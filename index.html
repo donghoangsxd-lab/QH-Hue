@@ -17,28 +17,30 @@
     #chart { background:#f9f9f9; display:none; padding:10px; }
     #table { background:#fff; display:none; height:33vh; overflow:auto; }
     #summary { padding:5px; font-weight:bold; background:#f0f0f0; }
+
+    /* Nút mũi tên */
     .toggle-btn {
       position:fixed;
-      width:0;
-      height:0;
-      border-left:10px solid transparent;
-      border-right:10px solid transparent;
+      width:0; height:0;
       cursor:pointer;
       z-index:999;
     }
+    /* Mũi tên dưới (bảng) */
     #btnTable {
-      bottom:10px;
-      left:50%;
-      transform:translateX(-50%);
-      border-top:10px solid #666;
+      bottom:10px; left:50%; transform:translateX(-50%);
+      border-left:10px solid transparent;
+      border-right:10px solid transparent;
     }
+    /* Mũi tên phải (biểu đồ) */
     #btnChart {
-      top:50%;
-      right:5px;
-      transform:translateY(-50%);
-      border-left:10px solid #666;
+      top:50%; right:5px; transform:translateY(-50%);
       border-top:10px solid transparent;
       border-bottom:10px solid transparent;
+    }
+    /* Màu trắng + viền xám */
+    .arrow-white {
+      border-color:white;
+      outline:2px solid gray;
     }
   </style>
 </head>
@@ -55,8 +57,8 @@
   </div>
 
   <!-- Nút mũi tên -->
-  <div id="btnTable" class="toggle-btn" title="Bật/tắt bảng"></div>
-  <div id="btnChart" class="toggle-btn" title="Bật/tắt biểu đồ"></div>
+  <div id="btnTable" class="toggle-btn"></div>
+  <div id="btnChart" class="toggle-btn"></div>
 
 <script>
   // Bản đồ
@@ -112,7 +114,6 @@
         onEachFeature: (f, layer) => {
           layer.on('click', e => {
             const isShift = e.originalEvent.shiftKey;
-            const maDoAn = f.properties.name;
             if (!isShift) {
               selectedLayers.forEach(l => l.setStyle({
                 color: l.feature.properties.stroke,
@@ -154,23 +155,69 @@
   // Điều khiển bố cục
   let showTable = false, showChart = false;
   function updateLayout() {
-    document.getElementById('table').style.display = showTable ? 'block' : 'none';
-    document.getElementById('chart').style.display = showChart ? 'block' : 'none';
+    const tableDiv = document.getElementById('table');
+    const chartDiv = document.getElementById('chart');
     const top = document.getElementById('top');
+    const btnTable = document.getElementById('btnTable');
+    const btnChart = document.getElementById('btnChart');
+
+    tableDiv.style.display = showTable ? 'block' : 'none';
+    chartDiv.style.display = showChart ? 'block' : 'none';
+
     if (showTable && showChart) {
-      top.style.gridTemplateColumns = '2fr 1fr';
+      top.style.gridTemplateColumns = '3fr 1fr'; // map 3/4, chart 1/4
       top.style.height = '67vh';
-      document.getElementById('table').style.height = '33vh';
+      tableDiv.style.height = '33vh';
+      // mũi tên hướng ra cạnh
+      btnTable.style.borderTop = "10px solid white";
+      btnTable.style.borderLeft = "10px solid transparent";
+      btnTable.style.borderRight = "10px solid transparent";
+      btnTable.style.outline = "2px solid gray";
+      btnChart.style.borderRight = "10px solid white";
+      btnChart.style.borderTop = "10px solid transparent";
+      btnChart.style.borderBottom = "10px solid transparent";
+      btnChart.style.outline = "2px solid gray";
     } else if (showChart && !showTable) {
-      top.style.gridTemplateColumns = '2fr 1fr';
+      top.style.gridTemplateColumns = '3fr 1fr';
       top.style.height = '100vh';
+      // mũi tên hướng ra cạnh
+      btnTable.style.borderTop = "10px solid white";
+      btnTable.style.borderLeft = "10px solid transparent";
+      btnTable.style.borderRight = "10px solid transparent";
+      btnTable.style.outline = "2px solid gray";
+
+      btnChart.style.borderRight = "10px solid white";
+      btnChart.style.borderTop = "10px solid transparent";
+      btnChart.style.borderBottom = "10px solid transparent";
+      btnChart.style.outline = "2px solid gray";
     } else if (!showChart && showTable) {
       top.style.gridTemplateColumns = '1fr 0fr';
       top.style.height = '67vh';
-      document.getElementById('table').style.height = '33vh';
+      tableDiv.style.height = '33vh';
+      // mũi tên hướng ra cạnh
+      btnTable.style.borderTop = "10px solid white";
+      btnTable.style.borderLeft = "10px solid transparent";
+      btnTable.style.borderRight = "10px solid transparent";
+      btnTable.style.outline = "2px solid gray";
+
+      btnChart.style.borderLeft = "10px solid white";
+      btnChart.style.borderTop = "10px solid transparent";
+      btnChart.style.borderBottom = "10px solid transparent";
+      btnChart.style.outline = "2px solid gray";
     } else {
       top.style.gridTemplateColumns = '1fr 0fr';
       top.style.height = '100vh';
+      tableDiv.style.height = '0';
+      // mũi tên hướng vào trong (bảng/biểu tắt)
+      btnTable.style.borderBottom = "10px solid white";
+      btnTable.style.borderLeft = "10px solid transparent";
+      btnTable.style.borderRight = "10px solid transparent";
+      btnTable.style.outline = "2px solid gray";
+
+      btnChart.style.borderLeft = "10px solid white";
+      btnChart.style.borderTop = "10px solid transparent";
+      btnChart.style.borderBottom = "10px solid transparent";
+      btnChart.style.outline = "2px solid gray";
     }
   }
 
@@ -182,6 +229,6 @@
     showChart = !showChart;
     updateLayout();
   };
-</script>
-</body>
-</html>
+
+  // Khởi tạo layout ban đầu
+  updateLayout();
