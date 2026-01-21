@@ -46,10 +46,10 @@
       ]
     });
 
-    // Biến lưu polygon đang được chọn
-    let selectedLayer = null;
+    // Biến lưu danh sách polygon đã chọn
+    let selectedLayers = [];
 
-    // Load polygon từ GeoJSON và xử lý tương tác
+    // Load polygon từ GeoJSON
     fetch('data.geojson')
       .then(response => response.json())
       .then(geojsonData => {
@@ -63,32 +63,38 @@
             };
           },
           onEachFeature: function (feature, layer) {
-            layer.on('click', function () {
-              // Reset style của polygon trước đó
-              if (selectedLayer) {
-                selectedLayer.setStyle({
-                  color: selectedLayer.feature.properties.stroke,
-                  fillColor: selectedLayer.feature.properties.fill,
-                  fillOpacity: 0.5,
+            layer.on('click', function (e) {
+              const isShift = e.originalEvent.shiftKey;
+              const maDoAn = feature.properties.name;
+
+              if (!isShift) {
+                // Nếu không giữ Shift → reset tất cả
+                selectedLayers.forEach(l => l.setStyle({
+                  color: l.feature.properties.stroke,
+                  fillColor: l.feature.properties.fill,
+                  fillOpacity: l.feature.properties['fill-opacity'],
                   weight: 1.2
-                });
+                }));
+                selectedLayers = [layer];
+              } else {
+                // Nếu giữ Shift → thêm vào danh sách nếu chưa có
+                if (!selectedLayers.includes(layer)) {
+                  selectedLayers.push(layer);
+                }
               }
 
-              // Gán polygon hiện tại là đã chọn
-              selectedLayer = layer;
+              // Highlight tất cả polygon đã chọn
+              selectedLayers.forEach(l => l.setStyle({
+                color: '#FFFFFF',
+                weight: 3,
+                fillColor: l.feature.properties.fill,
+                fillOpacity: l.feature.properties['fill-opacity']
+              }));
 
-              // Đổi style để highlight: giữ nguyên màu gốc, chỉ thêm viền trắng
-layer.setStyle({
-  color: '#FFFFFF', // viền trắng
-  weight: 5,        // độ dày viền
-  fillColor: feature.properties.fill,       // giữ nguyên màu gốc
-  fillOpacity: feature.properties['fill-opacity'] // giữ nguyên opacity gốc
-});
-
-
-              // Lọc bảng theo mã đồ án
-              var maDoAn = feature.properties.name;
-              table.search(maDoAn).draw();
+              // Lọc bảng theo danh sách mã đồ án
+              const maList = selectedLayers.map(l => l.feature.properties.name);
+              const regex = maList.join('|'); // tạo biểu thức lọc
+              table.search(regex, true, false).draw(); // lọc theo regex
             });
           }
         }).addTo(map);
