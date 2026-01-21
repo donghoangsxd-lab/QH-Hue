@@ -27,7 +27,29 @@
 
   <!-- File dữ liệu -->
   <script src="data.js"></script>   <!-- Bảng dữ liệu -->
-  <script src="data.json"></script> <!-- Polygon GeoJSON -->
+  <script>
+  fetch('data.geojson')
+    .then(response => response.json())
+    .then(geojsonData => {
+      L.geoJSON(geojsonData, {
+        style: function(feature) {
+          return {
+            color: feature.properties.stroke,
+            fillColor: feature.properties.fill,
+            fillOpacity: 0.5,
+            weight: 1.2
+          };
+        },
+        onEachFeature: function (feature, layer) {
+          layer.on('click', function () {
+            var maDoAn = feature.properties.name;
+            table.search(maDoAn).draw();
+          });
+        }
+      }).addTo(map);
+    });
+</script>
+
 
   <script>
     // Khởi tạo bản đồ Leaflet
