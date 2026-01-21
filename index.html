@@ -31,10 +31,6 @@
     }
     #btnTable { left:50%; transform:translateX(-50%); }
     #btnChart { top:50%; transform:translateY(-50%); }
-    /* Đặt control layers ở góc trên bên trái */
-    .leaflet-top.leaflet-left {
-      margin-top: 50px; /* đẩy xuống một chút để không che header */
-    }
   </style>
 </head>
 <body>
@@ -64,14 +60,15 @@
     subdomains:['mt0','mt1','mt2','mt3']
   });
 
-  // Khởi tạo bản đồ với lớp mặc định
+  // Khởi tạo bản đồ với lớp mặc định, bỏ nút zoom
   var map = L.map('map', {
     center: [16.466, 107.579],
     zoom: 13,
-    layers: [googleSat]
+    layers: [googleSat],
+    zoomControl: false
   });
 
-  // Nút chọn lớp nền ở góc trên bên trái
+  // Nút chọn lớp nền ở góc trên trái
   var baseMaps = {
     "Vệ tinh": googleSat,
     "Địa hình": googleTerrain,
@@ -172,7 +169,7 @@
     tableDiv.style.display = showTable ? 'block' : 'none';
     chartDiv.style.display = showChart ? 'block' : 'none';
 
-    // Bảng
+        // Bảng
     if (showTable) {
       tableDiv.style.height = '33vh';
       btnTable.style.cssText =
@@ -217,3 +214,4 @@
 </script>
 </body>
 </html>
+
