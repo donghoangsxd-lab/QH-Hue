@@ -9,12 +9,14 @@
     body { margin:0; font-family: Arial, sans-serif; }
     #map { height: 66vh; }
     #table { height: 34vh; overflow:auto; padding: 10px; }
+    #summary { padding: 10px; font-weight: bold; background: #f0f0f0; }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <div id="table">
     <table id="qhTable" class="display" style="width:100%"></table>
+    <div id="summary">Tổng diện tích: 0 ha | Tổng dân số: 0 người</div>
   </div>
 
   <!-- Thư viện JS -->
@@ -48,6 +50,21 @@
 
     // Biến lưu danh sách polygon đã chọn
     let selectedLayers = [];
+
+    // Hàm cập nhật tổng
+    function updateSummary(maList) {
+      let tongDienTich = 0;
+      let tongDanSo = 0;
+      maList.forEach(ma => {
+        const row = qhData.find(r => r[0] === ma);
+        if (row) {
+          tongDienTich += parseFloat(row[5]);
+          tongDanSo += parseInt(row[6]);
+        }
+      });
+      document.getElementById('summary').innerText =
+        `Tổng diện tích: ${tongDienTich.toLocaleString()} ha | Tổng dân số: ${tongDanSo.toLocaleString()} người`;
+    }
 
     // Load polygon từ GeoJSON
     fetch('data.geojson')
@@ -93,8 +110,11 @@
 
               // Lọc bảng theo danh sách mã đồ án
               const maList = selectedLayers.map(l => l.feature.properties.name);
-              const regex = maList.join('|'); // tạo biểu thức lọc
-              table.search(regex, true, false).draw(); // lọc theo regex
+              const regex = maList.join('|');
+              table.search(regex, true, false).draw();
+
+              // Cập nhật tổng
+              updateSummary(maList);
             });
           }
         }).addTo(map);
