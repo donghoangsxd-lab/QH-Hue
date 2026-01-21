@@ -157,78 +157,36 @@
     tableDiv.style.display = showTable ? 'block' : 'none';
     chartDiv.style.display = showChart ? 'block' : 'none';
 
-    // Reset mũi tên trước khi gán hướng mới
-    resetArrow(btnTable);
-    resetArrow(btnChart);
-
-    if (showTable && showChart) {
-      // Trạng thái 2: cả bảng và biểu đồ bật
-      top.style.gridTemplateColumns = '3fr 1fr'; // map 3/4, chart 1/4
+    // Logic bảng
+    if (showTable) {
       top.style.height = '67vh';
       tableDiv.style.height = '33vh';
-
-      // Mũi tên hướng ra cạnh ngoài của bảng/biểu
-      btnTable.style.bottom = "33vh";
-      btnTable.style.borderTop = "10px solid white";
-      btnTable.style.borderLeft = "10px solid transparent";
-      btnTable.style.borderRight = "10px solid transparent";
-      btnTable.style.filter = "drop-shadow(0 0 2px gray)";
-
-      btnChart.style.right = "25%";
-      btnChart.style.borderRight = "10px solid white";
-      btnChart.style.borderTop = "10px solid transparent";
-      btnChart.style.borderBottom = "10px solid transparent";
-      btnChart.style.filter = "drop-shadow(0 0 2px gray)";
-    } else if (showChart && !showTable) {
-      // Trạng thái 1: chỉ biểu đồ bật
-      top.style.gridTemplateColumns = '3fr 1fr';
-      top.style.height = '100vh';
-
-      btnTable.style.bottom = "10px";
-      btnTable.style.borderTop = "10px solid white";
-      btnTable.style.borderLeft = "10px solid transparent";
-      btnTable.style.borderRight = "10px solid transparent";
-      btnTable.style.filter = "drop-shadow(0 0 2px gray)";
-
-      btnChart.style.right = "25%";
-      btnChart.style.borderRight = "10px solid white";
-      btnChart.style.borderTop = "10px solid transparent";
-      btnChart.style.borderBottom = "10px solid transparent";
-      btnChart.style.filter = "drop-shadow(0 0 2px gray)";
-    } else if (!showChart && showTable) {
-      // Trạng thái 3: chỉ bảng bật
-      top.style.gridTemplateColumns = '1fr 0fr';
-      top.style.height = '67vh';
-      tableDiv.style.height = '33vh';
-
-      btnTable.style.bottom = "33vh";
-      btnTable.style.borderTop = "10px solid white";
-      btnTable.style.borderLeft = "10px solid transparent";
-      btnTable.style.borderRight = "10px solid transparent";
-      btnTable.style.filter = "drop-shadow(0 0 2px gray)";
-
-      btnChart.style.right = "5px";
-      btnChart.style.borderLeft = "10px solid white";
-      btnChart.style.borderTop = "10px solid transparent";
-      btnChart.style.borderBottom = "10px solid transparent";
-      btnChart.style.filter = "drop-shadow(0 0 2px gray)";
+      btnTable.style.cssText =
+        "position:fixed;bottom:33vh;left:50%;transform:translateX(-50%);" +
+        "border-top:10px solid white;border-left:10px solid transparent;border-right:10px solid transparent;" +
+        "filter:drop-shadow(0 0 2px gray);";
     } else {
-      // Trạng thái 4: cả bảng và biểu đồ tắt
-      top.style.gridTemplateColumns = '1fr 0fr';
       top.style.height = '100vh';
       tableDiv.style.height = '0';
+      btnTable.style.cssText =
+        "position:fixed;bottom:10px;left:50%;transform:translateX(-50%);" +
+        "border-bottom:10px solid white;border-left:10px solid transparent;border-right:10px solid transparent;" +
+        "filter:drop-shadow(0 0 2px gray);";
+    }
 
-      btnTable.style.bottom = "10px";
-      btnTable.style.borderBottom = "10px solid white";
-      btnTable.style.borderLeft = "10px solid transparent";
-      btnTable.style.borderRight = "10px solid transparent";
-      btnTable.style.filter = "drop-shadow(0 0 2px gray)";
-
-      btnChart.style.right = "5px";
-      btnChart.style.borderLeft = "10px solid white";
-      btnChart.style.borderTop = "10px solid transparent";
-      btnChart.style.borderBottom = "10px solid transparent";
-      btnChart.style.filter = "drop-shadow(0 0 2px gray)";
+    // Logic biểu đồ
+    if (showChart) {
+      top.style.gridTemplateColumns = '3fr 1fr'; // map 3/4, chart 1/4
+      btnChart.style.cssText =
+        "position:fixed;top:50%;right:25%;transform:translateY(-50%);" +
+        "border-right:10px solid white;border-top:10px solid transparent;border-bottom:10px solid transparent;" +
+        "filter:drop-shadow(0 0 2px gray);";
+    } else {
+      top.style.gridTemplateColumns = '1fr 0fr';
+      btnChart.style.cssText =
+        "position:fixed;top:50%;right:5px;transform:translateY(-50%);" +
+        "border-left:10px solid white;border-top:10px solid transparent;border-bottom:10px solid transparent;" +
+        "filter:drop-shadow(0 0 2px gray);";
     }
   }
 
@@ -246,3 +204,4 @@
 </script>
 </body>
 </html>
+
