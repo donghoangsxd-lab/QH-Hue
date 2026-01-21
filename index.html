@@ -31,6 +31,10 @@
     }
     #btnTable { left:50%; transform:translateX(-50%); }
     #btnChart { top:50%; transform:translateY(-50%); }
+    /* Đặt control layers ở góc trên bên trái */
+    .leaflet-top.leaflet-left {
+      margin-top: 50px; /* đẩy xuống một chút để không che header */
+    }
   </style>
 </head>
 <body>
@@ -49,10 +53,31 @@
   <div id="btnChart" class="toggle-btn"></div>
 
 <script>
-  var map = L.map('map').setView([16.466, 107.579], 13);
-  L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+  // Các lớp nền Google
+  var googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     subdomains:['mt0','mt1','mt2','mt3']
-  }).addTo(map);
+  });
+  var googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+    subdomains:['mt0','mt1','mt2','mt3']
+  });
+  var googleRoadmap = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    subdomains:['mt0','mt1','mt2','mt3']
+  });
+
+  // Khởi tạo bản đồ với lớp mặc định
+  var map = L.map('map', {
+    center: [16.466, 107.579],
+    zoom: 13,
+    layers: [googleSat]
+  });
+
+  // Nút chọn lớp nền ở góc trên bên trái
+  var baseMaps = {
+    "Vệ tinh": googleSat,
+    "Địa hình": googleTerrain,
+    "Đường phố": googleRoadmap
+  };
+  L.control.layers(baseMaps, null, { position: 'topleft' }).addTo(map);
 
   const qhData = [
     ["QH001","Quy hoạch Phú Xuân","123/QĐ-UBND","01/01/2024","UBND tỉnh",4300,310000],
