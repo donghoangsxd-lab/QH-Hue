@@ -17,9 +17,12 @@
     <table id="qhTable" class="display" style="width:100%"></table>
   </div>
 
+  <!-- Thư viện JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+  <!-- Dữ liệu bảng -->
   <script src="data.js"></script>
 
   <script>
@@ -43,7 +46,10 @@
       ]
     });
 
-    // Load polygon từ GeoJSON
+    // Biến lưu polygon đang được chọn
+    let selectedLayer = null;
+
+    // Load polygon từ GeoJSON và xử lý tương tác
     fetch('data.geojson')
       .then(response => response.json())
       .then(geojsonData => {
@@ -58,6 +64,28 @@
           },
           onEachFeature: function (feature, layer) {
             layer.on('click', function () {
+              // Reset style của polygon trước đó
+              if (selectedLayer) {
+                selectedLayer.setStyle({
+                  color: selectedLayer.feature.properties.stroke,
+                  fillColor: selectedLayer.feature.properties.fill,
+                  fillOpacity: 0.5,
+                  weight: 1.2
+                });
+              }
+
+              // Gán polygon hiện tại là đã chọn
+              selectedLayer = layer;
+
+              // Đổi style để highlight
+              layer.setStyle({
+                color: '#000000',
+                fillColor: '#FFD700',
+                fillOpacity: 0.7,
+                weight: 2
+              });
+
+              // Lọc bảng theo mã đồ án
               var maDoAn = feature.properties.name;
               table.search(maDoAn).draw();
             });
