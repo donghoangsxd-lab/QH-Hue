@@ -25,22 +25,11 @@
       cursor:pointer;
       z-index:999;
     }
-    /* Mũi tên dưới (bảng) */
     #btnTable {
-      bottom:10px; left:50%; transform:translateX(-50%);
-      border-left:10px solid transparent;
-      border-right:10px solid transparent;
+      left:50%; transform:translateX(-50%);
     }
-    /* Mũi tên phải (biểu đồ) */
     #btnChart {
-      top:50%; right:5px; transform:translateY(-50%);
-      border-top:10px solid transparent;
-      border-bottom:10px solid transparent;
-    }
-    /* Màu trắng + viền xám */
-    .arrow-white {
-      border-color:white;
-      outline:2px solid gray;
+      top:50%; transform:translateY(-50%);
     }
   </style>
 </head>
@@ -151,9 +140,13 @@
       }]
     }
   });
-
-  // Điều khiển bố cục
+  // Điều khiển bố cục và mũi tên
   let showTable = false, showChart = false;
+
+  function resetArrow(btn) {
+    btn.style.cssText = "position:fixed;width:0;height:0;cursor:pointer;z-index:999;";
+  }
+
   function updateLayout() {
     const tableDiv = document.getElementById('table');
     const chartDiv = document.getElementById('chart');
@@ -164,60 +157,78 @@
     tableDiv.style.display = showTable ? 'block' : 'none';
     chartDiv.style.display = showChart ? 'block' : 'none';
 
+    // Reset mũi tên trước khi gán hướng mới
+    resetArrow(btnTable);
+    resetArrow(btnChart);
+
     if (showTable && showChart) {
+      // Trạng thái 2: cả bảng và biểu đồ bật
       top.style.gridTemplateColumns = '3fr 1fr'; // map 3/4, chart 1/4
       top.style.height = '67vh';
       tableDiv.style.height = '33vh';
-      // mũi tên hướng ra cạnh
+
+      // Mũi tên hướng ra cạnh ngoài của bảng/biểu
+      btnTable.style.bottom = "33vh";
       btnTable.style.borderTop = "10px solid white";
       btnTable.style.borderLeft = "10px solid transparent";
       btnTable.style.borderRight = "10px solid transparent";
-      btnTable.style.outline = "2px solid gray";
+      btnTable.style.filter = "drop-shadow(0 0 2px gray)";
+
+      btnChart.style.right = "25%";
       btnChart.style.borderRight = "10px solid white";
       btnChart.style.borderTop = "10px solid transparent";
       btnChart.style.borderBottom = "10px solid transparent";
-      btnChart.style.outline = "2px solid gray";
+      btnChart.style.filter = "drop-shadow(0 0 2px gray)";
     } else if (showChart && !showTable) {
+      // Trạng thái 1: chỉ biểu đồ bật
       top.style.gridTemplateColumns = '3fr 1fr';
       top.style.height = '100vh';
-      // mũi tên hướng ra cạnh
+
+      btnTable.style.bottom = "10px";
       btnTable.style.borderTop = "10px solid white";
       btnTable.style.borderLeft = "10px solid transparent";
       btnTable.style.borderRight = "10px solid transparent";
-      btnTable.style.outline = "2px solid gray";
+      btnTable.style.filter = "drop-shadow(0 0 2px gray)";
 
+      btnChart.style.right = "25%";
       btnChart.style.borderRight = "10px solid white";
       btnChart.style.borderTop = "10px solid transparent";
       btnChart.style.borderBottom = "10px solid transparent";
-      btnChart.style.outline = "2px solid gray";
+      btnChart.style.filter = "drop-shadow(0 0 2px gray)";
     } else if (!showChart && showTable) {
+      // Trạng thái 3: chỉ bảng bật
       top.style.gridTemplateColumns = '1fr 0fr';
       top.style.height = '67vh';
       tableDiv.style.height = '33vh';
-      // mũi tên hướng ra cạnh
+
+      btnTable.style.bottom = "33vh";
       btnTable.style.borderTop = "10px solid white";
       btnTable.style.borderLeft = "10px solid transparent";
       btnTable.style.borderRight = "10px solid transparent";
-      btnTable.style.outline = "2px solid gray";
+      btnTable.style.filter = "drop-shadow(0 0 2px gray)";
 
+      btnChart.style.right = "5px";
       btnChart.style.borderLeft = "10px solid white";
       btnChart.style.borderTop = "10px solid transparent";
       btnChart.style.borderBottom = "10px solid transparent";
-      btnChart.style.outline = "2px solid gray";
+      btnChart.style.filter = "drop-shadow(0 0 2px gray)";
     } else {
+      // Trạng thái 4: cả bảng và biểu đồ tắt
       top.style.gridTemplateColumns = '1fr 0fr';
       top.style.height = '100vh';
       tableDiv.style.height = '0';
-      // mũi tên hướng vào trong (bảng/biểu tắt)
+
+      btnTable.style.bottom = "10px";
       btnTable.style.borderBottom = "10px solid white";
       btnTable.style.borderLeft = "10px solid transparent";
       btnTable.style.borderRight = "10px solid transparent";
-      btnTable.style.outline = "2px solid gray";
+      btnTable.style.filter = "drop-shadow(0 0 2px gray)";
 
+      btnChart.style.right = "5px";
       btnChart.style.borderLeft = "10px solid white";
       btnChart.style.borderTop = "10px solid transparent";
       btnChart.style.borderBottom = "10px solid transparent";
-      btnChart.style.outline = "2px solid gray";
+      btnChart.style.filter = "drop-shadow(0 0 2px gray)";
     }
   }
 
