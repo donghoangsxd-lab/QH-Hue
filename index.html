@@ -2,35 +2,47 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <title>Demo Quy hoạch Huế</title>
-  <!-- Leaflet + DataTables + Chart.js -->
+  <title>Quy hoạch Huế</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
   <style>
     body { margin:0; height:100vh; display:flex; flex-direction:column; font-family:sans-serif; }
-    #controls { padding:5px; background:#eee; text-align:right; }
     #layout { flex:1; display:grid; grid-template-rows: 1fr auto; }
     #top { display:grid; grid-template-columns: 1fr 0fr; height:100%; transition: all 0.3s; }
     #map { background:#ddd; }
-    #chart { background:#f9f9f9; display:none; }
+    #chart { background:#f9f9f9; display:none; padding:10px; }
     #table { background:#fff; display:none; height:33vh; overflow:auto; }
     #summary { padding:5px; font-weight:bold; background:#f0f0f0; }
-    .toggle-btn { position:absolute; background:#ccc; padding:3px; cursor:pointer; }
-    #btnTable { bottom:5px; left:50%; transform:translateX(-50%); }
-    #btnChart { top:50%; right:5px; transform:translateY(-50%); }
+    .toggle-btn {
+      position:fixed;
+      width:0;
+      height:0;
+      border-left:10px solid transparent;
+      border-right:10px solid transparent;
+      cursor:pointer;
+      z-index:999;
+    }
+    #btnTable {
+      bottom:10px;
+      left:50%;
+      transform:translateX(-50%);
+      border-top:10px solid #666;
+    }
+    #btnChart {
+      top:50%;
+      right:5px;
+      transform:translateY(-50%);
+      border-left:10px solid #666;
+      border-top:10px solid transparent;
+      border-bottom:10px solid transparent;
+    }
   </style>
 </head>
 <body>
-  <div id="controls">
-    <label><input type="checkbox" id="toggleTable"> Bảng dữ liệu</label>
-    <label><input type="checkbox" id="toggleChart"> Biểu đồ</label>
-  </div>
-
   <div id="layout">
     <div id="top">
       <div id="map"></div>
@@ -42,17 +54,18 @@
     </div>
   </div>
 
-  <div id="btnTable" class="toggle-btn">▲</div>
-  <div id="btnChart" class="toggle-btn">◀</div>
+  <!-- Nút mũi tên -->
+  <div id="btnTable" class="toggle-btn" title="Bật/tắt bảng"></div>
+  <div id="btnChart" class="toggle-btn" title="Bật/tắt biểu đồ"></div>
 
 <script>
-  // Khởi tạo bản đồ
+  // Bản đồ
   var map = L.map('map').setView([16.466, 107.579], 13);
   L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     subdomains:['mt0','mt1','mt2','mt3']
   }).addTo(map);
 
-  // Dữ liệu bảng demo
+  // Dữ liệu bảng
   const qhData = [
     ["QH001","Quy hoạch Phú Xuân","123/QĐ-UBND","01/01/2024","UBND tỉnh",4300,310000],
     ["QH002","Quy hoạch Thuận Hóa","456/QĐ-UBND","15/03/2024","UBND tỉnh",6600,410000]
@@ -70,10 +83,9 @@
     ]
   });
 
-  // Hàm cập nhật tổng
+  // Tổng
   function updateSummary(maList) {
-    let tongDienTich = 0;
-    let tongDanSo = 0;
+    let tongDienTich = 0, tongDanSo = 0;
     maList.forEach(ma => {
       const row = qhData.find(r => r[0] === ma);
       if (row) {
@@ -85,27 +97,22 @@
       `Tổng diện tích: ${tongDienTich.toLocaleString()} ha | Tổng dân số: ${tongDanSo.toLocaleString()} người`;
   }
 
-  // Biến lưu danh sách polygon đã chọn
+  // Polygon
   let selectedLayers = [];
-
-  // Load polygon từ GeoJSON
   fetch('data.geojson')
-    .then(response => response.json())
+    .then(res => res.json())
     .then(geojsonData => {
       L.geoJSON(geojsonData, {
-        style: function(feature) {
-          return {
-            color: feature.properties.stroke,
-            fillColor: feature.properties.fill,
-            fillOpacity: 0.5,
-            weight: 1.2
-          };
-        },
-        onEachFeature: function (feature, layer) {
-          layer.on('click', function (e) {
+        style: f => ({
+          color: f.properties.stroke,
+          fillColor: f.properties.fill,
+          fillOpacity: 0.5,
+          weight: 1.2
+        }),
+        onEachFeature: (f, layer) => {
+          layer.on('click', e => {
             const isShift = e.originalEvent.shiftKey;
-            const maDoAn = feature.properties.name;
-
+            const maDoAn = f.properties.name;
             if (!isShift) {
               selectedLayers.forEach(l => l.setStyle({
                 color: l.feature.properties.stroke,
@@ -115,30 +122,24 @@
               }));
               selectedLayers = [layer];
             } else {
-              if (!selectedLayers.includes(layer)) {
-                selectedLayers.push(layer);
-              }
+              if (!selectedLayers.includes(layer)) selectedLayers.push(layer);
             }
-
             selectedLayers.forEach(l => l.setStyle({
               color: '#FFFFFF',
               weight: 3,
               fillColor: l.feature.properties.fill,
               fillOpacity: l.feature.properties['fill-opacity']
             }));
-
             const maList = selectedLayers.map(l => l.feature.properties.name);
-            const regex = maList.join('|');
-            table.search(regex, true, false).draw();
+            table.search(maList.join('|'), true, false).draw();
             updateSummary(maList);
           });
         }
       }).addTo(map);
     });
 
-  // Chart demo
-  const ctx = document.getElementById('chartCanvas').getContext('2d');
-  new Chart(ctx, {
+  // Biểu đồ
+  new Chart(document.getElementById('chartCanvas').getContext('2d'), {
     type: 'bar',
     data: {
       labels: ['Phú Xuân','Thuận Hóa'],
@@ -150,48 +151,35 @@
     }
   });
 
-  // Điều khiển layout 4 trạng thái
-  const toggleTable = document.getElementById('toggleTable');
-  const toggleChart = document.getElementById('toggleChart');
-  const tableDiv = document.getElementById('table');
-  const chartDiv = document.getElementById('chart');
-  const topDiv = document.getElementById('top');
-
+  // Điều khiển bố cục
+  let showTable = false, showChart = false;
   function updateLayout() {
-    const showTable = toggleTable.checked;
-    const showChart = toggleChart.checked;
-
-    tableDiv.style.display = showTable ? 'block' : 'none';
-    chartDiv.style.display = showChart ? 'block' : 'none';
-
+    document.getElementById('table').style.display = showTable ? 'block' : 'none';
+    document.getElementById('chart').style.display = showChart ? 'block' : 'none';
+    const top = document.getElementById('top');
     if (showTable && showChart) {
-      topDiv.style.gridTemplateColumns = '2fr 1fr';
-      topDiv.style.height = '67vh';
-      tableDiv.style.height = '33vh';
+      top.style.gridTemplateColumns = '2fr 1fr';
+      top.style.height = '67vh';
+      document.getElementById('table').style.height = '33vh';
     } else if (showChart && !showTable) {
-      topDiv.style.gridTemplateColumns = '2fr 2fr';
-      topDiv.style.height = '100vh';
-      tableDiv.style.height = '0';
+      top.style.gridTemplateColumns = '2fr 1fr';
+      top.style.height = '100vh';
     } else if (!showChart && showTable) {
-      topDiv.style.gridTemplateColumns = '1fr 0fr';
-      topDiv.style.height = '67vh';
-      tableDiv.style.height = '33vh';
+      top.style.gridTemplateColumns = '1fr 0fr';
+      top.style.height = '67vh';
+      document.getElementById('table').style.height = '33vh';
     } else {
-      topDiv.style.gridTemplateColumns = '1fr 0fr';
-      topDiv.style.height = '100vh';
-      tableDiv.style.height = '0';
+      top.style.gridTemplateColumns = '1fr 0fr';
+      top.style.height = '100vh';
     }
   }
 
-  toggleTable.addEventListener('change', updateLayout);
-  toggleChart.addEventListener('change', updateLayout);
-
   document.getElementById('btnTable').onclick = () => {
-    toggleTable.checked = !toggleTable.checked;
+    showTable = !showTable;
     updateLayout();
   };
   document.getElementById('btnChart').onclick = () => {
-    toggleChart.checked = !toggleChart.checked;
+    showChart = !showChart;
     updateLayout();
   };
 </script>
