@@ -3,77 +3,30 @@
 <head>
   <meta charset="utf-8" />
   <title>Demo Quy hoạch Huế</title>
-  <!-- CSS cho Leaflet và DataTables -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" />
   <style>
     body { margin:0; font-family: Arial, sans-serif; }
-    #map { height: 66vh; }   /* 2/3 màn hình */
-    #table { height: 34vh; overflow:auto; } /* 1/3 màn hình */
+    #map { height: 66vh; }
+    #table { height: 34vh; overflow:auto; padding: 10px; }
   </style>
 </head>
 <body>
-  <!-- Bản đồ -->
   <div id="map"></div>
-  <!-- Bảng dữ liệu -->
   <div id="table">
-    <table id="qhTable" class="display"></table>
+    <table id="qhTable" class="display" style="width:100%"></table>
   </div>
 
-  <!-- JS thư viện -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-
-  <!-- File dữ liệu -->
-  <script src="data.js"></script>   <!-- Bảng dữ liệu -->
-  <script>
-  fetch('data.geojson')
-    .then(response => response.json())
-    .then(geojsonData => {
-      L.geoJSON(geojsonData, {
-        style: function(feature) {
-          return {
-            color: feature.properties.stroke,
-            fillColor: feature.properties.fill,
-            fillOpacity: 0.5,
-            weight: 1.2
-          };
-        },
-        onEachFeature: function (feature, layer) {
-          layer.on('click', function () {
-            var maDoAn = feature.properties.name;
-            table.search(maDoAn).draw();
-          });
-        }
-      }).addTo(map);
-    });
-</script>
-
+  <script src="data.js"></script>
 
   <script>
-    // Khởi tạo bản đồ Leaflet
-    var map = L.map('map').setView([16.466, 107.579], 13); // Tọa độ trung tâm Huế
+    // Khởi tạo bản đồ
+    var map = L.map('map').setView([16.466, 107.579], 13);
     L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
       subdomains:['mt0','mt1','mt2','mt3']
-    }).addTo(map);
-
-    // Load polygon từ GeoJSON
-    L.geoJSON(geojsonData, {
-      style: function(feature) {
-        return {
-          color: feature.properties.stroke,
-          fillColor: feature.properties.fill,
-          fillOpacity: 0.5,
-          weight: 1.2
-        };
-      },
-      onEachFeature: function (feature, layer) {
-        layer.on('click', function () {
-          var maDoAn = feature.properties.name; // QH001 hoặc QH002
-          table.search(maDoAn).draw(); // lọc bảng theo mã
-        });
-      }
     }).addTo(map);
 
     // Hiển thị bảng dữ liệu
@@ -89,6 +42,28 @@
         { title: "Dân số (người)" }
       ]
     });
+
+    // Load polygon từ GeoJSON
+    fetch('data.geojson')
+      .then(response => response.json())
+      .then(geojsonData => {
+        L.geoJSON(geojsonData, {
+          style: function(feature) {
+            return {
+              color: feature.properties.stroke,
+              fillColor: feature.properties.fill,
+              fillOpacity: 0.5,
+              weight: 1.2
+            };
+          },
+          onEachFeature: function (feature, layer) {
+            layer.on('click', function () {
+              var maDoAn = feature.properties.name;
+              table.search(maDoAn).draw();
+            });
+          }
+        }).addTo(map);
+      });
   </script>
 </body>
 </html>
