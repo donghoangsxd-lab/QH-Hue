@@ -77,13 +77,14 @@
               // Gán polygon hiện tại là đã chọn
               selectedLayer = layer;
 
-              // Đổi style để highlight
-              layer.setStyle({
-                color: '#000000',
-                fillColor: '#FFD700',
-                fillOpacity: 0.7,
-                weight: 2
-              });
+              // Đổi style để highlight: giữ nguyên màu gốc, chỉ thêm viền trắng
+layer.setStyle({
+  color: '#FFFFFF', // viền trắng
+  weight: 5,        // độ dày viền
+  fillColor: feature.properties.fill,       // giữ nguyên màu gốc
+  fillOpacity: feature.properties['fill-opacity'] // giữ nguyên opacity gốc
+});
+
 
               // Lọc bảng theo mã đồ án
               var maDoAn = feature.properties.name;
