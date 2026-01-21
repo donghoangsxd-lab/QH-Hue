@@ -3,122 +3,197 @@
 <head>
   <meta charset="utf-8" />
   <title>Demo Quy hoạch Huế</title>
+  <!-- Leaflet + DataTables + Chart.js -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" />
-  <style>
-    body { margin:0; font-family: Arial, sans-serif; }
-    #map { height: 66vh; }
-    #table { height: 34vh; overflow:auto; padding: 10px; }
-    #summary { padding: 10px; font-weight: bold; background: #f0f0f0; }
-  </style>
-</head>
-<body>
-  <div id="map"></div>
-  <div id="table">
-    <table id="qhTable" class="display" style="width:100%"></table>
-    <div id="summary">Tổng diện tích: 0 ha | Tổng dân số: 0 người</div>
-  </div>
-
-  <!-- Thư viện JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Dữ liệu bảng -->
-  <script src="data.js"></script>
+  <style>
+    body { margin:0; height:100vh; display:flex; flex-direction:column; font-family:sans-serif; }
+    #controls { padding:5px; background:#eee; text-align:right; }
+    #layout { flex:1; display:grid; grid-template-rows: 1fr auto; }
+    #top { display:grid; grid-template-columns: 1fr 0fr; height:100%; transition: all 0.3s; }
+    #map { background:#ddd; }
+    #chart { background:#f9f9f9; display:none; }
+    #table { background:#fff; display:none; height:33vh; overflow:auto; }
+    #summary { padding:5px; font-weight:bold; background:#f0f0f0; }
+    .toggle-btn { position:absolute; background:#ccc; padding:3px; cursor:pointer; }
+    #btnTable { bottom:5px; left:50%; transform:translateX(-50%); }
+    #btnChart { top:50%; right:5px; transform:translateY(-50%); }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <label><input type="checkbox" id="toggleTable"> Bảng dữ liệu</label>
+    <label><input type="checkbox" id="toggleChart"> Biểu đồ</label>
+  </div>
 
-  <script>
-    // Khởi tạo bản đồ
-    var map = L.map('map').setView([16.466, 107.579], 13);
-    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-      subdomains:['mt0','mt1','mt2','mt3']
-    }).addTo(map);
+  <div id="layout">
+    <div id="top">
+      <div id="map"></div>
+      <div id="chart"><canvas id="chartCanvas"></canvas></div>
+    </div>
+    <div id="table">
+      <table id="qhTable" class="display" style="width:100%"></table>
+      <div id="summary">Tổng diện tích: 0 ha | Tổng dân số: 0 người</div>
+    </div>
+  </div>
 
-    // Hiển thị bảng dữ liệu
-    var table = $('#qhTable').DataTable({
-      data: qhData,
-      columns: [
-        { title: "Mã đồ án" },
-        { title: "Tên đồ án" },
-        { title: "Quyết định" },
-        { title: "Ngày ban hành" },
-        { title: "Cơ quan ban hành" },
-        { title: "Diện tích (ha)" },
-        { title: "Dân số (người)" }
-      ]
+  <div id="btnTable" class="toggle-btn">▲</div>
+  <div id="btnChart" class="toggle-btn">◀</div>
+
+<script>
+  // Khởi tạo bản đồ
+  var map = L.map('map').setView([16.466, 107.579], 13);
+  L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    subdomains:['mt0','mt1','mt2','mt3']
+  }).addTo(map);
+
+  // Dữ liệu bảng demo
+  const qhData = [
+    ["QH001","Quy hoạch Phú Xuân","123/QĐ-UBND","01/01/2024","UBND tỉnh",4300,310000],
+    ["QH002","Quy hoạch Thuận Hóa","456/QĐ-UBND","15/03/2024","UBND tỉnh",6600,410000]
+  ];
+  const table = $('#qhTable').DataTable({
+    data: qhData,
+    columns: [
+      { title: "Mã đồ án" },
+      { title: "Tên đồ án" },
+      { title: "Quyết định" },
+      { title: "Ngày ban hành" },
+      { title: "Cơ quan ban hành" },
+      { title: "Diện tích (ha)" },
+      { title: "Dân số (người)" }
+    ]
+  });
+
+  // Hàm cập nhật tổng
+  function updateSummary(maList) {
+    let tongDienTich = 0;
+    let tongDanSo = 0;
+    maList.forEach(ma => {
+      const row = qhData.find(r => r[0] === ma);
+      if (row) {
+        tongDienTich += parseFloat(row[5]);
+        tongDanSo += parseInt(row[6]);
+      }
+    });
+    document.getElementById('summary').innerText =
+      `Tổng diện tích: ${tongDienTich.toLocaleString()} ha | Tổng dân số: ${tongDanSo.toLocaleString()} người`;
+  }
+
+  // Biến lưu danh sách polygon đã chọn
+  let selectedLayers = [];
+
+  // Load polygon từ GeoJSON
+  fetch('data.geojson')
+    .then(response => response.json())
+    .then(geojsonData => {
+      L.geoJSON(geojsonData, {
+        style: function(feature) {
+          return {
+            color: feature.properties.stroke,
+            fillColor: feature.properties.fill,
+            fillOpacity: 0.5,
+            weight: 1.2
+          };
+        },
+        onEachFeature: function (feature, layer) {
+          layer.on('click', function (e) {
+            const isShift = e.originalEvent.shiftKey;
+            const maDoAn = feature.properties.name;
+
+            if (!isShift) {
+              selectedLayers.forEach(l => l.setStyle({
+                color: l.feature.properties.stroke,
+                fillColor: l.feature.properties.fill,
+                fillOpacity: l.feature.properties['fill-opacity'],
+                weight: 1.2
+              }));
+              selectedLayers = [layer];
+            } else {
+              if (!selectedLayers.includes(layer)) {
+                selectedLayers.push(layer);
+              }
+            }
+
+            selectedLayers.forEach(l => l.setStyle({
+              color: '#FFFFFF',
+              weight: 3,
+              fillColor: l.feature.properties.fill,
+              fillOpacity: l.feature.properties['fill-opacity']
+            }));
+
+            const maList = selectedLayers.map(l => l.feature.properties.name);
+            const regex = maList.join('|');
+            table.search(regex, true, false).draw();
+            updateSummary(maList);
+          });
+        }
+      }).addTo(map);
     });
 
-    // Biến lưu danh sách polygon đã chọn
-    let selectedLayers = [];
-
-    // Hàm cập nhật tổng
-    function updateSummary(maList) {
-      let tongDienTich = 0;
-      let tongDanSo = 0;
-      maList.forEach(ma => {
-        const row = qhData.find(r => r[0] === ma);
-        if (row) {
-          tongDienTich += parseFloat(row[5]);
-          tongDanSo += parseInt(row[6]);
-        }
-      });
-      document.getElementById('summary').innerText =
-        `Tổng diện tích: ${tongDienTich.toLocaleString()} ha | Tổng dân số: ${tongDanSo.toLocaleString()} người`;
+  // Chart demo
+  const ctx = document.getElementById('chartCanvas').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Phú Xuân','Thuận Hóa'],
+      datasets: [{
+        label: 'Dân số',
+        data: [310000,410000],
+        backgroundColor: ['green','red']
+      }]
     }
+  });
 
-    // Load polygon từ GeoJSON
-    fetch('data.geojson')
-      .then(response => response.json())
-      .then(geojsonData => {
-        L.geoJSON(geojsonData, {
-          style: function(feature) {
-            return {
-              color: feature.properties.stroke,
-              fillColor: feature.properties.fill,
-              fillOpacity: 0.5,
-              weight: 1.2
-            };
-          },
-          onEachFeature: function (feature, layer) {
-            layer.on('click', function (e) {
-              const isShift = e.originalEvent.shiftKey;
-              const maDoAn = feature.properties.name;
+  // Điều khiển layout 4 trạng thái
+  const toggleTable = document.getElementById('toggleTable');
+  const toggleChart = document.getElementById('toggleChart');
+  const tableDiv = document.getElementById('table');
+  const chartDiv = document.getElementById('chart');
+  const topDiv = document.getElementById('top');
 
-              if (!isShift) {
-                // Nếu không giữ Shift → reset tất cả
-                selectedLayers.forEach(l => l.setStyle({
-                  color: l.feature.properties.stroke,
-                  fillColor: l.feature.properties.fill,
-                  fillOpacity: l.feature.properties['fill-opacity'],
-                  weight: 1.2
-                }));
-                selectedLayers = [layer];
-              } else {
-                // Nếu giữ Shift → thêm vào danh sách nếu chưa có
-                if (!selectedLayers.includes(layer)) {
-                  selectedLayers.push(layer);
-                }
-              }
+  function updateLayout() {
+    const showTable = toggleTable.checked;
+    const showChart = toggleChart.checked;
 
-              // Highlight tất cả polygon đã chọn
-              selectedLayers.forEach(l => l.setStyle({
-                color: '#FFFFFF',
-                weight: 3,
-                fillColor: l.feature.properties.fill,
-                fillOpacity: l.feature.properties['fill-opacity']
-              }));
+    tableDiv.style.display = showTable ? 'block' : 'none';
+    chartDiv.style.display = showChart ? 'block' : 'none';
 
-              // Lọc bảng theo danh sách mã đồ án
-              const maList = selectedLayers.map(l => l.feature.properties.name);
-              const regex = maList.join('|');
-              table.search(regex, true, false).draw();
+    if (showTable && showChart) {
+      topDiv.style.gridTemplateColumns = '2fr 1fr';
+      topDiv.style.height = '67vh';
+      tableDiv.style.height = '33vh';
+    } else if (showChart && !showTable) {
+      topDiv.style.gridTemplateColumns = '2fr 2fr';
+      topDiv.style.height = '100vh';
+      tableDiv.style.height = '0';
+    } else if (!showChart && showTable) {
+      topDiv.style.gridTemplateColumns = '1fr 0fr';
+      topDiv.style.height = '67vh';
+      tableDiv.style.height = '33vh';
+    } else {
+      topDiv.style.gridTemplateColumns = '1fr 0fr';
+      topDiv.style.height = '100vh';
+      tableDiv.style.height = '0';
+    }
+  }
 
-              // Cập nhật tổng
-              updateSummary(maList);
-            });
-          }
-        }).addTo(map);
-      });
-  </script>
+  toggleTable.addEventListener('change', updateLayout);
+  toggleChart.addEventListener('change', updateLayout);
+
+  document.getElementById('btnTable').onclick = () => {
+    toggleTable.checked = !toggleTable.checked;
+    updateLayout();
+  };
+  document.getElementById('btnChart').onclick = () => {
+    toggleChart.checked = !toggleChart.checked;
+    updateLayout();
+  };
+</script>
 </body>
 </html>
