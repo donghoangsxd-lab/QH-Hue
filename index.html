@@ -14,23 +14,30 @@
     #layout { flex:1; display:grid; grid-template-rows: 1fr auto; }
     #top { display:grid; grid-template-columns: 1fr 0fr; height:100%; transition: all 0.3s; }
     #map { background:#ddd; }
-    #chart { background:#f9f9f9; display:none; padding:10px; opacity:0.5; }
-	#table { background:#fff; display:none; height:33vh; overflow:auto; opacity:0.5; }
+    #chart, #table {
+      position:relative;
+      opacity:1;
+    }
+    #chart::before, #table::before {
+      content:"";
+      position:absolute;
+      top:0; left:0; right:0; bottom:0;
+      background:white;
+      opacity:0.5;
+      z-index:-1;
+    }
+    #chart { display:none; padding:10px; }
+    #table { display:none; height:33vh; overflow:auto; }
     #summary { padding:5px; font-weight:bold; background:#f0f0f0; }
 
-    /* Nút mũi tên */
     .toggle-btn {
       position:fixed;
       width:0; height:0;
       cursor:pointer;
       z-index:999;
     }
-    #btnTable {
-      left:50%; transform:translateX(-50%);
-    }
-    #btnChart {
-      top:50%; transform:translateY(-50%);
-    }
+    #btnTable { left:50%; transform:translateX(-50%); }
+    #btnChart { top:50%; transform:translateY(-50%); }
   </style>
 </head>
 <body>
@@ -45,18 +52,15 @@
     </div>
   </div>
 
-  <!-- Nút mũi tên -->
   <div id="btnTable" class="toggle-btn"></div>
   <div id="btnChart" class="toggle-btn"></div>
 
 <script>
-  // Bản đồ
   var map = L.map('map').setView([16.466, 107.579], 13);
   L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     subdomains:['mt0','mt1','mt2','mt3']
   }).addTo(map);
 
-  // Dữ liệu bảng
   const qhData = [
     ["QH001","Quy hoạch Phú Xuân","123/QĐ-UBND","01/01/2024","UBND tỉnh",4300,310000],
     ["QH002","Quy hoạch Thuận Hóa","456/QĐ-UBND","15/03/2024","UBND tỉnh",6600,410000]
@@ -74,7 +78,6 @@
     ]
   });
 
-  // Tổng
   function updateSummary(maList) {
     let tongDienTich = 0, tongDanSo = 0;
     maList.forEach(ma => {
@@ -88,7 +91,6 @@
       `Tổng diện tích: ${tongDienTich.toLocaleString()} ha | Tổng dân số: ${tongDanSo.toLocaleString()} người`;
   }
 
-  // Polygon
   let selectedLayers = [];
   fetch('data.geojson')
     .then(res => res.json())
@@ -128,7 +130,6 @@
       }).addTo(map);
     });
 
-  // Biểu đồ
   new Chart(document.getElementById('chartCanvas').getContext('2d'), {
     type: 'bar',
     data: {
@@ -140,56 +141,51 @@
       }]
     }
   });
-  // Điều khiển bố cục và mũi tên
+
   let showTable = false, showChart = false;
 
-  function resetArrow(btn) {
-    btn.style.cssText = "position:fixed;width:0;height:0;cursor:pointer;z-index:999;";
-  }
-
   function updateLayout() {
-  const tableDiv = document.getElementById('table');
-  const chartDiv = document.getElementById('chart');
-  const top = document.getElementById('top');
-  const btnTable = document.getElementById('btnTable');
-  const btnChart = document.getElementById('btnChart');
+    const tableDiv = document.getElementById('table');
+    const chartDiv = document.getElementById('chart');
+    const top = document.getElementById('top');
+    const btnTable = document.getElementById('btnTable');
+    const btnChart = document.getElementById('btnChart');
 
-  tableDiv.style.display = showTable ? 'block' : 'none';
-  chartDiv.style.display = showChart ? 'block' : 'none';
+    tableDiv.style.display = showTable ? 'block' : 'none';
+    chartDiv.style.display = showChart ? 'block' : 'none';
 
-  // Logic bảng
-  if (showTable) {
-    top.style.height = '67vh';
-    tableDiv.style.height = '33vh';
-    btnTable.style.cssText =
-      "position:fixed;bottom:33vh;left:50%;transform:translateX(-50%);" +
-      "border-top:10px solid white;border-left:10px solid transparent;border-right:10px solid transparent;" +
-      "filter:drop-shadow(0 0 2px gray);";
-  } else {
-    top.style.height = '100vh';
-    tableDiv.style.height = '0';
-    btnTable.style.cssText =
-      "position:fixed;bottom:10px;left:50%;transform:translateX(-50%);" +
-      "border-bottom:10px solid white;border-left:10px solid transparent;border-right:10px solid transparent;" +
-      "filter:drop-shadow(0 0 2px gray);";
+    // Bảng
+    if (showTable) {
+      top.style.height = '67vh';
+      tableDiv.style.height = '33vh';
+      btnTable.style.cssText =
+        "position:fixed;bottom:33vh;left:50%;transform:translateX(-50%);" +
+        "border-top:10px solid white;border-left:10px solid transparent;border-right:10px solid transparent;" +
+        "filter:drop-shadow(0 0 2px gray);";
+    } else {
+      top.style.height = '100vh';
+      tableDiv.style.height = '0';
+      btnTable.style.cssText =
+        "position:fixed;bottom:10px;left:50%;transform:translateX(-50%);" +
+        "border-bottom:10px solid white;border-left:10px solid transparent;border-right:10px solid transparent;" +
+        "filter:drop-shadow(0 0 2px gray);";
+    }
+
+        // Biểu đồ
+    if (showChart) {
+      top.style.gridTemplateColumns = '3fr 1fr';
+      btnChart.style.cssText =
+        "position:fixed;top:50%;right:25%;transform:translateY(-50%);" +
+        "border-left:10px solid white;border-top:10px solid transparent;border-bottom:10px solid transparent;" +
+        "filter:drop-shadow(0 0 2px gray);";
+    } else {
+      top.style.gridTemplateColumns = '1fr 0fr';
+      btnChart.style.cssText =
+        "position:fixed;top:50%;right:5px;transform:translateY(-50%);" +
+        "border-right:10px solid white;border-top:10px solid transparent;border-bottom:10px solid transparent;" +
+        "filter:drop-shadow(0 0 2px gray);";
+    }
   }
-
-  // Logic biểu đồ
-  if (showChart) {
-    top.style.gridTemplateColumns = '3fr 1fr'; // map 3/4, chart 1/4
-    btnChart.style.cssText =
-      "position:fixed;top:50%;right:25%;transform:translateY(-50%);" +
-      "border-left:10px solid white;border-top:10px solid transparent;border-bottom:10px solid transparent;" +
-      "filter:drop-shadow(0 0 2px gray);";
-  } else {
-    top.style.gridTemplateColumns = '1fr 0fr';
-    btnChart.style.cssText =
-      "position:fixed;top:50%;right:5px;transform:translateY(-50%);" +
-      "border-right:10px solid white;border-top:10px solid transparent;border-bottom:10px solid transparent;" +
-      "filter:drop-shadow(0 0 2px gray);";
-  }
-}
-
 
   document.getElementById('btnTable').onclick = () => {
     showTable = !showTable;
@@ -205,4 +201,3 @@
 </script>
 </body>
 </html>
-
