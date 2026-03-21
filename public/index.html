@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Guest School Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 500px; }
+
+    /* Popup form ở góc dưới bên trái */
+    #popupForm {
+      display: none;
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 10px;
+      z-index: 1000;
+      font-size: 14px;
+    }
+
+    .form-row {
+      display: flex;
+      align-items: stretch;
+      margin-bottom: 6px;
+    }
+
+    .form-row label {
+      width: 90px;
+    }
+
+    .form-row input {
+      flex: 1;
+      padding: 4px;
+    }
+
+    /* Nhóm tọa độ X/Y */
+    .coords-row {
+      display: flex;
+      align-items: stretch;
+      margin-bottom: 6px;
+    }
+
+    .coords-inputs {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .coord {
+      display: flex;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .coord label {
+      width: 90px;
+    }
+
+    .coord input {
+      flex: 1;
+      padding: 4px;
+    }
+
+    .coords-row button {
+      margin-left: 5px;
+      white-space: pre-line; /* cho phép xuống dòng */
+      padding: 0 8px;
+    }
+
+    /* Đây là đoạn CSS cho marker 📌 */
+    .custom-pin {
+      font-size: 28px;
+      line-height: 28px;
+    }
+
+    #openFormBtn {
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Guest: Bản đồ điểm trường</h2>
+  <button id="openFormBtn">BỔ SUNG TRƯỜNG</button>
+
+  <div id="map"></div>
+
+  <!-- Popup form -->
+  <div id="popupForm">
+    <div class="form-row">
+      <label>TÊN TRƯỜNG:</label>
+      <input type="text" id="tentruong">
+    </div>
+    <div class="form-row">
+      <label>DIỆN TÍCH:</label>
+      <input type="text" id="dientich">
+    </div>
+    <div class="coords-row">
+      <div class="coords-inputs">
+        <div class="coord">
+          <label>TỌA ĐỘ X:</label>
+          <input type="text" id="lon">
+        </div>
+        <div class="coord">
+          <label>TỌA ĐỘ Y:</label>
+          <input type="text" id="lat">
+        </div>
+      </div>
+      <button type="button" id="pickLonLatBtn">CHỌN TRÊN<br>BẢN ĐỒ</button>
+    </div>
+    <button id="submitBtn">THÊM</button>
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
