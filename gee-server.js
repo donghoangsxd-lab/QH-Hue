@@ -15,11 +15,11 @@ const PORT = process.env.PORT || 3000;
 // ==========================
 // 2. Cấu hình Google Sheets
 // ==========================
-const SPREADSHEET_ID = "1mtOJYO3_o_tcKbDPo1s8XqWbK7mR_09GjNIAqd-48iU";
+const SPREADSHEET_ID = process.env.SHEET_ID;
 
 async function getSheetsClient() {
   const auth = new google.auth.GoogleAuth({
-    keyFile: "key2.json", // file JSON chứa private key
+    credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
   return google.sheets({ version: "v4", auth: await auth.getClient() });
@@ -33,7 +33,7 @@ app.use(express.static(path.join(__dirname, "public")));
 // ==========================
 // 4. Khởi tạo Earth Engine
 // ==========================
-const key = require("./key2.json");
+const key = JSON.parse(process.env.GOOGLE_CREDENTIALS);
 ee.data.authenticateViaPrivateKey(
   {
     client_email: key.client_email,
