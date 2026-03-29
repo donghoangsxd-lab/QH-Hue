@@ -29,7 +29,7 @@
 <script>
 // 1. Khởi tạo bản đồ
 const map = L.map('map').setView([16.25, 107.25], 9);
-const googleLayer = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+const googleLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
   subdomains:['mt0','mt1','mt2','mt3'],
   maxZoom: 20
 }).addTo(map);
