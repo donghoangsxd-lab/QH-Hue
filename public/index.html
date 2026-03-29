@@ -3,11 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <title>Guest School Map</title>
+  <!-- ==========================
+       1. CSS & Style
+  ========================== -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     #map { height: 500px; }
-
-    /* Popup form ở góc dưới bên trái */
     #popupForm {
       display: none;
       position: absolute;
@@ -19,61 +20,34 @@
       z-index: 1000;
       font-size: 14px;
     }
-
-    .form-row {
-      display: flex;
-      align-items: stretch;
-      margin-bottom: 6px;
-    }
+    .form-row { display: flex; margin-bottom: 6px; }
     .form-row label { width: 90px; }
     .form-row input { flex: 1; padding: 4px; }
-
-    .coords-row {
-      display: flex;
-      align-items: stretch;
-      margin-bottom: 6px;
-    }
-    .coords-inputs {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-    }
-    .coord {
-      display: flex;
-      align-items: center;
-      margin-bottom: 4px;
-    }
+    .coords-row { display: flex; margin-bottom: 6px; }
+    .coords-inputs { flex: 1; }
+    .coord { display: flex; margin-bottom: 4px; }
     .coord label { width: 90px; }
     .coord input { flex: 1; padding: 4px; }
-    .coords-row button {
-      margin-left: 5px;
-      white-space: pre-line;
-      padding: 0 8px;
-    }
-
-    .custom-pin { font-size: 28px; line-height: 28px; }
     #openFormBtn { margin-bottom: 10px; }
-
-    /* Khung GEE */
-    #geeFrame {
-      width: 100%;
-      height: 600px;
-      border: none;
-      margin-top: 20px;
-    }
   </style>
 </head>
 <body>
+  <!-- ==========================
+       2. UI Layout
+  ========================== -->
   <h2>Guest: Bản đồ điểm trường</h2>
   <button id="openFormBtn">BỔ SUNG TRƯỜNG</button>
-
   <div id="map"></div>
 
-  <!-- Popup form -->
+  <!-- Form nhập liệu -->
   <div id="popupForm">
     <div class="form-row">
       <label>TÊN TRƯỜNG:</label>
       <input type="text" id="tentruong">
+    </div>
+    <div class="form-row">
+      <label>PHƯỜNG/XÃ:</label>
+      <input type="text" id="phuongXaTT">
     </div>
     <div class="form-row">
       <label>DIỆN TÍCH:</label>
@@ -95,13 +69,121 @@
     <button id="submitBtn">THÊM</button>
   </div>
 
-  <!-- Khung GEE App -->
-  <h2>Phân tích GEE: Buffer & Biểu đồ</h2>
-  <iframe id="geeFrame"
-    src="https://optimistic-yew-488501-s0.projects.earthengine.app/view/truonghoc-hue">
-  </iframe>
-
+  <!-- ==========================
+       3. Scripts & Map Logic
+  ========================== -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="script.js"></script>
-</body>
-</html>
+  <script>
+    // 3a. Khởi tạo bản đồ
+    const map = L.map('map').setView([16.25, 107.25], 10);
+    const googleLayer = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+      subdomains:['mt0','mt1','mt2','mt3'],
+      maxZoom: 20
+    }).addTo(map);
+
+    // 3b. Hiển thị form
+    document.getElementById("openFormBtn").addEventListener("click", () => {
+      document.getElementById("popupForm").style.display = "block";
+    });
+
+    // 3c. Chọn tọa độ trên bản đồ (chỉ khi bấm nút)
+    let tempMarker;
+    let isPickingCoords = false;
+
+    document.getElementById("pickLonLatBtn").addEventListener("click", () => {
+      isPickingCoords = true;
+      alert("Hãy click vào bản đồ để chọn tọa độ");
+    });
+
+    map.on("click", (e) => {
+      if (!isPickingCoords) return;
+      const { lat, lng } = e.latlng;
+      document.getElementById("lat").value = lat;
+      document.getElementById("lon").value = lng;
+
+      if (tempMarker) map.removeLayer(tempMarker);
+      tempMarker = L.marker([lat, lng]).addTo(map);
+
+      isPickingCoords = false;
+    });
+
+    // 3d. Gửi dữ liệu lên server
+    document.getElementById("submitBtn").addEventListener("click", () => {
+      const tentruong = document.getElementById("tentruong").value;
+      const phuongXaTT = document.getElementById("phuongXaTT").value;
+      const dientich = document.getElementById("dientich").value;
+      const lon = parseFloat(document.getElementById("lon").value);
+      const lat = parseFloat(document.getElementById("lat").value);
+
+      fetch("/api/schools/add", {   // dùng relative path để chạy cả local & Render
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tentruong, phuongXaTT, dientich, lon, lat })
+      })
+      .then(res => res.json())
+      .then(result => {
+        alert(result.message || "Đã gửi dữ liệu");
+        L.marker([lat, lon], { icon: schoolIconPending })
+          .addTo(map)
+          .bindPopup(`<b>${tentruong}</b><br/>Diện tích: ${dientich}<br/>Phường/Xã: ${phuongXaTT}<br/>Approve: false`);
+      });
+    });
+
+    // 3e. Icon trạng thái trường
+    const schoolIconApproved = L.icon({
+      iconUrl: "icons/Icon-TH3.png",
+      iconSize: [32, 48],
+      iconAnchor: [16, 48],
+      popupAnchor: [0, -48]
+    });
+    const schoolIconPending = L.icon({
+      iconUrl: "icons/Icon-TH2.png",
+      iconSize: [32, 48],
+      iconAnchor: [16, 48],
+      popupAnchor: [0, -48]
+    });
+
+    // 3f. Load dữ liệu GeoJSON từ bucket
+    const bucketUrl = "https://storage.googleapis.com/mamnon-hue-data/mamnon.geojson";
+    fetch(bucketUrl + "?ts=" + Date.now())
+      .then(res => res.json())
+      .then(data => {
+        const schoolsLayer = L.layerGroup();
+
+        (data.features || []).forEach(f => {
+          let x = f.properties.X;
+          let y = f.properties.Y;
+          if (x == null || y == null || isNaN(x) || isNaN(y)) return;
+
+          const isApproved = (f.properties.approve === true);
+          const tinhTrang = isApproved ? "Đã cập nhật" : "Đang đề xuất";
+
+          const marker = L.marker([y, x], {
+            icon: isApproved ? schoolIconApproved : schoolIconPending
+          }).bindPopup(
+            `<b>${f.properties.tenDoiTuon || "Không có tên"}</b><br/>
+             Diện tích: ${f.properties.dienTichDa || "N/A"}<br/>
+             Phường/Xã: ${f.properties.phuongXaTT || "N/A"}<br/>
+             Tình trạng: ${tinhTrang}`
+          );
+
+          schoolsLayer.addLayer(marker);
+        });
+
+        schoolsLayer.addTo(map);
+
+        // 3g. Các lớp overlay Earth Engine
+        var densityLayer = L.tileLayer(
+          'https://earthengine.googleapis.com/v1/projects/optimistic-yew-488501-s0/maps/bc7913bf582684a5efba8a96ee5ce693-b59aa2a6ea885767d6fc8d2000eaa79a/tiles/{z}/{x}/{y}',
+          { attribution: 'Google Earth Engine', opacity: 0.4 }
+        );
+        var buffer1000Layer = L.tileLayer(
+          'https://earthengine.googleapis.com/v1/projects/optimistic-yew-488501-s0/maps/d7fddb5f931c1d81f3f6181048bfddaf-4d93d1ed76abb6fc4fef63be3d52400b/tiles/{z}/{x}/{y}',
+          { attribution: 'Google Earth Engine' }
+        );
+        var buffer500Layer = L.tileLayer(
+          'https://earthengine.googleapis.com/v1/projects/optimistic-yew-488501-s0/maps/254df39da51e8ce2c061d944e3d80ffe-b447e0627a0ded9e97a97358a441ac39/tiles/{z}/{x}/{y}',
+          { attribution: 'Google Earth Engine' }
+        );
+        var ranhGioiXaLayer = L.tileLayer(
+          'https://earthengine.googleapis.com/v1/projects/optimistic-yew-488501-s0/maps/278150ab
