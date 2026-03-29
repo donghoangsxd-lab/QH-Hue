@@ -185,5 +185,24 @@
           'https://earthengine.googleapis.com/v1/projects/optimistic-yew-488501-s0/maps/254df39da51e8ce2c061d944e3d80ffe-b447e0627a0ded9e97a97358a441ac39/tiles/{z}/{x}/{y}',
           { attribution: 'Google Earth Engine' }
         );
-        var ranhGioiXaLayer = L.tileLayer(
-          'https://earthengine.googleapis.com/v1/projects/optimistic-yew-488501-s0/maps/278150ab
+       
+var ranhGioiXaLayer = L.tileLayer(
+  'https://earthengine.googleapis.com/v1/projects/optimistic-yew-488501-s0/maps/278150ab4e8ab6cb8373543e684c0b31-9a7672bc14bb31709f8b02174a671f45/tiles/{z}/{x}/{y}',
+  { attribution: 'Google Earth Engine' }
+);
+
+var baseMaps = { "Google Hybrid": googleLayer };
+var overlayMaps = {
+  "Dân số": densityLayer,
+  "Buffer 1000m": buffer1000Layer,
+  "Buffer 500m": buffer500Layer,
+  "Ranh giới xã": ranhGioiXaLayer,
+  "Điểm trường": schoolsLayer
+};
+
+L.control.layers(baseMaps, overlayMaps).addTo(map);
+      })
+      .catch(err => console.error("Lỗi fetch GeoJSON từ bucket:", err));
+  </script>
+</body>
+</html>
