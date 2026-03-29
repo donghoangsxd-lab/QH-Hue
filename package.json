@@ -2,18 +2,20 @@
   "name": "school-map-app",
   "version": "1.0.0",
   "description": "School map backend",
-  "main": "index.js",
+  "main": "gee-server.js",
   "scripts": {
-    "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node gee-server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "body-parser": "^1.20.2",
+    "@google-cloud/storage": "^7.19.0",
+    "@google/earthengine": "^0.1.419",
+    "body-parser": "^1.20.4",
     "express": "^5.2.1",
+    "google-auth-library": "^10.6.2",
     "googleapis": "^171.4.0"
   }
 }
