@@ -151,9 +151,10 @@
         const schoolsLayer = L.layerGroup();
 
         (data.features || []).forEach(f => {
-          let x = f.properties.X;
-          let y = f.properties.Y;
-          if (x == null || y == null || isNaN(x) || isNaN(y)) return;
+          const coords = f.geometry.coordinates;
+let x = coords[0]; // longitude
+let y = coords[1]; // latitude
+if (x == null || y == null || isNaN(x) || isNaN(y)) return;
 
           const isApproved = (f.properties.approve === true);
           const tinhTrang = isApproved ? "Đã cập nhật" : "Đang đề xuất";
