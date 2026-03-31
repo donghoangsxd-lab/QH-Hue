@@ -87,12 +87,13 @@ if (x == null || y == null || isNaN(x) || isNaN(y)) return;
      Phường/Xã: ${f.properties.phuongXaTT || "N/A"}<br/>
      Diện tích: ${f.properties.dienTichDa || "N/A"}<br/>
      Trạng thái: ${isApproved ? "Đã duyệt" : "Chưa duyệt"}<br/>
-     <button onclick="editSchool(${f.properties.rowNumber},
-       '${f.properties.tenDoiTuon}',
-       '${f.properties.phuongXaTT}',
-       '${f.properties.dienTichDa}',
-       ${coords[0]}, ${coords[1]},
-       ${isApproved})">Chỉnh sửa</button>`;
+     <button onclick="editSchool(${f.properties.rowNumber || 0},
+  '${f.properties.tenDoiTuon}',
+  '${f.properties.phuongXaTT}',
+  '${f.properties.dienTichDa}',
+  ${coords[0]}, ${coords[1]},
+  ${isApproved})">Chỉnh sửa</button>
+
 
         marker.bindPopup(popupHtml);
         schoolsLayer.addLayer(marker);
