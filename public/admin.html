@@ -72,9 +72,11 @@ function loadSchools() {
       schoolsLayer = L.layerGroup();
 
       (data.features || []).forEach(f => {
-        const x = f.properties.X;
-        const y = f.properties.Y;
-        if (!x || !y) return;
+        const coords = f.geometry.coordinates;
+const x = coords[0]; // longitude
+const y = coords[1]; // latitude
+if (x == null || y == null || isNaN(x) || isNaN(y)) return;
+
 
         const isApproved = (f.properties.approve === true);
         const marker = L.marker([y, x], {
