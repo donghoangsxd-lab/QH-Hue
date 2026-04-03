@@ -51,7 +51,13 @@ app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Khởi tạo Earth Engine (nếu cần)
-initEE();
+initEE()
+  .then(() => {
+    console.log("Earth Engine initialized");
+  })
+  .catch(err => {
+    console.error("Earth Engine init failed:", err);
+  });
 
 // ==========================
 // 5. Hàm cập nhật file mamnon.geojson từ Google Sheet lên bucket
