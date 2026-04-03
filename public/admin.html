@@ -105,7 +105,7 @@ if (x == null || y == null || isNaN(x) || isNaN(y)) return;
 
 // 4. Hàm gọi API approve
 function approveSchool(rowNumber) {
-  fetch(`/api/approve/${rowNumber}`, { method: "POST" })
+  fetch(`/approve/${rowNumber}`, { method: "POST" })
     .then(res => res.json())
     .then(result => {
       alert("Đã duyệt trường dòng " + result.row);
@@ -154,7 +154,7 @@ document.getElementById("saveEditBtn").addEventListener("click", () => {
   const lat = parseFloat(document.getElementById("editLat").value);
   const approve = document.getElementById("editApprove").checked;
 
-  fetch(`/api/update/${window.currentRowNumber}`, {
+  fetch(`/update/${window.currentRowNumber}`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ tenTruong, phuongXa, dienTich, lon, lat, approve })
