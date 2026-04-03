@@ -188,6 +188,51 @@ app.get('/api/sync', async (req, res) => {
 });
 
 // ==========================
+// 7c. API: Earth Engine Map Layers
+// ==========================
+const { getPopulationMap, getBuffer500Map, getBuffer1000Map, getRanhGioiXaMap } = require('./gee');
+
+app.get('/api/population-map', async (req, res) => {
+  try {
+    const url = await getPopulationMap();
+    res.json({ url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Lỗi tạo map dân số' });
+  }
+});
+
+app.get('/api/buffer500-map', async (req, res) => {
+  try {
+    const url = await getBuffer500Map();
+    res.json({ url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Lỗi tạo map buffer 500m' });
+  }
+});
+
+app.get('/api/buffer1000-map', async (req, res) => {
+  try {
+    const url = await getBuffer1000Map();
+    res.json({ url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Lỗi tạo map buffer 1000m' });
+  }
+});
+
+app.get('/api/ranhgioixa-map', async (req, res) => {
+  try {
+    const url = await getRanhGioiXaMap();
+    res.json({ url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Lỗi tạo map ranh giới xã' });
+  }
+});
+
+// ==========================
 // 8. Khởi động server
 // ==========================
 app.listen(PORT, () => {
