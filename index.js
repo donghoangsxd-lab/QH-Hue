@@ -26,7 +26,6 @@ const bucketUrl = "https://storage.googleapis.com/mamnon-hue-data/mamnon.geojson
 // ==========================
 // 3. Cấu hình Google Sheets
 // ==========================
-const { google } = require('googleapis');
 const SPREADSHEET_ID = process.env.SHEET_ID;
 
 async function getSheetsClient() {
