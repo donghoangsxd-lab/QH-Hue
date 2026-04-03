@@ -2,20 +2,30 @@
   "name": "school-map-app",
   "version": "1.0.0",
   "description": "School map backend",
-  "main": "gee-server.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "school",
+    "map",
+    "earthengine",
+    "express",
+    "google-cloud"
+  ],
+  "author": "Hoàng",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
     "@google/earthengine": "^0.1.419",
-    "body-parser": "^1.20.4",
-    "express": "^5.2.1",
+    "body-parser": "^1.20.2",
+    "express": "^4.18.2",
     "google-auth-library": "^10.6.2",
     "googleapis": "^171.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
   }
 }
