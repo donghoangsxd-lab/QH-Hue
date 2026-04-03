@@ -139,7 +139,7 @@ app.post('/api/schools/add', async (req, res) => {
 // ==========================
 // 7. API: Admin duyệt điểm
 // ==========================
-app.post('/approve/:rowNumber', async (req, res) => {
+app.post('/api/approve/:rowNumber', async (req, res) => {
   const rowNumber = req.params.rowNumber;
   try {
     const sheets = await getSheetsClient();
@@ -158,7 +158,7 @@ app.post('/approve/:rowNumber', async (req, res) => {
 });
 
 // API: Admin cập nhật trường
-app.post('/update/:rowNumber', async (req, res) => {
+app.post('/api/update/:rowNumber', async (req, res) => {
   const rowNumber = req.params.rowNumber;
   const { tenTruong, phuongXa, dienTich, lon, lat, approve } = req.body;
   try {
@@ -182,7 +182,7 @@ app.post('/update/:rowNumber', async (req, res) => {
 // ==========================
 // 7b. API: Sync thủ công
 // ==========================
-app.get('/sync', async (req, res) => {
+app.get('/api/sync', async (req, res) => {
   await updateMamnonFileToBucket();
   res.json({ status: 'ok', message: 'Bucket đã được cập nhật từ Sheet' });
 });
