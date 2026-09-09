@@ -137,7 +137,7 @@
 
   <script>
     const webAppUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec";
-    const geeApiBackend = "/api/gee"; // Đường dẫn gọi Vercel Serverless API Backend
+    const geeApiBackend = "/api/gee";
 
     const infraConfig = {
       "1-CV":   { color: "#2ecc71", label: "1. Công viên, điểm xanh", minSize: 300, radius: 500 },
@@ -163,7 +163,7 @@
     let geeHeatmapLayer = null;
     let isHeatmapOn = true;
 
-    // 1. TẢI DỮ LIỆU BAN ĐẦU TỪ VERCEL GEE BACKEND
+    // TẢI DỮ LIỆU BAN ĐẦU TỪ VERCEL GEE BACKEND
     function loadData() {
       fetch(geeApiBackend)
         .then(res => res.json())
@@ -201,7 +201,7 @@
       });
     }
 
-    // 2. NHẬN DYNAMIC TILE URL TỪ GEE VERCEL BACKEND
+    // NHẬN DYNAMIC TILE URL TỪ GEE VERCEL BACKEND
     function loadGeeDynamicHeatmap() {
       if (!isHeatmapOn) return;
 
@@ -232,7 +232,6 @@
       }
     }
 
-    // 3. LOGIC TRA CỨU ĐIỂM & GỢI Ý ĐẤT CHƯA SỬ DỤNG (9-CSD) TỪ VERCEL API
     function onPointClick(p, latlng) {
       bufferGroup.clearLayers();
       const content = document.getElementById('panelContent');
@@ -294,7 +293,6 @@
       content.innerHTML = html;
     }
 
-    // 4. BẢNG THỐNG KÊ VÀ BIỂU ĐỒ SỐ LIỆU SỐNG TỪ GEE BACKEND
     function openStatModal() {
       document.getElementById('statModal').style.display = 'block';
       const tbody = document.getElementById('statTableBody');
