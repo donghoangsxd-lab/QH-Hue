@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bản đồ Phân tích Hạ tầng Đô thị TP. Huế (Headless GIS)</title>
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
+    #map { width: 100%; height: 100vh; }
+    
+    .panel-left {
+      position: absolute; top: 15px; left: 15px; z-index: 1000;
+      background: rgba(255, 255, 255, 0.98); padding: 12px; border-radius: 6px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.25); width: 340px; max-height: 80vh; overflow-y: auto;
+      font-size: 11px;
+    }
+
+    .panel-legend {
+      position: absolute; bottom: 65px; right: 15px; z-index: 1000;
+      background: rgba(255, 255, 255, 0.98); padding: 10px; border-radius: 6px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2); width: 240px; font-size: 10px;
+    }
+
+    .panel-bottom-right {
+      position: absolute; bottom: 15px; right: 15px; z-index: 1000;
+      display: flex; gap: 6px;
+    }
+
+    .modal-panel {
+      display: none; position: absolute; top: 50px; left: 50%; transform: translateX(-50%);
+      z-index: 2000; background: #ffffff; padding: 15px; border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3); width: 92%; max-width: 1000px; max-height: 82vh; overflow-y: auto;
+    }
+
+    .btn {
+      background: #ffffff; color: #2c3e50; border: 1px solid #bdc3c7;
+      padding: 6px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px;
+    }
+    .btn:hover { background: #f8f9fa; }
+    .btn-active { background: #e74c3c; color: white; border: none; }
+    .btn-primary { background: #27ae60; color: white; border: none; }
+    .close-btn { float: right; cursor: pointer; font-weight: bold; color: #7f8c8d; }
+
+    .section-title { font-weight: bold; font-size: 12px; color: #1a252f; margin: 8px 0 4px 0; border-bottom: 1px solid #eee; padding-bottom: 2px; }
+    .sug-item { margin: 3px 0; padding: 4px; border-radius: 3px; font-size: 10px; }
+    .priority-item { background: #fef9e7; color: #d35400; font-weight: bold; border: 1px solid #f9e79f; }
+    
+    table.data-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 10px; }
+    table.data-table th, table.data-table td { border: 1px solid #ddd; padding: 4px 5px; text-align: center; }
+    table.data-table th { background-color: #2c3e50; color: white; position: sticky; top: 0; }
+    table.data-table tr:nth-child(even) { background-color: #f9f9f9; }
+    
+    .legend-circle { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+    .legend-square { display: inline-block; width: 10px; height: 10px; margin-right: 5px; }
+  </style>
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <!-- BẢNG ĐIỀU KHIỂN CHÍNH -->
+  <div class="panel-left" id="infoPanel">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <b style="font-size:13px; color:#2c3e50;">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
+      <span id="loadingStatus" style="color:#e67e22; font-weight:bold;">🔄 Đang tải GEE Backend...</span>
+    </div>
+    <hr style="margin:6px 0; border:0; border-top:1px solid #ddd;">
+    
+    <div id="panelContent">
+      <i>Click vào bất kỳ điểm hạ tầng trên bản đồ để tra cứu phân tích quy chuẩn và gợi ý chuyển đổi đất chưa sử dụng.</i>
+    </div>
+  </div>
+
+  <!-- BẢNG CHÚ THÍCH -->
+  <div class="panel-legend" id="legendPanel">
+    <div style="font-weight:bold; margin-bottom:5px; border-bottom:1px solid #ddd; padding-bottom:3px;">📖 CHÚ GIẢI KÝ HIỆU</div>
+    <div><span class="legend-circle" style="background:#2ecc71;"></span>1. Công viên, điểm xanh</div>
+    <div><span class="legend-circle" style="background:#8e44ad;"></span>2. Bãi đỗ xe, trạm sạc</div>
+    <div><span class="legend-circle" style="background:#d35400;"></span>3. Trường Mầm non</div>
+    <div><span class="legend-circle" style="background:#a0522d;"></span>4. Trường Tiểu học</div>
+    <div><span class="legend-circle" style="background:#5c4033;"></span>5. Trường THCS</div>
+    <div><span class="legend-circle" style="background:#ff00ff;"></span>6. Cơ sở Y tế</div>
+    <div><span class="legend-circle" style="background:#ff0000;"></span>7. Nhà văn hóa, thể thao</div>
+    <div><span class="legend-circle" style="background:#8b0000;"></span>8. Chợ, Trung tâm TM</div>
+    <div><span class="legend-square" style="background:#f39c12;"></span>9. Quỹ đất tiềm năng (CSD)</div>
+    <div><span style="color:#e74c3c;">🔺</span> Đề xuất mới (Chờ duyệt)</div>
+  </div>
+
+  <!-- NÚT CHỨC NĂNG -->
+  <div class="panel-bottom-right">
+    <button class="btn btn-active" onclick="toggleHeatmap()" id="heatmapBtn">🔥 Heatmap GEE (Bật)</button>
+    <button class="btn" onclick="openStatModal()">📊 Dân số & Hạ tầng (40 Phường)</button>
+    <button class="btn" onclick="openChartModal()">📈 Biểu đồ Điểm HT</button>
+    <button class="btn" onclick="openFormAdd()">➕ Thêm điểm mới</button>
+  </div>
+
+  <!-- MODAL BẢNG THỐNG KÊ FULL 40 PHƯỜNG XÃ -->
+  <div class="modal-panel" id="statModal">
+    <span class="close-btn" onclick="closeModal('statModal')">X</span>
+    <b style="font-size:13px; color:#2c3e50;">📊 BẢNG ĐÁNH GIÁ MẬT ĐỘ PHỦ HẠ TẦNG VÀ TỶ LỆ CUNG CẤP (40 PHƯỜNG XÃ TP. HUẾ)</b>
+    <div style="overflow-x:auto; max-height: 70vh; margin-top: 10px;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>STT</th>
+            <th>Tên Phường/Xã</th>
+            <th>Dân số (người)</th>
+            <th>CV</th>
+            <th>BDX</th>
+            <th>MN</th>
+            <th>TH</th>
+            <th>THCS</th>
+            <th>YT</th>
+            <th>VH</th>
+            <th>TM</th>
+            <th>Điểm HT (%)</th>
+          </tr>
+        </thead>
+        <tbody id="statTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MODAL BIỂU ĐỒ -->
+  <div class="modal-panel" id="chartModal">
+    <span class="close-btn" onclick="closeModal('chartModal')">X</span>
+    <b style="font-size:13px; color:#2c3e50;">📈 BIỂU ĐỒ TỶ LỆ TỔNG HỢP TIẾP CẬN HẠ TẦNG 40 PHƯỜNG XÃ</b>
+    <div style="height:380px; margin-top:10px;">
+      <canvas id="infraChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const webAppUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec";
+    const geeApiBackend = "/api/gee";
+
+    const infraConfig = {
+      "1-CV":   { color: "#2ecc71", label: "1. Công viên, điểm xanh", minSize: 300, radius: 500 },
+      "2-BDX":  { color: "#8e44ad", label: "2. Bãi đỗ xe, trạm sạc", minSize: 200, radius: 500 },
+      "3-MN":   { color: "#d35400", label: "3. Trường Mầm non", minSize: 800, radius: 500 },
+      "4-TH":   { color: "#a0522d", label: "4. Trường Tiểu học", minSize: 2000, radius: 1000 },
+      "5-THCS": { color: "#5c4033", label: "5. Trường THCS", minSize: 2500, radius: 1000 },
+      "6-YT":   { color: "#ff00ff", label: "6. Cơ sở Y tế", minSize: 1000, radius: 1000 },
+      "7-VH":   { color: "#ff0000", label: "7. Nhà văn hóa, thể thao", minSize: 500, radius: 500 },
+      "8-TM":   { color: "#8b0000", label: "8. Chợ, Trung tâm TM", minSize: 1500, radius: 500 },
+      "9-CSD":  { color: "#f39c12", label: "9. Quỹ đất tiềm năng (CSD)", minSize: 0, radius: 500 }
+    };
+
+    const map = L.map('map').setView([16.4637, 107.5905], 13);
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', { maxZoom: 18 }).addTo(map);
+
+    let rawDataList = [];
+    let wardStatsData = [];
+    let layerGroup = L.layerGroup().addTo(map);
+    let bufferGroup = L.layerGroup().addTo(map);
+    let geeHeatmapLayer = null;
+    let isHeatmapOn = true;
+
+    // TẢI DỮ LIỆU BAN ĐẦU TỪ VERCEL GEE BACKEND
+    function loadData() {
+      fetch(geeApiBackend)
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('loadingStatus').innerText = "✓ Hoàn tất GEE";
+          document.getElementById('loadingStatus').style.color = "#27ae60";
+          rawDataList = data.rawDataList || [];
+          renderMapLayers();
+          loadGeeDynamicHeatmap();
+        })
+        .catch(err => {
+          document.getElementById('loadingStatus').innerText = "⚠️ Lỗi API Backend";
+          document.getElementById('loadingStatus').style.color = "#e74c3c";
+        });
+    }
+
+    function renderMapLayers() {
+      layerGroup.clearLayers();
+
+      rawDataList.forEach(p => {
+        const latlng = [p.lat, p.lng];
+        
+        let marker;
+        if (!p.status) {
+          marker = L.circleMarker(latlng, { radius: 7, fillColor: "#e74c3c", color: "#fff", weight: 2, fillOpacity: 1 });
+        } else if (p.type === "9-CSD") {
+          marker = L.circleMarker(latlng, { radius: 7, fillColor: "#f39c12", color: "#d35400", weight: 2, fillOpacity: 0.9 });
+        } else {
+          const cfg = infraConfig[p.type] || { color: "#2ecc71" };
+          marker = L.circleMarker(latlng, { radius: 6, fillColor: cfg.color, color: "#fff", weight: 1, fillOpacity: 0.8 });
+        }
+
+        marker.on('click', () => onPointClick(p, latlng));
+        layerGroup.addLayer(marker);
+      });
+    }
+
+    // NHẬN DYNAMIC TILE URL TỪ GEE VERCEL BACKEND
+    function loadGeeDynamicHeatmap() {
+      if (!isHeatmapOn) return;
+
+      fetch(`${geeApiBackend}?action=getHeatmapTile`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.urlFormat) {
+            if (geeHeatmapLayer) map.removeLayer(geeHeatmapLayer);
+            geeHeatmapLayer = L.tileLayer(data.urlFormat, { opacity: 0.65, maxZoom: 18 });
+            geeHeatmapLayer.addTo(map);
+          }
+        })
+        .catch(err => console.error("Lỗi tải Heatmap Tile GEE:", err));
+    }
+
+    function toggleHeatmap() {
+      isHeatmapOn = !isHeatmapOn;
+      const btn = document.getElementById('heatmapBtn');
+      if (isHeatmapOn) {
+        btn.innerText = "🔥 Heatmap GEE (Bật)";
+        btn.classList.add("btn-active");
+        if (geeHeatmapLayer) map.addLayer(geeHeatmapLayer);
+        else loadGeeDynamicHeatmap();
+      } else {
+        btn.innerText = "🔥 Heatmap GEE (Tắt)";
+        btn.classList.remove("btn-active");
+        if (geeHeatmapLayer) map.removeLayer(geeHeatmapLayer);
+      }
+    }
+
+    function onPointClick(p, latlng) {
+      bufferGroup.clearLayers();
+      const content = document.getElementById('panelContent');
+      const isCSD = p.type === "9-CSD";
+
+      let html = `<b>🏢 ${p.name || 'Khu đất'}</b><br>`;
+      html += `• Địa bàn: Phường/Xã ${p.ward || '-'}<br>`;
+      html += `• Diện tích: <b>${(p.size || 0).toLocaleString()} m²</b><br>`;
+      html += `• Trạng thái: ${p.status ? '✓ Đã duyệt' : '⏳ Chờ duyệt'}<br>`;
+
+      if (isCSD) {
+        html += `<div class="section-title">💡 GỢI Ý CHUYỂN ĐỔI CHUẨN TỪ GEE:</div>`;
+        html += `<div id="geeSuggestions"><i>⏳ Đang tính toán không gian phục vụ GEE...</i></div>`;
+
+        fetch(`${geeApiBackend}?action=analyzeCSD&id=${encodeURIComponent(p.id)}`)
+          .then(res => res.json())
+          .then(resData => {
+            const container = document.getElementById('geeSuggestions');
+            let sugHtml = "";
+
+            if (resData.suggestions && resData.suggestions.length > 0) {
+              resData.suggestions.forEach(sug => {
+                const priorityBadge = sug.isTopPriority ? " ⭐ [ƯU TIÊN HÀNG ĐẦU]" : "";
+                const itemClass = sug.isTopPriority ? "sug-item priority-item" : "sug-item";
+                sugHtml += `<div class="${itemClass}">👉 ${sug.label} -> Phục vụ thêm: ~${sug.popGained.toLocaleString()} người${priorityBadge}</div>`;
+              });
+            }
+
+            if (resData.ineligible && resData.ineligible.length > 0) {
+              resData.ineligible.forEach(inEl => {
+                sugHtml += `<div class="sug-item" style="color:#7f8c8d;">❌ ${inEl.label} (Không đủ DT min: ${inEl.minSize}m²)</div>`;
+              });
+            }
+
+            container.innerHTML = sugHtml || "<span style='color:#27ae60;'>✓ Vị trí đã phủ đủ hạ tầng.</span>";
+          })
+          .catch(() => {
+            document.getElementById('geeSuggestions').innerHTML = "<span style='color:#c0392b;'>⚠️ Lỗi tính toán GEE.</span>";
+          });
+
+        html += `<div class="section-title">📝 ĐỀ XUẤT CHUYỂN ĐỔI CÔNG NĂNG:</div>
+          <select id="convertType" style="width:100%; margin-bottom:4px; padding:3px;">
+            <option value="1-CV">1. Công viên, điểm xanh</option>
+            <option value="2-BDX">2. Bãi đỗ xe, trạm sạc</option>
+            <option value="3-MN">3. Trường Mầm non</option>
+            <option value="4-TH">4. Trường Tiểu học</option>
+            <option value="5-THCS">5. Trường THCS</option>
+            <option value="6-YT">6. Cơ sở Y tế</option>
+            <option value="7-VH">7. Nhà văn hóa, thể thao</option>
+            <option value="8-TM">8. Chợ, Trung tâm TM</option>
+          </select>
+          <button class="btn btn-primary" style="width:100%;" onclick="sendProposal('${p.id}', '${p.name}')">🚀 Gửi Đề Xuất</button>
+        `;
+      } else {
+        const radius = p.radius || 500;
+        L.circle(latlng, { radius: radius, color: '#2980b9', fillColor: '#3498db', fillOpacity: 0.2 }).addTo(bufferGroup);
+      }
+
+      content.innerHTML = html;
+    }
+
+    function openStatModal() {
+      document.getElementById('statModal').style.display = 'block';
+      const tbody = document.getElementById('statTableBody');
+      tbody.innerHTML = "<tr><td colspan='12'>🔄 Đang tính toán dữ liệu 40 phường xã từ GEE...</td></tr>";
+
+      fetch(`${geeApiBackend}?action=getWardStats`)
+        .then(res => res.json())
+        .then(resData => {
+          tbody.innerHTML = "";
+          wardStatsData = resData.data || [];
+
+          wardStatsData.forEach((w, idx) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${idx + 1}</td>
+              <td style="font-weight:bold; color:#2980b9;">${w.Ten_Phuong}</td>
+              <td>${Number(w.Dan_So_Vector).toLocaleString()}</td>
+              <td>${Number(w["Ratio_1-CV"] || 0).toFixed(1)}%</td>
+              <td>${Number(w["Ratio_2-BDX"] || 0).toFixed(1)}%</td>
+              <td>${Number(w["Ratio_3-MN"] || 0).toFixed(1)}%</td>
+              <td>${Number(w["Ratio_4-TH"] || 0).toFixed(1)}%</td>
+              <td>${Number(w["Ratio_5-THCS"] || 0).toFixed(1)}%</td>
+              <td>${Number(w["Ratio_6-YT"] || 0).toFixed(1)}%</td>
+              <td>${Number(w["Ratio_7-VH"] || 0).toFixed(1)}%</td>
+              <td>${Number(w["Ratio_8-TM"] || 0).toFixed(1)}%</td>
+              <td style="font-weight:bold; color:#d35400;">${Number(w.Total_Infra_Score || 0).toFixed(1)}%</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        });
+    }
+
+    let chartInstance = null;
+    function openChartModal() {
+      document.getElementById('chartModal').style.display = 'block';
+      if (wardStatsData.length === 0) {
+        fetch(`${geeApiBackend}?action=getWardStats`)
+          .then(res => res.json())
+          .then(resData => {
+            wardStatsData = resData.data || [];
+            renderChart();
+          });
+      } else {
+        renderChart();
+      }
+    }
+
+    function renderChart() {
+      const ctx = document.getElementById('infraChart').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+
+      const labels = wardStatsData.map(w => w.Ten_Phuong);
+      const scores = wardStatsData.map(w => Number(w.Total_Infra_Score || 0).toFixed(1));
+
+      chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Tỷ lệ Tiếp cận Hạ tầng Tổng hợp GEE (%)',
+            data: scores,
+            backgroundColor: '#d35400'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true, max: 100 } }
+        }
+      });
+    }
+
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    function sendProposal(id, name) {
+      const targetType = document.getElementById('convertType').value;
+      const url = `${webAppUrl}?action=proposeConvert&id=${encodeURIComponent(id)}&targetType=${encodeURIComponent(targetType)}&name=${encodeURIComponent(name)}`;
+      fetch(url, { mode: 'no-cors' }).then(() => alert("✓ Đã gửi đề xuất chuyển đổi!"));
+    }
+
+    function openFormAdd() {
+      alert("Click vị trí trên bản đồ để ghim điểm mới!");
+      map.once('click', (e) => {
+        const name = prompt("Nhập tên khu đất đề xuất:", "Khu đất mới");
+        if (name) {
+          const syncUrl = `${webAppUrl}?action=addPoint&type=9-CSD&name=${encodeURIComponent(name)}&ward=Thuận Hóa&lat=${e.latlng.lat.toFixed(6)}&lng=${e.latlng.lng.toFixed(6)}&size=1000`;
+          fetch(syncUrl, { mode: 'no-cors' }).then(() => { alert("✓ Đã lưu ghim đề xuất!"); loadData(); });
+        }
+      });
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
