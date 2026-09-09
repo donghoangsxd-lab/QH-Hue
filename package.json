@@ -1,31 +1,15 @@
 {
-  "name": "school-map-app",
+  "name": "web-hatang-hue",
   "version": "1.0.0",
-  "description": "School map backend",
-  "main": "index.js",
+  "description": "Headless GIS Backend for Hue Urban Infrastructure Analysis using Earth Engine API",
+  "main": "api/gee.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node api/gee.js"
   },
-  "keywords": [
-    "school",
-    "map",
-    "earthengine",
-    "express",
-    "google-cloud"
-  ],
-  "author": "Hoàng",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "@google-cloud/storage": "^7.19.0",
-    "@google/earthengine": "^0.1.419",
-    "body-parser": "^1.20.2",
-    "express": "^4.18.2",
-    "google-auth-library": "^10.6.2",
-    "googleapis": "^171.4.0"
+    "@google/earthengine": "^0.1.385"
   },
-  "devDependencies": {
-    "nodemon": "^3.1.0"
+  "engines": {
+    "node": ">=18.x"
   }
 }
