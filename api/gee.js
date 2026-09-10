@@ -7,7 +7,7 @@ function initGEE() {
   return new Promise((resolve, reject) => {
     try {
       let privateKey = process.env.GEE_PRIVATE_KEY;
-      if (!privateKey) return reject(new Error("Thiếu GEE_PRIVATE_KEY"));
+      if (!privateKey) return reject(new Error("Thiếu biến GEE_PRIVATE_KEY"));
       if (typeof privateKey === 'string' && privateKey.trim().startsWith('{')) {
         privateKey = JSON.parse(privateKey);
       } else if (typeof privateKey === 'string') {
@@ -64,7 +64,6 @@ module.exports = async (req, res) => {
       return f.set('danSoNum', popNum);
     });
 
-    // Thuật toán chuẩn hóa Pixel Dân số: DanSoPixelNormalized = Sum_Pop_Ward / Count_Pixel_Ward
     const validPopMask = popRaster.gt(0);
     const validPopRaster = popRaster.updateMask(validPopMask);
     const wardPopSumImg = ee.Image().double().paint({ featureCollection: wardVectorParsed, color: 'danSoNum' });
@@ -92,7 +91,7 @@ module.exports = async (req, res) => {
       .updateMask(validPopMask)
       .rename('DanSoPixelNormalized');
 
-    // NẠP APPS SCRIPT
+    // NẠP DỮ LIỆU TỪ GOOGLE APPS SCRIPT
     const gasUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec?action=getJson";
     const gasResponse = await fetch(gasUrl);
     const geojson = await gasResponse.json();
@@ -182,12 +181,28 @@ module.exports = async (req, res) => {
       return res.status(200).json({ servedPop });
     }
 
-    // 3. GỢI Ý ĐẤT CHUYỂN ĐỔI (9-CSD)
+    // 3. THUẬT TOÁN GỢI Ý ĐẤT CHUYỂN ĐỔI (9-CSD) 2 CẤP
     if (action === 'analyzeCSD') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
       const size = Number(req.query.size) || 0;
+      const wardNameParam = String(req.query.ward || '').trim().toLowerCase();
       const ptGeom = ee.Geometry.Point([lng, lat]);
+
+      const wardFt = wardVectorParsed.filter(
+        ee.Filter.stringMatches('tenXa', `.*${req.query.ward}.*`, 'i')
+      ).first();
+
+      const wardPop = await new Promise((resolve) => {
+        wardFt.evaluate((ft) => resolve(ft ? Number(ft.properties.danSoNum || 0) : 0));
+      });
+
+      const wardExistAreas = {};
+      rawDataList.forEach(item => {
+        if (item.status && item.ward.trim().toLowerCase().includes(wardNameParam)) {
+          wardExistAreas[item.type] = (wardExistAreas[item.type] || 0) + item.size;
+        }
+      });
 
       const codesToCheck = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
       const suggestions = [];
@@ -199,6 +214,11 @@ module.exports = async (req, res) => {
           ineligible.push({ code, label: infraConfig[code].label, minSize: reqMinSize });
           continue;
         }
+
+        const normVal = quotaConfig[code] || 0;
+        const reqArea = Math.round(wardPop * normVal);
+        const existArea = wardExistAreas[code] || 0;
+        const deficitArea = reqArea - existArea;
 
         const candidateRadius = infraConfig[code].radius;
         const testBuffer = ptGeom.buffer(candidateRadius);
@@ -225,20 +245,26 @@ module.exports = async (req, res) => {
         suggestions.push({
           code,
           label: infraConfig[code].label,
+          deficitArea: Math.max(0, deficitArea),
+          isWardDeficit: deficitArea > 0,
           popGained: Math.round(popRes || 0)
         });
       }
 
-      suggestions.sort((a, b) => b.popGained - a.popGained);
-      if (suggestions.length > 0) {
-        const maxPop = suggestions[0].popGained;
-        suggestions.forEach(s => s.isTopPriority = (s.popGained === maxPop && maxPop > 0));
+      suggestions.sort((a, b) => {
+        if (a.isWardDeficit !== b.isWardDeficit) return a.isWardDeficit ? -1 : 1;
+        if (a.isWardDeficit && b.isWardDeficit) return b.deficitArea - a.deficitArea;
+        return b.popGained - a.popGained;
+      });
+
+      if (suggestions.length > 0 && suggestions[0].isWardDeficit) {
+        suggestions[0].isTopPriority = true;
       }
 
       return res.status(200).json({ suggestions, ineligible });
     }
 
-    // 4. BẢNG THỐNG KÊ MẬT ĐỘ TÁCH CỘT THUẦN GEE
+    // 4. BẢNG THỐNG KÊ MẬT ĐỘ TÁCH CỘT
     if (action === 'getWardStats') {
       const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
       const bandImagesList = [];
