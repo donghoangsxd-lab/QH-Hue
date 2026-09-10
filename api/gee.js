@@ -54,14 +54,35 @@ function cleanWardStr(str) {
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
     await initGEE();
     const action = req.query.action || 'getInitData';
+    const gasBaseUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec";
 
-    // 1. DỮ LIỆU NỀN GEE
+    // BỔ SUNG ACTION GỬI ĐỀ XUẤT ĐIỂM HẠ TẦNG MỚI SANG GOOGLE APPS SCRIPT
+    if (action === 'addPoint') {
+      const { type, name, ward, lat, lng, size } = req.query;
+      if (!type || !name || !lat || !lng) {
+        return res.status(400).json({ error: true, message: "Thiếu thông tin bắt buộc" });
+      }
+
+      const syncUrl = `${gasBaseUrl}?action=addPoint` +
+        `&type=${encodeURIComponent(type)}` +
+        `&name=${encodeURIComponent(name)}` +
+        `&ward=${encodeURIComponent(ward || 'Thuận Hóa')}` +
+        `&lat=${lat}` +
+        `&lng=${lng}` +
+        `&size=${size || 0}`;
+
+      const gasRes = await fetch(syncUrl);
+      const result = await gasRes.json().catch(() => ({ success: true }));
+      return res.status(200).json({ success: true, result });
+    }
+
+    // DỮ LIỆU NỀN GEE
     const popRaster = ee.Image("projects/optimistic-yew-488501-s0/assets/Pixel-danso").select(0).rename('DanSoPixel');
     const wardRegion = ee.Image("projects/optimistic-yew-488501-s0/assets/Output40xa").select(0).rename('ID_Region');
     const wardVector = ee.FeatureCollection("projects/optimistic-yew-488501-s0/assets/Polygon-40xa");
@@ -99,10 +120,10 @@ module.exports = async (req, res) => {
       .updateMask(validPopMask)
       .rename('DanSoPixelNormalized');
 
-    // NẠP DỮ LIỆU APPS SCRIPT AN TOÀN
+    // NẠP DỮ LIỆU ĐIỂM
     let rawDataList = [];
     try {
-      const gasUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec?action=getJson";
+      const gasUrl = `${gasBaseUrl}?action=getJson`;
       const gasResponse = await fetch(gasUrl);
       const geojson = await gasResponse.json();
       const features = geojson.features || [];
@@ -148,7 +169,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // TỐI ƯU HÀM TẠO HEATMAP AN TOÀN
     if (action === 'getHeatmapTile') {
       const categoryImageLayers = [];
       const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
@@ -264,7 +284,6 @@ module.exports = async (req, res) => {
           }).evaluate((r) => resolve(r ? r.DanSoPixelNormalized : 0));
         });
 
-        // TRIỆT TIÊU GIÁ TRỊ ÂM
         const cleanPopGained = Math.max(0, Math.round(popRes || 0));
 
         suggestions.push({
@@ -312,7 +331,7 @@ module.exports = async (req, res) => {
         infraMultiBand.reduceRegion({
           reducer: ee.Reducer.sum().repeat(8).group({ groupField: 8, groupName: 'ID_Phuong' }),
           geometry: wardVectorParsed.geometry(),
-          scale: 100, // TĂNG SCALE TỪ 60 LÊN 100 ĐỂ TỐC ĐỘ XỬ LÝ NHANH HƠN 3 LẦN, CHỐNG TIMEOUT
+          scale: 100,
           maxPixels: 1e9
         }).evaluate((res, err) => err ? reject(err) : resolve(res));
       });
