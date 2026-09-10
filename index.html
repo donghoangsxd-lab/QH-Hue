@@ -410,7 +410,6 @@
     let chartInstance = null;
     let isPickMode = false;
     let tempMarker = null;
-    let wardGeoJsonData = null; // BỘ ĐỆM LƯU RANH GIỚI 40 PHƯỜNG XÃ DÙNG CHO TRUY VẤN TỌA ĐỘ
 
     const layers = {
       pop: L.layerGroup(),
@@ -473,51 +472,8 @@
     });
 
     // =========================================================================
-    // THUẬT TOÁN TỰ ĐỘNG XÁC ĐỊNH PHƯỜNG/XÃ TỪ TỌA ĐỘ (POINT IN POLYGON)
+    // TRUY VẤN TÊN PHƯỜNG TỪ GEE SERVER KHI CLICK BẢN ĐỒ
     // =========================================================================
-    function isPointInPolygon(point, polygon) {
-      let x = point[0], y = point[1];
-      let inside = false;
-      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        let xi = polygon[i][0], yi = polygon[i][1];
-        let xj = polygon[j][0], yj = polygon[j][1];
-        let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-      }
-      return inside;
-    }
-
-    function identifyWardFromCoords(lat, lng) {
-      if (!wardGeoJsonData || !wardGeoJsonData.features) return "Thuận Hóa";
-      
-      const pt = [Number(lng), Number(lat)];
-      
-      for (let feature of wardGeoJsonData.features) {
-        if (!feature.geometry) continue;
-        const geomType = feature.geometry.type;
-        const coords = feature.geometry.coordinates;
-
-        if (geomType === "Polygon") {
-          if (isPointInPolygon(pt, coords[0])) {
-            return feature.properties.tenXa || feature.properties.name || feature.properties.NAME_2 || "Thuận Hóa";
-          }
-        } else if (geomType === "MultiPolygon") {
-          for (let poly of coords) {
-            if (isPointInPolygon(pt, poly[0])) {
-              return feature.properties.tenXa || feature.properties.name || feature.properties.NAME_2 || "Thuận Hóa";
-            }
-          }
-        }
-      }
-      return "Thuận Hóa";
-    }
-
-    // NẠP DỮ LIỆU GEOJSON RANH GIỚI
-    fetch("https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec?action=getBoundaryGeoJson")
-      .then(r => r.json())
-      .then(geoData => { wardGeoJsonData = geoData; })
-      .catch(() => {});
-
     map.on('click', (e) => {
       if (isPickMode) {
         const lat = e.latlng.lat.toFixed(6);
@@ -525,15 +481,28 @@
         document.getElementById('newLat').value = lat;
         document.getElementById('newLng').value = lng;
         
-        // TỰ ĐỘNG TRA CỨU PHƯỜNG/XÃ KHI GHIM TỌA ĐỘ
-        const detectedWard = identifyWardFromCoords(lat, lng);
-        document.getElementById('newWard').value = detectedWard;
-
         if (tempMarker) map.removeLayer(tempMarker);
         tempMarker = L.marker([lat, lng]).addTo(map);
-        
-        document.getElementById('statusMsg').style.color = "#27ae60";
-        document.getElementById('statusMsg').innerText = `✓ Đã xác định thuộc địa bàn: ${detectedWard}`;
+
+        const statusEl = document.getElementById('statusMsg');
+        statusEl.style.color = "#d35400";
+        statusEl.innerText = "⏳ Đang tra cứu địa bàn từ GEE...";
+
+        // GỌI API BACKEND GEE XÁC ĐỊNH TÊN PHƯỜNG XÃ CHUẨN ĐỒNG BỘ MÃ GEE
+        fetch(`${geeApiBackend}?action=getWardFromPoint&lat=${lat}&lng=${lng}`)
+          .then(r => r.json())
+          .then(res => {
+            const wardName = res.ward || "Thuận Hóa";
+            document.getElementById('newWard').value = wardName;
+            statusEl.style.color = "#27ae60";
+            statusEl.innerText = `✓ Thuộc địa bàn: Phường/Xã ${wardName}`;
+          })
+          .catch(() => {
+            document.getElementById('newWard').value = "Thuận Hóa";
+            statusEl.style.color = "#27ae60";
+            statusEl.innerText = "✓ Đã ghim tọa độ!";
+          });
+
         isPickMode = false;
         return;
       }
