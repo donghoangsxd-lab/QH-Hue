@@ -41,7 +41,7 @@
     .progress-bar-bg { width: 60px; background: #e0e0e0; height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--success-color); transition: width 0.3s ease; }
 
-    /* POPUP CHUẨN MẶC ĐỊNH LEAFLET VỚI PHONG CÁCH GLASSMORPHISM */
+    /* POPUP GLASSMORPHISM CHUẨN MẶC ĐỊNH */
     .leaflet-popup-content-wrapper {
       background: rgba(255, 255, 255, 0.45) !important;
       backdrop-filter: blur(12px) !important;
@@ -110,16 +110,35 @@
       opacity: 0.7;
     }
 
-    /* BẢNG ĐIỀU KHIỂN LAYER GÓC TRÊN BÊN PHẢI */
+    /* BẢNG ĐIỀU KHIỂN LAYER & NÚT BẤM THU GỌN */
     .leaflet-control-layers {
       border: 1px solid rgba(255, 255, 255, 0.7) !important;
-      border-radius: 10px !important;
+      border-radius: 8px !important;
       box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
-      background: rgba(255, 255, 255, 0.85) !important;
+      background: rgba(255, 255, 255, 0.9) !important;
       backdrop-filter: blur(12px) !important;
       -webkit-backdrop-filter: blur(12px) !important;
-      padding: 10px 12px !important;
+      padding: 6px 10px !important;
       font-size: 11px !important;
+    }
+
+    /* NÚT "QUẢN LÝ LỚP BẢN ĐỒ" KHI THU GỌN */
+    .leaflet-control-layers-toggle {
+      width: auto !important;
+      height: 28px !important;
+      background-image: none !important;
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      padding: 0 10px;
+      font-weight: bold;
+      font-size: 11px;
+      color: var(--primary-color);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .leaflet-control-layers-toggle::after {
+      content: "🗂️ Quản lý lớp bản đồ";
     }
 
     .layer-header-title {
@@ -133,13 +152,15 @@
 
     .opacity-control-panel { 
       background: transparent; 
-      padding: 6px 0 0 0; 
-      border-top: 1px dashed rgba(0,0,0,0.15);
+      padding: 4px 0 0 0; 
       font-size: 10.5px; 
-      margin-top: 6px; 
     }
 
-    .opacity-slider-row { margin-top: 4px; }
+    .opacity-slider-row { 
+      margin-top: 4px; 
+      border-top: 1px dashed rgba(0,0,0,0.12);
+      padding-top: 4px;
+    }
     .opacity-slider { width: 100%; margin: 2px 0; accent-color: var(--primary-color); cursor: pointer; }
 
     /* NÚT MỞ BẢNG TỔNG HỢP GÓC DƯỚI */
@@ -158,7 +179,7 @@
     }
     .btn-main:hover { background: #34495e; transform: translateY(-1px); }
 
-    /* MODAL TỔNG HỢP (4/5 BẢNG + 1/5 BIỂU ĐỒ) */
+    /* MODAL TỔNG HỢP */
     .modal-panel { 
       display: none; 
       position: absolute; 
@@ -196,7 +217,7 @@
 
   <div id="map"></div>
 
-  <!-- PANEL TIÊU ĐỀ & TIẾN TRÌNH THU GỌN -->
+  <!-- PANEL TIÊU ĐỀ BÊN TRÁI -->
   <div class="panel-left-compact">
     <b style="font-size:12px; color:var(--primary-color);">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
     <div class="progress-compact">
@@ -277,10 +298,10 @@
       c9: L.layerGroup().addTo(map)
     };
 
+    // DANH SÁCH LAYER VỚI ĐỔI TÊN LỚP 0 VÀ CHUYỂN HEATMAP XUỐNG DƯỚI CÙNG
     const layerControl = L.control.layers(null, {
-      "0. Raster Dân số Chuẩn hóa": layers.pop,
+      "0. Lớp phân bổ dân cư": layers.pop,
       "🗺️ Ranh giới 40 Phường Xã": layers.boundary,
-      "🔥 Heatmap Ma trận": layers.heatmap,
       "1. Công viên, điểm xanh": layers.c1,
       "2. Bãi đỗ xe, trạm sạc": layers.c2,
       "3. Trường Mầm non": layers.c3,
@@ -289,33 +310,26 @@
       "6. Cơ sở Y tế": layers.c6,
       "7. Nhà văn hóa, thể thao": layers.c7,
       "8. Chợ, Trung tâm thương mại": layers.c8,
-      "9. Quỹ đất tiềm năng": layers.c9
-    }, { collapsed: false, position: 'topright' }).addTo(map);
+      "9. Quỹ đất tiềm năng": layers.c9,
+      "🔥 Heatmap độ phủ hạ tầng": layers.heatmap
+    }, { collapsed: true, position: 'topright' }).addTo(map);
 
-    const layerContainerEl = document.querySelector('.leaflet-control-layers-list');
-    if (layerContainerEl) {
-      const titleEl = document.createElement('div');
-      titleEl.className = 'layer-header-title';
-      titleEl.innerHTML = '🗂️ QUẢN LÝ LỚP BẢN ĐỒ';
-      layerContainerEl.insertBefore(titleEl, layerContainerEl.firstChild);
-    }
-
+    // BỎ DÒNG "🎚️ ĐỘ TRONG SUỐT LAYER RASTER", CHỈ HIỆN SLIDER KHI BẬT LỚP TƯƠNG ỨNG
     const sliderContainer = L.DomUtil.create('div', 'opacity-control-panel');
     sliderContainer.innerHTML = `
-      <b style="color:var(--primary-color); font-size:10px;">🎚️ ĐỘ TRONG SUỐT LAYER RASTER:</b>
-      <div id="popBox" style="display:none;" class="opacity-slider-row">👥 Dân số: <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60"></div>
-      <div id="heatBox" style="display:none;" class="opacity-slider-row">🔥 Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="65"></div>
+      <div id="popBox" style="display:none;" class="opacity-slider-row">👥 Độ trong suốt Dân cư: <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60"></div>
+      <div id="heatBox" style="display:none;" class="opacity-slider-row">🔥 Độ trong suốt Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="65"></div>
     `;
-    document.querySelector('.leaflet-control-layers').appendChild(sliderContainer);
+    document.querySelector('.leaflet-control-layers-list').appendChild(sliderContainer);
 
     map.on('overlayadd', (e) => {
-      if (e.name === "0. Raster Dân số Chuẩn hóa") document.getElementById('popBox').style.display = 'block';
-      if (e.name === "🔥 Heatmap Ma trận") document.getElementById('heatBox').style.display = 'block';
+      if (e.name === "0. Lớp phân bổ dân cư") document.getElementById('popBox').style.display = 'block';
+      if (e.name === "🔥 Heatmap độ phủ hạ tầng") document.getElementById('heatBox').style.display = 'block';
     });
 
     map.on('overlayremove', (e) => {
-      if (e.name === "0. Raster Dân số Chuẩn hóa") document.getElementById('popBox').style.display = 'none';
-      if (e.name === "🔥 Heatmap Ma trận") document.getElementById('heatBox').style.display = 'none';
+      if (e.name === "0. Lớp phân bổ dân cư") document.getElementById('popBox').style.display = 'none';
+      if (e.name === "🔥 Heatmap độ phủ hạ tầng") document.getElementById('heatBox').style.display = 'none';
     });
 
     document.getElementById('popOpacity').addEventListener('input', (e) => {
@@ -323,6 +337,11 @@
     });
     document.getElementById('heatOpacity').addEventListener('input', (e) => {
       if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(e.target.value / 100);
+    });
+
+    // TỰ ĐỘNG THU GỌN PANEL BẢN ĐỒ VỀ TRẠNG THÁI NÚT DỰNG SẴN KHI CLICK VÀO BẢN ĐỒ
+    map.on('click', () => {
+      layerControl.collapse();
     });
 
     let rawDataList = [];
@@ -340,7 +359,6 @@
         if (d.urlFormat) L.tileLayer(d.urlFormat, { opacity: 0.9 }).addTo(layers.boundary);
       });
 
-      // NẠP DỮ LIỆU ĐIỂM HOÀN TOÀN TỪ BACKEND
       fetch(geeApiBackend).then(r => r.json()).then(data => {
         rawDataList = data.rawDataList || [];
         renderGroupedPoints();
@@ -373,7 +391,6 @@
       });
     }
 
-    // POPUP MẶC ĐỊNH ĐẶT CHÍNH GIỮA NGAY TRÊN ĐIỂM TRA CỨU
     function onPointClick(p, marker) {
       let contentHtml = `<div class="popup-container">`;
       contentHtml += `<b style="font-size:11px; color:var(--primary-color);">🏢 ${p.name}</b><br>`;
