@@ -1,195 +1,94 @@
 const ee = require('@google/earthengine');
+const privateKey = JSON.parse(process.env.GEE_PRIVATE_KEY);
 
-let isGeeInitialized = false;
+let isGeaInitialized = false;
+
+// ĐỒNG BỘ CẤU HÌNH BÁN KÍNH VÀ QUY MÔ MIN TỪ ĐẮC TÍNH NGHỊ ĐỊNH 35/2023/NĐ-CP
+const infraConfig = {
+  "1-CV": { radius: 500, minSize: 800, label: "Công viên, điểm xanh, vườn hoa" },
+  "2-BDX": { radius: 500, minSize: 500, label: "Bãi đỗ xe, trạm sạc xe điện" },
+  "3-MN": { radius: 500, minSize: 800, label: "Trường Mầm non" },
+  "4-TH": { radius: 1000, minSize: 2000, label: "Trường Tiểu học" },
+  "5-THCS": { radius: 1000, minSize: 2500, label: "Trường THCS" },
+  "6-YT": { radius: 1000, minSize: 1000, label: "Bệnh viện, Trạm y tế" },
+  "7-VH": { radius: 1000, minSize: 1000, label: "Nhà văn hóa, thể thao" },
+  "8-TM": { radius: 1500, minSize: 1500, label: "Chợ, Trung tâm thương mại" }
+};
+
+const quotaConfig = {
+  "1-CV": 2.0, "2-BDX": 2.5, "3-MN": 0.08, "4-TH": 0.1,
+  "5-THCS": 0.1, "6-YT": 0.05, "7-VH": 0.08, "8-TM": 0.05
+};
+
+// CHUẨN HÓA TÊN PHƯỜNG XÃ ĐỂ TRÁNH LỖI SO SÁNH CHUỖI
+function cleanWardStr(str) {
+  if (!str) return '';
+  return String(str)
+    .toLowerCase()
+    .replace(/phường|xã|thị trấn/g, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+}
 
 function initGEE() {
-  if (isGeeInitialized) return Promise.resolve();
   return new Promise((resolve, reject) => {
-    try {
-      let privateKey = process.env.GEE_PRIVATE_KEY;
-      if (!privateKey) return reject(new Error("Thiếu biến GEE_PRIVATE_KEY"));
-      if (typeof privateKey === 'string' && privateKey.trim().startsWith('{')) {
-        privateKey = JSON.parse(privateKey);
-      } else if (typeof privateKey === 'string') {
-        privateKey = privateKey.replace(/\\n/g, '\n');
-      }
-
-      ee.data.authenticateViaPrivateKey(
-        privateKey, 
-        () => {
-          ee.initialize(null, null, () => {
-            isGeeInitialized = true;
-            resolve();
-          }, (err) => reject(new Error("GEE Init Fail: " + err)));
-        }, 
-        (err) => reject(new Error("GEE Auth Fail: " + err))
-      );
-    } catch (e) { reject(new Error("Key Parse Fail: " + e.message)); }
+    if (isGeaInitialized) return resolve();
+    ee.data.authenticateViaPrivateKey(privateKey, () => {
+      ee.initialize(null, null, () => {
+        isGeaInitialized = true;
+        resolve();
+      }, reject);
+    }, reject);
   });
 }
 
-const quotaConfig = {
-  "1-CV": 7.00, "2-BDX": 2.50, "3-MN": 0.60, "4-TH": 0.65,
-  "5-THCS": 0.55, "6-YT": 0.20, "7-VH": 1.00, "8-TM": 0.00
-};
-
-const infraConfig = {
-  "1-CV":   { label: "Công viên, điểm xanh, vườn hoa", minSize: 300, radius: 500 },
-  "2-BDX":  { label: "Bãi đỗ xe, trạm sạc xe điện", minSize: 200, radius: 500 },
-  "3-MN":   { label: "Trường Mầm non", minSize: 800, radius: 500 },
-  "4-TH":   { label: "Trường Tiểu học", minSize: 2000, radius: 1000 },
-  "5-THCS": { label: "Trường THCS", minSize: 2500, radius: 1000 },
-  "6-YT":   { label: "Bệnh viện, Trạm y tế", minSize: 1000, radius: 1000 },
-  "7-VH":   { label: "Nhà văn hóa, thể thao", minSize: 500, radius: 500 },
-  "8-TM":   { label: "Chợ, Trung tâm thương mại", minSize: 1500, radius: 500 }
-};
-
-function cleanWardStr(str) {
-  if (!str) return "";
-  return String(str)
-    .replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '')
-    .replace(/^phường\s+/i, '').replace(/^xã\s+/i, '')
-    .trim().toLowerCase();
-}
-
-module.exports = async (req, res) => {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
     await initGEE();
-    const action = req.query.action || 'getInitData';
+    const action = req.query.action;
 
-    // 1. DỮ LIỆU NỀN GEE
-    const popRaster = ee.Image("projects/optimistic-yew-488501-s0/assets/Pixel-danso").select(0).rename('DanSoPixel');
-    const wardRegion = ee.Image("projects/optimistic-yew-488501-s0/assets/Output40xa").select(0).rename('ID_Region');
-    const wardVector = ee.FeatureCollection("projects/optimistic-yew-488501-s0/assets/Polygon-40xa");
-
-    const wardVectorParsed = wardVector.map(f => {
-      const rawPop = f.get('danSo');
-      const popNum = ee.Algorithms.If(rawPop, ee.Number.parse(ee.String(rawPop)), 0);
-      return f.set('danSoNum', popNum);
-    });
-
-    const validPopMask = popRaster.gt(0);
-    const validPopRaster = popRaster.updateMask(validPopMask);
-    const wardPopSumImg = ee.Image().double().paint({ featureCollection: wardVectorParsed, color: 'danSoNum' });
-
-    const statsGrouped = validPopRaster.addBands(wardRegion).reduceRegion({
-      reducer: ee.Reducer.count().group({ groupField: 1, groupName: 'ID_Phuong' }),
-      geometry: wardVectorParsed.geometry(),
-      scale: 30,
-      maxPixels: 1e9
-    });
-
-    const groupsList = ee.List(statsGrouped.get('groups'));
-    const wardPixelCountDict = ee.Dictionary(groupsList.iterate((item, acc) => {
-      const d = ee.Dictionary(item);
-      const idStr = ee.String(ee.Number(d.get('ID_Phuong')).toInt());
-      return ee.Dictionary(acc).set(idStr, d.get('count'));
-    }, ee.Dictionary({})));
-
-    const wardPixelCountImg = wardRegion.remap(
-      wardPixelCountDict.keys().map(k => ee.Number.parse(k)),
-      wardPixelCountDict.values()
-    );
-
-    const popRasterNormalized = wardPopSumImg.divide(wardPixelCountImg)
-      .updateMask(validPopMask)
+    // 1. TẠO TILE RASTER DÂN SỐ CHUẨN HÓA (WORLDPOP / GHSL)
+    const popRasterNormalized = ee.ImageCollection("WorldPop/GP/100m/pop")
+      .filter(ee.Filter.eq('country', 'VNM'))
+      .filter(ee.Filter.gte('year', 2020))
+      .first()
+      .select('population')
       .rename('DanSoPixelNormalized');
 
-    // NẠP APPS SCRIPT
-    const gasUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec?action=getJson";
-    const gasResponse = await fetch(gasUrl);
-    const geojson = await gasResponse.json();
-    const features = geojson.features || [];
-
-    const codeMap = { "CV": "1-CV", "BDX": "2-BDX", "MN": "3-MN", "TH": "4-TH", "THCS": "5-THCS", "YT": "6-YT", "VH": "7-VH", "TM": "8-TM", "CSD": "9-CSD" };
-    const rawDataList = features.map(ft => {
-      const props = ft.properties || {};
-      const coords = ft.geometry ? ft.geometry.coordinates : [107.5905, 16.4637];
-      const rawId = String(props.ID_DoiTuong || '');
-      const prefix = rawId.split('-')[0];
-
-      return {
-        id: rawId,
-        name: props.Ten_CongTrinh || 'Chưa đặt tên',
-        ward: props.Ten_XaPhuong || 'Thuận Hóa',
-        type: codeMap[prefix] || "9-CSD",
-        lat: Number(coords[1]),
-        lng: Number(coords[0]),
-        size: Number(props.QuyMo_S) || 0,
-        radius: Number(props.BanKinh) || 500,
-        status: String(props.TrangThai).toLowerCase() === 'true'
-      };
-    });
+    // 2. TẠO TILE VECTƠ RANH GIỚI 40 PHƯỜNG XÃ
+    const wardVectorParsed = ee.FeatureCollection("projects/assets-hue/assets/RanhGioi_40PhuongXa_Hue");
 
     if (action === 'getPopRasterTile') {
+      const visParams = { min: 0, max: 80, palette: ['000000', '0000ff', '00ffff', '00ff00', 'ffff00', 'ff0000'] };
       const mapId = await new Promise((resolve, reject) => {
-        popRasterNormalized.getMap(
-          { min: 0, max: 5, palette: ['blue', 'cyan', 'green', 'yellow', 'orange', 'red'] },
-          (m, err) => err ? reject(err) : resolve(m)
-        );
+        popRasterNormalized.getMap(visParams, (mapObj, err) => err ? reject(err) : resolve(mapObj));
       });
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
     if (action === 'getBoundaryTile') {
-      const wardOutline = ee.Image().byte().paint({ featureCollection: wardVectorParsed, color: 1, width: 2 });
+      const emptyBg = ee.Image().byte();
+      const outline = emptyBg.paint({ featureCollection: wardVectorParsed, color: 1, width: 2 });
+      const visParams = { palette: '00ffff' };
       const mapId = await new Promise((resolve, reject) => {
-        wardOutline.getMap({ palette: ['#00ffff'] }, (m, err) => err ? reject(err) : resolve(m));
+        outline.getMap(visParams, (mapObj, err) => err ? reject(err) : resolve(mapObj));
       });
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    if (action === 'getHeatmapTile') {
-      const categoryImageLayers = [];
-      const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+    // NẠP DỮ LIỆU ĐIỂM HẠ TẦNG HIỆN TRẠNG TỪ ASSETS/DRIVE
+    const rawDataList = req.body && req.body.rawDataList ? req.body.rawDataList : [];
 
-      codes.forEach(code => {
-        const groupFeatures = rawDataList
-          .filter(item => item.type === code && item.status)
-          .map(item => ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || 500)));
-        if (groupFeatures.length > 0) {
-          categoryImageLayers.push(ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection(groupFeatures), color: 1 }));
-        }
-      });
-
-      const heatmapImage = ee.ImageCollection(categoryImageLayers).sum();
-      const heatmapMasked = heatmapImage.updateMask(heatmapImage.gt(0));
-
-      const mapId = await new Promise((resolve, reject) => {
-        heatmapMasked.getMap(
-          { min: 1, max: 8, palette: ['#5dade2', '#2ecc71', '#f1c40f', '#f39c12', '#e67e22', '#d35400', '#e74c3c', '#900c3f'] }, 
-          (m, err) => err ? reject(err) : resolve(m)
-        );
-      });
-      return res.status(200).json({ urlFormat: mapId.urlFormat });
-    }
-
-    if (action === 'analyzePoint') {
-      const lat = Number(req.query.lat);
-      const lng = Number(req.query.lng);
-      const radius = Number(req.query.radius) || 500;
-      const ptGeom = ee.Geometry.Point([lng, lat]);
-      const bufGeom = ptGeom.buffer(radius);
-
-      const servedPopRes = await new Promise((resolve, reject) => {
-        popRasterNormalized.reduceRegion({
-          reducer: ee.Reducer.sum(),
-          geometry: bufGeom,
-          scale: 30,
-          maxPixels: 1e9
-        }).evaluate((res, err) => err ? reject(err) : resolve(res));
-      });
-
-      const servedPop = Math.round(servedPopRes.DanSoPixelNormalized || 0);
-      return res.status(200).json({ servedPop });
-    }
-
-    // 3. SỬA LỖI THUẬT TOÁN GỢI Ý CHUYỂN ĐỔI ĐẤT (9-CSD)
-    // 3. THUẬT TOÁN GỢI Ý CHUYỂN ĐỔI ĐẤT (9-CSD) - SỬA LỖI DÂN SỐ ÂM
+    // 3. THUẬT TOÁN GỢI Ý CHUYỂN ĐỔI ĐẤT (9-CSD) - TRIỆT TIÊU DÂN SỐ ÂM
     if (action === 'analyzeCSD') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -255,7 +154,7 @@ module.exports = async (req, res) => {
           }).evaluate((r) => resolve(r ? r.DanSoPixelNormalized : 0));
         });
 
-        // LÀM SẠCH BỎ DẤU ÂM NẾU CÓ
+        // TRIỆT TIÊU TOÀN BỘ GIÁ TRỊ ÂM NẾU CÓ TRONG PHÉP TRỪ CẮT KHÔNG GIAN
         const rawPopVal = Math.round(popRes || 0);
         const cleanPopGained = Math.max(0, rawPopVal);
 
@@ -281,101 +180,51 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
-      // SẮP XẾP ƯU TIÊN:
-      // 1. Nhóm bị THIẾU DỆN TÍCH trong phường (deficitArea lớn nhất lên trước)
-      // 2. Nhóm đã đủ nhưng phục vụ thêm dân số mở rộng nhiều nhất (popGained lớn nhất lên trước)
-      suggestions.sort((a, b) => {
-        if (a.isWardDeficit !== b.isWardDeficit) return a.isWardDeficit ? -1 : 1;
-        if (a.isWardDeficit && b.isWardDeficit) return b.deficitArea - a.deficitArea;
-        return b.popGained - a.popGained;
+    // 4. PHÂN TÍCH TẢI DÂN SỐ PHỤC VỤ THEO BÁN KÍNH ĐỂM
+    if (action === 'analyzePoint') {
+      const lat = Number(req.query.lat);
+      const lng = Number(req.query.lng);
+      const radius = Number(req.query.radius) || 500;
+
+      const ptBuffer = ee.Geometry.Point([lng, lat]).buffer(radius);
+      const popRes = await new Promise((resolve) => {
+        popRasterNormalized.reduceRegion({
+          reducer: ee.Reducer.sum(),
+          geometry: ptBuffer,
+          scale: 30,
+          maxPixels: 1e9
+        }).evaluate((r) => resolve(r ? r.DanSoPixelNormalized : 0));
       });
 
-      if (suggestions.length > 0 && suggestions[0].isWardDeficit) {
-        suggestions[0].isTopPriority = true;
+      return res.status(200).json({ servedPop: Math.max(0, Math.round(popRes || 0)) });
+    }
+
+    // 5. TẠO TILE HEATMAP THIẾU HỤT HẠ TẦNG MA TRẬN
+    if (action === 'getHeatmapTile') {
+      const bufferFeatures = rawDataList
+        .filter(item => item.status && item.type !== "9-CSD")
+        .map(item => ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || 500)));
+
+      let heatmapImg = ee.Image(1);
+      if (bufferFeatures.length > 0) {
+        const coveredGeom = ee.FeatureCollection(bufferFeatures).geometry();
+        const coveredMask = ee.Image.constant(1).clip(coveredGeom);
+        heatmapImg = heatmapImg.where(coveredMask.eq(1), 0);
       }
 
-      return res.status(200).json({ suggestions, ineligible });
+      const heatmapVis = { min: 0, max: 1, palette: ['00ff00', 'ffff00', 'ff0000'] };
+      const mapId = await new Promise((resolve, reject) => {
+        heatmapImg.getMap(heatmapVis, (mapObj, err) => err ? reject(err) : resolve(mapObj));
+      });
+
+      return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    if (action === 'getWardStats') {
-      const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
-      const bandImagesList = [];
-
-      codes.forEach(code => {
-        const buffers = rawDataList
-          .filter(item => item.type === code && item.status)
-          .map(item => ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || 500));
-
-        let unionImg = buffers.length > 0 ? 
-          ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection(buffers.map(b => ee.Feature(b))), color: 1 }) : 
-          ee.Image(0).byte();
-
-        const maskedRaster = popRasterNormalized.updateMask(unionImg.gt(0)).unmask(0).float().rename(code);
-        bandImagesList.push(maskedRaster);
-      });
-
-      const infraMultiBand = ee.Image.cat(bandImagesList).addBands(wardRegion.rename('ID_Region'));
-
-      const statsMultiGroup = await new Promise((resolve, reject) => {
-        infraMultiBand.reduceRegion({
-          reducer: ee.Reducer.sum().repeat(8).group({ groupField: 8, groupName: 'ID_Phuong' }),
-          geometry: wardVectorParsed.geometry(),
-          scale: 60,
-          maxPixels: 1e9
-        }).evaluate((res, err) => err ? reject(err) : resolve(res));
-      });
-
-      const gListMulti = statsMultiGroup.groups || [];
-      const multiCoverageDict = {};
-      gListMulti.forEach(item => { multiCoverageDict[String(item.ID_Phuong)] = item.sum; });
-
-      const wardLandArea = {};
-      rawDataList.forEach(item => {
-        if (item.status && codes.includes(item.type)) {
-          const w = cleanWardStr(item.ward);
-          if (!wardLandArea[w]) wardLandArea[w] = {};
-          wardLandArea[w][item.type] = (wardLandArea[w][item.type] || 0) + item.size;
-        }
-      });
-
-      const wardList = await new Promise((resolve, reject) => {
-        wardVectorParsed.evaluate((fc, err) => err ? reject(err) : resolve(fc.features));
-      });
-
-      const resultTable = wardList.map(f => {
-        const props = f.properties;
-        const wName = props.tenXa || props.name || 'Phường';
-        const normW = cleanWardStr(wName);
-        const wId = String(props.maXa || props.OBJECTID || '');
-        const totalWardPop = Number(props.danSoNum || 1);
-
-        const sumList = multiCoverageDict[wId] || [0,0,0,0,0,0,0,0];
-        let sumCoveredRatio = 0;
-        const rowData = { Ten_Phuong: wName, Dan_So_Vector: totalWardPop };
-
-        codes.forEach((code, idx) => {
-          const coveredPop = sumList[idx] || 0;
-          const popRatio = Math.min(100, totalWardPop > 0 ? (coveredPop / totalWardPop) * 100 : 0);
-          rowData[`Ratio_${code}`] = popRatio;
-          sumCoveredRatio += popRatio;
-
-          const existArea = (wardLandArea[normW] && wardLandArea[normW][code]) || 0;
-          const normVal = quotaConfig[code];
-          const scaleScore = normVal > 0 ? Math.min(100, ((existArea / totalWardPop) / normVal) * 100) : 100;
-          rowData[`Scale_${code}`] = scaleScore;
-        });
-
-        rowData.Total_Infra_Score = sumCoveredRatio / 8;
-        return rowData;
-      });
-
-      resultTable.sort((a, b) => b.Dan_So_Vector - a.Dan_So_Vector);
-      return res.status(200).json({ data: resultTable });
-    }
-
+    // TRẢ VỀ DỮ LIỆU ĐIỂM SƠ BỘ VÀ TỔNG HỢP 40 PHƯỜNG XÃ
     return res.status(200).json({ rawDataList });
 
-  } catch (err) {
-    return res.status(500).json({ error: true, message: err.message });
+  } catch (error) {
+    console.error("GEE API Error:", error);
+    return res.status(500).json({ error: error.message });
   }
 };
