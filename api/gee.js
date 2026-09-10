@@ -62,7 +62,6 @@ module.exports = async (req, res) => {
     const action = req.query.action || 'getInitData';
     const gasBaseUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec";
 
-    // LAYER VECTOR PHƯỜNG XÃ CHUẨN
     const wardVector = ee.FeatureCollection("projects/optimistic-yew-488501-s0/assets/Polygon-40xa");
     const wardVectorParsed = wardVector.map(f => {
       let rawPop = f.get('danSo');
@@ -71,7 +70,6 @@ module.exports = async (req, res) => {
       return f.set('danSoNum', popNum);
     });
 
-    // ACTION: TRUY VẤN TÊN PHƯỜNG TỪ TỌA ĐỘ
     if (action === 'getWardFromPoint') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -93,7 +91,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ward: wardData });
     }
 
-    // ACTION: ĐỒNG BỘ ĐIỂM ĐỀ XUẤT MỚI SANG SCRIPT SHEET
     if (action === 'addPoint') {
       const { type, name, ward, lat, lng, size } = req.query;
       if (!type || !name || !lat || !lng) {
@@ -111,7 +108,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, result });
     }
 
-    // ACTION: PHÊ DUYỆT ĐIỂM HẠ TẦNG THÀNH TRUE TRÊN GOOGLE SHEET
     if (action === 'approvePoint') {
       const { id } = req.query;
       if (!id) return res.status(400).json({ error: true, message: "Thiếu ID công trình" });
@@ -122,7 +118,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, result });
     }
 
-    // DỮ LIỆU NỀN GEE
     const popRaster = ee.Image("projects/optimistic-yew-488501-s0/assets/Pixel-danso").select(0).rename('DanSoPixel');
     const wardRegion = ee.Image("projects/optimistic-yew-488501-s0/assets/Output40xa").select(0).rename('ID_Region');
 
@@ -153,7 +148,6 @@ module.exports = async (req, res) => {
       .updateMask(validPopMask)
       .rename('DanSoPixelNormalized');
 
-    // NẠP VÀ CHUẨN HÓA DỮ LIỆU TỪ GOOGLE SHEET GEOJSON
     let rawDataList = [];
     try {
       const gasUrl = `${gasBaseUrl}?action=getJson`;
@@ -169,7 +163,6 @@ module.exports = async (req, res) => {
         const rawId = String(props.ID_DoiTuong || '');
         const prefix = rawId.split('-')[0];
 
-        // ÉP KIỂU ĐỒNG BỘ CHO GIÁ TRỊ TRẠNG THÁI (STATUS)
         const rawStatus = props.TrangThai;
         const isStatusTrue = (rawStatus === true || String(rawStatus).trim().toUpperCase() === 'TRUE');
 
@@ -207,13 +200,14 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
+    // HEATMAP: CHỈ TẠO BUFFER VÀ TÍNH ĐIỂM TRỌNG SỐ CHO CÁC ĐIỂM ĐÃ PHÊ DUYỆT (STATUS === TRUE)
     if (action === 'getHeatmapTile') {
       const categoryImageLayers = [];
       const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
 
       codes.forEach(code => {
         const groupFeatures = rawDataList
-          .filter(item => item.type === code && item.status)
+          .filter(item => item.type === code && item.status === true) // LỌC CHẶT CHẼ CHỈ LẤY TRUE
           .map(item => ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || 500)));
         if (groupFeatures.length > 0) {
           categoryImageLayers.push(ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection(groupFeatures), color: 1 }));
