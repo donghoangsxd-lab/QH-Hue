@@ -7,7 +7,7 @@ function initGEE() {
   return new Promise((resolve, reject) => {
     try {
       let privateKey = process.env.GEE_PRIVATE_KEY;
-      if (!privateKey) return reject(new Error("Thiếu biến GEE_PRIVATE_KEY"));
+      if (!privateKey) return reject(new Error("Thiếu GEE_PRIVATE_KEY"));
       if (typeof privateKey === 'string' && privateKey.trim().startsWith('{')) {
         privateKey = JSON.parse(privateKey);
       } else if (typeof privateKey === 'string') {
@@ -28,6 +28,22 @@ function initGEE() {
   });
 }
 
+const quotaConfig = {
+  "1-CV": 7.00, "2-BDX": 2.50, "3-MN": 0.60, "4-TH": 0.65,
+  "5-THCS": 0.55, "6-YT": 0.20, "7-VH": 1.00, "8-TM": 0.00
+};
+
+const infraConfig = {
+  "1-CV":   { label: "Công viên, điểm xanh, vườn hoa", minSize: 300, radius: 500 },
+  "2-BDX":  { label: "Bãi đỗ xe, trạm sạc xe điện", minSize: 200, radius: 500 },
+  "3-MN":   { label: "Trường Mầm non", minSize: 800, radius: 500 },
+  "4-TH":   { label: "Trường Tiểu học", minSize: 2000, radius: 1000 },
+  "5-THCS": { label: "Trường THCS", minSize: 2500, radius: 1000 },
+  "6-YT":   { label: "Bệnh viện, Trạm y tế", minSize: 1000, radius: 1000 },
+  "7-VH":   { label: "Nhà văn hóa, thể thao", minSize: 500, radius: 500 },
+  "8-TM":   { label: "Chợ, Trung tâm thương mại", minSize: 1500, radius: 500 }
+};
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
@@ -37,19 +53,18 @@ module.exports = async (req, res) => {
     await initGEE();
     const action = req.query.action || 'getInitData';
 
-    // 1. NẠP ASSETS RASTER VÀ VECTOR
+    // 1. DỮ LIỆU NỀN GEE
     const popRaster = ee.Image("projects/optimistic-yew-488501-s0/assets/Pixel-danso").select(0).rename('DanSoPixel');
     const wardRegion = ee.Image("projects/optimistic-yew-488501-s0/assets/Output40xa").select(0).rename('ID_Region');
     const wardVector = ee.FeatureCollection("projects/optimistic-yew-488501-s0/assets/Polygon-40xa");
 
-    // Parse dân số vector sang kiểu số
     const wardVectorParsed = wardVector.map(f => {
       const rawPop = f.get('danSo');
       const popNum = ee.Algorithms.If(rawPop, ee.Number.parse(ee.String(rawPop)), 0);
       return f.set('danSoNum', popNum);
     });
 
-    // Thuật toán tính Dân số Pixel Chuẩn hóa (PopRasterNormalized)
+    // Thuật toán chuẩn hóa Pixel Dân số: DanSoPixelNormalized = Sum_Pop_Ward / Count_Pixel_Ward
     const validPopMask = popRaster.gt(0);
     const validPopRaster = popRaster.updateMask(validPopMask);
     const wardPopSumImg = ee.Image().double().paint({ featureCollection: wardVectorParsed, color: 'danSoNum' });
@@ -77,27 +92,7 @@ module.exports = async (req, res) => {
       .updateMask(validPopMask)
       .rename('DanSoPixelNormalized');
 
-    // EXPORT TILE RASTER DÂN SỐ CHUẨN HÓA
-    if (action === 'getPopRasterTile') {
-      const mapId = await new Promise((resolve, reject) => {
-        popRasterNormalized.getMap(
-          { min: 0, max: 5, palette: ['blue', 'cyan', 'green', 'yellow', 'orange', 'red'] },
-          (m, err) => err ? reject(err) : resolve(m)
-        );
-      });
-      return res.status(200).json({ urlFormat: mapId.urlFormat });
-    }
-
-    // EXPORT RANH GIỚI 40 PHƯỜNG XÃ
-    if (action === 'getBoundaryTile') {
-      const wardOutline = ee.Image().byte().paint({ featureCollection: wardVectorParsed, color: 1, width: 2 });
-      const mapId = await new Promise((resolve, reject) => {
-        wardOutline.getMap({ palette: ['#00ffff'] }, (m, err) => err ? reject(err) : resolve(m));
-      });
-      return res.status(200).json({ urlFormat: mapId.urlFormat });
-    }
-
-    // NẠP ĐIỂM TỪ APPS SCRIPT
+    // NẠP APPS SCRIPT
     const gasUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec?action=getJson";
     const gasResponse = await fetch(gasUrl);
     const geojson = await gasResponse.json();
@@ -123,7 +118,24 @@ module.exports = async (req, res) => {
       };
     });
 
-    // DYNAMIC HEATMAP TILE
+    if (action === 'getPopRasterTile') {
+      const mapId = await new Promise((resolve, reject) => {
+        popRasterNormalized.getMap(
+          { min: 0, max: 5, palette: ['blue', 'cyan', 'green', 'yellow', 'orange', 'red'] },
+          (m, err) => err ? reject(err) : resolve(m)
+        );
+      });
+      return res.status(200).json({ urlFormat: mapId.urlFormat });
+    }
+
+    if (action === 'getBoundaryTile') {
+      const wardOutline = ee.Image().byte().paint({ featureCollection: wardVectorParsed, color: 1, width: 2 });
+      const mapId = await new Promise((resolve, reject) => {
+        wardOutline.getMap({ palette: ['#00ffff'] }, (m, err) => err ? reject(err) : resolve(m));
+      });
+      return res.status(200).json({ urlFormat: mapId.urlFormat });
+    }
+
     if (action === 'getHeatmapTile') {
       const categoryImageLayers = [];
       const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
@@ -149,18 +161,92 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // TÍNH TOÁN BẢNG THỐNG KÊ SỐNG THEO THUẬT TOÁN GEE
+    // 2. PHÂN TÍCH CHI TIẾT ĐIỂM HẠ TẦNG CLICK
+    if (action === 'analyzePoint') {
+      const lat = Number(req.query.lat);
+      const lng = Number(req.query.lng);
+      const radius = Number(req.query.radius) || 500;
+      const ptGeom = ee.Geometry.Point([lng, lat]);
+      const bufGeom = ptGeom.buffer(radius);
+
+      const servedPopRes = await new Promise((resolve, reject) => {
+        popRasterNormalized.reduceRegion({
+          reducer: ee.Reducer.sum(),
+          geometry: bufGeom,
+          scale: 30,
+          maxPixels: 1e9
+        }).evaluate((res, err) => err ? reject(err) : resolve(res));
+      });
+
+      const servedPop = Math.round(servedPopRes.DanSoPixelNormalized || 0);
+      return res.status(200).json({ servedPop });
+    }
+
+    // 3. GỢI Ý ĐẤT CHUYỂN ĐỔI (9-CSD)
+    if (action === 'analyzeCSD') {
+      const lat = Number(req.query.lat);
+      const lng = Number(req.query.lng);
+      const size = Number(req.query.size) || 0;
+      const ptGeom = ee.Geometry.Point([lng, lat]);
+
+      const codesToCheck = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+      const suggestions = [];
+      const ineligible = [];
+
+      for (const code of codesToCheck) {
+        const reqMinSize = infraConfig[code].minSize;
+        if (size < reqMinSize) {
+          ineligible.push({ code, label: infraConfig[code].label, minSize: reqMinSize });
+          continue;
+        }
+
+        const candidateRadius = infraConfig[code].radius;
+        const testBuffer = ptGeom.buffer(candidateRadius);
+
+        const existingBuffers = rawDataList
+          .filter(item => item.type === code && item.status)
+          .map(item => ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || candidateRadius)));
+
+        let netBufferGeom = testBuffer;
+        if (existingBuffers.length > 0) {
+          const existUnion = ee.FeatureCollection(existingBuffers).geometry();
+          netBufferGeom = testBuffer.difference(existUnion, 1);
+        }
+
+        const popRes = await new Promise((resolve) => {
+          popRasterNormalized.reduceRegion({
+            reducer: ee.Reducer.sum(),
+            geometry: netBufferGeom,
+            scale: 30,
+            maxPixels: 1e9
+          }).evaluate((r) => resolve(r ? r.DanSoPixelNormalized : 0));
+        });
+
+        suggestions.push({
+          code,
+          label: infraConfig[code].label,
+          popGained: Math.round(popRes || 0)
+        });
+      }
+
+      suggestions.sort((a, b) => b.popGained - a.popGained);
+      if (suggestions.length > 0) {
+        const maxPop = suggestions[0].popGained;
+        suggestions.forEach(s => s.isTopPriority = (s.popGained === maxPop && maxPop > 0));
+      }
+
+      return res.status(200).json({ suggestions, ineligible });
+    }
+
+    // 4. BẢNG THỐNG KÊ MẬT ĐỘ TÁCH CỘT THUẦN GEE
     if (action === 'getWardStats') {
       const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
       const bandImagesList = [];
 
       codes.forEach(code => {
-        const buffers = [];
-        rawDataList.forEach(item => {
-          if (item.type === code && item.status) {
-            buffers.push(ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || 500));
-          }
-        });
+        const buffers = rawDataList
+          .filter(item => item.type === code && item.status)
+          .map(item => ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || 500));
 
         let unionImg = buffers.length > 0 ? 
           ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection(buffers.map(b => ee.Feature(b))), color: 1 }) : 
@@ -183,8 +269,15 @@ module.exports = async (req, res) => {
 
       const gListMulti = statsMultiGroup.groups || [];
       const multiCoverageDict = {};
-      gListMulti.forEach(item => {
-        multiCoverageDict[String(item.ID_Phuong)] = item.sum;
+      gListMulti.forEach(item => { multiCoverageDict[String(item.ID_Phuong)] = item.sum; });
+
+      const wardLandArea = {};
+      rawDataList.forEach(item => {
+        if (item.status && codes.includes(item.type)) {
+          const w = item.ward.trim().toLowerCase();
+          if (!wardLandArea[w]) wardLandArea[w] = {};
+          wardLandArea[w][item.type] = (wardLandArea[w][item.type] || 0) + item.size;
+        }
       });
 
       const wardList = await new Promise((resolve, reject) => {
@@ -194,22 +287,28 @@ module.exports = async (req, res) => {
       const resultTable = wardList.map(f => {
         const props = f.properties;
         const wName = props.tenXa || props.name || 'Phường';
+        const normW = wName.trim().toLowerCase();
         const wId = String(props.maXa || props.OBJECTID || '');
-        const totalWardPop = Number(props.danSoNum || 0);
+        const totalWardPop = Number(props.danSoNum || 1);
 
         const sumList = multiCoverageDict[wId] || [0,0,0,0,0,0,0,0];
         let sumCoveredRatio = 0;
+        const rowData = { Ten_Phuong: wName, Dan_So_Vector: totalWardPop };
 
-        sumList.forEach(val => {
-          const ratio = totalWardPop > 0 ? (val / totalWardPop) * 100 : 0;
-          sumCoveredRatio += Math.min(100, ratio);
+        codes.forEach((code, idx) => {
+          const coveredPop = sumList[idx] || 0;
+          const popRatio = Math.min(100, totalWardPop > 0 ? (coveredPop / totalWardPop) * 100 : 0);
+          rowData[`Ratio_${code}`] = popRatio;
+          sumCoveredRatio += popRatio;
+
+          const existArea = (wardLandArea[normW] && wardLandArea[normW][code]) || 0;
+          const normVal = quotaConfig[code];
+          const scaleScore = normVal > 0 ? Math.min(100, ((existArea / totalWardPop) / normVal) * 100) : 100;
+          rowData[`Scale_${code}`] = scaleScore;
         });
 
-        return {
-          Ten_Phuong: wName,
-          Dan_So_Vector: totalWardPop,
-          Total_Infra_Score: sumCoveredRatio / 8
-        };
+        rowData.Total_Infra_Score = sumCoveredRatio / 8;
+        return rowData;
       });
 
       resultTable.sort((a, b) => b.Dan_So_Vector - a.Dan_So_Vector);
