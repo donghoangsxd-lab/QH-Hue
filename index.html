@@ -49,35 +49,41 @@
     .progress-bar-bg { width: 50px; background: #e0e0e0; height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--success-color); transition: width 0.3s ease; }
 
-    /* POPUP GLASSMORPHISM - KHẮC PHỤC TRÀN VIỀN POPUP */
+    /* KHẮC PHỤC TRIỆT ĐỂ MẶC ĐỊNH MAX-WIDTH CỦA LEAFLET POPUP */
+    .leaflet-popup {
+      max-width: none !important;
+    }
+
     .leaflet-popup-content-wrapper {
-      background: rgba(255, 255, 255, 0.45) !important;
-      backdrop-filter: blur(12px) !important;
-      -webkit-backdrop-filter: blur(12px) !important;
+      background: rgba(255, 255, 255, 0.55) !important;
+      backdrop-filter: blur(16px) !important;
+      -webkit-backdrop-filter: blur(16px) !important;
       border-radius: 12px !important;
       box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25) !important;
       padding: 4px !important;
-      border: 1px solid rgba(255, 255, 255, 0.7) !important;
-      overflow: hidden !important;
+      border: 1px solid rgba(255, 255, 255, 0.8) !important;
+      width: auto !important;
+      max-width: none !important;
     }
 
     .leaflet-popup-tip {
-      background: rgba(255, 255, 255, 0.45) !important;
-      backdrop-filter: blur(12px) !important;
+      background: rgba(255, 255, 255, 0.55) !important;
+      backdrop-filter: blur(16px) !important;
       box-shadow: none !important;
       border: 1px solid rgba(255, 255, 255, 0.5);
     }
 
     .leaflet-popup-content { 
-      margin: 4px 6px !important; 
+      margin: 6px 8px !important; 
       line-height: 1.35 !important; 
+      width: auto !important;
     }
 
-    /* TĂNG CHIỀU RỘNG LÊN 350PX & BẬT TỰ ĐỘNG XUỐNG HÀNG TRÁNH TRÀN KHUNG */
+    /* ĐỊNH DẠNG KHUNG POPUP CONTAINER RỘNG CHUẨN 380PX KHÔNG LO TRÀN */
     .popup-container {
-      width: 350px;
-      max-width: 82vw;
-      max-height: 340px;
+      width: 380px;
+      max-width: 85vw;
+      max-height: 350px;
       overflow-y: auto;
       overflow-x: hidden;
       padding-right: 4px;
@@ -92,24 +98,38 @@
     .inline-progress-bg { width: 100%; background: #ddd; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; }
     .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-color); transition: width 0.2s linear; }
 
+    /* TỐI ƯU CÁC THẺ CARD GỢI Ý CÔNG NĂNG LAYOUT 2 DÒNG */
     .sug-card {
-      background: rgba(255, 255, 255, 0.35) !important;
-      border: 1px solid rgba(255, 255, 255, 0.6);
+      background: rgba(255, 255, 255, 0.4) !important;
+      border: 1px solid rgba(255, 255, 255, 0.7);
       border-left: 3px solid #555;
-      padding: 5px 8px;
-      margin: 4px 0;
-      border-radius: 4px;
+      padding: 6px 8px;
+      margin: 5px 0;
+      border-radius: 5px;
       font-size: 10.5px;
       line-height: 1.4;
-      white-space: normal !important; /* MỞ LẠI CHO PHÉP XUỐNG HÀNG TỰ ĐỘNG */
-      word-break: break-word !important; /* BẢO ĐẢM KHÔNG BỊ TRÀN CHỮ RA NGOÀI */
       box-sizing: border-box;
+      width: 100%;
     }
 
     .sug-card.priority {
-      border-color: rgba(211, 84, 0, 0.6);
-      border-left: 3px solid var(--accent-color);
-      background: rgba(211, 84, 0, 0.2) !important;
+      border-color: rgba(211, 84, 0, 0.7);
+      border-left: 3.5px solid var(--accent-color);
+      background: rgba(230, 126, 34, 0.15) !important;
+    }
+
+    .sug-title {
+      font-weight: bold;
+      color: var(--primary-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sug-detail {
+      margin-top: 2px;
+      color: #333;
+      font-size: 10px;
     }
 
     .badge-priority {
@@ -120,11 +140,16 @@
       font-weight: bold;
       padding: 1px 5px;
       border-radius: 3px;
-      margin-top: 3px;
       text-transform: uppercase;
+      white-space: nowrap;
     }
 
-    .sug-card.ineligible { color: #555; border-left: 3px solid #aaa; opacity: 0.75; }
+    .sug-card.ineligible { 
+      color: #555; 
+      border-left: 3px solid #aaa; 
+      opacity: 0.75; 
+      font-size: 10px;
+    }
 
     /* PANEL QUẢN LÝ LỚP BẢN ĐỒ */
     .leaflet-top.leaflet-right { top: 10px; right: 10px; }
@@ -689,22 +714,28 @@
             let sugHtml = "";
             (res.suggestions || []).forEach(s => {
               if (s.isWardDeficit) {
-                const priorityBadge = s.isTopPriority ? `<br><span class="badge-priority">Ưu tiên hàng đầu - Thiếu nhiều nhất</span>` : "";
+                const priorityBadge = s.isTopPriority ? `<span class="badge-priority">ƯU TIÊN HÀNG ĐẦU</span>` : "";
                 const cls = s.isTopPriority ? "sug-card priority" : "sug-card";
+                
                 sugHtml += `<div class="${cls}">
-                  🚩 <b>${s.label}</b><br>
-                  └ Phường thiếu: <b>${s.deficitArea.toLocaleString()} m²</b> | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng
-                  ${priorityBadge}
+                  <div class="sug-title">
+                    <span>🚩 <b>${s.label}</b></span>
+                    ${priorityBadge}
+                  </div>
+                  <div class="sug-detail">
+                    └ Phường thiếu: <b>${s.deficitArea.toLocaleString()} m²</b> | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng
+                  </div>
                 </div>`;
               } else {
                 sugHtml += `<div class="sug-card">
-                  ✓ <b>${s.label}</b> (Đã đạt | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng)
+                  <div class="sug-title"><span>✓ <b>${s.label}</b></span></div>
+                  <div class="sug-detail">└ Đã đạt chỉ tiêu | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng</div>
                 </div>`;
               }
             });
             
             (res.ineligible || []).forEach(inEl => {
-              sugHtml += `<div class="sug-card ineligible">❌ ${inEl.label} (Không đủ DT min: ${inEl.minSize}m²)</div>`;
+              sugHtml += `<div class="sug-card ineligible">❌ <b>${inEl.label}</b> (Không đủ DT min: ${inEl.minSize}m²)</div>`;
             });
             
             const sugContainer = document.getElementById('csdSug');
