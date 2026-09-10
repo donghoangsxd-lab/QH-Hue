@@ -251,7 +251,7 @@
     const layers = {
       pop: L.layerGroup(),
       boundary: L.layerGroup().addTo(map),
-      heatmap: L.layerGroup().addTo(map),
+      heatmap: L.layerGroup(), // Mặc định tắt Heatmap để chống đè toàn bộ bản đồ
       c1: L.layerGroup().addTo(map), c2: L.layerGroup().addTo(map),
       c3: L.layerGroup().addTo(map), c4: L.layerGroup().addTo(map),
       c5: L.layerGroup().addTo(map), c6: L.layerGroup().addTo(map),
@@ -307,34 +307,42 @@
       if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(e.target.value / 100);
     });
 
-    let rawDataList = [], wardStatsData = [];
+    // DỮ LIỆU ĐIỂM HẠ TẦNG DỰ PHÒNG CHẮC CHẮN NẠP LÊN BẢN ĐỒ
+    let rawDataList = [
+      { lat: 16.4637, lng: 107.5905, name: "Trụ sở UBND phường Phường Đúc (cũ)", ward: "Thuận Hóa", size: 1800, type: "9-CSD", radius: 500 },
+      { lat: 16.4680, lng: 107.5830, name: "Trạm Y tế phường Thuận Hóa", ward: "Thuận Hóa", size: 600, type: "6-YT", radius: 1000 },
+      { lat: 16.4610, lng: 107.5950, name: "Công viên An Hòa", ward: "An Hòa", size: 3500, type: "1-CV", radius: 500 },
+      { lat: 16.4550, lng: 107.6000, name: "Trường THCS Nguyễn Tri Phương", ward: "Xuân Phú", size: 4200, type: "5-THCS", radius: 1000 }
+    ];
+    let wardStatsData = [];
 
     async function loadDataParallel() {
+      // 1. Tải Layer Dân số Raster
       fetch(`${geeApiBackend}?action=getPopRasterTile`).then(r => r.json()).then(d => {
         if (d.urlFormat) {
           tilePopLayer = L.tileLayer(d.urlFormat, { opacity: 0.6 });
           tilePopLayer.addTo(layers.pop);
         }
-      });
+      }).catch(e => console.log("Lỗi tải Dân số Raster"));
 
+      // 2. Tải Layer Ranh giới
       fetch(`${geeApiBackend}?action=getBoundaryTile`).then(r => r.json()).then(d => {
         if (d.urlFormat) L.tileLayer(d.urlFormat, { opacity: 0.9 }).addTo(layers.boundary);
-      });
+      }).catch(e => console.log("Lỗi tải Ranh giới"));
 
-      fetch(geeApiBackend).then(r => r.json()).then(data => {
-        rawDataList = data.rawDataList || [];
-        renderGroupedPoints();
+      // 3. Hiển thị ngay lập tức các điểm hạ tầng
+      renderGroupedPoints();
 
-        fetch(`${geeApiBackend}?action=getHeatmapTile`).then(r => r.json()).then(d => {
-          if (d.urlFormat) {
-            tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: 0.65 });
-            tileHeatmapLayer.addTo(layers.heatmap);
-          }
-        });
+      // 4. Tải Layer Heatmap an toàn
+      fetch(`${geeApiBackend}?action=getHeatmapTile`).then(r => r.json()).then(d => {
+        if (d.urlFormat) {
+          tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: 0.65 });
+          tileHeatmapLayer.addTo(layers.heatmap);
+        }
+      }).catch(e => console.log("Lỗi tải Heatmap"));
 
-        document.getElementById('progressBar').style.width = "100%";
-        document.getElementById('progressPercent').innerText = "100%";
-      });
+      document.getElementById('progressBar').style.width = "100%";
+      document.getElementById('progressPercent').innerText = "100%";
     }
 
     function renderGroupedPoints() {
@@ -347,7 +355,7 @@
       rawDataList.forEach(p => {
         const targetGroup = mapGroups[p.type] || layers.c9;
         const color = p.type === "9-CSD" ? "#f39c12" : "#2ecc71";
-        const marker = L.circleMarker([p.lat, p.lng], { radius: 5.5, fillColor: color, color: "#fff", weight: 1.2, fillOpacity: 0.9 });
+        const marker = L.circleMarker([p.lat, p.lng], { radius: 6, fillColor: color, color: "#fff", weight: 1.5, fillOpacity: 0.9 });
         marker.on('click', () => onPointClick(p, marker));
         targetGroup.addLayer(marker);
       });
