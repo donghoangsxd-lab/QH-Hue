@@ -22,7 +22,7 @@
     body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     #map { width: 100%; height: 100vh; }
     
-    /* PANEL TIÊU ĐỀ BÊN TRÁI HẠ TẦNG ĐÔ THỊ HUẾ - RỘNG 250PX CHỐNG XUỐNG HÀNG */
+    /* PANEL HẠ TẦNG ĐÔ THỊ HUẾ */
     .panel-left-compact { 
       position: absolute; 
       top: 10px; 
@@ -49,7 +49,7 @@
     .progress-bar-bg { width: 50px; background: #e0e0e0; height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--success-color); transition: width 0.3s ease; }
 
-    /* POPUP GLASSMORPHISM CHUẨN MẶC ĐỊNH */
+    /* POPUP GLASSMORPHISM */
     .leaflet-popup-content-wrapper {
       background: rgba(255, 255, 255, 0.45) !important;
       backdrop-filter: blur(12px) !important;
@@ -72,9 +72,10 @@
       line-height: 1.35 !important;
     }
 
+    /* MỞ RỘNG CHIỀU RỘNG BẢNG POPUP LÊN 330PX TRÁNH XUỐNG HÀNG CHỮ */
     .popup-container {
-      width: 270px;
-      max-height: 300px;
+      width: 330px;
+      max-height: 320px;
       overflow-y: auto;
       padding-right: 2px;
       font-size: 10.5px;
@@ -84,15 +85,6 @@
     .popup-container::-webkit-scrollbar { width: 4px; }
     .popup-container::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25); border-radius: 2px; }
 
-    .inline-progress-wrap {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 4px;
-      font-size: 10px;
-      font-weight: bold;
-      color: var(--accent-color);
-    }
     .inline-progress-bg { width: 100%; background: #ddd; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; }
     .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-color); transition: width 0.2s linear; }
 
@@ -100,10 +92,12 @@
       background: rgba(255, 255, 255, 0.3) !important;
       border: 1px solid rgba(255, 255, 255, 0.6);
       border-left: 3px solid #555;
-      padding: 4px 6px;
-      margin: 3px 0;
+      padding: 5px 8px;
+      margin: 4px 0;
       border-radius: 4px;
-      font-size: 10px;
+      font-size: 10.5px;
+      line-height: 1.4;
+      white-space: nowrap; /* GIỮ NGUYÊN HÀNG KHÔNG BỊ CẮT CHỮ */
     }
 
     .sug-card.priority {
@@ -118,9 +112,9 @@
       color: #fff;
       font-size: 8px;
       font-weight: bold;
-      padding: 1px 4px;
+      padding: 1px 5px;
       border-radius: 3px;
-      margin-top: 2px;
+      margin-top: 3px;
       text-transform: uppercase;
     }
 
@@ -259,7 +253,6 @@
 
     .chart-container { height: 25%; margin-top: 10px; border-top: 1px solid #eee; padding-top: 6px; }
 
-    /* FIX LỖI STICKY DỰ NGHẼN HEADER BẢNG KHI LĂN CHUỘT DƯỚI */
     table.data-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 10px; text-align: center; }
     table.data-table th, table.data-table td { border-right: 1px solid #e5e7e9; border-bottom: 1px solid #e5e7e9; padding: 5px 3px; }
     table.data-table th:first-child, table.data-table td:first-child { border-left: 1px solid #e5e7e9; }
@@ -274,7 +267,7 @@
     
     table.data-table thead tr:nth-child(2) th { 
       position: sticky; 
-      top: 22px; /* DÍNH CHẮC TRÁNH BỊ CUỘN NGHẼN CHE HEADER CHÍNH */
+      top: 22px; 
       z-index: 11; 
       background: var(--primary-color); 
       color: #fff; 
@@ -330,7 +323,6 @@
             <th rowspan="2">Tổng Điểm (%)</th>
           </tr>
           <tr>
-            <!-- ĐỔI TỪ "Phủ" THÀNH "Độ phủ" THỐNG NHẤT -->
             <th>Độ phủ</th><th>Q.Mô</th>
             <th>Độ phủ</th><th>Q.Mô</th>
             <th>Độ phủ</th><th>Q.Mô</th>
@@ -430,7 +422,6 @@
     let rawDataList = [];
     let wardStatsData = [];
 
-    // SỬA LỖI TẮC NGHẼN DỪNG VĨNH VIỄN Ở 60%
     async function loadDataParallel() {
       updateMainProgress(15);
 
@@ -527,7 +518,8 @@
             }
           });
       } else {
-        contentHtml += `<div style="color:var(--accent-color); font-weight:bold; margin-top:5px; margin-bottom:2px;">💡 GỢI Ý CHUYỂN ĐỔI CHUẨN GEE:</div>`;
+        /* CẬP NHẬT DÒNG TIÊU ĐỀ THEO YÊU CẦU */
+        contentHtml += `<div style="color:var(--accent-color); font-weight:bold; margin-top:5px; margin-bottom:2px;">💡 ĐỀ XUẤT CHUYỂN ĐỔI CÔNG NĂNG:</div>`;
         contentHtml += `<div id="csdSug">
           <div style="font-size:10px; color:#555;">⏳ Đang tính toán không gian: <span id="csdValText">0%</span></div>
           <div class="inline-progress-bg"><div class="inline-progress-fill" id="csdValBar"></div></div>
