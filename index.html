@@ -18,6 +18,7 @@
     body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     #map { width: 100%; height: 100vh; }
     
+    /* PANEL TIÊU ĐỀ BÊN TRÁI THU GỌN */
     .panel-left-compact { 
       position: absolute; 
       top: 10px; 
@@ -25,6 +26,7 @@
       z-index: 1000; 
       background: rgba(255, 255, 255, 0.85); 
       backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       padding: 6px 12px; 
       border-radius: 6px; 
       box-shadow: 0 2px 10px rgba(0,0,0,0.15); 
@@ -39,45 +41,44 @@
     .progress-bar-bg { width: 60px; background: #e0e0e0; height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--success-color); transition: width 0.3s ease; }
 
-    .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-      background: transparent !important;
-      box-shadow: none !important;
-      border: none !important;
-      padding: 0 !important;
+    /* POPUP CHUẨN MẶC ĐỊNH LEAFLET VỚI PHONG CÁCH GLASSMORPHISM */
+    .leaflet-popup-content-wrapper {
+      background: rgba(255, 255, 255, 0.45) !important;
+      backdrop-filter: blur(12px) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25) !important;
+      padding: 6px !important;
+      border: 1px solid rgba(255, 255, 255, 0.7) !important;
     }
-    .leaflet-popup-tip-container { display: none !important; }
-    .leaflet-popup-content { margin: 0 !important; line-height: 1.35 !important; }
 
-    .callout-wrapper { position: relative; margin-left: 50px; margin-bottom: 50px; }
-    .callout-box {
+    .leaflet-popup-tip {
+      background: rgba(255, 255, 255, 0.45) !important;
+      backdrop-filter: blur(12px) !important;
+      box-shadow: none !important;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+
+    .leaflet-popup-content {
+      margin: 6px 8px !important;
+      line-height: 1.35 !important;
+    }
+
+    .popup-container {
       width: 270px;
-      background: rgba(255, 255, 255, 0.35) !important;
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      border-radius: 12px;
-      border: 1.5px solid rgba(255, 255, 255, 0.7);
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-      padding: 10px;
+      max-height: 300px;
+      overflow-y: auto;
+      padding-right: 2px;
       font-size: 10.5px;
       color: #000;
     }
 
-    .callout-arrow-svg {
-      position: absolute;
-      bottom: -45px;
-      left: -45px;
-      width: 50px;
-      height: 50px;
-      pointer-events: none;
-    }
-
-    .popup-container { max-height: 290px; overflow-y: auto; padding-right: 2px; }
     .popup-container::-webkit-scrollbar { width: 4px; }
-    .popup-container::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 2px; }
+    .popup-container::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25); border-radius: 2px; }
 
     .sug-card {
-      background: rgba(255, 255, 255, 0.25) !important;
-      border: 1px solid rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.3) !important;
+      border: 1px solid rgba(255, 255, 255, 0.6);
       border-left: 3px solid #555;
       padding: 4px 6px;
       margin: 3px 0;
@@ -88,7 +89,7 @@
     .sug-card.priority {
       border-color: rgba(211, 84, 0, 0.6);
       border-left: 3px solid var(--accent-color);
-      background: rgba(211, 84, 0, 0.15) !important;
+      background: rgba(211, 84, 0, 0.2) !important;
     }
 
     .badge-priority {
@@ -103,14 +104,20 @@
       text-transform: uppercase;
     }
 
-    .sug-card.ineligible { color: #555; border-left: 3px solid #aaa; opacity: 0.7; }
+    .sug-card.ineligible {
+      color: #555;
+      border-left: 3px solid #aaa;
+      opacity: 0.7;
+    }
 
+    /* BẢNG ĐIỀU KHIỂN LAYER GÓC TRÊN BÊN PHẢI */
     .leaflet-control-layers {
       border: 1px solid rgba(255, 255, 255, 0.7) !important;
       border-radius: 10px !important;
       box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
       background: rgba(255, 255, 255, 0.85) !important;
       backdrop-filter: blur(12px) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
       padding: 10px 12px !important;
       font-size: 11px !important;
     }
@@ -124,10 +131,18 @@
       margin-bottom: 6px;
     }
 
-    .opacity-control-panel { background: transparent; padding: 6px 0 0 0; border-top: 1px dashed rgba(0,0,0,0.15); font-size: 10.5px; margin-top: 6px; }
+    .opacity-control-panel { 
+      background: transparent; 
+      padding: 6px 0 0 0; 
+      border-top: 1px dashed rgba(0,0,0,0.15);
+      font-size: 10.5px; 
+      margin-top: 6px; 
+    }
+
     .opacity-slider-row { margin-top: 4px; }
     .opacity-slider { width: 100%; margin: 2px 0; accent-color: var(--primary-color); cursor: pointer; }
 
+    /* NÚT MỞ BẢNG TỔNG HỢP GÓC DƯỚI */
     .panel-bottom-right { position: absolute; bottom: 18px; right: 18px; z-index: 1000; }
     .btn-main { 
       background: var(--primary-color); 
@@ -143,6 +158,7 @@
     }
     .btn-main:hover { background: #34495e; transform: translateY(-1px); }
 
+    /* MODAL TỔNG HỢP (4/5 BẢNG + 1/5 BIỂU ĐỒ) */
     .modal-panel { 
       display: none; 
       position: absolute; 
@@ -180,6 +196,7 @@
 
   <div id="map"></div>
 
+  <!-- PANEL TIÊU ĐỀ & TIẾN TRÌNH THU GỌN -->
   <div class="panel-left-compact">
     <b style="font-size:12px; color:var(--primary-color);">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
     <div class="progress-compact">
@@ -192,6 +209,7 @@
     <button class="btn-main" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP & BIỂU ĐỒ HẠ TẦNG (40 PHƯỜNG XÃ)</button>
   </div>
 
+  <!-- MODAL TỔNG HỢP BẢNG & BIỂU ĐỒ -->
   <div class="modal-panel" id="combinedModal">
     <div class="modal-header">
       <b style="font-size:13px; color:var(--primary-color);">📊 BẢNG ĐÁNH GIÁ MẬT ĐỘ PHỦ HẠ TẦNG VÀ BIỂU ĐỒ TỔNG HỢP (40 PHƯỜNG XÃ)</b>
@@ -251,7 +269,7 @@
     const layers = {
       pop: L.layerGroup(),
       boundary: L.layerGroup().addTo(map),
-      heatmap: L.layerGroup(), // Mặc định tắt Heatmap để chống đè toàn bộ bản đồ
+      heatmap: L.layerGroup(),
       c1: L.layerGroup().addTo(map), c2: L.layerGroup().addTo(map),
       c3: L.layerGroup().addTo(map), c4: L.layerGroup().addTo(map),
       c5: L.layerGroup().addTo(map), c6: L.layerGroup().addTo(map),
@@ -307,42 +325,36 @@
       if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(e.target.value / 100);
     });
 
-    // DỮ LIỆU ĐIỂM HẠ TẦNG DỰ PHÒNG CHẮC CHẮN NẠP LÊN BẢN ĐỒ
-    let rawDataList = [
-      { lat: 16.4637, lng: 107.5905, name: "Trụ sở UBND phường Phường Đúc (cũ)", ward: "Thuận Hóa", size: 1800, type: "9-CSD", radius: 500 },
-      { lat: 16.4680, lng: 107.5830, name: "Trạm Y tế phường Thuận Hóa", ward: "Thuận Hóa", size: 600, type: "6-YT", radius: 1000 },
-      { lat: 16.4610, lng: 107.5950, name: "Công viên An Hòa", ward: "An Hòa", size: 3500, type: "1-CV", radius: 500 },
-      { lat: 16.4550, lng: 107.6000, name: "Trường THCS Nguyễn Tri Phương", ward: "Xuân Phú", size: 4200, type: "5-THCS", radius: 1000 }
-    ];
+    let rawDataList = [];
     let wardStatsData = [];
 
     async function loadDataParallel() {
-      // 1. Tải Layer Dân số Raster
       fetch(`${geeApiBackend}?action=getPopRasterTile`).then(r => r.json()).then(d => {
         if (d.urlFormat) {
           tilePopLayer = L.tileLayer(d.urlFormat, { opacity: 0.6 });
           tilePopLayer.addTo(layers.pop);
         }
-      }).catch(e => console.log("Lỗi tải Dân số Raster"));
+      });
 
-      // 2. Tải Layer Ranh giới
       fetch(`${geeApiBackend}?action=getBoundaryTile`).then(r => r.json()).then(d => {
         if (d.urlFormat) L.tileLayer(d.urlFormat, { opacity: 0.9 }).addTo(layers.boundary);
-      }).catch(e => console.log("Lỗi tải Ranh giới"));
+      });
 
-      // 3. Hiển thị ngay lập tức các điểm hạ tầng
-      renderGroupedPoints();
+      // NẠP DỮ LIỆU ĐIỂM HOÀN TOÀN TỪ BACKEND
+      fetch(geeApiBackend).then(r => r.json()).then(data => {
+        rawDataList = data.rawDataList || [];
+        renderGroupedPoints();
 
-      // 4. Tải Layer Heatmap an toàn
-      fetch(`${geeApiBackend}?action=getHeatmapTile`).then(r => r.json()).then(d => {
-        if (d.urlFormat) {
-          tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: 0.65 });
-          tileHeatmapLayer.addTo(layers.heatmap);
-        }
-      }).catch(e => console.log("Lỗi tải Heatmap"));
+        fetch(`${geeApiBackend}?action=getHeatmapTile`).then(r => r.json()).then(d => {
+          if (d.urlFormat) {
+            tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: 0.65 });
+            tileHeatmapLayer.addTo(layers.heatmap);
+          }
+        });
 
-      document.getElementById('progressBar').style.width = "100%";
-      document.getElementById('progressPercent').innerText = "100%";
+        document.getElementById('progressBar').style.width = "100%";
+        document.getElementById('progressPercent').innerText = "100%";
+      });
     }
 
     function renderGroupedPoints() {
@@ -361,27 +373,21 @@
       });
     }
 
+    // POPUP MẶC ĐỊNH ĐẶT CHÍNH GIỮA NGAY TRÊN ĐIỂM TRA CỨU
     function onPointClick(p, marker) {
-      let contentHtml = `
-        <div class="callout-wrapper">
-          <svg class="callout-arrow-svg" viewBox="0 0 50 50">
-            <path d="M 50 0 L 0 50 L 50 20 Z" fill="rgba(255, 255, 255, 0.4)" stroke="rgba(255, 255, 255, 0.7)" stroke-width="1.5"/>
-          </svg>
-          <div class="callout-box">
-            <div class="popup-container">
-              <b style="font-size:11px; color:var(--primary-color);">🏢 ${p.name}</b><br>
-              • Địa bàn: <b>Phường/Xã ${p.ward}</b><br>
-              • Diện tích: <b>${p.size.toLocaleString()} m²</b><br>`;
+      let contentHtml = `<div class="popup-container">`;
+      contentHtml += `<b style="font-size:11px; color:var(--primary-color);">🏢 ${p.name}</b><br>`;
+      contentHtml += `• Địa bàn: <b>Phường/Xã ${p.ward}</b><br>`;
+      contentHtml += `• Diện tích: <b>${p.size.toLocaleString()} m²</b><br>`;
 
       if (p.type !== "9-CSD") {
         contentHtml += `<div id="servedPopText" style="color:#8e44ad; font-weight:bold; margin-top:4px;">• Dân số phục vụ: ⏳ Đang tính...</div>`;
-        contentHtml += `</div></div></div>`;
+        contentHtml += `</div>`;
 
         const popup = L.popup({
           closeButton: true,
-          offset: [0, 0],
           autoPan: true,
-          autoPanPadding: [80, 80]
+          autoPanPadding: [50, 50]
         }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
 
         popup.openOn(map);
@@ -396,13 +402,12 @@
       } else {
         contentHtml += `<div style="color:var(--accent-color); font-weight:bold; margin-top:5px; margin-bottom:2px;">💡 GỢI Ý CHUYỂN ĐỔI CHUẨN GEE:</div>`;
         contentHtml += `<div id="csdSug"><i>⏳ Đang tính toán...</i></div>`;
-        contentHtml += `</div></div></div>`;
+        contentHtml += `</div>`;
 
         const popup = L.popup({
           closeButton: true,
-          offset: [0, 0],
           autoPan: true,
-          autoPanPadding: [80, 80]
+          autoPanPadding: [50, 50]
         }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
 
         popup.openOn(map);
