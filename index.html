@@ -188,7 +188,7 @@
       padding: 6px 12px !important;
       font-size: 11px !important;
       margin: 0 !important;
-      width: 250px !important;
+      width: 270px !important;
       box-sizing: border-box !important;
     }
 
@@ -227,8 +227,9 @@
       display: flex !important;
       align-items: center !important;
       justify-content: space-between !important;
-      margin-bottom: 4px;
+      margin-bottom: 5px;
       font-size: 10.5px;
+      cursor: pointer;
     }
 
     .buffer-toggle-span {
@@ -238,7 +239,11 @@
       margin-left: auto;
       display: inline-flex;
       align-items: center;
-      gap: 2px;
+      gap: 3px;
+      background: rgba(211, 84, 0, 0.08);
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid rgba(211, 84, 0, 0.2);
     }
 
     .opacity-control-panel { background: transparent; padding: 2px 0 0 0; font-size: 10.5px; }
@@ -565,6 +570,18 @@
     let isInspectMode = false;
     let tempMarker = null;
 
+    // HÀM TÍNH KHOẢNG CÁCH METERS CHUẨN XÁC HAVERSINE NGAY TẠI CLIENT
+    function getDistanceMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
     const infraLabels = {
       "1-CV": "🌳 Công viên, điểm xanh, vườn hoa",
       "2-BDX": "🅿️ Bãi đỗ xe, trạm sạc xe điện",
@@ -661,6 +678,8 @@
       };
 
       overlaysList.forEach(lbl => {
+        if (lbl.querySelector('.buffer-toggle-span')) return;
+
         const textNode = Array.from(lbl.childNodes).find(n => n.nodeType === 3);
         if (textNode) {
           const layerName = textNode.textContent.trim();
@@ -668,17 +687,24 @@
           if (bKey) {
             const bufSpan = document.createElement('span');
             bufSpan.className = 'buffer-toggle-span';
-            bufSpan.innerHTML = `<input type="checkbox" id="chk_buf_${bKey}" style="cursor:pointer; accent-color:var(--accent-color);"> ⭕ Buffer`;
+            bufSpan.title = "Bật/Tắt vòng tròn bán kính phủ";
+            bufSpan.innerHTML = `<input type="checkbox" id="chk_buf_${bKey}" style="cursor:pointer; accent-color:#d35400;"> 🟢 Buffer`;
             
             bufSpan.querySelector('input').addEventListener('change', (evt) => {
+              evt.stopPropagation();
               if (evt.target.checked) map.addLayer(layers[bKey]);
               else map.removeLayer(layers[bKey]);
             });
+
+            bufSpan.addEventListener('click', (evt) => evt.stopPropagation());
             lbl.appendChild(bufSpan);
           }
         }
       });
     }
+
+    map.on('layeradd layerremove', () => setTimeout(setupBufferCheckboxes, 100));
+    document.querySelector('.leaflet-control-layers').addEventListener('mouseenter', setupBufferCheckboxes);
 
     function toggleInspectMode() {
       isInspectMode = !isInspectMode;
@@ -729,47 +755,56 @@
       }
 
       if (isInspectMode) {
-        const lat = e.latlng.lat.toFixed(6);
-        const lng = e.latlng.lng.toFixed(6);
+        const clickLat = e.latlng.lat;
+        const clickLng = e.latlng.lng;
 
         if (tempMarker) map.removeLayer(tempMarker);
-        tempMarker = L.marker([lat, lng]).addTo(map);
+        tempMarker = L.marker([clickLat, clickLng]).addTo(map);
 
-        let contentHtml = `<div class="popup-container">
-          <b style="font-size:11px; color:var(--primary-color);">📊 ĐÁNH GIÁ MẬT ĐỘ HẠ TẦNG VỊ TRÍ</b><br>
-          <div style="font-size:10px; color:#555; margin-top:4px;">⏳ Đang phân tích vị trí tra cứu: <span id="inspValText">0%</span></div>
-          <div class="inline-progress-bg"><div class="inline-progress-fill" id="inspValBar"></div></div>
-        </div>`;
+        // THUẬT TOÁN KIỂM TRA ĐỘ PHỦ TẠI CLIENT TRÁNH LỖI KẾT NỐI SẢN PHẨM BẢN ĐỒ
+        const coveredGroups = {};
+        const missingCodes = [];
 
-        const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([lat, lng]).setContent(contentHtml);
-        popup.openOn(map);
+        ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"].forEach(code => {
+          const itemsOfCode = rawDataList.filter(item => {
+            const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
+            return item.type === code && isApproved;
+          });
 
-        let step = 0;
-        const interval = setInterval(() => {
-          step += 15;
-          if (step <= 90) {
-            const bar = document.getElementById('inspValBar');
-            const txt = document.getElementById('inspValText');
-            if (bar) bar.style.width = step + "%";
-            if (txt) txt.innerText = step + "%";
+          itemsOfCode.forEach(item => {
+            const dist = getDistanceMeters(clickLat, clickLng, item.lat, item.lng);
+            const radius = Number(item.radius) || 500;
+            if (dist <= radius) {
+              if (!coveredGroups[code]) coveredGroups[code] = [];
+              coveredGroups[code].push(item.name);
+            }
+          });
+
+          if (!coveredGroups[code]) {
+            missingCodes.push(code);
           }
-        }, 100);
+        });
 
-        fetch(`${geeApiBackend}?action=analyzeLocation&lat=${lat}&lng=${lng}`)
+        const coveredCount = Object.keys(coveredGroups).length;
+        const missingCount = missingCodes.length;
+
+        // Tra cứu tên phường xã tại điểm click
+        fetch(`${geeApiBackend}?action=getWardFromPoint&lat=${clickLat.toFixed(6)}&lng=${clickLng.toFixed(6)}`)
           .then(r => r.json())
-          .then(res => {
-            clearInterval(interval);
+          .then(resWard => {
+            const wardName = resWard.ward || "Thuận Hóa";
+
             let resultHtml = `<div class="popup-container">
               <b style="font-size:11px; color:var(--primary-color);">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ</b><br>
-              <span style="font-size:10px; color:#555;">📍 Thuộc địa bàn: <b>Phường/Xã ${res.ward}</b></span><br>
+              <span style="font-size:10px; color:#555;">📍 Thuộc địa bàn: <b>Phường/Xã ${wardName}</b></span><br>
 
               <div style="font-weight:bold; color:var(--success-color); margin-top:6px; font-size:10.5px;">
-                1. Số nhóm hạ tầng tiếp cận: ${res.coveredCount}/8
+                1. Số nhóm hạ tầng tiếp cận: ${coveredCount}/8
               </div>`;
 
-            if (res.coveredCount > 0) {
-              Object.keys(res.coveredGroups).forEach(code => {
-                const names = res.coveredGroups[code].join(', ');
+            if (coveredCount > 0) {
+              Object.keys(coveredGroups).forEach(code => {
+                const names = coveredGroups[code].join(', ');
                 resultHtml += `<div class="sug-card">
                   <b>• ${infraLabels[code] || code}:</b><br>
                   <span style="color:#16a085;">└ ${names}</span>
@@ -780,11 +815,11 @@
             }
 
             resultHtml += `<div style="font-weight:bold; color:#c0392b; margin-top:6px; font-size:10.5px;">
-              2. Số nhóm hạ tầng chưa tiếp cận: ${res.missingCount}/8
+              2. Số nhóm hạ tầng chưa tiếp cận: ${missingCount}/8
             </div>`;
 
-            if (res.missingCount > 0) {
-              res.missingCodes.forEach(code => {
+            if (missingCount > 0) {
+              missingCodes.forEach(code => {
                 resultHtml += `<div class="sug-card ineligible">❌ ${infraLabels[code] || code}</div>`;
               });
             } else {
@@ -792,7 +827,11 @@
             }
 
             resultHtml += `</div>`;
-            popup.setContent(resultHtml);
+            
+            L.popup({ closeButton: true, autoPan: true })
+              .setLatLng([clickLat, clickLng])
+              .setContent(resultHtml)
+              .openOn(map);
           });
 
         toggleInspectMode();
@@ -909,7 +948,7 @@
         console.error("Lỗi tiến trình nạp bản đồ", e);
       } finally {
         updateMainProgress(100);
-        setupBufferCheckboxes();
+        setTimeout(setupBufferCheckboxes, 300);
       }
     }
 
@@ -978,7 +1017,6 @@
       });
     }
 
-    // TỰ ĐỘNG CẬP NHẬT LẠI HEATMAP NGAY SAU KHI PHÊ DUYỆT ĐIỂM
     function refreshHeatmapOnly() {
       fetch(`${geeApiBackend}?action=getHeatmapTile`)
         .then(r => r.json())
@@ -1003,7 +1041,7 @@
         .then(r => r.json())
         .then(res => {
           console.log(`✓ Đã phê duyệt công trình ${pointId} trên Google Sheet!`);
-          refreshHeatmapOnly(); // Tải lại bản đồ nhiệt mới
+          refreshHeatmapOnly();
         })
         .catch(err => {
           console.error(`❌ Lỗi đồng bộ phê duyệt cho ${pointId}:`, err);
@@ -1210,7 +1248,6 @@
       });
     }
 
-    // CLICK CHỌN XEM CHI TIẾT PHƯỜNG TRONG BẢNG TỔNG HỢP
     function selectWardDetail(wardName) {
       closeModal();
 
