@@ -330,6 +330,57 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
+    // ACTION TRA CỨU MẬT ĐỘ HẠ TẦNG VỊ TRÍ
+    if (action === 'analyzeLocation') {
+      const lat = Number(req.query.lat);
+      const lng = Number(req.query.lng);
+      if (!lat || !lng) return res.status(400).json({ error: true, message: "Thiếu tọa độ" });
+
+      const coveredGroups = {};
+      const missingCodes = [];
+
+      function getDistanceMeters(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      }
+
+      rawDataList.forEach(item => {
+        if (item.type === "9-CSD" || !item.status) return;
+        const dist = getDistanceMeters(lat, lng, item.lat, item.lng);
+        const radius = Number(item.radius) || 500;
+        if (dist <= radius) {
+          if (!coveredGroups[item.type]) coveredGroups[item.type] = [];
+          coveredGroups[item.type].push(item.name);
+        }
+      });
+
+      const allCodes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+      allCodes.forEach(code => {
+        if (!coveredGroups[code]) missingCodes.push(code);
+      });
+
+      const clickPoint = ee.Geometry.Point([lng, lat]);
+      const matchedWard = wardVectorParsed.filterBounds(clickPoint).first();
+      const wardName = await new Promise((resolve) => {
+        matchedWard.evaluate((ft) => {
+          resolve((ft && ft.properties) ? (ft.properties.tenXa || ft.properties.name || "Thuận Hóa") : "Thuận Hóa");
+        });
+      });
+
+      return res.status(200).json({
+        ward: wardName,
+        coveredGroups,
+        coveredCount: Object.keys(coveredGroups).length,
+        missingCodes,
+        missingCount: missingCodes.length
+      });
+    }
+
     if (action === 'getWardStats') {
       const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
       const bandImagesList = [];
