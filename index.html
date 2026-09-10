@@ -22,6 +22,9 @@
     body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     #map { width: 100%; height: 100vh; }
     
+    /* CURSOR CHẾ ĐỘ INSPECT TRA CỨU VỊ TRÍ */
+    #map.inspect-mode { cursor: help !important; }
+
     /* PANEL HẠ TẦNG ĐÔ THỊ HUẾ */
     .panel-left-compact { 
       position: absolute; 
@@ -196,7 +199,7 @@
     .opacity-slider { width: 100%; margin: 3px 0 1px 0; accent-color: var(--primary-color); cursor: pointer; display: block; }
 
     /* FORM BẢNG BỔ SUNG ĐIỂM HẠ TẦNG MỚI */
-    .panel-bottom-left { position: absolute; bottom: 18px; left: 18px; z-index: 1000; }
+    .panel-bottom-left { position: absolute; bottom: 18px; left: 18px; z-index: 1000; display: flex; gap: 8px; }
     
     .add-point-card {
       display: none;
@@ -210,6 +213,9 @@
       width: 275px;
       font-size: 11px;
       margin-bottom: 8px;
+      position: absolute;
+      bottom: 40px;
+      left: 0;
     }
 
     .add-point-card input, .add-point-card select {
@@ -266,7 +272,19 @@
       gap: 5px;
     }
 
-    /* BẢNG CHÚ GIẢI KÝ HIỆU & ĐỘ PHỦ HẠ TẦNG (LEGEND PANEL) */
+    .btn-inspect-active {
+      background: var(--accent-color) !important;
+      box-shadow: 0 0 10px rgba(211, 84, 0, 0.8) !important;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+      100% { transform: scale(1); }
+    }
+
+    /* BẢNG CHÚ GIẢI KÝ HIỆU VÀ ĐỘ PHỦ HẠ TẦNG (LEGEND PANEL) */
     .legend-panel {
       display: none;
       background: var(--panel-bg);
@@ -350,7 +368,7 @@
     </div>
   </div>
 
-  <!-- BẢNG ĐỀ XUẤT ĐIỂM HẠ TẦNG MỚI -->
+  <!-- BẢNG ĐỀ XUẤT ĐIỂM HẠ TẦNG MỚI VÀ NÚT KÍCH HOẠT TRA CỨU ĐIỂM -->
   <div class="panel-bottom-left">
     <div class="add-point-card" id="addPointCard">
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:4px; margin-bottom:6px;">
@@ -391,13 +409,13 @@
       <div id="statusMsg" style="font-size:10px; margin-top:4px; text-align:center; font-weight:bold;"></div>
     </div>
 
+    <button class="btn-main" id="btnInspectMode" onclick="toggleInspectMode()" title="Click vào bản đồ để kiểm tra hạ tầng có sẵn và còn thiếu">🖱️❓ TRA CỨU ĐIỂM</button>
     <button class="btn-main" onclick="toggleAddCard()">➕ ĐỀ XUẤT ĐIỂM MỚI</button>
   </div>
 
   <!-- PANEL CHÚ GIẢI KÝ HIỆU VÀ ĐIỀU KHIỂN GÓC DƯỚI PHẢI -->
   <div class="panel-bottom-right">
     
-    <!-- BẢNG CHÚ GIẢI CHUẨN MÃ GEE -->
     <div class="legend-panel" id="legendPanel">
       <div class="legend-header">
         <span>CHÚ GIẢI KÝ HIỆU & ĐỘ PHỦ</span>
@@ -495,7 +513,19 @@
     let tileHeatmapLayer = null;
     let chartInstance = null;
     let isPickMode = false;
+    let isInspectMode = false;
     let tempMarker = null;
+
+    const infraLabels = {
+      "1-CV": "1. Công viên, điểm xanh, vườn hoa",
+      "2-BDX": "2. Bãi đỗ xe, trạm sạc xe điện",
+      "3-MN": "3. Trường Mầm non",
+      "4-TH": "4. Trường Tiểu học",
+      "5-THCS": "5. Trường THCS",
+      "6-YT": "6. Bệnh viện, Trạm y tế",
+      "7-VH": "7. Nhà văn hóa, thể thao",
+      "8-TM": "8. Chợ, Trung tâm thương mại"
+    };
 
     const layers = {
       pop: L.layerGroup(),
@@ -557,6 +587,22 @@
       if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(e.target.value / 100);
     });
 
+    function toggleInspectMode() {
+      isInspectMode = !isInspectMode;
+      const btn = document.getElementById('btnInspectMode');
+      const mapEl = document.getElementById('map');
+
+      if (isInspectMode) {
+        btn.classList.add('btn-inspect-active');
+        btn.innerHTML = "🖱️❓ ĐANG TRA CỨU...";
+        mapEl.classList.add('inspect-mode');
+      } else {
+        btn.classList.remove('btn-inspect-active');
+        btn.innerHTML = "🖱️❓ TRA CỨU ĐIỂM";
+        mapEl.classList.remove('inspect-mode');
+      }
+    }
+
     map.on('click', (e) => {
       if (isPickMode) {
         const lat = e.latlng.lat.toFixed(6);
@@ -588,6 +634,79 @@
         isPickMode = false;
         return;
       }
+
+      // XỬ LÝ TRA CỨU MẬT ĐỘ HẠ TẦNG VỊ TRÍ KHI KÍCH HOẠT MOUSE + ?
+      if (isInspectMode) {
+        const lat = e.latlng.lat.toFixed(6);
+        const lng = e.latlng.lng.toFixed(6);
+
+        if (tempMarker) map.removeLayer(tempMarker);
+        tempMarker = L.marker([lat, lng]).addTo(map);
+
+        let contentHtml = `<div class="popup-container">
+          <b style="font-size:11px; color:var(--primary-color);">📊 ĐÁNH GIÁ MẬT ĐỘ HẠ TẦNG VỊ TRÍ</b><br>
+          <div style="font-size:10px; color:#555; margin-top:4px;">⏳ Đang phân tích vị trí tra cứu: <span id="inspValText">0%</span></div>
+          <div class="inline-progress-bg"><div class="inline-progress-fill" id="inspValBar"></div></div>
+        </div>`;
+
+        const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([lat, lng]).setContent(contentHtml);
+        popup.openOn(map);
+
+        let step = 0;
+        const interval = setInterval(() => {
+          step += 15;
+          if (step <= 90) {
+            const bar = document.getElementById('inspValBar');
+            const txt = document.getElementById('inspValText');
+            if (bar) bar.style.width = step + "%";
+            if (txt) txt.innerText = step + "%";
+          }
+        }, 100);
+
+        fetch(`${geeApiBackend}?action=analyzeLocation&lat=${lat}&lng=${lng}`)
+          .then(r => r.json())
+          .then(res => {
+            clearInterval(interval);
+            let resultHtml = `<div class="popup-container">
+              <b style="font-size:11px; color:var(--primary-color);">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ</b><br>
+              <span style="font-size:10px; color:#555;">📍 Thuộc địa bàn: <b>Phường/Xã ${res.ward}</b></span><br>
+
+              <div style="font-weight:bold; color:var(--success-color); margin-top:6px; font-size:10.5px;">
+                1. Số nhóm hạ tầng tiếp cận: ${res.coveredCount}/8
+              </div>`;
+
+            if (res.coveredCount > 0) {
+              Object.keys(res.coveredGroups).forEach(code => {
+                const names = res.coveredGroups[code].join(', ');
+                resultHtml += `<div class="sug-card">
+                  <b>• ${infraLabels[code] || code}:</b><br>
+                  <span style="color:#16a085;">└ ${names}</span>
+                </div>`;
+              });
+            } else {
+              resultHtml += `<div class="sug-card ineligible">(Chưa có hạ tầng nào phủ đến vị trí này)</div>`;
+            }
+
+            resultHtml += `<div style="font-weight:bold; color:#c0392b; margin-top:6px; font-size:10.5px;">
+              2. Số nhóm hạ tầng chưa tiếp cận: ${res.missingCount}/8
+            </div>`;
+
+            if (res.missingCount > 0) {
+              res.missingCodes.forEach(code => {
+                resultHtml += `<div class="sug-card ineligible">❌ ${infraLabels[code] || code}</div>`;
+              });
+            } else {
+              resultHtml += `<div class="sug-card priority">✓ Vị trí hoàn hảo, tiếp cận đủ 8 nhóm hạ tầng!</div>`;
+            }
+
+            resultHtml += `</div>`;
+            popup.setContent(resultHtml);
+          });
+
+        toggleInspectMode();
+        return;
+      }
+
       layerControl.collapse();
     });
 
@@ -736,6 +855,8 @@
     }
 
     function onPointClick(p, marker) {
+      if (isInspectMode) return;
+
       let contentHtml = `<div class="popup-container">`;
       contentHtml += `<b style="font-size:11px; color:var(--primary-color);">🏢 ${p.name}</b><br>`;
       contentHtml += `• Địa bàn: <b>Phường/Xã ${p.ward}</b><br>`;
