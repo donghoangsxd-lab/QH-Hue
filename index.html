@@ -24,7 +24,7 @@
     
     #map.inspect-mode { cursor: help !important; }
 
-    /* ICON HẠ TẦNG X1.2 LẦN (27px) */
+    /* ICON HẠ TẦNG KÍCH THƯỚC LỚN (27px) */
     .custom-infra-icon {
       display: flex;
       align-items: center;
@@ -89,7 +89,7 @@
     .progress-bar-bg { width: 50px; background: #e0e0e0; height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--success-color); transition: width 0.3s ease; }
 
-    /* BẢNG QUẢN LÝ LỚP MỚI HOÀN TOÀN TỰ DỰNG (ĐẢM BẢO CHẤM TRÒN XUẤT HIỆN 100%) */
+    /* PANEL QUẢN LÝ LỚP MẶC ĐỊNH THU GỌN VỚI NÚT [+] / [-] */
     .custom-layer-panel {
       position: absolute;
       top: 10px;
@@ -101,10 +101,40 @@
       border: var(--panel-border);
       border-radius: 8px;
       box-shadow: var(--panel-shadow);
-      padding: 10px 12px;
+      padding: 8px 12px;
       width: 290px;
       font-size: 11px;
       color: #2c3e50;
+      box-sizing: border-box;
+    }
+
+    .layer-header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: bold;
+      color: var(--primary-color);
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .btn-toggle-expand {
+      font-family: monospace;
+      font-weight: bold;
+      font-size: 14px;
+      color: var(--primary-color);
+      background: rgba(0,0,0,0.06);
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+
+    .layer-content-body {
+      display: none; /* MẶC ĐỊNH THU GỌN */
+      margin-top: 8px;
+      border-top: 1px solid rgba(0,0,0,0.1);
+      padding-top: 6px;
     }
 
     .layer-row {
@@ -319,93 +349,96 @@
     </div>
   </div>
 
-  <!-- BẢNG QUẢN LÝ LỚP MỚI TỰ DỰNG - CÓ CHẤM TRÒN BUFFER HOÀN HẢO -->
+  <!-- BẢNG QUẢN LÝ LỚP MẶC ĐỊNH THU GỌN CHÍNH XÁC -->
   <div class="custom-layer-panel">
-    <div style="font-weight:bold; color:var(--primary-color); font-size:12px; border-bottom:1px solid #ddd; padding-bottom:4px; margin-bottom:6px;">
-      🏛️ QUẢN LÝ LỚP BẢN ĐỒ
+    <div class="layer-header-bar" onclick="toggleLayerPanel()">
+      <span>🏛️ QUẢN LÝ LỚP BẢN ĐỒ</span>
+      <span class="btn-toggle-expand" id="btnExpandIcon">[+]</span>
     </div>
 
-    <div class="layer-row">
-      <input type="checkbox" id="chk_pop" onchange="toggleLayer('pop', this.checked)">
-      <label for="chk_pop">0. Lớp phân bổ dân cư</label>
-    </div>
-
-    <div class="layer-row">
-      <input type="checkbox" id="chk_bound" checked onchange="toggleLayer('boundary', this.checked)">
-      <label for="chk_bound">🗺️ Ranh giới 40 Phường Xã</label>
-    </div>
-
-    <div class="layer-row">
-      <input type="checkbox" id="chk_c1" checked onchange="toggleLayer('c1', this.checked)">
-      <span class="btn-dot-buffer" id="dot_b1" onclick="toggleBuffer('b1', this)" title="Bật/Tắt bán kính Buffer">●</span>
-      <label for="chk_c1">1. Công viên, điểm xanh</label>
-    </div>
-
-    <div class="layer-row">
-      <input type="checkbox" id="chk_c2" checked onchange="toggleLayer('c2', this.checked)">
-      <span class="btn-dot-buffer" id="dot_b2" onclick="toggleBuffer('b2', this)" title="Bật/Tắt bán kính Buffer">●</span>
-      <label for="chk_c2">2. Bãi đỗ xe, trạm sạc</label>
-    </div>
-
-    <div class="layer-row">
-      <input type="checkbox" id="chk_c3" checked onchange="toggleLayer('c3', this.checked)">
-      <span class="btn-dot-buffer" id="dot_b3" onclick="toggleBuffer('b3', this)" title="Bật/Tắt bán kính Buffer">●</span>
-      <label for="chk_c3">3. Trường Mầm non</label>
-    </div>
-
-    <div class="layer-row">
-      <input type="checkbox" id="chk_c4" checked onchange="toggleLayer('c4', this.checked)">
-      <span class="btn-dot-buffer" id="dot_b4" onclick="toggleBuffer('b4', this)" title="Bật/Tắt bán kính Buffer">●</span>
-      <label for="chk_c4">4. Trường Tiểu học</label>
-    </div>
-
-    <div class="layer-row">
-      <input type="checkbox" id="chk_c5" checked onchange="toggleLayer('c5', this.checked)">
-      <span class="btn-dot-buffer" id="dot_b5" onclick="toggleBuffer('b5', this)" title="Bật/Tắt bán kính Buffer">●</span>
-      <label for="chk_c5">5. Trường THCS</label>
-    </div>
-
-    <div class="layer-row">
-      <input type="checkbox" id="chk_c6" checked onchange="toggleLayer('c6', this.checked)">
-      <span class="btn-dot-buffer" id="dot_b6" onclick="toggleBuffer('b6', this)" title="Bật/Tắt bán kính Buffer">●</span>
-      <label for="chk_c6">6. Cơ sở Y tế</label>
-    </div>
-
-    <div class="layer-row">
-      <input type="checkbox" id="chk_c7" checked onchange="toggleLayer('c7', this.checked)">
-      <span class="btn-dot-buffer" id="dot_b7" onclick="toggleBuffer('b7', this)" title="Bật/Tắt bán kính Buffer">●</span>
-      <label for="chk_c7">7. Nhà văn hóa, thể thao</label>
-    </div>
-
-    <div class="layer-row">
-      <input type="checkbox" id="chk_c8" checked onchange="toggleLayer('c8', this.checked)">
-      <span class="btn-dot-buffer" id="dot_b8" onclick="toggleBuffer('b8', this)" title="Bật/Tắt bán kính Buffer">●</span>
-      <label for="chk_c8">8. Chợ, Trung tâm thương mại</label>
-    </div>
-
-    <div class="layer-row">
-      <input type="checkbox" id="chk_c9" checked onchange="toggleLayer('c9', this.checked)">
-      <span class="btn-dot-buffer" id="dot_b9" onclick="toggleBuffer('b9', this)" title="Bật/Tắt bán kính Buffer">●</span>
-      <label for="chk_c9">9. Quỹ đất tiềm năng</label>
-    </div>
-
-    <div class="layer-row">
-      <input type="checkbox" id="chk_heat" checked onchange="toggleLayer('heatmap', this.checked)">
-      <label for="chk_heat">🔥 Heatmap độ phủ hạ tầng</label>
-    </div>
-
-    <div id="popBox" style="display:none;" class="opacity-slider-row">
-      👥 Độ trong suốt Dân cư: 
-      <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" oninput="changePopOpacity(this.value)">
-    </div>
-
-    <div id="heatBox" class="opacity-slider-row">
-      🔥 Độ trong suốt Heatmap: 
-      <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="50" oninput="changeHeatOpacity(this.value)">
-      <div style="margin-top:6px; font-weight:bold; color:#d35400;">
-        ⭕ Bán kính Buffer toàn đô thị: <span id="radiusLabel" style="color:#27ae60;">500m</span>
+    <div class="layer-content-body" id="layerPanelBody">
+      <div class="layer-row">
+        <input type="checkbox" id="chk_pop" onchange="toggleLayer('pop', this.checked)">
+        <label for="chk_pop">0. Lớp phân bổ dân cư</label>
       </div>
-      <input type="range" id="radiusSlider" class="opacity-slider" min="0" max="3" step="1" value="1" onchange="changeBufferRadius(this.value)">
+
+      <div class="layer-row">
+        <input type="checkbox" id="chk_bound" checked onchange="toggleLayer('boundary', this.checked)">
+        <label for="chk_bound">🗺️ Ranh giới 40 Phường Xã</label>
+      </div>
+
+      <div class="layer-row">
+        <input type="checkbox" id="chk_c1" checked onchange="toggleLayer('c1', this.checked)">
+        <span class="btn-dot-buffer" id="dot_b1" onclick="toggleBuffer('b1', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <label for="chk_c1">1. Công viên, điểm xanh</label>
+      </div>
+
+      <div class="layer-row">
+        <input type="checkbox" id="chk_c2" checked onchange="toggleLayer('c2', this.checked)">
+        <span class="btn-dot-buffer" id="dot_b2" onclick="toggleBuffer('b2', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <label for="chk_c2">2. Bãi đỗ xe, trạm sạc</label>
+      </div>
+
+      <div class="layer-row">
+        <input type="checkbox" id="chk_c3" checked onchange="toggleLayer('c3', this.checked)">
+        <span class="btn-dot-buffer" id="dot_b3" onclick="toggleBuffer('b3', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <label for="chk_c3">3. Trường Mầm non</label>
+      </div>
+
+      <div class="layer-row">
+        <input type="checkbox" id="chk_c4" checked onchange="toggleLayer('c4', this.checked)">
+        <span class="btn-dot-buffer" id="dot_b4" onclick="toggleBuffer('b4', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <label for="chk_c4">4. Trường Tiểu học</label>
+      </div>
+
+      <div class="layer-row">
+        <input type="checkbox" id="chk_c5" checked onchange="toggleLayer('c5', this.checked)">
+        <span class="btn-dot-buffer" id="dot_b5" onclick="toggleBuffer('b5', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <label for="chk_c5">5. Trường THCS</label>
+      </div>
+
+      <div class="layer-row">
+        <input type="checkbox" id="chk_c6" checked onchange="toggleLayer('c6', this.checked)">
+        <span class="btn-dot-buffer" id="dot_b6" onclick="toggleBuffer('b6', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <label for="chk_c6">6. Cơ sở Y tế</label>
+      </div>
+
+      <div class="layer-row">
+        <input type="checkbox" id="chk_c7" checked onchange="toggleLayer('c7', this.checked)">
+        <span class="btn-dot-buffer" id="dot_b7" onclick="toggleBuffer('b7', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <label for="chk_c7">7. Nhà văn hóa, thể thao</label>
+      </div>
+
+      <div class="layer-row">
+        <input type="checkbox" id="chk_c8" checked onchange="toggleLayer('c8', this.checked)">
+        <span class="btn-dot-buffer" id="dot_b8" onclick="toggleBuffer('b8', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <label for="chk_c8">8. Chợ, Trung tâm thương mại</label>
+      </div>
+
+      <!-- MỤC 9: ĐÃ XÓA NÚT CHẤM TRÒN BUFFER -->
+      <div class="layer-row">
+        <input type="checkbox" id="chk_c9" checked onchange="toggleLayer('c9', this.checked)">
+        <label for="chk_c9">9. Quỹ đất tiềm năng</label>
+      </div>
+
+      <div class="layer-row">
+        <input type="checkbox" id="chk_heat" checked onchange="toggleLayer('heatmap', this.checked)">
+        <label for="chk_heat">🔥 Heatmap độ phủ hạ tầng</label>
+      </div>
+
+      <div id="popBox" style="display:none;" class="opacity-slider-row">
+        👥 Độ trong suốt Dân cư: 
+        <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" oninput="changePopOpacity(this.value)">
+      </div>
+
+      <div id="heatBox" class="opacity-slider-row">
+        🔥 Độ trong suốt Heatmap: 
+        <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="50" oninput="changeHeatOpacity(this.value)">
+        <div style="margin-top:6px; font-weight:bold; color:#d35400;">
+          ⭕ Bán kính Buffer toàn đô thị: <span id="radiusLabel" style="color:#27ae60;">500m</span>
+        </div>
+        <input type="range" id="radiusSlider" class="opacity-slider" min="0" max="3" step="1" value="1" onchange="changeBufferRadius(this.value)">
+      </div>
     </div>
   </div>
 
@@ -607,7 +640,19 @@
       c9: L.layerGroup().addTo(map), b9: L.layerGroup()
     };
 
-    // CÁC HÀM ĐIỀU KHIỂN BẬT TẮT LỚP TỰ DỰNG CỰC KỲ DỄ DÀNG
+    // HÀM XỔ XUỐNG / THU GỌN PANEL QUẢN LÝ LỚP BẢN ĐỒ
+    function toggleLayerPanel() {
+      const body = document.getElementById('layerPanelBody');
+      const icon = document.getElementById('btnExpandIcon');
+      if (body.style.display === 'block') {
+        body.style.display = 'none';
+        icon.innerText = '[+]';
+      } else {
+        body.style.display = 'block';
+        icon.innerText = '[-]';
+      }
+    }
+
     function toggleLayer(layerKey, isChecked) {
       if (isChecked) {
         map.addLayer(layers[layerKey]);
@@ -876,8 +921,8 @@
         await Promise.allSettled([pMain]);
         updateMainProgress(75);
 
-        // NẠP VỚI OPACITY MẶC ĐỊNH LÀ 50% (0.50)
-        const pHeat = fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}`).then(r => r.json()).then(d => {
+        // NẠP VỚI OPACITY MẶC ĐỊNH 50%
+        const pHeat = fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}&t=${Date.now()}`).then(r => r.json()).then(d => {
           if (d.urlFormat) {
             tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: 0.50 });
             layers.heatmap.clearLayers();
@@ -958,15 +1003,18 @@
       });
     }
 
+    /* KHẮC PHỤC TRIỆT ĐỂ LỖI MẤT HEATMAP: CẬP NHẬT BIẾN TILEHEATMAPLAYER VÀ CHỐNG CACHE TRÌNH DUYỆT */
     function refreshHeatmapOnly() {
       const currentOpacity = document.getElementById('heatOpacity').value / 100;
-      fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}`)
+      fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}&t=${Date.now()}`)
         .then(r => r.json())
         .then(d => {
           if (d.urlFormat) {
             layers.heatmap.clearLayers();
             tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: currentOpacity });
-            tileHeatmapLayer.addTo(layers.heatmap);
+            if (document.getElementById('chk_heat').checked) {
+              tileHeatmapLayer.addTo(layers.heatmap);
+            }
           }
         });
     }
