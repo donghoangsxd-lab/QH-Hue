@@ -93,7 +93,7 @@
     .leaflet-popup { max-width: none !important; }
 
     .leaflet-popup-content-wrapper {
-      background: rgba(255, 255, 255, 0.55) !important;
+      background: rgba(255, 255, 255, 0.9) !important;
       backdrop-filter: blur(16px) !important;
       -webkit-backdrop-filter: blur(16px) !important;
       border-radius: 10px !important;
@@ -105,7 +105,7 @@
     }
 
     .leaflet-popup-tip {
-      background: rgba(255, 255, 255, 0.55) !important;
+      background: rgba(255, 255, 255, 0.9) !important;
       backdrop-filter: blur(16px) !important;
       box-shadow: none !important;
       border: 1px solid rgba(255, 255, 255, 0.5);
@@ -116,7 +116,7 @@
     .popup-container {
       width: 310px;
       max-width: 82vw;
-      max-height: 340px;
+      max-height: 380px;
       overflow-y: auto;
       overflow-x: hidden;
       padding-right: 2px;
@@ -223,7 +223,6 @@
       text-align: left;
     }
 
-    /* CSS ĐIỀU CHỈNH HOÀN THIỆN LAYER MANAGER KÈM CHECKBOX BUFFER TÙY CHỌN */
     .leaflet-control-layers-overlays label {
       display: flex !important;
       align-items: center !important;
@@ -589,7 +588,6 @@
       "9-CSD": { symbol: "🏗️", border: "#f39c12" }
     };
 
-    // TÁCH LỚP ĐIỂM (MARKER) VÀ LỚP VÙNG (BUFFER) ĐI KÈM MẶC ĐỊNH TẮT TẤT CẢ BUFFER
     const layers = {
       pop: L.layerGroup(),
       boundary: L.layerGroup().addTo(map),
@@ -605,7 +603,6 @@
       c9: L.layerGroup().addTo(map), b9: L.layerGroup()
     };
 
-    // QUẢN LÝ LỚP BẢN ĐỒ - XÓA HẲN LỚP "ĐỀ XUẤT MỚI (CHỜ DUYỆT)" DO ĐÃ TỰ ĐỘNG GOM VÀO NHÓM 1-9
     const layerControl = L.control.layers(null, {
       "0. Lớp phân bổ dân cư": layers.pop,
       "🗺️ Ranh giới 40 Phường Xã": layers.boundary,
@@ -653,18 +650,13 @@
       if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(e.target.value / 100);
     });
 
-    // TỰ ĐỘNG BỔ SUNG CHECKBOX TÙY CHỌN BẬT/TẮT BUFFER VÀO BẢNG LAYER MANAGER
     function setupBufferCheckboxes() {
       const overlaysList = document.querySelectorAll('.leaflet-control-layers-overlays label');
       const bufferMapping = {
-        "1. Công viên, điểm xanh": "b1",
-        "2. Bãi đỗ xe, trạm sạc": "b2",
-        "3. Trường Mầm non": "b3",
-        "4. Trường Tiểu học": "b4",
-        "5. Trường THCS": "b5",
-        "6. Cơ sở Y tế": "b6",
-        "7. Nhà văn hóa, thể thao": "b7",
-        "8. Chợ, Trung tâm thương mại": "b8",
+        "1. Công viên, điểm xanh": "b1", "2. Bãi đỗ xe, trạm sạc": "b2",
+        "3. Trường Mầm non": "b3", "4. Trường Tiểu học": "b4",
+        "5. Trường THCS": "b5", "6. Cơ sở Y tế": "b6",
+        "7. Nhà văn hóa, thể thao": "b7", "8. Chợ, Trung tâm thương mại": "b8",
         "9. Quỹ đất tiềm năng": "b9"
       };
 
@@ -679,11 +671,8 @@
             bufSpan.innerHTML = `<input type="checkbox" id="chk_buf_${bKey}" style="cursor:pointer; accent-color:var(--accent-color);"> ⭕ Buffer`;
             
             bufSpan.querySelector('input').addEventListener('change', (evt) => {
-              if (evt.target.checked) {
-                map.addLayer(layers[bKey]);
-              } else {
-                map.removeLayer(layers[bKey]);
-              }
+              if (evt.target.checked) map.addLayer(layers[bKey]);
+              else map.removeLayer(layers[bKey]);
             });
             lbl.appendChild(bufSpan);
           }
@@ -924,7 +913,6 @@
       }
     }
 
-    // RENDER ĐIỂM VÀ TÁCH VÙNG COVERAGE BUFFER THÀNH LỚP TÙY CHỌN (MẶC ĐỊNH TẮT TẤT CẢ BUFFER)
     function renderGroupedPoints() {
       const mapGroups = {
         "1-CV": layers.c1, "2-BDX": layers.c2, "3-MN": layers.c3,
@@ -948,25 +936,19 @@
         const targetBufferGroup = bufferGroups[p.type] || layers.b9;
 
         if (!isApproved) {
-          // BUFFER CHỜ DUYỆT (NẾT ĐỨT ĐỎ) - LƯU VÀO SUB-LAYER CỦA LOẠI ĐÓ (MẶC ĐỊNH TẮT)
           if (p.type !== "9-CSD") {
             const pendingBuffer = L.circle([p.lat, p.lng], {
               radius: Number(p.radius) || 500,
-              color: '#e74c3c',
-              weight: 2,
-              dashArray: '6, 6',
-              fillColor: '#e74c3c',
-              fillOpacity: 0.12
+              color: '#e74c3c', weight: 2, dashArray: '6, 6',
+              fillColor: '#e74c3c', fillOpacity: 0.12
             });
             targetBufferGroup.addLayer(pendingBuffer);
           }
 
-          // ICON CHỜ DUYỆT (VIỀN ĐỎ NẾT ĐỨT) - TỰ ĐỘNG GOM VÀO ĐÚNG LAYER TỪ 1 NẾN 9
           const pendingDivIcon = L.divIcon({
             className: 'custom-infra-icon pending-border',
             html: `<div>${cfg.symbol}</div>`,
-            iconSize: [22, 22],
-            iconAnchor: [11, 11]
+            iconSize: [22, 22], iconAnchor: [11, 11]
           });
 
           const pendingMarker = L.marker([p.lat, p.lng], { icon: pendingDivIcon });
@@ -974,24 +956,19 @@
           targetGroup.addLayer(pendingMarker);
 
         } else {
-          // BUFFER CHÍNH THỨC (NẾT LIỀN) - LƯU VÀO SUB-LAYER CỦA LOẠI ĐÓ (MẶC ĐỊNH TẮT)
           if (p.type !== "9-CSD") {
             const officialBuffer = L.circle([p.lat, p.lng], {
               radius: Number(p.radius) || 500,
-              color: cfg.border,
-              weight: 1.5,
-              fillColor: cfg.border,
-              fillOpacity: 0.15
+              color: cfg.border, weight: 1.5,
+              fillColor: cfg.border, fillOpacity: 0.15
             });
             targetBufferGroup.addLayer(officialBuffer);
           }
 
-          // ICON CHÍNH THỨC (VIỀN ĐƠN)
           const customDivIcon = L.divIcon({
             className: 'custom-infra-icon',
             html: `<div style="border-color:${cfg.border}">${cfg.symbol}</div>`,
-            iconSize: [22, 22],
-            iconAnchor: [11, 11]
+            iconSize: [22, 22], iconAnchor: [11, 11]
           });
 
           const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
@@ -999,6 +976,19 @@
           targetGroup.addLayer(marker);
         }
       });
+    }
+
+    // TỰ ĐỘNG CẬP NHẬT LẠI HEATMAP NGAY SAU KHI PHÊ DUYỆT ĐIỂM
+    function refreshHeatmapOnly() {
+      fetch(`${geeApiBackend}?action=getHeatmapTile`)
+        .then(r => r.json())
+        .then(d => {
+          if (d.urlFormat) {
+            layers.heatmap.clearLayers();
+            tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: 0.65 });
+            tileHeatmapLayer.addTo(layers.heatmap);
+          }
+        });
     }
 
     function approvePointStatus(pointId) {
@@ -1013,6 +1003,7 @@
         .then(r => r.json())
         .then(res => {
           console.log(`✓ Đã phê duyệt công trình ${pointId} trên Google Sheet!`);
+          refreshHeatmapOnly(); // Tải lại bản đồ nhiệt mới
         })
         .catch(err => {
           console.error(`❌ Lỗi đồng bộ phê duyệt cho ${pointId}:`, err);
@@ -1194,7 +1185,11 @@
         wardStatsData.forEach((w, idx) => {
           let row = `<tr>
             <td>${idx + 1}</td>
-            <td style="font-weight:bold; color:#2980b9; text-align:left;">${w.Ten_Phuong}</td>
+            <td style="text-align:left;">
+              <a href="javascript:void(0)" onclick="selectWardDetail('${w.Ten_Phuong}')" style="font-weight:bold; color:#2980b9; text-decoration:none;">
+                📍 ${w.Ten_Phuong}
+              </a>
+            </td>
             <td style="font-weight:bold; color:#188038; text-align:right;">${Number(w.Dan_So_Vector).toLocaleString()}</td>`;
 
           codes.forEach(c => {
@@ -1213,6 +1208,134 @@
         clearInterval(mInterval);
         tbody.innerHTML = "<tr><td colspan='19' style='text-align:center; color:red; padding:20px;'>❌ Lỗi nạp dữ liệu từ GEE Server.</td></tr>";
       });
+    }
+
+    // CLICK CHỌN XEM CHI TIẾT PHƯỜNG TRONG BẢNG TỔNG HỢP
+    function selectWardDetail(wardName) {
+      closeModal();
+
+      const wardData = wardStatsData.find(w => w.Ten_Phuong === wardName);
+      if (!wardData) return;
+
+      const normWard = wardName.replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '').trim().toLowerCase();
+      const wardInfraList = rawDataList.filter(item => {
+        const itemWardNorm = item.ward.replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '').trim().toLowerCase();
+        return itemWardNorm === normWard && (item.status === true || item.status === 'true' || item.status === 'TRUE');
+      });
+
+      const currentAreas = { "1-CV": 0, "2-BDX": 0, "3-MN": 0, "4-TH": 0, "5-THCS": 0, "6-YT": 0, "7-VH": 0, "8-TM": 0 };
+      wardInfraList.forEach(item => {
+        if (currentAreas[item.type] !== undefined) currentAreas[item.type] += (item.size || 0);
+      });
+
+      const currentPop = Number(wardData.Dan_So_Vector || 0);
+
+      let modalHtml = `<div class="popup-container" style="width: 580px; max-width: 90vw;">
+        <b style="font-size:12px; color:var(--primary-color);">📍 PHÂN TÍCH HẠ TẦNG QUY CHUẨN: ${wardName.toUpperCase()}</b><br>
+        
+        <div style="background:#f8f9fa; border:1px solid #dcdfe6; padding:6px; border-radius:4px; margin:6px 0; font-size:11px;">
+          👥 Dân số hiện trạng: <b style="color:#27ae60;">~${currentPop.toLocaleString()} người</b> | 
+          🔮 Dự báo dân số: <input type="number" id="wardPopInput" value="${currentPop}" style="width:75px; font-size:11px; padding:1px 3px;" onchange="recalcWardQuota('${wardName}', this.value)">
+        </div>
+
+        <div id="wardQuotaTableContainer">
+          ${buildWardQuotaTableHtml(wardName, currentPop, currentAreas, wardInfraList)}
+        </div>
+      </div>`;
+
+      const firstPoint = wardInfraList[0] || { lat: 16.4637, lng: 107.5905 };
+      map.flyTo([firstPoint.lat, firstPoint.lng], 14);
+
+      const detailPopup = L.popup({ closeButton: true, autoPan: true })
+        .setLatLng([firstPoint.lat, firstPoint.lng])
+        .setContent(modalHtml);
+      
+      setTimeout(() => detailPopup.openOn(map), 300);
+    }
+
+    function buildWardQuotaTableHtml(wardName, pop, areas, infraList) {
+      const quotaConfig = {
+        "1-CV":   { norm: 7.00, label: "Công viên, điểm xanh" },
+        "2-BDX":  { norm: 2.50, label: "Bãi đỗ xe" },
+        "3-MN":   { norm: 0.60, label: "Mầm non" },
+        "4-TH":   { norm: 0.65, label: "Tiểu học" },
+        "5-THCS": { norm: 0.55, label: "THCS" },
+        "6-YT":   { norm: 0.20, label: "Cơ sở Y tế" },
+        "7-VH":   { norm: 1.00, label: "Văn hóa" },
+        "8-TM":   { norm: 0.00, label: "Thương mại" }
+      };
+
+      let html = `<table style="width:100%; border-collapse:collapse; font-size:10px; text-align:left;">
+        <thead>
+          <tr style="background:#2c3e50; color:#fff;">
+            <th style="padding:4px;">STT</th>
+            <th style="padding:4px;">Loại hạ tầng / Công trình</th>
+            <th style="padding:4px; text-align:right;">Hiện trạng</th>
+            <th style="padding:4px; text-align:center;">Chỉ tiêu</th>
+            <th style="padding:4px; text-align:right;">Nhu cầu DT</th>
+            <th style="padding:4px; text-align:center;">Đánh giá</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+      let stt = 1;
+      Object.keys(quotaConfig).forEach(code => {
+        const cfg = quotaConfig[code];
+        const existArea = areas[code] || 0;
+        const actualPerCap = pop > 0 ? (existArea / pop) : 0;
+        const reqArea = Math.round(pop * cfg.norm);
+        const isPass = actualPerCap >= cfg.norm;
+        const diffArea = existArea - reqArea;
+
+        const evalText = cfg.norm === 0 ? "Theo quy hoạch" : (isPass ? `ĐẠT (+${diffArea.toLocaleString()} m²)` : `THIẾU (${diffArea.toLocaleString()} m²)`);
+        const evalColor = cfg.norm === 0 ? "#7f8c8d" : (isPass ? "#27ae60" : "#c0392b");
+
+        html += `<tr style="background:#eaeded; font-weight:bold; border-bottom:1px solid #ccc;">
+          <td style="padding:3px; text-align:center;">${stt++}</td>
+          <td style="padding:3px;">${cfg.label}</td>
+          <td style="padding:3px; text-align:right;">${existArea.toLocaleString()} m²</td>
+          <td style="padding:3px; text-align:center;">${cfg.norm > 0 ? cfg.norm + ' m²' : '-'}</td>
+          <td style="padding:3px; text-align:right; color:#2980b9;">${reqArea > 0 ? reqArea.toLocaleString() + ' m²' : '-'}</td>
+          <td style="padding:3px; text-align:center; color:${evalColor};">${evalText}</td>
+        </tr>`;
+
+        const subItems = infraList.filter(it => it.type === code);
+        subItems.forEach(item => {
+          html += `<tr style="background:#fff; border-bottom:1px dashed #eee; font-size:9.5px;">
+            <td></td>
+            <td style="padding:2px 2px 2px 12px; color:#2980b9;">└ ${item.name}</td>
+            <td style="padding:2px; text-align:right;">${item.size.toLocaleString()} m²</td>
+            <td style="padding:2px; text-align:center; color:#aaa;">-</td>
+            <td style="padding:2px; text-align:right; color:#8e44ad;">Bán kính: ${item.radius}m</td>
+            <td style="padding:2px; text-align:center; color:#27ae60;">✓ Đang hoạt động</td>
+          </tr>`;
+        });
+      });
+
+      html += `</tbody></table>`;
+      return html;
+    }
+
+    function recalcWardQuota(wardName, newPopVal) {
+      const popNum = parseInt(newPopVal, 10) || 0;
+      const wardData = wardStatsData.find(w => w.Ten_Phuong === wardName);
+      if (!wardData) return;
+
+      const normWard = wardName.replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '').trim().toLowerCase();
+      const wardInfraList = rawDataList.filter(item => {
+        const itemWardNorm = item.ward.replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '').trim().toLowerCase();
+        return itemWardNorm === normWard && (item.status === true || item.status === 'true' || item.status === 'TRUE');
+      });
+
+      const currentAreas = { "1-CV": 0, "2-BDX": 0, "3-MN": 0, "4-TH": 0, "5-THCS": 0, "6-YT": 0, "7-VH": 0, "8-TM": 0 };
+      wardInfraList.forEach(item => {
+        if (currentAreas[item.type] !== undefined) currentAreas[item.type] += (item.size || 0);
+      });
+
+      const container = document.getElementById('wardQuotaTableContainer');
+      if (container) {
+        container.innerHTML = buildWardQuotaTableHtml(wardName, popNum, currentAreas, wardInfraList);
+      }
     }
 
     function renderCombinedChart() {
