@@ -13,6 +13,10 @@
       --primary-color: #2c3e50;
       --accent-color: #d35400;
       --success-color: #27ae60;
+      --panel-bg: rgba(255, 255, 255, 0.85);
+      --panel-blur: blur(10px);
+      --panel-border: 1px solid rgba(255, 255, 255, 0.6);
+      --panel-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
     }
 
     body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -24,17 +28,17 @@
       top: 10px; 
       left: 55px; 
       z-index: 1000; 
-      background: rgba(255, 255, 255, 0.85); 
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      background: var(--panel-bg); 
+      backdrop-filter: var(--panel-blur);
+      -webkit-backdrop-filter: var(--panel-blur);
       padding: 6px 12px; 
       border-radius: 6px; 
-      box-shadow: 0 2px 10px rgba(0,0,0,0.15); 
+      box-shadow: var(--panel-shadow); 
       display: flex;
       align-items: center;
       gap: 12px;
       font-size: 11px; 
-      border: 1px solid rgba(255,255,255,0.6);
+      border: var(--panel-border);
     }
 
     .progress-compact { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: bold; color: var(--success-color); }
@@ -110,46 +114,62 @@
       opacity: 0.7;
     }
 
-    /* BẢNG ĐIỀU KHIỂN LAYER & NÚT BẤM THU GỌN */
-    .leaflet-control-layers {
-      border: 1px solid rgba(255, 255, 255, 0.7) !important;
-      border-radius: 8px !important;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
-      background: rgba(255, 255, 255, 0.9) !important;
-      backdrop-filter: blur(12px) !important;
-      -webkit-backdrop-filter: blur(12px) !important;
-      padding: 6px 10px !important;
-      font-size: 11px !important;
+    /* ĐỒNG BỘ 100% ĐỊNH DẠNG KHUNG QUẢN LÝ LỚP BẢN ĐỒ VỚI PANEL HẠ TẦNG ĐÔ THỊ HUẾ */
+    .leaflet-top.leaflet-right {
+      top: 10px;
+      right: 10px;
     }
 
-    /* NÚT "QUẢN LÝ LỚP BẢN ĐỒ" KHI THU GỌN */
+    .leaflet-control-layers {
+      border: var(--panel-border) !important;
+      border-radius: 6px !important;
+      box-shadow: var(--panel-shadow) !important;
+      background: var(--panel-bg) !important;
+      backdrop-filter: var(--panel-blur) !important;
+      -webkit-backdrop-filter: var(--panel-blur) !important;
+      padding: 6px 12px !important;
+      font-size: 11px !important;
+      margin: 0 !important;
+      box-sizing: border-box;
+    }
+
+    /* NÚT THU GỌN QUẢN LÝ LỚP BẢN ĐỒ */
     .leaflet-control-layers-toggle {
       width: auto !important;
-      height: 28px !important;
+      height: auto !important;
       background-image: none !important;
       display: flex !important;
       align-items: center;
       justify-content: center;
-      padding: 0 10px;
-      font-weight: bold;
-      font-size: 11px;
-      color: var(--primary-color);
+      padding: 0 !important;
+      font-weight: bold !important;
+      font-size: 12px !important;
+      color: var(--primary-color) !important;
       text-decoration: none;
       white-space: nowrap;
+      text-transform: uppercase;
     }
     .leaflet-control-layers-toggle::after {
-      content: "🗂️ Quản lý lớp bản đồ";
+      content: "🏛️ QUẢN LÝ LỚP BẢN ĐỒ";
+    }
+
+    /* KHUNG MỞ RỘNG KHI XỔ DANH SÁCH (ĐỒNG BỘ CHIỀU RỘNG NÚT DỰNG SẴN) */
+    .leaflet-control-layers-expanded {
+      width: 220px !important;
+      padding: 8px 12px !important;
     }
 
     .layer-header-title {
       font-weight: bold;
       color: var(--primary-color);
-      font-size: 11px;
+      font-size: 12px;
+      text-transform: uppercase;
       border-bottom: 1px solid rgba(0,0,0,0.1);
-      padding-bottom: 4px;
+      padding-bottom: 5px;
       margin-bottom: 6px;
     }
 
+    /* ĐỒNG BỘ THANH SLIDER OPACITY */
     .opacity-control-panel { 
       background: transparent; 
       padding: 4px 0 0 0; 
@@ -160,8 +180,15 @@
       margin-top: 4px; 
       border-top: 1px dashed rgba(0,0,0,0.12);
       padding-top: 4px;
+      width: 100%;
     }
-    .opacity-slider { width: 100%; margin: 2px 0; accent-color: var(--primary-color); cursor: pointer; }
+    .opacity-slider { 
+      width: 100%; 
+      margin: 3px 0 1px 0; 
+      accent-color: var(--primary-color); 
+      cursor: pointer; 
+      display: block;
+    }
 
     /* NÚT MỞ BẢNG TỔNG HỢP GÓC DƯỚI */
     .panel-bottom-right { position: absolute; bottom: 18px; right: 18px; z-index: 1000; }
@@ -298,7 +325,7 @@
       c9: L.layerGroup().addTo(map)
     };
 
-    // DANH SÁCH LAYER VỚI ĐỔI TÊN LỚP 0 VÀ CHUYỂN HEATMAP XUỐNG DƯỚI CÙNG
+    // QUẢN LÝ LỚP BẢN ĐỒ BẬT TẮT VÀ XỔ BẢNG
     const layerControl = L.control.layers(null, {
       "0. Lớp phân bổ dân cư": layers.pop,
       "🗺️ Ranh giới 40 Phường Xã": layers.boundary,
@@ -314,7 +341,15 @@
       "🔥 Heatmap độ phủ hạ tầng": layers.heatmap
     }, { collapsed: true, position: 'topright' }).addTo(map);
 
-    // BỎ DÒNG "🎚️ ĐỘ TRONG SUỐT LAYER RASTER", CHỈ HIỆN SLIDER KHI BẬT LỚP TƯƠNG ỨNG
+    const layerContainerEl = document.querySelector('.leaflet-control-layers-list');
+    if (layerContainerEl) {
+      const titleEl = document.createElement('div');
+      titleEl.className = 'layer-header-title';
+      titleEl.innerHTML = '🏛️ QUẢN LÝ LỚP BẢN ĐỒ';
+      layerContainerEl.insertBefore(titleEl, layerContainerEl.firstChild);
+    }
+
+    // SLIDER OPACITY TỰ ĐỘNG HIỆN THỊ KHI BẬT LAYER DÂN CƯ HOẶC HEATMAP
     const sliderContainer = L.DomUtil.create('div', 'opacity-control-panel');
     sliderContainer.innerHTML = `
       <div id="popBox" style="display:none;" class="opacity-slider-row">👥 Độ trong suốt Dân cư: <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60"></div>
@@ -339,7 +374,7 @@
       if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(e.target.value / 100);
     });
 
-    // TỰ ĐỘNG THU GỌN PANEL BẢN ĐỒ VỀ TRẠNG THÁI NÚT DỰNG SẴN KHI CLICK VÀO BẢN ĐỒ
+    // TỰ ĐỘNG THU GỌN VỀ NÚT BAN ĐẦU KHI TRUY CẤP CLICK BẢN ĐỒ
     map.on('click', () => {
       layerControl.collapse();
     });
