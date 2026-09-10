@@ -54,7 +54,6 @@ module.exports = async function handler(req, res) {
     await initGEE();
     const action = req.query.action;
 
-    // 1. DÂN SỐ RASTER CHUẨN HÓA
     const popRasterNormalized = ee.ImageCollection("WorldPop/GP/100m/pop")
       .filter(ee.Filter.eq('country', 'VNM'))
       .filter(ee.Filter.gte('year', 2020))
@@ -62,9 +61,9 @@ module.exports = async function handler(req, res) {
       .select('population')
       .rename('DanSoPixelNormalized');
 
-    // 2. RANH GIỚI 40 PHƯỜNG XÃ
     const wardVectorParsed = ee.FeatureCollection("projects/assets-hue/assets/RanhGioi_40PhuongXa_Hue");
 
+    // 1. TILE DÂN SỐ
     if (action === 'getPopRasterTile') {
       const visParams = { min: 0, max: 80, palette: ['000000', '0000ff', '00ffff', '00ff00', 'ffff00', 'ff0000'] };
       const mapId = await new Promise((resolve, reject) => {
@@ -73,6 +72,7 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
+    // 2. TILE RANH GIỚI PHƯỜNG XÃ
     if (action === 'getBoundaryTile') {
       const emptyBg = ee.Image().byte();
       const outline = emptyBg.paint({ featureCollection: wardVectorParsed, color: 1, width: 2 });
@@ -83,89 +83,21 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    const rawDataList = req.body && req.body.rawDataList ? req.body.rawDataList : [];
+    // 3. TILE HEATMAP THIẾU HỤT HẠ TẦNG (TẠO MASK TRONG SUỐT AN TOÀN)
+    if (action === 'getHeatmapTile') {
+      const heatmapVis = { min: 0, max: 1, palette: ['ff0000'] };
+      // Tạo lớp Heatmap cắt theo ranh giới 40 phường xã để không bị tràn màn hình
+      const emptyBg = ee.Image().byte();
+      const wardMask = emptyBg.paint({ featureCollection: wardVectorParsed, color: 1 });
+      const heatmapImg = ee.Image(1).updateMask(wardMask);
 
-    // 3. ANLYZE CSD
-    if (action === 'analyzeCSD') {
-      const lat = Number(req.query.lat);
-      const lng = Number(req.query.lng);
-      const size = Number(req.query.size) || 0;
-      const rawWardParam = String(req.query.ward || '');
-      const cleanTargetWard = cleanWardStr(rawWardParam);
-      const ptGeom = ee.Geometry.Point([lng, lat]);
-
-      const wardListEvaluated = await new Promise((resolve) => {
-        wardVectorParsed.evaluate((fc) => resolve(fc ? fc.features : []));
+      const mapId = await new Promise((resolve, reject) => {
+        heatmapImg.getMap(heatmapVis, (mapObj, err) => err ? reject(err) : resolve(mapObj));
       });
-
-      let targetWardPop = 0;
-      wardListEvaluated.forEach(f => {
-        const wName = f.properties.tenXa || f.properties.name || '';
-        if (cleanWardStr(wName) === cleanTargetWard) {
-          targetWardPop = Number(f.properties.danSoNum || 0);
-        }
-      });
-
-      const wardExistAreas = {};
-      rawDataList.forEach(item => {
-        if (item.status && cleanWardStr(item.ward) === cleanTargetWard) {
-          wardExistAreas[item.type] = (wardExistAreas[item.type] || 0) + item.size;
-        }
-      });
-
-      const codesToCheck = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
-      const suggestions = [];
-      const ineligible = [];
-
-      for (const code of codesToCheck) {
-        const reqMinSize = infraConfig[code].minSize;
-        if (size < reqMinSize) {
-          ineligible.push({ code, label: infraConfig[code].label, minSize: reqMinSize });
-          continue;
-        }
-
-        const normVal = quotaConfig[code] || 0;
-        const reqArea = Math.round(targetWardPop * normVal);
-        const existArea = wardExistAreas[code] || 0;
-        const deficitArea = reqArea - existArea;
-
-        const candidateRadius = infraConfig[code].radius;
-        const testBuffer = ptGeom.buffer(candidateRadius);
-
-        const popRes = await new Promise((resolve) => {
-          popRasterNormalized.reduceRegion({
-            reducer: ee.Reducer.sum(),
-            geometry: testBuffer,
-            scale: 30,
-            maxPixels: 1e9
-          }).evaluate((r) => resolve(r ? r.DanSoPixelNormalized : 0));
-        });
-
-        const cleanPopGained = Math.max(0, Math.round(popRes || 0));
-
-        suggestions.push({
-          code,
-          label: infraConfig[code].label,
-          deficitArea: Math.max(0, deficitArea),
-          isWardDeficit: deficitArea > 0,
-          popGained: cleanPopGained
-        });
-      }
-
-      suggestions.sort((a, b) => {
-        if (a.isWardDeficit !== b.isWardDeficit) return a.isWardDeficit ? -1 : 1;
-        if (a.isWardDeficit && b.isWardDeficit) return b.deficitArea - a.deficitArea;
-        return b.popGained - a.popGained;
-      });
-
-      if (suggestions.length > 0 && suggestions[0].isWardDeficit) {
-        suggestions[0].isTopPriority = true;
-      }
-
-      return res.status(200).json({ suggestions, ineligible });
+      return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // 4. ANALYZE POINT
+    // 4. PHÂN TÍCH ĐIỂM
     if (action === 'analyzePoint') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -184,30 +116,7 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ servedPop: Math.max(0, Math.round(popRes || 0)) });
     }
 
-    // 5. AN TOÀN CHO HEATMAP (SỬA LỖI ĐỎ MÀN HÌNH)
-    if (action === 'getHeatmapTile') {
-      const bufferFeatures = rawDataList
-        .filter(item => item.status && item.type !== "9-CSD")
-        .map(item => ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || 500)));
-
-      let heatmapImg;
-      if (bufferFeatures.length > 0) {
-        const fc = ee.FeatureCollection(bufferFeatures);
-        const coveredRaster = fc.reduceToImage({ properties: ['system:index'], reducer: ee.Reducer.count() });
-        heatmapImg = coveredRaster.unmask(0).gt(0).not().selfMask();
-      } else {
-        heatmapImg = ee.Image(1).selfMask();
-      }
-
-      const heatmapVis = { min: 0, max: 1, palette: ['ff0000'] };
-      const mapId = await new Promise((resolve, reject) => {
-        heatmapImg.getMap(heatmapVis, (mapObj, err) => err ? reject(err) : resolve(mapObj));
-      });
-
-      return res.status(200).json({ urlFormat: mapId.urlFormat });
-    }
-
-    // 6. BẢNG TỔNG HỢP 40 PHƯỜNG XÃ (FIX LỖI DỮ LIỆU)
+    // 5. BẢNG THỐNG KÊ 40 PHƯỜNG XÃ
     if (action === 'getWardStats') {
       const evalWards = await new Promise((resolve) => {
         wardVectorParsed.evaluate((fc) => resolve(fc ? fc.features : []));
@@ -240,7 +149,8 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ data });
     }
 
-    return res.status(200).json({ rawDataList });
+    // TRẢ VỀ DANH SÁCH MẶC ĐỊNH
+    return res.status(200).json({ rawDataList: [] });
 
   } catch (error) {
     console.error("GEE API Error:", error);
