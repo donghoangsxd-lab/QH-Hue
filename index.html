@@ -188,7 +188,7 @@
       padding: 6px 12px !important;
       font-size: 11px !important;
       margin: 0 !important;
-      width: 220px !important;
+      width: 250px !important;
       box-sizing: border-box !important;
     }
 
@@ -221,6 +221,25 @@
       padding-bottom: 5px;
       margin-bottom: 8px;
       text-align: left;
+    }
+
+    /* CSS ĐIỀU CHỈNH HOÀN THIỆN LAYER MANAGER KÈM CHECKBOX BUFFER TÙY CHỌN */
+    .leaflet-control-layers-overlays label {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      margin-bottom: 4px;
+      font-size: 10.5px;
+    }
+
+    .buffer-toggle-span {
+      font-size: 9.5px;
+      color: #d35400;
+      font-weight: bold;
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
     }
 
     .opacity-control-panel { background: transparent; padding: 2px 0 0 0; font-size: 10.5px; }
@@ -570,22 +589,26 @@
       "9-CSD": { symbol: "🏗️", border: "#f39c12" }
     };
 
+    // TÁCH LỚP ĐIỂM (MARKER) VÀ LỚP VÙNG (BUFFER) ĐI KÈM MẶC ĐỊNH TẮT TẤT CẢ BUFFER
     const layers = {
       pop: L.layerGroup(),
       boundary: L.layerGroup().addTo(map),
       heatmap: L.layerGroup(),
-      pending: L.layerGroup().addTo(map),
-      c1: L.layerGroup().addTo(map), c2: L.layerGroup().addTo(map),
-      c3: L.layerGroup().addTo(map), c4: L.layerGroup().addTo(map),
-      c5: L.layerGroup().addTo(map), c6: L.layerGroup().addTo(map),
-      c7: L.layerGroup().addTo(map), c8: L.layerGroup().addTo(map),
-      c9: L.layerGroup().addTo(map)
+      c1: L.layerGroup().addTo(map), b1: L.layerGroup(),
+      c2: L.layerGroup().addTo(map), b2: L.layerGroup(),
+      c3: L.layerGroup().addTo(map), b3: L.layerGroup(),
+      c4: L.layerGroup().addTo(map), b4: L.layerGroup(),
+      c5: L.layerGroup().addTo(map), b5: L.layerGroup(),
+      c6: L.layerGroup().addTo(map), b6: L.layerGroup(),
+      c7: L.layerGroup().addTo(map), b7: L.layerGroup(),
+      c8: L.layerGroup().addTo(map), b8: L.layerGroup(),
+      c9: L.layerGroup().addTo(map), b9: L.layerGroup()
     };
 
+    // QUẢN LÝ LỚP BẢN ĐỒ - XÓA HẲN LỚP "ĐỀ XUẤT MỚI (CHỜ DUYỆT)" DO ĐÃ TỰ ĐỘNG GOM VÀO NHÓM 1-9
     const layerControl = L.control.layers(null, {
       "0. Lớp phân bổ dân cư": layers.pop,
       "🗺️ Ranh giới 40 Phường Xã": layers.boundary,
-      "📌 Đề xuất mới (Chờ duyệt)": layers.pending,
       "1. Công viên, điểm xanh": layers.c1,
       "2. Bãi đỗ xe, trạm sạc": layers.c2,
       "3. Trường Mầm non": layers.c3,
@@ -629,6 +652,44 @@
     document.getElementById('heatOpacity').addEventListener('input', (e) => {
       if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(e.target.value / 100);
     });
+
+    // TỰ ĐỘNG BỔ SUNG CHECKBOX TÙY CHỌN BẬT/TẮT BUFFER VÀO BẢNG LAYER MANAGER
+    function setupBufferCheckboxes() {
+      const overlaysList = document.querySelectorAll('.leaflet-control-layers-overlays label');
+      const bufferMapping = {
+        "1. Công viên, điểm xanh": "b1",
+        "2. Bãi đỗ xe, trạm sạc": "b2",
+        "3. Trường Mầm non": "b3",
+        "4. Trường Tiểu học": "b4",
+        "5. Trường THCS": "b5",
+        "6. Cơ sở Y tế": "b6",
+        "7. Nhà văn hóa, thể thao": "b7",
+        "8. Chợ, Trung tâm thương mại": "b8",
+        "9. Quỹ đất tiềm năng": "b9"
+      };
+
+      overlaysList.forEach(lbl => {
+        const textNode = Array.from(lbl.childNodes).find(n => n.nodeType === 3);
+        if (textNode) {
+          const layerName = textNode.textContent.trim();
+          const bKey = bufferMapping[layerName];
+          if (bKey) {
+            const bufSpan = document.createElement('span');
+            bufSpan.className = 'buffer-toggle-span';
+            bufSpan.innerHTML = `<input type="checkbox" id="chk_buf_${bKey}" style="cursor:pointer; accent-color:var(--accent-color);"> ⭕ Buffer`;
+            
+            bufSpan.querySelector('input').addEventListener('change', (evt) => {
+              if (evt.target.checked) {
+                map.addLayer(layers[bKey]);
+              } else {
+                map.removeLayer(layers[bKey]);
+              }
+            });
+            lbl.appendChild(bufSpan);
+          }
+        }
+      });
+    }
 
     function toggleInspectMode() {
       isInspectMode = !isInspectMode;
@@ -859,10 +920,11 @@
         console.error("Lỗi tiến trình nạp bản đồ", e);
       } finally {
         updateMainProgress(100);
+        setupBufferCheckboxes();
       }
     }
 
-    // TÍCH HỢP TÍNH NĂNG DUYỆT BẢN ĐỒ RIÊNG TỪNG LAYER (TẠO BUFFER VÀ ĐỘ PHỦ CHO CẢ ĐIỂM FALSE VÀ TRUE CÙNG LAYER)
+    // RENDER ĐIỂM VÀ TÁCH VÙNG COVERAGE BUFFER THÀNH LỚP TÙY CHỌN (MẶC ĐỊNH TẮT TẤT CẢ BUFFER)
     function renderGroupedPoints() {
       const mapGroups = {
         "1-CV": layers.c1, "2-BDX": layers.c2, "3-MN": layers.c3,
@@ -870,15 +932,23 @@
         "7-VH": layers.c7, "8-TM": layers.c8, "9-CSD": layers.c9
       };
 
+      const bufferGroups = {
+        "1-CV": layers.b1, "2-BDX": layers.b2, "3-MN": layers.b3,
+        "4-TH": layers.b4, "5-THCS": layers.b5, "6-YT": layers.b6,
+        "7-VH": layers.b7, "8-TM": layers.b8, "9-CSD": layers.b9
+      };
+
       Object.keys(mapGroups).forEach(k => mapGroups[k].clearLayers());
+      Object.keys(bufferGroups).forEach(k => bufferGroups[k].clearLayers());
 
       rawDataList.forEach(p => {
         const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
         const cfg = infraIcons[p.type] || { symbol: "🏢", border: "#2c3e50" };
         const targetGroup = mapGroups[p.type] || layers.c9;
+        const targetBufferGroup = bufferGroups[p.type] || layers.b9;
 
         if (!isApproved) {
-          // BÁN KÍNH DỰ KIẾN (FALSE): ĐƯỜNG NẾT ĐỨT CẢNH BÁO
+          // BUFFER CHỜ DUYỆT (NẾT ĐỨT ĐỎ) - LƯU VÀO SUB-LAYER CỦA LOẠI ĐÓ (MẶC ĐỊNH TẮT)
           if (p.type !== "9-CSD") {
             const pendingBuffer = L.circle([p.lat, p.lng], {
               radius: Number(p.radius) || 500,
@@ -888,10 +958,10 @@
               fillColor: '#e74c3c',
               fillOpacity: 0.12
             });
-            targetGroup.addLayer(pendingBuffer);
+            targetBufferGroup.addLayer(pendingBuffer);
           }
 
-          // ICON ĐIỂM CHỜ DUYỆT (FALSE): GIỮ ICON ĐÚNG LOẠI HẠ TẦNG + VIỀN ĐỎ NẾT ĐỨT
+          // ICON CHỜ DUYỆT (VIỀN ĐỎ NẾT ĐỨT) - TỰ ĐỘNG GOM VÀO ĐÚNG LAYER TỪ 1 NẾN 9
           const pendingDivIcon = L.divIcon({
             className: 'custom-infra-icon pending-border',
             html: `<div>${cfg.symbol}</div>`,
@@ -904,7 +974,7 @@
           targetGroup.addLayer(pendingMarker);
 
         } else {
-          // BÁN KÍNH CHÍNH THỨC (TRUE): ĐƯỜNG NẾT LIỀN
+          // BUFFER CHÍNH THỨC (NẾT LIỀN) - LƯU VÀO SUB-LAYER CỦA LOẠI ĐÓ (MẶC ĐỊNH TẮT)
           if (p.type !== "9-CSD") {
             const officialBuffer = L.circle([p.lat, p.lng], {
               radius: Number(p.radius) || 500,
@@ -913,10 +983,10 @@
               fillColor: cfg.border,
               fillOpacity: 0.15
             });
-            targetGroup.addLayer(officialBuffer);
+            targetBufferGroup.addLayer(officialBuffer);
           }
 
-          // ICON CHÍNH THỨC (TRUE)
+          // ICON CHÍNH THỨC (VIỀN ĐƠN)
           const customDivIcon = L.divIcon({
             className: 'custom-infra-icon',
             html: `<div style="border-color:${cfg.border}">${cfg.symbol}</div>`,
@@ -931,17 +1001,14 @@
       });
     }
 
-    // HÀM PHÊ DUYỆT ĐIỂM VÀ ĐỒNG BỘ TRỰC TIẾP LÊN GOOGLE SHEET
     function approvePointStatus(pointId) {
       const target = rawDataList.find(x => x.id === pointId);
       if (!target) return;
 
-      // 1. Cập nhật ngay trên giao diện bản đồ
       target.status = true;
       renderGroupedPoints();
       map.closePopup();
 
-      // 2. Gọi API đồng bộ lên Google Sheet
       fetch(`${geeApiBackend}?action=approvePoint&id=${encodeURIComponent(pointId)}`)
         .then(r => r.json())
         .then(res => {
