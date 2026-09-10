@@ -24,7 +24,7 @@
     
     #map.inspect-mode { cursor: help !important; }
 
-    /* ICON HẠ TẦNG ĐÃ ĐƯỢC PHÊ DUYỆT (TRUE) */
+    /* ICON HẠ TẦNG ĐÃ PHÊ DUYỆT (TRUE) */
     .custom-infra-icon {
       display: flex;
       align-items: center;
@@ -38,7 +38,7 @@
     }
     .custom-infra-icon:hover { transform: scale(1.3); z-index: 1000 !important; }
 
-    /* ICON HẠ TẦNG CHỜ DUYỆT (FALSE) - VIỀN ĐỎ NÉT ĐỨT & HIỆU ỨNG CẢNH BÁO */
+    /* ICON HẠ TẦNG CHỜ DUYỆT (FALSE) - VIỀN ĐỎ NẾT ĐỨT CẢNH BÁO */
     .custom-infra-icon.pending-border {
       border: 2px dashed #e74c3c !important;
       background: rgba(253, 237, 236, 0.95) !important;
@@ -585,7 +585,7 @@
     const layerControl = L.control.layers(null, {
       "0. Lớp phân bổ dân cư": layers.pop,
       "🗺️ Ranh giới 40 Phường Xã": layers.boundary,
-      "📌 Đề xuất mới (Chờ duyệt)": layers.pending,
+      "📌 Đề xuất mới (Tất cả chưa duyệt)": layers.pending,
       "1. Công viên, điểm xanh": layers.c1,
       "2. Bãi đỗ xe, trạm sạc": layers.c2,
       "3. Trường Mầm non": layers.c3,
@@ -796,17 +796,15 @@
         msg.style.color = "#27ae60";
         msg.innerText = "✓ Đã lưu đề xuất! Đang ghi nhận...";
         
-        const cfg = infraIcons[type] || { symbol: "🏢", border: "#e74c3c" };
-        const pendingDivIcon = L.divIcon({
-          className: 'custom-infra-icon pending-border',
-          html: `<div>${cfg.symbol}</div>`,
-          iconSize: [22, 22],
-          iconAnchor: [11, 11]
-        });
-
-        const newMarker = L.marker([p.lat, p.lng], { icon: pendingDivIcon });
-        newMarker.bindPopup(`<b>📌 Đề xuất mới <span class="badge-pending">Chờ duyệt</span></b><br>• Tên: ${name}<br>• Địa bàn: Phường/Xã ${ward}<br>• Diện tích: ${Number(size).toLocaleString()} m²`);
-        layers.pending.addLayer(newMarker);
+        const newObj = {
+          id: "NEW-" + Date.now(),
+          name, ward, type,
+          lat: Number(lat), lng: Number(lng),
+          size: Number(size), radius: 500,
+          status: false
+        };
+        rawDataList.push(newObj);
+        renderGroupedPoints();
 
         setTimeout(() => { toggleAddCard(); }, 1500);
       }).catch(err => {
@@ -864,7 +862,7 @@
       }
     }
 
-    // TỐI ƯU CÁC ĐIỂM CHỜ DUYỆT (STATUS = FALSE) VẪN GIỮ ICON ĐÚNG LOẠI HẠ TẦNG KÈM VIỀN ĐỎ CẢNH BÁO
+    // TÍCH HỢP TÍNH NĂNG DUYỆT BẢN ĐỒ RIÊNG TỪNG LAYER (TẠO BUFFER VÀ ĐỘ PHỦ CHO CẢ ĐIỂM FALSE VÀ TRUE CÙNG LAYER)
     function renderGroupedPoints() {
       const mapGroups = {
         "1-CV": layers.c1, "2-BDX": layers.c2, "3-MN": layers.c3,
@@ -872,12 +870,28 @@
         "7-VH": layers.c7, "8-TM": layers.c8, "9-CSD": layers.c9
       };
 
+      Object.keys(mapGroups).forEach(k => mapGroups[k].clearLayers());
+
       rawDataList.forEach(p => {
-        const isApproved = (p.status === true || p.status === 'true');
+        const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
         const cfg = infraIcons[p.type] || { symbol: "🏢", border: "#2c3e50" };
+        const targetGroup = mapGroups[p.type] || layers.c9;
 
         if (!isApproved) {
-          // HIỂN THỊ ĐÚNG ICON LOẠI HẠ TẦNG ĐÓ NHƯNG GẮN VIỀN ĐỎ NẾT ĐỨT CẢNH BÁO
+          // BÁN KÍNH DỰ KIẾN (FALSE): ĐƯỜNG NẾT ĐỨT CẢNH BÁO
+          if (p.type !== "9-CSD") {
+            const pendingBuffer = L.circle([p.lat, p.lng], {
+              radius: Number(p.radius) || 500,
+              color: '#e74c3c',
+              weight: 2,
+              dashArray: '6, 6',
+              fillColor: '#e74c3c',
+              fillOpacity: 0.12
+            });
+            targetGroup.addLayer(pendingBuffer);
+          }
+
+          // ICON ĐIỂM CHỜ DUYỆT (FALSE): GIỮ ICON ĐÚNG LOẠI HẠ TẦNG + VIỀN ĐỎ NẾT ĐỨT
           const pendingDivIcon = L.divIcon({
             className: 'custom-infra-icon pending-border',
             html: `<div>${cfg.symbol}</div>`,
@@ -886,11 +900,23 @@
           });
 
           const pendingMarker = L.marker([p.lat, p.lng], { icon: pendingDivIcon });
-          pendingMarker.bindPopup(`<b>📌 Đề xuất mới <span class="badge-pending">Chờ duyệt</span></b><br>• Tên: ${p.name}<br>• Loại: ${infraLabels[p.type] || p.type}<br>• Địa bàn: Phường/Xã ${p.ward}<br>• Diện tích: ${p.size.toLocaleString()} m²`);
-          layers.pending.addLayer(pendingMarker);
-        } else {
-          const targetGroup = mapGroups[p.type] || layers.c9;
+          pendingMarker.on('click', () => onPointClick(p, pendingMarker));
+          targetGroup.addLayer(pendingMarker);
 
+        } else {
+          // BÁN KÍNH CHÍNH THỨC (TRUE): ĐƯỜNG NẾT LIỀN
+          if (p.type !== "9-CSD") {
+            const officialBuffer = L.circle([p.lat, p.lng], {
+              radius: Number(p.radius) || 500,
+              color: cfg.border,
+              weight: 1.5,
+              fillColor: cfg.border,
+              fillOpacity: 0.15
+            });
+            targetGroup.addLayer(officialBuffer);
+          }
+
+          // ICON CHÍNH THỨC (TRUE)
           const customDivIcon = L.divIcon({
             className: 'custom-infra-icon',
             html: `<div style="border-color:${cfg.border}">${cfg.symbol}</div>`,
@@ -905,17 +931,71 @@
       });
     }
 
+    function approvePointStatus(pointId) {
+      const target = rawDataList.find(x => x.id === pointId);
+      if (target) {
+        target.status = true;
+        renderGroupedPoints();
+        map.closePopup();
+      }
+    }
+
     function onPointClick(p, marker) {
       if (isInspectMode) return;
 
+      const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
       let contentHtml = `<div class="popup-container">`;
-      contentHtml += `<b style="font-size:11px; color:var(--primary-color);">🏢 ${p.name}</b><br>`;
+
+      if (!isApproved) {
+        contentHtml += `<b style="font-size:11px; color:#c0392b;">🏢 ${p.name}</b> <span class="badge-pending">DỰ KIẾN (CHỜ DUYỆT)</span><br>`;
+      } else {
+        contentHtml += `<b style="font-size:11px; color:var(--primary-color);">🏢 ${p.name}</b><br>`;
+      }
+
+      contentHtml += `• Loại hạ tầng: <b>${infraLabels[p.type] || p.type}</b><br>`;
       contentHtml += `• Địa bàn: <b>Phường/Xã ${p.ward}</b><br>`;
       contentHtml += `• Diện tích: <b>${p.size.toLocaleString()} m²</b><br>`;
 
-      if (p.type !== "9-CSD") {
+      if (!isApproved) {
         contentHtml += `<div id="servedPopText">
-          <div style="color:#8e44ad; font-weight:bold; margin-top:4px;">• Dân số phục vụ: <span id="popValText">0%</span></div>
+          <div style="color:#e74c3c; font-weight:bold; margin-top:4px;">• Dân số phục vụ DỰ KIẾN: <span id="popValText">0%</span></div>
+          <div class="inline-progress-bg"><div class="inline-progress-fill" style="background:#e74c3c;" id="popValBar"></div></div>
+        </div>`;
+
+        contentHtml += `<button onclick="approvePointStatus('${p.id}')" style="width:100%; margin-top:8px; background:#27ae60; color:#fff; border:none; padding:5px; border-radius:4px; font-weight:bold; cursor:pointer;">
+          ✅ PHÊ DUYỆT THÀNH CHÍNH THỨC (STATUS = TRUE)
+        </button>`;
+        contentHtml += `</div>`;
+
+        const popup = L.popup({ closeButton: true, autoPan: true, autoPanPadding: [50, 50] })
+          .setLatLng([p.lat, p.lng]).setContent(contentHtml);
+        popup.openOn(map);
+
+        let pStep = 0;
+        const pInterval = setInterval(() => {
+          pStep += 15;
+          if (pStep <= 90) {
+            const bar = document.getElementById('popValBar');
+            const txt = document.getElementById('popValText');
+            if (bar) bar.style.width = pStep + "%";
+            if (txt) txt.innerText = pStep + "%";
+          }
+        }, 120);
+
+        fetch(`${geeApiBackend}?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${p.radius}`)
+          .then(r => r.json())
+          .then(res => {
+            clearInterval(pInterval);
+            const popVal = res.servedPop || 0;
+            const popContainer = document.getElementById('servedPopText');
+            if (popContainer) {
+              popContainer.innerHTML = `• Dân số phục vụ DỰ KIẾN: ~<b style="color:#e74c3c;">${popVal.toLocaleString()} người</b>`;
+            }
+          });
+
+      } else if (p.type !== "9-CSD") {
+        contentHtml += `<div id="servedPopText">
+          <div style="color:#8e44ad; font-weight:bold; margin-top:4px;">• Dân số phục vụ CHÍNH THỨC: <span id="popValText">0%</span></div>
           <div class="inline-progress-bg"><div class="inline-progress-fill" id="popValBar"></div></div>
         </div>`;
         contentHtml += `</div>`;
