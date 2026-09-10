@@ -24,7 +24,7 @@
     
     #map.inspect-mode { cursor: help !important; }
 
-    /* ICON HẠ TẦNG ĐÃ PHÊ DUYỆT (TRUE) - PHÓNG TO 1.2 LẦN (27px) */
+    /* ICON HẠ TẦNG ĐÃ PHÊ DUYỆT - KÍCH THƯỚC LỚN 27px (x1.2) */
     .custom-infra-icon {
       display: flex;
       align-items: center;
@@ -38,7 +38,6 @@
     }
     .custom-infra-icon:hover { transform: scale(1.3); z-index: 1000 !important; }
 
-    /* ICON HẠ TẦNG CHỜ DUYỆT (FALSE) */
     .custom-infra-icon.pending-border {
       border: 2px dashed #e74c3c !important;
       background: rgba(253, 237, 236, 0.95) !important;
@@ -178,7 +177,6 @@
 
     .leaflet-top.leaflet-right { top: 10px; right: 10px; }
 
-    /* KHUNG LAYER MANAGER NÂNG CẤP VỚI HÀNG TÙY CHỈNH VÀ NÚT TRÒN ĐIÈU KHIỂN BUFFER */
     .leaflet-control-layers {
       border: var(--panel-border) !important;
       border-radius: 8px !important;
@@ -189,7 +187,7 @@
       padding: 8px 12px !important;
       font-size: 11px !important;
       margin: 0 !important;
-      width: 290px !important;
+      width: 300px !important;
       box-sizing: border-box !important;
     }
 
@@ -232,33 +230,27 @@
       cursor: pointer;
     }
 
-    /* ĐỊNH DẠNG NÚT CHẤM TRÒN BUFFER MẠNH MẼ - HIỂN THỊ CỐ ĐỊNH 100% */
-    .layer-item-row {
-      display: flex;
-      align-items: center;
-      width: 100%;
-      margin-bottom: 4px;
-      font-size: 10.5px;
-    }
-
+    /* ĐỊNH DẠNG NÚT NÚT TRÒN GREEN VÀ RED CHO CÁC LỚP BUFFER */
     .btn-circle-buffer {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: #27ae60;
-      color: white;
-      font-size: 8px;
-      margin-left: 6px;
-      cursor: pointer;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-      border: 1px solid #1e8449;
-      user-select: none;
-      transition: all 0.2s ease;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 15px !important;
+      height: 15px !important;
+      min-width: 15px !important;
+      min-height: 15px !important;
+      border-radius: 50% !important;
+      background: #27ae60 !important;
+      color: #ffffff !important;
+      font-size: 9px !important;
+      font-weight: bold !important;
+      margin: 0 6px 0 4px !important;
+      cursor: pointer !important;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
+      border: 1px solid #1e8449 !important;
+      user-select: none !important;
+      line-height: 1 !important;
     }
-
     .btn-circle-buffer.active {
       background: #d35400 !important;
       border-color: #a04000 !important;
@@ -664,11 +656,12 @@
       layerListEl.insertBefore(titleEl, layerListEl.firstChild);
     }
 
+    /* ĐẶT OPACITY MẶC ĐỊNH LÀ 50% (VALUE=50) */
     const sliderContainer = L.DomUtil.create('div', 'opacity-control-panel');
     sliderContainer.innerHTML = `
       <div id="popBox" style="display:none;" class="opacity-slider-row">👥 Độ trong suốt Dân cư: <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60"></div>
       <div id="heatBox" style="display:none;" class="opacity-slider-row">
-        🔥 Độ trong suốt Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="65">
+        🔥 Độ trong suốt Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="50">
         <div style="margin-top:6px; font-weight:bold; color:#d35400;">
           ⭕ Bán kính Buffer toàn đô thị: <span id="radiusLabel" style="color:#27ae60;">500m</span>
         </div>
@@ -690,6 +683,7 @@
     document.getElementById('popOpacity').addEventListener('input', (e) => {
       if (tilePopLayer) tilePopLayer.setOpacity(e.target.value / 100);
     });
+
     document.getElementById('heatOpacity').addEventListener('input', (e) => {
       if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(e.target.value / 100);
     });
@@ -704,12 +698,11 @@
       refreshHeatmapOnly();
     });
 
-    // CHÈN DỨT ĐIỂM NÚT TRÒN GREEN ĐỒNG BỘ VÀO BẢNG LAYER CONTROL CỦA LEAFLET
-    function setupBufferCheckboxes() {
+    // GIẢI PHÁP TRIỆT ĐỂ 100%: TẠO VÀ DÙNG MUTATION OBSERVER ĐỂ CỐ ĐỊNH NÚT TRÒN GREEN/RED CẠNH DẤU TÍCH
+    function forceInjectBufferCircles() {
       const overlaysContainer = document.querySelector('.leaflet-control-layers-overlays');
       if (!overlaysContainer) return;
 
-      const labels = overlaysContainer.querySelectorAll('label');
       const bufferMapping = {
         "1. Công viên, điểm xanh": "b1", "2. Bãi đỗ xe, trạm sạc": "b2",
         "3. Trường Mầm non": "b3", "4. Trường Tiểu học": "b4",
@@ -718,21 +711,22 @@
         "9. Quỹ đất tiềm năng": "b9"
       };
 
+      const labels = overlaysContainer.querySelectorAll('label');
       labels.forEach(lbl => {
         if (lbl.querySelector('.btn-circle-buffer')) return;
 
-        const textSpan = Array.from(lbl.childNodes).find(n => n.nodeType === 3);
-        const checkboxEl = lbl.querySelector('input[type="checkbox"]');
+        const checkbox = lbl.querySelector('input[type="checkbox"]');
+        const textNode = Array.from(lbl.childNodes).find(n => n.nodeType === 3);
 
-        if (textSpan && checkboxEl) {
-          const name = textSpan.textContent.trim();
+        if (checkbox && textNode) {
+          const name = textNode.textContent.trim();
           const bKey = bufferMapping[name];
 
           if (bKey) {
             const btnCircle = document.createElement('span');
             btnCircle.className = 'btn-circle-buffer';
-            btnCircle.title = "Click để Bật/Tắt vòng tròn bán kính đệm (Buffer)";
-            btnCircle.innerHTML = "●";
+            btnCircle.title = "Click Bật/Tắt vòng tròn bán kính Buffer";
+            btnCircle.innerText = "●";
 
             if (map.hasLayer(layers[bKey])) btnCircle.classList.add('active');
 
@@ -749,14 +743,15 @@
               }
             });
 
-            checkboxEl.insertAdjacentElement('afterend', btnCircle);
+            checkbox.insertAdjacentElement('afterend', btnCircle);
           }
         }
       });
     }
 
-    // ĐẢM BẢO CHÈN NÚT CHẤM TRÒN KHI KHỞI TẠO VÀ DI CHUỘT
-    setInterval(setupBufferCheckboxes, 400);
+    const observer = new MutationObserver(() => forceInjectBufferCircles());
+    const overlaysTarget = document.querySelector('.leaflet-control-layers');
+    if (overlaysTarget) observer.observe(overlaysTarget, { childList: true, subtree: true });
 
     function toggleInspectMode() {
       isInspectMode = !isInspectMode;
@@ -986,9 +981,11 @@
         await Promise.allSettled([pMain]);
         updateMainProgress(75);
 
-        const pHeat = fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}`).then(r => r.json()).then(d => {
+        // NẠP VỚI MẶC ĐỊNH OPACITY 0.50 (50%)
+        const pHeat = fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}&t=${Date.now()}`).then(r => r.json()).then(d => {
           if (d.urlFormat) {
-            tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: 0.65 });
+            if (tileHeatmapLayer) map.removeLayer(tileHeatmapLayer);
+            tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: 0.50 });
             tileHeatmapLayer.addTo(layers.heatmap);
           }
         }).catch(() => {});
@@ -998,11 +995,10 @@
         console.error("Lỗi tiến trình nạp bản đồ", e);
       } finally {
         updateMainProgress(100);
-        setTimeout(setupBufferCheckboxes, 300);
+        setTimeout(forceInjectBufferCircles, 200);
       }
     }
 
-    /* RENDER DỮ LIỆU CÔNG TRÌNH VÀ ÉP BÁN KÍNH MỚI CHO TẤT CẢ CÔNG TRÌNH CHÍNH THỨC */
     function renderGroupedPoints() {
       const mapGroups = {
         "1-CV": layers.c1, "2-BDX": layers.c2, "3-MN": layers.c3,
@@ -1046,7 +1042,7 @@
           targetGroup.addLayer(pendingMarker);
 
         } else {
-          // BÁN KÍNH MỚI TỪ THANH TRƯỢT ĐƯỢC ÉP BUỘC VẼ VÒNG TRÒN BUFFER VÀ VẼ HEATMAP
+          // VẼ VÒNG TRÒN BUFFER THEO BÁN KÍNH MỚI TRÊN BẢN ĐỒ CLIENT
           if (p.type !== "9-CSD") {
             const officialBuffer = L.circle([p.lat, p.lng], {
               radius: globalBufferRadius,
@@ -1069,14 +1065,16 @@
       });
     }
 
-    /* ÉP MÁY CHỦ BẢN ĐỒ HEATMAP RENDER LAI BÁN KÍNH TOÀN BỘ THEO overrideRadius */
+    /* GIẢI PHÁP TRIỆT ĐỂ 2: XÓA CACHE TILE GEE KHI TẢI LAI VỚI BÁN KÍNH MỚI BẰNG THAM SỐ &t= */
     function refreshHeatmapOnly() {
-      fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}`)
+      const currentOpacity = document.getElementById('heatOpacity').value / 100;
+      fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}&t=${Date.now()}`)
         .then(r => r.json())
         .then(d => {
           if (d.urlFormat) {
+            if (tileHeatmapLayer) map.removeLayer(tileHeatmapLayer);
+            tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: currentOpacity });
             layers.heatmap.clearLayers();
-            tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: document.getElementById('heatOpacity').value / 100 });
             tileHeatmapLayer.addTo(layers.heatmap);
           }
         });
