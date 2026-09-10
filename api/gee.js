@@ -71,7 +71,7 @@ module.exports = async (req, res) => {
       return f.set('danSoNum', popNum);
     });
 
-    // ACTION 1: TRUY VẤN TÊN PHƯỜNG TỪ TỌA ĐỘ BẰNG FILTERBOUNDS (MÃ GEE CHUẨN)
+    // ACTION: TRUY VẤN TÊN PHƯỜNG TỪ TỌA ĐỘ
     if (action === 'getWardFromPoint') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -93,7 +93,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ward: wardData });
     }
 
-    // ACTION 2: ĐỒNG BỘ ĐIỂM ĐỀ XUẤT MỚI SANG SCRIPT SHEET
+    // ACTION: ĐỒNG BỘ ĐIỂM ĐỀ XUẤT MỚI SANG SCRIPT SHEET
     if (action === 'addPoint') {
       const { type, name, ward, lat, lng, size } = req.query;
       if (!type || !name || !lat || !lng) {
@@ -106,6 +106,17 @@ module.exports = async (req, res) => {
         `&ward=${encodeURIComponent(ward || 'Thuận Hóa')}` +
         `&lat=${lat}&lng=${lng}&size=${size || 0}`;
 
+      const gasRes = await fetch(syncUrl);
+      const result = await gasRes.json().catch(() => ({ success: true }));
+      return res.status(200).json({ success: true, result });
+    }
+
+    // ACTION: PHÊ DUYỆT ĐIỂM HẠ TẦNG THÀNH TRUE TRÊN GOOGLE SHEET
+    if (action === 'approvePoint') {
+      const { id } = req.query;
+      if (!id) return res.status(400).json({ error: true, message: "Thiếu ID công trình" });
+
+      const syncUrl = `${gasBaseUrl}?action=approvePoint&id=${encodeURIComponent(id)}`;
       const gasRes = await fetch(syncUrl);
       const result = await gasRes.json().catch(() => ({ success: true }));
       return res.status(200).json({ success: true, result });
@@ -142,7 +153,7 @@ module.exports = async (req, res) => {
       .updateMask(validPopMask)
       .rename('DanSoPixelNormalized');
 
-    // NẠP DỮ LIỆU ĐIỂM TỪ GOOGLE SHEET BUCKET
+    // NẠP VÀ CHUẨN HÓA DỮ LIỆU TỪ GOOGLE SHEET GEOJSON
     let rawDataList = [];
     try {
       const gasUrl = `${gasBaseUrl}?action=getJson`;
@@ -151,11 +162,16 @@ module.exports = async (req, res) => {
       const features = geojson.features || [];
 
       const codeMap = { "CV": "1-CV", "BDX": "2-BDX", "MN": "3-MN", "TH": "4-TH", "THCS": "5-THCS", "YT": "6-YT", "VH": "7-VH", "TM": "8-TM", "CSD": "9-CSD" };
+      
       rawDataList = features.map(ft => {
         const props = ft.properties || {};
         const coords = ft.geometry ? ft.geometry.coordinates : [107.5905, 16.4637];
         const rawId = String(props.ID_DoiTuong || '');
         const prefix = rawId.split('-')[0];
+
+        // ÉP KIỂU ĐỒNG BỘ CHO GIÁ TRỊ TRẠNG THÁI (STATUS)
+        const rawStatus = props.TrangThai;
+        const isStatusTrue = (rawStatus === true || String(rawStatus).trim().toUpperCase() === 'TRUE');
 
         return {
           id: rawId,
@@ -166,7 +182,7 @@ module.exports = async (req, res) => {
           lng: Number(coords[0]),
           size: Number(props.QuyMo_S) || 0,
           radius: Number(props.BanKinh) || 500,
-          status: String(props.TrangThai).toLowerCase() === 'true'
+          status: isStatusTrue
         };
       });
     } catch (e) {
@@ -330,7 +346,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
-    // ACTION TRA CỨU MẬT ĐỘ HẠ TẦNG VỊ TRÍ
     if (action === 'analyzeLocation') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
