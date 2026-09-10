@@ -1,16 +1,13 @@
 const ee = require('@google/earthengine');
 
-// BIẾN LƯU PHIÊN XÁC THỰC GEE ĐỂ KHÔNG PHẢI AUTH LẠI NHIỀU LẦN
 let isGeeInitialized = false;
 
 function initGEE() {
   if (isGeeInitialized) return Promise.resolve();
-
   return new Promise((resolve, reject) => {
     try {
       let privateKey = process.env.GEE_PRIVATE_KEY;
       if (!privateKey) return reject(new Error("Thiếu biến GEE_PRIVATE_KEY"));
-      
       if (typeof privateKey === 'string' && privateKey.trim().startsWith('{')) {
         privateKey = JSON.parse(privateKey);
       } else if (typeof privateKey === 'string') {
@@ -27,38 +24,82 @@ function initGEE() {
         }, 
         (err) => reject(new Error("GEE Auth Fail: " + err))
       );
-    } catch (e) { 
-      reject(new Error("Key Parse Fail: " + e.message)); 
-    }
+    } catch (e) { reject(new Error("Key Parse Fail: " + e.message)); }
   });
 }
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
     await initGEE();
     const action = req.query.action || 'getInitData';
 
+    // 1. NẠP ASSETS RASTER VÀ VECTOR
+    const popRaster = ee.Image("projects/optimistic-yew-488501-s0/assets/Pixel-danso").select(0).rename('DanSoPixel');
+    const wardRegion = ee.Image("projects/optimistic-yew-488501-s0/assets/Output40xa").select(0).rename('ID_Region');
     const wardVector = ee.FeatureCollection("projects/optimistic-yew-488501-s0/assets/Polygon-40xa");
 
-    // 1. RANH GIỚI 40 PHƯỜNG XÃ
+    // Parse dân số vector sang kiểu số
+    const wardVectorParsed = wardVector.map(f => {
+      const rawPop = f.get('danSo');
+      const popNum = ee.Algorithms.If(rawPop, ee.Number.parse(ee.String(rawPop)), 0);
+      return f.set('danSoNum', popNum);
+    });
+
+    // Thuật toán tính Dân số Pixel Chuẩn hóa (PopRasterNormalized)
+    const validPopMask = popRaster.gt(0);
+    const validPopRaster = popRaster.updateMask(validPopMask);
+    const wardPopSumImg = ee.Image().double().paint({ featureCollection: wardVectorParsed, color: 'danSoNum' });
+
+    const statsGrouped = validPopRaster.addBands(wardRegion).reduceRegion({
+      reducer: ee.Reducer.count().group({ groupField: 1, groupName: 'ID_Phuong' }),
+      geometry: wardVectorParsed.geometry(),
+      scale: 30,
+      maxPixels: 1e9
+    });
+
+    const groupsList = ee.List(statsGrouped.get('groups'));
+    const wardPixelCountDict = ee.Dictionary(groupsList.iterate((item, acc) => {
+      const d = ee.Dictionary(item);
+      const idStr = ee.String(ee.Number(d.get('ID_Phuong')).toInt());
+      return ee.Dictionary(acc).set(idStr, d.get('count'));
+    }, ee.Dictionary({})));
+
+    const wardPixelCountImg = wardRegion.remap(
+      wardPixelCountDict.keys().map(k => ee.Number.parse(k)),
+      wardPixelCountDict.values()
+    );
+
+    const popRasterNormalized = wardPopSumImg.divide(wardPixelCountImg)
+      .updateMask(validPopMask)
+      .rename('DanSoPixelNormalized');
+
+    // EXPORT TILE RASTER DÂN SỐ CHUẨN HÓA
+    if (action === 'getPopRasterTile') {
+      const mapId = await new Promise((resolve, reject) => {
+        popRasterNormalized.getMap(
+          { min: 0, max: 5, palette: ['blue', 'cyan', 'green', 'yellow', 'orange', 'red'] },
+          (m, err) => err ? reject(err) : resolve(m)
+        );
+      });
+      return res.status(200).json({ urlFormat: mapId.urlFormat });
+    }
+
+    // EXPORT RANH GIỚI 40 PHƯỜNG XÃ
     if (action === 'getBoundaryTile') {
-      const wardOutline = ee.Image().byte().paint({ featureCollection: wardVector, color: 1, width: 2 });
+      const wardOutline = ee.Image().byte().paint({ featureCollection: wardVectorParsed, color: 1, width: 2 });
       const mapId = await new Promise((resolve, reject) => {
         wardOutline.getMap({ palette: ['#00ffff'] }, (m, err) => err ? reject(err) : resolve(m));
       });
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // 2. DỮ LIỆU ĐIỂM HẠ TẦNG SỐNG TỪ APPS SCRIPT
+    // NẠP ĐIỂM TỪ APPS SCRIPT
     const gasUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec?action=getJson";
     const gasResponse = await fetch(gasUrl);
-    if (!gasResponse.ok) throw new Error("GAS Service Unavailable");
-    
     const geojson = await gasResponse.json();
     const features = geojson.features || [];
 
@@ -82,7 +123,7 @@ module.exports = async (req, res) => {
       };
     });
 
-    // 3. DYNAMIC HEATMAP TILE
+    // DYNAMIC HEATMAP TILE
     if (action === 'getHeatmapTile') {
       const categoryImageLayers = [];
       const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
@@ -96,10 +137,6 @@ module.exports = async (req, res) => {
         }
       });
 
-      if (categoryImageLayers.length === 0) {
-        return res.status(200).json({ urlFormat: null });
-      }
-
       const heatmapImage = ee.ImageCollection(categoryImageLayers).sum();
       const heatmapMasked = heatmapImage.updateMask(heatmapImage.gt(0));
 
@@ -112,33 +149,76 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // 4. BẢNG THỐNG KÊ 40 PHƯỜNG XÃ
+    // TÍNH TOÁN BẢNG THỐNG KÊ SỐNG THEO THUẬT TOÁN GEE
     if (action === 'getWardStats') {
-      const wardVectorParsed = wardVector.map(f => {
-        const rawPop = f.get('danSo');
-        const popNum = ee.Algorithms.If(rawPop, ee.Number.parse(ee.String(rawPop)), 0);
-        return f.set('danSoNum', popNum);
-      });
+      const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+      const bandImagesList = [];
 
-      const statsData = await new Promise((resolve, reject) => {
-        wardVectorParsed.evaluate((fc, err) => {
-          if (err) return reject(err);
-          const list = fc.features.map(f => ({
-            Ten_Phuong: f.properties.tenXa || f.properties.name || 'Phường',
-            Dan_So_Vector: Number(f.properties.danSoNum || 0),
-            Total_Infra_Score: Math.floor(Math.random() * 35) + 55
-          }));
-          resolve(list);
+      codes.forEach(code => {
+        const buffers = [];
+        rawDataList.forEach(item => {
+          if (item.type === code && item.status) {
+            buffers.push(ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || 500));
+          }
         });
+
+        let unionImg = buffers.length > 0 ? 
+          ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection(buffers.map(b => ee.Feature(b))), color: 1 }) : 
+          ee.Image(0).byte();
+
+        const maskedRaster = popRasterNormalized.updateMask(unionImg.gt(0)).unmask(0).float().rename(code);
+        bandImagesList.push(maskedRaster);
       });
 
-      return res.status(200).json({ data: statsData });
+      const infraMultiBand = ee.Image.cat(bandImagesList).addBands(wardRegion.rename('ID_Region'));
+
+      const statsMultiGroup = await new Promise((resolve, reject) => {
+        infraMultiBand.reduceRegion({
+          reducer: ee.Reducer.sum().repeat(8).group({ groupField: 8, groupName: 'ID_Phuong' }),
+          geometry: wardVectorParsed.geometry(),
+          scale: 60,
+          maxPixels: 1e9
+        }).evaluate((res, err) => err ? reject(err) : resolve(res));
+      });
+
+      const gListMulti = statsMultiGroup.groups || [];
+      const multiCoverageDict = {};
+      gListMulti.forEach(item => {
+        multiCoverageDict[String(item.ID_Phuong)] = item.sum;
+      });
+
+      const wardList = await new Promise((resolve, reject) => {
+        wardVectorParsed.evaluate((fc, err) => err ? reject(err) : resolve(fc.features));
+      });
+
+      const resultTable = wardList.map(f => {
+        const props = f.properties;
+        const wName = props.tenXa || props.name || 'Phường';
+        const wId = String(props.maXa || props.OBJECTID || '');
+        const totalWardPop = Number(props.danSoNum || 0);
+
+        const sumList = multiCoverageDict[wId] || [0,0,0,0,0,0,0,0];
+        let sumCoveredRatio = 0;
+
+        sumList.forEach(val => {
+          const ratio = totalWardPop > 0 ? (val / totalWardPop) * 100 : 0;
+          sumCoveredRatio += Math.min(100, ratio);
+        });
+
+        return {
+          Ten_Phuong: wName,
+          Dan_So_Vector: totalWardPop,
+          Total_Infra_Score: sumCoveredRatio / 8
+        };
+      });
+
+      resultTable.sort((a, b) => b.Dan_So_Vector - a.Dan_So_Vector);
+      return res.status(200).json({ data: resultTable });
     }
 
     return res.status(200).json({ rawDataList });
 
   } catch (err) {
-    console.error("API ERROR:", err.message);
     return res.status(500).json({ error: true, message: err.message });
   }
 };
