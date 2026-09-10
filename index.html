@@ -19,7 +19,6 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.25); width: 330px; font-size: 11px;
     }
 
-    /* BẢNG THEO DÕI TIẾN TRÌNH TẢI DỮ LIỆU */
     .progress-box {
       margin-top: 8px; padding: 8px; background: #f8f9fa;
       border: 1px solid #dcdfe6; border-radius: 4px; font-size: 10px;
@@ -33,28 +32,28 @@
 
     .panel-bottom-right { position: absolute; bottom: 15px; right: 15px; z-index: 1000; display: flex; gap: 6px; }
     .btn { background: #fff; border: 1px solid #bdc3c7; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; }
-    .modal-panel { display: none; position: absolute; top: 50px; left: 50%; transform: translateX(-50%); z-index: 2000; background: #fff; padding: 15px; border-radius: 8px; width: 90%; max-width: 900px; max-height: 80vh; overflow-y: auto; }
-    .close-btn { float: right; cursor: pointer; font-weight: bold; }
+    .modal-panel { display: none; position: absolute; top: 50px; left: 50%; transform: translateX(-50%); z-index: 2000; background: #fff; padding: 15px; border-radius: 8px; width: 90%; max-width: 950px; max-height: 80vh; overflow-y: auto; }
+    
+    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+    .modal-title { font-weight: bold; font-size: 13px; color: #2c3e50; }
+    .modal-status-bar { font-size: 11px; font-weight: bold; color: #e67e22; margin-right: 15px; }
+    .close-btn { cursor: pointer; font-weight: bold; font-size: 14px; color: #7f8c8d; }
   </style>
 </head>
 <body>
 
   <div id="map"></div>
 
-  <!-- BẢNG ĐIỀU KHIỂN & TIẾN TRÌNH TẢI -->
   <div class="panel-left">
     <b style="font-size:13px; color:#2c3e50;">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
     <hr style="margin:6px 0; border:0; border-top:1px solid #ddd;">
     
-    <!-- TIẾN TRÌNH CHI TIẾT -->
     <div class="progress-box" id="progressBox">
       <div style="display:flex; justify-content:space-between; font-weight:bold;">
         <span>⏳ THỜI GIAN THỰC TẢI GEE:</span>
         <span id="progressPercent">0%</span>
       </div>
-      <div class="progress-bar-bg">
-        <div class="progress-bar-fill" id="progressBar"></div>
-      </div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
       <div id="progressLog">
         <div class="status-item"><span>1. Ranh giới 40 Phường Xã:</span><span id="st-boundary" class="status-pending">Đang chờ...</span></div>
         <div class="status-item"><span>2. Heatmap Ma trận (GEE):</span><span id="st-heatmap" class="status-pending">Đang chờ...</span></div>
@@ -62,9 +61,7 @@
       </div>
     </div>
 
-    <div id="panelContent" style="margin-top:8px;">
-      <i>Click vào bất kỳ điểm hạ tầng trên bản đồ để tra cứu.</i>
-    </div>
+    <div id="panelContent" style="margin-top:8px;"><i>Click vào bất kỳ điểm hạ tầng trên bản đồ để tra cứu.</i></div>
   </div>
 
   <div class="panel-bottom-right">
@@ -72,20 +69,36 @@
     <button class="btn" onclick="openChartModal()">📈 Biểu đồ Điểm HT</button>
   </div>
 
+  <!-- MODAL BẢNG THỐNG KÊ VỚI THANH TIẾN ĐỘ TRÊN DÒNG TIÊU ĐỀ -->
   <div class="modal-panel" id="statModal">
-    <span class="close-btn" onclick="closeModal('statModal')">X</span>
-    <b>📊 ĐÁNH GIÁ PHỦ HẠ TẦNG 40 PHƯỜNG XÃ TP. HUẾ</b>
+    <div class="modal-header">
+      <span class="modal-title">📊 ĐÁNH GIÁ PHỦ HẠ TẦNG 40 PHƯỜNG XÃ TP. HUẾ</span>
+      <div>
+        <span class="modal-status-bar" id="modalProgressText">🔄 Đang chuẩn bị tải...</span>
+        <span class="close-btn" onclick="closeModal('statModal')">X</span>
+      </div>
+    </div>
+    
     <div style="overflow-x:auto; margin-top: 10px;">
       <table style="width:100%; border-collapse:collapse; font-size:11px;" border="1">
-        <thead><tr style="background:#2c3e50; color:#fff;"><th>STT</th><th>Phường/Xã</th><th>Dân số</th><th>Điểm HT (%)</th></tr></thead>
+        <thead>
+          <tr style="background:#2c3e50; color:#fff;">
+            <th>STT</th>
+            <th>Tên Phường/Xã</th>
+            <th>Dân số (người)</th>
+            <th>Điểm Tiếp Cận HT (%)</th>
+          </tr>
+        </thead>
         <tbody id="statTableBody"></tbody>
       </table>
     </div>
   </div>
 
   <div class="modal-panel" id="chartModal">
-    <span class="close-btn" onclick="closeModal('chartModal')">X</span>
-    <b>📈 BIỂU ĐỒ ĐIỂM HẠ TẦNG 40 PHƯỜNG XÃ</b>
+    <div class="modal-header">
+      <span class="modal-title">📈 BIỂU ĐỒ ĐIỂM HẠ TẦNG 40 PHƯỜNG XÃ</span>
+      <span class="close-btn" onclick="closeModal('chartModal')">X</span>
+    </div>
     <div style="height:350px; margin-top:10px;"><canvas id="infraChart"></canvas></div>
   </div>
 
@@ -100,16 +113,14 @@
     const layerHeatmap = L.layerGroup().addTo(map);
     const layerPoints = L.layerGroup().addTo(map);
 
-    const overlayMaps = {
+    L.control.layers(null, {
       "🗺️ Ranh giới 40 Phường/Xã (GEE)": layerBoundary,
       "🔥 Bản đồ nhiệt Heatmap (GEE)": layerHeatmap,
       "📍 Điểm Hạ tầng & Đất CSD": layerPoints
-    };
-    L.control.layers(null, overlayMaps, { collapsed: false, position: 'topright' }).addTo(map);
+    }, { collapsed: false, position: 'topright' }).addTo(map);
 
     let rawDataList = [], wardStatsData = [];
     let completedTasks = 0;
-    const totalTasks = 3;
 
     function updateProgress(taskId, status, isSuccess = true) {
       const el = document.getElementById(taskId);
@@ -118,64 +129,44 @@
         el.className = isSuccess ? "status-success" : "status-error";
       }
       completedTasks++;
-      const percent = Math.round((completedTasks / totalTasks) * 100);
+      const percent = Math.round((completedTasks / 3) * 100);
       document.getElementById('progressBar').style.width = percent + "%";
       document.getElementById('progressPercent').innerText = percent + "%";
-
-      if (completedTasks >= totalTasks) {
-        setTimeout(() => {
-          document.getElementById('progressBox').style.background = "#e8f8f5";
-        }, 500);
-      }
     }
 
-    // HÀM FETCH CÓ TIMEOUT BẢO VỆ (HẠN CHẾ TREO)
-    function fetchWithTimeout(url, timeout = 10000) {
+    function fetchWithTimeout(url, timeout = 12000) {
       return Promise.race([
         fetch(url),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout GEE")), timeout))
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), timeout))
       ]);
     }
 
     async function loadDataSequence() {
-      // 1. Tải Ranh giới
       try {
-        const res = await fetchWithTimeout(`${geeApiBackend}?action=getBoundaryTile`, 8000);
+        const res = await fetchWithTimeout(`${geeApiBackend}?action=getBoundaryTile`, 10000);
         const data = await res.json();
         if (data.urlFormat) {
           L.tileLayer(data.urlFormat, { opacity: 0.9 }).addTo(layerBoundary);
           updateProgress("st-boundary", "✓ Thành công");
-        } else {
-          updateProgress("st-boundary", "⚠️ Bỏ qua (Không có Tile)", false);
         }
-      } catch (e) {
-        updateProgress("st-boundary", "❌ Lỗi/Timeout", false);
-      }
+      } catch (e) { updateProgress("st-boundary", "❌ Lỗi/Timeout", false); }
 
-      // 2. Tải Heatmap Tile
       try {
-        const res = await fetchWithTimeout(`${geeApiBackend}?action=getHeatmapTile`, 12000);
+        const res = await fetchWithTimeout(`${geeApiBackend}?action=getHeatmapTile`, 15000);
         const data = await res.json();
         if (data.urlFormat) {
           L.tileLayer(data.urlFormat, { opacity: 0.65 }).addTo(layerHeatmap);
           updateProgress("st-heatmap", "✓ Thành công");
-        } else {
-          updateProgress("st-heatmap", "⚠️ Bỏ qua", false);
         }
-      } catch (e) {
-        updateProgress("st-heatmap", "❌ Lỗi/Timeout", false);
-      }
+      } catch (e) { updateProgress("st-heatmap", "❌ Lỗi/Timeout", false); }
 
-      // 3. Tải Điểm công trình
       try {
-        const res = await fetchWithTimeout(geeApiBackend, 8000);
+        const res = await fetchWithTimeout(geeApiBackend, 10000);
         const data = await res.json();
         rawDataList = data.rawDataList || [];
         renderPoints();
         updateProgress("st-points", `✓ Đã nạp ${rawDataList.length} điểm`);
-      } catch (e) {
-        updateProgress("st-points", "❌ Lỗi kết nối", false);
-      }
+      } catch (e) { updateProgress("st-points", "❌ Lỗi kết nối", false); }
     }
 
     function renderPoints() {
@@ -188,19 +179,50 @@
       });
     }
 
+    // TẢI DỮ LIỆU BẢNG VỚI CẬP NHẬT TRẠNG THÁI TIẾN ĐỘ TRÊN HEADER
     function openStatModal() {
       document.getElementById('statModal').style.display = 'block';
       const tbody = document.getElementById('statTableBody');
-      tbody.innerHTML = "<tr><td colspan='4'>🔄 Đang tải siêu tốc...</td></tr>";
+      const statusText = document.getElementById('modalProgressText');
+      
+      tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:15px;'>🔄 Đang tính toán dữ liệu Raster & Vector từ GEE Backend...</td></tr>";
+      statusText.style.color = "#e67e22";
+      statusText.innerText = "🔄 Đang xử lý GEE (0%)...";
 
-      fetch(`${geeApiBackend}?action=getWardStats`)
+      let timerVal = 0;
+      const interval = setInterval(() => {
+        timerVal += 5;
+        if (timerVal <= 90) {
+          statusText.innerText = `🔄 Đang xử lý GEE (${timerVal}%)...`;
+        }
+      }, 1000);
+
+      fetchWithTimeout(`${geeApiBackend}?action=getWardStats`, 25000)
         .then(res => res.json())
         .then(resData => {
+          clearInterval(interval);
+          if (resData.error) throw new Error(resData.message || "Lỗi Server");
+
+          statusText.style.color = "#27ae60";
+          statusText.innerText = "✓ Hoàn tất (100%)";
+          
           tbody.innerHTML = "";
           wardStatsData = resData.data || [];
           wardStatsData.forEach((w, idx) => {
-            tbody.innerHTML += `<tr><td>${idx+1}</td><td>${w.Ten_Phuong}</td><td>${Number(w.Dan_So_Vector).toLocaleString()}</td><td>${w.Total_Infra_Score}%</td></tr>`;
+            tbody.innerHTML += `
+              <tr>
+                <td style="text-align:center;">${idx+1}</td>
+                <td style="font-weight:bold; color:#2980b9;">${w.Ten_Phuong}</td>
+                <td style="text-align:right;">${Number(w.Dan_So_Vector).toLocaleString()}</td>
+                <td style="text-align:center; font-weight:bold; color:#d35400;">${Number(w.Total_Infra_Score || 0).toFixed(1)}%</td>
+              </tr>`;
           });
+        })
+        .catch(err => {
+          clearInterval(interval);
+          statusText.style.color = "#c0392b";
+          statusText.innerText = "❌ Lỗi tính toán GEE";
+          tbody.innerHTML = `<tr><td colspan='4' style='text-align:center; color:#c0392b; padding:15px;'>⚠️ Không thể nạp dữ liệu: ${err.message}. Vui lòng thử lại.</td></tr>`;
         });
     }
 
@@ -214,7 +236,7 @@
         type: 'bar',
         data: {
           labels: wardStatsData.map(w => w.Ten_Phuong),
-          datasets: [{ label: 'Điểm Hạ Tầng (%)', data: wardStatsData.map(w => w.Total_Infra_Score), backgroundColor: '#d35400' }]
+          datasets: [{ label: 'Điểm Tiếp Cận Hạ Tầng (%)', data: wardStatsData.map(w => w.Total_Infra_Score), backgroundColor: '#d35400' }]
         },
         options: { responsive: true, maintainAspectRatio: false }
       });
