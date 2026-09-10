@@ -585,7 +585,7 @@
     const layerControl = L.control.layers(null, {
       "0. Lớp phân bổ dân cư": layers.pop,
       "🗺️ Ranh giới 40 Phường Xã": layers.boundary,
-      "📌 Đề xuất mới (Tất cả chưa duyệt)": layers.pending,
+      "📌 Đề xuất mới (Chờ duyệt)": layers.pending,
       "1. Công viên, điểm xanh": layers.c1,
       "2. Bãi đỗ xe, trạm sạc": layers.c2,
       "3. Trường Mầm non": layers.c3,
@@ -931,13 +931,25 @@
       });
     }
 
+    // HÀM PHÊ DUYỆT ĐIỂM VÀ ĐỒNG BỘ TRỰC TIẾP LÊN GOOGLE SHEET
     function approvePointStatus(pointId) {
       const target = rawDataList.find(x => x.id === pointId);
-      if (target) {
-        target.status = true;
-        renderGroupedPoints();
-        map.closePopup();
-      }
+      if (!target) return;
+
+      // 1. Cập nhật ngay trên giao diện bản đồ
+      target.status = true;
+      renderGroupedPoints();
+      map.closePopup();
+
+      // 2. Gọi API đồng bộ lên Google Sheet
+      fetch(`${geeApiBackend}?action=approvePoint&id=${encodeURIComponent(pointId)}`)
+        .then(r => r.json())
+        .then(res => {
+          console.log(`✓ Đã phê duyệt công trình ${pointId} trên Google Sheet!`);
+        })
+        .catch(err => {
+          console.error(`❌ Lỗi đồng bộ phê duyệt cho ${pointId}:`, err);
+        });
     }
 
     function onPointClick(p, marker) {
