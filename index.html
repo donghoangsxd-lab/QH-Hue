@@ -13,7 +13,7 @@
       --primary-color: #2c3e50;
       --accent-color: #d35400;
       --success-color: #27ae60;
-      --panel-bg: rgba(255, 255, 255, 0.92);
+      --panel-bg: rgba(255, 255, 255, 0.94);
       --panel-blur: blur(12px);
       --panel-border: 1px solid rgba(255, 255, 255, 0.8);
       --panel-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
@@ -24,7 +24,7 @@
     
     #map.inspect-mode { cursor: help !important; }
 
-    /* ICON HẠ TẦNG ĐÃ PHÊ DUYỆT - KÍCH THƯỚC LỚN 27px (x1.2) */
+    /* ICON HẠ TẦNG X1.2 LẦN (27px) */
     .custom-infra-icon {
       display: flex;
       align-items: center;
@@ -89,180 +89,65 @@
     .progress-bar-bg { width: 50px; background: #e0e0e0; height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--success-color); transition: width 0.3s ease; }
 
-    .leaflet-popup { max-width: none !important; }
-
-    .leaflet-popup-content-wrapper {
-      background: rgba(255, 255, 255, 0.9) !important;
-      backdrop-filter: blur(16px) !important;
-      -webkit-backdrop-filter: blur(16px) !important;
-      border-radius: 10px !important;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2) !important;
-      padding: 2px !important;
-      border: 1px solid rgba(255, 255, 255, 0.8) !important;
-      width: auto !important;
-      max-width: none !important;
+    /* BẢNG QUẢN LÝ LỚP MỚI HOÀN TOÀN TỰ DỰNG (ĐẢM BẢO CHẤM TRÒN XUẤT HIỆN 100%) */
+    .custom-layer-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: var(--panel-bg);
+      backdrop-filter: var(--panel-blur);
+      -webkit-backdrop-filter: var(--panel-blur);
+      border: var(--panel-border);
+      border-radius: 8px;
+      box-shadow: var(--panel-shadow);
+      padding: 10px 12px;
+      width: 290px;
+      font-size: 11px;
+      color: #2c3e50;
     }
 
-    .leaflet-popup-tip {
-      background: rgba(255, 255, 255, 0.9) !important;
-      backdrop-filter: blur(16px) !important;
-      box-shadow: none !important;
-      border: 1px solid rgba(255, 255, 255, 0.5);
+    .layer-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px;
+      font-size: 11px;
+      user-select: none;
     }
 
-    .leaflet-popup-content { margin: 4px 6px !important; line-height: 1.3 !important; width: auto !important; }
-
-    .popup-container {
-      width: 310px;
-      max-width: 82vw;
-      max-height: 380px;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding-right: 2px;
-      font-size: 10.5px;
-      color: #000;
-      box-sizing: border-box;
+    .layer-row input[type="checkbox"] {
+      margin-right: 4px;
+      cursor: pointer;
+      accent-color: var(--primary-color);
     }
 
-    .popup-container::-webkit-scrollbar { width: 4px; }
-    .popup-container::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25); border-radius: 2px; }
-
-    .inline-progress-bg { width: 100%; background: #ddd; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; box-sizing: border-box; }
-    .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-color); transition: width 0.2s linear; }
-
-    .sug-card {
-      background: rgba(255, 255, 255, 0.4) !important;
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      border-left: 3px solid #555;
-      padding: 4px 6px;
-      margin: 3px 0;
-      border-radius: 4px;
-      font-size: 10px;
-      line-height: 1.35;
-      box-sizing: border-box;
-      width: 100%;
-    }
-
-    .sug-card.priority {
-      border-color: rgba(211, 84, 0, 0.7);
-      border-left: 3px solid var(--accent-color);
-      background: rgba(230, 126, 34, 0.15) !important;
-    }
-
-    .sug-title { 
-      font-weight: bold; 
-      color: var(--primary-color); 
-      display: inline-flex; 
-      align-items: center; 
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .sug-detail { margin-top: 1px; color: #333; font-size: 9.5px; }
-
-    .badge-priority {
-      display: inline-block;
-      background: var(--accent-color);
+    .btn-dot-buffer {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #27ae60;
       color: #fff;
-      font-size: 7.5px;
-      font-weight: bold;
-      padding: 1px 4px;
-      border-radius: 3px;
-      text-transform: uppercase;
-      white-space: nowrap;
+      font-size: 8px;
+      margin: 0 6px 0 2px;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      border: 1px solid #1e8449;
       line-height: 1;
     }
 
-    .sug-card.ineligible { color: #666; border-left: 3px solid #aaa; opacity: 0.75; font-size: 9.5px; padding: 3px 6px; }
-
-    .leaflet-top.leaflet-right { top: 10px; right: 10px; }
-
-    .leaflet-control-layers {
-      border: var(--panel-border) !important;
-      border-radius: 8px !important;
-      box-shadow: var(--panel-shadow) !important;
-      background: var(--panel-bg) !important;
-      backdrop-filter: var(--panel-blur) !important;
-      -webkit-backdrop-filter: var(--panel-blur) !important;
-      padding: 8px 12px !important;
-      font-size: 11px !important;
-      margin: 0 !important;
-      width: 300px !important;
-      box-sizing: border-box !important;
-    }
-
-    .leaflet-control-layers-toggle {
-      width: 100% !important;
-      height: 20px !important;
-      background-image: none !important;
-      display: flex !important;
-      align-items: center;
-      justify-content: flex-start !important;
-      padding: 0 !important;
-      font-weight: bold !important;
-      font-size: 12px !important;
-      color: var(--primary-color) !important;
-      text-decoration: none;
-      white-space: nowrap;
-      text-transform: uppercase;
-    }
-    .leaflet-control-layers-toggle::after { content: "🏛️ QUẢN LÝ LỚP BẢN ĐỒ"; }
-
-    .leaflet-control-layers-expanded { padding: 8px 12px !important; }
-    .leaflet-control-layers-expanded .leaflet-control-layers-toggle { display: none !important; }
-
-    .layer-header-title {
-      font-weight: bold;
-      color: var(--primary-color);
-      font-size: 12px;
-      text-transform: uppercase;
-      border-bottom: 1px solid rgba(0,0,0,0.12);
-      padding-bottom: 5px;
-      margin-bottom: 8px;
-      text-align: left;
-    }
-
-    .leaflet-control-layers-overlays label {
-      display: flex !important;
-      align-items: center !important;
-      margin-bottom: 5px;
-      font-size: 10.5px;
-      cursor: pointer;
-    }
-
-    /* ĐỊNH DẠNG NÚT NÚT TRÒN GREEN VÀ RED CHO CÁC LỚP BUFFER */
-    .btn-circle-buffer {
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      width: 15px !important;
-      height: 15px !important;
-      min-width: 15px !important;
-      min-height: 15px !important;
-      border-radius: 50% !important;
-      background: #27ae60 !important;
-      color: #ffffff !important;
-      font-size: 9px !important;
-      font-weight: bold !important;
-      margin: 0 6px 0 4px !important;
-      cursor: pointer !important;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
-      border: 1px solid #1e8449 !important;
-      user-select: none !important;
-      line-height: 1 !important;
-    }
-    .btn-circle-buffer.active {
+    .btn-dot-buffer.active {
       background: #d35400 !important;
       border-color: #a04000 !important;
       box-shadow: 0 0 6px rgba(211, 84, 0, 0.8) !important;
     }
 
-    .opacity-control-panel { background: transparent; padding: 2px 0 0 0; font-size: 10.5px; }
-
     .opacity-slider-row { 
-      margin-top: 6px; 
-      border-top: 1px dashed rgba(0,0,0,0.12);
-      padding-top: 5px;
+      margin-top: 8px; 
+      border-top: 1px dashed rgba(0,0,0,0.15);
+      padding-top: 6px;
       width: 100%;
       text-align: left;
     }
@@ -434,6 +319,96 @@
     </div>
   </div>
 
+  <!-- BẢNG QUẢN LÝ LỚP MỚI TỰ DỰNG - CÓ CHẤM TRÒN BUFFER HOÀN HẢO -->
+  <div class="custom-layer-panel">
+    <div style="font-weight:bold; color:var(--primary-color); font-size:12px; border-bottom:1px solid #ddd; padding-bottom:4px; margin-bottom:6px;">
+      🏛️ QUẢN LÝ LỚP BẢN ĐỒ
+    </div>
+
+    <div class="layer-row">
+      <input type="checkbox" id="chk_pop" onchange="toggleLayer('pop', this.checked)">
+      <label for="chk_pop">0. Lớp phân bổ dân cư</label>
+    </div>
+
+    <div class="layer-row">
+      <input type="checkbox" id="chk_bound" checked onchange="toggleLayer('boundary', this.checked)">
+      <label for="chk_bound">🗺️ Ranh giới 40 Phường Xã</label>
+    </div>
+
+    <div class="layer-row">
+      <input type="checkbox" id="chk_c1" checked onchange="toggleLayer('c1', this.checked)">
+      <span class="btn-dot-buffer" id="dot_b1" onclick="toggleBuffer('b1', this)" title="Bật/Tắt bán kính Buffer">●</span>
+      <label for="chk_c1">1. Công viên, điểm xanh</label>
+    </div>
+
+    <div class="layer-row">
+      <input type="checkbox" id="chk_c2" checked onchange="toggleLayer('c2', this.checked)">
+      <span class="btn-dot-buffer" id="dot_b2" onclick="toggleBuffer('b2', this)" title="Bật/Tắt bán kính Buffer">●</span>
+      <label for="chk_c2">2. Bãi đỗ xe, trạm sạc</label>
+    </div>
+
+    <div class="layer-row">
+      <input type="checkbox" id="chk_c3" checked onchange="toggleLayer('c3', this.checked)">
+      <span class="btn-dot-buffer" id="dot_b3" onclick="toggleBuffer('b3', this)" title="Bật/Tắt bán kính Buffer">●</span>
+      <label for="chk_c3">3. Trường Mầm non</label>
+    </div>
+
+    <div class="layer-row">
+      <input type="checkbox" id="chk_c4" checked onchange="toggleLayer('c4', this.checked)">
+      <span class="btn-dot-buffer" id="dot_b4" onclick="toggleBuffer('b4', this)" title="Bật/Tắt bán kính Buffer">●</span>
+      <label for="chk_c4">4. Trường Tiểu học</label>
+    </div>
+
+    <div class="layer-row">
+      <input type="checkbox" id="chk_c5" checked onchange="toggleLayer('c5', this.checked)">
+      <span class="btn-dot-buffer" id="dot_b5" onclick="toggleBuffer('b5', this)" title="Bật/Tắt bán kính Buffer">●</span>
+      <label for="chk_c5">5. Trường THCS</label>
+    </div>
+
+    <div class="layer-row">
+      <input type="checkbox" id="chk_c6" checked onchange="toggleLayer('c6', this.checked)">
+      <span class="btn-dot-buffer" id="dot_b6" onclick="toggleBuffer('b6', this)" title="Bật/Tắt bán kính Buffer">●</span>
+      <label for="chk_c6">6. Cơ sở Y tế</label>
+    </div>
+
+    <div class="layer-row">
+      <input type="checkbox" id="chk_c7" checked onchange="toggleLayer('c7', this.checked)">
+      <span class="btn-dot-buffer" id="dot_b7" onclick="toggleBuffer('b7', this)" title="Bật/Tắt bán kính Buffer">●</span>
+      <label for="chk_c7">7. Nhà văn hóa, thể thao</label>
+    </div>
+
+    <div class="layer-row">
+      <input type="checkbox" id="chk_c8" checked onchange="toggleLayer('c8', this.checked)">
+      <span class="btn-dot-buffer" id="dot_b8" onclick="toggleBuffer('b8', this)" title="Bật/Tắt bán kính Buffer">●</span>
+      <label for="chk_c8">8. Chợ, Trung tâm thương mại</label>
+    </div>
+
+    <div class="layer-row">
+      <input type="checkbox" id="chk_c9" checked onchange="toggleLayer('c9', this.checked)">
+      <span class="btn-dot-buffer" id="dot_b9" onclick="toggleBuffer('b9', this)" title="Bật/Tắt bán kính Buffer">●</span>
+      <label for="chk_c9">9. Quỹ đất tiềm năng</label>
+    </div>
+
+    <div class="layer-row">
+      <input type="checkbox" id="chk_heat" checked onchange="toggleLayer('heatmap', this.checked)">
+      <label for="chk_heat">🔥 Heatmap độ phủ hạ tầng</label>
+    </div>
+
+    <div id="popBox" style="display:none;" class="opacity-slider-row">
+      👥 Độ trong suốt Dân cư: 
+      <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" oninput="changePopOpacity(this.value)">
+    </div>
+
+    <div id="heatBox" class="opacity-slider-row">
+      🔥 Độ trong suốt Heatmap: 
+      <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="50" oninput="changeHeatOpacity(this.value)">
+      <div style="margin-top:6px; font-weight:bold; color:#d35400;">
+        ⭕ Bán kính Buffer toàn đô thị: <span id="radiusLabel" style="color:#27ae60;">500m</span>
+      </div>
+      <input type="range" id="radiusSlider" class="opacity-slider" min="0" max="3" step="1" value="1" onchange="changeBufferRadius(this.value)">
+    </div>
+  </div>
+
   <div class="panel-bottom-left">
     <div class="add-point-card" id="addPointCard">
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:4px; margin-bottom:6px;">
@@ -581,7 +556,6 @@
     let isInspectMode = false;
     let tempMarker = null;
 
-    // BÁN KÍNH MẶC ĐỊNH CHO TẤT CẢ CÔNG TRÌNH CHÍNH THỨC
     let globalBufferRadius = 500;
 
     function getDistanceMeters(lat1, lon1, lat2, lon2) {
@@ -621,7 +595,7 @@
     const layers = {
       pop: L.layerGroup(),
       boundary: L.layerGroup().addTo(map),
-      heatmap: L.layerGroup(),
+      heatmap: L.layerGroup().addTo(map),
       c1: L.layerGroup().addTo(map), b1: L.layerGroup(),
       c2: L.layerGroup().addTo(map), b2: L.layerGroup(),
       c3: L.layerGroup().addTo(map), b3: L.layerGroup(),
@@ -633,125 +607,48 @@
       c9: L.layerGroup().addTo(map), b9: L.layerGroup()
     };
 
-    const layerControl = L.control.layers(null, {
-      "0. Lớp phân bổ dân cư": layers.pop,
-      "🗺️ Ranh giới 40 Phường Xã": layers.boundary,
-      "1. Công viên, điểm xanh": layers.c1,
-      "2. Bãi đỗ xe, trạm sạc": layers.c2,
-      "3. Trường Mầm non": layers.c3,
-      "4. Trường Tiểu học": layers.c4,
-      "5. Trường THCS": layers.c5,
-      "6. Cơ sở Y tế": layers.c6,
-      "7. Nhà văn hóa, thể thao": layers.c7,
-      "8. Chợ, Trung tâm thương mại": layers.c8,
-      "9. Quỹ đất tiềm năng": layers.c9,
-      "🔥 Heatmap độ phủ hạ tầng": layers.heatmap
-    }, { collapsed: true, position: 'topright' }).addTo(map);
-
-    const layerListEl = document.querySelector('.leaflet-control-layers-list');
-    if (layerListEl) {
-      const titleEl = document.createElement('div');
-      titleEl.className = 'layer-header-title';
-      titleEl.innerHTML = '🏛️ QUẢN LÝ LỚP BẢN ĐỒ';
-      layerListEl.insertBefore(titleEl, layerListEl.firstChild);
+    // CÁC HÀM ĐIỀU KHIỂN BẬT TẮT LỚP TỰ DỰNG CỰC KỲ DỄ DÀNG
+    function toggleLayer(layerKey, isChecked) {
+      if (isChecked) {
+        map.addLayer(layers[layerKey]);
+      } else {
+        map.removeLayer(layers[layerKey]);
+      }
+      if (layerKey === 'pop') {
+        document.getElementById('popBox').style.display = isChecked ? 'block' : 'none';
+      }
+      if (layerKey === 'heatmap') {
+        document.getElementById('heatBox').style.display = isChecked ? 'block' : 'none';
+      }
     }
 
-    /* ĐẶT OPACITY MẶC ĐỊNH LÀ 50% (VALUE=50) */
-    const sliderContainer = L.DomUtil.create('div', 'opacity-control-panel');
-    sliderContainer.innerHTML = `
-      <div id="popBox" style="display:none;" class="opacity-slider-row">👥 Độ trong suốt Dân cư: <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60"></div>
-      <div id="heatBox" style="display:none;" class="opacity-slider-row">
-        🔥 Độ trong suốt Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="50">
-        <div style="margin-top:6px; font-weight:bold; color:#d35400;">
-          ⭕ Bán kính Buffer toàn đô thị: <span id="radiusLabel" style="color:#27ae60;">500m</span>
-        </div>
-        <input type="range" id="radiusSlider" class="opacity-slider" min="0" max="3" step="1" value="1">
-      </div>
-    `;
-    layerListEl.appendChild(sliderContainer);
+    function toggleBuffer(bufferKey, el) {
+      if (map.hasLayer(layers[bufferKey])) {
+        map.removeLayer(layers[bufferKey]);
+        el.classList.remove('active');
+      } else {
+        map.addLayer(layers[bufferKey]);
+        el.classList.add('active');
+      }
+    }
 
-    map.on('overlayadd', (e) => {
-      if (e.name === "0. Lớp phân bổ dân cư") document.getElementById('popBox').style.display = 'block';
-      if (e.name === "🔥 Heatmap độ phủ hạ tầng") document.getElementById('heatBox').style.display = 'block';
-    });
+    function changePopOpacity(val) {
+      if (tilePopLayer) tilePopLayer.setOpacity(val / 100);
+    }
 
-    map.on('overlayremove', (e) => {
-      if (e.name === "0. Lớp phân bổ dân cư") document.getElementById('popBox').style.display = 'none';
-      if (e.name === "🔥 Heatmap độ phủ hạ tầng") document.getElementById('heatBox').style.display = 'none';
-    });
-
-    document.getElementById('popOpacity').addEventListener('input', (e) => {
-      if (tilePopLayer) tilePopLayer.setOpacity(e.target.value / 100);
-    });
-
-    document.getElementById('heatOpacity').addEventListener('input', (e) => {
-      if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(e.target.value / 100);
-    });
+    function changeHeatOpacity(val) {
+      if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(val / 100);
+    }
 
     const radiusSteps = [300, 500, 1000, 2000];
-    document.getElementById('radiusSlider').addEventListener('change', (e) => {
-      const idx = parseInt(e.target.value, 10);
+    function changeBufferRadius(sliderIdx) {
+      const idx = parseInt(sliderIdx, 10);
       globalBufferRadius = radiusSteps[idx];
       document.getElementById('radiusLabel').innerText = globalBufferRadius + "m";
       
       renderGroupedPoints();
       refreshHeatmapOnly();
-    });
-
-    // GIẢI PHÁP TRIỆT ĐỂ 100%: TẠO VÀ DÙNG MUTATION OBSERVER ĐỂ CỐ ĐỊNH NÚT TRÒN GREEN/RED CẠNH DẤU TÍCH
-    function forceInjectBufferCircles() {
-      const overlaysContainer = document.querySelector('.leaflet-control-layers-overlays');
-      if (!overlaysContainer) return;
-
-      const bufferMapping = {
-        "1. Công viên, điểm xanh": "b1", "2. Bãi đỗ xe, trạm sạc": "b2",
-        "3. Trường Mầm non": "b3", "4. Trường Tiểu học": "b4",
-        "5. Trường THCS": "b5", "6. Cơ sở Y tế": "b6",
-        "7. Nhà văn hóa, thể thao": "b7", "8. Chợ, Trung tâm thương mại": "b8",
-        "9. Quỹ đất tiềm năng": "b9"
-      };
-
-      const labels = overlaysContainer.querySelectorAll('label');
-      labels.forEach(lbl => {
-        if (lbl.querySelector('.btn-circle-buffer')) return;
-
-        const checkbox = lbl.querySelector('input[type="checkbox"]');
-        const textNode = Array.from(lbl.childNodes).find(n => n.nodeType === 3);
-
-        if (checkbox && textNode) {
-          const name = textNode.textContent.trim();
-          const bKey = bufferMapping[name];
-
-          if (bKey) {
-            const btnCircle = document.createElement('span');
-            btnCircle.className = 'btn-circle-buffer';
-            btnCircle.title = "Click Bật/Tắt vòng tròn bán kính Buffer";
-            btnCircle.innerText = "●";
-
-            if (map.hasLayer(layers[bKey])) btnCircle.classList.add('active');
-
-            btnCircle.addEventListener('click', (evt) => {
-              evt.stopPropagation();
-              evt.preventDefault();
-              
-              if (map.hasLayer(layers[bKey])) {
-                map.removeLayer(layers[bKey]);
-                btnCircle.classList.remove('active');
-              } else {
-                map.addLayer(layers[bKey]);
-                btnCircle.classList.add('active');
-              }
-            });
-
-            checkbox.insertAdjacentElement('afterend', btnCircle);
-          }
-        }
-      });
     }
-
-    const observer = new MutationObserver(() => forceInjectBufferCircles());
-    const overlaysTarget = document.querySelector('.leaflet-control-layers');
-    if (overlaysTarget) observer.observe(overlaysTarget, { childList: true, subtree: true });
 
     function toggleInspectMode() {
       isInspectMode = !isInspectMode;
@@ -882,8 +779,6 @@
         toggleInspectMode();
         return;
       }
-
-      layerControl.collapse();
     });
 
     function toggleLegend() {
@@ -981,11 +876,11 @@
         await Promise.allSettled([pMain]);
         updateMainProgress(75);
 
-        // NẠP VỚI MẶC ĐỊNH OPACITY 0.50 (50%)
-        const pHeat = fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}&t=${Date.now()}`).then(r => r.json()).then(d => {
+        // NẠP VỚI OPACITY MẶC ĐỊNH LÀ 50% (0.50)
+        const pHeat = fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}`).then(r => r.json()).then(d => {
           if (d.urlFormat) {
-            if (tileHeatmapLayer) map.removeLayer(tileHeatmapLayer);
             tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: 0.50 });
+            layers.heatmap.clearLayers();
             tileHeatmapLayer.addTo(layers.heatmap);
           }
         }).catch(() => {});
@@ -995,7 +890,6 @@
         console.error("Lỗi tiến trình nạp bản đồ", e);
       } finally {
         updateMainProgress(100);
-        setTimeout(forceInjectBufferCircles, 200);
       }
     }
 
@@ -1042,7 +936,6 @@
           targetGroup.addLayer(pendingMarker);
 
         } else {
-          // VẼ VÒNG TRÒN BUFFER THEO BÁN KÍNH MỚI TRÊN BẢN ĐỒ CLIENT
           if (p.type !== "9-CSD") {
             const officialBuffer = L.circle([p.lat, p.lng], {
               radius: globalBufferRadius,
@@ -1065,16 +958,14 @@
       });
     }
 
-    /* GIẢI PHÁP TRIỆT ĐỂ 2: XÓA CACHE TILE GEE KHI TẢI LAI VỚI BÁN KÍNH MỚI BẰNG THAM SỐ &t= */
     function refreshHeatmapOnly() {
       const currentOpacity = document.getElementById('heatOpacity').value / 100;
-      fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}&t=${Date.now()}`)
+      fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}`)
         .then(r => r.json())
         .then(d => {
           if (d.urlFormat) {
-            if (tileHeatmapLayer) map.removeLayer(tileHeatmapLayer);
-            tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: currentOpacity });
             layers.heatmap.clearLayers();
+            tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: currentOpacity });
             tileHeatmapLayer.addTo(layers.heatmap);
           }
         });
