@@ -9,61 +9,84 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
+    :root {
+      --primary-color: #2c3e50;
+      --accent-color: #d35400;
+      --success-color: #27ae60;
+      --bg-card: rgba(255, 255, 255, 0.96);
+    }
+
+    body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     #map { width: 100%; height: 100vh; }
     
-    /* PANEL TRÁI: ĐĂNG NGANG HÀNG NÚT ZOOM, CÁCH LỀ 10PX */
+    /* PANEL TRÁI: KHUNG THÔNG TIN CÓ THANH CUỘN */
     .panel-left { 
       position: absolute; 
       top: 10px; 
-      left: 55px; /* Nằm ngay bên phải cụm nút zoom (+/-) */
+      left: 55px; 
       z-index: 1000; 
-      background: rgba(255, 255, 255, 0.98); 
-      padding: 8px 12px; 
-      border-radius: 6px; 
-      box-shadow: 0 2px 8px rgba(0,0,0,0.25); 
-      width: 310px; 
+      background: var(--bg-card); 
+      backdrop-filter: blur(8px);
+      padding: 10px 14px; 
+      border-radius: 8px; 
+      box-shadow: 0 4px 16px rgba(0,0,0,0.18); 
+      width: 320px; 
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
       font-size: 11px; 
+      color: #333;
     }
     
-    /* BỐ TRÍ TIÊU ĐỀ VÀ TIẾN TRÌNH TRÊN CÙNG MỘT HÀNG */
-    .header-progress-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
+    .panel-left::-webkit-scrollbar { width: 4px; }
+    .panel-left::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+
+    .header-progress-row { display: flex; justify-content: space-between; align-items: center; }
+    .progress-compact { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: bold; color: var(--success-color); }
+    .progress-bar-bg { width: 60px; background: #e0e0e0; height: 5px; border-radius: 3px; overflow: hidden; }
+    .progress-bar-fill { width: 0%; height: 100%; background: var(--success-color); transition: width 0.3s ease; }
+    
+    /* THẺ CARD DÀNH CHO CÁC MỤC GỢI Ý CSD */
+    .sug-card {
+      background: #fdfefe;
+      border: 1px solid #ebedef;
+      border-left: 3px solid #bdc3c7;
+      padding: 6px 8px;
+      margin: 4px 0;
+      border-radius: 4px;
+      font-size: 10.5px;
+      line-height: 1.4;
     }
 
-    .progress-compact {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 10px;
+    .sug-card.priority {
+      background: #fefde8;
+      border-color: #f9e79f;
+      border-left: 3px solid var(--accent-color);
+    }
+
+    .badge-priority {
+      display: inline-block;
+      background: var(--accent-color);
+      color: #fff;
+      font-size: 8.5px;
       font-weight: bold;
-      color: #27ae60;
-    }
-
-    .progress-bar-bg {
-      width: 60px;
-      background: #e0e0e0;
-      height: 6px;
+      padding: 1px 5px;
       border-radius: 3px;
-      overflow: hidden;
+      margin-top: 2px;
+      text-transform: uppercase;
     }
 
-    .progress-bar-fill {
-      width: 0%;
-      height: 100%;
-      background: #27ae60;
-      transition: width 0.3s ease;
+    .sug-card.ineligible {
+      background: #fbfcfc;
+      color: #7f8c8d;
+      border-left: 3px solid #d5dbdb;
     }
-    
-    /* PANEL CONTROL LAYERS VỚI TIÊU ĐỀ BỔ SUNG */
+
+    /* CONTROL LAYERS THIẾT KẾ HIỆN ĐẠI */
     .layer-header-title {
       font-weight: bold;
-      color: #2c3e50;
-      font-size: 12px;
-      border-bottom: 1px solid #ddd;
+      color: var(--primary-color);
+      font-size: 11.5px;
+      border-bottom: 1px solid #eee;
       padding-bottom: 4px;
       margin-bottom: 6px;
     }
@@ -71,17 +94,29 @@
     .opacity-control-panel { 
       background: #fff; 
       padding: 6px 0 0 0; 
-      border-top: 1px dashed #ccc;
-      font-size: 11px; 
+      border-top: 1px dashed #e0e0e0;
+      font-size: 10.5px; 
       margin-top: 6px; 
     }
-    .opacity-slider { width: 100%; margin: 2px 0 4px 0; }
+    .opacity-slider { width: 100%; margin: 2px 0 4px 0; accent-color: var(--primary-color); }
 
-    .panel-bottom-right { position: absolute; bottom: 15px; right: 15px; z-index: 1000; }
-    .btn { background: #2c3e50; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
-    .btn:hover { background: #34495e; }
+    /* NÚT MỞ BẢNG TỔNG HỢP GÓC DƯỚI */
+    .panel-bottom-right { position: absolute; bottom: 18px; right: 18px; z-index: 1000; }
+    .btn-main { 
+      background: var(--primary-color); 
+      color: #fff; 
+      border: none; 
+      padding: 9px 15px; 
+      border-radius: 6px; 
+      cursor: pointer; 
+      font-weight: bold; 
+      font-size: 11px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      transition: all 0.2s ease;
+    }
+    .btn-main:hover { background: #34495e; transform: translateY(-1px); }
 
-    /* MODAL TỔNG HỢP (4/5 BẢNG + 1/5 BIỂU ĐỒ) */
+    /* MODAL TỔNG HỢP GỘP (4/5 BẢNG + 1/5 BIỂU ĐỒ) */
     .modal-panel { 
       display: none; 
       position: absolute; 
@@ -90,56 +125,58 @@
       transform: translateX(-50%); 
       z-index: 2000; 
       background: #fff; 
-      padding: 15px; 
-      border-radius: 8px; 
-      width: 96%; 
-      max-width: 1300px; 
-      height: 88vh; 
-      box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+      padding: 16px; 
+      border-radius: 10px; 
+      width: 95%; 
+      max-width: 1320px; 
+      height: 86vh; 
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
     }
     
-    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2c3e50; padding-bottom: 8px; }
-    .close-btn { cursor: pointer; font-weight: bold; font-size: 16px; color: #c0392b; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); padding-bottom: 8px; }
+    .close-btn { cursor: pointer; font-weight: bold; font-size: 18px; color: #c0392b; line-height: 1; }
     
-    .table-container { height: calc(75% - 40px); overflow-y: auto; margin-top: 8px; border: 1px solid #ddd; }
-    .chart-container { height: 25%; margin-top: 10px; border-top: 2px solid #eee; padding-top: 5px; }
+    .table-container { height: calc(75% - 35px); overflow-y: auto; margin-top: 10px; border: 1px solid #e0e0e0; border-radius: 4px; }
+    .table-container::-webkit-scrollbar { width: 6px; height: 6px; }
+    .table-container::-webkit-scrollbar-thumb { background: #bbb; border-radius: 3px; }
+
+    .chart-container { height: 25%; margin-top: 10px; border-top: 1px solid #eee; padding-top: 6px; }
 
     table.data-table { width: 100%; border-collapse: collapse; font-size: 10px; text-align: center; }
-    table.data-table th, table.data-table td { border: 1px solid #ddd; padding: 4px 2px; }
-    table.data-table th { background: #2c3e50; color: #fff; position: sticky; top: 0; z-index: 10; }
-    
-    .sug-item { margin: 3px 0; padding: 5px; border-radius: 3px; font-size: 10px; }
-    .priority-item { background: #fef9e7; color: #d35400; font-weight: bold; border: 1px solid #f9e79f; }
+    table.data-table th, table.data-table td { border: 1px solid #e5e7e9; padding: 5px 3px; }
+    table.data-table th { background: var(--primary-color); color: #fff; position: sticky; top: 0; z-index: 10; font-weight: 600; }
+    table.data-table tbody tr:nth-child(even) { background-color: #fcfcfc; }
+    table.data-table tbody tr:hover { background-color: #f2f4f4; }
   </style>
 </head>
 <body>
 
   <div id="map"></div>
 
-  <!-- PANEL THÔNG TIN TRÁI GỌN GÀNG NGANG NÚT ZOOM -->
+  <!-- PANEL THÔNG TIN TRÁI CÓ THANH CUỘN GỌN GÀNG -->
   <div class="panel-left">
     <div class="header-progress-row">
-      <b style="font-size:12px; color:#2c3e50;">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
+      <b style="font-size:12px; color:var(--primary-color);">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
       <div class="progress-compact">
         <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
         <span id="progressPercent">0%</span>
       </div>
     </div>
-    <hr style="margin:5px 0; border:0; border-top:1px solid #eee;">
+    <hr style="margin:6px 0; border:0; border-top:1px solid #eee;">
     <div id="panelContent" style="margin-top:4px;"><i>Click vào bất kỳ điểm hạ tầng trên bản đồ để tra cứu.</i></div>
   </div>
 
   <div class="panel-bottom-right">
-    <button class="btn" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP & BIỂU ĐỒ HẠ TẦNG (40 PHƯỜNG XÃ)</button>
+    <button class="btn-main" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP & BIỂU ĐỒ HẠ TẦNG (40 PHƯỜNG XÃ)</button>
   </div>
 
-  <!-- MODAL BẢNG & BIỂU ĐỒ GỘP -->
+  <!-- MODAL TỔNG HỢP BẢNG & BIỂU ĐỒ -->
   <div class="modal-panel" id="combinedModal">
     <div class="modal-header">
-      <b style="font-size:13px; color:#2c3e50;">📊 BẢNG ĐÁNH GIÁ MẬT ĐỘ PHỦ HẠ TẦNG VÀ BIỂU ĐỒ TỔNG HỢP (40 PHƯỜNG XÃ)</b>
+      <b style="font-size:13px; color:var(--primary-color);">📊 BẢNG ĐÁNH GIÁ MẬT ĐỘ PHỦ HẠ TẦNG VÀ BIỂU ĐỒ TỔNG HỢP (40 PHƯỜNG XÃ)</b>
       <div>
-        <span id="modalProgressText" style="font-size:11px; font-weight:bold; color:#e67e22; margin-right:15px;">🔄 Đang xử lý...</span>
-        <span class="close-btn" onclick="closeModal()">X</span>
+        <span id="modalProgressText" style="font-size:11px; font-weight:bold; color:var(--accent-color); margin-right:15px;">🔄 Đang xử lý...</span>
+        <span class="close-btn" onclick="closeModal()">✕</span>
       </div>
     </div>
     
@@ -160,7 +197,7 @@
             <th>8. Thương mại</th>
             <th rowspan="2">Tổng Điểm (%)</th>
           </tr>
-          <tr style="background:#2c3e50;">
+          <tr style="background:var(--primary-color);">
             <th>Phủ</th><th>Q.Mô</th>
             <th>Phủ</th><th>Q.Mô</th>
             <th>Phủ</th><th>Q.Mô</th>
@@ -216,7 +253,7 @@
       "9. Quỹ đất tiềm năng": layers.c9
     }, { collapsed: true, position: 'topright' }).addTo(map);
 
-    // CHÈN TIÊU ĐỀ "LAYERS" VÀ THANH KÉO VÀO BẢNG ĐIỀU KHIỂN
+    // BỔ SUNG TIÊU ĐỀ "LAYERS" VÀ SLIDER OPACITY
     const layerContainerEl = document.querySelector('.leaflet-control-layers-list');
     if (layerContainerEl) {
       const titleEl = document.createElement('div');
@@ -227,9 +264,9 @@
 
     const sliderContainer = L.DomUtil.create('div', 'opacity-control-panel');
     sliderContainer.innerHTML = `
-      <b>🎚️ Độ trong suốt:</b><br>
-      <div id="popBox" style="display:none;">👥 Dân số: <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60"></div>
-      <div id="heatBox" style="display:none;">🔥 Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="65"></div>
+      <b>🎚️ Độ trong suốt Layer:</b><br>
+      <div id="popBox" style="display:none; margin-top:2px;">👥 Dân số: <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60"></div>
+      <div id="heatBox" style="display:none; margin-top:2px;">🔥 Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="65"></div>
     `;
     document.querySelector('.leaflet-control-layers').appendChild(sliderContainer);
 
@@ -289,7 +326,7 @@
       rawDataList.forEach(p => {
         const targetGroup = mapGroups[p.type] || layers.c9;
         const color = p.type === "9-CSD" ? "#f39c12" : "#2ecc71";
-        const marker = L.circleMarker([p.lat, p.lng], { radius: 6, fillColor: color, color: "#fff", weight: 1, fillOpacity: 0.9 });
+        const marker = L.circleMarker([p.lat, p.lng], { radius: 5.5, fillColor: color, color: "#fff", weight: 1.2, fillOpacity: 0.9 });
         marker.on('click', () => onPointClick(p));
         targetGroup.addLayer(marker);
       });
@@ -297,12 +334,12 @@
 
     function onPointClick(p) {
       const panel = document.getElementById('panelContent');
-      let html = `<b>🏢 ${p.name}</b><br>`;
-      html += `• Địa bàn: Phường/Xã ${p.ward}<br>`;
+      let html = `<b style="font-size:12px; color:var(--primary-color);">🏢 ${p.name}</b><br>`;
+      html += `• Địa bàn: <b>Phường/Xã ${p.ward}</b><br>`;
       html += `• Diện tích: <b>${p.size.toLocaleString()} m²</b><br>`;
 
       if (p.type !== "9-CSD") {
-        html += `<div style="color:#8e44ad; font-weight:bold; margin-top:4px;">• Dân số phục vụ liên phường: ⏳ Đang tính...</div>`;
+        html += `<div style="color:#8e44ad; font-weight:bold; margin-top:5px;">• Dân số phục vụ liên phường: ⏳ Đang tính...</div>`;
         panel.innerHTML = html;
 
         fetch(`${geeApiBackend}?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${p.radius}`)
@@ -313,7 +350,7 @@
             panel.innerHTML = html;
           });
       } else {
-        html += `<div style="color:#d35400; font-weight:bold; margin-top:5px;">💡 GỢI Ý CHUYỂN ĐỔI CHUẨN GEE:</div>`;
+        html += `<div style="color:var(--accent-color); font-weight:bold; margin-top:6px; margin-bottom:2px;">💡 GỢI Ý CHUYỂN ĐỔI CHUẨN GEE:</div>`;
         html += `<div id="csdSug"><i>⏳ Đang tính toán không gian phục vụ...</i></div>`;
         panel.innerHTML = html;
 
@@ -323,20 +360,25 @@
             let sugHtml = "";
             (res.suggestions || []).forEach(s => {
               if (s.isWardDeficit) {
-                const priority = s.isTopPriority ? " ⭐ [ƯU TIÊN HÀNG ĐẦU - THIẾU NHIỀU NHẤT]" : "";
-                const cls = s.isTopPriority ? "sug-item priority-item" : "sug-item";
-                sugHtml += `<div class="${cls}">🚩 <b>${s.label}</b><br>` +
-                           `   └ Phường thiếu: <b>${s.deficitArea.toLocaleString()} m²</b> | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng${priority}</div>`;
+                const priorityBadge = s.isTopPriority ? `<br><span class="badge-priority">Ưu tiên hàng đầu - Thiếu nhiều nhất</span>` : "";
+                const cls = s.isTopPriority ? "sug-card priority" : "sug-card";
+                sugHtml += `<div class="${cls}">
+                  🚩 <b>${s.label}</b><br>
+                  └ Phường thiếu: <b>${s.deficitArea.toLocaleString()} m²</b> | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng
+                  ${priorityBadge}
+                </div>`;
               } else {
-                sugHtml += `<div class="sug-item" style="color:#27ae60;">✓ <b>${s.label}</b> (Đã đạt | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng)</div>`;
+                sugHtml += `<div class="sug-card">
+                  ✓ <b>${s.label}</b> (Đã đạt chỉ tiêu | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng)
+                </div>`;
               }
             });
             
             (res.ineligible || []).forEach(inEl => {
-              sugHtml += `<div class="sug-item" style="color:#7f8c8d;">❌ ${inEl.label} (Không đủ DT min: ${inEl.minSize}m²)</div>`;
+              sugHtml += `<div class="sug-card ineligible">❌ ${inEl.label} (Không đủ DT min: ${inEl.minSize}m²)</div>`;
             });
             
-            document.getElementById('csdSug').innerHTML = sugHtml || "✓ Vị trí đã phủ đủ hạ tầng.";
+            document.getElementById('csdSug').innerHTML = sugHtml || "<div class='sug-card'>✓ Vị trí đã phủ đủ hạ tầng.</div>";
           });
       }
     }
@@ -345,10 +387,10 @@
       document.getElementById('combinedModal').style.display = 'block';
       const tbody = document.getElementById('statTableBody');
       const statusText = document.getElementById('modalProgressText');
-      tbody.innerHTML = "<tr><td colspan='19' style='text-align:center;'>🔄 Đang tính toán ma trận sống từ GEE...</td></tr>";
+      tbody.innerHTML = "<tr><td colspan='19' style='text-align:center; padding:20px;'>🔄 Đang tính toán ma trận sống từ GEE...</td></tr>";
 
       fetch(`${geeApiBackend}?action=getWardStats`).then(r => r.json()).then(resData => {
-        statusText.style.color = "#27ae60";
+        statusText.style.color = "var(--success-color)";
         statusText.innerText = "✓ Hoàn tất (100%)";
         tbody.innerHTML = "";
         wardStatsData = resData.data || [];
@@ -364,11 +406,11 @@
           codes.forEach(c => {
             const cov = Number(w[`Ratio_${c}`] || 0).toFixed(1);
             const scale = Number(w[`Scale_${c}`] || 0).toFixed(1);
-            row += `<td style="color:#27ae60;">${cov}%</td><td style="color:#d35400; font-weight:bold;">${scale}%</td>`;
+            row += `<td style="color:var(--success-color);">${cov}%</td><td style="color:var(--accent-color); font-weight:bold;">${scale}%</td>`;
           });
 
-          row += `<td style="color:#27ae60;">${Number(w["Ratio_8-TM"] || 0).toFixed(1)}%</td>`;
-          row += `<td style="font-weight:bold; color:#d35400;">${Number(w.Total_Infra_Score || 0).toFixed(1)}%</td></tr>`;
+          row += `<td style="color:var(--success-color);">${Number(w["Ratio_8-TM"] || 0).toFixed(1)}%</td>`;
+          row += `<td style="font-weight:bold; color:var(--accent-color);">${Number(w.Total_Infra_Score || 0).toFixed(1)}%</td></tr>`;
           tbody.innerHTML += row;
         });
 
