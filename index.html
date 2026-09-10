@@ -18,15 +18,13 @@
     body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     #map { width: 100%; height: 100vh; }
     
-    /* PANEL TIÊU ĐỀ BÊN TRÁI THU GỌN NGANG NÚT ZOOM */
     .panel-left-compact { 
       position: absolute; 
       top: 10px; 
       left: 55px; 
       z-index: 1000; 
-      background: rgba(255, 255, 255, 0.75); 
+      background: rgba(255, 255, 255, 0.85); 
       backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
       padding: 6px 12px; 
       border-radius: 6px; 
       box-shadow: 0 2px 10px rgba(0,0,0,0.15); 
@@ -41,7 +39,6 @@
     .progress-bar-bg { width: 60px; background: #e0e0e0; height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--success-color); transition: width 0.3s ease; }
 
-    /* TRIỆT TRÁO NỀN MẶC ĐỊNH CỦA LEAFLET */
     .leaflet-popup-content-wrapper, .leaflet-popup-tip {
       background: transparent !important;
       box-shadow: none !important;
@@ -49,22 +46,12 @@
       padding: 0 !important;
     }
     .leaflet-popup-tip-container { display: none !important; }
+    .leaflet-popup-content { margin: 0 !important; line-height: 1.35 !important; }
 
-    .leaflet-popup-content {
-      margin: 0 !important;
-      line-height: 1.35 !important;
-    }
-
-    /* KHUNG BONG BÓNG CALLOUT TRONG SUỐT VÀ MŨI TÊN SVG NỐI CHÍNH XÁC */
-    .callout-wrapper {
-      position: relative;
-      margin-left: 50px;
-      margin-bottom: 50px;
-    }
-
+    .callout-wrapper { position: relative; margin-left: 50px; margin-bottom: 50px; }
     .callout-box {
       width: 270px;
-      background: rgba(255, 255, 255, 0.35) !important; /* MỜ TRONG SUỐT 35% NHÌN XUYÊN BẢN ĐỒ */
+      background: rgba(255, 255, 255, 0.35) !important;
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
       border-radius: 12px;
@@ -75,7 +62,6 @@
       color: #000;
     }
 
-    /* MŨI TÊN MỎNG SẮC NẮC CHỈ CHÍNH XÁC 100% VÀO MARKER DƯỚI GÓC 45 ĐỘ */
     .callout-arrow-svg {
       position: absolute;
       bottom: -45px;
@@ -85,12 +71,7 @@
       pointer-events: none;
     }
 
-    .popup-container {
-      max-height: 290px;
-      overflow-y: auto;
-      padding-right: 2px;
-    }
-
+    .popup-container { max-height: 290px; overflow-y: auto; padding-right: 2px; }
     .popup-container::-webkit-scrollbar { width: 4px; }
     .popup-container::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 2px; }
 
@@ -122,20 +103,14 @@
       text-transform: uppercase;
     }
 
-    .sug-card.ineligible {
-      color: #555;
-      border-left: 3px solid #aaa;
-      opacity: 0.7;
-    }
+    .sug-card.ineligible { color: #555; border-left: 3px solid #aaa; opacity: 0.7; }
 
-    /* LAYER CONTROL SANG TRỌNG GÓC TRÊN BÊN PHẢI */
     .leaflet-control-layers {
       border: 1px solid rgba(255, 255, 255, 0.7) !important;
       border-radius: 10px !important;
       box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
       background: rgba(255, 255, 255, 0.85) !important;
       backdrop-filter: blur(12px) !important;
-      -webkit-backdrop-filter: blur(12px) !important;
       padding: 10px 12px !important;
       font-size: 11px !important;
     }
@@ -149,26 +124,10 @@
       margin-bottom: 6px;
     }
 
-    .opacity-control-panel { 
-      background: transparent; 
-      padding: 6px 0 0 0; 
-      border-top: 1px dashed rgba(0,0,0,0.15);
-      font-size: 10.5px; 
-      margin-top: 6px; 
-    }
+    .opacity-control-panel { background: transparent; padding: 6px 0 0 0; border-top: 1px dashed rgba(0,0,0,0.15); font-size: 10.5px; margin-top: 6px; }
+    .opacity-slider-row { margin-top: 4px; }
+    .opacity-slider { width: 100%; margin: 2px 0; accent-color: var(--primary-color); cursor: pointer; }
 
-    .opacity-slider-row {
-      margin-top: 4px;
-    }
-
-    .opacity-slider { 
-      width: 100%; 
-      margin: 2px 0; 
-      accent-color: var(--primary-color); 
-      cursor: pointer;
-    }
-
-    /* NÚT MỞ BẢNG TỔNG HỢP GÓC DƯỚI */
     .panel-bottom-right { position: absolute; bottom: 18px; right: 18px; z-index: 1000; }
     .btn-main { 
       background: var(--primary-color); 
@@ -184,7 +143,6 @@
     }
     .btn-main:hover { background: #34495e; transform: translateY(-1px); }
 
-    /* MODAL TỔNG HỢP (4/5 BẢNG + 1/5 BIỂU ĐỒ) */
     .modal-panel { 
       display: none; 
       position: absolute; 
@@ -222,7 +180,6 @@
 
   <div id="map"></div>
 
-  <!-- PANEL TIÊU ĐỀ & TIẾN TRÌNH THU GỌN -->
   <div class="panel-left-compact">
     <b style="font-size:12px; color:var(--primary-color);">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
     <div class="progress-compact">
@@ -235,7 +192,6 @@
     <button class="btn-main" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP & BIỂU ĐỒ HẠ TẦNG (40 PHƯỜNG XÃ)</button>
   </div>
 
-  <!-- MODAL TỔNG HỢP BẢNG & BIỂU ĐỒ -->
   <div class="modal-panel" id="combinedModal">
     <div class="modal-header">
       <b style="font-size:13px; color:var(--primary-color);">📊 BẢNG ĐÁNH GIÁ MẬT ĐỘ PHỦ HẠ TẦNG VÀ BIỂU ĐỒ TỔNG HỢP (40 PHƯỜNG XÃ)</b>
@@ -397,7 +353,6 @@
       });
     }
 
-    // CALLOUT BONG BÓNG VỚI MŨI TÊN SVG CHỈ CHÍNH XÁC 100% VÀO MARKER
     function onPointClick(p, marker) {
       let contentHtml = `
         <div class="callout-wrapper">
@@ -506,6 +461,8 @@
         });
 
         renderCombinedChart();
+      }).catch(err => {
+        tbody.innerHTML = "<tr><td colspan='19' style='text-align:center; color:red; padding:20px;'>❌ Lỗi nạp dữ liệu từ GEE Server.</td></tr>";
       });
     }
 
