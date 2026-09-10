@@ -22,7 +22,7 @@
     body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     #map { width: 100%; height: 100vh; }
     
-    /* PANEL TIÊU ĐỀ BÊN TRÁI THU GỌN */
+    /* PANEL TIÊU ĐỀ BÊN TRÁI */
     .panel-left-compact { 
       position: absolute; 
       top: 10px; 
@@ -39,10 +39,12 @@
       gap: 12px;
       font-size: 11px; 
       border: var(--panel-border);
+      width: 220px;
+      box-sizing: border-box;
     }
 
-    .progress-compact { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: bold; color: var(--success-color); }
-    .progress-bar-bg { width: 60px; background: #e0e0e0; height: 5px; border-radius: 3px; overflow: hidden; }
+    .progress-compact { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: bold; color: var(--success-color); margin-left: auto; }
+    .progress-bar-bg { width: 50px; background: #e0e0e0; height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--success-color); transition: width 0.3s ease; }
 
     /* POPUP GLASSMORPHISM CHUẨN MẶC ĐỊNH */
@@ -80,6 +82,18 @@
     .popup-container::-webkit-scrollbar { width: 4px; }
     .popup-container::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25); border-radius: 2px; }
 
+    .inline-progress-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      font-size: 10px;
+      font-weight: bold;
+      color: var(--accent-color);
+    }
+    .inline-progress-bg { width: 100%; background: #ddd; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; }
+    .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-color); transition: width 0.2s linear; }
+
     .sug-card {
       background: rgba(255, 255, 255, 0.3) !important;
       border: 1px solid rgba(255, 255, 255, 0.6);
@@ -114,7 +128,7 @@
       opacity: 0.7;
     }
 
-    /* ĐỒNG BỘ CHIỀU RỘNG PANEL QUẢN LÝ LỚP BẢN ĐỒ (MIN-WIDTH: 260PX CHỐNG CẮT CHỮ) */
+    /* ĐỒNG BỘ 100% KÍCH THƯỚC VÀ CĂN LỀ PANEL QUẢN LÝ LỚP BẢN ĐỒ */
     .leaflet-top.leaflet-right {
       top: 10px;
       right: 10px;
@@ -122,46 +136,44 @@
 
     .leaflet-control-layers {
       border: var(--panel-border) !important;
-      border-radius: 8px !important;
+      border-radius: 6px !important;
       box-shadow: var(--panel-shadow) !important;
       background: var(--panel-bg) !important;
       backdrop-filter: var(--panel-blur) !important;
       -webkit-backdrop-filter: var(--panel-blur) !important;
-      padding: 8px 12px !important;
+      padding: 6px 12px !important;
       font-size: 11px !important;
       margin: 0 !important;
-      min-width: 260px !important; /* MỞ RỘNG KHUNG ĐỂ HIỂN THỊ TRỌN VẸN VĂN BẢN DÀI */
+      width: 220px !important; /* ĐỒNG BỘ BẰNG KHUNG PANEL TRÁI */
       box-sizing: border-box !important;
     }
 
-    /* NÚT BẤM KHI THU GỌN CHÍNH GIỮA KHUNG 260PX */
+    /* NÚT THU GỌN QUẢN LÝ LỚP BẢN ĐỒ - CĂN LỀ TRÁI CỐ ĐỊNH */
     .leaflet-control-layers-toggle {
       width: 100% !important;
       height: 20px !important;
       background-image: none !important;
       display: flex !important;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start !important; /* CĂN LỀ TRÁI CỐ ĐỊNH CHỐNG NHẢY CHỮ */
       padding: 0 !important;
       font-weight: bold !important;
-      font-size: 11.5px !important;
+      font-size: 12px !important;
       color: var(--primary-color) !important;
       text-decoration: none;
       white-space: nowrap;
       text-transform: uppercase;
-      letter-spacing: 0.2px;
     }
     .leaflet-control-layers-toggle::after {
       content: "🏛️ QUẢN LÝ LỚP BẢN ĐỒ";
     }
 
-    /* KHUNG DANH SÁCH LAYER KHI XỔ RA */
     .leaflet-control-layers-expanded {
       padding: 8px 12px !important;
     }
 
     .leaflet-control-layers-expanded .leaflet-control-layers-toggle {
-      display: none !important; /* THU ẨN NÚT BẤM KHI ĐÃ XỔ DANH SÁCH */
+      display: none !important;
     }
 
     .leaflet-control-layers-overlays label {
@@ -170,21 +182,21 @@
       align-items: center;
       white-space: nowrap;
       cursor: pointer;
+      text-align: left;
     }
 
-    /* TIÊU ĐỀ ĐƠN KHI MỞ BẢNG */
+    /* TIÊU ĐỀ DUY NHẤT CĂN LỀ TRÁI Đồng BỘ */
     .layer-header-title {
       font-weight: bold;
       color: var(--primary-color);
-      font-size: 11.5px;
+      font-size: 12px;
       text-transform: uppercase;
       border-bottom: 1px solid rgba(0,0,0,0.12);
-      padding-bottom: 6px;
+      padding-bottom: 5px;
       margin-bottom: 8px;
-      letter-spacing: 0.2px;
+      text-align: left;
     }
 
-    /* THANH TRƯỢT OPACITY CÙNG CHIỀU RỘNG */
     .opacity-control-panel { 
       background: transparent; 
       padding: 2px 0 0 0; 
@@ -196,6 +208,7 @@
       border-top: 1px dashed rgba(0,0,0,0.12);
       padding-top: 5px;
       width: 100%;
+      text-align: left;
     }
     .opacity-slider { 
       width: 100%; 
@@ -259,7 +272,7 @@
 
   <div id="map"></div>
 
-  <!-- PANEL TIÊU ĐỀ BÊN TRÁI -->
+  <!-- PANEL TIÊU ĐỀ BÊN TRÁI HẠ TẦNG ĐÔ THỊ HUẾ -->
   <div class="panel-left-compact">
     <b style="font-size:12px; color:var(--primary-color);">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
     <div class="progress-compact">
@@ -276,9 +289,10 @@
   <div class="modal-panel" id="combinedModal">
     <div class="modal-header">
       <b style="font-size:13px; color:var(--primary-color);">📊 BẢNG ĐÁNH GIÁ MẬT ĐỘ PHỦ HẠ TẦNG VÀ BIỂU ĐỒ TỔNG HỢP (40 PHƯỜNG XÃ)</b>
-      <div>
-        <span id="modalProgressText" style="font-size:11px; font-weight:bold; color:var(--accent-color); margin-right:15px;">🔄 Đang xử lý...</span>
-        <span class="close-btn" onclick="closeModal()">✕</span>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:120px;" class="progress-bar-bg"><div class="progress-bar-fill" id="modalProgressBar"></div></div>
+        <span id="modalProgressText" style="font-size:11px; font-weight:bold; color:var(--accent-color);">0%</span>
+        <span class="close-btn" onclick="closeModal()" style="margin-left:10px;">✕</span>
       </div>
     </div>
     
@@ -340,7 +354,6 @@
       c9: L.layerGroup().addTo(map)
     };
 
-    // QUẢN LÝ LỚP BẢN ĐỒ BẬT TẮT VÀ XỔ BẢNG
     const layerControl = L.control.layers(null, {
       "0. Lớp phân bổ dân cư": layers.pop,
       "🗺️ Ranh giới 40 Phường Xã": layers.boundary,
@@ -356,7 +369,6 @@
       "🔥 Heatmap độ phủ hạ tầng": layers.heatmap
     }, { collapsed: true, position: 'topright' }).addTo(map);
 
-    // TẠO TIÊU ĐỀ DUY NHẤT VÀ DÒNG CHÚ THÍCH OPACITY
     const layerListEl = document.querySelector('.leaflet-control-layers-list');
     if (layerListEl) {
       const titleEl = document.createElement('div');
@@ -389,39 +401,51 @@
       if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(e.target.value / 100);
     });
 
-    // TỰ ĐỘNG THU GỌN VỀ NÚT BAN ĐẦU KHI CLICK VÀO BẢN ĐỒ
     map.on('click', () => {
       layerControl.collapse();
     });
 
+    function updateMainProgress(percent) {
+      document.getElementById('progressBar').style.width = percent + "%";
+      document.getElementById('progressPercent').innerText = percent + "%";
+    }
+
     let rawDataList = [];
     let wardStatsData = [];
 
+    // NẠP DỮ LIỆU ĐỒNG BỘ VÀ CHIA TIẾN ĐỘ 0 - 100%
     async function loadDataParallel() {
+      updateMainProgress(10);
+
+      // Lớp 1: Dân số
       fetch(`${geeApiBackend}?action=getPopRasterTile`).then(r => r.json()).then(d => {
         if (d.urlFormat) {
           tilePopLayer = L.tileLayer(d.urlFormat, { opacity: 0.6 });
           tilePopLayer.addTo(layers.pop);
         }
+        updateMainProgress(35);
       });
 
+      // Lớp 2: Ranh giới
       fetch(`${geeApiBackend}?action=getBoundaryTile`).then(r => r.json()).then(d => {
         if (d.urlFormat) L.tileLayer(d.urlFormat, { opacity: 0.9 }).addTo(layers.boundary);
+        updateMainProgress(60);
       });
 
+      // Lớp 3: Điểm hạ tầng
       fetch(geeApiBackend).then(r => r.json()).then(data => {
         rawDataList = data.rawDataList || [];
         renderGroupedPoints();
+        updateMainProgress(85);
 
+        // Lớp 4: Heatmap
         fetch(`${geeApiBackend}?action=getHeatmapTile`).then(r => r.json()).then(d => {
           if (d.urlFormat) {
             tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: 0.65 });
             tileHeatmapLayer.addTo(layers.heatmap);
           }
+          updateMainProgress(100);
         });
-
-        document.getElementById('progressBar').style.width = "100%";
-        document.getElementById('progressPercent').innerText = "100%";
       });
     }
 
@@ -441,6 +465,7 @@
       });
     }
 
+    // HIỂN THỊ TIẾN ĐỘ TÍNH TOÁN DÂN SỐ VÀ CSD POPUP (0 - 100%)
     function onPointClick(p, marker) {
       let contentHtml = `<div class="popup-container">`;
       contentHtml += `<b style="font-size:11px; color:var(--primary-color);">🏢 ${p.name}</b><br>`;
@@ -448,40 +473,64 @@
       contentHtml += `• Diện tích: <b>${p.size.toLocaleString()} m²</b><br>`;
 
       if (p.type !== "9-CSD") {
-        contentHtml += `<div id="servedPopText" style="color:#8e44ad; font-weight:bold; margin-top:4px;">• Dân số phục vụ: ⏳ Đang tính...</div>`;
+        contentHtml += `<div id="servedPopText">
+          <div style="color:#8e44ad; font-weight:bold; margin-top:4px;">• Dân số phục vụ: <span id="popValText">0%</span></div>
+          <div class="inline-progress-bg"><div class="inline-progress-fill" id="popValBar"></div></div>
+        </div>`;
         contentHtml += `</div>`;
 
-        const popup = L.popup({
-          closeButton: true,
-          autoPan: true,
-          autoPanPadding: [50, 50]
-        }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
-
+        const popup = L.popup({ closeButton: true, autoPan: true, autoPanPadding: [50, 50] })
+          .setLatLng([p.lat, p.lng]).setContent(contentHtml);
         popup.openOn(map);
+
+        let pStep = 0;
+        const pInterval = setInterval(() => {
+          pStep += 15;
+          if (pStep <= 90) {
+            const bar = document.getElementById('popValBar');
+            const txt = document.getElementById('popValText');
+            if (bar) bar.style.width = pStep + "%";
+            if (txt) txt.innerText = pStep + "%";
+          }
+        }, 120);
 
         fetch(`${geeApiBackend}?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${p.radius}`)
           .then(r => r.json())
           .then(res => {
+            clearInterval(pInterval);
             const popVal = res.servedPop || 0;
-            const popEl = document.getElementById('servedPopText');
-            if (popEl) popEl.innerHTML = `• Dân số phục vụ: ~<b>${popVal.toLocaleString()} người</b>`;
+            const popContainer = document.getElementById('servedPopText');
+            if (popContainer) {
+              popContainer.innerHTML = `• Dân số phục vụ: ~<b style="color:#8e44ad;">${popVal.toLocaleString()} người</b>`;
+            }
           });
       } else {
         contentHtml += `<div style="color:var(--accent-color); font-weight:bold; margin-top:5px; margin-bottom:2px;">💡 GỢI Ý CHUYỂN ĐỔI CHUẨN GEE:</div>`;
-        contentHtml += `<div id="csdSug"><i>⏳ Đang tính toán...</i></div>`;
+        contentHtml += `<div id="csdSug">
+          <div style="font-size:10px; color:#555;">⏳ Đang tính toán không gian: <span id="csdValText">0%</span></div>
+          <div class="inline-progress-bg"><div class="inline-progress-fill" id="csdValBar"></div></div>
+        </div>`;
         contentHtml += `</div>`;
 
-        const popup = L.popup({
-          closeButton: true,
-          autoPan: true,
-          autoPanPadding: [50, 50]
-        }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
-
+        const popup = L.popup({ closeButton: true, autoPan: true, autoPanPadding: [50, 50] })
+          .setLatLng([p.lat, p.lng]).setContent(contentHtml);
         popup.openOn(map);
+
+        let cStep = 0;
+        const cInterval = setInterval(() => {
+          cStep += 10;
+          if (cStep <= 90) {
+            const bar = document.getElementById('csdValBar');
+            const txt = document.getElementById('csdValText');
+            if (bar) bar.style.width = cStep + "%";
+            if (txt) txt.innerText = cStep + "%";
+          }
+        }, 150);
 
         fetch(`${geeApiBackend}?action=analyzeCSD&lat=${p.lat}&lng=${p.lng}&size=${p.size}&ward=${encodeURIComponent(p.ward)}`)
           .then(r => r.json())
           .then(res => {
+            clearInterval(cInterval);
             let sugHtml = "";
             (res.suggestions || []).forEach(s => {
               if (s.isWardDeficit) {
@@ -509,15 +558,30 @@
       }
     }
 
+    // TIẾN ĐỘ BẢNG TỔNG HỢP 0 - 100%
     function openCombinedModal() {
       document.getElementById('combinedModal').style.display = 'block';
       const tbody = document.getElementById('statTableBody');
-      const statusText = document.getElementById('modalProgressText');
+      const mBar = document.getElementById('modalProgressBar');
+      const mTxt = document.getElementById('modalProgressText');
+      
+      mBar.style.width = "0%";
+      mTxt.innerText = "0%";
       tbody.innerHTML = "<tr><td colspan='19' style='text-align:center; padding:20px;'>🔄 Đang tính toán ma trận sống từ GEE...</td></tr>";
 
+      let mStep = 0;
+      const mInterval = setInterval(() => {
+        mStep += 5;
+        if (mStep <= 90) {
+          mBar.style.width = mStep + "%";
+          mTxt.innerText = mStep + "%";
+        }
+      }, 150);
+
       fetch(`${geeApiBackend}?action=getWardStats`).then(r => r.json()).then(resData => {
-        statusText.style.color = "var(--success-color)";
-        statusText.innerText = "✓ Hoàn tất (100%)";
+        clearInterval(mInterval);
+        mBar.style.width = "100%";
+        mTxt.innerText = "100%";
         tbody.innerHTML = "";
         wardStatsData = resData.data || [];
 
@@ -542,6 +606,7 @@
 
         renderCombinedChart();
       }).catch(err => {
+        clearInterval(mInterval);
         tbody.innerHTML = "<tr><td colspan='19' style='text-align:center; color:red; padding:20px;'>❌ Lỗi nạp dữ liệu từ GEE Server.</td></tr>";
       });
     }
