@@ -24,31 +24,31 @@
     
     #map.inspect-mode { cursor: help !important; }
 
-    /* ICON HẠ TẦNG ĐÃ PHÊ DUYỆT (TRUE) */
+    /* ICON HẠ TẦNG ĐÃ PHÊ DUYỆT (TRUE) - PHÓNG TO 1.2 LẦN (27px) */
     .custom-infra-icon {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(255, 255, 255, 0.92);
-      border: 1.5px solid #2c3e50;
+      background: rgba(255, 255, 255, 0.95);
+      border: 2px solid #2c3e50;
       border-radius: 50%;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      font-size: 13px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+      font-size: 16px;
       transition: transform 0.15s ease;
     }
     .custom-infra-icon:hover { transform: scale(1.3); z-index: 1000 !important; }
 
-    /* ICON HẠ TẦNG CHỜ DUYỆT (FALSE) - VIỀN ĐỎ NẾT ĐỨT CẢNH BÁO */
+    /* ICON HẠ TẦNG CHỜ DUYỆT (FALSE) - CẢNH BÁO */
     .custom-infra-icon.pending-border {
       border: 2px dashed #e74c3c !important;
       background: rgba(253, 237, 236, 0.95) !important;
-      box-shadow: 0 0 8px rgba(231, 76, 60, 0.8) !important;
+      box-shadow: 0 0 10px rgba(231, 76, 60, 0.8) !important;
       animation: alertPulse 2s infinite ease-in-out;
     }
 
     @keyframes alertPulse {
       0% { box-shadow: 0 0 4px rgba(231, 76, 60, 0.6); }
-      50% { box-shadow: 0 0 10px rgba(231, 76, 60, 1); }
+      50% { box-shadow: 0 0 12px rgba(231, 76, 60, 1); }
       100% { box-shadow: 0 0 4px rgba(231, 76, 60, 0.6); }
     }
 
@@ -188,7 +188,7 @@
       padding: 6px 12px !important;
       font-size: 11px !important;
       margin: 0 !important;
-      width: 270px !important;
+      width: 280px !important;
       box-sizing: border-box !important;
     }
 
@@ -226,24 +226,31 @@
     .leaflet-control-layers-overlays label {
       display: flex !important;
       align-items: center !important;
-      justify-content: space-between !important;
       margin-bottom: 5px;
       font-size: 10.5px;
       cursor: pointer;
     }
 
-    .buffer-toggle-span {
-      font-size: 9.5px;
-      color: #d35400;
-      font-weight: bold;
-      margin-left: auto;
+    /* NÚT TRÒN XANH BẬT/TẮT BUFFER THAY THẾ CHÈN NGAY SAU Ô CHECKBOX FORM */
+    .btn-circle-buffer {
       display: inline-flex;
       align-items: center;
-      gap: 3px;
-      background: rgba(211, 84, 0, 0.08);
-      padding: 1px 5px;
-      border-radius: 4px;
-      border: 1px solid rgba(211, 84, 0, 0.2);
+      justify-content: center;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: #27ae60;
+      color: white;
+      font-size: 9px;
+      margin: 0 6px 0 4px;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      border: 1px solid #1e8449;
+      user-select: none;
+    }
+    .btn-circle-buffer.active {
+      background: #d35400 !important;
+      border-color: #a04000 !important;
     }
 
     .opacity-control-panel { background: transparent; padding: 2px 0 0 0; font-size: 10.5px; }
@@ -351,7 +358,7 @@
       box-shadow: var(--panel-shadow);
       border-radius: 8px;
       padding: 10px 12px;
-      width: 250px;
+      width: 260px;
       font-size: 10.5px;
       color: #2c3e50;
     }
@@ -368,7 +375,7 @@
     }
 
     .legend-row { display: flex; align-items: center; margin-bottom: 4px; }
-    .legend-icon-box { font-size: 13px; margin-right: 8px; width: 16px; text-align: center; }
+    .legend-icon-box { font-size: 15px; margin-right: 8px; width: 18px; text-align: center; }
     
     .heat-scale-title { font-weight: bold; font-size: 10.5px; color: #1a252f; margin: 8px 0 4px 0; }
     .heat-palette-row { display: flex; width: 100%; border-radius: 3px; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); }
@@ -437,10 +444,10 @@
         <option value="3-MN">🧸 3. Trường Mầm non</option>
         <option value="4-TH">🏫 4. Trường Tiểu học</option>
         <option value="5-THCS">📚 5. Trường THCS</option>
-        <option value="6-YT">🏥 6. Bệnh viện, Trạm y tế</option>
+        <option value="6-YT">✚ 6. Bệnh viện, Trạm y tế</option>
         <option value="7-VH">🎭 7. Nhà văn hóa, thể thao</option>
         <option value="8-TM">🛒 8. Chợ, Trung tâm thương mại</option>
-        <option value="9-CSD" selected>🏗️ 9. Quỹ đất tiềm năng (Chưa sử dụng)</option>
+        <option value="9-CSD" selected>🛠️ 9. Quỹ đất tiềm năng (Chưa sử dụng)</option>
       </select>
 
       <label>Tên khu đất / công trình:</label>
@@ -479,13 +486,13 @@
       <div class="legend-row"><span class="legend-icon-box">🧸</span>3. Trường Mầm non</div>
       <div class="legend-row"><span class="legend-icon-box">🏫</span>4. Trường Tiểu học</div>
       <div class="legend-row"><span class="legend-icon-box">📚</span>5. Trường THCS</div>
-      <div class="legend-row"><span class="legend-icon-box">🏥</span>6. Bệnh viện, Trạm y tế</div>
+      <div class="legend-row"><span class="legend-icon-box"><span style="color:#e74c3c; font-weight:900;">✚</span></span>6. Bệnh viện, Trạm y tế</div>
       <div class="legend-row"><span class="legend-icon-box">🎭</span>7. Nhà văn hóa, thể thao</div>
       <div class="legend-row"><span class="legend-icon-box">🛒</span>8. Chợ, Trung tâm thương mại</div>
       
-      <div class="legend-row"><span class="legend-icon-box">🏗️</span><b style="color:#d35400;">9. Quỹ đất tiềm năng (Chưa sử dụng)</b></div>
+      <div class="legend-row"><span class="legend-icon-box">🛠️</span><b style="color:#d35400;">9. Quỹ đất tiềm năng (Chưa sử dụng)</b></div>
       <div class="legend-row">
-        <div style="width:16px; height:16px; border:2px dashed #e74c3c; background:rgba(253,237,236,0.95); border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:10px; margin-right:8px;">🏫</div>
+        <div style="width:18px; height:18px; border:2px dashed #e74c3c; background:rgba(253,237,236,0.95); border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px; margin-right:8px;">🏫</div>
         <b style="color:#c0392b;">Chưa chấp thuận (Chờ duyệt)</b>
       </div>
 
@@ -570,7 +577,9 @@
     let isInspectMode = false;
     let tempMarker = null;
 
-    // HÀM TÍNH KHOẢNG CÁCH METERS CHUẨN XÁC HAVERSINE NGAY TẠI CLIENT
+    // BÁN KÍNH MẶC ĐỊNH CHO TẤT CẢ CÔNG TRÌNH CHÍNH THỨC
+    let globalBufferRadius = 500;
+
     function getDistanceMeters(lat1, lon1, lat2, lon2) {
       const R = 6371000;
       const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -588,21 +597,22 @@
       "3-MN": "🧸 Trường Mầm non",
       "4-TH": "🏫 Trường Tiểu học",
       "5-THCS": "📚 Trường THCS",
-      "6-YT": "🏥 Bệnh viện, Trạm y tế",
+      "6-YT": "✚ Bệnh viện, Trạm y tế",
       "7-VH": "🎭 Nhà văn hóa, thể thao",
       "8-TM": "🛒 Chợ, Trung tâm thương mại"
     };
 
+    /* THAY BỘ ICON DỄ NHẬN BIẾT & TĂNG KÍCH THƯỚC */
     const infraIcons = {
       "1-CV": { symbol: "🌳", border: "#2ecc71" },
       "2-BDX": { symbol: "🅿️", border: "#8e44ad" },
       "3-MN": { symbol: "🧸", border: "#d35400" },
       "4-TH": { symbol: "🏫", border: "#a0522d" },
       "5-THCS": { symbol: "📚", border: "#5c4033" },
-      "6-YT": { symbol: "🏥", border: "#ff00ff" },
+      "6-YT": { symbol: '<span style="color:#e74c3c; font-weight:900;">✚</span>', border: "#e74c3c" },
       "7-VH": { symbol: "🎭", border: "#ff0000" },
       "8-TM": { symbol: "🛒", border: "#8b0000" },
-      "9-CSD": { symbol: "🏗️", border: "#f39c12" }
+      "9-CSD": { symbol: "🛠️", border: "#f39c12" }
     };
 
     const layers = {
@@ -643,10 +653,17 @@
       layerListEl.insertBefore(titleEl, layerListEl.firstChild);
     }
 
+    /* CHIA ĐÔI THANH TÙY CHỈNH: THÊM THANH CHỌN BÁN KÍNH BUFFER TỰ ĐỘNG VẼ LAI HEATMAP */
     const sliderContainer = L.DomUtil.create('div', 'opacity-control-panel');
     sliderContainer.innerHTML = `
       <div id="popBox" style="display:none;" class="opacity-slider-row">👥 Độ trong suốt Dân cư: <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60"></div>
-      <div id="heatBox" style="display:none;" class="opacity-slider-row">🔥 Độ trong suốt Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="65"></div>
+      <div id="heatBox" style="display:none;" class="opacity-slider-row">
+        🔥 Độ trong suốt Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="65">
+        <div style="margin-top:6px; font-weight:bold; color:#d35400;">
+          ⭕ Bán kính Buffer: <span id="radiusLabel" style="color:#27ae60;">500m</span>
+        </div>
+        <input type="range" id="radiusSlider" class="opacity-slider" min="0" max="3" step="1" value="1">
+      </div>
     `;
     layerListEl.appendChild(sliderContainer);
 
@@ -667,6 +684,18 @@
       if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(e.target.value / 100);
     });
 
+    // MẢNG CÁC GIÁ TRỊ BÁN KÍNH BUFFER CHUẨN
+    const radiusSteps = [300, 500, 1000, 2000];
+    document.getElementById('radiusSlider').addEventListener('change', (e) => {
+      const idx = parseInt(e.target.value, 10);
+      globalBufferRadius = radiusSteps[idx];
+      document.getElementById('radiusLabel').innerText = globalBufferRadius + "m";
+      
+      renderGroupedPoints();
+      refreshHeatmapOnly();
+    });
+
+    // CHÈN NÚT TRÒN XANH NGAY SAU DẤU TÍCH HÌNH VUÔNG THAY CHO NÚT BUFFER CŨ
     function setupBufferCheckboxes() {
       const overlaysList = document.querySelectorAll('.leaflet-control-layers-overlays label');
       const bufferMapping = {
@@ -678,26 +707,34 @@
       };
 
       overlaysList.forEach(lbl => {
-        if (lbl.querySelector('.buffer-toggle-span')) return;
+        if (lbl.querySelector('.btn-circle-buffer')) return;
 
         const textNode = Array.from(lbl.childNodes).find(n => n.nodeType === 3);
-        if (textNode) {
+        const checkboxEl = lbl.querySelector('input[type="checkbox"]');
+
+        if (textNode && checkboxEl) {
           const layerName = textNode.textContent.trim();
           const bKey = bufferMapping[layerName];
+
           if (bKey) {
-            const bufSpan = document.createElement('span');
-            bufSpan.className = 'buffer-toggle-span';
-            bufSpan.title = "Bật/Tắt vòng tròn bán kính phủ";
-            bufSpan.innerHTML = `<input type="checkbox" id="chk_buf_${bKey}" style="cursor:pointer; accent-color:#d35400;"> 🟢 Buffer`;
-            
-            bufSpan.querySelector('input').addEventListener('change', (evt) => {
+            const btnCircle = document.createElement('span');
+            btnCircle.className = 'btn-circle-buffer';
+            btnCircle.title = "Bật/Tắt bán kính Buffer vòng tròn";
+            btnCircle.innerText = "●";
+
+            btnCircle.addEventListener('click', (evt) => {
               evt.stopPropagation();
-              if (evt.target.checked) map.addLayer(layers[bKey]);
-              else map.removeLayer(layers[bKey]);
+              evt.preventDefault();
+              if (map.hasLayer(layers[bKey])) {
+                map.removeLayer(layers[bKey]);
+                btnCircle.classList.remove('active');
+              } else {
+                map.addLayer(layers[bKey]);
+                btnCircle.classList.add('active');
+              }
             });
 
-            bufSpan.addEventListener('click', (evt) => evt.stopPropagation());
-            lbl.appendChild(bufSpan);
+            lbl.insertBefore(btnCircle, checkboxEl.nextSibling);
           }
         }
       });
@@ -761,7 +798,6 @@
         if (tempMarker) map.removeLayer(tempMarker);
         tempMarker = L.marker([clickLat, clickLng]).addTo(map);
 
-        // THUẬT TOÁN KIỂM TRA ĐỘ PHỦ TẠI CLIENT TRÁNH LỖI KẾT NỐI SẢN PHẨM BẢN ĐỒ
         const coveredGroups = {};
         const missingCodes = [];
 
@@ -773,7 +809,7 @@
 
           itemsOfCode.forEach(item => {
             const dist = getDistanceMeters(clickLat, clickLng, item.lat, item.lng);
-            const radius = Number(item.radius) || 500;
+            const radius = globalBufferRadius;
             if (dist <= radius) {
               if (!coveredGroups[code]) coveredGroups[code] = [];
               coveredGroups[code].push(item.name);
@@ -788,7 +824,6 @@
         const coveredCount = Object.keys(coveredGroups).length;
         const missingCount = missingCodes.length;
 
-        // Tra cứu tên phường xã tại điểm click
         fetch(`${geeApiBackend}?action=getWardFromPoint&lat=${clickLat.toFixed(6)}&lng=${clickLng.toFixed(6)}`)
           .then(r => r.json())
           .then(resWard => {
@@ -936,7 +971,7 @@
         await Promise.allSettled([pMain]);
         updateMainProgress(75);
 
-        const pHeat = fetch(`${geeApiBackend}?action=getHeatmapTile`).then(r => r.json()).then(d => {
+        const pHeat = fetch(`${geeApiBackend}?action=getHeatmapTile&radius=${globalBufferRadius}`).then(r => r.json()).then(d => {
           if (d.urlFormat) {
             tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: 0.65 });
             tileHeatmapLayer.addTo(layers.heatmap);
@@ -952,6 +987,7 @@
       }
     }
 
+    /* RENDER DỮ LIỆU CÔNG TRÌNH VÀ BÁN KÍNH VỚI KÍCH THƯỚC ICON 27px (X1.2 LẦN) */
     function renderGroupedPoints() {
       const mapGroups = {
         "1-CV": layers.c1, "2-BDX": layers.c2, "3-MN": layers.c3,
@@ -987,7 +1023,7 @@
           const pendingDivIcon = L.divIcon({
             className: 'custom-infra-icon pending-border',
             html: `<div>${cfg.symbol}</div>`,
-            iconSize: [22, 22], iconAnchor: [11, 11]
+            iconSize: [27, 27], iconAnchor: [13.5, 13.5]
           });
 
           const pendingMarker = L.marker([p.lat, p.lng], { icon: pendingDivIcon });
@@ -995,9 +1031,10 @@
           targetGroup.addLayer(pendingMarker);
 
         } else {
+          // BÁN KÍNH BUFFER MỚI THEO THANH TRUỢT ĐƯỢC ÉP CHO CÁC CÔNG TRÌNH CHÍNH THỨC
           if (p.type !== "9-CSD") {
             const officialBuffer = L.circle([p.lat, p.lng], {
-              radius: Number(p.radius) || 500,
+              radius: globalBufferRadius,
               color: cfg.border, weight: 1.5,
               fillColor: cfg.border, fillOpacity: 0.15
             });
@@ -1007,7 +1044,7 @@
           const customDivIcon = L.divIcon({
             className: 'custom-infra-icon',
             html: `<div style="border-color:${cfg.border}">${cfg.symbol}</div>`,
-            iconSize: [22, 22], iconAnchor: [11, 11]
+            iconSize: [27, 27], iconAnchor: [13.5, 13.5]
           });
 
           const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
@@ -1017,8 +1054,9 @@
       });
     }
 
+    /* VẼ LẠI HEATMAP TỰ ĐỘNG THEO BÁN KÍNH MỚI CHỌN */
     function refreshHeatmapOnly() {
-      fetch(`${geeApiBackend}?action=getHeatmapTile`)
+      fetch(`${geeApiBackend}?action=getHeatmapTile&radius=${globalBufferRadius}`)
         .then(r => r.json())
         .then(d => {
           if (d.urlFormat) {
@@ -1123,7 +1161,7 @@
           }
         }, 120);
 
-        fetch(`${geeApiBackend}?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${p.radius}`)
+        fetch(`${geeApiBackend}?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${globalBufferRadius}`)
           .then(r => r.json())
           .then(res => {
             clearInterval(pInterval);
@@ -1343,7 +1381,7 @@
             <td style="padding:2px 2px 2px 12px; color:#2980b9;">└ ${item.name}</td>
             <td style="padding:2px; text-align:right;">${item.size.toLocaleString()} m²</td>
             <td style="padding:2px; text-align:center; color:#aaa;">-</td>
-            <td style="padding:2px; text-align:right; color:#8e44ad;">Bán kính: ${item.radius}m</td>
+            <td style="padding:2px; text-align:right; color:#8e44ad;">Bán kính: ${globalBufferRadius}m</td>
             <td style="padding:2px; text-align:center; color:#27ae60;">✓ Đang hoạt động</td>
           </tr>`;
         });
