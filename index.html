@@ -69,7 +69,6 @@
     <button class="btn" onclick="openChartModal()">📈 Biểu đồ Điểm HT</button>
   </div>
 
-  <!-- MODAL BẢNG THỐNG KÊ VỚI THANH TIẾN ĐỘ TRÊN DÒNG TIÊU ĐỀ -->
   <div class="modal-panel" id="statModal">
     <div class="modal-header">
       <span class="modal-title">📊 ĐÁNH GIÁ PHỦ HẠ TẦNG 40 PHƯỜNG XÃ TP. HUẾ</span>
@@ -134,39 +133,53 @@
       document.getElementById('progressPercent').innerText = percent + "%";
     }
 
-    function fetchWithTimeout(url, timeout = 12000) {
-      return Promise.race([
-        fetch(url),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), timeout))
-      ]);
+    // HÀM TẢI CÓ TỰ ĐỘNG THỬ LẠI (AUTO RETRY TỐI ĐA 2 LẦN)
+    async function fetchWithRetry(url, timeout = 20000, retries = 2) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), timeout);
+          const res = await fetch(url, { signal: controller.signal });
+          clearTimeout(timer);
+          if (res.ok) return await res.json();
+        } catch (err) {
+          if (i === retries - 1) throw err;
+        }
+      }
     }
 
-    async function loadDataSequence() {
-      try {
-        const res = await fetchWithTimeout(`${geeApiBackend}?action=getBoundaryTile`, 10000);
-        const data = await res.json();
-        if (data.urlFormat) {
-          L.tileLayer(data.urlFormat, { opacity: 0.9 }).addTo(layerBoundary);
-          updateProgress("st-boundary", "✓ Thành công");
-        }
-      } catch (e) { updateProgress("st-boundary", "❌ Lỗi/Timeout", false); }
+    // GỌI SONG SONG TẤT CẢ REQUEST BẰNG PROMISE.ALL
+    async function loadDataParallel() {
+      // 1. Task Boundary
+      const p1 = fetchWithRetry(`${geeApiBackend}?action=getBoundaryTile`)
+        .then(data => {
+          if (data && data.urlFormat) {
+            L.tileLayer(data.urlFormat, { opacity: 0.9 }).addTo(layerBoundary);
+            updateProgress("st-boundary", "✓ Thành công");
+          } else updateProgress("st-boundary", "⚠️ Trống", false);
+        })
+        .catch(() => updateProgress("st-boundary", "❌ Lỗi/Timeout", false));
 
-      try {
-        const res = await fetchWithTimeout(`${geeApiBackend}?action=getHeatmapTile`, 15000);
-        const data = await res.json();
-        if (data.urlFormat) {
-          L.tileLayer(data.urlFormat, { opacity: 0.65 }).addTo(layerHeatmap);
-          updateProgress("st-heatmap", "✓ Thành công");
-        }
-      } catch (e) { updateProgress("st-heatmap", "❌ Lỗi/Timeout", false); }
+      // 2. Task Heatmap
+      const p2 = fetchWithRetry(`${geeApiBackend}?action=getHeatmapTile`)
+        .then(data => {
+          if (data && data.urlFormat) {
+            L.tileLayer(data.urlFormat, { opacity: 0.65 }).addTo(layerHeatmap);
+            updateProgress("st-heatmap", "✓ Thành công");
+          } else updateProgress("st-heatmap", "⚠️ Trống", false);
+        })
+        .catch(() => updateProgress("st-heatmap", "❌ Lỗi/Timeout", false));
 
-      try {
-        const res = await fetchWithTimeout(geeApiBackend, 10000);
-        const data = await res.json();
-        rawDataList = data.rawDataList || [];
-        renderPoints();
-        updateProgress("st-points", `✓ Đã nạp ${rawDataList.length} điểm`);
-      } catch (e) { updateProgress("st-points", "❌ Lỗi kết nối", false); }
+      // 3. Task Điểm hạ tầng
+      const p3 = fetchWithRetry(geeApiBackend)
+        .then(data => {
+          rawDataList = (data && data.rawDataList) ? data.rawDataList : [];
+          renderPoints();
+          updateProgress("st-points", `✓ ${rawDataList.length} điểm`);
+        })
+        .catch(() => updateProgress("st-points", "❌ Lỗi kết nối", false));
+
+      await Promise.allSettled([p1, p2, p3]);
     }
 
     function renderPoints() {
@@ -179,7 +192,6 @@
       });
     }
 
-    // TẢI DỮ LIỆU BẢNG VỚI CẬP NHẬT TRẠNG THÁI TIẾN ĐỘ TRÊN HEADER
     function openStatModal() {
       document.getElementById('statModal').style.display = 'block';
       const tbody = document.getElementById('statTableBody');
@@ -187,21 +199,11 @@
       
       tbody.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:15px;'>🔄 Đang tính toán dữ liệu Raster & Vector từ GEE Backend...</td></tr>";
       statusText.style.color = "#e67e22";
-      statusText.innerText = "🔄 Đang xử lý GEE (0%)...";
+      statusText.innerText = "🔄 Đang xử lý GEE...";
 
-      let timerVal = 0;
-      const interval = setInterval(() => {
-        timerVal += 5;
-        if (timerVal <= 90) {
-          statusText.innerText = `🔄 Đang xử lý GEE (${timerVal}%)...`;
-        }
-      }, 1000);
-
-      fetchWithTimeout(`${geeApiBackend}?action=getWardStats`, 25000)
-        .then(res => res.json())
+      fetchWithRetry(`${geeApiBackend}?action=getWardStats`, 25000)
         .then(resData => {
-          clearInterval(interval);
-          if (resData.error) throw new Error(resData.message || "Lỗi Server");
+          if (!resData || resData.error) throw new Error("Lỗi Server");
 
           statusText.style.color = "#27ae60";
           statusText.innerText = "✓ Hoàn tất (100%)";
@@ -219,10 +221,9 @@
           });
         })
         .catch(err => {
-          clearInterval(interval);
           statusText.style.color = "#c0392b";
           statusText.innerText = "❌ Lỗi tính toán GEE";
-          tbody.innerHTML = `<tr><td colspan='4' style='text-align:center; color:#c0392b; padding:15px;'>⚠️ Không thể nạp dữ liệu: ${err.message}. Vui lòng thử lại.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan='4' style='text-align:center; color:#c0392b; padding:15px;'>⚠️ Không thể nạp dữ liệu: Vui lòng thử lại.</td></tr>`;
         });
     }
 
@@ -244,7 +245,7 @@
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-    loadDataSequence();
+    loadDataParallel();
   </script>
 </body>
 </html>
