@@ -73,7 +73,6 @@
 
     .leaflet-popup-content { margin: 4px 6px !important; line-height: 1.3 !important; width: auto !important; }
 
-    /* THU HẸP CHIỀU RỘNG TỔNG THỂ POPUP XUỐNG 310PX */
     .popup-container {
       width: 310px;
       max-width: 82vw;
@@ -89,11 +88,9 @@
     .popup-container::-webkit-scrollbar { width: 4px; }
     .popup-container::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.25); border-radius: 2px; }
 
-    /* CÂN CHỈNH KHỚP CHIỀU RỘNG THANH TIẾN ĐỘ 0-100% */
     .inline-progress-bg { width: 100%; background: #ddd; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; box-sizing: border-box; }
     .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-color); transition: width 0.2s linear; }
 
-    /* CARD GỢI Ý CÔNG NĂNG - ÉP SÁT KHOẢNG TRỐNG */
     .sug-card {
       background: rgba(255, 255, 255, 0.4) !important;
       border: 1px solid rgba(255, 255, 255, 0.7);
@@ -113,7 +110,6 @@
       background: rgba(230, 126, 34, 0.15) !important;
     }
 
-    /* TIÊU ĐỀ ÉP NHÃN DÍNH SÁT THEO TÊN HẠ TẦNG */
     .sug-title { 
       font-weight: bold; 
       color: var(--primary-color); 
@@ -252,19 +248,57 @@
       margin-top: 4px;
     }
 
-    .panel-bottom-right { position: absolute; bottom: 18px; right: 18px; z-index: 1000; }
+    .panel-bottom-right { position: absolute; bottom: 18px; right: 18px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    
     .btn-main { 
       background: var(--primary-color); 
       color: #fff; 
       border: none; 
-      padding: 9px 15px; 
+      padding: 8px 14px; 
       border-radius: 6px; 
       cursor: pointer; 
       font-weight: bold; 
       font-size: 11px; 
       box-shadow: 0 4px 12px rgba(0,0,0,0.25);
       transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
     }
+
+    /* BẢNG CHÚ GIẢI KÝ HIỆU & ĐỘ PHỦ HẠ TẦNG (LEGEND PANEL) */
+    .legend-panel {
+      display: none;
+      background: var(--panel-bg);
+      backdrop-filter: var(--panel-blur);
+      -webkit-backdrop-filter: var(--panel-blur);
+      border: var(--panel-border);
+      box-shadow: var(--panel-shadow);
+      border-radius: 8px;
+      padding: 10px 12px;
+      width: 250px;
+      font-size: 10.5px;
+      color: #2c3e50;
+    }
+
+    .legend-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: bold;
+      font-size: 11px;
+      border-bottom: 1px solid rgba(0,0,0,0.12);
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+    }
+
+    .legend-row { display: flex; align-items: center; margin-bottom: 4px; }
+    .legend-icon-circle { width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.2); margin-right: 8px; flex-shrink: 0; }
+    .legend-icon-square { width: 11px; height: 11px; border: 1px solid rgba(0,0,0,0.2); margin-right: 8px; flex-shrink: 0; }
+    
+    .heat-scale-title { font-weight: bold; font-size: 10.5px; color: #1a252f; margin: 8px 0 4px 0; }
+    .heat-palette-row { display: flex; width: 100%; border-radius: 3px; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); }
+    .heat-color-box { flex: 1; height: 18px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9px; font-weight: bold; }
 
     .modal-panel { 
       display: none; 
@@ -360,8 +394,47 @@
     <button class="btn-main" onclick="toggleAddCard()">➕ ĐỀ XUẤT ĐIỂM MỚI</button>
   </div>
 
+  <!-- PANEL CHÚ GIẢI KÝ HIỆU VÀ ĐIỀU KHIỂN GÓC DƯỚI PHẢI -->
   <div class="panel-bottom-right">
-    <button class="btn-main" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP & BIỂU ĐỒ HẠ TẦNG (40 PHƯỜNG XÃ)</button>
+    
+    <!-- BẢNG CHÚ GIẢI CHUẨN MÃ GEE -->
+    <div class="legend-panel" id="legendPanel">
+      <div class="legend-header">
+        <span>CHÚ GIẢI KÝ HIỆU & ĐỘ PHỦ</span>
+        <span onclick="toggleLegend()" style="cursor:pointer; color:#c0392b; font-weight:bold;">✕</span>
+      </div>
+
+      <div class="legend-row"><div class="legend-icon-circle" style="background:#2ecc71;"></div>1. Công viên, điểm xanh, vườn hoa</div>
+      <div class="legend-row"><div class="legend-icon-circle" style="background:#8e44ad;"></div>2. Bãi đỗ xe, trạm sạc xe điện</div>
+      <div class="legend-row"><div class="legend-icon-circle" style="background:#d35400;"></div>3. Trường Mầm non</div>
+      <div class="legend-row"><div class="legend-icon-circle" style="background:#a0522d;"></div>4. Trường Tiểu học</div>
+      <div class="legend-row"><div class="legend-icon-circle" style="background:#5c4033;"></div>5. Trường THCS</div>
+      <div class="legend-row"><div class="legend-icon-circle" style="background:#ff00ff;"></div>6. Bệnh viện, Trạm y tế</div>
+      <div class="legend-row"><div class="legend-icon-circle" style="background:#ff0000;"></div>7. Nhà văn hóa, thể thao</div>
+      <div class="legend-row"><div class="legend-icon-circle" style="background:#8b0000;"></div>8. Chợ, Trung tâm thương mại</div>
+      
+      <div class="legend-row"><div class="legend-icon-square" style="background:#f39c12;"></div><b style="color:#d35400;">9. Quỹ đất tiềm năng (Chưa sử dụng)</b></div>
+      <div class="legend-row"><span style="margin-right:6px; font-size:12px;">🔺</span><b style="color:#c0392b;">Đề xuất mới (Chờ duyệt)</b></div>
+
+      <div style="height:1px; background:#bdc3c7; margin:6px 0 4px 0;"></div>
+
+      <div class="heat-scale-title">THANG ĐỘ PHỦ HẠ TẦNG (1 - 8)</div>
+      <div class="heat-palette-row">
+        <div class="heat-color-box" style="background:#5dade2;">1</div>
+        <div class="heat-color-box" style="background:#2ecc71;">2</div>
+        <div class="heat-color-box" style="background:#f1c40f;">3</div>
+        <div class="heat-color-box" style="background:#f39c12;">4</div>
+        <div class="heat-color-box" style="background:#e67e22;">5</div>
+        <div class="heat-color-box" style="background:#d35400;">6</div>
+        <div class="heat-color-box" style="background:#e74c3c;">7</div>
+        <div class="heat-color-box" style="background:#900c3f;">8</div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:6px;">
+      <button class="btn-main" onclick="toggleLegend()">📖 CHÚ THÍCH</button>
+      <button class="btn-main" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP & BIỂU ĐỒ (40 PHƯỜNG XÃ)</button>
+    </div>
   </div>
 
   <!-- MODAL TỔNG HỢP BẢNG & BIỂU ĐỒ -->
@@ -518,6 +591,11 @@
       layerControl.collapse();
     });
 
+    function toggleLegend() {
+      const p = document.getElementById('legendPanel');
+      p.style.display = p.style.display === 'block' ? 'none' : 'block';
+    }
+
     function toggleAddCard() {
       const card = document.getElementById('addPointCard');
       card.style.display = card.style.display === 'block' ? 'none' : 'block';
@@ -629,6 +707,12 @@
         "7-VH": layers.c7, "8-TM": layers.c8, "9-CSD": layers.c9
       };
 
+      const pointColors = {
+        "1-CV": "#2ecc71", "2-BDX": "#8e44ad", "3-MN": "#d35400",
+        "4-TH": "#a0522d", "5-THCS": "#5c4033", "6-YT": "#ff00ff",
+        "7-VH": "#ff0000", "8-TM": "#8b0000", "9-CSD": "#f39c12"
+      };
+
       rawDataList.forEach(p => {
         const isApproved = (p.status === true || p.status === 'true');
         
@@ -643,7 +727,7 @@
           layers.pending.addLayer(triangleMarker);
         } else {
           const targetGroup = mapGroups[p.type] || layers.c9;
-          const color = p.type === "9-CSD" ? "#f39c12" : "#2ecc71";
+          const color = pointColors[p.type] || "#2ecc71";
           const marker = L.circleMarker([p.lat, p.lng], { radius: 6, fillColor: color, color: "#fff", weight: 1.5, fillOpacity: 0.9 });
           marker.on('click', () => onPointClick(p, marker));
           targetGroup.addLayer(marker);
