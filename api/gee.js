@@ -44,6 +44,14 @@ const infraConfig = {
   "8-TM":   { label: "Chợ, Trung tâm thương mại", minSize: 1500, radius: 500 }
 };
 
+function cleanWardStr(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '')
+    .replace(/^phường\s+/i, '').replace(/^xã\s+/i, '')
+    .trim().toLowerCase();
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
@@ -91,7 +99,7 @@ module.exports = async (req, res) => {
       .updateMask(validPopMask)
       .rename('DanSoPixelNormalized');
 
-    // NẠP DỮ LIỆU TỪ GOOGLE APPS SCRIPT
+    // NẠP APPS SCRIPT
     const gasUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec?action=getJson";
     const gasResponse = await fetch(gasUrl);
     const geojson = await gasResponse.json();
@@ -160,7 +168,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // 2. PHÂN TÍCH CHI TIẾT ĐIỂM HẠ TẦNG CLICK
     if (action === 'analyzePoint') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -181,25 +188,32 @@ module.exports = async (req, res) => {
       return res.status(200).json({ servedPop });
     }
 
-    // 3. THUẬT TOÁN GỢI Ý ĐẤT CHUYỂN ĐỔI (9-CSD) 2 CẤP
+    // 3. SỬA LỖI THUẬT TOÁN GỢI Ý CHUYỂN ĐỔI ĐẤT (9-CSD)
     if (action === 'analyzeCSD') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
       const size = Number(req.query.size) || 0;
-      const wardNameParam = String(req.query.ward || '').trim().toLowerCase();
+      const rawWardParam = String(req.query.ward || '');
+      const cleanTargetWard = cleanWardStr(rawWardParam);
       const ptGeom = ee.Geometry.Point([lng, lat]);
 
-      const wardFt = wardVectorParsed.filter(
-        ee.Filter.stringMatches('tenXa', `.*${req.query.ward}.*`, 'i')
-      ).first();
-
-      const wardPop = await new Promise((resolve) => {
-        wardFt.evaluate((ft) => resolve(ft ? Number(ft.properties.danSoNum || 0) : 0));
+      // Lấy thông tin dân số phường chứa điểm CSD
+      const wardListEvaluated = await new Promise((resolve) => {
+        wardVectorParsed.evaluate((fc) => resolve(fc ? fc.features : []));
       });
 
+      let targetWardPop = 0;
+      wardListEvaluated.forEach(f => {
+        const wName = f.properties.tenXa || f.properties.name || '';
+        if (cleanWardStr(wName) === cleanTargetWard) {
+          targetWardPop = Number(f.properties.danSoNum || 0);
+        }
+      });
+
+      // Tính tổng diện tích hiện trạng của phường
       const wardExistAreas = {};
       rawDataList.forEach(item => {
-        if (item.status && item.ward.trim().toLowerCase().includes(wardNameParam)) {
+        if (item.status && cleanWardStr(item.ward) === cleanTargetWard) {
           wardExistAreas[item.type] = (wardExistAreas[item.type] || 0) + item.size;
         }
       });
@@ -216,10 +230,11 @@ module.exports = async (req, res) => {
         }
 
         const normVal = quotaConfig[code] || 0;
-        const reqArea = Math.round(wardPop * normVal);
+        const reqArea = Math.round(targetWardPop * normVal);
         const existArea = wardExistAreas[code] || 0;
-        const deficitArea = reqArea - existArea;
+        const deficitArea = reqArea - existArea; // > 0 tức là đang thiếu hụt trong phường
 
+        // Tính toán không gian vùng đệm mở rộng
         const candidateRadius = infraConfig[code].radius;
         const testBuffer = ptGeom.buffer(candidateRadius);
 
@@ -251,6 +266,9 @@ module.exports = async (req, res) => {
         });
       }
 
+      // SẮP XẾP ƯU TIÊN:
+      // 1. Nhóm bị THIẾU DỆN TÍCH trong phường (deficitArea lớn nhất lên trước)
+      // 2. Nhóm đã đủ nhưng phục vụ thêm dân số mở rộng nhiều nhất (popGained lớn nhất lên trước)
       suggestions.sort((a, b) => {
         if (a.isWardDeficit !== b.isWardDeficit) return a.isWardDeficit ? -1 : 1;
         if (a.isWardDeficit && b.isWardDeficit) return b.deficitArea - a.deficitArea;
@@ -264,7 +282,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
-    // 4. BẢNG THỐNG KÊ MẬT ĐỘ TÁCH CỘT
     if (action === 'getWardStats') {
       const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
       const bandImagesList = [];
@@ -300,7 +317,7 @@ module.exports = async (req, res) => {
       const wardLandArea = {};
       rawDataList.forEach(item => {
         if (item.status && codes.includes(item.type)) {
-          const w = item.ward.trim().toLowerCase();
+          const w = cleanWardStr(item.ward);
           if (!wardLandArea[w]) wardLandArea[w] = {};
           wardLandArea[w][item.type] = (wardLandArea[w][item.type] || 0) + item.size;
         }
@@ -313,7 +330,7 @@ module.exports = async (req, res) => {
       const resultTable = wardList.map(f => {
         const props = f.properties;
         const wName = props.tenXa || props.name || 'Phường';
-        const normW = wName.trim().toLowerCase();
+        const normW = cleanWardStr(wName);
         const wId = String(props.maXa || props.OBJECTID || '');
         const totalWardPop = Number(props.danSoNum || 1);
 
