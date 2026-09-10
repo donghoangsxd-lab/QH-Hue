@@ -189,6 +189,7 @@ module.exports = async (req, res) => {
     }
 
     // 3. SỬA LỖI THUẬT TOÁN GỢI Ý CHUYỂN ĐỔI ĐẤT (9-CSD)
+    // 3. THUẬT TOÁN GỢI Ý CHUYỂN ĐỔI ĐẤT (9-CSD) - SỬA LỖI DÂN SỐ ÂM
     if (action === 'analyzeCSD') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -197,7 +198,6 @@ module.exports = async (req, res) => {
       const cleanTargetWard = cleanWardStr(rawWardParam);
       const ptGeom = ee.Geometry.Point([lng, lat]);
 
-      // Lấy thông tin dân số phường chứa điểm CSD
       const wardListEvaluated = await new Promise((resolve) => {
         wardVectorParsed.evaluate((fc) => resolve(fc ? fc.features : []));
       });
@@ -210,7 +210,6 @@ module.exports = async (req, res) => {
         }
       });
 
-      // Tính tổng diện tích hiện trạng của phường
       const wardExistAreas = {};
       rawDataList.forEach(item => {
         if (item.status && cleanWardStr(item.ward) === cleanTargetWard) {
@@ -232,9 +231,8 @@ module.exports = async (req, res) => {
         const normVal = quotaConfig[code] || 0;
         const reqArea = Math.round(targetWardPop * normVal);
         const existArea = wardExistAreas[code] || 0;
-        const deficitArea = reqArea - existArea; // > 0 tức là đang thiếu hụt trong phường
+        const deficitArea = reqArea - existArea;
 
-        // Tính toán không gian vùng đệm mở rộng
         const candidateRadius = infraConfig[code].radius;
         const testBuffer = ptGeom.buffer(candidateRadius);
 
@@ -257,14 +255,31 @@ module.exports = async (req, res) => {
           }).evaluate((r) => resolve(r ? r.DanSoPixelNormalized : 0));
         });
 
+        // LÀM SẠCH BỎ DẤU ÂM NẾU CÓ
+        const rawPopVal = Math.round(popRes || 0);
+        const cleanPopGained = Math.max(0, rawPopVal);
+
         suggestions.push({
           code,
           label: infraConfig[code].label,
           deficitArea: Math.max(0, deficitArea),
           isWardDeficit: deficitArea > 0,
-          popGained: Math.round(popRes || 0)
+          popGained: cleanPopGained
         });
       }
+
+      suggestions.sort((a, b) => {
+        if (a.isWardDeficit !== b.isWardDeficit) return a.isWardDeficit ? -1 : 1;
+        if (a.isWardDeficit && b.isWardDeficit) return b.deficitArea - a.deficitArea;
+        return b.popGained - a.popGained;
+      });
+
+      if (suggestions.length > 0 && suggestions[0].isWardDeficit) {
+        suggestions[0].isTopPriority = true;
+      }
+
+      return res.status(200).json({ suggestions, ineligible });
+    }
 
       // SẮP XẾP ƯU TIÊN:
       // 1. Nhóm bị THIẾU DỆN TÍCH trong phường (deficitArea lớn nhất lên trước)
