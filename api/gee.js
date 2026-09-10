@@ -62,7 +62,38 @@ module.exports = async (req, res) => {
     const action = req.query.action || 'getInitData';
     const gasBaseUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec";
 
-    // BỔ SUNG ACTION GỬI ĐỀ XUẤT ĐIỂM HẠ TẦNG MỚI SANG GOOGLE APPS SCRIPT
+    // LAYER VECTOR PHƯỜNG XÃ CHUẨN
+    const wardVector = ee.FeatureCollection("projects/optimistic-yew-488501-s0/assets/Polygon-40xa");
+    const wardVectorParsed = wardVector.map(f => {
+      let rawPop = f.get('danSo');
+      if (!rawPop) rawPop = f.get('DanSo');
+      const popNum = ee.Algorithms.If(rawPop, ee.Number.parse(ee.String(rawPop)), 0);
+      return f.set('danSoNum', popNum);
+    });
+
+    // ACTION 1: TRUY VẤN TÊN PHƯỜNG TỪ TỌA ĐỘ BẰNG FILTERBOUNDS (MÃ GEE CHUẨN)
+    if (action === 'getWardFromPoint') {
+      const lat = Number(req.query.lat);
+      const lng = Number(req.query.lng);
+      if (!lat || !lng) return res.status(400).json({ error: true, message: "Thiếu tọa độ" });
+
+      const clickPoint = ee.Geometry.Point([lng, lat]);
+      const matchedWard = wardVectorParsed.filterBounds(clickPoint).first();
+
+      const wardData = await new Promise((resolve) => {
+        matchedWard.evaluate((feature) => {
+          let wardName = "Thuận Hóa";
+          if (feature && feature.properties) {
+            wardName = feature.properties.tenXa || feature.properties.NAME_2 || feature.properties.name || "Thuận Hóa";
+          }
+          resolve(wardName);
+        });
+      });
+
+      return res.status(200).json({ ward: wardData });
+    }
+
+    // ACTION 2: ĐỒNG BỘ ĐIỂM ĐỀ XUẤT MỚI SANG SCRIPT SHEET
     if (action === 'addPoint') {
       const { type, name, ward, lat, lng, size } = req.query;
       if (!type || !name || !lat || !lng) {
@@ -73,9 +104,7 @@ module.exports = async (req, res) => {
         `&type=${encodeURIComponent(type)}` +
         `&name=${encodeURIComponent(name)}` +
         `&ward=${encodeURIComponent(ward || 'Thuận Hóa')}` +
-        `&lat=${lat}` +
-        `&lng=${lng}` +
-        `&size=${size || 0}`;
+        `&lat=${lat}&lng=${lng}&size=${size || 0}`;
 
       const gasRes = await fetch(syncUrl);
       const result = await gasRes.json().catch(() => ({ success: true }));
@@ -85,13 +114,6 @@ module.exports = async (req, res) => {
     // DỮ LIỆU NỀN GEE
     const popRaster = ee.Image("projects/optimistic-yew-488501-s0/assets/Pixel-danso").select(0).rename('DanSoPixel');
     const wardRegion = ee.Image("projects/optimistic-yew-488501-s0/assets/Output40xa").select(0).rename('ID_Region');
-    const wardVector = ee.FeatureCollection("projects/optimistic-yew-488501-s0/assets/Polygon-40xa");
-
-    const wardVectorParsed = wardVector.map(f => {
-      const rawPop = f.get('danSo');
-      const popNum = ee.Algorithms.If(rawPop, ee.Number.parse(ee.String(rawPop)), 0);
-      return f.set('danSoNum', popNum);
-    });
 
     const validPopMask = popRaster.gt(0);
     const validPopRaster = popRaster.updateMask(validPopMask);
@@ -120,7 +142,7 @@ module.exports = async (req, res) => {
       .updateMask(validPopMask)
       .rename('DanSoPixelNormalized');
 
-    // NẠP DỮ LIỆU ĐIỂM
+    // NẠP DỮ LIỆU ĐIỂM TỪ GOOGLE SHEET BUCKET
     let rawDataList = [];
     try {
       const gasUrl = `${gasBaseUrl}?action=getJson`;
