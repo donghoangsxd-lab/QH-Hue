@@ -12,24 +12,60 @@
     body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
     #map { width: 100%; height: 100vh; }
     
-    .panel-left { position: absolute; top: 15px; left: 15px; z-index: 1000; background: rgba(255, 255, 255, 0.98); padding: 12px; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.25); width: 330px; font-size: 11px; }
+    /* ĐẨY DỊCH XUỐNG DƯỚI ĐỂ KHÔNG ĐÈ NÚT ZOOM + - */
+    .panel-left { 
+      position: absolute; 
+      top: 80px; 
+      left: 15px; 
+      z-index: 1000; 
+      background: rgba(255, 255, 255, 0.98); 
+      padding: 12px; 
+      border-radius: 6px; 
+      box-shadow: 0 2px 10px rgba(0,0,0,0.25); 
+      width: 330px; 
+      font-size: 11px; 
+    }
+    
     .progress-box { margin-top: 8px; padding: 8px; background: #f8f9fa; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 10px; }
     .progress-bar-bg { width: 100%; background: #e0e0e0; height: 8px; border-radius: 4px; overflow: hidden; margin: 4px 0; }
     .progress-bar-fill { width: 0%; height: 100%; background: #27ae60; transition: width 0.3s ease; }
     
-    .opacity-control-panel { background: #fff; padding: 8px; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.2); font-size: 11px; margin-top: 5px; }
+    .opacity-control-panel { background: #fff; padding: 8px; border-radius: 4px; font-size: 11px; margin-top: 5px; }
     .opacity-slider { width: 100%; margin: 3px 0 6px 0; }
 
-    .panel-bottom-right { position: absolute; bottom: 15px; right: 15px; z-index: 1000; display: flex; gap: 6px; }
-    .btn { background: #fff; border: 1px solid #bdc3c7; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; }
-    .modal-panel { display: none; position: absolute; top: 30px; left: 50%; transform: translateX(-50%); z-index: 2000; background: #fff; padding: 15px; border-radius: 8px; width: 96%; max-width: 1250px; max-height: 88vh; overflow-y: auto; }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; }
-    .close-btn { cursor: pointer; font-weight: bold; font-size: 14px; }
+    .panel-bottom-right { position: absolute; bottom: 15px; right: 15px; z-index: 1000; }
+    .btn { background: #2c3e50; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+    .btn:hover { background: #34495e; }
+
+    /* MODAL TỔNG HỢP GỘP CẢ BẢNG VÀ BIỂU ĐỒ */
+    .modal-panel { 
+      display: none; 
+      position: absolute; 
+      top: 25px; 
+      left: 50%; 
+      transform: translateX(-50%); 
+      z-index: 2000; 
+      background: #fff; 
+      padding: 15px; 
+      border-radius: 8px; 
+      width: 96%; 
+      max-width: 1300px; 
+      height: 88vh; 
+      box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+    }
     
+    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2c3e50; padding-bottom: 8px; }
+    .close-btn { cursor: pointer; font-weight: bold; font-size: 16px; color: #c0392b; }
+    
+    /* CHIA KHUNG 4/5 BẢNG VÀ 1/5 BIỂU ĐỒ */
+    .table-container { height: calc(75% - 40px); overflow-y: auto; margin-top: 8px; border: 1px solid #ddd; }
+    .chart-container { height: 25%; margin-top: 10px; border-top: 2px solid #eee; padding-top: 5px; }
+
     table.data-table { width: 100%; border-collapse: collapse; font-size: 10px; text-align: center; }
     table.data-table th, table.data-table td { border: 1px solid #ddd; padding: 4px 2px; }
-    table.data-table th { background: #2c3e50; color: #fff; position: sticky; top: 0; }
-    .sug-item { margin: 3px 0; padding: 4px; border-radius: 3px; font-size: 10px; }
+    table.data-table th { background: #2c3e50; color: #fff; position: sticky; top: 0; z-index: 10; }
+    
+    .sug-item { margin: 3px 0; padding: 5px; border-radius: 3px; font-size: 10px; }
     .priority-item { background: #fef9e7; color: #d35400; font-weight: bold; border: 1px solid #f9e79f; }
   </style>
 </head>
@@ -51,20 +87,21 @@
   </div>
 
   <div class="panel-bottom-right">
-    <button class="btn" onclick="openStatModal()">📊 Dân số & Hạ tầng (40 Phường)</button>
-    <button class="btn" onclick="openChartModal()">📈 Biểu đồ Điểm HT</button>
+    <button class="btn" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP & BIỂU ĐỒ HẠ TẦNG (40 PHƯỜNG XÃ)</button>
   </div>
 
-  <!-- MODAL BẢNG THỐNG KÊ CẤU TRÚC TÁCH CỘT ĐỘ PHỦ & QUY MÔ -->
-  <div class="modal-panel" id="statModal">
+  <!-- MODAL TỔNG HỢP TÍCH HỢP ĐỒNG THỜI BẢNG VÀ BIỂU ĐỒ -->
+  <div class="modal-panel" id="combinedModal">
     <div class="modal-header">
-      <b style="font-size:13px; color:#2c3e50;">📊 BẢNG ĐÁNH GIÁ MẬT ĐỘ PHỦ HẠ TẦNG VÀ TỶ LỆ CUNG CẤP DÂN SỐ (40 PHƯỜNG XÃ)</b>
+      <b style="font-size:13px; color:#2c3e50;">📊 BẢNG ĐÁNH GIÁ MẬT ĐỘ PHỦ HẠ TẦNG VÀ BIỂU ĐỒ TỔNG HỢP (40 PHƯỜNG XÃ)</b>
       <div>
         <span id="modalProgressText" style="font-size:11px; font-weight:bold; color:#e67e22; margin-right:15px;">🔄 Đang xử lý...</span>
-        <span class="close-btn" onclick="closeModal('statModal')">X</span>
+        <span class="close-btn" onclick="closeModal()">X</span>
       </div>
     </div>
-    <div style="overflow-x:auto; margin-top: 10px; max-height:70vh;">
+    
+    <!-- KHUNG 4/5 BẢNG DỮ LIỆU CUỘN -->
+    <div class="table-container">
       <table class="data-table">
         <thead>
           <tr style="background:#1a252f;">
@@ -95,14 +132,11 @@
         <tbody id="statTableBody"></tbody>
       </table>
     </div>
-  </div>
 
-  <div class="modal-panel" id="chartModal">
-    <div class="modal-header">
-      <b>📈 BIỂU ĐỒ TỶ LỆ TỔNG HỢP TIẾP CẬN HẠ TẦNG 40 PHƯỜNG XÃ</b>
-      <span class="close-btn" onclick="closeModal('chartModal')">X</span>
+    <!-- KHUNG 1/5 BIỂU ĐỒ CỐ ĐỊNH PHÍA DƯỚI -->
+    <div class="chart-container">
+      <canvas id="infraChart"></canvas>
     </div>
-    <div style="height:380px; margin-top:10px;"><canvas id="infraChart"></canvas></div>
   </div>
 
   <script>
@@ -113,6 +147,7 @@
 
     let tilePopLayer = null;
     let tileHeatmapLayer = null;
+    let chartInstance = null;
 
     const layers = {
       pop: L.layerGroup(),
@@ -125,7 +160,6 @@
       c9: L.layerGroup().addTo(map)
     };
 
-    // TÊN DẠNG DROPLIST RỌN GÀNG KHÔNG CHỨA DẤU NGOẶC ĐƠN
     const layerControl = L.control.layers(null, {
       "0. Raster Dân số Chuẩn hóa": layers.pop,
       "🗺️ Ranh giới 40 Phường Xã": layers.boundary,
@@ -141,14 +175,24 @@
       "9. Quỹ đất tiềm năng": layers.c9
     }, { collapsed: true, position: 'topright' }).addTo(map);
 
-    // THÊM THANH KÉO OPACITY VÀO PANEL LAYER CONTROL
+    // THANH KÉO DYNAMIC ẨN HIỆN THEO CHECKBOX LAYER
     const sliderContainer = L.DomUtil.create('div', 'opacity-control-panel');
     sliderContainer.innerHTML = `
-      <b>🎚️ Độ trong suốt Layer Raster:</b><br>
-      👥 Dân số: <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60"><br>
-      🔥 Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="65">
+      <b>🎚️ Độ trong suốt Layer:</b><br>
+      <div id="popBox" style="display:none;">👥 Dân số: <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60"></div>
+      <div id="heatBox" style="display:none;">🔥 Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="65"></div>
     `;
     document.querySelector('.leaflet-control-layers').appendChild(sliderContainer);
+
+    map.on('overlayadd', (e) => {
+      if (e.name === "0. Raster Dân số Chuẩn hóa") document.getElementById('popBox').style.display = 'block';
+      if (e.name === "🔥 Heatmap Ma trận") document.getElementById('heatBox').style.display = 'block';
+    });
+
+    map.on('overlayremove', (e) => {
+      if (e.name === "0. Raster Dân số Chuẩn hóa") document.getElementById('popBox').style.display = 'none';
+      if (e.name === "🔥 Heatmap Ma trận") document.getElementById('heatBox').style.display = 'none';
+    });
 
     document.getElementById('popOpacity').addEventListener('input', (e) => {
       if (tilePopLayer) tilePopLayer.setOpacity(e.target.value / 100);
@@ -202,7 +246,6 @@
       });
     }
 
-    // TRA CỨU CHI TIẾT ĐIỂM KHI CLICK
     function onPointClick(p) {
       const panel = document.getElementById('panelContent');
       let html = `<b>🏢 ${p.name}</b><br>`;
@@ -225,25 +268,32 @@
         html += `<div id="csdSug"><i>⏳ Đang tính toán không gian phục vụ...</i></div>`;
         panel.innerHTML = html;
 
-        fetch(`${geeApiBackend}?action=analyzeCSD&lat=${p.lat}&lng=${p.lng}&size=${p.size}`)
+        fetch(`${geeApiBackend}?action=analyzeCSD&lat=${p.lat}&lng=${p.lng}&size=${p.size}&ward=${encodeURIComponent(p.ward)}`)
           .then(r => r.json())
           .then(res => {
             let sugHtml = "";
             (res.suggestions || []).forEach(s => {
-              const priority = s.isTopPriority ? " ⭐ [ƯU TIÊN HÀNG ĐẦU]" : "";
-              const cls = s.isTopPriority ? "sug-item priority-item" : "sug-item";
-              sugHtml += `<div class="${cls}">👉 ${s.label} -> Phục vụ thêm: ~${s.popGained.toLocaleString()} người${priority}</div>`;
+              if (s.isWardDeficit) {
+                const priority = s.isTopPriority ? " ⭐ [ƯU TIÊN HÀNG ĐẦU - PHƯỜNG THIẾU NHIỀU NHẤT]" : "";
+                const cls = s.isTopPriority ? "sug-item priority-item" : "sug-item";
+                sugHtml += `<div class="${cls}">🚩 <b>${s.label}</b><br>` +
+                           `   └ Nội bộ Phường thiếu: <b>${s.deficitArea.toLocaleString()} m²</b> | Phục vụ thêm: ~${s.popGained.toLocaleString()} người${priority}</div>`;
+              } else {
+                sugHtml += `<div class="sug-item" style="color:#27ae60;">✓ <b>${s.label}</b> (Phường đã đạt | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng)</div>`;
+              }
             });
+            
             (res.ineligible || []).forEach(inEl => {
               sugHtml += `<div class="sug-item" style="color:#7f8c8d;">❌ ${inEl.label} (Không đủ DT min: ${inEl.minSize}m²)</div>`;
             });
+            
             document.getElementById('csdSug').innerHTML = sugHtml || "✓ Vị trí đã phủ đủ hạ tầng.";
           });
       }
     }
 
-    function openStatModal() {
-      document.getElementById('statModal').style.display = 'block';
+    function openCombinedModal() {
+      document.getElementById('combinedModal').style.display = 'block';
       const tbody = document.getElementById('statTableBody');
       const statusText = document.getElementById('modalProgressText');
       tbody.innerHTML = "<tr><td colspan='19' style='text-align:center;'>🔄 Đang tính toán ma trận sống từ GEE...</td></tr>";
@@ -272,23 +322,38 @@
           row += `<td style="font-weight:bold; color:#d35400;">${Number(w.Total_Infra_Score || 0).toFixed(1)}%</td></tr>`;
           tbody.innerHTML += row;
         });
+
+        renderCombinedChart();
       });
     }
 
-    function openChartModal() {
-      document.getElementById('chartModal').style.display = 'block';
+    function renderCombinedChart() {
       const ctx = document.getElementById('infraChart').getContext('2d');
-      new Chart(ctx, {
+      if (chartInstance) chartInstance.destroy();
+
+      chartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: wardStatsData.map(w => w.Ten_Phuong),
-          datasets: [{ label: 'Điểm Tiếp Cận Hạ Tầng (%)', data: wardStatsData.map(w => w.Total_Infra_Score), backgroundColor: '#d35400' }]
+          labels: wardStatsData.map(w => w.Ten_Phuong.replace('Phường ', '').replace('Xã ', '')),
+          datasets: [{ 
+            label: 'Điểm Tiếp Cận Hạ Tầng (%)', 
+            data: wardStatsData.map(w => w.Total_Infra_Score), 
+            backgroundColor: '#d35400' 
+          }]
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: { 
+          responsive: true, 
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { font: { size: 8 } } },
+            y: { beginAtZero: true, max: 100 }
+          }
+        }
       });
     }
 
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function closeModal() { document.getElementById('combinedModal').style.display = 'none'; }
 
     loadDataParallel();
   </script>
