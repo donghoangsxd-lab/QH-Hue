@@ -49,10 +49,8 @@
     .progress-bar-bg { width: 50px; background: #e0e0e0; height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--success-color); transition: width 0.3s ease; }
 
-    /* KHẮC PHỤC TRIỆT ĐỂ MẶC ĐỊNH MAX-WIDTH CỦA LEAFLET POPUP */
-    .leaflet-popup {
-      max-width: none !important;
-    }
+    /* LEAFLET POPUP CSS */
+    .leaflet-popup { max-width: none !important; }
 
     .leaflet-popup-content-wrapper {
       background: rgba(255, 255, 255, 0.55) !important;
@@ -73,13 +71,8 @@
       border: 1px solid rgba(255, 255, 255, 0.5);
     }
 
-    .leaflet-popup-content { 
-      margin: 6px 8px !important; 
-      line-height: 1.35 !important; 
-      width: auto !important;
-    }
+    .leaflet-popup-content { margin: 6px 8px !important; line-height: 1.35 !important; width: auto !important; }
 
-    /* ĐỊNH DẠNG KHUNG POPUP CONTAINER RỘNG CHUẨN 380PX KHÔNG LO TRÀN */
     .popup-container {
       width: 380px;
       max-width: 85vw;
@@ -98,7 +91,6 @@
     .inline-progress-bg { width: 100%; background: #ddd; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; }
     .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-color); transition: width 0.2s linear; }
 
-    /* TỐI ƯU CÁC THẺ CARD GỢI Ý CÔNG NĂNG LAYOUT 2 DÒNG */
     .sug-card {
       background: rgba(255, 255, 255, 0.4) !important;
       border: 1px solid rgba(255, 255, 255, 0.7);
@@ -118,19 +110,8 @@
       background: rgba(230, 126, 34, 0.15) !important;
     }
 
-    .sug-title {
-      font-weight: bold;
-      color: var(--primary-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .sug-detail {
-      margin-top: 2px;
-      color: #333;
-      font-size: 10px;
-    }
+    .sug-title { font-weight: bold; color: var(--primary-color); display: flex; justify-content: space-between; align-items: center; }
+    .sug-detail { margin-top: 2px; color: #333; font-size: 10px; }
 
     .badge-priority {
       display: inline-block;
@@ -144,12 +125,7 @@
       white-space: nowrap;
     }
 
-    .sug-card.ineligible { 
-      color: #555; 
-      border-left: 3px solid #aaa; 
-      opacity: 0.75; 
-      font-size: 10px;
-    }
+    .sug-card.ineligible { color: #555; border-left: 3px solid #aaa; opacity: 0.75; font-size: 10px; }
 
     /* PANEL QUẢN LÝ LỚP BẢN ĐỒ */
     .leaflet-top.leaflet-right { top: 10px; right: 10px; }
@@ -359,7 +335,7 @@
       </div>
 
       <label>Phường / Xã:</label>
-      <input type="text" id="newWard" placeholder="Thuận Hóa" />
+      <input type="text" id="newWard" placeholder="Tự động nhận diện..." />
 
       <label>Diện tích (m²):</label>
       <input type="number" id="newSize" placeholder="1000" />
@@ -434,6 +410,7 @@
     let chartInstance = null;
     let isPickMode = false;
     let tempMarker = null;
+    let wardGeoJsonData = null; // BỘ ĐỆM LƯU RANH GIỚI 40 PHƯỜNG XÃ DÙNG CHO TRUY VẤN TỌA ĐỘ
 
     const layers = {
       pop: L.layerGroup(),
@@ -495,6 +472,52 @@
       if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(e.target.value / 100);
     });
 
+    // =========================================================================
+    // THUẬT TOÁN TỰ ĐỘNG XÁC ĐỊNH PHƯỜNG/XÃ TỪ TỌA ĐỘ (POINT IN POLYGON)
+    // =========================================================================
+    function isPointInPolygon(point, polygon) {
+      let x = point[0], y = point[1];
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        let xi = polygon[i][0], yi = polygon[i][1];
+        let xj = polygon[j][0], yj = polygon[j][1];
+        let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    function identifyWardFromCoords(lat, lng) {
+      if (!wardGeoJsonData || !wardGeoJsonData.features) return "Thuận Hóa";
+      
+      const pt = [Number(lng), Number(lat)];
+      
+      for (let feature of wardGeoJsonData.features) {
+        if (!feature.geometry) continue;
+        const geomType = feature.geometry.type;
+        const coords = feature.geometry.coordinates;
+
+        if (geomType === "Polygon") {
+          if (isPointInPolygon(pt, coords[0])) {
+            return feature.properties.tenXa || feature.properties.name || feature.properties.NAME_2 || "Thuận Hóa";
+          }
+        } else if (geomType === "MultiPolygon") {
+          for (let poly of coords) {
+            if (isPointInPolygon(pt, poly[0])) {
+              return feature.properties.tenXa || feature.properties.name || feature.properties.NAME_2 || "Thuận Hóa";
+            }
+          }
+        }
+      }
+      return "Thuận Hóa";
+    }
+
+    // NẠP DỮ LIỆU GEOJSON RANH GIỚI
+    fetch("https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec?action=getBoundaryGeoJson")
+      .then(r => r.json())
+      .then(geoData => { wardGeoJsonData = geoData; })
+      .catch(() => {});
+
     map.on('click', (e) => {
       if (isPickMode) {
         const lat = e.latlng.lat.toFixed(6);
@@ -502,11 +525,15 @@
         document.getElementById('newLat').value = lat;
         document.getElementById('newLng').value = lng;
         
+        // TỰ ĐỘNG TRA CỨU PHƯỜNG/XÃ KHI GHIM TỌA ĐỘ
+        const detectedWard = identifyWardFromCoords(lat, lng);
+        document.getElementById('newWard').value = detectedWard;
+
         if (tempMarker) map.removeLayer(tempMarker);
         tempMarker = L.marker([lat, lng]).addTo(map);
         
         document.getElementById('statusMsg').style.color = "#27ae60";
-        document.getElementById('statusMsg').innerText = "✓ Đã ghim tọa độ thành công!";
+        document.getElementById('statusMsg').innerText = `✓ Đã xác định thuộc địa bàn: ${detectedWard}`;
         isPickMode = false;
         return;
       }
@@ -558,7 +585,7 @@
           [Number(lat) - 0.0003, Number(lng) + 0.0003]
         ], { color: '#e74c3c', fillColor: '#e74c3c', fillOpacity: 0.9 });
         
-        newMarker.bindPopup(`<b>📌 Đề xuất mới (Chờ duyệt)</b><br>• Tên: ${name}<br>• Diện tích: ${Number(size).toLocaleString()} m²`);
+        newMarker.bindPopup(`<b>📌 Đề xuất mới (Chờ duyệt)</b><br>• Tên: ${name}<br>• Địa bàn: Phường/Xã ${ward}<br>• Diện tích: ${Number(size).toLocaleString()} m²`);
         layers.pending.addLayer(newMarker);
 
         setTimeout(() => { toggleAddCard(); }, 1500);
