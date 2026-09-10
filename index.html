@@ -24,11 +24,11 @@
       top: 10px; 
       left: 55px; 
       z-index: 1000; 
-      background: rgba(255, 255, 255, 0.95); 
+      background: rgba(255, 255, 255, 0.85); 
       backdrop-filter: blur(8px);
       padding: 6px 12px; 
       border-radius: 6px; 
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2); 
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15); 
       display: flex;
       align-items: center;
       gap: 12px;
@@ -39,48 +39,48 @@
     .progress-bar-bg { width: 60px; background: #e0e0e0; height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--success-color); transition: width 0.3s ease; }
 
-    /* CSS BONG BÓNG LỜI THOẠI POPUP (SPEECH BUBBLE) */
+    /* CSS BONG BÓNG POPUP TRONG SUỐT VÀ DỊCH SANG PHẢI */
     .leaflet-popup-content-wrapper.custom-speech-bubble {
-      background: rgba(255, 255, 255, 0.94) !important;
-      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.72) !important; /* TĂNG ĐỘ TRONG SUỐT */
+      backdrop-filter: blur(12px) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
       border-radius: 10px !important;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25) !important;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
       padding: 2px !important;
-      border: 1px solid rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.6);
     }
 
     .leaflet-popup-tip.custom-speech-bubble-tip {
-      background: rgba(255, 255, 255, 0.94) !important;
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+      background: rgba(255, 255, 255, 0.72) !important;
     }
 
     .popup-container {
-      width: 290px;
-      max-height: 380px;
+      width: 270px; /* THU HẸP KÍCH THƯỚC */
+      max-height: 320px;
       overflow-y: auto;
       padding: 6px 8px;
-      font-size: 11px;
-      line-height: 1.4;
-      color: #333;
+      font-size: 10.5px;
+      line-height: 1.35;
+      color: #222;
     }
 
     .popup-container::-webkit-scrollbar { width: 4px; }
-    .popup-container::-webkit-scrollbar-thumb { background: #bbb; border-radius: 2px; }
+    .popup-container::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 2px; }
 
     /* THẺ CARD CÁC MỤC GỢI Ý CSD TRONG POPUP */
     .sug-card {
-      background: rgba(255, 255, 255, 0.85);
-      border: 1px solid #ebedef;
+      background: rgba(255, 255, 255, 0.65);
+      border: 1px solid rgba(235, 237, 239, 0.8);
       border-left: 3px solid #bdc3c7;
-      padding: 5px 7px;
-      margin: 4px 0;
+      padding: 4px 6px;
+      margin: 3px 0;
       border-radius: 4px;
-      font-size: 10.5px;
+      font-size: 10px;
     }
 
     .sug-card.priority {
-      background: rgba(254, 253, 232, 0.95);
-      border-color: #f9e79f;
+      background: rgba(254, 253, 232, 0.85);
+      border-color: rgba(249, 231, 159, 0.8);
       border-left: 3px solid var(--accent-color);
     }
 
@@ -88,16 +88,16 @@
       display: inline-block;
       background: var(--accent-color);
       color: #fff;
-      font-size: 8.5px;
+      font-size: 8px;
       font-weight: bold;
-      padding: 1px 5px;
+      padding: 1px 4px;
       border-radius: 3px;
       margin-top: 2px;
       text-transform: uppercase;
     }
 
     .sug-card.ineligible {
-      background: rgba(250, 250, 250, 0.8);
+      background: rgba(250, 250, 250, 0.5);
       color: #7f8c8d;
       border-left: 3px solid #d5dbdb;
     }
@@ -113,7 +113,7 @@
     }
 
     .opacity-control-panel { 
-      background: #fff; 
+      background: transparent; 
       padding: 6px 0 0 0; 
       border-top: 1px dashed #e0e0e0;
       font-size: 10.5px; 
@@ -145,7 +145,8 @@
       left: 50%; 
       transform: translateX(-50%); 
       z-index: 2000; 
-      background: #fff; 
+      background: rgba(255, 255, 255, 0.96); 
+      backdrop-filter: blur(10px);
       padding: 16px; 
       border-radius: 10px; 
       width: 95%; 
@@ -166,8 +167,8 @@
     table.data-table { width: 100%; border-collapse: collapse; font-size: 10px; text-align: center; }
     table.data-table th, table.data-table td { border: 1px solid #e5e7e9; padding: 5px 3px; }
     table.data-table th { background: var(--primary-color); color: #fff; position: sticky; top: 0; z-index: 10; font-weight: 600; }
-    table.data-table tbody tr:nth-child(even) { background-color: #fcfcfc; }
-    table.data-table tbody tr:hover { background-color: #f2f4f4; }
+    table.data-table tbody tr:nth-child(even) { background-color: rgba(252, 252, 252, 0.6); }
+    table.data-table tbody tr:hover { background-color: rgba(242, 244, 244, 0.9); }
   </style>
 </head>
 <body>
@@ -243,7 +244,6 @@
     let tilePopLayer = null;
     let tileHeatmapLayer = null;
     let chartInstance = null;
-    let activePopup = null;
 
     const layers = {
       pop: L.layerGroup(),
@@ -349,26 +349,25 @@
       });
     }
 
-    // TRA CỨU BẰNG BONG BÓNG POPUP (SPEECH BUBBLE)
+    // CẤU HÌNH POPUP DỊCH SANG PHẢI VÀ TĂNG ĐỘ TRONG SUỐT
     function onPointClick(p, marker) {
       let contentHtml = `<div class="popup-container">`;
-      contentHtml += `<b style="font-size:12px; color:var(--primary-color);">🏢 ${p.name}</b><br>`;
+      contentHtml += `<b style="font-size:11.5px; color:var(--primary-color);">🏢 ${p.name}</b><br>`;
       contentHtml += `• Địa bàn: <b>Phường/Xã ${p.ward}</b><br>`;
       contentHtml += `• Diện tích: <b>${p.size.toLocaleString()} m²</b><br>`;
 
       if (p.type !== "9-CSD") {
-        contentHtml += `<div id="servedPopText" style="color:#8e44ad; font-weight:bold; margin-top:5px;">• Dân số phục vụ liên phường: ⏳ Đang tính...</div>`;
+        contentHtml += `<div id="servedPopText" style="color:#8e44ad; font-weight:bold; margin-top:4px;">• Dân số phục vụ: ⏳ Đang tính...</div>`;
         contentHtml += `</div>`;
 
         const popup = L.popup({
-          className: 'custom-speech-bubble-wrapper',
           closeButton: true,
-          offset: [0, -5]
+          offset: [160, -20], // LỆCH SANG PHẢI ĐỂ KHÔNG CHE ĐIỂM HẠ TẦNG VÀ BÁN KÍNH
+          autoPanPaddingTopLeft: [50, 320]
         }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
 
         popup.openOn(map);
 
-        // Đổi class để áp dụng style bong bóng
         setTimeout(() => {
           const popupEl = document.querySelector('.leaflet-popup-content-wrapper');
           if (popupEl) popupEl.classList.add('custom-speech-bubble');
@@ -381,17 +380,17 @@
           .then(res => {
             const popVal = res.servedPop || 0;
             const popEl = document.getElementById('servedPopText');
-            if (popEl) popEl.innerHTML = `• Dân số phục vụ liên phường: ~<b>${popVal.toLocaleString()} người</b>`;
+            if (popEl) popEl.innerHTML = `• Dân số phục vụ: ~<b>${popVal.toLocaleString()} người</b>`;
           });
       } else {
-        contentHtml += `<div style="color:var(--accent-color); font-weight:bold; margin-top:6px; margin-bottom:2px;">💡 GỢI Ý CHUYỂN ĐỔI CHUẨN GEE:</div>`;
-        contentHtml += `<div id="csdSug"><i>⏳ Đang tính toán không gian phục vụ...</i></div>`;
+        contentHtml += `<div style="color:var(--accent-color); font-weight:bold; margin-top:5px; margin-bottom:2px;">💡 GỢI Ý CHUYỂN ĐỔI CHUẨN GEE:</div>`;
+        contentHtml += `<div id="csdSug"><i>⏳ Đang tính toán...</i></div>`;
         contentHtml += `</div>`;
 
         const popup = L.popup({
-          className: 'custom-speech-bubble-wrapper',
           closeButton: true,
-          offset: [0, -5]
+          offset: [160, -20], // LỆCH SANG PHẢI
+          autoPanPaddingTopLeft: [50, 320]
         }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
 
         popup.openOn(map);
@@ -418,7 +417,7 @@
                 </div>`;
               } else {
                 sugHtml += `<div class="sug-card">
-                  ✓ <b>${s.label}</b> (Đã đạt chỉ tiêu | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng)
+                  ✓ <b>${s.label}</b> (Đã đạt | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng)
                 </div>`;
               }
             });
