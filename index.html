@@ -24,19 +24,45 @@
     
     #map.inspect-mode { cursor: help !important; }
 
-    /* STYLING DÙNG DHO ICON ĐIỂM HẠ TẦNG TỐI ƯU HIỆU NĂNG */
+    /* ICON HẠ TẦNG ĐÃ ĐƯỢC PHÊ DUYỆT (TRUE) */
     .custom-infra-icon {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.92);
       border: 1.5px solid #2c3e50;
       border-radius: 50%;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
       font-size: 13px;
-      transition: transform 0.1s ease;
+      transition: transform 0.15s ease;
     }
-    .custom-infra-icon:hover { transform: scale(1.25); z-index: 1000 !important; }
+    .custom-infra-icon:hover { transform: scale(1.3); z-index: 1000 !important; }
+
+    /* ICON HẠ TẦNG CHỜ DUYỆT (FALSE) - VIỀN ĐỎ NÉT ĐỨT & HIỆU ỨNG CẢNH BÁO */
+    .custom-infra-icon.pending-border {
+      border: 2px dashed #e74c3c !important;
+      background: rgba(253, 237, 236, 0.95) !important;
+      box-shadow: 0 0 8px rgba(231, 76, 60, 0.8) !important;
+      animation: alertPulse 2s infinite ease-in-out;
+    }
+
+    @keyframes alertPulse {
+      0% { box-shadow: 0 0 4px rgba(231, 76, 60, 0.6); }
+      50% { box-shadow: 0 0 10px rgba(231, 76, 60, 1); }
+      100% { box-shadow: 0 0 4px rgba(231, 76, 60, 0.6); }
+    }
+
+    .badge-pending {
+      display: inline-block;
+      background: #e74c3c;
+      color: #fff;
+      font-size: 8px;
+      font-weight: bold;
+      padding: 1px 4px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      margin-left: 4px;
+    }
 
     .panel-left-compact { 
       position: absolute; 
@@ -435,7 +461,10 @@
       <div class="legend-row"><span class="legend-icon-box">🛒</span>8. Chợ, Trung tâm thương mại</div>
       
       <div class="legend-row"><span class="legend-icon-box">🏗️</span><b style="color:#d35400;">9. Quỹ đất tiềm năng (Chưa sử dụng)</b></div>
-      <div class="legend-row"><span class="legend-icon-box">🔺</span><b style="color:#c0392b;">Đề xuất mới (Chờ duyệt)</b></div>
+      <div class="legend-row">
+        <div style="width:16px; height:16px; border:2px dashed #e74c3c; background:rgba(253,237,236,0.95); border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:10px; margin-right:8px;">🏫</div>
+        <b style="color:#c0392b;">Chưa chấp thuận (Chờ duyệt)</b>
+      </div>
 
       <div style="height:1px; background:#bdc3c7; margin:6px 0 4px 0;"></div>
 
@@ -529,7 +558,6 @@
       "8-TM": "🛒 Chợ, Trung tâm thương mại"
     };
 
-    // BẢNG BẢO TRÌ ICON VÀ MÀU SẮC DỌC THEO QUY CHUẨN GIS
     const infraIcons = {
       "1-CV": { symbol: "🌳", border: "#2ecc71" },
       "2-BDX": { symbol: "🅿️", border: "#8e44ad" },
@@ -768,13 +796,16 @@
         msg.style.color = "#27ae60";
         msg.innerText = "✓ Đã lưu đề xuất! Đang ghi nhận...";
         
-        const newMarker = L.polygon([
-          [Number(lat) + 0.00045, Number(lng)],
-          [Number(lat) - 0.0003, Number(lng) - 0.0003],
-          [Number(lat) - 0.0003, Number(lng) + 0.0003]
-        ], { color: '#e74c3c', fillColor: '#e74c3c', fillOpacity: 0.9 });
-        
-        newMarker.bindPopup(`<b>📌 Đề xuất mới (Chờ duyệt)</b><br>• Tên: ${name}<br>• Địa bàn: Phường/Xã ${ward}<br>• Diện tích: ${Number(size).toLocaleString()} m²`);
+        const cfg = infraIcons[type] || { symbol: "🏢", border: "#e74c3c" };
+        const pendingDivIcon = L.divIcon({
+          className: 'custom-infra-icon pending-border',
+          html: `<div>${cfg.symbol}</div>`,
+          iconSize: [22, 22],
+          iconAnchor: [11, 11]
+        });
+
+        const newMarker = L.marker([p.lat, p.lng], { icon: pendingDivIcon });
+        newMarker.bindPopup(`<b>📌 Đề xuất mới <span class="badge-pending">Chờ duyệt</span></b><br>• Tên: ${name}<br>• Địa bàn: Phường/Xã ${ward}<br>• Diện tích: ${Number(size).toLocaleString()} m²`);
         layers.pending.addLayer(newMarker);
 
         setTimeout(() => { toggleAddCard(); }, 1500);
@@ -833,7 +864,7 @@
       }
     }
 
-    // THAY THẾ CHẤM TRÒN BẰNG ICON TƯỢNG HÌNH KHÔNG GÂY LAG
+    // TỐI ƯU CÁC ĐIỂM CHỜ DUYỆT (STATUS = FALSE) VẪN GIỮ ICON ĐÚNG LOẠI HẠ TẦNG KÈM VIỀN ĐỎ CẢNH BÁO
     function renderGroupedPoints() {
       const mapGroups = {
         "1-CV": layers.c1, "2-BDX": layers.c2, "3-MN": layers.c3,
@@ -843,21 +874,23 @@
 
       rawDataList.forEach(p => {
         const isApproved = (p.status === true || p.status === 'true');
-        
-        if (!isApproved) {
-          const triangleMarker = L.polygon([
-            [p.lat + 0.00045, p.lng],
-            [p.lat - 0.0003, p.lng - 0.0003],
-            [p.lat - 0.0003, p.lng + 0.0003]
-          ], { color: '#e74c3c', fillColor: '#e74c3c', fillOpacity: 0.9 });
+        const cfg = infraIcons[p.type] || { symbol: "🏢", border: "#2c3e50" };
 
-          triangleMarker.bindPopup(`<b>📌 Đề xuất mới (Chờ duyệt)</b><br>• Tên: ${p.name}<br>• Địa bàn: Phường/Xã ${p.ward}<br>• Diện tích: ${p.size.toLocaleString()} m²`);
-          layers.pending.addLayer(triangleMarker);
+        if (!isApproved) {
+          // HIỂN THỊ ĐÚNG ICON LOẠI HẠ TẦNG ĐÓ NHƯNG GẮN VIỀN ĐỎ NẾT ĐỨT CẢNH BÁO
+          const pendingDivIcon = L.divIcon({
+            className: 'custom-infra-icon pending-border',
+            html: `<div>${cfg.symbol}</div>`,
+            iconSize: [22, 22],
+            iconAnchor: [11, 11]
+          });
+
+          const pendingMarker = L.marker([p.lat, p.lng], { icon: pendingDivIcon });
+          pendingMarker.bindPopup(`<b>📌 Đề xuất mới <span class="badge-pending">Chờ duyệt</span></b><br>• Tên: ${p.name}<br>• Loại: ${infraLabels[p.type] || p.type}<br>• Địa bàn: Phường/Xã ${p.ward}<br>• Diện tích: ${p.size.toLocaleString()} m²`);
+          layers.pending.addLayer(pendingMarker);
         } else {
           const targetGroup = mapGroups[p.type] || layers.c9;
-          const cfg = infraIcons[p.type] || { symbol: "🏢", border: "#2c3e50" };
 
-          // TẠO DIV ICON SIÊU NHẸ (KHÔNG CALL HTTP REQUEST GIÚP MƯỢT MÀ)
           const customDivIcon = L.divIcon({
             className: 'custom-infra-icon',
             html: `<div style="border-color:${cfg.border}">${cfg.symbol}</div>`,
