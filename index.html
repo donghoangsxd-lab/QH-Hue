@@ -11,15 +11,26 @@
   <style>
     body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
     #map { width: 100%; height: 100vh; }
+    
     .panel-left { position: absolute; top: 15px; left: 15px; z-index: 1000; background: rgba(255, 255, 255, 0.98); padding: 12px; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.25); width: 330px; font-size: 11px; }
     .progress-box { margin-top: 8px; padding: 8px; background: #f8f9fa; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 10px; }
     .progress-bar-bg { width: 100%; background: #e0e0e0; height: 8px; border-radius: 4px; overflow: hidden; margin: 4px 0; }
     .progress-bar-fill { width: 0%; height: 100%; background: #27ae60; transition: width 0.3s ease; }
+    
+    .opacity-control-panel { background: #fff; padding: 8px; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.2); font-size: 11px; margin-top: 5px; }
+    .opacity-slider { width: 100%; margin: 3px 0 6px 0; }
+
     .panel-bottom-right { position: absolute; bottom: 15px; right: 15px; z-index: 1000; display: flex; gap: 6px; }
     .btn { background: #fff; border: 1px solid #bdc3c7; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; }
-    .modal-panel { display: none; position: absolute; top: 50px; left: 50%; transform: translateX(-50%); z-index: 2000; background: #fff; padding: 15px; border-radius: 8px; width: 90%; max-width: 950px; max-height: 80vh; overflow-y: auto; }
+    .modal-panel { display: none; position: absolute; top: 30px; left: 50%; transform: translateX(-50%); z-index: 2000; background: #fff; padding: 15px; border-radius: 8px; width: 96%; max-width: 1250px; max-height: 88vh; overflow-y: auto; }
     .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; }
-    .close-btn { cursor: pointer; font-weight: bold; }
+    .close-btn { cursor: pointer; font-weight: bold; font-size: 14px; }
+    
+    table.data-table { width: 100%; border-collapse: collapse; font-size: 10px; text-align: center; }
+    table.data-table th, table.data-table td { border: 1px solid #ddd; padding: 4px 2px; }
+    table.data-table th { background: #2c3e50; color: #fff; position: sticky; top: 0; }
+    .sug-item { margin: 3px 0; padding: 4px; border-radius: 3px; font-size: 10px; }
+    .priority-item { background: #fef9e7; color: #d35400; font-weight: bold; border: 1px solid #f9e79f; }
   </style>
 </head>
 <body>
@@ -29,7 +40,6 @@
   <div class="panel-left">
     <b style="font-size:13px; color:#2c3e50;">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
     <hr style="margin:6px 0; border:0; border-top:1px solid #ddd;">
-    
     <div class="progress-box">
       <div style="display:flex; justify-content:space-between; font-weight:bold;">
         <span>⏳ TIẾN TRÌNH TẢI TỪ GEE:</span>
@@ -45,17 +55,43 @@
     <button class="btn" onclick="openChartModal()">📈 Biểu đồ Điểm HT</button>
   </div>
 
+  <!-- MODAL BẢNG THỐNG KÊ CẤU TRÚC TÁCH CỘT ĐỘ PHỦ & QUY MÔ -->
   <div class="modal-panel" id="statModal">
     <div class="modal-header">
-      <b style="font-size:13px; color:#2c3e50;">📊 ĐÁNH GIÁ PHỦ HẠ TẦNG 40 PHƯỜNG XÃ TP. HUẾ</b>
+      <b style="font-size:13px; color:#2c3e50;">📊 BẢNG ĐÁNH GIÁ MẬT ĐỘ PHỦ HẠ TẦNG VÀ TỶ LỆ CUNG CẤP DÂN SỐ (40 PHƯỜNG XÃ)</b>
       <div>
         <span id="modalProgressText" style="font-size:11px; font-weight:bold; color:#e67e22; margin-right:15px;">🔄 Đang xử lý...</span>
         <span class="close-btn" onclick="closeModal('statModal')">X</span>
       </div>
     </div>
-    <div style="overflow-x:auto; margin-top: 10px;">
-      <table style="width:100%; border-collapse:collapse; font-size:11px;" border="1">
-        <thead><tr style="background:#2c3e50; color:#fff;"><th>STT</th><th>Phường/Xã</th><th>Dân số (người)</th><th>Điểm Tiếp Cận HT (%)</th></tr></thead>
+    <div style="overflow-x:auto; margin-top: 10px; max-height:70vh;">
+      <table class="data-table">
+        <thead>
+          <tr style="background:#1a252f;">
+            <th rowspan="2">STT</th>
+            <th rowspan="2">Tên Phường/Xã</th>
+            <th rowspan="2">Dân số</th>
+            <th colspan="2">1. Công viên</th>
+            <th colspan="2">2. Bãi đỗ xe</th>
+            <th colspan="2">3. Mầm non</th>
+            <th colspan="2">4. Tiểu học</th>
+            <th colspan="2">5. THCS</th>
+            <th colspan="2">6. Y tế</th>
+            <th colspan="2">7. Văn hóa</th>
+            <th>8. Thương mại</th>
+            <th rowspan="2">Tổng Điểm (%)</th>
+          </tr>
+          <tr style="background:#2c3e50;">
+            <th>Phủ</th><th>Q.Mô</th>
+            <th>Phủ</th><th>Q.Mô</th>
+            <th>Phủ</th><th>Q.Mô</th>
+            <th>Phủ</th><th>Q.Mô</th>
+            <th>Phủ</th><th>Q.Mô</th>
+            <th>Phủ</th><th>Q.Mô</th>
+            <th>Phủ</th><th>Q.Mô</th>
+            <th>Phủ</th>
+          </tr>
+        </thead>
         <tbody id="statTableBody"></tbody>
       </table>
     </div>
@@ -63,10 +99,10 @@
 
   <div class="modal-panel" id="chartModal">
     <div class="modal-header">
-      <b>📈 BIỂU ĐỒ ĐIỂM HẠ TẦNG 40 PHƯỜNG XÃ</b>
+      <b>📈 BIỂU ĐỒ TỶ LỆ TỔNG HỢP TIẾP CẬN HẠ TẦNG 40 PHƯỜNG XÃ</b>
       <span class="close-btn" onclick="closeModal('chartModal')">X</span>
     </div>
-    <div style="height:350px; margin-top:10px;"><canvas id="infraChart"></canvas></div>
+    <div style="height:380px; margin-top:10px;"><canvas id="infraChart"></canvas></div>
   </div>
 
   <script>
@@ -75,65 +111,78 @@
     const map = L.map('map').setView([16.4637, 107.5905], 13);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
 
-    // DỰNG CÁC LAYER GROUP TÁCH BIỆT TỪ 00 ĐẾN 09
+    let tilePopLayer = null;
+    let tileHeatmapLayer = null;
+
     const layers = {
       pop: L.layerGroup(),
       boundary: L.layerGroup().addTo(map),
       heatmap: L.layerGroup().addTo(map),
-      c1: L.layerGroup().addTo(map),
-      c2: L.layerGroup().addTo(map),
-      c3: L.layerGroup().addTo(map),
-      c4: L.layerGroup().addTo(map),
-      c5: L.layerGroup().addTo(map),
-      c6: L.layerGroup().addTo(map),
-      c7: L.layerGroup().addTo(map),
-      c8: L.layerGroup().addTo(map),
+      c1: L.layerGroup().addTo(map), c2: L.layerGroup().addTo(map),
+      c3: L.layerGroup().addTo(map), c4: L.layerGroup().addTo(map),
+      c5: L.layerGroup().addTo(map), c6: L.layerGroup().addTo(map),
+      c7: L.layerGroup().addTo(map), c8: L.layerGroup().addTo(map),
       c9: L.layerGroup().addTo(map)
     };
 
-    // QUẢN LÝ DROPLIST BẬT TẮT NHAU THEO THỨ TỰ CHUẨN GEE
-    L.control.layers(null, {
+    // TÊN DẠNG DROPLIST RỌN GÀNG KHÔNG CHỨA DẤU NGOẶC ĐƠN
+    const layerControl = L.control.layers(null, {
       "0. Raster Dân số Chuẩn hóa": layers.pop,
       "🗺️ Ranh giới 40 Phường Xã": layers.boundary,
-      "🔥 Heatmap Ma trận (GEE)": layers.heatmap,
-      "1. Công viên, điểm xanh (1-CV)": layers.c1,
-      "2. Bãi đỗ xe (2-BDX)": layers.c2,
-      "3. Mầm non (3-MN)": layers.c3,
-      "4. Tiểu học (4-TH)": layers.c4,
-      "5. THCS (5-THCS)": layers.c5,
-      "6. Cơ sở Y tế (6-YT)": layers.c6,
-      "7. Nhà văn hóa (7-VH)": layers.c7,
-      "8. Thương mại (8-TM)": layers.c8,
-      "9. Quỹ đất tiềm năng (9-CSD)": layers.c9
+      "🔥 Heatmap Ma trận": layers.heatmap,
+      "1. Công viên, điểm xanh": layers.c1,
+      "2. Bãi đỗ xe, trạm sạc": layers.c2,
+      "3. Trường Mầm non": layers.c3,
+      "4. Trường Tiểu học": layers.c4,
+      "5. Trường THCS": layers.c5,
+      "6. Cơ sở Y tế": layers.c6,
+      "7. Nhà văn hóa, thể thao": layers.c7,
+      "8. Chợ, Trung tâm thương mại": layers.c8,
+      "9. Quỹ đất tiềm năng": layers.c9
     }, { collapsed: true, position: 'topright' }).addTo(map);
+
+    // THÊM THANH KÉO OPACITY VÀO PANEL LAYER CONTROL
+    const sliderContainer = L.DomUtil.create('div', 'opacity-control-panel');
+    sliderContainer.innerHTML = `
+      <b>🎚️ Độ trong suốt Layer Raster:</b><br>
+      👥 Dân số: <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60"><br>
+      🔥 Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="65">
+    `;
+    document.querySelector('.leaflet-control-layers').appendChild(sliderContainer);
+
+    document.getElementById('popOpacity').addEventListener('input', (e) => {
+      if (tilePopLayer) tilePopLayer.setOpacity(e.target.value / 100);
+    });
+    document.getElementById('heatOpacity').addEventListener('input', (e) => {
+      if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(e.target.value / 100);
+    });
 
     let rawDataList = [], wardStatsData = [];
 
-    async function fetchWithRetry(url) {
-      const res = await fetch(url);
-      return await res.json();
-    }
-
     async function loadDataParallel() {
-      // 1. Raster Dân Số Chuẩn Hóa
-      fetchWithRetry(`${geeApiBackend}?action=getPopRasterTile`).then(d => {
-        if (d.urlFormat) L.tileLayer(d.urlFormat, { opacity: 0.6 }).addTo(layers.pop);
+      fetch(`${geeApiBackend}?action=getPopRasterTile`).then(r => r.json()).then(d => {
+        if (d.urlFormat) {
+          tilePopLayer = L.tileLayer(d.urlFormat, { opacity: 0.6 });
+          tilePopLayer.addTo(layers.pop);
+        }
       });
 
-      // 2. Ranh giới Vector
-      fetchWithRetry(`${geeApiBackend}?action=getBoundaryTile`).then(d => {
+      fetch(`${geeApiBackend}?action=getBoundaryTile`).then(r => r.json()).then(d => {
         if (d.urlFormat) L.tileLayer(d.urlFormat, { opacity: 0.9 }).addTo(layers.boundary);
       });
 
-      // 3. Heatmap
-      fetchWithRetry(`${geeApiBackend}?action=getHeatmapTile`).then(d => {
-        if (d.urlFormat) L.tileLayer(d.urlFormat, { opacity: 0.65 }).addTo(layers.heatmap);
+      fetch(`${geeApiBackend}?action=getHeatmapTile`).then(r => r.json()).then(d => {
+        if (d.urlFormat) {
+          tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: 0.65 });
+          tileHeatmapLayer.addTo(layers.heatmap);
+        }
       });
 
-      // 4. Điểm Hạ tầng
-      fetchWithRetry(geeApiBackend).then(data => {
+      fetch(geeApiBackend).then(r => r.json()).then(data => {
         rawDataList = data.rawDataList || [];
         renderGroupedPoints();
+        document.getElementById('progressBar').style.width = "100%";
+        document.getElementById('progressPercent').innerText = "100%";
       });
     }
 
@@ -148,31 +197,80 @@
         const targetGroup = mapGroups[p.type] || layers.c9;
         const color = p.type === "9-CSD" ? "#f39c12" : "#2ecc71";
         const marker = L.circleMarker([p.lat, p.lng], { radius: 6, fillColor: color, color: "#fff", weight: 1, fillOpacity: 0.9 });
-        marker.bindPopup(`<b>${p.name}</b><br>Loại: ${p.type}<br>Diện tích: ${p.size} m²`);
+        marker.on('click', () => onPointClick(p));
         targetGroup.addLayer(marker);
       });
+    }
+
+    // TRA CỨU CHI TIẾT ĐIỂM KHI CLICK
+    function onPointClick(p) {
+      const panel = document.getElementById('panelContent');
+      let html = `<b>🏢 ${p.name}</b><br>`;
+      html += `• Địa bàn: Phường/Xã ${p.ward}<br>`;
+      html += `• Diện tích: <b>${p.size.toLocaleString()} m²</b><br>`;
+
+      if (p.type !== "9-CSD") {
+        html += `<div style="color:#8e44ad; font-weight:bold; margin-top:4px;">• Dân số phục vụ liên phường: ⏳ Đang tính toán GEE...</div>`;
+        panel.innerHTML = html;
+
+        fetch(`${geeApiBackend}?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${p.radius}`)
+          .then(r => r.json())
+          .then(res => {
+            const popVal = res.servedPop || 0;
+            html = html.replace("⏳ Đang tính toán GEE...", `~<b>${popVal.toLocaleString()} người</b>`);
+            panel.innerHTML = html;
+          });
+      } else {
+        html += `<div style="color:#d35400; font-weight:bold; margin-top:5px;">💡 GỢI Ý CHUYỂN ĐỔI CHUẨN GEE:</div>`;
+        html += `<div id="csdSug"><i>⏳ Đang tính toán không gian phục vụ...</i></div>`;
+        panel.innerHTML = html;
+
+        fetch(`${geeApiBackend}?action=analyzeCSD&lat=${p.lat}&lng=${p.lng}&size=${p.size}`)
+          .then(r => r.json())
+          .then(res => {
+            let sugHtml = "";
+            (res.suggestions || []).forEach(s => {
+              const priority = s.isTopPriority ? " ⭐ [ƯU TIÊN HÀNG ĐẦU]" : "";
+              const cls = s.isTopPriority ? "sug-item priority-item" : "sug-item";
+              sugHtml += `<div class="${cls}">👉 ${s.label} -> Phục vụ thêm: ~${s.popGained.toLocaleString()} người${priority}</div>`;
+            });
+            (res.ineligible || []).forEach(inEl => {
+              sugHtml += `<div class="sug-item" style="color:#7f8c8d;">❌ ${inEl.label} (Không đủ DT min: ${inEl.minSize}m²)</div>`;
+            });
+            document.getElementById('csdSug').innerHTML = sugHtml || "✓ Vị trí đã phủ đủ hạ tầng.";
+          });
+      }
     }
 
     function openStatModal() {
       document.getElementById('statModal').style.display = 'block';
       const tbody = document.getElementById('statTableBody');
       const statusText = document.getElementById('modalProgressText');
-      tbody.innerHTML = "<tr><td colspan='4' style='text-align:center;'>🔄 Đang tính toán ma trận GEE sống...</td></tr>";
+      tbody.innerHTML = "<tr><td colspan='19' style='text-align:center;'>🔄 Đang tính toán ma trận sống từ GEE...</td></tr>";
 
-      fetchWithRetry(`${geeApiBackend}?action=getWardStats`).then(resData => {
+      fetch(`${geeApiBackend}?action=getWardStats`).then(r => r.json()).then(resData => {
         statusText.style.color = "#27ae60";
         statusText.innerText = "✓ Hoàn tất (100%)";
         tbody.innerHTML = "";
         wardStatsData = resData.data || [];
 
+        const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH"];
+
         wardStatsData.forEach((w, idx) => {
-          tbody.innerHTML += `
-            <tr>
-              <td style="text-align:center;">${idx+1}</td>
-              <td style="font-weight:bold; color:#2980b9;">${w.Ten_Phuong}</td>
-              <td style="text-align:right;">${Number(w.Dan_So_Vector).toLocaleString()}</td>
-              <td style="text-align:center; font-weight:bold; color:#d35400;">${Number(w.Total_Infra_Score || 0).toFixed(1)}%</td>
-            </tr>`;
+          let row = `<tr>
+            <td>${idx + 1}</td>
+            <td style="font-weight:bold; color:#2980b9; text-align:left;">${w.Ten_Phuong}</td>
+            <td style="font-weight:bold; color:#188038; text-align:right;">${Number(w.Dan_So_Vector).toLocaleString()}</td>`;
+
+          codes.forEach(c => {
+            const cov = Number(w[`Ratio_${c}`] || 0).toFixed(1);
+            const scale = Number(w[`Scale_${c}`] || 0).toFixed(1);
+            row += `<td style="color:#27ae60;">${cov}%</td><td style="color:#d35400; font-weight:bold;">${scale}%</td>`;
+          });
+
+          row += `<td style="color:#27ae60;">${Number(w["Ratio_8-TM"] || 0).toFixed(1)}%</td>`;
+          row += `<td style="font-weight:bold; color:#d35400;">${Number(w.Total_Infra_Score || 0).toFixed(1)}%</td></tr>`;
+          tbody.innerHTML += row;
         });
       });
     }
