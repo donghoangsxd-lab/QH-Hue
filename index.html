@@ -10,9 +10,9 @@
 
   <style>
     :root {
-      --bg-dark: rgba(15, 23, 42, 0.92);
+      --bg-dark: rgba(15, 23, 42, 0.88);
       --bg-card: rgba(30, 41, 59, 0.96);
-      --border-color: rgba(255, 255, 255, 0.18);
+      --border-color: rgba(255, 255, 255, 0.15);
       --accent-cyan: #38bdf8;
       --accent-green: #4ade80;
       --accent-orange: #fb923c;
@@ -20,7 +20,7 @@
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --panel-blur: blur(16px);
-      --panel-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+      --panel-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
     }
 
     body, html { 
@@ -32,10 +32,10 @@
     #map { width: 100%; height: 100vh; background: #0f172a; }
     #map.inspect-mode { cursor: crosshair !important; }
 
-    /* ẨN NÚT ZOOM MẶC ĐỊNH CỦA LEAFLET ĐỂ DÙNG THANH NÚT MỚI */
+    /* ẨN NÚT ZOOM MẶC ĐỊNH CỦA LEAFLET */
     .leaflet-control-zoom { display: none !important; }
 
-    /* FORMAT DÙNG CHUNG CHO TẤT CẢ PANEL / TOOLBAR */
+    /* FORMAT NỀN KÍNH MỜ CHO CÁC THANH CÔNG CỤ MOBILE */
     .ui-panel-format {
       background: var(--bg-dark);
       backdrop-filter: var(--panel-blur);
@@ -46,63 +46,65 @@
       box-sizing: border-box;
     }
 
-    /* FORMAT DÙNG CHUNG CHO NÚT BẤM */
+    /* FORMAT NÚT BẤM CẢI TIẾN: BỎ VIỀN ĐEN, PHỦ NỀN TRONG SUỐT */
     .ui-btn-format {
-      background: rgba(255, 255, 255, 0.05);
+      background: transparent;
       color: var(--text-main);
-      border: 1px solid var(--border-color);
+      border: none;
       border-radius: 8px;
-      padding: 8px 4px;
-      font-size: 11px;
+      padding: 8px 2px;
+      font-size: 10.5px;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 4px;
+      gap: 3px;
       transition: all 0.2s ease;
       white-space: nowrap;
     }
-    .ui-btn-format:hover, .ui-btn-format:active {
+    .ui-btn-format:active {
       background: rgba(255, 255, 255, 0.15);
-      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
     }
     .ui-btn-format.active {
       background: var(--accent-orange) !important;
       color: #fff !important;
-      border-color: var(--accent-orange) !important;
+      border-radius: 6px;
       box-shadow: 0 0 10px var(--accent-orange);
     }
 
-    /* HÀNG 1: QUY CHUẨN TOPBAR TRÊN CÙNG TRÀN VỪA KHÍT MÀN HÌNH */
+    /* HÀNG 1: TOPBAR TRÊN CÙNG TRÀN VỪA KHÍT MÀN HÌNH */
     .topbar-row {
       position: absolute; top: 12px; left: 12px; right: 12px; z-index: 1000;
       display: flex; gap: 8px; align-items: center;
     }
     .topbar-header {
-      flex: 1; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; font-size: 11px;
+      flex: 1; padding: 8px 12px; display: flex; align-items: center; gap: 8px; font-size: 11px;
     }
-    .progress-bar-bg { width: 45px; background: rgba(255,255,255,0.1); height: 5px; border-radius: 3px; overflow: hidden; }
+    .progress-bar-bg { 
+      flex: 1; background: rgba(255, 255, 255, 0.12); height: 5px; border-radius: 3px; overflow: hidden; 
+    }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
 
     /* HÀNG 2: THANH NÚT CÔNG CỤ (ZOOM, ĐO ĐẠC) NẰM NGAY DƯỚI HÀNG 1 */
     .toolbar-row {
       position: absolute; top: 58px; left: 12px; right: 12px; z-index: 1000;
-      padding: 6px; display: flex; gap: 6px; align-items: center;
+      padding: 4px; display: flex; align-items: center;
     }
     .toolbar-row .ui-btn-format { flex: 1; }
 
     /* HÀNG 3: THANH DOCKBAR 3 NÚT SÁT MÉP DƯỚI MÀN HÌNH */
     .dockbar-bottom-row {
       position: absolute; bottom: 12px; left: 12px; right: 12px; z-index: 1000;
-      padding: 6px; display: flex; gap: 6px; align-items: center;
+      padding: 4px; display: flex; align-items: center;
     }
-    .dockbar-bottom-row .ui-btn-format { flex: 1; padding: 10px 4px; font-size: 11.5px; }
+    .dockbar-bottom-row .ui-btn-format { flex: 1; padding: 10px 2px; font-size: 11px; }
 
     /* SIDEBAR DRAWER QUẢN LÝ LỚP DỮ LIỆU */
     .sidebar-panel {
-      position: absolute; top: 108px; right: 12px; z-index: 999;
-      width: 280px; font-size: 11.5px; overflow: hidden; display: none;
+      position: absolute; top: 104px; left: 12px; right: 12px; z-index: 999;
+      font-size: 11.5px; overflow: hidden; display: none;
     }
     .sidebar-panel.open { display: block; }
 
@@ -110,7 +112,7 @@
     .tab-btn { flex: 1; padding: 10px; text-align: center; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: all 0.2s ease; font-size: 11px; }
     .tab-btn.active { color: var(--accent-cyan); border-bottom: 2px solid var(--accent-cyan); background: rgba(255, 255, 255, 0.03); }
 
-    .tab-body { padding: 10px 12px; max-height: 55vh; overflow-y: auto; }
+    .tab-body { padding: 10px 12px; max-height: 50vh; overflow-y: auto; }
     .tab-body::-webkit-scrollbar { width: 4px; }
     .tab-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
 
@@ -188,10 +190,6 @@
 
     .inline-progress-bg { background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; }
     .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-cyan); transition: width 0.3s ease; }
-
-    @media (max-width: 600px) {
-      .sidebar-panel { left: 12px; right: 12px; width: auto; }
-    }
   </style>
 </head>
 <body>
@@ -201,20 +199,18 @@
   <!-- HÀNG 1: TOPBAR TRÊN CÙNG -->
   <div class="topbar-row">
     <div class="topbar-header ui-panel-format">
-      <b style="color:var(--accent-cyan);">🏛️ HẠ TẦNG HUẾ</b>
-      <div style="display:flex; align-items:center; gap:6px;">
-        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
-        <span id="progressPercent" style="color:var(--accent-green); font-weight:bold;">0%</span>
-      </div>
+      <b style="color:var(--accent-cyan); white-space:nowrap;">🏛️ BẢN ĐỒ HẠ TẦNG TP. HUẾ</b>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
+      <span id="progressPercent" style="color:var(--accent-green); font-weight:bold; white-space:nowrap;">0%</span>
     </div>
     <button class="ui-btn-format ui-panel-format" style="padding: 8px 12px;" onclick="toggleSidebar()">⚙️ LỚP BẢN ĐỒ</button>
   </div>
 
-  <!-- HÀNG 2: BỐN NÚT THAO TÁC CÔNG CỤ -->
+  <!-- HÀNG 2: BỐN NÚT THAO TÁC CÔNG CỤ (BỎ VIỀN ĐEN NÚT CON) -->
   <div class="toolbar-row ui-panel-format">
     <button class="ui-btn-format" onclick="map.zoomIn()">➕ ZOOM IN</button>
     <button class="ui-btn-format" onclick="map.zoomOut()">➖ ZOOM OUT</button>
-    <button class="ui-btn-format" id="btnMeasureDist" onclick="toggleMeasure('distance')">📏 DÀI</button>
+    <button class="ui-btn-format" id="btnMeasureDist" onclick="toggleMeasure('distance')">📏 CHIỀU DÀI</button>
     <button class="ui-btn-format" id="btnMeasureArea" onclick="toggleMeasure('area')">📐 DIỆN TÍCH</button>
   </div>
 
@@ -318,7 +314,7 @@
     </div>
   </div>
 
-  <!-- HÀNG 3: DOCKBAR DƯỚI CÙNG VỪA KHÍT MÀN HÌNH -->
+  <!-- HÀNG 3: DOCKBAR DƯỚI CÙNG VỪA KHÍT MÀN HÌNH (BỎ VIỀN ĐEN NÚT CON) -->
   <div class="dockbar-bottom-row ui-panel-format">
     <button class="ui-btn-format" id="btnInspectMode" onclick="toggleInspectMode()">🖱️ TRA CỨU ĐIỂM</button>
     <button class="ui-btn-format" onclick="toggleAddCard()">➕ ĐỀ XUẤT MỚI</button>
@@ -502,7 +498,7 @@
       const btnDist = document.getElementById('btnMeasureDist');
       const btnArea = document.getElementById('btnMeasureArea');
       btnDist.classList.remove('active');
-      btnDist.innerHTML = "📏 DÀI";
+      btnDist.innerHTML = "📏 CHIỀU DÀI";
       btnArea.classList.remove('active');
       btnArea.innerHTML = "📐 DIỆN TÍCH";
     }
