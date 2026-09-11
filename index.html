@@ -709,20 +709,21 @@
       c9: L.layerGroup().addTo(map), b9: L.layerGroup()
     };
 
+    let tileRoadsLayer = null;
+
     function toggleLayer(layerKey, isChecked) {
       if (isChecked) {
         if (layerKey === 'heatmap') {
           refreshHeatmapOnly();
         } else if (layerKey === 'roads') {
           if (!tileRoadsLayer) {
-            fetch(`${geeApiBackend}?action=getRoadsTile`)
-              .then(r => r.json())
-              .then(d => {
-                if (d.urlFormat) {
-                  tileRoadsLayer = L.tileLayer(d.urlFormat, { opacity: 0.8 });
-                  tileRoadsLayer.addTo(layers.roads);
-                }
-              });
+            // Nạp trực tiếp Tile đường giao thông OSM siêu nhanh từ CartoDB
+            tileRoadsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_lines/{z}/{x}/{y}{r}.png', {
+              maxZoom: 19,
+              opacity: 0.95,
+              subdomains: 'abcd'
+            });
+            tileRoadsLayer.addTo(layers.roads);
           }
           map.addLayer(layers.roads);
         } else {
@@ -732,12 +733,8 @@
         map.removeLayer(layers[layerKey]);
       }
 
-      if (layerKey === 'pop') {
-        document.getElementById('popBox').style.display = isChecked ? 'block' : 'none';
-      }
-      if (layerKey === 'heatmap') {
-        document.getElementById('heatBox').style.display = isChecked ? 'block' : 'none';
-      }
+      if (layerKey === 'pop') document.getElementById('popBox').style.display = isChecked ? 'block' : 'none';
+      if (layerKey === 'heatmap') document.getElementById('heatBox').style.display = isChecked ? 'block' : 'none';
     }
 
     function toggleBuffer(bufferKey, el) {
