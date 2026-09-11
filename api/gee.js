@@ -111,7 +111,7 @@ function invalidateCache() {
   lastWardStatsFetch = 0;
 }
 
-// TỐI ƯU HÀM TÍNH TOÁN MA TRẬN PHÂN TÍCH ĐỂ TRÁNH CRASH GEE SERVER
+// COST SURFACE PHẲNG ĐƯỢC CHUẨN HÓA ĐỂ TRÁNH CRASH TÍNH TOÁN CỦA GEE
 function getNetworkCostImage(region) {
   return ee.Image(1).clip(region);
 }
@@ -236,18 +236,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // NẠP TILE LỚP GIAO THÔNG TỪ GEE
-    if (action === 'getRoadsTile') {
-      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
-      const hueBounds = wardVectorParsed.geometry().bounds();
-      const roadsFC = ee.FeatureCollection("HOT/OSM/planet/roads").filterBounds(hueBounds);
-      const roadImage = ee.Image().byte().paint({ featureCollection: roadsFC, color: 1, width: 2 });
-      const mapId = await new Promise((resolve, reject) => {
-        roadImage.getMap({ palette: ['#38bdf8'] }, (m, err) => err ? reject(err) : resolve(m));
-      });
-      return res.status(200).json({ urlFormat: mapId.urlFormat });
-    }
-
     if (action === 'getHeatmapTile') {
       const overrideRadius = Number(req.query.overrideRadius) || 500;
       const hueBounds = wardVectorParsed.geometry().bounds();
@@ -265,7 +253,7 @@ module.exports = async (req, res) => {
           const sourceFC = ee.FeatureCollection(approvedPts);
           const networkDistImg = costImage.cumulativeCost({
             source: sourceFC,
-            maxDistance: overrideRadius * 2
+            maxDistance: overrideRadius * 1.3 // Hệ số uốn lượn đường bộ quy hoạch
           });
           const maskCoverage = networkDistImg.lte(overrideRadius);
           categoryLayers.push(ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection([ee.Feature(hueBounds)]), color: 1 }).updateMask(maskCoverage));
@@ -419,12 +407,12 @@ module.exports = async (req, res) => {
       if (!lat || !lng) return res.status(400).json({ error: true, message: "Thiếu tọa độ" });
 
       const clickGeom = ee.Geometry.Point([lng, lat]);
-      const searchRegion = clickGeom.buffer(userRadius * 2.5);
+      const searchRegion = clickGeom.buffer(userRadius * 2);
       const costImage = getNetworkCostImage(searchRegion);
 
       const distFromClickImg = costImage.cumulativeCost({
         source: clickGeom,
-        maxDistance: userRadius * 2.5
+        maxDistance: userRadius * 2
       });
 
       const approvedItems = rawDataList.filter(item => item.type !== "9-CSD" && item.status === true);
