@@ -43,7 +43,7 @@
       box-sizing: border-box;
     }
 
-    /* FORMAT NÚT BẤM CHUNG - BỎ VIỀN ĐEN */
+    /* FORMAT NÚT BẤM CHUNG */
     .ui-btn-format {
       background: transparent;
       color: var(--text-main);
@@ -78,7 +78,6 @@
     .tab-btn { flex: 1; padding: 10px 6px; text-align: center; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: all 0.2s ease; font-size: 11.5px; }
     .tab-btn.active { color: var(--accent-cyan); border-bottom: 2px solid var(--accent-cyan); background: rgba(255, 255, 255, 0.04); }
 
-    /* KHUNG NỘI DUNG CUỘN: TĂNG CHIỀU CAO & PADDING DƯỚI ĐỂ KHÔNG BỊ CHE KHUẤT */
     .tab-body { 
       padding: 12px 14px 40px 14px !important; 
       max-height: 72vh !important; 
@@ -88,7 +87,6 @@
     .tab-body::-webkit-scrollbar { width: 5px; }
     .tab-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
 
-    /* LỚP DỮ LIỆU ROW */
     .layer-row { 
       display: flex; 
       align-items: center; 
@@ -100,7 +98,6 @@
     .layer-row label { cursor: pointer; color: var(--text-main); }
     .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 16px; height: 16px; margin-right: 6px; }
 
-    /* CHÚ GIẢI ROW: CĂN TRÁI TOÀN BỘ, KHÔNG ÉP CĂN ĐỀU 2 BÊN */
     .legend-row { 
       display: flex; 
       align-items: center; 
@@ -188,23 +185,25 @@
        1. CẤU HÌNH GIAO DIỆN DESKTOP / LAPTOP (> 768px)
        ========================================================= */
     @media (min-width: 769px) {
-      .leaflet-control-zoom { display: block !important; }
-      .leaflet-top.leaflet-left { top: 60px !important; left: 16px !important; }
-      .leaflet-touch .leaflet-bar { border: 1px solid var(--border-color) !important; background: var(--bg-dark) !important; backdrop-filter: var(--panel-blur); }
-      .leaflet-touch .leaflet-bar a { background: transparent !important; color: var(--accent-cyan) !important; border-bottom: 1px solid var(--border-color) !important; }
+      .leaflet-control-zoom { display: none !important; }
 
+      /* Topbar nằm gọn góc trên bên trái */
       .topbar-row {
         position: absolute; top: 16px; left: 16px; z-index: 1000;
         width: 360px; display: flex; gap: 8px; align-items: center;
       }
-      .topbar-header { flex: 1; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+      .topbar-header { 
+        flex: 1; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; gap: 12px;
+      }
       .btn-toggle-layer-top { display: none; }
 
+      /* Thanh công cụ gom chung Zoom + Đo đạc thành 1 khối duy nhất đồng bộ với Topbar */
       .toolbar-row {
-        position: absolute; top: 60px; left: 60px; z-index: 1000;
-        padding: 4px 8px; display: flex; gap: 4px; align-items: center;
+        position: absolute; top: 68px; left: 16px; z-index: 1000;
+        width: 360px; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between;
       }
-      .btn-zoom-desktop { display: none; }
+      .toolbar-row .ui-btn-format { flex: 1; padding: 8px 4px; font-size: 11px; }
+      .btn-zoom-desktop { display: inline-flex !important; }
 
       .dockbar-bottom-row {
         position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;
@@ -269,13 +268,15 @@
   <div class="topbar-row">
     <div class="topbar-header ui-panel-format">
       <b style="color:var(--accent-cyan); white-space:nowrap;">🏛️ BẢN ĐỒ HẠ TẦNG TP. HUẾ</b>
-      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
-      <span id="progressPercent" style="color:var(--accent-green); font-weight:bold; white-space:nowrap;">0%</span>
+      <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:140px;">
+        <div class="progress-bar-bg" style="flex:1;"><div class="progress-bar-fill" id="progressBar"></div></div>
+        <span id="progressPercent" style="color:var(--accent-green); font-weight:bold; white-space:nowrap; font-size:11px;">0%</span>
+      </div>
     </div>
     <button class="ui-btn-format ui-panel-format btn-toggle-layer-top" style="padding: 8px 12px;" onclick="toggleSidebar()">⚙️ LỚP BẢN ĐỒ</button>
   </div>
 
-  <!-- HÀNG 2: THANH NÚT CÔNG CỤ -->
+  <!-- HÀNG 2: THANH NÚT CÔNG CỤ (ĐỒNG BỘ NẰM THẲNG DƯỚI TOPBAR) -->
   <div class="toolbar-row ui-panel-format">
     <button class="ui-btn-format btn-zoom-desktop" onclick="map.zoomIn()">➕ ZOOM IN</button>
     <button class="ui-btn-format btn-zoom-desktop" onclick="map.zoomOut()">➖ ZOOM OUT</button>
@@ -352,7 +353,7 @@
       </div>
     </div>
 
-    <!-- TAB 2: CHÚ GIẢI - ĐÃ CĂN TRÁI VÀ KHÔI PHÚC ICON Y TẾ ĐỎ -->
+    <!-- TAB 2: CHÚ GIẢI -->
     <div class="tab-body" id="tabLegend" style="display:none;">
       <div class="legend-row">🌳 1. Công viên, điểm xanh, vườn hoa</div>
       <div class="legend-row">🅿️ 2. Bãi đỗ xe, trạm sạc xe điện</div>
