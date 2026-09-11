@@ -10,50 +10,51 @@
 
   <style>
     :root {
-      --primary-color: #2c3e50;
-      --accent-color: #d35400;
-      --success-color: #27ae60;
-      --panel-bg: rgba(255, 255, 255, 0.94);
-      --panel-blur: blur(12px);
-      --panel-border: 1px solid rgba(255, 255, 255, 0.8);
-      --panel-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      --bg-dark: rgba(15, 23, 42, 0.88);
+      --bg-card: rgba(30, 41, 59, 0.94);
+      --border-color: rgba(255, 255, 255, 0.12);
+      --accent-cyan: #38bdf8;
+      --accent-green: #4ade80;
+      --accent-orange: #fb923c;
+      --accent-red: #f87171;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --panel-blur: blur(16px);
+      --panel-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
     }
 
-    body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    #map { width: 100%; height: 100vh; }
-    
-    #map.inspect-mode { cursor: help !important; }
+    body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: var(--text-main); }
+    #map { width: 100%; height: 100vh; background: #0f172a; }
+    #map.inspect-mode { cursor: crosshair !important; }
 
-    /* ICON HẠ TẦNG KÍCH THƯỚC LỚN (27px) */
+    /* ICON HẠ TẦNG HIỆN ĐẠI */
     .custom-infra-icon {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(255, 255, 255, 0.95);
-      border: 2px solid #2c3e50;
+      background: rgba(15, 23, 42, 0.9);
+      border: 2px solid var(--accent-cyan);
       border-radius: 50%;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
-      font-size: 16px;
-      transition: transform 0.15s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      font-size: 15px;
+      transition: all 0.2s ease;
     }
-    .custom-infra-icon:hover { transform: scale(1.3); z-index: 1000 !important; }
+    .custom-infra-icon:hover { transform: scale(1.3); z-index: 1000 !important; border-color: #fff; }
 
     .custom-infra-icon.pending-border {
-      border: 2px dashed #e74c3c !important;
-      background: rgba(253, 237, 236, 0.95) !important;
-      box-shadow: 0 0 10px rgba(231, 76, 60, 0.8) !important;
+      border: 2px dashed var(--accent-red) !important;
+      background: rgba(239, 68, 68, 0.2) !important;
       animation: alertPulse 2s infinite ease-in-out;
     }
 
     @keyframes alertPulse {
-      0% { box-shadow: 0 0 4px rgba(231, 76, 60, 0.6); }
-      50% { box-shadow: 0 0 12px rgba(231, 76, 60, 1); }
-      100% { box-shadow: 0 0 4px rgba(231, 76, 60, 0.6); }
+      0%, 100% { box-shadow: 0 0 6px rgba(248, 113, 113, 0.5); }
+      50% { box-shadow: 0 0 16px rgba(248, 113, 113, 0.9); }
     }
 
     .badge-pending {
       display: inline-block;
-      background: #e74c3c;
+      background: var(--accent-red);
       color: #fff;
       font-size: 8px;
       font-weight: bold;
@@ -63,409 +64,177 @@
       margin-left: 4px;
     }
 
-    .panel-left-compact { 
-      position: absolute; 
-      top: 10px; 
-      left: 55px; 
-      z-index: 1000; 
-      background: var(--panel-bg); 
-      backdrop-filter: var(--panel-blur);
-      -webkit-backdrop-filter: var(--panel-blur);
-      padding: 6px 12px; 
-      border-radius: 6px; 
-      box-shadow: var(--panel-shadow); 
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      font-size: 11px; 
-      border: var(--panel-border);
-      width: 250px;
-      box-sizing: border-box;
-      white-space: nowrap;
+    /* HEADER TIÊU ĐỀ GÓC TRÁI */
+    .panel-header-left { 
+      position: absolute; top: 16px; left: 16px; z-index: 1000; 
+      background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
+      padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border-color);
+      box-shadow: var(--panel-shadow); display: flex; align-items: center; gap: 12px; font-size: 12px;
+    }
+    .progress-bar-bg { width: 60px; background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden; }
+    .progress-bar-fill { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
+
+    /* SIDEBAR PANEL HỢP NHẤT GÓC PHẢI */
+    .sidebar-panel {
+      position: absolute; top: 16px; right: 16px; z-index: 1000;
+      background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
+      border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--panel-shadow);
+      width: 270px; font-size: 11.5px; overflow: hidden;
     }
 
-    .progress-compact { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: bold; color: var(--success-color); }
-    .progress-bar-bg { width: 50px; background: #e0e0e0; height: 5px; border-radius: 3px; overflow: hidden; }
-    .progress-bar-fill { width: 0%; height: 100%; background: var(--success-color); transition: width 0.3s ease; }
+    .tab-header { display: flex; background: rgba(0, 0, 0, 0.3); border-bottom: 1px solid var(--border-color); }
+    .tab-btn {
+      flex: 1; padding: 10px; text-align: center; font-weight: 600; cursor: pointer;
+      color: var(--text-muted); transition: all 0.2s ease; font-size: 11px;
+    }
+    .tab-btn.active { color: var(--accent-cyan); border-bottom: 2px solid var(--accent-cyan); background: rgba(255, 255, 255, 0.03); }
 
-    /* PANEL QUẢN LÝ LỚP BẢN ĐỒ TỐI ƯU CHIỀU RỘNG (250PX) */
-    .custom-layer-panel {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 1000;
-      background: var(--panel-bg);
-      backdrop-filter: var(--panel-blur);
-      -webkit-backdrop-filter: var(--panel-blur);
-      border: var(--panel-border);
-      border-radius: 8px;
-      box-shadow: var(--panel-shadow);
-      padding: 8px 10px;
-      width: 250px;
-      font-size: 11px;
-      color: #2c3e50;
-      box-sizing: border-box;
-    }
+    .tab-body { padding: 10px 12px; max-height: 75vh; overflow-y: auto; }
+    .tab-body::-webkit-scrollbar { width: 4px; }
+    .tab-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
 
-    .layer-header-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: bold;
-      color: var(--primary-color);
-      font-size: 12px;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    .btn-toggle-expand {
-      width: 18px;
-      height: 18px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      background: rgba(44, 62, 80, 0.08);
-      color: var(--primary-color);
-      font-size: 13px;
-      font-weight: bold;
-      transition: all 0.2s ease;
-      line-height: 1;
-    }
-    .btn-toggle-expand:hover {
-      background: var(--primary-color);
-      color: #fff;
-    }
-
-    .layer-content-body {
-      display: none;
-      margin-top: 8px;
-      border-top: 1px solid rgba(0,0,0,0.1);
-      padding-top: 6px;
-    }
-
-    .layer-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 5px;
-      font-size: 11px;
-      user-select: none;
-      width: 100%;
-    }
-
-    .layer-row-left {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-    }
-
-    .layer-row input[type="checkbox"] {
-      cursor: pointer;
-      accent-color: var(--primary-color);
-      margin: 0;
-    }
+    .layer-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+    .layer-row label { cursor: pointer; color: var(--text-main); }
+    .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; }
 
     .btn-dot-buffer {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 14px;
-      height: 14px;
-      min-width: 14px;
-      border-radius: 50%;
-      background: #27ae60;
-      color: #fff;
-      font-size: 8px;
-      cursor: pointer;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-      border: 1px solid #1e8449;
-      line-height: 1;
-      margin-left: 6px;
+      width: 14px; height: 14px; border-radius: 50%; background: #475569;
+      color: #fff; font-size: 8px; display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.2s ease;
+    }
+    .btn-dot-buffer.active { background: var(--accent-orange); box-shadow: 0 0 8px var(--accent-orange); }
+
+    .opacity-slider-row { margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px; }
+    .opacity-slider { width: 100%; accent-color: var(--accent-cyan); cursor: pointer; margin-top: 4px; }
+
+    /* FLOATING DOCKBAR CHÍNH GIỮA ĐÁY MÀN HÌNH */
+    .dockbar-container {
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;
+      background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
+      border: 1px solid var(--border-color); border-radius: 30px; padding: 6px 12px;
+      box-shadow: var(--panel-shadow); display: flex; gap: 8px;
     }
 
-    .btn-dot-buffer.active {
-      background: #d35400 !important;
-      border-color: #a04000 !important;
-      box-shadow: 0 0 6px rgba(211, 84, 0, 0.8) !important;
+    .btn-dock {
+      background: transparent; color: var(--text-main); border: none; padding: 8px 14px;
+      border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 11.5px;
+      display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease;
     }
+    .btn-dock:hover { background: rgba(255,255,255,0.1); color: var(--accent-cyan); }
+    .btn-dock.active { background: var(--accent-orange); color: #fff; box-shadow: 0 0 12px var(--accent-orange); }
 
-    .opacity-slider-row { 
-      margin-top: 8px; 
-      border-top: 1px dashed rgba(0,0,0,0.15);
-      padding-top: 6px;
-      width: 100%;
-      text-align: left;
-    }
-    .opacity-slider { width: 100%; margin: 3px 0 1px 0; accent-color: var(--primary-color); cursor: pointer; display: block; }
-
-    .panel-bottom-left { position: absolute; bottom: 18px; left: 18px; z-index: 1000; display: flex; gap: 8px; }
-    
+    /* FORM POPUP ĐỀ XUẤT ĐIỂM MỚI */
     .add-point-card {
-      display: none;
-      background: var(--panel-bg);
-      backdrop-filter: var(--panel-blur);
-      -webkit-backdrop-filter: var(--panel-blur);
-      border: var(--panel-border);
-      box-shadow: var(--panel-shadow);
-      border-radius: 8px;
-      padding: 10px 12px;
-      width: 275px;
-      font-size: 11px;
-      margin-bottom: 8px;
-      position: absolute;
-      bottom: 40px;
-      left: 0;
+      display: none; position: absolute; bottom: 75px; left: 50%; transform: translateX(-50%); z-index: 1001;
+      background: var(--bg-card); backdrop-filter: var(--panel-blur); border: 1px solid var(--border-color);
+      border-radius: 12px; box-shadow: var(--panel-shadow); padding: 14px; width: 290px; font-size: 11px;
     }
-
     .add-point-card input, .add-point-card select {
-      width: 100%;
-      padding: 5px 6px;
-      margin: 3px 0 6px 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 10.5px;
-      box-sizing: border-box;
+      width: 100%; padding: 6px; margin: 4px 0 8px 0; background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-color); color: #fff; border-radius: 6px; box-sizing: border-box; font-size: 11px;
     }
+    .btn-submit { width: 100%; background: var(--accent-green); color: #0f172a; border: none; padding: 8px; border-radius: 6px; font-weight: bold; cursor: pointer; }
 
-    .row-coords { display: flex; gap: 6px; }
-    .row-coords input { width: 40%; }
-    .btn-pick { 
-      width: 20%; 
-      background: #2980b9; 
-      color: #fff; 
-      border: none; 
-      border-radius: 4px; 
-      cursor: pointer; 
-      font-weight: bold; 
-      margin: 3px 0 6px 0;
-      height: 27px;
+    /* MODAL BẢNG THỐNG KÊ 40 PHƯỜNG XÃ */
+    .modal-panel {
+      display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2000;
+      background: var(--bg-card); backdrop-filter: var(--panel-blur); border: 1px solid var(--border-color);
+      border-radius: 16px; padding: 18px; width: 94%; max-width: 1320px; height: 86vh; box-shadow: var(--panel-shadow);
     }
-
-    .btn-submit {
-      width: 100%;
-      background: var(--success-color);
-      color: #fff;
-      border: none;
-      padding: 6px 0;
-      border-radius: 4px;
-      font-weight: bold;
-      cursor: pointer;
-      margin-top: 4px;
-    }
-
-    .panel-bottom-right { position: absolute; bottom: 18px; right: 18px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+    .table-container { height: calc(75% - 35px); overflow-y: auto; margin-top: 10px; border: 1px solid var(--border-color); border-radius: 8px; }
     
-    .btn-main { 
-      background: var(--primary-color); 
-      color: #fff; 
-      border: none; 
-      padding: 8px 14px; 
-      border-radius: 6px; 
-      cursor: pointer; 
-      font-weight: bold; 
-      font-size: 11px; 
-      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-      transition: all 0.2s ease;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .btn-inspect-active {
-      background: var(--accent-color) !important;
-      box-shadow: 0 0 10px rgba(211, 84, 0, 0.8) !important;
-      animation: pulse 1.5s infinite;
-    }
-
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.03); }
-      100% { transform: scale(1); }
-    }
-
-    .legend-panel {
-      display: none;
-      background: var(--panel-bg);
-      backdrop-filter: var(--panel-blur);
-      -webkit-backdrop-filter: var(--panel-blur);
-      border: var(--panel-border);
-      box-shadow: var(--panel-shadow);
-      border-radius: 8px;
-      padding: 10px 12px;
-      width: 260px;
-      font-size: 10.5px;
-      color: #2c3e50;
-    }
-
-    .legend-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: bold;
-      font-size: 11px;
-      border-bottom: 1px solid rgba(0,0,0,0.12);
-      padding-bottom: 4px;
-      margin-bottom: 6px;
-    }
-
-    .legend-row { display: flex; align-items: center; margin-bottom: 4px; }
-    .legend-icon-box { font-size: 15px; margin-right: 8px; width: 18px; text-align: center; }
+    table.data-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 10px; text-align: center; color: var(--text-main); }
+    table.data-table th, table.data-table td { border-right: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); padding: 5px 3px; }
+    table.data-table th:first-child, table.data-table td:first-child { border-left: 1px solid var(--border-color); }
     
-    .heat-scale-title { font-weight: bold; font-size: 10.5px; color: #1a252f; margin: 8px 0 4px 0; }
-    .heat-palette-row { display: flex; width: 100%; border-radius: 3px; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); }
-    .heat-color-box { flex: 1; height: 18px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9px; font-weight: bold; }
+    table.data-table thead tr:nth-child(1) th { position: sticky; top: 0; z-index: 12; background: #0f172a; color: #fff; }
+    table.data-table thead tr:nth-child(2) th { position: sticky; top: 22px; z-index: 11; background: rgba(30, 41, 59, 0.95); color: var(--accent-cyan); }
 
-    .modal-panel { 
-      display: none; 
-      position: absolute; 
-      top: 20px; 
-      left: 50%; 
-      transform: translateX(-50%); 
-      z-index: 2000; 
-      background: rgba(255, 255, 255, 0.95); 
-      backdrop-filter: blur(12px);
-      padding: 16px; 
-      border-radius: 10px; 
-      width: 95%; 
-      max-width: 1320px; 
-      height: 86vh; 
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-    }
-    
-    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); padding-bottom: 8px; }
-    .close-btn { cursor: pointer; font-weight: bold; font-size: 18px; color: #c0392b; line-height: 1; }
-    
-    .table-container { height: calc(75% - 35px); overflow-y: auto; margin-top: 10px; border: 1px solid #e0e0e0; border-radius: 4px; }
-    .table-container::-webkit-scrollbar { width: 6px; height: 6px; }
-    .table-container::-webkit-scrollbar-thumb { background: #bbb; border-radius: 3px; }
+    table.data-table tbody tr:nth-child(even) { background-color: rgba(255, 255, 255, 0.02); }
+    table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
 
-    .chart-container { height: 25%; margin-top: 10px; border-top: 1px solid #eee; padding-top: 6px; }
+    .chart-container { height: 25%; margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 6px; }
 
-    table.data-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 10px; text-align: center; }
-    table.data-table th, table.data-table td { border-right: 1px solid #e5e7e9; border-bottom: 1px solid #e5e7e9; padding: 5px 3px; }
-    table.data-table th:first-child, table.data-table td:first-child { border-left: 1px solid #e5e7e9; }
-    
-    table.data-table thead tr:nth-child(1) th { position: sticky; top: 0; z-index: 12; background: #1a252f; color: #fff; }
-    table.data-table thead tr:nth-child(2) th { position: sticky; top: 22px; z-index: 11; background: var(--primary-color); color: #fff; }
+    /* LEAFLET POPUP DARK OVERRIDE */
+    .leaflet-popup-content-wrapper { background: var(--bg-card) !important; color: var(--text-main) !important; border: 1px solid var(--border-color); border-radius: 10px !important; }
+    .leaflet-popup-tip { background: var(--bg-card) !important; }
 
-    table.data-table tbody tr:nth-child(even) { background-color: rgba(252, 252, 252, 0.6); }
-    table.data-table tbody tr:hover { background-color: rgba(242, 244, 244, 0.9); }
+    /* POPUP SUGGESTION CARDS */
+    .sug-card { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px; margin-top: 4px; font-size: 10px; }
+    .sug-card.priority { border-color: var(--accent-orange); background: rgba(251, 146, 60, 0.15); }
+    .sug-card.ineligible { border-color: var(--accent-red); color: var(--accent-red); }
+    .badge-priority { background: var(--accent-orange); color: #fff; font-size: 8px; font-weight: bold; padding: 1px 4px; border-radius: 3px; margin-left: 4px; }
+
+    .inline-progress-bg { background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; }
+    .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-cyan); transition: width 0.3s ease; }
   </style>
 </head>
 <body>
 
   <div id="map"></div>
 
-  <div class="panel-left-compact">
-    <b style="font-size:12px; color:var(--primary-color);">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
-    <div class="progress-compact">
+  <!-- HEADER GÓC TRÁI -->
+  <div class="panel-header-left">
+    <b style="color:var(--accent-cyan);">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
+    <div style="display:flex; align-items:center; gap:6px;">
       <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
-      <span id="progressPercent">0%</span>
+      <span id="progressPercent" style="color:var(--accent-green); font-weight:bold;">0%</span>
     </div>
   </div>
 
-  <div class="custom-layer-panel">
-    <div class="layer-header-bar" onclick="toggleLayerPanel()">
-      <span>🏛️ QUẢN LÝ LỚP BẢN ĐỒ</span>
-      <span class="btn-toggle-expand" id="btnExpandIcon">+</span>
+  <!-- SIDEBAR HỢP NHẤT GÓC PHẢI -->
+  <div class="sidebar-panel">
+    <div class="tab-header">
+      <div class="tab-btn active" id="tabBtnLayers" onclick="switchTab('layers')">⚙️ LỚP DỮ LIỆU</div>
+      <div class="tab-btn" id="tabBtnLegend" onclick="switchTab('legend')">📖 CHÚ GIẢI</div>
     </div>
 
-    <div class="layer-content-body" id="layerPanelBody">
+    <!-- TAB 1: LỚP BẢN ĐỒ -->
+    <div class="tab-body" id="tabLayers">
       <div class="layer-row">
-        <div class="layer-row-left">
-          <input type="checkbox" id="chk_pop" onchange="toggleLayer('pop', this.checked)">
-          <label for="chk_pop">0. Lớp phân bổ dân cư</label>
-        </div>
+        <div><input type="checkbox" id="chk_pop" onchange="toggleLayer('pop', this.checked)"> <label for="chk_pop">0. Phân bổ dân cư</label></div>
       </div>
-
       <div class="layer-row">
-        <div class="layer-row-left">
-          <input type="checkbox" id="chk_bound" checked onchange="toggleLayer('boundary', this.checked)">
-          <label for="chk_bound">🗺️ Ranh giới 40 Phường Xã</label>
-        </div>
+        <div><input type="checkbox" id="chk_bound" checked onchange="toggleLayer('boundary', this.checked)"> <label for="chk_bound">🗺️ Ranh giới 40 Phường Xã</label></div>
       </div>
-
       <div class="layer-row">
-        <div class="layer-row-left">
-          <input type="checkbox" id="chk_c1" checked onchange="toggleLayer('c1', this.checked)">
-          <label for="chk_c1">1. Công viên, điểm xanh</label>
-        </div>
-        <span class="btn-dot-buffer" id="dot_b1" onclick="toggleBuffer('b1', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <div><input type="checkbox" id="chk_c1" checked onchange="toggleLayer('c1', this.checked)"> <label for="chk_c1">1. Công viên, điểm xanh</label></div>
+        <span class="btn-dot-buffer" onclick="toggleBuffer('b1', this)">●</span>
       </div>
-
       <div class="layer-row">
-        <div class="layer-row-left">
-          <input type="checkbox" id="chk_c2" checked onchange="toggleLayer('c2', this.checked)">
-          <label for="chk_c2">2. Bãi đỗ xe, trạm sạc</label>
-        </div>
-        <span class="btn-dot-buffer" id="dot_b2" onclick="toggleBuffer('b2', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <div><input type="checkbox" id="chk_c2" checked onchange="toggleLayer('c2', this.checked)"> <label for="chk_c2">2. Bãi đỗ xe, trạm sạc</label></div>
+        <span class="btn-dot-buffer" onclick="toggleBuffer('b2', this)">●</span>
       </div>
-
       <div class="layer-row">
-        <div class="layer-row-left">
-          <input type="checkbox" id="chk_c3" checked onchange="toggleLayer('c3', this.checked)">
-          <label for="chk_c3">3. Trường Mầm non</label>
-        </div>
-        <span class="btn-dot-buffer" id="dot_b3" onclick="toggleBuffer('b3', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <div><input type="checkbox" id="chk_c3" checked onchange="toggleLayer('c3', this.checked)"> <label for="chk_c3">3. Trường Mầm non</label></div>
+        <span class="btn-dot-buffer" onclick="toggleBuffer('b3', this)">●</span>
       </div>
-
       <div class="layer-row">
-        <div class="layer-row-left">
-          <input type="checkbox" id="chk_c4" checked onchange="toggleLayer('c4', this.checked)">
-          <label for="chk_c4">4. Trường Tiểu học</label>
-        </div>
-        <span class="btn-dot-buffer" id="dot_b4" onclick="toggleBuffer('b4', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <div><input type="checkbox" id="chk_c4" checked onchange="toggleLayer('c4', this.checked)"> <label for="chk_c4">4. Trường Tiểu học</label></div>
+        <span class="btn-dot-buffer" onclick="toggleBuffer('b4', this)">●</span>
       </div>
-
       <div class="layer-row">
-        <div class="layer-row-left">
-          <input type="checkbox" id="chk_c5" checked onchange="toggleLayer('c5', this.checked)">
-          <label for="chk_c5">5. Trường THCS</label>
-        </div>
-        <span class="btn-dot-buffer" id="dot_b5" onclick="toggleBuffer('b5', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <div><input type="checkbox" id="chk_c5" checked onchange="toggleLayer('c5', this.checked)"> <label for="chk_c5">5. Trường THCS</label></div>
+        <span class="btn-dot-buffer" onclick="toggleBuffer('b5', this)">●</span>
       </div>
-
       <div class="layer-row">
-        <div class="layer-row-left">
-          <input type="checkbox" id="chk_c6" checked onchange="toggleLayer('c6', this.checked)">
-          <label for="chk_c6">6. Cơ sở Y tế</label>
-        </div>
-        <span class="btn-dot-buffer" id="dot_b6" onclick="toggleBuffer('b6', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <div><input type="checkbox" id="chk_c6" checked onchange="toggleLayer('c6', this.checked)"> <label for="chk_c6">6. Cơ sở Y tế</label></div>
+        <span class="btn-dot-buffer" onclick="toggleBuffer('b6', this)">●</span>
       </div>
-
       <div class="layer-row">
-        <div class="layer-row-left">
-          <input type="checkbox" id="chk_c7" checked onchange="toggleLayer('c7', this.checked)">
-          <label for="chk_c7">7. Nhà văn hóa, thể thao</label>
-        </div>
-        <span class="btn-dot-buffer" id="dot_b7" onclick="toggleBuffer('b7', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <div><input type="checkbox" id="chk_c7" checked onchange="toggleLayer('c7', this.checked)"> <label for="chk_c7">7. Nhà văn hóa, thể thao</label></div>
+        <span class="btn-dot-buffer" onclick="toggleBuffer('b7', this)">●</span>
       </div>
-
       <div class="layer-row">
-        <div class="layer-row-left">
-          <input type="checkbox" id="chk_c8" checked onchange="toggleLayer('c8', this.checked)">
-          <label for="chk_c8">8. Chợ, TTTM</label>
-        </div>
-        <span class="btn-dot-buffer" id="dot_b8" onclick="toggleBuffer('b8', this)" title="Bật/Tắt bán kính Buffer">●</span>
+        <div><input type="checkbox" id="chk_c8" checked onchange="toggleLayer('c8', this.checked)"> <label for="chk_c8">8. Chợ, TTTM</label></div>
+        <span class="btn-dot-buffer" onclick="toggleBuffer('b8', this)">●</span>
       </div>
-
       <div class="layer-row">
-        <div class="layer-row-left">
-          <input type="checkbox" id="chk_c9" checked onchange="toggleLayer('c9', this.checked)">
-          <label for="chk_c9">9. Quỹ đất tiềm năng</label>
-        </div>
+        <div><input type="checkbox" id="chk_c9" checked onchange="toggleLayer('c9', this.checked)"> <label for="chk_c9">9. Quỹ đất tiềm năng</label></div>
       </div>
-
       <div class="layer-row">
-        <div class="layer-row-left">
-          <input type="checkbox" id="chk_heat" checked onchange="toggleLayer('heatmap', this.checked)">
-          <label for="chk_heat">🔥 Heatmap độ phủ hạ tầng</label>
-        </div>
+        <div><input type="checkbox" id="chk_heat" checked onchange="toggleLayer('heatmap', this.checked)"> <label for="chk_heat">🔥 Heatmap độ phủ hạ tầng</label></div>
       </div>
 
       <div id="popBox" style="display:none;" class="opacity-slider-row">
@@ -476,108 +245,101 @@
       <div id="heatBox" class="opacity-slider-row">
         🔥 Độ trong suốt Heatmap: 
         <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="50" oninput="changeHeatOpacity(this.value)">
-        <div style="margin-top:6px; font-weight:bold; color:#d35400;">
-          ⭕ Bán kính Buffer toàn đô thị: <span id="radiusLabel" style="color:#27ae60;">500m</span>
+        <div style="margin-top:6px; display:flex; justify-content:space-between; color:var(--accent-cyan);">
+          <span>⭕ Bán kính Buffer toàn đô thị:</span><b id="radiusLabel" style="color:var(--accent-green);">500m</b>
         </div>
         <input type="range" id="radiusSlider" class="opacity-slider" min="0" max="3" step="1" value="1" onchange="debouncedChangeBufferRadius(this.value)">
       </div>
     </div>
-  </div>
 
-  <div class="panel-bottom-left">
-    <div class="add-point-card" id="addPointCard">
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding-bottom:4px; margin-bottom:6px;">
-        <b style="color:var(--primary-color);">➕ THÊM ĐIỂM HẠ TẦNG MỚI</b>
-        <span onclick="toggleAddCard()" style="cursor:pointer; font-weight:bold; color:#c0392b;">✕</span>
-      </div>
+    <!-- TAB 2: CHÚ GIẢI -->
+    <div class="tab-body" id="tabLegend" style="display:none;">
+      <div style="margin-bottom:6px;">🌳 1. Công viên, điểm xanh, vườn hoa</div>
+      <div style="margin-bottom:6px;">🅿️ 2. Bãi đỗ xe, trạm sạc xe điện</div>
+      <div style="margin-bottom:6px;">🧸 3. Trường Mầm non</div>
+      <div style="margin-bottom:6px;">🏫 4. Trường Tiểu học</div>
+      <div style="margin-bottom:6px;">📚 5. Trường THCS</div>
+      <div style="margin-bottom:6px;">✚ 6. Bệnh viện, Trạm y tế</div>
+      <div style="margin-bottom:6px;">🎭 7. Nhà văn hóa, thể thao</div>
+      <div style="margin-bottom:6px;">🛒 8. Chợ, Trung tâm thương mại</div>
       
-      <label>Loại hạ tầng:</label>
-      <select id="newType">
-        <option value="1-CV">🌳 1. Công viên, điểm xanh, vườn hoa</option>
-        <option value="2-BDX">🅿️ 2. Bãi đỗ xe, trạm sạc xe điện</option>
-        <option value="3-MN">🧸 3. Trường Mầm non</option>
-        <option value="4-TH">🏫 4. Trường Tiểu học</option>
-        <option value="5-THCS">📚 5. Trường THCS</option>
-        <option value="6-YT">✚ 6. Bệnh viện, Trạm y tế</option>
-        <option value="7-VH">🎭 7. Nhà văn hóa, thể thao</option>
-        <option value="8-TM">🛒 8. Chợ, Trung tâm thương mại</option>
-        <option value="9-CSD" selected>🛠️ 9. Quỹ đất tiềm năng (Chưa sử dụng)</option>
-      </select>
-
-      <label>Tên khu đất / công trình:</label>
-      <input type="text" id="newName" placeholder="Nhập tên công trình..." />
-
-      <label>Tọa độ (Lat / Lng):</label>
-      <div class="row-coords">
-        <input type="text" id="newLat" placeholder="Vĩ độ" />
-        <input type="text" id="newLng" placeholder="Kinh độ" />
-        <button class="btn-pick" onclick="enablePickMode()" title="Ghim trên bản đồ">📌</button>
+      <div style="margin-bottom:6px; color:var(--accent-orange);">🛠️ <b>9. Quỹ đất tiềm năng (Chưa sử dụng)</b></div>
+      <div style="display:flex; align-items:center; margin-bottom:8px;">
+        <div style="width:16px; height:16px; border:2px dashed var(--accent-red); background:rgba(239,68,68,0.2); border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:10px; margin-right:8px;">🏫</div>
+        <b style="color:var(--accent-red);">Chưa chấp thuận (Chờ duyệt)</b>
       </div>
 
-      <label>Phường / Xã:</label>
-      <input type="text" id="newWard" placeholder="Tự động nhận diện..." />
+      <div style="height:1px; background:var(--border-color); margin:8px 0;"></div>
 
-      <label>Diện tích (m²):</label>
-      <input type="number" id="newSize" placeholder="1000" />
-
-      <button class="btn-submit" onclick="submitNewPoint()">🚀 GỬI ĐỀ XUẤT MỚI</button>
-      <div id="statusMsg" style="font-size:10px; margin-top:4px; text-align:center; font-weight:bold;"></div>
-    </div>
-
-    <button class="btn-main" id="btnInspectMode" onclick="toggleInspectMode()" title="Click vào bản đồ để kiểm tra hạ tầng có sẵn và còn thiếu">🖱️❓ TRA CỨU ĐIỂM</button>
-    <button class="btn-main" onclick="toggleAddCard()">➕ ĐỀ XUẤT ĐIỂM MỚI</button>
-  </div>
-
-  <div class="panel-bottom-right">
-    <div class="legend-panel" id="legendPanel">
-      <div class="legend-header">
-        <span>CHÚ GIẢI KÝ HIỆU & ĐỘ PHỦ</span>
-        <span onclick="toggleLegend()" style="cursor:pointer; color:#c0392b; font-weight:bold;">✕</span>
-      </div>
-
-      <div class="legend-row"><span class="legend-icon-box">🌳</span>1. Công viên, điểm xanh, vườn hoa</div>
-      <div class="legend-row"><span class="legend-icon-box">🅿️</span>2. Bãi đỗ xe, trạm sạc xe điện</div>
-      <div class="legend-row"><span class="legend-icon-box">🧸</span>3. Trường Mầm non</div>
-      <div class="legend-row"><span class="legend-icon-box">🏫</span>4. Trường Tiểu học</div>
-      <div class="legend-row"><span class="legend-icon-box">📚</span>5. Trường THCS</div>
-      <div class="legend-row"><span class="legend-icon-box"><span style="color:#e74c3c; font-weight:900;">✚</span></span>6. Bệnh viện, Trạm y tế</div>
-      <div class="legend-row"><span class="legend-icon-box">🎭</span>7. Nhà văn hóa, thể thao</div>
-      <div class="legend-row"><span class="legend-icon-box">🛒</span>8. Chợ, Trung tâm thương mại</div>
-      
-      <div class="legend-row"><span class="legend-icon-box">🛠️</span><b style="color:#d35400;">9. Quỹ đất tiềm năng (Chưa sử dụng)</b></div>
-      <div class="legend-row">
-        <div style="width:18px; height:18px; border:2px dashed #e74c3c; background:rgba(253,237,236,0.95); border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:11px; margin-right:8px;">🏫</div>
-        <b style="color:#c0392b;">Chưa chấp thuận (Chờ duyệt)</b>
-      </div>
-
-      <div style="height:1px; background:#bdc3c7; margin:6px 0 4px 0;"></div>
-
-      <div class="heat-scale-title">THANG ĐỘ PHỦ HẠ TẦNG (1 - 8)</div>
-      <div class="heat-palette-row">
-        <div class="heat-color-box" style="background:#5dade2;">1</div>
-        <div class="heat-color-box" style="background:#2ecc71;">2</div>
-        <div class="heat-color-box" style="background:#f1c40f;">3</div>
-        <div class="heat-color-box" style="background:#f39c12;">4</div>
-        <div class="heat-color-box" style="background:#e67e22;">5</div>
-        <div class="heat-color-box" style="background:#d35400;">6</div>
-        <div class="heat-color-box" style="background:#e74c3c;">7</div>
-        <div class="heat-color-box" style="background:#900c3f;">8</div>
+      <div style="font-weight:bold; color:var(--text-main); margin-bottom:6px;">THANG ĐỘ PHỦ HẠ TẦNG (1 - 8)</div>
+      <div style="display:flex; width:100%; border-radius:4px; overflow:hidden; border:1px solid var(--border-color);">
+        <div style="flex:1; height:18px; background:#5dade2; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">1</div>
+        <div style="flex:1; height:18px; background:#2ecc71; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">2</div>
+        <div style="flex:1; height:18px; background:#f1c40f; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">3</div>
+        <div style="flex:1; height:18px; background:#f39c12; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">4</div>
+        <div style="flex:1; height:18px; background:#e67e22; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">5</div>
+        <div style="flex:1; height:18px; background:#d35400; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">6</div>
+        <div style="flex:1; height:18px; background:#e74c3c; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">7</div>
+        <div style="flex:1; height:18px; background:#900c3f; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">8</div>
       </div>
     </div>
+  </div>
 
+  <!-- FLOATING DOCKBAR CHÍNH GIỮA ĐÁY MÀN HÌNH -->
+  <div class="dockbar-container">
+    <button class="btn-dock" id="btnInspectMode" onclick="toggleInspectMode()" title="Click vào bản đồ để kiểm tra hạ tầng có sẵn và còn thiếu">🖱️❓ TRA CỨU ĐIỂM</button>
+    <button class="btn-dock" onclick="toggleAddCard()">➕ ĐỀ XUẤT ĐIỂM MỚI</button>
+    <button class="btn-dock" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP & BIỂU ĐỒ (40 PHƯỜNG XÃ)</button>
+  </div>
+
+  <!-- CARD ĐỀ XUẤT ĐIỂM MỚI -->
+  <div class="add-point-card" id="addPointCard">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:4px; margin-bottom:8px;">
+      <b style="color:var(--accent-cyan);">➕ THÊM ĐIỂM HẠ TẦNG MỚI</b>
+      <span onclick="toggleAddCard()" style="cursor:pointer; font-weight:bold; color:var(--accent-red);">✕</span>
+    </div>
+    
+    <label>Loại hạ tầng:</label>
+    <select id="newType">
+      <option value="1-CV">🌳 1. Công viên, điểm xanh, vườn hoa</option>
+      <option value="2-BDX">🅿️ 2. Bãi đỗ xe, trạm sạc xe điện</option>
+      <option value="3-MN">🧸 3. Trường Mầm non</option>
+      <option value="4-TH">🏫 4. Trường Tiểu học</option>
+      <option value="5-THCS">📚 5. Trường THCS</option>
+      <option value="6-YT">✚ 6. Bệnh viện, Trạm y tế</option>
+      <option value="7-VH">🎭 7. Nhà văn hóa, thể thao</option>
+      <option value="8-TM">🛒 8. Chợ, Trung tâm thương mại</option>
+      <option value="9-CSD" selected>🛠️ 9. Quỹ đất tiềm năng (Chưa sử dụng)</option>
+    </select>
+
+    <label>Tên khu đất / công trình:</label>
+    <input type="text" id="newName" placeholder="Nhập tên công trình..." />
+
+    <label>Tọa độ (Lat / Lng):</label>
     <div style="display:flex; gap:6px;">
-      <button class="btn-main" onclick="toggleLegend()">📖 CHÚ THÍCH</button>
-      <button class="btn-main" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP & BIỂU ĐỒ (40 PHƯỜNG XÃ)</button>
+      <input type="text" id="newLat" placeholder="Vĩ độ" style="width:40%;" />
+      <input type="text" id="newLng" placeholder="Kinh độ" style="width:40%;" />
+      <button style="width:20%; background:var(--accent-cyan); border:none; border-radius:4px; cursor:pointer; font-weight:bold; color:#0f172a;" onclick="enablePickMode()" title="Ghim trên bản đồ">📌</button>
     </div>
+
+    <label>Phường / Xã:</label>
+    <input type="text" id="newWard" placeholder="Tự động nhận diện..." />
+
+    <label>Diện tích (m²):</label>
+    <input type="number" id="newSize" placeholder="1000" />
+
+    <button class="btn-submit" onclick="submitNewPoint()">🚀 GỬI ĐỀ XUẤT MỚI</button>
+    <div id="statusMsg" style="font-size:10px; margin-top:4px; text-align:center; font-weight:bold;"></div>
   </div>
 
+  <!-- MODAL BẢNG THỐNG KÊ 40 PHƯỜNG -->
   <div class="modal-panel" id="combinedModal">
     <div class="modal-header">
-      <b style="font-size:13px; color:var(--primary-color);">📊 BẢNG ĐÁNH GIÁ MẬT ĐỘ PHỦ HẠ TẦNG VÀ BIỂU ĐỒ TỔNG HỢP (40 PHƯỜNG XÃ)</b>
+      <b style="font-size:13px; color:var(--accent-cyan);">📊 BẢNG ĐÁNH GIÁ MẬT ĐỘ PHỦ HẠ TẦNG VÀ BIỂU ĐỒ TỔNG HỢP (40 PHƯỜNG XÃ)</b>
       <div style="display:flex; align-items:center; gap:10px;">
         <div style="width:120px;" class="progress-bar-bg"><div class="progress-bar-fill" id="modalProgressBar"></div></div>
-        <span id="modalProgressText" style="font-size:11px; font-weight:bold; color:var(--accent-color);">0%</span>
-        <span class="close-btn" onclick="closeModal()" style="margin-left:10px;">✕</span>
+        <span id="modalProgressText" style="font-size:11px; font-weight:bold; color:var(--accent-orange);">0%</span>
+        <span class="close-btn" onclick="closeModal()" style="margin-left:10px; cursor:pointer; color:var(--accent-red); font-weight:bold; font-size:18px;">✕</span>
       </div>
     </div>
     
@@ -621,7 +383,7 @@
   <script>
     const geeApiBackend = "/api/gee";
 
-    // BẬT CANVAS RENDERER CHO LEAFLET ĐỂ TỐI ƯU TỐC ĐỘ DỰNG HÌNH
+    // BẬT CANVAS RENDERER CHO LEAFLET
     const map = L.map('map', { renderer: L.canvas() }).setView([16.4637, 107.5905], 13);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
 
@@ -634,13 +396,19 @@
 
     let globalBufferRadius = 500;
 
-    // HÀM DEBOUNCE GIÚP CHẶN YÊU CẦU SPAM TỪ SLIDER
     function debounce(func, wait) {
       let timeout;
       return function(...args) {
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(this, args), wait);
       };
+    }
+
+    function switchTab(tab) {
+      document.getElementById('tabLayers').style.display = tab === 'layers' ? 'block' : 'none';
+      document.getElementById('tabLegend').style.display = tab === 'legend' ? 'block' : 'none';
+      document.getElementById('tabBtnLayers').classList.toggle('active', tab === 'layers');
+      document.getElementById('tabBtnLegend').classList.toggle('active', tab === 'legend');
     }
 
     function getDistanceMeters(lat1, lon1, lat2, lon2) {
@@ -666,15 +434,15 @@
     };
 
     const infraIcons = {
-      "1-CV": { symbol: "🌳", border: "#2ecc71" },
-      "2-BDX": { symbol: "🅿️", border: "#8e44ad" },
-      "3-MN": { symbol: "🧸", border: "#d35400" },
-      "4-TH": { symbol: "🏫", border: "#a0522d" },
-      "5-THCS": { symbol: "📚", border: "#5c4033" },
-      "6-YT": { symbol: '<span style="color:#e74c3c; font-weight:900;">✚</span>', border: "#e74c3c" },
-      "7-VH": { symbol: "🎭", border: "#ff0000" },
-      "8-TM": { symbol: "🛒", border: "#8b0000" },
-      "9-CSD": { symbol: "🛠️", border: "#f39c12" }
+      "1-CV": { symbol: "🌳", border: "#4ade80" },
+      "2-BDX": { symbol: "🅿️", border: "#a855f7" },
+      "3-MN": { symbol: "🧸", border: "#fb923c" },
+      "4-TH": { symbol: "🏫", border: "#facc15" },
+      "5-THCS": { symbol: "📚", border: "#eab308" },
+      "6-YT": { symbol: '<span style="color:#f87171; font-weight:900;">✚</span>', border: "#f87171" },
+      "7-VH": { symbol: "🎭", border: "#ec4899" },
+      "8-TM": { symbol: "🛒", border: "#38bdf8" },
+      "9-CSD": { symbol: "🛠️", border: "#94a3b8" }
     };
 
     const layers = {
@@ -691,18 +459,6 @@
       c8: L.layerGroup().addTo(map), b8: L.layerGroup(),
       c9: L.layerGroup().addTo(map), b9: L.layerGroup()
     };
-
-    function toggleLayerPanel() {
-      const body = document.getElementById('layerPanelBody');
-      const icon = document.getElementById('btnExpandIcon');
-      if (body.style.display === 'block') {
-        body.style.display = 'none';
-        icon.innerText = '+';
-      } else {
-        body.style.display = 'block';
-        icon.innerText = '−';
-      }
-    }
 
     function toggleLayer(layerKey, isChecked) {
       if (isChecked) {
@@ -751,7 +507,6 @@
       refreshHeatmapOnly();
     }
 
-    // BỌC TRỄ DEBOUNCE 350MS CHO SLIDER BÁN KÍNH
     const debouncedChangeBufferRadius = debounce(changeBufferRadius, 350);
 
     function toggleInspectMode() {
@@ -760,11 +515,11 @@
       const mapEl = document.getElementById('map');
 
       if (isInspectMode) {
-        btn.classList.add('btn-inspect-active');
+        btn.classList.add('active');
         btn.innerHTML = "🖱️❓ ĐANG TRA CỨU...";
         mapEl.classList.add('inspect-mode');
       } else {
-        btn.classList.remove('btn-inspect-active');
+        btn.classList.remove('active');
         btn.innerHTML = "🖱️❓ TRA CỨU ĐIỂM";
         mapEl.classList.remove('inspect-mode');
       }
@@ -781,20 +536,20 @@
         tempMarker = L.marker([lat, lng]).addTo(map);
 
         const statusEl = document.getElementById('statusMsg');
-        statusEl.style.color = "#d35400";
-        statusEl.innerText = "⏳ Đang tra cứu địa bàn từ GEE...";
+        statusEl.style.color = "var(--accent-orange)";
+        statusEl.innerText = "⏳ Đang tra cứu địa bàn...";
 
         fetch(`${geeApiBackend}?action=getWardFromPoint&lat=${lat}&lng=${lng}`)
           .then(r => r.json())
           .then(res => {
             const wardName = res.ward || "Thuận Hóa";
             document.getElementById('newWard').value = wardName;
-            statusEl.style.color = "#27ae60";
-            statusEl.innerText = `✓ Thuộc địa bàn: Phường/Xã ${wardName}`;
+            statusEl.style.color = "var(--accent-green)";
+            statusEl.innerText = `✓ Thuộc địa bàn: ${wardName}`;
           })
           .catch(() => {
             document.getElementById('newWard').value = "Thuận Hóa";
-            statusEl.style.color = "#27ae60";
+            statusEl.style.color = "var(--accent-green)";
             statusEl.innerText = "✓ Đã ghim tọa độ!";
           });
 
@@ -820,16 +575,13 @@
 
           itemsOfCode.forEach(item => {
             const dist = getDistanceMeters(clickLat, clickLng, item.lat, item.lng);
-            const radius = globalBufferRadius;
-            if (dist <= radius) {
+            if (dist <= globalBufferRadius) {
               if (!coveredGroups[code]) coveredGroups[code] = [];
               coveredGroups[code].push(item.name);
             }
           });
 
-          if (!coveredGroups[code]) {
-            missingCodes.push(code);
-          }
+          if (!coveredGroups[code]) missingCodes.push(code);
         });
 
         const coveredCount = Object.keys(coveredGroups).length;
@@ -840,28 +592,25 @@
           .then(resWard => {
             const wardName = resWard.ward || "Thuận Hóa";
 
-            let resultHtml = `<div class="popup-container">
-              <b style="font-size:11px; color:var(--primary-color);">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ</b><br>
-              <span style="font-size:10px; color:#555;">📍 Thuộc địa bàn: <b>Phường/Xã ${wardName}</b></span><br>
+            let resultHtml = `<div style="font-size:11px;">
+              <b style="color:var(--accent-cyan);">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ</b><br>
+              <span style="color:var(--text-muted);">📍 Địa bàn: <b>Phường/Xã ${wardName}</b></span><br>
 
-              <div style="font-weight:bold; color:var(--success-color); margin-top:6px; font-size:10.5px;">
-                1. Số nhóm hạ tầng tiếp cận: ${coveredCount}/8
+              <div style="font-weight:bold; color:var(--accent-green); margin-top:6px;">
+                1. Tiếp cận: ${coveredCount}/8 nhóm
               </div>`;
 
             if (coveredCount > 0) {
               Object.keys(coveredGroups).forEach(code => {
                 const names = coveredGroups[code].join(', ');
-                resultHtml += `<div class="sug-card">
-                  <b>• ${infraLabels[code] || code}:</b><br>
-                  <span style="color:#16a085;">└ ${names}</span>
-                </div>`;
+                resultHtml += `<div class="sug-card">• <b>${infraLabels[code] || code}:</b><br><span style="color:var(--accent-cyan);">└ ${names}</span></div>`;
               });
             } else {
-              resultHtml += `<div class="sug-card ineligible">(Chưa có hạ tầng nào phủ đến vị trí này)</div>`;
+              resultHtml += `<div class="sug-card ineligible">(Chưa có hạ tầng phủ đến)</div>`;
             }
 
-            resultHtml += `<div style="font-weight:bold; color:#c0392b; margin-top:6px; font-size:10.5px;">
-              2. Số nhóm hạ tầng chưa tiếp cận: ${missingCount}/8
+            resultHtml += `<div style="font-weight:bold; color:var(--accent-red); margin-top:6px;">
+              2. Chưa tiếp cận: ${missingCount}/8 nhóm
             </div>`;
 
             if (missingCount > 0) {
@@ -869,7 +618,7 @@
                 resultHtml += `<div class="sug-card ineligible">❌ ${infraLabels[code] || code}</div>`;
               });
             } else {
-              resultHtml += `<div class="sug-card priority">✓ Vị trí hoàn hảo, tiếp cận đủ 8 nhóm hạ tầng!</div>`;
+              resultHtml += `<div class="sug-card priority">✓ Vị trí tiếp cận đủ 8 nhóm hạ tầng!</div>`;
             }
 
             resultHtml += `</div>`;
@@ -885,11 +634,6 @@
       }
     });
 
-    function toggleLegend() {
-      const p = document.getElementById('legendPanel');
-      p.style.display = p.style.display === 'block' ? 'none' : 'block';
-    }
-
     function toggleAddCard() {
       const card = document.getElementById('addPointCard');
       card.style.display = card.style.display === 'block' ? 'none' : 'block';
@@ -897,8 +641,8 @@
 
     function enablePickMode() {
       isPickMode = true;
-      document.getElementById('statusMsg').style.color = "#d35400";
-      document.getElementById('statusMsg').innerText = "👉 Click trực tiếp trên bản đồ để ghim tọa độ...";
+      document.getElementById('statusMsg').style.color = "var(--accent-orange)";
+      document.getElementById('statusMsg').innerText = "👉 Click trực tiếp trên bản đồ...";
     }
 
     function submitNewPoint() {
@@ -911,13 +655,13 @@
       const msg = document.getElementById('statusMsg');
 
       if (!name || !lat || !lng) {
-        msg.style.color = "#c0392b";
+        msg.style.color = "var(--accent-red)";
         msg.innerText = "⚠️ Vui lòng điền đủ Tên và Tọa độ!";
         return;
       }
 
-      msg.style.color = "#d35400";
-      msg.innerText = "🚀 Đang đồng bộ dữ liệu sang Google Sheet...";
+      msg.style.color = "var(--accent-orange)";
+      msg.innerText = "🚀 Đang gửi đề xuất...";
 
       const addUrl = `${geeApiBackend}?action=addPoint` +
         `&type=${encodeURIComponent(type)}` +
@@ -926,8 +670,8 @@
         `&lat=${lat}&lng=${lng}&size=${size}`;
 
       fetch(addUrl).then(r => r.json()).then(res => {
-        msg.style.color = "#27ae60";
-        msg.innerText = "✓ Đã lưu đề xuất! Đang ghi nhận...";
+        msg.style.color = "var(--accent-green)";
+        msg.innerText = "✓ Đã lưu đề xuất!";
         
         const newObj = {
           id: "NEW-" + Date.now(),
@@ -941,7 +685,7 @@
 
         setTimeout(() => { toggleAddCard(); }, 1500);
       }).catch(err => {
-        msg.style.color = "#c0392b";
+        msg.style.color = "var(--accent-red)";
         msg.innerText = "❌ Lỗi kết nối máy chủ!";
       });
     }
@@ -954,7 +698,6 @@
     let rawDataList = [];
     let wardStatsData = [];
 
-    // TỐI ƯU CACHE TILE URL Ở LOCALSTORAGE PHÍA CLIENT
     async function loadDataParallel() {
       updateMainProgress(15);
 
@@ -980,12 +723,12 @@
         }
 
         if (isTileCacheValid && cachedBoundTile) {
-          L.tileLayer(cachedBoundTile, { opacity: 0.9 }).addTo(layers.boundary);
+          L.tileLayer(cachedBoundTile, { opacity: 0.7 }).addTo(layers.boundary);
           pBound = Promise.resolve();
         } else {
           pBound = fetch(`${geeApiBackend}?action=getBoundaryTile`).then(r => r.json()).then(d => {
             if (d.urlFormat) {
-              L.tileLayer(d.urlFormat, { opacity: 0.9 }).addTo(layers.boundary);
+              L.tileLayer(d.urlFormat, { opacity: 0.7 }).addTo(layers.boundary);
               localStorage.setItem('bound_tile_url', d.urlFormat);
             }
           }).catch(() => {});
@@ -1028,7 +771,7 @@
 
       rawDataList.forEach(p => {
         const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
-        const cfg = infraIcons[p.type] || { symbol: "🏢", border: "#2c3e50" };
+        const cfg = infraIcons[p.type] || { symbol: "🏢", border: "var(--accent-cyan)" };
         const targetGroup = mapGroups[p.type] || layers.c9;
         const targetBufferGroup = bufferGroups[p.type] || layers.b9;
 
@@ -1036,8 +779,8 @@
           if (p.type !== "9-CSD") {
             const pendingBuffer = L.circle([p.lat, p.lng], {
               radius: Number(p.radius) || 500,
-              color: '#e74c3c', weight: 2, dashArray: '6, 6',
-              fillColor: '#e74c3c', fillOpacity: 0.12
+              color: 'var(--accent-red)', weight: 2, dashArray: '6, 6',
+              fillColor: 'var(--accent-red)', fillOpacity: 0.12
             });
             targetBufferGroup.addLayer(pendingBuffer);
           }
@@ -1056,15 +799,15 @@
           if (p.type !== "9-CSD") {
             const officialBuffer = L.circle([p.lat, p.lng], {
               radius: globalBufferRadius,
-              color: cfg.border, weight: 1.5,
-              fillColor: cfg.border, fillOpacity: 0.15
+              color: cfg.border, weight: 1.2,
+              fillColor: cfg.border, fillOpacity: 0.12
             });
             targetBufferGroup.addLayer(officialBuffer);
           }
 
           const customDivIcon = L.divIcon({
             className: 'custom-infra-icon',
-            html: `<div style="border-color:${cfg.border}">${cfg.symbol}</div>`,
+            html: `<div style="color:${cfg.border}">${cfg.symbol}</div>`,
             iconSize: [27, 27], iconAnchor: [13.5, 13.5]
           });
 
@@ -1101,11 +844,7 @@
       fetch(`${geeApiBackend}?action=approvePoint&id=${encodeURIComponent(pointId)}`)
         .then(r => r.json())
         .then(res => {
-          console.log(`✓ Đã phê duyệt công trình ${pointId} trên Google Sheet!`);
           refreshHeatmapOnly();
-        })
-        .catch(err => {
-          console.error(`❌ Lỗi đồng bộ phê duyệt cho ${pointId}:`, err);
         });
     }
 
@@ -1113,12 +852,12 @@
       if (isInspectMode) return;
 
       const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
-      let contentHtml = `<div class="popup-container">`;
+      let contentHtml = `<div style="font-size:11px;">`;
 
       if (!isApproved) {
-        contentHtml += `<b style="font-size:11px; color:#c0392b;">🏢 ${p.name}</b> <span class="badge-pending">DỰ KIẾN (CHỜ DUYỆT)</span><br>`;
+        contentHtml += `<b style="color:var(--accent-red);">🏢 ${p.name}</b> <span class="badge-pending">DỰ KIẾN</span><br>`;
       } else {
-        contentHtml += `<b style="font-size:11px; color:var(--primary-color);">🏢 ${p.name}</b><br>`;
+        contentHtml += `<b style="color:var(--accent-cyan);">🏢 ${p.name}</b><br>`;
       }
 
       contentHtml += `• Loại hạ tầng: <b>${infraLabels[p.type] || p.type}</b><br>`;
@@ -1127,16 +866,16 @@
 
       if (!isApproved) {
         contentHtml += `<div id="servedPopText">
-          <div style="color:#e74c3c; font-weight:bold; margin-top:4px;">• Dân số phục vụ DỰ KIẾN: <span id="popValText">0%</span></div>
-          <div class="inline-progress-bg"><div class="inline-progress-fill" style="background:#e74c3c;" id="popValBar"></div></div>
+          <div style="color:var(--accent-red); font-weight:bold; margin-top:4px;">• Dân số phục vụ DỰ KIẾN: <span id="popValText">0%</span></div>
+          <div class="inline-progress-bg"><div class="inline-progress-fill" style="background:var(--accent-red);" id="popValBar"></div></div>
         </div>`;
 
-        contentHtml += `<button onclick="approvePointStatus('${p.id}')" style="width:100%; margin-top:8px; background:#27ae60; color:#fff; border:none; padding:5px; border-radius:4px; font-weight:bold; cursor:pointer;">
-          ✅ PHÊ DUYỆT THÀNH CHÍNH THỨC (STATUS = TRUE)
+        contentHtml += `<button onclick="approvePointStatus('${p.id}')" style="width:100%; margin-top:8px; background:var(--accent-green); color:#0f172a; border:none; padding:6px; border-radius:4px; font-weight:bold; cursor:pointer;">
+          ✅ PHÊ DUYỆT CHÍNH THỨC (STATUS = TRUE)
         </button>`;
         contentHtml += `</div>`;
 
-        const popup = L.popup({ closeButton: true, autoPan: true, autoPanPadding: [50, 50] })
+        const popup = L.popup({ closeButton: true, autoPan: true })
           .setLatLng([p.lat, p.lng]).setContent(contentHtml);
         popup.openOn(map);
 
@@ -1158,18 +897,18 @@
             const popVal = res.servedPop || 0;
             const popContainer = document.getElementById('servedPopText');
             if (popContainer) {
-              popContainer.innerHTML = `• Dân số phục vụ DỰ KIẾN: ~<b style="color:#e74c3c;">${popVal.toLocaleString()} người</b>`;
+              popContainer.innerHTML = `• Dân số phục vụ DỰ KIẾN: ~<b style="color:var(--accent-red);">${popVal.toLocaleString()} người</b>`;
             }
           });
 
       } else if (p.type !== "9-CSD") {
         contentHtml += `<div id="servedPopText">
-          <div style="color:#8e44ad; font-weight:bold; margin-top:4px;">• Dân số phục vụ CHÍNH THỨC: <span id="popValText">0%</span></div>
-          <div class="inline-progress-bg"><div class="inline-progress-fill" id="popValBar"></div></div>
+          <div style="color:var(--accent-orange); font-weight:bold; margin-top:4px;">• Dân số phục vụ CHÍNH THỨC: <span id="popValText">0%</span></div>
+          <div class="inline-progress-bg"><div class="inline-progress-fill" style="background:var(--accent-orange);" id="popValBar"></div></div>
         </div>`;
         contentHtml += `</div>`;
 
-        const popup = L.popup({ closeButton: true, autoPan: true, autoPanPadding: [50, 50] })
+        const popup = L.popup({ closeButton: true, autoPan: true })
           .setLatLng([p.lat, p.lng]).setContent(contentHtml);
         popup.openOn(map);
 
@@ -1191,18 +930,18 @@
             const popVal = res.servedPop || 0;
             const popContainer = document.getElementById('servedPopText');
             if (popContainer) {
-              popContainer.innerHTML = `• Dân số phục vụ: ~<b style="color:#8e44ad;">${popVal.toLocaleString()} người</b>`;
+              popContainer.innerHTML = `• Dân số phục vụ: ~<b style="color:var(--accent-orange);">${popVal.toLocaleString()} người</b>`;
             }
           });
       } else {
-        contentHtml += `<div style="color:var(--accent-color); font-weight:bold; margin-top:4px; margin-bottom:2px;">💡 ĐỀ XUẤT CHUYỂN ĐỔI CÔNG NĂNG:</div>`;
+        contentHtml += `<div style="color:var(--accent-orange); font-weight:bold; margin-top:4px;">💡 ĐỀ XUẤT CHUYỂN ĐỔI CÔNG NĂNG:</div>`;
         contentHtml += `<div id="csdSug">
-          <div style="font-size:10px; color:#555;">⏳ Đang tính toán không gian: <span id="csdValText">0%</span></div>
+          <div style="font-size:10px; color:var(--text-muted);">⏳ Đang tính toán không gian: <span id="csdValText">0%</span></div>
           <div class="inline-progress-bg"><div class="inline-progress-fill" id="csdValBar"></div></div>
         </div>`;
         contentHtml += `</div>`;
 
-        const popup = L.popup({ closeButton: true, autoPan: true, autoPanPadding: [50, 50] })
+        const popup = L.popup({ closeButton: true, autoPan: true })
           .setLatLng([p.lat, p.lng]).setContent(contentHtml);
         popup.openOn(map);
 
@@ -1228,17 +967,13 @@
                 const cls = s.isTopPriority ? "sug-card priority" : "sug-card";
                 
                 sugHtml += `<div class="${cls}">
-                  <div class="sug-title">
-                    <span>🚩 <b>${s.label}</b></span>${priorityBadge}
-                  </div>
-                  <div class="sug-detail">
-                    └ Phường thiếu: <b>${s.deficitArea.toLocaleString()} m²</b> | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng
-                  </div>
+                  <div>🚩 <b>${s.label}</b> ${priorityBadge}</div>
+                  <div style="color:var(--text-muted); margin-top:2px;">└ Phường thiếu: <b>${s.deficitArea.toLocaleString()} m²</b> | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng</div>
                 </div>`;
               } else {
                 sugHtml += `<div class="sug-card">
-                  <div class="sug-title"><span>✓ <b>${s.label}</b></span></div>
-                  <div class="sug-detail">└ Đã đạt chỉ tiêu | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng</div>
+                  <div>✓ <b>${s.label}</b></div>
+                  <div style="color:var(--text-muted); margin-top:2px;">└ Đã đạt chỉ tiêu | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng</div>
                 </div>`;
               }
             });
@@ -1285,27 +1020,27 @@
           let row = `<tr>
             <td>${idx + 1}</td>
             <td style="text-align:left;">
-              <a href="javascript:void(0)" onclick="selectWardDetail('${w.Ten_Phuong}')" style="font-weight:bold; color:#2980b9; text-decoration:none;">
+              <a href="javascript:void(0)" onclick="selectWardDetail('${w.Ten_Phuong}')" style="font-weight:bold; color:var(--accent-cyan); text-decoration:none;">
                 📍 ${w.Ten_Phuong}
               </a>
             </td>
-            <td style="font-weight:bold; color:#188038; text-align:right;">${Number(w.Dan_So_Vector).toLocaleString()}</td>`;
+            <td style="font-weight:bold; color:var(--accent-green); text-align:right;">${Number(w.Dan_So_Vector).toLocaleString()}</td>`;
 
           codes.forEach(c => {
             const cov = Number(w[`Ratio_${c}`] || 0).toFixed(1);
             const scale = Number(w[`Scale_${c}`] || 0).toFixed(1);
-            row += `<td style="color:var(--success-color);">${cov}%</td><td style="color:var(--accent-color); font-weight:bold;">${scale}%</td>`;
+            row += `<td style="color:var(--accent-green);">${cov}%</td><td style="color:var(--accent-orange); font-weight:bold;">${scale}%</td>`;
           });
 
-          row += `<td style="color:var(--success-color);">${Number(w["Ratio_8-TM"] || 0).toFixed(1)}%</td>`;
-          row += `<td style="font-weight:bold; color:var(--accent-color);">${Number(w.Total_Infra_Score || 0).toFixed(1)}%</td></tr>`;
+          row += `<td style="color:var(--accent-green);">${Number(w["Ratio_8-TM"] || 0).toFixed(1)}%</td>`;
+          row += `<td style="font-weight:bold; color:var(--accent-orange);">${Number(w.Total_Infra_Score || 0).toFixed(1)}%</td></tr>`;
           tbody.innerHTML += row;
         });
 
         renderCombinedChart();
       }).catch(err => {
         clearInterval(mInterval);
-        tbody.innerHTML = "<tr><td colspan='19' style='text-align:center; color:red; padding:20px;'>❌ Lỗi nạp dữ liệu từ GEE Server.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='19' style='text-align:center; color:var(--accent-red); padding:20px;'>❌ Lỗi nạp dữ liệu từ GEE Server.</td></tr>";
       });
     }
 
@@ -1328,12 +1063,12 @@
 
       const currentPop = Number(wardData.Dan_So_Vector || 0);
 
-      let modalHtml = `<div class="popup-container" style="width: 580px; max-width: 90vw;">
-        <b style="font-size:12px; color:var(--primary-color);">📍 PHÂN TÍCH HẠ TẦNG QUY CHUẨN: ${wardName.toUpperCase()}</b><br>
+      let modalHtml = `<div style="width: 580px; max-width: 90vw;">
+        <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH HẠ TẦNG QUY CHUẨN: ${wardName.toUpperCase()}</b><br>
         
-        <div style="background:#f8f9fa; border:1px solid #dcdfe6; padding:6px; border-radius:4px; margin:6px 0; font-size:11px;">
-          👥 Dân số hiện trạng: <b style="color:#27ae60;">~${currentPop.toLocaleString()} người</b> | 
-          🔮 Dự báo dân số: <input type="number" id="wardPopInput" value="${currentPop}" style="width:75px; font-size:11px; padding:1px 3px;" onchange="recalcWardQuota('${wardName}', this.value)">
+        <div style="background:rgba(15, 23, 42, 0.8); border:1px solid var(--border-color); padding:6px; border-radius:6px; margin:6px 0; font-size:11px;">
+          👥 Dân số hiện trạng: <b style="color:var(--accent-green);">~${currentPop.toLocaleString()} người</b> | 
+          🔮 Dự báo: <input type="number" id="wardPopInput" value="${currentPop}" style="width:75px; font-size:11px; padding:2px; background:#0f172a; border:1px solid var(--border-color); color:#fff; border-radius:4px;" onchange="recalcWardQuota('${wardName}', this.value)">
         </div>
 
         <div id="wardQuotaTableContainer">
@@ -1363,15 +1098,15 @@
         "8-TM":   { norm: 0.00, label: "Thương mại" }
       };
 
-      let html = `<table style="width:100%; border-collapse:collapse; font-size:10px; text-align:left;">
+      let html = `<table style="width:100%; border-collapse:collapse; font-size:10px; text-align:left; color:var(--text-main);">
         <thead>
-          <tr style="background:#2c3e50; color:#fff;">
-            <th style="padding:4px;">STT</th>
-            <th style="padding:4px;">Loại hạ tầng / Công trình</th>
-            <th style="padding:4px; text-align:right;">Hiện trạng</th>
-            <th style="padding:4px; text-align:center;">Chỉ tiêu</th>
-            <th style="padding:4px; text-align:right;">Nhu cầu DT</th>
-            <th style="padding:4px; text-align:center;">Đánh giá</th>
+          <tr style="background:#0f172a; color:var(--accent-cyan);">
+            <th style="padding:4px; border:1px solid var(--border-color);">STT</th>
+            <th style="padding:4px; border:1px solid var(--border-color);">Loại hạ tầng / Công trình</th>
+            <th style="padding:4px; text-align:right; border:1px solid var(--border-color);">Hiện trạng</th>
+            <th style="padding:4px; text-align:center; border:1px solid var(--border-color);">Chỉ tiêu</th>
+            <th style="padding:4px; text-align:right; border:1px solid var(--border-color);">Nhu cầu DT</th>
+            <th style="padding:4px; text-align:center; border:1px solid var(--border-color);">Đánh giá</th>
           </tr>
         </thead>
         <tbody>`;
@@ -1386,26 +1121,26 @@
         const diffArea = existArea - reqArea;
 
         const evalText = cfg.norm === 0 ? "Theo quy hoạch" : (isPass ? `ĐẠT (+${diffArea.toLocaleString()} m²)` : `THIẾU (${diffArea.toLocaleString()} m²)`);
-        const evalColor = cfg.norm === 0 ? "#7f8c8d" : (isPass ? "#27ae60" : "#c0392b");
+        const evalColor = cfg.norm === 0 ? "var(--text-muted)" : (isPass ? "var(--accent-green)" : "var(--accent-red)");
 
-        html += `<tr style="background:#eaeded; font-weight:bold; border-bottom:1px solid #ccc;">
-          <td style="padding:3px; text-align:center;">${stt++}</td>
-          <td style="padding:3px;">${cfg.label}</td>
-          <td style="padding:3px; text-align:right;">${existArea.toLocaleString()} m²</td>
-          <td style="padding:3px; text-align:center;">${cfg.norm > 0 ? cfg.norm + ' m²' : '-'}</td>
-          <td style="padding:3px; text-align:right; color:#2980b9;">${reqArea > 0 ? reqArea.toLocaleString() + ' m²' : '-'}</td>
-          <td style="padding:3px; text-align:center; color:${evalColor};">${evalText}</td>
+        html += `<tr style="background:rgba(255,255,255,0.05); font-weight:bold; border-bottom:1px solid var(--border-color);">
+          <td style="padding:3px; text-align:center; border:1px solid var(--border-color);">${stt++}</td>
+          <td style="padding:3px; border:1px solid var(--border-color);">${cfg.label}</td>
+          <td style="padding:3px; text-align:right; border:1px solid var(--border-color);">${existArea.toLocaleString()} m²</td>
+          <td style="padding:3px; text-align:center; border:1px solid var(--border-color);">${cfg.norm > 0 ? cfg.norm + ' m²' : '-'}</td>
+          <td style="padding:3px; text-align:right; color:var(--accent-cyan); border:1px solid var(--border-color);">${reqArea > 0 ? reqArea.toLocaleString() + ' m²' : '-'}</td>
+          <td style="padding:3px; text-align:center; color:${evalColor}; border:1px solid var(--border-color);">${evalText}</td>
         </tr>`;
 
         const subItems = infraList.filter(it => it.type === code);
         subItems.forEach(item => {
-          html += `<tr style="background:#fff; border-bottom:1px dashed #eee; font-size:9.5px;">
-            <td></td>
-            <td style="padding:2px 2px 2px 12px; color:#2980b9;">└ ${item.name}</td>
-            <td style="padding:2px; text-align:right;">${item.size.toLocaleString()} m²</td>
-            <td style="padding:2px; text-align:center; color:#aaa;">-</td>
-            <td style="padding:2px; text-align:right; color:#8e44ad;">Bán kính: ${globalBufferRadius}m</td>
-            <td style="padding:2px; text-align:center; color:#27ae60;">✓ Đang hoạt động</td>
+          html += `<tr style="border-bottom:1px dashed var(--border-color); font-size:9.5px;">
+            <td style="border:1px solid var(--border-color);"></td>
+            <td style="padding:2px 2px 2px 12px; color:var(--accent-cyan); border:1px solid var(--border-color);">└ ${item.name}</td>
+            <td style="padding:2px; text-align:right; border:1px solid var(--border-color);">${item.size.toLocaleString()} m²</td>
+            <td style="padding:2px; text-align:center; color:var(--text-muted); border:1px solid var(--border-color);">-</td>
+            <td style="padding:2px; text-align:right; color:var(--accent-orange); border:1px solid var(--border-color);">Bán kính: ${globalBufferRadius}m</td>
+            <td style="padding:2px; text-align:center; color:var(--accent-green); border:1px solid var(--border-color);">✓ Hoạt động</td>
           </tr>`;
         });
       });
@@ -1447,7 +1182,7 @@
           datasets: [{ 
             label: 'Điểm Tiếp Cận Hạ Tầng (%)', 
             data: wardStatsData.map(w => w.Total_Infra_Score), 
-            backgroundColor: '#d35400' 
+            backgroundColor: '#38bdf8' 
           }]
         },
         options: { 
@@ -1455,8 +1190,8 @@
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: { ticks: { font: { size: 8 } } },
-            y: { beginAtZero: true, max: 100 }
+            x: { ticks: { font: { size: 8 }, color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { beginAtZero: true, max: 100, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }
           }
         }
       });
