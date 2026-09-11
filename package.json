@@ -1,15 +1,12 @@
 {
-  "name": "web-hatang-hue",
-  "version": "1.0.0",
-  "description": "Headless GIS Backend for Hue Urban Infrastructure Analysis using Earth Engine API",
+  "name": "qh-hue",
+  "version": "2.15.0",
+  "description": "Bản đồ Phân tích Hạ tầng Đô thị TP. Huế",
   "main": "api/gee.js",
   "scripts": {
-    "start": "node api/gee.js"
+    "start": "vercel dev"
   },
   "dependencies": {
     "@google/earthengine": "^0.1.385"
-  },
-  "engines": {
-    "node": ">=18.x"
   }
 }
