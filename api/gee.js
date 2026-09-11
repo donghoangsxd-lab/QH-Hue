@@ -317,7 +317,6 @@ module.exports = async (req, res) => {
       const suggestions = [];
       const ineligible = [];
 
-      // CHẠY SONG SONG CÁC TRUY VẤN SPATIAL CỦA GEE BẰNG PROMISE.ALL
       const csdPromises = codesToCheck.map(async (code) => {
         const reqMinSize = infraConfig[code].minSize;
         if (size < reqMinSize) {
@@ -343,7 +342,8 @@ module.exports = async (req, res) => {
           netBufferGeom = testBuffer.difference(existUnion, 1);
         }
 
-        const popRes = await new Promise((resolve) => {
+        // 1. TÍNH DÂN SỐ PHỦ RÒNG (NET POPULATION)
+        const netPopRes = await new Promise((resolve) => {
           popRasterNormalized.reduceRegion({
             reducer: ee.Reducer.sum(),
             geometry: netBufferGeom,
@@ -352,7 +352,20 @@ module.exports = async (req, res) => {
           }).evaluate((r) => resolve(r ? r.DanSoPixelNormalized : 0));
         });
 
-        const cleanPopGained = Math.max(0, Math.round(popRes || 0));
+        let cleanPopGained = Math.max(0, Math.round(netPopRes || 0));
+
+        // 2. NẾU VÙNG PHỦ RÒNG = 0 (DO BỊ ĐÈ), THÌ FALLBACK TÍNH TỔNG DÂN SỐ TRONG BÁN KÍNH TRỰC TIẾP
+        if (cleanPopGained === 0) {
+          const grossPopRes = await new Promise((resolve) => {
+            popRasterNormalized.reduceRegion({
+              reducer: ee.Reducer.sum(),
+              geometry: testBuffer,
+              scale: 30,
+              maxPixels: 1e9
+            }).evaluate((r) => resolve(r ? r.DanSoPixelNormalized : 0));
+          });
+          cleanPopGained = Math.max(0, Math.round(grossPopRes || 0));
+        }
 
         suggestions.push({
           code,
