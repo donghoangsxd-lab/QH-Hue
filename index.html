@@ -375,7 +375,7 @@
         🔥 Độ trong suốt Heatmap: 
         <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="50" oninput="changeHeatOpacity(this.value)">
         <div style="margin-top:8px; display:flex; justify-content:space-between; color:var(--accent-cyan);">
-          <span>⭕ Bán kính Buffer:</span><b id="radiusLabel" style="color:var(--accent-green);">500m</b>
+          <span>🛣️ Bán kính Mạng lưới:</span><b id="radiusLabel" style="color:var(--accent-green);">500m</b>
         </div>
         <input type="range" id="radiusSlider" class="opacity-slider" min="0" max="3" step="1" value="1" onchange="debouncedChangeBufferRadius(this.value)">
       </div>
@@ -533,9 +533,7 @@
   <script>
     const geeApiBackend = "/api/gee";
 
-    // CẤU HÌNH PHÂN QUYỀN: Mặc định VIEWER (Không yêu cầu đăng nhập)
     let currentUserRole = "VIEWER"; 
-    // Email cấp quyền Admin quản trị
     const ADMIN_EMAILS = ["donghoangsxd@gmail.com", "admin.sxd@hue.gov.vn"];
 
     function toggleAuthModal() {
@@ -544,7 +542,6 @@
       document.getElementById('authMsg').innerText = "";
     }
 
-    // Xử lý xác thực Token Google OAuth
     function parseJwt(token) {
       try {
         const base64Url = token.split('.')[1];
@@ -565,7 +562,6 @@
       if (payload && payload.email) {
         const userEmail = payload.email.toLowerCase();
         
-        // Kiểm tra địa chỉ Email có thuộc danh sách Admin
         if (ADMIN_EMAILS.includes(userEmail) || userEmail.endsWith("@hue.gov.vn")) {
           currentUserRole = "ADMIN";
           msg.style.color = "var(--accent-green)";
@@ -577,7 +573,7 @@
 
           setTimeout(() => {
             toggleAuthModal();
-            renderGroupedPoints(); // Refresh Marker & Popup với quyền Admin
+            renderGroupedPoints();
           }, 1000);
         } else {
           msg.style.color = "var(--accent-red)";
@@ -857,6 +853,7 @@
         return;
       }
 
+      // XỬ LÝ TRA CỨU MẠNG LƯỚI GIAO THÔNG KHI CLICK
       if (isInspectMode) {
         const clickLat = e.latlng.lat;
         const clickLng = e.latlng.lng;
@@ -864,40 +861,32 @@
         if (tempMarker) map.removeLayer(tempMarker);
         tempMarker = L.marker([clickLat, clickLng]).addTo(map);
 
-        const coveredGroups = {};
-        const missingCodes = [];
+        const loadingPopup = L.popup({ closeButton: true, autoPan: true })
+          .setLatLng([clickLat, clickLng])
+          .setContent(`
+            <div style="font-size:11px; text-align:center; padding:6px;">
+              <b style="color:var(--accent-cyan);">🛣️ ĐANG PHÂN TÍCH MẠNG LƯỚI GIAO THÔNG...</b><br>
+              <span style="color:var(--text-muted);">Tính toán khoảng cách di chuyển thực tế ${globalBufferRadius}m</span>
+            </div>
+          `)
+          .openOn(map);
 
-        ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"].forEach(code => {
-          const itemsOfCode = rawDataList.filter(item => {
-            const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
-            return item.type === code && isApproved;
-          });
-
-          itemsOfCode.forEach(item => {
-            const dist = getDistanceMeters(clickLat, clickLng, item.lat, item.lng);
-            if (dist <= globalBufferRadius) {
-              if (!coveredGroups[code]) coveredGroups[code] = [];
-              coveredGroups[code].push(item.name);
-            }
-          });
-
-          if (!coveredGroups[code]) missingCodes.push(code);
-        });
-
-        const coveredCount = Object.keys(coveredGroups).length;
-        const missingCount = missingCodes.length;
-
-        fetch(`${geeApiBackend}?action=getWardFromPoint&lat=${clickLat.toFixed(6)}&lng=${clickLng.toFixed(6)}`)
+        fetch(`${geeApiBackend}?action=analyzeLocation&lat=${clickLat.toFixed(6)}&lng=${clickLng.toFixed(6)}&radius=${globalBufferRadius}`)
           .then(r => r.json())
-          .then(resWard => {
-            const wardName = resWard.ward || "Thuận Hóa";
+          .then(res => {
+            const wardName = res.ward || "Thuận Hóa";
+            const coveredGroups = res.coveredGroups || {};
+            const missingCodes = res.missingCodes || [];
+
+            const coveredCount = res.coveredCount || 0;
+            const missingCount = res.missingCount || 0;
 
             let resultHtml = `<div style="font-size:11px;">
-              <b style="color:var(--accent-cyan);">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ</b><br>
-              <span style="color:var(--text-muted);">📍 Địa bàn: <b>Phường/Xã ${wardName}</b></span><br>
+              <b style="color:var(--accent-cyan);">📊 MẬT ĐỘ HẠ TẦNG THEO MẠNG LƯỚI GIAO THÔNG</b><br>
+              <span style="color:var(--text-muted);">📍 Địa bàn: <b>Phường/Xã ${wardName}</b> | Bán kính đi đường: <b>${globalBufferRadius}m</b></span><br>
 
               <div style="font-weight:bold; color:var(--accent-green); margin-top:6px;">
-                1. Tiếp cận: ${coveredCount}/8 nhóm
+                1. Tiếp cận theo đường bộ: ${coveredCount}/8 nhóm
               </div>`;
 
             if (coveredCount > 0) {
@@ -906,7 +895,7 @@
                 resultHtml += `<div class="sug-card">• <b>${infraLabels[code] || code}:</b><br><span style="color:var(--accent-cyan);">└ ${names}</span></div>`;
               });
             } else {
-              resultHtml += `<div class="sug-card ineligible">(Chưa có hạ tầng phủ đến)</div>`;
+              resultHtml += `<div class="sug-card ineligible">(Chưa có hạ tầng trong phạm vi đường bộ ${globalBufferRadius}m)</div>`;
             }
 
             resultHtml += `<div style="font-weight:bold; color:var(--accent-red); margin-top:6px;">
@@ -918,15 +907,15 @@
                 resultHtml += `<div class="sug-card ineligible">❌ ${infraLabels[code] || code}</div>`;
               });
             } else {
-              resultHtml += `<div class="sug-card priority">✓ Vị trí tiếp cận đủ 8 nhóm hạ tầng!</div>`;
+              resultHtml += `<div class="sug-card priority">✓ Vị trí tiếp cận đủ 8 nhóm hạ tầng theo giao thông!</div>`;
             }
 
             resultHtml += `</div>`;
-            
-            L.popup({ closeButton: true, autoPan: true })
-              .setLatLng([clickLat, clickLng])
-              .setContent(resultHtml)
-              .openOn(map);
+
+            loadingPopup.setContent(resultHtml);
+          })
+          .catch(err => {
+            loadingPopup.setContent(`<div style="color:var(--accent-red); font-size:11px;">❌ Lỗi tính toán mạng lưới từ GEE Server.</div>`);
           });
 
         toggleInspectMode();
@@ -1172,7 +1161,6 @@
           <div class="inline-progress-bg"><div class="inline-progress-fill" style="background:var(--accent-red);" id="popValBar"></div></div>
         </div>`;
 
-        // CHỈ ADMIN MỚI CÓ NÚT PHÊ DUYỆT
         if (currentUserRole === "ADMIN") {
           contentHtml += `<button onclick="approvePointStatus('${p.id}')" style="width:100%; margin-top:8px; background:var(--accent-green); color:#0f172a; border:none; padding:6px; border-radius:4px; font-weight:bold; cursor:pointer;">
             ✅ PHÊ DUYỆT CHÍNH THỨC (ADMIN)
@@ -1449,7 +1437,7 @@
             <td style="padding-left:12px; color:var(--accent-cyan);">└ ${item.name}</td>
             <td style="text-align:right;">${item.size.toLocaleString()} m²</td>
             <td style="text-align:center; color:var(--text-muted);">-</td>
-            <td style="text-align:right; color:var(--accent-orange);">Bán kính: ${globalBufferRadius}m</td>
+            <td style="text-align:right; color:var(--accent-orange);">Bán kính mạng lưới: ${globalBufferRadius}m</td>
             <td style="text-align:center; color:var(--accent-green);">✓ Hoạt động</td>
           </tr>`;
         });
