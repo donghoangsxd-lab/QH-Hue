@@ -111,18 +111,13 @@ function invalidateCache() {
   lastWardStatsFetch = 0;
 }
 
-// HÀM TẠO LỚP MA SÁT GIAO THÔNG CHUẨN HÓA KHÔNG BỊ RỖNG NGHIỆM
 function getNetworkCostImage(region) {
-  const roads = ee.FeatureCollection("HOT/OSM/planet/roads")
-    .filterBounds(region);
-    
+  const roads = ee.FeatureCollection("HOT/OSM/planet/roads").filterBounds(region);
   const roadImage = ee.Image().byte().paint({
     featureCollection: roads,
     color: 1,
     width: 3
   });
-
-  // Ma sát: Trên đường = 1, Ngoài đường = 12 (đi bộ/dẫn bộ cắt qua đường hẻm)
   return ee.Image(12).where(roadImage.gt(0), 1).clip(region);
 }
 
@@ -246,7 +241,22 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // HEATMAP MẠNG LƯỚI GIAO THÔNG
+    // TILE LỚP MẠNG LƯỚI GIAO THÔNG (ĐỂ BẬT/TẮT KIỂM TRA)
+    if (action === 'getRoadsTile') {
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
+      const hueBounds = wardVectorParsed.geometry().bounds();
+      const roadsFC = ee.FeatureCollection("HOT/OSM/planet/roads").filterBounds(hueBounds);
+      const roadImage = ee.Image().byte().paint({
+        featureCollection: roadsFC,
+        color: 1,
+        width: 2
+      });
+      const mapId = await new Promise((resolve, reject) => {
+        roadImage.getMap({ palette: ['#38bdf8'] }, (m, err) => err ? reject(err) : resolve(m));
+      });
+      return res.status(200).json({ urlFormat: mapId.urlFormat });
+    }
+
     if (action === 'getHeatmapTile') {
       const overrideRadius = Number(req.query.overrideRadius) || 500;
       const hueBounds = wardVectorParsed.geometry().bounds();
@@ -411,7 +421,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
-    // TRA CỨU ĐIỂM TIẾP CẬN MẠNG LƯỚI BẰNG HÀM TÍNH KHOẢNG CÁCH DI CHUYỂN TỐC ĐỘ CAO
     if (action === 'analyzeLocation') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -422,13 +431,11 @@ module.exports = async (req, res) => {
       const searchRegion = clickGeom.buffer(userRadius * 2.5);
       const costImage = getNetworkCostImage(searchRegion);
 
-      // Thuật toán ma sát di chuyển từ điểm click
       const distFromClickImg = costImage.cumulativeCost({
         source: clickGeom,
         maxDistance: userRadius * 2.5
       });
 
-      // Lọc các điểm hạ tầng đã duyệt trong vùng nghi vấn
       const approvedItems = rawDataList.filter(item => item.type !== "9-CSD" && item.status === true);
 
       const samplePromises = approvedItems.map(async (item) => {
@@ -447,7 +454,6 @@ module.exports = async (req, res) => {
 
       const coveredGroups = {};
       evaluatedItems.forEach(item => {
-        // Nếu khoảng cách mạng lưới thực tế nhỏ hơn bán kính thiết lập
         if (item.net_dist !== null && item.net_dist !== undefined && item.net_dist <= userRadius) {
           if (!coveredGroups[item.type]) coveredGroups[item.type] = [];
           const distMeters = Math.round(item.net_dist);
