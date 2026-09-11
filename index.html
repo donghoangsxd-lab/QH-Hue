@@ -2,33 +2,17 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Bản đồ Phân tích Hạ tầng Đô thị TP. Huế (Headless GIS)</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    /* NÚT ZOOM LEAFLET DỊCH XUỐNG DƯỚI PANEL HEADER */
-    .leaflet-top.leaflet-left {
-      top: 60px !important;
-      left: 16px !important;
-    }
-    .leaflet-touch .leaflet-bar {
-      border: 1px solid rgba(255, 255, 255, 0.2) !important;
-      background: rgba(15, 23, 42, 0.85) !important;
-      backdrop-filter: blur(12px);
-    }
-    .leaflet-touch .leaflet-bar a {
-      background: transparent !important;
-      color: #38bdf8 !important;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-    }
-
     :root {
-      --bg-dark: rgba(15, 23, 42, 0.88);
-      --bg-card: rgba(30, 41, 59, 0.95);
-      --border-color: rgba(255, 255, 255, 0.12);
+      --bg-dark: rgba(15, 23, 42, 0.90);
+      --bg-card: rgba(30, 41, 59, 0.96);
+      --border-color: rgba(255, 255, 255, 0.15);
       --accent-cyan: #38bdf8;
       --accent-green: #4ade80;
       --accent-orange: #fb923c;
@@ -39,11 +23,21 @@
       --panel-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
     }
 
-    body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: var(--text-main); }
+    body, html { 
+      margin: 0; padding: 0; height: 100%; 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+      background: #0f172a; color: var(--text-main); 
+      touch-action: manipulation;
+    }
     #map { width: 100%; height: 100vh; background: #0f172a; }
     #map.inspect-mode { cursor: crosshair !important; }
 
-    /* ICON HẠ TẦNG HIỆN ĐẠI */
+    /* NÚT ZOOM LEAFLET MẶC ĐỊNH */
+    .leaflet-top.leaflet-left { top: 60px !important; left: 16px !important; }
+    .leaflet-touch .leaflet-bar { border: 1px solid var(--border-color) !important; background: var(--bg-dark) !important; backdrop-filter: var(--panel-blur); }
+    .leaflet-touch .leaflet-bar a { background: transparent !important; color: var(--accent-cyan) !important; border-bottom: 1px solid var(--border-color) !important; }
+
+    /* ICON HẠ TẦNG */
     .custom-infra-icon {
       display: flex; align-items: center; justify-content: center;
       background: rgba(15, 23, 42, 0.9); border: 2px solid var(--accent-cyan);
@@ -64,60 +58,61 @@
       position: absolute; top: 16px; left: 16px; z-index: 1000; 
       background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
       padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border-color);
-      box-shadow: var(--panel-shadow); display: flex; align-items: center; gap: 12px; font-size: 12px;
+      box-shadow: var(--panel-shadow); display: flex; align-items: center; gap: 10px; font-size: 12px;
     }
-    .progress-bar-bg { width: 60px; background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden; }
+    .progress-bar-bg { width: 50px; background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
 
-    /* SIDEBAR PANEL HỢP NHẤT GÓC PHẢI */
+    /* SIDEBAR PANEL HỢP NHẤT GÓC PHẢI (DESKTOP) */
     .sidebar-panel {
       position: absolute; top: 16px; right: 16px; z-index: 1000;
       background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
       border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--panel-shadow);
-      width: 270px; font-size: 11.5px; overflow: hidden;
+      width: 270px; font-size: 11.5px; overflow: hidden; transition: all 0.3s ease;
     }
 
     .tab-header { display: flex; background: rgba(0, 0, 0, 0.3); border-bottom: 1px solid var(--border-color); }
     .tab-btn { flex: 1; padding: 10px; text-align: center; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: all 0.2s ease; font-size: 11px; }
     .tab-btn.active { color: var(--accent-cyan); border-bottom: 2px solid var(--accent-cyan); background: rgba(255, 255, 255, 0.03); }
 
-    .tab-body { padding: 10px 12px; max-height: 75vh; overflow-y: auto; }
+    .tab-body { padding: 10px 12px; max-height: 70vh; overflow-y: auto; }
     .tab-body::-webkit-scrollbar { width: 4px; }
     .tab-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
 
     .layer-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
     .layer-row label { cursor: pointer; color: var(--text-main); }
-    .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; }
+    .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 16px; height: 16px; }
 
-    .btn-dot-buffer { width: 14px; height: 14px; border-radius: 50%; background: #475569; color: #fff; font-size: 8px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; }
+    .btn-dot-buffer { width: 16px; height: 16px; border-radius: 50%; background: #475569; color: #fff; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; }
     .btn-dot-buffer.active { background: var(--accent-orange); box-shadow: 0 0 8px var(--accent-orange); }
 
     .opacity-slider-row { margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px; }
     .opacity-slider { width: 100%; accent-color: var(--accent-cyan); cursor: pointer; margin-top: 4px; }
 
-    /* FLOATING DOCKBAR CHÍNH GIỮA ĐÁY MÀN HÌNH */
+    /* FLOATING DOCKBAR CẠNH DƯỚI MÀN HÌNH (DESKTOP) */
     .dockbar-container {
       position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;
       background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
       border: 1px solid var(--border-color); border-radius: 30px; padding: 6px 12px;
       box-shadow: var(--panel-shadow); display: flex; gap: 6px; align-items: center;
+      max-width: 95vw;
     }
 
     .btn-dock {
       background: transparent; color: var(--text-main); border: none; padding: 8px 12px;
       border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 11.5px;
-      display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease;
-      white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease; white-space: nowrap;
     }
     .btn-dock:hover { background: rgba(255,255,255,0.1); color: var(--accent-cyan); }
     .btn-dock.active { background: var(--accent-orange); color: #fff; box-shadow: 0 0 12px var(--accent-orange); }
-
     .dock-divider { width: 1px; height: 18px; background: var(--border-color); margin: 0 2px; }
 
-    /* CARD PHÂN TÍCH PHƯỜNG TỐI ƯU GIAO DIỆN KHÔNG BỊ TRÀN */
-    .ward-popup-card {
-      width: 620px; max-width: 88vw; max-height: 80vh; overflow-y: auto; font-size: 10.5px;
-    }
+    /* MENU XỔ ĐO ĐẠC */
+    .measure-dropdown { display: none; position: absolute; bottom: 50px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 6px; box-shadow: var(--panel-shadow); flex-direction: column; gap: 4px; min-width: 140px; }
+    .measure-dropdown.show { display: flex; }
+
+    /* POPUP & MODAL CARDS */
+    .ward-popup-card { width: 620px; max-width: 88vw; max-height: 75vh; overflow-y: auto; font-size: 10.5px; }
     .ward-popup-card::-webkit-scrollbar { width: 5px; }
     .ward-popup-card::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
 
@@ -125,19 +120,17 @@
     table.ward-table th, table.ward-table td { border: 1px solid var(--border-color); padding: 5px 4px; word-wrap: break-word; }
     table.ward-table th { background: #0f172a; color: var(--accent-cyan); text-align: center; }
 
-    /* FORM POPUP ĐỀ XUẤT ĐIỂM MỚI */
     .add-point-card {
       display: none; position: absolute; bottom: 75px; left: 50%; transform: translateX(-50%); z-index: 1001;
       background: var(--bg-card); backdrop-filter: var(--panel-blur); border: 1px solid var(--border-color);
       border-radius: 12px; box-shadow: var(--panel-shadow); padding: 14px; width: 290px; font-size: 11px;
     }
     .add-point-card input, .add-point-card select {
-      width: 100%; padding: 6px; margin: 4px 0 8px 0; background: rgba(15, 23, 42, 0.8);
+      width: 100%; padding: 8px; margin: 4px 0 8px 0; background: rgba(15, 23, 42, 0.8);
       border: 1px solid var(--border-color); color: #fff; border-radius: 6px; box-sizing: border-box; font-size: 11px;
     }
-    .btn-submit { width: 100%; background: var(--accent-green); color: #0f172a; border: none; padding: 8px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    .btn-submit { width: 100%; background: var(--accent-green); color: #0f172a; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; }
 
-    /* MODAL BẢNG THỐNG KÊ 40 PHƯỜNG XÃ */
     .modal-panel {
       display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2000;
       background: var(--bg-card); backdrop-filter: var(--panel-blur); border: 1px solid var(--border-color);
@@ -168,13 +161,55 @@
 
     .inline-progress-bg { background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; }
     .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-cyan); transition: width 0.3s ease; }
+
+    /* =====================================================
+       CẤU HÌNH MOBILE WEB TỰ ĐỘNG RESPONSIVE (< 768px)
+       ===================================================== */
+    @media (max-width: 768px) {
+      /* Dời nút Zoom (+) (-) lên vị trí góc dưới bên trái để tiện tay dùng điện thoại */
+      .leaflet-top.leaflet-left { top: auto !important; bottom: 75px !important; left: 10px !important; }
+
+      .panel-header-left {
+        top: 10px; left: 10px; padding: 6px 10px; font-size: 11px; max-width: 80vw;
+      }
+
+      /* Sidebar chuyển thành Drawer có thể ẩn/hiện */
+      .sidebar-panel {
+        top: auto; bottom: 65px; right: 10px; left: 10px;
+        width: auto; max-height: 50vh; display: none;
+      }
+      .sidebar-panel.mobile-open { display: block; }
+
+      /* DockBar cuộn ngang bằng ngón tay mượt mà không bị vỡ hàng */
+      .dockbar-container {
+        bottom: 10px; width: 94vw; border-radius: 20px;
+        padding: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+        justify-content: flex-start;
+      }
+      .dockbar-container::-webkit-scrollbar { display: none; }
+
+      .btn-dock {
+        padding: 8px 10px; font-size: 11px; flex-shrink: 0;
+      }
+
+      .add-point-card {
+        bottom: 60px; width: 88vw; padding: 12px;
+      }
+
+      .modal-panel {
+        width: 96vw; height: 92vh; padding: 10px;
+      }
+      .ward-popup-card {
+        width: 85vw !important; max-height: 65vh;
+      }
+    }
   </style>
 </head>
 <body>
 
   <div id="map"></div>
 
-  <!-- HEADER GÓC TRÁI -->
+  <!-- HEADER TIÊU ĐỀ -->
   <div class="panel-header-left">
     <b style="color:var(--accent-cyan);">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
     <div style="display:flex; align-items:center; gap:6px;">
@@ -183,8 +218,8 @@
     </div>
   </div>
 
-  <!-- SIDEBAR HỢP NHẤT GÓC PHẢI -->
-  <div class="sidebar-panel">
+  <!-- SIDEBAR PANEL GÓC PHẢI -->
+  <div class="sidebar-panel" id="sidebarPanel">
     <div class="tab-header">
       <div class="tab-btn active" id="tabBtnLayers" onclick="switchTab('layers')">⚙️ LỚP DỮ LIỆU</div>
       <div class="tab-btn" id="tabBtnLegend" onclick="switchTab('legend')">📖 CHÚ GIẢI</div>
@@ -283,17 +318,22 @@
     </div>
   </div>
 
-  <!-- FLOATING DOCKBAR CHÍNH GIỮA ĐÁY MÀN HÌNH -->
+  <!-- FLOATING DOCKBAR THÔNG MINH CHO CẢ PC VÀ MOBILE -->
   <div class="dockbar-container">
-    <button class="btn-dock" id="btnInspectMode" onclick="toggleInspectMode()" title="Click vào bản đồ để kiểm tra hạ tầng">🖱️ TRA CỨU ĐIỂM</button>
-    <button class="btn-dock" onclick="toggleAddCard()">➕ ĐỀ XUẤT ĐIỂM MỚI</button>
-    <button class="btn-dock" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP (40 PHƯỜNG XÃ)</button>
+    <button class="btn-dock" id="btnToggleLayersMobile" onclick="toggleMobileLayers()">⚙️ LỚP BẢN ĐỒ</button>
+    <button class="btn-dock" id="btnInspectMode" onclick="toggleInspectMode()" title="Click vào bản đồ để kiểm tra">🖱️ TRA CỨU</button>
+    <button class="btn-dock" onclick="toggleAddCard()">➕ ĐỀ XUẤT</button>
+    <button class="btn-dock" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP</button>
     
     <div class="dock-divider"></div>
-    
-    <!-- 2 NÚT ĐO ĐẠC RIÊNG BIỆT CHUẨN GIS -->
-    <button class="btn-dock" id="btnMeasureDist" onclick="toggleMeasure('distance')" title="Đo khoảng cách / Chiều dài">📏 ĐO KHOẢNG CÁCH</button>
-    <button class="btn-dock" id="btnMeasureArea" onclick="toggleMeasure('area')" title="Đo diện tích / Đa giác">📐 ĐO DIỆN TÍCH</button>
+
+    <div style="position:relative; display:inline-block;">
+      <button class="btn-dock" id="btnMeasureMain" onclick="toggleMeasureMenu()">📐 ĐO ĐẠC ▼</button>
+      <div class="measure-dropdown" id="measureDropdown">
+        <button class="btn-dock" id="btnMeasureDist" onclick="toggleMeasure('distance')">📏 Đo khoảng cách</button>
+        <button class="btn-dock" id="btnMeasureArea" onclick="toggleMeasure('area')">📐 Đo diện tích</button>
+      </div>
+    </div>
   </div>
 
   <div class="add-point-card" id="addPointCard">
@@ -409,6 +449,16 @@
       };
     }
 
+    function toggleMobileLayers() {
+      const panel = document.getElementById('sidebarPanel');
+      panel.classList.toggle('mobile-open');
+    }
+
+    function toggleMeasureMenu() {
+      const dropdown = document.getElementById('measureDropdown');
+      dropdown.classList.toggle('show');
+    }
+
     function switchTab(tab) {
       document.getElementById('tabLayers').style.display = tab === 'layers' ? 'block' : 'none';
       document.getElementById('tabLegend').style.display = tab === 'legend' ? 'block' : 'none';
@@ -440,6 +490,8 @@
     }
 
     function toggleMeasure(type) {
+      document.getElementById('measureDropdown').classList.remove('show');
+
       if (activeMeasureType === type) {
         clearMeasure();
         return;
@@ -448,15 +500,13 @@
       clearMeasure();
       activeMeasureType = type;
       
-      const btnDist = document.getElementById('btnMeasureDist');
-      const btnArea = document.getElementById('btnMeasureArea');
+      const btnMain = document.getElementById('btnMeasureMain');
+      btnMain.classList.add('active');
 
       if (type === 'distance') {
-        btnDist.classList.add('active');
-        btnDist.innerHTML = "❌ HUỶ ĐO CHIỀU DÀI";
+        btnMain.innerHTML = "❌ HUỶ ĐO ĐẠC";
       } else {
-        btnArea.classList.add('active');
-        btnArea.innerHTML = "❌ HUỶ ĐO DIỆN TÍCH";
+        btnMain.innerHTML = "❌ HUỶ ĐO ĐẠC";
       }
     }
 
@@ -465,12 +515,9 @@
       measurePoints = [];
       measureLayerGroup.clearLayers();
 
-      const btnDist = document.getElementById('btnMeasureDist');
-      const btnArea = document.getElementById('btnMeasureArea');
-      btnDist.classList.remove('active');
-      btnDist.innerHTML = "📏 ĐO KHOẢNG CÁCH";
-      btnArea.classList.remove('active');
-      btnArea.innerHTML = "📐 ĐO DIỆN TÍCH";
+      const btnMain = document.getElementById('btnMeasureMain');
+      btnMain.classList.remove('active');
+      btnMain.innerHTML = "📐 ĐO ĐẠC ▼";
     }
 
     const infraLabels = {
@@ -571,13 +618,12 @@
         mapEl.classList.add('inspect-mode');
       } else {
         btn.classList.remove('active');
-        btn.innerHTML = "🖱️ TRA CỨU ĐIỂM";
+        btn.innerHTML = "🖱️ TRA CỨU";
         mapEl.classList.remove('inspect-mode');
       }
     }
 
     map.on('click', (e) => {
-      // ĐO KHẢO SÁT TRỰC TIẾP TRÊN BẢN ĐỒ
       if (activeMeasureType) {
         measurePoints.push(e.latlng);
         
