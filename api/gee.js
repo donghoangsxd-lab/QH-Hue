@@ -112,12 +112,14 @@ function invalidateCache() {
 }
 
 function getNetworkCostImage(region) {
+  // Lấy dữ liệu đường giao thông HOT/OSM phủ toàn bộ khung nhìn
   const roads = ee.FeatureCollection("HOT/OSM/planet/roads").filterBounds(region);
   const roadImage = ee.Image().byte().paint({
     featureCollection: roads,
     color: 1,
-    width: 3
+    width: 2
   });
+  // Các ô có đường giao thông chi phí di chuyển là 1, ô còn lại chi phí 12 (khó di chuyển)
   return ee.Image(12).where(roadImage.gt(0), 1).clip(region);
 }
 
