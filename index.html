@@ -10,7 +10,7 @@
 
   <style>
     :root {
-      --bg-dark: rgba(15, 23, 42, 0.90);
+      --bg-dark: rgba(15, 23, 42, 0.92);
       --bg-card: rgba(30, 41, 59, 0.96);
       --border-color: rgba(255, 255, 255, 0.15);
       --accent-cyan: #38bdf8;
@@ -32,10 +32,24 @@
     #map { width: 100%; height: 100vh; background: #0f172a; }
     #map.inspect-mode { cursor: crosshair !important; }
 
-    /* NÚT ZOOM LEAFLET MẶC ĐỊNH */
-    .leaflet-top.leaflet-left { top: 60px !important; left: 16px !important; }
-    .leaflet-touch .leaflet-bar { border: 1px solid var(--border-color) !important; background: var(--bg-dark) !important; backdrop-filter: var(--panel-blur); }
+    /* NHÓM CÔNG CỤ TRÊN (ZOOM + ĐO ĐẠC) */
+    .top-tools-container {
+      position: absolute; top: 60px; left: 16px; z-index: 1000;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+
+    .leaflet-top.leaflet-left { position: static !important; }
+    .leaflet-touch .leaflet-bar { border: 1px solid var(--border-color) !important; background: var(--bg-dark) !important; backdrop-filter: var(--panel-blur); border-radius: 10px; overflow: hidden; }
     .leaflet-touch .leaflet-bar a { background: transparent !important; color: var(--accent-cyan) !important; border-bottom: 1px solid var(--border-color) !important; }
+
+    .btn-top-tool {
+      background: var(--bg-dark); color: var(--text-main); border: 1px solid var(--border-color);
+      padding: 8px 12px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 11px;
+      backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
+      box-shadow: var(--panel-shadow); display: flex; align-items: center; gap: 6px; transition: all 0.2s ease;
+    }
+    .btn-top-tool:hover { background: rgba(255,255,255,0.1); color: var(--accent-cyan); }
+    .btn-top-tool.active { background: var(--accent-orange); color: #fff; border-color: var(--accent-orange); box-shadow: 0 0 12px var(--accent-orange); }
 
     /* ICON HẠ TẦNG */
     .custom-infra-icon {
@@ -63,7 +77,7 @@
     .progress-bar-bg { width: 50px; background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
 
-    /* SIDEBAR PANEL HỢP NHẤT GÓC PHẢI (DESKTOP) */
+    /* SIDEBAR PANEL GÓC PHẢI */
     .sidebar-panel {
       position: absolute; top: 16px; right: 16px; z-index: 1000;
       background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
@@ -75,7 +89,7 @@
     .tab-btn { flex: 1; padding: 10px; text-align: center; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: all 0.2s ease; font-size: 11px; }
     .tab-btn.active { color: var(--accent-cyan); border-bottom: 2px solid var(--accent-cyan); background: rgba(255, 255, 255, 0.03); }
 
-    .tab-body { padding: 10px 12px; max-height: 70vh; overflow-y: auto; }
+    .tab-body { padding: 10px 12px; max-height: 60vh; overflow-y: auto; }
     .tab-body::-webkit-scrollbar { width: 4px; }
     .tab-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
 
@@ -89,9 +103,9 @@
     .opacity-slider-row { margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px; }
     .opacity-slider { width: 100%; accent-color: var(--accent-cyan); cursor: pointer; margin-top: 4px; }
 
-    /* FLOATING DOCKBAR CẠNH DƯỚI MÀN HÌNH (DESKTOP) */
+    /* NHÓM CÔNG CỤ DƯỚI (DOCKBAR) */
     .dockbar-container {
-      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;
+      position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 1000;
       background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
       border: 1px solid var(--border-color); border-radius: 30px; padding: 6px 12px;
       box-shadow: var(--panel-shadow); display: flex; gap: 6px; align-items: center;
@@ -105,11 +119,14 @@
     }
     .btn-dock:hover { background: rgba(255,255,255,0.1); color: var(--accent-cyan); }
     .btn-dock.active { background: var(--accent-orange); color: #fff; box-shadow: 0 0 12px var(--accent-orange); }
-    .dock-divider { width: 1px; height: 18px; background: var(--border-color); margin: 0 2px; }
 
-    /* MENU XỔ ĐO ĐẠC */
-    .measure-dropdown { display: none; position: absolute; bottom: 50px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 6px; box-shadow: var(--panel-shadow); flex-direction: column; gap: 4px; min-width: 140px; }
-    .measure-dropdown.show { display: flex; }
+    /* BANNER BÁO TRẠNG THÁI CHẤM ĐIỂM DƯỚI MÀN HÌNH */
+    .pick-status-banner {
+      display: none; position: absolute; bottom: 75px; left: 50%; transform: translateX(-50%); z-index: 1002;
+      background: var(--accent-orange); color: #fff; font-weight: bold; font-size: 11px;
+      padding: 8px 16px; border-radius: 20px; box-shadow: var(--panel-shadow);
+      animation: alertPulse 1.5s infinite ease-in-out;
+    }
 
     /* POPUP & MODAL CARDS */
     .ward-popup-card { width: 620px; max-width: 88vw; max-height: 75vh; overflow-y: auto; font-size: 10.5px; }
@@ -162,46 +179,28 @@
     .inline-progress-bg { background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; }
     .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-cyan); transition: width 0.3s ease; }
 
-    /* =====================================================
-       CẤU HÌNH MOBILE WEB TỰ ĐỘNG RESPONSIVE (< 768px)
-       ===================================================== */
+    /* MOBILE RESPONSIVE (< 768px) */
     @media (max-width: 768px) {
-      /* Dời nút Zoom (+) (-) lên vị trí góc dưới bên trái để tiện tay dùng điện thoại */
-      .leaflet-top.leaflet-left { top: auto !important; bottom: 75px !important; left: 10px !important; }
+      .top-tools-container { top: 55px; left: 10px; gap: 6px; }
+      .panel-header-left { top: 10px; left: 10px; padding: 6px 10px; font-size: 11px; max-width: 80vw; }
 
-      .panel-header-left {
-        top: 10px; left: 10px; padding: 6px 10px; font-size: 11px; max-width: 80vw;
-      }
-
-      /* Sidebar chuyển thành Drawer có thể ẩn/hiện */
       .sidebar-panel {
         top: auto; bottom: 65px; right: 10px; left: 10px;
         width: auto; max-height: 50vh; display: none;
       }
       .sidebar-panel.mobile-open { display: block; }
 
-      /* DockBar cuộn ngang bằng ngón tay mượt mà không bị vỡ hàng */
       .dockbar-container {
-        bottom: 10px; width: 94vw; border-radius: 20px;
-        padding: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch;
-        justify-content: flex-start;
-      }
-      .dockbar-container::-webkit-scrollbar { display: none; }
-
-      .btn-dock {
-        padding: 8px 10px; font-size: 11px; flex-shrink: 0;
+        bottom: 10px; width: 92vw; border-radius: 20px;
+        padding: 4px; justify-content: space-around;
       }
 
-      .add-point-card {
-        bottom: 60px; width: 88vw; padding: 12px;
-      }
+      .btn-dock { padding: 8px 6px; font-size: 10.5px; }
+      .btn-top-tool { padding: 6px 10px; font-size: 10.5px; }
 
-      .modal-panel {
-        width: 96vw; height: 92vh; padding: 10px;
-      }
-      .ward-popup-card {
-        width: 85vw !important; max-height: 65vh;
-      }
+      .add-point-card { bottom: 60px; width: 88vw; padding: 12px; }
+      .modal-panel { width: 96vw; height: 92vh; padding: 10px; }
+      .ward-popup-card { width: 85vw !important; max-height: 65vh; }
     }
   </style>
 </head>
@@ -216,6 +215,13 @@
       <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
       <span id="progressPercent" style="color:var(--accent-green); font-weight:bold;">0%</span>
     </div>
+  </div>
+
+  <!-- NHÓM CÔNG CỤ PHÍA TRÊN (MÀN HÌNH MÁY TÍNH VÀ MOBILE) -->
+  <div class="top-tools-container">
+    <div id="leafletZoomBar"></div>
+    <button class="btn-top-tool" id="btnMeasureDist" onclick="toggleMeasure('distance')">📏 ĐO CHIỀU DÀI</button>
+    <button class="btn-top-tool" id="btnMeasureArea" onclick="toggleMeasure('area')">📐 ĐO DIỆN TÍCH</button>
   </div>
 
   <!-- SIDEBAR PANEL GÓC PHẢI -->
@@ -318,22 +324,17 @@
     </div>
   </div>
 
-  <!-- FLOATING DOCKBAR THÔNG MINH CHO CẢ PC VÀ MOBILE -->
+  <!-- NHÓM CÔNG CỤ PHÍA DƯỚI (DOCKBAR TẬP TRUNG TẠI ĐÂY) -->
   <div class="dockbar-container">
     <button class="btn-dock" id="btnToggleLayersMobile" onclick="toggleMobileLayers()">⚙️ LỚP BẢN ĐỒ</button>
-    <button class="btn-dock" id="btnInspectMode" onclick="toggleInspectMode()" title="Click vào bản đồ để kiểm tra">🖱️ TRA CỨU</button>
-    <button class="btn-dock" onclick="toggleAddCard()">➕ ĐỀ XUẤT</button>
+    <button class="btn-dock" id="btnInspectMode" onclick="toggleInspectMode()" title="Click vào bản đồ để kiểm tra">🖱️ TRA CỨU ĐIỂM</button>
+    <button class="btn-dock" onclick="toggleAddCard()">➕ ĐỀ XUẤT MỚI</button>
     <button class="btn-dock" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP</button>
-    
-    <div class="dock-divider"></div>
+  </div>
 
-    <div style="position:relative; display:inline-block;">
-      <button class="btn-dock" id="btnMeasureMain" onclick="toggleMeasureMenu()">📐 ĐO ĐẠC ▼</button>
-      <div class="measure-dropdown" id="measureDropdown">
-        <button class="btn-dock" id="btnMeasureDist" onclick="toggleMeasure('distance')">📏 Đo khoảng cách</button>
-        <button class="btn-dock" id="btnMeasureArea" onclick="toggleMeasure('area')">📐 Đo diện tích</button>
-      </div>
-    </div>
+  <!-- BANNER THÔNG BÁO KHI ĐANG PICK CHẤM TỌA ĐỘ -->
+  <div class="pick-status-banner" id="pickStatusBanner">
+    📌 Đang chọn điểm... Click trực tiếp trên bản đồ!
   </div>
 
   <div class="add-point-card" id="addPointCard">
@@ -425,8 +426,12 @@
   <script>
     const geeApiBackend = "/api/gee";
 
-    const map = L.map('map', { renderer: L.canvas() }).setView([16.4637, 107.5905], 13);
+    const map = L.map('map', { renderer: L.canvas(), zoomControl: false }).setView([16.4637, 107.5905], 13);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
+
+    // Chuyển nút Zoom Control vào cụm công cụ phía trên
+    const zoomControl = L.control.zoom({ position: 'topleft' }).addTo(map);
+    document.getElementById('leafletZoomBar').appendChild(zoomControl.getContainer());
 
     let tilePopLayer = null;
     let tileHeatmapLayer = null;
@@ -452,11 +457,6 @@
     function toggleMobileLayers() {
       const panel = document.getElementById('sidebarPanel');
       panel.classList.toggle('mobile-open');
-    }
-
-    function toggleMeasureMenu() {
-      const dropdown = document.getElementById('measureDropdown');
-      dropdown.classList.toggle('show');
     }
 
     function switchTab(tab) {
@@ -490,8 +490,6 @@
     }
 
     function toggleMeasure(type) {
-      document.getElementById('measureDropdown').classList.remove('show');
-
       if (activeMeasureType === type) {
         clearMeasure();
         return;
@@ -500,13 +498,15 @@
       clearMeasure();
       activeMeasureType = type;
       
-      const btnMain = document.getElementById('btnMeasureMain');
-      btnMain.classList.add('active');
+      const btnDist = document.getElementById('btnMeasureDist');
+      const btnArea = document.getElementById('btnMeasureArea');
 
       if (type === 'distance') {
-        btnMain.innerHTML = "❌ HUỶ ĐO ĐẠC";
+        btnDist.classList.add('active');
+        btnDist.innerHTML = "❌ HUỶ ĐO CHIỀU DÀI";
       } else {
-        btnMain.innerHTML = "❌ HUỶ ĐO ĐẠC";
+        btnArea.classList.add('active');
+        btnArea.innerHTML = "❌ HUỶ ĐO DIỆN TÍCH";
       }
     }
 
@@ -515,9 +515,12 @@
       measurePoints = [];
       measureLayerGroup.clearLayers();
 
-      const btnMain = document.getElementById('btnMeasureMain');
-      btnMain.classList.remove('active');
-      btnMain.innerHTML = "📐 ĐO ĐẠC ▼";
+      const btnDist = document.getElementById('btnMeasureDist');
+      const btnArea = document.getElementById('btnMeasureArea');
+      btnDist.classList.remove('active');
+      btnDist.innerHTML = "📏 ĐO CHIỀU DÀI";
+      btnArea.classList.remove('active');
+      btnArea.innerHTML = "📐 ĐO DIỆN TÍCH";
     }
 
     const infraLabels = {
@@ -618,7 +621,7 @@
         mapEl.classList.add('inspect-mode');
       } else {
         btn.classList.remove('active');
-        btn.innerHTML = "🖱️ TRA CỨU";
+        btn.innerHTML = "🖱️ TRA CỨU ĐIỂM";
         mapEl.classList.remove('inspect-mode');
       }
     }
@@ -665,6 +668,10 @@
         
         if (tempMarker) map.removeLayer(tempMarker);
         tempMarker = L.marker([lat, lng]).addTo(map);
+
+        // Hiện lại Bảng sau khi chấm điểm thành công
+        document.getElementById('addPointCard').style.display = 'block';
+        document.getElementById('pickStatusBanner').style.display = 'none';
 
         const statusEl = document.getElementById('statusMsg');
         statusEl.style.color = "var(--accent-orange)";
@@ -768,12 +775,14 @@
     function toggleAddCard() {
       const card = document.getElementById('addPointCard');
       card.style.display = card.style.display === 'block' ? 'none' : 'block';
+      document.getElementById('pickStatusBanner').style.display = 'none';
     }
 
     function enablePickMode() {
       isPickMode = true;
-      document.getElementById('statusMsg').style.color = "var(--accent-orange)";
-      document.getElementById('statusMsg').innerText = "👉 Click trực tiếp trên bản đồ...";
+      // Tạm thời ẩn Bảng và hiện Banner thông báo
+      document.getElementById('addPointCard').style.display = 'none';
+      document.getElementById('pickStatusBanner').style.display = 'block';
     }
 
     function submitNewPoint() {
