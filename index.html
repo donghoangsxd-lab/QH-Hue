@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Google Identity Services SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <style>
     :root {
@@ -74,7 +76,7 @@
     .progress-bar-bg { background: rgba(255, 255, 255, 0.12); height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
 
-    /* SIDEBAR & TAB HEADER CÓ NÚT ĐÓNG */
+    /* SIDEBAR & TAB HEADER */
     .tab-header { 
       display: flex; 
       align-items: center;
@@ -91,7 +93,6 @@
       font-size: 14px;
       font-weight: bold;
       transition: color 0.2s ease;
-      line-height: 1;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -99,7 +100,7 @@
     }
     .btn-close-panel:hover { color: var(--accent-red); }
 
-    /* KHUNG NỘI DUNG CUỘN - TỰ ĐỘNG KHÔM SÁT DỮ LIỆU, TRIỆT CẢNH THỪA DƯỚI */
+    /* KHUNG NỘI DUNG CUỘN */
     .tab-body { 
       padding: 12px 14px !important; 
       height: auto !important;
@@ -110,7 +111,7 @@
     .tab-body::-webkit-scrollbar { width: 4px; }
     .tab-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
 
-    /* LỚP DỮ LIỆU ROW & TỐI ƯU KÍCH THƯỚC CHECKBOX */
+    /* LỚP DỮ LIỆU ROW & TỐI ƯU CHECKBOX */
     .layer-row { 
       display: flex; 
       align-items: center; 
@@ -212,10 +213,7 @@
     .inline-progress-bg { background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; }
     .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-cyan); transition: width 0.3s ease; }
 
-
-    /* =========================================================
-       1. CẤU HÌNH GIAO DIỆN DESKTOP / LAPTOP (> 768px)
-       ========================================================= */
+    /* RESPONSIVE DESKTOP (> 768px) */
     @media (min-width: 769px) {
       .leaflet-control-zoom { display: none !important; }
 
@@ -247,19 +245,14 @@
         width: 300px; display: block;
         transition: transform 0.25s ease, opacity 0.25s ease;
       }
-      .sidebar-panel.closed {
-        display: none !important;
-      }
+      .sidebar-panel.closed { display: none !important; }
       .tab-btn { font-size: 12px; }
       .layer-row, .legend-row { font-size: 12px; }
 
       .add-point-card { bottom: 75px; left: 50%; transform: translateX(-50%); width: 320px; }
     }
 
-
-    /* =========================================================
-       2. CẤU HÌNH GIAO DIỆN MOBILE WEB (<= 768px)
-       ========================================================= */
+    /* RESPONSIVE MOBILE (<= 768px) */
     @media (max-width: 768px) {
       .leaflet-control-zoom { display: none !important; }
 
@@ -318,7 +311,7 @@
     <button class="ui-btn-format" id="btnMeasureArea" onclick="toggleMeasure('area')">📐 DIỆN TÍCH</button>
   </div>
 
-  <!-- SIDEBAR PANEL - BỔ SUNG NÚT THU GỌN Ở GÓC TRÊN BÊN PHẢI -->
+  <!-- SIDEBAR PANEL -->
   <div class="sidebar-panel ui-panel-format" id="sidebarPanel">
     <div class="tab-header">
       <div class="tab-btn active" id="tabBtnLayers" onclick="switchTab('layers')">⚙️ LỚP DỮ LIỆU</div>
@@ -428,8 +421,28 @@
     <button class="ui-btn-format" id="btnInspectMode" onclick="toggleInspectMode()">🖱️ TRA CỨU ĐIỂM</button>
     <button class="ui-btn-format" onclick="toggleAddCard()">➕ ĐỀ XUẤT MỚI</button>
     <button class="ui-btn-format" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP</button>
+    <button class="ui-btn-format" id="btnAuth" onclick="toggleAuthModal()" style="color:var(--accent-cyan);">🔑 ĐĂNG NHẬP GOOGLE</button>
   </div>
 
+  <!-- MODAL ĐĂNG NHẬP GOOGLE ADMIN -->
+  <div id="authModal" class="ui-panel-format" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:2001; padding:16px; width:300px; text-align:center;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <b style="color:var(--accent-cyan); font-size:12px;">🔑 ĐĂNG NHẬP QUẢN TRỊ (ADMIN)</b>
+      <span onclick="toggleAuthModal()" style="cursor:pointer; color:var(--accent-red); font-weight:bold;">✕</span>
+    </div>
+    <div style="font-size:10.5px; color:var(--text-muted); margin-bottom:12px;">Đăng nhập bằng tài khoản Google được cấp quyền Admin để thực hiện phê duyệt đề xuất hạ tầng.</div>
+    
+    <div id="g_id_onload"
+         data-client_id="YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+         data-callback="handleGoogleCredentialResponse"
+         data-auto_prompt="false">
+    </div>
+    <div class="g_id_signin" data-type="standard" data-size="large" data-theme="dark" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
+    
+    <div id="authMsg" style="font-size:10px; margin-top:8px; text-align:center; font-weight:bold;"></div>
+  </div>
+
+  <!-- CARD ĐỀ XUẤT ĐIỂM MỚI (CHO VIEWER/PUBLIC) -->
   <div class="add-point-card ui-panel-format" id="addPointCard">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:4px; margin-bottom:8px;">
       <b style="color:var(--accent-cyan);">➕ THÊM ĐIỂM HẠ TẦNG MỚI</b>
@@ -469,6 +482,7 @@
     <div id="statusMsg" style="font-size:10px; margin-top:4px; text-align:center; font-weight:bold;"></div>
   </div>
 
+  <!-- MODAL BẢNG TỔNG HỢP -->
   <div class="modal-panel ui-panel-format" id="combinedModal">
     <div class="modal-header">
       <b style="font-size:13px; color:var(--accent-cyan);">📊 BẢNG ĐÁNH GIÁ MẬT ĐỘ PHỦ HẠ TẦNG VÀ BIỂU ĐỒ TỔNG HỢP (40 PHƯỜNG XÃ)</b>
@@ -518,6 +532,62 @@
 
   <script>
     const geeApiBackend = "/api/gee";
+
+    // CẤU HÌNH PHÂN QUYỀN: Mặc định VIEWER (Không yêu cầu đăng nhập)
+    let currentUserRole = "VIEWER"; 
+    // Email cấp quyền Admin quản trị
+    const ADMIN_EMAILS = ["hoang.sxd@gmail.com", "admin.sxd@hue.gov.vn"];
+
+    function toggleAuthModal() {
+      const modal = document.getElementById('authModal');
+      modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+      document.getElementById('authMsg').innerText = "";
+    }
+
+    // Xử lý xác thực Token Google OAuth
+    function parseJwt(token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function handleGoogleCredentialResponse(response) {
+      const payload = parseJwt(response.credential);
+      const msg = document.getElementById('authMsg');
+
+      if (payload && payload.email) {
+        const userEmail = payload.email.toLowerCase();
+        
+        // Kiểm tra địa chỉ Email có thuộc danh sách Admin
+        if (ADMIN_EMAILS.includes(userEmail) || userEmail.endsWith("@hue.gov.vn")) {
+          currentUserRole = "ADMIN";
+          msg.style.color = "var(--accent-green)";
+          msg.innerText = `✓ Xin chào Admin (${payload.name})`;
+          
+          const btnAuth = document.getElementById('btnAuth');
+          btnAuth.style.color = "var(--accent-orange)";
+          btnAuth.innerHTML = `🔓 ADMIN (${payload.name})`;
+
+          setTimeout(() => {
+            toggleAuthModal();
+            renderGroupedPoints(); // Refresh Marker & Popup với quyền Admin
+          }, 1000);
+        } else {
+          msg.style.color = "var(--accent-red)";
+          msg.innerText = `❌ Email (${userEmail}) không có quyền Quản trị.`;
+        }
+      } else {
+        msg.style.color = "var(--accent-red)";
+        msg.innerText = "❌ Lỗi xác thực tài khoản Google!";
+      }
+    }
 
     const map = L.map('map', { renderer: L.canvas() }).setView([16.4637, 107.5905], 13);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
@@ -901,7 +971,7 @@
 
       fetch(addUrl).then(r => r.json()).then(res => {
         msg.style.color = "var(--accent-green)";
-        msg.innerText = "✓ Đã lưu đề xuất!";
+        msg.innerText = "✓ Đã lưu đề xuất thành công!";
         
         const newObj = {
           id: "NEW-" + Date.now(),
@@ -1064,6 +1134,8 @@
     }
 
     function approvePointStatus(pointId) {
+      if (currentUserRole !== "ADMIN") return;
+
       const target = rawDataList.find(x => x.id === pointId);
       if (!target) return;
 
@@ -1100,9 +1172,17 @@
           <div class="inline-progress-bg"><div class="inline-progress-fill" style="background:var(--accent-red);" id="popValBar"></div></div>
         </div>`;
 
-        contentHtml += `<button onclick="approvePointStatus('${p.id}')" style="width:100%; margin-top:8px; background:var(--accent-green); color:#0f172a; border:none; padding:6px; border-radius:4px; font-weight:bold; cursor:pointer;">
-          ✅ PHÊ DUYỆT CHÍNH THỨC (STATUS = TRUE)
-        </button>`;
+        // CHỈ ADMIN MỚI CÓ NÚT PHÊ DUYỆT
+        if (currentUserRole === "ADMIN") {
+          contentHtml += `<button onclick="approvePointStatus('${p.id}')" style="width:100%; margin-top:8px; background:var(--accent-green); color:#0f172a; border:none; padding:6px; border-radius:4px; font-weight:bold; cursor:pointer;">
+            ✅ PHÊ DUYỆT CHÍNH THỨC (ADMIN)
+          </button>`;
+        } else {
+          contentHtml += `<div style="margin-top:6px; font-size:10px; color:var(--accent-orange); font-style:italic; text-align:center;">
+            ⏳ Đang chờ Quản trị viên (Admin) phê duyệt.
+          </div>`;
+        }
+
         contentHtml += `</div>`;
 
         const popup = L.popup({ closeButton: true, autoPan: true })
