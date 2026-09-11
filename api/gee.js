@@ -112,14 +112,12 @@ function invalidateCache() {
 }
 
 function getNetworkCostImage(region) {
-  // Lấy dữ liệu đường giao thông HOT/OSM phủ toàn bộ khung nhìn
   const roads = ee.FeatureCollection("HOT/OSM/planet/roads").filterBounds(region);
   const roadImage = ee.Image().byte().paint({
     featureCollection: roads,
     color: 1,
     width: 2
   });
-  // Các ô có đường giao thông chi phí di chuyển là 1, ô còn lại chi phí 12 (khó di chuyển)
   return ee.Image(12).where(roadImage.gt(0), 1).clip(region);
 }
 
@@ -239,22 +237,6 @@ module.exports = async (req, res) => {
       const wardOutline = ee.Image().byte().paint({ featureCollection: wardVectorParsed, color: 1, width: 2 });
       const mapId = await new Promise((resolve, reject) => {
         wardOutline.getMap({ palette: ['#00ffff'] }, (m, err) => err ? reject(err) : resolve(m));
-      });
-      return res.status(200).json({ urlFormat: mapId.urlFormat });
-    }
-
-    // TILE LỚP MẠNG LƯỚI GIAO THÔNG (ĐỂ BẬT/TẮT KIỂM TRA)
-    if (action === 'getRoadsTile') {
-      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
-      const hueBounds = wardVectorParsed.geometry().bounds();
-      const roadsFC = ee.FeatureCollection("HOT/OSM/planet/roads").filterBounds(hueBounds);
-      const roadImage = ee.Image().byte().paint({
-        featureCollection: roadsFC,
-        color: 1,
-        width: 2
-      });
-      const mapId = await new Promise((resolve, reject) => {
-        roadImage.getMap({ palette: ['#38bdf8'] }, (m, err) => err ? reject(err) : resolve(m));
       });
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
