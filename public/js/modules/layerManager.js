@@ -1,12 +1,6 @@
-import { geeApiBackend, infraIcons } from '../config.js';
-import { map, isInspectMode } from './mapManager.js';
+import { state } from '../state.js';
+import { map } from './mapManager.js';
 import { onPointClick } from './analytics.js';
-
-export let rawDataList = [];
-export let globalBufferRadius = 500;
-
-export let tilePopLayer = null;
-export let tileHeatmapLayer = null;
 
 export const layers = {
   pop: L.layerGroup(),
@@ -23,9 +17,32 @@ export const layers = {
   c9: L.layerGroup(), b9: L.layerGroup()
 };
 
-export function updateMainProgress(percent) {
-  document.getElementById('progressBar').style.width = percent + "%";
-  document.getElementById('progressPercent').innerText = percent + "%";
+export const infraIcons = {
+  "1-CV": { symbol: "🌳", border: "#4ade80" },
+  "2-BDX": { symbol: "🅿️", border: "#a855f7" },
+  "3-MN": { symbol: "🧸", border: "#fb923c" },
+  "4-TH": { symbol: "🏫", border: "#facc15" },
+  "5-THCS": { symbol: "📚", border: "#eab308" },
+  "6-YT": { symbol: '<span style="color:#f87171; font-weight:900;">✚</span>', border: "#f87171" },
+  "7-VH": { symbol: "🎭", border: "#ec4899" },
+  "8-TM": { symbol: "🛒", border: "#38bdf8" },
+  "9-CSD": { symbol: "🛠️", border: "#94a3b8" }
+};
+
+let tileHeatmapLayer = null;
+
+export function initDefaultLayers(mapInstance) {
+  layers.boundary.addTo(mapInstance);
+  layers.heatmap.addTo(mapInstance);
+  layers.c1.addTo(mapInstance);
+  layers.c2.addTo(mapInstance);
+  layers.c3.addTo(mapInstance);
+  layers.c4.addTo(mapInstance);
+  layers.c5.addTo(mapInstance);
+  layers.c6.addTo(mapInstance);
+  layers.c7.addTo(mapInstance);
+  layers.c8.addTo(mapInstance);
+  layers.c9.addTo(mapInstance);
 }
 
 export function toggleLayer(layerKey, isChecked) {
@@ -33,120 +50,38 @@ export function toggleLayer(layerKey, isChecked) {
     if (layerKey === 'heatmap') {
       refreshHeatmapOnly();
     } else {
-      map.addLayer(layers[layerKey]);
+      if (map) map.addLayer(layers[layerKey]);
     }
   } else {
-    map.removeLayer(layers[layerKey]);
+    if (map) map.removeLayer(layers[layerKey]);
   }
 
-  if (layerKey === 'pop') {
-    document.getElementById('popBox').style.display = isChecked ? 'block' : 'none';
+  const popBox = document.getElementById('popBox');
+  const heatBox = document.getElementById('heatBox');
+
+  if (layerKey === 'pop' && popBox) {
+    popBox.style.display = isChecked ? 'block' : 'none';
   }
-  if (layerKey === 'heatmap') {
-    document.getElementById('heatBox').style.display = isChecked ? 'block' : 'none';
+  if (layerKey === 'heatmap' && heatBox) {
+    heatBox.style.display = isChecked ? 'block' : 'none';
   }
 }
 
 export function toggleBuffer(bufferKey, el) {
+  if (!map) return;
   if (map.hasLayer(layers[bufferKey])) {
     map.removeLayer(layers[bufferKey]);
-    el.classList.remove('active');
+    if (el) el.classList.remove('active');
   } else {
     map.addLayer(layers[bufferKey]);
-    el.classList.add('active');
+    if (el) el.classList.add('active');
   }
 }
 
-export function changePopOpacity(val) {
-  if (tilePopLayer) tilePopLayer.setOpacity(val / 100);
-}
+export function renderGroupedPoints(mapInstance) {
+  const targetMap = mapInstance || map;
+  if (!targetMap) return;
 
-export function changeHeatOpacity(val) {
-  if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(val / 100);
-}
-
-const radiusSteps = [300, 500, 1000, 2000];
-export function changeBufferRadius(sliderIdx) {
-  const idx = parseInt(sliderIdx, 10);
-  globalBufferRadius = radiusSteps[idx];
-  document.getElementById('radiusLabel').innerText = globalBufferRadius + "m";
-  
-  renderGroupedPoints();
-  refreshHeatmapOnly();
-}
-
-function debounce(func, wait) {
-  let timeout;
-  return function(...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
-  };
-}
-export const debouncedChangeBufferRadius = debounce(changeBufferRadius, 350);
-
-export async function loadDataParallel() {
-  updateMainProgress(15);
-
-  // Thêm các lớp layer mặc định lên Map
-  layers.boundary.addTo(map);
-  layers.heatmap.addTo(map);
-  layers.c1.addTo(map); layers.c2.addTo(map); layers.c3.addTo(map);
-  layers.c4.addTo(map); layers.c5.addTo(map); layers.c6.addTo(map);
-  layers.c7.addTo(map); layers.c8.addTo(map); layers.c9.addTo(map);
-
-  try {
-    const cachedPopTile = localStorage.getItem('pop_tile_url');
-    const cachedBoundTile = localStorage.getItem('bound_tile_url');
-    const tileCacheTime = localStorage.getItem('tile_cache_time');
-    const isTileCacheValid = tileCacheTime && (Date.now() - parseInt(tileCacheTime, 10) < 3600000);
-
-    let pPop, pBound;
-
-    if (isTileCacheValid && cachedPopTile) {
-      tilePopLayer = L.tileLayer(cachedPopTile, { opacity: 0.6 }).addTo(layers.pop);
-      pPop = Promise.resolve();
-    } else {
-      pPop = fetch(`${geeApiBackend}?action=getPopRasterTile`).then(r => r.json()).then(d => {
-        if (d.urlFormat) {
-          tilePopLayer = L.tileLayer(d.urlFormat, { opacity: 0.6 }).addTo(layers.pop);
-          localStorage.setItem('pop_tile_url', d.urlFormat);
-          localStorage.setItem('tile_cache_time', Date.now().toString());
-        }
-      }).catch(() => {});
-    }
-
-    if (isTileCacheValid && cachedBoundTile) {
-      L.tileLayer(cachedBoundTile, { opacity: 0.7 }).addTo(layers.boundary);
-      pBound = Promise.resolve();
-    } else {
-      pBound = fetch(`${geeApiBackend}?action=getBoundaryTile`).then(r => r.json()).then(d => {
-        if (d.urlFormat) {
-          L.tileLayer(d.urlFormat, { opacity: 0.7 }).addTo(layers.boundary);
-          localStorage.setItem('bound_tile_url', d.urlFormat);
-        }
-      }).catch(() => {});
-    }
-
-    await Promise.allSettled([pPop, pBound]);
-    updateMainProgress(50);
-
-    const pMain = fetch(geeApiBackend).then(r => r.json()).then(data => {
-      rawDataList = data.rawDataList || [];
-      renderGroupedPoints();
-    }).catch(() => {});
-
-    await Promise.allSettled([pMain]);
-    updateMainProgress(75);
-
-    await refreshHeatmapOnly();
-  } catch (e) {
-    console.error("Lỗi tiến trình nạp bản đồ", e);
-  } finally {
-    updateMainProgress(100);
-  }
-}
-
-export function renderGroupedPoints() {
   const mapGroups = {
     "1-CV": layers.c1, "2-BDX": layers.c2, "3-MN": layers.c3,
     "4-TH": layers.c4, "5-THCS": layers.c5, "6-YT": layers.c6,
@@ -162,7 +97,7 @@ export function renderGroupedPoints() {
   Object.keys(mapGroups).forEach(k => mapGroups[k].clearLayers());
   Object.keys(bufferGroups).forEach(k => bufferGroups[k].clearLayers());
 
-  rawDataList.forEach(p => {
+  state.rawDataList.forEach(p => {
     const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
     const cfg = infraIcons[p.type] || { symbol: "🏢", border: "var(--accent-cyan)" };
     const targetGroup = mapGroups[p.type] || layers.c9;
@@ -185,13 +120,13 @@ export function renderGroupedPoints() {
       });
 
       const pendingMarker = L.marker([p.lat, p.lng], { icon: pendingDivIcon });
-      pendingMarker.on('click', () => { if (!isInspectMode) onPointClick(p, pendingMarker); });
+      pendingMarker.on('click', () => onPointClick(p, pendingMarker, targetMap));
       targetGroup.addLayer(pendingMarker);
 
     } else {
       if (p.type !== "9-CSD") {
         const officialBuffer = L.circle([p.lat, p.lng], {
-          radius: globalBufferRadius,
+          radius: state.globalBufferRadius,
           color: cfg.border, weight: 1.2,
           fillColor: cfg.border, fillOpacity: 0.12
         });
@@ -205,21 +140,24 @@ export function renderGroupedPoints() {
       });
 
       const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
-      marker.on('click', () => { if (!isInspectMode) onPointClick(p, marker); });
+      marker.on('click', () => onPointClick(p, marker, targetMap));
       targetGroup.addLayer(marker);
     }
   });
 }
 
 export function refreshHeatmapOnly() {
-  const currentOpacity = document.getElementById('heatOpacity').value / 100;
-  return fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}&t=${Date.now()}`)
+  const heatOpacityEl = document.getElementById('heatOpacity');
+  const currentOpacity = heatOpacityEl ? heatOpacityEl.value / 100 : 0.5;
+
+  return fetch(`/api/gee?action=getHeatmapTile&overrideRadius=${state.globalBufferRadius}&t=${Date.now()}`)
     .then(r => r.json())
     .then(d => {
       if (d.urlFormat) {
         layers.heatmap.clearLayers();
         tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: currentOpacity });
-        if (document.getElementById('chk_heat').checked) {
+        const chkHeat = document.getElementById('chk_heat');
+        if (chkHeat && chkHeat.checked && map) {
           tileHeatmapLayer.addTo(layers.heatmap);
         }
       }
