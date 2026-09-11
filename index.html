@@ -41,6 +41,7 @@
       border-radius: 12px;
       box-shadow: var(--panel-shadow);
       box-sizing: border-box;
+      overflow: hidden;
     }
 
     /* FORMAT NÚT BẤM CHUNG */
@@ -73,39 +74,70 @@
     .progress-bar-bg { background: rgba(255, 255, 255, 0.12); height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
 
-    /* SIDEBAR & TAB CONTENT */
-    .tab-header { display: flex; background: rgba(0, 0, 0, 0.4); border-bottom: 1px solid var(--border-color); }
+    /* SIDEBAR & TAB HEADER CÓ NÚT ĐÓNG */
+    .tab-header { 
+      display: flex; 
+      align-items: center;
+      background: rgba(0, 0, 0, 0.4); 
+      border-bottom: 1px solid var(--border-color); 
+    }
     .tab-btn { flex: 1; padding: 10px 6px; text-align: center; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: all 0.2s ease; font-size: 11.5px; }
     .tab-btn.active { color: var(--accent-cyan); border-bottom: 2px solid var(--accent-cyan); background: rgba(255, 255, 255, 0.04); }
+    
+    .btn-close-panel {
+      padding: 0 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: color 0.2s ease;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+    }
+    .btn-close-panel:hover { color: var(--accent-red); }
 
+    /* KHUNG NỘI DUNG CUỘN - TỰ ĐỘNG KHÔM SÁT DỮ LIỆU, TRIỆT CẢNH THỪA DƯỚI */
     .tab-body { 
-      padding: 12px 14px 40px 14px !important; 
-      max-height: 72vh !important; 
+      padding: 12px 14px !important; 
+      height: auto !important;
+      max-height: 70vh !important; 
       overflow-y: auto !important; 
       box-sizing: border-box !important;
     }
-    .tab-body::-webkit-scrollbar { width: 5px; }
+    .tab-body::-webkit-scrollbar { width: 4px; }
     .tab-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
 
+    /* LỚP DỮ LIỆU ROW & TỐI ƯU KÍCH THƯỚC CHECKBOX */
     .layer-row { 
       display: flex; 
       align-items: center; 
       justify-content: space-between; 
-      margin-bottom: 8px; 
+      margin-bottom: 7px; 
       font-size: 11.5px; 
-      line-height: 1.4;
+      line-height: 1.3;
     }
     .layer-row label { cursor: pointer; color: var(--text-main); }
-    .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 16px; height: 16px; margin-right: 6px; }
+    .layer-row input[type="checkbox"] { 
+      accent-color: var(--accent-cyan); 
+      cursor: pointer; 
+      width: 14px; 
+      height: 14px; 
+      margin-right: 6px; 
+      vertical-align: middle;
+    }
 
+    /* CHÚ GIẢI ROW */
     .legend-row { 
       display: flex; 
       align-items: center; 
       justify-content: flex-start !important; 
       text-align: left !important;
-      margin-bottom: 8px; 
+      margin-bottom: 7px; 
       font-size: 11.5px; 
-      line-height: 1.4;
+      line-height: 1.3;
       gap: 6px;
     }
 
@@ -113,12 +145,12 @@
     .btn-dot-buffer.active { background: var(--accent-orange); box-shadow: 0 0 8px var(--accent-orange); }
 
     .opacity-slider-row { 
-      margin-top: 10px; 
+      margin-top: 8px; 
       border-top: 1px dashed var(--border-color); 
-      padding-top: 10px; 
+      padding-top: 8px; 
       font-size: 11.5px; 
     }
-    .opacity-slider { width: 100%; accent-color: var(--accent-cyan); cursor: pointer; margin-top: 6px; }
+    .opacity-slider { width: 100%; accent-color: var(--accent-cyan); cursor: pointer; margin-top: 4px; }
 
     /* ICON HẠ TẦNG & POPUP */
     .custom-infra-icon {
@@ -187,7 +219,6 @@
     @media (min-width: 769px) {
       .leaflet-control-zoom { display: none !important; }
 
-      /* Topbar nằm gọn góc trên bên trái */
       .topbar-row {
         position: absolute; top: 16px; left: 16px; z-index: 1000;
         width: 360px; display: flex; gap: 8px; align-items: center;
@@ -195,9 +226,8 @@
       .topbar-header { 
         flex: 1; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; gap: 12px;
       }
-      .btn-toggle-layer-top { display: none; }
+      .btn-toggle-layer-top { display: inline-flex !important; }
 
-      /* Thanh công cụ gom chung Zoom + Đo đạc thành 1 khối duy nhất đồng bộ với Topbar */
       .toolbar-row {
         position: absolute; top: 68px; left: 16px; z-index: 1000;
         width: 360px; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between;
@@ -214,7 +244,11 @@
 
       .sidebar-panel {
         position: absolute; top: 16px; right: 16px; z-index: 1000;
-        width: 300px; display: block !important;
+        width: 300px; display: block;
+        transition: transform 0.25s ease, opacity 0.25s ease;
+      }
+      .sidebar-panel.closed {
+        display: none !important;
       }
       .tab-btn { font-size: 12px; }
       .layer-row, .legend-row { font-size: 12px; }
@@ -276,7 +310,7 @@
     <button class="ui-btn-format ui-panel-format btn-toggle-layer-top" style="padding: 8px 12px;" onclick="toggleSidebar()">⚙️ LỚP BẢN ĐỒ</button>
   </div>
 
-  <!-- HÀNG 2: THANH NÚT CÔNG CỤ (ĐỒNG BỘ NẰM THẲNG DƯỚI TOPBAR) -->
+  <!-- HÀNG 2: THANH NÚT CÔNG CỤ -->
   <div class="toolbar-row ui-panel-format">
     <button class="ui-btn-format btn-zoom-desktop" onclick="map.zoomIn()">➕ ZOOM IN</button>
     <button class="ui-btn-format btn-zoom-desktop" onclick="map.zoomOut()">➖ ZOOM OUT</button>
@@ -284,11 +318,12 @@
     <button class="ui-btn-format" id="btnMeasureArea" onclick="toggleMeasure('area')">📐 DIỆN TÍCH</button>
   </div>
 
-  <!-- SIDEBAR PANEL -->
+  <!-- SIDEBAR PANEL - BỔ SUNG NÚT THU GỌN Ở GÓC TRÊN BÊN PHẢI -->
   <div class="sidebar-panel ui-panel-format" id="sidebarPanel">
     <div class="tab-header">
       <div class="tab-btn active" id="tabBtnLayers" onclick="switchTab('layers')">⚙️ LỚP DỮ LIỆU</div>
       <div class="tab-btn" id="tabBtnLegend" onclick="switchTab('legend')">📖 CHÚ GIẢI</div>
+      <div class="btn-close-panel" onclick="closeSidebar()" title="Thu gọn panel">✕</div>
     </div>
 
     <!-- TAB 1: LỚP DỮ LIỆU -->
@@ -511,6 +546,13 @@
     function toggleSidebar() {
       const panel = document.getElementById('sidebarPanel');
       panel.classList.toggle('open');
+      panel.classList.toggle('closed');
+    }
+
+    function closeSidebar() {
+      const panel = document.getElementById('sidebarPanel');
+      panel.classList.remove('open');
+      panel.classList.add('closed');
     }
 
     function switchTab(tab) {
