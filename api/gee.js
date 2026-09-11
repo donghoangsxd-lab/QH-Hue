@@ -2,7 +2,6 @@ const ee = require('@google/earthengine');
 
 let isGeeInitialized = false;
 
-// CACHE TÊN VERCEL GLOBAL SCOPE
 let cachedGeoJSON = null;
 let lastGeoJSONFetch = 0;
 const GEOJSON_CACHE_TTL = 10 * 60 * 1000;
@@ -112,16 +111,19 @@ function invalidateCache() {
   lastWardStatsFetch = 0;
 }
 
-// HÀM TẠO LỚP MA SÁT GIAO THÔNG TỪ MẠNG LƯỚI ĐƯỜNG OPENSTREETMAP (OSM)
+// HÀM TẠO LỚP MA SÁT GIAO THÔNG CHUẨN HÓA KHÔNG BỊ RỖNG NGHIỆM
 function getNetworkCostImage(region) {
-  const roads = ee.FeatureCollection("HOT/OSM/planet/roads").filterBounds(region);
-  const roadRaster = roads.reduceToImage({
-    properties: ['highway'],
-    reducer: ee.Reducer.first()
-  }).unmask(0);
-  
-  // Ma sát: Trên đường = 1 (m/m), Phi đường bộ = 35 (di chuyển cực kỳ khó khăn)
-  return ee.Image(35).where(roadRaster.gt(0), 1);
+  const roads = ee.FeatureCollection("HOT/OSM/planet/roads")
+    .filterBounds(region);
+    
+  const roadImage = ee.Image().byte().paint({
+    featureCollection: roads,
+    color: 1,
+    width: 3
+  });
+
+  // Ma sát: Trên đường = 1, Ngoài đường = 12 (đi bộ/dẫn bộ cắt qua đường hẻm)
+  return ee.Image(12).where(roadImage.gt(0), 1).clip(region);
 }
 
 module.exports = async (req, res) => {
@@ -132,7 +134,7 @@ module.exports = async (req, res) => {
   try {
     await initGEE();
     const action = req.query.action || 'getInitData';
-    const gasBaseUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec";
+    const gasBaseUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec";
 
     const wardVector = ee.FeatureCollection("projects/optimistic-yew-488501-s0/assets/Polygon-40xa");
     const wardVectorParsed = wardVector.map(f => {
@@ -244,7 +246,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // HEATMAP THEO MẠNG LƯỚI GIAO THÔNG (NETWORK CUMULATIVE COST)
+    // HEATMAP MẠNG LƯỚI GIAO THÔNG
     if (action === 'getHeatmapTile') {
       const overrideRadius = Number(req.query.overrideRadius) || 500;
       const hueBounds = wardVectorParsed.geometry().bounds();
@@ -262,7 +264,7 @@ module.exports = async (req, res) => {
           const sourceFC = ee.FeatureCollection(approvedPts);
           const networkDistImg = costImage.cumulativeCost({
             source: sourceFC,
-            maxDistance: overrideRadius * 1.5
+            maxDistance: overrideRadius * 2
           });
           const maskCoverage = networkDistImg.lte(overrideRadius);
           categoryLayers.push(ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection([ee.Feature(hueBounds)]), color: 1 }).updateMask(maskCoverage));
@@ -386,7 +388,7 @@ module.exports = async (req, res) => {
         }
 
         suggestions.push({
- code,
+          code,
           label: infraConfig[code].label,
           deficitArea: Math.max(0, deficitArea),
           isWardDeficit: deficitArea > 0,
@@ -409,7 +411,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
-    // TRA CỨU ĐIỂM TIẾP CẬN THEO MẠNG LƯỚI GIAO THÔNG THỰC TẾ
+    // TRA CỨU ĐIỂM TIẾP CẬN MẠNG LƯỚI BẰNG HÀM TÍNH KHOẢNG CÁCH DI CHUYỂN TỐC ĐỘ CAO
     if (action === 'analyzeLocation') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -417,50 +419,44 @@ module.exports = async (req, res) => {
       if (!lat || !lng) return res.status(400).json({ error: true, message: "Thiếu tọa độ" });
 
       const clickGeom = ee.Geometry.Point([lng, lat]);
-      const searchRegion = clickGeom.buffer(userRadius * 2);
+      const searchRegion = clickGeom.buffer(userRadius * 2.5);
       const costImage = getNetworkCostImage(searchRegion);
 
       // Thuật toán ma sát di chuyển từ điểm click
       const distFromClickImg = costImage.cumulativeCost({
         source: clickGeom,
-        maxDistance: userRadius * 1.5
+        maxDistance: userRadius * 2.5
       });
 
-      const approvedFeatures = rawDataList
-        .filter(item => item.type !== "9-CSD" && item.status === true)
-        .map(item => ee.Feature(ee.Geometry.Point([item.lng, item.lat]), {
-          id: item.id,
-          name: item.name,
-          type: item.type,
-          ward: item.ward
-        }));
+      // Lọc các điểm hạ tầng đã duyệt trong vùng nghi vấn
+      const approvedItems = rawDataList.filter(item => item.type !== "9-CSD" && item.status === true);
+
+      const samplePromises = approvedItems.map(async (item) => {
+        const itemGeom = ee.Geometry.Point([item.lng, item.lat]);
+        const distRes = await new Promise((resolve) => {
+          distFromClickImg.reduceRegion({
+            reducer: ee.Reducer.first(),
+            geometry: itemGeom,
+            scale: 15
+          }).evaluate((r) => resolve(r ? r.cumulative_cost : null));
+        });
+        return { ...item, net_dist: distRes };
+      });
+
+      const evaluatedItems = await Promise.all(samplePromises);
 
       const coveredGroups = {};
-      const missingCodes = [];
-
-      if (approvedFeatures.length > 0) {
-        const approvedFC = ee.FeatureCollection(approvedFeatures);
-        
-        // Trích xuất khoảng cách đi đường đến từng hạ tầng
-        const sampledFC = distFromClickImg.reduceRegions({
-          collection: approvedFC,
-          reducer: ee.Reducer.first().setOutputs(['net_dist']),
-          scale: 10
-        }).filter(ee.Filter.lte('net_dist', userRadius));
-
-        const reachableFeatures = await new Promise((resolve) => {
-          sampledFC.evaluate((fc) => resolve(fc ? fc.features : []));
-        });
-
-        reachableFeatures.forEach(ft => {
-          const props = ft.properties;
-          if (!coveredGroups[props.type]) coveredGroups[props.type] = [];
-          const distMeters = Math.round(props.net_dist || 0);
-          coveredGroups[props.type].push(`${props.name} (~${distMeters}m)`);
-        });
-      }
+      evaluatedItems.forEach(item => {
+        // Nếu khoảng cách mạng lưới thực tế nhỏ hơn bán kính thiết lập
+        if (item.net_dist !== null && item.net_dist !== undefined && item.net_dist <= userRadius) {
+          if (!coveredGroups[item.type]) coveredGroups[item.type] = [];
+          const distMeters = Math.round(item.net_dist);
+          coveredGroups[item.type].push(`${item.name} (~${distMeters}m)`);
+        }
+      });
 
       const allCodes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+      const missingCodes = [];
       allCodes.forEach(code => {
         if (!coveredGroups[code]) missingCodes.push(code);
       });
