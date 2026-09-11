@@ -102,7 +102,7 @@
       border-radius: 8px;
       box-shadow: var(--panel-shadow);
       padding: 8px 10px;
-      width: 250px; /* CO HẸP KHÔNG CHO THỪA DỰ 1/5 KHOẢNG TRẮNG */
+      width: 250px;
       font-size: 11px;
       color: #2c3e50;
       box-sizing: border-box;
@@ -119,7 +119,6 @@
       user-select: none;
     }
 
-    /* NÚT + / - CHUYÊN NGHIỆP KIỂU ĐỒ HỌA WEB */
     .btn-toggle-expand {
       width: 18px;
       height: 18px;
@@ -140,17 +139,16 @@
     }
 
     .layer-content-body {
-      display: none; /* MẶC ĐỊNH THU GỌN */
+      display: none;
       margin-top: 8px;
       border-top: 1px solid rgba(0,0,0,0.1);
       padding-top: 6px;
     }
 
-    /* DÒNG NỘI DUNG CĂN ĐỀU CẢ 2 BÊN */
     .layer-row {
       display: flex;
       align-items: center;
-      justify-content: space-between; /* ĐẨY NÚT DẤU CHẤM DÁN SÁT LỀ PHẢI */
+      justify-content: space-between;
       margin-bottom: 5px;
       font-size: 11px;
       user-select: none;
@@ -172,7 +170,6 @@
       margin: 0;
     }
 
-    /* CHẤM TRÒN BUFFER DÁN SÁT PHẢI */
     .btn-dot-buffer {
       display: inline-flex;
       align-items: center;
@@ -372,7 +369,6 @@
     </div>
   </div>
 
-  <!-- PANEL QUẢN LÝ LỚP MỚI TINH GỌN, CHẤM TRÒN SÁT LỀ PHẢI, NÚT + / - SANG TRỌNG -->
   <div class="custom-layer-panel">
     <div class="layer-header-bar" onclick="toggleLayerPanel()">
       <span>🏛️ QUẢN LÝ LỚP BẢN ĐỒ</span>
@@ -483,7 +479,7 @@
         <div style="margin-top:6px; font-weight:bold; color:#d35400;">
           ⭕ Bán kính Buffer toàn đô thị: <span id="radiusLabel" style="color:#27ae60;">500m</span>
         </div>
-        <input type="range" id="radiusSlider" class="opacity-slider" min="0" max="3" step="1" value="1" onchange="changeBufferRadius(this.value)">
+        <input type="range" id="radiusSlider" class="opacity-slider" min="0" max="3" step="1" value="1" onchange="debouncedChangeBufferRadius(this.value)">
       </div>
     </div>
   </div>
@@ -625,7 +621,8 @@
   <script>
     const geeApiBackend = "/api/gee";
 
-    const map = L.map('map').setView([16.4637, 107.5905], 13);
+    // BẬT CANVAS RENDERER CHO LEAFLET ĐỂ TỐI ƯU TỐC ĐỘ DỰNG HÌNH
+    const map = L.map('map', { renderer: L.canvas() }).setView([16.4637, 107.5905], 13);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
 
     let tilePopLayer = null;
@@ -636,6 +633,15 @@
     let tempMarker = null;
 
     let globalBufferRadius = 500;
+
+    // HÀM DEBOUNCE GIÚP CHẶN YÊU CẦU SPAM TỪ SLIDER
+    function debounce(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
 
     function getDistanceMeters(lat1, lon1, lat2, lon2) {
       const R = 6371000;
@@ -686,7 +692,6 @@
       c9: L.layerGroup().addTo(map), b9: L.layerGroup()
     };
 
-    // HÀM BẬT/TẮT THU GỌN BẢNG DÀNH CHO NÚT + VÀ − CHUYÊN NGHIỆP
     function toggleLayerPanel() {
       const body = document.getElementById('layerPanelBody');
       const icon = document.getElementById('btnExpandIcon');
@@ -745,6 +750,9 @@
       renderGroupedPoints();
       refreshHeatmapOnly();
     }
+
+    // BỌC TRỄ DEBOUNCE 350MS CHO SLIDER BÁN KÍNH
+    const debouncedChangeBufferRadius = debounce(changeBufferRadius, 350);
 
     function toggleInspectMode() {
       isInspectMode = !isInspectMode;
@@ -946,20 +954,42 @@
     let rawDataList = [];
     let wardStatsData = [];
 
+    // TỐI ƯU CACHE TILE URL Ở LOCALSTORAGE PHÍA CLIENT
     async function loadDataParallel() {
       updateMainProgress(15);
 
       try {
-        const pPop = fetch(`${geeApiBackend}?action=getPopRasterTile`).then(r => r.json()).then(d => {
-          if (d.urlFormat) {
-            tilePopLayer = L.tileLayer(d.urlFormat, { opacity: 0.6 });
-            tilePopLayer.addTo(layers.pop);
-          }
-        }).catch(() => {});
+        const cachedPopTile = localStorage.getItem('pop_tile_url');
+        const cachedBoundTile = localStorage.getItem('bound_tile_url');
+        const tileCacheTime = localStorage.getItem('tile_cache_time');
+        const isTileCacheValid = tileCacheTime && (Date.now() - parseInt(tileCacheTime, 10) < 3600000);
 
-        const pBound = fetch(`${geeApiBackend}?action=getBoundaryTile`).then(r => r.json()).then(d => {
-          if (d.urlFormat) L.tileLayer(d.urlFormat, { opacity: 0.9 }).addTo(layers.boundary);
-        }).catch(() => {});
+        let pPop, pBound;
+
+        if (isTileCacheValid && cachedPopTile) {
+          tilePopLayer = L.tileLayer(cachedPopTile, { opacity: 0.6 }).addTo(layers.pop);
+          pPop = Promise.resolve();
+        } else {
+          pPop = fetch(`${geeApiBackend}?action=getPopRasterTile`).then(r => r.json()).then(d => {
+            if (d.urlFormat) {
+              tilePopLayer = L.tileLayer(d.urlFormat, { opacity: 0.6 }).addTo(layers.pop);
+              localStorage.setItem('pop_tile_url', d.urlFormat);
+              localStorage.setItem('tile_cache_time', Date.now().toString());
+            }
+          }).catch(() => {});
+        }
+
+        if (isTileCacheValid && cachedBoundTile) {
+          L.tileLayer(cachedBoundTile, { opacity: 0.9 }).addTo(layers.boundary);
+          pBound = Promise.resolve();
+        } else {
+          pBound = fetch(`${geeApiBackend}?action=getBoundaryTile`).then(r => r.json()).then(d => {
+            if (d.urlFormat) {
+              L.tileLayer(d.urlFormat, { opacity: 0.9 }).addTo(layers.boundary);
+              localStorage.setItem('bound_tile_url', d.urlFormat);
+            }
+          }).catch(() => {});
+        }
 
         await Promise.allSettled([pPop, pBound]);
         updateMainProgress(50);
@@ -1045,7 +1075,6 @@
       });
     }
 
-    /* ĐẢM BẢO HEATMAP LUÔN RENDER THEO BÁN KÍNH MỚI BẮT BUỘC */
     function refreshHeatmapOnly() {
       const currentOpacity = document.getElementById('heatOpacity').value / 100;
       return fetch(`${geeApiBackend}?action=getHeatmapTile&overrideRadius=${globalBufferRadius}&t=${Date.now()}`)
