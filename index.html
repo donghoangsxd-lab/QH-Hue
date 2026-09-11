@@ -32,10 +32,7 @@
     #map { width: 100%; height: 100vh; background: #0f172a; }
     #map.inspect-mode { cursor: crosshair !important; }
 
-    /* ẨN NÚT ZOOM MẶC ĐỊNH CỦA LEAFLET */
-    .leaflet-control-zoom { display: none !important; }
-
-    /* FORMAT NỀN KÍNH MỜ CHO CÁC THANH CÔNG CỤ MOBILE */
+    /* FORMAT NỀN KÍNH MỜ CHUNG */
     .ui-panel-format {
       background: var(--bg-dark);
       backdrop-filter: var(--panel-blur);
@@ -46,27 +43,25 @@
       box-sizing: border-box;
     }
 
-    /* FORMAT NÚT BẤM CẢI TIẾN: BỎ VIỀN ĐEN, PHỦ NỀN TRONG SUỐT */
+    /* FORMAT NÚT BẤM CHUNGBÒ VIỀN ĐEN */
     .ui-btn-format {
       background: transparent;
       color: var(--text-main);
       border: none;
       border-radius: 8px;
-      padding: 8px 2px;
-      font-size: 10.5px;
+      padding: 8px 12px;
+      font-size: 11px;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 3px;
+      gap: 4px;
       transition: all 0.2s ease;
       white-space: nowrap;
     }
-    .ui-btn-format:active {
-      background: rgba(255, 255, 255, 0.15);
-      color: var(--accent-cyan);
-    }
+    .ui-btn-format:hover { background: rgba(255, 255, 255, 0.1); color: var(--accent-cyan); }
+    .ui-btn-format:active { background: rgba(255, 255, 255, 0.2); }
     .ui-btn-format.active {
       background: var(--accent-orange) !important;
       color: #fff !important;
@@ -74,59 +69,30 @@
       box-shadow: 0 0 10px var(--accent-orange);
     }
 
-    /* HÀNG 1: TOPBAR TRÊN CÙNG TRÀN VỪA KHÍT MÀN HÌNH */
-    .topbar-row {
-      position: absolute; top: 12px; left: 12px; right: 12px; z-index: 1000;
-      display: flex; gap: 8px; align-items: center;
-    }
-    .topbar-header {
-      flex: 1; padding: 8px 12px; display: flex; align-items: center; gap: 8px; font-size: 11px;
-    }
-    .progress-bar-bg { 
-      flex: 1; background: rgba(255, 255, 255, 0.12); height: 5px; border-radius: 3px; overflow: hidden; 
-    }
+    /* PROGRESS BAR */
+    .progress-bar-bg { background: rgba(255, 255, 255, 0.12); height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
 
-    /* HÀNG 2: THANH NÚT CÔNG CỤ (ZOOM, ĐO ĐẠC) NẰM NGAY DƯỚI HÀNG 1 */
-    .toolbar-row {
-      position: absolute; top: 58px; left: 12px; right: 12px; z-index: 1000;
-      padding: 4px; display: flex; align-items: center;
-    }
-    .toolbar-row .ui-btn-format { flex: 1; }
-
-    /* HÀNG 3: THANH DOCKBAR 3 NÚT SÁT MÉP DƯỚI MÀN HÌNH */
-    .dockbar-bottom-row {
-      position: absolute; bottom: 12px; left: 12px; right: 12px; z-index: 1000;
-      padding: 4px; display: flex; align-items: center;
-    }
-    .dockbar-bottom-row .ui-btn-format { flex: 1; padding: 10px 2px; font-size: 11px; }
-
-    /* SIDEBAR DRAWER QUẢN LÝ LỚP DỮ LIỆU */
-    .sidebar-panel {
-      position: absolute; top: 104px; left: 12px; right: 12px; z-index: 999;
-      font-size: 11.5px; overflow: hidden; display: none;
-    }
-    .sidebar-panel.open { display: block; }
-
+    /* SIDEBAR & TAB CONTENT */
     .tab-header { display: flex; background: rgba(0, 0, 0, 0.3); border-bottom: 1px solid var(--border-color); }
     .tab-btn { flex: 1; padding: 10px; text-align: center; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: all 0.2s ease; font-size: 11px; }
     .tab-btn.active { color: var(--accent-cyan); border-bottom: 2px solid var(--accent-cyan); background: rgba(255, 255, 255, 0.03); }
 
-    .tab-body { padding: 10px 12px; max-height: 50vh; overflow-y: auto; }
+    .tab-body { padding: 10px 12px; max-height: 55vh; overflow-y: auto; }
     .tab-body::-webkit-scrollbar { width: 4px; }
     .tab-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
 
-    .layer-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+    .layer-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; font-size: 11.5px; }
     .layer-row label { cursor: pointer; color: var(--text-main); }
     .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 16px; height: 16px; }
 
     .btn-dot-buffer { width: 16px; height: 16px; border-radius: 50%; background: #475569; color: #fff; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; }
     .btn-dot-buffer.active { background: var(--accent-orange); box-shadow: 0 0 8px var(--accent-orange); }
 
-    .opacity-slider-row { margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px; }
+    .opacity-slider-row { margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px; font-size: 11px; }
     .opacity-slider { width: 100%; accent-color: var(--accent-cyan); cursor: pointer; margin-top: 4px; }
 
-    /* ICON HẠ TẦNG */
+    /* ICON HẠ TẦNG & POPUP */
     .custom-infra-icon {
       display: flex; align-items: center; justify-content: center;
       background: rgba(15, 23, 42, 0.9); border: 2px solid var(--accent-cyan);
@@ -142,18 +108,13 @@
 
     .badge-pending { display: inline-block; background: var(--accent-red); color: #fff; font-size: 8px; font-weight: bold; padding: 1px 4px; border-radius: 3px; text-transform: uppercase; margin-left: 4px; }
 
-    /* POPUP & MODAL CARDS */
     .ward-popup-card { width: 620px; max-width: 88vw; max-height: 75vh; overflow-y: auto; font-size: 10.5px; }
-    .ward-popup-card::-webkit-scrollbar { width: 5px; }
-    .ward-popup-card::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
-
     table.ward-table { width: 100%; border-collapse: collapse; margin-top: 8px; table-layout: fixed; }
     table.ward-table th, table.ward-table td { border: 1px solid var(--border-color); padding: 5px 4px; word-wrap: break-word; }
     table.ward-table th { background: #0f172a; color: var(--accent-cyan); text-align: center; }
 
     .add-point-card {
-      display: none; position: absolute; bottom: 65px; left: 12px; right: 12px; z-index: 1001;
-      padding: 14px; font-size: 11px;
+      display: none; position: absolute; z-index: 1001; padding: 14px; font-size: 11px;
     }
     .add-point-card input, .add-point-card select {
       width: 100%; padding: 8px; margin: 4px 0 8px 0; background: rgba(15, 23, 42, 0.8);
@@ -190,6 +151,86 @@
 
     .inline-progress-bg { background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; }
     .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-cyan); transition: width 0.3s ease; }
+
+
+    /* =========================================================
+       1. CẤU HÌNH GIAO DIỆN DESKTOP / LAPTOP (> 768px)
+       ========================================================= */
+    @media (min-width: 769px) {
+      /* Bật nút Zoom mặc định của Leaflet trên Desktop */
+      .leaflet-control-zoom { display: block !important; }
+      .leaflet-top.leaflet-left { top: 60px !important; left: 16px !important; }
+      .leaflet-touch .leaflet-bar { border: 1px solid var(--border-color) !important; background: var(--bg-dark) !important; backdrop-filter: var(--panel-blur); }
+      .leaflet-touch .leaflet-bar a { background: transparent !important; color: var(--accent-cyan) !important; border-bottom: 1px solid var(--border-color) !important; }
+
+      /* Topbar nằm gọn góc trên trái */
+      .topbar-row {
+        position: absolute; top: 16px; left: 16px; z-index: 1000;
+        width: 360px; display: flex; gap: 8px; align-items: center;
+      }
+      .topbar-header { flex: 1; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+      .btn-toggle-layer-top { display: none; } /* Ẩn nút Lớp bản đồ ở Topbar vì Sidebar luôn mở */
+
+      /* Thanh đo đạc đặt gọn bên phải nút Zoom */
+      .toolbar-row {
+        position: absolute; top: 60px; left: 60px; z-index: 1000;
+        padding: 4px 8px; display: flex; gap: 4px; align-items: center;
+      }
+      .btn-zoom-desktop { display: none; } /* Ẩn 2 nút Zoom dư thừa vì đã dùng Leaflet Zoom */
+
+      /* DockBar gom ở giữa đáy màn hình */
+      .dockbar-bottom-row {
+        position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;
+        padding: 6px 16px; display: flex; gap: 8px; align-items: center;
+        border-radius: 30px; width: auto;
+      }
+      .dockbar-bottom-row .ui-btn-format { padding: 8px 16px; font-size: 11.5px; border-radius: 20px; }
+
+      /* Sidebar cố định ở góc trên bên phải */
+      .sidebar-panel {
+        position: absolute; top: 16px; right: 16px; z-index: 1000;
+        width: 280px; display: block !important;
+      }
+
+      .add-point-card { bottom: 75px; left: 50%; transform: translateX(-50%); width: 320px; }
+    }
+
+
+    /* =========================================================
+       2. CẤU HÌNH GIAO DIỆN MOBILE WEB (<= 768px) - GIỮ NGUYÊN 100%
+       ========================================================= */
+    @media (max-width: 768px) {
+      .leaflet-control-zoom { display: none !important; }
+
+      .topbar-row {
+        position: absolute; top: 12px; left: 12px; right: 12px; z-index: 1000;
+        display: flex; gap: 8px; align-items: center;
+      }
+      .topbar-header {
+        flex: 1; padding: 8px 12px; display: flex; align-items: center; gap: 8px; font-size: 11px;
+      }
+      .progress-bar-bg { flex: 1; }
+
+      .toolbar-row {
+        position: absolute; top: 58px; left: 12px; right: 12px; z-index: 1000;
+        padding: 4px; display: flex; align-items: center;
+      }
+      .toolbar-row .ui-btn-format { flex: 1; padding: 8px 2px; font-size: 10.5px; }
+
+      .dockbar-bottom-row {
+        position: absolute; bottom: 12px; left: 12px; right: 12px; z-index: 1000;
+        padding: 4px; display: flex; align-items: center;
+      }
+      .dockbar-bottom-row .ui-btn-format { flex: 1; padding: 10px 2px; font-size: 11px; }
+
+      .sidebar-panel {
+        position: absolute; top: 104px; left: 12px; right: 12px; z-index: 999;
+        display: none;
+      }
+      .sidebar-panel.open { display: block; }
+
+      .add-point-card { bottom: 65px; left: 12px; right: 12px; }
+    }
   </style>
 </head>
 <body>
@@ -203,18 +244,18 @@
       <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
       <span id="progressPercent" style="color:var(--accent-green); font-weight:bold; white-space:nowrap;">0%</span>
     </div>
-    <button class="ui-btn-format ui-panel-format" style="padding: 8px 12px;" onclick="toggleSidebar()">⚙️ LỚP BẢN ĐỒ</button>
+    <button class="ui-btn-format ui-panel-format btn-toggle-layer-top" style="padding: 8px 12px;" onclick="toggleSidebar()">⚙️ LỚP BẢN ĐỒ</button>
   </div>
 
-  <!-- HÀNG 2: BỐN NÚT THAO TÁC CÔNG CỤ (BỎ VIỀN ĐEN NÚT CON) -->
+  <!-- HÀNG 2: THANH NÚT CÔNG CỤ -->
   <div class="toolbar-row ui-panel-format">
-    <button class="ui-btn-format" onclick="map.zoomIn()">➕ ZOOM IN</button>
-    <button class="ui-btn-format" onclick="map.zoomOut()">➖ ZOOM OUT</button>
+    <button class="ui-btn-format btn-zoom-desktop" onclick="map.zoomIn()">➕ ZOOM IN</button>
+    <button class="ui-btn-format btn-zoom-desktop" onclick="map.zoomOut()">➖ ZOOM OUT</button>
     <button class="ui-btn-format" id="btnMeasureDist" onclick="toggleMeasure('distance')">📏 CHIỀU DÀI</button>
     <button class="ui-btn-format" id="btnMeasureArea" onclick="toggleMeasure('area')">📐 DIỆN TÍCH</button>
   </div>
 
-  <!-- SIDEBAR PANEL ĐẶT NGAY DƯỚI THANH CÔNG CỤ -->
+  <!-- SIDEBAR PANEL -->
   <div class="sidebar-panel ui-panel-format" id="sidebarPanel">
     <div class="tab-header">
       <div class="tab-btn active" id="tabBtnLayers" onclick="switchTab('layers')">⚙️ LỚP DỮ LIỆU</div>
@@ -314,7 +355,7 @@
     </div>
   </div>
 
-  <!-- HÀNG 3: DOCKBAR DƯỚI CÙNG VỪA KHÍT MÀN HÌNH (BỎ VIỀN ĐEN NÚT CON) -->
+  <!-- HÀNG 3: DOCKBAR DƯỚI CÙNG -->
   <div class="dockbar-bottom-row ui-panel-format">
     <button class="ui-btn-format" id="btnInspectMode" onclick="toggleInspectMode()">🖱️ TRA CỨU ĐIỂM</button>
     <button class="ui-btn-format" onclick="toggleAddCard()">➕ ĐỀ XUẤT MỚI</button>
