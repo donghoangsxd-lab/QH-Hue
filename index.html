@@ -713,17 +713,21 @@
       c9: L.layerGroup().addTo(map), b9: L.layerGroup()
     };
 
-    // Khởi tạo Lớp giao thông tốc độ cao CartoDB Voyager nét mảnh đè vệ tinh
+    // KHỞI TẠO LỚP GIAO THÔNG CHUẨN ĐÈ LÊN VỆ TINH
     tileRoadsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_lines/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
       opacity: 0.95,
-      subdomains: 'abcd'
+      subdomains: 'abcd',
+      zIndex: 500 // Bắt buộc để đè lên Esri Satellite
     }).addTo(layers.roads);
 
     function toggleLayer(layerKey, isChecked) {
       if (isChecked) {
         if (layerKey === 'heatmap') {
           refreshHeatmapOnly();
+        } else if (layerKey === 'roads') {
+          map.addLayer(layers.roads);
+          layers.roads.bringToFront(); // Đưa lớp giao thông lên trên cùng
         } else {
           map.addLayer(layers[layerKey]);
         }
