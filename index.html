@@ -313,7 +313,7 @@
         <div><input type="checkbox" id="chk_bound" checked onchange="toggleLayer('boundary', this.checked)"><label for="chk_bound">🗺️ Ranh giới 40 Phường Xã</label></div>
       </div>
       <div class="layer-row">
-        <div><input type="checkbox" id="chk_roads" onchange="toggleLayer('roads', this.checked)"><label for="chk_roads">🛣️ Lớp Giao thông (HOT/OSM)</label></div>
+        <div><input type="checkbox" id="chk_roads" checked onchange="toggleLayer('roads', this.checked)"><label for="chk_roads">🛣️ Lớp Giao thông (CARTO/OSM)</label></div>
       </div>
       <div class="layer-row">
         <div><input type="checkbox" id="chk_c1" checked onchange="toggleLayer('c1', this.checked)"><label for="chk_c1">1. Công viên, điểm xanh</label></div>
@@ -568,7 +568,7 @@
       }
     }
 
-    // NỀN VỆ TINH CỐ ĐỊNH TỪ ESRI WORLD IMAGERY
+    // KHỞI TẠO BẢN ĐỒ VỚI BẢN ĐỒ VỆ TINH ESRI WORLD IMAGERY
     const map = L.map('map', { renderer: L.canvas() }).setView([16.4637, 107.5905], 13);
     
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
@@ -700,7 +700,7 @@
     const layers = {
       pop: L.layerGroup(),
       boundary: L.layerGroup().addTo(map),
-      roads: L.layerGroup(),
+      roads: L.layerGroup().addTo(map), // Mặc định bật Lớp Giao thông Tốc độ Cao
       heatmap: L.layerGroup().addTo(map),
       c1: L.layerGroup().addTo(map), b1: L.layerGroup(),
       c2: L.layerGroup().addTo(map), b2: L.layerGroup(),
@@ -713,23 +713,17 @@
       c9: L.layerGroup().addTo(map), b9: L.layerGroup()
     };
 
+    // Khởi tạo Lớp giao thông tốc độ cao CartoDB Voyager nét mảnh đè vệ tinh
+    tileRoadsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_lines/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      opacity: 0.95,
+      subdomains: 'abcd'
+    }).addTo(layers.roads);
+
     function toggleLayer(layerKey, isChecked) {
       if (isChecked) {
         if (layerKey === 'heatmap') {
           refreshHeatmapOnly();
-        } else if (layerKey === 'roads') {
-          if (!tileRoadsLayer) {
-            // Nạp Lớp Giao thông Tốc độ Cao từ GEE Server
-            fetch(`${geeApiBackend}?action=getRoadsTile`)
-              .then(r => r.json())
-              .then(d => {
-                if (d.urlFormat) {
-                  tileRoadsLayer = L.tileLayer(d.urlFormat, { opacity: 0.85 });
-                  tileRoadsLayer.addTo(layers.roads);
-                }
-              });
-          }
-          map.addLayer(layers.roads);
         } else {
           map.addLayer(layers[layerKey]);
         }
