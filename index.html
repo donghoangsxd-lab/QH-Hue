@@ -12,7 +12,7 @@
     :root {
       --bg-dark: rgba(15, 23, 42, 0.92);
       --bg-card: rgba(30, 41, 59, 0.96);
-      --border-color: rgba(255, 255, 255, 0.15);
+      --border-color: rgba(255, 255, 255, 0.18);
       --accent-cyan: #38bdf8;
       --accent-green: #4ade80;
       --accent-orange: #fb923c;
@@ -20,36 +20,109 @@
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --panel-blur: blur(16px);
-      --panel-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      --panel-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
     }
 
     body, html { 
       margin: 0; padding: 0; height: 100%; 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
       background: #0f172a; color: var(--text-main); 
-      touch-action: manipulation;
+      touch-action: manipulation; overflow: hidden;
     }
     #map { width: 100%; height: 100vh; background: #0f172a; }
     #map.inspect-mode { cursor: crosshair !important; }
 
-    /* NHÓM CÔNG CỤ TRÊN (ZOOM + ĐO ĐẠC) */
-    .top-tools-container {
-      position: absolute; top: 60px; left: 16px; z-index: 1000;
-      display: flex; flex-direction: column; gap: 8px;
+    /* ẨN NÚT ZOOM MẶC ĐỊNH CỦA LEAFLET ĐỂ DÙNG THANH NÚT MỚI */
+    .leaflet-control-zoom { display: none !important; }
+
+    /* FORMAT DÙNG CHUNG CHO TẤT CẢ PANEL / TOOLBAR */
+    .ui-panel-format {
+      background: var(--bg-dark);
+      backdrop-filter: var(--panel-blur);
+      -webkit-backdrop-filter: var(--panel-blur);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      box-shadow: var(--panel-shadow);
+      box-sizing: border-box;
     }
 
-    .leaflet-top.leaflet-left { position: static !important; }
-    .leaflet-touch .leaflet-bar { border: 1px solid var(--border-color) !important; background: var(--bg-dark) !important; backdrop-filter: var(--panel-blur); border-radius: 10px; overflow: hidden; }
-    .leaflet-touch .leaflet-bar a { background: transparent !important; color: var(--accent-cyan) !important; border-bottom: 1px solid var(--border-color) !important; }
-
-    .btn-top-tool {
-      background: var(--bg-dark); color: var(--text-main); border: 1px solid var(--border-color);
-      padding: 8px 12px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 11px;
-      backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
-      box-shadow: var(--panel-shadow); display: flex; align-items: center; gap: 6px; transition: all 0.2s ease;
+    /* FORMAT DÙNG CHUNG CHO NÚT BẤM */
+    .ui-btn-format {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
     }
-    .btn-top-tool:hover { background: rgba(255,255,255,0.1); color: var(--accent-cyan); }
-    .btn-top-tool.active { background: var(--accent-orange); color: #fff; border-color: var(--accent-orange); box-shadow: 0 0 12px var(--accent-orange); }
+    .ui-btn-format:hover, .ui-btn-format:active {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: var(--accent-cyan);
+    }
+    .ui-btn-format.active {
+      background: var(--accent-orange) !important;
+      color: #fff !important;
+      border-color: var(--accent-orange) !important;
+      box-shadow: 0 0 10px var(--accent-orange);
+    }
+
+    /* HÀNG 1: QUY CHUẨN TOPBAR TRÊN CÙNG TRÀN VỪA KHÍT MÀN HÌNH */
+    .topbar-row {
+      position: absolute; top: 12px; left: 12px; right: 12px; z-index: 1000;
+      display: flex; gap: 8px; align-items: center;
+    }
+    .topbar-header {
+      flex: 1; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; font-size: 11px;
+    }
+    .progress-bar-bg { width: 45px; background: rgba(255,255,255,0.1); height: 5px; border-radius: 3px; overflow: hidden; }
+    .progress-bar-fill { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
+
+    /* HÀNG 2: THANH NÚT CÔNG CỤ (ZOOM, ĐO ĐẠC) NẰM NGAY DƯỚI HÀNG 1 */
+    .toolbar-row {
+      position: absolute; top: 58px; left: 12px; right: 12px; z-index: 1000;
+      padding: 6px; display: flex; gap: 6px; align-items: center;
+    }
+    .toolbar-row .ui-btn-format { flex: 1; }
+
+    /* HÀNG 3: THANH DOCKBAR 3 NÚT SÁT MÉP DƯỚI MÀN HÌNH */
+    .dockbar-bottom-row {
+      position: absolute; bottom: 12px; left: 12px; right: 12px; z-index: 1000;
+      padding: 6px; display: flex; gap: 6px; align-items: center;
+    }
+    .dockbar-bottom-row .ui-btn-format { flex: 1; padding: 10px 4px; font-size: 11.5px; }
+
+    /* SIDEBAR DRAWER QUẢN LÝ LỚP DỮ LIỆU */
+    .sidebar-panel {
+      position: absolute; top: 108px; right: 12px; z-index: 999;
+      width: 280px; font-size: 11.5px; overflow: hidden; display: none;
+    }
+    .sidebar-panel.open { display: block; }
+
+    .tab-header { display: flex; background: rgba(0, 0, 0, 0.3); border-bottom: 1px solid var(--border-color); }
+    .tab-btn { flex: 1; padding: 10px; text-align: center; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: all 0.2s ease; font-size: 11px; }
+    .tab-btn.active { color: var(--accent-cyan); border-bottom: 2px solid var(--accent-cyan); background: rgba(255, 255, 255, 0.03); }
+
+    .tab-body { padding: 10px 12px; max-height: 55vh; overflow-y: auto; }
+    .tab-body::-webkit-scrollbar { width: 4px; }
+    .tab-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+    .layer-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+    .layer-row label { cursor: pointer; color: var(--text-main); }
+    .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 16px; height: 16px; }
+
+    .btn-dot-buffer { width: 16px; height: 16px; border-radius: 50%; background: #475569; color: #fff; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; }
+    .btn-dot-buffer.active { background: var(--accent-orange); box-shadow: 0 0 8px var(--accent-orange); }
+
+    .opacity-slider-row { margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px; }
+    .opacity-slider { width: 100%; accent-color: var(--accent-cyan); cursor: pointer; margin-top: 4px; }
 
     /* ICON HẠ TẦNG */
     .custom-infra-icon {
@@ -67,67 +140,6 @@
 
     .badge-pending { display: inline-block; background: var(--accent-red); color: #fff; font-size: 8px; font-weight: bold; padding: 1px 4px; border-radius: 3px; text-transform: uppercase; margin-left: 4px; }
 
-    /* HEADER TIÊU ĐỀ GÓC TRÁI */
-    .panel-header-left { 
-      position: absolute; top: 16px; left: 16px; z-index: 1000; 
-      background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
-      padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border-color);
-      box-shadow: var(--panel-shadow); display: flex; align-items: center; gap: 10px; font-size: 12px;
-    }
-    .progress-bar-bg { width: 50px; background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden; }
-    .progress-bar-fill { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
-
-    /* SIDEBAR PANEL GÓC PHẢI */
-    .sidebar-panel {
-      position: absolute; top: 16px; right: 16px; z-index: 1000;
-      background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
-      border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--panel-shadow);
-      width: 270px; font-size: 11.5px; overflow: hidden; transition: all 0.3s ease;
-    }
-
-    .tab-header { display: flex; background: rgba(0, 0, 0, 0.3); border-bottom: 1px solid var(--border-color); }
-    .tab-btn { flex: 1; padding: 10px; text-align: center; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: all 0.2s ease; font-size: 11px; }
-    .tab-btn.active { color: var(--accent-cyan); border-bottom: 2px solid var(--accent-cyan); background: rgba(255, 255, 255, 0.03); }
-
-    .tab-body { padding: 10px 12px; max-height: 60vh; overflow-y: auto; }
-    .tab-body::-webkit-scrollbar { width: 4px; }
-    .tab-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
-
-    .layer-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
-    .layer-row label { cursor: pointer; color: var(--text-main); }
-    .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 16px; height: 16px; }
-
-    .btn-dot-buffer { width: 16px; height: 16px; border-radius: 50%; background: #475569; color: #fff; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; }
-    .btn-dot-buffer.active { background: var(--accent-orange); box-shadow: 0 0 8px var(--accent-orange); }
-
-    .opacity-slider-row { margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px; }
-    .opacity-slider { width: 100%; accent-color: var(--accent-cyan); cursor: pointer; margin-top: 4px; }
-
-    /* NHÓM CÔNG CỤ DƯỚI (DOCKBAR) */
-    .dockbar-container {
-      position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 1000;
-      background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
-      border: 1px solid var(--border-color); border-radius: 30px; padding: 6px 12px;
-      box-shadow: var(--panel-shadow); display: flex; gap: 6px; align-items: center;
-      max-width: 95vw;
-    }
-
-    .btn-dock {
-      background: transparent; color: var(--text-main); border: none; padding: 8px 12px;
-      border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 11.5px;
-      display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease; white-space: nowrap;
-    }
-    .btn-dock:hover { background: rgba(255,255,255,0.1); color: var(--accent-cyan); }
-    .btn-dock.active { background: var(--accent-orange); color: #fff; box-shadow: 0 0 12px var(--accent-orange); }
-
-    /* BANNER BÁO TRẠNG THÁI CHẤM ĐIỂM DƯỚI MÀN HÌNH */
-    .pick-status-banner {
-      display: none; position: absolute; bottom: 75px; left: 50%; transform: translateX(-50%); z-index: 1002;
-      background: var(--accent-orange); color: #fff; font-weight: bold; font-size: 11px;
-      padding: 8px 16px; border-radius: 20px; box-shadow: var(--panel-shadow);
-      animation: alertPulse 1.5s infinite ease-in-out;
-    }
-
     /* POPUP & MODAL CARDS */
     .ward-popup-card { width: 620px; max-width: 88vw; max-height: 75vh; overflow-y: auto; font-size: 10.5px; }
     .ward-popup-card::-webkit-scrollbar { width: 5px; }
@@ -138,9 +150,8 @@
     table.ward-table th { background: #0f172a; color: var(--accent-cyan); text-align: center; }
 
     .add-point-card {
-      display: none; position: absolute; bottom: 75px; left: 50%; transform: translateX(-50%); z-index: 1001;
-      background: var(--bg-card); backdrop-filter: var(--panel-blur); border: 1px solid var(--border-color);
-      border-radius: 12px; box-shadow: var(--panel-shadow); padding: 14px; width: 290px; font-size: 11px;
+      display: none; position: absolute; bottom: 65px; left: 12px; right: 12px; z-index: 1001;
+      padding: 14px; font-size: 11px;
     }
     .add-point-card input, .add-point-card select {
       width: 100%; padding: 8px; margin: 4px 0 8px 0; background: rgba(15, 23, 42, 0.8);
@@ -150,8 +161,7 @@
 
     .modal-panel {
       display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2000;
-      background: var(--bg-card); backdrop-filter: var(--panel-blur); border: 1px solid var(--border-color);
-      border-radius: 16px; padding: 18px; width: 94%; max-width: 1320px; height: 86vh; box-shadow: var(--panel-shadow);
+      padding: 16px; width: 95%; max-width: 1320px; height: 88vh;
     }
     .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
     .table-container { height: calc(75% - 35px); overflow-y: auto; margin-top: 10px; border: 1px solid var(--border-color); border-radius: 8px; }
@@ -179,28 +189,8 @@
     .inline-progress-bg { background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; }
     .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-cyan); transition: width 0.3s ease; }
 
-    /* MOBILE RESPONSIVE (< 768px) */
-    @media (max-width: 768px) {
-      .top-tools-container { top: 55px; left: 10px; gap: 6px; }
-      .panel-header-left { top: 10px; left: 10px; padding: 6px 10px; font-size: 11px; max-width: 80vw; }
-
-      .sidebar-panel {
-        top: auto; bottom: 65px; right: 10px; left: 10px;
-        width: auto; max-height: 50vh; display: none;
-      }
-      .sidebar-panel.mobile-open { display: block; }
-
-      .dockbar-container {
-        bottom: 10px; width: 92vw; border-radius: 20px;
-        padding: 4px; justify-content: space-around;
-      }
-
-      .btn-dock { padding: 8px 6px; font-size: 10.5px; }
-      .btn-top-tool { padding: 6px 10px; font-size: 10.5px; }
-
-      .add-point-card { bottom: 60px; width: 88vw; padding: 12px; }
-      .modal-panel { width: 96vw; height: 92vh; padding: 10px; }
-      .ward-popup-card { width: 85vw !important; max-height: 65vh; }
+    @media (max-width: 600px) {
+      .sidebar-panel { left: 12px; right: 12px; width: auto; }
     }
   </style>
 </head>
@@ -208,24 +198,28 @@
 
   <div id="map"></div>
 
-  <!-- HEADER TIÊU ĐỀ -->
-  <div class="panel-header-left">
-    <b style="color:var(--accent-cyan);">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
-    <div style="display:flex; align-items:center; gap:6px;">
-      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
-      <span id="progressPercent" style="color:var(--accent-green); font-weight:bold;">0%</span>
+  <!-- HÀNG 1: TOPBAR TRÊN CÙNG -->
+  <div class="topbar-row">
+    <div class="topbar-header ui-panel-format">
+      <b style="color:var(--accent-cyan);">🏛️ HẠ TẦNG HUẾ</b>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
+        <span id="progressPercent" style="color:var(--accent-green); font-weight:bold;">0%</span>
+      </div>
     </div>
+    <button class="ui-btn-format ui-panel-format" style="padding: 8px 12px;" onclick="toggleSidebar()">⚙️ LỚP BẢN ĐỒ</button>
   </div>
 
-  <!-- NHÓM CÔNG CỤ PHÍA TRÊN (MÀN HÌNH MÁY TÍNH VÀ MOBILE) -->
-  <div class="top-tools-container">
-    <div id="leafletZoomBar"></div>
-    <button class="btn-top-tool" id="btnMeasureDist" onclick="toggleMeasure('distance')">📏 ĐO CHIỀU DÀI</button>
-    <button class="btn-top-tool" id="btnMeasureArea" onclick="toggleMeasure('area')">📐 ĐO DIỆN TÍCH</button>
+  <!-- HÀNG 2: BỐN NÚT THAO TÁC CÔNG CỤ -->
+  <div class="toolbar-row ui-panel-format">
+    <button class="ui-btn-format" onclick="map.zoomIn()">➕ ZOOM IN</button>
+    <button class="ui-btn-format" onclick="map.zoomOut()">➖ ZOOM OUT</button>
+    <button class="ui-btn-format" id="btnMeasureDist" onclick="toggleMeasure('distance')">📏 DÀI</button>
+    <button class="ui-btn-format" id="btnMeasureArea" onclick="toggleMeasure('area')">📐 DIỆN TÍCH</button>
   </div>
 
-  <!-- SIDEBAR PANEL GÓC PHẢI -->
-  <div class="sidebar-panel" id="sidebarPanel">
+  <!-- SIDEBAR PANEL ĐẶT NGAY DƯỚI THANH CÔNG CỤ -->
+  <div class="sidebar-panel ui-panel-format" id="sidebarPanel">
     <div class="tab-header">
       <div class="tab-btn active" id="tabBtnLayers" onclick="switchTab('layers')">⚙️ LỚP DỮ LIỆU</div>
       <div class="tab-btn" id="tabBtnLegend" onclick="switchTab('legend')">📖 CHÚ GIẢI</div>
@@ -286,7 +280,7 @@
         🔥 Độ trong suốt Heatmap: 
         <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="50" oninput="changeHeatOpacity(this.value)">
         <div style="margin-top:6px; display:flex; justify-content:space-between; color:var(--accent-cyan);">
-          <span>⭕ Bán kính Buffer toàn đô thị:</span><b id="radiusLabel" style="color:var(--accent-green);">500m</b>
+          <span>⭕ Bán kính Buffer:</span><b id="radiusLabel" style="color:var(--accent-green);">500m</b>
         </div>
         <input type="range" id="radiusSlider" class="opacity-slider" min="0" max="3" step="1" value="1" onchange="debouncedChangeBufferRadius(this.value)">
       </div>
@@ -324,20 +318,14 @@
     </div>
   </div>
 
-  <!-- NHÓM CÔNG CỤ PHÍA DƯỚI (DOCKBAR TẬP TRUNG TẠI ĐÂY) -->
-  <div class="dockbar-container">
-    <button class="btn-dock" id="btnToggleLayersMobile" onclick="toggleMobileLayers()">⚙️ LỚP BẢN ĐỒ</button>
-    <button class="btn-dock" id="btnInspectMode" onclick="toggleInspectMode()" title="Click vào bản đồ để kiểm tra">🖱️ TRA CỨU ĐIỂM</button>
-    <button class="btn-dock" onclick="toggleAddCard()">➕ ĐỀ XUẤT MỚI</button>
-    <button class="btn-dock" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP</button>
+  <!-- HÀNG 3: DOCKBAR DƯỚI CÙNG VỪA KHÍT MÀN HÌNH -->
+  <div class="dockbar-bottom-row ui-panel-format">
+    <button class="ui-btn-format" id="btnInspectMode" onclick="toggleInspectMode()">🖱️ TRA CỨU ĐIỂM</button>
+    <button class="ui-btn-format" onclick="toggleAddCard()">➕ ĐỀ XUẤT MỚI</button>
+    <button class="ui-btn-format" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP</button>
   </div>
 
-  <!-- BANNER THÔNG BÁO KHI ĐANG PICK CHẤM TỌA ĐỘ -->
-  <div class="pick-status-banner" id="pickStatusBanner">
-    📌 Đang chọn điểm... Click trực tiếp trên bản đồ!
-  </div>
-
-  <div class="add-point-card" id="addPointCard">
+  <div class="add-point-card ui-panel-format" id="addPointCard">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:4px; margin-bottom:8px;">
       <b style="color:var(--accent-cyan);">➕ THÊM ĐIỂM HẠ TẦNG MỚI</b>
       <span onclick="toggleAddCard()" style="cursor:pointer; font-weight:bold; color:var(--accent-red);">✕</span>
@@ -376,7 +364,7 @@
     <div id="statusMsg" style="font-size:10px; margin-top:4px; text-align:center; font-weight:bold;"></div>
   </div>
 
-  <div class="modal-panel" id="combinedModal">
+  <div class="modal-panel ui-panel-format" id="combinedModal">
     <div class="modal-header">
       <b style="font-size:13px; color:var(--accent-cyan);">📊 BẢNG ĐÁNH GIÁ MẬT ĐỘ PHỦ HẠ TẦNG VÀ BIỂU ĐỒ TỔNG HỢP (40 PHƯỜNG XÃ)</b>
       <div style="display:flex; align-items:center; gap:10px;">
@@ -426,12 +414,8 @@
   <script>
     const geeApiBackend = "/api/gee";
 
-    const map = L.map('map', { renderer: L.canvas(), zoomControl: false }).setView([16.4637, 107.5905], 13);
+    const map = L.map('map', { renderer: L.canvas() }).setView([16.4637, 107.5905], 13);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
-
-    // Chuyển nút Zoom Control vào cụm công cụ phía trên
-    const zoomControl = L.control.zoom({ position: 'topleft' }).addTo(map);
-    document.getElementById('leafletZoomBar').appendChild(zoomControl.getContainer());
 
     let tilePopLayer = null;
     let tileHeatmapLayer = null;
@@ -454,9 +438,9 @@
       };
     }
 
-    function toggleMobileLayers() {
+    function toggleSidebar() {
       const panel = document.getElementById('sidebarPanel');
-      panel.classList.toggle('mobile-open');
+      panel.classList.toggle('open');
     }
 
     function switchTab(tab) {
@@ -503,10 +487,10 @@
 
       if (type === 'distance') {
         btnDist.classList.add('active');
-        btnDist.innerHTML = "❌ HUỶ ĐO CHIỀU DÀI";
+        btnDist.innerHTML = "❌ HUỶ";
       } else {
         btnArea.classList.add('active');
-        btnArea.innerHTML = "❌ HUỶ ĐO DIỆN TÍCH";
+        btnArea.innerHTML = "❌ HUỶ";
       }
     }
 
@@ -518,9 +502,9 @@
       const btnDist = document.getElementById('btnMeasureDist');
       const btnArea = document.getElementById('btnMeasureArea');
       btnDist.classList.remove('active');
-      btnDist.innerHTML = "📏 ĐO CHIỀU DÀI";
+      btnDist.innerHTML = "📏 DÀI";
       btnArea.classList.remove('active');
-      btnArea.innerHTML = "📐 ĐO DIỆN TÍCH";
+      btnArea.innerHTML = "📐 DIỆN TÍCH";
     }
 
     const infraLabels = {
@@ -617,7 +601,7 @@
 
       if (isInspectMode) {
         btn.classList.add('active');
-        btn.innerHTML = "🖱️❓ ĐANG TRA CỨU...";
+        btn.innerHTML = "🖱️❓ ĐANG CHỌN...";
         mapEl.classList.add('inspect-mode');
       } else {
         btn.classList.remove('active');
@@ -668,10 +652,6 @@
         
         if (tempMarker) map.removeLayer(tempMarker);
         tempMarker = L.marker([lat, lng]).addTo(map);
-
-        // Hiện lại Bảng sau khi chấm điểm thành công
-        document.getElementById('addPointCard').style.display = 'block';
-        document.getElementById('pickStatusBanner').style.display = 'none';
 
         const statusEl = document.getElementById('statusMsg');
         statusEl.style.color = "var(--accent-orange)";
@@ -775,14 +755,12 @@
     function toggleAddCard() {
       const card = document.getElementById('addPointCard');
       card.style.display = card.style.display === 'block' ? 'none' : 'block';
-      document.getElementById('pickStatusBanner').style.display = 'none';
     }
 
     function enablePickMode() {
       isPickMode = true;
-      // Tạm thời ẩn Bảng và hiện Banner thông báo
-      document.getElementById('addPointCard').style.display = 'none';
-      document.getElementById('pickStatusBanner').style.display = 'block';
+      document.getElementById('statusMsg').style.color = "var(--accent-orange)";
+      document.getElementById('statusMsg').innerText = "👉 Click trực tiếp trên bản đồ...";
     }
 
     function submitNewPoint() {
