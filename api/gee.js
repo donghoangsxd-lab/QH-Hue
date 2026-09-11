@@ -2,6 +2,15 @@ const ee = require('@google/earthengine');
 
 let isGeeInitialized = false;
 
+// 1. TẬN DỤNG VERCEL GLOBAL SCOPE ĐỂ CACHE TRÊN RAM SERVERLESS (WARM START)
+let cachedGeoJSON = null;
+let lastGeoJSONFetch = 0;
+const GEOJSON_CACHE_TTL = 10 * 60 * 1000; // Cache trong 10 phút
+
+let cachedWardStats = null;
+let lastWardStatsFetch = 0;
+const WARD_STATS_CACHE_TTL = 15 * 60 * 1000; // Cache kết quả 40 phường trong 15 phút
+
 function initGEE() {
   if (isGeeInitialized) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -50,6 +59,59 @@ function cleanWardStr(str) {
     .replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '')
     .replace(/^phường\s+/i, '').replace(/^xã\s+/i, '')
     .trim().toLowerCase();
+}
+
+// HÀM LẤY DỮ LIỆU ĐỌC TRỰC TIẾP TỪ GOOGLE CLOUD STORAGE CÓ CACHE RAM
+async function getRawDataList() {
+  const now = Date.now();
+  if (cachedGeoJSON && (now - lastGeoJSONFetch < GEOJSON_CACHE_TTL)) {
+    return cachedGeoJSON;
+  }
+
+  try {
+    // Đọc trực tiếp từ GCS công khai thay vì qua Google Apps Script
+    const gcsUrl = "https://storage.googleapis.com/hue-infra-data-us/infrastructure_hue.json";
+    const gcsResponse = await fetch(gcsUrl);
+    const geojson = await gcsResponse.json();
+    const features = geojson.features || [];
+
+    const codeMap = { "CV": "1-CV", "BDX": "2-BDX", "MN": "3-MN", "TH": "4-TH", "THCS": "5-THCS", "YT": "6-YT", "VH": "7-VH", "TM": "8-TM", "CSD": "9-CSD" };
+
+    cachedGeoJSON = features.map(ft => {
+      const props = ft.properties || {};
+      const coords = ft.geometry ? ft.geometry.coordinates : [107.5905, 16.4637];
+      const rawId = String(props.ID_DoiTuong || '');
+      const prefix = rawId.split('-')[0];
+
+      const rawStatus = props.TrangThai;
+      const isStatusTrue = (rawStatus === true || String(rawStatus).trim().toUpperCase() === 'TRUE');
+
+      return {
+        id: rawId,
+        name: props.Ten_CongTrinh || 'Chưa đặt tên',
+        ward: props.Ten_XaPhuong || 'Thuận Hóa',
+        type: codeMap[prefix] || "9-CSD",
+        lat: Number(coords[1]),
+        lng: Number(coords[0]),
+        size: Number(props.QuyMo_S) || 0,
+        radius: Number(props.BanKinh) || 500,
+        status: isStatusTrue
+      };
+    });
+
+    lastGeoJSONFetch = now;
+    return cachedGeoJSON;
+  } catch (e) {
+    console.error("Lỗi nạp GCS Data:", e.message);
+    return cachedGeoJSON || [];
+  }
+}
+
+function invalidateCache() {
+  cachedGeoJSON = null;
+  cachedWardStats = null;
+  lastGeoJSONFetch = 0;
+  lastWardStatsFetch = 0;
 }
 
 module.exports = async (req, res) => {
@@ -103,6 +165,7 @@ module.exports = async (req, res) => {
         `&ward=${encodeURIComponent(ward || 'Thuận Hóa')}` +
         `&lat=${lat}&lng=${lng}&size=${size || 0}`;
 
+      invalidateCache(); // Xóa cache khi có dữ liệu mới
       const gasRes = await fetch(syncUrl);
       const result = await gasRes.json().catch(() => ({ success: true }));
       return res.status(200).json({ success: true, result });
@@ -113,6 +176,7 @@ module.exports = async (req, res) => {
       if (!id) return res.status(400).json({ error: true, message: "Thiếu ID công trình" });
 
       const syncUrl = `${gasBaseUrl}?action=approvePoint&id=${encodeURIComponent(id)}`;
+      invalidateCache(); // Xóa cache khi phê duyệt công trình
       const gasRes = await fetch(syncUrl);
       const result = await gasRes.json().catch(() => ({ success: true }));
       return res.status(200).json({ success: true, result });
@@ -148,41 +212,11 @@ module.exports = async (req, res) => {
       .updateMask(validPopMask)
       .rename('DanSoPixelNormalized');
 
-    let rawDataList = [];
-    try {
-      const gasUrl = `${gasBaseUrl}?action=getJson`;
-      const gasResponse = await fetch(gasUrl);
-      const geojson = await gasResponse.json();
-      const features = geojson.features || [];
-
-      const codeMap = { "CV": "1-CV", "BDX": "2-BDX", "MN": "3-MN", "TH": "4-TH", "THCS": "5-THCS", "YT": "6-YT", "VH": "7-VH", "TM": "8-TM", "CSD": "9-CSD" };
-      
-      rawDataList = features.map(ft => {
-        const props = ft.properties || {};
-        const coords = ft.geometry ? ft.geometry.coordinates : [107.5905, 16.4637];
-        const rawId = String(props.ID_DoiTuong || '');
-        const prefix = rawId.split('-')[0];
-
-        const rawStatus = props.TrangThai;
-        const isStatusTrue = (rawStatus === true || String(rawStatus).trim().toUpperCase() === 'TRUE');
-
-        return {
-          id: rawId,
-          name: props.Ten_CongTrinh || 'Chưa đặt tên',
-          ward: props.Ten_XaPhuong || 'Thuận Hóa',
-          type: codeMap[prefix] || "9-CSD",
-          lat: Number(coords[1]),
-          lng: Number(coords[0]),
-          size: Number(props.QuyMo_S) || 0,
-          radius: Number(props.BanKinh) || 500,
-          status: isStatusTrue
-        };
-      });
-    } catch (e) {
-      console.error("Lỗi nạp GAS Data:", e.message);
-    }
+    // ĐỌC RAW DATA TỪ CACHE HOẶC GCS
+    const rawDataList = await getRawDataList();
 
     if (action === 'getPopRasterTile') {
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate'); // Cache Tile Vercel CDN 24h
       const mapId = await new Promise((resolve, reject) => {
         popRasterNormalized.getMap(
           { min: 0, max: 5, palette: ['blue', 'cyan', 'green', 'yellow', 'orange', 'red'] },
@@ -193,6 +227,7 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'getBoundaryTile') {
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate'); // Cache Tile Vercel CDN 24h
       const wardOutline = ee.Image().byte().paint({ featureCollection: wardVectorParsed, color: 1, width: 2 });
       const mapId = await new Promise((resolve, reject) => {
         wardOutline.getMap({ palette: ['#00ffff'] }, (m, err) => err ? reject(err) : resolve(m));
@@ -200,14 +235,13 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // HEATMAP: CHỈ TẠO BUFFER VÀ TÍNH ĐIỂM TRỌNG SỐ CHO CÁC ĐIỂM ĐÃ PHÊ DUYỆT (STATUS === TRUE)
     if (action === 'getHeatmapTile') {
       const categoryImageLayers = [];
       const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
 
       codes.forEach(code => {
         const groupFeatures = rawDataList
-          .filter(item => item.type === code && item.status === true) // LỌC CHẶT CHẼ CHỈ LẤY TRUE
+          .filter(item => item.type === code && item.status === true)
           .map(item => ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || 500)));
         if (groupFeatures.length > 0) {
           categoryImageLayers.push(ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection(groupFeatures), color: 1 }));
@@ -251,6 +285,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ servedPop });
     }
 
+    // TỐI ƯU SONG SONG HÓA PROMISE.ALL() CHO CS ANALYTICS
     if (action === 'analyzeCSD') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -282,11 +317,12 @@ module.exports = async (req, res) => {
       const suggestions = [];
       const ineligible = [];
 
-      for (const code of codesToCheck) {
+      // CHẠY SONG SONG CÁC TRUY VẤN SPATIAL CỦA GEE BẰNG PROMISE.ALL
+      const csdPromises = codesToCheck.map(async (code) => {
         const reqMinSize = infraConfig[code].minSize;
         if (size < reqMinSize) {
           ineligible.push({ code, label: infraConfig[code].label, minSize: reqMinSize });
-          continue;
+          return;
         }
 
         const normVal = quotaConfig[code] || 0;
@@ -325,7 +361,9 @@ module.exports = async (req, res) => {
           isWardDeficit: deficitArea > 0,
           popGained: cleanPopGained
         });
-      }
+      });
+
+      await Promise.all(csdPromises);
 
       suggestions.sort((a, b) => {
         if (a.isWardDeficit !== b.isWardDeficit) return a.isWardDeficit ? -1 : 1;
@@ -390,7 +428,13 @@ module.exports = async (req, res) => {
       });
     }
 
+    // CACHE BẢNG THỐNG KÊ 40 PHƯỜNG XÃ
     if (action === 'getWardStats') {
+      const now = Date.now();
+      if (cachedWardStats && (now - lastWardStatsFetch < WARD_STATS_CACHE_TTL)) {
+        return res.status(200).json({ data: cachedWardStats });
+      }
+
       const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
       const bandImagesList = [];
 
@@ -463,6 +507,10 @@ module.exports = async (req, res) => {
       });
 
       resultTable.sort((a, b) => b.Dan_So_Vector - a.Dan_So_Vector);
+
+      cachedWardStats = resultTable;
+      lastWardStatsFetch = now;
+
       return res.status(200).json({ data: resultTable });
     }
 
