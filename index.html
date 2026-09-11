@@ -5,15 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bản đồ Phân tích Hạ tầng Đô thị TP. Huế (Headless GIS)</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- BỔ SUNG CSS/JS ĐO ĐẠC KHÔNG GIAN -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-measure@3.1.0/dist/leaflet-measure.css">
-  
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/leaflet-measure@3.1.0/dist/leaflet-measure.pt_BR.js"></script>
 
   <style>
-    /* DỊCH NÚT ZOOM LEAFLET XUỐNG DƯỚI HEADER ĐỂ KHÔNG BỊ ĐÈ */
+    /* NÚT ZOOM LEAFLET DỊCH XUỐNG DƯỚI PANEL HEADER */
     .leaflet-top.leaflet-left {
       top: 60px !important;
       left: 16px !important;
@@ -29,19 +25,9 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
     }
 
-    /* TỐI ƯU CÔNG CỤ ĐO ĐẠC DARK THEME */
-    .leaflet-control-measure {
-      border: 1px solid rgba(255, 255, 255, 0.2) !important;
-      background: rgba(15, 23, 42, 0.9) !important;
-      backdrop-filter: blur(12px);
-      border-radius: 8px !important;
-      color: #f8fafc !important;
-    }
-    .leaflet-control-measure a { color: #38bdf8 !important; }
-
     :root {
       --bg-dark: rgba(15, 23, 42, 0.88);
-      --bg-card: rgba(30, 41, 59, 0.94);
+      --bg-card: rgba(30, 41, 59, 0.95);
       --border-color: rgba(255, 255, 255, 0.12);
       --accent-cyan: #38bdf8;
       --accent-green: #4ade80;
@@ -73,6 +59,7 @@
 
     .badge-pending { display: inline-block; background: var(--accent-red); color: #fff; font-size: 8px; font-weight: bold; padding: 1px 4px; border-radius: 3px; text-transform: uppercase; margin-left: 4px; }
 
+    /* HEADER TIÊU ĐỀ GÓC TRÁI */
     .panel-header-left { 
       position: absolute; top: 16px; left: 16px; z-index: 1000; 
       background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
@@ -82,6 +69,7 @@
     .progress-bar-bg { width: 60px; background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
 
+    /* SIDEBAR PANEL HỢP NHẤT GÓC PHẢI */
     .sidebar-panel {
       position: absolute; top: 16px; right: 16px; z-index: 1000;
       background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
@@ -107,21 +95,37 @@
     .opacity-slider-row { margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px; }
     .opacity-slider { width: 100%; accent-color: var(--accent-cyan); cursor: pointer; margin-top: 4px; }
 
+    /* FLOATING DOCKBAR CHÍNH GIỮA ĐÁY MÀN HÌNH */
     .dockbar-container {
       position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;
       background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
       border: 1px solid var(--border-color); border-radius: 30px; padding: 6px 12px;
-      box-shadow: var(--panel-shadow); display: flex; gap: 8px;
+      box-shadow: var(--panel-shadow); display: flex; gap: 6px; align-items: center;
     }
 
     .btn-dock {
-      background: transparent; color: var(--text-main); border: none; padding: 8px 14px;
+      background: transparent; color: var(--text-main); border: none; padding: 8px 12px;
       border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 11.5px;
       display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease;
+      white-space: nowrap;
     }
     .btn-dock:hover { background: rgba(255,255,255,0.1); color: var(--accent-cyan); }
     .btn-dock.active { background: var(--accent-orange); color: #fff; box-shadow: 0 0 12px var(--accent-orange); }
 
+    .dock-divider { width: 1px; height: 18px; background: var(--border-color); margin: 0 2px; }
+
+    /* CARD PHÂN TÍCH PHƯỜNG TỐI ƯU GIAO DIỆN KHÔNG BỊ TRÀN */
+    .ward-popup-card {
+      width: 620px; max-width: 88vw; max-height: 80vh; overflow-y: auto; font-size: 10.5px;
+    }
+    .ward-popup-card::-webkit-scrollbar { width: 5px; }
+    .ward-popup-card::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+    table.ward-table { width: 100%; border-collapse: collapse; margin-top: 8px; table-layout: fixed; }
+    table.ward-table th, table.ward-table td { border: 1px solid var(--border-color); padding: 5px 4px; word-wrap: break-word; }
+    table.ward-table th { background: #0f172a; color: var(--accent-cyan); text-align: center; }
+
+    /* FORM POPUP ĐỀ XUẤT ĐIỂM MỚI */
     .add-point-card {
       display: none; position: absolute; bottom: 75px; left: 50%; transform: translateX(-50%); z-index: 1001;
       background: var(--bg-card); backdrop-filter: var(--panel-blur); border: 1px solid var(--border-color);
@@ -133,6 +137,7 @@
     }
     .btn-submit { width: 100%; background: var(--accent-green); color: #0f172a; border: none; padding: 8px; border-radius: 6px; font-weight: bold; cursor: pointer; }
 
+    /* MODAL BẢNG THỐNG KÊ 40 PHƯỜNG XÃ */
     .modal-panel {
       display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2000;
       background: var(--bg-card); backdrop-filter: var(--panel-blur); border: 1px solid var(--border-color);
@@ -169,6 +174,7 @@
 
   <div id="map"></div>
 
+  <!-- HEADER GÓC TRÁI -->
   <div class="panel-header-left">
     <b style="color:var(--accent-cyan);">🏛️ HẠ TẦNG ĐÔ THỊ HUẾ</b>
     <div style="display:flex; align-items:center; gap:6px;">
@@ -177,6 +183,7 @@
     </div>
   </div>
 
+  <!-- SIDEBAR HỢP NHẤT GÓC PHẢI -->
   <div class="sidebar-panel">
     <div class="tab-header">
       <div class="tab-btn active" id="tabBtnLayers" onclick="switchTab('layers')">⚙️ LỚP DỮ LIỆU</div>
@@ -276,10 +283,17 @@
     </div>
   </div>
 
+  <!-- FLOATING DOCKBAR CHÍNH GIỮA ĐÁY MÀN HÌNH -->
   <div class="dockbar-container">
     <button class="btn-dock" id="btnInspectMode" onclick="toggleInspectMode()" title="Click vào bản đồ để kiểm tra hạ tầng">🖱️ TRA CỨU ĐIỂM</button>
     <button class="btn-dock" onclick="toggleAddCard()">➕ ĐỀ XUẤT ĐIỂM MỚI</button>
     <button class="btn-dock" onclick="openCombinedModal()">📊 BẢNG TỔNG HỢP (40 PHƯỜNG XÃ)</button>
+    
+    <div class="dock-divider"></div>
+    
+    <!-- 2 NÚT ĐO ĐẠC RIÊNG BIỆT CHUẨN GIS -->
+    <button class="btn-dock" id="btnMeasureDist" onclick="toggleMeasure('distance')" title="Đo khoảng cách / Chiều dài">📏 ĐO KHOẢNG CÁCH</button>
+    <button class="btn-dock" id="btnMeasureArea" onclick="toggleMeasure('area')" title="Đo diện tích / Đa giác">📐 ĐO DIỆN TÍCH</button>
   </div>
 
   <div class="add-point-card" id="addPointCard">
@@ -374,24 +388,16 @@
     const map = L.map('map', { renderer: L.canvas() }).setView([16.4637, 107.5905], 13);
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
 
-    // BỔ SUNG CÔNG CỤ ĐO ĐẠC KHÔNG GIAN CỦA LEAFLET
-    const measureControl = L.control.measure({
-      position: 'topleft',
-      primaryLengthUnit: 'meters',
-      secondaryLengthUnit: 'kilometers',
-      primaryAreaUnit: 'sqmeters',
-      secondaryAreaUnit: 'hectares',
-      activeColor: '#38bdf8',
-      completedColor: '#4ade80'
-    });
-    measureControl.addTo(map);
-
     let tilePopLayer = null;
     let tileHeatmapLayer = null;
     let chartInstance = null;
     let isPickMode = false;
     let isInspectMode = false;
     let tempMarker = null;
+
+    let activeMeasureType = null;
+    let measurePoints = [];
+    let measureLayerGroup = L.layerGroup().addTo(map);
 
     let globalBufferRadius = 500;
 
@@ -419,6 +425,52 @@
                 Math.sin(dLon / 2) * Math.sin(dLon / 2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
+    }
+
+    function calculatePolygonArea(latlngs) {
+      if (latlngs.length < 3) return 0;
+      let area = 0;
+      const R = 6378137;
+      for (let i = 0; i < latlngs.length; i++) {
+        const p1 = latlngs[i];
+        const p2 = latlngs[(i + 1) % latlngs.length];
+        area += ((p2.lng - p1.lng) * Math.PI / 180) * (2 + Math.sin(p1.lat * Math.PI / 180) + Math.sin(p2.lat * Math.PI / 180));
+      }
+      return Math.abs(area * R * R / 2);
+    }
+
+    function toggleMeasure(type) {
+      if (activeMeasureType === type) {
+        clearMeasure();
+        return;
+      }
+
+      clearMeasure();
+      activeMeasureType = type;
+      
+      const btnDist = document.getElementById('btnMeasureDist');
+      const btnArea = document.getElementById('btnMeasureArea');
+
+      if (type === 'distance') {
+        btnDist.classList.add('active');
+        btnDist.innerHTML = "❌ HUỶ ĐO CHIỀU DÀI";
+      } else {
+        btnArea.classList.add('active');
+        btnArea.innerHTML = "❌ HUỶ ĐO DIỆN TÍCH";
+      }
+    }
+
+    function clearMeasure() {
+      activeMeasureType = null;
+      measurePoints = [];
+      measureLayerGroup.clearLayers();
+
+      const btnDist = document.getElementById('btnMeasureDist');
+      const btnArea = document.getElementById('btnMeasureArea');
+      btnDist.classList.remove('active');
+      btnDist.innerHTML = "📏 ĐO KHOẢNG CÁCH";
+      btnArea.classList.remove('active');
+      btnArea.innerHTML = "📐 ĐO DIỆN TÍCH";
     }
 
     const infraLabels = {
@@ -519,12 +571,46 @@
         mapEl.classList.add('inspect-mode');
       } else {
         btn.classList.remove('active');
-        btn.innerHTML = "🖱️❓ TRA CỨU ĐIỂM";
+        btn.innerHTML = "🖱️ TRA CỨU ĐIỂM";
         mapEl.classList.remove('inspect-mode');
       }
     }
 
     map.on('click', (e) => {
+      // ĐO KHẢO SÁT TRỰC TIẾP TRÊN BẢN ĐỒ
+      if (activeMeasureType) {
+        measurePoints.push(e.latlng);
+        
+        const ptCircle = L.circleMarker(e.latlng, { radius: 5, color: '#fb923c', fillColor: '#fb923c', fillOpacity: 1 });
+        measureLayerGroup.addLayer(ptCircle);
+
+        if (activeMeasureType === 'distance' && measurePoints.length >= 2) {
+          let totalDist = 0;
+          for (let i = 0; i < measurePoints.length - 1; i++) {
+            totalDist += getDistanceMeters(measurePoints[i].lat, measurePoints[i].lng, measurePoints[i+1].lat, measurePoints[i+1].lng);
+          }
+          const polyline = L.polyline(measurePoints, { color: '#38bdf8', weight: 3, dashArray: '5, 5' });
+          measureLayerGroup.clearLayers();
+          measureLayerGroup.addLayer(polyline);
+          measurePoints.forEach(p => measureLayerGroup.addLayer(L.circleMarker(p, { radius: 5, color: '#fb923c', fillColor: '#fb923c', fillOpacity: 1 })));
+
+          const distText = totalDist >= 1000 ? (totalDist / 1000).toFixed(2) + " km" : Math.round(totalDist) + " m";
+          L.popup().setLatLng(e.latlng).setContent(`<b style="color:var(--accent-cyan);">📏 Tổng chiều dài:</b> <span style="color:var(--accent-green); font-weight:bold;">${distText}</span>`).openOn(map);
+        }
+
+        if (activeMeasureType === 'area' && measurePoints.length >= 3) {
+          const areaSqM = calculatePolygonArea(measurePoints);
+          const polygon = L.polygon(measurePoints, { color: '#4ade80', weight: 2, fillColor: '#4ade80', fillOpacity: 0.2 });
+          measureLayerGroup.clearLayers();
+          measureLayerGroup.addLayer(polygon);
+          measurePoints.forEach(p => measureLayerGroup.addLayer(L.circleMarker(p, { radius: 5, color: '#fb923c', fillColor: '#fb923c', fillOpacity: 1 })));
+
+          const areaText = areaSqM >= 10000 ? (areaSqM / 10000).toFixed(2) + " ha" : Math.round(areaSqM).toLocaleString() + " m²";
+          L.popup().setLatLng(e.latlng).setContent(`<b style="color:var(--accent-green);">📐 Tổng diện tích:</b> <span style="color:var(--accent-orange); font-weight:bold;">${areaText}</span>`).openOn(map);
+        }
+        return;
+      }
+
       if (isPickMode) {
         const lat = e.latlng.lat.toFixed(6);
         const lng = e.latlng.lng.toFixed(6);
@@ -1062,7 +1148,7 @@
 
       const currentPop = Number(wardData.Dan_So_Vector || 0);
 
-      let modalHtml = `<div style="width: 580px; max-width: 90vw;">
+      let modalHtml = `<div class="ward-popup-card">
         <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH HẠ TẦNG QUY CHUẨN: ${wardName.toUpperCase()}</b><br>
         
         <div style="background:rgba(15, 23, 42, 0.8); border:1px solid var(--border-color); padding:6px; border-radius:6px; margin:6px 0; font-size:11px;">
@@ -1078,7 +1164,7 @@
       const firstPoint = wardInfraList[0] || { lat: 16.4637, lng: 107.5905 };
       map.flyTo([firstPoint.lat, firstPoint.lng], 14);
 
-      const detailPopup = L.popup({ closeButton: true, autoPan: true })
+      const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 660 })
         .setLatLng([firstPoint.lat, firstPoint.lng])
         .setContent(modalHtml);
       
@@ -1097,15 +1183,15 @@
         "8-TM":   { norm: 0.00, label: "Thương mại" }
       };
 
-      let html = `<table style="width:100%; border-collapse:collapse; font-size:10px; text-align:left; color:var(--text-main);">
+      let html = `<table class="ward-table">
         <thead>
-          <tr style="background:#0f172a; color:var(--accent-cyan);">
-            <th style="padding:4px; border:1px solid var(--border-color);">STT</th>
-            <th style="padding:4px; border:1px solid var(--border-color);">Loại hạ tầng / Công trình</th>
-            <th style="padding:4px; text-align:right; border:1px solid var(--border-color);">Hiện trạng</th>
-            <th style="padding:4px; text-align:center; border:1px solid var(--border-color);">Chỉ tiêu</th>
-            <th style="padding:4px; text-align:right; border:1px solid var(--border-color);">Nhu cầu DT</th>
-            <th style="padding:4px; text-align:center; border:1px solid var(--border-color);">Đánh giá</th>
+          <tr>
+            <th style="width:28px;">STT</th>
+            <th style="width:160px; text-align:left;">Loại hạ tầng / Công trình</th>
+            <th style="width:80px; text-align:right;">Hiện trạng</th>
+            <th style="width:55px;">Chỉ tiêu</th>
+            <th style="width:85px; text-align:right;">Nhu cầu DT</th>
+            <th style="width:125px;">Đánh giá</th>
           </tr>
         </thead>
         <tbody>`;
@@ -1122,24 +1208,24 @@
         const evalText = cfg.norm === 0 ? "Theo quy hoạch" : (isPass ? `ĐẠT (+${diffArea.toLocaleString()} m²)` : `THIẾU (${diffArea.toLocaleString()} m²)`);
         const evalColor = cfg.norm === 0 ? "var(--text-muted)" : (isPass ? "var(--accent-green)" : "var(--accent-red)");
 
-        html += `<tr style="background:rgba(255,255,255,0.05); font-weight:bold; border-bottom:1px solid var(--border-color);">
-          <td style="padding:3px; text-align:center; border:1px solid var(--border-color);">${stt++}</td>
-          <td style="padding:3px; border:1px solid var(--border-color);">${cfg.label}</td>
-          <td style="padding:3px; text-align:right; border:1px solid var(--border-color);">${existArea.toLocaleString()} m²</td>
-          <td style="padding:3px; text-align:center; border:1px solid var(--border-color);">${cfg.norm > 0 ? cfg.norm + ' m²' : '-'}</td>
-          <td style="padding:3px; text-align:right; color:var(--accent-cyan); border:1px solid var(--border-color);">${reqArea > 0 ? reqArea.toLocaleString() + ' m²' : '-'}</td>
-          <td style="padding:3px; text-align:center; color:${evalColor}; border:1px solid var(--border-color);">${evalText}</td>
+        html += `<tr style="background:rgba(255,255,255,0.05); font-weight:bold;">
+          <td style="text-align:center;">${stt++}</td>
+          <td style="text-align:left;">${cfg.label}</td>
+          <td style="text-align:right;">${existArea.toLocaleString()} m²</td>
+          <td style="text-align:center;">${cfg.norm > 0 ? cfg.norm + ' m²' : '-'}</td>
+          <td style="text-align:right; color:var(--accent-cyan);">${reqArea > 0 ? reqArea.toLocaleString() + ' m²' : '-'}</td>
+          <td style="text-align:center; color:${evalColor}; font-size:9.5px;">${evalText}</td>
         </tr>`;
 
         const subItems = infraList.filter(it => it.type === code);
         subItems.forEach(item => {
-          html += `<tr style="border-bottom:1px dashed var(--border-color); font-size:9.5px;">
-            <td style="border:1px solid var(--border-color);"></td>
-            <td style="padding:2px 2px 2px 12px; color:var(--accent-cyan); border:1px solid var(--border-color);">└ ${item.name}</td>
-            <td style="padding:2px; text-align:right; border:1px solid var(--border-color);">${item.size.toLocaleString()} m²</td>
-            <td style="padding:2px; text-align:center; color:var(--text-muted); border:1px solid var(--border-color);">-</td>
-            <td style="padding:2px; text-align:right; color:var(--accent-orange); border:1px solid var(--border-color);">Bán kính: ${globalBufferRadius}m</td>
-            <td style="padding:2px; text-align:center; color:var(--accent-green); border:1px solid var(--border-color);">✓ Hoạt động</td>
+          html += `<tr style="font-size:9.5px; opacity:0.85;">
+            <td></td>
+            <td style="padding-left:12px; color:var(--accent-cyan);">└ ${item.name}</td>
+            <td style="text-align:right;">${item.size.toLocaleString()} m²</td>
+            <td style="text-align:center; color:var(--text-muted);">-</td>
+            <td style="text-align:right; color:var(--accent-orange);">Bán kính: ${globalBufferRadius}m</td>
+            <td style="text-align:center; color:var(--accent-green);">✓ Hoạt động</td>
           </tr>`;
         });
       });
