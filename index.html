@@ -714,11 +714,11 @@
     };
 
     // KHỞI TẠO LỚP GIAO THÔNG CHUẨN ĐÈ LÊN VỆ TINH
-    tileRoadsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_lines/{z}/{x}/{y}{r}.png', {
+    tileRoadsLayer = L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/toner-lines/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      opacity: 0.95,
+      opacity: 0.85,
       subdomains: 'abcd',
-      zIndex: 500 // Bắt buộc để đè lên Esri Satellite
+      zIndex: 500
     }).addTo(layers.roads);
 
     function toggleLayer(layerKey, isChecked) {
