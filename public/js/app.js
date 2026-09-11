@@ -1,79 +1,64 @@
-import { map, initMap, toggleInspectMode, enablePickMode, toggleMeasure } from './modules/mapManager.js';
-import { loadDataParallel, toggleLayer, toggleBuffer, changePopOpacity, changeHeatOpacity, debouncedChangeBufferRadius } from './modules/layerManager.js';
-import { toggleAuthModal } from './modules/authManager.js';
-import { submitNewPoint } from './modules/analytics.js';
-import { openCombinedModal, closeModal } from './modules/uiModal.js';
+import { state } from './state.js';
+import { initMap, toggleMeasure } from './modules/mapManager.js';
+import { initDefaultLayers, toggleLayer, toggleBuffer, renderGroupedPoints, refreshHeatmapOnly } from './modules/layerManager.js';
+import { handleInspectPointClick } from './modules/analytics.js';
 
-document.addEventListener('DOMContentLoaded', () => {
-  // 1. Khởi tạo Bản đồ
-  initMap();
+document.addEventListener('DOMContentLoaded', async () => {
+  const map = initMap();
+  initDefaultLayers(map);
 
-  // 2. Nạp dữ liệu GEE & GCS
-  loadDataParallel();
-
-  // 3. Gán sự kiện Nút Bấm UI
-  document.getElementById('btnToggleSidebar').onclick = () => {
-    const panel = document.getElementById('sidebarPanel');
-    panel.classList.toggle('open');
-    panel.classList.toggle('closed');
-  };
-
-  document.getElementById('btnCloseSidebar').onclick = () => {
-    const panel = document.getElementById('sidebarPanel');
-    panel.classList.remove('open');
-    panel.classList.add('closed');
-  };
-
-  document.getElementById('tabBtnLayers').onclick = () => switchTab('layers');
-  document.getElementById('tabBtnLegend').onclick = () => switchTab('legend');
-
-  document.getElementById('btnZoomIn').onclick = () => map.zoomIn();
-  document.getElementById('btnZoomOut').onclick = () => map.zoomOut();
-  document.getElementById('btnMeasureDist').onclick = () => toggleMeasure('distance');
-  document.getElementById('btnMeasureArea').onclick = () => toggleMeasure('area');
-
-  document.getElementById('btnInspectMode').onclick = toggleInspectMode;
-  document.getElementById('btnToggleAddCard').onclick = () => {
-    const card = document.getElementById('addPointCard');
-    card.style.display = card.style.display === 'block' ? 'none' : 'block';
-  };
-  document.getElementById('btnCloseAddCard').onclick = () => {
-    document.getElementById('addPointCard').style.display = 'none';
-  };
-  document.getElementById('btnOpenModal').onclick = openCombinedModal;
-  document.getElementById('btnCloseModal').onclick = closeModal;
-
-  document.getElementById('btnAuth').onclick = toggleAuthModal;
-  document.getElementById('btnCloseAuthModal').onclick = toggleAuthModal;
-
-  document.getElementById('btnEnablePickMode').onclick = enablePickMode;
-  document.getElementById('btnSubmitNewPoint').onclick = submitNewPoint;
-
-  // 4. Gán sự kiện Checkbox & Sliders Lớp dữ liệu
-  const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'heat'];
-  layerCheckboxes.forEach(key => {
-    const chk = document.getElementById(`chk_${key}`);
-    if (chk) {
-      const mapKey = key === 'bound' ? 'boundary' : (key === 'heat' ? 'heatmap' : key);
-      chk.onchange = (e) => toggleLayer(mapKey, e.target.checked);
+  // Lắng nghe sự kiện click trên bản đồ cho chế độ TRA CỨU / PHÂN TÍCH ISOCHRONE
+  map.on('click', (e) => {
+    if (state.isInspectMode) {
+      handleInspectPointClick(map, e.latlng.lat, e.latlng.lng);
     }
   });
 
-  document.querySelectorAll('.btn-dot-buffer').forEach(btn => {
-    btn.onclick = (e) => {
-      const bKey = e.target.getAttribute('data-buffer');
-      toggleBuffer(bKey, e.target);
-    };
+  // Sự kiện Nút bấm trên Toolbar
+  document.getElementById('btnMeasureDist')?.addEventListener('click', () => toggleMeasure('distance'));
+  document.getElementById('btnMeasureArea')?.addEventListener('click', () => toggleMeasure('area'));
+
+  // Sự kiện Nút Tra cứu điểm (Bật/Tắt chế độ Inspect)
+  const btnInspectMode = document.getElementById('btnInspectMode');
+  btnInspectMode?.addEventListener('click', () => {
+    state.isInspectMode = !state.isInspectMode;
+    if (state.isInspectMode) {
+      btnInspectMode.classList.add('active');
+      btnInspectMode.innerHTML = "🖱️❓ ĐANG CHỌN...";
+      document.getElementById('map')?.classList.add('inspect-mode');
+    } else {
+      btnInspectMode.classList.remove('active');
+      btnInspectMode.innerHTML = "🖱️ TRA CỨU ĐIỂM";
+      document.getElementById('map')?.classList.remove('inspect-mode');
+    }
   });
 
-  document.getElementById('popOpacity').oninput = (e) => changePopOpacity(e.target.value);
-  document.getElementById('heatOpacity').oninput = (e) => changeHeatOpacity(e.target.value);
-  document.getElementById('radiusSlider').onchange = (e) => debouncedChangeBufferRadius(e.target.value);
-});
+  // Sự kiện Checkbox Bật/Tắt các Lớp dữ liệu
+  const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'heat'];
+  layerCheckboxes.forEach(key => {
+    const el = document.getElementById(`chk_${key}`);
+    el?.addEventListener('change', (e) => {
+      const targetLayer = key === 'bound' ? 'boundary' : key;
+      toggleLayer(targetLayer, e.target.checked);
+    });
+  });
 
-function switchTab(tab) {
-  document.getElementById('tabLayers').style.display = tab === 'layers' ? 'block' : 'none';
-  document.getElementById('tabLegend').style.display = tab === 'legend' ? 'block' : 'none';
-  document.getElementById('tabBtnLayers').classList.toggle('active', tab === 'layers');
-  document.getElementById('tabBtnLegend').classList.toggle('active', tab === 'legend');
-}
+  // Sự kiện các Nút Dot Buffer
+  document.querySelectorAll('.btn-dot-buffer').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const bufferKey = e.target.getAttribute('data-buffer');
+      if (bufferKey) toggleBuffer(bufferKey, e.target);
+    });
+  });
+
+  // Nạp dữ liệu ban đầu từ Backend
+  try {
+    const res = await fetch('/api/gee');
+    const data = await res.json();
+    state.rawDataList = data.rawDataList || [];
+    renderGroupedPoints(map);
+    await refreshHeatmapOnly();
+  } catch (err) {
+    console.error("Lỗi nạp dữ liệu ban đầu:", err);
+  }
+});
