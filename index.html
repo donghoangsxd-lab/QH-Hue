@@ -10,9 +10,9 @@
 
   <style>
     :root {
-      --bg-dark: rgba(15, 23, 42, 0.88);
+      --bg-dark: rgba(15, 23, 42, 0.92);
       --bg-card: rgba(30, 41, 59, 0.96);
-      --border-color: rgba(255, 255, 255, 0.15);
+      --border-color: rgba(255, 255, 255, 0.18);
       --accent-cyan: #38bdf8;
       --accent-green: #4ade80;
       --accent-orange: #fb923c;
@@ -20,7 +20,7 @@
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --panel-blur: blur(16px);
-      --panel-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+      --panel-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
     }
 
     body, html { 
@@ -73,24 +73,43 @@
     .progress-bar-bg { background: rgba(255, 255, 255, 0.12); height: 5px; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
 
-    /* SIDEBAR & TAB CONTENT */
-    .tab-header { display: flex; background: rgba(0, 0, 0, 0.3); border-bottom: 1px solid var(--border-color); }
-    .tab-btn { flex: 1; padding: 10px; text-align: center; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: all 0.2s ease; font-size: 11px; }
-    .tab-btn.active { color: var(--accent-cyan); border-bottom: 2px solid var(--accent-cyan); background: rgba(255, 255, 255, 0.03); }
+    /* SIDEBAR & TAB CONTENT - ĐỒNG BỘ FONT & TĂNG KHÔNG GIAN HIỂN THỊ */
+    .tab-header { display: flex; background: rgba(0, 0, 0, 0.4); border-bottom: 1px solid var(--border-color); }
+    .tab-btn { flex: 1; padding: 10px 6px; text-align: center; font-weight: 600; cursor: pointer; color: var(--text-muted); transition: all 0.2s ease; font-size: 11.5px; }
+    .tab-btn.active { color: var(--accent-cyan); border-bottom: 2px solid var(--accent-cyan); background: rgba(255, 255, 255, 0.04); }
 
-    .tab-body { padding: 10px 12px; max-height: 55vh; overflow-y: auto; }
-    .tab-body::-webkit-scrollbar { width: 4px; }
-    .tab-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+    /* Tăng max-height & padding-bottom để tránh bị che mất Slider ở cuộn cuối */
+    .tab-body { 
+      padding: 12px 14px 28px 14px; 
+      max-height: 62vh; 
+      overflow-y: auto; 
+      box-sizing: border-box;
+    }
+    .tab-body::-webkit-scrollbar { width: 5px; }
+    .tab-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
 
-    .layer-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; font-size: 11.5px; }
+    /* ĐỒNG BỘ CỠ CHỮ 11.5px CHO CẢ 2 TAB */
+    .layer-row, .legend-row { 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      margin-bottom: 8px; 
+      font-size: 11.5px; 
+      line-height: 1.4;
+    }
     .layer-row label { cursor: pointer; color: var(--text-main); }
-    .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 16px; height: 16px; }
+    .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 16px; height: 16px; margin-right: 6px; }
 
-    .btn-dot-buffer { width: 16px; height: 16px; border-radius: 50%; background: #475569; color: #fff; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; }
+    .btn-dot-buffer { width: 16px; height: 16px; border-radius: 50%; background: #475569; color: #fff; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; flex-shrink: 0; }
     .btn-dot-buffer.active { background: var(--accent-orange); box-shadow: 0 0 8px var(--accent-orange); }
 
-    .opacity-slider-row { margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px; font-size: 11px; }
-    .opacity-slider { width: 100%; accent-color: var(--accent-cyan); cursor: pointer; margin-top: 4px; }
+    .opacity-slider-row { 
+      margin-top: 10px; 
+      border-top: 1px dashed var(--border-color); 
+      padding-top: 10px; 
+      font-size: 11.5px; 
+    }
+    .opacity-slider { width: 100%; accent-color: var(--accent-cyan); cursor: pointer; margin-top: 6px; }
 
     /* ICON HẠ TẦNG & POPUP */
     .custom-infra-icon {
@@ -157,28 +176,24 @@
        1. CẤU HÌNH GIAO DIỆN DESKTOP / LAPTOP (> 768px)
        ========================================================= */
     @media (min-width: 769px) {
-      /* Bật nút Zoom mặc định của Leaflet trên Desktop */
       .leaflet-control-zoom { display: block !important; }
       .leaflet-top.leaflet-left { top: 60px !important; left: 16px !important; }
       .leaflet-touch .leaflet-bar { border: 1px solid var(--border-color) !important; background: var(--bg-dark) !important; backdrop-filter: var(--panel-blur); }
       .leaflet-touch .leaflet-bar a { background: transparent !important; color: var(--accent-cyan) !important; border-bottom: 1px solid var(--border-color) !important; }
 
-      /* Topbar nằm gọn góc trên trái */
       .topbar-row {
         position: absolute; top: 16px; left: 16px; z-index: 1000;
         width: 360px; display: flex; gap: 8px; align-items: center;
       }
       .topbar-header { flex: 1; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
-      .btn-toggle-layer-top { display: none; } /* Ẩn nút Lớp bản đồ ở Topbar vì Sidebar luôn mở */
+      .btn-toggle-layer-top { display: none; }
 
-      /* Thanh đo đạc đặt gọn bên phải nút Zoom */
       .toolbar-row {
         position: absolute; top: 60px; left: 60px; z-index: 1000;
         padding: 4px 8px; display: flex; gap: 4px; align-items: center;
       }
-      .btn-zoom-desktop { display: none; } /* Ẩn 2 nút Zoom dư thừa vì đã dùng Leaflet Zoom */
+      .btn-zoom-desktop { display: none; }
 
-      /* DockBar gom ở giữa đáy màn hình */
       .dockbar-bottom-row {
         position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;
         padding: 6px 16px; display: flex; gap: 8px; align-items: center;
@@ -186,18 +201,20 @@
       }
       .dockbar-bottom-row .ui-btn-format { padding: 8px 16px; font-size: 11.5px; border-radius: 20px; }
 
-      /* Sidebar cố định ở góc trên bên phải */
+      /* Sidebar cố định bên phải: Rộng 300px để thoải mái không gian */
       .sidebar-panel {
         position: absolute; top: 16px; right: 16px; z-index: 1000;
-        width: 280px; display: block !important;
+        width: 300px; display: block !important;
       }
+      .tab-btn { font-size: 12px; }
+      .layer-row, .legend-row { font-size: 12px; }
 
       .add-point-card { bottom: 75px; left: 50%; transform: translateX(-50%); width: 320px; }
     }
 
 
     /* =========================================================
-       2. CẤU HÌNH GIAO DIỆN MOBILE WEB (<= 768px) - GIỮ NGUYÊN 100%
+       2. CẤU HÌNH GIAO DIỆN MOBILE WEB (<= 768px)
        ========================================================= */
     @media (max-width: 768px) {
       .leaflet-control-zoom { display: none !important; }
@@ -255,57 +272,58 @@
     <button class="ui-btn-format" id="btnMeasureArea" onclick="toggleMeasure('area')">📐 DIỆN TÍCH</button>
   </div>
 
-  <!-- SIDEBAR PANEL -->
+  <!-- SIDEBAR PANEL: ĐỒNG BỘ NỘI DUNG & FONT CHỮ -->
   <div class="sidebar-panel ui-panel-format" id="sidebarPanel">
     <div class="tab-header">
       <div class="tab-btn active" id="tabBtnLayers" onclick="switchTab('layers')">⚙️ LỚP DỮ LIỆU</div>
       <div class="tab-btn" id="tabBtnLegend" onclick="switchTab('legend')">📖 CHÚ GIẢI</div>
     </div>
 
+    <!-- TAB 1: LỚP DỮ LIỆU -->
     <div class="tab-body" id="tabLayers">
       <div class="layer-row">
-        <div><input type="checkbox" id="chk_pop" onchange="toggleLayer('pop', this.checked)"> <label for="chk_pop">0. Phân bổ dân cư</label></div>
+        <div><input type="checkbox" id="chk_pop" onchange="toggleLayer('pop', this.checked)"><label for="chk_pop">0. Phân bổ dân cư</label></div>
       </div>
       <div class="layer-row">
-        <div><input type="checkbox" id="chk_bound" checked onchange="toggleLayer('boundary', this.checked)"> <label for="chk_bound">🗺️ Ranh giới 40 Phường Xã</label></div>
+        <div><input type="checkbox" id="chk_bound" checked onchange="toggleLayer('boundary', this.checked)"><label for="chk_bound">🗺️ Ranh giới 40 Phường Xã</label></div>
       </div>
       <div class="layer-row">
-        <div><input type="checkbox" id="chk_c1" checked onchange="toggleLayer('c1', this.checked)"> <label for="chk_c1">1. Công viên, điểm xanh</label></div>
+        <div><input type="checkbox" id="chk_c1" checked onchange="toggleLayer('c1', this.checked)"><label for="chk_c1">1. Công viên, điểm xanh</label></div>
         <span class="btn-dot-buffer" onclick="toggleBuffer('b1', this)">●</span>
       </div>
       <div class="layer-row">
-        <div><input type="checkbox" id="chk_c2" checked onchange="toggleLayer('c2', this.checked)"> <label for="chk_c2">2. Bãi đỗ xe, trạm sạc</label></div>
+        <div><input type="checkbox" id="chk_c2" checked onchange="toggleLayer('c2', this.checked)"><label for="chk_c2">2. Bãi đỗ xe, trạm sạc</label></div>
         <span class="btn-dot-buffer" onclick="toggleBuffer('b2', this)">●</span>
       </div>
       <div class="layer-row">
-        <div><input type="checkbox" id="chk_c3" checked onchange="toggleLayer('c3', this.checked)"> <label for="chk_c3">3. Trường Mầm non</label></div>
+        <div><input type="checkbox" id="chk_c3" checked onchange="toggleLayer('c3', this.checked)"><label for="chk_c3">3. Trường Mầm non</label></div>
         <span class="btn-dot-buffer" onclick="toggleBuffer('b3', this)">●</span>
       </div>
       <div class="layer-row">
-        <div><input type="checkbox" id="chk_c4" checked onchange="toggleLayer('c4', this.checked)"> <label for="chk_c4">4. Trường Tiểu học</label></div>
+        <div><input type="checkbox" id="chk_c4" checked onchange="toggleLayer('c4', this.checked)"><label for="chk_c4">4. Trường Tiểu học</label></div>
         <span class="btn-dot-buffer" onclick="toggleBuffer('b4', this)">●</span>
       </div>
       <div class="layer-row">
-        <div><input type="checkbox" id="chk_c5" checked onchange="toggleLayer('c5', this.checked)"> <label for="chk_c5">5. Trường THCS</label></div>
+        <div><input type="checkbox" id="chk_c5" checked onchange="toggleLayer('c5', this.checked)"><label for="chk_c5">5. Trường THCS</label></div>
         <span class="btn-dot-buffer" onclick="toggleBuffer('b5', this)">●</span>
       </div>
       <div class="layer-row">
-        <div><input type="checkbox" id="chk_c6" checked onchange="toggleLayer('c6', this.checked)"> <label for="chk_c6">6. Cơ sở Y tế</label></div>
+        <div><input type="checkbox" id="chk_c6" checked onchange="toggleLayer('c6', this.checked)"><label for="chk_c6">6. Cơ sở Y tế</label></div>
         <span class="btn-dot-buffer" onclick="toggleBuffer('b6', this)">●</span>
       </div>
       <div class="layer-row">
-        <div><input type="checkbox" id="chk_c7" checked onchange="toggleLayer('c7', this.checked)"> <label for="chk_c7">7. Nhà văn hóa, thể thao</label></div>
+        <div><input type="checkbox" id="chk_c7" checked onchange="toggleLayer('c7', this.checked)"><label for="chk_c7">7. Nhà văn hóa, thể thao</label></div>
         <span class="btn-dot-buffer" onclick="toggleBuffer('b7', this)">●</span>
       </div>
       <div class="layer-row">
-        <div><input type="checkbox" id="chk_c8" checked onchange="toggleLayer('c8', this.checked)"> <label for="chk_c8">8. Chợ, TTTM</label></div>
+        <div><input type="checkbox" id="chk_c8" checked onchange="toggleLayer('c8', this.checked)"><label for="chk_c8">8. Chợ, TTTM</label></div>
         <span class="btn-dot-buffer" onclick="toggleBuffer('b8', this)">●</span>
       </div>
       <div class="layer-row">
-        <div><input type="checkbox" id="chk_c9" checked onchange="toggleLayer('c9', this.checked)"> <label for="chk_c9">9. Quỹ đất tiềm năng</label></div>
+        <div><input type="checkbox" id="chk_c9" checked onchange="toggleLayer('c9', this.checked)"><label for="chk_c9">9. Quỹ đất tiềm năng</label></div>
       </div>
       <div class="layer-row">
-        <div><input type="checkbox" id="chk_heat" checked onchange="toggleLayer('heatmap', this.checked)"> <label for="chk_heat">🔥 Heatmap độ phủ hạ tầng</label></div>
+        <div><input type="checkbox" id="chk_heat" checked onchange="toggleLayer('heatmap', this.checked)"><label for="chk_heat">🔥 Heatmap độ phủ hạ tầng</label></div>
       </div>
 
       <div id="popBox" style="display:none;" class="opacity-slider-row">
@@ -316,41 +334,42 @@
       <div id="heatBox" class="opacity-slider-row">
         🔥 Độ trong suốt Heatmap: 
         <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="50" oninput="changeHeatOpacity(this.value)">
-        <div style="margin-top:6px; display:flex; justify-content:space-between; color:var(--accent-cyan);">
+        <div style="margin-top:8px; display:flex; justify-content:space-between; color:var(--accent-cyan);">
           <span>⭕ Bán kính Buffer:</span><b id="radiusLabel" style="color:var(--accent-green);">500m</b>
         </div>
         <input type="range" id="radiusSlider" class="opacity-slider" min="0" max="3" step="1" value="1" onchange="debouncedChangeBufferRadius(this.value)">
       </div>
     </div>
 
+    <!-- TAB 2: CHÚ GIẢI - ĐỒNG BỘ FONT & TỐI ƯU KÍCH THƯỚC -->
     <div class="tab-body" id="tabLegend" style="display:none;">
-      <div style="margin-bottom:6px;">🌳 1. Công viên, điểm xanh, vườn hoa</div>
-      <div style="margin-bottom:6px;">🅿️ 2. Bãi đỗ xe, trạm sạc xe điện</div>
-      <div style="margin-bottom:6px;">🧸 3. Trường Mầm non</div>
-      <div style="margin-bottom:6px;">🏫 4. Trường Tiểu học</div>
-      <div style="margin-bottom:6px;">📚 5. Trường THCS</div>
-      <div style="margin-bottom:6px;">✚ 6. Bệnh viện, Trạm y tế</div>
-      <div style="margin-bottom:6px;">🎭 7. Nhà văn hóa, thể thao</div>
-      <div style="margin-bottom:6px;">🛒 8. Chợ, Trung tâm thương mại</div>
+      <div class="legend-row">🌳 1. Công viên, điểm xanh, vườn hoa</div>
+      <div class="legend-row">🅿️ 2. Bãi đỗ xe, trạm sạc xe điện</div>
+      <div class="legend-row">🧸 3. Trường Mầm non</div>
+      <div class="legend-row">🏫 4. Trường Tiểu học</div>
+      <div class="legend-row">📚 5. Trường THCS</div>
+      <div class="legend-row">✚ 6. Bệnh viện, Trạm y tế</div>
+      <div class="legend-row">🎭 7. Nhà văn hóa, thể thao</div>
+      <div class="legend-row">🛒 8. Chợ, Trung tâm thương mại</div>
       
-      <div style="margin-bottom:6px; color:var(--accent-orange);">🛠️ <b>9. Quỹ đất tiềm năng (Chưa sử dụng)</b></div>
-      <div style="display:flex; align-items:center; margin-bottom:8px;">
-        <div style="width:16px; height:16px; border:2px dashed var(--accent-red); background:rgba(239,68,68,0.2); border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:10px; margin-right:8px;">🏫</div>
+      <div class="legend-row" style="color:var(--accent-orange);">🛠️ <b>9. Quỹ đất tiềm năng (Chưa sử dụng)</b></div>
+      <div style="display:flex; align-items:center; margin-bottom:10px;" class="legend-row">
+        <div style="width:16px; height:16px; border:2px dashed var(--accent-red); background:rgba(239,68,68,0.2); border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:10px; margin-right:8px; flex-shrink:0;">🏫</div>
         <b style="color:var(--accent-red);">Chưa chấp thuận (Chờ duyệt)</b>
       </div>
 
-      <div style="height:1px; background:var(--border-color); margin:8px 0;"></div>
+      <div style="height:1px; background:var(--border-color); margin:10px 0;"></div>
 
-      <div style="font-weight:bold; color:var(--text-main); margin-bottom:6px;">THANG ĐỘ PHỦ HẠ TẦNG (1 - 8)</div>
-      <div style="display:flex; width:100%; border-radius:4px; overflow:hidden; border:1px solid var(--border-color);">
-        <div style="flex:1; height:18px; background:#5dade2; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">1</div>
-        <div style="flex:1; height:18px; background:#2ecc71; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">2</div>
-        <div style="flex:1; height:18px; background:#f1c40f; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">3</div>
-        <div style="flex:1; height:18px; background:#f39c12; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">4</div>
-        <div style="flex:1; height:18px; background:#e67e22; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">5</div>
-        <div style="flex:1; height:18px; background:#d35400; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">6</div>
-        <div style="flex:1; height:18px; background:#e74c3c; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">7</div>
-        <div style="flex:1; height:18px; background:#900c3f; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold;">8</div>
+      <div style="font-weight:bold; color:var(--text-main); margin-bottom:8px; font-size:11.5px;">THANG ĐỘ PHỦ HẠ TẦNG (1 - 8)</div>
+      <div style="display:flex; width:100%; border-radius:6px; overflow:hidden; border:1px solid var(--border-color);">
+        <div style="flex:1; height:20px; background:#5dade2; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">1</div>
+        <div style="flex:1; height:20px; background:#2ecc71; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">2</div>
+        <div style="flex:1; height:20px; background:#f1c40f; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">3</div>
+        <div style="flex:1; height:20px; background:#f39c12; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">4</div>
+        <div style="flex:1; height:20px; background:#e67e22; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">5</div>
+        <div style="flex:1; height:20px; background:#d35400; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">6</div>
+        <div style="flex:1; height:20px; background:#e74c3c; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">7</div>
+        <div style="flex:1; height:20px; background:#900c3f; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">8</div>
       </div>
     </div>
   </div>
