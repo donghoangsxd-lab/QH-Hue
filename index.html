@@ -568,10 +568,9 @@
       }
     }
 
-    // KHỞI TẠO BẢN ĐỒ VỚI BẢN ĐỒ VỆ TINH CỐ ĐỊNH NỀN
+    // NỀN VỆ TINH CỐ ĐỊNH TỪ ESRI WORLD IMAGERY
     const map = L.map('map', { renderer: L.canvas() }).setView([16.4637, 107.5905], 13);
     
-    // Nền Vệ Tinh Esri World Imagery
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
       maxZoom: 18,
       attribution: 'Esri Satellite'
@@ -720,13 +719,15 @@
           refreshHeatmapOnly();
         } else if (layerKey === 'roads') {
           if (!tileRoadsLayer) {
-            // Nạp lớp Giao thông trong suốt nét cao đè lên ảnh Vệ tinh
-            tileRoadsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_lines/{z}/{x}/{y}{r}.png', {
-              maxZoom: 19,
-              opacity: 0.95,
-              subdomains: 'abcd'
-            });
-            tileRoadsLayer.addTo(layers.roads);
+            // Nạp Lớp Giao thông Tốc độ Cao từ GEE Server
+            fetch(`${geeApiBackend}?action=getRoadsTile`)
+              .then(r => r.json())
+              .then(d => {
+                if (d.urlFormat) {
+                  tileRoadsLayer = L.tileLayer(d.urlFormat, { opacity: 0.85 });
+                  tileRoadsLayer.addTo(layers.roads);
+                }
+              });
           }
           map.addLayer(layers.roads);
         } else {
