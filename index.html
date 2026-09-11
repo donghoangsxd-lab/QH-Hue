@@ -312,7 +312,6 @@
       <div class="layer-row">
         <div><input type="checkbox" id="chk_bound" checked onchange="toggleLayer('boundary', this.checked)"><label for="chk_bound">🗺️ Ranh giới 40 Phường Xã</label></div>
       </div>
-      <!-- CHECKBOX BẬT TẮT LỚP GIAO THÔNG KHAI THÁC -->
       <div class="layer-row">
         <div><input type="checkbox" id="chk_roads" onchange="toggleLayer('roads', this.checked)"><label for="chk_roads">🛣️ Lớp Giao thông (HOT/OSM)</label></div>
       </div>
@@ -569,8 +568,14 @@
       }
     }
 
+    // KHỞI TẠO BẢN ĐỒ VỚI BẢN ĐỒ VỆ TINH CỐ ĐỊNH NỀN
     const map = L.map('map', { renderer: L.canvas() }).setView([16.4637, 107.5905], 13);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
+    
+    // Nền Vệ Tinh Esri World Imagery
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
+      maxZoom: 18,
+      attribution: 'Esri Satellite'
+    }).addTo(map);
 
     let tilePopLayer = null;
     let tileHeatmapLayer = null;
@@ -709,15 +714,13 @@
       c9: L.layerGroup().addTo(map), b9: L.layerGroup()
     };
 
-    let tileRoadsLayer = null;
-
     function toggleLayer(layerKey, isChecked) {
       if (isChecked) {
         if (layerKey === 'heatmap') {
           refreshHeatmapOnly();
         } else if (layerKey === 'roads') {
           if (!tileRoadsLayer) {
-            // Nạp trực tiếp Tile đường giao thông OSM siêu nhanh từ CartoDB
+            // Nạp lớp Giao thông trong suốt nét cao đè lên ảnh Vệ tinh
             tileRoadsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_lines/{z}/{x}/{y}{r}.png', {
               maxZoom: 19,
               opacity: 0.95,
