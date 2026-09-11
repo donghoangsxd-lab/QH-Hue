@@ -2,14 +2,14 @@ const ee = require('@google/earthengine');
 
 let isGeeInitialized = false;
 
-// 1. TẬN DỤNG VERCEL GLOBAL SCOPE ĐỂ CACHE TRÊN RAM SERVERLESS (WARM START)
+// CACHE TÊN VERCEL GLOBAL SCOPE
 let cachedGeoJSON = null;
 let lastGeoJSONFetch = 0;
-const GEOJSON_CACHE_TTL = 10 * 60 * 1000; // Cache trong 10 phút
+const GEOJSON_CACHE_TTL = 10 * 60 * 1000;
 
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
-const WARD_STATS_CACHE_TTL = 15 * 60 * 1000; // Cache kết quả 40 phường trong 15 phút
+const WARD_STATS_CACHE_TTL = 15 * 60 * 1000;
 
 function initGEE() {
   if (isGeeInitialized) return Promise.resolve();
@@ -61,7 +61,6 @@ function cleanWardStr(str) {
     .trim().toLowerCase();
 }
 
-// HÀM LẤY DỮ LIỆU ĐỌC TRỰC TIẾP TỪ GOOGLE CLOUD STORAGE CÓ CACHE RAM
 async function getRawDataList() {
   const now = Date.now();
   if (cachedGeoJSON && (now - lastGeoJSONFetch < GEOJSON_CACHE_TTL)) {
@@ -69,7 +68,6 @@ async function getRawDataList() {
   }
 
   try {
-    // Đọc trực tiếp từ GCS công khai thay vì qua Google Apps Script
     const gcsUrl = "https://storage.googleapis.com/hue-infra-data-us/infrastructure_hue.json";
     const gcsResponse = await fetch(gcsUrl);
     const geojson = await gcsResponse.json();
@@ -114,6 +112,18 @@ function invalidateCache() {
   lastWardStatsFetch = 0;
 }
 
+// HÀM TẠO LỚP MA SÁT GIAO THÔNG TỪ MẠNG LƯỚI ĐƯỜNG OPENSTREETMAP (OSM)
+function getNetworkCostImage(region) {
+  const roads = ee.FeatureCollection("HOT/OSM/planet/roads").filterBounds(region);
+  const roadRaster = roads.reduceToImage({
+    properties: ['highway'],
+    reducer: ee.Reducer.first()
+  }).unmask(0);
+  
+  // Ma sát: Trên đường = 1 (m/m), Phi đường bộ = 35 (di chuyển cực kỳ khó khăn)
+  return ee.Image(35).where(roadRaster.gt(0), 1);
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -122,7 +132,7 @@ module.exports = async (req, res) => {
   try {
     await initGEE();
     const action = req.query.action || 'getInitData';
-    const gasBaseUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec";
+    const gasBaseUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec";
 
     const wardVector = ee.FeatureCollection("projects/optimistic-yew-488501-s0/assets/Polygon-40xa");
     const wardVectorParsed = wardVector.map(f => {
@@ -165,7 +175,7 @@ module.exports = async (req, res) => {
         `&ward=${encodeURIComponent(ward || 'Thuận Hóa')}` +
         `&lat=${lat}&lng=${lng}&size=${size || 0}`;
 
-      invalidateCache(); // Xóa cache khi có dữ liệu mới
+      invalidateCache();
       const gasRes = await fetch(syncUrl);
       const result = await gasRes.json().catch(() => ({ success: true }));
       return res.status(200).json({ success: true, result });
@@ -176,7 +186,7 @@ module.exports = async (req, res) => {
       if (!id) return res.status(400).json({ error: true, message: "Thiếu ID công trình" });
 
       const syncUrl = `${gasBaseUrl}?action=approvePoint&id=${encodeURIComponent(id)}`;
-      invalidateCache(); // Xóa cache khi phê duyệt công trình
+      invalidateCache();
       const gasRes = await fetch(syncUrl);
       const result = await gasRes.json().catch(() => ({ success: true }));
       return res.status(200).json({ success: true, result });
@@ -212,11 +222,10 @@ module.exports = async (req, res) => {
       .updateMask(validPopMask)
       .rename('DanSoPixelNormalized');
 
-    // ĐỌC RAW DATA TỪ CACHE HOẶC GCS
     const rawDataList = await getRawDataList();
 
     if (action === 'getPopRasterTile') {
-      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate'); // Cache Tile Vercel CDN 24h
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
       const mapId = await new Promise((resolve, reject) => {
         popRasterNormalized.getMap(
           { min: 0, max: 5, palette: ['blue', 'cyan', 'green', 'yellow', 'orange', 'red'] },
@@ -227,7 +236,7 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'getBoundaryTile') {
-      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate'); // Cache Tile Vercel CDN 24h
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
       const wardOutline = ee.Image().byte().paint({ featureCollection: wardVectorParsed, color: 1, width: 2 });
       const mapId = await new Promise((resolve, reject) => {
         wardOutline.getMap({ palette: ['#00ffff'] }, (m, err) => err ? reject(err) : resolve(m));
@@ -235,22 +244,34 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
+    // HEATMAP THEO MẠNG LƯỚI GIAO THÔNG (NETWORK CUMULATIVE COST)
     if (action === 'getHeatmapTile') {
-      const categoryImageLayers = [];
+      const overrideRadius = Number(req.query.overrideRadius) || 500;
+      const hueBounds = wardVectorParsed.geometry().bounds();
+      const costImage = getNetworkCostImage(hueBounds);
+
+      const categoryLayers = [];
       const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
 
       codes.forEach(code => {
-        const groupFeatures = rawDataList
+        const approvedPts = rawDataList
           .filter(item => item.type === code && item.status === true)
-          .map(item => ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || 500)));
-        if (groupFeatures.length > 0) {
-          categoryImageLayers.push(ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection(groupFeatures), color: 1 }));
+          .map(item => ee.Feature(ee.Geometry.Point([item.lng, item.lat])));
+
+        if (approvedPts.length > 0) {
+          const sourceFC = ee.FeatureCollection(approvedPts);
+          const networkDistImg = costImage.cumulativeCost({
+            source: sourceFC,
+            maxDistance: overrideRadius * 1.5
+          });
+          const maskCoverage = networkDistImg.lte(overrideRadius);
+          categoryLayers.push(ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection([ee.Feature(hueBounds)]), color: 1 }).updateMask(maskCoverage));
         }
       });
 
       let heatmapMasked;
-      if (categoryImageLayers.length > 0) {
-        const heatmapImage = ee.ImageCollection(categoryImageLayers).sum();
+      if (categoryLayers.length > 0) {
+        const heatmapImage = ee.ImageCollection(categoryLayers).sum();
         heatmapMasked = heatmapImage.updateMask(heatmapImage.gt(0));
       } else {
         heatmapMasked = ee.Image(0).selfMask();
@@ -285,7 +306,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ servedPop });
     }
 
-    // TỐI ƯU SONG SONG HÓA PROMISE.ALL() CHO CS ANALYTICS
     if (action === 'analyzeCSD') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -342,7 +362,6 @@ module.exports = async (req, res) => {
           netBufferGeom = testBuffer.difference(existUnion, 1);
         }
 
-        // 1. TÍNH DÂN SỐ PHỦ RÒNG (NET POPULATION)
         const netPopRes = await new Promise((resolve) => {
           popRasterNormalized.reduceRegion({
             reducer: ee.Reducer.sum(),
@@ -354,7 +373,6 @@ module.exports = async (req, res) => {
 
         let cleanPopGained = Math.max(0, Math.round(netPopRes || 0));
 
-        // 2. NẾU VÙNG PHỦ RÒNG = 0 (DO BỊ ĐÈ), THÌ FALLBACK TÍNH TỔNG DÂN SỐ TRONG BÁN KÍNH TRỰC TIẾP
         if (cleanPopGained === 0) {
           const grossPopRes = await new Promise((resolve) => {
             popRasterNormalized.reduceRegion({
@@ -368,7 +386,7 @@ module.exports = async (req, res) => {
         }
 
         suggestions.push({
-          code,
+ code,
           label: infraConfig[code].label,
           deficitArea: Math.max(0, deficitArea),
           isWardDeficit: deficitArea > 0,
@@ -391,41 +409,63 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
+    // TRA CỨU ĐIỂM TIẾP CẬN THEO MẠNG LƯỚI GIAO THÔNG THỰC TẾ
     if (action === 'analyzeLocation') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
+      const userRadius = Number(req.query.radius) || 500;
       if (!lat || !lng) return res.status(400).json({ error: true, message: "Thiếu tọa độ" });
+
+      const clickGeom = ee.Geometry.Point([lng, lat]);
+      const searchRegion = clickGeom.buffer(userRadius * 2);
+      const costImage = getNetworkCostImage(searchRegion);
+
+      // Thuật toán ma sát di chuyển từ điểm click
+      const distFromClickImg = costImage.cumulativeCost({
+        source: clickGeom,
+        maxDistance: userRadius * 1.5
+      });
+
+      const approvedFeatures = rawDataList
+        .filter(item => item.type !== "9-CSD" && item.status === true)
+        .map(item => ee.Feature(ee.Geometry.Point([item.lng, item.lat]), {
+          id: item.id,
+          name: item.name,
+          type: item.type,
+          ward: item.ward
+        }));
 
       const coveredGroups = {};
       const missingCodes = [];
 
-      function getDistanceMeters(lat1, lon1, lat2, lon2) {
-        const R = 6371000;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      }
+      if (approvedFeatures.length > 0) {
+        const approvedFC = ee.FeatureCollection(approvedFeatures);
+        
+        // Trích xuất khoảng cách đi đường đến từng hạ tầng
+        const sampledFC = distFromClickImg.reduceRegions({
+          collection: approvedFC,
+          reducer: ee.Reducer.first().setOutputs(['net_dist']),
+          scale: 10
+        }).filter(ee.Filter.lte('net_dist', userRadius));
 
-      rawDataList.forEach(item => {
-        if (item.type === "9-CSD" || !item.status) return;
-        const dist = getDistanceMeters(lat, lng, item.lat, item.lng);
-        const radius = Number(item.radius) || 500;
-        if (dist <= radius) {
-          if (!coveredGroups[item.type]) coveredGroups[item.type] = [];
-          coveredGroups[item.type].push(item.name);
-        }
-      });
+        const reachableFeatures = await new Promise((resolve) => {
+          sampledFC.evaluate((fc) => resolve(fc ? fc.features : []));
+        });
+
+        reachableFeatures.forEach(ft => {
+          const props = ft.properties;
+          if (!coveredGroups[props.type]) coveredGroups[props.type] = [];
+          const distMeters = Math.round(props.net_dist || 0);
+          coveredGroups[props.type].push(`${props.name} (~${distMeters}m)`);
+        });
+      }
 
       const allCodes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
       allCodes.forEach(code => {
         if (!coveredGroups[code]) missingCodes.push(code);
       });
 
-      const clickPoint = ee.Geometry.Point([lng, lat]);
-      const matchedWard = wardVectorParsed.filterBounds(clickPoint).first();
+      const matchedWard = wardVectorParsed.filterBounds(clickGeom).first();
       const wardName = await new Promise((resolve) => {
         matchedWard.evaluate((ft) => {
           resolve((ft && ft.properties) ? (ft.properties.tenXa || ft.properties.name || "Thuận Hóa") : "Thuận Hóa");
@@ -441,7 +481,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // CACHE BẢNG THỐNG KÊ 40 PHƯỜNG XÃ
     if (action === 'getWardStats') {
       const now = Date.now();
       if (cachedWardStats && (now - lastWardStatsFetch < WARD_STATS_CACHE_TTL)) {
