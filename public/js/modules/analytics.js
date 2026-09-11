@@ -36,10 +36,74 @@ export function drawIsochronePolygon(map, lat, lng, customRadius) {
     .catch(() => {});
 }
 
+/**
+ * Xử lý khi click vào Marker công trình hạ tầng
+ */
+export function onPointClick(p, marker, map) {
+  const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
+  const customRadius = Number(document.getElementById('inputIsoRadius')?.value) || 500;
+
+  // Vẽ vùng phủ Isochrone khi click công trình
+  drawIsochronePolygon(map, p.lat, p.lng, customRadius);
+
+  let contentHtml = `<div style="font-size:11px;">`;
+
+  if (!isApproved) {
+    contentHtml += `<b style="color:var(--accent-red);">🏢 ${p.name}</b> <span class="badge-pending">DỰ KIẾN</span><br>`;
+  } else {
+    contentHtml += `<b style="color:var(--accent-cyan);">🏢 ${p.name}</b><br>`;
+  }
+
+  contentHtml += `• Địa bàn: <b>Phường/Xã ${p.ward}</b><br>`;
+  contentHtml += `• Diện tích: <b>${(p.size || 0).toLocaleString()} m²</b><br>`;
+
+  if (!isApproved) {
+    contentHtml += `<div id="servedPopText">
+      <div style="color:var(--accent-red); font-weight:bold; margin-top:4px;">• Dân số phục vụ DỰ KIẾN: <span id="popValText">0%</span></div>
+      <div class="inline-progress-bg"><div class="inline-progress-fill" style="background:var(--accent-red);" id="popValBar"></div></div>
+    </div>`;
+
+    if (state.currentUserRole === "ADMIN") {
+      contentHtml += `<button onclick="window.approvePointStatus('${p.id}')" style="width:100%; margin-top:8px; background:var(--accent-green); color:#0f172a; border:none; padding:6px; border-radius:4px; font-weight:bold; cursor:pointer;">
+        ✅ PHÊ DUYỆT CHÍNH THỨC (ADMIN)
+      </button>`;
+    } else {
+      contentHtml += `<div style="margin-top:6px; font-size:10px; color:var(--accent-orange); font-style:italic; text-align:center;">
+        ⏳ Đang chờ Quản trị viên (Admin) phê duyệt.
+      </div>`;
+    }
+
+    contentHtml += `</div>`;
+
+  } else if (p.type !== "9-CSD") {
+    contentHtml += `<div id="servedPopText">
+      <div style="color:var(--accent-orange); font-weight:bold; margin-top:4px;">• Dân số phục vụ CHÍNH THỨC: <span id="popValText">0%</span></div>
+      <div class="inline-progress-bg"><div class="inline-progress-fill" style="background:var(--accent-orange);" id="popValBar"></div></div>
+    </div>`;
+    contentHtml += `</div>`;
+  }
+
+  const popup = L.popup({ closeButton: true, autoPan: true })
+    .setLatLng([p.lat, p.lng])
+    .setContent(contentHtml);
+  
+  popup.openOn(map);
+
+  // Tính dân số phục vụ từ GEE
+  fetch(`/api/gee?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${customRadius}`)
+    .then(r => r.json())
+    .then(res => {
+      const popVal = res.servedPop || 0;
+      const popContainer = document.getElementById('servedPopText');
+      if (popContainer) {
+        popContainer.innerHTML = `• Dân số phục vụ (~${customRadius}m): ~<b style="color:var(--accent-orange);">${popVal.toLocaleString()} người</b>`;
+      }
+    });
+}
+
 export function handleInspectPointClick(map, clickLat, clickLng) {
   const customRadius = Number(document.getElementById('inputIsoRadius')?.value) || 500;
   
-  // Vẽ Isochrone xung quanh vị trí click
   drawIsochronePolygon(map, clickLat, clickLng, customRadius);
 
   const coveredGroups = {};
@@ -73,7 +137,7 @@ export function handleInspectPointClick(map, clickLat, clickLng) {
 
       let resultHtml = `<div style="font-size:11px;">
         <b style="color:var(--accent-cyan);">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ</b><br>
-        <span style="color:var(--text-muted);">📍 Địa bàn: <b>Phường/Xã ${wardName}</b> | 🛤️ Bán kính di chuyển: <b style="color:var(--accent-green);">${customRadius}m</b></span><br>
+        <span style="color:var(--text-muted);">📍 Địa bàn: <b>Phường/Xã ${wardName}</b> | 🛤️ Bán kính: <b style="color:var(--accent-green);">${customRadius}m</b></span><br>
 
         <div style="font-weight:bold; color:var(--accent-green); margin-top:6px;">
           1. Tiếp cận: ${coveredCount}/8 nhóm
