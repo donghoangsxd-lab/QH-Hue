@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Lớp Giao Thông GEE</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { width: 100vw; height: 100vh; background: #0f172a; }
+  </style>
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <script>
+    // 1. Khởi tạo bản đồ Leaflet tâm TP. Huế
+    const map = L.map('map').setView([16.4637, 107.5905], 13);
+
+    // Bản đồ nền Vệ tinh Esri
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 18
+    }).addTo(map);
+
+    // 2. Hàm gọi API và bắt lỗi chi tiết
+    async function testRoadsLayer() {
+      console.log("🔄 Bắt đầu gọi API GEE...");
+      
+      try {
+        const res = await fetch('/api/gee?action=getRoadsTile');
+        
+        if (!res.ok) {
+          throw new Error(`Lỗi HTTP ${res.status}: ${res.statusText}`);
+        }
+        
+        const data = await res.json();
+        console.log("📦 Kết quả trả về từ Server:", data);
+
+        if (!data || !data.urlFormat) {
+          throw new Error("Server trả về OK nhưng KHÔNG CÓ thuộc tính 'urlFormat'!");
+        }
+
+        // Thêm Tile Layer vào bản đồ
+        const roadsLayer = L.tileLayer(data.urlFormat, { opacity: 1.0, zIndex: 1000 });
+        roadsLayer.addTo(map);
+
+        alert("🎉 NẠP THÀNH CÔNG!\nLớp giao thông GEE đã hiển thị trên bản đồ.");
+
+      } catch (err) {
+        console.error("❌ Lỗi chi tiết:", err);
+        alert(`❌ KHÔNG TẢI ĐƯỢC LỚP GIAO THÔNG:\n\n${err.message}`);
+      }
+    }
+
+    // Tự động chạy sau 1 giây
+    setTimeout(testRoadsLayer, 1000);
+  </script>
+</body>
+</html>
