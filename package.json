@@ -9,7 +9,6 @@
   },
   "dependencies": {
     "@google/earthengine": "^0.1.385",
-    "@turf/turf": "^6.5.0",
     "axios": "^1.6.8"
   }
 }
