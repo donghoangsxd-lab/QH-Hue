@@ -7,7 +7,7 @@ let cachedWardStats = null;
 let lastWardStatsFetch = 0;
 
 // ==========================================
-// HELPER: TÍNH ISOCHRONE GIAO THÔNG (FALLBACK BUFFER)
+// HELPER: TÍNH ISOCHRONE GIAO THÔNG CHO 1 ĐIỂM
 // ==========================================
 async function calculateNetworkIsochrone(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
@@ -87,32 +87,19 @@ module.exports = async (req, res) => {
   try {
     const action = req.query.action || 'getInitData';
 
-    // 1. TÍNH ISOCHRONE MẠNG LƯỚI GIAO THÔNG
-    if (action === 'getIsochrone') {
-      const { features } = req.body || {};
-      if (!features || !Array.isArray(features)) {
-        return res.status(400).json({ success: false, message: 'Invalid features array' });
-      }
+    // 1. TÍNH ISOCHRONE RIÊNG CHO 1 ĐIỂM (DÙNG KHI CLICK HIGHLIGHT)
+    if (action === 'getSingleIsochrone') {
+      const lat = Number(req.query.lat);
+      const lng = Number(req.query.lng);
+      const banKinh = Number(req.query.radius) || 500;
+      if (!lat || !lng) return res.status(400).json({ error: true, message: "Thiếu tọa độ" });
 
-      const isoPromises = features.map(async (item) => {
-        const effectiveRadius = item.radius || item.banKinh || 500;
-        const polyCoords = await calculateNetworkIsochrone(item.lat, item.lng, effectiveRadius);
-        return {
-          type: 'Feature',
-          geometry: polyCoords,
-          properties: {
-            id: item.id,
-            name: item.name,
-            type: item.type,
-            ward: item.ward,
-            banKinh: effectiveRadius,
-            status: item.status
-          }
-        };
+      const polyCoords = await calculateNetworkIsochrone(lat, lng, banKinh);
+      return res.status(200).json({
+        type: 'Feature',
+        geometry: polyCoords,
+        properties: { banKinh }
       });
-
-      const isochroneFeatures = await Promise.all(isoPromises);
-      return res.json({ type: 'FeatureCollection', features: isochroneFeatures });
     }
 
     // 2. ĐỒNG BỘ ĐIỂM SANG GOOGLE SHEETS VIA GAS
@@ -151,12 +138,15 @@ module.exports = async (req, res) => {
     const { ee, wardVectorParsed, popRasterNormalized, wardRegion } = getGeeContext();
     const rawDataList = await getRawDataList();
 
-    // 3. TÍNH DÂN SỐ PHỤC VỤ TẠI ĐIỂM
+    // 3. TÍNH DÂN SỐ PHỤC VỤ TẠI ĐIỂM (THEO ĐA GIÁC OSRM HOẶC BÁN KÍNH GỐC)
     if (action === 'analyzePoint') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
       const radius = Number(req.query.radius) || 500;
-      const ptGeom = buildEeIsochroneGeometry(lat, lng, radius);
+      
+      // Tạo hình học đa giác OSRM chuẩn cho điểm phân tích
+      const polyCoords = await calculateNetworkIsochrone(lat, lng, radius);
+      const ptGeom = ee.Geometry(polyCoords);
 
       const servedPopRes = await new Promise((resolve, reject) => {
         popRasterNormalized.reduceRegion({
@@ -171,10 +161,10 @@ module.exports = async (req, res) => {
       return res.status(200).json({ servedPop });
     }
 
-    // 4. ĐỘ PHỦ HEATMAP TILE (Đồng bộ tuyệt đối với đa giác OSRM từ Client)
+    // 4. ĐỘ PHỦ HEATMAP TILE
     if (action === 'getHeatmapTile') {
       const { features } = req.body || {};
-      const overrideRadius = Number(req.query.overrideRadius) || 500;
+      const overrideRadius = Number(req.query.overrideRadius) || 0;
       const categoryImageLayers = [];
       const codes = constants.CODES_TO_CHECK;
 
@@ -189,7 +179,10 @@ module.exports = async (req, res) => {
         if (groupGeoms.length === 0) {
           groupGeoms = rawDataList
             .filter(item => item.type === code && item.status === true)
-            .map(item => ee.Feature(buildEeIsochroneGeometry(item.lat, item.lng, overrideRadius)));
+            .map(item => {
+              const r = overrideRadius > 0 ? overrideRadius : (Number(item.radius) || Number(item.banKinh) || 500);
+              return ee.Feature(buildEeIsochroneGeometry(item.lat, item.lng, r));
+            });
         }
 
         if (groupGeoms.length > 0) {
@@ -261,11 +254,18 @@ module.exports = async (req, res) => {
         const deficitArea = reqArea - existArea;
 
         const candidateRadius = constants.infraConfig[code].radius;
-        const testBuffer = buildEeIsochroneGeometry(lat, lng, candidateRadius);
+        const testPolyCoords = await calculateNetworkIsochrone(lat, lng, candidateRadius);
+        const testBuffer = ee.Geometry(testPolyCoords);
 
-        const existingBuffers = rawDataList
+        const existingBuffersPromises = rawDataList
           .filter(item => item.type === code && item.status)
-          .map(item => ee.Feature(buildEeIsochroneGeometry(item.lat, item.lng, Number(item.radius) || candidateRadius)));
+          .map(async (item) => {
+            const r = Number(item.radius) || Number(item.banKinh) || candidateRadius;
+            const pCoords = await calculateNetworkIsochrone(item.lat, item.lng, r);
+            return ee.Feature(ee.Geometry(pCoords));
+          });
+
+        const existingBuffers = await Promise.all(existingBuffersPromises);
 
         let netBufferGeom = testBuffer;
         if (existingBuffers.length > 0) {
@@ -330,18 +330,24 @@ module.exports = async (req, res) => {
       const codes = constants.CODES_TO_CHECK;
       const bandImagesList = [];
 
-      codes.forEach(code => {
-        const buffers = rawDataList
+      for (const code of codes) {
+        const itemBuffersPromises = rawDataList
           .filter(item => item.type === code && item.status)
-          .map(item => buildEeIsochroneGeometry(item.lat, item.lng, Number(item.radius) || 500));
+          .map(async (item) => {
+            const r = Number(item.radius) || Number(item.banKinh) || 500;
+            const pCoords = await calculateNetworkIsochrone(item.lat, item.lng, r);
+            return ee.Feature(ee.Geometry(pCoords));
+          });
+
+        const buffers = await Promise.all(itemBuffersPromises);
 
         let unionImg = buffers.length > 0 
-          ? ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection(buffers.map(b => ee.Feature(b))), color: 1 }) 
+          ? ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection(buffers), color: 1 }) 
           : ee.Image(0).byte();
 
         const maskedRaster = popRasterNormalized.updateMask(unionImg.gt(0)).unmask(0).float().rename(code);
         bandImagesList.push(maskedRaster);
-      });
+      }
 
       const infraMultiBand = ee.Image.cat(bandImagesList).addBands(wardRegion.rename('ID_Region'));
 
@@ -451,7 +457,7 @@ module.exports = async (req, res) => {
 
     return res.status(200).json({ rawDataList });
 
-  } catch (err) {
+-  } catch (err) {
     return res.status(500).json({ error: true, message: err.message });
   }
 };
