@@ -12,13 +12,12 @@ let lastWardStatsFetch = 0;
 async function calculateNetworkIsochrone(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
   const reachRatio = constants.ISOCHRONE_CONFIG?.REACH_RATIO || 0.9;
-  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 16; // Tăng lên 16 hướng để mượt hơn
+  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 16;
   const maxReachKm = (R * reachRatio) / 1000;
   const angleStep = 360 / sampleAngles;
   
   const angles = Array.from({ length: sampleAngles }, (_, i) => i * angleStep);
 
-  // Bước 1: Thu thập khoảng cách thực tế cho từng hướng quét
   const distancePromises = angles.map(async (angle) => {
     const rad = (angle * Math.PI) / 180;
     const destLat = lat + (maxReachKm / 111) * Math.cos(rad);
@@ -30,33 +29,28 @@ async function calculateNetworkIsochrone(lat, lng, banKinh) {
       
       if (res.data && res.data.routes && res.data.routes[0]) {
         const route = res.data.routes[0];
-        // Nếu quãng đường vòng quá xa hoặc đâm qua sông không hợp lý, giới hạn lại
         if (route.distance > R * 1.3) {
-          return maxReachKm * 0.4; // Thuụt nhẹ thay vì sập về 0
+          return maxReachKm * 0.4;
         }
-        // Trả về khoảng cách thực tế quy đổi theo tỷ lệ
         return Math.min(maxReachKm, (route.distance / 1000));
       }
     } catch (e) {}
     
-    // Hướng bị chặn (vướng sông/không đường): Dùng mức an toàn trung bình (khoảng 50% bán kính)
     return maxReachKm * 0.45;
   });
 
   const rawDistances = await Promise.all(distancePromises);
 
-  // Bước 2: Làm mượt bán kính giữa các góc quét (Moving Average 3 điểm) để triệt tiêu các góc nhọn/gai sao
   const smoothedDistances = [];
   const n = rawDistances.length;
   for (let i = 0; i < n; i++) {
     const prev = rawDistances[(i - 1 + n) % n];
     const curr = rawDistances[i];
     const next = rawDistances[(i + 1) % n];
-    const smoothVal = (prev + curr * 2 + next) / 4; // Trọng tâm dồn vào điểm hiện tại
+    const smoothVal = (prev + curr * 2 + next) / 4;
     smoothedDistances.push(smoothVal);
   }
 
-  // Bước 3: Chuyển đổi bán kính đã làm mượt thành tọa độ đa giác khép kín
   const polygonCoordinates = [];
   angles.forEach((angle, idx) => {
     const rad = (angle * Math.PI) / 180;
@@ -67,7 +61,6 @@ async function calculateNetworkIsochrone(lat, lng, banKinh) {
     polygonCoordinates.push([pLng, pLat]);
   });
 
-  // Khép kín vòng đa giác
   if (polygonCoordinates.length > 0) {
     polygonCoordinates.push(polygonCoordinates[0]);
   }
@@ -87,7 +80,6 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Parse Body nếu là request POST
   if (req.method === 'POST' && typeof req.body === 'string') {
     try { req.body = JSON.parse(req.body); } catch(e) {}
   }
@@ -155,7 +147,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, result });
     }
 
-    // Khởi tạo Earth Engine Context & Dữ liệu GCS
     await initGEE();
     const { ee, wardVectorParsed, popRasterNormalized, wardRegion } = getGeeContext();
     const rawDataList = await getRawDataList();
@@ -180,18 +171,34 @@ module.exports = async (req, res) => {
       return res.status(200).json({ servedPop });
     }
 
-    // 4. ĐỘ PHỦ HEATMAP TILE
+    // 4. ĐỘ PHỦ HEATMAP TILE (Đồng bộ tuyệt đối với đa giác OSRM từ Client)
     if (action === 'getHeatmapTile') {
+      const { features } = req.body || {};
       const overrideRadius = Number(req.query.overrideRadius) || 500;
       const categoryImageLayers = [];
       const codes = constants.CODES_TO_CHECK;
 
       codes.forEach(code => {
-        const groupFeatures = rawDataList
-          .filter(item => item.type === code && item.status === true)
-          .map(item => ee.Feature(buildEeIsochroneGeometry(item.lat, item.lng, overrideRadius)));
-        if (groupFeatures.length > 0) {
-          categoryImageLayers.push(ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection(groupFeatures), color: 1 }));
+        let groupGeoms = [];
+        if (features && Array.isArray(features)) {
+          groupGeoms = features
+            .filter(item => item.properties && item.properties.type === code && (item.properties.status === true || item.properties.status === 'true' || item.properties.status === 'TRUE'))
+            .map(item => ee.Feature(ee.Geometry(item.geometry)));
+        }
+
+        if (groupGeoms.length === 0) {
+          groupGeoms = rawDataList
+            .filter(item => item.type === code && item.status === true)
+            .map(item => ee.Feature(buildEeIsochroneGeometry(item.lat, item.lng, overrideRadius)));
+        }
+
+        if (groupGeoms.length > 0) {
+          categoryImageLayers.push(
+            ee.Image(0).byte().paint({ 
+              featureCollection: ee.FeatureCollection(groupGeoms), 
+              color: 1 
+            })
+          );
         }
       });
 
