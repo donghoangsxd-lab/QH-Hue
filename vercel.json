@@ -1,8 +1,9 @@
 {
   "version": 2,
-  "public": true,
-  "routes": [
-    { "src": "/api/gee", "destination": "/api/gee.js" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    {
+      "source": "/api/gee",
+      "destination": "/api/gee.js"
+    }
   ]
 }
