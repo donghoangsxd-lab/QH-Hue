@@ -1,19 +1,27 @@
 const axios = require('axios');
 const turf = require('@turf/turf');
+const constants = require('../config/constants');
 
 /**
  * Tính toán Đa giác Vùng phủ Isochrone bám sát tuyến đường (90% + 10%)
  * @param {number} lat - Vĩ độ công trình
  * @param {number} lng - Kinh độ công trình
- * @param {number} banKinh - Bán kính phục vụ R (m) trích xuất từ cột H của Google Sheet
+ * @param {number} banKinh - Bán kính phục vụ R (m)
  */
 async function calculateNetworkIsochrone(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
-  const reachDistanceKm = (R * 0.9) / 1000;  // 90% di chuyển mạng lưới giao thông OSRM
-  const offsetDistanceKm = (R * 0.1) / 1000; // 10% buffer offset làm mịn đa giác
+  
+  // Lấy tỷ lệ cấu hình từ constants.js (mặc định 90% di chuyển OSRM + 10% offset buffer làm mịn)
+  const reachRatio = constants.ISOCHRONE_CONFIG?.REACH_RATIO || 0.9;
+  const offsetRatio = constants.ISOCHRONE_CONFIG?.OFFSET_RATIO || 0.1;
+  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 12;
 
-  // Quét 12 hướng bức xạ giao thông
-  const angles = Array.from({ length: 12 }, (_, i) => i * 30);
+  const reachDistanceKm = (R * reachRatio) / 1000;  
+  const offsetDistanceKm = (R * offsetRatio) / 1000; 
+
+  // Quét các hướng bức xạ giao thông (mặc định 12 hướng)
+  const angleStep = 360 / sampleAngles;
+  const angles = Array.from({ length: sampleAngles }, (_, i) => i * angleStep);
   const allVertices = [];
 
   const routePromises = angles.map(async (angle) => {
@@ -60,7 +68,10 @@ exports.getNetworkIsochrones = async (req, res) => {
     }
 
     const isoPromises = features.map(async (item) => {
-      const poly = await calculateNetworkIsochrone(item.lat, item.lng, item.banKinh);
+      // Ưu tiên lấy item.radius (tên biến chuẩn Frontend) hoặc item.banKinh
+      const effectiveRadius = item.radius || item.banKinh || 500;
+      const poly = await calculateNetworkIsochrone(item.lat, item.lng, effectiveRadius);
+      
       return {
         type: 'Feature',
         geometry: poly.geometry,
@@ -69,7 +80,7 @@ exports.getNetworkIsochrones = async (req, res) => {
           name: item.name,
           type: item.type,
           ward: item.ward,
-          banKinh: item.banKinh,
+          banKinh: effectiveRadius,
           status: item.status
         }
       };
