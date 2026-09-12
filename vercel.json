@@ -4,7 +4,10 @@
     {
       "source": "/api/gee",
       "destination": "/api/gee.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/$1"
     }
-  ],
-  "cleanUrls": true
+  ]
 }
