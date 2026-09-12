@@ -12,88 +12,72 @@ let lastWardStatsFetch = 0;
 async function calculateNetworkIsochrone(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
   const reachRatio = constants.ISOCHRONE_CONFIG?.REACH_RATIO || 0.9;
-  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 12;
-  const reachDistanceKm = (R * reachRatio) / 1000;
-  const proxyDistanceKm = 0.1; // Điểm đại diện 100m cho hướng bị chặn/vướng sông
+  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 16; // Tăng lên 16 hướng để mượt hơn
+  const maxReachKm = (R * reachRatio) / 1000;
   const angleStep = 360 / sampleAngles;
   
-  const outerVertices = [];
   const angles = Array.from({ length: sampleAngles }, (_, i) => i * angleStep);
 
-  const routePromises = angles.map(async (angle) => {
+  // Bước 1: Thu thập khoảng cách thực tế cho từng hướng quét
+  const distancePromises = angles.map(async (angle) => {
     const rad = (angle * Math.PI) / 180;
-    const destLat = lat + (reachDistanceKm / 111) * Math.cos(rad);
-    const destLng = lng + (reachDistanceKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
+    const destLat = lat + (maxReachKm / 111) * Math.cos(rad);
+    const destLng = lng + (maxReachKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
     
     try {
-      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLng ? destLat : 0}?overview=full&geometries=geojson`;
-      // Sử dụng đúng tọa độ đích giả định
-      const targetUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=full&geometries=geojson`;
-      const res = await axios.get(targetUrl, { timeout: 2000 });
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=false`;
+      const res = await axios.get(osrmUrl, { timeout: 2000 });
       
       if (res.data && res.data.routes && res.data.routes[0]) {
         const route = res.data.routes[0];
-        // Kiểm tra ngưỡng khoảng cách thực tế (tránh vòng cầu quá xa)
-        if (route.distance > R * 1.4) {
-          return null; // Đánh dấu hướng bị chặn/vượt quá giới hạn
+        // Nếu quãng đường vòng quá xa hoặc đâm qua sông không hợp lý, giới hạn lại
+        if (route.distance > R * 1.3) {
+          return maxReachKm * 0.4; // Thuụt nhẹ thay vì sập về 0
         }
-        const coords = route.geometry.coordinates;
-        return coords[coords.length - 1]; // Lấy điểm mút xa nhất hợp lệ
+        // Trả về khoảng cách thực tế quy đổi theo tỷ lệ
+        return Math.min(maxReachKm, (route.distance / 1000));
       }
-    } catch (e) {
-      // Lỗi mạng hoặc OSRM không tìm được đường qua sông
-    }
-    return null; 
+    } catch (e) {}
+    
+    // Hướng bị chặn (vướng sông/không đường): Dùng mức an toàn trung bình (khoảng 50% bán kính)
+    return maxReachKm * 0.45;
   });
 
-  const results = await Promise.all(routePromises);
+  const rawDistances = await Promise.all(distancePromises);
 
-  // Xử lý điểm hợp lệ và bổ sung điểm proxy cho hướng bị chặn
+  // Bước 2: Làm mượt bán kính giữa các góc quét (Moving Average 3 điểm) để triệt tiêu các góc nhọn/gai sao
+  const smoothedDistances = [];
+  const n = rawDistances.length;
+  for (let i = 0; i < n; i++) {
+    const prev = rawDistances[(i - 1 + n) % n];
+    const curr = rawDistances[i];
+    const next = rawDistances[(i + 1) % n];
+    const smoothVal = (prev + curr * 2 + next) / 4; // Trọng tâm dồn vào điểm hiện tại
+    smoothedDistances.push(smoothVal);
+  }
+
+  // Bước 3: Chuyển đổi bán kính đã làm mượt thành tọa độ đa giác khép kín
+  const polygonCoordinates = [];
   angles.forEach((angle, idx) => {
-    const pt = results[idx];
     const rad = (angle * Math.PI) / 180;
-
-    if (pt && Array.isArray(pt)) {
-      // Hướng hợp lệ: Thêm điểm mút giao thông thực tế
-      outerVertices.push(pt);
-    } else {
-      // Hướng bị chặn (vướng sông, không có cầu, cụt đường): Dùng điểm proxy gần (100m)
-      const proxyLat = lat + (proxyDistanceKm / 111) * Math.cos(rad);
-      const proxyLng = lng + (proxyDistanceKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
-      outerVertices.push([proxyLng, proxyLat]);
-    }
+    const distKm = smoothedDistances[idx];
+    
+    const pLat = lat + (distKm / 111) * Math.cos(rad);
+    const pLng = lng + (distKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
+    polygonCoordinates.push([pLng, pLat]);
   });
 
-  if (outerVertices.length >= 3) {
-    // Sắp xếp các đỉnh theo góc cực quanh tâm để tạo vòng đa giác khép kín chính xác
-    outerVertices.sort((a, b) => {
-      const angleA = Math.atan2(a[1] - lat, a[0] - lng);
-      const angleB = Math.atan2(b[1] - lat, b[0] - lng);
-      return angleA - angleB;
-    });
-
-    // Khép kín vòng đa giác
-    outerVertices.push(outerVertices[0]);
-
-    return {
-      type: 'Polygon',
-      coordinates: [outerVertices]
-    };
+  // Khép kín vòng đa giác
+  if (polygonCoordinates.length > 0) {
+    polygonCoordinates.push(polygonCoordinates[0]);
   }
 
-  // Fallback an toàn hình tròn cục bộ
-  const circlePoints = [];
-  for (let i = 0; i <= 360; i += 15) {
-    const rad = (i * Math.PI) / 180;
-    const dLat = (R / 111000) * Math.cos(rad);
-    const dLng = (R / (111000 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
-    circlePoints.push([lng + dLng, lat + dLat]);
-  }
   return {
     type: 'Polygon',
-    coordinates: [circlePoints]
+    coordinates: [polygonCoordinates]
   };
 }
+
 // ==========================================
 // MAIN VERCEL SERVERLESS ROUTER
 // ==========================================
