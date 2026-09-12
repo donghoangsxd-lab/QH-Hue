@@ -5,7 +5,5 @@
       "source": "/api/gee",
       "destination": "/api/gee.js"
     }
-  ],
-  "cleanUrls": true,
-  "trailingSlash": false
+  ]
 }
