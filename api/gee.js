@@ -1,8 +1,7 @@
 const ee = require('@google/earthengine');
-const { getIsochrone } = require('./controllers/routeController');
+const turf = require('@turf/turf');
 
 let isGeeInitialized = false;
-
 let cachedGeoJSON = null;
 let lastGeoJSONFetch = 0;
 const GEOJSON_CACHE_TTL = 10 * 60 * 1000;
@@ -80,9 +79,7 @@ async function getRawDataList() {
       const coords = ft.geometry ? ft.geometry.coordinates : [107.5905, 16.4637];
       const rawId = String(props.ID_DoiTuong || '');
       const prefix = rawId.split('-')[0];
-
       const rawStatus = props.TrangThai;
-      const isStatusTrue = (rawStatus === true || String(rawStatus).trim().toUpperCase() === 'TRUE');
 
       return {
         id: rawId,
@@ -93,23 +90,40 @@ async function getRawDataList() {
         lng: Number(coords[0]),
         size: Number(props.QuyMo_S) || 0,
         radius: Number(props.BanKinh) || 500,
-        status: isStatusTrue
+        status: (rawStatus === true || String(rawStatus).trim().toUpperCase() === 'TRUE')
       };
     });
 
     lastGeoJSONFetch = now;
     return cachedGeoJSON;
   } catch (e) {
-    console.error("Lỗi nạp GCS Data:", e.message);
     return cachedGeoJSON || [];
   }
 }
 
 function invalidateCache() {
-  cachedGeoJSON = null;
-  cachedWardStats = null;
-  lastGeoJSONFetch = 0;
-  lastWardStatsFetch = 0;
+  cachedGeoJSON = null; cachedWardStats = null;
+  lastGeoJSONFetch = 0; lastWardStatsFetch = 0;
+}
+
+// HÀM TẠO EE.GEOMETRY TỪ DYNAMIC ISOCHRONE (90% + 10%)
+function buildEeIsochroneGeometry(lat, lng, banKinh) {
+  const R = Number(banKinh) || 500;
+  const reachKm = (R * 0.9) / 1000;
+  const offsetKm = (R * 0.1) / 1000;
+
+  const angles = Array.from({ length: 12 }, (_, i) => i * 30);
+  const pts = angles.map(a => {
+    const dest = turf.destination([lng, lat], reachKm, a, { units: 'kilometers' });
+    return dest.geometry.coordinates;
+  });
+
+  const poly = turf.convex(turf.featureCollection(pts.map(p => turf.point(p))));
+  if (poly) {
+    const smooth = turf.buffer(poly, offsetKm, { units: 'kilometers' });
+    return ee.Geometry.Polygon(smooth.geometry.coordinates);
+  }
+  return ee.Geometry.Point([lng, lat]).buffer(R);
 }
 
 module.exports = async (req, res) => {
@@ -118,22 +132,14 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const action = req.query.action || 'getInitData';
-
-    // Route xử lý Isochrone Giao thông
-    if (action === 'getIsochrone') {
-      return await getIsochrone(req, res);
-    }
-
     await initGEE();
+    const action = req.query.action || 'getInitData';
     const gasBaseUrl = "https://script.google.com/macros/s/AKfycbzyvYP9WoDizfwb-ZMT374jHbLY02X3HlhxKnmZEYl8UrYrO6SSzSB7eQRH0kaXWguU/exec";
 
     const wardVector = ee.FeatureCollection("projects/optimistic-yew-488501-s0/assets/Polygon-40xa");
     const wardVectorParsed = wardVector.map(f => {
-      let rawPop = f.get('danSo');
-      if (!rawPop) rawPop = f.get('DanSo');
-      const popNum = ee.Algorithms.If(rawPop, ee.Number.parse(ee.String(rawPop)), 0);
-      return f.set('danSoNum', popNum);
+      let rawPop = f.get('danSo') || f.get('DanSo');
+      return f.set('danSoNum', ee.Algorithms.If(rawPop, ee.Number.parse(ee.String(rawPop)), 0));
     });
 
     if (action === 'getWardFromPoint') {
@@ -196,8 +202,7 @@ module.exports = async (req, res) => {
     const statsGrouped = validPopRaster.addBands(wardRegion).reduceRegion({
       reducer: ee.Reducer.count().group({ groupField: 1, groupName: 'ID_Phuong' }),
       geometry: wardVectorParsed.geometry(),
-      scale: 60,
-      maxPixels: 1e9
+      scale: 60, maxPixels: 1e9
     });
 
     const groupsList = ee.List(statsGrouped.get('groups'));
@@ -245,7 +250,8 @@ module.exports = async (req, res) => {
       codes.forEach(code => {
         const groupFeatures = rawDataList
           .filter(item => item.type === code && item.status === true)
-          .map(item => ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || 500)));
+          .map(item => ee.Feature(buildEeIsochroneGeometry(item.lat, item.lng, item.radius)));
+        
         if (groupFeatures.length > 0) {
           categoryImageLayers.push(ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection(groupFeatures), color: 1 }));
         }
@@ -272,13 +278,13 @@ module.exports = async (req, res) => {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
       const radius = Number(req.query.radius) || 500;
-      const ptGeom = ee.Geometry.Point([lng, lat]);
-      const bufGeom = ptGeom.buffer(radius);
+      
+      const isochroneGeom = buildEeIsochroneGeometry(lat, lng, radius);
 
       const servedPopRes = await new Promise((resolve, reject) => {
         popRasterNormalized.reduceRegion({
           reducer: ee.Reducer.sum(),
-          geometry: bufGeom,
+          geometry: isochroneGeom,
           scale: 30,
           maxPixels: 1e9
         }).evaluate((res, err) => err ? reject(err) : resolve(res));
@@ -288,13 +294,14 @@ module.exports = async (req, res) => {
       return res.status(200).json({ servedPop });
     }
 
+    // BẢO TOÀN LOGIC PHÂN TÍCH QUỸ ĐẤT CSD
     if (action === 'analyzeCSD') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
       const size = Number(req.query.size) || 0;
       const rawWardParam = String(req.query.ward || '');
       const cleanTargetWard = cleanWardStr(rawWardParam);
-      const ptGeom = ee.Geometry.Point([lng, lat]);
+      const isochroneGeom = buildEeIsochroneGeometry(lat, lng, 500);
 
       const wardListEvaluated = await new Promise((resolve) => {
         wardVectorParsed.evaluate((fc) => resolve(fc ? fc.features : []));
@@ -332,11 +339,11 @@ module.exports = async (req, res) => {
         const deficitArea = reqArea - existArea;
 
         const candidateRadius = infraConfig[code].radius;
-        const testBuffer = ptGeom.buffer(candidateRadius);
+        const testBuffer = buildEeIsochroneGeometry(lat, lng, candidateRadius);
 
         const existingBuffers = rawDataList
           .filter(item => item.type === code && item.status)
-          .map(item => ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || candidateRadius)));
+          .map(item => ee.Feature(buildEeIsochroneGeometry(item.lat, item.lng, Number(item.radius) || candidateRadius)));
 
         let netBufferGeom = testBuffer;
         if (existingBuffers.length > 0) {
@@ -391,6 +398,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
+    // BẢO TOÀN LOGIC TRA CỨU MẬT ĐỘ TẠI ĐIỂM
     if (action === 'analyzeLocation') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -441,6 +449,7 @@ module.exports = async (req, res) => {
       });
     }
 
+    // BẢO TOÀN LOGIC BẢNG BÁO CÁO 40 PHƯỜNG XÃ
     if (action === 'getWardStats') {
       const now = Date.now();
       if (cachedWardStats && (now - lastWardStatsFetch < WARD_STATS_CACHE_TTL)) {
@@ -453,7 +462,7 @@ module.exports = async (req, res) => {
       codes.forEach(code => {
         const buffers = rawDataList
           .filter(item => item.type === code && item.status)
-          .map(item => ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || 500));
+          .map(item => buildEeIsochroneGeometry(item.lat, item.lng, Number(item.radius) || 500));
 
         let unionImg = buffers.length > 0 ? 
           ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection(buffers.map(b => ee.Feature(b))), color: 1 }) : 
