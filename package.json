@@ -4,9 +4,12 @@
   "description": "Bản đồ Phân tích Hạ tầng Đô thị TP. Huế",
   "main": "api/gee.js",
   "scripts": {
-    "start": "vercel dev"
+    "start": "vercel dev",
+    "build": "echo 'No build step required'"
   },
   "dependencies": {
-    "@google/earthengine": "^0.1.385"
+    "@google/earthengine": "^0.1.385",
+    "@turf/turf": "^6.5.0",
+    "axios": "^1.6.8"
   }
 }
