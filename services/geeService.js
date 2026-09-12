@@ -73,19 +73,23 @@ function getGeeContext() {
 }
 
 // Xây dựng hình học Isochrone bằng toán học thuần túy (Không dùng Turf)
+// Xây dựng hình học đa giác mượt mà (Tương thích đồng bộ cho cả Isochrone & Heatmap)
 function buildEeIsochroneGeometry(lat, lng, banKinh) {
   const R = Number(banKinh) || 500;
-  const radiusKm = (R * 0.95) / 1000; // Quy mô hiệu chỉnh bán kính
+  const radiusKm = (R * 0.9) / 1000; 
   
   const coords = [];
-  const steps = 16;
+  const steps = 24; // Tăng số bước lên 24 để biên dạng mịn màng, không bị góc cạnh
   for (let i = 0; i < steps; i++) {
     const angle = (i * 360) / steps;
     const rad = (angle * Math.PI) / 180;
     
-    // Xấp xỉ độ dịch chuyển kinh vĩ tuyến (1 độ vĩ tuyến ~ 111km)
-    const dLat = (radiusKm / 111) * Math.cos(rad);
-    const dLng = (radiusKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
+    // Tạo độ cong hữu cơ nhẹ dựa trên hàm lượng giác
+    const dynamicFactor = 1 + 0.03 * Math.sin(rad * 4);
+    const rCurrent = radiusKm * dynamicFactor;
+
+    const dLat = (rCurrent / 111) * Math.cos(rad);
+    const dLng = (rCurrent / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
     
     coords.push([lng + dLng, lat + dLat]);
   }
