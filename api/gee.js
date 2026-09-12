@@ -12,15 +12,16 @@ let lastWardStatsFetch = 0;
 async function calculateNetworkIsochrone(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
   const reachRatio = constants.ISOCHRONE_CONFIG?.REACH_RATIO || 0.9;
-  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 16;
+  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 12; // 12 hoặc 8 hướng quét
   const reachDistanceKm = (R * reachRatio) / 1000;
   const angleStep = 360 / sampleAngles;
   
-  const allVertices = [];
+  const outerVertices = [];
   const angles = Array.from({ length: sampleAngles }, (_, i) => i * angleStep);
 
   const routePromises = angles.map(async (angle) => {
     const rad = (angle * Math.PI) / 180;
+    // Tính điểm đích giả định theo hướng góc quét
     const destLat = lat + (reachDistanceKm / 111) * Math.cos(rad);
     const destLng = lng + (reachDistanceKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
     
@@ -28,39 +29,41 @@ async function calculateNetworkIsochrone(lat, lng, banKinh) {
       const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=full&geometries=geojson`;
       const res = await axios.get(osrmUrl, { timeout: 2000 });
       if (res.data && res.data.routes && res.data.routes[0]) {
-        // Lấy TOÀN BỘ tọa độ các điểm trên tuyến đường OSRM trả về
-        return res.data.routes[0].geometry.coordinates;
+        const coords = res.data.routes[0].geometry.coordinates;
+        // CHỈ LẤY ĐIỂM XA NHẤT (ĐIỂM CUỐI CÙNG) MÀ HƯỚNG QUÉT ĐI ĐƯỢC TRÊN TUYẾN GIAO THÔNG
+        return coords[coords.length - 1];
       }
     } catch (e) {}
-    return [[lng, lat], [destLng, destLat]];
+    
+    // Fallback nếu hướng đó OSRM không trả về
+    return [destLng, destLat];
   });
 
   const results = await Promise.all(routePromises);
-  results.forEach(coords => {
-    if (coords && Array.isArray(coords)) {
-      allVertices.push(...coords);
+  results.forEach(pt => {
+    if (pt && Array.isArray(pt)) {
+      outerVertices.push(pt);
     }
   });
 
-  // Gom nhóm và lọc bớt các điểm trùng lặp để tạo biên polygon mượt mà
-  if (allVertices.length >= 3) {
-    // Sắp xếp các điểm theo góc quanh tâm (tâm [lng, lat]) để tạo thành đa giác khép kín chính xác
-    const sortedPoints = allVertices.sort((a, b) => {
+  if (outerVertices.length >= 3) {
+    // Sắp xếp các đỉnh theo góc quanh tâm để tạo thành vòng khép kín không bị đan chéo
+    outerVertices.sort((a, b) => {
       const angleA = Math.atan2(a[1] - lat, a[0] - lng);
       const angleB = Math.atan2(b[1] - lat, b[0] - lng);
       return angleA - angleB;
     });
 
     // Khép kín vòng đa giác
-    sortedPoints.push(sortedPoints[0]);
+    outerVertices.push(outerVertices[0]);
 
     return {
       type: 'Polygon',
-      coordinates: [sortedPoints]
+      coordinates: [outerVertices]
     };
   }
 
-  // Fallback an toàn nếu OSRM lỗi
+  // Fallback vòng tròn nếu thiếu dữ liệu
   const circlePoints = [];
   for (let i = 0; i <= 360; i += 15) {
     const rad = (i * Math.PI) / 180;
