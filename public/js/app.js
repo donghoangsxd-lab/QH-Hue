@@ -88,26 +88,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Thay đổi bán kính đồng bộ toàn cục (Ghi đè tạm thời)
+  // Thay đổi bán kính chung qua ô nhập số (ngay dưới Heatmap)
   const inputIsoRadius = document.getElementById('inputIsoRadius');
-  inputIsoRadius?.addEventListener('change', (e) => {
+  inputIsoRadius?.addEventListener('input', (e) => {
     state.globalBufferRadiusOverride = Number(e.target.value) || 500;
-    const radiusLabel = document.getElementById('radiusLabel');
-    if (radiusLabel) radiusLabel.innerText = `${state.globalBufferRadiusOverride}m`;
-    
-    renderGroupedPoints();
-    refreshHeatmapOnly();
-  });
-
-  // Thay đổi slider bán kính Heatmap
-  const radiusSlider = document.getElementById('radiusSlider');
-  const radiusSteps = [300, 500, 1000, 2000];
-  radiusSlider?.addEventListener('change', (e) => {
-    const idx = parseInt(e.target.value, 10);
-    state.globalBufferRadiusOverride = radiusSteps[idx] || 500;
-    const radiusLabel = document.getElementById('radiusLabel');
-    if (radiusLabel) radiusLabel.innerText = `${state.globalBufferRadiusOverride}m`;
-    
     renderGroupedPoints();
     refreshHeatmapOnly();
   });
