@@ -39,7 +39,6 @@ export function initMap() {
 
   measureLayerGroup = L.layerGroup().addTo(map);
 
-  // Khởi tạo các layer mặc định
   layers.boundary.addTo(map);
   layers.heatmap.addTo(map);
   layers.c1.addTo(map); layers.c2.addTo(map); layers.c3.addTo(map);
@@ -427,5 +426,4 @@ export function approvePointStatus(pointId) {
     });
 }
 
-// Bind approvePointStatus vào Global Scope cho Popup Gọi HTML Inline
 window.approvePointStatus = approvePointStatus;
