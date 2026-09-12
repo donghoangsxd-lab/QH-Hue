@@ -7,7 +7,7 @@ export const layers = {
   pop: L.layerGroup(),
   boundary: L.layerGroup(),
   heatmap: L.layerGroup(),
-  singleIso: L.layerGroup(), // Layer chứa vùng isochrone highlight của riêng điểm được chọn
+  singleIso: L.layerGroup(),
   c1: L.layerGroup(), b1: L.layerGroup(),
   c2: L.layerGroup(), b2: L.layerGroup(),
   c3: L.layerGroup(), b3: L.layerGroup(),
@@ -42,7 +42,7 @@ export function initMap() {
 
   layers.boundary.addTo(map);
   layers.heatmap.addTo(map);
-  layers.singleIso.addTo(map); // Thêm layer highlight vào bản đồ mặc định
+  layers.singleIso.addTo(map);
   layers.c1.addTo(map); layers.c2.addTo(map); layers.c3.addTo(map);
   layers.c4.addTo(map); layers.c5.addTo(map); layers.c6.addTo(map);
   layers.c7.addTo(map); layers.c8.addTo(map); layers.c9.addTo(map);
@@ -142,7 +142,6 @@ export function renderGroupedPoints() {
     const targetGroup = mapGroups[p.type] || layers.c9;
     const targetBufferGroup = bufferGroups[p.type] || layers.b9;
 
-    // Lấy bán kính ưu tiên từ Global ghi đè (nếu người dùng kéo thanh trượt), ngược lại lấy từ dữ liệu gốc của điểm (Sheet)
     const itemRadius = state.globalBufferRadiusOverride || Number(p.radius) || Number(p.banKinh) || 500;
 
     if (!isApproved) {
@@ -193,12 +192,22 @@ export async function refreshHeatmapOnly() {
   const currentOpacity = heatOpacityEl ? heatOpacityEl.value / 100 : 0.5;
 
   const overrideRad = state.globalBufferRadiusOverride || 0;
+  const activeFeatures = state.rawDataList
+    .filter(item => item.status && item.type !== "9-CSD")
+    .map(item => ({ ...item, radius: overrideRad > 0 ? overrideRad : (Number(item.radius) || Number(item.banKinh) || 500) }));
 
   try {
+    const isoRes = await fetch('/api/gee?action=getIsochrone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ features: activeFeatures })
+    });
+    const isoData = await isoRes.json();
+
     const heatRes = await fetch(`/api/gee?action=getHeatmapTile&overrideRadius=${overrideRad}&t=${Date.now()}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features: [] })
+      body: JSON.stringify({ features: isoData.features })
     });
     const d = await heatRes.json();
 
@@ -215,7 +224,6 @@ export async function refreshHeatmapOnly() {
   }
 }
 
-// Bỏ hàm refreshNetworkIsochrones cũ, chuyển thành hàm highlight ranh giới riêng lẻ khi click điểm
 export async function highlightSingleIsochrone(lat, lng, radius) {
   if (!map || !layers.singleIso) return;
   layers.singleIso.clearLayers();
@@ -245,7 +253,6 @@ export function onPointClick(p, marker) {
   const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
   const itemRadius = state.globalBufferRadiusOverride || Number(p.radius) || Number(p.banKinh) || 500;
 
-  // Khi click vào điểm, tự động gọi API highlight ranh giới vùng tiếp cận giao thông của riêng điểm đó
   if (p.type !== "9-CSD") {
     highlightSingleIsochrone(p.lat, p.lng, itemRadius);
   }
