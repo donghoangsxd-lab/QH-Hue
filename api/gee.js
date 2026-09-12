@@ -138,13 +138,12 @@ module.exports = async (req, res) => {
     const { ee, wardVectorParsed, popRasterNormalized, wardRegion } = getGeeContext();
     const rawDataList = await getRawDataList();
 
-    // 3. TÍNH DÂN SỐ PHỤC VỤ TẠI ĐIỂM (THEO ĐA GIÁC OSRM HOẶC BÁN KÍNH GỐC)
+    // 3. TÍNH DÂN SỐ PHỤC VỤ TẠI ĐIỂM
     if (action === 'analyzePoint') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
       const radius = Number(req.query.radius) || 500;
       
-      // Tạo hình học đa giác OSRM chuẩn cho điểm phân tích
       const polyCoords = await calculateNetworkIsochrone(lat, lng, radius);
       const ptGeom = ee.Geometry(polyCoords);
 
@@ -455,9 +454,11 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
+    // Mặc định trả về danh sách thô nếu không khớp action nào
     return res.status(200).json({ rawDataList });
 
--  } catch (err) {
+  } catch (err) {
+    console.error("GEE API Error:", err);
     return res.status(500).json({ error: true, message: err.message });
   }
 };
