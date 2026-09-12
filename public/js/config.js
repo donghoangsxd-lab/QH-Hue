@@ -23,3 +23,23 @@ export const infraIcons = {
   "8-TM": { symbol: "🛒", border: "#38bdf8" },
   "9-CSD": { symbol: "🛠️", border: "#94a3b8" }
 };
+
+// BỔ SUNG 1: Bảng định mức quy chuẩn diện tích / người (phục vụ Popup tính toán Phường/Xã)
+export const quotaConfig = {
+  "1-CV": 7.00,
+  "2-BDX": 2.50,
+  "3-MN": 0.60,
+  "4-TH": 0.65,
+  "5-THCS": 0.55,
+  "6-YT": 0.20,
+  "7-VH": 1.00,
+  "8-TM": 0.00
+};
+
+// BỔ SUNG 2: Cấu hình mặc định Isochrone Giao thông
+export const defaultIsoConfig = {
+  defaultRadius: 500,
+  minRadius: 100,
+  maxRadius: 3000,
+  step: 100
+};
