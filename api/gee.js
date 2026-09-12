@@ -8,17 +8,23 @@ const constants = require('./config/constants');
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // Parse Body nếu là request POST
+  if (req.method === 'POST' && typeof req.body === 'string') {
+    try { req.body = JSON.parse(req.body); } catch(e) {}
+  }
 
   try {
     const action = req.query.action || 'getInitData';
 
-    // 1. Phân tuyến Isochrone Giao thông (90% đường + 10% offset)
+    // 1. Phân tuyến Isochrone Giao thông
     if (action === 'getIsochrone') {
       return await getNetworkIsochrones(req, res);
     }
 
-    // 2. Phân tuyến xử lý đồng bộ Google Sheets (Add/Approve)
+    // 2. Phân tuyến xử lý đồng bộ Google Sheets
     if (action === 'addPoint') {
       const { type, name, ward, lat, lng, size } = req.query;
       if (!type || !name || !lat || !lng) {
@@ -48,7 +54,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, result });
     }
 
-    // Khởi tạo kết nối Earth Engine & Lấy dữ liệu GCS
+    // Khởi tạo Earth Engine Context & Lấy dữ liệu
     await initGEE();
     const rawDataList = await getRawDataList();
 
@@ -63,7 +69,7 @@ module.exports = async (req, res) => {
     }
 
     // 5. Xử lý các tác vụ Tile Raster / GIS căn bản
-    const { ee, wardVectorParsed, popRasterNormalized, wardRegion } = getGeeContext();
+    const { ee, wardVectorParsed, popRasterNormalized } = getGeeContext();
 
     if (action === 'getWardFromPoint') {
       const lat = Number(req.query.lat);
@@ -106,7 +112,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // Mặc định trả về dữ liệu danh sách điểm công trình
     return res.status(200).json({ rawDataList });
 
   } catch (err) {
