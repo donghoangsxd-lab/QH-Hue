@@ -14,8 +14,14 @@ export const state = {
   // Dữ liệu ma trận thống kê 40 Phường/Xã
   wardStatsData: [],
 
-  // Bán kính Buffer mặc định (mét)
+  // Bán kính Buffer đệm hạ tầng mặc định (mét)
   globalBufferRadius: 500,
+
+  // Bán kính tiếp cận Isochrone Giao thông mặc định (mét)
+  isochroneRadius: 500,
+
+  // Layer group lưu giữ các đa giác Isochrone giao thông
+  isochroneLayerGroup: null,
 
   // Trạng thái các chế độ tương tác bản đồ
   isPickMode: false,
@@ -48,4 +54,11 @@ export function setRawDataList(data) {
  */
 export function setWardStatsData(data) {
   state.wardStatsData = Array.isArray(data) ? data : [];
+}
+
+/**
+ * Cập nhật bán kính Isochrone tiếp cận giao thông
+ */
+export function setIsochroneRadius(radius) {
+  state.isochroneRadius = Number(radius) || 500;
 }
