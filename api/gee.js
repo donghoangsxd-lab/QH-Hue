@@ -12,45 +12,47 @@ let lastWardStatsFetch = 0;
 async function calculateNetworkIsochrone(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
   const reachRatio = constants.ISOCHRONE_CONFIG?.REACH_RATIO || 0.9;
-  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 12;
+  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 16;
   const reachDistanceKm = (R * reachRatio) / 1000;
   const angleStep = 360 / sampleAngles;
   
-  // Dùng OSRM lấy tuyến đường mẫu, nếu lỗi trả về vòng tròn mặc định
-  try {
-    const angles = Array.from({ length: sampleAngles }, (_, i) => i * angleStep);
-    const routePromises = angles.map(async (angle) => {
-      // Tính toán tọa độ điểm đến xấp xỉ theo góc
-      const rad = (angle * Math.PI) / 180;
-      const destLat = lat + (reachDistanceKm / 111) * Math.cos(rad);
-      const destLng = lng + (reachDistanceKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
-      
+  const outerPoints = [];
+  const angles = Array.from({ length: sampleAngles }, (_, i) => i * angleStep);
+
+  const routePromises = angles.map(async (angle) => {
+    const rad = (angle * Math.PI) / 180;
+    const destLat = lat + (reachDistanceKm / 111) * Math.cos(rad);
+    const destLng = lng + (reachDistanceKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
+    
+    try {
       const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=full&geometries=geojson`;
       const res = await axios.get(osrmUrl, { timeout: 2000 });
       if (res.data && res.data.routes && res.data.routes[0]) {
-        return res.data.routes[0].geometry.coordinates;
+        const coords = res.data.routes[0].geometry.coordinates;
+        // Chỉ lấy điểm mút ngoài cùng của tuyến đường OSRM
+        return coords[coords.length - 1];
       }
-      return null;
-    });
-
-    const results = await Promise.all(routePromises);
-    const allCoordinates = [];
-    results.forEach(coords => {
-      if (coords) allCoordinates.push(...coords);
-    });
-
-    if (allCoordinates.length > 5) {
-      // Trả về GeoJSON Polygon xấp xỉ từ OSRM coordinates
-      return {
-        type: 'Polygon',
-        coordinates: [allCoordinates]
-      };
+    } catch (e) {
+      // Bỏ qua nếu lỗi mạng
     }
-  } catch (e) {
-    // Bỏ qua và rơi về fallback hình tròn
+    return [destLng, destLat];
+  });
+
+  const results = await Promise.all(routePromises);
+  results.forEach(pt => {
+    if (pt) outerPoints.push(pt);
+  });
+
+  if (outerPoints.length >= 3) {
+    // Khép kín vòng đa giác ngoài
+    outerPoints.push(outerPoints[0]);
+    return {
+      type: 'Polygon',
+      coordinates: [outerPoints]
+    };
   }
 
-  // Fallback: Tạo hình tròn đơn giản quanh tâm
+  // Fallback: Vòng tròn mượt mà nếu OSRM không phản hồi
   const circlePoints = [];
   for (let i = 0; i <= 360; i += 15) {
     const rad = (i * Math.PI) / 180;
