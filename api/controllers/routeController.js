@@ -1,66 +1,86 @@
-const fetch = require('node-fetch');
+const axios = require('axios');
+const turf = require('@turf/turf');
 
 /**
- * Controller xử lý tính toán Isochrone (Vùng phủ di chuyển theo khoảng cách/thời gian)
+ * Tính toán Đa giác Vùng phủ Isochrone bám sát tuyến đường (90% + 10%)
+ * @param {number} lat - Vĩ độ công trình
+ * @param {number} lng - Kinh độ công trình
+ * @param {number} banKinh - Bán kính phục vụ R (m) trích xuất từ cột H của Google Sheet
  */
-async function getIsochrone(req, res) {
-  try {
-    const lat = Number(req.query.lat);
-    const lng = Number(req.query.lng);
-    const radius = Number(req.query.radius) || 500; // Mặc định 500m nếu không truyền
-    const profile = req.query.profile || 'foot'; // 'foot' (đi bộ) hoặc 'car' (xe máy/ô tô)
+async function calculateNetworkIsochrone(lat, lng, banKinh) {
+  const R = parseFloat(banKinh) || 500;
+  const reachDistanceKm = (R * 0.9) / 1000;  // 90% di chuyển mạng lưới giao thông OSRM
+  const offsetDistanceKm = (R * 0.1) / 1000; // 10% buffer offset làm mịn đa giác
 
-    if (!lat || !lng) {
-      return res.status(400).json({ error: true, message: "Thiếu tọa độ lat/lng" });
-    }
+  // Quét 12 hướng bức xạ giao thông
+  const angles = Array.from({ length: 12 }, (_, i) => i * 30);
+  const allVertices = [];
 
-    // Quy đổi vận tốc trung bình (Đi bộ: ~4.5 km/h, Xe máy: ~20 km/h)
-    const speedKmh = profile === 'car' ? 20 : 4.5;
-    const timeMinutes = Math.round((radius / 1000) / speedKmh * 60);
+  const routePromises = angles.map(async (angle) => {
+    const dest = turf.destination([lng, lat], reachDistanceKm, angle, { units: 'kilometers' });
+    const [destLng, destLat] = dest.geometry.coordinates;
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=full&geometries=geojson`;
 
-    // Gọi OSRM Public Routing Service API
-    const osrmProfile = profile === 'car' ? 'driving' : 'foot';
-    const osrmUrl = `https://router.project-osrm.org/route/v1/${osrmProfile}/${lng},${lat};${lng + 0.005},${lat + 0.005}?overview=full&geometries=geojson`;
-
-    // Tạo Polygon Isochrone xấp xỉ theo đồ thị mạng lưới đường xá xung quanh điểm
-    const steps = 16;
-    const coordinates = [];
-    const radiusInDegrees = radius / 111320; // Quy đổi mét sang độ địa lý
-
-    for (let i = 0; i < steps; i++) {
-      const angle = (i * 360 / steps) * (Math.PI / 180);
-      // Biến đổi bán kính theo góc để mô phỏng mạng lưới giao thông ngõ hẻm đô thị
-      const factor = 0.75 + 0.25 * Math.sin(i * 3); 
-      const dLat = (radiusInDegrees * Math.sin(angle)) * factor;
-      const dLng = (radiusInDegrees * Math.cos(angle) / Math.cos(lat * Math.PI / 180)) * factor;
-      coordinates.push([lng + dLng, lat + dLat]);
-    }
-    coordinates.push(coordinates[0]); // Khép kín Polygon
-
-    const isochroneFeature = {
-      type: "Feature",
-      geometry: {
-        type: "Polygon",
-        coordinates: [coordinates]
-      },
-      properties: {
-        center: [lng, lat],
-        radiusMeters: radius,
-        estimatedMinutes: timeMinutes,
-        profile: profile
+    try {
+      const res = await axios.get(osrmUrl, { timeout: 2500 });
+      if (res.data && res.data.routes && res.data.routes[0]) {
+        return res.data.routes[0].geometry.coordinates;
       }
-    };
+    } catch (e) {
+      // Fallback khi OSRM timeout: Lấy thẳng đường chim bay 90%
+      return [[lng, lat], [destLng, destLat]];
+    }
+    return null;
+  });
 
-    return res.status(200).json({
-      success: true,
-      data: isochroneFeature
-    });
+  const results = await Promise.all(routePromises);
+  results.forEach(coords => {
+    if (coords) coords.forEach(pt => allVertices.push(pt));
+  });
 
-  } catch (error) {
-    return res.status(500).json({ error: true, message: "Lỗi tính toán Isochrone: " + error.message });
+  if (allVertices.length >= 3) {
+    const pointsFeature = turf.featureCollection(allVertices.map(pt => turf.point(pt)));
+    const hullPolygon = turf.convex(pointsFeature);
+    if (hullPolygon) {
+      // Buffer offset 10% R để bọc trọn lề đường và làm mịn đa giác
+      return turf.buffer(hullPolygon, offsetDistanceKm, { units: 'kilometers' });
+    }
   }
+
+  // Fallback an toàn: Buffer đường tròn 100% R nếu không dựng được Hull
+  return turf.buffer(turf.point([lng, lat]), R / 1000, { units: 'kilometers' });
 }
 
-module.exports = {
-  getIsochrone
+// Controller Handler trả GeoJSON FeatureCollection toàn bộ Isochrones
+exports.getNetworkIsochrones = async (req, res) => {
+  try {
+    const { features } = req.body;
+    if (!features || !Array.isArray(features)) {
+      return res.status(400).json({ success: false, message: 'Invalid features array' });
+    }
+
+    const isoPromises = features.map(async (item) => {
+      const poly = await calculateNetworkIsochrone(item.lat, item.lng, item.banKinh);
+      return {
+        type: 'Feature',
+        geometry: poly.geometry,
+        properties: {
+          id: item.id,
+          name: item.name,
+          type: item.type,
+          ward: item.ward,
+          banKinh: item.banKinh,
+          status: item.status
+        }
+      };
+    });
+
+    const isochroneFeatures = await Promise.all(isoPromises);
+    return res.json({
+      type: 'FeatureCollection',
+      features: isochroneFeatures
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
 };
