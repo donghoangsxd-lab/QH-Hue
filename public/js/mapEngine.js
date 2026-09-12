@@ -7,6 +7,7 @@ export const layers = {
   pop: L.layerGroup(),
   boundary: L.layerGroup(),
   heatmap: L.layerGroup(),
+  singleIso: L.layerGroup(), // Layer chứa vùng isochrone highlight của riêng điểm được chọn
   c1: L.layerGroup(), b1: L.layerGroup(),
   c2: L.layerGroup(), b2: L.layerGroup(),
   c3: L.layerGroup(), b3: L.layerGroup(),
@@ -41,6 +42,7 @@ export function initMap() {
 
   layers.boundary.addTo(map);
   layers.heatmap.addTo(map);
+  layers.singleIso.addTo(map); // Thêm layer highlight vào bản đồ mặc định
   layers.c1.addTo(map); layers.c2.addTo(map); layers.c3.addTo(map);
   layers.c4.addTo(map); layers.c5.addTo(map); layers.c6.addTo(map);
   layers.c7.addTo(map); layers.c8.addTo(map); layers.c9.addTo(map);
@@ -53,11 +55,13 @@ export function toggleLayer(layerKey, isChecked) {
   if (isChecked) {
     if (layerKey === 'heatmap') {
       refreshHeatmapOnly();
-    } else {
+    } else if (layers[layerKey]) {
       map.addLayer(layers[layerKey]);
     }
   } else {
-    map.removeLayer(layers[layerKey]);
+    if (layers[layerKey]) {
+      map.removeLayer(layers[layerKey]);
+    }
   }
 
   const popBox = document.getElementById('popBox');
@@ -138,10 +142,13 @@ export function renderGroupedPoints() {
     const targetGroup = mapGroups[p.type] || layers.c9;
     const targetBufferGroup = bufferGroups[p.type] || layers.b9;
 
+    // Lấy bán kính ưu tiên từ Global ghi đè (nếu người dùng kéo thanh trượt), ngược lại lấy từ dữ liệu gốc của điểm (Sheet)
+    const itemRadius = state.globalBufferRadiusOverride || Number(p.radius) || Number(p.banKinh) || 500;
+
     if (!isApproved) {
       if (p.type !== "9-CSD") {
         const pendingBuffer = L.circle([p.lat, p.lng], {
-          radius: Number(p.radius) || 500,
+          radius: itemRadius,
           color: 'var(--accent-red)', weight: 2, dashArray: '6, 6',
           fillColor: 'var(--accent-red)', fillOpacity: 0.12
         });
@@ -161,7 +168,7 @@ export function renderGroupedPoints() {
     } else {
       if (p.type !== "9-CSD") {
         const officialBuffer = L.circle([p.lat, p.lng], {
-          radius: state.globalBufferRadius,
+          radius: itemRadius,
           color: cfg.border, weight: 1.2,
           fillColor: cfg.border, fillOpacity: 0.12
         });
@@ -185,23 +192,13 @@ export async function refreshHeatmapOnly() {
   const heatOpacityEl = document.getElementById('heatOpacity');
   const currentOpacity = heatOpacityEl ? heatOpacityEl.value / 100 : 0.5;
 
-  const customRadius = Number(document.getElementById('inputIsoRadius')?.value) || state.globalBufferRadius || 500;
-  const activeFeatures = state.rawDataList
-    .filter(item => item.status && item.type !== "9-CSD")
-    .map(item => ({ ...item, radius: customRadius }));
+  const overrideRad = state.globalBufferRadiusOverride || 0;
 
   try {
-    const isoRes = await fetch('/api/gee?action=getIsochrone', {
+    const heatRes = await fetch(`/api/gee?action=getHeatmapTile&overrideRadius=${overrideRad}&t=${Date.now()}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features: activeFeatures })
-    });
-    const isoData = await isoRes.json();
-
-    const heatRes = await fetch(`/api/gee?action=getHeatmapTile&t=${Date.now()}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features: isoData.features })
+      body: JSON.stringify({ features: [] })
     });
     const d = await heatRes.json();
 
@@ -218,54 +215,40 @@ export async function refreshHeatmapOnly() {
   }
 }
 
-export async function refreshNetworkIsochrones() {
-  if (!map) return;
-  if (!state.isochroneLayerGroup) {
-    state.isochroneLayerGroup = L.layerGroup().addTo(map);
-  }
-  state.isochroneLayerGroup.clearLayers();
-
-  const customRadius = Number(document.getElementById('inputIsoRadius')?.value) || state.globalBufferRadius || 500;
-  const activeFeatures = state.rawDataList
-    .filter(item => item.status && item.type !== "9-CSD")
-    .map(item => ({ ...item, radius: customRadius }));
-
-  if (activeFeatures.length === 0) return;
+// Bỏ hàm refreshNetworkIsochrones cũ, chuyển thành hàm highlight ranh giới riêng lẻ khi click điểm
+export async function highlightSingleIsochrone(lat, lng, radius) {
+  if (!map || !layers.singleIso) return;
+  layers.singleIso.clearLayers();
 
   try {
-    const res = await fetch('/api/gee?action=getIsochrone', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features: activeFeatures })
-    });
-    const isochroneGeoJSON = await res.json();
+    const res = await fetch(`/api/gee?action=getSingleIsochrone&lat=${lat}&lng=${lng}&radius=${radius}`);
+    const geoJsonData = await res.json();
 
-    const isoLayer = L.geoJSON(isochroneGeoJSON, {
-      style: (feature) => ({
-        color: infraIcons[feature.properties.type]?.border || "#38bdf8",
-        weight: 1.8,
-        fillColor: infraIcons[feature.properties.type]?.border || "#38bdf8",
-        fillOpacity: 0.2
-      }),
-      onEachFeature: (feature, layer) => {
-        layer.bindPopup(
-          `<b>${feature.properties.name}</b><br>` +
-          `• Bán kính giao thông: <b>${feature.properties.banKinh}m</b><br>` +
-          `<small style="color:var(--accent-cyan);">• Thuật toán: 90% Giao thông OSRM + 10% Offset</small>`
-        );
-      }
-    });
-
-    state.isochroneLayerGroup.addLayer(isoLayer);
+    if (geoJsonData && geoJsonData.geometry) {
+      const isoLayer = L.geoJSON(geoJsonData, {
+        style: {
+          color: "#38bdf8",
+          weight: 2.2,
+          fillColor: "#38bdf8",
+          fillOpacity: 0.3
+        }
+      });
+      layers.singleIso.addLayer(isoLayer);
+    }
   } catch (err) {
-    console.error("Lỗi vẽ Isochrones:", err);
+    console.error("Lỗi tải Isochrone cá nhân:", err);
   }
 }
 
 export function onPointClick(p, marker) {
   if (state.isInspectMode) return;
   const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
-  const customRadius = Number(document.getElementById('inputIsoRadius')?.value) || 500;
+  const itemRadius = state.globalBufferRadiusOverride || Number(p.radius) || Number(p.banKinh) || 500;
+
+  // Khi click vào điểm, tự động gọi API highlight ranh giới vùng tiếp cận giao thông của riêng điểm đó
+  if (p.type !== "9-CSD") {
+    highlightSingleIsochrone(p.lat, p.lng, itemRadius);
+  }
 
   let contentHtml = `<div style="font-size:11px;">`;
   if (!isApproved) {
@@ -298,7 +281,7 @@ export function onPointClick(p, marker) {
     const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
     popup.openOn(map);
 
-    fetch(`/api/gee?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${p.radius}`)
+    fetch(`/api/gee?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${itemRadius}`)
       .then(r => r.json())
       .then(res => {
         const popVal = res.servedPop || 0;
@@ -318,7 +301,7 @@ export function onPointClick(p, marker) {
     const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
     popup.openOn(map);
 
-    fetch(`/api/gee?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${customRadius}`)
+    fetch(`/api/gee?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${itemRadius}`)
       .then(r => r.json())
       .then(res => {
         const popVal = res.servedPop || 0;
@@ -357,7 +340,7 @@ export function onPointClick(p, marker) {
 }
 
 export function handleInspectPointClick(clickLat, clickLng) {
-  const customRadius = Number(document.getElementById('inputIsoRadius')?.value) || 500;
+  const checkRadius = state.globalBufferRadiusOverride || 500;
   
   if (state.tempMarker) map.removeLayer(state.tempMarker);
   state.tempMarker = L.marker([clickLat, clickLng]).addTo(map);
@@ -373,8 +356,9 @@ export function handleInspectPointClick(clickLat, clickLng) {
     });
 
     itemsOfCode.forEach(item => {
+      const itemR = state.globalBufferRadiusOverride || Number(item.radius) || Number(item.banKinh) || checkRadius;
       const dist = getDistanceMeters(clickLat, clickLng, item.lat, item.lng);
-      if (dist <= customRadius) {
+      if (dist <= itemR) {
         if (!coveredGroups[code]) coveredGroups[code] = [];
         coveredGroups[code].push(item.name);
       }
@@ -393,7 +377,7 @@ export function handleInspectPointClick(clickLat, clickLng) {
 
       let resultHtml = `<div style="font-size:11px;">
         <b style="color:var(--accent-cyan);">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ</b><br>
-        <span style="color:var(--text-muted);">📍 Địa bàn: <b>Phường/Xã ${wardName}</b> | 🛤️ Bán kính: <b style="color:var(--accent-green);">${customRadius}m</b></span><br>
+        <span style="color:var(--text-muted);">📍 Địa bàn: <b>Phường/Xã ${wardName}</b> | 🛤️ Bán kính chuẩn: <b style="color:var(--accent-green);">${checkRadius}m</b></span><br>
 
         <div style="font-weight:bold; color:var(--accent-green); margin-top:6px;">
           1. Tiếp cận: ${coveredCount}/8 nhóm
