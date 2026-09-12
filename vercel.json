@@ -1,13 +1,11 @@
 {
   "version": 2,
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/gee",
-      "dest": "/api/gee.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/api/gee",
+      "destination": "/api/gee.js"
     }
-  ]
+  ],
+  "cleanUrls": true,
+  "trailingSlash": false
 }
