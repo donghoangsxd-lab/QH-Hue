@@ -6,7 +6,6 @@ import {
   toggleMeasure, 
   renderGroupedPoints, 
   refreshHeatmapOnly, 
-  refreshNetworkIsochrones, 
   handleInspectPointClick 
 } from './mapEngine.js';
 import { 
@@ -89,16 +88,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Thay đổi bán kính Isochrone Giao thông
+  // Thay đổi bán kính đồng bộ toàn cục (Ghi đè tạm thời)
   const inputIsoRadius = document.getElementById('inputIsoRadius');
   inputIsoRadius?.addEventListener('change', (e) => {
-    state.globalBufferRadius = Number(e.target.value) || 500;
+    state.globalBufferRadiusOverride = Number(e.target.value) || 500;
     const radiusLabel = document.getElementById('radiusLabel');
-    if (radiusLabel) radiusLabel.innerText = `${state.globalBufferRadius}m`;
+    if (radiusLabel) radiusLabel.innerText = `${state.globalBufferRadiusOverride}m`;
     
     renderGroupedPoints();
     refreshHeatmapOnly();
-    refreshNetworkIsochrones();
   });
 
   // Thay đổi slider bán kính Heatmap
@@ -106,9 +104,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const radiusSteps = [300, 500, 1000, 2000];
   radiusSlider?.addEventListener('change', (e) => {
     const idx = parseInt(e.target.value, 10);
-    state.globalBufferRadius = radiusSteps[idx] || 500;
+    state.globalBufferRadiusOverride = radiusSteps[idx] || 500;
     const radiusLabel = document.getElementById('radiusLabel');
-    if (radiusLabel) radiusLabel.innerText = `${state.globalBufferRadius}m`;
+    if (radiusLabel) radiusLabel.innerText = `${state.globalBufferRadiusOverride}m`;
     
     renderGroupedPoints();
     refreshHeatmapOnly();
@@ -118,18 +116,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const heatOpacity = document.getElementById('heatOpacity');
   heatOpacity?.addEventListener('input', () => refreshHeatmapOnly());
 
-  // Checkboxes Lớp dữ liệu
-  const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'heat', 'isochrone'];
+  // Checkboxes Lớp dữ liệu (Đã loại bỏ isochrone toàn cục)
+  const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'heat'];
   layerCheckboxes.forEach(key => {
     const el = document.getElementById(`chk_${key}`);
     el?.addEventListener('change', (e) => {
       const targetLayer = key === 'bound' ? 'boundary' : key;
-      if (key === 'isochrone') {
-        if (e.target.checked) refreshNetworkIsochrones();
-        else if (state.isochroneLayerGroup) state.isochroneLayerGroup.clearLayers();
-      } else {
-        toggleLayer(targetLayer, e.target.checked);
-      }
+      toggleLayer(targetLayer, e.target.checked);
     });
   });
 
@@ -265,7 +258,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderGroupedPoints();
     await refreshHeatmapOnly();
-    await refreshNetworkIsochrones();
 
     if (progressBar) progressBar.style.width = "100%";
     if (progressPercent) progressPercent.innerText = "100%";
