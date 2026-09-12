@@ -181,22 +181,41 @@ export function renderGroupedPoints() {
   });
 }
 
-export function refreshHeatmapOnly() {
+export async function refreshHeatmapOnly() {
   const heatOpacityEl = document.getElementById('heatOpacity');
   const currentOpacity = heatOpacityEl ? heatOpacityEl.value / 100 : 0.5;
 
-  return fetch(`/api/gee?action=getHeatmapTile&overrideRadius=${state.globalBufferRadius}&t=${Date.now()}`)
-    .then(r => r.json())
-    .then(d => {
-      if (d.urlFormat) {
-        layers.heatmap.clearLayers();
-        tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: currentOpacity });
-        const chkHeat = document.getElementById('chk_heat');
-        if (chkHeat && chkHeat.checked && map) {
-          tileHeatmapLayer.addTo(layers.heatmap);
-        }
-      }
+  const customRadius = Number(document.getElementById('inputIsoRadius')?.value) || state.globalBufferRadius || 500;
+  const activeFeatures = state.rawDataList
+    .filter(item => item.status && item.type !== "9-CSD")
+    .map(item => ({ ...item, radius: customRadius }));
+
+  try {
+    const isoRes = await fetch('/api/gee?action=getIsochrone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ features: activeFeatures })
     });
+    const isoData = await isoRes.json();
+
+    const heatRes = await fetch(`/api/gee?action=getHeatmapTile&t=${Date.now()}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ features: isoData.features })
+    });
+    const d = await heatRes.json();
+
+    if (d.urlFormat) {
+      layers.heatmap.clearLayers();
+      tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: currentOpacity });
+      const chkHeat = document.getElementById('chk_heat');
+      if (chkHeat && chkHeat.checked && map) {
+        tileHeatmapLayer.addTo(layers.heatmap);
+      }
+    }
+  } catch (err) {
+    console.error("Lỗi cập nhật Heatmap:", err);
+  }
 }
 
 export async function refreshNetworkIsochrones() {
