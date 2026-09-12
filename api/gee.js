@@ -1,5 +1,4 @@
 const axios = require('axios');
-const turf = require('@turf/turf');
 const constants = require('../config/constants');
 const { initGEE, getGeeContext, buildEeIsochroneGeometry } = require('../services/geeService');
 const { getRawDataList, invalidateCache } = require('../services/gcsService');
@@ -8,51 +7,61 @@ let cachedWardStats = null;
 let lastWardStatsFetch = 0;
 
 // ==========================================
-// HELPER: TÍNH ISOCHRONE MẠNG LƯỚI GIAO THÔNG (90% + 10%)
+// HELPER: TÍNH ISOCHRONE GIAO THÔNG (FALLBACK BUFFER)
 // ==========================================
 async function calculateNetworkIsochrone(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
   const reachRatio = constants.ISOCHRONE_CONFIG?.REACH_RATIO || 0.9;
-  const offsetRatio = constants.ISOCHRONE_CONFIG?.OFFSET_RATIO || 0.1;
   const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 12;
-
   const reachDistanceKm = (R * reachRatio) / 1000;
-  const offsetDistanceKm = (R * offsetRatio) / 1000;
-
   const angleStep = 360 / sampleAngles;
-  const angles = Array.from({ length: sampleAngles }, (_, i) => i * angleStep);
-  const allVertices = [];
-
-  const routePromises = angles.map(async (angle) => {
-    const dest = turf.destination([lng, lat], reachDistanceKm, angle, { units: 'kilometers' });
-    const [destLng, destLat] = dest.geometry.coordinates;
-    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=full&geometries=geojson`;
-
-    try {
-      const res = await axios.get(osrmUrl, { timeout: 2500 });
+  
+  // Dùng OSRM lấy tuyến đường mẫu, nếu lỗi trả về vòng tròn mặc định
+  try {
+    const angles = Array.from({ length: sampleAngles }, (_, i) => i * angleStep);
+    const routePromises = angles.map(async (angle) => {
+      // Tính toán tọa độ điểm đến xấp xỉ theo góc
+      const rad = (angle * Math.PI) / 180;
+      const destLat = lat + (reachDistanceKm / 111) * Math.cos(rad);
+      const destLng = lng + (reachDistanceKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
+      
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=full&geometries=geojson`;
+      const res = await axios.get(osrmUrl, { timeout: 2000 });
       if (res.data && res.data.routes && res.data.routes[0]) {
         return res.data.routes[0].geometry.coordinates;
       }
-    } catch (e) {
-      return [[lng, lat], [destLng, destLat]];
-    }
-    return null;
-  });
+      return null;
+    });
 
-  const results = await Promise.all(routePromises);
-  results.forEach(coords => {
-    if (coords) coords.forEach(pt => allVertices.push(pt));
-  });
+    const results = await Promise.all(routePromises);
+    const allCoordinates = [];
+    results.forEach(coords => {
+      if (coords) allCoordinates.push(...coords);
+    });
 
-  if (allVertices.length >= 3) {
-    const pointsFeature = turf.featureCollection(allVertices.map(pt => turf.point(pt)));
-    const hullPolygon = turf.convex(pointsFeature);
-    if (hullPolygon) {
-      return turf.buffer(hullPolygon, offsetDistanceKm, { units: 'kilometers' });
+    if (allCoordinates.length > 5) {
+      // Trả về GeoJSON Polygon xấp xỉ từ OSRM coordinates
+      return {
+        type: 'Polygon',
+        coordinates: [allCoordinates]
+      };
     }
+  } catch (e) {
+    // Bỏ qua và rơi về fallback hình tròn
   }
 
-  return turf.buffer(turf.point([lng, lat]), R / 1000, { units: 'kilometers' });
+  // Fallback: Tạo hình tròn đơn giản quanh tâm
+  const circlePoints = [];
+  for (let i = 0; i <= 360; i += 15) {
+    const rad = (i * Math.PI) / 180;
+    const dLat = (R / 111000) * Math.cos(rad);
+    const dLng = (R / (111000 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
+    circlePoints.push([lng + dLng, lat + dLat]);
+  }
+  return {
+    type: 'Polygon',
+    coordinates: [circlePoints]
+  };
 }
 
 // ==========================================
@@ -81,10 +90,10 @@ module.exports = async (req, res) => {
 
       const isoPromises = features.map(async (item) => {
         const effectiveRadius = item.radius || item.banKinh || 500;
-        const poly = await calculateNetworkIsochrone(item.lat, item.lng, effectiveRadius);
+        const polyCoords = await calculateNetworkIsochrone(item.lat, item.lng, effectiveRadius);
         return {
           type: 'Feature',
-          geometry: poly.geometry,
+          geometry: polyCoords,
           properties: {
             id: item.id,
             name: item.name,
@@ -114,7 +123,7 @@ module.exports = async (req, res) => {
         `&lat=${lat}&lng=${lng}&size=${size || 0}`;
 
       invalidateCache();
-      cachedWardStats = null; // Invalidate cache phường xã
+      cachedWardStats = null;
       const gasRes = await fetch(syncUrl);
       const result = await gasRes.json().catch(() => ({ success: true }));
       return res.status(200).json({ success: true, result });
@@ -126,7 +135,7 @@ module.exports = async (req, res) => {
 
       const syncUrl = `${constants.GAS_BASE_URL}?action=approvePoint&id=${encodeURIComponent(id)}`;
       invalidateCache();
-      cachedWardStats = null; // Invalidate cache phường xã
+      cachedWardStats = null;
       const gasRes = await fetch(syncUrl);
       const result = await gasRes.json().catch(() => ({ success: true }));
       return res.status(200).json({ success: true, result });
@@ -398,7 +407,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ward: wardData });
     }
 
-    // 8. TIÊN ÍCH RASTERS (DÂN SỐ & RANH GIỚI)
+    // 8. TIỆN ÍCH RASTERS (DÂN SỐ & RANH GIỚI)
     if (action === 'getPopRasterTile') {
       res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
       const mapId = await new Promise((resolve, reject) => {
