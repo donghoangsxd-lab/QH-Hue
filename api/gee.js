@@ -12,8 +12,9 @@ let lastWardStatsFetch = 0;
 async function calculateNetworkIsochrone(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
   const reachRatio = constants.ISOCHRONE_CONFIG?.REACH_RATIO || 0.9;
-  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 12; // 12 hoặc 8 hướng quét
+  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 12;
   const reachDistanceKm = (R * reachRatio) / 1000;
+  const proxyDistanceKm = 0.1; // Điểm đại diện 100m cho hướng bị chặn/vướng sông
   const angleStep = 360 / sampleAngles;
   
   const outerVertices = [];
@@ -21,33 +22,50 @@ async function calculateNetworkIsochrone(lat, lng, banKinh) {
 
   const routePromises = angles.map(async (angle) => {
     const rad = (angle * Math.PI) / 180;
-    // Tính điểm đích giả định theo hướng góc quét
     const destLat = lat + (reachDistanceKm / 111) * Math.cos(rad);
     const destLng = lng + (reachDistanceKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
     
     try {
-      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=full&geometries=geojson`;
-      const res = await axios.get(osrmUrl, { timeout: 2000 });
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLng ? destLat : 0}?overview=full&geometries=geojson`;
+      // Sử dụng đúng tọa độ đích giả định
+      const targetUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=full&geometries=geojson`;
+      const res = await axios.get(targetUrl, { timeout: 2000 });
+      
       if (res.data && res.data.routes && res.data.routes[0]) {
-        const coords = res.data.routes[0].geometry.coordinates;
-        // CHỈ LẤY ĐIỂM XA NHẤT (ĐIỂM CUỐI CÙNG) MÀ HƯỚNG QUÉT ĐI ĐƯỢC TRÊN TUYẾN GIAO THÔNG
-        return coords[coords.length - 1];
+        const route = res.data.routes[0];
+        // Kiểm tra ngưỡng khoảng cách thực tế (tránh vòng cầu quá xa)
+        if (route.distance > R * 1.4) {
+          return null; // Đánh dấu hướng bị chặn/vượt quá giới hạn
+        }
+        const coords = route.geometry.coordinates;
+        return coords[coords.length - 1]; // Lấy điểm mút xa nhất hợp lệ
       }
-    } catch (e) {}
-    
-    // Fallback nếu hướng đó OSRM không trả về
-    return [destLng, destLat];
+    } catch (e) {
+      // Lỗi mạng hoặc OSRM không tìm được đường qua sông
+    }
+    return null; 
   });
 
   const results = await Promise.all(routePromises);
-  results.forEach(pt => {
+
+  // Xử lý điểm hợp lệ và bổ sung điểm proxy cho hướng bị chặn
+  angles.forEach((angle, idx) => {
+    const pt = results[idx];
+    const rad = (angle * Math.PI) / 180;
+
     if (pt && Array.isArray(pt)) {
+      // Hướng hợp lệ: Thêm điểm mút giao thông thực tế
       outerVertices.push(pt);
+    } else {
+      // Hướng bị chặn (vướng sông, không có cầu, cụt đường): Dùng điểm proxy gần (100m)
+      const proxyLat = lat + (proxyDistanceKm / 111) * Math.cos(rad);
+      const proxyLng = lng + (proxyDistanceKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
+      outerVertices.push([proxyLng, proxyLat]);
     }
   });
 
   if (outerVertices.length >= 3) {
-    // Sắp xếp các đỉnh theo góc quanh tâm để tạo thành vòng khép kín không bị đan chéo
+    // Sắp xếp các đỉnh theo góc cực quanh tâm để tạo vòng đa giác khép kín chính xác
     outerVertices.sort((a, b) => {
       const angleA = Math.atan2(a[1] - lat, a[0] - lng);
       const angleB = Math.atan2(b[1] - lat, b[0] - lng);
@@ -63,7 +81,7 @@ async function calculateNetworkIsochrone(lat, lng, banKinh) {
     };
   }
 
-  // Fallback vòng tròn nếu thiếu dữ liệu
+  // Fallback an toàn hình tròn cục bộ
   const circlePoints = [];
   for (let i = 0; i <= 360; i += 15) {
     const rad = (i * Math.PI) / 180;
@@ -76,7 +94,6 @@ async function calculateNetworkIsochrone(lat, lng, banKinh) {
     coordinates: [circlePoints]
   };
 }
-
 // ==========================================
 // MAIN VERCEL SERVERLESS ROUTER
 // ==========================================
