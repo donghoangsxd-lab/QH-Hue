@@ -87,7 +87,34 @@ module.exports = async (req, res) => {
   try {
     const action = req.query.action || 'getInitData';
 
-    // 1. TÍNH ISOCHRONE RIÊNG CHO 1 ĐIỂM (DÙNG KHI CLICK HIGHLIGHT)
+    // 1. TÍNH ISOCHRONE MẠNG LƯỚI GIAO THÔNG (DÙNG CHO HIGHLIGHT VÀ HEATMAP)
+    if (action === 'getIsochrone') {
+      const { features } = req.body || {};
+      if (!features || !Array.isArray(features)) {
+        return res.status(400).json({ success: false, message: 'Invalid features array' });
+      }
+
+      const isoPromises = features.map(async (item) => {
+        const effectiveRadius = item.radius || item.banKinh || 500;
+        const polyCoords = await calculateNetworkIsochrone(item.lat, item.lng, effectiveRadius);
+        return {
+          type: 'Feature',
+          geometry: polyCoords,
+          properties: {
+            id: item.id,
+            name: item.name,
+            type: item.type,
+            ward: item.ward,
+            banKinh: effectiveRadius,
+            status: item.status
+          }
+        };
+      });
+
+      const isochroneFeatures = await Promise.all(isoPromises);
+      return res.json({ type: 'FeatureCollection', features: isochroneFeatures });
+    }
+
     if (action === 'getSingleIsochrone') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -160,28 +187,29 @@ module.exports = async (req, res) => {
       return res.status(200).json({ servedPop });
     }
 
-    // 4. ĐỘ PHỦ HEATMAP TILE
+    // 4. ĐỘ PHỦ HEATMAP TILE (Đồng bộ tuyệt đối tính theo mạng lưới giao thông OSRM)
     if (action === 'getHeatmapTile') {
       const { features } = req.body || {};
       const overrideRadius = Number(req.query.overrideRadius) || 0;
       const categoryImageLayers = [];
       const codes = constants.CODES_TO_CHECK;
 
-      codes.forEach(code => {
+      for (const code of codes) {
         let groupGeoms = [];
-        if (features && Array.isArray(features)) {
+        if (features && Array.isArray(features) && features.length > 0) {
           groupGeoms = features
             .filter(item => item.properties && item.properties.type === code && (item.properties.status === true || item.properties.status === 'true' || item.properties.status === 'TRUE'))
             .map(item => ee.Feature(ee.Geometry(item.geometry)));
         }
 
         if (groupGeoms.length === 0) {
-          groupGeoms = rawDataList
-            .filter(item => item.type === code && item.status === true)
-            .map(item => {
-              const r = overrideRadius > 0 ? overrideRadius : (Number(item.radius) || Number(item.banKinh) || 500);
-              return ee.Feature(buildEeIsochroneGeometry(item.lat, item.lng, r));
-            });
+          const validItems = rawDataList.filter(item => item.type === code && item.status === true);
+          const geomPromises = validItems.map(async (item) => {
+            const r = overrideRadius > 0 ? overrideRadius : (Number(item.radius) || Number(item.banKinh) || 500);
+            const polyCoords = await calculateNetworkIsochrone(item.lat, item.lng, r);
+            return ee.Feature(ee.Geometry(polyCoords));
+          });
+          groupGeoms = await Promise.all(geomPromises);
         }
 
         if (groupGeoms.length > 0) {
@@ -192,7 +220,7 @@ module.exports = async (req, res) => {
             })
           );
         }
-      });
+      }
 
       let heatmapMasked = categoryImageLayers.length > 0 
         ? ee.ImageCollection(categoryImageLayers).sum().updateMask(ee.ImageCollection(categoryImageLayers).sum().gt(0))
@@ -454,7 +482,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // Mặc định trả về danh sách thô nếu không khớp action nào
     return res.status(200).json({ rawDataList });
 
   } catch (err) {
