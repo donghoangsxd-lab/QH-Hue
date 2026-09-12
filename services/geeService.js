@@ -1,5 +1,4 @@
 const ee = require('@google/earthengine');
-const turf = require('@turf/turf');
 
 let isGeeInitialized = false;
 let geeContext = null;
@@ -73,23 +72,27 @@ function getGeeContext() {
   return geeContext;
 }
 
+// Xây dựng hình học Isochrone bằng toán học thuần túy (Không dùng Turf)
 function buildEeIsochroneGeometry(lat, lng, banKinh) {
   const R = Number(banKinh) || 500;
-  const reachKm = (R * 0.9) / 1000;
-  const offsetKm = (R * 0.1) / 1000;
-
-  const angles = Array.from({ length: 12 }, (_, i) => i * 30);
-  const pts = angles.map(a => {
-    const dest = turf.destination([lng, lat], reachKm, a, { units: 'kilometers' });
-    return dest.geometry.coordinates;
-  });
-
-  const poly = turf.convex(turf.featureCollection(pts.map(p => turf.point(p))));
-  if (poly) {
-    const smooth = turf.buffer(poly, offsetKm, { units: 'kilometers' });
-    return ee.Geometry.Polygon(smooth.geometry.coordinates);
+  const radiusKm = (R * 0.95) / 1000; // Quy mô hiệu chỉnh bán kính
+  
+  const coords = [];
+  const steps = 16;
+  for (let i = 0; i < steps; i++) {
+    const angle = (i * 360) / steps;
+    const rad = (angle * Math.PI) / 180;
+    
+    // Xấp xỉ độ dịch chuyển kinh vĩ tuyến (1 độ vĩ tuyến ~ 111km)
+    const dLat = (radiusKm / 111) * Math.cos(rad);
+    const dLng = (radiusKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
+    
+    coords.push([lng + dLng, lat + dLat]);
   }
-  return ee.Geometry.Point([lng, lat]).buffer(R);
+  // Khép kín vòng đa giác
+  coords.push(coords[0]);
+
+  return ee.Geometry.Polygon([coords]);
 }
 
 module.exports = { initGEE, getGeeContext, buildEeIsochroneGeometry };
