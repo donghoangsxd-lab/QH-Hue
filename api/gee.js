@@ -16,7 +16,7 @@ async function calculateNetworkIsochrone(lat, lng, banKinh) {
   const reachDistanceKm = (R * reachRatio) / 1000;
   const angleStep = 360 / sampleAngles;
   
-  const outerPoints = [];
+  const allVertices = [];
   const angles = Array.from({ length: sampleAngles }, (_, i) => i * angleStep);
 
   const routePromises = angles.map(async (angle) => {
@@ -28,31 +28,39 @@ async function calculateNetworkIsochrone(lat, lng, banKinh) {
       const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=full&geometries=geojson`;
       const res = await axios.get(osrmUrl, { timeout: 2000 });
       if (res.data && res.data.routes && res.data.routes[0]) {
-        const coords = res.data.routes[0].geometry.coordinates;
-        // Chỉ lấy điểm mút ngoài cùng của tuyến đường OSRM
-        return coords[coords.length - 1];
+        // Lấy TOÀN BỘ tọa độ các điểm trên tuyến đường OSRM trả về
+        return res.data.routes[0].geometry.coordinates;
       }
-    } catch (e) {
-      // Bỏ qua nếu lỗi mạng
-    }
-    return [destLng, destLat];
+    } catch (e) {}
+    return [[lng, lat], [destLng, destLat]];
   });
 
   const results = await Promise.all(routePromises);
-  results.forEach(pt => {
-    if (pt) outerPoints.push(pt);
+  results.forEach(coords => {
+    if (coords && Array.isArray(coords)) {
+      allVertices.push(...coords);
+    }
   });
 
-  if (outerPoints.length >= 3) {
-    // Khép kín vòng đa giác ngoài
-    outerPoints.push(outerPoints[0]);
+  // Gom nhóm và lọc bớt các điểm trùng lặp để tạo biên polygon mượt mà
+  if (allVertices.length >= 3) {
+    // Sắp xếp các điểm theo góc quanh tâm (tâm [lng, lat]) để tạo thành đa giác khép kín chính xác
+    const sortedPoints = allVertices.sort((a, b) => {
+      const angleA = Math.atan2(a[1] - lat, a[0] - lng);
+      const angleB = Math.atan2(b[1] - lat, b[0] - lng);
+      return angleA - angleB;
+    });
+
+    // Khép kín vòng đa giác
+    sortedPoints.push(sortedPoints[0]);
+
     return {
       type: 'Polygon',
-      coordinates: [outerPoints]
+      coordinates: [sortedPoints]
     };
   }
 
-  // Fallback: Vòng tròn mượt mà nếu OSRM không phản hồi
+  // Fallback an toàn nếu OSRM lỗi
   const circlePoints = [];
   for (let i = 0; i <= 360; i += 15) {
     const rad = (i * Math.PI) / 180;
