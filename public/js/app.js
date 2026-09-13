@@ -4,9 +4,12 @@ import {
   toggleLayer, 
   toggleBuffer, 
   toggleMeasure, 
+  clearMeasure,
   renderGroupedPoints, 
   refreshHeatmapOnly, 
-  handleInspectPointClick 
+  handleInspectPointClick,
+  measureLayerGroup,
+  map as mapInstance
 } from './mapEngine.js';
 import { 
   toggleAuthModal, 
@@ -59,6 +62,61 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    // Chế độ đo đạc (Chiều dài hoặc Diện tích)
+    if (state.activeMeasureType) {
+      const { lat, lng } = e.latlng;
+      state.measurePoints.push([lng, lat]); // Turf dùng [lng, lat]
+
+      if (measureLayerGroup) {
+        // Vẽ marker điểm chấm
+        L.circleMarker([lat, lng], { radius: 4, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 1 }).addTo(measureLayerGroup);
+
+        if (state.activeMeasureType === 'distance') {
+          if (state.measurePoints.length >= 2) {
+            const line = turf.lineString(state.measurePoints);
+            const distanceMeters = turf.length(line, { units: 'meters' });
+            
+            // Vẽ đường nối
+            measureLayerGroup.clearLayers();
+            state.measurePoints.forEach(pt => {
+              L.circleMarker([pt[1], pt[0]], { radius: 4, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 1 }).addTo(measureLayerGroup);
+            });
+
+            const coords = state.measurePoints.map(pt => [pt[1], pt[0]]);
+            L.polyline(coords, { color: '#38bdf8', weight: 3, dashArray: '4,4' }).addTo(measureLayerGroup);
+
+            const textDist = distanceMeters >= 1000 ? `${(distanceMeters/1000).toFixed(2)} km` : `${Math.round(distanceMeters)} m`;
+            L.popup({ closeButton: false, autoClose: false })
+              .setLatLng([lat, lng])
+              .setContent(`<b style="color:var(--accent-cyan);">📏 Chiều dài: ${textDist}</b>`)
+              .openOn(map);
+          }
+        } else if (state.activeMeasureType === 'area') {
+          if (state.measurePoints.length >= 3) {
+            // Đảm bảo khép kín đa giác tính diện tích
+            const closedCoords = [...state.measurePoints, state.measurePoints[0]];
+            const polygon = turf.polygon([closedCoords]);
+            const areaSqMeters = turf.area(polygon);
+
+            measureLayerGroup.clearLayers();
+            state.measurePoints.forEach(pt => {
+              L.circleMarker([pt[1], pt[0]], { radius: 4, color: '#f59e0b', fillColor: '#f59e0b', fillOpacity: 1 }).addTo(measureLayerGroup);
+            });
+
+            const coords = closedCoords.map(pt => [pt[1], pt[0]]);
+            L.polygon(coords, { color: '#f59e0b', weight: 2, fillColor: '#f59e0b', fillOpacity: 0.2 }).addTo(measureLayerGroup);
+
+            const textArea = areaSqMeters >= 10000 ? `${(areaSqMeters/10000).toFixed(2)} ha` : `${Math.round(areaSqMeters)} m²`;
+            L.popup({ closeButton: false, autoClose: false })
+              .setLatLng([lat, lng])
+              .setContent(`<b style="color:var(--accent-orange);">📐 Diện tích: ${textArea}</b>`)
+              .openOn(map);
+          }
+        }
+      }
+      return;
+    }
+
     // Chế độ tra cứu mật độ hạ tầng tại vị trí
     if (state.isInspectMode) {
       handleInspectPointClick(e.latlng.lat, e.latlng.lng);
@@ -100,7 +158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const heatOpacity = document.getElementById('heatOpacity');
   heatOpacity?.addEventListener('input', () => refreshHeatmapOnly());
 
-  // Checkboxes Lớp dữ liệu (Đã loại bỏ isochrone toàn cục)
+  // Checkboxes Lớp dữ liệu
   const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'heat'];
   layerCheckboxes.forEach(key => {
     const el = document.getElementById(`chk_${key}`);
