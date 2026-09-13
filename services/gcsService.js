@@ -2,16 +2,20 @@ const axios = require('axios');
 const constants = require('../config/constants');
 
 let cachedGeoJSON = null;
-let lastGeoJSONFetch = 0;
+let lastETag = null; // Lưu mã phiên bản ETag từ GCS Bucket
 
 async function getRawDataList() {
-  const now = Date.now();
-  // Kiểm tra cache hợp lệ
-  if (cachedGeoJSON && (now - lastGeoJSONFetch < constants.GEOJSON_CACHE_TTL)) {
-    return cachedGeoJSON;
-  }
-
   try {
+    // 1. Thực hiện request nhẹ (HEAD) tới GCS URL để kiểm tra ETag (thời điểm cập nhật file trên bucket)
+    const headRes = await axios.head(constants.GCS_URL, { timeout: 5000 });
+    const currentETag = headRes.headers['etag'] || headRes.headers['last-modified'];
+
+    // 2. Nếu ETag trùng khớp với cache hiện tại và đã có dữ liệu -> Trả về cache ngay lập tức (Không tốn thời gian parse lại)
+    if (cachedGeoJSON && currentETag && currentETag === lastETag) {
+      return cachedGeoJSON;
+    }
+
+    // 3. Nếu ETag thay đổi (Bucket đã có file mới) hoặc lần đầu chạy -> Tải toàn bộ nội dung JSON mới
     const response = await axios.get(constants.GCS_URL, { timeout: 10000 });
     const geojson = response.data || {};
     const features = geojson.features || [];
@@ -41,17 +45,19 @@ async function getRawDataList() {
       };
     });
 
-    lastGeoJSONFetch = now;
+    // Cập nhật lại mã ETag mới nhất
+    lastETag = currentETag;
     return cachedGeoJSON;
   } catch (e) {
     console.error("Lỗi nạp GCS Data:", e.message);
+    // Fallback trả về cache cũ nếu có lỗi kết nối mạng đột xuất
     return cachedGeoJSON || [];
   }
 }
 
 function invalidateCache() {
   cachedGeoJSON = null;
-  lastGeoJSONFetch = 0;
+  lastETag = null;
 }
 
 module.exports = { getRawDataList, invalidateCache };
