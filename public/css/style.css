@@ -159,6 +159,23 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
 .inline-progress-bg { background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; }
 .inline-progress-fill { width: 0%; height: 100%; background: var(--accent-cyan); transition: width 0.3s ease; }
 
+/* NHÃN TÊN 40 PHƯỜNG XÃ (TỰ ĐỘNG CO GIÃN THEO ZOOM) */
+.ward-label-icon {
+  background: transparent !important;
+  border: none !important;
+}
+.ward-label-icon .ward-label-text {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  color: #ffffff;
+  font-weight: 700;
+  white-space: nowrap;
+  text-shadow: 0 0 3px #000, 0 0 3px #000, 1px 1px 2px #000;
+  letter-spacing: 0.2px;
+  pointer-events: none;
+  transition: font-size 0.15s ease;
+}
+
 /* RESPONSIVE LAYOUTS */
 @media (min-width: 769px) {
   .leaflet-control-zoom { display: none !important; }
