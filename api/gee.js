@@ -1,6 +1,6 @@
 const axios = require('axios');
 const constants = require('../config/constants');
-const { initGEE, getGeeContext, buildEeIsochroneGeometry } = require('../services/geeService');
+const { initGEE, getGeeContext } = require('../services/geeService');
 const { getRawDataList, invalidateCache } = require('../services/gcsService');
 
 let cachedWardStats = null;
@@ -480,6 +480,31 @@ module.exports = async (req, res) => {
         wardOutline.getMap({ palette: ['#00ffff'] }, (m, err) => err ? reject(err) : resolve(m));
       });
       return res.status(200).json({ urlFormat: mapId.urlFormat });
+    }
+
+    // 9. TÊN & TÂM (CENTROID) CỦA 40 PHƯỜNG XÃ - PHỤC VỤ VẼ NHÃN TRÊN BẢN ĐỒ
+    if (action === 'getWardLabels') {
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
+
+      const wardCentroidFc = wardVectorParsed.map(f =>
+        f.set('centroidCoords', f.geometry().centroid(1).coordinates())
+      );
+
+      const wardFeatures = await new Promise((resolve, reject) => {
+        wardCentroidFc.evaluate((fc, err) => err ? reject(err) : resolve(fc ? fc.features : []));
+      });
+
+      const labels = wardFeatures.map(f => {
+        const props = f.properties || {};
+        const coords = props.centroidCoords || [107.5905, 16.4637];
+        return {
+          name: props.tenXa || props.NAME_2 || props.name || 'Phường',
+          lat: coords[1],
+          lng: coords[0]
+        };
+      });
+
+      return res.status(200).json({ labels });
     }
 
     return res.status(200).json({ rawDataList });
