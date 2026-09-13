@@ -20,6 +20,7 @@ export const layers = {
 };
 
 let tileHeatmapLayer = null;
+let wardLabelMarkers = [];
 
 export function getDistanceMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;
@@ -47,7 +48,63 @@ export function initMap() {
   layers.c4.addTo(map); layers.c5.addTo(map); layers.c6.addTo(map);
   layers.c7.addTo(map); layers.c8.addTo(map); layers.c9.addTo(map);
 
+  map.on('zoomend', updateWardLabelFontSize);
+
   return map;
+}
+
+// TẢI RANH GIỚI 40 PHƯỜNG XÃ (TILE ẢNH) + TÊN PHƯỜNG XÃ TẠI VỊ TRÍ TÂM
+export async function loadBoundaryLayer() {
+  if (!map) return;
+
+  // 1. Tải ảnh ranh giới (đường viền cyan)
+  try {
+    const tileRes = await fetch('/api/gee?action=getBoundaryTile');
+    const tileData = await tileRes.json();
+    if (tileData.urlFormat) {
+      const boundaryTile = L.tileLayer(tileData.urlFormat, { opacity: 0.9 });
+      layers.boundary.addLayer(boundaryTile);
+    }
+  } catch (err) {
+    console.error("Lỗi tải ranh giới 40 phường xã:", err);
+  }
+
+  // 2. Tải tên + tâm 40 phường xã, vẽ nhãn chữ tại vị trí tâm
+  try {
+    const labelRes = await fetch('/api/gee?action=getWardLabels');
+    const labelData = await labelRes.json();
+    const labels = labelData.labels || [];
+
+    wardLabelMarkers = labels.map(item => {
+      const icon = L.divIcon({
+        className: 'ward-label-icon',
+        html: `<span class="ward-label-text">${item.name}</span>`,
+        iconSize: [0, 0]
+      });
+      const marker = L.marker([item.lat, item.lng], { icon, interactive: false });
+      layers.boundary.addLayer(marker);
+      return marker;
+    });
+
+    updateWardLabelFontSize();
+  } catch (err) {
+    console.error("Lỗi tải tên 40 phường xã:", err);
+  }
+}
+
+function updateWardLabelFontSize() {
+  if (!map) return;
+  const zoom = map.getZoom();
+
+  // Nội suy tuyến tính: zoom càng lớn (phóng to) chữ càng to, zoom nhỏ (thu nhỏ) chữ càng bé
+  const minZoom = 11, maxZoom = 17;
+  const minSize = 8, maxSize = 16;
+  const clampedZoom = Math.max(minZoom, Math.min(maxZoom, zoom));
+  const fontSize = minSize + (clampedZoom - minZoom) * (maxSize - minSize) / (maxZoom - minZoom);
+
+  document.querySelectorAll('.ward-label-text').forEach(el => {
+    el.style.fontSize = fontSize.toFixed(1) + 'px';
+  });
 }
 
 export function toggleLayer(layerKey, isChecked) {
