@@ -346,7 +346,7 @@ export function onPointClick(p, marker) {
   }
 }
 
-export function handleInspectPointClick(clickLat, clickLng) {
+export async function handleInspectPointClick(clickLat, clickLng) {
   const checkRadius = state.globalBufferRadiusOverride || 500;
   
   if (state.tempMarker) map.removeLayer(state.tempMarker);
@@ -356,21 +356,49 @@ export function handleInspectPointClick(clickLat, clickLng) {
   const missingCodes = [];
 
   const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+  
+  // Lọc ra các hạ tầng chính thức đã được phê duyệt
+  const activeItems = state.rawDataList.filter(item => {
+    const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
+    return codes.includes(item.type) && isApproved;
+  });
+
+  try {
+    // Gọi API OSRM chung để lấy ranh giới đa giác chuẩn xác theo mạng lưới giao thông giống hệ thống Heatmap
+    const res = await fetch('/api/gee?action=getIsochrone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        features: activeItems.map(item => ({
+          ...item,
+          radius: state.globalBufferRadiusOverride || Number(item.radius) || Number(item.banKinh) || 500
+        }))
+      })
+    });
+    const isochroneGeoJSON = await res.json();
+    const clickPointGeo = turf.point([clickLng, clickLat]);
+
+    // Sử dụng Turf.js để kiểm tra điểm click có nằm bên trong vùng phủ OSRM thực tế hay không
+    if (isochroneGeoJSON && isochroneGeoJSON.features) {
+      isochroneGeoJSON.features.forEach(feat => {
+        const code = feat.properties.type;
+        const name = feat.properties.name;
+        if (feat.geometry) {
+          const polyFeature = turf.polygon(feat.geometry.coordinates);
+          if (turf.booleanPointInPolygon(clickPointGeo, polyFeature)) {
+            if (!coveredGroups[code]) coveredGroups[code] = [];
+            if (!coveredGroups[code].includes(name)) {
+              coveredGroups[code].push(name);
+            }
+          }
+        }
+      });
+    }
+  } catch (err) {
+    console.error("Lỗi kiểm tra mạng lưới OSRM tại điểm:", err);
+  }
+
   codes.forEach(code => {
-    const itemsOfCode = state.rawDataList.filter(item => {
-      const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
-      return item.type === code && isApproved;
-    });
-
-    itemsOfCode.forEach(item => {
-      const itemR = state.globalBufferRadiusOverride || Number(item.radius) || Number(item.banKinh) || checkRadius;
-      const dist = getDistanceMeters(clickLat, clickLng, item.lat, item.lng);
-      if (dist <= itemR) {
-        if (!coveredGroups[code]) coveredGroups[code] = [];
-        coveredGroups[code].push(item.name);
-      }
-    });
-
     if (!coveredGroups[code]) missingCodes.push(code);
   });
 
