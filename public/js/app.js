@@ -8,6 +8,7 @@ import {
   renderGroupedPoints, 
   refreshHeatmapOnly, 
   handleInspectPointClick,
+  loadBoundaryLayer,
   measureLayerGroup,
   map as mapInstance
 } from './mapEngine.js';
@@ -300,6 +301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderGroupedPoints();
     await refreshHeatmapOnly();
+    loadBoundaryLayer();
 
     if (progressBar) progressBar.style.width = "100%";
     if (progressPercent) progressPercent.innerText = "100%";
