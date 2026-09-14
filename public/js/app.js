@@ -15,7 +15,8 @@ import {
 import { 
   toggleAuthModal, 
   openCombinedModal, 
-  closeModal 
+  closeModal,
+  openWardDetailDirect
 } from './uiComponents.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -177,6 +178,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
+  // ==========================================
+  // BỘ LỌC ĐỊA BÀN (DROPDOWN): TP. HUẾ <-> 1 PHƯỜNG/XÃ CỤ THỂ
+  // ==========================================
+  async function loadWardSelectorOptions() {
+    try {
+      const res = await fetch('/api/gee?action=getWardLabels');
+      const data = await res.json();
+      state.wardLabelsList = data.labels || [];
+
+      const wardSelector = document.getElementById('wardSelector');
+      if (!wardSelector) return;
+
+      state.wardLabelsList
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+        .forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item.name;
+          opt.textContent = item.name;
+          wardSelector.appendChild(opt);
+        });
+    } catch (err) {
+      console.error("Lỗi tải danh sách phường/xã:", err);
+    }
+  }
+  loadWardSelectorOptions();
+
+  document.getElementById('wardSelector')?.addEventListener('change', (e) => {
+    state.selectedWard = e.target.value || null;
+
+    // Lọc lại toàn bộ điểm hiển thị & phân tích heatmap chỉ trong phạm vi phường/xã được chọn
+    renderGroupedPoints();
+    refreshHeatmapOnly();
+
+    // Bay tới vị trí tâm phường/xã được chọn (nếu có), hoặc quay về toàn cảnh TP. Huế
+    if (state.selectedWard) {
+      const target = state.wardLabelsList.find(w => w.name === state.selectedWard);
+      if (target) map.flyTo([target.lat, target.lng], 14);
+    } else {
+      map.flyTo([16.4637, 107.5905], 13);
+    }
+  });
+
   // Sidebar Controls & Tabs
   const sidebarPanel = document.getElementById('sidebarPanel');
   document.getElementById('btnToggleSidebar')?.addEventListener('click', () => {
@@ -206,7 +250,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Modal & Dockbar Navigation
-  document.getElementById('btnOpenCombinedModal')?.addEventListener('click', openCombinedModal);
+  // Nếu đang lọc theo 1 phường/xã cụ thể -> mở thẳng bảng chi tiết phường đó (bỏ qua bảng tổng hợp 40 phường)
+  document.getElementById('btnOpenCombinedModal')?.addEventListener('click', () => {
+    if (state.selectedWard) {
+      openWardDetailDirect(state.selectedWard);
+    } else {
+      openCombinedModal();
+    }
+  });
   document.getElementById('btnCloseCombinedModal')?.addEventListener('click', closeModal);
   document.getElementById('btnAuth')?.addEventListener('click', toggleAuthModal);
   document.getElementById('btnCloseAuthModal')?.addEventListener('click', toggleAuthModal);
