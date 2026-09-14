@@ -146,7 +146,22 @@ export function closeModal() {
   if (modal) modal.style.display = 'none'; 
 }
 
-function selectWardDetail(wardName) {
+// MỞ THẲNG BẢNG CHI TIẾT 1 PHƯỜNG/XÃ (bỏ qua bước xem bảng tổng hợp 40 phường)
+// Dùng khi người dùng đang lọc bộ chọn địa bàn về 1 phường cụ thể và bấm "BẢNG TỔNG HỢP"
+export async function openWardDetailDirect(wardName) {
+  try {
+    // Vẫn cần dữ liệu ma trận 40 phường để lấy đúng dân số/chỉ tiêu của phường được chọn,
+    // nhưng có cache 15 phút phía server (getWardStats) nên các lần gọi sau rất nhanh.
+    const res = await fetch('/api/gee?action=getWardStats');
+    const resData = await res.json();
+    state.wardStatsData = resData.data || [];
+    selectWardDetail(wardName);
+  } catch (err) {
+    console.error("Lỗi tải thống kê hạ tầng phường:", err);
+  }
+}
+
+export function selectWardDetail(wardName) {
   closeModal();
 
   const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
@@ -247,7 +262,7 @@ function buildWardQuotaTableHtml(wardName, pop, areas, infraList) {
         <td style="padding-left:12px; color:var(--accent-cyan);">└ ${item.name}</td>
         <td style="text-align:right;">${item.size.toLocaleString()} m²</td>
         <td style="text-align:center; color:var(--text-muted);">-</td>
-        <td style="text-align:right; color:var(--accent-orange);">Bán kính: ${state.globalBufferRadius}m</td>
+        <td style="text-align:right; color:var(--accent-orange);">Bán kính: ${Number(item.radius) || Number(item.banKinh) || 500}m</td>
         <td style="text-align:center; color:var(--accent-green);">✓ Hoạt động</td>
       </tr>`;
     });
