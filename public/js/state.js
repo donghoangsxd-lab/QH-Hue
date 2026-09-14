@@ -12,6 +12,11 @@ export const state = {
   rawDataList: [],
   wardStatsData: [],
 
+  // Bộ lọc địa bàn: null = xem toàn TP. Huế | "Tên phường" = chỉ lọc riêng phường đó
+  selectedWard: null,
+  // Danh sách tên + tọa độ tâm 40 phường xã (dùng cho dropdown lọc & bay tới vị trí)
+  wardLabelsList: [],
+
   // Bán kính đệm Buffer & Isochrone Giao thông mặc định (mét)
   globalBufferRadius: 500,
   isochroneRadius: 500,
