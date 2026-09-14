@@ -188,29 +188,17 @@ module.exports = async (req, res) => {
     }
 
     // 4. ĐỘ PHỦ HEATMAP TILE (Đồng bộ tuyệt đối tính theo mạng lưới giao thông OSRM)
-    if (action === 'getHeatmapTile') {
+        if (action === 'getHeatmapTile') {
       const { features } = req.body || {};
-      const overrideRadius = Number(req.query.overrideRadius) || 0;
       const categoryImageLayers = [];
       const codes = constants.CODES_TO_CHECK;
+      const featureList = Array.isArray(features) ? features : [];
 
       for (const code of codes) {
-        let groupGeoms = [];
-        if (features && Array.isArray(features) && features.length > 0) {
-          groupGeoms = features
-            .filter(item => item.properties && item.properties.type === code && (item.properties.status === true || item.properties.status === 'true' || item.properties.status === 'TRUE'))
-            .map(item => ee.Feature(ee.Geometry(item.geometry)));
-        }
-
-        if (groupGeoms.length === 0) {
-          const validItems = rawDataList.filter(item => item.type === code && item.status === true);
-          const geomPromises = validItems.map(async (item) => {
-            const r = overrideRadius > 0 ? overrideRadius : (Number(item.radius) || Number(item.banKinh) || 500);
-            const polyCoords = await calculateNetworkIsochrone(item.lat, item.lng, r);
-            return ee.Feature(ee.Geometry(polyCoords));
-          });
-          groupGeoms = await Promise.all(geomPromises);
-        }
+        const groupGeoms = featureList
+          .filter(item => item.properties && item.properties.type === code &&
+            (item.properties.status === true || item.properties.status === 'true' || item.properties.status === 'TRUE'))
+          .map(item => ee.Feature(ee.Geometry(item.geometry)));
 
         if (groupGeoms.length > 0) {
           categoryImageLayers.push(
@@ -500,7 +488,8 @@ module.exports = async (req, res) => {
         return {
           name: props.tenXa || props.NAME_2 || props.name || 'Phường',
           lat: coords[1],
-          lng: coords[0]
+          lng: coords[0],
+          geometry: f.geometry
         };
       });
 
