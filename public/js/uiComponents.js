@@ -104,6 +104,10 @@ export function openCombinedModal() {
       state.wardStatsData = resData.data || [];
       const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH"];
 
+      if (state.wardStatsData.length > 0) {
+        renderCombinedChart();
+      }
+
       state.wardStatsData.forEach((w, idx) => {
         let row = `<tr>
           <td>${idx + 1}</td>
