@@ -23,7 +23,6 @@ let tileHeatmapLayer = null;
 let wardLabelMarkers = [];
 
 // Kiểm tra 1 điểm (lat,lng) có nằm trong ranh giới hình học thật của 1 phường/xã hay không
-// (dùng turf.js đối chiếu polygon ranh giới, KHÔNG dựa vào chuỗi "Ten_XaPhuong" ghi trong Sheet)
 function isPointInWardGeometry(lat, lng, geometry) {
   if (!geometry) return false;
   try {
@@ -42,6 +41,7 @@ function getWardFilteredList(sourceList) {
   if (!wardInfo || !wardInfo.geometry) return sourceList;
   return sourceList.filter(p => isPointInWardGeometry(p.lat, p.lng, wardInfo.geometry));
 }
+
 export function getDistanceMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -77,7 +77,6 @@ export function initMap() {
 export async function loadBoundaryLayer() {
   if (!map) return;
 
-  // 1. Tải ảnh ranh giới (đường viền cyan)
   try {
     const tileRes = await fetch('/api/gee?action=getBoundaryTile');
     const tileData = await tileRes.json();
@@ -89,12 +88,11 @@ export async function loadBoundaryLayer() {
     console.error("Lỗi tải ranh giới 40 phường xã:", err);
   }
 
-  // 2. Tải tên + tâm 40 phường xã, vẽ nhãn chữ tại vị trí tâm
   try {
     const labelRes = await fetch('/api/gee?action=getWardLabels');
     const labelData = await labelRes.json();
     const labels = labelData.labels || [];
-    state.wardLabelsList = labels; // Lưu kèm geometry để lọc điểm theo ranh giới thật, dùng chung toàn app
+    state.wardLabelsList = labels;
 
     wardLabelMarkers = labels.map(item => {
       const icon = L.divIcon({
@@ -117,7 +115,6 @@ function updateWardLabelFontSize() {
   if (!map) return;
   const zoom = map.getZoom();
 
-  // Nội suy tuyến tính: zoom càng lớn (phóng to) chữ càng to, zoom nhỏ (thu nhỏ) chữ càng bé
   const minZoom = 11, maxZoom = 17;
   const minSize = 8, maxSize = 16;
   const clampedZoom = Math.max(minZoom, Math.min(maxZoom, zoom));
@@ -207,7 +204,6 @@ export function renderGroupedPoints() {
 
   Object.keys(mapGroups).forEach(k => mapGroups[k].clearLayers());
 
-  // BỘ LỌC ĐỊA BÀN: lọc theo ranh giới hình học thật, không dùng chuỗi "Ten_XaPhuong" trong Sheet
   const sourceList = getWardFilteredList(state.rawDataList);
 
   sourceList.forEach(p => {
@@ -240,43 +236,28 @@ export function renderGroupedPoints() {
   });
 }
 
-export async function refreshHeatmapOnly() {
-  const heatOpacityEl = document.getElementById('heatOpacity');
-  const currentOpacity = heatOpacityEl ? heatOpacityEl.value / 100 : 0.5;
-
-  const overrideRad = state.globalBufferRadiusOverride || 0;
-
-  // BỘ LỌC ĐỊA BÀN: heatmap chỉ tính trên tập điểm thuộc phường/xã đang chọn (nếu có)
-  const activeFeatures = state.rawDataList
-    .filter(item => item.status && item.type !== "9-CSD" &&
-      (!state.selectedWard || normalizeWardName(item.ward) === normalizeWardName(state.selectedWard)))
-    .map(item => ({ ...item, radius: overrideRad > 0 ? overrideRad : (Number(item.radius) || Number(item.banKinh) || 500) }));
+// HÀM HIGHLIGHT ĐƠN LẺ ISOCHRONE KHI CLICK CHỌN ĐIỂM
+export async function highlightSingleIsochrone(lat, lng, radius) {
+  if (!layers.singleIso) return;
+  layers.singleIso.clearLayers();
 
   try {
-    const isoRes = await fetch('/api/gee?action=getIsochrone', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features: activeFeatures })
-    });
-    const isoData = await isoRes.json();
-
-    const heatRes = await fetch(`/api/gee?action=getHeatmapTile&overrideRadius=${overrideRad}&t=${Date.now()}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features: isoData.features })
-    });
-    const d = await heatRes.json();
-
-    if (d.urlFormat) {
-      layers.heatmap.clearLayers();
-      tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: currentOpacity });
-      const chkHeat = document.getElementById('chk_heat');
-      if (chkHeat && chkHeat.checked && map) {
-        tileHeatmapLayer.addTo(layers.heatmap);
-      }
+    const res = await fetch(`/api/gee?action=getSingleIsochrone&lat=${lat}&lng=${lng}&radius=${radius}`);
+    const data = await res.json();
+    if (data && data.geometry) {
+      const geoLayer = L.geoJSON(data, {
+        style: {
+          color: 'var(--accent-cyan)',
+          weight: 2.5,
+          dashArray: '5,5',
+          fillColor: 'var(--accent-cyan)',
+          fillOpacity: 0.18
+        }
+      });
+      layers.singleIso.addLayer(geoLayer);
     }
   } catch (err) {
-    console.error("Lỗi cập nhật Heatmap:", err);
+    console.error("Lỗi vẽ single isochrone:", err);
   }
 }
 
@@ -292,7 +273,6 @@ export async function refreshHeatmapOnly() {
   };
   Object.keys(bufferGroups).forEach(k => bufferGroups[k].clearLayers());
 
-  // Toàn bộ điểm hạ tầng (trừ 9-CSD) trong phạm vi đang xem, gồm cả điểm dự kiến lẫn chính thức
   const scopedList = getWardFilteredList(state.rawDataList).filter(item => item.type !== "9-CSD");
   const allFeaturesInput = scopedList.map(item => ({
     ...item,
@@ -305,7 +285,6 @@ export async function refreshHeatmapOnly() {
   }
 
   try {
-    // TÍNH ISOCHRONE BÁM ĐƯỜNG GIAO THÔNG - DÙNG CHUNG CHO CẢ BUFFER HIỂN THỊ VÀ BẢN ĐỒ NHIỆT
     const isoRes = await fetch('/api/gee?action=getIsochrone', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -314,7 +293,6 @@ export async function refreshHeatmapOnly() {
     const isoData = await isoRes.json();
     const isoFeatures = (isoData && isoData.features) || [];
 
-    // 1. VẼ BUFFER ĐÚNG THEO ĐA GIÁC ISOCHRONE (không còn dùng vòng tròn L.circle)
     isoFeatures.forEach(feat => {
       const props = feat.properties || {};
       const isApproved = (props.status === true || props.status === 'true' || props.status === 'TRUE');
@@ -328,7 +306,6 @@ export async function refreshHeatmapOnly() {
       targetBufferGroup.addLayer(L.geoJSON(feat, { style }));
     });
 
-    // 2. HEATMAP CHỈ TÍNH TRÊN CÁC ĐIỂM ĐÃ CHÍNH THỨC (status = true)
     const approvedFeatures = isoFeatures.filter(feat => {
       const s = feat.properties && feat.properties.status;
       return (s === true || s === 'true' || s === 'TRUE');
@@ -354,6 +331,18 @@ export async function refreshHeatmapOnly() {
   }
 }
 
+export function onPointClick(p, marker) {
+  const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
+  const itemRadius = state.globalBufferRadiusOverride > 0 ? state.globalBufferRadiusOverride : (Number(p.radius) || Number(p.banKinh) || 500);
+
+  highlightSingleIsochrone(p.lat, p.lng, itemRadius);
+
+  let contentHtml = `<div style="min-width:220px; font-size:11px;">`;
+  contentHtml += `<b style="color:var(--accent-cyan); font-size:12px;">${p.name}</b>`;
+  if (!isApproved) {
+    contentHtml += `<span class="badge-pending">Chờ duyệt</span>`;
+  }
+  contentHtml += `<br><hr style="border-color:var(--border-color); margin:4px 0;">`;
   contentHtml += `• Loại hạ tầng: <b>${infraLabels[p.type] || p.type}</b><br>`;
   contentHtml += `• Địa bàn: <b>Phường/Xã ${p.ward}</b><br>`;
   contentHtml += `• Diện tích: <b>${(p.size || 0).toLocaleString()} m²</b><br>`;
@@ -435,7 +424,8 @@ export async function refreshHeatmapOnly() {
       });
   }
 }
-// TẢI LỚP RASTER DÂN SỐ (LỚP TĨNH, TẢI SẴN KHI VÀO TRANG - trước đây bị bỏ sót, chưa từng hoạt động)
+
+// TẢI LỚP RASTER DÂN SỐ
 export async function loadPopulationLayer() {
   if (!map) return;
   try {
@@ -462,14 +452,12 @@ export async function handleInspectPointClick(clickLat, clickLng) {
 
   const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
   
-  // Lọc ra các hạ tầng chính thức đã được phê duyệt
   const activeItems = state.rawDataList.filter(item => {
     const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
     return codes.includes(item.type) && isApproved;
   });
 
   try {
-    // Gọi API OSRM chung để lấy ranh giới đa giác chuẩn xác theo mạng lưới giao thông giống hệ thống Heatmap
     const res = await fetch('/api/gee?action=getIsochrone', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -483,7 +471,6 @@ export async function handleInspectPointClick(clickLat, clickLng) {
     const isochroneGeoJSON = await res.json();
     const clickPointGeo = turf.point([clickLng, clickLat]);
 
-    // Sử dụng Turf.js để kiểm tra điểm click có nằm bên trong vùng phủ OSRM thực tế hay không
     if (isochroneGeoJSON && isochroneGeoJSON.features) {
       isochroneGeoJSON.features.forEach(feat => {
         const code = feat.properties.type;
