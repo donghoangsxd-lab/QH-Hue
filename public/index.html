@@ -18,8 +18,13 @@
   <!-- HÀNG 1: TOPBAR TRÊN CÙNG -->
   <div class="topbar-row">
     <div class="topbar-header ui-panel-format">
-      <b style="color:var(--accent-cyan); white-space:nowrap;">🏛️ BẢN ĐỒ HẠ TẦNG TP. HUẾ</b>
-      <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:140px;">
+      <div style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
+        <b style="color:var(--accent-cyan); white-space:nowrap;">🏛️ BẢN ĐỒ HẠ TẦNG</b>
+        <select id="wardSelector" class="ward-selector-dropdown" title="Lọc theo địa bàn phường/xã">
+          <option value="">TP. HUẾ</option>
+        </select>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:110px;">
         <div class="progress-bar-bg" style="flex:1;"><div class="progress-bar-fill" id="progressBar"></div></div>
         <span id="progressPercent" style="color:var(--accent-green); font-weight:bold; white-space:nowrap; font-size:11px;">0%</span>
       </div>
