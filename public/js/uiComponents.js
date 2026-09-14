@@ -160,18 +160,30 @@ export async function openWardDetailDirect(wardName) {
     console.error("Lỗi tải thống kê hạ tầng phường:", err);
   }
 }
-
+// Lọc điểm hạ tầng thuộc 1 phường/xã theo đúng ranh giới hình học (turf.js),
+// KHÔNG dựa vào chuỗi "Ten_XaPhuong" ghi trong Sheet - đồng bộ với logic lọc trên bản đồ
+function getWardInfraList(wardName) {
+  const wardInfo = state.wardLabelsList.find(w => w.name === wardName);
+  if (!wardInfo || !wardInfo.geometry) return [];
+  return state.rawDataList.filter(item => {
+    const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
+    if (!isApproved) return false;
+    try {
+      const pt = turf.point([item.lng, item.lat]);
+      const poly = turf.feature(wardInfo.geometry);
+      return turf.booleanPointInPolygon(pt, poly);
+    } catch (e) {
+      return false;
+    }
+  });
+}
 export function selectWardDetail(wardName) {
   closeModal();
 
   const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
   if (!wardData) return;
 
-  const normWard = wardName.replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '').trim().toLowerCase();
-  const wardInfraList = state.rawDataList.filter(item => {
-    const itemWardNorm = item.ward.replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '').trim().toLowerCase();
-    return itemWardNorm === normWard && (item.status === true || item.status === 'true' || item.status === 'TRUE');
-  });
+   const wardInfraList = getWardInfraList(wardName);
 
   const currentAreas = { "1-CV": 0, "2-BDX": 0, "3-MN": 0, "4-TH": 0, "5-THCS": 0, "6-YT": 0, "7-VH": 0, "8-TM": 0 };
   wardInfraList.forEach(item => {
@@ -277,11 +289,7 @@ function recalcWardQuota(wardName, newPopVal) {
   const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
   if (!wardData) return;
 
-  const normWard = wardName.replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '').trim().toLowerCase();
-  const wardInfraList = state.rawDataList.filter(item => {
-    const itemWardNorm = item.ward.replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '').trim().toLowerCase();
-    return itemWardNorm === normWard && (item.status === true || item.status === 'true' || item.status === 'TRUE');
-  });
+    const wardInfraList = getWardInfraList(wardName);
 
   const currentAreas = { "1-CV": 0, "2-BDX": 0, "3-MN": 0, "4-TH": 0, "5-THCS": 0, "6-YT": 0, "7-VH": 0, "8-TM": 0 };
   wardInfraList.forEach(item => {
