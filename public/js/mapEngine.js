@@ -299,7 +299,7 @@ export async function refreshHeatmapOnly() {
       const cfg = infraIcons[props.type] || { border: "var(--accent-cyan)" };
       const targetBufferGroup = bufferGroups[props.type] || layers.b9;
 
-      // Đổi viền buffer thành màu trắng (#ffffff), mảnh hơn (weight: 1)
+      // Vẽ buffer chính xác theo đa giác Isochrone giao thông trả về từ backend (OSRM)
       const style = isApproved
         ? { color: '#ffffff', weight: 1, fillColor: cfg.border || '#38bdf8', fillOpacity: 0.10 }
         : { color: 'var(--accent-red)', weight: 1.5, dashArray: '4,4', fillColor: 'var(--accent-red)', fillOpacity: 0.10 };
