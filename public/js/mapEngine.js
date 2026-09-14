@@ -22,14 +22,26 @@ export const layers = {
 let tileHeatmapLayer = null;
 let wardLabelMarkers = [];
 
-// Chuẩn hóa tên phường/xã để so khớp bộ lọc (bỏ tiền tố "Phường "/"Xã ", chữ thường, trim khoảng trắng)
-function normalizeWardName(str) {
-  if (!str) return "";
-  return String(str)
-    .replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '')
-    .trim().toLowerCase();
+// Kiểm tra 1 điểm (lat,lng) có nằm trong ranh giới hình học thật của 1 phường/xã hay không
+// (dùng turf.js đối chiếu polygon ranh giới, KHÔNG dựa vào chuỗi "Ten_XaPhuong" ghi trong Sheet)
+function isPointInWardGeometry(lat, lng, geometry) {
+  if (!geometry) return false;
+  try {
+    const pt = turf.point([lng, lat]);
+    const poly = turf.feature(geometry);
+    return turf.booleanPointInPolygon(pt, poly);
+  } catch (e) {
+    return false;
+  }
 }
 
+// Trả về danh sách điểm hạ tầng thuộc phạm vi phường/xã đang chọn (lọc theo hình học ranh giới thật)
+function getWardFilteredList(sourceList) {
+  if (!state.selectedWard) return sourceList;
+  const wardInfo = state.wardLabelsList.find(w => w.name === state.selectedWard);
+  if (!wardInfo || !wardInfo.geometry) return sourceList;
+  return sourceList.filter(p => isPointInWardGeometry(p.lat, p.lng, wardInfo.geometry));
+}
 export function getDistanceMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -82,6 +94,7 @@ export async function loadBoundaryLayer() {
     const labelRes = await fetch('/api/gee?action=getWardLabels');
     const labelData = await labelRes.json();
     const labels = labelData.labels || [];
+    state.wardLabelsList = labels; // Lưu kèm geometry để lọc điểm theo ranh giới thật, dùng chung toàn app
 
     wardLabelMarkers = labels.map(item => {
       const icon = L.divIcon({
@@ -192,38 +205,17 @@ export function renderGroupedPoints() {
     "7-VH": layers.c7, "8-TM": layers.c8, "9-CSD": layers.c9
   };
 
-  const bufferGroups = {
-    "1-CV": layers.b1, "2-BDX": layers.b2, "3-MN": layers.b3,
-    "4-TH": layers.b4, "5-THCS": layers.b5, "6-YT": layers.b6,
-    "7-VH": layers.b7, "8-TM": layers.b8, "9-CSD": layers.b9
-  };
-
   Object.keys(mapGroups).forEach(k => mapGroups[k].clearLayers());
-  Object.keys(bufferGroups).forEach(k => bufferGroups[k].clearLayers());
 
-  // BỘ LỌC ĐỊA BÀN: nếu đang chọn 1 phường/xã cụ thể, chỉ hiển thị các điểm thuộc phường đó
-  const sourceList = state.selectedWard
-    ? state.rawDataList.filter(p => normalizeWardName(p.ward) === normalizeWardName(state.selectedWard))
-    : state.rawDataList;
+  // BỘ LỌC ĐỊA BÀN: lọc theo ranh giới hình học thật, không dùng chuỗi "Ten_XaPhuong" trong Sheet
+  const sourceList = getWardFilteredList(state.rawDataList);
 
   sourceList.forEach(p => {
     const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
     const cfg = infraIcons[p.type] || { symbol: "🏢", border: "var(--accent-cyan)" };
     const targetGroup = mapGroups[p.type] || layers.c9;
-    const targetBufferGroup = bufferGroups[p.type] || layers.b9;
-
-    const itemRadius = state.globalBufferRadiusOverride || Number(p.radius) || Number(p.banKinh) || 500;
 
     if (!isApproved) {
-      if (p.type !== "9-CSD") {
-        const pendingBuffer = L.circle([p.lat, p.lng], {
-          radius: itemRadius,
-          color: 'var(--accent-red)', weight: 2, dashArray: '6, 6',
-          fillColor: 'var(--accent-red)', fillOpacity: 0.12
-        });
-        targetBufferGroup.addLayer(pendingBuffer);
-      }
-
       const pendingDivIcon = L.divIcon({
         className: 'custom-infra-icon pending-border',
         html: `<div>${cfg.symbol}</div>`,
@@ -235,15 +227,6 @@ export function renderGroupedPoints() {
       targetGroup.addLayer(pendingMarker);
 
     } else {
-      if (p.type !== "9-CSD") {
-        const officialBuffer = L.circle([p.lat, p.lng], {
-          radius: itemRadius,
-          color: cfg.border, weight: 1.2,
-          fillColor: cfg.border, fillOpacity: 0.12
-        });
-        targetBufferGroup.addLayer(officialBuffer);
-      }
-
       const customDivIcon = L.divIcon({
         className: 'custom-infra-icon',
         html: `<div style="color:${cfg.border}">${cfg.symbol}</div>`,
@@ -297,45 +280,79 @@ export async function refreshHeatmapOnly() {
   }
 }
 
-export async function highlightSingleIsochrone(lat, lng, radius) {
-  if (!map || !layers.singleIso) return;
-  layers.singleIso.clearLayers();
+export async function refreshHeatmapOnly() {
+  const heatOpacityEl = document.getElementById('heatOpacity');
+  const currentOpacity = heatOpacityEl ? heatOpacityEl.value / 100 : 0.5;
+  const overrideRad = state.globalBufferRadiusOverride || 0;
+
+  const bufferGroups = {
+    "1-CV": layers.b1, "2-BDX": layers.b2, "3-MN": layers.b3,
+    "4-TH": layers.b4, "5-THCS": layers.b5, "6-YT": layers.b6,
+    "7-VH": layers.b7, "8-TM": layers.b8, "9-CSD": layers.b9
+  };
+  Object.keys(bufferGroups).forEach(k => bufferGroups[k].clearLayers());
+
+  // Toàn bộ điểm hạ tầng (trừ 9-CSD) trong phạm vi đang xem, gồm cả điểm dự kiến lẫn chính thức
+  const scopedList = getWardFilteredList(state.rawDataList).filter(item => item.type !== "9-CSD");
+  const allFeaturesInput = scopedList.map(item => ({
+    ...item,
+    radius: overrideRad > 0 ? overrideRad : (Number(item.radius) || Number(item.banKinh) || 500)
+  }));
+
+  if (allFeaturesInput.length === 0) {
+    layers.heatmap.clearLayers();
+    return;
+  }
 
   try {
-    const res = await fetch(`/api/gee?action=getSingleIsochrone&lat=${lat}&lng=${lng}&radius=${radius}`);
-    const geoJsonData = await res.json();
+    // TÍNH ISOCHRONE BÁM ĐƯỜNG GIAO THÔNG - DÙNG CHUNG CHO CẢ BUFFER HIỂN THỊ VÀ BẢN ĐỒ NHIỆT
+    const isoRes = await fetch('/api/gee?action=getIsochrone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ features: allFeaturesInput })
+    });
+    const isoData = await isoRes.json();
+    const isoFeatures = (isoData && isoData.features) || [];
 
-    if (geoJsonData && geoJsonData.geometry) {
-      const isoLayer = L.geoJSON(geoJsonData, {
-        style: {
-          color: "#38bdf8",
-          weight: 2.2,
-          fillColor: "#38bdf8",
-          fillOpacity: 0.3
-        }
-      });
-      layers.singleIso.addLayer(isoLayer);
+    // 1. VẼ BUFFER ĐÚNG THEO ĐA GIÁC ISOCHRONE (không còn dùng vòng tròn L.circle)
+    isoFeatures.forEach(feat => {
+      const props = feat.properties || {};
+      const isApproved = (props.status === true || props.status === 'true' || props.status === 'TRUE');
+      const cfg = infraIcons[props.type] || { border: "var(--accent-cyan)" };
+      const targetBufferGroup = bufferGroups[props.type] || layers.b9;
+
+      const style = isApproved
+        ? { color: cfg.border, weight: 1.2, fillColor: cfg.border, fillOpacity: 0.12 }
+        : { color: 'var(--accent-red)', weight: 2, dashArray: '6,6', fillColor: 'var(--accent-red)', fillOpacity: 0.12 };
+
+      targetBufferGroup.addLayer(L.geoJSON(feat, { style }));
+    });
+
+    // 2. HEATMAP CHỈ TÍNH TRÊN CÁC ĐIỂM ĐÃ CHÍNH THỨC (status = true)
+    const approvedFeatures = isoFeatures.filter(feat => {
+      const s = feat.properties && feat.properties.status;
+      return (s === true || s === 'true' || s === 'TRUE');
+    });
+
+    const heatRes = await fetch(`/api/gee?action=getHeatmapTile&t=${Date.now()}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ features: approvedFeatures })
+    });
+    const d = await heatRes.json();
+
+    if (d.urlFormat) {
+      layers.heatmap.clearLayers();
+      tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: currentOpacity });
+      const chkHeat = document.getElementById('chk_heat');
+      if (chkHeat && chkHeat.checked && map) {
+        tileHeatmapLayer.addTo(layers.heatmap);
+      }
     }
   } catch (err) {
-    console.error("Lỗi tải Isochrone cá nhân:", err);
+    console.error("Lỗi cập nhật Buffer/Heatmap:", err);
   }
 }
-
-export function onPointClick(p, marker) {
-  if (state.isInspectMode) return;
-  const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
-  const itemRadius = state.globalBufferRadiusOverride || Number(p.radius) || Number(p.banKinh) || 500;
-
-  if (p.type !== "9-CSD") {
-    highlightSingleIsochrone(p.lat, p.lng, itemRadius);
-  }
-
-  let contentHtml = `<div style="font-size:11px;">`;
-  if (!isApproved) {
-    contentHtml += `<b style="color:var(--accent-red);">🏢 ${p.name}</b> <span class="badge-pending">DỰ KIẾN</span><br>`;
-  } else {
-    contentHtml += `<b style="color:var(--accent-cyan);">🏢 ${p.name}</b><br>`;
-  }
 
   contentHtml += `• Loại hạ tầng: <b>${infraLabels[p.type] || p.type}</b><br>`;
   contentHtml += `• Địa bàn: <b>Phường/Xã ${p.ward}</b><br>`;
@@ -416,6 +433,21 @@ export function onPointClick(p, marker) {
         const sugContainer = document.getElementById('csdSug');
         if (sugContainer) sugContainer.innerHTML = sugHtml || "<div class='sug-card'>✓ Vị trí đã phủ đủ hạ tầng.</div>";
       });
+  }
+}
+// TẢI LỚP RASTER DÂN SỐ (LỚP TĨNH, TẢI SẴN KHI VÀO TRANG - trước đây bị bỏ sót, chưa từng hoạt động)
+export async function loadPopulationLayer() {
+  if (!map) return;
+  try {
+    const res = await fetch('/api/gee?action=getPopRasterTile');
+    const data = await res.json();
+    if (data.urlFormat) {
+      const popOpacityEl = document.getElementById('popOpacity');
+      const opacity = popOpacityEl ? popOpacityEl.value / 100 : 0.6;
+      layers.pop.addLayer(L.tileLayer(data.urlFormat, { opacity }));
+    }
+  } catch (err) {
+    console.error("Lỗi tải lớp raster dân số:", err);
   }
 }
 
