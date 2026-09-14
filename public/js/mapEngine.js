@@ -6,6 +6,7 @@ export let measureLayerGroup = null;
 export const layers = {
   pop: L.layerGroup(),
   boundary: L.layerGroup(),
+  highlightWard: L.layerGroup(), // Lớp chứa ranh giới phường đang chọn để highlight
   heatmap: L.layerGroup(),
   singleIso: L.layerGroup(),
   c1: L.layerGroup(), b1: L.layerGroup(),
@@ -22,7 +23,6 @@ export const layers = {
 let tileHeatmapLayer = null;
 let wardLabelMarkers = [];
 
-// Kiểm tra 1 điểm (lat,lng) có nằm trong ranh giới hình học thật của 1 phường/xã hay không
 function isPointInWardGeometry(lat, lng, geometry) {
   if (!geometry) return false;
   try {
@@ -34,7 +34,6 @@ function isPointInWardGeometry(lat, lng, geometry) {
   }
 }
 
-// Trả về danh sách điểm hạ tầng thuộc phạm vi phường/xã đang chọn (lọc theo hình học ranh giới thật)
 function getWardFilteredList(sourceList) {
   if (!state.selectedWard) return sourceList;
   const wardInfo = state.wardLabelsList.find(w => w.name === state.selectedWard);
@@ -62,6 +61,7 @@ export function initMap() {
   measureLayerGroup = L.layerGroup().addTo(map);
 
   layers.boundary.addTo(map);
+  layers.highlightWard.addTo(map);
   layers.heatmap.addTo(map);
   layers.singleIso.addTo(map);
   layers.c1.addTo(map); layers.c2.addTo(map); layers.c3.addTo(map);
@@ -73,7 +73,6 @@ export function initMap() {
   return map;
 }
 
-// TẢI RANH GIỚI 40 PHƯỜNG XÃ (TILE ẢNH) + TÊN PHƯỜNG XÃ TẠI VỊ TRÍ TÂM
 export async function loadBoundaryLayer() {
   if (!map) return;
 
@@ -108,6 +107,35 @@ export async function loadBoundaryLayer() {
     updateWardLabelFontSize();
   } catch (err) {
     console.error("Lỗi tải tên 40 phường xã:", err);
+  }
+}
+
+// HÀM HIGHLIGHT RANH GIỚI PHƯỜNG KHI CHỌN TỪ DROPLIST
+export function highlightWardBoundary(wardName) {
+  if (!layers.highlightWard) return;
+  layers.highlightWard.clearLayers();
+
+  if (!wardName) return; // Nếu chọn "TP. HUẾ" thì xóa highlight
+
+  const wardInfo = state.wardLabelsList.find(w => w.name === wardName);
+  if (wardInfo && wardInfo.geometry) {
+    const wardGeoJSON = {
+      type: "Feature",
+      geometry: wardInfo.geometry,
+      properties: { name: wardName }
+    };
+
+    const highlightLayer = L.geoJSON(wardGeoJSON, {
+      style: {
+        color: '#fb923c', // Màu cam vàng nổi bật
+        weight: 3.5,
+        dashArray: '6,6',
+        fillColor: '#fb923c',
+        fillOpacity: 0.15
+      }
+    });
+
+    layers.highlightWard.addLayer(highlightLayer);
   }
 }
 
@@ -236,7 +264,6 @@ export function renderGroupedPoints() {
   });
 }
 
-// HÀM HIGHLIGHT ĐƠN LẺ ISOCHRONE KHI CLICK CHỌN ĐIỂM
 export async function highlightSingleIsochrone(lat, lng, radius) {
   if (!layers.singleIso) return;
   layers.singleIso.clearLayers();
@@ -273,7 +300,15 @@ export async function refreshHeatmapOnly() {
   };
   Object.keys(bufferGroups).forEach(k => bufferGroups[k].clearLayers());
 
-  const scopedList = getWardFilteredList(state.rawDataList).filter(item => item.type !== "9-CSD");
+  // LỌC: Bỏ qua 9-CSD chưa duyệt (status = false) không tạo buffer
+  const scopedList = getWardFilteredList(state.rawDataList).filter(item => {
+    if (item.type === "9-CSD") {
+      const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
+      return isApproved; // Chỉ lấy CSD đã duyệt
+    }
+    return true;
+  });
+
   const allFeaturesInput = scopedList.map(item => ({
     ...item,
     radius: overrideRad > 0 ? overrideRad : (Number(item.radius) || Number(item.banKinh) || 500)
@@ -299,7 +334,6 @@ export async function refreshHeatmapOnly() {
       const cfg = infraIcons[props.type] || { border: "var(--accent-cyan)" };
       const targetBufferGroup = bufferGroups[props.type] || layers.b9;
 
-      // Vẽ buffer chính xác theo đa giác Isochrone giao thông trả về từ backend (OSRM)
       const style = isApproved
         ? { color: '#ffffff', weight: 1, fillColor: cfg.border || '#38bdf8', fillOpacity: 0.10 }
         : { color: 'var(--accent-red)', weight: 1.5, dashArray: '4,4', fillColor: 'var(--accent-red)', fillOpacity: 0.10 };
@@ -334,9 +368,13 @@ export async function refreshHeatmapOnly() {
 
 export function onPointClick(p, marker) {
   const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
+  const isCSDUnapproved = (p.type === "9-CSD" && !isApproved); // Kiểm tra sheet 9 và chưa duyệt (FALSE)
   const itemRadius = state.globalBufferRadiusOverride > 0 ? state.globalBufferRadiusOverride : (Number(p.radius) || Number(p.banKinh) || 500);
 
-  highlightSingleIsochrone(p.lat, p.lng, itemRadius);
+  // Nếu không phải CSD chưa duyệt thì mới gọi highlight isochrone
+  if (!isCSDUnapproved) {
+    highlightSingleIsochrone(p.lat, p.lng, itemRadius);
+  }
 
   let contentHtml = `<div style="min-width:220px; font-size:11px;">`;
   contentHtml += `<b style="color:var(--accent-cyan); font-size:12px;">${p.name}</b>`;
@@ -347,13 +385,19 @@ export function onPointClick(p, marker) {
   contentHtml += `• Loại hạ tầng: <b>${infraLabels[p.type] || p.type}</b><br>`;
   contentHtml += `• Địa bàn: <b>Phường/Xã ${p.ward}</b><br>`;
   contentHtml += `• Diện tích: <b>${(p.size || 0).toLocaleString()} m²</b><br>`;
-  contentHtml += `• Bán kính phục vụ: <b style="color:var(--accent-cyan);">${itemRadius} m</b><br>`;
+
+  // YÊU CẦU 1: Nếu là sheet 9 và ở trạng thái FALSE -> Không hiển thị bán kính phục vụ và không hiển thị dân số phục vụ
+  if (!isCSDUnapproved) {
+    contentHtml += `• Bán kính phục vụ: <b style="color:var(--accent-cyan);">${itemRadius} m</b><br>`;
+  }
 
   if (!isApproved) {
-    contentHtml += `<div id="servedPopText">
-      <div style="color:var(--accent-red); font-weight:bold; margin-top:4px;">• Dân số phục vụ DỰ KIẾN: <span id="popValText">0%</span></div>
-      <div class="inline-progress-bg"><div class="inline-progress-fill" style="background:var(--accent-red);" id="popValBar"></div></div>
-    </div>`;
+    if (!isCSDUnapproved) {
+      contentHtml += `<div id="servedPopText">
+        <div style="color:var(--accent-red); font-weight:bold; margin-top:4px;">• Dân số phục vụ DỰ KIẾN: <span id="popValText">0%</span></div>
+        <div class="inline-progress-bg"><div class="inline-progress-fill" style="background:var(--accent-red);" id="popValBar"></div></div>
+      </div>`;
+    }
 
     if (state.currentUserRole === "ADMIN") {
       contentHtml += `<button onclick="window.approvePointStatus('${p.id}')" style="width:100%; margin-top:8px; background:var(--accent-green); color:#0f172a; border:none; padding:6px; border-radius:4px; font-weight:bold; cursor:pointer;">
@@ -369,15 +413,18 @@ export function onPointClick(p, marker) {
     const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
     popup.openOn(map);
 
-    fetch(`/api/gee?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${itemRadius}`)
-      .then(r => r.json())
-      .then(res => {
-        const popVal = res.servedPop || 0;
-        const popContainer = document.getElementById('servedPopText');
-        if (popContainer) {
-          popContainer.innerHTML = `• Dân số phục vụ DỰ KIẾN: ~<b style="color:var(--accent-red);">${popVal.toLocaleString()} người</b>`;
-        }
-      });
+    // Chỉ fetch phân tích dân số nếu không phải CSD chưa duyệt
+    if (!isCSDUnapproved) {
+      fetch(`/api/gee?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${itemRadius}`)
+        .then(r => r.json())
+        .then(res => {
+          const popVal = res.servedPop || 0;
+          const popContainer = document.getElementById('servedPopText');
+          if (popContainer) {
+            popContainer.innerHTML = `• Dân số phục vụ DỰ KIẾN: ~<b style="color:var(--accent-red);">${popVal.toLocaleString()} người</b>`;
+          }
+        });
+    }
 
   } else if (p.type !== "9-CSD") {
     contentHtml += `<div id="servedPopText">
@@ -427,7 +474,6 @@ export function onPointClick(p, marker) {
   }
 }
 
-// TẢI LỚP RASTER DÂN SỐ
 export async function loadPopulationLayer() {
   if (!map) return;
   try {
