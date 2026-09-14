@@ -61,15 +61,16 @@ body, html {
 
 /* DROPDOWN BỘ LỌC ĐỊA BÀN (TP. HUẾ <-> 1 PHƯỜNG/XÃ) */
 .ward-selector-dropdown {
-  background: rgba(15, 23, 42, 0.7);
+  background: rgba(15, 23, 42, 0.85);
   color: var(--accent-cyan);
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 3px 6px;
+  padding: 3px 8px;
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-  max-width: 130px;
+  max-width: 155px;
+  min-width: 110px;
   outline: none;
 }
 .ward-selector-dropdown:hover { border-color: var(--accent-cyan); }
