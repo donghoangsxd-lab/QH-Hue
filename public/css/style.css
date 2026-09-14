@@ -59,6 +59,22 @@ body, html {
   box-shadow: 0 0 10px var(--accent-orange);
 }
 
+/* DROPDOWN BỘ LỌC ĐỊA BÀN (TP. HUẾ <-> 1 PHƯỜNG/XÃ) */
+.ward-selector-dropdown {
+  background: rgba(15, 23, 42, 0.7);
+  color: var(--accent-cyan);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  max-width: 130px;
+  outline: none;
+}
+.ward-selector-dropdown:hover { border-color: var(--accent-cyan); }
+.ward-selector-dropdown option { background: #0f172a; color: var(--text-main); }
+
 /* PROGRESS BAR */
 .progress-bar-bg { background: rgba(255, 255, 255, 0.12); height: 5px; border-radius: 3px; overflow: hidden; }
 .progress-bar-fill { width: 0%; height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
@@ -197,8 +213,9 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
 @media (max-width: 768px) {
   .leaflet-control-zoom { display: none !important; }
   .topbar-row { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 1000; display: flex; gap: 8px; align-items: center; }
-  .topbar-header { flex: 1; padding: 8px 12px; display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .topbar-header { flex: 1; padding: 8px 12px; display: flex; align-items: center; gap: 8px; font-size: 11px; justify-content: space-between; }
   .progress-bar-bg { flex: 1; }
+  .ward-selector-dropdown { max-width: 90px; font-size: 10px; }
   .toolbar-row { position: absolute; top: 58px; left: 12px; right: 12px; z-index: 1000; padding: 4px; display: flex; align-items: center; }
   .toolbar-row .ui-btn-format { flex: 1; padding: 8px 2px; font-size: 10.5px; }
   .dockbar-bottom-row { position: absolute; bottom: 12px; left: 12px; right: 12px; z-index: 1000; padding: 4px; display: flex; align-items: center; }
