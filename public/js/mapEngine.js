@@ -22,6 +22,14 @@ export const layers = {
 let tileHeatmapLayer = null;
 let wardLabelMarkers = [];
 
+// Chuẩn hóa tên phường/xã để so khớp bộ lọc (bỏ tiền tố "Phường "/"Xã ", chữ thường, trim khoảng trắng)
+function normalizeWardName(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '')
+    .trim().toLowerCase();
+}
+
 export function getDistanceMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -193,7 +201,12 @@ export function renderGroupedPoints() {
   Object.keys(mapGroups).forEach(k => mapGroups[k].clearLayers());
   Object.keys(bufferGroups).forEach(k => bufferGroups[k].clearLayers());
 
-  state.rawDataList.forEach(p => {
+  // BỘ LỌC ĐỊA BÀN: nếu đang chọn 1 phường/xã cụ thể, chỉ hiển thị các điểm thuộc phường đó
+  const sourceList = state.selectedWard
+    ? state.rawDataList.filter(p => normalizeWardName(p.ward) === normalizeWardName(state.selectedWard))
+    : state.rawDataList;
+
+  sourceList.forEach(p => {
     const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
     const cfg = infraIcons[p.type] || { symbol: "🏢", border: "var(--accent-cyan)" };
     const targetGroup = mapGroups[p.type] || layers.c9;
@@ -249,8 +262,11 @@ export async function refreshHeatmapOnly() {
   const currentOpacity = heatOpacityEl ? heatOpacityEl.value / 100 : 0.5;
 
   const overrideRad = state.globalBufferRadiusOverride || 0;
+
+  // BỘ LỌC ĐỊA BÀN: heatmap chỉ tính trên tập điểm thuộc phường/xã đang chọn (nếu có)
   const activeFeatures = state.rawDataList
-    .filter(item => item.status && item.type !== "9-CSD")
+    .filter(item => item.status && item.type !== "9-CSD" &&
+      (!state.selectedWard || normalizeWardName(item.ward) === normalizeWardName(state.selectedWard)))
     .map(item => ({ ...item, radius: overrideRad > 0 ? overrideRad : (Number(item.radius) || Number(item.banKinh) || 500) }));
 
   try {
