@@ -26,6 +26,14 @@ async function getRawDataList() {
         ? ft.geometry.coordinates 
         : [107.5905, 16.4637];
 
+      // Hàm chuẩn hóa tọa độ: xử lý an toàn trường hợp Google Sheets lưu dấu phẩy (,) thay vì dấu chấm (.)
+      const parseCoord = (val, defaultVal) => {
+        if (val === undefined || val === null) return defaultVal;
+        const strVal = String(val).trim().replace(',', '.');
+        const num = Number(strVal);
+        return isNaN(num) ? defaultVal : num;
+      };
+
       const rawId = String(props.ID_DoiTuong || '');
       const prefix = rawId.split('-')[0];
 
@@ -37,10 +45,10 @@ async function getRawDataList() {
         name: props.Ten_CongTrinh || 'Chưa đặt tên',
         ward: props.Ten_XaPhuong || 'Thuận Hóa',
         type: constants.codeMap[prefix] || "9-CSD",
-        lat: Number(coords[1]),
-        lng: Number(coords[0]),
-        size: Number(props.QuyMo_S) || 0,
-        radius: Number(props.BanKinh) || 500,
+        lat: parseCoord(coords[1], 16.4637), // Đảm bảo luôn parse đúng chuẩn số thực dấu chấm
+        lng: parseCoord(coords[0], 107.5905),
+        size: Number(String(props.QuyMo_S || 0).replace(',', '.')) || 0,
+        radius: Number(String(props.BanKinh || 500).replace(',', '.')) || 500,
         status: isStatusTrue
       };
     });
