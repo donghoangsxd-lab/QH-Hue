@@ -9,7 +9,9 @@ import {
   refreshHeatmapOnly, 
   handleInspectPointClick,
   loadBoundaryLayer,
+  loadPopulationLayer,
   measureLayerGroup,
+  layers,
   map as mapInstance
 } from './mapEngine.js';
 import { 
@@ -157,9 +159,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Độ trong suốt Heatmap
-  const heatOpacity = document.getElementById('heatOpacity');
+    const heatOpacity = document.getElementById('heatOpacity');
   heatOpacity?.addEventListener('input', () => refreshHeatmapOnly());
 
+  // Độ trong suốt Dân cư (trước đây thanh trượt này không hoạt động do chưa từng gắn sự kiện)
+  document.getElementById('popOpacity')?.addEventListener('input', (e) => {
+    const val = e.target.value / 100;
+    layers.pop.eachLayer(l => l.setOpacity && l.setOpacity(val));
+  });
+  
   // Checkboxes Lớp dữ liệu
   const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'heat'];
   layerCheckboxes.forEach(key => {
@@ -178,35 +186,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // ==========================================
+    // ==========================================
   // BỘ LỌC ĐỊA BÀN (DROPDOWN): TP. HUẾ <-> 1 PHƯỜNG/XÃ CỤ THỂ
   // ==========================================
-  async function loadWardSelectorOptions() {
-    try {
-      const res = await fetch('/api/gee?action=getWardLabels');
-      const data = await res.json();
-      state.wardLabelsList = data.labels || [];
-
-      const wardSelector = document.getElementById('wardSelector');
-      if (!wardSelector) return;
-
-      state.wardLabelsList
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
-        .forEach(item => {
-          const opt = document.createElement('option');
-          opt.value = item.name;
-          opt.textContent = item.name;
-          wardSelector.appendChild(opt);
-        });
-    } catch (err) {
-      console.error("Lỗi tải danh sách phường/xã:", err);
-    }
-  }
-  loadWardSelectorOptions();
-
-  document.getElementById('wardSelector')?.addEventListener('change', (e) => {
+  document.getElementById('wardSelector')?.addEventListener('change', async (e) => {
     state.selectedWard = e.target.value || null;
+
+    // CHỈ TẢI DANH SÁCH ĐIỂM HẠ TẦNG KHI NGƯỜI DÙNG THỰC SỰ CHỌN DROPDOWN LẦN ĐẦU
+    if (state.rawDataList.length === 0) {
+      try {
+        const res = await fetch('/api/gee');
+        const data = await res.json();
+        state.rawDataList = data.rawDataList || [];
+      } catch (err) {
+        console.error("Lỗi tải dữ liệu điểm hạ tầng:", err);
+        return;
+      }
+    }
 
     // Lọc lại toàn bộ điểm hiển thị & phân tích heatmap chỉ trong phạm vi phường/xã được chọn
     renderGroupedPoints();
@@ -220,7 +216,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       map.flyTo([16.4637, 107.5905], 13);
     }
   });
-
+  
   // Sidebar Controls & Tabs
   const sidebarPanel = document.getElementById('sidebarPanel');
   document.getElementById('btnToggleSidebar')?.addEventListener('click', () => {
@@ -336,27 +332,32 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
   });
 
-  // 4. Nạp dữ liệu khởi tạo ban đầu
+    // 4. KHỞI TẠO: CHỈ TẢI DỮ LIỆU TĨNH (ranh giới 40 phường xã + raster dân số)
   try {
     const progressBar = document.getElementById('progressBar');
     const progressPercent = document.getElementById('progressPercent');
-    if (progressBar) progressBar.style.width = "30%";
-    if (progressPercent) progressPercent.innerText = "30%";
+    if (progressBar) progressBar.style.width = "40%";
+    if (progressPercent) progressPercent.innerText = "40%";
 
-    const res = await fetch('/api/gee');
-    const data = await res.json();
-    state.rawDataList = data.rawDataList || [];
+    await Promise.all([loadBoundaryLayer(), loadPopulationLayer()]);
 
-    if (progressBar) progressBar.style.width = "70%";
-    if (progressPercent) progressPercent.innerText = "70%";
-
-    renderGroupedPoints();
-    await refreshHeatmapOnly();
-    loadBoundaryLayer();
+    // Nạp danh sách 40 phường/xã vào Dropdown (dữ liệu đã có sẵn từ loadBoundaryLayer)
+    const wardSelector = document.getElementById('wardSelector');
+    if (wardSelector) {
+      state.wardLabelsList
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+        .forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item.name;
+          opt.textContent = item.name;
+          wardSelector.appendChild(opt);
+        });
+    }
 
     if (progressBar) progressBar.style.width = "100%";
     if (progressPercent) progressPercent.innerText = "100%";
   } catch (err) {
-    console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
+    console.error("Lỗi khởi tạo dữ liệu tĩnh bản đồ:", err);
   }
 });
