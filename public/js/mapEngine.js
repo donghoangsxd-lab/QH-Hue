@@ -299,9 +299,10 @@ export async function refreshHeatmapOnly() {
       const cfg = infraIcons[props.type] || { border: "var(--accent-cyan)" };
       const targetBufferGroup = bufferGroups[props.type] || layers.b9;
 
+      // Đổi viền buffer thành màu trắng (#ffffff), mảnh hơn (weight: 1)
       const style = isApproved
-        ? { color: cfg.border, weight: 1.2, fillColor: cfg.border, fillOpacity: 0.12 }
-        : { color: 'var(--accent-red)', weight: 2, dashArray: '6,6', fillColor: 'var(--accent-red)', fillOpacity: 0.12 };
+        ? { color: '#ffffff', weight: 1, fillColor: cfg.border || '#38bdf8', fillOpacity: 0.10 }
+        : { color: 'var(--accent-red)', weight: 1.5, dashArray: '4,4', fillColor: 'var(--accent-red)', fillOpacity: 0.10 };
 
       targetBufferGroup.addLayer(L.geoJSON(feat, { style }));
     });
@@ -346,6 +347,7 @@ export function onPointClick(p, marker) {
   contentHtml += `• Loại hạ tầng: <b>${infraLabels[p.type] || p.type}</b><br>`;
   contentHtml += `• Địa bàn: <b>Phường/Xã ${p.ward}</b><br>`;
   contentHtml += `• Diện tích: <b>${(p.size || 0).toLocaleString()} m²</b><br>`;
+  contentHtml += `• Bán kính phục vụ: <b style="color:var(--accent-cyan);">${itemRadius} m</b><br>`;
 
   if (!isApproved) {
     contentHtml += `<div id="servedPopText">
