@@ -244,13 +244,13 @@ export function renderGroupedPoints() {
 
     const pinFillColor = '#1e3a8a'; 
     const strokeColor = isApproved ? '#ffffff' : '#f87171'; 
-    const strokeDash = isApproved ? '' : 'stroke-dasharray="1.5,1.5"';
-    const strokeWidth = isApproved ? '0.6' : '1.2';
+    const strokeDash = isApproved ? '' : 'stroke-dasharray="2,2"';
+    const strokeWidth = isApproved ? '0.8' : '1.5';
 
-    // Đã thu nhỏ gọn gàng với width: 22, height: 27
+    // Đã thu nhỏ toàn bộ SVG (width: 32, height: 39 - tương đương 2/3 kích thước cũ) với hệ tọa độ viewBox tỷ lệ chuẩn
     const svgPinHtml = `
-      <svg width="22" height="25" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.5)); overflow: visible;">
-        <!-- Khung ghim giọt nước tỷ lệ chuẩn -->
+      <svg width="32" height="39" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 3px 4px rgba(0,0,0,0.5)); overflow: visible;">
+        <!-- Khung ghim giọt nước thu nhỏ đều -->
         <path d="M 12 1 
                  C 7.03 1, 3 5.03, 3 10 
                  C 3 15, 12 30, 12 30 
@@ -261,19 +261,19 @@ export function renderGroupedPoints() {
               stroke-width="${strokeWidth}" 
               ${strokeDash}/>
         
-        <!-- Vòng tròn nền trắng thu nhỏ cân đối (r=4.2) -->
-        <circle cx="12" cy="10" r="4.2" fill="#ffffff" stroke="none"/>
+        <!-- Vòng tròn nền trắng ở tâm được thu nhỏ cân đối (r=4.8) -->
+        <circle cx="12" cy="10" r="4.8" fill="#ffffff" stroke="none"/>
         
-        <!-- Biểu tượng thu nhỏ tinh gọn (font-size: 6.5px) -->
-        <text x="12" y="10.5" font-size="6.5px" text-anchor="middle" dominant-baseline="central">${cfg.symbol || '🏢'}</text>
+        <!-- Biểu tượng từ Bảng Chú Giải thu nhỏ vừa vặn (font-size: 8px) tuyệt đối không tràn viền -->
+        <text x="12" y="10.5" font-size="8px" text-anchor="middle" dominant-baseline="central">${cfg.symbol || '🏢'}</text>
       </svg>
     `;
 
     const customDivIcon = L.divIcon({
       className: 'custom-infra-icon-v2',
       html: svgPinHtml,
-      iconSize: [22, 27], 
-      iconAnchor: [11, 27] // Mỏ neo căn chuẩn tại chóp đáy mới
+      iconSize: [32, 39], 
+      iconAnchor: [16, 39] // Mỏ neo căn chuẩn tại chóp nhọn phía đáy theo kích thước mới
     });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
