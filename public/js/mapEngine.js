@@ -242,28 +242,29 @@ export function renderGroupedPoints() {
     const cfg = infraIcons[p.type] || { symbol: "🏢" };
     const targetGroup = mapGroups[p.type] || layers.c9;
 
-    const pinFillColor = '#1e3a8a'; 
-    const strokeColor = isApproved ? '#ffffff' : '#f87171'; 
+    const pinFillColor = '#1e3a8a'; // Xanh biển đậm sang trọng
+    const strokeColor = isApproved ? '#ffffff' : '#f87171'; // Viền trắng 1 pixel hoặc đỏ cảnh báo nếu chưa duyệt
     const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
     const strokeWidth = isApproved ? '1' : '1.8';
 
-    // ĐƯỜNG BAO MỀM MẠI: Dùng đường cong Bézier (C) nối liền mạch từ chóp nhọn lên vòng tròn, triệt tiêu hoàn toàn góc gãy
+    // ĐƯỜNG BAO CHUẨN ĐẠI GIA SỐ HỌC: Khối ghim giọt nước hoàn chỉnh, mượt mà từ đầu tròn xuống chóp nhọn
     const svgPinHtml = `
       <svg width="48" height="58" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.6)); overflow: visible;">
-        <path d="M 12,30 
-                 C 5,18 2,13 2,11 
-                 A 10,10 0 0,0 22,11 
-                 C 22,13 19,18 12,30 Z" 
+        <path d="M 12 1 
+                 C 7.03 1, 3 5.03, 3 10 
+                 C 3 15, 12 30, 12 30 
+                 C 12 30, 21 15, 21 10 
+                 C 21 5.03, 16.97 1, 12 1 Z" 
               fill="${pinFillColor}" 
               stroke="${strokeColor}" 
               stroke-width="${strokeWidth}" 
               ${strokeDash}/>
         
         <!-- Vòng tròn nền trắng ở tâm chứa icon từ Bảng Chú Giải -->
-        <circle cx="12" cy="11" r="6.2" fill="#ffffff" stroke="none"/>
+        <circle cx="12" cy="10" r="6.2" fill="#ffffff" stroke="none"/>
         
         <!-- Biểu tượng chính xác từ Bảng Chú Giải -->
-        <text x="12" y="11.5" font-size="11.5px" text-anchor="middle" dominant-baseline="central">${cfg.symbol || '🏢'}</text>
+        <text x="12" y="10.5" font-size="11.5px" text-anchor="middle" dominant-baseline="central">${cfg.symbol || '🏢'}</text>
       </svg>
     `;
 
