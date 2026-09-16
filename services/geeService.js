@@ -21,7 +21,6 @@ function initGEE() {
           ee.initialize(null, null, () => {
             isGeeInitialized = true;
             
-            // Khởi tạo các biến không gian tĩnh phục vụ phân tích
             const wardVector = ee.FeatureCollection("projects/optimistic-yew-488501-s0/assets/Polygon-40xa");
             const wardVectorParsed = wardVector.map(f => {
               let rawPop = f.get('danSo') || f.get('DanSo');
@@ -72,19 +71,17 @@ function getGeeContext() {
   return geeContext;
 }
 
-// Xây dựng hình học Isochrone bằng toán học thuần túy (Không dùng Turf)
-// Xây dựng hình học đa giác mượt mà (Tương thích đồng bộ cho cả Isochrone & Heatmap)
+// Xây dựng hình học đa giác mượt mà dự phòng (Fallback Geometry)
 function buildEeIsochroneGeometry(lat, lng, banKinh) {
   const R = Number(banKinh) || 500;
   const radiusKm = (R * 0.9) / 1000; 
   
   const coords = [];
-  const steps = 24; // Tăng số bước lên 24 để biên dạng mịn màng, không bị góc cạnh
+  const steps = 24;
   for (let i = 0; i < steps; i++) {
     const angle = (i * 360) / steps;
     const rad = (angle * Math.PI) / 180;
     
-    // Tạo độ cong hữu cơ nhẹ dựa trên hàm lượng giác
     const dynamicFactor = 1 + 0.03 * Math.sin(rad * 4);
     const rCurrent = radiusKm * dynamicFactor;
 
@@ -93,7 +90,6 @@ function buildEeIsochroneGeometry(lat, lng, banKinh) {
     
     coords.push([lng + dLng, lat + dLat]);
   }
-  // Khép kín vòng đa giác
   coords.push(coords[0]);
 
   return ee.Geometry.Polygon([coords]);
