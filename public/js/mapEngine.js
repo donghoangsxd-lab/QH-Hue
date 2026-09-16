@@ -237,33 +237,53 @@ export function renderGroupedPoints() {
 
   const sourceList = getWardFilteredList(state.rawDataList);
 
+  // Bộ biểu tượng SVG vector chuyên dụng cho từng loại hạ tầng đặt vào tâm ghim
+  const innerIconsSvg = {
+    "1-CV": '<path d="M12 2L2 22h20L12 2zm0 3.5L18.5 20h-13L12 5.5zM11 14h2v5h-2v-5z" fill="currentColor"/>', // Cây xanh / Công viên
+    "2-BDX": '<path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.85 7h10.29l1.04 3H5.81l1.04-3zM19 17H5v-4.66l.12-.34h13.76l.12.34V17z" fill="currentColor"/>', // Bến xe
+    "3-MN": '<path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z" fill="currentColor"/>', // Mầm non
+    "4-TH": '<path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z" fill="currentColor"/>', // Tiểu học
+    "5-THCS": '<path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z" fill="currentColor"/>', // Trung học
+    "6-YT": '<path d="M19 10.5h-5.5V5c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v5.5H5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5h5.5V19c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-5.5H19c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5z" fill="currentColor"/>', // Y tế (Dấu cộng chuẩn)
+    "7-VH": '<path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" fill="currentColor"/>', // Văn hóa
+    "8-TM": '<path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 4h-8v8H4V6h16v2z" fill="currentColor"/>', // Thương mại
+    "9-CSD": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor"/>' // Chuyển đổi / Quỹ đất
+  };
+
   sourceList.forEach(p => {
     const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
-    const cfg = infraIcons[p.type] || { symbol: "🏢", border: "var(--accent-cyan)" };
+    const cfg = infraIcons[p.type] || { border: "var(--accent-cyan)" };
     const targetGroup = mapGroups[p.type] || layers.c9;
 
-    if (!isApproved) {
-      const pendingDivIcon = L.divIcon({
-        className: 'custom-infra-icon pending-border',
-        html: `<div>${cfg.symbol}</div>`,
-        iconSize: [30, 30], iconAnchor: [15, 30] // Neo ở chóp nhọn hình giọt nước
-      });
+    // Màu sắc khung ghim: Xanh/Cyan nếu đã duyệt, Đỏ nếu chưa duyệt
+    const pinColor = isApproved ? (cfg.border || '#38bdf8') : '#f87171';
+    const innerPathSvg = innerIconsSvg[p.type] || innerIconsSvg["9-CSD"];
 
-      const pendingMarker = L.marker([p.lat, p.lng], { icon: pendingDivIcon });
-      pendingMarker.on('click', () => onPointClick(p, pendingMarker));
-      targetGroup.addLayer(pendingMarker);
+    // Mẫu SVG kết hợp khung ghim bản đồ chuẩn và biểu tượng vector ở tâm tròn
+    const svgPinHtml = `
+      <svg width="34" height="42" viewBox="0 0 24 24" fill="${pinColor}" stroke="#0f172a" stroke-width="1.2" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 3px 5px rgba(0,0,0,0.6));">
+        <!-- Khung ghim bản đồ bên ngoài -->
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+        <!-- Vòng tròn tâm màu tối để làm nền cho biểu tượng -->
+        <circle cx="12" cy="9" r="4.2" fill="#0f172a" stroke="${pinColor}" stroke-width="0.8"/>
+      </svg>
+      <div class="pin-inner-icon" style="color:#ffffff;">
+        <svg width="14" height="14" viewBox="0 0 24 24">
+          ${innerPathSvg}
+        </svg>
+      </div>
+    `;
 
-    } else {
-      const customDivIcon = L.divIcon({
-        className: 'custom-infra-icon',
-        html: `<div style="color:${cfg.border}">${cfg.symbol}</div>`,
-        iconSize: [30, 30], iconAnchor: [15, 30]
-      });
+    const customDivIcon = L.divIcon({
+      className: isApproved ? 'custom-infra-icon' : 'custom-infra-icon pending-border',
+      html: svgPinHtml,
+      iconSize: [34, 42], 
+      iconAnchor: [17, 42] // Mỏ neo đúng tại chóp nhọn phía đáy ghim
+    });
 
-      const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
-      marker.on('click', () => onPointClick(p, marker));
-      targetGroup.addLayer(marker);
-    }
+    const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
+    marker.on('click', () => onPointClick(p, marker));
+    targetGroup.addLayer(marker);
   });
 }
 
