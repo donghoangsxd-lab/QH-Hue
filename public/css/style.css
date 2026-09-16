@@ -125,22 +125,22 @@ body, html {
   -moz-appearance: textfield;
 }
 
-/* ICON HẠ TẦNG - HÌNH GIỌT NƯỚC CHUẨN GÓC */
+/* ICON HẠ TẦNG - HÌNH GHIM CÓ CHÓP NHỌN Ở ĐÁY */
 .custom-infra-icon {
   display: flex; 
   align-items: center; 
   justify-content: center;
   background: rgba(15, 23, 42, 0.95); 
   border: 2px solid var(--accent-cyan);
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(45deg); /* Đã đổi từ -45deg sang 45deg để chỉnh đúng hướng */
+  /* Bo tròn các góc trên, thắt nhọn góc dưới chính giữa để tạo hình chóp đáy */
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  transform: none; /* Không xoay */
   box-shadow: 0 4px 12px rgba(0,0,0,0.6); 
   transition: all 0.2s ease;
 }
 
-/* Xoay ngược biểu tượng bên trong lại -45deg để hiển thị thẳng đứng */
 .custom-infra-icon > div {
-  transform: rotate(-45deg);
+  transform: none; /* Không xoay phần nội dung bên trong */
   display: flex; 
   align-items: center; 
   justify-content: center;
@@ -149,7 +149,7 @@ body, html {
 }
 
 .custom-infra-icon:hover { 
-  transform: scale(1.25) rotate(45deg); 
+  transform: scale(1.25); 
   z-index: 1000 !important; 
   border-color: #fff; 
 }
