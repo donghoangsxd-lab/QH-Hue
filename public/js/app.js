@@ -23,12 +23,9 @@ import {
 } from './uiComponents.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // 1. Khởi tạo Leaflet Map
   const map = initMap();
 
-  // 2. Lắng nghe sự kiện click trên bản đồ
   map.on('click', (e) => {
-    // Chế độ ghim tọa độ đề xuất mới
     if (state.isPickMode) {
       const lat = e.latlng.lat.toFixed(6);
       const lng = e.latlng.lng.toFixed(6);
@@ -67,10 +64,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Chế độ đo đạc (Chiều dài hoặc Diện tích)
     if (state.activeMeasureType) {
       const { lat, lng } = e.latlng;
-      state.measurePoints.push([lng, lat]); // Turf dùng [lng, lat]
+      state.measurePoints.push([lng, lat]);
 
       if (measureLayerGroup) {
         L.circleMarker([lat, lng], { radius: 4, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 1 }).addTo(measureLayerGroup);
@@ -119,20 +115,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Chế độ tra cứu mật độ hạ tầng tại vị trí
     if (state.isInspectMode) {
       handleInspectPointClick(e.latlng.lat, e.latlng.lng);
       return;
     }
   });
 
-  // 3. Bind sự kiện Toolbar & Zoom buttons
   document.getElementById('btnZoomIn')?.addEventListener('click', () => map.zoomIn());
   document.getElementById('btnZoomOut')?.addEventListener('click', () => map.zoomOut());
   document.getElementById('btnMeasureDist')?.addEventListener('click', () => toggleMeasure('distance'));
   document.getElementById('btnMeasureArea')?.addEventListener('click', () => toggleMeasure('area'));
 
-  // Tra cứu vị trí mode
   const btnInspectMode = document.getElementById('btnInspectMode');
   btnInspectMode?.addEventListener('click', () => {
     state.isInspectMode = !state.isInspectMode;
@@ -148,7 +141,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Thay đổi bán kính chung qua ô nhập số
   const inputIsoRadius = document.getElementById('inputIsoRadius');
   inputIsoRadius?.addEventListener('input', (e) => {
     state.globalBufferRadiusOverride = Number(e.target.value) || 500;
@@ -156,17 +148,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     refreshHeatmapOnly();
   });
 
-  // Độ trong suốt Heatmap
   const heatOpacity = document.getElementById('heatOpacity');
   heatOpacity?.addEventListener('input', () => refreshHeatmapOnly());
 
-  // Độ trong suốt Dân cư
   document.getElementById('popOpacity')?.addEventListener('input', (e) => {
     const val = e.target.value / 100;
     layers.pop.eachLayer(l => l.setOpacity && l.setOpacity(val));
   });
   
-  // Checkboxes Lớp dữ liệu
   const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'heat'];
   layerCheckboxes.forEach(key => {
     const el = document.getElementById(`chk_${key}`);
@@ -176,7 +165,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // Dots bật/tắt Buffer
   document.querySelectorAll('.btn-dot-buffer').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const bufferKey = e.target.getAttribute('data-buffer');
@@ -184,7 +172,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // BỘ LỌC ĐỊA BÀN (DROPDOWN)
   document.getElementById('wardSelector')?.addEventListener('change', async (e) => {
     state.selectedWard = e.target.value || null;
 
@@ -199,6 +186,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
+    const mapGroups = [layers.c1, layers.c2, layers.c3, layers.c4, layers.c5, layers.c6, layers.c7, layers.c8, layers.c9];
+
+    if (state.selectedWard === "Thành phố Huế") {
+      mapGroups.forEach(g => { if (map.hasLayer(g)) map.removeLayer(g); });
+      highlightWardBoundary(null);
+      refreshHeatmapOnly();
+      map.flyTo([16.4637, 107.5905], 12);
+      return;
+    } else {
+      mapGroups.forEach(g => { if (!map.hasLayer(g)) map.addLayer(g); });
+    }
+
     renderGroupedPoints();
     refreshHeatmapOnly();
     highlightWardBoundary(state.selectedWard);
@@ -211,7 +210,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   
-  // Sidebar Controls & Tabs
   const sidebarPanel = document.getElementById('sidebarPanel');
   document.getElementById('btnToggleSidebar')?.addEventListener('click', () => {
     sidebarPanel?.classList.toggle('closed');
@@ -239,9 +237,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     tabBtnLayers.classList.remove('active');
   });
 
-  // Modal & Dockbar Navigation
   document.getElementById('btnOpenCombinedModal')?.addEventListener('click', () => {
-    if (state.selectedWard) {
+    if (state.selectedWard && state.selectedWard !== "Thành phố Huế") {
       openWardDetailDirect(state.selectedWard);
     } else {
       openCombinedModal();
@@ -251,7 +248,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btnAuth')?.addEventListener('click', toggleAuthModal);
   document.getElementById('btnCloseAuthModal')?.addEventListener('click', toggleAuthModal);
 
-  // Thêm điểm mới Card Controls
   const addPointCard = document.getElementById('addPointCard');
   document.getElementById('btnToggleAddCard')?.addEventListener('click', () => {
     if (addPointCard) addPointCard.style.display = addPointCard.style.display === 'block' ? 'none' : 'block';
@@ -269,7 +265,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Submit Đề xuất Điểm mới
   document.getElementById('btnSubmitNewPoint')?.addEventListener('click', () => {
     const type = document.getElementById('newType')?.value;
     const name = document.getElementById('newName')?.value;
@@ -325,7 +320,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
   });
 
-  // 4. KHỞI TẠO: TẢI DỮ LIỆU TĨNH VÀ PRELOAD NGẦM
   try {
     const progressBar = document.getElementById('progressBar');
     const progressPercent = document.getElementById('progressPercent');
@@ -350,7 +344,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (progressBar) progressBar.style.width = "100%";
     if (progressPercent) progressPercent.innerText = "100%";
 
-    // PRELOAD NGẦM DỮ LIỆU HẠ TẦNG TĂNG TỐC TƯƠNG TÁC
     setTimeout(async () => {
       try {
         const res = await fetch('/api/gee');
