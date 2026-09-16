@@ -125,38 +125,33 @@ body, html {
   -moz-appearance: textfield;
 }
 
-/* ICON HẠ TẦNG - HÌNH GHIM CÓ CHÓP NHỌN Ở ĐÁY */
+/* ICON HẠ TẦNG - KHUNG GHIM BẢN ĐỒ CHUẨN SVG */
 .custom-infra-icon {
   display: flex; 
   align-items: center; 
   justify-content: center;
-  background: rgba(15, 23, 42, 0.95); 
-  border: 2px solid var(--accent-cyan);
-  /* Bo tròn các góc trên, thắt nhọn góc dưới chính giữa để tạo hình chóp đáy */
-  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-  transform: none; /* Không xoay */
-  box-shadow: 0 4px 12px rgba(0,0,0,0.6); 
+  background: transparent;
+  position: relative;
   transition: all 0.2s ease;
 }
 
-.custom-infra-icon > div {
-  transform: none; /* Không xoay phần nội dung bên trong */
+/* Định vị biểu tượng vector nằm chính xác vào phần tròn phía trên của ghim */
+.custom-infra-icon .pin-inner-icon {
+  position: absolute;
+  top: 5px; 
+  left: 50%;
+  transform: translateX(-50%);
   display: flex; 
   align-items: center; 
   justify-content: center;
-  width: 100%;
-  height: 100%;
 }
 
 .custom-infra-icon:hover { 
   transform: scale(1.25); 
   z-index: 1000 !important; 
-  border-color: #fff; 
 }
 
 .custom-infra-icon.pending-border { 
-  border: 2px dashed var(--accent-red) !important; 
-  background: rgba(239, 68, 68, 0.25) !important; 
   animation: alertPulse 2s infinite ease-in-out; 
 }
 
