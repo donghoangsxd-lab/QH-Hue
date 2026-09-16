@@ -1,31 +1,32 @@
 const axios = require('axios');
 const constants = require('../config/constants');
-const { initGEE, getGeeContext } = require('../services/geeService');
+const { initGEE, getGeeContext, buildEeIsochroneGeometry } = require('../services/geeService');
 const { getRawDataList, invalidateCache } = require('../services/gcsService');
 
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
 
 // ==========================================
-// HELPER: TÍNH ISOCHRONE GIAO THÔNG CHO 1 ĐIỂM
+// HELPER: TÍNH ISOCHRONE GIAO THÔNG (HYBRID OSRM + GEE FALLBACK)
 // ==========================================
 async function calculateNetworkIsochrone(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
   const reachRatio = constants.ISOCHRONE_CONFIG?.REACH_RATIO || 0.9;
-  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 16;
+  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 12;
   const maxReachKm = (R * reachRatio) / 1000;
   const angleStep = 360 / sampleAngles;
   
   const angles = Array.from({ length: sampleAngles }, (_, i) => i * angleStep);
 
-  const distancePromises = angles.map(async (angle) => {
-    const rad = (angle * Math.PI) / 180;
-    const destLat = lat + (maxReachKm / 111) * Math.cos(rad);
-    const destLng = lng + (maxReachKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
-    
-    try {
+  try {
+    // Timeout nhanh 1.2s để tránh treo Vercel Serverless Function
+    const distancePromises = angles.map(async (angle) => {
+      const rad = (angle * Math.PI) / 180;
+      const destLat = lat + (maxReachKm / 111) * Math.cos(rad);
+      const destLng = lng + (maxReachKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
+      
       const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=false`;
-      const res = await axios.get(osrmUrl, { timeout: 2000 });
+      const res = await axios.get(osrmUrl, { timeout: 1200 });
       
       if (res.data && res.data.routes && res.data.routes[0]) {
         const route = res.data.routes[0];
@@ -34,41 +35,55 @@ async function calculateNetworkIsochrone(lat, lng, banKinh) {
         }
         return Math.min(maxReachKm, (route.distance / 1000));
       }
-    } catch (e) {}
-    
-    return maxReachKm * 0.45;
-  });
+      return maxReachKm * 0.45;
+    });
 
-  const rawDistances = await Promise.all(distancePromises);
+    const rawDistances = await Promise.all(distancePromises);
 
-  const smoothedDistances = [];
-  const n = rawDistances.length;
-  for (let i = 0; i < n; i++) {
-    const prev = rawDistances[(i - 1 + n) % n];
-    const curr = rawDistances[i];
-    const next = rawDistances[(i + 1) % n];
-    const smoothVal = (prev + curr * 2 + next) / 4;
-    smoothedDistances.push(smoothVal);
+    const smoothedDistances = [];
+    const n = rawDistances.length;
+    for (let i = 0; i < n; i++) {
+      const prev = rawDistances[(i - 1 + n) % n];
+      const curr = rawDistances[i];
+      const next = rawDistances[(i + 1) % n];
+      smoothedDistances.push((prev + curr * 2 + next) / 4);
+    }
+
+    const polygonCoordinates = [];
+    angles.forEach((angle, idx) => {
+      const rad = (angle * Math.PI) / 180;
+      const distKm = smoothedDistances[idx];
+      const pLat = lat + (distKm / 111) * Math.cos(rad);
+      const pLng = lng + (distKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
+      polygonCoordinates.push([pLng, pLat]);
+    });
+
+    if (polygonCoordinates.length > 0) {
+      polygonCoordinates.push(polygonCoordinates[0]);
+    }
+
+    return {
+      type: 'Polygon',
+      coordinates: [polygonCoordinates]
+    };
+
+  } catch (err) {
+    // FALLBACK GEE: Tự động chuyển sang mô hình hình học mượt mà trên GEE khi OSRM lỗi/timeout
+    const fallbackGeom = buildEeIsochroneGeometry(lat, lng, R);
+    const geoJsonGeom = await new Promise((resolve) => {
+      fallbackGeom.evaluate((g) => resolve(g));
+    });
+    return geoJsonGeom || {
+      type: 'Polygon',
+      coordinates: [[
+        [lng, lat + maxReachKm/111],
+        [lng + maxReachKm/111, lat],
+        [lng, lat - maxReachKm/111],
+        [lng - maxReachKm/111, lat],
+        [lng, lat + maxReachKm/111]
+      ]]
+    };
   }
-
-  const polygonCoordinates = [];
-  angles.forEach((angle, idx) => {
-    const rad = (angle * Math.PI) / 180;
-    const distKm = smoothedDistances[idx];
-    
-    const pLat = lat + (distKm / 111) * Math.cos(rad);
-    const pLng = lng + (distKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
-    polygonCoordinates.push([pLng, pLat]);
-  });
-
-  if (polygonCoordinates.length > 0) {
-    polygonCoordinates.push(polygonCoordinates[0]);
-  }
-
-  return {
-    type: 'Polygon',
-    coordinates: [polygonCoordinates]
-  };
 }
 
 // ==========================================
@@ -87,7 +102,6 @@ module.exports = async (req, res) => {
   try {
     const action = req.query.action || 'getInitData';
 
-    // 1. TÍNH ISOCHRONE MẠNG LƯỚI GIAO THÔNG (DÙNG CHO HIGHLIGHT VÀ HEATMAP)
     if (action === 'getIsochrone') {
       const { features } = req.body || {};
       if (!features || !Array.isArray(features)) {
@@ -129,7 +143,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 2. ĐỒNG BỘ ĐIỂM SANG GOOGLE SHEETS VIA GAS
     if (action === 'addPoint') {
       const { type, name, ward, lat, lng, size } = req.query;
       if (!type || !name || !lat || !lng) {
@@ -165,7 +178,6 @@ module.exports = async (req, res) => {
     const { ee, wardVectorParsed, popRasterNormalized, wardRegion } = getGeeContext();
     const rawDataList = await getRawDataList();
 
-    // 3. TÍNH DÂN SỐ PHỤC VỤ TẠI ĐIỂM
     if (action === 'analyzePoint') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -187,8 +199,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ servedPop });
     }
 
-    // 4. ĐỘ PHỦ HEATMAP TILE (Đồng bộ tuyệt đối tính theo mạng lưới giao thông OSRM)
-        if (action === 'getHeatmapTile') {
+    if (action === 'getHeatmapTile') {
       const { features } = req.body || {};
       const categoryImageLayers = [];
       const codes = constants.CODES_TO_CHECK;
@@ -223,7 +234,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // 5. PHÂN TÍCH QUỸ ĐẤT CHUYỂN ĐỔI CÔNG NĂNG (CSD)
     if (action === 'analyzeCSD') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -335,7 +345,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
-    // 6. THỐNG KÊ MA TRẬN 40 PHƯỜNG XÃ
     if (action === 'getWardStats') {
       const now = Date.now();
       if (cachedWardStats && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)) {
@@ -427,7 +436,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ data: resultTable });
     }
 
-    // 7. XÁC ĐỊNH PHƯỜNG XÃ TỪ TỌA ĐỘ
     if (action === 'getWardFromPoint') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -449,7 +457,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ward: wardData });
     }
 
-    // 8. TIỆN ÍCH RASTERS (DÂN SỐ & RANH GIỚI)
     if (action === 'getPopRasterTile') {
       res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
       const mapId = await new Promise((resolve, reject) => {
@@ -470,7 +477,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // 9. TÊN & TÂM (CENTROID) CỦA 40 PHƯỜNG XÃ - PHỤC VỤ VẼ NHÃN TRÊN BẢN ĐỒ
     if (action === 'getWardLabels') {
       res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
 
