@@ -247,24 +247,25 @@ export function renderGroupedPoints() {
     const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
     const fillColor = isApproved ? baseColor : 'rgba(239, 68, 68, 0.4)';
 
-    // Biểu tượng Y tế (6-YT) hoặc các icon khác hiển thị màu trắng nổi bật ở tâm
-    let innerSymbolHtml = `<text x="12" y="10.5" font-size="12.5px" text-anchor="middle" dominant-baseline="central" fill="#ffffff">${cfg.symbol}</text>`;
+    // Xử lý biểu tượng bên trong: Nếu là y tế dùng dấu cộng vector chuẩn đẹp tuyệt đối, các loại khác dùng emoji/symbol
+    let innerSymbolHtml = `<text x="12" y="10.5" font-size="12px" text-anchor="middle" dominant-baseline="central" fill="#ffffff">${cfg.symbol}</text>`;
     if (p.type === "6-YT") {
-      innerSymbolHtml = `<path d="M14 9h-3V6c0-.55-.45-1-1-1s-1 .45-1 1v3H7c-.55 0-1 .45-1 1s.45 1 1 1h3v3c0 .55.45 1 1 1s1-.45 1-1v-3h3c.55 0 1-.45 1-1s-.45-1-1-1z" fill="#ffffff" transform="scale(0.85) translate(1, 1)"/>`;
+      // Dấu cộng y tế chuẩn SVG đối xứng, không bị lệch
+      innerSymbolHtml = `<path d="M13.5 8.5H15c.55 0 1 .45 1 1s-.45 1-1 1h-1.5V12c0 .55-.45 1-1 1s-1-.45-1-1v-1.5H9.5c-.55 0-1-.45-1-1s.45-1 1-1H11.5V7c0-.55.45-1 1-1s1 .45 1 1v1.5z" fill="#ffffff"/>`;
     }
 
-    // Đường dẫn SVG path tạo hình ghim dạng tròn phình to ở nửa trên và thắt nhọn ở đáy (rất dễ căn chỉnh icon)
+    // Path chuẩn mẫu huy hiệu tròn to phần đầu, thon nhọn ở chân + lỗ khoét tròn rỗng ở tâm
     const svgPinHtml = `
-      <svg width="52" height="64" viewBox="0 0 24 34" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.6)); overflow: visible;">
-        <!-- Path ghim dáng tròn to phần đầu, nhọn ở chân + khoét lỗ tròn rỗng ở tâm để thấy icon/xuyên thấu -->
-        <path d="M12 1C6.48 1 2 5.48 2 11c0 5.25 10 21 10 21s10-15.75 10-21c0-5.52-4.48-10-10-10zm0 14c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z" 
+      <svg width="52" height="64" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.6)); overflow: visible;">
+        <!-- Khung ghim dạng tròn phình to ở trên, thuôn bầu nhẹ xuống đáy -->
+        <path d="M12 2C7.03 2 3 6.03 3 11c0 4.5 9 19 9 19s9-14.5 9-19c0-4.97-4.03-9-9-9zm0 13.5c-2.48 0-4.5-2.02-4.5-4.5s2.02-4.5 4.5-4.5 4.5 2.02 4.5 4.5-2.02 4.5-4.5 4.5z" 
               fill="${fillColor}" 
               stroke="${strokeColor}" 
               stroke-width="1.5" 
               fill-rule="evenodd"
               ${strokeDash}/>
         
-        <!-- Biểu tượng căn chuẩn ngay ngắn tại tâm phần đầu tròn to -->
+        <!-- Biểu tượng đặt chuẩn ngay ngắn tại tâm phần đầu tròn -->
         ${innerSymbolHtml}
       </svg>
     `;
@@ -273,7 +274,7 @@ export function renderGroupedPoints() {
       className: 'custom-infra-icon-svg',
       html: svgPinHtml,
       iconSize: [52, 64], 
-      iconAnchor: [26, 64] // Mỏ neo chuẩn xác tại chóp nhọn ở đáy
+      iconAnchor: [26, 32] // Mỏ neo chuẩn xác tại chóp nhọn phía đáy ghim
     });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
