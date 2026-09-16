@@ -35,9 +35,12 @@ function isPointInWardGeometry(lat, lng, geometry) {
 }
 
 function getWardFilteredList(sourceList) {
+  // Nếu chưa chọn phường hoặc chọn toàn bộ Thành phố Huế thì trả về toàn bộ danh sách
   if (!state.selectedWard || state.selectedWard === "Thành phố Huế") return sourceList;
+  
   const wardInfo = state.wardLabelsList.find(w => w.name === state.selectedWard);
   if (!wardInfo || !wardInfo.geometry) return sourceList;
+  
   return sourceList.filter(p => isPointInWardGeometry(p.lat, p.lng, wardInfo.geometry));
 }
 
