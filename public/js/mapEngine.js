@@ -247,21 +247,21 @@ export function renderGroupedPoints() {
     const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
     const fillColor = isApproved ? baseColor : 'rgba(239, 68, 68, 0.2)';
 
-    // Đã tăng kích thước lên 20% (width: 44, height: 54), viewBox tương ứng 24 x 36
+    // Khung ghim phóng to kích thước 44x54, tâm hình tròn trắng đặt tại cy="10"
     const svgPinHtml = `
       <svg width="44" height="54" viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.6)); overflow: visible;">
-        <!-- Khung ghim giọt nước ngược phóng to -->
+        <!-- Khung ghim giọt nước ngược -->
         <path d="M12 2C7.58 2 4 5.58 4 10c0 6 8 18 8 18s8-12 8-18c0-4.42-3.58-8-8-8z" 
               fill="${fillColor}" 
               stroke="${strokeColor}" 
               stroke-width="1.6" 
               ${strokeDash}/>
         
-        <!-- Vòng tròn nền trắng mở rộng ở tâm (r = 6.2) -->
+        <!-- Vòng tròn nền trắng ở tâm (cy="10", r="6.2") -->
         <circle cx="12" cy="10" r="6.2" fill="#ffffff" stroke="${strokeColor}" stroke-width="0.8"/>
         
-        <!-- Biểu tượng từ chú giải được căn chuẩn tuyệt đối vào tâm vòng tròn trắng lớn -->
-        <text x="12" y="12.2" font-size="12.5px" text-anchor="middle" dominant-baseline="central">${cfg.symbol}</text>
+        <!-- Đã dịch chuyển biểu tượng lên phía trên (y="9.8") để nằm chuẩn chính xác vào tâm hình tròn trắng cho mọi loại icon -->
+        <text x="12" y="9.8" font-size="12px" text-anchor="middle" dominant-baseline="central">${cfg.symbol}</text>
       </svg>
     `;
 
@@ -269,7 +269,7 @@ export function renderGroupedPoints() {
       className: 'custom-infra-icon-svg',
       html: svgPinHtml,
       iconSize: [44, 54], 
-      iconAnchor: [22, 54] // Mỏ neo dịch chuyển tương ứng theo kích thước mới (chóp nhọn ở đáy)
+      iconAnchor: [22, 54] // Mỏ neo chuẩn xác tại chóp nhọn phía đáy ghim
     });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
