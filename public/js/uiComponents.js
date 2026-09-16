@@ -144,15 +144,43 @@ export function closeModal() {
 }
 
 export async function openWardDetailDirect(wardName) {
-  // 1. Mở ngay lập tức popup giao diện kèm khung tiến trình chờ (giống bảng tổng hợp) để người dùng biết đang tải
-  const initialModalHtml = `<div class="ward-popup-card" style="min-width: 450px; text-align: center; padding: 20px;">
-    <b style="font-size:13px; color:var(--accent-cyan);">📍 ĐANG TẢI DỮ LIỆU QUY CHUẨN: ${wardName.toUpperCase()}</b><br><br>
-    <div style="width: 100%;" class="progress-bar-bg"><div class="progress-bar-fill" id="wardDetailProgressBar" style="width: 0%;"></div></div>
-    <span id="wardDetailProgressText" style="font-size:11px; font-weight:bold; color:var(--accent-orange); margin-top: 8px; display:inline-block;">0%</span>
-  </div>`;
-
   const firstPoint = state.wardLabelsList.find(w => w.name === wardName) || { lat: 16.4637, lng: 107.5905 };
   if (map) map.flyTo([firstPoint.lat, firstPoint.lng], 14);
+
+  // 1. Tạo sẵn khung giao diện chuẩn và HEADER ngay lập tức, kèm thanh progress bar nằm đúng góc trên bên phải (cạnh nút X)
+  const initialModalHtml = `<div class="ward-popup-card" style="min-width: 620px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
+      <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH HẠ TẦNG QUY CHUẨN: ${wardName.toUpperCase()}</b>
+      
+      <!-- Thanh tiến trình nằm ở góc trên bên phải, cạnh nút X -->
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="width:100px;" class="progress-bar-bg"><div class="progress-bar-fill" id="wardDetailProgressBar" style="width: 5%;"></div></div>
+        <span id="wardDetailProgressText" style="font-size:10.5px; font-weight:bold; color:var(--accent-orange);">5%</span>
+      </div>
+    </div>
+
+    <div style="background:rgba(15, 23, 42, 0.8); border:1px solid var(--border-color); padding:6px; border-radius:6px; margin:6px 0; font-size:11px;">
+      👥 Dân số hiện trạng & Dự báo: Đang khởi tạo...
+    </div>
+
+    <div id="wardQuotaTableContainer">
+      <table class="ward-table">
+        <thead>
+          <tr>
+            <th style="width:28px;">STT</th>
+            <th style="width:160px; text-align:left;">Loại hạ tầng / Công trình</th>
+            <th style="width:80px; text-align:right;">Hiện trạng</th>
+            <th style="width:55px;">Chỉ tiêu</th>
+            <th style="width:85px; text-align:right;">Nhu cầu DT</th>
+            <th style="width:125px;">Đánh giá</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="6" style="text-align:center; padding:25px; color:var(--accent-orange);">⏳ Đang tổng hợp dữ liệu không gian và phân tích quy chuẩn (Vui lòng chờ khoảng 10 - 20 giây)...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>`;
 
   const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 660 })
     .setLatLng([firstPoint.lat, firstPoint.lng])
@@ -160,20 +188,21 @@ export async function openWardDetailDirect(wardName) {
   
   detailPopup.openOn(map);
 
-  // 2. Chạy thanh tiến trình giả lập mượt mà để thông báo người dùng đang xử lý
-  let pStep = 0;
+  // 2. Chạy thanh tiến trình mô phỏng chậm rãi kéo dài trong khoảng 15 giây đúng thực tế xử lý
+  let pStep = 5;
   const pInterval = setInterval(() => {
-    pStep += 10;
-    if (pStep <= 90) {
+    if (pStep < 92) {
+      // Tăng đều đặn để đạt khoảng 90% trong vòng ~15 giây
+      pStep += 2; 
       const bar = document.getElementById('wardDetailProgressBar');
       const txt = document.getElementById('wardDetailProgressText');
       if (bar) bar.style.width = pStep + "%";
       if (txt) txt.innerText = pStep + "%";
     }
-  }, 100);
+  }, 350);
 
   try {
-    // 3. Gọi API lấy dữ liệu ngầm (có cache phía server nên rất nhanh)
+    // 3. Gọi API lấy dữ liệu ngầm từ Server
     const res = await fetch('/api/gee?action=getWardStats');
     const resData = await res.json();
     
@@ -185,15 +214,15 @@ export async function openWardDetailDirect(wardName) {
 
     state.wardStatsData = resData.data || [];
     
-    // 4. Sau khi có dữ liệu, vẽ lại nội dung chi tiết thực tế của phường
+    // 4. Sau khi hoàn tất tải dữ liệu, render nội dung thân bảng thật
     setTimeout(() => {
       selectWardDetail(wardName);
-    }, 200);
+    }, 400);
 
   } catch (err) {
     clearInterval(pInterval);
     console.error("Lỗi tải thống kê hạ tầng phường:", err);
-    const container = document.querySelector('.ward-popup-card');
+    const container = document.getElementById('wardQuotaTableContainer');
     if (container) {
       container.innerHTML = `<div style="color:var(--accent-red); padding:15px; text-align:center;">❌ Không thể tải dữ liệu quy chuẩn cho ${wardName}. Vui lòng thử lại.</div>`;
     }
