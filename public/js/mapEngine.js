@@ -237,43 +237,37 @@ export function renderGroupedPoints() {
 
   const sourceList = getWardFilteredList(state.rawDataList);
 
+  // Từ điển ánh xạ file PNG gốc (Đã duyệt) và file viền đỏ (Chưa duyệt) khớp 100% với GitHub
+  const iconFiles = {
+    "1-CV": { approved: "Park.png", pending: "Park2.png" },
+    "2-BDX": { approved: "Parking.png", pending: "Parking2.png" },
+    "3-MN": { approved: "Mamnon.png", pending: "Mamnon2.png" },
+    "4-TH": { approved: "Tieuhoc.png", pending: "Tieuhoc2.png" },
+    "5-THCS": { approved: "THCS.png", pending: "THCS2.png" },
+    "6-YT": { approved: "Yte.png", pending: "Yte2.png" },
+    "7-VH": { approved: "Vanhoa.png", pending: "Vanhoa2.png" },
+    "8-TM": { approved: "Cho.png", pending: "Cho2.png" },
+    "9-CSD": { approved: "Unused.png", pending: "Unused2.png" } // Quỹ đất tiềm năng
+  };
+
   sourceList.forEach(p => {
     const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
-    const cfg = infraIcons[p.type] || { symbol: "🏢" };
     const targetGroup = mapGroups[p.type] || layers.c9;
+    
+    const categoryIcons = iconFiles[p.type] || { approved: "Park.png", pending: "Park2.png" };
+    const fileName = isApproved ? categoryIcons.approved : categoryIcons.pending;
 
-    const pinFillColor = '#1e3a8a'; 
-    const strokeColor = isApproved ? '#ffffff' : '#f87171'; 
-    const strokeDash = isApproved ? '' : 'stroke-dasharray="2,2"';
-    const strokeWidth = isApproved ? '0.8' : '1.5';
+    // Đường dẫn trỏ trực tiếp đến thư mục icons
+    const iconUrl = `./icons/${fileName}`;
 
-    // Đã thu nhỏ toàn bộ SVG (width: 32, height: 39 - tương đương 2/3 kích thước cũ) với hệ tọa độ viewBox tỷ lệ chuẩn
-    const svgPinHtml = `
-      <svg width="32" height="39" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 3px 4px rgba(0,0,0,0.5)); overflow: visible;">
-        <!-- Khung ghim giọt nước thu nhỏ đều -->
-        <path d="M 12 1 
-                 C 7.03 1, 3 5.03, 3 10 
-                 C 3 15, 12 30, 12 30 
-                 C 12 30, 21 15, 21 10 
-                 C 21 5.03, 16.97 1, 12 1 Z" 
-              fill="${pinFillColor}" 
-              stroke="${strokeColor}" 
-              stroke-width="${strokeWidth}" 
-              ${strokeDash}/>
-        
-        <!-- Vòng tròn nền trắng ở tâm được thu nhỏ cân đối (r=4.8) -->
-        <circle cx="12" cy="10" r="4.8" fill="#ffffff" stroke="none"/>
-        
-        <!-- Biểu tượng từ Bảng Chú Giải thu nhỏ vừa vặn (font-size: 8px) tuyệt đối không tràn viền -->
-        <text x="12" y="10.5" font-size="8px" text-anchor="middle" dominant-baseline="central">${cfg.symbol || '🏢'}</text>
-      </svg>
-    `;
+    // Kích thước chuẩn gọn gàng 22x27px kèm hiệu ứng bóng đổ sắc nét
+    const imgHtml = `<img src="${iconUrl}" style="width: 22px; height: 27px; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.5));" />`;
 
     const customDivIcon = L.divIcon({
-      className: 'custom-infra-icon-v2',
-      html: svgPinHtml,
-      iconSize: [32, 39], 
-      iconAnchor: [16, 39] // Mỏ neo căn chuẩn tại chóp nhọn phía đáy theo kích thước mới
+      className: 'custom-infra-icon-png',
+      html: imgHtml,
+      iconSize: [22, 27], 
+      iconAnchor: [11, 27] // Mỏ neo căn chuẩn tại chóp nhọn phía đáy ghim
     });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
