@@ -264,11 +264,11 @@ export function renderGroupedPoints() {
     const imgHtml = `<img src="${iconUrl}" style="width: 22px; height: 27px; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.5));" />`;
 
     const customDivIcon = L.divIcon({
-      className: 'custom-infra-icon-png',
-      html: imgHtml,
-      iconSize: [22, 27], 
-      iconAnchor: [11, 27] // Mỏ neo căn chuẩn tại chóp nhọn phía đáy ghim
-    });
+  className: 'custom-infra-icon-png',
+  html: imgHtml,
+  iconSize: [26, 32],      // Tăng khoảng 20%
+  iconAnchor: [13, 32]     // Neo tại tâm đáy mới
+});
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
     marker.on('click', () => onPointClick(p, marker));
