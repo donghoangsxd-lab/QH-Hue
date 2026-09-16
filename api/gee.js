@@ -7,52 +7,44 @@ let cachedWardStats = null;
 let lastWardStatsFetch = 0;
 
 // ==========================================
-// HELPER: TÍNH ISOCHRONE GIAO THÔNG (HYBRID OSRM + GEE FALLBACK)
+// HELPER: TÍNH ISOCHRONE GIAO THÔNG (AN TOÀN CHỐNG LỖI 500)
 // ==========================================
 async function calculateNetworkIsochrone(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
   const reachRatio = constants.ISOCHRONE_CONFIG?.REACH_RATIO || 0.9;
-  const sampleAngles = constants.ISOCHRONE_CONFIG?.SAMPLE_ANGLES || 12;
+  const sampleAngles = 8; // Giảm xuống 8 hướng để tăng tốc độ xử lý hàng loạt, chống nghẽn mạng
   const maxReachKm = (R * reachRatio) / 1000;
   const angleStep = 360 / sampleAngles;
   
   const angles = Array.from({ length: sampleAngles }, (_, i) => i * angleStep);
 
   try {
-    // Timeout nhanh 1.2s để tránh treo Vercel Serverless Function
     const distancePromises = angles.map(async (angle) => {
       const rad = (angle * Math.PI) / 180;
       const destLat = lat + (maxReachKm / 111) * Math.cos(rad);
       const destLng = lng + (maxReachKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
       
-      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=false`;
-      const res = await axios.get(osrmUrl, { timeout: 1200 });
-      
-      if (res.data && res.data.routes && res.data.routes[0]) {
-        const route = res.data.routes[0];
-        if (route.distance > R * 1.3) {
-          return maxReachKm * 0.4;
+      try {
+        const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=false`;
+        const res = await axios.get(osrmUrl, { timeout: 800 }); // Timeout nhanh 800ms
+        
+        if (res.data && res.data.routes && res.data.routes[0]) {
+          const route = res.data.routes[0];
+          if (route.distance > R * 1.3) return maxReachKm * 0.4;
+          return Math.min(maxReachKm, (route.distance / 1000));
         }
-        return Math.min(maxReachKm, (route.distance / 1000));
+      } catch (e) {
+        // Bỏ qua lỗi từng hướng nhỏ để dùng fallback hình học
       }
       return maxReachKm * 0.45;
     });
 
     const rawDistances = await Promise.all(distancePromises);
 
-    const smoothedDistances = [];
-    const n = rawDistances.length;
-    for (let i = 0; i < n; i++) {
-      const prev = rawDistances[(i - 1 + n) % n];
-      const curr = rawDistances[i];
-      const next = rawDistances[(i + 1) % n];
-      smoothedDistances.push((prev + curr * 2 + next) / 4);
-    }
-
     const polygonCoordinates = [];
     angles.forEach((angle, idx) => {
       const rad = (angle * Math.PI) / 180;
-      const distKm = smoothedDistances[idx];
+      const distKm = rawDistances[idx];
       const pLat = lat + (distKm / 111) * Math.cos(rad);
       const pLng = lng + (distKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
       polygonCoordinates.push([pLng, pLat]);
@@ -68,20 +60,20 @@ async function calculateNetworkIsochrone(lat, lng, banKinh) {
     };
 
   } catch (err) {
-    // FALLBACK GEE: Tự động chuyển sang mô hình hình học mượt mà trên GEE khi OSRM lỗi/timeout
-    const fallbackGeom = buildEeIsochroneGeometry(lat, lng, R);
-    const geoJsonGeom = await new Promise((resolve) => {
-      fallbackGeom.evaluate((g) => resolve(g));
-    });
-    return geoJsonGeom || {
+    // Fallback hình học an toàn, trả về hình tròn xấp xỉ dạng đa giác lập tức
+    const fallbackCoords = [];
+    for (let i = 0; i < 12; i++) {
+      const angle = (i * 360) / 12;
+      const rad = (angle * Math.PI) / 180;
+      fallbackCoords.push([
+        lng + (maxReachKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad),
+        lat + (maxReachKm / 111) * Math.cos(rad)
+      ]);
+    }
+    fallbackCoords.push(fallbackCoords[0]);
+    return {
       type: 'Polygon',
-      coordinates: [[
-        [lng, lat + maxReachKm/111],
-        [lng + maxReachKm/111, lat],
-        [lng, lat - maxReachKm/111],
-        [lng - maxReachKm/111, lat],
-        [lng, lat + maxReachKm/111]
-      ]]
+      coordinates: [fallbackCoords]
     };
   }
 }
