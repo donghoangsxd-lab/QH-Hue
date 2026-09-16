@@ -504,14 +504,43 @@ export async function loadPopulationLayer() {
 }
 
 export async function handleInspectPointClick(clickLat, clickLng) {
-  const checkRadius = state.globalBufferRadiusOverride || 500;
+  if (!map) return;
+  const checkRadius = state.globalBufferRadiusOwner || state.globalBufferRadiusOverride || 500;
   
   if (state.tempMarker) map.removeLayer(state.tempMarker);
   state.tempMarker = L.marker([clickLat, clickLng]).addTo(map);
 
+  // 1. Dựng khung giao diện popup ngay lập tức kèm thanh tiến trình chờ tải
+  let initialHtml = `<div style="min-width:260px; font-size:11px;">`;
+  initialHtml += `<b style="color:var(--accent-cyan); font-size:12px;">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ TRA CỨU</b><br>`;
+  initialHtml += `<span style="color:var(--text-muted);">📍 Tọa độ: ${clickLat.toFixed(5)}, ${clickLng.toFixed(5)} | 🛤️ Bán kính chuẩn: <b style="color:var(--accent-green);">${checkRadius}m</b></span><br>`;
+  
+  // Khung tiến trình động
+  initialHtml += `<div id="inspectLoadContainer" style="margin-top:6px; padding:6px; background:rgba(15,23,42,0.6); border-radius:6px; border:1px solid var(--border-color);">
+    <div style="font-size:10.5px; color:var(--accent-orange); font-weight:bold; margin-bottom:4px;">⏳ Đang quét không gian vùng phục vụ...</div>
+    <div class="progress-bar-bg" style="width:100%; background:rgba(255,255,255,0.1); height:5px; border-radius:3px; overflow:hidden;"><div class="progress-bar-fill" id="inspectProgressBar" style="width:30%; height:100%; background:var(--accent-cyan);"></div></div>
+  </div>`;
+  initialHtml += `</div>`;
+
+  // Mở popup ngay lập tức
+  const popup = L.popup({ closeButton: true, autoPan: true })
+    .setLatLng([clickLat, clickLng])
+    .setContent(initialHtml);
+  popup.openOn(map);
+
+  // Hiệu ứng thanh tiến trình chạy giả lập mượt mà
+  let pVal = 30;
+  const pInterval = setInterval(() => {
+    if (pVal < 85) {
+      pVal += 15;
+      const bar = document.getElementById('inspectProgressBar');
+      if (bar) bar.style.width = pVal + "%";
+    }
+  }, 100);
+
+  // 2. Thực hiện các tác vụ tính toán ngầm phía sau
   const coveredGroups = {};
   const missingCodes = [];
-
   const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
   
   const activeItems = state.rawDataList.filter(item => {
@@ -526,7 +555,7 @@ export async function handleInspectPointClick(clickLat, clickLng) {
       body: JSON.stringify({ 
         features: activeItems.map(item => ({
           ...item,
-          radius: state.globalBufferRadiusOverride || Number(item.radius) || Number(item.banKinh) || 500
+          radius: checkRadius
         }))
       })
     });
@@ -538,13 +567,15 @@ export async function handleInspectPointClick(clickLat, clickLng) {
         const code = feat.properties.type;
         const name = feat.properties.name;
         if (feat.geometry) {
-          const polyFeature = turf.polygon(feat.geometry.coordinates);
-          if (turf.booleanPointInPolygon(clickPointGeo, polyFeature)) {
-            if (!coveredGroups[code]) coveredGroups[code] = [];
-            if (!coveredGroups[code].includes(name)) {
-              coveredGroups[code].push(name);
+          try {
+            const polyFeature = turf.polygon(feat.geometry.coordinates);
+            if (turf.booleanPointInPolygon(clickPointGeo, polyFeature)) {
+              if (!coveredGroups[code]) coveredGroups[code] = [];
+              if (!coveredGroups[code].includes(name)) {
+                coveredGroups[code].push(name);
+              }
             }
-          }
+          } catch (e) {}
         }
       });
     }
@@ -559,47 +590,53 @@ export async function handleInspectPointClick(clickLat, clickLng) {
   const coveredCount = Object.keys(coveredGroups).length;
   const missingCount = missingCodes.length;
 
-  fetch(`/api/gee?action=getWardFromPoint&lat=${clickLat.toFixed(6)}&lng=${clickLng.toFixed(6)}`)
-    .then(r => r.json())
-    .then(resWard => {
-      const wardName = resWard.ward || "Thuận Hóa";
+  try {
+    const wardRes = await fetch(`/api/gee?action=getWardFromPoint&lat=${clickLat.toFixed(6)}&lng=${clickLng.toFixed(6)}`);
+    const resWard = await wardRes.json();
+    
+    clearInterval(pInterval);
+    const wardName = resWard.ward || "Thuận Hóa";
 
-      let resultHtml = `<div style="font-size:11px;">
-        <b style="color:var(--accent-cyan);">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ</b><br>
-        <span style="color:var(--text-muted);">📍 Địa bàn: <b>Phường/Xã ${wardName}</b> | 🛤️ Bán kính chuẩn: <b style="color:var(--accent-green);">${checkRadius}m</b></span><br>
+    let resultHtml = `<div style="font-size:11px; min-width:260px;">
+      <b style="color:var(--accent-cyan); font-size:12px;">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ TRA CỨU</b><br>
+      <span style="color:var(--text-muted);">📍 Địa bàn: <b>Phường/Xã ${wardName}</b> | 🛤️ Bán kính chuẩn: <b style="color:var(--accent-green);">${checkRadius}m</b></span><br>
 
-        <div style="font-weight:bold; color:var(--accent-green); margin-top:6px;">
-          1. Tiếp cận: ${coveredCount}/8 nhóm
-        </div>`;
-
-      if (coveredCount > 0) {
-        Object.keys(coveredGroups).forEach(code => {
-          const names = coveredGroups[code].join(', ');
-          resultHtml += `<div class="sug-card">• <b>${infraLabels[code] || code}:</b><br><span style="color:var(--accent-cyan);">└ ${names}</span></div>`;
-        });
-      } else {
-        resultHtml += `<div class="sug-card ineligible">(Chưa có hạ tầng phủ đến)</div>`;
-      }
-
-      resultHtml += `<div style="font-weight:bold; color:var(--accent-red); margin-top:6px;">
-        2. Chưa tiếp cận: ${missingCount}/8 nhóm
+      <div style="font-weight:bold; color:var(--accent-green); margin-top:6px;">
+        1. Tiếp cận: ${coveredCount}/8 nhóm
       </div>`;
 
-      if (missingCount > 0) {
-        missingCodes.forEach(code => {
-          resultHtml += `<div class="sug-card ineligible">❌ ${infraLabels[code] || code}</div>`;
-        });
-      } else {
-        resultHtml += `<div class="sug-card priority">✓ Vị trí tiếp cận đủ 8 nhóm hạ tầng!</div>`;
-      }
+    if (coveredCount > 0) {
+      Object.keys(coveredGroups).forEach(code => {
+        const names = coveredGroups[code].join(', ');
+        resultHtml += `<div class="sug-card">• <b>${infraLabels[code] || code}:</b><br><span style="color:var(--accent-cyan);">└ ${names}</span></div>`;
+      });
+    } else {
+      resultHtml += `<div class="sug-card ineligible">(Chưa có hạ tầng phủ đến)</div>`;
+    }
 
-      resultHtml += `</div>`;
-      
-      L.popup({ closeButton: true, autoPan: true })
-        .setLatLng([clickLat, clickLng])
-        .setContent(resultHtml)
-        .openOn(map);
-    });
+    resultHtml += `<div style="font-weight:bold; color:var(--accent-red); margin-top:6px;">
+      2. Chưa tiếp cận: ${missingCount}/8 nhóm
+    </div>`;
+
+    if (missingCount > 0) {
+      missingCodes.forEach(code => {
+        resultHtml += `<div class="sug-card ineligible">❌ ${infraLabels[code] || code}</div>`;
+      });
+    } else {
+      resultHtml += `<div class="sug-card priority">✓ Vị trí tiếp cận đủ 8 nhóm hạ tầng!</div>`;
+    }
+
+    resultHtml += `</div>`;
+    
+    popup.setContent(resultHtml);
+
+  } catch (err) {
+    clearInterval(pInterval);
+    const container = document.getElementById('inspectLoadContainer');
+    if (container) {
+      container.innerHTML = `<span style="color:var(--accent-red);">❌ Lỗi phân tích vị trí tra cứu.</span>`;
+    }
+  }
 }
 
 export function approvePointStatus(pointId) {
