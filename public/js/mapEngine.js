@@ -381,7 +381,8 @@ export function onPointClick(p, marker) {
     highlightSingleIsochrone(p.lat, p.lng, itemRadius);
   }
 
-  let contentHtml = `<div style="min-width:220px; font-size:11px;">`;
+  // 1. Dựng khung giao diện popup ngay lập tức kèm thanh tiến độ (Progress bar) chờ tải dữ liệu
+  let contentHtml = `<div style="min-width:240px; font-size:11px;">`;
   contentHtml += `<b style="color:var(--accent-cyan); font-size:12px;">${p.name}</b>`;
   if (!isApproved) {
     contentHtml += `<span class="badge-pending">Chờ duyệt</span>`;
@@ -395,70 +396,73 @@ export function onPointClick(p, marker) {
     contentHtml += `• Bán kính phục vụ: <b style="color:var(--accent-cyan);">${itemRadius} m</b><br>`;
   }
 
+  // Khung chứa tiến trình tải dữ liệu động
+  contentHtml += `<div id="dynamicLoadContainer" style="margin-top:6px; padding:6px; background:rgba(15,23,42,0.6); border-radius:6px; border:1px solid var(--border-color);">
+    <div style="font-size:10.5px; color:var(--accent-orange); font-weight:bold; margin-bottom:4px;">⏳ Đang phân tích dữ liệu không gian...</div>
+    <div class="progress-bar-bg" style="width:100%;"><div class="progress-bar-fill" id="popupProgressBar" style="width:30%;"></div></div>
+  </div>`;
+
+  if (!isApproved && state.currentUserRole === "ADMIN") {
+    contentHtml += `<button onclick="window.approvePointStatus('${p.id}')" style="width:100%; margin-top:8px; background:var(--accent-green); color:#0f172a; border:none; padding:6px; border-radius:4px; font-weight:bold; cursor:pointer;">
+      ✅ PHÊ DUYỆT CHÍNH THỨC (ADMIN)
+    </button>`;
+  } else if (!isApproved) {
+    contentHtml += `<div style="margin-top:6px; font-size:10px; color:var(--accent-orange); font-style:italic; text-align:center;">
+      ⏳ Đang chờ Quản trị viên (Admin) phê duyệt.
+    </div>`;
+  }
+  contentHtml += `</div>`;
+
+  const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
+  popup.openOn(map);
+
+  // Hiệu ứng thanh tiến trình chạy giả lập mượt mà tăng trải nghiệm
+  let pVal = 30;
+  const pInterval = setInterval(() => {
+    if (pVal < 85) {
+      pVal += 15;
+      const bar = document.getElementById('popupProgressBar');
+      if (bar) bar.style.width = pVal + "%";
+    }
+  }, 100);
+
+  // 2. Thực hiện gọi API ngầm phía sau
   if (!isApproved) {
-    if (!isCSDUnapproved) {
-      contentHtml += `<div id="servedPopText">
-        <div style="color:var(--accent-red); font-weight:bold; margin-top:4px;">• Dân số phục vụ DỰ KIẾN: <span id="popValText">0%</span></div>
-        <div class="inline-progress-bg"><div class="inline-progress-fill" style="background:var(--accent-red);" id="popValBar"></div></div>
-      </div>`;
-    }
-
-    if (state.currentUserRole === "ADMIN") {
-      contentHtml += `<button onclick="window.approvePointStatus('${p.id}')" style="width:100%; margin-top:8px; background:var(--accent-green); color:#0f172a; border:none; padding:6px; border-radius:4px; font-weight:bold; cursor:pointer;">
-        ✅ PHÊ DUYỆT CHÍNH THỨC (ADMIN)
-      </button>`;
-    } else {
-      contentHtml += `<div style="margin-top:6px; font-size:10px; color:var(--accent-orange); font-style:italic; text-align:center;">
-        ⏳ Đang chờ Quản trị viên (Admin) phê duyệt.
-      </div>`;
-    }
-    contentHtml += `</div>`;
-
-    const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
-    popup.openOn(map);
-
     if (!isCSDUnapproved) {
       fetch(`/api/gee?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${itemRadius}`)
         .then(r => r.json())
         .then(res => {
+          clearInterval(pInterval);
           const popVal = res.servedPop || 0;
-          const popContainer = document.getElementById('servedPopText');
-          if (popContainer) {
-            popContainer.innerHTML = `• Dân số phục vụ: ~<b style="color:var(--accent-red);">${popVal.toLocaleString()} người</b>`;
+          const container = document.getElementById('dynamicLoadContainer');
+          if (container) {
+            container.innerHTML = `• Dân số phục vụ DỰ KIẾN: ~<b style="color:var(--accent-red);">${popVal.toLocaleString()} người</b>`;
           }
-        });
+        })
+        .catch(() => { clearInterval(pInterval); });
+    } else {
+      clearInterval(pInterval);
+      const container = document.getElementById('dynamicLoadContainer');
+      if (container) container.remove();
     }
-
   } else if (p.type !== "9-CSD") {
-    contentHtml += `<div id="servedPopText">
-      <div style="color:var(--accent-orange); font-weight:bold; margin-top:4px;">• Dân số phục vụ: <span id="popValText">0%</span></div>
-      <div class="inline-progress-bg"><div class="inline-progress-fill" style="background:var(--accent-orange);" id="popValBar"></div></div>
-    </div>`;
-    contentHtml += `</div>`;
-
-    const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
-    popup.openOn(map);
-
     fetch(`/api/gee?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${itemRadius}`)
       .then(r => r.json())
       .then(res => {
+        clearInterval(pInterval);
         const popVal = res.servedPop || 0;
-        const popContainer = document.getElementById('servedPopText');
-        if (popContainer) {
-          popContainer.innerHTML = `• Dân số phục vụ: ~<b style="color:var(--accent-orange);">${popVal.toLocaleString()} người</b>`;
+        const container = document.getElementById('dynamicLoadContainer');
+        if (container) {
+          container.innerHTML = `• Dân số phục vụ: ~<b style="color:var(--accent-orange);">${popVal.toLocaleString()} người</b>`;
         }
-      });
+      })
+      .catch(() => { clearInterval(pInterval); });
   } else {
-    contentHtml += `<div style="color:var(--accent-orange); font-weight:bold; margin-top:4px;">💡 ĐỀ XUẤT CHUYỂN ĐỔI CÔNG NĂNG:</div>`;
-    contentHtml += `<div id="csdSug"><div style="font-size:10px; color:var(--text-muted);">⏳ Đang tính toán không gian...</div></div></div>`;
-
-    const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
-    popup.openOn(map);
-
     fetch(`/api/gee?action=analyzeCSD&lat=${p.lat}&lng=${p.lng}&size=${p.size}&ward=${encodeURIComponent(p.ward)}`)
       .then(r => r.json())
       .then(res => {
-        let sugHtml = "";
+        clearInterval(pInterval);
+        let sugHtml = "<div style='font-weight:bold; color:var(--accent-orange); margin-bottom:4px;'>💡 ĐỀ XUẤT CHUYỂN ĐỔI CÔNG NĂNG:</div>";
         (res.suggestions || []).forEach(s => {
           if (s.isWardDeficit) {
             const priorityBadge = s.isTopPriority ? `<span class="badge-priority">ƯU TIÊN HÀNG ĐẦU</span>` : "";
@@ -471,8 +475,15 @@ export function onPointClick(p, marker) {
         (res.ineligible || []).forEach(inEl => {
           sugHtml += `<div class="sug-card ineligible">❌ <b>${inEl.label}</b> (Không đủ DT min: ${inEl.minSize}m²)</div>`;
         });
-        const sugContainer = document.getElementById('csdSug');
-        if (sugContainer) sugContainer.innerHTML = sugHtml || "<div class='sug-card'>✓ Vị trí đã phủ đủ hạ tầng.</div>";
+        const container = document.getElementById('dynamicLoadContainer');
+        if (container) {
+          container.innerHTML = sugHtml || "<div class='sug-card'>✓ Vị trí đã phủ đủ hạ tầng.</div>";
+        }
+      })
+      .catch(() => {
+        clearInterval(pInterval);
+        const container = document.getElementById('dynamicLoadContainer');
+        if (container) container.innerHTML = "<span style='color:var(--accent-red);'>❌ Không thể tải phân tích CSD.</span>";
       });
   }
 }
