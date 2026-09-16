@@ -247,35 +247,34 @@ export function renderGroupedPoints() {
     const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
     const fillColor = isApproved ? baseColor : 'rgba(239, 68, 68, 0.4)';
 
-    // Giảm kích thước biểu tượng bên trong khoảng 20% (font-size từ 11.5px xuống 9.5px) để thoáng và đẹp hơn
+    // Biểu tượng bên trong (đã thu nhỏ 20%, y tế dùng dấu cộng mảnh chuẩn)
     let innerSymbolHtml = `<text x="12" y="10" font-size="9.5px" text-anchor="middle" dominant-baseline="central">${cfg.symbol}</text>`;
     if (p.type === "6-YT") {
       innerSymbolHtml = `<path d="M12 7.5v5M9.5 10h5" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round"/>`;
     }
 
-    // Path đường bao mới: Tròn phình to ở nửa trên, thon gọn bầu ở chân (chuẩn dáng huy hiệu tròn)
+    // PATH MỚI: Phần đầu là một hình tròn hoàn hảo (Bán kính lớn, phình to rõ rệt), đuôi vuốt nhọn ngắn gọn ở đáy
     const svgPinHtml = `
       <svg width="48" height="58" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.5)); overflow: visible;">
-        <!-- Khung ghim tròn to phần đầu, vuốt nhọn ở đáy -->
-        <path d="M12 1.5C7.3 1.5 3.5 5.3 3.5 10c0 4.2 8.5 18 8.5 18s8.5-13.8 8.5-18c0-4.7-3.8-8.5-8.5-8.5z" 
+        <path d="M12 1C6.48 1 2 5.48 2 11c0 4.65 10 20 10 20s10-15.35 10-20c0-5.52-4.48-10-10-10z" 
               fill="${fillColor}" 
               stroke="${strokeColor}" 
               stroke-width="1.5" 
               ${strokeDash}/>
         
         <!-- Vòng tròn nền trắng ở tâm -->
-        <circle cx="12" cy="10" r="5.5" fill="#ffffff" stroke="${isApproved ? baseColor : '#f87171'}" stroke-width="0.6"/>
+        <circle cx="12" cy="11" r="5.5" fill="#ffffff" stroke="${isApproved ? baseColor : '#f87171'}" stroke-width="0.6"/>
         
-        <!-- Biểu tượng đã được thu nhỏ lại 20% nằm gọn gàng bên trong -->
+        <!-- Biểu tượng bên trong -->
         ${innerSymbolHtml}
       </svg>
     `;
 
     const customDivIcon = L.divIcon({
-      className: 'custom-infra-icon-svg',
+      className: 'custom-infra-icon-v2', // Đổi tên class để tránh cache cũ của Leaflet
       html: svgPinHtml,
       iconSize: [48, 58], 
-      iconAnchor: [24, 58] // Mỏ neo chuẩn tại chóp nhọn phía đáy
+      iconAnchor: [24, 58]
     });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
