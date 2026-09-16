@@ -243,20 +243,17 @@ export function renderGroupedPoints() {
     const targetGroup = mapGroups[p.type] || layers.c9;
 
     const pinFillColor = '#1e3a8a'; 
-    // Viền trắng rất mỏng (1 pixel) cho điểm đã duyệt, hoặc viền đỏ cảnh báo nếu chưa duyệt
     const strokeColor = isApproved ? '#ffffff' : '#f87171'; 
     const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
-    const strokeWidth = isApproved ? '1' : '1.8'; // Bề dày viền đúng 1 pixel khi đã duyệt
+    const strokeWidth = isApproved ? '1' : '1.8';
 
+    // ĐƯỜNG BAO MỀM MẠI: Dùng đường cong Bézier (C) nối liền mạch từ chóp nhọn lên vòng tròn, triệt tiêu hoàn toàn góc gãy
     const svgPinHtml = `
       <svg width="48" height="58" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.6)); overflow: visible;">
-        <!-- Khung ghim với đường viền mỏng 1 pixel màu trắng bao ngoài -->
-        <path d="M 12,1 
-                 A 10,10 0 0,1 22,11 
-                 L 22,11 
-                 L 12,30 
-                 L 2,11 
-                 A 10,10 0 0,1 12,1 Z" 
+        <path d="M 12,30 
+                 C 5,18 2,13 2,11 
+                 A 10,10 0 0,0 22,11 
+                 C 22,13 19,18 12,30 Z" 
               fill="${pinFillColor}" 
               stroke="${strokeColor}" 
               stroke-width="${strokeWidth}" 
