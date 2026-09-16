@@ -237,72 +237,74 @@ export function renderGroupedPoints() {
 
   const sourceList = getWardFilteredList(state.rawDataList);
 
-  // Bộ biểu tượng SVG vector đầy đủ màu sắc đặc trưng chuẩn theo mẫu bạn cung cấp
-  const sampleIcons = {
-    "1-CV": {
-      bg: "#22c55e", // Xanh lá cây
-      svg: '<path d="M12 2C9.24 2 7 4.24 7 7c0 1.93 1.1 3.59 2.7 4.4C8.65 12.3 8 13.57 8 15c0 2.21 1.79 4 4 4s4-1.79 4-4c0-1.43-.65-2.7-1.7-3.6 1.6-.81 2.7-2.47 2.7-4.4 0-2.76-2.24-5-5-5zm0 2c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 9c1.3 0 2.4.84 2.82 2H9.18C9.6 13.84 10.7 13 12 13zm-2 5h4v3h-4v-3z" fill="#22c55e"/>'
+  // Từ điển vector chính xác cho từng loại hạ tầng theo đúng chuẩn bộ icon mẫu
+  const infraSvgSymbols = {
+    "1-CV": { // Công viên (Cây xanh)
+      color: "#22c55e",
+      path: '<path d="M12 2C9.24 2 7 4.24 7 7c0 1.93 1.1 3.59 2.7 4.4C8.65 12.3 8 13.57 8 15c0 2.21 1.79 4 4 4s4-1.79 4-4c0-1.43-.65-2.7-1.7-3.6 1.6-.81 2.7-2.47 2.7-4.4 0-2.76-2.24-5-5-5zm0 2c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 9c1.3 0 2.4.84 2.82 2H9.18C9.6 13.84 10.7 13 12 13zm-2 5h4v3h-4v-3z"/>'
     },
-    "2-BDX": {
-      bg: "#3b82f6", // Xanh dương chữ P
-      svg: '<path d="M9 6h4.5c1.38 0 2.5 1.12 2.5 2.5S14.88 11 13.5 11H9V6zm0 7v5H7V6h6.5c2.48 0 4.5 2.02 4.5 4.5s-2.02 4.5-4.5 4.5H9z" fill="#3b82f6"/>'
+    "2-BDX": { // Bến xe (Chữ P)
+      color: "#3b82f6",
+      path: '<path d="M9 6h4.5c1.38 0 2.5 1.12 2.5 2.5S14.88 11 13.5 11H9V6zm0 7v5H7V6h6.5c2.48 0 4.5 2.02 4.5 4.5s-2.02 4.5-4.5 4.5H9z"/>'
     },
-    "3-MN": {
-      bg: "#f97316", // Bình sữa mầm non
-      svg: '<path d="M14 6v1h1.5C16.33 7 17 7.67 17 8.5S16.33 10 15.5 10H14v2h2.5c1.38 0 2.5 1.12 2.5 2.5S17.88 17 16.5 17H14v1c0 1.1-.9 2-2 2s-2-.9-2-2v-1H7.5C6.12 17 5 15.88 5 14.5S6.12 12 7.5 12H10v-2H8.5C7.67 10 7 9.33 7 8.5S7.67 7 8.5 7H10V6c0-1.1.9-2 2-2s2 .9 2 2zm-3 8c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm2-4c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z" fill="#f97316"/>'
+    "3-MN": { // Trường Mầm non (Bình sữa)
+      color: "#f97316",
+      path: '<path d="M14 6v1h1.5C16.33 7 17 7.67 17 8.5S16.33 10 15.5 10H14v2h2.5c1.38 0 2.5 1.12 2.5 2.5S17.88 17 16.5 17H14v1c0 1.1-.9 2-2 2s-2-.9-2-2v-1H7.5C6.12 17 5 15.88 5 14.5S6.12 12 7.5 12H10v-2H8.5C7.67 10 7 9.33 7 8.5S7.67 7 8.5 7H10V6c0-1.1.9-2 2-2s2 .9 2 2zm-3 8c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm2-4c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>'
     },
-    "4-TH": {
-      bg: "#b45309", // Trường tiểu học (Màu nâu đỏ)
-      svg: '<path d="M12 3L2 10l3 2.18V18h3v-3h4v3h3v-5.82L22 10l-10-7zm0 3.5l5.18 3.64L12 13.82 6.82 10.14 12 6.5z" fill="#b45309"/>'
+    "4-TH": { // Trường Tiểu học (Biểu tượng trường học)
+      color: "#b45309",
+      path: '<path d="M12 3L2 10l3 2.18V18h3v-3h4v3h3v-5.82L22 10l-10-7zm0 3.5l5.18 3.64L12 13.82 6.82 10.14 12 6.5z"/>'
     },
-    "5-THCS": {
-      bg: "#10b981", // Trường THCS (Màu xanh ngọc)
-      svg: '<path d="M18 10.5V16c0 .55-.45 1-1 1h-2v-5.18l-3 1.8-3-1.8V17H7c-.55 0-1-.45-1-1v-5.5L12 7l6 3.5zM12 3L2 9l10 6 10-6-10-6z" fill="#10b981"/>'
+    "5-THCS": { // Trường THCS (Mũ cử nhân / Học vấn)
+      color: "#10b981",
+      path: '<path d="M18 10.5V16c0 .55-.45 1-1 1h-2v-5.18l-3 1.8-3-1.8V17H7c-.55 0-1-.45-1-1v-5.5L12 7l6 3.5zM12 3L2 9l10 6 10-6-10-6z"/>'
     },
-    "6-YT": {
-      bg: "#ef4444", // Bệnh viện / Y tế (Dấu cộng đỏ)
-      svg: '<path d="M19 10.5h-5.5V5c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v5.5H5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5h5.5V19c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-5.5H19c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5z" fill="#ef4444"/>'
+    "6-YT": { // Y tế / Bệnh viện (Dấu cộng)
+      color: "#ef4444",
+      path: '<path d="M19 10.5h-5.5V5c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v5.5H5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5h5.5V19c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-5.5H19c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5z"/>'
     },
-    "7-VH": {
-      bg: "#ec4899", // Nhà văn hóa (Mặt nạ)
-      svg: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-.29.02-.58.05-.86 2.32 1.05 4.86 1.63 7.95 1.63s5.63-.58 7.95-1.63c.03.28.05.57.05.86 0 4.41-3.59 8-8 8z" fill="#ec4899"/>'
+    "7-VH": { // Nhà văn hóa (Mặt nạ nghệ thuật)
+      color: "#ec4899",
+      path: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-.29.02-.58.05-.86 2.32 1.05 4.86 1.63 7.95 1.63s5.63-.58 7.95-1.63c.03.28.05.57.05.86 0 4.41-3.59 8-8 8z"/>'
     },
-    "8-TM": {
-      bg: "#3b82f6", // Chợ / Thương mại (Xe đẩy hàng)
-      svg: '<path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z" fill="#3b82f6"/>'
+    "8-TM": { // Chợ / Thương mại (Giỏ hàng)
+      color: "#3b82f6",
+      path: '<path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>'
     },
-    "9-CSD": {
-      bg: "#8b5cf6", // Quỹ đất tiềm năng
-      svg: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="#8b5cf6"/>'
+    "9-CSD": { // Quỹ đất tiềm năng
+      color: "#8b5cf6",
+      path: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>'
     }
   };
 
   sourceList.forEach(p => {
     const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
     const targetGroup = mapGroups[p.type] || layers.c9;
-    const iconData = sampleIcons[p.type] || sampleIcons["9-CSD"];
+    const itemConfig = infraIcons[p.type] || { border: "#38bdf8" };
+    const svgData = infraSvgSymbols[p.type] || infraSvgSymbols["9-CSD"];
 
-    // Màu viền và màu nền ngoài của ghim (Nếu chưa duyệt thì hiện viền nét đứt màu đỏ cảnh báo)
+    // Màu sắc chủ đạo: Lấy theo màu của loại hạ tầng hoặc đỏ cảnh báo nếu chưa duyệt
+    const mainColor = itemConfig.border || svgData.color;
     const strokeColor = isApproved ? '#ffffff' : '#f87171';
     const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
-    const pinFillColor = isApproved ? iconData.bg : 'rgba(239, 68, 68, 0.4)';
+    const pinFillColor = isApproved ? mainColor : 'rgba(239, 68, 68, 0.4)';
 
-    // Khung SVG chuẩn hình mẫu: Ghim tròn to phần đầu + Vòng tròn nền trắng ở tâm + Icon vector chuyên nghiệp
+    // Khung ghim chuẩn phong cách huy hiệu tròn to ở trên, thon nhọn ở đáy + vòng tròn trắng sạch sẽ ở tâm chứa icon đúng chuẩn
     const svgPinHtml = `
       <svg width="48" height="58" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.5)); overflow: visible;">
-        <!-- Đường bao ghim dáng tròn to phần đầu, vuốt nhọn ở đáy -->
+        <!-- Khung ghim bên ngoài -->
         <path d="M12 1C6.48 1 2 5.48 2 11c0 4.65 10 20 10 20s10-15.35 10-20c0-5.52-4.48-10-10-10z" 
               fill="${pinFillColor}" 
               stroke="${strokeColor}" 
               stroke-width="1.5" 
               ${strokeDash}/>
         
-        <!-- Vòng tròn nền trắng sạch sẽ ở tâm (chiếm ~70% diện tích phần đầu) -->
-        <circle cx="12" cy="11" r="6.2" fill="#ffffff" stroke="${iconData.bg}" stroke-width="0.8"/>
+        <!-- Vòng tròn nền trắng ở tâm -->
+        <circle cx="12" cy="11" r="6.2" fill="#ffffff" stroke="${mainColor}" stroke-width="0.8"/>
         
-        <!-- Biểu tượng vector chuẩn bên trong vòng tròn trắng -->
-        <g transform="translate(7, 6) scale(0.42)">
-          ${iconData.svg}
+        <!-- Biểu tượng vector độc lập ứng với từng danh mục hạ tầng -->
+        <g fill="${mainColor}" transform="translate(6, 5) scale(0.5)">
+          ${svgData.path}
         </g>
       </svg>
     `;
