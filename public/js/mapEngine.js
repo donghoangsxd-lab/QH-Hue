@@ -247,29 +247,29 @@ export function renderGroupedPoints() {
     const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
     const fillColor = isApproved ? baseColor : 'rgba(239, 68, 68, 0.2)';
 
-    // Gộp toàn bộ ghim và biểu tượng vào chung 1 khối SVG duy nhất (dùng thẻ <text> chứa emoji/icon)
+    // Đã tăng kích thước lên 20% (width: 44, height: 54), viewBox tương ứng 24 x 36
     const svgPinHtml = `
-      <svg width="36" height="44" viewBox="0 0 24 30" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 3px 5px rgba(0,0,0,0.6)); overflow: visible;">
-        <!-- Khung ghim giọt nước ngược -->
-        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
+      <svg width="44" height="54" viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.6)); overflow: visible;">
+        <!-- Khung ghim giọt nước ngược phóng to -->
+        <path d="M12 2C7.58 2 4 5.58 4 10c0 6 8 18 8 18s8-12 8-18c0-4.42-3.58-8-8-8z" 
               fill="${fillColor}" 
               stroke="${strokeColor}" 
-              stroke-width="1.8" 
+              stroke-width="1.6" 
               ${strokeDash}/>
         
-        <!-- Vòng tròn nền trắng ở phần đầu tròn của ghim -->
-        <circle cx="12" cy="9" r="6" fill="#ffffff" stroke="${strokeColor}" stroke-width="0.8"/>
+        <!-- Vòng tròn nền trắng mở rộng ở tâm (r = 6.2) -->
+        <circle cx="12" cy="10" r="6.2" fill="#ffffff" stroke="${strokeColor}" stroke-width="0.8"/>
         
-        <!-- Biểu tượng/Emoji từ bảng chú giải được nhúng trực tiếp vào tâm SVG -->
-        <text x="12" y="12.5" font-size="11px" text-anchor="middle" dominant-baseline="central">${cfg.symbol}</text>
+        <!-- Biểu tượng từ chú giải được căn chuẩn tuyệt đối vào tâm vòng tròn trắng lớn -->
+        <text x="12" y="12.2" font-size="12.5px" text-anchor="middle" dominant-baseline="central">${cfg.symbol}</text>
       </svg>
     `;
 
     const customDivIcon = L.divIcon({
       className: 'custom-infra-icon-svg',
       html: svgPinHtml,
-      iconSize: [36, 44], 
-      iconAnchor: [18, 44] // Mỏ neo chuẩn xác tại chóp nhọn phía đáy ghim
+      iconSize: [44, 54], 
+      iconAnchor: [22, 54] // Mỏ neo dịch chuyển tương ứng theo kích thước mới (chóp nhọn ở đáy)
     });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
