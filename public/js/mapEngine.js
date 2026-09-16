@@ -242,14 +242,15 @@ export function renderGroupedPoints() {
     const cfg = infraIcons[p.type] || { symbol: "🏢" };
     const targetGroup = mapGroups[p.type] || layers.c9;
 
-    const pinFillColor = '#1e3a8a'; // Xanh biển đậm sang trọng
-    const strokeColor = isApproved ? '#ffffff' : '#f87171'; // Viền trắng 1 pixel hoặc đỏ cảnh báo nếu chưa duyệt
-    const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
-    const strokeWidth = isApproved ? '1' : '1.8';
+    const pinFillColor = '#1e3a8a'; 
+    const strokeColor = isApproved ? '#ffffff' : '#f87171'; 
+    const strokeDash = isApproved ? '' : 'stroke-dasharray="1.5,1.5"';
+    const strokeWidth = isApproved ? '0.6' : '1.2';
 
-    // ĐƯỜNG BAO CHUẨN ĐẠI GIA SỐ HỌC: Khối ghim giọt nước hoàn chỉnh, mượt mà từ đầu tròn xuống chóp nhọn
+    // Đã thu nhỏ gọn gàng với width: 22, height: 27
     const svgPinHtml = `
-      <svg width="48" height="58" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.6)); overflow: visible;">
+      <svg width="22" height="25" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.5)); overflow: visible;">
+        <!-- Khung ghim giọt nước tỷ lệ chuẩn -->
         <path d="M 12 1 
                  C 7.03 1, 3 5.03, 3 10 
                  C 3 15, 12 30, 12 30 
@@ -260,19 +261,19 @@ export function renderGroupedPoints() {
               stroke-width="${strokeWidth}" 
               ${strokeDash}/>
         
-        <!-- Vòng tròn nền trắng ở tâm chứa icon từ Bảng Chú Giải -->
-        <circle cx="12" cy="10" r="6.2" fill="#ffffff" stroke="none"/>
+        <!-- Vòng tròn nền trắng thu nhỏ cân đối (r=4.2) -->
+        <circle cx="12" cy="10" r="4.2" fill="#ffffff" stroke="none"/>
         
-        <!-- Biểu tượng chính xác từ Bảng Chú Giải -->
-        <text x="12" y="10.5" font-size="11.5px" text-anchor="middle" dominant-baseline="central">${cfg.symbol || '🏢'}</text>
+        <!-- Biểu tượng thu nhỏ tinh gọn (font-size: 6.5px) -->
+        <text x="12" y="10.5" font-size="6.5px" text-anchor="middle" dominant-baseline="central">${cfg.symbol || '🏢'}</text>
       </svg>
     `;
 
     const customDivIcon = L.divIcon({
       className: 'custom-infra-icon-v2',
       html: svgPinHtml,
-      iconSize: [48, 58], 
-      iconAnchor: [24, 58]
+      iconSize: [22, 27], 
+      iconAnchor: [11, 27] // Mỏ neo căn chuẩn tại chóp đáy mới
     });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
