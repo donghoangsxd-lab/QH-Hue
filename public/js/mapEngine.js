@@ -239,30 +239,34 @@ export function renderGroupedPoints() {
 
   sourceList.forEach(p => {
     const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
-    // Lấy trực tiếp biểu tượng emoji/icon từ bảng Chú Giải (infraIcons trong state.js)
     const cfg = infraIcons[p.type] || { symbol: "🏢" };
     const targetGroup = mapGroups[p.type] || layers.c9;
 
-    // Màu nền chung cho giọt nước: Xanh biển đậm sang trọng, nếu chưa duyệt có thể phủ nhẹ sắc đỏ hoặc giữ nguyên nền xanh viền đỏ đứt nét
-    const pinFillColor = isApproved ? '#1e3a8a' : 'rgba(30, 58, 138, 0.7)'; 
-    const strokeColor = isApproved ? '#38bdf8' : '#f87171'; // Viền xanh cyan nhẹ nếu duyệt, đỏ đứt nét nếu chưa duyệt
+    const pinFillColor = '#1e3a8a'; // Xanh biển đậm sang trọng cho toàn bộ nền giọt nước
+    
+    // Nếu đã duyệt: Không dùng viền sáng nữa (cho viền trùng màu nền hoặc none để sạch hình). 
+    // Nếu chưa duyệt: Giữ viền đỏ nét đứt để cảnh báo.
+    const strokeColor = isApproved ? '#1e3a8a' : '#f87171'; 
     const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
-    const strokeWidth = isApproved ? '1.2' : '1.8';
+    const strokeWidth = isApproved ? '0' : '1.8';
 
-    // Cấu trúc SVG hoàn thiện: Ghim xanh biển đậm + Vòng tròn trắng ở tâm + Tái sử dụng chính xác icon từ Chú Giải
     const svgPinHtml = `
       <svg width="48" height="58" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.6)); overflow: visible;">
-        <!-- Khung ghim dáng tròn to phần đầu, vuốt nhọn ở đáy (Đã bỏ hoàn toàn viền trắng ngoài) -->
-        <path d="M12 1C6.48 1 2 5.48 2 11c0 4.65 10 20 10 20s10-15.35 10-20c0-5.52-4.48-10-10-10z" 
+        <!-- Khung ghim nền xanh biển đậm, không còn viền sáng bên ngoài -->
+        <path d="M12 1 
+                 C 17.52 1, 22 5.48, 22 11 
+                 C 22 14.5, 17 21, 12 30 
+                 C 7 21, 2 14.5, 2 11 
+                 C 2 5.48, 6.48 1, 12 1 Z" 
               fill="${pinFillColor}" 
               stroke="${strokeColor}" 
               stroke-width="${strokeWidth}" 
               ${strokeDash}/>
         
-        <!-- Vòng tròn nền trắng sạch sẽ ở tâm để làm nổi bật icon từ Chú Giải -->
+        <!-- Vòng tròn nền trắng ở tâm chứa icon từ Bảng Chú Giải -->
         <circle cx="12" cy="11" r="6.2" fill="#ffffff" stroke="none"/>
         
-        <!-- Tái sử dụng chính xác biểu tượng từ Bảng Chú Giải đặt gọn gàng ngay tâm -->
+        <!-- Biểu tượng chính xác từ Bảng Chú Giải -->
         <text x="12" y="11.5" font-size="11.5px" text-anchor="middle" dominant-baseline="central">${cfg.symbol || '🏢'}</text>
       </svg>
     `;
@@ -271,7 +275,7 @@ export function renderGroupedPoints() {
       className: 'custom-infra-icon-v2',
       html: svgPinHtml,
       iconSize: [48, 58], 
-      iconAnchor: [24, 58] // Mỏ neo chuẩn xác tại chóp nhọn phía đáy ghim
+      iconAnchor: [24, 58]
     });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
