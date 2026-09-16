@@ -247,27 +247,26 @@ export function renderGroupedPoints() {
     const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
     const fillColor = isApproved ? baseColor : 'rgba(239, 68, 68, 0.4)';
 
-    // Xử lý biểu tượng bên trong: Y tế dùng dấu cộng vector mảnh chuẩn sắc nét, các loại khác dùng emoji/symbol rõ ràng
-    let innerSymbolHtml = `<text x="12" y="10" font-size="11.5px" text-anchor="middle" dominant-baseline="central">${cfg.symbol}</text>`;
+    // Giảm kích thước biểu tượng bên trong khoảng 20% (font-size từ 11.5px xuống 9.5px) để thoáng và đẹp hơn
+    let innerSymbolHtml = `<text x="12" y="10" font-size="9.5px" text-anchor="middle" dominant-baseline="central">${cfg.symbol}</text>`;
     if (p.type === "6-YT") {
-      // Dấu cộng y tế thiết kế phẳng, hiện đại và tinh tế
       innerSymbolHtml = `<path d="M12 7.5v5M9.5 10h5" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round"/>`;
     }
 
-    // Cấu trúc SVG hoàn thiện: Ghim màu đặc + Vòng tròn trắng nổi bật + Biểu tượng sắc nét ở tâm
+    // Path đường bao mới: Tròn phình to ở nửa trên, thon gọn bầu ở chân (chuẩn dáng huy hiệu tròn)
     const svgPinHtml = `
       <svg width="48" height="58" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.5)); overflow: visible;">
-        <!-- Khung ghim giọt nước chuẩn tỷ lệ, bo tròn phần đầu, nhọn ở đáy -->
-        <path d="M12 2C7.58 2 4 5.58 4 10c0 4.5 8 18 8 18s8-13.5 8-18c0-4.42-3.58-8-8-8z" 
+        <!-- Khung ghim tròn to phần đầu, vuốt nhọn ở đáy -->
+        <path d="M12 1.5C7.3 1.5 3.5 5.3 3.5 10c0 4.2 8.5 18 8.5 18s8.5-13.8 8.5-18c0-4.7-3.8-8.5-8.5-8.5z" 
               fill="${fillColor}" 
               stroke="${strokeColor}" 
               stroke-width="1.5" 
               ${strokeDash}/>
         
-        <!-- Vòng tròn nền trắng sạch sẽ ở tâm -->
-        <circle cx="12" cy="10" r="5.8" fill="#ffffff" stroke="${isApproved ? baseColor : '#f87171'}" stroke-width="0.6"/>
+        <!-- Vòng tròn nền trắng ở tâm -->
+        <circle cx="12" cy="10" r="5.5" fill="#ffffff" stroke="${isApproved ? baseColor : '#f87171'}" stroke-width="0.6"/>
         
-        <!-- Biểu tượng căn chuẩn tuyệt đối ở trung tâm -->
+        <!-- Biểu tượng đã được thu nhỏ lại 20% nằm gọn gàng bên trong -->
         ${innerSymbolHtml}
       </svg>
     `;
@@ -276,7 +275,7 @@ export function renderGroupedPoints() {
       className: 'custom-infra-icon-svg',
       html: svgPinHtml,
       iconSize: [48, 58], 
-      iconAnchor: [24, 58] // Mỏ neo chuẩn xác tại chóp nhọn ở đáy ghim
+      iconAnchor: [24, 58] // Mỏ neo chuẩn tại chóp nhọn phía đáy
     });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
