@@ -242,24 +242,26 @@ export function renderGroupedPoints() {
     const cfg = infraIcons[p.type] || { symbol: "🏢", border: "var(--accent-cyan)" };
     const targetGroup = mapGroups[p.type] || layers.c9;
 
-    const strokeColor = isApproved ? (cfg.border || '#38bdf8') : '#f87171';
-    const strokeDash = isApproved ? '' : 'stroke-dasharray="3.5,3.5"';
-    const fillColor = isApproved ? (cfg.border || '#38bdf8') : 'rgba(239, 68, 68, 0.15)';
+    // Màu sắc theo loại hạ tầng
+    const baseColor = cfg.border || '#38bdf8';
+    const strokeColor = isApproved ? baseColor : '#f87171';
+    const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
+    const fillColor = isApproved ? baseColor : 'rgba(239, 68, 68, 0.2)';
 
-    // Giọt nước rộng 24 đơn vị -> Bán kính r = 9.5 (chiếm ~90% chiều rộng), hình tròn trắng to rõ ràng chứa icon
+    // Cấu trúc SVG chuẩn: Khung ghim giọt nước (màu hạ tầng) + Vòng tròn trắng vừa vặn ở phần đầu tròn (r=5.5) + Biểu tượng chú giải
     const svgPinHtml = `
-      <svg width="36" height="44" viewBox="0 0 24 30" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 3px 5px rgba(0,0,0,0.6));">
-        <!-- Khung ghim giọt nước ngược -->
+      <svg width="34" height="42" viewBox="0 0 24 30" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 3px 5px rgba(0,0,0,0.6));">
+        <!-- Khung ghim giọt nước ngược mang màu sắc hạ tầng -->
         <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" 
               fill="${fillColor}" 
               stroke="${strokeColor}" 
               stroke-width="1.8" 
               ${strokeDash}/>
         
-        <!-- Hình tròn nền trắng chiếm ~90% chiều rộng (r = 9.5) -->
-        <circle cx="12" cy="9" r="9.2" fill="#ffffff" stroke="${strokeColor}" stroke-width="0.8"/>
+        <!-- Vòng tròn nền trắng vừa vặn ở phần đầu tròn của ghim (r=5.5) -->
+        <circle cx="12" cy="9" r="5.5" fill="#ffffff" stroke="${strokeColor}" stroke-width="0.8"/>
       </svg>
-      <div class="pin-inner-icon" style="position: absolute; top: 1px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; font-size: 13.5px; line-height: 1; width: 22px; height: 22px;">
+      <div class="pin-inner-icon" style="position: absolute; top: 3px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1; width: 20px; height: 20px;">
         ${cfg.symbol}
       </div>
     `;
@@ -267,8 +269,8 @@ export function renderGroupedPoints() {
     const customDivIcon = L.divIcon({
       className: 'custom-infra-icon',
       html: svgPinHtml,
-      iconSize: [36, 44], 
-      iconAnchor: [18, 44] // Mỏ neo chuẩn xác tại chóp nhọn phía đáy ghim
+      iconSize: [34, 42], 
+      iconAnchor: [17, 42] // Mỏ neo đúng tại chóp nhọn phía đáy ghim
     });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
@@ -276,6 +278,7 @@ export function renderGroupedPoints() {
     targetGroup.addLayer(marker);
   });
 }
+
 // HÀM HIGHLIGHT ĐƠN LẺ ISOCHRONE KHI CLICK CHỌN ĐIỂM
 export async function highlightSingleIsochrone(lat, lng, radius) {
   if (!layers.singleIso) return;
