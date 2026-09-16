@@ -242,22 +242,21 @@ export function renderGroupedPoints() {
     const cfg = infraIcons[p.type] || { symbol: "🏢" };
     const targetGroup = mapGroups[p.type] || layers.c9;
 
-    const pinFillColor = '#1e3a8a'; // Xanh biển đậm sang trọng cho toàn bộ nền giọt nước
-    
-    // Nếu đã duyệt: Không dùng viền sáng nữa (cho viền trùng màu nền hoặc none để sạch hình). 
-    // Nếu chưa duyệt: Giữ viền đỏ nét đứt để cảnh báo.
-    const strokeColor = isApproved ? '#1e3a8a' : '#f87171'; 
+    const pinFillColor = '#1e3a8a'; 
+    // Viền trắng rất mỏng (1 pixel) cho điểm đã duyệt, hoặc viền đỏ cảnh báo nếu chưa duyệt
+    const strokeColor = isApproved ? '#ffffff' : '#f87171'; 
     const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
-    const strokeWidth = isApproved ? '0' : '1.8';
+    const strokeWidth = isApproved ? '1' : '1.8'; // Bề dày viền đúng 1 pixel khi đã duyệt
 
     const svgPinHtml = `
       <svg width="48" height="58" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.6)); overflow: visible;">
-        <!-- Khung ghim nền xanh biển đậm, không còn viền sáng bên ngoài -->
-        <path d="M12 1 
-                 C 17.52 1, 22 5.48, 22 11 
-                 C 22 14.5, 17 21, 12 30 
-                 C 7 21, 2 14.5, 2 11 
-                 C 2 5.48, 6.48 1, 12 1 Z" 
+        <!-- Khung ghim với đường viền mỏng 1 pixel màu trắng bao ngoài -->
+        <path d="M 12,1 
+                 A 10,10 0 0,1 22,11 
+                 L 22,11 
+                 L 12,30 
+                 L 2,11 
+                 A 10,10 0 0,1 12,1 Z" 
               fill="${pinFillColor}" 
               stroke="${strokeColor}" 
               stroke-width="${strokeWidth}" 
