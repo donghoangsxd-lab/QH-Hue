@@ -245,4 +245,14 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
   .sidebar-panel { position: absolute; top: 104px; left: 12px; right: 12px; z-index: 999; display: none; }
   .sidebar-panel.open { display: block; }
   .add-point-card { bottom: 65px; left: 12px; right: 12px; }
+
+  .custom-infra-icon-svg {
+  background: transparent !important;
+  border: none !important;
+  transition: transform 0.2s ease;
+}
+.custom-infra-icon-svg:hover {
+  transform: scale(1.25);
+  z-index: 1000 !important;
+}
 }
