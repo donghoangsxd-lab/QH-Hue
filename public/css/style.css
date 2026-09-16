@@ -125,24 +125,22 @@ body, html {
   -moz-appearance: textfield;
 }
 
-/* ICON HẠ TẦNG & ANIMATION - HÌNH GIỌT NƯỚC */
-/* ICON HẠ TẦNG & ANIMATION - HÌNH GIỌT NƯỚC CHUẨN KHÔNG XOAY LỆCH */
+/* ICON HẠ TẦNG - HÌNH GIỌT NƯỚC CHUẨN GÓC */
 .custom-infra-icon {
   display: flex; 
   align-items: center; 
   justify-content: center;
   background: rgba(15, 23, 42, 0.95); 
   border: 2px solid var(--accent-cyan);
-  /* Tạo hình giọt nước bằng bo góc tinh chỉnh mà không cần rotate container */
   border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
+  transform: rotate(45deg); /* Đã đổi từ -45deg sang 45deg để chỉnh đúng hướng */
   box-shadow: 0 4px 12px rgba(0,0,0,0.6); 
   transition: all 0.2s ease;
 }
 
-/* Giữ cho icon/ký tự bên trong thẳng đứng tuyệt đối, không bị xoay */
+/* Xoay ngược biểu tượng bên trong lại -45deg để hiển thị thẳng đứng */
 .custom-infra-icon > div {
-  transform: rotate(45deg);
+  transform: rotate(-45deg);
   display: flex; 
   align-items: center; 
   justify-content: center;
@@ -151,7 +149,7 @@ body, html {
 }
 
 .custom-infra-icon:hover { 
-  transform: scale(1.25) rotate(-45deg); 
+  transform: scale(1.25) rotate(45deg); 
   z-index: 1000 !important; 
   border-color: #fff; 
 }
@@ -161,6 +159,7 @@ body, html {
   background: rgba(239, 68, 68, 0.25) !important; 
   animation: alertPulse 2s infinite ease-in-out; 
 }
+
 @keyframes alertPulse {
   0%, 100% { box-shadow: 0 0 6px rgba(248, 113, 113, 0.5); }
   50% { box-shadow: 0 0 16px rgba(248, 113, 113, 0.9); }
