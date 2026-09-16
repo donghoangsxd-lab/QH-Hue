@@ -243,30 +243,28 @@ export function renderGroupedPoints() {
     const targetGroup = mapGroups[p.type] || layers.c9;
 
     const baseColor = cfg.border || '#38bdf8';
-    const strokeColor = isApproved ? baseColor : '#f87171';
+    const strokeColor = isApproved ? '#ffffff' : '#f87171';
     const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
-    const fillColor = isApproved ? baseColor : 'rgba(239, 68, 68, 0.2)';
+    const fillColor = isApproved ? baseColor : 'rgba(239, 68, 68, 0.4)';
 
-    // Nếu là công trình Y tế (6-YT), dùng vector SVG dấu cộng chuẩn nằm chính xác tuyệt đối vào tâm để không bị lệch rớt
-    let innerSymbolHtml = `<text x="12" y="10" font-size="12px" text-anchor="middle" dominant-baseline="central">${cfg.symbol}</text>`;
+    // Biểu tượng Y tế (6-YT) hoặc các icon khác hiển thị màu trắng nổi bật ở tâm
+    let innerSymbolHtml = `<text x="12" y="10.5" font-size="12.5px" text-anchor="middle" dominant-baseline="central" fill="#ffffff">${cfg.symbol}</text>`;
     if (p.type === "6-YT") {
-      innerSymbolHtml = `<path d="M14 9h-3V6c0-.55-.45-1-1-1s-1 .45-1 1v3H7c-.55 0-1 .45-1 1s.45 1 1 1h3v3c0 .55.45 1 1 1s1-.45 1-1v-3h3c.55 0 1-.45 1-1s-.45-1-1-1z" fill="#ef4444" transform="scale(0.85) translate(1, 1)"/>`;
+      innerSymbolHtml = `<path d="M14 9h-3V6c0-.55-.45-1-1-1s-1 .45-1 1v3H7c-.55 0-1 .45-1 1s.45 1 1 1h3v3c0 .55.45 1 1 1s1-.45 1-1v-3h3c.55 0 1-.45 1-1s-.45-1-1-1z" fill="#ffffff" transform="scale(0.85) translate(1, 1)"/>`;
     }
 
-    // Đã tăng size khung giọt nước thêm 20% (width: 52, height: 64) để không gian rộng rãi, thoáng đãng
+    // Đường dẫn SVG path tạo hình ghim dạng tròn phình to ở nửa trên và thắt nhọn ở đáy (rất dễ căn chỉnh icon)
     const svgPinHtml = `
-      <svg width="52" height="64" viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.6)); overflow: visible;">
-        <!-- Khung ghim giọt nước ngược -->
-        <path d="M12 2C7.58 2 4 5.58 4 10c0 6 8 18 8 18s8-12 8-18c0-4.42-3.58-8-8-8z" 
+      <svg width="52" height="64" viewBox="0 0 24 34" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.6)); overflow: visible;">
+        <!-- Path ghim dáng tròn to phần đầu, nhọn ở chân + khoét lỗ tròn rỗng ở tâm để thấy icon/xuyên thấu -->
+        <path d="M12 1C6.48 1 2 5.48 2 11c0 5.25 10 21 10 21s10-15.75 10-21c0-5.52-4.48-10-10-10zm0 14c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z" 
               fill="${fillColor}" 
               stroke="${strokeColor}" 
               stroke-width="1.5" 
+              fill-rule="evenodd"
               ${strokeDash}/>
         
-        <!-- Vòng tròn nền trắng ở tâm (cy="10", r="6.2") -->
-        <circle cx="12" cy="10" r="6.2" fill="#ffffff" stroke="${strokeColor}" stroke-width="0.8"/>
-        
-        <!-- Biểu tượng bên trong (đã fix chuẩn định vị tâm tuyệt đối cho y tế và các loại khác) -->
+        <!-- Biểu tượng căn chuẩn ngay ngắn tại tâm phần đầu tròn to -->
         ${innerSymbolHtml}
       </svg>
     `;
@@ -275,7 +273,7 @@ export function renderGroupedPoints() {
       className: 'custom-infra-icon-svg',
       html: svgPinHtml,
       iconSize: [52, 64], 
-      iconAnchor: [26, 64] // Mỏ neo chuẩn xác tại chóp nhọn phía đáy ghim theo kích thước mới
+      iconAnchor: [26, 64] // Mỏ neo chuẩn xác tại chóp nhọn ở đáy
     });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
