@@ -215,9 +215,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Bay tới vị trí tâm phường/xã được chọn (nếu có), hoặc quay về toàn cảnh TP. Huế
     if (state.selectedWard) {
       const target = state.wardLabelsList.find(w => w.name === state.selectedWard);
-      if (target) map.flyTo([target.lat, target.lng], 14);
+      if (target) map.flyTo([target.lat, target.lng], 13);
     } else {
-      map.flyTo([16.4637, 107.5905], 13);
+      map.flyTo([16.4637, 107.5905], 12);
     }
   });
   
