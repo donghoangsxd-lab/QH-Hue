@@ -3,9 +3,6 @@ import { map, renderGroupedPoints } from './mapEngine.js';
 
 let chartInstance = null;
 
-// ==========================================
-// 1. QUẢN LÝ XÁC THỰC GOOGLE OAUTH ADMIN
-// ==========================================
 export function toggleAuthModal() {
   const modal = document.getElementById('authModal');
   if (!modal) return;
@@ -65,12 +62,8 @@ export function handleGoogleCredentialResponse(response) {
   }
 }
 
-// Bind Global cho SDK Google Callback
 window.handleGoogleCredentialResponse = handleGoogleCredentialResponse;
 
-// ==========================================
-// 2. MODAL BẢNG TỔNG HỢP & CHART 40 PHƯỜNG XÃ
-// ==========================================
 export function openCombinedModal() {
   const combinedModal = document.getElementById('combinedModal');
   if (!combinedModal) return;
@@ -150,12 +143,8 @@ export function closeModal() {
   if (modal) modal.style.display = 'none'; 
 }
 
-// MỞ THẲNG BẢNG CHI TIẾT 1 PHƯỜNG/XÃ (bỏ qua bước xem bảng tổng hợp 40 phường)
-// Dùng khi người dùng đang lọc bộ chọn địa bàn về 1 phường cụ thể và bấm "BẢNG TỔNG HỢP"
 export async function openWardDetailDirect(wardName) {
   try {
-    // Vẫn cần dữ liệu ma trận 40 phường để lấy đúng dân số/chỉ tiêu của phường được chọn,
-    // nhưng có cache 15 phút phía server (getWardStats) nên các lần gọi sau rất nhanh.
     const res = await fetch('/api/gee?action=getWardStats');
     const resData = await res.json();
     state.wardStatsData = resData.data || [];
@@ -164,9 +153,11 @@ export async function openWardDetailDirect(wardName) {
     console.error("Lỗi tải thống kê hạ tầng phường:", err);
   }
 }
-// Lọc điểm hạ tầng thuộc 1 phường/xã theo đúng ranh giới hình học (turf.js),
-// KHÔNG dựa vào chuỗi "Ten_XaPhuong" ghi trong Sheet - đồng bộ với logic lọc trên bản đồ
+
 function getWardInfraList(wardName) {
+  if (!wardName || wardName === "Thành phố Huế") {
+    return state.rawDataList.filter(item => (item.status === true || item.status === 'true' || item.status === 'TRUE'));
+  }
   const wardInfo = state.wardLabelsList.find(w => w.name === wardName);
   if (!wardInfo || !wardInfo.geometry) return [];
   return state.rawDataList.filter(item => {
@@ -181,13 +172,14 @@ function getWardInfraList(wardName) {
     }
   });
 }
+
 export function selectWardDetail(wardName) {
   closeModal();
 
   const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
   if (!wardData) return;
 
-   const wardInfraList = getWardInfraList(wardName);
+  const wardInfraList = getWardInfraList(wardName);
 
   const currentAreas = { "1-CV": 0, "2-BDX": 0, "3-MN": 0, "4-TH": 0, "5-THCS": 0, "6-YT": 0, "7-VH": 0, "8-TM": 0 };
   wardInfraList.forEach(item => {
@@ -293,7 +285,7 @@ function recalcWardQuota(wardName, newPopVal) {
   const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
   if (!wardData) return;
 
-    const wardInfraList = getWardInfraList(wardName);
+  const wardInfraList = getWardInfraList(wardName);
 
   const currentAreas = { "1-CV": 0, "2-BDX": 0, "3-MN": 0, "4-TH": 0, "5-THCS": 0, "6-YT": 0, "7-VH": 0, "8-TM": 0 };
   wardInfraList.forEach(item => {
