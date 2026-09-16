@@ -10,7 +10,7 @@ import {
   handleInspectPointClick,
   loadBoundaryLayer,
   loadPopulationLayer,
-  highlightWardBoundary, // <-- ĐÃ BỔ SUNG IMPORT HÀM HIGHLIGHT RANH GIỚI PHƯỜNG
+  highlightWardBoundary, 
   measureLayerGroup,
   layers,
   map as mapInstance
@@ -73,7 +73,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       state.measurePoints.push([lng, lat]); // Turf dùng [lng, lat]
 
       if (measureLayerGroup) {
-        // Vẽ marker điểm chấm
         L.circleMarker([lat, lng], { radius: 4, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 1 }).addTo(measureLayerGroup);
 
         if (state.activeMeasureType === 'distance') {
@@ -81,7 +80,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const line = turf.lineString(state.measurePoints);
             const distanceMeters = turf.length(line, { units: 'meters' });
             
-            // Vẽ đường nối
             measureLayerGroup.clearLayers();
             state.measurePoints.forEach(pt => {
               L.circleMarker([pt[1], pt[0]], { radius: 4, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 1 }).addTo(measureLayerGroup);
@@ -98,7 +96,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         } else if (state.activeMeasureType === 'area') {
           if (state.measurePoints.length >= 3) {
-            // Đảm bảo khép kín đa giác tính diện tích
             const closedCoords = [...state.measurePoints, state.measurePoints[0]];
             const polygon = turf.polygon([closedCoords]);
             const areaSqMeters = turf.area(polygon);
@@ -151,7 +148,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Thay đổi bán kính chung qua ô nhập số (ngay dưới Heatmap)
+  // Thay đổi bán kính chung qua ô nhập số
   const inputIsoRadius = document.getElementById('inputIsoRadius');
   inputIsoRadius?.addEventListener('input', (e) => {
     state.globalBufferRadiusOverride = Number(e.target.value) || 500;
@@ -187,13 +184,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // ==========================================
-  // BỘ LỌC ĐỊA BÀN (DROPDOWN): TP. HUẾ <-> 1 PHƯỜNG/XÃ CỤ THỂ
-  // ==========================================
+  // BỘ LỌC ĐỊA BÀN (DROPDOWN)
   document.getElementById('wardSelector')?.addEventListener('change', async (e) => {
     state.selectedWard = e.target.value || null;
 
-    // CHỈ TẢI DANH SÁCH ĐIỂM HẠ TẦNG KHI NGƯỜI DÙNG THỰC SỰ CHỌN DROPDOWN LẦN ĐẦU
     if (state.rawDataList.length === 0) {
       try {
         const res = await fetch('/api/gee');
@@ -205,14 +199,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    // Lọc lại toàn bộ điểm hiển thị & phân tích heatmap chỉ trong phạm vi phường/xã được chọn
     renderGroupedPoints();
     refreshHeatmapOnly();
-
-    // Highlight ranh giới phường được chọn trên bản đồ
     highlightWardBoundary(state.selectedWard);
 
-    // Bay tới vị trí tâm phường/xã được chọn (nếu có), hoặc quay về toàn cảnh TP. Huế
     if (state.selectedWard) {
       const target = state.wardLabelsList.find(w => w.name === state.selectedWard);
       if (target) map.flyTo([target.lat, target.lng], 13);
@@ -335,7 +325,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
   });
 
-  // 4. KHỞI TẠO: CHỈ TẢI DỮ LIỆU TĨNH
+  // 4. KHỞI TẠO: TẢI DỮ LIỆU TĨNH VÀ PRELOAD NGẦM
   try {
     const progressBar = document.getElementById('progressBar');
     const progressPercent = document.getElementById('progressPercent');
@@ -359,6 +349,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (progressBar) progressBar.style.width = "100%";
     if (progressPercent) progressPercent.innerText = "100%";
+
+    // PRELOAD NGẦM DỮ LIỆU HẠ TẦNG TĂNG TỐC TƯƠNG TÁC
+    setTimeout(async () => {
+      try {
+        const res = await fetch('/api/gee');
+        const data = await res.json();
+        state.rawDataList = data.rawDataList || [];
+      } catch (e) {
+        console.log("Preload background data skipped.");
+      }
+    }, 500);
+
   } catch (err) {
     console.error("Lỗi khởi tạo dữ liệu tĩnh bản đồ:", err);
   }
