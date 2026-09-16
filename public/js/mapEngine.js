@@ -247,25 +247,27 @@ export function renderGroupedPoints() {
     const strokeDash = isApproved ? '' : 'stroke-dasharray="3,3"';
     const fillColor = isApproved ? baseColor : 'rgba(239, 68, 68, 0.4)';
 
-    // Xử lý biểu tượng bên trong: Nếu là y tế dùng dấu cộng vector chuẩn đẹp tuyệt đối, các loại khác dùng emoji/symbol
-    let innerSymbolHtml = `<text x="12" y="10.5" font-size="12px" text-anchor="middle" dominant-baseline="central" fill="#ffffff">${cfg.symbol}</text>`;
+    // Xử lý biểu tượng bên trong: Y tế dùng dấu cộng vector mảnh chuẩn sắc nét, các loại khác dùng emoji/symbol rõ ràng
+    let innerSymbolHtml = `<text x="12" y="10" font-size="11.5px" text-anchor="middle" dominant-baseline="central">${cfg.symbol}</text>`;
     if (p.type === "6-YT") {
-      // Dấu cộng y tế chuẩn SVG đối xứng, không bị lệch
-      innerSymbolHtml = `<path d="M13.5 8.5H15c.55 0 1 .45 1 1s-.45 1-1 1h-1.5V12c0 .55-.45 1-1 1s-1-.45-1-1v-1.5H9.5c-.55 0-1-.45-1-1s.45-1 1-1H11.5V7c0-.55.45-1 1-1s1 .45 1 1v1.5z" fill="#ffffff"/>`;
+      // Dấu cộng y tế thiết kế phẳng, hiện đại và tinh tế
+      innerSymbolHtml = `<path d="M12 7.5v5M9.5 10h5" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round"/>`;
     }
 
-    // Path chuẩn mẫu huy hiệu tròn to phần đầu, thon nhọn ở chân + lỗ khoét tròn rỗng ở tâm
+    // Cấu trúc SVG hoàn thiện: Ghim màu đặc + Vòng tròn trắng nổi bật + Biểu tượng sắc nét ở tâm
     const svgPinHtml = `
-      <svg width="52" height="64" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.6)); overflow: visible;">
-        <!-- Khung ghim dạng tròn phình to ở trên, thuôn bầu nhẹ xuống đáy -->
-        <path d="M12 2C7.03 2 3 6.03 3 11c0 4.5 9 19 9 19s9-14.5 9-19c0-4.97-4.03-9-9-9zm0 13.5c-2.48 0-4.5-2.02-4.5-4.5s2.02-4.5 4.5-4.5 4.5 2.02 4.5 4.5-2.02 4.5-4.5 4.5z" 
+      <svg width="48" height="58" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.5)); overflow: visible;">
+        <!-- Khung ghim giọt nước chuẩn tỷ lệ, bo tròn phần đầu, nhọn ở đáy -->
+        <path d="M12 2C7.58 2 4 5.58 4 10c0 4.5 8 18 8 18s8-13.5 8-18c0-4.42-3.58-8-8-8z" 
               fill="${fillColor}" 
               stroke="${strokeColor}" 
               stroke-width="1.5" 
-              fill-rule="evenodd"
               ${strokeDash}/>
         
-        <!-- Biểu tượng đặt chuẩn ngay ngắn tại tâm phần đầu tròn -->
+        <!-- Vòng tròn nền trắng sạch sẽ ở tâm -->
+        <circle cx="12" cy="10" r="5.8" fill="#ffffff" stroke="${isApproved ? baseColor : '#f87171'}" stroke-width="0.6"/>
+        
+        <!-- Biểu tượng căn chuẩn tuyệt đối ở trung tâm -->
         ${innerSymbolHtml}
       </svg>
     `;
@@ -273,8 +275,8 @@ export function renderGroupedPoints() {
     const customDivIcon = L.divIcon({
       className: 'custom-infra-icon-svg',
       html: svgPinHtml,
-      iconSize: [52, 64], 
-      iconAnchor: [26, 32] // Mỏ neo chuẩn xác tại chóp nhọn phía đáy ghim
+      iconSize: [48, 58], 
+      iconAnchor: [24, 58] // Mỏ neo chuẩn xác tại chóp nhọn ở đáy ghim
     });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
