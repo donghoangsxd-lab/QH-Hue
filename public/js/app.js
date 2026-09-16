@@ -10,6 +10,7 @@ import {
   handleInspectPointClick,
   loadBoundaryLayer,
   loadPopulationLayer,
+  highlightWardBoundary, // <-- ĐÃ BỔ SUNG IMPORT HÀM HIGHLIGHT RANH GIỚI PHƯỜNG
   measureLayerGroup,
   layers,
   map as mapInstance
@@ -159,10 +160,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Độ trong suốt Heatmap
-    const heatOpacity = document.getElementById('heatOpacity');
+  const heatOpacity = document.getElementById('heatOpacity');
   heatOpacity?.addEventListener('input', () => refreshHeatmapOnly());
 
-  // Độ trong suốt Dân cư (trước đây thanh trượt này không hoạt động do chưa từng gắn sự kiện)
+  // Độ trong suốt Dân cư
   document.getElementById('popOpacity')?.addEventListener('input', (e) => {
     const val = e.target.value / 100;
     layers.pop.eachLayer(l => l.setOpacity && l.setOpacity(val));
@@ -186,7 +187,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-    // ==========================================
+  // ==========================================
   // BỘ LỌC ĐỊA BÀN (DROPDOWN): TP. HUẾ <-> 1 PHƯỜNG/XÃ CỤ THỂ
   // ==========================================
   document.getElementById('wardSelector')?.addEventListener('change', async (e) => {
@@ -207,6 +208,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Lọc lại toàn bộ điểm hiển thị & phân tích heatmap chỉ trong phạm vi phường/xã được chọn
     renderGroupedPoints();
     refreshHeatmapOnly();
+
+    // Highlight ranh giới phường được chọn trên bản đồ
+    highlightWardBoundary(state.selectedWard);
 
     // Bay tới vị trí tâm phường/xã được chọn (nếu có), hoặc quay về toàn cảnh TP. Huế
     if (state.selectedWard) {
@@ -246,7 +250,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Modal & Dockbar Navigation
-  // Nếu đang lọc theo 1 phường/xã cụ thể -> mở thẳng bảng chi tiết phường đó (bỏ qua bảng tổng hợp 40 phường)
   document.getElementById('btnOpenCombinedModal')?.addEventListener('click', () => {
     if (state.selectedWard) {
       openWardDetailDirect(state.selectedWard);
@@ -332,7 +335,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
   });
 
-    // 4. KHỞI TẠO: CHỈ TẢI DỮ LIỆU TĨNH (ranh giới 40 phường xã + raster dân số)
+  // 4. KHỞI TẠO: CHỈ TẢI DỮ LIỆU TĨNH
   try {
     const progressBar = document.getElementById('progressBar');
     const progressPercent = document.getElementById('progressPercent');
@@ -341,7 +344,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await Promise.all([loadBoundaryLayer(), loadPopulationLayer()]);
 
-    // Nạp danh sách 40 phường/xã vào Dropdown (dữ liệu đã có sẵn từ loadBoundaryLayer)
     const wardSelector = document.getElementById('wardSelector');
     if (wardSelector) {
       state.wardLabelsList
