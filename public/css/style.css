@@ -59,7 +59,7 @@ body, html {
   box-shadow: 0 0 10px var(--accent-orange);
 }
 
-/* DROPDOWN BỘ LỌC ĐỊA BÀN (TP. HUẾ <-> 1 PHƯỜNG/XÃ) */
+/* DROPDOWN BỘ LỌC ĐỊA BÀN */
 .ward-selector-dropdown {
   background: rgba(15, 23, 42, 0.85);
   color: var(--accent-cyan);
@@ -211,14 +211,12 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
 
 @media (min-width: 769px) {
   .leaflet-control-zoom { display: none !important; }
-  .topbar-row { position: absolute; top: 16px; left: 16px; z-index: 1000; width: 400px; display: flex; gap: 8px; align-items: center; }
-  .topbar-header { flex: 1; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; gap: 8px; overflow: visible !important; }
-  .btn-toggle-layer-top { display: inline-flex !important; }
-  .toolbar-row { position: absolute; top: 68px; left: 16px; z-index: 1000; width: 400px; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between; }
-  .toolbar-row .ui-btn-format { flex: 1; padding: 8px 4px; font-size: 11px; }
-  .btn-zoom-desktop { display: inline-flex !important; }
-  .dockbar-bottom-row { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; padding: 6px 16px; display: flex; gap: 8px; align-items: center; border-radius: 30px; width: auto; }
-  .dockbar-bottom-row .ui-btn-format { padding: 8px 16px; font-size: 11.5px; border-radius: 20px; }
+  .topbar-row { position: absolute; top: 12px; left: 16px; z-index: 1000; width: 400px; display: flex; gap: 8px; align-items: center; }
+  .topbar-header { flex: 1; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; gap: 8px; height: 38px; overflow: visible !important; }
+  .toolbar-row { position: absolute; top: 54px; left: 16px; z-index: 1000; width: 400px; padding: 4px 6px; display: flex; align-items: center; justify-content: space-between; height: 34px; }
+  .toolbar-row .ui-btn-format { flex: 1; padding: 4px 4px; font-size: 11px; height: 26px; }
+  .dockbar-bottom-row { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 1000; padding: 4px 12px; display: flex; gap: 8px; align-items: center; border-radius: 20px; height: 38px; width: auto; }
+  .dockbar-bottom-row .ui-btn-format { padding: 4px 12px; font-size: 11.5px; border-radius: 14px; height: 28px; }
   .sidebar-panel { position: absolute; top: 16px; right: 16px; z-index: 1000; width: 300px; display: block; transition: transform 0.25s ease, opacity 0.25s ease; }
   .sidebar-panel.closed { display: none !important; }
   .tab-btn { font-size: 12px; }
@@ -228,14 +226,12 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
 
 @media (max-width: 768px) {
   .leaflet-control-zoom { display: none !important; }
-  .topbar-row { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 1000; display: flex; gap: 8px; align-items: center; }
-  .topbar-header { flex: 1; padding: 8px 10px; display: flex; align-items: center; gap: 6px; font-size: 11px; justify-content: space-between; overflow: visible !important; }
-  .progress-bar-bg { flex: 1; }
-  .ward-selector-dropdown { max-width: 110px; font-size: 10px; }
-  .toolbar-row { position: absolute; top: 58px; left: 12px; right: 12px; z-index: 1000; padding: 4px; display: flex; align-items: center; }
-  .toolbar-row .ui-btn-format { flex: 1; padding: 8px 2px; font-size: 10.5px; }
-  .dockbar-bottom-row { position: absolute; bottom: 12px; left: 12px; right: 12px; z-index: 1000; padding: 4px; display: flex; align-items: center; }
-  .dockbar-bottom-row .ui-btn-format { flex: 1; padding: 10px 2px; font-size: 11px; }
+  .topbar-row { position: absolute; top: 10px; left: 12px; right: 12px; z-index: 1000; display: flex; gap: 8px; align-items: center; }
+  .topbar-header { flex: 1; padding: 6px 8px; display: flex; align-items: center; gap: 6px; font-size: 11px; height: 36px; justify-content: space-between; overflow: visible !important; }
+  .toolbar-row { position: absolute; top: 50px; left: 12px; right: 12px; z-index: 1000; padding: 3px; display: flex; align-items: center; height: 32px; }
+  .toolbar-row .ui-btn-format { flex: 1; padding: 4px 2px; font-size: 10px; height: 24px; }
+  .dockbar-bottom-row { position: absolute; bottom: 10px; left: 12px; right: 12px; z-index: 1000; padding: 3px; display: flex; align-items: center; height: 36px; }
+  .dockbar-bottom-row .ui-btn-format { flex: 1; padding: 4px 2px; font-size: 10.5px; height: 26px; }
   .sidebar-panel { position: absolute; top: 104px; left: 12px; right: 12px; z-index: 999; display: none; }
   .sidebar-panel.open { display: block; }
   .add-point-card { bottom: 65px; left: 12px; right: 12px; }
