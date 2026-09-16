@@ -23,7 +23,6 @@ export const layers = {
 let tileHeatmapLayer = null;
 let wardLabelMarkers = [];
 
-// Kiểm tra 1 điểm (lat,lng) có nằm trong ranh giới hình học thật của 1 phường/xã hay không
 function isPointInWardGeometry(lat, lng, geometry) {
   if (!geometry) return false;
   try {
@@ -35,9 +34,8 @@ function isPointInWardGeometry(lat, lng, geometry) {
   }
 }
 
-// Trả về danh sách điểm hạ tầng thuộc phạm vi phường/xã đang chọn (lọc theo hình học ranh giới thật)
 function getWardFilteredList(sourceList) {
-  if (!state.selectedWard) return sourceList;
+  if (!state.selectedWard || state.selectedWard === "Thành phố Huế") return sourceList;
   const wardInfo = state.wardLabelsList.find(w => w.name === state.selectedWard);
   if (!wardInfo || !wardInfo.geometry) return sourceList;
   return sourceList.filter(p => isPointInWardGeometry(p.lat, p.lng, wardInfo.geometry));
@@ -75,7 +73,6 @@ export function initMap() {
   return map;
 }
 
-// TẢI RANH GIỚI 40 PHƯỜNG XÃ (TILE ẢNH) + TÊN PHƯỜNG XÃ TẠI VỊ TRÍ TÂM
 export async function loadBoundaryLayer() {
   if (!map) return;
 
@@ -113,12 +110,11 @@ export async function loadBoundaryLayer() {
   }
 }
 
-// HÀM HIGHLIGHT RANH GIỚI PHƯỜNG KHI CHỌN TỪ DROPLIST
 export function highlightWardBoundary(wardName) {
   if (!layers.highlightWard) return;
   layers.highlightWard.clearLayers();
 
-  if (!wardName) return;
+  if (!wardName || wardName === "Thành phố Huế") return;
 
   const wardInfo = state.wardLabelsList.find(w => w.name === wardName);
   if (wardInfo && wardInfo.geometry) {
@@ -165,7 +161,9 @@ export function toggleLayer(layerKey, isChecked) {
       map.addLayer(layers[layerKey]);
     }
   } else {
-    if (layers[layerKey]) {
+    if (layerKey === 'heatmap') {
+      layers.heatmap.clearLayers();
+    } else if (layers[layerKey]) {
       map.removeLayer(layers[layerKey]);
     }
   }
@@ -237,7 +235,6 @@ export function renderGroupedPoints() {
 
   const sourceList = getWardFilteredList(state.rawDataList);
 
-  // Từ điển ánh xạ file PNG gốc (Đã duyệt) và file viền đỏ (Chưa duyệt) khớp 100% với GitHub
   const iconFiles = {
     "1-CV": { approved: "Park.png", pending: "Park2.png" },
     "2-BDX": { approved: "Parking.png", pending: "Parking2.png" },
@@ -247,7 +244,7 @@ export function renderGroupedPoints() {
     "6-YT": { approved: "Yte.png", pending: "Yte2.png" },
     "7-VH": { approved: "Vanhoa.png", pending: "Vanhoa2.png" },
     "8-TM": { approved: "Cho.png", pending: "Cho2.png" },
-    "9-CSD": { approved: "Unused.png", pending: "Unused2.png" } // Quỹ đất tiềm năng
+    "9-CSD": { approved: "Unused.png", pending: "Unused2.png" }
   };
 
   sourceList.forEach(p => {
@@ -256,19 +253,16 @@ export function renderGroupedPoints() {
     
     const categoryIcons = iconFiles[p.type] || { approved: "Park.png", pending: "Park2.png" };
     const fileName = isApproved ? categoryIcons.approved : categoryIcons.pending;
-
-    // Đường dẫn trỏ trực tiếp đến thư mục icons
     const iconUrl = `./icons/${fileName}`;
 
-    // Kích thước chuẩn gọn gàng 22x27px kèm hiệu ứng bóng đổ sắc nét
     const imgHtml = `<img src="${iconUrl}" style="width: 22px; height: 27px; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.5));" />`;
 
     const customDivIcon = L.divIcon({
-  className: 'custom-infra-icon-png',
-  html: imgHtml,
-  iconSize: [26, 32],      // Tăng khoảng 20%
-  iconAnchor: [13, 32]     // Neo tại tâm đáy mới
-});
+      className: 'custom-infra-icon-png',
+      html: imgHtml,
+      iconSize: [26, 32],
+      iconAnchor: [13, 32]
+    });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
     marker.on('click', () => onPointClick(p, marker));
@@ -276,7 +270,6 @@ export function renderGroupedPoints() {
   });
 }
 
-// HÀM HIGHLIGHT ĐƠN LẺ ISOCHRONE KHI CLICK CHỌN ĐIỂM
 export async function highlightSingleIsochrone(lat, lng, radius) {
   if (!layers.singleIso) return;
   layers.singleIso.clearLayers();
@@ -287,9 +280,9 @@ export async function highlightSingleIsochrone(lat, lng, radius) {
     if (data && data.geometry) {
       const geoLayer = L.geoJSON(data, {
         style: {
-          color: 'var(--accent-cyan)',
-          weight: 2.5,
-          dashArray: '5,5',
+          color: '#ffffff',
+          weight: 1,
+          dashArray: '3,3',
           fillColor: 'var(--accent-cyan)',
           fillOpacity: 0.18
         }
@@ -303,7 +296,7 @@ export async function highlightSingleIsochrone(lat, lng, radius) {
 
 export async function refreshHeatmapOnly() {
   const heatOpacityEl = document.getElementById('heatOpacity');
-  const currentOpacity = heatOpacityEl ? heatOpacityEl.value / 100 : 0.5;
+  const currentOpacity = heatOpacityEl ? heatOpacityEl.value / 100 : 0.3; // Mặc định 30%
   const overrideRad = state.globalBufferRadiusOverride || 0;
 
   const bufferGroups = {
@@ -346,9 +339,10 @@ export async function refreshHeatmapOnly() {
       const cfg = infraIcons[props.type] || { border: "var(--accent-cyan)" };
       const targetBufferGroup = bufferGroups[props.type] || layers.b9;
 
+      // ĐỔI MÀU VIỀN BUFFER THÀNH MÀU TRẮNG, NÉT MẢNH
       const style = isApproved
         ? { color: '#ffffff', weight: 1, fillColor: cfg.border || '#38bdf8', fillOpacity: 0.10 }
-        : { color: 'var(--accent-red)', weight: 1.5, dashArray: '4,4', fillColor: 'var(--accent-red)', fillOpacity: 0.10 };
+        : { color: '#ffffff', weight: 1.2, dashArray: '3,3', fillColor: 'var(--accent-red)', fillOpacity: 0.10 };
 
       targetBufferGroup.addLayer(L.geoJSON(feat, { style }));
     });
@@ -430,14 +424,14 @@ export function onPointClick(p, marker) {
           const popVal = res.servedPop || 0;
           const popContainer = document.getElementById('servedPopText');
           if (popContainer) {
-            popContainer.innerHTML = `• Dân số phục vụ DỰ KIẾN: ~<b style="color:var(--accent-red);">${popVal.toLocaleString()} người</b>`;
+            popContainer.innerHTML = `• Dân số phục vụ: ~<b style="color:var(--accent-red);">${popVal.toLocaleString()} người</b>`;
           }
         });
     }
 
   } else if (p.type !== "9-CSD") {
     contentHtml += `<div id="servedPopText">
-      <div style="color:var(--accent-orange); font-weight:bold; margin-top:4px;">• Dân số phục vụ CHÍNH THỨC: <span id="popValText">0%</span></div>
+      <div style="color:var(--accent-orange); font-weight:bold; margin-top:4px;">• Dân số phục vụ: <span id="popValText">0%</span></div>
       <div class="inline-progress-bg"><div class="inline-progress-fill" style="background:var(--accent-orange);" id="popValBar"></div></div>
     </div>`;
     contentHtml += `</div>`;
@@ -483,7 +477,6 @@ export function onPointClick(p, marker) {
   }
 }
 
-// TẢI LỚP RASTER DÂN SỐ
 export async function loadPopulationLayer() {
   if (!map) return;
   try {
