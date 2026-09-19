@@ -18,9 +18,9 @@ export const state = {
   wardLabelsList: [],
 
   // Bán kính đệm Buffer & Isochrone Giao thông mặc định (mét)
-globalBufferRadius: 500,
-globalBufferRadiusOverride: 0,
-isochroneRadius: 500,
+  globalBufferRadius: 500,
+  globalBufferRadiusOverride: null,
+  isochroneRadius: 500,
 
   // Layer Group lưu các đa giác Isochrone giao thông
   isochroneLayerGroup: null,
