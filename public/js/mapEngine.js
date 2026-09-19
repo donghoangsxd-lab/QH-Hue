@@ -157,13 +157,22 @@ export function toggleLayer(layerKey, isChecked) {
   if (!map) return;
   if (isChecked) {
     if (layerKey === 'heatmap') {
-      refreshHeatmapOnly();
+      if (!map.hasLayer(layers.heatmap)) {
+        map.addLayer(layers.heatmap);
+      }
+      if (tileHeatmapLayer && !layers.heatmap.hasLayer(tileHeatmapLayer)) {
+        layers.heatmap.addLayer(tileHeatmapLayer);
+      } else if (!tileHeatmapLayer) {
+        refreshHeatmapOnly();
+      }
     } else if (layers[layerKey]) {
       map.addLayer(layers[layerKey]);
     }
   } else {
     if (layerKey === 'heatmap') {
-      layers.heatmap.clearLayers();
+      if (map.hasLayer(layers.heatmap)) {
+        map.removeLayer(layers.heatmap);
+      }
     } else if (layers[layerKey]) {
       map.removeLayer(layers[layerKey]);
     }
@@ -236,7 +245,6 @@ export function renderGroupedPoints() {
 
   const sourceList = getWardFilteredList(state.rawDataList);
 
-  // Khắc phục lỗi Pie Chart: Cập nhật hoặc ẩn biểu đồ dựa vào việc chọn phường xã
   if (state.selectedWard && state.selectedWard !== "Thành phố Huế") {
     updateInfraPieChart(sourceList);
   } else {
@@ -278,13 +286,13 @@ export function renderGroupedPoints() {
   });
 }
 
-// 16 HƯỚNG DÙNG CHO CHI TIẾT KHI CLICK ĐIỂM
 export async function highlightSingleIsochrone(lat, lng, radius) {
   if (!layers.singleIso) return;
   layers.singleIso.clearLayers();
 
   try {
     const res = await fetch(`/api/gee?action=getSingleIsochrone&lat=${lat}&lng=${lng}&radius=${radius}`);
+    if (!res.ok) return;
     const data = await res.json();
     if (data && data.geometry) {
       const geoLayer = L.geoJSON(data, {
@@ -303,7 +311,10 @@ export async function highlightSingleIsochrone(lat, lng, radius) {
   }
 }
 
+let heatmapFetchSeq = 0;
+
 export async function refreshHeatmapOnly() {
+  const currentSeq = ++heatmapFetchSeq;
   const heatOpacityEl = document.getElementById('heatOpacity');
   const currentOpacity = heatOpacityEl ? heatOpacityEl.value / 100 : 0.3;
   const overrideRad = state.globalBufferRadiusOverride || 0;
@@ -315,13 +326,11 @@ export async function refreshHeatmapOnly() {
   };
   Object.keys(bufferGroups).forEach(k => bufferGroups[k].clearLayers());
 
-  // Lấy danh sách đã lọc theo phường được chọn từ droplist (nếu có)
   const scopedList = getWardFilteredList(state.rawDataList).filter(item => {
     const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
     if (item.type === "9-CSD") {
       return isApproved;
     }
-    // Đảm bảo chỉ lấy các công trình đã duyệt hoặc hiển thị đúng theo ngữ cảnh
     return true; 
   });
 
@@ -336,13 +345,15 @@ export async function refreshHeatmapOnly() {
   }
 
   try {
-    // Gọi GEE tạo buffer/isochrone giới hạn theo phạm vi hiện tại (Toàn thành phố hoặc riêng Phường được chọn)
     const isoRes = await fetch('/api/gee?action=getIsochrone', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ features: allFeaturesInput })
     });
+    if (!isoRes.ok) return;
     const isoData = await isoRes.json();
+    if (currentSeq !== heatmapFetchSeq) return;
+
     const isoFeatures = (isoData && isoData.features) || [];
 
     isoFeatures.forEach(feat => {
@@ -363,20 +374,26 @@ export async function refreshHeatmapOnly() {
       return (s === true || s === 'true' || s === 'TRUE');
     });
 
-    // Tạo tile heatmap tương ứng với tập dữ liệu (đã được cô lập theo phường nếu người dùng chọn droplist)
     const heatRes = await fetch(`/api/gee?action=getHeatmapTile&t=${Date.now()}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ features: approvedFeatures })
     });
+    if (!heatRes.ok) return;
     const d = await heatRes.json();
+    if (currentSeq !== heatmapFetchSeq) return;
 
     if (d.urlFormat) {
       layers.heatmap.clearLayers();
       tileHeatmapLayer = L.tileLayer(d.urlFormat, { opacity: currentOpacity });
+      window.currentHeatmapTileLayer = tileHeatmapLayer;
+      
       const chkHeat = document.getElementById('chk_heat');
       if (chkHeat && chkHeat.checked && map) {
-        tileHeatmapLayer.addTo(layers.heatmap);
+        layers.heatmap.addLayer(tileHeatmapLayer);
+        if (!map.hasLayer(layers.heatmap)) {
+          map.addLayer(layers.heatmap);
+        }
       }
     }
   } catch (err) {
@@ -531,6 +548,7 @@ export async function handleInspectPointClick(clickLat, clickLng) {
         }))
       })
     });
+    if (!res.ok) return;
     const isochroneGeoJSON = await res.json();
     const clickPointGeo = turf.point([clickLng, clickLat]);
 
