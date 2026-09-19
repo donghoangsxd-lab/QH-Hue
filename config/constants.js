@@ -7,8 +7,7 @@ const constants = {
   // Cấu hình thuật toán Isochrone Giao thông (90% Di chuyển + 10% Offset làm mịn)
   ISOCHRONE_CONFIG: {
     REACH_RATIO: 0.9,  // 90% bán kính di chuyển thực tế theo đường giao thông
-    OFFSET_RATIO: 0.1, // 10% bán kính đệm làm mịn polygon
-    SAMPLE_ANGLES: 12  // 12 hướng bức xạ tính toán polygon
+    OFFSET_RATIO: 0.1  // 10% bán kính đệm làm mịn polygon
   },
 
   // Danh sách mã nhóm hạ tầng tiêu chuẩn phục vụ đánh giá quy chuẩn
