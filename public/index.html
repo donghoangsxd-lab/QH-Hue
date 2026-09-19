@@ -15,54 +15,42 @@
 
   <div id="map"></div>
 
-  <!-- WIDGET PIE CHART (DONUT) TRONG SUỐT, GÓC TRÊN BÊN TRÁI -->
+  <!-- WIDGET DONUT CHART TRONG SUỐT, GÓC TRÊN BÊN TRÁI -->
   <div class="infra-pie-widget-transparent" id="infraPieWidget" style="display:none;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-      <b style="color:var(--accent-cyan); font-size:10.5px;">📊 TỶ TRỌNG ĐẤT</b>
+      <b style="color:var(--accent-cyan); font-size:10px;">📊 TỶ TRỌNG ĐẤT</b>
       <span id="btnClosePie" style="cursor:pointer; font-weight:bold; color:var(--accent-red); font-size:11px;">✕</span>
     </div>
-    <div style="height:120px; position:relative;">
+    <div style="height:110px; position:relative;">
       <canvas id="infraPieChart"></canvas>
     </div>
   </div>
 
-  <!-- HÀNG 1: TOPBAR TRÊN CÙNG (CHỈ CÒN TIÊU ĐỀ VÀ DROPDOWN ĐỊA BÀN) -->
-  <div class="topbar-row">
-    <div class="topbar-header ui-panel-format" style="width: 100%;">
-      <div style="display:flex; align-items:center; gap:6px; white-space:nowrap; width: 100%; justify-content: space-between;">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <b style="color:var(--accent-cyan); white-space:nowrap;">🏛️ BẢN ĐỒ HẠ TẦNG</b>
-          <select id="wardSelector" class="ward-selector-dropdown" title="Lọc theo địa bàn phường/xã">
-            <option value="">Chọn để xem...</option>
-            <option value="Thành phố Huế">Thành phố Huế</option>
-          </select>
-        </div>
-        <div style="display:flex; align-items:center; gap:6px; max-width:80px;">
-          <div class="progress-bar-bg" style="flex:1;"><div class="progress-bar-fill" id="progressBar"></div></div>
-          <span id="progressPercent" style="color:var(--accent-green); font-weight:bold; white-space:nowrap; font-size:10px;">0%</span>
-        </div>
-      </div>
-    </div>
+  <!-- THANH CÔNG CỤ DỌC BÊN TRÁI (6 NÚT) -->
+  <div class="vertical-toolbar ui-panel-format">
+    <button class="ui-btn-format" id="btnZoomIn" title="Phóng to bản đồ">➕</button>
+    <button class="ui-btn-format" id="btnZoomOut" title="Thu nhỏ bản đồ">➖</button>
+    <button class="ui-btn-format" id="btnMeasureDist" title="Đo chiều dài">📏</button>
+    <button class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích">📐</button>
+    <button class="ui-btn-format" id="btnToggleSidebar" title="Quản lý lớp dữ liệu">⚙️</button>
+    <button class="ui-btn-format" id="btnAuth" title="Đăng nhập Quản trị">🔑</button>
   </div>
 
-  <!-- HÀNG 2: THANH NÚT CÔNG CỤ (GỒM ĐÚNG 06 NÚT HÌNH VUÔNG: +, -, THƯỚC, EKE, LAYER, CHÌA KHÓA) -->
-  <div class="toolbar-row ui-panel-format">
-    <button class="ui-btn-format square-tool-btn" id="btnZoomIn" title="Phóng to (+)">➕</button>
-    <button class="ui-btn-format square-tool-btn" id="btnZoomOut" title="Thu nhỏ (-)">➖</button>
-    <button class="ui-btn-format square-tool-btn" id="btnMeasureDist" title="Đo chiều dài">📏</button>
-    <button class="ui-btn-format square-tool-btn" id="btnMeasureArea" title="Đo diện tích">📐</button>
-    <button class="ui-btn-format square-tool-btn" id="btnToggleSidebar" title="Quản lý lớp bản đồ">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-cyan);">
-        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-        <path d="M2 17l10 5 10-5"></path>
-        <path d="M2 12l10 5 10-5"></path>
-      </svg>
-    </button>
-    <button class="ui-btn-format square-tool-btn" id="btnAuth" title="Đăng nhập Quản trị (Admin)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-cyan);">
-        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
-      </svg>
-    </button>
+  <!-- TOPBAR THU GỌN VỪA KHÍT -->
+  <div class="topbar-row">
+    <div class="topbar-header ui-panel-format">
+      <div style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
+        <b style="color:var(--accent-cyan); font-size:11px; white-space:nowrap;">🏛️ HẠ TẦNG HUẾ</b>
+        <select id="wardSelector" class="ward-selector-dropdown" title="Lọc theo địa bàn phường/xã">
+          <option value="">Chọn phường...</option>
+          <option value="Thành phố Huế">Thành phố Huế</option>
+        </select>
+      </div>
+      <div style="display:flex; align-items:center; gap:6px; margin-left: 8px;">
+        <div class="progress-bar-bg" style="width: 45px;"><div class="progress-bar-fill" id="progressBar"></div></div>
+        <span id="progressPercent" style="color:var(--accent-green); font-weight:bold; font-size:10px;">0%</span>
+      </div>
+    </div>
   </div>
 
   <!-- SIDEBAR PANEL -->
