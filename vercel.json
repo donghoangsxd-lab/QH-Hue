@@ -1,9 +1,13 @@
 {
-  "version": 2,
-  "rewrites": [
+  "functions": {
+    "api/gee.js": {
+      "maxDuration": 60
+    }
+  },
+  "routes": [
     {
-      "source": "/api/gee",
-      "destination": "/api/gee.js"
+      "src": "/api/gee",
+      "dest": "/api/gee.js"
     }
   ]
 }
