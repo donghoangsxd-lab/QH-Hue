@@ -103,21 +103,28 @@ module.exports = async (req, res) => {
     // 1. TỔNG QUÁT: DÙNG BÁN KÍNH TRÒN TRỰC TIẾP TRÊN GEE (CỰC KỲ NHANH, KHÔNG TIMEOUT)
     if (action === 'getIsochrone') {
       const { features } = req.body || {};
-      if (!features || !Array.isArray(features)) {
-        return res.status(400).json({ success: false, message: 'Invalid features array' });
+      
+      // Kiểm tra an toàn: Nếu features không hợp lệ hoặc rỗng, trả về FeatureCollection rỗng để tránh lỗi 500
+      if (!features || !Array.isArray(features) || features.length === 0) {
+        return res.json({ type: 'FeatureCollection', features: [] });
       }
 
       // Xử lý tạo hình tròn buffer server-side bằng GEE .buffer() thuần túy
-      const fc = ee.FeatureCollection(features.map(item => {
-        const effectiveRadius = item.radius || item.banKinh || 500;
+      const validFeatures = features.filter(item => item && typeof item.lat === 'number' && typeof item.lng === 'number');
+      if (validFeatures.length === 0) {
+        return res.json({ type: 'FeatureCollection', features: [] });
+      }
+
+      const fc = ee.FeatureCollection(validFeatures.map(item => {
+        const effectiveRadius = Number(item.radius) || Number(item.banKinh) || 500;
         const geom = ee.Geometry.Point([item.lng, item.lat]).buffer(effectiveRadius);
         return ee.Feature(geom, {
-          id: item.id,
-          name: item.name,
-          type: item.type,
-          ward: item.ward,
+          id: item.id || '',
+          name: item.name || '',
+          type: item.type || '',
+          ward: item.ward || '',
           banKinh: effectiveRadius,
-          status: item.status
+          status: item.status ?? false
         });
       }));
 
