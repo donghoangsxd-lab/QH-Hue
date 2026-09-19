@@ -102,38 +102,50 @@ module.exports = async (req, res) => {
 
     // 1. TỔNG QUÁT: DÙNG BÁN KÍNH TRÒN TRỰC TIẾP TRÊN GEE (CỰC KỲ NHANH, KHÔNG TIMEOUT)
     if (action === 'getIsochrone') {
-      const { features } = req.body || {};
+      // Đảm bảo parse an toàn body dù client gửi dưới dạng string hay object JSON
+      let requestBody = req.body || {};
+      if (typeof requestBody === 'string') {
+        try { requestBody = JSON.parse(requestBody); } catch (e) { requestBody = {}; }
+      }
       
-      // Kiểm tra an toàn: Nếu mảng features rỗng hoặc không hợp lệ, trả về FeatureCollection rỗng để tránh lỗi 500[cite: 4]
+      const features = requestBody.features;
+      
+      // Kiểm tra an toàn: Nếu không có features hoặc mảng rỗng, trả về FeatureCollection rỗng (Mã 200) thay vì lỗi 500[cite: 4]
       if (!features || !Array.isArray(features) || features.length === 0) {
-        return res.json({ type: 'FeatureCollection', features: [] });
+        return res.status(200).json({ type: 'FeatureCollection', features: [] });
       }
 
-      // Lọc các phần tử thực sự có tọa độ lat, lng hợp lệ (kiểu số)[cite: 4]
+      // Lọc các phần tử thực sự có tọa độ lat, lng hợp lệ[cite: 4]
       const validFeatures = features.filter(item => item && typeof item.lat === 'number' && typeof item.lng === 'number');
       if (validFeatures.length === 0) {
-        return res.json({ type: 'FeatureCollection', features: [] });
+        return res.status(200).json({ type: 'FeatureCollection', features: [] });
       }
 
-      // Xử lý tạo hình tròn buffer server-side bằng GEE .buffer() thuần túy[cite: 4]
-      const fc = ee.FeatureCollection(validFeatures.map(item => {
-        const effectiveRadius = Number(item.radius) || Number(item.banKinh) || 500;
-        const geom = ee.Geometry.Point([item.lng, item.lat]).buffer(effectiveRadius);
-        return ee.Feature(geom, {
-          id: item.id || '',
-          name: item.name || '',
-          type: item.type || '',
-          ward: item.ward || '',
-          banKinh: effectiveRadius,
-          status: item.status ?? false
+      try {
+        // Xử lý tạo hình tròn buffer server-side bằng GEE .buffer() thuần túy[cite: 4]
+        const fc = ee.FeatureCollection(validFeatures.map(item => {
+          const effectiveRadius = Number(item.radius) || Number(item.banKinh) || 500;
+          const geom = ee.Geometry.Point([item.lng, item.lat]).buffer(effectiveRadius);
+          return ee.Feature(geom, {
+            id: item.id || '',
+            name: item.name || '',
+            type: item.type || '',
+            ward: item.ward || '',
+            banKinh: effectiveRadius,
+            status: item.status ?? false
+          });
+        }));
+
+        const evaluatedFc = await new Promise((resolve, reject) => {
+          fc.evaluate((res, err) => err ? reject(err) : resolve(res));
         });
-      }));
 
-      const evaluatedFc = await new Promise((resolve, reject) => {
-        fc.evaluate((res, err) => err ? reject(err) : resolve(res));
-      });
-
-      return res.json(evaluatedFc || { type: 'FeatureCollection', features: [] });
+        return res.status(200).json(evaluatedFc || { type: 'FeatureCollection', features: [] });
+      } catch (geeErr) {
+        console.error("GEE Evaluation Internal Error:", geeErr.message);
+        // Bắt mọi lỗi phát sinh từ phía GEE và trả về mảng rỗng để client không bị gián đoạn giao diện[cite: 4]
+        return res.status(200).json({ type: 'FeatureCollection', features: [] });
+      }
     }
 
     // CHI TIẾT ĐIỂM: DÙNG ISOCHRONE 16 HƯỚNG KHI CLICK VÀO 1 ĐIỂM CỤ THỂ
