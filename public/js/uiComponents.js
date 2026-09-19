@@ -2,6 +2,7 @@ import { state } from './state.js';
 import { map, renderGroupedPoints } from './mapEngine.js';
 
 let chartInstance = null;
+let infraPieInstance = null;
 
 export function toggleAuthModal() {
   const modal = document.getElementById('authModal');
@@ -40,8 +41,13 @@ export function handleGoogleCredentialResponse(response) {
       
       const btnAuth = document.getElementById('btnAuth');
       if (btnAuth) {
-        btnAuth.style.color = "var(--accent-orange)";
-        btnAuth.innerHTML = `🔓 ADMIN (${payload.name})`;
+        btnAuth.style.borderColor = "var(--accent-orange)";
+        btnAuth.title = `Đã đăng nhập: Admin (${payload.name})`;
+        btnAuth.innerHTML = `
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-orange);">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>`;
       }
 
       setTimeout(() => {
@@ -63,6 +69,86 @@ export function handleGoogleCredentialResponse(response) {
 }
 
 window.handleGoogleCredentialResponse = handleGoogleCredentialResponse;
+
+// ==========================================
+// QUẢN LÝ BIỂU ĐỒ TRÒN TỶ TRỌNG DIỆN TÍCH ĐẤT HẠ TẦNG
+// ==========================================
+export function updateInfraPieChart(filteredData) {
+  const widget = document.getElementById('infraPieWidget');
+  if (!widget) return;
+  
+  widget.style.display = 'block';
+
+  const canvasEl = document.getElementById('infraPieChart');
+  if (!canvasEl) return;
+  const ctx = canvasEl.getContext('2d');
+
+  const typeAreas = {
+    "1-CV": 0, "2-BDX": 0, "3-MN": 0, "4-TH": 0, 
+    "5-THCS": 0, "6-YT": 0, "7-VH": 0, "8-TM": 0, "9-CSD": 0
+  };
+
+  filteredData.forEach(item => {
+    const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
+    if (isApproved && typeAreas[item.type] !== undefined) {
+      typeAreas[item.type] += (Number(item.size) || 0);
+    }
+  });
+
+  const labels = [
+    "Công viên", "Bãi đỗ xe", "Mầm non", "Tiểu học", 
+    "THCS", "Y tế", "Văn hóa", "Thương mại", "Đất CSD"
+  ];
+  const dataValues = Object.values(typeAreas);
+  const backgroundColors = [
+    '#38bdf8', '#2ecc71', '#f1c40f', '#f39c12', 
+    '#e67e22', '#d35400', '#e74c3c', '#900c3f', '#94a3b8'
+  ];
+
+  if (infraPieInstance) {
+    infraPieInstance.data.datasets[0].data = dataValues;
+    infraPieInstance.update();
+    return;
+  }
+
+  infraPieInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: dataValues,
+        backgroundColor: backgroundColors,
+        borderWidth: 1,
+        borderColor: '#0f172a'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return ` ${context.label}: ${context.raw.toLocaleString()} m²`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+export function hideInfraPieChart() {
+  const widget = document.getElementById('infraPieWidget');
+  if (widget) widget.style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('btnClosePie')?.addEventListener('click', () => {
+    hideInfraPieChart();
+  });
+});
 
 export function openCombinedModal() {
   const combinedModal = document.getElementById('combinedModal');
@@ -147,12 +233,10 @@ export async function openWardDetailDirect(wardName) {
   const firstPoint = state.wardLabelsList.find(w => w.name === wardName) || { lat: 16.4637, lng: 107.5905 };
   if (map) map.flyTo([firstPoint.lat, firstPoint.lng], 14);
 
-  // 1. Tạo sẵn khung giao diện chuẩn và HEADER ngay lập tức, kèm thanh progress bar nằm đúng góc trên bên phải (cạnh nút X)
   const initialModalHtml = `<div class="ward-popup-card" style="min-width: 620px;">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
       <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH HẠ TẦNG QUY CHUẨN: ${wardName.toUpperCase()}</b>
       
-      <!-- Thanh tiến trình nằm ở góc trên bên phải, cạnh nút X -->
       <div style="display:flex; align-items:center; gap:8px;">
         <div style="width:100px;" class="progress-bar-bg"><div class="progress-bar-fill" id="wardDetailProgressBar" style="width: 5%;"></div></div>
         <span id="wardDetailProgressText" style="font-size:10.5px; font-weight:bold; color:var(--accent-orange);">5%</span>
@@ -188,11 +272,9 @@ export async function openWardDetailDirect(wardName) {
   
   detailPopup.openOn(map);
 
-  // 2. Chạy thanh tiến trình mô phỏng chậm rãi kéo dài trong khoảng 15 giây đúng thực tế xử lý
   let pStep = 5;
   const pInterval = setInterval(() => {
     if (pStep < 92) {
-      // Tăng đều đặn để đạt khoảng 90% trong vòng ~15 giây
       pStep += 2; 
       const bar = document.getElementById('wardDetailProgressBar');
       const txt = document.getElementById('wardDetailProgressText');
@@ -202,7 +284,6 @@ export async function openWardDetailDirect(wardName) {
   }, 350);
 
   try {
-    // 3. Gọi API lấy dữ liệu ngầm từ Server
     const res = await fetch('/api/gee?action=getWardStats');
     const resData = await res.json();
     
@@ -214,7 +295,6 @@ export async function openWardDetailDirect(wardName) {
 
     state.wardStatsData = resData.data || [];
     
-    // 4. Sau khi hoàn tất tải dữ liệu, render nội dung thân bảng thật
     setTimeout(() => {
       selectWardDetail(wardName);
     }, 400);
