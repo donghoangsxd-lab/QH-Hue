@@ -172,6 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
+  // Khắc phục: Xử lý async đầy đủ khi thay đổi dropdown phường/xã để kích hoạt vẽ lại điểm và heatmap
   document.getElementById('wardSelector')?.addEventListener('change', async (e) => {
     state.selectedWard = e.target.value || null;
 
@@ -186,10 +187,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    // Tinh chỉnh logic chuyển phường: Không ép ghi đè toàn bộ checkbox lớp bản đồ, 
-    // chỉ làm mới lại điểm, heatmap và ranh giới theo địa bàn được chọn.
+    // 1. Cập nhật lại các điểm marker theo phạm vi phường
     renderGroupedPoints();
-    refreshHeatmapOnly();
+    
+    // 2. Chờ tính toán và vẽ lại lớp Heatmap cùng vùng đệm theo phường được chọn
+    await refreshHeatmapOnly();
+    
+    // 3. Highlight ranh giới phường trên bản đồ
     highlightWardBoundary(state.selectedWard);
 
     if (state.selectedWard && state.selectedWard !== "Thành phố Huế") {
@@ -340,8 +344,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const data = await res.json();
         state.rawDataList = data.rawDataList || [];
         
-        // Kích hoạt vẽ heatmap ngay khi dữ liệu nền đã sẵn sàng lần đầu
-        refreshHeatmapOnly();
+        // Kích hoạt vẽ heatmap lần đầu khi dữ liệu sẵn sàng
+        await refreshHeatmapOnly();
       } catch (e) {
         console.log("Preload background data skipped.");
       }
@@ -351,3 +355,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error("Lỗi khởi tạo dữ liệu tĩnh bản đồ:", err);
   }
 });
+```[cite: 1, 7]
