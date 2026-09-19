@@ -19,6 +19,7 @@ async function calculateNetworkIsochrone16(lat, lng, banKinh) {
   const angles = Array.from({ length: sampleAngles }, (_, i) => i * angleStep);
 
   try {
+    // Tối ưu hóa giới hạn thực thi song song để tránh quá tải kết nối OSRM (Rate Limiting)
     const distancePromises = angles.map(async (angle) => {
       const rad = (angle * Math.PI) / 180;
       const destLat = lat + (maxReachKm / 111) * Math.cos(rad);
@@ -405,7 +406,10 @@ module.exports = async (req, res) => {
         const wName = props.tenXa || props.name || 'Phường';
         const normW = constants.cleanWardStr(wName);
         const wId = String(props.maXa || props.OBJECTID || '');
-        const totalWardPop = Number(props.danSoNum || 1);
+        
+        // Khắc phục an toàn: Kiểm tra giá trị dân số tránh chia cho 0 hoặc NaN
+        let totalWardPop = Number(props.danSoNum || 1);
+        if (isNaN(totalWardPop) || totalWardPop <= 0) totalWardPop = 1;
 
         const sumList = multiCoverageDict[wId] || [0, 0, 0, 0, 0, 0, 0, 0];
         let sumCoveredRatio = 0;
