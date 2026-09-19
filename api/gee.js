@@ -1,18 +1,18 @@
 const axios = require('axios');
 const constants = require('../config/constants');
-const { initGEE, getGeeContext, buildEeIsochroneGeometry } = require('../services/geeService');
+const { initGEE, getGeeContext } = require('../services/geeService');
 const { getRawDataList, invalidateCache } = require('../services/gcsService');
 
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
 
 // ==========================================
-// HELPER: TÍNH ISOCHRONE GIAO THÔNG (AN TOÀN CHỐNG LỖI 500)
+// CHI TIẾT: THUẬT TOÁN ISOCHRONE 16 HƯỚNG (DÙNG KHI CLICK ĐIỂM CỤ THỂ)
 // ==========================================
-async function calculateNetworkIsochrone(lat, lng, banKinh) {
+async function calculateNetworkIsochrone16(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
   const reachRatio = constants.ISOCHRONE_CONFIG?.REACH_RATIO || 0.9;
-  const sampleAngles = 8; // Giảm xuống 8 hướng để tăng tốc độ xử lý hàng loạt, chống nghẽn mạng
+  const sampleAngles = 16; // Tăng lên 16 hướng theo yêu cầu để đạt độ chính xác cao
   const maxReachKm = (R * reachRatio) / 1000;
   const angleStep = 360 / sampleAngles;
   
@@ -26,25 +26,34 @@ async function calculateNetworkIsochrone(lat, lng, banKinh) {
       
       try {
         const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${destLng},${destLat}?overview=false`;
-        const res = await axios.get(osrmUrl, { timeout: 800 }); // Timeout nhanh 800ms
+        const res = await axios.get(osrmUrl, { timeout: 1200 });
         
         if (res.data && res.data.routes && res.data.routes[0]) {
           const route = res.data.routes[0];
           if (route.distance > R * 1.3) return maxReachKm * 0.4;
           return Math.min(maxReachKm, (route.distance / 1000));
         }
-      } catch (e) {
-        // Bỏ qua lỗi từng hướng nhỏ để dùng fallback hình học
-      }
+      } catch (e) {}
+      
       return maxReachKm * 0.45;
     });
 
     const rawDistances = await Promise.all(distancePromises);
 
+    const smoothedDistances = [];
+    const n = rawDistances.length;
+    for (let i = 0; i < n; i++) {
+      const prev = rawDistances[(i - 1 + n) % n];
+      const curr = rawDistances[i];
+      const next = rawDistances[(i + 1) % n];
+      smoothedDistances.push((prev + curr * 2 + next) / 4);
+    }
+
     const polygonCoordinates = [];
     angles.forEach((angle, idx) => {
       const rad = (angle * Math.PI) / 180;
-      const distKm = rawDistances[idx];
+      const distKm = smoothedDistances[idx];
+      
       const pLat = lat + (distKm / 111) * Math.cos(rad);
       const pLng = lng + (distKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
       polygonCoordinates.push([pLng, pLat]);
@@ -58,12 +67,11 @@ async function calculateNetworkIsochrone(lat, lng, banKinh) {
       type: 'Polygon',
       coordinates: [polygonCoordinates]
     };
-
   } catch (err) {
-    // Fallback hình học an toàn, trả về hình tròn xấp xỉ dạng đa giác lập tức
+    // Fallback an toàn 16 điểm
     const fallbackCoords = [];
-    for (let i = 0; i < 12; i++) {
-      const angle = (i * 360) / 12;
+    for (let i = 0; i < sampleAngles; i++) {
+      const angle = (i * 360) / sampleAngles;
       const rad = (angle * Math.PI) / 180;
       fallbackCoords.push([
         lng + (maxReachKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad),
@@ -71,10 +79,7 @@ async function calculateNetworkIsochrone(lat, lng, banKinh) {
       ]);
     }
     fallbackCoords.push(fallbackCoords[0]);
-    return {
-      type: 'Polygon',
-      coordinates: [fallbackCoords]
-    };
+    return { type: 'Polygon', coordinates: [fallbackCoords] };
   }
 }
 
@@ -94,40 +99,42 @@ module.exports = async (req, res) => {
   try {
     const action = req.query.action || 'getInitData';
 
+    // 1. TỔNG QUÁT: DÙNG BÁN KÍNH TRÒN TRỰC TIẾP TRÊN GEE (CỰC KỲ NHANH, KHÔNG TIMEOUT)
     if (action === 'getIsochrone') {
       const { features } = req.body || {};
       if (!features || !Array.isArray(features)) {
         return res.status(400).json({ success: false, message: 'Invalid features array' });
       }
 
-      const isoPromises = features.map(async (item) => {
+      // Xử lý tạo hình tròn buffer server-side bằng GEE .buffer() thuần túy
+      const fc = ee.FeatureCollection(features.map(item => {
         const effectiveRadius = item.radius || item.banKinh || 500;
-        const polyCoords = await calculateNetworkIsochrone(item.lat, item.lng, effectiveRadius);
-        return {
-          type: 'Feature',
-          geometry: polyCoords,
-          properties: {
-            id: item.id,
-            name: item.name,
-            type: item.type,
-            ward: item.ward,
-            banKinh: effectiveRadius,
-            status: item.status
-          }
-        };
+        const geom = ee.Geometry.Point([item.lng, item.lat]).buffer(effectiveRadius);
+        return ee.Feature(geom, {
+          id: item.id,
+          name: item.name,
+          type: item.type,
+          ward: item.ward,
+          banKinh: effectiveRadius,
+          status: item.status
+        });
+      }));
+
+      const evaluatedFc = await new Promise((resolve, reject) => {
+        fc.evaluate((res, err) => err ? reject(err) : resolve(res));
       });
 
-      const isochroneFeatures = await Promise.all(isoPromises);
-      return res.json({ type: 'FeatureCollection', features: isochroneFeatures });
+      return res.json(evaluatedFc || { type: 'FeatureCollection', features: [] });
     }
 
+    // CHI TIẾT ĐIỂM: DÙNG ISOCHRONE 16 HƯỚNG KHI CLICK VÀO 1 ĐIỂM CỤ THỂ
     if (action === 'getSingleIsochrone') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
       const banKinh = Number(req.query.radius) || 500;
       if (!lat || !lng) return res.status(400).json({ error: true, message: "Thiếu tọa độ" });
 
-      const polyCoords = await calculateNetworkIsochrone(lat, lng, banKinh);
+      const polyCoords = await calculateNetworkIsochrone16(lat, lng, banKinh);
       return res.status(200).json({
         type: 'Feature',
         geometry: polyCoords,
@@ -170,12 +177,13 @@ module.exports = async (req, res) => {
     const { ee, wardVectorParsed, popRasterNormalized, wardRegion } = getGeeContext();
     const rawDataList = await getRawDataList();
 
+    // ANALYZE POINT: Dùng 16 hướng khi click chi tiết điểm
     if (action === 'analyzePoint') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
       const radius = Number(req.query.radius) || 500;
       
-      const polyCoords = await calculateNetworkIsochrone(lat, lng, radius);
+      const polyCoords = await calculateNetworkIsochrone16(lat, lng, radius);
       const ptGeom = ee.Geometry(polyCoords);
 
       const servedPopRes = await new Promise((resolve, reject) => {
@@ -271,15 +279,14 @@ module.exports = async (req, res) => {
         const deficitArea = reqArea - existArea;
 
         const candidateRadius = constants.infraConfig[code].radius;
-        const testPolyCoords = await calculateNetworkIsochrone(lat, lng, candidateRadius);
-        const testBuffer = ee.Geometry(testPolyCoords);
+        // Dùng bán kính tròn nhanh cho phân tích quỹ đất CSD tổng quát
+        const testBuffer = ee.Geometry.Point([lng, lat]).buffer(candidateRadius);
 
         const existingBuffersPromises = rawDataList
           .filter(item => item.type === code && item.status)
           .map(async (item) => {
             const r = Number(item.radius) || Number(item.banKinh) || candidateRadius;
-            const pCoords = await calculateNetworkIsochrone(item.lat, item.lng, r);
-            return ee.Feature(ee.Geometry(pCoords));
+            return ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(r));
           });
 
         const existingBuffers = await Promise.all(existingBuffersPromises);
@@ -337,6 +344,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
+    // WARD STATS: DÙNG BÁN KÍNH TRÒN GEE SIÊU TỐC CHO 40 PHƯỜNG XÃ
     if (action === 'getWardStats') {
       const now = Date.now();
       if (cachedWardStats && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)) {
@@ -351,8 +359,7 @@ module.exports = async (req, res) => {
           .filter(item => item.type === code && item.status)
           .map(async (item) => {
             const r = Number(item.radius) || Number(item.banKinh) || 500;
-            const pCoords = await calculateNetworkIsochrone(item.lat, item.lng, r);
-            return ee.Feature(ee.Geometry(pCoords));
+            return ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(r));
           });
 
         const buffers = await Promise.all(itemBuffersPromises);
