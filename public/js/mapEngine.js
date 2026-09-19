@@ -236,8 +236,8 @@ export function renderGroupedPoints() {
 
   const sourceList = getWardFilteredList(state.rawDataList);
 
-  // Cập nhật Pie Chart tương ứng với danh sách hiển thị hiện tại
-  if (state.selectedWard) {
+  // Khắc phục lỗi Pie Chart: Cập nhật hoặc ẩn biểu đồ dựa vào việc chọn phường xã
+  if (state.selectedWard && state.selectedWard !== "Thành phố Huế") {
     updateInfraPieChart(sourceList);
   } else {
     hideInfraPieChart();
@@ -334,7 +334,6 @@ export async function refreshHeatmapOnly() {
   }
 
   try {
-    // Dùng bán kính tròn GEE siêu tốc cho toàn bộ tổng quan buffer / heatmap
     const isoRes = await fetch('/api/gee?action=getIsochrone', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
