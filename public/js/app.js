@@ -339,6 +339,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const res = await fetch('/api/gee');
         const data = await res.json();
         state.rawDataList = data.rawDataList || [];
+        
+        // Kích hoạt vẽ heatmap ngay khi dữ liệu nền đã sẵn sàng lần đầu
+        refreshHeatmapOnly();
       } catch (e) {
         console.log("Preload background data skipped.");
       }
