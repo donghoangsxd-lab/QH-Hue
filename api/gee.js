@@ -104,17 +104,18 @@ module.exports = async (req, res) => {
     if (action === 'getIsochrone') {
       const { features } = req.body || {};
       
-      // Kiểm tra an toàn: Nếu features không hợp lệ hoặc rỗng, trả về FeatureCollection rỗng để tránh lỗi 500
+      // Kiểm tra an toàn: Nếu danh sách features rỗng hoặc không hợp lệ, trả về FeatureCollection rỗng để tránh lỗi 500
       if (!features || !Array.isArray(features) || features.length === 0) {
         return res.json({ type: 'FeatureCollection', features: [] });
       }
 
-      // Xử lý tạo hình tròn buffer server-side bằng GEE .buffer() thuần túy
+      // Lọc các đối tượng có tọa độ hợp lệ
       const validFeatures = features.filter(item => item && typeof item.lat === 'number' && typeof item.lng === 'number');
       if (validFeatures.length === 0) {
         return res.json({ type: 'FeatureCollection', features: [] });
       }
 
+      // Xử lý tạo hình tròn buffer server-side bằng GEE .buffer() thuần túy
       const fc = ee.FeatureCollection(validFeatures.map(item => {
         const effectiveRadius = Number(item.radius) || Number(item.banKinh) || 500;
         const geom = ee.Geometry.Point([item.lng, item.lat]).buffer(effectiveRadius);
