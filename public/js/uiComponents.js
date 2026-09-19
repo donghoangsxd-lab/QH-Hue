@@ -71,7 +71,7 @@ export function handleGoogleCredentialResponse(response) {
 window.handleGoogleCredentialResponse = handleGoogleCredentialResponse;
 
 // ==========================================
-// QUẢN LÝ BIỂU ĐỒ TRÒN TỶ TRỌNG DIỆN TÍCH ĐẤT HẠ TẦNG
+// QUẢN LÝ BIỂU ĐỒ TRÒN TỶ TRỌNG DIỆN TÍCH ĐẤT HẠ TẦNG (TRONG SUỐT GÓC TRÊN TRÁI)
 // ==========================================
 export function updateInfraPieChart(filteredData) {
   const widget = document.getElementById('infraPieWidget');
@@ -119,7 +119,7 @@ export function updateInfraPieChart(filteredData) {
         data: dataValues,
         backgroundColor: backgroundColors,
         borderWidth: 1,
-        borderColor: '#0f172a'
+        borderColor: 'rgba(15, 23, 42, 0.6)'
       }]
     },
     options: {
