@@ -6,8 +6,13 @@ let lastETag = null; // Lưu mã phiên bản ETag từ GCS Bucket
 
 async function getRawDataList() {
   try {
-    const headRes = await axios.head(constants.GCS_URL, { timeout: 5000 });
-    const currentETag = headRes.headers['etag'] || headRes.headers['last-modified'];
+    let currentETag = null;
+    try {
+      const headRes = await axios.head(constants.GCS_URL, { timeout: 5000 });
+      currentETag = headRes.headers['etag'] || headRes.headers['last-modified'];
+    } catch (headErr) {
+      // Bẫy lỗi an toàn cho HEAD request để không chặn tiến trình GET khi bucket có vấn đề về CORS hoặc header
+    }
 
     if (cachedGeoJSON && currentETag && currentETag === lastETag) {
       return cachedGeoJSON;
@@ -21,13 +26,13 @@ async function getRawDataList() {
       const props = ft.properties || {};
       const coords = (ft.geometry && Array.isArray(ft.geometry.coordinates)) 
         ? ft.geometry.coordinates 
-        : [107.5905, 16.4637];
+        : [null, null];
 
-      const parseCoord = (val, defaultVal) => {
-        if (val === undefined || val === null) return defaultVal;
+      const parseCoord = (val) => {
+        if (val === undefined || val === null) return null;
         const strVal = String(val).trim().replace(',', '.');
         const num = Number(strVal);
-        return isNaN(num) ? defaultVal : num;
+        return isNaN(num) ? null : num;
       };
 
       const rawId = String(props.ID_DoiTuong || '');
@@ -41,13 +46,13 @@ async function getRawDataList() {
         name: props.Ten_CongTrinh || 'Chưa đặt tên',
         ward: props.Ten_XaPhuong || 'Thuận Hóa',
         type: constants.codeMap[prefix] || "9-CSD",
-        lat: parseCoord(coords[1], 16.4637),
-        lng: parseCoord(coords[0], 107.5905),
+        lat: parseCoord(coords[1]),
+        lng: parseCoord(coords[0]),
         size: Number(String(props.QuyMo_S || 0).replace(',', '.')) || 0,
         radius: Number(String(props.BanKinh || 500).replace(',', '.')) || 500,
         status: isStatusTrue
       };
-    });
+    }).filter(item => item.lat !== null && item.lng !== null); // Lọc bỏ hoàn toàn các dòng thiếu tọa độ hoặc tọa độ không hợp lệ
 
     lastETag = currentETag;
     return cachedGeoJSON;
