@@ -186,33 +186,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    const mapGroups = [layers.c1, layers.c2, layers.c3, layers.c4, layers.c5, layers.c6, layers.c7, layers.c8, layers.c9];
-    const layerKeys = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'];
-
-    if (state.selectedWard === "Thành phố Huế") {
-      mapGroups.forEach(g => { if (map.hasLayer(g)) map.removeLayer(g); });
-      // Đồng bộ tắt checkbox trên giao diện Lớp dữ liệu
-      layerKeys.forEach(key => {
-        const chk = document.getElementById(`chk_${key}`);
-        if (chk) chk.checked = false;
-      });
-      highlightWardBoundary(null);
-      refreshHeatmapOnly();
-      map.flyTo([16.4637, 107.5905], 12);
-      return;
-    } else {
-      mapGroups.forEach(g => { if (!map.hasLayer(g)) map.addLayer(g); });
-      layerKeys.forEach(key => {
-        const chk = document.getElementById(`chk_${key}`);
-        if (chk) chk.checked = true;
-      });
-    }
-
+    // Tinh chỉnh logic chuyển phường: Không ép ghi đè toàn bộ checkbox lớp bản đồ, 
+    // chỉ làm mới lại điểm, heatmap và ranh giới theo địa bàn được chọn.
     renderGroupedPoints();
     refreshHeatmapOnly();
     highlightWardBoundary(state.selectedWard);
 
-    if (state.selectedWard) {
+    if (state.selectedWard && state.selectedWard !== "Thành phố Huế") {
       const target = state.wardLabelsList.find(w => w.name === state.selectedWard);
       if (target) map.flyTo([target.lat, target.lng], 13);
     } else {
