@@ -233,7 +233,8 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
   .dockbar-bottom-row { position: absolute; bottom: 10px; left: 12px; right: 12px; z-index: 1000; padding: 3px; display: flex; align-items: center; height: 36px; }
   .dockbar-bottom-row .ui-btn-format { flex: 1; padding: 4px 2px; font-size: 10.5px; height: 26px; }
   .sidebar-panel { position: absolute; top: 104px; left: 12px; right: 12px; z-index: 999; display: none; }
-  .sidebar-panel.open { display: block; }
+  .sidebar-panel.closed { display: none !important; }
+  .sidebar-panel.open { display: block !important; }
   .add-point-card { bottom: 65px; left: 12px; right: 12px; }
 
   .custom-infra-icon-svg {
