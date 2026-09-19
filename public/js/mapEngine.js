@@ -23,6 +23,7 @@ export const layers = {
 
 let tileHeatmapLayer = null;
 let wardLabelMarkers = [];
+let lastCalculatedIsochrones = []; // Lưu cache tập đa giác isochrone gần nhất để tái sử dụng cho tra cứu điểm
 
 function isPointInWardGeometry(lat, lng, geometry) {
   if (!geometry) return false;
@@ -281,7 +282,10 @@ export function renderGroupedPoints() {
     });
 
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
-    marker.on('click', () => onPointClick(p, marker));
+    marker.on('click', () => {
+      if (state.isPickMode || state.activeMeasureType) return;
+      onPointClick(p, marker);
+    });
     targetGroup.addLayer(marker);
   });
 }
@@ -317,7 +321,7 @@ export async function refreshHeatmapOnly() {
   const currentSeq = ++heatmapFetchSeq;
   const heatOpacityEl = document.getElementById('heatOpacity');
   const currentOpacity = heatOpacityEl ? heatOpacityEl.value / 100 : 0.3;
-  const overrideRad = state.globalBufferRadiusOverride || 0;
+  const overrideRad = state.globalBufferRadiusOverride;
 
   const bufferGroups = {
     "1-CV": layers.b1, "2-BDX": layers.b2, "3-MN": layers.b3,
@@ -336,11 +340,12 @@ export async function refreshHeatmapOnly() {
 
   const allFeaturesInput = scopedList.map(item => ({
     ...item,
-    radius: overrideRad > 0 ? overrideRad : (Number(item.radius) || Number(item.banKinh) || 500)
+    radius: overrideRad !== null ? overrideRad : (Number(item.radius) || Number(item.banKinh) || 500)
   }));
 
   if (allFeaturesInput.length === 0) {
     layers.heatmap.clearLayers();
+    lastCalculatedIsochrones = [];
     return;
   }
 
@@ -355,6 +360,7 @@ export async function refreshHeatmapOnly() {
     if (currentSeq !== heatmapFetchSeq) return;
 
     const isoFeatures = (isoData && isoData.features) || [];
+    lastCalculatedIsochrones = isoFeatures; // Cập nhật cache đa giác cho tra cứu điểm
 
     isoFeatures.forEach(feat => {
       const props = feat.properties || {};
@@ -404,7 +410,8 @@ export async function refreshHeatmapOnly() {
 export function onPointClick(p, marker) {
   const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
   const isCSDUnapproved = (p.type === "9-CSD" && !isApproved);
-  const itemRadius = state.globalBufferRadiusOverride > 0 ? state.globalBufferRadiusOverride : (Number(p.radius) || Number(p.banKinh) || 500);
+  const overrideRad = state.globalBufferRadiusOverride;
+  const itemRadius = overrideRad !== null ? overrideRad : (Number(p.radius) || Number(p.banKinh) || 500);
 
   if (!isCSDUnapproved) {
     highlightSingleIsochrone(p.lat, p.lng, itemRadius);
@@ -522,7 +529,7 @@ export async function loadPopulationLayer() {
 }
 
 export async function handleInspectPointClick(clickLat, clickLng) {
-  const checkRadius = state.globalBufferRadiusOverride || 500;
+  const checkRadius = state.globalBufferRadiusOverride !== null ? state.globalBufferRadiusOverride : 500;
   
   if (state.tempMarker) map.removeLayer(state.tempMarker);
   state.tempMarker = L.marker([clickLat, clickLng]).addTo(map);
@@ -532,44 +539,54 @@ export async function handleInspectPointClick(clickLat, clickLng) {
 
   const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
   
-  const activeItems = state.rawDataList.filter(item => {
-    const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
-    return codes.includes(item.type) && isApproved;
-  });
+  let isochroneFeatures = lastCalculatedIsochrones;
 
-  try {
-    const res = await fetch('/api/gee?action=getIsochrone', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        features: activeItems.map(item => ({
-          ...item,
-          radius: state.globalBufferRadiusOverride || Number(item.radius) || Number(item.banKinh) || 500
-        }))
-      })
+  // Nếu chưa có cache đa giác, tiến hành gọi API lấy bộ đệm một lần duy nhất
+  if (!isochroneFeatures || isochroneFeatures.length === 0) {
+    const activeItems = state.rawDataList.filter(item => {
+      const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
+      return codes.includes(item.type) && isApproved;
     });
-    if (!res.ok) return;
-    const isochroneGeoJSON = await res.json();
-    const clickPointGeo = turf.point([clickLng, clickLat]);
 
-    if (isochroneGeoJSON && isochroneGeoJSON.features) {
-      isochroneGeoJSON.features.forEach(feat => {
-        const code = feat.properties.type;
-        const name = feat.properties.name;
-        if (feat.geometry) {
-          const polyFeature = turf.polygon(feat.geometry.coordinates);
-          if (turf.booleanPointInPolygon(clickPointGeo, polyFeature)) {
-            if (!coveredGroups[code]) coveredGroups[code] = [];
-            if (!coveredGroups[code].includes(name)) {
-              coveredGroups[code].push(name);
-            }
+    try {
+      const res = await fetch('/api/gee?action=getIsochrone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          features: activeItems.map(item => ({
+            ...item,
+            radius: state.globalBufferRadiusOverride !== null ? state.globalBufferRadiusOverride : (Number(item.radius) || Number(item.banKinh) || 500)
+          }))
+        })
+      });
+      if (res.ok) {
+        const isochroneGeoJSON = await res.json();
+        isochroneFeatures = (isochroneGeoJSON && isochroneGeoJSON.features) || [];
+      }
+    } catch (err) {
+      console.error("Lỗi kiểm tra mạng lưới tại điểm:", err);
+    }
+  }
+
+  const clickPointGeo = turf.point([clickLng, clickLat]);
+  isochroneFeatures.forEach(feat => {
+    const props = feat.properties || {};
+    const code = props.type;
+    const name = props.name;
+    const isApproved = (props.status === true || props.status === 'true' || props.status === 'TRUE');
+    
+    if (codes.includes(code) && isApproved && feat.geometry) {
+      try {
+        const polyFeature = turf.polygon(feat.geometry.coordinates);
+        if (turf.booleanPointInPolygon(clickPointGeo, polyFeature)) {
+          if (!coveredGroups[code]) coveredGroups[code] = [];
+          if (!coveredGroups[code].includes(name)) {
+            coveredGroups[code].push(name);
           }
         }
-      });
+      } catch (e) {}
     }
-  } catch (err) {
-    console.error("Lỗi kiểm tra mạng lưới tại điểm:", err);
-  }
+  });
 
   codes.forEach(code => {
     if (!coveredGroups[code]) missingCodes.push(code);
