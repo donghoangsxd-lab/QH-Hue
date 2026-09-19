@@ -12,14 +12,13 @@ let lastWardStatsFetch = 0;
 async function calculateNetworkIsochrone16(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
   const reachRatio = constants.ISOCHRONE_CONFIG?.REACH_RATIO || 0.9;
-  const sampleAngles = 16; // Tăng lên 16 hướng theo yêu cầu để đạt độ chính xác cao
+  const sampleAngles = 16; // 16 hướng theo yêu cầu để đạt độ chính xác cao
   const maxReachKm = (R * reachRatio) / 1000;
   const angleStep = 360 / sampleAngles;
   
   const angles = Array.from({ length: sampleAngles }, (_, i) => i * angleStep);
 
   try {
-    // Tối ưu hóa giới hạn thực thi song song để tránh quá tải kết nối OSRM (Rate Limiting)
     const distancePromises = angles.map(async (angle) => {
       const rad = (angle * Math.PI) / 180;
       const destLat = lat + (maxReachKm / 111) * Math.cos(rad);
@@ -69,7 +68,6 @@ async function calculateNetworkIsochrone16(lat, lng, banKinh) {
       coordinates: [polygonCoordinates]
     };
   } catch (err) {
-    // Fallback an toàn 16 điểm
     const fallbackCoords = [];
     for (let i = 0; i < sampleAngles; i++) {
       const angle = (i * 360) / sampleAngles;
@@ -93,16 +91,11 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  if (req.method === 'POST' && typeof req.body === 'string') {
-    try { req.body = JSON.parse(req.body); } catch(e) {}
-  }
-
   try {
     const action = req.query.action || 'getInitData';
 
-    // 1. TỔNG QUÁT: DÙNG BÁN KÍNH TRÒN TRỰC TIẾP TRÊN GEE (CỰC KỲ NHANH, KHÔNG TIMEOUT)
+    // 1. TỔNG QUÁT: DÙNG BÁN KÍNH TRÒN TRỰC TIẾP TRÊN GEE
     if (action === 'getIsochrone') {
-      // Đảm bảo parse an toàn body dù client gửi dưới dạng string hay object JSON
       let requestBody = req.body || {};
       if (typeof requestBody === 'string') {
         try { requestBody = JSON.parse(requestBody); } catch (e) { requestBody = {}; }
@@ -110,19 +103,16 @@ module.exports = async (req, res) => {
       
       const features = requestBody.features;
       
-      // Kiểm tra an toàn: Nếu không có features hoặc mảng rỗng, trả về FeatureCollection rỗng (Mã 200) thay vì lỗi 500[cite: 4]
       if (!features || !Array.isArray(features) || features.length === 0) {
         return res.status(200).json({ type: 'FeatureCollection', features: [] });
       }
 
-      // Lọc các phần tử thực sự có tọa độ lat, lng hợp lệ[cite: 4]
       const validFeatures = features.filter(item => item && typeof item.lat === 'number' && typeof item.lng === 'number');
       if (validFeatures.length === 0) {
         return res.status(200).json({ type: 'FeatureCollection', features: [] });
       }
 
       try {
-        // Xử lý tạo hình tròn buffer server-side bằng GEE .buffer() thuần túy[cite: 4]
         const fc = ee.FeatureCollection(validFeatures.map(item => {
           const effectiveRadius = Number(item.radius) || Number(item.banKinh) || 500;
           const geom = ee.Geometry.Point([item.lng, item.lat]).buffer(effectiveRadius);
@@ -142,8 +132,7 @@ module.exports = async (req, res) => {
 
         return res.status(200).json(evaluatedFc || { type: 'FeatureCollection', features: [] });
       } catch (geeErr) {
-        console.error("GEE Evaluation Internal Error:", geeErr.message);
-        // Bắt mọi lỗi phát sinh từ phía GEE và trả về mảng rỗng để client không bị gián đoạn giao diện[cite: 4]
+        console.error("GEE Isochrone Error:", geeErr.message);
         return res.status(200).json({ type: 'FeatureCollection', features: [] });
       }
     }
@@ -221,16 +210,30 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'getHeatmapTile') {
-      const { features } = req.body || {};
+      let requestBody = req.body || {};
+      if (typeof requestBody === 'string') {
+        try { requestBody = JSON.parse(requestBody); } catch (e) { requestBody = {}; }
+      }
+
+      const features = requestBody.features || [];
       const categoryImageLayers = [];
       const codes = constants.CODES_TO_CHECK;
-      const featureList = Array.isArray(features) ? features : [];
 
       for (const code of codes) {
-        const groupGeoms = featureList
-          .filter(item => item.properties && item.properties.type === code &&
-            (item.properties.status === true || item.properties.status === 'true' || item.properties.status === 'TRUE'))
-          .map(item => ee.Feature(ee.Geometry(item.geometry)));
+        const groupGeoms = features
+          .filter(item => {
+            const props = item.properties || item;
+            const isApproved = (props.status === true || props.status === 'true' || props.status === 'TRUE');
+            return props.type === code && isApproved && item.geometry;
+          })
+          .map(item => {
+            try {
+              return ee.Feature(ee.Geometry(item.geometry));
+            } catch (err) {
+              return null;
+            }
+          })
+          .filter(geom => geom !== null);
 
         if (groupGeoms.length > 0) {
           categoryImageLayers.push(
@@ -242,17 +245,26 @@ module.exports = async (req, res) => {
         }
       }
 
-      let heatmapMasked = categoryImageLayers.length > 0 
-        ? ee.ImageCollection(categoryImageLayers).sum().updateMask(ee.ImageCollection(categoryImageLayers).sum().gt(0))
-        : ee.Image(0).selfMask();
+      let heatmapMasked;
+      if (categoryImageLayers.length > 0) {
+        const summedCol = ee.ImageCollection(categoryImageLayers).sum();
+        heatmapMasked = summedCol.updateMask(summedCol.gt(0));
+      } else {
+        heatmapMasked = ee.Image(0).clip(ee.Geometry.Point([107.5905, 16.4637]).buffer(100)).selfMask();
+      }
 
-      const mapId = await new Promise((resolve, reject) => {
-        heatmapMasked.getMap(
-          { min: 1, max: 8, palette: ['#5dade2', '#2ecc71', '#f1c40f', '#f39c12', '#e67e22', '#d35400', '#e74c3c', '#900c3f'] }, 
-          (m, err) => err ? reject(err) : resolve(m)
-        );
-      });
-      return res.status(200).json({ urlFormat: mapId.urlFormat });
+      try {
+        const mapId = await new Promise((resolve, reject) => {
+          heatmapMasked.getMap(
+            { min: 1, max: 8, palette: ['#5dade2', '#2ecc71', '#f1c40f', '#f39c12', '#e67e22', '#d35400', '#e74c3c', '#900c3f'] }, 
+            (m, err) => err ? reject(err) : resolve(m)
+          );
+        });
+        return res.status(200).json({ urlFormat: mapId.urlFormat });
+      } catch (mapErr) {
+        console.error("GEE GetMap Tile Error:", mapErr.message);
+        return res.status(200).json({ urlFormat: "" });
+      }
     }
 
     if (action === 'analyzeCSD') {
@@ -300,7 +312,6 @@ module.exports = async (req, res) => {
         const deficitArea = reqArea - existArea;
 
         const candidateRadius = constants.infraConfig[code].radius;
-        // Dùng bán kính tròn nhanh cho phân tích quỹ đất CSD tổng quát
         const testBuffer = ee.Geometry.Point([lng, lat]).buffer(candidateRadius);
 
         const existingBuffersPromises = rawDataList
@@ -365,7 +376,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
-    // WARD STATS: DÙNG BÁN KÍNH TRÒN GEE SIÊU TỐC CHO 40 PHƯỜNG XÃ
     if (action === 'getWardStats') {
       const now = Date.now();
       if (cachedWardStats && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)) {
@@ -427,7 +437,6 @@ module.exports = async (req, res) => {
         const normW = constants.cleanWardStr(wName);
         const wId = String(props.maXa || props.OBJECTID || '');
         
-        // Khắc phục an toàn: Kiểm tra giá trị dân số tránh chia cho 0 hoặc NaN
         let totalWardPop = Number(props.danSoNum || 1);
         if (isNaN(totalWardPop) || totalWardPop <= 0) totalWardPop = 1;
 
