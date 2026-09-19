@@ -141,11 +141,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Debounce cho ô nhập bán kính buffer để chống spam OSRM/GEE
   let radiusDebounceTimer = null;
   const inputIsoRadius = document.getElementById('inputIsoRadius');
   inputIsoRadius?.addEventListener('input', (e) => {
-    state.globalBufferRadiusOverride = Number(e.target.value) || 500;
+    const val = e.target.value;
+    state.globalBufferRadiusOverride = val === "" ? null : (Number(val) || 500);
     clearTimeout(radiusDebounceTimer);
     radiusDebounceTimer = setTimeout(() => {
       renderGroupedPoints();
@@ -153,7 +153,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 400);
   });
 
-  // Thanh trượt độ trong suốt heatmap chỉ cập nhật opacity trực tiếp, không gọi lại quy trình nặng
   const heatOpacity = document.getElementById('heatOpacity');
   heatOpacity?.addEventListener('input', (e) => {
     const val = e.target.value / 100;
@@ -213,10 +212,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   const sidebarPanel = document.getElementById('sidebarPanel');
   document.getElementById('btnToggleSidebar')?.addEventListener('click', () => {
-    sidebarPanel?.classList.toggle('closed');
+    if (window.innerWidth <= 768) {
+      sidebarPanel?.classList.toggle('open');
+      sidebarPanel?.classList.toggle('closed');
+    } else {
+      sidebarPanel?.classList.toggle('closed');
+    }
   });
   document.getElementById('btnCloseSidebar')?.addEventListener('click', () => {
     sidebarPanel?.classList.add('closed');
+    sidebarPanel?.classList.remove('open');
   });
 
   const tabBtnLayers = document.getElementById('tabBtnLayers');
@@ -327,17 +332,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (progressBar) progressBar.style.width = "30%";
     if (progressPercent) progressPercent.innerText = "30%";
 
-    // 1. Tải ranh giới và dân số tĩnh
     await Promise.all([loadBoundaryLayer(), loadPopulationLayer()]);
     if (progressBar) progressBar.style.width = "60%";
     if (progressPercent) progressPercent.innerText = "60%";
 
-    // 2. TẢI DỮ LIỆU ĐIỂM HẠ TẦNG NGAY KHI KHỞI ĐỘNG (QUAN TRỌNG ĐỂ CÓ DỮ LIỆU VẼ HEATMAP)
     const dataRes = await fetch('/api/gee');
     const dataJson = await dataRes.json();
     state.rawDataList = dataJson.rawDataList || [];
 
-    // 3. Nạp danh sách 40 phường/xã vào Dropdown
     const wardSelector = document.getElementById('wardSelector');
     if (wardSelector) {
       state.wardLabelsList
@@ -354,7 +356,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (progressBar) progressBar.style.width = "90%";
     if (progressPercent) progressPercent.innerText = "90%";
 
-    // 4. Render điểm và vẽ heatmap ngay lần đầu tiên tải trang
     renderGroupedPoints();
     await refreshHeatmapOnly();
 
