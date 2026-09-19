@@ -15,6 +15,17 @@
 
   <div id="map"></div>
 
+  <!-- WIDGET PIE CHART TỶ TRỌNG DIỆN TÍCH ĐẤT HẠ TẦNG (HIỆN KHI CHỌN PHƯỜNG) -->
+  <div class="infra-pie-widget ui-panel-format" id="infraPieWidget" style="display:none; position:absolute; bottom:70px; right:16px; z-index:1000; width:240px; padding:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:4px; margin-bottom:6px;">
+      <b style="color:var(--accent-cyan); font-size:11px;">📊 TỶ TRỌNG DIỆN TÍCH ĐẤT</b>
+      <span id="btnClosePie" style="cursor:pointer; font-weight:bold; color:var(--accent-red); font-size:12px;">✕</span>
+    </div>
+    <div style="height:150px; position:relative;">
+      <canvas id="infraPieChart"></canvas>
+    </div>
+  </div>
+
   <!-- HÀNG 1: TOPBAR TRÊN CÙNG -->
   <div class="topbar-row">
     <div class="topbar-header ui-panel-format">
