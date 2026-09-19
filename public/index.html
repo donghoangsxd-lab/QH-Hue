@@ -15,7 +15,7 @@
 
   <div id="map"></div>
 
-  <!-- WIDGET PIE CHART (DONUT) TRONG SUỐT, GÓC TRÊN BÊN TRÁI DƯỚI ZOOM -->
+  <!-- WIDGET PIE CHART (DONUT) TRONG SUỐT, GÓC TRÊN BÊN TRÁI -->
   <div class="infra-pie-widget-transparent" id="infraPieWidget" style="display:none;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
       <b style="color:var(--accent-cyan); font-size:10.5px;">📊 TỶ TRỌNG ĐẤT</b>
@@ -26,44 +26,43 @@
     </div>
   </div>
 
-  <!-- HÀNG 1: TOPBAR TRÊN CÙNG -->
+  <!-- HÀNG 1: TOPBAR TRÊN CÙNG (CHỈ CÒN TIÊU ĐỀ VÀ DROPDOWN ĐỊA BÀN) -->
   <div class="topbar-row">
-    <div class="topbar-header ui-panel-format">
-      <div style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-        <b style="color:var(--accent-cyan); white-space:nowrap;">🏛️ BẢN ĐỒ HẠ TẦNG</b>
-        <select id="wardSelector" class="ward-selector-dropdown" title="Lọc theo địa bàn phường/xã">
-          <option value="">Chọn để xem...</option>
-          <option value="Thành phố Huế">Thành phố Huế</option>
-        </select>
-      </div>
-      <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:90px;">
-        <div class="progress-bar-bg" style="flex:1;"><div class="progress-bar-fill" id="progressBar"></div></div>
-        <span id="progressPercent" style="color:var(--accent-green); font-weight:bold; white-space:nowrap; font-size:10px;">0%</span>
+    <div class="topbar-header ui-panel-format" style="width: 100%;">
+      <div style="display:flex; align-items:center; gap:6px; white-space:nowrap; width: 100%; justify-content: space-between;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <b style="color:var(--accent-cyan); white-space:nowrap;">🏛️ BẢN ĐỒ HẠ TẦNG</b>
+          <select id="wardSelector" class="ward-selector-dropdown" title="Lọc theo địa bàn phường/xã">
+            <option value="">Chọn để xem...</option>
+            <option value="Thành phố Huế">Thành phố Huế</option>
+          </select>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; max-width:80px;">
+          <div class="progress-bar-bg" style="flex:1;"><div class="progress-bar-fill" id="progressBar"></div></div>
+          <span id="progressPercent" style="color:var(--accent-green); font-weight:bold; white-space:nowrap; font-size:10px;">0%</span>
+        </div>
       </div>
     </div>
+  </div>
 
-    <!-- ICON ADMIN / ĐĂNG NHẬP GOOGLE NHỎ GỌN Ở GÓC TRÊN BÊN PHẢI -->
-    <button class="ui-btn-format ui-panel-format btn-toggle-layer-top" id="btnAuth" title="Đăng nhập Quản trị (Admin)" style="display:inline-flex; align-items:center; justify-content:center; padding: 0; width: 38px; height: 38px; min-width: 38px; background: var(--bg-dark);">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-cyan);">
-        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
-      </svg>
-    </button>
-
-    <button class="ui-btn-format ui-panel-format btn-toggle-layer-top" id="btnToggleSidebar" title="Quản lý lớp bản đồ" style="display:inline-flex; align-items:center; justify-content:center; padding: 0; width: 38px; height: 38px; min-width: 38px; background: var(--bg-dark);">
+  <!-- HÀNG 2: THANH NÚT CÔNG CỤ (GỒM ĐÚNG 06 NÚT HÌNH VUÔNG: +, -, THƯỚC, EKE, LAYER, CHÌA KHÓA) -->
+  <div class="toolbar-row ui-panel-format">
+    <button class="ui-btn-format square-tool-btn" id="btnZoomIn" title="Phóng to (+)">➕</button>
+    <button class="ui-btn-format square-tool-btn" id="btnZoomOut" title="Thu nhỏ (-)">➖</button>
+    <button class="ui-btn-format square-tool-btn" id="btnMeasureDist" title="Đo chiều dài">📏</button>
+    <button class="ui-btn-format square-tool-btn" id="btnMeasureArea" title="Đo diện tích">📐</button>
+    <button class="ui-btn-format square-tool-btn" id="btnToggleSidebar" title="Quản lý lớp bản đồ">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-cyan);">
         <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
         <path d="M2 17l10 5 10-5"></path>
         <path d="M2 12l10 5 10-5"></path>
       </svg>
     </button>
-  </div>
-
-  <!-- HÀNG 2: THANH NÚT CÔNG CỤ -->
-  <div class="toolbar-row ui-panel-format">
-    <button class="ui-btn-format btn-zoom-desktop" id="btnZoomIn">➕ ZOOM IN</button>
-    <button class="ui-btn-format btn-zoom-desktop" id="btnZoomOut">➖ ZOOM OUT</button>
-    <button class="ui-btn-format" id="btnMeasureDist">📏 CHIỀU DÀI</button>
-    <button class="ui-btn-format" id="btnMeasureArea">📐 DIỆN TÍCH</button>
+    <button class="ui-btn-format square-tool-btn" id="btnAuth" title="Đăng nhập Quản trị (Admin)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-cyan);">
+        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+      </svg>
+    </button>
   </div>
 
   <!-- SIDEBAR PANEL -->
