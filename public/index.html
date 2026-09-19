@@ -15,13 +15,13 @@
 
   <div id="map"></div>
 
-  <!-- WIDGET PIE CHART TỶ TRỌNG DIỆN TÍCH ĐẤT HẠ TẦNG (HIỆN KHI CHỌN PHƯỜNG) -->
-  <div class="infra-pie-widget ui-panel-format" id="infraPieWidget" style="display:none; position:absolute; bottom:70px; right:16px; z-index:1000; width:240px; padding:10px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:4px; margin-bottom:6px;">
-      <b style="color:var(--accent-cyan); font-size:11px;">📊 TỶ TRỌNG DIỆN TÍCH ĐẤT</b>
-      <span id="btnClosePie" style="cursor:pointer; font-weight:bold; color:var(--accent-red); font-size:12px;">✕</span>
+  <!-- WIDGET PIE CHART (DONUT) TRONG SUỐT, GÓC TRÊN BÊN TRÁI DƯỚI ZOOM -->
+  <div class="infra-pie-widget-transparent" id="infraPieWidget" style="display:none;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+      <b style="color:var(--accent-cyan); font-size:10.5px;">📊 TỶ TRỌNG ĐẤT</b>
+      <span id="btnClosePie" style="cursor:pointer; font-weight:bold; color:var(--accent-red); font-size:11px;">✕</span>
     </div>
-    <div style="height:150px; position:relative;">
+    <div style="height:120px; position:relative;">
       <canvas id="infraPieChart"></canvas>
     </div>
   </div>
@@ -36,12 +36,20 @@
           <option value="Thành phố Huế">Thành phố Huế</option>
         </select>
       </div>
-      <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:110px;">
+      <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:90px;">
         <div class="progress-bar-bg" style="flex:1;"><div class="progress-bar-fill" id="progressBar"></div></div>
-        <span id="progressPercent" style="color:var(--accent-green); font-weight:bold; white-space:nowrap; font-size:11px;">0%</span>
+        <span id="progressPercent" style="color:var(--accent-green); font-weight:bold; white-space:nowrap; font-size:10px;">0%</span>
       </div>
     </div>
-    <button class="ui-btn-format ui-panel-format btn-toggle-layer-top" id="btnToggleSidebar" title="Quản lý lớp bản đồ" style="display:inline-flex; align-items:center; justify-content:center; padding: 0 10px; height: 38px; min-width: 38px; background: var(--bg-dark);">
+
+    <!-- ICON ADMIN / ĐĂNG NHẬP GOOGLE NHỎ GỌN Ở GÓC TRÊN BÊN PHẢI -->
+    <button class="ui-btn-format ui-panel-format btn-toggle-layer-top" id="btnAuth" title="Đăng nhập Quản trị (Admin)" style="display:inline-flex; align-items:center; justify-content:center; padding: 0; width: 38px; height: 38px; min-width: 38px; background: var(--bg-dark);">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-cyan);">
+        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.778-7.778zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+      </svg>
+    </button>
+
+    <button class="ui-btn-format ui-panel-format btn-toggle-layer-top" id="btnToggleSidebar" title="Quản lý lớp bản đồ" style="display:inline-flex; align-items:center; justify-content:center; padding: 0; width: 38px; height: 38px; min-width: 38px; background: var(--bg-dark);">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-cyan);">
         <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
         <path d="M2 17l10 5 10-5"></path>
@@ -59,7 +67,7 @@
   </div>
 
   <!-- SIDEBAR PANEL -->
-  <div class="sidebar-panel ui-panel-format" id="sidebarPanel">
+  <div class="sidebar-panel ui-panel-format closed" id="sidebarPanel">
     <div class="tab-header">
       <div class="tab-btn active" id="tabBtnLayers">⚙️ LỚP DỮ LIỆU</div>
       <div class="tab-btn" id="tabBtnLegend">📖 CHÚ GIẢI</div>
@@ -114,7 +122,6 @@
           <input type="checkbox" id="chk_heat" checked>
           <label for="chk_heat">🔥 Heatmap độ phủ hạ tầng</label>
         </div>
-        <span id="heatStatusText" style="font-size:10px; color:var(--accent-orange); font-style:italic;"></span>
       </div>
 
       <div id="popBox" style="display:none;" class="opacity-slider-row">
@@ -151,20 +158,6 @@
         <img src="./icons/Park2.png" style="width:18px; height:23px; vertical-align:middle; margin-right:6px;" />
         <b style="color:var(--accent-red);">Chưa chấp thuận (Chờ duyệt)</b>
       </div>
-
-      <div style="height:1px; background:var(--border-color); margin:12px 0;"></div>
-
-      <div style="font-weight:bold; color:var(--text-main); margin-bottom:8px; font-size:11.5px; text-align:left;">THANG ĐỘ PHỦ HẠ TẦNG (1 - 8)</div>
-      <div style="display:flex; width:100%; border-radius:6px; overflow:hidden; border:1px solid var(--border-color);">
-        <div style="flex:1; height:22px; background:#5dade2; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">1</div>
-        <div style="flex:1; height:22px; background:#2ecc71; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">2</div>
-        <div style="flex:1; height:22px; background:#f1c40f; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">3</div>
-        <div style="flex:1; height:22px; background:#f39c12; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">4</div>
-        <div style="flex:1; height:22px; background:#e67e22; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">5</div>
-        <div style="flex:1; height:22px; background:#d35400; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">6</div>
-        <div style="flex:1; height:22px; background:#e74c3c; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">7</div>
-        <div style="flex:1; height:22px; background:#900c3f; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:bold;">8</div>
-      </div>
     </div>
   </div>
 
@@ -173,7 +166,6 @@
     <button class="ui-btn-format" id="btnInspectMode">🖱️ TRA CỨU ĐIỂM</button>
     <button class="ui-btn-format" id="btnToggleAddCard">➕ ĐỀ XUẤT MỚI</button>
     <button class="ui-btn-format" id="btnOpenCombinedModal">📊 BẢNG TỔNG HỢP</button>
-    <button class="ui-btn-format" id="btnAuth" style="color:var(--accent-cyan);">🔑 ĐĂNG NHẬP GOOGLE</button>
   </div>
 
   <!-- MODAL ĐĂNG NHẬP GOOGLE ADMIN -->
