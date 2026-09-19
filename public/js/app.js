@@ -355,4 +355,3 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error("Lỗi khởi tạo dữ liệu tĩnh bản đồ:", err);
   }
 });
-```[cite: 1, 7]
