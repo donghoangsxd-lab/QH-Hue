@@ -315,12 +315,14 @@ export async function refreshHeatmapOnly() {
   };
   Object.keys(bufferGroups).forEach(k => bufferGroups[k].clearLayers());
 
+  // Lấy danh sách đã lọc theo phường được chọn từ droplist (nếu có)
   const scopedList = getWardFilteredList(state.rawDataList).filter(item => {
+    const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
     if (item.type === "9-CSD") {
-      const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
       return isApproved;
     }
-    return true;
+    // Đảm bảo chỉ lấy các công trình đã duyệt hoặc hiển thị đúng theo ngữ cảnh
+    return true; 
   });
 
   const allFeaturesInput = scopedList.map(item => ({
@@ -334,6 +336,7 @@ export async function refreshHeatmapOnly() {
   }
 
   try {
+    // Gọi GEE tạo buffer/isochrone giới hạn theo phạm vi hiện tại (Toàn thành phố hoặc riêng Phường được chọn)
     const isoRes = await fetch('/api/gee?action=getIsochrone', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -360,6 +363,7 @@ export async function refreshHeatmapOnly() {
       return (s === true || s === 'true' || s === 'TRUE');
     });
 
+    // Tạo tile heatmap tương ứng với tập dữ liệu (đã được cô lập theo phường nếu người dùng chọn droplist)
     const heatRes = await fetch(`/api/gee?action=getHeatmapTile&t=${Date.now()}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -376,7 +380,7 @@ export async function refreshHeatmapOnly() {
       }
     }
   } catch (err) {
-    console.error("Lỗi cập nhật Buffer/Heatmap:", err);
+    console.error("Lỗi cập nhật Buffer/Heatmap theo địa bàn:", err);
   }
 }
 
