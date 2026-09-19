@@ -10,7 +10,7 @@ import {
   handleInspectPointClick,
   loadBoundaryLayer,
   loadPopulationLayer,
-  highlightWardBoundary, 
+  highlightWardBoundary,
   measureLayerGroup,
   layers,
   map as mapInstance
@@ -172,7 +172,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // Khắc phục: Xử lý async đầy đủ khi thay đổi dropdown phường/xã để kích hoạt vẽ lại điểm và heatmap
   document.getElementById('wardSelector')?.addEventListener('change', async (e) => {
     state.selectedWard = e.target.value || null;
 
@@ -187,20 +186,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    // 1. Cập nhật lại các điểm marker theo phạm vi phường
     renderGroupedPoints();
-    
-    // 2. Chờ tính toán và vẽ lại lớp Heatmap cùng vùng đệm theo phường được chọn
     await refreshHeatmapOnly();
-    
-    // 3. Highlight ranh giới phường trên bản đồ
     highlightWardBoundary(state.selectedWard);
 
     if (state.selectedWard && state.selectedWard !== "Thành phố Huế") {
       const target = state.wardLabelsList.find(w => w.name === state.selectedWard);
-      if (target) map.flyTo([target.lat, target.lng], 13);
+      if (target) map.flyTo([target.lat, target.lng], 14);
     } else {
-      map.flyTo([16.4637, 107.5905], 12);
+      map.flyTo([16.4637, 107.5905], 13);
     }
   });
   
@@ -232,7 +226,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('btnOpenCombinedModal')?.addEventListener('click', () => {
-    if (state.selectedWard && state.selectedWard !== "Thành phố Huế") {
+    if (state.selectedWard) {
       openWardDetailDirect(state.selectedWard);
     } else {
       openCombinedModal();
@@ -317,11 +311,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     const progressBar = document.getElementById('progressBar');
     const progressPercent = document.getElementById('progressPercent');
-    if (progressBar) progressBar.style.width = "40%";
-    if (progressPercent) progressPercent.innerText = "40%";
+    if (progressBar) progressBar.style.width = "30%";
+    if (progressPercent) progressPercent.innerText = "30%";
 
+    // 1. Tải ranh giới và dân số tĩnh
     await Promise.all([loadBoundaryLayer(), loadPopulationLayer()]);
+    if (progressBar) progressBar.style.width = "60%";
+    if (progressPercent) progressPercent.innerText = "60%";
 
+    // 2. TẢI DỮ LIỆU ĐIỂM HẠ TẦNG NGAY KHI KHỞI ĐỘNG (QUAN TRỌNG ĐỂ CÓ DỮ LIỆU VẼ HEATMAP)
+    const dataRes = await fetch('/api/gee');
+    const dataJson = await dataRes.json();
+    state.rawDataList = dataJson.rawDataList || [];
+
+    // 3. Nạp danh sách 40 phường/xã vào Dropdown
     const wardSelector = document.getElementById('wardSelector');
     if (wardSelector) {
       state.wardLabelsList
@@ -335,23 +338,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    if (progressBar) progressBar.style.width = "90%";
+    if (progressPercent) progressPercent.innerText = "90%";
+
+    // 4. Render điểm và vẽ heatmap ngay lần đầu tiên tải trang
+    renderGroupedPoints();
+    await refreshHeatmapOnly();
+
     if (progressBar) progressBar.style.width = "100%";
     if (progressPercent) progressPercent.innerText = "100%";
-
-    setTimeout(async () => {
-      try {
-        const res = await fetch('/api/gee');
-        const data = await res.json();
-        state.rawDataList = data.rawDataList || [];
-        
-        // Kích hoạt vẽ heatmap lần đầu khi dữ liệu sẵn sàng
-        await refreshHeatmapOnly();
-      } catch (e) {
-        console.log("Preload background data skipped.");
-      }
-    }, 500);
-
   } catch (err) {
-    console.error("Lỗi khởi tạo dữ liệu tĩnh bản đồ:", err);
+    console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
   }
 });
