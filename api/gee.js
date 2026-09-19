@@ -12,7 +12,7 @@ let lastWardStatsFetch = 0;
 async function calculateNetworkIsochrone16(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
   const reachRatio = constants.ISOCHRONE_CONFIG?.REACH_RATIO || 0.9;
-  const sampleAngles = 16; // 16 hướng theo yêu cầu để đạt độ chính xác cao
+  const sampleAngles = 16;
   const maxReachKm = (R * reachRatio) / 1000;
   const angleStep = 360 / sampleAngles;
   
@@ -94,6 +94,11 @@ module.exports = async (req, res) => {
   try {
     const action = req.query.action || 'getInitData';
 
+    // Bắt buộc khởi tạo GEE trước mọi action để đảm bảo biến ee luôn sẵn sàng
+    await initGEE();
+    const { ee, wardVectorParsed, popRasterNormalized, wardRegion } = getGeeContext();
+    const rawDataList = await getRawDataList();
+
     // 1. TỔNG QUÁT: DÙNG BÁN KÍNH TRÒN TRỰC TIẾP TRÊN GEE
     if (action === 'getIsochrone') {
       let requestBody = req.body || {};
@@ -107,7 +112,7 @@ module.exports = async (req, res) => {
         return res.status(200).json({ type: 'FeatureCollection', features: [] });
       }
 
-      const validFeatures = features.filter(item => item && typeof item.lat === 'number' && typeof item.lng === 'number');
+      const validFeatures = features.filter(item => item && typeof item.lat === 'number' && typeof item.lng === 'number' && !isNaN(item.lat) && !isNaN(item.lng));
       if (validFeatures.length === 0) {
         return res.status(200).json({ type: 'FeatureCollection', features: [] });
       }
@@ -182,10 +187,6 @@ module.exports = async (req, res) => {
       const result = await gasRes.json().catch(() => ({ success: true }));
       return res.status(200).json({ success: true, result });
     }
-
-    await initGEE();
-    const { ee, wardVectorParsed, popRasterNormalized, wardRegion } = getGeeContext();
-    const rawDataList = await getRawDataList();
 
     // ANALYZE POINT: Dùng 16 hướng khi click chi tiết điểm
     if (action === 'analyzePoint') {
