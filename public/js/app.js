@@ -141,15 +141,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Debounce cho ô nhập bán kính buffer để chống spam OSRM/GEE
+  let radiusDebounceTimer = null;
   const inputIsoRadius = document.getElementById('inputIsoRadius');
   inputIsoRadius?.addEventListener('input', (e) => {
     state.globalBufferRadiusOverride = Number(e.target.value) || 500;
-    renderGroupedPoints();
-    refreshHeatmapOnly();
+    clearTimeout(radiusDebounceTimer);
+    radiusDebounceTimer = setTimeout(() => {
+      renderGroupedPoints();
+      refreshHeatmapOnly();
+    }, 400);
   });
 
+  // Thanh trượt độ trong suốt heatmap chỉ cập nhật opacity trực tiếp, không gọi lại quy trình nặng
   const heatOpacity = document.getElementById('heatOpacity');
-  heatOpacity?.addEventListener('input', () => refreshHeatmapOnly());
+  heatOpacity?.addEventListener('input', (e) => {
+    const val = e.target.value / 100;
+    if (window.currentHeatmapTileLayer && typeof window.currentHeatmapTileLayer.setOpacity === 'function') {
+      window.currentHeatmapTileLayer.setOpacity(val);
+    }
+  });
 
   document.getElementById('popOpacity')?.addEventListener('input', (e) => {
     const val = e.target.value / 100;
@@ -160,7 +171,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   layerCheckboxes.forEach(key => {
     const el = document.getElementById(`chk_${key}`);
     el?.addEventListener('change', (e) => {
-      const targetLayer = key === 'bound' ? 'boundary' : key;
+      let targetLayer = key;
+      if (key === 'bound') targetLayer = 'boundary';
+      if (key === 'heat') targetLayer = 'heatmap';
       toggleLayer(targetLayer, e.target.checked);
     });
   });
