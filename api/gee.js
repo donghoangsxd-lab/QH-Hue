@@ -6,9 +6,6 @@ const { getRawDataList, invalidateCache } = require('../services/gcsService');
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
 
-// ==========================================
-// CHI TIẾT: THUẬT TOÁN ISOCHRONE 16 HƯỚNG (DÙNG KHI CLICK ĐIỂM CỤ THỂ)
-// ==========================================
 async function calculateNetworkIsochrone16(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
   const reachRatio = constants.ISOCHRONE_CONFIG?.REACH_RATIO || 0.9;
@@ -45,7 +42,7 @@ async function calculateNetworkIsochrone16(lat, lng, banKinh) {
     for (let i = 0; i < n; i++) {
       const prev = rawDistances[(i - 1 + n) % n];
       const curr = rawDistances[i];
-      const next = rawDistances[(i + 1) % n];
+      const next = rawDistances[(i + 1 + n) % n];
       smoothedDistances.push((prev + curr * 2 + next) / 4);
     }
 
@@ -82,9 +79,6 @@ async function calculateNetworkIsochrone16(lat, lng, banKinh) {
   }
 }
 
-// ==========================================
-// MAIN VERCEL SERVERLESS ROUTER
-// ==========================================
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -386,7 +380,6 @@ module.exports = async (req, res) => {
       const wardMap = {};
       const evaluatedWards = [];
 
-      // Hàm toán học kiểm tra điểm (lat, lng) có nằm trong đa giác (polygon coordinates) hay không (Ray-casting)
       function isPointInPolygon(point, vs) {
         const x = point[0], y = point[1];
         let inside = false;
@@ -405,7 +398,6 @@ module.exports = async (req, res) => {
         const coords = geometry.coordinates;
         try {
           if (type === 'Polygon') {
-            // coords[0] là LinearRing ngoài cùng
             if (isPointInPolygon([ptLng, ptLat], coords[0])) {
               return true;
             }
@@ -442,7 +434,6 @@ module.exports = async (req, res) => {
         }
       });
 
-      // BẮT BUỘC QUÉT KHÔNG GIAN THỰC TẾ BẰNG TỌA ĐỘ VÀ HÌNH HỌC PHƯỜNG
       rawDataList.forEach(item => {
         if (item.lat == null || item.lng == null) return;
         const ptLng = Number(item.lng);
@@ -457,7 +448,6 @@ module.exports = async (req, res) => {
           }
         }
 
-        // Chỉ add vào phường nếu khớp hình học không gian, tuyệt đối không gán ép qua tên text ở sheet
         if (assignedWardName && wardMap[assignedWardName]) {
           wardMap[assignedWardName].items.push(item);
         }
@@ -576,6 +566,15 @@ module.exports = async (req, res) => {
           Total_Infra_Score: Math.round((urbanScoreSum / (urbanTotalCount || 1)) * 100)
         };
 
+        calculatedRow["Ratio_1-CV"] = urbanResults["CV_DT"] ? Math.min(100, (urbanResults["CV_DT"].currentArea / (urbanResults["CV_DT"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_2-BDX"] = urbanResults["BDX_DT"] ? Math.min(100, (urbanResults["BDX_DT"].currentArea / (urbanResults["BDX_DT"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_3-MN"] = unitResults["3-MN"] ? Math.min(100, (unitResults["3-MN"].currentArea / (unitResults["3-MN"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_4-TH"] = unitResults["4-TH"] ? Math.min(100, (unitResults["4-TH"].currentArea / (unitResults["4-TH"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_5-THCS"] = unitResults["5-THCS"] ? Math.min(100, (unitResults["5-THCS"].currentArea / (unitResults["5-THCS"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_6-YT"] = urbanResults["YT_DT"] ? Math.min(100, (urbanResults["YT_DT"].currentArea / (urbanResults["YT_DT"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_7-VH"] = urbanResults["VH_DT"] ? Math.min(100, (urbanResults["VH_DT"].currentArea / (urbanResults["VH_DT"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_8-TM"] = urbanResults["TM_DT"] ? Math.min(100, (urbanResults["TM_DT"].currentArea / (urbanResults["TM_DT"].requiredArea || 1)) * 100) : 0;
+
         resultTable.push(calculatedRow);
       }
 
@@ -652,7 +651,7 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({ labels });
     }
-// === CHÈN ACTION GET BOUNDARY VECTOR VÀO ĐÂY ===
+
     if (action === 'getBoundaryVector') {
       res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
       const fcGeoJson = await new Promise((resolve, reject) => {
@@ -660,7 +659,7 @@ module.exports = async (req, res) => {
       });
       return res.status(200).json(fcGeoJson);
     }
-    // ===============================================
+
     return res.status(200).json({ rawDataList });
 
   } catch (err) {
