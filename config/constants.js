@@ -13,13 +13,41 @@ const constants = {
   // Danh sách mã nhóm hạ tầng tiêu chuẩn phục vụ đánh giá quy chuẩn
   CODES_TO_CHECK: ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"],
 
-  // Bảng định mức diện tích quy chuẩn (m2/người)
+  // ---------------------------------------------------------------------------
+  // CẤU TRÚC PHÂN LOẠI THEO QCVN 01:2026/BXD
+  // ---------------------------------------------------------------------------
+  
+  // A. CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ
+  urbanInfraConfig: {
+    "THPT": { label: "Trường THPT", minSize: 5000, radius: 2000, quota: 0.60, nhom: "Cấp đô thị" },
+    "YT_DT": { label: "Y tế cấp khu vực (đô thị)", minSize: 1000, radius: 2000, quota: 0.40, nhom: "Cấp đô thị" },
+    "VH_DT": { label: "Văn hóa - Thể thao cấp khu vực (đô thị)", minSize: 1000, radius: 2000, quota: 1.60, nhom: "Cấp đô thị" },
+    "TM_DT": { label: "Chợ - TMDV cấp khu vực (đô thị)", minSize: 1500, radius: 2000, quota: 0.40, nhom: "Cấp đô thị" },
+    "CV_DT": { label: "Công viên cấp khu vực (đô thị)", minSize: 3000, radius: 2000, quota: 5.00, nhom: "Cấp đô thị" },
+    "BDX_DT": { label: "Bãi đỗ xe khu vực (đô thị)", minSize: 1000, radius: 2000, quota: 1.50, nhom: "Cấp đô thị" }
+  },
+
+  // B. CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở
+  unitInfraConfig: {
+    "3-MN":   { label: "Trường Mầm non", minSize: 800, radius: 500, quota: 0.60, nhom: "Cấp DVƠ" },
+    "4-TH":   { label: "Trường Tiểu học", minSize: 2000, radius: 1000, quota: 0.65, nhom: "Cấp DVƠ" },
+    "5-THCS": { label: "Trường THCS", minSize: 2500, radius: 1000, quota: 0.55, nhom: "Cấp DVƠ" },
+    // Nhóm Dịch vụ công cộng đơn vị ở (Tổng hợp chỉ tiêu >= 2.0 m2/người)
+    "YT_DV":  { label: "Y tế đơn vị ở", minSize: 500, radius: 1000, quota: 0, nhom: "Cấp DVƠ", parentGroup: "DVCC", minSingleSize: 500 },
+    "VH_DV":  { label: "Văn hóa đơn vị ở", minSize: 500, radius: 1000, quota: 0, nhom: "Cấp DVƠ", parentGroup: "DVCC", minSingleSize: 1000 },
+    "TM_DV":  { label: "Chợ - TMDV đơn vị ở", minSize: 1000, radius: 1000, quota: 0, nhom: "Cấp DVƠ", parentGroup: "DVCC", minSingleSize: 2000 },
+    "DVCC_TOTAL": { label: "Dịch vụ công cộng đơn vị ở (Tổng hợp)", minSize: 0, radius: 1000, quota: 2.00, nhom: "Cấp DVƠ" },
+    
+    "CV_DV":  { label: "Cây xanh đơn vị ở", minSize: 500, radius: 500, quota: 2.00, nhom: "Cấp DVƠ" },
+    "BDX_DV": { label: "Bãi đỗ xe đơn vị ở", minSize: 500, radius: 500, quota: 2.50, nhom: "Cấp DVƠ" }
+  },
+
+  // Giữ lại tương thích ngược cho hệ thống cũ
   quotaConfig: {
     "1-CV": 7.00, "2-BDX": 2.50, "3-MN": 0.60, "4-TH": 0.65,
     "5-THCS": 0.55, "6-YT": 0.20, "7-VH": 1.00, "8-TM": 0.00
   },
 
-  // Quy mô diện tích tối thiểu và bán kính mặc định
   infraConfig: {
     "1-CV":   { label: "Công viên, điểm xanh, vườn hoa", minSize: 300, radius: 500 },
     "2-BDX":  { label: "Bãi đỗ xe, trạm sạc xe điện", minSize: 200, radius: 500 },
