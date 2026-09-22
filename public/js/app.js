@@ -365,3 +365,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
   }
 });
+// Bật/tắt tất cả icon hạ tầng trên bản đồ (Nút Con mắt)
+  let allIconsVisible = true;
+  document.getElementById('btnToggleAllIcons')?.addEventListener('click', () => {
+    allIconsVisible = !allIconsVisible;
+    const groups = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'];
+    groups.forEach(gKey => {
+      const chk = document.getElementById(`chk_${gKey}`);
+      if (chk && chk.checked) {
+        toggleLayer(gKey, allIconsVisible);
+      }
+    });
+    const btnEye = document.getElementById('btnToggleAllIcons');
+    if (btnEye) {
+      btnEye.style.opacity = allIconsVisible ? '1' : '0.5';
+      btnEye.title = allIconsVisible ? 'Ẩn toàn bộ icon' : 'Hiện toàn bộ icon';
+    }
+  });
+
+  // Định vị GPS của người dùng
+  document.getElementById('btnLocateGPS')?.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      alert("Trình duyệt của bạn không hỗ trợ định vị GPS.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        map.setView([lat, lng], 16);
+        L.circleMarker([lat, lng], { radius: 8, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 0.8 })
+          .addTo(map)
+          .bindPopup("<b>Vị trí hiện tại của bạn</b>").openPopup();
+      },
+      () => {
+        alert("Không thể lấy được vị trí GPS của bạn.");
+      }
+    );
+  });
+
+  // Chụp ảnh màn hình (Sử dụng thư viện bản đồ cơ bản hoặc canvas export)
+  document.getElementById('btnScreenshot')?.addEventListener('click', () => {
+    window.print();
+  });
