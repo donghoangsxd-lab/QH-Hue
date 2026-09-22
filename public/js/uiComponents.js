@@ -70,9 +70,6 @@ export function handleGoogleCredentialResponse(response) {
 
 window.handleGoogleCredentialResponse = handleGoogleCredentialResponse;
 
-// ==========================================
-// QUẢN LÝ BIỂU ĐỒ TRÒN TỶ TRỌNG DIỆN TÍCH ĐẤT HẠ TẦNG (TRONG SUỐT GÓC TRÊN TRÁI)
-// ==========================================
 export function updateInfraPieChart(filteredData) {
   const widget = document.getElementById('infraPieWidget');
   if (!widget) return;
@@ -233,7 +230,7 @@ export async function openWardDetailDirect(wardName) {
   const firstPoint = state.wardLabelsList.find(w => w.name === wardName) || { lat: 16.4637, lng: 107.5905 };
   if (map) map.flyTo([firstPoint.lat, firstPoint.lng], 14);
 
-  const initialModalHtml = `<div class="ward-popup-card" style="min-width: 650px;">
+  const initialModalHtml = `<div class="ward-popup-card" style="min-width: 700px;">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
       <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH HẠ TẦNG QUY CHUẨN: ${wardName.toUpperCase()}</b>
       
@@ -251,11 +248,11 @@ export async function openWardDetailDirect(wardName) {
       <table class="ward-table">
         <thead>
           <tr>
-            <th style="width:28%;">STT / Loại hạ tầng</th>
-            <th style="width:24%;">Công trình / Hiện trạng</th>
-            <th style="width:14%;">Chỉ tiêu</th>
+            <th style="width:30%;">STT / Loại hạ tầng</th>
+            <th style="width:25%;">Công trình / Hiện trạng</th>
+            <th style="width:12%;">Chỉ tiêu</th>
             <th style="width:18%;">Nhu cầu DT (m²)</th>
-            <th style="width:16%;">Đánh giá</th>
+            <th style="width:15%;">Đánh giá</th>
           </tr>
         </thead>
         <tbody>
@@ -265,7 +262,7 @@ export async function openWardDetailDirect(wardName) {
     </div>
   </div>`;
 
-  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 680 })
+  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 720 })
     .setLatLng([firstPoint.lat, firstPoint.lng])
     .setContent(initialModalHtml);
   
@@ -308,25 +305,6 @@ export async function openWardDetailDirect(wardName) {
   }
 }
 
-function getWardInfraList(wardName) {
-  if (!wardName || wardName === "Thành phố Huế") {
-    return state.rawDataList.filter(item => (item.status === true || item.status === 'true' || item.status === 'TRUE'));
-  }
-  const wardInfo = state.wardLabelsList.find(w => w.name === wardName);
-  if (!wardInfo || !wardInfo.geometry) return [];
-  return state.rawDataList.filter(item => {
-    const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
-    if (!isApproved) return false;
-    try {
-      const pt = turf.point([item.lng, item.lat]);
-      const poly = turf.feature(wardInfo.geometry);
-      return turf.booleanPointInPolygon(pt, poly);
-    } catch (e) {
-      return false;
-    }
-  });
-}
-
 export function selectWardDetail(wardName) {
   closeModal();
 
@@ -345,7 +323,7 @@ function renderWardDetailPopup(wardData) {
   const currentUnits = wardData.currentUnits || Math.max(1, Math.round(popCurrent / 20000));
   const projectedUnits = wardData.projectedUnits || Math.max(1, Math.round(popProjected / 20000));
 
-  let modalHtml = `<div class="ward-popup-card" style="min-width: 650px;">
+  let modalHtml = `<div class="ward-popup-card" style="min-width: 700px;">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
       <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH QUY CHUẨN QCVN 01:2026/BXD: ${wardData.Ten_Phuong.toUpperCase()}</b>
     </div>
@@ -365,13 +343,27 @@ function renderWardDetailPopup(wardData) {
   </div>`;
 
   const firstPoint = state.wardLabelsList.find(w => w.name === wardData.Ten_Phuong) || { lat: 16.4637, lng: 107.5905 };
-  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 680 })
+  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 720 })
     .setLatLng([firstPoint.lat, firstPoint.lng])
     .setContent(modalHtml);
   
   detailPopup.openOn(map);
 
   setTimeout(() => {
+    window.toggleWardSubItems = function(sectionId) {
+      const el = document.getElementById(sectionId);
+      const btn = document.getElementById('btn_' + sectionId);
+      if (el) {
+        if (el.style.display === 'none') {
+          el.style.display = 'table-row-group';
+          if (btn) btn.textContent = '[-]';
+        } else {
+          el.style.display = 'none';
+          if (btn) btn.textContent = '[+]';
+        }
+      }
+    };
+
     const popInput = document.getElementById('wardPopInput');
     if (popInput) {
       popInput.onchange = (e) => {
@@ -380,7 +372,6 @@ function renderWardDetailPopup(wardData) {
         const unitLbl = document.getElementById('projectedUnitsLabel');
         if (unitLbl) unitLbl.innerText = newUnits;
         
-        // Cập nhật lại dữ liệu tính toán theo dân số quy hoạch mới
         wardData.projectedPopulation = newProjPop;
         Object.keys(wardData.urbanResults || {}).forEach(k => {
           wardData.urbanResults[k].requiredArea = wardData.urbanResults[k].quota * newProjPop;
@@ -408,21 +399,19 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   const unitRes = wardData.unitResults || {};
   const dvccSummary = wardData.dvccSummary || {};
 
-  let html = `<table class="ward-table" style="font-size:10px;">
+  let html = `<div class="ward-table-scroll-container"><table class="ward-table" style="font-size:10px;">
     <thead>
       <tr>
-        <th style="width:28%;">STT / Loại hạ tầng</th>
-        <th style="width:24%;">Công trình / Hiện trạng</th>
-        <th style="width:14%;">Chỉ tiêu</th>
+        <th style="width:30%;">STT / Loại hạ tầng</th>
+        <th style="width:25%;">Công trình / Hiện trạng</th>
+        <th style="width:12%;">Chỉ tiêu</th>
         <th style="width:18%;">Nhu cầu DT</th>
-        <th style="width:16%;">Đánh giá</th>
+        <th style="width:15%;">Đánh giá</th>
       </tr>
     </thead>
     <tbody>`;
 
-  // ---------------------------------------------------------------------------
-  // PHẦN A: CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ
-  // ---------------------------------------------------------------------------
+  // A. CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ
   html += `<tr style="background:rgba(56, 189, 248, 0.18); font-weight:bold;">
     <td colspan="5" style="color:var(--accent-cyan); text-align:left; padding-left:8px;">A / CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ</td>
   </tr>`;
@@ -439,33 +428,37 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>`
       : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU</span>`;
 
+    const sectionId = 'urban_sub_' + key;
+    const hasSub = node.subItems && node.subItems.length > 0;
+    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:6px;" title="Thu gọn/Mở rộng">[+]</span>` : '';
+
     html += `<tr>
-      <td style="text-align:left; font-weight:bold;">${urbanIdx}/ ${node.label}</td>
+      <td style="text-align:left; font-weight:bold;">${urbanIdx}/ ${node.label} ${toggleBtn}</td>
       <td style="text-align:right; font-weight:bold;">${node.currentArea.toLocaleString()} m²</td>
       <td style="text-align:center;">>= ${node.quota}</td>
       <td style="text-align:right; color:var(--accent-cyan);">${reqArea.toLocaleString()} m²</td>
       <td style="text-align:center;">${statusHtml}</td>
     </tr>`;
 
-    if (node.subItems && node.subItems.length > 0) {
+    html += `<tbody id="${sectionId}" style="display:none;">`;
+    if (hasSub) {
       node.subItems.forEach(sub => {
-        html += `<tr style="color:var(--text-muted); font-size:9.5px;">
-          <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);">└ ${sub.name}</td>
+        html += `<tr style="color:var(--text-muted); font-size:9.5px; background:rgba(255,255,255,0.01);">
+          <td style="text-align:left; padding-left:16px; color:var(--accent-cyan);">└ ${sub.name}</td>
           <td style="text-align:right;">${sub.size.toLocaleString()} m²</td>
           <td colspan="3" style="text-align:left;">BK: ${sub.radius}m | ${sub.status ? 'Đã duyệt' : 'Chờ duyệt'}</td>
         </tr>`;
       });
     } else {
-      html += `<tr style="color:var(--text-muted); font-size:9.5px; font-style:italic;">
-        <td colspan="5" style="text-align:left; padding-left:14px;">└ Chưa có công trình cập nhật.</td>
+      html += `<tr style="color:var(--text-muted); font-size:9.5px; font-style:italic; background:rgba(255,255,255,0.01);">
+        <td colspan="5" style="text-align:left; padding-left:16px;">└ Chưa có công trình cập nhật.</td>
       </tr>`;
     }
+    html += `</tbody>`;
     urbanIdx++;
   });
 
-  // ---------------------------------------------------------------------------
-  // PHẦN B: CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở
-  // ---------------------------------------------------------------------------
+  // B. CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở
   html += `<tr style="background:rgba(74, 222, 128, 0.18); font-weight:bold;">
     <td colspan="5" style="color:var(--accent-green); text-align:left; padding-left:8px;">B / CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở</td>
   </tr>`;
@@ -482,31 +475,37 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>`
       : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU</span>`;
 
+    const sectionId = 'unit_sub_' + key;
+    const hasSub = node.subItems && node.subItems.length > 0;
+    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:6px;" title="Thu gọn/Mở rộng">[+]</span>` : '';
+
     html += `<tr>
-      <td style="text-align:left; font-weight:bold;">${unitIdx}/ ${node.label}</td>
+      <td style="text-align:left; font-weight:bold;">${unitIdx}/ ${node.label} ${toggleBtn}</td>
       <td style="text-align:right; font-weight:bold;">${node.currentArea.toLocaleString()} m²</td>
       <td style="text-align:center;">>= ${node.quota}</td>
       <td style="text-align:right; color:var(--accent-cyan);">${reqArea.toLocaleString()} m²</td>
       <td style="text-align:center;">${statusHtml}</td>
     </tr>`;
 
-    if (node.subItems && node.subItems.length > 0) {
+    html += `<tbody id="${sectionId}" style="display:none;">`;
+    if (hasSub) {
       node.subItems.forEach(sub => {
-        html += `<tr style="color:var(--text-muted); font-size:9.5px;">
-          <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);">└ ${sub.name}</td>
+        html += `<tr style="color:var(--text-muted); font-size:9.5px; background:rgba(255,255,255,0.01);">
+          <td style="text-align:left; padding-left:16px; color:var(--accent-cyan);">└ ${sub.name}</td>
           <td style="text-align:right;">${sub.size.toLocaleString()} m²</td>
           <td colspan="3" style="text-align:left;">BK: ${sub.radius}m</td>
         </tr>`;
       });
     } else {
-      html += `<tr style="color:var(--text-muted); font-size:9.5px; font-style:italic;">
-        <td colspan="5" style="text-align:left; padding-left:14px;">└ Chưa có công trình.</td>
+      html += `<tr style="color:var(--text-muted); font-size:9.5px; font-style:italic; background:rgba(255,255,255,0.01);">
+        <td colspan="5" style="text-align:left; padding-left:16px;">└ Chưa có công trình.</td>
       </tr>`;
     }
+    html += `</tbody>`;
     unitIdx++;
   });
 
-  // 4. Nhóm Dịch vụ công cộng đơn vị ở (Tổng hợp 4.1, 4.2, 4.3)
+  // 4. Dịch vụ công cộng đơn vị ở
   unitIdx = 4;
   const dvccReqArea = Math.round(2.0 * projPop);
   const dvccPass = dvccSummary.status;
@@ -522,7 +521,6 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     <td style="text-align:center;">${dvccStatusHtml}</td>
   </tr>`;
 
-  // Chi tiết thành phần 4.1, 4.2, 4.3
   const subDvcc = [
     { key: "YT_DV", label: "4.1/ Y tế đơn vị ở (>= 500m²/khu)", min: 500 },
     { key: "VH_DV", label: "4.2/ Văn hóa đơn vị ở (>= 1.000m²/khu)", min: 1000 },
@@ -532,26 +530,34 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   subDvcc.forEach(subGroup => {
     const node = unitRes[subGroup.key];
     if (!node) return;
+    const sectionId = 'dvcc_sub_' + subGroup.key;
+    const hasSub = node.subItems && node.subItems.length > 0;
+    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:6px;" title="Thu gọn/Mở rộng">[+]</span>` : '';
+
     html += `<tr style="background:rgba(255,255,255,0.02);">
-      <td style="text-align:left; padding-left:12px; font-weight:600; color:var(--accent-cyan);">${subGroup.label}</td>
+      <td style="text-align:left; padding-left:12px; font-weight:600; color:var(--accent-cyan);">${subGroup.label} ${toggleBtn}</td>
       <td style="text-align:right; font-weight:bold;">${node.currentArea.toLocaleString()} m²</td>
       <td colspan="2" style="text-align:center; color:var(--text-muted);">Tổng hợp vào DVCC</td>
       <td style="text-align:center;">-</td>
     </tr>`;
 
-    if (node.subItems && node.subItems.length > 0) {
+    html += `<tbody id="${sectionId}" style="display:none;">`;
+    if (hasSub) {
       node.subItems.forEach(sub => {
         const validSize = sub.size >= subGroup.min;
-        html += `<tr style="color:var(--text-muted); font-size:9.5px;">
-          <td style="text-align:left; padding-left:22px;">└ ${sub.name} (${sub.size.toLocaleString()} m²)</td>
-          <td colspan="4" style="text-align:left;">${validSize ? '<span style="color:var(--accent-green);">Đạt diện tích tối thiểu</span>' : '<span style="color:var(--accent-red);">Chưa đạt ĐK diện tích tối thiểu</span>'}</td>
+        const evalText = validSize ? '<span style="color:var(--accent-green);">Đạt ĐK tối thiểu</span>' : '<span style="color:var(--accent-red);">Chưa đạt ĐK tối thiểu</span>';
+        html += `<tr style="color:var(--text-muted); font-size:9.5px; background:rgba(255,255,255,0.01);">
+          <td style="text-align:left; padding-left:22px;">└ ${sub.name}</td>
+          <td style="text-align:right;">${sub.size.toLocaleString()} m²</td>
+          <td colspan="3" style="text-align:left;">${evalText}</td>
         </tr>`;
       });
     } else {
-      html += `<tr style="color:var(--text-muted); font-size:9.5px; font-style:italic;">
+      html += `<tr style="color:var(--text-muted); font-size:9.5px; font-style:italic; background:rgba(255,255,255,0.01);">
         <td colspan="5" style="text-align:left; padding-left:22px;">└ Chưa có công trình.</td>
       </tr>`;
     }
+    html += `</tbody>`;
   });
 
   // 5. Cây xanh đơn vị ở & 6. Bãi đỗ xe đơn vị ở
@@ -566,31 +572,37 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>`
       : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU</span>`;
 
+    const sectionId = 'unit_sub_' + key;
+    const hasSub = node.subItems && node.subItems.length > 0;
+    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:6px;" title="Thu gọn/Mở rộng">[+]</span>` : '';
+
     html += `<tr>
-      <td style="text-align:left; font-weight:bold;">${remIdx}/ ${node.label}</td>
+      <td style="text-align:left; font-weight:bold;">${remIdx}/ ${node.label} ${toggleBtn}</td>
       <td style="text-align:right; font-weight:bold;">${node.currentArea.toLocaleString()} m²</td>
       <td style="text-align:center;">>= ${node.quota}</td>
       <td style="text-align:right; color:var(--accent-cyan);">${reqArea.toLocaleString()} m²</td>
       <td style="text-align:center;">${statusHtml}</td>
     </tr>`;
 
-    if (node.subItems && node.subItems.length > 0) {
+    html += `<tbody id="${sectionId}" style="display:none;">`;
+    if (hasSub) {
       node.subItems.forEach(sub => {
-        html += `<tr style="color:var(--text-muted); font-size:9.5px;">
-          <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);">└ ${sub.name}</td>
+        html += `<tr style="color:var(--text-muted); font-size:9.5px; background:rgba(255,255,255,0.01);">
+          <td style="text-align:left; padding-left:16px; color:var(--accent-cyan);">└ ${sub.name}</td>
           <td style="text-align:right;">${sub.size.toLocaleString()} m²</td>
           <td colspan="3" style="text-align:left;">BK: ${sub.radius}m</td>
         </tr>`;
       });
     } else {
-      html += `<tr style="color:var(--text-muted); font-size:9.5px; font-style:italic;">
-        <td colspan="5" style="text-align:left; padding-left:14px;">└ Chưa có công trình.</td>
+      html += `<tr style="color:var(--text-muted); font-size:9.5px; font-style:italic; background:rgba(255,255,255,0.01);">
+        <td colspan="5" style="text-align:left; padding-left:16px;">└ Chưa có công trình.</td>
       </tr>`;
     }
+    html += `</tbody>`;
     remIdx++;
   });
 
-  html += `</tbody></table>`;
+  html += `</tbody></table></div>`;
   return html;
 }
 
