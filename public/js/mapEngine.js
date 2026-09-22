@@ -232,13 +232,14 @@ export function clearMeasure() {
 
   const btnDist = document.getElementById('btnMeasureDist');
   const btnArea = document.getElementById('btnMeasureArea');
+  
   if (btnDist) {
     btnDist.classList.remove('active');
-    btnDist.innerHTML = "📏 CHIỀU DÀI";
+    btnDist.innerHTML = "📏"; // Phục hồi lại icon gốc thay vì text dài
   }
   if (btnArea) {
     btnArea.classList.remove('active');
-    btnArea.innerHTML = "📐 DIỆN TÍCH";
+    btnArea.innerHTML = "📐"; // Phục hồi lại icon gốc thay vì text dài
   }
 }
 
