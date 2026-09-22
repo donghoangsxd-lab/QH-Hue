@@ -635,7 +635,15 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({ labels });
     }
-
+// === CHÈN ACTION GET BOUNDARY VECTOR VÀO ĐÂY ===
+    if (action === 'getBoundaryVector') {
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
+      const fcGeoJson = await new Promise((resolve, reject) => {
+        wardVectorParsed.evaluate((fc, err) => err ? reject(err) : resolve(fc || { type: 'FeatureCollection', features: [] }));
+      });
+      return res.status(200).json(fcGeoJson);
+    }
+    // ===============================================
     return res.status(200).json({ rawDataList });
 
   } catch (err) {
