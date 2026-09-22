@@ -365,16 +365,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
   }
 });
-// Bật/tắt tất cả icon hạ tầng trên bản đồ (Nút Con mắt)
+// Bật/tắt tất cả icon hạ tầng trên bản đồ (Nút Con mắt) + Đồng bộ checkbox trong panel
   let allIconsVisible = true;
   document.getElementById('btnToggleAllIcons')?.addEventListener('click', () => {
     allIconsVisible = !allIconsVisible;
     const groups = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'];
     groups.forEach(gKey => {
       const chk = document.getElementById(`chk_${gKey}`);
-      if (chk && chk.checked) {
-        toggleLayer(gKey, allIconsVisible);
+      if (chk) {
+        chk.checked = allIconsVisible;
       }
+      toggleLayer(gKey, allIconsVisible);
     });
     const btnEye = document.getElementById('btnToggleAllIcons');
     if (btnEye) {
