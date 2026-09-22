@@ -326,46 +326,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
   });
 
-  try {
-    const progressBar = document.getElementById('progressBar');
-    const progressPercent = document.getElementById('progressPercent');
-    if (progressBar) progressBar.style.width = "30%";
-    if (progressPercent) progressPercent.innerText = "30%";
-
-    await Promise.all([loadBoundaryLayer(), loadPopulationLayer()]);
-    if (progressBar) progressBar.style.width = "60%";
-    if (progressPercent) progressPercent.innerText = "60%";
-
-    const dataRes = await fetch('/api/gee');
-    const dataJson = await dataRes.json();
-    state.rawDataList = dataJson.rawDataList || [];
-
-    const wardSelector = document.getElementById('wardSelector');
-    if (wardSelector) {
-      state.wardLabelsList
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
-        .forEach(item => {
-          const opt = document.createElement('option');
-          opt.value = item.name;
-          opt.textContent = item.name;
-          wardSelector.appendChild(opt);
-        });
-    }
-
-    if (progressBar) progressBar.style.width = "90%";
-    if (progressPercent) progressPercent.innerText = "90%";
-
-    renderGroupedPoints();
-    await refreshHeatmapOnly();
-
-    if (progressBar) progressBar.style.width = "100%";
-    if (progressPercent) progressPercent.innerText = "100%";
-  } catch (err) {
-    console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
-  }
-});
-// Bật/tắt tất cả icon hạ tầng trên bản đồ (Nút Con mắt) + Đồng bộ checkbox trong panel
+  // Bật/tắt tất cả icon hạ tầng trên bản đồ (Nút Con mắt) + Đồng bộ checkbox trong panel
   let allIconsVisible = true;
   document.getElementById('btnToggleAllIcons')?.addEventListener('click', () => {
     allIconsVisible = !allIconsVisible;
@@ -405,7 +366,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     );
   });
 
-  // Chụp ảnh màn hình (Sử dụng thư viện bản đồ cơ bản hoặc canvas export)
+  // Chụp ảnh màn hình
   document.getElementById('btnScreenshot')?.addEventListener('click', () => {
     window.print();
   });
+
+  try {
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+    if (progressBar) progressBar.style.width = "30%";
+    if (progressPercent) progressPercent.innerText = "30%";
+
+    await Promise.all([loadBoundaryLayer(), loadPopulationLayer()]);
+    if (progressBar) progressBar.style.width = "60%";
+    if (progressPercent) progressPercent.innerText = "60%";
+
+    const dataRes = await fetch('/api/gee');
+    const dataJson = await dataRes.json();
+    state.rawDataList = dataJson.rawDataList || [];
+
+    const wardSelector = document.getElementById('wardSelector');
+    if (wardSelector) {
+      state.wardLabelsList
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+        .forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item.name;
+          opt.textContent = item.name;
+          wardSelector.appendChild(opt);
+        });
+    }
+
+    if (progressBar) progressBar.style.width = "90%";
+    if (progressPercent) progressPercent.innerText = "90%";
+
+    renderGroupedPoints();
+    await refreshHeatmapOnly();
+
+    if (progressBar) progressBar.style.width = "100%";
+    if (progressPercent) progressPercent.innerText = "100%";
+  } catch (err) {
+    console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
+  }
+});
