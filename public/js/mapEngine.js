@@ -79,14 +79,23 @@ export async function loadBoundaryLayer() {
   if (!map) return;
 
   try {
-    const tileRes = await fetch('/api/gee?action=getBoundaryTile');
-    const tileData = await tileRes.json();
-    if (tileData.urlFormat) {
-      const boundaryTile = L.tileLayer(tileData.urlFormat, { opacity: 0.9 });
-      layers.boundary.addLayer(boundaryTile);
+    const boundRes = await fetch('/api/gee?action=getBoundaryVector');
+    const boundData = await boundRes.json();
+    
+    if (boundData && boundData.features) {
+      const boundaryVectorLayer = L.geoJSON(boundData, {
+        style: {
+          color: '#ffffff',
+          weight: 1.5,
+          dashArray: '4, 4',
+          fillColor: 'transparent',
+          fillOpacity: 0
+        }
+      });
+      layers.boundary.addLayer(boundaryVectorLayer);
     }
   } catch (err) {
-    console.error("Lỗi tải ranh giới 40 phường xã:", err);
+    console.error("Lỗi tải ranh giới vector 40 phường xã:", err);
   }
 
   try {
