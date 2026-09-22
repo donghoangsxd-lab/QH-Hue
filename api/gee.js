@@ -386,9 +386,42 @@ module.exports = async (req, res) => {
       const wardMap = {};
       const evaluatedWards = [];
 
+      // Hàm toán học kiểm tra điểm (lat, lng) có nằm trong đa giác (polygon coordinates) hay không (Ray-casting)
+      function isPointInPolygon(point, vs) {
+        const x = point[0], y = point[1];
+        let inside = false;
+        for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+          const xi = vs[i][0], yi = vs[i][1];
+          const xj = vs[j][0], yj = vs[j][1];
+          const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+          if (intersect) inside = !inside;
+        }
+        return inside;
+      }
+
+      function checkPointInGeoJSONGeometry(ptLng, ptLat, geometry) {
+        if (!geometry || !geometry.coordinates) return false;
+        const type = geometry.type;
+        const coords = geometry.coordinates;
+        try {
+          if (type === 'Polygon') {
+            // coords[0] là LinearRing ngoài cùng
+            if (isPointInPolygon([ptLng, ptLat], coords[0])) {
+              return true;
+            }
+          } else if (type === 'MultiPolygon') {
+            for (const polyCoords of coords) {
+              if (isPointInPolygon([ptLng, ptLat], polyCoords[0])) {
+                return true;
+              }
+            }
+          }
+        } catch (e) {}
+        return false;
+      }
+
       wardList.forEach(f => {
         const props = f.properties || {};
-        // Lấy tên phường chuẩn xác từ asset GEE
         const wName = props.tenXa || props.NAME_2 || props.name || 'Phường';
         const totalPop = Number(props.danSoNum || props.danSo || 10000);
         
@@ -409,24 +442,22 @@ module.exports = async (req, res) => {
         }
       });
 
-      // BẮT BUỘC QUÉT KHÔNG GIAN BẰNG TURF.JS: Điểm nào nằm trong ranh giới phường nào thì gán vào phường đó
+      // BẮT BUỘC QUÉT KHÔNG GIAN THỰC TẾ BẰNG TỌA ĐỘ VÀ HÌNH HỌC PHƯỜNG
       rawDataList.forEach(item => {
-        if (!item.lat || !item.lng) return;
-        const pt = turf.point([Number(item.lng), Number(item.lat)]);
+        if (item.lat == null || item.lng == null) return;
+        const ptLng = Number(item.lng);
+        const ptLat = Number(item.lat);
         
         let assignedWardName = null;
 
         for (const w of evaluatedWards) {
-          try {
-            const poly = turf.feature(w.geometry);
-            if (turf.booleanPointInPolygon(pt, poly)) {
-              assignedWardName = w.name;
-              break;
-            }
-          } catch (e) {}
+          if (checkPointInGeoJSONGeometry(ptLng, ptLat, w.geometry)) {
+            assignedWardName = w.name;
+            break;
+          }
         }
 
-        // Chỉ đưa vào danh mục items của phường nếu khớp hình học không gian thực tế
+        // Chỉ add vào phường nếu khớp hình học không gian, tuyệt đối không gán ép qua tên text ở sheet
         if (assignedWardName && wardMap[assignedWardName]) {
           wardMap[assignedWardName].items.push(item);
         }
