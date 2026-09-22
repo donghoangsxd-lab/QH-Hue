@@ -94,12 +94,10 @@ module.exports = async (req, res) => {
   try {
     const action = req.query.action || 'getInitData';
 
-    // Bắt buộc khởi tạo GEE trước mọi action để đảm bảo biến ee luôn sẵn sàng
     await initGEE();
     const { ee, wardVectorParsed, popRasterNormalized, wardRegion } = getGeeContext();
     const rawDataList = await getRawDataList();
 
-    // 1. TỔNG QUÁT: DÙNG BÁN KÍNH TRÒN TRỰC TIẾP TRÊN GEE
     if (action === 'getIsochrone') {
       let requestBody = req.body || {};
       if (typeof requestBody === 'string') {
@@ -142,7 +140,6 @@ module.exports = async (req, res) => {
       }
     }
 
-    // CHI TIẾT ĐIỂM: DÙNG ISOCHRONE 16 HƯỚNG KHI CLICK VÀO 1 ĐIỂM CỤ THỂ
     if (action === 'getSingleIsochrone') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -188,7 +185,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, result });
     }
 
-    // ANALYZE POINT: Dùng 16 hướng khi click chi tiết điểm
     if (action === 'analyzePoint') {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -377,16 +373,12 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
-    // ==========================================
-    // ACTION: getWardStats (CHUẨN 40 PHƯỜNG XÃ & QUÉT TỌA ĐỘ KHÔNG GIAN)
-    // ==========================================
     if (action === 'getWardStats') {
       const now = Date.now();
       if (cachedWardStats && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)) {
         return res.status(200).json({ data: cachedWardStats });
       }
 
-      // 1. Lấy danh sách chuẩn đúng 40 phường/xã từ Vector GEE
       const wardList = await new Promise((resolve, reject) => {
         wardVectorParsed.evaluate((fc, err) => err ? reject(err) : resolve(fc ? fc.features : []));
       });
@@ -407,9 +399,6 @@ module.exports = async (req, res) => {
         };
       });
 
-      // 2. Sử dụng không gian GIS (Turf.js logic phía server hoặc kiểm tra polygon) để quét điểm thuộc phường
-      // Thay vì tin vào cột 'ward' trong sheet, ta kiểm tra điểm (lat, lng) nằm trong ranh giới polygon phường nào.
-      // Dùng danh sách feature từ wardVectorParsed để mapping chính xác tọa độ công trình vào đúng phường.
       const evaluatedWards = wardList.map(f => {
         return {
           name: f.properties.tenXa || f.properties.name || 'Phường',
@@ -431,7 +420,6 @@ module.exports = async (req, res) => {
           } catch (e) {}
         }
 
-        // Nếu không quét được bằng hình học, fallback về cleanWardStr hoặc "Thuận Hóa"
         if (!assignedWardName || !wardMap[assignedWardName]) {
           const cleanItemWard = constants.cleanWardStr(item.ward);
           assignedWardName = Object.keys(wardMap).find(k => constants.cleanWardStr(k) === cleanItemWard) || "Thuận Hóa";
@@ -476,7 +464,7 @@ module.exports = async (req, res) => {
         }
 
         data.items.forEach(item => {
-          if (!item.status) return; // Chỉ xét công trình đã duyệt (TRUE)
+          if (!item.status) return;
 
           const prefix = item.id.split('-')[0];
           const normalizedNhom = constants.cleanNhomStr(item.nhomHaTang);
@@ -539,7 +527,7 @@ module.exports = async (req, res) => {
           node.status = node.currentArea >= node.requiredArea;
         }
 
-        resultTable.push({
+        const calculatedRow = {
           Ten_Phuong: wName,
           Dan_So_Vector: pop,
           projectedPopulation: projPop,
@@ -553,7 +541,19 @@ module.exports = async (req, res) => {
             status: dvccOverallStatus
           },
           Total_Infra_Score: Math.round((urbanScoreSum / (urbanTotalCount || 1)) * 100)
-        });
+        };
+
+        // Hỗ trợ tương thích ngược cho bảng tổng hợp cũ
+        calculatedRow["Ratio_1-CV"] = urbanResults["CV_DT"] ? Math.min(100, (urbanResults["CV_DT"].currentArea / (urbanResults["CV_DT"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_2-BDX"] = urbanResults["BDX_DT"] ? Math.min(100, (urbanResults["BDX_DT"].currentArea / (urbanResults["BDX_DT"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_3-MN"] = unitResults["3-MN"] ? Math.min(100, (unitResults["3-MN"].currentArea / (unitResults["3-MN"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_4-TH"] = unitResults["4-TH"] ? Math.min(100, (unitResults["4-TH"].currentArea / (unitResults["4-TH"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_5-THCS"] = unitResults["5-THCS"] ? Math.min(100, (unitResults["5-THCS"].currentArea / (unitResults["5-THCS"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_6-YT"] = urbanResults["YT_DT"] ? Math.min(100, (urbanResults["YT_DT"].currentArea / (urbanResults["YT_DT"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_7-VH"] = urbanResults["VH_DT"] ? Math.min(100, (urbanResults["VH_DT"].currentArea / (urbanResults["VH_DT"].requiredArea || 1)) * 100) : 0;
+        calculatedRow["Ratio_8-TM"] = urbanResults["TM_DT"] ? Math.min(100, (urbanResults["TM_DT"].currentArea / (urbanResults["TM_DT"].requiredArea || 1)) * 100) : 0;
+
+        resultTable.push(calculatedRow);
       }
 
       resultTable.sort((a, b) => b.Dan_So_Vector - a.Dan_So_Vector);
