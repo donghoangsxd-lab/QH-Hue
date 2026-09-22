@@ -70,12 +70,12 @@ export function handleGoogleCredentialResponse(response) {
 
 window.handleGoogleCredentialResponse = handleGoogleCredentialResponse;
 
+// NÂNG CẤP BIỂU ĐỒ TRÒN TỶ TRỌNG ĐẤT: ĐẶT Ở GÓC TRÊN BÊN TRÁI, TIÊU ĐỀ CĂN GIỮA, CÓ LINE VÀ DANH SÁCH % CHI TIẾT
 export function updateInfraPieChart(sourceList) {
   const widget = document.getElementById('infraPieWidget');
   if (!widget) return;
   widget.style.display = 'block';
 
-  // Tính toán diện tích theo từng loại hạ tầng
   const areaTotals = {};
   let totalAreaSum = 0;
 
@@ -116,7 +116,7 @@ export function updateInfraPieChart(sourceList) {
   const bgColors = keys.map(k => colorsMap[k] || '#38bdf8');
   const labels = keys.map(k => labelsMap[k] || k);
 
-  // Render danh sách chi tiết phần trăm ở dưới
+  // Render danh sách chi tiết phần trăm ở dưới biểu đồ tròn
   const legendContainer = document.getElementById('pieLegendDetails');
   if (legendContainer) {
     let html = '';
@@ -136,7 +136,6 @@ export function updateInfraPieChart(sourceList) {
     legendContainer.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Chưa có dữ liệu</div>';
   }
 
-  // Khởi tạo/Cập nhật Chart.js Donut
   const ctx = document.getElementById('infraPieChart')?.getContext('2d');
   if (!ctx) return;
 
@@ -159,7 +158,7 @@ export function updateInfraPieChart(sourceList) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false }, // Ẩn legend mặc định để dùng bảng chi tiết bên dưới
+        legend: { display: false },
         tooltip: {
           callbacks: {
             label: function(context) {
@@ -395,10 +394,10 @@ function renderWardDetailPopup(wardData) {
       if (el) {
         if (el.style.display === 'none') {
           el.style.display = 'table-row-group';
-          if (btn) btn.textContent = '[-]';
+          if (btn) btn.textContent = '▲ Thu gọn';
         } else {
           el.style.display = 'none';
-          if (btn) btn.textContent = '[+]';
+          if (btn) btn.textContent = '▼ Chi tiết';
         }
       }
     };
@@ -469,7 +468,8 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
     const sectionId = 'urban_sub_' + key;
     const hasSub = node.subItems && node.subItems.length > 0;
-    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:6px;" title="Thu gọn/Mở rộng">[+]</span>` : '';
+    // CẢI TIẾN: Thay nút [+] / [-] thô bằng icon mũi tên chuyên nghiệp
+    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:6px; font-size:9.5px;" title="Thu gọn/Mở rộng">▼ Chi tiết</span>` : '';
 
     html += `<tr>
       <td style="text-align:left; font-weight:bold;">${urbanIdx}/ ${node.label} ${toggleBtn}</td>
@@ -516,7 +516,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
     const sectionId = 'unit_sub_' + key;
     const hasSub = node.subItems && node.subItems.length > 0;
-    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:6px;" title="Thu gọn/Mở rộng">[+]</span>` : '';
+    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:6px; font-size:9.5px;" title="Thu gọn/Mở rộng">▼ Chi tiết</span>` : '';
 
     html += `<tr>
       <td style="text-align:left; font-weight:bold;">${unitIdx}/ ${node.label} ${toggleBtn}</td>
@@ -571,7 +571,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     if (!node) return;
     const sectionId = 'dvcc_sub_' + subGroup.key;
     const hasSub = node.subItems && node.subItems.length > 0;
-    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:6px;" title="Thu gọn/Mở rộng">[+]</span>` : '';
+    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:6px; font-size:9.5px;" title="Thu gọn/Mở rộng">▼ Chi tiết</span>` : '';
 
     html += `<tr style="background:rgba(255,255,255,0.02);">
       <td style="text-align:left; padding-left:12px; font-weight:600; color:var(--accent-cyan);">${subGroup.label} ${toggleBtn}</td>
@@ -613,7 +613,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
     const sectionId = 'unit_sub_' + key;
     const hasSub = node.subItems && node.subItems.length > 0;
-    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:6px;" title="Thu gọn/Mở rộng">[+]</span>` : '';
+    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:6px; font-size:9.5px;" title="Thu gọn/Mở rộng">▼ Chi tiết</span>` : '';
 
     html += `<tr>
       <td style="text-align:left; font-weight:bold;">${remIdx}/ ${node.label} ${toggleBtn}</td>
