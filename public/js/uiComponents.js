@@ -161,7 +161,7 @@ export function openCombinedModal() {
   
   if (mBar) mBar.style.width = "0%";
   if (mTxt) mTxt.innerText = "0%";
-  if (tbody) tbody.innerHTML = "<tr><td colspan='19' style='text-align:center; padding:20px;'>🔄 Đang tính toán ma trận sống từ GEE...</td></tr>";
+  if (tbody) tbody.innerHTML = "<tr><td colspan='19' style='text-align:center; padding:20px;'>🔄 Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>";
 
   let mStep = 0;
   const mInterval = setInterval(() => {
@@ -233,7 +233,7 @@ export async function openWardDetailDirect(wardName) {
   const firstPoint = state.wardLabelsList.find(w => w.name === wardName) || { lat: 16.4637, lng: 107.5905 };
   if (map) map.flyTo([firstPoint.lat, firstPoint.lng], 14);
 
-  const initialModalHtml = `<div class="ward-popup-card" style="min-width: 620px;">
+  const initialModalHtml = `<div class="ward-popup-card" style="min-width: 650px;">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
       <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH HẠ TẦNG QUY CHUẨN: ${wardName.toUpperCase()}</b>
       
@@ -244,29 +244,28 @@ export async function openWardDetailDirect(wardName) {
     </div>
 
     <div style="background:rgba(15, 23, 42, 0.8); border:1px solid var(--border-color); padding:6px; border-radius:6px; margin:6px 0; font-size:11px;">
-      👥 Dân số hiện trạng & Dự báo: Đang khởi tạo...
+      👥 Dân số & Đơn vị ở: Đang khởi tạo...
     </div>
 
     <div id="wardQuotaTableContainer">
       <table class="ward-table">
         <thead>
           <tr>
-            <th style="width:28px;">STT</th>
-            <th style="width:160px; text-align:left;">Loại hạ tầng / Công trình</th>
-            <th style="width:80px; text-align:right;">Hiện trạng</th>
-            <th style="width:55px;">Chỉ tiêu</th>
-            <th style="width:85px; text-align:right;">Nhu cầu DT</th>
-            <th style="width:125px;">Đánh giá</th>
+            <th style="width:28%;">STT / Loại hạ tầng</th>
+            <th style="width:24%;">Công trình / Hiện trạng</th>
+            <th style="width:14%;">Chỉ tiêu</th>
+            <th style="width:18%;">Nhu cầu DT (m²)</th>
+            <th style="width:16%;">Đánh giá</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td colspan="6" style="text-align:center; padding:25px; color:var(--accent-orange);">⏳ Đang tổng hợp dữ liệu không gian và phân tích quy chuẩn (Vui lòng chờ khoảng 10 - 20 giây)...</td></tr>
+          <tr><td colspan="5" style="text-align:center; padding:25px; color:var(--accent-orange);">⏳ Đang tổng hợp dữ liệu quy chuẩn theo QCVN 01:2026/BXD...</td></tr>
         </tbody>
       </table>
     </div>
   </div>`;
 
-  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 660 })
+  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 680 })
     .setLatLng([firstPoint.lat, firstPoint.lng])
     .setContent(initialModalHtml);
   
@@ -334,123 +333,265 @@ export function selectWardDetail(wardName) {
   const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
   if (!wardData) return;
 
-  const wardInfraList = getWardInfraList(wardName);
+  const firstPoint = state.wardLabelsList.find(w => w.name === wardName) || { lat: 16.4637, lng: 107.5905 };
+  if (map) map.flyTo([firstPoint.lat, firstPoint.lng], 14);
 
-  const currentAreas = { "1-CV": 0, "2-BDX": 0, "3-MN": 0, "4-TH": 0, "5-THCS": 0, "6-YT": 0, "7-VH": 0, "8-TM": 0 };
-  wardInfraList.forEach(item => {
-    if (currentAreas[item.type] !== undefined) currentAreas[item.type] += (item.size || 0);
-  });
+  renderWardDetailPopup(wardData);
+}
 
-  const currentPop = Number(wardData.Dan_So_Vector || 0);
+function renderWardDetailPopup(wardData) {
+  const popCurrent = wardData.Dan_So_Vector || 45000;
+  const popProjected = wardData.projectedPopulation || Math.round(popCurrent * 1.2);
+  const currentUnits = wardData.currentUnits || Math.max(1, Math.round(popCurrent / 20000));
+  const projectedUnits = wardData.projectedUnits || Math.max(1, Math.round(popProjected / 20000));
 
-  let modalHtml = `<div class="ward-popup-card">
-    <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH HẠ TẦNG QUY CHUẨN: ${wardName.toUpperCase()}</b><br>
+  let modalHtml = `<div class="ward-popup-card" style="min-width: 650px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
+      <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH QUY CHUẨN QCVN 01:2026/BXD: ${wardData.Ten_Phuong.toUpperCase()}</b>
+    </div>
     
-    <div style="background:rgba(15, 23, 42, 0.8); border:1px solid var(--border-color); padding:6px; border-radius:6px; margin:6px 0; font-size:11px;">
-      👥 Dân số hiện trạng: <b style="color:var(--accent-green);">~${currentPop.toLocaleString()} người</b> | 
-      🔮 Dự báo: <input type="number" id="wardPopInput" value="${currentPop}" style="width:75px; font-size:11px; padding:2px; background:#0f172a; border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+    <div style="background:rgba(15, 23, 42, 0.85); border:1px solid var(--border-color); padding:8px; border-radius:6px; margin-bottom:8px; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
+      <div>👥 Dân số hiện trạng: <b>${popCurrent.toLocaleString()} người</b> (${currentUnits} đơn vị ở)</div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        📈 Dân số quy hoạch: 
+        <input type="number" id="wardPopInput" value="${popProjected}" step="1000" min="1000" style="width:85px; padding:2px 6px; background:#0f172a; color:var(--accent-cyan); border:1px solid var(--border-color); border-radius:4px; font-weight:bold; text-align:center;" /> 
+        người (<span id="projectedUnitsLabel">${projectedUnits}</span> đơn vị ở)
+      </div>
     </div>
 
     <div id="wardQuotaTableContainer">
-      ${buildWardQuotaTableHtml(wardName, currentPop, currentAreas, wardInfraList)}
+      ${buildWardQuotaTableHtml(wardData, popProjected)}
     </div>
   </div>`;
 
-  const firstPoint = wardInfraList[0] || { lat: 16.4637, lng: 107.5905 };
-  if (map) map.flyTo([firstPoint.lat, firstPoint.lng], 14);
-
-  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 660 })
+  const firstPoint = state.wardLabelsList.find(w => w.name === wardData.Ten_Phuong) || { lat: 16.4637, lng: 107.5905 };
+  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 680 })
     .setLatLng([firstPoint.lat, firstPoint.lng])
     .setContent(modalHtml);
   
+  detailPopup.openOn(map);
+
   setTimeout(() => {
-    if (map) detailPopup.openOn(map);
     const popInput = document.getElementById('wardPopInput');
     if (popInput) {
-      popInput.onchange = (e) => recalcWardQuota(wardName, e.target.value);
+      popInput.onchange = (e) => {
+        const newProjPop = Number(e.target.value) || popCurrent;
+        const newUnits = Math.max(1, Math.round(newProjPop / 20000));
+        const unitLbl = document.getElementById('projectedUnitsLabel');
+        if (unitLbl) unitLbl.innerText = newUnits;
+        
+        // Cập nhật lại dữ liệu tính toán theo dân số quy hoạch mới
+        wardData.projectedPopulation = newProjPop;
+        Object.keys(wardData.urbanResults || {}).forEach(k => {
+          wardData.urbanResults[k].requiredArea = wardData.urbanResults[k].quota * newProjPop;
+          wardData.urbanResults[k].status = wardData.urbanResults[k].currentArea >= wardData.urbanResults[k].requiredArea;
+        });
+        Object.keys(wardData.unitResults || {}).forEach(k => {
+          wardData.unitResults[k].requiredArea = (wardData.unitResults[k].quota || 0) * newProjPop;
+          if (k !== "YT_DV" && k !== "VH_DV" && k !== "TM_DV") {
+            wardData.unitResults[k].status = wardData.unitResults[k].currentArea >= wardData.unitResults[k].requiredArea;
+          }
+        });
+        wardData.dvccSummary.requiredArea = 2.0 * newProjPop;
+
+        const container = document.getElementById('wardQuotaTableContainer');
+        if (container) {
+          container.innerHTML = buildWardQuotaTableHtml(wardData, newProjPop);
+        }
+      };
     }
-  }, 300);
+  }, 200);
 }
 
-function buildWardQuotaTableHtml(wardName, pop, areas, infraList) {
-  const quotaConfig = {
-    "1-CV":   { norm: 7.00, label: "Công viên, điểm xanh" },
-    "2-BDX":  { norm: 2.50, label: "Bãi đỗ xe" },
-    "3-MN":   { norm: 0.60, label: "Mầm non" },
-    "4-TH":   { norm: 0.65, label: "Tiểu học" },
-    "5-THCS": { norm: 0.55, label: "THCS" },
-    "6-YT":   { norm: 0.20, label: "Cơ sở Y tế" },
-    "7-VH":   { norm: 1.00, label: "Văn hóa" },
-    "8-TM":   { norm: 0.00, label: "Thương mại" }
-  };
+function buildWardQuotaTableHtml(wardData, projPop) {
+  const urbanRes = wardData.urbanResults || {};
+  const unitRes = wardData.unitResults || {};
+  const dvccSummary = wardData.dvccSummary || {};
 
-  let html = `<table class="ward-table">
+  let html = `<table class="ward-table" style="font-size:10px;">
     <thead>
       <tr>
-        <th style="width:28px;">STT</th>
-        <th style="width:160px; text-align:left;">Loại hạ tầng / Công trình</th>
-        <th style="width:80px; text-align:right;">Hiện trạng</th>
-        <th style="width:55px;">Chỉ tiêu</th>
-        <th style="width:85px; text-align:right;">Nhu cầu DT</th>
-        <th style="width:125px;">Đánh giá</th>
+        <th style="width:28%;">STT / Loại hạ tầng</th>
+        <th style="width:24%;">Công trình / Hiện trạng</th>
+        <th style="width:14%;">Chỉ tiêu</th>
+        <th style="width:18%;">Nhu cầu DT</th>
+        <th style="width:16%;">Đánh giá</th>
       </tr>
     </thead>
     <tbody>`;
 
-  let stt = 1;
-  Object.keys(quotaConfig).forEach(code => {
-    const cfg = quotaConfig[code];
-    const existArea = areas[code] || 0;
-    const actualPerCap = pop > 0 ? (existArea / pop) : 0;
-    const reqArea = Math.round(pop * cfg.norm);
-    const isPass = actualPerCap >= cfg.norm;
-    const diffArea = existArea - reqArea;
+  // ---------------------------------------------------------------------------
+  // PHẦN A: CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ
+  // ---------------------------------------------------------------------------
+  html += `<tr style="background:rgba(56, 189, 248, 0.18); font-weight:bold;">
+    <td colspan="5" style="color:var(--accent-cyan); text-align:left; padding-left:8px;">A / CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ</td>
+  </tr>`;
 
-    const evalText = cfg.norm === 0 ? "Theo quy hoạch" : (isPass ? `ĐẠT (+${diffArea.toLocaleString()} m²)` : `THIẾU (${diffArea.toLocaleString()} m²)`);
-    const evalColor = cfg.norm === 0 ? "var(--text-muted)" : (isPass ? "var(--accent-green)" : "var(--accent-red)");
+  const urbanKeys = ["THPT", "YT_DT", "VH_DT", "TM_DT", "CV_DT", "BDX_DT"];
+  let urbanIdx = 1;
 
-    html += `<tr style="background:rgba(255,255,255,0.05); font-weight:bold;">
-      <td style="text-align:center;">${stt++}</td>
-      <td style="text-align:left;">${cfg.label}</td>
-      <td style="text-align:right;">${existArea.toLocaleString()} m²</td>
-      <td style="text-align:center;">${cfg.norm > 0 ? cfg.norm + ' m²' : '-'}</td>
-      <td style="text-align:right; color:var(--accent-cyan);">${reqArea > 0 ? reqArea.toLocaleString() + ' m²' : '-'}</td>
-      <td style="text-align:center; color:${evalColor}; font-size:9.5px;">${evalText}</td>
+  urbanKeys.forEach(key => {
+    const node = urbanRes[key];
+    if (!node) return;
+    const reqArea = Math.round(node.quota * projPop);
+    const isPass = node.currentArea >= reqArea;
+    const statusHtml = isPass 
+      ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>`
+      : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU</span>`;
+
+    html += `<tr>
+      <td style="text-align:left; font-weight:bold;">${urbanIdx}/ ${node.label}</td>
+      <td style="text-align:right; font-weight:bold;">${node.currentArea.toLocaleString()} m²</td>
+      <td style="text-align:center;">>= ${node.quota}</td>
+      <td style="text-align:right; color:var(--accent-cyan);">${reqArea.toLocaleString()} m²</td>
+      <td style="text-align:center;">${statusHtml}</td>
     </tr>`;
 
-    const subItems = infraList.filter(it => it.type === code);
-    subItems.forEach(item => {
-      html += `<tr style="font-size:9.5px; opacity:0.85;">
-        <td></td>
-        <td style="padding-left:12px; color:var(--accent-cyan);">└ ${item.name}</td>
-        <td style="text-align:right;">${item.size.toLocaleString()} m²</td>
-        <td style="text-align:center; color:var(--text-muted);">-</td>
-        <td style="text-align:right; color:var(--accent-orange);">Bán kính: ${Number(item.radius) || Number(item.banKinh) || 500}m</td>
-        <td style="text-align:center; color:var(--accent-green);">✓ Hoạt động</td>
+    if (node.subItems && node.subItems.length > 0) {
+      node.subItems.forEach(sub => {
+        html += `<tr style="color:var(--text-muted); font-size:9.5px;">
+          <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);">└ ${sub.name}</td>
+          <td style="text-align:right;">${sub.size.toLocaleString()} m²</td>
+          <td colspan="3" style="text-align:left;">BK: ${sub.radius}m | ${sub.status ? 'Đã duyệt' : 'Chờ duyệt'}</td>
+        </tr>`;
+      });
+    } else {
+      html += `<tr style="color:var(--text-muted); font-size:9.5px; font-style:italic;">
+        <td colspan="5" style="text-align:left; padding-left:14px;">└ Chưa có công trình cập nhật.</td>
       </tr>`;
-    });
+    }
+    urbanIdx++;
+  });
+
+  // ---------------------------------------------------------------------------
+  // PHẦN B: CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở
+  // ---------------------------------------------------------------------------
+  html += `<tr style="background:rgba(74, 222, 128, 0.18); font-weight:bold;">
+    <td colspan="5" style="color:var(--accent-green); text-align:left; padding-left:8px;">B / CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở</td>
+  </tr>`;
+
+  const unitKeys = ["3-MN", "4-TH", "5-THCS"];
+  let unitIdx = 1;
+
+  unitKeys.forEach(key => {
+    const node = unitRes[key];
+    if (!node) return;
+    const reqArea = Math.round(node.quota * projPop);
+    const isPass = node.currentArea >= reqArea;
+    const statusHtml = isPass 
+      ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>`
+      : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU</span>`;
+
+    html += `<tr>
+      <td style="text-align:left; font-weight:bold;">${unitIdx}/ ${node.label}</td>
+      <td style="text-align:right; font-weight:bold;">${node.currentArea.toLocaleString()} m²</td>
+      <td style="text-align:center;">>= ${node.quota}</td>
+      <td style="text-align:right; color:var(--accent-cyan);">${reqArea.toLocaleString()} m²</td>
+      <td style="text-align:center;">${statusHtml}</td>
+    </tr>`;
+
+    if (node.subItems && node.subItems.length > 0) {
+      node.subItems.forEach(sub => {
+        html += `<tr style="color:var(--text-muted); font-size:9.5px;">
+          <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);">└ ${sub.name}</td>
+          <td style="text-align:right;">${sub.size.toLocaleString()} m²</td>
+          <td colspan="3" style="text-align:left;">BK: ${sub.radius}m</td>
+        </tr>`;
+      });
+    } else {
+      html += `<tr style="color:var(--text-muted); font-size:9.5px; font-style:italic;">
+        <td colspan="5" style="text-align:left; padding-left:14px;">└ Chưa có công trình.</td>
+      </tr>`;
+    }
+    unitIdx++;
+  });
+
+  // 4. Nhóm Dịch vụ công cộng đơn vị ở (Tổng hợp 4.1, 4.2, 4.3)
+  unitIdx = 4;
+  const dvccReqArea = Math.round(2.0 * projPop);
+  const dvccPass = dvccSummary.status;
+  const dvccStatusHtml = dvccPass 
+    ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>`
+    : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU / KHÔNG ĐẠT</span>`;
+
+  html += `<tr>
+    <td style="text-align:left; font-weight:bold;">${unitIdx}/ Dịch vụ công cộng đơn vị ở</td>
+    <td style="text-align:right; font-weight:bold;">${(dvccSummary.totalArea || 0).toLocaleString()} m²</td>
+    <td style="text-align:center;">>= 2.00</td>
+    <td style="text-align:right; color:var(--accent-cyan);">${dvccReqArea.toLocaleString()} m²</td>
+    <td style="text-align:center;">${dvccStatusHtml}</td>
+  </tr>`;
+
+  // Chi tiết thành phần 4.1, 4.2, 4.3
+  const subDvcc = [
+    { key: "YT_DV", label: "4.1/ Y tế đơn vị ở (>= 500m²/khu)", min: 500 },
+    { key: "VH_DV", label: "4.2/ Văn hóa đơn vị ở (>= 1.000m²/khu)", min: 1000 },
+    { key: "TM_DV", label: "4.3/ Chợ - TMDV đơn vị ở (>= 2.000m²/khu)", min: 2000 }
+  ];
+
+  subDvcc.forEach(subGroup => {
+    const node = unitRes[subGroup.key];
+    if (!node) return;
+    html += `<tr style="background:rgba(255,255,255,0.02);">
+      <td style="text-align:left; padding-left:12px; font-weight:600; color:var(--accent-cyan);">${subGroup.label}</td>
+      <td style="text-align:right; font-weight:bold;">${node.currentArea.toLocaleString()} m²</td>
+      <td colspan="2" style="text-align:center; color:var(--text-muted);">Tổng hợp vào DVCC</td>
+      <td style="text-align:center;">-</td>
+    </tr>`;
+
+    if (node.subItems && node.subItems.length > 0) {
+      node.subItems.forEach(sub => {
+        const validSize = sub.size >= subGroup.min;
+        html += `<tr style="color:var(--text-muted); font-size:9.5px;">
+          <td style="text-align:left; padding-left:22px;">└ ${sub.name} (${sub.size.toLocaleString()} m²)</td>
+          <td colspan="4" style="text-align:left;">${validSize ? '<span style="color:var(--accent-green);">Đạt diện tích tối thiểu</span>' : '<span style="color:var(--accent-red);">Chưa đạt ĐK diện tích tối thiểu</span>'}</td>
+        </tr>`;
+      });
+    } else {
+      html += `<tr style="color:var(--text-muted); font-size:9.5px; font-style:italic;">
+        <td colspan="5" style="text-align:left; padding-left:22px;">└ Chưa có công trình.</td>
+      </tr>`;
+    }
+  });
+
+  // 5. Cây xanh đơn vị ở & 6. Bãi đỗ xe đơn vị ở
+  const remainingUnitKeys = ["CV_DV", "BDX_DV"];
+  let remIdx = 5;
+  remainingUnitKeys.forEach(key => {
+    const node = unitRes[key];
+    if (!node) return;
+    const reqArea = Math.round(node.quota * projPop);
+    const isPass = node.currentArea >= reqArea;
+    const statusHtml = isPass 
+      ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>`
+      : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU</span>`;
+
+    html += `<tr>
+      <td style="text-align:left; font-weight:bold;">${remIdx}/ ${node.label}</td>
+      <td style="text-align:right; font-weight:bold;">${node.currentArea.toLocaleString()} m²</td>
+      <td style="text-align:center;">>= ${node.quota}</td>
+      <td style="text-align:right; color:var(--accent-cyan);">${reqArea.toLocaleString()} m²</td>
+      <td style="text-align:center;">${statusHtml}</td>
+    </tr>`;
+
+    if (node.subItems && node.subItems.length > 0) {
+      node.subItems.forEach(sub => {
+        html += `<tr style="color:var(--text-muted); font-size:9.5px;">
+          <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);">└ ${sub.name}</td>
+          <td style="text-align:right;">${sub.size.toLocaleString()} m²</td>
+          <td colspan="3" style="text-align:left;">BK: ${sub.radius}m</td>
+        </tr>`;
+      });
+    } else {
+      html += `<tr style="color:var(--text-muted); font-size:9.5px; font-style:italic;">
+        <td colspan="5" style="text-align:left; padding-left:14px;">└ Chưa có công trình.</td>
+      </tr>`;
+    }
+    remIdx++;
   });
 
   html += `</tbody></table>`;
   return html;
-}
-
-function recalcWardQuota(wardName, newPopVal) {
-  const popNum = parseInt(newPopVal, 10) || 0;
-  const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
-  if (!wardData) return;
-
-  const wardInfraList = getWardInfraList(wardName);
-
-  const currentAreas = { "1-CV": 0, "2-BDX": 0, "3-MN": 0, "4-TH": 0, "5-THCS": 0, "6-YT": 0, "7-VH": 0, "8-TM": 0 };
-  wardInfraList.forEach(item => {
-    if (currentAreas[item.type] !== undefined) currentAreas[item.type] += (item.size || 0);
-  });
-
-  const container = document.getElementById('wardQuotaTableContainer');
-  if (container) {
-    container.innerHTML = buildWardQuotaTableHtml(wardName, popNum, currentAreas, wardInfraList);
-  }
 }
 
 function renderCombinedChart() {
