@@ -384,9 +384,11 @@ module.exports = async (req, res) => {
       });
 
       const wardMap = {};
+      const evaluatedWards = [];
+
       wardList.forEach(f => {
         const props = f.properties || {};
-        const wName = props.tenXa || props.name || 'Phường';
+        const wName = props.tenXa || props.name || props.NAME_2 || 'Phường';
         const totalPop = Number(props.danSoNum || 10000);
         
         wardMap[wName] = {
@@ -397,13 +399,11 @@ module.exports = async (req, res) => {
           projectedUnits: Math.max(1, Math.round((totalPop * 1.2) / 20000)),
           items: []
         };
-      });
 
-      const evaluatedWards = wardList.map(f => {
-        return {
-          name: f.properties.tenXa || f.properties.name || 'Phường',
+        evaluatedWards.push({
+          name: wName,
           geometry: f.geometry
-        };
+        });
       });
 
       rawDataList.forEach(item => {
@@ -411,6 +411,8 @@ module.exports = async (req, res) => {
         const pt = { type: 'Point', coordinates: [item.lng, item.lat] };
         
         let assignedWardName = null;
+
+        // 1. Ưu tiên quét hình học chính xác bằng Turf.js
         for (const w of evaluatedWards) {
           try {
             if (w.geometry && turf.booleanPointInPolygon(pt, w.geometry)) {
@@ -420,12 +422,17 @@ module.exports = async (req, res) => {
           } catch (e) {}
         }
 
+        // 2. Nếu không khớp hình học, so sánh chuỗi tên phường/xã từ trường dữ liệu gốc của điểm
         if (!assignedWardName || !wardMap[assignedWardName]) {
           const cleanItemWard = constants.cleanWardStr(item.ward);
-          assignedWardName = Object.keys(wardMap).find(k => constants.cleanWardStr(k) === cleanItemWard) || "Thuận Hóa";
+          const matchedKey = Object.keys(wardMap).find(k => constants.cleanWardStr(k) === cleanItemWard);
+          if (matchedKey) {
+            assignedWardName = matchedKey;
+          }
         }
 
-        if (wardMap[assignedWardName]) {
+        // Chỉ add vào phường nếu tìm thấy khớp thực sự, tuyệt đối không gán cứng về Thuận Hóa
+        if (assignedWardName && wardMap[assignedWardName]) {
           wardMap[assignedWardName].items.push(item);
         }
       });
@@ -543,7 +550,6 @@ module.exports = async (req, res) => {
           Total_Infra_Score: Math.round((urbanScoreSum / (urbanTotalCount || 1)) * 100)
         };
 
-        // Hỗ trợ tương thích ngược cho bảng tổng hợp cũ
         calculatedRow["Ratio_1-CV"] = urbanResults["CV_DT"] ? Math.min(100, (urbanResults["CV_DT"].currentArea / (urbanResults["CV_DT"].requiredArea || 1)) * 100) : 0;
         calculatedRow["Ratio_2-BDX"] = urbanResults["BDX_DT"] ? Math.min(100, (urbanResults["BDX_DT"].currentArea / (urbanResults["BDX_DT"].requiredArea || 1)) * 100) : 0;
         calculatedRow["Ratio_3-MN"] = unitResults["3-MN"] ? Math.min(100, (unitResults["3-MN"].currentArea / (unitResults["3-MN"].requiredArea || 1)) * 100) : 0;
