@@ -26,7 +26,7 @@
     </div>
   </div>
 
-  <!-- THANH CÔNG CỤ DỌC BÊN TRÁI (6 NÚT: ZOOM IN, ZOOM OUT, ĐO DÀI, ĐO DIỆN TÍCH, GPS, CHỤP ẢNH) -->
+  <!-- THANH CÔNG CỤ DỌC BÊN TRÁI (GIỮA MÀN HÌNH) -->
   <div class="vertical-toolbar ui-panel-format">
     <button class="ui-btn-format" id="btnZoomIn" title="Phóng to bản đồ">➕</button>
     <button class="ui-btn-format" id="btnZoomOut" title="Thu nhỏ bản đồ">➖</button>
@@ -36,21 +36,20 @@
     <button class="ui-btn-format" id="btnScreenshot" title="Chụp ảnh màn hình bản đồ">📸</button>
   </div>
 
-  <!-- NHÓM NÚT GÓC TRÊN BÊN PHẢI (CON MẮT > BÁNH RĂNG > CHÌA KHÓA) -->
-  <div class="topright-toolbar ui-panel-format">
-    <button class="ui-btn-format" id="btnToggleAllIcons" title="Ẩn/Hiện toàn bộ icon trên bản đồ">👁️</button>
-    <button class="ui-btn-format" id="btnToggleSidebar" title="Quản lý lớp dữ liệu">⚙️</button>
+  <!-- NHÓM NÚT TRUNG TÂM BÊN PHẢI (CHÌA KHÓA > BÁNH RĂNG > CON MẮT) -->
+  <div class="middle-right-toolbar ui-panel-format">
     <button class="ui-btn-format" id="btnAuth" title="Đăng nhập Quản trị">🔑</button>
+    <button class="ui-btn-format" id="btnToggleSidebar" title="Quản lý lớp dữ liệu">⚙️</button>
+    <button class="ui-btn-format" id="btnToggleAllIcons" title="Ẩn/Hiện toàn bộ icon trên bản đồ">👁️</button>
   </div>
 
-  <!-- TOPBAR THU GỌN VỪA KHÍT -->
+  <!-- TOPBAR ĐẶT Ở GIỮA PHÍA TRÊN -->
   <div class="topbar-row">
     <div class="topbar-header ui-panel-format">
       <div style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-        <b style="color:var(--accent-cyan); font-size:11px; white-space:nowrap;">🏛️ HẠ TẦNG HUẾ</b>
+        <b style="color:var(--accent-cyan); font-size:11px; white-space:nowrap;">🏛️ BẢN ĐỒ HẠ TẦNG</b>
         <select id="wardSelector" class="ward-selector-dropdown" title="Lọc theo địa bàn phường/xã">
-          <option value="">Chọn phường...</option>
-          <option value="Thành phố Huế">Thành phố Huế</option>
+          <option value="Thành phố Huế" selected>TP. Huế</option>
         </select>
       </div>
       <div style="display:flex; align-items:center; gap:6px; margin-left: 8px;">
