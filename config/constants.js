@@ -70,6 +70,23 @@ const constants = {
       .replace(/^Phường\s+/i, '').replace(/^Xã\s+/i, '')
       .replace(/^phường\s+/i, '').replace(/^xã\s+/i, '')
       .trim().toLowerCase();
+  },
+
+  // Hàm chuẩn hóa chuỗi nhóm hạ tầng luôn quy về "Cap DVO" hoặc "Cap Do Thi"
+  cleanNhomStr: function(str) {
+    if (!str) return "Cap DVO";
+    const s = String(str)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d").replace(/Đ/g, "D")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (s.includes("do thi") || s.includes("urban")) {
+      return "Cap Do Thi";
+    }
+    return "Cap DVO";
   }
 };
 
