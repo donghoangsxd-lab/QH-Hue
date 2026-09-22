@@ -41,11 +41,11 @@ async function getRawDataList() {
       const rawStatus = props.TrangThai;
       const isStatusTrue = (rawStatus === true || String(rawStatus).trim().toUpperCase() === 'TRUE');
 
-      // Đọc và chuẩn hóa thông tin Nhóm hạ tầng (Cấp đô thị / Cấp đơn vị ở)
-      const rawNhom = String(props.Nhom_HaTang || props.nhomHaTang || '').trim();
-      let assignedNhom = rawNhom;
-      if (!assignedNhom) {
-        assignedNhom = (prefix === 'THPT' || prefix === 'YT_DT' || prefix === 'VH_DT') ? 'Cấp đô thị' : 'Cấp DVƠ';
+      // Chuẩn hóa Nhóm hạ tầng thông qua hằng số constants
+      const rawNhom = props.Nhom_HaTang || props.nhomHaTang;
+      let assignedNhom = constants.cleanNhomStr(rawNhom);
+      if (!rawNhom && (prefix === 'THPT' || prefix === 'YT_DT' || prefix === 'VH_DT')) {
+        assignedNhom = "Cap Do Thi";
       }
 
       return {
