@@ -462,7 +462,8 @@ module.exports = async (req, res) => {
           if (!item.status) return; // Chỉ xét công trình đã duyệt (TRUE)
 
           const prefix = item.id.split('-')[0];
-          const isUrban = (item.nhomHaTang === "Cấp đô thị" || prefix === "THPT");
+          const normalizedNhom = constants.cleanNhomStr(item.nhomHaTang);
+          const isUrban = (normalizedNhom === "Cap Do Thi" || prefix === "THPT");
 
           if (isUrban) {
             let targetKey = "CV_DT";
