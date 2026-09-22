@@ -377,89 +377,172 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
+    // ==========================================
+    // ACTION: getWardStats (CẬP NHẬT THEO QCVN 01:2026/BXD)
+    // ==========================================
     if (action === 'getWardStats') {
       const now = Date.now();
       if (cachedWardStats && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)) {
         return res.status(200).json({ data: cachedWardStats });
       }
 
-      const codes = constants.CODES_TO_CHECK;
-      const bandImagesList = [];
-
-      for (const code of codes) {
-        const itemBuffersPromises = rawDataList
-          .filter(item => item.type === code && item.status)
-          .map(async (item) => {
-            const r = Number(item.radius) || Number(item.banKinh) || 500;
-            return ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(r));
-          });
-
-        const buffers = await Promise.all(itemBuffersPromises);
-
-        let unionImg = buffers.length > 0 
-          ? ee.Image(0).byte().paint({ featureCollection: ee.FeatureCollection(buffers), color: 1 }) 
-          : ee.Image(0).byte();
-
-        const maskedRaster = popRasterNormalized.updateMask(unionImg.gt(0)).unmask(0).float().rename(code);
-        bandImagesList.push(maskedRaster);
-      }
-
-      const infraMultiBand = ee.Image.cat(bandImagesList).addBands(wardRegion.rename('ID_Region'));
-
-      const statsMultiGroup = await new Promise((resolve, reject) => {
-        infraMultiBand.reduceRegion({
-          reducer: ee.Reducer.sum().repeat(8).group({ groupField: 8, groupName: 'ID_Phuong' }),
-          geometry: wardVectorParsed.geometry(),
-          scale: 100,
-          maxPixels: 1e9
-        }).evaluate((res, err) => err ? reject(err) : resolve(res));
-      });
-
-      const gListMulti = statsMultiGroup ? (statsMultiGroup.groups || []) : [];
-      const multiCoverageDict = {};
-      gListMulti.forEach(item => { multiCoverageDict[String(item.ID_Phuong)] = item.sum; });
-
-      const wardLandArea = {};
-      rawDataList.forEach(item => {
-        if (item.status && codes.includes(item.type)) {
-          const w = constants.cleanWardStr(item.ward);
-          if (!wardLandArea[w]) wardLandArea[w] = {};
-          wardLandArea[w][item.type] = (wardLandArea[w][item.type] || 0) + item.size;
-        }
-      });
-
+      // 1. Thu thập danh sách ranh giới phường từ GEE/Vector
       const wardList = await new Promise((resolve, reject) => {
         wardVectorParsed.evaluate((fc, err) => err ? reject(err) : resolve(fc ? fc.features : []));
       });
 
-      const resultTable = wardList.map(f => {
+      // 2. Gom nhóm dữ liệu hạ tầng thực tế theo từng phường
+      const wardMap = {};
+      wardList.forEach(f => {
         const props = f.properties || {};
         const wName = props.tenXa || props.name || 'Phường';
-        const normW = constants.cleanWardStr(wName);
-        const wId = String(props.maXa || props.OBJECTID || '');
-        
-        let totalWardPop = Number(props.danSoNum || 1);
-        if (isNaN(totalWardPop) || totalWardPop <= 0) totalWardPop = 1;
+        const totalPop = Number(props.danSoNum || 45000); // Lấy dân số từ vector hoặc mặc định
+        wardMap[wName] = {
+          wardName: wName,
+          population: totalPop,
+          projectedPopulation: Math.round(totalPop * 1.2), // Giả định dân số quy hoạch +20% hoặc tùy biến
+          items: []
+        };
+      });
 
-        const sumList = multiCoverageDict[wId] || [0, 0, 0, 0, 0, 0, 0, 0];
-        let sumCoveredRatio = 0;
-        const rowData = { Ten_Phuong: wName, Dan_So_Vector: totalWardPop };
+      rawDataList.forEach(item => {
+        const wName = item.ward || "Thuận Hóa";
+        if (!wardMap[wName]) {
+          wardMap[wName] = {
+            wardName: wName,
+            population: 45000,
+            projectedPopulation: 55000,
+            items: []
+          };
+        }
+        wardMap[wName].items.push(item);
+      });
 
-        codes.forEach((code, idx) => {
-          const coveredPop = sumList[idx] || 0;
-          const popRatio = Math.min(100, totalWardPop > 0 ? (coveredPop / totalWardPop) * 100 : 0);
-          rowData[`Ratio_${code}`] = popRatio;
-          sumCoveredRatio += popRatio;
+      const resultTable = [];
 
-          const existArea = (wardLandArea[normW] && wardLandArea[normW][code]) || 0;
-          const normVal = constants.quotaConfig[code] || 0;
-          const scaleScore = normVal > 0 ? Math.min(100, ((existArea / totalWardPop) / normVal) * 100) : 100;
-          rowData[`Scale_${code}`] = scaleScore;
+      for (const wName in wardMap) {
+        const data = wardMap[wName];
+        const pop = data.population;
+        const projPop = data.projectedPopulation;
+
+        // Tính số đơn vị ở tự động (Dân số / 20.000, làm tròn số nguyên, tối thiểu 1)
+        const currentUnits = Math.max(1, Math.round(pop / 20000));
+        const projectedUnits = Math.max(1, Math.round(projPop / 20000));
+
+        // Khởi tạo Phần A (Cấp đô thị) theo QCVN 01:2026/BXD
+        const urbanResults = {};
+        for (const key in constants.urbanInfraConfig) {
+          const cfg = constants.urbanInfraConfig[key];
+          urbanResults[key] = {
+            label: cfg.label,
+            quota: cfg.quota,
+            currentArea: 0,
+            requiredArea: cfg.quota * projPop,
+            subItems: [],
+            status: false
+          };
+        }
+
+        // Khởi tạo Phần B (Cấp đơn vị ở) theo QCVN 01:2026/BXD
+        const unitResults = {};
+        for (const key in constants.unitInfraConfig) {
+          const cfg = constants.unitInfraConfig[key];
+          unitResults[key] = {
+            label: cfg.label,
+            quota: cfg.quota || 0,
+            currentArea: 0,
+            requiredArea: (cfg.quota || 0) * projPop,
+            subItems: [],
+            status: false
+          };
+        }
+
+        // Phân loại công trình vào Phần A hoặc Phần B dựa trên cột nhomHaTang và tiền tố ID
+        data.items.forEach(item => {
+          if (!item.status) return; // Chỉ xét công trình đã duyệt (TRUE)
+
+          const prefix = item.id.split('-')[0];
+          const isUrban = (item.nhomHaTang === "Cấp đô thị" || prefix === "THPT");
+
+          if (isUrban) {
+            let targetKey = "CV_DT";
+            if (prefix === "THPT") targetKey = "THPT";
+            else if (prefix === "YT" || prefix === "6") targetKey = "YT_DT";
+            else if (prefix === "VH" || prefix === "7") targetKey = "VH_DT";
+            else if (prefix === "TM" || prefix === "8") targetKey = "TM_DT";
+            else if (prefix === "CV" || prefix === "1") targetKey = "CV_DT";
+            else if (prefix === "BDX" || prefix === "2") targetKey = "BDX_DT";
+
+            if (urbanResults[targetKey]) {
+              urbanResults[targetKey].currentArea += item.size;
+              urbanResults[targetKey].subItems.push(item);
+            }
+          } else {
+            let targetKey = "CV_DV";
+            if (prefix === "MN" || prefix === "3") targetKey = "3-MN";
+            else if (prefix === "TH" || prefix === "4") targetKey = "4-TH";
+            else if (prefix === "THCS" || prefix === "5") targetKey = "5-THCS";
+            else if (prefix === "YT" || prefix === "6") targetKey = "YT_DV";
+            else if (prefix === "VH" || prefix === "7") targetKey = "VH_DV";
+            else if (prefix === "TM" || prefix === "8") targetKey = "TM_DV";
+            else if (prefix === "CV" || prefix === "1") targetKey = "CV_DV";
+            else if (prefix === "BDX" || prefix === "2") targetKey = "BDX_DV";
+
+            if (unitResults[targetKey]) {
+              unitResults[targetKey].currentArea += item.size;
+              unitResults[targetKey].subItems.push(item);
+            }
+          }
         });
 
-        rowData.Total_Infra_Score = sumCoveredRatio / 8;
-        return rowData;
-      });
+        // Đánh giá trạng thái Đạt / Không đạt cho Phần A
+        let urbanScoreSum = 0;
+        let urbanTotalCount = 0;
+        for (const key in urbanResults) {
+          const node = urbanResults[key];
+          node.status = node.currentArea >= node.requiredArea;
+          urbanScoreSum += node.status ? 1 : (node.currentArea / (node.requiredArea || 1));
+          urbanTotalCount++;
+        }
+
+        // Đánh giá đặc thù nhóm Dịch vụ công cộng đơn vị ở (DVCC)
+        const ytArea = unitResults["YT_DV"].currentArea;
+        const vhArea = unitResults["VH_DV"].currentArea;
+        const tmArea = unitResults["TM_DV"].currentArea;
+        const dvccTotalArea = ytArea + vhArea + tmArea;
+        const dvccRequiredArea = 2.0 * projPop; // Tổng chỉ tiêu >= 2.0 m2/người
+
+        // Kiểm tra điều kiện diện tích tối thiểu cho từng công trình thành phần:
+        // Y tế đơn vị ở >= 500m2, Văn hóa đơn vị ở >= 1000m2, Chợ/TMDV đơn vị ở >= 2000m2
+        const ytValid = unitResults["YT_DV"].subItems.every(it => it.size >= 500);
+        const vhValid = unitResults["VH_DV"].subItems.every(it => it.size >= 1000);
+        const tmValid = unitResults["TM_DV"].subItems.every(it => it.size >= 2000);
+
+        const dvccOverallStatus = (dvccTotalArea >= dvccRequiredArea) && ytValid && vhValid && tmValid;
+
+        // Các mục đơn vị ở khác (Mầm non, Tiểu học, THCS, Cây xanh, Bãi đỗ xe)
+        for (const key in unitResults) {
+          if (key === "YT_DV" || key === "VH_DV" || key === "TM_DV" || key === "DVCC_TOTAL") continue;
+          const node = unitResults[key];
+          node.status = node.currentArea >= node.requiredArea;
+        }
+
+        resultTable.push({
+          Ten_Phuong: wName,
+          Dan_So_Vector: pop,
+          projectedPopulation: projPop,
+          currentUnits: currentUnits,
+          projectedUnits: projectedUnits,
+          urbanResults: urbanResults,
+          unitResults: unitResults,
+          dvccSummary: {
+            totalArea: dvccTotalArea,
+            requiredArea: dvccRequiredArea,
+            status: dvccOverallStatus
+          },
+          Total_Infra_Score: Math.round((urbanScoreSum / (urbanTotalCount || 1)) * 100)
+        });
+      }
 
       resultTable.sort((a, b) => b.Dan_So_Vector - a.Dan_So_Vector);
 
