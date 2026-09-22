@@ -378,7 +378,7 @@ module.exports = async (req, res) => {
     }
 
     // ==========================================
-    // ACTION: getWardStats (CẬP NHẬT THEO QCVN 01:2026/BXD)
+    // ACTION: getWardStats (CHUẨN 40 PHƯỜNG XÃ & QUÉT TỌA ĐỘ KHÔNG GIAN)
     // ==========================================
     if (action === 'getWardStats') {
       const now = Date.now();
@@ -386,50 +386,69 @@ module.exports = async (req, res) => {
         return res.status(200).json({ data: cachedWardStats });
       }
 
-      // 1. Thu thập danh sách ranh giới phường từ GEE/Vector
+      // 1. Lấy danh sách chuẩn đúng 40 phường/xã từ Vector GEE
       const wardList = await new Promise((resolve, reject) => {
         wardVectorParsed.evaluate((fc, err) => err ? reject(err) : resolve(fc ? fc.features : []));
       });
 
-      // 2. Gom nhóm dữ liệu hạ tầng thực tế theo từng phường
       const wardMap = {};
       wardList.forEach(f => {
         const props = f.properties || {};
         const wName = props.tenXa || props.name || 'Phường';
-        const totalPop = Number(props.danSoNum || 45000); // Lấy dân số từ vector hoặc mặc định
+        const totalPop = Number(props.danSoNum || 10000);
+        
         wardMap[wName] = {
-          wardName: wName,
-          population: totalPop,
-          projectedPopulation: Math.round(totalPop * 1.2), // Giả định dân số quy hoạch +20% hoặc tùy biến
+          Ten_Phuong: wName,
+          Dan_So_Vector: totalPop,
+          projectedPopulation: Math.round(totalPop * 1.2),
+          currentUnits: Math.max(1, Math.round(totalPop / 20000)),
+          projectedUnits: Math.max(1, Math.round((totalPop * 1.2) / 20000)),
           items: []
         };
       });
 
+      // 2. Sử dụng không gian GIS (Turf.js logic phía server hoặc kiểm tra polygon) để quét điểm thuộc phường
+      // Thay vì tin vào cột 'ward' trong sheet, ta kiểm tra điểm (lat, lng) nằm trong ranh giới polygon phường nào.
+      // Dùng danh sách feature từ wardVectorParsed để mapping chính xác tọa độ công trình vào đúng phường.
+      const evaluatedWards = wardList.map(f => {
+        return {
+          name: f.properties.tenXa || f.properties.name || 'Phường',
+          geometry: f.geometry
+        };
+      });
+
       rawDataList.forEach(item => {
-        const wName = item.ward || "Thuận Hóa";
-        if (!wardMap[wName]) {
-          wardMap[wName] = {
-            wardName: wName,
-            population: 45000,
-            projectedPopulation: 55000,
-            items: []
-          };
+        if (!item.lat || !item.lng) return;
+        const pt = { type: 'Point', coordinates: [item.lng, item.lat] };
+        
+        let assignedWardName = null;
+        for (const w of evaluatedWards) {
+          try {
+            if (w.geometry && turf.booleanPointInPolygon(pt, w.geometry)) {
+              assignedWardName = w.name;
+              break;
+            }
+          } catch (e) {}
         }
-        wardMap[wName].items.push(item);
+
+        // Nếu không quét được bằng hình học, fallback về cleanWardStr hoặc "Thuận Hóa"
+        if (!assignedWardName || !wardMap[assignedWardName]) {
+          const cleanItemWard = constants.cleanWardStr(item.ward);
+          assignedWardName = Object.keys(wardMap).find(k => constants.cleanWardStr(k) === cleanItemWard) || "Thuận Hóa";
+        }
+
+        if (wardMap[assignedWardName]) {
+          wardMap[assignedWardName].items.push(item);
+        }
       });
 
       const resultTable = [];
 
       for (const wName in wardMap) {
         const data = wardMap[wName];
-        const pop = data.population;
+        const pop = data.Dan_So_Vector;
         const projPop = data.projectedPopulation;
 
-        // Tính số đơn vị ở tự động (Dân số / 20.000, làm tròn số nguyên, tối thiểu 1)
-        const currentUnits = Math.max(1, Math.round(pop / 20000));
-        const projectedUnits = Math.max(1, Math.round(projPop / 20000));
-
-        // Khởi tạo Phần A (Cấp đô thị) theo QCVN 01:2026/BXD
         const urbanResults = {};
         for (const key in constants.urbanInfraConfig) {
           const cfg = constants.urbanInfraConfig[key];
@@ -443,7 +462,6 @@ module.exports = async (req, res) => {
           };
         }
 
-        // Khởi tạo Phần B (Cấp đơn vị ở) theo QCVN 01:2026/BXD
         const unitResults = {};
         for (const key in constants.unitInfraConfig) {
           const cfg = constants.unitInfraConfig[key];
@@ -457,7 +475,6 @@ module.exports = async (req, res) => {
           };
         }
 
-        // Phân loại công trình vào Phần A hoặc Phần B dựa trên cột nhomHaTang và tiền tố ID
         data.items.forEach(item => {
           if (!item.status) return; // Chỉ xét công trình đã duyệt (TRUE)
 
@@ -496,7 +513,6 @@ module.exports = async (req, res) => {
           }
         });
 
-        // Đánh giá trạng thái Đạt / Không đạt cho Phần A
         let urbanScoreSum = 0;
         let urbanTotalCount = 0;
         for (const key in urbanResults) {
@@ -506,22 +522,17 @@ module.exports = async (req, res) => {
           urbanTotalCount++;
         }
 
-        // Đánh giá đặc thù nhóm Dịch vụ công cộng đơn vị ở (DVCC)
         const ytArea = unitResults["YT_DV"].currentArea;
         const vhArea = unitResults["VH_DV"].currentArea;
         const tmArea = unitResults["TM_DV"].currentArea;
         const dvccTotalArea = ytArea + vhArea + tmArea;
-        const dvccRequiredArea = 2.0 * projPop; // Tổng chỉ tiêu >= 2.0 m2/người
+        const dvccRequiredArea = 2.0 * projPop;
 
-        // Kiểm tra điều kiện diện tích tối thiểu cho từng công trình thành phần:
-        // Y tế đơn vị ở >= 500m2, Văn hóa đơn vị ở >= 1000m2, Chợ/TMDV đơn vị ở >= 2000m2
         const ytValid = unitResults["YT_DV"].subItems.every(it => it.size >= 500);
         const vhValid = unitResults["VH_DV"].subItems.every(it => it.size >= 1000);
         const tmValid = unitResults["TM_DV"].subItems.every(it => it.size >= 2000);
-
         const dvccOverallStatus = (dvccTotalArea >= dvccRequiredArea) && ytValid && vhValid && tmValid;
 
-        // Các mục đơn vị ở khác (Mầm non, Tiểu học, THCS, Cây xanh, Bãi đỗ xe)
         for (const key in unitResults) {
           if (key === "YT_DV" || key === "VH_DV" || key === "TM_DV" || key === "DVCC_TOTAL") continue;
           const node = unitResults[key];
@@ -532,8 +543,8 @@ module.exports = async (req, res) => {
           Ten_Phuong: wName,
           Dan_So_Vector: pop,
           projectedPopulation: projPop,
-          currentUnits: currentUnits,
-          projectedUnits: projectedUnits,
+          currentUnits: data.currentUnits,
+          projectedUnits: data.projectedUnits,
           urbanResults: urbanResults,
           unitResults: unitResults,
           dvccSummary: {
