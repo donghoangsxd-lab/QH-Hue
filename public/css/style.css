@@ -24,15 +24,15 @@ body, html {
 /* WIDGET DONUT CHART TRONG SUỐT GÓC TRÊN BÊN TRÁI */
 .infra-pie-widget-transparent {
   position: absolute;
-  top: 96px;
+  top: 12px;         /* Đưa lên phía trên cùng bên trái */
   left: 16px;
   z-index: 1000;
-  width: 175px;
+  width: 210px;      /* Tăng chiều rộng để hiển thị rõ biểu đồ và chú thích % */
   padding: 8px;
-  background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
