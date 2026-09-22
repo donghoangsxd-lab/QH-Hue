@@ -70,68 +70,107 @@ export function handleGoogleCredentialResponse(response) {
 
 window.handleGoogleCredentialResponse = handleGoogleCredentialResponse;
 
-export function updateInfraPieChart(filteredData) {
+export function updateInfraPieChart(sourceList) {
   const widget = document.getElementById('infraPieWidget');
   if (!widget) return;
-  
   widget.style.display = 'block';
 
-  const canvasEl = document.getElementById('infraPieChart');
-  if (!canvasEl) return;
-  const ctx = canvasEl.getContext('2d');
+  // Tính toán diện tích theo từng loại hạ tầng
+  const areaTotals = {};
+  let totalAreaSum = 0;
 
-  const typeAreas = {
-    "1-CV": 0, "2-BDX": 0, "3-MN": 0, "4-TH": 0, 
-    "5-THCS": 0, "6-YT": 0, "7-VH": 0, "8-TM": 0, "9-CSD": 0
-  };
-
-  filteredData.forEach(item => {
-    const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
-    if (isApproved && typeAreas[item.type] !== undefined) {
-      typeAreas[item.type] += (Number(item.size) || 0);
-    }
+  sourceList.forEach(item => {
+    if (!item.status) return;
+    const type = item.type || 'Khác';
+    const size = Number(item.size || 0);
+    areaTotals[type] = (areaTotals[type] || 0) + size;
+    totalAreaSum += size;
   });
 
-  const labels = [
-    "Công viên", "Bãi đỗ xe", "Mầm non", "Tiểu học", 
-    "THCS", "Y tế", "Văn hóa", "Thương mại", "Đất CSD"
-  ];
-  const dataValues = Object.values(typeAreas);
-  const backgroundColors = [
-    '#38bdf8', '#2ecc71', '#f1c40f', '#f39c12', 
-    '#e67e22', '#d35400', '#e74c3c', '#900c3f', '#94a3b8'
-  ];
+  const labelsMap = {
+    "1-CV": "Công viên, cây xanh",
+    "2-BDX": "Bãi đỗ xe, trạm sạc",
+    "3-MN": "Trường Mầm non",
+    "4-TH": "Trường Tiểu học",
+    "5-THCS": "Trường THCS",
+    "6-YT": "Cơ sở Y tế",
+    "7-VH": "Nhà văn hóa, thể thao",
+    "8-TM": "Chợ, TTTM",
+    "9-CSD": "Quỹ đất tiềm năng"
+  };
 
-  if (infraPieInstance) {
-    infraPieInstance.data.datasets[0].data = dataValues;
-    infraPieInstance.update();
-    return;
+  const colorsMap = {
+    "1-CV": "#2ecc71",
+    "2-BDX": "#3498db",
+    "3-MN": "#e67e22",
+    "4-TH": "#e74c3c",
+    "5-THCS": "#9b59b6",
+    "6-YT": "#1abc9c",
+    "7-VH": "#f1c40f",
+    "8-TM": "#e91e63",
+    "9-CSD": "#95a5a6"
+  };
+
+  const keys = Object.keys(areaTotals);
+  const dataVals = keys.map(k => areaTotals[k]);
+  const bgColors = keys.map(k => colorsMap[k] || '#38bdf8');
+  const labels = keys.map(k => labelsMap[k] || k);
+
+  // Render danh sách chi tiết phần trăm ở dưới
+  const legendContainer = document.getElementById('pieLegendDetails');
+  if (legendContainer) {
+    let html = '';
+    keys.forEach((k, idx) => {
+      const val = dataVals[idx];
+      const pct = totalAreaSum > 0 ? ((val / totalAreaSum) * 100).toFixed(1) : 0;
+      const color = colorsMap[k] || '#38bdf8';
+      const name = labelsMap[k] || k;
+      html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+        <span style="color:var(--text-main); display:flex; align-items:center; gap:4px;">
+          <span style="width:8px; height:8px; background:${color}; border-radius:50%; display:inline-block;"></span>
+          ${name}:
+        </span>
+        <b style="color:var(--accent-cyan);">${pct}%</b>
+      </div>`;
+    });
+    legendContainer.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Chưa có dữ liệu</div>';
   }
 
-  infraPieInstance = new Chart(ctx, {
+  // Khởi tạo/Cập nhật Chart.js Donut
+  const ctx = document.getElementById('infraPieChart')?.getContext('2d');
+  if (!ctx) return;
+
+  if (window.myInfraPieChartInstance) {
+    window.myInfraPieChartInstance.destroy();
+  }
+
+  window.myInfraPieChartInstance = new Chart(ctx, {
     type: 'doughnut',
     data: {
       labels: labels,
       datasets: [{
-        data: dataValues,
-        backgroundColor: backgroundColors,
+        data: dataVals,
+        backgroundColor: bgColors,
         borderWidth: 1,
-        borderColor: 'rgba(15, 23, 42, 0.6)'
+        borderColor: 'rgba(15, 23, 42, 0.8)'
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
+        legend: { display: false }, // Ẩn legend mặc định để dùng bảng chi tiết bên dưới
         tooltip: {
           callbacks: {
             label: function(context) {
-              return ` ${context.label}: ${context.raw.toLocaleString()} m²`;
+              const val = context.raw || 0;
+              const pct = totalAreaSum > 0 ? ((val / totalAreaSum) * 100).toFixed(1) : 0;
+              return ` ${context.label}: ${val.toLocaleString()} m² (${pct}%)`;
             }
           }
         }
-      }
+      },
+      cutout: '60%'
     }
   });
 }
