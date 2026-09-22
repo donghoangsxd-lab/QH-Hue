@@ -17,12 +17,16 @@
 
   <!-- WIDGET DONUT CHART TRONG SUỐT, GÓC TRÊN BÊN TRÁI -->
   <div class="infra-pie-widget-transparent" id="infraPieWidget" style="display:none;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-      <b style="color:var(--accent-cyan); font-size:10px;">📊 TỶ TRỌNG ĐẤT</b>
-      <span id="btnClosePie" style="cursor:pointer; font-weight:bold; color:var(--accent-red); font-size:11px;">✕</span>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
+      <b style="color:var(--accent-cyan); font-size:11px; text-align:center; width:100%;">📊 CƠ CẤU CÁC LOẠI ĐẤT</b>
+      <span id="btnClosePie" style="cursor:pointer; font-weight:bold; color:var(--accent-red); font-size:12px; position:absolute; right:8px;">✕</span>
     </div>
-    <div style="height:110px; position:relative;">
+    <div style="height:130px; position:relative; display:flex; justify-content:center;">
       <canvas id="infraPieChart"></canvas>
+    </div>
+    <!-- Phần hiển thị chi tiết số % ở bên dưới -->
+    <div id="pieLegendDetails" style="margin-top:6px; font-size:9.5px; max-height:85px; overflow-y:auto; border-top:1px dashed var(--border-color); padding-top:4px;">
+      <!-- Dữ liệu % sẽ được đổ tự động vào đây -->
     </div>
   </div>
 
