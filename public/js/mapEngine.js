@@ -371,15 +371,31 @@ export async function refreshHeatmapOnly() {
     const isoFeatures = (isoData && isoData.features) || [];
     lastCalculatedIsochrones = isoFeatures; // Cập nhật cache đa giác cho tra cứu điểm
 
+    // Định nghĩa bảng màu đặc trưng tương ứng cho từng loại hạ tầng
+    const infraBorderColors = {
+      "1-CV": "#2ecc71",   // Công viên: Xanh lá
+      "2-BDX": "#3498db",  // Bãi đỗ xe: Xanh dương
+      "3-MN": "#e67e22",   // Mầm non: Vàng
+      "4-TH": "#e74c3c",   // Tiểu học: Cam
+      "5-THCS": "#9b59b6", // THCS: Cam đậm
+      "6-YT": "#1abc9c",   // Y tế: Magenta
+      "7-VH": "#f1c40f",   // Văn hóa: Đỏ
+      "8-TM": "#e91e63",   // Thương mại: Đỏ đậm
+      "9-CSD": "#95a5a6"   // Quỹ đất tiềm năng: Xám
+    };
+
     isoFeatures.forEach(feat => {
       const props = feat.properties || {};
       const isApproved = (props.status === true || props.status === 'true' || props.status === 'TRUE');
-      const cfg = infraIcons[props.type] || { border: "var(--accent-cyan)" };
       const targetBufferGroup = bufferGroups[props.type] || layers.b9;
+      
+      // Lấy màu riêng theo loại hạ tầng, mặc định là cyan nếu không khớp
+      const typeColor = infraBorderColors[props.type] || '#38bdf8';
 
+      // Cấu hình style: viền đúng màu hạ tầng, dày hơn (1.8 - 2.2), nét đứt rõ thoáng (6,6)
       const style = isApproved
-        ? { color: '#ffffff', weight: 1, fillColor: cfg.border || '#38bdf8', fillOpacity: 0.10 }
-        : { color: '#ffffff', weight: 1.2, dashArray: '3,3', fillColor: 'var(--accent-red)', fillOpacity: 0.10 };
+        ? { color: typeColor, weight: 2.2, dashArray: '6, 6', fillColor: typeColor, fillOpacity: 0.12 }
+        : { color: '#f87171', weight: 2.2, dashArray: '4, 4', fillColor: '#f87171', fillOpacity: 0.10 };
 
       targetBufferGroup.addLayer(L.geoJSON(feat, { style }));
     });
