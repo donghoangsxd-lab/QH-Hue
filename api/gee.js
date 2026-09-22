@@ -388,8 +388,9 @@ module.exports = async (req, res) => {
 
       wardList.forEach(f => {
         const props = f.properties || {};
-        const wName = props.tenXa || props.name || props.NAME_2 || 'Phường';
-        const totalPop = Number(props.danSoNum || 10000);
+        // Lấy tên phường chuẩn xác từ asset GEE
+        const wName = props.tenXa || props.NAME_2 || props.name || 'Phường';
+        const totalPop = Number(props.danSoNum || props.danSo || 10000);
         
         wardMap[wName] = {
           Ten_Phuong: wName,
@@ -400,38 +401,32 @@ module.exports = async (req, res) => {
           items: []
         };
 
-        evaluatedWards.push({
-          name: wName,
-          geometry: f.geometry
-        });
+        if (f.geometry) {
+          evaluatedWards.push({
+            name: wName,
+            geometry: f.geometry
+          });
+        }
       });
 
+      // BẮT BUỘC QUÉT KHÔNG GIAN BẰNG TURF.JS: Điểm nào nằm trong ranh giới phường nào thì gán vào phường đó
       rawDataList.forEach(item => {
         if (!item.lat || !item.lng) return;
-        const pt = { type: 'Point', coordinates: [item.lng, item.lat] };
+        const pt = turf.point([Number(item.lng), Number(item.lat)]);
         
         let assignedWardName = null;
 
-        // 1. Ưu tiên quét hình học chính xác bằng Turf.js
         for (const w of evaluatedWards) {
           try {
-            if (w.geometry && turf.booleanPointInPolygon(pt, w.geometry)) {
+            const poly = turf.feature(w.geometry);
+            if (turf.booleanPointInPolygon(pt, poly)) {
               assignedWardName = w.name;
               break;
             }
           } catch (e) {}
         }
 
-        // 2. Nếu không khớp hình học, so sánh chuỗi tên phường/xã từ trường dữ liệu gốc của điểm
-        if (!assignedWardName || !wardMap[assignedWardName]) {
-          const cleanItemWard = constants.cleanWardStr(item.ward);
-          const matchedKey = Object.keys(wardMap).find(k => constants.cleanWardStr(k) === cleanItemWard);
-          if (matchedKey) {
-            assignedWardName = matchedKey;
-          }
-        }
-
-        // Chỉ add vào phường nếu tìm thấy khớp thực sự, tuyệt đối không gán cứng về Thuận Hóa
+        // Chỉ đưa vào danh mục items của phường nếu khớp hình học không gian thực tế
         if (assignedWardName && wardMap[assignedWardName]) {
           wardMap[assignedWardName].items.push(item);
         }
@@ -487,7 +482,7 @@ module.exports = async (req, res) => {
             else if (prefix === "BDX" || prefix === "2") targetKey = "BDX_DT";
 
             if (urbanResults[targetKey]) {
-              urbanResults[targetKey].currentArea += item.size;
+              urbanResults[targetKey].currentArea += Number(item.size || 0);
               urbanResults[targetKey].subItems.push(item);
             }
           } else {
@@ -502,7 +497,7 @@ module.exports = async (req, res) => {
             else if (prefix === "BDX" || prefix === "2") targetKey = "BDX_DV";
 
             if (unitResults[targetKey]) {
-              unitResults[targetKey].currentArea += item.size;
+              unitResults[targetKey].currentArea += Number(item.size || 0);
               unitResults[targetKey].subItems.push(item);
             }
           }
@@ -523,9 +518,9 @@ module.exports = async (req, res) => {
         const dvccTotalArea = ytArea + vhArea + tmArea;
         const dvccRequiredArea = 2.0 * projPop;
 
-        const ytValid = unitResults["YT_DV"].subItems.every(it => it.size >= 500);
-        const vhValid = unitResults["VH_DV"].subItems.every(it => it.size >= 1000);
-        const tmValid = unitResults["TM_DV"].subItems.every(it => it.size >= 2000);
+        const ytValid = unitResults["YT_DV"].subItems.every(it => Number(it.size || 0) >= 500);
+        const vhValid = unitResults["VH_DV"].subItems.every(it => Number(it.size || 0) >= 1000);
+        const tmValid = unitResults["TM_DV"].subItems.every(it => Number(it.size || 0) >= 2000);
         const dvccOverallStatus = (dvccTotalArea >= dvccRequiredArea) && ytValid && vhValid && tmValid;
 
         for (const key in unitResults) {
@@ -549,15 +544,6 @@ module.exports = async (req, res) => {
           },
           Total_Infra_Score: Math.round((urbanScoreSum / (urbanTotalCount || 1)) * 100)
         };
-
-        calculatedRow["Ratio_1-CV"] = urbanResults["CV_DT"] ? Math.min(100, (urbanResults["CV_DT"].currentArea / (urbanResults["CV_DT"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_2-BDX"] = urbanResults["BDX_DT"] ? Math.min(100, (urbanResults["BDX_DT"].currentArea / (urbanResults["BDX_DT"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_3-MN"] = unitResults["3-MN"] ? Math.min(100, (unitResults["3-MN"].currentArea / (unitResults["3-MN"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_4-TH"] = unitResults["4-TH"] ? Math.min(100, (unitResults["4-TH"].currentArea / (unitResults["4-TH"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_5-THCS"] = unitResults["5-THCS"] ? Math.min(100, (unitResults["5-THCS"].currentArea / (unitResults["5-THCS"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_6-YT"] = urbanResults["YT_DT"] ? Math.min(100, (urbanResults["YT_DT"].currentArea / (urbanResults["YT_DT"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_7-VH"] = urbanResults["VH_DT"] ? Math.min(100, (urbanResults["VH_DT"].currentArea / (urbanResults["VH_DT"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_8-TM"] = urbanResults["TM_DT"] ? Math.min(100, (urbanResults["TM_DT"].currentArea / (urbanResults["TM_DT"].requiredArea || 1)) * 100) : 0;
 
         resultTable.push(calculatedRow);
       }
