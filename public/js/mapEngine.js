@@ -23,7 +23,7 @@ export const layers = {
 
 let tileHeatmapLayer = null;
 let wardLabelMarkers = [];
-let lastCalculatedIsochrones = []; // Lưu cache tập đa giác isochrone gần nhất để tái sử dụng cho tra cứu điểm
+let lastCalculatedIsochrones = [];
 
 function isPointInWardGeometry(lat, lng, geometry) {
   if (!geometry) return false;
@@ -218,10 +218,10 @@ export function toggleMeasure(type) {
 
   if (type === 'distance' && btnDist) {
     btnDist.classList.add('active');
-    btnDist.innerHTML = "❌ HUỶ";
+    btnDist.innerHTML = "❌";
   } else if (type === 'area' && btnArea) {
     btnArea.classList.add('active');
-    btnArea.innerHTML = "❌ HUỶ";
+    btnArea.innerHTML = "❌";
   }
 }
 
@@ -232,14 +232,13 @@ export function clearMeasure() {
 
   const btnDist = document.getElementById('btnMeasureDist');
   const btnArea = document.getElementById('btnMeasureArea');
-  
   if (btnDist) {
     btnDist.classList.remove('active');
-    btnDist.innerHTML = "📏"; // Phục hồi lại icon gốc thay vì text dài
+    btnDist.innerHTML = "📏";
   }
   if (btnArea) {
     btnArea.classList.remove('active');
-    btnArea.innerHTML = "📐"; // Phục hồi lại icon gốc thay vì text dài
+    btnArea.innerHTML = "📐";
   }
 }
 
@@ -370,9 +369,8 @@ export async function refreshHeatmapOnly() {
     if (currentSeq !== heatmapFetchSeq) return;
 
     const isoFeatures = (isoData && isoData.features) || [];
-    lastCalculatedIsochrones = isoFeatures; // Cập nhật cache đa giác cho tra cứu điểm
+    lastCalculatedIsochrones = isoFeatures;
 
-    // Định nghĩa bảng màu đặc trưng tương ứng cho từng loại hạ tầng
     const infraBorderColors = {
       "1-CV": "#2ecc71",   // Công viên: Xanh lá
       "2-BDX": "#3498db",  // Bãi đỗ xe: Xanh dương
@@ -390,10 +388,8 @@ export async function refreshHeatmapOnly() {
       const isApproved = (props.status === true || props.status === 'true' || props.status === 'TRUE');
       const targetBufferGroup = bufferGroups[props.type] || layers.b9;
       
-      // Lấy màu riêng theo loại hạ tầng, mặc định là cyan nếu không khớp
       const typeColor = infraBorderColors[props.type] || '#38bdf8';
 
-      // Cấu hình style: viền đúng màu hạ tầng, dày hơn (1.8 - 2.2), nét đứt rõ thoáng (6,6)
       const style = isApproved
         ? { color: typeColor, weight: 2.2, dashArray: '6, 6', fillColor: typeColor, fillOpacity: 0.12 }
         : { color: '#f87171', weight: 2.2, dashArray: '4, 4', fillColor: '#f87171', fillOpacity: 0.10 };
@@ -567,7 +563,6 @@ export async function handleInspectPointClick(clickLat, clickLng) {
   
   let isochroneFeatures = lastCalculatedIsochrones;
 
-  // Nếu chưa có cache đa giác, tiến hành gọi API lấy bộ đệm một lần duy nhất
   if (!isochroneFeatures || isochroneFeatures.length === 0) {
     const activeItems = state.rawDataList.filter(item => {
       const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
