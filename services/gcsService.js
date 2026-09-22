@@ -11,7 +11,7 @@ async function getRawDataList() {
       const headRes = await axios.head(constants.GCS_URL, { timeout: 5000 });
       currentETag = headRes.headers['etag'] || headRes.headers['last-modified'];
     } catch (headErr) {
-      // Bẫy lỗi an toàn cho HEAD request để không chặn tiến trình GET khi bucket có vấn đề về CORS hoặc header
+      // Bẫy lỗi an toàn cho HEAD request
     }
 
     if (cachedGeoJSON && currentETag && currentETag === lastETag) {
@@ -41,18 +41,26 @@ async function getRawDataList() {
       const rawStatus = props.TrangThai;
       const isStatusTrue = (rawStatus === true || String(rawStatus).trim().toUpperCase() === 'TRUE');
 
+      // Đọc và chuẩn hóa thông tin Nhóm hạ tầng (Cấp đô thị / Cấp đơn vị ở)
+      const rawNhom = String(props.Nhom_HaTang || props.nhomHaTang || '').trim();
+      let assignedNhom = rawNhom;
+      if (!assignedNhom) {
+        assignedNhom = (prefix === 'THPT' || prefix === 'YT_DT' || prefix === 'VH_DT') ? 'Cấp đô thị' : 'Cấp DVƠ';
+      }
+
       return {
         id: rawId,
         name: props.Ten_CongTrinh || 'Chưa đặt tên',
         ward: props.Ten_XaPhuong || 'Thuận Hóa',
         type: constants.codeMap[prefix] || "9-CSD",
+        nhomHaTang: assignedNhom, // Bổ sung nhận biết nhóm hạ tầng phục vụ quy chuẩn QCVN
         lat: parseCoord(coords[1]),
         lng: parseCoord(coords[0]),
         size: Number(String(props.QuyMo_S || 0).replace(',', '.')) || 0,
         radius: Number(String(props.BanKinh || 500).replace(',', '.')) || 500,
         status: isStatusTrue
       };
-    }).filter(item => item.lat !== null && item.lng !== null); // Lọc bỏ hoàn toàn các dòng thiếu tọa độ hoặc tọa độ không hợp lệ
+    }).filter(item => item.lat !== null && item.lng !== null);
 
     lastETag = currentETag;
     return cachedGeoJSON;
