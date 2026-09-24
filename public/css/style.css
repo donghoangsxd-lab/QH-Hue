@@ -24,10 +24,10 @@ body, html {
 /* WIDGET DONUT CHART TRONG SUỐT GÓC TRÊN BÊN TRÁI */
 .infra-pie-widget-transparent {
   position: absolute;
-  top: 12px;         /* Đưa lên phía trên cùng bên trái */
+  top: 12px;
   left: 16px;
   z-index: 1000;
-  width: 210px;      /* Tăng chiều rộng để hiển thị rõ biểu đồ và chú thích % */
+  width: 210px;
   padding: 8px;
   background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(10px);
@@ -37,7 +37,7 @@ body, html {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
-/* THANH CÔNG CỤ DỌC BÊN TRÁI (GIỮA MÀN HÌNH) */
+/* THANH CÔNG CỤ DỌC BÊN TRÁI */
 .vertical-toolbar {
   position: absolute;
   top: 220px;
@@ -57,7 +57,7 @@ body, html {
   justify-content: center;
 }
 
-/* CỤM NÚT TRUNG TÂM BÊN PHẢI (CHÌA KHÓA > BÁNH RĂNG > CON MẮT) ĐỐI DIỆN CỘT TRÁI */
+/* CỤM NÚT TRUNG TÂM BÊN PHẢI */
 .middle-right-toolbar {
   position: absolute;
   top: 220px;
@@ -240,6 +240,7 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
   transition: font-size 0.15s ease;
 }
 
+/* RESPONSIVE DESKTOP */
 @media (min-width: 769px) {
   .leaflet-control-zoom { display: none !important; }
   .topbar-row { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000; width: auto; display: flex; align-items: center; }
@@ -253,6 +254,7 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
   .add-point-card { bottom: 75px; left: 50%; transform: translateX(-50%); width: 320px; }
 }
 
+/* RESPONSIVE MOBILE & TỐI ƯU GIAO DIỆN DI ĐỘNG */
 @media (max-width: 768px) {
   .leaflet-control-zoom { display: none !important; }
   .topbar-row { position: absolute; top: 10px; left: 12px; right: 12px; z-index: 1000; display: flex; align-items: center; }
@@ -262,56 +264,39 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
   .sidebar-panel { position: absolute; top: 104px; left: 12px; right: 12px; z-index: 999; display: none; }
   .sidebar-panel.closed { display: none !important; }
   .sidebar-panel.open { display: block !important; }
-  .infra-pie-widget-transparent { top: 92px; left: 12px; width: 145px; }
-  .vertical-toolbar { top: 215px; left: 12px; }
-  .middle-right-toolbar { top: 215px; right: 12px; }
-  .add-point-card { bottom: 65px; left: 12px; right: 12px; }
-}
 
-/* --- TỐI ƯU HÓA GIAO DIỆN TRÊN ĐIỆN THOẠI (MOBILE RESPONSIVE) --- */
-@media screen and (max-width: 768px) {
-  /* 1. Đưa widget biểu đồ tròn xuống góc dưới hoặc thu nhỏ gọn gàng, tránh đè nút */
+  /* Tối ưu widget biểu đồ tránh đè nút */
   .infra-pie-widget-transparent {
     top: 60px !important;
     left: 8px !important;
     width: 175px !important;
     padding: 6px !important;
   }
-  
   .infra-pie-widget-transparent canvas {
     height: 95px !important;
   }
 
-  /* 2. Thu nhỏ thanh công cụ dọc (Zoom, Đo đạc) và dịch sang phải hoặc sát mép trái hơn */
+  /* Thu nhỏ và dịch chuyển thanh công cụ dọc */
   .vertical-toolbar, div.leaflet-control-zoom {
     left: 4px !important;
     top: 170px !important;
     transform: scale(0.9);
     transform-origin: top left;
   }
+  .middle-right-toolbar { 
+    top: 215px; 
+    right: 12px; 
+  }
 
-  /* 3. Tối ưu popup bảng quy chuẩn phường/xã tràn màn hình di động */
+  /* Tối ưu popup và bảng quy chuẩn */
   .ward-popup-card, .ward-table-scroll-container {
     min-width: 100% !important;
     max-width: 100% !important;
     font-size: 9.5px !important;
   }
-
-  /* 4. Thu nhỏ các bảng thống kê và ma trận để không bị vỡ khung */
   .ward-table th, .ward-table td {
     padding: 4px 6px !important;
     font-size: 9.5px !important;
   }
-
-  /* 5. Gom nhóm thanh menu phía dưới màn hình di động cho gọn gàng */
-  .bottom-toolbar, .mobile-action-bar {
-    bottom: 25px !important;
-    padding: 4px 8px !important;
-    gap: 4px !important;
-  }
-  
-  .bottom-toolbar button {
-    font-size: 9.5px !important;
-    padding: 6px 8px !important;
-  }
+  .add-point-card { bottom: 65px; left: 12px; right: 12px; }
 }
