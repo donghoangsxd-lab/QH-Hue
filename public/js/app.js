@@ -273,6 +273,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnSubmitNewPoint')?.addEventListener('click', () => {
     const type = document.getElementById('newType')?.value;
+    const nhomHaTang = document.getElementById('newNhomHaTang')?.value || "Cấp đơn vị ở"; // Lấy giá trị tiếng Việt có dấu
     const name = document.getElementById('newName')?.value;
     const lat = document.getElementById('newLat')?.value;
     const lng = document.getElementById('newLng')?.value;
@@ -295,6 +296,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const addUrl = `/api/gee?action=addPoint` +
       `&type=${encodeURIComponent(type)}` +
+      `&nhomHaTang=${encodeURIComponent(nhomHaTang)}` +
       `&name=${encodeURIComponent(name)}` +
       `&ward=${encodeURIComponent(ward)}` +
       `&lat=${lat}&lng=${lng}&size=${size}`;
@@ -309,7 +311,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         state.rawDataList.push({
           id: "NEW-" + Date.now(),
-          name, ward, type,
+          name, ward, type, nhomHaTang,
           lat: Number(lat), lng: Number(lng),
           size: Number(size), radius: 500,
           status: false
