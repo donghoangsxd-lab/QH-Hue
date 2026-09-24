@@ -525,12 +525,19 @@ module.exports = async (req, res) => {
           }
         });
 
-        let urbanScoreSum = 0;
+        let urbanCoverageSum = 0;
+        let urbanScaleSum = 0;
         let urbanTotalCount = 0;
+        
         for (const key in urbanResults) {
           const node = urbanResults[key];
           node.status = node.currentArea >= node.requiredArea;
-          urbanScoreSum += node.status ? 1 : (node.currentArea / (node.requiredArea || 1));
+          
+          const coverageVal = node.status ? 100 : Math.min(100, (node.currentArea / (node.requiredArea || 1)) * 100);
+          const scaleVal = Math.min(100, (node.currentArea / (node.requiredArea || 1)) * 100);
+
+          urbanCoverageSum += coverageVal;
+          urbanScaleSum += scaleVal;
           urbanTotalCount++;
         }
 
@@ -564,7 +571,8 @@ module.exports = async (req, res) => {
             requiredArea: dvccRequiredArea,
             status: dvccOverallStatus
           },
-          Total_Infra_Score: Math.round((urbanScoreSum / (urbanTotalCount || 1)) * 100)
+          Avg_Coverage_Score: Math.round(urbanCoverageSum / (urbanTotalCount || 1)),
+          Avg_Scale_Score: Math.round(urbanScaleSum / (urbanTotalCount || 1))
         };
 
         calculatedRow["Ratio_1-CV"] = urbanResults["CV_DT"] ? Math.min(100, (urbanResults["CV_DT"].currentArea / (urbanResults["CV_DT"].requiredArea || 1)) * 100) : 0;
