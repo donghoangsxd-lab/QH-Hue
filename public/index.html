@@ -24,13 +24,10 @@
     <div style="height:130px; position:relative; display:flex; justify-content:center;">
       <canvas id="infraPieChart"></canvas>
     </div>
-    <!-- Phần hiển thị chi tiết số % ở bên dưới -->
-    <div id="pieLegendDetails" style="margin-top:6px; font-size:9.5px; max-height:85px; overflow-y:auto; border-top:1px dashed var(--border-color); padding-top:4px;">
-      <!-- Dữ liệu % sẽ được đổ tự động vào đây -->
-    </div>
+    <div id="pieLegendDetails" style="margin-top:6px; font-size:9.5px; max-height:85px; overflow-y:auto; border-top:1px dashed var(--border-color); padding-top:4px;"></div>
   </div>
 
-  <!-- THANH CÔNG CỤ DỌC BÊN TRÁI (GIỮA MÀN HÌNH) -->
+  <!-- THANH CÔNG CỤ DỌC BÊN TRÁI -->
   <div class="vertical-toolbar ui-panel-format">
     <button class="ui-btn-format" id="btnZoomIn" title="Phóng to bản đồ">➕</button>
     <button class="ui-btn-format" id="btnZoomOut" title="Thu nhỏ bản đồ">➖</button>
@@ -40,7 +37,7 @@
     <button class="ui-btn-format" id="btnScreenshot" title="Chụp ảnh màn hình bản đồ">📸</button>
   </div>
 
-  <!-- NHÓM NÚT TRUNG TÂM BÊN PHẢI (CHÌA KHÓA > BÁNH RĂNG > CON MẮT) -->
+  <!-- NHÓM NÚT TRUNG TÂM BÊN PHẢI -->
   <div class="middle-right-toolbar ui-panel-format">
     <button class="ui-btn-format" id="btnAuth" title="Đăng nhập Quản trị">🔑</button>
     <button class="ui-btn-format" id="btnToggleSidebar" title="Quản lý lớp dữ liệu">⚙️</button>
@@ -73,63 +70,25 @@
 
     <!-- TAB 1: LỚP DỮ LIỆU -->
     <div class="tab-body" id="tabLayers">
-      <div class="layer-row">
-        <div><input type="checkbox" id="chk_pop"><label for="chk_pop">0. Phân bổ dân cư</label></div>
-      </div>
-      <div class="layer-row">
-        <div><input type="checkbox" id="chk_bound" checked><label for="chk_bound">🗺️ Ranh giới 40 Phường Xã</label></div>
-      </div>
-      <div class="layer-row">
-        <div><input type="checkbox" id="chk_c1" checked><label for="chk_c1">1. Công viên, điểm xanh</label></div>
-        <span class="btn-dot-buffer" data-buffer="b1">●</span>
-      </div>
-      <div class="layer-row">
-        <div><input type="checkbox" id="chk_c2" checked><label for="chk_c2">2. Bãi đỗ xe, trạm sạc</label></div>
-        <span class="btn-dot-buffer" data-buffer="b2">●</span>
-      </div>
-      <div class="layer-row">
-        <div><input type="checkbox" id="chk_c3" checked><label for="chk_c3">3. Trường Mầm non</label></div>
-        <span class="btn-dot-buffer" data-buffer="b3">●</span>
-      </div>
-      <div class="layer-row">
-        <div><input type="checkbox" id="chk_c4" checked><label for="chk_c4">4. Trường Tiểu học</label></div>
-        <span class="btn-dot-buffer" data-buffer="b4">●</span>
-      </div>
-      <div class="layer-row">
-        <div><input type="checkbox" id="chk_c5" checked><label for="chk_c5">5. Trường THCS</label></div>
-        <span class="btn-dot-buffer" data-buffer="b5">●</span>
-      </div>
-      <div class="layer-row">
-        <div><input type="checkbox" id="chk_c6" checked><label for="chk_c6">6. Cơ sở Y tế</label></div>
-        <span class="btn-dot-buffer" data-buffer="b6">●</span>
-      </div>
-      <div class="layer-row">
-        <div><input type="checkbox" id="chk_c7" checked><label for="chk_c7">7. Nhà văn hóa, thể thao</label></div>
-        <span class="btn-dot-buffer" data-buffer="b7">●</span>
-      </div>
-      <div class="layer-row">
-        <div><input type="checkbox" id="chk_c8" checked><label for="chk_c8">8. Chợ, TTTM</label></div>
-        <span class="btn-dot-buffer" data-buffer="b8">●</span>
-      </div>
-      <div class="layer-row">
-        <div><input type="checkbox" id="chk_c9" checked><label for="chk_c9">9. Quỹ đất tiềm năng</label></div>
-      </div>
-      <div class="layer-row">
-        <div>
-          <input type="checkbox" id="chk_heat" checked>
-          <label for="chk_heat">🔥 Heatmap độ phủ hạ tầng</label>
-        </div>
-      </div>
+      <div class="layer-row"><div><input type="checkbox" id="chk_pop"><label for="chk_pop">0. Phân bổ dân cư</label></div></div>
+      <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound">🗺️ Ranh giới 40 Phường Xã</label></div></div>
+      <div class="layer-row"><div><input type="checkbox" id="chk_c1" checked><label for="chk_c1">1. Công viên, điểm xanh</label></div><span class="btn-dot-buffer" data-buffer="b1">●</span></div>
+      <div class="layer-row"><div><input type="checkbox" id="chk_c2" checked><label for="chk_c2">2. Bãi đỗ xe, trạm sạc</label></div><span class="btn-dot-buffer" data-buffer="b2">●</span></div>
+      <div class="layer-row"><div><input type="checkbox" id="chk_c3" checked><label for="chk_c3">3. Trường Mầm non</label></div><span class="btn-dot-buffer" data-buffer="b3">●</span></div>
+      <div class="layer-row"><div><input type="checkbox" id="chk_c4" checked><label for="chk_c4">4. Trường Tiểu học</label></div><span class="btn-dot-buffer" data-buffer="b4">●</span></div>
+      <div class="layer-row"><div><input type="checkbox" id="chk_c5" checked><label for="chk_c5">5. Trường THCS</label></div><span class="btn-dot-buffer" data-buffer="b5">●</span></div>
+      <div class="layer-row"><div><input type="checkbox" id="chk_c6" checked><label for="chk_c6">6. Cơ sở Y tế</label></div><span class="btn-dot-buffer" data-buffer="b6">●</span></div>
+      <div class="layer-row"><div><input type="checkbox" id="chk_c7" checked><label for="chk_c7">7. Nhà văn hóa, thể thao</label></div><span class="btn-dot-buffer" data-buffer="b7">●</span></div>
+      <div class="layer-row"><div><input type="checkbox" id="chk_c8" checked><label for="chk_c8">8. Chợ, TTTM</label></div><span class="btn-dot-buffer" data-buffer="b8">●</span></div>
+      <div class="layer-row"><div><input type="checkbox" id="chk_c9" checked><label for="chk_c9">9. Quỹ đất tiềm năng</label></div></div>
+      <div class="layer-row"><div><input type="checkbox" id="chk_heat" checked><label for="chk_heat">🔥 Heatmap độ phủ hạ tầng</label></div></div>
 
       <div id="popBox" style="display:none;" class="opacity-slider-row">
-        👥 Độ trong suốt Dân cư: 
-        <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60">
+        👥 Độ trong suốt Dân cư: <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60">
       </div>
 
       <div id="heatBox" class="opacity-slider-row">
-        🔥 Độ trong suốt Heatmap: 
-        <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30">
-        
+        🔥 Độ trong suốt Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30">
         <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between; padding: 0 2px;">
           <span style="font-size: 11.5px; color: var(--text-muted);">🛤️ Bán kính buffer chung (m):</span>
           <input type="number" id="inputIsoRadius" value="500" min="100" max="5000" step="50" style="width: 80px; background: #0f172a; color: var(--accent-cyan); border: 1px solid var(--border-color); border-radius: 4px; padding: 3px 6px; text-align: center; font-weight: bold; font-size: 12px;" />
@@ -147,18 +106,12 @@
       <div class="legend-row"><img src="./icons/Yte.png" style="width:18px; height:23px; vertical-align:middle; margin-right:6px;" /> 6. Bệnh viện, Trạm y tế</div>
       <div class="legend-row"><img src="./icons/Vanhoa.png" style="width:18px; height:23px; vertical-align:middle; margin-right:6px;" /> 7. Nhà văn hóa, thể thao</div>
       <div class="legend-row"><img src="./icons/Cho.png" style="width:18px; height:23px; vertical-align:middle; margin-right:6px;" /> 8. Chợ, Trung tâm thương mại</div>
-      
-      <div class="legend-row" style="color:var(--accent-orange); margin-top:6px;">
-        <img src="./icons/Unused.png" style="width:18px; height:23px; vertical-align:middle; margin-right:6px;" /> <b>9. Quỹ đất tiềm năng (Chưa sử dụng)</b>
-      </div>
-      <div class="legend-row" style="margin-bottom:12px;">
-        <img src="./icons/Park2.png" style="width:18px; height:23px; vertical-align:middle; margin-right:6px;" />
-        <b style="color:var(--accent-red);">Chưa chấp thuận (Chờ duyệt)</b>
-      </div>
+      <div class="legend-row" style="color:var(--accent-orange); margin-top:6px;"><img src="./icons/Unused.png" style="width:18px; height:23px; vertical-align:middle; margin-right:6px;" /> <b>9. Quỹ đất tiềm năng (Chưa sử dụng)</b></div>
+      <div class="legend-row" style="margin-bottom:12px;"><img src="./icons/Park2.png" style="width:18px; height:23px; vertical-align:middle; margin-right:6px;" /><b style="color:var(--accent-red);">Chưa chấp thuận (Chờ duyệt)</b></div>
     </div>
   </div>
 
-  <!-- HÀNG 3: DOCKBAR DƯỚI CÙNG -->
+  <!-- DOCKBAR DƯỚI CÙNG -->
   <div class="dockbar-bottom-row ui-panel-format">
     <button class="ui-btn-format" id="btnInspectMode">🖱️ TRA CỨU ĐIỂM</button>
     <button class="ui-btn-format" id="btnToggleAddCard">➕ ĐỀ XUẤT MỚI</button>
@@ -172,14 +125,8 @@
       <span id="btnCloseAuthModal" style="cursor:pointer; color:var(--accent-red); font-weight:bold;">✕</span>
     </div>
     <div style="font-size:10.5px; color:var(--text-muted); margin-bottom:12px;">Đăng nhập bằng tài khoản Google được cấp quyền Admin để thực hiện phê duyệt đề xuất hạ tầng.</div>
-    
-    <div id="g_id_onload"
-         data-client_id="409688791128-s7b4uohia2a9n3u27rl0gmkdupiig554.apps.googleusercontent.com"
-         data-callback="handleGoogleCredentialResponse"
-         data-auto_prompt="false">
-    </div>
+    <div id="g_id_onload" data-client_id="409688791128-s7b4uohia2a9n3u27rl0gmkdupiig554.apps.googleusercontent.com" data-callback="handleGoogleCredentialResponse" data-auto_prompt="false"></div>
     <div class="g_id_signin" data-type="standard" data-size="large" data-theme="dark" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
-    
     <div id="authMsg" style="font-size:10px; margin-top:8px; text-align:center; font-weight:bold;"></div>
   </div>
 
@@ -203,12 +150,11 @@
       <option value="9-CSD" selected>🛠️ 9. Quỹ đất tiềm năng (Chưa sử dụng)</option>
     </select>
 
-    <!-- BỔ SUNG DROPLIST PHÂN CẤP HẠ TẦNG (GHI VÀO CỘT D / Nhom_HaTang) -->
     <label>Phân cấp hạ tầng (Cột D):</label>
-<select id="newNhomHaTang">
-  <option value="Cấp đô thị">Cấp đô thị</option>
-  <option value="Cấp đơn vị ở" selected>Cấp đơn vị ở</option>
-</select>
+    <select id="newNhomHaTang">
+      <option value="Cấp đô thị">Cấp đô thị</option>
+      <option value="Cấp đơn vị ở" selected>Cấp đơn vị ở</option>
+    </select>
 
     <label>Tên khu đất / công trình:</label>
     <input type="text" id="newName" placeholder="Nhập tên công trình..." />
@@ -255,9 +201,8 @@
             <th colspan="2">5. THCS</th>
             <th colspan="2">6. Y tế</th>
             <th colspan="2">7. Văn hóa</th>
-            <th>8. Thương mại</th>
-            <th rowspan="2">Độ phủ (%)</th>
-            <th rowspan="2">Quy mô (%)</th>
+            <th colspan="2">8. Thương mại</th>
+            <th colspan="2">TỔNG CỘNG</th>
           </tr>
           <tr>
             <th>Độ phủ</th><th>Q.Mô</th>
@@ -267,7 +212,8 @@
             <th>Độ phủ</th><th>Q.Mô</th>
             <th>Độ phủ</th><th>Q.Mô</th>
             <th>Độ phủ</th><th>Q.Mô</th>
-            <th>Độ phủ</th>
+            <th>Độ phủ</th><th>Q.Mô</th>
+            <th>Độ phủ</th><th>Q.Mô</th>
           </tr>
         </thead>
         <tbody id="statTableBody"></tbody>
