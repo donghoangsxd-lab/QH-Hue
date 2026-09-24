@@ -149,13 +149,14 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'addPoint') {
-      const { type, name, ward, lat, lng, size } = req.query;
+      const { type, name, ward, lat, lng, size, nhomHaTang } = req.query;
       if (!type || !name || !lat || !lng) {
         return res.status(400).json({ error: true, message: "Thiếu thông tin bắt buộc" });
       }
 
       const syncUrl = `${constants.GAS_BASE_URL}?action=addPoint` +
         `&type=${encodeURIComponent(type)}` +
+        `&nhomHaTang=${encodeURIComponent(nhomHaTang || 'Cấp đơn vị ở')}` +
         `&name=${encodeURIComponent(name)}` +
         `&ward=${encodeURIComponent(ward || 'Thuận Hóa')}` +
         `&lat=${lat}&lng=${lng}&size=${size || 0}`;
@@ -491,7 +492,7 @@ module.exports = async (req, res) => {
 
           const prefix = item.id.split('-')[0];
           const normalizedNhom = constants.cleanNhomStr(item.nhomHaTang);
-          const isUrban = (normalizedNhom === "Cap Do Thi" || prefix === "THPT");
+          const isUrban = (normalizedNhom === "Cap Do Thi" || normalizedNhom === "Cấp đô thị" || prefix === "THPT");
 
           if (isUrban) {
             let targetKey = "CV_DT";
