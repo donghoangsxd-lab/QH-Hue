@@ -267,3 +267,51 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
   .middle-right-toolbar { top: 215px; right: 12px; }
   .add-point-card { bottom: 65px; left: 12px; right: 12px; }
 }
+
+/* --- TỐI ƯU HÓA GIAO DIỆN TRÊN ĐIỆN THOẠI (MOBILE RESPONSIVE) --- */
+@media screen and (max-width: 768px) {
+  /* 1. Đưa widget biểu đồ tròn xuống góc dưới hoặc thu nhỏ gọn gàng, tránh đè nút */
+  .infra-pie-widget-transparent {
+    top: 60px !important;
+    left: 8px !important;
+    width: 175px !important;
+    padding: 6px !important;
+  }
+  
+  .infra-pie-widget-transparent canvas {
+    height: 95px !important;
+  }
+
+  /* 2. Thu nhỏ thanh công cụ dọc (Zoom, Đo đạc) và dịch sang phải hoặc sát mép trái hơn */
+  .vertical-toolbar, div.leaflet-control-zoom {
+    left: 4px !important;
+    top: 170px !important;
+    transform: scale(0.9);
+    transform-origin: top left;
+  }
+
+  /* 3. Tối ưu popup bảng quy chuẩn phường/xã tràn màn hình di động */
+  .ward-popup-card, .ward-table-scroll-container {
+    min-width: 100% !important;
+    max-width: 100% !important;
+    font-size: 9.5px !important;
+  }
+
+  /* 4. Thu nhỏ các bảng thống kê và ma trận để không bị vỡ khung */
+  .ward-table th, .ward-table td {
+    padding: 4px 6px !important;
+    font-size: 9.5px !important;
+  }
+
+  /* 5. Gom nhóm thanh menu phía dưới màn hình di động cho gọn gàng */
+  .bottom-toolbar, .mobile-action-bar {
+    bottom: 25px !important;
+    padding: 4px 8px !important;
+    gap: 4px !important;
+  }
+  
+  .bottom-toolbar button {
+    font-size: 9.5px !important;
+    padding: 6px 8px !important;
+  }
+}
