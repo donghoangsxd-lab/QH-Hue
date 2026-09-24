@@ -194,7 +194,7 @@ export function openCombinedModal() {
   
   if (mBar) mBar.style.width = "0%";
   if (mTxt) mTxt.innerText = "0%";
-  if (tbody) tbody.innerHTML = "<tr><td colspan='19' style='text-align:center; padding:20px;'>🔄 Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>";
+  if (tbody) tbody.innerHTML = "<tr><td colspan='20' style='text-align:center; padding:20px;'>🔄 Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>";
 
   let mStep = 0;
   const mInterval = setInterval(() => {
@@ -214,7 +214,7 @@ export function openCombinedModal() {
       if (tbody) tbody.innerHTML = "";
       
       state.wardStatsData = resData.data || [];
-      const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH"];
+      const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
 
       if (state.wardStatsData.length > 0) {
         renderCombinedChart();
@@ -236,10 +236,8 @@ export function openCombinedModal() {
           row += `<td style="color:var(--accent-green);">${cov}%</td><td style="color:var(--accent-orange); font-weight:bold;">${scale}%</td>`;
         });
 
-        row += `<td style="color:var(--accent-green);">${Number(w["Ratio_8-TM"] || 0).toFixed(1)}%</td>`;
-        // Hiển thị 2 cột cuối: Độ phủ (%) và Quy mô (%)
-        row += `<td style="font-weight:bold; color:var(--accent-green);">${Number(w.Avg_Coverage_Score || 0).toFixed(1)}%</td>`;
-        row += `<td style="font-weight:bold; color:var(--accent-orange);">${Number(w.Avg_Scale_Score || 0).toFixed(1)}%</td></tr>`;
+        row += `<td style="font-weight:bold; color:var(--accent-green); background:rgba(56,189,248,0.05);">${Number(w.Avg_Coverage_Score || 0).toFixed(1)}%</td>`;
+        row += `<td style="font-weight:bold; color:var(--accent-orange); background:rgba(245,158,11,0.05);">${Number(w.Avg_Scale_Score || 0).toFixed(1)}%</td></tr>`;
         
         if (tbody) tbody.innerHTML += row;
       });
@@ -255,7 +253,7 @@ export function openCombinedModal() {
     })
     .catch(() => {
       clearInterval(mInterval);
-      if (tbody) tbody.innerHTML = "<tr><td colspan='19' style='text-align:center; color:var(--accent-red); padding:20px;'>❌ Lỗi nạp dữ liệu từ GEE Server.</td></tr>";
+      if (tbody) tbody.innerHTML = "<tr><td colspan='20' style='text-align:center; color:var(--accent-red); padding:20px;'>❌ Lỗi nạp dữ liệu từ GEE Server.</td></tr>";
     });
 }
 
@@ -271,17 +269,14 @@ export async function openWardDetailDirect(wardName) {
   const initialModalHtml = `<div class="ward-popup-card" style="min-width: 700px;">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
       <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH HẠ TẦNG QUY CHUẨN: ${wardName.toUpperCase()}</b>
-      
       <div style="display:flex; align-items:center; gap:8px;">
         <div style="width:100px;" class="progress-bar-bg"><div class="progress-bar-fill" id="wardDetailProgressBar" style="width: 5%;"></div></div>
         <span id="wardDetailProgressText" style="font-size:10.5px; font-weight:bold; color:var(--accent-orange);">5%</span>
       </div>
     </div>
-
     <div style="background:rgba(15, 23, 42, 0.8); border:1px solid var(--border-color); padding:6px; border-radius:6px; margin:6px 0; font-size:11px;">
       👥 Dân số & Đơn vị ở: Đang khởi tạo...
     </div>
-
     <div id="wardQuotaTableContainer">
       <table class="ward-table">
         <thead>
@@ -328,11 +323,7 @@ export async function openWardDetailDirect(wardName) {
     if (txt) txt.innerText = "100%";
 
     state.wardStatsData = resData.data || [];
-    
-    setTimeout(() => {
-      selectWardDetail(wardName);
-    }, 400);
-
+    setTimeout(() => { selectWardDetail(wardName); }, 400);
   } catch (err) {
     clearInterval(pInterval);
     console.error("Lỗi tải thống kê hạ tầng phường:", err);
@@ -345,7 +336,6 @@ export async function openWardDetailDirect(wardName) {
 
 export function selectWardDetail(wardName) {
   closeModal();
-
   const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
   if (!wardData) return;
 
@@ -365,7 +355,6 @@ function renderWardDetailPopup(wardData) {
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
       <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH QUY CHUẨN QCVN 01:2026/BXD: ${wardData.Ten_Phuong.toUpperCase()}</b>
     </div>
-    
     <div style="background:rgba(15, 23, 42, 0.85); border:1px solid var(--border-color); padding:8px; border-radius:6px; margin-bottom:8px; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
       <div>👥 Dân số hiện trạng: <b>${popCurrent.toLocaleString()} người</b> (${currentUnits} đơn vị ở)</div>
       <div style="display:flex; align-items:center; gap:6px;">
@@ -374,7 +363,6 @@ function renderWardDetailPopup(wardData) {
         người (<span id="projectedUnitsLabel">${projectedUnits}</span> đơn vị ở)
       </div>
     </div>
-
     <div id="wardQuotaTableContainer">
       ${buildWardQuotaTableHtml(wardData, popProjected)}
     </div>
@@ -461,9 +449,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     if (!node) return;
     const reqArea = Math.round(node.quota * projPop);
     const isPass = node.currentArea >= reqArea;
-    const statusHtml = isPass 
-      ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>`
-      : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU</span>`;
+    const statusHtml = isPass ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>` : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU</span>`;
 
     const sectionId = 'urban_sub_' + key;
     const hasSub = node.subItems && node.subItems.length > 0;
@@ -507,9 +493,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     if (!node) return;
     const reqArea = Math.round(node.quota * projPop);
     const isPass = node.currentArea >= reqArea;
-    const statusHtml = isPass 
-      ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>`
-      : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU</span>`;
+    const statusHtml = isPass ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>` : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU</span>`;
 
     const sectionId = 'unit_sub_' + key;
     const hasSub = node.subItems && node.subItems.length > 0;
@@ -544,9 +528,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   unitIdx = 4;
   const dvccReqArea = Math.round(2.0 * projPop);
   const dvccPass = dvccSummary.status;
-  const dvccStatusHtml = dvccPass 
-    ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>`
-    : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU / KHÔNG ĐẠT</span>`;
+  const dvccStatusHtml = dvccPass ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>` : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU / KHÔNG ĐẠT</span>`;
 
   html += `<tr>
     <td style="text-align:left; font-weight:bold;">${unitIdx}/ Dịch vụ công cộng đơn vị ở</td>
@@ -602,9 +584,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     if (!node) return;
     const reqArea = Math.round(node.quota * projPop);
     const isPass = node.currentArea >= reqArea;
-    const statusHtml = isPass 
-      ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>`
-      : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU</span>`;
+    const statusHtml = isPass ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ĐẠT</span>` : `<span style="color:var(--accent-red); font-weight:bold;">✗ THIẾU</span>`;
 
     const sectionId = 'unit_sub_' + key;
     const hasSub = node.subItems && node.subItems.length > 0;
@@ -640,7 +620,6 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   return html;
 }
 
-// Biểu đồ tổng hợp hiển thị 2 cột (Độ phủ & Quy mô) kẹp sát nhau cho từng phường
 function renderCombinedChart() {
   const chartEl = document.getElementById('infraChart');
   if (!chartEl) return;
@@ -655,14 +634,14 @@ function renderCombinedChart() {
         { 
           label: 'Độ phủ (%)', 
           data: state.wardStatsData.map(w => w.Avg_Coverage_Score || 0), 
-          backgroundColor: '#38bdf8', // Xanh dương
+          backgroundColor: '#38bdf8',
           barPercentage: 0.9,
           categoryPercentage: 0.8
         },
         { 
           label: 'Quy mô (%)', 
           data: state.wardStatsData.map(w => w.Avg_Scale_Score || 0), 
-          backgroundColor: '#f59e0b', // Cam
+          backgroundColor: '#f59e0b',
           barPercentage: 0.9,
           categoryPercentage: 0.8
         }
@@ -676,7 +655,7 @@ function renderCombinedChart() {
       },
       scales: {
         x: { 
-          stacked: false, // Để 2 cột đứng cạnh nhau thay vì chồng lên nhau
+          stacked: false, 
           ticks: { font: { size: 8 }, color: '#94a3b8' }, 
           grid: { color: 'rgba(255,255,255,0.05)' } 
         },
