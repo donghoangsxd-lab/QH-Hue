@@ -525,38 +525,10 @@ module.exports = async (req, res) => {
           }
         });
 
-        let urbanCoverageSum = 0;
-        let urbanScaleSum = 0;
-        let urbanTotalCount = 0;
-        
-        for (const key in urbanResults) {
-          const node = urbanResults[key];
-          node.status = node.currentArea >= node.requiredArea;
-          
-          const coverageVal = node.status ? 100 : Math.min(100, (node.currentArea / (node.requiredArea || 1)) * 100);
-          const scaleVal = Math.min(100, (node.currentArea / (node.requiredArea || 1)) * 100);
-
-          urbanCoverageSum += coverageVal;
-          urbanScaleSum += scaleVal;
-          urbanTotalCount++;
-        }
-
-        const ytArea = unitResults["YT_DV"].currentArea;
-        const vhArea = unitResults["VH_DV"].currentArea;
-        const tmArea = unitResults["TM_DV"].currentArea;
-        const dvccTotalArea = ytArea + vhArea + tmArea;
-        const dvccRequiredArea = 2.0 * projPop;
-
-        const ytValid = unitResults["YT_DV"].subItems.every(it => Number(it.size || 0) >= 500);
-        const vhValid = unitResults["VH_DV"].subItems.every(it => Number(it.size || 0) >= 1000);
-        const tmValid = unitResults["TM_DV"].subItems.every(it => Number(it.size || 0) >= 2000);
-        const dvccOverallStatus = (dvccTotalArea >= dvccRequiredArea) && ytValid && vhValid && tmValid;
-
-        for (const key in unitResults) {
-          if (key === "YT_DV" || key === "VH_DV" || key === "TM_DV" || key === "DVCC_TOTAL") continue;
-          const node = unitResults[key];
-          node.status = node.currentArea >= node.requiredArea;
-        }
+        const codesList = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+        let totalCoverageSum = 0;
+        let totalScaleSum = 0;
+        let countMetrics = 0;
 
         const calculatedRow = {
           Ten_Phuong: wName,
@@ -567,22 +539,40 @@ module.exports = async (req, res) => {
           urbanResults: urbanResults,
           unitResults: unitResults,
           dvccSummary: {
-            totalArea: dvccTotalArea,
-            requiredArea: dvccRequiredArea,
-            status: dvccOverallStatus
-          },
-          Avg_Coverage_Score: Math.round(urbanCoverageSum / (urbanTotalCount || 1)),
-          Avg_Scale_Score: Math.round(urbanScaleSum / (urbanTotalCount || 1))
+            totalArea: (unitResults["YT_DV"]?.currentArea || 0) + (unitResults["VH_DV"]?.currentArea || 0) + (unitResults["TM_DV"]?.currentArea || 0),
+            requiredArea: 2.0 * projPop,
+            status: false
+          }
         };
 
-        calculatedRow["Ratio_1-CV"] = urbanResults["CV_DT"] ? Math.min(100, (urbanResults["CV_DT"].currentArea / (urbanResults["CV_DT"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_2-BDX"] = urbanResults["BDX_DT"] ? Math.min(100, (urbanResults["BDX_DT"].currentArea / (urbanResults["BDX_DT"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_3-MN"] = unitResults["3-MN"] ? Math.min(100, (unitResults["3-MN"].currentArea / (unitResults["3-MN"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_4-TH"] = unitResults["4-TH"] ? Math.min(100, (unitResults["4-TH"].currentArea / (unitResults["4-TH"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_5-THCS"] = unitResults["5-THCS"] ? Math.min(100, (unitResults["5-THCS"].currentArea / (unitResults["5-THCS"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_6-YT"] = urbanResults["YT_DT"] ? Math.min(100, (urbanResults["YT_DT"].currentArea / (urbanResults["YT_DT"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_7-VH"] = urbanResults["VH_DT"] ? Math.min(100, (urbanResults["VH_DT"].currentArea / (urbanResults["VH_DT"].requiredArea || 1)) * 100) : 0;
-        calculatedRow["Ratio_8-TM"] = urbanResults["TM_DT"] ? Math.min(100, (urbanResults["TM_DT"].currentArea / (urbanResults["TM_DT"].requiredArea || 1)) * 100) : 0;
+        codesList.forEach(c => {
+          let node = null;
+          if (c === "1-CV") node = urbanResults["CV_DT"] || unitResults["CV_DV"];
+          else if (c === "2-BDX") node = urbanResults["BDX_DT"] || unitResults["BDX_DV"];
+          else if (c === "3-MN") node = unitResults["3-MN"];
+          else if (c === "4-TH") node = unitResults["4-TH"];
+          else if (c === "5-THCS") node = unitResults["5-THCS"];
+          else if (c === "6-YT") node = urbanResults["YT_DT"] || unitResults["YT_DV"];
+          else if (c === "7-VH") node = urbanResults["VH_DT"] || unitResults["VH_DV"];
+          else if (c === "8-TM") node = urbanResults["TM_DT"] || unitResults["TM_DV"];
+
+          const current = node ? node.currentArea : 0;
+          const required = node ? node.requiredArea : 1;
+
+          const scaleRaw = (current / (required || 1)) * 100;
+          const scaleVal = Math.min(100, scaleRaw);
+          const coverageVal = (current >= required) ? 100 : scaleVal;
+
+          calculatedRow[`Ratio_${c}`] = coverageVal;
+          calculatedRow[`Scale_${c}`] = scaleVal;
+
+          totalCoverageSum += coverageVal;
+          totalScaleSum += scaleVal;
+          countMetrics++;
+        });
+
+        calculatedRow.Avg_Coverage_Score = Math.round(totalCoverageSum / (countMetrics || 1));
+        calculatedRow.Avg_Scale_Score = Math.round(totalScaleSum / (countMetrics || 1));
 
         resultTable.push(calculatedRow);
       }
