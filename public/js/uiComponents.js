@@ -70,7 +70,6 @@ export function handleGoogleCredentialResponse(response) {
 
 window.handleGoogleCredentialResponse = handleGoogleCredentialResponse;
 
-// NÂNG CẤP BIỂU ĐỒ TRÒN TỶ TRỌNG ĐẤT: ĐẶT Ở GÓC TRÊN BÊN TRÁI, TIÊU ĐỀ CĂN GIỮA, CÓ LINE VÀ DANH SÁCH % CHI TIẾT
 export function updateInfraPieChart(sourceList) {
   const widget = document.getElementById('infraPieWidget');
   if (!widget) return;
@@ -116,7 +115,6 @@ export function updateInfraPieChart(sourceList) {
   const bgColors = keys.map(k => colorsMap[k] || '#38bdf8');
   const labels = keys.map(k => labelsMap[k] || k);
 
-  // Render danh sách chi tiết phần trăm ở dưới biểu đồ tròn
   const legendContainer = document.getElementById('pieLegendDetails');
   if (legendContainer) {
     let html = '';
@@ -239,7 +237,9 @@ export function openCombinedModal() {
         });
 
         row += `<td style="color:var(--accent-green);">${Number(w["Ratio_8-TM"] || 0).toFixed(1)}%</td>`;
-        row += `<td style="font-weight:bold; color:var(--accent-orange);">${Number(w.Total_Infra_Score || 0).toFixed(1)}%</td></tr>`;
+        // Hiển thị 2 cột cuối: Độ phủ (%) và Quy mô (%)
+        row += `<td style="font-weight:bold; color:var(--accent-green);">${Number(w.Avg_Coverage_Score || 0).toFixed(1)}%</td>`;
+        row += `<td style="font-weight:bold; color:var(--accent-orange);">${Number(w.Avg_Scale_Score || 0).toFixed(1)}%</td></tr>`;
         
         if (tbody) tbody.innerHTML += row;
       });
@@ -449,7 +449,6 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     </thead>
     <tbody>`;
 
-  // A. CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ
   html += `<tr style="background:rgba(56, 189, 248, 0.18); font-weight:bold;">
     <td colspan="5" style="color:var(--accent-cyan); text-align:left; padding-left:8px;">A / CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ</td>
   </tr>`;
@@ -468,7 +467,6 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
     const sectionId = 'urban_sub_' + key;
     const hasSub = node.subItems && node.subItems.length > 0;
-    // CẢI TIẾN: Thay nút [+] / [-] thô bằng icon mũi tên chuyên nghiệp
     const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:6px; font-size:9.5px;" title="Thu gọn/Mở rộng">▼ Chi tiết</span>` : '';
 
     html += `<tr>
@@ -497,7 +495,6 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     urbanIdx++;
   });
 
-  // B. CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở
   html += `<tr style="background:rgba(74, 222, 128, 0.18); font-weight:bold;">
     <td colspan="5" style="color:var(--accent-green); text-align:left; padding-left:8px;">B / CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở</td>
   </tr>`;
@@ -544,7 +541,6 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     unitIdx++;
   });
 
-  // 4. Dịch vụ công cộng đơn vị ở
   unitIdx = 4;
   const dvccReqArea = Math.round(2.0 * projPop);
   const dvccPass = dvccSummary.status;
@@ -599,7 +595,6 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     html += `</tbody>`;
   });
 
-  // 5. Cây xanh đơn vị ở & 6. Bãi đỗ xe đơn vị ở
   const remainingUnitKeys = ["CV_DV", "BDX_DV"];
   let remIdx = 5;
   remainingUnitKeys.forEach(key => {
@@ -645,6 +640,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   return html;
 }
 
+// Biểu đồ tổng hợp hiển thị 2 cột (Độ phủ & Quy mô) kẹp sát nhau cho từng phường
 function renderCombinedChart() {
   const chartEl = document.getElementById('infraChart');
   if (!chartEl) return;
@@ -655,19 +651,41 @@ function renderCombinedChart() {
     type: 'bar',
     data: {
       labels: state.wardStatsData.map(w => w.Ten_Phuong.replace('Phường ', '').replace('Xã ', '')),
-      datasets: [{ 
-        label: 'Điểm Tiếp Cận Hạ Tầng (%)', 
-        data: state.wardStatsData.map(w => w.Total_Infra_Score), 
-        backgroundColor: '#38bdf8' 
-      }]
+      datasets: [
+        { 
+          label: 'Độ phủ (%)', 
+          data: state.wardStatsData.map(w => w.Avg_Coverage_Score || 0), 
+          backgroundColor: '#38bdf8', // Xanh dương
+          barPercentage: 0.9,
+          categoryPercentage: 0.8
+        },
+        { 
+          label: 'Quy mô (%)', 
+          data: state.wardStatsData.map(w => w.Avg_Scale_Score || 0), 
+          backgroundColor: '#f59e0b', // Cam
+          barPercentage: 0.9,
+          categoryPercentage: 0.8
+        }
+      ]
     },
     options: { 
       responsive: true, 
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { 
+        legend: { display: true, position: 'top', labels: { color: '#94a3b8', boxWidth: 12, font: { size: 10 } } } 
+      },
       scales: {
-        x: { ticks: { font: { size: 8 }, color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-        y: { beginAtZero: true, max: 100, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        x: { 
+          stacked: false, // Để 2 cột đứng cạnh nhau thay vì chồng lên nhau
+          ticks: { font: { size: 8 }, color: '#94a3b8' }, 
+          grid: { color: 'rgba(255,255,255,0.05)' } 
+        },
+        y: { 
+          beginAtZero: true, 
+          max: 100, 
+          ticks: { color: '#94a3b8' }, 
+          grid: { color: 'rgba(255,255,255,0.05)' } 
+        }
       }
     }
   });
