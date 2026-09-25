@@ -629,7 +629,7 @@ module.exports = async (req, res) => {
           }
         };
 
-        codesList.forEach(c => {
+        const coveragePromises = codesList.map(async (c) => {
           let node = null;
           if (c === "1-CV") node = urbanResults["CV_DT"] || unitResults["CV_DV"];
           else if (c === "2-BDX") node = urbanResults["BDX_DT"] || unitResults["BDX_DV"];
@@ -642,7 +642,6 @@ module.exports = async (req, res) => {
 
           const current = node ? node.currentArea : 0;
           const required = node ? node.requiredArea : 1;
-
           const rawScale = (current / (required || 1)) * 100;
           const scaleVal = Number(Math.min(100, Math.max(0, rawScale)).toFixed(1));
 
@@ -652,7 +651,6 @@ module.exports = async (req, res) => {
           if (matchingItems.length > 0 && popRasterNormalized) {
             try {
               const radiusVal = (constants.infraConfig && constants.infraConfig[c]) ? constants.infraConfig[c].radius : 500;
-              
               const bufferFeatures = matchingItems.map(it => {
                 const effectiveR = Number(it.radius) || Number(it.banKinh) || radiusVal;
                 return ee.Feature(ee.Geometry.Point([it.lng, it.lat]).buffer(effectiveR));
@@ -660,25 +658,20 @@ module.exports = async (req, res) => {
               
               const unionBuffers = ee.FeatureCollection(bufferFeatures).geometry();
               const wardGeom = f.geometry();
-              
               const servedIntersection = unionBuffers.intersection(wardGeom, 1);
-              
-              const pixelStats = popRasterNormalized.reduceRegion({
-                reducer: ee.Reducer.count(),
-                geometry: wardGeom,
-                scale: 30,
-                maxPixels: 1e9
+
+              // Gom chung yêu cầu tính toán pixel GEE thành một dictionary để gọi evaluate an toàn
+              const dictToEval = ee.Dictionary({
+                totalPix: popRasterNormalized.reduceRegion({ reducer: ee.Reducer.count(), geometry: wardGeom, scale: 30, maxPixels: 1e9 }).get('DanSoPixelNormalized'),
+                servedPix: popRasterNormalized.reduceRegion({ reducer: ee.Reducer.count(), geometry: servedIntersection, scale: 30, maxPixels: 1e9 }).get('DanSoPixelNormalized')
               });
 
-              const servedPixelStats = popRasterNormalized.reduceRegion({
-                reducer: ee.Reducer.count(),
-                geometry: servedIntersection,
-                scale: 30,
-                maxPixels: 1e9
+              const evalResult = await new Promise((resolve) => {
+                dictToEval.evaluate((res) => resolve(res || { totalPix: 0, servedPix: 0 }));
               });
 
-              const totalPix = Number(pixelStats.get('DanSoPixelNormalized').getInfo() || 0);
-              const servedPix = Number(servedPixelStats.get('DanSoPixelNormalized').getInfo() || 0);
+              const totalPix = Number(evalResult.totalPix || 0);
+              const servedPix = Number(evalResult.servedPix || 0);
 
               if (totalPix > 0) {
                 coverageVal = Number(Math.min(100, Math.max(0, (servedPix / totalPix) * 100)).toFixed(1));
@@ -688,11 +681,15 @@ module.exports = async (req, res) => {
             }
           }
 
-          calculatedRow[`Ratio_${c}`] = coverageVal;
-          calculatedRow[`Scale_${c}`] = scaleVal;
+          return { c, coverageVal, scaleVal };
+        });
 
-          totalCoverageSum += coverageVal;
-          totalScaleSum += scaleVal;
+        const metricsResults = await Promise.all(coveragePromises);
+        metricsResults.forEach(m => {
+          calculatedRow[`Ratio_${m.c}`] = m.coverageVal;
+          calculatedRow[`Scale_${m.c}`] = m.scaleVal;
+          totalCoverageSum += m.coverageVal;
+          totalScaleSum += m.scaleVal;
           countMetrics++;
         });
 
