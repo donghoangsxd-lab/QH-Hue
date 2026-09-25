@@ -75,6 +75,16 @@ export function updateInfraPieChart(sourceList) {
   if (!widget) return;
   widget.style.display = 'block';
 
+  // Mặc định luôn hiển thị đầy đủ cả bảng chú giải (bỏ hoàn toàn nút ẩn/hiện)
+  const legendContainer = document.getElementById('pieLegendDetails');
+  if (legendContainer) {
+    legendContainer.style.display = 'block';
+  }
+  const toggleBtn = document.getElementById('btnTogglePieLegend');
+  if (toggleBtn) {
+    toggleBtn.style.display = 'none'; // Ẩn luôn nút bấm thừa nếu có
+  }
+
   const areaTotals = {};
   let totalAreaSum = 0;
 
@@ -116,7 +126,6 @@ export function updateInfraPieChart(sourceList) {
   const bgColors = keys.map(k => colorsMap[k] || '#38bdf8');
   const labels = keys.map(k => labelsMap[k] || k);
 
-  const legendContainer = document.getElementById('pieLegendDetails');
   if (legendContainer) {
     let html = '';
     keys.forEach((k, idx) => {
@@ -212,21 +221,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnClosePie')?.addEventListener('click', () => {
     hideInfraPieChart();
   });
-
-  const toggleBtn = document.getElementById('btnTogglePieLegend');
-  const legendContainer = document.getElementById('pieLegendDetails');
-  if (toggleBtn && legendContainer) {
-    legendContainer.style.display = 'none';
-    toggleBtn.addEventListener('click', () => {
-      if (legendContainer.style.display === 'none') {
-        legendContainer.style.display = 'block';
-        toggleBtn.style.transform = 'rotate(180deg)';
-      } else {
-        legendContainer.style.display = 'none';
-        toggleBtn.style.transform = 'rotate(0deg)';
-      }
-    });
-  }
 });
 
 export function openCombinedModal() {
@@ -614,7 +608,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     unitIdx++;
   });
 
-  // Mục 4: Đất dịch vụ công cộng đơn vị ở (Kiểm soát chỉ tiêu diện tích tổng >= 2.0 m2/người)
+  // Mục 4: Đất dịch vụ công cộng đơn vị ở
   unitIdx = 4;
   const dvccTotalArea = (unitRes["YT_DV"]?.currentArea || 0) + (unitRes["VH_DV"]?.currentArea || 0) + (unitRes["TM_DV"]?.currentArea || 0);
   const dvccReqArea = Math.round(2.0 * projPop);
@@ -633,7 +627,6 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     <td style="text-align:center;">-</td>
   </tr>`;
 
-  // Các mục thành phần: 4.1. Y tế đơn vị ở, 4.2. Văn hóa thể thao đơn vị ở, 4.3. Chợ - TMDV đơn vị ở (Kiểm soát số lượng >= tổng số đơn vị ở)
   const subComponentKeys = [
     { key: "YT_DV", label: "4.1. Y tế đơn vị ở", code: "6-YT" },
     { key: "VH_DV", label: "4.2. Văn hóa thể thao đơn vị ở", code: "7-VH" },
@@ -676,7 +669,6 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     html += `</tbody>`;
   });
 
-  // Mục 5. Công viên đơn vị ở & 6. Bãi đỗ xe đơn vị ở
   const extraUnitKeys = [
     { key: "CV_DV", label: "5. Công viên đơn vị ở", quota: 2.00, code: "1-CV" },
     { key: "BDX_DV", label: "6. Bãi đỗ xe đơn vị ở", quota: 2.50, code: "2-BDX" }
