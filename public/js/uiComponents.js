@@ -597,7 +597,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     <td style="text-align:center;">${dvccCoverageHtml}</td>
   </tr>`;
 
-  // C. CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG)
+  // C. CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG) - THỂ HIỆN GỌN TRONG 1 HÀNG
   html += `<tr style="background:rgba(234, 179, 8, 0.18); font-weight:bold;">
     <td colspan="8" style="color:var(--accent-orange); text-align:left; padding-left:8px;">C / CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG)</td>
   </tr>`;
@@ -607,15 +607,27 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     csdList.forEach((csd, csdIdx) => {
       const csdLat = csd.lat || csd.latitude || 16.4637;
       const csdLng = csd.lng || csd.longitude || 107.5905;
+      
+      // Lấy tên đề xuất ưu tiên hàng đầu hiển thị gọn
+      let shortProposal = "Quy hoạch hạ tầng công cộng";
+      if (csd.suggestions && csd.suggestions.length > 0) {
+        const topSugg = csd.suggestions.find(s => s.isTopPriority) || csd.suggestions.find(s => s.status === 'eligible');
+        if (topSugg) {
+          shortProposal = `Ưu tiên: ${topSugg.label}`;
+        }
+      }
+
       html += `<tr style="color:var(--text-main); font-size:9.5px; background:rgba(255,255,255,0.01);">
         <td style="text-align:center; font-weight:bold;">${csdIdx + 1}</td>
         <td style="text-align:left; padding-left:14px;">
-          <a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${csdLat}, ${csdLng}, '${encodeURIComponent(csd.name || '')}')" style="color:var(--accent-cyan); text-decoration:none; font-weight:bold;" title="Nhấn để xem trên bản đồ">
+          <a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${csdLat}, ${csdLng}, '${encodeURIComponent(csd.name || '')}')" style="color:var(--accent-cyan); text-decoration:none; font-weight:bold;" title="Nhấn để xem chi tiết trên bản đồ">
             ${csd.name}
           </a>
         </td>
         <td style="text-align:right; font-weight:bold;">${Number(csd.size || 0).toLocaleString()} m²</td>
-        <td colspan="4" style="text-align:left; color:var(--text-muted);">Đề xuất: ${csd.proposal || 'Quy hoạch hạ tầng công cộng'}</td>
+        <td colspan="4" style="text-align:left; color:var(--accent-orange); font-weight:500;">
+          💡 Đề xuất: ${shortProposal}
+        </td>
         <td style="text-align:center; color:var(--accent-orange);">Chưa sử dụng</td>
       </tr>`;
     });
@@ -630,11 +642,10 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   return html;
 }
 
-// Hàm xử lý thu gọn modal, bay đến vị trí công trình và mô phỏng click trực tiếp vào marker để hiện popup thông tin
+// Hàm xử lý thu gọn modal, bay đến vị trí công trình và kích hoạt mở popup của marker
 window.zoomToFeatureAndMinimizeModal = function(lat, lng, encodedName) {
   const targetName = decodeURIComponent(encodedName).trim();
   
-  // 1. Đóng bảng thống kê chi tiết phường và modal tổng
   if (map) {
     map.closePopup();
   }
@@ -643,12 +654,10 @@ window.zoomToFeatureAndMinimizeModal = function(lat, lng, encodedName) {
     combinedModal.style.display = 'none';
   }
 
-  // 2. Zoom bản đồ mượt mà đến tọa độ công trình
   if (map) {
     map.flyTo([lat, lng], 16, { animate: true, duration: 1.2 });
   }
 
-  // 3. Tìm marker trên bản đồ khớp với tọa độ/tên và kích hoạt sự kiện click (hiện popup + vòng isochrone)
   setTimeout(() => {
     let targetMarker = null;
 
@@ -666,14 +675,12 @@ window.zoomToFeatureAndMinimizeModal = function(lat, lng, encodedName) {
     }
 
     if (targetMarker) {
-      // Nếu tìm thấy marker thực tế, gọi đúng sự kiện click trên bản đồ của ứng dụng
       if (typeof targetMarker.fire === 'function') {
         targetMarker.fire('click');
       } else if (typeof targetMarker.openPopup === 'function') {
         targetMarker.openPopup();
       }
     } else {
-      // Fallback an toàn nếu không tìm thấy collection marker: tự tạo popup mô phỏng chi tiết
       L.popup()
         .setLatLng([lat, lng])
         .setContent(`<div style="font-size:12px; color:#0f172a; padding:4px;">
