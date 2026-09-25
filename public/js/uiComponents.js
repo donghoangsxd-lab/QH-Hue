@@ -251,13 +251,24 @@ export function openCombinedModal() {
     pdfBtn.innerHTML = '🖨️';
     pdfBtn.onclick = () => {
       const element = document.getElementById('combinedModal');
+      const scrollContainers = element.querySelectorAll('.table-container');
+      scrollContainers.forEach(c => {
+        c.style.maxHeight = 'none';
+        c.style.overflow = 'visible';
+      });
+
       html2pdf().from(element).set({
-        margin: 10,
+        margin: 5,
         filename: 'Bao-Cao-Ha-Tang-TP-Hue.pdf',
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-      }).save();
+      }).save().then(() => {
+        scrollContainers.forEach(c => {
+          c.style.maxHeight = '';
+          c.style.overflow = 'auto';
+        });
+      });
     };
     headerActions.insertBefore(pdfBtn, headerActions.firstChild);
   }
@@ -377,7 +388,6 @@ export function selectWardDetail(wardName) {
   const firstPoint = state.wardLabelsList.find(w => w.name === wardName) || { lat: 16.4637, lng: 107.5905 };
   if (map) map.flyTo([firstPoint.lat, firstPoint.lng], 14);
 
-  // Kích hoạt hiển thị biểu đồ Donut cho phường được chọn
   const wardPoints = state.rawDataList.filter(item => {
     const itemWard = (item.ward || "").toLowerCase().trim();
     const targetWard = wardName.toLowerCase().replace(/^phường\s+/i, '').replace(/^xã\s+/i, '').trim();
@@ -424,13 +434,24 @@ function renderWardDetailPopup(wardData) {
     if (pdfBtn) {
       pdfBtn.onclick = () => {
         const element = document.getElementById('wardDetailPdfContainer');
+        const scrollContainers = element.querySelectorAll('.ward-table-scroll-container');
+        scrollContainers.forEach(c => {
+          c.style.maxHeight = 'none';
+          c.style.overflow = 'visible';
+        });
+
         html2pdf().from(element).set({
-          margin: 10,
+          margin: 5,
           filename: `Bao-Cao-${wardData.Ten_Phuong}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
+          html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-        }).save();
+        }).save().then(() => {
+          scrollContainers.forEach(c => {
+            c.style.maxHeight = '';
+            c.style.overflow = 'auto';
+          });
+        });
       };
     }
 
@@ -511,8 +532,8 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     const scaleHtml = `<span style="color:${scalePct >= 100 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">Đạt ${scalePct}%</span>`;
     const countItems = node.subItems ? node.subItems.length : 0;
     
-    const rawCov = Number(wardData[`Ratio_${key === 'CV_DT' ? '1-CV' : key === 'BDX_DT' ? '2-BDX' : key === 'THPT' ? '4-TH' : key === 'YT_DT' ? '6-YT' : key === 'VH_DT' ? '7-VH' : '8-TM'}`] || 0);
-    const coveragePct = countItems > 0 ? rawCov : 0;
+    const mapCode = key === 'CV_DT' ? '1-CV' : key === 'BDX_DT' ? '2-BDX' : key === 'THPT' ? '4-TH' : key === 'YT_DT' ? '6-YT' : key === 'VH_DT' ? '7-VH' : key === 'TM_DT' ? '8-TM' : '1-CV';
+    const coveragePct = Number(wardData[`Ratio_${mapCode}`] || 0).toFixed(1);
     const coverageHtml = `<span style="color:${coveragePct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${coveragePct}%</span>`;
 
     const sectionId = 'urban_sub_' + key;
@@ -542,18 +563,16 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     urbanIdx++;
   });
 
-  // B / CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở (Bổ sung mục 5. Công viên đơn vị ở, 6. Bãi đỗ xe đơn vị ở)
+  // B / CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở
   html += `<tr style="background:rgba(74, 222, 128, 0.18); font-weight:bold;">
     <td style="text-align:center; color:var(--accent-green);">B</td>
     <td colspan="7" style="color:var(--accent-green); text-align:left; padding-left:8px;">CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở (Quy hoạch: ${totalUnits} đơn vị ở)</td>
   </tr>`;
 
   const unitKeys = [
-    { key: "3-MN", label: "Trường Mầm non", quota: 0.60, code: "3-MN" },
-    { key: "4-TH", label: "Trường Tiểu học", quota: 0.65, code: "4-TH" },
-    { key: "5-THCS", label: "Trường THCS", quota: 0.55, code: "5-THCS" },
-    { key: "CV_DV", label: "Công viên đơn vị ở", quota: 2.00, code: "1-CV" },
-    { key: "BDX_DV", label: "Bãi đỗ xe đơn vị ở", quota: 2.50, code: "2-BDX" }
+    { key: "3-MN", label: "1. Trường Mầm non", quota: 0.60, code: "3-MN" },
+    { key: "4-TH", label: "2. Trường Tiểu học", quota: 0.65, code: "4-TH" },
+    { key: "5-THCS", label: "3. Trường THCS", quota: 0.55, code: "5-THCS" }
   ];
 
   let unitIdx = 1;
@@ -565,8 +584,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     const scalePct = reqArea > 0 ? Math.min(100, Math.round((currentArea / reqArea) * 100)) : 100;
     const scaleHtml = `<span style="color:${scalePct >= 100 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">Đạt ${scalePct}%</span>`;
     
-    const rawCov = Number(wardData[`Ratio_${item.code}`] || 0);
-    const coveragePct = subItems.length > 0 ? rawCov : 0;
+    const coveragePct = Number(wardData[`Ratio_${item.code}`] || 0).toFixed(1);
     const coverageHtml = `<span style="color:${coveragePct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${coveragePct}%</span>`;
 
     const sectionId = 'unit_sub_' + item.key;
@@ -596,36 +614,55 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     unitIdx++;
   });
 
-  // Hiển thị mặc định 3 loại đất thành phần Dịch vụ công cộng đơn vị ở (Y tế, Văn hóa, Chợ - TMDV) với nút tam giác xem chi tiết
-  const dvccComponents = [
-    { key: "YT_DV", label: "✚ Y tế đơn vị ở", quota: ">= 0.20", code: "6-YT" },
-    { key: "VH_DV", label: "🎭 Văn hóa đơn vị ở", quota: ">= 1.00", code: "7-VH" },
-    { key: "TM_DV", label: "🛒 Chợ - TMDV đơn vị ở", quota: ">= 0.40", code: "8-TM" }
+  // Mục 4: Đất dịch vụ công cộng đơn vị ở (Kiểm soát chỉ tiêu diện tích tổng >= 2.0 m2/người)
+  unitIdx = 4;
+  const dvccTotalArea = (unitRes["YT_DV"]?.currentArea || 0) + (unitRes["VH_DV"]?.currentArea || 0) + (unitRes["TM_DV"]?.currentArea || 0);
+  const dvccReqArea = Math.round(2.0 * projPop);
+  const dvccScalePct = dvccReqArea > 0 ? Math.min(100, Math.round((dvccTotalArea / dvccReqArea) * 100)) : 100;
+  const dvccScaleHtml = `<span style="color:${dvccScalePct >= 100 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">Đạt ${dvccScalePct}%</span>`;
+  const dvccSubItemsCount = (unitRes["YT_DV"]?.subItems?.length || 0) + (unitRes["VH_DV"]?.subItems?.length || 0) + (unitRes["TM_DV"]?.subItems?.length || 0);
+
+  html += `<tr>
+    <td style="text-align:center; font-weight:bold;">${unitIdx}</td>
+    <td style="text-align:left; font-weight:bold; color:var(--accent-cyan);">4. Đất dịch vụ công cộng đơn vị ở</td>
+    <td style="text-align:right; font-weight:bold;">${dvccTotalArea.toLocaleString()} m²</td>
+    <td style="text-align:center;">>= 2.00</td>
+    <td style="text-align:right; color:var(--accent-cyan);">${dvccReqArea.toLocaleString()} m²</td>
+    <td style="text-align:center;">${dvccSubItemsCount} cơ sở</td>
+    <td style="text-align:center;">${dvccScaleHtml}</td>
+    <td style="text-align:center;">-</td>
+  </tr>`;
+
+  // Các mục thành phần: 4.1. Y tế đơn vị ở, 4.2. Văn hóa thể thao đơn vị ở, 4.3. Chợ - TMDV đơn vị ở (Kiểm soát số lượng >= tổng số đơn vị ở)
+  const subComponentKeys = [
+    { key: "YT_DV", label: "4.1. Y tế đơn vị ở", code: "6-YT" },
+    { key: "VH_DV", label: "4.2. Văn hóa thể thao đơn vị ở", code: "7-VH" },
+    { key: "TM_DV", label: "4.3. Chợ - TMDV đơn vị ở", code: "8-TM" }
   ];
 
-  dvccComponents.forEach(comp => {
+  subComponentKeys.forEach(comp => {
     const compNode = unitRes[comp.key];
     const compArea = compNode ? compNode.currentArea : 0;
     const compSub = compNode && compNode.subItems ? compNode.subItems : [];
-    const compReq = Math.round((comp.key === 'YT_DV' ? 0.2 : comp.key === 'VH_DV' ? 1.0 : 0.4) * projPop);
-    const compScale = compReq > 0 ? Math.min(100, Math.round((compArea / compReq) * 100)) : 0;
+    const countCheck = compSub.length >= totalUnits;
+    const countHtml = `<span style="color:${countCheck ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">${compSub.length}/${totalUnits} cơ sở</span>`;
     
-    const rawCov = Number(wardData[`Ratio_${comp.code}`] || 0);
-    const compCov = compSub.length > 0 ? rawCov : 0;
-    
+    const coveragePct = Number(wardData[`Ratio_${comp.code}`] || 0).toFixed(1);
+    const coverageHtml = `<span style="color:${coveragePct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${coveragePct}%</span>`;
+
     const subId = 'comp_sub_' + comp.key;
     const hasSubComp = compSub.length > 0;
     const compToggle = hasSubComp ? `<span id="btn_${subId}" onclick="window.toggleWardSubItems('${subId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; float:right; font-size:10px;">▼</span>` : '';
 
     html += `<tr>
-      <td style="text-align:center; font-weight:bold;">${unitIdx}</td>
-      <td style="text-align:left; font-weight:bold; padding-left:6px;">${comp.label} ${compToggle}</td>
-      <td style="text-align:right; font-weight:bold;">${compArea.toLocaleString()} m²</td>
-      <td style="text-align:center;">${comp.quota}</td>
-      <td style="text-align:right; color:var(--accent-cyan);">${compReq.toLocaleString()} m²</td>
-      <td style="text-align:center;">${compSub.length} cơ sở</td>
-      <td style="text-align:center;"><span style="color:${compScale >= 100 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">Đạt ${compScale}%</span></td>
-      <td style="text-align:center; font-weight:bold; color:var(--accent-orange);">${compCov}%</td>
+      <td style="text-align:center;">-</td>
+      <td style="text-align:left; padding-left:14px; font-weight:500;">${comp.label} ${compToggle}</td>
+      <td style="text-align:right;">${compArea.toLocaleString()} m²</td>
+      <td style="text-align:center;">-</td>
+      <td style="text-align:right;">-</td>
+      <td style="text-align:center;">${countHtml}</td>
+      <td style="text-align:center;">-</td>
+      <td style="text-align:center;">${coverageHtml}</td>
     </tr>`;
 
     html += `<tbody id="${subId}" style="display:none;">`;
@@ -634,6 +671,50 @@ function buildWardQuotaTableHtml(wardData, projPop) {
         const subLat = sub.lat || 16.4637;
         const subLng = sub.lng || 107.5905;
         html += `<tr style="color:var(--text-muted); font-size:9.5px;"><td style="text-align:center;">-</td><td colspan="7" style="text-align:left; padding-left:24px;"><a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${subLat}, ${subLng}, '${encodeURIComponent(sub.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">└ ${sub.name} (${Number(sub.size || 0).toLocaleString()} m²)</a></td></tr>`;
+      });
+    }
+    html += `</tbody>`;
+  });
+
+  // Mục 5. Công viên đơn vị ở & 6. Bãi đỗ xe đơn vị ở
+  const extraUnitKeys = [
+    { key: "CV_DV", label: "5. Công viên đơn vị ở", quota: 2.00, code: "1-CV" },
+    { key: "BDX_DV", label: "6. Bãi đỗ xe đơn vị ở", quota: 2.50, code: "2-BDX" }
+  ];
+
+  unitIdx = 5;
+  extraUnitKeys.forEach(item => {
+    const node = unitRes[item.key];
+    const currentArea = node ? node.currentArea : 0;
+    const subItems = node && node.subItems ? node.subItems : [];
+    const reqArea = Math.round(item.quota * projPop);
+    const scalePct = reqArea > 0 ? Math.min(100, Math.round((currentArea / reqArea) * 100)) : 100;
+    const scaleHtml = `<span style="color:${scalePct >= 100 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">Đạt ${scalePct}%</span>`;
+    
+    const coveragePct = Number(wardData[`Ratio_${item.code}`] || 0).toFixed(1);
+    const coverageHtml = `<span style="color:${coveragePct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${coveragePct}%</span>`;
+
+    const sectionId = 'unit_sub_' + item.key;
+    const hasSub = subItems.length > 0;
+    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; float:right; font-size:10px;">▼</span>` : '';
+
+    html += `<tr>
+      <td style="text-align:center; font-weight:bold;">${unitIdx}</td>
+      <td style="text-align:left; font-weight:bold;">${item.label} ${toggleBtn}</td>
+      <td style="text-align:right; font-weight:bold;">${currentArea.toLocaleString()} m²</td>
+      <td style="text-align:center;">>= ${item.quota}</td>
+      <td style="text-align:right; color:var(--accent-cyan);">${reqArea.toLocaleString()} m²</td>
+      <td style="text-align:center;">${subItems.length} cơ sở</td>
+      <td style="text-align:center;">${scaleHtml}</td>
+      <td style="text-align:center;">${coverageHtml}</td>
+    </tr>`;
+
+    html += `<tbody id="${sectionId}" style="display:none;">`;
+    if (hasSub) {
+      subItems.forEach(sub => {
+        const subLat = sub.lat || 16.4637;
+        const subLng = sub.lng || 107.5905;
+        html += `<tr style="color:var(--text-muted); font-size:9.5px;"><td style="text-align:center;">-</td><td colspan="7" style="text-align:left; padding-left:14px;"><a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${subLat}, ${subLng}, '${encodeURIComponent(sub.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">└ ${sub.name} (${Number(sub.size || 0).toLocaleString()} m²)</a></td></tr>`;
       });
     }
     html += `</tbody>`;
@@ -675,7 +756,6 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   return html;
 }
 
-// Khôi phục hoàn toàn tính năng click vào tên công trình để zoom và tự mở bảng thuộc tính (popup)
 window.zoomToFeatureAndMinimizeModal = function(lat, lng, encodedName) {
   const targetName = decodeURIComponent(encodedName).trim();
   
