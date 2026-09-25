@@ -281,14 +281,14 @@ export async function openWardDetailDirect(wardName) {
       <table class="ward-table">
         <thead>
           <tr>
-            <th style="width:6%; text-align:center;">STT</th>
-            <th style="width:23%;">Loại hạ tầng</th>
-            <th style="width:15%;">Hiện trạng</th>
-            <th style="width:10%;">Chỉ tiêu</th>
-            <th style="width:14%;">Nhu cầu DT</th>
-            <th style="width:10%; text-align:center;">Số lượng</th>
-            <th style="width:11%; text-align:center;">Quy mô</th>
-            <th style="width:11%; text-align:center;">Độ phủ</th>
+            <th style="width:5%; text-align:center;">STT</th>
+            <th style="width:31%;">Loại hạ tầng</th>
+            <th style="width:12%;">Hiện trạng</th>
+            <th style="width:8%;">Chỉ tiêu</th>
+            <th style="width:11%;">Nhu cầu DT</th>
+            <th style="width:9%; text-align:center;">Số lượng</th>
+            <th style="width:12%; text-align:center;">Quy mô</th>
+            <th style="width:12%; text-align:center;">Độ phủ</th>
           </tr>
         </thead>
         <tbody>
@@ -432,14 +432,14 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   let html = `<div class="ward-table-scroll-container"><table class="ward-table" style="font-size:9.5px;">
     <thead>
       <tr>
-        <th style="width:6%; text-align:center;">STT</th>
-        <th style="width:23%;">Loại hạ tầng</th>
-        <th style="width:15%;">Hiện trạng</th>
-        <th style="width:10%;">Chỉ tiêu</th>
-        <th style="width:14%;">Nhu cầu DT</th>
-        <th style="width:10%; text-align:center;">Số lượng</th>
-        <th style="width:11%; text-align:center;">Quy mô</th>
-        <th style="width:11%; text-align:center;">Độ phủ</th>
+        <th style="width:5%; text-align:center;">STT</th>
+        <th style="width:31%;">Loại hạ tầng</th>
+        <th style="width:12%;">Hiện trạng</th>
+        <th style="width:8%;">Chỉ tiêu</th>
+        <th style="width:11%;">Nhu cầu DT</th>
+        <th style="width:9%; text-align:center;">Số lượng</th>
+        <th style="width:12%; text-align:center;">Quy mô</th>
+        <th style="width:12%; text-align:center;">Độ phủ</th>
       </tr>
     </thead>
     <tbody>`;
@@ -604,7 +604,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   } else {
     html += `<tr>
       <td style="text-align:center;">-</td>
-      <td colspan="7" style="text-align:center; color:var(--text-muted); font-style:italic;">Không có cơ sở chưa sử dụng nào trên địa bàn phường.</td>
+      <td colspan="7" style="text-align:center; color:var(--text-muted); font-style:italic;">Không có cơ sở chưa sử dụng nào nằm trong ranh giới phường.</td>
     </tr>`;
   }
 
