@@ -349,23 +349,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Định vị GPS của người dùng và tự động kích hoạt kiểm tra hạ tầng tại điểm đó
   document.getElementById('btnLocateGPS')?.addEventListener('click', () => {
     if (!navigator.geolocation) {
       alert("Trình duyệt của bạn không hỗ trợ định vị GPS.");
       return;
     }
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
+        
+        // Zoom tới vị trí GPS hiện tại
         map.setView([lat, lng], 16);
+        
         L.circleMarker([lat, lng], { radius: 8, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 0.8 })
           .addTo(map)
           .bindPopup("<b>Vị trí hiện tại của bạn</b>").openPopup();
+
+        // Tự động kích hoạt gọi hàm kiểm tra thông tin/hạ tầng tại vị trí GPS này
+        if (typeof handleInspectPointClick === 'function') {
+          handleInspectPointClick(lat, lng);
+        }
       },
       () => {
         alert("Không thể lấy được vị trí GPS của bạn.");
-      }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   });
 
@@ -389,7 +400,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const wardSelector = document.getElementById('wardSelector');
     if (wardSelector) {
-      // Thêm tùy chọn thành phố viết hoa trang trọng ở đầu danh sách
       const defaultOpt = document.createElement('option');
       defaultOpt.value = "Thành phố Huế";
       defaultOpt.textContent = "THÀNH PHỐ HUẾ";
@@ -401,7 +411,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         .forEach(item => {
           const opt = document.createElement('option');
           opt.value = item.name;
-          // Chuyển toàn bộ tên phường xã trong droplist thành chữ viết hoa
           opt.textContent = item.name.toUpperCase();
           wardSelector.appendChild(opt);
         });
@@ -413,7 +422,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderGroupedPoints();
     await refreshHeatmapOnly();
 
-    // Khi đạt 100%, ẩn thanh progress bar để không bị chèn chữ, chỉ giữ lại số 100%
     if (progressBar) progressBar.style.display = "none";
     if (progressPercent) progressPercent.innerText = "100%";
   } catch (err) {
