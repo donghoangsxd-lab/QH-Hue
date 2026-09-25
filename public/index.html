@@ -16,7 +16,7 @@
   <div id="map"></div>
 
   <!-- WIDGET DONUT CHART TRONG SUỐT, GÓC TRÊN BÊN TRÁI -->
-  <div class="infra-pie-widget-transparent" id="infraPieWidget" style="display:none;">
+  <div class="infra-pie-widget-transparent" id="infraPieWidget" style="display:none; position:relative;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
       <b style="color:var(--accent-cyan); font-size:11px; text-align:center; width:100%;">📊 CƠ CẤU CÁC LOẠI ĐẤT</b>
       <span id="btnClosePie" style="cursor:pointer; font-weight:bold; color:var(--accent-red); font-size:12px; position:absolute; right:8px;">✕</span>
@@ -24,24 +24,22 @@
     <div style="height:130px; position:relative; display:flex; justify-content:center;">
       <canvas id="infraPieChart"></canvas>
     </div>
-    <div id="pieLegendDetails" style="margin-top:6px; font-size:9.5px; max-height:85px; overflow-y:auto; border-top:1px dashed var(--border-color); padding-top:4px;"></div>
+    <!-- NÚT TAM GIÁC XỔ/THU GỌN GHI CHÚ Ở GÓC DƯỚI BÊN PHẢI -->
+    <button id="btnTogglePieLegend" title="Xổ/Thu gọn chú thích" style="position:absolute; right:6px; bottom:6px; background:rgba(56,189,248,0.2); border:1px solid var(--border-color); color:var(--accent-cyan); border-radius:3px; cursor:pointer; width:18px; height:18px; font-size:9px; display:flex; align-items:center; justify-content:center; transition: transform 0.2s;">▼</button>
+    <div id="pieLegendDetails" style="margin-top:6px; font-size:9.5px; max-height:85px; overflow-y:auto; border-top:1px dashed var(--border-color); padding-top:4px; display:none;"></div>
   </div>
 
-  <!-- THANH CÔNG CỤ DỌC BÊN TRÁI -->
-  <div class="vertical-toolbar ui-panel-format">
-    <button class="ui-btn-format" id="btnZoomIn" title="Phóng to bản đồ">➕</button>
-    <button class="ui-btn-format" id="btnZoomOut" title="Thu nhỏ bản đồ">➖</button>
-    <button class="ui-btn-format" id="btnMeasureDist" title="Đo chiều dài">📏</button>
-    <button class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích">📐</button>
-    <button class="ui-btn-format" id="btnLocateGPS" title="Định vị vị trí GPS của bạn">📍</button>
-    <button class="ui-btn-format" id="btnScreenshot" title="Chụp ảnh màn hình bản đồ">📸</button>
-  </div>
-
-  <!-- NHÓM NÚT TRUNG TÂM BÊN PHẢI -->
-  <div class="middle-right-toolbar ui-panel-format">
+  <!-- THANH CÔNG CỤ DỌC BÊN PHẢI (GỘP THÀNH 8 NÚT THEO THỨ TỰ YÊU CẦU) -->
+  <div class="middle-right-toolbar ui-panel-format" style="display:flex; flex-direction:column; gap:4px;">
     <button class="ui-btn-format" id="btnAuth" title="Đăng nhập Quản trị">🔑</button>
     <button class="ui-btn-format" id="btnToggleSidebar" title="Quản lý lớp dữ liệu">⚙️</button>
     <button class="ui-btn-format" id="btnToggleAllIcons" title="Ẩn/Hiện toàn bộ icon trên bản đồ">👁️</button>
+    <button class="ui-btn-format" id="btnLocateGPS" title="Định vị vị trí GPS của bạn">📍</button>
+    <button class="ui-btn-format" id="btnScreenshot" title="Chụp ảnh màn hình bản đồ">📸</button>
+    <button class="ui-btn-format" id="btnZoomIn" title="Phóng to bản đồ">➕</button>
+    <button class="ui-btn-format" id="btnZoomOut" title="Thu nhỏ bản đồ">➖</button>
+    <button class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích">📐</button>
+    <button class="ui-btn-format" id="btnMeasureDist" title="Đo chiều dài">📏</button>
   </div>
 
   <!-- TOPBAR ĐẶT Ở GIỮA PHÍA TRÊN -->
