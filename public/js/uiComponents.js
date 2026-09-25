@@ -75,14 +75,13 @@ export function updateInfraPieChart(sourceList) {
   if (!widget) return;
   widget.style.display = 'block';
 
-  // Mặc định luôn hiển thị đầy đủ cả bảng chú giải (bỏ hoàn toàn nút ẩn/hiện)
   const legendContainer = document.getElementById('pieLegendDetails');
   if (legendContainer) {
     legendContainer.style.display = 'block';
   }
   const toggleBtn = document.getElementById('btnTogglePieLegend');
   if (toggleBtn) {
-    toggleBtn.style.display = 'none'; // Ẩn luôn nút bấm thừa nếu có
+    toggleBtn.style.display = 'none';
   }
 
   const areaTotals = {};
@@ -151,35 +150,7 @@ export function updateInfraPieChart(sourceList) {
     window.myInfraPieChartInstance.destroy();
   }
 
-  const percentageLabelPlugin = {
-    id: 'percentageLabelPlugin',
-    afterDatasetsDraw(chart) {
-      const { ctx } = chart;
-      chart.data.datasets.forEach((dataset, datasetIndex) => {
-        const meta = chart.getDatasetMeta(datasetIndex);
-        if (!meta.hidden) {
-          meta.data.forEach((element, index) => {
-            const dataVal = dataset.data[index];
-            const percentage = totalAreaSum > 0 ? ((dataVal / totalAreaSum) * 100).toFixed(1) : 0;
-            
-            if (parseFloat(percentage) > 3) {
-              const { x, y } = element.tooltipPosition();
-              ctx.save();
-              ctx.font = 'bold 10px sans-serif';
-              ctx.fillStyle = '#ffffff';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-              ctx.shadowBlur = 4;
-              ctx.fillText(`${percentage}%`, x, y);
-              ctx.restore();
-            }
-          });
-        }
-      });
-    }
-  };
-
+  // Bỏ hoàn toàn plugin vẽ text % trên chart để loại bỏ triệt để lỗi hiển thị
   window.myInfraPieChartInstance = new Chart(ctx, {
     type: 'doughnut',
     data: {
@@ -207,8 +178,7 @@ export function updateInfraPieChart(sourceList) {
         }
       },
       cutout: '60%'
-    },
-    plugins: [percentageLabelPlugin]
+    }
   });
 }
 
@@ -581,7 +551,6 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     const coveragePct = Number(wardData[`Ratio_${item.code}`] || 0).toFixed(1);
     const coverageHtml = `<span style="color:${coveragePct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${coveragePct}%</span>`;
 
-    // Hiển thị số lượng theo dạng Hiện trạng / Tổng đơn vị ở quy hoạch (Màu xanh nếu đủ, đỏ nếu thiếu)
     const countCheck = subItems.length >= totalUnits;
     const countHtml = `<span style="color:${countCheck ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">${subItems.length}/${totalUnits} cơ sở</span>`;
 
@@ -612,7 +581,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     unitIdx++;
   });
 
-  // Mục 4: Đất dịch vụ công cộng đơn vị ở (STT số 4)
+  // Mục 4: Đất dịch vụ công cộng đơn vị ở (Giữ màu trắng chuẩn, không tô xanh)
   const dvccTotalArea = (unitRes["YT_DV"]?.currentArea || 0) + (unitRes["VH_DV"]?.currentArea || 0) + (unitRes["TM_DV"]?.currentArea || 0);
   const dvccReqArea = Math.round(2.0 * projPop);
   const dvccScalePct = dvccReqArea > 0 ? Math.min(100, Math.round((dvccTotalArea / dvccReqArea) * 100)) : 100;
@@ -623,7 +592,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
   html += `<tr>
     <td style="text-align:center; font-weight:bold;">${unitIdx}</td>
-    <td style="text-align:left; font-weight:bold; color:var(--accent-cyan);">Đất dịch vụ công cộng đơn vị ở</td>
+    <td style="text-align:left; font-weight:bold; color:var(--text-main);">Đất dịch vụ công cộng đơn vị ở</td>
     <td style="text-align:right; font-weight:bold;">${dvccTotalArea.toLocaleString()} m²</td>
     <td style="text-align:center;">>= 2.00</td>
     <td style="text-align:right; color:var(--accent-cyan);">${dvccReqArea.toLocaleString()} m²</td>
@@ -632,7 +601,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     <td style="text-align:center;">-</td>
   </tr>`;
 
-  // Các mục thành phần: 4.1, 4.2, 4.3 (Tách số qua cột STT)
+  // Các mục thành phần: 4.1, 4.2, 4.3 (Đã bổ sung đầy đủ nút tam giác mở rộng cho Y tế và Bãi đỗ xe/Chợ-TMDV)
   const subComponentKeys = [
     { key: "YT_DV", label: "Y tế đơn vị ở", code: "6-YT", stt: "4.1" },
     { key: "VH_DV", label: "Văn hóa thể thao đơn vị ở", code: "7-VH", stt: "4.2" },
@@ -675,7 +644,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     html += `</tbody>`;
   });
 
-  unitIdx = 5; // Tiếp tục STT số 5 cho Công viên và Bãi đỗ xe đơn vị ở
+  unitIdx = 5;
   const extraUnitKeys = [
     { key: "CV_DV", label: "Công viên đơn vị ở", quota: 2.00, code: "1-CV" },
     { key: "BDX_DV", label: "Bãi đỗ xe đơn vị ở", quota: 2.50, code: "2-BDX" }
@@ -722,7 +691,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     unitIdx++;
   });
 
-  // C / CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG)
+  // C / CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG) - Định dạng ngắn gọn theo yêu cầu mục 4
   html += `<tr style="background:rgba(234, 179, 8, 0.18); font-weight:bold;">
     <td style="text-align:center; color:var(--accent-orange);">C</td>
     <td colspan="7" style="color:var(--accent-orange); text-align:left; padding-left:8px;">CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG)</td>
@@ -733,11 +702,17 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     csdList.forEach((csd, csdIdx) => {
       const csdLat = csd.lat || 16.4637;
       const csdLng = csd.lng || 107.5905;
+      
       let shortProposal = "Quy hoạch hạ tầng công cộng";
       if (csd.suggestions && csd.suggestions.length > 0) {
-        const topSugg = csd.suggestions.find(s => s.isTopPriority) || csd.suggestions.find(s => s.status === 'eligible');
-        if (topSugg) {
-          shortProposal = `Ưu tiên: ${topSugg.label} (Bù đắp ~${topSugg.coverageRatio}% nhu cầu)`;
+        const eligibleSugg = csd.suggestions.filter(s => s.status === 'eligible');
+        if (eligibleSugg.length > 0) {
+          const parts = eligibleSugg.slice(0, 2).map((s, idx) => {
+            const rank = idx + 1;
+            const pct = s.coverageRatio || 0;
+            return `${s.label} (Ưu tiên ${rank} - tăng ${pct}%)`;
+          });
+          shortProposal = `Đề xuất: ${parts.join('; ')}`;
         }
       }
 
@@ -745,7 +720,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
         <td style="text-align:center; font-weight:bold;">${csdIdx + 1}</td>
         <td style="text-align:left; padding-left:6px; font-weight:bold;"><a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${csdLat}, ${csdLng}, '${encodeURIComponent(csd.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">${csd.name}</a></td>
         <td style="text-align:right; font-weight:bold;">${Number(csd.size || 0).toLocaleString()} m²</td>
-        <td colspan="4" style="text-align:left; color:var(--accent-orange); font-weight:500;">💡 Đề xuất: ${shortProposal}</td>
+        <td colspan="4" style="text-align:left; color:var(--accent-orange); font-weight:500;">💡 ${shortProposal}</td>
         <td style="text-align:center; color:var(--accent-orange);">Chưa sử dụng</td>
       </tr>`;
     });
