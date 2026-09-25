@@ -597,7 +597,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     <td style="text-align:center;">${dvccCoverageHtml}</td>
   </tr>`;
 
-  // C. CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG) - THỂ HIỆN GỌN TRONG 1 HÀNG
+  // C. CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG) - THỂ HIỆN GỌN KÈM TỶ LỆ % KHẮC PHỤC NHU CẦU
   html += `<tr style="background:rgba(234, 179, 8, 0.18); font-weight:bold;">
     <td colspan="8" style="color:var(--accent-orange); text-align:left; padding-left:8px;">C / CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG)</td>
   </tr>`;
@@ -608,12 +608,11 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       const csdLat = csd.lat || csd.latitude || 16.4637;
       const csdLng = csd.lng || csd.longitude || 107.5905;
       
-      // Lấy tên đề xuất ưu tiên hàng đầu hiển thị gọn
       let shortProposal = "Quy hoạch hạ tầng công cộng";
       if (csd.suggestions && csd.suggestions.length > 0) {
         const topSugg = csd.suggestions.find(s => s.isTopPriority) || csd.suggestions.find(s => s.status === 'eligible');
         if (topSugg) {
-          shortProposal = `Ưu tiên: ${topSugg.label}`;
+          shortProposal = `Ưu tiên: ${topSugg.label} (Bù đắp ~${topSugg.coverageRatio}% nhu cầu)`;
         }
       }
 
