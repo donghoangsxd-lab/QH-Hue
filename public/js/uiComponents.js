@@ -486,9 +486,15 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     html += `<tbody id="${sectionId}" style="display:none;">`;
     if (hasSub) {
       node.subItems.forEach(sub => {
-        html += `<tr style="color:var(--text-muted); font-size:9px; background:rgba(255,255,255,0.01);">
+        const subLat = sub.lat || sub.latitude || 16.4637;
+        const subLng = sub.lng || sub.longitude || 107.5905;
+        html += `<tr style="color:var(--text-muted); font-size:9.5px; background:rgba(255,255,255,0.01);">
           <td style="text-align:center;">-</td>
-          <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);">└ ${sub.name}</td>
+          <td style="text-align:left; padding-left:14px;">
+            <a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${subLat}, ${subLng}, '${encodeURIComponent(sub.name || '')}')" style="color:var(--accent-cyan); text-decoration:none; font-weight:bold;" title="Nhấn để xem trên bản đồ">
+              └ ${sub.name}
+            </a>
+          </td>
           <td style="text-align:right; font-weight:bold;">${Number(sub.size || 0).toLocaleString()} m²</td>
           <td colspan="4" style="text-align:left;"></td>
           <td style="text-align:center; color:var(--accent-orange);">BK: ${sub.radius || 500}m</td>
@@ -544,9 +550,15 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     html += `<tbody id="${sectionId}" style="display:none;">`;
     if (hasSub) {
       node.subItems.forEach(sub => {
-        html += `<tr style="color:var(--text-muted); font-size:9px; background:rgba(255,255,255,0.01);">
+        const subLat = sub.lat || sub.latitude || 16.4637;
+        const subLng = sub.lng || sub.longitude || 107.5905;
+        html += `<tr style="color:var(--text-muted); font-size:9.5px; background:rgba(255,255,255,0.01);">
           <td style="text-align:center;">-</td>
-          <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);">└ ${sub.name}</td>
+          <td style="text-align:left; padding-left:14px;">
+            <a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${subLat}, ${subLng}, '${encodeURIComponent(sub.name || '')}')" style="color:var(--accent-cyan); text-decoration:none; font-weight:bold;" title="Nhấn để xem trên bản đồ">
+              └ ${sub.name}
+            </a>
+          </td>
           <td style="text-align:right; font-weight:bold;">${Number(sub.size || 0).toLocaleString()} m²</td>
           <td colspan="4" style="text-align:left;"></td>
           <td style="text-align:center; color:var(--accent-orange);">BK: ${sub.radius || 500}m</td>
@@ -593,9 +605,15 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   const csdList = wardData.csdItems || [];
   if (csdList.length > 0) {
     csdList.forEach((csd, csdIdx) => {
+      const csdLat = csd.lat || csd.latitude || 16.4637;
+      const csdLng = csd.lng || csd.longitude || 107.5905;
       html += `<tr style="color:var(--text-main); font-size:9.5px; background:rgba(255,255,255,0.01);">
         <td style="text-align:center; font-weight:bold;">${csdIdx + 1}</td>
-        <td style="text-align:left; padding-left:14px; color:var(--accent-cyan); font-weight:bold;">${csd.name}</td>
+        <td style="text-align:left; padding-left:14px;">
+          <a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${csdLat}, ${csdLng}, '${encodeURIComponent(csd.name || '')}')" style="color:var(--accent-cyan); text-decoration:none; font-weight:bold;" title="Nhấn để xem trên bản đồ">
+            ${csd.name}
+          </a>
+        </td>
         <td style="text-align:right; font-weight:bold;">${Number(csd.size || 0).toLocaleString()} m²</td>
         <td colspan="4" style="text-align:left; color:var(--text-muted);">Đề xuất: ${csd.proposal || 'Quy hoạch hạ tầng công cộng'}</td>
         <td style="text-align:center; color:var(--accent-orange);">Chưa sử dụng</td>
@@ -611,6 +629,51 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   html += `</tbody></table></div>`;
   return html;
 }
+
+// Hàm xử lý thu gọn modal, bay đến vị trí công trình và hiển thị thông tin chi tiết
+window.zoomToFeatureAndMinimizeModal = function(lat, lng, encodedName) {
+  const targetName = decodeURIComponent(encodedName);
+  
+  // 1. Đóng popup chi tiết phường / modal tổng
+  if (map) {
+    map.closePopup();
+  }
+  const combinedModal = document.getElementById('combinedModal');
+  if (combinedModal) {
+    combinedModal.style.display = 'none';
+  }
+
+  // 2. Zoom bản đồ đến tọa độ công trình
+  if (map) {
+    map.flyTo([lat, lng], 16, { animate: true, duration: 1.2 });
+  }
+
+  // 3. Mở popup thông tin chi tiết của công trình tương tự như click trên bản đồ
+  setTimeout(() => {
+    if (window.markerLayers && window.markerLayers.length > 0) {
+      const foundMarker = window.markerLayers.find(m => {
+        const p = m.options || m._latlng || {};
+        const mLat = m._latlng ? m._latlng.lat : (p.lat || 0);
+        const mLng = m._latlng ? m._latlng.lng : (p.lng || 0);
+        const mName = m.featureName || (m.options && m.options.title) || "";
+        return (Math.abs(mLat - lat) < 0.0001 && Math.abs(mLng - lng) < 0.0001) || (mName === targetName);
+      });
+
+      if (foundMarker) {
+        if (foundMarker.openPopup) {
+          foundMarker.openPopup();
+        } else if (map && foundMarker.getLatLng) {
+          map.openPopup(foundMarker.getPopup(), foundMarker.getLatLng());
+        }
+      } else {
+        L.popup()
+          .setLatLng([lat, lng])
+          .setContent(`<div style="font-size:11px; color:#0f172a;"><b>${targetName}</b><br/>Tọa độ: ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>`)
+          .openOn(map);
+      }
+    }
+  }, 1300);
+};
 
 function renderCombinedChart() {
   const chartEl = document.getElementById('infraChart');
