@@ -303,13 +303,10 @@ module.exports = async (req, res) => {
         const existArea = wardExistAreas[code] || 0;
         const deficitArea = reqArea - existArea;
 
-        // Logic mới: Tính tỷ lệ % nhu cầu của phường được khắc phục bởi diện tích khu đất (size)
-        // Công thức: (size / deficitArea) * 100 (nếu có thiếu hụt), hoặc dựa trên tỷ trọng đóng góp vào tổng nhu cầu reqArea
         let coverageRatio = 0;
         if (deficitArea > 0) {
           coverageRatio = Number(((size / deficitArea) * 100).toFixed(1));
         } else {
-          // Nếu đã đủ chỉ tiêu, tính tỷ lệ so với tổng nhu cầu chuẩn
           coverageRatio = reqArea > 0 ? Number(((size / reqArea) * 100).toFixed(1)) : 0;
         }
 
@@ -358,7 +355,7 @@ module.exports = async (req, res) => {
           code,
           label: constants.infraConfig[code].label,
           deficitArea: Math.max(0, deficitArea),
-          coverageRatio: coverageRatio, // Tỷ lệ % khắc phục nhu cầu
+          coverageRatio: coverageRatio,
           isWardDeficit: deficitArea > 0,
           popGained: cleanPopGained
         });
@@ -366,7 +363,6 @@ module.exports = async (req, res) => {
 
       await Promise.all(csdPromises);
 
-      // Sắp xếp theo mức độ khắc phục % nhu cầu giảm dần (ưu tiên loại hạ tầng nào mà khu đất giải quyết được tỷ trọng thiếu hụt lớn nhất)
       suggestions.sort((a, b) => {
         if (a.isWardDeficit !== b.isWardDeficit) return a.isWardDeficit ? -1 : 1;
         return b.coverageRatio - a.coverageRatio;
@@ -651,7 +647,6 @@ module.exports = async (req, res) => {
             try {
               const radiusVal = (constants.infraConfig && constants.infraConfig[c]) ? constants.infraConfig[c].radius : 500;
               
-              // Tạo các vùng buffer từ danh sách công trình hiện trạng đã được phê duyệt
               const bufferFeatures = matchingItems.map(it => {
                 const effectiveR = Number(it.radius) || Number(it.banKinh) || radiusVal;
                 return ee.Feature(ee.Geometry.Point([it.lng, it.lat]).buffer(effectiveR));
@@ -660,27 +655,28 @@ module.exports = async (req, res) => {
               const unionBuffers = ee.FeatureCollection(bufferFeatures).geometry();
               const wardGeom = f.geometry();
               
-              // Vùng giao giữa vùng phục vụ và ranh giới phường
               const servedIntersection = unionBuffers.intersection(wardGeom, 1);
               
-              // Tổng số pixel dân số của phường
-              const totalWardPopPixels = popRasterNormalized.reduceRegion({
+              const pixelStats = popRasterNormalized.reduceRegion({
                 reducer: ee.Reducer.count(),
                 geometry: wardGeom,
                 scale: 30,
                 maxPixels: 1e9
-              }).get('DanSoPixelNormalized');
+              });
 
-              // Số pixel dân số nằm trong vùng được phục vụ
-              const servedPopPixels = popRasterNormalized.reduceRegion({
+              const servedPixelStats = popRasterNormalized.reduceRegion({
                 reducer: ee.Reducer.count(),
                 geometry: servedIntersection,
                 scale: 30,
                 maxPixels: 1e9
-              }).get('DanSoPixelNormalized');
+              });
 
-              // Tính tỷ lệ % (số pixel được phủ / tổng số pixel phường)
-              // Lưu ý: Giá trị này được đánh giá qua GEE evaluate bên ngoài hoặc tính toán trực tiếp nếu đã gom cấu trúc FeatureCollection.
+              const totalPix = Number(pixelStats.get('DanSoPixelNormalized').getInfo() || 0);
+              const servedPix = Number(servedPixelStats.get('DanSoPixelNormalized').getInfo() || 0);
+
+              if (totalPix > 0) {
+                coverageVal = Number(Math.min(100, Math.max(0, (servedPix / totalPix) * 100)).toFixed(1));
+              }
             } catch (err) {
               coverageVal = 0;
             }
