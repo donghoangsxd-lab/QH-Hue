@@ -242,7 +242,6 @@ export function openCombinedModal() {
   if (mTxt) mTxt.innerText = "20%";
   if (tbody) tbody.innerHTML = "<tr><td colspan='20' style='text-align:center; padding:20px;'>🔄 Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>";
 
-  // Thêm nút xuất PDF vào header modal tổng hợp nếu chưa có
   const headerActions = combinedModal.querySelector('.modal-header > div');
   if (headerActions && !document.getElementById('btnExportCombinedPdf')) {
     const pdfBtn = document.createElement('button');
@@ -378,6 +377,14 @@ export function selectWardDetail(wardName) {
   const firstPoint = state.wardLabelsList.find(w => w.name === wardName) || { lat: 16.4637, lng: 107.5905 };
   if (map) map.flyTo([firstPoint.lat, firstPoint.lng], 14);
 
+  // Kích hoạt hiển thị biểu đồ Donut cho phường được chọn
+  const wardPoints = state.rawDataList.filter(item => {
+    const itemWard = (item.ward || "").toLowerCase().trim();
+    const targetWard = wardName.toLowerCase().replace(/^phường\s+/i, '').replace(/^xã\s+/i, '').trim();
+    return itemWard.includes(targetWard) && item.status === true;
+  });
+  updateInfraPieChart(wardPoints.length > 0 ? wardPoints : state.rawDataList);
+
   renderWardDetailPopup(wardData);
 }
 
@@ -457,7 +464,6 @@ function renderWardDetailPopup(wardData) {
         Object.keys(wardData.unitResults || {}).forEach(k => {
           wardData.unitResults[k].requiredArea = (wardData.unitResults[k].quota || 0) * newProjPop;
         });
-        wardData.dvccSummary.requiredArea = 2.0 * newProjPop;
 
         const container = document.getElementById('wardQuotaTableContainer');
         if (container) {
@@ -488,7 +494,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     </thead>
     <tbody>`;
 
-  // A / CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ (Tách nhóm A vào cột STT)
+  // A / CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ
   html += `<tr style="background:rgba(56, 189, 248, 0.18); font-weight:bold;">
     <td style="text-align:center; color:var(--accent-cyan);">A</td>
     <td colspan="7" style="color:var(--accent-cyan); text-align:left; padding-left:8px;">CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ</td>
@@ -504,7 +510,9 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     const scalePct = reqArea > 0 ? Math.min(100, Math.round((node.currentArea / reqArea) * 100)) : 100;
     const scaleHtml = `<span style="color:${scalePct >= 100 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">Đạt ${scalePct}%</span>`;
     const countItems = node.subItems ? node.subItems.length : 0;
-    const coveragePct = Number(wardData[`Ratio_${key === 'CV_DT' ? '1-CV' : key === 'BDX_DT' ? '2-BDX' : key === 'THPT' ? '4-TH' : key === 'YT_DT' ? '6-YT' : key === 'VH_DT' ? '7-VH' : '8-TM'}`] || scalePct).toFixed(1);
+    
+    const rawCov = Number(wardData[`Ratio_${key === 'CV_DT' ? '1-CV' : key === 'BDX_DT' ? '2-BDX' : key === 'THPT' ? '4-TH' : key === 'YT_DT' ? '6-YT' : key === 'VH_DT' ? '7-VH' : '8-TM'}`] || 0);
+    const coveragePct = countItems > 0 ? rawCov : 0;
     const coverageHtml = `<span style="color:${coveragePct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${coveragePct}%</span>`;
 
     const sectionId = 'urban_sub_' + key;
@@ -525,105 +533,114 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     html += `<tbody id="${sectionId}" style="display:none;">`;
     if (hasSub) {
       node.subItems.forEach(sub => {
-        html += `<tr style="color:var(--text-muted); font-size:9.5px;"><td style="text-align:center;">-</td><td colspan="7" style="text-align:left; padding-left:14px;">└ ${sub.name} (${Number(sub.size || 0).toLocaleString()} m²)</td></tr>`;
+        const subLat = sub.lat || 16.4637;
+        const subLng = sub.lng || 107.5905;
+        html += `<tr style="color:var(--text-muted); font-size:9.5px;"><td style="text-align:center;">-</td><td colspan="7" style="text-align:left; padding-left:14px;"><a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${subLat}, ${subLng}, '${encodeURIComponent(sub.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">└ ${sub.name} (${Number(sub.size || 0).toLocaleString()} m²)</a></td></tr>`;
       });
     }
     html += `</tbody>`;
     urbanIdx++;
   });
 
-  // B / CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở (Tách nhóm B vào cột STT)
+  // B / CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở (Bổ sung mục 5. Công viên đơn vị ở, 6. Bãi đỗ xe đơn vị ở)
   html += `<tr style="background:rgba(74, 222, 128, 0.18); font-weight:bold;">
     <td style="text-align:center; color:var(--accent-green);">B</td>
     <td colspan="7" style="color:var(--accent-green); text-align:left; padding-left:8px;">CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở (Quy hoạch: ${totalUnits} đơn vị ở)</td>
   </tr>`;
 
-  const unitKeys = ["3-MN", "4-TH", "5-THCS"];
-  let unitIdx = 1;
+  const unitKeys = [
+    { key: "3-MN", label: "Trường Mầm non", quota: 0.60, code: "3-MN" },
+    { key: "4-TH", label: "Trường Tiểu học", quota: 0.65, code: "4-TH" },
+    { key: "5-THCS", label: "Trường THCS", quota: 0.55, code: "5-THCS" },
+    { key: "CV_DV", label: "Công viên đơn vị ở", quota: 2.00, code: "1-CV" },
+    { key: "BDX_DV", label: "Bãi đỗ xe đơn vị ở", quota: 2.50, code: "2-BDX" }
+  ];
 
-  unitKeys.forEach(key => {
-    const node = unitRes[key];
-    if (!node) return;
-    const reqArea = Math.round(node.quota * projPop);
-    const countItems = node.subItems ? node.subItems.length : 0;
-    const countHtml = `<span style="color:${countItems >= totalUnits ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">${countItems}/${totalUnits}</span>`;
-    const scalePct = reqArea > 0 ? Math.min(100, Math.round((node.currentArea / reqArea) * 100)) : 100;
+  let unitIdx = 1;
+  unitKeys.forEach(item => {
+    const node = unitRes[item.key];
+    const currentArea = node ? node.currentArea : 0;
+    const subItems = node && node.subItems ? node.subItems : [];
+    const reqArea = Math.round(item.quota * projPop);
+    const scalePct = reqArea > 0 ? Math.min(100, Math.round((currentArea / reqArea) * 100)) : 100;
     const scaleHtml = `<span style="color:${scalePct >= 100 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">Đạt ${scalePct}%</span>`;
-    const coveragePct = Number(wardData[`Ratio_${key}`] || scalePct).toFixed(1);
+    
+    const rawCov = Number(wardData[`Ratio_${item.code}`] || 0);
+    const coveragePct = subItems.length > 0 ? rawCov : 0;
     const coverageHtml = `<span style="color:${coveragePct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${coveragePct}%</span>`;
 
-    const sectionId = 'unit_sub_' + key;
-    const hasSub = node.subItems && node.subItems.length > 0;
+    const sectionId = 'unit_sub_' + item.key;
+    const hasSub = subItems.length > 0;
     const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; float:right; font-size:10px;">▼</span>` : '';
 
     html += `<tr>
       <td style="text-align:center; font-weight:bold;">${unitIdx}</td>
-      <td style="text-align:left; font-weight:bold;">${node.label} ${toggleBtn}</td>
-      <td style="text-align:right; font-weight:bold;">${node.currentArea.toLocaleString()} m²</td>
-      <td style="text-align:center;">>= ${node.quota}</td>
+      <td style="text-align:left; font-weight:bold;">${item.label} ${toggleBtn}</td>
+      <td style="text-align:right; font-weight:bold;">${currentArea.toLocaleString()} m²</td>
+      <td style="text-align:center;">>= ${item.quota}</td>
       <td style="text-align:right; color:var(--accent-cyan);">${reqArea.toLocaleString()} m²</td>
-      <td style="text-align:center;">${countHtml}</td>
+      <td style="text-align:center;">${subItems.length} cơ sở</td>
       <td style="text-align:center;">${scaleHtml}</td>
       <td style="text-align:center;">${coverageHtml}</td>
     </tr>`;
 
     html += `<tbody id="${sectionId}" style="display:none;">`;
     if (hasSub) {
-      node.subItems.forEach(sub => {
-        html += `<tr style="color:var(--text-muted); font-size:9.5px;"><td style="text-align:center;">-</td><td colspan="7" style="text-align:left; padding-left:14px;">└ ${sub.name} (${Number(sub.size || 0).toLocaleString()} m²)</td></tr>`;
+      subItems.forEach(sub => {
+        const subLat = sub.lat || 16.4637;
+        const subLng = sub.lng || 107.5905;
+        html += `<tr style="color:var(--text-muted); font-size:9.5px;"><td style="text-align:center;">-</td><td colspan="7" style="text-align:left; padding-left:14px;"><a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${subLat}, ${subLng}, '${encodeURIComponent(sub.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">└ ${sub.name} (${Number(sub.size || 0).toLocaleString()} m²)</a></td></tr>`;
       });
     }
     html += `</tbody>`;
     unitIdx++;
   });
 
-  // Dịch vụ công cộng đơn vị ở (Gồm 3 nhóm thành phần Y tế, Văn hóa, Thương mại)
-  const dvccSubItems = [...(unitRes["YT_DV"]?.subItems || []), ...(unitRes["VH_DV"]?.subItems || []), ...(unitRes["TM_DV"]?.subItems || [])];
-  const dvccTotalArea = (unitRes["YT_DV"]?.currentArea || 0) + (unitRes["VH_DV"]?.currentArea || 0) + (unitRes["TM_DV"]?.currentArea || 0);
-  const dvccReqArea = Math.round(2.0 * projPop);
-  const dvccScalePct = dvccReqArea > 0 ? Math.min(100, Math.round((dvccTotalArea / dvccReqArea) * 100)) : 100;
-  const dvccCountHtml = `<span style="color:${dvccSubItems.length >= totalUnits ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">${dvccSubItems.length}/${totalUnits}</span>`;
-  const dvccSectionId = 'unit_sub_DVCC';
-  const dvccToggleBtn = `<span id="btn_${dvccSectionId}" onclick="window.toggleWardSubItems('${dvccSectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; float:right; font-size:10px;">▼</span>`;
-
-  html += `<tr>
-    <td style="text-align:center; font-weight:bold;">${unitIdx}</td>
-    <td style="text-align:left; font-weight:bold;">Dịch vụ công cộng đơn vị ở ${dvccToggleBtn}</td>
-    <td style="text-align:right; font-weight:bold;">${dvccTotalArea.toLocaleString()} m²</td>
-    <td style="text-align:center;">>= 2.00</td>
-    <td style="text-align:right; color:var(--accent-cyan);">${dvccReqArea.toLocaleString()} m²</td>
-    <td style="text-align:center;">${dvccCountHtml}</td>
-    <td style="text-align:center;"><span style="color:${dvccScalePct >= 100 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">Đạt ${dvccScalePct}%</span></td>
-    <td style="text-align:center; font-weight:bold; color:var(--accent-orange);">${dvccScalePct}%</td>
-  </tr>`;
-
-  // Thêm chi tiết 3 nhóm thành phần bên trong Dịch vụ công cộng đơn vị ở
-  html += `<tbody id="${dvccSectionId}" style="display:none;">`;
-  const subComponentKeys = [
-    { key: "YT_DV", label: "✚ Y tế đơn vị ở" },
-    { key: "VH_DV", label: "🎭 Văn hóa đơn vị ở" },
-    { key: "TM_DV", label: "🛒 Chợ - TMDV đơn vị ở" }
+  // Hiển thị mặc định 3 loại đất thành phần Dịch vụ công cộng đơn vị ở (Y tế, Văn hóa, Chợ - TMDV) với nút tam giác xem chi tiết
+  const dvccComponents = [
+    { key: "YT_DV", label: "✚ Y tế đơn vị ở", quota: ">= 0.20", code: "6-YT" },
+    { key: "VH_DV", label: "🎭 Văn hóa đơn vị ở", quota: ">= 1.00", code: "7-VH" },
+    { key: "TM_DV", label: "🛒 Chợ - TMDV đơn vị ở", quota: ">= 0.40", code: "8-TM" }
   ];
-  subComponentKeys.forEach(comp => {
+
+  dvccComponents.forEach(comp => {
     const compNode = unitRes[comp.key];
     const compArea = compNode ? compNode.currentArea : 0;
-    const compCount = compNode && compNode.subItems ? compNode.subItems.length : 0;
-    html += `<tr style="color:var(--accent-cyan); font-size:9.5px; background:rgba(255,255,255,0.02);">
-      <td style="text-align:center;">•</td>
-      <td style="text-align:left; padding-left:14px; font-weight:bold;">${comp.label}</td>
-      <td style="text-align:right;">${compArea.toLocaleString()} m²</td>
-      <td colspan="3" style="text-align:left; padding-left:10px;">Số lượng: ${compCount} cơ sở</td>
-      <td colspan="2"></td>
+    const compSub = compNode && compNode.subItems ? compNode.subItems : [];
+    const compReq = Math.round((comp.key === 'YT_DV' ? 0.2 : comp.key === 'VH_DV' ? 1.0 : 0.4) * projPop);
+    const compScale = compReq > 0 ? Math.min(100, Math.round((compArea / compReq) * 100)) : 0;
+    
+    const rawCov = Number(wardData[`Ratio_${comp.code}`] || 0);
+    const compCov = compSub.length > 0 ? rawCov : 0;
+    
+    const subId = 'comp_sub_' + comp.key;
+    const hasSubComp = compSub.length > 0;
+    const compToggle = hasSubComp ? `<span id="btn_${subId}" onclick="window.toggleWardSubItems('${subId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; float:right; font-size:10px;">▼</span>` : '';
+
+    html += `<tr>
+      <td style="text-align:center; font-weight:bold;">${unitIdx}</td>
+      <td style="text-align:left; font-weight:bold; padding-left:6px;">${comp.label} ${compToggle}</td>
+      <td style="text-align:right; font-weight:bold;">${compArea.toLocaleString()} m²</td>
+      <td style="text-align:center;">${comp.quota}</td>
+      <td style="text-align:right; color:var(--accent-cyan);">${compReq.toLocaleString()} m²</td>
+      <td style="text-align:center;">${compSub.length} cơ sở</td>
+      <td style="text-align:center;"><span style="color:${compScale >= 100 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">Đạt ${compScale}%</span></td>
+      <td style="text-align:center; font-weight:bold; color:var(--accent-orange);">${compCov}%</td>
     </tr>`;
-    if (compNode && compNode.subItems) {
-      compNode.subItems.forEach(sub => {
-        html += `<tr style="color:var(--text-muted); font-size:9.5px;"><td style="text-align:center;">-</td><td colspan="7" style="text-align:left; padding-left:24px;">└ ${sub.name} (${Number(sub.size || 0).toLocaleString()} m²)</td></tr>`;
+
+    html += `<tbody id="${subId}" style="display:none;">`;
+    if (hasSubComp) {
+      compSub.forEach(sub => {
+        const subLat = sub.lat || 16.4637;
+        const subLng = sub.lng || 107.5905;
+        html += `<tr style="color:var(--text-muted); font-size:9.5px;"><td style="text-align:center;">-</td><td colspan="7" style="text-align:left; padding-left:24px;"><a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${subLat}, ${subLng}, '${encodeURIComponent(sub.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">└ ${sub.name} (${Number(sub.size || 0).toLocaleString()} m²)</a></td></tr>`;
       });
     }
+    html += `</tbody>`;
+    unitIdx++;
   });
-  html += `</tbody>`;
 
-  // C / CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG) (Tách nhóm C vào cột STT)
+  // C / CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG)
   html += `<tr style="background:rgba(234, 179, 8, 0.18); font-weight:bold;">
     <td style="text-align:center; color:var(--accent-orange);">C</td>
     <td colspan="7" style="color:var(--accent-orange); text-align:left; padding-left:8px;">CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG)</td>
@@ -632,6 +649,8 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   const csdList = wardData.csdItems || [];
   if (csdList.length > 0) {
     csdList.forEach((csd, csdIdx) => {
+      const csdLat = csd.lat || 16.4637;
+      const csdLng = csd.lng || 107.5905;
       let shortProposal = "Quy hoạch hạ tầng công cộng";
       if (csd.suggestions && csd.suggestions.length > 0) {
         const topSugg = csd.suggestions.find(s => s.isTopPriority) || csd.suggestions.find(s => s.status === 'eligible');
@@ -642,7 +661,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
       html += `<tr style="color:var(--text-main); font-size:9.5px;">
         <td style="text-align:center; font-weight:bold;">${csdIdx + 1}</td>
-        <td style="text-align:left; padding-left:6px; font-weight:bold;">${csd.name}</td>
+        <td style="text-align:left; padding-left:6px; font-weight:bold;"><a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${csdLat}, ${csdLng}, '${encodeURIComponent(csd.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">${csd.name}</a></td>
         <td style="text-align:right; font-weight:bold;">${Number(csd.size || 0).toLocaleString()} m²</td>
         <td colspan="4" style="text-align:left; color:var(--accent-orange); font-weight:500;">💡 Đề xuất: ${shortProposal}</td>
         <td style="text-align:center; color:var(--accent-orange);">Chưa sử dụng</td>
@@ -655,6 +674,63 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   html += `</tbody></table></div>`;
   return html;
 }
+
+// Khôi phục hoàn toàn tính năng click vào tên công trình để zoom và tự mở bảng thuộc tính (popup)
+window.zoomToFeatureAndMinimizeModal = function(lat, lng, encodedName) {
+  const targetName = decodeURIComponent(encodedName).trim();
+  
+  if (map) {
+    map.closePopup();
+  }
+  const combinedModal = document.getElementById('combinedModal');
+  if (combinedModal) {
+    combinedModal.style.display = 'none';
+  }
+
+  if (map) {
+    map.flyTo([lat, lng], 17, { animate: true, duration: 1.2 });
+  }
+
+  setTimeout(() => {
+    let foundMarker = null;
+    const groups = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'];
+    
+    groups.forEach(gKey => {
+      import('./mapEngine.js').then(mod => {
+        const groupLayer = mod.layers?.[gKey];
+        if (groupLayer && typeof groupLayer.eachLayer === 'function') {
+          groupLayer.eachLayer(layer => {
+            if (layer instanceof L.Marker) {
+              const mLat = layer.getLatLng().lat;
+              const mLng = layer.getLatLng().lng;
+              if (Math.abs(mLat - lat) < 0.0001 && Math.abs(mLng - lng) < 0.0001) {
+                foundMarker = layer;
+              }
+            }
+          });
+        }
+      });
+    });
+
+    setTimeout(() => {
+      if (foundMarker) {
+        foundMarker.fire('click');
+      } else {
+        const matchedData = state.rawDataList.find(item => Math.abs(item.lat - lat) < 0.0001 && Math.abs(item.lng - lng) < 0.0001);
+        if (matchedData) {
+          import('./mapEngine.js').then(mod => {
+            mod.onPointClick(matchedData, null);
+          });
+        } else {
+          L.popup()
+            .setLatLng([lat, lng])
+            .setContent(`<div style="font-size:11px; color:#0f172a;"><b style="color:#0284c7;">${targetName}</b><br/>• Tọa độ: ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>`)
+            .openOn(map);
+        }
+      }
+    }, 200);
+  }, 1300);
+};
 
 function renderCombinedChart() {
   const chartEl = document.getElementById('infraChart');
