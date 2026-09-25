@@ -439,6 +439,14 @@ export function onPointClick(p, marker) {
     highlightSingleIsochrone(p.lat, p.lng, itemRadius);
   }
 
+  // Xác định cấp công trình dựa theo nhomHaTang hoặc loại hạ tầng
+  let capCongTrinh = p.nhomHaTang || "Cấp đơn vị ở";
+  if (capCongTrinh.toLowerCase().includes("đô thị") || p.type?.endsWith("-DT")) {
+    capCongTrinh = "Cấp đô thị";
+  } else {
+    capCongTrinh = "Cấp đơn vị ở";
+  }
+
   let contentHtml = `<div style="min-width:220px; font-size:11px;">`;
   contentHtml += `<b style="color:var(--accent-cyan); font-size:12px;">${p.name}</b>`;
   if (!isApproved) {
@@ -447,6 +455,7 @@ export function onPointClick(p, marker) {
   contentHtml += `<br><hr style="border-color:var(--border-color); margin:4px 0;">`;
   contentHtml += `• Loại hạ tầng: <b>${infraLabels[p.type] || p.type}</b><br>`;
   contentHtml += `• Địa bàn: <b>Phường/Xã ${p.ward}</b><br>`;
+  contentHtml += `• Cấp công trình: <b style="color:var(--accent-orange);">${capCongTrinh}</b><br>`;
   contentHtml += `• Diện tích: <b>${(p.size || 0).toLocaleString()} m²</b><br>`;
 
   if (!isCSDUnapproved) {
