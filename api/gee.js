@@ -581,14 +581,12 @@ module.exports = async (req, res) => {
           const current = node ? node.currentArea : 0;
           const required = node ? node.requiredArea : 1;
 
-          // Tính toán tỷ lệ thực tế dưới dạng số thập phân (làm tròn 1 chữ số thập phân)
+          // Tính toán tỷ lệ phần trăm thô
           const rawRatio = (current / (required || 1)) * 100;
           
-          // Độ phủ bị chặn trần tối đa 100%
+          // Cả Độ phủ và Quy mô đều bị khống chế mức trần tối đa 100%
           const coverageVal = Number(Math.min(100, Math.max(0, rawRatio)).toFixed(1));
-          
-          // Quy mô giữ nguyên giá trị thực tế (có thể vượt 100% nếu đầu tư dư dả)
-          const scaleVal = Number(Math.max(0, rawRatio).toFixed(1));
+          const scaleVal = Number(Math.min(100, Math.max(0, rawRatio)).toFixed(1));
 
           calculatedRow[`Ratio_${c}`] = coverageVal;
           calculatedRow[`Scale_${c}`] = scaleVal;
