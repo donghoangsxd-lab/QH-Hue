@@ -266,7 +266,7 @@ export async function openWardDetailDirect(wardName) {
   const firstPoint = state.wardLabelsList.find(w => w.name === wardName) || { lat: 16.4637, lng: 107.5905 };
   if (map) map.flyTo([firstPoint.lat, firstPoint.lng], 14);
 
-  const initialModalHtml = `<div class="ward-popup-card" style="min-width: 760px;">
+  const initialModalHtml = `<div class="ward-popup-card" style="min-width: 780px;">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
       <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH HẠ TẦNG QUY CHUẨN: ${wardName.toUpperCase()}</b>
       <div style="display:flex; align-items:center; gap:8px;">
@@ -281,23 +281,24 @@ export async function openWardDetailDirect(wardName) {
       <table class="ward-table">
         <thead>
           <tr>
-            <th style="width:25%;">STT / Loại hạ tầng</th>
-            <th style="width:16%;">Hiện trạng</th>
+            <th style="width:6%; text-align:center;">STT</th>
+            <th style="width:23%;">Loại hạ tầng</th>
+            <th style="width:15%;">Hiện trạng</th>
             <th style="width:10%;">Chỉ tiêu</th>
             <th style="width:14%;">Nhu cầu DT</th>
-            <th style="width:11%; text-align:center;">Số lượng</th>
-            <th style="width:12%; text-align:center;">Quy mô</th>
-            <th style="width:12%; text-align:center;">Độ phủ</th>
+            <th style="width:10%; text-align:center;">Số lượng</th>
+            <th style="width:11%; text-align:center;">Quy mô</th>
+            <th style="width:11%; text-align:center;">Độ phủ</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td colspan="7" style="text-align:center; padding:25px; color:var(--accent-orange);">⏳ Đang tổng hợp dữ liệu quy chuẩn theo QCVN 01:2026/BXD...</td></tr>
+          <tr><td colspan="8" style="text-align:center; padding:25px; color:var(--accent-orange);">⏳ Đang tổng hợp dữ liệu quy chuẩn theo QCVN 01:2026/BXD...</td></tr>
         </tbody>
       </table>
     </div>
   </div>`;
 
-  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 780 })
+  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 800 })
     .setLatLng([firstPoint.lat, firstPoint.lng])
     .setContent(initialModalHtml);
   
@@ -353,7 +354,7 @@ function renderWardDetailPopup(wardData) {
   const currentUnits = wardData.currentUnits || Math.max(1, Math.round(popCurrent / 20000));
   const projectedUnits = wardData.projectedUnits || Math.max(1, Math.round(popProjected / 20000));
 
-  let modalHtml = `<div class="ward-popup-card" style="min-width: 760px;">
+  let modalHtml = `<div class="ward-popup-card" style="min-width: 780px;">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
       <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH QUY CHUẨN QCVN 01:2026/BXD: ${wardData.Ten_Phuong.toUpperCase()}</b>
     </div>
@@ -371,7 +372,7 @@ function renderWardDetailPopup(wardData) {
   </div>`;
 
   const firstPoint = state.wardLabelsList.find(w => w.name === wardData.Ten_Phuong) || { lat: 16.4637, lng: 107.5905 };
-  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 780 })
+  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 800 })
     .setLatLng([firstPoint.lat, firstPoint.lng])
     .setContent(modalHtml);
   
@@ -384,10 +385,10 @@ function renderWardDetailPopup(wardData) {
       if (el) {
         if (el.style.display === 'none') {
           el.style.display = 'table-row-group';
-          if (btn) btn.textContent = '▲ Thu gọn';
+          if (btn) btn.textContent = '▲';
         } else {
           el.style.display = 'none';
-          if (btn) btn.textContent = '▼ Chi tiết';
+          if (btn) btn.textContent = '▼';
         }
       }
     };
@@ -431,20 +432,21 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   let html = `<div class="ward-table-scroll-container"><table class="ward-table" style="font-size:9.5px;">
     <thead>
       <tr>
-        <th style="width:25%;">STT / Loại hạ tầng</th>
-        <th style="width:16%;">Hiện trạng</th>
+        <th style="width:6%; text-align:center;">STT</th>
+        <th style="width:23%;">Loại hạ tầng</th>
+        <th style="width:15%;">Hiện trạng</th>
         <th style="width:10%;">Chỉ tiêu</th>
         <th style="width:14%;">Nhu cầu DT</th>
-        <th style="width:11%; text-align:center;">Số lượng</th>
-        <th style="width:12%; text-align:center;">Quy mô</th>
-        <th style="width:12%; text-align:center;">Độ phủ</th>
+        <th style="width:10%; text-align:center;">Số lượng</th>
+        <th style="width:11%; text-align:center;">Quy mô</th>
+        <th style="width:11%; text-align:center;">Độ phủ</th>
       </tr>
     </thead>
     <tbody>`;
 
   // A. CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ
   html += `<tr style="background:rgba(56, 189, 248, 0.18); font-weight:bold;">
-    <td colspan="7" style="color:var(--accent-cyan); text-align:left; padding-left:8px;">A / CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ</td>
+    <td colspan="8" style="color:var(--accent-cyan); text-align:left; padding-left:8px;">A / CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ</td>
   </tr>`;
 
   const urbanKeys = ["THPT", "YT_DT", "VH_DT", "TM_DT", "CV_DT", "BDX_DT"];
@@ -463,17 +465,17 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     const countItems = node.subItems ? node.subItems.length : 0;
     const countHtml = `<span style="color:var(--text-main);">${countItems} cơ sở</span>`;
 
-    const coveragePass = node.currentArea >= reqArea;
-    const coverageHtml = coveragePass 
-      ? `<span style="color:var(--accent-green);">✓ Phủ kín</span>` 
-      : `<span style="color:var(--accent-red);">✗ Chưa phủ</span>`;
+    // Tính % độ phủ thực tế dựa trên diện tích hiện tại / nhu cầu (tối đa 100%)
+    const coveragePct = Math.min(100, Math.round((node.currentArea / (reqArea || 1)) * 100));
+    const coverageHtml = `<span style="color:${coveragePct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${coveragePct}%</span>`;
 
     const sectionId = 'urban_sub_' + key;
     const hasSub = node.subItems && node.subItems.length > 0;
     const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; float:right; font-size:10px;" title="Chi tiết">▼</span>` : '';
 
     html += `<tr>
-      <td style="text-align:left; font-weight:bold;">${urbanIdx}/ ${node.label} ${toggleBtn}</td>
+      <td style="text-align:center; font-weight:bold;">${urbanIdx}</td>
+      <td style="text-align:left; font-weight:bold;">${node.label} ${toggleBtn}</td>
       <td style="text-align:right; font-weight:bold;">${node.currentArea.toLocaleString()} m²</td>
       <td style="text-align:center;">>= ${node.quota}</td>
       <td style="text-align:right; color:var(--accent-cyan);">${reqArea.toLocaleString()} m²</td>
@@ -486,8 +488,11 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     if (hasSub) {
       node.subItems.forEach(sub => {
         html += `<tr style="color:var(--text-muted); font-size:9px; background:rgba(255,255,255,0.01);">
-          <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);" colspan="2">└ ${sub.name} (${sub.size.toLocaleString()} m²)</td>
-          <td colspan="5" style="text-align:left;">BK: ${sub.radius}m | ${sub.status ? 'Đã duyệt' : 'Chờ duyệt'}</td>
+          <td style="text-align:center;">-</td>
+          <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);">└ ${sub.name}</td>
+          <td style="text-align:right;">${sub.size.toLocaleString()} m²</td>
+          <td colspan="4" style="text-align:left;"></td>
+          <td style="text-align:center; color:var(--accent-orange);">BK: ${sub.radius}m</td>
         </tr>`;
       });
     }
@@ -497,7 +502,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
   // B. CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở
   html += `<tr style="background:rgba(74, 222, 128, 0.18); font-weight:bold;">
-    <td colspan="7" style="color:var(--accent-green); text-align:left; padding-left:8px;">B / CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở (Quy hoạch: ${totalUnits} đơn vị ở)</td>
+    <td colspan="8" style="color:var(--accent-green); text-align:left; padding-left:8px;">B / CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở (Quy hoạch: ${totalUnits} đơn vị ở)</td>
   </tr>`;
 
   const unitKeys = ["3-MN", "4-TH", "5-THCS"];
@@ -519,17 +524,16 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       ? `<span style="color:var(--accent-green); font-weight:bold;">Đạt ${scalePct}%</span>` 
       : `<span style="color:var(--accent-red); font-weight:bold;">Đạt ${scalePct}%</span>`;
 
-    const coveragePass = node.currentArea >= reqArea && countItems >= totalUnits;
-    const coverageHtml = coveragePass 
-      ? `<span style="color:var(--accent-green);">✓ Phủ kín</span>` 
-      : `<span style="color:var(--accent-red);">✗ Hụt bán kính</span>`;
+    const coveragePct = Math.min(100, Math.round((node.currentArea / (reqArea || 1)) * 100));
+    const coverageHtml = `<span style="color:${coveragePct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${coveragePct}%</span>`;
 
     const sectionId = 'unit_sub_' + key;
     const hasSub = node.subItems && node.subItems.length > 0;
     const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; float:right; font-size:10px;" title="Chi tiết">▼</span>` : '';
 
     html += `<tr>
-      <td style="text-align:left; font-weight:bold;">${unitIdx}/ ${node.label} ${toggleBtn}</td>
+      <td style="text-align:center; font-weight:bold;">${unitIdx}</td>
+      <td style="text-align:left; font-weight:bold;">${node.label} ${toggleBtn}</td>
       <td style="text-align:right; font-weight:bold;">${node.currentArea.toLocaleString()} m²</td>
       <td style="text-align:center;">>= ${node.quota}</td>
       <td style="text-align:right; color:var(--accent-cyan);">${reqArea.toLocaleString()} m²</td>
@@ -542,8 +546,11 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     if (hasSub) {
       node.subItems.forEach(sub => {
         html += `<tr style="color:var(--text-muted); font-size:9px; background:rgba(255,255,255,0.01);">
-          <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);" colspan="2">└ ${sub.name} (${sub.size.toLocaleString()} m²)</td>
-          <td colspan="5" style="text-align:left;">BK: ${sub.radius}m</td>
+          <td style="text-align:center;">-</td>
+          <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);">└ ${sub.name}</td>
+          <td style="text-align:right;">${sub.size.toLocaleString()} m²</td>
+          <td colspan="4" style="text-align:left;"></td>
+          <td style="text-align:center; color:var(--accent-orange);">BK: ${sub.radius}m</td>
         </tr>`;
       });
     }
@@ -565,10 +572,12 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     ? `<span style="color:var(--accent-green); font-weight:bold;">Đạt ${dvccScalePct}%</span>` 
     : `<span style="color:var(--accent-red); font-weight:bold;">Đạt ${dvccScalePct}%</span>`;
 
-  const dvccCoverageHtml = dvccSummary.status ? `<span style="color:var(--accent-green);">✓ Phủ kín</span>` : `<span style="color:var(--accent-red);">✗ Hụt bán kính</span>`;
+  const dvccCoveragePct = Math.min(100, Math.round(((dvccSummary.totalArea || 0) / (dvccReqArea || 1)) * 100));
+  const dvccCoverageHtml = `<span style="color:${dvccCoveragePct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${dvccCoveragePct}%</span>`;
 
   html += `<tr>
-    <td style="text-align:left; font-weight:bold;">${unitIdx}/ Dịch vụ công cộng đơn vị ở</td>
+    <td style="text-align:center; font-weight:bold;">${unitIdx}</td>
+    <td style="text-align:left; font-weight:bold;">Dịch vụ công cộng đơn vị ở</td>
     <td style="text-align:right; font-weight:bold;">${(dvccSummary.totalArea || 0).toLocaleString()} m²</td>
     <td style="text-align:center;">>= 2.00</td>
     <td style="text-align:right; color:var(--accent-cyan);">${dvccReqArea.toLocaleString()} m²</td>
