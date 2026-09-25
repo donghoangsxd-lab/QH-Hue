@@ -470,7 +470,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
     const sectionId = 'urban_sub_' + key;
     const hasSub = node.subItems && node.subItems.length > 0;
-    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:4px; font-size:9px;" title="Chi tiết">▼</span>` : '';
+    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; float:right; font-size:10px;" title="Chi tiết">▼</span>` : '';
 
     html += `<tr>
       <td style="text-align:left; font-weight:bold;">${urbanIdx}/ ${node.label} ${toggleBtn}</td>
@@ -508,20 +508,17 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     if (!node) return;
     const reqArea = Math.round(node.quota * projPop);
     
-    // 1. Số lượng: Đạt khi số lượng cơ sở >= số đơn vị ở[cite: 5]
     const countItems = node.subItems ? node.subItems.length : 0;
     const isCountPass = countItems >= totalUnits;
     const countHtml = isCountPass 
       ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ${countItems}/${totalUnits}</span>` 
       : `<span style="color:var(--accent-red); font-weight:bold;">✗ ${countItems}/${totalUnits}</span>`;
 
-    // 2. Quy mô diện tích: Hiển thị tỷ lệ % cụ thể[cite: 5]
     const scalePct = reqArea > 0 ? Math.round((node.currentArea / reqArea) * 100) : 100;
     const scaleHtml = scalePct >= 100 
       ? `<span style="color:var(--accent-green); font-weight:bold;">Đạt ${scalePct}%</span>` 
       : `<span style="color:var(--accent-red); font-weight:bold;">Đạt ${scalePct}%</span>`;
 
-    // 3. Độ phủ: Phủ kín các pixel dân cư[cite: 5]
     const coveragePass = node.currentArea >= reqArea && countItems >= totalUnits;
     const coverageHtml = coveragePass 
       ? `<span style="color:var(--accent-green);">✓ Phủ kín</span>` 
@@ -529,7 +526,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
     const sectionId = 'unit_sub_' + key;
     const hasSub = node.subItems && node.subItems.length > 0;
-    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; margin-left:4px; font-size:9px;" title="Chi tiết">▼</span>` : '';
+    const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; float:right; font-size:10px;" title="Chi tiết">▼</span>` : '';
 
     html += `<tr>
       <td style="text-align:left; font-weight:bold;">${unitIdx}/ ${node.label} ${toggleBtn}</td>
