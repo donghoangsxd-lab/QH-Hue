@@ -141,6 +141,37 @@ export function updateInfraPieChart(sourceList) {
     window.myInfraPieChartInstance.destroy();
   }
 
+  // Plugin vẽ trực tiếp nhãn phần trăm (%) lên các lát cắt của biểu đồ tròn
+  const percentageLabelPlugin = {
+    id: 'percentageLabelPlugin',
+    afterDatasetsDraw(chart) {
+      const { ctx, data } = chart;
+      chart.data.datasets.forEach((dataset, datasetIndex) => {
+        const meta = chart.getDatasetMeta(datasetIndex);
+        if (!meta.hidden) {
+          meta.data.forEach((element, index) => {
+            const dataVal = dataset.data[index];
+            const percentage = totalAreaSum > 0 ? ((dataVal / totalAreaSum) * 100).toFixed(1) : 0;
+            
+            // Chỉ hiển thị nhãn phần trăm nếu lát cắt lớn hơn 3% để tránh bị chèn ép chữ
+            if (parseFloat(percentage) > 3) {
+              const { x, y } = element.tooltipPosition();
+              ctx.save();
+              ctx.font = 'bold 10px sans-serif';
+              ctx.fillStyle = '#ffffff';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+              ctx.shadowBlur = 4;
+              ctx.fillText(`${percentage}%`, x, y);
+              ctx.restore();
+            }
+          });
+        }
+      });
+    }
+  };
+
   window.myInfraPieChartInstance = new Chart(ctx, {
     type: 'doughnut',
     data: {
@@ -168,7 +199,8 @@ export function updateInfraPieChart(sourceList) {
         }
       },
       cutout: '60%'
-    }
+    },
+    plugins: [percentageLabelPlugin]
   });
 }
 
@@ -181,6 +213,22 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnClosePie')?.addEventListener('click', () => {
     hideInfraPieChart();
   });
+
+  // Xử lý sự kiện nút tam giác xổ/thu gọn phần ghi chú biểu đồ cơ cấu đất
+  const toggleBtn = document.getElementById('btnTogglePieLegend');
+  const legendContainer = document.getElementById('pieLegendDetails');
+  if (toggleBtn && legendContainer) {
+    legendContainer.style.display = 'none'; // Mặc định ẩn
+    toggleBtn.addEventListener('click', () => {
+      if (legendContainer.style.display === 'none') {
+        legendContainer.style.display = 'block';
+        toggleBtn.style.transform = 'rotate(180deg)'; // Xoay ngược mũi tên khi mở
+      } else {
+        legendContainer.style.display = 'none';
+        toggleBtn.style.transform = 'rotate(0deg)';
+      }
+    });
+  }
 });
 
 export function openCombinedModal() {
