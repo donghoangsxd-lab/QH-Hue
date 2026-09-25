@@ -564,9 +564,9 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   </tr>`;
 
   const unitKeys = [
-    { key: "3-MN", label: "1. Trường Mầm non", quota: 0.60, code: "3-MN" },
-    { key: "4-TH", label: "2. Trường Tiểu học", quota: 0.65, code: "4-TH" },
-    { key: "5-THCS", label: "3. Trường THCS", quota: 0.55, code: "5-THCS" }
+    { key: "3-MN", label: "Trường Mầm non", quota: 0.60, code: "3-MN" },
+    { key: "4-TH", label: "Trường Tiểu học", quota: 0.65, code: "4-TH" },
+    { key: "5-THCS", label: "Trường THCS", quota: 0.55, code: "5-THCS" }
   ];
 
   let unitIdx = 1;
@@ -581,6 +581,10 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     const coveragePct = Number(wardData[`Ratio_${item.code}`] || 0).toFixed(1);
     const coverageHtml = `<span style="color:${coveragePct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${coveragePct}%</span>`;
 
+    // Hiển thị số lượng theo dạng Hiện trạng / Tổng đơn vị ở quy hoạch (Màu xanh nếu đủ, đỏ nếu thiếu)
+    const countCheck = subItems.length >= totalUnits;
+    const countHtml = `<span style="color:${countCheck ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">${subItems.length}/${totalUnits} cơ sở</span>`;
+
     const sectionId = 'unit_sub_' + item.key;
     const hasSub = subItems.length > 0;
     const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; float:right; font-size:10px;">▼</span>` : '';
@@ -591,7 +595,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       <td style="text-align:right; font-weight:bold;">${currentArea.toLocaleString()} m²</td>
       <td style="text-align:center;">>= ${item.quota}</td>
       <td style="text-align:right; color:var(--accent-cyan);">${reqArea.toLocaleString()} m²</td>
-      <td style="text-align:center;">${subItems.length} cơ sở</td>
+      <td style="text-align:center;">${countHtml}</td>
       <td style="text-align:center;">${scaleHtml}</td>
       <td style="text-align:center;">${coverageHtml}</td>
     </tr>`;
@@ -608,29 +612,31 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     unitIdx++;
   });
 
-  // Mục 4: Đất dịch vụ công cộng đơn vị ở
-  unitIdx = 4;
+  // Mục 4: Đất dịch vụ công cộng đơn vị ở (STT số 4)
   const dvccTotalArea = (unitRes["YT_DV"]?.currentArea || 0) + (unitRes["VH_DV"]?.currentArea || 0) + (unitRes["TM_DV"]?.currentArea || 0);
   const dvccReqArea = Math.round(2.0 * projPop);
   const dvccScalePct = dvccReqArea > 0 ? Math.min(100, Math.round((dvccTotalArea / dvccReqArea) * 100)) : 100;
   const dvccScaleHtml = `<span style="color:${dvccScalePct >= 100 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">Đạt ${dvccScalePct}%</span>`;
   const dvccSubItemsCount = (unitRes["YT_DV"]?.subItems?.length || 0) + (unitRes["VH_DV"]?.subItems?.length || 0) + (unitRes["TM_DV"]?.subItems?.length || 0);
+  const dvccCountCheck = dvccSubItemsCount >= totalUnits;
+  const dvccCountHtml = `<span style="color:${dvccCountCheck ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">${dvccSubItemsCount}/${totalUnits} cơ sở</span>`;
 
   html += `<tr>
     <td style="text-align:center; font-weight:bold;">${unitIdx}</td>
-    <td style="text-align:left; font-weight:bold; color:var(--accent-cyan);">4. Đất dịch vụ công cộng đơn vị ở</td>
+    <td style="text-align:left; font-weight:bold; color:var(--accent-cyan);">Đất dịch vụ công cộng đơn vị ở</td>
     <td style="text-align:right; font-weight:bold;">${dvccTotalArea.toLocaleString()} m²</td>
     <td style="text-align:center;">>= 2.00</td>
     <td style="text-align:right; color:var(--accent-cyan);">${dvccReqArea.toLocaleString()} m²</td>
-    <td style="text-align:center;">${dvccSubItemsCount} cơ sở</td>
+    <td style="text-align:center;">${dvccCountHtml}</td>
     <td style="text-align:center;">${dvccScaleHtml}</td>
     <td style="text-align:center;">-</td>
   </tr>`;
 
+  // Các mục thành phần: 4.1, 4.2, 4.3 (Tách số qua cột STT)
   const subComponentKeys = [
-    { key: "YT_DV", label: "4.1. Y tế đơn vị ở", code: "6-YT" },
-    { key: "VH_DV", label: "4.2. Văn hóa thể thao đơn vị ở", code: "7-VH" },
-    { key: "TM_DV", label: "4.3. Chợ - TMDV đơn vị ở", code: "8-TM" }
+    { key: "YT_DV", label: "Y tế đơn vị ở", code: "6-YT", stt: "4.1" },
+    { key: "VH_DV", label: "Văn hóa thể thao đơn vị ở", code: "7-VH", stt: "4.2" },
+    { key: "TM_DV", label: "Chợ - TMDV đơn vị ở", code: "8-TM", stt: "4.3" }
   ];
 
   subComponentKeys.forEach(comp => {
@@ -648,7 +654,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     const compToggle = hasSubComp ? `<span id="btn_${subId}" onclick="window.toggleWardSubItems('${subId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; float:right; font-size:10px;">▼</span>` : '';
 
     html += `<tr>
-      <td style="text-align:center;">-</td>
+      <td style="text-align:center; font-weight:600; font-size:9px;">${comp.stt}</td>
       <td style="text-align:left; padding-left:14px; font-weight:500;">${comp.label} ${compToggle}</td>
       <td style="text-align:right;">${compArea.toLocaleString()} m²</td>
       <td style="text-align:center;">-</td>
@@ -669,12 +675,12 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     html += `</tbody>`;
   });
 
+  unitIdx = 5; // Tiếp tục STT số 5 cho Công viên và Bãi đỗ xe đơn vị ở
   const extraUnitKeys = [
-    { key: "CV_DV", label: "5. Công viên đơn vị ở", quota: 2.00, code: "1-CV" },
-    { key: "BDX_DV", label: "6. Bãi đỗ xe đơn vị ở", quota: 2.50, code: "2-BDX" }
+    { key: "CV_DV", label: "Công viên đơn vị ở", quota: 2.00, code: "1-CV" },
+    { key: "BDX_DV", label: "Bãi đỗ xe đơn vị ở", quota: 2.50, code: "2-BDX" }
   ];
 
-  unitIdx = 5;
   extraUnitKeys.forEach(item => {
     const node = unitRes[item.key];
     const currentArea = node ? node.currentArea : 0;
@@ -686,6 +692,9 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     const coveragePct = Number(wardData[`Ratio_${item.code}`] || 0).toFixed(1);
     const coverageHtml = `<span style="color:${coveragePct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${coveragePct}%</span>`;
 
+    const countCheck = subItems.length >= totalUnits;
+    const countHtml = `<span style="color:${countCheck ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">${subItems.length}/${totalUnits} cơ sở</span>`;
+
     const sectionId = 'unit_sub_' + item.key;
     const hasSub = subItems.length > 0;
     const toggleBtn = hasSub ? `<span id="btn_${sectionId}" onclick="window.toggleWardSubItems('${sectionId}')" style="cursor:pointer; color:var(--accent-cyan); font-weight:bold; float:right; font-size:10px;">▼</span>` : '';
@@ -696,7 +705,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       <td style="text-align:right; font-weight:bold;">${currentArea.toLocaleString()} m²</td>
       <td style="text-align:center;">>= ${item.quota}</td>
       <td style="text-align:right; color:var(--accent-cyan);">${reqArea.toLocaleString()} m²</td>
-      <td style="text-align:center;">${subItems.length} cơ sở</td>
+      <td style="text-align:center;">${countHtml}</td>
       <td style="text-align:center;">${scaleHtml}</td>
       <td style="text-align:center;">${coverageHtml}</td>
     </tr>`;
