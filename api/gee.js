@@ -303,6 +303,16 @@ module.exports = async (req, res) => {
         const existArea = wardExistAreas[code] || 0;
         const deficitArea = reqArea - existArea;
 
+        // Logic mới: Tính tỷ lệ % nhu cầu của phường được khắc phục bởi diện tích khu đất (size)
+        // Công thức: (size / deficitArea) * 100 (nếu có thiếu hụt), hoặc dựa trên tỷ trọng đóng góp vào tổng nhu cầu reqArea
+        let coverageRatio = 0;
+        if (deficitArea > 0) {
+          coverageRatio = Number(((size / deficitArea) * 100).toFixed(1));
+        } else {
+          // Nếu đã đủ chỉ tiêu, tính tỷ lệ so với tổng nhu cầu chuẩn
+          coverageRatio = reqArea > 0 ? Number(((size / reqArea) * 100).toFixed(1)) : 0;
+        }
+
         const candidateRadius = constants.infraConfig[code].radius;
         const testBuffer = ee.Geometry.Point([lng, lat]).buffer(candidateRadius);
 
@@ -348,6 +358,7 @@ module.exports = async (req, res) => {
           code,
           label: constants.infraConfig[code].label,
           deficitArea: Math.max(0, deficitArea),
+          coverageRatio: coverageRatio, // Tỷ lệ % khắc phục nhu cầu
           isWardDeficit: deficitArea > 0,
           popGained: cleanPopGained
         });
@@ -355,10 +366,10 @@ module.exports = async (req, res) => {
 
       await Promise.all(csdPromises);
 
+      // Sắp xếp theo mức độ khắc phục % nhu cầu giảm dần (ưu tiên loại hạ tầng nào mà khu đất giải quyết được tỷ trọng thiếu hụt lớn nhất)
       suggestions.sort((a, b) => {
         if (a.isWardDeficit !== b.isWardDeficit) return a.isWardDeficit ? -1 : 1;
-        if (a.isWardDeficit && b.isWardDeficit) return b.deficitArea - a.deficitArea;
-        return b.popGained - a.popGained;
+        return b.coverageRatio - a.coverageRatio;
       });
 
       if (suggestions.length > 0 && suggestions[0].isWardDeficit) {
@@ -436,7 +447,6 @@ module.exports = async (req, res) => {
         }
       });
 
-      // Kiểm tra tọa độ thực tế của điểm nằm trong polygon ranh giới phường
       rawDataList.forEach(item => {
         if (item.lat == null || item.lng == null) return;
         const ptLng = Number(item.lng);
@@ -461,7 +471,6 @@ module.exports = async (req, res) => {
             const codesToCheck = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
             
             const wardExistAreas = {};
-            // Tổng hợp hiện trạng trong phường
             rawDataList.forEach(subItem => {
               if (subItem.status && constants.cleanWardStr(subItem.ward) === constants.cleanWardStr(assignedWardName)) {
                 wardExistAreas[subItem.type] = (wardExistAreas[subItem.type] || 0) + Number(subItem.size || 0);
@@ -482,10 +491,18 @@ module.exports = async (req, res) => {
               const existArea = wardExistAreas[code] || 0;
               const deficitArea = reqArea - existArea;
 
+              let coverageRatio = 0;
+              if (deficitArea > 0) {
+                coverageRatio = Number(((csdSize / deficitArea) * 100).toFixed(1));
+              } else {
+                coverageRatio = reqArea > 0 ? Number(((csdSize / reqArea) * 100).toFixed(1)) : 0;
+              }
+
               return {
                 code,
                 label,
                 deficitArea: Math.max(0, deficitArea),
+                coverageRatio: coverageRatio,
                 isWardDeficit: deficitArea > 0,
                 status: 'eligible'
               };
@@ -495,7 +512,7 @@ module.exports = async (req, res) => {
               if (a.status === 'ineligible' && b.status !== 'ineligible') return 1;
               if (a.status !== 'ineligible' && b.status === 'ineligible') return -1;
               if (a.isWardDeficit !== b.isWardDeficit) return a.isWardDeficit ? -1 : 1;
-              return b.deficitArea - a.deficitArea;
+              return b.coverageRatio - a.coverageRatio;
             });
 
             if (evaluatedSuggestions.length > 0 && evaluatedSuggestions[0].status === 'eligible' && evaluatedSuggestions[0].isWardDeficit) {
