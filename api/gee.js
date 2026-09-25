@@ -424,7 +424,8 @@ module.exports = async (req, res) => {
           projectedPopulation: Math.round(totalPop * 1.2),
           currentUnits: Math.max(1, Math.round(totalPop / 20000)),
           projectedUnits: Math.max(1, Math.round((totalPop * 1.2) / 20000)),
-          items: []
+          items: [],
+          csdItems: []
         };
 
         if (f.geometry) {
@@ -435,6 +436,7 @@ module.exports = async (req, res) => {
         }
       });
 
+      // Kiểm tra tọa độ thực tế của điểm nằm trong polygon ranh giới phường
       rawDataList.forEach(item => {
         if (item.lat == null || item.lng == null) return;
         const ptLng = Number(item.lng);
@@ -450,7 +452,20 @@ module.exports = async (req, res) => {
         }
 
         if (assignedWardName && wardMap[assignedWardName]) {
-          wardMap[assignedWardName].items.push(item);
+          const prefix = String(item.id || '').split('-')[0];
+          const nhom = String(item.nhomHaTang || '').toLowerCase();
+          const isUnused = (prefix === "CSD" || prefix === "9" || nhom.includes("chưa sử dụng") || nhom.includes("csd") || item.status === false || item.status === 'false');
+
+          if (isUnused) {
+            wardMap[assignedWardName].csdItems.push({
+              name: item.name || item.ten || "Khu đất chưa sử dụng",
+              size: Number(item.size || item.dienTich || 0),
+              proposal: item.proposal || item.note || item.deXuat || "Quy hoạch hạ tầng công cộng",
+              status: item.status
+            });
+          } else {
+            wardMap[assignedWardName].items.push(item);
+          }
         }
       });
 
@@ -487,25 +502,10 @@ module.exports = async (req, res) => {
           };
         }
 
-        // Mảng chứa các cơ sở chưa sử dụng (quỹ đất tiềm năng) thuộc phường này
-        const csdItems = [];
-
         data.items.forEach(item => {
-          const prefix = item.id.split('-')[0];
-          
-          // Kiểm tra nếu là quỹ đất tiềm năng / cơ sở chưa sử dụng (mã 9-CSD hoặc type là 9-CSD)
-          if (prefix === "9" || item.type === "9-CSD" || !item.status) {
-            if (!item.status) {
-              csdItems.push({
-                name: item.name || "Khu đất tiềm năng",
-                size: Number(item.size || 0),
-                proposal: item.proposal || item.deXuat || "Đề xuất quy hoạch hạ tầng công cộng",
-                status: item.status
-              });
-            }
-            return;
-          }
+          if (!item.status) return;
 
+          const prefix = item.id.split('-')[0];
           const normalizedNhom = constants.cleanNhomStr(item.nhomHaTang);
           const isUrban = (normalizedNhom === "Cap Do Thi" || normalizedNhom === "Cấp đô thị" || prefix === "THPT");
 
@@ -540,25 +540,6 @@ module.exports = async (req, res) => {
           }
         });
 
-        // Tính toán tỷ lệ % độ phủ buffer thực tế cho từng loại hạ tầng của phường
-        // Dựa trên tỷ lệ số công trình/hiện trạng hoặc giả lập logic không gian buffer thực tế
-        const allKeys = [...Object.keys(urbanResults), ...Object.keys(unitResults)];
-        allKeys.forEach(k => {
-          const node = urbanResults[k] || unitResults[k];
-          if (node) {
-            const count = node.subItems ? node.subItems.length : 0;
-            // Tính toán % độ phủ dựa trên số lượng cơ sở hiện hữu so với yêu cầu hoặc diện tích đạt được
-            let covPct = 0;
-            if (count > 0) {
-              const reqArea = node.requiredArea || 1;
-              covPct = Math.min(100, Math.round((node.currentArea / reqArea) * 100));
-              // Nếu có công trình, đảm bảo độ phủ tối thiểu đạt mức tương đối dựa trên bán kính phục vụ
-              if (covPct < 15 && count > 0) covPct = Math.min(100, count * 25);
-            }
-            node.coveragePercent = covPct;
-          }
-        });
-
         const codesList = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
         let totalCoverageSum = 0;
         let totalScaleSum = 0;
@@ -572,10 +553,10 @@ module.exports = async (req, res) => {
           projectedUnits: data.projectedUnits,
           urbanResults: urbanResults,
           unitResults: unitResults,
+          csdItems: data.csdItems || [],
           dvccSummary: {
             totalArea: (unitResults["YT_DV"]?.currentArea || 0) + (unitResults["VH_DV"]?.currentArea || 0) + (unitResults["TM_DV"]?.currentArea || 0),
             requiredArea: 2.0 * projPop,
-            coveragePercent: Math.min(100, Math.round((((unitResults["YT_DV"]?.currentArea || 0) + (unitResults["VH_DV"]?.currentArea || 0) + (unitResults["TM_DV"]?.currentArea || 0)) / (2.0 * projPop || 1)) * 100)),
             status: false
           }
         };
@@ -594,10 +575,7 @@ module.exports = async (req, res) => {
           const current = node ? node.currentArea : 0;
           const required = node ? node.requiredArea : 1;
 
-          // Tính toán tỷ lệ phần trăm thô
           const rawRatio = (current / (required || 1)) * 100;
-          
-          // Cả Độ phủ và Quy mô đều bị khống chế mức trần tối đa 100%
           const coverageVal = Number(Math.min(100, Math.max(0, rawRatio)).toFixed(1));
           const scaleVal = Number(Math.min(100, Math.max(0, rawRatio)).toFixed(1));
 
