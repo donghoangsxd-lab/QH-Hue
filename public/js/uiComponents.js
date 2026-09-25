@@ -457,7 +457,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     if (!node) return;
     const reqArea = Math.round(node.quota * projPop);
     
-    const scalePct = reqArea > 0 ? Math.round((node.currentArea / reqArea) * 100) : 100;
+    const scalePct = reqArea > 0 ? Math.min(100, Math.round((node.currentArea / reqArea) * 100)) : 100;
     const scaleHtml = scalePct >= 100 
       ? `<span style="color:var(--accent-green); font-weight:bold;">Đạt ${scalePct}%</span>` 
       : `<span style="color:var(--accent-red); font-weight:bold;">Đạt ${scalePct}%</span>`;
@@ -465,7 +465,6 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     const countItems = node.subItems ? node.subItems.length : 0;
     const countHtml = `<span style="color:var(--text-main);">${countItems} cơ sở</span>`;
 
-    // Tính % độ phủ thực tế dựa trên diện tích hiện tại / nhu cầu (tối đa 100%)
     const coveragePct = Math.min(100, Math.round((node.currentArea / (reqArea || 1)) * 100));
     const coverageHtml = `<span style="color:${coveragePct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${coveragePct}%</span>`;
 
@@ -490,9 +489,9 @@ function buildWardQuotaTableHtml(wardData, projPop) {
         html += `<tr style="color:var(--text-muted); font-size:9px; background:rgba(255,255,255,0.01);">
           <td style="text-align:center;">-</td>
           <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);">└ ${sub.name}</td>
-          <td style="text-align:right;">${sub.size.toLocaleString()} m²</td>
+          <td style="text-align:right; font-weight:bold;">${Number(sub.size || 0).toLocaleString()} m²</td>
           <td colspan="4" style="text-align:left;"></td>
-          <td style="text-align:center; color:var(--accent-orange);">BK: ${sub.radius}m</td>
+          <td style="text-align:center; color:var(--accent-orange);">BK: ${sub.radius || 500}m</td>
         </tr>`;
       });
     }
@@ -519,7 +518,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       ? `<span style="color:var(--accent-green); font-weight:bold;">✓ ${countItems}/${totalUnits}</span>` 
       : `<span style="color:var(--accent-red); font-weight:bold;">✗ ${countItems}/${totalUnits}</span>`;
 
-    const scalePct = reqArea > 0 ? Math.round((node.currentArea / reqArea) * 100) : 100;
+    const scalePct = reqArea > 0 ? Math.min(100, Math.round((node.currentArea / reqArea) * 100)) : 100;
     const scaleHtml = scalePct >= 100 
       ? `<span style="color:var(--accent-green); font-weight:bold;">Đạt ${scalePct}%</span>` 
       : `<span style="color:var(--accent-red); font-weight:bold;">Đạt ${scalePct}%</span>`;
@@ -548,9 +547,9 @@ function buildWardQuotaTableHtml(wardData, projPop) {
         html += `<tr style="color:var(--text-muted); font-size:9px; background:rgba(255,255,255,0.01);">
           <td style="text-align:center;">-</td>
           <td style="text-align:left; padding-left:14px; color:var(--accent-cyan);">└ ${sub.name}</td>
-          <td style="text-align:right;">${sub.size.toLocaleString()} m²</td>
+          <td style="text-align:right; font-weight:bold;">${Number(sub.size || 0).toLocaleString()} m²</td>
           <td colspan="4" style="text-align:left;"></td>
-          <td style="text-align:center; color:var(--accent-orange);">BK: ${sub.radius}m</td>
+          <td style="text-align:center; color:var(--accent-orange);">BK: ${sub.radius || 500}m</td>
         </tr>`;
       });
     }
@@ -561,7 +560,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   // Dịch vụ công cộng đơn vị ở
   unitIdx = 4;
   const dvccReqArea = Math.round(2.0 * projPop);
-  const dvccScalePct = dvccReqArea > 0 ? Math.round(((dvccSummary.totalArea || 0) / dvccReqArea) * 100) : 100;
+  const dvccScalePct = dvccReqArea > 0 ? Math.min(100, Math.round(((dvccSummary.totalArea || 0) / dvccReqArea) * 100)) : 100;
   const dvccCountItems = (unitRes["YT_DV"]?.subItems?.length || 0) + (unitRes["VH_DV"]?.subItems?.length || 0) + (unitRes["TM_DV"]?.subItems?.length || 0);
   
   const dvccCountHtml = dvccCountItems >= totalUnits 
@@ -585,6 +584,29 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     <td style="text-align:center;">${dvccScaleHtml}</td>
     <td style="text-align:center;">${dvccCoverageHtml}</td>
   </tr>`;
+
+  // C. CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG)
+  html += `<tr style="background:rgba(234, 179, 8, 0.18); font-weight:bold;">
+    <td colspan="8" style="color:var(--accent-orange); text-align:left; padding-left:8px;">C / CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG)</td>
+  </tr>`;
+
+  const csdList = wardData.csdItems || [];
+  if (csdList.length > 0) {
+    csdList.forEach((csd, csdIdx) => {
+      html += `<tr style="color:var(--text-main); font-size:9.5px; background:rgba(255,255,255,0.01);">
+        <td style="text-align:center; font-weight:bold;">${csdIdx + 1}</td>
+        <td style="text-align:left; padding-left:14px; color:var(--accent-cyan); font-weight:bold;">${csd.name}</td>
+        <td style="text-align:right; font-weight:bold;">${Number(csd.size || 0).toLocaleString()} m²</td>
+        <td colspan="4" style="text-align:left; color:var(--text-muted);">Đề xuất: ${csd.proposal || 'Quy hoạch hạ tầng công cộng'}</td>
+        <td style="text-align:center; color:var(--accent-orange);">Chưa sử dụng</td>
+      </tr>`;
+    });
+  } else {
+    html += `<tr>
+      <td style="text-align:center;">-</td>
+      <td colspan="7" style="text-align:center; color:var(--text-muted); font-style:italic;">Không có cơ sở chưa sử dụng nào trên địa bàn phường.</td>
+    </tr>`;
+  }
 
   html += `</tbody></table></div>`;
   return html;
