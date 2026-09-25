@@ -292,25 +292,32 @@ module.exports = async (req, res) => {
       const ineligible = [];
 
       const csdPromises = codesToCheck.map(async (code) => {
-        const reqMinSize = constants.infraConfig[code].minSize;
+        const infraCfg = constants.infraConfig ? constants.infraConfig[code] : null;
+        const reqMinSize = infraCfg ? infraCfg.minSize : 0;
+        const label = infraCfg ? infraCfg.label : code;
+
+        // BƯỚC 1: Căn cứ quy mô diện tích khu đất để loại ra khỏi danh sách xem xét nếu không đáp ứng diện tích tối thiểu
         if (size < reqMinSize) {
-          ineligible.push({ code, label: constants.infraConfig[code].label, minSize: reqMinSize });
+          ineligible.push({ code, label, minSize: reqMinSize });
           return;
         }
 
         const normVal = constants.quotaConfig[code] || 0;
         const reqArea = Math.round(targetWardPop * normVal);
         const existArea = wardExistAreas[code] || 0;
-        const deficitArea = reqArea - existArea;
+        
+        const scalePct = reqArea > 0 ? (existArea / reqArea) * 100 : 100;
 
-        let coverageRatio = 0;
-        if (deficitArea > 0) {
-          coverageRatio = Number(((size / deficitArea) * 100).toFixed(1));
-        } else {
-          coverageRatio = reqArea > 0 ? Number(((size / reqArea) * 100).toFixed(1)) : 0;
+        // BƯỚC 2: Xem xét quy mô loại hạ tầng nào đã vượt quá 100% thì loại ra khỏi danh sách đề xuất
+        if (scalePct >= 100) {
+          return; 
         }
 
-        const candidateRadius = constants.infraConfig[code].radius;
+        const deficitArea = reqArea - existArea;
+        let coverageRatio = deficitArea > 0 ? Number(((size / deficitArea) * 100).toFixed(1)) : (reqArea > 0 ? Number(((size / reqArea) * 100).toFixed(1)) : 0);
+
+        // BƯỚC 3: Tính toán độ phủ thực tế qua pixel dân số bổ sung (net buffer)
+        const candidateRadius = infraCfg ? infraCfg.radius : 500;
         const testBuffer = ee.Geometry.Point([lng, lat]).buffer(candidateRadius);
 
         const existingBuffersPromises = rawDataList
@@ -353,7 +360,7 @@ module.exports = async (req, res) => {
 
         suggestions.push({
           code,
-          label: constants.infraConfig[code].label,
+          label,
           deficitArea: Math.max(0, deficitArea),
           coverageRatio: coverageRatio,
           isWardDeficit: deficitArea > 0,
@@ -363,12 +370,13 @@ module.exports = async (req, res) => {
 
       await Promise.all(csdPromises);
 
+      // Sắp xếp ưu tiên theo số lượng pixel dân số bổ sung (popGained) và tỷ lệ khắc phục thiếu hụt lớn nhất
       suggestions.sort((a, b) => {
-        if (a.isWardDeficit !== b.isWardDeficit) return a.isWardDeficit ? -1 : 1;
+        if (a.popGained !== b.popGained) return b.popGained - a.popGained;
         return b.coverageRatio - a.coverageRatio;
       });
 
-      if (suggestions.length > 0 && suggestions[0].isWardDeficit) {
+      if (suggestions.length > 0) {
         suggestions[0].isTopPriority = true;
       }
 
@@ -485,14 +493,14 @@ module.exports = async (req, res) => {
               const normVal = constants.quotaConfig ? (constants.quotaConfig[code] || 0) : 0;
               const reqArea = Math.round(wardMap[assignedWardName].Dan_So_Vector * normVal);
               const existArea = wardExistAreas[code] || 0;
-              const deficitArea = reqArea - existArea;
+              const scalePct = reqArea > 0 ? (existArea / reqArea) * 100 : 100;
 
-              let coverageRatio = 0;
-              if (deficitArea > 0) {
-                coverageRatio = Number(((csdSize / deficitArea) * 100).toFixed(1));
-              } else {
-                coverageRatio = reqArea > 0 ? Number(((csdSize / reqArea) * 100).toFixed(1)) : 0;
+              if (scalePct >= 100) {
+                return { code, label, status: 'fulfilled' };
               }
+
+              const deficitArea = reqArea - existArea;
+              let coverageRatio = deficitArea > 0 ? Number(((csdSize / deficitArea) * 100).toFixed(1)) : 0;
 
               return {
                 code,
@@ -505,13 +513,12 @@ module.exports = async (req, res) => {
             });
 
             evaluatedSuggestions.sort((a, b) => {
-              if (a.status === 'ineligible' && b.status !== 'ineligible') return 1;
-              if (a.status !== 'ineligible' && b.status === 'ineligible') return -1;
-              if (a.isWardDeficit !== b.isWardDeficit) return a.isWardDeficit ? -1 : 1;
+              if (a.status === 'ineligible' || a.status === 'fulfilled') return 1;
+              if (b.status === 'ineligible' || b.status === 'fulfilled') return -1;
               return b.coverageRatio - a.coverageRatio;
             });
 
-            if (evaluatedSuggestions.length > 0 && evaluatedSuggestions[0].status === 'eligible' && evaluatedSuggestions[0].isWardDeficit) {
+            if (evaluatedSuggestions.length > 0 && evaluatedSuggestions[0].status === 'eligible') {
               evaluatedSuggestions[0].isTopPriority = true;
             }
 
@@ -521,7 +528,7 @@ module.exports = async (req, res) => {
               lat: ptLat,
               lng: ptLng,
               radius: Number(item.radius || item.banKinh || 500),
-              suggestions: evaluatedSuggestions,
+              suggestions: evaluatedSuggestions.filter(s => s.status !== 'fulfilled'),
               status: item.status
             });
           } else {
@@ -639,7 +646,6 @@ module.exports = async (req, res) => {
           const rawScale = (current / (required || 1)) * 100;
           const scaleVal = Number(Math.min(100, Math.max(0, rawScale)).toFixed(1));
 
-          // Tính độ phủ chuẩn xác bằng tỷ lệ số pixel dân số được phủ / tổng số pixel dân số phường
           let coverageVal = 0;
           const matchingItems = (node && node.subItems) ? node.subItems.filter(it => it.status && it.lat != null && it.lng != null) : [];
 
