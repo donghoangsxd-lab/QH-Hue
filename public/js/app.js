@@ -186,6 +186,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('wardSelector')?.addEventListener('change', async (e) => {
     state.selectedWard = e.target.value || null;
+    if (state.selectedWard === "THÀNH PHỐ HUẾ") {
+      state.selectedWard = "Thành phố Huế";
+    }
 
     if (state.rawDataList.length === 0) {
       try {
@@ -273,7 +276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnSubmitNewPoint')?.addEventListener('click', () => {
     const type = document.getElementById('newType')?.value;
-    const nhomHaTang = document.getElementById('newNhomHaTang')?.value || "Cấp đơn vị ở"; // Lấy giá trị tiếng Việt có dấu
+    const nhomHaTang = document.getElementById('newNhomHaTang')?.value || "Cấp đơn vị ở";
     const name = document.getElementById('newName')?.value;
     const lat = document.getElementById('newLat')?.value;
     const lng = document.getElementById('newLng')?.value;
@@ -328,7 +331,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
   });
 
-  // Bật/tắt tất cả icon hạ tầng trên bản đồ (Nút Con mắt) + Đồng bộ checkbox trong panel
   let allIconsVisible = true;
   document.getElementById('btnToggleAllIcons')?.addEventListener('click', () => {
     allIconsVisible = !allIconsVisible;
@@ -347,7 +349,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Định vị GPS của người dùng
   document.getElementById('btnLocateGPS')?.addEventListener('click', () => {
     if (!navigator.geolocation) {
       alert("Trình duyệt của bạn không hỗ trợ định vị GPS.");
@@ -368,7 +369,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     );
   });
 
-  // Chụp ảnh màn hình
   document.getElementById('btnScreenshot')?.addEventListener('click', () => {
     window.print();
   });
@@ -389,13 +389,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const wardSelector = document.getElementById('wardSelector');
     if (wardSelector) {
+      // Thêm tùy chọn thành phố viết hoa trang trọng ở đầu danh sách
+      const defaultOpt = document.createElement('option');
+      defaultOpt.value = "Thành phố Huế";
+      defaultOpt.textContent = "THÀNH PHỐ HUẾ";
+      wardSelector.appendChild(defaultOpt);
+
       state.wardLabelsList
         .slice()
         .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
         .forEach(item => {
           const opt = document.createElement('option');
           opt.value = item.name;
-          opt.textContent = item.name;
+          // Chuyển toàn bộ tên phường xã trong droplist thành chữ viết hoa
+          opt.textContent = item.name.toUpperCase();
           wardSelector.appendChild(opt);
         });
     }
@@ -406,7 +413,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderGroupedPoints();
     await refreshHeatmapOnly();
 
-    if (progressBar) progressBar.style.width = "100%";
+    // Khi đạt 100%, ẩn thanh progress bar để không bị chèn chữ, chỉ giữ lại số 100%
+    if (progressBar) progressBar.style.display = "none";
     if (progressPercent) progressPercent.innerText = "100%";
   } catch (err) {
     console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
