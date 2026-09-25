@@ -457,10 +457,58 @@ module.exports = async (req, res) => {
           const isUnused = (prefix === "CSD" || prefix === "9" || nhom.includes("chưa sử dụng") || nhom.includes("csd") || item.status === false || item.status === 'false');
 
           if (isUnused) {
+            const csdSize = Number(item.size || item.dienTich || 0);
+            const codesToCheck = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+            
+            const wardExistAreas = {};
+            // Tổng hợp hiện trạng trong phường
+            rawDataList.forEach(subItem => {
+              if (subItem.status && constants.cleanWardStr(subItem.ward) === constants.cleanWardStr(assignedWardName)) {
+                wardExistAreas[subItem.type] = (wardExistAreas[subItem.type] || 0) + Number(subItem.size || 0);
+              }
+            });
+
+            const evaluatedSuggestions = codesToCheck.map(code => {
+              const infraCfg = constants.infraConfig ? constants.infraConfig[code] : null;
+              const reqMinSize = infraCfg ? infraCfg.minSize : 0;
+              const label = infraCfg ? infraCfg.label : code;
+              
+              if (csdSize < reqMinSize) {
+                return { code, label, status: 'ineligible' };
+              }
+
+              const normVal = constants.quotaConfig ? (constants.quotaConfig[code] || 0) : 0;
+              const reqArea = Math.round(wardMap[assignedWardName].Dan_So_Vector * normVal);
+              const existArea = wardExistAreas[code] || 0;
+              const deficitArea = reqArea - existArea;
+
+              return {
+                code,
+                label,
+                deficitArea: Math.max(0, deficitArea),
+                isWardDeficit: deficitArea > 0,
+                status: 'eligible'
+              };
+            });
+
+            evaluatedSuggestions.sort((a, b) => {
+              if (a.status === 'ineligible' && b.status !== 'ineligible') return 1;
+              if (a.status !== 'ineligible' && b.status === 'ineligible') return -1;
+              if (a.isWardDeficit !== b.isWardDeficit) return a.isWardDeficit ? -1 : 1;
+              return b.deficitArea - a.deficitArea;
+            });
+
+            if (evaluatedSuggestions.length > 0 && evaluatedSuggestions[0].status === 'eligible' && evaluatedSuggestions[0].isWardDeficit) {
+              evaluatedSuggestions[0].isTopPriority = true;
+            }
+
             wardMap[assignedWardName].csdItems.push({
               name: item.name || item.ten || "Khu đất chưa sử dụng",
-              size: Number(item.size || item.dienTich || 0),
-              proposal: item.proposal || item.note || item.deXuat || "Quy hoạch hạ tầng công cộng",
+              size: csdSize,
+              lat: ptLat,
+              lng: ptLng,
+              radius: Number(item.radius || item.banKinh || 500),
+              suggestions: evaluatedSuggestions,
               status: item.status
             });
           } else {
