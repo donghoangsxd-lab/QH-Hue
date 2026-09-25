@@ -39,7 +39,7 @@ async function getRawDataList() {
       const prefix = rawId.split('-')[0];
 
       const rawStatus = props.TrangThai;
-      const isStatusTrue = (rawStatus === true || String(rawStatus).trim().toUpperCase() === 'TRUE');
+      const isStatusTrue = (rawStatus === true || String(rawStatus).trim().toUpperCase() === 'TRUE' || String(rawStatus).trim() === '1');
 
       // Chuẩn hóa Nhóm hạ tầng thông qua hằng số constants
       const rawNhom = props.Nhom_HaTang || props.nhomHaTang;
