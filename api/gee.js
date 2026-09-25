@@ -469,7 +469,6 @@ module.exports = async (req, res) => {
             quota: cfg.quota,
             currentArea: 0,
             requiredArea: cfg.quota * projPop,
-            coveragePercent: 0, // Lưu % độ phủ buffer thực tế
             subItems: [],
             status: false
           };
@@ -483,16 +482,30 @@ module.exports = async (req, res) => {
             quota: cfg.quota || 0,
             currentArea: 0,
             requiredArea: (cfg.quota || 0) * projPop,
-            coveragePercent: 0, // Lưu % độ phủ buffer thực tế
             subItems: [],
             status: false
           };
         }
 
-        data.items.forEach(item => {
-          if (!item.status) return;
+        // Mảng chứa các cơ sở chưa sử dụng (quỹ đất tiềm năng) thuộc phường này
+        const csdItems = [];
 
+        data.items.forEach(item => {
           const prefix = item.id.split('-')[0];
+          
+          // Kiểm tra nếu là quỹ đất tiềm năng / cơ sở chưa sử dụng (mã 9-CSD hoặc type là 9-CSD)
+          if (prefix === "9" || item.type === "9-CSD" || !item.status) {
+            if (!item.status) {
+              csdItems.push({
+                name: item.name || "Khu đất tiềm năng",
+                size: Number(item.size || 0),
+                proposal: item.proposal || item.deXuat || "Đề xuất quy hoạch hạ tầng công cộng",
+                status: item.status
+              });
+            }
+            return;
+          }
+
           const normalizedNhom = constants.cleanNhomStr(item.nhomHaTang);
           const isUrban = (normalizedNhom === "Cap Do Thi" || normalizedNhom === "Cấp đô thị" || prefix === "THPT");
 
