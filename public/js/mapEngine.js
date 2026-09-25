@@ -274,7 +274,7 @@ export function renderGroupedPoints() {
   };
 
   sourceList.forEach(p => {
-    const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
+    const isApproved = (p.status === true || String(p.status).trim().toUpperCase() === 'TRUE' || String(p.status).trim() === '1');
     const targetGroup = mapGroups[p.type] || layers.c9;
     
     const categoryIcons = iconFiles[p.type] || { approved: "Park.png", pending: "Park2.png" };
@@ -340,7 +340,7 @@ export async function refreshHeatmapOnly() {
   Object.keys(bufferGroups).forEach(k => bufferGroups[k].clearLayers());
 
   const scopedList = getWardFilteredList(state.rawDataList).filter(item => {
-    const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
+    const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE' || String(item.status).trim() === '1');
     if (item.type === "9-CSD") {
       return isApproved;
     }
@@ -385,7 +385,7 @@ export async function refreshHeatmapOnly() {
 
     isoFeatures.forEach(feat => {
       const props = feat.properties || {};
-      const isApproved = (props.status === true || props.status === 'true' || props.status === 'TRUE');
+      const isApproved = (props.status === true || String(props.status).trim().toUpperCase() === 'TRUE' || String(props.status).trim() === '1');
       const targetBufferGroup = bufferGroups[props.type] || layers.b9;
       
       const typeColor = infraBorderColors[props.type] || '#38bdf8';
@@ -399,7 +399,7 @@ export async function refreshHeatmapOnly() {
 
     const approvedFeatures = isoFeatures.filter(feat => {
       const s = feat.properties && feat.properties.status;
-      return (s === true || s === 'true' || s === 'TRUE');
+      return (s === true || String(s).trim().toUpperCase() === 'TRUE' || String(s).trim() === '1');
     });
 
     const heatRes = await fetch(`/api/gee?action=getHeatmapTile&t=${Date.now()}`, {
@@ -430,7 +430,7 @@ export async function refreshHeatmapOnly() {
 }
 
 export function onPointClick(p, marker) {
-  const isApproved = (p.status === true || p.status === 'true' || p.status === 'TRUE');
+  const isApproved = (p.status === true || String(p.status).trim().toUpperCase() === 'TRUE' || String(p.status).trim() === '1');
   const isCSDUnapproved = (p.type === "9-CSD" && !isApproved);
   const overrideRad = state.globalBufferRadiusOverride;
   const itemRadius = overrideRad !== null ? overrideRad : (Number(p.radius) || Number(p.banKinh) || 500);
@@ -439,7 +439,6 @@ export function onPointClick(p, marker) {
     highlightSingleIsochrone(p.lat, p.lng, itemRadius);
   }
 
-  // Xác định cấp công trình dựa theo nhomHaTang hoặc loại hạ tầng
   let capCongTrinh = p.nhomHaTang || "Cấp đơn vị ở";
   if (capCongTrinh.toLowerCase().includes("đô thị") || p.type?.endsWith("-DT")) {
     capCongTrinh = "Cấp đô thị";
@@ -574,7 +573,7 @@ export async function handleInspectPointClick(clickLat, clickLng) {
 
   if (!isochroneFeatures || isochroneFeatures.length === 0) {
     const activeItems = state.rawDataList.filter(item => {
-      const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
+      const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE' || String(item.status).trim() === '1');
       return codes.includes(item.type) && isApproved;
     });
 
@@ -603,7 +602,7 @@ export async function handleInspectPointClick(clickLat, clickLng) {
     const props = feat.properties || {};
     const code = props.type;
     const name = props.name;
-    const isApproved = (props.status === true || props.status === 'true' || props.status === 'TRUE');
+    const isApproved = (props.status === true || String(props.status).trim().toUpperCase() === 'TRUE' || String(props.status).trim() === '1');
     
     if (codes.includes(code) && isApproved && feat.geometry) {
       try {
