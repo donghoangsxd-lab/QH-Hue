@@ -113,13 +113,14 @@ module.exports = async (req, res) => {
         const fc = ee.FeatureCollection(validFeatures.map(item => {
           const effectiveRadius = Number(item.radius) || Number(item.banKinh) || 500;
           const geom = ee.Geometry.Point([item.lng, item.lat]).buffer(effectiveRadius);
+          const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE');
           return ee.Feature(geom, {
             id: item.id || '',
             name: item.name || '',
             type: item.type || '',
             ward: item.ward || '',
             banKinh: effectiveRadius,
-            status: item.status ?? false
+            status: isApproved
           });
         }));
 
@@ -215,7 +216,7 @@ module.exports = async (req, res) => {
         const groupGeoms = features
           .filter(item => {
             const props = item.properties || item;
-            const isApproved = (props.status === true || props.status === 'true' || props.status === 'TRUE');
+            const isApproved = (props.status === true || String(props.status).trim().toUpperCase() === 'TRUE');
             return props.type === code && isApproved && item.geometry;
           })
           .map(item => {
@@ -274,15 +275,17 @@ module.exports = async (req, res) => {
 
       let targetWardPop = 0;
       wardListEvaluated.forEach(f => {
-        const wName = f.properties.tenXa || f.properties.name || '';
+        const props = f.properties || {};
+        const wName = props.tenXa || props.NAME_2 || props.name || '';
         if (constants.cleanWardStr(wName) === cleanTargetWard) {
-          targetWardPop = Number(f.properties.danSoNum || 0);
+          targetWardPop = Number(props.danSoNum || 0);
         }
       });
 
       const wardExistAreas = {};
       rawDataList.forEach(item => {
-        if (item.status && constants.cleanWardStr(item.ward) === cleanTargetWard) {
+        const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE');
+        if (isApproved && constants.cleanWardStr(item.ward) === cleanTargetWard) {
           wardExistAreas[item.type] = (wardExistAreas[item.type] || 0) + item.size;
         }
       });
@@ -296,7 +299,6 @@ module.exports = async (req, res) => {
         const reqMinSize = infraCfg ? infraCfg.minSize : 0;
         const label = infraCfg ? infraCfg.label : code;
 
-        // BƯỚC 1: Căn cứ quy mô diện tích khu đất để loại ra khỏi danh sách xem xét nếu không đáp ứng diện tích tối thiểu
         if (size < reqMinSize) {
           ineligible.push({ code, label, minSize: reqMinSize });
           return;
@@ -308,7 +310,6 @@ module.exports = async (req, res) => {
         
         const scalePct = reqArea > 0 ? (existArea / reqArea) * 100 : 100;
 
-        // BƯỚC 2: Xem xét quy mô loại hạ tầng nào đã vượt quá 100% thì loại ra khỏi danh sách đề xuất
         if (scalePct >= 100) {
           return; 
         }
@@ -316,12 +317,14 @@ module.exports = async (req, res) => {
         const deficitArea = reqArea - existArea;
         let coverageRatio = deficitArea > 0 ? Number(((size / deficitArea) * 100).toFixed(1)) : (reqArea > 0 ? Number(((size / reqArea) * 100).toFixed(1)) : 0);
 
-        // BƯỚC 3: Tính toán độ phủ thực tế qua pixel dân số bổ sung (net buffer)
         const candidateRadius = infraCfg ? infraCfg.radius : 500;
         const testBuffer = ee.Geometry.Point([lng, lat]).buffer(candidateRadius);
 
         const existingBuffersPromises = rawDataList
-          .filter(item => item.type === code && item.status)
+          .filter(item => {
+            const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE');
+            return item.type === code && isApproved;
+          })
           .map(async (item) => {
             const r = Number(item.radius) || Number(item.banKinh) || candidateRadius;
             return ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(r));
@@ -370,7 +373,6 @@ module.exports = async (req, res) => {
 
       await Promise.all(csdPromises);
 
-      // Sắp xếp ưu tiên theo số lượng pixel dân số bổ sung (popGained) và tỷ lệ khắc phục thiếu hụt lớn nhất
       suggestions.sort((a, b) => {
         if (a.popGained !== b.popGained) return b.popGained - a.popGained;
         return b.coverageRatio - a.coverageRatio;
@@ -468,15 +470,17 @@ module.exports = async (req, res) => {
         if (assignedWardName && wardMap[assignedWardName]) {
           const prefix = String(item.id || '').split('-')[0];
           const nhom = String(item.nhomHaTang || '').toLowerCase();
-          const isUnused = (prefix === "CSD" || prefix === "9" || nhom.includes("chưa sử dụng") || nhom.includes("csd") || item.status === false || item.status === 'false');
+          const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE');
+          const isUnused = (prefix === "CSD" || prefix === "9" || nhom.includes("chưa sử dụng") || nhom.includes("csd") || !isApproved);
 
-          if (isUnused) {
+          if (isUnused && !isApproved) {
             const csdSize = Number(item.size || item.dienTich || 0);
             const codesToCheck = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
             
             const wardExistAreas = {};
             rawDataList.forEach(subItem => {
-              if (subItem.status && constants.cleanWardStr(subItem.ward) === constants.cleanWardStr(assignedWardName)) {
+              const subApproved = (subItem.status === true || String(subItem.status).trim().toUpperCase() === 'TRUE');
+              if (subApproved && constants.cleanWardStr(subItem.ward) === constants.cleanWardStr(assignedWardName)) {
                 wardExistAreas[subItem.type] = (wardExistAreas[subItem.type] || 0) + Number(subItem.size || 0);
               }
             });
@@ -531,7 +535,7 @@ module.exports = async (req, res) => {
               suggestions: evaluatedSuggestions.filter(s => s.status !== 'fulfilled'),
               status: item.status
             });
-          } else {
+          } else if (isApproved) {
             wardMap[assignedWardName].items.push(item);
           }
         }
@@ -571,7 +575,8 @@ module.exports = async (req, res) => {
         }
 
         data.items.forEach(item => {
-          if (!item.status) return;
+          const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE');
+          if (!isApproved) return;
 
           const prefix = item.id.split('-')[0];
           const normalizedNhom = constants.cleanNhomStr(item.nhomHaTang);
@@ -646,7 +651,10 @@ module.exports = async (req, res) => {
           const scaleVal = Number(Math.min(100, Math.max(0, rawScale)).toFixed(1));
 
           let coverageVal = 0;
-          const matchingItems = (node && node.subItems) ? node.subItems.filter(it => it.status && it.lat != null && it.lng != null) : [];
+          const matchingItems = (node && node.subItems) ? node.subItems.filter(it => {
+            const isApproved = (it.status === true || String(it.status).trim().toUpperCase() === 'TRUE');
+            return isApproved && it.lat != null && it.lng != null;
+          }) : [];
 
           if (matchingItems.length > 0 && popRasterNormalized) {
             try {
@@ -660,7 +668,6 @@ module.exports = async (req, res) => {
               const wardGeom = f.geometry();
               const servedIntersection = unionBuffers.intersection(wardGeom, 1);
 
-              // Gom chung yêu cầu tính toán pixel GEE thành một dictionary để gọi evaluate an toàn
               const dictToEval = ee.Dictionary({
                 totalPix: popRasterNormalized.reduceRegion({ reducer: ee.Reducer.count(), geometry: wardGeom, scale: 30, maxPixels: 1e9 }).get('DanSoPixelNormalized'),
                 servedPix: popRasterNormalized.reduceRegion({ reducer: ee.Reducer.count(), geometry: servedIntersection, scale: 30, maxPixels: 1e9 }).get('DanSoPixelNormalized')
@@ -719,7 +726,8 @@ module.exports = async (req, res) => {
         matchedWard.evaluate((feature) => {
           let wardName = "Thuận Hóa";
           if (feature && feature.properties) {
-            wardName = feature.properties.tenXa || feature.properties.NAME_2 || feature.properties.name || "Thuận Hóa";
+            const props = feature.properties;
+            wardName = props.tenXa || props.NAME_2 || props.name || "Thuận Hóa";
           }
           resolve(wardName);
         });
