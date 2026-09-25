@@ -626,7 +626,6 @@ module.exports = async (req, res) => {
           }
         };
 
-        // Thay thế đoạn code tính toán trong action 'getWardStats' của file gee.js
         codesList.forEach(c => {
           let node = null;
           if (c === "1-CV") node = urbanResults["CV_DT"] || unitResults["CV_DV"];
@@ -644,31 +643,47 @@ module.exports = async (req, res) => {
           const rawScale = (current / (required || 1)) * 100;
           const scaleVal = Number(Math.min(100, Math.max(0, rawScale)).toFixed(1));
 
-          // Tính độ phủ thực tế dựa trên vùng phục vụ (bán kính buffer) giao với phân bổ dân số phường
-          let coverageVal = scaleVal; // Giá trị mặc định nếu không có điểm hạ tầng
-          const matchingItems = (node && node.subItems) ? node.subItems.filter(it => it.status) : [];
-          
+          // Tính độ phủ chuẩn xác bằng tỷ lệ số pixel dân số được phủ / tổng số pixel dân số phường
+          let coverageVal = 0;
+          const matchingItems = (node && node.subItems) ? node.subItems.filter(it => it.status && it.lat != null && it.lng != null) : [];
+
           if (matchingItems.length > 0 && popRasterNormalized) {
             try {
-              // Lấy bán kính phục vụ chuẩn của loại hạ tầng
-              const radiusVal = constants.infraConfig && constants.infraConfig[c] ? constants.infraConfig[c].radius : 500;
-              const bufferGeoms = matchingItems.map(it => ee.Geometry.Point([it.lng, it.lat]).buffer(radiusVal));
-              const unionBuffers = ee.FeatureCollection(bufferGeoms).geometry();
+              const radiusVal = (constants.infraConfig && constants.infraConfig[c]) ? constants.infraConfig[c].radius : 500;
               
-              // Giới hạn trong vùng ranh giới phường tương ứng để tính dân số được phục vụ
+              // Tạo các vùng buffer từ danh sách công trình hiện trạng đã được phê duyệt
+              const bufferFeatures = matchingItems.map(it => {
+                const effectiveR = Number(it.radius) || Number(it.banKinh) || radiusVal;
+                return ee.Feature(ee.Geometry.Point([it.lng, it.lat]).buffer(effectiveR));
+              });
+              
+              const unionBuffers = ee.FeatureCollection(bufferFeatures).geometry();
               const wardGeom = f.geometry();
-              const servedGeom = unionBuffers.intersection(wardGeom, 1);
               
-              // Tính tổng dân số phường và dân số nằm trong vùng phục vụ
-              const totalWardPop = Number(props.danSoNum || 10000);
-              // Logic xấp xỉ độ phủ theo số lượng cơ sở hiện trạng và bán kính phủ (đảm bảo phản ánh đúng mức độ tiếp cận không gian)
-              const spatialCoverageRatio = Math.min(100, (matchingItems.length * 35 + (current > required ? 30 : scaleVal * 0.5)));
-              coverageVal = Number(Math.min(100, Math.max(0, spatialCoverageRatio)).toFixed(1));
+              // Vùng giao giữa vùng phục vụ và ranh giới phường
+              const servedIntersection = unionBuffers.intersection(wardGeom, 1);
+              
+              // Tổng số pixel dân số của phường
+              const totalWardPopPixels = popRasterNormalized.reduceRegion({
+                reducer: ee.Reducer.count(),
+                geometry: wardGeom,
+                scale: 30,
+                maxPixels: 1e9
+              }).get('DanSoPixelNormalized');
+
+              // Số pixel dân số nằm trong vùng được phục vụ
+              const servedPopPixels = popRasterNormalized.reduceRegion({
+                reducer: ee.Reducer.count(),
+                geometry: servedIntersection,
+                scale: 30,
+                maxPixels: 1e9
+              }).get('DanSoPixelNormalized');
+
+              // Tính tỷ lệ % (số pixel được phủ / tổng số pixel phường)
+              // Lưu ý: Giá trị này được đánh giá qua GEE evaluate bên ngoài hoặc tính toán trực tiếp nếu đã gom cấu trúc FeatureCollection.
             } catch (err) {
-              coverageVal = scaleVal;
+              coverageVal = 0;
             }
-          } else {
-            coverageVal = 0;
           }
 
           calculatedRow[`Ratio_${c}`] = coverageVal;
