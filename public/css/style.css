@@ -13,7 +13,7 @@
 }
 
 body, html { 
-  margin: 0; padding: 0; height: 100%; 
+  margin: 0; padding: 0; height: 100vh; 
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
   background: #0f172a; color: var(--text-main); 
   touch-action: manipulation; overflow: hidden;
@@ -35,29 +35,11 @@ body, html {
   border: 1px solid var(--border-color);
   border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  height: auto !important;
+  min-height: 150px;
 }
 
-/* THANH CÔNG CỤ DỌC BÊN TRÁI */
-.vertical-toolbar {
-  position: absolute;
-  top: 220px;
-  left: 16px;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px;
-  width: 42px;
-}
-.vertical-toolbar .ui-btn-format {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  font-size: 13px;
-  justify-content: center;
-}
-
-/* CỤM NÚT TRUNG TÂM BÊN PHẢI */
+/* CỤM NÚT TRUNG TÂM BÊN PHẢI (GỘP ĐỦ 8 NÚT) */
 .middle-right-toolbar {
   position: absolute;
   top: 220px;
@@ -213,6 +195,16 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
 
 .chart-container { height: 25%; margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 6px; }
 
+/* BỎ HẲN THANH TRƯỢT VÀ HIỂN THỊ ĐỦ TOÀN BỘ PHẦN CHÚ THÍCH BIỂU ĐỒ TRÒN */
+#pieLegendDetails {
+  margin-top: 6px;
+  font-size: 9.5px;
+  max-height: none !important;
+  overflow-y: visible !important;
+  border-top: 1px dashed var(--border-color);
+  padding-top: 4px;
+}
+
 .leaflet-popup-content-wrapper { background: var(--bg-card) !important; color: var(--text-main) !important; border: 1px solid var(--border-color); border-radius: 10px !important; }
 .leaflet-popup-tip { background: var(--bg-card) !important; }
 
@@ -276,15 +268,8 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
     height: 95px !important;
   }
 
-  /* Thu nhỏ và dịch chuyển thanh công cụ dọc */
-  .vertical-toolbar, div.leaflet-control-zoom {
-    left: 4px !important;
-    top: 170px !important;
-    transform: scale(0.9);
-    transform-origin: top left;
-  }
   .middle-right-toolbar { 
-    top: 215px; 
+    top: 170px; 
     right: 12px; 
   }
 
