@@ -439,20 +439,23 @@ export function onPointClick(p, marker) {
     highlightSingleIsochrone(p.lat, p.lng, itemRadius);
   }
 
-  let capCongTrinh = p.nhomHaTang || "Cấp đơn vị ở";
-  if (capCongTrinh.toLowerCase().includes("đô thị") || p.type?.endsWith("-DT")) {
-    capCongTrinh = "Cấp đô thị";
-  } else {
-    capCongTrinh = "Cấp đơn vị ở";
-  }
+  // Lấy trực tiếp giá trị cấp công trình từ dữ liệu cột D truyền vào (nhomHaTang)
+  let capCongTrinh = p.nhomHaTang || p.capCongTrinh || "Cấp đơn vị ở";
 
   let contentHtml = `<div style="min-width:220px; font-size:11px;">`;
   contentHtml += `<b style="color:var(--accent-cyan); font-size:12px;">${p.name}</b>`;
   if (!isApproved) {
     contentHtml += `<span class="badge-pending">Chờ duyệt</span>`;
   }
+  
+  // Thay thế dấu cộng màu trắng thành màu đỏ nếu có ký tự "+" trong tên nhãn hạ tầng
+  let rawLabel = infraLabels[p.type] || p.type;
+  if (rawLabel.includes("+")) {
+    rawLabel = rawLabel.replace("+", `<span style="color:var(--accent-red); font-weight:bold;">+</span>`);
+  }
+
   contentHtml += `<br><hr style="border-color:var(--border-color); margin:4px 0;">`;
-  contentHtml += `• Loại hạ tầng: <b>${infraLabels[p.type] || p.type}</b><br>`;
+  contentHtml += `• Loại hạ tầng: <b>${rawLabel}</b><br>`;
   contentHtml += `• Địa bàn: <b>Phường/Xã ${p.ward}</b><br>`;
   contentHtml += `• Cấp công trình: <b style="color:var(--accent-orange);">${capCongTrinh}</b><br>`;
   contentHtml += `• Diện tích: <b>${(p.size || 0).toLocaleString()} m²</b><br>`;
