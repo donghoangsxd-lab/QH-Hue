@@ -630,11 +630,11 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   return html;
 }
 
-// Hàm xử lý thu gọn modal, bay đến vị trí công trình và hiển thị thông tin chi tiết
+// Hàm xử lý thu gọn modal, bay đến vị trí công trình và mô phỏng click trực tiếp vào marker để hiện popup thông tin
 window.zoomToFeatureAndMinimizeModal = function(lat, lng, encodedName) {
-  const targetName = decodeURIComponent(encodedName);
+  const targetName = decodeURIComponent(encodedName).trim();
   
-  // 1. Đóng popup chi tiết phường / modal tổng
+  // 1. Đóng bảng thống kê chi tiết phường và modal tổng
   if (map) {
     map.closePopup();
   }
@@ -643,34 +643,44 @@ window.zoomToFeatureAndMinimizeModal = function(lat, lng, encodedName) {
     combinedModal.style.display = 'none';
   }
 
-  // 2. Zoom bản đồ đến tọa độ công trình
+  // 2. Zoom bản đồ mượt mà đến tọa độ công trình
   if (map) {
     map.flyTo([lat, lng], 16, { animate: true, duration: 1.2 });
   }
 
-  // 3. Mở popup thông tin chi tiết của công trình tương tự như click trên bản đồ
+  // 3. Tìm marker trên bản đồ khớp với tọa độ/tên và kích hoạt sự kiện click (hiện popup + vòng isochrone)
   setTimeout(() => {
-    if (window.markerLayers && window.markerLayers.length > 0) {
-      const foundMarker = window.markerLayers.find(m => {
-        const p = m.options || m._latlng || {};
-        const mLat = m._latlng ? m._latlng.lat : (p.lat || 0);
-        const mLng = m._latlng ? m._latlng.lng : (p.lng || 0);
-        const mName = m.featureName || (m.options && m.options.title) || "";
-        return (Math.abs(mLat - lat) < 0.0001 && Math.abs(mLng - lng) < 0.0001) || (mName === targetName);
-      });
+    let targetMarker = null;
 
-      if (foundMarker) {
-        if (foundMarker.openPopup) {
-          foundMarker.openPopup();
-        } else if (map && foundMarker.getLatLng) {
-          map.openPopup(foundMarker.getPopup(), foundMarker.getLatLng());
-        }
-      } else {
-        L.popup()
-          .setLatLng([lat, lng])
-          .setContent(`<div style="font-size:11px; color:#0f172a;"><b>${targetName}</b><br/>Tọa độ: ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>`)
-          .openOn(map);
+    if (window.markerLayers && window.markerLayers.length > 0) {
+      targetMarker = window.markerLayers.find(m => {
+        const mLat = m._latlng ? m._latlng.lat : (m.options?.lat || 0);
+        const mLng = m._latlng ? m._latlng.lng : (m.options?.lng || 0);
+        const mName = (m.featureName || m.options?.title || m.options?.name || "").trim();
+
+        const matchCoords = (Math.abs(mLat - lat) < 0.0001 && Math.abs(mLng - lng) < 0.0001);
+        const matchName = (mName && targetName && mName.toLowerCase() === targetName.toLowerCase());
+
+        return matchCoords || matchName;
+      });
+    }
+
+    if (targetMarker) {
+      // Nếu tìm thấy marker thực tế, gọi đúng sự kiện click trên bản đồ của ứng dụng
+      if (typeof targetMarker.fire === 'function') {
+        targetMarker.fire('click');
+      } else if (typeof targetMarker.openPopup === 'function') {
+        targetMarker.openPopup();
       }
+    } else {
+      // Fallback an toàn nếu không tìm thấy collection marker: tự tạo popup mô phỏng chi tiết
+      L.popup()
+        .setLatLng([lat, lng])
+        .setContent(`<div style="font-size:12px; color:#0f172a; padding:4px;">
+          <b style="font-size:13px; color:#0284c7;">${targetName}</b><br/>
+          • Tọa độ: ${lat.toFixed(5)}, ${lng.toFixed(5)}
+        </div>`)
+        .openOn(map);
     }
   }, 1300);
 };
