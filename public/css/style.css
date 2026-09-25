@@ -97,7 +97,7 @@ body, html {
   box-shadow: 0 0 10px var(--accent-orange);
 }
 
-/* DROPDOWN BỘ LỌC ĐỊA BÀN */
+/* DROPDOWN BỘ LỌC ĐỊA BÀN - TOÀN BỘ CHỮ VIẾT HOA ĐỒNG BỘ */
 .ward-selector-dropdown {
   background: rgba(15, 23, 42, 0.85);
   color: var(--accent-cyan);
@@ -107,12 +107,13 @@ body, html {
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-  max-width: 120px;
-  min-width: 95px;
+  max-width: 155px;
+  min-width: 125px;
   outline: none;
+  text-transform: uppercase;
 }
 .ward-selector-dropdown:hover { border-color: var(--accent-cyan); }
-.ward-selector-dropdown option { background: #0f172a; color: var(--text-main); }
+.ward-selector-dropdown option { background: #0f172a; color: var(--text-main); text-transform: uppercase; }
 
 /* PROGRESS BAR */
 .progress-bar-bg { background: rgba(255, 255, 255, 0.12); height: 5px; border-radius: 3px; overflow: hidden; }
@@ -195,7 +196,6 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
 
 .chart-container { height: 25%; margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 6px; }
 
-/* BỎ HẲN THANH TRƯỢT VÀ HIỂN THỊ ĐỦ TOÀN BỘ PHẦN CHÚ THÍCH BIỂU ĐỒ TRÒN */
 #pieLegendDetails {
   margin-top: 6px;
   font-size: 9.5px;
@@ -232,13 +232,53 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
   transition: font-size 0.15s ease;
 }
 
-/* RESPONSIVE DESKTOP */
+/* RESPONSIVE DESKTOP - CÂN ĐỐI CHIỀU RỘNG/CAU GIỮA TOP BAR VÀ BOTTOM DOCK BAR */
 @media (min-width: 769px) {
   .leaflet-control-zoom { display: none !important; }
-  .topbar-row { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000; width: auto; display: flex; align-items: center; }
-  .topbar-header { padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; gap: 6px; height: 36px; }
-  .dockbar-bottom-row { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 1000; padding: 4px 12px; display: flex; gap: 8px; align-items: center; border-radius: 20px; height: 38px; width: auto; }
-  .dockbar-bottom-row .ui-btn-format { padding: 4px 12px; font-size: 11.5px; border-radius: 14px; height: 28px; }
+  
+  /* Topbar canh giữa chuẩn xác, chiều rộng tự động co giãn theo nội dung */
+  .topbar-row { 
+    position: absolute; 
+    top: 14px; 
+    left: 50%; 
+    transform: translateX(-50%); 
+    z-index: 1000; 
+    width: auto; 
+    display: flex; 
+    align-items: center; 
+  }
+  .topbar-header { 
+    padding: 6px 14px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    font-size: 11px; 
+    gap: 12px; 
+    height: 38px; 
+  }
+
+  /* Dockbar phía dưới cân đối đồng bộ chiều rộng và style với Topbar */
+  .dockbar-bottom-row { 
+    position: absolute; 
+    bottom: 14px; 
+    left: 50%; 
+    transform: translateX(-50%); 
+    z-index: 1000; 
+    padding: 4px 10px; 
+    display: flex; 
+    gap: 8px; 
+    align-items: center; 
+    border-radius: 12px; 
+    height: 38px; 
+    width: auto; 
+  }
+  .dockbar-bottom-row .ui-btn-format { 
+    padding: 4px 12px; 
+    font-size: 11.5px; 
+    border-radius: 8px; 
+    height: 28px; 
+  }
+
   .sidebar-panel { position: absolute; top: 16px; right: 65px; z-index: 1000; width: 300px; display: block; transition: transform 0.25s ease, opacity 0.25s ease; }
   .sidebar-panel.closed { display: none !important; }
   .tab-btn { font-size: 12px; }
@@ -250,14 +290,13 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
 @media (max-width: 768px) {
   .leaflet-control-zoom { display: none !important; }
   .topbar-row { position: absolute; top: 10px; left: 12px; right: 12px; z-index: 1000; display: flex; align-items: center; }
-  .topbar-header { flex: 1; padding: 6px 8px; display: flex; align-items: center; gap: 6px; font-size: 11px; height: 34px; justify-content: space-between; }
+  .topbar-header { flex: 1; padding: 6px 8px; display: flex; align-items: center; gap: 6px; font-size: 11px; height: 36px; justify-content: space-between; }
   .dockbar-bottom-row { position: absolute; bottom: 10px; left: 12px; right: 12px; z-index: 1000; padding: 3px; display: flex; align-items: center; height: 36px; }
   .dockbar-bottom-row .ui-btn-format { flex: 1; padding: 4px 2px; font-size: 10.5px; height: 26px; }
   .sidebar-panel { position: absolute; top: 104px; left: 12px; right: 12px; z-index: 999; display: none; }
   .sidebar-panel.closed { display: none !important; }
   .sidebar-panel.open { display: block !important; }
 
-  /* Tối ưu widget biểu đồ tránh đè nút */
   .infra-pie-widget-transparent {
     top: 60px !important;
     left: 8px !important;
@@ -273,7 +312,6 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
     right: 12px; 
   }
 
-  /* Tối ưu popup và bảng quy chuẩn */
   .ward-popup-card, .ward-table-scroll-container {
     min-width: 100% !important;
     max-width: 100% !important;
