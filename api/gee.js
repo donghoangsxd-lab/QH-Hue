@@ -144,6 +144,93 @@ function checkPointInGeoJSONGeometry(ptLng, ptLat, geometry) {
   return false;
 }
 
+/** Khoảng cách mét (haversine) */
+function distMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/** Diện tích polygon GeoJSON (m²) — equirectangular gần đúng */
+function geoJsonAreaM2(geometry) {
+  if (!geometry || !geometry.coordinates) return 0;
+  const ringArea = (ring) => {
+    if (!ring || ring.length < 3) return 0;
+    const lat0 = ring.reduce((s, p) => s + p[1], 0) / ring.length;
+    const mPerDegLat = 111320;
+    const mPerDegLng = 111320 * Math.cos((lat0 * Math.PI) / 180);
+    let sum = 0;
+    for (let i = 0; i < ring.length - 1; i++) {
+      const x1 = ring[i][0] * mPerDegLng;
+      const y1 = ring[i][1] * mPerDegLat;
+      const x2 = ring[i + 1][0] * mPerDegLng;
+      const y2 = ring[i + 1][1] * mPerDegLat;
+      sum += x1 * y2 - x2 * y1;
+    }
+    return Math.abs(sum) / 2;
+  };
+  try {
+    if (geometry.type === 'Polygon') return ringArea(geometry.coordinates[0]);
+    if (geometry.type === 'MultiPolygon') {
+      return geometry.coordinates.reduce((s, poly) => s + ringArea(poly[0]), 0);
+    }
+  } catch (e) {}
+  return 0;
+}
+
+/**
+ * Ước lượng % độ phủ BỔ SUNG khi đặt hạ tầng tại (lat,lng):
+ * = diện tích (buffer ∩ phường − đã phủ bởi cùng loại) / diện tích phường × 100.
+ * Bán kính mặc định 1000m; phần chồng buffer cùng loại bị loại → thường chỉ vài %.
+ */
+function estimateCoverageAddPct({ lat, lng, radius, wardGeometry, existingSameType }) {
+  const R = Math.max(50, Number(radius) || 1000);
+  const wardArea = geoJsonAreaM2(wardGeometry);
+  if (!wardArea || wardArea <= 0 || lat == null || lng == null) return 0;
+
+  const bufferArea = Math.PI * R * R;
+  const rings = 5;
+  const perRing = 16;
+  let sampleTotal = 0;
+  let sampleNewInWard = 0;
+
+  const isCoveredByExisting = (pLat, pLng) => {
+    for (const ex of existingSameType || []) {
+      if (ex.lat == null || ex.lng == null) continue;
+      const rEx = Math.max(50, Number(ex.radius) || Number(ex.banKinh) || R);
+      if (distMeters(pLat, pLng, Number(ex.lat), Number(ex.lng)) <= rEx) return true;
+    }
+    return false;
+  };
+
+  const consider = (sLat, sLng) => {
+    sampleTotal += 1;
+    if (!checkPointInGeoJSONGeometry(sLng, sLat, wardGeometry)) return;
+    if (isCoveredByExisting(sLat, sLng)) return;
+    sampleNewInWard += 1;
+  };
+
+  consider(lat, lng);
+  for (let ring = 1; ring <= rings; ring++) {
+    const r = (R * ring) / rings;
+    for (let k = 0; k < perRing; k++) {
+      const ang = (2 * Math.PI * k) / perRing + (ring % 2) * (Math.PI / perRing);
+      const dLat = (r * Math.cos(ang)) / 111320;
+      const dLng = (r * Math.sin(ang)) / (111320 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
+      consider(lat + dLat, lng + dLng);
+    }
+  }
+
+  if (sampleTotal <= 0) return 0;
+  const netAreaInWard = (sampleNewInWard / sampleTotal) * bufferArea;
+  const pct = (Math.min(netAreaInWard, wardArea) / wardArea) * 100;
+  return Number(Math.min(100, Math.max(0, pct)).toFixed(1));
+}
+
 let cachedEvaluatedWards = null;
 let cachedEvaluatedWardsAt = 0;
 
@@ -590,9 +677,32 @@ module.exports = async (req, res) => {
       rawDataList.forEach(item => {
         const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE');
         if (isApproved && constants.cleanWardStr(item.ward) === cleanTargetWard) {
-          wardExistAreas[item.type] = (wardExistAreas[item.type] || 0) + item.size;
+          const t = constants.resolveTypeCode(item) || item.type;
+          if (!t) return;
+          wardExistAreas[t] = (wardExistAreas[t] || 0) + Number(item.size || 0);
         }
       });
+
+      const wardFeat = wardListEvaluated.find(f => {
+        const props = f.properties || {};
+        const wName = props.tenXa || props.NAME_2 || props.name || '';
+        return constants.cleanWardStr(wName) === cleanTargetWard;
+      });
+
+      let wardTotalPopPix = 0;
+      if (wardFeat && wardFeat.geometry && popRasterNormalized) {
+        try {
+          const totalRes = await new Promise((resolve) => {
+            popRasterNormalized.reduceRegion({
+              reducer: ee.Reducer.count(),
+              geometry: ee.Geometry(wardFeat.geometry),
+              scale: 60,
+              maxPixels: 1e9
+            }).evaluate((r) => resolve(r || {}));
+          });
+          wardTotalPopPix = Number(totalRes.DanSoPixelNormalized || totalRes.count || 0);
+        } catch (e) {}
+      }
 
       const codesToCheck = constants.CODES_TO_CHECK;
       const suggestions = [];
@@ -619,15 +729,15 @@ module.exports = async (req, res) => {
         }
 
         const deficitArea = reqArea - existArea;
-        let coverageRatio = deficitArea > 0 ? Number(((size / deficitArea) * 100).toFixed(1)) : (reqArea > 0 ? Number(((size / reqArea) * 100).toFixed(1)) : 0);
+        const scaleAddPct = Number(Math.min(100, Math.max(0, (size / Math.max(reqArea, 1)) * 100)).toFixed(1));
 
-        const candidateRadius = infraCfg ? infraCfg.radius : 500;
+        const candidateRadius = (infraCfg && infraCfg.radius) || 1000;
         const testBuffer = ee.Geometry.Point([lng, lat]).buffer(candidateRadius);
 
         const existingBuffersPromises = rawDataList
           .filter(item => {
             const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE');
-            return item.type === code && isApproved;
+            return constants.resolveTypeCode(item) === code && isApproved;
           })
           .map(async (item) => {
             const r = Number(item.radius) || Number(item.banKinh) || candidateRadius;
@@ -644,32 +754,48 @@ module.exports = async (req, res) => {
 
         const netPopRes = await new Promise((resolve) => {
           popRasterNormalized.reduceRegion({
-            reducer: ee.Reducer.sum(),
+            reducer: ee.Reducer.count(),
             geometry: netBufferGeom,
-            scale: 30,
+            scale: 60,
             maxPixels: 1e9
-          }).evaluate((r) => resolve(r ? r.DanSoPixelNormalized : 0));
+          }).evaluate((r) => resolve(r || {}));
         });
 
-        let cleanPopGained = Math.max(0, Math.round(netPopRes || 0));
+        let cleanPopGained = Math.max(0, Math.round(Number(netPopRes.DanSoPixelNormalized || netPopRes.count || 0)));
 
         if (cleanPopGained === 0) {
           const grossPopRes = await new Promise((resolve) => {
             popRasterNormalized.reduceRegion({
-              reducer: ee.Reducer.sum(),
+              reducer: ee.Reducer.count(),
               geometry: testBuffer,
-              scale: 30,
+              scale: 60,
               maxPixels: 1e9
-            }).evaluate((r) => resolve(r ? r.DanSoPixelNormalized : 0));
+            }).evaluate((r) => resolve(r || {}));
           });
-          cleanPopGained = Math.max(0, Math.round(grossPopRes || 0));
+          cleanPopGained = Math.max(0, Math.round(Number(grossPopRes.DanSoPixelNormalized || grossPopRes.count || 0)));
+        }
+
+        let coverageAddPct = 0;
+        if (wardTotalPopPix > 0) {
+          coverageAddPct = Number(Math.min(100, Math.max(0, (cleanPopGained / wardTotalPopPix) * 100)).toFixed(1));
+        } else {
+          coverageAddPct = estimateCoverageAddPct({
+            lat, lng,
+            radius: candidateRadius,
+            wardGeometry: wardFeat ? wardFeat.geometry : null,
+            existingSameType: rawDataList.filter(it =>
+              isApprovedStatus(it.status) && constants.resolveTypeCode(it) === code
+            )
+          });
         }
 
         suggestions.push({
           code,
           label,
           deficitArea: Math.max(0, deficitArea),
-          coverageRatio: coverageRatio,
+          coverageRatio: coverageAddPct,
+          scaleAddPct,
+          coverageAddPct,
           isWardDeficit: deficitArea > 0,
           popGained: cleanPopGained
         });
@@ -678,15 +804,17 @@ module.exports = async (req, res) => {
       await Promise.all(csdPromises);
 
       suggestions.sort((a, b) => {
-        if (a.popGained !== b.popGained) return b.popGained - a.popGained;
-        return b.coverageRatio - a.coverageRatio;
+        if (b.coverageAddPct !== a.coverageAddPct) return b.coverageAddPct - a.coverageAddPct;
+        return b.scaleAddPct - a.scaleAddPct;
       });
 
-      if (suggestions.length > 0) {
-        suggestions[0].isTopPriority = true;
+      // Tối đa 2 lựa chọn
+      const topSuggestions = suggestions.slice(0, 2);
+      if (topSuggestions.length > 0) {
+        topSuggestions[0].isTopPriority = true;
       }
 
-      return res.status(200).json({ suggestions, ineligible });
+      return res.status(200).json({ suggestions: topSuggestions, ineligible });
     }
 
     if (action === 'getWardCoverage') {
@@ -760,7 +888,7 @@ module.exports = async (req, res) => {
       const now = Date.now();
       if (cachedWardStats && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)
           && cachedWardStats[0] && cachedWardStats[0]._assignMode === 'geometry'
-          && cachedWardStats[0]._schema === 3) {
+          && cachedWardStats[0]._schema === 4) {
         return res.status(200).json({ data: cachedWardStats, coverageStatus: 'cached' });
       }
       cachedWardStats = null;
@@ -800,20 +928,28 @@ module.exports = async (req, res) => {
 
           if (isCSD) {
             const csdSize = Number(item.size || item.dienTich || 0);
-            
+            const wardMeta = evaluatedWards.find(w => w.name === assignedWardName);
+            const wardGeom = wardMeta ? wardMeta.geometry : null;
+
             const wardExistAreas = {};
+            const wardExistByType = {};
             rawDataList.forEach(subItem => {
               const subApproved = (subItem.status === true || String(subItem.status).trim().toUpperCase() === 'TRUE');
               if (!subApproved || subItem.lat == null || subItem.lng == null) return;
               if (assignWardByGeometry(Number(subItem.lng), Number(subItem.lat), evaluatedWards) !== assignedWardName) return;
-              wardExistAreas[subItem.type] = (wardExistAreas[subItem.type] || 0) + Number(subItem.size || 0);
+              const subType = constants.resolveTypeCode(subItem) || subItem.type;
+              if (!subType || subType === '9-CSD') return;
+              wardExistAreas[subType] = (wardExistAreas[subType] || 0) + Number(subItem.size || 0);
+              if (!wardExistByType[subType]) wardExistByType[subType] = [];
+              wardExistByType[subType].push(subItem);
             });
 
             const evaluatedSuggestions = codesToCheck.map(code => {
               const infraCfg = constants.infraConfig ? constants.infraConfig[code] : null;
               const reqMinSize = infraCfg ? infraCfg.minSize : 0;
               const label = infraCfg ? infraCfg.label : code;
-              
+              const candidateRadius = (infraCfg && infraCfg.radius) || 1000;
+
               if (csdSize < reqMinSize) {
                 return { code, label, status: 'ineligible' };
               }
@@ -827,40 +963,49 @@ module.exports = async (req, res) => {
                 return { code, label, status: 'fulfilled' };
               }
 
-              const deficitArea = reqArea - existArea;
-              let coverageRatio = deficitArea > 0 ? Number(((csdSize / deficitArea) * 100).toFixed(1)) : 0;
+              const deficitArea = Math.max(0, reqArea - existArea);
               const scaleAddPct = Number(Math.min(100, Math.max(0, (csdSize / Math.max(reqArea, 1)) * 100)).toFixed(1));
-              const coverageAddPct = Number(Math.min(100, Math.max(0, (csdSize / Math.max(existArea + csdSize, 1)) * 100)).toFixed(1));
+              const coverageAddPct = estimateCoverageAddPct({
+                lat: ptLat,
+                lng: ptLng,
+                radius: candidateRadius,
+                wardGeometry: wardGeom,
+                existingSameType: wardExistByType[code] || []
+              });
 
               return {
                 code,
                 label,
-                deficitArea: Math.max(0, deficitArea),
-                coverageRatio: coverageRatio,
+                deficitArea,
+                coverageRatio: coverageAddPct,
                 scaleAddPct,
                 coverageAddPct,
+                radiusUsed: candidateRadius,
                 isWardDeficit: deficitArea > 0,
                 status: 'eligible'
               };
             });
 
-            evaluatedSuggestions.sort((a, b) => {
-              if (a.status === 'ineligible' || a.status === 'fulfilled') return 1;
-              if (b.status === 'ineligible' || b.status === 'fulfilled') return -1;
-              return b.coverageRatio - a.coverageRatio;
-            });
+            const eligibleSorted = evaluatedSuggestions
+              .filter(s => s.status === 'eligible')
+              .sort((a, b) => {
+                if (b.coverageAddPct !== a.coverageAddPct) return b.coverageAddPct - a.coverageAddPct;
+                return b.scaleAddPct - a.scaleAddPct;
+              });
 
-            if (evaluatedSuggestions.length > 0 && evaluatedSuggestions[0].status === 'eligible') {
-              evaluatedSuggestions[0].isTopPriority = true;
-            }
+            if (eligibleSorted.length > 0) eligibleSorted[0].isTopPriority = true;
+
+            // Chỉ giữ tối đa 2 lựa chọn ưu tiên + danh sách ineligible (nếu cần)
+            const topTwo = eligibleSorted.slice(0, 2);
+            const ineligibleKeep = evaluatedSuggestions.filter(s => s.status === 'ineligible');
 
             wardMap[assignedWardName].csdItems.push({
               name: item.name || item.ten || "Khu đất chưa sử dụng",
               size: csdSize,
               lat: ptLat,
               lng: ptLng,
-              radius: Number(item.radius || item.banKinh || 500),
-              suggestions: evaluatedSuggestions.filter(s => s.status !== 'fulfilled'),
+              radius: Number(item.radius || item.banKinh || 1000),
+              suggestions: [...topTwo, ...ineligibleKeep],
               status: item.status,
               needsApproval: !isApproved
             });
@@ -994,15 +1139,30 @@ module.exports = async (req, res) => {
         };
 
         calculatedRow.pendingItems = (data.pendingItems || []).map(item => {
-          const code = item.type || "9-CSD";
+          const code = constants.resolveTypeCode(item) || item.type || "9-CSD";
           const size = Number(item.size || 0);
           const quota = (constants.quotaConfig && constants.quotaConfig[code]) || 0;
           const reqArea = Math.max(1, Math.round(quota * projPop));
           const existArea = typeAreaExist(code);
           const scaleAddPct = Number(Math.min(100, Math.max(0, (size / reqArea) * 100)).toFixed(1));
-          // % đóng góp diện tích trong nhóm sau khi duyệt (ước lượng độ phủ đóng góp)
-          const coverageAddPct = Number(Math.min(100, Math.max(0, (size / Math.max(existArea + size, 1)) * 100)).toFixed(1));
-          const typeLabel = (constants.infraConfig && constants.infraConfig[code] && constants.infraConfig[code].label) || code;
+          const infraCfg = constants.infraConfig ? constants.infraConfig[code] : null;
+          const candidateRadius = (infraCfg && infraCfg.radius) || Number(item.radius || item.banKinh) || 1000;
+          const wardMeta = evaluatedWards.find(w => w.name === wName);
+          const existingSame = [];
+          Object.values(urbanResults).forEach(n => (n.subItems || []).forEach(s => {
+            if (constants.resolveTypeCode(s) === code) existingSame.push(s);
+          }));
+          Object.values(unitResults).forEach(n => (n.subItems || []).forEach(s => {
+            if (constants.resolveTypeCode(s) === code) existingSame.push(s);
+          }));
+          const coverageAddPct = estimateCoverageAddPct({
+            lat: item.lat,
+            lng: item.lng,
+            radius: candidateRadius,
+            wardGeometry: wardMeta ? wardMeta.geometry : null,
+            existingSameType: existingSame
+          });
+          const typeLabel = (infraCfg && infraCfg.label) || code;
           return {
             id: item.id,
             name: item.name,
@@ -1011,7 +1171,7 @@ module.exports = async (req, res) => {
             size,
             lat: item.lat,
             lng: item.lng,
-            radius: Number(item.radius || item.banKinh || 500),
+            radius: candidateRadius,
             status: item.status,
             scaleAddPct,
             coverageAddPct
@@ -1048,7 +1208,7 @@ module.exports = async (req, res) => {
         calculatedRow.Avg_Coverage_Score = Number((totalCoverageSum / (countMetrics || 1)).toFixed(1));
         calculatedRow.Avg_Scale_Score = Number((totalScaleSum / (countMetrics || 1)).toFixed(1));
         calculatedRow._assignMode = 'geometry';
-        calculatedRow._schema = 3;
+        calculatedRow._schema = 4;
         if (cachedCoverageByWard[wName]) calculatedRow._coverageReady = true;
 
         resultTable.push(calculatedRow);

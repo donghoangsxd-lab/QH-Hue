@@ -620,13 +620,12 @@ export function onPointClick(p, marker) {
       .then(res => {
         let sugHtml = "";
         (res.suggestions || []).forEach(s => {
-          if (s.isWardDeficit) {
-            const priorityBadge = s.isTopPriority ? `<span class="badge-priority">ƯU TIÊN HÀNG ĐẦU</span>` : "";
-            const cls = s.isTopPriority ? "sug-card priority" : "sug-card";
-            sugHtml += `<div class="${cls}"><div>🚩 <b>${s.label}</b> ${priorityBadge}</div><div style="color:var(--text-muted); margin-top:2px;">└ Phường thiếu: <b>${s.deficitArea.toLocaleString()} m²</b> | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng</div></div>`;
-          } else {
-            sugHtml += `<div class="sug-card"><div>✓ <b>${s.label}</b></div><div style="color:var(--text-muted); margin-top:2px;">└ Đã đạt chỉ tiêu | Phục vụ thêm: ~${s.popGained.toLocaleString()} ng</div></div>`;
-          }
+          const priorityBadge = s.isTopPriority ? `<span class="badge-priority">ƯU TIÊN HÀNG ĐẦU</span>` : "";
+          const cls = s.isTopPriority ? "sug-card priority" : "sug-card";
+          const scaleAdd = Number(s.scaleAddPct || 0).toFixed(1);
+          const covAdd = Number(s.coverageAddPct != null ? s.coverageAddPct : s.coverageRatio || 0).toFixed(1);
+          sugHtml += `<div class="${cls}"><div>🚩 <b>${s.label}</b> ${priorityBadge}</div>
+            <div style="color:var(--text-muted); margin-top:2px;">└ Bổ sung <b style="color:var(--accent-green);">${scaleAdd}%</b> quy mô, <b style="color:var(--accent-cyan);">${covAdd}%</b> độ phủ</div></div>`;
         });
         (res.ineligible || []).forEach(inEl => {
           sugHtml += `<div class="sug-card ineligible">❌ <b>${inEl.label}</b> (Không đủ DT min: ${inEl.minSize}m²)</div>`;

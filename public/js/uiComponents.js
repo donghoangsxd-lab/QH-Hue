@@ -1042,10 +1042,10 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       let suggestionHtml = '';
       const eligibleSugg = (csd.suggestions || []).filter(s => s.status === 'eligible');
       if (eligibleSugg.length > 0) {
-        suggestionHtml = eligibleSugg.slice(0, 3).map((s, idx) => {
-          const scaleAdd = Number(s.scaleAddPct != null ? s.scaleAddPct : (s.coverageRatio || 0)).toFixed(1);
+        suggestionHtml = eligibleSugg.slice(0, 2).map((s, idx) => {
+          const scaleAdd = Number(s.scaleAddPct != null ? s.scaleAddPct : 0).toFixed(1);
           const covAdd = Number(s.coverageAddPct != null ? s.coverageAddPct : 0).toFixed(1);
-          return `<div style="margin:1px 0;">Ưu tiên ${idx + 1}: ${s.label} (bổ sung ${scaleAdd}% quy mô, ${covAdd}% độ phủ).</div>`;
+          return `<div style="margin:1px 0;">Ưu tiên ${idx + 1}: ${s.label} (bổ sung <b style="color:var(--accent-green);">${scaleAdd}%</b> quy mô, <b style="color:var(--accent-cyan);">${covAdd}%</b> độ phủ).</div>`;
         }).join('');
       } else {
         suggestionHtml = `<div style="color:var(--text-muted); font-style:italic;">Chưa có gợi ý phù hợp</div>`;
