@@ -746,7 +746,10 @@ module.exports = async (req, res) => {
           const required = node ? node.requiredArea : 1;
           const rawScale = (current / (required || 1)) * 100;
           const scaleVal = Number(Math.min(100, Math.max(0, rawScale)).toFixed(1));
-          const coverageVal = Number((coverageByWard[wName] && coverageByWard[wName][c]) || 0);
+          const covMap = coverageByWard[wName]
+            || coverageByWard[Object.keys(coverageByWard).find(k => constants.cleanWardStr(k) === constants.cleanWardStr(wName))]
+            || {};
+          const coverageVal = Number(covMap[c] || 0);
 
           calculatedRow[`Ratio_${c}`] = coverageVal;
           calculatedRow[`Scale_${c}`] = scaleVal;
