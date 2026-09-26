@@ -90,10 +90,17 @@ function bandKeyForCode(code) {
 }
 
 function readPixProp(props, key) {
-  const candidates = [props[key], props.DanSoPixelNormalized, props.count];
-  for (const v of candidates) {
-    const n = Number(v);
+  if (!props || key == null) return 0;
+  const direct = props[key];
+  if (direct != null && direct !== '') {
+    const n = Number(direct);
     if (!Number.isNaN(n) && n >= 0) return n;
+  }
+  // EE đôi khi đổi dấu '-' thành '_'
+  const altKey = String(key).replace(/-/g, '_');
+  if (altKey !== key && props[altKey] != null && props[altKey] !== '') {
+    const n2 = Number(props[altKey]);
+    if (!Number.isNaN(n2) && n2 >= 0) return n2;
   }
   return 0;
 }
@@ -174,46 +181,81 @@ function assignWardByGeometry(ptLng, ptLat, evaluatedWards) {
 }
 
 /**
- * Độ phủ 1 phường: 8 buffer loại hạ tầng (điểm nằm trong ranh giới) chồng raster dân số.
- * 1 lần reduceRegion — đủ nhẹ cho Vercel.
+ * Độ phủ 1 phường: 8 loại + tách đô thị/đơn vị ở (tránh ghi đè DT vs DV).
  */
 async function computeSingleWardCoverage(ee, popRasterNormalized, wardGeometry, itemsInWard) {
   const codesList = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+  const levelSplitCodes = ["1-CV", "2-BDX", "6-YT", "7-VH", "8-TM"];
   const ratios = {};
   codesList.forEach(c => { ratios[c] = 0; });
+  levelSplitCodes.forEach(c => {
+    ratios[`${c}_DT`] = 0;
+    ratios[`${c}_DV`] = 0;
+  });
+  ratios.THPT = 0;
 
   if (!popRasterNormalized || !wardGeometry) {
     return { ratios, Avg_Coverage_Score: 0 };
   }
 
+  const resolveType = (it) => constants.resolveTypeCode(it);
+  const isUrbanItem = (it) => constants.isUrbanLevel(it);
+  const isThptItem = (it) => {
+    const prefix = String(it.id || '').split('-')[0].toUpperCase();
+    if (prefix === 'THPT') return true;
+    const name = String(it.name || '')
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/Đ/g, 'D');
+    return name.includes('THPT') || name.includes('TRUNG HOC PHO THONG');
+  };
+
   const wardGeom = ee.Geometry(wardGeometry);
   const emptyMask = ee.Image.constant(0).selfMask();
   const bandImages = [popRasterNormalized.rename('pix_total')];
 
-  codesList.forEach(c => {
-    const bandName = bandKeyForCode(c);
-    const matchingItems = (itemsInWard || []).filter(it =>
-      isApprovedStatus(it.status) && it.type === c && it.lat != null && it.lng != null
-    );
-
-    if (matchingItems.length === 0) {
+  const pushBufferBand = (bandName, matchingItems, defaultRadius) => {
+    if (!matchingItems || matchingItems.length === 0) {
       bandImages.push(popRasterNormalized.updateMask(emptyMask).rename(bandName));
       return;
     }
-
-    const defaultR = (constants.infraConfig && constants.infraConfig[c] && constants.infraConfig[c].radius) || 500;
     const bufferFc = ee.FeatureCollection(matchingItems.map(it => {
-      const effectiveR = Number(it.radius) || Number(it.banKinh) || defaultR;
+      const effectiveR = Number(it.radius) || Number(it.banKinh) || defaultRadius || 500;
       return ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(effectiveR));
     }));
-
-    const bufferMask = ee.Image(0).byte().paint({
-      featureCollection: bufferFc,
-      color: 1
-    }).gt(0);
-
+    const bufferMask = ee.Image(0).byte().paint({ featureCollection: bufferFc, color: 1 }).gt(0);
     bandImages.push(popRasterNormalized.updateMask(bufferMask).rename(bandName));
+  };
+
+  const approved = (itemsInWard || []).filter(it =>
+    isApprovedStatus(it.status) && it.lat != null && it.lng != null
+  );
+
+  const itemsOfType = (code) => approved.filter(it => resolveType(it) === code);
+
+  codesList.forEach(c => {
+    const defaultR = (constants.infraConfig && constants.infraConfig[c] && constants.infraConfig[c].radius) || 500;
+    pushBufferBand(bandKeyForCode(c), itemsOfType(c), defaultR);
   });
+
+  levelSplitCodes.forEach(c => {
+    const urbanR = (constants.urbanInfraConfig && (
+      (c === '1-CV' && constants.urbanInfraConfig.CV_DT) ||
+      (c === '2-BDX' && constants.urbanInfraConfig.BDX_DT) ||
+      (c === '6-YT' && constants.urbanInfraConfig.YT_DT) ||
+      (c === '7-VH' && constants.urbanInfraConfig.VH_DT) ||
+      (c === '8-TM' && constants.urbanInfraConfig.TM_DT)
+    ));
+    const unitR = (constants.infraConfig && constants.infraConfig[c] && constants.infraConfig[c].radius) || 500;
+    const urbanDefault = (urbanR && urbanR.radius) || 2000;
+    const ofType = itemsOfType(c);
+    pushBufferBand(`${bandKeyForCode(c)}_DT`, ofType.filter(isUrbanItem), urbanDefault);
+    pushBufferBand(`${bandKeyForCode(c)}_DV`, ofType.filter(it => !isUrbanItem(it)), unitR);
+  });
+
+  const thptDefaultR = (constants.urbanInfraConfig && constants.urbanInfraConfig.THPT && constants.urbanInfraConfig.THPT.radius) || 2000;
+  pushBufferBand('cov_THPT', approved.filter(isThptItem), thptDefaultR);
 
   const stacked = ee.Image.cat(bandImages);
   const dict = stacked.reduceRegion({
@@ -229,19 +271,36 @@ async function computeSingleWardCoverage(ee, popRasterNormalized, wardGeometry, 
   });
 
   const totalPix = readPixProp(evalResult, 'pix_total');
-  let sum = 0;
-  codesList.forEach(c => {
-    const servedPix = readPixProp(evalResult, bandKeyForCode(c));
-    const val = totalPix > 0
+  const pctFromBand = (bandName) => {
+    const servedPix = readPixProp(evalResult, bandName);
+    return totalPix > 0
       ? Number(Math.min(100, Math.max(0, (servedPix / totalPix) * 100)).toFixed(1))
       : 0;
-    ratios[c] = val;
-    sum += val;
+  };
+
+  let sum = 0;
+  codesList.forEach(c => {
+    ratios[c] = pctFromBand(bandKeyForCode(c));
+    sum += ratios[c];
   });
+  levelSplitCodes.forEach(c => {
+    ratios[`${c}_DT`] = pctFromBand(`${bandKeyForCode(c)}_DT`);
+    ratios[`${c}_DV`] = pctFromBand(`${bandKeyForCode(c)}_DV`);
+  });
+  ratios.THPT = pctFromBand('cov_THPT');
 
   return {
     ratios,
-    Avg_Coverage_Score: Number((sum / (codesList.length || 1)).toFixed(1))
+    Avg_Coverage_Score: Number((sum / (codesList.length || 1)).toFixed(1)),
+    coverageSchema: 2,
+    _debugCounts: {
+      approved: approved.length,
+      byType: Object.fromEntries(codesList.map(c => [c, itemsOfType(c).length])),
+      byTypeDT: Object.fromEntries(levelSplitCodes.map(c => [c, itemsOfType(c).filter(isUrbanItem).length])),
+      byTypeDV: Object.fromEntries(levelSplitCodes.map(c => [c, itemsOfType(c).filter(it => !isUrbanItem(it)).length])),
+      thpt: approved.filter(isThptItem).length,
+      totalPix
+    }
   };
 }
 
@@ -269,7 +328,7 @@ async function computeWardCoverageRatios(ee, popRasterNormalized, rawDataList, w
   codesList.forEach(c => {
     const bandName = bandKeyForCode(c);
     const matchingItems = rawDataList.filter(it =>
-      isApprovedStatus(it.status) && it.type === c && it.lat != null && it.lng != null
+      isApprovedStatus(it.status) && constants.resolveTypeCode(it) === c && it.lat != null && it.lng != null
     );
 
     if (matchingItems.length === 0) {
@@ -658,11 +717,19 @@ module.exports = async (req, res) => {
         );
 
         const payload = { ward: targetWard.name, ratios: {}, Avg_Coverage_Score: result.Avg_Coverage_Score || 0 };
-        const codesList = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
-        codesList.forEach(c => {
+        const ratioKeys = Object.keys(result.ratios || {});
+        ratioKeys.forEach(c => {
           payload.ratios[c] = Number((result.ratios && result.ratios[c]) || 0);
           payload[`Ratio_${c}`] = payload.ratios[c];
         });
+        // Giữ tương thích bảng tổng hợp 8 mã gốc
+        const codesList = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+        codesList.forEach(c => {
+          if (payload.ratios[c] == null) payload.ratios[c] = 0;
+          payload[`Ratio_${c}`] = payload.ratios[c];
+        });
+        payload.coverageSchema = result.coverageSchema || 2;
+        if (result._debugCounts) payload.itemCounts = result._debugCounts;
         if (result.timedOut) payload.coverageStatus = 'timeout';
         else payload.coverageStatus = 'ok';
 
@@ -672,11 +739,10 @@ module.exports = async (req, res) => {
             Avg_Coverage_Score: payload.Avg_Coverage_Score,
             at: Date.now()
           };
-          // Đồng bộ vào bảng tổng hợp đang cache (nếu có)
           if (cachedWardStats && Array.isArray(cachedWardStats)) {
             const row = cachedWardStats.find(w => w.Ten_Phuong === targetWard.name);
             if (row) {
-              codesList.forEach(c => { row[`Ratio_${c}`] = payload.ratios[c]; });
+              Object.keys(payload.ratios).forEach(c => { row[`Ratio_${c}`] = payload.ratios[c]; });
               row.Avg_Coverage_Score = payload.Avg_Coverage_Score;
               row._coverageReady = true;
             }
@@ -763,12 +829,16 @@ module.exports = async (req, res) => {
 
               const deficitArea = reqArea - existArea;
               let coverageRatio = deficitArea > 0 ? Number(((csdSize / deficitArea) * 100).toFixed(1)) : 0;
+              const scaleAddPct = Number(Math.min(100, Math.max(0, (csdSize / Math.max(reqArea, 1)) * 100)).toFixed(1));
+              const coverageAddPct = Number(Math.min(100, Math.max(0, (csdSize / Math.max(existArea + csdSize, 1)) * 100)).toFixed(1));
 
               return {
                 code,
                 label,
                 deficitArea: Math.max(0, deficitArea),
                 coverageRatio: coverageRatio,
+                scaleAddPct,
+                coverageAddPct,
                 isWardDeficit: deficitArea > 0,
                 status: 'eligible'
               };
@@ -846,18 +916,26 @@ module.exports = async (req, res) => {
           const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE');
           if (!isApproved) return;
 
-          const prefix = item.id.split('-')[0];
-          const normalizedNhom = constants.cleanNhomStr(item.nhomHaTang);
-          const isUrban = (normalizedNhom === "Cap Do Thi" || normalizedNhom === "Cấp đô thị" || prefix === "THPT");
+          const prefix = String(item.id || '').split('-')[0];
+          const prefixUp = prefix.toUpperCase();
+          const isUrban = constants.isUrbanLevel(item);
+          const typeCode = constants.resolveTypeCode(item);
 
           if (isUrban) {
             let targetKey = "CV_DT";
-            if (prefix === "THPT") targetKey = "THPT";
-            else if (prefix === "YT" || prefix === "6") targetKey = "YT_DT";
-            else if (prefix === "VH" || prefix === "7") targetKey = "VH_DT";
-            else if (prefix === "TM" || prefix === "8") targetKey = "TM_DT";
-            else if (prefix === "CV" || prefix === "1") targetKey = "CV_DT";
-            else if (prefix === "BDX" || prefix === "2") targetKey = "BDX_DT";
+            if (prefixUp === "THPT" || (typeCode === "4-TH" && String(item.name || '').toUpperCase().includes('THPT'))) {
+              targetKey = "THPT";
+            } else if (typeCode === "6-YT" || prefixUp === "YT" || prefixUp === "YT_DT" || prefixUp === "6") {
+              targetKey = "YT_DT";
+            } else if (typeCode === "7-VH" || prefixUp === "VH" || prefixUp === "VH_DT" || prefixUp === "7") {
+              targetKey = "VH_DT";
+            } else if (typeCode === "8-TM" || prefixUp === "TM" || prefixUp === "TM_DT" || prefixUp === "8") {
+              targetKey = "TM_DT";
+            } else if (typeCode === "1-CV" || prefixUp === "CV" || prefixUp === "CV_DT" || prefixUp === "1") {
+              targetKey = "CV_DT";
+            } else if (typeCode === "2-BDX" || prefixUp === "BDX" || prefixUp === "BDX_DT" || prefixUp === "2") {
+              targetKey = "BDX_DT";
+            }
 
             if (urbanResults[targetKey]) {
               urbanResults[targetKey].currentArea += Number(item.size || 0);
@@ -865,14 +943,14 @@ module.exports = async (req, res) => {
             }
           } else {
             let targetKey = "CV_DV";
-            if (prefix === "MN" || prefix === "3") targetKey = "3-MN";
-            else if (prefix === "TH" || prefix === "4") targetKey = "4-TH";
-            else if (prefix === "THCS" || prefix === "5") targetKey = "5-THCS";
-            else if (prefix === "YT" || prefix === "6") targetKey = "YT_DV";
-            else if (prefix === "VH" || prefix === "7") targetKey = "VH_DV";
-            else if (prefix === "TM" || prefix === "8") targetKey = "TM_DV";
-            else if (prefix === "CV" || prefix === "1") targetKey = "CV_DV";
-            else if (prefix === "BDX" || prefix === "2") targetKey = "BDX_DV";
+            if (typeCode === "3-MN" || prefixUp === "MN" || prefixUp === "3") targetKey = "3-MN";
+            else if (typeCode === "4-TH" || prefixUp === "TH" || prefixUp === "4") targetKey = "4-TH";
+            else if (typeCode === "5-THCS" || prefixUp === "THCS" || prefixUp === "5") targetKey = "5-THCS";
+            else if (typeCode === "6-YT" || prefixUp === "YT" || prefixUp === "YT_DV" || prefixUp === "6") targetKey = "YT_DV";
+            else if (typeCode === "7-VH" || prefixUp === "VH" || prefixUp === "VH_DV" || prefixUp === "7") targetKey = "VH_DV";
+            else if (typeCode === "8-TM" || prefixUp === "TM" || prefixUp === "TM_DV" || prefixUp === "8") targetKey = "TM_DV";
+            else if (typeCode === "1-CV" || prefixUp === "CV" || prefixUp === "CV_DV" || prefixUp === "1") targetKey = "CV_DV";
+            else if (typeCode === "2-BDX" || prefixUp === "BDX" || prefixUp === "BDX_DV" || prefixUp === "2") targetKey = "BDX_DV";
 
             if (unitResults[targetKey]) {
               unitResults[targetKey].currentArea += Number(item.size || 0);

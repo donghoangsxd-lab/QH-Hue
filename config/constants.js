@@ -49,7 +49,7 @@ const constants = {
   },
 
   infraConfig: {
-    "1-CV":   { label: "Công viên, điểm xanh, vườn hoa", minSize: 300, radius: 500 },
+    "1-CV":   { label: "Cây xanh, công viên", minSize: 300, radius: 500 },
     "2-BDX":  { label: "Bãi đỗ xe, trạm sạc xe điện", minSize: 200, radius: 500 },
     "3-MN":   { label: "Trường Mầm non", minSize: 800, radius: 500 },
     "4-TH":   { label: "Trường Tiểu học", minSize: 2000, radius: 1000 },
@@ -61,7 +61,35 @@ const constants = {
 
   codeMap: {
     "CV": "1-CV", "BDX": "2-BDX", "MN": "3-MN", "TH": "4-TH",
-    "THCS": "5-THCS", "YT": "6-YT", "VH": "7-VH", "TM": "8-TM", "CSD": "9-CSD"
+    "THCS": "5-THCS", "YT": "6-YT", "VH": "7-VH", "TM": "8-TM", "CSD": "9-CSD",
+    "1": "1-CV", "2": "2-BDX", "3": "3-MN", "4": "4-TH",
+    "5": "5-THCS", "6": "6-YT", "7": "7-VH", "8": "8-TM", "9": "9-CSD",
+    "THPT": "4-TH",
+    "CV_DT": "1-CV", "CV_DV": "1-CV",
+    "BDX_DT": "2-BDX", "BDX_DV": "2-BDX",
+    "YT_DT": "6-YT", "YT_DV": "6-YT",
+    "VH_DT": "7-VH", "VH_DV": "7-VH",
+    "TM_DT": "8-TM", "TM_DV": "8-TM"
+  },
+
+  /** Chuẩn hóa mã loại công trình từ id / type */
+  resolveTypeCode: function(item) {
+    const codes = this.CODES_TO_CHECK || [];
+    if (item && item.type && codes.includes(item.type)) return item.type;
+    const prefix = String((item && item.id) || '').split('-')[0];
+    if (this.codeMap[prefix]) return this.codeMap[prefix];
+    const stripped = prefix.replace(/_DT$/i, '').replace(/_DV$/i, '');
+    if (this.codeMap[stripped]) return this.codeMap[stripped];
+    return item && item.type ? item.type : null;
+  },
+
+  /** Phân cấp đô thị vs đơn vị ở — thống nhất mọi chỗ */
+  isUrbanLevel: function(item) {
+    const prefix = String((item && item.id) || '').split('-')[0].toUpperCase();
+    if (prefix === 'THPT' || /_DT$/i.test(prefix)) return true;
+    if (/_DV$/i.test(prefix)) return false;
+    const nhom = this.cleanNhomStr(item && item.nhomHaTang);
+    return nhom === 'Cap Do Thi';
   },
 
   cleanWardStr: function(str) {

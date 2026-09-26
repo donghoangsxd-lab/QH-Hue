@@ -36,15 +36,19 @@ async function getRawDataList() {
       };
 
       const rawId = String(props.ID_DoiTuong || '');
-      const prefix = rawId.split('-')[0];
+      const prefix = String(rawId || '').split('-')[0];
 
       const rawStatus = props.TrangThai;
       const isStatusTrue = (rawStatus === true || String(rawStatus).trim().toUpperCase() === 'TRUE' || String(rawStatus).trim() === '1');
 
+      const mappedType = constants.codeMap[prefix]
+        || constants.codeMap[prefix.replace(/_DT$/i, '').replace(/_DV$/i, '')]
+        || "9-CSD";
+
       // Chuẩn hóa Nhóm hạ tầng thông qua hằng số constants
       const rawNhom = props.Nhom_HaTang || props.nhomHaTang;
       let assignedNhom = constants.cleanNhomStr(rawNhom);
-      if (!rawNhom && (prefix === 'THPT' || prefix === 'YT_DT' || prefix === 'VH_DT')) {
+      if (!rawNhom && (prefix === 'THPT' || /_DT$/i.test(prefix))) {
         assignedNhom = "Cap Do Thi";
       }
 
@@ -52,7 +56,7 @@ async function getRawDataList() {
         id: rawId,
         name: props.Ten_CongTrinh || 'Chưa đặt tên',
         ward: props.Ten_XaPhuong || 'Thuận Hóa',
-        type: constants.codeMap[prefix] || "9-CSD",
+        type: mappedType,
         nhomHaTang: assignedNhom, // Bổ sung nhận biết nhóm hạ tầng phục vụ quy chuẩn QCVN
         lat: parseCoord(coords[1]),
         lng: parseCoord(coords[0]),
