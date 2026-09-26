@@ -19,16 +19,14 @@
 
   <!-- WIDGET DONUT CHART TRONG SUỐT, GÓC TRÊN BÊN TRÁI -->
   <div class="infra-pie-widget-transparent" id="infraPieWidget" style="display:none;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
-      <b style="color:var(--accent-cyan); font-size:11px; text-align:center; width:100%;">📊 CƠ CẤU CÁC LOẠI ĐẤT</b>
-      <span id="btnClosePie" style="cursor:pointer; font-weight:bold; color:var(--accent-red); font-size:12px; position:absolute; right:8px;">✕</span>
+    <div class="pie-widget-header">
+      <b>📊 CƠ CẤU ĐẤT</b>
+      <span id="btnClosePie">✕</span>
     </div>
-    <div style="height:130px; position:relative; display:flex; justify-content:center;">
+    <div class="pie-chart-wrap">
       <canvas id="infraPieChart"></canvas>
     </div>
-    <!-- NÚT TAM GIÁC XỔ/THU GỌN GHI CHÚ Ở GÓC DƯỚI BÊN PHẢI -->
-    <button id="btnTogglePieLegend" title="Xổ/Thu gọn chú thích" style="position:absolute; right:6px; bottom:6px; background:rgba(56,189,248,0.2); border:1px solid var(--border-color); color:var(--accent-cyan); border-radius:3px; cursor:pointer; width:18px; height:18px; font-size:9px; display:flex; align-items:center; justify-content:center; transition: transform 0.2s;">▼</button>
-    <div id="pieLegendDetails" style="margin-top:6px; font-size:9.5px; max-height:85px; overflow-y:auto; border-top:1px dashed var(--border-color); padding-top:4px; display:none;"></div>
+    <div id="pieLegendDetails"></div>
   </div>
 
   <!-- THANH CÔNG CỤ DỌC BÊN PHẢI (GỘP THÀNH 8 NÚT THEO THỨ TỰ YÊU CẦU) -->

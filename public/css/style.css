@@ -25,18 +25,74 @@ body, html {
 .infra-pie-widget-transparent {
   position: absolute;
   top: 12px;
-  left: 16px;
+  left: 12px;
   z-index: 1000;
-  width: 210px;
-  padding: 8px;
-  background: rgba(15, 23, 42, 0.85);
+  width: 168px;
+  padding: 5px 6px 4px;
+  background: rgba(15, 23, 42, 0.88);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   height: auto !important;
-  min-height: 150px;
+  min-height: 0;
+  box-sizing: border-box;
+}
+.infra-pie-widget-transparent .pie-widget-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  margin: 0 0 2px;
+  padding: 0 14px 3px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+.infra-pie-widget-transparent .pie-widget-header b {
+  color: var(--accent-cyan);
+  font-size: 9.5px;
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.infra-pie-widget-transparent #btnClosePie {
+  position: absolute;
+  right: 0;
+  top: -1px;
+  cursor: pointer;
+  font-weight: bold;
+  color: var(--accent-red);
+  font-size: 11px;
+  line-height: 1;
+}
+.infra-pie-widget-transparent .pie-chart-wrap {
+  height: 96px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+}
+.infra-pie-widget-transparent canvas {
+  max-width: 100% !important;
+  max-height: 96px !important;
+}
+.infra-pie-widget-transparent #pieLegendDetails {
+  margin-top: 3px !important;
+  padding-top: 3px !important;
+  font-size: 8.5px !important;
+  max-height: none !important;
+  overflow: visible !important;
+  border-top: 1px dashed var(--border-color);
+  line-height: 1.25;
+}
+.infra-pie-widget-transparent #pieLegendDetails > div {
+  margin-bottom: 1px !important;
+  gap: 2px;
+}
+.infra-pie-widget-transparent #btnTogglePieLegend {
+  display: none !important;
 }
 
 /* CỤM NÚT TRUNG TÂM BÊN PHẢI (GỘP ĐỦ 8 NÚT) */
@@ -298,13 +354,16 @@ table.data-table tbody tr:hover { background-color: rgba(255, 255, 255, 0.08); }
   .sidebar-panel.open { display: block !important; }
 
   .infra-pie-widget-transparent {
-    top: 60px !important;
+    top: 56px !important;
     left: 8px !important;
-    width: 175px !important;
-    padding: 6px !important;
+    width: 150px !important;
+    padding: 4px 5px 3px !important;
+  }
+  .infra-pie-widget-transparent .pie-chart-wrap {
+    height: 84px !important;
   }
   .infra-pie-widget-transparent canvas {
-    height: 95px !important;
+    max-height: 84px !important;
   }
 
   .middle-right-toolbar { 

@@ -133,10 +133,6 @@ export function updateInfraPieChart(sourceList) {
   if (legendContainer) {
     legendContainer.style.display = 'block';
   }
-  const toggleBtn = document.getElementById('btnTogglePieLegend');
-  if (toggleBtn) {
-    toggleBtn.style.display = 'none';
-  }
 
   const areaTotals = {};
   let totalAreaSum = 0;
@@ -158,16 +154,16 @@ export function updateInfraPieChart(sourceList) {
   }
 
   const labelsMap = {
-    "1-CV": "Công viên, cây xanh",
-    "2-BDX": "Bãi đỗ xe, trạm sạc",
-    "3-MN": "Trường Mầm non",
-    "4-TH": "Trường Tiểu học",
-    "5-THCS": "Trường THCS",
-    "6-YT": "Cơ sở Y tế",
-    "7-VH": "Nhà văn hóa, thể thao",
-    "8-TM": "Chợ, TTTM",
-    "9-CSD": "Quỹ đất tiềm năng",
-    "empty": "Chưa có dữ liệu"
+    "1-CV": "Công viên",
+    "2-BDX": "Bãi đỗ xe",
+    "3-MN": "Mầm non",
+    "4-TH": "Tiểu học",
+    "5-THCS": "THCS",
+    "6-YT": "Y tế",
+    "7-VH": "Văn hóa",
+    "8-TM": "Chợ/TTTM",
+    "9-CSD": "Quỹ đất",
+    "empty": "Chưa có DL"
   };
 
   const colorsMap = {
@@ -194,12 +190,12 @@ export function updateInfraPieChart(sourceList) {
       const pct = totalAreaSum > 0 ? ((val / totalAreaSum) * 100).toFixed(1) : 0;
       const color = colorsMap[k] || '#38bdf8';
       const name = labelsMap[k] || k;
-      html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
-        <span style="color:var(--text-main); display:flex; align-items:center; gap:4px;">
-          <span style="width:8px; height:8px; background:${color}; border-radius:50%; display:inline-block;"></span>
-          ${name}:
+      html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1px; gap:4px;">
+        <span style="color:var(--text-main); display:flex; align-items:center; gap:3px; min-width:0;">
+          <span style="width:6px; height:6px; background:${color}; border-radius:50%; display:inline-block; flex-shrink:0;"></span>
+          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</span>
         </span>
-        <b style="color:var(--accent-cyan);">${pct}%</b>
+        <b style="color:var(--accent-cyan); flex-shrink:0;">${pct}%</b>
       </div>`;
     });
     legendContainer.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Chưa có dữ liệu</div>';
@@ -227,6 +223,7 @@ export function updateInfraPieChart(sourceList) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: 0 },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -239,7 +236,7 @@ export function updateInfraPieChart(sourceList) {
           }
         }
       },
-      cutout: '60%'
+      cutout: '58%'
     }
   });
 }
