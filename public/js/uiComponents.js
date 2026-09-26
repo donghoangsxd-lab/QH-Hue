@@ -1,15 +1,65 @@
 import { state } from './state.js';
 import { map, renderGroupedPoints } from './mapEngine.js';
+import { geeApi } from './api.js';
 
 let chartInstance = null;
 let infraPieInstance = null;
 
+const GOOGLE_CLIENT_ID = "409688791128-s7b4uohia2a9n3u27rl0gmkdupiig554.apps.googleusercontent.com";
+let googleSignInReady = false;
+
+function showGoogleOriginHint() {
+  const msg = document.getElementById('authMsg');
+  if (!msg) return;
+  const origin = window.location.origin;
+  msg.style.color = "var(--accent-orange)";
+  msg.innerText = `Origin ${origin} chưa được Google cho phép. Thêm origin này vào Authorized JavaScript origins của Client ID, hoặc chạy npx vercel dev (localhost) thay vì Live Server.`;
+}
+
+export function initGoogleSignIn() {
+  const container = document.getElementById('googleSignInBtn');
+  if (!container || googleSignInReady) return;
+
+  const tryInit = (attempt = 0) => {
+    if (!window.google?.accounts?.id) {
+      if (attempt < 40) {
+        setTimeout(() => tryInit(attempt + 1), 150);
+      } else {
+        showGoogleOriginHint();
+      }
+      return;
+    }
+
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: handleGoogleCredentialResponse,
+      auto_select: false,
+      cancel_on_tap_outside: true
+    });
+
+    container.innerHTML = "";
+    window.google.accounts.id.renderButton(container, {
+      type: "standard",
+      size: "large",
+      theme: "filled_black",
+      text: "signin_with",
+      shape: "rectangular",
+      logo_alignment: "left"
+    });
+    googleSignInReady = true;
+  };
+
+  tryInit();
+}
+
 export function toggleAuthModal() {
   const modal = document.getElementById('authModal');
   if (!modal) return;
-  modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+  const opening = modal.style.display !== 'block';
+  modal.style.display = opening ? 'block' : 'none';
   const msg = document.getElementById('authMsg');
   if (msg) msg.innerText = "";
+  if (opening) initGoogleSignIn();
 }
 
 function parseJwt(token) {
@@ -237,7 +287,7 @@ export function openCombinedModal() {
     headerActions.insertBefore(pdfBtn, headerActions.firstChild);
   }
 
-  fetch('/api/gee?action=getWardStats')
+  fetch(geeApi('action=getWardStats'))
     .then(r => r.json())
     .then(resData => {
       if (mBar) mBar.style.width = "100%";
@@ -335,7 +385,7 @@ export async function openWardDetailDirect(wardName) {
   detailPopup.openOn(map);
 
   try {
-    const res = await fetch('/api/gee?action=getWardStats');
+    const res = await fetch(geeApi('action=getWardStats'));
     const resData = await res.json();
     state.wardStatsData = resData.data || [];
     setTimeout(() => { selectWardDetail(wardName); }, 200);

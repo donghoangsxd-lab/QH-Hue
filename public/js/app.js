@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { geeApi } from './api.js';
 import { 
   initMap, 
   toggleLayer, 
@@ -19,10 +20,12 @@ import {
   toggleAuthModal, 
   openCombinedModal, 
   closeModal,
-  openWardDetailDirect
+  openWardDetailDirect,
+  initGoogleSignIn
 } from './uiComponents.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
+  initGoogleSignIn();
   const map = initMap();
 
   map.on('click', (e) => {
@@ -40,7 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         statusEl.innerText = "⏳ Đang tra cứu địa bàn...";
       }
 
-      fetch(`/api/gee?action=getWardFromPoint&lat=${lat}&lng=${lng}`)
+      fetch(geeApi(`action=getWardFromPoint&lat=${lat}&lng=${lng}`))
         .then(r => r.json())
         .then(res => {
           const wardName = res.ward || "Thuận Hóa";
@@ -192,7 +195,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (state.rawDataList.length === 0) {
       try {
-        const res = await fetch('/api/gee');
+        const res = await fetch(geeApi());
         const data = await res.json();
         state.rawDataList = data.rawDataList || [];
       } catch (err) {
@@ -247,7 +250,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('btnOpenCombinedModal')?.addEventListener('click', () => {
-    if (state.selectedWard) {
+    if (state.selectedWard && state.selectedWard !== "Thành phố Huế") {
       openWardDetailDirect(state.selectedWard);
     } else {
       openCombinedModal();
@@ -297,12 +300,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       msg.innerText = "🚀 Đang gửi đề xuất...";
     }
 
-    const addUrl = `/api/gee?action=addPoint` +
+    const addUrl = geeApi(
+      `action=addPoint` +
       `&type=${encodeURIComponent(type)}` +
       `&nhomHaTang=${encodeURIComponent(nhomHaTang)}` +
       `&name=${encodeURIComponent(name)}` +
       `&ward=${encodeURIComponent(ward)}` +
-      `&lat=${lat}&lng=${lng}&size=${size}`;
+      `&lat=${lat}&lng=${lng}&size=${size}`
+    );
 
     fetch(addUrl)
       .then(r => r.json())
@@ -394,21 +399,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (progressBar) progressBar.style.width = "60%";
     if (progressPercent) progressPercent.innerText = "60%";
 
-    const dataRes = await fetch('/api/gee');
+    const dataRes = await fetch(geeApi());
     const dataJson = await dataRes.json();
     state.rawDataList = dataJson.rawDataList || [];
 
     const wardSelector = document.getElementById('wardSelector');
     if (wardSelector) {
+      wardSelector.innerHTML = "";
       const defaultOpt = document.createElement('option');
       defaultOpt.value = "Thành phố Huế";
       defaultOpt.textContent = "THÀNH PHỐ HUẾ";
+      defaultOpt.selected = true;
       wardSelector.appendChild(defaultOpt);
+      state.selectedWard = "Thành phố Huế";
 
       state.wardLabelsList
         .slice()
         .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
         .forEach(item => {
+          if (!item.name || item.name === "Thành phố Huế") return;
           const opt = document.createElement('option');
           opt.value = item.name;
           opt.textContent = item.name.toUpperCase();

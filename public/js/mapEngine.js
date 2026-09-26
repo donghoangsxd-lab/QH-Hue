@@ -1,5 +1,6 @@
 import { state, infraLabels, infraIcons } from './state.js';
 import { updateInfraPieChart, hideInfraPieChart } from './uiComponents.js';
+import { geeApi } from './api.js';
 
 export let map = null;
 export let measureLayerGroup = null;
@@ -79,7 +80,7 @@ export async function loadBoundaryLayer() {
   if (!map) return;
 
   try {
-    const boundRes = await fetch('/api/gee?action=getBoundaryVector');
+    const boundRes = await fetch(geeApi('action=getBoundaryVector'));
     const boundData = await boundRes.json();
     
     if (boundData && boundData.features) {
@@ -99,7 +100,7 @@ export async function loadBoundaryLayer() {
   }
 
   try {
-    const labelRes = await fetch('/api/gee?action=getWardLabels');
+    const labelRes = await fetch(geeApi('action=getWardLabels'));
     const labelData = await labelRes.json();
     const labels = labelData.labels || [];
     state.wardLabelsList = labels;
@@ -304,7 +305,7 @@ export async function highlightSingleIsochrone(lat, lng, radius) {
   layers.singleIso.clearLayers();
 
   try {
-    const res = await fetch(`/api/gee?action=getSingleIsochrone&lat=${lat}&lng=${lng}&radius=${radius}`);
+    const res = await fetch(geeApi(`action=getSingleIsochrone&lat=${lat}&lng=${lng}&radius=${radius}`));
     if (!res.ok) return;
     const data = await res.json();
     if (data && data.geometry) {
@@ -359,7 +360,7 @@ export async function refreshHeatmapOnly() {
   }
 
   try {
-    const isoRes = await fetch('/api/gee?action=getIsochrone', {
+    const isoRes = await fetch(geeApi('action=getIsochrone'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ features: allFeaturesInput })
@@ -402,7 +403,7 @@ export async function refreshHeatmapOnly() {
       return (s === true || String(s).trim().toUpperCase() === 'TRUE' || String(s).trim() === '1');
     });
 
-    const heatRes = await fetch(`/api/gee?action=getHeatmapTile&t=${Date.now()}`, {
+    const heatRes = await fetch(geeApi(`action=getHeatmapTile&t=${Date.now()}`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ features: approvedFeatures })
@@ -487,7 +488,7 @@ export function onPointClick(p, marker) {
     popup.openOn(map);
 
     if (!isCSDUnapproved) {
-      fetch(`/api/gee?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${itemRadius}`)
+      fetch(geeApi(`action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${itemRadius}`))
         .then(r => r.json())
         .then(res => {
           const popVal = res.servedPop || 0;
@@ -508,7 +509,7 @@ export function onPointClick(p, marker) {
     const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
     popup.openOn(map);
 
-    fetch(`/api/gee?action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${itemRadius}`)
+    fetch(geeApi(`action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${itemRadius}`))
       .then(r => r.json())
       .then(res => {
         const popVal = res.servedPop || 0;
@@ -524,7 +525,7 @@ export function onPointClick(p, marker) {
     const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
     popup.openOn(map);
 
-    fetch(`/api/gee?action=analyzeCSD&lat=${p.lat}&lng=${p.lng}&size=${p.size}&ward=${encodeURIComponent(p.ward)}`)
+    fetch(geeApi(`action=analyzeCSD&lat=${p.lat}&lng=${p.lng}&size=${p.size}&ward=${encodeURIComponent(p.ward)}`))
       .then(r => r.json())
       .then(res => {
         let sugHtml = "";
@@ -549,7 +550,7 @@ export function onPointClick(p, marker) {
 export async function loadPopulationLayer() {
   if (!map) return;
   try {
-    const res = await fetch('/api/gee?action=getPopRasterTile');
+    const res = await fetch(geeApi('action=getPopRasterTile'));
     const data = await res.json();
     if (data.urlFormat) {
       const popOpacityEl = document.getElementById('popOpacity');
@@ -581,7 +582,7 @@ export async function handleInspectPointClick(clickLat, clickLng) {
     });
 
     try {
-      const res = await fetch('/api/gee?action=getIsochrone', {
+      const res = await fetch(geeApi('action=getIsochrone'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -627,7 +628,7 @@ export async function handleInspectPointClick(clickLat, clickLng) {
   const coveredCount = Object.keys(coveredGroups).length;
   const missingCount = missingCodes.length;
 
-  fetch(`/api/gee?action=getWardFromPoint&lat=${clickLat.toFixed(6)}&lng=${clickLng.toFixed(6)}`)
+  fetch(geeApi(`action=getWardFromPoint&lat=${clickLat.toFixed(6)}&lng=${clickLng.toFixed(6)}`))
     .then(r => r.json())
     .then(resWard => {
       const wardName = resWard.ward || "Thuận Hóa";
@@ -679,7 +680,7 @@ export function approvePointStatus(pointId) {
   renderGroupedPoints();
   map.closePopup();
 
-  fetch(`/api/gee?action=approvePoint&id=${encodeURIComponent(pointId)}`)
+  fetch(geeApi(`action=approvePoint&id=${encodeURIComponent(pointId)}`))
     .then(r => r.json())
     .then(() => {
       refreshHeatmapOnly();

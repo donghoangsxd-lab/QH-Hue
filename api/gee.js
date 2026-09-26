@@ -79,6 +79,94 @@ async function calculateNetworkIsochrone16(lat, lng, banKinh) {
   }
 }
 
+function isApprovedStatus(status) {
+  return status === true || String(status).trim().toUpperCase() === 'TRUE';
+}
+
+async function computeWardCoverageRatios(ee, popRasterNormalized, rawDataList, evaluatedWards) {
+  const codesList = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+  const coverageByWard = {};
+
+  evaluatedWards.forEach(w => {
+    coverageByWard[w.name] = {};
+    codesList.forEach(c => { coverageByWard[w.name][c] = 0; });
+  });
+
+  if (!popRasterNormalized || evaluatedWards.length === 0) return coverageByWard;
+
+  const wardFc = ee.FeatureCollection(evaluatedWards.map(w =>
+    ee.Feature(ee.Geometry(w.geometry), { Ten_Phuong: w.name })
+  ));
+
+  const evalFc = (eeObj) => new Promise((resolve, reject) => {
+    eeObj.evaluate((fc, err) => err ? reject(err) : resolve(fc));
+  });
+
+  const totalPixFc = popRasterNormalized.reduceRegions({
+    collection: wardFc,
+    reducer: ee.Reducer.count().setOutputs(['totalPix']),
+    scale: 30,
+    tileScale: 4
+  });
+  const readPixCount = (props, preferredKey) => {
+    const candidates = [
+      props[preferredKey],
+      props.DanSoPixelNormalized,
+      props.count,
+      props.totalPix,
+      props.servedPix
+    ];
+    for (const v of candidates) {
+      const n = Number(v);
+      if (!Number.isNaN(n) && n >= 0) return n;
+    }
+    return 0;
+  };
+
+  const totalEval = await evalFc(totalPixFc);
+  const totalPixMap = {};
+  (totalEval.features || []).forEach(feat => {
+    const props = feat.properties || {};
+    totalPixMap[props.Ten_Phuong] = readPixCount(props, 'totalPix');
+  });
+
+  for (const c of codesList) {
+    const matchingItems = rawDataList.filter(it =>
+      isApprovedStatus(it.status) && it.type === c && it.lat != null && it.lng != null
+    );
+    if (matchingItems.length === 0) continue;
+
+    const defaultR = (constants.infraConfig && constants.infraConfig[c] && constants.infraConfig[c].radius) || 500;
+    const bufferFc = ee.FeatureCollection(matchingItems.map(it => {
+      const effectiveR = Number(it.radius) || Number(it.banKinh) || defaultR;
+      return ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(effectiveR));
+    }));
+
+    const bufferMask = ee.Image(0).byte().paint({ featureCollection: bufferFc, color: 1 }).gt(0);
+    const servedRaster = popRasterNormalized.updateMask(bufferMask);
+    const servedFc = servedRaster.reduceRegions({
+      collection: wardFc,
+      reducer: ee.Reducer.count().setOutputs(['servedPix']),
+      scale: 30,
+      tileScale: 4
+    });
+    const servedEval = await evalFc(servedFc);
+
+    (servedEval.features || []).forEach(feat => {
+      const props = feat.properties || {};
+      const name = props.Ten_Phuong;
+      const totalPix = totalPixMap[name] || 0;
+      const servedPix = readPixCount(props, 'servedPix');
+      if (!coverageByWard[name]) coverageByWard[name] = {};
+      coverageByWard[name][c] = totalPix > 0
+        ? Number(Math.min(100, Math.max(0, (servedPix / totalPix) * 100)).toFixed(1))
+        : 0;
+    });
+  }
+
+  return coverageByWard;
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -541,6 +629,13 @@ module.exports = async (req, res) => {
         }
       });
 
+      let coverageByWard = {};
+      try {
+        coverageByWard = await computeWardCoverageRatios(ee, popRasterNormalized, rawDataList, evaluatedWards);
+      } catch (covErr) {
+        console.error("Lỗi tính độ phủ pixel dân số:", covErr && covErr.message);
+      }
+
       const resultTable = [];
 
       for (const wName in wardMap) {
@@ -613,7 +708,7 @@ module.exports = async (req, res) => {
           }
         });
 
-        const codesList = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+        const codesList = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
         let totalCoverageSum = 0;
         let totalScaleSum = 0;
         let countMetrics = 0;
@@ -634,7 +729,7 @@ module.exports = async (req, res) => {
           }
         };
 
-        const coveragePromises = codesList.map(async (c) => {
+        codesList.forEach(c => {
           let node = null;
           if (c === "1-CV") node = urbanResults["CV_DT"] || unitResults["CV_DV"];
           else if (c === "2-BDX") node = urbanResults["BDX_DT"] || unitResults["BDX_DV"];
@@ -649,54 +744,12 @@ module.exports = async (req, res) => {
           const required = node ? node.requiredArea : 1;
           const rawScale = (current / (required || 1)) * 100;
           const scaleVal = Number(Math.min(100, Math.max(0, rawScale)).toFixed(1));
+          const coverageVal = Number((coverageByWard[wName] && coverageByWard[wName][c]) || 0);
 
-          let coverageVal = 0;
-          const matchingItems = (node && node.subItems) ? node.subItems.filter(it => {
-            const isApproved = (it.status === true || String(it.status).trim().toUpperCase() === 'TRUE');
-            return isApproved && it.lat != null && it.lng != null;
-          }) : [];
-
-          if (matchingItems.length > 0 && popRasterNormalized) {
-            try {
-              const radiusVal = (constants.infraConfig && constants.infraConfig[c]) ? constants.infraConfig[c].radius : 500;
-              const bufferFeatures = matchingItems.map(it => {
-                const effectiveR = Number(it.radius) || Number(it.banKinh) || radiusVal;
-                return ee.Feature(ee.Geometry.Point([it.lng, it.lat]).buffer(effectiveR));
-              });
-              
-              const unionBuffers = ee.FeatureCollection(bufferFeatures).geometry();
-              const wardGeom = f.geometry();
-              const servedIntersection = unionBuffers.intersection(wardGeom, 1);
-
-              const dictToEval = ee.Dictionary({
-                totalPix: popRasterNormalized.reduceRegion({ reducer: ee.Reducer.count(), geometry: wardGeom, scale: 30, maxPixels: 1e9 }).get('DanSoPixelNormalized'),
-                servedPix: popRasterNormalized.reduceRegion({ reducer: ee.Reducer.count(), geometry: servedIntersection, scale: 30, maxPixels: 1e9 }).get('DanSoPixelNormalized')
-              });
-
-              const evalResult = await new Promise((resolve) => {
-                dictToEval.evaluate((res) => resolve(res || { totalPix: 0, servedPix: 0 }));
-              });
-
-              const totalPix = Number(evalResult.totalPix || 0);
-              const servedPix = Number(evalResult.servedPix || 0);
-
-              if (totalPix > 0) {
-                coverageVal = Number(Math.min(100, Math.max(0, (servedPix / totalPix) * 100)).toFixed(1));
-              }
-            } catch (err) {
-              coverageVal = 0;
-            }
-          }
-
-          return { c, coverageVal, scaleVal };
-        });
-
-        const metricsResults = await Promise.all(coveragePromises);
-        metricsResults.forEach(m => {
-          calculatedRow[`Ratio_${m.c}`] = m.coverageVal;
-          calculatedRow[`Scale_${m.c}`] = m.scaleVal;
-          totalCoverageSum += m.coverageVal;
-          totalScaleSum += m.scaleVal;
+          calculatedRow[`Ratio_${c}`] = coverageVal;
+          calculatedRow[`Scale_${c}`] = scaleVal;
+          totalCoverageSum += coverageVal;
+          totalScaleSum += scaleVal;
           countMetrics++;
         });
 
