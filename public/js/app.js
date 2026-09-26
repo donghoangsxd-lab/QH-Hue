@@ -21,7 +21,8 @@ import {
   openCombinedModal, 
   closeModal,
   openWardDetailDirect,
-  initGoogleSignIn
+  initGoogleSignIn,
+  startBackgroundCoverageFill
 } from './uiComponents.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -426,6 +427,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (progressBar) progressBar.style.display = "none";
     if (progressPercent) progressPercent.innerText = "100%";
+
+    // Chạy ngầm tính độ phủ (dân số lớn → nhỏ), ghi nhớ để bảng tổng hợp dùng lại
+    fetch(geeApi('action=getWardStats'))
+      .then(r => r.ok ? r.json() : null)
+      .then(resData => {
+        if (!resData || !resData.data) return;
+        state.wardStatsData = resData.data;
+        startBackgroundCoverageFill();
+      })
+      .catch(err => console.warn("Không khởi động tính độ phủ nền:", err));
   } catch (err) {
     console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
   }

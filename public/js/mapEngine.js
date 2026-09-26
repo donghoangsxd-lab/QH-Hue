@@ -449,6 +449,47 @@ export async function refreshHeatmapOnly() {
   }
 }
 
+function formatCapCongTrinhLabel(raw) {
+  if (!raw) return "Cấp đơn vị ở";
+  const original = String(raw).trim();
+  const s = original
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/\s+/g, " ");
+
+  if (s.includes("do thi") || s.includes("urban") || s === "cap do thi") return "Cấp đô thị";
+  if (s.includes("don vi") || s.includes("dvo") || s.includes("cap dvo") || s.includes("dvo")) return "Cấp đơn vị ở";
+  if (original.includes("đô thị")) return "Cấp đô thị";
+  if (original.includes("đơn vị")) return "Cấp đơn vị ở";
+  return original;
+}
+
+function resolveWardNameFromCoords(lat, lng) {
+  if (!state.wardLabelsList || state.wardLabelsList.length === 0) return null;
+  for (const w of state.wardLabelsList) {
+    if (w.geometry && isPointInWardGeometry(lat, lng, w.geometry)) return w.name;
+  }
+  return null;
+}
+
+function buildDiaBanHtml(geoWard, sheetWard) {
+  const geo = (geoWard || "").trim();
+  const sheet = (sheetWard || "").trim();
+  if (!geo) {
+    return sheet ? `Phường/Xã ${sheet}` : "Phường/Xã —";
+  }
+  let html = `Phường/Xã ${geo}`;
+  const clean = (s) => String(s || "")
+    .replace(/^Phường\s+/i, "").replace(/^Xã\s+/i, "")
+    .trim().toLowerCase();
+  if (sheet && clean(sheet) !== clean(geo)) {
+    html += ` <span style="color:var(--accent-orange); font-size:9px; font-weight:normal;">(Sheet: ${sheet})</span>`;
+  }
+  return html;
+}
+
 export function onPointClick(p, marker) {
   const isApproved = (p.status === true || String(p.status).trim().toUpperCase() === 'TRUE' || String(p.status).trim() === '1');
   const isCSDUnapproved = (p.type === "9-CSD" && !isApproved);
@@ -459,8 +500,9 @@ export function onPointClick(p, marker) {
     highlightSingleIsochrone(p.lat, p.lng, itemRadius);
   }
 
-  // Lấy trực tiếp giá trị cấp công trình từ dữ liệu cột D truyền vào (nhomHaTang)
-  let capCongTrinh = p.nhomHaTang || p.capCongTrinh || "Cấp đơn vị ở";
+  const capCongTrinh = formatCapCongTrinhLabel(p.nhomHaTang || p.capCongTrinh || "Cấp đơn vị ở");
+  const geoWardNow = resolveWardNameFromCoords(p.lat, p.lng);
+  const diaBanHtml = buildDiaBanHtml(geoWardNow, p.ward);
 
   let contentHtml = `<div style="min-width:220px; font-size:11px;">`;
   contentHtml += `<b style="color:var(--accent-cyan); font-size:12px;">${p.name}</b>`;
@@ -468,7 +510,6 @@ export function onPointClick(p, marker) {
     contentHtml += `<span class="badge-pending">Chờ duyệt</span>`;
   }
   
-  // Thay thế dấu cộng màu trắng thành màu đỏ nếu có ký tự "+" trong tên nhãn hạ tầng
   let rawLabel = infraLabels[p.type] || p.type;
   if (rawLabel.includes("+")) {
     rawLabel = rawLabel.replace("+", `<span style="color:var(--accent-red); font-weight:bold;">+</span>`);
@@ -476,7 +517,7 @@ export function onPointClick(p, marker) {
 
   contentHtml += `<br><hr style="border-color:var(--border-color); margin:4px 0;">`;
   contentHtml += `• Loại hạ tầng: <b>${rawLabel}</b><br>`;
-  contentHtml += `• Địa bàn: <b>Phường/Xã ${p.ward}</b><br>`;
+  contentHtml += `• Địa bàn: <b id="popupWardDiaBan">${diaBanHtml}</b><br>`;
   contentHtml += `• Cấp công trình: <b style="color:var(--accent-orange);">${capCongTrinh}</b><br>`;
   contentHtml += `• Diện tích: <b>${(p.size || 0).toLocaleString()} m²</b><br>`;
 
@@ -506,6 +547,16 @@ export function onPointClick(p, marker) {
     const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
     popup.openOn(map);
 
+    if (!geoWardNow) {
+      fetch(geeApi(`action=getWardFromPoint&lat=${p.lat}&lng=${p.lng}`))
+        .then(r => r.json())
+        .then(res => {
+          const el = document.getElementById('popupWardDiaBan');
+          if (el) el.innerHTML = buildDiaBanHtml(res.ward, p.ward);
+        })
+        .catch(() => {});
+    }
+
     if (!isCSDUnapproved) {
       fetch(geeApi(`action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${itemRadius}`))
         .then(r => r.json())
@@ -528,6 +579,16 @@ export function onPointClick(p, marker) {
     const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
     popup.openOn(map);
 
+    if (!geoWardNow) {
+      fetch(geeApi(`action=getWardFromPoint&lat=${p.lat}&lng=${p.lng}`))
+        .then(r => r.json())
+        .then(res => {
+          const el = document.getElementById('popupWardDiaBan');
+          if (el) el.innerHTML = buildDiaBanHtml(res.ward, p.ward);
+        })
+        .catch(() => {});
+    }
+
     fetch(geeApi(`action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${itemRadius}`))
       .then(r => r.json())
       .then(res => {
@@ -544,7 +605,17 @@ export function onPointClick(p, marker) {
     const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
     popup.openOn(map);
 
-    fetch(geeApi(`action=analyzeCSD&lat=${p.lat}&lng=${p.lng}&size=${p.size}&ward=${encodeURIComponent(p.ward)}`))
+    if (!geoWardNow) {
+      fetch(geeApi(`action=getWardFromPoint&lat=${p.lat}&lng=${p.lng}`))
+        .then(r => r.json())
+        .then(res => {
+          const el = document.getElementById('popupWardDiaBan');
+          if (el) el.innerHTML = buildDiaBanHtml(res.ward, p.ward);
+        })
+        .catch(() => {});
+    }
+
+    fetch(geeApi(`action=analyzeCSD&lat=${p.lat}&lng=${p.lng}&size=${p.size}&ward=${encodeURIComponent(geoWardNow || p.ward || '')}`))
       .then(r => r.json())
       .then(res => {
         let sugHtml = "";

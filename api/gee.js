@@ -5,6 +5,8 @@ const { getRawDataList, invalidateCache } = require('../services/gcsService');
 
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
+/** Cache độ phủ theo phường (ghi nhớ khi tính nền / mở chi tiết) */
+let cachedCoverageByWard = {};
 
 async function calculateNetworkIsochrone16(lat, lng, banKinh) {
   const R = parseFloat(banKinh) || 500;
@@ -405,6 +407,7 @@ module.exports = async (req, res) => {
 
       invalidateCache();
       cachedWardStats = null;
+      cachedCoverageByWard = {};
       const gasRes = await fetch(syncUrl);
       const result = await gasRes.json().catch(() => ({ success: true }));
       return res.status(200).json({ success: true, result });
@@ -417,6 +420,7 @@ module.exports = async (req, res) => {
       const syncUrl = `${constants.GAS_BASE_URL}?action=approvePoint&id=${encodeURIComponent(id)}`;
       invalidateCache();
       cachedWardStats = null;
+      cachedCoverageByWard = {};
       const gasRes = await fetch(syncUrl);
       const result = await gasRes.json().catch(() => ({ success: true }));
       return res.status(200).json({ success: true, result });
@@ -662,6 +666,23 @@ module.exports = async (req, res) => {
         if (result.timedOut) payload.coverageStatus = 'timeout';
         else payload.coverageStatus = 'ok';
 
+        if (!result.timedOut) {
+          cachedCoverageByWard[targetWard.name] = {
+            ratios: { ...payload.ratios },
+            Avg_Coverage_Score: payload.Avg_Coverage_Score,
+            at: Date.now()
+          };
+          // Đồng bộ vào bảng tổng hợp đang cache (nếu có)
+          if (cachedWardStats && Array.isArray(cachedWardStats)) {
+            const row = cachedWardStats.find(w => w.Ten_Phuong === targetWard.name);
+            if (row) {
+              codesList.forEach(c => { row[`Ratio_${c}`] = payload.ratios[c]; });
+              row.Avg_Coverage_Score = payload.Avg_Coverage_Score;
+              row._coverageReady = true;
+            }
+          }
+        }
+
         return res.status(200).json(payload);
       } catch (err) {
         console.error("getWardCoverage error:", err && err.message);
@@ -774,8 +795,11 @@ module.exports = async (req, res) => {
         }
       });
 
-      // Độ phủ toàn TP: tách endpoint getWardCoverage theo từng phường (tránh 504).
+      // Độ phủ: lấy từ cache đã tính nền / chi tiết phường; phần còn thiếu client tính tiếp.
       const coverageByWard = {};
+      Object.keys(cachedCoverageByWard).forEach(name => {
+        coverageByWard[name] = cachedCoverageByWard[name].ratios || {};
+      });
       const coverageStatus = 'per_ward';
 
       const resultTable = [];
@@ -901,6 +925,7 @@ module.exports = async (req, res) => {
         calculatedRow.Avg_Coverage_Score = Number((totalCoverageSum / (countMetrics || 1)).toFixed(1));
         calculatedRow.Avg_Scale_Score = Number((totalScaleSum / (countMetrics || 1)).toFixed(1));
         calculatedRow._assignMode = 'geometry';
+        if (cachedCoverageByWard[wName]) calculatedRow._coverageReady = true;
 
         resultTable.push(calculatedRow);
       }

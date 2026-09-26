@@ -124,6 +124,10 @@ export function updateInfraPieChart(sourceList) {
   const widget = document.getElementById('infraPieWidget');
   if (!widget) return;
   widget.style.display = 'block';
+  widget.style.position = 'absolute';
+  widget.style.top = '12px';
+  widget.style.left = '16px';
+  widget.style.zIndex = '1100';
 
   const legendContainer = document.getElementById('pieLegendDetails');
   if (legendContainer) {
@@ -137,14 +141,21 @@ export function updateInfraPieChart(sourceList) {
   const areaTotals = {};
   let totalAreaSum = 0;
 
-  sourceList.forEach(item => {
-    const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE');
+  (sourceList || []).forEach(item => {
+    const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE' || item.status === '1');
     if (!isApproved && item.type !== "9-CSD") return;
     const type = item.type || 'Khác';
     const size = Number(item.size || 0);
-    areaTotals[type] = (areaTotals[type] || 0) + size;
-    totalAreaSum += size;
+    // Nếu diện tích = 0 vẫn tính 1 đơn vị để donut không trống
+    const weight = size > 0 ? size : 1;
+    areaTotals[type] = (areaTotals[type] || 0) + weight;
+    totalAreaSum += weight;
   });
+
+  if (Object.keys(areaTotals).length === 0) {
+    areaTotals['empty'] = 1;
+    totalAreaSum = 1;
+  }
 
   const labelsMap = {
     "1-CV": "Công viên, cây xanh",
@@ -155,7 +166,8 @@ export function updateInfraPieChart(sourceList) {
     "6-YT": "Cơ sở Y tế",
     "7-VH": "Nhà văn hóa, thể thao",
     "8-TM": "Chợ, TTTM",
-    "9-CSD": "Quỹ đất tiềm năng"
+    "9-CSD": "Quỹ đất tiềm năng",
+    "empty": "Chưa có dữ liệu"
   };
 
   const colorsMap = {
@@ -243,6 +255,152 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+const COVERAGE_LS_KEY = 'qh_hue_ward_coverage_v1';
+const COVERAGE_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+let coverageFillRunning = false;
+
+function loadLocalCoverageCache() {
+  try {
+    const raw = localStorage.getItem(COVERAGE_LS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveLocalCoverageCache(map) {
+  try {
+    localStorage.setItem(COVERAGE_LS_KEY, JSON.stringify(map));
+  } catch (e) {}
+}
+
+function applyCoverageToWardRow(ward, covPayload) {
+  COVERAGE_CODES.forEach(c => {
+    const val = Number((covPayload.ratios && covPayload.ratios[c]) ?? covPayload[`Ratio_${c}`] ?? 0);
+    ward[`Ratio_${c}`] = val;
+  });
+  ward.Avg_Coverage_Score = Number(covPayload.Avg_Coverage_Score || 0);
+  ward._coverageReady = true;
+}
+
+function mergeLocalCoverageIntoStats() {
+  const cache = loadLocalCoverageCache();
+  (state.wardStatsData || []).forEach(w => {
+    const hit = cache[w.Ten_Phuong];
+    if (!hit) return;
+    applyCoverageToWardRow(w, hit);
+  });
+}
+
+function rebuildCombinedTableBody() {
+  const tbody = document.getElementById('statTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  state.wardStatsData.forEach((w, idx) => {
+    let row = `<tr data-ward-row="${w.Ten_Phuong}">
+      <td>${idx + 1}</td>
+      <td style="text-align:left;">
+        <a href="javascript:void(0)" class="ward-link" data-ward="${w.Ten_Phuong}" style="font-weight:bold; color:var(--accent-cyan); text-decoration:none;">
+          📍 ${w.Ten_Phuong}
+        </a>
+      </td>
+      <td style="font-weight:bold; color:var(--accent-green); text-align:right;">${Number(w.Dan_So_Vector).toLocaleString()}</td>`;
+
+    COVERAGE_CODES.forEach(c => {
+      const cov = Number(w[`Ratio_${c}`] || 0).toFixed(1);
+      const scale = Number(w[`Scale_${c}`] || 0).toFixed(1);
+      row += `<td class="cov-cell" data-code="${c}" style="color:var(--accent-green);">${cov}%</td><td style="color:var(--accent-orange); font-weight:bold;">${scale}%</td>`;
+    });
+
+    row += `<td class="cov-avg" style="font-weight:bold; color:var(--accent-green); background:rgba(56,189,248,0.05);">${Number(w.Avg_Coverage_Score || 0).toFixed(1)}%</td>`;
+    row += `<td style="font-weight:bold; color:var(--accent-orange); background:rgba(245,158,11,0.05);">${Number(w.Avg_Scale_Score || 0).toFixed(1)}%</td></tr>`;
+    tbody.innerHTML += row;
+  });
+
+  document.querySelectorAll('.ward-link').forEach(link => {
+    link.onclick = (e) => {
+      const wName = e.currentTarget.getAttribute('data-ward');
+      selectWardDetail(wName);
+    };
+  });
+}
+
+function patchCombinedTableWardRow(ward) {
+  const tr = Array.from(document.querySelectorAll('tr[data-ward-row]'))
+    .find(el => el.getAttribute('data-ward-row') === ward.Ten_Phuong);
+  if (!tr) {
+    rebuildCombinedTableBody();
+    return;
+  }
+  COVERAGE_CODES.forEach(c => {
+    const cell = tr.querySelector(`.cov-cell[data-code="${c}"]`);
+    if (cell) cell.textContent = `${Number(ward[`Ratio_${c}`] || 0).toFixed(1)}%`;
+  });
+  const avgCell = tr.querySelector('.cov-avg');
+  if (avgCell) avgCell.textContent = `${Number(ward.Avg_Coverage_Score || 0).toFixed(1)}%`;
+}
+
+/**
+ * Tính độ phủ nền: dân số lớn → nhỏ, ghi nhớ localStorage + cập nhật bảng khi đang mở.
+ */
+export async function startBackgroundCoverageFill() {
+  if (coverageFillRunning) return;
+  coverageFillRunning = true;
+
+  const mBar = document.getElementById('modalProgressBar');
+  const mTxt = document.getElementById('modalProgressText');
+  const cache = loadLocalCoverageCache();
+  mergeLocalCoverageIntoStats();
+  rebuildCombinedTableBody();
+  renderCombinedChart();
+
+  const queue = [...(state.wardStatsData || [])]
+    .sort((a, b) => Number(b.Dan_So_Vector || 0) - Number(a.Dan_So_Vector || 0));
+
+  let done = queue.filter(w => w._coverageReady || cache[w.Ten_Phuong]).length;
+  const total = queue.length || 1;
+
+  for (const ward of queue) {
+    if (ward._coverageReady || cache[ward.Ten_Phuong]) {
+      if (cache[ward.Ten_Phuong] && !ward._coverageReady) {
+        applyCoverageToWardRow(ward, cache[ward.Ten_Phuong]);
+        patchCombinedTableWardRow(ward);
+      }
+      done = Math.max(done, queue.filter(w => w._coverageReady || cache[w.Ten_Phuong]).length);
+      if (mBar) mBar.style.width = `${Math.round((done / total) * 100)}%`;
+      if (mTxt) mTxt.innerText = `Độ phủ ${done}/${total}`;
+      continue;
+    }
+
+    try {
+      const res = await fetch(geeApi(`action=getWardCoverage&ward=${encodeURIComponent(ward.Ten_Phuong)}`));
+      if (res.ok) {
+        const cov = await res.json();
+        if (cov.coverageStatus !== 'timeout') {
+          applyCoverageToWardRow(ward, cov);
+          cache[ward.Ten_Phuong] = {
+            ratios: Object.fromEntries(COVERAGE_CODES.map(c => [c, ward[`Ratio_${c}`]])),
+            Avg_Coverage_Score: ward.Avg_Coverage_Score
+          };
+          saveLocalCoverageCache(cache);
+          patchCombinedTableWardRow(ward);
+        }
+      }
+    } catch (err) {
+      console.warn("Background coverage fail:", ward.Ten_Phuong, err);
+    }
+
+    done += 1;
+    if (mBar) mBar.style.width = `${Math.round((done / total) * 100)}%`;
+    if (mTxt) mTxt.innerText = `Độ phủ ${Math.min(done, total)}/${total}`;
+  }
+
+  renderCombinedChart();
+  if (mTxt) mTxt.innerText = "100%";
+  if (mBar) mBar.style.width = "100%";
+  coverageFillRunning = false;
+}
+
 export function openCombinedModal() {
   const combinedModal = document.getElementById('combinedModal');
   if (!combinedModal) return;
@@ -297,47 +455,18 @@ export function openCombinedModal() {
       return r.json();
     })
     .then(resData => {
-      if (mBar) mBar.style.width = "100%";
-      if (mTxt) mTxt.innerText = "100%";
+      if (mBar) mBar.style.width = "40%";
+      if (mTxt) mTxt.innerText = "40%";
       if (tbody) tbody.innerHTML = "";
       
       state.wardStatsData = resData.data || [];
-      const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
-
-      if (state.wardStatsData.length > 0) {
-        renderCombinedChart();
-      }
-
-      state.wardStatsData.forEach((w, idx) => {
-        let row = `<tr>
-          <td>${idx + 1}</td>
-          <td style="text-align:left;">
-            <a href="javascript:void(0)" class="ward-link" data-ward="${w.Ten_Phuong}" style="font-weight:bold; color:var(--accent-cyan); text-decoration:none;">
-              📍 ${w.Ten_Phuong}
-            </a>
-          </td>
-          <td style="font-weight:bold; color:var(--accent-green); text-align:right;">${Number(w.Dan_So_Vector).toLocaleString()}</td>`;
-
-        codes.forEach(c => {
-          const cov = Number(w[`Ratio_${c}`] || 0).toFixed(1);
-          const scale = Number(w[`Scale_${c}`] || 0).toFixed(1);
-          row += `<td style="color:var(--accent-green);">${cov}%</td><td style="color:var(--accent-orange); font-weight:bold;">${scale}%</td>`;
-        });
-
-        row += `<td style="font-weight:bold; color:var(--accent-green); background:rgba(56,189,248,0.05);">${Number(w.Avg_Coverage_Score || 0).toFixed(1)}%</td>`;
-        row += `<td style="font-weight:bold; color:var(--accent-orange); background:rgba(245,158,11,0.05);">${Number(w.Avg_Scale_Score || 0).toFixed(1)}%</td></tr>`;
-        
-        if (tbody) tbody.innerHTML += row;
-      });
-
-      document.querySelectorAll('.ward-link').forEach(link => {
-        link.onclick = (e) => {
-          const wName = e.target.getAttribute('data-ward');
-          selectWardDetail(wName);
-        };
-      });
-
+      mergeLocalCoverageIntoStats();
+      rebuildCombinedTableBody();
       renderCombinedChart();
+
+      if (mBar) mBar.style.width = "50%";
+      if (mTxt) mTxt.innerText = "Độ phủ…";
+      startBackgroundCoverageFill();
     })
     .catch((err) => {
       if (tbody) tbody.innerHTML = `<tr><td colspan='20' style='text-align:center; color:var(--accent-red); padding:20px;'>❌ ${err.message || 'Lỗi nạp dữ liệu từ GEE Server.'}</td></tr>`;
@@ -426,7 +555,12 @@ export function selectWardDetail(wardName) {
   const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
   if (!wardData) return;
 
+  state.selectedWard = wardName;
+  const wardSelector = document.getElementById('wardSelector');
+  if (wardSelector) wardSelector.value = wardName;
+
   fitMapToWard(wardName);
+  renderGroupedPoints();
 
   const wardPoints = [];
   Object.values(wardData.urbanResults || {}).forEach(node => {
@@ -445,19 +579,21 @@ async function fetchAndApplyWardCoverage(wardData) {
     const res = await fetch(geeApi(`action=getWardCoverage&ward=${encodeURIComponent(wardData.Ten_Phuong)}`));
     if (!res.ok) return false;
     const cov = await res.json();
-    const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
-    codes.forEach(c => {
-      const val = Number((cov.ratios && cov.ratios[c]) ?? cov[`Ratio_${c}`] ?? 0);
-      wardData[`Ratio_${c}`] = val;
-    });
-    wardData.Avg_Coverage_Score = Number(cov.Avg_Coverage_Score || 0);
+    applyCoverageToWardRow(wardData, cov);
+    const cache = loadLocalCoverageCache();
+    cache[wardData.Ten_Phuong] = {
+      ratios: Object.fromEntries(COVERAGE_CODES.map(c => [c, wardData[`Ratio_${c}`]])),
+      Avg_Coverage_Score: wardData.Avg_Coverage_Score
+    };
+    saveLocalCoverageCache(cache);
 
     const idx = state.wardStatsData.findIndex(w => w.Ten_Phuong === wardData.Ten_Phuong);
     if (idx >= 0) {
-      codes.forEach(c => { state.wardStatsData[idx][`Ratio_${c}`] = wardData[`Ratio_${c}`]; });
+      COVERAGE_CODES.forEach(c => { state.wardStatsData[idx][`Ratio_${c}`] = wardData[`Ratio_${c}`]; });
       state.wardStatsData[idx].Avg_Coverage_Score = wardData.Avg_Coverage_Score;
+      state.wardStatsData[idx]._coverageReady = true;
     }
-    return true;
+    return cov.coverageStatus !== 'timeout';
   } catch (err) {
     console.error("Lỗi tải độ phủ phường:", err);
     return false;
