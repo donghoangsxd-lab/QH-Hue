@@ -478,9 +478,9 @@ function buildDiaBanHtml(geoWard, sheetWard) {
   const geo = (geoWard || "").trim();
   const sheet = (sheetWard || "").trim();
   if (!geo) {
-    return sheet ? `Phường/Xã ${sheet}` : "Phường/Xã —";
+    return sheet || "—";
   }
-  let html = `Phường/Xã ${geo}`;
+  let html = geo;
   const clean = (s) => String(s || "")
     .replace(/^Phường\s+/i, "").replace(/^Xã\s+/i, "")
     .trim().toLowerCase();
@@ -728,7 +728,7 @@ export async function handleInspectPointClick(clickLat, clickLng) {
 
       let resultHtml = `<div style="font-size:11px;">
         <b style="color:var(--accent-cyan);">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ</b><br>
-        <span style="color:var(--text-muted);">📍 Địa bàn: <b>Phường/Xã ${wardName}</b> | 🛤️ Bán kính chuẩn: <b style="color:var(--accent-green);">${checkRadius}m</b></span><br>
+        <span style="color:var(--text-muted);">📍 Địa bàn: <b>${wardName}</b> | 🛤️ Bán kính chuẩn: <b style="color:var(--accent-green);">${checkRadius}m</b></span><br>
 
         <div style="font-weight:bold; color:var(--accent-green); margin-top:6px;">
           1. Tiếp cận: ${coveredCount}/8 nhóm
