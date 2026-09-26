@@ -519,7 +519,7 @@ export async function openWardDetailDirect(wardName) {
           <tr>
             <th style="width:5%; text-align:center;">STT</th>
             <th style="width:31%;">Loại hạ tầng</th>
-            <th style="width:12%;">Hiện trạng</th>
+            <th style="width:12%;">Diện tích</th>
             <th style="width:8%;">Chỉ tiêu</th>
             <th style="width:11%;">Nhu cầu DT</th>
             <th style="width:9%; text-align:center;">Số lượng</th>
@@ -742,7 +742,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       <tr>
         <th style="width:5%; text-align:center;">STT</th>
         <th style="width:31%;">Loại hạ tầng</th>
-        <th style="width:12%;">Hiện trạng</th>
+        <th style="width:12%;">Diện tích</th>
         <th style="width:8%;">Chỉ tiêu</th>
         <th style="width:11%;">Nhu cầu DT</th>
         <th style="width:9%; text-align:center;">Số lượng</th>
@@ -948,9 +948,38 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     unitIdx++;
   });
 
-  // C / CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG) - Định dạng ngắn gọn theo yêu cầu mục 4
+  // C / CÔNG TRÌNH CHƯA DUYỆT (QUY HOẠCH) — nhóm 1–8, TrangThai = FALSE
+  html += `<tr style="background:rgba(248, 113, 113, 0.18); font-weight:bold;">
+    <td style="text-align:center; color:var(--accent-red);">C</td>
+    <td colspan="7" style="color:var(--accent-red); text-align:left; padding-left:8px;">CÔNG TRÌNH CHƯA DUYỆT (QUY HOẠCH)</td>
+  </tr>`;
+
+  const pendingList = wardData.pendingItems || [];
+  if (pendingList.length > 0) {
+    pendingList.forEach((pItem, pIdx) => {
+      const pLat = pItem.lat || 16.4637;
+      const pLng = pItem.lng || 107.5905;
+      const scaleAdd = Number(pItem.scaleAddPct || 0).toFixed(1);
+      const covAdd = Number(pItem.coverageAddPct || 0).toFixed(1);
+      const typeNote = pItem.typeLabel ? ` <span style="color:var(--text-muted); font-weight:normal;">(${pItem.typeLabel})</span>` : '';
+      html += `<tr style="color:var(--text-main); font-size:9.5px;">
+        <td style="text-align:center; font-weight:bold;">${pIdx + 1}</td>
+        <td style="text-align:left; padding-left:6px; font-weight:bold;">
+          <a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${pLat}, ${pLng}, '${encodeURIComponent(pItem.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">${pItem.name || 'Công trình'}</a>${typeNote}
+        </td>
+        <td style="text-align:right; font-weight:bold;">${Number(pItem.size || 0).toLocaleString()} m²</td>
+        <td colspan="5" style="text-align:left; color:var(--accent-orange); font-weight:500;">
+          Sau khi phê duyệt dự kiến bổ sung <b style="color:var(--accent-green);">${scaleAdd}%</b> quy mô, <b style="color:var(--accent-cyan);">${covAdd}%</b> độ phủ
+        </td>
+      </tr>`;
+    });
+  } else {
+    html += `<tr><td style="text-align:center;">-</td><td colspan="7" style="text-align:center; color:var(--text-muted); font-style:italic;">Không có công trình nhóm 1–8 đang chờ duyệt trong phường.</td></tr>`;
+  }
+
+  // D / CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG)
   html += `<tr style="background:rgba(234, 179, 8, 0.18); font-weight:bold;">
-    <td style="text-align:center; color:var(--accent-orange);">C</td>
+    <td style="text-align:center; color:var(--accent-orange);">D</td>
     <td colspan="7" style="color:var(--accent-orange); text-align:left; padding-left:8px;">CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG)</td>
   </tr>`;
 
@@ -972,12 +1001,15 @@ function buildWardQuotaTableHtml(wardData, projPop) {
           shortProposal = `Đề xuất: ${parts.join('; ')}`;
         }
       }
+      const needApproveNote = (csd.needsApproval || csd.status === false || String(csd.status).toUpperCase() === 'FALSE')
+        ? ' <span style="color:var(--accent-red); font-weight:bold;">(Cần phê duyệt)</span>'
+        : '';
 
       html += `<tr style="color:var(--text-main); font-size:9.5px;">
         <td style="text-align:center; font-weight:bold;">${csdIdx + 1}</td>
         <td style="text-align:left; padding-left:6px; font-weight:bold;"><a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${csdLat}, ${csdLng}, '${encodeURIComponent(csd.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">${csd.name}</a></td>
         <td style="text-align:right; font-weight:bold;">${Number(csd.size || 0).toLocaleString()} m²</td>
-        <td colspan="4" style="text-align:left; color:var(--accent-orange); font-weight:500;">💡 ${shortProposal}</td>
+        <td colspan="4" style="text-align:left; color:var(--accent-orange); font-weight:500;">💡 ${shortProposal}${needApproveNote}</td>
         <td style="text-align:center; color:var(--accent-orange);">Chưa sử dụng</td>
       </tr>`;
     });

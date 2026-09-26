@@ -632,7 +632,10 @@ export function onPointClick(p, marker) {
           sugHtml += `<div class="sug-card ineligible">❌ <b>${inEl.label}</b> (Không đủ DT min: ${inEl.minSize}m²)</div>`;
         });
         const sugContainer = document.getElementById('csdSug');
-        if (sugContainer) sugContainer.innerHTML = sugHtml || "<div class='sug-card'>✓ Vị trí đã phủ đủ hạ tầng.</div>";
+        if (sugContainer) {
+          const base = sugHtml || "<div class='sug-card'>✓ Vị trí đã phủ đủ hạ tầng.</div>";
+          sugContainer.innerHTML = base + `<div style="margin-top:6px; font-size:10px; color:var(--accent-red); font-weight:bold; text-align:center;">(Cần phê duyệt)</div>`;
+        }
       });
   }
 }

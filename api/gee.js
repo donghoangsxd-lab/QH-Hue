@@ -693,7 +693,8 @@ module.exports = async (req, res) => {
     if (action === 'getWardStats') {
       const now = Date.now();
       if (cachedWardStats && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)
-          && cachedWardStats[0] && cachedWardStats[0]._assignMode === 'geometry') {
+          && cachedWardStats[0] && cachedWardStats[0]._assignMode === 'geometry'
+          && cachedWardStats[0]._schema === 3) {
         return res.status(200).json({ data: cachedWardStats, coverageStatus: 'cached' });
       }
       cachedWardStats = null;
@@ -710,6 +711,7 @@ module.exports = async (req, res) => {
           currentUnits: Math.max(1, Math.round(totalPop / 20000)),
           projectedUnits: Math.max(1, Math.round((totalPop * 1.2) / 20000)),
           items: [],
+          pendingItems: [],
           csdItems: []
         };
       });
@@ -725,11 +727,13 @@ module.exports = async (req, res) => {
           const prefix = String(item.id || '').split('-')[0];
           const nhom = String(item.nhomHaTang || '').toLowerCase();
           const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE');
-          const isUnused = (prefix === "CSD" || prefix === "9" || nhom.includes("chưa sử dụng") || nhom.includes("csd") || !isApproved);
+          const typeCode = item.type || constants.codeMap[prefix] || "";
+          const isCSD = (typeCode === "9-CSD" || prefix === "CSD" || prefix === "9"
+            || nhom.includes("chưa sử dụng") || nhom.includes("csd"));
+          const codesToCheck = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
 
-          if (isUnused && !isApproved) {
+          if (isCSD) {
             const csdSize = Number(item.size || item.dienTich || 0);
-            const codesToCheck = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
             
             const wardExistAreas = {};
             rawDataList.forEach(subItem => {
@@ -787,8 +791,11 @@ module.exports = async (req, res) => {
               lng: ptLng,
               radius: Number(item.radius || item.banKinh || 500),
               suggestions: evaluatedSuggestions.filter(s => s.status !== 'fulfilled'),
-              status: item.status
+              status: item.status,
+              needsApproval: !isApproved
             });
+          } else if (!isApproved && codesToCheck.includes(typeCode)) {
+            wardMap[assignedWardName].pendingItems.push(item);
           } else if (isApproved) {
             wardMap[assignedWardName].items.push(item);
           }
@@ -888,12 +895,50 @@ module.exports = async (req, res) => {
           urbanResults: urbanResults,
           unitResults: unitResults,
           csdItems: data.csdItems || [],
+          pendingItems: [],
           dvccSummary: {
             totalArea: (unitResults["YT_DV"]?.currentArea || 0) + (unitResults["VH_DV"]?.currentArea || 0) + (unitResults["TM_DV"]?.currentArea || 0),
             requiredArea: 2.0 * projPop,
             status: false
           }
         };
+
+        const typeAreaExist = (code) => {
+          if (code === "1-CV") return (urbanResults["CV_DT"]?.currentArea || 0) + (unitResults["CV_DV"]?.currentArea || 0);
+          if (code === "2-BDX") return (urbanResults["BDX_DT"]?.currentArea || 0) + (unitResults["BDX_DV"]?.currentArea || 0);
+          if (code === "3-MN") return unitResults["3-MN"]?.currentArea || 0;
+          if (code === "4-TH") return unitResults["4-TH"]?.currentArea || 0;
+          if (code === "5-THCS") return unitResults["5-THCS"]?.currentArea || 0;
+          if (code === "6-YT") return (urbanResults["YT_DT"]?.currentArea || 0) + (unitResults["YT_DV"]?.currentArea || 0);
+          if (code === "7-VH") return (urbanResults["VH_DT"]?.currentArea || 0) + (unitResults["VH_DV"]?.currentArea || 0);
+          if (code === "8-TM") return (urbanResults["TM_DT"]?.currentArea || 0) + (unitResults["TM_DV"]?.currentArea || 0);
+          return 0;
+        };
+
+        calculatedRow.pendingItems = (data.pendingItems || []).map(item => {
+          const code = item.type || "9-CSD";
+          const size = Number(item.size || 0);
+          const quota = (constants.quotaConfig && constants.quotaConfig[code]) || 0;
+          const reqArea = Math.max(1, Math.round(quota * projPop));
+          const existArea = typeAreaExist(code);
+          const scaleAddPct = Number(Math.min(100, Math.max(0, (size / reqArea) * 100)).toFixed(1));
+          // % đóng góp diện tích trong nhóm sau khi duyệt (ước lượng độ phủ đóng góp)
+          const coverageAddPct = Number(Math.min(100, Math.max(0, (size / Math.max(existArea + size, 1)) * 100)).toFixed(1));
+          const typeLabel = (constants.infraConfig && constants.infraConfig[code] && constants.infraConfig[code].label) || code;
+          return {
+            id: item.id,
+            name: item.name,
+            type: code,
+            typeLabel,
+            size,
+            lat: item.lat,
+            lng: item.lng,
+            radius: Number(item.radius || item.banKinh || 500),
+            status: item.status,
+            scaleAddPct,
+            coverageAddPct
+          };
+        });
 
         codesList.forEach(c => {
           let node = null;
@@ -925,6 +970,7 @@ module.exports = async (req, res) => {
         calculatedRow.Avg_Coverage_Score = Number((totalCoverageSum / (countMetrics || 1)).toFixed(1));
         calculatedRow.Avg_Scale_Score = Number((totalScaleSum / (countMetrics || 1)).toFixed(1));
         calculatedRow._assignMode = 'geometry';
+        calculatedRow._schema = 3;
         if (cachedCoverageByWard[wName]) calculatedRow._coverageReady = true;
 
         resultTable.push(calculatedRow);
