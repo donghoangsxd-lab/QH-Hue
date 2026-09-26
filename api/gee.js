@@ -106,9 +106,145 @@ function withTimeout(promise, ms, onTimeoutValue) {
   });
 }
 
+function isPointInPolygon(point, vs) {
+  const x = point[0], y = point[1];
+  let inside = false;
+  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+    const xi = vs[i][0], yi = vs[i][1];
+    const xj = vs[j][0], yj = vs[j][1];
+    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function checkPointInGeoJSONGeometry(ptLng, ptLat, geometry) {
+  if (!geometry || !geometry.coordinates) return false;
+  const type = geometry.type;
+  const coords = geometry.coordinates;
+  try {
+    if (type === 'Polygon') {
+      return isPointInPolygon([ptLng, ptLat], coords[0]);
+    }
+    if (type === 'MultiPolygon') {
+      for (const polyCoords of coords) {
+        if (isPointInPolygon([ptLng, ptLat], polyCoords[0])) return true;
+      }
+    }
+  } catch (e) {}
+  return false;
+}
+
+let cachedEvaluatedWards = null;
+let cachedEvaluatedWardsAt = 0;
+
+async function loadEvaluatedWards(wardVectorParsed) {
+  const now = Date.now();
+  if (cachedEvaluatedWards && (now - cachedEvaluatedWardsAt < constants.WARD_STATS_CACHE_TTL)) {
+    return cachedEvaluatedWards;
+  }
+  const wardList = await new Promise((resolve, reject) => {
+    wardVectorParsed.evaluate((fc, err) => err ? reject(err) : resolve(fc ? fc.features : []));
+  });
+  const evaluatedWards = [];
+  wardList.forEach(f => {
+    const props = f.properties || {};
+    const wName = props.tenXa || props.NAME_2 || props.name || 'Phường';
+    const totalPop = Number(props.danSoNum || props.danSo || 10000);
+    evaluatedWards.push({
+      name: wName,
+      pop: totalPop,
+      geometry: f.geometry || null
+    });
+  });
+  cachedEvaluatedWards = evaluatedWards;
+  cachedEvaluatedWardsAt = now;
+  return evaluatedWards;
+}
+
+function assignWardByGeometry(ptLng, ptLat, evaluatedWards) {
+  for (const w of evaluatedWards) {
+    if (w.geometry && checkPointInGeoJSONGeometry(ptLng, ptLat, w.geometry)) {
+      return w.name;
+    }
+  }
+  return null;
+}
+
 /**
- * Tối ưu độ phủ: 8 vùng buffer (1/loại) + 1 band tổng pixel,
- * chồng lên FeatureCollection phường phía GEE — chỉ 1 lần evaluate.
+ * Độ phủ 1 phường: 8 buffer loại hạ tầng (điểm nằm trong ranh giới) chồng raster dân số.
+ * 1 lần reduceRegion — đủ nhẹ cho Vercel.
+ */
+async function computeSingleWardCoverage(ee, popRasterNormalized, wardGeometry, itemsInWard) {
+  const codesList = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+  const ratios = {};
+  codesList.forEach(c => { ratios[c] = 0; });
+
+  if (!popRasterNormalized || !wardGeometry) {
+    return { ratios, Avg_Coverage_Score: 0 };
+  }
+
+  const wardGeom = ee.Geometry(wardGeometry);
+  const emptyMask = ee.Image.constant(0).selfMask();
+  const bandImages = [popRasterNormalized.rename('pix_total')];
+
+  codesList.forEach(c => {
+    const bandName = bandKeyForCode(c);
+    const matchingItems = (itemsInWard || []).filter(it =>
+      isApprovedStatus(it.status) && it.type === c && it.lat != null && it.lng != null
+    );
+
+    if (matchingItems.length === 0) {
+      bandImages.push(popRasterNormalized.updateMask(emptyMask).rename(bandName));
+      return;
+    }
+
+    const defaultR = (constants.infraConfig && constants.infraConfig[c] && constants.infraConfig[c].radius) || 500;
+    const bufferFc = ee.FeatureCollection(matchingItems.map(it => {
+      const effectiveR = Number(it.radius) || Number(it.banKinh) || defaultR;
+      return ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(effectiveR));
+    }));
+
+    const bufferMask = ee.Image(0).byte().paint({
+      featureCollection: bufferFc,
+      color: 1
+    }).gt(0);
+
+    bandImages.push(popRasterNormalized.updateMask(bufferMask).rename(bandName));
+  });
+
+  const stacked = ee.Image.cat(bandImages);
+  const dict = stacked.reduceRegion({
+    reducer: ee.Reducer.count(),
+    geometry: wardGeom,
+    scale: 60,
+    maxPixels: 1e9,
+    tileScale: 4
+  });
+
+  const evalResult = await new Promise((resolve, reject) => {
+    dict.evaluate((res, err) => err ? reject(err) : resolve(res || {}));
+  });
+
+  const totalPix = readPixProp(evalResult, 'pix_total');
+  let sum = 0;
+  codesList.forEach(c => {
+    const servedPix = readPixProp(evalResult, bandKeyForCode(c));
+    const val = totalPix > 0
+      ? Number(Math.min(100, Math.max(0, (servedPix / totalPix) * 100)).toFixed(1))
+      : 0;
+    ratios[c] = val;
+    sum += val;
+  });
+
+  return {
+    ratios,
+    Avg_Coverage_Score: Number((sum / (codesList.length || 1)).toFixed(1))
+  };
+}
+
+/**
+ * Tối ưu độ phủ toàn TP: 8 vùng buffer + 1 band tổng — 1 lần evaluate (có thể chậm).
  */
 async function computeWardCoverageRatios(ee, popRasterNormalized, rawDataList, wardVectorParsed) {
   const codesList = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
@@ -490,35 +626,64 @@ module.exports = async (req, res) => {
       return res.status(200).json({ suggestions, ineligible });
     }
 
-    if (action === 'getWardStats') {
-      const now = Date.now();
-      if (cachedWardStats && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)) {
-        return res.status(200).json({ data: cachedWardStats, coverageStatus: 'cached' });
+    if (action === 'getWardCoverage') {
+      const wardName = String(req.query.ward || '').trim();
+      if (!wardName) {
+        return res.status(400).json({ error: true, message: "Thiếu tên phường" });
       }
 
-      // Chỉ lấy thuộc tính (không tải geometry) để tránh timeout Vercel 60s
-      const wardPropsFc = wardVectorParsed.map(f => ee.Feature(null, {
-        tenXa: f.get('tenXa'),
-        NAME_2: f.get('NAME_2'),
-        name: f.get('name'),
-        danSoNum: f.get('danSoNum'),
-        danSo: f.get('danSo')
-      }));
+      const evaluatedWards = await loadEvaluatedWards(wardVectorParsed);
+      const targetWard = evaluatedWards.find(w =>
+        w.name === wardName || constants.cleanWardStr(w.name) === constants.cleanWardStr(wardName)
+      );
+      if (!targetWard || !targetWard.geometry) {
+        return res.status(404).json({ error: true, message: "Không tìm thấy ranh giới phường" });
+      }
 
-      const wardList = await new Promise((resolve, reject) => {
-        wardPropsFc.evaluate((fc, err) => err ? reject(err) : resolve(fc ? fc.features : []));
+      const itemsInWard = rawDataList.filter(item => {
+        if (item.lat == null || item.lng == null) return false;
+        if (!isApprovedStatus(item.status)) return false;
+        return checkPointInGeoJSONGeometry(Number(item.lng), Number(item.lat), targetWard.geometry);
       });
 
-      const wardMap = {};
-      const wardNameByClean = {};
+      try {
+        const result = await withTimeout(
+          computeSingleWardCoverage(ee, popRasterNormalized, targetWard.geometry, itemsInWard),
+          45000,
+          { ratios: {}, Avg_Coverage_Score: 0, timedOut: true }
+        );
 
-      wardList.forEach(f => {
-        const props = f.properties || {};
-        const wName = props.tenXa || props.NAME_2 || props.name || 'Phường';
-        const totalPop = Number(props.danSoNum || props.danSo || 10000);
-        
-        wardMap[wName] = {
-          Ten_Phuong: wName,
+        const payload = { ward: targetWard.name, ratios: {}, Avg_Coverage_Score: result.Avg_Coverage_Score || 0 };
+        const codesList = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+        codesList.forEach(c => {
+          payload.ratios[c] = Number((result.ratios && result.ratios[c]) || 0);
+          payload[`Ratio_${c}`] = payload.ratios[c];
+        });
+        if (result.timedOut) payload.coverageStatus = 'timeout';
+        else payload.coverageStatus = 'ok';
+
+        return res.status(200).json(payload);
+      } catch (err) {
+        console.error("getWardCoverage error:", err && err.message);
+        return res.status(500).json({ error: true, message: err.message || "Lỗi tính độ phủ" });
+      }
+    }
+
+    if (action === 'getWardStats') {
+      const now = Date.now();
+      if (cachedWardStats && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)
+          && cachedWardStats[0] && cachedWardStats[0]._assignMode === 'geometry') {
+        return res.status(200).json({ data: cachedWardStats, coverageStatus: 'cached' });
+      }
+      cachedWardStats = null;
+
+      const evaluatedWards = await loadEvaluatedWards(wardVectorParsed);
+
+      const wardMap = {};
+      evaluatedWards.forEach(w => {
+        const totalPop = w.pop || 10000;
+        wardMap[w.name] = {
+          Ten_Phuong: w.name,
           Dan_So_Vector: totalPop,
           projectedPopulation: Math.round(totalPop * 1.2),
           currentUnits: Math.max(1, Math.round(totalPop / 20000)),
@@ -526,24 +691,14 @@ module.exports = async (req, res) => {
           items: [],
           csdItems: []
         };
-        wardNameByClean[constants.cleanWardStr(wName)] = wName;
       });
-
-      const resolveWardName = (rawWard) => {
-        const clean = constants.cleanWardStr(rawWard);
-        if (!clean) return null;
-        if (wardNameByClean[clean]) return wardNameByClean[clean];
-        const hit = Object.keys(wardMap).find(w => {
-          const cw = constants.cleanWardStr(w);
-          return cw && (clean.includes(cw) || cw.includes(clean));
-        });
-        return hit || null;
-      };
 
       rawDataList.forEach(item => {
         if (item.lat == null || item.lng == null) return;
-        
-        const assignedWardName = resolveWardName(item.ward);
+        const ptLng = Number(item.lng);
+        const ptLat = Number(item.lat);
+
+        const assignedWardName = assignWardByGeometry(ptLng, ptLat, evaluatedWards);
 
         if (assignedWardName && wardMap[assignedWardName]) {
           const prefix = String(item.id || '').split('-')[0];
@@ -558,9 +713,9 @@ module.exports = async (req, res) => {
             const wardExistAreas = {};
             rawDataList.forEach(subItem => {
               const subApproved = (subItem.status === true || String(subItem.status).trim().toUpperCase() === 'TRUE');
-              if (subApproved && constants.cleanWardStr(subItem.ward) === constants.cleanWardStr(assignedWardName)) {
-                wardExistAreas[subItem.type] = (wardExistAreas[subItem.type] || 0) + Number(subItem.size || 0);
-              }
+              if (!subApproved || subItem.lat == null || subItem.lng == null) return;
+              if (assignWardByGeometry(Number(subItem.lng), Number(subItem.lat), evaluatedWards) !== assignedWardName) return;
+              wardExistAreas[subItem.type] = (wardExistAreas[subItem.type] || 0) + Number(subItem.size || 0);
             });
 
             const evaluatedSuggestions = codesToCheck.map(code => {
@@ -607,8 +762,8 @@ module.exports = async (req, res) => {
             wardMap[assignedWardName].csdItems.push({
               name: item.name || item.ten || "Khu đất chưa sử dụng",
               size: csdSize,
-              lat: Number(item.lat),
-              lng: Number(item.lng),
+              lat: ptLat,
+              lng: ptLng,
               radius: Number(item.radius || item.banKinh || 500),
               suggestions: evaluatedSuggestions.filter(s => s.status !== 'fulfilled'),
               status: item.status
@@ -619,10 +774,9 @@ module.exports = async (req, res) => {
         }
       });
 
-      // Tạm bỏ tính độ phủ GEE trong getWardStats để tránh 504 Vercel (60s).
-      // Cột Quy mô vẫn đầy đủ; độ phủ sẽ bổ sung bằng endpoint riêng khi ổn định.
+      // Độ phủ toàn TP: tách endpoint getWardCoverage theo từng phường (tránh 504).
       const coverageByWard = {};
-      const coverageStatus = 'deferred';
+      const coverageStatus = 'per_ward';
 
       const resultTable = [];
 
@@ -746,6 +900,7 @@ module.exports = async (req, res) => {
 
         calculatedRow.Avg_Coverage_Score = Number((totalCoverageSum / (countMetrics || 1)).toFixed(1));
         calculatedRow.Avg_Scale_Score = Number((totalScaleSum / (countMetrics || 1)).toFixed(1));
+        calculatedRow._assignMode = 'geometry';
 
         resultTable.push(calculatedRow);
       }

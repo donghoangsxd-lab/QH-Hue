@@ -428,14 +428,40 @@ export function selectWardDetail(wardName) {
 
   fitMapToWard(wardName);
 
-  const wardPoints = state.rawDataList.filter(item => {
-    const itemWard = (item.ward || "").toLowerCase().trim();
-    const targetWard = wardName.toLowerCase().replace(/^phường\s+/i, '').replace(/^xã\s+/i, '').trim();
-    return itemWard.includes(targetWard) && item.status === true;
+  const wardPoints = [];
+  Object.values(wardData.urbanResults || {}).forEach(node => {
+    (node.subItems || []).forEach(it => wardPoints.push(it));
   });
-  updateInfraPieChart(wardPoints.length > 0 ? wardPoints : state.rawDataList);
+  Object.values(wardData.unitResults || {}).forEach(node => {
+    (node.subItems || []).forEach(it => wardPoints.push(it));
+  });
+  updateInfraPieChart(wardPoints.length > 0 ? wardPoints : state.rawDataList.filter(i => i.status === true));
 
   renderWardDetailPopup(wardData);
+}
+
+async function fetchAndApplyWardCoverage(wardData) {
+  try {
+    const res = await fetch(geeApi(`action=getWardCoverage&ward=${encodeURIComponent(wardData.Ten_Phuong)}`));
+    if (!res.ok) return false;
+    const cov = await res.json();
+    const codes = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+    codes.forEach(c => {
+      const val = Number((cov.ratios && cov.ratios[c]) ?? cov[`Ratio_${c}`] ?? 0);
+      wardData[`Ratio_${c}`] = val;
+    });
+    wardData.Avg_Coverage_Score = Number(cov.Avg_Coverage_Score || 0);
+
+    const idx = state.wardStatsData.findIndex(w => w.Ten_Phuong === wardData.Ten_Phuong);
+    if (idx >= 0) {
+      codes.forEach(c => { state.wardStatsData[idx][`Ratio_${c}`] = wardData[`Ratio_${c}`]; });
+      state.wardStatsData[idx].Avg_Coverage_Score = wardData.Avg_Coverage_Score;
+    }
+    return true;
+  } catch (err) {
+    console.error("Lỗi tải độ phủ phường:", err);
+    return false;
+  }
 }
 
 function renderWardDetailPopup(wardData) {
@@ -457,6 +483,7 @@ function renderWardDetailPopup(wardData) {
         người (<span id="projectedUnitsLabel">${projectedUnits}</span> đơn vị ở)
       </div>
     </div>
+    <div id="wardCoverageStatus" style="font-size:10px; color:var(--accent-orange); margin-bottom:6px;">⏳ Đang tính độ phủ buffer × dân số (GEE)...</div>
     <div id="wardQuotaTableContainer">
       ${buildWardQuotaTableHtml(wardData, popProjected)}
     </div>
@@ -511,16 +538,16 @@ function renderWardDetailPopup(wardData) {
 
     const popInput = document.getElementById('wardPopInput');
     if (popInput) {
-      popInput.onchange = (e) => {
-        const newProjPop = Number(e.target.value) || popCurrent;
+      popInput.oninput = (e) => {
+        const newProjPop = Number(e.target.value) || popProjected;
         const newUnits = Math.max(1, Math.round(newProjPop / 20000));
-        const unitLbl = document.getElementById('projectedUnitsLabel');
-        if (unitLbl) unitLbl.innerText = newUnits;
-        
+        const unitsLabel = document.getElementById('projectedUnitsLabel');
+        if (unitsLabel) unitsLabel.innerText = newUnits;
         wardData.projectedPopulation = newProjPop;
+        wardData.projectedUnits = newUnits;
+
         Object.keys(wardData.urbanResults || {}).forEach(k => {
-          wardData.urbanResults[k].requiredArea = wardData.urbanResults[k].quota * newProjPop;
-          wardData.urbanResults[k].status = wardData.urbanResults[k].currentArea >= wardData.urbanResults[k].requiredArea;
+          wardData.urbanResults[k].requiredArea = (wardData.urbanResults[k].quota || 0) * newProjPop;
         });
         Object.keys(wardData.unitResults || {}).forEach(k => {
           wardData.unitResults[k].requiredArea = (wardData.unitResults[k].quota || 0) * newProjPop;
@@ -532,6 +559,20 @@ function renderWardDetailPopup(wardData) {
         }
       };
     }
+
+    fetchAndApplyWardCoverage(wardData).then((ok) => {
+      const statusEl = document.getElementById('wardCoverageStatus');
+      const container = document.getElementById('wardQuotaTableContainer');
+      const popEl = document.getElementById('wardPopInput');
+      const projPop = popEl ? Number(popEl.value) || popProjected : popProjected;
+      if (container) container.innerHTML = buildWardQuotaTableHtml(wardData, projPop);
+      if (statusEl) {
+        statusEl.style.color = ok ? 'var(--accent-green)' : 'var(--accent-red)';
+        statusEl.innerText = ok
+          ? `✓ Độ phủ trung bình: ${Number(wardData.Avg_Coverage_Score || 0).toFixed(1)}%`
+          : '⚠ Không tính được độ phủ GEE (thử lại sau).';
+      }
+    });
   }, 200);
 }
 
@@ -539,6 +580,26 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   const urbanRes = wardData.urbanResults || {};
   const unitRes = wardData.unitResults || {};
   const totalUnits = wardData.projectedUnits || Math.max(1, Math.round(projPop / 20000));
+
+  const renderSubItemRow = (sub, padLeft = 14) => {
+    const subLat = sub.lat || 16.4637;
+    const subLng = sub.lng || 107.5905;
+    const sizeVal = Number(sub.size || 0);
+    const radiusVal = Number(sub.radius || sub.banKinh || 0);
+    const safeName = String(sub.name || 'Công trình').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return `<tr style="color:var(--text-muted); font-size:9.5px;">
+      <td style="text-align:center;">-</td>
+      <td style="text-align:left; padding-left:${padLeft}px;">
+        <a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${subLat}, ${subLng}, '${encodeURIComponent(sub.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">${safeName}</a>
+      </td>
+      <td style="text-align:right;">${sizeVal.toLocaleString()} m²</td>
+      <td style="text-align:center;">-</td>
+      <td style="text-align:right;">-</td>
+      <td style="text-align:center;">-</td>
+      <td style="text-align:center;">-</td>
+      <td style="text-align:center; color:var(--accent-cyan); font-weight:bold;">${radiusVal > 0 ? `${radiusVal.toLocaleString()} m` : '-'}</td>
+    </tr>`;
+  };
 
   let html = `<div class="ward-table-scroll-container"><table class="ward-table" style="font-size:9.5px;">
     <thead>
@@ -593,11 +654,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
     html += `<tbody id="${sectionId}" style="display:none;">`;
     if (hasSub) {
-      node.subItems.forEach(sub => {
-        const subLat = sub.lat || 16.4637;
-        const subLng = sub.lng || 107.5905;
-        html += `<tr style="color:var(--text-muted); font-size:9.5px;"><td style="text-align:center;">-</td><td colspan="7" style="text-align:left; padding-left:14px;"><a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${subLat}, ${subLng}, '${encodeURIComponent(sub.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">└ ${sub.name} (${Number(sub.size || 0).toLocaleString()} m²)</a></td></tr>`;
-      });
+      node.subItems.forEach(sub => { html += renderSubItemRow(sub, 14); });
     }
     html += `</tbody>`;
     urbanIdx++;
@@ -647,11 +704,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
     html += `<tbody id="${sectionId}" style="display:none;">`;
     if (hasSub) {
-      subItems.forEach(sub => {
-        const subLat = sub.lat || 16.4637;
-        const subLng = sub.lng || 107.5905;
-        html += `<tr style="color:var(--text-muted); font-size:9.5px;"><td style="text-align:center;">-</td><td colspan="7" style="text-align:left; padding-left:14px;"><a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${subLat}, ${subLng}, '${encodeURIComponent(sub.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">└ ${sub.name} (${Number(sub.size || 0).toLocaleString()} m²)</a></td></tr>`;
-      });
+      subItems.forEach(sub => { html += renderSubItemRow(sub, 14); });
     }
     html += `</tbody>`;
     unitIdx++;
@@ -711,11 +764,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
     html += `<tbody id="${subId}" style="display:none;">`;
     if (hasSubComp) {
-      compSub.forEach(sub => {
-        const subLat = sub.lat || 16.4637;
-        const subLng = sub.lng || 107.5905;
-        html += `<tr style="color:var(--text-muted); font-size:9.5px;"><td style="text-align:center;">-</td><td colspan="7" style="text-align:left; padding-left:24px;"><a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${subLat}, ${subLng}, '${encodeURIComponent(sub.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">└ ${sub.name} (${Number(sub.size || 0).toLocaleString()} m²)</a></td></tr>`;
-      });
+      compSub.forEach(sub => { html += renderSubItemRow(sub, 24); });
     }
     html += `</tbody>`;
   });
@@ -757,11 +806,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
     html += `<tbody id="${sectionId}" style="display:none;">`;
     if (hasSub) {
-      subItems.forEach(sub => {
-        const subLat = sub.lat || 16.4637;
-        const subLng = sub.lng || 107.5905;
-        html += `<tr style="color:var(--text-muted); font-size:9.5px;"><td style="text-align:center;">-</td><td colspan="7" style="text-align:left; padding-left:14px;"><a href="javascript:void(0)" onclick="window.zoomToFeatureAndMinimizeModal(${subLat}, ${subLng}, '${encodeURIComponent(sub.name || '')}')" style="color:var(--accent-cyan); text-decoration:none;">└ ${sub.name} (${Number(sub.size || 0).toLocaleString()} m²)</a></td></tr>`;
-      });
+      subItems.forEach(sub => { html += renderSubItemRow(sub, 14); });
     }
     html += `</tbody>`;
     unitIdx++;
