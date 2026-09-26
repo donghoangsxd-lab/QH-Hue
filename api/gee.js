@@ -619,24 +619,10 @@ module.exports = async (req, res) => {
         }
       });
 
-      let coverageByWard = {};
-      let coverageStatus = 'ok';
-      try {
-        // Giữ dưới hạn 60s của Vercel: nếu GEE chậm vẫn trả bảng quy mô (có CORS)
-        const covResult = await withTimeout(
-          computeWardCoverageRatios(ee, popRasterNormalized, rawDataList, wardVectorParsed)
-            .then(data => ({ ok: true, data }))
-            .catch(err => ({ ok: false, data: {}, err })),
-          25000,
-          { ok: false, data: {}, timedOut: true }
-        );
-        coverageByWard = covResult.data || {};
-        if (covResult.timedOut) coverageStatus = 'timeout';
-        else if (!covResult.ok) coverageStatus = 'error';
-      } catch (covErr) {
-        console.error("Lỗi tính độ phủ pixel dân số:", covErr && covErr.message);
-        coverageStatus = 'error';
-      }
+      // Tạm bỏ tính độ phủ GEE trong getWardStats để tránh 504 Vercel (60s).
+      // Cột Quy mô vẫn đầy đủ; độ phủ sẽ bổ sung bằng endpoint riêng khi ổn định.
+      const coverageByWard = {};
+      const coverageStatus = 'deferred';
 
       const resultTable = [];
 
