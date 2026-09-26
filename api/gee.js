@@ -83,58 +83,61 @@ function isApprovedStatus(status) {
   return status === true || String(status).trim().toUpperCase() === 'TRUE';
 }
 
-async function computeWardCoverageRatios(ee, popRasterNormalized, rawDataList, evaluatedWards) {
+function bandKeyForCode(code) {
+  return `cov_${String(code).replace(/-/g, '_')}`;
+}
+
+function readPixProp(props, key) {
+  const candidates = [props[key], props.DanSoPixelNormalized, props.count];
+  for (const v of candidates) {
+    const n = Number(v);
+    if (!Number.isNaN(n) && n >= 0) return n;
+  }
+  return 0;
+}
+
+function withTimeout(promise, ms, onTimeoutValue) {
+  let timer = null;
+  const timeoutPromise = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(onTimeoutValue), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+/**
+ * Tối ưu độ phủ: 8 vùng buffer (1/loại) + 1 band tổng pixel,
+ * chồng lên FeatureCollection phường phía GEE — chỉ 1 lần evaluate.
+ */
+async function computeWardCoverageRatios(ee, popRasterNormalized, rawDataList, wardVectorParsed) {
   const codesList = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
   const coverageByWard = {};
 
-  evaluatedWards.forEach(w => {
-    coverageByWard[w.name] = {};
-    codesList.forEach(c => { coverageByWard[w.name][c] = 0; });
+  if (!popRasterNormalized || !wardVectorParsed) return coverageByWard;
+
+  const wardFc = wardVectorParsed.map(f => {
+    const name = ee.Algorithms.If(
+      f.get('tenXa'), f.get('tenXa'),
+      ee.Algorithms.If(f.get('NAME_2'), f.get('NAME_2'),
+        ee.Algorithms.If(f.get('name'), f.get('name'), 'Phuong'))
+    );
+    return f.set('Ten_Phuong', ee.String(name));
   });
 
-  if (!popRasterNormalized || evaluatedWards.length === 0) return coverageByWard;
+  const emptyMask = ee.Image.constant(0).selfMask();
+  const bandImages = [popRasterNormalized.rename('pix_total')];
 
-  const wardFc = ee.FeatureCollection(evaluatedWards.map(w =>
-    ee.Feature(ee.Geometry(w.geometry), { Ten_Phuong: w.name })
-  ));
-
-  const evalFc = (eeObj) => new Promise((resolve, reject) => {
-    eeObj.evaluate((fc, err) => err ? reject(err) : resolve(fc));
-  });
-
-  const totalPixFc = popRasterNormalized.reduceRegions({
-    collection: wardFc,
-    reducer: ee.Reducer.count().setOutputs(['totalPix']),
-    scale: 30,
-    tileScale: 4
-  });
-  const readPixCount = (props, preferredKey) => {
-    const candidates = [
-      props[preferredKey],
-      props.DanSoPixelNormalized,
-      props.count,
-      props.totalPix,
-      props.servedPix
-    ];
-    for (const v of candidates) {
-      const n = Number(v);
-      if (!Number.isNaN(n) && n >= 0) return n;
-    }
-    return 0;
-  };
-
-  const totalEval = await evalFc(totalPixFc);
-  const totalPixMap = {};
-  (totalEval.features || []).forEach(feat => {
-    const props = feat.properties || {};
-    totalPixMap[props.Ten_Phuong] = readPixCount(props, 'totalPix');
-  });
-
-  for (const c of codesList) {
+  codesList.forEach(c => {
+    const bandName = bandKeyForCode(c);
     const matchingItems = rawDataList.filter(it =>
       isApprovedStatus(it.status) && it.type === c && it.lat != null && it.lng != null
     );
-    if (matchingItems.length === 0) continue;
+
+    if (matchingItems.length === 0) {
+      bandImages.push(popRasterNormalized.updateMask(emptyMask).rename(bandName));
+      return;
+    }
 
     const defaultR = (constants.infraConfig && constants.infraConfig[c] && constants.infraConfig[c].radius) || 500;
     const bufferFc = ee.FeatureCollection(matchingItems.map(it => {
@@ -142,27 +145,41 @@ async function computeWardCoverageRatios(ee, popRasterNormalized, rawDataList, e
       return ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(effectiveR));
     }));
 
-    const bufferMask = ee.Image(0).byte().paint({ featureCollection: bufferFc, color: 1 }).gt(0);
-    const servedRaster = popRasterNormalized.updateMask(bufferMask);
-    const servedFc = servedRaster.reduceRegions({
-      collection: wardFc,
-      reducer: ee.Reducer.count().setOutputs(['servedPix']),
-      scale: 30,
-      tileScale: 4
-    });
-    const servedEval = await evalFc(servedFc);
+    const bufferMask = ee.Image(0).byte().paint({
+      featureCollection: bufferFc,
+      color: 1
+    }).gt(0);
 
-    (servedEval.features || []).forEach(feat => {
-      const props = feat.properties || {};
-      const name = props.Ten_Phuong;
-      const totalPix = totalPixMap[name] || 0;
-      const servedPix = readPixCount(props, 'servedPix');
-      if (!coverageByWard[name]) coverageByWard[name] = {};
+    bandImages.push(popRasterNormalized.updateMask(bufferMask).rename(bandName));
+  });
+
+  const stacked = ee.Image.cat(bandImages).clip(wardFc.geometry());
+  const reduced = stacked.reduceRegions({
+    collection: wardFc,
+    reducer: ee.Reducer.count(),
+    scale: 90,
+    tileScale: 16,
+    maxPixels: 1e9
+  });
+
+  const evaluated = await new Promise((resolve, reject) => {
+    reduced.evaluate((fc, err) => err ? reject(err) : resolve(fc || { features: [] }));
+  });
+
+  (evaluated.features || []).forEach(feat => {
+    const props = feat.properties || {};
+    const name = props.Ten_Phuong;
+    if (!name) return;
+    if (!coverageByWard[name]) coverageByWard[name] = {};
+
+    const totalPix = readPixProp(props, 'pix_total');
+    codesList.forEach(c => {
+      const servedPix = readPixProp(props, bandKeyForCode(c));
       coverageByWard[name][c] = totalPix > 0
         ? Number(Math.min(100, Math.max(0, (servedPix / totalPix) * 100)).toFixed(1))
         : 0;
     });
-  }
+  });
 
   return coverageByWard;
 }
@@ -476,47 +493,24 @@ module.exports = async (req, res) => {
     if (action === 'getWardStats') {
       const now = Date.now();
       if (cachedWardStats && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)) {
-        return res.status(200).json({ data: cachedWardStats });
+        return res.status(200).json({ data: cachedWardStats, coverageStatus: 'cached' });
       }
 
+      // Chỉ lấy thuộc tính (không tải geometry) để tránh timeout Vercel 60s
+      const wardPropsFc = wardVectorParsed.map(f => ee.Feature(null, {
+        tenXa: f.get('tenXa'),
+        NAME_2: f.get('NAME_2'),
+        name: f.get('name'),
+        danSoNum: f.get('danSoNum'),
+        danSo: f.get('danSo')
+      }));
+
       const wardList = await new Promise((resolve, reject) => {
-        wardVectorParsed.evaluate((fc, err) => err ? reject(err) : resolve(fc ? fc.features : []));
+        wardPropsFc.evaluate((fc, err) => err ? reject(err) : resolve(fc ? fc.features : []));
       });
 
       const wardMap = {};
-      const evaluatedWards = [];
-
-      function isPointInPolygon(point, vs) {
-        const x = point[0], y = point[1];
-        let inside = false;
-        for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-          const xi = vs[i][0], yi = vs[i][1];
-          const xj = vs[j][0], yj = vs[j][1];
-          const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-          if (intersect) inside = !inside;
-        }
-        return inside;
-      }
-
-      function checkPointInGeoJSONGeometry(ptLng, ptLat, geometry) {
-        if (!geometry || !geometry.coordinates) return false;
-        const type = geometry.type;
-        const coords = geometry.coordinates;
-        try {
-          if (type === 'Polygon') {
-            if (isPointInPolygon([ptLng, ptLat], coords[0])) {
-              return true;
-            }
-          } else if (type === 'MultiPolygon') {
-            for (const polyCoords of coords) {
-              if (isPointInPolygon([ptLng, ptLat], polyCoords[0])) {
-                return true;
-              }
-            }
-          }
-        } catch (e) {}
-        return false;
-      }
+      const wardNameByClean = {};
 
       wardList.forEach(f => {
         const props = f.properties || {};
@@ -532,28 +526,24 @@ module.exports = async (req, res) => {
           items: [],
           csdItems: []
         };
-
-        if (f.geometry) {
-          evaluatedWards.push({
-            name: wName,
-            geometry: f.geometry
-          });
-        }
+        wardNameByClean[constants.cleanWardStr(wName)] = wName;
       });
+
+      const resolveWardName = (rawWard) => {
+        const clean = constants.cleanWardStr(rawWard);
+        if (!clean) return null;
+        if (wardNameByClean[clean]) return wardNameByClean[clean];
+        const hit = Object.keys(wardMap).find(w => {
+          const cw = constants.cleanWardStr(w);
+          return cw && (clean.includes(cw) || cw.includes(clean));
+        });
+        return hit || null;
+      };
 
       rawDataList.forEach(item => {
         if (item.lat == null || item.lng == null) return;
-        const ptLng = Number(item.lng);
-        const ptLat = Number(item.lat);
         
-        let assignedWardName = null;
-
-        for (const w of evaluatedWards) {
-          if (checkPointInGeoJSONGeometry(ptLng, ptLat, w.geometry)) {
-            assignedWardName = w.name;
-            break;
-          }
-        }
+        const assignedWardName = resolveWardName(item.ward);
 
         if (assignedWardName && wardMap[assignedWardName]) {
           const prefix = String(item.id || '').split('-')[0];
@@ -617,8 +607,8 @@ module.exports = async (req, res) => {
             wardMap[assignedWardName].csdItems.push({
               name: item.name || item.ten || "Khu đất chưa sử dụng",
               size: csdSize,
-              lat: ptLat,
-              lng: ptLng,
+              lat: Number(item.lat),
+              lng: Number(item.lng),
               radius: Number(item.radius || item.banKinh || 500),
               suggestions: evaluatedSuggestions.filter(s => s.status !== 'fulfilled'),
               status: item.status
@@ -630,10 +620,22 @@ module.exports = async (req, res) => {
       });
 
       let coverageByWard = {};
+      let coverageStatus = 'ok';
       try {
-        coverageByWard = await computeWardCoverageRatios(ee, popRasterNormalized, rawDataList, evaluatedWards);
+        // Giữ dưới hạn 60s của Vercel: nếu GEE chậm vẫn trả bảng quy mô (có CORS)
+        const covResult = await withTimeout(
+          computeWardCoverageRatios(ee, popRasterNormalized, rawDataList, wardVectorParsed)
+            .then(data => ({ ok: true, data }))
+            .catch(err => ({ ok: false, data: {}, err })),
+          25000,
+          { ok: false, data: {}, timedOut: true }
+        );
+        coverageByWard = covResult.data || {};
+        if (covResult.timedOut) coverageStatus = 'timeout';
+        else if (!covResult.ok) coverageStatus = 'error';
       } catch (covErr) {
         console.error("Lỗi tính độ phủ pixel dân số:", covErr && covErr.message);
+        coverageStatus = 'error';
       }
 
       const resultTable = [];
@@ -764,7 +766,7 @@ module.exports = async (req, res) => {
       cachedWardStats = resultTable;
       lastWardStatsFetch = now;
 
-      return res.status(200).json({ data: resultTable });
+      return res.status(200).json({ data: resultTable, coverageStatus });
     }
 
     if (action === 'getWardFromPoint') {

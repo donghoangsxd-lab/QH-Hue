@@ -122,11 +122,14 @@ export async function loadBoundaryLayer() {
   }
 }
 
-export function highlightWardBoundary(wardName) {
-  if (!layers.highlightWard) return;
+export function highlightWardBoundary(wardName, { fitView = true } = {}) {
+  if (!layers.highlightWard || !map) return;
   layers.highlightWard.clearLayers();
 
-  if (!wardName || wardName === "Thành phố Huế") return;
+  if (!wardName || wardName === "Thành phố Huế") {
+    if (fitView) map.flyTo([16.4637, 107.5905], 13);
+    return;
+  }
 
   const wardInfo = state.wardLabelsList.find(w => w.name === wardName);
   if (wardInfo && wardInfo.geometry) {
@@ -147,6 +150,22 @@ export function highlightWardBoundary(wardName) {
     });
 
     layers.highlightWard.addLayer(highlightLayer);
+
+    if (fitView) {
+      const bounds = highlightLayer.getBounds();
+      if (bounds && bounds.isValid()) {
+        map.fitBounds(bounds, {
+          padding: [48, 48],
+          maxZoom: 15,
+          animate: true,
+          duration: 0.8
+        });
+      } else if (wardInfo.lat != null && wardInfo.lng != null) {
+        map.flyTo([wardInfo.lat, wardInfo.lng], 14);
+      }
+    }
+  } else if (fitView && wardInfo && wardInfo.lat != null && wardInfo.lng != null) {
+    map.flyTo([wardInfo.lat, wardInfo.lng], 14);
   }
 }
 

@@ -206,14 +206,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderGroupedPoints();
     await refreshHeatmapOnly();
-    highlightWardBoundary(state.selectedWard);
-
-    if (state.selectedWard && state.selectedWard !== "Thành phố Huế") {
-      const target = state.wardLabelsList.find(w => w.name === state.selectedWard);
-      if (target) map.flyTo([target.lat, target.lng], 14);
-    } else {
-      map.flyTo([16.4637, 107.5905], 13);
-    }
+    highlightWardBoundary(state.selectedWard, { fitView: true });
   });
   
   const sidebarPanel = document.getElementById('sidebarPanel');

@@ -288,7 +288,14 @@ export function openCombinedModal() {
   }
 
   fetch(geeApi('action=getWardStats'))
-    .then(r => r.json())
+    .then(async r => {
+      if (!r.ok) {
+        throw new Error(r.status === 504
+          ? 'Máy chủ GEE quá tải / hết thời gian (504). Thử lại sau ít phút.'
+          : `Lỗi máy chủ (${r.status})`);
+      }
+      return r.json();
+    })
     .then(resData => {
       if (mBar) mBar.style.width = "100%";
       if (mTxt) mTxt.innerText = "100%";
@@ -332,8 +339,8 @@ export function openCombinedModal() {
 
       renderCombinedChart();
     })
-    .catch(() => {
-      if (tbody) tbody.innerHTML = "<tr><td colspan='20' style='text-align:center; color:var(--accent-red); padding:20px;'>❌ Lỗi nạp dữ liệu từ GEE Server.</td></tr>";
+    .catch((err) => {
+      if (tbody) tbody.innerHTML = `<tr><td colspan='20' style='text-align:center; color:var(--accent-red); padding:20px;'>❌ ${err.message || 'Lỗi nạp dữ liệu từ GEE Server.'}</td></tr>`;
     });
 }
 
@@ -342,9 +349,29 @@ export function closeModal() {
   if (modal) modal.style.display = 'none'; 
 }
 
+function fitMapToWard(wardName) {
+  if (!map || !wardName) return;
+  if (wardName === "Thành phố Huế") {
+    map.flyTo([16.4637, 107.5905], 13);
+    return;
+  }
+  const wardInfo = state.wardLabelsList.find(w => w.name === wardName);
+  if (wardInfo && wardInfo.geometry) {
+    const layer = L.geoJSON({ type: 'Feature', geometry: wardInfo.geometry });
+    const bounds = layer.getBounds();
+    if (bounds && bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15, animate: true, duration: 0.8 });
+      return;
+    }
+  }
+  if (wardInfo && wardInfo.lat != null && wardInfo.lng != null) {
+    map.flyTo([wardInfo.lat, wardInfo.lng], 14);
+  }
+}
+
 export async function openWardDetailDirect(wardName) {
+  fitMapToWard(wardName);
   const firstPoint = state.wardLabelsList.find(w => w.name === wardName) || { lat: 16.4637, lng: 107.5905 };
-  if (map) map.flyTo([firstPoint.lat, firstPoint.lng], 14);
 
   const initialModalHtml = `<div class="ward-popup-card" id="wardDetailPdfContainer" style="min-width: 780px;">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
@@ -399,8 +426,7 @@ export function selectWardDetail(wardName) {
   const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
   if (!wardData) return;
 
-  const firstPoint = state.wardLabelsList.find(w => w.name === wardName) || { lat: 16.4637, lng: 107.5905 };
-  if (map) map.flyTo([firstPoint.lat, firstPoint.lng], 14);
+  fitMapToWard(wardName);
 
   const wardPoints = state.rawDataList.filter(item => {
     const itemWard = (item.ward || "").toLowerCase().trim();
