@@ -1,7 +1,7 @@
-import { state, infraLabels, infraIcons, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_HIGHLIGHT_STYLE } from './state.js';
+import { state, infraLabels, infraIcons, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_HIGHLIGHT_STYLE, PLAN_CHANGE_INFO, getBufferStyle, getPlanScenarioList } from './state.js';
 import { updateInfraPieChart } from './uiComponents.js';
 import { geeApi } from './api.js';
-import { getCoveredRightWidth, highlightPlanWard } from './planMap.js';
+import { getCoveredRightWidth, highlightPlanWard, refreshPlanLayers, planMap, planLayers, syncPlanLayer } from './planMap.js';
 
 export let map = null;
 export let measureLayerGroup = null;
@@ -237,6 +237,7 @@ export function toggleLayer(layerKey, isChecked) {
       map.removeLayer(layers[layerKey]);
     }
   }
+  syncPlanLayer(layerKey);
 
   const popBox = document.getElementById('popBox');
   const heatBox = document.getElementById('heatBox');
@@ -253,6 +254,7 @@ export function toggleBuffer(bufferKey, el) {
     map.addLayer(layers[bufferKey]);
     if (el) el.classList.add('active');
   }
+  syncPlanLayer(bufferKey);
 }
 
 export function toggleMeasure(type) {
@@ -295,17 +297,21 @@ export function clearMeasure() {
 export function renderGroupedPoints() {
   if (!map) return;
 
+  const sourceList = getWardFilteredList(state.rawDataList);
+  updateInfraPieChart(sourceList);
+  renderPointGroups(layers, sourceList, map);
+
+  if (planMap) renderPointGroups(planLayers, getWardFilteredList(getPlanScenarioList()), planMap);
+}
+
+function renderPointGroups(groups, sourceList, targetMap) {
   const mapGroups = {
-    "1-CV": layers.c1, "2-BDX": layers.c2, "3-MN": layers.c3,
-    "4-TH": layers.c4, "5-THCS": layers.c5, "6-YT": layers.c6,
-    "7-VH": layers.c7, "8-TM": layers.c8, "9-CSD": layers.c9
+    "1-CV": groups.c1, "2-BDX": groups.c2, "3-MN": groups.c3,
+    "4-TH": groups.c4, "5-THCS": groups.c5, "6-YT": groups.c6,
+    "7-VH": groups.c7, "8-TM": groups.c8, "9-CSD": groups.c9
   };
 
   Object.keys(mapGroups).forEach(k => mapGroups[k].clearLayers());
-
-  const sourceList = getWardFilteredList(state.rawDataList);
-
-  updateInfraPieChart(sourceList);
 
   const iconFiles = {
     "1-CV": { approved: "Park.png", pending: "Park2.png" },
@@ -321,13 +327,15 @@ export function renderGroupedPoints() {
 
   sourceList.forEach(p => {
     const isApproved = (p.status === true || String(p.status).trim().toUpperCase() === 'TRUE' || String(p.status).trim() === '1');
-    const targetGroup = mapGroups[p.type] || layers.c9;
+    const targetGroup = mapGroups[p.type] || groups.c9;
     
     const categoryIcons = iconFiles[p.type] || { approved: "Park.png", pending: "Park2.png" };
     const fileName = isApproved ? categoryIcons.approved : categoryIcons.pending;
     const iconUrl = `./icons/${fileName}`;
 
-    const imgHtml = `<img src="${iconUrl}" style="width: 22px; height: 27px; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.5));" />`;
+    const planInfo = PLAN_CHANGE_INFO[p.planChange];
+    const badgeHtml = planInfo ? `<span class="plan-badge" style="background:${planInfo.color};" title="${planInfo.label}"></span>` : '';
+    const imgHtml = `<img src="${iconUrl}" style="width: 22px; height: 27px; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.5));" />${badgeHtml}`;
 
     const customDivIcon = L.divIcon({
       className: 'custom-infra-icon-png',
@@ -339,15 +347,16 @@ export function renderGroupedPoints() {
     const marker = L.marker([p.lat, p.lng], { icon: customDivIcon });
     marker.on('click', () => {
       if (state.isPickMode || state.activeMeasureType) return;
-      onPointClick(p, marker);
+      onPointClick(p, marker, targetMap);
     });
     targetGroup.addLayer(marker);
   });
 }
 
-export async function highlightSingleIsochrone(lat, lng, radius) {
-  if (!layers.singleIso) return;
+export async function highlightSingleIsochrone(lat, lng, radius, group = layers.singleIso) {
+  if (!group) return;
   layers.singleIso.clearLayers();
+  planLayers.singleIso.clearLayers();
 
   try {
     const res = await fetch(geeApi(`action=getSingleIsochrone&lat=${lat}&lng=${lng}&radius=${radius}`));
@@ -363,7 +372,7 @@ export async function highlightSingleIsochrone(lat, lng, radius) {
           fillOpacity: 0.18
         }
       });
-      layers.singleIso.addLayer(geoLayer);
+      group.addLayer(geoLayer);
     }
   } catch (err) {
     console.error("Lỗi vẽ single isochrone:", err);
@@ -385,22 +394,26 @@ export async function refreshHeatmapOnly() {
   };
   Object.keys(bufferGroups).forEach(k => bufferGroups[k].clearLayers());
 
-  const scopedList = getWardFilteredList(state.rawDataList).filter(item => {
+  const bufferFilter = item => {
     const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE' || String(item.status).trim() === '1');
     if (item.type === "9-CSD") {
       return isApproved;
     }
     return true; 
-  });
+  };
+  const scopedList = getWardFilteredList(state.rawDataList).filter(bufferFilter);
 
-  const allFeaturesInput = scopedList.map(item => ({
+  const withRadius = item => ({
     ...item,
     radius: overrideRad !== null ? overrideRad : (Number(item.radius) || Number(item.banKinh) || 500)
-  }));
+  });
+  const allFeaturesInput = scopedList.map(withRadius);
+  const planNewInput = getWardFilteredList(state.planDataList).filter(bufferFilter).map(withRadius);
 
   if (allFeaturesInput.length === 0) {
     layers.heatmap.clearLayers();
     lastCalculatedIsochrones = [];
+    refreshPlanLayers([], '', planNewInput);
     return;
   }
 
@@ -417,30 +430,11 @@ export async function refreshHeatmapOnly() {
     const isoFeatures = (isoData && isoData.features) || [];
     lastCalculatedIsochrones = isoFeatures;
 
-    const infraBorderColors = {
-      "1-CV": "#2ecc71",   // Công viên: Xanh lá
-      "2-BDX": "#3498db",  // Bãi đỗ xe: Xanh dương
-      "3-MN": "#e67e22",   // Mầm non: Vàng
-      "4-TH": "#e74c3c",   // Tiểu học: Cam
-      "5-THCS": "#9b59b6", // THCS: Cam đậm
-      "6-YT": "#1abc9c",   // Y tế: Magenta
-      "7-VH": "#f1c40f",   // Văn hóa: Đỏ
-      "8-TM": "#e91e63",   // Thương mại: Đỏ đậm
-      "9-CSD": "#95a5a6"   // Quỹ đất tiềm năng: Xám
-    };
-
     isoFeatures.forEach(feat => {
       const props = feat.properties || {};
       const isApproved = (props.status === true || String(props.status).trim().toUpperCase() === 'TRUE' || String(props.status).trim() === '1');
       const targetBufferGroup = bufferGroups[props.type] || layers.b9;
-      
-      const typeColor = infraBorderColors[props.type] || '#38bdf8';
-
-      const style = isApproved
-        ? { color: typeColor, weight: 2.2, dashArray: '6, 6', fillColor: typeColor, fillOpacity: 0.12 }
-        : { color: '#f87171', weight: 2.2, dashArray: '4, 4', fillColor: '#f87171', fillOpacity: 0.10 };
-
-      targetBufferGroup.addLayer(L.geoJSON(feat, { style }));
+      targetBufferGroup.addLayer(L.geoJSON(feat, { style: getBufferStyle(props.type, isApproved) }));
     });
 
     const approvedFeatures = isoFeatures.filter(feat => {
@@ -456,6 +450,8 @@ export async function refreshHeatmapOnly() {
     if (!heatRes.ok) return;
     const d = await heatRes.json();
     if (currentSeq !== heatmapFetchSeq) return;
+
+    refreshPlanLayers(isoFeatures, d.urlFormat, planNewInput);
 
     if (d.urlFormat) {
       layers.heatmap.clearLayers();
@@ -516,14 +512,19 @@ function buildDiaBanHtml(geoWard, sheetWard) {
   return html;
 }
 
-export function onPointClick(p, marker) {
+export function onPointClick(p, marker, targetMap = map) {
   const isApproved = (p.status === true || String(p.status).trim().toUpperCase() === 'TRUE' || String(p.status).trim() === '1');
   const isCSDUnapproved = (p.type === "9-CSD" && !isApproved);
   const overrideRad = state.globalBufferRadiusOverride;
   const itemRadius = overrideRad !== null ? overrideRad : (Number(p.radius) || Number(p.banKinh) || 500);
+  const isPlanScenario = p.scenario === 'QH';
+
+  // Popup dùng id cố định (popupWardDiaBan, servedPopText...) nên chỉ để mở 1 popup trên 2 bản đồ
+  if (map) map.closePopup();
+  if (planMap) planMap.closePopup();
 
   if (!isCSDUnapproved) {
-    highlightSingleIsochrone(p.lat, p.lng, itemRadius);
+    highlightSingleIsochrone(p.lat, p.lng, itemRadius, isPlanScenario ? planLayers.singleIso : layers.singleIso);
   }
 
   const capCongTrinh = formatCapCongTrinhLabel(p.nhomHaTang || p.capCongTrinh || "Cấp đơn vị ở");
@@ -545,7 +546,15 @@ export function onPointClick(p, marker) {
   contentHtml += `• Loại hạ tầng: <b>${rawLabel}</b><br>`;
   contentHtml += `• Địa bàn: <b id="popupWardDiaBan">${diaBanHtml}</b><br>`;
   contentHtml += `• Cấp công trình: <b style="color:var(--accent-orange);">${capCongTrinh}</b><br>`;
-  contentHtml += `• Diện tích: <b>${(p.size || 0).toLocaleString()} m²</b><br>`;
+  const planInfo = PLAN_CHANGE_INFO[p.planChange];
+  contentHtml += `• Diện tích${isPlanScenario ? ' QH' : ''}: <b>${Number(p.size || 0).toLocaleString()} m²</b>`;
+  if (planInfo) {
+    const otherSize = isPlanScenario
+      ? (p.planChange === 'new' ? '' : `, HT ${Number(p.sizeHT || 0).toLocaleString()} m²`)
+      : (p.planChange === 'relocate' ? '' : ` → QH ${Number(p.sizeQH || 0).toLocaleString()} m²`);
+    contentHtml += ` <span style="color:${planInfo.color}; font-weight:bold;">(${planInfo.label}${otherSize})</span>`;
+  }
+  contentHtml += `<br>`;
 
   if (!isCSDUnapproved) {
     contentHtml += `• Bán kính phục vụ: <b style="color:var(--accent-cyan);">${itemRadius} m</b><br>`;
@@ -571,7 +580,7 @@ export function onPointClick(p, marker) {
     contentHtml += `</div>`;
 
     const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
-    popup.openOn(map);
+    popup.openOn(targetMap);
 
     if (!geoWardNow) {
       fetch(geeApi(`action=getWardFromPoint&lat=${p.lat}&lng=${p.lng}`))
@@ -603,7 +612,7 @@ export function onPointClick(p, marker) {
     contentHtml += `</div>`;
 
     const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
-    popup.openOn(map);
+    popup.openOn(targetMap);
 
     if (!geoWardNow) {
       fetch(geeApi(`action=getWardFromPoint&lat=${p.lat}&lng=${p.lng}`))
@@ -629,7 +638,7 @@ export function onPointClick(p, marker) {
     contentHtml += `<div id="csdSug"><div style="font-size:10px; color:var(--text-muted);">⏳ Đang tính toán không gian...</div></div></div>`;
 
     const popup = L.popup({ closeButton: true, autoPan: true }).setLatLng([p.lat, p.lng]).setContent(contentHtml);
-    popup.openOn(map);
+    popup.openOn(targetMap);
 
     if (!geoWardNow) {
       fetch(geeApi(`action=getWardFromPoint&lat=${p.lat}&lng=${p.lng}`))
@@ -674,6 +683,7 @@ export async function loadPopulationLayer() {
       const popOpacityEl = document.getElementById('popOpacity');
       const opacity = popOpacityEl ? popOpacityEl.value / 100 : 0.6;
       layers.pop.addLayer(L.tileLayer(data.urlFormat, { opacity }));
+      planLayers.pop.addLayer(L.tileLayer(data.urlFormat, { opacity }));
     }
   } catch (err) {
     console.error("Lỗi tải lớp raster dân số:", err);
@@ -802,12 +812,14 @@ export async function handleInspectPointClick(clickLat, clickLng) {
 
 export function approvePointStatus(pointId) {
   if (state.currentUserRole !== "ADMIN") return;
-  const target = state.rawDataList.find(x => x.id === pointId);
+  const target = state.rawDataList.find(x => x.id === pointId)
+    || state.planDataList.find(x => x.id === pointId);
   if (!target) return;
 
   target.status = true;
   renderGroupedPoints();
   map.closePopup();
+  if (planMap) planMap.closePopup();
 
   fetch(geeApi(`action=approvePoint&id=${encodeURIComponent(pointId)}`))
     .then(r => r.json())

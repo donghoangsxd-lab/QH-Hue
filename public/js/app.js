@@ -29,7 +29,7 @@ import {
   initGoogleSignIn,
   startBackgroundCoverageFill
 } from './uiComponents.js';
-import { initPlanMap, renderPlanBoundaries, toggleCompareMode } from './planMap.js';
+import { initPlanMap, planLayers, renderPlanBoundaries, setPlanHeatOpacity, toggleCompareMode } from './planMap.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initGoogleSignIn();
@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     new ResizeObserver(() => map.invalidateSize({ pan: false })).observe(mapEl);
   }
 
-  initPlanMap(map);
+  initPlanMap(map, layers);
   centerOnCity();
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleCompareMode);
 
@@ -201,11 +201,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (window.currentHeatmapTileLayer && typeof window.currentHeatmapTileLayer.setOpacity === 'function') {
       window.currentHeatmapTileLayer.setOpacity(val);
     }
+    setPlanHeatOpacity(val);
   });
 
   document.getElementById('popOpacity')?.addEventListener('input', (e) => {
     const val = e.target.value / 100;
     layers.pop.eachLayer(l => l.setOpacity && l.setOpacity(val));
+    planLayers.pop.eachLayer(l => l.setOpacity && l.setOpacity(val));
   });
   
   const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'heat'];
@@ -235,6 +237,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const res = await fetch(geeApi());
         const data = await res.json();
         state.rawDataList = data.rawDataList || [];
+        state.planDataList = data.planDataList || [];
       } catch (err) {
         console.error("Lỗi tải dữ liệu điểm hạ tầng:", err);
         return;
@@ -264,12 +267,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lng = document.getElementById('newLng')?.value;
     const ward = document.getElementById('newWard')?.value || "";
     const size = document.getElementById('newSize')?.value || 0;
+    const phase = document.getElementById('newPhase')?.value === 'QH' ? 'QH' : 'HT';
     const msg = document.getElementById('statusMsg');
 
     if (!name || !lat || !lng) {
       if (msg) {
         msg.style.color = "var(--accent-red)";
         msg.innerText = "⚠️ Vui lòng điền đủ Tên và Tọa độ!";
+      }
+      return;
+    }
+    if (phase === 'QH' && !(Number(size) > 0)) {
+      if (msg) {
+        msg.style.color = "var(--accent-red)";
+        msg.innerText = "⚠️ Điểm quy hoạch mới cần nhập diện tích > 0!";
       }
       return;
     }
@@ -285,7 +296,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       `&nhomHaTang=${encodeURIComponent(nhomHaTang)}` +
       `&name=${encodeURIComponent(name)}` +
       `&ward=${encodeURIComponent(ward)}` +
-      `&lat=${lat}&lng=${lng}&size=${size}`
+      `&lat=${lat}&lng=${lng}&size=${size}` +
+      `&phase=${phase}`
     );
 
     fetch(addUrl)
@@ -296,13 +308,18 @@ document.addEventListener('DOMContentLoaded', async () => {
           msg.innerText = "✓ Đã lưu đề xuất thành công!";
         }
         
-        state.rawDataList.push({
+        const newItem = {
           id: "NEW-" + Date.now(),
           name, ward, type, nhomHaTang,
           lat: Number(lat), lng: Number(lng),
-          size: Number(size), radius: 500,
+          size: phase === 'QH' ? 0 : Number(size), radius: 500,
+          sizeHT: phase === 'QH' ? null : Number(size),
+          sizeQH: Number(size),
+          planChange: phase === 'QH' ? 'new' : 'keep',
           status: false
-        });
+        };
+        if (phase === 'QH') state.planDataList.push(newItem);
+        else state.rawDataList.push(newItem);
 
         renderGroupedPoints();
         ['newName', 'newLat', 'newLng', 'newWard', 'newSize'].forEach(id => {
@@ -385,6 +402,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const dataRes = await fetch(geeApi());
     const dataJson = await dataRes.json();
     state.rawDataList = dataJson.rawDataList || [];
+    state.planDataList = dataJson.planDataList || [];
 
     const wardSelector = document.getElementById('wardSelector');
     if (wardSelector) {

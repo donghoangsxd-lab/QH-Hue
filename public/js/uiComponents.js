@@ -483,7 +483,11 @@ function renderSummaryNote(wardName) {
   });
   const cov = list.length === 1 ? Number(list[0].Avg_Coverage_Score || 0) : (pop ? covSum / pop : 0);
   const scale = list.length === 1 ? Number(list[0].Avg_Scale_Score || 0) : (pop ? scaleSum / pop : 0);
-  subtitle.innerHTML = `👥 Tổng dân số: <b>${pop.toLocaleString()}</b> người`
+  const units = list.length === 1
+    ? ` (${list[0].currentUnits || Math.max(1, Math.round(pop / 20000))} đơn vị ở)`
+    : '';
+  const popLabel = city ? 'Tổng dân số' : '<span title="Dân số hiện trạng">Dân số HT</span>';
+  subtitle.innerHTML = `👥 ${popLabel}: <b>${pop.toLocaleString()}</b> người${units}`
     + ` · <span class="bp-swatch" style="background:${CHART_COVERAGE_COLOR};"></span>Độ phủ hạ tầng TB: <b>${cov.toFixed(1)}%</b>`
     + ` · <span class="bp-swatch" style="background:${CHART_SCALE_COLOR};"></span>Quy mô hạ tầng TB: <b>${scale.toFixed(1)}%</b>`;
 }
@@ -506,6 +510,8 @@ function setBottomPanelHeader(wardName) {
   const wardView = document.getElementById('wardSummaryView');
   if (chartView) chartView.style.display = city && (maximized || !cityTableOn) ? 'flex' : 'none';
   if (cityView) cityView.style.display = city && (maximized || cityTableOn) ? 'flex' : 'none';
+  const planEl = document.getElementById('bpWardPlan');
+  if (planEl) planEl.style.display = city ? 'none' : '';
   if (wardView) wardView.style.display = city ? 'none' : 'flex';
 }
 
@@ -513,6 +519,8 @@ export async function renderBottomPanel() {
   const seq = ++bottomRenderSeq;
   const wardName = isCityMode() ? CITY_NAME : state.selectedWard;
   const city = wardName === CITY_NAME;
+  const planEl = document.getElementById('bpWardPlan');
+  if (planEl) planEl.innerHTML = '';
   setBottomPanelHeader(wardName);
 
   const tbody = document.getElementById('statTableBody');
@@ -610,19 +618,9 @@ async function fetchAndApplyWardCoverage(wardData) {
 function renderWardSummary(wardData) {
   const popCurrent = wardData.Dan_So_Vector || 45000;
   const popProjected = wardData.projectedPopulation || Math.round(popCurrent * 1.2);
-  const currentUnits = wardData.currentUnits || Math.max(1, Math.round(popCurrent / 20000));
   const projectedUnits = wardData.projectedUnits || Math.max(1, Math.round(popProjected / 20000));
 
   const summaryHtml = `<div id="wardSummaryCard" data-ward="${wardData.Ten_Phuong}" style="display:contents;">
-    <div class="ward-summary-head">
-      <div>👥 Dân số hiện trạng: <b>${popCurrent.toLocaleString()} người</b> (${currentUnits} đơn vị ở)</div>
-      <div>
-        📈 Dân số quy hoạch:
-        <input type="number" id="wardPopInput" value="${popProjected}" step="1000" min="1000" />
-        người (<span id="projectedUnitsLabel">${projectedUnits}</span> đơn vị ở)
-      </div>
-      <div id="wardCoverageStatus">⏳ Đang tính độ phủ buffer × dân số (GEE)...</div>
-    </div>
     <div id="wardQuotaTableContainer">
       ${buildWardQuotaTableHtml(wardData, popProjected)}
     </div>
@@ -631,6 +629,15 @@ function renderWardSummary(wardData) {
   const view = document.getElementById('wardSummaryView');
   if (!view) return;
   view.innerHTML = summaryHtml;
+
+  // Dân số hiện trạng / độ phủ / quy mô đã có ở #bpSubtitle, dòng tiêu đề chỉ bổ sung dân số quy hoạch
+  const planEl = document.getElementById('bpWardPlan');
+  if (planEl) {
+    planEl.innerHTML = `· <span title="Dân số quy hoạch">Dân số QH</span>:
+      <input type="number" id="wardPopInput" value="${popProjected}" step="1000" min="1000" />
+      người (<span id="projectedUnitsLabel">${projectedUnits}</span> đơn vị ở)
+      <span id="wardCoverageStatus">⏳ Đang tính độ phủ...</span>`;
+  }
 
   const popInput = document.getElementById('wardPopInput');
   if (popInput) {
@@ -667,10 +674,8 @@ function renderWardSummary(wardData) {
     renderSummaryNote(wardData.Ten_Phuong);
     patchCombinedTableWardRow(wardData);
     if (statusEl) {
-      statusEl.style.color = ok ? 'var(--accent-green)' : 'var(--accent-red)';
-      statusEl.innerText = ok
-        ? `✓ Độ phủ trung bình: ${Number(wardData.Avg_Coverage_Score || 0).toFixed(1)}%`
-        : '⚠ Không tính được độ phủ GEE (thử lại sau).';
+      statusEl.style.color = 'var(--accent-red)';
+      statusEl.innerText = ok ? '' : '⚠ Không tính được độ phủ GEE';
     }
   });
 }

@@ -507,7 +507,9 @@ module.exports = async (req, res) => {
 
     await initGEE();
     const { ee, wardVectorParsed, popRasterNormalized, wardRegion } = getGeeContext();
-    const rawDataList = await getRawDataList();
+    const allDataList = await getRawDataList();
+    // Mọi phép tính hiện trạng chỉ dùng công trình có QuyMo_HT (ô trống = hiện tại chưa hình thành)
+    const rawDataList = allDataList.filter(it => it.planChange !== 'new' && it.planChange !== 'none');
 
     if (action === 'getIsochrone') {
       let requestBody = req.body || {};
@@ -567,7 +569,7 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'addPoint') {
-      const { type, name, ward, lat, lng, size, nhomHaTang } = req.query;
+      const { type, name, ward, lat, lng, size, nhomHaTang, phase } = req.query;
       if (!type || !name || !lat || !lng) {
         return res.status(400).json({ error: true, message: "Thiếu thông tin bắt buộc" });
       }
@@ -580,7 +582,8 @@ module.exports = async (req, res) => {
         `&nhomHaTang=${encodeURIComponent(nhomHaTang || 'Cấp đơn vị ở')}` +
         `&name=${encodeURIComponent(name)}` +
         `&ward=${encodeURIComponent(geoWard || ward || '')}` +
-        `&lat=${lat}&lng=${lng}&size=${size || 0}`;
+        `&lat=${lat}&lng=${lng}&size=${size || 0}` +
+        `&phase=${phase === 'QH' ? 'QH' : 'HT'}`;
 
       invalidateCache();
       cachedWardStats = null;
@@ -1300,7 +1303,8 @@ module.exports = async (req, res) => {
       return res.status(200).json(fcGeoJson);
     }
 
-    return res.status(200).json({ rawDataList });
+    const planDataList = allDataList.filter(it => it.planChange === 'new');
+    return res.status(200).json({ rawDataList, planDataList });
 
   } catch (err) {
     console.error("GEE API Error:", err);

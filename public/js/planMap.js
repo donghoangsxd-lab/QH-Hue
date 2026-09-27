@@ -1,20 +1,37 @@
-import { state, infraLabels, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_HIGHLIGHT_STYLE } from './state.js';
-
-const PLAN_SAMPLE_URL = './data/planning-sample.geojson';
-const PLAN_COLORS = {
-  "1-CV": "#16a34a", "2-BDX": "#2563eb", "3-MN": "#ea580c", "4-TH": "#dc2626",
-  "5-THCS": "#9333ea", "6-YT": "#0d9488", "7-VH": "#ca8a04", "8-TM": "#db2777"
-};
+import { state, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_HIGHLIGHT_STYLE, BUFFER_KEYS, getBufferStyle } from './state.js';
+import { geeApi } from './api.js';
 
 export let planMap = null;
 let leftMap = null;
+let leftLayers = null;
 let compareOn = false;
 let dividerRatio = 0.5;
-const planBoundaryLayer = L.layerGroup();
 const planHighlightLayer = L.layerGroup();
 
-export function initPlanMap(mainMap) {
+// Cùng khóa với `layers` của bản đồ hiện trạng (mapEngine.js) để bật/tắt đồng thời
+export const planLayers = {
+  pop: L.layerGroup(),
+  boundary: L.layerGroup(),
+  heatmap: L.layerGroup(),
+  singleIso: L.layerGroup(),
+  c1: L.layerGroup(), b1: L.layerGroup(),
+  c2: L.layerGroup(), b2: L.layerGroup(),
+  c3: L.layerGroup(), b3: L.layerGroup(),
+  c4: L.layerGroup(), b4: L.layerGroup(),
+  c5: L.layerGroup(), b5: L.layerGroup(),
+  c6: L.layerGroup(), b6: L.layerGroup(),
+  c7: L.layerGroup(), b7: L.layerGroup(),
+  c8: L.layerGroup(), b8: L.layerGroup(),
+  c9: L.layerGroup(), b9: L.layerGroup()
+};
+let planHeatTile = null;
+let planHeatSeq = 0;
+
+const isApproved = (s) => s === true || String(s).trim().toUpperCase() === 'TRUE' || String(s).trim() === '1';
+
+export function initPlanMap(mainMap, mainLayers) {
   leftMap = mainMap;
+  leftLayers = mainLayers;
   planMap = L.map('mapPlan', {
     zoomControl: false,
     attributionControl: true,
@@ -27,9 +44,8 @@ export function initPlanMap(mainMap) {
     attribution: 'Tiles &copy; Esri'
   }).addTo(planMap);
 
-  planBoundaryLayer.addTo(planMap);
   planHighlightLayer.addTo(planMap);
-  loadPlanSampleData();
+  syncAllPlanLayers();
   syncMaps(leftMap, planMap);
   initDividerDrag();
 
@@ -45,16 +61,38 @@ export function initPlanMap(mainMap) {
   return planMap;
 }
 
+// Hiện/ẩn lớp quy hoạch theo đúng trạng thái lớp cùng tên bên bản đồ hiện trạng
+export function syncPlanLayer(key) {
+  const group = planLayers[key];
+  if (!planMap || !group || !leftLayers) return;
+  const on = key === 'heatmap'
+    ? document.getElementById('chk_heat')?.checked !== false
+    : leftMap.hasLayer(leftLayers[key]);
+  if (on) group.addTo(planMap);
+  else group.remove();
+}
+
+export function syncAllPlanLayers() {
+  Object.keys(planLayers).forEach(syncPlanLayer);
+}
+
 export function renderPlanBoundaries() {
-  planBoundaryLayer.clearLayers();
+  const group = planLayers.boundary;
+  group.clearLayers();
+  const wards = state.wardLabelsList || [];
   const fc = {
     type: 'FeatureCollection',
-    features: (state.wardLabelsList || [])
+    features: wards
       .filter(w => w.geometry)
       .map(w => ({ type: 'Feature', geometry: w.geometry, properties: { name: w.name } }))
   };
-  planBoundaryLayer.addLayer(L.geoJSON(fc, { style: WARD_BOUNDARY_SHADOW_STYLE, interactive: false }));
-  planBoundaryLayer.addLayer(L.geoJSON(fc, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false }));
+  group.addLayer(L.geoJSON(fc, { style: WARD_BOUNDARY_SHADOW_STYLE, interactive: false }));
+  group.addLayer(L.geoJSON(fc, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false }));
+  wards.forEach(item => {
+    if (item.lat == null || item.lng == null) return;
+    const icon = L.divIcon({ className: 'ward-label-icon', html: `<span class="ward-label-text">${item.name}</span>`, iconSize: [0, 0] });
+    group.addLayer(L.marker([item.lat, item.lng], { icon, interactive: false }));
+  });
 }
 
 export function highlightPlanWard(wardName) {
@@ -65,34 +103,70 @@ export function highlightPlanWard(wardName) {
   planHighlightLayer.addLayer(L.geoJSON({ type: 'Feature', geometry: w.geometry }, { style: WARD_HIGHLIGHT_STYLE, interactive: false }));
 }
 
-async function loadPlanSampleData() {
+function setPlanHeatUrl(url) {
+  planLayers.heatmap.clearLayers();
+  planHeatTile = null;
+  if (!url) return;
+  const opacityEl = document.getElementById('heatOpacity');
+  planHeatTile = L.tileLayer(url, { opacity: opacityEl ? opacityEl.value / 100 : 0.3 });
+  planLayers.heatmap.addLayer(planHeatTile);
+}
+
+export function setPlanHeatOpacity(val) {
+  if (planHeatTile) planHeatTile.setOpacity(val);
+}
+
+function renderPlanBuffers(isoFeatures) {
+  Object.values(BUFFER_KEYS).forEach(k => planLayers[k].clearLayers());
+  isoFeatures.forEach(feat => {
+    const props = feat.properties || {};
+    const group = planLayers[BUFFER_KEYS[props.type]] || planLayers.b9;
+    group.addLayer(L.geoJSON(feat, { style: getBufferStyle(props.type, isApproved(props.status)), interactive: false }));
+  });
+}
+
+// Vùng phủ & heatmap quy hoạch dùng lại isochrone hiện trạng (bỏ công trình di dời) + isochrone công trình quy hoạch mới,
+// tương đương tính lại toàn bộ từ danh sách getPlanScenarioList() nhưng không phải gọi GEE cho ~700 điểm lần nữa.
+// Mở rộng/thu hẹp không đổi bán kính nên không làm đổi vùng phủ.
+export async function refreshPlanLayers(leftIsoFeatures, leftUrl, newItems) {
+  const seq = ++planHeatSeq;
+  const relocated = new Set(state.rawDataList.filter(it => it.planChange === 'relocate').map(it => it.id));
+
   try {
-    const res = await fetch(PLAN_SAMPLE_URL);
-    if (!res.ok) return;
-    const data = await res.json();
-    L.geoJSON(data, {
-      style: f => {
-        const color = PLAN_COLORS[f.properties.loai] || '#7c3aed';
-        return { color, weight: 2, dashArray: '6,4', fillColor: color, fillOpacity: 0.25 };
-      },
-      pointToLayer: (f, latlng) => {
-        const color = PLAN_COLORS[f.properties.loai] || '#7c3aed';
-        return L.circleMarker(latlng, { radius: 8, color: '#fff', weight: 2, fillColor: color, fillOpacity: 0.95 });
-      },
-      onEachFeature: (f, layer) => {
-        const p = f.properties || {};
-        layer.bindPopup(`<div style="font-size:11px; min-width:200px;">
-          <b style="color:var(--accent-cyan);">${p.name || 'Công trình quy hoạch'}</b><br>
-          <hr style="border-color:var(--border-color); margin:4px 0;">
-          • Loại hạ tầng: <b>${infraLabels[p.loai] || p.loai || '-'}</b><br>
-          • Diện tích: <b>${Number(p.dienTich || 0).toLocaleString()} m²</b><br>
-          • Giai đoạn: <b style="color:var(--accent-orange);">${p.giaiDoan || '-'}</b><br>
-          <i style="color:var(--text-muted);">Dữ liệu mẫu để thử tính năng so sánh.</i>
-        </div>`);
-      }
-    }).addTo(planMap);
+    let newIso = [];
+    if (newItems.length) {
+      const isoRes = await fetch(geeApi('action=getIsochrone'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ features: newItems })
+      });
+      if (isoRes.ok) newIso = ((await isoRes.json()) || {}).features || [];
+    }
+    if (seq !== planHeatSeq) return;
+
+    const planIso = leftIsoFeatures
+      .filter(f => !relocated.has(f.properties && f.properties.id))
+      .concat(newIso);
+    renderPlanBuffers(planIso);
+
+    const approvedNewIso = newIso.filter(f => isApproved(f.properties && f.properties.status));
+    if (!relocated.size && !approvedNewIso.length) {
+      setPlanHeatUrl(leftUrl);
+      return;
+    }
+
+    const features = planIso.filter(f => isApproved(f.properties && f.properties.status));
+    const heatRes = await fetch(geeApi(`action=getHeatmapTile&t=${Date.now()}`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ features })
+    });
+    if (!heatRes.ok) return;
+    const d = await heatRes.json();
+    if (seq !== planHeatSeq) return;
+    setPlanHeatUrl(d.urlFormat);
   } catch (err) {
-    console.warn("Không tải được dữ liệu quy hoạch mẫu:", err);
+    console.warn("Lỗi cập nhật heatmap quy hoạch:", err);
   }
 }
 

@@ -101,6 +101,12 @@
           <option value="9-CSD" selected>🛠️ 9. Quỹ đất tiềm năng (Chưa sử dụng)</option>
         </select>
 
+        <label>Giai đoạn:</label>
+        <select id="newPhase">
+          <option value="HT" selected>Hiện trạng (bổ sung điểm còn thiếu)</option>
+          <option value="QH">Quy hoạch mới</option>
+        </select>
+
         <label>Phân cấp hạ tầng (Cột D):</label>
         <select id="newNhomHaTang">
           <option value="Cấp đô thị">Cấp đô thị</option>
@@ -151,6 +157,17 @@
             <span>❄️ Lạnh: thiếu hạ tầng</span><span>Nóng: đủ hạ tầng 🔥</span>
           </div>
         </div>
+
+        <div class="heat-legend">
+          <div class="heat-legend-title">◨ Biến động quy hoạch</div>
+          <div class="plan-legend">
+            <span><i style="background:#22c55e;"></i>Quy hoạch mới</span>
+            <span><i style="background:#38bdf8;"></i>Mở rộng</span>
+            <span><i style="background:#f59e0b;"></i>Thu hẹp</span>
+            <span><i style="background:#ef4444;"></i>Di dời</span>
+          </div>
+          <div class="plan-legend-note">Chấm màu trên icon; điểm di dời chỉ còn ở bản đồ hiện trạng.</div>
+        </div>
       </div>
     </div>
   </aside>
@@ -176,6 +193,7 @@
             <b class="bp-part-title">BẢNG TỔNG HỢP HẠ TẦNG</b>
             <select id="wardSelector" class="ward-selector-dropdown" title="Chọn địa bàn phân tích (phường/xã)"></select>
             <span id="bpSubtitle"></span>
+            <span id="bpWardPlan" style="display:none;"></span>
           </div>
           <div class="bp-actions" data-html2canvas-ignore="true">
             <button class="bp-btn bp-icon" id="btnToggleStatTable" title="Xem bảng thông tin">

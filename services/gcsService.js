@@ -4,6 +4,24 @@ const constants = require('../config/constants');
 let cachedGeoJSON = null;
 let lastETag = null; // Lưu mã phiên bản ETag từ GCS Bucket
 
+// Ô trống / không có cột -> null (khác với số 0 nhập tường minh)
+function parseArea(val) {
+  if (val === undefined || val === null || String(val).trim() === '') return null;
+  const num = Number(String(val).trim().replace(',', '.'));
+  return isNaN(num) ? null : num;
+}
+
+// Ô trống = giai đoạn đó không có công trình; số 0 = có công trình nhưng chưa rõ diện tích (không so sánh được)
+// HT trống + QH có = quy hoạch mới; HT có + QH trống = di dời; cả 2 trống = không thể hiện ở bản đồ nào
+function classifyPlanChange(sizeHT, sizeQH) {
+  if (sizeHT === null) return sizeQH === null ? 'none' : 'new';
+  if (sizeQH === null) return 'relocate';
+  if (sizeHT === 0 || sizeQH === 0) return 'keep';
+  if (sizeQH > sizeHT) return 'expand';
+  if (sizeQH < sizeHT) return 'shrink';
+  return 'keep';
+}
+
 async function getRawDataList() {
   try {
     let currentETag = null;
@@ -52,6 +70,9 @@ async function getRawDataList() {
         assignedNhom = "Cap Do Thi";
       }
 
+      const sizeHT = parseArea(props.QuyMo_HT !== undefined ? props.QuyMo_HT : props.QuyMo_S);
+      const sizeQH = parseArea(props.QuyMo_QH);
+
       return {
         id: rawId,
         name: props.Ten_CongTrinh || 'Chưa đặt tên',
@@ -60,7 +81,10 @@ async function getRawDataList() {
         nhomHaTang: assignedNhom, // Bổ sung nhận biết nhóm hạ tầng phục vụ quy chuẩn QCVN
         lat: parseCoord(coords[1]),
         lng: parseCoord(coords[0]),
-        size: Number(String(props.QuyMo_S || 0).replace(',', '.')) || 0,
+        size: sizeHT || 0,
+        sizeHT,
+        sizeQH,
+        planChange: classifyPlanChange(sizeHT, sizeQH),
         radius: Number(String(props.BanKinh || 500).replace(',', '.')) || 500,
         status: isStatusTrue
       };
