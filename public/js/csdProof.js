@@ -34,6 +34,13 @@ function pulseMarker(lat, lng, color, tooltip, permanent = false) {
     .bindTooltip(tooltip, { permanent, direction: 'top', offset: [0, -10], className: 'proof-tooltip' });
 }
 
+// Bề rộng thanh công cụ dọc bên trái đang đè lên bản đồ (px)
+function leftToolbarWidth(targetMap) {
+  const tb = document.querySelector('.map-toolbar');
+  if (!tb || !tb.offsetParent) return 0;
+  return Math.max(0, tb.getBoundingClientRect().right - targetMap.getContainer().getBoundingClientRect().left);
+}
+
 function legendRow(swatchStyle, text) {
   return `<div class="proof-legend-row"><span class="proof-swatch" style="${swatchStyle}"></span><span>${text}</span></div>`;
 }
@@ -138,11 +145,14 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
 
   group.addTo(targetMap);
 
+  const padTopLeft = (fit && fit.padTopLeft) || [20, 20];
+  const leftClear = Math.max(padTopLeft[0], leftToolbarWidth(targetMap) + 8);
+
   const panel = L.control({ position: 'bottomleft' });
   panel.onAdd = () => {
     const div = L.DomUtil.create('div', 'proof-panel');
     div.innerHTML = buildPanelHtml(data, typeColor);
-    if (fit && fit.padTopLeft && fit.padTopLeft[0] > 20) div.style.marginLeft = `${fit.padTopLeft[0]}px`;
+    div.style.marginLeft = `${leftClear}px`;
     L.DomEvent.disableClickPropagation(div);
     L.DomEvent.disableScrollPropagation(div);
     div.querySelector('.proof-close').addEventListener('click', clearCsdProof);
@@ -156,7 +166,7 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
   const bounds = L.latLng(c.lat, c.lng).toBounds(c.radius * 2.3);
   data.existing.forEach(e => bounds.extend(L.latLng(e.lat, e.lng)));
   targetMap.fitBounds(bounds, {
-    paddingTopLeft: (fit && fit.padTopLeft) || [20, 20],
+    paddingTopLeft: [leftClear, padTopLeft[1]],
     paddingBottomRight: (fit && fit.padBottomRight) || [20, 20],
     maxZoom: 17
   });
