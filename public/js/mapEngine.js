@@ -26,12 +26,16 @@ let tileHeatmapLayer = null;
 let wardLabelMarkers = [];
 let lastCalculatedIsochrones = [];
 
+const WARD_GEOM_VERSION = 2;
+
 function isPointInWardGeometry(lat, lng, geometry) {
-  if (!geometry) return false;
+  if (!geometry || lat == null || lng == null) return false;
+  if (geometry.type === 'GeometryCollection') {
+    return (geometry.geometries || []).some(g => isPointInWardGeometry(lat, lng, g));
+  }
+  if (geometry.type !== 'Polygon' && geometry.type !== 'MultiPolygon') return false;
   try {
-    const pt = turf.point([lng, lat]);
-    const poly = turf.feature(geometry);
-    return turf.booleanPointInPolygon(pt, poly);
+    return turf.booleanPointInPolygon(turf.point([Number(lng), Number(lat)]), turf.feature(geometry));
   } catch (e) {
     return false;
   }
@@ -80,7 +84,7 @@ export async function loadBoundaryLayer() {
   if (!map) return;
 
   try {
-    const boundRes = await fetch(geeApi('action=getBoundaryVector'));
+    const boundRes = await fetch(geeApi(`action=getBoundaryVector&v=${WARD_GEOM_VERSION}`));
     const boundData = await boundRes.json();
     
     if (boundData && boundData.features) {
@@ -100,7 +104,7 @@ export async function loadBoundaryLayer() {
   }
 
   try {
-    const labelRes = await fetch(geeApi('action=getWardLabels'));
+    const labelRes = await fetch(geeApi(`action=getWardLabels&v=${WARD_GEOM_VERSION}`));
     const labelData = await labelRes.json();
     const labels = labelData.labels || [];
     state.wardLabelsList = labels;
@@ -615,7 +619,7 @@ export function onPointClick(p, marker) {
         .catch(() => {});
     }
 
-    fetch(geeApi(`action=analyzeCSD&lat=${p.lat}&lng=${p.lng}&size=${p.size}&ward=${encodeURIComponent(geoWardNow || p.ward || '')}`))
+    fetch(geeApi(`action=analyzeCSD&lat=${p.lat}&lng=${p.lng}&size=${p.size}`))
       .then(r => r.json())
       .then(res => {
         let sugHtml = "";
@@ -723,7 +727,7 @@ export async function handleInspectPointClick(clickLat, clickLng) {
   fetch(geeApi(`action=getWardFromPoint&lat=${clickLat.toFixed(6)}&lng=${clickLng.toFixed(6)}`))
     .then(r => r.json())
     .then(resWard => {
-      const wardName = resWard.ward || "Thuận Hóa";
+      const wardName = resolveWardNameFromCoords(clickLat, clickLng) || resWard.ward || "Ngoài ranh giới";
 
       let resultHtml = `<div style="font-size:11px;">
         <b style="color:var(--accent-cyan);">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ</b><br>

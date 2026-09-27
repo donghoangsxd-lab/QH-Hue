@@ -252,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-const COVERAGE_LS_KEY = 'qh_hue_ward_coverage_v3';
+const COVERAGE_LS_KEY = 'qh_hue_ward_coverage_v4';
 const COVERAGE_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
 const COVERAGE_LEVEL_KEYS = [
   "1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM",
@@ -597,15 +597,6 @@ export function selectWardDetail(wardName) {
 
   fitMapToWard(wardName);
   renderGroupedPoints();
-
-  const wardPoints = [];
-  Object.values(wardData.urbanResults || {}).forEach(node => {
-    (node.subItems || []).forEach(it => wardPoints.push(it));
-  });
-  Object.values(wardData.unitResults || {}).forEach(node => {
-    (node.subItems || []).forEach(it => wardPoints.push(it));
-  });
-  updateInfraPieChart(wardPoints.length > 0 ? wardPoints : state.rawDataList.filter(i => i.status === true));
 
   renderWardDetailPopup(wardData);
 }

@@ -127,19 +127,40 @@ function isPointInPolygon(point, vs) {
   return inside;
 }
 
+function isPointInPolygonRings(point, rings) {
+  if (!rings || !rings[0] || !isPointInPolygon(point, rings[0])) return false;
+  for (let i = 1; i < rings.length; i++) {
+    if (isPointInPolygon(point, rings[i])) return false;
+  }
+  return true;
+}
+
+/**
+ * Ranh giới phường từ GEE có thể là GeometryCollection (lẫn LineString).
+ * Quy về Polygon / MultiPolygon để mọi phép kiểm tra điểm-trong-phường thống nhất.
+ */
+function normalizeWardGeometry(geometry) {
+  if (!geometry) return null;
+  const polygons = [];
+  const collect = (g) => {
+    if (!g) return;
+    if (g.type === 'Polygon' && Array.isArray(g.coordinates)) polygons.push(g.coordinates);
+    else if (g.type === 'MultiPolygon' && Array.isArray(g.coordinates)) g.coordinates.forEach(p => polygons.push(p));
+    else if (g.type === 'GeometryCollection') (g.geometries || []).forEach(collect);
+  };
+  collect(geometry);
+  if (polygons.length === 0) return null;
+  if (polygons.length === 1) return { type: 'Polygon', coordinates: polygons[0] };
+  return { type: 'MultiPolygon', coordinates: polygons };
+}
+
 function checkPointInGeoJSONGeometry(ptLng, ptLat, geometry) {
-  if (!geometry || !geometry.coordinates) return false;
-  const type = geometry.type;
-  const coords = geometry.coordinates;
+  const geom = normalizeWardGeometry(geometry);
+  if (!geom) return false;
+  const pt = [ptLng, ptLat];
   try {
-    if (type === 'Polygon') {
-      return isPointInPolygon([ptLng, ptLat], coords[0]);
-    }
-    if (type === 'MultiPolygon') {
-      for (const polyCoords of coords) {
-        if (isPointInPolygon([ptLng, ptLat], polyCoords[0])) return true;
-      }
-    }
+    if (geom.type === 'Polygon') return isPointInPolygonRings(pt, geom.coordinates);
+    return geom.coordinates.some(rings => isPointInPolygonRings(pt, rings));
   } catch (e) {}
   return false;
 }
@@ -250,7 +271,7 @@ async function loadEvaluatedWards(wardVectorParsed) {
     evaluatedWards.push({
       name: wName,
       pop: totalPop,
-      geometry: f.geometry || null
+      geometry: normalizeWardGeometry(f.geometry)
     });
   });
   cachedEvaluatedWards = evaluatedWards;
@@ -258,13 +279,20 @@ async function loadEvaluatedWards(wardVectorParsed) {
   return evaluatedWards;
 }
 
+/** Cách duy nhất xác định công trình thuộc phường nào: theo tọa độ, không dùng cột phường của sheet. */
 function assignWardByGeometry(ptLng, ptLat, evaluatedWards) {
+  if (ptLng == null || ptLat == null || Number.isNaN(ptLng) || Number.isNaN(ptLat)) return null;
   for (const w of evaluatedWards) {
     if (w.geometry && checkPointInGeoJSONGeometry(ptLng, ptLat, w.geometry)) {
       return w.name;
     }
   }
   return null;
+}
+
+function findWardByName(evaluatedWards, wardName) {
+  const clean = constants.cleanWardStr(wardName);
+  return evaluatedWards.find(w => w.name === wardName || constants.cleanWardStr(w.name) === clean) || null;
 }
 
 /**
@@ -544,11 +572,14 @@ module.exports = async (req, res) => {
         return res.status(400).json({ error: true, message: "Thiếu thông tin bắt buộc" });
       }
 
+      const evaluatedWardsForAdd = await loadEvaluatedWards(wardVectorParsed);
+      const geoWard = assignWardByGeometry(Number(lng), Number(lat), evaluatedWardsForAdd);
+
       const syncUrl = `${constants.GAS_BASE_URL}?action=addPoint` +
         `&type=${encodeURIComponent(type)}` +
         `&nhomHaTang=${encodeURIComponent(nhomHaTang || 'Cấp đơn vị ở')}` +
         `&name=${encodeURIComponent(name)}` +
-        `&ward=${encodeURIComponent(ward || 'Thuận Hóa')}` +
+        `&ward=${encodeURIComponent(geoWard || ward || '')}` +
         `&lat=${lat}&lng=${lng}&size=${size || 0}`;
 
       invalidateCache();
@@ -655,38 +686,22 @@ module.exports = async (req, res) => {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
       const size = Number(req.query.size) || 0;
-      const rawWardParam = String(req.query.ward || '');
-      const cleanTargetWard = constants.cleanWardStr(rawWardParam);
 
       if (!lat || !lng) return res.status(400).json({ error: true, message: "Thiếu tọa độ điểm" });
 
-      const wardListEvaluated = await new Promise((resolve) => {
-        wardVectorParsed.evaluate((fc) => resolve(fc ? fc.features : []));
-      });
-
-      let targetWardPop = 0;
-      wardListEvaluated.forEach(f => {
-        const props = f.properties || {};
-        const wName = props.tenXa || props.NAME_2 || props.name || '';
-        if (constants.cleanWardStr(wName) === cleanTargetWard) {
-          targetWardPop = Number(props.danSoNum || 0);
-        }
-      });
+      const evaluatedWardsCsd = await loadEvaluatedWards(wardVectorParsed);
+      const targetWardName = assignWardByGeometry(lng, lat, evaluatedWardsCsd);
+      const wardFeat = targetWardName ? findWardByName(evaluatedWardsCsd, targetWardName) : null;
+      const targetWardPop = wardFeat ? Number(wardFeat.pop || 0) : 0;
 
       const wardExistAreas = {};
       rawDataList.forEach(item => {
-        const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE');
-        if (isApproved && constants.cleanWardStr(item.ward) === cleanTargetWard) {
-          const t = constants.resolveTypeCode(item) || item.type;
-          if (!t) return;
-          wardExistAreas[t] = (wardExistAreas[t] || 0) + Number(item.size || 0);
-        }
-      });
-
-      const wardFeat = wardListEvaluated.find(f => {
-        const props = f.properties || {};
-        const wName = props.tenXa || props.NAME_2 || props.name || '';
-        return constants.cleanWardStr(wName) === cleanTargetWard;
+        if (!isApprovedStatus(item.status) || item.lat == null || item.lng == null) return;
+        if (!targetWardName) return;
+        if (assignWardByGeometry(Number(item.lng), Number(item.lat), evaluatedWardsCsd) !== targetWardName) return;
+        const t = constants.resolveTypeCode(item) || item.type;
+        if (!t) return;
+        wardExistAreas[t] = (wardExistAreas[t] || 0) + Number(item.size || 0);
       });
 
       let wardTotalPopPix = 0;
@@ -814,7 +829,7 @@ module.exports = async (req, res) => {
         topSuggestions[0].isTopPriority = true;
       }
 
-      return res.status(200).json({ suggestions: topSuggestions, ineligible });
+      return res.status(200).json({ ward: targetWardName, suggestions: topSuggestions, ineligible });
     }
 
     if (action === 'getWardCoverage') {
@@ -824,9 +839,7 @@ module.exports = async (req, res) => {
       }
 
       const evaluatedWards = await loadEvaluatedWards(wardVectorParsed);
-      const targetWard = evaluatedWards.find(w =>
-        w.name === wardName || constants.cleanWardStr(w.name) === constants.cleanWardStr(wardName)
-      );
+      const targetWard = findWardByName(evaluatedWards, wardName);
       if (!targetWard || !targetWard.geometry) {
         return res.status(404).json({ error: true, message: "Không tìm thấy ranh giới phường" });
       }
@@ -834,7 +847,7 @@ module.exports = async (req, res) => {
       const itemsInWard = rawDataList.filter(item => {
         if (item.lat == null || item.lng == null) return false;
         if (!isApprovedStatus(item.status)) return false;
-        return checkPointInGeoJSONGeometry(Number(item.lng), Number(item.lat), targetWard.geometry);
+        return assignWardByGeometry(Number(item.lng), Number(item.lat), evaluatedWards) === targetWard.name;
       });
 
       try {
@@ -888,7 +901,7 @@ module.exports = async (req, res) => {
       const now = Date.now();
       if (cachedWardStats && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)
           && cachedWardStats[0] && cachedWardStats[0]._assignMode === 'geometry'
-          && cachedWardStats[0]._schema === 4) {
+          && cachedWardStats[0]._schema === 5) {
         return res.status(200).json({ data: cachedWardStats, coverageStatus: 'cached' });
       }
       cachedWardStats = null;
@@ -1208,7 +1221,7 @@ module.exports = async (req, res) => {
         calculatedRow.Avg_Coverage_Score = Number((totalCoverageSum / (countMetrics || 1)).toFixed(1));
         calculatedRow.Avg_Scale_Score = Number((totalScaleSum / (countMetrics || 1)).toFixed(1));
         calculatedRow._assignMode = 'geometry';
-        calculatedRow._schema = 4;
+        calculatedRow._schema = 5;
         if (cachedCoverageByWard[wName]) calculatedRow._coverageReady = true;
 
         resultTable.push(calculatedRow);
@@ -1227,19 +1240,8 @@ module.exports = async (req, res) => {
       const lng = Number(req.query.lng);
       if (!lat || !lng) return res.status(400).json({ error: true, message: "Thiếu tọa độ" });
 
-      const clickPoint = ee.Geometry.Point([lng, lat]);
-      const matchedWard = wardVectorParsed.filterBounds(clickPoint).first();
-
-      const wardData = await new Promise((resolve) => {
-        matchedWard.evaluate((feature) => {
-          let wardName = "Thuận Hóa";
-          if (feature && feature.properties) {
-            const props = feature.properties;
-            wardName = props.tenXa || props.NAME_2 || props.name || "Thuận Hóa";
-          }
-          resolve(wardName);
-        });
-      });
+      const evaluatedWardsPt = await loadEvaluatedWards(wardVectorParsed);
+      const wardData = assignWardByGeometry(lng, lat, evaluatedWardsPt);
 
       return res.status(200).json({ ward: wardData });
     }
@@ -1282,7 +1284,7 @@ module.exports = async (req, res) => {
           name: props.tenXa || props.NAME_2 || props.name || 'Phường',
           lat: coords[1],
           lng: coords[0],
-          geometry: f.geometry
+          geometry: normalizeWardGeometry(f.geometry)
         };
       });
 
@@ -1294,6 +1296,7 @@ module.exports = async (req, res) => {
       const fcGeoJson = await new Promise((resolve, reject) => {
         wardVectorParsed.evaluate((fc, err) => err ? reject(err) : resolve(fc || { type: 'FeatureCollection', features: [] }));
       });
+      (fcGeoJson.features || []).forEach(f => { f.geometry = normalizeWardGeometry(f.geometry); });
       return res.status(200).json(fcGeoJson);
     }
 

@@ -47,17 +47,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       fetch(geeApi(`action=getWardFromPoint&lat=${lat}&lng=${lng}`))
         .then(r => r.json())
         .then(res => {
-          const wardName = res.ward || "Thuận Hóa";
+          const wardName = res.ward || "";
           const inputWard = document.getElementById('newWard');
           if (inputWard) inputWard.value = wardName;
           if (statusEl) {
-            statusEl.style.color = "var(--accent-green)";
-            statusEl.innerText = `✓ Thuộc địa bàn: ${wardName}`;
+            statusEl.style.color = wardName ? "var(--accent-green)" : "var(--accent-orange)";
+            statusEl.innerText = wardName ? `✓ Thuộc địa bàn: ${wardName}` : "⚠ Vị trí nằm ngoài ranh giới 40 phường/xã";
           }
         })
         .catch(() => {
-          const inputWard = document.getElementById('newWard');
-          if (inputWard) inputWard.value = "Thuận Hóa";
           if (statusEl) {
             statusEl.style.color = "var(--accent-green)";
             statusEl.innerText = "✓ Đã ghim tọa độ!";
@@ -277,7 +275,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const name = document.getElementById('newName')?.value;
     const lat = document.getElementById('newLat')?.value;
     const lng = document.getElementById('newLng')?.value;
-    const ward = document.getElementById('newWard')?.value || "Thuận Hóa";
+    const ward = document.getElementById('newWard')?.value || "";
     const size = document.getElementById('newSize')?.value || 0;
     const msg = document.getElementById('statusMsg');
 
