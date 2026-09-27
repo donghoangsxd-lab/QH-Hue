@@ -1,6 +1,7 @@
-import { state, infraLabels, infraIcons } from './state.js';
-import { updateInfraPieChart, hideInfraPieChart } from './uiComponents.js';
+import { state, infraLabels, infraIcons, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_HIGHLIGHT_STYLE } from './state.js';
+import { updateInfraPieChart } from './uiComponents.js';
 import { geeApi } from './api.js';
+import { getCoveredRightWidth, highlightPlanWard } from './planMap.js';
 
 export let map = null;
 export let measureLayerGroup = null;
@@ -59,7 +60,7 @@ export function getDistanceMeters(lat1, lon1, lat2, lon2) {
 }
 
 export function initMap() {
-  map = L.map('map', { renderer: L.canvas() }).setView([16.4637, 107.5905], 13);
+  map = L.map('map', { renderer: L.canvas() }).setView(CITY_CENTER, CITY_ZOOM);
 
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
     maxZoom: 18
@@ -88,16 +89,8 @@ export async function loadBoundaryLayer() {
     const boundData = await boundRes.json();
     
     if (boundData && boundData.features) {
-      const boundaryVectorLayer = L.geoJSON(boundData, {
-        style: {
-          color: '#ffffff',
-          weight: 1.5,
-          dashArray: '4, 4',
-          fillColor: 'transparent',
-          fillOpacity: 0
-        }
-      });
-      layers.boundary.addLayer(boundaryVectorLayer);
+      layers.boundary.addLayer(L.geoJSON(boundData, { style: WARD_BOUNDARY_SHADOW_STYLE, interactive: false }));
+      layers.boundary.addLayer(L.geoJSON(boundData, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false }));
     }
   } catch (err) {
     console.error("Lỗi tải ranh giới vector 40 phường xã:", err);
@@ -126,12 +119,42 @@ export async function loadBoundaryLayer() {
   }
 }
 
+const CITY_CENTER = [16.4637, 107.5905];
+const CITY_ZOOM = 13;
+
+function getRightObstruction() {
+  if (!map) return 0;
+  let panelW = 0;
+  const rp = document.getElementById('rightPanel');
+  if (rp && !document.body.classList.contains('right-collapsed')) {
+    panelW = Math.max(0, map.getContainer().getBoundingClientRect().right - rp.getBoundingClientRect().left);
+  }
+  const covered = Math.max(getCoveredRightWidth(), panelW);
+  return (map.getSize().x - covered) < 240 ? 0 : covered;
+}
+
+export function centerOnCity(options = { animate: false }) {
+  flyToVisible(CITY_CENTER, CITY_ZOOM, options);
+}
+
+export function flyToVisible(latlng, zoom, options) {
+  if (!map) return;
+  const shift = getRightObstruction() / 2;
+  if (!shift) {
+    map.flyTo(latlng, zoom, options);
+    return;
+  }
+  const target = map.project(L.latLng(latlng), zoom).add([shift, 0]);
+  map.flyTo(map.unproject(target, zoom), zoom, options);
+}
+
 export function highlightWardBoundary(wardName, { fitView = true } = {}) {
   if (!layers.highlightWard || !map) return;
   layers.highlightWard.clearLayers();
+  highlightPlanWard(wardName);
 
   if (!wardName || wardName === "Thành phố Huế") {
-    if (fitView) map.flyTo([16.4637, 107.5905], 13);
+    if (fitView) centerOnCity({});
     return;
   }
 
@@ -143,15 +166,7 @@ export function highlightWardBoundary(wardName, { fitView = true } = {}) {
       properties: { name: wardName }
     };
 
-    const highlightLayer = L.geoJSON(wardGeoJSON, {
-      style: {
-        color: '#fb923c',
-        weight: 3.5,
-        dashArray: '6,6',
-        fillColor: '#fb923c',
-        fillOpacity: 0.15
-      }
-    });
+    const highlightLayer = L.geoJSON(wardGeoJSON, { style: WARD_HIGHLIGHT_STYLE, interactive: false });
 
     layers.highlightWard.addLayer(highlightLayer);
 
@@ -159,17 +174,18 @@ export function highlightWardBoundary(wardName, { fitView = true } = {}) {
       const bounds = highlightLayer.getBounds();
       if (bounds && bounds.isValid()) {
         map.fitBounds(bounds, {
-          padding: [48, 48],
+          paddingTopLeft: [20, 20],
+          paddingBottomRight: [20 + getRightObstruction(), 20],
           maxZoom: 15,
           animate: true,
           duration: 0.8
         });
       } else if (wardInfo.lat != null && wardInfo.lng != null) {
-        map.flyTo([wardInfo.lat, wardInfo.lng], 14);
+        flyToVisible([wardInfo.lat, wardInfo.lng], 14);
       }
     }
   } else if (fitView && wardInfo && wardInfo.lat != null && wardInfo.lng != null) {
-    map.flyTo([wardInfo.lat, wardInfo.lng], 14);
+    flyToVisible([wardInfo.lat, wardInfo.lng], 14);
   }
 }
 
@@ -289,11 +305,7 @@ export function renderGroupedPoints() {
 
   const sourceList = getWardFilteredList(state.rawDataList);
 
-  if (state.selectedWard && state.selectedWard !== "Thành phố Huế") {
-    updateInfraPieChart(sourceList);
-  } else {
-    hideInfraPieChart();
-  }
+  updateInfraPieChart(sourceList);
 
   const iconFiles = {
     "1-CV": { approved: "Park.png", pending: "Park2.png" },
@@ -674,6 +686,17 @@ export async function handleInspectPointClick(clickLat, clickLng) {
   if (state.tempMarker) map.removeLayer(state.tempMarker);
   state.tempMarker = L.marker([clickLat, clickLng]).addTo(map);
 
+  const inspectPopup = L.popup({
+    className: 'inspect-popup',
+    maxWidth: 320,
+    minWidth: 240,
+    autoPanPaddingTopLeft: [20, 20],
+    autoPanPaddingBottomRight: [20 + getRightObstruction(), 20]
+  })
+    .setLatLng([clickLat, clickLng])
+    .setContent(`<div style="font-size:11px;">⏳ Đang phân tích vị trí ${clickLat.toFixed(5)}, ${clickLng.toFixed(5)}...</div>`)
+    .openOn(map);
+
   const coveredGroups = {};
   const missingCodes = [];
 
@@ -741,6 +764,7 @@ export async function handleInspectPointClick(clickLat, clickLng) {
 
       let resultHtml = `<div style="font-size:11px;">
         <b style="color:var(--accent-cyan);">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ</b><br>
+        <span style="color:var(--text-muted);">📌 Tọa độ: <b>${clickLat.toFixed(5)}, ${clickLng.toFixed(5)}</b></span><br>
         <span style="color:var(--text-muted);">📍 Địa bàn: <b>${wardName}</b> | 🛤️ Bán kính chuẩn: <b style="color:var(--accent-green);">${checkRadius}m</b></span><br>
 
         <div style="font-weight:bold; color:var(--accent-green); margin-top:6px;">
@@ -769,11 +793,10 @@ export async function handleInspectPointClick(clickLat, clickLng) {
       }
 
       resultHtml += `</div>`;
-      
-      L.popup({ closeButton: true, autoPan: true })
-        .setLatLng([clickLat, clickLng])
-        .setContent(resultHtml)
-        .openOn(map);
+
+      if (!inspectPopup.isOpen()) return;
+      map.closePopup(inspectPopup);
+      inspectPopup.setContent(resultHtml).openOn(map);
     });
 }
 

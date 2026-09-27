@@ -49,6 +49,11 @@ export const infraLabels = {
   "9-CSD": "🛠️ Quỹ đất tiềm năng (Chưa sử dụng)"
 };
 
+// Ranh giới phường xã: nét bóng tối vẽ dưới + nét vàng nhạt vẽ trên (đổ bóng rẻ, không dùng CSS filter)
+export const WARD_BOUNDARY_SHADOW_STYLE = { color: '#000000', weight: 4.5, opacity: 0.45, fill: false, interactive: false };
+export const WARD_BOUNDARY_LINE_STYLE = { color: '#fde68a', weight: 1.6, opacity: 0.95, fill: false, interactive: false };
+export const WARD_HIGHLIGHT_STYLE = { color: '#fb923c', weight: 3.5, dashArray: '6,6', fillColor: '#fb923c', fillOpacity: 0.15, interactive: false };
+
 export const infraIcons = {
   "1-CV": { symbol: "🌳", border: "#4ade80" },
   "2-BDX": { symbol: "🅿️", border: "#a855f7" },

@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { map, renderGroupedPoints, focusWard } from './mapEngine.js';
+import { map, renderGroupedPoints, focusWard, flyToVisible } from './mapEngine.js';
 import { geeApi } from './api.js';
 
 let chartInstance = null;
@@ -121,19 +121,7 @@ export function handleGoogleCredentialResponse(response) {
 window.handleGoogleCredentialResponse = handleGoogleCredentialResponse;
 
 export function updateInfraPieChart(sourceList) {
-  const widget = document.getElementById('infraPieWidget');
-  if (!widget) return;
-  widget.style.display = 'block';
-  widget.style.position = 'absolute';
-  widget.style.top = '12px';
-  widget.style.left = '16px';
-  widget.style.zIndex = '1100';
-
   const legendContainer = document.getElementById('pieLegendDetails');
-  if (legendContainer) {
-    legendContainer.style.display = 'block';
-  }
-
   const areaTotals = {};
   let totalAreaSum = 0;
 
@@ -190,12 +178,12 @@ export function updateInfraPieChart(sourceList) {
       const pct = totalAreaSum > 0 ? ((val / totalAreaSum) * 100).toFixed(1) : 0;
       const color = colorsMap[k] || '#38bdf8';
       const name = labelsMap[k] || k;
-      html += `<div style="display:flex; align-items:center; justify-content:space-between; gap:4px; margin:0; width:100%;">
-        <span style="color:#0f172a; display:flex; align-items:center; gap:4px; min-width:0; text-align:left; justify-content:flex-start; flex:1;">
-          <span style="width:7px; height:7px; background:${color}; border-radius:50%; display:inline-block; flex-shrink:0;"></span>
-          <span style="text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</span>
+      html += `<div style="display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%;">
+        <span style="color:var(--text-main); display:flex; align-items:center; gap:5px; min-width:0; flex:1;">
+          <span style="width:8px; height:8px; background:${color}; border-radius:50%; display:inline-block; flex-shrink:0;"></span>
+          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</span>
         </span>
-        <b style="color:#0e7490; flex-shrink:0; text-align:right; min-width:2.6em;">${pct}%</b>
+        <b style="color:var(--accent-cyan); flex-shrink:0; text-align:right; min-width:2.8em;">${pct}%</b>
       </div>`;
     });
     legendContainer.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Chưa có dữ liệu</div>';
@@ -241,17 +229,6 @@ export function updateInfraPieChart(sourceList) {
   });
 }
 
-export function hideInfraPieChart() {
-  const widget = document.getElementById('infraPieWidget');
-  if (widget) widget.style.display = 'none';
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('btnClosePie')?.addEventListener('click', () => {
-    hideInfraPieChart();
-  });
-});
-
 const COVERAGE_LS_KEY = 'qh_hue_ward_coverage_v4';
 const COVERAGE_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
 const COVERAGE_LEVEL_KEYS = [
@@ -261,7 +238,6 @@ const COVERAGE_LEVEL_KEYS = [
   "THPT"
 ];
 let coverageFillRunning = false;
-let wardDetailSeq = 0;
 
 function loadLocalCoverageCache() {
   try {
@@ -384,18 +360,16 @@ export async function startBackgroundCoverageFill() {
   if (coverageFillRunning) return;
   coverageFillRunning = true;
 
-  const mBar = document.getElementById('modalProgressBar');
-  const mTxt = document.getElementById('modalProgressText');
   const cache = loadLocalCoverageCache();
   mergeLocalCoverageIntoStats();
   rebuildCombinedTableBody();
-  renderCombinedChart();
+  if (isCityMode()) {
+    renderCombinedChart();
+    renderSummaryNote(CITY_NAME);
+  }
 
   const queue = [...(state.wardStatsData || [])]
     .sort((a, b) => Number(b.Dan_So_Vector || 0) - Number(a.Dan_So_Vector || 0));
-
-  let done = queue.filter(w => w._coverageReady || cache[w.Ten_Phuong]).length;
-  const total = queue.length || 1;
 
   for (const ward of queue) {
     if (ward._coverageReady || cache[ward.Ten_Phuong]) {
@@ -403,9 +377,6 @@ export async function startBackgroundCoverageFill() {
         applyCoverageToWardRow(ward, cache[ward.Ten_Phuong]);
         patchCombinedTableWardRow(ward);
       }
-      done = Math.max(done, queue.filter(w => w._coverageReady || cache[w.Ten_Phuong]).length);
-      if (mBar) mBar.style.width = `${Math.round((done / total) * 100)}%`;
-      if (mTxt) mTxt.innerText = `Độ phủ ${done}/${total}`;
       continue;
     }
 
@@ -421,183 +392,184 @@ export async function startBackgroundCoverageFill() {
           };
           saveLocalCoverageCache(cache);
           patchCombinedTableWardRow(ward);
+          if (isCityMode()) renderSummaryNote(CITY_NAME);
         }
       }
     } catch (err) {
       console.warn("Background coverage fail:", ward.Ten_Phuong, err);
     }
-
-    done += 1;
-    if (mBar) mBar.style.width = `${Math.round((done / total) * 100)}%`;
-    if (mTxt) mTxt.innerText = `Độ phủ ${Math.min(done, total)}/${total}`;
   }
 
-  renderCombinedChart();
-  if (mTxt) mTxt.innerText = "100%";
-  if (mBar) mBar.style.width = "100%";
+  if (isCityMode()) {
+    renderCombinedChart();
+    renderSummaryNote(CITY_NAME);
+  }
   coverageFillRunning = false;
 }
 
-export function openCombinedModal() {
-  const combinedModal = document.getElementById('combinedModal');
-  if (!combinedModal) return;
+const CITY_NAME = "Thành phố Huế";
+let wardStatsPromise = null;
+let bottomRenderSeq = 0;
 
-  combinedModal.style.display = 'block';
-  const tbody = document.getElementById('statTableBody');
-  const mBar = document.getElementById('modalProgressBar');
-  const mTxt = document.getElementById('modalProgressText');
-  
-  if (mBar) mBar.style.width = "20%";
-  if (mTxt) mTxt.innerText = "20%";
-  if (tbody) tbody.innerHTML = "<tr><td colspan='20' style='text-align:center; padding:20px;'>🔄 Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>";
+function isCityMode() {
+  return !state.selectedWard || state.selectedWard === CITY_NAME;
+}
 
-  const headerActions = combinedModal.querySelector('.modal-header > div');
-  if (headerActions && !document.getElementById('btnExportCombinedPdf')) {
-    const pdfBtn = document.createElement('button');
-    pdfBtn.id = 'btnExportCombinedPdf';
-    pdfBtn.title = 'Xuất báo cáo PDF';
-    pdfBtn.style.cssText = 'background:transparent; border:none; color:var(--accent-cyan); cursor:pointer; font-size:16px; font-weight:bold; margin-right:6px;';
-    pdfBtn.innerHTML = '🖨️';
-    pdfBtn.onclick = () => {
-      const element = document.getElementById('combinedModal');
-      const scrollContainers = element.querySelectorAll('.table-container');
-      scrollContainers.forEach(c => {
-        c.style.maxHeight = 'none';
-        c.style.overflow = 'visible';
+export function ensureWardStats() {
+  if (state.wardStatsData.length > 0) return Promise.resolve(state.wardStatsData);
+  if (!wardStatsPromise) {
+    wardStatsPromise = fetch(geeApi('action=getWardStats'))
+      .then(r => {
+        if (!r.ok) {
+          throw new Error(r.status === 504
+            ? 'Máy chủ GEE quá tải / hết thời gian (504). Thử lại sau ít phút.'
+            : `Lỗi máy chủ (${r.status})`);
+        }
+        return r.json();
+      })
+      .then(resData => {
+        state.wardStatsData = resData.data || [];
+        mergeLocalCoverageIntoStats();
+        return state.wardStatsData;
+      })
+      .catch(err => {
+        wardStatsPromise = null;
+        throw err;
       });
-
-      html2pdf().from(element).set({
-        margin: 5,
-        filename: 'Bao-Cao-Ha-Tang-TP-Hue.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-      }).save().then(() => {
-        scrollContainers.forEach(c => {
-          c.style.maxHeight = '';
-          c.style.overflow = 'auto';
-        });
-      });
-    };
-    headerActions.insertBefore(pdfBtn, headerActions.firstChild);
   }
-
-  fetch(geeApi('action=getWardStats'))
-    .then(async r => {
-      if (!r.ok) {
-        throw new Error(r.status === 504
-          ? 'Máy chủ GEE quá tải / hết thời gian (504). Thử lại sau ít phút.'
-          : `Lỗi máy chủ (${r.status})`);
-      }
-      return r.json();
-    })
-    .then(resData => {
-      if (mBar) mBar.style.width = "40%";
-      if (mTxt) mTxt.innerText = "40%";
-      if (tbody) tbody.innerHTML = "";
-      
-      state.wardStatsData = resData.data || [];
-      mergeLocalCoverageIntoStats();
-      rebuildCombinedTableBody();
-      renderCombinedChart();
-
-      if (mBar) mBar.style.width = "50%";
-      if (mTxt) mTxt.innerText = "Độ phủ…";
-      startBackgroundCoverageFill();
-    })
-    .catch((err) => {
-      if (tbody) tbody.innerHTML = `<tr><td colspan='20' style='text-align:center; color:var(--accent-red); padding:20px;'>❌ ${err.message || 'Lỗi nạp dữ liệu từ GEE Server.'}</td></tr>`;
-    });
+  return wardStatsPromise;
 }
 
-export function closeModal() { 
-  const modal = document.getElementById('combinedModal');
-  if (modal) modal.style.display = 'none'; 
-}
-
-export function isWardDetailOpen() {
-  return !!document.getElementById('wardDetailPdfContainer');
-}
-
-export function closeWardDetail() {
-  wardDetailSeq++;
-  map.closePopup();
-}
-
-export async function openWardDetailDirect(wardName) {
-  const seq = ++wardDetailSeq;
-  focusWard(wardName);
-  const firstPoint = state.wardLabelsList.find(w => w.name === wardName) || { lat: 16.4637, lng: 107.5905 };
-
-  const initialModalHtml = `<div class="ward-popup-card" id="wardDetailPdfContainer" style="min-width: 780px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
-      <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH HẠ TẦNG QUY CHUẨN: ${wardName.toUpperCase()}</b>
-      <div style="display:flex; align-items:center; gap:8px;">
-        <button id="btnExportWardPdf" title="Xuất báo cáo PDF" style="background:transparent; border:none; color:var(--accent-cyan); cursor:pointer; font-size:15px; font-weight:bold;">🖨️</button>
-        <div style="width:80px;" class="progress-bar-bg"><div class="progress-bar-fill" id="wardDetailProgressBar" style="width: 100%;"></div></div>
-      </div>
-    </div>
-    <div style="background:rgba(15, 23, 42, 0.8); border:1px solid var(--border-color); padding:6px; border-radius:6px; margin:6px 0; font-size:11px;">
-      👥 Dân số & Đơn vị ở: Đang khởi tạo...
-    </div>
-    <div id="wardQuotaTableContainer">
-      <table class="ward-table">
-        <thead>
-          <tr>
-            <th style="width:5%; text-align:center;">STT</th>
-            <th style="width:31%;">Loại hạ tầng</th>
-            <th style="width:12%;">Diện tích</th>
-            <th style="width:8%;">Chỉ tiêu</th>
-            <th style="width:11%;">Nhu cầu DT</th>
-            <th style="width:9%; text-align:center;">Số lượng</th>
-            <th style="width:12%; text-align:center;">Quy mô</th>
-            <th style="width:12%; text-align:center;">Độ phủ</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td colspan="8" style="text-align:center; padding:25px; color:var(--accent-orange);">⏳ Đang tổng hợp dữ liệu quy chuẩn theo QCVN 01:2026/BXD...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>`;
-
-  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 800 })
-    .setLatLng([firstPoint.lat, firstPoint.lng])
-    .setContent(initialModalHtml);
-  
-  detailPopup.openOn(map);
-
-  try {
-    const res = await fetch(geeApi('action=getWardStats'));
-    const resData = await res.json();
-    state.wardStatsData = resData.data || [];
-    if (seq !== wardDetailSeq) return;
-    selectWardDetail(wardName, { focus: false });
-  } catch (err) {
-    console.error("Lỗi tải thống kê hạ tầng phường:", err);
+export function setBottomPanelMaximized(maximized) {
+  document.body.classList.toggle('bottom-max', maximized);
+  const btn = document.getElementById('btnToggleBottomMax');
+  if (btn) {
+    btn.textContent = maximized ? '🗗' : '⛶';
+    btn.title = maximized ? 'Thu về 1/5 màn hình' : 'Phóng to toàn màn hình';
   }
 }
 
-export function selectWardDetail(wardName, { focus = true } = {}) {
-  const seq = ++wardDetailSeq;
-  closeModal();
-  map.closePopup();
+export function toggleBottomPanelMaximized() {
+  setBottomPanelMaximized(!document.body.classList.contains('bottom-max'));
+}
 
-  let opened = false;
-  const openDetail = () => {
-    if (opened || seq !== wardDetailSeq) return;
-    opened = true;
-    const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
-    if (wardData) renderWardDetailPopup(wardData);
-  };
+let cityTableOn = false;
 
-  if (!focus) {
-    openDetail();
+export function toggleStatTable() {
+  if (!isCityMode()) return;
+  cityTableOn = !cityTableOn;
+  setBottomPanelHeader(CITY_NAME);
+}
+
+function renderSummaryNote(wardName) {
+  const subtitle = document.getElementById('bpSubtitle');
+  if (!subtitle) return;
+  const city = !wardName || wardName === CITY_NAME;
+  const list = city ? state.wardStatsData : state.wardStatsData.filter(w => w.Ten_Phuong === wardName);
+  if (!list.length) {
+    subtitle.innerHTML = '';
     return;
   }
-  map.once('moveend', openDetail);
-  setTimeout(openDetail, 1200);
-  focusWard(wardName);
+  // Toàn thành phố: bình quân gia quyền theo dân số của 40 phường xã
+  let pop = 0, covSum = 0, scaleSum = 0;
+  list.forEach(w => {
+    const p = Number(w.Dan_So_Vector || 0);
+    pop += p;
+    covSum += Number(w.Avg_Coverage_Score || 0) * p;
+    scaleSum += Number(w.Avg_Scale_Score || 0) * p;
+  });
+  const cov = list.length === 1 ? Number(list[0].Avg_Coverage_Score || 0) : (pop ? covSum / pop : 0);
+  const scale = list.length === 1 ? Number(list[0].Avg_Scale_Score || 0) : (pop ? scaleSum / pop : 0);
+  subtitle.innerHTML = `👥 Tổng dân số: <b>${pop.toLocaleString()}</b> người`
+    + ` · Độ phủ hạ tầng: <b style="color:#38bdf8;">${cov.toFixed(1)}%</b>`
+    + ` · Quy mô hạ tầng: <b style="color:#f59e0b;">${scale.toFixed(1)}%</b>`;
+}
+
+function setBottomPanelHeader(wardName) {
+  const city = !wardName || wardName === CITY_NAME;
+  renderSummaryNote(wardName);
+
+  const btn = document.getElementById('btnToggleStatTable');
+  if (btn) {
+    btn.style.display = city ? '' : 'none';
+    btn.classList.toggle('active', cityTableOn);
+    btn.title = cityTableOn ? 'Quay lại biểu đồ độ phủ & quy mô' : 'Xem bảng thông tin 40 phường xã';
+  }
+
+  const chartView = document.getElementById('cityChartView');
+  const cityView = document.getElementById('citySummaryView');
+  const wardView = document.getElementById('wardSummaryView');
+  if (chartView) chartView.style.display = city && !cityTableOn ? 'flex' : 'none';
+  if (cityView) cityView.style.display = city && cityTableOn ? 'flex' : 'none';
+  if (wardView) wardView.style.display = city ? 'none' : 'flex';
+}
+
+export async function renderBottomPanel() {
+  const seq = ++bottomRenderSeq;
+  const wardName = isCityMode() ? CITY_NAME : state.selectedWard;
+  const city = wardName === CITY_NAME;
+  setBottomPanelHeader(wardName);
+
+  const tbody = document.getElementById('statTableBody');
+  const wardView = document.getElementById('wardSummaryView');
+  if (state.wardStatsData.length === 0) {
+    if (city && tbody) {
+      tbody.innerHTML = "<tr><td colspan='21' style='text-align:center; padding:20px;'>🔄 Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>";
+    }
+    if (!city && wardView) {
+      wardView.innerHTML = `<div class="rp-empty">⏳ Đang tổng hợp dữ liệu quy chuẩn cho ${wardName}...</div>`;
+    }
+  }
+
+  try {
+    await ensureWardStats();
+  } catch (err) {
+    if (seq !== bottomRenderSeq) return;
+    const msg = `❌ ${err.message || 'Lỗi nạp dữ liệu từ GEE Server.'}`;
+    if (city && tbody) tbody.innerHTML = `<tr><td colspan='21' style='text-align:center; color:var(--accent-red); padding:20px;'>${msg}</td></tr>`;
+    if (!city && wardView) wardView.innerHTML = `<div class="rp-empty" style="color:var(--accent-red);">${msg}</div>`;
+    return;
+  }
+  if (seq !== bottomRenderSeq) return;
+  setBottomPanelHeader(wardName);
+
+  if (city) {
+    rebuildCombinedTableBody();
+    renderCombinedChart();
+    return;
+  }
+
+  const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
+  if (!wardData) {
+    if (wardView) wardView.innerHTML = `<div class="rp-empty">Không tìm thấy dữ liệu thống kê cho ${wardName}.</div>`;
+    return;
+  }
+  renderWardSummary(wardData);
+}
+
+export function exportBottomPanelPdf() {
+  const body = document.getElementById('bpBody');
+  if (!body) return;
+  const fileName = isCityMode() ? 'Bao-Cao-Ha-Tang-TP-Hue.pdf' : `Bao-Cao-${state.selectedWard}.pdf`;
+  body.classList.add('pdf-export');
+  html2pdf().from(body).set({
+    margin: 5,
+    filename: fileName,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+  }).save().then(
+    () => body.classList.remove('pdf-export'),
+    () => body.classList.remove('pdf-export')
+  );
+}
+
+export function selectWardDetail(wardName) {
+  setBottomPanelMaximized(false);
+  map.closePopup();
+  const focusDone = focusWard(wardName);
+  renderBottomPanel();
+  return focusDone;
 }
 
 async function fetchAndApplyWardCoverage(wardData) {
@@ -630,119 +602,82 @@ async function fetchAndApplyWardCoverage(wardData) {
   }
 }
 
-function renderWardDetailPopup(wardData) {
+function renderWardSummary(wardData) {
   const popCurrent = wardData.Dan_So_Vector || 45000;
   const popProjected = wardData.projectedPopulation || Math.round(popCurrent * 1.2);
   const currentUnits = wardData.currentUnits || Math.max(1, Math.round(popCurrent / 20000));
   const projectedUnits = wardData.projectedUnits || Math.max(1, Math.round(popProjected / 20000));
 
-  let modalHtml = `<div class="ward-popup-card" id="wardDetailPdfContainer" data-ward="${wardData.Ten_Phuong}" style="min-width: 780px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
-      <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH QUY CHUẨN QCVN 01:2026/BXD: ${wardData.Ten_Phuong.toUpperCase()}</b>
-      <button id="btnExportWardPdf" title="Xuất báo cáo PDF" style="background:transparent; border:none; color:var(--accent-cyan); cursor:pointer; font-size:15px; font-weight:bold;">🖨️</button>
-    </div>
-    <div style="background:rgba(15, 23, 42, 0.85); border:1px solid var(--border-color); padding:8px; border-radius:6px; margin-bottom:8px; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
+  const summaryHtml = `<div id="wardSummaryCard" data-ward="${wardData.Ten_Phuong}" style="display:contents;">
+    <div class="ward-summary-head">
       <div>👥 Dân số hiện trạng: <b>${popCurrent.toLocaleString()} người</b> (${currentUnits} đơn vị ở)</div>
-      <div style="display:flex; align-items:center; gap:6px;">
-        📈 Dân số quy hoạch: 
-        <input type="number" id="wardPopInput" value="${popProjected}" step="1000" min="1000" style="width:85px; padding:2px 6px; background:#0f172a; color:var(--accent-cyan); border:1px solid var(--border-color); border-radius:4px; font-weight:bold; text-align:center;" /> 
+      <div>
+        📈 Dân số quy hoạch:
+        <input type="number" id="wardPopInput" value="${popProjected}" step="1000" min="1000" />
         người (<span id="projectedUnitsLabel">${projectedUnits}</span> đơn vị ở)
       </div>
+      <div id="wardCoverageStatus">⏳ Đang tính độ phủ buffer × dân số (GEE)...</div>
     </div>
-    <div id="wardCoverageStatus" style="font-size:10px; color:var(--accent-orange); margin-bottom:6px;">⏳ Đang tính độ phủ buffer × dân số (GEE)...</div>
     <div id="wardQuotaTableContainer">
       ${buildWardQuotaTableHtml(wardData, popProjected)}
     </div>
   </div>`;
 
-  const firstPoint = state.wardLabelsList.find(w => w.name === wardData.Ten_Phuong) || { lat: 16.4637, lng: 107.5905 };
-  const detailPopup = L.popup({ closeButton: true, autoPan: true, maxWidth: 800 })
-    .setLatLng([firstPoint.lat, firstPoint.lng])
-    .setContent(modalHtml);
-  
-  detailPopup.openOn(map);
+  const view = document.getElementById('wardSummaryView');
+  if (!view) return;
+  view.innerHTML = summaryHtml;
 
-  setTimeout(() => {
-    const pdfBtn = document.getElementById('btnExportWardPdf');
-    if (pdfBtn) {
-      pdfBtn.onclick = () => {
-        const element = document.getElementById('wardDetailPdfContainer');
-        const scrollContainers = element.querySelectorAll('.ward-table-scroll-container');
-        scrollContainers.forEach(c => {
-          c.style.maxHeight = 'none';
-          c.style.overflow = 'visible';
-        });
+  const popInput = document.getElementById('wardPopInput');
+  if (popInput) {
+    popInput.oninput = (e) => {
+      const newProjPop = Number(e.target.value) || popProjected;
+      const newUnits = Math.max(1, Math.round(newProjPop / 20000));
+      const unitsLabel = document.getElementById('projectedUnitsLabel');
+      if (unitsLabel) unitsLabel.innerText = newUnits;
+      wardData.projectedPopulation = newProjPop;
+      wardData.projectedUnits = newUnits;
 
-        html2pdf().from(element).set({
-          margin: 5,
-          filename: `Bao-Cao-${wardData.Ten_Phuong}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-        }).save().then(() => {
-          scrollContainers.forEach(c => {
-            c.style.maxHeight = '';
-            c.style.overflow = 'auto';
-          });
-        });
-      };
-    }
+      Object.keys(wardData.urbanResults || {}).forEach(k => {
+        wardData.urbanResults[k].requiredArea = (wardData.urbanResults[k].quota || 0) * newProjPop;
+      });
+      Object.keys(wardData.unitResults || {}).forEach(k => {
+        wardData.unitResults[k].requiredArea = (wardData.unitResults[k].quota || 0) * newProjPop;
+      });
 
-    window.toggleWardSubItems = function(sectionId) {
-      const el = document.getElementById(sectionId);
-      const btn = document.getElementById('btn_' + sectionId);
-      if (el) {
-        if (el.style.display === 'none') {
-          el.style.display = 'table-row-group';
-          if (btn) btn.textContent = '▲';
-        } else {
-          el.style.display = 'none';
-          if (btn) btn.textContent = '▼';
-        }
+      const container = document.getElementById('wardQuotaTableContainer');
+      if (container) {
+        container.innerHTML = buildWardQuotaTableHtml(wardData, newProjPop);
       }
     };
+  }
 
-    const popInput = document.getElementById('wardPopInput');
-    if (popInput) {
-      popInput.oninput = (e) => {
-        const newProjPop = Number(e.target.value) || popProjected;
-        const newUnits = Math.max(1, Math.round(newProjPop / 20000));
-        const unitsLabel = document.getElementById('projectedUnitsLabel');
-        if (unitsLabel) unitsLabel.innerText = newUnits;
-        wardData.projectedPopulation = newProjPop;
-        wardData.projectedUnits = newUnits;
-
-        Object.keys(wardData.urbanResults || {}).forEach(k => {
-          wardData.urbanResults[k].requiredArea = (wardData.urbanResults[k].quota || 0) * newProjPop;
-        });
-        Object.keys(wardData.unitResults || {}).forEach(k => {
-          wardData.unitResults[k].requiredArea = (wardData.unitResults[k].quota || 0) * newProjPop;
-        });
-
-        const container = document.getElementById('wardQuotaTableContainer');
-        if (container) {
-          container.innerHTML = buildWardQuotaTableHtml(wardData, newProjPop);
-        }
-      };
+  fetchAndApplyWardCoverage(wardData).then((ok) => {
+    const card = document.getElementById('wardSummaryCard');
+    if (!card || card.dataset.ward !== wardData.Ten_Phuong) return;
+    const statusEl = document.getElementById('wardCoverageStatus');
+    const container = document.getElementById('wardQuotaTableContainer');
+    const popEl = document.getElementById('wardPopInput');
+    const projPop = popEl ? Number(popEl.value) || popProjected : popProjected;
+    if (container) container.innerHTML = buildWardQuotaTableHtml(wardData, projPop);
+    renderSummaryNote(wardData.Ten_Phuong);
+    patchCombinedTableWardRow(wardData);
+    if (statusEl) {
+      statusEl.style.color = ok ? 'var(--accent-green)' : 'var(--accent-red)';
+      statusEl.innerText = ok
+        ? `✓ Độ phủ trung bình: ${Number(wardData.Avg_Coverage_Score || 0).toFixed(1)}%`
+        : '⚠ Không tính được độ phủ GEE (thử lại sau).';
     }
-
-    fetchAndApplyWardCoverage(wardData).then((ok) => {
-      const card = document.getElementById('wardDetailPdfContainer');
-      if (!card || card.dataset.ward !== wardData.Ten_Phuong) return;
-      const statusEl = document.getElementById('wardCoverageStatus');
-      const container = document.getElementById('wardQuotaTableContainer');
-      const popEl = document.getElementById('wardPopInput');
-      const projPop = popEl ? Number(popEl.value) || popProjected : popProjected;
-      if (container) container.innerHTML = buildWardQuotaTableHtml(wardData, projPop);
-      if (statusEl) {
-        statusEl.style.color = ok ? 'var(--accent-green)' : 'var(--accent-red)';
-        statusEl.innerText = ok
-          ? `✓ Độ phủ trung bình: ${Number(wardData.Avg_Coverage_Score || 0).toFixed(1)}%`
-          : '⚠ Không tính được độ phủ GEE (thử lại sau).';
-      }
-    });
-  }, 200);
+  });
 }
+
+window.toggleWardSubItems = function(sectionId) {
+  const el = document.getElementById(sectionId);
+  const btn = document.getElementById('btn_' + sectionId);
+  if (!el) return;
+  const opening = el.style.display === 'none';
+  el.style.display = opening ? 'table-row-group' : 'none';
+  if (btn) btn.textContent = opening ? '▲' : '▼';
+};
 
 function buildWardQuotaTableHtml(wardData, projPop) {
   const urbanRes = wardData.urbanResults || {};
@@ -1069,13 +1004,10 @@ window.zoomToFeatureAndMinimizeModal = function(lat, lng, encodedName) {
   if (map) {
     map.closePopup();
   }
-  const combinedModal = document.getElementById('combinedModal');
-  if (combinedModal) {
-    combinedModal.style.display = 'none';
-  }
+  setBottomPanelMaximized(false);
 
   if (map) {
-    map.flyTo([lat, lng], 17, { animate: true, duration: 1.2 });
+    flyToVisible([lat, lng], 17, { animate: true, duration: 1.2 });
   }
 
   setTimeout(() => {
@@ -1120,6 +1052,14 @@ window.zoomToFeatureAndMinimizeModal = function(lat, lng, encodedName) {
 };
 
 function renderCombinedChart() {
+  drawCoverageScaleChart(
+    state.wardStatsData.map(w => w.Ten_Phuong.replace('Phường ', '').replace('Xã ', '')),
+    state.wardStatsData.map(w => w.Avg_Coverage_Score || 0),
+    state.wardStatsData.map(w => w.Avg_Scale_Score || 0)
+  );
+}
+
+function drawCoverageScaleChart(labels, coverageVals, scaleVals) {
   const chartEl = document.getElementById('infraChart');
   if (!chartEl) return;
   const ctx = chartEl.getContext('2d');
@@ -1128,18 +1068,18 @@ function renderCombinedChart() {
   chartInstance = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: state.wardStatsData.map(w => w.Ten_Phuong.replace('Phường ', '').replace('Xã ', '')),
+      labels,
       datasets: [
-        { 
-          label: 'Độ phủ (%)', 
-          data: state.wardStatsData.map(w => w.Avg_Coverage_Score || 0), 
+        {
+          label: 'Độ phủ (%)',
+          data: coverageVals,
           backgroundColor: '#38bdf8',
           barPercentage: 0.9,
           categoryPercentage: 0.8
         },
-        { 
-          label: 'Quy mô (%)', 
-          data: state.wardStatsData.map(w => w.Avg_Scale_Score || 0), 
+        {
+          label: 'Quy mô (%)',
+          data: scaleVals,
           backgroundColor: '#f59e0b',
           barPercentage: 0.9,
           categoryPercentage: 0.8
@@ -1150,12 +1090,18 @@ function renderCombinedChart() {
       responsive: true, 
       maintainAspectRatio: false,
       plugins: { 
-        legend: { display: true, position: 'top', labels: { color: '#94a3b8', boxWidth: 12, font: { size: 10 } } } 
+        legend: { display: true, position: 'top', align: 'end', labels: { color: '#94a3b8', boxWidth: 12, font: { size: 10 } } } 
       },
       scales: {
         x: { 
           stacked: false, 
-          ticks: { font: { size: 8 }, color: '#94a3b8' }, 
+          ticks: {
+            autoSkip: false,
+            minRotation: 45,
+            maxRotation: 45,
+            color: getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#cbd5e1',
+            font: { size: 10.5, family: getComputedStyle(document.body).fontFamily }
+          }, 
           grid: { color: 'rgba(255,255,255,0.05)' } 
         },
         y: { 
