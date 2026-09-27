@@ -1036,7 +1036,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
         <td style="text-align:left; padding-left:6px; font-weight:bold;">${zoomLinkHtml(pItem)}${typeNote}</td>
         <td style="text-align:right; font-weight:bold;">${fmtNum(pItem.size)} m²</td>
         <td colspan="5" style="text-align:left; color:var(--accent-orange); font-weight:500;">
-          Sau khi phê duyệt dự kiến bổ sung <b style="color:var(--accent-green);">${fmtPct(pItem.scaleAddPct)}</b> quy mô, <b style="color:var(--accent-cyan);">${fmtPct(pItem.coverageAddPct)}</b> độ phủ
+          Sau khi phê duyệt dự kiến bổ sung <b style="color:var(--accent-green);">${fmtPct(pItem.scaleAddPct)}</b> quy mô, <b style="color:var(--accent-cyan);">${fmtPct(pItem.coverageAddPct)}</b> độ phủ${pItem.coverageMethod === 'estimate' ? ' (ước lượng)' : ''}
         </td>
       </tr>`);
     });
@@ -1056,7 +1056,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       const eligibleSugg = (csd.suggestions || []).filter(s => s.status === 'eligible');
       const suggestionHtml = eligibleSugg.length > 0
         ? eligibleSugg.slice(0, 2).map((s, idx) =>
-          `<div style="margin:1px 0;">Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bổ sung <b style="color:var(--accent-green);">${fmtPct(s.scaleAddPct)}</b> quy mô, <b style="color:var(--accent-cyan);">${fmtPct(s.coverageAddPct)}</b> độ phủ).</div>`
+          `<div style="margin:1px 0;">Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bổ sung <b style="color:var(--accent-green);">${fmtPct(s.scaleAddPct)}</b> quy mô, <b style="color:var(--accent-cyan);">${fmtPct(s.coverageAddPct)}</b> độ phủ${s.coverageMethod === 'estimate' ? ', ước lượng' : ''}).</div>`
         ).join('')
         : `<div style="color:var(--text-muted); font-style:italic;">Chưa có gợi ý phù hợp</div>`;
 

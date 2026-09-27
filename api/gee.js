@@ -364,6 +364,157 @@ function estimateCoverageAddPct({ lat, lng, radius, wardGeometry, existingSameTy
   return Number(Math.min(100, Math.max(0, pct)).toFixed(1));
 }
 
+// ============================ ĐỀ XUẤT CHUYỂN ĐỔI QUỸ ĐẤT (CSD) ============================
+// Dùng chung cho popup khu đất (analyzeCSD), bảng chi tiết phường (getWardStats) và lớp minh chứng (explainCSD)
+
+// Lưới đếm pixel dân cư: phải trùng giữa phép đếm và lớp ảnh minh chứng
+const POP_PIXEL_SCALE = 60;
+// Tổng pixel dân cư của phường không đổi theo dữ liệu công trình
+const wardPopPixelCache = new Map();
+
+/** Bán kính vùng phục vụ của khu đất khi xét loại `code`: cột BanKinh trong sheet, ô trống thì theo bán kính mặc định của loại */
+function csdCandidateRadius(csd, code) {
+  if (csd.radiusSet && Number(csd.radius) > 0) return Number(csd.radius);
+  return (constants.infraConfig[code] && constants.infraConfig[code].radius) || 500;
+}
+
+/** Công trình cùng loại đã duyệt (toàn TP, kể cả phường bên cạnh) có buffer chạm tới buffer ứng viên */
+function nearbySameType(approvedAll, code, lat, lng, radius) {
+  return approvedAll.filter(it => metricCode(it) === code
+    && distMeters(lat, lng, Number(it.lat), Number(it.lng)) <= radius + (Number(it.radius) || radius));
+}
+
+/** Buffer ứng viên ∩ phường, và phần còn trống = (buffer − hợp các buffer cùng loại) ∩ phường */
+function candidateGeometries(ee, { lat, lng, radius, existing, ward }) {
+  const wardGeom = ee.Geometry(ward.geometry);
+  const buffer = ee.Geometry.Point([lng, lat]).buffer(radius);
+  const covered = existing.length > 0
+    ? ee.FeatureCollection(existing.map(it =>
+      ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(Number(it.radius) || radius))
+    )).geometry()
+    : null;
+  const net = covered ? buffer.difference(covered, 1) : buffer;
+  return { bufferInWard: buffer.intersection(wardGeom, 1), net: net.intersection(wardGeom, 1) };
+}
+
+/** Đếm pixel dân cư của nhiều vùng trong 1 lần gọi GEE: [{ key, geometry }] → { key: số pixel } */
+async function countPopPixels(ee, popRaster, regions) {
+  if (!regions.length) return {};
+  const fc = ee.FeatureCollection(regions.map(r => ee.Feature(r.geometry, { k: r.key })));
+  const reduced = popRaster.reduceRegions({
+    collection: fc, reducer: ee.Reducer.count(), scale: POP_PIXEL_SCALE, tileScale: 4
+  }).map(f => ee.Feature(null, { k: f.get('k'), n: f.get('count') }));
+  const res = (await eeEvaluate(reduced)) || {};
+  const out = {};
+  (res.features || []).forEach(f => {
+    const p = f.properties || {};
+    out[p.k] = Number(p.n) || 0;
+  });
+  return out;
+}
+
+/** Ngữ cảnh chỉ tiêu của phường: dân số quy hoạch + diện tích hiện có theo nhóm (giống cột quy mô của bảng phường) */
+function buildWardContext(wardFeat, approvedItemsInWard) {
+  const projPop = Math.round((wardFeat.pop || 10000) * constants.POP_GROWTH);
+  const { urbanResults, unitResults } = bucketWardInfra(approvedItemsInWard, projPop, { withSubItems: false });
+  return { name: wardFeat.name, geometry: wardFeat.geometry, projPop, urbanResults, unitResults };
+}
+
+/**
+ * Lọc 8 loại cho 1 khu đất: (1) bỏ loại có DT tối thiểu lớn hơn khu đất, (2) bỏ loại phường đã đủ 100% quy mô.
+ * Loại còn lại thành ứng viên chờ đếm pixel dân cư bổ sung (fillCoverageGains).
+ */
+function csdSuggestionCandidates(csd, ward, approvedAll) {
+  const size = Number(csd.size || 0);
+  const suggestions = [];
+  const candidates = [];
+  CODES.forEach(code => {
+    const cfg = constants.infraConfig[code] || {};
+    const label = cfg.label || code;
+    const minSize = cfg.minSize || 0;
+    if (size < minSize) {
+      suggestions.push({ code, label, minSize, status: 'ineligible' });
+      return;
+    }
+    const reqArea = Math.round(ward.projPop * (constants.quotaConfig[code] || 0));
+    const existArea = codeCurrentArea(code, ward.urbanResults, ward.unitResults);
+    if (reqArea <= 0 || existArea >= reqArea) {
+      suggestions.push({ code, label, status: 'fulfilled' });
+      return;
+    }
+    const radius = csdCandidateRadius(csd, code);
+    const existing = nearbySameType(approvedAll, code, csd.lat, csd.lng, radius);
+    const s = {
+      code, label, status: 'eligible',
+      deficitArea: reqArea - existArea,
+      isWardDeficit: true,
+      scaleAddPct: round1(clamp((size / reqArea) * 100, 0, 100)),
+      radiusUsed: radius,
+      existingCount: existing.length,
+      coverageAddPct: 0
+    };
+    suggestions.push(s);
+    candidates.push({ lat: csd.lat, lng: csd.lng, radius, existing, ward, target: s });
+  });
+  return { suggestions, candidates };
+}
+
+/** Xếp ưu tiên: % dân cư được phục vụ thêm giảm dần, bằng nhau thì theo % quy mô bổ sung */
+function rankEligible(suggestions) {
+  const eligible = suggestions
+    .filter(s => s.status === 'eligible')
+    .sort((a, b) => (b.coverageAddPct - a.coverageAddPct) || (b.scaleAddPct - a.scaleAddPct));
+  if (eligible.length > 0) eligible[0].isTopPriority = true;
+  return eligible;
+}
+
+/**
+ * Đếm pixel dân cư mới được phục vụ cho mọi ứng viên trong 1 lần gọi GEE, quy đổi % theo tổng pixel dân cư của phường.
+ * GEE lỗi / quá hạn → ước lượng hình học (coverageMethod = 'estimate'). Trả về true nếu mọi ứng viên đếm được bằng pixel.
+ */
+async function fillCoverageGains(ee, popRaster, candidates) {
+  if (!candidates.length) return true;
+  const regions = candidates.map((c, i) => ({ key: `c${i}`, geometry: candidateGeometries(ee, c).net }));
+  const wardGeoms = new Map();
+  candidates.forEach(c => {
+    if (!wardPopPixelCache.has(c.ward.name)) wardGeoms.set(c.ward.name, c.ward.geometry);
+  });
+  const wardKeys = [...wardGeoms.keys()];
+  wardKeys.forEach((name, i) => regions.push({ key: `w${i}`, geometry: ee.Geometry(wardGeoms.get(name)) }));
+
+  let counts = null;
+  try {
+    counts = await withTimeout(countPopPixels(ee, popRaster, regions), 30000, null);
+  } catch (e) {
+    console.warn("fillCoverageGains: GEE lỗi, dùng ước lượng hình học:", e.message);
+  }
+  if (counts) wardKeys.forEach((name, i) => wardPopPixelCache.set(name, counts[`w${i}`] || 0));
+
+  let allPixel = true;
+  candidates.forEach((c, i) => {
+    const wardTotal = counts ? (wardPopPixelCache.get(c.ward.name) || 0) : 0;
+    if (counts && wardTotal > 0) {
+      const gained = counts[`c${i}`] || 0;
+      Object.assign(c.target, {
+        popGained: gained,
+        wardPopPixels: wardTotal,
+        coverageAddPct: round1(clamp((gained / wardTotal) * 100, 0, 100)),
+        coverageMethod: 'pixel'
+      });
+    } else {
+      allPixel = false;
+      Object.assign(c.target, {
+        popGained: null,
+        coverageAddPct: estimateCoverageAddPct({
+          lat: c.lat, lng: c.lng, radius: c.radius, wardGeometry: c.ward.geometry, existingSameType: c.existing
+        }),
+        coverageMethod: 'estimate'
+      });
+    }
+  });
+  return allPixel;
+}
+
 let cachedEvaluatedWards = null;
 let cachedEvaluatedWardsAt = 0;
 // "lng,lat" -> tên phường; toạ độ công trình hầu như không đổi nên chỉ phải kiểm tra điểm-trong-đa-giác 1 lần
@@ -876,126 +1027,88 @@ module.exports = async (req, res) => {
     // Mọi phép tính hiện trạng chỉ dùng công trình có QuyMo_HT (ô trống = hiện tại chưa hình thành)
     const rawDataList = allDataList.filter(it => it.planChange !== 'new' && it.planChange !== 'none');
 
-    if (action === 'analyzeCSD') {
-      const pt = parseCoordInBounds(req.query.lat, req.query.lng);
-      if (!pt) return res.status(400).json({ error: true, message: "Tọa độ không hợp lệ" });
-      const { lat, lng } = pt;
-      const size = clamp(Number(req.query.size) || 0, 0, 1e8);
-
+    // Khu đất CSD theo id (lấy diện tích + cột BanKinh từ sheet); không có id thì dùng tọa độ + diện tích gửi lên
+    const resolveCsdRequest = async () => {
+      const id = String(req.query.id || '').trim();
+      const byId = id ? rawDataList.find(it => it.id === id) : null;
+      let csd = byId;
+      if (!csd) {
+        const pt = parseCoordInBounds(req.query.lat, req.query.lng);
+        if (!pt) throw httpError(400, "Tọa độ không hợp lệ");
+        csd = { id: null, lat: pt.lat, lng: pt.lng, size: clamp(Number(req.query.size) || 0, 0, 1e8), radiusSet: false };
+      }
       const evaluatedWardsCsd = await loadEvaluatedWards(wardVectorParsed);
-      const targetWardName = assignWardByGeometry(lng, lat, evaluatedWardsCsd);
-      const wardFeat = targetWardName ? findWardByName(evaluatedWardsCsd, targetWardName) : null;
-      const targetWardProjPop = wardFeat ? Math.round(Number(wardFeat.pop || 0) * constants.POP_GROWTH) : 0;
+      const wardName = assignWardByGeometry(csd.lng, csd.lat, evaluatedWardsCsd);
+      const wardFeat = wardName ? findWardByName(evaluatedWardsCsd, wardName) : null;
+      if (!wardFeat || !wardFeat.geometry) throw httpError(400, "Khu đất nằm ngoài ranh giới 40 phường/xã");
+      const approvedAll = rawDataList.filter(it => isApprovedStatus(it.status) && it.lat != null && it.lng != null);
+      const approvedInWard = approvedAll.filter(it => assignWardByGeometry(it.lng, it.lat, evaluatedWardsCsd) === wardName);
+      const ward = buildWardContext(wardFeat, approvedInWard);
+      return { csd, ward, approvedAll, ...csdSuggestionCandidates(csd, ward, approvedAll) };
+    };
 
-      const approvedAll = rawDataList.filter(item => isApprovedStatus(item.status) && item.lat != null && item.lng != null);
-      const wardExistAreas = {};
-      if (targetWardName) {
-        approvedAll.forEach(item => {
-          if (assignWardByGeometry(item.lng, item.lat, evaluatedWardsCsd) !== targetWardName) return;
-          const t = metricCode(item);
-          if (t) wardExistAreas[t] = (wardExistAreas[t] || 0) + Number(item.size || 0);
-        });
-      }
-
-      let wardTotalPopPix = 0;
-      if (wardFeat && wardFeat.geometry && popRasterNormalized) {
-        try {
-          const totalRes = (await eeEvaluate(popRasterNormalized.reduceRegion({
-            reducer: ee.Reducer.count(),
-            geometry: ee.Geometry(wardFeat.geometry),
-            scale: 60,
-            maxPixels: 1e9
-          }))) || {};
-          wardTotalPopPix = Number(totalRes.DanSoPixelNormalized || totalRes.count || 0);
-        } catch (e) {
-          console.warn("analyzeCSD: không đếm được pixel dân cư của phường:", e.message);
-        }
-      }
-
-      const suggestions = [];
-      const ineligible = [];
-
-      await Promise.all(CODES.map(async (code) => {
-        const infraCfg = constants.infraConfig ? constants.infraConfig[code] : null;
-        const reqMinSize = infraCfg ? infraCfg.minSize : 0;
-        const label = infraCfg ? infraCfg.label : code;
-
-        if (size < reqMinSize) {
-          ineligible.push({ code, label, minSize: reqMinSize });
-          return;
-        }
-
-        const reqArea = Math.round(targetWardProjPop * (constants.quotaConfig[code] || 0));
-        const existArea = wardExistAreas[code] || 0;
-        const scalePct = reqArea > 0 ? (existArea / reqArea) * 100 : 100;
-        if (scalePct >= 100) return;
-
-        const deficitArea = reqArea - existArea;
-        const scaleAddPct = Number(Math.min(100, Math.max(0, (size / Math.max(reqArea, 1)) * 100)).toFixed(1));
-        const candidateRadius = (infraCfg && infraCfg.radius) || 1000;
-
-        // Chỉ công trình cùng loại đủ gần mới có thể chồng lên buffer ứng viên
-        const existingSame = approvedAll.filter(item => metricCode(item) === code
-          && distMeters(lat, lng, item.lat, item.lng) <= candidateRadius + (Number(item.radius) || candidateRadius));
-
-        let cleanPopGained = null;
-        let coverageAddPct = null;
-        if (wardTotalPopPix > 0) {
-          try {
-            let netBufferGeom = ee.Geometry.Point([lng, lat]).buffer(candidateRadius);
-            if (existingSame.length > 0) {
-              const existUnion = ee.FeatureCollection(existingSame.map(item =>
-                ee.Feature(ee.Geometry.Point([item.lng, item.lat]).buffer(Number(item.radius) || candidateRadius))
-              )).geometry();
-              netBufferGeom = netBufferGeom.difference(existUnion, 1);
-            }
-            // Tử số chỉ tính phần nằm trong phường, cùng phạm vi với mẫu số (tổng pixel dân cư của phường)
-            netBufferGeom = netBufferGeom.intersection(ee.Geometry(wardFeat.geometry), 1);
-            const netPopRes = (await eeEvaluate(popRasterNormalized.reduceRegion({
-              reducer: ee.Reducer.count(),
-              geometry: netBufferGeom,
-              scale: 60,
-              maxPixels: 1e9
-            }))) || {};
-            cleanPopGained = Math.max(0, Math.round(Number(netPopRes.DanSoPixelNormalized || netPopRes.count || 0)));
-            coverageAddPct = Number(Math.min(100, (cleanPopGained / wardTotalPopPix) * 100).toFixed(1));
-          } catch (e) {
-            console.warn(`analyzeCSD ${code}: GEE lỗi, dùng ước lượng hình học:`, e.message);
-          }
-        }
-        if (coverageAddPct === null) {
-          coverageAddPct = estimateCoverageAddPct({
-            lat, lng,
-            radius: candidateRadius,
-            wardGeometry: wardFeat ? wardFeat.geometry : null,
-            existingSameType: existingSame
-          });
-        }
-
-        suggestions.push({
-          code,
-          label,
-          deficitArea: Math.max(0, deficitArea),
-          coverageRatio: coverageAddPct,
-          scaleAddPct,
-          coverageAddPct,
-          isWardDeficit: deficitArea > 0,
-          popGained: cleanPopGained
-        });
-      }));
-
-      suggestions.sort((a, b) => {
-        if (b.coverageAddPct !== a.coverageAddPct) return b.coverageAddPct - a.coverageAddPct;
-        return b.scaleAddPct - a.scaleAddPct;
+    if (action === 'analyzeCSD') {
+      const { ward, suggestions, candidates } = await resolveCsdRequest();
+      await fillCoverageGains(ee, popRasterNormalized, candidates);
+      return res.status(200).json({
+        ward: ward.name,
+        suggestions: rankEligible(suggestions).slice(0, 2),
+        ineligible: suggestions.filter(s => s.status === 'ineligible')
       });
+    }
 
-      // Tối đa 2 lựa chọn
-      const topSuggestions = suggestions.slice(0, 2);
-      if (topSuggestions.length > 0) {
-        topSuggestions[0].isTopPriority = true;
+    // Minh chứng trực quan cho 1 đề xuất: công trình cùng loại đã trừ, vùng còn trống, pixel dân cư được đếm
+    if (action === 'explainCSD') {
+      const code = String(req.query.code || '');
+      if (!CODES.includes(code)) return res.status(400).json({ error: true, message: "Loại hạ tầng không hợp lệ" });
+      const { csd, ward, suggestions, candidates } = await resolveCsdRequest();
+      const cand = candidates.find(c => c.target.code === code);
+      if (!cand) {
+        const s = suggestions.find(x => x.code === code);
+        const reason = s && s.status === 'ineligible'
+          ? `Khu đất nhỏ hơn diện tích tối thiểu (${s.minSize} m²)`
+          : 'Phường đã đạt 100% quy mô loại này';
+        return res.status(400).json({ error: true, message: reason });
       }
 
-      return res.status(200).json({ ward: targetWardName, suggestions: topSuggestions, ineligible });
+      const { bufferInWard, net } = candidateGeometries(ee, cand);
+      if (!wardPopPixelCache.has(ward.name)) {
+        const wc = await countPopPixels(ee, popRasterNormalized, [{ key: 'w', geometry: ee.Geometry(ward.geometry) }]);
+        wardPopPixelCache.set(ward.name, wc.w || 0);
+      }
+      const [counts, netGeoJson, mapId] = await Promise.all([
+        countPopPixels(ee, popRasterNormalized, [
+          { key: 'buffer', geometry: bufferInWard },
+          { key: 'net', geometry: net }
+        ]),
+        eeEvaluate(net.simplify(5)),
+        // Pixel dân cư trên đúng lưới đếm: 1 = đã được phục vụ (trong buffer, ngoài vùng trống), 2 = được đếm bổ sung
+        new Promise((resolve, reject) => {
+          const img = ee.Image(0).byte()
+            .paint(ee.FeatureCollection([ee.Feature(bufferInWard)]), 1)
+            .paint(ee.FeatureCollection([ee.Feature(net)]), 2);
+          img.updateMask(img.gt(0)).updateMask(popRasterNormalized.mask())
+            .reproject({ crs: 'EPSG:4326', scale: POP_PIXEL_SCALE })
+            .getMap({ min: 1, max: 2, palette: ['8a8a8a', 'ffd400'] }, (m, err) => err ? reject(err) : resolve(m));
+        })
+      ]);
+
+      const wardTotal = wardPopPixelCache.get(ward.name) || 0;
+      const bufferPix = counts.buffer || 0;
+      const netPix = counts.net || 0;
+      return res.status(200).json({
+        code,
+        label: cand.target.label,
+        ward: ward.name,
+        candidate: { id: csd.id, name: csd.name || null, lat: csd.lat, lng: csd.lng, radius: cand.radius, radiusFromSheet: !!csd.radiusSet },
+        existing: cand.existing.map(it => ({ id: it.id, name: it.name, lat: it.lat, lng: it.lng, radius: Number(it.radius) || cand.radius })),
+        netGeometry: netGeoJson,
+        pixels: { buffer: bufferPix, covered: Math.max(0, bufferPix - netPix), net: netPix, wardTotal },
+        coverageAddPct: wardTotal > 0 ? round1(clamp((netPix / wardTotal) * 100, 0, 100)) : 0,
+        scaleAddPct: cand.target.scaleAddPct,
+        pixelScale: POP_PIXEL_SCALE,
+        tileUrl: mapId.urlFormat
+      });
     }
 
     if (action === 'getWardCoverage') {
@@ -1083,7 +1196,6 @@ module.exports = async (req, res) => {
           currentUnits: Math.max(1, Math.round(totalPop / constants.POP_PER_UNIT)),
           projectedUnits: Math.max(1, Math.round(projPop / constants.POP_PER_UNIT)),
           items: [],
-          byCode: {},
           covItems: [],
           pendingItems: [],
           csdRaw: [],
@@ -1110,8 +1222,6 @@ module.exports = async (req, res) => {
           w.csdRaw.push(item);
         } else if (approved) {
           w.items.push(item);
-          const code = metricCode(item);
-          if (code) (w.byCode[code] = w.byCode[code] || []).push(item);
         } else if (CODES.includes(typeCode)) {
           w.pendingItems.push(item);
         }
@@ -1132,6 +1242,9 @@ module.exports = async (req, res) => {
       });
 
       const resultTable = [];
+      const approvedAll = rawDataList.filter(it => isApprovedStatus(it.status) && it.lat != null && it.lng != null);
+      const coverageCandidates = [];
+      const rankAfterCount = [];
 
       for (const wName in wardMap) {
         const data = wardMap[wName];
@@ -1144,88 +1257,36 @@ module.exports = async (req, res) => {
         const planBuckets = bucketWardInfra(data.planItems, projPop, { withSubItems: false });
         const planScales = scaleByCode(planBuckets.urbanResults, planBuckets.unitResults, projPop);
 
-        // Gợi ý chuyển đổi quỹ đất chưa sử dụng (CSD)
+        // Gợi ý chuyển đổi quỹ đất chưa sử dụng (CSD): cùng logic với popup khu đất, % độ phủ đếm pixel sau vòng lặp
+        const wardCtx = { name: wName, geometry: wardGeom, projPop, urbanResults, unitResults };
         const csdItems = data.csdRaw.map(item => {
-          const csdSize = Number(item.size || item.dienTich || 0);
-          const evaluatedSuggestions = CODES.map(code => {
-            const infraCfg = constants.infraConfig ? constants.infraConfig[code] : null;
-            const reqMinSize = infraCfg ? infraCfg.minSize : 0;
-            const label = infraCfg ? infraCfg.label : code;
-            const candidateRadius = (infraCfg && infraCfg.radius) || 1000;
-
-            if (csdSize < reqMinSize) {
-              return { code, label, status: 'ineligible' };
-            }
-
-            const reqArea = Math.round(projPop * (constants.quotaConfig[code] || 0));
-            const existArea = codeCurrentArea(code, urbanResults, unitResults);
-            const scalePct = reqArea > 0 ? (existArea / reqArea) * 100 : 100;
-
-            if (scalePct >= 100) {
-              return { code, label, status: 'fulfilled' };
-            }
-
-            const deficitArea = Math.max(0, reqArea - existArea);
-            const scaleAddPct = Number(Math.min(100, Math.max(0, (csdSize / Math.max(reqArea, 1)) * 100)).toFixed(1));
-            const coverageAddPct = estimateCoverageAddPct({
-              lat: item.lat,
-              lng: item.lng,
-              radius: candidateRadius,
-              wardGeometry: wardGeom,
-              existingSameType: data.byCode[code] || []
-            });
-
-            return {
-              code,
-              label,
-              deficitArea,
-              coverageRatio: coverageAddPct,
-              scaleAddPct,
-              coverageAddPct,
-              radiusUsed: candidateRadius,
-              isWardDeficit: deficitArea > 0,
-              status: 'eligible'
-            };
-          });
-
-          const eligibleSorted = evaluatedSuggestions
-            .filter(s => s.status === 'eligible')
-            .sort((a, b) => {
-              if (b.coverageAddPct !== a.coverageAddPct) return b.coverageAddPct - a.coverageAddPct;
-              return b.scaleAddPct - a.scaleAddPct;
-            });
-
-          if (eligibleSorted.length > 0) eligibleSorted[0].isTopPriority = true;
-
-          // Chỉ giữ tối đa 2 lựa chọn ưu tiên + danh sách ineligible (nếu cần)
-          return {
+          const { suggestions, candidates } = csdSuggestionCandidates(item, wardCtx, approvedAll);
+          coverageCandidates.push(...candidates);
+          const row = {
             id: item.id,
             name: item.name || item.ten || "Khu đất chưa sử dụng",
-            size: csdSize,
+            size: Number(item.size || 0),
             lat: item.lat,
             lng: item.lng,
-            radius: Number(item.radius || item.banKinh || 1000),
-            suggestions: [...eligibleSorted.slice(0, 2), ...evaluatedSuggestions.filter(s => s.status === 'ineligible')],
+            radius: Number(item.radius) || 500,
+            suggestions: [],
             status: item.status,
             needsApproval: !isApprovedStatus(item.status)
           };
+          // Tối đa 2 lựa chọn ưu tiên + danh sách không đủ diện tích tối thiểu
+          rankAfterCount.push(() => {
+            row.suggestions = [...rankEligible(suggestions).slice(0, 2), ...suggestions.filter(s => s.status === 'ineligible')];
+          });
+          return row;
         });
 
         const pendingItems = data.pendingItems.map(item => {
           const code = constants.resolveTypeCode(item) || item.type || "9-CSD";
           const size = Number(item.size || 0);
           const reqArea = Math.max(1, Math.round((constants.quotaConfig[code] || 0) * projPop));
-          const scaleAddPct = Number(Math.min(100, Math.max(0, (size / reqArea) * 100)).toFixed(1));
           const infraCfg = constants.infraConfig ? constants.infraConfig[code] : null;
-          const candidateRadius = (infraCfg && infraCfg.radius) || Number(item.radius || item.banKinh) || 1000;
-          const coverageAddPct = estimateCoverageAddPct({
-            lat: item.lat,
-            lng: item.lng,
-            radius: candidateRadius,
-            wardGeometry: wardGeom,
-            existingSameType: data.byCode[metricCode(item)] || []
-          });
-          return {
+          const radius = Number(item.radius) || (infraCfg && infraCfg.radius) || 500;
+          const row = {
             id: item.id,
             name: item.name,
             type: code,
@@ -1233,11 +1294,18 @@ module.exports = async (req, res) => {
             size,
             lat: item.lat,
             lng: item.lng,
-            radius: candidateRadius,
+            radius,
             status: item.status,
-            scaleAddPct,
-            coverageAddPct
+            scaleAddPct: round1(clamp((size / reqArea) * 100, 0, 100)),
+            coverageAddPct: 0
           };
+          coverageCandidates.push({
+            lat: item.lat, lng: item.lng, radius,
+            existing: nearbySameType(approvedAll, metricCode(item), item.lat, item.lng, radius),
+            ward: wardCtx,
+            target: row
+          });
+          return row;
         });
 
         const calculatedRow = {
@@ -1272,15 +1340,19 @@ module.exports = async (req, res) => {
         // Độ phủ QH chỉ khác HT khi phường có công trình mới/di dời (mở rộng/thu hẹp không đổi bán kính)
         calculatedRow.planCovSig = data.planCovChanges.length ? coverageSignature(data.planCovItems) : '';
         calculatedRow._assignMode = 'geometry';
-        calculatedRow._schema = 7;
+        calculatedRow._schema = 8;
         applyCachedCoverage(calculatedRow);
 
         resultTable.push(calculatedRow);
       }
 
+      const allPixel = await fillCoverageGains(ee, popRasterNormalized, coverageCandidates);
+      rankAfterCount.forEach(fn => fn());
+
       resultTable.sort((a, b) => b.Dan_So_Vector - a.Dan_So_Vector);
 
-      cachedWardStats = resultTable;
+      // Kết quả ước lượng (GEE lỗi) không giữ trong cache để lần sau đếm lại bằng pixel
+      cachedWardStats = allPixel ? resultTable : null;
       cachedWardStatsVersion = getDataVersion();
       lastWardStatsFetch = now;
 

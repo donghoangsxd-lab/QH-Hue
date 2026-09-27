@@ -91,6 +91,7 @@ async function getRawDataList() {
       };
       const banKinh = parseArea(props.BanKinh);
       item.radius = banKinh > 0 ? banKinh : constants.defaultRadius(item);
+      item.radiusSet = banKinh > 0;
       return item;
     }).filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng)
       && Math.abs(item.lat) <= 90 && Math.abs(item.lng) <= 180);

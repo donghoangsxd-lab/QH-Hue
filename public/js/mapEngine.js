@@ -5,6 +5,7 @@ import {
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast } from './utils.js';
+import { showCsdProof, clearCsdProof } from './csdProof.js';
 import {
   getCoveredRightWidth, highlightPlanWard, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, onCompareChange
@@ -697,6 +698,7 @@ export function onPointClick(p, targetMap = map) {
   // Chỉ để mở 1 popup công trình trên 2 bản đồ
   if (map) map.closePopup();
   if (planMap) planMap.closePopup();
+  clearCsdProof();
 
   if (!isCSDUnapproved) {
     highlightSingleIsochrone(p.lat, p.lng, itemRadius, isPlanScenario ? planLayers.singleIso : layers.singleIso);
@@ -765,21 +767,33 @@ export function onPointClick(p, targetMap = map) {
   }
 
   if (isCSD && approved) {
-    fetchJson(geeApi(`action=analyzeCSD&lat=${p.lat}&lng=${p.lng}&size=${Number(p.size) || 0}`))
+    const csdQuery = `id=${encodeURIComponent(p.id || '')}&lat=${p.lat}&lng=${p.lng}&size=${Number(p.size) || 0}`;
+    fetchJson(geeApi(`action=analyzeCSD&${csdQuery}`))
       .then(res => {
+        const suggestions = res.suggestions || [];
         let sugHtml = "";
-        (res.suggestions || []).forEach(s => {
+        suggestions.forEach((s, idx) => {
           const priorityBadge = s.isTopPriority ? `<span class="badge-priority">ƯU TIÊN HÀNG ĐẦU</span>` : "";
           const cls = s.isTopPriority ? "sug-card priority" : "sug-card";
-          const covAdd = s.coverageAddPct != null ? s.coverageAddPct : s.coverageRatio;
+          const estimateNote = s.coverageMethod === 'estimate' ? ` <span title="GEE bận: ước lượng theo diện tích">(ước lượng)</span>` : '';
           sugHtml += `<div class="${cls}"><div>🚩 <b>${escapeHtml(s.label)}</b> ${priorityBadge}</div>
-            <div style="color:var(--text-muted); margin-top:2px;">└ Bổ sung <b style="color:var(--accent-green);">${fmtNum(s.scaleAddPct)}%</b> quy mô, <b style="color:var(--accent-cyan);">${fmtNum(covAdd)}%</b> độ phủ</div></div>`;
+            <div style="color:var(--text-muted); margin-top:2px;">└ Bổ sung <b style="color:var(--accent-green);">${fmtNum(s.scaleAddPct)}%</b> quy mô, <b style="color:var(--accent-cyan);">${fmtNum(s.coverageAddPct)}%</b> độ phủ${estimateNote}</div>
+            <button type="button" class="proof-btn" data-idx="${idx}">🔍 Xem minh chứng</button></div>`;
         });
         (res.ineligible || []).forEach(inEl => {
           sugHtml += `<div class="sug-card ineligible">❌ <b>${escapeHtml(inEl.label)}</b> (Không đủ DT min: ${fmtNum(inEl.minSize)} m²)</div>`;
         });
         const base = sugHtml || "<div class='sug-card'>✓ Vị trí đã phủ đủ hạ tầng.</div>";
         fill('.js-csd', base + `<div style="margin-top:6px; font-size:10px; color:var(--accent-red); font-weight:bold; text-align:center;">(Cần phê duyệt)</div>`);
+        popup.getElement()?.querySelectorAll('.proof-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const fitOpts = popupFitOptions(targetMap, 300, 50);
+            showCsdProof(p, suggestions[Number(btn.dataset.idx)], targetMap, {
+              padTopLeft: fitOpts.autoPanPaddingTopLeft,
+              padBottomRight: fitOpts.autoPanPaddingBottomRight
+            });
+          });
+        });
       })
       .catch(() => fill('.js-csd', `<div class="sug-card ineligible">Chưa tính được đề xuất (GEE đang bận), mở lại sau.</div>`));
   }
