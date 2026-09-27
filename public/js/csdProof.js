@@ -165,9 +165,13 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
   targetMap.closePopup();
   const bounds = L.latLng(c.lat, c.lng).toBounds(c.radius * 2.3);
   data.existing.forEach(e => bounds.extend(L.latLng(e.lat, e.lng)));
+  const padBottomRight = (fit && fit.padBottomRight) || [20, 20];
+  // Bản đồ đủ rộng thì dồn vùng minh chứng sang phải bảng số liệu để không bị che
+  const panelRight = leftClear + panel.getContainer().offsetWidth + 16;
+  const roomRight = targetMap.getSize().x - panelRight - padBottomRight[0];
   targetMap.fitBounds(bounds, {
-    paddingTopLeft: [leftClear, padTopLeft[1]],
-    paddingBottomRight: (fit && fit.padBottomRight) || [20, 20],
+    paddingTopLeft: [roomRight >= 320 ? panelRight : leftClear, padTopLeft[1]],
+    paddingBottomRight: padBottomRight,
     maxZoom: 17
   });
 }
