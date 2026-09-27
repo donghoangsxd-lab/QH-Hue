@@ -231,6 +231,8 @@ export function updateInfraPieChart(sourceList) {
 
 const COVERAGE_LS_KEY = 'qh_hue_ward_coverage_v4';
 const COVERAGE_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+const CHART_COVERAGE_COLOR = '#38bdf8';
+const CHART_SCALE_COLOR = '#f59e0b';
 const COVERAGE_LEVEL_KEYS = [
   "1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM",
   "1-CV_DT", "1-CV_DV", "2-BDX_DT", "2-BDX_DV",
@@ -447,6 +449,7 @@ export function setBottomPanelMaximized(maximized) {
     btn.textContent = maximized ? '🗗' : '⛶';
     btn.title = maximized ? 'Thu về 1/5 màn hình' : 'Phóng to toàn màn hình';
   }
+  setBottomPanelHeader(isCityMode() ? CITY_NAME : state.selectedWard);
 }
 
 export function toggleBottomPanelMaximized() {
@@ -481,17 +484,19 @@ function renderSummaryNote(wardName) {
   const cov = list.length === 1 ? Number(list[0].Avg_Coverage_Score || 0) : (pop ? covSum / pop : 0);
   const scale = list.length === 1 ? Number(list[0].Avg_Scale_Score || 0) : (pop ? scaleSum / pop : 0);
   subtitle.innerHTML = `👥 Tổng dân số: <b>${pop.toLocaleString()}</b> người`
-    + ` · Độ phủ hạ tầng: <b style="color:#38bdf8;">${cov.toFixed(1)}%</b>`
-    + ` · Quy mô hạ tầng: <b style="color:#f59e0b;">${scale.toFixed(1)}%</b>`;
+    + ` · <span class="bp-swatch" style="background:${CHART_COVERAGE_COLOR};"></span>Độ phủ hạ tầng TB: <b>${cov.toFixed(1)}%</b>`
+    + ` · <span class="bp-swatch" style="background:${CHART_SCALE_COLOR};"></span>Quy mô hạ tầng TB: <b>${scale.toFixed(1)}%</b>`;
 }
 
 function setBottomPanelHeader(wardName) {
   const city = !wardName || wardName === CITY_NAME;
+  // Toàn màn hình: chart và bảng hiện cùng lúc nên không cần nút chuyển
+  const maximized = document.body.classList.contains('bottom-max');
   renderSummaryNote(wardName);
 
   const btn = document.getElementById('btnToggleStatTable');
   if (btn) {
-    btn.style.display = city ? '' : 'none';
+    btn.style.display = city && !maximized ? '' : 'none';
     btn.classList.toggle('active', cityTableOn);
     btn.title = cityTableOn ? 'Quay lại biểu đồ độ phủ & quy mô' : 'Xem bảng thông tin 40 phường xã';
   }
@@ -499,8 +504,8 @@ function setBottomPanelHeader(wardName) {
   const chartView = document.getElementById('cityChartView');
   const cityView = document.getElementById('citySummaryView');
   const wardView = document.getElementById('wardSummaryView');
-  if (chartView) chartView.style.display = city && !cityTableOn ? 'flex' : 'none';
-  if (cityView) cityView.style.display = city && cityTableOn ? 'flex' : 'none';
+  if (chartView) chartView.style.display = city && (maximized || !cityTableOn) ? 'flex' : 'none';
+  if (cityView) cityView.style.display = city && (maximized || cityTableOn) ? 'flex' : 'none';
   if (wardView) wardView.style.display = city ? 'none' : 'flex';
 }
 
@@ -1051,6 +1056,16 @@ window.zoomToFeatureAndMinimizeModal = function(lat, lng, encodedName) {
   }, 1300);
 };
 
+// Nhãn xoay 45° bị Chart.js giới hạn chiều cao trục X: tên ghép dài (vd "Chân Mây - Lăng Cô") viết tắt vế sau, tooltip vẫn hiện đủ
+function shortWardTick(name) {
+  if (name.length <= 13) return name;
+  const parts = name.split(/\s*-\s*/);
+  if (parts.length < 2) return name;
+  const tail = parts.pop().split(' ');
+  const last = tail.pop();
+  return `${parts.join('-')}-${tail.map(w => w[0] + '.').join('')}${last}`;
+}
+
 function renderCombinedChart() {
   drawCoverageScaleChart(
     state.wardStatsData.map(w => w.Ten_Phuong.replace('Phường ', '').replace('Xã ', '')),
@@ -1073,14 +1088,14 @@ function drawCoverageScaleChart(labels, coverageVals, scaleVals) {
         {
           label: 'Độ phủ (%)',
           data: coverageVals,
-          backgroundColor: '#38bdf8',
+          backgroundColor: CHART_COVERAGE_COLOR,
           barPercentage: 0.9,
           categoryPercentage: 0.8
         },
         {
           label: 'Quy mô (%)',
           data: scaleVals,
-          backgroundColor: '#f59e0b',
+          backgroundColor: CHART_SCALE_COLOR,
           barPercentage: 0.9,
           categoryPercentage: 0.8
         }
@@ -1089,8 +1104,9 @@ function drawCoverageScaleChart(labels, coverageVals, scaleVals) {
     options: { 
       responsive: true, 
       maintainAspectRatio: false,
+      layout: { padding: { top: 6 } },
       plugins: { 
-        legend: { display: true, position: 'top', align: 'end', labels: { color: '#94a3b8', boxWidth: 12, font: { size: 10 } } } 
+        legend: { display: false } 
       },
       scales: {
         x: { 
@@ -1099,6 +1115,7 @@ function drawCoverageScaleChart(labels, coverageVals, scaleVals) {
             autoSkip: false,
             minRotation: 45,
             maxRotation: 45,
+            callback: function(value) { return shortWardTick(this.getLabelForValue(value)); },
             color: getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#cbd5e1',
             font: { size: 10.5, family: getComputedStyle(document.body).fontFamily }
           }, 

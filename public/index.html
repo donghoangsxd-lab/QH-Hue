@@ -45,21 +45,16 @@
 
   <!-- PANEL CÔNG CỤ BÊN PHẢI (GỘP TRA CỨU / ĐỀ XUẤT / LỚP DỮ LIỆU / CHÚ GIẢI) -->
   <aside class="right-panel" id="rightPanel">
-    <div class="rp-header">
-      <div class="rp-title-row">
-        <b class="rp-title">🏛️ BẢN ĐỒ HẠ TẦNG TP. HUẾ</b>
-        <button class="rp-icon-btn" id="btnCollapseRightPanel" title="Thu gọn panel">»</button>
-      </div>
-      <div class="rp-progress">
-        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
-        <span id="progressPercent">0%</span>
-      </div>
-    </div>
-
     <div class="tab-header rp-tabs">
       <div class="tab-btn active" data-tab="tabLayers">⚙️<span>Lớp dữ liệu</span></div>
       <div class="tab-btn" data-tab="tabAdd">➕<span>Đề xuất</span></div>
       <div class="tab-btn" data-tab="tabLegend">📖<span>Chú giải</span></div>
+      <button class="rp-collapse-btn" id="btnCollapseRightPanel" title="Thu gọn panel">»</button>
+    </div>
+
+    <div class="rp-progress">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
+      <span id="progressPercent">0%</span>
     </div>
 
     <div class="rp-body">
