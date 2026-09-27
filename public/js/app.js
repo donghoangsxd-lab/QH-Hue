@@ -1,35 +1,62 @@
-import { state } from './state.js';
+import { state, bumpDataVersion } from './state.js';
 import { geeApi } from './api.js';
-import { 
-  initMap, 
-  toggleLayer, 
-  toggleBuffer, 
-  toggleMeasure, 
-  clearMeasure,
-  renderGroupedPoints, 
-  refreshHeatmapOnly, 
+import {
+  initMap,
+  toggleLayer,
+  toggleBuffer,
+  toggleMeasure,
+  handleMeasureClick,
+  renderGroupedPoints,
+  refreshBuffers,
+  refreshHeatmapOnly,
+  setHeatOpacity,
   handleInspectPointClick,
   loadBoundaryLayer,
   loadPopulationLayer,
-  focusWard,
   flyToVisible,
   centerOnCity,
-  measureLayerGroup,
-  layers,
-  map as mapInstance
+  layers
 } from './mapEngine.js';
-import { 
-  toggleAuthModal, 
+import {
+  toggleAuthModal,
   selectWardDetail,
   renderBottomPanel,
   ensureWardStats,
+  reloadWardStats,
   toggleBottomPanelMaximized,
   toggleStatTable,
   exportBottomPanelPdf,
+  captureMapScreenshot,
   initGoogleSignIn,
+  initBottomPanelEvents,
+  restoreAdminSession,
+  signOutAdmin,
   startBackgroundCoverageFill
 } from './uiComponents.js';
-import { initPlanMap, planLayers, renderPlanBoundaries, setPlanHeatOpacity, toggleCompareMode } from './planMap.js';
+import { initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleCompareMode } from './planMap.js';
+import { escapeHtml, showToast } from './utils.js';
+
+const CITY_NAME = "Thành phố Huế";
+const RADIUS_MIN = 50;
+const RADIUS_MAX = 5000;
+// Bán kính mặc định cho điểm vừa thêm (khớp config/constants.js: cấp đô thị 2000 m, cấp đơn vị ở theo loại)
+const UNIT_DEFAULT_RADIUS = { "1-CV": 500, "2-BDX": 500, "3-MN": 500, "4-TH": 1000, "5-THCS": 1000, "6-YT": 1000, "7-VH": 500, "8-TM": 500 };
+
+function setStatus(text, color) {
+  const el = document.getElementById('statusMsg');
+  if (!el) return;
+  el.style.color = color;
+  el.textContent = text;
+}
+
+async function loadInfraData() {
+  const res = await fetch(geeApi());
+  if (!res.ok) throw new Error(`Lỗi máy chủ (${res.status})`);
+  const data = await res.json();
+  state.rawDataList = data.rawDataList || [];
+  state.planDataList = data.planDataList || [];
+  bumpDataVersion();
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   initGoogleSignIn();
@@ -42,119 +69,72 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   initPlanMap(map, layers);
   centerOnCity();
+  initBottomPanelEvents();
+  restoreAdminSession();
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleCompareMode);
 
-  map.on('click', (e) => {
+  // ---------- Click bản đồ: dùng chung cho nửa trái (hiện trạng) và nửa phải (quy hoạch) khi so sánh ----------
+  const pickCoordinate = (latlng) => {
+    const lat = latlng.lat.toFixed(6);
+    const lng = latlng.lng.toFixed(6);
+    const inputLat = document.getElementById('newLat');
+    const inputLng = document.getElementById('newLng');
+    if (inputLat) inputLat.value = lat;
+    if (inputLng) inputLng.value = lng;
+    setStatus("⏳ Đang tra cứu địa bàn...", "var(--accent-orange)");
+
+    fetch(geeApi(`action=getWardFromPoint&lat=${lat}&lng=${lng}`))
+      .then(r => (r.ok ? r.json() : {}))
+      .then(res => {
+        const wardName = res.ward || "";
+        const inputWard = document.getElementById('newWard');
+        if (inputWard) inputWard.value = wardName;
+        setStatus(
+          wardName ? `✓ Thuộc địa bàn: ${wardName}` : "⚠ Vị trí nằm ngoài ranh giới 40 phường/xã",
+          wardName ? "var(--accent-green)" : "var(--accent-orange)"
+        );
+      })
+      .catch(() => setStatus("✓ Đã ghim tọa độ (chưa tra cứu được địa bàn)", "var(--accent-orange)"));
+    state.isPickMode = false;
+  };
+
+  const handleMapClick = (e, targetMap) => {
     if (state.isPickMode) {
-      const lat = e.latlng.lat.toFixed(6);
-      const lng = e.latlng.lng.toFixed(6);
-      const inputLat = document.getElementById('newLat');
-      const inputLng = document.getElementById('newLng');
-      if (inputLat) inputLat.value = lat;
-      if (inputLng) inputLng.value = lng;
-
-      const statusEl = document.getElementById('statusMsg');
-      if (statusEl) {
-        statusEl.style.color = "var(--accent-orange)";
-        statusEl.innerText = "⏳ Đang tra cứu địa bàn...";
-      }
-
-      fetch(geeApi(`action=getWardFromPoint&lat=${lat}&lng=${lng}`))
-        .then(r => r.json())
-        .then(res => {
-          const wardName = res.ward || "";
-          const inputWard = document.getElementById('newWard');
-          if (inputWard) inputWard.value = wardName;
-          if (statusEl) {
-            statusEl.style.color = wardName ? "var(--accent-green)" : "var(--accent-orange)";
-            statusEl.innerText = wardName ? `✓ Thuộc địa bàn: ${wardName}` : "⚠ Vị trí nằm ngoài ranh giới 40 phường/xã";
-          }
-        })
-        .catch(() => {
-          if (statusEl) {
-            statusEl.style.color = "var(--accent-green)";
-            statusEl.innerText = "✓ Đã ghim tọa độ!";
-          }
-        });
-
-      state.isPickMode = false;
+      pickCoordinate(e.latlng);
       return;
     }
-
     if (state.activeMeasureType) {
-      const { lat, lng } = e.latlng;
-      state.measurePoints.push([lng, lat]);
-
-      if (measureLayerGroup) {
-        L.circleMarker([lat, lng], { radius: 4, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 1 }).addTo(measureLayerGroup);
-
-        if (state.activeMeasureType === 'distance') {
-          if (state.measurePoints.length >= 2) {
-            const line = turf.lineString(state.measurePoints);
-            const distanceMeters = turf.length(line, { units: 'meters' });
-            
-            measureLayerGroup.clearLayers();
-            state.measurePoints.forEach(pt => {
-              L.circleMarker([pt[1], pt[0]], { radius: 4, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 1 }).addTo(measureLayerGroup);
-            });
-
-            const coords = state.measurePoints.map(pt => [pt[1], pt[0]]);
-            L.polyline(coords, { color: '#38bdf8', weight: 3, dashArray: '4,4' }).addTo(measureLayerGroup);
-
-            const textDist = distanceMeters >= 1000 ? `${(distanceMeters/1000).toFixed(2)} km` : `${Math.round(distanceMeters)} m`;
-            L.popup({ closeButton: false, autoClose: false })
-              .setLatLng([lat, lng])
-              .setContent(`<b style="color:var(--accent-cyan);">📏 Chiều dài: ${textDist}</b>`)
-              .openOn(map);
-          }
-        } else if (state.activeMeasureType === 'area') {
-          if (state.measurePoints.length >= 3) {
-            const closedCoords = [...state.measurePoints, state.measurePoints[0]];
-            const polygon = turf.polygon([closedCoords]);
-            const areaSqMeters = turf.area(polygon);
-
-            measureLayerGroup.clearLayers();
-            state.measurePoints.forEach(pt => {
-              L.circleMarker([pt[1], pt[0]], { radius: 4, color: '#f59e0b', fillColor: '#f59e0b', fillOpacity: 1 }).addTo(measureLayerGroup);
-            });
-
-            const coords = closedCoords.map(pt => [pt[1], pt[0]]);
-            L.polygon(coords, { color: '#f59e0b', weight: 2, fillColor: '#f59e0b', fillOpacity: 0.2 }).addTo(measureLayerGroup);
-
-            const textArea = areaSqMeters >= 10000 ? `${(areaSqMeters/10000).toFixed(2)} ha` : `${Math.round(areaSqMeters)} m²`;
-            L.popup({ closeButton: false, autoClose: false })
-              .setLatLng([lat, lng])
-              .setContent(`<b style="color:var(--accent-orange);">📐 Diện tích: ${textArea}</b>`)
-              .openOn(map);
-          }
-        }
-      }
+      handleMeasureClick(e.latlng);
       return;
     }
-
     if (state.isInspectMode) {
-      handleInspectPointClick(e.latlng.lat, e.latlng.lng);
-      return;
+      handleInspectPointClick(e.latlng.lat, e.latlng.lng, targetMap);
     }
-  });
+  };
+  map.on('click', (e) => handleMapClick(e, map));
+  planMap?.on('click', (e) => handleMapClick(e, planMap));
 
   document.getElementById('btnMeasureDist')?.addEventListener('click', () => toggleMeasure('distance'));
   document.getElementById('btnMeasureArea')?.addEventListener('click', () => toggleMeasure('area'));
 
   const btnInspectMode = document.getElementById('btnInspectMode');
+  const planEl = document.getElementById('mapPlan');
   const setInspectMode = (on) => {
     state.isInspectMode = on;
     btnInspectMode?.classList.toggle('active', on);
     if (btnInspectMode) {
+      btnInspectMode.setAttribute('aria-pressed', String(on));
       btnInspectMode.title = on
         ? "Đang bật tra cứu (bấm để tắt)"
         : "Bật chế độ tra cứu: click lên bản đồ để xem hạ tầng tiếp cận tại vị trí";
     }
     mapEl?.classList.toggle('inspect-mode', on);
+    planEl?.classList.toggle('inspect-mode', on);
     if (on) state.isPickMode = false;
   };
   btnInspectMode?.addEventListener('click', () => setInspectMode(!state.isInspectMode));
 
+  // ---------- Panel phải ----------
   const tabButtons = document.querySelectorAll('.rp-tabs .tab-btn');
   let activeTab = 'tabLayers';
   const setRightPanelCollapsed = (collapsed) => {
@@ -163,7 +143,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const showRightTab = (tabId) => {
     activeTab = tabId;
     setRightPanelCollapsed(false);
-    tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
+    tabButtons.forEach(btn => {
+      const on = btn.dataset.tab === tabId;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-selected', String(on));
+    });
     ['tabLayers', 'tabAdd', 'tabLegend'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = id === tabId ? 'block' : 'none';
@@ -183,242 +167,226 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btnToggleBottomMax')?.addEventListener('click', toggleBottomPanelMaximized);
   document.getElementById('btnToggleStatTable')?.addEventListener('click', toggleStatTable);
   document.getElementById('btnExportBottomPdf')?.addEventListener('click', exportBottomPanelPdf);
-  let radiusDebounceTimer = null;
-  const inputIsoRadius = document.getElementById('inputIsoRadius');
-  inputIsoRadius?.addEventListener('input', (e) => {
-    const val = e.target.value;
-    state.globalBufferRadiusOverride = val === "" ? null : (Number(val) || 500);
-    clearTimeout(radiusDebounceTimer);
-    radiusDebounceTimer = setTimeout(() => {
-      renderGroupedPoints();
-      refreshHeatmapOnly();
-    }, 400);
-  });
 
-  const heatOpacity = document.getElementById('heatOpacity');
-  heatOpacity?.addEventListener('input', (e) => {
-    const val = e.target.value / 100;
-    if (window.currentHeatmapTileLayer && typeof window.currentHeatmapTileLayer.setOpacity === 'function') {
-      window.currentHeatmapTileLayer.setOpacity(val);
+  // Bán kính chung: chặn trong khoảng hợp lệ; buffer vẽ lại nhanh (client), heatmap gọi GEE thì đợi lâu hơn
+  let bufferDebounce = null;
+  let heatDebounce = null;
+  const inputIsoRadius = document.getElementById('inputIsoRadius');
+  const applyRadius = (commit) => {
+    const raw = inputIsoRadius.value.trim();
+    let next = null;
+    if (raw !== "") {
+      const n = Number(raw);
+      if (!Number.isFinite(n)) return;
+      next = Math.round(Math.min(RADIUS_MAX, Math.max(RADIUS_MIN, n)));
+      if (commit && String(next) !== raw) inputIsoRadius.value = next;
     }
-    setPlanHeatOpacity(val);
-  });
+    if (next === state.globalBufferRadiusOverride) return;
+    state.globalBufferRadiusOverride = next;
+    clearTimeout(bufferDebounce);
+    clearTimeout(heatDebounce);
+    bufferDebounce = setTimeout(refreshBuffers, 250);
+    heatDebounce = setTimeout(refreshHeatmapOnly, 600);
+  };
+  inputIsoRadius?.addEventListener('input', () => applyRadius(false));
+  inputIsoRadius?.addEventListener('change', () => applyRadius(true));
+
+  document.getElementById('heatOpacity')?.addEventListener('input', (e) => setHeatOpacity(e.target.value / 100));
 
   document.getElementById('popOpacity')?.addEventListener('input', (e) => {
     const val = e.target.value / 100;
     layers.pop.eachLayer(l => l.setOpacity && l.setOpacity(val));
     planLayers.pop.eachLayer(l => l.setOpacity && l.setOpacity(val));
   });
-  
+
   const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'heat'];
   layerCheckboxes.forEach(key => {
-    const el = document.getElementById(`chk_${key}`);
-    el?.addEventListener('change', (e) => {
-      let targetLayer = key;
-      if (key === 'bound') targetLayer = 'boundary';
-      if (key === 'heat') targetLayer = 'heatmap';
+    document.getElementById(`chk_${key}`)?.addEventListener('change', (e) => {
+      const targetLayer = key === 'bound' ? 'boundary' : key === 'heat' ? 'heatmap' : key;
       toggleLayer(targetLayer, e.target.checked);
     });
   });
 
   document.querySelectorAll('.btn-dot-buffer').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const bufferKey = e.target.getAttribute('data-buffer');
-      if (bufferKey) toggleBuffer(bufferKey, e.target);
+    btn.addEventListener('click', () => {
+      const bufferKey = btn.getAttribute('data-buffer');
+      if (bufferKey) toggleBuffer(bufferKey, btn);
     });
   });
 
   document.getElementById('wardSelector')?.addEventListener('change', async (e) => {
-    let wardName = e.target.value || null;
-    if (wardName === "THÀNH PHỐ HUẾ") wardName = "Thành phố Huế";
-
     if (state.rawDataList.length === 0) {
       try {
-        const res = await fetch(geeApi());
-        const data = await res.json();
-        state.rawDataList = data.rawDataList || [];
-        state.planDataList = data.planDataList || [];
+        await loadInfraData();
       } catch (err) {
         console.error("Lỗi tải dữ liệu điểm hạ tầng:", err);
+        showToast('❌ Không tải được dữ liệu công trình', 'error');
         return;
       }
     }
-
-    await selectWardDetail(wardName || "Thành phố Huế");
+    await selectWardDetail(e.target.value || CITY_NAME);
   });
 
+  // ---------- Đăng nhập quản trị ----------
   document.getElementById('btnAuth')?.addEventListener('click', toggleAuthModal);
   document.getElementById('btnCloseAuthModal')?.addEventListener('click', toggleAuthModal);
-
-  document.getElementById('btnPickOnMap')?.addEventListener('click', () => {
-    state.isPickMode = true;
-    const statusEl = document.getElementById('statusMsg');
-    if (statusEl) {
-      statusEl.style.color = "var(--accent-orange)";
-      statusEl.innerText = "👉 Click trực tiếp trên bản đồ để chọn tọa độ...";
-    }
+  document.getElementById('btnSignOut')?.addEventListener('click', () => {
+    signOutAdmin();
+    toggleAuthModal();
+    showToast('Đã đăng xuất tài khoản quản trị', 'info');
   });
 
-  document.getElementById('btnSubmitNewPoint')?.addEventListener('click', () => {
+  // ---------- Thêm điểm đề xuất ----------
+  document.getElementById('btnPickOnMap')?.addEventListener('click', () => {
+    state.isPickMode = true;
+    setStatus("👉 Click trực tiếp trên bản đồ để chọn tọa độ...", "var(--accent-orange)");
+  });
+
+  let submitting = false;
+  document.getElementById('btnSubmitNewPoint')?.addEventListener('click', async () => {
+    if (submitting) return;
     const type = document.getElementById('newType')?.value;
     const nhomHaTang = document.getElementById('newNhomHaTang')?.value || "Cấp đơn vị ở";
-    const name = document.getElementById('newName')?.value;
-    const lat = document.getElementById('newLat')?.value;
-    const lng = document.getElementById('newLng')?.value;
-    const ward = document.getElementById('newWard')?.value || "";
-    const size = document.getElementById('newSize')?.value || 0;
+    const name = (document.getElementById('newName')?.value || '').trim();
+    const lat = Number(document.getElementById('newLat')?.value);
+    const lng = Number(document.getElementById('newLng')?.value);
+    const size = Number(document.getElementById('newSize')?.value || 0);
     const phase = document.getElementById('newPhase')?.value === 'QH' ? 'QH' : 'HT';
-    const msg = document.getElementById('statusMsg');
 
-    if (!name || !lat || !lng) {
-      if (msg) {
-        msg.style.color = "var(--accent-red)";
-        msg.innerText = "⚠️ Vui lòng điền đủ Tên và Tọa độ!";
-      }
+    if (!name || !Number.isFinite(lat) || !Number.isFinite(lng) || !document.getElementById('newLat')?.value) {
+      setStatus("⚠️ Vui lòng điền đủ Tên và Tọa độ hợp lệ!", "var(--accent-red)");
       return;
     }
-    if (phase === 'QH' && !(Number(size) > 0)) {
-      if (msg) {
-        msg.style.color = "var(--accent-red)";
-        msg.innerText = "⚠️ Điểm quy hoạch mới cần nhập diện tích > 0!";
-      }
+    if (!Number.isFinite(size) || size < 0) {
+      setStatus("⚠️ Diện tích không hợp lệ!", "var(--accent-red)");
+      return;
+    }
+    if (phase === 'QH' && !(size > 0)) {
+      setStatus("⚠️ Điểm quy hoạch mới cần nhập diện tích > 0!", "var(--accent-red)");
       return;
     }
 
-    if (msg) {
-      msg.style.color = "var(--accent-orange)";
-      msg.innerText = "🚀 Đang gửi đề xuất...";
-    }
+    submitting = true;
+    setStatus("🚀 Đang gửi đề xuất...", "var(--accent-orange)");
+    try {
+      const res = await fetch(geeApi('action=addPoint'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, nhomHaTang, name, lat, lng, size, phase })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setStatus(`❌ ${data.message || `Gửi đề xuất thất bại (${res.status})`}`, "var(--accent-red)");
+        return;
+      }
 
-    const addUrl = geeApi(
-      `action=addPoint` +
-      `&type=${encodeURIComponent(type)}` +
-      `&nhomHaTang=${encodeURIComponent(nhomHaTang)}` +
-      `&name=${encodeURIComponent(name)}` +
-      `&ward=${encodeURIComponent(ward)}` +
-      `&lat=${lat}&lng=${lng}&size=${size}` +
-      `&phase=${phase}`
-    );
+      setStatus(`✓ Đã lưu đề xuất${data.id ? ` (mã ${data.id})` : ''}, chờ quản trị phê duyệt.`, "var(--accent-green)");
+      ['newName', 'newLat', 'newLng', 'newWard', 'newSize'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
 
-    fetch(addUrl)
-      .then(r => r.json())
-      .then(() => {
-        if (msg) {
-          msg.style.color = "var(--accent-green)";
-          msg.innerText = "✓ Đã lưu đề xuất thành công!";
-        }
-        
+      // Lấy lại danh sách từ máy chủ (đã đồng bộ Sheets → GCS); lỗi thì tạm thêm điểm vào danh sách cục bộ
+      try {
+        await loadInfraData();
+      } catch (err) {
+        const isUrban = nhomHaTang === 'Cấp đô thị';
         const newItem = {
-          id: "NEW-" + Date.now(),
-          name, ward, type, nhomHaTang,
-          lat: Number(lat), lng: Number(lng),
-          size: phase === 'QH' ? 0 : Number(size), radius: 500,
-          sizeHT: phase === 'QH' ? null : Number(size),
-          sizeQH: Number(size),
+          id: data.id || `NEW-${Date.now()}`,
+          name, ward: data.ward || '', type, nhomHaTang, lat, lng,
+          size: phase === 'QH' ? 0 : size,
+          radius: isUrban ? 2000 : (UNIT_DEFAULT_RADIUS[type] || 500),
+          sizeHT: phase === 'QH' ? null : size,
+          sizeQH: size,
           planChange: phase === 'QH' ? 'new' : 'keep',
           status: false
         };
         if (phase === 'QH') state.planDataList.push(newItem);
         else state.rawDataList.push(newItem);
-
-        renderGroupedPoints();
-        ['newName', 'newLat', 'newLng', 'newWard', 'newSize'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.value = '';
-        });
-      })
-      .catch(() => {
-        if (msg) {
-          msg.style.color = "var(--accent-red)";
-          msg.innerText = "❌ Lỗi kết nối máy chủ!";
-        }
-      });
+        bumpDataVersion();
+      }
+      renderGroupedPoints();
+      if (state.wardStatsData.length) reloadWardStats();
+    } catch (err) {
+      setStatus("❌ Lỗi kết nối máy chủ!", "var(--accent-red)");
+    } finally {
+      submitting = false;
+    }
   });
 
+  // ---------- Ẩn/hiện toàn bộ icon ----------
   let allIconsVisible = true;
-  document.getElementById('btnToggleAllIcons')?.addEventListener('click', () => {
+  const btnEye = document.getElementById('btnToggleAllIcons');
+  btnEye?.addEventListener('click', () => {
     allIconsVisible = !allIconsVisible;
-    const groups = ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'];
-    groups.forEach(gKey => {
+    ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'].forEach(gKey => {
       const chk = document.getElementById(`chk_${gKey}`);
-      if (chk) {
-        chk.checked = allIconsVisible;
-      }
+      if (chk) chk.checked = allIconsVisible;
       toggleLayer(gKey, allIconsVisible);
     });
-    const btnEye = document.getElementById('btnToggleAllIcons');
-    if (btnEye) {
-      btnEye.style.opacity = allIconsVisible ? '1' : '0.5';
-      btnEye.title = allIconsVisible ? 'Ẩn toàn bộ icon' : 'Hiện toàn bộ icon';
-    }
+    btnEye.style.opacity = allIconsVisible ? '1' : '0.5';
+    btnEye.title = allIconsVisible ? 'Ẩn toàn bộ icon' : 'Hiện toàn bộ icon';
+    btnEye.setAttribute('aria-pressed', String(!allIconsVisible));
   });
 
-  // Định vị GPS của người dùng và tự động kích hoạt kiểm tra hạ tầng tại điểm đó
+  // ---------- Định vị GPS: 1 marker duy nhất (thay thế lần định vị trước) + tra cứu hạ tầng tại chỗ ----------
+  const gpsLayers = [L.layerGroup().addTo(map), planMap ? L.layerGroup().addTo(planMap) : null].filter(Boolean);
   document.getElementById('btnLocateGPS')?.addEventListener('click', () => {
     if (!navigator.geolocation) {
-      alert("Trình duyệt của bạn không hỗ trợ định vị GPS.");
+      showToast('Trình duyệt của bạn không hỗ trợ định vị GPS.', 'error');
       return;
     }
-
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
-        
-        // Zoom tới vị trí GPS hiện tại
         flyToVisible([lat, lng], 16, { animate: false });
-        
-        L.circleMarker([lat, lng], { radius: 8, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 0.8 })
-          .addTo(map)
-          .bindPopup("<b>Vị trí hiện tại của bạn</b>").openPopup();
-
-        // Tự động kích hoạt gọi hàm kiểm tra thông tin/hạ tầng tại vị trí GPS này
-        if (typeof handleInspectPointClick === 'function') {
-          handleInspectPointClick(lat, lng);
-        }
+        gpsLayers.forEach(g => {
+          g.clearLayers();
+          L.circleMarker([lat, lng], { radius: 8, color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 0.8 })
+            .bindPopup(`<b>Vị trí hiện tại của bạn</b><br/>${escapeHtml(lat.toFixed(5))}, ${escapeHtml(lng.toFixed(5))}`)
+            .addTo(g);
+        });
+        handleInspectPointClick(lat, lng);
       },
-      () => {
-        alert("Không thể lấy được vị trí GPS của bạn.");
-      },
+      () => showToast('Không thể lấy được vị trí GPS của bạn.', 'error'),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   });
 
-  document.getElementById('btnScreenshot')?.addEventListener('click', () => {
-    window.print();
-  });
+  document.getElementById('btnScreenshot')?.addEventListener('click', captureMapScreenshot);
+
+  // ---------- Nạp dữ liệu ban đầu ----------
+  const progressBar = document.getElementById('progressBar');
+  const progressPercent = document.getElementById('progressPercent');
+  const setProgress = (pct) => {
+    if (progressBar) progressBar.style.width = `${pct}%`;
+    if (progressPercent) progressPercent.textContent = `${pct}%`;
+  };
 
   try {
-    const progressBar = document.getElementById('progressBar');
-    const progressPercent = document.getElementById('progressPercent');
-    if (progressBar) progressBar.style.width = "30%";
-    if (progressPercent) progressPercent.innerText = "30%";
-
+    setProgress(30);
     await Promise.all([loadBoundaryLayer(), loadPopulationLayer()]);
     renderPlanBoundaries();
-    if (progressBar) progressBar.style.width = "60%";
-    if (progressPercent) progressPercent.innerText = "60%";
+    setProgress(60);
 
-    const dataRes = await fetch(geeApi());
-    const dataJson = await dataRes.json();
-    state.rawDataList = dataJson.rawDataList || [];
-    state.planDataList = dataJson.planDataList || [];
+    await loadInfraData();
 
     const wardSelector = document.getElementById('wardSelector');
     if (wardSelector) {
       wardSelector.innerHTML = "";
       const defaultOpt = document.createElement('option');
-      defaultOpt.value = "Thành phố Huế";
-      defaultOpt.textContent = "THÀNH PHỐ HUẾ";
+      defaultOpt.value = CITY_NAME;
+      defaultOpt.textContent = CITY_NAME.toUpperCase();
       defaultOpt.selected = true;
       wardSelector.appendChild(defaultOpt);
-      state.selectedWard = "Thành phố Huế";
+      state.selectedWard = CITY_NAME;
 
       state.wardLabelsList
         .slice()
         .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
         .forEach(item => {
-          if (!item.name || item.name === "Thành phố Huế") return;
+          if (!item.name || item.name === CITY_NAME) return;
           const opt = document.createElement('option');
           opt.value = item.name;
           opt.textContent = item.name.toUpperCase();
@@ -426,26 +394,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    if (progressBar) progressBar.style.width = "90%";
-    if (progressPercent) progressPercent.innerText = "90%";
-
+    setProgress(90);
     renderGroupedPoints();
     renderBottomPanel();
 
-    // Chạy ngầm tính độ phủ (dân số lớn → nhỏ), ghi nhớ để bảng tổng hợp dùng lại
+    // Chạy ngầm tính độ phủ (dân số lớn → nhỏ), ghi nhớ theo chữ ký dữ liệu để lần sau dùng lại
     ensureWardStats()
       .then(() => startBackgroundCoverageFill())
       .catch(err => console.warn("Không khởi động tính độ phủ nền:", err));
 
     await refreshHeatmapOnly();
-
-    if (progressBar) progressBar.style.width = "100%";
-    if (progressPercent) progressPercent.innerText = "100%";
+    setProgress(100);
     setTimeout(() => {
       const progressRow = document.querySelector('.rp-progress');
       if (progressRow) progressRow.style.display = 'none';
     }, 600);
   } catch (err) {
     console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
+    showToast('❌ Lỗi nạp dữ liệu bản đồ, vui lòng tải lại trang.', 'error');
   }
 });

@@ -2,16 +2,18 @@
  * Quản lý trạng thái ứng dụng & Danh mục cấu hình UI Frontend
  */
 export const state = {
-  // Phân quyền người dùng: 'VIEWER' (mặc định) hoặc 'ADMIN'
+  // Phân quyền người dùng: 'VIEWER' (mặc định) hoặc 'ADMIN' — chỉ đặt ADMIN sau khi server xác minh Google token
   currentUserRole: "VIEWER",
-
-  // Danh sách Email được cấp quyền Quản trị (Admin)
-  adminEmails: ["donghoangsxd@gmail.com", "admin.sxd@hue.gov.vn"],
+  // Google ID token của Admin, gửi kèm mỗi thao tác phê duyệt để server kiểm tra lại
+  authToken: null,
+  authUser: null,
 
   // Dữ liệu công trình hạ tầng & Ma trận 40 Phường/Xã
   rawDataList: [],
-  // Công trình quy hoạch mới (QuyMo_HT = 0, QuyMo_QH > 0): chỉ có trên bản đồ quy hoạch
+  // Công trình quy hoạch mới (QuyMo_HT trống, QuyMo_QH có giá trị): chỉ có trên bản đồ quy hoạch
   planDataList: [],
+  // Tăng mỗi khi danh sách công trình hoặc trạng thái duyệt thay đổi (làm mới các kết quả lọc đã ghi nhớ)
+  dataVersion: 0,
   wardStatsData: [],
 
   // Bộ lọc địa bàn: null = xem toàn TP. Huế | "Tên phường" = chỉ lọc riêng phường đó
@@ -19,13 +21,8 @@ export const state = {
   // Danh sách tên + tọa độ tâm 40 phường xã (dùng cho dropdown lọc & bay tới vị trí)
   wardLabelsList: [],
 
-  // Bán kính đệm Buffer & Isochrone Giao thông mặc định (mét)
-  globalBufferRadius: 500,
+  // Bán kính buffer chung do người dùng nhập (null = dùng cột BanKinh của từng công trình)
   globalBufferRadiusOverride: null,
-  isochroneRadius: 500,
-
-  // Layer Group lưu các đa giác Isochrone giao thông
-  isochroneLayerGroup: null,
 
   // Trạng thái các chế độ tương tác
   isPickMode: false,
@@ -38,6 +35,15 @@ export const state = {
   // Marker tạm trên bản đồ
   tempMarker: null
 };
+
+export function bumpDataVersion() {
+  state.dataVersion++;
+}
+
+export function effectiveRadius(item) {
+  if (state.globalBufferRadiusOverride !== null) return state.globalBufferRadiusOverride;
+  return Number(item.radius) || Number(item.banKinh) || 500;
+}
 
 export const infraLabels = {
   "1-CV": "🌳 Công viên, điểm xanh, vườn hoa",
@@ -65,6 +71,10 @@ export const BUFFER_KEYS = {
   "1-CV": "b1", "2-BDX": "b2", "3-MN": "b3", "4-TH": "b4", "5-THCS": "b5",
   "6-YT": "b6", "7-VH": "b7", "8-TM": "b8", "9-CSD": "b9"
 };
+export const ICON_GROUP_KEYS = {
+  "1-CV": "c1", "2-BDX": "c2", "3-MN": "c3", "4-TH": "c4", "5-THCS": "c5",
+  "6-YT": "c6", "7-VH": "c7", "8-TM": "c8", "9-CSD": "c9"
+};
 export function getBufferStyle(type, approved) {
   if (!approved) return { color: '#f87171', weight: 2.2, dashArray: '4, 4', fillColor: '#f87171', fillOpacity: 0.10 };
   const color = BUFFER_COLORS[type] || '#38bdf8';
@@ -79,37 +89,17 @@ export const PLAN_CHANGE_INFO = {
   relocate: { label: "Di dời", color: "#ef4444" }
 };
 
-export const infraIcons = {
-  "1-CV": { symbol: "🌳", border: "#4ade80" },
-  "2-BDX": { symbol: "🅿️", border: "#a855f7" },
-  "3-MN": { symbol: "🧸", border: "#fb923c" },
-  "4-TH": { symbol: "🏫", border: "#facc15" },
-  "5-THCS": { symbol: "📚", border: "#eab308" },
-  "6-YT": { symbol: '<span style="color:#f87171; font-weight:900;">✚</span>', border: "#f87171" },
-  "7-VH": { symbol: "🎭", border: "#ec4899" },
-  "8-TM": { symbol: "🛒", border: "#38bdf8" },
-  "9-CSD": { symbol: "🛠️", border: "#94a3b8" }
-};
-
-export function setUserRole(role) {
-  state.currentUserRole = role;
-}
-
-export function setRawDataList(data) {
-  state.rawDataList = Array.isArray(data) ? data : [];
-}
+let planListCache = { version: -1, list: [] };
 
 // Dữ liệu bản đồ quy hoạch: công trình có QuyMo_QH (hiện trạng bỏ di dời + quy hoạch mới), diện tích lấy theo QuyMo_QH
 export function getPlanScenarioList() {
+  if (planListCache.version === state.dataVersion) return planListCache.list;
   const list = [];
   state.rawDataList.forEach(it => {
     if (it.planChange === 'relocate') return;
     list.push({ ...it, size: it.sizeQH ?? it.size, sizeHT: it.sizeHT ?? it.size, scenario: 'QH' });
   });
   state.planDataList.forEach(it => list.push({ ...it, size: it.sizeQH, scenario: 'QH' }));
+  planListCache = { version: state.dataVersion, list };
   return list;
-}
-
-export function setWardStatsData(data) {
-  state.wardStatsData = Array.isArray(data) ? data : [];
 }

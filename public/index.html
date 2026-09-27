@@ -4,13 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bản đồ Phân tích Hạ tầng Đô thị TP. Huế (Headless GIS)</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  <!-- Thư viện ghim phiên bản + SRI; html2pdf / html2canvas chỉ tải khi xuất PDF / chụp ảnh (public/js/utils.js) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"
+    integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
+    integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <!-- Thêm thư viện hỗ trợ xuất PDF -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -21,35 +24,37 @@
 
     <!-- BẢN ĐỒ QUY HOẠCH (NỬA PHẢI, CẮT THEO THANH TRƯỢT SO SÁNH) -->
     <div id="mapPlan"></div>
-    <div id="swipeDivider" title="Kéo để so sánh">
+    <div id="swipeDivider" title="Kéo (hoặc dùng phím ← →) để so sánh" tabindex="0" role="separator"
+      aria-orientation="vertical" aria-label="Thanh trượt so sánh hiện trạng và quy hoạch"
+      aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
       <span class="swipe-label swipe-label-left">◧ HIỆN TRẠNG HẠ TẦNG</span>
       <span class="swipe-handle">⟷</span>
       <span class="swipe-label swipe-label-right">QUY HOẠCH HẠ TẦNG ◨</span>
     </div>
 
-    <!-- THANH CÔNG CỤ DỌC BÊN PHẢI BẢN ĐỒ -->
-    <div class="middle-right-toolbar ui-panel-format">
-      <button class="ui-btn-format" id="btnToggleCompare" title="So sánh Hiện trạng / Quy hoạch (chia đôi màn hình)">◧</button>
-      <button class="ui-btn-format" id="btnAuth" title="Đăng nhập Quản trị">🔑</button>
-      <button class="ui-btn-format" id="btnToggleSidebar" title="Lớp dữ liệu">⚙️</button>
-      <button class="ui-btn-format" id="btnToggleAllIcons" title="Ẩn/Hiện toàn bộ icon trên bản đồ">👁️</button>
-      <button class="ui-btn-format" id="btnLocateGPS" title="Định vị vị trí GPS của bạn">📍</button>
-      <button class="ui-btn-format" id="btnScreenshot" title="Chụp ảnh màn hình bản đồ">📸</button>
-      <button class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích">📐</button>
-      <button class="ui-btn-format" id="btnMeasureDist" title="Đo chiều dài">📏</button>
-      <button class="ui-btn-format" id="btnInspectMode" title="Bật chế độ tra cứu: click lên bản đồ để xem hạ tầng tiếp cận tại vị trí">🖱️</button>
+    <!-- THANH CÔNG CỤ DỌC CẠNH TRÁI BẢN ĐỒ -->
+    <div class="map-toolbar ui-panel-format" role="toolbar" aria-label="Công cụ bản đồ" aria-orientation="vertical">
+      <button type="button" class="ui-btn-format" id="btnToggleCompare" title="So sánh Hiện trạng / Quy hoạch (chia đôi màn hình)" aria-label="So sánh hiện trạng và quy hoạch" aria-pressed="false">◧</button>
+      <button type="button" class="ui-btn-format" id="btnAuth" title="Đăng nhập quản trị" aria-label="Đăng nhập quản trị">🔑</button>
+      <button type="button" class="ui-btn-format" id="btnToggleSidebar" title="Lớp dữ liệu" aria-label="Lớp dữ liệu">⚙️</button>
+      <button type="button" class="ui-btn-format" id="btnToggleAllIcons" title="Ẩn toàn bộ icon" aria-label="Ẩn/hiện toàn bộ icon" aria-pressed="false">👁️</button>
+      <button type="button" class="ui-btn-format" id="btnLocateGPS" title="Định vị vị trí GPS của bạn" aria-label="Định vị GPS">📍</button>
+      <button type="button" class="ui-btn-format" id="btnScreenshot" title="Chụp ảnh bản đồ (lưu PNG)" aria-label="Chụp ảnh bản đồ">📸</button>
+      <button type="button" class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích" aria-label="Đo diện tích">📐</button>
+      <button type="button" class="ui-btn-format" id="btnMeasureDist" title="Đo chiều dài" aria-label="Đo chiều dài">📏</button>
+      <button type="button" class="ui-btn-format" id="btnInspectMode" title="Bật chế độ tra cứu: click lên bản đồ để xem hạ tầng tiếp cận tại vị trí" aria-label="Chế độ tra cứu" aria-pressed="false">🖱️</button>
     </div>
 
-    <button class="rp-expand-btn ui-panel-format" id="btnExpandRightPanel" title="Mở panel công cụ">«</button>
+    <button type="button" class="rp-expand-btn ui-panel-format" id="btnExpandRightPanel" title="Mở panel công cụ" aria-label="Mở panel công cụ">«</button>
   </div>
 
   <!-- PANEL CÔNG CỤ BÊN PHẢI (GỘP TRA CỨU / ĐỀ XUẤT / LỚP DỮ LIỆU / CHÚ GIẢI) -->
   <aside class="right-panel" id="rightPanel">
-    <div class="tab-header rp-tabs">
-      <div class="tab-btn active" data-tab="tabLayers">⚙️<span>Lớp dữ liệu</span></div>
-      <div class="tab-btn" data-tab="tabAdd">➕<span>Đề xuất</span></div>
-      <div class="tab-btn" data-tab="tabLegend">📖<span>Chú giải</span></div>
-      <button class="rp-collapse-btn" id="btnCollapseRightPanel" title="Thu gọn panel">»</button>
+    <div class="tab-header rp-tabs" role="tablist">
+      <button type="button" class="tab-btn active" data-tab="tabLayers" role="tab" aria-selected="true" aria-controls="tabLayers">⚙️<span>Lớp dữ liệu</span></button>
+      <button type="button" class="tab-btn" data-tab="tabAdd" role="tab" aria-selected="false" aria-controls="tabAdd">➕<span>Đề xuất</span></button>
+      <button type="button" class="tab-btn" data-tab="tabLegend" role="tab" aria-selected="false" aria-controls="tabLegend">📖<span>Chú giải</span></button>
+      <button type="button" class="rp-collapse-btn" id="btnCollapseRightPanel" title="Thu gọn panel" aria-label="Thu gọn panel">»</button>
     </div>
 
     <div class="rp-progress">
@@ -62,14 +67,14 @@
       <div class="tab-body" id="tabLayers">
         <div class="layer-row"><div><input type="checkbox" id="chk_pop"><label for="chk_pop">0. Phân bổ dân cư</label></div></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound">🗺️ Ranh giới 40 Phường Xã</label></div></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c1" checked><label for="chk_c1">1. Công viên, điểm xanh</label></div><span class="btn-dot-buffer" data-buffer="b1" title="Bật/tắt vùng phủ">●</span></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c2" checked><label for="chk_c2">2. Bãi đỗ xe, trạm sạc</label></div><span class="btn-dot-buffer" data-buffer="b2" title="Bật/tắt vùng phủ">●</span></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c3" checked><label for="chk_c3">3. Trường Mầm non</label></div><span class="btn-dot-buffer" data-buffer="b3" title="Bật/tắt vùng phủ">●</span></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c4" checked><label for="chk_c4">4. Trường Tiểu học</label></div><span class="btn-dot-buffer" data-buffer="b4" title="Bật/tắt vùng phủ">●</span></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c5" checked><label for="chk_c5">5. Trường THCS</label></div><span class="btn-dot-buffer" data-buffer="b5" title="Bật/tắt vùng phủ">●</span></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c6" checked><label for="chk_c6">6. Cơ sở Y tế</label></div><span class="btn-dot-buffer" data-buffer="b6" title="Bật/tắt vùng phủ">●</span></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c7" checked><label for="chk_c7">7. Nhà văn hóa, thể thao</label></div><span class="btn-dot-buffer" data-buffer="b7" title="Bật/tắt vùng phủ">●</span></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c8" checked><label for="chk_c8">8. Chợ, TTTM</label></div><span class="btn-dot-buffer" data-buffer="b8" title="Bật/tắt vùng phủ">●</span></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c1" checked><label for="chk_c1">1. Công viên, điểm xanh</label></div><button type="button" class="btn-dot-buffer" data-buffer="b1" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c2" checked><label for="chk_c2">2. Bãi đỗ xe, trạm sạc</label></div><button type="button" class="btn-dot-buffer" data-buffer="b2" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c3" checked><label for="chk_c3">3. Trường Mầm non</label></div><button type="button" class="btn-dot-buffer" data-buffer="b3" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c4" checked><label for="chk_c4">4. Trường Tiểu học</label></div><button type="button" class="btn-dot-buffer" data-buffer="b4" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c5" checked><label for="chk_c5">5. Trường THCS</label></div><button type="button" class="btn-dot-buffer" data-buffer="b5" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c6" checked><label for="chk_c6">6. Cơ sở Y tế</label></div><button type="button" class="btn-dot-buffer" data-buffer="b6" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c7" checked><label for="chk_c7">7. Nhà văn hóa, thể thao</label></div><button type="button" class="btn-dot-buffer" data-buffer="b7" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c8" checked><label for="chk_c8">8. Chợ, TTTM</label></div><button type="button" class="btn-dot-buffer" data-buffer="b8" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c9" checked><label for="chk_c9">9. Quỹ đất tiềm năng</label></div></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_heat" checked><label for="chk_heat">🔥 Heatmap độ phủ hạ tầng</label></div></div>
 
@@ -80,8 +85,8 @@
         <div id="heatBox" class="opacity-slider-row">
           🔥 Độ trong suốt Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30">
           <div class="rp-inline-field">
-            <span>🛤️ Bán kính buffer chung (m):</span>
-            <input type="number" id="inputIsoRadius" value="500" min="100" max="5000" step="50" />
+            <label for="inputIsoRadius">🛤️ Bán kính buffer chung (m):</label>
+            <input type="number" id="inputIsoRadius" placeholder="Mặc định" min="50" max="5000" step="50" title="Để trống = dùng bán kính riêng của từng công trình (50–5000 m)" />
           </div>
         </div>
       </div>
@@ -120,17 +125,17 @@
         <div class="rp-coord-row">
           <input type="text" id="newLat" placeholder="Vĩ độ" />
           <input type="text" id="newLng" placeholder="Kinh độ" />
-          <button id="btnPickOnMap" title="Ghim trên bản đồ">📌</button>
+          <button type="button" id="btnPickOnMap" title="Ghim trên bản đồ" aria-label="Ghim tọa độ trên bản đồ">📌</button>
         </div>
 
         <label>Phường / Xã:</label>
         <input type="text" id="newWard" placeholder="Tự động nhận diện theo tọa độ..." />
 
         <label>Diện tích (m²):</label>
-        <input type="number" id="newSize" placeholder="1000" />
+        <input type="number" id="newSize" placeholder="1000" min="0" step="1" />
 
-        <button class="btn-submit" id="btnSubmitNewPoint">🚀 GỬI ĐỀ XUẤT MỚI</button>
-        <div id="statusMsg" class="rp-status"></div>
+        <button type="button" class="btn-submit" id="btnSubmitNewPoint">🚀 GỬI ĐỀ XUẤT MỚI</button>
+        <div id="statusMsg" class="rp-status" role="status" aria-live="polite"></div>
       </div>
 
       <!-- TAB: CHÚ GIẢI -->
@@ -144,7 +149,8 @@
         <div class="legend-row"><img src="./icons/Vanhoa.png" class="legend-icon" /> 7. Nhà văn hóa, thể thao</div>
         <div class="legend-row"><img src="./icons/Cho.png" class="legend-icon" /> 8. Chợ, Trung tâm thương mại</div>
         <div class="legend-row" style="color:var(--accent-orange); margin-top:6px;"><img src="./icons/Unused.png" class="legend-icon" /> <b>9. Quỹ đất tiềm năng (Chưa sử dụng)</b></div>
-        <div class="legend-row"><img src="./icons/Park2.png" class="legend-icon" /><b style="color:var(--accent-red);">Chưa chấp thuận (Chờ duyệt)</b></div>
+        <div class="legend-row"><img src="./icons/Park2.png" class="legend-icon" alt="" /><b style="color:var(--accent-red);">Chưa chấp thuận (Chờ duyệt)</b></div>
+        <div class="plan-legend-note">Khi khung nhìn có quá nhiều công trình (thu nhỏ bản đồ), icon được thay bằng chấm tròn cùng màu nhóm; chấm đỏ = chờ duyệt. Phóng to để xem icon.</div>
 
         <div class="heat-legend">
           <div class="heat-legend-title">🔥 Heatmap độ phủ hạ tầng</div>
@@ -246,14 +252,15 @@
   </section>
 
   <!-- MODAL ĐĂNG NHẬP GOOGLE ADMIN -->
-  <div id="authModal" class="ui-panel-format" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3001; padding:16px; width:300px; text-align:center;">
+  <div id="authModal" class="ui-panel-format" role="dialog" aria-modal="true" aria-labelledby="authModalTitle" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3001; padding:16px; width:300px; text-align:center;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <b style="color:var(--accent-cyan); font-size:12px;">🔑 ĐĂNG NHẬP QUẢN TRỊ (ADMIN)</b>
-      <span id="btnCloseAuthModal" style="cursor:pointer; color:var(--accent-red); font-weight:bold;">✕</span>
+      <b id="authModalTitle" style="color:var(--accent-cyan); font-size:12px;">🔑 ĐĂNG NHẬP QUẢN TRỊ (ADMIN)</b>
+      <button type="button" id="btnCloseAuthModal" class="auth-close-btn" aria-label="Đóng">✕</button>
     </div>
     <div style="font-size:10.5px; color:var(--text-muted); margin-bottom:12px;">Đăng nhập bằng tài khoản Google được cấp quyền Admin để thực hiện phê duyệt đề xuất hạ tầng.</div>
     <div id="googleSignInBtn" style="display:flex; justify-content:center;"></div>
-    <div id="authMsg" style="font-size:10px; margin-top:8px; text-align:center; font-weight:bold;"></div>
+    <button type="button" id="btnSignOut" class="btn-submit" style="display:none; margin-top:8px;">Đăng xuất quản trị</button>
+    <div id="authMsg" role="status" aria-live="polite" style="font-size:10px; margin-top:8px; text-align:center; font-weight:bold;"></div>
   </div>
 
   <script type="module" src="./js/app.js"></script>

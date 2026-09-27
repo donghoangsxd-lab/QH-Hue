@@ -32,7 +32,7 @@ body, html {
   bottom: var(--bottom-h);
 }
 #map { position: absolute; inset: 0; z-index: 0; background: var(--bg-panel); }
-#map.inspect-mode { cursor: crosshair !important; }
+#map.inspect-mode, #mapPlan.inspect-mode { cursor: crosshair !important; }
 
 /* SO SÁNH HIỆN TRẠNG / QUY HOẠCH (SWIPE) */
 #mapPlan {
@@ -144,7 +144,7 @@ body.compare-on #mapPlan, body.compare-on #swipeDivider { display: block; }
 }
 
 /* THANH CÔNG CỤ DỌC TRÊN BẢN ĐỒ (BÊN TRÁI) */
-.middle-right-toolbar {
+.map-toolbar {
   position: absolute;
   top: 12px;
   left: 12px;
@@ -155,7 +155,7 @@ body.compare-on #mapPlan, body.compare-on #swipeDivider { display: block; }
   padding: 6px;
   width: 42px;
 }
-.middle-right-toolbar .ui-btn-format {
+.map-toolbar .ui-btn-format {
   width: 30px;
   height: 30px;
   padding: 0;
@@ -255,6 +255,9 @@ body.right-collapsed .right-panel {
 }
 .tab-btn {
   flex: 1;
+  font-family: inherit;
+  background: transparent;
+  border: none;
   padding: 6px 2px 5px;
   display: flex;
   flex-direction: column;
@@ -281,14 +284,14 @@ body.right-collapsed .right-panel {
 .layer-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 11.5px; line-height: 1.3; }
 .layer-row label { cursor: pointer; color: var(--text-main); }
 .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 14px; height: 14px; margin-right: 6px; vertical-align: middle; }
-.btn-dot-buffer { width: 16px; height: 16px; border-radius: 50%; background: #475569; color: #fff; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; flex-shrink: 0; }
+.btn-dot-buffer { width: 16px; height: 16px; padding: 0; border: none; font-family: inherit; line-height: 1; border-radius: 50%; background: #475569; color: #fff; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; flex-shrink: 0; }
 .btn-dot-buffer.active { background: var(--accent-orange); box-shadow: 0 0 8px var(--accent-orange); }
 .opacity-slider-row { margin-top: 6px; border-top: 1px dashed var(--border-color); padding-top: 6px; font-size: 11px; }
 .opacity-slider { width: 100%; accent-color: var(--accent-cyan); cursor: pointer; margin-top: 4px; }
 .rp-inline-field { margin-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.rp-inline-field span { font-size: 11px; color: var(--text-muted); }
+.rp-inline-field span, .rp-inline-field label { font-size: 11px; color: var(--text-muted); }
 .rp-inline-field input {
-  width: 64px; background: var(--bg-panel); color: var(--accent-cyan);
+  width: 76px; background: var(--bg-panel); color: var(--accent-cyan);
   border: 1px solid var(--border-color); border-radius: 4px; padding: 3px 6px;
   text-align: center; font-weight: bold; font-size: 12px;
 }
@@ -313,7 +316,8 @@ body.right-collapsed .right-panel {
 .plan-legend span { display: flex; align-items: center; gap: 6px; }
 .plan-legend i { width: 11px; height: 11px; border-radius: 50%; border: 2px solid #fff; box-sizing: border-box; flex-shrink: 0; }
 .plan-legend-note { margin-top: 4px; font-size: 10px; color: var(--text-muted); font-style: italic; }
-.plan-badge { position: absolute; top: -2px; right: 1px; width: 9px; height: 9px; border-radius: 50%; background: #22c55e; border: 1.5px solid #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.5); pointer-events: none; }
+/* Tâm chấm trùng điểm neo = mũi ghim của icon (iconAnchor [11, 26] trong mapEngine.js), nằm dưới icon */
+.plan-badge { position: absolute; left: 11px; top: 26px; width: 16px; height: 16px; transform: translate(-50%, -50%); border-radius: 50%; background: #22c55e; border: 1.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.6); pointer-events: none; }
 
 .rp-empty { color: var(--text-muted); font-style: italic; font-size: 11px; text-align: center; padding: 16px 8px; border: 1px dashed var(--border-color); border-radius: 8px; }
 
@@ -490,10 +494,110 @@ table.ward-table th {
   position: absolute;
   transform: translate(-50%, -50%);
   color: #ffffff;
+  font-size: var(--ward-label-size, 11px);
   font-weight: 700;
   white-space: nowrap;
   text-shadow: 0 0 3px #000, 0 0 3px #000, 1px 1px 2px #000;
   letter-spacing: 0.2px;
   pointer-events: none;
   transition: font-size 0.15s ease;
+}
+
+/* Nhãn kết quả đo (thay cho popup chồng nhau) */
+.measure-label { background: transparent !important; border: none !important; }
+.measure-label span {
+  position: absolute;
+  left: 8px;
+  top: -12px;
+  white-space: nowrap;
+  background: rgba(15, 23, 42, 0.92);
+  color: var(--text-main);
+  border: 1px solid var(--accent-cyan);
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* Thông báo ngắn */
+.app-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translate(-50%, 20px);
+  z-index: 5000;
+  max-width: min(90vw, 460px);
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.96);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.app-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.app-toast.success { border-color: var(--accent-green); }
+.app-toast.error { border-color: var(--accent-red); }
+.app-toast.info { border-color: var(--accent-cyan); }
+
+/* Nút phê duyệt trong popup (chỉ hiện với Admin) */
+.popup-approve-btn {
+  margin-top: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 5px;
+  background: var(--accent-green);
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.popup-approve-btn:hover { filter: brightness(1.1); }
+.popup-approve-btn:disabled { opacity: 0.6; cursor: wait; }
+
+/* Nút dạng liên kết trong bảng (tên phường, tên công trình) */
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent-cyan);
+  text-align: left;
+  cursor: pointer;
+}
+.link-btn:hover { text-decoration: underline; }
+.sub-toggle {
+  float: right;
+  background: none;
+  border: none;
+  padding: 0 2px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: bold;
+  color: var(--accent-cyan);
+  cursor: pointer;
+}
+.cov-pending { color: var(--text-muted); font-weight: normal; }
+
+.auth-close-btn {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  font: inherit;
+  color: var(--accent-red);
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* Viền focus khi dùng bàn phím */
+button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
 }

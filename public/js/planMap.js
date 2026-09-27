@@ -1,5 +1,5 @@
-import { state, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_HIGHLIGHT_STYLE, BUFFER_KEYS, getBufferStyle } from './state.js';
-import { geeApi } from './api.js';
+import { state, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_HIGHLIGHT_STYLE } from './state.js';
+import { escapeHtml, wardLabelFontSize } from './utils.js';
 
 export let planMap = null;
 let leftMap = null;
@@ -7,6 +7,7 @@ let leftLayers = null;
 let compareOn = false;
 let dividerRatio = 0.5;
 const planHighlightLayer = L.layerGroup();
+const compareListeners = [];
 
 // Cùng khóa với `layers` của bản đồ hiện trạng (mapEngine.js) để bật/tắt đồng thời
 export const planLayers = {
@@ -25,9 +26,6 @@ export const planLayers = {
   c9: L.layerGroup(), b9: L.layerGroup()
 };
 let planHeatTile = null;
-let planHeatSeq = 0;
-
-const isApproved = (s) => s === true || String(s).trim().toUpperCase() === 'TRUE' || String(s).trim() === '1';
 
 export function initPlanMap(mainMap, mainLayers) {
   leftMap = mainMap;
@@ -41,6 +39,7 @@ export function initPlanMap(mainMap, mainLayers) {
 
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     maxZoom: 18,
+    crossOrigin: 'anonymous',
     attribution: 'Tiles &copy; Esri'
   }).addTo(planMap);
 
@@ -48,6 +47,12 @@ export function initPlanMap(mainMap, mainLayers) {
   syncAllPlanLayers();
   syncMaps(leftMap, planMap);
   initDividerDrag();
+
+  const updateLabelSize = () => {
+    planMap.getContainer().style.setProperty('--ward-label-size', `${wardLabelFontSize(planMap.getZoom()).toFixed(1)}px`);
+  };
+  planMap.on('zoomend', updateLabelSize);
+  updateLabelSize();
 
   const area = document.getElementById('mapArea');
   if (area && window.ResizeObserver) {
@@ -59,6 +64,15 @@ export function initPlanMap(mainMap, mainLayers) {
 
   setCompareMode(false);
   return planMap;
+}
+
+export function isCompareOn() {
+  return compareOn;
+}
+
+// Bản đồ quy hoạch chỉ vẽ điểm / buffer / heatmap khi đang bật so sánh
+export function onCompareChange(fn) {
+  compareListeners.push(fn);
 }
 
 // Hiện/ẩn lớp quy hoạch theo đúng trạng thái lớp cùng tên bên bản đồ hiện trạng
@@ -90,7 +104,7 @@ export function renderPlanBoundaries() {
   group.addLayer(L.geoJSON(fc, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false }));
   wards.forEach(item => {
     if (item.lat == null || item.lng == null) return;
-    const icon = L.divIcon({ className: 'ward-label-icon', html: `<span class="ward-label-text">${item.name}</span>`, iconSize: [0, 0] });
+    const icon = L.divIcon({ className: 'ward-label-icon', html: `<span class="ward-label-text">${escapeHtml(item.name)}</span>`, iconSize: [0, 0] });
     group.addLayer(L.marker([item.lat, item.lng], { icon, interactive: false }));
   });
 }
@@ -103,7 +117,7 @@ export function highlightPlanWard(wardName) {
   planHighlightLayer.addLayer(L.geoJSON({ type: 'Feature', geometry: w.geometry }, { style: WARD_HIGHLIGHT_STYLE, interactive: false }));
 }
 
-function setPlanHeatUrl(url) {
+export function setPlanHeatUrl(url) {
   planLayers.heatmap.clearLayers();
   planHeatTile = null;
   if (!url) return;
@@ -114,60 +128,6 @@ function setPlanHeatUrl(url) {
 
 export function setPlanHeatOpacity(val) {
   if (planHeatTile) planHeatTile.setOpacity(val);
-}
-
-function renderPlanBuffers(isoFeatures) {
-  Object.values(BUFFER_KEYS).forEach(k => planLayers[k].clearLayers());
-  isoFeatures.forEach(feat => {
-    const props = feat.properties || {};
-    const group = planLayers[BUFFER_KEYS[props.type]] || planLayers.b9;
-    group.addLayer(L.geoJSON(feat, { style: getBufferStyle(props.type, isApproved(props.status)), interactive: false }));
-  });
-}
-
-// Vùng phủ & heatmap quy hoạch dùng lại isochrone hiện trạng (bỏ công trình di dời) + isochrone công trình quy hoạch mới,
-// tương đương tính lại toàn bộ từ danh sách getPlanScenarioList() nhưng không phải gọi GEE cho ~700 điểm lần nữa.
-// Mở rộng/thu hẹp không đổi bán kính nên không làm đổi vùng phủ.
-export async function refreshPlanLayers(leftIsoFeatures, leftUrl, newItems) {
-  const seq = ++planHeatSeq;
-  const relocated = new Set(state.rawDataList.filter(it => it.planChange === 'relocate').map(it => it.id));
-
-  try {
-    let newIso = [];
-    if (newItems.length) {
-      const isoRes = await fetch(geeApi('action=getIsochrone'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ features: newItems })
-      });
-      if (isoRes.ok) newIso = ((await isoRes.json()) || {}).features || [];
-    }
-    if (seq !== planHeatSeq) return;
-
-    const planIso = leftIsoFeatures
-      .filter(f => !relocated.has(f.properties && f.properties.id))
-      .concat(newIso);
-    renderPlanBuffers(planIso);
-
-    const approvedNewIso = newIso.filter(f => isApproved(f.properties && f.properties.status));
-    if (!relocated.size && !approvedNewIso.length) {
-      setPlanHeatUrl(leftUrl);
-      return;
-    }
-
-    const features = planIso.filter(f => isApproved(f.properties && f.properties.status));
-    const heatRes = await fetch(geeApi(`action=getHeatmapTile&t=${Date.now()}`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features })
-    });
-    if (!heatRes.ok) return;
-    const d = await heatRes.json();
-    if (seq !== planHeatSeq) return;
-    setPlanHeatUrl(d.urlFormat);
-  } catch (err) {
-    console.warn("Lỗi cập nhật heatmap quy hoạch:", err);
-  }
 }
 
 function syncMaps(a, b) {
@@ -218,6 +178,7 @@ function updateDivider() {
   if (!area || !divider || !planEl) return;
   const x = Math.round(area.clientWidth * dividerRatio);
   divider.style.left = `${x}px`;
+  divider.setAttribute('aria-valuenow', String(Math.round(dividerRatio * 100)));
   planEl.style.clipPath = `inset(0 0 0 ${x}px)`;
 }
 
@@ -244,6 +205,19 @@ function initDividerDrag() {
   };
   divider.addEventListener('pointerup', release);
   divider.addEventListener('pointercancel', release);
+
+  // Bàn phím: ←/→ dịch 2%, giữ Shift dịch 10%, Home/End về 2 mép
+  divider.addEventListener('keydown', (e) => {
+    const step = e.shiftKey ? 0.1 : 0.02;
+    if (e.key === 'ArrowLeft') dividerRatio -= step;
+    else if (e.key === 'ArrowRight') dividerRatio += step;
+    else if (e.key === 'Home') dividerRatio = 0.02;
+    else if (e.key === 'End') dividerRatio = 0.98;
+    else return;
+    e.preventDefault();
+    dividerRatio = Math.min(0.98, Math.max(0.02, dividerRatio));
+    updateDivider();
+  });
 }
 
 export function setCompareMode(on) {
@@ -253,13 +227,18 @@ export function setCompareMode(on) {
   const btn = document.getElementById('btnToggleCompare');
   if (btn) {
     btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', String(on));
     btn.title = on ? 'Tắt so sánh Hiện trạng / Quy hoạch' : 'So sánh Hiện trạng / Quy hoạch (chia đôi màn hình)';
   }
-  if (!planMap || !on) return;
+  if (!planMap || !on) {
+    compareListeners.forEach(fn => fn(false));
+    return;
+  }
   planMap.invalidateSize({ pan: false });
   planMap.setView(leftMap.getCenter(), leftMap.getZoom(), { animate: false });
   updateDivider();
   compareOn = true;
+  compareListeners.forEach(fn => fn(true));
 }
 
 export function toggleCompareMode() {

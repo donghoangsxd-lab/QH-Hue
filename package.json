@@ -1,8 +1,12 @@
 {
   "name": "qh-hue",
-  "version": "2.15.0",
+  "version": "2.16.0",
   "description": "Bản đồ Phân tích Hạ tầng Đô thị TP. Huế",
   "main": "api/gee.js",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "start": "vercel dev",
     "build": "echo 'No build step required'"

@@ -3,6 +3,8 @@ const constants = require('../config/constants');
 
 let cachedGeoJSON = null;
 let lastETag = null; // Lưu mã phiên bản ETag từ GCS Bucket
+// Tăng mỗi lần dữ liệu được tải lại, để các cache tính toán phía sau (thống kê phường, độ phủ) tự hết hạn theo
+let dataVersion = 0;
 
 // Ô trống / không có cột -> null (khác với số 0 nhập tường minh)
 function parseArea(val) {
@@ -73,7 +75,7 @@ async function getRawDataList() {
       const sizeHT = parseArea(props.QuyMo_HT !== undefined ? props.QuyMo_HT : props.QuyMo_S);
       const sizeQH = parseArea(props.QuyMo_QH);
 
-      return {
+      const item = {
         id: rawId,
         name: props.Ten_CongTrinh || 'Chưa đặt tên',
         ward: props.Ten_XaPhuong || '',
@@ -85,12 +87,16 @@ async function getRawDataList() {
         sizeHT,
         sizeQH,
         planChange: classifyPlanChange(sizeHT, sizeQH),
-        radius: Number(String(props.BanKinh || 500).replace(',', '.')) || 500,
         status: isStatusTrue
       };
-    }).filter(item => item.lat !== null && item.lng !== null);
+      const banKinh = parseArea(props.BanKinh);
+      item.radius = banKinh > 0 ? banKinh : constants.defaultRadius(item);
+      return item;
+    }).filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng)
+      && Math.abs(item.lat) <= 90 && Math.abs(item.lng) <= 180);
 
     lastETag = currentETag;
+    dataVersion++;
     return cachedGeoJSON;
   } catch (e) {
     console.error("Lỗi nạp GCS Data:", e.message);
@@ -103,4 +109,8 @@ function invalidateCache() {
   lastETag = null;
 }
 
-module.exports = { getRawDataList, invalidateCache };
+function getDataVersion() {
+  return dataVersion;
+}
+
+module.exports = { getRawDataList, invalidateCache, getDataVersion };

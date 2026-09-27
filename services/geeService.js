@@ -1,10 +1,20 @@
 const ee = require('@google/earthengine');
 
-let isGeeInitialized = false;
 let geeContext = null;
+let initPromise = null;
 
+// Các request đồng thời lúc khởi động dùng chung 1 lần xác thực; lỗi thì cho phép thử lại ở request sau
 function initGEE() {
-  if (isGeeInitialized) return Promise.resolve();
+  if (!initPromise) {
+    initPromise = createGeeContext().catch(err => {
+      initPromise = null;
+      throw err;
+    });
+  }
+  return initPromise;
+}
+
+function createGeeContext() {
   return new Promise((resolve, reject) => {
     try {
       let privateKey = process.env.GEE_PRIVATE_KEY;
@@ -19,8 +29,6 @@ function initGEE() {
         privateKey, 
         () => {
           ee.initialize(null, null, () => {
-            isGeeInitialized = true;
-            
             const wardVector = ee.FeatureCollection("projects/optimistic-yew-488501-s0/assets/Polygon-40xa");
             const wardVectorParsed = wardVector.map(f => {
               let rawPop = f.get('danSo') || f.get('DanSo');
@@ -71,28 +79,11 @@ function getGeeContext() {
   return geeContext;
 }
 
-// Xây dựng hình học đa giác mượt mà dự phòng (Fallback Geometry)
-function buildEeIsochroneGeometry(lat, lng, banKinh) {
-  const R = Number(banKinh) || 500;
-  const radiusKm = (R * 0.9) / 1000; 
-  
-  const coords = [];
-  const steps = 24;
-  for (let i = 0; i < steps; i++) {
-    const angle = (i * 360) / steps;
-    const rad = (angle * Math.PI) / 180;
-    
-    const dynamicFactor = 1 + 0.03 * Math.sin(rad * 4);
-    const rCurrent = radiusKm * dynamicFactor;
-
-    const dLat = (rCurrent / 111) * Math.cos(rad);
-    const dLng = (rCurrent / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(rad);
-    
-    coords.push([lng + dLng, lat + dLat]);
-  }
-  coords.push(coords[0]);
-
-  return ee.Geometry.Polygon([coords]);
+// evaluate của Earth Engine báo lỗi qua tham số thứ 2 của callback; bọc lại để lỗi không bị nuốt thành số 0
+function eeEvaluate(eeObject) {
+  return new Promise((resolve, reject) => {
+    eeObject.evaluate((result, err) => (err ? reject(new Error(String(err))) : resolve(result)));
+  });
 }
 
-module.exports = { initGEE, getGeeContext, buildEeIsochroneGeometry };
+module.exports = { initGEE, getGeeContext, eeEvaluate };
