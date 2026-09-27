@@ -261,6 +261,7 @@ const COVERAGE_LEVEL_KEYS = [
   "THPT"
 ];
 let coverageFillRunning = false;
+let wardDetailSeq = 0;
 
 function loadLocalCoverageCache() {
   try {
@@ -514,28 +515,18 @@ export function closeModal() {
   if (modal) modal.style.display = 'none'; 
 }
 
-function fitMapToWard(wardName) {
-  if (!map || !wardName) return;
-  if (wardName === "Thành phố Huế") {
-    map.flyTo([16.4637, 107.5905], 13);
-    return;
-  }
-  const wardInfo = state.wardLabelsList.find(w => w.name === wardName);
-  if (wardInfo && wardInfo.geometry) {
-    const layer = L.geoJSON({ type: 'Feature', geometry: wardInfo.geometry });
-    const bounds = layer.getBounds();
-    if (bounds && bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15, animate: true, duration: 0.8 });
-      return;
-    }
-  }
-  if (wardInfo && wardInfo.lat != null && wardInfo.lng != null) {
-    map.flyTo([wardInfo.lat, wardInfo.lng], 14);
-  }
+export function isWardDetailOpen() {
+  return !!document.getElementById('wardDetailPdfContainer');
+}
+
+export function closeWardDetail() {
+  wardDetailSeq++;
+  map.closePopup();
 }
 
 export async function openWardDetailDirect(wardName) {
-  fitMapToWard(wardName);
+  const seq = ++wardDetailSeq;
+  focusWard(wardName);
   const firstPoint = state.wardLabelsList.find(w => w.name === wardName) || { lat: 16.4637, lng: 107.5905 };
 
   const initialModalHtml = `<div class="ward-popup-card" id="wardDetailPdfContainer" style="min-width: 780px;">
@@ -580,26 +571,32 @@ export async function openWardDetailDirect(wardName) {
     const res = await fetch(geeApi('action=getWardStats'));
     const resData = await res.json();
     state.wardStatsData = resData.data || [];
-    setTimeout(() => { selectWardDetail(wardName); }, 200);
+    if (seq !== wardDetailSeq) return;
+    selectWardDetail(wardName, { focus: false });
   } catch (err) {
     console.error("Lỗi tải thống kê hạ tầng phường:", err);
   }
 }
 
-export function selectWardDetail(wardName) {
+export function selectWardDetail(wardName, { focus = true } = {}) {
+  const seq = ++wardDetailSeq;
   closeModal();
   map.closePopup();
 
   let opened = false;
   const openDetail = () => {
-    if (opened) return;
+    if (opened || seq !== wardDetailSeq) return;
     opened = true;
     const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
     if (wardData) renderWardDetailPopup(wardData);
   };
+
+  if (!focus) {
+    openDetail();
+    return;
+  }
   map.once('moveend', openDetail);
   setTimeout(openDetail, 1200);
-
   focusWard(wardName);
 }
 
@@ -639,7 +636,7 @@ function renderWardDetailPopup(wardData) {
   const currentUnits = wardData.currentUnits || Math.max(1, Math.round(popCurrent / 20000));
   const projectedUnits = wardData.projectedUnits || Math.max(1, Math.round(popProjected / 20000));
 
-  let modalHtml = `<div class="ward-popup-card" id="wardDetailPdfContainer" style="min-width: 780px;">
+  let modalHtml = `<div class="ward-popup-card" id="wardDetailPdfContainer" data-ward="${wardData.Ten_Phuong}" style="min-width: 780px;">
     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:6px;">
       <b style="font-size:12px; color:var(--accent-cyan);">📍 PHÂN TÍCH QUY CHUẨN QCVN 01:2026/BXD: ${wardData.Ten_Phuong.toUpperCase()}</b>
       <button id="btnExportWardPdf" title="Xuất báo cáo PDF" style="background:transparent; border:none; color:var(--accent-cyan); cursor:pointer; font-size:15px; font-weight:bold;">🖨️</button>
@@ -730,6 +727,8 @@ function renderWardDetailPopup(wardData) {
     }
 
     fetchAndApplyWardCoverage(wardData).then((ok) => {
+      const card = document.getElementById('wardDetailPdfContainer');
+      if (!card || card.dataset.ward !== wardData.Ten_Phuong) return;
       const statusEl = document.getElementById('wardCoverageStatus');
       const container = document.getElementById('wardQuotaTableContainer');
       const popEl = document.getElementById('wardPopInput');

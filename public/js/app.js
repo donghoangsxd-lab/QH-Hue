@@ -21,6 +21,9 @@ import {
   openCombinedModal, 
   closeModal,
   openWardDetailDirect,
+  selectWardDetail,
+  isWardDetailOpen,
+  closeWardDetail,
   initGoogleSignIn,
   startBackgroundCoverageFill
 } from './uiComponents.js';
@@ -197,6 +200,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.rawDataList = data.rawDataList || [];
       } catch (err) {
         console.error("Lỗi tải dữ liệu điểm hạ tầng:", err);
+        return;
+      }
+    }
+
+    if (isWardDetailOpen()) {
+      closeWardDetail();
+      if (wardName && wardName !== "Thành phố Huế") {
+        if (state.wardStatsData.length > 0) selectWardDetail(wardName);
+        else openWardDetailDirect(wardName);
         return;
       }
     }
