@@ -11,7 +11,7 @@ import {
   handleInspectPointClick,
   loadBoundaryLayer,
   loadPopulationLayer,
-  highlightWardBoundary,
+  focusWard,
   measureLayerGroup,
   layers,
   map as mapInstance
@@ -187,10 +187,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('wardSelector')?.addEventListener('change', async (e) => {
-    state.selectedWard = e.target.value || null;
-    if (state.selectedWard === "THÀNH PHỐ HUẾ") {
-      state.selectedWard = "Thành phố Huế";
-    }
+    let wardName = e.target.value || null;
+    if (wardName === "THÀNH PHỐ HUẾ") wardName = "Thành phố Huế";
 
     if (state.rawDataList.length === 0) {
       try {
@@ -203,9 +201,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    renderGroupedPoints();
-    await refreshHeatmapOnly();
-    highlightWardBoundary(state.selectedWard, { fitView: true });
+    await focusWard(wardName);
   });
   
   const sidebarPanel = document.getElementById('sidebarPanel');

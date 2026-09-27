@@ -173,6 +173,16 @@ export function highlightWardBoundary(wardName, { fitView = true } = {}) {
   }
 }
 
+export function focusWard(wardName) {
+  state.selectedWard = wardName || "Thành phố Huế";
+  const wardSelector = document.getElementById('wardSelector');
+  if (wardSelector) wardSelector.value = state.selectedWard;
+
+  highlightWardBoundary(state.selectedWard, { fitView: true });
+  renderGroupedPoints();
+  return refreshHeatmapOnly();
+}
+
 function updateWardLabelFontSize() {
   if (!map) return;
   const zoom = map.getZoom();

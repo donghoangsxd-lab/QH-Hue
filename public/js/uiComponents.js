@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { map, renderGroupedPoints } from './mapEngine.js';
+import { map, renderGroupedPoints, focusWard } from './mapEngine.js';
 import { geeApi } from './api.js';
 
 let chartInstance = null;
@@ -588,17 +588,19 @@ export async function openWardDetailDirect(wardName) {
 
 export function selectWardDetail(wardName) {
   closeModal();
-  const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
-  if (!wardData) return;
+  map.closePopup();
 
-  state.selectedWard = wardName;
-  const wardSelector = document.getElementById('wardSelector');
-  if (wardSelector) wardSelector.value = wardName;
+  let opened = false;
+  const openDetail = () => {
+    if (opened) return;
+    opened = true;
+    const wardData = state.wardStatsData.find(w => w.Ten_Phuong === wardName);
+    if (wardData) renderWardDetailPopup(wardData);
+  };
+  map.once('moveend', openDetail);
+  setTimeout(openDetail, 1200);
 
-  fitMapToWard(wardName);
-  renderGroupedPoints();
-
-  renderWardDetailPopup(wardData);
+  focusWard(wardName);
 }
 
 async function fetchAndApplyWardCoverage(wardData) {
