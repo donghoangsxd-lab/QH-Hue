@@ -120,26 +120,27 @@ export function handleGoogleCredentialResponse(response) {
 
 window.handleGoogleCredentialResponse = handleGoogleCredentialResponse;
 
-export function updateInfraPieChart(sourceList) {
-  const legendContainer = document.getElementById('pieLegendDetails');
-  const areaTotals = {};
-  let totalAreaSum = 0;
-
-  (sourceList || []).forEach(item => {
+function sumAreaByType(list) {
+  const totals = {};
+  let sum = 0;
+  (list || []).forEach(item => {
     const isApproved = (item.status === true || item.status === 'true' || item.status === 'TRUE' || item.status === '1');
     if (!isApproved && item.type !== "9-CSD") return;
     const type = item.type || 'Khác';
     const size = Number(item.size || 0);
     // Nếu diện tích = 0 vẫn tính 1 đơn vị để donut không trống
     const weight = size > 0 ? size : 1;
-    areaTotals[type] = (areaTotals[type] || 0) + weight;
-    totalAreaSum += weight;
+    totals[type] = (totals[type] || 0) + weight;
+    sum += weight;
   });
+  return { totals, sum };
+}
 
-  if (Object.keys(areaTotals).length === 0) {
-    areaTotals['empty'] = 1;
-    totalAreaSum = 1;
-  }
+// Donut 2 vòng đồng tâm: trong = hiện trạng (sourceList), ngoài = quy hoạch (planList)
+export function updateInfraPieChart(sourceList, planList = []) {
+  const legendContainer = document.getElementById('pieLegendDetails');
+  const ht = sumAreaByType(sourceList);
+  const qh = sumAreaByType(planList);
 
   const labelsMap = {
     "1-CV": "Công viên",
@@ -166,27 +167,31 @@ export function updateInfraPieChart(sourceList) {
     "9-CSD": "#95a5a6"
   };
 
-  const keys = Object.keys(areaTotals);
-  const dataVals = keys.map(k => areaTotals[k]);
+  const keys = Object.keys(labelsMap).filter(k => ht.totals[k] || qh.totals[k]);
+  const isEmpty = keys.length === 0;
+  if (isEmpty) keys.push('empty');
+  const htVals = keys.map(k => isEmpty ? 1 : (ht.totals[k] || 0));
+  const qhVals = keys.map(k => isEmpty ? 1 : (qh.totals[k] || 0));
+  const htPct = keys.map((k, i) => ht.sum > 0 ? (htVals[i] / ht.sum) * 100 : 0);
+  const qhPct = keys.map((k, i) => qh.sum > 0 ? (qhVals[i] / qh.sum) * 100 : 0);
   const bgColors = keys.map(k => colorsMap[k] || '#38bdf8');
   const labels = keys.map(k => labelsMap[k] || k);
 
   if (legendContainer) {
-    let html = '';
+    let html = `<div class="pie-legend-row pie-legend-head"><span></span><span>HT</span><span>QH</span></div>`;
     keys.forEach((k, idx) => {
-      const val = dataVals[idx];
-      const pct = totalAreaSum > 0 ? ((val / totalAreaSum) * 100).toFixed(1) : 0;
-      const color = colorsMap[k] || '#38bdf8';
-      const name = labelsMap[k] || k;
-      html += `<div style="display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%;">
-        <span style="color:var(--text-main); display:flex; align-items:center; gap:5px; min-width:0; flex:1;">
-          <span style="width:8px; height:8px; background:${color}; border-radius:50%; display:inline-block; flex-shrink:0;"></span>
-          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</span>
+      const delta = qhPct[idx] - htPct[idx];
+      const qhColor = delta >= 0.1 ? 'var(--accent-green)' : (delta <= -0.1 ? 'var(--accent-red)' : 'var(--accent-cyan)');
+      html += `<div class="pie-legend-row">
+        <span class="pie-legend-name">
+          <span style="width:8px; height:8px; background:${colorsMap[k] || '#38bdf8'}; border-radius:50%; display:inline-block; flex-shrink:0;"></span>
+          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${labelsMap[k] || k}</span>
         </span>
-        <b style="color:var(--accent-cyan); flex-shrink:0; text-align:right; min-width:2.8em;">${pct}%</b>
+        <b style="color:var(--accent-cyan);">${htPct[idx].toFixed(1)}%</b>
+        <b style="color:${qhColor};">${qhPct[idx].toFixed(1)}%</b>
       </div>`;
     });
-    legendContainer.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Chưa có dữ liệu</div>';
+    legendContainer.innerHTML = html;
   }
 
   const ctx = document.getElementById('infraPieChart')?.getContext('2d');
@@ -197,16 +202,15 @@ export function updateInfraPieChart(sourceList) {
   }
 
   // Bỏ hoàn toàn plugin vẽ text % trên chart để loại bỏ triệt để lỗi hiển thị
+  // Chart.js vẽ dataset đầu tiên ở vòng ngoài cùng
   window.myInfraPieChartInstance = new Chart(ctx, {
     type: 'doughnut',
     data: {
       labels: labels,
-      datasets: [{
-        data: dataVals,
-        backgroundColor: bgColors,
-        borderWidth: 1,
-        borderColor: 'rgba(15, 23, 42, 0.8)'
-      }]
+      datasets: [
+        { label: 'Quy hoạch', data: qhVals, pct: qhPct, backgroundColor: bgColors, borderWidth: 1, borderColor: 'rgba(15, 23, 42, 0.8)' },
+        { label: 'Hiện trạng', data: htVals, pct: htPct, backgroundColor: bgColors, borderWidth: 1, borderColor: 'rgba(15, 23, 42, 0.8)' }
+      ]
     },
     options: {
       responsive: true,
@@ -218,13 +222,13 @@ export function updateInfraPieChart(sourceList) {
           callbacks: {
             label: function(context) {
               const val = context.raw || 0;
-              const pct = totalAreaSum > 0 ? ((val / totalAreaSum) * 100).toFixed(1) : 0;
-              return ` ${context.label}: ${val.toLocaleString()} m² (${pct}%)`;
+              const pct = context.dataset.pct[context.dataIndex] || 0;
+              return ` ${context.dataset.label} – ${context.label}: ${val.toLocaleString()} m² (${pct.toFixed(1)}%)`;
             }
           }
         }
       },
-      cutout: '55%'
+      cutout: '62%'
     }
   });
 }
@@ -233,6 +237,8 @@ const COVERAGE_LS_KEY = 'qh_hue_ward_coverage_v4';
 const COVERAGE_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
 const CHART_COVERAGE_COLOR = '#38bdf8';
 const CHART_SCALE_COLOR = '#f59e0b';
+const CHART_PLAN_UP_COLOR = '#22c55e';
+const CHART_PLAN_DOWN_COLOR = '#ef4444';
 const COVERAGE_LEVEL_KEYS = [
   "1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM",
   "1-CV_DT", "1-CV_DV", "2-BDX_DT", "2-BDX_DV",
@@ -254,6 +260,44 @@ function saveLocalCoverageCache(map) {
   try {
     localStorage.setItem(COVERAGE_LS_KEY, JSON.stringify(map));
   } catch (e) {}
+}
+
+// Độ phủ theo quy hoạch: { [phường]: { sig, ratios, Avg_Coverage_Score } }, sig = planCovSig từ getWardStats
+const COVERAGE_QH_LS_KEY = 'qh_hue_ward_coverage_qh_v1';
+let planCoverageCache = null;
+
+function getPlanCoverageCache() {
+  if (!planCoverageCache) {
+    try {
+      planCoverageCache = JSON.parse(localStorage.getItem(COVERAGE_QH_LS_KEY) || '{}');
+    } catch (e) {
+      planCoverageCache = {};
+    }
+  }
+  return planCoverageCache;
+}
+
+function savePlanCoverageCache() {
+  try {
+    localStorage.setItem(COVERAGE_QH_LS_KEY, JSON.stringify(planCoverageCache || {}));
+  } catch (e) {}
+}
+
+function hasPlanCoverage(ward) {
+  const hit = getPlanCoverageCache()[ward.Ten_Phuong];
+  return !!hit && hit.sig === ward.planCovSig;
+}
+
+// Phường không có công trình mới/di dời: độ phủ QH = HT; chưa tính xong thì tạm lấy HT
+function planCoverageOf(ward) {
+  if (ward.planCovSig && hasPlanCoverage(ward)) {
+    return Number(getPlanCoverageCache()[ward.Ten_Phuong].Avg_Coverage_Score || 0);
+  }
+  return Number(ward.Avg_Coverage_Score || 0);
+}
+
+function planScaleOf(ward) {
+  return Number(ward.Avg_Scale_QH ?? ward.Avg_Scale_Score ?? 0);
 }
 
 function applyCoverageToWardRow(ward, covPayload) {
@@ -406,6 +450,26 @@ export async function startBackgroundCoverageFill() {
     renderCombinedChart();
     renderSummaryNote(CITY_NAME);
   }
+
+  // Độ phủ theo quy hoạch: chỉ tính lại phường có công trình mới/di dời
+  const planCache = getPlanCoverageCache();
+  for (const ward of queue) {
+    if (!ward.planCovSig || hasPlanCoverage(ward)) continue;
+    try {
+      const res = await fetch(geeApi(`action=getWardCoverage&scenario=QH&ward=${encodeURIComponent(ward.Ten_Phuong)}`));
+      if (!res.ok) continue;
+      const cov = await res.json();
+      if (cov.coverageStatus === 'timeout') continue;
+      planCache[ward.Ten_Phuong] = { sig: ward.planCovSig, ratios: cov.ratios || {}, Avg_Coverage_Score: Number(cov.Avg_Coverage_Score || 0) };
+      savePlanCoverageCache();
+      if (isCityMode()) {
+        renderCombinedChart(false);
+        renderSummaryNote(CITY_NAME);
+      }
+    } catch (err) {
+      console.warn("Background plan coverage fail:", ward.Ten_Phuong, err);
+    }
+  }
   coverageFillRunning = false;
 }
 
@@ -474,22 +538,34 @@ function renderSummaryNote(wardName) {
     return;
   }
   // Toàn thành phố: bình quân gia quyền theo dân số của 40 phường xã
-  let pop = 0, covSum = 0, scaleSum = 0;
+  let pop = 0, covSum = 0, scaleSum = 0, covQHSum = 0, scaleQHSum = 0;
   list.forEach(w => {
     const p = Number(w.Dan_So_Vector || 0);
     pop += p;
     covSum += Number(w.Avg_Coverage_Score || 0) * p;
     scaleSum += Number(w.Avg_Scale_Score || 0) * p;
+    covQHSum += planCoverageOf(w) * p;
+    scaleQHSum += planScaleOf(w) * p;
   });
-  const cov = list.length === 1 ? Number(list[0].Avg_Coverage_Score || 0) : (pop ? covSum / pop : 0);
-  const scale = list.length === 1 ? Number(list[0].Avg_Scale_Score || 0) : (pop ? scaleSum / pop : 0);
+  const single = list.length === 1;
+  const cov = single ? Number(list[0].Avg_Coverage_Score || 0) : (pop ? covSum / pop : 0);
+  const scale = single ? Number(list[0].Avg_Scale_Score || 0) : (pop ? scaleSum / pop : 0);
+  const covQH = single ? planCoverageOf(list[0]) : (pop ? covQHSum / pop : 0);
+  const scaleQH = single ? planScaleOf(list[0]) : (pop ? scaleQHSum / pop : 0);
+  const qhValue = (ht, qh) => {
+    const d = qh - ht;
+    const color = d >= 0.05 ? CHART_PLAN_UP_COLOR : (d <= -0.05 ? CHART_PLAN_DOWN_COLOR : 'var(--text-main)');
+    return ` → <b style="color:${color};" title="Theo quy hoạch">${qh.toFixed(1)}%</b>`;
+  };
   const units = list.length === 1
     ? ` (${list[0].currentUnits || Math.max(1, Math.round(pop / 20000))} đơn vị ở)`
     : '';
   const popLabel = city ? 'Tổng dân số' : '<span title="Dân số hiện trạng">Dân số HT</span>';
   subtitle.innerHTML = `👥 ${popLabel}: <b>${pop.toLocaleString()}</b> người${units}`
-    + ` · <span class="bp-swatch" style="background:${CHART_COVERAGE_COLOR};"></span>Độ phủ hạ tầng TB: <b>${cov.toFixed(1)}%</b>`
-    + ` · <span class="bp-swatch" style="background:${CHART_SCALE_COLOR};"></span>Quy mô hạ tầng TB: <b>${scale.toFixed(1)}%</b>`;
+    + ` · <span class="bp-swatch" style="background:${CHART_COVERAGE_COLOR};"></span>Độ phủ TB: <b title="Hiện trạng">${cov.toFixed(1)}%</b>${qhValue(cov, covQH)}`
+    + ` · <span class="bp-swatch" style="background:${CHART_SCALE_COLOR};"></span>Quy mô TB: <b title="Hiện trạng">${scale.toFixed(1)}%</b>${qhValue(scale, scaleQH)}`
+    + ` · <span class="bp-swatch" style="background:${CHART_PLAN_UP_COLOR};"></span>QH tăng`
+    + ` <span class="bp-swatch" style="background:${CHART_PLAN_DOWN_COLOR};"></span>QH giảm`;
 }
 
 function setBottomPanelHeader(wardName) {
@@ -1071,15 +1147,28 @@ function shortWardTick(name) {
   return `${parts.join('-')}-${tail.map(w => w[0] + '.').join('')}${last}`;
 }
 
-function renderCombinedChart() {
+function renderCombinedChart(animate = true) {
+  const wards = state.wardStatsData;
   drawCoverageScaleChart(
-    state.wardStatsData.map(w => w.Ten_Phuong.replace('Phường ', '').replace('Xã ', '')),
-    state.wardStatsData.map(w => w.Avg_Coverage_Score || 0),
-    state.wardStatsData.map(w => w.Avg_Scale_Score || 0)
+    wards.map(w => w.Ten_Phuong.replace('Phường ', '').replace('Xã ', '')),
+    { ht: wards.map(w => Number(w.Avg_Coverage_Score || 0)), qh: wards.map(planCoverageOf) },
+    { ht: wards.map(w => Number(w.Avg_Scale_Score || 0)), qh: wards.map(planScaleOf) },
+    animate
   );
 }
 
-function drawCoverageScaleChart(labels, coverageVals, scaleVals) {
+// Mỗi chỉ số là 1 cột xếp chồng: phần chung = min(HT, QH); QH tăng thêm đoạn xanh lá phía trên,
+// QH giảm thì đoạn đỏ là phần mất đi từ mức QH lên tới mức HT
+function planStackDatasets(label, stack, color, series) {
+  const common = { stack, barPercentage: 0.9, categoryPercentage: 0.8, series };
+  return [
+    { ...common, label, data: series.ht.map((v, i) => Math.min(v, series.qh[i])), backgroundColor: color },
+    { ...common, label: `${label} – QH tăng`, data: series.ht.map((v, i) => Math.max(0, series.qh[i] - v)), backgroundColor: CHART_PLAN_UP_COLOR },
+    { ...common, label: `${label} – QH giảm`, data: series.ht.map((v, i) => Math.max(0, v - series.qh[i])), backgroundColor: CHART_PLAN_DOWN_COLOR }
+  ];
+}
+
+function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
   const chartEl = document.getElementById('infraChart');
   if (!chartEl) return;
   const ctx = chartEl.getContext('2d');
@@ -1090,32 +1179,33 @@ function drawCoverageScaleChart(labels, coverageVals, scaleVals) {
     data: {
       labels,
       datasets: [
-        {
-          label: 'Độ phủ (%)',
-          data: coverageVals,
-          backgroundColor: CHART_COVERAGE_COLOR,
-          barPercentage: 0.9,
-          categoryPercentage: 0.8
-        },
-        {
-          label: 'Quy mô (%)',
-          data: scaleVals,
-          backgroundColor: CHART_SCALE_COLOR,
-          barPercentage: 0.9,
-          categoryPercentage: 0.8
-        }
+        ...planStackDatasets('Độ phủ', 'cov', CHART_COVERAGE_COLOR, coverage),
+        ...planStackDatasets('Quy mô', 'scale', CHART_SCALE_COLOR, scale)
       ]
     },
     options: { 
       responsive: true, 
       maintainAspectRatio: false,
+      animation: animate ? undefined : false,
       layout: { padding: { top: 6 } },
       plugins: { 
-        legend: { display: false } 
+        legend: { display: false },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          filter: item => item.datasetIndex % 3 === 0,
+          callbacks: {
+            label: item => {
+              const s = item.dataset.series;
+              const ht = s.ht[item.dataIndex], qh = s.qh[item.dataIndex];
+              return ` ${item.dataset.label}: HT ${ht.toFixed(1)}% → QH ${qh.toFixed(1)}%`;
+            }
+          }
+        }
       },
       scales: {
         x: { 
-          stacked: false, 
+          stacked: true, 
           ticks: {
             autoSkip: false,
             minRotation: 45,
@@ -1127,6 +1217,7 @@ function drawCoverageScaleChart(labels, coverageVals, scaleVals) {
           grid: { color: 'rgba(255,255,255,0.05)' } 
         },
         y: { 
+          stacked: true,
           beginAtZero: true, 
           max: 100, 
           ticks: { color: '#94a3b8' }, 

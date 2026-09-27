@@ -298,10 +298,11 @@ export function renderGroupedPoints() {
   if (!map) return;
 
   const sourceList = getWardFilteredList(state.rawDataList);
-  updateInfraPieChart(sourceList);
+  const planList = getWardFilteredList(getPlanScenarioList());
+  updateInfraPieChart(sourceList, planList);
   renderPointGroups(layers, sourceList, map);
 
-  if (planMap) renderPointGroups(planLayers, getWardFilteredList(getPlanScenarioList()), planMap);
+  if (planMap) renderPointGroups(planLayers, planList, planMap);
 }
 
 function renderPointGroups(groups, sourceList, targetMap) {
@@ -333,8 +334,9 @@ function renderPointGroups(groups, sourceList, targetMap) {
     const fileName = isApproved ? categoryIcons.approved : categoryIcons.pending;
     const iconUrl = `./icons/${fileName}`;
 
-    const planInfo = PLAN_CHANGE_INFO[p.planChange];
-    const badgeHtml = planInfo ? `<span class="plan-badge" style="background:${planInfo.color};" title="${planInfo.label}"></span>` : '';
+    // Chỉ đánh dấu trên bản đồ quy hoạch các điểm khác hiện trạng (mới/mở rộng/thu hẹp)
+    const planInfo = p.scenario === 'QH' ? PLAN_CHANGE_INFO[p.planChange] : null;
+    const badgeHtml = planInfo ? `<span class="plan-badge" title="${planInfo.label}"></span>` : '';
     const imgHtml = `<img src="${iconUrl}" style="width: 22px; height: 27px; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.5));" />${badgeHtml}`;
 
     const customDivIcon = L.divIcon({

@@ -1,4 +1,5 @@
 const axios = require('axios');
+const crypto = require('crypto');
 const constants = require('../config/constants');
 const { initGEE, getGeeContext } = require('../services/geeService');
 const { getRawDataList, invalidateCache } = require('../services/gcsService');
@@ -298,6 +299,114 @@ function findWardByName(evaluatedWards, wardName) {
 /**
  * Độ phủ 1 phường: 8 loại + tách đô thị/đơn vị ở (tránh ghi đè DT vs DV).
  */
+// Kịch bản quy hoạch: công trình có QuyMo_QH (bỏ di dời / không thể hiện), diện tích theo QuyMo_QH
+function getPlanScenarioItems(allDataList) {
+  return allDataList
+    .filter(it => it.planChange !== 'relocate' && it.planChange !== 'none')
+    .map(it => ({ ...it, size: it.sizeQH ?? it.size }));
+}
+
+// Gom diện tích công trình đã duyệt vào các nhóm chỉ tiêu cấp đô thị / cấp đơn vị ở
+function bucketWardInfra(items, projPop) {
+  const urbanResults = {};
+  for (const key in constants.urbanInfraConfig) {
+    const cfg = constants.urbanInfraConfig[key];
+    urbanResults[key] = {
+      label: cfg.label,
+      quota: cfg.quota,
+      currentArea: 0,
+      requiredArea: cfg.quota * projPop,
+      subItems: [],
+      status: false
+    };
+  }
+
+  const unitResults = {};
+  for (const key in constants.unitInfraConfig) {
+    const cfg = constants.unitInfraConfig[key];
+    unitResults[key] = {
+      label: cfg.label,
+      quota: cfg.quota || 0,
+      currentArea: 0,
+      requiredArea: (cfg.quota || 0) * projPop,
+      subItems: [],
+      status: false
+    };
+  }
+
+  items.forEach(item => {
+    const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE');
+    if (!isApproved) return;
+
+    const prefix = String(item.id || '').split('-')[0];
+    const prefixUp = prefix.toUpperCase();
+    const isUrban = constants.isUrbanLevel(item);
+    const typeCode = constants.resolveTypeCode(item);
+
+    if (isUrban) {
+      let targetKey = "CV_DT";
+      if (prefixUp === "THPT" || (typeCode === "4-TH" && String(item.name || '').toUpperCase().includes('THPT'))) {
+        targetKey = "THPT";
+      } else if (typeCode === "6-YT" || prefixUp === "YT" || prefixUp === "YT_DT" || prefixUp === "6") {
+        targetKey = "YT_DT";
+      } else if (typeCode === "7-VH" || prefixUp === "VH" || prefixUp === "VH_DT" || prefixUp === "7") {
+        targetKey = "VH_DT";
+      } else if (typeCode === "8-TM" || prefixUp === "TM" || prefixUp === "TM_DT" || prefixUp === "8") {
+        targetKey = "TM_DT";
+      } else if (typeCode === "1-CV" || prefixUp === "CV" || prefixUp === "CV_DT" || prefixUp === "1") {
+        targetKey = "CV_DT";
+      } else if (typeCode === "2-BDX" || prefixUp === "BDX" || prefixUp === "BDX_DT" || prefixUp === "2") {
+        targetKey = "BDX_DT";
+      }
+
+      if (urbanResults[targetKey]) {
+        urbanResults[targetKey].currentArea += Number(item.size || 0);
+        urbanResults[targetKey].subItems.push(item);
+      }
+    } else {
+      let targetKey = "CV_DV";
+      if (typeCode === "3-MN" || prefixUp === "MN" || prefixUp === "3") targetKey = "3-MN";
+      else if (typeCode === "4-TH" || prefixUp === "TH" || prefixUp === "4") targetKey = "4-TH";
+      else if (typeCode === "5-THCS" || prefixUp === "THCS" || prefixUp === "5") targetKey = "5-THCS";
+      else if (typeCode === "6-YT" || prefixUp === "YT" || prefixUp === "YT_DV" || prefixUp === "6") targetKey = "YT_DV";
+      else if (typeCode === "7-VH" || prefixUp === "VH" || prefixUp === "VH_DV" || prefixUp === "7") targetKey = "VH_DV";
+      else if (typeCode === "8-TM" || prefixUp === "TM" || prefixUp === "TM_DV" || prefixUp === "8") targetKey = "TM_DV";
+      else if (typeCode === "1-CV" || prefixUp === "CV" || prefixUp === "CV_DV" || prefixUp === "1") targetKey = "CV_DV";
+      else if (typeCode === "2-BDX" || prefixUp === "BDX" || prefixUp === "BDX_DV" || prefixUp === "2") targetKey = "BDX_DV";
+
+      if (unitResults[targetKey]) {
+        unitResults[targetKey].currentArea += Number(item.size || 0);
+        unitResults[targetKey].subItems.push(item);
+      }
+    }
+  });
+
+  return { urbanResults, unitResults };
+}
+
+// Tỷ lệ quy mô (%) của 8 mã hạ tầng so với chỉ tiêu, chặn trong 0–100
+function scaleByCode(urbanResults, unitResults) {
+  const codesList = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+  const scales = {};
+  codesList.forEach(c => {
+    let node = null;
+    if (c === "1-CV") node = urbanResults["CV_DT"] || unitResults["CV_DV"];
+    else if (c === "2-BDX") node = urbanResults["BDX_DT"] || unitResults["BDX_DV"];
+    else if (c === "3-MN") node = unitResults["3-MN"];
+    else if (c === "4-TH") node = unitResults["4-TH"];
+    else if (c === "5-THCS") node = unitResults["5-THCS"];
+    else if (c === "6-YT") node = urbanResults["YT_DT"] || unitResults["YT_DV"];
+    else if (c === "7-VH") node = urbanResults["VH_DT"] || unitResults["VH_DV"];
+    else if (c === "8-TM") node = urbanResults["TM_DT"] || unitResults["TM_DV"];
+
+    const current = node ? node.currentArea : 0;
+    const required = node ? node.requiredArea : 1;
+    const rawScale = (current / (required || 1)) * 100;
+    scales[c] = Number(Math.min(100, Math.max(0, rawScale)).toFixed(1));
+  });
+  return scales;
+}
+
 async function computeSingleWardCoverage(ee, popRasterNormalized, wardGeometry, itemsInWard) {
   const codesList = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
   const levelSplitCodes = ["1-CV", "2-BDX", "6-YT", "7-VH", "8-TM"];
@@ -847,7 +956,9 @@ module.exports = async (req, res) => {
         return res.status(404).json({ error: true, message: "Không tìm thấy ranh giới phường" });
       }
 
-      const itemsInWard = rawDataList.filter(item => {
+      const isPlan = String(req.query.scenario || '').toUpperCase() === 'QH';
+      const scenarioList = isPlan ? getPlanScenarioItems(allDataList) : rawDataList;
+      const itemsInWard = scenarioList.filter(item => {
         if (item.lat == null || item.lng == null) return false;
         if (!isApprovedStatus(item.status)) return false;
         return assignWardByGeometry(Number(item.lng), Number(item.lat), evaluatedWards) === targetWard.name;
@@ -877,7 +988,9 @@ module.exports = async (req, res) => {
         if (result.timedOut) payload.coverageStatus = 'timeout';
         else payload.coverageStatus = 'ok';
 
-        if (!result.timedOut) {
+        if (isPlan) payload.scenario = 'QH';
+
+        if (!result.timedOut && !isPlan) {
           cachedCoverageByWard[targetWard.name] = {
             ratios: { ...payload.ratios },
             Avg_Coverage_Score: payload.Avg_Coverage_Score,
@@ -904,7 +1017,7 @@ module.exports = async (req, res) => {
       const now = Date.now();
       if (cachedWardStats && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)
           && cachedWardStats[0] && cachedWardStats[0]._assignMode === 'geometry'
-          && cachedWardStats[0]._schema === 5) {
+          && cachedWardStats[0]._schema === 6) {
         return res.status(200).json({ data: cachedWardStats, coverageStatus: 'cached' });
       }
       cachedWardStats = null;
@@ -922,8 +1035,22 @@ module.exports = async (req, res) => {
           projectedUnits: Math.max(1, Math.round((totalPop * 1.2) / 20000)),
           items: [],
           pendingItems: [],
-          csdItems: []
+          csdItems: [],
+          planItems: [],
+          planCovChanges: []
         };
+      });
+
+      getPlanScenarioItems(allDataList).forEach(item => {
+        if (item.lat == null || item.lng == null || item.type === "9-CSD") return;
+        const w = wardMap[assignWardByGeometry(Number(item.lng), Number(item.lat), evaluatedWards)];
+        if (w) w.planItems.push(item);
+      });
+      allDataList.forEach(item => {
+        if (item.planChange !== 'new' && item.planChange !== 'relocate') return;
+        if (!isApprovedStatus(item.status) || item.lat == null || item.lng == null) return;
+        const w = wardMap[assignWardByGeometry(Number(item.lng), Number(item.lat), evaluatedWards)];
+        if (w) w.planCovChanges.push(`${item.id}:${item.planChange}`);
       });
 
       rawDataList.forEach(item => {
@@ -1047,78 +1174,10 @@ module.exports = async (req, res) => {
         const pop = data.Dan_So_Vector;
         const projPop = data.projectedPopulation;
 
-        const urbanResults = {};
-        for (const key in constants.urbanInfraConfig) {
-          const cfg = constants.urbanInfraConfig[key];
-          urbanResults[key] = {
-            label: cfg.label,
-            quota: cfg.quota,
-            currentArea: 0,
-            requiredArea: cfg.quota * projPop,
-            subItems: [],
-            status: false
-          };
-        }
-
-        const unitResults = {};
-        for (const key in constants.unitInfraConfig) {
-          const cfg = constants.unitInfraConfig[key];
-          unitResults[key] = {
-            label: cfg.label,
-            quota: cfg.quota || 0,
-            currentArea: 0,
-            requiredArea: (cfg.quota || 0) * projPop,
-            subItems: [],
-            status: false
-          };
-        }
-
-        data.items.forEach(item => {
-          const isApproved = (item.status === true || String(item.status).trim().toUpperCase() === 'TRUE');
-          if (!isApproved) return;
-
-          const prefix = String(item.id || '').split('-')[0];
-          const prefixUp = prefix.toUpperCase();
-          const isUrban = constants.isUrbanLevel(item);
-          const typeCode = constants.resolveTypeCode(item);
-
-          if (isUrban) {
-            let targetKey = "CV_DT";
-            if (prefixUp === "THPT" || (typeCode === "4-TH" && String(item.name || '').toUpperCase().includes('THPT'))) {
-              targetKey = "THPT";
-            } else if (typeCode === "6-YT" || prefixUp === "YT" || prefixUp === "YT_DT" || prefixUp === "6") {
-              targetKey = "YT_DT";
-            } else if (typeCode === "7-VH" || prefixUp === "VH" || prefixUp === "VH_DT" || prefixUp === "7") {
-              targetKey = "VH_DT";
-            } else if (typeCode === "8-TM" || prefixUp === "TM" || prefixUp === "TM_DT" || prefixUp === "8") {
-              targetKey = "TM_DT";
-            } else if (typeCode === "1-CV" || prefixUp === "CV" || prefixUp === "CV_DT" || prefixUp === "1") {
-              targetKey = "CV_DT";
-            } else if (typeCode === "2-BDX" || prefixUp === "BDX" || prefixUp === "BDX_DT" || prefixUp === "2") {
-              targetKey = "BDX_DT";
-            }
-
-            if (urbanResults[targetKey]) {
-              urbanResults[targetKey].currentArea += Number(item.size || 0);
-              urbanResults[targetKey].subItems.push(item);
-            }
-          } else {
-            let targetKey = "CV_DV";
-            if (typeCode === "3-MN" || prefixUp === "MN" || prefixUp === "3") targetKey = "3-MN";
-            else if (typeCode === "4-TH" || prefixUp === "TH" || prefixUp === "4") targetKey = "4-TH";
-            else if (typeCode === "5-THCS" || prefixUp === "THCS" || prefixUp === "5") targetKey = "5-THCS";
-            else if (typeCode === "6-YT" || prefixUp === "YT" || prefixUp === "YT_DV" || prefixUp === "6") targetKey = "YT_DV";
-            else if (typeCode === "7-VH" || prefixUp === "VH" || prefixUp === "VH_DV" || prefixUp === "7") targetKey = "VH_DV";
-            else if (typeCode === "8-TM" || prefixUp === "TM" || prefixUp === "TM_DV" || prefixUp === "8") targetKey = "TM_DV";
-            else if (typeCode === "1-CV" || prefixUp === "CV" || prefixUp === "CV_DV" || prefixUp === "1") targetKey = "CV_DV";
-            else if (typeCode === "2-BDX" || prefixUp === "BDX" || prefixUp === "BDX_DV" || prefixUp === "2") targetKey = "BDX_DV";
-
-            if (unitResults[targetKey]) {
-              unitResults[targetKey].currentArea += Number(item.size || 0);
-              unitResults[targetKey].subItems.push(item);
-            }
-          }
-        });
+        const { urbanResults, unitResults } = bucketWardInfra(data.items, projPop);
+        const scales = scaleByCode(urbanResults, unitResults);
+        const planBuckets = bucketWardInfra(data.planItems, projPop);
+        const planScales = scaleByCode(planBuckets.urbanResults, planBuckets.unitResults);
 
         const codesList = constants.CODES_TO_CHECK || ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
         let totalCoverageSum = 0;
@@ -1194,21 +1253,11 @@ module.exports = async (req, res) => {
           };
         });
 
+        let totalScaleQHSum = 0;
         codesList.forEach(c => {
-          let node = null;
-          if (c === "1-CV") node = urbanResults["CV_DT"] || unitResults["CV_DV"];
-          else if (c === "2-BDX") node = urbanResults["BDX_DT"] || unitResults["BDX_DV"];
-          else if (c === "3-MN") node = unitResults["3-MN"];
-          else if (c === "4-TH") node = unitResults["4-TH"];
-          else if (c === "5-THCS") node = unitResults["5-THCS"];
-          else if (c === "6-YT") node = urbanResults["YT_DT"] || unitResults["YT_DV"];
-          else if (c === "7-VH") node = urbanResults["VH_DT"] || unitResults["VH_DV"];
-          else if (c === "8-TM") node = urbanResults["TM_DT"] || unitResults["TM_DV"];
-
-          const current = node ? node.currentArea : 0;
-          const required = node ? node.requiredArea : 1;
-          const rawScale = (current / (required || 1)) * 100;
-          const scaleVal = Number(Math.min(100, Math.max(0, rawScale)).toFixed(1));
+          const scaleVal = scales[c];
+          calculatedRow[`ScaleQH_${c}`] = planScales[c];
+          totalScaleQHSum += planScales[c];
           const covMap = coverageByWard[wName]
             || coverageByWard[Object.keys(coverageByWard).find(k => constants.cleanWardStr(k) === constants.cleanWardStr(wName))]
             || {};
@@ -1223,8 +1272,12 @@ module.exports = async (req, res) => {
 
         calculatedRow.Avg_Coverage_Score = Number((totalCoverageSum / (countMetrics || 1)).toFixed(1));
         calculatedRow.Avg_Scale_Score = Number((totalScaleSum / (countMetrics || 1)).toFixed(1));
+        calculatedRow.Avg_Scale_QH = Number((totalScaleQHSum / (countMetrics || 1)).toFixed(1));
+        // Độ phủ QH chỉ khác HT khi phường có công trình mới/di dời (mở rộng/thu hẹp không đổi bán kính)
+        const covChanges = data.planCovChanges.sort().join('|');
+        calculatedRow.planCovSig = covChanges ? crypto.createHash('md5').update(covChanges).digest('hex').slice(0, 12) : '';
         calculatedRow._assignMode = 'geometry';
-        calculatedRow._schema = 5;
+        calculatedRow._schema = 6;
         if (cachedCoverageByWard[wName]) calculatedRow._coverageReady = true;
 
         resultTable.push(calculatedRow);
