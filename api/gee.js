@@ -367,10 +367,18 @@ function estimateCoverageAddPct({ lat, lng, radius, wardGeometry, existingSameTy
 // ============================ ĐỀ XUẤT CHUYỂN ĐỔI QUỸ ĐẤT (CSD) ============================
 // Dùng chung cho popup khu đất (analyzeCSD), bảng chi tiết phường (getWardStats) và lớp minh chứng (explainCSD)
 
-// Lưới đếm pixel dân cư: phải trùng giữa phép đếm và lớp ảnh minh chứng
-const POP_PIXEL_SCALE = 60;
+// Đếm pixel trên lưới gốc của raster phân bổ dân cư (Pixel-danso) — phép đếm và lớp ảnh minh chứng dùng cùng lưới này
 // Tổng pixel dân cư của phường không đổi theo dữ liệu công trình
 const wardPopPixelCache = new Map();
+let popPixelSizeCache = null;
+
+/** Kích thước ô lưới (m) của raster dân cư gốc */
+async function popPixelSize(popProjection) {
+  if (popPixelSizeCache == null) {
+    popPixelSizeCache = round1(Number(await eeEvaluate(popProjection.nominalScale())) || 0);
+  }
+  return popPixelSizeCache;
+}
 
 /** Bán kính vùng phục vụ của khu đất khi xét loại `code`: cột BanKinh trong sheet, ô trống thì theo bán kính mặc định của loại */
 function csdCandidateRadius(csd, code) {
@@ -397,12 +405,15 @@ function candidateGeometries(ee, { lat, lng, radius, existing, ward }) {
   return { bufferInWard: buffer.intersection(wardGeom, 1), net: net.intersection(wardGeom, 1) };
 }
 
-/** Đếm pixel dân cư của nhiều vùng trong 1 lần gọi GEE: [{ key, geometry }] → { key: số pixel } */
-async function countPopPixels(ee, popRaster, regions) {
+/**
+ * Đếm pixel dân cư của nhiều vùng trong 1 lần gọi GEE: [{ key, geometry }] → { key: số pixel }.
+ * popRasterNative giữ phép chiếu gốc nên không truyền scale: GEE đếm đúng từng ô của raster gốc.
+ */
+async function countPopPixels(ee, popRasterNative, regions) {
   if (!regions.length) return {};
   const fc = ee.FeatureCollection(regions.map(r => ee.Feature(r.geometry, { k: r.key })));
-  const reduced = popRaster.reduceRegions({
-    collection: fc, reducer: ee.Reducer.count(), scale: POP_PIXEL_SCALE, tileScale: 4
+  const reduced = popRasterNative.reduceRegions({
+    collection: fc, reducer: ee.Reducer.count(), tileScale: 4
   }).map(f => ee.Feature(null, { k: f.get('k'), n: f.get('count') }));
   const res = (await eeEvaluate(reduced)) || {};
   const out = {};
@@ -415,9 +426,10 @@ async function countPopPixels(ee, popRaster, regions) {
 
 /** Ngữ cảnh chỉ tiêu của phường: dân số quy hoạch + diện tích hiện có theo nhóm (giống cột quy mô của bảng phường) */
 function buildWardContext(wardFeat, approvedItemsInWard) {
-  const projPop = Math.round((wardFeat.pop || 10000) * constants.POP_GROWTH);
+  const pop = wardFeat.pop || 10000;
+  const projPop = Math.round(pop * constants.POP_GROWTH);
   const { urbanResults, unitResults } = bucketWardInfra(approvedItemsInWard, projPop, { withSubItems: false });
-  return { name: wardFeat.name, geometry: wardFeat.geometry, projPop, urbanResults, unitResults };
+  return { name: wardFeat.name, geometry: wardFeat.geometry, pop, projPop, urbanResults, unitResults };
 }
 
 /**
@@ -876,7 +888,7 @@ module.exports = async (req, res) => {
     }
 
     await initGEE();
-    const { ee, wardVectorParsed, popRasterNormalized } = getGeeContext();
+    const { ee, wardVectorParsed, popRasterNormalized, popRasterNative, popProjection } = getGeeContext();
 
     // --- Thao tác cần Earth Engine nhưng không cần danh sách công trình ---
     if (action === 'addPoint') {
@@ -1049,7 +1061,7 @@ module.exports = async (req, res) => {
 
     if (action === 'analyzeCSD') {
       const { ward, suggestions, candidates } = await resolveCsdRequest();
-      await fillCoverageGains(ee, popRasterNormalized, candidates);
+      await fillCoverageGains(ee, popRasterNative, candidates);
       return res.status(200).json({
         ward: ward.name,
         suggestions: rankEligible(suggestions).slice(0, 2),
@@ -1072,30 +1084,32 @@ module.exports = async (req, res) => {
       }
 
       const { bufferInWard, net } = candidateGeometries(ee, cand);
-      if (!wardPopPixelCache.has(ward.name)) {
-        const wc = await countPopPixels(ee, popRasterNormalized, [{ key: 'w', geometry: ee.Geometry(ward.geometry) }]);
-        wardPopPixelCache.set(ward.name, wc.w || 0);
-      }
-      const [counts, netGeoJson, mapId] = await Promise.all([
-        countPopPixels(ee, popRasterNormalized, [
-          { key: 'buffer', geometry: bufferInWard },
-          { key: 'net', geometry: net }
-        ]),
+      const regions = [
+        { key: 'buffer', geometry: bufferInWard },
+        { key: 'net', geometry: net }
+      ];
+      if (!wardPopPixelCache.has(ward.name)) regions.push({ key: 'ward', geometry: ee.Geometry(ward.geometry) });
+      const [counts, netGeoJson, mapId, pixelSize] = await Promise.all([
+        countPopPixels(ee, popRasterNative, regions),
         eeEvaluate(net.simplify(5)),
-        // Pixel dân cư trên đúng lưới đếm: 1 = đã được phục vụ (trong buffer, ngoài vùng trống), 2 = được đếm bổ sung
+        // Pixel dân cư trên lưới gốc của raster: 1 = đã được phục vụ (trong buffer, ngoài vùng trống), 2 = được đếm bổ sung
         new Promise((resolve, reject) => {
           const img = ee.Image(0).byte()
             .paint(ee.FeatureCollection([ee.Feature(bufferInWard)]), 1)
-            .paint(ee.FeatureCollection([ee.Feature(net)]), 2);
-          img.updateMask(img.gt(0)).updateMask(popRasterNormalized.mask())
-            .reproject({ crs: 'EPSG:4326', scale: POP_PIXEL_SCALE })
+            .paint(ee.FeatureCollection([ee.Feature(net)]), 2)
+            .reproject(popProjection);
+          img.updateMask(img.gt(0)).updateMask(popRasterNative.mask())
             .getMap({ min: 1, max: 2, palette: ['8a8a8a', 'ffd400'] }, (m, err) => err ? reject(err) : resolve(m));
-        })
+        }),
+        popPixelSize(popProjection)
       ]);
+      if (counts.ward != null) wardPopPixelCache.set(ward.name, counts.ward);
 
       const wardTotal = wardPopPixelCache.get(ward.name) || 0;
       const bufferPix = counts.buffer || 0;
       const netPix = counts.net || 0;
+      // Dân số bình quân 1 pixel = dân số phường / số pixel dân cư của phường (làm tròn như hiển thị để nhân tay khớp)
+      const popPerPixel = wardTotal > 0 ? Number((ward.pop / wardTotal).toFixed(2)) : 0;
       return res.status(200).json({
         code,
         label: cand.target.label,
@@ -1106,7 +1120,12 @@ module.exports = async (req, res) => {
         pixels: { buffer: bufferPix, covered: Math.max(0, bufferPix - netPix), net: netPix, wardTotal },
         coverageAddPct: wardTotal > 0 ? round1(clamp((netPix / wardTotal) * 100, 0, 100)) : 0,
         scaleAddPct: cand.target.scaleAddPct,
-        pixelScale: POP_PIXEL_SCALE,
+        population: {
+          ward: ward.pop,
+          perPixel: popPerPixel,
+          added: Math.round(popPerPixel * netPix)
+        },
+        pixelSize,
         tileUrl: mapId.urlFormat
       });
     }
@@ -1258,7 +1277,7 @@ module.exports = async (req, res) => {
         const planScales = scaleByCode(planBuckets.urbanResults, planBuckets.unitResults, projPop);
 
         // Gợi ý chuyển đổi quỹ đất chưa sử dụng (CSD): cùng logic với popup khu đất, % độ phủ đếm pixel sau vòng lặp
-        const wardCtx = { name: wName, geometry: wardGeom, projPop, urbanResults, unitResults };
+        const wardCtx = { name: wName, geometry: wardGeom, pop, projPop, urbanResults, unitResults };
         const csdItems = data.csdRaw.map(item => {
           const { suggestions, candidates } = csdSuggestionCandidates(item, wardCtx, approvedAll);
           coverageCandidates.push(...candidates);
@@ -1346,7 +1365,7 @@ module.exports = async (req, res) => {
         resultTable.push(calculatedRow);
       }
 
-      const allPixel = await fillCoverageGains(ee, popRasterNormalized, coverageCandidates);
+      const allPixel = await fillCoverageGains(ee, popRasterNative, coverageCandidates);
       rankAfterCount.forEach(fn => fn());
 
       resultTable.sort((a, b) => b.Dan_So_Vector - a.Dan_So_Vector);

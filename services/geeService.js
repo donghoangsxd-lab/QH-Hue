@@ -64,7 +64,12 @@ function createGeeContext() {
               .updateMask(validPopMask)
               .rename('DanSoPixelNormalized');
 
-            geeContext = { ee, wardVectorParsed, popRasterNormalized, wardRegion };
+            // popRasterNative: raster phân bổ dân cư gốc (chỉ pixel có dân), giữ nguyên lưới gốc để đếm pixel đề xuất CSD
+            geeContext = {
+              ee, wardVectorParsed, popRasterNormalized, wardRegion,
+              popRasterNative: validPopRaster,
+              popProjection: popRaster.projection()
+            };
             resolve();
           }, (err) => reject(new Error("GEE Init Fail: " + err)));
         }, 

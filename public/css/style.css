@@ -510,6 +510,7 @@ table.ward-table th {
   border: 1px solid var(--accent-cyan); border-radius: 8px;
   padding: 8px 10px; font-size: 10.5px; line-height: 1.4;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  max-height: min(72vh, 520px); overflow-y: auto;
 }
 .proof-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; color: var(--accent-cyan); font-size: 11.5px; }
 .proof-close { background: none; border: none; color: var(--text-muted); font-size: 14px; cursor: pointer; padding: 0 2px; }
@@ -524,6 +525,7 @@ table.ward-table th {
 .proof-table td { padding: 2px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.25); }
 .proof-table td:last-child { text-align: right; font-weight: 700; white-space: nowrap; padding-left: 8px; }
 .proof-table .proof-strong td { color: #ffd400; }
+.proof-table .proof-group td { padding-top: 6px; color: var(--accent-orange); font-weight: 700; text-align: left; border-bottom: 1px solid rgba(251, 146, 60, 0.4); }
 .proof-table .proof-result td { color: var(--accent-cyan); font-size: 12px; border-bottom: none; }
 .proof-foot { margin-top: 4px; font-size: 9.5px; }
 

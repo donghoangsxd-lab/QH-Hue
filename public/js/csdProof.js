@@ -10,6 +10,7 @@ import { escapeHtml, fmtNum, showToast } from './utils.js';
 const CANDIDATE_COLOR = '#facc15';
 const NET_COLOR = '#22d3ee';
 const MAX_LISTED_EXISTING = 6;
+const PER_PIXEL_FORMAT = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // Mỗi lúc chỉ 1 lớp minh chứng; requestSeq bỏ qua kết quả trả về muộn của lần bấm trước
 let active = null;
@@ -47,6 +48,7 @@ function legendRow(swatchStyle, text) {
 
 function buildPanelHtml(data, typeColor) {
   const px = data.pixels;
+  const pop = data.population;
   const existingN = data.existing.length;
   const radiusNote = data.candidate.radiusFromSheet ? 'cột BanKinh' : 'mặc định của loại, cột BanKinh trống';
   const listed = data.existing.slice(0, MAX_LISTED_EXISTING)
@@ -68,13 +70,20 @@ function buildPanelHtml(data, typeColor) {
     </div>
     ${existingN ? `<details class="proof-existing"><summary>Công trình cùng loại đã trừ</summary><ul>${listed}${more}</ul></details>` : ''}
     <table class="proof-table">
+      <tr class="proof-group"><td colspan="2">① Pixel dân cư (ô ${fmtNum(data.pixelSize)} × ${fmtNum(data.pixelSize)} m)</td></tr>
       <tr><td>Pixel dân cư trong C (thuộc phường)</td><td>${fmtNum(px.buffer)}</td></tr>
       <tr><td>− Đã được ${existingN} công trình cùng loại phủ</td><td>${fmtNum(px.covered)}</td></tr>
-      <tr class="proof-strong"><td>= Được phục vụ thêm</td><td>${fmtNum(px.net)}</td></tr>
+      <tr class="proof-strong"><td>= Pixel được phục vụ thêm</td><td>${fmtNum(px.net)}</td></tr>
       <tr><td>÷ Tổng pixel dân cư của phường</td><td>${fmtNum(px.wardTotal)}</td></tr>
       <tr class="proof-result"><td>= Độ phủ tăng thêm</td><td>${fmtNum(data.coverageAddPct)}%</td></tr>
+      <tr class="proof-group"><td colspan="2">② Dân số được phục vụ thêm</td></tr>
+      <tr><td>Dân số phường</td><td>${fmtNum(pop.ward)} người</td></tr>
+      <tr><td>÷ Tổng pixel dân cư của phường</td><td>${fmtNum(px.wardTotal)}</td></tr>
+      <tr><td>= Dân số bình quân 1 pixel</td><td>${PER_PIXEL_FORMAT.format(pop.perPixel || 0)} người</td></tr>
+      <tr><td>× Pixel được phục vụ thêm</td><td>${fmtNum(px.net)}</td></tr>
+      <tr class="proof-result"><td>= Dân số được phục vụ thêm</td><td>≈ ${fmtNum(pop.added)} người</td></tr>
     </table>
-    <div class="proof-muted proof-foot">Ô lưới dân cư ${fmtNum(data.pixelScale)} m · quy mô bổ sung ${fmtNum(data.scaleAddPct)}%</div>`;
+    <div class="proof-muted proof-foot">Raster phân bổ dân cư gốc · quy mô bổ sung ${fmtNum(data.scaleAddPct)}%</div>`;
 }
 
 /**
