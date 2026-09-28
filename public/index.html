@@ -33,7 +33,7 @@
     </div>
 
     <!-- THANH CÔNG CỤ DỌC CẠNH TRÁI BẢN ĐỒ -->
-    <div class="map-toolbar ui-panel-format" role="toolbar" aria-label="Công cụ bản đồ" aria-orientation="vertical">
+    <div class="map-toolbar" role="toolbar" aria-label="Công cụ bản đồ" aria-orientation="vertical">
       <button type="button" class="ui-btn-format" id="btnToggleCompare" title="So sánh Hiện trạng / Quy hoạch (chia đôi màn hình)" aria-label="So sánh hiện trạng và quy hoạch" aria-pressed="false">◧</button>
       <button type="button" class="ui-btn-format" id="btnAuth" title="Đăng nhập quản trị" aria-label="Đăng nhập quản trị">🔑</button>
       <button type="button" class="ui-btn-format" id="btnToggleSidebar" title="Lớp dữ liệu" aria-label="Lớp dữ liệu">⚙️</button>
@@ -78,14 +78,21 @@
         <div class="layer-row"><div><input type="checkbox" id="chk_c9" checked><label for="chk_c9">9. Quỹ đất tiềm năng</label></div></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_heat" checked><label for="chk_heat">🔥 Heatmap độ phủ hạ tầng</label></div></div>
 
-        <div id="popBox" style="display:none;" class="opacity-slider-row">
-          👥 Độ trong suốt Dân cư: <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60">
-        </div>
-
-        <div id="heatBox" class="opacity-slider-row">
-          🔥 Độ trong suốt Heatmap: <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30">
+        <div class="rp-settings">
+          <div id="popBox" style="display:none;">
+            <div class="rp-inline-field">
+              <label for="popOpacity">👥 Độ trong suốt dân cư</label>
+              <input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60">
+            </div>
+          </div>
+          <div id="heatBox">
+            <div class="rp-inline-field">
+              <label for="heatOpacity">🔥 Độ trong suốt heatmap</label>
+              <input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30">
+            </div>
+          </div>
           <div class="rp-inline-field">
-            <label for="inputIsoRadius">🛤️ Bán kính buffer chung (m):</label>
+            <label for="inputIsoRadius">🛤️ Bán kính buffer chung (m)</label>
             <input type="number" id="inputIsoRadius" placeholder="Mặc định" min="50" max="5000" step="50" title="Để trống = dùng bán kính riêng của từng công trình (50–5000 m)" />
           </div>
         </div>
@@ -93,7 +100,8 @@
 
       <!-- TAB: ĐỀ XUẤT ĐIỂM MỚI -->
       <div class="tab-body add-point-form" id="tabAdd" style="display:none;">
-        <label>Loại hạ tầng:</label>
+        <div class="form-grid">
+        <label for="newType">Loại</label>
         <select id="newType">
           <option value="1-CV">🌳 1. Công viên, điểm xanh, vườn hoa</option>
           <option value="2-BDX">🅿️ 2. Bãi đỗ xe, trạm sạc xe điện</option>
@@ -103,36 +111,37 @@
           <option value="6-YT">✚ 6. Bệnh viện, Trạm y tế</option>
           <option value="7-VH">🎭 7. Nhà văn hóa, thể thao</option>
           <option value="8-TM">🛒 8. Chợ, Trung tâm thương mại</option>
-          <option value="9-CSD" selected>🛠️ 9. Quỹ đất tiềm năng (Chưa sử dụng)</option>
+          <option value="9-CSD" selected>🛠️ 9. Quỹ đất tiềm năng</option>
         </select>
 
-        <label>Giai đoạn:</label>
+        <label for="newPhase">Giai đoạn</label>
         <select id="newPhase">
-          <option value="HT" selected>Hiện trạng (bổ sung điểm còn thiếu)</option>
+          <option value="HT" selected>Hiện trạng (bổ sung điểm)</option>
           <option value="QH">Quy hoạch mới</option>
         </select>
 
-        <label>Phân cấp hạ tầng (Cột D):</label>
+        <label for="newNhomHaTang" title="Phân cấp hạ tầng (Cột D)">Phân cấp</label>
         <select id="newNhomHaTang">
           <option value="Cấp đô thị">Cấp đô thị</option>
           <option value="Cấp đơn vị ở" selected>Cấp đơn vị ở</option>
         </select>
 
-        <label>Tên khu đất / công trình:</label>
-        <input type="text" id="newName" placeholder="Nhập tên công trình..." />
+        <label for="newName">Tên</label>
+        <input type="text" id="newName" placeholder="Tên khu đất / công trình..." />
 
-        <label>Tọa độ (Lat / Lng):</label>
+        <label for="newLat" title="Vĩ độ / Kinh độ">Tọa độ</label>
         <div class="rp-coord-row">
           <input type="text" id="newLat" placeholder="Vĩ độ" />
           <input type="text" id="newLng" placeholder="Kinh độ" />
           <button type="button" id="btnPickOnMap" title="Ghim trên bản đồ" aria-label="Ghim tọa độ trên bản đồ">📌</button>
         </div>
 
-        <label>Phường / Xã:</label>
-        <input type="text" id="newWard" placeholder="Tự động nhận diện theo tọa độ..." />
+        <label for="newWard">Phường/Xã</label>
+        <input type="text" id="newWard" placeholder="Tự nhận diện theo tọa độ" />
 
-        <label>Diện tích (m²):</label>
-        <input type="number" id="newSize" placeholder="1000" min="0" step="1" />
+        <label for="newSize">Diện tích</label>
+        <input type="number" id="newSize" placeholder="m² (vd 1000)" min="0" step="1" />
+        </div>
 
         <button type="button" class="btn-submit" id="btnSubmitNewPoint">🚀 GỬI ĐỀ XUẤT MỚI</button>
         <div id="statusMsg" class="rp-status" role="status" aria-live="polite"></div>
@@ -148,9 +157,9 @@
         <div class="legend-row"><img src="./icons/Yte.png" class="legend-icon" /> 6. Bệnh viện, Trạm y tế</div>
         <div class="legend-row"><img src="./icons/Vanhoa.png" class="legend-icon" /> 7. Nhà văn hóa, thể thao</div>
         <div class="legend-row"><img src="./icons/Cho.png" class="legend-icon" /> 8. Chợ, Trung tâm thương mại</div>
-        <div class="legend-row" style="color:var(--accent-orange); margin-top:6px;"><img src="./icons/Unused.png" class="legend-icon" /> <b>9. Quỹ đất tiềm năng (Chưa sử dụng)</b></div>
+        <div class="legend-row" style="color:var(--accent-orange); margin-top:4px;"><img src="./icons/Unused.png" class="legend-icon" /> <b>9. Quỹ đất tiềm năng (Chưa sử dụng)</b></div>
         <div class="legend-row"><img src="./icons/Park2.png" class="legend-icon" alt="" /><b style="color:var(--accent-red);">Chưa chấp thuận (Chờ duyệt)</b></div>
-        <div class="plan-legend-note">Khi khung nhìn có quá nhiều công trình (thu nhỏ bản đồ), icon được thay bằng chấm tròn cùng màu nhóm; chấm đỏ = chờ duyệt. Phóng to để xem icon.</div>
+        <div class="legend-row"><span class="legend-icon legend-dot"><i style="background:#22c55e;"></i></span>Điểm quy hoạch khác hiện trạng</div>
 
         <div class="heat-legend">
           <div class="heat-legend-title">🔥 Heatmap độ phủ hạ tầng</div>
@@ -159,17 +168,6 @@
           <div class="heat-legend-ticks">
             <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
           </div>
-          <div class="heat-legend-ends">
-            <span>❄️ Lạnh: thiếu hạ tầng</span><span>Nóng: đủ hạ tầng 🔥</span>
-          </div>
-        </div>
-
-        <div class="heat-legend">
-          <div class="heat-legend-title">◨ Biến động quy hoạch</div>
-          <div class="plan-legend">
-            <span style="grid-column: 1 / -1;"><i style="background:#22c55e;"></i>Điểm quy hoạch khác hiện trạng</span>
-          </div>
-          <div class="plan-legend-note">Chấm xanh trên icon (mới / mở rộng / thu hẹp); điểm di dời không xuất hiện ở bản đồ quy hoạch.</div>
         </div>
       </div>
     </div>
@@ -179,13 +177,27 @@
   <section class="bottom-panel" id="bottomPanel">
     <div class="bp-body" id="bpBody">
       <!-- PHẦN 1: CƠ CẤU ĐẤT HẠ TẦNG -->
+      <!-- Thẻ lật 2 mặt: trước = cơ cấu theo diện tích, sau = thống kê số lượng 9 loại hạ tầng -->
       <div class="bp-part bp-part1">
         <div class="bp-part-head">
-          <b class="bp-part-title">CƠ CẤU ĐẤT HẠ TẦNG</b>
+          <b class="bp-part-title" id="bpPart1Title">CƠ CẤU ĐẤT HẠ TẦNG</b>
+          <div class="flip-controls" data-html2canvas-ignore="true">
+            <span class="flip-dots" aria-hidden="true"><i class="active"></i><i></i></span>
+            <button type="button" class="bp-btn" id="btnFlipPart1" aria-pressed="false" title="Lật trang: thống kê số lượng công trình">⟳ Số lượng</button>
+          </div>
         </div>
-        <div class="bp-pie-inner">
-          <div class="pie-chart-wrap"><canvas id="infraPieChart"></canvas></div>
-          <div id="pieLegendDetails"></div>
+        <div class="flip-card" id="part1Flip">
+          <div class="flip-inner">
+            <div class="flip-face flip-front">
+              <div class="bp-pie-inner">
+                <div class="pie-chart-wrap"><canvas id="infraPieChart"></canvas></div>
+                <div id="pieLegendDetails"></div>
+              </div>
+            </div>
+            <div class="flip-face flip-back" aria-hidden="true">
+              <div class="infra-count-grid" id="infraCountGrid"></div>
+            </div>
+          </div>
         </div>
       </div>
 

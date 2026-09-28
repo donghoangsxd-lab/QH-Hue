@@ -178,8 +178,93 @@ const PIE_LABELS = {
   "6-YT": "Y tế", "7-VH": "Văn hóa", "8-TM": "Chợ/TTTM", "9-CSD": "Quỹ đất", "empty": "Chưa có DL"
 };
 
+// ================== MẶT SAU THẺ LẬT: THỐNG KÊ SỐ LƯỢNG 9 LOẠI ==================
+const COUNT_CARD_LABELS = {
+  "1-CV": "Công viên", "2-BDX": "Bãi đỗ xe", "3-MN": "Mầm non", "4-TH": "Tiểu học", "5-THCS": "THCS",
+  "6-YT": "Y tế", "7-VH": "Văn hóa", "8-TM": "Chợ, TTTM", "9-CSD": "Quỹ đất"
+};
+// Biểu tượng nét (viewBox 24×24, stroke = màu loại)
+const COUNT_CARD_ICONS = {
+  "1-CV": '<path d="M12 3l5 7h-3l4 6H6l4-6H7z"/><path d="M12 16v5"/>',
+  "2-BDX": '<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M10 17V7h3.2a3 3 0 010 6H10"/>',
+  "3-MN": '<rect x="4" y="12" width="7" height="7" rx="1"/><rect x="13" y="12" width="7" height="7" rx="1"/><rect x="8.5" y="4" width="7" height="7" rx="1"/>',
+  "4-TH": '<path d="M3 10l9-5 9 5"/><path d="M5 10v9h14v-9"/><path d="M10 19v-5h4v5"/>',
+  "5-THCS": '<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>',
+  "6-YT": '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
+  "7-VH": '<path d="M3 9l9-5 9 5"/><path d="M5 9v9M9.5 9v9M14.5 9v9M19 9v9"/><path d="M3 20h18"/>',
+  "8-TM": '<circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M3 4h2l2.5 11h11l2-8H6.5"/>',
+  "9-CSD": '<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 2.2"/><path d="M12 9v6M9 12h6"/>'
+};
+
+// Hiện trạng: số đã duyệt (quỹ đất: mọi khu đất, như donut) + số chờ duyệt; quy hoạch: số đã duyệt
+function countByType(sourceList, planList) {
+  const stats = {};
+  Object.keys(COUNT_CARD_LABELS).forEach(k => { stats[k] = { approved: 0, pending: 0, plan: 0 }; });
+  (sourceList || []).forEach(it => {
+    const s = stats[it.type];
+    if (!s) return;
+    if (isApproved(it.status)) s.approved++;
+    else s.pending++;
+  });
+  (planList || []).forEach(it => {
+    const s = stats[it.type];
+    if (s && (isApproved(it.status) || it.type === "9-CSD")) s.plan++;
+  });
+  return stats;
+}
+
+function renderInfraCountCards(sourceList, planList) {
+  const grid = document.getElementById('infraCountGrid');
+  if (!grid) return;
+  const stats = countByType(sourceList, planList);
+  grid.innerHTML = Object.keys(COUNT_CARD_LABELS).map(k => {
+    const s = stats[k];
+    const color = PIE_COLORS[k];
+    const isCsd = k === "9-CSD";
+    const shown = isCsd ? s.approved + s.pending : s.approved;
+    const total = s.approved + s.pending;
+    const approvedPct = total > 0 ? (s.approved / total) * 100 : 0;
+    const delta = s.plan - shown;
+    const planTag = delta === 0 ? '' :
+      `<span class="count-plan ${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '▲' : '▼'}${fmtNum(Math.abs(delta))}</span>`;
+    const tip = `${COUNT_CARD_LABELS[k]}\nĐã duyệt: ${fmtNum(s.approved)} · Chờ duyệt: ${fmtNum(s.pending)}\nQuy hoạch: ${fmtNum(s.plan)} (chênh ${delta > 0 ? '+' : ''}${fmtNum(delta)})`;
+    return `<div class="count-card" style="--c:${color}" title="${escapeHtml(tip)}">
+      <span class="count-icon"><svg viewBox="0 0 24 24" aria-hidden="true">${COUNT_CARD_ICONS[k]}</svg></span>
+      <div class="count-info">
+        <span class="count-label">${COUNT_CARD_LABELS[k]}</span>
+        <div class="count-mid"><b class="count-num">${fmtNum(shown)}</b>${planTag}</div>
+        <div class="count-foot"><span class="count-bar"><i style="width:${approvedPct.toFixed(1)}%"></i></span><span class="count-pct">${fmtPct(approvedPct)}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setPart1Flipped(flipped) {
+  const card = document.getElementById('part1Flip');
+  if (!card) return;
+  card.classList.toggle('flipped', flipped);
+  card.querySelector('.flip-front')?.setAttribute('aria-hidden', String(flipped));
+  card.querySelector('.flip-back')?.setAttribute('aria-hidden', String(!flipped));
+  const title = document.getElementById('bpPart1Title');
+  if (title) title.textContent = flipped ? 'SỐ LƯỢNG CÔNG TRÌNH' : 'CƠ CẤU ĐẤT HẠ TẦNG';
+  const btn = document.getElementById('btnFlipPart1');
+  if (btn) {
+    btn.textContent = flipped ? '⟳ Diện tích' : '⟳ Số lượng';
+    btn.title = flipped ? 'Lật trang: cơ cấu theo diện tích' : 'Lật trang: thống kê số lượng công trình';
+    btn.setAttribute('aria-pressed', String(flipped));
+  }
+  document.querySelectorAll('.flip-dots i').forEach((dot, i) => dot.classList.toggle('active', i === (flipped ? 1 : 0)));
+}
+
+function initPart1Flip() {
+  document.getElementById('btnFlipPart1')?.addEventListener('click', () => {
+    setPart1Flipped(!document.getElementById('part1Flip').classList.contains('flipped'));
+  });
+}
+
 // Donut 2 vòng đồng tâm: trong = hiện trạng (sourceList), ngoài = quy hoạch (planList)
 export function updateInfraPieChart(sourceList, planList = []) {
+  renderInfraCountCards(sourceList, planList);
   const legendContainer = document.getElementById('pieLegendDetails');
   const ht = sumAreaByType(sourceList);
   const qh = sumAreaByType(planList);
@@ -749,6 +834,7 @@ export function selectWardDetail(wardName) {
 
 // Click trong bảng 40 phường và bảng chi tiết phường (thay cho onclick nội tuyến)
 export function initBottomPanelEvents() {
+  initPart1Flip();
   document.getElementById('statTableBody')?.addEventListener('click', (e) => {
     const link = e.target.closest('.ward-link');
     if (link) selectWardDetail(link.dataset.ward);
