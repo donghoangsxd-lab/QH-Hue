@@ -280,7 +280,7 @@ export function updateInfraPieChart(sourceList, planList = []) {
   const labels = keys.map(k => PIE_LABELS[k] || k);
 
   if (legendContainer) {
-    legendContainer.innerHTML = `<div class="pie-legend-row pie-legend-head"><span></span><span>HT</span><span>QH</span></div>`
+    legendContainer.innerHTML = `<div class="pie-legend-row pie-legend-head"><span>Ký hiệu</span><span>H.Trạng</span><span>QH</span></div>`
       + keys.map((k, idx) => {
         const delta = qhPct[idx] - htPct[idx];
         const qhColor = delta >= 0.1 ? 'var(--accent-green)' : (delta <= -0.1 ? 'var(--accent-red)' : 'var(--accent-cyan)');
@@ -635,6 +635,7 @@ export function reloadWardStats() {
 
 export function setBottomPanelMaximized(maximized) {
   document.body.classList.toggle('bottom-max', maximized);
+  if (maximized) setPart1Flipped(false);
   const btn = document.getElementById('btnToggleBottomMax');
   if (btn) {
     btn.textContent = maximized ? '🗗' : '⛶';
