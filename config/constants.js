@@ -1,27 +1,116 @@
 // A. CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ
 const urbanInfraConfig = {
   "THPT": { label: "Trường THPT", minSize: 5000, radius: 2000, quota: 0.60, nhom: "Cấp đô thị" },
-  "YT_DT": { label: "Y tế cấp khu vực (đô thị)", minSize: 1000, radius: 2000, quota: 0.40, nhom: "Cấp đô thị" },
-  "VH_DT": { label: "Văn hóa - Thể thao cấp khu vực (đô thị)", minSize: 1000, radius: 2000, quota: 1.60, nhom: "Cấp đô thị" },
-  "TM_DT": { label: "Chợ - TMDV cấp khu vực (đô thị)", minSize: 1500, radius: 2000, quota: 0.40, nhom: "Cấp đô thị" },
-  "CV_DT": { label: "Công viên cấp khu vực (đô thị)", minSize: 3000, radius: 2000, quota: 5.00, nhom: "Cấp đô thị" },
-  "BDX_DT": { label: "Bãi đỗ xe khu vực (đô thị)", minSize: 1000, radius: 2000, quota: 1.50, nhom: "Cấp đô thị" }
+  "YT_DT": { label: "Y tế cấp khu vực", minSize: 1000, radius: 2000, quota: 0.40, nhom: "Cấp đô thị" },
+  "VH_DT": { label: "Văn hóa - Thể thao cấp khu vực", minSize: 1000, radius: 2000, quota: 1.60, nhom: "Cấp đô thị" },
+  "TM_DT": { label: "Chợ - TMDV cấp khu vực", minSize: 1500, radius: 2000, quota: 0.40, nhom: "Cấp đô thị" },
+  "CV_DT": { label: "Công viên cấp khu vực", minSize: 3000, radius: 2000, quota: 5.00, nhom: "Cấp đô thị" },
+  "BDX_DT": { label: "Bãi đỗ xe khu vực", minSize: 1000, radius: 2000, quota: 1.50, nhom: "Cấp đô thị" }
 };
 
 // B. CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở
 const unitInfraConfig = {
-  "3-MN":   { label: "Trường Mầm non", minSize: 800, radius: 500, quota: 0.60, nhom: "Cấp DVƠ" },
+  "3-MN":   { label: "Trường Mầm non", minSize: 800, radius: 1000, quota: 0.60, nhom: "Cấp DVƠ" },
   "4-TH":   { label: "Trường Tiểu học", minSize: 2000, radius: 1000, quota: 0.65, nhom: "Cấp DVƠ" },
   "5-THCS": { label: "Trường THCS", minSize: 2500, radius: 1000, quota: 0.55, nhom: "Cấp DVƠ" },
-  // Nhóm Dịch vụ công cộng đơn vị ở (Tổng hợp chỉ tiêu >= 2.0 m2/người)
+  // Dịch vụ công cộng khác đơn vị ở (Bảng 6: điểm dịch vụ công, trạm y tế, nhà văn hóa, nhà sinh hoạt cộng đồng, chợ — chung 0,20 m²/người)
   "YT_DV":  { label: "Y tế đơn vị ở", minSize: 500, radius: 1000, quota: 0, nhom: "Cấp DVƠ", parentGroup: "DVCC", minSingleSize: 500 },
   "VH_DV":  { label: "Văn hóa đơn vị ở", minSize: 500, radius: 1000, quota: 0, nhom: "Cấp DVƠ", parentGroup: "DVCC", minSingleSize: 1000 },
   "TM_DV":  { label: "Chợ - TMDV đơn vị ở", minSize: 1000, radius: 1000, quota: 0, nhom: "Cấp DVƠ", parentGroup: "DVCC", minSingleSize: 2000 },
-  "DVCC_TOTAL": { label: "Dịch vụ công cộng đơn vị ở (Tổng hợp)", minSize: 0, radius: 1000, quota: 2.00, nhom: "Cấp DVƠ" },
+  "DVCC_TOTAL": { label: "Dịch vụ công cộng khác đơn vị ở (y tế, văn hóa, chợ)", minSize: 0, radius: 1000, quota: 0.20, nhom: "Cấp DVƠ" },
+  // Tổng đất DVCC đơn vị ở gồm cả trường học (Bảng 6 đô thị / Bảng 28 nông thôn: ≥ 2,0 m²/người)
+  "DVCC_ALL": { label: "Tổng đất dịch vụ công cộng đơn vị ở (gồm trường học)", minSize: 0, radius: 0, quota: 2.00, nhom: "Cấp DVƠ",
+    sumOf: ["3-MN", "4-TH", "5-THCS", "YT_DV", "VH_DV", "TM_DV"] },
 
   "CV_DV":  { label: "Cây xanh đơn vị ở", minSize: 500, radius: 500, quota: 2.00, nhom: "Cấp DVƠ" },
   "BDX_DV": { label: "Bãi đỗ xe đơn vị ở", minSize: 500, radius: 500, quota: 2.50, nhom: "Cấp DVƠ" }
 };
+
+// C. HỒ SƠ CHỈ TIÊU THEO LOẠI ĐỊA BÀN
+// Phường = bộ đô thị (Bảng 5, 6, 18). Xã = bộ nông thôn (Bảng 28, 29, 30) — QCVN không tách xã đồng bằng / miền núi.
+// Xã định hướng đô thị: bộ nông thôn, riêng cây xanh khu vực theo đô thị miền núi 3,5 m²/người (Mục 2.4.3).
+const PLAIN_COMMUNES = ["Chân Mây - Lăng Cô", "Đan Điền", "Hưng Lộc", "Lộc An", "Phú Hồ", "Phú Lộc", "Phú Vang", "Phú Vinh", "Quảng Điền", "Vinh Lộc"];
+const MOUNTAIN_COMMUNES = ["A Lưới 1", "A Lưới 2", "A Lưới 3", "A Lưới 4", "A Lưới 5", "Bình Điền", "Khe Tre", "Long Quảng", "Nam Đông"];
+const URBAN_ORIENTED_COMMUNES = ["Khe Tre", "A Lưới 2"];
+
+// null = QCVN không quy định cho loại địa bàn này → không tính vào quy mô
+const RURAL_QUOTA = { YT_DT: 0.20, VH_DT: 1.00, TM_DT: 0.20, CV_DT: null, BDX_DT: null, BDX_DV: null, DVCC_TOTAL: null };
+const PROFILE_QUOTA = {
+  DT: {},
+  XA: RURAL_QUOTA,
+  XA_DT: { ...RURAL_QUOTA, CV_DT: 3.50 }
+};
+const PROFILES = Object.keys(PROFILE_QUOTA);
+
+// Bán kính DVCC đơn vị ở tại nông thôn ≤ 2 km (Mục 4.6.2.2)
+const RURAL_UNIT_RADIUS = 2000;
+const RURAL_UNIT_RADIUS_CODES = ["3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+
+// Quy tắc đếm cơ sở: THPT khi dân số > 20.000 (Bảng 5, 29); 1 trạm y tế, 1 chợ mỗi xã (Bảng 30)
+const THPT_POP_THRESHOLD = 20000;
+const COUNT_RULES = {
+  DT: { THPT: { minPop: THPT_POP_THRESHOLD } },
+  XA: { THPT: { minPop: THPT_POP_THRESHOLD }, YT_DV: { perWard: 1 }, TM_DV: { perWard: 1 } },
+  XA_DT: { THPT: { minPop: THPT_POP_THRESHOLD }, YT_DV: { perWard: 1 }, TM_DV: { perWard: 1 } }
+};
+
+// Quy mô tối thiểu 1 công trình theo tiền tố tên (so sau khi bỏ dấu, viết hoa) — chỉ cảnh báo, diện tích vẫn cộng vào chỉ tiêu
+const MIN_SIZE_RULES = [
+  { profiles: ["XA", "XA_DT"], code: "6-YT", prefixes: ["Trạm y tế"], min: 500, ref: "Bảng 30" },
+  { profiles: ["XA", "XA_DT"], code: "7-VH", prefixes: ["Nhà văn hóa"], min: 1000, ref: "Bảng 30" },
+  { profiles: ["XA", "XA_DT"], code: "7-VH", prefixes: ["Phòng truyền thống", "Thư viện"], min: 200, ref: "Bảng 30" },
+  { profiles: ["XA", "XA_DT"], code: "7-VH", prefixes: ["Cụm công trình văn hóa", "Cụm văn hóa"], min: 5000, ref: "Bảng 30" },
+  { profiles: ["XA", "XA_DT"], code: "8-TM", prefixes: ["Chợ"], excludePrefixes: ["Chợ đầu mối"], min: 1500, ref: "Bảng 30" },
+  { profiles: ["XA", "XA_DT"], code: "8-TM", prefixes: ["Cửa hàng"], min: 300, ref: "Bảng 30" }
+];
+
+// Mỗi đơn vị ở đô thị phát triển mới: ≥ 1 công viên, vườn hoa ≥ 5.000 m² hoặc 2 công viên, vườn hoa ≥ 2.500 m² (Mục 2.2.3.2)
+const UNIT_PARK_RULE = { profiles: ["DT"], large: 5000, medium: 2500 };
+
+const foldName = (s) => String(s || '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+  .replace(/\s+/g, ' ').trim().toUpperCase();
+
+const bareWardName = (name) => foldName(name).replace(/^(PHUONG|XA)\s+/, '');
+const URBAN_ORIENTED_SET = new Set(URBAN_ORIENTED_COMMUNES.map(bareWardName));
+const MOUNTAIN_SET = new Set(MOUNTAIN_COMMUNES.map(bareWardName));
+const COMMUNE_SET = new Set([...PLAIN_COMMUNES, ...MOUNTAIN_COMMUNES].map(bareWardName));
+
+/** 'DT' | 'XA' | 'XA_DT' theo tên phường/xã (có hoặc không có tiền tố "Phường"/"Xã") */
+function wardProfile(name) {
+  const bare = bareWardName(name);
+  if (URBAN_ORIENTED_SET.has(bare)) return 'XA_DT';
+  if (COMMUNE_SET.has(bare)) return 'XA';
+  return 'DT';
+}
+
+function wardProfileLabel(name) {
+  const profile = wardProfile(name);
+  if (profile === 'DT') return 'Phường – chỉ tiêu đô thị';
+  const terrain = MOUNTAIN_SET.has(bareWardName(name)) ? 'miền núi' : 'đồng bằng';
+  return profile === 'XA_DT'
+    ? `Xã ${terrain} định hướng đô thị – chỉ tiêu nông thôn, cây xanh khu vực 3,5 m²/người`
+    : `Xã ${terrain} – chỉ tiêu nông thôn`;
+}
+
+/** Chỉ tiêu m²/người của 1 nhóm theo hồ sơ; null = không quy định */
+function baseQuota(key, profile = 'DT') {
+  const override = PROFILE_QUOTA[profile] || {};
+  if (Object.prototype.hasOwnProperty.call(override, key)) return override[key];
+  const cfg = urbanInfraConfig[key] || unitInfraConfig[key];
+  return cfg ? (cfg.quota || 0) : 0;
+}
+
+/** Nhóm công trình con có quy tắc quy mô tối thiểu theo tên → { min, ref } hoặc null */
+function minSizeRuleFor(item, code, profile) {
+  const name = foldName(item && item.name);
+  if (!name) return null;
+  const rule = MIN_SIZE_RULES.find(r => r.code === code && r.profiles.includes(profile)
+    && r.prefixes.some(p => name.startsWith(foldName(p)))
+    && !(r.excludePrefixes || []).some(p => name.startsWith(foldName(p))));
+  return rule ? { min: rule.min, ref: rule.ref } : null;
+}
 
 // Mỗi mã hạ tầng = tổng các nhóm chỉ tiêu cấp đô thị + cấp đơn vị ở (THPT tính riêng, không thuộc 4-TH)
 const CODE_LEVEL_KEYS = {
@@ -35,21 +124,24 @@ const CODE_LEVEL_KEYS = {
   "8-TM": ["TM_DT", "TM_DV"]
 };
 
-// Chỉ tiêu DVCC đơn vị ở (2.0 m²/người) chia cho Y tế / Văn hóa / Chợ theo tỷ lệ diện tích tối thiểu 1 cơ sở (500 : 1000 : 2000)
-function levelQuota(key) {
-  if (urbanInfraConfig[key]) return urbanInfraConfig[key].quota || 0;
+// Chỉ tiêu DVCC khác đơn vị ở chia cho Y tế / Văn hóa / Chợ theo tỷ lệ diện tích tối thiểu 1 cơ sở (500 : 1000 : 2000) — chỉ phục vụ quy mô theo mã
+function levelQuota(key, profile = 'DT') {
   const cfg = unitInfraConfig[key];
-  if (!cfg) return 0;
-  if (cfg.parentGroup !== 'DVCC') return cfg.quota || 0;
+  if (!cfg || cfg.parentGroup !== 'DVCC') return baseQuota(key, profile) || 0;
   const parts = Object.values(unitInfraConfig).filter(c => c.parentGroup === 'DVCC');
   const totalWeight = parts.reduce((s, c) => s + (c.minSingleSize || 0), 0);
-  return totalWeight > 0 ? unitInfraConfig.DVCC_TOTAL.quota * (cfg.minSingleSize || 0) / totalWeight : 0;
+  return totalWeight > 0 ? (baseQuota('DVCC_TOTAL', profile) || 0) * (cfg.minSingleSize || 0) / totalWeight : 0;
 }
 
-const quotaConfig = {};
-Object.keys(CODE_LEVEL_KEYS).forEach(code => {
-  quotaConfig[code] = Number(CODE_LEVEL_KEYS[code].reduce((s, k) => s + levelQuota(k), 0).toFixed(4));
+// Chỉ tiêu tổng (m²/người) của từng mã theo hồ sơ; quotaConfig = hồ sơ đô thị (giữ tương thích)
+const quotaByProfile = {};
+PROFILES.forEach(profile => {
+  quotaByProfile[profile] = {};
+  Object.keys(CODE_LEVEL_KEYS).forEach(code => {
+    quotaByProfile[profile][code] = Number(CODE_LEVEL_KEYS[code].reduce((s, k) => s + levelQuota(k, profile), 0).toFixed(4));
+  });
 });
+const quotaConfig = quotaByProfile.DT;
 
 const PROD_ORIGIN = "https://web-hatang-hue-4.vercel.app";
 
@@ -115,16 +207,34 @@ const constants = {
 
   // Chỉ tiêu tổng (m²/người) của từng mã, suy ra từ 2 bảng trên — dùng chung cho quy mô, gợi ý CSD, điểm chờ duyệt
   quotaConfig,
+  quotaByProfile,
 
+  // Hồ sơ chỉ tiêu theo loại địa bàn (phường / xã / xã định hướng đô thị)
+  PROFILE_QUOTA,
+  COUNT_RULES,
+  UNIT_PARK_RULE,
+  wardProfile,
+  wardProfileLabel,
+  baseQuota,
+  minSizeRuleFor,
+  quotaFor: (code, profile = 'DT') => (quotaByProfile[profile] || quotaByProfile.DT)[code] || 0,
+
+  // minSize: ngưỡng lọc gợi ý chuyển đổi quỹ đất (nội bộ, không phải chỉ tiêu QCVN)
   infraConfig: {
     "1-CV":   { label: "Cây xanh, công viên", minSize: 300, radius: 500 },
     "2-BDX":  { label: "Bãi đỗ xe, trạm sạc xe điện", minSize: 200, radius: 500 },
-    "3-MN":   { label: "Trường Mầm non", minSize: 800, radius: 500 },
+    "3-MN":   { label: "Trường Mầm non", minSize: 800, radius: 1000 },
     "4-TH":   { label: "Trường Tiểu học", minSize: 2000, radius: 1000 },
     "5-THCS": { label: "Trường THCS", minSize: 2500, radius: 1000 },
     "6-YT":   { label: "Bệnh viện, Trạm y tế", minSize: 1000, radius: 1000 },
-    "7-VH":   { label: "Nhà văn hóa, thể thao", minSize: 500, radius: 500 },
-    "8-TM":   { label: "Chợ, Trung tâm thương mại", minSize: 1500, radius: 500 }
+    "7-VH":   { label: "Nhà văn hóa, thể thao", minSize: 500, radius: 1000 },
+    "8-TM":   { label: "Chợ, Trung tâm thương mại", minSize: 1500, radius: 1000 }
+  },
+
+  /** Bán kính mặc định công trình cấp đơn vị ở theo mã và hồ sơ phường/xã */
+  unitRadius: function(code, profile = 'DT') {
+    if (profile !== 'DT' && RURAL_UNIT_RADIUS_CODES.includes(code)) return RURAL_UNIT_RADIUS;
+    return (this.infraConfig[code] && this.infraConfig[code].radius) || 500;
   },
 
   codeMap: {
@@ -177,14 +287,23 @@ const constants = {
     return nhom === 'Cap Do Thi';
   },
 
-  /** Bán kính mặc định khi cột BanKinh trống: theo cấp và loại công trình */
+  /** Bán kính mặc định khi cột BanKinh trống: theo cấp, loại công trình và loại địa bàn (cột Ten_XaPhuong) */
   defaultRadius: function(item) {
     if (this.isThptItem(item)) return urbanInfraConfig.THPT.radius;
     const code = this.resolveTypeCode(item);
     if (this.isUrbanLevel(item) && CODE_LEVEL_KEYS[code] && urbanInfraConfig[CODE_LEVEL_KEYS[code][0]]) {
       return urbanInfraConfig[CODE_LEVEL_KEYS[code][0]].radius;
     }
-    return (this.infraConfig[code] && this.infraConfig[code].radius) || 500;
+    return this.unitRadius(code, wardProfile(item && item.ward));
+  },
+
+  /** Bán kính chuẩn khi cột BanKinh nhập khác chuẩn cấp đơn vị ở của hồ sơ phường/xã; null = đúng chuẩn hoặc không kiểm tra */
+  radiusMismatch: function(item, profile) {
+    if (!item || !item.radiusSet || this.isThptItem(item) || this.isUrbanLevel(item)) return null;
+    const code = this.resolveTypeCode(item);
+    if (!this.infraConfig[code]) return null;
+    const std = this.unitRadius(code, profile);
+    return Number(item.radius) === std ? null : std;
   },
 
   cleanWardStr: function(str) {

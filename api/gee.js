@@ -467,9 +467,9 @@ async function popPixelSize(popProjection) {
 }
 
 /** Bán kính vùng phục vụ của khu đất khi xét loại `code`: cột BanKinh trong sheet, ô trống thì theo bán kính mặc định của loại */
-function csdCandidateRadius(csd, code) {
+function csdCandidateRadius(csd, code, profile) {
   if (csd.radiusSet && Number(csd.radius) > 0) return Number(csd.radius);
-  return (constants.infraConfig[code] && constants.infraConfig[code].radius) || 500;
+  return constants.unitRadius(code, profile);
 }
 
 /** Công trình cùng loại đã duyệt (toàn TP, kể cả phường bên cạnh) có buffer chạm tới buffer ứng viên */
@@ -514,8 +514,9 @@ async function countPopPixels(ee, popRasterNative, regions) {
 function buildWardContext(wardFeat, approvedItemsInWard) {
   const pop = wardFeat.pop || 10000;
   const projPop = Math.round(pop * constants.POP_GROWTH);
-  const { urbanResults, unitResults } = bucketWardInfra(approvedItemsInWard, projPop, { withSubItems: false });
-  return { name: wardFeat.name, geometry: wardFeat.geometry, pop, projPop, urbanResults, unitResults };
+  const profile = constants.wardProfile(wardFeat.name);
+  const { urbanResults, unitResults } = bucketWardInfra(approvedItemsInWard, projPop, { withSubItems: false, profile });
+  return { name: wardFeat.name, geometry: wardFeat.geometry, pop, projPop, profile, urbanResults, unitResults };
 }
 
 /**
@@ -534,13 +535,13 @@ function csdSuggestionCandidates(csd, ward, approvedAll) {
       suggestions.push({ code, label, minSize, status: 'ineligible' });
       return;
     }
-    const reqArea = Math.round(ward.projPop * (constants.quotaConfig[code] || 0));
+    const reqArea = Math.round(ward.projPop * constants.quotaFor(code, ward.profile));
     const existArea = codeCurrentArea(code, ward.urbanResults, ward.unitResults);
     if (reqArea <= 0 || existArea >= reqArea) {
       suggestions.push({ code, label, status: 'fulfilled' });
       return;
     }
-    const radius = csdCandidateRadius(csd, code);
+    const radius = csdCandidateRadius(csd, code, ward.profile);
     const existing = nearbySameType(approvedAll, code, csd.lat, csd.lng, radius);
     const s = {
       code, label, status: 'eligible',
@@ -719,31 +720,42 @@ function levelKeyOf(item) {
   return constants.isUrbanLevel(item) ? keys[0] : keys[1];
 }
 
-function slimItem(item) {
-  return {
+function slimItem(item, profile) {
+  const slim = {
     id: item.id, name: item.name, type: item.type,
     lat: item.lat, lng: item.lng,
     size: item.size, radius: item.radius, status: item.status
   };
+  const rule = constants.minSizeRuleFor(item, constants.resolveTypeCode(item), profile);
+  if (rule) {
+    slim.minSize = rule.min;
+    slim.minSizeRef = rule.ref;
+  }
+  const radiusStd = constants.radiusMismatch(item, profile);
+  if (radiusStd != null) slim.radiusStd = radiusStd;
+  return slim;
 }
 
-// Gom diện tích công trình đã duyệt vào các nhóm chỉ tiêu cấp đô thị / cấp đơn vị ở
-function bucketWardInfra(items, projPop, { withSubItems = true } = {}) {
-  const makeBucket = (cfg, quota) => ({
-    label: cfg.label,
-    quota,
-    currentArea: 0,
-    requiredArea: quota * projPop,
-    subItems: [],
-    status: false
-  });
+// Gom diện tích công trình đã duyệt vào các nhóm chỉ tiêu cấp đô thị / cấp đơn vị ở (chỉ tiêu theo hồ sơ phường/xã)
+function bucketWardInfra(items, projPop, { withSubItems = true, profile = 'DT' } = {}) {
+  const makeBucket = (key, cfg) => {
+    const quota = constants.baseQuota(key, profile);
+    return {
+      label: cfg.label,
+      quota,
+      currentArea: 0,
+      requiredArea: (quota || 0) * projPop,
+      subItems: [],
+      status: false
+    };
+  };
   const urbanResults = {};
   for (const key in constants.urbanInfraConfig) {
-    urbanResults[key] = makeBucket(constants.urbanInfraConfig[key], constants.urbanInfraConfig[key].quota);
+    urbanResults[key] = makeBucket(key, constants.urbanInfraConfig[key]);
   }
   const unitResults = {};
   for (const key in constants.unitInfraConfig) {
-    unitResults[key] = makeBucket(constants.unitInfraConfig[key], constants.unitInfraConfig[key].quota || 0);
+    unitResults[key] = makeBucket(key, constants.unitInfraConfig[key]);
   }
 
   items.forEach(item => {
@@ -752,8 +764,13 @@ function bucketWardInfra(items, projPop, { withSubItems = true } = {}) {
     const bucket = key && (urbanResults[key] || unitResults[key]);
     if (!bucket) return;
     bucket.currentArea += Number(item.size || 0);
-    if (withSubItems) bucket.subItems.push(slimItem(item));
+    if (withSubItems) bucket.subItems.push(slimItem(item, profile));
   });
+
+  for (const key in constants.unitInfraConfig) {
+    const sumOf = constants.unitInfraConfig[key].sumOf;
+    if (sumOf) unitResults[key].currentArea = sumOf.reduce((s, k) => s + (unitResults[k] ? unitResults[k].currentArea : 0), 0);
+  }
 
   return { urbanResults, unitResults };
 }
@@ -766,15 +783,21 @@ function codeCurrentArea(code, urbanResults, unitResults) {
   }, 0);
 }
 
-// Tỷ lệ quy mô (%) của 8 mã hạ tầng so với chỉ tiêu tổng (quotaConfig × dân số quy hoạch), chặn trong 0–100
-function scaleByCode(urbanResults, unitResults, projPop) {
+// Tỷ lệ quy mô (%) của 8 mã hạ tầng so với chỉ tiêu tổng theo hồ sơ phường/xã, chặn trong 0–100; null = mã không có chỉ tiêu
+function scaleByCode(urbanResults, unitResults, projPop, profile = 'DT') {
   const scales = {};
   CODES.forEach(c => {
-    const required = (constants.quotaConfig[c] || 0) * projPop;
+    const required = constants.quotaFor(c, profile) * projPop;
     const current = codeCurrentArea(c, urbanResults, unitResults);
-    scales[c] = required > 0 ? round1(clamp((current / required) * 100, 0, 100)) : 0;
+    scales[c] = required > 0 ? round1(clamp((current / required) * 100, 0, 100)) : null;
   });
   return scales;
+}
+
+// Bình quân quy mô trên các mã có chỉ tiêu
+function avgScale(scales) {
+  const vals = CODES.map(c => scales[c]).filter(v => v != null);
+  return vals.length ? Number((vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1)) : 0;
 }
 
 // Công trình tham gia tính độ phủ (đã duyệt, thuộc 8 mã — THPT mang mã 4-TH nên cũng nằm trong đây)
@@ -1514,14 +1537,15 @@ module.exports = async (req, res) => {
         const pop = data.Dan_So_Vector;
         const projPop = data.projectedPopulation;
         const wardGeom = data.meta.geometry;
+        const profile = constants.wardProfile(wName);
 
-        const { urbanResults, unitResults } = bucketWardInfra(data.items, projPop);
-        const scales = scaleByCode(urbanResults, unitResults, projPop);
-        const planBuckets = bucketWardInfra(data.planItems, projPop, { withSubItems: false });
-        const planScales = scaleByCode(planBuckets.urbanResults, planBuckets.unitResults, projPop);
+        const { urbanResults, unitResults } = bucketWardInfra(data.items, projPop, { profile });
+        const scales = scaleByCode(urbanResults, unitResults, projPop, profile);
+        const planBuckets = bucketWardInfra(data.planItems, projPop, { withSubItems: false, profile });
+        const planScales = scaleByCode(planBuckets.urbanResults, planBuckets.unitResults, projPop, profile);
 
         // Gợi ý chuyển đổi quỹ đất chưa sử dụng (CSD): cùng logic với popup khu đất, % độ phủ đếm pixel sau vòng lặp
-        const wardCtx = { name: wName, geometry: wardGeom, pop, projPop, urbanResults, unitResults };
+        const wardCtx = { name: wName, geometry: wardGeom, pop, projPop, profile, urbanResults, unitResults };
         const csdItems = data.csdRaw.map(item => {
           const { suggestions, candidates } = csdSuggestionCandidates(item, wardCtx, approvedAll);
           coverageCandidates.push(...candidates);
@@ -1546,9 +1570,9 @@ module.exports = async (req, res) => {
         const pendingItems = data.pendingItems.map(item => {
           const code = constants.resolveTypeCode(item) || item.type || "9-CSD";
           const size = Number(item.size || 0);
-          const reqArea = Math.max(1, Math.round((constants.quotaConfig[code] || 0) * projPop));
+          const reqArea = Math.round(constants.quotaFor(code, profile) * projPop);
           const infraCfg = constants.infraConfig ? constants.infraConfig[code] : null;
-          const radius = Number(item.radius) || (infraCfg && infraCfg.radius) || 500;
+          const radius = Number(item.radius) || constants.unitRadius(code, profile);
           const row = {
             id: item.id,
             name: item.name,
@@ -1559,7 +1583,7 @@ module.exports = async (req, res) => {
             lng: item.lng,
             radius,
             status: item.status,
-            scaleAddPct: round1(clamp((size / reqArea) * 100, 0, 100)),
+            scaleAddPct: reqArea > 0 ? round1(clamp((size / reqArea) * 100, 0, 100)) : 0,
             coverageAddPct: 0
           };
           coverageCandidates.push({
@@ -1580,33 +1604,33 @@ module.exports = async (req, res) => {
           projectedPopulation: projPop,
           currentUnits: data.currentUnits,
           projectedUnits: data.projectedUnits,
+          profile,
+          profileLabel: constants.wardProfileLabel(wName),
+          countRules: constants.COUNT_RULES[profile] || {},
+          parkRule: constants.UNIT_PARK_RULE.profiles.includes(profile) ? constants.UNIT_PARK_RULE : null,
           urbanResults,
           unitResults,
           csdItems,
           pendingItems,
           dvccSummary: {
             totalArea: (unitResults["YT_DV"]?.currentArea || 0) + (unitResults["VH_DV"]?.currentArea || 0) + (unitResults["TM_DV"]?.currentArea || 0),
-            requiredArea: constants.unitInfraConfig.DVCC_TOTAL.quota * projPop,
+            requiredArea: (constants.baseQuota('DVCC_TOTAL', profile) || 0) * projPop,
             status: false
           }
         };
 
-        let totalScaleSum = 0;
-        let totalScaleQHSum = 0;
         CODES.forEach(c => {
           calculatedRow[`Scale_${c}`] = scales[c];
           calculatedRow[`ScaleQH_${c}`] = planScales[c];
-          totalScaleSum += scales[c];
-          totalScaleQHSum += planScales[c];
         });
-        calculatedRow.Avg_Scale_Score = Number((totalScaleSum / CODES.length).toFixed(1));
-        calculatedRow.Avg_Scale_QH = Number((totalScaleQHSum / CODES.length).toFixed(1));
+        calculatedRow.Avg_Scale_Score = avgScale(scales);
+        calculatedRow.Avg_Scale_QH = avgScale(planScales);
 
         calculatedRow.covSig = coverageSignature(data.covItems);
         // Độ phủ QH chỉ khác HT khi phường có công trình mới/di dời (mở rộng/thu hẹp không đổi bán kính)
         calculatedRow.planCovSig = data.planCovChanges.length ? coverageSignature(data.planCovItems) : '';
         calculatedRow._assignMode = 'geometry';
-        calculatedRow._schema = 9;
+        calculatedRow._schema = 10;
         applyCachedCoverage(calculatedRow);
 
         resultTable.push(calculatedRow);
