@@ -550,6 +550,8 @@ export async function startBackgroundCoverageFill() {
 
 // ================== BẢNG 40 PHƯỜNG XÃ ==================
 const PENDING_CELL = '<span class="cov-pending" title="Đang tính độ phủ">⏳</span>';
+const AREA_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
+const fmtArea = (km2) => AREA_FORMAT.format(Number(km2) || 0);
 
 function wardRowHtml(w, idx) {
   const ready = !!w._coverageReady;
@@ -564,6 +566,8 @@ function wardRowHtml(w, idx) {
       <button type="button" class="ward-link link-btn" data-ward="${name}" style="font-weight:bold; color:var(--accent-cyan);">📍 ${name}</button>
     </td>
     <td style="font-weight:bold; color:var(--accent-green); text-align:right;">${fmtNum(w.Dan_So_Vector)}</td>
+    <td style="text-align:right;">${w.Dien_Tich_Km2 ? fmtArea(w.Dien_Tich_Km2) : '-'}</td>
+    <td style="text-align:right; font-weight:bold; color:var(--accent-cyan);">${w.Mat_Do_Dan_So ? fmtNum(w.Mat_Do_Dan_So) : '-'}</td>
     ${cells}
     <td class="cov-avg" style="font-weight:bold; color:var(--accent-green); background:rgba(56,189,248,0.05);">${ready ? fmtPct(w.Avg_Coverage_Score) : PENDING_CELL}</td>
     <td style="font-weight:bold; color:var(--accent-orange); background:rgba(245,158,11,0.05);">${fmtPct(w.Avg_Scale_Score)}</td>
@@ -701,7 +705,11 @@ function renderSummaryNote(wardName) {
     ? ` (${list[0].currentUnits || Math.max(1, Math.round(pop / 20000))} đơn vị ở)`
     : '';
   const popLabel = city ? 'Tổng dân số' : '<span title="Dân số hiện trạng">Dân số HT</span>';
-  subtitle.innerHTML = `👥 ${popLabel}: <b>${fmtNum(pop)}</b> người${units}`
+  const areaKm2 = list.reduce((s, w) => s + (Number(w.Dien_Tich_Km2) || 0), 0);
+  const density = city && areaKm2 > 0
+    ? ` · <span title="Tổng dân số / tổng diện tích ${fmtArea(areaKm2)} km²">Mật độ: <b>${fmtNum(Math.round(pop / areaKm2))}</b> người/km²</span>`
+    : '';
+  subtitle.innerHTML = `👥 ${popLabel}: <b>${fmtNum(pop)}</b> người${units}${density}`
     + ` · <span class="bp-swatch" style="background:${CHART_COVERAGE_COLOR};"></span>Độ phủ TB: ${covText}`
     + ` · <span class="bp-swatch" style="background:${CHART_SCALE_COLOR};"></span>Quy mô TB: <b title="Hiện trạng">${fmtPct(scale)}</b>${qhValue(scale, scaleQH)}`
     + ` · <span class="bp-swatch" style="background:${CHART_PLAN_UP_COLOR};"></span>QH tăng`
@@ -744,7 +752,7 @@ export async function renderBottomPanel() {
   const wardView = document.getElementById('wardSummaryView');
   if (state.wardStatsData.length === 0) {
     if (city && tbody) {
-      tbody.innerHTML = "<tr><td colspan='21' style='text-align:center; padding:20px;'>🔄 Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>";
+      tbody.innerHTML = "<tr><td colspan='23' style='text-align:center; padding:20px;'>🔄 Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>";
     }
     if (!city && wardView) {
       wardView.innerHTML = `<div class="rp-empty">⏳ Đang tổng hợp dữ liệu quy chuẩn cho ${escapeHtml(wardName)}...</div>`;
@@ -756,7 +764,7 @@ export async function renderBottomPanel() {
   } catch (err) {
     if (seq !== bottomRenderSeq) return;
     const msg = `❌ ${escapeHtml(err.message || 'Lỗi nạp dữ liệu từ GEE Server.')}`;
-    if (city && tbody) tbody.innerHTML = `<tr><td colspan='21' style='text-align:center; color:var(--accent-red); padding:20px;'>${msg}</td></tr>`;
+    if (city && tbody) tbody.innerHTML = `<tr><td colspan='23' style='text-align:center; color:var(--accent-red); padding:20px;'>${msg}</td></tr>`;
     if (!city && wardView) wardView.innerHTML = `<div class="rp-empty" style="color:var(--accent-red);">${msg}</div>`;
     return;
   }
@@ -920,8 +928,14 @@ function renderWardSummary(wardData) {
 
   const view = document.getElementById('wardSummaryView');
   if (!view) return;
+  const areaKm2 = Number(wardData.Dien_Tich_Km2) || 0;
+  const areaHtml = areaKm2 > 0
+    ? `<span title="Theo thuộc tính diện tích của polygon phường/xã">📐 Diện tích <b>${fmtArea(areaKm2)} km²</b></span>`
+      + ` · <span title="Dân số / diện tích">👥 Mật độ HT <b>${fmtNum(Math.round(popCurrent / areaKm2))}</b>`
+      + ` → QH <b id="wardDensityQH">${fmtNum(Math.round(popProjected / areaKm2))}</b> người/km²</span>`
+    : '';
   view.innerHTML = `<div id="wardSummaryCard" style="display:contents;">
-    <div id="wardRoadLen" class="ward-road-len"></div>
+    <div class="ward-info-line">${areaHtml}<span id="wardRoadLen"></span></div>
     <div id="wardQuotaTableContainer">${buildWardQuotaTableHtml(wardData, popProjected)}</div>
   </div>`;
   document.getElementById('wardSummaryCard').dataset.ward = wardData.Ten_Phuong;
@@ -945,6 +959,8 @@ function renderWardSummary(wardData) {
       const newUnits = Math.max(1, Math.round(newProjPop / 20000));
       const unitsLabel = document.getElementById('projectedUnitsLabel');
       if (unitsLabel) unitsLabel.textContent = newUnits;
+      const densityQH = document.getElementById('wardDensityQH');
+      if (densityQH && areaKm2 > 0) densityQH.textContent = fmtNum(Math.round(newProjPop / areaKm2));
       wardData.projectedPopulation = newProjPop;
       wardData.projectedUnits = newUnits;
       [wardData.urbanResults, wardData.unitResults].forEach(group => {

@@ -627,9 +627,14 @@ async function loadEvaluatedWards(wardVectorParsed) {
   const evaluatedWards = ((fc && fc.features) || []).map(f => {
     const props = f.properties || {};
     const geometry = normalizeWardGeometry(f.geometry);
+    const name = props.tenXa || props.NAME_2 || props.name || 'Phường';
+    const areaOfficial = Number(constants.WARD_AREA_KM2[String(name).normalize('NFC').trim()]);
+    const areaAttr = Number(String(props.dienTich == null ? '' : props.dienTich).replace(',', '.'));
     return {
-      name: props.tenXa || props.NAME_2 || props.name || 'Phường',
+      name,
       pop: Number(props.danSoNum || props.danSo || 10000),
+      // Diện tích (km²): bảng chính thức → thuộc tính dienTich của polygon → tính từ hình học
+      areaKm2: areaOfficial > 0 ? areaOfficial : areaAttr > 0 ? areaAttr : Math.round(geoJsonAreaM2(geometry) / 1e4) / 100,
       geometry,
       bbox: geometryBBox(geometry)
     };
@@ -1566,9 +1571,12 @@ module.exports = async (req, res) => {
           return row;
         });
 
+        const areaKm2 = Number(data.meta.areaKm2) || 0;
         const calculatedRow = {
           Ten_Phuong: wName,
           Dan_So_Vector: pop,
+          Dien_Tich_Km2: areaKm2,
+          Mat_Do_Dan_So: areaKm2 > 0 ? Math.round(pop / areaKm2) : 0,
           projectedPopulation: projPop,
           currentUnits: data.currentUnits,
           projectedUnits: data.projectedUnits,
@@ -1598,7 +1606,7 @@ module.exports = async (req, res) => {
         // Độ phủ QH chỉ khác HT khi phường có công trình mới/di dời (mở rộng/thu hẹp không đổi bán kính)
         calculatedRow.planCovSig = data.planCovChanges.length ? coverageSignature(data.planCovItems) : '';
         calculatedRow._assignMode = 'geometry';
-        calculatedRow._schema = 8;
+        calculatedRow._schema = 9;
         applyCachedCoverage(calculatedRow);
 
         resultTable.push(calculatedRow);

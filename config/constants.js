@@ -82,6 +82,21 @@ const constants = {
   POP_GROWTH: 1.2,
   POP_PER_UNIT: 20000,
 
+  // Diện tích chính thức 40 phường/xã (km², tổng 4.947,1 km²) — ưu tiên hơn thuộc tính dienTich của polygon (vài phường nhập sai).
+  // Tên khớp thuộc tính tenXa của polygon; phường không có trong bảng thì lấy dienTich của polygon.
+  WARD_AREA_KM2: {
+    "Phường Thuận An": 36.48, "Phường Hóa Châu": 34.6, "Phường Mỹ Thượng": 28.83, "Phường Vỹ Dạ": 8.93,
+    "Phường Thuận Hóa": 7.57, "Phường An Cựu": 16.71, "Phường Thủy Xuân": 37.03, "Phường Kim Long": 90.14,
+    "Phường Hương An": 19.43, "Phường Phú Xuân": 10.38, "Phường Hương Trà": 83.28, "Phường Kim Trà": 42.8,
+    "Phường Thanh Thủy": 48.92, "Phường Hương Thủy": 33.93, "Phường Phú Bài": 344.63, "Phường Phong Điền": 592.48,
+    "Phường Phong Thái": 187.02, "Phường Phong Dinh": 87.17, "Phường Phong Phú": 60.85, "Phường Phong Quảng": 41.7,
+    "Xã Đan Điền": 82.62, "Xã Quảng Điền": 45.93, "Xã Phú Vinh": 57.95, "Xã Phú Hồ": 57.72,
+    "Xã Phú Vang": 86.19, "Xã Vinh Lộc": 66.53, "Xã Hưng Lộc": 95.62, "Xã Lộc An": 177.58,
+    "Xã Phú Lộc": 119.3, "Xã Chân Mây - Lăng Cô": 261.38, "Xã Long Quảng": 215.85, "Xã Nam Đông": 175.95,
+    "Xã Khe Tre": 256.02, "Xã Bình Điền": 266.5, "Xã A Lưới 1": 198.59, "Xã A Lưới 2": 97.62,
+    "Xã A Lưới 3": 154.23, "Xã A Lưới 4": 233.65, "Xã A Lưới 5": 464.4, "Phường Dương Nỗ": 20.63
+  },
+
   // Cấu hình thuật toán Isochrone Giao thông (90% Di chuyển + 10% Offset làm mịn)
   ISOCHRONE_CONFIG: {
     REACH_RATIO: 0.9,  // 90% bán kính di chuyển thực tế theo đường giao thông

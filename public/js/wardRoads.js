@@ -142,7 +142,7 @@ export async function fillWardRoadLengths(wardName) {
   const d = wards[wardName];
   if (!d) { el.innerHTML = ''; return; }
   const when = d.at ? ` (OSM ${new Date(d.at).toLocaleDateString('vi-VN')})` : '';
-  el.innerHTML = `🛣️ Đường giao thông${escapeHtml(when)}:`
+  el.innerHTML = `${el.previousElementSibling ? ' · ' : ''}🛣️ Đường giao thông${escapeHtml(when)}:`
     + ` <span title="Quốc lộ, tỉnh lộ, đường chính đô thị và đường phố có tên — đường đôi tính 1 lần theo tim tuyến">Trục chính <b>${KM_FORMAT.format(d.main)} km</b></span>`
     + ` · <span title="Đường không tên, kiệt/hẻm, đường nội bộ, dịch vụ, phố đi bộ — theo OpenStreetMap nên là mức tối thiểu">Kiệt <b>${KM_FORMAT.format(d.kiet)} km</b></span>`;
 }
