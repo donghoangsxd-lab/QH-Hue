@@ -306,8 +306,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           size: phase === 'QH' ? 0 : size,
           radius: isUrban ? 2000 : (UNIT_DEFAULT_RADIUS[type] || 500),
           sizeHT: phase === 'QH' ? null : size,
-          sizeQH: size,
-          planChange: phase === 'QH' ? 'new' : 'keep',
+          sizeQH: phase === 'QH' ? size : null,
+          planChange: phase === 'QH' ? 'new' : 'relocate',
           status: false
         };
         if (phase === 'QH') state.planDataList.push(newItem);

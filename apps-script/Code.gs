@@ -9,6 +9,7 @@ const GEOJSON_FILE_NAME = "infrastructure_hue.json";
 const CAD_FILE_NAME = "cad_parcels.json";
 const CAD_SHEET_NAME = "CAD_Polygon";
 const CAD_HEADERS = ["ID_DoiTuong", "Layer", "DienTich", "File", "ThoiGianNhap", "GeoJSON"];
+const CAD_DEFAULT_RADIUS = 1000; // bán kính tạm cho lô nhập từ DXF, admin chỉnh lại sau
 const VALID_PREFIXES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM", "9-CSD"];
 
 // Cột được xác định theo tên tiêu đề dòng 1 (không phân biệt hoa thường, bỏ khoảng trắng)
@@ -111,6 +112,16 @@ function findInfraSheet(ss, typeCode) {
     if (sheets[s].getName().trim().indexOf(typeCode) === 0) return sheets[s];
   }
   return null;
+}
+
+// Giá trị cột Nhom_HaTang theo danh sách chọn của Sheet
+function sheetNhom(nhom) {
+  return nhom === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp DVO';
+}
+
+// Tên phường/xã ghi Sheet dạng ngắn như dữ liệu sẵn có: "Phường Thuận Hóa" → "Thuận Hóa"
+function sheetWard(ward) {
+  return String(ward || '').replace(/^\s*(Phường|Xã|Thị trấn)\s+/i, '').trim();
 }
 
 function jsonOutput(obj) {
@@ -476,7 +487,7 @@ function doGet(e) {
     if (action === "addPoint") {
       var typeCode = params.type || "9-CSD";
       var name = params.name || "Công trình mới";
-      var ward = params.ward || "Thuận Hóa";
+      var ward = sheetWard(params.ward) || "Thuận Hóa";
       var phase = String(params.phase || 'HT').toUpperCase() === 'QH' ? 'QH' : 'HT';
 
       var latStr = String(params.lat || '0').replace(',', '.');
@@ -506,12 +517,12 @@ function doGet(e) {
       setCell('id', newId);
       setCell('name', name);
       setCell('ward', ward);
-      setCell('nhom', params.nhomHaTang === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở');
+      setCell('nhom', sheetNhom(params.nhomHaTang));
       setCell('lat', "'" + latStr);
       setCell('lng', "'" + lngStr);
-      // QH: HT để trống = quy hoạch mới | HT: ghi cùng giá trị cho QH = giữ nguyên theo hiện trạng
-      setCell('quyMoHT', phase === 'QH' ? '' : size);
-      setCell('quyMoQH', size);
+      // Chỉ ghi cột quy mô của giai đoạn đang đề xuất (QH: QuyMo_HT để trống = quy hoạch mới)
+      if (phase === 'QH') setCell('quyMoQH', size);
+      else setCell('quyMoHT', size);
       setCell('banKinh', 500);
       setCell('trangThai', false);
       setCell('thoiGian', currentTime);
@@ -592,7 +603,8 @@ function doPost(e) {
  * Nhập lô đất từ DXF. body = { phase: 'HT'|'QH', fileName, sync, items: [{ type, idPrefix, nhom, name, ward,
  * lat, lng, size, area, crossWard, layer, matchId, geometry }] }
  * - matchId có trong Sheet → cập nhật tọa độ, phường, quy mô giai đoạn đang nhập; không có → thêm dòng mới
- * - Dòng mới giai đoạn HT ghi cùng giá trị cho QuyMo_QH (giữ nguyên theo hiện trạng); giai đoạn QH để trống QuyMo_HT
+ * - Chỉ ghi cột quy mô của giai đoạn đang nhập (HT → QuyMo_HT, QH → QuyMo_QH), cột còn lại để trống
+ * - BanKinh tạm = CAD_DEFAULT_RADIUS (dòng mới, hoặc dòng cập nhật đang trống bán kính)
  * - sync = false: chưa đẩy lên bucket (máy chủ gửi nhiều phần, chỉ phần cuối đồng bộ)
  */
 function importCadBatch(body) {
@@ -648,10 +660,13 @@ function importCadBatch(body) {
         id = it.matchId;
         var sheetRow = r + 1;
         var prevNote = String(cellAt(c.data[r], c.col.ghiChu) || '').trim();
-        c.sheet.getRange(sheetRow, c.col.lat + 1).setNumberFormat("@").setValue(String(it.lat));
-        c.sheet.getRange(sheetRow, c.col.lng + 1).setNumberFormat("@").setValue(String(it.lng));
-        if (c.col.ward >= 0) c.sheet.getRange(sheetRow, c.col.ward + 1).setValue(it.ward);
+        c.sheet.getRange(sheetRow, c.col.lat + 1).setValue(Number(it.lat));
+        c.sheet.getRange(sheetRow, c.col.lng + 1).setValue(Number(it.lng));
+        if (c.col.ward >= 0) c.sheet.getRange(sheetRow, c.col.ward + 1).setValue(sheetWard(it.ward));
         c.sheet.getRange(sheetRow, qCol + 1).setValue(it.size);
+        if (c.col.banKinh >= 0 && String(cellAt(c.data[r], c.col.banKinh) || '').trim() === '') {
+          c.sheet.getRange(sheetRow, c.col.banKinh + 1).setValue(CAD_DEFAULT_RADIUS);
+        }
         if (c.col.trangThai >= 0) c.sheet.getRange(sheetRow, c.col.trangThai + 1).setValue(true);
         if (c.col.thoiGian >= 0) c.sheet.getRange(sheetRow, c.col.thoiGian + 1).setValue(currentTime);
         if (c.col.ghiChu >= 0) c.sheet.getRange(sheetRow, c.col.ghiChu + 1).setValue(prevNote ? prevNote + " | " + note : note);
@@ -662,12 +677,12 @@ function importCadBatch(body) {
         var set = function(idx, value) { if (idx >= 0) row[idx] = value; };
         set(c.col.id, id);
         set(c.col.name, it.name);
-        set(c.col.ward, it.ward);
-        set(c.col.nhom, it.nhom === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở');
-        set(c.col.lat, String(it.lat));
-        set(c.col.lng, String(it.lng));
+        set(c.col.ward, sheetWard(it.ward));
+        set(c.col.nhom, sheetNhom(it.nhom));
+        set(c.col.lat, Number(it.lat));
+        set(c.col.lng, Number(it.lng));
         set(qCol, it.size);
-        if (phase === 'HT') set(c.col.quyMoQH, it.size);
+        set(c.col.banKinh, CAD_DEFAULT_RADIUS);
         set(c.col.trangThai, true);
         set(c.col.thoiGian, currentTime);
         set(c.col.ghiChu, note);
@@ -677,15 +692,20 @@ function importCadBatch(body) {
       if (it.geometry) polygons.push({ id: id, layer: it.layer, area: it.area, geometry: it.geometry });
     });
 
-    // Dòng mới ghi 1 lần mỗi tab; cột tọa độ để dạng văn bản như addPoint
+    // Dòng mới ghi 1 lần mỗi tab, chép định dạng + danh sách chọn (Nhom_HaTang, TrangThai) từ dòng dữ liệu cuối
     Object.keys(ctx).forEach(function(k) {
       var c = ctx[k];
       if (!c || !c.newRows.length) return;
       var start = c.sheet.getLastRow() + 1;
       var n = c.newRows.length;
-      c.sheet.getRange(start, c.col.lat + 1, n, 1).setNumberFormat("@");
-      c.sheet.getRange(start, c.col.lng + 1, n, 1).setNumberFormat("@");
-      c.sheet.getRange(start, 1, n, c.data[0].length).setValues(c.newRows);
+      var w = c.data[0].length;
+      var target = c.sheet.getRange(start, 1, n, w);
+      if (start > 2) {
+        var template = c.sheet.getRange(start - 1, 1, 1, w);
+        template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+        template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
+      }
+      target.setValues(c.newRows);
     });
 
     upsertCadPolygons(ss, polygons, fileName, currentTime);
