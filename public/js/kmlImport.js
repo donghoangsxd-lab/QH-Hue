@@ -21,6 +21,19 @@ function layerField(pm) {
   return m ? m[1] : '';
 }
 
+// Mọi thuộc tính của Placemark (để khớp thủ công khi tên không theo quy ước): ExtendedData, bảng HTML ArcGIS, Folder, tên
+function placemarkAttrs(pm, name, folders) {
+  const attrs = {};
+  const put = (k, v) => { k = String(k || '').trim(); if (k && !(k in attrs)) attrs[k] = String(v ?? '').trim(); };
+  descendants(pm, 'SimpleData').forEach(sd => put(sd.getAttribute('name'), sd.textContent));
+  descendants(pm, 'Data').forEach(d => put(d.getAttribute('name'), childText(d, 'value')));
+  const desc = childText(pm, 'description');
+  for (const m of desc.matchAll(/<t[dh][^>]*>\s*([^<]{1,40}?)\s*<\/t[dh]>\s*<t[dh][^>]*>\s*([^<]*?)\s*<\/t[dh]>/gi)) put(m[1], m[2]);
+  folders.forEach((f, i) => put(i === 0 ? 'Folder' : `Folder cấp trên ${i}`, f));
+  put('Tên Placemark', name);
+  return attrs;
+}
+
 function folderNames(pm) {
   const names = [];
   for (let el = pm.parentElement; el; el = el.parentElement) {
@@ -63,16 +76,21 @@ export function openRing(pts) {
   return r.length >= 3 ? r : null;
 }
 
-/** Đọc KML (văn bản) → { entities: [{kind: 'POLYGON'|'POLYLINE', layer, name, rings}], stats } */
+/**
+ * Đọc KML (văn bản) → { entities: [{kind: 'POLYGON'|'POLYLINE'|'POINT', layer, name, attrs, rings, pt?}], stats }.
+ * Bộ lọc mặc định: chỉ nhận Polygon, đường khép kín và Point (Placemark không có vùng); còn lại đếm vào stats.skipped.
+ */
 export function parseKml(text) {
   const doc = new DOMParser().parseFromString(text, 'application/xml');
   if (doc.getElementsByTagName('parsererror').length) throw new Error('File KML lỗi cấu trúc XML.');
-  const stats = { placemark: 0, polygon: 0, polyline: 0, point: 0, openLine: 0 };
+  const stats = { placemark: 0, polygon: 0, polyline: 0, point: 0, skipped: {} };
+  const skip = (label, n = 1) => { stats.skipped[label] = (stats.skipped[label] || 0) + n; };
   const entities = [];
   for (const pm of descendants(doc, 'Placemark')) {
     stats.placemark++;
     const name = childText(pm, 'name');
     const layer = resolveLayer(pm, name);
+    const attrs = placemarkAttrs(pm, name, folderNames(pm));
     const polyRings = [];
     for (const poly of descendants(pm, 'Polygon')) {
       for (const lr of descendants(poly, 'LinearRing')) {
@@ -85,11 +103,19 @@ export function parseKml(text) {
     for (const ln of lines) {
       const pts = parseCoords(childText(ln, 'coordinates'));
       const r = pts.length > 3 && samePt(pts[0], pts[pts.length - 1]) ? openRing(pts) : null;
-      if (r) lineRings.push(r); else stats.openLine++;
+      if (r) lineRings.push(r); else skip('line hở');
     }
-    if (polyRings.length) { entities.push({ kind: 'POLYGON', layer, name, rings: polyRings }); stats.polygon++; }
-    if (lineRings.length) { entities.push({ kind: 'POLYLINE', layer, name, rings: lineRings }); stats.polyline++; }
-    if (!polyRings.length && !lineRings.length && descendants(pm, 'Point').length) stats.point++;
+    if (polyRings.length) { entities.push({ kind: 'POLYGON', layer, name, attrs, rings: polyRings }); stats.polygon++; }
+    if (lineRings.length) { entities.push({ kind: 'POLYLINE', layer, name, attrs, rings: lineRings }); stats.polyline++; }
+    const points = descendants(pm, 'Point');
+    // Point đi kèm vùng trong cùng Placemark (MultiGeometry) là điểm nhãn của vùng → không nhập riêng
+    if (polyRings.length || lineRings.length) continue;
+    let added = 0;
+    for (const p of points) {
+      const pt = parseCoords(childText(p, 'coordinates'))[0];
+      if (pt) { entities.push({ kind: 'POINT', layer, name, attrs, rings: [], pt }); stats.point++; added++; }
+    }
+    if (!added && !lines.length) skip(points.length ? 'point lỗi tọa độ' : 'placemark không có hình');
   }
   return { entities, stats };
 }

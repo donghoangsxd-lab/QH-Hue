@@ -225,17 +225,19 @@ function parseCadItem(it) {
   const ward = sanitizeSheetText(it.ward, 80);
   const layer = sanitizeSheetText(it.layer, 60) || idPrefix;
   const matchId = it.matchId ? String(it.matchId) : null;
-  if (!pt || !ward || !Number.isFinite(area) || area <= 0 || area > 1e8) return null;
+  // Điểm (không có ranh): quy mô ghi 0 = có công trình, chưa rõ diện tích; chỉ tạo mới
+  const point = it.point === true;
+  if (!pt || !ward || !Number.isFinite(area) || area > 1e8 || (point ? area !== 0 || matchId : area <= 0)) return null;
   if (matchId && !/^[A-Za-z0-9_\-]{1,40}$/.test(matchId)) return null;
-  const crossWard = it.crossWard === true;
+  const crossWard = !point && it.crossWard === true;
   const areaRounded = Math.round(area * 10) / 10;
-  let geometry = parseCadGeometry(it.geometry);
+  let geometry = point ? null : parseCadGeometry(it.geometry);
   if (geometry && JSON.stringify(geometry).length > CAD_GEOJSON_MAX_CHARS) geometry = null;
   return {
     type, idPrefix,
     nhom: it.nhom === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở',
     name: sanitizeSheetText(it.name, 150) || `${layer} (DXF)`,
-    ward, layer, matchId, crossWard,
+    ward, layer, matchId, crossWard, point,
     lat: pt.lat.toFixed(6), lng: pt.lng.toFixed(6),
     area: areaRounded,
     size: crossWard ? 0 : areaRounded,
@@ -664,6 +666,30 @@ function findWardByName(evaluatedWards, wardName) {
   return evaluatedWards.find(w => w.name === wardName || constants.cleanWardStr(w.name) === clean) || null;
 }
 
+// ============================ ĐỐI CHIẾU TÊN PHƯỜNG SHEET ↔ TỌA ĐỘ ============================
+
+// Dấu nhắc ghi vào cột Note (Apps Script dùng cùng tiền tố để thay / gỡ); tên phường dạng ngắn như cột Ten_XaPhuong
+const WARD_NOTE_PREFIX = '⚠ Phường/xã theo tọa độ:';
+const WARD_OUTSIDE_TEXT = 'ngoài ranh 40 phường/xã';
+const wardKey = (s) => constants.cleanWardStr(String(s || '').normalize('NFC').replace(/^\s*Thị trấn\s+/i, ''));
+const shortWard = (s) => String(s || '').replace(/^\s*(Phường|Xã|Thị trấn)\s+/i, '').trim();
+
+/**
+ * Công trình có Ten_XaPhuong (Sheet) khác phường theo tọa độ → [{ id, sheetWard, coordWard, note }].
+ * note = nội dung dấu nhắc cần có trong cột Note; noteOk = Note đã có đúng dấu đó.
+ */
+function findWardMismatches(items, evaluatedWards) {
+  const out = [];
+  items.forEach(it => {
+    if (!it.id) return;
+    const coord = assignWardByGeometry(it.lng, it.lat, evaluatedWards);
+    if (coord && wardKey(coord) === wardKey(it.ward)) return;
+    const note = `${WARD_NOTE_PREFIX} ${coord ? shortWard(coord) : WARD_OUTSIDE_TEXT}`;
+    out.push({ id: it.id, name: it.name, sheetWard: it.ward || '', coordWard: coord, note, noteOk: String(it.note || '').includes(note) });
+  });
+  return out;
+}
+
 // ============================ PHÂN LOẠI & CHỈ TIÊU ============================
 
 // Kịch bản quy hoạch: công trình có QuyMo_QH (bỏ di dời / không thể hiện), diện tích theo QuyMo_QH
@@ -991,7 +1017,7 @@ module.exports = async (req, res) => {
         created: result.created || [],
         updated: result.updated || [],
         skipped: result.skipped || [],
-        polygonsDropped: items.filter(it => !it.geometry).length
+        polygonsDropped: items.filter(it => !it.geometry && !it.point).length
       });
     }
 
@@ -1167,6 +1193,30 @@ module.exports = async (req, res) => {
     const allDataList = await getRawDataList();
     // Mọi phép tính hiện trạng chỉ dùng công trình có QuyMo_HT (ô trống = hiện tại chưa hình thành)
     const rawDataList = allDataList.filter(it => it.planChange !== 'new' && it.planChange !== 'none');
+
+    // Admin: ghi dấu nhắc "phường theo tọa độ" vào cột Note cho công trình lệch phường, gỡ dấu ở dòng đã sửa đúng
+    if (action === 'syncWardNotes') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const evaluatedWards = await loadEvaluatedWards(wardVectorParsed);
+      const mismatches = findWardMismatches(allDataList, evaluatedWards);
+      const flagged = new Set(mismatches.map(m => m.id));
+      const stale = allDataList.filter(it => it.id && !flagged.has(it.id) && String(it.note || '').includes(WARD_NOTE_PREFIX)).length;
+      const summary = { success: true, mismatches: mismatches.length, marked: 0, cleared: 0 };
+      if (!stale && mismatches.every(m => m.noteOk)) return res.status(200).json({ ...summary, unchanged: true });
+      const result = await callAppsScript({ action: 'markWardNotes' }, {
+        action: 'markWardNotes',
+        prefix: WARD_NOTE_PREFIX,
+        items: mismatches.map(m => ({ id: m.id, note: m.note }))
+      });
+      invalidateAllCaches();
+      return res.status(200).json({
+        ...summary,
+        marked: Number(result.marked) || 0,
+        cleared: Number(result.cleared) || 0,
+        noNoteColumn: Array.isArray(result.noNoteColumn) ? result.noNoteColumn : []
+      });
+    }
 
     // Khu đất CSD theo id (lấy diện tích + cột BanKinh từ sheet); không có id thì dùng tọa độ + diện tích gửi lên
     const resolveCsdRequest = async () => {

@@ -255,10 +255,34 @@ function dedupeRing(ring) {
   return out;
 }
 
-/** Đọc DXF (văn bản) → { entities: [{kind, layer, rings}], stats } — chỉ HATCH, LWPOLYLINE, POLYLINE khép kín trong ENTITIES */
+function readPoint(tags, i) {
+  const ent = { kind: 'POINT', layer: '0', rings: [], pt: null };
+  let x = NaN, y = NaN;
+  for (; i < tags.length && tags[i][0] !== 0; i++) {
+    const [code, v] = tags[i];
+    if (code === 8) ent.layer = v;
+    else if (code === 10) x = parseFloat(v);
+    else if (code === 20) y = parseFloat(v);
+  }
+  if (Number.isFinite(x) && Number.isFinite(y)) ent.pt = [x, y];
+  return [ent, i];
+}
+
+// Tên hiển thị của đối tượng DXF bị bỏ qua (bộ lọc mặc định chỉ nhận HATCH, polyline khép kín, POINT)
+const DXF_SKIP_LABEL = { LINE: 'line', TEXT: 'text', MTEXT: 'mtext', INSERT: 'block', ATTDEF: 'attdef', DIMENSION: 'dimension' };
+
+/** Thêm 1 đối tượng bị bỏ qua vào stats.skipped ({ nhãn: số lượng }) */
+export function countSkipped(stats, label, n = 1) {
+  stats.skipped[label] = (stats.skipped[label] || 0) + n;
+}
+
+/**
+ * Đọc DXF (văn bản) → { entities: [{kind, layer, rings, pt?}], stats } — chỉ HATCH, LWPOLYLINE / POLYLINE khép kín và POINT
+ * trong ENTITIES; mọi đối tượng khác (line, pline hở, text, mtext, block...) đếm vào stats.skipped.
+ */
 export function parseDxf(text) {
   const tags = readTags(text);
-  const stats = { hatch: 0, polyline: 0, openPolyline: 0, insert: 0, splineEdges: 0, ignored: {}, insUnits: null };
+  const stats = { hatch: 0, polyline: 0, point: 0, insert: 0, splineEdges: 0, skipped: {}, insUnits: null };
   const entities = [];
   let section = null;
   for (let i = 0; i < tags.length;) {
@@ -269,19 +293,22 @@ export function parseDxf(text) {
     if (v === 'ENDSEC') { section = null; i++; continue; }
     if (section !== 'ENTITIES') { i++; continue; }
     let ent = null;
-    if (v === 'HATCH') { [ent, i] = readHatch(tags, i + 1, stats); stats.hatch++; }
+    if (v === 'HATCH') { [ent, i] = readHatch(tags, i + 1, stats); }
     else if (v === 'LWPOLYLINE') { [ent, i] = readLwPolyline(tags, i + 1); }
     else if (v === 'POLYLINE') { [ent, i] = readPolyline(tags, i + 1); }
+    else if (v === 'POINT') { [ent, i] = readPoint(tags, i + 1); }
     else {
       if (v === 'INSERT') stats.insert++;
-      else stats.ignored[v] = (stats.ignored[v] || 0) + 1;
+      countSkipped(stats, DXF_SKIP_LABEL[v] || v.toLowerCase());
       for (i++; i < tags.length && tags[i][0] !== 0; i++);
       continue;
     }
-    if (ent.kind !== 'HATCH') {
-      if (ent.rings.length) stats.polyline++; else stats.openPolyline++;
-    }
-    if (ent.rings.length) entities.push(ent);
+    if (ent.kind === 'POINT') {
+      if (ent.pt) { entities.push(ent); stats.point++; } else countSkipped(stats, 'point lỗi tọa độ');
+    } else if (ent.rings.length) {
+      entities.push(ent);
+      if (ent.kind === 'HATCH') stats.hatch++; else stats.polyline++;
+    } else countSkipped(stats, ent.kind === 'HATCH' ? 'hatch lỗi biên' : 'pline hở');
   }
   return { entities, stats };
 }
@@ -406,10 +433,13 @@ const E_RANGE = [350000, 900000];
 const N_RANGE = [1650000, 1950000];
 const inRange = (v, r) => v >= r[0] && v <= r[1];
 
+/** Tọa độ đầu tiên của thực thể (đỉnh đầu của vòng, hoặc chính điểm với thực thể POINT) */
+export const firstXY = (e) => e.pt || e.rings[0][0];
+
 /** Phát hiện đảo X/Y và đơn vị mm từ vài điểm mẫu: trả về hàm (x, y) → [E, N] mét, kèm ghi chú */
 export function detectAxes(entities) {
   const sample = [];
-  for (const e of entities) { sample.push(e.rings[0][0]); if (sample.length >= 50) break; }
+  for (const e of entities) { sample.push(firstXY(e)); if (sample.length >= 50) break; }
   const tries = [
     { note: '', f: (x, y) => [x, y] },
     { note: 'đảo X/Y', f: (x, y) => [y, x] },
@@ -435,14 +465,25 @@ function metersApart(a, b) {
  * Thực thể → lô đất: { layer, name, prefix, type, nhom, area (m²), lat, lng, polygons ([[lng,lat]...] theo vòng) }
  * project(ent) → { toXY(x, y) → [X, Y] mét trên mặt phẳng, toLatLng(X, Y) → [lat, lng] }.
  * Đường khép kín trùng với vùng tô cùng layer (cùng tâm < 1 m, diện tích lệch < 1%) được bỏ để không đếm 2 lần.
+ * Thực thể POINT → công trình dạng điểm (area 0, polygons []); điểm nằm trong lô cùng loại của file được bỏ (điểm ghi chú của lô).
  */
 function makeParcels(entities, project) {
   const parcels = [];
   const unknownLayers = {};
   for (const ent of entities) {
-    const t = layerToType(ent.layer);
+    // typeCode: mã loại người dùng khớp thủ công cho layer/thuộc tính không theo quy ước
+    const t = layerToType(ent.typeCode || ent.layer);
     if (!t) { unknownLayers[ent.layer] = (unknownLayers[ent.layer] || 0) + 1; continue; }
     const { toXY, toLatLng } = project(ent);
+    if (ent.kind === 'POINT') {
+      const [lat, lng] = toLatLng(...toXY(ent.pt[0], ent.pt[1]));
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      parcels.push({
+        kind: 'POINT', layer: ent.layer, name: ent.name || '', handle: null, manual: !!ent.typeCode, ...t,
+        area: 0, lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6, polygons: []
+      });
+      continue;
+    }
     const rings = ent.rings.map(r => r.map(([x, y]) => toXY(x, y)));
     const polys = buildPolygons(rings);
     if (!polys.length) continue;
@@ -462,7 +503,7 @@ function makeParcels(entities, project) {
     const [cE, cN] = polys.some(p => pointInPolygon(whole[0], whole[1], p.rings)) ? whole : interiorPoint(main.rings);
     const [lat, lng] = toLatLng(cE, cN);
     parcels.push({
-      kind: ent.kind, layer: ent.layer, name: ent.name || '', handle: ent.handle || null, ...t,
+      kind: ent.kind, layer: ent.layer, name: ent.name || '', handle: ent.handle || null, manual: !!ent.typeCode, ...t,
       area: Math.round(area * 10) / 10,
       lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6,
       polygons: polys.map(p => p.rings.map(r => {
@@ -488,10 +529,19 @@ function makeParcels(entities, project) {
 
   const fills = parcels.filter(p => FILL_KINDS.has(p.kind));
   const boundHandles = new Set(entities.filter(e => e.kind === 'HATCH').flatMap(e => e.sources || []));
-  const kept = parcels.filter(p => FILL_KINDS.has(p.kind) || !(boundHandles.has(p.handle) || fills.some(h => h.layer === p.layer
-    && metersApart(h, p) < 1
-    && Math.abs(h.area - p.area) <= 0.01 * h.area)));
-  return { parcels: kept, duplicatesDropped: parcels.length - kept.length, unknownLayers };
+  const areas = parcels.filter(p => p.kind !== 'POINT');
+  let pointsInLots = 0;
+  const kept = parcels.filter(p => {
+    if (p.kind === 'POINT') {
+      const inLot = areas.some(a => a.type === p.type && inPolys(p.lng, p.lat, a.polygons));
+      if (inLot) pointsInLots++;
+      return !inLot;
+    }
+    return FILL_KINDS.has(p.kind) || !(boundHandles.has(p.handle) || fills.some(h => h.layer === p.layer
+      && metersApart(h, p) < 1
+      && Math.abs(h.area - p.area) <= 0.01 * h.area));
+  });
+  return { parcels: kept, duplicatesDropped: parcels.length - kept.length - pointsInLots, pointsInLots, unknownLayers };
 }
 
 /** Thực thể DXF (VN-2000) → { parcels, duplicatesDropped, unknownLayers, axes } */
@@ -516,10 +566,10 @@ function localProjection(lng0, lat0) {
 
 /** Thực thể KML (vòng [lng, lat] WGS84) → { parcels, duplicatesDropped, unknownLayers, axes } */
 export function buildParcelsLonLat(entities) {
-  const sample = entities.slice(0, 50).map(e => e.rings[0][0]);
+  const sample = entities.slice(0, 50).map(firstXY);
   const ok = sample.filter(([lng, lat]) => inRange(lat, LAT_RANGE) && inRange(lng, LNG_RANGE)).length;
   const valid = sample.length > 0 && ok >= sample.length * 0.9;
-  return { ...makeParcels(entities, (ent) => localProjection(ent.rings[0][0][0], ent.rings[0][0][1])), axes: { note: '', valid } };
+  return { ...makeParcels(entities, (ent) => localProjection(...firstXY(ent))), axes: { note: '', valid } };
 }
 
 // ============================ PHƯỜNG & CÔNG TRÌNH ĐÃ CÓ ============================
@@ -579,6 +629,7 @@ export function assignWards(parcels, wards) {
     p.ward = home ? home.name : null;
     p.crossWard = false;
     p.wardShares = null;
+    if (!p.polygons.length) continue;
     const hit = new Set();
     for (const [x, y] of samplePoints(p.polygons)) hit.add(find(x, y));
     if (hit.size === 1 && hit.has(home)) continue;
@@ -604,20 +655,34 @@ export function assignWards(parcels, wards) {
   return parcels;
 }
 
+// Điểm cách công trình cùng loại đã có dưới ngưỡng này coi là đã có (không tạo trùng, không ghi đè quy mô)
+const POINT_EXISTING_M = 20;
+
 /**
  * Lô chứa công trình cùng loại đã có → cập nhật công trình đó (p.matchId). Nhiều công trình trong 1 lô,
  * hoặc 1 công trình nằm trong nhiều lô → p.matchConflict (danh sách ID) để admin chọn.
+ * Điểm (không có ranh) gần công trình cùng loại < POINT_EXISTING_M → p.existingId (bỏ qua khi ghi).
  */
 export function matchExisting(parcels, existing) {
   const boxes = parcels.map(p => bboxOfRings(p.polygons.map(poly => poly[0])));
   const byParcel = parcels.map(() => []);
   const byItem = new Map();
+  parcels.forEach(p => {
+    p.existingId = null;
+    if (p.kind !== 'POINT') return;
+    let bestD = POINT_EXISTING_M;
+    for (const it of existing) {
+      if (p.type !== it.type || !it.id) continue;
+      const d = metersApart(p, { lat: Number(it.lat), lng: Number(it.lng) });
+      if (d < bestD) { bestD = d; p.existingId = it.id; }
+    }
+  });
   for (const it of existing) {
     const x = Number(it.lng), y = Number(it.lat);
     if (!Number.isFinite(x) || !Number.isFinite(y) || !it.id) continue;
     parcels.forEach((p, k) => {
       const b = boxes[k];
-      if (p.type !== it.type || x < b[0] || x > b[2] || y < b[1] || y > b[3]) return;
+      if (p.kind === 'POINT' || p.type !== it.type || x < b[0] || x > b[2] || y < b[1] || y > b[3]) return;
       if (!inPolys(x, y, p.polygons)) return;
       byParcel[k].push(it.id);
       byItem.set(it.id, (byItem.get(it.id) || 0) + 1);

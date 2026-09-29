@@ -396,6 +396,24 @@ body.right-collapsed .right-panel {
 .cad-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; color: var(--text-muted); }
 .cad-clear { background: none; border: 1px solid var(--border-color); color: var(--text-muted); border-radius: 4px; font-size: 10px; padding: 2px 6px; cursor: pointer; }
 .cad-clear:hover { color: var(--accent-red); border-color: var(--accent-red); }
+.cad-filter { margin-top: 3px; font-weight: normal; color: var(--text-muted); line-height: 1.4; }
+.cad-filter b { color: var(--text-main); }
+/* Khớp thủ công layer / thuộc tính → loại hạ tầng */
+.cad-map { margin-top: 6px; padding: 6px; border: 1px solid rgba(251, 146, 60, 0.45); border-radius: 6px; background: rgba(251, 146, 60, 0.05); }
+.cad-map-head { font-weight: 600; margin-bottom: 4px; }
+.cad-map-head b { color: var(--accent-orange); }
+.cad-map-field { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; color: var(--text-muted); white-space: nowrap; }
+.cad-map-field select { flex: 1; min-width: 0; padding: 2px 3px; font-size: 10.5px; font-family: inherit; color: var(--text-main); background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color); border-radius: 4px; }
+.cad-map-list { max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 5px; background: rgba(15, 23, 42, 0.35); }
+.cad-map-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: center; gap: 5px; padding: 3px 5px; border-bottom: 1px solid rgba(148, 163, 184, 0.12); border-left: 2px solid transparent; }
+.cad-map-row.mapped { border-left-color: #4ade80; }
+.cad-map-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cad-map-val small { color: var(--text-muted); }
+.cad-map-val em { margin-left: 4px; padding: 0 4px; border-radius: 6px; font-size: 8.5px; font-style: normal; font-weight: 600; color: #facc15; background: rgba(250, 204, 21, 0.15); }
+.cad-map-type { width: 100%; padding: 2px 3px; font-size: 10px; font-family: inherit; color: var(--text-main); background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; }
+.cad-map-row.mapped .cad-map-type { border-color: rgba(74, 222, 128, 0.6); }
+.cad-map-foot { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 4px; color: var(--text-muted); }
+.cad-map-foot b { color: #facc15; }
 .btn-submit:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ===================== PANEL DƯỚI ===================== */
@@ -784,6 +802,44 @@ table.ward-table th {
 .app-toast.success { border-color: var(--accent-green); }
 .app-toast.error { border-color: var(--accent-red); }
 .app-toast.info { border-color: var(--accent-cyan); }
+
+/* Nhắc Admin: tên phường trong Sheet khác phường theo tọa độ */
+.ward-check {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1300;
+  width: min(92vw, 520px);
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.95);
+  color: var(--text-main);
+  border: 1px solid rgba(251, 146, 60, 0.7);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  font-size: 11.5px;
+}
+.ward-check[hidden] { display: none; }
+.ward-check-head { display: flex; align-items: center; gap: 6px; }
+.ward-check-text { flex: 1; min-width: 0; line-height: 1.35; }
+.ward-check-text > b { color: var(--accent-orange); }
+.ward-check-text small { color: var(--text-muted); }
+.ward-check-text small b { color: #facc15; }
+.ward-check-btn { flex-shrink: 0; padding: 3px 8px; font-size: 10.5px; font-family: inherit; color: var(--text-main); background: rgba(148, 163, 184, 0.12); border: 1px solid var(--border-color); border-radius: 5px; cursor: pointer; white-space: nowrap; }
+.ward-check-btn:hover { border-color: var(--accent-cyan); }
+.ward-check-btn.primary { background: rgba(251, 146, 60, 0.2); border-color: rgba(251, 146, 60, 0.7); font-weight: 600; }
+.ward-check-btn.primary:hover { background: rgba(251, 146, 60, 0.35); }
+.ward-check-btn:disabled { opacity: 0.55; cursor: wait; }
+.ward-check-close { flex-shrink: 0; background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; padding: 0 2px; }
+.ward-check-close:hover { color: var(--accent-red); }
+.ward-check-list { margin-top: 6px; max-height: 40vh; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 5px; background: rgba(15, 23, 42, 0.4); }
+.ward-check-row { display: block; width: 100%; padding: 4px 7px; text-align: left; font-family: inherit; font-size: 11px; color: var(--text-main); background: none; border: none; border-bottom: 1px solid rgba(148, 163, 184, 0.12); cursor: pointer; }
+.ward-check-row:hover { background: rgba(34, 211, 238, 0.1); }
+.ward-check-row span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ward-check-row small { color: var(--text-muted); }
+.ward-check-row small b { color: var(--accent-orange); }
+.ward-check-row em { margin-left: 4px; padding: 0 4px; border-radius: 6px; font-size: 8.5px; font-style: normal; font-weight: 600; color: #4ade80; background: rgba(74, 222, 128, 0.15); }
+.ward-check-more { padding: 4px 7px; color: var(--text-muted); font-style: italic; }
 
 /* Nút phê duyệt trong popup (chỉ hiện với Admin) */
 .popup-approve-btn {

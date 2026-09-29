@@ -38,6 +38,7 @@ import {
 import { initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleCompareMode } from './planMap.js';
 import { escapeHtml, showToast } from './utils.js';
 import { initCadImport } from './cadImportUi.js';
+import { initWardCheck, refreshWardCheck } from './wardCheck.js';
 
 const CITY_NAME = "Thành phố Huế";
 const RADIUS_MIN = 50;
@@ -73,15 +74,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   initPlanMap(map, layers);
   centerOnCity();
   initBottomPanelEvents();
-  initCadImport({
-    onImported: async () => {
-      try { await loadInfraData(); } catch (err) { showToast('⚠️ Chưa tải lại được dữ liệu, thử F5 sau ít phút', 'error'); return; }
-      renderGroupedPoints();
-      loadCadParcels();
-      refreshHeatmapOnly();
-      if (state.wardStatsData.length) reloadWardStats();
-    }
-  });
+  // Sau khi máy chủ ghi Sheet (nhập file, ghi dấu nhắc phường): tải lại dữ liệu và làm mới bản đồ, bảng
+  const reloadAfterSheetWrite = async () => {
+    try { await loadInfraData(); } catch (err) { showToast('⚠️ Chưa tải lại được dữ liệu, thử F5 sau ít phút', 'error'); return; }
+    renderGroupedPoints();
+    loadCadParcels();
+    refreshHeatmapOnly();
+    if (state.wardStatsData.length) reloadWardStats();
+    refreshWardCheck();
+  };
+  initCadImport({ onImported: reloadAfterSheetWrite });
+  initWardCheck({ onSynced: reloadAfterSheetWrite });
   restoreAdminSession();
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleCompareMode);
 
@@ -411,6 +414,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderGroupedPoints();
     renderBottomPanel();
     loadCadParcels();
+    refreshWardCheck();
 
     // Chạy ngầm tính độ phủ (dân số lớn → nhỏ), ghi nhớ theo chữ ký dữ liệu để lần sau dùng lại
     ensureWardStats()

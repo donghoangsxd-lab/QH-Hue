@@ -79,6 +79,7 @@ async function getRawDataList() {
         id: rawId,
         name: props.Ten_CongTrinh || 'Chưa đặt tên',
         ward: props.Ten_XaPhuong || '',
+        note: String(props.GhiChu || ''),
         type: mappedType,
         nhomHaTang: assignedNhom, // Bổ sung nhận biết nhóm hạ tầng phục vụ quy chuẩn QCVN
         lat: parseCoord(coords[1]),

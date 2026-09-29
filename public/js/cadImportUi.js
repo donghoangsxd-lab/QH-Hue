@@ -7,6 +7,7 @@ import { escapeHtml, fmtNum, distanceMeters } from './utils.js';
 import { parseDxf, buildParcels, buildParcelsLonLat, assignWards, matchExisting, layerToType, CRS_PRESETS } from './cadImport.js';
 import { parseKml, unzipKml } from './kmlImport.js';
 import { parseGeoJson } from './geojsonImport.js';
+import { createManualMapping, selectField, setCode, clearCodes, applyManualMapping, manualMappingHtml } from './cadTypeMapping.js';
 
 // Diện tích tối thiểu theo loại (khớp config/constants.js → infraConfig.minSize)
 const MIN_SIZE = { "1-CV": 300, "2-BDX": 200, "3-MN": 800, "4-TH": 2000, "5-THCS": 2500, "6-YT": 1000, "7-VH": 500, "8-TM": 1500 };
@@ -19,7 +20,7 @@ const CHUNK_MAX_CHARS = 2500000;
 const CHOICE_NEW = '__new';
 const CHOICE_SKIP = '__skip';
 
-let current = null;   // { fileName, format: 'dxf'|'kml'|'geojson', wgs84, stats, result, items: Map ID → công trình đang có }
+let current = null;   // { fileName, format: 'dxf'|'kml'|'geojson', wgs84, stats, result, manual (khớp thủ công), items: Map ID → công trình đang có }
 let previewLayer = null;
 let submitting = false;
 let onImported = null;
@@ -36,6 +37,38 @@ function setStatus(text, color) {
 
 function fmtArea(m2) {
   return m2 >= 10000 ? `${fmtNum(Math.round(m2 / 100) / 100)} ha` : `${fmtNum(Math.round(m2))} m²`;
+}
+
+const isPoint = (p) => p.kind === 'POINT';
+const sizeText = (p) => (isPoint(p) ? 'điểm' : fmtArea(p.area));
+
+// Tên loại đối tượng được nhận (theo định dạng file) dùng trong câu tóm tắt
+function kindLabel(kind, format) {
+  if (kind === 'POINT') return 'điểm';
+  if (kind === 'HATCH') return 'hatch';
+  if (kind === 'POLYGON') return 'polygon';
+  return format === 'dxf' ? 'polyline kín' : 'đường khép kín';
+}
+
+// "a, b và c"
+function joinVi(parts) {
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} và ${parts[parts.length - 1]}` : parts.join('');
+}
+
+// { nhãn: số } → "50 hatch, 30 polygon và 10 điểm" (giữ thứ tự hatch / polygon / polyline / điểm)
+function countText(counts, sortByCount = false) {
+  const list = Object.entries(counts).filter(([, n]) => n > 0);
+  if (sortByCount) list.sort((a, b) => b[1] - a[1]);
+  return joinVi(list.map(([label, n]) => `${fmtNum(n)} ${label}`));
+}
+
+function kindCounts(list, format) {
+  const counts = {};
+  ['HATCH', 'POLYGON', 'LWPOLYLINE', 'POLYLINE', 'POINT'].forEach(k => {
+    const n = list.filter(x => x.kind === k).length;
+    if (n) counts[kindLabel(k, format)] = (counts[kindLabel(k, format)] || 0) + n;
+  });
+  return counts;
 }
 
 // ID công trình lô sẽ cập nhật (null = tạo mới / bỏ qua / ngoài TP)
@@ -63,9 +96,12 @@ function nearestChoice(p) {
   return best;
 }
 
+const writable = (parcels) => parcels.filter(p => ['new', 'update'].includes(parcelAction(p).key));
+
 // Trạng thái xử lý của 1 lô khi ghi: bỏ qua / cập nhật / tạo mới; vắt ranh thì quy mô = 0
 function parcelAction(p) {
   if (!p.ward) return { key: 'out', label: 'Ngoài TP', cls: 'bad' };
+  if (p.existingId) return { key: 'exists', label: `Đã có ${p.existingId}`, cls: 'warn' };
   if (p.matchConflict && p.choice === CHOICE_SKIP) return { key: 'skip', label: 'Bỏ qua', cls: 'warn' };
   const id = targetId(p);
   if (id && dupTargets.has(id)) return { key: 'dup', label: `Trùng ${id}`, cls: 'bad' };
@@ -85,8 +121,11 @@ function pickHtml(p, idx) {
   return `<select class="cad-pick" data-idx="${idx}" title="Lô chứa ${p.matchConflict.length} công trình cùng loại">${options.join('')}</select>`;
 }
 
+// Tên layer hiển thị; lô khớp thủ công kèm mã loại đã gán
+const layerText = (p) => (p.manual ? `${p.layer} → ${p.prefix}` : p.layer);
+
 function parcelTip(p) {
-  return `<b>${escapeHtml(p.layer)}</b> · ${fmtArea(p.area)}<br>${escapeHtml(p.ward || 'Ngoài TP. Huế')}${p.crossWard ? ' · <span style="color:#f87171">vắt ranh</span>' : ''}<br>${escapeHtml(parcelAction(p).label)}`;
+  return `<b>${escapeHtml(layerText(p))}</b> · ${sizeText(p)}<br>${escapeHtml(p.ward || 'Ngoài TP. Huế')}${p.crossWard ? ' · <span style="color:#f87171">vắt ranh</span>' : ''}<br>${escapeHtml(parcelAction(p).label)}`;
 }
 
 function clearPreview() {
@@ -94,12 +133,24 @@ function clearPreview() {
   previewLayer = null;
 }
 
-function drawPreview(parcels) {
+// fit = false (đổi khớp thủ công): giữ khung nhìn, trừ lần đầu có lô để xem
+function drawPreview(parcels, fit = true) {
+  const hadPreview = !!previewLayer;
   clearPreview();
   if (!map || !parcels.length) return;
+  if (!hadPreview) fit = true;
   previewLayer = L.featureGroup();
   parcels.forEach((p, idx) => {
     const color = BUFFER_COLORS[p.type] || '#38bdf8';
+    if (isPoint(p)) {
+      const dot = L.circleMarker([p.lat, p.lng], {
+        radius: 7, weight: 2, color: '#fff', dashArray: p.ward ? null : '3,3',
+        fillColor: p.ward ? color : '#94a3b8', fillOpacity: p.existingId ? 0.35 : 0.95
+      }).bindTooltip(() => parcelTip(p), { sticky: true });
+      dot.on('click', () => focusRow(idx));
+      previewLayer.addLayer(dot);
+      return;
+    }
     const style = !p.ward
       ? { color: '#94a3b8', weight: 2, dashArray: '4,4', fillColor: '#94a3b8', fillOpacity: 0.2 }
       : p.crossWard
@@ -111,7 +162,7 @@ function drawPreview(parcels) {
     previewLayer.addLayer(L.circleMarker([p.lat, p.lng], { radius: 4, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 1, interactive: false }));
   });
   previewLayer.addTo(map);
-  map.fitBounds(previewLayer.getBounds(), { padding: [40, 40], maxZoom: 17 });
+  if (fit) map.fitBounds(previewLayer.getBounds(), { padding: [40, 40], maxZoom: 17 });
 }
 
 function focusRow(idx) {
@@ -133,13 +184,14 @@ function renderReport() {
   const parcels = result.parcels;
   refreshDupTargets(parcels);
   const byType = {};
-  const count = { out: 0, skip: 0, dup: 0, update: 0, new: 0, cross: 0, small: 0, multi: 0 };
+  const count = { out: 0, exists: 0, skip: 0, dup: 0, update: 0, new: 0, cross: 0, small: 0, multi: 0, newPoint: 0 };
   parcels.forEach(p => {
     const a = parcelAction(p);
     count[a.key]++;
     if (p.ward && p.matchConflict) count.multi++;
     if (p.ward && p.crossWard) count.cross++;
-    if (p.ward && MIN_SIZE[p.type] && p.area < MIN_SIZE[p.type]) count.small++;
+    if (p.ward && !isPoint(p) && MIN_SIZE[p.type] && p.area < MIN_SIZE[p.type]) count.small++;
+    if (a.key === 'new' && isPoint(p)) count.newPoint++;
     const t = byType[p.type] || (byType[p.type] = { n: 0, area: 0 });
     t.n++;
     if (p.ward && !p.crossWard) t.area += p.area;
@@ -164,11 +216,18 @@ function renderReport() {
   if (count.dup) alerts.push(['bad', `${count.dup} lô cùng cập nhật 1 công trình: chọn lại (tạo mới / bỏ qua) trước khi ghi.`]);
   if (count.skip) alerts.push(['info', `${count.skip} lô được chọn bỏ qua.`]);
   if (count.small) alerts.push(['info', `${count.small} lô nhỏ hơn diện tích tối thiểu của loại (vẫn nhập).`]);
+  if (count.newPoint) alerts.push(['info', `${count.newPoint} điểm (không có ranh) tạo mới với quy mô = 0 (có công trình, chưa rõ diện tích) — bổ sung diện tích trong Sheet sau.`]);
+  if (count.exists) alerts.push(['warn', `${count.exists} điểm cách công trình cùng loại đã có dưới 20 m: coi là đã có, bỏ qua.`]);
+  if (result.pointsInLots) alerts.push(['info', `${result.pointsInLots} điểm nằm trong lô cùng loại của file (điểm ghi chú của lô): bỏ qua.`]);
   const unknown = Object.entries(result.unknownLayers);
-  if (unknown.length) alerts.push(['warn', `${UNKNOWN_LABEL[current.format]} (bỏ qua): ${unknown.map(([l, n]) => `${escapeHtml(l)} (${n})`).join(', ')}.`]);
-  if (stats.insert) alerts.push(['warn', `${stats.insert} block (INSERT) chưa được đọc — explode block trước khi xuất DXF.`]);
-  if (stats.point) alerts.push(['info', `${stats.point} đối tượng dạng điểm (không có ranh): bỏ qua.`]);
-  if (stats.openLine) alerts.push(['info', `${stats.openLine} đường không khép kín: bỏ qua.`]);
+  if (unknown.length) {
+    const nUnknown = unknown.reduce((s, [, n]) => s + n, 0);
+    const listed = unknown.slice(0, 8).map(([l, n]) => `${escapeHtml(l)} (${n})`).join(', ');
+    alerts.push(['warn', `${UNKNOWN_LABEL[current.format]}: ${nUnknown} đối tượng bị bỏ qua — ${listed}${unknown.length > 8 ? ', …' : ''}. Gán loại ở khung <b>Khớp thủ công</b> bên dưới nếu cần nhập.`]);
+  }
+  const manualCount = parcels.filter(p => p.manual).length;
+  if (manualCount) alerts.push(['info', `${manualCount} lô được gán loại thủ công (ghi chú trong Sheet kèm tên layer gốc).`]);
+  if (stats.insert) alerts.push(['warn', `${stats.insert} block (INSERT) bị bỏ qua — nếu block chứa ranh lô, explode block trước khi xuất DXF.`]);
   if (stats.splineEdges) alerts.push(['info', `${stats.splineEdges} cạnh spline được tính gần đúng.`]);
   if (!state.wardLabelsList.some(w => w.geometry)) alerts.push(['bad', 'Chưa tải xong ranh 40 phường xã — mở lại file sau ít giây.']);
 
@@ -184,28 +243,48 @@ function renderReport() {
     const a = parcelAction(p);
     return `<div class="cad-row" data-idx="${idx}" title="Xem trên bản đồ">
       <i class="cad-dot" style="background:${BUFFER_COLORS[p.type] || '#38bdf8'}"></i>
-      <span class="cad-row-main">${escapeHtml(p.layer)} · ${p.crossWard ? `<s>${fmtArea(p.area)}</s> 0` : fmtArea(p.area)}<br><small>${escapeHtml(p.ward || '—')}</small>
+      <span class="cad-row-main">${escapeHtml(layerText(p))} · ${p.crossWard ? `<s>${fmtArea(p.area)}</s> 0` : sizeText(p)}<br><small>${escapeHtml(p.ward || '—')}</small>
         ${p.ward && p.matchConflict ? pickHtml(p, idx) : ''}</span>
       <span class="cad-badge ${a.cls}">${escapeHtml(p.crossWard && a.key !== 'out' ? `${a.label} · vắt ranh` : a.label)}</span>
     </div>`;
   }).join('');
   const listScroll = box.querySelector('.cad-list')?.scrollTop || 0;
+  const mapScroll = box.querySelector('.cad-map-list')?.scrollTop || 0;
+
+  const kept = countText(kindCounts(current.entities, current.format)) || 'không có đối tượng hợp lệ';
+  const skipped = countText(stats.skipped || {}, true);
+  const dupText = result.duplicatesDropped ? ` · bỏ ${result.duplicatesDropped} ${isVector ? 'đường trùng polygon' : 'polyline trùng hatch'}` : '';
 
   box.innerHTML = `
-    <div class="cad-file">📄 <b>${escapeHtml(fileName)}</b> · ${parcels.length} lô (${isVector
-      ? `${stats.polygon} polygon, ${stats.polyline} đường khép kín${result.duplicatesDropped ? `, bỏ ${result.duplicatesDropped} đường trùng polygon` : ''}`
-      : `${stats.hatch} hatch, ${stats.polyline} polyline khép kín${result.duplicatesDropped ? `, bỏ ${result.duplicatesDropped} polyline trùng hatch` : ''}`})</div>
+    <div class="cad-file">📄 <b>${escapeHtml(fileName)}</b> · ${parcels.length} lô${dupText}
+      <div class="cad-filter">Nhận: <b>${kept}</b>${skipped ? `<br>Bỏ qua (bộ lọc mặc định): ${skipped}` : ''}</div></div>
     ${alerts.map(([cls, text]) => `<div class="cad-alert ${cls}">${text}</div>`).join('')}
+    ${manualMappingHtml(current.manual)}
     ${parcels.length ? `<table class="cad-table"><thead><tr><th>Loại</th><th>Số lô</th><th>Diện tích tính</th></tr></thead><tbody>${typeRows}</tbody></table>
     <div class="cad-list">${listRows}${parcels.length > MAX_LISTED ? `<div class="cad-more">… và ${parcels.length - MAX_LISTED} lô khác</div>` : ''}</div>` : ''}
-    <div class="cad-foot"><span>Sẽ ghi: ${count.new} mới · ${count.update} cập nhật</span><button type="button" id="btnCadClear" class="cad-clear">✕ Xóa xem trước</button></div>`;
+    <div class="cad-foot"><span>Sẽ ghi: ${count.new} mới · ${count.update} cập nhật${count.new + count.update ? ` <small>(${countText(kindCounts(writable(parcels), current.format))})</small>` : ''}</span><button type="button" id="btnCadClear" class="cad-clear">✕ Xóa xem trước</button></div>`;
 
   const list = box.querySelector('.cad-list');
   if (list) list.scrollTop = listScroll;
+  const mapList = box.querySelector('.cad-map-list');
+  if (mapList) mapList.scrollTop = mapScroll;
+  $('cadMapField')?.addEventListener('change', (e) => {
+    selectField(current.manual, e.target.value, current.entities);
+    analyse({ fit: false });
+  });
+  box.querySelectorAll('.cad-map-type').forEach(sel => sel.addEventListener('change', () => {
+    setCode(current.manual, Number(sel.dataset.k), sel.value);
+    analyse({ fit: false });
+  }));
+  $('cadMapClear')?.addEventListener('click', () => {
+    clearCodes(current.manual);
+    analyse({ fit: false });
+  });
   box.querySelectorAll('.cad-row').forEach(row => row.addEventListener('click', (e) => {
     if (e.target.closest('.cad-pick')) return;
     const p = parcels[Number(row.dataset.idx)];
-    if (p && map) map.fitBounds(L.geoJSON({ type: 'MultiPolygon', coordinates: p.polygons }).getBounds(), { padding: [60, 60], maxZoom: 18 });
+    if (p && map && isPoint(p)) map.setView([p.lat, p.lng], Math.max(map.getZoom(), 17));
+    else if (p && map) map.fitBounds(L.geoJSON({ type: 'MultiPolygon', coordinates: p.polygons }).getBounds(), { padding: [60, 60], maxZoom: 18 });
   }));
   box.querySelectorAll('.cad-pick').forEach(sel => sel.addEventListener('change', () => {
     const p = parcels[Number(sel.dataset.idx)];
@@ -220,18 +299,27 @@ function renderReport() {
   }
 }
 
-function analyse() {
+// Khóa nhận diện lô qua các lần phân tích lại (đổi khớp thủ công / hệ tọa độ) để giữ lựa chọn công trình của admin
+const parcelKey = (p) => `${p.layer}|${p.lat}|${p.lng}|${p.area}`;
+
+function analyse({ fit = true } = {}) {
   if (!current) return;
   const crs = CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
-  const result = current.wgs84 ? buildParcelsLonLat(current.entities) : buildParcels(current.entities, { crs });
+  const entities = applyManualMapping(current.entities, current.manual);
+  const result = current.wgs84 ? buildParcelsLonLat(entities) : buildParcels(entities, { crs });
   assignWards(result.parcels, state.wardLabelsList || []);
   const existing = [...state.rawDataList, ...state.planDataList];
   matchExisting(result.parcels, existing);
   current.items = new Map(existing.filter(it => it.id).map(it => [it.id, it]));
+  const prevChoices = new Map((current.result?.parcels || []).filter(p => p.choice).map(p => [parcelKey(p), p.choice]));
   current.result = result;
-  result.parcels.forEach(p => { p.choice = p.matchConflict ? nearestChoice(p) : null; });
+  result.parcels.forEach(p => {
+    if (!p.matchConflict) { p.choice = null; return; }
+    const prev = prevChoices.get(parcelKey(p));
+    p.choice = prev && (prev === CHOICE_NEW || prev === CHOICE_SKIP || p.matchConflict.includes(prev)) ? prev : nearestChoice(p);
+  });
   renderReport();
-  drawPreview(result.parcels);
+  drawPreview(result.parcels, fit);
 }
 
 async function loadFile(file) {
@@ -246,15 +334,17 @@ async function loadFile(file) {
       const head = await file.slice(0, 22).text();
       if (head.startsWith('AutoCAD Binary DXF')) throw new Error('DXF dạng nhị phân chưa hỗ trợ — lưu lại dạng ASCII DXF.');
       parsed = parseDxf(await file.text());
-      if (!parsed.entities.length) throw new Error('Không tìm thấy HATCH hoặc polyline khép kín nào.');
     } else {
       parsed = ext === 'json' || ext === 'geojson' ? parseGeoJson(await file.text())
         : parseKml(ext === 'kmz' ? await unzipKml(await file.arrayBuffer()) : await file.text());
-      if (!parsed.entities.length) throw new Error('Không tìm thấy Polygon hoặc đường khép kín nào trong file.');
+    }
+    if (!parsed.entities.length) {
+      const skipped = countText(parsed.stats.skipped || {}, true);
+      throw new Error(`Không có ${ext === 'dxf' ? 'HATCH, polyline khép kín hoặc POINT' : 'Polygon, đường khép kín hoặc Point'} nào để nhập${skipped ? ` (bỏ qua ${skipped})` : ''}.`);
     }
     const format = ext === 'dxf' ? 'dxf' : ext === 'kml' || ext === 'kmz' ? 'kml' : 'geojson';
     const wgs84 = format === 'kml' || (format === 'geojson' && parsed.wgs84);
-    current = { fileName: file.name, format, wgs84, entities: parsed.entities, stats: parsed.stats, result: null };
+    current = { fileName: file.name, format, wgs84, entities: parsed.entities, stats: parsed.stats, result: null, manual: createManualMapping(parsed.entities) };
     lockCrs(wgs84);
     analyse();
     setStatus('');
@@ -310,15 +400,36 @@ function buildItems() {
       lat: p.lat,
       lng: p.lng,
       area: p.area,
+      point: isPoint(p),
+      kind: p.kind,
       crossWard: !!p.crossWard,
-      layer: p.layer,
+      // Máy chủ giữ tối đa 60 ký tự: rút gọn tên gốc để còn mã loại đã gán ở cuối
+      layer: p.manual ? `${p.layer.slice(0, 45)} → ${p.prefix}` : p.layer,
       matchId: action.key === 'update' ? action.id : null,
-      geometry: p.polygons.length === 1
-        ? { type: 'Polygon', coordinates: p.polygons[0] }
-        : { type: 'MultiPolygon', coordinates: p.polygons }
+      geometry: isPoint(p) ? null
+        : p.polygons.length === 1
+          ? { type: 'Polygon', coordinates: p.polygons[0] }
+          : { type: 'MultiPolygon', coordinates: p.polygons }
     });
   });
   return items;
+}
+
+// Câu báo kết quả kiểu "50 hatch, 30 polygon và 10 điểm (bỏ qua 5 line, 7 pline hở và 15 mtext)"
+function importSummary(items) {
+  const { stats, result, format } = current;
+  const skipped = { ...(stats.skipped || {}) };
+  const add = (label, n) => { if (n) skipped[label] = (skipped[label] || 0) + n; };
+  add('không rõ loại', Object.values(result.unknownLayers).reduce((s, n) => s + n, 0));
+  add(format === 'dxf' ? 'polyline trùng hatch' : 'đường trùng polygon', result.duplicatesDropped);
+  add('điểm trong lô cùng loại', result.pointsInLots);
+  const counts = { out: 0, exists: 0, skip: 0 };
+  result.parcels.forEach(p => { const k = parcelAction(p).key; if (k in counts) counts[k]++; });
+  add('ngoài TP. Huế', counts.out);
+  add('điểm đã có', counts.exists);
+  add('lô chọn bỏ qua', counts.skip);
+  const skippedText = countText(skipped, true);
+  return `${countText(kindCounts(items, format))}${skippedText ? ` (bỏ qua ${skippedText})` : ''}`;
 }
 
 function chunkItems(items) {
@@ -356,7 +467,8 @@ async function submitImport() {
   }
   const nUpdate = items.filter(it => it.matchId).length;
   const phaseLabel = phase === 'QH' ? 'Quy hoạch (QuyMo_QH)' : 'Hiện trạng (QuyMo_HT)';
-  if (!confirm(`Ghi ${items.length} lô vào Google Sheet?\n• ${items.length - nUpdate} tạo mới, ${nUpdate} cập nhật\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
+  const summary = importSummary(items);
+  if (!confirm(`Ghi ${items.length} lô vào Google Sheet?\n• ${summary}\n• ${items.length - nUpdate} tạo mới, ${nUpdate} cập nhật\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
 
   const chunks = chunkItems(items);
   const done = { created: [], updated: [], skipped: [], polygonsDropped: 0 };
@@ -377,12 +489,12 @@ async function submitImport() {
       done.polygonsDropped += data.polygonsDropped || 0;
     }
     const extra = [
-      done.skipped.length ? `bỏ qua ${done.skipped.length}: ${done.skipped.slice(0, 3).join('; ')}` : '',
+      done.skipped.length ? `máy chủ bỏ qua ${done.skipped.length}: ${done.skipped.slice(0, 3).join('; ')}` : '',
       done.polygonsDropped ? `${done.polygonsDropped} lô ranh quá phức tạp chỉ ghi điểm tâm` : ''
     ].filter(Boolean).join(' · ');
     submitting = false;
     resetImport(true);
-    setStatus(`✓ Đã ghi ${done.created.length} mới, ${done.updated.length} cập nhật${extra ? ` (${extra})` : ''}.`, 'var(--accent-green)');
+    setStatus(`✓ Đã thêm ${summary} — ${done.created.length} mới, ${done.updated.length} cập nhật${extra ? ` · ${extra}` : ''}.`, 'var(--accent-green)');
     if (onImported) await onImported();
   } catch (err) {
     const written = done.created.length + done.updated.length;

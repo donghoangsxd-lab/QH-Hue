@@ -39,12 +39,16 @@ function collect(g, out) {
     }
     case 'MultiLineString': (c || []).forEach(l => collect({ type: 'LineString', coordinates: l }, out)); break;
     case 'GeometryCollection': (g.geometries || []).forEach(sub => collect(sub, out)); break;
-    case 'Point': case 'MultiPoint': out.point = true; break;
-    default: break;
+    case 'Point': if (isPt(c)) out.points.push([c[0], c[1]]); break;
+    case 'MultiPoint': out.points.push(...toPts(c)); break;
+    default: out.other++; break;
   }
 }
 
-/** Đọc GeoJSON (văn bản) → { entities: [{kind, layer, name, rings}], stats, wgs84 } */
+/**
+ * Đọc GeoJSON (văn bản) → { entities: [{kind, layer, name, attrs, rings, pt?}], stats, wgs84 }.
+ * Bộ lọc mặc định: chỉ nhận Polygon, đường khép kín và Point (feature không có vùng); còn lại đếm vào stats.skipped.
+ */
 export function parseGeoJson(text) {
   let data;
   try { data = JSON.parse(text); } catch (e) { throw new Error('File JSON lỗi cú pháp.'); }
@@ -54,20 +58,31 @@ export function parseGeoJson(text) {
     : null;
   if (!Array.isArray(features)) throw new Error('Không phải GeoJSON (cần FeatureCollection hoặc Feature).');
 
-  const stats = { feature: features.length, polygon: 0, polyline: 0, point: 0, openLine: 0 };
+  const stats = { feature: features.length, polygon: 0, polyline: 0, point: 0, skipped: {} };
+  const skip = (label, n = 1) => { if (n) stats.skipped[label] = (stats.skipped[label] || 0) + n; };
   const entities = [];
   for (const f of features) {
     const props = (f && f.properties) || {};
     const name = pickProp(props, NAME_FIELD);
     const layer = resolveLayer(props, name);
-    const out = { poly: [], line: [], openLine: 0, point: false };
+    // Thuộc tính dạng chữ/số (để khớp thủ công khi tên không theo quy ước)
+    const attrs = {};
+    Object.entries(props).forEach(([k, v]) => {
+      if (v != null && typeof v !== 'object') attrs[k] = String(v).trim();
+    });
+    const out = { poly: [], line: [], openLine: 0, points: [], other: 0 };
     collect(f && f.geometry, out);
-    stats.openLine += out.openLine;
-    if (out.poly.length) { entities.push({ kind: 'POLYGON', layer, name, rings: out.poly }); stats.polygon++; }
-    if (out.line.length) { entities.push({ kind: 'POLYLINE', layer, name, rings: out.line }); stats.polyline++; }
-    if (!out.poly.length && !out.line.length && out.point) stats.point++;
+    skip('line hở', out.openLine);
+    skip('hình khác', out.other);
+    if (out.poly.length) { entities.push({ kind: 'POLYGON', layer, name, attrs, rings: out.poly }); stats.polygon++; }
+    if (out.line.length) { entities.push({ kind: 'POLYLINE', layer, name, attrs, rings: out.line }); stats.polyline++; }
+    // Point đi kèm vùng trong cùng feature (GeometryCollection) là điểm nhãn của vùng → không nhập riêng
+    if (!out.poly.length && !out.line.length) {
+      out.points.forEach(pt => { entities.push({ kind: 'POINT', layer, name, attrs, rings: [], pt }); stats.point++; });
+      if (!out.points.length && !out.openLine && !out.other) skip('feature không có hình');
+    }
   }
-  const sample = entities.slice(0, 50).map(e => e.rings[0][0]);
+  const sample = entities.slice(0, 50).map(e => e.pt || e.rings[0][0]);
   const wgs84 = sample.every(([x, y]) => Math.abs(x) <= 180 && Math.abs(y) <= 90);
   return { entities, stats, wgs84 };
 }

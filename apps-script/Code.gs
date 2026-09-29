@@ -339,7 +339,10 @@ function installedOnEdit(e) {
     lock.waitLock(10000);
     var currentTime = Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm:ss");
     var isCsdSheet = sheetName.indexOf("9-CSD") === 0;
+    var touches = function(idx) { return idx >= 0 && startCol <= idx + 1 && endCol >= idx + 1; };
     var touchesStatus = statusCol > 0 && startCol <= statusCol && endCol >= statusCol;
+    var touchesWard = touches(col.ward);
+    var touchesCoord = touches(col.lat) || touches(col.lng);
 
     var rowsToDelete = []; // các dòng CSD đã chuyển đổi xong, cần xóa khỏi sheet gốc
 
@@ -401,6 +404,9 @@ function installedOnEdit(e) {
       // Nếu dòng này không phải trường hợp chuyển đổi CSD, chỉ cập nhật timestamp bình thường
       if (!handledAsConversion && timeCol > 0) {
         sheet.getRange(row, timeCol).setValue(currentTime);
+      }
+      if (!handledAsConversion && noteCol > 0 && (touchesWard || touchesCoord)) {
+        clearFixedWardMark(sheet, row, col, touchesCoord);
       }
     }
 
@@ -594,6 +600,7 @@ function doPost(e) {
 
     var body = JSON.parse((e.postData && e.postData.contents) || '{}');
     if (body.action === "importCadBatch") return jsonOutput(importCadBatch(body));
+    if (body.action === "markWardNotes") return jsonOutput(markWardNotes(body));
     return jsonOutput({ "error": "Action không hợp lệ" });
   } catch (err) {
     return jsonOutput({ "error": err.toString() });
@@ -652,6 +659,7 @@ function importCadBatch(body) {
       }
 
       var note = "Nhập từ file " + fileName + " (layer " + it.layer + ")"
+        + (it.point ? "; dạng điểm, chưa có diện tích" : "")
         + (it.crossWard ? "; vắt ranh phường, diện tích thật " + it.area + " m²" : "");
       var r = it.matchId ? c.idRow[it.matchId] : undefined;
       var id;
@@ -717,6 +725,91 @@ function importCadBatch(body) {
 
   if (body.sync !== false) syncSheetsToGCS();
   return { "success": true, "created": created, "updated": updated, "skipped": skipped, "polygons": polygons.length };
+}
+
+// ĐỐI CHIẾU PHƯỜNG: dấu nhắc trong cột Note, VD "⚠ Phường/xã theo tọa độ: Thuận Hóa" (các mục trong Note cách nhau " | ")
+const WARD_NOTE_PREFIX = "⚠ Phường/xã theo tọa độ:";
+
+function splitNote(note) {
+  return String(note || '').split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s !== ''; });
+}
+
+// Note sau khi thay dấu nhắc cũ bằng mark ('' = chỉ gỡ); giữ nguyên các ghi chú khác
+function noteWithWardMark(note, mark, prefix) {
+  var parts = splitNote(note).filter(function(s) { return s.indexOf(prefix) !== 0; });
+  if (mark) parts.push(mark);
+  return parts.join(' | ');
+}
+
+function wardMarkOf(note, prefix) {
+  var parts = splitNote(note).filter(function(s) { return s.indexOf(prefix) === 0; });
+  return parts.length ? parts[parts.length - 1] : '';
+}
+
+function wardKey(s) {
+  return String(s || '').normalize('NFC').replace(/^\s*(Phường|Xã|Thị trấn)\s+/i, '').trim().toLowerCase();
+}
+
+// Sửa tay trên Sheet: Ten_XaPhuong đã khớp dấu nhắc → gỡ; sửa tọa độ → gỡ (lần kiểm tra sau trên webapp sẽ ghi lại nếu vẫn lệch)
+function clearFixedWardMark(sheet, row, col, coordChanged) {
+  var cell = sheet.getRange(row, col.ghiChu + 1);
+  var note = String(cell.getValue() || '');
+  var mark = wardMarkOf(note, WARD_NOTE_PREFIX);
+  if (!mark) return;
+  var fixed = coordChanged
+    || (col.ward >= 0 && wardKey(sheet.getRange(row, col.ward + 1).getValue()) === wardKey(mark.slice(WARD_NOTE_PREFIX.length)));
+  if (fixed) cell.setValue(noteWithWardMark(note, '', WARD_NOTE_PREFIX));
+}
+
+/**
+ * Máy chủ webapp gửi danh sách công trình có Ten_XaPhuong khác phường theo tọa độ: body = { prefix, items: [{ id, note }] }.
+ * Dòng có trong danh sách → ghi / thay dấu nhắc; dòng không còn trong danh sách mà Note còn dấu cũ → gỡ.
+ * Chỉ ghi lại cột Note của tab có thay đổi (1 lần / tab), rồi đồng bộ bucket.
+ */
+function markWardNotes(body) {
+  var prefix = String(body.prefix || WARD_NOTE_PREFIX);
+  var want = {};
+  (Array.isArray(body.items) ? body.items : []).forEach(function(it) {
+    var id = String(it.id || '').trim();
+    var note = String(it.note || '').trim();
+    if (id && note.indexOf(prefix) === 0) want[id] = note.slice(0, 200);
+  });
+  var marked = 0, cleared = 0, noNoteColumn = [];
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    ss.getSheets().forEach(function(sheet) {
+      if (!isValidInfraSheet(sheet.getName())) return;
+      var data = sheet.getDataRange().getValues();
+      if (data.length <= 1) return;
+      var col = getColumnMap(data[0]);
+      if (col.id < 0) return;
+      if (col.ghiChu < 0) {
+        var hasWanted = data.some(function(row, i) { return i > 0 && want[String(row[col.id] || '').trim()]; });
+        if (hasWanted) noNoteColumn.push(sheet.getName());
+        return;
+      }
+      var changed = false;
+      var notes = data.slice(1).map(function(row) {
+        var id = String(row[col.id] || '').trim();
+        var note = String(row[col.ghiChu] || '');
+        var mark = want[id] || '';
+        if (mark === wardMarkOf(note, prefix)) return [note];
+        changed = true;
+        if (mark) marked++; else cleared++;
+        return [noteWithWardMark(note, mark, prefix)];
+      });
+      if (changed) sheet.getRange(2, col.ghiChu + 1, notes.length, 1).setValues(notes);
+    });
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+
+  if (marked || cleared) syncSheetsToGCS();
+  return { "success": true, "marked": marked, "cleared": cleared, "noNoteColumn": noNoteColumn };
 }
 
 // Ranh lô theo (ID_DoiTuong, GiaiDoan): đã có thì ghi đè, chưa có thì thêm dòng. Dòng cũ chưa có GiaiDoan coi là HT

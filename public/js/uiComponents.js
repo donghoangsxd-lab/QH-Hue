@@ -2,6 +2,7 @@ import { state } from './state.js';
 import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js';
 import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, showToast } from './utils.js';
+import { refreshWardCheck } from './wardCheck.js';
 
 let chartInstance = null;
 let infraPieInstance = null;
@@ -151,6 +152,7 @@ function updateAuthUi() {
   if (signOut) signOut.style.display = isAdmin ? '' : 'none';
   const gBtn = document.getElementById('googleSignInBtn');
   if (gBtn) gBtn.style.display = isAdmin ? 'none' : '';
+  refreshWardCheck();
 }
 
 // ================== BIỂU ĐỒ DONUT CƠ CẤU DIỆN TÍCH ==================

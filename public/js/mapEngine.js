@@ -450,7 +450,7 @@ const PIE_GAP_COLOR = 'rgba(15, 23, 42, 0.85)';
 // Phường chứa điểm, ghi nhớ theo tọa độ (danh sách hiện trạng và quy hoạch dùng chung); đổi bộ ranh phường thì tính lại
 const wardAtCache = new Map();
 let wardAtSource = null;
-function wardNameAt(lat, lng) {
+export function wardNameAt(lat, lng) {
   if (wardAtSource !== state.wardLabelsList) {
     wardAtCache.clear();
     wardAtSource = state.wardLabelsList;
@@ -927,8 +927,8 @@ function buildDiaBanHtml(geoWard, sheetWard) {
   if (!geo) return escapeHtml(sheet || "—");
   let html = escapeHtml(geo);
   const clean = (s) => String(s || "").replace(/^Phường\s+/i, "").replace(/^Xã\s+/i, "").trim().toLowerCase();
-  if (sheet && clean(sheet) !== clean(geo)) {
-    html += ` <span style="color:var(--accent-orange); font-size:9px; font-weight:normal;">(Sheet: ${escapeHtml(sheet)})</span>`;
+  if (clean(sheet) !== clean(geo)) {
+    html += ` <span style="color:var(--accent-orange); font-size:9px; font-weight:normal;" title="Tên phường trong Sheet khác phường theo tọa độ — cần sửa cột Ten_XaPhuong">(⚠ Sheet: ${escapeHtml(sheet || 'trống')})</span>`;
   }
   return html;
 }
