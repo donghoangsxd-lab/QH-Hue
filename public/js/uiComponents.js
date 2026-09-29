@@ -3,6 +3,7 @@ import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js
 import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, showToast } from './utils.js';
 import { refreshWardCheck } from './wardCheck.js';
+import { fillWardRoadLengths } from './wardRoads.js';
 
 let chartInstance = null;
 let infraPieInstance = null;
@@ -150,8 +151,8 @@ function updateAuthUi() {
   }
   const signOut = document.getElementById('btnSignOut');
   if (signOut) signOut.style.display = isAdmin ? '' : 'none';
-  const preload = document.getElementById('btnPreloadRoads');
-  if (preload) preload.style.display = isAdmin ? '' : 'none';
+  const wardRoadsBtn = document.getElementById('btnWardRoads');
+  if (wardRoadsBtn) wardRoadsBtn.style.display = isAdmin ? '' : 'none';
   const gBtn = document.getElementById('googleSignInBtn');
   if (gBtn) gBtn.style.display = isAdmin ? 'none' : '';
   refreshWardCheck();
@@ -920,9 +921,12 @@ function renderWardSummary(wardData) {
   const view = document.getElementById('wardSummaryView');
   if (!view) return;
   view.innerHTML = `<div id="wardSummaryCard" style="display:contents;">
+    <div id="wardRoadLen" class="ward-road-len"></div>
     <div id="wardQuotaTableContainer">${buildWardQuotaTableHtml(wardData, popProjected)}</div>
   </div>`;
   document.getElementById('wardSummaryCard').dataset.ward = wardData.Ten_Phuong;
+  document.getElementById('wardRoadLen').dataset.ward = wardData.Ten_Phuong;
+  fillWardRoadLengths(wardData.Ten_Phuong);
 
   // Dân số hiện trạng / độ phủ / quy mô đã có ở #bpSubtitle, dòng tiêu đề chỉ bổ sung dân số quy hoạch
   const planEl = document.getElementById('bpWardPlan');

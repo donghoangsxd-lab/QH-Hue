@@ -990,48 +990,63 @@ module.exports = async (req, res) => {
       return res.status(200).json({ parcels });
     }
 
-    // Mạng đường quanh công trình cho "phạm vi thực tế": đọc bản lưu trên bucket, chưa có / quá cũ thì tải Overpass
-    // rồi nhờ Apps Script lưu. Chỉ lưu cho vị trí trùng công trình có trong dữ liệu (không cho ghi bucket tùy ý).
+    // Mạng lưới đường toàn thành phố (Admin tải từ OSM theo phường, lưu bucket roads/v2/ qua Apps Script)
+    // "Phạm vi thực tế": cắt đường quanh công trình từ mạng lưới đã lưu; chưa tải đủ → 404, trình duyệt tự hỏi Overpass
     if (action === 'getRoads') {
       const pt = parseCoordInBounds(req.query.lat, req.query.lng);
       if (!pt) return res.status(400).json({ error: true, message: "Tọa độ không hợp lệ" });
       const r = roads.roadsRadius(parseRadius(req.query.r));
-      if (r > roads.ROADS_MAX_RADIUS) return res.status(404).json({ error: true, message: 'Bán kính quá lớn để lưu sẵn — trình duyệt tự tải' });
-      const lat = roads.round4(pt.lat), lng = roads.round4(pt.lng);
-      const key = roads.roadsKey(lat, lng, r);
-      const shareable = 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400';
-
-      const cached = await roads.readCachedRoads(key);
-      if (cached && Date.now() - Number(cached.saved || 0) < roads.ROADS_STALE_MS) {
-        res.setHeader('Cache-Control', shareable);
-        return res.status(200).json({ ...cached, source: 'cache' });
-      }
-      const items = await getRawDataList();
-      const isItem = items.some(it => distMeters(pt.lat, pt.lng, Number(it.lat), Number(it.lng)) <= 30);
-      if (!isItem) {
-        if (cached) return res.status(200).json({ ...cached, source: 'cache' });
-        return res.status(404).json({ error: true, message: 'Chỉ lưu sẵn mạng đường quanh công trình có trong dữ liệu' });
-      }
-
-      let ways;
+      if (r > roads.ROADS_MAX_RADIUS) return res.status(404).json({ error: true, message: 'Bán kính quá lớn — trình duyệt tự tải' });
+      let ways = null;
       try {
-        ways = await roads.fetchOverpassWays(lat, lng, r);
+        ways = await roads.waysAround(pt.lat, pt.lng, r);
       } catch (err) {
-        if (cached) return res.status(200).json({ ...cached, source: 'cache' });
-        return res.status(502).json({ error: true, message: 'Máy chủ dữ liệu đường (OpenStreetMap) đang quá tải' });
+        console.warn('Đọc mạng lưới đường lỗi:', err.message);
       }
-      const payload = { v: 1, saved: Date.now(), lat, lng, r, ways };
-      let saved = false;
-      if (ways.length) {
-        try {
-          const result = await callAppsScript({ action: 'saveRoads' }, { action: 'saveRoads', key, content: JSON.stringify(payload) });
-          saved = result.saved === true;
-        } catch (err) {
-          console.warn('Không lưu được mạng đường lên bucket:', err.message);
-        }
+      if (!ways) return res.status(404).json({ error: true, message: 'Chưa có mạng lưới đường lưu sẵn' });
+      res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400');
+      return res.status(200).json({ v: 2, r, ways, source: 'network' });
+    }
+
+    // Chiều dài đường trục chính / kiệt theo phường (tính lúc Admin tải mạng lưới, lưu trong index)
+    if (action === 'getWardRoads') {
+      const index = await roads.readRoadsIndex(req.query.fresh === '1');
+      res.setHeader('Cache-Control', req.query.fresh === '1' ? 'no-store' : 'public, max-age=300, s-maxage=600, stale-while-revalidate=86400');
+      return res.status(200).json({ v: 2, total: (index && index.total) || 0, wards: (index && index.wards) || {} });
+    }
+
+    if (action === 'saveRoadNetwork') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const ward = String(body.ward || '').trim();
+      const part = Math.round(Number(body.part));
+      const ways = roads.parseNetworkPart(body.ways);
+      if (!roads.wardSlug(ward) || ward.length > 80 || !(part >= 0 && part < roads.MAX_PARTS) || !ways) {
+        return res.status(400).json({ error: true, message: 'Dữ liệu mạng lưới đường không hợp lệ' });
       }
-      res.setHeader('Cache-Control', saved ? shareable : 'no-store');
-      return res.status(200).json({ ...payload, source: 'overpass', saved });
+      const content = JSON.stringify({ v: 2, ward, part, ways });
+      if (content.length > roads.MAX_PART_CHARS) return res.status(413).json({ error: true, message: 'Phần mạng lưới đường quá lớn' });
+      const result = await callAppsScript({ action: 'saveRoads' }, { action: 'saveRoads', key: `net_${roads.wardSlug(ward)}_${part}`, content });
+      if (result.saved !== true) {
+        return res.status(502).json({ error: true, message: 'Apps Script chưa ghi được lên bucket (đã triển khai phiên bản mới của Code.gs chưa?)' });
+      }
+      return res.status(200).json({ success: true, saved: true, ways: ways.length });
+    }
+
+    if (action === 'saveWardRoads') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const parsed = roads.parseRoadsIndex(body.wards, body.total);
+      if (!parsed) return res.status(400).json({ error: true, message: 'Dữ liệu chỉ mục mạng lưới đường không hợp lệ' });
+      const payload = { v: 2, saved: Date.now(), ...parsed };
+      const result = await callAppsScript({ action: 'saveRoads' }, { action: 'saveRoads', key: 'index', content: JSON.stringify(payload) });
+      if (result.saved !== true) {
+        return res.status(502).json({ error: true, message: 'Apps Script chưa ghi được lên bucket (đã triển khai phiên bản mới của Code.gs chưa?)' });
+      }
+      roads.rememberIndex(payload);
+      return res.status(200).json({ success: true, saved: true, count: Object.keys(parsed.wards).length });
     }
 
     if (action === 'importCadBatch') {

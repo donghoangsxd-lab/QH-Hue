@@ -582,6 +582,9 @@ table.data-table .ward-link:hover { text-decoration: underline !important; }
 }
 #wardCoverageStatus { margin-left: 6px; }
 #wardQuotaTableContainer { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ward-road-len { flex-shrink: 0; color: var(--text-muted); font-size: 10.5px; padding: 0 2px 4px; }
+.ward-road-len:empty { display: none; }
+.ward-road-len b { color: var(--accent-cyan); }
 
 .ward-table-scroll-container {
   flex: 1;

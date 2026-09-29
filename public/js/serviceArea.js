@@ -2,10 +2,10 @@
 // Dijkstra trên đồ thị đường (đi 2 chiều) → tô các đoạn tới được lên lưới → nới SIDE_M, đóng hình CLOSE_M, lấp lỗ → dò viền, bo góc
 import { geeApi } from './api.js';
 
-const SERVER_TIMEOUT_MS = 58000;     // máy chủ webapp: đọc bucket, hoặc tải Overpass + lưu (Vercel tối đa 60 s)
+const SERVER_TIMEOUT_MS = 30000;     // máy chủ webapp cắt đường từ mạng lưới toàn thành phố đã lưu trên bucket
 const SERVER_HEAD_START_MS = 6000;   // máy chủ chưa trả lời sau chừng này thì trình duyệt hỏi thẳng Overpass song song
 const ROAD_MARGIN_M = 100;           // tải đường rộng hơn bán kính phục vụ (đường nối ngay ngoài vòng)
-const SERVER_MAX_RADIUS_M = 3400;    // bán kính tải (bậc 500 m) trên 3500 m máy chủ không lưu sẵn (services/roadsService.js)
+const SERVER_MAX_RADIUS_M = 3400;    // bán kính cắt (bậc 500 m) trên 3500 m máy chủ không trả (services/roadsService.js)
 
 // Máy chủ Overpass công cộng hay quá tải (504) → gọi lần lượt có giãn cách, lấy kết quả về trước
 const OVERPASS_URLS = [
@@ -81,11 +81,10 @@ async function queryOverpass(url, q, signal) {
   return data;
 }
 
-// Trình duyệt tự hỏi Overpass (khi máy chủ webapp chậm / lỗi / vị trí không phải công trình trong dữ liệu)
-async function fetchWaysDirect(lat, lng, r) {
-  const q = `[out:json][timeout:25];way["highway"]["highway"!~"^(${EXCLUDED_HIGHWAYS})$"]["access"!~"^(private|no)$"]["foot"!="no"](around:${r},${lat},${lng});out body geom;`;
+/** Hỏi lần lượt các máy chủ Overpass (giãn cách hedgeMs), lấy kết quả về trước → JSON Overpass */
+export async function queryOverpassHedged(q, timeoutMs = FETCH_TIMEOUT_MS, hedgeMs = HEDGE_MS) {
   const ctrl = new AbortController();
-  const deadline = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  const deadline = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const data = await new Promise((resolve, reject) => {
       let next = 0, failed = 0, done = false, lastErr = null, hedge = null;
@@ -98,16 +97,22 @@ async function fetchWaysDirect(lat, lng, r) {
           if (++failed >= OVERPASS_URLS.length || ctrl.signal.aborted) { done = true; clearTimeout(hedge); reject(lastErr); }
           else launch();
         });
-        hedge = setTimeout(launch, HEDGE_MS);
+        hedge = setTimeout(launch, hedgeMs);
       };
       ctrl.signal.addEventListener('abort', () => { if (!done) { done = true; clearTimeout(hedge); reject(lastErr || new Error('Máy chủ dữ liệu đường quá tải')); } });
       launch();
     });
-    return slimWays(data.elements);
+    return data;
   } finally {
     clearTimeout(deadline);
     ctrl.abort();
   }
+}
+
+// Trình duyệt tự hỏi Overpass (khi máy chủ webapp chậm / lỗi / vị trí không phải công trình trong dữ liệu)
+async function fetchWaysDirect(lat, lng, r) {
+  const q = `[out:json][timeout:25];way["highway"]["highway"!~"^(${EXCLUDED_HIGHWAYS})$"]["access"!~"^(private|no)$"]["foot"!="no"](around:${r},${lat},${lng});out body geom;`;
+  return slimWays((await queryOverpassHedged(q)).elements);
 }
 
 // Dạng gọn từ máy chủ: [cầu ? 1 : 0, [id nút...], [lat, lon, lat, lon, ...]] → dạng Overpass rút gọn
@@ -117,7 +122,7 @@ const unpackWays = (packed) => (packed || []).map(([bridge, nodes, flat]) => ({
   tags: bridge ? { bridge: 'yes' } : undefined
 }));
 
-// Máy chủ webapp: bản lưu chung trên bucket (mọi người dùng), chưa có thì máy chủ tải Overpass rồi lưu
+// Máy chủ webapp: cắt đường quanh điểm từ mạng lưới toàn thành phố trên bucket (404 nếu Admin chưa tải đủ)
 async function requestServerRoads(lat, lng, radius) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), SERVER_TIMEOUT_MS);
@@ -132,12 +137,6 @@ async function requestServerRoads(lat, lng, radius) {
 }
 
 const fetchWaysFromServer = async (lat, lng, radius) => unpackWays((await requestServerRoads(lat, lng, radius)).ways);
-
-/** Admin tải trước: nhờ máy chủ lưu mạng đường của 1 công trình lên bucket → 'cache' (đã có) | 'saved' | 'unsaved' */
-export async function preloadServerRoads(lat, lng, radius) {
-  const data = await requestServerRoads(lat, lng, radius);
-  return data.source === 'cache' ? 'cache' : data.saved ? 'saved' : 'unsaved';
-}
 
 // Cache trình duyệt → máy chủ webapp; máy chủ chưa trả lời sau SERVER_HEAD_START_MS (hoặc lỗi) thì hỏi thẳng Overpass, lấy bên về trước
 async function fetchWays(lat, lng, radius) {

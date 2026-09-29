@@ -730,14 +730,15 @@ function importCadBatch(body) {
   return { "success": true, "created": created, "updated": updated, "skipped": skipped, "polygons": polygons.length };
 }
 
-// MẠNG ĐƯỜNG OSM QUANH CÔNG TRÌNH (máy chủ webapp tải từ Overpass, lưu chung trên bucket để mọi người dùng lại)
-// body = { key: "16.4637_107.5905_1000", content: JSON } → file roads/v1/<key>.json
+// MẠNG LƯỚI ĐƯỜNG OSM TOÀN THÀNH PHỐ (Admin tải theo phường/xã, máy chủ webapp gửi sang để lưu lên bucket)
+// body = { key: "net_phuong-thuan-hoa_0" (1 phần mạng lưới 1 phường) | "index" (chỉ mục + chiều dài đường), content: JSON }
+// → file roads/v2/<key>.json
 function saveRoads(body) {
   var key = String(body.key || '');
   var content = String(body.content || '');
-  if (!/^\d{1,2}\.\d{4}_\d{2,3}\.\d{4}_\d{3,4}$/.test(key)) return { "error": "Tên file mạng đường không hợp lệ" };
-  if (!content || content.length > 8000000) return { "error": "Dữ liệu mạng đường rỗng hoặc quá lớn" };
-  return { "success": true, "saved": uploadToGCS(content, "roads/v1/" + key + ".json") };
+  if (!/^(net_[a-z0-9-]{1,60}_\d{1,2}|index)$/.test(key)) return { "error": "Tên file mạng lưới đường không hợp lệ" };
+  if (!content || content.length > 8000000) return { "error": "Dữ liệu mạng lưới đường rỗng hoặc quá lớn" };
+  return { "success": true, "saved": uploadToGCS(content, "roads/v2/" + key + ".json") };
 }
 
 // ĐỐI CHIẾU PHƯỜNG: dấu nhắc trong cột Note, VD "⚠ Phường/xã theo tọa độ: Thuận Hóa" (các mục trong Note cách nhau " | ")
