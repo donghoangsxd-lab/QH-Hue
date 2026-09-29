@@ -1,15 +1,22 @@
 // Tab Đề xuất → "Hàng loạt (DXF)": đọc file CAD, xem trước các lô trên bản đồ và báo cáo kiểm tra trước khi ghi
 import { state, infraLabels, BUFFER_COLORS } from './state.js';
 import { map } from './mapEngine.js';
+import { geeApi } from './api.js';
+import { signOutAdmin } from './uiComponents.js';
 import { escapeHtml, fmtNum } from './utils.js';
 import { parseDxf, buildParcels, assignWards, matchExisting, CRS_PRESETS } from './cadImport.js';
 
 // Diện tích tối thiểu theo loại (khớp config/constants.js → infraConfig.minSize)
 const MIN_SIZE = { "1-CV": 300, "2-BDX": 200, "3-MN": 800, "4-TH": 2000, "5-THCS": 2500, "6-YT": 1000, "7-VH": 500, "8-TM": 1500 };
 const MAX_LISTED = 200;
+// Mỗi lần gửi: tối đa 300 lô (giới hạn máy chủ) và ~2,5 MB (Vercel nhận tối đa 4,5 MB/yêu cầu)
+const CHUNK_MAX_ITEMS = 250;
+const CHUNK_MAX_CHARS = 2500000;
 
 let current = null;   // { fileName, stats, result }
 let previewLayer = null;
+let submitting = false;
+let onImported = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -125,9 +132,9 @@ function renderReport() {
     const p = parcels[Number(row.dataset.idx)];
     if (p && map) map.fitBounds(L.geoJSON({ type: 'MultiPolygon', coordinates: p.polygons }).getBounds(), { padding: [60, 60], maxZoom: 18 });
   }));
-  $('btnCadClear')?.addEventListener('click', resetImport);
+  $('btnCadClear')?.addEventListener('click', () => resetImport());
   if (btn) {
-    btn.disabled = !(count.new + count.update) || !result.axes.valid;
+    btn.disabled = submitting || !(count.new + count.update) || !result.axes.valid;
     btn.title = state.currentUserRole === 'ADMIN' ? '' : 'Cần đăng nhập Admin';
   }
 }
@@ -164,16 +171,110 @@ async function loadFile(file) {
   }
 }
 
-function resetImport() {
+function resetImport(keepStatus = false) {
   current = null;
   clearPreview();
   renderReport();
-  setStatus('');
+  if (!keepStatus) setStatus('');
   const input = $('cadFile');
   if (input) input.value = '';
 }
 
-export function initCadImport() {
+// Lô sẽ ghi (tạo mới / cập nhật) → dữ liệu gửi máy chủ; tên mặc định "<layer> – <tên file> #<thứ tự>" để admin sửa sau
+function buildItems() {
+  const fileBase = current.fileName.replace(/\.dxf$/i, '');
+  const items = [];
+  current.result.parcels.forEach((p, idx) => {
+    const key = parcelAction(p).key;
+    if (key !== 'new' && key !== 'update') return;
+    items.push({
+      type: p.type,
+      idPrefix: p.prefix.replace(/_DV$/, ''),
+      nhom: p.nhom,
+      name: `${p.layer} – ${fileBase} #${idx + 1}`,
+      ward: p.ward,
+      lat: p.lat,
+      lng: p.lng,
+      area: p.area,
+      crossWard: !!p.crossWard,
+      layer: p.layer,
+      matchId: p.matchId || null,
+      geometry: p.polygons.length === 1
+        ? { type: 'Polygon', coordinates: p.polygons[0] }
+        : { type: 'MultiPolygon', coordinates: p.polygons }
+    });
+  });
+  return items;
+}
+
+function chunkItems(items) {
+  const chunks = [];
+  let cur = [], chars = 0;
+  for (const it of items) {
+    const len = JSON.stringify(it).length;
+    if (cur.length && (cur.length >= CHUNK_MAX_ITEMS || chars + len > CHUNK_MAX_CHARS)) {
+      chunks.push(cur);
+      cur = [];
+      chars = 0;
+    }
+    cur.push(it);
+    chars += len;
+  }
+  if (cur.length) chunks.push(cur);
+  return chunks;
+}
+
+async function submitImport() {
+  if (!current?.result || submitting) return;
+  if (state.currentUserRole !== 'ADMIN' || !state.authToken) {
+    setStatus('🔒 Cần đăng nhập Admin để ghi hàng loạt.', 'var(--accent-red)');
+    return;
+  }
+  const phase = $('cadPhase')?.value === 'QH' ? 'QH' : 'HT';
+  const items = buildItems();
+  if (!items.length) return;
+  const nUpdate = items.filter(it => it.matchId).length;
+  const phaseLabel = phase === 'QH' ? 'Quy hoạch (QuyMo_QH)' : 'Hiện trạng (QuyMo_HT)';
+  if (!confirm(`Ghi ${items.length} lô vào Google Sheet?\n• ${items.length - nUpdate} tạo mới, ${nUpdate} cập nhật\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
+
+  const chunks = chunkItems(items);
+  const done = { created: [], updated: [], skipped: [], polygonsDropped: 0 };
+  submitting = true;
+  renderReport();
+  try {
+    for (let k = 0; k < chunks.length; k++) {
+      setStatus(`⏳ Đang ghi ${chunks.length > 1 ? `phần ${k + 1}/${chunks.length}` : `${items.length} lô`}...`, 'var(--accent-orange)');
+      const res = await fetch(geeApi('action=importCadBatch'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+        body: JSON.stringify({ phase, fileName: current.fileName, sync: k === chunks.length - 1, items: chunks[k] })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) signOutAdmin();
+      if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+      ['created', 'updated', 'skipped'].forEach(key => done[key].push(...(data[key] || [])));
+      done.polygonsDropped += data.polygonsDropped || 0;
+    }
+    const extra = [
+      done.skipped.length ? `bỏ qua ${done.skipped.length}: ${done.skipped.slice(0, 3).join('; ')}` : '',
+      done.polygonsDropped ? `${done.polygonsDropped} lô ranh quá phức tạp chỉ ghi điểm tâm` : ''
+    ].filter(Boolean).join(' · ');
+    submitting = false;
+    resetImport(true);
+    setStatus(`✓ Đã ghi ${done.created.length} mới, ${done.updated.length} cập nhật${extra ? ` (${extra})` : ''}.`, 'var(--accent-green)');
+    if (onImported) await onImported();
+  } catch (err) {
+    const written = done.created.length + done.updated.length;
+    setStatus(`❌ ${err.message}${written ? ` — đã ghi ${written} lô vào Sheet trước khi lỗi, bản đồ cập nhật ở lần đồng bộ kế tiếp` : ''}`, 'var(--accent-red)');
+  } finally {
+    submitting = false;
+    renderReport();
+  }
+}
+
+/** opts.onImported: gọi sau khi ghi xong để tải lại dữ liệu bản đồ */
+export function initCadImport(opts = {}) {
+  onImported = opts.onImported || null;
   document.querySelectorAll('.add-mode-btn').forEach(btn => btn.addEventListener('click', () => {
     document.querySelectorAll('.add-mode-btn').forEach(b => {
       const on = b === btn;
@@ -194,8 +295,5 @@ export function initCadImport() {
   }
   $('cadCrs')?.addEventListener('change', analyse);
   $('cadPhase')?.addEventListener('change', renderReport);
-  $('btnCadSubmit')?.addEventListener('click', () => {
-    if (state.currentUserRole !== 'ADMIN') { setStatus('🔒 Cần đăng nhập Admin để ghi hàng loạt.', 'var(--accent-red)'); return; }
-    setStatus('⏳ Chức năng ghi hàng loạt đang chờ cập nhật Apps Script (doPost).', 'var(--accent-orange)');
-  });
+  $('btnCadSubmit')?.addEventListener('click', submitImport);
 }

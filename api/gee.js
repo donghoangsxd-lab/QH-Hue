@@ -184,21 +184,85 @@ function sanitizeSheetText(raw, maxLen) {
     .slice(0, maxLen);
 }
 
-async function callAppsScript(params) {
+// ============================ NHẬP LÔ ĐẤT TỪ DXF ============================
+
+const CAD_BATCH_MAX = 300;
+// Ô Google Sheet chứa tối đa 50.000 ký tự: ranh dài hơn thì chỉ ghi điểm tâm
+const CAD_GEOJSON_MAX_CHARS = 45000;
+const round6 = (v) => Math.round(v * 1e6) / 1e6;
+
+function parseCadGeometry(g) {
+  if (!g || (g.type !== 'Polygon' && g.type !== 'MultiPolygon') || !Array.isArray(g.coordinates)) return null;
+  const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+  const out = [];
+  for (const poly of polys) {
+    if (!Array.isArray(poly) || !poly.length) return null;
+    const rings = [];
+    for (const ring of poly) {
+      if (!Array.isArray(ring) || ring.length < 4 || ring.length > 20000) return null;
+      const r = [];
+      for (const c of ring) {
+        if (!Array.isArray(c)) return null;
+        const pt = parseCoordInBounds(c[1], c[0]);
+        if (!pt) return null;
+        r.push([round6(pt.lng), round6(pt.lat)]);
+      }
+      rings.push(r);
+    }
+    out.push(rings);
+  }
+  return out.length === 1 ? { type: 'Polygon', coordinates: out[0] } : { type: 'MultiPolygon', coordinates: out };
+}
+
+// 1 lô do trình duyệt gửi → dữ liệu ghi Sheet; null nếu không hợp lệ. Lô vắt ranh ghi quy mô 0
+function parseCadItem(it) {
+  if (!it || typeof it !== 'object') return null;
+  const type = String(it.type || '');
+  const idPrefix = String(it.idPrefix || '').toUpperCase();
+  if (!/^[A-Z_]{2,8}$/.test(idPrefix) || constants.codeMap[idPrefix] !== type) return null;
+  const pt = parseCoordInBounds(it.lat, it.lng);
+  const area = Number(it.area);
+  const ward = sanitizeSheetText(it.ward, 80);
+  const layer = sanitizeSheetText(it.layer, 60) || idPrefix;
+  const matchId = it.matchId ? String(it.matchId) : null;
+  if (!pt || !ward || !Number.isFinite(area) || area <= 0 || area > 1e8) return null;
+  if (matchId && !/^[A-Za-z0-9_\-]{1,40}$/.test(matchId)) return null;
+  const crossWard = it.crossWard === true;
+  const areaRounded = Math.round(area * 10) / 10;
+  let geometry = parseCadGeometry(it.geometry);
+  if (geometry && JSON.stringify(geometry).length > CAD_GEOJSON_MAX_CHARS) geometry = null;
+  return {
+    type, idPrefix,
+    nhom: it.nhom === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở',
+    name: sanitizeSheetText(it.name, 150) || `${layer} (DXF)`,
+    ward, layer, matchId, crossWard,
+    lat: pt.lat.toFixed(6), lng: pt.lng.toFixed(6),
+    area: areaRounded,
+    size: crossWard ? 0 : areaRounded,
+    geometry
+  };
+}
+
+// body != null → POST JSON tới doPost (dữ liệu lớn); còn lại GET tới doGet
+async function callAppsScript(params, body = null) {
   if (!constants.GAS_BASE_URL) {
     throw httpError(503, 'Máy chủ chưa cấu hình GAS_BASE_URL (Vercel → Settings → Environment Variables)');
   }
   const query = new URLSearchParams(params);
   if (constants.GAS_SECRET) query.set('key', constants.GAS_SECRET);
+  const url = `${constants.GAS_BASE_URL}?${query.toString()}`;
+  const opts = {
+    timeout: body ? 55000 : 25000,
+    responseType: 'text',
+    transformResponse: r => r,
+    validateStatus: () => true
+  };
 
   let res;
   try {
-    res = await axios.get(`${constants.GAS_BASE_URL}?${query.toString()}`, {
-      timeout: 25000,
-      responseType: 'text',
-      transformResponse: r => r,
-      validateStatus: () => true
-    });
+    res = body
+      ? await axios.post(url, JSON.stringify(body), { ...opts, headers: { 'Content-Type': 'application/json' }, maxBodyLength: Infinity })
+      : await axios.get(url, opts);
   } catch (e) {
     throw httpError(502, 'Không kết nối được Google Apps Script');
   }
@@ -892,6 +956,38 @@ module.exports = async (req, res) => {
       const result = await callAppsScript({ action: 'approvePoint', id });
       invalidateAllCaches();
       return res.status(200).json({ success: true, id: result.id || id });
+    }
+
+    if (action === 'importCadBatch') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const rawItems = Array.isArray(body.items) ? body.items : [];
+      if (!rawItems.length || rawItems.length > CAD_BATCH_MAX) {
+        return res.status(400).json({ error: true, message: `Mỗi lần gửi 1–${CAD_BATCH_MAX} lô` });
+      }
+      const items = [];
+      for (let i = 0; i < rawItems.length; i++) {
+        const item = parseCadItem(rawItems[i]);
+        if (!item) return res.status(400).json({ error: true, message: `Lô thứ ${i + 1} không hợp lệ (loại, tọa độ, phường hoặc diện tích)` });
+        items.push(item);
+      }
+      const sync = body.sync !== false;
+      const result = await callAppsScript({ action: 'importCadBatch' }, {
+        action: 'importCadBatch',
+        phase: body.phase === 'QH' ? 'QH' : 'HT',
+        fileName: sanitizeSheetText(body.fileName, 120) || 'DXF',
+        sync,
+        items
+      });
+      if (sync) invalidateAllCaches();
+      return res.status(200).json({
+        success: true,
+        created: result.created || [],
+        updated: result.updated || [],
+        skipped: result.skipped || [],
+        polygonsDropped: items.filter(it => !it.geometry).length
+      });
     }
 
     if (action === 'getSingleIsochrone') {

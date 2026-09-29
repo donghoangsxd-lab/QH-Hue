@@ -71,7 +71,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   initPlanMap(map, layers);
   centerOnCity();
   initBottomPanelEvents();
-  initCadImport();
+  initCadImport({
+    onImported: async () => {
+      try { await loadInfraData(); } catch (err) { showToast('⚠️ Chưa tải lại được dữ liệu, thử F5 sau ít phút', 'error'); return; }
+      renderGroupedPoints();
+      refreshHeatmapOnly();
+      if (state.wardStatsData.length) reloadWardStats();
+    }
+  });
   restoreAdminSession();
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleCompareMode);
 
