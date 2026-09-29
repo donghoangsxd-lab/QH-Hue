@@ -8,7 +8,7 @@ const BUCKET_NAME = "hue-infra-data-us";
 const GEOJSON_FILE_NAME = "infrastructure_hue.json";
 const CAD_FILE_NAME = "cad_parcels.json";
 const CAD_SHEET_NAME = "CAD_Polygon";
-const CAD_HEADERS = ["ID_DoiTuong", "Layer", "DienTich", "File", "ThoiGianNhap", "GeoJSON"];
+const CAD_HEADERS = ["ID_DoiTuong", "Layer", "DienTich", "File", "ThoiGianNhap", "GeoJSON", "GiaiDoan"];
 const CAD_DEFAULT_RADIUS = 1000; // bán kính tạm cho lô nhập từ DXF, admin chỉnh lại sau
 const VALID_PREFIXES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM", "9-CSD"];
 
@@ -211,7 +211,8 @@ function collectCadFeatures(ss, pointFeatures) {
         "Layer": String(cellAt(data[i], col.layer === undefined ? -1 : col.layer) || ''),
         "DienTich": parseCleanNumber(cellAt(data[i], col.dientich === undefined ? -1 : col.dientich)),
         "File": String(cellAt(data[i], col.file === undefined ? -1 : col.file) || ''),
-        "ThoiGianNhap": String(cellAt(data[i], col.thoigiannhap === undefined ? -1 : col.thoigiannhap) || '')
+        "ThoiGianNhap": String(cellAt(data[i], col.thoigiannhap === undefined ? -1 : col.thoigiannhap) || ''),
+        "GiaiDoan": String(cellAt(data[i], col.giaidoan === undefined ? -1 : col.giaidoan) || '').trim().toUpperCase() === 'QH' ? 'QH' : 'HT'
       }
     });
   }
@@ -708,7 +709,7 @@ function importCadBatch(body) {
       target.setValues(c.newRows);
     });
 
-    upsertCadPolygons(ss, polygons, fileName, currentTime);
+    upsertCadPolygons(ss, polygons, fileName, currentTime, phase);
     SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
@@ -718,29 +719,31 @@ function importCadBatch(body) {
   return { "success": true, "created": created, "updated": updated, "skipped": skipped, "polygons": polygons.length };
 }
 
-// Ranh lô theo ID_DoiTuong: đã có thì ghi đè, chưa có thì thêm dòng
-function upsertCadPolygons(ss, polygons, fileName, currentTime) {
+// Ranh lô theo (ID_DoiTuong, GiaiDoan): đã có thì ghi đè, chưa có thì thêm dòng. Dòng cũ chưa có GiaiDoan coi là HT
+function upsertCadPolygons(ss, polygons, fileName, currentTime, phase) {
   if (!polygons.length) return;
   var sheet = ss.getSheetByName(CAD_SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(CAD_SHEET_NAME);
-    sheet.getRange(1, 1, 1, CAD_HEADERS.length).setValues([CAD_HEADERS]);
     sheet.setFrozenRows(1);
   }
+  sheet.getRange(1, 1, 1, CAD_HEADERS.length).setValues([CAD_HEADERS]);
 
   var last = sheet.getLastRow();
   var rowOf = {};
   if (last > 1) {
-    sheet.getRange(2, 1, last - 1, 1).getValues().forEach(function(v, i) {
+    sheet.getRange(2, 1, last - 1, CAD_HEADERS.length).getValues().forEach(function(v, i) {
       var id = String(v[0] || '').trim();
-      if (id) rowOf[id] = i + 2;
+      var ph = String(v[6] || '').trim().toUpperCase() === 'QH' ? 'QH' : 'HT';
+      if (id) rowOf[id + '|' + ph] = i + 2;
     });
   }
 
   var appends = [];
   polygons.forEach(function(p) {
-    var values = [p.id, p.layer, p.area, fileName, currentTime, JSON.stringify(p.geometry)];
-    if (rowOf[p.id]) sheet.getRange(rowOf[p.id], 1, 1, values.length).setValues([values]);
+    var values = [p.id, p.layer, p.area, fileName, currentTime, JSON.stringify(p.geometry), phase];
+    var r = rowOf[p.id + '|' + phase];
+    if (r) sheet.getRange(r, 1, 1, values.length).setValues([values]);
     else appends.push(values);
   });
   if (appends.length) {

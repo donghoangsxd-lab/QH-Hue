@@ -2,7 +2,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const constants = require('../config/constants');
 const { initGEE, getGeeContext, eeEvaluate } = require('../services/geeService');
-const { getRawDataList, invalidateCache, getDataVersion } = require('../services/gcsService');
+const { getRawDataList, getCadParcels, invalidateCache, getDataVersion } = require('../services/gcsService');
 const { requireAdmin, httpError } = require('../services/authService');
 
 let cachedWardStats = null;
@@ -956,6 +956,11 @@ module.exports = async (req, res) => {
       const result = await callAppsScript({ action: 'approvePoint', id });
       invalidateAllCaches();
       return res.status(200).json({ success: true, id: result.id || id });
+    }
+
+    if (action === 'getCadParcels') {
+      const parcels = await getCadParcels();
+      return res.status(200).json({ parcels });
     }
 
     if (action === 'importCadBatch') {

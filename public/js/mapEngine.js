@@ -409,6 +409,34 @@ function hasValidCoord(p) {
   return p.lat != null && p.lng != null && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng));
 }
 
+// Ranh lô đất CAD chỉ vẽ khi phóng to đủ gần (ở mức toàn thành phố hàng nghìn polygon vừa rối vừa nặng)
+const PARCEL_MIN_ZOOM = 15;
+
+// Bản đồ quy hoạch ưu tiên ranh QH, chưa có thì dùng ranh hiện trạng của cùng công trình
+function parcelGeometryFor(p) {
+  const parcels = state.cadParcels;
+  if (!parcels.size) return null;
+  if (p.scenario === 'QH') return parcels.get(`QH|${p.id}`) || parcels.get(`HT|${p.id}`) || null;
+  return parcels.get(`HT|${p.id}`) || null;
+}
+
+function createParcelShape(entry, targetMap) {
+  const p = entry.point;
+  const geometry = parcelGeometryFor(p);
+  if (!geometry) return null;
+  const approved = isApproved(p.status);
+  const color = approved ? (BUFFER_COLORS[p.type] || '#38bdf8') : '#f87171';
+  const shape = L.geoJSON(geometry, {
+    style: { color, weight: 1.8, opacity: 0.95, fillColor: color, fillOpacity: 0.22, dashArray: approved ? null : '4,4' },
+    bubblingMouseEvents: false
+  });
+  shape.on('click', () => {
+    if (state.isPickMode || state.activeMeasureType) return;
+    onPointClick(entry.point, targetMap);
+  });
+  return shape;
+}
+
 function createPointMarker(entry, mode, targetMap) {
   const p = entry.point;
   const approved = isApproved(p.status);
@@ -449,15 +477,22 @@ function createPointMarker(entry, mode, targetMap) {
  * - Chỉ tạo marker cho điểm nằm trong khung nhìn (nới 25%), khi kéo/zoom chỉ thêm/bớt phần chênh lệch.
  * - Nhiều điểm trong khung nhìn (> ICON_MAX_VISIBLE) thì chuyển sang chấm tròn canvas thay cho icon DOM.
  * - Buffer vẽ bằng L.circle trên canvas, chỉ dựng cho nhóm đang bật.
+ * - Ranh lô CAD (nếu có) vẽ cùng nhóm với marker nên bật/tắt theo loại hạ tầng và lọc phường như icon.
  */
 function createRenderer(getMap, groups, isActive) {
   let list = [];
   let mode = null;
+  let parcelsOn = false;
   const rendered = new Map();
   const builtBuffers = new Set();
 
+  const removeEntry = (entry) => {
+    entry.group.removeLayer(entry.marker);
+    if (entry.shape) entry.group.removeLayer(entry.shape);
+  };
+
   const clearPoints = () => {
-    rendered.forEach(entry => entry.group.removeLayer(entry.marker));
+    rendered.forEach(removeEntry);
     rendered.clear();
   };
 
@@ -467,16 +502,18 @@ function createRenderer(getMap, groups, isActive) {
     const bounds = m.getBounds().pad(0.25);
     const visible = list.filter(p => bounds.contains([p.lat, p.lng]));
     const nextMode = visible.length <= ICON_MAX_VISIBLE ? 'icon' : 'dot';
-    if (nextMode !== mode) {
+    const wantParcels = state.showParcels && state.cadParcels.size > 0 && m.getZoom() >= PARCEL_MIN_ZOOM;
+    if (nextMode !== mode || wantParcels !== parcelsOn) {
       clearPoints();
       mode = nextMode;
+      parcelsOn = wantParcels;
     }
 
     const wanted = new Map();
     visible.forEach(p => wanted.set(pointKey(p), p));
     rendered.forEach((entry, key) => {
       if (wanted.has(key)) return;
-      entry.group.removeLayer(entry.marker);
+      removeEntry(entry);
       rendered.delete(key);
     });
     wanted.forEach((p, key) => {
@@ -486,10 +523,19 @@ function createRenderer(getMap, groups, isActive) {
         return;
       }
       const entry = { point: p, group: groups[ICON_GROUP_KEYS[p.type]] || groups.c9 };
+      entry.shape = parcelsOn ? createParcelShape(entry, m) : null;
+      if (entry.shape) entry.group.addLayer(entry.shape);
       entry.marker = createPointMarker(entry, mode, m);
       entry.group.addLayer(entry.marker);
       rendered.set(key, entry);
     });
+  }
+
+  // Vẽ lại toàn bộ marker + ranh lô (dữ liệu ranh vừa tải hoặc bật/tắt lớp ranh)
+  function reset() {
+    clearPoints();
+    mode = null;
+    refreshPoints();
   }
 
   function buildBuffer(key) {
@@ -525,7 +571,7 @@ function createRenderer(getMap, groups, isActive) {
     invalidateBuffers();
   }
 
-  return { setList, refreshPoints, refreshBuffers, invalidateBuffers };
+  return { setList, refreshPoints, refreshBuffers, invalidateBuffers, reset };
 }
 
 const leftRenderer = createRenderer(() => map, layers, () => true);
@@ -544,6 +590,36 @@ export function renderGroupedPoints() {
 export function refreshBuffers() {
   leftRenderer.invalidateBuffers();
   planRenderer.invalidateBuffers();
+}
+
+// ============================ RANH LÔ ĐẤT CAD ============================
+
+function redrawParcels() {
+  leftRenderer.reset();
+  planRenderer.reset();
+}
+
+/** Tải ranh lô từ máy chủ (cad_parcels.json qua cache ETag); lỗi thì giữ ranh đang có */
+export async function loadCadParcels() {
+  try {
+    const res = await fetch(geeApi('action=getCadParcels'));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const next = new Map();
+    (data.parcels || []).forEach(p => {
+      if (p && p.id && p.geometry) next.set(`${p.phase === 'QH' ? 'QH' : 'HT'}|${p.id}`, p.geometry);
+    });
+    state.cadParcels = next;
+  } catch (err) {
+    console.warn('Không tải được ranh lô CAD:', err);
+    return;
+  }
+  redrawParcels();
+}
+
+export function setParcelsVisible(on) {
+  state.showParcels = !!on;
+  redrawParcels();
 }
 
 // ============================ HEATMAP ============================

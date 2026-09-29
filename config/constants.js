@@ -57,6 +57,8 @@ const constants = {
   WARD_STATS_CACHE_TTL: 15 * 60 * 1000, // Cache Wards 15 phút
   WARD_GEOMETRY_CACHE_TTL: 6 * 60 * 60 * 1000, // Ranh giới phường gần như không đổi
   GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/infrastructure_hue.json",
+  // Ranh lô đất nhập từ DXF (Apps Script dựng từ tab CAD_Polygon)
+  CAD_GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/cad_parcels.json",
 
   // Cấu hình trên Vercel (Settings → Environment Variables), không ghi vào mã nguồn
   GAS_BASE_URL: process.env.GAS_BASE_URL || "",

@@ -105,13 +105,59 @@ async function getRawDataList() {
   }
 }
 
+// ============================ RANH LÔ ĐẤT (cad_parcels.json) ============================
+
+let cachedParcels = null;
+let lastParcelETag = null;
+
+/** [{ id, phase: 'HT'|'QH', layer, area, geometry }]; file chưa có (chưa nhập DXF lần nào) → [] */
+async function getCadParcels() {
+  try {
+    let currentETag = null;
+    try {
+      const headRes = await axios.head(constants.CAD_GCS_URL, { timeout: 5000 });
+      currentETag = headRes.headers['etag'] || headRes.headers['last-modified'];
+    } catch (headErr) {
+      if (headErr.response && headErr.response.status === 404) return [];
+    }
+
+    if (cachedParcels && currentETag && currentETag === lastParcelETag) {
+      return cachedParcels;
+    }
+
+    const response = await axios.get(constants.CAD_GCS_URL, { timeout: 15000 });
+    const features = (response.data && response.data.features) || [];
+    cachedParcels = features
+      .filter(ft => ft && ft.geometry && (ft.geometry.type === 'Polygon' || ft.geometry.type === 'MultiPolygon'))
+      .map(ft => {
+        const props = ft.properties || {};
+        return {
+          id: String(props.ID_DoiTuong || ''),
+          phase: String(props.GiaiDoan || '').toUpperCase() === 'QH' ? 'QH' : 'HT',
+          layer: String(props.Layer || ''),
+          area: Number(props.DienTich) || null,
+          geometry: ft.geometry
+        };
+      })
+      .filter(p => p.id);
+    lastParcelETag = currentETag;
+    return cachedParcels;
+  } catch (e) {
+    if (e.response && e.response.status === 404) return [];
+    console.error("Lỗi nạp ranh lô GCS:", e.message);
+    return cachedParcels || [];
+  }
+}
+
 function invalidateCache() {
   cachedGeoJSON = null;
   lastETag = null;
+  cachedParcels = null;
+  lastParcelETag = null;
 }
 
 function getDataVersion() {
   return dataVersion;
 }
 
-module.exports = { getRawDataList, invalidateCache, getDataVersion };
+module.exports = { getRawDataList, getCadParcels, invalidateCache, getDataVersion };

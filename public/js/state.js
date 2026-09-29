@@ -14,6 +14,9 @@ export const state = {
   planDataList: [],
   // Tăng mỗi khi danh sách công trình hoặc trạng thái duyệt thay đổi (làm mới các kết quả lọc đã ghi nhớ)
   dataVersion: 0,
+  // Ranh lô đất nhập từ DXF: "HT|<ID_DoiTuong>" / "QH|<ID_DoiTuong>" → GeoJSON geometry
+  cadParcels: new Map(),
+  showParcels: true,
   wardStatsData: [],
 
   // Bộ lọc địa bàn: null = xem toàn TP. Huế | "Tên phường" = chỉ lọc riêng phường đó

@@ -13,6 +13,8 @@ import {
   handleInspectPointClick,
   loadBoundaryLayer,
   loadPopulationLayer,
+  loadCadParcels,
+  setParcelsVisible,
   flyToVisible,
   centerOnCity,
   layers
@@ -75,6 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     onImported: async () => {
       try { await loadInfraData(); } catch (err) { showToast('⚠️ Chưa tải lại được dữ liệu, thử F5 sau ít phút', 'error'); return; }
       renderGroupedPoints();
+      loadCadParcels();
       refreshHeatmapOnly();
       if (state.wardStatsData.length) reloadWardStats();
     }
@@ -215,6 +218,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       toggleLayer(targetLayer, e.target.checked);
     });
   });
+  document.getElementById('chk_parcel')?.addEventListener('change', (e) => setParcelsVisible(e.target.checked));
 
   document.querySelectorAll('.btn-dot-buffer').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -406,6 +410,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setProgress(90);
     renderGroupedPoints();
     renderBottomPanel();
+    loadCadParcels();
 
     // Chạy ngầm tính độ phủ (dân số lớn → nhỏ), ghi nhớ theo chữ ký dữ liệu để lần sau dùng lại
     ensureWardStats()
