@@ -348,14 +348,26 @@ body.right-collapsed .right-panel {
 
 /* ĐỀ XUẤT: nhập 1 điểm / hàng loạt DXF */
 .add-mode-switch { display: flex; gap: 3px; padding: 3px; margin-bottom: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color); border-radius: 7px; }
-.add-mode-btn { flex: 1; padding: 5px 4px; border: none; border-radius: 5px; background: transparent; color: var(--text-muted); font-size: 10.5px; font-weight: 600; cursor: pointer; }
+.add-mode-btn { flex: 1; padding: 5px 4px; border: none; border-radius: 5px; background: transparent; color: var(--text-muted); font-size: 10.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .add-mode-btn.active { background: var(--accent-cyan); color: var(--bg-panel); }
+.add-point-form select:disabled { opacity: 0.45; cursor: not-allowed; }
 .add-point-form label.cad-drop {
-  display: flex; align-items: center; justify-content: center; margin-top: 8px; padding: 12px 6px; white-space: normal; text-align: center;
-  border: 1.5px dashed var(--accent-cyan); border-radius: 7px; color: var(--text-main); font-size: 11px; cursor: pointer; background: rgba(34, 211, 238, 0.06);
+  display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 8px; padding: 10px 6px; white-space: normal; text-align: center;
+  border: 1.5px dashed rgba(34, 211, 238, 0.6); border-radius: 7px; color: var(--text-main); font-size: 11px; cursor: pointer; background: rgba(34, 211, 238, 0.05); transition: background 0.2s, border-color 0.2s;
 }
-.add-point-form label.cad-drop.over, .add-point-form label.cad-drop:hover { background: rgba(34, 211, 238, 0.16); }
-.cad-hint { margin-top: 4px; font-size: 9.5px; line-height: 1.35; color: var(--text-muted); }
+.add-point-form label.cad-drop.over, .add-point-form label.cad-drop:hover { background: rgba(34, 211, 238, 0.14); border-color: var(--accent-cyan); }
+.cad-drop-main b { color: var(--accent-cyan); }
+.cad-drop-types { display: flex; gap: 4px; }
+.cad-drop-types i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; padding: 1px 6px; border-radius: 3px; color: var(--text-muted); border: 1px solid var(--border-color); }
+.cad-hint { margin-top: 6px; padding: 6px 7px; font-size: 10px; line-height: 1.4; color: var(--text-muted); background: rgba(15, 23, 42, 0.55); border: 1px solid var(--border-color); border-radius: 6px; }
+.cad-hint-title { margin-bottom: 3px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-main); }
+.cad-hint-row { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 4px; }
+.cad-hint-row b { font-weight: 600; color: var(--text-main); }
+.cad-hint code { font-family: Consolas, monospace; font-size: 9.5px; color: var(--accent-cyan); }
+.cad-codes { display: flex; flex-wrap: wrap; gap: 3px; margin: 5px 0 4px; }
+.cad-codes code { padding: 0 5px; border-radius: 3px; background: rgba(34, 211, 238, 0.1); border: 1px solid rgba(34, 211, 238, 0.25); cursor: help; }
+.cad-hint-note { font-size: 9.5px; }
+#addBulk:has(#cadReport:not(:empty)) .cad-hint { display: none; }
 #cadReport:empty { display: none; }
 #cadReport { margin-top: 8px; font-size: 10.5px; }
 .cad-file { margin-bottom: 4px; line-height: 1.35; }

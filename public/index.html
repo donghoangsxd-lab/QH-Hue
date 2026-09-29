@@ -103,7 +103,7 @@
       <div class="tab-body add-point-form" id="tabAdd" style="display:none;">
         <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
           <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true">✍️ Nhập 1 điểm</button>
-          <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false">📂 Hàng loạt (DXF/KML)</button>
+          <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ">📂 Nhập hàng loạt</button>
         </div>
 
         <div id="addSingle">
@@ -168,10 +168,19 @@
             </select>
           </div>
           <label class="cad-drop" id="cadDrop" for="cadFile">
-            <span>📂 Chọn file <b>.dxf</b>, <b>.kml</b>, <b>.kmz</b> hoặc kéo thả vào đây</span>
+            <span class="cad-drop-main"><b>Chọn file</b> hoặc kéo thả vào đây</span>
+            <span class="cad-drop-types"><i>DXF</i><i>KML</i><i>KMZ</i></span>
             <input type="file" id="cadFile" accept=".dxf,.kml,.kmz" hidden />
           </label>
-          <div class="cad-hint">Mỗi layer đặt theo mã loại: CV, BDX, MN, TH, THCS, THPT, YT, VH, TM, CSD (thêm <b>_DT</b> cho cấp đô thị, VD CV_DT). DXF: chỉ đọc HATCH và polyline khép kín. KML/KMZ: đọc Polygon và đường khép kín; loại lấy theo trường Layer → tên Folder → tên Placemark, tên Placemark dùng làm tên công trình.</div>
+          <div class="cad-hint">
+            <div class="cad-hint-title">Quy ước đặt tên</div>
+            <div class="cad-hint-row"><b>DXF</b><span>Tên layer = mã loại</span></div>
+            <div class="cad-hint-row"><b>KML/KMZ</b><span>Trường <code>Layer</code> / tên Folder = mã loại</span></div>
+            <div class="cad-codes">
+              <code title="Công viên, điểm xanh">CV</code><code title="Bãi đỗ xe, trạm sạc">BDX</code><code title="Mầm non">MN</code><code title="Tiểu học">TH</code><code title="THCS">THCS</code><code title="THPT (cấp đô thị)">THPT</code><code title="Y tế">YT</code><code title="Văn hóa, thể thao">VH</code><code title="Chợ, TTTM">TM</code><code title="Quỹ đất tiềm năng">CSD</code>
+            </div>
+            <div class="cad-hint-note">Cấp đô thị thêm <code>_DT</code>, VD <code>CV_DT</code></div>
+          </div>
           <div id="cadReport"></div>
           <button type="button" class="btn-submit" id="btnCadSubmit" disabled>🚀 GHI VÀO HỆ THỐNG (ADMIN)</button>
           <div id="cadStatus" class="rp-status" role="status" aria-live="polite"></div>
