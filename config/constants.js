@@ -22,7 +22,7 @@ const unitInfraConfig = {
   "DVCC_ALL": { label: "Tổng đất dịch vụ công cộng đơn vị ở (gồm trường học)", minSize: 0, radius: 0, quota: 2.00, nhom: "Cấp DVƠ",
     sumOf: ["3-MN", "4-TH", "5-THCS", "YT_DV", "VH_DV", "TM_DV"] },
 
-  "CV_DV":  { label: "Cây xanh đơn vị ở", minSize: 500, radius: 500, quota: 2.00, nhom: "Cấp DVƠ" },
+  "CV_DV":  { label: "Cây xanh đơn vị ở", minSize: 500, radius: 400, quota: 2.00, nhom: "Cấp DVƠ" },
   "BDX_DV": { label: "Bãi đỗ xe đơn vị ở", minSize: 500, radius: 500, quota: 2.50, nhom: "Cấp DVƠ" }
 };
 
@@ -221,7 +221,8 @@ const constants = {
 
   // minSize: ngưỡng lọc gợi ý chuyển đổi quỹ đất (nội bộ, không phải chỉ tiêu QCVN)
   infraConfig: {
-    "1-CV":   { label: "Cây xanh, công viên", minSize: 300, radius: 500 },
+    // Công viên đơn vị ở: QCVN chỉ quy định bán kính nhóm nhà ở ≤ 400 m (Mục 2.2.3.3)
+    "1-CV":   { label: "Cây xanh, công viên", minSize: 300, radius: 400 },
     "2-BDX":  { label: "Bãi đỗ xe, trạm sạc xe điện", minSize: 200, radius: 500 },
     "3-MN":   { label: "Trường Mầm non", minSize: 800, radius: 1000 },
     "4-TH":   { label: "Trường Tiểu học", minSize: 2000, radius: 1000 },
@@ -287,23 +288,27 @@ const constants = {
     return nhom === 'Cap Do Thi';
   },
 
-  /** Bán kính mặc định khi cột BanKinh trống: theo cấp, loại công trình và loại địa bàn (cột Ten_XaPhuong) */
-  defaultRadius: function(item) {
+  /** Bán kính vùng phục vụ theo quy chuẩn: theo cấp, loại công trình và hồ sơ phường/xã chứa công trình */
+  standardRadius: function(item, profile = 'DT') {
     if (this.isThptItem(item)) return urbanInfraConfig.THPT.radius;
     const code = this.resolveTypeCode(item);
     if (this.isUrbanLevel(item) && CODE_LEVEL_KEYS[code] && urbanInfraConfig[CODE_LEVEL_KEYS[code][0]]) {
       return urbanInfraConfig[CODE_LEVEL_KEYS[code][0]].radius;
     }
-    return this.unitRadius(code, wardProfile(item && item.ward));
+    return this.unitRadius(code, profile);
   },
 
-  /** Bán kính chuẩn khi cột BanKinh nhập khác chuẩn cấp đơn vị ở của hồ sơ phường/xã; null = đúng chuẩn hoặc không kiểm tra */
+  /** Bán kính tạm khi chưa xác định được phường/xã theo tọa độ (cột Ten_XaPhuong có thể còn tên cũ trước sáp nhập) */
+  defaultRadius: function(item) {
+    return this.standardRadius(item, wardProfile(item && item.ward));
+  },
+
+  /** Giá trị cột BanKinh khi khác bán kính chuẩn cấp đơn vị ở (chỉ để đối chiếu dữ liệu, không dùng tính toán); null = khớp hoặc không kiểm tra */
   radiusMismatch: function(item, profile) {
-    if (!item || !item.radiusSet || this.isThptItem(item) || this.isUrbanLevel(item)) return null;
+    if (!item || !(item.sheetRadius > 0) || this.isThptItem(item) || this.isUrbanLevel(item)) return null;
     const code = this.resolveTypeCode(item);
     if (!this.infraConfig[code]) return null;
-    const std = this.unitRadius(code, profile);
-    return Number(item.radius) === std ? null : std;
+    return Number(item.sheetRadius) === this.unitRadius(code, profile) ? null : Number(item.sheetRadius);
   },
 
   cleanWardStr: function(str) {

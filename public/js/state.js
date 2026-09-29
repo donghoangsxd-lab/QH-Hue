@@ -24,7 +24,7 @@ export const state = {
   // Danh sách tên + tọa độ tâm 40 phường xã (dùng cho dropdown lọc & bay tới vị trí)
   wardLabelsList: [],
 
-  // Bán kính buffer chung do người dùng nhập (null = dùng cột BanKinh của từng công trình)
+  // Bán kính buffer chung do người dùng nhập (null = bán kính chuẩn của từng công trình do máy chủ gán)
   globalBufferRadiusOverride: null,
 
   // Trạng thái các chế độ tương tác

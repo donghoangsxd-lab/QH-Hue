@@ -90,9 +90,10 @@ async function getRawDataList() {
         planChange: classifyPlanChange(sizeHT, sizeQH),
         status: isStatusTrue
       };
+      // Bán kính luôn theo quy chuẩn (api/gee.js tính lại theo phường/xã chứa công trình); cột BanKinh chỉ để đối chiếu
       const banKinh = parseArea(props.BanKinh);
-      item.radius = banKinh > 0 ? banKinh : constants.defaultRadius(item);
-      item.radiusSet = banKinh > 0;
+      item.radius = constants.defaultRadius(item);
+      item.sheetRadius = banKinh > 0 ? banKinh : null;
       return item;
     }).filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng)
       && Math.abs(item.lat) <= 90 && Math.abs(item.lng) <= 180);

@@ -1014,19 +1014,18 @@ function minSizeSummaryHtml(subItems) {
   return ` <span class="min-size-warn" title="Số công trình nhỏ hơn quy mô tối thiểu theo QCVN 01:2026/BXD">⚠ ${below}/${checked} dưới QM tối thiểu</span>`;
 }
 
-const RADIUS_WARN_TITLE = 'Cột BanKinh trong Sheet khác bán kính chuẩn cấp đơn vị ở của phường/xã chứa công trình (theo tọa độ): phường 1.000 m, xã 2.000 m, công viên và bãi đỗ xe 500 m.';
+const RADIUS_WARN_TITLE = 'Cột BanKinh trong Sheet khác bán kính chuẩn cấp đơn vị ở của phường/xã chứa công trình (theo tọa độ): phường 1.000 m, xã 2.000 m, công viên 400 m, bãi đỗ xe 500 m. Bản đồ, heatmap và độ phủ luôn dùng bán kính chuẩn; cột BanKinh chỉ để đối chiếu.';
 
 function radiusCellHtml(sub) {
-  const radiusVal = Number(sub.radius || sub.banKinh || 0);
+  const radiusVal = Number(sub.radius || 0);
   if (!(radiusVal > 0)) return '-';
-  if (sub.radiusStd == null) return `${fmtNum(radiusVal)} m`;
-  const title = `${RADIUS_WARN_TITLE} Sửa cột BanKinh thành ${fmtNum(sub.radiusStd)}.`;
-  return `<span class="min-size-warn" title="${title}">⚠ ${fmtNum(radiusVal)} m</span><br><span class="min-size-note">chuẩn ${fmtNum(sub.radiusStd)} m</span>`;
+  if (sub.sheetRadius == null) return `${fmtNum(radiusVal)} m`;
+  return `${fmtNum(radiusVal)} m<br><span class="min-size-warn" title="${RADIUS_WARN_TITLE} Sửa cột BanKinh thành ${fmtNum(radiusVal)}.">⚠ Sheet ${fmtNum(sub.sheetRadius)} m</span>`;
 }
 
 function radiusSummaryHtml(subItems) {
-  const wrong = subItems.filter(s => s.radiusStd != null).length;
-  return wrong ? ` <span class="min-size-warn" title="${RADIUS_WARN_TITLE}">⚠ ${wrong} BK sai chuẩn</span>` : '';
+  const wrong = subItems.filter(s => s.sheetRadius != null).length;
+  return wrong ? ` <span class="min-size-warn" title="${RADIUS_WARN_TITLE}">⚠ ${wrong} BK Sheet lệch chuẩn</span>` : '';
 }
 
 // Mỗi đơn vị ở phát triển mới: ≥ 1 công viên ≥ 5.000 m² hoặc 2 công viên ≥ 2.500 m² (Mục 2.2.3.2)

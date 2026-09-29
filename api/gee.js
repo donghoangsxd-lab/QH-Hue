@@ -466,9 +466,8 @@ async function popPixelSize(popProjection) {
   return popPixelSizeCache;
 }
 
-/** Bán kính vùng phục vụ của khu đất khi xét loại `code`: cột BanKinh trong sheet, ô trống thì theo bán kính mặc định của loại */
+/** Bán kính vùng phục vụ của khu đất khi xét loại `code`: theo quy chuẩn của loại và hồ sơ phường/xã */
 function csdCandidateRadius(csd, code, profile) {
-  if (csd.radiusSet && Number(csd.radius) > 0) return Number(csd.radius);
   return constants.unitRadius(code, profile);
 }
 
@@ -668,6 +667,20 @@ function assignWardByGeometry(ptLngRaw, ptLatRaw, evaluatedWards) {
   return found;
 }
 
+// Mỗi phiên bản dữ liệu / ranh giới chỉ gán lại bán kính 1 lần
+let standardRadiusKey = null;
+
+/** Bán kính mọi công trình theo quy chuẩn của phường/xã chứa công trình (theo tọa độ) — dùng chung cho vùng phủ, heatmap, độ phủ */
+function applyStandardRadius(list, evaluatedWards) {
+  const key = `${getDataVersion()}|${cachedEvaluatedWardsAt}|${list.length}`;
+  if (key === standardRadiusKey) return;
+  list.forEach(it => {
+    const ward = assignWardByGeometry(it.lng, it.lat, evaluatedWards);
+    it.radius = constants.standardRadius(it, constants.wardProfile(ward || it.ward));
+  });
+  standardRadiusKey = key;
+}
+
 function findWardByName(evaluatedWards, wardName) {
   const clean = constants.cleanWardStr(wardName);
   return evaluatedWards.find(w => w.name === wardName || constants.cleanWardStr(w.name) === clean) || null;
@@ -731,8 +744,8 @@ function slimItem(item, profile) {
     slim.minSize = rule.min;
     slim.minSizeRef = rule.ref;
   }
-  const radiusStd = constants.radiusMismatch(item, profile);
-  if (radiusStd != null) slim.radiusStd = radiusStd;
+  const sheetRadius = constants.radiusMismatch(item, profile);
+  if (sheetRadius != null) slim.sheetRadius = sheetRadius;
   return slim;
 }
 
@@ -1279,6 +1292,11 @@ module.exports = async (req, res) => {
 
     // --- Thao tác cần danh sách công trình ---
     const allDataList = await getRawDataList();
+    try {
+      applyStandardRadius(allDataList, await loadEvaluatedWards(wardVectorParsed));
+    } catch (e) {
+      console.error("Không gán được bán kính theo ranh phường/xã:", e && e.message);
+    }
     // Mọi phép tính hiện trạng chỉ dùng công trình có QuyMo_HT (ô trống = hiện tại chưa hình thành)
     const rawDataList = allDataList.filter(it => it.planChange !== 'new' && it.planChange !== 'none');
 
@@ -1306,7 +1324,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Khu đất CSD theo id (lấy diện tích + cột BanKinh từ sheet); không có id thì dùng tọa độ + diện tích gửi lên
+    // Khu đất CSD theo id (lấy diện tích từ sheet); không có id thì dùng tọa độ + diện tích gửi lên
     const resolveCsdRequest = async () => {
       const id = String(req.query.id || '').trim();
       const byId = id ? rawDataList.find(it => it.id === id) : null;
@@ -1314,7 +1332,7 @@ module.exports = async (req, res) => {
       if (!csd) {
         const pt = parseCoordInBounds(req.query.lat, req.query.lng);
         if (!pt) throw httpError(400, "Tọa độ không hợp lệ");
-        csd = { id: null, lat: pt.lat, lng: pt.lng, size: clamp(Number(req.query.size) || 0, 0, 1e8), radiusSet: false };
+        csd = { id: null, lat: pt.lat, lng: pt.lng, size: clamp(Number(req.query.size) || 0, 0, 1e8) };
       }
       const evaluatedWardsCsd = await loadEvaluatedWards(wardVectorParsed);
       const wardName = assignWardByGeometry(csd.lng, csd.lat, evaluatedWardsCsd);
@@ -1381,7 +1399,7 @@ module.exports = async (req, res) => {
         code,
         label: cand.target.label,
         ward: ward.name,
-        candidate: { id: csd.id, name: csd.name || null, lat: csd.lat, lng: csd.lng, radius: cand.radius, radiusFromSheet: !!csd.radiusSet },
+        candidate: { id: csd.id, name: csd.name || null, lat: csd.lat, lng: csd.lng, radius: cand.radius },
         existing: cand.existing.map(it => ({ id: it.id, name: it.name, lat: it.lat, lng: it.lng, radius: Number(it.radius) || cand.radius })),
         netGeometry: netGeoJson,
         pixels: { buffer: bufferPix, covered: Math.max(0, bufferPix - netPix), net: netPix, wardTotal },

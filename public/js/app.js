@@ -46,7 +46,7 @@ const RADIUS_MIN = 50;
 const RADIUS_MAX = 5000;
 // Bán kính mặc định cho điểm vừa thêm (khớp config/constants.js: cấp đô thị 2000 m, cấp đơn vị ở theo loại)
 // Khớp config/constants.js: phường ≤ 1 km (Mục 2.3.3.1); xã: trường, y tế, văn hóa, chợ ≤ 2 km (Mục 4.6.2.2)
-const UNIT_DEFAULT_RADIUS = { "1-CV": 500, "2-BDX": 500, "3-MN": 1000, "4-TH": 1000, "5-THCS": 1000, "6-YT": 1000, "7-VH": 1000, "8-TM": 1000 };
+const UNIT_DEFAULT_RADIUS = { "1-CV": 400, "2-BDX": 500, "3-MN": 1000, "4-TH": 1000, "5-THCS": 1000, "6-YT": 1000, "7-VH": 1000, "8-TM": 1000 };
 const RURAL_UNIT_RADIUS = 2000;
 const unitDefaultRadius = (type, ward) => (/^xã\s/i.test(String(ward || '').trim()) && !["1-CV", "2-BDX"].includes(type)
   ? RURAL_UNIT_RADIUS
