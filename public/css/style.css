@@ -364,8 +364,9 @@ body.right-collapsed .right-panel {
 .cad-hint-row { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 4px; }
 .cad-hint-row b { font-weight: 600; color: var(--text-main); }
 .cad-hint code { font-family: Consolas, monospace; font-size: 9.5px; color: var(--accent-cyan); }
-.cad-codes { display: flex; flex-wrap: wrap; gap: 3px; margin: 5px 0 4px; }
-.cad-codes code { padding: 0 5px; border-radius: 3px; background: rgba(34, 211, 238, 0.1); border: 1px solid rgba(34, 211, 238, 0.25); cursor: help; }
+.cad-codes { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 2px 7px; align-items: center; margin: 5px 0 4px; padding: 4px 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
+.cad-codes code { text-align: center; padding: 0 4px; border-radius: 3px; background: rgba(34, 211, 238, 0.1); border: 1px solid rgba(34, 211, 238, 0.25); }
+.cad-codes span { color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cad-hint-note { font-size: 9.5px; }
 #addBulk:has(#cadReport:not(:empty)) .cad-hint { display: none; }
 #cadReport:empty { display: none; }
