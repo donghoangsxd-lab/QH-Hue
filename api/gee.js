@@ -154,6 +154,25 @@ function parseRadius(raw, fallback = 500) {
   return clamp(Number.isFinite(r) && r > 0 ? r : fallback, min, max);
 }
 
+// Vòng ngoài vùng phục vụ do client dựng ([[lng, lat], ...]): mọi đỉnh phải nằm trong bán kính (+ dung sai làm mềm) quanh công trình
+function parseServiceRing(raw, pt, radius) {
+  if (!Array.isArray(raw) || raw.length < 4 || raw.length > 3000) return null;
+  const maxM = radius + 150;
+  const mLat = 111320;
+  const mLng = 111320 * Math.cos(pt.lat * Math.PI / 180);
+  const ring = [];
+  for (const c of raw) {
+    if (!Array.isArray(c)) return null;
+    const lng = Number(c[0]), lat = Number(c[1]);
+    if (!parseCoordInBounds(lat, lng)) return null;
+    if (Math.hypot((lat - pt.lat) * mLat, (lng - pt.lng) * mLng) > maxM) return null;
+    ring.push([lng, lat]);
+  }
+  const first = ring[0], last = ring[ring.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) ring.push([first[0], first[1]]);
+  return ring;
+}
+
 // Tên ghi vào Google Sheet: bỏ ký tự điều khiển và ký tự đầu dòng khiến Sheet hiểu thành công thức (= + - @)
 function sanitizeSheetText(raw, maxLen) {
   return String(raw || '')
@@ -928,11 +947,20 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'analyzePoint') {
-      const pt = parseCoordInBounds(req.query.lat, req.query.lng);
+      const isPost = req.method === 'POST';
+      const src = isPost ? readJsonBody(req) : req.query;
+      const pt = parseCoordInBounds(src.lat, src.lng);
       if (!pt) return res.status(400).json({ error: true, message: "Tọa độ không hợp lệ" });
-      const radius = parseRadius(req.query.radius);
+      const radius = parseRadius(src.radius);
 
-      const polyCoords = await calculateNetworkIsochrone16(pt.lat, pt.lng, radius);
+      let polyCoords;
+      if (isPost) {
+        const ring = parseServiceRing(src.polygon, pt, radius);
+        if (!ring) return res.status(400).json({ error: true, message: "Vùng phục vụ không hợp lệ" });
+        polyCoords = { type: 'Polygon', coordinates: [ring] };
+      } else {
+        polyCoords = await calculateNetworkIsochrone16(pt.lat, pt.lng, radius);
+      }
       const servedPopRes = await eeEvaluate(popRasterNormalized.reduceRegion({
         reducer: ee.Reducer.sum(),
         geometry: ee.Geometry(polyCoords),

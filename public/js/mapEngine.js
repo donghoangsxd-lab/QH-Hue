@@ -6,6 +6,7 @@ import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponen
 import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast } from './utils.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
+import { computeServiceArea } from './serviceArea.js';
 import {
   getCoveredRightWidth, highlightPlanWard, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, onCompareChange
@@ -635,24 +636,43 @@ async function refreshPlanHeat() {
 
 // ============================ POPUP CÔNG TRÌNH ============================
 
+// Vùng phục vụ thực tế theo mạng đường + đường giao thông làm minh chứng.
+// Trả về { area, polygon }: area = null khi không tải được đường (khi đó polygon là vòng tròn bán kính); null nếu đã có click khác.
 export async function highlightSingleIsochrone(lat, lng, radius, group = layers.singleIso) {
-  if (!group) return;
   const seq = ++singleIsoSeq;
   layers.singleIso.clearLayers();
   planLayers.singleIso.clearLayers();
+  if (!group) return null;
+  lat = Number(lat);
+  lng = Number(lng);
+  group.addLayer(L.circle([lat, lng], { radius, color: '#ffffff', weight: 1.2, dashArray: '4,4', fill: false, interactive: false }));
 
   try {
-    const res = await fetch(geeApi(`action=getSingleIsochrone&lat=${lat}&lng=${lng}&radius=${radius}`));
-    if (!res.ok || seq !== singleIsoSeq) return;
-    const data = await res.json();
-    if (seq !== singleIsoSeq || !data || !data.geometry) return;
-    group.addLayer(L.geoJSON(data, {
+    const area = await computeServiceArea(lat, lng, radius);
+    if (seq !== singleIsoSeq) return null;
+    group.addLayer(L.polyline(area.allRoads, { color: '#e2e8f0', weight: 1, opacity: 0.35, interactive: false }));
+    group.addLayer(L.geoJSON(area.polygon, {
       interactive: false,
-      style: { color: '#ffffff', weight: 1.2, dashArray: '3,3', fillColor: '#38bdf8', fillOpacity: 0.18 }
+      style: { color: '#22c55e', weight: 2, fillColor: '#22c55e', fillOpacity: 0.2 }
     }));
+    group.addLayer(L.polyline(area.reachRoads, { color: '#fde047', weight: 2, opacity: 0.95, interactive: false }));
+    return { area, polygon: area.polygon };
   } catch (err) {
-    console.error("Lỗi vẽ single isochrone:", err);
+    if (seq !== singleIsoSeq) return null;
+    console.warn("Không dựng được vùng phục vụ theo mạng đường:", err);
+    group.addLayer(L.circle([lat, lng], { radius, color: '#ffffff', weight: 1.2, dashArray: '3,3', fillColor: '#38bdf8', fillOpacity: 0.18, interactive: false }));
+    return { area: null, polygon: turf.circle([lng, lat], radius / 1000, { steps: 64 }) };
   }
+}
+
+async function fetchServedPop(lat, lng, radius, polygon) {
+  const res = await fetch(geeApi('action=analyzePoint'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lat, lng, radius, polygon: polygon.geometry.coordinates[0] })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
 function formatCapCongTrinhLabel(raw) {
@@ -700,9 +720,9 @@ export function onPointClick(p, targetMap = map) {
   if (planMap) planMap.closePopup();
   clearCsdProof();
 
-  if (!isCSDUnapproved) {
-    highlightSingleIsochrone(p.lat, p.lng, itemRadius, isPlanScenario ? planLayers.singleIso : layers.singleIso);
-  }
+  const areaPromise = isCSDUnapproved
+    ? null
+    : highlightSingleIsochrone(p.lat, p.lng, itemRadius, isPlanScenario ? planLayers.singleIso : layers.singleIso);
 
   const capCongTrinh = formatCapCongTrinhLabel(p.nhomHaTang || p.capCongTrinh || "Cấp đơn vị ở");
   const geoWardNow = resolveWardNameFromCoords(Number(p.lat), Number(p.lng));
@@ -725,6 +745,7 @@ export function onPointClick(p, targetMap = map) {
   html += `<br>`;
   if (!isCSDUnapproved) {
     html += `• Bán kính phục vụ: <b style="color:var(--accent-cyan);">${fmtNum(itemRadius)} m</b><br>`;
+    html += `<div class="js-area">• Phạm vi thực tế: <span style="color:var(--text-muted);">⏳ đang dựng theo mạng đường...</span></div>`;
   }
 
   const servedColor = approved ? 'var(--accent-orange)' : 'var(--accent-red)';
@@ -760,10 +781,27 @@ export function onPointClick(p, targetMap = map) {
       .catch(() => {});
   }
 
+  if (areaPromise) {
+    areaPromise.then(r => {
+      if (!r) return;
+      if (r.area) {
+        const pct = Math.round(r.area.areaKm2 / r.area.circleKm2 * 100);
+        fill('.js-area', `• Phạm vi thực tế: <b style="color:#22c55e;">${r.area.areaKm2.toFixed(2)} km²</b> <span style="color:var(--text-muted);">(${pct}% vòng tròn, theo ${r.area.reachKm.toFixed(1)} km đường tiếp cận)</span>`);
+      } else {
+        fill('.js-area', `<span style="color:var(--text-muted);">• Phạm vi thực tế: chưa tải được dữ liệu đường, tạm hiển thị vòng tròn bán kính.</span>`);
+      }
+    });
+  }
+
   if (showServed) {
-    fetchJson(geeApi(`action=analyzePoint&lat=${p.lat}&lng=${p.lng}&radius=${itemRadius}`))
-      .then(res => fill('.js-served', `• Dân số phục vụ: ~<b style="color:${servedColor};">${fmtNum(res.servedPop || 0)} người</b>`))
-      .catch(() => fill('.js-served', `<span style="color:var(--text-muted); font-weight:normal;">• Dân số phục vụ: chưa tính được (GEE đang bận), mở lại sau.</span>`));
+    const servedLabel = `Dân số phục vụ${approved ? '' : ' DỰ KIẾN'}`;
+    Promise.resolve(areaPromise)
+      .then(r => {
+        const polygon = r ? r.polygon : turf.circle([Number(p.lng), Number(p.lat)], itemRadius / 1000, { steps: 64 });
+        return fetchServedPop(Number(p.lat), Number(p.lng), itemRadius, polygon).then(res => ({ res, real: !!(r && r.area) }));
+      })
+      .then(({ res, real }) => fill('.js-served', `• ${servedLabel}: ~<b style="color:${servedColor};">${fmtNum(res.servedPop || 0)} người</b> <span style="font-weight:normal; color:var(--text-muted);">(${real ? 'trong phạm vi thực tế' : 'trong vòng tròn'})</span>`))
+      .catch(() => fill('.js-served', `<span style="color:var(--text-muted); font-weight:normal;">• ${servedLabel}: chưa tính được (GEE đang bận), mở lại sau.</span>`));
   }
 
   if (isCSD && approved) {
