@@ -423,18 +423,27 @@ export function detectAxes(entities) {
   return { ...tries[0], valid: false };
 }
 
+// Thực thể dạng vùng tô (HATCH trong DXF, Polygon trong KML) được ưu tiên hơn đường khép kín trùng với nó
+const FILL_KINDS = new Set(['HATCH', 'POLYGON']);
+
+function metersApart(a, b) {
+  const k = 111320;
+  return Math.hypot((a.lat - b.lat) * k, (a.lng - b.lng) * k * Math.cos(a.lat * DEG));
+}
+
 /**
- * Thực thể DXF → lô đất: { layer, prefix, type, nhom, area (m²), lat, lng, polygons ([[lng,lat]...] theo vòng) }
- * Polyline trùng với HATCH cùng layer (cùng tâm < 1 m, diện tích lệch < 1%) được bỏ để không đếm 2 lần.
+ * Thực thể → lô đất: { layer, name, prefix, type, nhom, area (m²), lat, lng, polygons ([[lng,lat]...] theo vòng) }
+ * project(ent) → { toXY(x, y) → [X, Y] mét trên mặt phẳng, toLatLng(X, Y) → [lat, lng] }.
+ * Đường khép kín trùng với vùng tô cùng layer (cùng tâm < 1 m, diện tích lệch < 1%) được bỏ để không đếm 2 lần.
  */
-export function buildParcels(entities, { crs = CRS_PRESETS.HUE_3 } = {}) {
-  const axes = detectAxes(entities);
+function makeParcels(entities, project) {
   const parcels = [];
   const unknownLayers = {};
   for (const ent of entities) {
     const t = layerToType(ent.layer);
     if (!t) { unknownLayers[ent.layer] = (unknownLayers[ent.layer] || 0) + 1; continue; }
-    const rings = ent.rings.map(r => r.map(([x, y]) => axes.f(x, y)));
+    const { toXY, toLatLng } = project(ent);
+    const rings = ent.rings.map(r => r.map(([x, y]) => toXY(x, y)));
     const polys = buildPolygons(rings);
     if (!polys.length) continue;
     const area = polys.reduce((s, p) => s + p.area, 0);
@@ -451,14 +460,13 @@ export function buildParcels(entities, { crs = CRS_PRESETS.HUE_3 } = {}) {
     }
     const whole = [sx / area, sy / area];
     const [cE, cN] = polys.some(p => pointInPolygon(whole[0], whole[1], p.rings)) ? whole : interiorPoint(main.rings);
-    const [lat, lng] = vn2000ToWgs84(cE, cN, crs);
+    const [lat, lng] = toLatLng(cE, cN);
     parcels.push({
-      kind: ent.kind, layer: ent.layer, handle: ent.handle || null, ...t,
+      kind: ent.kind, layer: ent.layer, name: ent.name || '', handle: ent.handle || null, ...t,
       area: Math.round(area * 10) / 10,
       lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6,
-      centerEN: [cE, cN],
       polygons: polys.map(p => p.rings.map(r => {
-        const ring = r.map(([E, N]) => { const [la, lo] = vn2000ToWgs84(E, N, crs); return [lo, la]; });
+        const ring = r.map(([X, Y]) => { const [la, lo] = toLatLng(X, Y); return [lo, la]; });
         ring.push(ring[0]);
         return ring;
       }))
@@ -478,12 +486,40 @@ export function buildParcels(entities, { crs = CRS_PRESETS.HUE_3 } = {}) {
     }
   }
 
-  const hatches = parcels.filter(p => p.kind === 'HATCH');
+  const fills = parcels.filter(p => FILL_KINDS.has(p.kind));
   const boundHandles = new Set(entities.filter(e => e.kind === 'HATCH').flatMap(e => e.sources || []));
-  const kept = parcels.filter(p => p.kind === 'HATCH' || !(boundHandles.has(p.handle) || hatches.some(h => h.layer === p.layer
-    && Math.hypot(h.centerEN[0] - p.centerEN[0], h.centerEN[1] - p.centerEN[1]) < 1
+  const kept = parcels.filter(p => FILL_KINDS.has(p.kind) || !(boundHandles.has(p.handle) || fills.some(h => h.layer === p.layer
+    && metersApart(h, p) < 1
     && Math.abs(h.area - p.area) <= 0.01 * h.area)));
-  return { parcels: kept, duplicatesDropped: parcels.length - kept.length, unknownLayers, axes: { note: axes.note, valid: axes.valid } };
+  return { parcels: kept, duplicatesDropped: parcels.length - kept.length, unknownLayers };
+}
+
+/** Thực thể DXF (VN-2000) → { parcels, duplicatesDropped, unknownLayers, axes } */
+export function buildParcels(entities, { crs = CRS_PRESETS.HUE_3 } = {}) {
+  const axes = detectAxes(entities);
+  const proj = { toXY: axes.f, toLatLng: (E, N) => vn2000ToWgs84(E, N, crs) };
+  return { ...makeParcels(entities, () => proj), axes: { note: axes.note, valid: axes.valid } };
+}
+
+// Phạm vi kiểm tra tọa độ KML (quanh TP. Huế)
+const LAT_RANGE = [15.5, 17.2];
+const LNG_RANGE = [106.5, 108.6];
+
+// Mặt phẳng cục bộ quanh (lng0, lat0) theo bán kính cong ellipsoid WGS84: sai số diện tích không đáng kể ở cỡ lô đất
+function localProjection(lng0, lat0) {
+  const s = Math.sin(lat0 * DEG);
+  const w = Math.sqrt(1 - E2 * s * s);
+  const mLat = A * (1 - E2) / (w * w * w) * DEG;
+  const mLng = A / w * Math.cos(lat0 * DEG) * DEG;
+  return { toXY: (lng, lat) => [(lng - lng0) * mLng, (lat - lat0) * mLat], toLatLng: (x, y) => [lat0 + y / mLat, lng0 + x / mLng] };
+}
+
+/** Thực thể KML (vòng [lng, lat] WGS84) → { parcels, duplicatesDropped, unknownLayers, axes } */
+export function buildParcelsLonLat(entities) {
+  const sample = entities.slice(0, 50).map(e => e.rings[0][0]);
+  const ok = sample.filter(([lng, lat]) => inRange(lat, LAT_RANGE) && inRange(lng, LNG_RANGE)).length;
+  const valid = sample.length > 0 && ok >= sample.length * 0.9;
+  return { ...makeParcels(entities, (ent) => localProjection(ent.rings[0][0][0], ent.rings[0][0][1])), axes: { note: '', valid } };
 }
 
 // ============================ PHƯỜNG & CÔNG TRÌNH ĐÃ CÓ ============================

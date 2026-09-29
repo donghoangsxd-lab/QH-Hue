@@ -601,7 +601,7 @@ function doPost(e) {
 }
 
 /**
- * Nhập lô đất từ DXF. body = { phase: 'HT'|'QH', fileName, sync, items: [{ type, idPrefix, nhom, name, ward,
+ * Nhập lô đất từ DXF/KML/KMZ. body = { phase: 'HT'|'QH', fileName, sync, items: [{ type, idPrefix, nhom, name, ward,
  * lat, lng, size, area, crossWard, layer, matchId, geometry }] }
  * - matchId có trong Sheet → cập nhật tọa độ, phường, quy mô giai đoạn đang nhập; không có → thêm dòng mới
  * - Chỉ ghi cột quy mô của giai đoạn đang nhập (HT → QuyMo_HT, QH → QuyMo_QH), cột còn lại để trống
@@ -651,7 +651,7 @@ function importCadBatch(body) {
         return;
       }
 
-      var note = "Nhập từ DXF " + fileName + " (layer " + it.layer + ")"
+      var note = "Nhập từ file " + fileName + " (layer " + it.layer + ")"
         + (it.crossWard ? "; vắt ranh phường, diện tích thật " + it.area + " m²" : "");
       var r = it.matchId ? c.idRow[it.matchId] : undefined;
       var id;
