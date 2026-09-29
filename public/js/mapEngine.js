@@ -636,12 +636,17 @@ async function refreshPlanHeat() {
 
 // ============================ POPUP CÔNG TRÌNH ============================
 
+function clearSingleIsochrone() {
+  singleIsoSeq++;
+  layers.singleIso.clearLayers();
+  planLayers.singleIso.clearLayers();
+}
+
 // Vùng phục vụ thực tế theo mạng đường + đường giao thông làm minh chứng.
 // Trả về { area, polygon }: area = null khi không tải được đường (khi đó polygon là vòng tròn bán kính); null nếu đã có click khác.
 export async function highlightSingleIsochrone(lat, lng, radius, group = layers.singleIso) {
-  const seq = ++singleIsoSeq;
-  layers.singleIso.clearLayers();
-  planLayers.singleIso.clearLayers();
+  clearSingleIsochrone();
+  const seq = singleIsoSeq;
   if (!group) return null;
   lat = Number(lat);
   lng = Number(lng);
@@ -816,7 +821,7 @@ export function onPointClick(p, targetMap = map) {
           const estimateNote = s.coverageMethod === 'estimate' ? ` <span title="GEE bận: ước lượng theo diện tích">(ước lượng)</span>` : '';
           sugHtml += `<div class="${cls}"><div>🚩 <b>${escapeHtml(s.label)}</b> ${priorityBadge}</div>
             <div style="color:var(--text-muted); margin-top:2px;">└ Bổ sung <b style="color:var(--accent-green);">${fmtNum(s.scaleAddPct)}%</b> quy mô, <b style="color:var(--accent-cyan);">${fmtNum(s.coverageAddPct)}%</b> độ phủ${estimateNote}</div>
-            <button type="button" class="proof-btn" data-idx="${idx}">🔍 Xem minh chứng</button></div>`;
+            <button type="button" class="proof-btn" data-idx="${idx}">📋 Xem thuyết minh</button></div>`;
         });
         (res.ineligible || []).forEach(inEl => {
           sugHtml += `<div class="sug-card ineligible">❌ <b>${escapeHtml(inEl.label)}</b> (Không đủ DT min: ${fmtNum(inEl.minSize)} m²)</div>`;
@@ -826,6 +831,7 @@ export function onPointClick(p, targetMap = map) {
         popup.getElement()?.querySelectorAll('.proof-btn').forEach(btn => {
           btn.addEventListener('click', () => {
             const fitOpts = popupFitOptions(targetMap, 300, 50);
+            clearSingleIsochrone();
             showCsdProof(p, suggestions[Number(btn.dataset.idx)], targetMap, {
               padTopLeft: fitOpts.autoPanPaddingTopLeft,
               padBottomRight: fitOpts.autoPanPaddingBottomRight

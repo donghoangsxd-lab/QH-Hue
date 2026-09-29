@@ -1127,7 +1127,7 @@ module.exports = async (req, res) => {
             .paint(ee.FeatureCollection([ee.Feature(net)]), 2)
             .reproject(popProjection);
           img.updateMask(img.gt(0)).updateMask(popRasterNative.mask())
-            .getMap({ min: 1, max: 2, palette: ['8a8a8a', 'ffd400'] }, (m, err) => err ? reject(err) : resolve(m));
+            .getMap({ min: 1, max: 2, palette: ['22c55e', 'ffd400'] }, (m, err) => err ? reject(err) : resolve(m));
         }),
         popPixelSize(popProjection)
       ]);

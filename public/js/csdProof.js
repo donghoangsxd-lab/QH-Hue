@@ -42,6 +42,20 @@ function leftToolbarWidth(targetMap) {
   return Math.max(0, tb.getBoundingClientRect().right - targetMap.getContainer().getBoundingClientRect().left);
 }
 
+// Ngang hàng thanh công cụ; nếu nhãn so sánh (HIỆN TRẠNG / QUY HOẠCH) nằm trên cùng dải ngang thì xuống dưới nhãn
+function panelTopOffset(targetMap, leftClear, panelWidth) {
+  const box = targetMap.getContainer().getBoundingClientRect();
+  const tb = document.querySelector('.map-toolbar');
+  let top = tb && tb.offsetParent ? Math.max(0, tb.getBoundingClientRect().top - box.top) : 12;
+  const x0 = box.left + leftClear, x1 = x0 + panelWidth;
+  document.querySelectorAll('.swipe-label').forEach(label => {
+    if (!label.offsetParent) return;
+    const r = label.getBoundingClientRect();
+    if (r.right > x0 && r.left < x1 && r.top - box.top <= top + 4) top = Math.max(top, r.bottom - box.top + 6);
+  });
+  return top;
+}
+
 function legendRow(swatchStyle, text) {
   return `<div class="proof-legend-row"><span class="proof-swatch" style="${swatchStyle}"></span><span>${text}</span></div>`;
 }
@@ -50,40 +64,42 @@ function buildPanelHtml(data, typeColor) {
   const px = data.pixels;
   const pop = data.population;
   const existingN = data.existing.length;
-  const radiusNote = data.candidate.radiusFromSheet ? 'cột BanKinh' : 'mặc định của loại, cột BanKinh trống';
+  const label = escapeHtml(data.label);
+  const cell = fmtNum(data.pixelSize);
   const listed = data.existing.slice(0, MAX_LISTED_EXISTING)
-    .map(e => `<li>${escapeHtml(e.name || e.id)} <span class="proof-muted">(R ${fmtNum(e.radius)} m)</span></li>`).join('');
+    .map(e => `<li>${escapeHtml(e.name || e.id)} <span class="proof-muted">(phục vụ ${fmtNum(e.radius)} m)</span></li>`).join('');
   const more = existingN > MAX_LISTED_EXISTING ? `<li class="proof-muted">… và ${existingN - MAX_LISTED_EXISTING} công trình khác</li>` : '';
 
   return `
     <div class="proof-head">
-      <b>🔍 MINH CHỨNG: ${escapeHtml(data.label)}</b>
-      <button type="button" class="proof-close" aria-label="Tắt minh chứng">✕</button>
+      <b>📋 THUYẾT MINH PHƯƠNG ÁN CHỌN: ${label}</b>
+      <button type="button" class="proof-close" aria-label="Đóng thuyết minh">✕</button>
     </div>
     <div class="proof-muted">${escapeHtml(data.candidate.name || 'Khu đất chưa sử dụng')} · ${escapeHtml(data.ward)}</div>
+    <div class="proof-summary">Nếu xây ${label} tại đây: phục vụ thêm khoảng <b>${fmtNum(pop.added)} người</b>, độ phủ của phường tăng <b>${fmtNum(data.coverageAddPct)}%</b>.</div>
     <div class="proof-legend">
-      ${legendRow(`border:2px dashed ${CANDIDATE_COLOR};`, `Vùng phục vụ của khu đất C, R = ${fmtNum(data.candidate.radius)} m (${radiusNote})`)}
-      ${legendRow(`background:${typeColor}33; border:1.5px solid ${typeColor};`, `${existingN} công trình ${escapeHtml(data.label)} hiện có chạm tới C`)}
-      ${legendRow(`background:${NET_COLOR}22; border:2px solid ${NET_COLOR};`, 'Vùng còn trống = C − vùng đã phủ, trong ranh phường')}
-      ${legendRow('background:#8a8a8a;', 'Pixel dân cư trong C đã được phục vụ')}
-      ${legendRow('background:#ffd400;', 'Pixel dân cư được phục vụ thêm (được đếm)')}
+      ${legendRow(`border:2px dashed ${CANDIDATE_COLOR};`, `Phạm vi phục vụ nếu xây tại khu đất này (bán kính ${fmtNum(data.candidate.radius)} m)`)}
+      ${legendRow(`background:${typeColor}33; border:1.5px solid ${typeColor};`, existingN ? `${existingN} ${label} hiện có ở gần và phạm vi của chúng` : `Chưa có ${label} nào ở gần`)}
+      ${legendRow(`background:${NET_COLOR}22; border:2px solid ${NET_COLOR};`, `Khu vực trong phường hiện chưa có ${label} phục vụ`)}
+      ${legendRow('background:#22c55e;', 'Nơi có dân ở, đã được phục vụ')}
+      ${legendRow('background:#ffd400;', 'Nơi có dân ở, sẽ được phục vụ thêm')}
     </div>
-    ${existingN ? `<details class="proof-existing"><summary>Công trình cùng loại đã trừ</summary><ul>${listed}${more}</ul></details>` : ''}
+    ${existingN ? `<details class="proof-existing"><summary>Xem các ${label} hiện có ở gần</summary><ul>${listed}${more}</ul></details>` : ''}
+    <div class="proof-muted proof-note">Bản đồ dân cư được chia thành các ô vuông ${cell} × ${cell} m; dưới đây đếm các ô có người ở.</div>
     <table class="proof-table">
-      <tr class="proof-group"><td colspan="2">① Pixel dân cư (ô ${fmtNum(data.pixelSize)} × ${fmtNum(data.pixelSize)} m)</td></tr>
-      <tr><td>Pixel dân cư trong C (thuộc phường)</td><td>${fmtNum(px.buffer)}</td></tr>
-      <tr><td>− Đã được ${existingN} công trình cùng loại phủ</td><td>${fmtNum(px.covered)}</td></tr>
-      <tr class="proof-strong"><td>= Pixel được phục vụ thêm</td><td>${fmtNum(px.net)}</td></tr>
-      <tr><td>÷ Tổng pixel dân cư của phường</td><td>${fmtNum(px.wardTotal)}</td></tr>
-      <tr class="proof-result"><td>= Độ phủ tăng thêm</td><td>${fmtNum(data.coverageAddPct)}%</td></tr>
-      <tr class="proof-group"><td colspan="2">② Dân số được phục vụ thêm</td></tr>
+      <tr class="proof-group"><td colspan="2">① Độ phủ tăng thêm</td></tr>
+      <tr><td>Ô dân cư trong phạm vi phục vụ</td><td>${fmtNum(px.buffer)} ô</td></tr>
+      <tr><td>− Đã có ${label} khác phục vụ</td><td>${fmtNum(px.covered)} ô</td></tr>
+      <tr class="proof-strong"><td>= Được phục vụ thêm</td><td>${fmtNum(px.net)} ô</td></tr>
+      <tr><td>÷ Tổng số ô dân cư của phường</td><td>${fmtNum(px.wardTotal)} ô</td></tr>
+      <tr class="proof-result"><td>= Độ phủ của phường tăng thêm</td><td>${fmtNum(data.coverageAddPct)}%</td></tr>
+      <tr class="proof-group"><td colspan="2">② Số dân được phục vụ thêm</td></tr>
       <tr><td>Dân số phường</td><td>${fmtNum(pop.ward)} người</td></tr>
-      <tr><td>÷ Tổng pixel dân cư của phường</td><td>${fmtNum(px.wardTotal)}</td></tr>
-      <tr><td>= Dân số bình quân 1 pixel</td><td>${PER_PIXEL_FORMAT.format(pop.perPixel || 0)} người</td></tr>
-      <tr><td>× Pixel được phục vụ thêm</td><td>${fmtNum(px.net)}</td></tr>
-      <tr class="proof-result"><td>= Dân số được phục vụ thêm</td><td>≈ ${fmtNum(pop.added)} người</td></tr>
+      <tr><td>÷ ${fmtNum(px.wardTotal)} ô = bình quân mỗi ô</td><td>${PER_PIXEL_FORMAT.format(pop.perPixel || 0)} người</td></tr>
+      <tr><td>× Số ô được phục vụ thêm</td><td>${fmtNum(px.net)} ô</td></tr>
+      <tr class="proof-result"><td>= Số dân được phục vụ thêm</td><td>≈ ${fmtNum(pop.added)} người</td></tr>
     </table>
-    <div class="proof-muted proof-foot">Raster phân bổ dân cư gốc · quy mô bổ sung ${fmtNum(data.scaleAddPct)}%</div>`;
+    <div class="proof-muted proof-foot">Diện tích khu đất đáp ứng ${fmtNum(data.scaleAddPct)}% nhu cầu ${label} của phường theo chỉ tiêu.</div>`;
 }
 
 /**
@@ -95,7 +111,7 @@ function buildPanelHtml(data, typeColor) {
 export async function showCsdProof(csd, suggestion, targetMap, fit) {
   clearCsdProof();
   const seq = requestSeq;
-  showToast(`Đang dựng minh chứng "${suggestion.label}"...`, 'info');
+  showToast(`Đang lập thuyết minh "${suggestion.label}"...`, 'info');
 
   let data;
   try {
@@ -105,7 +121,7 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
     data = await res.json();
     if (!res.ok || data.error) throw new Error(data.message || `HTTP ${res.status}`);
   } catch (err) {
-    if (seq === requestSeq) showToast(`Không dựng được minh chứng: ${err.message}`, 'error');
+    if (seq === requestSeq) showToast(`Không lập được thuyết minh: ${err.message}`, 'error');
     return;
   }
   if (seq !== requestSeq) return;
@@ -114,7 +130,7 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
   const c = data.candidate;
   const group = L.layerGroup();
 
-  if (data.tileUrl) group.addLayer(L.tileLayer(data.tileUrl, { opacity: 0.9, zIndex: 50 }));
+  if (data.tileUrl) group.addLayer(L.tileLayer(data.tileUrl, { opacity: 0.65, zIndex: 50 }));
 
   const wardInfo = (state.wardLabelsList || []).find(w => w.name === data.ward);
   if (wardInfo && wardInfo.geometry) {
@@ -150,18 +166,19 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
   data.existing.forEach(e => {
     group.addLayer(pulseMarker(e.lat, e.lng, typeColor, `${escapeHtml(e.name || e.id)} · R ${fmtNum(e.radius)} m`));
   });
-  group.addLayer(pulseMarker(c.lat, c.lng, CANDIDATE_COLOR, `C · ${escapeHtml(data.label)}`, true));
+  group.addLayer(pulseMarker(c.lat, c.lng, CANDIDATE_COLOR, `Khu đất đề xuất · ${escapeHtml(data.label)}`, true));
 
   group.addTo(targetMap);
 
   const padTopLeft = (fit && fit.padTopLeft) || [20, 20];
   const leftClear = Math.max(padTopLeft[0], leftToolbarWidth(targetMap) + 8);
 
-  const panel = L.control({ position: 'bottomleft' });
+  const panel = L.control({ position: 'topleft' });
   panel.onAdd = () => {
     const div = L.DomUtil.create('div', 'proof-panel');
     div.innerHTML = buildPanelHtml(data, typeColor);
     div.style.marginLeft = `${leftClear}px`;
+    div.style.marginTop = `${panelTopOffset(targetMap, leftClear, 370)}px`;
     L.DomEvent.disableClickPropagation(div);
     L.DomEvent.disableScrollPropagation(div);
     div.querySelector('.proof-close').addEventListener('click', clearCsdProof);
