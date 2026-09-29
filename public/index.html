@@ -100,6 +100,12 @@
 
       <!-- TAB: ĐỀ XUẤT ĐIỂM MỚI -->
       <div class="tab-body add-point-form" id="tabAdd" style="display:none;">
+        <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
+          <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true">✍️ Nhập 1 điểm</button>
+          <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false">📂 Hàng loạt (DXF)</button>
+        </div>
+
+        <div id="addSingle">
         <div class="form-grid">
         <label for="newType">Loại</label>
         <select id="newType">
@@ -145,6 +151,30 @@
 
         <button type="button" class="btn-submit" id="btnSubmitNewPoint">🚀 GỬI ĐỀ XUẤT MỚI</button>
         <div id="statusMsg" class="rp-status" role="status" aria-live="polite"></div>
+        </div>
+
+        <div id="addBulk" style="display:none;">
+          <div class="form-grid">
+            <label for="cadCrs">Hệ tọa độ</label>
+            <select id="cadCrs">
+              <option value="HUE_3" selected>VN-2000 KTT 107°, múi 3°</option>
+              <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
+            </select>
+            <label for="cadPhase">Giai đoạn</label>
+            <select id="cadPhase">
+              <option value="HT" selected>Hiện trạng (QuyMo_HT)</option>
+              <option value="QH">Quy hoạch (QuyMo_QH)</option>
+            </select>
+          </div>
+          <label class="cad-drop" id="cadDrop" for="cadFile">
+            <span>📂 Chọn file <b>.dxf</b> hoặc kéo thả vào đây</span>
+            <input type="file" id="cadFile" accept=".dxf" hidden />
+          </label>
+          <div class="cad-hint">Mỗi layer đặt theo mã loại: CV, BDX, MN, TH, THCS, THPT, YT, VH, TM, CSD (thêm <b>_DT</b> cho cấp đô thị, VD CV_DT). Chỉ đọc HATCH và polyline khép kín.</div>
+          <div id="cadReport"></div>
+          <button type="button" class="btn-submit" id="btnCadSubmit" disabled>🚀 GHI VÀO HỆ THỐNG (ADMIN)</button>
+          <div id="cadStatus" class="rp-status" role="status" aria-live="polite"></div>
+        </div>
       </div>
 
       <!-- TAB: CHÚ GIẢI -->

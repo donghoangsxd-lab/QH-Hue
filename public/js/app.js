@@ -35,6 +35,7 @@ import {
 } from './uiComponents.js';
 import { initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleCompareMode } from './planMap.js';
 import { escapeHtml, showToast } from './utils.js';
+import { initCadImport } from './cadImportUi.js';
 
 const CITY_NAME = "Thành phố Huế";
 const RADIUS_MIN = 50;
@@ -70,6 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initPlanMap(map, layers);
   centerOnCity();
   initBottomPanelEvents();
+  initCadImport();
   restoreAdminSession();
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleCompareMode);
 
