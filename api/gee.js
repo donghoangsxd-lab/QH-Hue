@@ -4,6 +4,7 @@ const constants = require('../config/constants');
 const { initGEE, getGeeContext, eeEvaluate } = require('../services/geeService');
 const { getRawDataList, getCadParcels, invalidateCache, getDataVersion } = require('../services/gcsService');
 const { requireAdmin, httpError } = require('../services/authService');
+const roads = require('../services/roadsService');
 
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
@@ -987,6 +988,50 @@ module.exports = async (req, res) => {
     if (action === 'getCadParcels') {
       const parcels = await getCadParcels();
       return res.status(200).json({ parcels });
+    }
+
+    // Mạng đường quanh công trình cho "phạm vi thực tế": đọc bản lưu trên bucket, chưa có / quá cũ thì tải Overpass
+    // rồi nhờ Apps Script lưu. Chỉ lưu cho vị trí trùng công trình có trong dữ liệu (không cho ghi bucket tùy ý).
+    if (action === 'getRoads') {
+      const pt = parseCoordInBounds(req.query.lat, req.query.lng);
+      if (!pt) return res.status(400).json({ error: true, message: "Tọa độ không hợp lệ" });
+      const r = roads.roadsRadius(parseRadius(req.query.r));
+      if (r > roads.ROADS_MAX_RADIUS) return res.status(404).json({ error: true, message: 'Bán kính quá lớn để lưu sẵn — trình duyệt tự tải' });
+      const lat = roads.round4(pt.lat), lng = roads.round4(pt.lng);
+      const key = roads.roadsKey(lat, lng, r);
+      const shareable = 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400';
+
+      const cached = await roads.readCachedRoads(key);
+      if (cached && Date.now() - Number(cached.saved || 0) < roads.ROADS_STALE_MS) {
+        res.setHeader('Cache-Control', shareable);
+        return res.status(200).json({ ...cached, source: 'cache' });
+      }
+      const items = await getRawDataList();
+      const isItem = items.some(it => distMeters(pt.lat, pt.lng, Number(it.lat), Number(it.lng)) <= 30);
+      if (!isItem) {
+        if (cached) return res.status(200).json({ ...cached, source: 'cache' });
+        return res.status(404).json({ error: true, message: 'Chỉ lưu sẵn mạng đường quanh công trình có trong dữ liệu' });
+      }
+
+      let ways;
+      try {
+        ways = await roads.fetchOverpassWays(lat, lng, r);
+      } catch (err) {
+        if (cached) return res.status(200).json({ ...cached, source: 'cache' });
+        return res.status(502).json({ error: true, message: 'Máy chủ dữ liệu đường (OpenStreetMap) đang quá tải' });
+      }
+      const payload = { v: 1, saved: Date.now(), lat, lng, r, ways };
+      let saved = false;
+      if (ways.length) {
+        try {
+          const result = await callAppsScript({ action: 'saveRoads' }, { action: 'saveRoads', key, content: JSON.stringify(payload) });
+          saved = result.saved === true;
+        } catch (err) {
+          console.warn('Không lưu được mạng đường lên bucket:', err.message);
+        }
+      }
+      res.setHeader('Cache-Control', saved ? shareable : 'no-store');
+      return res.status(200).json({ ...payload, source: 'overpass', saved });
     }
 
     if (action === 'importCadBatch') {

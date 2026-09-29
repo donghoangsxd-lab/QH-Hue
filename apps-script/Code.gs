@@ -245,9 +245,11 @@ function uploadToGCS(content, fileName) {
     if (responseCode !== 200) {
       console.error("Lỗi Upload GCS " + objectName + " Code " + responseCode + ": " + responseBody);
     }
+    return responseCode === 200;
   } catch (err) {
     Logger.log("❌ Lỗi ngoại lệ Sync GCS: " + err.toString());
     console.error(err);
+    return false;
   }
 }
 
@@ -601,6 +603,7 @@ function doPost(e) {
     var body = JSON.parse((e.postData && e.postData.contents) || '{}');
     if (body.action === "importCadBatch") return jsonOutput(importCadBatch(body));
     if (body.action === "markWardNotes") return jsonOutput(markWardNotes(body));
+    if (body.action === "saveRoads") return jsonOutput(saveRoads(body));
     return jsonOutput({ "error": "Action không hợp lệ" });
   } catch (err) {
     return jsonOutput({ "error": err.toString() });
@@ -725,6 +728,16 @@ function importCadBatch(body) {
 
   if (body.sync !== false) syncSheetsToGCS();
   return { "success": true, "created": created, "updated": updated, "skipped": skipped, "polygons": polygons.length };
+}
+
+// MẠNG ĐƯỜNG OSM QUANH CÔNG TRÌNH (máy chủ webapp tải từ Overpass, lưu chung trên bucket để mọi người dùng lại)
+// body = { key: "16.4637_107.5905_1000", content: JSON } → file roads/v1/<key>.json
+function saveRoads(body) {
+  var key = String(body.key || '');
+  var content = String(body.content || '');
+  if (!/^\d{1,2}\.\d{4}_\d{2,3}\.\d{4}_\d{3,4}$/.test(key)) return { "error": "Tên file mạng đường không hợp lệ" };
+  if (!content || content.length > 8000000) return { "error": "Dữ liệu mạng đường rỗng hoặc quá lớn" };
+  return { "success": true, "saved": uploadToGCS(content, "roads/v1/" + key + ".json") };
 }
 
 // ĐỐI CHIẾU PHƯỜNG: dấu nhắc trong cột Note, VD "⚠ Phường/xã theo tọa độ: Thuận Hóa" (các mục trong Note cách nhau " | ")

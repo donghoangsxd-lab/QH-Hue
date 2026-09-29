@@ -1,16 +1,28 @@
 // Vùng phục vụ thực tế của 1 công trình theo mạng đường OSM (chỉ tính khi click chọn công trình)
 // Dijkstra trên đồ thị đường (đi 2 chiều) → tô các đoạn tới được lên lưới → nới SIDE_M, đóng hình CLOSE_M, lấp lỗ → dò viền, bo góc
+import { geeApi } from './api.js';
 
+const SERVER_TIMEOUT_MS = 58000;     // máy chủ webapp: đọc bucket, hoặc tải Overpass + lưu (Vercel tối đa 60 s)
+const SERVER_HEAD_START_MS = 6000;   // máy chủ chưa trả lời sau chừng này thì trình duyệt hỏi thẳng Overpass song song
+const ROAD_MARGIN_M = 100;           // tải đường rộng hơn bán kính phục vụ (đường nối ngay ngoài vòng)
+const SERVER_MAX_RADIUS_M = 3400;    // bán kính tải (bậc 500 m) trên 3500 m máy chủ không lưu sẵn (services/roadsService.js)
+
+// Máy chủ Overpass công cộng hay quá tải (504) → gọi lần lượt có giãn cách, lấy kết quả về trước
 const OVERPASS_URLS = [
   'https://overpass-api.de/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter'
 ];
+const HEDGE_MS = 4000;          // máy chủ trước chưa trả lời sau chừng này thì gọi thêm máy chủ kế tiếp
+const WAYS_CACHE = 'qhhue-overpass-v1';
+const WAYS_CACHE_DAYS = 14;
 const EXCLUDED_HIGHWAYS = 'motorway|motorway_link|construction|proposed|planned|abandoned|disused|razed|raceway|bus_guideway|platform|corridor|elevator|escape|via_ferrata';
 const SIDE_M = 50;      // nhà ven 2 bên đoạn đường tới được
 const CLOSE_M = 150;    // lấp khe hẹp hơn 2 × CLOSE_M giữa các nhánh đường
 const GAP_M = 25;       // tự nối đầu đường cụt với nút gần hơn GAP_M (bù lỗi nối nút của OSM)
 const SNAP_MAX_M = 300; // công trình cách đường xa hơn thì không tính được
-const FETCH_TIMEOUT_MS = 25000;
+const FETCH_TIMEOUT_MS = 40000; // tổng thời gian chờ mọi máy chủ Overpass
 const CACHE_MAX = 30;
 
 const cache = new Map();
@@ -26,29 +38,135 @@ function projector(lat0, lng0) {
 
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
-async function fetchWays(lat, lng, radius) {
-  const q = `[out:json][timeout:25];way["highway"]["highway"!~"^(${EXCLUDED_HIGHWAYS})$"]["access"!~"^(private|no)$"]["foot"!="no"](around:${Math.round(radius)},${lat},${lng});out body geom;`;
-  let lastErr = null;
-  for (const url of OVERPASS_URLS) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'data=' + encodeURIComponent(q),
-        signal: ctrl.signal
-      });
-      if (!res.ok) throw new Error(`Overpass HTTP ${res.status}`);
-      const data = await res.json();
-      return (data.elements || []).filter(w => Array.isArray(w.nodes) && Array.isArray(w.geometry) && w.nodes.length === w.geometry.length);
-    } catch (err) {
-      lastErr = err;
-    } finally {
-      clearTimeout(timer);
-    }
+// Chỉ giữ phần cần cho đồ thị (nút, tọa độ, cờ cầu) để lưu cache gọn
+const slimWays = (elements) => (elements || [])
+  .filter(w => Array.isArray(w.nodes) && Array.isArray(w.geometry) && w.nodes.length === w.geometry.length)
+  .map(w => ({
+    nodes: w.nodes,
+    geometry: w.geometry.map(p => ({ lat: p.lat, lon: p.lon })),
+    tags: w.tags && w.tags.bridge ? { bridge: w.tags.bridge } : undefined
+  }));
+
+// Cache Storage của trình duyệt (còn sau khi tải lại trang); không hỗ trợ thì bỏ qua
+async function cachedWays(key) {
+  try {
+    if (typeof caches === 'undefined') return null;
+    const res = await (await caches.open(WAYS_CACHE)).match(key);
+    if (!res) return null;
+    const saved = Number(res.headers.get('x-saved')) || 0;
+    if (Date.now() - saved > WAYS_CACHE_DAYS * 86400000) return null;
+    return await res.json();
+  } catch (e) { return null; }
+}
+
+async function saveWays(key, ways) {
+  try {
+    if (typeof caches === 'undefined') return;
+    const body = JSON.stringify(ways);
+    await (await caches.open(WAYS_CACHE)).put(key, new Response(body, { headers: { 'Content-Type': 'application/json', 'x-saved': String(Date.now()) } }));
+  } catch (e) { /* hết dung lượng / chế độ riêng tư: bỏ qua */ }
+}
+
+async function queryOverpass(url, q, signal) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'data=' + encodeURIComponent(q),
+    signal
+  });
+  if (!res.ok) throw new Error(`Overpass HTTP ${res.status}`);
+  const data = await res.json();
+  // Máy chủ quá tải có thể trả 200 kèm remark lỗi và danh sách rỗng
+  if (data.remark && /error|timed out|out of memory/i.test(data.remark) && !(data.elements || []).length) throw new Error(data.remark);
+  return data;
+}
+
+// Trình duyệt tự hỏi Overpass (khi máy chủ webapp chậm / lỗi / vị trí không phải công trình trong dữ liệu)
+async function fetchWaysDirect(lat, lng, r) {
+  const q = `[out:json][timeout:25];way["highway"]["highway"!~"^(${EXCLUDED_HIGHWAYS})$"]["access"!~"^(private|no)$"]["foot"!="no"](around:${r},${lat},${lng});out body geom;`;
+  const ctrl = new AbortController();
+  const deadline = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const data = await new Promise((resolve, reject) => {
+      let next = 0, failed = 0, done = false, lastErr = null, hedge = null;
+      const launch = () => {
+        clearTimeout(hedge);
+        if (done || next >= OVERPASS_URLS.length) return;
+        const url = OVERPASS_URLS[next++];
+        queryOverpass(url, q, ctrl.signal).then(d => { done = true; clearTimeout(hedge); resolve(d); }, err => {
+          lastErr = err;
+          if (++failed >= OVERPASS_URLS.length || ctrl.signal.aborted) { done = true; clearTimeout(hedge); reject(lastErr); }
+          else launch();
+        });
+        hedge = setTimeout(launch, HEDGE_MS);
+      };
+      ctrl.signal.addEventListener('abort', () => { if (!done) { done = true; clearTimeout(hedge); reject(lastErr || new Error('Máy chủ dữ liệu đường quá tải')); } });
+      launch();
+    });
+    return slimWays(data.elements);
+  } finally {
+    clearTimeout(deadline);
+    ctrl.abort();
   }
-  throw lastErr || new Error('Không tải được dữ liệu đường');
+}
+
+// Dạng gọn từ máy chủ: [cầu ? 1 : 0, [id nút...], [lat, lon, lat, lon, ...]] → dạng Overpass rút gọn
+const unpackWays = (packed) => (packed || []).map(([bridge, nodes, flat]) => ({
+  nodes,
+  geometry: nodes.map((_, i) => ({ lat: flat[2 * i], lon: flat[2 * i + 1] })),
+  tags: bridge ? { bridge: 'yes' } : undefined
+}));
+
+// Máy chủ webapp: bản lưu chung trên bucket (mọi người dùng), chưa có thì máy chủ tải Overpass rồi lưu
+async function requestServerRoads(lat, lng, radius) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), SERVER_TIMEOUT_MS);
+  try {
+    const res = await fetch(geeApi(`action=getRoads&lat=${lat}&lng=${lng}&r=${Math.round(radius)}`), { signal: ctrl.signal });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !Array.isArray(data.ways)) throw new Error(data.message || `HTTP ${res.status}`);
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const fetchWaysFromServer = async (lat, lng, radius) => unpackWays((await requestServerRoads(lat, lng, radius)).ways);
+
+/** Admin tải trước: nhờ máy chủ lưu mạng đường của 1 công trình lên bucket → 'cache' (đã có) | 'saved' | 'unsaved' */
+export async function preloadServerRoads(lat, lng, radius) {
+  const data = await requestServerRoads(lat, lng, radius);
+  return data.source === 'cache' ? 'cache' : data.saved ? 'saved' : 'unsaved';
+}
+
+// Cache trình duyệt → máy chủ webapp; máy chủ chưa trả lời sau SERVER_HEAD_START_MS (hoặc lỗi) thì hỏi thẳng Overpass, lấy bên về trước
+async function fetchWays(lat, lng, radius) {
+  const r = Math.round(radius + ROAD_MARGIN_M);
+  const key = `https://qhhue.cache/overpass?v=1&lat=${lat.toFixed(5)}&lng=${lng.toFixed(5)}&r=${r}`;
+  const hit = await cachedWays(key);
+  if (hit) return hit;
+
+  const server = radius <= SERVER_MAX_RADIUS_M
+    ? fetchWaysFromServer(lat, lng, radius)
+    : Promise.reject(new Error('Bán kính quá lớn để lưu sẵn'));
+  const direct = new Promise((resolve, reject) => {
+    let started = false;
+    const start = () => {
+      if (started) return;
+      started = true;
+      fetchWaysDirect(lat, lng, r).then(resolve, reject);
+    };
+    const timer = setTimeout(start, SERVER_HEAD_START_MS);
+    server.then(() => clearTimeout(timer), () => { clearTimeout(timer); start(); });
+  });
+  let ways;
+  try {
+    ways = await Promise.any([server, direct]);
+  } catch (err) {
+    throw (err.errors && err.errors[err.errors.length - 1]) || err;
+  }
+  if (ways.length) saveWays(key, ways);
+  return ways;
 }
 
 class MinHeap {
@@ -326,7 +444,7 @@ function serviceMask(segments, radius, cell) {
 
 async function compute(lat, lng, radius) {
   const proj = projector(lat, lng);
-  const ways = await fetchWays(lat, lng, radius + 100);
+  const ways = await fetchWays(lat, lng, radius);
   if (!ways.length) throw new Error('Không có đường giao thông quanh công trình');
   const graph = buildGraph(ways, proj);
   const origin = bestOrigin(graph, radius);

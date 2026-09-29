@@ -1019,7 +1019,7 @@ export function onPointClick(p, targetMap = map) {
         const pct = Math.round(r.area.areaKm2 / r.area.circleKm2 * 100);
         fill('.js-area', `• Phạm vi thực tế: <b style="color:#22c55e;">${r.area.areaKm2.toFixed(2)} km²</b> <span style="color:var(--text-muted);">(${pct}% vòng tròn, theo ${r.area.reachKm.toFixed(1)} km đường tiếp cận)</span>`);
       } else {
-        fill('.js-area', `<span style="color:var(--text-muted);">• Phạm vi thực tế: chưa tải được dữ liệu đường, tạm hiển thị vòng tròn bán kính.</span>`);
+        fill('.js-area', `<span style="color:var(--text-muted);">• Phạm vi thực tế: máy chủ dữ liệu đường (OpenStreetMap) đang quá tải — tạm hiển thị vòng tròn bán kính, bấm lại công trình sau ít phút.</span>`);
       }
     });
   }

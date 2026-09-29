@@ -39,6 +39,7 @@ import { initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleCompareMo
 import { escapeHtml, showToast } from './utils.js';
 import { initCadImport } from './cadImportUi.js';
 import { initWardCheck, refreshWardCheck } from './wardCheck.js';
+import { initRoadsPreload } from './roadsPreload.js';
 
 const CITY_NAME = "Thành phố Huế";
 const RADIUS_MIN = 50;
@@ -85,6 +86,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
   initCadImport({ onImported: reloadAfterSheetWrite });
   initWardCheck({ onSynced: reloadAfterSheetWrite });
+  initRoadsPreload();
   restoreAdminSession();
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleCompareMode);
 

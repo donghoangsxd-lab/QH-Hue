@@ -150,6 +150,8 @@ function updateAuthUi() {
   }
   const signOut = document.getElementById('btnSignOut');
   if (signOut) signOut.style.display = isAdmin ? '' : 'none';
+  const preload = document.getElementById('btnPreloadRoads');
+  if (preload) preload.style.display = isAdmin ? '' : 'none';
   const gBtn = document.getElementById('googleSignInBtn');
   if (gBtn) gBtn.style.display = isAdmin ? 'none' : '';
   refreshWardCheck();
