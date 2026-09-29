@@ -56,7 +56,7 @@ function insidePolygon(el) {
 const samePt = (a, b) => Math.abs(a[0] - b[0]) < CLOSE_TOL_DEG && Math.abs(a[1] - b[1]) < CLOSE_TOL_DEG;
 
 // Vòng mở (bỏ điểm đóng và điểm lặp liên tiếp); null nếu dưới 3 đỉnh
-function openRing(pts) {
+export function openRing(pts) {
   const r = [];
   for (const p of pts) if (!r.length || !samePt(r[r.length - 1], p)) r.push(p);
   if (r.length > 1 && samePt(r[0], r[r.length - 1])) r.pop();

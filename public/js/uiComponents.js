@@ -175,13 +175,13 @@ const PIE_COLORS = {
 };
 const PIE_LABELS = {
   "1-CV": "Công viên", "2-BDX": "Bãi đỗ xe", "3-MN": "Mầm non", "4-TH": "Tiểu học", "5-THCS": "THCS",
-  "6-YT": "Y tế", "7-VH": "Văn hóa", "8-TM": "Chợ/TTTM", "9-CSD": "Quỹ đất", "empty": "Chưa có DL"
+  "6-YT": "Y tế", "7-VH": "Văn hóa", "8-TM": "Chợ/TTTM", "9-CSD": "Chưa sử dụng", "empty": "Chưa có DL"
 };
 
 // ================== MẶT SAU THẺ LẬT: THỐNG KÊ SỐ LƯỢNG 9 LOẠI ==================
 const COUNT_CARD_LABELS = {
   "1-CV": "Công viên", "2-BDX": "Bãi đỗ xe", "3-MN": "Mầm non", "4-TH": "Tiểu học", "5-THCS": "THCS",
-  "6-YT": "Y tế", "7-VH": "Văn hóa", "8-TM": "Chợ, TTTM", "9-CSD": "Quỹ đất"
+  "6-YT": "Y tế", "7-VH": "Văn hóa", "8-TM": "Chợ, TTTM", "9-CSD": "Chưa sử dụng"
 };
 // Biểu tượng nét (viewBox 24×24, stroke = màu loại)
 const COUNT_CARD_ICONS = {
@@ -196,7 +196,7 @@ const COUNT_CARD_ICONS = {
   "9-CSD": '<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 2.2"/><path d="M12 9v6M9 12h6"/>'
 };
 
-// Hiện trạng: số đã duyệt (quỹ đất: mọi khu đất, như donut) + số chờ duyệt; quy hoạch: số đã duyệt
+// Hiện trạng: số đã duyệt (cơ sở chưa sử dụng: mọi khu đất, như donut) + số chờ duyệt; quy hoạch: số đã duyệt
 function countByType(sourceList, planList) {
   const stats = {};
   Object.keys(COUNT_CARD_LABELS).forEach(k => { stats[k] = { approved: 0, pending: 0, plan: 0 }; });
@@ -1131,8 +1131,8 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     parts.push(`<tr><td style="text-align:center;">-</td><td colspan="7" style="text-align:center; color:var(--text-muted); font-style:italic;">Không có công trình nhóm 1–8 đang chờ duyệt trong phường.</td></tr>`);
   }
 
-  // D / CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG)
-  sectionHeader('D', 'var(--accent-orange)', 'rgba(234, 179, 8, 0.18)', 'CÁC CƠ SỞ CHƯA SỬ DỤNG (QUỸ ĐẤT TIỀM NĂNG)');
+  // D / CÁC CƠ SỞ CHƯA SỬ DỤNG
+  sectionHeader('D', 'var(--accent-orange)', 'rgba(234, 179, 8, 0.18)', 'CÁC CƠ SỞ CHƯA SỬ DỤNG');
   const csdList = wardData.csdItems || [];
   if (csdList.length > 0) {
     csdList.forEach((csd, csdIdx) => {

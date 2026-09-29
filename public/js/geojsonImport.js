@@ -1,0 +1,73 @@
+// Nhập lô đất từ GeoJSON (.geojson / .json): Polygon, MultiPolygon và đường khép kín.
+// Loại hạ tầng theo thuộc tính Layer, không có thì theo tên; tọa độ độ (WGS84) hoặc mét (VN-2000, xuất từ QGIS giữ nguyên hệ).
+import { layerToType } from './cadImport.js';
+import { openRing } from './kmlImport.js';
+
+const LAYER_FIELD = /^(layer|layer_?name|ten_?layer|lop)$/i;
+const NAME_FIELD = /^(ten_?cong_?trinh|name|ten)$/i;
+
+function pickProp(props, re) {
+  const key = Object.keys(props).find(k => re.test(k));
+  const v = key ? props[key] : null;
+  return v == null ? '' : String(v).trim();
+}
+
+function resolveLayer(props, name) {
+  const field = pickProp(props, LAYER_FIELD);
+  if (field && layerToType(field)) return field;
+  const t = name && layerToType(name);
+  if (t) return t.prefix;
+  return field || name || '(không tên)';
+}
+
+const isPt = (c) => Array.isArray(c) && Number.isFinite(c[0]) && Number.isFinite(c[1]);
+const toPts = (coords) => (Array.isArray(coords) ? coords.filter(isPt).map(c => [c[0], c[1]]) : []);
+
+// Gom vòng polygon / đường khép kín của 1 geometry (kể cả GeometryCollection)
+function collect(g, out) {
+  if (!g || typeof g !== 'object') return;
+  const c = g.coordinates;
+  switch (g.type) {
+    case 'Polygon': (c || []).forEach(r => { const ring = openRing(toPts(r)); if (ring) out.poly.push(ring); }); break;
+    case 'MultiPolygon': (c || []).forEach(p => collect({ type: 'Polygon', coordinates: p }, out)); break;
+    case 'LineString': {
+      const pts = toPts(c);
+      const closed = pts.length > 3 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1];
+      const ring = closed ? openRing(pts) : null;
+      if (ring) out.line.push(ring); else out.openLine++;
+      break;
+    }
+    case 'MultiLineString': (c || []).forEach(l => collect({ type: 'LineString', coordinates: l }, out)); break;
+    case 'GeometryCollection': (g.geometries || []).forEach(sub => collect(sub, out)); break;
+    case 'Point': case 'MultiPoint': out.point = true; break;
+    default: break;
+  }
+}
+
+/** Đọc GeoJSON (văn bản) → { entities: [{kind, layer, name, rings}], stats, wgs84 } */
+export function parseGeoJson(text) {
+  let data;
+  try { data = JSON.parse(text); } catch (e) { throw new Error('File JSON lỗi cú pháp.'); }
+  const features = data?.type === 'FeatureCollection' ? data.features
+    : data?.type === 'Feature' ? [data]
+    : data?.type && (data.coordinates || data.geometries) ? [{ type: 'Feature', properties: {}, geometry: data }]
+    : null;
+  if (!Array.isArray(features)) throw new Error('Không phải GeoJSON (cần FeatureCollection hoặc Feature).');
+
+  const stats = { feature: features.length, polygon: 0, polyline: 0, point: 0, openLine: 0 };
+  const entities = [];
+  for (const f of features) {
+    const props = (f && f.properties) || {};
+    const name = pickProp(props, NAME_FIELD);
+    const layer = resolveLayer(props, name);
+    const out = { poly: [], line: [], openLine: 0, point: false };
+    collect(f && f.geometry, out);
+    stats.openLine += out.openLine;
+    if (out.poly.length) { entities.push({ kind: 'POLYGON', layer, name, rings: out.poly }); stats.polygon++; }
+    if (out.line.length) { entities.push({ kind: 'POLYLINE', layer, name, rings: out.line }); stats.polyline++; }
+    if (!out.poly.length && !out.line.length && out.point) stats.point++;
+  }
+  const sample = entities.slice(0, 50).map(e => e.rings[0][0]);
+  const wgs84 = sample.every(([x, y]) => Math.abs(x) <= 180 && Math.abs(y) <= 90);
+  return { entities, stats, wgs84 };
+}

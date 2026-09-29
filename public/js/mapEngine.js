@@ -4,7 +4,7 @@ import {
 } from './state.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi } from './api.js';
-import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast } from './utils.js';
+import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint } from './utils.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea } from './serviceArea.js';
 import {
@@ -52,6 +52,7 @@ const ICON_FILES = {
   "9-CSD": { approved: "Unused.png", pending: "Unused2.png" }
 };
 const BUFFER_TYPE_BY_KEY = Object.fromEntries(Object.entries(BUFFER_KEYS).map(([type, key]) => [key, type]));
+const ICON_LAYER_KEYS = new Set(Object.values(ICON_GROUP_KEYS));
 const ESRI_TILES = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
 let tileHeatmapLayer = null;
@@ -102,6 +103,20 @@ function getWardFilteredList(sourceList) {
   return result;
 }
 
+// Tìm điểm đặt nhãn trên ranh đã đơn giản hóa (ranh gốc ~140.000 đỉnh, tính trực tiếp mất ~1 s),
+// rồi kiểm tra lại trên ranh gốc; không đạt thì giữ tâm do server trả về
+const LABEL_SIMPLIFY_DEG = 0.0003;
+function labelPointFor(geometry) {
+  if (!geometry) return null;
+  try {
+    const simple = turf.simplify(turf.feature(geometry), { tolerance: LABEL_SIMPLIFY_DEG }).geometry;
+    const pt = wardLabelPoint(simple);
+    return pt && isPointInWardGeometry(pt.lat, pt.lng, geometry) ? pt : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 function resolveWardNameFromCoords(lat, lng) {
   for (const w of state.wardLabelsList || []) {
     if (w.geometry && isPointInWard(lat, lng, w)) return w.name;
@@ -148,6 +163,7 @@ function ensurePlanHooks() {
 
 function handleCompareChange(on) {
   ensurePlanHooks();
+  leftRenderer.refreshPoints();
   if (!on) return;
   planRenderer.setList(getWardFilteredList(getPlanScenarioList()));
   if (heatStale) refreshHeatmapOnly();
@@ -173,6 +189,10 @@ export async function loadBoundaryLayer() {
     const labelRes = await fetch(geeApi(`action=getWardLabels&v=${WARD_GEOM_VERSION}`));
     const labelData = await labelRes.json();
     const labels = labelData.labels || [];
+    labels.forEach(item => {
+      const pt = labelPointFor(item.geometry);
+      if (pt) Object.assign(item, { lat: pt.lat, lng: pt.lng });
+    });
     state.wardLabelsList = labels;
     wardBBoxes.clear();
 
@@ -184,6 +204,8 @@ export async function loadBoundaryLayer() {
       });
       layers.boundary.addLayer(L.marker([item.lat, item.lng], { icon, interactive: false }));
     });
+    leftRenderer.refreshPoints();
+    planRenderer.refreshPoints();
   } catch (err) {
     console.error("Lỗi tải tên 40 phường xã:", err);
   }
@@ -307,6 +329,10 @@ export function toggleLayer(layerKey, isChecked) {
     map.removeLayer(layers[layerKey]);
   }
   syncPlanLayer(layerKey);
+  if (ICON_LAYER_KEYS.has(layerKey)) {
+    leftRenderer.refreshPoints();
+    planRenderer.refreshPoints();
+  }
 
   const popBox = document.getElementById('popBox');
   const heatBox = document.getElementById('heatBox');
@@ -412,6 +438,70 @@ function hasValidCoord(p) {
 // Ranh lô đất CAD chỉ vẽ khi phóng to đủ gần (ở mức toàn thành phố hàng nghìn polygon vừa rối vừa nặng)
 const PARCEL_MIN_ZOOM = 15;
 
+// Zoom ≤ ngưỡng (mức toàn thành phố): mỗi phường 1 biểu đồ tròn số công trình theo loại thay cho icon chồng chéo.
+// Đang chọn 1 phường thì luôn hiện icon (phường rộng có thể vừa khung ở zoom thấp, 1 biểu đồ đơn lẻ không có ý nghĩa)
+const PIE_MAX_ZOOM = 12;
+const PIE_CLICK_ZOOM = 15;
+const PIE_MIN_PX = 22;
+const PIE_MAX_PX = 46;
+const PIE_SLICE_GAP_DEG = 1.6;
+const PIE_GAP_COLOR = 'rgba(15, 23, 42, 0.85)';
+
+// Phường chứa điểm, ghi nhớ theo tọa độ (danh sách hiện trạng và quy hoạch dùng chung); đổi bộ ranh phường thì tính lại
+const wardAtCache = new Map();
+let wardAtSource = null;
+function wardNameAt(lat, lng) {
+  if (wardAtSource !== state.wardLabelsList) {
+    wardAtCache.clear();
+    wardAtSource = state.wardLabelsList;
+  }
+  const key = `${lat},${lng}`;
+  if (!wardAtCache.has(key)) wardAtCache.set(key, resolveWardNameFromCoords(Number(lat), Number(lng)));
+  return wardAtCache.get(key);
+}
+
+function pieTooltipHtml(ward, counts, total, scenarioLabel) {
+  const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([type, n]) => `
+    <div class="ward-pie-row"><i style="background:${BUFFER_COLORS[type] || '#38bdf8'}"></i><span>${escapeHtml((infraLabels[type] || type).replace(/^[^\p{L}\d]+/u, ''))}</span><b>${fmtNum(n)}</b></div>`).join('');
+  return `<div class="ward-pie-title">${escapeHtml(ward.name)}${scenarioLabel ? `<small>${scenarioLabel}</small>` : ''}</div>
+    ${rows}<div class="ward-pie-total"><span>Tổng</span><b>${fmtNum(total)}</b></div>
+    <div class="ward-pie-hint">Bấm để phóng to xem từng công trình</div>`;
+}
+
+function createWardPie(ward, counts, total, maxTotal, targetMap, scenarioLabel) {
+  const size = Math.round(PIE_MIN_PX + (PIE_MAX_PX - PIE_MIN_PX) * Math.sqrt(total / maxTotal));
+  const entries = Object.entries(counts);
+  // Vạch ngăn mảnh giữa các lát để phân biệt các màu gần nhau (cam/đỏ...)
+  const gap = entries.length > 1 ? PIE_SLICE_GAP_DEG : 0;
+  let acc = 0;
+  const stops = entries.map(([type, n]) => {
+    const from = acc;
+    acc += (n / total) * 360;
+    const color = BUFFER_COLORS[type] || '#38bdf8';
+    const end = Math.max(from, acc - gap);
+    return `${color} ${from.toFixed(2)}deg ${end.toFixed(2)}deg, ${PIE_GAP_COLOR} ${end.toFixed(2)}deg ${acc.toFixed(2)}deg`;
+  }).join(', ');
+  // Tâm biểu đồ đặt tại điểm sâu nhất trong ranh phường; tên phường gắn liền phía trên (nhãn rời bị ẩn ở chế độ này)
+  const marker = L.marker([ward.lat, ward.lng], {
+    icon: L.divIcon({
+      className: 'ward-pie-icon',
+      html: `<span class="ward-pie-name">${escapeHtml(ward.name)}</span><div class="ward-pie" style="width:${size}px;height:${size}px;background:conic-gradient(${stops})"><span>${total}</span></div>`,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2]
+    }),
+    riseOnHover: true,
+    bubblingMouseEvents: false
+  });
+  marker.bindTooltip(pieTooltipHtml(ward, counts, total, scenarioLabel), {
+    direction: 'auto', offset: [size / 2 + 6, 0], className: 'ward-pie-tip', opacity: 1
+  });
+  marker.on('click', () => {
+    if (state.isPickMode || state.activeMeasureType) return;
+    targetMap.flyTo([ward.lat, ward.lng], PIE_CLICK_ZOOM);
+  });
+  return marker;
+}
+
 // Bản đồ quy hoạch ưu tiên ranh QH, chưa có thì dùng ranh hiện trạng của cùng công trình
 function parcelGeometryFor(p) {
   const parcels = state.cadParcels;
@@ -478,13 +568,52 @@ function createPointMarker(entry, mode, targetMap) {
  * - Nhiều điểm trong khung nhìn (> ICON_MAX_VISIBLE) thì chuyển sang chấm tròn canvas thay cho icon DOM.
  * - Buffer vẽ bằng L.circle trên canvas, chỉ dựng cho nhóm đang bật.
  * - Ranh lô CAD (nếu có) vẽ cùng nhóm với marker nên bật/tắt theo loại hạ tầng và lọc phường như icon.
+ * - Zoom ≤ PIE_MAX_ZOOM: bỏ marker, mỗi phường 1 biểu đồ tròn đếm theo các loại đang bật.
  */
-function createRenderer(getMap, groups, isActive) {
+function createRenderer(getMap, groups, isActive, scenarioLabel) {
   let list = [];
+  let listSeq = 0;
   let mode = null;
   let parcelsOn = false;
+  let pieKey = null;
   const rendered = new Map();
   const builtBuffers = new Set();
+  const pieGroup = L.layerGroup();
+
+  const clearPies = () => {
+    pieGroup.clearLayers();
+    pieGroup.remove();
+    pieKey = null;
+  };
+
+  function renderPies(m) {
+    const activeTypes = Object.keys(ICON_GROUP_KEYS).filter(t => m.hasLayer(groups[ICON_GROUP_KEYS[t]]));
+    const label = scenarioLabel();
+    const key = `${listSeq}|${activeTypes.join(',')}|${state.wardLabelsList.length}|${label}`;
+    if (!m.hasLayer(pieGroup)) pieGroup.addTo(m);
+    if (key === pieKey) return;
+    pieKey = key;
+    pieGroup.clearLayers();
+
+    const active = new Set(activeTypes);
+    const byWard = new Map();
+    list.forEach(p => {
+      if (!active.has(p.type)) return;
+      const name = wardNameAt(p.lat, p.lng);
+      if (!name) return;
+      const counts = byWard.get(name) || {};
+      counts[p.type] = (counts[p.type] || 0) + 1;
+      byWard.set(name, counts);
+    });
+    const totals = new Map([...byWard].map(([name, counts]) => [name, Object.values(counts).reduce((s, n) => s + n, 0)]));
+    const maxTotal = Math.max(1, ...totals.values());
+    state.wardLabelsList.forEach(ward => {
+      const counts = byWard.get(ward.name);
+      if (!counts || ward.lat == null || ward.lng == null) return;
+      const ordered = Object.fromEntries(Object.keys(ICON_GROUP_KEYS).filter(t => counts[t]).map(t => [t, counts[t]]));
+      pieGroup.addLayer(createWardPie(ward, ordered, totals.get(ward.name), maxTotal, m, label));
+    });
+  }
 
   const removeEntry = (entry) => {
     entry.group.removeLayer(entry.marker);
@@ -499,6 +628,21 @@ function createRenderer(getMap, groups, isActive) {
   function refreshPoints() {
     const m = getMap();
     if (!m || !isActive()) return;
+    const wardSelected = state.selectedWard && state.selectedWard !== CITY_NAME;
+    if (m.getZoom() <= PIE_MAX_ZOOM && !wardSelected && state.wardLabelsList.some(w => w.geometry)) {
+      if (mode !== 'pie') {
+        clearPoints();
+        mode = 'pie';
+        parcelsOn = false;
+        m.getContainer().classList.add('ward-pie-mode');
+      }
+      renderPies(m);
+      return;
+    }
+    if (mode === 'pie') {
+      clearPies();
+      m.getContainer().classList.remove('ward-pie-mode');
+    }
     const bounds = m.getBounds().pad(0.25);
     const visible = list.filter(p => bounds.contains([p.lat, p.lng]));
     const nextMode = visible.length <= ICON_MAX_VISIBLE ? 'icon' : 'dot';
@@ -534,7 +678,12 @@ function createRenderer(getMap, groups, isActive) {
   // Vẽ lại toàn bộ marker + ranh lô (dữ liệu ranh vừa tải hoặc bật/tắt lớp ranh)
   function reset() {
     clearPoints();
+    if (mode === 'pie') {
+      clearPies();
+      getMap()?.getContainer().classList.remove('ward-pie-mode');
+    }
     mode = null;
+    pieKey = null;
     refreshPoints();
   }
 
@@ -567,6 +716,7 @@ function createRenderer(getMap, groups, isActive) {
 
   function setList(next) {
     list = next.filter(hasValidCoord);
+    listSeq++;
     refreshPoints();
     invalidateBuffers();
   }
@@ -574,8 +724,8 @@ function createRenderer(getMap, groups, isActive) {
   return { setList, refreshPoints, refreshBuffers, invalidateBuffers, reset };
 }
 
-const leftRenderer = createRenderer(() => map, layers, () => true);
-const planRenderer = createRenderer(() => planMap, planLayers, () => isCompareOn());
+const leftRenderer = createRenderer(() => map, layers, () => true, () => (isCompareOn() ? 'Hiện trạng' : ''));
+const planRenderer = createRenderer(() => planMap, planLayers, () => isCompareOn(), () => 'Quy hoạch');
 
 export function renderGroupedPoints() {
   if (!map) return;

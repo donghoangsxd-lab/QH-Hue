@@ -679,6 +679,70 @@ table.ward-table th {
   transition: font-size 0.15s ease;
 }
 
+/* Biểu đồ tròn tổng hợp mỗi phường xã ở zoom nhỏ */
+.ward-pie-mode .ward-label-text { display: none; }
+.ward-pie-icon { background: transparent !important; border: none !important; }
+.ward-pie-name {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 3px);
+  transform: translateX(-50%);
+  color: #fff;
+  font-size: var(--ward-label-size, 11px);
+  font-weight: 700;
+  white-space: nowrap;
+  text-shadow: 0 0 3px #000, 0 0 3px #000, 1px 1px 2px #000;
+  letter-spacing: 0.2px;
+  pointer-events: none;
+}
+.ward-pie {
+  position: relative;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.6), 0 2px 6px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.ward-pie:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.9), 0 3px 10px rgba(0, 0, 0, 0.55);
+}
+.ward-pie span {
+  position: absolute;
+  inset: 28%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.leaflet-tooltip.ward-pie-tip {
+  min-width: 170px;
+  padding: 7px 9px;
+  background: rgba(15, 23, 42, 0.96);
+  color: var(--text-main);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  font-size: 11.5px;
+}
+.leaflet-tooltip-left.ward-pie-tip::before { border-left-color: rgba(15, 23, 42, 0.96); }
+.leaflet-tooltip-right.ward-pie-tip::before { border-right-color: rgba(15, 23, 42, 0.96); }
+.ward-pie-title { font-weight: 700; color: var(--accent-cyan); margin-bottom: 5px; }
+.ward-pie-title small { color: var(--text-muted); font-weight: 400; margin-left: 4px; }
+.ward-pie-row { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 6px; padding: 1px 0; }
+.ward-pie-row i { width: 10px; height: 10px; border-radius: 2px; }
+.ward-pie-row b { font-variant-numeric: tabular-nums; }
+.ward-pie-total { margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.15); display: flex; justify-content: space-between; font-weight: 700; }
+.ward-pie-hint { margin-top: 3px; font-size: 10px; font-style: italic; color: var(--text-muted); }
+
 /* Nhãn kết quả đo (thay cho popup chồng nhau) */
 .measure-label { background: transparent !important; border: none !important; }
 .measure-label span {

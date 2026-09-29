@@ -57,7 +57,7 @@ export const infraLabels = {
   "6-YT": "✚ Bệnh viện, Trạm y tế",
   "7-VH": "🎭 Nhà văn hóa, thể thao",
   "8-TM": "🛒 Chợ, Trung tâm thương mại",
-  "9-CSD": "🛠️ Quỹ đất tiềm năng (Chưa sử dụng)"
+  "9-CSD": "🛠️ Cơ sở chưa sử dụng"
 };
 
 // Ranh giới phường xã: nét viền ghi xám vẽ dưới + nét vàng nhạt vẽ trên (đổ bóng rẻ, không dùng CSS filter)

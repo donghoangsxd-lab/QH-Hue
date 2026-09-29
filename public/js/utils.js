@@ -34,6 +34,113 @@ export function wardLabelFontSize(zoom) {
   return minSize + (z - minZoom) * (maxSize - minSize) / (maxZoom - minZoom);
 }
 
+/**
+ * Điểm đặt nhãn trong ranh (pole of inaccessibility – thuật toán polylabel): điểm nằm TRONG polygon, xa ranh nhất.
+ * Tâm hình học của phường cong/lõm có thể rơi sát ranh hoặc sang phường khác nên không dùng.
+ * MultiPolygon lấy phần diện tích lớn nhất. Trả về { lat, lng, depthM } hoặc null.
+ */
+const CENTER_PULL = 0.35;
+export function wardLabelPoint(geometry, precisionM = 20) {
+  const polys = geometry?.type === 'Polygon' ? [geometry.coordinates]
+    : geometry?.type === 'MultiPolygon' ? geometry.coordinates
+    : geometry?.type === 'GeometryCollection' ? (geometry.geometries || []).flatMap(g =>
+      g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [])
+    : [];
+  if (!polys.length) return null;
+
+  // Chiếu phẳng cục bộ (x = kinh độ·cos(vĩ độ)) để khoảng cách theo 2 trục cùng tỉ lệ
+  const lat0 = polys[0][0][0][1];
+  const kx = Math.cos((lat0 * Math.PI) / 180);
+  const project = (rings) => rings.map(r => r.map(([lng, lat]) => [lng * kx, lat]));
+  const ringArea = (r) => {
+    let s = 0;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) s += (r[j][0] - r[i][0]) * (r[j][1] + r[i][1]);
+    return Math.abs(s / 2);
+  };
+  const rings = polys.map(project).reduce((best, p) => (ringArea(p[0]) > ringArea(best[0]) ? p : best));
+
+  // Khoảng cách có dấu tới ranh: dương = trong polygon (tính cả lỗ thủng)
+  const signedDist = (x, y) => {
+    let inside = false;
+    let minSq = Infinity;
+    rings.forEach(ring => {
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [ax, ay] = ring[i];
+        const [bx, by] = ring[j];
+        if ((ay > y) !== (by > y) && x < ((bx - ax) * (y - ay)) / (by - ay) + ax) inside = !inside;
+        let dx = bx - ax, dy = by - ay;
+        let px = ax, py = ay;
+        if (dx || dy) {
+          const t = ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy);
+          if (t > 1) { px = bx; py = by; } else if (t > 0) { px = ax + dx * t; py = ay + dy * t; }
+        }
+        dx = x - px; dy = y - py;
+        minSq = Math.min(minSq, dx * dx + dy * dy);
+      }
+    });
+    return (inside ? 1 : -1) * Math.sqrt(minSq);
+  };
+
+  const outer = rings[0];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  outer.forEach(([x, y]) => {
+    if (x < minX) minX = x; if (y < minY) minY = y;
+    if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+  });
+  const cellSize = Math.min(maxX - minX, maxY - minY);
+  const toResult = (c) => ({ lat: c.y, lng: c.x / kx, depthM: Math.max(0, c.d) * 111320 });
+  if (!(cellSize > 0)) return toResult({ x: minX, y: minY, d: 0 });
+
+  // Trọng tâm diện tích vòng ngoài (có thể nằm ngoài polygon, chỉ dùng làm điểm hút)
+  let a = 0, cx = 0, cy = 0;
+  for (let i = 0, j = outer.length - 1; i < outer.length; j = i++) {
+    const f = outer[i][0] * outer[j][1] - outer[j][0] * outer[i][1];
+    cx += (outer[i][0] + outer[j][0]) * f;
+    cy += (outer[i][1] + outer[j][1]) * f;
+    a += f * 3;
+  }
+  if (a) { cx /= a; cy /= a; } else { cx = (minX + maxX) / 2; cy = (minY + maxY) / 2; }
+
+  // Điểm số = độ sâu × hệ số giảm dần theo khoảng cách tới trọng tâm: phường dài có nhiều chỗ sâu ngang nhau
+  // thì chọn chỗ gần giữa phường (ổn định, không nhảy sang một đầu)
+  const extent = Math.max(maxX - minX, maxY - minY);
+  const centerFactor = (dc) => 1 - CENTER_PULL * Math.min(1, Math.max(0, dc) / extent);
+  const makeCell = (x, y, h) => {
+    const d = signedDist(x, y);
+    const dc = Math.hypot(x - cx, y - cy);
+    const r = h * Math.SQRT2;
+    const up = d + r;
+    return { x, y, h, d, score: d * centerFactor(dc), max: up > 0 ? up * centerFactor(dc - r) : up };
+  };
+  const precision = precisionM / 111320;
+  const queue = [];
+  const push = (c) => {
+    let i = queue.length;
+    while (i > 0 && queue[i - 1].max < c.max) i--;
+    queue.splice(i, 0, c);
+  };
+  const h0 = cellSize / 2;
+  for (let x = minX; x < maxX; x += cellSize) {
+    for (let y = minY; y < maxY; y += cellSize) push(makeCell(x + h0, y + h0, h0));
+  }
+
+  let best = makeCell(cx, cy, 0);
+  const bboxCell = makeCell(minX + (maxX - minX) / 2, minY + (maxY - minY) / 2, 0);
+  if (bboxCell.score > best.score) best = bboxCell;
+
+  while (queue.length) {
+    const cell = queue.shift();
+    if (cell.score > best.score) best = cell;
+    if (cell.max - best.score <= precision) continue;
+    const h = cell.h / 2;
+    push(makeCell(cell.x - h, cell.y - h, h));
+    push(makeCell(cell.x + h, cell.y - h, h));
+    push(makeCell(cell.x - h, cell.y + h, h));
+    push(makeCell(cell.x + h, cell.y + h, h));
+  }
+  return toResult(best);
+}
+
 const scriptPromises = {};
 export function loadScript(src, integrity) {
   if (!scriptPromises[src]) {

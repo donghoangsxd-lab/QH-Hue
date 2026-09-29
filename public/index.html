@@ -75,7 +75,7 @@
         <div class="layer-row"><div><input type="checkbox" id="chk_c6" checked><label for="chk_c6">6. Cơ sở Y tế</label></div><button type="button" class="btn-dot-buffer" data-buffer="b6" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c7" checked><label for="chk_c7">7. Nhà văn hóa, thể thao</label></div><button type="button" class="btn-dot-buffer" data-buffer="b7" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c8" checked><label for="chk_c8">8. Chợ, TTTM</label></div><button type="button" class="btn-dot-buffer" data-buffer="b8" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c9" checked><label for="chk_c9">9. Quỹ đất tiềm năng</label></div></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c9" checked><label for="chk_c9">9. Cơ sở chưa sử dụng</label></div></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_parcel" checked><label for="chk_parcel">📐 Ranh lô đất (CAD) <small class="layer-hint">phóng to để xem</small></label></div></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_heat" checked><label for="chk_heat">🔥 Heatmap độ phủ hạ tầng</label></div></div>
 
@@ -103,7 +103,7 @@
       <div class="tab-body add-point-form" id="tabAdd" style="display:none;">
         <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
           <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true">✍️ Nhập 1 điểm</button>
-          <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ">📂 Nhập hàng loạt</button>
+          <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ, GeoJSON">📂 Nhập hàng loạt</button>
         </div>
 
         <div id="addSingle">
@@ -118,7 +118,7 @@
           <option value="6-YT">✚ 6. Bệnh viện, Trạm y tế</option>
           <option value="7-VH">🎭 7. Nhà văn hóa, thể thao</option>
           <option value="8-TM">🛒 8. Chợ, Trung tâm thương mại</option>
-          <option value="9-CSD" selected>🛠️ 9. Quỹ đất tiềm năng</option>
+          <option value="9-CSD" selected>🛠️ 9. Cơ sở chưa sử dụng</option>
         </select>
 
         <label for="newPhase">Giai đoạn</label>
@@ -169,13 +169,14 @@
           </div>
           <label class="cad-drop" id="cadDrop" for="cadFile">
             <span class="cad-drop-main"><b>Chọn file</b> hoặc kéo thả vào đây</span>
-            <span class="cad-drop-types"><i>DXF</i><i>KML</i><i>KMZ</i></span>
-            <input type="file" id="cadFile" accept=".dxf,.kml,.kmz" hidden />
+            <span class="cad-drop-types"><i>DXF</i><i>KML</i><i>KMZ</i><i>GeoJSON</i></span>
+            <input type="file" id="cadFile" accept=".dxf,.kml,.kmz,.geojson,.json" hidden />
           </label>
           <div class="cad-hint">
             <div class="cad-hint-title">Quy ước đặt tên</div>
             <div class="cad-hint-row"><b>DXF</b><span>Tên layer = mã loại</span></div>
             <div class="cad-hint-row"><b>KML/KMZ</b><span>Trường <code>Layer</code> / tên Folder = mã loại</span></div>
+            <div class="cad-hint-row"><b>GeoJSON</b><span>Thuộc tính <code>Layer</code> = mã loại</span></div>
             <div class="cad-codes">
               <code>CV</code><span>Công viên, điểm xanh, vườn hoa</span>
               <code>BDX</code><span>Bãi đỗ xe, trạm sạc xe điện</span>
@@ -186,7 +187,7 @@
               <code>YT</code><span>Bệnh viện, Trạm y tế</span>
               <code>VH</code><span>Nhà văn hóa, thể thao</span>
               <code>TM</code><span>Chợ, Trung tâm thương mại</span>
-              <code>CSD</code><span>Quỹ đất tiềm năng</span>
+              <code>CSD</code><span>Cơ sở chưa sử dụng</span>
             </div>
             <div class="cad-hint-note">Cấp đô thị thêm <code>_DT</code>, VD <code>CV_DT</code></div>
           </div>
@@ -206,7 +207,7 @@
         <div class="legend-row"><img src="./icons/Yte.png" class="legend-icon" /> 6. Bệnh viện, Trạm y tế</div>
         <div class="legend-row"><img src="./icons/Vanhoa.png" class="legend-icon" /> 7. Nhà văn hóa, thể thao</div>
         <div class="legend-row"><img src="./icons/Cho.png" class="legend-icon" /> 8. Chợ, Trung tâm thương mại</div>
-        <div class="legend-row" style="color:var(--accent-orange); margin-top:4px;"><img src="./icons/Unused.png" class="legend-icon" /> <b>9. Quỹ đất tiềm năng (Chưa sử dụng)</b></div>
+        <div class="legend-row" style="color:var(--accent-orange); margin-top:4px;"><img src="./icons/Unused.png" class="legend-icon" /> <b>9. Cơ sở chưa sử dụng</b></div>
         <div class="legend-row"><img src="./icons/Park2.png" class="legend-icon" alt="" /><b style="color:var(--accent-red);">Chưa chấp thuận (Chờ duyệt)</b></div>
         <div class="legend-row"><span class="legend-icon legend-dot"><i style="background:#22c55e;"></i></span>Điểm quy hoạch khác hiện trạng</div>
 

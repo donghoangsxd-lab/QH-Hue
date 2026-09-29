@@ -1,4 +1,4 @@
-// Tab Đề xuất → "Hàng loạt (DXF/KML)": đọc file CAD/KML/KMZ, xem trước các lô trên bản đồ và báo cáo kiểm tra trước khi ghi
+// Tab Đề xuất → "Nhập hàng loạt": đọc file DXF/KML/KMZ/GeoJSON, xem trước các lô trên bản đồ và báo cáo kiểm tra trước khi ghi
 import { state, infraLabels, BUFFER_COLORS } from './state.js';
 import { map } from './mapEngine.js';
 import { geeApi } from './api.js';
@@ -6,6 +6,7 @@ import { signOutAdmin } from './uiComponents.js';
 import { escapeHtml, fmtNum, distanceMeters } from './utils.js';
 import { parseDxf, buildParcels, buildParcelsLonLat, assignWards, matchExisting, layerToType, CRS_PRESETS } from './cadImport.js';
 import { parseKml, unzipKml } from './kmlImport.js';
+import { parseGeoJson } from './geojsonImport.js';
 
 // Diện tích tối thiểu theo loại (khớp config/constants.js → infraConfig.minSize)
 const MIN_SIZE = { "1-CV": 300, "2-BDX": 200, "3-MN": 800, "4-TH": 2000, "5-THCS": 2500, "6-YT": 1000, "7-VH": 500, "8-TM": 1500 };
@@ -18,7 +19,7 @@ const CHUNK_MAX_CHARS = 2500000;
 const CHOICE_NEW = '__new';
 const CHOICE_SKIP = '__skip';
 
-let current = null;   // { fileName, format: 'dxf'|'kml', stats, result, items: Map ID → công trình đang có }
+let current = null;   // { fileName, format: 'dxf'|'kml'|'geojson', wgs84, stats, result, items: Map ID → công trình đang có }
 let previewLayer = null;
 let submitting = false;
 let onImported = null;
@@ -144,23 +145,29 @@ function renderReport() {
     if (p.ward && !p.crossWard) t.area += p.area;
   });
 
-  const isKml = current.format === 'kml';
+  const isVector = current.format !== 'dxf';
+  const UNKNOWN_LABEL = {
+    dxf: 'Layer không nhận diện',
+    kml: 'Không nhận diện được loại (trường Layer / Folder / tên Placemark)',
+    geojson: 'Không nhận diện được loại (thuộc tính Layer / tên)'
+  };
   const alerts = [];
-  if (!result.axes.valid) alerts.push(['bad', isKml
-    ? 'Tọa độ không nằm trong khu vực TP. Huế — kiểm tra lại hệ tọa độ khi xuất KML (phải là WGS84).'
+  if (!result.axes.valid) alerts.push(['bad', current.wgs84
+    ? 'Tọa độ không nằm trong khu vực TP. Huế — kiểm tra lại hệ tọa độ khi xuất file (phải là WGS84 hoặc VN-2000).'
     : 'Tọa độ không nằm trong vùng VN-2000 của Huế — kiểm tra lại hệ tọa độ / đơn vị bản vẽ.']);
   else if (result.axes.note) alerts.push(['info', `Đã tự nhận diện bản vẽ: ${escapeHtml(result.axes.note)}.`]);
+  if (current.format === 'geojson') alerts.push(['info', current.wgs84 ? 'Tọa độ GeoJSON: WGS84 (kinh độ, vĩ độ).' : 'Tọa độ GeoJSON: mét — tính theo hệ VN-2000 đang chọn ở ô Hệ tọa độ.']);
   if (count.cross) alerts.push(['warn', `${count.cross} lô vắt ranh phường (lấn ≥ 5%): ghi quy mô = 0, diện tích thật ghi vào Ghi chú.`]);
-  if (count.out) alerts.push(['bad', `${count.out} lô nằm ngoài TP. Huế: bỏ qua.`]);
+  if (count.out) alerts.push(['bad', `${count.out} lô nằm ngoài TP. Huế (đưa lên đầu danh sách, viền xám trên bản đồ): bỏ qua — sẽ hỏi xác nhận trước khi ghi.`]);
   if (count.update) alerts.push(['info', `${count.update} lô chứa công trình cùng loại đã có: cập nhật tọa độ + diện tích ${phase === 'QH' ? 'QH' : 'HT'} cho công trình đó.`]);
   if (count.multi) alerts.push(['warn', `${count.multi} lô chứa nhiều công trình cùng loại (đưa lên đầu danh sách): chọn công trình cần cập nhật — mặc định gợi ý công trình gần tâm lô nhất, các công trình còn lại giữ nguyên.`]);
   if (count.dup) alerts.push(['bad', `${count.dup} lô cùng cập nhật 1 công trình: chọn lại (tạo mới / bỏ qua) trước khi ghi.`]);
   if (count.skip) alerts.push(['info', `${count.skip} lô được chọn bỏ qua.`]);
   if (count.small) alerts.push(['info', `${count.small} lô nhỏ hơn diện tích tối thiểu của loại (vẫn nhập).`]);
   const unknown = Object.entries(result.unknownLayers);
-  if (unknown.length) alerts.push(['warn', `${isKml ? 'Không nhận diện được loại (trường Layer / Folder / tên Placemark)' : 'Layer không nhận diện'} (bỏ qua): ${unknown.map(([l, n]) => `${escapeHtml(l)} (${n})`).join(', ')}.`]);
+  if (unknown.length) alerts.push(['warn', `${UNKNOWN_LABEL[current.format]} (bỏ qua): ${unknown.map(([l, n]) => `${escapeHtml(l)} (${n})`).join(', ')}.`]);
   if (stats.insert) alerts.push(['warn', `${stats.insert} block (INSERT) chưa được đọc — explode block trước khi xuất DXF.`]);
-  if (stats.point) alerts.push(['info', `${stats.point} Placemark dạng điểm (không có ranh): bỏ qua.`]);
+  if (stats.point) alerts.push(['info', `${stats.point} đối tượng dạng điểm (không có ranh): bỏ qua.`]);
   if (stats.openLine) alerts.push(['info', `${stats.openLine} đường không khép kín: bỏ qua.`]);
   if (stats.splineEdges) alerts.push(['info', `${stats.splineEdges} cạnh spline được tính gần đúng.`]);
   if (!state.wardLabelsList.some(w => w.geometry)) alerts.push(['bad', 'Chưa tải xong ranh 40 phường xã — mở lại file sau ít giây.']);
@@ -169,9 +176,9 @@ function renderReport() {
     <tr><td><i class="cad-dot" style="background:${BUFFER_COLORS[type] || '#38bdf8'}"></i>${escapeHtml(infraLabels[type] || type)}</td>
     <td>${t.n}</td><td>${fmtArea(t.area)}</td></tr>`).join('');
 
-  // Lô cần admin chọn (nhiều công trình / trùng) lên đầu để không bị khuất sau giới hạn MAX_LISTED
-  const needsPick = (p) => (p.ward && p.matchConflict) || parcelAction(p).key === 'dup' ? 1 : 0;
-  const order = parcels.map((_, idx) => idx).sort((a, b) => needsPick(parcels[b]) - needsPick(parcels[a]));
+  // Lô cần admin chọn (nhiều công trình / trùng) rồi lô ngoài TP lên đầu để không bị khuất sau giới hạn MAX_LISTED
+  const rank = (p) => ((p.ward && p.matchConflict) || parcelAction(p).key === 'dup' ? 2 : !p.ward ? 1 : 0);
+  const order = parcels.map((_, idx) => idx).sort((a, b) => rank(parcels[b]) - rank(parcels[a]));
   const listRows = order.slice(0, MAX_LISTED).map(idx => {
     const p = parcels[idx];
     const a = parcelAction(p);
@@ -185,7 +192,7 @@ function renderReport() {
   const listScroll = box.querySelector('.cad-list')?.scrollTop || 0;
 
   box.innerHTML = `
-    <div class="cad-file">📄 <b>${escapeHtml(fileName)}</b> · ${parcels.length} lô (${isKml
+    <div class="cad-file">📄 <b>${escapeHtml(fileName)}</b> · ${parcels.length} lô (${isVector
       ? `${stats.polygon} polygon, ${stats.polyline} đường khép kín${result.duplicatesDropped ? `, bỏ ${result.duplicatesDropped} đường trùng polygon` : ''}`
       : `${stats.hatch} hatch, ${stats.polyline} polyline khép kín${result.duplicatesDropped ? `, bỏ ${result.duplicatesDropped} polyline trùng hatch` : ''}`})</div>
     ${alerts.map(([cls, text]) => `<div class="cad-alert ${cls}">${text}</div>`).join('')}
@@ -216,7 +223,7 @@ function renderReport() {
 function analyse() {
   if (!current) return;
   const crs = CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
-  const result = current.format === 'kml' ? buildParcelsLonLat(current.entities) : buildParcels(current.entities, { crs });
+  const result = current.wgs84 ? buildParcelsLonLat(current.entities) : buildParcels(current.entities, { crs });
   assignWards(result.parcels, state.wardLabelsList || []);
   const existing = [...state.rawDataList, ...state.planDataList];
   matchExisting(result.parcels, existing);
@@ -229,8 +236,8 @@ function analyse() {
 
 async function loadFile(file) {
   if (!file) return;
-  const ext = (file.name.match(/\.(dxf|kml|kmz)$/i) || [])[1]?.toLowerCase();
-  if (!ext) { setStatus('⚠️ Chỉ nhận file .dxf (AutoCAD: Save As → DXF), .kml hoặc .kmz.', 'var(--accent-red)'); return; }
+  const ext = (file.name.match(/\.(dxf|kml|kmz|geojson|json)$/i) || [])[1]?.toLowerCase();
+  if (!ext) { setStatus('⚠️ Chỉ nhận file .dxf (AutoCAD: Save As → DXF), .kml, .kmz, .geojson hoặc .json.', 'var(--accent-red)'); return; }
   setStatus('⏳ Đang đọc file...', 'var(--accent-orange)');
   await new Promise(r => setTimeout(r, 30));
   try {
@@ -241,12 +248,14 @@ async function loadFile(file) {
       parsed = parseDxf(await file.text());
       if (!parsed.entities.length) throw new Error('Không tìm thấy HATCH hoặc polyline khép kín nào.');
     } else {
-      parsed = parseKml(ext === 'kmz' ? await unzipKml(await file.arrayBuffer()) : await file.text());
+      parsed = ext === 'json' || ext === 'geojson' ? parseGeoJson(await file.text())
+        : parseKml(ext === 'kmz' ? await unzipKml(await file.arrayBuffer()) : await file.text());
       if (!parsed.entities.length) throw new Error('Không tìm thấy Polygon hoặc đường khép kín nào trong file.');
     }
-    const format = ext === 'dxf' ? 'dxf' : 'kml';
-    current = { fileName: file.name, format, entities: parsed.entities, stats: parsed.stats, result: null };
-    lockCrs(format === 'kml');
+    const format = ext === 'dxf' ? 'dxf' : ext === 'kml' || ext === 'kmz' ? 'kml' : 'geojson';
+    const wgs84 = format === 'kml' || (format === 'geojson' && parsed.wgs84);
+    current = { fileName: file.name, format, wgs84, entities: parsed.entities, stats: parsed.stats, result: null };
+    lockCrs(wgs84);
     analyse();
     setStatus('');
   } catch (err) {
@@ -258,12 +267,12 @@ async function loadFile(file) {
   }
 }
 
-// KML/KMZ luôn là WGS84 → khóa ô chọn hệ tọa độ VN-2000
+// File tọa độ WGS84 (KML/KMZ, GeoJSON dạng độ) → khóa ô chọn hệ tọa độ VN-2000
 function lockCrs(on) {
   const sel = $('cadCrs');
   if (!sel) return;
   sel.disabled = on;
-  sel.title = on ? 'KML/KMZ luôn dùng WGS84' : '';
+  sel.title = on ? 'File dùng tọa độ WGS84 (kinh độ, vĩ độ)' : '';
 }
 
 function resetImport(keepStatus = false) {
@@ -286,7 +295,7 @@ function ownName(p) {
 
 // Lô sẽ ghi (tạo mới / cập nhật) → dữ liệu gửi máy chủ; tên theo Placemark, không có thì "<layer> – <tên file> #<thứ tự>" để admin sửa sau
 function buildItems() {
-  const fileBase = current.fileName.replace(/\.(dxf|kml|kmz)$/i, '');
+  const fileBase = current.fileName.replace(/\.(dxf|kml|kmz|geojson|json)$/i, '');
   const items = [];
   refreshDupTargets(current.result.parcels);
   current.result.parcels.forEach((p, idx) => {
@@ -338,6 +347,13 @@ async function submitImport() {
   const phase = $('cadPhase')?.value === 'QH' ? 'QH' : 'HT';
   const items = buildItems();
   if (!items.length) return;
+  const outside = current.result.parcels.filter(p => !p.ward);
+  if (outside.length) {
+    const byLayer = {};
+    outside.forEach(p => { byLayer[p.layer] = (byLayer[p.layer] || 0) + 1; });
+    const detail = Object.entries(byLayer).map(([l, n]) => `${l}: ${n}`).join(', ');
+    if (!confirm(`⚠️ Có ${outside.length} lô nằm ngoài TP. Huế (${detail}) sẽ bị BỎ QUA, không ghi vào Sheet.\n\nNếu đây là lỗi vẽ / sai vị trí, bấm Hủy để sửa file rồi nhập lại.\nBấm OK để tiếp tục ghi ${items.length} lô hợp lệ.`)) return;
+  }
   const nUpdate = items.filter(it => it.matchId).length;
   const phaseLabel = phase === 'QH' ? 'Quy hoạch (QuyMo_QH)' : 'Hiện trạng (QuyMo_HT)';
   if (!confirm(`Ghi ${items.length} lô vào Google Sheet?\n• ${items.length - nUpdate} tạo mới, ${nUpdate} cập nhật\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
