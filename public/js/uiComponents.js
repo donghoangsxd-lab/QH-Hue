@@ -4,6 +4,7 @@ import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, showToast, wardStatHtml } from './utils.js';
 import { refreshWardCheck } from './wardCheck.js';
 import { fillWardRoadLengths, fillCityRoadDensity } from './wardRoads.js';
+import { refreshRoadPanel } from './customRoads.js';
 
 let chartInstance = null;
 let infraPieInstance = null;
@@ -153,6 +154,12 @@ function updateAuthUi() {
   if (signOut) signOut.style.display = isAdmin ? '' : 'none';
   const wardRoadsBtn = document.getElementById('btnWardRoads');
   if (wardRoadsBtn) wardRoadsBtn.style.display = isAdmin ? '' : 'none';
+  const roadModeBtn = document.getElementById('btnAddRoadMode');
+  if (roadModeBtn) {
+    roadModeBtn.style.display = isAdmin ? '' : 'none';
+    if (!isAdmin && roadModeBtn.classList.contains('active')) document.querySelector('.add-mode-btn[data-mode="addSingle"]')?.click();
+  }
+  refreshRoadPanel();
   const gBtn = document.getElementById('googleSignInBtn');
   if (gBtn) gBtn.style.display = isAdmin ? 'none' : '';
   refreshWardCheck();

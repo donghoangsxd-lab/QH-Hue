@@ -125,22 +125,47 @@ export function sumWardLengths(elements, geometry) {
 }
 
 // ================== ĐỌC / HIỂN THỊ ==================
-let lengthsPromise = null;
+let metaPromise = null;
+const NO_CUSTOM = { saved: 0, count: 0, extra: {} };
 
-/** { [tên phường]: { bbox, parts, at, main, kiet } } — rỗng nếu chưa tải / lỗi */
-export function loadWardRoadLengths(force = false) {
-  if (!lengthsPromise || force) {
+/** { wards: index OSM, custom: { saved, count, extra: { phường: { main, kiet } } } (tuyến Admin vẽ bổ sung) } */
+function loadRoadsMeta(force = false) {
+  if (!metaPromise || force) {
     const promise = fetch(geeApi(`action=getWardRoads${force ? '&fresh=1' : ''}`))
       .then(r => (r.ok ? r.json() : {}))
-      .then(d => (d && d.wards && typeof d.wards === 'object' ? d.wards : {}))
+      .then(d => ({
+        wards: d && d.wards && typeof d.wards === 'object' ? d.wards : {},
+        custom: d && d.custom && typeof d.custom === 'object' ? { ...NO_CUSTOM, ...d.custom } : NO_CUSTOM
+      }))
       .catch(() => {
-        if (lengthsPromise === promise) lengthsPromise = null;
-        return {};
+        if (metaPromise === promise) metaPromise = null;
+        return { wards: {}, custom: NO_CUSTOM };
       });
-    lengthsPromise = promise;
+    metaPromise = promise;
   }
-  return lengthsPromise;
+  return metaPromise;
 }
+
+/** { [tên phường]: { bbox, parts, at, main, kiet } } (chỉ OSM, đúng dạng index lưu bucket) — rỗng nếu chưa tải / lỗi */
+export async function loadWardRoadLengths(force = false) {
+  return (await loadRoadsMeta(force)).wards;
+}
+
+/** Phiên bản tuyến đường bổ sung (0 = chưa có) — gắn vào yêu cầu getRoads để CDN / cache trình duyệt không giữ bản cũ */
+export async function customRoadsVersion() {
+  return (await loadRoadsMeta()).custom.saved || 0;
+}
+
+/** Sau khi Admin lưu tuyến bổ sung: đọc lại chỉ mục + chiều dài bổ sung, vẽ lại ô mật độ đường */
+export async function refreshRoadsMeta() {
+  await loadRoadsMeta(true);
+  if (state.selectedWard) fillWardRoadLengths(state.selectedWard);
+  const city = $('cityRoadDensity');
+  if (city && city.dataset.areas) fillCityRoadDensity(city, JSON.parse(city.dataset.areas));
+}
+
+// Chiều dài OSM + tuyến bổ sung của 1 phường
+const withExtra = (d, extra) => ({ main: d.main + ((extra && extra.main) || 0), kiet: d.kiet + ((extra && extra.kiet) || 0) });
 
 /** main = đường trục chính + đường khu vực (đường phố có tên), kiet = đường nội bộ; chia cho diện tích tự nhiên (km²) */
 function roadDensityHtml(main, kiet, areaKm2, source) {
@@ -152,15 +177,20 @@ function roadDensityHtml(main, kiet, areaKm2, source) {
 }
 
 const osmDate = (at) => (at ? `OSM ${new Date(at).toLocaleDateString('vi-VN')}` : 'OpenStreetMap');
+const customNote = (n) => (n ? ` + ${n} tuyến Admin bổ sung` : '');
 
 /** Điền mật độ đường vào ô #wardRoadLen của phần chi tiết phường (data-ward, data-area km²) nếu đã có số liệu */
 export async function fillWardRoadLengths(wardName) {
-  const wards = await loadWardRoadLengths();
+  const { wards, custom } = await loadRoadsMeta();
   const el = $('wardRoadLen');
   if (!el || el.dataset.ward !== wardName) return;
   const d = wards[wardName];
   const areaKm2 = Number(el.dataset.area) || 0;
-  el.innerHTML = d && areaKm2 > 0 ? roadDensityHtml(d.main, d.kiet, areaKm2, `theo ${osmDate(d.at)}`) : '';
+  if (!d || !(areaKm2 > 0)) { el.innerHTML = ''; return; }
+  const extra = custom.extra[wardName];
+  const km = withExtra(d, extra);
+  const added = custom.count && extra ? ' + tuyến Admin bổ sung' : '';
+  el.innerHTML = roadDensityHtml(km.main, km.kiet, areaKm2, `theo ${osmDate(d.at)}${added}`);
 }
 
 /**
@@ -168,18 +198,20 @@ export async function fillWardRoadLengths(wardName) {
  * chia cho tổng diện tích của chính các phường/xã đó (areas = { tên phường: km² })
  */
 export async function fillCityRoadDensity(el, areas) {
-  const wards = await loadWardRoadLengths();
+  if (el) el.dataset.areas = JSON.stringify(areas);
+  const { wards, custom } = await loadRoadsMeta();
   if (!el || !el.isConnected) return;
   let main = 0, kiet = 0, areaKm2 = 0, n = 0, at = 0;
   Object.entries(areas).forEach(([name, area]) => {
     const d = wards[name];
     if (!d || !(area > 0)) return;
-    main += d.main; kiet += d.kiet; areaKm2 += area; n++;
+    const km = withExtra(d, custom.extra[name]);
+    main += km.main; kiet += km.kiet; areaKm2 += area; n++;
     at = Math.max(at, d.at || 0);
   });
   const total = Object.keys(areas).length;
   el.innerHTML = n && areaKm2 > 0
-    ? roadDensityHtml(main, kiet, areaKm2, `${n}/${total} phường/xã có mạng lưới đường, theo ${osmDate(at)}`)
+    ? roadDensityHtml(main, kiet, areaKm2, `${n}/${total} phường/xã có mạng lưới đường, theo ${osmDate(at)}${customNote(custom.count)}`)
     : '';
 }
 
@@ -195,7 +227,7 @@ function setMsg(text, color) {
   el.style.color = color || '';
 }
 
-async function postAdmin(action, body) {
+export async function postAdmin(action, body) {
   const res = await fetch(geeApi(`action=${action}`), {
     method: 'POST',
     headers: { Authorization: `Bearer ${state.authToken}`, 'Content-Type': 'application/json' },
@@ -254,7 +286,8 @@ async function run() {
       index[w.name] = await downloadWard(w, step);
       step('cập nhật chỉ mục');
       await postAdmin('saveWardRoads', { wards: index, total: wards.length });
-      lengthsPromise = Promise.resolve({ ...index });
+      const { custom } = await loadRoadsMeta();
+      metaPromise = Promise.resolve({ wards: { ...index }, custom });
       fresh++;
     } catch (err) {
       failed.push(w.name);

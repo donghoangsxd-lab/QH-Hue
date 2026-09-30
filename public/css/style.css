@@ -350,6 +350,8 @@ body.right-collapsed .right-panel {
 
 /* ĐỀ XUẤT: nhập 1 điểm / hàng loạt DXF */
 .add-mode-switch { display: flex; gap: 3px; padding: 3px; margin-bottom: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color); border-radius: 7px; }
+.add-mode-switch:has(#btnAddRoadMode:not([style*="none"])) { gap: 2px; }
+.add-mode-switch:has(#btnAddRoadMode:not([style*="none"])) .add-mode-btn { padding: 5px 2px; }
 .add-mode-btn { flex: 1; padding: 5px 4px; border: none; border-radius: 5px; background: transparent; color: var(--text-muted); font-size: 10.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .add-mode-btn.active { background: var(--accent-cyan); color: var(--bg-panel); }
 .add-point-form select:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -370,6 +372,19 @@ body.right-collapsed .right-panel {
 .cad-codes code { text-align: center; padding: 0 4px; border-radius: 3px; background: rgba(34, 211, 238, 0.1); border: 1px solid rgba(34, 211, 238, 0.25); }
 .cad-codes span { color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cad-hint-note { font-size: 9.5px; }
+/* ĐỀ XUẤT: Admin vẽ bổ sung tuyến đường */
+.road-draw-actions { display: flex; gap: 4px; margin-top: 8px; }
+.road-draw-actions button { flex: 1; height: 26px; border: 1px solid var(--border-color); border-radius: 5px; background: rgba(15, 23, 42, 0.8); color: var(--text-main); font-size: 10.5px; font-weight: 600; cursor: pointer; }
+.road-draw-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
+#btnRoadDraw { flex: 1.4; border-color: var(--accent-cyan); color: var(--accent-cyan); }
+#btnRoadDraw.active { background: var(--accent-cyan); color: var(--bg-panel); }
+.road-draw-info { margin-top: 5px; font-size: 10.5px; color: var(--text-muted); text-align: center; }
+.road-draw-info:empty { display: none; }
+.road-draw-info b { color: var(--text-main); }
+#addRoad .btn-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+#roadList:empty { display: none; }
+.road-del { flex-shrink: 0; width: 24px; height: 22px; padding: 0; border: none; border-radius: 4px; background: transparent; cursor: pointer; font-size: 12px; }
+.road-del:hover { background: rgba(248, 113, 113, 0.2); }
 #addBulk:has(#cadReport:not(:empty)) .cad-hint { display: none; }
 #cadReport:empty { display: none; }
 #cadReport { margin-top: 8px; font-size: 10.5px; }

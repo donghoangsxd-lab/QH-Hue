@@ -499,7 +499,7 @@ function createWardPie(ward, counts, total, maxTotal, targetMap, scenarioLabel) 
     direction: 'auto', offset: [size / 2 + 6, 0], className: 'ward-pie-tip', opacity: 1
   });
   marker.on('click', () => {
-    if (state.isPickMode || state.activeMeasureType) return;
+    if (state.isPickMode || state.activeMeasureType || state.roadDrawMode) return;
     targetMap.flyTo([ward.lat, ward.lng], PIE_CLICK_ZOOM);
   });
   return marker;
@@ -524,7 +524,7 @@ function createParcelShape(entry, targetMap) {
     bubblingMouseEvents: false
   });
   shape.on('click', () => {
-    if (state.isPickMode || state.activeMeasureType) return;
+    if (state.isPickMode || state.activeMeasureType || state.roadDrawMode) return;
     onPointClick(entry.point, targetMap);
   });
   return shape;
@@ -559,7 +559,7 @@ function createPointMarker(entry, mode, targetMap) {
     });
   }
   marker.on('click', () => {
-    if (state.isPickMode || state.activeMeasureType) return;
+    if (state.isPickMode || state.activeMeasureType || state.roadDrawMode) return;
     onPointClick(entry.point, targetMap);
   });
   return marker;

@@ -1038,9 +1038,10 @@ module.exports = async (req, res) => {
       if (!pt) return res.status(400).json({ error: true, message: "Tọa độ không hợp lệ" });
       const r = roads.roadsRadius(parseRadius(req.query.r));
       if (r > roads.ROADS_MAX_RADIUS) return res.status(404).json({ error: true, message: 'Bán kính quá lớn — trình duyệt tự tải' });
+      const cv = Math.max(0, Math.round(Number(req.query.cv) || 0));
       let ways = null;
       try {
-        ways = await roads.waysAround(pt.lat, pt.lng, r);
+        ways = await roads.waysAround(pt.lat, pt.lng, r, cv);
       } catch (err) {
         console.warn('Đọc mạng lưới đường lỗi:', err.message);
       }
@@ -1054,10 +1055,48 @@ module.exports = async (req, res) => {
     }
 
     // Chiều dài đường trục chính / kiệt theo phường (tính lúc Admin tải mạng lưới, lưu trong index)
+    // custom: phiên bản + chiều dài theo phường của tuyến Admin vẽ bổ sung (client cộng thêm vào index)
     if (action === 'getWardRoads') {
-      const index = await roads.readRoadsIndex(req.query.fresh === '1');
-      res.setHeader('Cache-Control', req.query.fresh === '1' ? 'no-store' : 'public, max-age=300, s-maxage=600, stale-while-revalidate=86400');
-      return res.status(200).json({ v: 2, total: (index && index.total) || 0, wards: (index && index.wards) || {} });
+      const fresh = req.query.fresh === '1';
+      const index = await roads.readRoadsIndex(fresh);
+      let custom = null;
+      try {
+        const c = await roads.readCustomRoads(0, fresh);
+        custom = { saved: c.saved, count: c.roads.length, extra: roads.customExtra(c) };
+      } catch (err) {
+        console.warn('Đọc tuyến đường bổ sung lỗi:', err.message);
+      }
+      res.setHeader('Cache-Control', fresh || !custom ? 'no-store' : 'public, max-age=300, s-maxage=600, stale-while-revalidate=86400');
+      return res.status(200).json({ v: 2, total: (index && index.total) || 0, wards: (index && index.wards) || {}, custom });
+    }
+
+    // Danh sách tuyến bổ sung đầy đủ (màn hình Admin vẽ / xóa tuyến)
+    if (action === 'getCustomRoads') {
+      const c = await roads.readCustomRoads(0, true);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ v: 2, saved: c.saved, roads: c.roads });
+    }
+
+    // Ghi đè toàn bộ danh sách tuyến bổ sung; base = phiên bản client đang sửa (khác bản trên bucket → 409, tránh 2 tab ghi đè nhau)
+    if (action === 'saveCustomRoads') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const list = roads.parseCustomRoads(body.roads);
+      if (!list) return res.status(400).json({ error: true, message: 'Dữ liệu tuyến đường bổ sung không hợp lệ' });
+      const current = await roads.readCustomRoads(0, true);
+      if (Math.round(Number(body.base) || 0) !== current.saved) {
+        return res.status(409).json({ error: true, message: 'Danh sách tuyến bổ sung vừa được sửa ở phiên khác — mở lại chế độ vẽ để tải bản mới' });
+      }
+      const payload = { v: 2, saved: Date.now(), roads: list };
+      const content = JSON.stringify(payload);
+      if (content.length > roads.MAX_PART_CHARS) return res.status(413).json({ error: true, message: 'Danh sách tuyến bổ sung quá lớn' });
+      const result = await callAppsScript({ action: 'saveRoads' }, { action: 'saveRoads', key: 'custom', content });
+      if (result.saved !== true) {
+        return res.status(502).json({ error: true, message: 'Apps Script chưa ghi được lên bucket (đã triển khai phiên bản mới của Code.gs chưa?)' });
+      }
+      roads.rememberCustom(payload);
+      return res.status(200).json({ success: true, saved: true, at: payload.saved, count: list.length });
     }
 
     if (action === 'saveRoadNetwork') {

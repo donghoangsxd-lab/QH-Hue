@@ -1,7 +1,7 @@
 // Vùng phục vụ thực tế của 1 công trình theo mạng đường OSM (chỉ tính khi click chọn công trình)
 // Dijkstra trên đồ thị đường (đi 2 chiều) → tô các đoạn tới được lên lưới → nới SIDE_M, đóng hình CLOSE_M, lấp lỗ → dò viền, bo góc
 import { geeApi } from './api.js';
-import { roadDrawGroup } from './wardRoads.js';
+import { roadDrawGroup, customRoadsVersion } from './wardRoads.js';
 
 const SERVER_TIMEOUT_MS = 30000;     // máy chủ webapp cắt đường từ mạng lưới toàn thành phố đã lưu trên bucket
 const SERVER_HEAD_START_MS = 6000;   // máy chủ chưa trả lời sau chừng này thì trình duyệt hỏi thẳng Overpass song song
@@ -117,7 +117,9 @@ export async function queryOverpassHedged(q, timeoutMs = FETCH_TIMEOUT_MS, hedge
 // Trình duyệt tự hỏi Overpass (khi máy chủ webapp chậm / lỗi / vị trí không phải công trình trong dữ liệu)
 async function fetchWaysDirect(lat, lng, r) {
   const q = `[out:json][timeout:25];way["highway"]["highway"!~"^(${EXCLUDED_HIGHWAYS})$"]["access"!~"^(private|no)$"]["foot"!="no"](around:${r},${lat},${lng});out body geom;`;
-  return slimWays((await queryOverpassHedged(q)).elements);
+  const ways = slimWays((await queryOverpassHedged(q)).elements);
+  ways.direct = true;
+  return ways;
 }
 
 // Dạng gọn từ máy chủ: [cầu ? 1 : 0, [id nút...], [lat, lon, lat, lon, ...], nhóm vẽ?] → dạng Overpass rút gọn
@@ -129,11 +131,11 @@ const unpackWays = (packed) => (packed || []).map(([bridge, nodes, flat, group])
 }));
 
 // Máy chủ webapp: cắt đường quanh điểm từ mạng lưới toàn thành phố trên bucket (404 nếu Admin chưa tải đủ)
-async function requestServerRoads(lat, lng, radius) {
+async function requestServerRoads(lat, lng, radius, cv) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), SERVER_TIMEOUT_MS);
   try {
-    const res = await fetch(geeApi(`action=getRoads&lat=${lat}&lng=${lng}&r=${Math.round(radius)}&g=1`), { signal: ctrl.signal });
+    const res = await fetch(geeApi(`action=getRoads&lat=${lat}&lng=${lng}&r=${Math.round(radius)}&g=1${cv ? `&cv=${cv}` : ''}`), { signal: ctrl.signal });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !Array.isArray(data.ways)) throw new Error(data.message || `HTTP ${res.status}`);
     return data;
@@ -142,17 +144,18 @@ async function requestServerRoads(lat, lng, radius) {
   }
 }
 
-const fetchWaysFromServer = async (lat, lng, radius) => unpackWays((await requestServerRoads(lat, lng, radius)).ways);
+const fetchWaysFromServer = async (lat, lng, radius, cv) => unpackWays((await requestServerRoads(lat, lng, radius, cv)).ways);
 
 // Cache trình duyệt → máy chủ webapp; máy chủ chưa trả lời sau SERVER_HEAD_START_MS (hoặc lỗi) thì hỏi thẳng Overpass, lấy bên về trước
-async function fetchWays(lat, lng, radius) {
+// cv (phiên bản tuyến Admin bổ sung) nằm trong khóa cache: lưu tuyến mới thì các vùng phục vụ tính lại theo mạng lưới mới
+async function fetchWays(lat, lng, radius, cv) {
   const r = Math.round(radius + ROAD_MARGIN_M);
-  const key = `https://qhhue.cache/overpass?v=${WAYS_KEY_VERSION}&lat=${lat.toFixed(5)}&lng=${lng.toFixed(5)}&r=${r}`;
+  const key = `https://qhhue.cache/overpass?v=${WAYS_KEY_VERSION}&lat=${lat.toFixed(5)}&lng=${lng.toFixed(5)}&r=${r}${cv ? `&cv=${cv}` : ''}`;
   const hit = await cachedWays(key);
   if (hit) return hit;
 
   const server = radius <= SERVER_MAX_RADIUS_M
-    ? fetchWaysFromServer(lat, lng, radius)
+    ? fetchWaysFromServer(lat, lng, radius, cv)
     : Promise.reject(new Error('Bán kính quá lớn để lưu sẵn'));
   const direct = new Promise((resolve, reject) => {
     let started = false;
@@ -171,8 +174,14 @@ async function fetchWays(lat, lng, radius) {
     throw (err.errors && err.errors[err.errors.length - 1]) || err;
   }
   // Mạng lưới lưu cũ chưa có nhóm vẽ: không giữ trong trình duyệt để có màu theo nhóm ngay khi Admin tải lại
-  if (ways.length && ways.every(w => w.group != null)) saveWays(key, ways);
+  // Overpass trực tiếp không có tuyến Admin bổ sung: không giữ khi đã có tuyến bổ sung
+  if (ways.length && ways.every(w => w.group != null) && !(cv && ways.direct)) saveWays(key, ways);
   return ways;
+}
+
+/** Đường quanh 1 điểm (gồm tuyến Admin bổ sung) → [{ nodes, geometry: [{ lat, lon }], group }] — dùng khi vẽ tuyến để bắt dính nút */
+export async function roadWaysAround(lat, lng, radius) {
+  return fetchWays(lat, lng, radius, await customRoadsVersion());
 }
 
 class MinHeap {
@@ -474,9 +483,9 @@ function serviceMask(segments, radius, cell) {
 const groupKey = (group) => (group === 1 ? 'main' : group === 2 ? 'named' : group === 0 ? 'kiet' : 'unknown');
 const byGroup = () => ({ main: [], named: [], kiet: [], unknown: [] });
 
-async function compute(lat, lng, radius) {
+async function compute(lat, lng, radius, cv) {
   const proj = projector(lat, lng);
-  const ways = await fetchWays(lat, lng, radius);
+  const ways = await fetchWays(lat, lng, radius, cv);
   if (!ways.length) throw new Error('Không có đường giao thông quanh công trình');
   const graph = buildGraph(ways, proj);
   const origin = bestOrigin(graph, radius);
@@ -520,9 +529,10 @@ async function compute(lat, lng, radius) {
  * flowPaths (tuyến từ rìa về công trình), areaKm2, circleKm2, reachKm, snapM }
  */
 export async function computeServiceArea(lat, lng, radius) {
-  const key = `${lat.toFixed(5)},${lng.toFixed(5)},${Math.round(radius)}`;
+  const cv = await customRoadsVersion();
+  const key = `${lat.toFixed(5)},${lng.toFixed(5)},${Math.round(radius)},${cv}`;
   if (cache.has(key)) return cache.get(key);
-  const pending = compute(lat, lng, radius);
+  const pending = compute(lat, lng, radius, cv);
   cache.set(key, pending);
   pending.catch(() => cache.delete(key));
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);

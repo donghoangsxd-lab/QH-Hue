@@ -2,6 +2,8 @@
 //   roads/v2/index.json            = { v: 2, saved, total, wards: { tên: { bbox: [w, s, e, n], parts, at, main, kiet } } }
 //   roads/v2/net_<slug>_<i>.json   = { v: 2, ward, part, ways: [[id, cầu ? 1 : 0, [id nút...], [lat, lon, ...], nhóm vẽ?], ...] }
 //   nhóm vẽ: 1 = trục chính, 2 = đường có tên, 0 = kiệt (bản lưu cũ không có phần tử này)
+//   roads/v2/custom.json           = { v: 2, saved, roads: [{ id, g, name, nodes, flat, len: { tên phường: km }, at }] }
+//   (tuyến đường hiện trạng Admin vẽ bổ sung; tách riêng để tải lại OSM không mất, mỗi lần lưu ghi đè cả file)
 // Máy chủ cắt đường quanh công trình từ các file này cho "phạm vi thực tế"; index chứa luôn chiều dài trục chính / kiệt.
 // Đọc: file công khai. Ghi: Apps Script (máy chủ Vercel không có quyền ghi bucket).
 const axios = require('axios');
@@ -14,8 +16,11 @@ const INDEX_TTL_MS = 10 * 60 * 1000;
 const PART_CACHE_MAX = 16;        // số phần mạng lưới giữ trong bộ nhớ hàm Vercel (mỗi phần tối đa ~3 MB)
 const MAX_PART_CHARS = 3000000;   // dưới giới hạn 4,5 MB/yêu cầu của Vercel khi Admin gửi lên
 const MAX_PARTS = 20;
+const CUSTOM_MAX_ROADS = 3000;
+const CUSTOM_MAX_POINTS = 2000;   // số đỉnh tối đa của 1 tuyến vẽ bổ sung
 
 let indexCache = null;            // { at, data }
+let customCache = null;           // { at, data: { saved, roads } }
 const partCache = new Map();      // "slug_i@at" → ways
 
 const round6 = (v) => Math.round(v * 1e6) / 1e6;
@@ -49,6 +54,41 @@ async function readRoadsIndex(force = false) {
   return data;
 }
 
+/**
+ * custom.json → { saved, roads } (chưa có file → rỗng; lỗi mạng → ném lỗi để không trả / ghi đè nhầm danh sách rỗng).
+ * minSaved: phiên bản client đã biết (tham số cv) — bộ nhớ cũ hơn thì đọc lại, đọc lại vẫn cũ hơn thì ném lỗi (tránh CDN giữ bản cũ).
+ */
+async function readCustomRoads(minSaved = 0, force = false) {
+  const c = customCache;
+  if (!force && c && Date.now() - c.at < INDEX_TTL_MS && c.data.saved >= minSaved) return c.data;
+  const res = await axios.get(`${ROADS_PUBLIC_BASE}custom.json?v=${Date.now()}`, { timeout: 8000, validateStatus: () => true });
+  let data;
+  if (res.status === 404 || res.status === 403) data = { saved: 0, roads: [] };
+  else if (res.status === 200 && res.data && res.data.v === 2 && Array.isArray(res.data.roads)) {
+    data = { saved: Number(res.data.saved) || 0, roads: res.data.roads };
+  } else throw new Error(`Không đọc được tuyến đường bổ sung (HTTP ${res.status})`);
+  customCache = { at: Date.now(), data };
+  if (data.saved < minSaved) throw new Error('Tuyến đường bổ sung trên bucket chưa cập nhật');
+  return data;
+}
+
+function rememberCustom(payload) {
+  customCache = { at: Date.now(), data: { saved: payload.saved, roads: payload.roads } };
+}
+
+/** Chiều dài tuyến bổ sung theo phường: { tên phường: { main, kiet } } km (nhóm 1, 2 → main; 0 → kiet như index) */
+function customExtra(data) {
+  const out = {};
+  (data && data.roads || []).forEach(r => {
+    Object.entries(r.len || {}).forEach(([ward, km]) => {
+      const e = out[ward] || (out[ward] = { main: 0, kiet: 0 });
+      e[r.g === 0 ? 'kiet' : 'main'] += Number(km) || 0;
+    });
+  });
+  Object.values(out).forEach(e => { e.main = Math.round(e.main * 100) / 100; e.kiet = Math.round(e.kiet * 100) / 100; });
+  return out;
+}
+
 async function readPart(name, i, at) {
   const key = `${wardSlug(name)}_${i}@${at}`;
   if (partCache.has(key)) {
@@ -66,9 +106,10 @@ async function readPart(name, i, at) {
 
 /**
  * Đường có đỉnh cách (lat, lng) không quá r mét → [[cầu, [id nút...], [lat, lon, ...], nhóm vẽ?], ...] (dạng client đang dùng),
- * hoặc null nếu mạng lưới chưa tải đủ 40 phường/xã (trình duyệt tự hỏi Overpass).
+ * hoặc null nếu mạng lưới chưa tải đủ 40 phường/xã (trình duyệt tự hỏi Overpass). Gồm cả tuyến Admin vẽ bổ sung
+ * (customMin = phiên bản tuyến bổ sung client đã biết).
  */
-async function waysAround(lat, lng, r) {
+async function waysAround(lat, lng, r, customMin = 0) {
   const index = await readRoadsIndex();
   if (!index) return null;
   const entries = Object.entries(index.wards);
@@ -80,23 +121,25 @@ async function waysAround(lat, lng, r) {
     && w.bbox[0] <= lng + dLng && w.bbox[2] >= lng - dLng && w.bbox[1] <= lat + dLat && w.bbox[3] >= lat - dLat);
   const loads = [];
   near.forEach(([name, w]) => { for (let i = 0; i < w.parts; i++) loads.push(readPart(name, i, w.at)); });
-  const partsWays = await Promise.all(loads);
+  const [partsWays, custom] = await Promise.all([Promise.all(loads), readCustomRoads(customMin)]);
 
   const r2 = r * r;
+  const within = (flat) => {
+    for (let i = 0; i < flat.length; i += 2) {
+      const dy = (flat[i] - lat) * kLat, dx = (flat[i + 1] - lng) * kLng;
+      if (dx * dx + dy * dy <= r2) return true;
+    }
+    return false;
+  };
   const seen = new Set();
   const out = [];
   partsWays.forEach(ways => ways.forEach(w => {
     const [id, bridge, nodes, flat, group] = w;
-    if (seen.has(id)) return;
-    for (let i = 0; i < flat.length; i += 2) {
-      const dy = (flat[i] - lat) * kLat, dx = (flat[i + 1] - lng) * kLng;
-      if (dx * dx + dy * dy <= r2) {
-        seen.add(id);
-        out.push(group == null ? [bridge, nodes, flat] : [bridge, nodes, flat, group]);
-        return;
-      }
-    }
+    if (seen.has(id) || !within(flat)) return;
+    seen.add(id);
+    out.push(group == null ? [bridge, nodes, flat] : [bridge, nodes, flat, group]);
   }));
+  custom.roads.forEach(c => { if (within(c.flat)) out.push([0, c.nodes, c.flat, c.g]); });
   return out;
 }
 
@@ -146,7 +189,40 @@ function rememberIndex(data) {
   indexCache = { at: Date.now(), data };
 }
 
+/**
+ * Danh sách tuyến bổ sung Admin gửi lên (toàn bộ, ghi đè) → roads đã kiểm tra, hoặc null nếu sai dạng.
+ * Mỗi tuyến: { id: "R…", g: 1 trục chính | 2 khu vực | 0 nội bộ, name, nodes: [id nút], flat: [lat, lon, ...], len: { phường: km }, at }
+ */
+function parseCustomRoads(raw) {
+  if (!Array.isArray(raw) || raw.length > CUSTOM_MAX_ROADS) return null;
+  const out = [];
+  const ids = new Set();
+  for (const r of raw) {
+    if (!r || typeof r !== 'object') return null;
+    const id = String(r.id || '');
+    const { g, nodes, flat, len } = r;
+    if (!/^R[a-z0-9]{1,16}$/.test(id) || ids.has(id) || (g !== 0 && g !== 1 && g !== 2)) return null;
+    if (!Array.isArray(nodes) || !Array.isArray(flat) || nodes.length < 2 || nodes.length > CUSTOM_MAX_POINTS) return null;
+    if (flat.length !== nodes.length * 2 || !nodes.every(isInt)) return null;
+    for (let i = 0; i < flat.length; i += 2) if (!isLat(flat[i]) || !isLng(flat[i + 1])) return null;
+    if (!len || typeof len !== 'object' || Array.isArray(len) || Object.keys(len).length > 80) return null;
+    const cleanLen = {};
+    for (const [ward, km] of Object.entries(len)) {
+      const key = String(ward).trim();
+      const v = Number(km);
+      if (!key || key.length > 80 || !Number.isFinite(v) || v < 0 || v > 500) return null;
+      cleanLen[key] = Math.round(v * 1000) / 1000;
+    }
+    const at = Math.round(Number(r.at));
+    if (!(at > 0 && at < 1e14)) return null;
+    ids.add(id);
+    out.push({ id, g, name: String(r.name || '').trim().slice(0, 120), nodes, flat: flat.map(round6), len: cleanLen, at });
+  }
+  return out;
+}
+
 module.exports = {
   wardSlug, roadsRadius, readRoadsIndex, waysAround, parseNetworkPart, parseRoadsIndex, rememberIndex,
+  readCustomRoads, rememberCustom, customExtra, parseCustomRoads,
   ROADS_MAX_RADIUS, MAX_PART_CHARS, MAX_PARTS
 };

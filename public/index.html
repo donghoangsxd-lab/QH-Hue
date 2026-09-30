@@ -99,6 +99,7 @@
         <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
           <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true">✍️ Nhập 1 điểm</button>
           <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ, GeoJSON">📂 Nhập hàng loạt</button>
+          <button type="button" class="add-mode-btn" data-mode="addRoad" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Admin vẽ bổ sung tuyến đường hiện trạng chưa có trên OpenStreetMap">🛣️ Đường</button>
         </div>
 
         <div id="addSingle">
@@ -189,6 +190,28 @@
           <div id="cadReport"></div>
           <button type="button" class="btn-submit" id="btnCadSubmit" disabled>🚀 GHI VÀO HỆ THỐNG (ADMIN)</button>
           <div id="cadStatus" class="rp-status" role="status" aria-live="polite"></div>
+        </div>
+
+        <div id="addRoad" style="display:none;">
+          <div class="form-grid">
+            <label for="roadType">Loại</label>
+            <select id="roadType">
+              <option value="1">Đường trục chính</option>
+              <option value="2" selected>Đường khu vực</option>
+              <option value="0">Đường nội bộ</option>
+            </select>
+            <label for="roadName">Tên</label>
+            <input type="text" id="roadName" maxlength="120" placeholder="Tên tuyến (không bắt buộc)" />
+          </div>
+          <div class="road-draw-actions">
+            <button type="button" id="btnRoadDraw" aria-pressed="false">✏️ Vẽ tuyến mới</button>
+            <button type="button" id="btnRoadUndo" title="Xóa đỉnh cuối (Backspace)" disabled>↶ Xóa đỉnh</button>
+          </div>
+          <div id="roadDrawInfo" class="road-draw-info"></div>
+          <div class="cad-hint">Click lên bản đồ hiện trạng để đặt đỉnh. Đỉnh cách nút đường sẵn có ≤ 20 m tự bắt dính (chấm xanh) để tuyến nối vào mạng lưới — đặt đỉnh tại các nút giao. Esc: dừng vẽ.</div>
+          <button type="button" class="btn-submit" id="btnRoadSave" disabled title="Ghi đè danh sách tuyến bổ sung roads/v2/custom.json trên bucket">💾 LƯU TUYẾN (ADMIN)</button>
+          <div id="roadStatus" class="rp-status" role="status" aria-live="polite"></div>
+          <div id="roadList" class="cad-list"></div>
         </div>
       </div>
 

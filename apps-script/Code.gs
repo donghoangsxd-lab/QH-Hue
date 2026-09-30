@@ -731,12 +731,12 @@ function importCadBatch(body) {
 }
 
 // MẠNG LƯỚI ĐƯỜNG OSM TOÀN THÀNH PHỐ (Admin tải theo phường/xã, máy chủ webapp gửi sang để lưu lên bucket)
-// body = { key: "net_phuong-thuan-hoa_0" (1 phần mạng lưới 1 phường) | "index" (chỉ mục + chiều dài đường), content: JSON }
-// → file roads/v2/<key>.json
+// body = { key: "net_phuong-thuan-hoa_0" (1 phần mạng lưới 1 phường) | "index" (chỉ mục + chiều dài đường)
+//        | "custom" (tuyến đường hiện trạng Admin vẽ bổ sung), content: JSON } → file roads/v2/<key>.json
 function saveRoads(body) {
   var key = String(body.key || '');
   var content = String(body.content || '');
-  if (!/^(net_[a-z0-9-]{1,60}_\d{1,2}|index)$/.test(key)) return { "error": "Tên file mạng lưới đường không hợp lệ" };
+  if (!/^(net_[a-z0-9-]{1,60}_\d{1,2}|index|custom)$/.test(key)) return { "error": "Tên file mạng lưới đường không hợp lệ" };
   if (!content || content.length > 8000000) return { "error": "Dữ liệu mạng lưới đường rỗng hoặc quá lớn" };
   return { "success": true, "saved": uploadToGCS(content, "roads/v2/" + key + ".json") };
 }
