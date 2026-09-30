@@ -142,23 +142,45 @@ export function loadWardRoadLengths(force = false) {
   return lengthsPromise;
 }
 
-/**
- * Điền mật độ đường vào ô #wardRoadLen của phần chi tiết phường (nếu đã có số liệu).
- * main = đường trục chính + đường khu vực (đường phố có tên), kiet = đường nội bộ; chia cho diện tích tự nhiên (data-area, km²)
- */
+/** main = đường trục chính + đường khu vực (đường phố có tên), kiet = đường nội bộ; chia cho diện tích tự nhiên (km²) */
+function roadDensityHtml(main, kiet, areaKm2, source) {
+  const total = main + kiet;
+  return wardStatHtml('Mật độ giao thông', DENSITY_FORMAT.format(total / areaKm2), 'km/km²',
+    `Tổng chiều dài các tuyến đường ${KM_FORMAT.format(total)} km (trục chính + khu vực ${KM_FORMAT.format(main)} km, nội bộ ${KM_FORMAT.format(kiet)} km) / diện tích tự nhiên ${KM_FORMAT.format(areaKm2)} km² — ${source}`)
+    + wardStatHtml('Mật độ đường khu vực', DENSITY_FORMAT.format(main / areaKm2), 'km/km²',
+      `(Đường trục chính + đường khu vực) ${KM_FORMAT.format(main)} km / diện tích tự nhiên ${KM_FORMAT.format(areaKm2)} km² — ${source}`);
+}
+
+const osmDate = (at) => (at ? `OSM ${new Date(at).toLocaleDateString('vi-VN')}` : 'OpenStreetMap');
+
+/** Điền mật độ đường vào ô #wardRoadLen của phần chi tiết phường (data-ward, data-area km²) nếu đã có số liệu */
 export async function fillWardRoadLengths(wardName) {
   const wards = await loadWardRoadLengths();
   const el = $('wardRoadLen');
   if (!el || el.dataset.ward !== wardName) return;
   const d = wards[wardName];
   const areaKm2 = Number(el.dataset.area) || 0;
-  if (!d || !(areaKm2 > 0)) { el.innerHTML = ''; return; }
-  const when = d.at ? `OSM ${new Date(d.at).toLocaleDateString('vi-VN')}` : 'OpenStreetMap';
-  const total = d.main + d.kiet;
-  el.innerHTML = wardStatHtml('Mật độ giao thông', DENSITY_FORMAT.format(total / areaKm2), 'km/km²',
-    `Tổng chiều dài các tuyến đường ${KM_FORMAT.format(total)} km (trục chính + khu vực ${KM_FORMAT.format(d.main)} km, nội bộ ${KM_FORMAT.format(d.kiet)} km) / diện tích tự nhiên ${KM_FORMAT.format(areaKm2)} km² — theo ${when}`)
-    + wardStatHtml('Mật độ đường khu vực', DENSITY_FORMAT.format(d.main / areaKm2), 'km/km²',
-      `(Đường trục chính + đường khu vực) ${KM_FORMAT.format(d.main)} km / diện tích tự nhiên ${KM_FORMAT.format(areaKm2)} km² — theo ${when}`);
+  el.innerHTML = d && areaKm2 > 0 ? roadDensityHtml(d.main, d.kiet, areaKm2, `theo ${osmDate(d.at)}`) : '';
+}
+
+/**
+ * Mật độ đường toàn thành phố vào phần tử el: cộng chiều dài các phường/xã đã có mạng lưới đường,
+ * chia cho tổng diện tích của chính các phường/xã đó (areas = { tên phường: km² })
+ */
+export async function fillCityRoadDensity(el, areas) {
+  const wards = await loadWardRoadLengths();
+  if (!el || !el.isConnected) return;
+  let main = 0, kiet = 0, areaKm2 = 0, n = 0, at = 0;
+  Object.entries(areas).forEach(([name, area]) => {
+    const d = wards[name];
+    if (!d || !(area > 0)) return;
+    main += d.main; kiet += d.kiet; areaKm2 += area; n++;
+    at = Math.max(at, d.at || 0);
+  });
+  const total = Object.keys(areas).length;
+  el.innerHTML = n && areaKm2 > 0
+    ? roadDensityHtml(main, kiet, areaKm2, `${n}/${total} phường/xã có mạng lưới đường, theo ${osmDate(at)}`)
+    : '';
 }
 
 // ================== ADMIN TẢI MẠNG LƯỚI & LƯU ==================

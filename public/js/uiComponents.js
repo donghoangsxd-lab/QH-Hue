@@ -3,7 +3,7 @@ import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js
 import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, showToast, wardStatHtml } from './utils.js';
 import { refreshWardCheck } from './wardCheck.js';
-import { fillWardRoadLengths } from './wardRoads.js';
+import { fillWardRoadLengths, fillCityRoadDensity } from './wardRoads.js';
 
 let chartInstance = null;
 let infraPieInstance = null;
@@ -708,11 +708,7 @@ function renderSummaryNote(wardName) {
     ? ` (${list[0].currentUnits || Math.max(1, Math.round(pop / 20000))} đơn vị ở)`
     : '';
   const popLabel = city ? 'Tổng dân số' : '<span title="Dân số hiện trạng">Dân số HT</span>';
-  const areaKm2 = list.reduce((s, w) => s + (Number(w.Dien_Tich_Km2) || 0), 0);
-  const density = city && areaKm2 > 0
-    ? ` · <span title="Tổng dân số / tổng diện tích ${fmtArea(areaKm2)} km²">Mật độ: <b>${fmtNum(Math.round(pop / areaKm2))}</b> người/km²</span>`
-    : '';
-  subtitle.innerHTML = `👥 ${popLabel}: <b>${fmtNum(pop)}</b> người${units}${density}`
+  subtitle.innerHTML = `👥 ${popLabel}: <b>${fmtNum(pop)}</b> người${units}`
     + ` · <span class="bp-swatch" style="background:${CHART_COVERAGE_COLOR};"></span>Độ phủ TB: ${covText}`
     + ` · <span class="bp-swatch" style="background:${CHART_SCALE_COLOR};"></span>Quy mô TB: <b title="Hiện trạng">${fmtPct(scale)}</b>${qhValue(scale, scaleQH)}`
     + ` · <span class="bp-swatch" style="background:${CHART_PLAN_UP_COLOR};"></span>QH tăng`
@@ -741,6 +737,44 @@ function setBottomPanelHeader(wardName) {
   const planEl = document.getElementById('bpWardPlan');
   if (planEl) planEl.style.display = city ? 'none' : '';
   if (wardView) wardView.style.display = city ? 'none' : 'flex';
+  const cityInfo = document.getElementById('cityInfoLine');
+  if (cityInfo) cityInfo.style.display = city ? '' : 'none';
+}
+
+// Dòng chỉ tiêu toàn thành phố (cùng dạng dòng chỉ tiêu phường): tổng diện tích, mật độ dân số, mật độ đường
+function renderCityInfoLine() {
+  const el = document.getElementById('cityInfoLine');
+  if (!el) return;
+  const list = state.wardStatsData;
+  const areas = {};
+  let areaKm2 = 0, pop = 0, popQH = 0, urbanPop = 0, urbanPopQH = 0, urbanCount = 0;
+  list.forEach(w => {
+    const a = Number(w.Dien_Tich_Km2) || 0;
+    const p = Number(w.Dan_So_Vector) || 0;
+    const pQH = Number(w.projectedPopulation) || Math.round(p * 1.2);
+    areas[w.Ten_Phuong] = a;
+    areaKm2 += a;
+    pop += p;
+    popQH += pQH;
+    if (/^phường\s/i.test(String(w.Ten_Phuong || '').trim())) {
+      urbanPop += p;
+      urbanPopQH += pQH;
+      urbanCount++;
+    }
+  });
+  if (!(areaKm2 > 0)) { el.innerHTML = ''; return; }
+  const urbanRate = (u, total) => fmtPct(total > 0 ? (u / total) * 100 : 0);
+  const urbanHT = urbanRate(urbanPop, pop);
+  const urbanQH = urbanRate(urbanPopQH, popQH);
+  el.innerHTML = wardStatHtml('Diện tích', fmtArea(areaKm2), 'km²', `Tổng diện tích tự nhiên ${list.length} phường/xã`)
+    + wardStatHtml('Mật độ dân số',
+      `${fmtNum(Math.round(pop / areaKm2))} <em>(HT)</em> → ${fmtNum(Math.round(popQH / areaKm2))} <em>(QH)</em>`,
+      'người/km²', `Tổng dân số hiện trạng ${fmtNum(pop)} / quy hoạch ${fmtNum(popQH)} người chia cho tổng diện tích tự nhiên`)
+    + wardStatHtml('Tỷ lệ đô thị hóa',
+      urbanHT === urbanQH ? urbanHT : `${urbanHT} <em>(HT)</em> → ${urbanQH} <em>(QH)</em>`,
+      '', `Dân số ${urbanCount} phường (hiện trạng ${fmtNum(urbanPop)} / quy hoạch ${fmtNum(urbanPopQH)} người) chia cho tổng dân số toàn thành phố`)
+    + '<div id="cityRoadDensity" class="ward-stat-group"></div>';
+  fillCityRoadDensity(document.getElementById('cityRoadDensity'), areas);
 }
 
 export async function renderBottomPanel() {
@@ -775,6 +809,7 @@ export async function renderBottomPanel() {
   setBottomPanelHeader(wardName);
 
   if (city) {
+    renderCityInfoLine();
     rebuildCombinedTableBody();
     renderCombinedChart();
     return;
