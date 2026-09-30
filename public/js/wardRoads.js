@@ -178,7 +178,7 @@ async function postAdmin(action, body) {
   return data;
 }
 
-/** Tải 1 phường: Overpass → lưu các phần mạng lưới → { bbox, parts, at, main, kiet } cho index */
+/** Tải 1 phường: Overpass → lưu các phần mạng lưới → { bbox, parts, at, main, kiet, grouped } cho index */
 async function downloadWard(w, onStep) {
   const bbox = turf.bbox(turf.feature(w.geometry));
   const data = await queryOverpassHedged(wardQuery(bbox), QUERY_TIMEOUT_MS, QUERY_HEDGE_MS);
@@ -188,19 +188,25 @@ async function downloadWard(w, onStep) {
     onStep(`lưu phần ${i + 1}/${parts.length}`);
     await postAdmin('saveRoadNetwork', { ward: w.name, part: i, ways: parts[i] });
   }
-  return { bbox, parts: parts.length, at: Date.now(), ...lengths };
+  return { bbox, parts: parts.length, at: Date.now(), ...lengths, grouped: true };
 }
+
+// grouped = mạng lưới có nhóm vẽ đường (trục chính / có tên / kiệt); bản lưu trước đó thiếu → cần tải lại
+const isCurrent = (d) => !!(d && d.parts && d.grouped);
 
 async function run() {
   const wards = state.wardLabelsList.filter(w => w.geometry);
   if (!wards.length) { setMsg('Chưa tải xong ranh giới phường/xã.', 'var(--accent-red)'); return; }
   const index = { ...(await loadWardRoadLengths(true)) };
-  const missing = wards.filter(w => !(index[w.name] && index[w.name].parts));
+  const missing = wards.filter(w => !isCurrent(index[w.name]));
+  const outdated = missing.filter(w => index[w.name] && index[w.name].parts).length;
   let targets = missing;
   if (!missing.length) {
     if (!confirm(`Đã có mạng lưới đường cả ${wards.length} phường/xã. Tải lại toàn bộ theo OpenStreetMap mới nhất?`)) return;
     targets = wards;
-  } else if (!confirm(`Tải mạng lưới đường cho ${missing.length} phường/xã chưa có?\n\nDùng chung cho "phạm vi thực tế" của công trình và chiều dài đường theo phường. Mỗi phường/xã mất vài giây đến 1–2 phút; giữ tab mở tới khi xong (có thể bấm Dừng).`)) {
+  } else if (!confirm(`Tải mạng lưới đường cho ${missing.length} phường/xã`
+    + `${outdated ? ` (${outdated} phường/xã đang lưu bản cũ chưa phân nhóm trục chính / đường có tên / kiệt)` : ' chưa có'}?`
+    + `\n\nDùng chung cho "phạm vi thực tế" của công trình và chiều dài đường theo phường. Mỗi phường/xã mất vài giây đến 1–2 phút; giữ tab mở tới khi xong (có thể bấm Dừng, lần sau bấm lại sẽ tải tiếp phần còn lại).`)) {
     return;
   }
 
@@ -232,7 +238,7 @@ async function run() {
   running = false;
   if (btn) btn.textContent = BTN_LABEL;
   const tail = failed.length ? ` Lỗi ${failed.length}: ${failed.join(', ')} — bấm lại để tải tiếp.` : '';
-  const have = wards.filter(w => index[w.name] && index[w.name].parts).length;
+  const have = wards.filter(w => isCurrent(index[w.name])).length;
   setMsg(`${stopRequested ? 'Đã dừng' : '✓ Xong'}: tải ${fresh}/${targets.length} phường/xã (đã có ${have}/${wards.length}).${tail}`,
     failed.length || stopRequested || have < wards.length ? 'var(--accent-orange)' : 'var(--accent-green)');
   if (state.selectedWard) fillWardRoadLengths(state.selectedWard);

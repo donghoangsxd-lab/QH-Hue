@@ -137,6 +137,7 @@ function parseRoadsIndex(rawWards, rawTotal) {
     if (!(parts >= 1 && parts <= MAX_PARTS) || !(at > 0 && at < 1e14)) return null;
     if (![main, kiet].every(x => Number.isFinite(x) && x >= 0 && x < 1e5)) return null;
     wards[key] = { bbox: [w, s, e, n].map(round6), parts, at, main: Math.round(main * 100) / 100, kiet: Math.round(kiet * 100) / 100 };
+    if (v.grouped === true) wards[key].grouped = true;
   }
   return { total, wards };
 }
