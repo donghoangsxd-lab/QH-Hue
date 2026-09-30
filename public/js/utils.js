@@ -9,6 +9,30 @@ export function escapeHtml(value) {
 }
 
 /** 1 ô chỉ tiêu trong dòng thông tin phường: nhãn nhỏ phía trên, giá trị (HTML đã escape) + đơn vị phía dưới */
+/** Icon nét mảnh trong sprite #i-* (index.html); kích thước theo cỡ chữ của phần tử chứa */
+export function ico(name, cls = '') {
+  return `<svg class="ico${cls ? ` ${cls}` : ''}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+}
+
+/** html2canvas vẽ SVG thành ảnh tách rời (mất <use href="#..."> và CSS): chép nội dung symbol + màu nét vào từng icon của bản sao */
+export function inlineSpriteIcons(doc) {
+  doc.querySelectorAll('svg.ico').forEach(svg => {
+    const href = svg.querySelector('use')?.getAttribute('href');
+    const sym = href && doc.querySelector(href);
+    if (!sym) return;
+    const cs = doc.defaultView.getComputedStyle(svg);
+    svg.setAttribute('viewBox', sym.getAttribute('viewBox'));
+    svg.setAttribute('width', parseFloat(cs.width) || 12);
+    svg.setAttribute('height', parseFloat(cs.height) || 12);
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', cs.color);
+    svg.setAttribute('stroke-width', cs.strokeWidth || '1.8');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.innerHTML = sym.innerHTML.replaceAll('currentColor', cs.color);
+  });
+}
+
 export function wardStatHtml(label, valueHtml, unit, title) {
   return `<div class="ward-stat"${title ? ` title="${escapeHtml(title)}"` : ''}>`
     + `<small>${escapeHtml(label)}</small><span><b>${valueHtml}</b>${unit ? ` <em>${escapeHtml(unit)}</em>` : ''}</span></div>`;
@@ -183,6 +207,27 @@ export function loadHtml2Canvas() {
   );
 }
 
+// Ký hiệu đầu chuỗi thông báo → icon SVG (giữ quy ước viết thông báo cũ: "⏳ Đang...", "✓ Đã...", "❌ Lỗi...")
+const STATUS_MARKS = [
+  [/^(?:✅|✓)\s*/u, 'check'],
+  [/^❌\s*/u, 'error'],
+  [/^⚠\uFE0F?\s*/u, 'alert'],
+  [/^(?:⏳|🔄|🚀)\s*/u, 'clock'],
+  [/^(?:👉|🔒)\s*/u, 'info'],
+];
+
+/** Đặt nội dung thông báo cho el: ký hiệu đầu chuỗi đổi thành icon, phần chữ được escape */
+export function setStatusContent(el, text, fallbackIcon = null) {
+  let rest = String(text ?? '');
+  let icon = fallbackIcon;
+  for (const [re, name] of STATUS_MARKS) {
+    const m = rest.match(re);
+    if (m) { icon = name; rest = rest.slice(m[0].length); break; }
+  }
+  el.innerHTML = rest ? `${icon ? ico(icon) : ''}${escapeHtml(rest)}` : '';
+}
+
+const TOAST_ICONS = { success: 'check', error: 'error', info: 'info' };
 let toastTimer = null;
 export function showToast(message, type = 'info') {
   let el = document.getElementById('appToast');
@@ -194,7 +239,7 @@ export function showToast(message, type = 'info') {
     document.body.appendChild(el);
   }
   el.className = `app-toast ${type}`;
-  el.textContent = message;
+  setStatusContent(el, message, TOAST_ICONS[type]);
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 4000);

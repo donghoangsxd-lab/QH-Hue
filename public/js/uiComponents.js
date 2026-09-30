@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js';
 import { geeApi } from './api.js';
-import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, showToast, wardStatHtml } from './utils.js';
+import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, showToast, wardStatHtml, ico, setStatusContent, inlineSpriteIcons } from './utils.js';
 import { refreshWardCheck } from './wardCheck.js';
 import { fillWardRoadLengths, fillCityRoadDensity } from './wardRoads.js';
 import { refreshRoadPanel } from './customRoads.js';
@@ -20,7 +20,7 @@ function setAuthMsg(text, color = 'var(--text-main)') {
   const msg = document.getElementById('authMsg');
   if (!msg) return;
   msg.style.color = color;
-  msg.textContent = text;
+  setStatusContent(msg, text);
 }
 
 function showGoogleOriginHint() {
@@ -138,18 +138,14 @@ export async function restoreAdminSession() {
   }
 }
 
-const AUTH_ICON_DEFAULT = '🔑';
-const AUTH_ICON_ADMIN = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-orange);" aria-hidden="true">
-  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
-
 function updateAuthUi() {
   const isAdmin = state.currentUserRole === 'ADMIN' && !!state.authUser;
   const btnAuth = document.getElementById('btnAuth');
   if (btnAuth) {
-    btnAuth.style.borderColor = isAdmin ? 'var(--accent-orange)' : '';
+    btnAuth.classList.toggle('is-admin', isAdmin);
     btnAuth.title = isAdmin ? `Đã đăng nhập: Admin (${state.authUser.name})` : 'Đăng nhập quản trị';
     btnAuth.setAttribute('aria-label', btnAuth.title);
-    btnAuth.innerHTML = isAdmin ? AUTH_ICON_ADMIN : AUTH_ICON_DEFAULT;
+    btnAuth.innerHTML = ico(isAdmin ? 'user' : 'key');
   }
   const signOut = document.getElementById('btnSignOut');
   if (signOut) signOut.style.display = isAdmin ? '' : 'none';
@@ -263,7 +259,7 @@ function setPart1Flipped(flipped) {
   if (title) title.textContent = flipped ? 'SỐ LƯỢNG CÔNG TRÌNH' : 'CƠ CẤU ĐẤT HẠ TẦNG';
   const btn = document.getElementById('btnFlipPart1');
   if (btn) {
-    btn.textContent = flipped ? '⟳ Diện tích' : '⟳ Số lượng';
+    btn.innerHTML = `${ico('flip')}${flipped ? 'Diện tích' : 'Số lượng'}`;
     btn.title = flipped ? 'Lật trang: cơ cấu theo diện tích' : 'Lật trang: thống kê số lượng công trình';
     btn.setAttribute('aria-pressed', String(flipped));
   }
@@ -297,14 +293,14 @@ export function updateInfraPieChart(sourceList, planList = []) {
     legendContainer.innerHTML = `<div class="pie-legend-row pie-legend-head"><span>Ký hiệu</span><span>H.Trạng</span><span>QH</span></div>`
       + keys.map((k, idx) => {
         const delta = qhPct[idx] - htPct[idx];
-        const qhColor = delta >= 0.1 ? 'var(--accent-green)' : (delta <= -0.1 ? 'var(--accent-red)' : 'var(--accent-cyan)');
+        const qhCls = delta >= 0.1 ? 'c-green' : (delta <= -0.1 ? 'c-red' : 'c-cyan');
         return `<div class="pie-legend-row">
           <span class="pie-legend-name">
-            <span style="width:8px; height:8px; background:${bgColors[idx]}; border-radius:50%; display:inline-block; flex-shrink:0;"></span>
-            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(labels[idx])}</span>
+            <i class="pie-dot" style="background:${bgColors[idx]};"></i>
+            <span class="pie-legend-text">${escapeHtml(labels[idx])}</span>
           </span>
-          <b style="color:var(--accent-cyan);">${fmtPct(htPct[idx])}</b>
-          <b style="color:${qhColor};">${fmtPct(qhPct[idx])}</b>
+          <b class="c-cyan">${fmtPct(htPct[idx])}</b>
+          <b class="${qhCls}">${fmtPct(qhPct[idx])}</b>
         </div>`;
       }).join('');
   }
@@ -558,31 +554,31 @@ export async function startBackgroundCoverageFill() {
 }
 
 // ================== BẢNG 40 PHƯỜNG XÃ ==================
-const PENDING_CELL = '<span class="cov-pending" title="Đang tính độ phủ">⏳</span>';
+const PENDING_CELL = `<span class="cov-pending" title="Đang tính độ phủ">${ico('clock')}</span>`;
 const AREA_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 const fmtArea = (km2) => AREA_FORMAT.format(Number(km2) || 0);
 const NOT_REQUIRED_TITLE = 'QCVN 01:2026/BXD không quy định chỉ tiêu này cho loại địa bàn của phường/xã';
-const NOT_REQUIRED_DASH = `<span style="color:var(--text-muted);" title="${NOT_REQUIRED_TITLE}">–</span>`;
+const NOT_REQUIRED_DASH = `<span class="c-muted" title="${NOT_REQUIRED_TITLE}">–</span>`;
 
 function wardRowHtml(w, idx) {
   const ready = !!w._coverageReady;
   const cells = COVERAGE_CODES.map(c => {
     const cov = ready ? fmtPct(w[`Ratio_${c}`]) : PENDING_CELL;
     const scale = w[`Scale_${c}`] === null ? NOT_REQUIRED_DASH : fmtPct(w[`Scale_${c}`]);
-    return `<td class="cov-cell" data-code="${c}" style="color:var(--accent-green);">${cov}</td><td style="color:var(--accent-orange); font-weight:bold;">${scale}</td>`;
+    return `<td class="cov-cell" data-code="${c}">${cov}</td><td class="st-scale">${scale}</td>`;
   }).join('');
   const name = escapeHtml(w.Ten_Phuong);
   return `<tr data-ward-row="${name}">
     <td>${idx + 1}</td>
-    <td style="text-align:left;">
-      <button type="button" class="ward-link link-btn" data-ward="${name}" style="font-weight:bold; color:var(--accent-cyan);">📍 ${name}</button>
+    <td class="st-name">
+      <button type="button" class="ward-link link-btn" data-ward="${name}">${name}</button>
     </td>
-    <td style="font-weight:bold; color:var(--accent-green); text-align:right;">${fmtNum(w.Dan_So_Vector)}</td>
-    <td style="text-align:right;">${w.Dien_Tich_Km2 ? fmtArea(w.Dien_Tich_Km2) : '-'}</td>
-    <td style="text-align:right; font-weight:bold; color:var(--accent-cyan);">${w.Mat_Do_Dan_So ? fmtNum(w.Mat_Do_Dan_So) : '-'}</td>
+    <td class="st-num st-pop">${fmtNum(w.Dan_So_Vector)}</td>
+    <td class="st-num">${w.Dien_Tich_Km2 ? fmtArea(w.Dien_Tich_Km2) : '-'}</td>
+    <td class="st-num st-dens">${w.Mat_Do_Dan_So ? fmtNum(w.Mat_Do_Dan_So) : '-'}</td>
     ${cells}
-    <td class="cov-avg" style="font-weight:bold; color:var(--accent-green); background:rgba(56,189,248,0.05);">${ready ? fmtPct(w.Avg_Coverage_Score) : PENDING_CELL}</td>
-    <td style="font-weight:bold; color:var(--accent-orange); background:rgba(245,158,11,0.05);">${fmtPct(w.Avg_Scale_Score)}</td>
+    <td class="cov-avg">${ready ? fmtPct(w.Avg_Coverage_Score) : PENDING_CELL}</td>
+    <td class="st-scale st-scale-avg">${fmtPct(w.Avg_Scale_Score)}</td>
   </tr>`;
 }
 
@@ -665,8 +661,9 @@ export function setBottomPanelMaximized(maximized) {
   if (maximized) setPart1Flipped(false);
   const btn = document.getElementById('btnToggleBottomMax');
   if (btn) {
-    btn.textContent = maximized ? '🗗' : '⛶';
+    btn.innerHTML = ico(maximized ? 'minimize' : 'maximize');
     btn.title = maximized ? 'Thu về 1/5 màn hình' : 'Phóng to toàn màn hình';
+    btn.setAttribute('aria-label', btn.title);
   }
   setBottomPanelHeader(isCityMode() ? CITY_NAME : state.selectedWard);
 }
@@ -683,13 +680,23 @@ export function toggleStatTable() {
   setBottomPanelHeader(CITY_NAME);
 }
 
+// Chú giải biểu đồ 40 phường (dòng tiêu đề, chỉ hiện ở chế độ toàn TP khi biểu đồ đang hiển thị)
+function renderChartLegend() {
+  const el = document.getElementById('bpChartLegend');
+  if (!el || el.childElementCount) return;
+  const sw = (color, label) => `<span class="bp-legend-item"><i class="bp-swatch" style="background:${color};"></i>${label}</span>`;
+  el.innerHTML = sw(CHART_COVERAGE_COLOR, 'Độ phủ') + sw(CHART_SCALE_COLOR, 'Quy mô')
+    + sw(CHART_PLAN_UP_COLOR, 'QH tăng') + sw(CHART_PLAN_DOWN_COLOR, 'QH giảm');
+}
+
+// Dân số / độ phủ TB / quy mô TB: nhóm .js-summary trong dòng chỉ số (toàn TP hoặc phường đang xem)
 function renderSummaryNote(wardName) {
-  const subtitle = document.getElementById('bpSubtitle');
-  if (!subtitle) return;
   const city = !wardName || wardName === CITY_NAME;
+  const box = document.querySelector(city ? '#cityInfoLine .js-summary' : '#wardSummaryCard .js-summary');
+  if (!box) return;
   const list = city ? state.wardStatsData : state.wardStatsData.filter(w => w.Ten_Phuong === wardName);
   if (!list.length) {
-    subtitle.innerHTML = '';
+    box.innerHTML = '';
     return;
   }
   // Toàn thành phố: bình quân gia quyền theo dân số; độ phủ chỉ lấy các phường đã tính xong
@@ -710,24 +717,24 @@ function renderSummaryNote(wardName) {
   const covQH = covPop ? covQHSum / covPop : 0;
   const scale = pop ? scaleSum / pop : 0;
   const scaleQH = pop ? scaleQHSum / pop : 0;
-  const qhValue = (ht, qh) => {
+  const htQh = (ht, qh) => {
     const d = qh - ht;
-    const color = d >= 0.05 ? CHART_PLAN_UP_COLOR : (d <= -0.05 ? CHART_PLAN_DOWN_COLOR : 'var(--text-main)');
-    return ` → <b style="color:${color};" title="Theo quy hoạch">${fmtPct(qh)}</b>`;
+    const cls = d >= 0.05 ? 'c-green' : (d <= -0.05 ? 'c-red' : '');
+    return `${fmtPct(ht)} <em>(HT)</em> → <span class="${cls}">${fmtPct(qh)}</span> <em>(QH)</em>`;
   };
-  const covText = readyCount === 0
-    ? '<b title="Đang tính độ phủ">⏳</b>'
-    : `<b title="Hiện trạng">${fmtPct(cov)}</b>${qhValue(cov, covQH)}`
-      + (readyCount < list.length ? ` <span style="color:var(--text-muted);">(đã tính ${readyCount}/${list.length})</span>` : '');
-  const units = list.length === 1
-    ? ` (${list[0].currentUnits || Math.max(1, Math.round(pop / 20000))} đơn vị ở)`
-    : '';
-  const popLabel = city ? 'Tổng dân số' : '<span title="Dân số hiện trạng">Dân số HT</span>';
-  subtitle.innerHTML = `👥 ${popLabel}: <b>${fmtNum(pop)}</b> người${units}`
-    + ` · <span class="bp-swatch" style="background:${CHART_COVERAGE_COLOR};"></span>Độ phủ TB: ${covText}`
-    + ` · <span class="bp-swatch" style="background:${CHART_SCALE_COLOR};"></span>Quy mô TB: <b title="Hiện trạng">${fmtPct(scale)}</b>${qhValue(scale, scaleQH)}`
-    + ` · <span class="bp-swatch" style="background:${CHART_PLAN_UP_COLOR};"></span>QH tăng`
-    + ` <span class="bp-swatch" style="background:${CHART_PLAN_DOWN_COLOR};"></span>QH giảm`;
+  const covValue = readyCount === 0
+    ? ico('clock')
+    : htQh(cov, covQH) + (readyCount < list.length ? ` <em>· ${readyCount}/${list.length}</em>` : '');
+  const covTitle = city
+    ? `Bình quân theo dân số các phường/xã đã tính xong (${readyCount}/${list.length}); hiện trạng → quy hoạch`
+    : 'Độ phủ trung bình 8 nhóm hạ tầng; hiện trạng → quy hoạch';
+  const popHtml = city
+    ? wardStatHtml('Dân số', `${fmtNum(pop)} <em>(HT)</em> → ${fmtNum(CITY_POP_QH)} <em>(QH)</em>`, 'người',
+      'Dân số hiện trạng (tổng 40 phường/xã) → dân số quy hoạch toàn TP (cơ sở tính mật độ QH và trần tổng dân số QH các phường xã)')
+    : wardStatHtml('Dân số HT', fmtNum(pop), `người · ${list[0].currentUnits || Math.max(1, Math.round(pop / 20000))} đơn vị ở`, 'Dân số hiện trạng');
+  box.innerHTML = popHtml
+    + wardStatHtml('Độ phủ TB', covValue, '', covTitle)
+    + wardStatHtml('Quy mô TB', htQh(scale, scaleQH), '', 'Mức đáp ứng quy mô trung bình theo QCVN 01:2026/BXD; hiện trạng → quy hoạch');
 }
 
 function setBottomPanelHeader(wardName) {
@@ -754,6 +761,11 @@ function setBottomPanelHeader(wardName) {
   if (wardView) wardView.style.display = city ? 'none' : 'flex';
   const cityInfo = document.getElementById('cityInfoLine');
   if (cityInfo) cityInfo.style.display = city ? '' : 'none';
+  const legend = document.getElementById('bpChartLegend');
+  if (legend) {
+    renderChartLegend();
+    legend.style.display = chartView && chartView.style.display !== 'none' ? '' : 'none';
+  }
 }
 
 // Dòng chỉ tiêu toàn thành phố (cùng dạng dòng chỉ tiêu phường): tổng diện tích, mật độ dân số, mật độ đường
@@ -783,11 +795,11 @@ function renderCityInfoLine() {
   const urbanQH = urbanRate(urbanPopQH, popQH);
   const over = popQH - CITY_POP_QH;
   const wardsQHHtml = over > 0
-    ? `<span style="color:var(--accent-red);">⚠ ${fmtNum(popQH)}</span>`
+    ? `<span class="c-red">${ico('alert')}${fmtNum(popQH)}</span>`
     : fmtNum(popQH);
   el.innerHTML = wardStatHtml('Diện tích', fmtArea(areaKm2), 'km²', `Tổng diện tích tự nhiên ${list.length} phường/xã`)
-    + wardStatHtml('Dân số QH toàn TP', fmtNum(CITY_POP_QH), 'người', 'Dân số quy hoạch TP. Huế: cơ sở tính mật độ QH toàn TP và trần tổng dân số QH các phường xã')
-    + wardStatHtml(`Tổng DS QH ${list.length} phường/xã`, wardsQHHtml, 'người',
+    + '<div class="ward-stat-group js-summary"></div>'
+    + wardStatHtml('Tổng DS QH phường/xã', wardsQHHtml, 'người',
       over > 0
         ? `Vượt trần dân số QH toàn TP ${fmtNum(over)} người, cần giảm dân số QH của một số phường/xã`
         : `Còn ${fmtNum(-over)} người trước khi chạm trần ${fmtNum(CITY_POP_QH)}`)
@@ -798,6 +810,7 @@ function renderCityInfoLine() {
       urbanHT === urbanQH ? urbanHT : `${urbanHT} <em>(HT)</em> → ${urbanQH} <em>(QH)</em>`,
       '', `Dân số ${urbanCount} phường (hiện trạng ${fmtNum(urbanPop)} / quy hoạch ${fmtNum(urbanPopQH)} người) chia cho tổng dân số toàn thành phố`)
     + '<div id="cityRoadDensity" class="ward-stat-group"></div>';
+  renderSummaryNote(CITY_NAME);
   fillCityRoadDensity(document.getElementById('cityRoadDensity'), areas);
   checkPopCap();
 }
@@ -814,10 +827,10 @@ export async function renderBottomPanel() {
   const wardView = document.getElementById('wardSummaryView');
   if (state.wardStatsData.length === 0) {
     if (city && tbody) {
-      tbody.innerHTML = "<tr><td colspan='23' style='text-align:center; padding:20px;'>🔄 Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>";
+      tbody.innerHTML = `<tr><td colspan="23" class="st-msg">${ico('clock')}Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>`;
     }
     if (!city && wardView) {
-      wardView.innerHTML = `<div class="rp-empty">⏳ Đang tổng hợp dữ liệu quy chuẩn cho ${escapeHtml(wardName)}...</div>`;
+      wardView.innerHTML = `<div class="rp-empty">${ico('clock')}Đang tổng hợp dữ liệu quy chuẩn cho ${escapeHtml(wardName)}...</div>`;
     }
   }
 
@@ -825,9 +838,9 @@ export async function renderBottomPanel() {
     await ensureWardStats();
   } catch (err) {
     if (seq !== bottomRenderSeq) return;
-    const msg = `❌ ${escapeHtml(err.message || 'Lỗi nạp dữ liệu từ GEE Server.')}`;
-    if (city && tbody) tbody.innerHTML = `<tr><td colspan='23' style='text-align:center; color:var(--accent-red); padding:20px;'>${msg}</td></tr>`;
-    if (!city && wardView) wardView.innerHTML = `<div class="rp-empty" style="color:var(--accent-red);">${msg}</div>`;
+    const msg = `${ico('error')}${escapeHtml(err.message || 'Lỗi nạp dữ liệu từ GEE Server.')}`;
+    if (city && tbody) tbody.innerHTML = `<tr><td colspan="23" class="st-msg c-red">${msg}</td></tr>`;
+    if (!city && wardView) wardView.innerHTML = `<div class="rp-empty c-red">${msg}</div>`;
     return;
   }
   if (seq !== bottomRenderSeq) return;
@@ -863,7 +876,7 @@ export async function exportBottomPanelPdf() {
     margin: 5,
     filename: fileName,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+    html2canvas: { scale: 2, useCORS: true, scrollY: 0, onclone: inlineSpriteIcons },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
   }).save().then(
     () => body.classList.remove('pdf-export'),
@@ -882,6 +895,7 @@ export async function captureMapScreenshot() {
       useCORS: true,
       logging: false,
       backgroundColor: '#0f172a',
+      onclone: inlineSpriteIcons,
       ignoreElements: el => el.classList?.contains('map-toolbar') || el.classList?.contains('leaflet-control-zoom')
     });
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
@@ -944,7 +958,7 @@ function setWardCoverageStatus(wardName, text, color = 'var(--accent-orange)') {
   const statusEl = document.getElementById('wardCoverageStatus');
   if (!statusEl) return;
   statusEl.style.color = color;
-  statusEl.textContent = text;
+  setStatusContent(statusEl, text);
 }
 
 function refreshWardQuotaTable(wardData) {
@@ -998,8 +1012,8 @@ function renderWardSummary(wardData) {
         `${fmtNum(Math.round(popCurrent / areaKm2))} <em>(HT)</em> → <span id="wardDensityQH">${fmtNum(Math.round(popProjected / areaKm2))}</span> <em>(QH)</em>`,
         'người/km²', 'Dân số hiện trạng / quy hoạch chia cho diện tích tự nhiên')
     : '';
-  view.innerHTML = `<div id="wardSummaryCard" style="display:contents;">
-    <div class="ward-info-line">${areaHtml}<div id="wardRoadLen" class="ward-stat-group"></div><div id="wardPopCapWarn" class="ward-stat-group"></div></div>
+  view.innerHTML = `<div id="wardSummaryCard">
+    <div class="ward-info-line"><div class="ward-stat-group js-summary"></div>${areaHtml}<div id="wardRoadLen" class="ward-stat-group"></div><div id="wardPopCapWarn" class="ward-stat-group"></div></div>
     <div id="wardQuotaTableContainer">${buildWardQuotaTableHtml(wardData, popProjected)}</div>
   </div>`;
   document.getElementById('wardSummaryCard').dataset.ward = wardData.Ten_Phuong;
@@ -1007,8 +1021,9 @@ function renderWardSummary(wardData) {
   roadLenEl.dataset.ward = wardData.Ten_Phuong;
   roadLenEl.dataset.area = String(areaKm2);
   fillWardRoadLengths(wardData.Ten_Phuong);
+  renderSummaryNote(wardData.Ten_Phuong);
 
-  // Dân số hiện trạng / độ phủ / quy mô đã có ở #bpSubtitle, dòng tiêu đề chỉ bổ sung dân số quy hoạch
+  // Dân số HT / độ phủ / quy mô nằm ở dòng chỉ số; dòng tiêu đề chỉ giữ ô nhập dân số quy hoạch
   const planEl = document.getElementById('bpWardPlan');
   if (planEl) {
     planEl.innerHTML = `· <label for="wardPopInput" title="Dân số quy hoạch">Dân số QH</label>:
@@ -1050,7 +1065,7 @@ function checkPopCap(wardData = null) {
     const room = Math.max(0, CITY_POP_QH - (total - planPopOf(wardData)));
     warnEl.innerHTML = wardStatHtml(`Tổng DS QH ${state.wardStatsData.length} phường/xã`,
       over > 0
-        ? `<span style="color:var(--accent-red);">⚠ ${fmtNum(total)} (vượt ${fmtNum(over)})</span>`
+        ? `<span class="c-red">${ico('alert')}${fmtNum(total)} (vượt ${fmtNum(over)})</span>`
         : `${fmtNum(total)} <em>/ ${fmtNum(CITY_POP_QH)}</em>`,
       'người',
       `Trần dân số QH toàn TP ${fmtNum(CITY_POP_QH)} người. Phường/xã này tối đa ${fmtNum(room)} người để tổng không vượt trần`);
@@ -1086,14 +1101,14 @@ function minSizeBadgeHtml(sub) {
   const size = Number(sub.size || 0);
   const title = `QCVN 01:2026/BXD ${escapeHtml(sub.minSizeRef || '')}: tối thiểu ${fmtNum(min)} m²/công trình`;
   if (!(size > 0)) return ` <span class="min-size-note" title="${title}">(chưa có diện tích)</span>`;
-  return size < min ? ` <span class="min-size-warn" title="${title}">⚠ &lt; ${fmtNum(min)} m²</span>` : '';
+  return size < min ? ` <span class="min-size-warn" title="${title}">${ico('alert')}&lt; ${fmtNum(min)} m²</span>` : '';
 }
 
 function minSizeSummaryHtml(subItems) {
   const below = subItems.filter(s => Number(s.minSize) > 0 && Number(s.size) > 0 && Number(s.size) < Number(s.minSize)).length;
   if (!below) return '';
   const checked = subItems.filter(s => Number(s.minSize) > 0 && Number(s.size) > 0).length;
-  return ` <span class="min-size-warn" title="Số công trình nhỏ hơn quy mô tối thiểu theo QCVN 01:2026/BXD">⚠ ${below}/${checked} dưới QM tối thiểu</span>`;
+  return ` <span class="min-size-warn" title="Số công trình nhỏ hơn quy mô tối thiểu theo QCVN 01:2026/BXD">${ico('alert')}${below}/${checked} dưới QM tối thiểu</span>`;
 }
 
 const RADIUS_WARN_TITLE = 'Cột BanKinh trong Sheet khác bán kính chuẩn cấp đơn vị ở của phường/xã chứa công trình (theo tọa độ): phường 1.000 m, xã 2.000 m, công viên 400 m, bãi đỗ xe 500 m. Bản đồ, heatmap và độ phủ luôn dùng bán kính chuẩn; cột BanKinh chỉ để đối chiếu.';
@@ -1102,12 +1117,12 @@ function radiusCellHtml(sub) {
   const radiusVal = Number(sub.radius || 0);
   if (!(radiusVal > 0)) return '-';
   if (sub.sheetRadius == null) return `${fmtNum(radiusVal)} m`;
-  return `${fmtNum(radiusVal)} m<br><span class="min-size-warn" title="${RADIUS_WARN_TITLE} Sửa cột BanKinh thành ${fmtNum(radiusVal)}.">⚠ Sheet ${fmtNum(sub.sheetRadius)} m</span>`;
+  return `${fmtNum(radiusVal)} m<br><span class="min-size-warn" title="${RADIUS_WARN_TITLE} Sửa cột BanKinh thành ${fmtNum(radiusVal)}.">${ico('alert')}Sheet ${fmtNum(sub.sheetRadius)} m</span>`;
 }
 
 function radiusSummaryHtml(subItems) {
   const wrong = subItems.filter(s => s.sheetRadius != null).length;
-  return wrong ? ` <span class="min-size-warn" title="${RADIUS_WARN_TITLE}">⚠ ${wrong} BK Sheet lệch chuẩn</span>` : '';
+  return wrong ? ` <span class="min-size-warn" title="${RADIUS_WARN_TITLE}">${ico('alert')}${wrong} BK Sheet lệch chuẩn</span>` : '';
 }
 
 // Mỗi đơn vị ở phát triển mới: ≥ 1 công viên ≥ 5.000 m² hoặc 2 công viên ≥ 2.500 m² (Mục 2.2.3.2)
@@ -1116,14 +1131,14 @@ function parkRuleHtml(subItems, rule, totalUnits) {
   const medium = subItems.filter(s => Number(s.size) >= rule.medium && Number(s.size) < rule.large).length;
   const ok = Math.min(totalUnits, large + Math.floor(medium / 2));
   const title = `QCVN 01:2026/BXD Mục 2.2.3.2: mỗi đơn vị ở phát triển mới có ≥ 1 công viên ≥ ${fmtNum(rule.large)} m² hoặc 2 công viên ≥ ${fmtNum(rule.medium)} m²`;
-  return `<span title="${title}" style="color:${ok >= totalUnits ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">${ok}/${totalUnits} ĐVỞ đạt QM</span>`;
+  return `<b title="${title}" class="${ok >= totalUnits ? 'c-green' : 'c-red'}">${ok}/${totalUnits} ĐVỞ đạt QM</b>`;
 }
 
 function zoomLinkHtml(item, fallbackName = 'Công trình') {
   const name = escapeHtml(item.name || fallbackName);
   const lat = Number(item.lat), lng = Number(item.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return `<span>${name}</span>`;
-  return `<button type="button" class="link-btn" data-action="zoom" data-lat="${lat}" data-lng="${lng}" data-name="${name}" style="color:var(--accent-cyan);">${name}</button>`;
+  return `<button type="button" class="link-btn" data-action="zoom" data-lat="${lat}" data-lng="${lng}" data-name="${name}">${name}</button>`;
 }
 
 function toggleBtnHtml(sectionId) {
@@ -1132,17 +1147,17 @@ function toggleBtnHtml(sectionId) {
 
 function scaleCellHtml(currentArea, reqArea) {
   const pct = reqArea > 0 ? Math.min(100, Math.round((currentArea / reqArea) * 100)) : 100;
-  return `<span style="color:${pct >= 100 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">Đạt ${pct}%</span>`;
+  return `<b class="${pct >= 100 ? 'c-green' : 'c-red'}">Đạt ${pct}%</b>`;
 }
 
 function coverageCellHtml(wardData, code) {
   const pct = getCoveragePct(wardData, code);
   if (pct == null) return PENDING_CELL;
-  return `<span style="color:${pct >= 100 ? 'var(--accent-green)' : 'var(--accent-orange)'}; font-weight:bold;">${fmtPct(pct)}</span>`;
+  return `<b class="${pct >= 100 ? 'c-green' : 'c-orange'}">${fmtPct(pct)}</b>`;
 }
 
 function countCellHtml(count, totalUnits) {
-  return `<span style="color:${count >= totalUnits ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight:bold;">${count}/${totalUnits} cơ sở</span>`;
+  return `<b class="${count >= totalUnits ? 'c-green' : 'c-red'}">${count}/${totalUnits} cơ sở</b>`;
 }
 
 function buildWardQuotaTableHtml(wardData, projPop) {
@@ -1151,26 +1166,27 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   const totalUnits = wardData.projectedUnits || Math.max(1, Math.round(projPop / 20000));
   const parts = [];
 
-  const subItemRows = (sectionId, subItems, padLeft = 14) => {
+  const subItemRows = (sectionId, subItems, deep = false) => {
     parts.push(`<tbody id="${sectionId}" style="display:none;">`);
     subItems.forEach(sub => {
-      parts.push(`<tr style="color:var(--text-muted); font-size:9.5px;">
-        <td style="text-align:center;">-</td>
-        <td style="text-align:left; padding-left:${padLeft}px;">${zoomLinkHtml(sub)}${minSizeBadgeHtml(sub)}</td>
-        <td style="text-align:right;">${fmtNum(sub.size)} m²</td>
-        <td style="text-align:center;">-</td>
-        <td style="text-align:right;">-</td>
-        <td style="text-align:center;">-</td>
-        <td style="text-align:center;">-</td>
-        <td style="text-align:center; color:var(--accent-cyan); font-weight:bold;">${radiusCellHtml(sub)}</td>
+      parts.push(`<tr class="wt-sub${deep ? ' wt-deep' : ''}">
+        <td>-</td>
+        <td>${zoomLinkHtml(sub)}${minSizeBadgeHtml(sub)}</td>
+        <td>${fmtNum(sub.size)} m²</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td class="wt-radius">${radiusCellHtml(sub)}</td>
       </tr>`);
     });
     parts.push(`</tbody>`);
   };
 
-  const sectionHeader = (letter, color, bg, title) => parts.push(`<tr style="background:${bg}; font-weight:bold;">
-    <td style="text-align:center; color:${color};">${letter}</td>
-    <td colspan="7" style="color:${color}; text-align:left; padding-left:8px;">${title}</td>
+  // tone: a (cyan) / b (green) / c (red) / d (orange) — màu tiêu đề nhóm A–D
+  const sectionHeader = (letter, tone, title) => parts.push(`<tr class="wt-section wt-${tone}">
+    <td>${letter}</td>
+    <td colspan="7">${title}</td>
   </tr>`);
 
   const countHtmlOf = (subItems, target) => (target
@@ -1183,36 +1199,28 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     const subItems = (node && node.subItems) || [];
     const required = hasQuota(quota);
     const reqArea = required ? Math.round(Number(quota) * projPop) : 0;
-    parts.push(`<tr>
-      <td style="text-align:center; font-weight:bold;">${stt}</td>
-      <td style="text-align:left; font-weight:bold;">${escapeHtml(label)} ${subItems.length ? toggleBtnHtml(sectionId) : ''}${minSizeSummaryHtml(subItems)}${radiusSummaryHtml(subItems)}</td>
-      <td style="text-align:right; font-weight:bold;">${fmtNum(currentArea)} m²</td>
-      <td style="text-align:center;">${required ? quotaText(quota) : NOT_REQUIRED_DASH}</td>
-      <td style="text-align:right; color:var(--accent-cyan);">${required ? `${fmtNum(reqArea)} m²` : NOT_REQUIRED_DASH}</td>
-      <td style="text-align:center;">${countHtmlOf(subItems, countTarget)}${extraCount}</td>
-      <td style="text-align:center;">${required ? scaleCellHtml(currentArea, reqArea) : `<span style="color:var(--text-muted);" title="${NOT_REQUIRED_TITLE}">Không QĐ</span>`}</td>
-      <td style="text-align:center;">${coverageCellHtml(wardData, code)}</td>
+    parts.push(`<tr class="wt-main">
+      <td>${stt}</td>
+      <td>${escapeHtml(label)} ${subItems.length ? toggleBtnHtml(sectionId) : ''}${minSizeSummaryHtml(subItems)}${radiusSummaryHtml(subItems)}</td>
+      <td>${fmtNum(currentArea)} m²</td>
+      <td>${required ? quotaText(quota) : NOT_REQUIRED_DASH}</td>
+      <td>${required ? `${fmtNum(reqArea)} m²` : NOT_REQUIRED_DASH}</td>
+      <td>${countHtmlOf(subItems, countTarget)}${extraCount}</td>
+      <td>${required ? scaleCellHtml(currentArea, reqArea) : `<span class="c-muted" title="${NOT_REQUIRED_TITLE}">Không QĐ</span>`}</td>
+      <td>${coverageCellHtml(wardData, code)}</td>
     </tr>`);
-    if (subItems.length) subItemRows(sectionId, subItems, 14);
+    if (subItems.length) subItemRows(sectionId, subItems);
   };
 
-  parts.push(`<div class="ward-table-scroll-container"><table class="ward-table" style="font-size:9.5px;">
+  parts.push(`<div class="ward-table-scroll-container"><table class="ward-table">
+    <colgroup><col style="width:5%"><col style="width:31%"><col style="width:12%"><col style="width:8%"><col style="width:11%"><col style="width:9%"><col style="width:12%"><col style="width:12%"></colgroup>
     <thead>
-      <tr>
-        <th style="width:5%; text-align:center;">STT</th>
-        <th style="width:31%;">Loại hạ tầng</th>
-        <th style="width:12%;">Diện tích</th>
-        <th style="width:8%;">Chỉ tiêu</th>
-        <th style="width:11%;">Nhu cầu DT</th>
-        <th style="width:9%; text-align:center;">Số lượng</th>
-        <th style="width:12%; text-align:center;">Quy mô</th>
-        <th style="width:12%; text-align:center;">Độ phủ</th>
-      </tr>
+      <tr><th>STT</th><th>Loại hạ tầng</th><th>Diện tích</th><th>Chỉ tiêu</th><th>Nhu cầu DT</th><th>Số lượng</th><th>Quy mô</th><th>Độ phủ</th></tr>
     </thead>
     <tbody>`);
 
   // A / CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ
-  sectionHeader('A', 'var(--accent-cyan)', 'rgba(56, 189, 248, 0.18)', 'CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ');
+  sectionHeader('A', 'a', 'CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ');
   const urbanCodes = { THPT: 'THPT', YT_DT: '6-YT_DT', VH_DT: '7-VH_DT', TM_DT: '8-TM_DT', CV_DT: '1-CV_DT', BDX_DT: '2-BDX_DT' };
   let urbanIdx = 1;
   Object.keys(urbanCodes).forEach(key => {
@@ -1223,7 +1231,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
   // B / CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở
   const isUrbanProfile = !wardData.profile || wardData.profile === 'DT';
-  sectionHeader('B', 'var(--accent-green)', 'rgba(74, 222, 128, 0.18)', `CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở (Quy hoạch: ${totalUnits} đơn vị ở)`);
+  sectionHeader('B', 'b', `CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở (Quy hoạch: ${totalUnits} đơn vị ở)`);
   const unitSchools = [
     { key: "3-MN", label: "Trường Mầm non" },
     { key: "4-TH", label: "Trường Tiểu học" },
@@ -1246,15 +1254,15 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   const dvccArea = dvccKeys.reduce((s, c) => s + Number(unitRes[c.key]?.currentArea || 0), 0);
   const dvccCount = dvccKeys.reduce((s, c) => s + (unitRes[c.key]?.subItems?.length || 0), 0);
   const dvccReq = dvccRequired ? Math.round(Number(dvccQuota) * projPop) : 0;
-  parts.push(`<tr>
-    <td style="text-align:center; font-weight:bold;">${unitIdx}</td>
-    <td style="text-align:left; font-weight:bold; color:var(--text-main);">Dịch vụ công cộng khác đơn vị ở${dvccRequired ? '' : ' <span style="color:var(--text-muted); font-weight:normal;">(theo số cơ sở)</span>'}</td>
-    <td style="text-align:right; font-weight:bold;">${fmtNum(dvccArea)} m²</td>
-    <td style="text-align:center;">${dvccRequired ? quotaText(dvccQuota) : NOT_REQUIRED_DASH}</td>
-    <td style="text-align:right; color:var(--accent-cyan);">${dvccRequired ? `${fmtNum(dvccReq)} m²` : NOT_REQUIRED_DASH}</td>
-    <td style="text-align:center;">${isUrbanProfile ? countCellHtml(dvccCount, totalUnits) : `${dvccCount} cơ sở`}</td>
-    <td style="text-align:center;">${dvccRequired ? scaleCellHtml(dvccArea, dvccReq) : '-'}</td>
-    <td style="text-align:center;">-</td>
+  parts.push(`<tr class="wt-main">
+    <td>${unitIdx}</td>
+    <td>Dịch vụ công cộng khác đơn vị ở${dvccRequired ? '' : ' <span class="wt-light">(theo số cơ sở)</span>'}</td>
+    <td>${fmtNum(dvccArea)} m²</td>
+    <td>${dvccRequired ? quotaText(dvccQuota) : NOT_REQUIRED_DASH}</td>
+    <td>${dvccRequired ? `${fmtNum(dvccReq)} m²` : NOT_REQUIRED_DASH}</td>
+    <td>${isUrbanProfile ? countCellHtml(dvccCount, totalUnits) : `${dvccCount} cơ sở`}</td>
+    <td>${dvccRequired ? scaleCellHtml(dvccArea, dvccReq) : '-'}</td>
+    <td>-</td>
   </tr>`);
 
   dvccKeys.forEach(comp => {
@@ -1262,17 +1270,17 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     const subItems = (node && node.subItems) || [];
     const sectionId = `comp_sub_${comp.key}`;
     const target = countTargetOf(wardData, comp.key, projPop) ?? (isUrbanProfile ? totalUnits : null);
-    parts.push(`<tr>
-      <td style="text-align:center; font-weight:600; font-size:9px;">${comp.stt}</td>
-      <td style="text-align:left; padding-left:14px; font-weight:500;">${comp.label} ${subItems.length ? toggleBtnHtml(sectionId) : ''}${minSizeSummaryHtml(subItems)}${radiusSummaryHtml(subItems)}</td>
-      <td style="text-align:right;">${fmtNum(node ? node.currentArea : 0)} m²</td>
-      <td style="text-align:center;">-</td>
-      <td style="text-align:right;">-</td>
-      <td style="text-align:center;">${countHtmlOf(subItems, target)}</td>
-      <td style="text-align:center;">-</td>
-      <td style="text-align:center;">${coverageCellHtml(wardData, comp.code)}</td>
+    parts.push(`<tr class="wt-comp">
+      <td>${comp.stt}</td>
+      <td>${comp.label} ${subItems.length ? toggleBtnHtml(sectionId) : ''}${minSizeSummaryHtml(subItems)}${radiusSummaryHtml(subItems)}</td>
+      <td>${fmtNum(node ? node.currentArea : 0)} m²</td>
+      <td>-</td>
+      <td>-</td>
+      <td>${countHtmlOf(subItems, target)}</td>
+      <td>-</td>
+      <td>${coverageCellHtml(wardData, comp.code)}</td>
     </tr>`);
-    if (subItems.length) subItemRows(sectionId, subItems, 24);
+    if (subItems.length) subItemRows(sectionId, subItems, true);
   });
   unitIdx++;
 
@@ -1283,15 +1291,15 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     ? Number(allNode.currentArea || 0)
     : ["3-MN", "4-TH", "5-THCS"].reduce((s, k) => s + Number(unitRes[k]?.currentArea || 0), dvccArea);
   const allReq = Math.round(Number(allQuota) * projPop);
-  parts.push(`<tr>
-    <td style="text-align:center; font-weight:bold;">${unitIdx++}</td>
-    <td style="text-align:left; font-weight:bold; color:var(--text-main);" title="QCVN 01:2026/BXD ${isUrbanProfile ? 'Bảng 6' : 'Bảng 28'}">Tổng đất dịch vụ công cộng đơn vị ở (1+2+3+4)</td>
-    <td style="text-align:right; font-weight:bold;">${fmtNum(allArea)} m²</td>
-    <td style="text-align:center;">${quotaText(allQuota)}</td>
-    <td style="text-align:right; color:var(--accent-cyan);">${fmtNum(allReq)} m²</td>
-    <td style="text-align:center;">-</td>
-    <td style="text-align:center;">${scaleCellHtml(allArea, allReq)}</td>
-    <td style="text-align:center;">-</td>
+  parts.push(`<tr class="wt-main">
+    <td>${unitIdx++}</td>
+    <td title="QCVN 01:2026/BXD ${isUrbanProfile ? 'Bảng 6' : 'Bảng 28'}">Tổng đất dịch vụ công cộng đơn vị ở (1+2+3+4)</td>
+    <td>${fmtNum(allArea)} m²</td>
+    <td>${quotaText(allQuota)}</td>
+    <td>${fmtNum(allReq)} m²</td>
+    <td>-</td>
+    <td>${scaleCellHtml(allArea, allReq)}</td>
+    <td>-</td>
   </tr>`);
 
   [
@@ -1309,49 +1317,47 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   });
 
   // C / CÔNG TRÌNH CHƯA DUYỆT (QUY HOẠCH) — nhóm 1–8, TrangThai = FALSE
-  sectionHeader('C', 'var(--accent-red)', 'rgba(248, 113, 113, 0.18)', 'CÔNG TRÌNH CHƯA DUYỆT (QUY HOẠCH)');
+  sectionHeader('C', 'c', 'CÔNG TRÌNH CHƯA DUYỆT (QUY HOẠCH)');
   const pendingList = wardData.pendingItems || [];
   if (pendingList.length > 0) {
     pendingList.forEach((pItem, pIdx) => {
-      const typeNote = pItem.typeLabel ? ` <span style="color:var(--text-muted); font-weight:normal;">(${escapeHtml(pItem.typeLabel)})</span>` : '';
-      parts.push(`<tr style="color:var(--text-main); font-size:9.5px;">
-        <td style="text-align:center; font-weight:bold;">${pIdx + 1}</td>
-        <td style="text-align:left; padding-left:6px; font-weight:bold;">${zoomLinkHtml(pItem)}${typeNote}</td>
-        <td style="text-align:right; font-weight:bold;">${fmtNum(pItem.size)} m²</td>
-        <td colspan="5" style="text-align:left; color:var(--accent-orange); font-weight:500;">
-          Sau khi phê duyệt dự kiến bổ sung <b style="color:var(--accent-green);">${fmtPct(pItem.scaleAddPct)}</b> quy mô, <b style="color:var(--accent-cyan);">${fmtPct(pItem.coverageAddPct)}</b> độ phủ${pItem.coverageMethod === 'estimate' ? ' (ước lượng)' : ''}
+      const typeNote = pItem.typeLabel ? ` <span class="wt-light">(${escapeHtml(pItem.typeLabel)})</span>` : '';
+      parts.push(`<tr class="wt-item">
+        <td>${pIdx + 1}</td>
+        <td>${zoomLinkHtml(pItem)}${typeNote}</td>
+        <td>${fmtNum(pItem.size)} m²</td>
+        <td colspan="5" class="wt-note">
+          Sau khi phê duyệt dự kiến bổ sung <b class="c-green">${fmtPct(pItem.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(pItem.coverageAddPct)}</b> độ phủ${pItem.coverageMethod === 'estimate' ? ' (ước lượng)' : ''}
         </td>
       </tr>`);
     });
   } else {
-    parts.push(`<tr><td style="text-align:center;">-</td><td colspan="7" style="text-align:center; color:var(--text-muted); font-style:italic;">Không có công trình nhóm 1–8 đang chờ duyệt trong phường.</td></tr>`);
+    parts.push(`<tr class="wt-empty"><td>-</td><td colspan="7">Không có công trình nhóm 1–8 đang chờ duyệt trong phường.</td></tr>`);
   }
 
   // D / CÁC CƠ SỞ CHƯA SỬ DỤNG
-  sectionHeader('D', 'var(--accent-orange)', 'rgba(234, 179, 8, 0.18)', 'CÁC CƠ SỞ CHƯA SỬ DỤNG');
+  sectionHeader('D', 'd', 'CÁC CƠ SỞ CHƯA SỬ DỤNG');
   const csdList = wardData.csdItems || [];
   if (csdList.length > 0) {
     csdList.forEach((csd, csdIdx) => {
       const needApprove = csd.needsApproval || !isApproved(csd.status);
-      const needApproveNote = needApprove
-        ? `<div style="color:var(--accent-red); font-weight:bold; font-size:9px; margin-top:1px;">(Cần phê duyệt)</div>`
-        : '';
+      const needApproveNote = needApprove ? `<div class="wt-need-approve">(Cần phê duyệt)</div>` : '';
       const eligibleSugg = (csd.suggestions || []).filter(s => s.status === 'eligible');
       const suggestionHtml = eligibleSugg.length > 0
         ? eligibleSugg.slice(0, 2).map((s, idx) =>
-          `<div style="margin:1px 0;">Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bổ sung <b style="color:var(--accent-green);">${fmtPct(s.scaleAddPct)}</b> quy mô, <b style="color:var(--accent-cyan);">${fmtPct(s.coverageAddPct)}</b> độ phủ${s.coverageMethod === 'estimate' ? ', ước lượng' : ''}).</div>`
+          `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bổ sung <b class="c-green">${fmtPct(s.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(s.coverageAddPct)}</b> độ phủ${s.coverageMethod === 'estimate' ? ', ước lượng' : ''}).</div>`
         ).join('')
-        : `<div style="color:var(--text-muted); font-style:italic;">Chưa có gợi ý phù hợp</div>`;
+        : `<div class="c-muted"><i>Chưa có gợi ý phù hợp</i></div>`;
 
-      parts.push(`<tr style="color:var(--text-main); font-size:9.5px;">
-        <td style="text-align:center; font-weight:bold; vertical-align:top;">${csdIdx + 1}</td>
-        <td style="text-align:left; padding-left:6px; font-weight:bold; vertical-align:top;">${zoomLinkHtml(csd, 'Khu đất chưa sử dụng')}${needApproveNote}</td>
-        <td style="text-align:right; font-weight:bold; vertical-align:top;">${fmtNum(csd.size)} m²</td>
-        <td colspan="5" style="text-align:left; color:var(--accent-orange); font-weight:500; vertical-align:top; line-height:1.35;">${suggestionHtml}</td>
+      parts.push(`<tr class="wt-item wt-top">
+        <td>${csdIdx + 1}</td>
+        <td>${zoomLinkHtml(csd, 'Khu đất chưa sử dụng')}${needApproveNote}</td>
+        <td>${fmtNum(csd.size)} m²</td>
+        <td colspan="5" class="wt-note">${suggestionHtml}</td>
       </tr>`);
     });
   } else {
-    parts.push(`<tr><td style="text-align:center;">-</td><td colspan="7" style="text-align:center; color:var(--text-muted); font-style:italic;">Không có cơ sở chưa sử dụng nào nằm trong ranh giới phường.</td></tr>`);
+    parts.push(`<tr class="wt-empty"><td>-</td><td colspan="7">Không có cơ sở chưa sử dụng nào nằm trong ranh giới phường.</td></tr>`);
   }
 
   parts.push(`</tbody></table></div>`);

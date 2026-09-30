@@ -1,6 +1,6 @@
 // Khớp thủ công loại hạ tầng khi file không đặt tên layer / thuộc tính theo quy ước mã loại:
 // người dùng chọn trường nhận diện (Layer, Folder, thuộc tính...), rồi gán từng giá trị tìm được với 1 loại hạ tầng.
-import { escapeHtml } from './utils.js';
+import { escapeHtml, ico } from './utils.js';
 import { layerToType, tt16Layer } from './cadImport.js';
 
 // Mã loại cho ô chọn (khớp LAYER_PREFIXES; cấp đơn vị ở dùng mã gốc, cấp đô thị thêm _DT)
@@ -167,7 +167,7 @@ export function manualMappingHtml(mapping) {
   }).join('');
   const more = mapping.values.length - shown.length;
   return `<div class="cad-map">
-    <div class="cad-map-head">🔧 Khớp thủ công <b>${mapping.unknownCount}</b> đối tượng chưa nhận diện được loại</div>
+    <div class="cad-map-head">${ico('tool')}Khớp thủ công <b>${mapping.unknownCount}</b> đối tượng chưa nhận diện được loại</div>
     <label class="cad-map-field">Nhận diện theo <select id="cadMapField">${fieldOpts}</select></label>
     <div class="cad-map-list">${rows}${more > 0 ? `<div class="cad-more">… còn ${more} giá trị khác (bỏ qua) — nên chọn trường có ít giá trị hơn</div>` : ''}</div>
     <div class="cad-map-foot"><span>Đã khớp ${mappedLots}/${mapping.unknownCount} đối tượng${mapping.suggested.size ? ` · <b>${mapping.suggested.size}</b> gợi ý cần kiểm tra` : ''}</span>${mapping.codes.size ? '<button type="button" id="cadMapClear" class="cad-clear">Bỏ khớp</button>' : ''}</div>

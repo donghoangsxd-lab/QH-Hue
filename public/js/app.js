@@ -1,5 +1,5 @@
-import { state, bumpDataVersion } from './state.js';
-import { geeApi } from './api.js';
+import { state, bumpDataVersion, BUFFER_COLORS, ICON_GROUP_KEYS } from './state.js';
+import { geeApi, infraListUrl, markDataWritten } from './api.js';
 import {
   initMap,
   toggleLayer,
@@ -12,7 +12,7 @@ import {
   setHeatOpacity,
   handleInspectPointClick,
   loadBoundaryLayer,
-  loadPopulationLayer,
+  ensurePopulationLayer,
   loadCadParcels,
   setParcelsVisible,
   flyToVisible,
@@ -36,7 +36,7 @@ import {
   startBackgroundCoverageFill
 } from './uiComponents.js';
 import { initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleCompareMode } from './planMap.js';
-import { escapeHtml, showToast } from './utils.js';
+import { escapeHtml, setStatusContent, showToast } from './utils.js';
 import { initCadImport } from './cadImportUi.js';
 import { initWardCheck, refreshWardCheck } from './wardCheck.js';
 import { initWardRoads } from './wardRoads.js';
@@ -45,6 +45,17 @@ import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 
 const CITY_NAME = "Thành phố Huế";
+
+// Ô màu theo loại hạ tầng ở danh sách lớp và chú giải, cùng màu chấm trên bản đồ khi zoom xa (1 nguồn: BUFFER_COLORS)
+function addTypeSwatches() {
+  const swatch = (type) => `<i class="layer-swatch" style="background:${BUFFER_COLORS[type]};"></i>`;
+  Object.entries(ICON_GROUP_KEYS).forEach(([type, key]) => {
+    document.querySelector(`label[for="chk_${key}"]`)?.insertAdjacentHTML('afterbegin', swatch(type));
+  });
+  document.querySelectorAll('#tabLegend .legend-row[data-type]').forEach(row => {
+    row.querySelector('.legend-icon')?.insertAdjacentHTML('afterend', swatch(row.dataset.type));
+  });
+}
 const RADIUS_MIN = 50;
 const RADIUS_MAX = 5000;
 // Bán kính mặc định cho điểm vừa thêm (khớp config/constants.js: cấp đô thị 2000 m, cấp đơn vị ở theo loại)
@@ -59,11 +70,11 @@ function setStatus(text, color) {
   const el = document.getElementById('statusMsg');
   if (!el) return;
   el.style.color = color;
-  el.textContent = text;
+  setStatusContent(el, text);
 }
 
 async function loadInfraData() {
-  const res = await fetch(geeApi());
+  const res = await fetch(infraListUrl());
   if (!res.ok) throw new Error(`Lỗi máy chủ (${res.status})`);
   const data = await res.json();
   state.rawDataList = data.rawDataList || [];
@@ -233,10 +244,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     planLayers.pop.eachLayer(l => l.setOpacity && l.setOpacity(val));
   });
 
+  addTypeSwatches();
   const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'heat'];
   layerCheckboxes.forEach(key => {
     document.getElementById(`chk_${key}`)?.addEventListener('change', (e) => {
       const targetLayer = key === 'bound' ? 'boundary' : key === 'heat' ? 'heatmap' : key;
+      if (key === 'pop' && e.target.checked) ensurePopulationLayer();
       toggleLayer(targetLayer, e.target.checked);
     });
   });
@@ -304,6 +317,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     submitting = true;
     setStatus("🚀 Đang gửi đề xuất...", "var(--accent-orange)");
     try {
+      markDataWritten();
       const res = await fetch(geeApi('action=addPoint'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -400,13 +414,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   try {
-    setProgress(30);
-    await Promise.all([loadBoundaryLayer(), loadPopulationLayer()]);
-    renderPlanBoundaries();
-    setProgress(60);
+    setProgress(20);
+    // Gọi song song: ranh giới (CDN cache), danh sách công trình, thống kê phường; heatmap chờ danh sách công trình
+    const boundaryReady = loadBoundaryLayer().then(renderPlanBoundaries);
+    const statsReady = ensureWardStats();
+    statsReady.catch(() => {});
+    if (document.getElementById('chk_pop')?.checked) ensurePopulationLayer();
 
     await loadInfraData();
+    setProgress(60);
+    renderGroupedPoints();
+    loadCadParcels();
+    const heatReady = refreshHeatmapOnly();
 
+    Promise.all([statsReady, boundaryReady])
+      .then(() => startBackgroundCoverageFill())
+      .catch(err => console.warn("Không khởi động tính độ phủ nền:", err));
+
+    await boundaryReady;
     const wardSelector = document.getElementById('wardSelector');
     if (wardSelector) {
       wardSelector.innerHTML = "";
@@ -430,17 +455,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     setProgress(90);
-    renderGroupedPoints();
     renderBottomPanel();
-    loadCadParcels();
     refreshWardCheck();
 
-    // Chạy ngầm tính độ phủ (dân số lớn → nhỏ), ghi nhớ theo chữ ký dữ liệu để lần sau dùng lại
-    ensureWardStats()
-      .then(() => startBackgroundCoverageFill())
-      .catch(err => console.warn("Không khởi động tính độ phủ nền:", err));
-
-    await refreshHeatmapOnly();
+    await heatReady;
     setProgress(100);
     setTimeout(() => {
       const progressRow = document.querySelector('.rp-progress');

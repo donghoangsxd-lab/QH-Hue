@@ -1786,6 +1786,8 @@ module.exports = async (req, res) => {
     }
 
     const planDataList = allDataList.filter(it => it.planChange === 'new');
+    // CDN giữ 30 s (tránh khởi động nguội GEE mỗi lượt mở trang); fresh = client vừa ghi dữ liệu → bỏ qua CDN
+    res.setHeader('Cache-Control', req.query.fresh ? 'no-store' : 'public, max-age=0, s-maxage=30, stale-while-revalidate=120');
     return res.status(200).json({ rawDataList, planDataList });
 
   } catch (err) {

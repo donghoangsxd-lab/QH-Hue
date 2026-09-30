@@ -1,6 +1,8 @@
 // Ký hiệu ranh lô theo TT 16/2025/TT-BXD (Phụ lục I, Mục 4 – QHPK 1/2.000, 1/5.000): màu theo mã ACI của bảng + hoa văn vẽ gần đúng.
 // Viền: hiện trạng (HT_) mảnh; quy hoạch đợt đầu (QHDD_) đậm liền; quy hoạch dài hạn (QHDH_) đậm nét đứt.
 
+import { ico } from './utils.js';
+
 // color: màu ACI (nền + nét); ink: màu nét hoa văn / viền khi màu ACI khó nhìn trên ảnh vệ tinh; edge: màu viền riêng
 export const TT16_STYLES = {
   "1-CV": { label: 'Cây xanh sử dụng công cộng', layer: 'DAT_HTXH_CayxanhCC', aci: 72, color: '#66cc00', pattern: 'dots' },
@@ -121,13 +123,13 @@ export function renderTt16Legend(container) {
     return `<div class="tt16-row" title="${s.layer} · màu ACI ${s.aci}">
       <i class="tt16-swatch" style="${bg}border-color:${s.edge || s.ink || s.color};"></i><span>${s.label}</span><small>${s.aci}</small></div>`;
   }).join('');
-  container.innerHTML = `
-    <div class="tt16-title">📐 Ranh lô đất <small>(ký hiệu TT 16/2025/TT-BXD)</small></div>
+  container.innerHTML = `<details class="fold">
+    <summary class="tt16-title">${ico('parcel')}Ranh lô đất <small>(ký hiệu TT 16/2025/TT-BXD)</small></summary>
     ${rows}
     <div class="tt16-borders">
       <span><i class="tt16-line"></i>Hiện trạng</span>
       <span><i class="tt16-line thick"></i>QH đợt đầu</span>
       <span><i class="tt16-line thick dashed"></i>QH dài hạn</span>
     </div>
-    <div class="tt16-note">Phóng to mức 15–16 hiện màu nền, mức 17–18 hiện hoa văn.</div>`;
+    <div class="tt16-note">Zoom 15–16: màu nền · 17–18: hoa văn</div></details>`;
 }

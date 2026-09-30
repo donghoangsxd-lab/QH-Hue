@@ -4,19 +4,71 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bản đồ Phân tích Hạ tầng Đô thị TP. Huế (Headless GIS)</title>
-  <!-- Thư viện ghim phiên bản + SRI; html2pdf / html2canvas chỉ tải khi xuất PDF / chụp ảnh (public/js/utils.js) -->
+  <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
+  <link rel="preconnect" href="https://earthengine.googleapis.com" crossorigin>
+  <!-- Thư viện ghim phiên bản + SRI; html2pdf / html2canvas chỉ tải khi xuất PDF / chụp ảnh (public/js/utils.js).
+       defer giữ thứ tự chạy (Leaflet → Chart → Turf → app.js module) nhưng không chặn dựng trang -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"
     integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
+  <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="i-compare" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/><path d="M12 4h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7z" fill="currentColor" fill-opacity=".3" stroke="none"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4.5"/><path d="M11.2 11.8 20 3M16.5 6.5l3 3M18.5 4.5l2 2"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5z"/><path d="m2 12.5 10 5 10-5"/><path d="m2 17 10 5 10-5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></symbol>
+    <symbol id="i-area" viewBox="0 0 24 24"><path d="M5 19 3.5 8.5 12 3.5l8.5 5L19 19z" fill="currentColor" fill-opacity=".2"/><circle cx="5" cy="19" r="1.4" fill="currentColor"/><circle cx="19" cy="19" r="1.4" fill="currentColor"/><circle cx="12" cy="3.5" r="1.4" fill="currentColor"/></symbol>
+    <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7.5 12.5 2 2M10.5 9.5l2 2M13.5 6.5l2 2"/></symbol>
+    <symbol id="i-inspect" viewBox="0 0 24 24"><path d="m4 3 7 17 2.5-7.5L21 10z"/><path d="m14 14 6 6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19M9 7h6"/></symbol>
+    <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m6 7 5 5-5 5M13 7l5 5-5 5"/></symbol>
+    <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="m18 7-5 5 5 5M11 7l-5 5 5 5"/></symbol>
+    <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 14.8h18M9 9.5V20M15 9.5V20"/></symbol>
+    <symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="9" rx="1.5"/><path d="M7 14h10v7H7z"/></symbol>
+    <symbol id="i-maximize" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-minimize" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
+    <symbol id="i-flip" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></symbol>
+    <symbol id="i-parcel" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 2.4"/><path d="M4 12h16M12 4v16" stroke-opacity=".45"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 6"/></symbol>
+    <symbol id="i-road" viewBox="0 0 24 24"><path d="M8 3 4 21M16 3l4 18M12 4v3M12 10.5v3M12 17v3"/></symbol>
+    <symbol id="i-heat" viewBox="0 0 24 24"><path d="M12 22c4 0 7-2.7 7-6.8 0-3.2-2-5.7-3.6-7.4-.3 2-1.3 3.3-2.6 3.8C13.5 7.5 12 4.5 9.5 2.5 9.6 6 5 9 5 15.2 5 19.3 8 22 12 22z"/></symbol>
+    <symbol id="i-radius" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-dasharray="3 2.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 12h9"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></symbol>
+    <symbol id="i-tool" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.4-3.4a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 10 14"/><path d="m21 3-7 18-4-7-7-4z"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H16l4 4v11.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z"/><path d="M8 3v5h7V3M7 20v-6h10v6"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M3 12h18"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 4a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17.2v.1"/></symbol>
+    <symbol id="i-error" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8v.1"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.2 1 2.1h5c0-.9.4-1.7 1-2.1A6 6 0 0 0 12 3z"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  </svg>
 
   <!-- VÙNG BẢN ĐỒ (co giãn theo panel phải và panel dưới) -->
   <div id="mapArea">
@@ -27,34 +79,34 @@
     <div id="swipeDivider" title="Kéo (hoặc dùng phím ← →) để so sánh" tabindex="0" role="separator"
       aria-orientation="vertical" aria-label="Thanh trượt so sánh hiện trạng và quy hoạch"
       aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
-      <span class="swipe-label swipe-label-left">◧ HIỆN TRẠNG HẠ TẦNG</span>
-      <span class="swipe-handle">⟷</span>
-      <span class="swipe-label swipe-label-right">QUY HOẠCH HẠ TẦNG ◨</span>
+      <span class="swipe-label swipe-label-left">HIỆN TRẠNG HẠ TẦNG</span>
+      <span class="swipe-handle"><svg class="ico"><use href="#i-swap"/></svg></span>
+      <span class="swipe-label swipe-label-right">QUY HOẠCH HẠ TẦNG</span>
     </div>
 
     <!-- THANH CÔNG CỤ DỌC CẠNH TRÁI BẢN ĐỒ -->
     <div class="map-toolbar" role="toolbar" aria-label="Công cụ bản đồ" aria-orientation="vertical">
-      <button type="button" class="ui-btn-format" id="btnToggleCompare" title="So sánh Hiện trạng / Quy hoạch (chia đôi màn hình)" aria-label="So sánh hiện trạng và quy hoạch" aria-pressed="false">◧</button>
-      <button type="button" class="ui-btn-format" id="btnAuth" title="Đăng nhập quản trị" aria-label="Đăng nhập quản trị">🔑</button>
-      <button type="button" class="ui-btn-format" id="btnToggleSidebar" title="Lớp dữ liệu" aria-label="Lớp dữ liệu">⚙️</button>
-      <button type="button" class="ui-btn-format" id="btnToggleAllIcons" title="Ẩn toàn bộ icon" aria-label="Ẩn/hiện toàn bộ icon" aria-pressed="false">👁️</button>
-      <button type="button" class="ui-btn-format" id="btnLocateGPS" title="Định vị vị trí GPS của bạn" aria-label="Định vị GPS">📍</button>
-      <button type="button" class="ui-btn-format" id="btnScreenshot" title="Chụp ảnh bản đồ (lưu PNG)" aria-label="Chụp ảnh bản đồ">📸</button>
-      <button type="button" class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích" aria-label="Đo diện tích">📐</button>
-      <button type="button" class="ui-btn-format" id="btnMeasureDist" title="Đo chiều dài" aria-label="Đo chiều dài">📏</button>
-      <button type="button" class="ui-btn-format" id="btnInspectMode" title="Bật chế độ tra cứu: click lên bản đồ để xem hạ tầng tiếp cận tại vị trí" aria-label="Chế độ tra cứu" aria-pressed="false">🖱️</button>
+      <button type="button" class="ui-btn-format" id="btnToggleCompare" title="So sánh Hiện trạng / Quy hoạch (chia đôi màn hình)" aria-label="So sánh hiện trạng và quy hoạch" aria-pressed="false"><svg class="ico"><use href="#i-compare"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnAuth" title="Đăng nhập quản trị" aria-label="Đăng nhập quản trị"><svg class="ico"><use href="#i-key"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnToggleSidebar" title="Lớp dữ liệu" aria-label="Lớp dữ liệu"><svg class="ico"><use href="#i-layers"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnToggleAllIcons" title="Ẩn toàn bộ icon" aria-label="Ẩn/hiện toàn bộ icon" aria-pressed="false"><svg class="ico"><use href="#i-eye"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnLocateGPS" title="Định vị vị trí GPS của bạn" aria-label="Định vị GPS"><svg class="ico"><use href="#i-locate"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnScreenshot" title="Chụp ảnh bản đồ (lưu PNG)" aria-label="Chụp ảnh bản đồ"><svg class="ico"><use href="#i-camera"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích" aria-label="Đo diện tích"><svg class="ico"><use href="#i-area"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnMeasureDist" title="Đo chiều dài" aria-label="Đo chiều dài"><svg class="ico"><use href="#i-ruler"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnInspectMode" title="Bật chế độ tra cứu: click lên bản đồ để xem hạ tầng tiếp cận tại vị trí" aria-label="Chế độ tra cứu" aria-pressed="false"><svg class="ico"><use href="#i-inspect"/></svg></button>
     </div>
 
-    <button type="button" class="rp-expand-btn ui-panel-format" id="btnExpandRightPanel" title="Mở panel công cụ" aria-label="Mở panel công cụ">«</button>
+    <button type="button" class="rp-expand-btn ui-panel-format" id="btnExpandRightPanel" title="Mở panel công cụ" aria-label="Mở panel công cụ"><svg class="ico"><use href="#i-chev-left"/></svg></button>
   </div>
 
   <!-- PANEL CÔNG CỤ BÊN PHẢI (GỘP TRA CỨU / ĐỀ XUẤT / LỚP DỮ LIỆU / CHÚ GIẢI) -->
   <aside class="right-panel" id="rightPanel">
     <div class="tab-header rp-tabs" role="tablist">
-      <button type="button" class="tab-btn active" data-tab="tabLayers" role="tab" aria-selected="true" aria-controls="tabLayers">⚙️<span>Lớp dữ liệu</span></button>
-      <button type="button" class="tab-btn" data-tab="tabAdd" role="tab" aria-selected="false" aria-controls="tabAdd">➕<span>Đề xuất</span></button>
-      <button type="button" class="tab-btn" data-tab="tabLegend" role="tab" aria-selected="false" aria-controls="tabLegend">📖<span>Chú giải</span></button>
-      <button type="button" class="rp-collapse-btn" id="btnCollapseRightPanel" title="Thu gọn panel" aria-label="Thu gọn panel">»</button>
+      <button type="button" class="tab-btn active" data-tab="tabLayers" role="tab" aria-selected="true" aria-controls="tabLayers"><svg class="ico"><use href="#i-layers"/></svg><span>Lớp dữ liệu</span></button>
+      <button type="button" class="tab-btn" data-tab="tabAdd" role="tab" aria-selected="false" aria-controls="tabAdd"><svg class="ico"><use href="#i-plus"/></svg><span>Đề xuất</span></button>
+      <button type="button" class="tab-btn" data-tab="tabLegend" role="tab" aria-selected="false" aria-controls="tabLegend"><svg class="ico"><use href="#i-book"/></svg><span>Chú giải</span></button>
+      <button type="button" class="rp-collapse-btn" id="btnCollapseRightPanel" title="Thu gọn panel" aria-label="Thu gọn panel"><svg class="ico"><use href="#i-chev-right"/></svg></button>
     </div>
 
     <div class="rp-progress">
@@ -77,13 +129,13 @@
         <div class="layer-row"><div><input type="checkbox" id="chk_c9" checked><label for="chk_c9">10. Cơ sở chưa sử dụng</label></div></div>
 
         <div class="rp-settings">
-          <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound">🗺️ Ranh giới 40 Phường Xã</label></div></div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_parcel" checked><label for="chk_parcel">📐 Ranh lô đất hạ tầng <small class="layer-hint">phóng to để xem</small></label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_parcel" checked><label for="chk_parcel"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Ranh lô đất hạ tầng <small class="layer-hint">phóng to để xem</small></label></div></div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_pop"><label for="chk_pop">👥 Phân bổ dân cư</label></div>
+            <div><input type="checkbox" id="chk_pop"><label for="chk_pop"><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư</label></div>
             <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
           </div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung">🛣️ Mạng lưới đường <small class="layer-hint" id="roadsHint">phóng to để xem</small></label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">phóng to để xem</small></label></div></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
             <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
             <span class="road-legend-item"><i style="background:#60a5fa; height:2px;"></i>Khu vực</span>
@@ -91,11 +143,11 @@
             <span class="road-legend-item"><i style="background:#fde047; height:2px;"></i>Chưa phân loại</span>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_heat" checked><label for="chk_heat">🔥 Bản đồ độ phủ hạ tầng</label></div>
+            <div><input type="checkbox" id="chk_heat" checked><label for="chk_heat"><svg class="ico ico-layer"><use href="#i-heat"/></svg>Bản đồ độ phủ hạ tầng</label></div>
             <span id="heatBox" class="layer-slider"><input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30" title="Độ trong suốt bản đồ độ phủ" aria-label="Độ trong suốt bản đồ độ phủ"></span>
           </div>
           <div class="rp-inline-field">
-            <label for="inputIsoRadius">⭕ Giả lập bán kính chung (m)</label>
+            <label for="inputIsoRadius"><svg class="ico ico-layer"><use href="#i-radius"/></svg>Giả lập bán kính chung (m)</label>
             <input type="number" id="inputIsoRadius" placeholder="Mặc định" min="50" max="5000" step="50" title="Để trống = dùng bán kính riêng của từng công trình (50–5000 m)" />
           </div>
         </div>
@@ -104,24 +156,24 @@
       <!-- TAB: ĐỀ XUẤT ĐIỂM MỚI -->
       <div class="tab-body add-point-form" id="tabAdd" style="display:none;">
         <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
-          <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true">✍️ Nhập 1 điểm</button>
-          <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ, GeoJSON">📂 Nhập hàng loạt</button>
-          <button type="button" class="add-mode-btn" data-mode="addAdmin" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Admin hiệu chỉnh dữ liệu nền: vẽ bổ sung tuyến đường, xóa / thêm pixel dân cư">🛠️ Admin</button>
+          <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true"><svg class="ico"><use href="#i-pen"/></svg>Nhập 1 điểm</button>
+          <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ, GeoJSON"><svg class="ico"><use href="#i-folder"/></svg>Nhập hàng loạt</button>
+          <button type="button" class="add-mode-btn" data-mode="addAdmin" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Admin hiệu chỉnh dữ liệu nền: vẽ bổ sung tuyến đường, xóa / thêm pixel dân cư"><svg class="ico"><use href="#i-tool"/></svg>Admin</button>
         </div>
 
         <div id="addSingle">
         <div class="form-grid">
         <label for="newType">Loại</label>
         <select id="newType">
-          <option value="1-CV">🌳 1. Công viên, điểm xanh, vườn hoa</option>
-          <option value="2-BDX">🅿️ 2. Bãi đỗ xe, trạm sạc xe điện</option>
-          <option value="3-MN">🧸 3. Trường Mầm non</option>
-          <option value="4-TH">🏫 4. Trường Tiểu học</option>
-          <option value="5-THCS">📚 5. Trường THCS</option>
-          <option value="6-YT">✚ 6. Bệnh viện, Trạm y tế</option>
-          <option value="7-VH">🎭 7. Nhà văn hóa, thể thao</option>
-          <option value="8-TM">🛒 8. Chợ, Trung tâm thương mại</option>
-          <option value="9-CSD" selected>🛠️ 9. Cơ sở chưa sử dụng</option>
+          <option value="1-CV">1. Công viên, điểm xanh, vườn hoa</option>
+          <option value="2-BDX">2. Bãi đỗ xe, trạm sạc xe điện</option>
+          <option value="3-MN">3. Trường Mầm non</option>
+          <option value="4-TH">4. Trường Tiểu học</option>
+          <option value="5-THCS">5. Trường THCS</option>
+          <option value="6-YT">6. Bệnh viện, Trạm y tế</option>
+          <option value="7-VH">7. Nhà văn hóa, thể thao</option>
+          <option value="8-TM">8. Chợ, Trung tâm thương mại</option>
+          <option value="9-CSD" selected>9. Cơ sở chưa sử dụng</option>
         </select>
 
         <label for="newPhase">Giai đoạn</label>
@@ -143,7 +195,7 @@
         <div class="rp-coord-row">
           <input type="text" id="newLat" placeholder="Vĩ độ" />
           <input type="text" id="newLng" placeholder="Kinh độ" />
-          <button type="button" id="btnPickOnMap" title="Ghim trên bản đồ" aria-label="Ghim tọa độ trên bản đồ">📌</button>
+          <button type="button" id="btnPickOnMap" title="Ghim trên bản đồ" aria-label="Ghim tọa độ trên bản đồ"><svg class="ico"><use href="#i-pin"/></svg></button>
         </div>
 
         <label for="newWard">Phường/Xã</label>
@@ -153,7 +205,7 @@
         <input type="number" id="newSize" placeholder="m² (vd 1000)" min="0" step="1" />
         </div>
 
-        <button type="button" class="btn-submit" id="btnSubmitNewPoint">🚀 GỬI ĐỀ XUẤT MỚI</button>
+        <button type="button" class="btn-submit" id="btnSubmitNewPoint"><svg class="ico"><use href="#i-send"/></svg>GỬI ĐỀ XUẤT MỚI</button>
         <div id="statusMsg" class="rp-status" role="status" aria-live="polite"></div>
         </div>
 
@@ -175,8 +227,8 @@
             <span class="cad-drop-types"><i>DXF</i><i>KML</i><i>KMZ</i><i>GeoJSON</i></span>
             <input type="file" id="cadFile" accept=".dxf,.kml,.kmz,.geojson,.json" hidden />
           </label>
-          <div class="cad-hint">
-            <div class="cad-hint-title">Quy ước đặt tên</div>
+          <details class="cad-hint fold">
+            <summary class="cad-hint-title">Quy ước đặt tên</summary>
             <div class="cad-hint-row"><b>DXF</b><span>Tên layer theo TT 16/2025, VD <code>HT_DAT_HTXH_Yte</code>, hoặc = mã loại</span></div>
             <div class="cad-hint-row"><b>KML/KMZ</b><span>Trường <code>Layer</code> / tên Folder = mã loại</span></div>
             <div class="cad-hint-row"><b>GeoJSON</b><span>Thuộc tính <code>Layer</code> = mã loại</span></div>
@@ -198,16 +250,16 @@
               hậu tố <code>_CT</code> / <code>_CV</code> = cấp đô thị, <code>_DVO</code> = đơn vị ở; Truonghoc thêm <code>_MN</code> / <code>_TH</code> / <code>_THCS</code>,
               thiếu thì chọn cấp từng lô. Chỉ nhận hatch (layer không có hatch mới nhận polyline kín), ghi thẳng không hỏi xác nhận.
             </div>
-          </div>
+          </details>
           <div id="cadReport"></div>
-          <button type="button" class="btn-submit" id="btnCadSubmit" disabled>🚀 GHI VÀO HỆ THỐNG (ADMIN)</button>
+          <button type="button" class="btn-submit" id="btnCadSubmit" disabled><svg class="ico"><use href="#i-save"/></svg>GHI VÀO HỆ THỐNG (ADMIN)</button>
           <div id="cadStatus" class="rp-status" role="status" aria-live="polite"></div>
         </div>
 
         <div id="addAdmin" style="display:none;">
         <div class="admin-sub-switch" role="tablist" aria-label="Công cụ hiệu chỉnh">
-          <button type="button" class="admin-sub-btn active" data-sub="addRoad" role="tab" aria-selected="true">🛣️ Tuyến đường</button>
-          <button type="button" class="admin-sub-btn" data-sub="addPop" role="tab" aria-selected="false">👥 Pixel dân cư</button>
+          <button type="button" class="admin-sub-btn active" data-sub="addRoad" role="tab" aria-selected="true"><svg class="ico"><use href="#i-road"/></svg>Tuyến đường</button>
+          <button type="button" class="admin-sub-btn" data-sub="addPop" role="tab" aria-selected="false"><svg class="ico"><use href="#i-users"/></svg>Pixel dân cư</button>
         </div>
         <div id="addRoad">
           <div class="form-grid">
@@ -221,12 +273,12 @@
             <input type="text" id="roadName" maxlength="120" placeholder="Tên tuyến (không bắt buộc)" />
           </div>
           <div class="road-draw-actions">
-            <button type="button" id="btnRoadDraw" aria-pressed="false">✏️ Vẽ tuyến mới</button>
-            <button type="button" id="btnRoadUndo" title="Xóa đỉnh cuối (Backspace)" disabled>↶ Xóa đỉnh</button>
+            <button type="button" id="btnRoadDraw" aria-pressed="false"><svg class="ico"><use href="#i-pen"/></svg>Vẽ tuyến mới</button>
+            <button type="button" id="btnRoadUndo" title="Xóa đỉnh cuối (Backspace)" disabled><svg class="ico"><use href="#i-undo"/></svg>Xóa đỉnh</button>
           </div>
           <div id="roadDrawInfo" class="road-draw-info"></div>
-          <div class="cad-hint">Click lên bản đồ hiện trạng để đặt đỉnh. Đỉnh cách nút đường sẵn có ≤ 20 m tự bắt dính (chấm xanh) để tuyến nối vào mạng lưới — đặt đỉnh tại các nút giao. Esc: dừng vẽ.</div>
-          <button type="button" class="btn-submit" id="btnRoadSave" disabled title="Ghi đè danh sách tuyến bổ sung roads/v2/custom.json trên bucket">💾 LƯU TUYẾN (ADMIN)</button>
+          <div class="cad-hint">Click bản đồ hiện trạng để đặt đỉnh; đỉnh cách nút đường ≤ 20 m tự bắt dính (chấm xanh). Esc: dừng vẽ.</div>
+          <button type="button" class="btn-submit" id="btnRoadSave" disabled title="Ghi đè danh sách tuyến bổ sung roads/v2/custom.json trên bucket"><svg class="ico"><use href="#i-save"/></svg>LƯU TUYẾN (ADMIN)</button>
           <div id="roadStatus" class="rp-status" role="status" aria-live="polite"></div>
           <div id="roadList" class="cad-list"></div>
         </div>
@@ -242,12 +294,12 @@
             <input type="text" id="popName" maxlength="120" placeholder="VD: Sông Hương, KCN Phú Bài..." />
           </div>
           <div class="road-draw-actions">
-            <button type="button" id="btnPopDraw" aria-pressed="false">✏️ Vẽ vùng mới</button>
-            <button type="button" id="btnPopUndo" title="Xóa đỉnh cuối (Backspace)" disabled>↶ Xóa đỉnh</button>
+            <button type="button" id="btnPopDraw" aria-pressed="false"><svg class="ico"><use href="#i-pen"/></svg>Vẽ vùng mới</button>
+            <button type="button" id="btnPopUndo" title="Xóa đỉnh cuối (Backspace)" disabled><svg class="ico"><use href="#i-undo"/></svg>Xóa đỉnh</button>
           </div>
           <div id="popDrawInfo" class="road-draw-info"></div>
-          <div class="cad-hint">Click lên bản đồ hiện trạng để đặt các đỉnh của vùng (tự khép kín). Dân số phường giữ nguyên: xóa pixel thì dân dồn sang các pixel còn lại của phường. Vùng thêm được áp sau vùng xóa. Esc: dừng vẽ.</div>
-          <button type="button" class="btn-submit" id="btnPopSave" disabled title="Ghi đè danh sách vùng hiệu chỉnh pop/edits.json trên bucket">💾 LƯU VÙNG (ADMIN)</button>
+          <div class="cad-hint" title="Vùng thêm được áp sau vùng xóa">Click bản đồ hiện trạng để đặt đỉnh vùng (tự khép kín). Tổng dân số phường giữ nguyên: xóa pixel thì dân dồn sang pixel còn lại. Esc: dừng vẽ.</div>
+          <button type="button" class="btn-submit" id="btnPopSave" disabled title="Ghi đè danh sách vùng hiệu chỉnh pop/edits.json trên bucket"><svg class="ico"><use href="#i-save"/></svg>LƯU VÙNG (ADMIN)</button>
           <div id="popStatus" class="rp-status" role="status" aria-live="polite"></div>
           <div id="popList" class="cad-list"></div>
         </div>
@@ -256,23 +308,24 @@
 
       <!-- TAB: CHÚ GIẢI -->
       <div class="tab-body" id="tabLegend" style="display:none;">
-        <div class="legend-row"><img src="./icons/Park.png" class="legend-icon" /> 1. Công viên, điểm xanh, vườn hoa</div>
-        <div class="legend-row"><img src="./icons/Parking.png" class="legend-icon" /> 2. Bãi đỗ xe, trạm sạc xe điện</div>
-        <div class="legend-row"><img src="./icons/Mamnon.png" class="legend-icon" /> 3. Trường Mầm non</div>
-        <div class="legend-row"><img src="./icons/Tieuhoc.png" class="legend-icon" /> 4. Trường Tiểu học</div>
-        <div class="legend-row"><img src="./icons/THCS.png" class="legend-icon" /> 5. Trường THCS</div>
-        <div class="legend-row"><img src="./icons/THPT.png" class="legend-icon" /> 6. Trường THPT</div>
-        <div class="legend-row"><img src="./icons/Yte.png" class="legend-icon" /> 7. Bệnh viện, Trạm y tế</div>
-        <div class="legend-row"><img src="./icons/Vanhoa.png" class="legend-icon" /> 8. Nhà văn hóa, thể thao</div>
-        <div class="legend-row"><img src="./icons/Cho.png" class="legend-icon" /> 9. Chợ, Trung tâm thương mại</div>
-        <div class="legend-row" style="color:var(--accent-orange); margin-top:4px;"><img src="./icons/Unused.png" class="legend-icon" /> <b>10. Cơ sở chưa sử dụng</b></div>
-        <div class="legend-row"><img src="./icons/Park2.png" class="legend-icon" alt="" /><b style="color:var(--accent-red);">Chưa chấp thuận (Chờ duyệt)</b></div>
-        <div class="legend-row"><span class="legend-icon legend-dot"><i style="background:#22c55e;"></i></span>Điểm quy hoạch khác hiện trạng</div>
+        <div class="legend-note">Zoom ≥ 15: biểu tượng · zoom xa hơn: chấm màu</div>
+        <div class="legend-row" data-type="1-CV"><img src="./icons/Park.png" class="legend-icon" alt="" />1. Công viên, điểm xanh, vườn hoa</div>
+        <div class="legend-row" data-type="2-BDX"><img src="./icons/Parking.png" class="legend-icon" alt="" />2. Bãi đỗ xe, trạm sạc xe điện</div>
+        <div class="legend-row" data-type="3-MN"><img src="./icons/Mamnon.png" class="legend-icon" alt="" />3. Trường Mầm non</div>
+        <div class="legend-row" data-type="4-TH"><img src="./icons/Tieuhoc.png" class="legend-icon" alt="" />4. Trường Tiểu học</div>
+        <div class="legend-row" data-type="5-THCS"><img src="./icons/THCS.png" class="legend-icon" alt="" />5. Trường THCS</div>
+        <div class="legend-row" data-type="THPT"><img src="./icons/THPT.png" class="legend-icon" alt="" />6. Trường THPT</div>
+        <div class="legend-row" data-type="6-YT"><img src="./icons/Yte.png" class="legend-icon" alt="" />7. Bệnh viện, Trạm y tế</div>
+        <div class="legend-row" data-type="7-VH"><img src="./icons/Vanhoa.png" class="legend-icon" alt="" />8. Nhà văn hóa, thể thao</div>
+        <div class="legend-row" data-type="8-TM"><img src="./icons/Cho.png" class="legend-icon" alt="" />9. Chợ, Trung tâm thương mại</div>
+        <div class="legend-row legend-unused" data-type="9-CSD"><img src="./icons/Unused.png" class="legend-icon" alt="" /><b>10. Cơ sở chưa sử dụng</b></div>
+        <div class="legend-row legend-pending"><img src="./icons/Park2.png" class="legend-icon" alt="" /><i class="layer-swatch legend-pending-dot"></i><b>Chưa chấp thuận (Chờ duyệt)</b></div>
+        <div class="legend-row"><span class="legend-icon legend-dot"><i class="legend-plan-dot"></i></span><i class="layer-swatch legend-plan-swatch"></i>Điểm quy hoạch khác hiện trạng</div>
 
         <div class="tt16-legend" id="parcelLegend"></div>
 
         <div class="heat-legend">
-          <div class="heat-legend-title">🔥 Bản đồ độ phủ hạ tầng</div>
+          <div class="heat-legend-title"><svg class="ico"><use href="#i-heat"/></svg>Bản đồ độ phủ hạ tầng</div>
           <div class="heat-legend-sub">Số nhóm hạ tầng tiếp cận được tại mỗi vị trí</div>
           <div class="heat-legend-bar"></div>
           <div class="heat-legend-ticks">
@@ -293,7 +346,7 @@
           <b class="bp-part-title" id="bpPart1Title">CƠ CẤU ĐẤT HẠ TẦNG</b>
           <div class="flip-controls" data-html2canvas-ignore="true">
             <span class="flip-dots" aria-hidden="true"><i class="active"></i><i></i></span>
-            <button type="button" class="bp-btn" id="btnFlipPart1" aria-pressed="false" title="Lật trang: thống kê số lượng công trình">⟳ Số lượng</button>
+            <button type="button" class="bp-btn" id="btnFlipPart1" aria-pressed="false" title="Lật trang: thống kê số lượng công trình"><svg class="ico"><use href="#i-flip"/></svg>Số lượng</button>
           </div>
         </div>
         <div class="flip-card" id="part1Flip">
@@ -318,15 +371,13 @@
           <div class="bp-title-wrap">
             <b class="bp-part-title">BẢNG TỔNG HỢP HẠ TẦNG</b>
             <select id="wardSelector" class="ward-selector-dropdown" title="Chọn địa bàn phân tích (phường/xã)"></select>
-            <span id="bpSubtitle"></span>
+            <span id="bpChartLegend" class="bp-legend"></span>
             <span id="bpWardPlan" style="display:none;"></span>
           </div>
           <div class="bp-actions" data-html2canvas-ignore="true">
-            <button class="bp-btn bp-icon" id="btnToggleStatTable" title="Xem bảng thông tin">
-              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M1.5 6h13M1.5 9.5h13M6 6v7.5M10.5 6v7.5"/></svg>
-            </button>
-            <button class="bp-btn" id="btnExportBottomPdf" title="Xuất báo cáo PDF">🖨️</button>
-            <button class="bp-btn" id="btnToggleBottomMax" title="Phóng to toàn màn hình">⛶</button>
+            <button type="button" class="bp-btn bp-icon" id="btnToggleStatTable" title="Xem bảng thông tin" aria-label="Xem bảng thông tin"><svg class="ico"><use href="#i-table"/></svg></button>
+            <button type="button" class="bp-btn bp-icon" id="btnExportBottomPdf" title="Xuất báo cáo PDF" aria-label="Xuất báo cáo PDF"><svg class="ico"><use href="#i-printer"/></svg></button>
+            <button type="button" class="bp-btn bp-icon" id="btnToggleBottomMax" title="Phóng to toàn màn hình" aria-label="Phóng to toàn màn hình"><svg class="ico"><use href="#i-maximize"/></svg></button>
           </div>
         </div>
 
@@ -378,17 +429,17 @@
   </section>
 
   <!-- MODAL ĐĂNG NHẬP GOOGLE ADMIN -->
-  <div id="authModal" class="ui-panel-format" role="dialog" aria-modal="true" aria-labelledby="authModalTitle" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:3001; padding:16px; width:300px; text-align:center;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <b id="authModalTitle" style="color:var(--accent-cyan); font-size:12px;">🔑 ĐĂNG NHẬP QUẢN TRỊ (ADMIN)</b>
-      <button type="button" id="btnCloseAuthModal" class="auth-close-btn" aria-label="Đóng">✕</button>
+  <div id="authModal" class="ui-panel-format auth-modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle" style="display:none;">
+    <div class="auth-head">
+      <b id="authModalTitle"><svg class="ico"><use href="#i-key"/></svg>ĐĂNG NHẬP QUẢN TRỊ (ADMIN)</b>
+      <button type="button" id="btnCloseAuthModal" class="auth-close-btn" aria-label="Đóng"><svg class="ico"><use href="#i-close"/></svg></button>
     </div>
-    <div style="font-size:10.5px; color:var(--text-muted); margin-bottom:12px;">Đăng nhập bằng tài khoản Google được cấp quyền Admin để thực hiện phê duyệt đề xuất hạ tầng.</div>
-    <div id="googleSignInBtn" style="display:flex; justify-content:center;"></div>
-    <button type="button" id="btnWardRoads" class="btn-submit" style="display:none; margin-top:8px;" title="Tải mạng lưới đường OpenStreetMap của 40 phường/xã lên bucket: dùng chung cho phạm vi thực tế của công trình và chiều dài đường trục chính / kiệt theo phường">🛣️ Tải mạng lưới đường toàn thành phố</button>
-    <div id="wardRoadsMsg" role="status" aria-live="polite" style="font-size:10px; margin-top:4px;"></div>
-    <button type="button" id="btnSignOut" class="btn-submit" style="display:none; margin-top:8px;">Đăng xuất quản trị</button>
-    <div id="authMsg" role="status" aria-live="polite" style="font-size:10px; margin-top:8px; text-align:center; font-weight:bold;"></div>
+    <div class="auth-desc">Đăng nhập bằng tài khoản Google được cấp quyền Admin để thực hiện phê duyệt đề xuất hạ tầng.</div>
+    <div id="googleSignInBtn"></div>
+    <button type="button" id="btnWardRoads" class="btn-submit btn-secondary" style="display:none;" title="Tải mạng lưới đường OpenStreetMap của 40 phường/xã lên bucket: dùng chung cho phạm vi thực tế của công trình và chiều dài đường trục chính / kiệt theo phường"><svg class="ico"><use href="#i-road"/></svg>Tải mạng lưới đường toàn thành phố</button>
+    <div id="wardRoadsMsg" class="auth-msg" role="status" aria-live="polite"></div>
+    <button type="button" id="btnSignOut" class="btn-submit btn-secondary" style="display:none;"><svg class="ico"><use href="#i-logout"/></svg>Đăng xuất quản trị</button>
+    <div id="authMsg" class="auth-msg auth-msg-strong" role="status" aria-live="polite"></div>
   </div>
 
   <script type="module" src="./js/app.js"></script>

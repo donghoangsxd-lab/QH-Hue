@@ -50,16 +50,16 @@ export function effectiveRadius(item) {
 }
 
 export const infraLabels = {
-  "1-CV": "🌳 Công viên, điểm xanh, vườn hoa",
-  "2-BDX": "🅿️ Bãi đỗ xe, trạm sạc xe điện",
-  "3-MN": "🧸 Trường Mầm non",
-  "4-TH": "🏫 Trường Tiểu học",
-  "5-THCS": "📚 Trường THCS",
-  "THPT": "🎓 Trường THPT",
-  "6-YT": "✚ Bệnh viện, Trạm y tế",
-  "7-VH": "🎭 Nhà văn hóa, thể thao",
-  "8-TM": "🛒 Chợ, Trung tâm thương mại",
-  "9-CSD": "🛠️ Cơ sở chưa sử dụng"
+  "1-CV": "Công viên, điểm xanh, vườn hoa",
+  "2-BDX": "Bãi đỗ xe, trạm sạc xe điện",
+  "3-MN": "Trường Mầm non",
+  "4-TH": "Trường Tiểu học",
+  "5-THCS": "Trường THCS",
+  "THPT": "Trường THPT",
+  "6-YT": "Bệnh viện, Trạm y tế",
+  "7-VH": "Nhà văn hóa, thể thao",
+  "8-TM": "Chợ, Trung tâm thương mại",
+  "9-CSD": "Cơ sở chưa sử dụng"
 };
 
 // Ranh giới phường xã: nét viền ghi xám vẽ dưới + nét vàng nhạt vẽ trên (đổ bóng rẻ, không dùng CSS filter)

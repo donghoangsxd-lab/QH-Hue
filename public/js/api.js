@@ -13,3 +13,18 @@ export function geeApi(search = '') {
   if (!search) return base;
   return `${base}?${String(search).replace(/^\?/, '')}`;
 }
+
+// Danh sách công trình được CDN giữ tối đa 30 s + 120 s stale-while-revalidate (api/gee.js):
+// trình duyệt vừa ghi dữ liệu thì trong 3 phút luôn lấy bản mới, bỏ qua CDN
+const WRITE_KEY = 'qh_data_written_at';
+const FRESH_WINDOW_MS = 3 * 60 * 1000;
+
+export function markDataWritten() {
+  try { localStorage.setItem(WRITE_KEY, String(Date.now())); } catch (e) { /* chế độ riêng tư */ }
+}
+
+export function infraListUrl() {
+  let writtenAt = 0;
+  try { writtenAt = Number(localStorage.getItem(WRITE_KEY)) || 0; } catch (e) { /* chế độ riêng tư */ }
+  return Date.now() - writtenAt < FRESH_WINDOW_MS ? geeApi(`fresh=${writtenAt}`) : geeApi();
+}

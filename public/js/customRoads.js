@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { map, wardNameAt, clearMeasure } from './mapEngine.js';
-import { escapeHtml, fmtNum } from './utils.js';
+import { escapeHtml, fmtNum, ico, setStatusContent } from './utils.js';
 import { postAdmin, refreshRoadsMeta } from './wardRoads.js';
 import { roadWaysAround } from './serviceArea.js';
 import { refreshRoadNetwork } from './roadNetworkLayer.js';
@@ -35,7 +35,7 @@ let listLayer = null, drawLayer = null;
 function setStatus(text, color) {
   const el = $('roadStatus');
   if (!el) return;
-  el.textContent = text;
+  setStatusContent(el, text);
   el.style.color = color || '';
 }
 
@@ -125,7 +125,7 @@ function renderRoads() {
   }
   const list = $('roadList');
   if (!list) return;
-  if (!loaded) { list.innerHTML = '<div class="cad-row">⏳ Đang tải danh sách tuyến bổ sung...</div>'; return; }
+  if (!loaded) { list.innerHTML = `<div class="cad-row">${ico('clock')}Đang tải danh sách tuyến bổ sung...</div>`; return; }
   if (!roads.length) { list.innerHTML = ''; return; }
   list.innerHTML = roads.slice().sort((a, b) => b.at - a.at).map(r => {
     const t = TYPES[r.g] || TYPES[2];
@@ -136,7 +136,7 @@ function renderRoads() {
       <span class="cad-dot" style="background:${t.color};"></span>
       <div class="cad-row-main"><b>${escapeHtml(r.name || 'Tuyến không tên')}</b><br>
         <small>${t.label} · ${fmtLen(lengthM(pts))}${wards ? ` · ${escapeHtml(wards)}` : ''}</small></div>
-      <button type="button" class="road-del" data-del="${r.id}" title="Xóa tuyến khỏi bucket" aria-label="Xóa tuyến">🗑</button>
+      <button type="button" class="road-del" data-del="${r.id}" title="Xóa tuyến khỏi bucket" aria-label="Xóa tuyến">${ico('trash')}</button>
     </div>`;
   }).join('');
 }
@@ -253,7 +253,7 @@ function setDrawing(on) {
   }
   const btn = $('btnRoadDraw');
   if (btn) {
-    btn.textContent = on ? '⏹ Dừng vẽ' : '✏️ Vẽ tuyến mới';
+    btn.innerHTML = on ? `${ico('stop')}Dừng vẽ` : `${ico('pen')}Vẽ tuyến mới`;
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', String(on));
   }

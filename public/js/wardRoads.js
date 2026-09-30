@@ -3,7 +3,7 @@
 // chiều dài trục chính / kiệt cắt theo ranh phường lưu trong index; mọi người dùng đọc qua máy chủ (action getWardRoads).
 import { state } from './state.js';
 import { geeApi } from './api.js';
-import { escapeHtml, showToast, wardStatHtml } from './utils.js';
+import { escapeHtml, ico, setStatusContent, showToast, wardStatHtml } from './utils.js';
 import { queryOverpassHedged } from './serviceArea.js';
 
 const QUERY_TIMEOUT_MS = 170000; // xã miền núi rộng hàng trăm km²
@@ -216,14 +216,14 @@ export async function fillCityRoadDensity(el, areas) {
 }
 
 // ================== ADMIN TẢI MẠNG LƯỚI & LƯU ==================
-const BTN_LABEL = '🛣️ Tải mạng lưới đường toàn thành phố';
+const BTN_LABEL = `${ico('road')}Tải mạng lưới đường toàn thành phố`;
 let running = false;
 let stopRequested = false;
 
 function setMsg(text, color) {
   const el = $('wardRoadsMsg');
   if (!el) return;
-  el.textContent = text;
+  setStatusContent(el, text);
   el.style.color = color || '';
 }
 
@@ -274,7 +274,7 @@ async function run() {
   running = true;
   stopRequested = false;
   const btn = $('btnWardRoads');
-  if (btn) btn.textContent = '⏹ Dừng tải mạng lưới đường';
+  if (btn) btn.innerHTML = `${ico('stop')}Dừng tải mạng lưới đường`;
   const failed = [];
   let done = 0, fresh = 0;
 
@@ -298,7 +298,7 @@ async function run() {
   }
 
   running = false;
-  if (btn) btn.textContent = BTN_LABEL;
+  if (btn) btn.innerHTML = BTN_LABEL;
   const tail = failed.length ? ` Lỗi ${failed.length}: ${failed.join(', ')} — bấm lại để tải tiếp.` : '';
   const have = wards.filter(w => isCurrent(index[w.name])).length;
   setMsg(`${stopRequested ? 'Đã dừng' : '✓ Xong'}: tải ${fresh}/${targets.length} phường/xã (đã có ${have}/${wards.length}).${tail}`,

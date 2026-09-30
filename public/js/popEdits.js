@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { map, clearMeasure, loadPopulationLayer } from './mapEngine.js';
-import { escapeHtml, fmtNum } from './utils.js';
+import { escapeHtml, fmtNum, ico, setStatusContent } from './utils.js';
 import { postAdmin } from './wardRoads.js';
 import { reloadWardStats } from './uiComponents.js';
 
@@ -34,7 +34,7 @@ const fmtPixels = (m2) => `~${fmtNum(Math.max(1, Math.round(m2 / PIXEL_M2)))} pi
 function setStatus(text, color) {
   const el = $('popStatus');
   if (!el) return;
-  el.textContent = text;
+  setStatusContent(el, text);
   el.style.color = color || '';
 }
 
@@ -86,7 +86,7 @@ function renderEdits() {
   }
   const list = $('popList');
   if (!list) return;
-  if (!loaded) { list.innerHTML = '<div class="cad-row">⏳ Đang tải danh sách vùng hiệu chỉnh...</div>'; return; }
+  if (!loaded) { list.innerHTML = `<div class="cad-row">${ico('clock')}Đang tải danh sách vùng hiệu chỉnh...</div>`; return; }
   if (!edits.length) { list.innerHTML = ''; return; }
   list.innerHTML = edits.slice().sort((a, b) => b.at - a.at).map(e => {
     const o = OPS[e.op];
@@ -95,7 +95,7 @@ function renderEdits() {
       <span class="cad-dot" style="background:${o.color};"></span>
       <div class="cad-row-main"><b>${escapeHtml(e.name || 'Vùng không tên')}</b><br>
         <small>${o.label} · ${fmtArea(m2)} · ${fmtPixels(m2)}</small></div>
-      <button type="button" class="road-del" data-del="${e.id}" title="Xóa vùng khỏi bucket (khôi phục raster gốc)" aria-label="Xóa vùng">🗑</button>
+      <button type="button" class="road-del" data-del="${e.id}" title="Xóa vùng khỏi bucket (khôi phục raster gốc)" aria-label="Xóa vùng">${ico('trash')}</button>
     </div>`;
   }).join('');
 }
@@ -185,7 +185,7 @@ function setDrawing(on) {
   } else if (drawing()) state.adminDrawMode = null;
   const btn = $('btnPopDraw');
   if (btn) {
-    btn.textContent = on ? '⏹ Dừng vẽ' : '✏️ Vẽ vùng mới';
+    btn.innerHTML = on ? `${ico('stop')}Dừng vẽ` : `${ico('pen')}Vẽ vùng mới`;
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', String(on));
   }

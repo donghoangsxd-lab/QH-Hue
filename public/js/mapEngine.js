@@ -3,8 +3,8 @@ import {
   BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, getBufferStyle, getPlanScenarioList, effectiveRadius, bumpDataVersion, layerType
 } from './state.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
-import { geeApi } from './api.js';
-import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint } from './utils.js';
+import { geeApi, markDataWritten } from './api.js';
+import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico } from './utils.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
@@ -41,8 +41,9 @@ const CITY_CENTER = [16.4637, 107.5905];
 const CITY_ZOOM = 13;
 const WARD_GEOM_VERSION = 2;
 const INFRA_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
-// Số điểm trong khung nhìn ≤ ngưỡng thì vẽ icon PNG (DOM); vượt ngưỡng vẽ chấm tròn trên canvas cho nhẹ
+// Icon PNG (DOM) chỉ từ ICON_MIN_ZOOM và khi số điểm trong khung nhìn ≤ ngưỡng; còn lại vẽ chấm màu trên canvas
 const ICON_MAX_VISIBLE = 1500;
+const ICON_MIN_ZOOM = 15;
 const ICON_FILES = {
   "1-CV": { approved: "Park.png", pending: "Park2.png" },
   "2-BDX": { approved: "Parking.png", pending: "Parking2.png" },
@@ -108,7 +109,7 @@ function getWardFilteredList(sourceList) {
 }
 
 // Tìm điểm đặt nhãn trên ranh đã đơn giản hóa (ranh gốc ~140.000 đỉnh, tính trực tiếp mất ~1 s),
-// rồi kiểm tra lại trên ranh gốc; không đạt thì giữ tâm do server trả về
+// rồi kiểm tra lại trên ranh gốc; không đạt thì dùng fallbackLabelPoint
 const LABEL_SIMPLIFY_DEG = 0.0003;
 function labelPointFor(geometry) {
   if (!geometry) return null;
@@ -118,6 +119,15 @@ function labelPointFor(geometry) {
     return pt && isPointInWardGeometry(pt.lat, pt.lng, geometry) ? pt : null;
   } catch (e) {
     return null;
+  }
+}
+
+function fallbackLabelPoint(geometry) {
+  try {
+    const [lng, lat] = turf.pointOnFeature(turf.feature(geometry)).geometry.coordinates;
+    return { lat, lng };
+  } catch (e) {
+    return { lat: CITY_CENTER[0], lng: CITY_CENTER[1] };
   }
 }
 
@@ -178,11 +188,13 @@ function handleCompareChange(on) {
 export async function loadBoundaryLayer() {
   if (!map) return;
 
+  let features = [];
   try {
     const boundRes = await fetch(geeApi(`action=getBoundaryVector&v=${WARD_GEOM_VERSION}`));
     const boundData = await boundRes.json();
     
     if (boundData && boundData.features) {
+      features = boundData.features;
       layers.boundary.addLayer(L.geoJSON(boundData, { style: WARD_BOUNDARY_SHADOW_STYLE, interactive: false }));
       layers.boundary.addLayer(L.geoJSON(boundData, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false }));
     }
@@ -190,13 +202,17 @@ export async function loadBoundaryLayer() {
     console.error("Lỗi tải ranh giới vector 40 phường xã:", err);
   }
 
+  // Tên + điểm đặt nhãn lấy từ chính ranh vừa tải (cùng thứ tự, cùng tên như getWardLabels), không tải lại hình học lần 2
   try {
-    const labelRes = await fetch(geeApi(`action=getWardLabels&v=${WARD_GEOM_VERSION}`));
-    const labelData = await labelRes.json();
-    const labels = labelData.labels || [];
-    labels.forEach(item => {
-      const pt = labelPointFor(item.geometry);
-      if (pt) Object.assign(item, { lat: pt.lat, lng: pt.lng });
+    const labels = features.filter(f => f && f.geometry).map(f => {
+      const props = f.properties || {};
+      const pt = labelPointFor(f.geometry) || fallbackLabelPoint(f.geometry);
+      return {
+        name: props.tenXa || props.NAME_2 || props.name || 'Phường',
+        lat: pt.lat,
+        lng: pt.lng,
+        geometry: f.geometry
+      };
     });
     state.wardLabelsList = labels;
     wardBBoxes.clear();
@@ -372,7 +388,7 @@ export function toggleMeasure(type) {
   const btn = document.getElementById(type === 'distance' ? 'btnMeasureDist' : 'btnMeasureArea');
   if (btn) {
     btn.classList.add('active');
-    btn.textContent = "❌";
+    btn.innerHTML = ico('close');
   }
 }
 
@@ -385,11 +401,11 @@ export function clearMeasure() {
   const btnArea = document.getElementById('btnMeasureArea');
   if (btnDist) {
     btnDist.classList.remove('active');
-    btnDist.textContent = "📏";
+    btnDist.innerHTML = ico('ruler');
   }
   if (btnArea) {
     btnArea.classList.remove('active');
-    btnArea.textContent = "📐";
+    btnArea.innerHTML = ico('area');
   }
 }
 
@@ -411,10 +427,10 @@ function drawMeasure() {
   let label = '';
   if (!isArea && pts.length >= 2) {
     const meters = turf.length(turf.lineString(pts), { units: 'meters' });
-    label = `📏 Chiều dài: ${meters >= 1000 ? `${fmtNum(meters / 1000)} km` : `${fmtNum(Math.round(meters))} m`}`;
+    label = `${ico('ruler')}Chiều dài: ${meters >= 1000 ? `${fmtNum(meters / 1000)} km` : `${fmtNum(Math.round(meters))} m`}`;
   } else if (isArea && pts.length >= 3) {
     const sqm = turf.area(turf.polygon([[...pts, pts[0]]]));
-    label = `📐 Diện tích: ${sqm >= 10000 ? `${fmtNum(sqm / 10000)} ha` : `${fmtNum(Math.round(sqm))} m²`}`;
+    label = `${ico('area')}Diện tích: ${sqm >= 10000 ? `${fmtNum(sqm / 10000)} ha` : `${fmtNum(Math.round(sqm))} m²`}`;
   }
 
   groups.forEach(g => {
@@ -469,7 +485,7 @@ export function wardNameAt(lat, lng) {
 
 function pieTooltipHtml(ward, counts, total, scenarioLabel) {
   const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([type, n]) => `
-    <div class="ward-pie-row"><i style="background:${BUFFER_COLORS[type] || '#38bdf8'}"></i><span>${escapeHtml((infraLabels[type] || type).replace(/^[^\p{L}\d]+/u, ''))}</span><b>${fmtNum(n)}</b></div>`).join('');
+    <div class="ward-pie-row"><i style="background:${BUFFER_COLORS[type] || '#38bdf8'}"></i><span>${escapeHtml(infraLabels[type] || type)}</span><b>${fmtNum(n)}</b></div>`).join('');
   return `<div class="ward-pie-title">${escapeHtml(ward.name)}${scenarioLabel ? `<small>${scenarioLabel}</small>` : ''}</div>
     ${rows}<div class="ward-pie-total"><span>Tổng</span><b>${fmtNum(total)}</b></div>
     <div class="ward-pie-hint">Bấm để phóng to xem từng công trình</div>`;
@@ -556,14 +572,16 @@ function createPointMarker(entry, mode, targetMap) {
       })
     });
   } else {
+    // Viền trắng để chấm nổi trên ảnh vệ tinh; điểm quy hoạch khác hiện trạng viền xanh đậm như chấm biến động của icon
     marker = L.circleMarker([p.lat, p.lng], {
-      radius: 4.5,
-      weight: planInfo ? 2.5 : 1,
-      color: planInfo ? '#22c55e' : '#0f172a',
+      radius: 5,
+      weight: planInfo ? 2.5 : 1.5,
+      color: planInfo ? '#22c55e' : '#ffffff',
       fillColor: approved ? (BUFFER_COLORS[layerType(p)] || '#38bdf8') : '#f87171',
-      fillOpacity: 0.95,
+      fillOpacity: 1,
       bubblingMouseEvents: false
     });
+    marker.bindTooltip(p.name || '', { direction: 'top', offset: [0, -6], className: 'dot-tip' });
   }
   marker.on('click', () => {
     if (state.isPickMode || state.activeMeasureType || state.adminDrawMode) return;
@@ -575,7 +593,7 @@ function createPointMarker(entry, mode, targetMap) {
 /**
  * Bộ vẽ cho 1 bản đồ:
  * - Chỉ tạo marker cho điểm nằm trong khung nhìn (nới 25%), khi kéo/zoom chỉ thêm/bớt phần chênh lệch.
- * - Nhiều điểm trong khung nhìn (> ICON_MAX_VISIBLE) thì chuyển sang chấm tròn canvas thay cho icon DOM.
+ * - Zoom < ICON_MIN_ZOOM hoặc nhiều điểm trong khung nhìn (> ICON_MAX_VISIBLE): chấm tròn canvas thay cho icon DOM.
  * - Buffer vẽ bằng L.circle trên canvas, chỉ dựng cho nhóm đang bật.
  * - Ranh lô CAD (nếu có) vẽ cùng nhóm với marker nên bật/tắt theo loại hạ tầng và lọc phường như icon.
  * - Zoom ≤ PIE_MAX_ZOOM: bỏ marker, mỗi phường 1 biểu đồ tròn đếm theo các loại đang bật.
@@ -657,7 +675,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     }
     const bounds = m.getBounds().pad(0.25);
     const visible = list.filter(p => bounds.contains([p.lat, p.lng]));
-    const nextMode = visible.length <= ICON_MAX_VISIBLE ? 'icon' : 'dot';
+    const nextMode = m.getZoom() >= ICON_MIN_ZOOM && visible.length <= ICON_MAX_VISIBLE ? 'icon' : 'dot';
     const wantParcels = state.showParcels && state.cadParcels.size > 0 && m.getZoom() >= PARCEL_MIN_ZOOM;
     const detail = m.getZoom() >= PARCEL_PATTERN_ZOOM;
     if (nextMode !== mode || wantParcels !== parcelsOn) {
@@ -979,7 +997,7 @@ function buildDiaBanHtml(geoWard, sheetWard) {
   let html = escapeHtml(geo);
   const clean = (s) => String(s || "").replace(/^Phường\s+/i, "").replace(/^Xã\s+/i, "").trim().toLowerCase();
   if (clean(sheet) !== clean(geo)) {
-    html += ` <span style="color:var(--accent-orange); font-size:9px; font-weight:normal;" title="Tên phường trong Sheet khác phường theo tọa độ — cần sửa cột Ten_XaPhuong">(⚠ Sheet: ${escapeHtml(sheet || 'trống')})</span>`;
+    html += ` <span class="pp-warn" title="Tên phường trong Sheet khác phường theo tọa độ — cần sửa cột Ten_XaPhuong">${ico('alert')}Sheet: ${escapeHtml(sheet || 'trống')}</span>`;
   }
   return html;
 }
@@ -1009,40 +1027,40 @@ export function onPointClick(p, targetMap = map) {
   const capCongTrinh = formatCapCongTrinhLabel(p.nhomHaTang || p.capCongTrinh || "Cấp đơn vị ở");
   const geoWardNow = resolveWardNameFromCoords(Number(p.lat), Number(p.lng));
 
-  let html = `<div style="min-width:220px; font-size:11px;">`;
-  html += `<b style="color:var(--accent-cyan); font-size:12px;">${escapeHtml(p.name)}</b>`;
+  let html = `<div class="pp">`;
+  html += `<div class="pp-title">${escapeHtml(p.name)}`;
   if (!approved) html += `<span class="badge-pending">Chờ duyệt</span>`;
-  html += `<br><hr style="border-color:var(--border-color); margin:4px 0;">`;
-  html += `• Loại hạ tầng: <b>${escapeHtml(infraLabels[layerType(p)] || p.type)}</b><br>`;
-  html += `• Địa bàn: <b class="js-ward">${buildDiaBanHtml(geoWardNow, p.ward)}</b><br>`;
-  html += `• Cấp công trình: <b style="color:var(--accent-orange);">${escapeHtml(capCongTrinh)}</b><br>`;
+  html += `</div>`;
+  html += `<div class="pp-row"><span>Loại hạ tầng</span><b>${escapeHtml(infraLabels[layerType(p)] || p.type)}</b></div>`;
+  html += `<div class="pp-row"><span>Địa bàn</span><b class="js-ward">${buildDiaBanHtml(geoWardNow, p.ward)}</b></div>`;
+  html += `<div class="pp-row"><span>Cấp công trình</span><b class="c-orange">${escapeHtml(capCongTrinh)}</b></div>`;
   const planInfo = PLAN_CHANGE_INFO[p.planChange];
-  html += `• Diện tích${isPlanScenario ? ' QH' : ''}: <b>${fmtNum(p.size)} m²</b>`;
+  let sizeHtml = `${fmtNum(p.size)} m²`;
   if (planInfo) {
     const otherSize = isPlanScenario
       ? (p.planChange === 'new' ? '' : `, HT ${fmtNum(p.sizeHT)} m²`)
       : (p.planChange === 'relocate' ? '' : ` → QH ${fmtNum(p.sizeQH)} m²`);
-    html += ` <span style="color:${planInfo.color}; font-weight:bold;">(${planInfo.label}${otherSize})</span>`;
+    sizeHtml += ` <span class="pp-plan" style="color:${planInfo.color};">(${planInfo.label}${otherSize})</span>`;
   }
-  html += `<br>`;
+  html += `<div class="pp-row"><span>Diện tích${isPlanScenario ? ' QH' : ''}</span><b>${sizeHtml}</b></div>`;
   if (!isCSDUnapproved) {
-    html += `• Bán kính phục vụ: <b style="color:var(--accent-cyan);">${fmtNum(itemRadius)} m</b><br>`;
-    html += `<div class="js-area">• Phạm vi thực tế: <span style="color:var(--text-muted);">⏳ đang dựng theo mạng đường...</span></div>`;
+    html += `<div class="pp-row"><span>Bán kính phục vụ</span><b class="c-cyan">${fmtNum(itemRadius)} m</b></div>`;
+    html += `<div class="pp-row js-area"><span>Phạm vi thực tế</span><span class="pp-loading">${ico('clock')}đang dựng theo mạng đường...</span></div>`;
   }
 
-  const servedColor = approved ? 'var(--accent-orange)' : 'var(--accent-red)';
+  const servedCls = approved ? 'c-orange' : 'c-red';
   const showServed = !isCSD;
   if (showServed) {
-    html += `<div class="js-served" style="color:${servedColor}; font-weight:bold; margin-top:4px;">• Dân số phục vụ${approved ? '' : ' DỰ KIẾN'}: <span style="font-weight:normal;">⏳ đang tính...</span></div>`;
+    html += `<div class="pp-row pp-served js-served"><span>Dân số phục vụ${approved ? '' : ' dự kiến'}</span><span class="pp-loading">${ico('clock')}đang tính...</span></div>`;
   }
   if (isCSD && approved) {
-    html += `<div style="color:var(--accent-orange); font-weight:bold; margin-top:4px;">💡 ĐỀ XUẤT CHUYỂN ĐỔI CÔNG NĂNG:</div>`;
-    html += `<div class="js-csd"><div style="font-size:10px; color:var(--text-muted);">⏳ Đang tính toán không gian...</div></div>`;
+    html += `<div class="pp-section c-orange">${ico('bulb')}ĐỀ XUẤT CHUYỂN ĐỔI CÔNG NĂNG</div>`;
+    html += `<div class="js-csd"><div class="pp-loading">${ico('clock')}Đang tính toán không gian...</div></div>`;
   }
   if (!approved) {
     html += state.currentUserRole === "ADMIN"
-      ? `<button type="button" class="js-approve popup-approve-btn">✅ PHÊ DUYỆT CHÍNH THỨC (ADMIN)</button>`
-      : `<div style="margin-top:6px; font-size:10px; color:var(--accent-orange); font-style:italic; text-align:center;">⏳ Đang chờ Quản trị viên (Admin) phê duyệt.</div>`;
+      ? `<button type="button" class="js-approve popup-approve-btn">${ico('check')}PHÊ DUYỆT CHÍNH THỨC (ADMIN)</button>`
+      : `<div class="pp-note c-orange">${ico('clock')}Đang chờ Quản trị viên (Admin) phê duyệt.</div>`;
   }
   html += `</div>`;
 
@@ -1068,22 +1086,22 @@ export function onPointClick(p, targetMap = map) {
       if (!r) return;
       if (r.area) {
         const pct = Math.round(r.area.areaKm2 / r.area.circleKm2 * 100);
-        fill('.js-area', `• Phạm vi thực tế: <b style="color:#22c55e;">${r.area.areaKm2.toFixed(2)} km²</b> <span style="color:var(--text-muted);">(${pct}% vòng tròn, theo ${r.area.reachKm.toFixed(1)} km đường tiếp cận)</span>${roadLegendHtml(r.area)}`);
+        fill('.js-area', `<span>Phạm vi thực tế</span><div><b class="c-green">${r.area.areaKm2.toFixed(2)} km²</b> <span class="pp-sub">(${pct}% vòng tròn, theo ${r.area.reachKm.toFixed(1)} km đường tiếp cận)</span>${roadLegendHtml(r.area)}</div>`);
       } else {
-        fill('.js-area', `<span style="color:var(--text-muted);">• Phạm vi thực tế: máy chủ dữ liệu đường (OpenStreetMap) đang quá tải — tạm hiển thị vòng tròn bán kính, bấm lại công trình sau ít phút.</span>`);
+        fill('.js-area', `<span>Phạm vi thực tế</span><span class="pp-sub">máy chủ dữ liệu đường (OpenStreetMap) đang quá tải — tạm hiển thị vòng tròn bán kính, bấm lại công trình sau ít phút.</span>`);
       }
     });
   }
 
   if (showServed) {
-    const servedLabel = `Dân số phục vụ${approved ? '' : ' DỰ KIẾN'}`;
+    const servedLabel = `Dân số phục vụ${approved ? '' : ' dự kiến'}`;
     Promise.resolve(areaPromise)
       .then(r => {
         const polygon = r ? r.polygon : turf.circle([Number(p.lng), Number(p.lat)], itemRadius / 1000, { steps: 64 });
         return fetchServedPop(Number(p.lat), Number(p.lng), itemRadius, polygon).then(res => ({ res, real: !!(r && r.area) }));
       })
-      .then(({ res, real }) => fill('.js-served', `• ${servedLabel}: ~<b style="color:${servedColor};">${fmtNum(res.servedPop || 0)} người</b> <span style="font-weight:normal; color:var(--text-muted);">(${real ? 'trong phạm vi thực tế' : 'trong vòng tròn'})</span>`))
-      .catch(() => fill('.js-served', `<span style="color:var(--text-muted); font-weight:normal;">• ${servedLabel}: chưa tính được (GEE đang bận), mở lại sau.</span>`));
+      .then(({ res, real }) => fill('.js-served', `<span>${servedLabel}</span><div><b class="${servedCls}">~${fmtNum(res.servedPop || 0)} người</b> <span class="pp-sub">(${real ? 'trong phạm vi thực tế' : 'trong vòng tròn'})</span></div>`))
+      .catch(() => fill('.js-served', `<span>${servedLabel}</span><span class="pp-sub">chưa tính được (GEE đang bận), mở lại sau.</span>`));
   }
 
   if (isCSD && approved) {
@@ -1096,15 +1114,15 @@ export function onPointClick(p, targetMap = map) {
           const priorityBadge = s.isTopPriority ? `<span class="badge-priority">ƯU TIÊN HÀNG ĐẦU</span>` : "";
           const cls = s.isTopPriority ? "sug-card priority" : "sug-card";
           const estimateNote = s.coverageMethod === 'estimate' ? ` <span title="GEE bận: ước lượng theo diện tích">(ước lượng)</span>` : '';
-          sugHtml += `<div class="${cls}"><div>🚩 <b>${escapeHtml(s.label)}</b> ${priorityBadge}</div>
-            <div style="color:var(--text-muted); margin-top:2px;">└ Bổ sung <b style="color:var(--accent-green);">${fmtNum(s.scaleAddPct)}%</b> quy mô, <b style="color:var(--accent-cyan);">${fmtNum(s.coverageAddPct)}%</b> độ phủ${estimateNote}</div>
-            <button type="button" class="proof-btn" data-idx="${idx}">📋 Xem thuyết minh</button></div>`;
+          sugHtml += `<div class="${cls}"><div>${ico('flag')}<b>${escapeHtml(s.label)}</b> ${priorityBadge}</div>
+            <div class="pp-sub">Bổ sung <b class="c-green">${fmtNum(s.scaleAddPct)}%</b> quy mô, <b class="c-cyan">${fmtNum(s.coverageAddPct)}%</b> độ phủ${estimateNote}</div>
+            <button type="button" class="proof-btn" data-idx="${idx}">${ico('book')}Xem thuyết minh</button></div>`;
         });
         (res.ineligible || []).forEach(inEl => {
-          sugHtml += `<div class="sug-card ineligible">❌ <b>${escapeHtml(inEl.label)}</b> (Không đủ DT min: ${fmtNum(inEl.minSize)} m²)</div>`;
+          sugHtml += `<div class="sug-card ineligible">${ico('error')}<b>${escapeHtml(inEl.label)}</b> (Không đủ DT min: ${fmtNum(inEl.minSize)} m²)</div>`;
         });
-        const base = sugHtml || "<div class='sug-card'>✓ Vị trí đã phủ đủ hạ tầng.</div>";
-        fill('.js-csd', base + `<div style="margin-top:6px; font-size:10px; color:var(--accent-red); font-weight:bold; text-align:center;">(Cần phê duyệt)</div>`);
+        const base = sugHtml || `<div class="sug-card">${ico('check')}Vị trí đã phủ đủ hạ tầng.</div>`;
+        fill('.js-csd', base + `<div class="pp-note c-red">(Cần phê duyệt)</div>`);
         popup.getElement()?.querySelectorAll('.proof-btn').forEach(btn => {
           btn.addEventListener('click', () => {
             const fitOpts = popupFitOptions(targetMap, 300, 50);
@@ -1138,7 +1156,7 @@ export function zoomToPoint(lat, lng, name) {
     }
     L.popup(popupFitOptions(map, 300, 50))
       .setLatLng([lat, lng])
-      .setContent(`<div style="font-size:11px;"><b style="color:var(--accent-cyan);">${escapeHtml(name)}</b><br/>• Tọa độ: ${lat.toFixed(5)}, ${lng.toFixed(5)}</div>`)
+      .setContent(`<div class="pp"><div class="pp-title">${escapeHtml(name)}</div><div class="pp-row"><span>Tọa độ</span><b>${lat.toFixed(5)}, ${lng.toFixed(5)}</b></div></div>`)
       .openOn(map);
   };
   map.once('moveend', open);
@@ -1159,10 +1177,25 @@ export async function loadPopulationLayer(pv) {
       planLayers.pop?.clearLayers();
       layers.pop.addLayer(L.tileLayer(data.urlFormat, { opacity }));
       planLayers.pop.addLayer(L.tileLayer(data.urlFormat, { opacity }));
+      if (pv) popLayerPromise = Promise.resolve(true);
+      return true;
     }
   } catch (err) {
     console.error("Lỗi tải lớp raster dân số:", err);
   }
+  return false;
+}
+
+// Lớp dân cư mặc định tắt: chỉ gọi GEE lần đầu người dùng bật (lỗi thì lần bật sau thử lại)
+let popLayerPromise = null;
+export function ensurePopulationLayer() {
+  if (!popLayerPromise) {
+    popLayerPromise = loadPopulationLayer().then(ok => {
+      if (!ok) popLayerPromise = null;
+      return ok;
+    });
+  }
+  return popLayerPromise;
 }
 
 // ============================ TRA CỨU TẠI VỊ TRÍ ============================
@@ -1187,30 +1220,31 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
   const override = state.globalBufferRadiusOverride;
   const wardLocal = resolveWardNameFromCoords(clickLat, clickLng);
 
-  let html = `<div style="font-size:11px;">
-    <b style="color:var(--accent-cyan);">📊 MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ${isPlan ? ' (QUY HOẠCH)' : ''}</b><br>
-    <span style="color:var(--text-muted);">📌 Tọa độ: <b>${clickLat.toFixed(5)}, ${clickLng.toFixed(5)}</b></span><br>
-    <span style="color:var(--text-muted);">📍 Địa bàn: <b class="js-ward">${escapeHtml(wardLocal || '⏳')}</b> | 🛤️ Bán kính: <b style="color:var(--accent-green);">${override !== null ? `${fmtNum(override)} m (chung)` : 'theo từng công trình'}</b></span><br>
-    <div style="font-weight:bold; color:var(--accent-green); margin-top:6px;">1. Tiếp cận: ${coveredCount}/8 nhóm</div>`;
+  let html = `<div class="pp">
+    <div class="pp-title">${ico('chart')}MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ${isPlan ? ' (QUY HOẠCH)' : ''}</div>
+    <div class="pp-row"><span>Tọa độ</span><b>${clickLat.toFixed(5)}, ${clickLng.toFixed(5)}</b></div>
+    <div class="pp-row"><span>Địa bàn</span><b class="js-ward">${wardLocal ? escapeHtml(wardLocal) : ico('clock')}</b></div>
+    <div class="pp-row"><span>Bán kính</span><b class="c-green">${override !== null ? `${fmtNum(override)} m (chung)` : 'theo từng công trình'}</b></div>
+    <div class="pp-section c-green">1. Tiếp cận: ${coveredCount}/8 nhóm</div>`;
 
   if (coveredCount > 0) {
     INFRA_CODES.forEach(code => {
       if (!coveredGroups[code]) return;
       const names = [...coveredGroups[code]];
       const shown = names.slice(0, 5).map(escapeHtml).join(', ') + (names.length > 5 ? ` và ${names.length - 5} công trình khác` : '');
-      html += `<div class="sug-card">• <b>${escapeHtml(infraLabels[code] || code)}:</b><br><span style="color:var(--accent-cyan);">└ ${shown}</span></div>`;
+      html += `<div class="sug-card"><b>${escapeHtml(infraLabels[code] || code)}</b><div class="c-cyan">${shown}</div></div>`;
     });
   } else {
     html += `<div class="sug-card ineligible">(Chưa có hạ tầng phủ đến)</div>`;
   }
 
-  html += `<div style="font-weight:bold; color:var(--accent-red); margin-top:6px;">2. Chưa tiếp cận: ${missingCodes.length}/8 nhóm</div>`;
+  html += `<div class="pp-section c-red">2. Chưa tiếp cận: ${missingCodes.length}/8 nhóm</div>`;
   if (missingCodes.length > 0) {
     missingCodes.forEach(code => {
-      html += `<div class="sug-card ineligible">❌ ${escapeHtml(infraLabels[code] || code)}</div>`;
+      html += `<div class="sug-card ineligible">${ico('error')}${escapeHtml(infraLabels[code] || code)}</div>`;
     });
   } else {
-    html += `<div class="sug-card priority">✓ Vị trí tiếp cận đủ 8 nhóm hạ tầng!</div>`;
+    html += `<div class="sug-card priority">${ico('check')}Vị trí tiếp cận đủ 8 nhóm hạ tầng!</div>`;
   }
   html += `</div>`;
 
@@ -1249,6 +1283,7 @@ export async function approvePointStatus(pointId) {
   applyStatus(true);
 
   try {
+    markDataWritten();
     const res = await fetch(geeApi('action=approvePoint'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },

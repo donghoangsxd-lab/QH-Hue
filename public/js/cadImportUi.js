@@ -1,9 +1,9 @@
 // Tab Đề xuất → "Nhập hàng loạt": đọc file DXF/KML/KMZ/GeoJSON, xem trước các lô trên bản đồ và báo cáo kiểm tra trước khi ghi
 import { state, infraLabels, BUFFER_COLORS } from './state.js';
 import { map } from './mapEngine.js';
-import { geeApi } from './api.js';
+import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
-import { escapeHtml, fmtNum, distanceMeters } from './utils.js';
+import { escapeHtml, fmtNum, distanceMeters, ico, setStatusContent } from './utils.js';
 import {
   parseDxf, buildParcels, buildParcelsLonLat, assignWards, matchExisting, layerToType, tt16Layer, linkStages, sameSite,
   LAYER_PREFIXES, SCHOOL_PENDING, CRS_PRESETS
@@ -42,7 +42,7 @@ function setStatus(text, color) {
   const el = $('cadStatus');
   if (!el) return;
   el.style.color = color || '';
-  el.textContent = text || '';
+  setStatusContent(el, text);
 }
 
 function fmtArea(m2) {
@@ -281,7 +281,7 @@ function reviewHtml() {
   const left = lots.filter(p => !current.levels.has(p.src)).length;
   const at = lots.findIndex(p => p.src === current.reviewSrc);
   if (at < 0) {
-    return `<div class="cad-review done">🏫 ${left ? `Còn <b>${left}</b>/${lots.length} lô trường học chưa rõ cấp (layer Truonghoc thiếu hậu tố _MN / _TH / _THCS).`
+    return `<div class="cad-review done">${ico(left ? 'alert' : 'check')}${left ? `Còn <b>${left}</b>/${lots.length} lô trường học chưa rõ cấp (layer Truonghoc thiếu hậu tố _MN / _TH / _THCS).`
       : `Đã duyệt ${lots.length} lô trường học chưa rõ cấp.`}
       <button type="button" class="cad-rev-open" data-src="${(lots.find(p => !current.levels.has(p.src)) || lots[0]).src}">${left ? 'Duyệt tiếp' : 'Xem lại'}</button></div>`;
   }
@@ -289,9 +289,9 @@ function reviewHtml() {
   const lv = current.levels.get(p.src);
   const btn = (code, label, cls = '') => `<button type="button" class="cad-rev-btn${cls}${lv === code ? ' on' : ''}" data-lv="${code}">${label}</button>`;
   return `<div class="cad-review">
-    <div class="cad-review-head">🏫 Lô trường học chưa rõ cấp <b>${at + 1}/${lots.length}</b> · còn ${left} lô chưa duyệt</div>
+    <div class="cad-review-head">${ico('alert')}Lô trường học chưa rõ cấp <b>${at + 1}/${lots.length}</b> · còn ${left} lô chưa duyệt</div>
     <div class="cad-review-info">${escapeHtml(p.layer)} · ${sizeText(p)} · ${escapeHtml(p.ward)}${p.crossWard ? ' · vắt ranh' : ''}</div>
-    <div class="cad-review-btns">${SCHOOL_LEVELS.map(([code, label]) => btn(code, `✓ ${label}`)).join('')}${btn(LEVEL_REJECT, '✕ Từ chối', ' rej')}</div>
+    <div class="cad-review-btns">${SCHOOL_LEVELS.map(([code, label]) => btn(code, `${ico('check')}${label}`)).join('')}${btn(LEVEL_REJECT, `${ico('close')}Từ chối`, ' rej')}</div>
     <div class="cad-review-nav">
       <button type="button" class="cad-rev-go" data-src="${lots[(at - 1 + lots.length) % lots.length].src}">‹ Lô trước</button>
       <button type="button" class="cad-rev-go" data-src="${lots[(at + 1) % lots.length].src}">Lô sau ›</button>
@@ -416,14 +416,14 @@ function renderReport() {
   const dupText = result.duplicatesDropped ? ` · bỏ ${result.duplicatesDropped} ${isVector ? 'đường trùng polygon' : 'polyline trùng hatch'}` : '';
 
   box.innerHTML = `
-    <div class="cad-file">📄 <b>${escapeHtml(fileName)}</b> · ${parcels.length} lô${dupText}
+    <div class="cad-file">${ico('file')}<b>${escapeHtml(fileName)}</b> · ${parcels.length} lô${dupText}
       <div class="cad-filter">Nhận: <b>${kept}</b>${skipped ? `<br>Bỏ qua (bộ lọc mặc định): ${skipped}` : ''}</div></div>
     ${reviewHtml()}
     ${alerts.map(([cls, text]) => `<div class="cad-alert ${cls}">${text}</div>`).join('')}
     ${manualMappingHtml(current.manual)}
     ${parcels.length ? `<table class="cad-table"><thead><tr><th>Loại</th><th>Số lô</th><th>Diện tích tính</th></tr></thead><tbody>${typeRows}</tbody></table>
     <div class="cad-list">${listRows}${parcels.length > MAX_LISTED ? `<div class="cad-more">… và ${parcels.length - MAX_LISTED} lô khác</div>` : ''}</div>` : ''}
-    <div class="cad-foot"><span>Sẽ ghi: ${count.new} mới · ${count.update} cập nhật${count.new + count.update ? ` <small>(${countText(kindCounts(writable(parcels), current.format))})</small>` : ''}</span><button type="button" id="btnCadClear" class="cad-clear">✕ Xóa xem trước</button></div>`;
+    <div class="cad-foot"><span>Sẽ ghi: ${count.new} mới · ${count.update} cập nhật${count.new + count.update ? ` <small>(${countText(kindCounts(writable(parcels), current.format))})</small>` : ''}</span><button type="button" id="btnCadClear" class="cad-clear">${ico('close')}Xóa xem trước</button></div>`;
 
   const list = box.querySelector('.cad-list');
   if (list) list.scrollTop = listScroll;
@@ -670,6 +670,7 @@ async function submitImport() {
   try {
     for (let k = 0; k < chunks.length; k++) {
       setStatus(`⏳ Đang ghi ${chunks.length > 1 ? `phần ${k + 1}/${chunks.length}` : `${items.length} lô`}...`, 'var(--accent-orange)');
+      markDataWritten();
       const res = await fetch(geeApi('action=importCadBatch'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },

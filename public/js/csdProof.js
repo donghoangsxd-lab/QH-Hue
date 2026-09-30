@@ -5,7 +5,7 @@
  */
 import { state, BUFFER_COLORS } from './state.js';
 import { geeApi } from './api.js';
-import { escapeHtml, fmtNum, showToast } from './utils.js';
+import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 
 const CANDIDATE_COLOR = '#facc15';
 const NET_COLOR = '#22d3ee';
@@ -72,8 +72,8 @@ function buildPanelHtml(data, typeColor) {
 
   return `
     <div class="proof-head">
-      <b>📋 THUYẾT MINH PHƯƠNG ÁN CHỌN: ${label}</b>
-      <button type="button" class="proof-close" aria-label="Đóng thuyết minh">✕</button>
+      <b>${ico('book')}THUYẾT MINH PHƯƠNG ÁN CHỌN: ${label}</b>
+      <button type="button" class="proof-close" aria-label="Đóng thuyết minh">${ico('close')}</button>
     </div>
     <div class="proof-muted">${escapeHtml(data.candidate.name || 'Khu đất chưa sử dụng')} · ${escapeHtml(data.ward)}</div>
     <div class="proof-summary">Nếu xây ${label} tại đây: phục vụ thêm khoảng <b>${fmtNum(pop.added)} người</b>, độ phủ của phường tăng <b>${fmtNum(data.coverageAddPct)}%</b>.</div>

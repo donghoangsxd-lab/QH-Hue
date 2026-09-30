@@ -1,8 +1,8 @@
 // Nhắc Admin: công trình có Ten_XaPhuong (Sheet) khác phường theo tọa độ (bảng thống kê luôn tính theo tọa độ).
 // Nút "Ghi vào cột Note" nhờ máy chủ ghi dấu "⚠ Phường/xã theo tọa độ: …" vào Sheet để sửa nhanh.
 import { state } from './state.js';
-import { geeApi } from './api.js';
-import { escapeHtml, showToast } from './utils.js';
+import { geeApi, markDataWritten } from './api.js';
+import { escapeHtml, ico, showToast } from './utils.js';
 import { wardNameAt, zoomToPoint } from './mapEngine.js';
 
 // Khớp api/gee.js (WARD_NOTE_PREFIX) và apps-script/Code.gs
@@ -66,11 +66,11 @@ export function refreshWardCheck() {
 
   box.innerHTML = `
     <div class="ward-check-head">
-      <span class="ward-check-text">⚠ <b>${list.length}</b> công trình có tên phường trong Sheet khác phường theo tọa độ<br>
+      <span class="ward-check-text">${ico('alert')}<b>${list.length}</b> công trình có tên phường trong Sheet khác phường theo tọa độ<br>
         <small>${pending ? `<b>${pending}</b> chưa ghi vào cột Note` : 'Đã ghi chú trong cột Note — chờ sửa cột Ten_XaPhuong'}</small></span>
       <button type="button" class="ward-check-btn" data-act="toggle" aria-expanded="${expanded}">${expanded ? 'Ẩn' : 'Xem'} danh sách</button>
-      ${pending ? `<button type="button" class="ward-check-btn primary" data-act="sync"${busy ? ' disabled' : ''}>${busy ? '⏳ Đang ghi...' : '📝 Ghi vào cột Note'}</button>` : ''}
-      <button type="button" class="ward-check-close" data-act="close" aria-label="Ẩn nhắc">✕</button>
+      ${pending ? `<button type="button" class="ward-check-btn primary" data-act="sync"${busy ? ' disabled' : ''}>${busy ? `${ico('clock')}Đang ghi...` : `${ico('pen')}Ghi vào cột Note`}</button>` : ''}
+      <button type="button" class="ward-check-close" data-act="close" aria-label="Ẩn nhắc">${ico('close')}</button>
     </div>
     ${expanded ? `<div class="ward-check-list">${list.slice(0, MAX_LISTED).map(rowHtml).join('')}${list.length > MAX_LISTED ? `<div class="ward-check-more">… và ${list.length - MAX_LISTED} công trình khác</div>` : ''}</div>` : ''}`;
   box.hidden = false;
@@ -81,6 +81,7 @@ async function syncNotes() {
   busy = true;
   refreshWardCheck();
   try {
+    markDataWritten();
     const res = await fetch(geeApi('action=syncWardNotes'), {
       method: 'POST',
       headers: { Authorization: `Bearer ${state.authToken}` }
