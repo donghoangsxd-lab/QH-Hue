@@ -1,6 +1,8 @@
 const ee = require('@google/earthengine');
 
 let geeContext = null;
+let geeBase = null;          // asset nạp 1 lần: ranh phường, raster dân cư gốc, raster mã phường
+let popEditsVersion = -1;    // phiên bản vùng hiệu chỉnh dân cư đang áp (services/popEditsService.js)
 let initPromise = null;
 
 // Các request đồng thời lúc khởi động dùng chung 1 lần xác thực; lỗi thì cho phép thử lại ở request sau
@@ -37,39 +39,10 @@ function createGeeContext() {
 
             const popRaster = ee.Image("projects/optimistic-yew-488501-s0/assets/Pixel-danso").select(0).rename('DanSoPixel');
             const wardRegion = ee.Image("projects/optimistic-yew-488501-s0/assets/Output40xa").select(0).rename('ID_Region');
-
-            const validPopMask = popRaster.gt(0);
-            const validPopRaster = popRaster.updateMask(validPopMask);
             const wardPopSumImg = ee.Image().double().paint({ featureCollection: wardVectorParsed, color: 'danSoNum' });
 
-            const statsGrouped = validPopRaster.addBands(wardRegion).reduceRegion({
-              reducer: ee.Reducer.count().group({ groupField: 1, groupName: 'ID_Phuong' }),
-              geometry: wardVectorParsed.geometry(),
-              scale: 60, maxPixels: 1e9
-            });
-
-            const groupsList = ee.List(statsGrouped.get('groups'));
-            const wardPixelCountDict = ee.Dictionary(groupsList.iterate((item, acc) => {
-              const d = ee.Dictionary(item);
-              const idStr = ee.String(ee.Number(d.get('ID_Phuong')).toInt());
-              return ee.Dictionary(acc).set(idStr, d.get('count'));
-            }, ee.Dictionary({})));
-
-            const wardPixelCountImg = wardRegion.remap(
-              wardPixelCountDict.keys().map(k => ee.Number.parse(k)),
-              wardPixelCountDict.values()
-            );
-
-            const popRasterNormalized = wardPopSumImg.divide(wardPixelCountImg)
-              .updateMask(validPopMask)
-              .rename('DanSoPixelNormalized');
-
-            // popRasterNative: raster phân bổ dân cư gốc (chỉ pixel có dân), giữ nguyên lưới gốc để đếm pixel đề xuất CSD
-            geeContext = {
-              ee, wardVectorParsed, popRasterNormalized, wardRegion,
-              popRasterNative: validPopRaster,
-              popProjection: popRaster.projection()
-            };
+            geeBase = { ee, wardVectorParsed, popRaster, wardRegion, wardPopSumImg };
+            applyPopEdits(0, []);
             resolve();
           }, (err) => reject(new Error("GEE Init Fail: " + err)));
         }, 
@@ -77,6 +50,68 @@ function createGeeContext() {
       );
     } catch (e) { reject(new Error("Key Parse Fail: " + e.message)); }
   });
+}
+
+/**
+ * Dựng lại raster dân cư theo vùng hiệu chỉnh: pixel có dân = raster gốc > 0, bỏ pixel trong vùng "remove", thêm pixel
+ * trong vùng "add" (áp sau). Dân số phường chia đều cho số pixel có dân của phường như cũ. Không có vùng → đúng như raster gốc.
+ */
+function applyPopEdits(version, edits) {
+  const { ee, wardVectorParsed, popRaster, wardRegion, wardPopSumImg } = geeBase;
+  const zone = (op) => {
+    const list = (edits || []).filter(e => e.op === op);
+    if (!list.length) return null;
+    const fc = ee.FeatureCollection(list.map(e => ee.Feature(ee.Geometry.Polygon([e.ring], null, false))));
+    return ee.Image(0).byte().paint(fc, 1);
+  };
+  const removeZone = zone('remove');
+  const addZone = zone('add');
+
+  let validPopMask = popRaster.gt(0);
+  let validPopRaster;
+  if (!removeZone && !addZone) {
+    validPopRaster = popRaster.updateMask(validPopMask);
+  } else {
+    // unmask: vùng thêm có thể nằm ngoài phạm vi có dữ liệu của raster gốc; giữ phép chiếu (lưới 30 m) của raster gốc
+    validPopMask = validPopMask.unmask(0, false);
+    if (removeZone) validPopMask = validPopMask.where(removeZone, 0);
+    if (addZone) validPopMask = validPopMask.where(addZone, 1);
+    validPopRaster = validPopMask.selfMask().rename('DanSoPixel');
+  }
+
+  const statsGrouped = validPopRaster.addBands(wardRegion).reduceRegion({
+    reducer: ee.Reducer.count().group({ groupField: 1, groupName: 'ID_Phuong' }),
+    geometry: wardVectorParsed.geometry(),
+    scale: 60, maxPixels: 1e9
+  });
+
+  const groupsList = ee.List(statsGrouped.get('groups'));
+  const wardPixelCountDict = ee.Dictionary(groupsList.iterate((item, acc) => {
+    const d = ee.Dictionary(item);
+    const idStr = ee.String(ee.Number(d.get('ID_Phuong')).toInt());
+    return ee.Dictionary(acc).set(idStr, d.get('count'));
+  }, ee.Dictionary({})));
+
+  const wardPixelCountImg = wardRegion.remap(
+    wardPixelCountDict.keys().map(k => ee.Number.parse(k)),
+    wardPixelCountDict.values()
+  );
+
+  const popRasterNormalized = wardPopSumImg.divide(wardPixelCountImg)
+    .updateMask(validPopMask)
+    .rename('DanSoPixelNormalized');
+
+  // popRasterNative: raster phân bổ dân cư (chỉ pixel có dân), giữ nguyên lưới gốc để đếm pixel đề xuất CSD
+  geeContext = {
+    ee, wardVectorParsed, popRasterNormalized, wardRegion,
+    popRasterNative: validPopRaster,
+    popProjection: popRaster.projection()
+  };
+  popEditsVersion = version;
+}
+
+function getPopEditsVersion() {
+  return popEditsVersion;
 }
 
 function getGeeContext() {
@@ -91,4 +126,4 @@ function eeEvaluate(eeObject) {
   });
 }
 
-module.exports = { initGEE, getGeeContext, eeEvaluate };
+module.exports = { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion };

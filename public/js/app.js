@@ -41,6 +41,8 @@ import { initCadImport } from './cadImportUi.js';
 import { initWardCheck, refreshWardCheck } from './wardCheck.js';
 import { initWardRoads } from './wardRoads.js';
 import { initCustomRoads, handleRoadDrawClick } from './customRoads.js';
+import { initPopEdits, handlePopDrawClick } from './popEdits.js';
+import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 
 const CITY_NAME = "Thành phố Huế";
 const RADIUS_MIN = 50;
@@ -94,6 +96,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   initWardCheck({ onSynced: reloadAfterSheetWrite });
   initWardRoads();
   initCustomRoads();
+  initPopEdits();
+  initRoadNetworkLayer();
   restoreAdminSession();
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleCompareMode);
 
@@ -123,8 +127,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   const handleMapClick = (e, targetMap) => {
-    if (state.roadDrawMode) {
-      if (targetMap === map) handleRoadDrawClick(e.latlng);
+    if (state.adminDrawMode) {
+      if (targetMap !== map) return;
+      if (state.adminDrawMode === 'road') handleRoadDrawClick(e.latlng);
+      else handlePopDrawClick(e.latlng);
       return;
     }
     if (state.isPickMode) {

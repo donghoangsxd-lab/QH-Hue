@@ -30,7 +30,7 @@ export const state = {
   // Trạng thái các chế độ tương tác
   isPickMode: false,
   isInspectMode: false,
-  roadDrawMode: false,     // Admin đang vẽ tuyến đường bổ sung (customRoads.js)
+  adminDrawMode: null,     // Admin đang vẽ: 'road' = tuyến đường bổ sung (customRoads.js), 'pop' = vùng hiệu chỉnh dân cư (popEdits.js)
 
   // Đo đạc khoảng cách / diện tích
   activeMeasureType: null,

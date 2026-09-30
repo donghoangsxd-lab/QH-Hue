@@ -83,6 +83,13 @@
             <div><input type="checkbox" id="chk_pop"><label for="chk_pop">👥 Phân bổ dân cư</label></div>
             <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
           </div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung">🛣️ Mạng lưới đường <small class="layer-hint" id="roadsHint">phóng to để xem</small></label></div></div>
+          <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
+            <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
+            <span class="road-legend-item"><i style="background:#60a5fa; height:2px;"></i>Khu vực</span>
+            <span class="road-legend-item"><i style="background:#cbd5e1; height:2px;"></i>Nội bộ</span>
+            <span class="road-legend-item"><i style="background:#fde047; height:2px;"></i>Chưa phân loại</span>
+          </div>
           <div class="layer-row">
             <div><input type="checkbox" id="chk_heat" checked><label for="chk_heat">🔥 Bản đồ độ phủ hạ tầng</label></div>
             <span id="heatBox" class="layer-slider"><input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30" title="Độ trong suốt bản đồ độ phủ" aria-label="Độ trong suốt bản đồ độ phủ"></span>
@@ -99,7 +106,7 @@
         <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
           <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true">✍️ Nhập 1 điểm</button>
           <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ, GeoJSON">📂 Nhập hàng loạt</button>
-          <button type="button" class="add-mode-btn" data-mode="addRoad" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Admin vẽ bổ sung tuyến đường hiện trạng chưa có trên OpenStreetMap">🛣️ Đường</button>
+          <button type="button" class="add-mode-btn" data-mode="addAdmin" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Admin hiệu chỉnh dữ liệu nền: vẽ bổ sung tuyến đường, xóa / thêm pixel dân cư">🛠️ Admin</button>
         </div>
 
         <div id="addSingle">
@@ -158,7 +165,7 @@
               <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
             </select>
             <label for="cadPhase">Giai đoạn</label>
-            <select id="cadPhase">
+            <select id="cadPhase" title="Áp dụng cho layer đặt theo mã loại; layer TT16 lấy giai đoạn theo tiền tố HT_ / QHDD_ / QHDH_">
               <option value="HT" selected>Hiện trạng (QuyMo_HT)</option>
               <option value="QH">Quy hoạch (QuyMo_QH)</option>
             </select>
@@ -170,7 +177,7 @@
           </label>
           <div class="cad-hint">
             <div class="cad-hint-title">Quy ước đặt tên</div>
-            <div class="cad-hint-row"><b>DXF</b><span>Tên layer = mã loại</span></div>
+            <div class="cad-hint-row"><b>DXF</b><span>Tên layer theo TT 16/2025, VD <code>HT_DAT_HTXH_Yte</code>, hoặc = mã loại</span></div>
             <div class="cad-hint-row"><b>KML/KMZ</b><span>Trường <code>Layer</code> / tên Folder = mã loại</span></div>
             <div class="cad-hint-row"><b>GeoJSON</b><span>Thuộc tính <code>Layer</code> = mã loại</span></div>
             <div class="cad-codes">
@@ -186,13 +193,23 @@
               <code>CSD</code><span>Cơ sở chưa sử dụng</span>
             </div>
             <div class="cad-hint-note">Cấp đô thị thêm <code>_DT</code>, VD <code>CV_DT</code></div>
+            <div class="cad-hint-note cad-hint-tt16">
+              <b>TT16:</b> <code>HT_</code> → QuyMo_HT, <code>QHDD_</code> / <code>QHDH_</code> → QuyMo_QH (bỏ qua ô Giai đoạn);
+              hậu tố <code>_CT</code> / <code>_CV</code> = cấp đô thị, <code>_DVO</code> = đơn vị ở; Truonghoc thêm <code>_MN</code> / <code>_TH</code> / <code>_THCS</code>,
+              thiếu thì chọn cấp từng lô. Chỉ nhận hatch (layer không có hatch mới nhận polyline kín), ghi thẳng không hỏi xác nhận.
+            </div>
           </div>
           <div id="cadReport"></div>
           <button type="button" class="btn-submit" id="btnCadSubmit" disabled>🚀 GHI VÀO HỆ THỐNG (ADMIN)</button>
           <div id="cadStatus" class="rp-status" role="status" aria-live="polite"></div>
         </div>
 
-        <div id="addRoad" style="display:none;">
+        <div id="addAdmin" style="display:none;">
+        <div class="admin-sub-switch" role="tablist" aria-label="Công cụ hiệu chỉnh">
+          <button type="button" class="admin-sub-btn active" data-sub="addRoad" role="tab" aria-selected="true">🛣️ Tuyến đường</button>
+          <button type="button" class="admin-sub-btn" data-sub="addPop" role="tab" aria-selected="false">👥 Pixel dân cư</button>
+        </div>
+        <div id="addRoad">
           <div class="form-grid">
             <label for="roadType">Loại</label>
             <select id="roadType">
@@ -212,6 +229,28 @@
           <button type="button" class="btn-submit" id="btnRoadSave" disabled title="Ghi đè danh sách tuyến bổ sung roads/v2/custom.json trên bucket">💾 LƯU TUYẾN (ADMIN)</button>
           <div id="roadStatus" class="rp-status" role="status" aria-live="polite"></div>
           <div id="roadList" class="cad-list"></div>
+        </div>
+
+        <div id="addPop" style="display:none;">
+          <div class="form-grid">
+            <label for="popOp">Thao tác</label>
+            <select id="popOp">
+              <option value="remove" selected>Xóa pixel (không có dân)</option>
+              <option value="add">Thêm pixel (khu dân cư mới)</option>
+            </select>
+            <label for="popName">Ghi chú</label>
+            <input type="text" id="popName" maxlength="120" placeholder="VD: Sông Hương, KCN Phú Bài..." />
+          </div>
+          <div class="road-draw-actions">
+            <button type="button" id="btnPopDraw" aria-pressed="false">✏️ Vẽ vùng mới</button>
+            <button type="button" id="btnPopUndo" title="Xóa đỉnh cuối (Backspace)" disabled>↶ Xóa đỉnh</button>
+          </div>
+          <div id="popDrawInfo" class="road-draw-info"></div>
+          <div class="cad-hint">Click lên bản đồ hiện trạng để đặt các đỉnh của vùng (tự khép kín). Dân số phường giữ nguyên: xóa pixel thì dân dồn sang các pixel còn lại của phường. Vùng thêm được áp sau vùng xóa. Esc: dừng vẽ.</div>
+          <button type="button" class="btn-submit" id="btnPopSave" disabled title="Ghi đè danh sách vùng hiệu chỉnh pop/edits.json trên bucket">💾 LƯU VÙNG (ADMIN)</button>
+          <div id="popStatus" class="rp-status" role="status" aria-live="polite"></div>
+          <div id="popList" class="cad-list"></div>
+        </div>
         </div>
       </div>
 

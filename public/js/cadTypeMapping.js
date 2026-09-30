@@ -1,7 +1,7 @@
 // Khớp thủ công loại hạ tầng khi file không đặt tên layer / thuộc tính theo quy ước mã loại:
 // người dùng chọn trường nhận diện (Layer, Folder, thuộc tính...), rồi gán từng giá trị tìm được với 1 loại hạ tầng.
 import { escapeHtml } from './utils.js';
-import { layerToType } from './cadImport.js';
+import { layerToType, tt16Layer } from './cadImport.js';
 
 // Mã loại cho ô chọn (khớp LAYER_PREFIXES; cấp đơn vị ở dùng mã gốc, cấp đô thị thêm _DT)
 export const TYPE_CODE_OPTIONS = [
@@ -67,7 +67,8 @@ function remember(value, code) {
 
 // DXF chỉ có tên layer; KML/GeoJSON có thêm thuộc tính do bộ đọc gom
 const attrsOf = (ent) => ent.attrs || { Layer: ent.layer };
-const isUnknown = (ent) => !layerToType(ent.layer);
+// Layer TT16 (kể cả loại đất ngoài 10 nhóm, Truonghoc chờ chọn cấp) không đưa vào khớp thủ công
+const isUnknown = (ent) => !tt16Layer(ent.layer) && !layerToType(ent.layer);
 
 /**
  * Tạo trạng thái khớp thủ công cho các thực thể chưa nhận diện được loại; null nếu mọi thực thể đều đúng quy ước.

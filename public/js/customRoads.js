@@ -7,6 +7,7 @@ import { map, wardNameAt, clearMeasure } from './mapEngine.js';
 import { escapeHtml, fmtNum } from './utils.js';
 import { postAdmin, refreshRoadsMeta } from './wardRoads.js';
 import { roadWaysAround } from './serviceArea.js';
+import { refreshRoadNetwork } from './roadNetworkLayer.js';
 
 const SNAP_M = 20;
 const NET_RADIUS_M = 1000;          // tải mạng lưới quanh đỉnh để bắt dính
@@ -39,6 +40,7 @@ function setStatus(text, color) {
 }
 
 const selectedType = () => Number($('roadType')?.value ?? 2);
+const drawing = () => state.adminDrawMode === 'road';
 const lengthM = (pts) => pts.slice(1).reduce((s, p, i) => s + distM(pts[i], p), 0);
 const fmtLen = (m) => (m >= 1000 ? `${fmtNum(Math.round(m / 10) / 100)} km` : `${fmtNum(Math.round(m))} m`);
 
@@ -100,7 +102,7 @@ function renderDraft() {
   if (info) {
     info.innerHTML = vertices.length
       ? `<b>${vertices.length}</b> đỉnh · dài <b>${fmtLen(lengthM(vertices))}</b> · <span style="color:#22c55e;">${snapped} đỉnh nối mạng lưới</span>`
-      : (state.roadDrawMode ? 'Click lên bản đồ hiện trạng để đặt đỉnh đầu tiên' : '');
+      : (drawing() ? 'Click lên bản đồ hiện trạng để đặt đỉnh đầu tiên' : '');
   }
   const save = $('btnRoadSave');
   if (save) save.disabled = vertices.length < 2 || busy;
@@ -164,6 +166,7 @@ async function persist(next, okText) {
   netNodes = new Map();
   renderRoads();
   await refreshRoadsMeta();
+  refreshRoadNetwork();
   setStatus(okText, 'var(--accent-green)');
 }
 
@@ -242,7 +245,8 @@ function zoomToRoad(id) {
 
 // ================== CHẾ ĐỘ VẼ ==================
 function setDrawing(on) {
-  state.roadDrawMode = on;
+  if (on) state.adminDrawMode = 'road';
+  else if (drawing()) state.adminDrawMode = null;
   if (on) {
     clearMeasure();
     state.isPickMode = false;
@@ -263,13 +267,17 @@ function syncPanel() {
   const visible = !!panel && panel.offsetParent !== null && state.currentUserRole === 'ADMIN';
   if (!map) return;
   if (visible) {
-    if (!listLayer) listLayer = L.layerGroup().addTo(map);
+    if (!listLayer) {
+      listLayer = L.layerGroup().addTo(map);
+      const chk = $('chk_roads');
+      if (chk && !chk.checked) chk.click();
+    }
     if (!drawLayer) drawLayer = L.layerGroup().addTo(map);
     if (!loaded) loadRoads();
     renderRoads();
     renderDraft();
   } else {
-    if (state.roadDrawMode) setDrawing(false);
+    if (drawing()) setDrawing(false);
     listLayer?.remove(); listLayer = null;
     drawLayer?.remove(); drawLayer = null;
     loaded = false;
@@ -286,9 +294,9 @@ export function refreshRoadPanel() {
 }
 
 export function initCustomRoads() {
-  document.querySelectorAll('.tab-btn, .add-mode-btn, .rp-collapse-btn, #btnExpandRightPanel')
+  document.querySelectorAll('.tab-btn, .add-mode-btn, .admin-sub-btn, .rp-collapse-btn, #btnExpandRightPanel')
     .forEach(b => b.addEventListener('click', refreshRoadPanel));
-  $('btnRoadDraw')?.addEventListener('click', () => setDrawing(!state.roadDrawMode));
+  $('btnRoadDraw')?.addEventListener('click', () => setDrawing(!drawing()));
   $('btnRoadUndo')?.addEventListener('click', () => { vertices.pop(); renderDraft(); });
   $('btnRoadSave')?.addEventListener('click', saveDraft);
   $('roadType')?.addEventListener('change', renderDraft);
@@ -299,7 +307,7 @@ export function initCustomRoads() {
     if (row) zoomToRoad(row.dataset.road);
   });
   document.addEventListener('keydown', (e) => {
-    if (!state.roadDrawMode || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if (!drawing() || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
     if (e.key === 'Escape') setDrawing(false);
     if ((e.key === 'Backspace' || (e.key === 'z' && (e.ctrlKey || e.metaKey))) && vertices.length) {
       e.preventDefault();

@@ -1,10 +1,11 @@
 const axios = require('axios');
 const crypto = require('crypto');
 const constants = require('../config/constants');
-const { initGEE, getGeeContext, eeEvaluate } = require('../services/geeService');
+const { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion } = require('../services/geeService');
 const { getRawDataList, getCadParcels, invalidateCache, getDataVersion } = require('../services/gcsService');
 const { requireAdmin, httpError } = require('../services/authService');
 const roads = require('../services/roadsService');
+const popEdits = require('../services/popEditsService');
 
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
@@ -215,34 +216,55 @@ function parseCadGeometry(g) {
   return out.length === 1 ? { type: 'Polygon', coordinates: out[0] } : { type: 'MultiPolygon', coordinates: out };
 }
 
-// 1 lô do trình duyệt gửi → dữ liệu ghi Sheet; null nếu không hợp lệ. Lô vắt ranh ghi quy mô 0
-function parseCadItem(it) {
+// Quy mô 1 giai đoạn của lô: { phase HT/QH, point, crossWard, area, size, layer, geometry }; null nếu không hợp lệ.
+// Điểm (không có ranh): quy mô ghi 0 = có công trình, chưa rõ diện tích. Lô vắt ranh ghi quy mô 0
+function parseCadStage(s, fallbackLayer) {
+  if (!s || typeof s !== 'object') return null;
+  const phase = s.phase === 'QH' || s.phase === 'HT' ? s.phase : null;
+  const area = Number(s.area);
+  const point = s.point === true;
+  if (!phase || !Number.isFinite(area) || area > 1e8 || (point ? area !== 0 : area <= 0)) return null;
+  const crossWard = !point && s.crossWard === true;
+  const areaRounded = Math.round(area * 10) / 10;
+  let geometry = point ? null : parseCadGeometry(s.geometry);
+  if (geometry && JSON.stringify(geometry).length > CAD_GEOJSON_MAX_CHARS) geometry = null;
+  return {
+    phase, point, crossWard, area: areaRounded, size: crossWard ? 0 : areaRounded,
+    layer: sanitizeSheetText(s.layer, 60) || fallbackLayer, geometry
+  };
+}
+
+// 1 lô do trình duyệt gửi → dữ liệu ghi Sheet; null nếu không hợp lệ.
+// it.stages: 1–2 giai đoạn khác nhau (cặp HT + QH cùng vị trí); không có thì 1 giai đoạn = defaultPhase (ô Giai đoạn)
+function parseCadItem(it, defaultPhase) {
   if (!it || typeof it !== 'object') return null;
   const type = String(it.type || '');
   const idPrefix = String(it.idPrefix || '').toUpperCase();
   if (!/^[A-Z_]{2,8}$/.test(idPrefix) || constants.codeMap[idPrefix] !== type) return null;
   const pt = parseCoordInBounds(it.lat, it.lng);
-  const area = Number(it.area);
   const ward = sanitizeSheetText(it.ward, 80);
   const layer = sanitizeSheetText(it.layer, 60) || idPrefix;
   const matchId = it.matchId ? String(it.matchId) : null;
-  // Điểm (không có ranh): quy mô ghi 0 = có công trình, chưa rõ diện tích; chỉ tạo mới
-  const point = it.point === true;
-  if (!pt || !ward || !Number.isFinite(area) || area > 1e8 || (point ? area !== 0 || matchId : area <= 0)) return null;
+  const rawStages = Array.isArray(it.stages) && it.stages.length ? it.stages
+    : [{ phase: defaultPhase, area: it.area, point: it.point, crossWard: it.crossWard, layer: it.layer, geometry: it.geometry }];
+  if (rawStages.length > 2) return null;
+  const stages = rawStages.map(s => parseCadStage(s, layer));
+  if (stages.some(s => !s) || new Set(stages.map(s => s.phase)).size !== stages.length) return null;
+  // Công trình chỉ có điểm: chỉ tạo mới
+  const point = stages.every(s => s.point);
+  if (!pt || !ward || (point && matchId)) return null;
   if (matchId && !/^[A-Za-z0-9_\-]{1,40}$/.test(matchId)) return null;
-  const crossWard = !point && it.crossWard === true;
-  const areaRounded = Math.round(area * 10) / 10;
-  let geometry = point ? null : parseCadGeometry(it.geometry);
-  if (geometry && JSON.stringify(geometry).length > CAD_GEOJSON_MAX_CHARS) geometry = null;
+  const first = stages[0];
   return {
     type, idPrefix,
     nhom: it.nhom === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở',
     name: sanitizeSheetText(it.name, 150) || `${layer} (DXF)`,
-    ward, layer, matchId, crossWard, point,
+    ward, layer, matchId, crossWard: first.crossWard, point,
     lat: pt.lat.toFixed(6), lng: pt.lng.toFixed(6),
-    area: areaRounded,
-    size: crossWard ? 0 : areaRounded,
-    geometry
+    area: first.area,
+    size: first.size,
+    geometry: first.geometry,
+    stages
   };
 }
 
@@ -291,6 +313,25 @@ function invalidateAllCaches() {
   invalidateCache();
   cachedWardStats = null;
   cachedCoverageByWard = {};
+}
+
+/**
+ * Áp vùng hiệu chỉnh dân cư mới nhất lên raster (đọc bucket tối đa 5 phút/lần; minVersion mới hơn bản đang áp → đọc ngay);
+ * đổi phiên bản → bỏ mọi số liệu tính theo dân cư
+ */
+async function syncPopEdits(minVersion = 0) {
+  let data;
+  try {
+    data = await popEdits.readPopEdits(minVersion > getPopEditsVersion());
+  } catch (err) {
+    console.warn('Đọc vùng hiệu chỉnh dân cư lỗi:', err.message);
+    return;
+  }
+  if (data.saved === getPopEditsVersion()) return;
+  applyPopEdits(data.saved, data.edits);
+  cachedWardStats = null;
+  cachedCoverageByWard = {};
+  wardPopPixelCache.clear();
 }
 
 // ============================ HÌNH HỌC PHƯỜNG ============================
@@ -823,13 +864,15 @@ function coverageItemsInWard(list, wardName, evaluatedWards) {
   return list.filter(it => isCoverageItem(it) && assignWardByGeometry(it.lng, it.lat, evaluatedWards) === wardName);
 }
 
-// Chữ ký dữ liệu đầu vào độ phủ: đổi khi thêm/bớt/duyệt/dời công trình hoặc đổi bán kính
+// Chữ ký dữ liệu đầu vào độ phủ: đổi khi thêm/bớt/duyệt/dời công trình, đổi bán kính hoặc Admin hiệu chỉnh pixel dân cư
 function coverageSignature(items) {
   const parts = items.map(it => [
     it.id, it.lat, it.lng, it.radius, constants.resolveTypeCode(it),
     constants.isUrbanLevel(it) ? 1 : 0, constants.isThptItem(it) ? 1 : 0
   ].join('|')).sort();
-  return crypto.createHash('md5').update(`v${COVERAGE_ALGO_VERSION}#${parts.join(';')}`).digest('hex').slice(0, 12);
+  const popVersion = getPopEditsVersion();
+  const head = `v${COVERAGE_ALGO_VERSION}${popVersion > 0 ? `p${popVersion}` : ''}`;
+  return crypto.createHash('md5').update(`${head}#${parts.join(';')}`).digest('hex').slice(0, 12);
 }
 
 function bandKeyForCode(code) {
@@ -1099,6 +1142,35 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, saved: true, at: payload.saved, count: list.length });
     }
 
+    // Vùng hiệu chỉnh raster dân cư (Admin vẽ xóa / thêm pixel dân cư) — đọc đầy đủ cho màn hình Admin
+    if (action === 'getPopEdits') {
+      const d = await popEdits.readPopEdits(true);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ v: 1, saved: d.saved, edits: d.edits });
+    }
+
+    // Ghi đè toàn bộ vùng hiệu chỉnh; base = phiên bản client đang sửa (khác bản trên bucket → 409)
+    if (action === 'savePopEdits') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const list = popEdits.parsePopEdits(body.edits);
+      if (!list) return res.status(400).json({ error: true, message: 'Dữ liệu vùng hiệu chỉnh dân cư không hợp lệ' });
+      const current = await popEdits.readPopEdits(true);
+      if (Math.round(Number(body.base) || 0) !== current.saved) {
+        return res.status(409).json({ error: true, message: 'Vùng hiệu chỉnh dân cư vừa được sửa ở phiên khác — mở lại panel để tải bản mới' });
+      }
+      const payload = { v: 1, saved: Date.now(), edits: list };
+      const content = JSON.stringify(payload);
+      if (content.length > popEdits.MAX_CHARS) return res.status(413).json({ error: true, message: 'Danh sách vùng hiệu chỉnh quá lớn' });
+      const result = await callAppsScript({ action: 'savePopEdits' }, { action: 'savePopEdits', content });
+      if (result.saved !== true) {
+        return res.status(502).json({ error: true, message: 'Apps Script chưa ghi được lên bucket (đã triển khai phiên bản mới của Code.gs chưa?)' });
+      }
+      popEdits.rememberPopEdits(payload);
+      return res.status(200).json({ success: true, saved: true, at: payload.saved, count: list.length });
+    }
+
     if (action === 'saveRoadNetwork') {
       requirePostFromApp(req);
       await requireAdmin(req);
@@ -1141,16 +1213,17 @@ module.exports = async (req, res) => {
       if (!rawItems.length || rawItems.length > CAD_BATCH_MAX) {
         return res.status(400).json({ error: true, message: `Mỗi lần gửi 1–${CAD_BATCH_MAX} lô` });
       }
+      const phase = body.phase === 'QH' ? 'QH' : 'HT';
       const items = [];
       for (let i = 0; i < rawItems.length; i++) {
-        const item = parseCadItem(rawItems[i]);
-        if (!item) return res.status(400).json({ error: true, message: `Lô thứ ${i + 1} không hợp lệ (loại, tọa độ, phường hoặc diện tích)` });
+        const item = parseCadItem(rawItems[i], phase);
+        if (!item) return res.status(400).json({ error: true, message: `Lô thứ ${i + 1} không hợp lệ (loại, tọa độ, phường, diện tích hoặc giai đoạn)` });
         items.push(item);
       }
       const sync = body.sync !== false;
       const result = await callAppsScript({ action: 'importCadBatch' }, {
         action: 'importCadBatch',
-        phase: body.phase === 'QH' ? 'QH' : 'HT',
+        phase,
         fileName: sanitizeSheetText(body.fileName, 120) || 'DXF',
         sync,
         items
@@ -1161,7 +1234,7 @@ module.exports = async (req, res) => {
         created: result.created || [],
         updated: result.updated || [],
         skipped: result.skipped || [],
-        polygonsDropped: items.filter(it => !it.geometry && !it.point).length
+        polygonsDropped: items.reduce((n, it) => n + it.stages.filter(s => !s.geometry && !s.point).length, 0)
       });
     }
 
@@ -1178,6 +1251,7 @@ module.exports = async (req, res) => {
     }
 
     await initGEE();
+    await syncPopEdits(Math.round(Number(req.query.pv) || 0));
     const { ee, wardVectorParsed, popRasterNormalized, popRasterNative, popProjection } = getGeeContext();
 
     // --- Thao tác cần Earth Engine nhưng không cần danh sách công trình ---
@@ -1285,7 +1359,8 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'getPopRasterTile') {
-      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
+      // pv: Admin vừa lưu vùng hiệu chỉnh → lấy ảnh mới ngay; người dùng khác nhận ảnh mới sau tối đa 5 phút
+      res.setHeader('Cache-Control', req.query.pv ? 'no-store' : 's-maxage=300, stale-while-revalidate=300');
       const mapId = await new Promise((resolve, reject) => {
         popRasterNormalized.getMap(
           { min: 0, max: 5, palette: ['blue', 'cyan', 'green', 'yellow', 'orange', 'red'] },

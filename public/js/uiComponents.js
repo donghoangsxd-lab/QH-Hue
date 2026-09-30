@@ -5,6 +5,7 @@ import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, 
 import { refreshWardCheck } from './wardCheck.js';
 import { fillWardRoadLengths, fillCityRoadDensity } from './wardRoads.js';
 import { refreshRoadPanel } from './customRoads.js';
+import { refreshPopPanel } from './popEdits.js';
 
 let chartInstance = null;
 let infraPieInstance = null;
@@ -160,6 +161,7 @@ function updateAuthUi() {
     if (!isAdmin && roadModeBtn.classList.contains('active')) document.querySelector('.add-mode-btn[data-mode="addSingle"]')?.click();
   }
   refreshRoadPanel();
+  refreshPopPanel();
   const gBtn = document.getElementById('googleSignInBtn');
   if (gBtn) gBtn.style.display = isAdmin ? 'none' : '';
   refreshWardCheck();

@@ -499,7 +499,7 @@ function createWardPie(ward, counts, total, maxTotal, targetMap, scenarioLabel) 
     direction: 'auto', offset: [size / 2 + 6, 0], className: 'ward-pie-tip', opacity: 1
   });
   marker.on('click', () => {
-    if (state.isPickMode || state.activeMeasureType || state.roadDrawMode) return;
+    if (state.isPickMode || state.activeMeasureType || state.adminDrawMode) return;
     targetMap.flyTo([ward.lat, ward.lng], PIE_CLICK_ZOOM);
   });
   return marker;
@@ -524,7 +524,7 @@ function createParcelShape(entry, targetMap) {
     bubblingMouseEvents: false
   });
   shape.on('click', () => {
-    if (state.isPickMode || state.activeMeasureType || state.roadDrawMode) return;
+    if (state.isPickMode || state.activeMeasureType || state.adminDrawMode) return;
     onPointClick(entry.point, targetMap);
   });
   return shape;
@@ -559,7 +559,7 @@ function createPointMarker(entry, mode, targetMap) {
     });
   }
   marker.on('click', () => {
-    if (state.isPickMode || state.activeMeasureType || state.roadDrawMode) return;
+    if (state.isPickMode || state.activeMeasureType || state.adminDrawMode) return;
     onPointClick(entry.point, targetMap);
   });
   return marker;
@@ -1132,14 +1132,17 @@ export function zoomToPoint(lat, lng, name) {
   flyToVisible([lat, lng], 17, { animate: true, duration: 1.2 });
 }
 
-export async function loadPopulationLayer() {
+/** pv: phiên bản vùng hiệu chỉnh dân cư Admin vừa lưu (bỏ qua cache CDN, thay ảnh đang hiển thị) */
+export async function loadPopulationLayer(pv) {
   if (!map) return;
   try {
-    const res = await fetch(geeApi('action=getPopRasterTile'));
+    const res = await fetch(geeApi(`action=getPopRasterTile${pv ? `&pv=${pv}` : ''}`));
     const data = await res.json();
     if (data.urlFormat) {
       const popOpacityEl = document.getElementById('popOpacity');
       const opacity = popOpacityEl ? popOpacityEl.value / 100 : 0.6;
+      layers.pop.clearLayers();
+      planLayers.pop?.clearLayers();
       layers.pop.addLayer(L.tileLayer(data.urlFormat, { opacity }));
       planLayers.pop.addLayer(L.tileLayer(data.urlFormat, { opacity }));
     }

@@ -604,6 +604,7 @@ function doPost(e) {
     if (body.action === "importCadBatch") return jsonOutput(importCadBatch(body));
     if (body.action === "markWardNotes") return jsonOutput(markWardNotes(body));
     if (body.action === "saveRoads") return jsonOutput(saveRoads(body));
+    if (body.action === "savePopEdits") return jsonOutput(savePopEdits(body));
     return jsonOutput({ "error": "Action không hợp lệ" });
   } catch (err) {
     return jsonOutput({ "error": err.toString() });
@@ -612,9 +613,11 @@ function doPost(e) {
 
 /**
  * Nhập lô đất từ DXF/KML/KMZ. body = { phase: 'HT'|'QH', fileName, sync, items: [{ type, idPrefix, nhom, name, ward,
- * lat, lng, size, area, crossWard, layer, matchId, geometry }] }
- * - matchId có trong Sheet → cập nhật tọa độ, phường, quy mô giai đoạn đang nhập; không có → thêm dòng mới
- * - Chỉ ghi cột quy mô của giai đoạn đang nhập (HT → QuyMo_HT, QH → QuyMo_QH), cột còn lại để trống
+ * lat, lng, size, area, crossWard, layer, matchId, geometry, stages }] }
+ * - stages: [{ phase, size, area, point, crossWard, layer, geometry }] — 1 giai đoạn, hoặc 2 (lô HT + QH cùng vị trí,
+ *   tên layer theo TT16); không có stages thì 1 giai đoạn = body.phase với size / area / geometry của item
+ * - matchId có trong Sheet → cập nhật tọa độ, phường, quy mô các giai đoạn đang nhập; không có → thêm dòng mới
+ * - Chỉ ghi cột quy mô của giai đoạn đang nhập (HT → QuyMo_HT, QH → QuyMo_QH), cột còn lại để nguyên / trống
  * - BanKinh tạm = CAD_DEFAULT_RADIUS (dòng mới, hoặc dòng cập nhật đang trống bán kính)
  * - sync = false: chưa đẩy lên bucket (máy chủ gửi nhiều phần, chỉ phần cuối đồng bộ)
  */
@@ -655,15 +658,24 @@ function importCadBatch(body) {
         skipped.push(it.layer + ": không có tab " + it.type + " hợp lệ");
         return;
       }
-      var qCol = phase === 'QH' ? c.col.quyMoQH : c.col.quyMoHT;
-      if (qCol < 0) {
-        skipped.push(it.layer + ": tab " + c.sheet.getName() + " thiếu cột QuyMo_" + phase);
-        return;
+      var stages = Array.isArray(it.stages) && it.stages.length ? it.stages
+        : [{ phase: phase, size: it.size, area: it.area, point: it.point, crossWard: it.crossWard, layer: it.layer, geometry: it.geometry }];
+      var qCols = [];
+      for (var k = 0; k < stages.length; k++) {
+        stages[k].phase = stages[k].phase === 'QH' ? 'QH' : 'HT';
+        var qc = stages[k].phase === 'QH' ? c.col.quyMoQH : c.col.quyMoHT;
+        if (qc < 0) {
+          skipped.push(it.layer + ": tab " + c.sheet.getName() + " thiếu cột QuyMo_" + stages[k].phase);
+          return;
+        }
+        qCols.push(qc);
       }
 
-      var note = "Nhập từ file " + fileName + " (layer " + it.layer + ")"
-        + (it.point ? "; dạng điểm, chưa có diện tích" : "")
-        + (it.crossWard ? "; vắt ranh phường, diện tích thật " + it.area + " m²" : "");
+      var note = "Nhập từ file " + fileName + " (" + stages.map(function(st) {
+        return "layer " + st.layer + " → QuyMo_" + st.phase
+          + (st.point ? ", dạng điểm, chưa có diện tích" : "")
+          + (st.crossWard ? ", vắt ranh phường, diện tích thật " + st.area + " m²" : "");
+      }).join("; ") + ")";
       var r = it.matchId ? c.idRow[it.matchId] : undefined;
       var id;
 
@@ -675,7 +687,7 @@ function importCadBatch(body) {
         c.sheet.getRange(sheetRow, c.col.lat + 1).setValue(Number(it.lat));
         c.sheet.getRange(sheetRow, c.col.lng + 1).setValue(Number(it.lng));
         if (c.col.ward >= 0) c.sheet.getRange(sheetRow, c.col.ward + 1).setValue(sheetWard(it.ward));
-        c.sheet.getRange(sheetRow, qCol + 1).setValue(it.size);
+        stages.forEach(function(st, k) { c.sheet.getRange(sheetRow, qCols[k] + 1).setValue(st.size); });
         if (c.col.banKinh >= 0 && String(cellAt(c.data[r], c.col.banKinh) || '').trim() === '') {
           c.sheet.getRange(sheetRow, c.col.banKinh + 1).setValue(CAD_DEFAULT_RADIUS);
         }
@@ -693,7 +705,7 @@ function importCadBatch(body) {
         set(c.col.nhom, sheetNhom(it.nhom));
         set(c.col.lat, Number(it.lat));
         set(c.col.lng, Number(it.lng));
-        set(qCol, it.size);
+        stages.forEach(function(st, k) { set(qCols[k], st.size); });
         set(c.col.banKinh, CAD_DEFAULT_RADIUS);
         set(c.col.trangThai, true);
         set(c.col.thoiGian, currentTime);
@@ -701,7 +713,9 @@ function importCadBatch(body) {
         c.newRows.push(row);
         created.push(id);
       }
-      if (it.geometry) polygons.push({ id: id, layer: it.layer, area: it.area, geometry: it.geometry });
+      stages.forEach(function(st) {
+        if (st.geometry) polygons.push({ id: id, layer: st.layer, area: st.area, geometry: st.geometry, phase: st.phase });
+      });
     });
 
     // Dòng mới ghi 1 lần mỗi tab, chép định dạng + danh sách chọn (Nhom_HaTang, TrangThai) từ dòng dữ liệu cuối
@@ -739,6 +753,13 @@ function saveRoads(body) {
   if (!/^(net_[a-z0-9-]{1,60}_\d{1,2}|index|custom)$/.test(key)) return { "error": "Tên file mạng lưới đường không hợp lệ" };
   if (!content || content.length > 8000000) return { "error": "Dữ liệu mạng lưới đường rỗng hoặc quá lớn" };
   return { "success": true, "saved": uploadToGCS(content, "roads/v2/" + key + ".json") };
+}
+
+// VÙNG HIỆU CHỈNH RASTER DÂN CƯ (Admin vẽ xóa / thêm pixel dân cư) → file pop/edits.json (ghi đè toàn bộ)
+function savePopEdits(body) {
+  var content = String(body.content || '');
+  if (!content || content.length > 2000000) return { "error": "Dữ liệu vùng hiệu chỉnh dân cư rỗng hoặc quá lớn" };
+  return { "success": true, "saved": uploadToGCS(content, "pop/edits.json") };
 }
 
 // ĐỐI CHIẾU PHƯỜNG: dấu nhắc trong cột Note, VD "⚠ Phường/xã theo tọa độ: Thuận Hóa" (các mục trong Note cách nhau " | ")
@@ -848,8 +869,9 @@ function upsertCadPolygons(ss, polygons, fileName, currentTime, phase) {
 
   var appends = [];
   polygons.forEach(function(p) {
-    var values = [p.id, p.layer, p.area, fileName, currentTime, JSON.stringify(p.geometry), phase];
-    var r = rowOf[p.id + '|' + phase];
+    var ph = p.phase === 'QH' || p.phase === 'HT' ? p.phase : phase;
+    var values = [p.id, p.layer, p.area, fileName, currentTime, JSON.stringify(p.geometry), ph];
+    var r = rowOf[p.id + '|' + ph];
     if (r) sheet.getRange(r, 1, 1, values.length).setValues([values]);
     else appends.push(values);
   });

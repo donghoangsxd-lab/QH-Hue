@@ -290,6 +290,7 @@ body.right-collapsed .right-panel {
 .layer-row label { cursor: pointer; color: var(--text-main); }
 .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 13px; height: 13px; margin: 0 6px 0 0; vertical-align: middle; }
 .layer-row .layer-hint { color: var(--text-muted, #94a3b8); font-size: 9.5px; }
+.road-legend.layer-legend { margin: 0 0 4px 22px; flex-wrap: wrap; row-gap: 2px; }
 .btn-dot-buffer { width: 16px; height: 16px; padding: 0; border: none; font-family: inherit; line-height: 1; border-radius: 50%; background: #475569; color: #fff; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; flex-shrink: 0; }
 .btn-dot-buffer.active { background: var(--accent-orange); box-shadow: 0 0 8px var(--accent-orange); }
 .rp-settings { margin-top: 5px; border-top: 1px dashed var(--border-color); padding-top: 3px; }
@@ -372,17 +373,22 @@ body.right-collapsed .right-panel {
 .cad-codes code { text-align: center; padding: 0 4px; border-radius: 3px; background: rgba(34, 211, 238, 0.1); border: 1px solid rgba(34, 211, 238, 0.25); }
 .cad-codes span { color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cad-hint-note { font-size: 9.5px; }
+.cad-hint-tt16 { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border-color); }
+.cad-hint-tt16 b { color: var(--text-main); }
 /* ĐỀ XUẤT: Admin vẽ bổ sung tuyến đường */
 .road-draw-actions { display: flex; gap: 4px; margin-top: 8px; }
 .road-draw-actions button { flex: 1; height: 26px; border: 1px solid var(--border-color); border-radius: 5px; background: rgba(15, 23, 42, 0.8); color: var(--text-main); font-size: 10.5px; font-weight: 600; cursor: pointer; }
 .road-draw-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
-#btnRoadDraw { flex: 1.4; border-color: var(--accent-cyan); color: var(--accent-cyan); }
-#btnRoadDraw.active { background: var(--accent-cyan); color: var(--bg-panel); }
+#btnRoadDraw, #btnPopDraw { flex: 1.4; border-color: var(--accent-cyan); color: var(--accent-cyan); }
+#btnRoadDraw.active, #btnPopDraw.active { background: var(--accent-cyan); color: var(--bg-panel); }
 .road-draw-info { margin-top: 5px; font-size: 10.5px; color: var(--text-muted); text-align: center; }
 .road-draw-info:empty { display: none; }
 .road-draw-info b { color: var(--text-main); }
-#addRoad .btn-submit:disabled { opacity: 0.45; cursor: not-allowed; }
-#roadList:empty { display: none; }
+#addAdmin .btn-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+#roadList:empty, #popList:empty { display: none; }
+.admin-sub-switch { display: flex; gap: 4px; margin-bottom: 8px; }
+.admin-sub-btn { flex: 1; padding: 4px; border: 1px solid var(--border-color); border-radius: 5px; background: transparent; color: var(--text-muted); font-size: 10.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.admin-sub-btn.active { border-color: var(--accent-orange); color: var(--accent-orange); background: rgba(251, 146, 60, 0.1); }
 .road-del { flex-shrink: 0; width: 24px; height: 22px; padding: 0; border: none; border-radius: 4px; background: transparent; cursor: pointer; font-size: 12px; }
 .road-del:hover { background: rgba(248, 113, 113, 0.2); }
 #addBulk:has(#cadReport:not(:empty)) .cad-hint { display: none; }
@@ -415,6 +421,24 @@ body.right-collapsed .right-panel {
 .cad-clear:hover { color: var(--accent-red); border-color: var(--accent-red); }
 .cad-filter { margin-top: 3px; font-weight: normal; color: var(--text-muted); line-height: 1.4; }
 .cad-filter b { color: var(--text-main); }
+.cad-row.reviewing { background: rgba(250, 204, 21, 0.16); box-shadow: inset 2px 0 0 #facc15; }
+/* Duyệt từng lô Truonghoc thiếu hậu tố cấp trường */
+.cad-review { margin-top: 6px; padding: 6px; border: 1px solid rgba(250, 204, 21, 0.55); border-radius: 6px; background: rgba(250, 204, 21, 0.07); line-height: 1.35; }
+.cad-review.done { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.cad-review-head { font-weight: 600; }
+.cad-review-head b { color: #facc15; }
+.cad-review-info { margin: 2px 0 5px; color: var(--text-muted); overflow-wrap: anywhere; }
+.cad-review-btns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.cad-review-btns button, .cad-review-nav button, .cad-review.done button {
+  padding: 4px 2px; font-size: 10px; font-weight: 600; font-family: inherit; white-space: nowrap; cursor: pointer;
+  color: var(--text-main); background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color); border-radius: 4px;
+}
+.cad-rev-btn:hover, .cad-rev-btn.on { border-color: #4ade80; color: #4ade80; background: rgba(34, 197, 94, 0.14); }
+.cad-rev-btn.rej:hover, .cad-rev-btn.rej.on { border-color: var(--accent-red); color: var(--accent-red); background: rgba(248, 113, 113, 0.14); }
+.cad-review-nav { display: flex; gap: 4px; margin-top: 4px; }
+.cad-review-nav button { flex: 1; font-weight: 500; color: var(--text-muted); }
+.cad-review-nav button:hover, .cad-review.done button:hover { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+.cad-review.done button { flex-shrink: 0; padding: 3px 8px; }
 /* Khớp thủ công layer / thuộc tính → loại hạ tầng */
 .cad-map { margin-top: 6px; padding: 6px; border: 1px solid rgba(251, 146, 60, 0.45); border-radius: 6px; background: rgba(251, 146, 60, 0.05); }
 .cad-map-head { font-weight: 600; margin-bottom: 4px; }

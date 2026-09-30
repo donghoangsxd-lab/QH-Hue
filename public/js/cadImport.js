@@ -268,8 +268,8 @@ function readPoint(tags, i) {
   return [ent, i];
 }
 
-// Tên hiển thị của đối tượng DXF bị bỏ qua (bộ lọc mặc định chỉ nhận HATCH, polyline khép kín, POINT)
-const DXF_SKIP_LABEL = { LINE: 'line', TEXT: 'text', MTEXT: 'mtext', INSERT: 'block', ATTDEF: 'attdef', DIMENSION: 'dimension' };
+// Tên hiển thị của đối tượng DXF bị bỏ qua (chỉ nhận HATCH và polyline khép kín)
+const DXF_SKIP_LABEL = { LINE: 'line', TEXT: 'text', MTEXT: 'mtext', INSERT: 'block', ATTDEF: 'attdef', DIMENSION: 'dimension', POINT: 'point' };
 
 /** Thêm 1 đối tượng bị bỏ qua vào stats.skipped ({ nhãn: số lượng }) */
 export function countSkipped(stats, label, n = 1) {
@@ -277,12 +277,13 @@ export function countSkipped(stats, label, n = 1) {
 }
 
 /**
- * Đọc DXF (văn bản) → { entities: [{kind, layer, rings, pt?}], stats } — chỉ HATCH, LWPOLYLINE / POLYLINE khép kín và POINT
- * trong ENTITIES; mọi đối tượng khác (line, pline hở, text, mtext, block...) đếm vào stats.skipped.
+ * Đọc DXF (văn bản) → { entities: [{kind, layer, rings}], stats } — chỉ HATCH và LWPOLYLINE / POLYLINE khép kín trong ENTITIES;
+ * layer đã có hatch thì bỏ polyline kín của layer đó (ranh hatch, đường bao công trình...).
+ * Mọi đối tượng khác (line, pline hở, point, text, mtext, dim, block...) đếm vào stats.skipped.
  */
 export function parseDxf(text) {
   const tags = readTags(text);
-  const stats = { hatch: 0, polyline: 0, point: 0, insert: 0, splineEdges: 0, skipped: {}, insUnits: null };
+  const stats = { hatch: 0, polyline: 0, insert: 0, splineEdges: 0, skipped: {}, insUnits: null };
   const entities = [];
   let section = null;
   for (let i = 0; i < tags.length;) {
@@ -296,21 +297,25 @@ export function parseDxf(text) {
     if (v === 'HATCH') { [ent, i] = readHatch(tags, i + 1, stats); }
     else if (v === 'LWPOLYLINE') { [ent, i] = readLwPolyline(tags, i + 1); }
     else if (v === 'POLYLINE') { [ent, i] = readPolyline(tags, i + 1); }
-    else if (v === 'POINT') { [ent, i] = readPoint(tags, i + 1); }
     else {
       if (v === 'INSERT') stats.insert++;
       countSkipped(stats, DXF_SKIP_LABEL[v] || v.toLowerCase());
       for (i++; i < tags.length && tags[i][0] !== 0; i++);
       continue;
     }
-    if (ent.kind === 'POINT') {
-      if (ent.pt) { entities.push(ent); stats.point++; } else countSkipped(stats, 'point lỗi tọa độ');
-    } else if (ent.rings.length) {
+    if (ent.rings.length) {
       entities.push(ent);
       if (ent.kind === 'HATCH') stats.hatch++; else stats.polyline++;
     } else countSkipped(stats, ent.kind === 'HATCH' ? 'hatch lỗi biên' : 'pline hở');
   }
-  return { entities, stats };
+  const hatchLayers = new Set(entities.filter(e => e.kind === 'HATCH').map(e => e.layer));
+  const kept = entities.filter(e => e.kind === 'HATCH' || !hatchLayers.has(e.layer));
+  const dropped = entities.length - kept.length;
+  if (dropped) {
+    stats.polyline -= dropped;
+    countSkipped(stats, 'polyline kín ở layer đã có hatch', dropped);
+  }
+  return { entities: kept, stats };
 }
 
 // ============================ HÌNH HỌC (mét, VN-2000) ============================
@@ -418,8 +423,69 @@ export const LAYER_PREFIXES = {
 };
 const PREFIX_KEYS = Object.keys(LAYER_PREFIXES).sort((a, b) => b.length - a.length);
 
-/** Tên layer → { prefix, type, nhom } hoặc null. Nhận đúng mã hoặc mã + phần đuôi sau dấu _ - khoảng trắng (VD "MN_QH") */
+// ---- Tên layer theo TT 16/2025/TT-BXD (Phụ lục I): <tiền tố>_<loại đất>[_<hậu tố>] ----
+// Tiền tố → cột quy mô: HT_ → QuyMo_HT; QHDD_ / QHDH_ (QHC, QHPK) và QH_ (QHCT 1/500) → QuyMo_QH
+const TT16_PHASE = { HT: 'HT', QHDD: 'QH', QHDH: 'QH', QH: 'QH' };
+// Loại đất TT16 thuộc 10 nhóm webapp (viết hoa, không dấu) → mã gốc; urban: loại đất vốn cấp đô thị khi không có hậu tố.
+// SCHOOL: Truonghoc cần hậu tố _MN / _TH / _THCS, thiếu thì admin chọn từng lô.
+const TT16_LANDS = {
+  DAT_DD_CAYXANHCCDOTHI: { code: 'CV', urban: true },
+  DAT_HTXH_CAYXANHCC: { code: 'CV' }, DAT_CTHTXH_CAYXANHCC: { code: 'CV' }, DAT_KXD_CAYXANHCC: { code: 'CV' },
+  DAT_HTKT_BAIDOXE: { code: 'BDX' }, DAT_CTHTKT_BAIDOXE: { code: 'BDX' },
+  DAT_DD_TRUONGTHPT: { code: 'THPT' }, DAT_HTXH_TRUONGTHPT: { code: 'THPT' }, DAT_CTHTXH_TRUONGTHPT: { code: 'THPT' },
+  DAT_DD_TRUONGHOC: { code: 'SCHOOL' }, DAT_HTXH_TRUONGHOC: { code: 'SCHOOL' }, DAT_CTHTXH_TRUONGHOC: { code: 'SCHOOL' },
+  DAT_NDD_YTE: { code: 'YT', urban: true },
+  DAT_HTXH_YTE: { code: 'YT' }, DAT_CTHTXH_YTE: { code: 'YT' }, DAT_KXD_YTE: { code: 'YT' },
+  DAT_NDD_VANHOATHETHAO: { code: 'VH', urban: true },
+  DAT_HTXH_VANHOA: { code: 'VH' }, DAT_HTXH_THEDUCTHETHAO: { code: 'VH' },
+  DAT_CTHTXH_VANHOA: { code: 'VH' }, DAT_CTHTXH_THEDUCTHETHAO: { code: 'VH' }, DAT_KXD_VANHOATHETHAO: { code: 'VH' },
+  DAT_CTHTXD_THUONGMAIDV: { code: 'TM' }, DAT_CTHTXH_THUONGMAIDV: { code: 'TM' }, DAT_DICHVU: { code: 'TM' }
+};
+const TT16_URBAN_SUFFIX = new Set(['CT', 'CV', 'QG']);
+const TT16_SCHOOL_SUFFIX = new Set(['MN', 'TH', 'THCS']);
+const TT16_SUFFIX = new Set([...TT16_URBAN_SUFFIX, ...TT16_SCHOOL_SUFFIX, 'DVO']);
+// Mã có biến thể cấp đô thị (_DT) trong LAYER_PREFIXES
+const URBAN_CODES = new Set(['CV', 'BDX', 'YT', 'VH', 'TM']);
+
+/**
+ * Tên layer TT16 → null (không theo TT16) hoặc { tt16, phase (HT/QH), stage (HT/QHDD/QHDH/QH), ... }:
+ *   - thuộc 10 nhóm: thêm { prefix, type, nhom } như layerToType
+ *   - Truonghoc thiếu hậu tố cấp trường: { school: true }
+ *   - loại đất TT16 ngoài 10 nhóm (hoặc hậu tố lạ): { other: true }
+ * Hậu tố _CT / _CV / _QG → cấp đô thị, _DVO → cấp đơn vị ở; không có hậu tố → theo loại đất.
+ */
+export function tt16Layer(layerName) {
+  const parts = String(layerName || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/gi, 'D').toUpperCase().split(/[_\s]+/).filter(Boolean);
+  const stage = parts[0];
+  if (!TT16_PHASE[stage] || parts[1] !== 'DAT') return null;
+  const phase = TT16_PHASE[stage];
+  const core = parts.slice(1);
+  const suffixes = [];
+  while (core.length > 2 && suffixes.length < 2 && !TT16_LANDS[core.join('_')] && TT16_SUFFIX.has(core[core.length - 1])) {
+    suffixes.unshift(core.pop());
+  }
+  const land = TT16_LANDS[core.join('_')];
+  if (!land) return { tt16: true, other: true, phase, stage };
+  let code = land.code;
+  if (code === 'SCHOOL') {
+    const level = suffixes.find(s => TT16_SCHOOL_SUFFIX.has(s));
+    if (!level) return { tt16: true, school: true, phase, stage };
+    code = level;
+  }
+  const urban = suffixes.some(s => TT16_URBAN_SUFFIX.has(s)) || (!suffixes.includes('DVO') && !!land.urban);
+  const prefix = urban && URBAN_CODES.has(code) ? `${code}_DT` : code;
+  const nhom = prefix === 'THPT' || prefix.endsWith('_DT') ? 'Cấp đô thị' : 'Cấp đơn vị ở';
+  return { tt16: true, phase, stage, prefix, type: LAYER_PREFIXES[prefix], nhom };
+}
+
+/**
+ * Tên layer → { prefix, type, nhom } hoặc null. Nhận tên TT16 (tt16Layer), đúng mã webapp
+ * hoặc mã + phần đuôi sau dấu _ - khoảng trắng (VD "MN_QH")
+ */
 export function layerToType(layerName) {
+  const tt = tt16Layer(layerName);
+  if (tt) return tt.prefix ? { prefix: tt.prefix, type: tt.type, nhom: tt.nhom } : null;
   const name = String(layerName || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
   const prefix = LAYER_PREFIXES[name] ? name : PREFIX_KEYS.find(k => name.startsWith(k + '_'));
   if (!prefix) return null;
@@ -465,30 +531,44 @@ function metersApart(a, b) {
  * Thực thể → lô đất: { layer, name, prefix, type, nhom, area (m²), lat, lng, polygons ([[lng,lat]...] theo vòng) }
  * project(ent) → { toXY(x, y) → [X, Y] mét trên mặt phẳng, toLatLng(X, Y) → [lat, lng] }.
  * Đường khép kín trùng với vùng tô cùng layer (cùng tâm < 1 m, diện tích lệch < 1%) được bỏ để không đếm 2 lần.
- * Thực thể POINT → công trình dạng điểm (area 0, polygons []); điểm nằm trong lô cùng loại của file được bỏ (điểm ghi chú của lô).
+ * Thực thể POINT → công trình dạng điểm (area 0, polygons []); điểm nằm trong lô cùng loại, cùng giai đoạn của file được bỏ.
+ * Layer TT16: lô mang phase / stage theo tiền tố; Truonghoc thiếu hậu tố → lô chờ chọn cấp (school, pending, type SCHOOL_PENDING);
+ * loại đất TT16 ngoài 10 nhóm → tt16Other (bỏ qua).
  */
+export const SCHOOL_PENDING = 'SCHOOL';
+
 function makeParcels(entities, project) {
   const parcels = [];
   const unknownLayers = {};
-  for (const ent of entities) {
+  const tt16Other = {};
+  entities.forEach((ent, src) => {
+    const tt = tt16Layer(ent.layer);
+    if (tt && tt.other && !ent.typeCode) { tt16Other[ent.layer] = (tt16Other[ent.layer] || 0) + 1; return; }
     // typeCode: mã loại người dùng khớp thủ công cho layer/thuộc tính không theo quy ước
-    const t = layerToType(ent.typeCode || ent.layer);
-    if (!t) { unknownLayers[ent.layer] = (unknownLayers[ent.layer] || 0) + 1; continue; }
+    const t = ent.typeCode ? layerToType(ent.typeCode)
+      : tt && tt.school ? { prefix: '', type: SCHOOL_PENDING, nhom: 'Cấp đơn vị ở' }
+        : layerToType(ent.layer);
+    if (!t) { unknownLayers[ent.layer] = (unknownLayers[ent.layer] || 0) + 1; return; }
+    const tag = {
+      src, prefix: t.prefix, type: t.type, nhom: t.nhom, manual: !!ent.typeCode,
+      tt16: !!tt, phase: tt ? tt.phase : null, stage: tt ? tt.stage : null,
+      school: !!(tt && tt.school && !ent.typeCode), pending: !!(tt && tt.school && !ent.typeCode)
+    };
     const { toXY, toLatLng } = project(ent);
     if (ent.kind === 'POINT') {
       const [lat, lng] = toLatLng(...toXY(ent.pt[0], ent.pt[1]));
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
       parcels.push({
-        kind: 'POINT', layer: ent.layer, name: ent.name || '', handle: null, manual: !!ent.typeCode, ...t,
+        kind: 'POINT', layer: ent.layer, name: ent.name || '', handle: null, ...tag,
         area: 0, lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6, polygons: []
       });
-      continue;
+      return;
     }
     const rings = ent.rings.map(r => r.map(([x, y]) => toXY(x, y)));
     const polys = buildPolygons(rings);
-    if (!polys.length) continue;
+    if (!polys.length) return;
     const area = polys.reduce((s, p) => s + p.area, 0);
-    if (!(area > 0)) continue;
+    if (!(area > 0)) return;
     const main = polys.reduce((a, b) => (b.area > a.area ? b : a));
     // Tâm chung của mọi mảnh (trừ lỗ); rơi ra ngoài lô thì lấy điểm nằm sâu trong mảnh lớn nhất
     let sx = 0, sy = 0;
@@ -503,7 +583,7 @@ function makeParcels(entities, project) {
     const [cE, cN] = polys.some(p => pointInPolygon(whole[0], whole[1], p.rings)) ? whole : interiorPoint(main.rings);
     const [lat, lng] = toLatLng(cE, cN);
     parcels.push({
-      kind: ent.kind, layer: ent.layer, name: ent.name || '', handle: ent.handle || null, manual: !!ent.typeCode, ...t,
+      kind: ent.kind, layer: ent.layer, name: ent.name || '', handle: ent.handle || null, ...tag,
       area: Math.round(area * 10) / 10,
       lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6,
       polygons: polys.map(p => p.rings.map(r => {
@@ -512,7 +592,7 @@ function makeParcels(entities, project) {
         return ring;
       }))
     });
-  }
+  });
 
   // Hatch bị cắt thành nhiều mảnh sát nhau → gộp lại 1 khối (cần turf toàn cục; không có thì giữ nguyên các mảnh)
   if (typeof turf !== 'undefined') {
@@ -533,7 +613,7 @@ function makeParcels(entities, project) {
   let pointsInLots = 0;
   const kept = parcels.filter(p => {
     if (p.kind === 'POINT') {
-      const inLot = areas.some(a => a.type === p.type && inPolys(p.lng, p.lat, a.polygons));
+      const inLot = areas.some(a => a.type === p.type && a.phase === p.phase && inPolys(p.lng, p.lat, a.polygons));
       if (inLot) pointsInLots++;
       return !inLot;
     }
@@ -541,7 +621,7 @@ function makeParcels(entities, project) {
       && metersApart(h, p) < 1
       && Math.abs(h.area - p.area) <= 0.01 * h.area));
   });
-  return { parcels: kept, duplicatesDropped: parcels.length - kept.length - pointsInLots, pointsInLots, unknownLayers };
+  return { parcels: kept, duplicatesDropped: parcels.length - kept.length - pointsInLots, pointsInLots, unknownLayers, tt16Other };
 }
 
 /** Thực thể DXF (VN-2000) → { parcels, duplicatesDropped, unknownLayers, axes } */
@@ -660,7 +740,7 @@ const POINT_EXISTING_M = 20;
 
 /**
  * Lô chứa công trình cùng loại đã có → cập nhật công trình đó (p.matchId). Nhiều công trình trong 1 lô,
- * hoặc 1 công trình nằm trong nhiều lô → p.matchConflict (danh sách ID) để admin chọn.
+ * hoặc 1 công trình nằm trong nhiều lô cùng giai đoạn → p.matchConflict (danh sách ID) để admin chọn.
  * Điểm (không có ranh) gần công trình cùng loại < POINT_EXISTING_M → p.existingId (bỏ qua khi ghi).
  */
 export function matchExisting(parcels, existing) {
@@ -685,15 +765,51 @@ export function matchExisting(parcels, existing) {
       if (p.kind === 'POINT' || p.type !== it.type || x < b[0] || x > b[2] || y < b[1] || y > b[3]) return;
       if (!inPolys(x, y, p.polygons)) return;
       byParcel[k].push(it.id);
-      byItem.set(it.id, (byItem.get(it.id) || 0) + 1);
+      const key = `${p.phase || ''}|${it.id}`;
+      byItem.set(key, (byItem.get(key) || 0) + 1);
     });
   }
   parcels.forEach((p, k) => {
     const ids = byParcel[k];
     p.matchId = null;
     p.matchConflict = null;
-    if (ids.length === 1 && byItem.get(ids[0]) === 1) p.matchId = ids[0];
+    if (ids.length === 1 && byItem.get(`${p.phase || ''}|${ids[0]}`) === 1) p.matchId = ids[0];
     else if (ids.length) p.matchConflict = ids;
   });
   return parcels;
+}
+
+/** 2 lô cùng loại (cùng mã ID) ở cùng vị trí: tâm lô này nằm trong lô kia; 2 điểm thì cách nhau < POINT_EXISTING_M */
+export function sameSite(a, b) {
+  if (a.type !== b.type || a.prefix !== b.prefix) return false;
+  const pa = a.polygons.length > 0, pb = b.polygons.length > 0;
+  if (!pa && !pb) return metersApart(a, b) < POINT_EXISTING_M;
+  return (pb && inPolys(a.lng, a.lat, b.polygons)) || (pa && inPolys(b.lng, b.lat, a.polygons));
+}
+
+/**
+ * Nối các giai đoạn của lô TT16 (chạy sau matchExisting; bỏ qua lô chờ chọn cấp / bị từ chối):
+ *   - QHDD trùng vị trí QHDH → bỏ QHDD (cả hai cùng ghi QuyMo_QH, lấy quy hoạch phân khu chi tiết hơn)
+ *   - HT + QH cùng vị trí → 1 công trình ghi cả QuyMo_HT và QuyMo_QH: lô HT có p.partner = lô QH, lô QH có p.merged
+ * Lô vắt ranh vẫn nối; lô ngoài TP, lô chứa nhiều công trình, điểm đã có thì giữ riêng.
+ * → { parcels, stageDupes (số lô QHDD bị bỏ) }
+ */
+export function linkStages(parcels) {
+  const usable = (p) => p.stage && !p.pending && !p.rejected;
+  const qhdh = parcels.filter(p => usable(p) && p.stage === 'QHDH');
+  const kept = qhdh.length ? parcels.filter(p => !(usable(p) && p.stage === 'QHDD' && qhdh.some(q => sameSite(p, q)))) : parcels.slice();
+  kept.forEach(p => { p.partner = null; p.merged = false; });
+  const single = (p) => usable(p) && p.ward && !p.matchConflict && !p.existingId;
+  const hts = kept.filter(p => single(p) && p.phase === 'HT');
+  kept.forEach(q => {
+    if (!single(q) || q.phase !== 'QH') return;
+    let best = null, bestD = Infinity;
+    for (const h of hts) {
+      if (h.partner || (h.matchId && q.matchId && h.matchId !== q.matchId) || !sameSite(h, q)) continue;
+      const d = metersApart(h, q);
+      if (d < bestD) { bestD = d; best = h; }
+    }
+    if (best) { best.partner = q; q.merged = true; }
+  });
+  return { parcels: kept, stageDupes: parcels.length - kept.length };
 }
