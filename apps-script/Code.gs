@@ -9,7 +9,6 @@ const GEOJSON_FILE_NAME = "infrastructure_hue.json";
 const CAD_FILE_NAME = "cad_parcels.json";
 const CAD_SHEET_NAME = "CAD_Polygon";
 const CAD_HEADERS = ["ID_DoiTuong", "Layer", "DienTich", "File", "ThoiGianNhap", "GeoJSON", "GiaiDoan"];
-const CAD_DEFAULT_RADIUS = 1000; // bán kính tạm cho lô nhập từ DXF, admin chỉnh lại sau
 const VALID_PREFIXES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM", "9-CSD"];
 
 // Cột được xác định theo tên tiêu đề dòng 1 (không phân biệt hoa thường, bỏ khoảng trắng)
@@ -170,7 +169,7 @@ function collectFeatures(ss) {
           "QuyMo_HT": quyMoHT,
           "QuyMo_QH": parseOptionalNumber(cellAt(row, col.quyMoQH)),
           "QuyMo_S": quyMoHT || 0, // giữ cho webapp bản cũ, bằng quy mô hiện trạng
-          "BanKinh": parseCleanNumber(cellAt(row, col.banKinh)) || 500,
+          "BanKinh": parseOptionalNumber(cellAt(row, col.banKinh)), // trống → null: webapp chỉ đối chiếu khi Sheet có nhập
           "TrangThai": String(rawStatus === undefined || rawStatus === null ? 'TRUE' : rawStatus).toUpperCase(),
           "ThoiGianCapNhat": String(cellAt(row, col.thoiGian) || ''),
           "GhiChu": String(cellAt(row, col.ghiChu) || '')
@@ -382,11 +381,11 @@ function installedOnEdit(e) {
                 if (tCol[key] >= 0 && col[key] >= 0) newRow[tCol[key]] = rowValues[col[key]];
               });
 
-              // Khu đất trống chưa có công trình: HT = 0, diện tích khu đất chuyển sang QH
+              // Khu đất trống chưa có công trình: HT để trống (= quy hoạch mới; số 0 sẽ bị hiểu là đã có công trình), diện tích khu đất chuyển sang QH
               var landArea = parseOptionalNumber(cellAt(rowValues, col.quyMoQH));
               if (landArea === null) landArea = parseCleanNumber(cellAt(rowValues, col.quyMoHT));
               if (tCol.quyMoQH >= 0) {
-                if (tCol.quyMoHT >= 0) newRow[tCol.quyMoHT] = 0;
+                if (tCol.quyMoHT >= 0) newRow[tCol.quyMoHT] = '';
                 newRow[tCol.quyMoQH] = landArea;
               }
 
@@ -532,7 +531,6 @@ function doGet(e) {
       // Chỉ ghi cột quy mô của giai đoạn đang đề xuất (QH: QuyMo_HT để trống = quy hoạch mới)
       if (phase === 'QH') setCell('quyMoQH', size);
       else setCell('quyMoHT', size);
-      setCell('banKinh', 500);
       setCell('trangThai', false);
       setCell('thoiGian', currentTime);
       setCell('ghiChu', phase === 'QH' ? "Đề xuất quy hoạch mới từ GEE" : "Thêm mới từ GEE");
@@ -618,7 +616,7 @@ function doPost(e) {
  *   tên layer theo TT16); không có stages thì 1 giai đoạn = body.phase với size / area / geometry của item
  * - matchId có trong Sheet → cập nhật tọa độ, phường, quy mô các giai đoạn đang nhập; không có → thêm dòng mới
  * - Chỉ ghi cột quy mô của giai đoạn đang nhập (HT → QuyMo_HT, QH → QuyMo_QH), cột còn lại để nguyên / trống
- * - BanKinh tạm = CAD_DEFAULT_RADIUS (dòng mới, hoặc dòng cập nhật đang trống bán kính)
+ * - Không ghi BanKinh: bán kính luôn theo quy chuẩn, cột chỉ để đối chiếu khi admin tự nhập
  * - sync = false: chưa đẩy lên bucket (máy chủ gửi nhiều phần, chỉ phần cuối đồng bộ)
  */
 function importCadBatch(body) {
@@ -688,9 +686,6 @@ function importCadBatch(body) {
         c.sheet.getRange(sheetRow, c.col.lng + 1).setValue(Number(it.lng));
         if (c.col.ward >= 0) c.sheet.getRange(sheetRow, c.col.ward + 1).setValue(sheetWard(it.ward));
         stages.forEach(function(st, k) { c.sheet.getRange(sheetRow, qCols[k] + 1).setValue(st.size); });
-        if (c.col.banKinh >= 0 && String(cellAt(c.data[r], c.col.banKinh) || '').trim() === '') {
-          c.sheet.getRange(sheetRow, c.col.banKinh + 1).setValue(CAD_DEFAULT_RADIUS);
-        }
         if (c.col.trangThai >= 0) c.sheet.getRange(sheetRow, c.col.trangThai + 1).setValue(true);
         if (c.col.thoiGian >= 0) c.sheet.getRange(sheetRow, c.col.thoiGian + 1).setValue(currentTime);
         if (c.col.ghiChu >= 0) c.sheet.getRange(sheetRow, c.col.ghiChu + 1).setValue(prevNote ? prevNote + " | " + note : note);
@@ -706,7 +701,6 @@ function importCadBatch(body) {
         set(c.col.lat, Number(it.lat));
         set(c.col.lng, Number(it.lng));
         stages.forEach(function(st, k) { set(qCols[k], st.size); });
-        set(c.col.banKinh, CAD_DEFAULT_RADIUS);
         set(c.col.trangThai, true);
         set(c.col.thoiGian, currentTime);
         set(c.col.ghiChu, note);

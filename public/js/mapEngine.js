@@ -41,9 +41,8 @@ const CITY_CENTER = [16.4637, 107.5905];
 const CITY_ZOOM = 13;
 const WARD_GEOM_VERSION = 2;
 const INFRA_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
-// Icon PNG (DOM) chỉ từ ICON_MIN_ZOOM và khi số điểm trong khung nhìn ≤ ngưỡng; còn lại vẽ chấm màu trên canvas
+// Số điểm trong khung nhìn ≤ ngưỡng thì vẽ icon PNG (DOM); vượt ngưỡng vẽ chấm tròn trên canvas cho nhẹ
 const ICON_MAX_VISIBLE = 1500;
-const ICON_MIN_ZOOM = 15;
 const ICON_FILES = {
   "1-CV": { approved: "Park.png", pending: "Park2.png" },
   "2-BDX": { approved: "Parking.png", pending: "Parking2.png" },
@@ -160,7 +159,7 @@ export function initMap() {
   layers.c7.addTo(map); layers.c8.addTo(map); layers.c9.addTo(map);
 
   map.on('zoomend', updateWardLabelFontSize);
-  map.on('moveend', () => leftRenderer.refreshPoints());
+  map.on('moveend', refreshLeftSoon);
   updateWardLabelFontSize();
   onCompareChange(handleCompareChange);
   renderTt16Legend(document.getElementById('parcelLegend'));
@@ -173,13 +172,22 @@ function ensurePlanHooks() {
   if (planHooked || !planMap) return;
   planHooked = true;
   planMeasureGroup = L.layerGroup().addTo(planMap);
-  planMap.on('moveend', () => planRenderer.refreshPoints());
+  planMap.on('moveend', refreshPlanSoon);
 }
+
+// Khi so sánh, bản đồ còn lại được đồng bộ bằng setView mỗi khung hình (mỗi lần phát moveend): gom lại, vẽ 1 lần khi dừng
+const debounce = (fn, ms) => { let t = null; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; };
+const refreshLeftSoon = debounce(() => leftRenderer.refreshPoints(), 60);
+const refreshPlanSoon = debounce(() => planRenderer.refreshPoints(), 60);
 
 function handleCompareChange(on) {
   ensurePlanHooks();
   leftRenderer.refreshPoints();
-  if (!on) return;
+  if (!on) {
+    // Vùng phục vụ đang vẽ trên bản đồ quy hoạch (bị ẩn): dừng hiệu ứng chấm chạy
+    if (planLayers.singleIso.getLayers().length) clearSingleIsochrone();
+    return;
+  }
   planRenderer.setList(getWardFilteredList(getPlanScenarioList()));
   if (heatStale) refreshHeatmapOnly();
   else if (planHeatStale) refreshPlanHeat();
@@ -581,7 +589,7 @@ function createPointMarker(entry, mode, targetMap) {
       fillOpacity: 1,
       bubblingMouseEvents: false
     });
-    marker.bindTooltip(p.name || '', { direction: 'top', offset: [0, -6], className: 'dot-tip' });
+    marker.bindTooltip(escapeHtml(p.name || ''), { direction: 'top', offset: [0, -6], className: 'dot-tip' });
   }
   marker.on('click', () => {
     if (state.isPickMode || state.activeMeasureType || state.adminDrawMode) return;
@@ -593,7 +601,7 @@ function createPointMarker(entry, mode, targetMap) {
 /**
  * Bộ vẽ cho 1 bản đồ:
  * - Chỉ tạo marker cho điểm nằm trong khung nhìn (nới 25%), khi kéo/zoom chỉ thêm/bớt phần chênh lệch.
- * - Zoom < ICON_MIN_ZOOM hoặc nhiều điểm trong khung nhìn (> ICON_MAX_VISIBLE): chấm tròn canvas thay cho icon DOM.
+ * - Nhiều điểm trong khung nhìn (> ICON_MAX_VISIBLE) thì chuyển sang chấm tròn canvas thay cho icon DOM.
  * - Buffer vẽ bằng L.circle trên canvas, chỉ dựng cho nhóm đang bật.
  * - Ranh lô CAD (nếu có) vẽ cùng nhóm với marker nên bật/tắt theo loại hạ tầng và lọc phường như icon.
  * - Zoom ≤ PIE_MAX_ZOOM: bỏ marker, mỗi phường 1 biểu đồ tròn đếm theo các loại đang bật.
@@ -674,8 +682,10 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
       m.getContainer().classList.remove('ward-pie-mode');
     }
     const bounds = m.getBounds().pad(0.25);
-    const visible = list.filter(p => bounds.contains([p.lat, p.lng]));
-    const nextMode = m.getZoom() >= ICON_MIN_ZOOM && visible.length <= ICON_MAX_VISIBLE ? 'icon' : 'dot';
+    // Nhóm đang tắt: không dựng marker và không tính vào ngưỡng ICON_MAX_VISIBLE (bật lại lớp sẽ gọi refreshPoints)
+    const groupOf = (p) => groups[ICON_GROUP_KEYS[layerType(p)]] || groups.c9;
+    const visible = list.filter(p => bounds.contains([p.lat, p.lng]) && m.hasLayer(groupOf(p)));
+    const nextMode = visible.length <= ICON_MAX_VISIBLE ? 'icon' : 'dot';
     const wantParcels = state.showParcels && state.cadParcels.size > 0 && m.getZoom() >= PARCEL_MIN_ZOOM;
     const detail = m.getZoom() >= PARCEL_PATTERN_ZOOM;
     if (nextMode !== mode || wantParcels !== parcelsOn) {
@@ -702,7 +712,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
         existing.point = p;
         return;
       }
-      const entry = { point: p, group: groups[ICON_GROUP_KEYS[layerType(p)]] || groups.c9 };
+      const entry = { point: p, group: groupOf(p) };
       entry.shape = parcelsOn ? createParcelShape(entry, m, parcelDetail) : null;
       if (entry.shape) entry.group.addLayer(entry.shape);
       entry.marker = createPointMarker(entry, mode, m);
@@ -1144,14 +1154,15 @@ export function zoomToPoint(lat, lng, name) {
   map.closePopup();
   if (planMap) planMap.closePopup();
   const near = (it) => Math.abs(Number(it.lat) - lat) < 1e-5 && Math.abs(Number(it.lng) - lng) < 1e-5;
-  const item = state.rawDataList.find(near) || state.planDataList.find(near);
+  // Công trình chỉ có ở quy hoạch: lấy bản ghi theo kịch bản QH (quy mô QH) và mở trên bản đồ quy hoạch nếu đang so sánh
+  const item = state.rawDataList.find(near) || getPlanScenarioList().find(near);
 
   let opened = false;
   const open = () => {
     if (opened) return;
     opened = true;
     if (item) {
-      onPointClick(item, map);
+      onPointClick(item, item.scenario === 'QH' && isCompareOn() && planMap ? planMap : map);
       return;
     }
     L.popup(popupFitOptions(map, 300, 50))

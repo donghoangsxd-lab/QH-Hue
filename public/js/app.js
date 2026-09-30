@@ -46,14 +46,11 @@ import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 
 const CITY_NAME = "Thành phố Huế";
 
-// Ô màu theo loại hạ tầng ở danh sách lớp và chú giải, cùng màu chấm trên bản đồ khi zoom xa (1 nguồn: BUFFER_COLORS)
+// Ô màu theo loại hạ tầng ở danh sách lớp, cùng màu vùng phủ (buffer) trên bản đồ (1 nguồn: BUFFER_COLORS)
 function addTypeSwatches() {
-  const swatch = (type) => `<i class="layer-swatch" style="background:${BUFFER_COLORS[type]};"></i>`;
   Object.entries(ICON_GROUP_KEYS).forEach(([type, key]) => {
-    document.querySelector(`label[for="chk_${key}"]`)?.insertAdjacentHTML('afterbegin', swatch(type));
-  });
-  document.querySelectorAll('#tabLegend .legend-row[data-type]').forEach(row => {
-    row.querySelector('.legend-icon')?.insertAdjacentHTML('afterend', swatch(row.dataset.type));
+    document.querySelector(`label[for="chk_${key}"]`)
+      ?.insertAdjacentHTML('afterbegin', `<i class="layer-swatch" style="background:${BUFFER_COLORS[type]};"></i>`);
   });
 }
 const RADIUS_MIN = 50;
@@ -113,9 +110,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleCompareMode);
 
   // ---------- Click bản đồ: dùng chung cho nửa trái (hiện trạng) và nửa phải (quy hoạch) khi so sánh ----------
+  let pickSeq = 0;
   const pickCoordinate = (latlng) => {
     const lat = latlng.lat.toFixed(6);
     const lng = latlng.lng.toFixed(6);
+    const seq = ++pickSeq;
     const inputLat = document.getElementById('newLat');
     const inputLng = document.getElementById('newLng');
     if (inputLat) inputLat.value = lat;
@@ -125,6 +124,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     fetch(geeApi(`action=getWardFromPoint&lat=${lat}&lng=${lng}`))
       .then(r => (r.ok ? r.json() : {}))
       .then(res => {
+        if (seq !== pickSeq) return;   // đã ghim vị trí khác sau lần này
         const wardName = res.ward || "";
         const inputWard = document.getElementById('newWard');
         if (inputWard) inputWard.value = wardName;
@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           wardName ? "var(--accent-green)" : "var(--accent-orange)"
         );
       })
-      .catch(() => setStatus("✓ Đã ghim tọa độ (chưa tra cứu được địa bàn)", "var(--accent-orange)"));
+      .catch(() => { if (seq === pickSeq) setStatus("✓ Đã ghim tọa độ (chưa tra cứu được địa bàn)", "var(--accent-orange)"); });
     state.isPickMode = false;
   };
 

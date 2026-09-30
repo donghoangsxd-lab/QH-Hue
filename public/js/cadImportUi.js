@@ -454,7 +454,7 @@ function renderReport() {
     p.choice = sel.value;
     renderReport();
   }));
-  $('btnCadClear')?.addEventListener('click', () => resetImport());
+  $('btnCadClear')?.addEventListener('click', () => { if (!submitting) resetImport(); });
   if (btn) {
     btn.disabled = submitting || !(count.new + count.update) || count.dup > 0 || count.pending > 0 || !result.axes.valid;
     btn.title = state.currentUserRole !== 'ADMIN' ? 'Cần đăng nhập Admin'
@@ -500,7 +500,7 @@ function analyse({ fit = true } = {}) {
 }
 
 async function loadFile(file) {
-  if (!file) return;
+  if (!file || submitting) return;
   const ext = (file.name.match(/\.(dxf|kml|kmz|geojson|json)$/i) || [])[1]?.toLowerCase();
   if (!ext) { setStatus('⚠️ Chỉ nhận file .dxf (AutoCAD: Save As → DXF), .kml, .kmz, .geojson hoặc .json.', 'var(--accent-red)'); return; }
   setStatus('⏳ Đang đọc file...', 'var(--accent-orange)');
@@ -645,6 +645,8 @@ async function submitImport() {
     setStatus('🔒 Cần đăng nhập Admin để ghi hàng loạt.', 'var(--accent-red)');
     return;
   }
+  // Lần ghi trước lỗi giữa chừng: ghi tiếp từ phần lỗi, không gửi lại các phần đã ghi (tránh tạo trùng lô)
+  if (current.pending) return writeChunks(current.pending);
   const phase = globalPhase();
   const items = buildItems();
   if (!items.length) return;
@@ -663,18 +665,26 @@ async function submitImport() {
     if (!confirm(`Ghi ${items.length} lô vào Google Sheet?\n• ${summary}\n• ${items.length - nUpdate} tạo mới, ${nUpdate} cập nhật\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
   }
 
-  const chunks = chunkItems(items);
-  const done = { created: [], updated: [], skipped: [], polygonsDropped: 0 };
+  return writeChunks({
+    phase, summary, fileName: current.fileName, total: items.length, chunks: chunkItems(items), next: 0,
+    done: { created: [], updated: [], skipped: [], polygonsDropped: 0 }
+  });
+}
+
+// job: { phase, summary, fileName, total, chunks, next, done }; lỗi ở phần nào thì giữ job trong current.pending để ghi tiếp
+async function writeChunks(job) {
+  const { chunks, done } = job;
   submitting = true;
   renderReport();
   try {
-    for (let k = 0; k < chunks.length; k++) {
-      setStatus(`⏳ Đang ghi ${chunks.length > 1 ? `phần ${k + 1}/${chunks.length}` : `${items.length} lô`}...`, 'var(--accent-orange)');
+    for (; job.next < chunks.length; job.next++) {
+      const k = job.next;
+      setStatus(`⏳ Đang ghi ${chunks.length > 1 ? `phần ${k + 1}/${chunks.length}` : `${job.total} lô`}...`, 'var(--accent-orange)');
       markDataWritten();
       const res = await fetch(geeApi('action=importCadBatch'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
-        body: JSON.stringify({ phase, fileName: current.fileName, sync: k === chunks.length - 1, items: chunks[k] })
+        body: JSON.stringify({ phase: job.phase, fileName: job.fileName, sync: k === chunks.length - 1, items: chunks[k] })
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401 || res.status === 403) signOutAdmin();
@@ -688,11 +698,12 @@ async function submitImport() {
     ].filter(Boolean).join(' · ');
     submitting = false;
     resetImport(true);
-    setStatus(`✓ Đã thêm ${summary} — ${done.created.length} mới, ${done.updated.length} cập nhật${extra ? ` · ${extra}` : ''}.`, 'var(--accent-green)');
+    setStatus(`✓ Đã thêm ${job.summary} — ${done.created.length} mới, ${done.updated.length} cập nhật${extra ? ` · ${extra}` : ''}.`, 'var(--accent-green)');
     if (onImported) await onImported();
   } catch (err) {
     const written = done.created.length + done.updated.length;
-    setStatus(`❌ ${err.message}${written ? ` — đã ghi ${written} lô vào Sheet trước khi lỗi, bản đồ cập nhật ở lần đồng bộ kế tiếp` : ''}`, 'var(--accent-red)');
+    if (current) current.pending = job;
+    setStatus(`❌ ${err.message}${written ? ` — đã ghi ${written} lô vào Sheet` : ''}. Bấm Ghi lần nữa để ghi tiếp từ phần ${job.next + 1}/${chunks.length}.`, 'var(--accent-red)');
   } finally {
     submitting = false;
     renderReport();

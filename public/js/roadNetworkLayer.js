@@ -8,7 +8,7 @@ import { roadWaysAround } from './serviceArea.js';
 const MIN_ZOOM = 14;
 const CELL_DEG = 0.02;          // ô lưới ~2,2 × 2,1 km
 const CELL_RADIUS_M = 1600;     // phủ trọn ô (nửa đường chéo ~1,55 km)
-const MAX_CELLS = 60;           // số ô giữ trong bộ nhớ
+const MAX_CELLS = 60;           // số ô giữ trong bộ nhớ (ngoài các ô đang trong khung nhìn)
 const MAX_PARALLEL = 3;
 // Vẽ từ nhóm nhỏ lên nhóm lớn để trục chính nằm trên cùng
 const STYLES = [
@@ -41,6 +41,14 @@ function cellKeysInView() {
   return keys;
 }
 
+// Bỏ ô cũ nhất khi vượt MAX_CELLS nhưng giữ ô đang trong khung nhìn (màn hình lớn ở zoom 14 cần > 60 ô, xóa ô đang xem sẽ tải lại mãi)
+function trimCache(inView) {
+  for (const [key, cell] of cells) {
+    if (cells.size <= MAX_CELLS) break;
+    if (!inView.has(key) && !cell.loading) cells.delete(key);
+  }
+}
+
 function pump() {
   while (active < MAX_PARALLEL && queue.length) {
     const key = queue.shift();
@@ -51,7 +59,6 @@ function pump() {
         const lines = { main: [], named: [], kiet: [], unknown: [] };
         ways.forEach(w => lines[groupKey(w.group)].push(w.geometry.map(p => [p.lat, p.lon])));
         cells.set(key, { lines });
-        while (cells.size > MAX_CELLS) cells.delete(cells.keys().next().value);
       })
       .catch(() => cells.delete(key))   // lần di chuyển bản đồ sau sẽ thử lại
       .finally(() => { active--; if (visible) update(); pump(); });
@@ -79,6 +86,7 @@ function update() {
     return;
   }
   const keys = cellKeysInView();
+  trimCache(new Set(keys));
   keys.forEach(key => {
     if (!cells.has(key)) {
       cells.set(key, { loading: true });

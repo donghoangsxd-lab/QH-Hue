@@ -8,7 +8,6 @@ export function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
 }
 
-/** 1 ô chỉ tiêu trong dòng thông tin phường: nhãn nhỏ phía trên, giá trị (HTML đã escape) + đơn vị phía dưới */
 /** Icon nét mảnh trong sprite #i-* (index.html); kích thước theo cỡ chữ của phần tử chứa */
 export function ico(name, cls = '') {
   return `<svg class="ico${cls ? ` ${cls}` : ''}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
@@ -33,8 +32,10 @@ export function inlineSpriteIcons(doc) {
   });
 }
 
+/** 1 ô chỉ tiêu trong dòng thông tin phường: nhãn nhỏ phía trên, giá trị (HTML đã escape) + đơn vị phía dưới */
 export function wardStatHtml(label, valueHtml, unit, title) {
-  return `<div class="ward-stat"${title ? ` title="${escapeHtml(title)}"` : ''}>`
+  const tip = [title, unit && `Đơn vị: ${unit}`].filter(Boolean).join('\n');
+  return `<div class="ward-stat"${tip ? ` title="${escapeHtml(tip)}"` : ''}>`
     + `<small>${escapeHtml(label)}</small><span><b>${valueHtml}</b>${unit ? ` <em>${escapeHtml(unit)}</em>` : ''}</span></div>`;
 }
 

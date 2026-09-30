@@ -48,7 +48,11 @@ function createGeeContext() {
         }, 
         (err) => reject(new Error("GEE Auth Fail: " + err))
       );
-    } catch (e) { reject(new Error("Key Parse Fail: " + e.message)); }
+    } catch (e) {
+      // Lỗi JSON.parse có kèm 1 đoạn nội dung khóa: chỉ ghi log máy chủ, không trả về client
+      console.error("GEE key parse error:", e.name);
+      reject(new Error("Key Parse Fail: GEE_PRIVATE_KEY không hợp lệ"));
+    }
   });
 }
 

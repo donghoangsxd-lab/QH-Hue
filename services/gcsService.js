@@ -24,12 +24,15 @@ function classifyPlanChange(sizeHT, sizeQH) {
   return 'keep';
 }
 
+// Object công khai không đặt Cache-Control bị cache biên của Google giữ tới 1 giờ: thêm ?v= để HEAD/GET luôn tới bản gốc
+const bypassEdge = (url) => `${url}?v=${Date.now()}`;
+const tagOf = (res) => (res && (res.headers['etag'] || res.headers['last-modified'])) || null;
+
 async function getRawDataList() {
   try {
     let currentETag = null;
     try {
-      const headRes = await axios.head(constants.GCS_URL, { timeout: 5000 });
-      currentETag = headRes.headers['etag'] || headRes.headers['last-modified'];
+      currentETag = tagOf(await axios.head(bypassEdge(constants.GCS_URL), { timeout: 5000 }));
     } catch (headErr) {
       // Bẫy lỗi an toàn cho HEAD request
     }
@@ -38,7 +41,9 @@ async function getRawDataList() {
       return cachedGeoJSON;
     }
 
-    const response = await axios.get(constants.GCS_URL, { timeout: 10000 });
+    const response = await axios.get(bypassEdge(constants.GCS_URL), { timeout: 10000 });
+    // ETag theo đúng bản vừa tải (file có thể đổi giữa HEAD và GET)
+    const loadedETag = tagOf(response) || currentETag;
     const geojson = response.data || {};
     const features = geojson.features || [];
 
@@ -98,8 +103,9 @@ async function getRawDataList() {
     }).filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng)
       && Math.abs(item.lat) <= 90 && Math.abs(item.lng) <= 180);
 
-    lastETag = currentETag;
-    dataVersion++;
+    // Chỉ tăng phiên bản khi dữ liệu thật sự đổi (HEAD lỗi thì vẫn tải lại nhưng không làm mất các cache tính toán phía sau)
+    if (!loadedETag || loadedETag !== lastETag) dataVersion++;
+    lastETag = loadedETag;
     return cachedGeoJSON;
   } catch (e) {
     console.error("Lỗi nạp GCS Data:", e.message);
@@ -117,8 +123,7 @@ async function getCadParcels() {
   try {
     let currentETag = null;
     try {
-      const headRes = await axios.head(constants.CAD_GCS_URL, { timeout: 5000 });
-      currentETag = headRes.headers['etag'] || headRes.headers['last-modified'];
+      currentETag = tagOf(await axios.head(bypassEdge(constants.CAD_GCS_URL), { timeout: 5000 }));
     } catch (headErr) {
       if (headErr.response && headErr.response.status === 404) return [];
     }
@@ -127,7 +132,7 @@ async function getCadParcels() {
       return cachedParcels;
     }
 
-    const response = await axios.get(constants.CAD_GCS_URL, { timeout: 15000 });
+    const response = await axios.get(bypassEdge(constants.CAD_GCS_URL), { timeout: 15000 });
     const features = (response.data && response.data.features) || [];
     cachedParcels = features
       .filter(ft => ft && ft.geometry && (ft.geometry.type === 'Polygon' || ft.geometry.type === 'MultiPolygon'))
@@ -142,7 +147,7 @@ async function getCadParcels() {
         };
       })
       .filter(p => p.id);
-    lastParcelETag = currentETag;
+    lastParcelETag = tagOf(response) || currentETag;
     return cachedParcels;
   } catch (e) {
     if (e.response && e.response.status === 404) return [];

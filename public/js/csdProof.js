@@ -126,7 +126,7 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
   }
   if (seq !== requestSeq) return;
 
-  const typeColor = BUFFER_COLORS[data.code] || '#2ecc71';
+  const typeColor = BUFFER_COLORS[data.code] || BUFFER_COLORS['9-CSD'];
   const c = data.candidate;
   const group = L.layerGroup();
 

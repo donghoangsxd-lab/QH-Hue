@@ -1,4 +1,4 @@
-import { state } from './state.js';
+import { state, BUFFER_COLORS } from './state.js';
 import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js';
 import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, showToast, wardStatHtml, ico, setStatusContent, inlineSpriteIcons } from './utils.js';
@@ -27,16 +27,19 @@ function showGoogleOriginHint() {
   setAuthMsg(`Origin ${window.location.origin} chưa được Google cho phép. Thêm origin này vào Authorized JavaScript origins của Client ID, hoặc chạy npx vercel dev (localhost) thay vì Live Server.`, 'var(--accent-orange)');
 }
 
+let googleSignInPending = false;
 export function initGoogleSignIn() {
   const container = document.getElementById('googleSignInBtn');
-  if (!container || googleSignInReady) return;
+  if (!container || googleSignInReady || googleSignInPending) return;
+  googleSignInPending = true;
 
   const tryInit = (attempt = 0) => {
     if (!window.google?.accounts?.id) {
       if (attempt < 40) setTimeout(() => tryInit(attempt + 1), 150);
-      else showGoogleOriginHint();
+      else { googleSignInPending = false; showGoogleOriginHint(); }
       return;
     }
+    googleSignInPending = false;
     window.google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback: handleGoogleCredentialResponse,
@@ -179,10 +182,7 @@ function sumAreaByType(list) {
   return { totals, sum };
 }
 
-const PIE_COLORS = {
-  "1-CV": "#2ecc71", "2-BDX": "#3498db", "3-MN": "#e67e22", "4-TH": "#e74c3c",
-  "5-THCS": "#9b59b6", "6-YT": "#1abc9c", "7-VH": "#f1c40f", "8-TM": "#e91e63", "9-CSD": "#95a5a6"
-};
+const PIE_COLORS = BUFFER_COLORS;
 const PIE_LABELS = {
   "1-CV": "Công viên", "2-BDX": "Bãi đỗ xe", "3-MN": "Mầm non", "4-TH": "Tiểu học", "5-THCS": "THCS",
   "6-YT": "Y tế", "7-VH": "Văn hóa", "8-TM": "Chợ/TTTM", "9-CSD": "Chưa sử dụng", "empty": "Chưa có DL"
@@ -239,7 +239,7 @@ function renderInfraCountCards(sourceList, planList) {
       `<span class="count-plan ${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '▲' : '▼'}${fmtNum(Math.abs(delta))}</span>`;
     const tip = `${COUNT_CARD_LABELS[k]}\nĐã duyệt: ${fmtNum(s.approved)} · Chờ duyệt: ${fmtNum(s.pending)}\nQuy hoạch: ${fmtNum(s.plan)} (chênh ${delta > 0 ? '+' : ''}${fmtNum(delta)})`;
     return `<div class="count-card" style="--c:${color}" title="${escapeHtml(tip)}">
-      <span class="count-icon"><svg viewBox="0 0 24 24" aria-hidden="true">${COUNT_CARD_ICONS[k]}</svg></span>
+      <span class="count-icon"><svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${COUNT_CARD_ICONS[k]}</svg></span>
       <div class="count-info">
         <span class="count-label">${COUNT_CARD_LABELS[k]}</span>
         <div class="count-mid"><b class="count-num">${fmtNum(shown)}</b>${planTag}</div>
@@ -680,7 +680,7 @@ export function toggleStatTable() {
   setBottomPanelHeader(CITY_NAME);
 }
 
-// Chú giải biểu đồ 40 phường (dòng tiêu đề, chỉ hiện ở chế độ toàn TP khi biểu đồ đang hiển thị)
+// Chú giải biểu đồ 40 phường: 1 dòng ở góc trên phải khung biểu đồ (chart chừa padding top)
 function renderChartLegend() {
   const el = document.getElementById('bpChartLegend');
   if (!el || el.childElementCount) return;
@@ -689,16 +689,39 @@ function renderChartLegend() {
     + sw(CHART_PLAN_UP_COLOR, 'QH tăng') + sw(CHART_PLAN_DOWN_COLOR, 'QH giảm');
 }
 
-// Dân số / độ phủ TB / quy mô TB: nhóm .js-summary trong dòng chỉ số (toàn TP hoặc phường đang xem)
+// ================== CHỈ TIÊU TRÊN THANH TIÊU ĐỀ ==================
+// Mỗi cột 1 chỉ tiêu: ô trên hiện trạng, ô dưới quy hoạch. Ô mật độ đường HT giữ id cũ để wardRoads.js điền vào.
+function buildHeadStats(key, city) {
+  const el = document.getElementById('bpHeadStats');
+  if (!el) return;
+  const col = (ht, qh) => `<div class="hs-col"><div class="hs-cell" id="${ht}"></div><div class="hs-cell hs-qh" id="${qh}"></div></div>`;
+  el.dataset.key = key;
+  el.innerHTML = col('hsPopHT', 'hsPopQH') + col('hsArea', 'hsPopCap') + col('hsDensHT', 'hsDensQH')
+    + col(city ? 'cityRoadDensity' : 'wardRoadLen', 'hsRoadQH') + col('hsCovHT', 'hsCovQH')
+    + (city ? col('hsUrbanHT', 'hsUrbanQH') : '<div class="hs-status" id="wardCoverageStatus"></div>');
+  setHeadCell('hsRoadQH', wardStatHtml('Mật độ đường/đường KV QH', '–/–', 'km/km²',
+    'Chưa có dữ liệu mạng lưới đường quy hoạch (mạng lưới hiện có: OpenStreetMap + tuyến Admin vẽ bổ sung là đường hiện trạng)'));
+}
+
+function clearHeadStats() {
+  const el = document.getElementById('bpHeadStats');
+  if (el) { el.dataset.key = ''; el.innerHTML = ''; }
+}
+
+const headStatsKey = () => document.getElementById('bpHeadStats')?.dataset.key || '';
+
+function setHeadCell(id, html) {
+  const cell = document.getElementById(id);
+  if (cell) cell.innerHTML = html;
+}
+
+// Dân số HT / độ phủ TB / quy mô TB (HT và QH) của toàn TP hoặc phường đang xem
 function renderSummaryNote(wardName) {
   const city = !wardName || wardName === CITY_NAME;
-  const box = document.querySelector(city ? '#cityInfoLine .js-summary' : '#wardSummaryCard .js-summary');
-  if (!box) return;
+  // Kết quả độ phủ đến muộn của phường vừa rời đi không ghi vào tiêu đề phường đang xem
+  if (headStatsKey() !== (city ? CITY_NAME : wardName)) return;
   const list = city ? state.wardStatsData : state.wardStatsData.filter(w => w.Ten_Phuong === wardName);
-  if (!list.length) {
-    box.innerHTML = '';
-    return;
-  }
+  if (!list.length) return;
   // Toàn thành phố: bình quân gia quyền theo dân số; độ phủ chỉ lấy các phường đã tính xong
   let pop = 0, covPop = 0, covSum = 0, scaleSum = 0, covQHSum = 0, scaleQHSum = 0, readyCount = 0;
   list.forEach(w => {
@@ -717,24 +740,26 @@ function renderSummaryNote(wardName) {
   const covQH = covPop ? covQHSum / covPop : 0;
   const scale = pop ? scaleSum / pop : 0;
   const scaleQH = pop ? scaleQHSum / pop : 0;
-  const htQh = (ht, qh) => {
+  // Giá trị QH: xanh khi tăng, đỏ khi giảm so với HT
+  const qhHtml = (ht, qh) => {
     const d = qh - ht;
-    const cls = d >= 0.05 ? 'c-green' : (d <= -0.05 ? 'c-red' : '');
-    return `${fmtPct(ht)} <em>(HT)</em> → <span class="${cls}">${fmtPct(qh)}</span> <em>(QH)</em>`;
+    return `<span class="${d >= 0.05 ? 'c-green' : (d <= -0.05 ? 'c-red' : '')}">${fmtPct(qh)}</span>`;
   };
-  const covValue = readyCount === 0
-    ? ico('clock')
-    : htQh(cov, covQH) + (readyCount < list.length ? ` <em>· ${readyCount}/${list.length}</em>` : '');
-  const covTitle = city
-    ? `Bình quân theo dân số các phường/xã đã tính xong (${readyCount}/${list.length}); hiện trạng → quy hoạch`
-    : 'Độ phủ trung bình 8 nhóm hạ tầng; hiện trạng → quy hoạch';
-  const popHtml = city
-    ? wardStatHtml('Dân số', `${fmtNum(pop)} <em>(HT)</em> → ${fmtNum(CITY_POP_QH)} <em>(QH)</em>`, 'người',
-      'Dân số hiện trạng (tổng 40 phường/xã) → dân số quy hoạch toàn TP (cơ sở tính mật độ QH và trần tổng dân số QH các phường xã)')
-    : wardStatHtml('Dân số HT', fmtNum(pop), `người · ${list[0].currentUnits || Math.max(1, Math.round(pop / 20000))} đơn vị ở`, 'Dân số hiện trạng');
-  box.innerHTML = popHtml
-    + wardStatHtml('Độ phủ TB', covValue, '', covTitle)
-    + wardStatHtml('Quy mô TB', htQh(scale, scaleQH), '', 'Mức đáp ứng quy mô trung bình theo QCVN 01:2026/BXD; hiện trạng → quy hoạch');
+  const partial = readyCount < list.length ? ` <em>· ${readyCount}/${list.length}</em>` : '';
+  const covTitle = (city
+    ? `Độ phủ: bình quân theo dân số các phường/xã đã tính xong (${readyCount}/${list.length})`
+    : 'Độ phủ trung bình 8 nhóm hạ tầng')
+    + '\nQuy mô: mức đáp ứng quy mô trung bình theo QCVN 01:2026/BXD';
+  setHeadCell('hsPopHT', wardStatHtml('Dân số HT', fmtNum(pop), 'người',
+    city ? `Dân số hiện trạng, tổng ${list.length} phường/xã` : 'Dân số hiện trạng'));
+  if (city) {
+    setHeadCell('hsPopQH', wardStatHtml('Dân số QH', fmtNum(CITY_POP_QH), 'người',
+      'Dân số quy hoạch toàn TP: cơ sở tính mật độ QH và trần tổng dân số QH các phường/xã'));
+  }
+  setHeadCell('hsCovHT', wardStatHtml('Độ phủ/quy mô TB',
+    `${readyCount ? fmtPct(cov) : ico('clock')}/${fmtPct(scale)}${partial}`, '', `${covTitle}\n(hiện trạng)`));
+  setHeadCell('hsCovQH', wardStatHtml('Độ phủ/quy mô TB QH',
+    `${readyCount ? qhHtml(cov, covQH) : ico('clock')}/${qhHtml(scale, scaleQH)}${partial}`, '', `${covTitle}\n(quy hoạch; xanh = tăng, đỏ = giảm so với hiện trạng)`));
 }
 
 function setBottomPanelHeader(wardName) {
@@ -756,22 +781,12 @@ function setBottomPanelHeader(wardName) {
   const wardView = document.getElementById('wardSummaryView');
   if (chartView) chartView.style.display = city && (maximized || !cityTableOn) ? 'flex' : 'none';
   if (cityView) cityView.style.display = city && (maximized || cityTableOn) ? 'flex' : 'none';
-  const planEl = document.getElementById('bpWardPlan');
-  if (planEl) planEl.style.display = city ? 'none' : '';
   if (wardView) wardView.style.display = city ? 'none' : 'flex';
-  const cityInfo = document.getElementById('cityInfoLine');
-  if (cityInfo) cityInfo.style.display = city ? '' : 'none';
-  const legend = document.getElementById('bpChartLegend');
-  if (legend) {
-    renderChartLegend();
-    legend.style.display = chartView && chartView.style.display !== 'none' ? '' : 'none';
-  }
+  renderChartLegend();
 }
 
-// Dòng chỉ tiêu toàn thành phố (cùng dạng dòng chỉ tiêu phường): tổng diện tích, mật độ dân số, mật độ đường
-function renderCityInfoLine() {
-  const el = document.getElementById('cityInfoLine');
-  if (!el) return;
+// Chỉ tiêu toàn thành phố trên thanh tiêu đề: diện tích, mật độ dân số, mật độ đường, tỷ lệ đô thị hóa (HT / QH)
+function renderCityHeadStats() {
   const list = state.wardStatsData;
   const areas = {};
   let areaKm2 = 0, pop = 0, popQH = 0, urbanPop = 0, urbanPopQH = 0, urbanCount = 0;
@@ -789,29 +804,26 @@ function renderCityInfoLine() {
       urbanCount++;
     }
   });
-  if (!(areaKm2 > 0)) { el.innerHTML = ''; return; }
+  buildHeadStats(CITY_NAME, true);
   const urbanRate = (u, total) => fmtPct(total > 0 ? (u / total) * 100 : 0);
-  const urbanHT = urbanRate(urbanPop, pop);
-  const urbanQH = urbanRate(urbanPopQH, popQH);
+  const urbanTitle = `Dân số ${urbanCount} phường chia cho tổng dân số toàn thành phố`;
   const over = popQH - CITY_POP_QH;
-  const wardsQHHtml = over > 0
-    ? `<span class="c-red">${ico('alert')}${fmtNum(popQH)}</span>`
-    : fmtNum(popQH);
-  el.innerHTML = wardStatHtml('Diện tích', fmtArea(areaKm2), 'km²', `Tổng diện tích tự nhiên ${list.length} phường/xã`)
-    + '<div class="ward-stat-group js-summary"></div>'
-    + wardStatHtml('Tổng DS QH phường/xã', wardsQHHtml, 'người',
-      over > 0
-        ? `Vượt trần dân số QH toàn TP ${fmtNum(over)} người, cần giảm dân số QH của một số phường/xã`
-        : `Còn ${fmtNum(-over)} người trước khi chạm trần ${fmtNum(CITY_POP_QH)}`)
-    + wardStatHtml('Mật độ dân số',
-      `${fmtNum(Math.round(pop / areaKm2))} <em>(HT)</em> → ${fmtNum(Math.round(CITY_POP_QH / areaKm2))} <em>(QH)</em>`,
-      'người/km²', `Dân số hiện trạng ${fmtNum(pop)} / quy hoạch toàn TP ${fmtNum(CITY_POP_QH)} người chia cho tổng diện tích tự nhiên`)
-    + wardStatHtml('Tỷ lệ đô thị hóa',
-      urbanHT === urbanQH ? urbanHT : `${urbanHT} <em>(HT)</em> → ${urbanQH} <em>(QH)</em>`,
-      '', `Dân số ${urbanCount} phường (hiện trạng ${fmtNum(urbanPop)} / quy hoạch ${fmtNum(urbanPopQH)} người) chia cho tổng dân số toàn thành phố`)
-    + '<div id="cityRoadDensity" class="ward-stat-group"></div>';
+  setHeadCell('hsPopCap', wardStatHtml('Tổng DS QH P/X',
+    over > 0 ? `<span class="c-red">${ico('alert')}${fmtNum(popQH)}</span>` : fmtNum(popQH), 'người',
+    `Tổng dân số QH ${list.length} phường/xã. ` + (over > 0
+      ? `Vượt trần dân số QH toàn TP ${fmtNum(over)} người, cần giảm dân số QH của một số phường/xã`
+      : `Còn ${fmtNum(-over)} người trước khi chạm trần ${fmtNum(CITY_POP_QH)}`)));
+  setHeadCell('hsUrbanHT', wardStatHtml('Đô thị hóa', urbanRate(urbanPop, pop), '', `${urbanTitle} (hiện trạng ${fmtNum(urbanPop)} người)`));
+  setHeadCell('hsUrbanQH', wardStatHtml('Đô thị hóa QH', urbanRate(urbanPopQH, popQH), '', `${urbanTitle} (quy hoạch ${fmtNum(urbanPopQH)} người)`));
+  if (areaKm2 > 0) {
+    setHeadCell('hsArea', wardStatHtml('Diện tích', fmtArea(areaKm2), 'km²', `Tổng diện tích tự nhiên ${list.length} phường/xã`));
+    setHeadCell('hsDensHT', wardStatHtml('Mật độ DS', fmtNum(Math.round(pop / areaKm2)), 'người/km²',
+      `Dân số hiện trạng ${fmtNum(pop)} người chia cho tổng diện tích tự nhiên`));
+    setHeadCell('hsDensQH', wardStatHtml('Mật độ DS QH', fmtNum(Math.round(CITY_POP_QH / areaKm2)), 'người/km²',
+      `Dân số quy hoạch toàn TP ${fmtNum(CITY_POP_QH)} người chia cho tổng diện tích tự nhiên`));
+    fillCityRoadDensity(document.getElementById('cityRoadDensity'), areas);
+  }
   renderSummaryNote(CITY_NAME);
-  fillCityRoadDensity(document.getElementById('cityRoadDensity'), areas);
   checkPopCap();
 }
 
@@ -819,8 +831,8 @@ export async function renderBottomPanel() {
   const seq = ++bottomRenderSeq;
   const wardName = isCityMode() ? CITY_NAME : state.selectedWard;
   const city = wardName === CITY_NAME;
-  const planEl = document.getElementById('bpWardPlan');
-  if (planEl) planEl.innerHTML = '';
+  // Đổi địa bàn: xóa chỉ tiêu cũ ngay, không để số của địa bàn trước hiện trong lúc chờ dữ liệu
+  if (headStatsKey() !== wardName) clearHeadStats();
   setBottomPanelHeader(wardName);
 
   const tbody = document.getElementById('statTableBody');
@@ -847,7 +859,7 @@ export async function renderBottomPanel() {
   setBottomPanelHeader(wardName);
 
   if (city) {
-    renderCityInfoLine();
+    renderCityHeadStats();
     rebuildCombinedTableBody();
     renderCombinedChart();
     return;
@@ -861,27 +873,28 @@ export async function renderBottomPanel() {
   renderWardSummary(wardData);
 }
 
+let pdfExporting = false;
 export async function exportBottomPanelPdf() {
   const body = document.getElementById('bpBody');
-  if (!body) return;
+  if (!body || pdfExporting) return;
+  pdfExporting = true;
   try {
     await loadHtml2Pdf();
   } catch (err) {
+    pdfExporting = false;
     showToast('❌ Không tải được thư viện xuất PDF, kiểm tra kết nối mạng.', 'error');
     return;
   }
   const fileName = isCityMode() ? 'Bao-Cao-Ha-Tang-TP-Hue.pdf' : `Bao-Cao-${state.selectedWard}.pdf`;
   body.classList.add('pdf-export');
+  const done = () => { body.classList.remove('pdf-export'); pdfExporting = false; };
   window.html2pdf().from(body).set({
     margin: 5,
     filename: fileName,
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, scrollY: 0, onclone: inlineSpriteIcons },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-  }).save().then(
-    () => body.classList.remove('pdf-export'),
-    () => body.classList.remove('pdf-export')
-  );
+  }).save().then(done, done);
 }
 
 // Chụp khung bản đồ (kể cả chế độ so sánh) thành ảnh PNG; lỗi thì quay về hộp thoại in của trình duyệt
@@ -942,11 +955,7 @@ export function initBottomPanelEvents() {
     const toggle = e.target.closest('[data-action="toggle"]');
     if (toggle) {
       const section = document.getElementById(toggle.dataset.target);
-      if (!section) return;
-      const opening = section.style.display === 'none';
-      section.style.display = opening ? 'table-row-group' : 'none';
-      toggle.textContent = opening ? '▲' : '▼';
-      toggle.setAttribute('aria-expanded', String(opening));
+      if (section) setSubSectionOpen(e.currentTarget, toggle.dataset.target, section.style.display === 'none');
     }
   });
 }
@@ -961,14 +970,29 @@ function setWardCoverageStatus(wardName, text, color = 'var(--accent-orange)') {
   setStatusContent(statusEl, text);
 }
 
+function setSubSectionOpen(root, sectionId, open) {
+  const section = document.getElementById(sectionId);
+  const toggle = root.querySelector(`[data-action="toggle"][data-target="${sectionId}"]`);
+  if (section) section.style.display = open ? 'table-row-group' : 'none';
+  if (toggle) {
+    toggle.textContent = open ? '▲' : '▼';
+    toggle.setAttribute('aria-expanded', String(open));
+  }
+}
+
+// Dựng lại bảng (gõ dân số QH, có kết quả độ phủ) nhưng giữ các danh sách công trình người dùng đang mở
 function refreshWardQuotaTable(wardData) {
   const card = document.getElementById('wardSummaryCard');
   if (!card || card.dataset.ward !== wardData.Ten_Phuong) return;
   const container = document.getElementById('wardQuotaTableContainer');
-  if (container) container.innerHTML = buildWardQuotaTableHtml(wardData, wardData.projectedPopulation);
+  if (!container) return;
+  const openIds = [...container.querySelectorAll('tbody[id]')].filter(tb => tb.style.display !== 'none').map(tb => tb.id);
+  container.innerHTML = buildWardQuotaTableHtml(wardData, wardData.projectedPopulation);
+  openIds.forEach(id => setSubSectionOpen(container, id, true));
 }
 
-// Độ phủ phường đang xem: lỗi/timeout/0% bất thường → tự gọi lại sau 15s → 45s → 90s
+// Độ phủ phường đang xem: lỗi/timeout/0% bất thường → tự gọi lại sau 15s → 45s → 90s (1 chuỗi thử lại tại 1 thời điểm)
+let wardRetryTimer = null;
 function loadWardDetailCoverage(wardData, attempt = 0) {
   const name = wardData.Ten_Phuong;
   if (wardData._coverageReady && !wardData._coverageTentative) {
@@ -988,7 +1012,8 @@ function loadWardDetailCoverage(wardData, attempt = 0) {
     } else if (attempt < DETAIL_RETRY_DELAYS.length) {
       const wait = DETAIL_RETRY_DELAYS[attempt];
       setWardCoverageStatus(name, `⏳ Máy chủ GEE đang bận, tự tính lại sau ${wait / 1000}s...`);
-      setTimeout(() => {
+      clearTimeout(wardRetryTimer);
+      wardRetryTimer = setTimeout(() => {
         if (state.selectedWard === name && isWardCurrent(wardData)) loadWardDetailCoverage(wardData, attempt + 1);
       }, wait);
     } else {
@@ -1006,31 +1031,27 @@ function renderWardSummary(wardData) {
   const view = document.getElementById('wardSummaryView');
   if (!view) return;
   const areaKm2 = Number(wardData.Dien_Tich_Km2) || 0;
-  const areaHtml = areaKm2 > 0
-    ? wardStatHtml('Diện tích', fmtArea(areaKm2), 'km²', 'Diện tích tự nhiên theo thuộc tính polygon phường/xã')
-      + wardStatHtml('Mật độ dân số',
-        `${fmtNum(Math.round(popCurrent / areaKm2))} <em>(HT)</em> → <span id="wardDensityQH">${fmtNum(Math.round(popProjected / areaKm2))}</span> <em>(QH)</em>`,
-        'người/km²', 'Dân số hiện trạng / quy hoạch chia cho diện tích tự nhiên')
-    : '';
   view.innerHTML = `<div id="wardSummaryCard">
-    <div class="ward-info-line"><div class="ward-stat-group js-summary"></div>${areaHtml}<div id="wardRoadLen" class="ward-stat-group"></div><div id="wardPopCapWarn" class="ward-stat-group"></div></div>
     <div id="wardQuotaTableContainer">${buildWardQuotaTableHtml(wardData, popProjected)}</div>
   </div>`;
   document.getElementById('wardSummaryCard').dataset.ward = wardData.Ten_Phuong;
+
+  buildHeadStats(wardData.Ten_Phuong, false);
+  setHeadCell('hsPopQH', `<div class="ward-stat" title="Dân số quy hoạch của phường/xã, nhập để tính lại nhu cầu diện tích">`
+    + `<small><label for="wardPopInput">Dân số QH</label></small><span><b><input type="number" id="wardPopInput" value="${Number(popProjected)}" step="1000" min="1000" max="${CITY_POP_QH}" /></b>`
+    + ` <em class="hs-keep">người (<span id="projectedUnitsLabel">${projectedUnits}</span> đơn vị ở)</em></span></div>`);
+  if (areaKm2 > 0) {
+    setHeadCell('hsArea', wardStatHtml('Diện tích', fmtArea(areaKm2), 'km²', 'Diện tích tự nhiên theo thuộc tính polygon phường/xã'));
+    setHeadCell('hsDensHT', wardStatHtml('Mật độ DS', fmtNum(Math.round(popCurrent / areaKm2)), 'người/km²',
+      'Dân số hiện trạng chia cho diện tích tự nhiên'));
+    setHeadCell('hsDensQH', wardStatHtml('Mật độ DS QH', `<span id="wardDensityQH">${fmtNum(Math.round(popProjected / areaKm2))}</span>`, 'người/km²',
+      'Dân số quy hoạch chia cho diện tích tự nhiên'));
+  }
   const roadLenEl = document.getElementById('wardRoadLen');
   roadLenEl.dataset.ward = wardData.Ten_Phuong;
   roadLenEl.dataset.area = String(areaKm2);
   fillWardRoadLengths(wardData.Ten_Phuong);
   renderSummaryNote(wardData.Ten_Phuong);
-
-  // Dân số HT / độ phủ / quy mô nằm ở dòng chỉ số; dòng tiêu đề chỉ giữ ô nhập dân số quy hoạch
-  const planEl = document.getElementById('bpWardPlan');
-  if (planEl) {
-    planEl.innerHTML = `· <label for="wardPopInput" title="Dân số quy hoạch">Dân số QH</label>:
-      <input type="number" id="wardPopInput" value="${Number(popProjected)}" step="1000" min="1000" max="${CITY_POP_QH}" />
-      người (<span id="projectedUnitsLabel">${projectedUnits}</span> đơn vị ở)
-      <span id="wardCoverageStatus"></span>`;
-  }
 
   const popInput = document.getElementById('wardPopInput');
   if (popInput) {
@@ -1053,22 +1074,23 @@ function renderWardSummary(wardData) {
   }
   checkPopCap(wardData);
 
+  clearTimeout(wardRetryTimer);
   loadWardDetailCoverage(wardData);
 }
 
-// Trần dân số QH toàn TP: ô tổng dân số QH trong dòng chỉ tiêu phường; toast mỗi lần tổng chuyển từ trong ngưỡng sang vượt ngưỡng
+// Trần dân số QH toàn TP: ô tổng dân số QH (hàng QH trên tiêu đề phường); toast mỗi lần tổng chuyển từ trong ngưỡng sang vượt ngưỡng
 function checkPopCap(wardData = null) {
   const total = totalPlanPop();
   const over = total - CITY_POP_QH;
-  const warnEl = document.getElementById('wardPopCapWarn');
-  if (warnEl && wardData) {
+  const warnEl = document.getElementById('hsPopCap');
+  if (warnEl && wardData && headStatsKey() === wardData.Ten_Phuong) {
     const room = Math.max(0, CITY_POP_QH - (total - planPopOf(wardData)));
-    warnEl.innerHTML = wardStatHtml(`Tổng DS QH ${state.wardStatsData.length} phường/xã`,
+    warnEl.innerHTML = wardStatHtml('Tổng DS QH P/X',
       over > 0
-        ? `<span class="c-red">${ico('alert')}${fmtNum(total)} (vượt ${fmtNum(over)})</span>`
-        : `${fmtNum(total)} <em>/ ${fmtNum(CITY_POP_QH)}</em>`,
+        ? `<span class="c-red">${ico('alert')}${fmtNum(total)}</span>`
+        : fmtNum(total),
       'người',
-      `Trần dân số QH toàn TP ${fmtNum(CITY_POP_QH)} người. Phường/xã này tối đa ${fmtNum(room)} người để tổng không vượt trần`);
+      `Tổng dân số QH ${state.wardStatsData.length} phường/xã${over > 0 ? `, vượt trần ${fmtNum(over)} người` : ''}. Trần dân số QH toàn TP ${fmtNum(CITY_POP_QH)} người. Phường/xã này tối đa ${fmtNum(room)} người để tổng không vượt trần`);
   }
   if (over > 0 && !popCapExceeded) {
     showToast(`⚠️ Tổng dân số QH các phường/xã (${fmtNum(total)} người) vượt dân số QH toàn TP ${fmtNum(CITY_POP_QH)} người`, 'error');
@@ -1167,7 +1189,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   const parts = [];
 
   const subItemRows = (sectionId, subItems, deep = false) => {
-    parts.push(`<tbody id="${sectionId}" style="display:none;">`);
+    parts.push(`</tbody><tbody id="${sectionId}" style="display:none;">`);
     subItems.forEach(sub => {
       parts.push(`<tr class="wt-sub${deep ? ' wt-deep' : ''}">
         <td>-</td>
@@ -1180,7 +1202,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
         <td class="wt-radius">${radiusCellHtml(sub)}</td>
       </tr>`);
     });
-    parts.push(`</tbody>`);
+    parts.push(`</tbody><tbody>`);
   };
 
   // tone: a (cyan) / b (green) / c (red) / d (orange) — màu tiêu đề nhóm A–D
@@ -1213,7 +1235,6 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   };
 
   parts.push(`<div class="ward-table-scroll-container"><table class="ward-table">
-    <colgroup><col style="width:5%"><col style="width:31%"><col style="width:12%"><col style="width:8%"><col style="width:11%"><col style="width:9%"><col style="width:12%"><col style="width:12%"></colgroup>
     <thead>
       <tr><th>STT</th><th>Loại hạ tầng</th><th>Diện tích</th><th>Chỉ tiêu</th><th>Nhu cầu DT</th><th>Số lượng</th><th>Quy mô</th><th>Độ phủ</th></tr>
     </thead>
@@ -1421,7 +1442,7 @@ function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      layout: { padding: { top: 6 } },
+      layout: { padding: { top: 16 } },
       plugins: {
         legend: { display: false },
         tooltip: {

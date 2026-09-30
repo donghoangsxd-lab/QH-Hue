@@ -308,19 +308,18 @@
 
       <!-- TAB: CHÚ GIẢI -->
       <div class="tab-body" id="tabLegend" style="display:none;">
-        <div class="legend-note">Zoom ≥ 15: biểu tượng · zoom xa hơn: chấm màu</div>
-        <div class="legend-row" data-type="1-CV"><img src="./icons/Park.png" class="legend-icon" alt="" />1. Công viên, điểm xanh, vườn hoa</div>
-        <div class="legend-row" data-type="2-BDX"><img src="./icons/Parking.png" class="legend-icon" alt="" />2. Bãi đỗ xe, trạm sạc xe điện</div>
-        <div class="legend-row" data-type="3-MN"><img src="./icons/Mamnon.png" class="legend-icon" alt="" />3. Trường Mầm non</div>
-        <div class="legend-row" data-type="4-TH"><img src="./icons/Tieuhoc.png" class="legend-icon" alt="" />4. Trường Tiểu học</div>
-        <div class="legend-row" data-type="5-THCS"><img src="./icons/THCS.png" class="legend-icon" alt="" />5. Trường THCS</div>
-        <div class="legend-row" data-type="THPT"><img src="./icons/THPT.png" class="legend-icon" alt="" />6. Trường THPT</div>
-        <div class="legend-row" data-type="6-YT"><img src="./icons/Yte.png" class="legend-icon" alt="" />7. Bệnh viện, Trạm y tế</div>
-        <div class="legend-row" data-type="7-VH"><img src="./icons/Vanhoa.png" class="legend-icon" alt="" />8. Nhà văn hóa, thể thao</div>
-        <div class="legend-row" data-type="8-TM"><img src="./icons/Cho.png" class="legend-icon" alt="" />9. Chợ, Trung tâm thương mại</div>
-        <div class="legend-row legend-unused" data-type="9-CSD"><img src="./icons/Unused.png" class="legend-icon" alt="" /><b>10. Cơ sở chưa sử dụng</b></div>
-        <div class="legend-row legend-pending"><img src="./icons/Park2.png" class="legend-icon" alt="" /><i class="layer-swatch legend-pending-dot"></i><b>Chưa chấp thuận (Chờ duyệt)</b></div>
-        <div class="legend-row"><span class="legend-icon legend-dot"><i class="legend-plan-dot"></i></span><i class="layer-swatch legend-plan-swatch"></i>Điểm quy hoạch khác hiện trạng</div>
+        <div class="legend-row"><img src="./icons/Park.png" class="legend-icon" alt="" />1. Công viên, điểm xanh, vườn hoa</div>
+        <div class="legend-row"><img src="./icons/Parking.png" class="legend-icon" alt="" />2. Bãi đỗ xe, trạm sạc xe điện</div>
+        <div class="legend-row"><img src="./icons/Mamnon.png" class="legend-icon" alt="" />3. Trường Mầm non</div>
+        <div class="legend-row"><img src="./icons/Tieuhoc.png" class="legend-icon" alt="" />4. Trường Tiểu học</div>
+        <div class="legend-row"><img src="./icons/THCS.png" class="legend-icon" alt="" />5. Trường THCS</div>
+        <div class="legend-row"><img src="./icons/THPT.png" class="legend-icon" alt="" />6. Trường THPT</div>
+        <div class="legend-row"><img src="./icons/Yte.png" class="legend-icon" alt="" />7. Bệnh viện, Trạm y tế</div>
+        <div class="legend-row"><img src="./icons/Vanhoa.png" class="legend-icon" alt="" />8. Nhà văn hóa, thể thao</div>
+        <div class="legend-row"><img src="./icons/Cho.png" class="legend-icon" alt="" />9. Chợ, Trung tâm thương mại</div>
+        <div class="legend-row legend-unused"><img src="./icons/Unused.png" class="legend-icon" alt="" /><b>10. Cơ sở chưa sử dụng</b></div>
+        <div class="legend-row legend-pending"><img src="./icons/Park2.png" class="legend-icon" alt="" /><b>Chưa chấp thuận (Chờ duyệt)</b></div>
+        <div class="legend-row"><span class="legend-icon legend-dot"><i class="legend-plan-dot"></i></span>Điểm quy hoạch khác hiện trạng</div>
 
         <div class="tt16-legend" id="parcelLegend"></div>
 
@@ -371,9 +370,9 @@
           <div class="bp-title-wrap">
             <b class="bp-part-title">BẢNG TỔNG HỢP HẠ TẦNG</b>
             <select id="wardSelector" class="ward-selector-dropdown" title="Chọn địa bàn phân tích (phường/xã)"></select>
-            <span id="bpChartLegend" class="bp-legend"></span>
-            <span id="bpWardPlan" style="display:none;"></span>
           </div>
+          <!-- Chỉ tiêu địa bàn: hàng trên hiện trạng, hàng dưới quy hoạch (cùng cột = cùng chỉ tiêu) -->
+          <div class="bp-head-stats" id="bpHeadStats"></div>
           <div class="bp-actions" data-html2canvas-ignore="true">
             <button type="button" class="bp-btn bp-icon" id="btnToggleStatTable" title="Xem bảng thông tin" aria-label="Xem bảng thông tin"><svg class="ico"><use href="#i-table"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnExportBottomPdf" title="Xuất báo cáo PDF" aria-label="Xuất báo cáo PDF"><svg class="ico"><use href="#i-printer"/></svg></button>
@@ -382,9 +381,8 @@
         </div>
 
         <div class="bp-part-body">
-          <div class="ward-info-line" id="cityInfoLine" style="display:none;"></div>
           <div class="bp-view" id="cityChartView">
-            <div class="bp-chart-wrap"><canvas id="infraChart"></canvas></div>
+            <div class="bp-chart-wrap"><span id="bpChartLegend" class="bp-legend"></span><canvas id="infraChart"></canvas></div>
           </div>
           <div class="bp-view" id="citySummaryView" style="display:none;">
             <div class="table-container">

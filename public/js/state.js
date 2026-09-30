@@ -1,6 +1,8 @@
 /**
  * Quản lý trạng thái ứng dụng & Danh mục cấu hình UI Frontend
  */
+import { TT16_STYLES } from './tt16Symbols.js';
+
 export const state = {
   // Phân quyền người dùng: 'VIEWER' (mặc định) hoặc 'ADMIN' — chỉ đặt ADMIN sau khi server xác minh Google token
   currentUserRole: "VIEWER",
@@ -67,11 +69,11 @@ export const WARD_BOUNDARY_SHADOW_STYLE = { color: '#64748b', weight: 4, opacity
 export const WARD_BOUNDARY_LINE_STYLE = { color: '#fde68a', weight: 1.6, opacity: 0.95, fill: false, interactive: false };
 export const WARD_HIGHLIGHT_STYLE = { color: '#fb923c', weight: 3.5, dashArray: '6,6', fillColor: '#fb923c', fillOpacity: 0.15, interactive: false };
 
-// Vùng phủ (buffer) theo loại hạ tầng, dùng chung cho bản đồ hiện trạng và quy hoạch
-export const BUFFER_COLORS = {
-  "1-CV": "#2ecc71", "2-BDX": "#3498db", "3-MN": "#e67e22", "4-TH": "#e74c3c", "5-THCS": "#9b59b6", "THPT": "#0d9488",
-  "6-YT": "#1abc9c", "7-VH": "#f1c40f", "8-TM": "#e91e63", "9-CSD": "#95a5a6"
-};
+// Màu 10 lớp hạ tầng = màu ACI của lớp đất tương ứng theo TT 16/2025/TT-BXD (MN, TH, THCS chung DAT_HTXH_Truonghoc);
+// dùng chung cho vùng phủ (buffer), biểu đồ, ô màu danh sách lớp ở cả bản đồ hiện trạng và quy hoạch
+export const BUFFER_COLORS = Object.fromEntries(
+  ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "THPT", "6-YT", "7-VH", "8-TM", "9-CSD"].map(k => [k, TT16_STYLES[k].color])
+);
 export const BUFFER_KEYS = {
   "1-CV": "b1", "2-BDX": "b2", "3-MN": "b3", "4-TH": "b4", "5-THCS": "b5", "THPT": "b10",
   "6-YT": "b6", "7-VH": "b7", "8-TM": "b8", "9-CSD": "b9"
