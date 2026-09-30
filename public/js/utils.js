@@ -8,6 +8,12 @@ export function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
 }
 
+/** 1 ô chỉ tiêu trong dòng thông tin phường: nhãn nhỏ phía trên, giá trị (HTML đã escape) + đơn vị phía dưới */
+export function wardStatHtml(label, valueHtml, unit, title) {
+  return `<div class="ward-stat"${title ? ` title="${escapeHtml(title)}"` : ''}>`
+    + `<small>${escapeHtml(label)}</small><span><b>${valueHtml}</b>${unit ? ` <em>${escapeHtml(unit)}</em>` : ''}</span></div>`;
+}
+
 export function isApproved(status) {
   return status === true || String(status).trim().toUpperCase() === 'TRUE' || String(status).trim() === '1';
 }

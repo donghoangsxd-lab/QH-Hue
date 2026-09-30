@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js';
 import { geeApi } from './api.js';
-import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, showToast } from './utils.js';
+import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, showToast, wardStatHtml } from './utils.js';
 import { refreshWardCheck } from './wardCheck.js';
 import { fillWardRoadLengths } from './wardRoads.js';
 
@@ -933,19 +933,19 @@ function renderWardSummary(wardData) {
   if (!view) return;
   const areaKm2 = Number(wardData.Dien_Tich_Km2) || 0;
   const areaHtml = areaKm2 > 0
-    ? `<span title="Theo thuộc tính diện tích của polygon phường/xã">📐 Diện tích <b>${fmtArea(areaKm2)} km²</b></span>`
-      + ` · <span title="Dân số / diện tích">👥 Mật độ HT <b>${fmtNum(Math.round(popCurrent / areaKm2))}</b>`
-      + ` → QH <b id="wardDensityQH">${fmtNum(Math.round(popProjected / areaKm2))}</b> người/km²</span>`
-    : '';
-  const profileHtml = wardData.profileLabel
-    ? `<span title="Hồ sơ chỉ tiêu theo QCVN 01:2026/BXD">🏷️ <b>${escapeHtml(wardData.profileLabel)}</b></span>${areaHtml ? ' · ' : ''}`
+    ? wardStatHtml('Diện tích', fmtArea(areaKm2), 'km²', 'Diện tích tự nhiên theo thuộc tính polygon phường/xã')
+      + wardStatHtml('Mật độ dân số',
+        `${fmtNum(Math.round(popCurrent / areaKm2))} <em>(HT)</em> → <span id="wardDensityQH">${fmtNum(Math.round(popProjected / areaKm2))}</span> <em>(QH)</em>`,
+        'người/km²', 'Dân số hiện trạng / quy hoạch chia cho diện tích tự nhiên')
     : '';
   view.innerHTML = `<div id="wardSummaryCard" style="display:contents;">
-    <div class="ward-info-line">${profileHtml}${areaHtml}<span id="wardRoadLen"></span></div>
+    <div class="ward-info-line">${areaHtml}<div id="wardRoadLen" class="ward-stat-group"></div></div>
     <div id="wardQuotaTableContainer">${buildWardQuotaTableHtml(wardData, popProjected)}</div>
   </div>`;
   document.getElementById('wardSummaryCard').dataset.ward = wardData.Ten_Phuong;
-  document.getElementById('wardRoadLen').dataset.ward = wardData.Ten_Phuong;
+  const roadLenEl = document.getElementById('wardRoadLen');
+  roadLenEl.dataset.ward = wardData.Ten_Phuong;
+  roadLenEl.dataset.area = String(areaKm2);
   fillWardRoadLengths(wardData.Ten_Phuong);
 
   // Dân số hiện trạng / độ phủ / quy mô đã có ở #bpSubtitle, dòng tiêu đề chỉ bổ sung dân số quy hoạch

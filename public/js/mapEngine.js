@@ -871,10 +871,10 @@ let stopFlow = null;
 // Đường theo nhóm (serviceArea.js): nền = mọi đường quanh công trình (mờ), tới được = phần đi được trong bán kính.
 // Vẽ từ nhóm nhỏ lên nhóm lớn để trục chính nằm trên cùng; 'unknown' = mạng lưới lưu cũ chưa phân nhóm.
 const ROAD_STYLES = [
-  ['kiet',    { label: 'Đường kiệt, hẻm, nội bộ', color: '#cbd5e1', base: 0.6, reach: 1.1 }],
-  ['unknown', { label: 'Đường tiếp cận (chưa phân nhóm — Admin tải lại mạng lưới đường)', color: '#fde047', base: 0.9, reach: 1.8 }],
-  ['named',   { label: 'Đường có tên', color: '#60a5fa', base: 1.1, reach: 2.2 }],
-  ['main',    { label: 'Trục chính', color: '#fb923c', base: 1.6, reach: 3.2 }]
+  ['kiet',    { label: 'Đường nội bộ', title: 'Kiệt, hẻm, đường không tên, đường nội bộ', color: '#cbd5e1', base: 0.6, reach: 1.1 }],
+  ['unknown', { label: 'Đường chưa phân nhóm', title: 'Mạng lưới đường lưu bản cũ — Admin tải lại mạng lưới đường', color: '#fde047', base: 0.9, reach: 1.8 }],
+  ['named',   { label: 'Đường khu vực', title: 'Đường phố có tên', color: '#60a5fa', base: 1.1, reach: 2.2 }],
+  ['main',    { label: 'Đường trục chính', title: 'Quốc lộ, tỉnh lộ, đường chính đô thị', color: '#fb923c', base: 1.6, reach: 3.2 }]
 ];
 
 function addRoadLayers(group, area) {
@@ -893,7 +893,7 @@ function addRoadLayers(group, area) {
 function roadLegendHtml(area) {
   const items = ROAD_STYLES.slice().reverse()
     .filter(([key]) => area.reachRoads[key].length)
-    .map(([, s]) => `<span class="road-legend-item"><i style="background:${s.color}; height:${Math.max(2, Math.round(s.reach))}px;"></i>${s.label}</span>`);
+    .map(([, s]) => `<span class="road-legend-item" title="${s.title}"><i style="background:${s.color}; height:${Math.max(2, Math.round(s.reach))}px;"></i>${s.label}</span>`);
   return items.length ? `<div class="road-legend">${items.join('')}</div>` : '';
 }
 

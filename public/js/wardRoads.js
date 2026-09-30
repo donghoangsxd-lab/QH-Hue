@@ -3,7 +3,7 @@
 // chiều dài trục chính / kiệt cắt theo ranh phường lưu trong index; mọi người dùng đọc qua máy chủ (action getWardRoads).
 import { state } from './state.js';
 import { geeApi } from './api.js';
-import { escapeHtml, showToast } from './utils.js';
+import { escapeHtml, showToast, wardStatHtml } from './utils.js';
 import { queryOverpassHedged } from './serviceArea.js';
 
 const QUERY_TIMEOUT_MS = 170000; // xã miền núi rộng hàng trăm km²
@@ -25,6 +25,7 @@ const R = 6371008.8, RAD = Math.PI / 180;
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const KM_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
+const DENSITY_FORMAT = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Thẻ OSM của 1 đường → 'main' | 'kiet' | null (không tính) */
 export function roadClass(tags) {
@@ -141,17 +142,23 @@ export function loadWardRoadLengths(force = false) {
   return lengthsPromise;
 }
 
-/** Điền chiều dài đường vào ô #wardRoadLen của phần chi tiết phường (nếu đã có số liệu) */
+/**
+ * Điền mật độ đường vào ô #wardRoadLen của phần chi tiết phường (nếu đã có số liệu).
+ * main = đường trục chính + đường khu vực (đường phố có tên), kiet = đường nội bộ; chia cho diện tích tự nhiên (data-area, km²)
+ */
 export async function fillWardRoadLengths(wardName) {
   const wards = await loadWardRoadLengths();
   const el = $('wardRoadLen');
   if (!el || el.dataset.ward !== wardName) return;
   const d = wards[wardName];
-  if (!d) { el.innerHTML = ''; return; }
-  const when = d.at ? ` (OSM ${new Date(d.at).toLocaleDateString('vi-VN')})` : '';
-  el.innerHTML = `${el.previousElementSibling ? ' · ' : ''}🛣️ Đường giao thông${escapeHtml(when)}:`
-    + ` <span title="Quốc lộ, tỉnh lộ, đường chính đô thị và đường phố có tên — đường đôi tính 1 lần theo tim tuyến">Trục chính <b>${KM_FORMAT.format(d.main)} km</b></span>`
-    + ` · <span title="Đường không tên, kiệt/hẻm, đường nội bộ, dịch vụ, phố đi bộ — theo OpenStreetMap nên là mức tối thiểu">Kiệt <b>${KM_FORMAT.format(d.kiet)} km</b></span>`;
+  const areaKm2 = Number(el.dataset.area) || 0;
+  if (!d || !(areaKm2 > 0)) { el.innerHTML = ''; return; }
+  const when = d.at ? `OSM ${new Date(d.at).toLocaleDateString('vi-VN')}` : 'OpenStreetMap';
+  const total = d.main + d.kiet;
+  el.innerHTML = wardStatHtml('Mật độ giao thông', DENSITY_FORMAT.format(total / areaKm2), 'km/km²',
+    `Tổng chiều dài các tuyến đường ${KM_FORMAT.format(total)} km (trục chính + khu vực ${KM_FORMAT.format(d.main)} km, nội bộ ${KM_FORMAT.format(d.kiet)} km) / diện tích tự nhiên ${KM_FORMAT.format(areaKm2)} km² — theo ${when}`)
+    + wardStatHtml('Mật độ đường khu vực', DENSITY_FORMAT.format(d.main / areaKm2), 'km/km²',
+      `(Đường trục chính + đường khu vực) ${KM_FORMAT.format(d.main)} km / diện tích tự nhiên ${KM_FORMAT.format(areaKm2)} km² — theo ${when}`);
 }
 
 // ================== ADMIN TẢI MẠNG LƯỚI & LƯU ==================
