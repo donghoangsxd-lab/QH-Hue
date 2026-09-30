@@ -611,7 +611,13 @@ function patchCombinedTableWardRow(ward) {
 
 // ================== PANEL THỐNG KÊ DƯỚI ==================
 const CITY_NAME = "Thành phố Huế";
+// Dân số quy hoạch toàn TP: mẫu số mật độ QH toàn TP và trần tổng dân số QH các phường xã
+const CITY_POP_QH = 1850000;
 let wardStatsPromise = null;
+let popCapExceeded = false;
+
+const planPopOf = (w) => Number(w.projectedPopulation) || Math.round((Number(w.Dan_So_Vector) || 0) * 1.2);
+const totalPlanPop = () => state.wardStatsData.reduce((sum, w) => sum + planPopOf(w), 0);
 let bottomRenderSeq = 0;
 
 function isCityMode() {
@@ -760,7 +766,7 @@ function renderCityInfoLine() {
   list.forEach(w => {
     const a = Number(w.Dien_Tich_Km2) || 0;
     const p = Number(w.Dan_So_Vector) || 0;
-    const pQH = Number(w.projectedPopulation) || Math.round(p * 1.2);
+    const pQH = planPopOf(w);
     areas[w.Ten_Phuong] = a;
     areaKm2 += a;
     pop += p;
@@ -775,15 +781,25 @@ function renderCityInfoLine() {
   const urbanRate = (u, total) => fmtPct(total > 0 ? (u / total) * 100 : 0);
   const urbanHT = urbanRate(urbanPop, pop);
   const urbanQH = urbanRate(urbanPopQH, popQH);
+  const over = popQH - CITY_POP_QH;
+  const wardsQHHtml = over > 0
+    ? `<span style="color:var(--accent-red);">⚠ ${fmtNum(popQH)}</span>`
+    : fmtNum(popQH);
   el.innerHTML = wardStatHtml('Diện tích', fmtArea(areaKm2), 'km²', `Tổng diện tích tự nhiên ${list.length} phường/xã`)
+    + wardStatHtml('Dân số QH toàn TP', fmtNum(CITY_POP_QH), 'người', 'Dân số quy hoạch TP. Huế: cơ sở tính mật độ QH toàn TP và trần tổng dân số QH các phường xã')
+    + wardStatHtml(`Tổng DS QH ${list.length} phường/xã`, wardsQHHtml, 'người',
+      over > 0
+        ? `Vượt trần dân số QH toàn TP ${fmtNum(over)} người, cần giảm dân số QH của một số phường/xã`
+        : `Còn ${fmtNum(-over)} người trước khi chạm trần ${fmtNum(CITY_POP_QH)}`)
     + wardStatHtml('Mật độ dân số',
-      `${fmtNum(Math.round(pop / areaKm2))} <em>(HT)</em> → ${fmtNum(Math.round(popQH / areaKm2))} <em>(QH)</em>`,
-      'người/km²', `Tổng dân số hiện trạng ${fmtNum(pop)} / quy hoạch ${fmtNum(popQH)} người chia cho tổng diện tích tự nhiên`)
+      `${fmtNum(Math.round(pop / areaKm2))} <em>(HT)</em> → ${fmtNum(Math.round(CITY_POP_QH / areaKm2))} <em>(QH)</em>`,
+      'người/km²', `Dân số hiện trạng ${fmtNum(pop)} / quy hoạch toàn TP ${fmtNum(CITY_POP_QH)} người chia cho tổng diện tích tự nhiên`)
     + wardStatHtml('Tỷ lệ đô thị hóa',
       urbanHT === urbanQH ? urbanHT : `${urbanHT} <em>(HT)</em> → ${urbanQH} <em>(QH)</em>`,
       '', `Dân số ${urbanCount} phường (hiện trạng ${fmtNum(urbanPop)} / quy hoạch ${fmtNum(urbanPopQH)} người) chia cho tổng dân số toàn thành phố`)
     + '<div id="cityRoadDensity" class="ward-stat-group"></div>';
   fillCityRoadDensity(document.getElementById('cityRoadDensity'), areas);
+  checkPopCap();
 }
 
 export async function renderBottomPanel() {
@@ -983,7 +999,7 @@ function renderWardSummary(wardData) {
         'người/km²', 'Dân số hiện trạng / quy hoạch chia cho diện tích tự nhiên')
     : '';
   view.innerHTML = `<div id="wardSummaryCard" style="display:contents;">
-    <div class="ward-info-line">${areaHtml}<div id="wardRoadLen" class="ward-stat-group"></div></div>
+    <div class="ward-info-line">${areaHtml}<div id="wardRoadLen" class="ward-stat-group"></div><div id="wardPopCapWarn" class="ward-stat-group"></div></div>
     <div id="wardQuotaTableContainer">${buildWardQuotaTableHtml(wardData, popProjected)}</div>
   </div>`;
   document.getElementById('wardSummaryCard').dataset.ward = wardData.Ten_Phuong;
@@ -996,7 +1012,7 @@ function renderWardSummary(wardData) {
   const planEl = document.getElementById('bpWardPlan');
   if (planEl) {
     planEl.innerHTML = `· <label for="wardPopInput" title="Dân số quy hoạch">Dân số QH</label>:
-      <input type="number" id="wardPopInput" value="${Number(popProjected)}" step="1000" min="1000" max="2000000" />
+      <input type="number" id="wardPopInput" value="${Number(popProjected)}" step="1000" min="1000" max="${CITY_POP_QH}" />
       người (<span id="projectedUnitsLabel">${projectedUnits}</span> đơn vị ở)
       <span id="wardCoverageStatus"></span>`;
   }
@@ -1005,7 +1021,7 @@ function renderWardSummary(wardData) {
   if (popInput) {
     popInput.oninput = (e) => {
       const raw = Number(e.target.value);
-      const newProjPop = Number.isFinite(raw) && raw >= 1000 ? Math.min(raw, 2000000) : popProjected;
+      const newProjPop = Number.isFinite(raw) && raw >= 1000 ? Math.min(raw, CITY_POP_QH) : popProjected;
       const newUnits = Math.max(1, Math.round(newProjPop / 20000));
       const unitsLabel = document.getElementById('projectedUnitsLabel');
       if (unitsLabel) unitsLabel.textContent = newUnits;
@@ -1017,10 +1033,32 @@ function renderWardSummary(wardData) {
         Object.values(group || {}).forEach(node => { node.requiredArea = (node.quota || 0) * newProjPop; });
       });
       refreshWardQuotaTable(wardData);
+      checkPopCap(wardData);
     };
   }
+  checkPopCap(wardData);
 
   loadWardDetailCoverage(wardData);
+}
+
+// Trần dân số QH toàn TP: ô tổng dân số QH trong dòng chỉ tiêu phường; toast mỗi lần tổng chuyển từ trong ngưỡng sang vượt ngưỡng
+function checkPopCap(wardData = null) {
+  const total = totalPlanPop();
+  const over = total - CITY_POP_QH;
+  const warnEl = document.getElementById('wardPopCapWarn');
+  if (warnEl && wardData) {
+    const room = Math.max(0, CITY_POP_QH - (total - planPopOf(wardData)));
+    warnEl.innerHTML = wardStatHtml(`Tổng DS QH ${state.wardStatsData.length} phường/xã`,
+      over > 0
+        ? `<span style="color:var(--accent-red);">⚠ ${fmtNum(total)} (vượt ${fmtNum(over)})</span>`
+        : `${fmtNum(total)} <em>/ ${fmtNum(CITY_POP_QH)}</em>`,
+      'người',
+      `Trần dân số QH toàn TP ${fmtNum(CITY_POP_QH)} người. Phường/xã này tối đa ${fmtNum(room)} người để tổng không vượt trần`);
+  }
+  if (over > 0 && !popCapExceeded) {
+    showToast(`⚠️ Tổng dân số QH các phường/xã (${fmtNum(total)} người) vượt dân số QH toàn TP ${fmtNum(CITY_POP_QH)} người`, 'error');
+  }
+  popCapExceeded = over > 0;
 }
 
 const DEFAULT_QUOTA = {

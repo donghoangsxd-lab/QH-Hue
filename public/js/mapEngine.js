@@ -8,6 +8,7 @@ import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, show
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
+import { tt16ParcelStyle, renderTt16Legend } from './tt16Symbols.js';
 import {
   getCoveredRightWidth, highlightPlanWard, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, onCompareChange
@@ -130,7 +131,7 @@ function resolveWardNameFromCoords(lat, lng) {
 // ============================ KHỞI TẠO BẢN ĐỒ ============================
 
 export function initMap() {
-  map = L.map('map', { renderer: L.canvas() }).setView(CITY_CENTER, CITY_ZOOM);
+  map = L.map('map', { renderer: L.canvas(), maxZoom: 18 }).setView(CITY_CENTER, CITY_ZOOM);
 
   L.tileLayer(ESRI_TILES, {
     maxZoom: 18,
@@ -152,6 +153,7 @@ export function initMap() {
   map.on('moveend', () => leftRenderer.refreshPoints());
   updateWardLabelFontSize();
   onCompareChange(handleCompareChange);
+  renderTt16Legend(document.getElementById('parcelLegend'));
 
   return map;
 }
@@ -438,8 +440,10 @@ function hasValidCoord(p) {
   return p.lat != null && p.lng != null && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng));
 }
 
-// Ranh lô đất CAD chỉ vẽ khi phóng to đủ gần (ở mức toàn thành phố hàng nghìn polygon vừa rối vừa nặng)
+// Ranh lô đất CAD chỉ vẽ khi phóng to đủ gần (ở mức toàn thành phố hàng nghìn polygon vừa rối vừa nặng):
+// từ PARCEL_MIN_ZOOM tô màu nền TT16, từ PARCEL_PATTERN_ZOOM (gần 1 lô cụ thể) tô hoa văn TT16
 const PARCEL_MIN_ZOOM = 15;
+const PARCEL_PATTERN_ZOOM = 17;
 
 // Zoom ≤ ngưỡng (mức toàn thành phố): mỗi phường 1 biểu đồ tròn số công trình theo loại thay cho icon chồng chéo.
 // Đang chọn 1 phường thì luôn hiện icon (phường rộng có thể vừa khung ở zoom thấp, 1 biểu đồ đơn lẻ không có ý nghĩa)
@@ -505,22 +509,25 @@ function createWardPie(ward, counts, total, maxTotal, targetMap, scenarioLabel) 
   return marker;
 }
 
-// Bản đồ quy hoạch ưu tiên ranh QH, chưa có thì dùng ranh hiện trạng của cùng công trình
-function parcelGeometryFor(p) {
+// Bản đồ quy hoạch ưu tiên ranh QH, chưa có thì dùng ranh hiện trạng của cùng công trình → { geometry, layer }
+function parcelFor(p) {
   const parcels = state.cadParcels;
   if (!parcels.size) return null;
   if (p.scenario === 'QH') return parcels.get(`QH|${p.id}`) || parcels.get(`HT|${p.id}`) || null;
   return parcels.get(`HT|${p.id}`) || null;
 }
 
-function createParcelShape(entry, targetMap) {
+function parcelStyle(entry, detailed) {
   const p = entry.point;
-  const geometry = parcelGeometryFor(p);
-  if (!geometry) return null;
-  const approved = isApproved(p.status);
-  const color = approved ? (BUFFER_COLORS[layerType(p)] || '#38bdf8') : '#f87171';
-  const shape = L.geoJSON(geometry, {
-    style: { color, weight: 1.8, opacity: 0.95, fillColor: color, fillOpacity: 0.22, dashArray: approved ? null : '4,4' },
+  return tt16ParcelStyle(layerType(p), entry.parcel.layer, { scenario: p.scenario, detailed, approved: isApproved(p.status) });
+}
+
+function createParcelShape(entry, targetMap, detailed) {
+  const p = entry.point;
+  entry.parcel = parcelFor(p);
+  if (!entry.parcel) return null;
+  const shape = L.geoJSON(entry.parcel.geometry, {
+    style: parcelStyle(entry, detailed),
     bubblingMouseEvents: false
   });
   shape.on('click', () => {
@@ -578,6 +585,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
   let listSeq = 0;
   let mode = null;
   let parcelsOn = false;
+  let parcelDetail = false;
   let pieKey = null;
   const rendered = new Map();
   const builtBuffers = new Set();
@@ -651,10 +659,16 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     const visible = list.filter(p => bounds.contains([p.lat, p.lng]));
     const nextMode = visible.length <= ICON_MAX_VISIBLE ? 'icon' : 'dot';
     const wantParcels = state.showParcels && state.cadParcels.size > 0 && m.getZoom() >= PARCEL_MIN_ZOOM;
+    const detail = m.getZoom() >= PARCEL_PATTERN_ZOOM;
     if (nextMode !== mode || wantParcels !== parcelsOn) {
       clearPoints();
       mode = nextMode;
       parcelsOn = wantParcels;
+    }
+    // Qua ngưỡng hoa văn: chỉ đổi kiểu tô của ranh lô đang vẽ, giữ nguyên marker
+    if (detail !== parcelDetail) {
+      parcelDetail = detail;
+      rendered.forEach(entry => { if (entry.shape) entry.shape.setStyle(parcelStyle(entry, detail)); });
     }
 
     const wanted = new Map();
@@ -671,7 +685,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
         return;
       }
       const entry = { point: p, group: groups[ICON_GROUP_KEYS[layerType(p)]] || groups.c9 };
-      entry.shape = parcelsOn ? createParcelShape(entry, m) : null;
+      entry.shape = parcelsOn ? createParcelShape(entry, m, parcelDetail) : null;
       if (entry.shape) entry.group.addLayer(entry.shape);
       entry.marker = createPointMarker(entry, mode, m);
       entry.group.addLayer(entry.marker);
@@ -761,7 +775,7 @@ export async function loadCadParcels() {
     const data = await res.json();
     const next = new Map();
     (data.parcels || []).forEach(p => {
-      if (p && p.id && p.geometry) next.set(`${p.phase === 'QH' ? 'QH' : 'HT'}|${p.id}`, p.geometry);
+      if (p && p.id && p.geometry) next.set(`${p.phase === 'QH' ? 'QH' : 'HT'}|${p.id}`, { geometry: p.geometry, layer: p.layer || '' });
     });
     state.cadParcels = next;
   } catch (err) {

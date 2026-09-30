@@ -311,6 +311,21 @@ body.right-collapsed .right-panel {
 .legend-icon { width: 14px; height: 18px; vertical-align: middle; flex-shrink: 0; }
 
 /* Màu phải khớp palette heatmap trong api/gee.js (min 1, max 8) */
+/* Chú giải ranh lô đất theo TT16: mẫu hoa văn + màu ACI */
+.tt16-legend { margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--border-color); }
+.tt16-title { font-size: 12px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 4px; }
+.tt16-title small { font-weight: 400; color: var(--text-muted); }
+.tt16-row { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; font-size: 11px; }
+.tt16-row span { flex: 1; min-width: 0; }
+.tt16-row small { font-size: 9.5px; color: var(--text-muted); }
+.tt16-row small::before { content: 'ACI '; }
+.tt16-swatch { width: 26px; height: 14px; flex-shrink: 0; border: 1.3px solid; border-radius: 2px; background-color: rgba(15, 23, 42, 0.6); }
+.tt16-borders { display: flex; flex-wrap: wrap; gap: 3px 10px; margin-top: 5px; font-size: 10.5px; color: var(--text-muted); }
+.tt16-borders span { display: inline-flex; align-items: center; gap: 4px; }
+.tt16-line { display: inline-block; width: 18px; height: 10px; border: 1px solid var(--text-main); border-radius: 1px; }
+.tt16-line.thick { border-width: 2.5px; }
+.tt16-line.dashed { border-style: dashed; }
+.tt16-note { margin-top: 3px; font-size: 10px; color: var(--text-muted); font-style: italic; }
 .heat-legend { margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--border-color); }
 .heat-legend-title { font-size: 12px; font-weight: 700; color: var(--accent-orange); }
 .heat-legend-sub { font-size: 10.5px; color: var(--text-muted); margin: 1px 0 5px; }

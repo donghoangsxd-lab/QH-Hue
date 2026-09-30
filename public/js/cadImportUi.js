@@ -212,7 +212,7 @@ function drawPreview(parcels, fit = true, focus = null) {
     previewLayer.addLayer(L.circleMarker([p.lat, p.lng], { radius: 4, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 1, interactive: false }));
   });
   previewLayer.addTo(map);
-  if (focus) zoomToParcel(focus, 19);
+  if (focus) zoomToParcel(focus);
   else if (fit) map.fitBounds(previewLayer.getBounds(), { ...viewPadding(40), maxZoom: 17 });
 }
 
@@ -254,7 +254,7 @@ function openReview(src) {
   current.reviewSrc = p ? p.src : null;
   renderReport();
   markReview(p);
-  zoomToParcel(p, 19);
+  zoomToParcel(p);
 }
 
 // Chọn cấp / từ chối lô đang duyệt; áp dụng luôn cho lô Truonghoc chưa duyệt cùng vị trí ở giai đoạn khác, rồi sang lô kế tiếp
