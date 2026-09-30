@@ -588,6 +588,14 @@ table.data-table .ward-link:hover { text-decoration: underline !important; }
 .min-size-warn { color: var(--accent-orange); font-size: 9px; font-weight: 600; white-space: nowrap; }
 .min-size-note { color: var(--text-muted); font-size: 9px; font-style: italic; white-space: nowrap; }
 
+/* Chú giải nhóm đường trong popup công trình (mapEngine.js ROAD_STYLES) */
+.road-legend { display: flex; flex-wrap: wrap; gap: 3px 10px; margin: 3px 0 0 8px; font-size: 9.5px; color: var(--text-muted); }
+.road-legend-item { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.road-legend-item i { display: inline-block; width: 16px; border-radius: 2px; }
+
+/* Chấm sáng tuyến tiếp cận (flowAnimation.js): trên vùng phục vụ, dưới marker công trình và popup */
+.flow-pane { z-index: 450; pointer-events: none; filter: drop-shadow(0 0 2px #ffffff) drop-shadow(0 0 6px rgba(34, 211, 238, 0.9)); }
+
 .ward-table-scroll-container {
   flex: 1;
   min-height: 0;

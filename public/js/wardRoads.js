@@ -40,6 +40,13 @@ export function roadClass(tags) {
   return null;
 }
 
+/** Nhóm vẽ bản đồ: 1 = trục chính (quốc lộ, tỉnh lộ, đường chính đô thị), 2 = đường phố có tên, 0 = kiệt / đường nhỏ */
+export function roadDrawGroup(tags) {
+  const t = tags || {};
+  if (MAIN_HIGHWAY.test(t.highway || '')) return 1;
+  return roadClass(t) === 'main' ? 2 : 0;
+}
+
 /** Đường dùng được cho "phạm vi thực tế" (giống truy vấn Overpass trực tiếp trong serviceArea.js) */
 function isWalkable(tags) {
   const t = tags || {};
@@ -53,7 +60,7 @@ function wardQuery(bbox) {
 
 const round6 = (v) => Math.round(v * 1e6) / 1e6;
 
-/** Đường đi được → các phần [[id, cầu ? 1 : 0, [id nút...], [lat, lon, ...]], ...], mỗi phần dưới PART_CHARS ký tự */
+/** Đường đi được → các phần [[id, cầu ? 1 : 0, [id nút...], [lat, lon, ...], nhóm vẽ], ...], mỗi phần dưới PART_CHARS ký tự */
 function packNetworkParts(elements) {
   const parts = [[]];
   let size = 0;
@@ -62,7 +69,7 @@ function packNetworkParts(elements) {
     if (!isWalkable(w.tags) || !Array.isArray(w.nodes) || !Array.isArray(g) || w.nodes.length < 2 || w.nodes.length !== g.length) return;
     if (g.some(p => !p)) return;
     const bridge = w.tags && w.tags.bridge && w.tags.bridge !== 'no' ? 1 : 0;
-    const packed = [w.id, bridge, w.nodes, g.flatMap(p => [round6(p.lat), round6(p.lon)])];
+    const packed = [w.id, bridge, w.nodes, g.flatMap(p => [round6(p.lat), round6(p.lon)]), roadDrawGroup(w.tags)];
     const len = JSON.stringify(packed).length + 1;
     if (size + len > PART_CHARS && parts[parts.length - 1].length) { parts.push([]); size = 0; }
     parts[parts.length - 1].push(packed);

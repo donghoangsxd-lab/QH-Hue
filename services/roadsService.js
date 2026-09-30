@@ -1,6 +1,7 @@
 // Mạng lưới đường OSM toàn thành phố (Admin tải 1 lần theo từng phường/xã ở trình duyệt), lưu trên bucket GCS:
 //   roads/v2/index.json            = { v: 2, saved, total, wards: { tên: { bbox: [w, s, e, n], parts, at, main, kiet } } }
-//   roads/v2/net_<slug>_<i>.json   = { v: 2, ward, part, ways: [[id, cầu ? 1 : 0, [id nút...], [lat, lon, ...]], ...] }
+//   roads/v2/net_<slug>_<i>.json   = { v: 2, ward, part, ways: [[id, cầu ? 1 : 0, [id nút...], [lat, lon, ...], nhóm vẽ?], ...] }
+//   nhóm vẽ: 1 = trục chính, 2 = đường có tên, 0 = kiệt (bản lưu cũ không có phần tử này)
 // Máy chủ cắt đường quanh công trình từ các file này cho "phạm vi thực tế"; index chứa luôn chiều dài trục chính / kiệt.
 // Đọc: file công khai. Ghi: Apps Script (máy chủ Vercel không có quyền ghi bucket).
 const axios = require('axios');
@@ -64,7 +65,7 @@ async function readPart(name, i, at) {
 }
 
 /**
- * Đường có đỉnh cách (lat, lng) không quá r mét → [[cầu, [id nút...], [lat, lon, ...]], ...] (dạng client đang dùng),
+ * Đường có đỉnh cách (lat, lng) không quá r mét → [[cầu, [id nút...], [lat, lon, ...], nhóm vẽ?], ...] (dạng client đang dùng),
  * hoặc null nếu mạng lưới chưa tải đủ 40 phường/xã (trình duyệt tự hỏi Overpass).
  */
 async function waysAround(lat, lng, r) {
@@ -85,13 +86,13 @@ async function waysAround(lat, lng, r) {
   const seen = new Set();
   const out = [];
   partsWays.forEach(ways => ways.forEach(w => {
-    const [id, bridge, nodes, flat] = w;
+    const [id, bridge, nodes, flat, group] = w;
     if (seen.has(id)) return;
     for (let i = 0; i < flat.length; i += 2) {
       const dy = (flat[i] - lat) * kLat, dx = (flat[i + 1] - lng) * kLng;
       if (dx * dx + dy * dy <= r2) {
         seen.add(id);
-        out.push([bridge, nodes, flat]);
+        out.push(group == null ? [bridge, nodes, flat] : [bridge, nodes, flat, group]);
         return;
       }
     }
@@ -108,12 +109,13 @@ function parseNetworkPart(raw) {
   if (!Array.isArray(raw) || raw.length > 200000) return null;
   const out = [];
   for (const w of raw) {
-    if (!Array.isArray(w) || w.length !== 4) return null;
-    const [id, bridge, nodes, flat] = w;
+    if (!Array.isArray(w) || (w.length !== 4 && w.length !== 5)) return null;
+    const [id, bridge, nodes, flat, group] = w;
     if (!isInt(id) || (bridge !== 0 && bridge !== 1) || !Array.isArray(nodes) || !Array.isArray(flat)) return null;
     if (nodes.length < 2 || nodes.length > 5000 || flat.length !== nodes.length * 2 || !nodes.every(isInt)) return null;
+    if (w.length === 5 && group !== 0 && group !== 1 && group !== 2) return null;
     for (let i = 0; i < flat.length; i += 2) if (!isLat(flat[i]) || !isLng(flat[i + 1])) return null;
-    out.push([id, bridge, nodes, flat.map(round6)]);
+    out.push(w.length === 5 ? [id, bridge, nodes, flat.map(round6), group] : [id, bridge, nodes, flat.map(round6)]);
   }
   return out;
 }

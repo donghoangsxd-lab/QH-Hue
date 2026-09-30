@@ -1045,7 +1045,11 @@ module.exports = async (req, res) => {
         console.warn('Đọc mạng lưới đường lỗi:', err.message);
       }
       if (!ways) return res.status(404).json({ error: true, message: 'Chưa có mạng lưới đường lưu sẵn' });
-      res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400');
+      // Bản lưu cũ chưa có nhóm vẽ: cache ngắn để Admin tải lại mạng lưới là có màu theo nhóm ngay
+      const legacy = ways.some(w => w.length < 4);
+      res.setHeader('Cache-Control', legacy
+        ? 'public, max-age=600, s-maxage=600'
+        : 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400');
       return res.status(200).json({ v: 2, r, ways, source: 'network' });
     }
 

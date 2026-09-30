@@ -7,6 +7,7 @@ import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint } from './utils.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea } from './serviceArea.js';
+import { startFlowAnimation } from './flowAnimation.js';
 import {
   getCoveredRightWidth, highlightPlanWard, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, onCompareChange
@@ -862,8 +863,41 @@ async function refreshPlanHeat() {
 
 // ============================ POPUP CÔNG TRÌNH ============================
 
+let stopFlow = null;
+
+// Đường theo nhóm (serviceArea.js): nền = mọi đường quanh công trình (mờ), tới được = phần đi được trong bán kính.
+// Vẽ từ nhóm nhỏ lên nhóm lớn để trục chính nằm trên cùng; 'unknown' = mạng lưới lưu cũ chưa phân nhóm.
+const ROAD_STYLES = [
+  ['kiet',    { label: 'Đường kiệt, hẻm, nội bộ', color: '#cbd5e1', base: 0.6, reach: 1.1 }],
+  ['unknown', { label: 'Đường tiếp cận (chưa phân nhóm — Admin tải lại mạng lưới đường)', color: '#fde047', base: 0.9, reach: 1.8 }],
+  ['named',   { label: 'Đường có tên', color: '#60a5fa', base: 1.1, reach: 2.2 }],
+  ['main',    { label: 'Trục chính', color: '#fb923c', base: 1.6, reach: 3.2 }]
+];
+
+function addRoadLayers(group, area) {
+  ROAD_STYLES.forEach(([key, s]) => {
+    if (area.allRoads[key].length) {
+      group.addLayer(L.polyline(area.allRoads[key], { color: '#e2e8f0', weight: s.base, opacity: 0.3, interactive: false }));
+    }
+  });
+  ROAD_STYLES.forEach(([key, s]) => {
+    if (area.reachRoads[key].length) {
+      group.addLayer(L.polyline(area.reachRoads[key], { color: s.color, weight: s.reach, opacity: 0.95, lineCap: 'round', interactive: false }));
+    }
+  });
+}
+
+function roadLegendHtml(area) {
+  const items = ROAD_STYLES.slice().reverse()
+    .filter(([key]) => area.reachRoads[key].length)
+    .map(([, s]) => `<span class="road-legend-item"><i style="background:${s.color}; height:${Math.max(2, Math.round(s.reach))}px;"></i>${s.label}</span>`);
+  return items.length ? `<div class="road-legend">${items.join('')}</div>` : '';
+}
+
 function clearSingleIsochrone() {
   singleIsoSeq++;
+  if (stopFlow) stopFlow();
+  stopFlow = null;
   layers.singleIso.clearLayers();
   planLayers.singleIso.clearLayers();
 }
@@ -876,17 +910,17 @@ export async function highlightSingleIsochrone(lat, lng, radius, group = layers.
   if (!group) return null;
   lat = Number(lat);
   lng = Number(lng);
-  group.addLayer(L.circle([lat, lng], { radius, color: '#ffffff', weight: 1.2, dashArray: '4,4', fill: false, interactive: false }));
+  group.addLayer(L.circle([lat, lng], { radius, color: '#ffffff', weight: 1.2, dashArray: '4,4', fillColor: '#020617', fillOpacity: 0.6, interactive: false }));
 
   try {
     const area = await computeServiceArea(lat, lng, radius);
     if (seq !== singleIsoSeq) return null;
-    group.addLayer(L.polyline(area.allRoads, { color: '#e2e8f0', weight: 1, opacity: 0.35, interactive: false }));
     group.addLayer(L.geoJSON(area.polygon, {
       interactive: false,
-      style: { color: '#22c55e', weight: 2, fillColor: '#22c55e', fillOpacity: 0.2 }
+      style: { color: '#22c55e', weight: 2, fillColor: '#22c55e', fillOpacity: 0.1 }
     }));
-    group.addLayer(L.polyline(area.reachRoads, { color: '#fde047', weight: 2, opacity: 0.95, interactive: false }));
+    addRoadLayers(group, area);
+    stopFlow = startFlowAnimation(group === planLayers.singleIso ? planMap : map, group, area.flowPaths);
     return { area, polygon: area.polygon };
   } catch (err) {
     if (seq !== singleIsoSeq) return null;
@@ -1017,7 +1051,7 @@ export function onPointClick(p, targetMap = map) {
       if (!r) return;
       if (r.area) {
         const pct = Math.round(r.area.areaKm2 / r.area.circleKm2 * 100);
-        fill('.js-area', `• Phạm vi thực tế: <b style="color:#22c55e;">${r.area.areaKm2.toFixed(2)} km²</b> <span style="color:var(--text-muted);">(${pct}% vòng tròn, theo ${r.area.reachKm.toFixed(1)} km đường tiếp cận)</span>`);
+        fill('.js-area', `• Phạm vi thực tế: <b style="color:#22c55e;">${r.area.areaKm2.toFixed(2)} km²</b> <span style="color:var(--text-muted);">(${pct}% vòng tròn, theo ${r.area.reachKm.toFixed(1)} km đường tiếp cận)</span>${roadLegendHtml(r.area)}`);
       } else {
         fill('.js-area', `<span style="color:var(--text-muted);">• Phạm vi thực tế: máy chủ dữ liệu đường (OpenStreetMap) đang quá tải — tạm hiển thị vòng tròn bán kính, bấm lại công trình sau ít phút.</span>`);
       }

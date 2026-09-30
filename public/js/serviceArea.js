@@ -1,6 +1,7 @@
 // Vùng phục vụ thực tế của 1 công trình theo mạng đường OSM (chỉ tính khi click chọn công trình)
 // Dijkstra trên đồ thị đường (đi 2 chiều) → tô các đoạn tới được lên lưới → nới SIDE_M, đóng hình CLOSE_M, lấp lỗ → dò viền, bo góc
 import { geeApi } from './api.js';
+import { roadDrawGroup } from './wardRoads.js';
 
 const SERVER_TIMEOUT_MS = 30000;     // máy chủ webapp cắt đường từ mạng lưới toàn thành phố đã lưu trên bucket
 const SERVER_HEAD_START_MS = 6000;   // máy chủ chưa trả lời sau chừng này thì trình duyệt hỏi thẳng Overpass song song
@@ -16,6 +17,7 @@ const OVERPASS_URLS = [
 ];
 const HEDGE_MS = 4000;          // máy chủ trước chưa trả lời sau chừng này thì gọi thêm máy chủ kế tiếp
 const WAYS_CACHE = 'qhhue-overpass-v1';
+const WAYS_KEY_VERSION = 2; // 2 = đường có nhóm vẽ (trục chính / có tên / kiệt)
 const WAYS_CACHE_DAYS = 14;
 const EXCLUDED_HIGHWAYS = 'motorway|motorway_link|construction|proposed|planned|abandoned|disused|razed|raceway|bus_guideway|platform|corridor|elevator|escape|via_ferrata';
 const SIDE_M = 50;      // nhà ven 2 bên đoạn đường tới được
@@ -24,6 +26,8 @@ const GAP_M = 25;       // tự nối đầu đường cụt với nút gần h�
 const SNAP_MAX_M = 300; // công trình cách đường xa hơn thì không tính được
 const FETCH_TIMEOUT_MS = 40000; // tổng thời gian chờ mọi máy chủ Overpass
 const CACHE_MAX = 30;
+const FLOW_DIRECTIONS = 16; // số hướng minh họa tuyến tiếp cận
+const FLOW_MIN_M = 50;      // bỏ hướng có tuyến ngắn hơn (bị chặn ngay cạnh công trình)
 
 const cache = new Map();
 
@@ -38,13 +42,14 @@ function projector(lat0, lng0) {
 
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
-// Chỉ giữ phần cần cho đồ thị (nút, tọa độ, cờ cầu) để lưu cache gọn
+// Chỉ giữ phần cần cho đồ thị (nút, tọa độ, cờ cầu) và nhóm vẽ để lưu cache gọn
 const slimWays = (elements) => (elements || [])
   .filter(w => Array.isArray(w.nodes) && Array.isArray(w.geometry) && w.nodes.length === w.geometry.length)
   .map(w => ({
     nodes: w.nodes,
     geometry: w.geometry.map(p => ({ lat: p.lat, lon: p.lon })),
-    tags: w.tags && w.tags.bridge ? { bridge: w.tags.bridge } : undefined
+    tags: w.tags && w.tags.bridge ? { bridge: w.tags.bridge } : undefined,
+    group: roadDrawGroup(w.tags)
   }));
 
 // Cache Storage của trình duyệt (còn sau khi tải lại trang); không hỗ trợ thì bỏ qua
@@ -115,11 +120,12 @@ async function fetchWaysDirect(lat, lng, r) {
   return slimWays((await queryOverpassHedged(q)).elements);
 }
 
-// Dạng gọn từ máy chủ: [cầu ? 1 : 0, [id nút...], [lat, lon, lat, lon, ...]] → dạng Overpass rút gọn
-const unpackWays = (packed) => (packed || []).map(([bridge, nodes, flat]) => ({
+// Dạng gọn từ máy chủ: [cầu ? 1 : 0, [id nút...], [lat, lon, lat, lon, ...], nhóm vẽ?] → dạng Overpass rút gọn
+const unpackWays = (packed) => (packed || []).map(([bridge, nodes, flat, group]) => ({
   nodes,
   geometry: nodes.map((_, i) => ({ lat: flat[2 * i], lon: flat[2 * i + 1] })),
-  tags: bridge ? { bridge: 'yes' } : undefined
+  tags: bridge ? { bridge: 'yes' } : undefined,
+  group: group ?? null
 }));
 
 // Máy chủ webapp: cắt đường quanh điểm từ mạng lưới toàn thành phố trên bucket (404 nếu Admin chưa tải đủ)
@@ -127,7 +133,7 @@ async function requestServerRoads(lat, lng, radius) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), SERVER_TIMEOUT_MS);
   try {
-    const res = await fetch(geeApi(`action=getRoads&lat=${lat}&lng=${lng}&r=${Math.round(radius)}`), { signal: ctrl.signal });
+    const res = await fetch(geeApi(`action=getRoads&lat=${lat}&lng=${lng}&r=${Math.round(radius)}&g=1`), { signal: ctrl.signal });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !Array.isArray(data.ways)) throw new Error(data.message || `HTTP ${res.status}`);
     return data;
@@ -141,7 +147,7 @@ const fetchWaysFromServer = async (lat, lng, radius) => unpackWays((await reques
 // Cache trình duyệt → máy chủ webapp; máy chủ chưa trả lời sau SERVER_HEAD_START_MS (hoặc lỗi) thì hỏi thẳng Overpass, lấy bên về trước
 async function fetchWays(lat, lng, radius) {
   const r = Math.round(radius + ROAD_MARGIN_M);
-  const key = `https://qhhue.cache/overpass?v=1&lat=${lat.toFixed(5)}&lng=${lng.toFixed(5)}&r=${r}`;
+  const key = `https://qhhue.cache/overpass?v=${WAYS_KEY_VERSION}&lat=${lat.toFixed(5)}&lng=${lng.toFixed(5)}&r=${r}`;
   const hit = await cachedWays(key);
   if (hit) return hit;
 
@@ -164,7 +170,8 @@ async function fetchWays(lat, lng, radius) {
   } catch (err) {
     throw (err.errors && err.errors[err.errors.length - 1]) || err;
   }
-  if (ways.length) saveWays(key, ways);
+  // Mạng lưới lưu cũ chưa có nhóm vẽ: không giữ trong trình duyệt để có màu theo nhóm ngay khi Admin tải lại
+  if (ways.length && ways.every(w => w.group != null)) saveWays(key, ways);
   return ways;
 }
 
@@ -219,7 +226,7 @@ function buildGraph(ways, proj) {
     for (let i = 1; i < w.nodes.length; i++) {
       const len = dist(xy[i - 1], xy[i]);
       link(w.nodes[i - 1], w.nodes[i], len);
-      segs.push([w.nodes[i - 1], w.nodes[i], len]);
+      segs.push([w.nodes[i - 1], w.nodes[i], len, w.group]);
     }
   }
 
@@ -252,8 +259,10 @@ function buildGraph(ways, proj) {
   return { pos, adj, segs };
 }
 
+// D: quãng đường ngắn nhất tới từng nút; P: nút liền trước trên đường ngắn nhất (để dựng lại tuyến đi)
 function dijkstra(graph, src, startDist, radius) {
   const D = new Map([[src, startDist]]);
+  const P = new Map();
   const heap = new MinHeap();
   heap.push([startDist, src]);
   while (heap.size) {
@@ -263,32 +272,33 @@ function dijkstra(graph, src, startDist, radius) {
       const nd = d + w;
       if (nd <= radius && nd < (D.get(v) ?? Infinity)) {
         D.set(v, nd);
+        P.set(v, u);
         heap.push([nd, v]);
       }
     }
   }
-  return D;
+  return { D, P };
 }
 
-// Các đoạn (hoặc phần đoạn) tới được trong bán kính, toạ độ mét
+// Các đoạn (hoặc phần đoạn) tới được trong bán kính, toạ độ mét: [điểm đầu, điểm cuối, nhóm vẽ]
 function reachableSegments(graph, D, radius) {
   const out = [];
   let total = 0;
-  const partial = (from, to, dFrom, len) => {
+  const partial = (from, to, dFrom, len, group) => {
     const f = Math.min(1, (radius - dFrom) / len);
     if (f <= 0) return;
-    out.push([from, [from[0] + (to[0] - from[0]) * f, from[1] + (to[1] - from[1]) * f]]);
+    out.push([from, [from[0] + (to[0] - from[0]) * f, from[1] + (to[1] - from[1]) * f], group]);
     total += len * f;
   };
-  for (const [a, b, len] of graph.segs) {
+  for (const [a, b, len, group] of graph.segs) {
     if (len <= 0) continue;
     const da = D.get(a), db = D.get(b), pa = graph.pos.get(a), pb = graph.pos.get(b);
     if (da != null && db != null && da + len <= radius + 1 && db + len <= radius + 1) {
-      out.push([pa, pb]);
+      out.push([pa, pb, group]);
       total += len;
     } else {
-      if (da != null) partial(pa, pb, da, len);
-      if (db != null) partial(pb, pa, db, len);
+      if (da != null) partial(pa, pb, da, len, group);
+      if (db != null) partial(pb, pa, db, len, group);
     }
   }
   return { segments: out, totalM: total };
@@ -304,11 +314,30 @@ function bestOrigin(graph, radius) {
   near.sort((a, b) => a[0] - b[0]);
   let best = null;
   for (const [d, id] of near.slice(0, 5)) {
-    const D = dijkstra(graph, id, d, radius);
+    const { D, P } = dijkstra(graph, id, d, radius);
     const reach = reachableSegments(graph, D, radius);
-    if (!best || reach.totalM > best.reach.totalM) best = { snapM: d, D, reach };
+    if (!best || reach.totalM > best.reach.totalM) best = { snapM: d, D, P, reach };
   }
   return best;
+}
+
+// Mỗi hướng (FLOW_DIRECTIONS hướng) lấy nút tới được xa nhất theo đường đi, dựng tuyến ngắn nhất từ nút đó về công trình
+function flowPaths(graph, origin, proj) {
+  const step = 360 / FLOW_DIRECTIONS;
+  const far = new Array(FLOW_DIRECTIONS).fill(null);
+  for (const [id, d] of origin.D) {
+    const p = graph.pos.get(id);
+    const k = Math.round(((Math.atan2(p[0], p[1]) * 180 / Math.PI + 360) % 360) / step) % FLOW_DIRECTIONS;
+    if (!far[k] || d > far[k][1]) far[k] = [id, d];
+  }
+  return far
+    .filter(f => f && f[1] - origin.snapM >= FLOW_MIN_M)
+    .map(([id]) => {
+      const path = [];
+      for (let u = id; u !== undefined; u = origin.P.get(u)) path.push(proj.toLatLng(...graph.pos.get(u)));
+      path.push(proj.toLatLng(0, 0));
+      return path;
+    });
 }
 
 function distanceTransform(src, W, H, cell) {
@@ -441,6 +470,10 @@ function serviceMask(segments, radius, cell) {
   return { solid: largestComponent(mask, W, H), W, H, half };
 }
 
+// Nhóm vẽ → khóa: mạng lưới lưu cũ (chưa có nhóm) vào 'unknown'
+const groupKey = (group) => (group === 1 ? 'main' : group === 2 ? 'named' : group === 0 ? 'kiet' : 'unknown');
+const byGroup = () => ({ main: [], named: [], kiet: [], unknown: [] });
+
 async function compute(lat, lng, radius) {
   const proj = projector(lat, lng);
   const ways = await fetchWays(lat, lng, radius);
@@ -465,13 +498,16 @@ async function compute(lat, lng, radius) {
     polygon = polygon.geometry.coordinates.map(c => turf.polygon([c[0]])).sort((a, b) => turf.area(b) - turf.area(a))[0];
   }
 
-  const reachRoads = origin.reach.segments.map(([p, q]) => [proj.toLatLng(p[0], p[1]), proj.toLatLng(q[0], q[1])]);
-  const allRoads = ways.map(w => w.geometry.map(p => [p.lat, p.lon]));
+  const reachRoads = byGroup();
+  origin.reach.segments.forEach(([p, q, group]) => reachRoads[groupKey(group)].push([proj.toLatLng(p[0], p[1]), proj.toLatLng(q[0], q[1])]));
+  const allRoads = byGroup();
+  ways.forEach(w => allRoads[groupKey(w.group)].push(w.geometry.map(p => [p.lat, p.lon])));
 
   return {
     polygon,
     reachRoads,
     allRoads,
+    flowPaths: flowPaths(graph, origin, proj),
     areaKm2: turf.area(polygon) / 1e6,
     circleKm2: Math.PI * (radius / 1000) ** 2,
     reachKm: origin.reach.totalM / 1000,
@@ -479,7 +515,10 @@ async function compute(lat, lng, radius) {
   };
 }
 
-/** Vùng phục vụ thực tế: { polygon (GeoJSON), reachRoads, allRoads ([[lat,lng]...]), areaKm2, circleKm2, reachKm, snapM } */
+/**
+ * Vùng phục vụ thực tế: { polygon (GeoJSON), reachRoads, allRoads ({ main, named, kiet, unknown }: [[lat,lng]...] theo nhóm vẽ),
+ * flowPaths (tuyến từ rìa về công trình), areaKm2, circleKm2, reachKm, snapM }
+ */
 export async function computeServiceArea(lat, lng, radius) {
   const key = `${lat.toFixed(5)},${lng.toFixed(5)},${Math.round(radius)}`;
   if (cache.has(key)) return cache.get(key);
