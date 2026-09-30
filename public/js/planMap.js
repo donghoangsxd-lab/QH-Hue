@@ -20,6 +20,7 @@ export const planLayers = {
   c3: L.layerGroup(), b3: L.layerGroup(),
   c4: L.layerGroup(), b4: L.layerGroup(),
   c5: L.layerGroup(), b5: L.layerGroup(),
+  c10: L.layerGroup(), b10: L.layerGroup(),
   c6: L.layerGroup(), b6: L.layerGroup(),
   c7: L.layerGroup(), b7: L.layerGroup(),
   c8: L.layerGroup(), b8: L.layerGroup(),

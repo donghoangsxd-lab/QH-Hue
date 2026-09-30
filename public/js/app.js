@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     planLayers.pop.eachLayer(l => l.setOpacity && l.setOpacity(val));
   });
 
-  const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'heat'];
+  const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'heat'];
   layerCheckboxes.forEach(key => {
     document.getElementById(`chk_${key}`)?.addEventListener('change', (e) => {
       const targetLayer = key === 'bound' ? 'boundary' : key === 'heat' ? 'heatmap' : key;
@@ -342,7 +342,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnEye = document.getElementById('btnToggleAllIcons');
   btnEye?.addEventListener('click', () => {
     allIconsVisible = !allIconsVisible;
-    ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'].forEach(gKey => {
+    ['c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9'].forEach(gKey => {
       const chk = document.getElementById(`chk_${gKey}`);
       if (chk) chk.checked = allIconsVisible;
       toggleLayer(gKey, allIconsVisible);

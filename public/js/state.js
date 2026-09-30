@@ -54,6 +54,7 @@ export const infraLabels = {
   "3-MN": "🧸 Trường Mầm non",
   "4-TH": "🏫 Trường Tiểu học",
   "5-THCS": "📚 Trường THCS",
+  "THPT": "🎓 Trường THPT",
   "6-YT": "✚ Bệnh viện, Trạm y tế",
   "7-VH": "🎭 Nhà văn hóa, thể thao",
   "8-TM": "🛒 Chợ, Trung tâm thương mại",
@@ -67,17 +68,31 @@ export const WARD_HIGHLIGHT_STYLE = { color: '#fb923c', weight: 3.5, dashArray: 
 
 // Vùng phủ (buffer) theo loại hạ tầng, dùng chung cho bản đồ hiện trạng và quy hoạch
 export const BUFFER_COLORS = {
-  "1-CV": "#2ecc71", "2-BDX": "#3498db", "3-MN": "#e67e22", "4-TH": "#e74c3c", "5-THCS": "#9b59b6",
+  "1-CV": "#2ecc71", "2-BDX": "#3498db", "3-MN": "#e67e22", "4-TH": "#e74c3c", "5-THCS": "#9b59b6", "THPT": "#0d9488",
   "6-YT": "#1abc9c", "7-VH": "#f1c40f", "8-TM": "#e91e63", "9-CSD": "#95a5a6"
 };
 export const BUFFER_KEYS = {
-  "1-CV": "b1", "2-BDX": "b2", "3-MN": "b3", "4-TH": "b4", "5-THCS": "b5",
+  "1-CV": "b1", "2-BDX": "b2", "3-MN": "b3", "4-TH": "b4", "5-THCS": "b5", "THPT": "b10",
   "6-YT": "b6", "7-VH": "b7", "8-TM": "b8", "9-CSD": "b9"
 };
 export const ICON_GROUP_KEYS = {
-  "1-CV": "c1", "2-BDX": "c2", "3-MN": "c3", "4-TH": "c4", "5-THCS": "c5",
+  "1-CV": "c1", "2-BDX": "c2", "3-MN": "c3", "4-TH": "c4", "5-THCS": "c5", "THPT": "c10",
   "6-YT": "c6", "7-VH": "c7", "8-TM": "c8", "9-CSD": "c9"
 };
+
+// Trường THPT lưu mã 4-TH (chỉ tiêu tính riêng ở máy chủ theo constants.isThptItem); trên bản đồ tách thành lớp riêng
+const layerTypeMemo = new WeakMap();
+export function layerType(p) {
+  if (!p || p.type !== '4-TH') return p ? p.type : undefined;
+  let t = layerTypeMemo.get(p);
+  if (!t) {
+    const prefix = String(p.id || '').split('-')[0].toUpperCase();
+    const name = String(p.name || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/Đ/g, 'D');
+    t = prefix === 'THPT' || name.includes('THPT') || name.includes('TRUNG HOC PHO THONG') ? 'THPT' : '4-TH';
+    layerTypeMemo.set(p, t);
+  }
+  return t;
+}
 export function getBufferStyle(type, approved) {
   if (!approved) return { color: '#f87171', weight: 2.2, dashArray: '4, 4', fillColor: '#f87171', fillOpacity: 0.10 };
   const color = BUFFER_COLORS[type] || '#38bdf8';

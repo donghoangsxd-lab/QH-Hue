@@ -1,6 +1,6 @@
 import {
   state, infraLabels, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_HIGHLIGHT_STYLE, PLAN_CHANGE_INFO,
-  BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, getBufferStyle, getPlanScenarioList, effectiveRadius, bumpDataVersion
+  BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, getBufferStyle, getPlanScenarioList, effectiveRadius, bumpDataVersion, layerType
 } from './state.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi } from './api.js';
@@ -28,6 +28,7 @@ export const layers = {
   c3: L.layerGroup(), b3: L.layerGroup(),
   c4: L.layerGroup(), b4: L.layerGroup(),
   c5: L.layerGroup(), b5: L.layerGroup(),
+  c10: L.layerGroup(), b10: L.layerGroup(),
   c6: L.layerGroup(), b6: L.layerGroup(),
   c7: L.layerGroup(), b7: L.layerGroup(),
   c8: L.layerGroup(), b8: L.layerGroup(),
@@ -47,6 +48,7 @@ const ICON_FILES = {
   "3-MN": { approved: "Mamnon.png", pending: "Mamnon2.png" },
   "4-TH": { approved: "Tieuhoc.png", pending: "Tieuhoc2.png" },
   "5-THCS": { approved: "THCS.png", pending: "THCS2.png" },
+  "THPT": { approved: "THPT.png", pending: "THPT2.png" },
   "6-YT": { approved: "Yte.png", pending: "Yte2.png" },
   "7-VH": { approved: "Vanhoa.png", pending: "Vanhoa2.png" },
   "8-TM": { approved: "Cho.png", pending: "Cho2.png" },
@@ -143,7 +145,7 @@ export function initMap() {
   layers.heatmap.addTo(map);
   layers.singleIso.addTo(map);
   layers.c1.addTo(map); layers.c2.addTo(map); layers.c3.addTo(map);
-  layers.c4.addTo(map); layers.c5.addTo(map); layers.c6.addTo(map);
+  layers.c4.addTo(map); layers.c5.addTo(map); layers.c10.addTo(map); layers.c6.addTo(map);
   layers.c7.addTo(map); layers.c8.addTo(map); layers.c9.addTo(map);
 
   map.on('zoomend', updateWardLabelFontSize);
@@ -337,8 +339,8 @@ export function toggleLayer(layerKey, isChecked) {
 
   const popBox = document.getElementById('popBox');
   const heatBox = document.getElementById('heatBox');
-  if (layerKey === 'pop' && popBox) popBox.style.display = isChecked ? 'block' : 'none';
-  if (layerKey === 'heatmap' && heatBox) heatBox.style.display = isChecked ? 'block' : 'none';
+  if (layerKey === 'pop' && popBox) popBox.style.display = isChecked ? '' : 'none';
+  if (layerKey === 'heatmap' && heatBox) heatBox.style.display = isChecked ? '' : 'none';
 }
 
 export function toggleBuffer(bufferKey, el) {
@@ -516,7 +518,7 @@ function createParcelShape(entry, targetMap) {
   const geometry = parcelGeometryFor(p);
   if (!geometry) return null;
   const approved = isApproved(p.status);
-  const color = approved ? (BUFFER_COLORS[p.type] || '#38bdf8') : '#f87171';
+  const color = approved ? (BUFFER_COLORS[layerType(p)] || '#38bdf8') : '#f87171';
   const shape = L.geoJSON(geometry, {
     style: { color, weight: 1.8, opacity: 0.95, fillColor: color, fillOpacity: 0.22, dashArray: approved ? null : '4,4' },
     bubblingMouseEvents: false
@@ -535,7 +537,7 @@ function createPointMarker(entry, mode, targetMap) {
   const planInfo = p.scenario === 'QH' ? PLAN_CHANGE_INFO[p.planChange] : null;
   let marker;
   if (mode === 'icon') {
-    const files = ICON_FILES[p.type] || ICON_FILES["1-CV"];
+    const files = ICON_FILES[layerType(p)] || ICON_FILES["1-CV"];
     const iconUrl = `./icons/${approved ? files.approved : files.pending}`;
     const badgeHtml = planInfo ? `<span class="plan-badge" title="${planInfo.label}"></span>` : '';
     marker = L.marker([p.lat, p.lng], {
@@ -551,7 +553,7 @@ function createPointMarker(entry, mode, targetMap) {
       radius: 4.5,
       weight: planInfo ? 2.5 : 1,
       color: planInfo ? '#22c55e' : '#0f172a',
-      fillColor: approved ? (BUFFER_COLORS[p.type] || '#38bdf8') : '#f87171',
+      fillColor: approved ? (BUFFER_COLORS[layerType(p)] || '#38bdf8') : '#f87171',
       fillOpacity: 0.95,
       bubblingMouseEvents: false
     });
@@ -599,11 +601,12 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     const active = new Set(activeTypes);
     const byWard = new Map();
     list.forEach(p => {
-      if (!active.has(p.type)) return;
+      const type = layerType(p);
+      if (!active.has(type)) return;
       const name = wardNameAt(p.lat, p.lng);
       if (!name) return;
       const counts = byWard.get(name) || {};
-      counts[p.type] = (counts[p.type] || 0) + 1;
+      counts[type] = (counts[type] || 0) + 1;
       byWard.set(name, counts);
     });
     const totals = new Map([...byWard].map(([name, counts]) => [name, Object.values(counts).reduce((s, n) => s + n, 0)]));
@@ -667,7 +670,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
         existing.point = p;
         return;
       }
-      const entry = { point: p, group: groups[ICON_GROUP_KEYS[p.type]] || groups.c9 };
+      const entry = { point: p, group: groups[ICON_GROUP_KEYS[layerType(p)]] || groups.c9 };
       entry.shape = parcelsOn ? createParcelShape(entry, m) : null;
       if (entry.shape) entry.group.addLayer(entry.shape);
       entry.marker = createPointMarker(entry, mode, m);
@@ -693,10 +696,10 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     const type = BUFFER_TYPE_BY_KEY[key];
     group.clearLayers();
     list.forEach(p => {
-      if (p.type !== type) return;
+      if (layerType(p) !== type) return;
       const approved = isApproved(p.status);
       if (type === "9-CSD" && !approved) return;
-      group.addLayer(L.circle([p.lat, p.lng], { radius: effectiveRadius(p), ...getBufferStyle(p.type, approved), interactive: false }));
+      group.addLayer(L.circle([p.lat, p.lng], { radius: effectiveRadius(p), ...getBufferStyle(type, approved), interactive: false }));
     });
     builtBuffers.add(key);
   }
@@ -996,7 +999,7 @@ export function onPointClick(p, targetMap = map) {
   html += `<b style="color:var(--accent-cyan); font-size:12px;">${escapeHtml(p.name)}</b>`;
   if (!approved) html += `<span class="badge-pending">Chờ duyệt</span>`;
   html += `<br><hr style="border-color:var(--border-color); margin:4px 0;">`;
-  html += `• Loại hạ tầng: <b>${escapeHtml(infraLabels[p.type] || p.type)}</b><br>`;
+  html += `• Loại hạ tầng: <b>${escapeHtml(infraLabels[layerType(p)] || p.type)}</b><br>`;
   html += `• Địa bàn: <b class="js-ward">${buildDiaBanHtml(geoWardNow, p.ward)}</b><br>`;
   html += `• Cấp công trình: <b style="color:var(--accent-orange);">${escapeHtml(capCongTrinh)}</b><br>`;
   const planInfo = PLAN_CHANGE_INFO[p.planChange];
