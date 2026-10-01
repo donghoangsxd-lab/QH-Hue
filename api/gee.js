@@ -369,6 +369,10 @@ const FLOOD_BIN_MAX = 40;
 let cachedFloodBins = null;   // { version: phiên bản hiệu chỉnh dân cư, data }
 const cachedSatStats = new Map();   // "lst|năm" hoặc "sar|năm|bản dân cư|bản dữ liệu" → kết quả thống kê lớp vệ tinh
 const wardNameOf = (p) => p.tenXa || p.NAME_2 || p.name || 'Phường';
+// Pixel có dân (1/0). Đếm trên lưới raster dân cư (crs popProjection, POP_SCALE_M) như lúc chia dân số phường rồi quy ra người:
+// dân trong vùng = dân phường × pixel có dân trong vùng / tổng pixel có dân của phường. Cộng thẳng popRasterNormalized
+// (phép chiếu mặc định WGS84 do paint) ra gấp ~2,8 lần.
+const populatedPixels = (popRasterNative) => popRasterNative.mask().gt(0).unmask(0).rename('pix');
 
 function invalidateAllCaches() {
   invalidateCache();
@@ -1768,17 +1772,21 @@ module.exports = async (req, res) => {
       const version = getPopEditsVersion();
       if (cachedFloodBins && cachedFloodBins.version === version) return res.status(200).json(cachedFloodBins.data);
       const bin = sat.demImage(ee).round().clamp(FLOOD_BIN_MIN, FLOOD_BIN_MAX).rename('bin');
-      const img = popRasterNormalized.unmask(0).rename('pop').addBands(ee.Image.pixelArea().rename('area')).addBands(bin);
+      const img = populatedPixels(popRasterNative).addBands(ee.Image.pixelArea().rename('area')).addBands(bin);
       const fc = await eeEvaluate(img.reduceRegions({
         collection: wardVectorParsed,
-        reducer: ee.Reducer.sum().repeat(2).group({ groupField: 2, groupName: 'bin' }),
+        reducer: ee.Reducer.sum().unweighted().repeat(2).group({ groupField: 2, groupName: 'bin' }),
+        crs: popProjection,
         scale: POP_SCALE_M
       }).map(f => ee.Feature(null).copyProperties(f)));
       const wards = ((fc && fc.features) || []).map(f => {
         const p = f.properties || {};
+        const groups = p.groups || [];
+        const pix = groups.reduce((s, g) => s + (g.sum[0] || 0), 0);
+        const perPix = pix ? (Number(p.danSoNum) || 0) / pix : 0;
         return {
-          name: p.tenXa || p.NAME_2 || p.name || 'Phường',
-          bins: (p.groups || []).map(g => [g.bin, Math.round((g.sum[0] || 0) * 10) / 10, Math.round(g.sum[1] || 0)])
+          name: wardNameOf(p),
+          bins: groups.map(g => [g.bin, Math.round((g.sum[0] || 0) * perPix * 10) / 10, Math.round(g.sum[1] || 0)])
         };
       });
       const data = { binMin: FLOOD_BIN_MIN, binMax: FLOOD_BIN_MAX, wards };
@@ -1892,14 +1900,12 @@ module.exports = async (req, res) => {
       const key = `sar|${year}|${getPopEditsVersion()}|${getDataVersion()}`;
       if (!cachedSatStats.has(key)) {
         const flood = sat.sarFloodMask(ee, wardVectorParsed, year);
-        const pop = popRasterNormalized.unmask(0);
-        const img = pop.multiply(flood).rename('popFlood')
-          .addBands(ee.Image.pixelArea().multiply(flood).rename('area'))
-          .addBands(pop.rename('pop'));
+        const pix = populatedPixels(popRasterNative);
+        const img = pix.addBands(pix.multiply(flood).rename('pixFlood')).addBands(ee.Image.pixelArea().multiply(flood).rename('area'));
         const items = rawDataList.filter(it => isApprovedStatus(it.status) && it.id && Number.isFinite(Number(it.lat)) && Number.isFinite(Number(it.lng)));
         const pts = ee.FeatureCollection(items.map((it, i) => ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]), { i })));
         const [fc, hit] = await Promise.all([
-          eeEvaluate(img.reduceRegions({ collection: wardVectorParsed, reducer: ee.Reducer.sum(), scale: POP_SCALE_M, tileScale: 4 })
+          eeEvaluate(img.reduceRegions({ collection: wardVectorParsed, reducer: ee.Reducer.sum().unweighted(), crs: popProjection, scale: POP_SCALE_M, tileScale: 4 })
             .map(f => ee.Feature(null).copyProperties(f))),
           items.length
             ? eeEvaluate(flood.reduceRegions({ collection: pts, reducer: ee.Reducer.max(), scale: 20, tileScale: 4 }).filter(ee.Filter.eq('max', 1)).aggregate_array('i'))
@@ -1908,8 +1914,10 @@ module.exports = async (req, res) => {
         let pop0 = 0, popF = 0, area = 0;
         const wards = ((fc && fc.features) || []).map(f => {
           const p = f.properties || {};
-          pop0 += p.pop || 0; popF += p.popFlood || 0; area += p.area || 0;
-          return { name: wardNameOf(p), pop: Math.round(p.popFlood || 0), area: Math.round(p.area || 0) };
+          const wardPop = Number(p.danSoNum) || 0;
+          const wp = p.pix ? wardPop * (p.pixFlood || 0) / p.pix : 0;
+          pop0 += wardPop; popF += wp; area += p.area || 0;
+          return { name: wardNameOf(p), pop: Math.round(wp), area: Math.round(p.area || 0) };
         }).filter(w => w.pop > 0 || w.area > 0).sort((a, b) => b.pop - a.pop);
         if (cachedSatStats.size > 40) cachedSatStats.clear();
         cachedSatStats.set(key, {
