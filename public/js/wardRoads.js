@@ -1,6 +1,6 @@
 // Mạng lưới đường OSM toàn thành phố: Admin tải 1 lần theo từng phường/xã (khung bao phường) → lưu bucket roads/v2/
 // (services/roadsService.js). Cùng 1 lần tải: phần đi được dùng cho "phạm vi thực tế" (máy chủ cắt quanh công trình),
-// chiều dài trục chính / kiệt cắt theo ranh phường lưu trong index; mọi người dùng đọc qua máy chủ (action getWardRoads).
+// chiều dài trục chính / khu vực / nội bộ / xe đạp cắt theo ranh phường lưu trong index; mọi người dùng đọc qua máy chủ (action getWardRoads).
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml, ico, setStatusContent, showToast, wardStatHtml } from './utils.js';
@@ -27,11 +27,12 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const KM_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
 const DENSITY_FORMAT = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** Thẻ OSM của 1 đường → 'main' | 'kiet' | null (không tính) */
+/** Thẻ OSM của 1 đường → 'main' | 'kiet' | 'bike' | null (không tính) */
 export function roadClass(tags) {
   const t = tags || {};
   const hw = t.highway || '';
   if (t.area === 'yes' || /^(private|no)$/.test(t.access || '')) return null;
+  if (hw === 'cycleway' || (/^(path|footway|track)$/.test(hw) && t.bicycle === 'designated')) return 'bike';
   const alley = ALLEY_NAME.test(String(t.name || '').normalize('NFC').trim());
   if (MAIN_HIGHWAY.test(hw)) return 'main';
   if (STREET_HIGHWAY.test(hw)) return t.name && !alley ? 'main' : 'kiet';
@@ -41,11 +42,12 @@ export function roadClass(tags) {
   return null;
 }
 
-/** Nhóm vẽ bản đồ: 1 = trục chính (quốc lộ, tỉnh lộ, đường chính đô thị), 2 = đường phố có tên, 0 = kiệt / đường nhỏ */
+/** Nhóm vẽ bản đồ: 1 = trục chính (quốc lộ, tỉnh lộ, đường chính đô thị), 2 = đường phố có tên, 0 = kiệt / đường nhỏ, 3 = đường xe đạp */
 export function roadDrawGroup(tags) {
   const t = tags || {};
   if (MAIN_HIGHWAY.test(t.highway || '')) return 1;
-  return roadClass(t) === 'main' ? 2 : 0;
+  const cls = roadClass(t);
+  return cls === 'main' ? 2 : cls === 'bike' ? 3 : 0;
 }
 
 /** Đường dùng được cho "phạm vi thực tế" (giống truy vấn Overpass trực tiếp trong serviceArea.js) */
@@ -81,7 +83,10 @@ function packNetworkParts(elements) {
 
 const segLen = (a, b) => R * Math.hypot((b.lat - a.lat) * RAD, (b.lon - a.lon) * RAD * Math.cos((a.lat + b.lat) / 2 * RAD));
 
-/** Đường Overpass (out tags geom) + ranh phường → { main, kiet } km; đoạn thuộc phường xét theo trung điểm */
+/**
+ * Đường Overpass (out tags geom) + ranh phường → { main, kiet, trunk, bike } km; đoạn thuộc phường xét theo trung điểm.
+ * main = trục chính + khu vực (giữ nguyên nghĩa cũ cho mật độ đường), trunk = riêng trục chính, bike = đường xe đạp (không vào mật độ)
+ */
 export function sumWardLengths(elements, geometry) {
   const feature = turf.feature(geometry);
   const [minX, minY, maxX, maxY] = turf.bbox(feature);
@@ -119,9 +124,14 @@ export function sumWardLengths(elements, geometry) {
     }
   });
 
-  const km = { main: 0, kiet: 0 };
-  ways.forEach(x => { km[x.cls] += x.len * x.weight / 1000; });
-  return { main: Math.round(km.main * 100) / 100, kiet: Math.round(km.kiet * 100) / 100 };
+  const km = { main: 0, kiet: 0, trunk: 0, bike: 0 };
+  ways.forEach(x => {
+    const v = x.len * x.weight / 1000;
+    km[x.cls] += v;
+    if (x.cls === 'main' && MAIN_HIGHWAY.test(x.tags.highway || '')) km.trunk += v;
+  });
+  const r2 = (v) => Math.round(v * 100) / 100;
+  return { main: r2(km.main), kiet: r2(km.kiet), trunk: r2(km.trunk), bike: r2(km.bike) };
 }
 
 // ================== ĐỌC / HIỂN THỊ ==================
@@ -156,16 +166,56 @@ export async function customRoadsVersion() {
   return (await loadRoadsMeta()).custom.saved || 0;
 }
 
-/** Sau khi Admin lưu tuyến bổ sung: đọc lại chỉ mục + chiều dài bổ sung, vẽ lại ô mật độ đường */
+// Bảng thống kê (uiComponents.js) nghe sự kiện này để điền lại chiều dài 4 loại đường
+export const ROADS_META_EVENT = 'roads-meta-updated';
+
+/** Sau khi Admin lưu tuyến bổ sung / tải lại mạng lưới: đọc lại chỉ mục + chiều dài bổ sung, vẽ lại ô mật độ đường và bảng */
 export async function refreshRoadsMeta() {
   await loadRoadsMeta(true);
   if (state.selectedWard) fillWardRoadLengths(state.selectedWard);
   const city = $('cityRoadDensity');
   if (city && city.dataset.areas) fillCityRoadDensity(city, JSON.parse(city.dataset.areas));
+  document.dispatchEvent(new CustomEvent(ROADS_META_EVENT));
 }
 
 // Chiều dài OSM + tuyến bổ sung của 1 phường
 const withExtra = (d, extra) => ({ main: d.main + ((extra && extra.main) || 0), kiet: d.kiet + ((extra && extra.kiet) || 0) });
+
+export const ROAD_TYPES = [
+  { key: 'trunk', label: 'Đường trục chính', short: 'Trục chính', title: 'Quốc lộ, tỉnh lộ, đường chính đô thị, liên khu vực' },
+  { key: 'named', label: 'Đường khu vực', short: 'Khu vực', title: 'Đường phố có tên' },
+  { key: 'kiet', label: 'Đường nội bộ', short: 'Nội bộ', title: 'Kiệt, hẻm, đường không tên, đường dịch vụ, phố đi bộ' },
+  { key: 'bike', label: 'Đường xe đạp', short: 'Xe đạp', title: 'Đường dành riêng cho xe đạp (OSM highway=cycleway / bicycle=designated + tuyến Admin vẽ)' }
+];
+
+/**
+ * Chiều dài 4 loại đường (km) của 1 phường: { trunk, named, kiet, bike, main } — null nếu phường chưa có mạng lưới.
+ * trunk / named = null khi chỉ mục lưu bản cũ chưa tách trục chính khỏi khu vực (Admin tải lại mạng lưới đường);
+ * main = trục chính + khu vực (luôn có).
+ */
+function roadTypeLengths(d, extra) {
+  if (!d) return null;
+  const e = { main: 0, kiet: 0, trunk: 0, bike: 0, ...(extra || {}) };
+  const split = Number.isFinite(d.trunk);
+  return {
+    est: split && !!d.trunkEst,
+    main: d.main + e.main,
+    trunk: split ? d.trunk + e.trunk : null,
+    named: split ? Math.max(0, d.main - d.trunk) + (e.main - e.trunk) : null,
+    kiet: d.kiet + e.kiet,
+    bike: (Number(d.bike) || 0) + e.bike
+  };
+}
+
+/** { tên phường: { trunk, named, kiet, bike } | null } cho mọi phường có trong chỉ mục */
+export async function loadRoadTypeLengths() {
+  const { wards, custom } = await loadRoadsMeta();
+  const out = {};
+  Object.entries(wards).forEach(([name, d]) => { out[name] = roadTypeLengths(d, custom.extra[name]); });
+  return out;
+}
+
+export const fmtKm = (v) => KM_FORMAT.format(v);
 
 /** main = đường trục chính + đường khu vực (đường phố có tên), kiet = đường nội bộ; chia cho diện tích tự nhiên (km²) */
 function roadDensityHtml(main, kiet, areaKm2, source) {
@@ -251,21 +301,155 @@ async function downloadWard(w, onStep) {
   return { bbox, parts: parts.length, at: Date.now(), ...lengths, grouped: true };
 }
 
-// grouped = mạng lưới có nhóm vẽ đường (trục chính / có tên / kiệt); bản lưu trước đó thiếu → cần tải lại
-const isCurrent = (d) => !!(d && d.parts && d.grouped);
+// grouped = mạng lưới có nhóm vẽ đường (trục chính / có tên / kiệt); trunk = chỉ mục đã tách chiều dài trục chính / khu vực / xe đạp;
+// trunkEst = trục chính mới ước tính (phường có đường trục chính 2 chiều) → vẫn cần tải lại OSM.
+// Bản chưa tách: quét mạng lưới đã lưu (scanSavedNetworks) trước, chỉ tải lại OSM phường thật sự cần
+const isCurrent = (d) => !!(d && d.parts && d.grouped && Number.isFinite(d.trunk) && !d.trunkEst);
+const needsSplitOnly = (d) => !!(d && d.parts && d.grouped && !Number.isFinite(d.trunk));
+
+async function fetchSavedPart(name, part, at) {
+  const res = await fetch(geeApi(`action=getRoadPart&ward=${encodeURIComponent(name)}&part=${part}&at=${at}`));
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || !Array.isArray(d.ways)) throw new Error(d.message || `HTTP ${res.status}`);
+  return d.ways;
+}
+
+const PIECE_M = 20;          // chia đoạn trục chính thành mẩu ≤ 20 m để dò tuyến song song
+const DUAL_GAP_M = 40;       // 2 làn của đường đôi cách nhau dưới 40 m
+const DUAL_COS = Math.cos(20 * RAD);
+const DUAL_MIN_KM = 0.3;     // tổng mẩu trục chính có tuyến song song kèm (≈ 2 × chiều dài đường đôi) dưới ngưỡng = nút giao, nhánh rẽ
+const MATCH_KM = 0.3, MATCH_PCT = 0.01; // sai lệch cho phép giữa tổng đo lại và tổng chính xác đã lưu
+
+/**
+ * Mạng lưới đã lưu của 1 phường (các phần [[id, cầu, nút, [lat, lon, ...], nhóm vẽ], ...]) + ranh phường →
+ * { len: { 0, 1, 2, 3 } km theo nhóm vẽ (đoạn có trung điểm trong ranh, như sumWardLengths), dualKm: km trục chính có tuyến trục chính khác song song kèm }
+ */
+function scanWardNetwork(waysList, geometry) {
+  const feature = turf.feature(geometry);
+  const [minX, minY, maxX, maxY] = turf.bbox(feature);
+  const inside = (lat, lon) => lon >= minX && lon <= maxX && lat >= minY && lat <= maxY && turf.booleanPointInPolygon([lon, lat], feature);
+  const lat0 = (minY + maxY) / 2, kLng = Math.cos(lat0 * RAD) * R * RAD, kLat = R * RAD;
+  const len = { 0: 0, 1: 0, 2: 0, 3: 0 };
+  const pieces = [];   // mẩu trục chính trong ranh: [x, y, ux, uy, dài m, id tuyến]
+  const seen = new Set();
+  waysList.forEach(ways => ways.forEach(([id, , , flat, group]) => {
+    if (seen.has(id) || !(group in len)) return;
+    seen.add(id);
+    for (let i = 2; i < flat.length; i += 2) {
+      const a = { lat: flat[i - 2], lon: flat[i - 1] }, b = { lat: flat[i], lon: flat[i + 1] };
+      if (!inside((a.lat + b.lat) / 2, (a.lon + b.lon) / 2)) continue;
+      const l = segLen(a, b);
+      len[group] += l;
+      if (group !== 1 || l <= 0) continue;
+      const ax = a.lon * kLng, ay = a.lat * kLat, dx = b.lon * kLng - ax, dy = b.lat * kLat - ay;
+      const n = Math.ceil(l / PIECE_M);
+      for (let k = 0; k < n; k++) pieces.push([ax + dx * (k + 0.5) / n, ay + dy * (k + 0.5) / n, dx / l, dy / l, l / n, id]);
+    }
+  }));
+
+  const grid = new Map();
+  const cell = (x, y) => `${Math.floor(x / DUAL_GAP_M)}:${Math.floor(y / DUAL_GAP_M)}`;
+  pieces.forEach((p, i) => { const k = cell(p[0], p[1]); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(i); });
+  const hasParallel = ([x, y, ux, uy, , id]) => {
+    const cx = Math.floor(x / DUAL_GAP_M), cy = Math.floor(y / DUAL_GAP_M);
+    for (let gx = cx - 1; gx <= cx + 1; gx++) {
+      for (let gy = cy - 1; gy <= cy + 1; gy++) {
+        for (const j of grid.get(`${gx}:${gy}`) || []) {
+          const q = pieces[j];
+          if (q[5] === id || Math.abs(ux * q[2] + uy * q[3]) < DUAL_COS) continue;
+          const ox = q[0] - x, oy = q[1] - y;
+          // lệch ngang ≥ 3 m: 2 làn chạy cạnh nhau, không phải 2 tuyến nối tiếp thẳng hàng
+          if (Math.hypot(ox, oy) <= DUAL_GAP_M && Math.abs(ox * uy - oy * ux) >= 3) return true;
+        }
+      }
+    }
+    return false;
+  };
+  const dualM = pieces.reduce((s, p) => s + (hasParallel(p) ? p[4] : 0), 0);
+  const km = (m) => Math.round(m / 10) / 100;
+  return { len: { 0: km(len[0]), 1: km(len[1]), 2: km(len[2]), 3: km(len[3]) }, dualKm: km(dualM) };
+}
+
+/**
+ * Tách trục chính / khu vực cho phường đã có mạng lưới (bản chưa tách) mà không tải lại OSM.
+ * Tổng main đã lưu đã gộp đường đôi và gồm cả đường ngoài mạng lưới đi bộ (cao tốc, cấm đi bộ):
+ * - tổng đo lại (nhóm 1 + 2) khớp main, hoặc chỉ dư do đường đôi ở đường khu vực → trục chính = chiều dài nhóm 1 (chính xác);
+ * - còn lại (có đường trục chính 2 chiều / tuyến ngoài mạng lưới) → ước tính theo tỉ lệ, đánh dấu trunkEst để chỉ tải lại các phường này.
+ * Trả về danh sách phường cần tải lại.
+ */
+async function scanSavedNetworks(targets, index, total) {
+  running = true;
+  stopRequested = false;
+  const btn = $('btnWardRoads');
+  if (btn) btn.innerHTML = `${ico('stop')}Dừng quét mạng lưới`;
+  const failed = [], reload = [];
+  let done = 0, exact = 0;
+  for (const w of targets) {
+    if (stopRequested) break;
+    setMsg(`⏳ Quét ${done + 1}/${targets.length}: ${w.name}...`, 'var(--accent-orange)');
+    try {
+      const d = index[w.name];
+      const parts = [];
+      for (let i = 0; i < d.parts; i++) parts.push(await fetchSavedPart(w.name, i, d.at));
+      const { len, dualKm } = scanWardNetwork(parts, w.geometry);
+      const gap = len[1] + len[2] - d.main;
+      const tol = Math.max(MATCH_KM, d.main * MATCH_PCT);
+      const bike = len[3];
+      if (Math.abs(gap) <= tol || (gap > tol && dualKm < DUAL_MIN_KM)) {
+        index[w.name] = { ...d, trunk: Math.min(d.main, len[1]), bike };
+        exact++;
+      } else {
+        const ratio = len[1] + len[2] > 0 ? len[1] / (len[1] + len[2]) : 0;
+        index[w.name] = { ...d, trunk: Math.round(d.main * ratio * 100) / 100, bike, trunkEst: true };
+        reload.push(`${w.name} (${dualKm >= DUAL_MIN_KM ? `đường đôi ~${KM_FORMAT.format(dualKm / 2)} km` : 'có tuyến ngoài mạng lưới đi bộ'})`);
+      }
+    } catch (err) {
+      failed.push(w.name);
+    }
+    done++;
+  }
+  try {
+    setMsg('⏳ Đang lưu chỉ mục mạng lưới đường...', 'var(--accent-orange)');
+    await postAdmin('saveWardRoads', { wards: index, total });
+    await refreshRoadsMeta();
+    const tail = failed.length ? ` Lỗi ${failed.length}: ${failed.join(', ')} — bấm lại để quét tiếp.` : '';
+    setMsg(`${stopRequested ? 'Đã dừng' : '✓ Quét xong'}: ${exact} phường/xã tách chính xác, ${reload.length} phường/xã có đường trục chính 2 chiều cần tải lại.${tail}`,
+      failed.length || stopRequested || reload.length ? 'var(--accent-orange)' : 'var(--accent-green)');
+  } catch (err) {
+    setMsg(`❌ ${err.message}`, 'var(--accent-red)');
+  } finally {
+    running = false;
+    if (btn) btn.innerHTML = BTN_LABEL;
+  }
+  return { reload, stopped: stopRequested };
+}
 
 async function run() {
   const wards = state.wardLabelsList.filter(w => w.geometry);
   if (!wards.length) { setMsg('Chưa tải xong ranh giới phường/xã.', 'var(--accent-red)'); return; }
   const index = { ...(await loadWardRoadLengths(true)) };
+  const splitOnly = wards.filter(w => needsSplitOnly(index[w.name]));
+  let dualNote = '';
+  if (splitOnly.length) {
+    if (!confirm(`${splitOnly.length} phường/xã đã có mạng lưới đường nhưng chưa tách chiều dài trục chính / khu vực / xe đạp.`
+      + `\n\nQuét mạng lưới đã lưu (khoảng 1–2 phút, không tải lại OpenStreetMap): phường/xã không có đường trục chính 2 chiều được tách chính xác ngay,`
+      + ` chỉ phường/xã có đường trục chính 2 chiều mới cần tải lại.`)) return;
+    const { reload, stopped } = await scanSavedNetworks(splitOnly, index, wards.length);
+    if (stopped) return;
+    if (reload.length) dualNote = `\n\nCó đường trục chính 2 chiều (đang hiện số ước tính ≈):\n• ${reload.join('\n• ')}`;
+  }
   const missing = wards.filter(w => !isCurrent(index[w.name]));
-  const outdated = missing.filter(w => index[w.name] && index[w.name].parts).length;
+  const flagged = missing.filter(w => index[w.name] && index[w.name].trunkEst).length;
+  const outdated = missing.filter(w => index[w.name] && index[w.name].parts && !index[w.name].trunkEst).length;
+  const absent = missing.length - flagged - outdated;
   let targets = missing;
   if (!missing.length) {
+    if (splitOnly.length) return;
     if (!confirm(`Đã có mạng lưới đường cả ${wards.length} phường/xã. Tải lại toàn bộ theo OpenStreetMap mới nhất?`)) return;
     targets = wards;
-  } else if (!confirm(`Tải mạng lưới đường cho ${missing.length} phường/xã`
-    + `${outdated ? ` (${outdated} phường/xã đang lưu bản cũ chưa phân nhóm trục chính / đường có tên / kiệt)` : ' chưa có'}?`
+  } else if (!confirm(`Tải lại mạng lưới đường từ OpenStreetMap cho ${missing.length} phường/xã: `
+    + [flagged && `${flagged} có đường trục chính 2 chiều`, outdated && `${outdated} đang lưu bản cũ`, absent && `${absent} chưa có`].filter(Boolean).join(', ')
+    + `?${dualNote}`
     + `\n\nDùng chung cho "phạm vi thực tế" của công trình và chiều dài đường theo phường. Mỗi phường/xã mất vài giây đến 1–2 phút; giữ tab mở tới khi xong (có thể bấm Dừng, lần sau bấm lại sẽ tải tiếp phần còn lại).`)) {
     return;
   }
@@ -303,6 +487,7 @@ async function run() {
   setMsg(`${stopRequested ? 'Đã dừng' : '✓ Xong'}: tải ${fresh}/${targets.length} phường/xã (đã có ${have}/${wards.length}).${tail}`,
     failed.length || stopRequested || have < wards.length ? 'var(--accent-orange)' : 'var(--accent-green)');
   if (state.selectedWard) fillWardRoadLengths(state.selectedWard);
+  if (fresh) document.dispatchEvent(new CustomEvent(ROADS_META_EVENT));
 }
 
 export function initWardRoads() {

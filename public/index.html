@@ -141,6 +141,7 @@
             <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
             <span class="road-legend-item"><i style="background:#60a5fa; height:2px;"></i>Khu vực</span>
             <span class="road-legend-item"><i style="background:#cbd5e1; height:2px;"></i>Nội bộ</span>
+            <span class="road-legend-item" title="Đường dành riêng cho xe đạp: OpenStreetMap + tuyến Admin vẽ bổ sung"><i style="background:repeating-linear-gradient(90deg,#4ade80 0 5px,transparent 5px 8px); height:2px;"></i>Xe đạp</span>
             <span class="road-legend-item"><i style="background:#fde047; height:2px;"></i>Chưa phân loại</span>
           </div>
           <div class="layer-row">
@@ -272,6 +273,7 @@
               <option value="1">Đường trục chính</option>
               <option value="2" selected>Đường khu vực</option>
               <option value="0">Đường nội bộ</option>
+              <option value="3">Đường xe đạp</option>
             </select>
             <label for="roadName">Tên</label>
             <input type="text" id="roadName" maxlength="120" placeholder="Tên tuyến (không bắt buộc)" />
@@ -343,26 +345,36 @@
   <section class="bottom-panel" id="bottomPanel">
     <div class="bp-body" id="bpBody">
       <!-- PHẦN 1: CƠ CẤU ĐẤT HẠ TẦNG -->
-      <!-- Thẻ lật 2 mặt: trước = cơ cấu theo diện tích, sau = thống kê số lượng 9 loại hạ tầng -->
+      <!-- Khối xoay 3 mặt: cơ cấu theo diện tích → số lượng 9 loại hạ tầng → hệ thống giao thông (phóng to: xếp chồng) -->
       <div class="bp-part bp-part1">
         <div class="bp-part-head">
           <b class="bp-part-title" id="bpPart1Title">CƠ CẤU ĐẤT HẠ TẦNG</b>
           <div class="flip-controls" data-html2canvas-ignore="true">
-            <span class="flip-dots" aria-hidden="true"><i class="active"></i><i></i></span>
-            <button type="button" class="bp-btn" id="btnFlipPart1" aria-pressed="false" title="Lật trang: thống kê số lượng công trình"><svg class="ico"><use href="#i-flip"/></svg>Số lượng</button>
+            <span class="flip-dots" id="part1Dots"><i class="active" data-page="0" title="Cơ cấu đất hạ tầng"></i><i data-page="1" title="Số lượng công trình"></i><i data-page="2" title="Hệ thống giao thông"></i></span>
+            <button type="button" class="bp-btn" id="btnFlipPart1" title="Xoay trang: thống kê số lượng công trình"><svg class="ico"><use href="#i-flip"/></svg>Số lượng</button>
           </div>
         </div>
-        <div class="flip-card" id="part1Flip">
+        <div class="flip-card" id="part1Flip" data-page="0">
           <div class="flip-inner">
-            <div class="flip-face flip-front">
+            <div class="flip-face flip-front" data-page="0">
               <div class="bp-pie-inner">
                 <div class="pie-chart-wrap"><canvas id="infraPieChart"></canvas></div>
                 <div id="pieLegendDetails"></div>
               </div>
             </div>
-            <div class="flip-face flip-back" aria-hidden="true">
+            <div class="flip-face flip-back" data-page="1" aria-hidden="true">
               <div class="bp-part-head flip-back-head"><b class="bp-part-title">SỐ LƯỢNG CÔNG TRÌNH</b></div>
               <div class="infra-count-grid" id="infraCountGrid"></div>
+            </div>
+            <div class="flip-face flip-back" data-page="2" aria-hidden="true">
+              <div class="bp-part-head flip-back-head"><b class="bp-part-title">HỆ THỐNG GIAO THÔNG</b></div>
+              <div class="road-chart">
+                <div class="pie-chart-wrap road-donut-wrap">
+                  <canvas id="roadDonutChart"></canvas>
+                  <div class="road-donut-center" id="roadDonutCenter"></div>
+                </div>
+                <div class="road-chart-rows" id="roadChartRows"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -407,6 +419,7 @@
                     <th colspan="2">7. Văn hóa</th>
                     <th colspan="2">8. Thương mại</th>
                     <th colspan="2">TỔNG CỘNG</th>
+                    <th colspan="4" title="Chiều dài theo OpenStreetMap + tuyến Admin vẽ bổ sung, cắt theo ranh phường/xã">Đường giao thông (km)</th>
                   </tr>
                   <tr>
                     <th>Độ phủ</th><th>Q.Mô</th>
@@ -418,9 +431,14 @@
                     <th>Độ phủ</th><th>Q.Mô</th>
                     <th>Độ phủ</th><th>Q.Mô</th>
                     <th>Độ phủ</th><th>Q.Mô</th>
+                    <th title="Quốc lộ, tỉnh lộ, đường chính đô thị, liên khu vực">Trục chính</th>
+                    <th title="Đường phố có tên">Khu vực</th>
+                    <th title="Kiệt, hẻm, đường không tên, đường dịch vụ">Nội bộ</th>
+                    <th title="Đường dành riêng cho xe đạp">Xe đạp</th>
                   </tr>
                 </thead>
                 <tbody id="statTableBody"></tbody>
+                <tfoot id="statTableFoot"></tfoot>
               </table>
             </div>
           </div>

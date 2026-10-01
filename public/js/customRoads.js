@@ -16,7 +16,8 @@ const MIN_LENGTH_M = 5;
 const TYPES = {
   1: { label: 'Đường trục chính', color: '#fb923c' },
   2: { label: 'Đường khu vực', color: '#60a5fa' },
-  0: { label: 'Đường nội bộ', color: '#cbd5e1' }
+  0: { label: 'Đường nội bộ', color: '#cbd5e1' },
+  3: { label: 'Đường xe đạp', color: '#4ade80' }
 };
 
 const $ = (id) => document.getElementById(id);

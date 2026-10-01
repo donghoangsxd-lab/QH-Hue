@@ -480,8 +480,9 @@ function serviceMask(segments, radius, cell) {
 }
 
 // Nhóm vẽ → khóa: mạng lưới lưu cũ (chưa có nhóm) vào 'unknown'
-const groupKey = (group) => (group === 1 ? 'main' : group === 2 ? 'named' : group === 0 ? 'kiet' : 'unknown');
-const byGroup = () => ({ main: [], named: [], kiet: [], unknown: [] });
+const GROUP_KEYS = { 0: 'kiet', 1: 'main', 2: 'named', 3: 'bike' };
+const groupKey = (group) => GROUP_KEYS[group] || 'unknown';
+const byGroup = () => ({ main: [], named: [], kiet: [], bike: [], unknown: [] });
 
 // Chỉ giữ các đoạn đường có cả 2 đầu nằm trong vùng giới hạn (đồ thị không đi xuyên ra ngoài ranh)
 function clipWays(ways, feature) {

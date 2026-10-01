@@ -651,31 +651,83 @@ body.bottom-max .bottom-panel { top: 0; right: 0; height: auto; z-index: 2500; }
 .pie-legend-head span:first-child { text-align: left; }
 .pie-legend-name { color: var(--text-main); display: flex; align-items: center; gap: 5px; min-width: 0; }
 
-/* THẺ LẬT: TRƯỚC = CƠ CẤU DIỆN TÍCH, SAU = SỐ LƯỢNG 9 LOẠI */
+/* KHỐI XOAY 3 MẶT: CƠ CẤU DIỆN TÍCH → SỐ LƯỢNG 9 LOẠI → HỆ THỐNG GIAO THÔNG */
 .flip-controls { display: flex; align-items: center; gap: 8px; }
 .flip-dots { display: inline-flex; gap: 4px; }
-.flip-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border-color); transition: background 0.3s, width 0.3s; }
+.flip-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border-color); cursor: pointer; transition: background 0.3s, width 0.3s; }
+.flip-dots i:hover { background: var(--text-muted); }
 .flip-dots i.active { width: 14px; border-radius: var(--r-sm); background: var(--accent-cyan); }
-.flip-card { position: relative; flex: 1; min-height: 0; width: 338px; perspective: 900px; }
+/* --prism-r = khoảng cách tâm lăng trụ tam giác đều tới mặt = rộng / (2·tan 60°) */
+.flip-card { --turn: 0; --prism-r: 97.6px; position: relative; flex: 1; min-height: 0; width: 338px; perspective: 1100px; overflow: hidden; }
 .flip-inner {
   position: absolute; inset: 0;
   transform-style: preserve-3d;
-  transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+  transform: translateZ(calc(-1 * var(--prism-r))) rotateY(calc(var(--turn) * -120deg));
+  transition: transform 0.75s cubic-bezier(0.4, 0.2, 0.2, 1);
 }
-.flip-card.flipped .flip-inner { transform: rotateY(180deg); }
-.flip-face { position: absolute; inset: 0; display: flex; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-.flip-back { transform: rotateY(180deg); flex-direction: column; }
+.flip-face { position: absolute; inset: 0; display: flex; backface-visibility: hidden; -webkit-backface-visibility: hidden; transform: translateZ(var(--prism-r)); }
+.flip-face[data-page="1"] { transform: rotateY(120deg) translateZ(var(--prism-r)); }
+.flip-face[data-page="2"] { transform: rotateY(240deg) translateZ(var(--prism-r)); }
+.flip-back { flex-direction: column; }
 .flip-face[aria-hidden="true"] { pointer-events: none; }
 .flip-back-head { display: none; }
 
-/* PHÓNG TO: 2 BẢNG XẾP CHỒNG, GIỮ CHIỀU CAO NHƯ PANEL THƯỜNG */
+/* PHÓNG TO: 3 BẢNG XẾP CHỒNG Ở CỘT TRÁI, GIỮ CHIỀU CAO NHƯ PANEL THƯỜNG */
 body.bottom-max .flip-controls { display: none; }
-body.bottom-max .flip-card { flex: none; perspective: none; }
+body.bottom-max .bp-part1 { overflow-y: auto; scrollbar-width: thin; }
+body.bottom-max .flip-card { flex: none; perspective: none; overflow: visible; }
 body.bottom-max .flip-card .flip-inner,
 body.bottom-max .flip-card .flip-face { position: static; transform: none; pointer-events: auto; }
 body.bottom-max .flip-front { height: calc(var(--bottom-h) - var(--bp-head-h) - 2px); }
 body.bottom-max .flip-back-head { display: flex; border-top: 1px solid var(--border-color); }
-body.bottom-max .infra-count-grid { flex: none; height: calc(var(--bottom-h) - var(--bp-head-h) - 2px); }
+body.bottom-max .infra-count-grid,
+body.bottom-max .road-chart { flex: none; height: calc(var(--bottom-h) - var(--bp-head-h) - 2px); }
+
+/* MẶT HỆ THỐNG GIAO THÔNG: donut cơ cấu chiều dài + thanh "mặt đường" có vạch kẻ chạy */
+.road-chart { flex: 1; min-height: 0; display: flex; align-items: center; gap: 12px; padding: 4px 12px; box-sizing: border-box; }
+.road-donut-wrap { position: relative; }
+.road-donut-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none; line-height: 1.1; text-align: center;
+}
+.road-donut-center b { color: var(--text-strong); font-size: var(--fs-lg); font-weight: 700; font-variant-numeric: tabular-nums; }
+.road-donut-center small { color: var(--text-muted); font-size: var(--fs-xs); }
+.road-chart-rows { flex: 1; min-width: 0; max-height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 2px; font-size: var(--fs-sm); }
+.road-chart-msg { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.35; }
+.rc-row { min-width: 0; }
+.rc-line { display: flex; align-items: baseline; gap: 5px; line-height: 15px; }
+.rc-name { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 5px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--c); box-shadow: 0 0 6px var(--c); }
+.rc-km { color: var(--text-strong); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rc-km em { color: var(--text-muted); font-style: normal; font-weight: 400; font-size: var(--fs-xs); }
+.rc-pct { width: 3.4em; color: var(--c); font-size: var(--fs-xs); font-weight: 700; text-align: right; white-space: nowrap; }
+.rc-road { height: 6px; margin-top: 1px; border-radius: 3px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.rc-road i {
+  position: relative; display: block; height: 100%; width: var(--w); min-width: 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 55%, #0f172a), var(--c));
+  box-shadow: 0 0 6px color-mix(in srgb, var(--c) 55%, transparent);
+}
+.rc-road i::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; margin-top: -0.5px;
+  background: repeating-linear-gradient(90deg, rgba(15, 23, 42, 0.85) 0 5px, transparent 5px 10px);
+  animation: rc-flow 0.9s linear infinite;
+}
+.rc-none .rc-km, .rc-none .rc-name { color: var(--text-muted); }
+.rc-none .rc-pct { color: var(--text-muted); font-weight: 400; font-style: italic; }
+.rc-foot { margin-top: 2px; padding-top: 3px; border-top: 1px dashed var(--border-color); color: var(--text-muted); font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rc-foot b { color: var(--accent-cyan); font-size: var(--fs-sm); }
+.rc-foot em { font-style: normal; }
+/* Thanh mọc dần mỗi lần xoay tới trang giao thông (và khi phóng to) */
+.flip-card[data-page="2"] .rc-road i,
+body.bottom-max .rc-road i { animation: rc-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes rc-grow { from { width: 0; } }
+@keyframes rc-flow { to { background-position: 10px 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .flip-inner { transition: none; }
+  .rc-road i, .rc-road i::after { animation: none !important; }
+}
 
 .infra-count-grid {
   flex: 1; min-height: 0;
@@ -738,6 +790,10 @@ table.data-table .st-scale { color: var(--accent-orange); font-weight: 700; }
 table.data-table .cov-avg { font-weight: 700; color: var(--accent-green); background: rgba(var(--cyan-rgb), 0.05); }
 table.data-table .st-scale-avg { background: rgba(var(--orange-rgb), 0.05); }
 table.data-table .st-msg { text-align: center; padding: 20px; }
+table.data-table .st-road { color: var(--text-main); }
+table.data-table tfoot td { position: sticky; bottom: 0; z-index: 10; background: var(--bg-panel); border-top: 1px solid var(--accent-cyan); font-weight: 700; }
+table.data-table tfoot .st-name { color: var(--accent-cyan); }
+table.data-table tfoot .st-total-note { font-weight: 400; font-style: italic; }
 
 /* BẢNG CHI TIẾT PHƯỜNG TRONG PANEL DƯỚI */
 #wardSummaryCard { display: contents; }
@@ -804,10 +860,12 @@ table.ward-table td:nth-child(3), table.ward-table td:nth-child(5) { text-align:
 .ward-table .wt-b { --sec-c: var(--accent-green); --sec-rgb: var(--green-rgb); }
 .ward-table .wt-c { --sec-c: var(--accent-red); --sec-rgb: var(--red-rgb); }
 .ward-table .wt-d { --sec-c: var(--accent-orange); --sec-rgb: var(--orange-rgb); }
+.ward-table .wt-e { --sec-c: #93c5fd; --sec-rgb: 147, 197, 253; }
 .ward-table .wt-item td:nth-child(-n+3) { font-weight: 700; }
 .ward-table .wt-item td:nth-child(2) { padding-left: 6px; }
 .ward-table .wt-top td { vertical-align: top; }
 table.ward-table td.wt-note { width: auto; white-space: normal; text-align: left; color: var(--accent-orange); font-weight: 500; line-height: 1.35; }
+table.ward-table td.wt-road-note { color: var(--text-main); font-weight: 400; }
 .ward-table .wt-empty td:nth-child(2) { text-align: center; color: var(--text-muted); font-style: italic; }
 .ward-table .wt-light { color: var(--text-muted); font-weight: 400; }
 .ward-table .wt-need-approve { color: var(--accent-red); font-size: var(--fs-xs); margin-top: 1px; }
@@ -834,7 +892,9 @@ table.ward-table th {
 .bp-body.pdf-export .flip-face { position: static; transform: none; perspective: none; }
 .bp-body.pdf-export .flip-front { height: 150px; }
 .bp-body.pdf-export .flip-back-head { display: flex; border-top: 1px solid var(--border-color); }
-.bp-body.pdf-export .infra-count-grid { flex: none; height: 150px; }
+.bp-body.pdf-export .infra-count-grid,
+.bp-body.pdf-export .road-chart { flex: none; height: 150px; }
+.bp-body.pdf-export .flip-card { overflow: visible; }
 
 /* ===================== POPUP & THẺ GỢI Ý ===================== */
 .badge-pending { display: inline-block; background: var(--accent-red); color: #fff; font-size: var(--fs-xs); font-weight: bold; padding: 1px 4px; border-radius: var(--r-sm); text-transform: uppercase; margin-left: 4px; }

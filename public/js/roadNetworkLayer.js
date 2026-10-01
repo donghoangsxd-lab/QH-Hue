@@ -1,4 +1,4 @@
-// Lớp "Mạng lưới đường" (bảng lớp dữ liệu): đường theo 3 nhóm, gồm cả tuyến Admin vẽ bổ sung — để thấy chỗ còn thiếu đường.
+// Lớp "Mạng lưới đường" (bảng lớp dữ liệu): đường theo 4 nhóm (kể cả đường xe đạp), gồm cả tuyến Admin vẽ bổ sung — để thấy chỗ còn thiếu đường.
 // Tải theo ô lưới ~2 km quanh khung nhìn qua action getRoads (máy chủ cắt từ mạng lưới trên bucket, có cache CDN / trình duyệt);
 // chỉ hiện từ mức phóng MIN_ZOOM để không tải cả thành phố cùng lúc. Vẽ đồng thời trên bản đồ hiện trạng và quy hoạch.
 import { map } from './mapEngine.js';
@@ -10,14 +10,16 @@ const CELL_DEG = 0.02;          // ô lưới ~2,2 × 2,1 km
 const CELL_RADIUS_M = 1600;     // phủ trọn ô (nửa đường chéo ~1,55 km)
 const MAX_CELLS = 60;           // số ô giữ trong bộ nhớ (ngoài các ô đang trong khung nhìn)
 const MAX_PARALLEL = 3;
-// Vẽ từ nhóm nhỏ lên nhóm lớn để trục chính nằm trên cùng
+// Vẽ từ nhóm nhỏ lên nhóm lớn để trục chính nằm trên cùng; đường xe đạp nét đứt trên cùng (thường chạy song song đường phố)
 const STYLES = [
   ['kiet', { color: '#cbd5e1', weight: 1 }],
   ['unknown', { color: '#fde047', weight: 1.3 }],
   ['named', { color: '#60a5fa', weight: 1.8 }],
-  ['main', { color: '#fb923c', weight: 2.6 }]
+  ['main', { color: '#fb923c', weight: 2.6 }],
+  ['bike', { color: '#4ade80', weight: 2.2, dashArray: '6,4' }]
 ];
-const groupKey = (g) => (g === 1 ? 'main' : g === 2 ? 'named' : g === 0 ? 'kiet' : 'unknown');
+const GROUP_KEYS = { 0: 'kiet', 1: 'main', 2: 'named', 3: 'bike' };
+const groupKey = (g) => GROUP_KEYS[g] || 'unknown';
 
 let visible = false;
 let leftGroup = null, rightGroup = null;
@@ -56,7 +58,7 @@ function pump() {
     active++;
     roadWaysAround((i + 0.5) * CELL_DEG, (j + 0.5) * CELL_DEG, CELL_RADIUS_M)
       .then(ways => {
-        const lines = { main: [], named: [], kiet: [], unknown: [] };
+        const lines = { main: [], named: [], kiet: [], bike: [], unknown: [] };
         ways.forEach(w => lines[groupKey(w.group)].push(w.geometry.map(p => [p.lat, p.lon])));
         cells.set(key, { lines });
       })
@@ -71,7 +73,7 @@ function draw(keys) {
     const lines = [];
     keys.forEach(key => { const c = cells.get(key); if (c && c.lines) lines.push(...c.lines[k]); });
     if (!lines.length) return;
-    const style = { color: s.color, weight: s.weight, opacity: 0.9, interactive: false };
+    const style = { ...s, opacity: 0.9, interactive: false };
     leftGroup.addLayer(L.polyline(lines, style));
     if (rightGroup) rightGroup.addLayer(L.polyline(lines, style));
   });

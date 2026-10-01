@@ -946,6 +946,7 @@ const ROAD_STYLES = [
   ['kiet',    { label: 'Đường nội bộ', title: 'Kiệt, hẻm, đường không tên, đường nội bộ', color: '#a5c8ff', base: 0.6, reach: 1.2 }],
   ['unknown', { label: 'Đường chưa phân nhóm', title: 'Mạng lưới đường lưu bản cũ — Admin tải lại mạng lưới đường', color: '#fde047', base: 0.9, reach: 1.8 }],
   ['named',   { label: 'Đường khu vực', title: 'Đường phố có tên', color: '#22d3ee', base: 1.1, reach: 2.2 }],
+  ['bike',    { label: 'Đường xe đạp', title: 'Đường dành riêng cho xe đạp', color: '#4ade80', base: 1, reach: 2 }],
   ['main',    { label: 'Đường trục chính', title: 'Quốc lộ, tỉnh lộ, đường chính đô thị', color: '#fbbf24', base: 1.6, reach: 3.2 }]
 ];
 const ROAD_BASE_COLOR = '#3b6fd8';

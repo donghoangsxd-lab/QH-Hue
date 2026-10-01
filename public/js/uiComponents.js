@@ -3,7 +3,7 @@ import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js
 import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, showToast, wardStatHtml, ico, setStatusContent, inlineSpriteIcons } from './utils.js';
 import { refreshWardCheck } from './wardCheck.js';
-import { fillWardRoadLengths, fillCityRoadDensity } from './wardRoads.js';
+import { fillWardRoadLengths, fillCityRoadDensity, loadRoadTypeLengths, ROAD_TYPES, ROADS_META_EVENT, fmtKm } from './wardRoads.js';
 import { refreshRoadPanel } from './customRoads.js';
 import { refreshPopPanel } from './popEdits.js';
 
@@ -249,26 +249,41 @@ function renderInfraCountCards(sourceList, planList) {
   }).join('');
 }
 
-function setPart1Flipped(flipped) {
+// Khối lăng trụ 3 mặt: luôn xoay cùng 1 chiều (part1Turn tăng dần), mặt đang xem = part1Turn % 3
+const PART1_PAGES = [
+  { title: 'CƠ CẤU ĐẤT HẠ TẦNG', short: 'Diện tích', hint: 'cơ cấu đất theo diện tích' },
+  { title: 'SỐ LƯỢNG CÔNG TRÌNH', short: 'Số lượng', hint: 'thống kê số lượng công trình' },
+  { title: 'HỆ THỐNG GIAO THÔNG', short: 'Giao thông', hint: 'chiều dài các loại đường giao thông' }
+];
+let part1Turn = 0;
+
+function setPart1Turn(turn) {
   const card = document.getElementById('part1Flip');
   if (!card) return;
-  card.classList.toggle('flipped', flipped);
-  card.querySelector('.flip-front')?.setAttribute('aria-hidden', String(flipped));
-  card.querySelector('.flip-back')?.setAttribute('aria-hidden', String(!flipped));
+  part1Turn = Math.max(0, turn);
+  const page = part1Turn % PART1_PAGES.length;
+  const next = PART1_PAGES[(page + 1) % PART1_PAGES.length];
+  card.dataset.page = String(page);
+  card.style.setProperty('--turn', part1Turn);
+  card.querySelectorAll('.flip-face').forEach(face => face.setAttribute('aria-hidden', String(Number(face.dataset.page) !== page)));
   const title = document.getElementById('bpPart1Title');
-  if (title) title.textContent = flipped ? 'SỐ LƯỢNG CÔNG TRÌNH' : 'CƠ CẤU ĐẤT HẠ TẦNG';
+  if (title) title.textContent = PART1_PAGES[page].title;
   const btn = document.getElementById('btnFlipPart1');
   if (btn) {
-    btn.innerHTML = `${ico('flip')}${flipped ? 'Diện tích' : 'Số lượng'}`;
-    btn.title = flipped ? 'Lật trang: cơ cấu theo diện tích' : 'Lật trang: thống kê số lượng công trình';
-    btn.setAttribute('aria-pressed', String(flipped));
+    btn.innerHTML = `${ico('flip')}${next.short}`;
+    btn.title = `Xoay trang: ${next.hint}`;
   }
-  document.querySelectorAll('.flip-dots i').forEach((dot, i) => dot.classList.toggle('active', i === (flipped ? 1 : 0)));
+  document.querySelectorAll('#part1Dots i').forEach(dot => dot.classList.toggle('active', Number(dot.dataset.page) === page));
+  if (page === 2) replayRoadDonut();
 }
 
 function initPart1Flip() {
-  document.getElementById('btnFlipPart1')?.addEventListener('click', () => {
-    setPart1Flipped(!document.getElementById('part1Flip').classList.contains('flipped'));
+  document.getElementById('btnFlipPart1')?.addEventListener('click', () => setPart1Turn(part1Turn + 1));
+  document.getElementById('part1Dots')?.addEventListener('click', (e) => {
+    const dot = e.target.closest('i[data-page]');
+    if (!dot) return;
+    const steps = (Number(dot.dataset.page) - (part1Turn % PART1_PAGES.length) + PART1_PAGES.length) % PART1_PAGES.length;
+    if (steps) setPart1Turn(part1Turn + steps);
   });
 }
 
@@ -560,6 +575,256 @@ const fmtArea = (km2) => AREA_FORMAT.format(Number(km2) || 0);
 const NOT_REQUIRED_TITLE = 'QCVN 01:2026/BXD không quy định chỉ tiêu này cho loại địa bàn của phường/xã';
 const NOT_REQUIRED_DASH = `<span class="c-muted" title="${NOT_REQUIRED_TITLE}">–</span>`;
 
+// ================== CHIỀU DÀI 4 LOẠI ĐƯỜNG (bảng 40 phường + bảng chi tiết phường) ==================
+let roadTypesByWard = null;   // { phường: { trunk, named, kiet, bike } | null }; null = chưa đọc xong chỉ mục mạng lưới đường
+let roadTypesPromise = null;
+const ROAD_PENDING = `<span class="cov-pending" title="Đang đọc mạng lưới đường">${ico('clock')}</span>`;
+const ROAD_MISSING_TITLE = 'Phường/xã chưa có mạng lưới đường — Admin bấm "Tải mạng lưới đường toàn thành phố"';
+const ROAD_NOT_SPLIT_TITLE = 'Mạng lưới đường lưu bản cũ chưa tách trục chính / khu vực — Admin bấm "Tải mạng lưới đường toàn thành phố" để tính lại';
+const roadDash = (title) => `<span class="c-muted" title="${title}">–</span>`;
+
+const ROAD_EST_TITLE = 'Ước tính: phường/xã có đường trục chính 2 chiều, tạm chia tổng trục chính + khu vực theo tỉ lệ chiều dài 2 nhóm trong mạng lưới đã lưu (trục chính hơi cao) — Admin bấm "Tải mạng lưới đường toàn thành phố" để tải lại phường/xã này lấy số chính xác';
+const isEstKey = (types, key) => types.est && (key === 'trunk' || key === 'named');
+
+function roadKmHtml(types, key) {
+  if (!types) return roadDash(ROAD_MISSING_TITLE);
+  if (types[key] == null) return roadDash(ROAD_NOT_SPLIT_TITLE);
+  return isEstKey(types, key) ? `<span title="${ROAD_EST_TITLE}">≈${fmtKm(types[key])}</span>` : fmtKm(types[key]);
+}
+
+const roadCellsHtml = (wardName) => ROAD_TYPES.map(t => `<td class="st-num st-road" data-road="${t.key}">`
+  + `${roadTypesByWard ? roadKmHtml(roadTypesByWard[wardName], t.key) : ROAD_PENDING}</td>`).join('');
+
+function ensureRoadTypes(force = false) {
+  if (!roadTypesPromise || force) {
+    const promise = loadRoadTypeLengths()
+      .then(m => {
+        if (roadTypesPromise === promise) { roadTypesByWard = m; refreshRoadViews(); }
+        return m;
+      })
+      .catch(() => { if (roadTypesPromise === promise) roadTypesPromise = null; return null; });
+    roadTypesPromise = promise;
+  }
+  return roadTypesPromise;
+}
+
+function refreshRoadViews() {
+  document.querySelectorAll('#statTableBody tr[data-ward-row]').forEach(tr => {
+    const types = roadTypesByWard && roadTypesByWard[tr.getAttribute('data-ward-row')];
+    tr.querySelectorAll('.st-road').forEach(td => { td.innerHTML = roadTypesByWard ? roadKmHtml(types, td.dataset.road) : ROAD_PENDING; });
+  });
+  renderCityTableFoot();
+  renderRoadChart();
+  const card = document.getElementById('wardSummaryCard');
+  const body = document.getElementById('wardRoadBody');
+  const wardData = card && state.wardStatsData.find(w => w.Ten_Phuong === card.dataset.ward);
+  if (body && wardData) body.innerHTML = wardRoadRowsHtml(wardData);
+}
+
+/** Tổng chiều dài từng loại các phường đã có mạng lưới; trục chính / khu vực bỏ qua phường chưa tách (đếm vào notSplit) */
+function sumRoadTypes(names) {
+  const sum = { trunk: 0, named: 0, kiet: 0, bike: 0 };
+  let have = 0, notSplit = 0, est = 0;
+  names.forEach(name => {
+    const t = roadTypesByWard && roadTypesByWard[name];
+    if (!t) return;
+    have++;
+    if (t.trunk == null) notSplit++;
+    if (t.est) est++;
+    ROAD_TYPES.forEach(({ key }) => { sum[key] += t[key] || 0; });
+  });
+  return { sum, have, notSplit, est };
+}
+
+// Dòng tổng toàn thành phố cuối bảng 40 phường: dân số, diện tích, mật độ và chiều dài 4 loại đường
+function renderCityTableFoot() {
+  const foot = document.getElementById('statTableFoot');
+  if (!foot) return;
+  const list = state.wardStatsData;
+  if (!list.length) { foot.innerHTML = ''; return; }
+  const pop = list.reduce((s, w) => s + (Number(w.Dan_So_Vector) || 0), 0);
+  const area = list.reduce((s, w) => s + (Number(w.Dien_Tich_Km2) || 0), 0);
+  let roadCells;
+  if (!roadTypesByWard) {
+    roadCells = ROAD_TYPES.map(() => `<td class="st-num st-road">${ROAD_PENDING}</td>`).join('');
+  } else {
+    const { sum, have, notSplit, est } = sumRoadTypes(list.map(w => w.Ten_Phuong));
+    const scope = `Tổng ${have}/${list.length} phường/xã có mạng lưới đường`;
+    roadCells = ROAD_TYPES.map(({ key }) => {
+      const splitKey = key === 'trunk' || key === 'named';
+      const partial = splitKey && notSplit;
+      if (!have || (partial && notSplit === have)) return `<td class="st-num st-road">${roadDash(have ? ROAD_NOT_SPLIT_TITLE : ROAD_MISSING_TITLE)}</td>`;
+      let title = partial ? `${scope}, ${notSplit} phường/xã chưa tách trục chính / khu vực (không cộng)` : scope;
+      if (splitKey && est) title += `\n${est} phường/xã ước tính — ${ROAD_EST_TITLE}`;
+      return `<td class="st-num st-road" title="${title}">${splitKey && est ? '≈' : ''}${fmtKm(sum[key])}${partial ? '*' : ''}</td>`;
+    }).join('');
+  }
+  foot.innerHTML = `<tr class="st-total">
+    <td></td>
+    <td class="st-name">Toàn thành phố</td>
+    <td class="st-num st-pop">${fmtNum(pop)}</td>
+    <td class="st-num">${fmtArea(area)}</td>
+    <td class="st-num st-dens">${area > 0 ? fmtNum(Math.round(pop / area)) : '-'}</td>
+    <td colspan="${COVERAGE_CODES.length * 2 + 2}" class="c-muted st-total-note">Độ phủ / quy mô toàn thành phố: xem thanh tiêu đề</td>
+    ${roadCells}
+  </tr>`;
+}
+
+// ================== MẶT 3 PANEL TRÁI: HỆ THỐNG GIAO THÔNG (toàn TP hoặc phường đang xem) ==================
+// Màu khớp lớp mạng lưới đường (roadNetworkLayer.js); mixed = phường lưu bản cũ chưa tách trục chính / khu vực
+const ROAD_CHART_TYPES = [
+  { key: 'trunk', label: 'Trục chính', color: '#fb923c', title: ROAD_TYPES[0].title },
+  { key: 'named', label: 'Khu vực', color: '#60a5fa', title: ROAD_TYPES[1].title },
+  { key: 'mixed', label: 'TC + KV', color: '#fde047', title: ROAD_NOT_SPLIT_TITLE },
+  { key: 'kiet', label: 'Nội bộ', color: '#cbd5e1', title: ROAD_TYPES[2].title },
+  { key: 'bike', label: 'Xe đạp', color: '#4ade80', title: ROAD_TYPES[3].title }
+];
+let roadDonutInstance = null;
+
+function roadChartData() {
+  const city = isCityMode();
+  const wards = state.wardStatsData;
+  const names = city ? (wards.length ? wards.map(w => w.Ten_Phuong) : Object.keys(roadTypesByWard)) : [state.selectedWard];
+  const v = { trunk: 0, named: 0, mixed: 0, kiet: 0, bike: 0 };
+  let have = 0, est = 0, areaKm2 = 0;
+  names.forEach(name => {
+    const t = roadTypesByWard[name];
+    if (!t) return;
+    have++;
+    if (t.est) est++;
+    if (t.trunk == null) v.mixed += t.main;
+    else { v.trunk += t.trunk; v.named += t.named; }
+    v.kiet += t.kiet;
+    v.bike += t.bike;
+    const w = wards.find(x => x.Ten_Phuong === name);
+    areaKm2 += Number(w && w.Dien_Tich_Km2) || 0;
+  });
+  return { city, v, have, total: names.length, est, areaKm2 };
+}
+
+// Donut cơ cấu chiều dài đường 1+2+3 (không gồm xe đạp, như mật độ đường); types = null → vòng xám chờ dữ liệu
+function updateRoadDonut(types, v) {
+  const canvas = document.getElementById('roadDonutChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  const parts = types ? types.filter(t => t.key !== 'bike') : [];
+  const labels = parts.map(t => t.label);
+  const data = types ? parts.map(t => v[t.key]) : [1];
+  const colors = types ? parts.map(t => t.color) : ['rgba(255, 255, 255, 0.08)'];
+  if (roadDonutInstance && roadDonutInstance.canvas === canvas) {
+    roadDonutInstance.data.labels = labels;
+    Object.assign(roadDonutInstance.data.datasets[0], { data, backgroundColor: colors });
+    roadDonutInstance.update();
+    return;
+  }
+  roadDonutInstance = new Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 1, borderColor: 'rgba(15, 23, 42, 0.8)', hoverOffset: 4 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: 3 },
+      cutout: '68%',
+      animation: { animateRotate: true, duration: 900 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: !!types,
+          callbacks: {
+            label: (ctx) => {
+              const sum = ctx.dataset.data.reduce((s, x) => s + x, 0);
+              return ` ${ctx.label}: ${fmtKm(ctx.raw)} km (${fmtPct(sum > 0 ? (ctx.raw / sum) * 100 : 0)})`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// Quay lại vòng donut mỗi lần xoay tới trang giao thông
+function replayRoadDonut() {
+  if (!roadDonutInstance) return;
+  roadDonutInstance.reset();
+  roadDonutInstance.update();
+}
+
+function renderRoadChart() {
+  const rowsEl = document.getElementById('roadChartRows');
+  const center = document.getElementById('roadDonutCenter');
+  if (!rowsEl || !center) return;
+  const empty = (html) => { rowsEl.innerHTML = `<div class="road-chart-msg">${html}</div>`; center.innerHTML = ''; updateRoadDonut(null); };
+  if (!roadTypesByWard) return empty(`${ico('clock')}Đang đọc mạng lưới đường...`);
+  const d = roadChartData();
+  if (!d.have) return empty(`<span class="c-muted">${ROAD_MISSING_TITLE}.</span>`);
+
+  const { v } = d;
+  const kvKm = v.trunk + v.named + v.mixed;
+  const totalKm = kvKm + v.kiet;
+  const types = ROAD_CHART_TYPES.filter(t => t.key !== 'mixed' || v.mixed > 0);
+  const maxKm = Math.max(...types.map(t => v[t.key]), 0.001);
+  const scope = d.city ? `${d.have}/${d.total} phường/xã có mạng lưới đường` : escapeHtml(state.selectedWard);
+  const notSplit = v.mixed > 0 && v.trunk + v.named === 0;
+  const rows = types.map(t => {
+    const km = v[t.key];
+    const splitKey = t.key === 'trunk' || t.key === 'named';
+    const est = d.est > 0 && splitKey;
+    const unsplit = notSplit && splitKey;
+    const none = t.key === 'bike' && !km;
+    const pct = totalKm > 0 ? (km / totalKm) * 100 : 0;
+    const tip = unsplit ? `${t.title}\n${ROAD_NOT_SPLIT_TITLE}`
+      : `${t.title}\n${fmtKm(km)} km${t.key === 'bike' ? '' : ` = ${fmtPct(pct)} tổng chiều dài đường (1+2+3)`} — ${scope}`
+        + (est ? `\n${d.city ? `${d.est} phường/xã ước tính — ` : ''}${ROAD_EST_TITLE}` : '')
+        + (none ? '\nChưa có tuyến xe đạp (OpenStreetMap chưa có — Admin vẽ bổ sung ở tab Đề xuất › Tuyến đường)' : '');
+    return `<div class="rc-row${none || unsplit ? ' rc-none' : ''}" style="--c:${t.color}; --w:${((km / maxKm) * 100).toFixed(1)}%" title="${escapeHtml(tip)}">
+      <div class="rc-line">
+        <span class="rc-name"><i class="rc-dot"></i>${t.label}</span>
+        <b class="rc-km">${unsplit ? '–' : `${est ? '≈' : ''}${fmtKm(km)}<em> km</em>`}</b>
+        <span class="rc-pct">${unsplit ? 'chưa tách' : none ? 'chưa có' : (t.key === 'bike' ? '' : fmtPct(pct))}</span>
+      </div>
+      <div class="rc-road"><i></i></div>
+    </div>`;
+  }).join('');
+  const dens = (km) => (d.areaKm2 > 0 ? (km / d.areaKm2).toFixed(2).replace('.', ',') : '–');
+  const densTip = `Mật độ đường: ${fmtKm(totalKm)} km / ${fmtArea(d.areaKm2)} km² diện tích tự nhiên`
+    + `\nMật độ đường khu vực: (trục chính + khu vực) ${fmtKm(kvKm)} km / ${fmtArea(d.areaKm2)} km² — ${scope}`;
+  rowsEl.innerHTML = rows
+    + `<div class="rc-foot" title="${escapeHtml(densTip)}">Mật độ <b>${dens(totalKm)}</b> · KV <b>${dens(kvKm)}</b> <em>km/km²</em>`
+    + `${d.city && d.have < d.total ? ` <em>· ${d.have}/${d.total} P/X</em>` : ''}</div>`;
+  center.innerHTML = `<b>${fmtKm(totalKm)}</b><small>km đường</small>`;
+  updateRoadDonut(types, v);
+}
+
+// Nhóm E bảng chi tiết phường: chiều dài, mật độ từng loại đường; tổng 1+2+3 = mật độ đường (không gồm đường xe đạp)
+function wardRoadRowsHtml(wardData) {
+  const name = wardData.Ten_Phuong;
+  const areaKm2 = Number(wardData.Dien_Tich_Km2) || 0;
+  const dens = (km) => (areaKm2 > 0 ? `${(km / areaKm2).toFixed(2).replace('.', ',')} km/km²` : '');
+  if (!roadTypesByWard) return `<tr class="wt-empty"><td>-</td><td colspan="7">${ico('clock')}Đang đọc mạng lưới đường...</td></tr>`;
+  const t = roadTypesByWard[name];
+  if (!t) return `<tr class="wt-empty"><td>-</td><td colspan="7">${ROAD_MISSING_TITLE}.</td></tr>`;
+  const rows = ROAD_TYPES.map((rt, i) => {
+    const v = t[rt.key];
+    let note;
+    if (v == null) note = `<span class="c-muted">${ROAD_NOT_SPLIT_TITLE}</span>`;
+    else if (rt.key === 'bike' && !v) note = '<span class="c-muted">Chưa có tuyến xe đạp (OpenStreetMap chưa có — Admin vẽ bổ sung ở tab Đề xuất › Tuyến đường)</span>';
+    else note = `Mật độ ${dens(v)}${isEstKey(t, rt.key) ? ` <span class="c-muted" title="${ROAD_EST_TITLE}">(ước tính từ mạng lưới đã lưu)</span>` : ''}`;
+    return `<tr class="wt-comp">
+      <td>${i + 1}</td>
+      <td title="${rt.title}">${rt.label}</td>
+      <td>${v == null ? roadDash(ROAD_NOT_SPLIT_TITLE) : `${isEstKey(t, rt.key) ? '≈' : ''}${fmtKm(v)} km`}</td>
+      <td colspan="5" class="wt-note wt-road-note">${note}</td>
+    </tr>`;
+  });
+  const totalKm = t.main + t.kiet;
+  rows.push(`<tr class="wt-main">
+    <td></td>
+    <td title="Không gồm đường xe đạp">Tổng đường giao thông (1+2+3)</td>
+    <td>${fmtKm(totalKm)} km</td>
+    <td colspan="5" class="wt-note wt-road-note">Mật độ đường ${dens(totalKm)}</td>
+  </tr>`);
+  return rows.join('');
+}
+
 function wardRowHtml(w, idx) {
   const ready = !!w._coverageReady;
   const cells = COVERAGE_CODES.map(c => {
@@ -579,6 +844,7 @@ function wardRowHtml(w, idx) {
     ${cells}
     <td class="cov-avg">${ready ? fmtPct(w.Avg_Coverage_Score) : PENDING_CELL}</td>
     <td class="st-scale st-scale-avg">${fmtPct(w.Avg_Scale_Score)}</td>
+    ${roadCellsHtml(w.Ten_Phuong)}
   </tr>`;
 }
 
@@ -586,6 +852,8 @@ function rebuildCombinedTableBody() {
   const tbody = document.getElementById('statTableBody');
   if (!tbody) return;
   tbody.innerHTML = state.wardStatsData.map(wardRowHtml).join('');
+  renderCityTableFoot();
+  ensureRoadTypes();
 }
 
 function patchCombinedTableWardRow(ward) {
@@ -658,7 +926,7 @@ export function reloadWardStats() {
 
 export function setBottomPanelMaximized(maximized) {
   document.body.classList.toggle('bottom-max', maximized);
-  if (maximized) setPart1Flipped(false);
+  if (maximized) setPart1Turn(0);
   const btn = document.getElementById('btnToggleBottomMax');
   if (btn) {
     btn.innerHTML = ico(maximized ? 'minimize' : 'maximize');
@@ -834,12 +1102,14 @@ export async function renderBottomPanel() {
   // Đổi địa bàn: xóa chỉ tiêu cũ ngay, không để số của địa bàn trước hiện trong lúc chờ dữ liệu
   if (headStatsKey() !== wardName) clearHeadStats();
   setBottomPanelHeader(wardName);
+  renderRoadChart();
+  ensureRoadTypes();
 
   const tbody = document.getElementById('statTableBody');
   const wardView = document.getElementById('wardSummaryView');
   if (state.wardStatsData.length === 0) {
     if (city && tbody) {
-      tbody.innerHTML = `<tr><td colspan="23" class="st-msg">${ico('clock')}Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="27" class="st-msg">${ico('clock')}Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>`;
     }
     if (!city && wardView) {
       wardView.innerHTML = `<div class="rp-empty">${ico('clock')}Đang tổng hợp dữ liệu quy chuẩn cho ${escapeHtml(wardName)}...</div>`;
@@ -851,12 +1121,13 @@ export async function renderBottomPanel() {
   } catch (err) {
     if (seq !== bottomRenderSeq) return;
     const msg = `${ico('error')}${escapeHtml(err.message || 'Lỗi nạp dữ liệu từ GEE Server.')}`;
-    if (city && tbody) tbody.innerHTML = `<tr><td colspan="23" class="st-msg c-red">${msg}</td></tr>`;
+    if (city && tbody) tbody.innerHTML = `<tr><td colspan="27" class="st-msg c-red">${msg}</td></tr>`;
     if (!city && wardView) wardView.innerHTML = `<div class="rp-empty c-red">${msg}</div>`;
     return;
   }
   if (seq !== bottomRenderSeq) return;
   setBottomPanelHeader(wardName);
+  renderRoadChart();
 
   if (city) {
     renderCityHeadStats();
@@ -939,6 +1210,7 @@ export function selectWardDetail(wardName) {
 // Click trong bảng 40 phường và bảng chi tiết phường (thay cho onclick nội tuyến)
 export function initBottomPanelEvents() {
   initPart1Flip();
+  document.addEventListener(ROADS_META_EVENT, () => ensureRoadTypes(true));
   document.getElementById('statTableBody')?.addEventListener('click', (e) => {
     const link = e.target.closest('.ward-link');
     if (link) selectWardDetail(link.dataset.ward);
@@ -1051,6 +1323,7 @@ function renderWardSummary(wardData) {
   roadLenEl.dataset.ward = wardData.Ten_Phuong;
   roadLenEl.dataset.area = String(areaKm2);
   fillWardRoadLengths(wardData.Ten_Phuong);
+  ensureRoadTypes();
   renderSummaryNote(wardData.Ten_Phuong);
 
   const popInput = document.getElementById('wardPopInput');
@@ -1380,6 +1653,10 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   } else {
     parts.push(`<tr class="wt-empty"><td>-</td><td colspan="7">Không có cơ sở chưa sử dụng nào nằm trong ranh giới phường.</td></tr>`);
   }
+
+  // E / MẠNG LƯỚI ĐƯỜNG GIAO THÔNG — điền lại khi đọc xong chỉ mục mạng lưới đường (refreshRoadViews)
+  sectionHeader('E', 'e', 'MẠNG LƯỚI ĐƯỜNG GIAO THÔNG (OpenStreetMap + tuyến Admin bổ sung)');
+  parts.push(`</tbody><tbody id="wardRoadBody">${wardRoadRowsHtml(wardData)}</tbody><tbody>`);
 
   parts.push(`</tbody></table></div>`);
   return parts.join('');

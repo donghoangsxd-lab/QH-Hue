@@ -1121,6 +1121,18 @@ module.exports = async (req, res) => {
       return res.status(200).json({ v: 2, total: (index && index.total) || 0, wards: (index && index.wards) || {}, custom });
     }
 
+    // 1 phần mạng lưới đường đã lưu của 1 phường (bucket không mở CORS cho trình duyệt) — Admin tách chiều dài theo nhóm vẽ
+    if (action === 'getRoadPart') {
+      const index = await roads.readRoadsIndex();
+      const ward = String(req.query.ward || '').trim();
+      const part = Math.round(Number(req.query.part));
+      const entry = index && Object.prototype.hasOwnProperty.call(index.wards, ward) ? index.wards[ward] : null;
+      if (!entry || !(part >= 0 && part < entry.parts)) return res.status(404).json({ error: true, message: 'Không có phần mạng lưới đường này' });
+      const ways = await roads.readPart(ward, part, entry.at);
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+      return res.status(200).json({ v: 2, ward, part, at: entry.at, ways });
+    }
+
     // Danh sách tuyến bổ sung đầy đủ (màn hình Admin vẽ / xóa tuyến)
     if (action === 'getCustomRoads') {
       const c = await roads.readCustomRoads(0, true);

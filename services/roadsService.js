@@ -1,7 +1,9 @@
 // Mạng lưới đường OSM toàn thành phố (Admin tải 1 lần theo từng phường/xã ở trình duyệt), lưu trên bucket GCS:
-//   roads/v2/index.json            = { v: 2, saved, total, wards: { tên: { bbox: [w, s, e, n], parts, at, main, kiet } } }
+//   roads/v2/index.json            = { v: 2, saved, total, wards: { tên: { bbox: [w, s, e, n], parts, at, main, kiet, trunk?, bike? } } }
+//   (main = trục chính + khu vực, trunk = riêng trục chính, bike = đường xe đạp; bản lưu cũ chưa có trunk / bike;
+//    trunkEst = trunk chia từ main theo tỉ lệ chiều dài nhóm vẽ trong mạng lưới đã lưu, chưa tải lại OSM)
 //   roads/v2/net_<slug>_<i>.json   = { v: 2, ward, part, ways: [[id, cầu ? 1 : 0, [id nút...], [lat, lon, ...], nhóm vẽ?], ...] }
-//   nhóm vẽ: 1 = trục chính, 2 = đường có tên, 0 = kiệt (bản lưu cũ không có phần tử này)
+//   nhóm vẽ: 1 = trục chính, 2 = đường có tên, 0 = kiệt, 3 = đường xe đạp (bản lưu cũ không có phần tử này)
 //   roads/v2/custom.json           = { v: 2, saved, roads: [{ id, g, name, nodes, flat, len: { tên phường: km }, at }] }
 //   (tuyến đường hiện trạng Admin vẽ bổ sung; tách riêng để tải lại OSM không mất, mỗi lần lưu ghi đè cả file)
 // Máy chủ cắt đường quanh công trình từ các file này cho "phạm vi thực tế"; index chứa luôn chiều dài trục chính / kiệt.
@@ -76,16 +78,22 @@ function rememberCustom(payload) {
   customCache = { at: Date.now(), data: { saved: payload.saved, roads: payload.roads } };
 }
 
-/** Chiều dài tuyến bổ sung theo phường: { tên phường: { main, kiet } } km (nhóm 1, 2 → main; 0 → kiet như index) */
+/**
+ * Chiều dài tuyến bổ sung theo phường: { tên phường: { main, kiet, trunk, bike } } km
+ * (nhóm 1, 2 → main như index, nhóm 1 thêm vào trunk; 0 → kiet; 3 → bike)
+ */
 function customExtra(data) {
   const out = {};
+  const KEY = { 0: 'kiet', 1: 'main', 2: 'main', 3: 'bike' };
   (data && data.roads || []).forEach(r => {
     Object.entries(r.len || {}).forEach(([ward, km]) => {
-      const e = out[ward] || (out[ward] = { main: 0, kiet: 0 });
-      e[r.g === 0 ? 'kiet' : 'main'] += Number(km) || 0;
+      const e = out[ward] || (out[ward] = { main: 0, kiet: 0, trunk: 0, bike: 0 });
+      const v = Number(km) || 0;
+      e[KEY[r.g] || 'main'] += v;
+      if (r.g === 1) e.trunk += v;
     });
   });
-  Object.values(out).forEach(e => { e.main = Math.round(e.main * 100) / 100; e.kiet = Math.round(e.kiet * 100) / 100; });
+  Object.values(out).forEach(e => Object.keys(e).forEach(k => { e[k] = Math.round(e[k] * 100) / 100; }));
   return out;
 }
 
@@ -156,7 +164,7 @@ function parseNetworkPart(raw) {
     const [id, bridge, nodes, flat, group] = w;
     if (!isInt(id) || (bridge !== 0 && bridge !== 1) || !Array.isArray(nodes) || !Array.isArray(flat)) return null;
     if (nodes.length < 2 || nodes.length > 5000 || flat.length !== nodes.length * 2 || !nodes.every(isInt)) return null;
-    if (w.length === 5 && group !== 0 && group !== 1 && group !== 2) return null;
+    if (w.length === 5 && ![0, 1, 2, 3].includes(group)) return null;
     for (let i = 0; i < flat.length; i += 2) if (!isLat(flat[i]) || !isLng(flat[i + 1])) return null;
     out.push(w.length === 5 ? [id, bridge, nodes, flat.map(round6), group] : [id, bridge, nodes, flat.map(round6)]);
   }
@@ -181,6 +189,13 @@ function parseRoadsIndex(rawWards, rawTotal) {
     if (![main, kiet].every(x => Number.isFinite(x) && x >= 0 && x < 1e5)) return null;
     wards[key] = { bbox: [w, s, e, n].map(round6), parts, at, main: Math.round(main * 100) / 100, kiet: Math.round(kiet * 100) / 100 };
     if (v.grouped === true) wards[key].grouped = true;
+    if (v.trunkEst === true) wards[key].trunkEst = true;
+    if (v.trunk != null || v.bike != null) {
+      const trunk = Number(v.trunk), bike = Number(v.bike);
+      if (![trunk, bike].every(x => Number.isFinite(x) && x >= 0 && x < 1e5) || trunk > main + 0.01) return null;
+      wards[key].trunk = Math.round(trunk * 100) / 100;
+      wards[key].bike = Math.round(bike * 100) / 100;
+    }
   }
   return { total, wards };
 }
@@ -191,7 +206,7 @@ function rememberIndex(data) {
 
 /**
  * Danh sách tuyến bổ sung Admin gửi lên (toàn bộ, ghi đè) → roads đã kiểm tra, hoặc null nếu sai dạng.
- * Mỗi tuyến: { id: "R…", g: 1 trục chính | 2 khu vực | 0 nội bộ, name, nodes: [id nút], flat: [lat, lon, ...], len: { phường: km }, at }
+ * Mỗi tuyến: { id: "R…", g: 1 trục chính | 2 khu vực | 0 nội bộ | 3 xe đạp, name, nodes: [id nút], flat: [lat, lon, ...], len: { phường: km }, at }
  */
 function parseCustomRoads(raw) {
   if (!Array.isArray(raw) || raw.length > CUSTOM_MAX_ROADS) return null;
@@ -201,7 +216,7 @@ function parseCustomRoads(raw) {
     if (!r || typeof r !== 'object') return null;
     const id = String(r.id || '');
     const { g, nodes, flat, len } = r;
-    if (!/^R[a-z0-9]{1,16}$/.test(id) || ids.has(id) || (g !== 0 && g !== 1 && g !== 2)) return null;
+    if (!/^R[a-z0-9]{1,16}$/.test(id) || ids.has(id) || ![0, 1, 2, 3].includes(g)) return null;
     if (!Array.isArray(nodes) || !Array.isArray(flat) || nodes.length < 2 || nodes.length > CUSTOM_MAX_POINTS) return null;
     if (flat.length !== nodes.length * 2 || !nodes.every(isInt)) return null;
     for (let i = 0; i < flat.length; i += 2) if (!isLat(flat[i]) || !isLng(flat[i + 1])) return null;
@@ -222,7 +237,7 @@ function parseCustomRoads(raw) {
 }
 
 module.exports = {
-  wardSlug, roadsRadius, readRoadsIndex, waysAround, parseNetworkPart, parseRoadsIndex, rememberIndex,
+  wardSlug, roadsRadius, readRoadsIndex, readPart, waysAround, parseNetworkPart, parseRoadsIndex, rememberIndex,
   readCustomRoads, rememberCustom, customExtra, parseCustomRoads,
   ROADS_MAX_RADIUS, MAX_PART_CHARS, MAX_PARTS
 };
