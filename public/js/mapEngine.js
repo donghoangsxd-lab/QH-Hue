@@ -1070,14 +1070,34 @@ export async function highlightSingleIsochrone(lat, lng, radius, group = layers.
   }
 }
 
-async function fetchServedPop(lat, lng, radius, polygon) {
+// Gửi loại + diện tích để server giới hạn dân số phục vụ theo chỉ tiêu m²/người
+async function fetchServedPop(p, radius, polygon) {
   const res = await fetch(geeApi('action=analyzePoint'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lat, lng, radius, polygon: polygon.geometry.coordinates[0] })
+    body: JSON.stringify({
+      lat: Number(p.lat), lng: Number(p.lng), radius, polygon: polygon.geometry.coordinates[0],
+      id: p.id || '', name: p.name || '', type: p.type || '', size: Number(p.size) || 0
+    })
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+const QUOTA_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
+
+// Đối chiếu dân trong phạm vi với số dân diện tích công trình đáp ứng theo chỉ tiêu m²/người
+function servedQuotaHtml(res, size) {
+  const quota = Number(res.quota) || 0;
+  if (!(quota > 0)) return '';
+  if (res.capacity == null) return `<div class="pp-sub">Chưa rõ diện tích nên chưa đối chiếu chỉ tiêu ${QUOTA_FORMAT.format(quota)} m²/người.</div>`;
+  const formula = `${fmtNum(size)} m² ÷ ${QUOTA_FORMAT.format(quota)} m²/người = ${fmtNum(res.capacity)} người`;
+  const reach = Number(res.reachPop) || 0;
+  if (reach > res.capacity) {
+    const lackArea = Math.ceil((reach - res.capacity) * quota);
+    return `<div class="pp-sub pp-cap-warn">${ico('alert')}Phạm vi có ~${fmtNum(reach)} người nhưng quy mô chỉ đáp ứng theo chỉ tiêu: ${formula} (thiếu ~${fmtNum(lackArea)} m²).</div>`;
+  }
+  return `<div class="pp-sub">Quy mô theo chỉ tiêu đáp ứng tối đa: ${formula}.</div>`;
 }
 
 function formatCapCongTrinhLabel(raw) {
@@ -1234,9 +1254,9 @@ export function onPointClick(p, targetMap = map) {
     Promise.resolve(areaPromise)
       .then(r => {
         const polygon = r ? r.polygon : turf.circle([Number(p.lng), Number(p.lat)], itemRadius / 1000, { steps: 64 });
-        return fetchServedPop(Number(p.lat), Number(p.lng), itemRadius, polygon).then(res => ({ res, real: !!(r && r.area) }));
+        return fetchServedPop(p, itemRadius, polygon).then(res => ({ res, real: !!(r && r.area) }));
       })
-      .then(({ res, real }) => fill('.js-served', `<span>${servedLabel}</span><div><b class="${servedCls}">~${fmtNum(res.servedPop || 0)} người</b> <span class="pp-sub">(${real ? 'trong phạm vi thực tế' : 'trong vòng tròn'}${scope})</span></div>`))
+      .then(({ res, real }) => fill('.js-served', `<span>${servedLabel}</span><div><b class="${servedCls}">~${fmtNum(res.servedPop || 0)} người</b> <span class="pp-sub">(${real ? 'trong phạm vi thực tế' : 'trong vòng tròn'}${scope})</span>${servedQuotaHtml(res, p.size)}</div>`))
       .catch(() => fill('.js-served', `<span>${servedLabel}</span><span class="pp-sub">chưa tính được (GEE đang bận), mở lại sau.</span>`));
   }
 
@@ -1252,7 +1272,8 @@ export function onPointClick(p, targetMap = map) {
           const estimateNote = s.coverageMethod === 'estimate' ? ` <span title="GEE bận: ước lượng theo diện tích">(ước lượng)</span>` : '';
           const basisNote = s.basis === 'scale'
             ? `Bù thiếu quy mô: phường đạt <b class="c-red">${fmtNum(s.currentScalePct)}%</b> → <b class="c-green">${fmtNum(Math.min(100, s.currentScalePct + s.scaleAddPct))}%</b> (độ phủ không tăng)`
-            : `Bổ sung <b class="c-green">${fmtNum(s.scaleAddPct)}%</b> quy mô, <b class="c-cyan">${fmtNum(s.coverageAddPct)}%</b> độ phủ${estimateNote}`;
+            : `Bổ sung <b class="c-green">${fmtNum(s.scaleAddPct)}%</b> quy mô, <b class="c-cyan">${fmtNum(s.coverageAddPct)}%</b> độ phủ${estimateNote}`
+              + (s.capacityLimited ? `<br>Quy mô chỉ đáp ứng ~${fmtNum(s.capacity)} người (${QUOTA_FORMAT.format(s.quota)} m²/người)` : '');
           sugHtml += `<div class="${cls}"><div>${ico('flag')}<b>${escapeHtml(s.label)}</b> ${priorityBadge}</div>
             <div class="pp-sub">${basisNote}</div>
             <button type="button" class="proof-btn" data-idx="${idx}">${ico('book')}Xem thuyết minh</button></div>`;

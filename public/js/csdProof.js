@@ -11,6 +11,7 @@ const CANDIDATE_COLOR = '#facc15';
 const NET_COLOR = '#22d3ee';
 const MAX_LISTED_EXISTING = 6;
 const PER_PIXEL_FORMAT = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const QUOTA_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 const COUNT_MS = 900;
 const CSD_MIN_COVERAGE_PCT = 0.5;   // khớp api/gee.js: dưới ngưỡng này xếp hạng theo thiếu quy mô
 const SPOTLIGHT_OPACITY = 0.5;   // làm tối bản đồ ngoài phạm vi khu đất
@@ -111,6 +112,25 @@ function coverageBlockHtml(data, label) {
   </section>`;
 }
 
+// Sức chứa khu đất theo chỉ tiêu m²/người so với số dân chưa được phục vụ trong bán kính
+function capacityBlockHtml(data) {
+  const pop = data.population;
+  const reach = pop.reach ?? pop.added;
+  if (pop.capacity == null || !(reach > 0)) return '';
+  const lack = Math.max(0, reach - pop.added);
+  const siteArea = data.scale ? data.scale.siteArea : Math.round(pop.capacity * pop.quota);
+  return `<section class="proof-block">
+    <div class="proof-block-title"><span>Sức chứa theo chỉ tiêu</span><b>${fmtNum(siteArea)} m² ÷ ${QUOTA_FORMAT.format(pop.quota)} m²/người</b></div>
+    <div class="proof-bar">${bar(pctOf(pop.added, reach), 'seg-net')}</div>
+    <div class="proof-bar-legend">
+      <span><i class="seg-net"></i>Đáp ứng <b>~${fmtNum(pop.added)}</b> / ${fmtNum(reach)} người chưa được phục vụ</span>
+      ${lack > 0
+        ? `<span><i class="seg-gap"></i>Vượt sức chứa ~${fmtNum(lack)} người (cần thêm ~${fmtNum(Math.ceil(lack * pop.quota))} m²)</span>`
+        : `<span>Đủ quy mô, còn dư cho ~${fmtNum(pop.capacity - reach)} người</span>`}
+    </div>
+  </section>`;
+}
+
 // ② Quy mô loại công trình của phường so với chỉ tiêu: hiện có / khu đất bổ sung / còn thiếu
 function scaleBlockHtml(data, label) {
   const sc = data.scale;
@@ -136,6 +156,8 @@ function buildPanelHtml(data, typeColor) {
   const label = escapeHtml(data.label);
   const cell = fmtNum(data.pixelSize);
   const isScale = isScaleBasis(data);
+  const coverageHtml = coverageBlockHtml(data, label) + capacityBlockHtml(data);
+  const reach = pop.reach ?? pop.added;
   const listed = data.existing.slice(0, MAX_LISTED_EXISTING)
     .map(e => `<li>${escapeHtml(e.name || e.id)} <span class="proof-muted">(phục vụ ${fmtNum(e.radius)} m)</span></li>`).join('');
   const more = existingN > MAX_LISTED_EXISTING ? `<li class="proof-muted">… và ${existingN - MAX_LISTED_EXISTING} công trình khác</li>` : '';
@@ -161,7 +183,7 @@ function buildPanelHtml(data, typeColor) {
       <div class="proof-kpi k-cyan${data.coverageAddPct ? '' : ' is-zero'}"><b>+<span data-count="${data.coverageAddPct}" data-dec="1">0</span>%</b><span>độ phủ của phường</span></div>
       ${scaleKpi}
     </div>
-    ${isScale ? scaleBlockHtml(data, label) + coverageBlockHtml(data, label) : coverageBlockHtml(data, label) + scaleBlockHtml(data, label)}
+    ${isScale ? scaleBlockHtml(data, label) + coverageHtml : coverageHtml + scaleBlockHtml(data, label)}
     <div class="proof-legend">
       ${legendItem(`border:2px dashed ${CANDIDATE_COLOR};`, 'Phạm vi khu đất')}
       ${legendItem(`background:${typeColor}22; border:1.5px dashed ${typeColor};`, existingN ? `${existingN} ${label} hiện có` : `Chưa có ${label} gần đây`)}
@@ -174,17 +196,18 @@ function buildPanelHtml(data, typeColor) {
       <summary>Cách tính chi tiết</summary>
       <div class="proof-muted proof-note">Bản đồ dân cư chia thành ô vuông ${cell} × ${cell} m; chỉ đếm ô có người ở.</div>
       <table class="proof-table">
-      <tr class="proof-group"><td colspan="2">① Độ phủ tăng thêm</td></tr>
+      <tr class="proof-group"><td colspan="2">① Ô dân cư chưa được phục vụ</td></tr>
       <tr><td>Ô dân cư trong phạm vi phục vụ</td><td>${fmtNum(px.buffer)} ô</td></tr>
       <tr><td>− Đã có ${label} khác phục vụ</td><td>${fmtNum(px.covered)} ô</td></tr>
-      <tr class="proof-strong"><td>= Được phục vụ thêm</td><td>${fmtNum(px.net)} ô</td></tr>
-      <tr><td>÷ Tổng số ô dân cư của phường</td><td>${fmtNum(px.wardTotal)} ô</td></tr>
-      <tr class="proof-result"><td>= Độ phủ của phường tăng thêm</td><td>${fmtNum(data.coverageAddPct)}%</td></tr>
+      <tr class="proof-strong"><td>= Chưa được phục vụ</td><td>${fmtNum(px.net)} ô</td></tr>
       <tr class="proof-group"><td colspan="2">② Số dân được phục vụ thêm</td></tr>
       <tr><td>Dân số phường</td><td>${fmtNum(pop.ward)} người</td></tr>
-      <tr><td>÷ ${fmtNum(px.wardTotal)} ô = bình quân mỗi ô</td><td>${PER_PIXEL_FORMAT.format(pop.perPixel || 0)} người</td></tr>
-      <tr><td>× Số ô được phục vụ thêm</td><td>${fmtNum(px.net)} ô</td></tr>
-      <tr class="proof-result"><td>= Số dân được phục vụ thêm</td><td>≈ ${fmtNum(pop.added)} người</td></tr>
+      <tr><td>÷ ${fmtNum(px.wardTotal)} ô dân cư = bình quân mỗi ô</td><td>${PER_PIXEL_FORMAT.format(pop.perPixel || 0)} người</td></tr>
+      <tr class="proof-strong"><td>× ${fmtNum(px.net)} ô = Dân chưa được phục vụ</td><td>≈ ${fmtNum(reach)} người</td></tr>
+      ${pop.capacity != null ? `<tr><td>Sức chứa: ${fmtNum(data.scale ? data.scale.siteArea : 0)} m² ÷ ${QUOTA_FORMAT.format(pop.quota)} m²/người</td><td>${fmtNum(pop.capacity)} người</td></tr>` : ''}
+      <tr class="proof-result"><td>= Số dân được phục vụ thêm${pop.capacity != null ? ' (lấy số nhỏ hơn)' : ''}</td><td>≈ ${fmtNum(pop.added)} người</td></tr>
+      <tr class="proof-group"><td colspan="2">③ Độ phủ tăng thêm</td></tr>
+      <tr><td>${fmtNum(pop.added)} ÷ ${fmtNum(pop.ward)} người</td><td>${fmtNum(data.coverageAddPct)}%</td></tr>
       ${scaleRowsHtml(data)}
       </table>
     </details>`;
@@ -202,7 +225,12 @@ function summaryHtml(data, label) {
     return `<p>${head} Phường mới đạt <b class="c-red">${fmtNum(sc.currentPct)}%</b> chỉ tiêu (thiếu ${fmtNum(sc.deficit)} m²) —
       bổ sung khu đất giúp <b>giảm tải</b> cho các cơ sở hiện có.</p>`;
   }
-  return `<p>Xây ${label} tại đây phục vụ thêm khoảng <b>${fmtNum(data.population.added)} người</b> hiện chưa có ${label} trong bán kính phục vụ.</p>`;
+  const pop = data.population;
+  if (pop.capacity != null && pop.reach > pop.added) {
+    return `<p>Trong bán kính có ~${fmtNum(pop.reach)} người chưa có ${label}, nhưng theo chỉ tiêu ${QUOTA_FORMAT.format(pop.quota)} m²/người
+      khu đất chỉ đáp ứng khoảng <b>${fmtNum(pop.added)} người</b>.</p>`;
+  }
+  return `<p>Xây ${label} tại đây phục vụ thêm khoảng <b>${fmtNum(pop.added)} người</b> hiện chưa có ${label} trong bán kính phục vụ.</p>`;
 }
 
 function scaleRowsHtml(data) {
@@ -210,7 +238,7 @@ function scaleRowsHtml(data) {
   if (!sc) return `<tr><td colspan="2" class="proof-muted">Diện tích khu đất đáp ứng ${fmtNum(data.scaleAddPct)}% nhu cầu của phường theo chỉ tiêu.</td></tr>`;
   const used = Math.min(sc.siteArea, sc.deficit);
   return `
-      <tr class="proof-group"><td colspan="2">③ Bù thiếu quy mô theo chỉ tiêu</td></tr>
+      <tr class="proof-group"><td colspan="2">④ Bù thiếu quy mô theo chỉ tiêu</td></tr>
       <tr><td>Nhu cầu của phường theo chỉ tiêu</td><td>${fmtNum(sc.required)} m²</td></tr>
       <tr><td>− Hiện có (đạt ${fmtNum(sc.currentPct)}%)</td><td>${fmtNum(sc.existing)} m²</td></tr>
       <tr class="proof-strong"><td>= Còn thiếu</td><td>${fmtNum(sc.deficit)} m²</td></tr>

@@ -1021,6 +1021,7 @@ table.ward-table th {
 .pp-sub, .pp-loading { font-size: var(--fs-sm); font-weight: 400; color: var(--text-muted); }
 .pp-plan { font-weight: 700; }
 .pp-warn { font-size: var(--fs-xs); font-weight: 400; color: var(--accent-orange); white-space: nowrap; }
+.pp-cap-warn { color: var(--accent-orange); }
 .pp-served > :first-child { color: var(--text-main); font-weight: 600; }
 .pp-section { display: flex; align-items: center; margin-top: 7px; font-weight: 700; }
 .pp-note { margin-top: 6px; font-size: var(--fs-sm); font-style: italic; text-align: center; }

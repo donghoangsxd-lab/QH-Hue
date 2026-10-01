@@ -565,6 +565,19 @@ async function popPixelSize(popProjection) {
   return popPixelSizeCache;
 }
 
+/**
+ * Số dân tối đa 1 khu đất/công trình đáp ứng = diện tích ÷ chỉ tiêu m²/người của loại (chỉ tiêu tổng như bảng phường; THPT theo chỉ tiêu riêng).
+ * capacity = null: chưa rõ diện tích (0) hoặc QCVN không quy định chỉ tiêu cho loại/địa bàn → không giới hạn.
+ */
+function capacityByQuota(item, size, profile) {
+  const quota = constants.isThptItem(item)
+    ? (constants.baseQuota('THPT', profile) || 0)
+    : constants.quotaFor(constants.resolveTypeCode(item), profile);
+  return { quota, capacity: quota > 0 && size > 0 ? Math.floor(size / quota) : null };
+}
+
+const capByCapacity = (pop, capacity) => (capacity == null ? pop : Math.min(pop, capacity));
+
 /** Bán kính vùng phục vụ của khu đất khi xét loại `code`: theo quy chuẩn của loại và hồ sơ phường/xã */
 function csdCandidateRadius(csd, code, profile) {
   return constants.unitRadius(code, profile);
@@ -644,6 +657,7 @@ function csdSuggestionCandidates(csd, ward, approvedAll) {
     const deficitArea = reqArea - existArea;
     const s = {
       code, label, status: 'eligible',
+      ...capacityByQuota({ type: code }, size, ward.profile),
       reqArea,
       existArea: Math.round(existArea),
       deficitArea: Math.round(deficitArea),
@@ -708,21 +722,31 @@ async function fillCoverageGains(ee, popRaster, candidates) {
   let allPixel = true;
   candidates.forEach((c, i) => {
     const wardTotal = counts ? (wardPopPixelCache.get(c.ward.name) || 0) : 0;
+    const capacity = c.target.capacity ?? null;
     if (counts && wardTotal > 0) {
       const gained = counts[`c${i}`] || 0;
+      // Dân chưa được phục vụ trong bán kính, chỉ tính phần diện tích khu đất đáp ứng được theo chỉ tiêu m²/người
+      const reach = gained * (c.ward.pop / wardTotal);
+      const added = capByCapacity(reach, capacity);
       Object.assign(c.target, {
         popGained: gained,
         wardPopPixels: wardTotal,
-        coverageAddPct: round1(clamp((gained / wardTotal) * 100, 0, 100)),
+        popReach: Math.round(reach),
+        popAdded: Math.round(added),
+        capacityLimited: added < reach,
+        coverageAddPct: c.ward.pop > 0 ? round1(clamp((added / c.ward.pop) * 100, 0, 100)) : 0,
         coverageMethod: 'pixel'
       });
     } else {
       allPixel = false;
+      const est = estimateCoverageAddPct({
+        lat: c.lat, lng: c.lng, radius: c.radius, wardGeometry: c.ward.geometry, existingSameType: c.existing
+      });
+      const capPct = capacity == null || !(c.ward.pop > 0) ? Infinity : (capacity / c.ward.pop) * 100;
       Object.assign(c.target, {
         popGained: null,
-        coverageAddPct: estimateCoverageAddPct({
-          lat: c.lat, lng: c.lng, radius: c.radius, wardGeometry: c.ward.geometry, existingSameType: c.existing
-        }),
+        capacityLimited: est > capPct,
+        coverageAddPct: round1(Math.min(est, capPct)),
         coverageMethod: 'estimate'
       });
     }
@@ -1454,6 +1478,8 @@ module.exports = async (req, res) => {
       const pt = parseCoordInBounds(src.lat, src.lng);
       if (!pt) return res.status(400).json({ error: true, message: "Tọa độ không hợp lệ" });
       const radius = parseRadius(src.radius);
+      const item = { id: String(src.id || '').slice(0, 50), name: String(src.name || '').slice(0, 200), type: String(src.type || '').slice(0, 20) };
+      const size = clamp(Number(src.size) || 0, 0, 1e8);
 
       let polyCoords;
       if (isPost) {
@@ -1471,8 +1497,14 @@ module.exports = async (req, res) => {
         maxPixels: 1e9
       }));
 
-      const servedPop = Math.round(servedPopRes ? servedPopRes.DanSoPixelNormalized || 0 : 0);
-      return res.status(200).json({ servedPop });
+      const reachPop = Math.round(servedPopRes ? servedPopRes.DanSoPixelNormalized || 0 : 0);
+      // Dân số phục vụ không vượt quá số dân diện tích công trình đáp ứng theo chỉ tiêu m²/người (hồ sơ phường/xã chứa công trình)
+      let cap = { quota: 0, capacity: null };
+      if (item.type || item.id) {
+        const wardName = assignWardByGeometry(pt.lng, pt.lat, await loadEvaluatedWards(wardVectorParsed));
+        cap = capacityByQuota(item, size, constants.wardProfile(wardName || ''));
+      }
+      return res.status(200).json({ servedPop: capByCapacity(reachPop, cap.capacity), reachPop, ...cap });
     }
 
     if (action === 'getHeatmapTile') {
@@ -1696,8 +1728,12 @@ module.exports = async (req, res) => {
       const netPix = counts.net || 0;
       // Dân số bình quân 1 pixel = dân số phường / số pixel dân cư của phường (làm tròn như hiển thị để nhân tay khớp)
       const popPerPixel = wardTotal > 0 ? Number((ward.pop / wardTotal).toFixed(2)) : 0;
-      const coverageAddPct = wardTotal > 0 ? round1(clamp((netPix / wardTotal) * 100, 0, 100)) : 0;
       const t = cand.target;
+      // Cùng phép tính với fillCoverageGains: dân trong vùng trống, giới hạn bởi sức chứa theo chỉ tiêu m²/người
+      const reachExact = wardTotal > 0 ? netPix * (ward.pop / wardTotal) : 0;
+      const addedExact = capByCapacity(reachExact, t.capacity);
+      const coverageAddPct = ward.pop > 0 ? round1(clamp((addedExact / ward.pop) * 100, 0, 100)) : 0;
+      const reach = Math.round(popPerPixel * netPix);
       return res.status(200).json({
         code,
         label: cand.target.label,
@@ -1720,7 +1756,10 @@ module.exports = async (req, res) => {
         population: {
           ward: ward.pop,
           perPixel: popPerPixel,
-          added: Math.round(popPerPixel * netPix)
+          reach,
+          quota: t.quota,
+          capacity: t.capacity,
+          added: capByCapacity(reach, t.capacity)
         },
         pixelSize,
         tileUrl: mapId.urlFormat
@@ -1913,6 +1952,7 @@ module.exports = async (req, res) => {
             lng: item.lng,
             radius,
             status: item.status,
+            ...capacityByQuota(item, size, profile),
             scaleAddPct: reqArea > 0 ? round1(clamp((size / reqArea) * 100, 0, 100)) : 0,
             coverageAddPct: 0
           };

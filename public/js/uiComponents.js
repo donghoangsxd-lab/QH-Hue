@@ -1382,6 +1382,10 @@ const quotaOf = (node, key) => (node ? node.quota : DEFAULT_QUOTA[key]);
 const hasQuota = (quota) => quota != null && Number.isFinite(Number(quota));
 const QUOTA_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 const quotaText = (quota) => `≥ ${QUOTA_FORMAT.format(Number(quota))}`;
+// Độ phủ đã bị giới hạn vì diện tích chỉ đáp ứng được số dân = diện tích ÷ chỉ tiêu m²/người
+const capacityNote = (s) => (s.capacityLimited
+  ? `, quy mô chỉ đáp ứng ~${fmtNum(s.capacity)} người theo ${QUOTA_FORMAT.format(s.quota)} m²/người`
+  : '');
 
 // Mục tiêu số cơ sở theo QCVN (THPT khi dân số > 20.000; 1 trạm y tế, 1 chợ mỗi xã); null = không có quy tắc
 function countTargetOf(wardData, key, projPop) {
@@ -1623,7 +1627,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
         <td>${zoomLinkHtml(pItem)}${typeNote}</td>
         <td>${fmtNum(pItem.size)} m²</td>
         <td colspan="5" class="wt-note">
-          Sau khi phê duyệt dự kiến bổ sung <b class="c-green">${fmtPct(pItem.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(pItem.coverageAddPct)}</b> độ phủ${pItem.coverageMethod === 'estimate' ? ' (ước lượng)' : ''}
+          Sau khi phê duyệt dự kiến bổ sung <b class="c-green">${fmtPct(pItem.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(pItem.coverageAddPct)}</b> độ phủ${pItem.coverageMethod === 'estimate' ? ' (ước lượng)' : ''}${capacityNote(pItem)}
         </td>
       </tr>`);
     });
@@ -1642,7 +1646,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       const suggestionHtml = eligibleSugg.length > 0
         ? eligibleSugg.slice(0, 2).map((s, idx) => s.basis === 'scale'
           ? `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bù thiếu quy mô: phường đạt <b class="c-red">${fmtPct(s.currentScalePct)}</b> → <b class="c-green">${fmtPct(Math.min(100, s.currentScalePct + s.scaleAddPct))}</b>, độ phủ không tăng).</div>`
-          : `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bổ sung <b class="c-green">${fmtPct(s.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(s.coverageAddPct)}</b> độ phủ${s.coverageMethod === 'estimate' ? ', ước lượng' : ''}).</div>`
+          : `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bổ sung <b class="c-green">${fmtPct(s.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(s.coverageAddPct)}</b> độ phủ${s.coverageMethod === 'estimate' ? ', ước lượng' : ''}${capacityNote(s)}).</div>`
         ).join('')
         : `<div class="c-muted"><i>Chưa có gợi ý phù hợp</i></div>`;
 
