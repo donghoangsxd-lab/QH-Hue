@@ -1,7 +1,7 @@
 import { state, BUFFER_COLORS, isNetworkType, NT_KIND_LABELS, layerType, infraLabels } from './state.js';
 import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js';
 import { geeApi } from './api.js';
-import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, showToast, wardStatHtml, ico, setStatusContent, inlineSpriteIcons } from './utils.js';
+import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, showToast, wardStatHtml, ico, setStatusContent, inlineSpriteIcons } from './utils.js';
 import { refreshWardCheck } from './wardCheck.js';
 import { fillWardRoadLengths, fillCityRoadDensity, loadRoadTypeLengths, ROAD_TYPES, ROADS_META_EVENT, fmtKm } from './wardRoads.js';
 import { refreshRoadPanel } from './customRoads.js';
@@ -1247,37 +1247,6 @@ export async function exportBottomPanelPdf() {
     html2canvas: { scale: 2, useCORS: true, scrollY: 0, onclone: inlineSpriteIcons },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
   }).save().then(done, done);
-}
-
-// Chụp khung bản đồ (kể cả chế độ so sánh) thành ảnh PNG; lỗi thì quay về hộp thoại in của trình duyệt
-export async function captureMapScreenshot() {
-  const area = document.getElementById('mapArea');
-  if (!area) return;
-  try {
-    await loadHtml2Canvas();
-    showToast('⏳ Đang chụp ảnh bản đồ...');
-    const canvas = await window.html2canvas(area, {
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#0f172a',
-      onclone: inlineSpriteIcons,
-      ignoreElements: el => el.classList?.contains('map-toolbar') || el.classList?.contains('leaflet-control-zoom')
-    });
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-    if (!blob) throw new Error('Không tạo được ảnh');
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Ban-do-ha-tang-Hue-${new Date().toISOString().slice(0, 10)}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast('✓ Đã lưu ảnh bản đồ', 'success');
-  } catch (err) {
-    console.warn('Chụp ảnh bản đồ lỗi, chuyển sang in:', err);
-    window.print();
-  }
 }
 
 export function selectWardDetail(wardName) {

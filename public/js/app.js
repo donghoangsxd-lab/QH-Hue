@@ -28,7 +28,6 @@ import {
   toggleBottomPanelMaximized,
   toggleStatTable,
   exportBottomPanelPdf,
-  captureMapScreenshot,
   initGoogleSignIn,
   initBottomPanelEvents,
   restoreAdminSession,
@@ -47,6 +46,7 @@ import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 import { initTerrainLayer } from './terrainLayer.js';
 import { initFloodSim } from './floodSim.js';
 import { initSketchLayer, handleSketchClick, stopSketchTool } from './sketchLayer.js';
+import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
 
 const CITY_NAME = "Thành phố Huế";
 
@@ -471,6 +471,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('btnScreenshot')?.addEventListener('click', captureMapScreenshot);
+  document.getElementById('btnPrintA3')?.addEventListener('click', exportMapA3);
 
   // ---------- Nạp dữ liệu ban đầu ----------
   const progressBar = document.getElementById('progressBar');

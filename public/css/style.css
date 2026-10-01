@@ -1080,6 +1080,58 @@ table.ward-table th {
 .bp-body.pdf-export .road-chart { flex: none; height: 150px; }
 .bp-body.pdf-export .flip-card { overflow: visible; }
 
+/* IN KHỔ A3 (printLayout.js): tạm phóng khung bản đồ theo tỷ lệ khung in để tải đúng vùng ảnh nền */
+#mapArea.print-staging { right: auto; bottom: auto; width: var(--print-w); height: var(--print-h); }
+.pa3-holder { position: absolute; left: -20000px; top: 0; }
+.pa3-page { position: relative; overflow: hidden; background: #fff; color: #0f172a; font-family: Arial, Helvetica, sans-serif; }
+.pa3-map { position: absolute; display: block; }
+.pa3-svg { position: absolute; left: 0; top: 0; }
+.pa3-gridlines line { stroke: #fff; stroke-opacity: 0.55; stroke-width: 0.7; stroke-dasharray: 6 4; }
+.pa3-ticks line { stroke: #0f172a; stroke-width: 1; }
+.pa3-frame-border { fill: none; stroke: #0f172a; stroke-width: 1.4; }
+.pa3-outer { fill: none; stroke: #0f172a; stroke-width: 2.4; }
+.pa3-outer-in, .pa3-side-sep { fill: none; stroke: #0f172a; stroke-width: 0.8; }
+.pa3-gl { position: absolute; font-size: 10px; line-height: 1; white-space: nowrap; color: #0f172a; }
+.pa3-gl-top { transform: translate(-50%, -100%); }
+.pa3-gl-bottom { transform: translate(-50%, 0); }
+.pa3-gl-side { transform: translate(-50%, -50%) rotate(-90deg); }
+.pa3-split { position: absolute; width: 0; border-left: 2px solid #fff; box-shadow: 0 0 3px rgba(0,0,0,0.7); }
+.pa3-split-lbl { position: absolute; padding: 3px 8px; border-radius: 3px; background: rgba(15,23,42,0.82); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; }
+.pa3-side { position: absolute; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; }
+.pa3-org { text-align: center; font-size: 13px; line-height: 1.4; }
+.pa3-org b { display: block; font-size: 15px; }
+.pa3-org b::after { content: ''; display: block; width: 90px; margin: 4px auto 0; border-top: 1.2px solid #0f172a; }
+.pa3-title { margin-top: 6px; text-align: center; font-size: 22px; font-weight: 700; line-height: 1.25; text-transform: uppercase; color: #991b1b; }
+.pa3-place { text-align: center; font-size: 15px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.pa3-scale-block { display: flex; align-items: center; gap: 16px; padding: 10px 4px; border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; }
+.pa3-north-svg { width: 40px; height: 60px; display: block; }
+.pa3-ratio { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.pa3-scalebar { display: flex; height: 7px; border: 1px solid #0f172a; }
+.pa3-scalebar i { flex: 1; }
+.pa3-scalebar i.b { background: #0f172a; }
+.pa3-scalebar i.w { background: #fff; }
+.pa3-scalebar-lbl { display: flex; justify-content: space-between; margin-top: 3px; font-size: 10px; }
+.pa3-ratio-note { margin-top: 4px; font-size: 10px; font-style: italic; color: #64748b; }
+.pa3-legend { flex: 1; min-height: 0; overflow: hidden; }
+.pa3-sec { margin-bottom: 8px; padding-bottom: 3px; border-bottom: 1.5px solid #0f172a; font-size: 14px; font-weight: 700; letter-spacing: 0.08em; }
+.pa3-lg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; font-size: 11.5px; line-height: 1.2; }
+.pa3-lg-row { display: flex; align-items: center; gap: 6px; }
+.pa3-lg-icon { height: 20px; width: auto; flex-shrink: 0; }
+.pa3-lg-sym { display: inline-block; width: 26px; height: 13px; flex-shrink: 0; box-sizing: border-box; }
+.pa3-lg-buffer { border: 1.5px dashed #0284c7; border-radius: 7px; background: rgba(56,189,248,0.22); }
+.pa3-lg-ward { border: 1.8px solid #22d3ee; background: rgba(34,211,238,0.1); }
+.pa3-lg-bound { height: 5px; background: #fde68a; border: 1px solid #64748b; }
+.pa3-lg-line { height: 0; border-top: var(--w) solid var(--c); }
+.pa3-lg-dash { border-top-style: dashed; }
+.pa3-lg-ramp { grid-column: 1 / -1; margin-top: 4px; }
+.pa3-lg-ramp-title { margin-bottom: 3px; font-weight: 700; }
+.pa3-lg-bar { height: 10px; border: 1px solid #475569; }
+.pa3-lg-heat { background: linear-gradient(to right, #5dade2, #2ecc71, #f1c40f, #f39c12, #e67e22, #d35400, #e74c3c, #900c3f); }
+.pa3-lg-pop { background: linear-gradient(to right, blue, cyan, green, yellow, orange, red); }
+.pa3-lg-ticks { display: flex; justify-content: space-between; margin-top: 2px; font-size: 10px; }
+.pa3-info { padding-top: 8px; border-top: 1px solid #cbd5e1; font-size: 11px; line-height: 1.5; color: #334155; }
+.pa3-note { margin-top: 4px; font-style: italic; color: #64748b; }
+
 /* ===================== POPUP & THẺ GỢI Ý ===================== */
 .badge-pending { display: inline-block; background: var(--accent-red); color: #fff; font-size: var(--fs-xs); font-weight: bold; padding: 1px 4px; border-radius: var(--r-sm); text-transform: uppercase; margin-left: 4px; }
 
@@ -1276,8 +1328,8 @@ table.ward-table th {
   background: #b91c1c; border: 1.5px solid #fde047; border-radius: 5px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
 }
-.island-flag-name { color: #fff; font-size: 13px; }
-.island-flag-country { color: #fde047; font-size: 11px; }
+.island-flag-name { color: #fff; font-size: 9px; letter-spacing: 0; }
+.island-flag-country { color: #fde047; font-size: 14px; letter-spacing: 0.03em; }
 
 /* Biểu đồ tròn tổng hợp mỗi phường xã ở zoom nhỏ */
 .ward-pie-mode .ward-label-text { display: none; }
