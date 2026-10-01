@@ -436,6 +436,18 @@ body.right-collapsed .right-panel {
 .flood-row:hover { background: rgba(var(--cyan-rgb), 0.12); color: var(--text-strong); }
 .flood-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flood-row b { color: #93c5fd; font-weight: 500; white-space: nowrap; }
+/* Lớp vệ tinh (satLayers.js): chọn năm, chú giải; phần thống kê dùng chung kiểu mô phỏng ngập */
+.sat-pick { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }
+.sat-pick select { flex: 1; min-width: 0; height: 22px; padding: 0 4px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm); color: var(--text-main); font: inherit; }
+.sat-legend { margin: 4px 0; }
+.sat-legend:empty { display: none; }
+.sat-legend-title { margin-bottom: 2px; }
+.sat-legend-bar { height: 7px; border-radius: var(--r-sm); }
+.sat-legend-ticks { display: flex; justify-content: space-between; margin-top: 1px; }
+.sat-swatch { display: inline-block; width: 14px; height: 9px; margin-right: 5px; border-radius: 2px; vertical-align: -1px; }
+.sat-count { color: #f87171; }
+.flood-wards.sat-hot b { color: #f97316; }
+.flood-wards.sat-cool b { color: #60a5fa; }
 .btn-dot-buffer { width: 16px; height: 16px; padding: 0; border: none; font-family: inherit; line-height: 1; border-radius: 50%; background: rgba(148, 163, 184, 0.35); color: var(--text-strong); font-size: var(--fs-xs); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--ease); flex-shrink: 0; }
 .btn-dot-buffer:hover { background: rgba(var(--cyan-rgb), 0.45); }
 .btn-dot-buffer.active { background: var(--accent-cyan); color: var(--text-on-accent); box-shadow: 0 0 8px rgba(var(--cyan-rgb), 0.6); }

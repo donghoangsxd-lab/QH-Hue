@@ -1,6 +1,6 @@
-// Mô phỏng ngập theo mực nước (bảng lớp dữ liệu): pixel có cao độ SRTM thấp hơn mực nước được tô theo độ sâu,
-// kèm công trình hạ tầng bị ngập (hiện trạng / quy hoạch) và dân số, diện tích ngập theo phường (bảng GEE action getFloodBins).
-// Tính theo cao độ (mọi vùng thấp hơn mực nước), không loang từ sông: SRTM đo mặt sông hẹp sai lệch vài mét nên loang sẽ bị chặn giả.
+// Mô phỏng ngập theo mực nước (bảng lớp dữ liệu): pixel có cao độ (Copernicus DEM GLO-30, terrainLayer.js) thấp hơn mực nước
+// được tô theo độ sâu, kèm công trình hạ tầng bị ngập (hiện trạng / quy hoạch) và dân số, diện tích ngập theo phường (GEE getFloodBins).
+// Tính theo cao độ (mọi vùng thấp hơn mực nước), không loang từ sông: DEM 30 m đo mặt sông hẹp sai lệch vài mét nên loang sẽ bị chặn giả.
 import { map, flyToVisible } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { state, BUFFER_COLORS, layerType, getPlanScenarioList } from './state.js';
@@ -8,7 +8,7 @@ import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum } from './utils.js';
 import { loadElevTile, NATIVE_MAX_ZOOM } from './terrainLayer.js';
 
-const POINT_ZOOM = 12;          // ô Terrarium dùng để lấy cao độ tại công trình (~36 m/pixel, sát độ phân giải SRTM 30 m)
+const POINT_ZOOM = 12;          // ô Terrarium dùng để lấy cao độ tại công trình (~36 m/pixel, sát độ phân giải DEM 30 m)
 const MAX_LIST = 150;
 // Độ sâu (m) → màu nước: nông xanh nhạt, sâu xanh đậm
 const DEPTH_STOPS = [[0, [186, 230, 253, 150]], [0.5, [56, 189, 248, 180]], [1.5, [37, 99, 235, 210]], [3, [30, 58, 138, 235]]];
@@ -43,7 +43,7 @@ let leftLayer = null, rightLayer = null;
 let ringsLeft = null, ringsRight = null;
 const liveTiles = new Map();    // canvas ô đang hiển thị → cao độ, để tô lại ngay khi kéo mực nước
 
-// Pixel cao độ ≤ 0 m (biển, phá, đầm trong SRTM) là mặt nước thường xuyên: không tô
+// Pixel cao độ ≤ 0 m (biển, phá, đầm trong DEM) là mặt nước thường xuyên: không tô
 function paintTile(tile, elev) {
   const ctx = tile.getContext('2d');
   const data = ctx.createImageData(256, 256);
@@ -148,7 +148,7 @@ function ensureBins() {
   return binsPromise;
 }
 
-// Bậc b (cao độ SRTM nguyên mét) ngập khi b < mực nước; diện tích bỏ bậc ≤ 0 m (mặt nước thường xuyên)
+// Bậc b (cao độ DEM làm tròn mét) ngập khi b < mực nước; diện tích bỏ bậc ≤ 0 m (mặt nước thường xuyên)
 function exposureByWard() {
   if (!binsData) return null;
   let pop = 0, area = 0, popAll = 0;

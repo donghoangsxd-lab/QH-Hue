@@ -4,6 +4,7 @@ import { map } from './mapEngine.js';
 import { planMap, isCompareOn } from './planMap.js';
 import { state } from './state.js';
 import { wgs84ToVn2000 } from './cadImport.js';
+import { satPrintLegend } from './satLayers.js';
 import { escapeHtml, distanceMeters, loadHtml2Canvas, loadHtml2Pdf, showToast, inlineSpriteIcons } from './utils.js';
 
 const CITY_NAME = 'Thành phố Huế';
@@ -190,7 +191,7 @@ function legendRows() {
     ramps.push(`<div class="pa3-lg-ramp"><div class="pa3-lg-ramp-title">Phân bổ dân cư (người / ô 30 m)</div>
       <div class="pa3-lg-bar pa3-lg-pop"></div><div class="pa3-lg-ticks">${[0, 1, 2, 3, 4, '≥5'].map(n => `<span>${n}</span>`).join('')}</div></div>`);
   }
-  return rows.join('') + ramps.join('');
+  return rows.join('') + ramps.join('') + satPrintLegend();
 }
 
 // ================== DỰNG TRANG A3 ==================

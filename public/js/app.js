@@ -45,6 +45,7 @@ import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 import { initTerrainLayer } from './terrainLayer.js';
 import { initFloodSim } from './floodSim.js';
+import { initSatLayers } from './satLayers.js';
 import { initSketchLayer, handleSketchClick, stopSketchTool } from './sketchLayer.js';
 import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
 
@@ -158,6 +159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initRoadNetworkLayer();
   initTerrainLayer();
   initFloodSim();
+  initSatLayers();
   initSketchLayer();
   // Bật đo đạc / tra cứu / ghim / vẽ tuyến → bỏ chọn công cụ phác thảo (hình đã vẽ vẫn giữ)
   ['btnMeasureDist', 'btnMeasureArea', 'btnInspectMode', 'btnPickOnMap', 'btnRoadDraw', 'btnPopDraw']

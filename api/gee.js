@@ -6,6 +6,7 @@ const { getRawDataList, getCadParcels, invalidateCache, getDataVersion } = requi
 const { requireAdmin, httpError } = require('../services/authService');
 const roads = require('../services/roadsService');
 const popEdits = require('../services/popEditsService');
+const sat = require('../services/satService');
 
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
@@ -366,6 +367,8 @@ const CSD_MIN_COVERAGE_PCT = 0.5;
 const FLOOD_BIN_MIN = -1;
 const FLOOD_BIN_MAX = 40;
 let cachedFloodBins = null;   // { version: phiên bản hiệu chỉnh dân cư, data }
+const cachedSatStats = new Map();   // "lst|năm" hoặc "sar|năm|bản dân cư|bản dữ liệu" → kết quả thống kê lớp vệ tinh
+const wardNameOf = (p) => p.tenXa || p.NAME_2 || p.name || 'Phường';
 
 function invalidateAllCaches() {
   invalidateCache();
@@ -1758,13 +1761,13 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // Mô phỏng ngập (floodSim.js): dân số và diện tích mỗi phường theo từng mét cao độ SRTM (cùng nguồn lớp địa hình);
+    // Mô phỏng ngập (floodSim.js): dân số và diện tích mỗi phường theo từng mét cao độ GLO-30 (cùng nguồn lớp địa hình);
     // trình duyệt tự cộng các bậc thấp hơn mực nước nên kéo thanh mực nước không phải gọi lại máy chủ
     if (action === 'getFloodBins') {
       res.setHeader('Cache-Control', req.query.pv ? 'no-store' : 's-maxage=3600, stale-while-revalidate=86400');
       const version = getPopEditsVersion();
       if (cachedFloodBins && cachedFloodBins.version === version) return res.status(200).json(cachedFloodBins.data);
-      const bin = ee.Image('USGS/SRTMGL1_003').select('elevation').clamp(FLOOD_BIN_MIN, FLOOD_BIN_MAX).rename('bin');
+      const bin = sat.demImage(ee).round().clamp(FLOOD_BIN_MIN, FLOOD_BIN_MAX).rename('bin');
       const img = popRasterNormalized.unmask(0).rename('pop').addBands(ee.Image.pixelArea().rename('area')).addBands(bin);
       const fc = await eeEvaluate(img.reduceRegions({
         collection: wardVectorParsed,
@@ -1781,6 +1784,56 @@ module.exports = async (req, res) => {
       const data = { binMin: FLOOD_BIN_MIN, binMax: FLOOD_BIN_MAX, wards };
       cachedFloodBins = { version, data };
       return res.status(200).json(data);
+    }
+
+    // Cao độ Copernicus DEM GLO-30 dạng ô Terrarium: terrainLayer.js / floodSim.js giải mã ngay trên trình duyệt
+    if (action === 'getDemTile') {
+      res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=3600');
+      return res.status(200).json({ urlFormat: await sat.mapUrl(ee, sat.terrariumImage(ee)) });
+    }
+
+    // Vùng ngập mùa lũ từ radar Sentinel-1; year=all → số mùa lũ mỗi pixel bị ngập qua các năm
+    if (action === 'getSarFloodTile') {
+      const years = sat.sarYears();
+      const all = req.query.year === 'all';
+      const year = all ? null : sat.parseYear(req.query.year, years);
+      if (!all && year == null) return res.status(400).json({ error: true, message: "Năm không hợp lệ" });
+      res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=3600');
+      const { image, legend } = sat.sarFloodVis(ee, wardVectorParsed, year, years);
+      return res.status(200).json({ urlFormat: await sat.mapUrl(ee, image), legend, years });
+    }
+
+    // Nhiệt độ bề mặt mùa nóng (Landsat 8/9)
+    if (action === 'getLstTile') {
+      const years = sat.lstYears();
+      const year = sat.parseYear(req.query.year, years);
+      if (year == null) return res.status(400).json({ error: true, message: "Năm không hợp lệ" });
+      res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=3600');
+      const image = sat.lstImage(ee, wardVectorParsed, year).visualize(sat.LST_VIS);
+      return res.status(200).json({ urlFormat: await sat.mapUrl(ee, image), legend: sat.LST_VIS, years });
+    }
+
+    if (action === 'getLstStats') {
+      const year = sat.parseYear(req.query.year, sat.lstYears());
+      if (year == null) return res.status(400).json({ error: true, message: "Năm không hợp lệ" });
+      res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=86400');
+      const key = `lst|${year}`;
+      if (!cachedSatStats.has(key)) {
+        const fc = await eeEvaluate(sat.lstImage(ee, wardVectorParsed, year).reduceRegions({
+          collection: wardVectorParsed,
+          reducer: ee.Reducer.mean().combine(ee.Reducer.count(), null, true),
+          scale: 30,
+          tileScale: 4
+        }).map(f => ee.Feature(null).copyProperties(f)));
+        let sum = 0, n = 0;
+        const wards = ((fc && fc.features) || []).map(f => {
+          const p = f.properties || {};
+          if (p.mean != null && p.count) { sum += p.mean * p.count; n += p.count; }
+          return { name: wardNameOf(p), mean: p.mean == null ? null : round1(p.mean) };
+        }).filter(w => w.mean != null);
+        cachedSatStats.set(key, { year, city: n ? round1(sum / n) : null, wards });
+      }
+      return res.status(200).json(cachedSatStats.get(key));
     }
 
     if (action === 'getBoundaryTile') {
@@ -1830,6 +1883,46 @@ module.exports = async (req, res) => {
     }
     // Mọi phép tính hiện trạng chỉ dùng công trình có QuyMo_HT (ô trống = hiện tại chưa hình thành)
     const rawDataList = allDataList.filter(it => it.planChange !== 'new' && it.planChange !== 'none');
+
+    // Thống kê vùng ngập mùa lũ (Sentinel-1): diện tích, dân cư theo phường + công trình hiện trạng đã duyệt nằm trong vùng ngập
+    if (action === 'getSarFloodStats') {
+      const year = sat.parseYear(req.query.year, sat.sarYears());
+      if (year == null) return res.status(400).json({ error: true, message: "Năm không hợp lệ" });
+      res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+      const key = `sar|${year}|${getPopEditsVersion()}|${getDataVersion()}`;
+      if (!cachedSatStats.has(key)) {
+        const flood = sat.sarFloodMask(ee, wardVectorParsed, year);
+        const pop = popRasterNormalized.unmask(0);
+        const img = pop.multiply(flood).rename('popFlood')
+          .addBands(ee.Image.pixelArea().multiply(flood).rename('area'))
+          .addBands(pop.rename('pop'));
+        const items = rawDataList.filter(it => isApprovedStatus(it.status) && it.id && Number.isFinite(Number(it.lat)) && Number.isFinite(Number(it.lng)));
+        const pts = ee.FeatureCollection(items.map((it, i) => ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]), { i })));
+        const [fc, hit] = await Promise.all([
+          eeEvaluate(img.reduceRegions({ collection: wardVectorParsed, reducer: ee.Reducer.sum(), scale: POP_SCALE_M, tileScale: 4 })
+            .map(f => ee.Feature(null).copyProperties(f))),
+          items.length
+            ? eeEvaluate(flood.reduceRegions({ collection: pts, reducer: ee.Reducer.max(), scale: 20, tileScale: 4 }).filter(ee.Filter.eq('max', 1)).aggregate_array('i'))
+            : []
+        ]);
+        let pop0 = 0, popF = 0, area = 0;
+        const wards = ((fc && fc.features) || []).map(f => {
+          const p = f.properties || {};
+          pop0 += p.pop || 0; popF += p.popFlood || 0; area += p.area || 0;
+          return { name: wardNameOf(p), pop: Math.round(p.popFlood || 0), area: Math.round(p.area || 0) };
+        }).filter(w => w.pop > 0 || w.area > 0).sort((a, b) => b.pop - a.pop);
+        if (cachedSatStats.size > 40) cachedSatStats.clear();
+        cachedSatStats.set(key, {
+          year,
+          area: Math.round(area),
+          pop: Math.round(popF),
+          popAll: Math.round(pop0),
+          wards,
+          ids: (hit || []).map(i => items[i] && items[i].id).filter(Boolean)
+        });
+      }
+      return res.status(200).json(cachedSatStats.get(key));
+    }
 
     // Admin: ghi dấu nhắc "phường theo tọa độ" vào cột Note cho công trình lệch phường, gỡ dấu ở dòng đã sửa đúng
     if (action === 'syncWardNotes') {
