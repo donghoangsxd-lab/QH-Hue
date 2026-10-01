@@ -43,6 +43,7 @@ import { initWardRoads } from './wardRoads.js';
 import { initCustomRoads, handleRoadDrawClick } from './customRoads.js';
 import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
+import { initTerrainLayer } from './terrainLayer.js';
 import { initSketchLayer, handleSketchClick, stopSketchTool } from './sketchLayer.js';
 
 const CITY_NAME = "Thành phố Huế";
@@ -129,6 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCustomRoads();
   initPopEdits();
   initRoadNetworkLayer();
+  initTerrainLayer();
   initSketchLayer();
   // Bật đo đạc / tra cứu / ghim / vẽ tuyến → bỏ chọn công cụ vẽ tạm (hình đã vẽ vẫn giữ)
   ['btnMeasureDist', 'btnMeasureArea', 'btnInspectMode', 'btnPickOnMap', 'btnRoadDraw', 'btnPopDraw']

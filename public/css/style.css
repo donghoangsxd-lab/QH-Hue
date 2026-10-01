@@ -383,6 +383,14 @@ body.right-collapsed .right-panel {
 .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 13px; height: 13px; margin: 0 6px 0 0; vertical-align: middle; }
 .layer-row .layer-hint { color: var(--text-muted); font-size: var(--fs-xs); }
 .road-legend.layer-legend { margin: 0 0 4px 22px; flex-wrap: wrap; row-gap: 2px; }
+.terrain-legend { margin: 0 6px 6px 22px; font-size: var(--fs-xs); color: var(--text-muted); }
+.terrain-legend-bar { height: 8px; border-radius: var(--r-sm); }
+.terrain-legend-ticks { position: relative; height: 13px; }
+.terrain-legend-ticks span { position: absolute; top: 1px; transform: translateX(-50%); white-space: nowrap; }
+.terrain-legend-ticks span:first-child { transform: none; }
+.terrain-legend-ticks span:last-child { transform: translateX(-100%); }
+.terrain-legend-foot { display: flex; justify-content: space-between; gap: 6px; }
+#terrainReadout { color: var(--text-strong); font-variant-numeric: tabular-nums; }
 .btn-dot-buffer { width: 16px; height: 16px; padding: 0; border: none; font-family: inherit; line-height: 1; border-radius: 50%; background: rgba(148, 163, 184, 0.35); color: var(--text-strong); font-size: var(--fs-xs); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--ease); flex-shrink: 0; }
 .btn-dot-buffer:hover { background: rgba(var(--cyan-rgb), 0.45); }
 .btn-dot-buffer.active { background: var(--accent-cyan); color: var(--text-on-accent); box-shadow: 0 0 8px rgba(var(--cyan-rgb), 0.6); }

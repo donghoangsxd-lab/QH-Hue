@@ -145,6 +145,7 @@ export function initMap() {
   L.tileLayer(ESRI_TILES, {
     maxZoom: 19,
     maxNativeZoom: 18,
+    zIndex: 0,
     crossOrigin: 'anonymous',
     attribution: 'Tiles &copy; Esri'
   }).addTo(map);
