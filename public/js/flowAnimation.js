@@ -34,7 +34,7 @@ function pointAt(path, cum, s) {
 
 /**
  * paths: [[lat, lng]...] xếp từ rìa vùng phục vụ về công trình. Trả về hàm dừng (gỡ chấm khỏi group).
- * Người dùng bật "giảm chuyển động" thì chỉ vẽ điểm đầu tuyến, không chạy hiệu ứng.
+ * Luôn chạy (kể cả khi hệ điều hành tắt hiệu ứng động): chấm sáng là phần minh họa chính của vùng phục vụ.
  */
 export function startFlowAnimation(map, group, paths) {
   if (!map || !group || !paths || !paths.length) return () => {};
@@ -45,28 +45,25 @@ export function startFlowAnimation(map, group, paths) {
 
   tracks.forEach(t => add(L.circleMarker(t.path[0], { ...END_STYLE, renderer })));
 
-  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let frame = 0;
-  if (!reduceMotion) {
-    const dots = [];
-    tracks.forEach((t, j) => {
-      const len = t.cum[t.cum.length - 1];
-      for (let k = 0; k < DOTS_PER_PATH; k++) {
-        dots.push({ t, len, phase: ((k / DOTS_PER_PATH) + j * 0.137) % 1, marker: add(L.circleMarker(t.path[0], { ...DOT_STYLE, renderer })) });
-      }
+  const dots = [];
+  tracks.forEach((t, j) => {
+    const len = t.cum[t.cum.length - 1];
+    for (let k = 0; k < DOTS_PER_PATH; k++) {
+      dots.push({ t, len, phase: ((k / DOTS_PER_PATH) + j * 0.137) % 1, marker: add(L.circleMarker(t.path[0], { ...DOT_STYLE, renderer })) });
+    }
+  });
+  const start = performance.now();
+  const tick = (now) => {
+    if (!layers.length || !group.hasLayer(layers[0])) return;
+    const travelled = ((now - start) / 1000) * SPEED_MPS;
+    dots.forEach(d => {
+      if (d.len <= 0) return;
+      d.marker.setLatLng(pointAt(d.t.path, d.t.cum, (travelled + d.phase * d.len) % d.len));
     });
-    const start = performance.now();
-    const tick = (now) => {
-      if (!group.hasLayer(layers[0])) return;
-      const travelled = ((now - start) / 1000) * SPEED_MPS;
-      dots.forEach(d => {
-        if (d.len <= 0) return;
-        d.marker.setLatLng(pointAt(d.t.path, d.t.cum, (travelled + d.phase * d.len) % d.len));
-      });
-      frame = requestAnimationFrame(tick);
-    };
     frame = requestAnimationFrame(tick);
-  }
+  };
+  frame = requestAnimationFrame(tick);
 
   return () => {
     cancelAnimationFrame(frame);

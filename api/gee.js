@@ -234,6 +234,13 @@ function parseCadStage(s, fallbackLayer) {
   };
 }
 
+// Bán kính phục vụ theo QCVN 01:2026 ghi vào cột BanKinh của dòng mới: theo cấp (đô thị / đơn vị ở), loại công trình
+// và phường / xã chứa điểm (constants.standardRadius); cơ sở chưa sử dụng không có vùng phục vụ → null
+function qcvnRadius(item, ward) {
+  if (item.type === '9-CSD') return null;
+  return constants.standardRadius(item, constants.wardProfile(ward));
+}
+
 // 1 lô do trình duyệt gửi → dữ liệu ghi Sheet; null nếu không hợp lệ.
 // it.stages: 1–2 giai đoạn khác nhau (cặp HT + QH cùng vị trí); không có thì 1 giai đoạn = defaultPhase (ô Giai đoạn)
 function parseCadItem(it, defaultPhase) {
@@ -255,10 +262,11 @@ function parseCadItem(it, defaultPhase) {
   if (!pt || !ward || (point && matchId)) return null;
   if (matchId && !/^[A-Za-z0-9_\-]{1,40}$/.test(matchId)) return null;
   const first = stages[0];
+  const nhom = it.nhom === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
+  const name = sanitizeSheetText(it.name, 150) || `${layer} (DXF)`;
   return {
-    type, idPrefix,
-    nhom: it.nhom === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở',
-    name: sanitizeSheetText(it.name, 150) || `${layer} (DXF)`,
+    type, idPrefix, nhom, name,
+    radius: qcvnRadius({ id: `${idPrefix}-0`, type, name, nhomHaTang: nhom }, ward),
     ward, layer, matchId, crossWard: first.crossWard, point,
     lat: pt.lat.toFixed(6), lng: pt.lng.toFixed(6),
     area: first.area,
@@ -1275,6 +1283,7 @@ module.exports = async (req, res) => {
       const evaluatedWardsForAdd = await loadEvaluatedWards(wardVectorParsed);
       const geoWard = assignWardByGeometry(pt.lng, pt.lat, evaluatedWardsForAdd);
       if (!geoWard) return res.status(400).json({ error: true, message: "Vị trí nằm ngoài ranh giới 40 phường/xã" });
+      const radius = qcvnRadius({ type, name, nhomHaTang }, geoWard);
 
       const result = await callAppsScript({
         action: 'addPoint',
@@ -1285,10 +1294,11 @@ module.exports = async (req, res) => {
         lat: pt.lat.toFixed(6),
         lng: pt.lng.toFixed(6),
         size: String(size),
+        radius: radius ? String(radius) : '',
         phase
       });
       invalidateAllCaches();
-      return res.status(200).json({ success: true, id: result.id || null, ward: geoWard });
+      return res.status(200).json({ success: true, id: result.id || null, ward: geoWard, radius });
     }
 
     if (action === 'analyzePoint') {

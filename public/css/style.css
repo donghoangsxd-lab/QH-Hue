@@ -416,6 +416,9 @@ body.right-collapsed .right-panel {
   border: 1px solid var(--border-color); color: var(--text-main); border-radius: var(--r-md); box-sizing: border-box; font-size: var(--fs-md);
 }
 .add-point-form input:focus, .add-point-form select:focus { outline: none; border-color: var(--accent-cyan); }
+.rp-radius { font-size: var(--fs-sm); color: var(--text-muted); }
+.rp-radius b { color: var(--accent-cyan); }
+.rp-radius small { font-size: var(--fs-xs); }
 .rp-coord-row { display: flex; gap: 4px; align-items: center; }
 .rp-coord-row input { flex: 1; min-width: 0; }
 .rp-coord-row button {
@@ -753,6 +756,23 @@ table.data-table .st-msg { text-align: center; padding: 20px; }
 
 /* Chấm sáng tuyến tiếp cận (flowAnimation.js): trên vùng phục vụ, dưới marker công trình và popup */
 .flow-pane { z-index: 450; pointer-events: none; filter: drop-shadow(0 0 2px #ffffff) drop-shadow(0 0 6px rgba(var(--cyan-rgb), 0.9)); }
+
+/* Chế độ âm bản khi chọn công trình (mapEngine.js highlightSingleIsochrone): icon ngoài phạm vi phục vụ mờ đi */
+.sel-active .custom-infra-icon-png { opacity: 0.35; transition: opacity 0.2s; }
+.sel-active .custom-infra-icon-png.sel-in { opacity: 1; }
+.sel-active .custom-infra-icon-png.sel-in img { filter: drop-shadow(0 0 4px rgba(var(--cyan-rgb), 0.95)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)) !important; }
+/* Vòng sóng tại công trình đang chọn */
+.sel-pulse { pointer-events: none; }
+.sel-pulse::before, .sel-pulse::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  border: 2px solid var(--accent-cyan); box-shadow: 0 0 8px rgba(var(--cyan-rgb), 0.9);
+  animation: sel-wave 1.8s ease-out infinite;
+}
+.sel-pulse::after { animation-delay: 0.9s; }
+@keyframes sel-wave {
+  from { transform: scale(0.4); opacity: 1; }
+  to { transform: scale(3.2); opacity: 0; }
+}
 
 .ward-table-scroll-container {
   flex: 1;

@@ -55,13 +55,35 @@ function addTypeSwatches() {
 }
 const RADIUS_MIN = 50;
 const RADIUS_MAX = 5000;
-// Bán kính mặc định cho điểm vừa thêm (khớp config/constants.js: cấp đô thị 2000 m, cấp đơn vị ở theo loại)
-// Khớp config/constants.js: phường ≤ 1 km (Mục 2.3.3.1); xã: trường, y tế, văn hóa, chợ ≤ 2 km (Mục 4.6.2.2)
+// Bán kính phục vụ theo QCVN 01:2026 (khớp config/constants.js standardRadius, máy chủ tính lại khi ghi Sheet):
+// cấp đô thị và trường THPT 2 km; cấp đơn vị ở: phường ≤ 1 km (Mục 2.3.3.1), xã: trường, y tế, văn hóa, chợ ≤ 2 km (Mục 4.6.2.2);
+// cây xanh nhóm nhà ở 400 m, bãi đỗ xe 500 m
+const URBAN_RADIUS = 2000;
 const UNIT_DEFAULT_RADIUS = { "1-CV": 400, "2-BDX": 500, "3-MN": 1000, "4-TH": 1000, "5-THCS": 1000, "6-YT": 1000, "7-VH": 1000, "8-TM": 1000 };
 const RURAL_UNIT_RADIUS = 2000;
-const unitDefaultRadius = (type, ward) => (/^xã\s/i.test(String(ward || '').trim()) && !["1-CV", "2-BDX"].includes(type)
-  ? RURAL_UNIT_RADIUS
-  : (UNIT_DEFAULT_RADIUS[type] || 500));
+const isThptName = (name) => /THPT|TRUNG HOC PHO THONG/.test(String(name || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/Đ/g, 'D'));
+function qcvnRadius(type, nhomHaTang, ward, name) {
+  if (!UNIT_DEFAULT_RADIUS[type]) return null;
+  if (nhomHaTang === 'Cấp đô thị' || (type === '4-TH' && isThptName(name))) return URBAN_RADIUS;
+  return /^xã\s/i.test(String(ward || '').trim()) && !["1-CV", "2-BDX"].includes(type) ? RURAL_UNIT_RADIUS : UNIT_DEFAULT_RADIUS[type];
+}
+
+function updateRadiusPreview() {
+  const out = document.getElementById('newRadius');
+  if (!out) return;
+  const type = document.getElementById('newType')?.value;
+  const nhom = document.getElementById('newNhomHaTang')?.value;
+  const ward = document.getElementById('newWard')?.value || '';
+  const name = document.getElementById('newName')?.value;
+  const r = qcvnRadius(type, nhom, ward, name);
+  if (!r) {
+    out.textContent = type === '9-CSD' ? 'Không áp dụng (cơ sở chưa sử dụng)' : '—';
+    return;
+  }
+  const scope = type === '4-TH' && isThptName(name) ? 'trường THPT, cấp đô thị' : nhom === 'Cấp đô thị' ? 'cấp đô thị' : 'cấp đơn vị ở';
+  const area = !ward ? 'chưa xác định phường/xã' : /^xã\s/i.test(ward.trim()) ? 'xã' : 'phường';
+  out.innerHTML = `<b>${r.toLocaleString('vi-VN')} m</b> <small>(${scope}, ${area})</small>`;
+}
 
 function setStatus(text, color) {
   const el = document.getElementById('statusMsg');
@@ -128,6 +150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const wardName = res.ward || "";
         const inputWard = document.getElementById('newWard');
         if (inputWard) inputWard.value = wardName;
+        updateRadiusPreview();
         setStatus(
           wardName ? `✓ Thuộc địa bàn: ${wardName}` : "⚠ Vị trí nằm ngoài ranh giới 40 phường/xã",
           wardName ? "var(--accent-green)" : "var(--accent-orange)"
@@ -285,6 +308,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ---------- Thêm điểm đề xuất ----------
+  ['newType', 'newNhomHaTang', 'newWard', 'newName'].forEach(id => {
+    const el = document.getElementById(id);
+    el?.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', updateRadiusPreview);
+  });
+  updateRadiusPreview();
   document.getElementById('btnPickOnMap')?.addEventListener('click', () => {
     state.isPickMode = true;
     setStatus("👉 Click trực tiếp trên bản đồ để chọn tọa độ...", "var(--accent-orange)");
@@ -329,22 +357,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      setStatus(`✓ Đã lưu đề xuất${data.id ? ` (mã ${data.id})` : ''}, chờ quản trị phê duyệt.`, "var(--accent-green)");
+      const radiusNote = data.radius ? `, bán kính ${Number(data.radius).toLocaleString('vi-VN')} m theo QCVN 01:2026` : '';
+      setStatus(`✓ Đã lưu đề xuất${data.id ? ` (mã ${data.id})` : ''}${radiusNote}, chờ quản trị phê duyệt.`, "var(--accent-green)");
       ['newName', 'newLat', 'newLng', 'newWard', 'newSize'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
+      updateRadiusPreview();
 
       // Lấy lại danh sách từ máy chủ (đã đồng bộ Sheets → GCS); lỗi thì tạm thêm điểm vào danh sách cục bộ
       try {
         await loadInfraData();
       } catch (err) {
-        const isUrban = nhomHaTang === 'Cấp đô thị';
         const newItem = {
           id: data.id || `NEW-${Date.now()}`,
           name, ward: data.ward || '', type, nhomHaTang, lat, lng,
           size: phase === 'QH' ? 0 : size,
-          radius: isUrban ? 2000 : unitDefaultRadius(type, data.ward),
+          radius: data.radius || qcvnRadius(type, nhomHaTang, data.ward, name) || 500,
           sizeHT: phase === 'QH' ? null : size,
           sizeQH: phase === 'QH' ? size : null,
           planChange: phase === 'QH' ? 'new' : 'relocate',

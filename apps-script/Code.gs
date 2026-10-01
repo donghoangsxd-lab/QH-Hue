@@ -501,6 +501,8 @@ function doGet(e) {
       var latStr = String(params.lat || '0').replace(',', '.');
       var lngStr = String(params.lng || '0').replace(',', '.');
       var size = parseCleanNumber(params.size);
+      // Bán kính theo QCVN 01:2026 do máy chủ webapp tính (cấp đô thị / đơn vị ở, phường / xã); trống = không có vùng phục vụ
+      var radius = parseCleanNumber(params.radius);
 
       // Điểm quy hoạch mới bắt buộc có diện tích để phân biệt với công trình chưa rõ quy mô
       if (phase === 'QH' && size <= 0) {
@@ -531,6 +533,7 @@ function doGet(e) {
       // Chỉ ghi cột quy mô của giai đoạn đang đề xuất (QH: QuyMo_HT để trống = quy hoạch mới)
       if (phase === 'QH') setCell('quyMoQH', size);
       else setCell('quyMoHT', size);
+      if (radius > 0) setCell('banKinh', radius);
       setCell('trangThai', false);
       setCell('thoiGian', currentTime);
       setCell('ghiChu', phase === 'QH' ? "Đề xuất quy hoạch mới từ GEE" : "Thêm mới từ GEE");
@@ -616,7 +619,7 @@ function doPost(e) {
  *   tên layer theo TT16); không có stages thì 1 giai đoạn = body.phase với size / area / geometry của item
  * - matchId có trong Sheet → cập nhật tọa độ, phường, quy mô các giai đoạn đang nhập; không có → thêm dòng mới
  * - Chỉ ghi cột quy mô của giai đoạn đang nhập (HT → QuyMo_HT, QH → QuyMo_QH), cột còn lại để nguyên / trống
- * - Không ghi BanKinh: bán kính luôn theo quy chuẩn, cột chỉ để đối chiếu khi admin tự nhập
+ * - BanKinh = it.radius (bán kính QCVN 01:2026 do máy chủ webapp tính): ghi cho dòng mới, dòng cập nhật chỉ ghi khi đang trống
  * - sync = false: chưa đẩy lên bucket (máy chủ gửi nhiều phần, chỉ phần cuối đồng bộ)
  */
 function importCadBatch(body) {
@@ -686,6 +689,9 @@ function importCadBatch(body) {
         c.sheet.getRange(sheetRow, c.col.lng + 1).setValue(Number(it.lng));
         if (c.col.ward >= 0) c.sheet.getRange(sheetRow, c.col.ward + 1).setValue(sheetWard(it.ward));
         stages.forEach(function(st, k) { c.sheet.getRange(sheetRow, qCols[k] + 1).setValue(st.size); });
+        if (c.col.banKinh >= 0 && Number(it.radius) > 0 && String(cellAt(c.data[r], c.col.banKinh) || '').trim() === '') {
+          c.sheet.getRange(sheetRow, c.col.banKinh + 1).setValue(Number(it.radius));
+        }
         if (c.col.trangThai >= 0) c.sheet.getRange(sheetRow, c.col.trangThai + 1).setValue(true);
         if (c.col.thoiGian >= 0) c.sheet.getRange(sheetRow, c.col.thoiGian + 1).setValue(currentTime);
         if (c.col.ghiChu >= 0) c.sheet.getRange(sheetRow, c.col.ghiChu + 1).setValue(prevNote ? prevNote + " | " + note : note);
@@ -701,6 +707,7 @@ function importCadBatch(body) {
         set(c.col.lat, Number(it.lat));
         set(c.col.lng, Number(it.lng));
         stages.forEach(function(st, k) { set(qCols[k], st.size); });
+        if (Number(it.radius) > 0) set(c.col.banKinh, Number(it.radius));
         set(c.col.trangThai, true);
         set(c.col.thoiGian, currentTime);
         set(c.col.ghiChu, note);

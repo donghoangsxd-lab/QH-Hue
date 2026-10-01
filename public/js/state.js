@@ -1,7 +1,6 @@
 /**
  * Quản lý trạng thái ứng dụng & Danh mục cấu hình UI Frontend
  */
-import { TT16_STYLES } from './tt16Symbols.js';
 
 export const state = {
   // Phân quyền người dùng: 'VIEWER' (mặc định) hoặc 'ADMIN' — chỉ đặt ADMIN sau khi server xác minh Google token
@@ -69,11 +68,14 @@ export const WARD_BOUNDARY_SHADOW_STYLE = { color: '#64748b', weight: 4, opacity
 export const WARD_BOUNDARY_LINE_STYLE = { color: '#fde68a', weight: 1.6, opacity: 0.95, fill: false, interactive: false };
 export const WARD_HIGHLIGHT_STYLE = { color: '#fb923c', weight: 3.5, dashArray: '6,6', fillColor: '#fb923c', fillOpacity: 0.15, interactive: false };
 
-// Màu 10 lớp hạ tầng = màu ACI của lớp đất tương ứng theo TT 16/2025/TT-BXD (MN, TH, THCS chung DAT_HTXH_Truonghoc);
-// dùng chung cho vùng phủ (buffer), biểu đồ, ô màu danh sách lớp ở cả bản đồ hiện trạng và quy hoạch
-export const BUFFER_COLORS = Object.fromEntries(
-  ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "THPT", "6-YT", "7-VH", "8-TM", "9-CSD"].map(k => [k, TT16_STYLES[k].color])
-);
+// Màu hiển thị 10 lớp hạ tầng (vùng phủ, biểu đồ, ô màu danh sách lớp, màu nền lô khi zoom xa) — tông sáng nổi trên nền
+// vệ tinh / giao diện tối, giữ họ màu của TT 16/2025 (cây xanh lục, y tế hồng tím, văn hóa hồng, dịch vụ đỏ, chưa sử dụng xám);
+// lớp màu ACI tối của TT16 (trường học, bãi đỗ xe) thay bằng màu tươi, mỗi cấp trường 1 màu riêng.
+// Hoa văn ranh lô khi phóng to vẫn theo đúng màu ACI của TT16 (tt16Symbols.js).
+export const BUFFER_COLORS = {
+  "1-CV": "#7ed321", "2-BDX": "#4dabf7", "3-MN": "#ffd43b", "4-TH": "#ff922b", "5-THCS": "#20c997", "THPT": "#b197fc",
+  "6-YT": "#f06cdb", "7-VH": "#ff8fab", "8-TM": "#ff5c5c", "9-CSD": "#ced4da"
+};
 export const BUFFER_KEYS = {
   "1-CV": "b1", "2-BDX": "b2", "3-MN": "b3", "4-TH": "b4", "5-THCS": "b5", "THPT": "b10",
   "6-YT": "b6", "7-VH": "b7", "8-TM": "b8", "9-CSD": "b9"

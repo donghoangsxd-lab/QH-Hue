@@ -3,6 +3,7 @@
 // Viền theo khung ô ký hiệu: hiện trạng (HT_) mảnh; quy hoạch đợt đầu (QHDD_) dải liền; dài hạn (QHDH_) dải nét đứt.
 
 import { ico } from './utils.js';
+import { BUFFER_COLORS } from './state.js';
 
 // color: RGB chuẩn AutoCAD của mã ACI; pattern: khóa ô lặp trong TILES
 export const TT16_STYLES = {
@@ -135,7 +136,8 @@ function styleKey(type, layer) {
 /**
  * Style Leaflet cho ranh lô. layer: tên layer gốc trong file (tiền tố HT_ / QHDD_ / QHDH_ quyết định kiểu viền);
  * scenario: 'QH' khi vẽ trên bản đồ quy hoạch (layer không có tiền tố thì coi là quy hoạch đợt đầu);
- * detailed: phóng to gần lô → tô hoa văn thay cho màu nền; approved = false → viền đỏ nét đứt (chờ duyệt).
+ * detailed: phóng to gần lô → tô hoa văn + viền màu ACI TT16; zoom xa → màu nền và viền theo màu lớp (BUFFER_COLORS, tông sáng).
+ * approved = false → viền đỏ nét đứt (chờ duyệt).
  */
 export function tt16ParcelStyle(type, layer, { scenario, detailed, approved }) {
   const key = styleKey(type, layer);
@@ -144,14 +146,15 @@ export function tt16ParcelStyle(type, layer, { scenario, detailed, approved }) {
   const plan = stage === 'QHDD' || stage === 'QHDH' || stage === 'QH' || (stage !== 'HT' && scenario === 'QH');
   const pattern = detailed ? patternFor(key) : null;
   const k = PT_PX * (detailed ? 1 : COARSE_FRAME_SCALE);
+  const color = pattern ? s.color : (BUFFER_COLORS[type] || s.color);
   return {
-    color: approved ? s.color : '#f87171',
+    color: approved ? color : '#f87171',
     weight: plan ? +(FRAME_PT * k).toFixed(1) : 1,
     opacity: 0.95,
     lineCap: 'butt',
     lineJoin: 'miter',
     dashArray: !approved ? '4,4' : stage === 'QHDH' ? DASH_PT.map(v => +(v * k).toFixed(1)).join(',') : null,
-    fillColor: pattern || s.color,
+    fillColor: pattern || color,
     fillOpacity: pattern ? 1 : s.fillOpacity || FILL_OPACITY
   };
 }
@@ -181,5 +184,5 @@ export function renderTt16Legend(container) {
       <span>${frameSample('dd')}QH đợt đầu</span>
       <span>${frameSample('dh')}QH dài hạn</span>
     </div>
-    <div class="tt16-note">Zoom 15–16: màu nền · 17–18: hoa văn</div></details>`;
+    <div class="tt16-note">Zoom 15–16: màu lớp hạ tầng · 17–18: hoa văn, màu TT16</div></details>`;
 }

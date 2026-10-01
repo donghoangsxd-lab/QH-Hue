@@ -616,6 +616,12 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
   const rendered = new Map();
   const builtBuffers = new Set();
   const pieGroup = L.layerGroup();
+  // Công trình trong phạm vi phục vụ của công trình đang chọn (pointKey); null = không chọn
+  let selKeys = null;
+  const markSel = (entry, key) => {
+    const el = entry.marker.getElement && entry.marker.getElement();
+    if (el) el.classList.toggle('sel-in', !!selKeys && selKeys.has(key));
+  };
 
   const clearPies = () => {
     pieGroup.clearLayers();
@@ -717,8 +723,14 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
       if (entry.shape) entry.group.addLayer(entry.shape);
       entry.marker = createPointMarker(entry, mode, m);
       entry.group.addLayer(entry.marker);
+      if (selKeys) markSel(entry, key);
       rendered.set(key, entry);
     });
+  }
+
+  function highlight(keys) {
+    selKeys = keys;
+    rendered.forEach(markSel);
   }
 
   // Vẽ lại toàn bộ marker + ranh lô (dữ liệu ranh vừa tải hoặc bật/tắt lớp ranh)
@@ -767,7 +779,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     invalidateBuffers();
   }
 
-  return { setList, refreshPoints, refreshBuffers, invalidateBuffers, reset };
+  return { setList, refreshPoints, refreshBuffers, invalidateBuffers, reset, highlight };
 }
 
 const leftRenderer = createRenderer(() => map, layers, () => true, () => (isCompareOn() ? 'Hiện trạng' : ''));
@@ -910,26 +922,58 @@ async function refreshPlanHeat() {
 
 let stopFlow = null;
 
-// Đường theo nhóm (serviceArea.js): nền = mọi đường quanh công trình (mờ), tới được = phần đi được trong bán kính.
+// Chọn công trình = chế độ âm bản: phủ xanh dương thẫm (ngoài vòng bán kính nhạt, trong vòng đậm) trên pane riêng
+// nằm trên canvas buffer/heatmap/chấm công trình, dưới icon và chấm sáng; nổi bật đường tiếp cận và công trình trong phạm vi
+const SEL_PANE = 'selPane';
+const SEL_PANE_Z = 420;
+const SEL_NAVY = '#04112b';
+const SEL_OUTER_OPACITY = 0.5;
+const SEL_INNER_OPACITY = 0.84;
+const SEL_ACCENT = '#22d3ee';
+const SEL_RING_STEPS = 96;
+const WORLD_RING = [[-85, -180], [-85, 180], [85, 180], [85, -180]];
+const selRenderers = new WeakMap();
+
+function selRendererFor(m) {
+  if (!m.getPane(SEL_PANE)) m.createPane(SEL_PANE).style.zIndex = SEL_PANE_Z;
+  if (!selRenderers.has(m)) selRenderers.set(m, L.canvas({ pane: SEL_PANE }));
+  return selRenderers.get(m);
+}
+
+// Đường theo nhóm (serviceArea.js): nền = mọi đường quanh công trình (xanh mờ kiểu bản vẽ), tới được = phần đi được trong bán kính (phát sáng).
 // Vẽ từ nhóm nhỏ lên nhóm lớn để trục chính nằm trên cùng; 'unknown' = mạng lưới lưu cũ chưa phân nhóm.
 const ROAD_STYLES = [
-  ['kiet',    { label: 'Đường nội bộ', title: 'Kiệt, hẻm, đường không tên, đường nội bộ', color: '#cbd5e1', base: 0.6, reach: 1.1 }],
+  ['kiet',    { label: 'Đường nội bộ', title: 'Kiệt, hẻm, đường không tên, đường nội bộ', color: '#a5c8ff', base: 0.6, reach: 1.2 }],
   ['unknown', { label: 'Đường chưa phân nhóm', title: 'Mạng lưới đường lưu bản cũ — Admin tải lại mạng lưới đường', color: '#fde047', base: 0.9, reach: 1.8 }],
-  ['named',   { label: 'Đường khu vực', title: 'Đường phố có tên', color: '#60a5fa', base: 1.1, reach: 2.2 }],
-  ['main',    { label: 'Đường trục chính', title: 'Quốc lộ, tỉnh lộ, đường chính đô thị', color: '#fb923c', base: 1.6, reach: 3.2 }]
+  ['named',   { label: 'Đường khu vực', title: 'Đường phố có tên', color: '#22d3ee', base: 1.1, reach: 2.2 }],
+  ['main',    { label: 'Đường trục chính', title: 'Quốc lộ, tỉnh lộ, đường chính đô thị', color: '#fbbf24', base: 1.6, reach: 3.2 }]
 ];
+const ROAD_BASE_COLOR = '#3b6fd8';
+const ROAD_GLOW_SCALE = 3.2;
 
-function addRoadLayers(group, area) {
+function addRoadLayers(group, area, renderer) {
   ROAD_STYLES.forEach(([key, s]) => {
     if (area.allRoads[key].length) {
-      group.addLayer(L.polyline(area.allRoads[key], { color: '#e2e8f0', weight: s.base, opacity: 0.3, interactive: false }));
+      group.addLayer(L.polyline(area.allRoads[key], { renderer, color: ROAD_BASE_COLOR, weight: s.base, opacity: 0.55, interactive: false }));
     }
   });
   ROAD_STYLES.forEach(([key, s]) => {
-    if (area.reachRoads[key].length) {
-      group.addLayer(L.polyline(area.reachRoads[key], { color: s.color, weight: s.reach, opacity: 0.95, lineCap: 'round', interactive: false }));
-    }
+    if (!area.reachRoads[key].length) return;
+    group.addLayer(L.polyline(area.reachRoads[key], { renderer, color: s.color, weight: s.reach * ROAD_GLOW_SCALE, opacity: 0.18, lineCap: 'round', lineJoin: 'round', interactive: false }));
+    group.addLayer(L.polyline(area.reachRoads[key], { renderer, color: s.color, weight: s.reach, opacity: 1, lineCap: 'round', lineJoin: 'round', interactive: false }));
   });
+}
+
+// Công trình trong phạm vi phục vụ: vòng sáng màu theo loại (thấy được cả khi đang vẽ chấm canvas), icon DOM được giữ sáng, icon ngoài phạm vi mờ đi
+function addInRangePoints(group, points, polygon, renderer, m) {
+  const keys = new Set();
+  points.forEach(p => {
+    if (!turf.booleanPointInPolygon([Number(p.lng), Number(p.lat)], polygon)) return;
+    const color = isApproved(p.status) ? (BUFFER_COLORS[layerType(p)] || SEL_ACCENT) : '#f87171';
+    group.addLayer(L.circleMarker([p.lat, p.lng], { renderer, radius: 8, color, weight: 2, opacity: 1, fillColor: color, fillOpacity: 0.3, interactive: false }));
+    keys.add(pointKey(p));
+  });
+  (m === planMap ? planRenderer : leftRenderer).highlight(keys);
 }
 
 function roadLegendHtml(area) {
@@ -945,33 +989,47 @@ function clearSingleIsochrone() {
   stopFlow = null;
   layers.singleIso.clearLayers();
   planLayers.singleIso.clearLayers();
+  [map, planMap].forEach(m => m?.getContainer().classList.remove('sel-active'));
+  leftRenderer.highlight(null);
+  planRenderer.highlight(null);
 }
 
-// Vùng phục vụ thực tế theo mạng đường + đường giao thông làm minh chứng.
+// Vùng phục vụ thực tế theo mạng đường + đường giao thông làm minh chứng, hiển thị kiểu âm bản.
+// points: công trình đang hiển thị để làm nổi những công trình nằm trong phạm vi.
 // Trả về { area, polygon }: area = null khi không tải được đường (khi đó polygon là vòng tròn bán kính); null nếu đã có click khác.
-export async function highlightSingleIsochrone(lat, lng, radius, group = layers.singleIso) {
+export async function highlightSingleIsochrone(lat, lng, radius, group = layers.singleIso, points = []) {
   clearSingleIsochrone();
   const seq = singleIsoSeq;
-  if (!group) return null;
+  const m = group === planLayers.singleIso ? planMap : map;
+  if (!group || !m) return null;
   lat = Number(lat);
   lng = Number(lng);
-  group.addLayer(L.circle([lat, lng], { radius, color: '#ffffff', weight: 1.2, dashArray: '4,4', fillColor: '#020617', fillOpacity: 0.6, interactive: false }));
+  const renderer = selRendererFor(m);
+  const circle = turf.circle([lng, lat], radius / 1000, { steps: SEL_RING_STEPS });
+  const ring = circle.geometry.coordinates[0].map(([x, y]) => [y, x]);
+  group.addLayer(L.polygon([WORLD_RING, ring], { renderer, stroke: false, fillColor: SEL_NAVY, fillOpacity: SEL_OUTER_OPACITY, interactive: false }));
+  group.addLayer(L.polygon(ring, { renderer, color: '#7dd3fc', weight: 1.2, opacity: 0.85, dashArray: '4,5', fillColor: SEL_NAVY, fillOpacity: SEL_INNER_OPACITY, interactive: false }));
+  group.addLayer(L.marker([lat, lng], { icon: L.divIcon({ className: 'sel-pulse', iconSize: [18, 18] }), interactive: false, keyboard: false, zIndexOffset: -1000 }));
+  m.getContainer().classList.add('sel-active');
 
   try {
     const area = await computeServiceArea(lat, lng, radius);
     if (seq !== singleIsoSeq) return null;
     group.addLayer(L.geoJSON(area.polygon, {
       interactive: false,
-      style: { color: '#22c55e', weight: 2, fillColor: '#22c55e', fillOpacity: 0.1 }
+      renderer,
+      style: { color: SEL_ACCENT, weight: 1.8, opacity: 0.9, fillColor: SEL_ACCENT, fillOpacity: 0.07 }
     }));
-    addRoadLayers(group, area);
-    stopFlow = startFlowAnimation(group === planLayers.singleIso ? planMap : map, group, area.flowPaths);
+    addRoadLayers(group, area, renderer);
+    addInRangePoints(group, points, area.polygon, renderer, m);
+    stopFlow = startFlowAnimation(m, group, area.flowPaths);
     return { area, polygon: area.polygon };
   } catch (err) {
     if (seq !== singleIsoSeq) return null;
     console.warn("Không dựng được vùng phục vụ theo mạng đường:", err);
-    group.addLayer(L.circle([lat, lng], { radius, color: '#ffffff', weight: 1.2, dashArray: '3,3', fillColor: '#38bdf8', fillOpacity: 0.18, interactive: false }));
-    return { area: null, polygon: turf.circle([lng, lat], radius / 1000, { steps: 64 }) };
+    group.addLayer(L.polygon(ring, { renderer, color: '#7dd3fc', weight: 1.2, dashArray: '3,3', fillColor: '#38bdf8', fillOpacity: 0.12, interactive: false }));
+    addInRangePoints(group, points, circle, renderer, m);
+    return { area: null, polygon: circle };
   }
 }
 
@@ -1030,9 +1088,13 @@ export function onPointClick(p, targetMap = map) {
   if (planMap) planMap.closePopup();
   clearCsdProof();
 
+  const groups = isPlanScenario ? planLayers : layers;
+  const inViewPoints = isCSDUnapproved ? [] : getWardFilteredList(isPlanScenario ? getPlanScenarioList() : state.rawDataList)
+    .filter(q => (q.type !== '9-CSD' || q === p) && hasValidCoord(q) && targetMap.hasLayer(groups[ICON_GROUP_KEYS[layerType(q)]]));
   const areaPromise = isCSDUnapproved
     ? null
-    : highlightSingleIsochrone(p.lat, p.lng, itemRadius, isPlanScenario ? planLayers.singleIso : layers.singleIso);
+    : highlightSingleIsochrone(p.lat, p.lng, itemRadius, groups.singleIso, inViewPoints);
+  const selSeq = singleIsoSeq;
 
   const capCongTrinh = formatCapCongTrinhLabel(p.nhomHaTang || p.capCongTrinh || "Cấp đơn vị ở");
   const geoWardNow = resolveWardNameFromCoords(Number(p.lat), Number(p.lng));
@@ -1077,6 +1139,8 @@ export function onPointClick(p, targetMap = map) {
   const popup = L.popup({ closeButton: true, autoPan: true, ...popupFitOptions(targetMap, 300, 50) }).setLatLng([p.lat, p.lng]).setContent(html);
   popup.openOn(targetMap);
   popup.getElement()?.querySelector('.js-approve')?.addEventListener('click', () => approvePointStatus(p.id));
+  // Đóng popup thì thoát chế độ âm bản (trừ khi đã chọn công trình khác / chuyển sang thuyết minh CSD)
+  popup.on('remove', () => { if (singleIsoSeq === selSeq) clearSingleIsochrone(); });
 
   // Kết quả tải chậm chỉ ghi vào đúng popup này (popup đã đóng / đã mở popup khác thì bỏ qua)
   const fill = (selector, content) => {
