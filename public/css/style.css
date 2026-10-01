@@ -221,7 +221,7 @@ body.compare-on #mapPlan, body.compare-on #swipeDivider { display: block; }
 }
 .map-toolbar .ui-btn-format:hover { background: rgba(30, 41, 59, 0.98); border-color: var(--accent-cyan); }
 
-/* LỚP VẼ TẠM: bảng công cụ mở ngang cạnh nút (top đặt theo nút trong sketchLayer.js) */
+/* PHÁC THẢO: bảng công cụ mở ngang cạnh nút (top đặt theo nút trong sketchLayer.js) */
 .sketch-palette {
   position: absolute;
   left: 42px;
@@ -257,8 +257,28 @@ body.compare-on #mapPlan, body.compare-on #swipeDivider { display: block; }
 .sketch-hint { max-width: 420px; padding: 0 4px 2px; font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.35; }
 .sketch-hint:empty { display: none; }
 #map.sketch-mode { cursor: crosshair !important; }
+#map.sketch-text-mode { cursor: text !important; }
 .sketch-popup .leaflet-popup-content { margin: 6px; }
+.sketch-menu { display: flex; flex-direction: column; gap: 4px; }
 .sketch-del { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-red); font-size: var(--fs-sm); padding: 4px 8px; }
+.sketch-menu .sketch-del:first-child:not(:last-child) { color: var(--accent-cyan); }
+/* Hàng phụ: tùy chọn chữ, chọn định dạng lưu */
+.sketch-sub { gap: 6px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-muted); }
+.sketch-sub[hidden] { display: none; }
+.sketch-sub select { height: 24px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-main); background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm); }
+.sketch-btn.sketch-telex, .sketch-btn.sketch-export { width: auto; height: 24px; padding: 0 8px; font-size: var(--fs-sm); font-weight: 600; border-color: var(--border-color); }
+/* Chữ phác thảo: cỡ cố định trên màn hình, viền tối để đọc được trên ảnh vệ tinh */
+.sketch-text { background: none; border: none; }
+.sketch-text-body, .sketch-text-editor {
+  font-family: Arial, 'Segoe UI', sans-serif; font-weight: 700; line-height: 1.25; white-space: pre;
+  text-shadow: 0 0 3px #020617, 0 0 2px #020617, 1px 1px 2px #020617;
+}
+.sketch-text-body { padding: 1px 3px; cursor: pointer; }
+.sketch-text-editor {
+  position: absolute; z-index: 1000; min-width: 140px; margin: 0; padding: 0 2px; box-sizing: content-box;
+  background: rgba(2, 6, 23, 0.55); border: 1px dashed currentColor; border-radius: var(--r-sm);
+  outline: none; resize: none; overflow: hidden; field-sizing: content;
+}
 .rp-expand-btn {
   display: flex;
   position: absolute;
@@ -584,6 +604,22 @@ body.right-collapsed .right-panel {
 .cad-table { width: 100%; margin-top: 5px; border-collapse: collapse; font-size: var(--fs-sm); }
 .cad-table th { color: var(--text-muted); font-weight: 600; text-align: right; border-bottom: 1px solid var(--border-color); padding: 2px 0; }
 .cad-table th:first-child, .cad-table td:first-child { text-align: left; }
+.pop-brush-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pop-brush-row input { flex: 1; min-width: 0; accent-color: var(--accent-cyan); }
+.pop-brush-row b { min-width: 42px; text-align: right; font-size: var(--fs-sm); }
+/* Ghi cố định vùng hiệu chỉnh vào asset GEE */
+.pop-bake { display: flex; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 8px; border: 1px dashed var(--border-color); border-radius: var(--r-md); }
+.pop-bake-info { flex: 1; min-width: 0; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.35; }
+.pop-bake-info b { color: var(--text-main); word-break: break-all; }
+.pop-bake-info .ico { width: 11px; height: 11px; margin-right: 3px; vertical-align: -1px; }
+#btnPopBake {
+  flex-shrink: 0; height: 26px; padding: 0 8px; display: inline-flex; align-items: center; gap: 4px;
+  border: 1px solid var(--accent-orange); border-radius: var(--r-md); background: transparent;
+  color: var(--accent-orange); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+#btnPopBake:hover:not(:disabled) { background: rgba(var(--orange-rgb), 0.15); }
+#btnPopBake:disabled { opacity: 0.45; cursor: not-allowed; }
+#btnPopBake .ico { width: 13px; height: 13px; }
 .osm-types { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; font-size: var(--fs-md); }
 .osm-types label { cursor: pointer; }
 .osm-types input { accent-color: var(--accent-cyan); margin: 0 6px 0 0; vertical-align: middle; }
@@ -780,9 +816,36 @@ body.bottom-max .flip-back-head { display: flex; border-top: 1px solid var(--bor
 body.bottom-max .infra-count-grid,
 body.bottom-max .road-chart { flex: none; height: calc(var(--bottom-h) - var(--bp-head-h) - 2px); }
 
+/* MÀN HÌNH RỘNG (uiComponents.js › updatePart1Spread): KHÔNG XOAY, mặt cơ cấu đất giữ cột trái,
+   mặt số lượng + giao thông chèn vào khoảng trống bên phải bảng; tiêu đề bảng tổng hợp vẫn chạy hết bề ngang */
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) {
+  grid-template-columns: 338px minmax(0, 1fr) 338px 338px;
+  grid-template-rows: var(--bp-head-h) minmax(0, 1fr);
+}
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .bp-part1,
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .flip-card,
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .flip-inner { display: contents; }
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .bp-part1 > .bp-part-head { grid-area: 1 / 1; }
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .flip-controls { display: none; }
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .bp-part2 { grid-area: 1 / 2 / 3 / 5; }
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .bp-part2 .bp-part-body { padding-right: calc(2 * 338px + 8px); }
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .flip-face {
+  position: relative; inset: auto; z-index: 1; min-height: 0;
+  transform: none; pointer-events: auto; background: var(--bg-panel);
+}
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .flip-face[data-page="0"] { grid-area: 2 / 1; }
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .flip-face[data-page="1"] { grid-area: 2 / 3; border-left: 1px solid var(--border-color); }
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .flip-face[data-page="2"] { grid-area: 2 / 4; border-left: 1px solid var(--border-color); }
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .flip-back-head {
+  display: flex; height: 20px; padding-left: 10px; background: none;
+}
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .flip-back-head .bp-part-title { font-size: var(--fs-sm); }
+body:not(.bottom-max) .bp-body.bp-spread:not(.pdf-export) .rc-road i { animation: rc-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
 /* MẶT HỆ THỐNG GIAO THÔNG: donut cơ cấu chiều dài + thanh "mặt đường" có vạch kẻ chạy */
-.road-chart { flex: 1; min-height: 0; display: flex; align-items: center; gap: 12px; padding: 4px 12px; box-sizing: border-box; }
-.road-donut-wrap { position: relative; }
+.road-chart { flex: 1; min-height: 0; display: flex; align-items: center; gap: 10px; padding: 3px 10px 2px; box-sizing: border-box; }
+/* Donut co theo chiều cao còn lại (màn thấp không đè khối mật độ / xe buýt), tối đa 112 px */
+.bp-part1 .road-donut-wrap { position: relative; width: auto; height: min(100%, 112px); aspect-ratio: 1; }
 .road-donut-center {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -790,16 +853,22 @@ body.bottom-max .road-chart { flex: none; height: calc(var(--bottom-h) - var(--b
 }
 .road-donut-center b { color: var(--text-strong); font-size: var(--fs-lg); font-weight: 700; font-variant-numeric: tabular-nums; }
 .road-donut-center small { color: var(--text-muted); font-size: var(--fs-xs); }
-.road-chart-rows { flex: 1; min-width: 0; max-height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 2px; font-size: var(--fs-sm); }
+.road-chart-rows { flex: 1; min-width: 0; max-height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 3px; font-size: var(--fs-sm); }
 .road-chart-msg { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.35; }
 .rc-row { min-width: 0; }
-.rc-line { display: flex; align-items: baseline; gap: 5px; line-height: 15px; }
-.rc-name { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 5px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--c); box-shadow: 0 0 6px var(--c); }
+.rc-line { display: flex; align-items: center; gap: 5px; line-height: 16px; }
+.rc-icon {
+  width: 16px; height: 16px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; border: 1px solid color-mix(in srgb, var(--c) 70%, transparent);
+  background: radial-gradient(circle, color-mix(in srgb, var(--c) 26%, transparent), transparent 75%);
+}
+.rc-icon svg { width: 11px; height: 11px; fill: none; stroke: var(--c); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.rc-name { flex: 1; min-width: 0; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rc-km { color: var(--text-strong); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rc-km em { color: var(--text-muted); font-style: normal; font-weight: 400; font-size: var(--fs-xs); }
 .rc-pct { width: 3.4em; color: var(--c); font-size: var(--fs-xs); font-weight: 700; text-align: right; white-space: nowrap; }
-.rc-road { height: 6px; margin-top: 1px; border-radius: 3px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.rc-road { height: 5px; margin: 1px 0 0 21px; border-radius: 3px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
 .rc-road i {
   position: relative; display: block; height: 100%; width: var(--w); min-width: 0;
   border-radius: 3px;
@@ -813,9 +882,6 @@ body.bottom-max .road-chart { flex: none; height: calc(var(--bottom-h) - var(--b
 }
 .rc-none .rc-km, .rc-none .rc-name { color: var(--text-muted); }
 .rc-none .rc-pct { color: var(--text-muted); font-weight: 400; font-style: italic; }
-.rc-foot { margin-top: 2px; padding-top: 3px; border-top: 1px dashed var(--border-color); color: var(--text-muted); font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rc-foot b { color: var(--accent-cyan); font-size: var(--fs-sm); }
-.rc-foot em { font-style: normal; }
 /* Thanh mọc dần mỗi lần xoay tới trang giao thông (và khi phóng to) */
 .flip-card[data-page="2"] .rc-road i,
 body.bottom-max .rc-road i { animation: rc-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
@@ -828,39 +894,59 @@ body.bottom-max .rc-road i { animation: rc-grow 0.9s cubic-bezier(0.2, 0.8, 0.2,
 
 .infra-count-grid {
   flex: 1; min-height: 0;
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr);
-  gap: 4px; padding: 5px 8px 6px; box-sizing: border-box;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr);
+  gap: 3px; padding: 4px 6px 5px; box-sizing: border-box;
 }
+/* Ô 4 × 3: hàng trên biểu tượng nhỏ + tên, giữa số lượng, dưới thanh tỷ lệ đã duyệt */
 .count-card {
   min-width: 0; min-height: 0;
-  display: flex; align-items: center; gap: 6px;
-  padding: 2px 6px 2px 5px;
+  display: flex; flex-direction: column; justify-content: center; gap: 1px;
+  padding: 2px 5px;
   border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
   border-radius: var(--r-md);
   background: linear-gradient(135deg, color-mix(in srgb, var(--c) 12%, rgba(30, 41, 59, 0.95)), rgba(15, 23, 42, 0.95) 70%);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 .count-card:hover { border-color: var(--c); box-shadow: 0 0 10px color-mix(in srgb, var(--c) 35%, transparent); }
+.count-head { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .count-icon {
-  width: 26px; height: 26px; flex-shrink: 0;
+  width: 15px; height: 15px; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 50%;
-  border: 1.5px solid var(--c);
+  border: 1px solid var(--c);
   background: radial-gradient(circle, color-mix(in srgb, var(--c) 28%, transparent), transparent 72%);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--c) 55%, transparent), inset 0 0 6px color-mix(in srgb, var(--c) 35%, transparent);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--c) 55%, transparent);
 }
-.count-icon svg { width: 15px; height: 15px; fill: none; stroke: var(--c); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.count-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.count-label { color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.count-mid { display: flex; align-items: baseline; gap: 4px; line-height: 1; }
-.count-num { color: var(--text-strong); font-size: var(--fs-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+.count-icon svg { width: 10px; height: 10px; fill: none; stroke: var(--c); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.count-label { min-width: 0; color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.count-mid { display: flex; align-items: baseline; gap: 3px; line-height: 1; }
+.count-num { color: var(--text-strong); font-size: var(--fs-lg); font-weight: 700; font-variant-numeric: tabular-nums; }
 .count-plan { font-size: var(--fs-xs); font-weight: 700; }
 .count-plan.up { color: var(--accent-green); }
 .count-plan.down { color: var(--accent-red); }
 .count-foot { display: flex; align-items: center; gap: 4px; }
 .count-bar { flex: 1; height: 3px; border-radius: var(--r-sm); background: rgba(255, 255, 255, 0.1); overflow: hidden; }
 .count-bar i { display: block; height: 100%; border-radius: var(--r-sm); background: linear-gradient(90deg, #22c55e, var(--accent-green)); box-shadow: 0 0 4px var(--accent-green); }
-.count-pct { color: var(--accent-green); font-size: var(--fs-xs); font-weight: 700; min-width: 2.6em; text-align: right; }
+.count-pct { color: var(--accent-green); font-size: var(--fs-xs); font-weight: 700; text-align: right; white-space: nowrap; }
+
+/* Chân mặt giao thông: mật độ đến đường khu vực + trạm dừng xe buýt (điểm, không có khu đất) */
+.road-foot { flex-shrink: 0; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 4px; padding: 0 8px 4px; }
+.road-stat {
+  min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 1px;
+  padding: 2px 7px; border-radius: var(--r-md);
+  border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--c) 10%, rgba(30, 41, 59, 0.9)), rgba(15, 23, 42, 0.9) 75%);
+  white-space: nowrap; overflow: hidden;
+}
+.road-stat:empty { display: none; }
+.road-dens { --c: var(--accent-cyan); }
+.road-stat-label { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); font-size: var(--fs-xs); line-height: 1.2; }
+.road-stat-label svg { width: 11px; height: 11px; flex-shrink: 0; fill: none; stroke: var(--c); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.road-stat-val { display: flex; align-items: baseline; gap: 3px; min-width: 0; overflow: hidden; line-height: 1.15; }
+.road-stat-val b { color: var(--c); font-size: var(--fs-md); font-weight: 700; font-variant-numeric: tabular-nums; }
+.road-stat-val em { color: var(--text-muted); font-style: normal; font-size: var(--fs-xs); }
+.road-stat-val .road-dens-scope { margin-left: auto; }
+.road-bus .road-bus-pending { color: var(--accent-orange); }
 
 .bp-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .bp-chart-wrap { flex: 1; min-height: 0; position: relative; }
@@ -1156,18 +1242,42 @@ table.ward-table th {
   background: transparent !important;
   border: none !important;
 }
+/* Tên phường xã kiểu Google Maps: chữ in hoa giãn cách, viền tối mảnh để đọc trên ảnh vệ tinh */
 .ward-label-icon .ward-label-text {
   position: absolute;
   transform: translate(-50%, -50%);
-  color: #ffffff;
+  color: #f1f5f9;
+  font-family: Arial, 'Segoe UI', sans-serif;
   font-size: var(--ward-label-size, 11px);
   font-weight: 700;
+  text-transform: uppercase;
   white-space: nowrap;
-  text-shadow: 0 0 3px #000, 0 0 3px #000, 1px 1px 2px #000;
-  letter-spacing: 0.2px;
+  text-shadow: 0 0 2px #0f172a, 0 0 4px #0f172a, 0 1px 3px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.12em;
   pointer-events: none;
   transition: font-size 0.15s ease;
 }
+
+/* Cờ Việt Nam tại quần đảo Hoàng Sa, Trường Sa (islandFlags.js): tâm cờ đặt đúng tọa độ, nhãn dưới cờ */
+.island-flag { background: none !important; border: none !important; }
+.island-flag-body {
+  position: absolute; left: 0; top: 0; transform: translate(-50%, -14px);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;
+}
+.island-flag-svg {
+  display: block; width: 42px; height: 28px;
+  border: 1.5px solid #fde047; border-radius: 3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+.island-flag-label {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 3px 12px 4px; white-space: nowrap; text-align: center;
+  font-family: Arial, 'Segoe UI', sans-serif; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.2;
+  background: #b91c1c; border: 1.5px solid #fde047; border-radius: 5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+.island-flag-name { color: #fff; font-size: 13px; }
+.island-flag-country { color: #fde047; font-size: 11px; }
 
 /* Biểu đồ tròn tổng hợp mỗi phường xã ở zoom nhỏ */
 .ward-pie-mode .ward-label-text { display: none; }
@@ -1177,12 +1287,14 @@ table.ward-table th {
   left: 50%;
   bottom: calc(100% + 3px);
   transform: translateX(-50%);
-  color: #fff;
+  color: #f1f5f9;
+  font-family: Arial, 'Segoe UI', sans-serif;
   font-size: var(--ward-label-size, 11px);
   font-weight: 700;
+  text-transform: uppercase;
   white-space: nowrap;
-  text-shadow: 0 0 3px #000, 0 0 3px #000, 1px 1px 2px #000;
-  letter-spacing: 0.2px;
+  text-shadow: 0 0 2px #0f172a, 0 0 4px #0f172a, 0 1px 3px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.12em;
   pointer-events: none;
 }
 .ward-pie {

@@ -69,6 +69,33 @@ export function vn2000ToWgs84(easting, northing, crs = CRS_PRESETS.HUE_3) {
   return [la / DEG, lo / DEG];
 }
 
+function tmForward(lat, lon, lon0, k0) {
+  const s = Math.sin(lat), c = Math.cos(lat), t = Math.tan(lat);
+  const N = A / Math.sqrt(1 - E2 * s * s);
+  const T = t * t, C = EP2 * c * c, Aa = (lon - lon0 * DEG) * c;
+  const M = A * ((1 - E2 / 4 - 3 * E2 * E2 / 64 - 5 * E2 ** 3 / 256) * lat
+    - (3 * E2 / 8 + 3 * E2 * E2 / 32 + 45 * E2 ** 3 / 1024) * Math.sin(2 * lat)
+    + (15 * E2 * E2 / 256 + 45 * E2 ** 3 / 1024) * Math.sin(4 * lat)
+    - (35 * E2 ** 3 / 3072) * Math.sin(6 * lat));
+  const x = FALSE_EASTING + k0 * N * (Aa + (1 - T + C) * Aa ** 3 / 6
+    + (5 - 18 * T + T * T + 72 * C - 58 * EP2) * Aa ** 5 / 120);
+  const y = k0 * (M + N * t * (Aa * Aa / 2 + (5 - T + 9 * C + 4 * C * C) * Aa ** 4 / 24
+    + (61 - 58 * T + T * T + 600 * C - 330 * EP2) * Aa ** 6 / 720));
+  return [x, y];
+}
+
+/** [lat, lng] WGS84 → tọa độ phẳng VN-2000 [E, N] (mét); 7 tham số đảo dấu (sai lệch < 1 cm so với phép nghịch đảo chặt) */
+export function wgs84ToVn2000(lat, lng, crs = CRS_PRESETS.HUE_3) {
+  const [x, y, z] = toEcef(lat * DEG, lng * DEG);
+  const [dx, dy, dz, rx, ry, rz, s] = VN2000_TOWGS84.map(v => -v);
+  const m = 1 + s * 1e-6, Rx = rx * SEC, Ry = ry * SEC, Rz = rz * SEC;
+  const X = m * (x - Rz * y + Ry * z) + dx;
+  const Y = m * (Rz * x + y - Rx * z) + dy;
+  const Z = m * (-Ry * x + Rx * y + z) + dz;
+  const [la, lo] = fromEcef(X, Y, Z);
+  return tmForward(la, lo, crs.lon0, crs.k0);
+}
+
 // ============================ ĐỌC DXF ============================
 
 const ARC_STEP = 2 * DEG; // sai số diện tích cung ≈ 0,02%

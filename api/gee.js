@@ -1,7 +1,7 @@
 const axios = require('axios');
 const crypto = require('crypto');
 const constants = require('../config/constants');
-const { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, POP_SCALE_M } = require('../services/geeService');
+const { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, POP_SCALE_M } = require('../services/geeService');
 const { getRawDataList, getCadParcels, invalidateCache, getDataVersion } = require('../services/gcsService');
 const { requireAdmin, httpError } = require('../services/authService');
 const roads = require('../services/roadsService');
@@ -386,11 +386,20 @@ async function syncPopEdits(minVersion = 0) {
     return;
   }
   if (data.saved === getPopEditsVersion()) return;
-  applyPopEdits(data.saved, data.edits);
+  applyPopEdits(data.saved, data.edits, data.asset);
   cachedFloodBins = null;
   cachedWardStats = null;
   cachedCoverageByWard = {};
   wardPopPixelCache.clear();
+}
+
+/** Ghi edits.json qua Apps Script (bucket không cho máy chủ ghi trực tiếp) */
+async function writePopEdits(payload) {
+  const content = JSON.stringify(payload);
+  if (content.length > popEdits.MAX_CHARS) throw httpError(413, 'Danh sách vùng hiệu chỉnh quá lớn');
+  const result = await callAppsScript({ action: 'savePopEdits' }, { action: 'savePopEdits', content });
+  if (result.saved !== true) throw httpError(502, 'Apps Script chưa ghi được lên bucket (đã triển khai phiên bản mới của Code.gs chưa?)');
+  popEdits.rememberPopEdits(payload);
 }
 
 // ============================ HÌNH HỌC PHƯỜNG ============================
@@ -1402,7 +1411,7 @@ module.exports = async (req, res) => {
     if (action === 'getPopEdits') {
       const d = await popEdits.readPopEdits(true);
       res.setHeader('Cache-Control', 'no-store');
-      return res.status(200).json({ v: 1, saved: d.saved, edits: d.edits });
+      return res.status(200).json({ v: 1, saved: d.saved, edits: d.edits, asset: d.asset, bake: d.bake });
     }
 
     // Ghi đè toàn bộ vùng hiệu chỉnh; base = phiên bản client đang sửa (khác bản trên bucket → 409)
@@ -1413,17 +1422,14 @@ module.exports = async (req, res) => {
       const list = popEdits.parsePopEdits(body.edits);
       if (!list) return res.status(400).json({ error: true, message: 'Dữ liệu vùng hiệu chỉnh dân cư không hợp lệ' });
       const current = await popEdits.readPopEdits(true);
+      if (current.bake) {
+        return res.status(409).json({ error: true, message: 'Đang ghi cố định vào asset — chờ tác vụ GEE xong rồi sửa tiếp' });
+      }
       if (Math.round(Number(body.base) || 0) !== current.saved) {
         return res.status(409).json({ error: true, message: 'Vùng hiệu chỉnh dân cư vừa được sửa ở phiên khác — mở lại panel để tải bản mới' });
       }
-      const payload = { v: 1, saved: Date.now(), edits: list };
-      const content = JSON.stringify(payload);
-      if (content.length > popEdits.MAX_CHARS) return res.status(413).json({ error: true, message: 'Danh sách vùng hiệu chỉnh quá lớn' });
-      const result = await callAppsScript({ action: 'savePopEdits' }, { action: 'savePopEdits', content });
-      if (result.saved !== true) {
-        return res.status(502).json({ error: true, message: 'Apps Script chưa ghi được lên bucket (đã triển khai phiên bản mới của Code.gs chưa?)' });
-      }
-      popEdits.rememberPopEdits(payload);
+      const payload = popEdits.buildPayload({ saved: Date.now(), edits: list, asset: current.asset });
+      await writePopEdits(payload);
       return res.status(200).json({ success: true, saved: true, at: payload.saved, count: list.length });
     }
 
@@ -1575,6 +1581,52 @@ module.exports = async (req, res) => {
 
     await initGEE();
     await syncPopEdits(Math.round(Number(req.query.pv) || 0));
+
+    // Ghi cố định vùng hiệu chỉnh dân cư vào asset mới (tác vụ GEE chạy nền); trong lúc chạy vẫn tính theo asset cũ + vùng
+    if (action === 'bakePopEdits') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const current = await popEdits.readPopEdits(true);
+      if (current.bake) return res.status(409).json({ error: true, message: 'Đang có tác vụ ghi cố định chạy — chờ xong' });
+      if (Math.round(Number(body.base) || 0) !== current.saved) {
+        return res.status(409).json({ error: true, message: 'Vùng hiệu chỉnh dân cư vừa được sửa ở phiên khác — mở lại panel để tải bản mới' });
+      }
+      if (!current.edits.length) return res.status(400).json({ error: true, message: 'Chưa có vùng hiệu chỉnh nào để ghi cố định' });
+      if (getPopEditsVersion() !== current.saved) applyPopEdits(current.saved, current.edits, current.asset);
+      const asset = popEdits.bakedAssetId();
+      let task;
+      try {
+        task = await startPopBake(asset);
+      } catch (err) {
+        console.error('Ghi cố định asset dân cư lỗi:', err.message);
+        return res.status(502).json({ error: true, message: `GEE không nhận tác vụ xuất asset (tài khoản dịch vụ cần quyền ghi asset trong dự án): ${err.message}` });
+      }
+      const bake = { task, asset, at: Date.now() };
+      await writePopEdits(popEdits.buildPayload({ ...current, bake }));
+      return res.status(200).json({ success: true, saved: true, bake });
+    }
+
+    // Trạng thái tác vụ ghi cố định; xong → asset mới làm nền, xóa danh sách vùng (đã nằm trong asset)
+    if (action === 'popBakeStatus') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const current = await popEdits.readPopEdits(true);
+      if (!current.bake) return res.status(200).json({ success: true, saved: true, state: 'NONE', asset: current.asset, at: current.saved });
+      const t = await getTaskState(current.bake.task);
+      if (t.state === 'COMPLETED') {
+        const payload = popEdits.buildPayload({ saved: Date.now(), edits: [], asset: current.bake.asset });
+        await writePopEdits(payload);
+        await syncPopEdits(payload.saved);
+        return res.status(200).json({ success: true, saved: true, state: 'DONE', asset: payload.asset, at: payload.saved });
+      }
+      if (t.state === 'FAILED' || t.state === 'CANCELLED') {
+        await writePopEdits(popEdits.buildPayload({ ...current, bake: null }));
+        return res.status(200).json({ success: true, saved: true, state: t.state, error: t.error, asset: current.asset, at: current.saved });
+      }
+      return res.status(200).json({ success: true, saved: true, state: t.state, bake: current.bake, at: current.saved });
+    }
+
     const { ee, wardVectorParsed, popRasterNormalized, popRasterNative, popProjection } = getGeeContext();
 
     // --- Thao tác cần Earth Engine nhưng không cần danh sách công trình ---

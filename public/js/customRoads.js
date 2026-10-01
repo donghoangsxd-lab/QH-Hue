@@ -10,7 +10,7 @@ import { roadWaysAround } from './serviceArea.js';
 import { refreshRoadNetwork } from './roadNetworkLayer.js';
 import { setDrawAssist } from './drawAssist.js';
 
-const SNAP_M = 20;
+const SNAP_M = 1;                   // chỉ bắt dính khi đỉnh cách nút < 1 m (click gần như trùng nút)
 const NET_RADIUS_M = 1000;          // tải mạng lưới quanh đỉnh để bắt dính
 const NODE_BASE = 8e15;             // mã nút tuyến bổ sung (OSM hiện ~1,3e10, không trùng)
 const MIN_LENGTH_M = 5;

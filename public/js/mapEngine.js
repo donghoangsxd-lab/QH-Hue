@@ -10,6 +10,7 @@ import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
 import { tt16ParcelStyle, renderTt16Legend } from './tt16Symbols.js';
+import { addIslandFlags } from './islandFlags.js';
 import {
   getCoveredRightWidth, highlightPlanWard, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, onCompareChange
@@ -158,6 +159,7 @@ export function initMap() {
   }).addTo(map);
 
   measureLayerGroup = L.layerGroup().addTo(map);
+  addIslandFlags(map);
 
   layers.boundary.addTo(map);
   layers.highlightWard.addTo(map);

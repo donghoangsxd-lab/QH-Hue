@@ -1,5 +1,6 @@
 import { state, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_HIGHLIGHT_STYLE } from './state.js';
 import { escapeHtml, wardLabelFontSize } from './utils.js';
+import { addIslandFlags } from './islandFlags.js';
 
 export let planMap = null;
 let leftMap = null;
@@ -51,6 +52,7 @@ export function initPlanMap(mainMap, mainLayers) {
   }).addTo(planMap);
 
   planHighlightLayer.addTo(planMap);
+  addIslandFlags(planMap);
   syncAllPlanLayers();
   syncMaps(leftMap, planMap);
   initDividerDrag();

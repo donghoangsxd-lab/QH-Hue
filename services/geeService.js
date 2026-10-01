@@ -5,6 +5,10 @@ let geeBase = null;          // asset nạp 1 lần: ranh phường, raster dân
 let popEditsVersion = -1;    // phiên bản vùng hiệu chỉnh dân cư đang áp (services/popEditsService.js)
 let initPromise = null;
 
+// Raster dân cư gốc; sau khi "ghi cố định" thì nền là asset Pixel-danso-hc-… (edits.json › asset)
+const POP_ASSET = "projects/optimistic-yew-488501-s0/assets/Pixel-danso";
+let popAssetId = POP_ASSET;
+
 // Lưới đếm pixel có dân của phường. Mọi phép cộng/đếm trên popRasterNormalized phải dùng đúng lưới này:
 // mỗi pixel mang dân số phường / số pixel đếm ở lưới này, cộng ở lưới 30 m gốc sẽ ra gấp ~4 lần.
 const POP_SCALE_M = 60;
@@ -41,7 +45,8 @@ function createGeeContext() {
               return f.set('danSoNum', ee.Algorithms.If(rawPop, ee.Number.parse(ee.String(rawPop)), 0));
             });
 
-            const popRaster = ee.Image("projects/optimistic-yew-488501-s0/assets/Pixel-danso").select(0).rename('DanSoPixel');
+            const popRaster = ee.Image(POP_ASSET).select(0).rename('DanSoPixel');
+            popAssetId = POP_ASSET;
             const wardRegion = ee.Image("projects/optimistic-yew-488501-s0/assets/Output40xa").select(0).rename('ID_Region');
             const wardPopSumImg = ee.Image().double().paint({ featureCollection: wardVectorParsed, color: 'danSoNum' });
 
@@ -63,13 +68,19 @@ function createGeeContext() {
 /**
  * Dựng lại raster dân cư theo vùng hiệu chỉnh: pixel có dân = raster gốc > 0, bỏ pixel trong vùng "remove", thêm pixel
  * trong vùng "add" (áp sau). Dân số phường chia đều cho số pixel có dân của phường như cũ. Không có vùng → đúng như raster gốc.
+ * asset: raster nền đã ghi cố định (null = Pixel-danso gốc).
  */
-function applyPopEdits(version, edits) {
+function applyPopEdits(version, edits, asset = null) {
+  const target = asset || POP_ASSET;
+  if (target !== popAssetId) {
+    geeBase.popRaster = geeBase.ee.Image(target).select(0).rename('DanSoPixel');
+    popAssetId = target;
+  }
   const { ee, wardVectorParsed, popRaster, wardRegion, wardPopSumImg } = geeBase;
   const zone = (op) => {
     const list = (edits || []).filter(e => e.op === op);
     if (!list.length) return null;
-    const fc = ee.FeatureCollection(list.map(e => ee.Feature(ee.Geometry.Polygon([e.ring], null, false))));
+    const fc = ee.FeatureCollection(list.map(e => ee.Feature(ee.Geometry.Polygon([e.ring, ...(e.holes || [])], null, false))));
     return ee.Image(0).byte().paint(fc, 1);
   };
   const removeZone = zone('remove');
@@ -134,4 +145,40 @@ function eeEvaluate(eeObject) {
   });
 }
 
-module.exports = { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, POP_SCALE_M };
+/**
+ * Xuất raster dân cư đang áp vùng hiệu chỉnh (pixel có dân = 1) thành asset mới, cùng lưới với raster nền.
+ * Trả về mã tác vụ GEE (tác vụ chạy nền vài phút, xem trạng thái bằng getTaskState).
+ */
+async function startPopBake(assetId) {
+  const { ee, wardVectorParsed, popRasterNative, popProjection } = getGeeContext();
+  const [proj, bounds] = await Promise.all([
+    eeEvaluate(popProjection),
+    eeEvaluate(wardVectorParsed.geometry().bounds(1))
+  ]);
+  const task = ee.batch.Export.image.toAsset({
+    image: popRasterNative.gt(0).selfMask().toByte().rename('DanSoPixel'),
+    description: 'QH-Hue_Pixel-danso_ghi-co-dinh',
+    assetId,
+    pyramidingPolicy: { '.default': 'mode' },
+    region: ee.Geometry(bounds),
+    crs: proj.crs,
+    crsTransform: proj.transform,
+    maxPixels: 1e10
+  });
+  await new Promise((resolve, reject) => task.start(resolve, (err) => reject(new Error(String(err)))));
+  if (!task.id) throw new Error('GEE không trả về mã tác vụ');
+  return task.id;
+}
+
+/** Trạng thái tác vụ xuất: { state: READY | RUNNING | COMPLETED | FAILED | CANCELLED | ..., error } */
+function getTaskState(taskId) {
+  return new Promise((resolve, reject) => {
+    geeContext.ee.data.getTaskStatus(taskId, (list, err) => {
+      if (err) return reject(new Error(String(err)));
+      const t = (list && list[0]) || {};
+      resolve({ state: String(t.state || 'UNKNOWN'), error: t.error_message || '' });
+    });
+  });
+}
+
+module.exports = { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, POP_SCALE_M };

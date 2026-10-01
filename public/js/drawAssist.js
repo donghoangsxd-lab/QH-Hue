@@ -1,4 +1,4 @@
-// Trợ giúp khi vẽ trên bản đồ hiện trạng (tuyến đường, vùng dân cư, lớp vẽ tạm):
+// Trợ giúp khi vẽ trên bản đồ hiện trạng (tuyến đường, vùng dân cư, phác thảo):
 // - chuột dừng sát mép phần bản đồ nhìn thấy → bản đồ tự trôi theo hướng đó để vẽ tiếp tuyến dài
 // - cho phóng tới cấp 19 (ảnh vệ tinh Esri ở Huế chỉ có tới cấp 18, cấp 19 phóng ảnh cấp 18)
 import { map, getRightObstruction } from './mapEngine.js';

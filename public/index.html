@@ -76,6 +76,7 @@
     <symbol id="i-sk-polyline" viewBox="0 0 24 24"><path d="m3 18 6-9 5 6 7-10"/><circle cx="9" cy="9" r="1.4" fill="currentColor"/><circle cx="14" cy="15" r="1.4" fill="currentColor"/></symbol>
     <symbol id="i-sk-polygon" viewBox="0 0 24 24"><path d="m4 9 7-5 9 4-2 11H7z" fill="currentColor" fill-opacity=".2"/></symbol>
     <symbol id="i-sk-arrow" viewBox="0 0 24 24"><path d="M4 20 18 6"/><path d="M10 5h9v9" fill="none"/></symbol>
+    <symbol id="i-sk-text" viewBox="0 0 24 24"><path d="M5 7V4h14v3M12 4v16M9 20h6"/></symbol>
     <symbol id="i-sk-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity=".15"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><path d="M12 12h8" stroke-dasharray="2 2"/></symbol>
   </svg>
 
@@ -104,16 +105,17 @@
       <button type="button" class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích" aria-label="Đo diện tích"><svg class="ico"><use href="#i-area"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnMeasureDist" title="Đo chiều dài" aria-label="Đo chiều dài"><svg class="ico"><use href="#i-ruler"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnInspectMode" title="Bật chế độ tra cứu: click lên bản đồ để xem hạ tầng tiếp cận tại vị trí" aria-label="Chế độ tra cứu" aria-pressed="false"><svg class="ico"><use href="#i-inspect"/></svg></button>
-      <button type="button" class="ui-btn-format" id="btnSketch" title="Lớp vẽ tạm (chỉ trong phiên này, không lưu, người khác không thấy)" aria-label="Lớp vẽ tạm" aria-pressed="false" aria-controls="sketchPalette"><svg class="ico"><use href="#i-sketch"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnSketch" title="Phác thảo (chỉ trong phiên này, người khác không thấy; lưu ra file KML / DXF)" aria-label="Phác thảo" aria-pressed="false" aria-controls="sketchPalette"><svg class="ico"><use href="#i-sketch"/></svg></button>
 
-      <!-- BẢNG CÔNG CỤ LỚP VẼ TẠM (sketchLayer.js) -->
-      <div class="sketch-palette" id="sketchPalette" role="toolbar" aria-label="Công cụ vẽ tạm" hidden>
+      <!-- BẢNG CÔNG CỤ PHÁC THẢO (sketchLayer.js) -->
+      <div class="sketch-palette" id="sketchPalette" role="toolbar" aria-label="Công cụ phác thảo" hidden>
         <div class="sketch-row">
           <button type="button" class="sketch-btn" data-tool="line" title="Đường thẳng" aria-label="Đường thẳng" aria-pressed="false"><svg class="ico"><use href="#i-sk-line"/></svg></button>
           <button type="button" class="sketch-btn" data-tool="polyline" title="Đường gấp khúc (polyline)" aria-label="Đường gấp khúc" aria-pressed="false"><svg class="ico"><use href="#i-sk-polyline"/></svg></button>
           <button type="button" class="sketch-btn" data-tool="polygon" title="Đa giác (polygon)" aria-label="Đa giác" aria-pressed="false"><svg class="ico"><use href="#i-sk-polygon"/></svg></button>
           <button type="button" class="sketch-btn" data-tool="arrow" title="Mũi tên" aria-label="Mũi tên" aria-pressed="false"><svg class="ico"><use href="#i-sk-arrow"/></svg></button>
           <button type="button" class="sketch-btn" data-tool="circle" title="Vòng tròn" aria-label="Vòng tròn" aria-pressed="false"><svg class="ico"><use href="#i-sk-circle"/></svg></button>
+          <button type="button" class="sketch-btn" data-tool="text" title="Chữ nhiều dòng (MText, gõ tiếng Việt Telex)" aria-label="Chữ" aria-pressed="false"><svg class="ico"><use href="#i-sk-text"/></svg></button>
           <span class="sketch-sep"></span>
           <button type="button" class="sketch-color" data-color="#f43f5e" title="Đỏ" aria-label="Màu đỏ"></button>
           <button type="button" class="sketch-color" data-color="#facc15" title="Vàng" aria-label="Màu vàng"></button>
@@ -122,8 +124,24 @@
           <button type="button" class="sketch-color" data-color="#ffffff" title="Trắng" aria-label="Màu trắng"></button>
           <span class="sketch-sep"></span>
           <button type="button" class="sketch-btn" id="btnSketchUndo" title="Hoàn tác (Backspace)" aria-label="Hoàn tác"><svg class="ico"><use href="#i-undo"/></svg></button>
-          <button type="button" class="sketch-btn" id="btnSketchClear" title="Xóa toàn bộ hình vẽ tạm" aria-label="Xóa toàn bộ"><svg class="ico"><use href="#i-trash"/></svg></button>
-          <button type="button" class="sketch-btn" id="btnSketchClose" title="Đóng bảng (hình đã vẽ vẫn giữ)" aria-label="Đóng bảng công cụ vẽ tạm"><svg class="ico"><use href="#i-close"/></svg></button>
+          <button type="button" class="sketch-btn" id="btnSketchSave" title="Lưu phác thảo ra file KML / DXF" aria-label="Lưu phác thảo" aria-expanded="false" aria-controls="sketchSaveRow"><svg class="ico"><use href="#i-save"/></svg></button>
+          <button type="button" class="sketch-btn" id="btnSketchClear" title="Xóa toàn bộ hình phác thảo" aria-label="Xóa toàn bộ"><svg class="ico"><use href="#i-trash"/></svg></button>
+          <button type="button" class="sketch-btn" id="btnSketchClose" title="Đóng bảng (hình đã vẽ vẫn giữ)" aria-label="Đóng bảng công cụ phác thảo"><svg class="ico"><use href="#i-close"/></svg></button>
+        </div>
+        <div class="sketch-row sketch-sub" id="sketchTextRow" hidden>
+          <label for="sketchTextSize">Cỡ chữ</label>
+          <select id="sketchTextSize">
+            <option value="12">Nhỏ</option>
+            <option value="16" selected>Vừa</option>
+            <option value="22">Lớn</option>
+            <option value="30">Rất lớn</option>
+          </select>
+          <button type="button" class="sketch-btn sketch-telex" id="btnSketchTelex" title="Bộ gõ Telex có sẵn (tắt nếu máy đã bật Unikey / EVKey mà gõ bị lỗi)" aria-pressed="true">Telex</button>
+        </div>
+        <div class="sketch-row sketch-sub" id="sketchSaveRow" hidden>
+          <span>Lưu thành</span>
+          <button type="button" class="sketch-btn sketch-export" data-export="kml" title="KML (WGS84): mở bằng Google Earth, QGIS, Google My Maps">KML</button>
+          <button type="button" class="sketch-btn sketch-export" data-export="dxf" title="DXF (VN-2000 TT-Huế, KTT 107°00', mét): mở bằng AutoCAD">DXF</button>
         </div>
         <div class="sketch-hint" id="sketchHint" aria-live="polite"></div>
       </div>
@@ -351,7 +369,7 @@
             <button type="button" id="btnRoadUndo" title="Xóa đỉnh cuối (Backspace)" disabled><svg class="ico"><use href="#i-undo"/></svg>Xóa đỉnh</button>
           </div>
           <div id="roadDrawInfo" class="road-draw-info"></div>
-          <div class="cad-hint">Click bản đồ hiện trạng để đặt đỉnh; đỉnh cách nút đường ≤ 20 m tự bắt dính (chấm xanh). Esc: dừng vẽ.</div>
+          <div class="cad-hint">Click bản đồ hiện trạng để đặt đỉnh; đỉnh cách nút đường &lt; 1 m mới bắt dính (chấm xanh) — phóng to tối đa rồi click đúng nút để nối tuyến. Esc: dừng vẽ.</div>
           <button type="button" class="btn-submit" id="btnRoadSave" disabled title="Ghi đè danh sách tuyến bổ sung roads/v2/custom.json trên bucket"><svg class="ico"><use href="#i-save"/></svg>LƯU TUYẾN (ADMIN)</button>
           <div id="roadStatus" class="rp-status" role="status" aria-live="polite"></div>
           <div id="roadList" class="cad-list"></div>
@@ -364,17 +382,28 @@
               <option value="remove" selected>Xóa pixel (không có dân)</option>
               <option value="add">Thêm pixel (khu dân cư mới)</option>
             </select>
+            <label for="popTool">Công cụ</label>
+            <select id="popTool">
+              <option value="brush" selected>Cọ tô (giữ chuột rê)</option>
+              <option value="polygon">Vùng đa giác (click đỉnh)</option>
+            </select>
+            <label for="popBrush" id="popBrushLabel">Cỡ cọ</label>
+            <span class="pop-brush-row" id="popBrushRow"><input type="range" id="popBrush" min="30" max="300" step="15" value="60" aria-label="Đường kính cọ (m)"><b id="popBrushVal">60 m</b></span>
             <label for="popName">Ghi chú</label>
             <input type="text" id="popName" maxlength="120" placeholder="VD: Sông Hương, KCN Phú Bài..." />
           </div>
           <div class="road-draw-actions">
-            <button type="button" id="btnPopDraw" aria-pressed="false"><svg class="ico"><use href="#i-pen"/></svg>Vẽ vùng mới</button>
-            <button type="button" id="btnPopUndo" title="Xóa đỉnh cuối (Backspace)" disabled><svg class="ico"><use href="#i-undo"/></svg>Xóa đỉnh</button>
+            <button type="button" id="btnPopDraw" aria-pressed="false"><svg class="ico"><use href="#i-pen"/></svg>Bắt đầu tô</button>
+            <button type="button" id="btnPopUndo" title="Xóa nét cọ cuối (Backspace / Ctrl+Z)" disabled><svg class="ico"><use href="#i-undo"/></svg>Hoàn tác nét</button>
           </div>
           <div id="popDrawInfo" class="road-draw-info"></div>
-          <div class="cad-hint" title="Vùng thêm được áp sau vùng xóa">Click bản đồ hiện trạng để đặt đỉnh vùng (tự khép kín). Tổng dân số phường giữ nguyên: xóa pixel thì dân dồn sang pixel còn lại. Esc: dừng vẽ.</div>
+          <div class="cad-hint" id="popHint" title="Vùng thêm được áp sau vùng xóa">Giữ chuột trái và rê để tô. Tổng dân số phường giữ nguyên: xóa pixel thì dân dồn sang pixel còn lại.</div>
           <button type="button" class="btn-submit" id="btnPopSave" disabled title="Ghi đè danh sách vùng hiệu chỉnh pop/edits.json trên bucket"><svg class="ico"><use href="#i-save"/></svg>LƯU VÙNG (ADMIN)</button>
           <div id="popStatus" class="rp-status" role="status" aria-live="polite"></div>
+          <div class="pop-bake">
+            <div class="pop-bake-info" id="popAssetInfo"></div>
+            <button type="button" id="btnPopBake" disabled title="Xuất raster đã áp các vùng thành asset GEE mới làm nền, rồi xóa danh sách vùng — tính toán nhẹ hơn. Asset gốc Pixel-danso giữ nguyên."><svg class="ico"><use href="#i-save"/></svg>Ghi cố định vào asset</button>
+          </div>
           <div id="popList" class="cad-list"></div>
         </div>
 
@@ -431,8 +460,7 @@
       <!-- Khối xoay 3 mặt: cơ cấu theo diện tích → số lượng 9 loại hạ tầng → hệ thống giao thông (phóng to: xếp chồng) -->
       <div class="bp-part bp-part1">
         <div class="bp-part-head">
-          <b class="bp-part-title" id="bpPart1Title">CƠ CẤU ĐẤT HẠ TẦNG</b>
-          <div class="flip-controls" data-html2canvas-ignore="true">
+          <b class="bp-part-title" id="bpPart1Title">CƠ CẤU ĐẤT HẠ TẦNG</b>          <div class="flip-controls" data-html2canvas-ignore="true">
             <span class="flip-dots" id="part1Dots"><i class="active" data-page="0" title="Cơ cấu đất hạ tầng"></i><i data-page="1" title="Số lượng công trình"></i><i data-page="2" title="Hệ thống giao thông"></i></span>
             <button type="button" class="bp-btn" id="btnFlipPart1" title="Xoay trang: thống kê số lượng công trình"><svg class="ico"><use href="#i-flip"/></svg>Số lượng</button>
           </div>
@@ -457,6 +485,10 @@
                   <div class="road-donut-center" id="roadDonutCenter"></div>
                 </div>
                 <div class="road-chart-rows" id="roadChartRows"></div>
+              </div>
+              <div class="road-foot">
+                <div class="road-stat road-dens" id="roadDensity"></div>
+                <div class="road-stat road-bus" id="roadBusRow"></div>
               </div>
             </div>
           </div>

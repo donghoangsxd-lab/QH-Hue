@@ -1,4 +1,4 @@
-import { state, BUFFER_COLORS, isNetworkType, NT_KIND_LABELS } from './state.js';
+import { state, BUFFER_COLORS, isNetworkType, NT_KIND_LABELS, layerType, infraLabels } from './state.js';
 import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js';
 import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, showToast, wardStatHtml, ico, setStatusContent, inlineSpriteIcons } from './utils.js';
@@ -191,10 +191,12 @@ const PIE_LABELS = {
   "6-YT": "Y tế", "7-VH": "Văn hóa", "8-TM": "Chợ/TTTM", "9-CSD": "Chưa sử dụng", "empty": "Chưa có DL"
 };
 
-// ================== MẶT SAU THẺ LẬT: THỐNG KÊ SỐ LƯỢNG 9 LOẠI ==================
+// ================== MẶT SAU THẺ LẬT: THỐNG KÊ SỐ LƯỢNG 12 LOẠI (4 × 3 Ô) ==================
+// Trạm dừng xe buýt (điểm trên vỉa hè, không có khu đất) thống kê ở mặt Hệ thống giao thông (renderBusRow)
 const COUNT_CARD_LABELS = {
-  "1-CV": "Công viên", "2-BDX": "Bãi đỗ xe", "3-MN": "Mầm non", "4-TH": "Tiểu học", "5-THCS": "THCS",
-  "6-YT": "Y tế", "7-VH": "Văn hóa", "8-TM": "Chợ, TTTM", "9-CSD": "Chưa sử dụng"
+  "1-CV": "Công viên", "2-BDX": "Bãi đỗ xe", "3-MN": "Mầm non", "4-TH": "Tiểu học",
+  "5-THCS": "THCS", "THPT": "THPT", "6-YT": "Y tế", "7-VH": "Văn hóa",
+  "8-TM": "Chợ, TTTM", "11-PCCC": "Trụ sở PCCC", "12-NT": "Nghĩa trang", "9-CSD": "Chưa sử dụng"
 };
 // Biểu tượng nét (viewBox 24×24, stroke = màu loại)
 const COUNT_CARD_ICONS = {
@@ -206,30 +208,53 @@ const COUNT_CARD_ICONS = {
   "6-YT": '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
   "7-VH": '<path d="M3 9l9-5 9 5"/><path d="M5 9v9M9.5 9v9M14.5 9v9M19 9v9"/><path d="M3 20h18"/>',
   "8-TM": '<circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M3 4h2l2.5 11h11l2-8H6.5"/>',
-  "9-CSD": '<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 2.2"/><path d="M12 9v6M9 12h6"/>'
+  "9-CSD": '<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 2.2"/><path d="M12 9v6M9 12h6"/>',
+  "THPT": '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5"/><path d="M22 9v6"/>',
+  "11-PCCC": '<path d="M12 3c1 3 5 5 5 10a5 5 0 01-10 0c0-2.5 1.5-4 2.5-5 .3 1.6 1.2 2.6 2.5 3 0-3-1-5.5 0-8z"/>',
+  "12-NT": '<path d="M7 21V10a5 5 0 0110 0v11"/><path d="M4 21h16"/><path d="M12 9v6M9.5 11.5h5"/>'
 };
+const BUS_ICON = '<rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 11h16M8 21v-3M16 21v-3"/><circle cx="8" cy="14.5" r="1"/><circle cx="16" cy="14.5" r="1"/>';
 
-// Hiện trạng: số đã duyệt (cơ sở chưa sử dụng: mọi khu đất, như donut) + số chờ duyệt; quy hoạch: số đã duyệt
-function countByType(sourceList, planList) {
+// Hiện trạng: số đã duyệt (cơ sở chưa sử dụng: mọi khu đất, như donut) + số chờ duyệt; quy hoạch: số đã duyệt.
+// Trường THPT lưu mã 4-TH → tách theo layerType như lớp bản đồ
+function countByType(sourceList, planList, keys) {
   const stats = {};
-  Object.keys(COUNT_CARD_LABELS).forEach(k => { stats[k] = { approved: 0, pending: 0, plan: 0 }; });
+  keys.forEach(k => { stats[k] = { approved: 0, pending: 0, plan: 0 }; });
   (sourceList || []).forEach(it => {
-    const s = stats[it.type];
+    const s = stats[layerType(it)];
     if (!s) return;
     if (isApproved(it.status)) s.approved++;
     else s.pending++;
   });
   (planList || []).forEach(it => {
-    const s = stats[it.type];
+    const s = stats[layerType(it)];
     if (s && (isApproved(it.status) || it.type === "9-CSD")) s.plan++;
   });
   return stats;
 }
 
+const planDeltaTag = (delta) => (delta === 0 ? '' :
+  `<span class="count-plan ${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '▲' : '▼'}${fmtNum(Math.abs(delta))}</span>`);
+
+/** Dòng trạm dừng xe buýt dưới biểu đồ mặt Hệ thống giao thông */
+function renderBusRow(sourceList, planList) {
+  const el = document.getElementById('roadBusRow');
+  if (!el) return;
+  const s = countByType(sourceList, planList, ['10-BUS'])['10-BUS'];
+  const color = PIE_COLORS['10-BUS'];
+  el.title = `Trạm dừng xe buýt (QCVN 01:2026 Mục 2.8.3.3: đi bộ tới trạm ≤ 500 m)\nĐã duyệt: ${fmtNum(s.approved)} · Chờ duyệt: ${fmtNum(s.pending)}`
+    + `\nQuy hoạch: ${fmtNum(s.plan)} (chênh ${s.plan - s.approved > 0 ? '+' : ''}${fmtNum(s.plan - s.approved)})`;
+  el.style.setProperty('--c', color);
+  el.innerHTML = `<span class="road-stat-label"><svg viewBox="0 0 24 24" aria-hidden="true">${BUS_ICON}</svg>Trạm dừng xe buýt</span>`
+    + `<span class="road-stat-val"><b>${fmtNum(s.approved)}</b><em>trạm</em>${planDeltaTag(s.plan - s.approved)}`
+    + (s.pending ? `<em class="road-bus-pending">+${fmtNum(s.pending)} chờ</em>` : '') + '</span>';
+}
+
 function renderInfraCountCards(sourceList, planList) {
+  renderBusRow(sourceList, planList);
   const grid = document.getElementById('infraCountGrid');
   if (!grid) return;
-  const stats = countByType(sourceList, planList);
+  const stats = countByType(sourceList, planList, Object.keys(COUNT_CARD_LABELS));
   grid.innerHTML = Object.keys(COUNT_CARD_LABELS).map(k => {
     const s = stats[k];
     const color = PIE_COLORS[k];
@@ -238,16 +263,14 @@ function renderInfraCountCards(sourceList, planList) {
     const total = s.approved + s.pending;
     const approvedPct = total > 0 ? (s.approved / total) * 100 : 0;
     const delta = s.plan - shown;
-    const planTag = delta === 0 ? '' :
-      `<span class="count-plan ${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '▲' : '▼'}${fmtNum(Math.abs(delta))}</span>`;
-    const tip = `${COUNT_CARD_LABELS[k]}\nĐã duyệt: ${fmtNum(s.approved)} · Chờ duyệt: ${fmtNum(s.pending)}\nQuy hoạch: ${fmtNum(s.plan)} (chênh ${delta > 0 ? '+' : ''}${fmtNum(delta)})`;
+    const tip = `${infraLabels[k] || COUNT_CARD_LABELS[k]}\nĐã duyệt: ${fmtNum(s.approved)} · Chờ duyệt: ${fmtNum(s.pending)}\nQuy hoạch: ${fmtNum(s.plan)} (chênh ${delta > 0 ? '+' : ''}${fmtNum(delta)})`;
     return `<div class="count-card" style="--c:${color}" title="${escapeHtml(tip)}">
-      <span class="count-icon"><svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${COUNT_CARD_ICONS[k]}</svg></span>
-      <div class="count-info">
+      <div class="count-head">
+        <span class="count-icon"><svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${COUNT_CARD_ICONS[k]}</svg></span>
         <span class="count-label">${COUNT_CARD_LABELS[k]}</span>
-        <div class="count-mid"><b class="count-num">${fmtNum(shown)}</b>${planTag}</div>
-        <div class="count-foot"><span class="count-bar"><i style="width:${approvedPct.toFixed(1)}%"></i></span><span class="count-pct">${fmtPct(approvedPct)}</span></div>
       </div>
+      <div class="count-mid"><b class="count-num">${fmtNum(shown)}</b>${planDeltaTag(delta)}</div>
+      <div class="count-foot"><span class="count-bar"><i style="width:${approvedPct.toFixed(1)}%"></i></span><span class="count-pct">${fmtPct(approvedPct)}</span></div>
     </div>`;
   }).join('');
 }
@@ -268,7 +291,8 @@ function setPart1Turn(turn) {
   const next = PART1_PAGES[(page + 1) % PART1_PAGES.length];
   card.dataset.page = String(page);
   card.style.setProperty('--turn', part1Turn);
-  card.querySelectorAll('.flip-face').forEach(face => face.setAttribute('aria-hidden', String(Number(face.dataset.page) !== page)));
+  const spread = isPart1Spread();
+  card.querySelectorAll('.flip-face').forEach(face => face.setAttribute('aria-hidden', String(!spread && Number(face.dataset.page) !== page)));
   const title = document.getElementById('bpPart1Title');
   if (title) title.textContent = PART1_PAGES[page].title;
   const btn = document.getElementById('btnFlipPart1');
@@ -280,7 +304,39 @@ function setPart1Turn(turn) {
   if (page === 2) replayRoadDonut();
 }
 
+// Hạng màn hình theo bề rộng CSS px (trình duyệt không đo được inch; Windows phóng to 125–150% làm màn Full HD hẹp lại):
+// s < 1700 (laptop 14–17"), m < 2300 (21–24" Full HD), l ≥ 2300 (27–32" QHD / 4K)
+const SCREEN_TIERS = [[2300, 'l'], [1700, 'm'], [0, 's']];
+const SPREAD_FACE_W = 338;     // = bề rộng .flip-card khi xoay
+const CITY_CHART_MIN_W = 900;  // biểu đồ 40 phường/xã cần tối thiểu chừng này
+
+const isPart1Spread = () => !!document.getElementById('bpBody')?.classList.contains('bp-spread')
+  && !document.body.classList.contains('bottom-max');
+
+/**
+ * Trải 3 mặt khối xoay cạnh nhau khi còn chỗ: màn l luôn trải, màn m chỉ khi xem 1 phường/xã
+ * (bảng chỉ tiêu phường hẹp, bỏ trống nửa phải panel), màn s giữ khối xoay
+ */
+function updatePart1Spread() {
+  const body = document.getElementById('bpBody');
+  if (!body) return;
+  const tier = SCREEN_TIERS.find(([min]) => window.innerWidth >= min)[1];
+  document.documentElement.dataset.screen = tier;
+  const ward = !isCityMode();
+  const need = ward ? (document.querySelector('#wardSummaryView .ward-table')?.offsetWidth || 700) : CITY_CHART_MIN_W;
+  const spread = (tier === 'l' || (tier === 'm' && ward)) && body.clientWidth - 3 * SPREAD_FACE_W - 24 >= need;
+  if (body.classList.contains('bp-spread') === spread) return;
+  body.classList.toggle('bp-spread', spread);
+  // Trải ra: tiêu đề cột trái về mặt cơ cấu đất
+  setPart1Turn(spread ? part1Turn - (part1Turn % PART1_PAGES.length) : part1Turn);
+}
+
 function initPart1Flip() {
+  let resizeRaf = 0;
+  window.addEventListener('resize', () => {
+    if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; updatePart1Spread(); });
+  });
+  updatePart1Spread();
   document.getElementById('btnFlipPart1')?.addEventListener('click', () => setPart1Turn(part1Turn + 1));
   document.getElementById('part1Dots')?.addEventListener('click', (e) => {
     const dot = e.target.closest('i[data-page]');
@@ -675,11 +731,19 @@ function renderCityTableFoot() {
 
 // ================== MẶT 3 PANEL TRÁI: HỆ THỐNG GIAO THÔNG (toàn TP hoặc phường đang xem) ==================
 // Màu khớp lớp mạng lưới đường (roadNetworkLayer.js); mixed = phường lưu bản cũ chưa tách trục chính / khu vực
+// Biểu tượng nét (viewBox 24×24): xe tải = trục chính, ô tô con = khu vực, người đi bộ = nội bộ / kiệt, xe đạp
+const ROAD_ICONS = {
+  trunk: '<circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17H3V6a1 1 0 011-1h9v12M9 17h6M19 17h2v-6h-8M13 6h5l3 5"/>',
+  named: '<circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 012 2v4h-2M15 17H9M3 11h15M12 11V6"/>',
+  mixed: '<path d="M4 19L8 5M16 5l4 14M12 8V6M12 13v-2M12 18v-2"/>',
+  kiet: '<circle cx="13" cy="4" r="1.2"/><path d="M7 21l3-4M16 21l-2-4-3-3 1-6M6 12l2-3 4-1 3 3 3 1"/>',
+  bike: '<circle cx="5" cy="18" r="3"/><circle cx="19" cy="18" r="3"/><circle cx="17" cy="5" r="1"/><path d="M12 19v-4l-3-3 5-4 2 3h3"/>'
+};
 const ROAD_CHART_TYPES = [
   { key: 'trunk', label: 'Trục chính', color: '#fb923c', title: ROAD_TYPES[0].title },
   { key: 'named', label: 'Khu vực', color: '#60a5fa', title: ROAD_TYPES[1].title },
   { key: 'mixed', label: 'TC + KV', color: '#fde047', title: ROAD_NOT_SPLIT_TITLE },
-  { key: 'kiet', label: 'Nội bộ', color: '#cbd5e1', title: ROAD_TYPES[2].title },
+  { key: 'kiet', label: 'Nội bộ, kiệt', color: '#cbd5e1', title: ROAD_TYPES[2].title },
   { key: 'bike', label: 'Xe đạp', color: '#4ade80', title: ROAD_TYPES[3].title }
 ];
 let roadDonutInstance = null;
@@ -754,8 +818,19 @@ function replayRoadDonut() {
 function renderRoadChart() {
   const rowsEl = document.getElementById('roadChartRows');
   const center = document.getElementById('roadDonutCenter');
+  const densEl = document.getElementById('roadDensity');
   if (!rowsEl || !center) return;
-  const empty = (html) => { rowsEl.innerHTML = `<div class="road-chart-msg">${html}</div>`; center.innerHTML = ''; updateRoadDonut(null); };
+  const setDensity = (value, tip = '') => {
+    if (!densEl) return;
+    densEl.title = tip;
+    densEl.innerHTML = `<span class="road-stat-label">Mật độ đến đường khu vực:</span><span class="road-stat-val">${value}</span>`;
+  };
+  const empty = (html) => {
+    rowsEl.innerHTML = `<div class="road-chart-msg">${html}</div>`;
+    center.innerHTML = '';
+    setDensity('<b>–</b><em>km/km²</em>');
+    updateRoadDonut(null);
+  };
   if (!roadTypesByWard) return empty(`${ico('clock')}Đang đọc mạng lưới đường...`);
   const d = roadChartData();
   if (!d.have) return empty(`<span class="c-muted">${ROAD_MISSING_TITLE}.</span>`);
@@ -780,7 +855,8 @@ function renderRoadChart() {
         + (none ? '\nChưa có tuyến xe đạp (OpenStreetMap chưa có — Admin vẽ bổ sung ở tab Đề xuất › Tuyến đường)' : '');
     return `<div class="rc-row${none || unsplit ? ' rc-none' : ''}" style="--c:${t.color}; --w:${((km / maxKm) * 100).toFixed(1)}%" title="${escapeHtml(tip)}">
       <div class="rc-line">
-        <span class="rc-name"><i class="rc-dot"></i>${t.label}</span>
+        <span class="rc-icon"><svg viewBox="0 0 24 24" aria-hidden="true">${ROAD_ICONS[t.key]}</svg></span>
+        <span class="rc-name">${t.label}</span>
         <b class="rc-km">${unsplit ? '–' : `${est ? '≈' : ''}${fmtKm(km)}<em> km</em>`}</b>
         <span class="rc-pct">${unsplit ? 'chưa tách' : none ? 'chưa có' : (t.key === 'bike' ? '' : fmtPct(pct))}</span>
       </div>
@@ -788,11 +864,11 @@ function renderRoadChart() {
     </div>`;
   }).join('');
   const dens = (km) => (d.areaKm2 > 0 ? (km / d.areaKm2).toFixed(2).replace('.', ',') : '–');
-  const densTip = `Mật độ đường: ${fmtKm(totalKm)} km / ${fmtArea(d.areaKm2)} km² diện tích tự nhiên`
-    + `\nMật độ đường khu vực: (trục chính + khu vực) ${fmtKm(kvKm)} km / ${fmtArea(d.areaKm2)} km² — ${scope}`;
-  rowsEl.innerHTML = rows
-    + `<div class="rc-foot" title="${escapeHtml(densTip)}">Mật độ <b>${dens(totalKm)}</b> · KV <b>${dens(kvKm)}</b> <em>km/km²</em>`
-    + `${d.city && d.have < d.total ? ` <em>· ${d.have}/${d.total} P/X</em>` : ''}</div>`;
+  const densTip = `Mật độ đến đường khu vực = (đường trục chính + đường khu vực) ${fmtKm(kvKm)} km / ${fmtArea(d.areaKm2)} km² diện tích tự nhiên`
+    + `${d.city ? ` của ${d.have} phường/xã có mạng lưới đường` : ''} — ${scope}`
+    + `\nMật độ đường (gồm nội bộ, kiệt): ${fmtKm(totalKm)} km / ${fmtArea(d.areaKm2)} km² = ${dens(totalKm)} km/km²`;
+  rowsEl.innerHTML = rows;
+  setDensity(`<b>${dens(kvKm)}</b><em>km/km²</em>${d.city && d.have < d.total ? `<em class="road-dens-scope">${d.have}/${d.total} P/X</em>` : ''}`, densTip);
   center.innerHTML = `<b>${fmtKm(totalKm)}</b><small>km đường</small>`;
   updateRoadDonut(types, v);
 }
@@ -1055,6 +1131,7 @@ function setBottomPanelHeader(wardName) {
   if (cityView) cityView.style.display = city && (maximized || cityTableOn) ? 'flex' : 'none';
   if (wardView) wardView.style.display = city ? 'none' : 'flex';
   renderChartLegend();
+  updatePart1Spread();
 }
 
 // Chỉ tiêu toàn thành phố trên thanh tiêu đề: diện tích, mật độ dân số, mật độ đường, tỷ lệ đô thị hóa (HT / QH)

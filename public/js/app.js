@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initTerrainLayer();
   initFloodSim();
   initSketchLayer();
-  // Bật đo đạc / tra cứu / ghim / vẽ tuyến → bỏ chọn công cụ vẽ tạm (hình đã vẽ vẫn giữ)
+  // Bật đo đạc / tra cứu / ghim / vẽ tuyến → bỏ chọn công cụ phác thảo (hình đã vẽ vẫn giữ)
   ['btnMeasureDist', 'btnMeasureArea', 'btnInspectMode', 'btnPickOnMap', 'btnRoadDraw', 'btnPopDraw']
     .forEach(id => document.getElementById(id)?.addEventListener('click', stopSketchTool));
   restoreAdminSession();
