@@ -67,6 +67,26 @@ const MIN_SIZE_RULES = [
 // Mỗi đơn vị ở đô thị phát triển mới: ≥ 1 công viên, vườn hoa ≥ 5.000 m² hoặc 2 công viên, vườn hoa ≥ 2.500 m² (Mục 2.2.3.2)
 const UNIT_PARK_RULE = { profiles: ["DT"], large: 5000, medium: 2500 };
 
+// D. MẠNG LƯỚI HẠ TẦNG KHÁC — không có chỉ tiêu m²/người theo phường, không tính vào quy mô / độ phủ / heatmap của 8 nhóm
+const NETWORK_CODES = ["10-BUS", "11-PCCC", "12-NT"];
+const networkConfig = {
+  // Mục 2.8.3.3: đi bộ đến bến ≤ 500 m; khu trung tâm: bến xe buýt cách nhau ≤ 600 m.
+  // gapIgnore: bỏ qua trạm cách < 100 m khi tìm trạm kế cận (cặp trạm 2 bên đường)
+  "10-BUS": { label: "Trạm dừng xe buýt", radius: 500, gapMax: 600, gapIgnore: 100, noArea: true },
+  // Mục 2.5.13.1: khu vực trung tâm ≤ 3 km (áp cho phường), khu vực khác ≤ 5 km (xã)
+  "11-PCCC": { label: "Trụ sở cảnh sát PCCC", radius: { DT: 3000, XA: 5000, XA_DT: 5000 }, noArea: true },
+  // Mục 2.12.1.1: 1 nhà tang lễ / ≤ 250.000 người; 2.12.2.1: nghĩa trang tập trung ≥ 0,04 ha / 1.000 người = 0,4 m²/người
+  "12-NT": { label: "Nhà tang lễ, nghĩa trang", funeralPopPer: 250000, cemeteryQuota: 0.4 }
+};
+// Phân loại nhóm 12-NT theo tên; safety = khoảng cách an toàn môi trường tới nhà ở (Bảng 23), 0 = không quy định
+const NT_KINDS = {
+  funeral: { label: "Nhà tang lễ", safety: 0 },
+  crematorium: { label: "Cơ sở hỏa táng", safety: 500 },
+  cemetery_cat: { label: "Nghĩa trang cát táng", safety: 100 },
+  cemetery_once: { label: "Nghĩa trang chôn cất một lần", safety: 500 },
+  cemetery_hung: { label: "Nghĩa trang hung táng", safety: 1000 }
+};
+
 const foldName = (s) => String(s || '')
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .replace(/đ/g, 'd').replace(/Đ/g, 'D')
@@ -76,6 +96,16 @@ const bareWardName = (name) => foldName(name).replace(/^(PHUONG|XA)\s+/, '');
 const URBAN_ORIENTED_SET = new Set(URBAN_ORIENTED_COMMUNES.map(bareWardName));
 const MOUNTAIN_SET = new Set(MOUNTAIN_COMMUNES.map(bareWardName));
 const COMMUNE_SET = new Set([...PLAIN_COMMUNES, ...MOUNTAIN_COMMUNES].map(bareWardName));
+
+/** Loại công trình nhóm 12-NT theo tên (khóa NT_KINDS); nghĩa trang không ghi rõ hình thức → hung táng (khoảng cách lớn nhất) */
+function ntKind(item) {
+  const name = foldName(item && item.name);
+  if (name.includes('TANG LE')) return 'funeral';
+  if (name.includes('HOA TANG') || name.includes('HOA THAN')) return 'crematorium';
+  if (name.includes('CAT TANG')) return 'cemetery_cat';
+  if (/CHON (CAT )?(MOT|1) LAN/.test(name)) return 'cemetery_once';
+  return 'cemetery_hung';
+}
 
 /** 'DT' | 'XA' | 'XA_DT' theo tên phường/xã (có hoặc không có tiền tố "Phường"/"Xã") */
 function wardProfile(name) {
@@ -172,7 +202,7 @@ const constants = {
   RADIUS_LIMITS: { min: 50, max: 5000 },
   MAX_HEATMAP_POINTS: 20000,
 
-  // Dân số quy hoạch = dân số hiện trạng × hệ số tăng trưởng; 1 đơn vị ở ≈ 20.000 người
+  // Dân số quy hoạch = dân số hiện trạng × hệ số tăng trưởng; 1 đơn vị ở tối đa 20.000 người (Mục 2.2.2.2) → số đơn vị ở làm tròn lên
   POP_GROWTH: 1.2,
   POP_PER_UNIT: 20000,
 
@@ -199,6 +229,11 @@ const constants = {
 
   // Danh sách mã nhóm hạ tầng tiêu chuẩn phục vụ đánh giá quy chuẩn
   CODES_TO_CHECK: ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"],
+  NETWORK_CODES,
+  networkConfig,
+  NT_KINDS,
+  ntKind,
+  isNetworkCode: (code) => NETWORK_CODES.includes(code),
 
   // ---------------------------------------------------------------------------
   // CẤU TRÚC PHÂN LOẠI THEO QCVN 01:2026/BXD
@@ -245,6 +280,8 @@ const constants = {
     "THCS": "5-THCS", "YT": "6-YT", "VH": "7-VH", "TM": "8-TM", "CSD": "9-CSD",
     "1": "1-CV", "2": "2-BDX", "3": "3-MN", "4": "4-TH",
     "5": "5-THCS", "6": "6-YT", "7": "7-VH", "8": "8-TM", "9": "9-CSD",
+    "BUS": "10-BUS", "PCCC": "11-PCCC", "NT": "12-NT",
+    "10": "10-BUS", "11": "11-PCCC", "12": "12-NT",
     "THPT": "4-TH",
     "CV_DT": "1-CV", "CV_DV": "1-CV",
     "BDX_DT": "2-BDX", "BDX_DV": "2-BDX",
@@ -294,10 +331,18 @@ const constants = {
   standardRadius: function(item, profile = 'DT') {
     if (this.isThptItem(item)) return urbanInfraConfig.THPT.radius;
     const code = this.resolveTypeCode(item);
+    if (NETWORK_CODES.includes(code)) return this.networkRadius(item, code, profile);
     if (this.isUrbanLevel(item) && CODE_LEVEL_KEYS[code] && urbanInfraConfig[CODE_LEVEL_KEYS[code][0]]) {
       return urbanInfraConfig[CODE_LEVEL_KEYS[code][0]].radius;
     }
     return this.unitRadius(code, profile);
+  },
+
+  /** Trạm xe buýt: phạm vi đi bộ; PCCC: bán kính theo phường / xã; nhà tang lễ, nghĩa trang: khoảng cách an toàn Bảng 23 */
+  networkRadius: function(item, code, profile = 'DT') {
+    if (code === '12-NT') return NT_KINDS[ntKind(item)].safety;
+    const r = networkConfig[code].radius;
+    return typeof r === 'object' ? (r[profile] || r.DT) : r;
   },
 
   /** Bán kính tạm khi chưa xác định được phường/xã theo tọa độ (cột Ten_XaPhuong có thể còn tên cũ trước sáp nhập) */

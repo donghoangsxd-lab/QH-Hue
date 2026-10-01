@@ -1,4 +1,4 @@
-import { state, bumpDataVersion, BUFFER_COLORS, ICON_GROUP_KEYS } from './state.js';
+import { state, bumpDataVersion, BUFFER_COLORS, ICON_GROUP_KEYS, isNetworkType, ntKindOf, NT_KIND_LABELS } from './state.js';
 import { geeApi, infraListUrl, markDataWritten } from './api.js';
 import {
   initMap,
@@ -39,6 +39,7 @@ import { initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleCompareMo
 import { escapeHtml, setStatusContent, showToast } from './utils.js';
 import { initCadImport } from './cadImportUi.js';
 import { initWardCheck, refreshWardCheck } from './wardCheck.js';
+import { initOsmImport } from './osmImport.js';
 import { initWardRoads } from './wardRoads.js';
 import { initCustomRoads, handleRoadDrawClick } from './customRoads.js';
 import { initPopEdits, handlePopDrawClick } from './popEdits.js';
@@ -65,7 +66,16 @@ const URBAN_RADIUS = 2000;
 const UNIT_DEFAULT_RADIUS = { "1-CV": 400, "2-BDX": 500, "3-MN": 1000, "4-TH": 1000, "5-THCS": 1000, "6-YT": 1000, "7-VH": 1000, "8-TM": 1000 };
 const RURAL_UNIT_RADIUS = 2000;
 const isThptName = (name) => /THPT|TRUNG HOC PHO THONG/.test(String(name || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/Đ/g, 'D'));
+// Mạng lưới: trạm xe buýt 500 m đi bộ (Mục 2.8.3.3), PCCC 3 km phường / 5 km xã (Mục 2.5.13.1), nghĩa trang theo Bảng 23
+const NO_AREA_TYPES = ["10-BUS", "11-PCCC"];
+const NT_SAFETY = { funeral: 0, crematorium: 500, cemetery_cat: 100, cemetery_once: 500, cemetery_hung: 1000 };
+function networkRadius(type, ward, name) {
+  if (type === '10-BUS') return 500;
+  if (type === '11-PCCC') return /^xã\s/i.test(String(ward || '').trim()) ? 5000 : 3000;
+  return NT_SAFETY[ntKindOf({ name })];
+}
 function qcvnRadius(type, nhomHaTang, ward, name) {
+  if (isNetworkType(type)) return networkRadius(type, ward, name);
   if (!UNIT_DEFAULT_RADIUS[type]) return null;
   if (nhomHaTang === 'Cấp đô thị' || (type === '4-TH' && isThptName(name))) return URBAN_RADIUS;
   return /^xã\s/i.test(String(ward || '').trim()) && !["1-CV", "2-BDX"].includes(type) ? RURAL_UNIT_RADIUS : UNIT_DEFAULT_RADIUS[type];
@@ -79,6 +89,20 @@ function updateRadiusPreview() {
   const ward = document.getElementById('newWard')?.value || '';
   const name = document.getElementById('newName')?.value;
   const r = qcvnRadius(type, nhom, ward, name);
+  const nhomEl = document.getElementById('newNhomHaTang');
+  if (nhomEl) nhomEl.disabled = isNetworkType(type);
+  if (type === '12-NT') {
+    const kind = ntKindOf({ name });
+    out.innerHTML = r
+      ? `<b>${r.toLocaleString('vi-VN')} m</b> <small>(khoảng cách an toàn Bảng 23: ${NT_KIND_LABELS[kind].toLowerCase()})</small>`
+      : `<small>Nhà tang lễ: không quy định khoảng cách an toàn. Tên ghi rõ "cát táng" / "chôn cất một lần" / "hỏa táng" để áp đúng khoảng cách</small>`;
+    return;
+  }
+  if (isNetworkType(type)) {
+    const area = !ward ? 'chưa xác định phường/xã' : /^xã\s/i.test(ward.trim()) ? 'xã' : 'phường';
+    out.innerHTML = `<b>${r.toLocaleString('vi-VN')} m</b> <small>(${type === '10-BUS' ? 'phạm vi đi bộ tới trạm' : `bán kính phục vụ PCCC, ${area}`})</small>`;
+    return;
+  }
   if (!r) {
     out.textContent = type === '9-CSD' ? 'Không áp dụng (cơ sở chưa sử dụng)' : '—';
     return;
@@ -127,6 +151,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
   initCadImport({ onImported: reloadAfterSheetWrite });
   initWardCheck({ onSynced: reloadAfterSheetWrite });
+  initOsmImport({ onImported: reloadAfterSheetWrite });
   initWardRoads();
   initCustomRoads();
   initPopEdits();
@@ -281,7 +306,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   addTypeSwatches();
-  const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'heat'];
+  const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'c11', 'c12', 'c13', 'heat'];
   layerCheckboxes.forEach(key => {
     document.getElementById(`chk_${key}`)?.addEventListener('change', (e) => {
       const targetLayer = key === 'bound' ? 'boundary' : key === 'heat' ? 'heatmap' : key;
@@ -350,7 +375,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       setStatus("⚠️ Diện tích không hợp lệ!", "var(--accent-red)");
       return;
     }
-    if (phase === 'QH' && !(size > 0)) {
+    if (phase === 'QH' && !(size > 0) && !NO_AREA_TYPES.includes(type)) {
       setStatus("⚠️ Điểm quy hoạch mới cần nhập diện tích > 0!", "var(--accent-red)");
       return;
     }
@@ -386,7 +411,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           id: data.id || `NEW-${Date.now()}`,
           name, ward: data.ward || '', type, nhomHaTang, lat, lng,
           size: phase === 'QH' ? 0 : size,
-          radius: data.radius || qcvnRadius(type, nhomHaTang, data.ward, name) || 500,
+          radius: data.radius ?? qcvnRadius(type, nhomHaTang, data.ward, name) ?? 500,
           sizeHT: phase === 'QH' ? null : size,
           sizeQH: phase === 'QH' ? size : null,
           planChange: phase === 'QH' ? 'new' : 'relocate',
@@ -410,7 +435,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnEye = document.getElementById('btnToggleAllIcons');
   btnEye?.addEventListener('click', () => {
     allIconsVisible = !allIconsVisible;
-    ['c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9'].forEach(gKey => {
+    ['c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'c11', 'c12', 'c13'].forEach(gKey => {
       const chk = document.getElementById(`chk_${gKey}`);
       if (chk) chk.checked = allIconsVisible;
       toggleLayer(gKey, allIconsVisible);

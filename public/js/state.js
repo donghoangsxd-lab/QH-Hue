@@ -19,6 +19,8 @@ export const state = {
   cadParcels: new Map(),
   showParcels: true,
   wardStatsData: [],
+  // Chỉ tiêu mạng lưới toàn TP (getWardStats): { HT, QH } — số nhà tang lễ, diện tích nghĩa trang so với dân số
+  cityNetwork: null,
 
   // Bộ lọc địa bàn: null = xem toàn TP. Huế | "Tên phường" = chỉ lọc riêng phường đó
   selectedWard: null,
@@ -46,7 +48,29 @@ export function bumpDataVersion() {
   state.dataVersion++;
 }
 
+// Mạng lưới hạ tầng khác (config/constants.js NETWORK_CODES): không tính quy mô m²/người, độ phủ tổng hợp và heatmap
+export const NETWORK_TYPES = ["10-BUS", "11-PCCC", "12-NT"];
+export const isNetworkType = (type) => NETWORK_TYPES.includes(type);
+
+// Nhà tang lễ / nghĩa trang (cùng hàm ntKind ở config/constants.js): bán kính = khoảng cách an toàn Bảng 23
+export const NT_KIND_LABELS = {
+  funeral: "Nhà tang lễ", crematorium: "Cơ sở hỏa táng", cemetery_cat: "Nghĩa trang cát táng",
+  cemetery_once: "Nghĩa trang chôn cất một lần", cemetery_hung: "Nghĩa trang hung táng"
+};
+export function ntKindOf(item) {
+  if (item && item.ntKind) return item.ntKind;
+  const name = String(item && item.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/\s+/g, ' ').trim().toUpperCase();
+  if (name.includes('TANG LE')) return 'funeral';
+  if (name.includes('HOA TANG') || name.includes('HOA THAN')) return 'crematorium';
+  if (name.includes('CAT TANG')) return 'cemetery_cat';
+  if (/CHON (CAT )?(MOT|1) LAN/.test(name)) return 'cemetery_once';
+  return 'cemetery_hung';
+}
+
 export function effectiveRadius(item) {
+  // Khoảng cách an toàn nghĩa trang là quy định cố định, không theo bán kính giả định; nhà tang lễ = 0 (không có vùng)
+  if (item && item.type === '12-NT') return Number(item.radius) || 0;
   if (state.globalBufferRadiusOverride !== null) return state.globalBufferRadiusOverride;
   return Number(item.radius) || Number(item.banKinh) || 500;
 }
@@ -61,7 +85,10 @@ export const infraLabels = {
   "6-YT": "Bệnh viện, Trạm y tế",
   "7-VH": "Nhà văn hóa, thể thao",
   "8-TM": "Chợ, Trung tâm thương mại",
-  "9-CSD": "Cơ sở chưa sử dụng"
+  "9-CSD": "Cơ sở chưa sử dụng",
+  "10-BUS": "Trạm dừng xe buýt",
+  "11-PCCC": "Trụ sở cảnh sát PCCC",
+  "12-NT": "Nhà tang lễ, nghĩa trang"
 };
 
 // Ranh giới phường xã: nét viền ghi xám vẽ dưới + nét vàng nhạt vẽ trên (đổ bóng rẻ, không dùng CSS filter)
@@ -75,15 +102,18 @@ export const WARD_HIGHLIGHT_STYLE = { color: '#fb923c', weight: 3.5, dashArray: 
 // Hoa văn ranh lô khi phóng to vẫn theo đúng màu ACI của TT16 (tt16Symbols.js).
 export const BUFFER_COLORS = {
   "1-CV": "#7ed321", "2-BDX": "#4dabf7", "3-MN": "#ffd43b", "4-TH": "#ff922b", "5-THCS": "#20c997", "THPT": "#b197fc",
-  "6-YT": "#f06cdb", "7-VH": "#ff8fab", "8-TM": "#ff5c5c", "9-CSD": "#ced4da"
+  "6-YT": "#f06cdb", "7-VH": "#ff8fab", "8-TM": "#ff5c5c", "9-CSD": "#ced4da",
+  "10-BUS": "#00e5ff", "11-PCCC": "#ff3d00", "12-NT": "#a1887f"
 };
 export const BUFFER_KEYS = {
   "1-CV": "b1", "2-BDX": "b2", "3-MN": "b3", "4-TH": "b4", "5-THCS": "b5", "THPT": "b10",
-  "6-YT": "b6", "7-VH": "b7", "8-TM": "b8", "9-CSD": "b9"
+  "6-YT": "b6", "7-VH": "b7", "8-TM": "b8", "9-CSD": "b9",
+  "10-BUS": "b11", "11-PCCC": "b12", "12-NT": "b13"
 };
 export const ICON_GROUP_KEYS = {
   "1-CV": "c1", "2-BDX": "c2", "3-MN": "c3", "4-TH": "c4", "5-THCS": "c5", "THPT": "c10",
-  "6-YT": "c6", "7-VH": "c7", "8-TM": "c8", "9-CSD": "c9"
+  "6-YT": "c6", "7-VH": "c7", "8-TM": "c8", "9-CSD": "c9",
+  "10-BUS": "c11", "11-PCCC": "c12", "12-NT": "c13"
 };
 
 // Trường THPT lưu mã 4-TH (chỉ tiêu tính riêng ở máy chủ theo constants.isThptItem); trên bản đồ tách thành lớp riêng

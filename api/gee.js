@@ -10,6 +10,7 @@ const popEdits = require('../services/popEditsService');
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
 let cachedWardStatsVersion = -1;
+let cachedCityNetwork = null;
 /** Độ phủ đã tính: { "HT:<phường>" | "QH:<phường>": { sig, ratios, Avg_Coverage_Score } } — chỉ dùng lại khi chữ ký dữ liệu khớp */
 let cachedCoverageByWard = {};
 // Tăng khi đổi cách tính độ phủ để mọi cache cũ (server + trình duyệt) tự hết hiệu lực
@@ -581,6 +582,149 @@ const capByCapacity = (pop, capacity) => (capacity == null ? pop : Math.min(pop,
 /** Bán kính vùng phục vụ của khu đất khi xét loại `code`: theo quy chuẩn của loại và hồ sơ phường/xã */
 function csdCandidateRadius(csd, code, profile) {
   return constants.unitRadius(code, profile);
+}
+
+// ============================ MẠNG LƯỚI: TRẠM XE BUÝT, TRỤ SỞ PCCC, NHÀ TANG LỄ - NGHĨA TRANG ============================
+
+const networkItemsOf = (list, code) => list.filter(it => it.type === code && isApprovedStatus(it.status) && it.lat != null && it.lng != null);
+const isCemetery = (it) => String(it.ntKind || constants.ntKind(it)).startsWith('cemetery');
+
+/**
+ * Trạm của phường cách trạm gần nhất > gapMax (Mục 2.8.3.3: khu trung tâm ≤ 600 m); trạm cách < gapIgnore
+ * coi là cặp trạm 2 chiều đường nên không tính là trạm kế cận
+ */
+function busGaps(stopsInWard, allStops) {
+  const { gapMax, gapIgnore } = constants.networkConfig['10-BUS'];
+  const out = [];
+  stopsInWard.forEach(s => {
+    let nearest = Infinity;
+    allStops.forEach(o => {
+      if (o === s) return;
+      const d = distMeters(Number(s.lat), Number(s.lng), Number(o.lat), Number(o.lng));
+      if (d >= gapIgnore && d < nearest) nearest = d;
+    });
+    if (nearest > gapMax) out.push({ id: s.id, name: s.name, lat: s.lat, lng: s.lng, nearestM: Number.isFinite(nearest) ? Math.round(nearest) : null });
+  });
+  return out;
+}
+
+const networkSlim = (it) => ({
+  id: it.id, name: it.name, type: it.type, lat: it.lat, lng: it.lng,
+  size: Number(it.size) || 0, radius: Number(it.radius) || 0, status: it.status,
+  ...(it.type === '12-NT' ? { ntKind: it.ntKind || constants.ntKind(it) } : {})
+});
+
+/** Tóm tắt mạng lưới của 1 phường: approved = công trình đã duyệt trong phường, pending = điểm chờ duyệt */
+function wardNetworkSummary(approved, pending, allBusStops, profile) {
+  const of = (code) => approved.filter(it => it.type === code);
+  const bus = of('10-BUS');
+  return {
+    bus: bus.map(networkSlim),
+    // Khoảng cách trạm ≤ 600 m chỉ áp dụng khu trung tâm đô thị → chỉ xét phường
+    busGaps: profile === 'DT' ? busGaps(bus, allBusStops) : [],
+    busGapCheck: profile === 'DT',
+    pccc: of('11-PCCC').map(networkSlim),
+    pcccRadius: constants.networkRadius({}, '11-PCCC', profile),
+    nt: of('12-NT').map(networkSlim),
+    pending: pending.map(networkSlim)
+  };
+}
+
+/** Chỉ tiêu toàn thành phố: số nhà tang lễ (Mục 2.12.1.1) và diện tích nghĩa trang (Mục 2.12.2.1) theo dân số quy hoạch */
+function cityNetworkSummary(list, cityPop) {
+  const cfg = constants.networkConfig['12-NT'];
+  const nt = networkItemsOf(list, '12-NT');
+  const cemeteries = nt.filter(isCemetery);
+  const kindCount = (k) => nt.filter(it => (it.ntKind || constants.ntKind(it)) === k).length;
+  return {
+    pop: cityPop,
+    busCount: networkItemsOf(list, '10-BUS').length,
+    pcccCount: networkItemsOf(list, '11-PCCC').length,
+    funeralCount: kindCount('funeral'),
+    funeralRequired: Math.max(1, Math.ceil(cityPop / cfg.funeralPopPer)),
+    crematoriumCount: kindCount('crematorium'),
+    cemeteryCount: cemeteries.length,
+    cemeteryArea: Math.round(cemeteries.reduce((s, it) => s + (Number(it.size) || 0), 0)),
+    cemeteryNoArea: cemeteries.filter(it => !(Number(it.size) > 0)).length,
+    cemeteryRequired: Math.round(cityPop * cfg.cemeteryQuota)
+  };
+}
+
+/** Độ phủ mạng lưới đã tính: { "HT:<phường>": { sig, payload } } */
+let cachedNetworkCoverage = {};
+
+function networkSignature(groups) {
+  const parts = Object.keys(groups).map(k => `${k}:${groups[k].map(it => [it.id, it.lat, it.lng, it.radius].join('|')).sort().join(';')}`);
+  return crypto.createHash('md5').update(`n1p${getPopEditsVersion()}#${parts.join('#')}`).digest('hex').slice(0, 12);
+}
+
+/**
+ * Dân số phường nằm trong vùng phục vụ trạm xe buýt (500 m), trụ sở PCCC (3 km phường / 5 km xã — theo phường đang xét)
+ * và trong khoảng cách an toàn nghĩa trang / cơ sở hỏa táng (Bảng 23). Mọi công trình toàn TP đều được xét (buffer vượt ranh phường)
+ */
+async function computeNetworkCoverage(ee, popRaster, wardGeometry, groups) {
+  const geom = ee.Geometry(wardGeometry);
+  const empty = ee.Image(0).selfMask();
+  const maskOf = (items) => items.length
+    ? ee.Image(0).byte().paint(ee.FeatureCollection(items.map(it =>
+      ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(Number(it.radius))))), 1).selfMask()
+    : empty;
+  const pop = popRaster.select('DanSoPixelNormalized');
+  const img = ee.Image.cat([
+    pop.rename('total'),
+    ...Object.keys(groups).map(k => pop.updateMask(maskOf(groups[k])).rename(k))
+  ]);
+  const res = (await eeEvaluate(img.reduceRegion({
+    reducer: ee.Reducer.sum().unweighted(), geometry: geom, scale: POP_SCALE_M, maxPixels: 1e9
+  }))) || {};
+  const total = Math.round(Number(res.total) || 0);
+  const out = { popTotal: total };
+  Object.keys(groups).forEach(k => {
+    const p = Math.round(Number(res[k]) || 0);
+    out[k] = { pop: p, pct: total > 0 ? round1(clamp((p / total) * 100, 0, 100)) : 0, count: groups[k].length };
+  });
+  return out;
+}
+
+// ============================ NHẬP ĐIỂM OPENSTREETMAP (ADMIN) ============================
+
+const OSM_IMPORT_MAX = 1500;
+// Cùng loại đã có trong dữ liệu gần hơn ngưỡng này (m) → coi là trùng, không đề xuất lại
+// (trạm xe buýt nhỏ: cặp trạm 2 chiều đường cách nhau ~20–30 m vẫn là 2 trạm)
+const OSM_DUP_M = { "10-BUS": 12, "11-PCCC": 80, "12-NT": 60 };
+const OSM_REF_RE = /^OSM:(node|way|relation)\/\d{1,12}$/;
+
+/** Điểm OSM trình duyệt gửi lên → điểm hợp lệ (đúng loại, trong 40 phường/xã, chưa có trong dữ liệu) kèm phường và bán kính */
+function prepareOsmImport(rawItems, allDataList, evaluatedWards) {
+  const stats = {};
+  constants.NETWORK_CODES.forEach(c => { stats[c] = { received: 0, outside: 0, duplicate: 0, accepted: 0 }; });
+  const known = allDataList.filter(it => constants.isNetworkCode(it.type) && it.lat != null && it.lng != null);
+  const knownRefs = new Set();
+  known.forEach(it => {
+    const m = String(it.note || '').match(/OSM:(node|way|relation)\/\d+/);
+    if (m) knownRefs.add(m[0]);
+  });
+  const accepted = [];
+  rawItems.forEach(raw => {
+    const type = String(raw && raw.type || '');
+    if (!constants.isNetworkCode(type)) return;
+    const st = stats[type];
+    st.received++;
+    const pt = parseCoordInBounds(raw.lat, raw.lng);
+    const ref = String(raw.ref || '');
+    if (!pt || !OSM_REF_RE.test(ref)) { st.outside++; return; }
+    const ward = assignWardByGeometry(pt.lng, pt.lat, evaluatedWards);
+    if (!ward) { st.outside++; return; }
+    const near = (it) => it.type === type && distMeters(pt.lat, pt.lng, Number(it.lat), Number(it.lng)) < OSM_DUP_M[type];
+    if (knownRefs.has(ref) || known.some(near) || accepted.some(near)) { st.duplicate++; return; }
+    const name = sanitizeSheetText(raw.name, 150) || constants.networkConfig[type].label;
+    const size = clamp(Math.round(Number(raw.size) || 0), 0, 1e7);
+    const item = { type, name, ward, lat: pt.lat, lng: pt.lng, size, ref };
+    item.radius = constants.standardRadius(item, constants.wardProfile(ward));
+    accepted.push(item);
+    st.accepted++;
+  });
+  return { accepted, stats };
 }
 
 /** Công trình cùng loại đã duyệt (toàn TP, kể cả phường bên cạnh) có buffer chạm tới buffer ứng viên */
@@ -1440,16 +1584,18 @@ module.exports = async (req, res) => {
       const body = readJsonBody(req);
       const type = String(body.type || '');
       const name = sanitizeSheetText(body.name, 150);
-      const nhomHaTang = body.nhomHaTang === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
+      const isNetwork = constants.isNetworkCode(type);
+      const nhomHaTang = isNetwork || body.nhomHaTang === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
       const phase = body.phase === 'QH' ? 'QH' : 'HT';
       const size = Number(body.size || 0);
       const pt = parseCoordInBounds(body.lat, body.lng);
+      const noArea = isNetwork && !!constants.networkConfig[type].noArea;
 
-      if (![...CODES, '9-CSD'].includes(type)) return res.status(400).json({ error: true, message: "Loại hạ tầng không hợp lệ" });
+      if (![...CODES, '9-CSD', ...constants.NETWORK_CODES].includes(type)) return res.status(400).json({ error: true, message: "Loại hạ tầng không hợp lệ" });
       if (!name) return res.status(400).json({ error: true, message: "Thiếu tên công trình" });
       if (!pt) return res.status(400).json({ error: true, message: "Tọa độ không hợp lệ hoặc nằm ngoài TP. Huế" });
       if (!Number.isFinite(size) || size < 0 || size > 1e8) return res.status(400).json({ error: true, message: "Diện tích không hợp lệ" });
-      if (phase === 'QH' && !(size > 0)) return res.status(400).json({ error: true, message: "Điểm quy hoạch mới cần diện tích > 0" });
+      if (phase === 'QH' && !(size > 0) && !noArea) return res.status(400).json({ error: true, message: "Điểm quy hoạch mới cần diện tích > 0" });
 
       const evaluatedWardsForAdd = await loadEvaluatedWards(wardVectorParsed);
       const geoWard = assignWardByGeometry(pt.lng, pt.lat, evaluatedWardsForAdd);
@@ -1766,6 +1912,52 @@ module.exports = async (req, res) => {
       });
     }
 
+    if (action === 'getNetworkCoverage') {
+      const evaluatedWards = await loadEvaluatedWards(wardVectorParsed);
+      const targetWard = findWardByName(evaluatedWards, String(req.query.ward || '').trim().slice(0, 100));
+      if (!targetWard || !targetWard.geometry) return res.status(404).json({ error: true, message: "Không tìm thấy ranh giới phường" });
+      const isPlan = String(req.query.scenario || '').toUpperCase() === 'QH';
+      const list = isPlan ? getPlanScenarioItems(allDataList) : rawDataList;
+      const profile = constants.wardProfile(targetWard.name);
+      const pcccR = constants.networkRadius({}, '11-PCCC', profile);
+      const groups = {
+        bus: networkItemsOf(list, '10-BUS'),
+        pccc: networkItemsOf(list, '11-PCCC').map(it => ({ ...it, radius: pcccR })),
+        nt: networkItemsOf(list, '12-NT').filter(it => Number(it.radius) > 0)
+      };
+      const sig = networkSignature(groups);
+      const cacheKey = `${isPlan ? 'QH' : 'HT'}:${targetWard.name}`;
+      const hit = cachedNetworkCoverage[cacheKey];
+      if (hit && hit.sig === sig) return res.status(200).json(hit.payload);
+
+      const result = await withTimeout(computeNetworkCoverage(ee, popRasterNormalized, targetWard.geometry, groups), 45000, null);
+      if (!result) return res.status(504).json({ error: true, message: "GEE quá thời gian khi tính độ phủ mạng lưới" });
+      const payload = { ward: targetWard.name, scenario: isPlan ? 'QH' : 'HT', pcccRadius: pcccR, sig, ...result };
+      cachedNetworkCoverage[cacheKey] = { sig, payload };
+      return res.status(200).json(payload);
+    }
+
+    // Admin: điểm OSM (trình duyệt tải từ Overpass) → lọc trùng, gán phường, bán kính → ghi Sheet ở trạng thái chờ duyệt
+    if (action === 'importOsmNetwork') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const rawItems = Array.isArray(body.items) ? body.items : [];
+      if (!rawItems.length || rawItems.length > OSM_IMPORT_MAX) {
+        return res.status(400).json({ error: true, message: `Mỗi lần gửi 1–${OSM_IMPORT_MAX} điểm` });
+      }
+      const { accepted, stats } = prepareOsmImport(rawItems, allDataList, await loadEvaluatedWards(wardVectorParsed));
+      if (body.dryRun || !accepted.length) {
+        return res.status(200).json({ success: true, dryRun: true, stats, items: accepted });
+      }
+      const result = await callAppsScript({ action: 'addPendingPoints' }, {
+        action: 'addPendingPoints',
+        items: accepted.map(it => ({ ...it, lat: it.lat.toFixed(6), lng: it.lng.toFixed(6) }))
+      });
+      invalidateAllCaches();
+      return res.status(200).json({ success: true, stats, created: Number(result.created) || 0, skipped: Number(result.skipped) || 0 });
+    }
+
     if (action === 'getWardCoverage') {
       const wardName = String(req.query.ward || '').trim().slice(0, 100);
       if (!wardName) {
@@ -1832,7 +2024,7 @@ module.exports = async (req, res) => {
       if (cachedWardStats && cachedWardStatsVersion === getDataVersion()
           && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)) {
         cachedWardStats.forEach(applyCachedCoverage);
-        return res.status(200).json({ data: cachedWardStats, coverageStatus: 'cached' });
+        return res.status(200).json({ data: cachedWardStats, network: cachedCityNetwork, coverageStatus: 'cached' });
       }
       cachedWardStats = null;
 
@@ -1848,15 +2040,17 @@ module.exports = async (req, res) => {
           Ten_Phuong: w.name,
           Dan_So_Vector: totalPop,
           projectedPopulation: projPop,
-          currentUnits: Math.max(1, Math.round(totalPop / constants.POP_PER_UNIT)),
-          projectedUnits: Math.max(1, Math.round(projPop / constants.POP_PER_UNIT)),
+          currentUnits: Math.max(1, Math.ceil(totalPop / constants.POP_PER_UNIT)),
+          projectedUnits: Math.max(1, Math.ceil(projPop / constants.POP_PER_UNIT)),
           items: [],
           covItems: [],
           pendingItems: [],
           csdRaw: [],
           planItems: [],
           planCovItems: [],
-          planCovChanges: []
+          planCovChanges: [],
+          network: [],
+          networkPending: []
         };
       });
 
@@ -1865,6 +2059,10 @@ module.exports = async (req, res) => {
         if (item.lat == null || item.lng == null) return;
         const w = wardMap[wardOf(item)];
         if (!w) return;
+        if (constants.isNetworkCode(item.type)) {
+          (isApprovedStatus(item.status) ? w.network : w.networkPending).push(item);
+          return;
+        }
         const prefix = String(item.id || '').split('-')[0];
         const nhom = String(item.nhomHaTang || '').toLowerCase();
         const approved = isApprovedStatus(item.status);
@@ -1900,6 +2098,7 @@ module.exports = async (req, res) => {
       const approvedAll = rawDataList.filter(it => isApprovedStatus(it.status) && it.lat != null && it.lng != null);
       const coverageCandidates = [];
       const rankAfterCount = [];
+      const allBusStops = networkItemsOf(rawDataList, '10-BUS');
 
       for (const wName in wardMap) {
         const data = wardMap[wName];
@@ -1982,6 +2181,7 @@ module.exports = async (req, res) => {
           unitResults,
           csdItems,
           pendingItems,
+          network: wardNetworkSummary(data.network, data.networkPending, allBusStops, profile),
           dvccSummary: {
             totalArea: (unitResults["YT_DV"]?.currentArea || 0) + (unitResults["VH_DV"]?.currentArea || 0) + (unitResults["TM_DV"]?.currentArea || 0),
             requiredArea: (constants.baseQuota('DVCC_TOTAL', profile) || 0) * projPop,
@@ -2011,12 +2211,19 @@ module.exports = async (req, res) => {
 
       resultTable.sort((a, b) => b.Dan_So_Vector - a.Dan_So_Vector);
 
+      const cityPop = resultTable.reduce((s, r) => s + (Number(r.projectedPopulation) || 0), 0);
+      const cityNetwork = {
+        HT: cityNetworkSummary(rawDataList, cityPop),
+        QH: cityNetworkSummary(getPlanScenarioItems(allDataList), cityPop)
+      };
+
       // Kết quả ước lượng (GEE lỗi) không giữ trong cache để lần sau đếm lại bằng pixel
       cachedWardStats = allPixel ? resultTable : null;
+      cachedCityNetwork = cityNetwork;
       cachedWardStatsVersion = getDataVersion();
       lastWardStatsFetch = now;
 
-      return res.status(200).json({ data: resultTable, coverageStatus: 'per_ward' });
+      return res.status(200).json({ data: resultTable, network: cityNetwork, coverageStatus: 'per_ward' });
     }
 
     const planDataList = allDataList.filter(it => it.planChange === 'new');

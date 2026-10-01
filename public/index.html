@@ -159,6 +159,10 @@
         <div class="layer-row"><div><input type="checkbox" id="chk_c7" checked><label for="chk_c7">8. Nhà văn hóa, thể thao</label></div><button type="button" class="btn-dot-buffer" data-buffer="b7" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c8" checked><label for="chk_c8">9. Chợ, TTTM</label></div><button type="button" class="btn-dot-buffer" data-buffer="b8" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c9" checked><label for="chk_c9">10. Cơ sở chưa sử dụng</label></div></div>
+        <div class="layer-group-title" title="Không tính vào quy mô m²/người, độ phủ tổng hợp và bản đồ độ phủ">Mạng lưới hạ tầng khác</div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c11"><label for="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3)">11. Trạm dừng xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" title="Bật/tắt phạm vi 500 m" aria-label="Bật/tắt phạm vi 500 m" aria-pressed="false">●</button></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c12"><label for="chk_c12" title="Bán kính phục vụ ≤ 3 km phường, ≤ 5 km xã (QCVN 01:2026 Mục 2.5.13.1)">12. Trụ sở cảnh sát PCCC</label></div><button type="button" class="btn-dot-buffer" data-buffer="b12" title="Bật/tắt bán kính phục vụ" aria-label="Bật/tắt bán kính phục vụ" aria-pressed="false">●</button></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c13"><label for="chk_c13" title="Vùng đệm = khoảng cách an toàn tới khu dân cư (QCVN 01:2026 Bảng 23)">13. Nhà tang lễ, nghĩa trang</label></div><button type="button" class="btn-dot-buffer" data-buffer="b13" title="Bật/tắt khoảng cách an toàn" aria-label="Bật/tắt khoảng cách an toàn" aria-pressed="false">●</button></div>
 
         <div class="rp-settings">
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div></div>
@@ -226,6 +230,9 @@
           <option value="7-VH">7. Nhà văn hóa, thể thao</option>
           <option value="8-TM">8. Chợ, Trung tâm thương mại</option>
           <option value="9-CSD" selected>9. Cơ sở chưa sử dụng</option>
+          <option value="10-BUS">10. Trạm dừng xe buýt</option>
+          <option value="11-PCCC">11. Trụ sở cảnh sát PCCC</option>
+          <option value="12-NT">12. Nhà tang lễ, nghĩa trang</option>
         </select>
 
         <label for="newPhase">Giai đoạn</label>
@@ -325,6 +332,7 @@
         <div class="admin-sub-switch" role="tablist" aria-label="Công cụ hiệu chỉnh">
           <button type="button" class="admin-sub-btn active" data-sub="addRoad" role="tab" aria-selected="true"><svg class="ico"><use href="#i-road"/></svg>Tuyến đường</button>
           <button type="button" class="admin-sub-btn" data-sub="addPop" role="tab" aria-selected="false"><svg class="ico"><use href="#i-users"/></svg>Pixel dân cư</button>
+          <button type="button" class="admin-sub-btn" data-sub="addOsm" role="tab" aria-selected="false" title="Nhập trạm xe buýt, trụ sở PCCC, nhà tang lễ - nghĩa trang từ OpenStreetMap"><svg class="ico"><use href="#i-map"/></svg>Dữ liệu OSM</button>
         </div>
         <div id="addRoad">
           <div class="form-grid">
@@ -369,6 +377,18 @@
           <div id="popStatus" class="rp-status" role="status" aria-live="polite"></div>
           <div id="popList" class="cad-list"></div>
         </div>
+
+        <div id="addOsm" style="display:none;">
+          <div class="cad-hint">Tải điểm OpenStreetMap trong 40 phường/xã, ghi vào tab 10-BUS / 11-PCCC / 12-NT của Sheet ở trạng thái <b>chờ duyệt</b>. Điểm đã có (cùng mã OSM, hoặc cùng loại ở rất gần) tự bỏ qua; lăng mộ di tích và trụ nước chữa cháy không được nhập.</div>
+          <div class="osm-types">
+            <label><input type="checkbox" class="osm-type" value="10-BUS" checked>Trạm dừng xe buýt</label>
+            <label><input type="checkbox" class="osm-type" value="11-PCCC" checked>Trụ sở cảnh sát PCCC</label>
+            <label><input type="checkbox" class="osm-type" value="12-NT" checked>Nhà tang lễ, nghĩa trang</label>
+          </div>
+          <button type="button" class="btn-submit" id="btnOsmCheck"><svg class="ico"><use href="#i-inspect"/></svg>KIỂM TRA DỮ LIỆU OSM</button>
+          <div id="osmStatus" class="rp-status" role="status" aria-live="polite"></div>
+          <div id="osmReport"></div>
+        </div>
         </div>
       </div>
 
@@ -384,6 +404,9 @@
         <div class="legend-row"><img src="./icons/Vanhoa.png" class="legend-icon" alt="" />8. Nhà văn hóa, thể thao</div>
         <div class="legend-row"><img src="./icons/Cho.png" class="legend-icon" alt="" />9. Chợ, Trung tâm thương mại</div>
         <div class="legend-row legend-unused"><img src="./icons/Unused.png" class="legend-icon" alt="" /><b>10. Cơ sở chưa sử dụng</b></div>
+        <div class="legend-row"><img src="./icons/Bus.svg" class="legend-icon" alt="" />11. Trạm dừng xe buýt</div>
+        <div class="legend-row"><img src="./icons/Pccc.svg" class="legend-icon" alt="" />12. Trụ sở cảnh sát PCCC</div>
+        <div class="legend-row"><img src="./icons/Nghiatrang.svg" class="legend-icon" alt="" />13. Nhà tang lễ, nghĩa trang</div>
         <div class="legend-row legend-pending"><img src="./icons/Park2.png" class="legend-icon" alt="" /><b>Chưa chấp thuận (Chờ duyệt)</b></div>
         <div class="legend-row"><span class="legend-icon legend-dot"><i class="legend-plan-dot"></i></span>Điểm quy hoạch khác hiện trạng</div>
 

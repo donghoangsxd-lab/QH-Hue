@@ -1,4 +1,4 @@
-import { state, BUFFER_COLORS } from './state.js';
+import { state, BUFFER_COLORS, isNetworkType, NT_KIND_LABELS } from './state.js';
 import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js';
 import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, loadHtml2Canvas, showToast, wardStatHtml, ico, setStatusContent, inlineSpriteIcons } from './utils.js';
@@ -174,6 +174,7 @@ function sumAreaByType(list) {
   let sum = 0;
   (list || []).forEach(item => {
     if (!isApproved(item.status) && item.type !== "9-CSD") return;
+    if (isNetworkType(item.type)) return;
     const type = item.type || 'Khác';
     const size = Number(item.size || 0);
     // Diện tích = 0 vẫn tính 1 đơn vị để donut không trống
@@ -906,6 +907,7 @@ export function ensureWardStats() {
         // Bỏ qua kết quả của lượt tải cũ nếu đã có yêu cầu nạp lại
         if (wardStatsPromise !== promise) return state.wardStatsData;
         state.wardStatsData = resData.data || [];
+        state.cityNetwork = resData.network || null;
         mergeLocalCoverageIntoStats();
         return state.wardStatsData;
       })
@@ -1300,7 +1302,7 @@ function renderWardSummary(wardData) {
   const popCurrent = wardData.Dan_So_Vector || 45000;
   if (!wardData.projectedPopulation) wardData.projectedPopulation = Math.round(popCurrent * 1.2);
   const popProjected = wardData.projectedPopulation;
-  const projectedUnits = wardData.projectedUnits || Math.max(1, Math.round(popProjected / 20000));
+  const projectedUnits = wardData.projectedUnits || Math.max(1, Math.ceil(popProjected / 20000));
 
   const view = document.getElementById('wardSummaryView');
   if (!view) return;
@@ -1333,7 +1335,7 @@ function renderWardSummary(wardData) {
     popInput.oninput = (e) => {
       const raw = Number(e.target.value);
       const newProjPop = Number.isFinite(raw) && raw >= 1000 ? Math.min(raw, CITY_POP_QH) : popProjected;
-      const newUnits = Math.max(1, Math.round(newProjPop / 20000));
+      const newUnits = Math.max(1, Math.ceil(newProjPop / 20000));
       const unitsLabel = document.getElementById('projectedUnitsLabel');
       if (unitsLabel) unitsLabel.textContent = newUnits;
       const densityQH = document.getElementById('wardDensityQH');
@@ -1351,6 +1353,7 @@ function renderWardSummary(wardData) {
 
   clearTimeout(wardRetryTimer);
   loadWardDetailCoverage(wardData);
+  loadWardNetworkCoverage(wardData);
 }
 
 // Trần dân số QH toàn TP: ô tổng dân số QH (hàng QH trên tiêu đề phường); toast mỗi lần tổng chuyển từ trong ngưỡng sang vượt ngưỡng
@@ -1464,7 +1467,7 @@ function countCellHtml(count, totalUnits) {
 function buildWardQuotaTableHtml(wardData, projPop) {
   const urbanRes = wardData.urbanResults || {};
   const unitRes = wardData.unitResults || {};
-  const totalUnits = wardData.projectedUnits || Math.max(1, Math.round(projPop / 20000));
+  const totalUnits = wardData.projectedUnits || Math.max(1, Math.ceil(projPop / 20000));
   const parts = [];
 
   const subItemRows = (sectionId, subItems, deep = false) => {
@@ -1665,8 +1668,155 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   sectionHeader('E', 'e', 'MẠNG LƯỚI ĐƯỜNG GIAO THÔNG (OpenStreetMap + tuyến Admin bổ sung)');
   parts.push(`</tbody><tbody id="wardRoadBody">${wardRoadRowsHtml(wardData)}</tbody><tbody>`);
 
+  parts.push(networkSectionHtml(wardData));
+
   parts.push(`</tbody></table></div>`);
   return parts.join('');
+}
+
+// ================== F / MẠNG LƯỚI HẠ TẦNG KHÁC (TRẠM XE BUÝT, PCCC, NHÀ TANG LỄ - NGHĨA TRANG) ==================
+// Dân số trong vùng phục vụ / vùng cách ly theo phường (action getNetworkCoverage): "phường|dataVersion" → kết quả | 'error'
+const netCoverageCache = new Map();
+const netCovInflight = new Set();
+const netCovKey = (ward) => `${ward}|${state.dataVersion}`;
+
+function netCovCellHtml(ward, key) {
+  const res = netCoverageCache.get(netCovKey(ward));
+  if (!res) return PENDING_CELL;
+  if (res === 'error') return `<span class="c-muted" title="Chưa tính được (GEE đang bận), mở lại phường sau">–</span>`;
+  const g = res[key] || { pop: 0, pct: 0 };
+  if (key === 'nt') {
+    return g.pop > 0
+      ? `<b class="c-red" title="Dân số nằm trong khoảng cách an toàn của nghĩa trang / cơ sở hỏa táng (Bảng 23)">${fmtNum(g.pop)} người</b>`
+      : `<b class="c-green" title="Không có dân cư trong khoảng cách an toàn">0 người</b>`;
+  }
+  return `<b class="${g.pct >= 100 ? 'c-green' : 'c-orange'}" title="${fmtNum(g.pop)}/${fmtNum(res.popTotal)} người trong phạm vi">${fmtPct(g.pct)}</b>`;
+}
+
+function loadWardNetworkCoverage(wardData) {
+  const ward = wardData.Ten_Phuong;
+  const key = netCovKey(ward);
+  if (netCoverageCache.has(key) || netCovInflight.has(key)) return;
+  const fillCells = () => {
+    const card = document.getElementById('wardSummaryCard');
+    if (!card || card.dataset.ward !== ward) return;
+    card.querySelectorAll('.net-cov').forEach(td => { td.innerHTML = netCovCellHtml(ward, td.dataset.key); });
+  };
+  // Toàn TP chưa có điểm mạng lưới đã duyệt: mọi phường 0%, không cần gọi GEE
+  if (!state.rawDataList.some(it => isNetworkType(it.type) && isApproved(it.status))) {
+    const zero = { pop: 0, pct: 0, count: 0 };
+    netCoverageCache.set(key, { popTotal: 0, bus: zero, pccc: zero, nt: zero });
+    fillCells();
+    return;
+  }
+  netCovInflight.add(key);
+  fetch(geeApi(`action=getNetworkCoverage&ward=${encodeURIComponent(ward)}`))
+    .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+    .then(res => netCoverageCache.set(key, res))
+    .catch(() => netCoverageCache.set(key, 'error'))
+    .finally(() => {
+      netCovInflight.delete(key);
+      fillCells();
+      if (netCoverageCache.get(key) === 'error') netCoverageCache.delete(key);
+    });
+}
+
+const NET_TYPE_SHORT = { "10-BUS": "Trạm xe buýt", "11-PCCC": "Trụ sở PCCC", "12-NT": "Nhà tang lễ, nghĩa trang" };
+
+function networkSubRows(sectionId, items, gapMap = null, withType = false) {
+  const rows = items.map(it => {
+    const gap = gapMap && gapMap.get(it.id);
+    const gapBadge = gap
+      ? ` <span class="min-size-warn" title="Khoảng cách tới trạm gần nhất (bỏ qua trạm cách < 100 m: cặp trạm 2 chiều đường)">${ico('alert')}${gap.nearestM == null ? 'không có trạm kế cận' : `cách trạm gần nhất ${fmtNum(gap.nearestM)} m`}</span>`
+      : '';
+    const note = withType ? NET_TYPE_SHORT[it.type] : it.ntKind ? NT_KIND_LABELS[it.ntKind] : '';
+    return `<tr class="wt-sub">
+      <td>-</td>
+      <td>${zoomLinkHtml(it)}${note ? ` <span class="wt-light">(${escapeHtml(note)})</span>` : ''}${gapBadge}</td>
+      <td>${Number(it.size) > 0 ? `${fmtNum(it.size)} m²` : '-'}</td>
+      <td>-</td><td>-</td><td>-</td><td>-</td>
+      <td class="wt-radius">${Number(it.radius) > 0 ? `${fmtNum(it.radius)} m` : '-'}</td>
+    </tr>`;
+  }).join('');
+  return `</tbody><tbody id="${sectionId}" style="display:none;">${rows}</tbody><tbody>`;
+}
+
+function networkSectionHtml(wardData) {
+  const head = `<tr class="wt-section wt-f"><td>F</td><td colspan="7">MẠNG LƯỚI HẠ TẦNG KHÁC <span class="wt-light">(không tính vào quy mô, độ phủ tổng hợp)</span></td></tr>`;
+  const net = wardData.network;
+  if (!net) return head + `<tr class="wt-empty"><td>-</td><td colspan="7">Máy chủ chưa trả dữ liệu mạng lưới (tải lại trang).</td></tr>`;
+  const ward = wardData.Ten_Phuong;
+  const tog = (id, list) => (list.length ? toggleBtnHtml(id) : '');
+  const covCell = (key) => `<td class="net-cov" data-key="${key}">${netCovCellHtml(ward, key)}</td>`;
+  let html = head;
+
+  const gapMap = new Map((net.busGaps || []).map(g => [g.id, g]));
+  const gapNote = !net.busGapCheck
+    ? '<span class="c-muted" title="Khoảng cách giữa các trạm ≤ 600 m chỉ áp dụng khu trung tâm đô thị">khoảng cách trạm: không xét (xã)</span>'
+    : !net.bus.length ? '' : gapMap.size
+      ? `<b class="c-red" title="Trạm cách trạm kế cận > 600 m (Mục 2.8.3.3)">${gapMap.size} trạm cách &gt; 600 m</b>`
+      : '<b class="c-green">khoảng cách trạm ≤ 600 m</b>';
+  html += `<tr class="wt-main">
+    <td>1</td>
+    <td title="QCVN 01:2026/BXD Mục 2.8.3.3: cự ly đi bộ tới trạm ≤ 500 m; khu trung tâm khoảng cách trạm ≤ 600 m">Trạm dừng xe buýt ${tog('net_sub_bus', net.bus)}</td>
+    <td>-</td>
+    <td colspan="2">≤ 500 m đi bộ${gapNote ? `<br>${gapNote}` : ''}</td>
+    <td>${net.bus.length} trạm</td>
+    <td>-</td>
+    ${covCell('bus')}
+  </tr>`;
+  if (net.bus.length) html += networkSubRows('net_sub_bus', net.bus, gapMap);
+
+  const pcccKm = QUOTA_FORMAT.format((Number(net.pcccRadius) || 0) / 1000);
+  html += `<tr class="wt-main">
+    <td>2</td>
+    <td title="QCVN 01:2026/BXD Mục 2.5.13.1: bán kính phục vụ ≤ 3 km khu trung tâm, ≤ 5 km khu vực khác">Trụ sở cảnh sát PCCC ${tog('net_sub_pccc', net.pccc)}</td>
+    <td>-</td>
+    <td colspan="2">bán kính ≤ ${pcccKm} km</td>
+    <td>${net.pccc.length} trụ sở</td>
+    <td>-</td>
+    ${covCell('pccc')}
+  </tr>`;
+  if (net.pccc.length) html += networkSubRows('net_sub_pccc', net.pccc);
+
+  const cemArea = net.nt.filter(it => String(it.ntKind || '').startsWith('cemetery')).reduce((s, it) => s + (Number(it.size) || 0), 0);
+  const funerals = net.nt.filter(it => it.ntKind === 'funeral').length;
+  html += `<tr class="wt-main">
+    <td>3</td>
+    <td title="Vùng đệm = khoảng cách an toàn tới khu dân cư (Bảng 23): hung táng 1.000 m, chôn cất một lần 500 m, cát táng 100 m, hỏa táng 500 m">Nhà tang lễ, nghĩa trang ${tog('net_sub_nt', net.nt)}</td>
+    <td>${fmtNum(cemArea)} m²</td>
+    <td colspan="2">Bảng 23 <span class="wt-light">(dân trong vùng cách ly)</span></td>
+    <td>${net.nt.length} cơ sở${funerals ? `<br><span class="wt-light">${funerals} nhà tang lễ</span>` : ''}</td>
+    <td>-</td>
+    ${covCell('nt')}
+  </tr>`;
+  if (net.nt.length) html += networkSubRows('net_sub_nt', net.nt);
+
+  const city = state.cityNetwork && state.cityNetwork.HT;
+  if (city) {
+    const funeralOk = city.funeralCount >= city.funeralRequired;
+    const noAreaNote = city.cemeteryNoArea ? `<br><span class="wt-light">${city.cemeteryNoArea} nghĩa trang chưa có diện tích</span>` : '';
+    html += `<tr class="wt-comp">
+      <td>3.1</td>
+      <td title="Mục 2.12.1.1: mỗi nhà tang lễ phục vụ ≤ 250.000 người; Mục 2.12.2.1: đất nghĩa trang ≥ 0,04 ha/1.000 người — tính chung toàn thành phố theo dân số QH ${fmtNum(city.pop)} người">Chỉ tiêu toàn thành phố</td>
+      <td>${fmtNum(city.cemeteryArea)} m²${noAreaNote}</td>
+      <td colspan="2">nghĩa trang ≥ 0,4 m²/người<br>→ ${fmtNum(city.cemeteryRequired)} m²</td>
+      <td><b class="${funeralOk ? 'c-green' : 'c-red'}" title="1 nhà tang lễ / 250.000 người">${city.funeralCount}/${city.funeralRequired} nhà tang lễ</b></td>
+      <td>${scaleCellHtml(city.cemeteryArea, city.cemeteryRequired)}</td>
+      <td>-</td>
+    </tr>`;
+  }
+
+  if ((net.pending || []).length) {
+    html += `<tr class="wt-comp">
+      <td>4</td>
+      <td>Điểm mạng lưới chờ duyệt ${toggleBtnHtml('net_sub_pending')}</td>
+      <td>-</td>
+      <td colspan="5" class="wt-note">${net.pending.length} điểm (người dùng đề xuất hoặc nhập từ OpenStreetMap) — mở điểm trên bản đồ để phê duyệt</td>
+    </tr>`;
+    html += networkSubRows('net_sub_pending', net.pending, null, true);
+  }
+  return html;
 }
 
 // ================== BIỂU ĐỒ ĐỘ PHỦ & QUY MÔ 40 PHƯỜNG ==================

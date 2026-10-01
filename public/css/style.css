@@ -382,6 +382,7 @@ body.right-collapsed .right-panel {
 .layer-row label { cursor: pointer; color: var(--text-main); }
 .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 13px; height: 13px; margin: 0 6px 0 0; vertical-align: middle; }
 .layer-row .layer-hint { color: var(--text-muted); font-size: var(--fs-xs); }
+.layer-group-title { margin: 5px 0 1px; padding-top: 3px; border-top: 1px dashed var(--border-color); font-size: var(--fs-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; cursor: help; }
 .road-legend.layer-legend { margin: 0 0 4px 22px; flex-wrap: wrap; row-gap: 2px; }
 .terrain-legend { margin: 0 6px 6px 22px; font-size: var(--fs-xs); color: var(--text-muted); }
 .terrain-legend-bar { height: 8px; border-radius: var(--r-sm); }
@@ -583,6 +584,10 @@ body.right-collapsed .right-panel {
 .cad-table { width: 100%; margin-top: 5px; border-collapse: collapse; font-size: var(--fs-sm); }
 .cad-table th { color: var(--text-muted); font-weight: 600; text-align: right; border-bottom: 1px solid var(--border-color); padding: 2px 0; }
 .cad-table th:first-child, .cad-table td:first-child { text-align: left; }
+.osm-types { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; font-size: var(--fs-md); }
+.osm-types label { cursor: pointer; }
+.osm-types input { accent-color: var(--accent-cyan); margin: 0 6px 0 0; vertical-align: middle; }
+.osm-table + .btn-submit { margin-top: 8px; }
 .cad-table td { text-align: right; padding: 2px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.2); }
 .cad-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; flex-shrink: 0; }
 .cad-list { margin-top: 5px; max-height: 170px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--r-md); }
@@ -953,6 +958,7 @@ table.ward-table td:nth-child(3), table.ward-table td:nth-child(5) { text-align:
 .ward-table .wt-c { --sec-c: var(--accent-red); --sec-rgb: var(--red-rgb); }
 .ward-table .wt-d { --sec-c: var(--accent-orange); --sec-rgb: var(--orange-rgb); }
 .ward-table .wt-e { --sec-c: #93c5fd; --sec-rgb: 147, 197, 253; }
+.ward-table .wt-f { --sec-c: #fca5a5; --sec-rgb: 252, 165, 165; }
 .ward-table .wt-item td:nth-child(-n+3) { font-weight: 700; }
 .ward-table .wt-item td:nth-child(2) { padding-left: 6px; }
 .ward-table .wt-top td { vertical-align: top; }

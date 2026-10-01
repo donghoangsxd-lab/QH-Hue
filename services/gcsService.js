@@ -95,6 +95,7 @@ async function getRawDataList() {
         planChange: classifyPlanChange(sizeHT, sizeQH),
         status: isStatusTrue
       };
+      if (mappedType === '12-NT') item.ntKind = constants.ntKind(item);
       // Bán kính luôn theo quy chuẩn (api/gee.js tính lại theo phường/xã chứa công trình); cột BanKinh chỉ để đối chiếu
       const banKinh = parseArea(props.BanKinh);
       item.radius = constants.defaultRadius(item);

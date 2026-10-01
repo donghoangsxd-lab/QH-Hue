@@ -9,7 +9,14 @@ const GEOJSON_FILE_NAME = "infrastructure_hue.json";
 const CAD_FILE_NAME = "cad_parcels.json";
 const CAD_SHEET_NAME = "CAD_Polygon";
 const CAD_HEADERS = ["ID_DoiTuong", "Layer", "DienTich", "File", "ThoiGianNhap", "GeoJSON", "GiaiDoan"];
-const VALID_PREFIXES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM", "9-CSD"];
+const VALID_PREFIXES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM", "9-CSD", "10-BUS", "11-PCCC", "12-NT"];
+
+// Mạng lưới hạ tầng khác (QCVN 01:2026 Mục 2.8.3.3, 2.5.13.1, 2.12): tab tự tạo khi ghi điểm đầu tiên
+const NETWORK_TABS = { "10-BUS": "Trạm dừng xe buýt", "11-PCCC": "Trụ sở PCCC", "12-NT": "Nhà tang lễ, nghĩa trang" };
+// Loại không cần diện tích: điểm quy hoạch mới được ghi QuyMo_QH = 0
+const NO_AREA_TYPES = ["10-BUS", "11-PCCC"];
+const STANDARD_HEADERS = ["ID_DoiTuong", "Ten_CongTrinh", "Ten_XaPhuong", "Nhom_HaTang", "Latitude", "Longitude",
+  "QuyMo_HT", "QuyMo_QH", "BanKinh", "TrangThai", "ThoiGianCapNhat", "Note"];
 
 // Cột được xác định theo tên tiêu đề dòng 1 (không phân biệt hoa thường, bỏ khoảng trắng)
 const COLUMN_ALIASES = {
@@ -111,6 +118,17 @@ function findInfraSheet(ss, typeCode) {
     if (sheets[s].getName().trim().indexOf(typeCode) === 0) return sheets[s];
   }
   return null;
+}
+
+// Tab hạ tầng theo mã; loại mạng lưới chưa có tab thì tạo tab với dòng tiêu đề chuẩn; loại khác chưa có tab → null
+function ensureInfraSheet(ss, typeCode) {
+  var sheet = findInfraSheet(ss, typeCode);
+  if (sheet || !NETWORK_TABS.hasOwnProperty(typeCode)) return sheet;
+  sheet = ss.insertSheet(typeCode + " " + NETWORK_TABS[typeCode]);
+  sheet.getRange(1, 1, 1, STANDARD_HEADERS.length).setValues([STANDARD_HEADERS]).setFontWeight("bold");
+  sheet.setFrozenRows(1);
+  sheet.getRange(2, 5, sheet.getMaxRows() - 1, 2).setNumberFormat("@");
+  return sheet;
 }
 
 // Giá trị cột Nhom_HaTang theo danh sách chọn của Sheet
@@ -504,13 +522,13 @@ function doGet(e) {
       // Bán kính theo QCVN 01:2026 do máy chủ webapp tính (cấp đô thị / đơn vị ở, phường / xã); trống = không có vùng phục vụ
       var radius = parseCleanNumber(params.radius);
 
-      // Điểm quy hoạch mới bắt buộc có diện tích để phân biệt với công trình chưa rõ quy mô
-      if (phase === 'QH' && size <= 0) {
+      // Điểm quy hoạch mới bắt buộc có diện tích để phân biệt với công trình chưa rõ quy mô (trừ trạm xe buýt, trụ sở PCCC)
+      if (phase === 'QH' && size <= 0 && NO_AREA_TYPES.indexOf(typeCode) === -1) {
         return ContentService.createTextOutput(JSON.stringify({ "error": "Điểm quy hoạch mới cần diện tích > 0" }))
           .setMimeType(ContentService.MimeType.JSON);
       }
 
-      var targetSheet = findInfraSheet(ss, typeCode);
+      var targetSheet = ensureInfraSheet(ss, typeCode);
       if (!targetSheet) targetSheet = ss.getSheets()[0];
 
       var data = targetSheet.getDataRange().getValues();
@@ -608,6 +626,7 @@ function doPost(e) {
     if (body.action === "savePopEdits") return jsonOutput(savePopEdits(body));
     if (body.action === "addPendingCad") return jsonOutput(addPendingCad(body));
     if (body.action === "removePendingCad") return jsonOutput(removePendingCad(body));
+    if (body.action === "addPendingPoints") return jsonOutput(addPendingPoints(body));
     return jsonOutput({ "error": "Action không hợp lệ" });
   } catch (err) {
     return jsonOutput({ "error": err.toString() });
@@ -745,6 +764,80 @@ function importCadBatch(body) {
 
   if (body.sync !== false) syncSheetsToGCS();
   return { "success": true, "created": created, "updated": updated, "skipped": skipped, "polygons": polygons.length };
+}
+
+/**
+ * Ghi hàng loạt điểm hiện trạng ở trạng thái chờ duyệt (TrangThai = FALSE), VD điểm OpenStreetMap do Admin nhập.
+ * body = { items: [{ type, name, ward, lat, lng, size, radius, ref }] } — ref (VD "OSM:node/123") ghi vào cột Note;
+ * dòng có Note chứa cùng ref đã có trong tab thì bỏ qua để nhập lại nhiều lần không bị trùng
+ */
+function addPendingPoints(body) {
+  var items = Array.isArray(body.items) ? body.items : [];
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var currentTime = Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm:ss");
+  var created = [], skipped = 0;
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var ctx = {};
+    items.forEach(function(it) {
+      var typeCode = String(it.type || '');
+      if (!ctx.hasOwnProperty(typeCode)) {
+        var sheet = ensureInfraSheet(ss, typeCode);
+        if (!sheet) { ctx[typeCode] = null; }
+        else {
+          var data = sheet.getDataRange().getValues();
+          var col = getColumnMap(data[0]);
+          var notes = {};
+          for (var r = 1; r < data.length; r++) notes[String(cellAt(data[r], col.ghiChu) || '')] = true;
+          ctx[typeCode] = { sheet: sheet, data: data, col: col, notes: Object.keys(notes).join('\n'), maxNum: null, rows: [] };
+        }
+      }
+      var c = ctx[typeCode];
+      var ref = String(it.ref || '');
+      if (!c || c.col.id < 0 || c.col.lat < 0 || c.col.lng < 0 || (ref && c.notes.indexOf(ref) !== -1)) { skipped++; return; }
+
+      var prefix = typeCode.split('-')[1];
+      if (c.maxNum === null) c.maxNum = maxIdNumber(c.data, c.col.id, prefix);
+      c.maxNum++;
+      var id = formatId(prefix, c.maxNum);
+      var row = new Array(c.data[0].length).fill('');
+      var set = function(idx, value) { if (idx >= 0) row[idx] = value; };
+      set(c.col.id, id);
+      set(c.col.name, String(it.name || 'Công trình mới').slice(0, 150));
+      set(c.col.ward, sheetWard(it.ward));
+      set(c.col.nhom, 'Cấp đô thị');
+      set(c.col.lat, String(Number(it.lat)));
+      set(c.col.lng, String(Number(it.lng)));
+      set(c.col.quyMoHT, Number(it.size) > 0 ? Number(it.size) : 0);
+      if (Number(it.radius) > 0) set(c.col.banKinh, Number(it.radius));
+      set(c.col.trangThai, false);
+      set(c.col.thoiGian, currentTime);
+      set(c.col.ghiChu, "Đề xuất từ OpenStreetMap" + (ref ? " (" + ref + ")" : ""));
+      c.rows.push(row);
+      created.push(id);
+    });
+
+    Object.keys(ctx).forEach(function(k) {
+      var c = ctx[k];
+      if (!c || !c.rows.length) return;
+      var start = c.sheet.getLastRow() + 1;
+      var target = c.sheet.getRange(start, 1, c.rows.length, c.data[0].length);
+      if (start > 2) {
+        var template = c.sheet.getRange(start - 1, 1, 1, c.data[0].length);
+        template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+        template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
+      }
+      target.setValues(c.rows);
+    });
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+
+  if (created.length) syncSheetsToGCS();
+  return { "success": true, "created": created.length, "skipped": skipped };
 }
 
 // MẠNG LƯỚI ĐƯỜNG OSM TOÀN THÀNH PHỐ (Admin tải theo phường/xã, máy chủ webapp gửi sang để lưu lên bucket)
