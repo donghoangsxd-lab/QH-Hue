@@ -220,9 +220,9 @@ export const fmtKm = (v) => KM_FORMAT.format(v);
 /** main = đường trục chính + đường khu vực (đường phố có tên), kiet = đường nội bộ; chia cho diện tích tự nhiên (km²) */
 function roadDensityHtml(main, kiet, areaKm2, source) {
   const total = main + kiet;
-  return wardStatHtml('Mật độ đường/đường KV', `${DENSITY_FORMAT.format(total / areaKm2)}/${DENSITY_FORMAT.format(main / areaKm2)}`, 'km/km²',
-    `Mật độ đường: tổng chiều dài các tuyến ${KM_FORMAT.format(total)} km (trục chính + khu vực ${KM_FORMAT.format(main)} km, nội bộ ${KM_FORMAT.format(kiet)} km) / diện tích tự nhiên ${KM_FORMAT.format(areaKm2)} km²\n`
-    + `Mật độ đến đường khu vực: (đường trục chính + đường khu vực) ${KM_FORMAT.format(main)} km / ${KM_FORMAT.format(areaKm2)} km² — ${source}`);
+  return wardStatHtml('Mật độ đến đường KV', DENSITY_FORMAT.format(main / areaKm2), 'km/km²',
+    `Mật độ đến đường khu vực: (đường trục chính + đường khu vực) ${KM_FORMAT.format(main)} km / ${KM_FORMAT.format(areaKm2)} km² — ${source}\n`
+    + `Mật độ đường (mọi tuyến): ${DENSITY_FORMAT.format(total / areaKm2)} km/km² — tổng chiều dài các tuyến ${KM_FORMAT.format(total)} km (trục chính + khu vực ${KM_FORMAT.format(main)} km, nội bộ ${KM_FORMAT.format(kiet)} km) / diện tích tự nhiên ${KM_FORMAT.format(areaKm2)} km²`);
 }
 
 const osmDate = (at) => (at ? `OSM ${new Date(at).toLocaleDateString('vi-VN')}` : 'OpenStreetMap');

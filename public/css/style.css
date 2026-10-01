@@ -746,9 +746,9 @@ body.bottom-max .bottom-panel { top: 0; right: 0; height: auto; z-index: 2500; }
 .hs-qh .ward-stat b { color: var(--accent-orange); }
 .hs-status { align-self: center; padding-left: 8px; font-size: var(--fs-xs); white-space: nowrap; }
 .hs-status:empty { display: none; }
-/* Màn hình hẹp: bỏ đơn vị (vẫn có trong tooltip) để 2 hàng chỉ tiêu nằm gọn 1 dòng */
+/* Màn hình hẹp: tiêu đề toàn TP bỏ đơn vị (vẫn có trong tooltip) để 2 hàng chỉ tiêu nằm gọn 1 dòng; tiêu đề 1 phường luôn hiện đơn vị */
 @media (max-width: 1580px) {
-  .hs-cell .ward-stat span > em:not(.hs-keep) { display: none; }
+  .bp-head-stats:not(.hs-units) .hs-cell .ward-stat span > em { display: none; }
   .hs-col { padding: 0 6px; }
 }
 #wardPopInput {
@@ -756,6 +756,7 @@ body.bottom-max .bottom-panel { top: 0; right: 0; height: auto; z-index: 2500; }
   background: var(--bg-panel); color: var(--accent-orange);
   border: 1px solid var(--border-color); border-radius: var(--r-sm); font-weight: bold; font-size: var(--fs-sm); text-align: center;
 }
+#wardPopInput.over-cap { color: var(--accent-red); border-color: var(--accent-red); }
 .bp-legend { position: absolute; top: 0; right: 2px; z-index: 1; display: flex; gap: 10px; color: var(--text-muted); font-size: var(--fs-xs); line-height: 14px; pointer-events: none; }
 .bp-legend-item { display: inline-flex; align-items: center; }
 .bp-swatch { display: inline-block; width: 9px; height: 9px; border-radius: var(--r-sm); margin: 0 4px 0 2px; vertical-align: -1px; }
@@ -1389,6 +1390,17 @@ table.ward-table th {
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
+/* Zoom thấy toàn TP: 1 biểu đồ chung + ranh thành phố nổi bật */
+.city-pie-icon .ward-pie-name { bottom: calc(100% + 6px); font-size: 16px; color: #fef08a; letter-spacing: 0.16em; }
+.city-pie-icon .ward-pie { border-width: 2px; box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.6), 0 0 14px rgba(250, 204, 21, 0.55); }
+.city-pie-icon .ward-pie span { font-size: var(--fs-md); }
+.city-outline-glow { filter: blur(3px); animation: city-glow 2.4s ease-in-out infinite; }
+.city-outline-line { filter: drop-shadow(0 0 2px rgba(250, 204, 21, 0.9)); }
+@keyframes city-glow {
+  0%, 100% { stroke-opacity: 0.25; }
+  50% { stroke-opacity: 0.7; }
+}
+@media (prefers-reduced-motion: reduce) { .city-outline-glow { animation: none; } }
 .leaflet-tooltip.ward-pie-tip {
   min-width: 170px;
   padding: 7px 9px;

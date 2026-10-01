@@ -488,6 +488,10 @@ const PIE_MIN_PX = 22;
 const PIE_MAX_PX = 46;
 const PIE_SLICE_GAP_DEG = 1.6;
 const PIE_GAP_COLOR = 'rgba(15, 23, 42, 0.85)';
+// Zoom ≤ ngưỡng (thấy toàn bộ thành phố): gộp 40 biểu đồ phường thành 1 biểu đồ TP, làm nổi ranh giới thành phố
+const CITY_PIE_MAX_ZOOM = 10;
+const CITY_PIE_PX = 64;
+const CITY_OUTLINE_SIMPLIFY_DEG = 0.0004;
 
 // Phường chứa điểm, ghi nhớ theo tọa độ (danh sách hiện trạng và quy hoạch dùng chung); đổi bộ ranh phường thì tính lại
 const wardAtCache = new Map();
@@ -502,16 +506,16 @@ export function wardNameAt(lat, lng) {
   return wardAtCache.get(key);
 }
 
-function pieTooltipHtml(ward, counts, total, scenarioLabel) {
+function pieTooltipHtml(ward, counts, total, scenarioLabel, city) {
   const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([type, n]) => `
     <div class="ward-pie-row"><i style="background:${BUFFER_COLORS[type] || '#38bdf8'}"></i><span>${escapeHtml(infraLabels[type] || type)}</span><b>${fmtNum(n)}</b></div>`).join('');
   return `<div class="ward-pie-title">${escapeHtml(ward.name)}${scenarioLabel ? `<small>${scenarioLabel}</small>` : ''}</div>
     ${rows}<div class="ward-pie-total"><span>Tổng</span><b>${fmtNum(total)}</b></div>
-    <div class="ward-pie-hint">Bấm để phóng to xem từng công trình</div>`;
+    <div class="ward-pie-hint">Bấm để phóng to xem ${city ? 'từng phường/xã' : 'từng công trình'}</div>`;
 }
 
-function createWardPie(ward, counts, total, maxTotal, targetMap, scenarioLabel) {
-  const size = Math.round(PIE_MIN_PX + (PIE_MAX_PX - PIE_MIN_PX) * Math.sqrt(total / maxTotal));
+// city = biểu đồ chung toàn thành phố: tên in hoa cỡ lớn, bấm vào phóng tới mức biểu đồ từng phường
+function createWardPie(ward, counts, total, size, targetMap, scenarioLabel, city = false) {
   const entries = Object.entries(counts);
   // Vạch ngăn mảnh giữa các lát để phân biệt các màu gần nhau (cam/đỏ...)
   const gap = entries.length > 1 ? PIE_SLICE_GAP_DEG : 0;
@@ -526,22 +530,101 @@ function createWardPie(ward, counts, total, maxTotal, targetMap, scenarioLabel) 
   // Tâm biểu đồ đặt tại điểm sâu nhất trong ranh phường; tên phường gắn liền phía trên (nhãn rời bị ẩn ở chế độ này)
   const marker = L.marker([ward.lat, ward.lng], {
     icon: L.divIcon({
-      className: 'ward-pie-icon',
-      html: `<span class="ward-pie-name">${escapeHtml(ward.name)}</span><div class="ward-pie" style="width:${size}px;height:${size}px;background:conic-gradient(${stops})"><span>${total}</span></div>`,
+      className: `ward-pie-icon${city ? ' city-pie-icon' : ''}`,
+      html: `<span class="ward-pie-name">${escapeHtml(city ? ward.name.toUpperCase() : ward.name)}</span><div class="ward-pie" style="width:${size}px;height:${size}px;background:conic-gradient(${stops})"><span>${total}</span></div>`,
       iconSize: [size, size],
       iconAnchor: [size / 2, size / 2]
     }),
     riseOnHover: true,
     bubblingMouseEvents: false
   });
-  marker.bindTooltip(pieTooltipHtml(ward, counts, total, scenarioLabel), {
+  marker.bindTooltip(pieTooltipHtml(ward, counts, total, scenarioLabel, city), {
     direction: 'auto', offset: [size / 2 + 6, 0], className: 'ward-pie-tip', opacity: 1
   });
   marker.on('click', () => {
     if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
-    targetMap.flyTo([ward.lat, ward.lng], PIE_CLICK_ZOOM);
+    if (city) targetMap.flyTo(CITY_CENTER, CITY_PIE_MAX_ZOOM + 1);
+    else targetMap.flyTo([ward.lat, ward.lng], PIE_CLICK_ZOOM);
   });
   return marker;
+}
+
+// Ranh thành phố = các cạnh chỉ thuộc 1 phường (cạnh chung của 2 phường liền kề trùng đỉnh nên bị loại),
+// nối thành các đường liên tục rồi giản lược; ~0,1 s so với vài giây nếu turf.union 40 phường.
+// Tâm biểu đồ chung = trọng tâm các phường theo diện tích (rơi ra ngoài ranh thì lấy điểm đặt nhãn phường gần nhất)
+let cityShape = null;
+function cityShapeOf(wards) {
+  if (cityShape && cityShape.source === wards) return cityShape;
+  const vkey = (p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`;
+  const edges = new Map();
+  let sx = 0, sy = 0, sa = 0;
+  wards.forEach(w => {
+    const g = w.geometry;
+    if (!g) return;
+    const polys = g.type === 'Polygon' ? [g.coordinates] : (g.type === 'MultiPolygon' ? g.coordinates : []);
+    polys.forEach(poly => poly.forEach(ring => {
+      for (let i = 0; i < ring.length - 1; i++) {
+        const ka = vkey(ring[i]), kb = vkey(ring[i + 1]);
+        if (ka === kb) continue;
+        const k = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+        const e = edges.get(k);
+        if (e) e.n++;
+        else edges.set(k, { n: 1, a: ring[i], b: ring[i + 1], ka, kb });
+      }
+    }));
+    try {
+      const area = turf.area(g);
+      const [x, y] = turf.centroid(g).geometry.coordinates;
+      sx += x * area; sy += y * area; sa += area;
+    } catch (e) { /* hình học lỗi: bỏ qua khi tính tâm */ }
+  });
+
+  const outer = [...edges.values()].filter(e => e.n === 1);
+  const adj = new Map();
+  outer.forEach(e => {
+    [e.ka, e.kb].forEach(k => { if (!adj.has(k)) adj.set(k, []); adj.get(k).push(e); });
+  });
+  const used = new Set();
+  const walk = (k) => {
+    const pts = [];
+    for (;;) {
+      const next = (adj.get(k) || []).find(e => !used.has(e));
+      if (!next) return pts;
+      used.add(next);
+      const forward = next.ka === k;
+      pts.push(forward ? next.b : next.a);
+      k = forward ? next.kb : next.ka;
+    }
+  };
+  const lines = [];
+  outer.forEach(start => {
+    if (used.has(start)) return;
+    used.add(start);
+    const ahead = walk(start.kb);
+    const behind = walk(start.ka).reverse();
+    const coords = [...behind, start.a, start.b, ...ahead];
+    const simple = coords.length > 2
+      ? turf.simplify(turf.lineString(coords), { tolerance: CITY_OUTLINE_SIMPLIFY_DEG }).geometry.coordinates
+      : coords;
+    lines.push(simple.map(([lng, lat]) => [lat, lng]));
+  });
+
+  let center = sa ? { lat: sy / sa, lng: sx / sa } : { lat: CITY_CENTER[0], lng: CITY_CENTER[1] };
+  if (!wardNameAt(center.lat, center.lng)) {
+    const near = wards.filter(w => w.lat != null && w.lng != null)
+      .sort((a, b) => ((a.lat - center.lat) ** 2 + (a.lng - center.lng) ** 2) - ((b.lat - center.lat) ** 2 + (b.lng - center.lng) ** 2))[0];
+    if (near) center = { lat: near.lat, lng: near.lng };
+  }
+  cityShape = { source: wards, lines, center };
+  return cityShape;
+}
+
+// Ranh TP nổi bật: nét trắng trên quầng vàng nhấp nháy (SVG riêng để tạo hiệu ứng CSS; bản đồ chính vẽ canvas)
+function createCityOutline(lines, renderer) {
+  return L.layerGroup([
+    L.polyline(lines, { renderer, className: 'city-outline-glow', color: '#facc15', weight: 11, opacity: 0.45, interactive: false }),
+    L.polyline(lines, { renderer, className: 'city-outline-line', color: '#ffffff', weight: 2.4, opacity: 1, interactive: false })
+  ]);
 }
 
 // Bản đồ quy hoạch ưu tiên ranh QH, chưa có thì dùng ranh hiện trạng của cùng công trình → { geometry, layer }
@@ -627,6 +710,8 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
   const rendered = new Map();
   const builtBuffers = new Set();
   const pieGroup = L.layerGroup();
+  const outlineRenderer = L.svg({ padding: 0.3 });
+  let outlineLayer = null;
   // Công trình trong phạm vi phục vụ của công trình đang chọn (pointKey); null = không chọn
   let selKeys = null;
   const markSel = (entry, key) => {
@@ -634,16 +719,32 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     if (el) el.classList.toggle('sel-in', !!selKeys && selKeys.has(key));
   };
 
+  const showCityOutline = (m, on) => {
+    m.getContainer().classList.toggle('city-pie-mode', on);
+    if (!on) { outlineLayer?.remove(); return; }
+    const shape = cityShapeOf(state.wardLabelsList);
+    if (!outlineLayer || outlineLayer.source !== shape) {
+      outlineLayer?.remove();
+      outlineLayer = createCityOutline(shape.lines, outlineRenderer);
+      outlineLayer.source = shape;
+    }
+    if (!m.hasLayer(outlineLayer)) outlineLayer.addTo(m);
+  };
+
   const clearPies = () => {
     pieGroup.clearLayers();
     pieGroup.remove();
     pieKey = null;
+    const m = getMap();
+    if (m) showCityOutline(m, false);
   };
 
   function renderPies(m) {
+    const cityPie = m.getZoom() <= CITY_PIE_MAX_ZOOM;
+    showCityOutline(m, cityPie);
     const activeTypes = Object.keys(ICON_GROUP_KEYS).filter(t => m.hasLayer(groups[ICON_GROUP_KEYS[t]]));
     const label = scenarioLabel();
-    const key = `${listSeq}|${activeTypes.join(',')}|${state.wardLabelsList.length}|${label}`;
+    const key = `${listSeq}|${activeTypes.join(',')}|${state.wardLabelsList.length}|${label}|${cityPie}`;
     if (!m.hasLayer(pieGroup)) pieGroup.addTo(m);
     if (key === pieKey) return;
     pieKey = key;
@@ -660,13 +761,24 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
       counts[type] = (counts[type] || 0) + 1;
       byWard.set(name, counts);
     });
+    const orderedOf = (counts) => Object.fromEntries(Object.keys(ICON_GROUP_KEYS).filter(t => counts[t]).map(t => [t, counts[t]]));
+    if (cityPie) {
+      const cityCounts = {};
+      byWard.forEach(counts => Object.entries(counts).forEach(([t, n]) => { cityCounts[t] = (cityCounts[t] || 0) + n; }));
+      const total = Object.values(cityCounts).reduce((s, n) => s + n, 0);
+      if (!total) return;
+      const { center } = cityShapeOf(state.wardLabelsList);
+      pieGroup.addLayer(createWardPie({ name: CITY_NAME, ...center }, orderedOf(cityCounts), total, CITY_PIE_PX, m, label, true));
+      return;
+    }
     const totals = new Map([...byWard].map(([name, counts]) => [name, Object.values(counts).reduce((s, n) => s + n, 0)]));
     const maxTotal = Math.max(1, ...totals.values());
     state.wardLabelsList.forEach(ward => {
       const counts = byWard.get(ward.name);
       if (!counts || ward.lat == null || ward.lng == null) return;
-      const ordered = Object.fromEntries(Object.keys(ICON_GROUP_KEYS).filter(t => counts[t]).map(t => [t, counts[t]]));
-      pieGroup.addLayer(createWardPie(ward, ordered, totals.get(ward.name), maxTotal, m, label));
+      const total = totals.get(ward.name);
+      const size = Math.round(PIE_MIN_PX + (PIE_MAX_PX - PIE_MIN_PX) * Math.sqrt(total / maxTotal));
+      pieGroup.addLayer(createWardPie(ward, orderedOf(counts), total, size, m, label));
     });
   }
 

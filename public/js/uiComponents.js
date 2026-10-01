@@ -1044,10 +1044,11 @@ function buildHeadStats(key, city) {
   if (!el) return;
   const col = (ht, qh) => `<div class="hs-col"><div class="hs-cell" id="${ht}"></div><div class="hs-cell hs-qh" id="${qh}"></div></div>`;
   el.dataset.key = key;
+  el.classList.toggle('hs-units', !city);
   el.innerHTML = col('hsPopHT', 'hsPopQH') + col('hsArea', 'hsPopCap') + col('hsDensHT', 'hsDensQH')
     + col(city ? 'cityRoadDensity' : 'wardRoadLen', 'hsRoadQH') + col('hsCovHT', 'hsCovQH')
     + (city ? col('hsUrbanHT', 'hsUrbanQH') : '<div class="hs-status" id="wardCoverageStatus"></div>');
-  setHeadCell('hsRoadQH', wardStatHtml('Mật độ đường/đường KV QH', '–/–', 'km/km²',
+  setHeadCell('hsRoadQH', wardStatHtml('Mật độ đến đường KV QH', '–', 'km/km²',
     'Chưa có dữ liệu mạng lưới đường quy hoạch (mạng lưới hiện có: OpenStreetMap + tuyến Admin vẽ bổ sung là đường hiện trạng)'));
 }
 
@@ -1344,11 +1345,13 @@ function loadWardDetailCoverage(wardData, attempt = 0) {
   });
 }
 
+const UNIT_POP = 20000;
+
 function renderWardSummary(wardData) {
   const popCurrent = wardData.Dan_So_Vector || 45000;
   if (!wardData.projectedPopulation) wardData.projectedPopulation = Math.round(popCurrent * 1.2);
   const popProjected = wardData.projectedPopulation;
-  const projectedUnits = wardData.projectedUnits || Math.max(1, Math.ceil(popProjected / 20000));
+  const projectedUnits = wardData.projectedUnits || Math.max(1, Math.ceil(popProjected / UNIT_POP));
 
   const view = document.getElementById('wardSummaryView');
   if (!view) return;
@@ -1361,7 +1364,9 @@ function renderWardSummary(wardData) {
   buildHeadStats(wardData.Ten_Phuong, false);
   setHeadCell('hsPopQH', `<div class="ward-stat" title="Dân số quy hoạch của phường/xã, nhập để tính lại nhu cầu diện tích">`
     + `<small><label for="wardPopInput">Dân số QH</label></small><span><b><input type="number" id="wardPopInput" value="${Number(popProjected)}" step="1000" min="1000" max="${CITY_POP_QH}" /></b>`
-    + ` <em class="hs-keep">người (<span id="projectedUnitsLabel">${projectedUnits}</span> đơn vị ở)</em></span></div>`);
+    + ` <em>người</em></span></div>`);
+  setHeadCell('hsPopCap', wardStatHtml('Số đơn vị ở', `<span id="projectedUnitsLabel">${projectedUnits}</span>`, '',
+    `Số đơn vị ở theo dân số QH, quy mô tối đa ${fmtNum(UNIT_POP)} người/đơn vị ở`));
   if (areaKm2 > 0) {
     setHeadCell('hsArea', wardStatHtml('Diện tích', fmtArea(areaKm2), 'km²', 'Diện tích tự nhiên theo thuộc tính polygon phường/xã'));
     setHeadCell('hsDensHT', wardStatHtml('Mật độ DS', fmtNum(Math.round(popCurrent / areaKm2)), 'người/km²',
@@ -1381,7 +1386,7 @@ function renderWardSummary(wardData) {
     popInput.oninput = (e) => {
       const raw = Number(e.target.value);
       const newProjPop = Number.isFinite(raw) && raw >= 1000 ? Math.min(raw, CITY_POP_QH) : popProjected;
-      const newUnits = Math.max(1, Math.ceil(newProjPop / 20000));
+      const newUnits = Math.max(1, Math.ceil(newProjPop / UNIT_POP));
       const unitsLabel = document.getElementById('projectedUnitsLabel');
       if (unitsLabel) unitsLabel.textContent = newUnits;
       const densityQH = document.getElementById('wardDensityQH');
@@ -1402,19 +1407,17 @@ function renderWardSummary(wardData) {
   loadWardNetworkCoverage(wardData);
 }
 
-// Trần dân số QH toàn TP: ô tổng dân số QH (hàng QH trên tiêu đề phường); toast mỗi lần tổng chuyển từ trong ngưỡng sang vượt ngưỡng
+// Trần dân số QH toàn TP: ô nhập dân số QH của phường tô đỏ + tooltip khi tổng vượt trần; toast mỗi lần tổng chuyển từ trong ngưỡng sang vượt ngưỡng
 function checkPopCap(wardData = null) {
   const total = totalPlanPop();
   const over = total - CITY_POP_QH;
-  const warnEl = document.getElementById('hsPopCap');
-  if (warnEl && wardData && headStatsKey() === wardData.Ten_Phuong) {
+  const input = document.getElementById('wardPopInput');
+  if (input && wardData && headStatsKey() === wardData.Ten_Phuong) {
     const room = Math.max(0, CITY_POP_QH - (total - planPopOf(wardData)));
-    warnEl.innerHTML = wardStatHtml('Tổng DS QH P/X',
-      over > 0
-        ? `<span class="c-red">${ico('alert')}${fmtNum(total)}</span>`
-        : fmtNum(total),
-      'người',
-      `Tổng dân số QH ${state.wardStatsData.length} phường/xã${over > 0 ? `, vượt trần ${fmtNum(over)} người` : ''}. Trần dân số QH toàn TP ${fmtNum(CITY_POP_QH)} người. Phường/xã này tối đa ${fmtNum(room)} người để tổng không vượt trần`);
+    input.classList.toggle('over-cap', over > 0);
+    input.closest('.ward-stat').title = 'Dân số quy hoạch của phường/xã, nhập để tính lại nhu cầu diện tích\n'
+      + `Tổng dân số QH ${state.wardStatsData.length} phường/xã: ${fmtNum(total)} người${over > 0 ? `, vượt trần ${fmtNum(over)} người` : ''}. `
+      + `Trần dân số QH toàn TP ${fmtNum(CITY_POP_QH)} người. Phường/xã này tối đa ${fmtNum(room)} người để tổng không vượt trần`;
   }
   if (over > 0 && !popCapExceeded) {
     showToast(`⚠️ Tổng dân số QH các phường/xã (${fmtNum(total)} người) vượt dân số QH toàn TP ${fmtNum(CITY_POP_QH)} người`, 'error');
