@@ -5,6 +5,10 @@ let geeBase = null;          // asset nạp 1 lần: ranh phường, raster dân
 let popEditsVersion = -1;    // phiên bản vùng hiệu chỉnh dân cư đang áp (services/popEditsService.js)
 let initPromise = null;
 
+// Lưới đếm pixel có dân của phường. Mọi phép cộng/đếm trên popRasterNormalized phải dùng đúng lưới này:
+// mỗi pixel mang dân số phường / số pixel đếm ở lưới này, cộng ở lưới 30 m gốc sẽ ra gấp ~4 lần.
+const POP_SCALE_M = 60;
+
 // Các request đồng thời lúc khởi động dùng chung 1 lần xác thực; lỗi thì cho phép thử lại ở request sau
 function initGEE() {
   if (!initPromise) {
@@ -86,7 +90,7 @@ function applyPopEdits(version, edits) {
   const statsGrouped = validPopRaster.addBands(wardRegion).reduceRegion({
     reducer: ee.Reducer.count().group({ groupField: 1, groupName: 'ID_Phuong' }),
     geometry: wardVectorParsed.geometry(),
-    scale: 60, maxPixels: 1e9
+    scale: POP_SCALE_M, maxPixels: 1e9
   });
 
   const groupsList = ee.List(statsGrouped.get('groups'));
@@ -130,4 +134,4 @@ function eeEvaluate(eeObject) {
   });
 }
 
-module.exports = { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion };
+module.exports = { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, POP_SCALE_M };

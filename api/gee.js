@@ -1,7 +1,7 @@
 const axios = require('axios');
 const crypto = require('crypto');
 const constants = require('../config/constants');
-const { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion } = require('../services/geeService');
+const { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, POP_SCALE_M } = require('../services/geeService');
 const { getRawDataList, getCadParcels, invalidateCache, getDataVersion } = require('../services/gcsService');
 const { requireAdmin, httpError } = require('../services/authService');
 const roads = require('../services/roadsService');
@@ -978,7 +978,7 @@ async function computeSingleWardCoverage(ee, popRasterNormalized, wardGeometry, 
   const dict = stacked.reduceRegion({
     reducer: ee.Reducer.count(),
     geometry: wardGeom,
-    scale: 60,
+    scale: POP_SCALE_M,
     maxPixels: 1e9,
     tileScale: 4
   });
@@ -1316,10 +1316,11 @@ module.exports = async (req, res) => {
       } else {
         polyCoords = await calculateNetworkIsochrone16(pt.lat, pt.lng, radius);
       }
+      // Không trọng số: mỗi pixel có dân đếm trọn như lúc chia dân số phường → cả phường cộng lại đúng bằng dân số phường
       const servedPopRes = await eeEvaluate(popRasterNormalized.reduceRegion({
-        reducer: ee.Reducer.sum(),
+        reducer: ee.Reducer.sum().unweighted(),
         geometry: ee.Geometry(polyCoords),
-        scale: 30,
+        scale: POP_SCALE_M,
         maxPixels: 1e9
       }));
 

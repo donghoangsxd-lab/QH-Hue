@@ -874,6 +874,19 @@ table.ward-table th {
 .pp-note { margin-top: 6px; font-size: var(--fs-sm); font-style: italic; text-align: center; }
 .pp .road-legend { margin: 3px 0 0; flex-wrap: wrap; row-gap: 2px; font-weight: 400; }
 
+/* Nút con mắt cạnh nút đóng: thu popup công trình về dòng tên */
+.infra-popup .pp-title { padding-right: 22px; }
+.leaflet-container a.pp-collapse-btn {
+  position: absolute; top: 0; right: 24px; width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); text-decoration: none; border-radius: var(--r-sm);
+}
+.leaflet-container a.pp-collapse-btn:hover { color: var(--accent-cyan); }
+.pp-collapse-btn .ico { width: 15px; height: 15px; margin: 0; }
+.infra-popup.pp-collapsed .pp > :not(.pp-title) { display: none; }
+.infra-popup.pp-collapsed .pp-title { padding-bottom: 0; margin-bottom: 0; border-bottom: 0; }
+.infra-popup.pp-collapsed .leaflet-popup-content-wrapper { opacity: 0.92; }
+
 .sug-card { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--r-md); padding: 6px; margin-top: 4px; font-size: var(--fs-sm); }
 .sug-card.priority { border-color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.15); }
 .sug-card.ineligible { border-color: var(--accent-red); color: var(--accent-red); }

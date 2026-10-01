@@ -994,10 +994,32 @@ function clearSingleIsochrone() {
   planRenderer.highlight(null);
 }
 
+// Công trình cấp đơn vị ở chỉ phục vụ trong phường của nó (QCVN 01:2026: đơn vị ở ⊂ phường/xã);
+// cấp đô thị (kể cả THPT) phục vụ liên phường. Ranh rút gọn ~10 m cho nhẹ phép cắt và giữ vòng gửi máy chủ dưới giới hạn đỉnh.
+const WARD_CLIP_TOLERANCE_DEG = 0.0001;
+const wardClipCache = new Map();
+
+function serviceClipFor(p, wardName) {
+  if (p.type === '9-CSD' || layerType(p) === 'THPT') return null;
+  if (formatCapCongTrinhLabel(p.nhomHaTang || p.capCongTrinh) === 'Cấp đô thị') return null;
+  const ward = wardName && (state.wardLabelsList || []).find(w => w.name === wardName);
+  if (!ward || !ward.geometry) return null;
+  if (!wardClipCache.has(ward.name)) {
+    let feature = null;
+    try {
+      feature = turf.simplify(turf.feature(ward.geometry), { tolerance: WARD_CLIP_TOLERANCE_DEG, highQuality: true });
+      feature.bbox = turf.bbox(feature);
+    } catch (e) { /* ranh lỗi: không giới hạn */ }
+    wardClipCache.set(ward.name, feature && { key: ward.name, feature, name: ward.name });
+  }
+  return wardClipCache.get(ward.name);
+}
+
 // Vùng phục vụ thực tế theo mạng đường + đường giao thông làm minh chứng, hiển thị kiểu âm bản.
 // points: công trình đang hiển thị để làm nổi những công trình nằm trong phạm vi.
+// clip: ranh phường giới hạn vùng phục vụ (serviceClipFor), null = không giới hạn.
 // Trả về { area, polygon }: area = null khi không tải được đường (khi đó polygon là vòng tròn bán kính); null nếu đã có click khác.
-export async function highlightSingleIsochrone(lat, lng, radius, group = layers.singleIso, points = []) {
+export async function highlightSingleIsochrone(lat, lng, radius, group = layers.singleIso, points = [], clip = null) {
   clearSingleIsochrone();
   const seq = singleIsoSeq;
   const m = group === planLayers.singleIso ? planMap : map;
@@ -1009,11 +1031,14 @@ export async function highlightSingleIsochrone(lat, lng, radius, group = layers.
   const ring = circle.geometry.coordinates[0].map(([x, y]) => [y, x]);
   group.addLayer(L.polygon([WORLD_RING, ring], { renderer, stroke: false, fillColor: SEL_NAVY, fillOpacity: SEL_OUTER_OPACITY, interactive: false }));
   group.addLayer(L.polygon(ring, { renderer, color: '#7dd3fc', weight: 1.2, opacity: 0.85, dashArray: '4,5', fillColor: SEL_NAVY, fillOpacity: SEL_INNER_OPACITY, interactive: false }));
+  if (clip) {
+    group.addLayer(L.geoJSON(clip.feature, { interactive: false, renderer, style: { color: '#fbbf24', weight: 1.6, opacity: 0.9, dashArray: '6,4', fill: false } }));
+  }
   group.addLayer(L.marker([lat, lng], { icon: L.divIcon({ className: 'sel-pulse', iconSize: [18, 18] }), interactive: false, keyboard: false, zIndexOffset: -1000 }));
   m.getContainer().classList.add('sel-active');
 
   try {
-    const area = await computeServiceArea(lat, lng, radius);
+    const area = await computeServiceArea(lat, lng, radius, clip);
     if (seq !== singleIsoSeq) return null;
     group.addLayer(L.geoJSON(area.polygon, {
       interactive: false,
@@ -1027,9 +1052,18 @@ export async function highlightSingleIsochrone(lat, lng, radius, group = layers.
   } catch (err) {
     if (seq !== singleIsoSeq) return null;
     console.warn("Không dựng được vùng phục vụ theo mạng đường:", err);
-    group.addLayer(L.polygon(ring, { renderer, color: '#7dd3fc', weight: 1.2, dashArray: '3,3', fillColor: '#38bdf8', fillOpacity: 0.12, interactive: false }));
-    addInRangePoints(group, points, circle, renderer, m);
-    return { area: null, polygon: circle };
+    let polygon = circle;
+    if (clip) {
+      const inWard = turf.intersect(circle, clip.feature);
+      if (inWard) {
+        polygon = inWard.geometry.type === 'MultiPolygon'
+          ? inWard.geometry.coordinates.map(c => turf.polygon([c[0]])).sort((a, b) => turf.area(b) - turf.area(a))[0]
+          : inWard;
+      }
+    }
+    group.addLayer(L.geoJSON(polygon, { renderer, interactive: false, style: { color: '#7dd3fc', weight: 1.2, dashArray: '3,3', fillColor: '#38bdf8', fillOpacity: 0.12 } }));
+    addInRangePoints(group, points, polygon, renderer, m);
+    return { area: null, polygon };
   }
 }
 
@@ -1076,6 +1110,27 @@ async function fetchJson(url) {
   return res.json();
 }
 
+// Nút con mắt cạnh nút đóng: thu popup về dòng tên để xem trọn vùng phục vụ (popup neo theo đáy nên mũi chỉ không đổi chỗ)
+function addPopupCollapseToggle(popup) {
+  const container = popup.getElement();
+  if (!container) return;
+  const btn = L.DomUtil.create('a', 'pp-collapse-btn', container);
+  btn.href = '#';
+  btn.setAttribute('role', 'button');
+  const render = (collapsed) => {
+    btn.innerHTML = ico(collapsed ? 'eye' : 'eye-off');
+    btn.title = collapsed ? 'Hiện bảng thông tin' : 'Ẩn bảng thông tin để xem toàn bộ vùng phục vụ';
+    btn.setAttribute('aria-label', btn.title);
+    btn.setAttribute('aria-pressed', String(collapsed));
+  };
+  render(false);
+  L.DomEvent.disableClickPropagation(btn);
+  L.DomEvent.on(btn, 'click', (e) => {
+    L.DomEvent.preventDefault(e);
+    render(container.classList.toggle('pp-collapsed'));
+  });
+}
+
 export function onPointClick(p, targetMap = map) {
   const approved = isApproved(p.status);
   const isCSD = p.type === "9-CSD";
@@ -1089,15 +1144,17 @@ export function onPointClick(p, targetMap = map) {
   clearCsdProof();
 
   const groups = isPlanScenario ? planLayers : layers;
+  const selType = layerType(p);
+  const geoWardNow = resolveWardNameFromCoords(Number(p.lat), Number(p.lng));
+  const clip = serviceClipFor(p, geoWardNow);
   const inViewPoints = isCSDUnapproved ? [] : getWardFilteredList(isPlanScenario ? getPlanScenarioList() : state.rawDataList)
-    .filter(q => (q.type !== '9-CSD' || q === p) && hasValidCoord(q) && targetMap.hasLayer(groups[ICON_GROUP_KEYS[layerType(q)]]));
+    .filter(q => layerType(q) === selType && (q.type !== '9-CSD' || q === p) && hasValidCoord(q) && targetMap.hasLayer(groups[ICON_GROUP_KEYS[selType]]));
   const areaPromise = isCSDUnapproved
     ? null
-    : highlightSingleIsochrone(p.lat, p.lng, itemRadius, groups.singleIso, inViewPoints);
+    : highlightSingleIsochrone(p.lat, p.lng, itemRadius, groups.singleIso, inViewPoints, clip);
   const selSeq = singleIsoSeq;
 
   const capCongTrinh = formatCapCongTrinhLabel(p.nhomHaTang || p.capCongTrinh || "Cấp đơn vị ở");
-  const geoWardNow = resolveWardNameFromCoords(Number(p.lat), Number(p.lng));
 
   let html = `<div class="pp">`;
   html += `<div class="pp-title">${escapeHtml(p.name)}`;
@@ -1136,9 +1193,10 @@ export function onPointClick(p, targetMap = map) {
   }
   html += `</div>`;
 
-  const popup = L.popup({ closeButton: true, autoPan: true, ...popupFitOptions(targetMap, 300, 50) }).setLatLng([p.lat, p.lng]).setContent(html);
+  const popup = L.popup({ className: 'infra-popup', closeButton: true, autoPan: true, ...popupFitOptions(targetMap, 300, 50) }).setLatLng([p.lat, p.lng]).setContent(html);
   popup.openOn(targetMap);
   popup.getElement()?.querySelector('.js-approve')?.addEventListener('click', () => approvePointStatus(p.id));
+  addPopupCollapseToggle(popup);
   // Đóng popup thì thoát chế độ âm bản (trừ khi đã chọn công trình khác / chuyển sang thuyết minh CSD)
   popup.on('remove', () => { if (singleIsoSeq === selSeq) clearSingleIsochrone(); });
 
@@ -1169,12 +1227,13 @@ export function onPointClick(p, targetMap = map) {
 
   if (showServed) {
     const servedLabel = `Dân số phục vụ${approved ? '' : ' dự kiến'}`;
+    const scope = clip ? `, nội bộ ${escapeHtml(clip.name)}` : ', kể cả phường lân cận';
     Promise.resolve(areaPromise)
       .then(r => {
         const polygon = r ? r.polygon : turf.circle([Number(p.lng), Number(p.lat)], itemRadius / 1000, { steps: 64 });
         return fetchServedPop(Number(p.lat), Number(p.lng), itemRadius, polygon).then(res => ({ res, real: !!(r && r.area) }));
       })
-      .then(({ res, real }) => fill('.js-served', `<span>${servedLabel}</span><div><b class="${servedCls}">~${fmtNum(res.servedPop || 0)} người</b> <span class="pp-sub">(${real ? 'trong phạm vi thực tế' : 'trong vòng tròn'})</span></div>`))
+      .then(({ res, real }) => fill('.js-served', `<span>${servedLabel}</span><div><b class="${servedCls}">~${fmtNum(res.servedPop || 0)} người</b> <span class="pp-sub">(${real ? 'trong phạm vi thực tế' : 'trong vòng tròn'}${scope})</span></div>`))
       .catch(() => fill('.js-served', `<span>${servedLabel}</span><span class="pp-sub">chưa tính được (GEE đang bận), mở lại sau.</span>`));
   }
 

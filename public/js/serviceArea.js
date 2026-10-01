@@ -483,9 +483,35 @@ function serviceMask(segments, radius, cell) {
 const groupKey = (group) => (group === 1 ? 'main' : group === 2 ? 'named' : group === 0 ? 'kiet' : 'unknown');
 const byGroup = () => ({ main: [], named: [], kiet: [], unknown: [] });
 
-async function compute(lat, lng, radius, cv) {
+// Chỉ giữ các đoạn đường có cả 2 đầu nằm trong vùng giới hạn (đồ thị không đi xuyên ra ngoài ranh)
+function clipWays(ways, feature) {
+  const inside = new Map();
+  const isIn = (id, p) => {
+    if (!inside.has(id)) inside.set(id, turf.booleanPointInPolygon([p.lon, p.lat], feature));
+    return inside.get(id);
+  };
+  const out = [];
+  for (const w of ways) {
+    let run = null;
+    w.nodes.forEach((id, i) => {
+      const p = w.geometry[i];
+      if (!isIn(id, p)) { run = null; return; }
+      if (!run) out.push(run = { nodes: [], geometry: [], tags: w.tags, group: w.group });
+      run.nodes.push(id);
+      run.geometry.push(p);
+    });
+  }
+  return out.filter(w => w.nodes.length > 1);
+}
+
+const largestPolygon = (poly) => poly.geometry.type === 'MultiPolygon'
+  ? poly.geometry.coordinates.map(c => turf.polygon([c[0]])).sort((a, b) => turf.area(b) - turf.area(a))[0]
+  : poly;
+
+async function compute(lat, lng, radius, cv, clip) {
   const proj = projector(lat, lng);
-  const ways = await fetchWays(lat, lng, radius, cv);
+  const allWays = await fetchWays(lat, lng, radius, cv);
+  const ways = clip ? clipWays(allWays, clip.feature) : allWays;
   if (!ways.length) throw new Error('Không có đường giao thông quanh công trình');
   const graph = buildGraph(ways, proj);
   const origin = bestOrigin(graph, radius);
@@ -502,15 +528,17 @@ async function compute(lat, lng, radius, cv) {
   const degPerM = 1 / 111320;
   const rough = turf.simplify(turf.polygon([ring]), { tolerance: cell * 0.9 * degPerM });
   const smooth = turf.simplify(turf.polygonSmooth(rough, { iterations: 3 }).features[0], { tolerance: 2 * degPerM });
-  let polygon = turf.intersect(smooth, circle) || smooth;
-  if (polygon.geometry.type === 'MultiPolygon') {
-    polygon = polygon.geometry.coordinates.map(c => turf.polygon([c[0]])).sort((a, b) => turf.area(b) - turf.area(a))[0];
+  let polygon = largestPolygon(turf.intersect(smooth, circle) || smooth);
+  if (clip) {
+    const inWard = turf.intersect(polygon, clip.feature);
+    if (!inWard) throw new Error('Vùng phục vụ nằm ngoài ranh phường');
+    polygon = largestPolygon(inWard);
   }
 
   const reachRoads = byGroup();
   origin.reach.segments.forEach(([p, q, group]) => reachRoads[groupKey(group)].push([proj.toLatLng(p[0], p[1]), proj.toLatLng(q[0], q[1])]));
   const allRoads = byGroup();
-  ways.forEach(w => allRoads[groupKey(w.group)].push(w.geometry.map(p => [p.lat, p.lon])));
+  allWays.forEach(w => allRoads[groupKey(w.group)].push(w.geometry.map(p => [p.lat, p.lon])));
 
   return {
     polygon,
@@ -527,12 +555,13 @@ async function compute(lat, lng, radius, cv) {
 /**
  * Vùng phục vụ thực tế: { polygon (GeoJSON), reachRoads, allRoads ({ main, named, kiet, unknown }: [[lat,lng]...] theo nhóm vẽ),
  * flowPaths (tuyến từ rìa về công trình), areaKm2, circleKm2, reachKm, snapM }
+ * clip: { key, feature } — vùng giới hạn (ranh phường của công trình cấp đơn vị ở); đồ thị đường và vùng phục vụ không vượt ra ngoài
  */
-export async function computeServiceArea(lat, lng, radius) {
+export async function computeServiceArea(lat, lng, radius, clip = null) {
   const cv = await customRoadsVersion();
-  const key = `${lat.toFixed(5)},${lng.toFixed(5)},${Math.round(radius)},${cv}`;
+  const key = `${lat.toFixed(5)},${lng.toFixed(5)},${Math.round(radius)},${cv},${clip ? clip.key : ''}`;
   if (cache.has(key)) return cache.get(key);
-  const pending = compute(lat, lng, radius, cv);
+  const pending = compute(lat, lng, radius, cv, clip);
   cache.set(key, pending);
   pending.catch(() => cache.delete(key));
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
