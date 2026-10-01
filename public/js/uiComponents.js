@@ -1640,8 +1640,9 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       const needApproveNote = needApprove ? `<div class="wt-need-approve">(Cần phê duyệt)</div>` : '';
       const eligibleSugg = (csd.suggestions || []).filter(s => s.status === 'eligible');
       const suggestionHtml = eligibleSugg.length > 0
-        ? eligibleSugg.slice(0, 2).map((s, idx) =>
-          `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bổ sung <b class="c-green">${fmtPct(s.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(s.coverageAddPct)}</b> độ phủ${s.coverageMethod === 'estimate' ? ', ước lượng' : ''}).</div>`
+        ? eligibleSugg.slice(0, 2).map((s, idx) => s.basis === 'scale'
+          ? `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bù thiếu quy mô: phường đạt <b class="c-red">${fmtPct(s.currentScalePct)}</b> → <b class="c-green">${fmtPct(Math.min(100, s.currentScalePct + s.scaleAddPct))}</b>, độ phủ không tăng).</div>`
+          : `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bổ sung <b class="c-green">${fmtPct(s.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(s.coverageAddPct)}</b> độ phủ${s.coverageMethod === 'estimate' ? ', ước lượng' : ''}).</div>`
         ).join('')
         : `<div class="c-muted"><i>Chưa có gợi ý phù hợp</i></div>`;
 

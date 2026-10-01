@@ -1250,8 +1250,11 @@ export function onPointClick(p, targetMap = map) {
           const priorityBadge = s.isTopPriority ? `<span class="badge-priority">ƯU TIÊN HÀNG ĐẦU</span>` : "";
           const cls = s.isTopPriority ? "sug-card priority" : "sug-card";
           const estimateNote = s.coverageMethod === 'estimate' ? ` <span title="GEE bận: ước lượng theo diện tích">(ước lượng)</span>` : '';
+          const basisNote = s.basis === 'scale'
+            ? `Bù thiếu quy mô: phường đạt <b class="c-red">${fmtNum(s.currentScalePct)}%</b> → <b class="c-green">${fmtNum(Math.min(100, s.currentScalePct + s.scaleAddPct))}%</b> (độ phủ không tăng)`
+            : `Bổ sung <b class="c-green">${fmtNum(s.scaleAddPct)}%</b> quy mô, <b class="c-cyan">${fmtNum(s.coverageAddPct)}%</b> độ phủ${estimateNote}`;
           sugHtml += `<div class="${cls}"><div>${ico('flag')}<b>${escapeHtml(s.label)}</b> ${priorityBadge}</div>
-            <div class="pp-sub">Bổ sung <b class="c-green">${fmtNum(s.scaleAddPct)}%</b> quy mô, <b class="c-cyan">${fmtNum(s.coverageAddPct)}%</b> độ phủ${estimateNote}</div>
+            <div class="pp-sub">${basisNote}</div>
             <button type="button" class="proof-btn" data-idx="${idx}">${ico('book')}Xem thuyết minh</button></div>`;
         });
         (res.ineligible || []).forEach(inEl => {

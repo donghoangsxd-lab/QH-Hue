@@ -358,6 +358,9 @@ async function callAppsScript(params, body = null) {
   throw httpError(502, 'Apps Script trả về phản hồi không hợp lệ');
 }
 
+// Đề xuất chuyển đổi CSD: độ phủ tăng dưới ngưỡng này (% dân cư phường) coi như không tăng → chọn theo thiếu quy mô
+const CSD_MIN_COVERAGE_PCT = 0.5;
+
 // Bậc cao độ (m) của bảng dân số / diện tích theo cao độ: dưới FLOOD_BIN_MIN gộp vào bậc đầu, từ FLOOD_BIN_MAX gộp vào bậc cuối
 const FLOOD_BIN_MIN = -1;
 const FLOOD_BIN_MAX = 40;
@@ -638,11 +641,16 @@ function csdSuggestionCandidates(csd, ward, approvedAll) {
     }
     const radius = csdCandidateRadius(csd, code, ward.profile);
     const existing = nearbySameType(approvedAll, code, csd.lat, csd.lng, radius);
+    const deficitArea = reqArea - existArea;
     const s = {
       code, label, status: 'eligible',
-      deficitArea: reqArea - existArea,
+      reqArea,
+      existArea: Math.round(existArea),
+      deficitArea: Math.round(deficitArea),
       isWardDeficit: true,
-      scaleAddPct: round1(clamp((size / reqArea) * 100, 0, 100)),
+      currentScalePct: round1(clamp((existArea / reqArea) * 100, 0, 100)),
+      // Chỉ phần diện tích lấp vào chỗ thiếu mới tính là bổ sung quy mô (khu đất lớn hơn phần thiếu không cộng thêm)
+      scaleAddPct: round1(clamp((Math.min(size, deficitArea) / reqArea) * 100, 0, 100)),
       radiusUsed: radius,
       existingCount: existing.length,
       coverageAddPct: 0
@@ -653,11 +661,24 @@ function csdSuggestionCandidates(csd, ward, approvedAll) {
   return { suggestions, candidates };
 }
 
-/** Xếp ưu tiên: % dân cư được phục vụ thêm giảm dần, bằng nhau thì theo % quy mô bổ sung */
+/** Cơ sở chọn công năng: mở rộng độ phủ (phục vụ thêm dân chưa có công trình) hay bù thiếu quy mô của phường */
+function csdBasis(coverageAddPct) {
+  return coverageAddPct >= CSD_MIN_COVERAGE_PCT ? 'coverage' : 'scale';
+}
+
+/**
+ * Xếp ưu tiên: loại tăng được độ phủ đứng trước (% độ phủ giảm dần, bằng nhau theo % quy mô bổ sung);
+ * loại không tăng độ phủ (khu đất đã nằm trong phạm vi công trình cùng loại) xét theo bảng chỉ tiêu của phường:
+ * loại có tỷ lệ đạt quy mô thấp nhất trước, bằng nhau thì loại khu đất bù được nhiều hơn.
+ */
 function rankEligible(suggestions) {
-  const eligible = suggestions
-    .filter(s => s.status === 'eligible')
-    .sort((a, b) => (b.coverageAddPct - a.coverageAddPct) || (b.scaleAddPct - a.scaleAddPct));
+  const eligible = suggestions.filter(s => s.status === 'eligible');
+  eligible.forEach(s => { s.basis = csdBasis(s.coverageAddPct); });
+  eligible.sort((a, b) => {
+    if (a.basis !== b.basis) return a.basis === 'coverage' ? -1 : 1;
+    if (a.basis === 'coverage') return (b.coverageAddPct - a.coverageAddPct) || (b.scaleAddPct - a.scaleAddPct);
+    return (a.currentScalePct - b.currentScalePct) || (b.scaleAddPct - a.scaleAddPct);
+  });
   if (eligible.length > 0) eligible[0].isTopPriority = true;
   return eligible;
 }
@@ -1675,6 +1696,8 @@ module.exports = async (req, res) => {
       const netPix = counts.net || 0;
       // Dân số bình quân 1 pixel = dân số phường / số pixel dân cư của phường (làm tròn như hiển thị để nhân tay khớp)
       const popPerPixel = wardTotal > 0 ? Number((ward.pop / wardTotal).toFixed(2)) : 0;
+      const coverageAddPct = wardTotal > 0 ? round1(clamp((netPix / wardTotal) * 100, 0, 100)) : 0;
+      const t = cand.target;
       return res.status(200).json({
         code,
         label: cand.target.label,
@@ -1683,8 +1706,17 @@ module.exports = async (req, res) => {
         existing: cand.existing.map(it => ({ id: it.id, name: it.name, lat: it.lat, lng: it.lng, radius: Number(it.radius) || cand.radius })),
         netGeometry: netGeoJson,
         pixels: { buffer: bufferPix, covered: Math.max(0, bufferPix - netPix), net: netPix, wardTotal },
-        coverageAddPct: wardTotal > 0 ? round1(clamp((netPix / wardTotal) * 100, 0, 100)) : 0,
-        scaleAddPct: cand.target.scaleAddPct,
+        coverageAddPct,
+        basis: csdBasis(coverageAddPct),
+        scaleAddPct: t.scaleAddPct,
+        scale: {
+          required: t.reqArea,
+          existing: t.existArea,
+          deficit: t.deficitArea,
+          siteArea: Math.round(Number(csd.size) || 0),
+          currentPct: t.currentScalePct,
+          afterPct: round1(clamp(t.currentScalePct + t.scaleAddPct, 0, 100))
+        },
         population: {
           ward: ward.pop,
           perPixel: popPerPixel,
