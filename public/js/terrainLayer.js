@@ -5,7 +5,7 @@ import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
 
 const TILE_URL = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
-const NATIVE_MAX_ZOOM = 15;     // ~4,8 m/pixel ở z15, đã mịn hơn dữ liệu gốc 30 m
+export const NATIVE_MAX_ZOOM = 15;     // ~4,8 m/pixel ở z15, đã mịn hơn dữ liệu gốc 30 m
 // Thang không tuyến tính: đồng bằng ven phá 0–10 m chiếm nhiều bậc màu để thấy rõ vùng trũng
 const STOPS = [
   [0, '#08306b'], [2, '#08519c'], [4, '#2171b5'], [7, '#4292c6'], [10, '#4fb3d9'],
@@ -14,7 +14,7 @@ const STOPS = [
 ];
 const LEGEND_TICKS = [0, 10, 50, 200, 700, 1700];
 const LUT_MAX = 2000;
-const CACHE_MAX = 80;           // số ô giữ lại cao độ để đọc số liệu tại con trỏ (~128 KB/ô)
+const CACHE_MAX = 120;          // số ô giữ lại cao độ (~128 KB/ô): đọc số liệu tại con trỏ, tô lại lớp ngập khi đổi mực nước
 
 const $ = (id) => document.getElementById(id);
 const hexRgb = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
@@ -34,6 +34,7 @@ const LUT = (() => {
 })();
 
 const elevCache = new Map();    // "z/x/y" → Int16Array 256×256 (m)
+const pending = new Map();      // "z/x/y" → Promise đang tải
 
 function cacheTile(key, elev) {
   elevCache.delete(key);
@@ -41,30 +42,49 @@ function cacheTile(key, elev) {
   if (elevCache.size > CACHE_MAX) elevCache.delete(elevCache.keys().next().value);
 }
 
+/** Cao độ (m, làm tròn) 256×256 pixel của 1 ô Terrarium; dùng chung bộ nhớ đệm cho lớp địa hình và mô phỏng ngập */
+export function loadElevTile(z, x, y) {
+  const key = `${z}/${x}/${y}`;
+  const hit = elevCache.get(key);
+  if (hit) return Promise.resolve(hit);
+  if (pending.has(key)) return pending.get(key);
+  const p = new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 256;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const px = ctx.getImageData(0, 0, 256, 256).data;
+      const elev = new Int16Array(256 * 256);
+      for (let i = 0, q = 0; q < px.length; i++, q += 4) elev[i] = Math.round(px[q] * 256 + px[q + 1] + px[q + 2] / 256 - 32768);
+      cacheTile(key, elev);
+      resolve(elev);
+    };
+    img.onerror = () => reject(new Error('terrain tile'));
+    img.src = L.Util.template(TILE_URL, { z, x, y });
+  }).finally(() => pending.delete(key));
+  pending.set(key, p);
+  return p;
+}
+
 const TerrainGrid = L.GridLayer.extend({
   createTile(coords, done) {
     const tile = document.createElement('canvas');
     tile.width = tile.height = 256;
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const ctx = tile.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(img, 0, 0);
-      const data = ctx.getImageData(0, 0, 256, 256);
+    loadElevTile(coords.z, coords.x, coords.y).then(elev => {
+      const ctx = tile.getContext('2d');
+      const data = ctx.createImageData(256, 256);
       const px = data.data;
-      const elev = new Int16Array(256 * 256);
-      for (let i = 0, p = 0; p < px.length; i++, p += 4) {
-        const e = px[p] * 256 + px[p + 1] + px[p + 2] / 256 - 32768;
-        elev[i] = Math.round(e);
-        const m = e <= 0 ? 0 : e >= LUT_MAX ? LUT_MAX : e | 0;
+      for (let i = 0, p = 0; i < elev.length; i++, p += 4) {
+        const e = elev[i];
+        const m = e <= 0 ? 0 : e >= LUT_MAX ? LUT_MAX : e;
         px[p] = LUT[m * 3]; px[p + 1] = LUT[m * 3 + 1]; px[p + 2] = LUT[m * 3 + 2]; px[p + 3] = 255;
       }
       ctx.putImageData(data, 0, 0);
-      cacheTile(`${coords.z}/${coords.x}/${coords.y}`, elev);
       done(null, tile);
-    };
-    img.onerror = () => done(new Error('terrain tile'), tile);
-    img.src = L.Util.template(TILE_URL, coords);
+    }, err => done(err, tile));
     return tile;
   }
 });

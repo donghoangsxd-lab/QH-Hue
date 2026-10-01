@@ -46,6 +46,7 @@
     <symbol id="i-parcel" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 2.4"/><path d="M4 12h16M12 4v16" stroke-opacity=".45"/></symbol>
     <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 6"/></symbol>
     <symbol id="i-terrain" viewBox="0 0 24 24"><path d="m2 20 7-12 4 6.5 2.5-3.5L22 20z"/><path d="m7.4 10.8 1.6 1.4 1.6-1.4"/></symbol>
+    <symbol id="i-flood" viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 9.5V14M17.5 9.5V14"/><path d="M2 17c1.7 0 1.7-1.3 3.3-1.3S7 17 8.7 17s1.6-1.3 3.3-1.3 1.6 1.3 3.3 1.3 1.7-1.3 3.4-1.3S20.3 17 22 17M2 20.5c1.7 0 1.7-1.3 3.3-1.3s1.7 1.3 3.4 1.3 1.6-1.3 3.3-1.3 1.6 1.3 3.3 1.3 1.7-1.3 3.4-1.3 1.6 1.3 3.3 1.3"/></symbol>
     <symbol id="i-road" viewBox="0 0 24 24"><path d="M8 3 4 21M16 3l4 18M12 4v3M12 10.5v3M12 17v3"/></symbol>
     <symbol id="i-heat" viewBox="0 0 24 24"><path d="M12 22c4 0 7-2.7 7-6.8 0-3.2-2-5.7-3.6-7.4-.3 2-1.3 3.3-2.6 3.8C13.5 7.5 12 4.5 9.5 2.5 9.6 6 5 9 5 15.2 5 19.3 8 22 12 22z"/></symbol>
     <symbol id="i-radius" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-dasharray="3 2.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 12h9"/></symbol>
@@ -174,6 +175,16 @@
             <div class="terrain-legend-bar" id="terrainLegendBar"></div>
             <div class="terrain-legend-ticks" id="terrainLegendTicks"></div>
             <div class="terrain-legend-foot"><span>Cao độ (m)</span><span id="terrainReadout"></span></div>
+          </div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_flood"><label for="chk_flood" title="Tô mọi vùng có cao độ SRTM thấp hơn mực nước giả định. Mực nước tính theo cao độ SRTM (bề mặt, gồm cả nhà và cây; đô thị thường cao hơn nền đất vài mét), không phải số đọc tại trạm thủy văn"><svg class="ico ico-layer"><use href="#i-flood"/></svg>Mô phỏng ngập</label></div></div>
+          <div class="flood-box" id="floodBox" style="display:none;">
+            <div class="flood-level">
+              <label for="floodLevel">Mực nước</label>
+              <input type="range" id="floodLevel" class="opacity-slider" min="0.5" max="15" step="0.5" value="5" aria-label="Mực nước giả định (m)">
+              <b id="floodLevelVal">5 m</b>
+            </div>
+            <div class="flood-legend"><span>Sâu 0</span><div class="flood-legend-bar" id="floodLegendBar"></div><span>≥ 3 m</span></div>
+            <div class="flood-stats" id="floodStats"></div>
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">phóng to để xem</small></label></div></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">

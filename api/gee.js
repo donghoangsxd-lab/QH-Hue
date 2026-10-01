@@ -358,6 +358,11 @@ async function callAppsScript(params, body = null) {
   throw httpError(502, 'Apps Script trả về phản hồi không hợp lệ');
 }
 
+// Bậc cao độ (m) của bảng dân số / diện tích theo cao độ: dưới FLOOD_BIN_MIN gộp vào bậc đầu, từ FLOOD_BIN_MAX gộp vào bậc cuối
+const FLOOD_BIN_MIN = -1;
+const FLOOD_BIN_MAX = 40;
+let cachedFloodBins = null;   // { version: phiên bản hiệu chỉnh dân cư, data }
+
 function invalidateAllCaches() {
   invalidateCache();
   cachedWardStats = null;
@@ -378,6 +383,7 @@ async function syncPopEdits(minVersion = 0) {
   }
   if (data.saved === getPopEditsVersion()) return;
   applyPopEdits(data.saved, data.edits);
+  cachedFloodBins = null;
   cachedWardStats = null;
   cachedCoverageByWard = {};
   wardPopPixelCache.clear();
@@ -1499,6 +1505,31 @@ module.exports = async (req, res) => {
         );
       });
       return res.status(200).json({ urlFormat: mapId.urlFormat });
+    }
+
+    // Mô phỏng ngập (floodSim.js): dân số và diện tích mỗi phường theo từng mét cao độ SRTM (cùng nguồn lớp địa hình);
+    // trình duyệt tự cộng các bậc thấp hơn mực nước nên kéo thanh mực nước không phải gọi lại máy chủ
+    if (action === 'getFloodBins') {
+      res.setHeader('Cache-Control', req.query.pv ? 'no-store' : 's-maxage=3600, stale-while-revalidate=86400');
+      const version = getPopEditsVersion();
+      if (cachedFloodBins && cachedFloodBins.version === version) return res.status(200).json(cachedFloodBins.data);
+      const bin = ee.Image('USGS/SRTMGL1_003').select('elevation').clamp(FLOOD_BIN_MIN, FLOOD_BIN_MAX).rename('bin');
+      const img = popRasterNormalized.unmask(0).rename('pop').addBands(ee.Image.pixelArea().rename('area')).addBands(bin);
+      const fc = await eeEvaluate(img.reduceRegions({
+        collection: wardVectorParsed,
+        reducer: ee.Reducer.sum().repeat(2).group({ groupField: 2, groupName: 'bin' }),
+        scale: POP_SCALE_M
+      }).map(f => ee.Feature(null).copyProperties(f)));
+      const wards = ((fc && fc.features) || []).map(f => {
+        const p = f.properties || {};
+        return {
+          name: p.tenXa || p.NAME_2 || p.name || 'Phường',
+          bins: (p.groups || []).map(g => [g.bin, Math.round((g.sum[0] || 0) * 10) / 10, Math.round(g.sum[1] || 0)])
+        };
+      });
+      const data = { binMin: FLOOD_BIN_MIN, binMax: FLOOD_BIN_MAX, wards };
+      cachedFloodBins = { version, data };
+      return res.status(200).json(data);
     }
 
     if (action === 'getBoundaryTile') {
