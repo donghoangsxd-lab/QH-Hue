@@ -7,6 +7,7 @@ import { map, clearMeasure, loadPopulationLayer } from './mapEngine.js';
 import { escapeHtml, fmtNum, ico, setStatusContent } from './utils.js';
 import { postAdmin } from './wardRoads.js';
 import { reloadWardStats } from './uiComponents.js';
+import { setDrawAssist } from './drawAssist.js';
 
 const PIXEL_M2 = 900; // ô raster 30 m × 30 m (ước lượng số pixel trong vùng)
 const MIN_AREA_M2 = 100;
@@ -190,6 +191,7 @@ function setDrawing(on) {
     btn.setAttribute('aria-pressed', String(on));
   }
   if (map) map.getContainer().style.cursor = on ? 'crosshair' : '';
+  setDrawAssist('pop', on);
   renderDraft();
 }
 

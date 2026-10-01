@@ -40,7 +40,8 @@ export function initPlanMap(mainMap, mainLayers) {
   }).setView(leftMap.getCenter(), leftMap.getZoom());
 
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 18,
+    maxZoom: 19,
+    maxNativeZoom: 18,
     crossOrigin: 'anonymous',
     attribution: 'Tiles &copy; Esri'
   }).addTo(planMap);
@@ -124,7 +125,7 @@ export function setPlanHeatUrl(url) {
   planHeatTile = null;
   if (!url) return;
   const opacityEl = document.getElementById('heatOpacity');
-  planHeatTile = L.tileLayer(url, { opacity: opacityEl ? opacityEl.value / 100 : 0.3 });
+  planHeatTile = L.tileLayer(url, { maxZoom: 19, opacity: opacityEl ? opacityEl.value / 100 : 0.3 });
   planLayers.heatmap.addLayer(planHeatTile);
 }
 

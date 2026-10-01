@@ -6,7 +6,7 @@ import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponen
 import { geeApi, markDataWritten } from './api.js';
 import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico } from './utils.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
-import { computeServiceArea } from './serviceArea.js';
+import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
 import { tt16ParcelStyle, renderTt16Legend } from './tt16Symbols.js';
 import {
@@ -143,7 +143,8 @@ export function initMap() {
   map = L.map('map', { renderer: L.canvas(), maxZoom: 18 }).setView(CITY_CENTER, CITY_ZOOM);
 
   L.tileLayer(ESRI_TILES, {
-    maxZoom: 18,
+    maxZoom: 19,
+    maxNativeZoom: 18,
     crossOrigin: 'anonymous',
     attribution: 'Tiles &copy; Esri'
   }).addTo(map);
@@ -240,7 +241,7 @@ export async function loadBoundaryLayer() {
   }
 }
 
-function getRightObstruction() {
+export function getRightObstruction() {
   if (!map) return 0;
   let panelW = 0;
   const rp = document.getElementById('rightPanel');
@@ -527,7 +528,7 @@ function createWardPie(ward, counts, total, maxTotal, targetMap, scenarioLabel) 
     direction: 'auto', offset: [size / 2 + 6, 0], className: 'ward-pie-tip', opacity: 1
   });
   marker.on('click', () => {
-    if (state.isPickMode || state.activeMeasureType || state.adminDrawMode) return;
+    if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
     targetMap.flyTo([ward.lat, ward.lng], PIE_CLICK_ZOOM);
   });
   return marker;
@@ -555,7 +556,7 @@ function createParcelShape(entry, targetMap, detailed) {
     bubblingMouseEvents: false
   });
   shape.on('click', () => {
-    if (state.isPickMode || state.activeMeasureType || state.adminDrawMode) return;
+    if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
     onPointClick(entry.point, targetMap);
   });
   return shape;
@@ -592,7 +593,7 @@ function createPointMarker(entry, mode, targetMap) {
     marker.bindTooltip(escapeHtml(p.name || ''), { direction: 'top', offset: [0, -6], className: 'dot-tip' });
   }
   marker.on('click', () => {
-    if (state.isPickMode || state.activeMeasureType || state.adminDrawMode) return;
+    if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
     onPointClick(entry.point, targetMap);
   });
   return marker;
@@ -864,7 +865,7 @@ function setLeftHeatUrl(url) {
   tileHeatmapLayer = null;
   if (!url) return;
   const heatOpacityEl = document.getElementById('heatOpacity');
-  tileHeatmapLayer = L.tileLayer(url, { opacity: heatOpacityEl ? heatOpacityEl.value / 100 : 0.3 });
+  tileHeatmapLayer = L.tileLayer(url, { maxZoom: 19, opacity: heatOpacityEl ? heatOpacityEl.value / 100 : 0.3 });
   layers.heatmap.addLayer(tileHeatmapLayer);
 }
 
@@ -1310,8 +1311,8 @@ export async function loadPopulationLayer(pv) {
       const opacity = popOpacityEl ? popOpacityEl.value / 100 : 0.6;
       layers.pop.clearLayers();
       planLayers.pop?.clearLayers();
-      layers.pop.addLayer(L.tileLayer(data.urlFormat, { opacity }));
-      planLayers.pop.addLayer(L.tileLayer(data.urlFormat, { opacity }));
+      layers.pop.addLayer(L.tileLayer(data.urlFormat, { maxZoom: 19, opacity }));
+      planLayers.pop.addLayer(L.tileLayer(data.urlFormat, { maxZoom: 19, opacity }));
       if (pv) popLayerPromise = Promise.resolve(true);
       return true;
     }
@@ -1335,10 +1336,81 @@ export function ensurePopulationLayer() {
 
 // ============================ TRA CỨU TẠI VỊ TRÍ ============================
 
+const ROUTE_CANDIDATES = 4;   // mỗi nhóm thử vài công trình gần nhất theo đường chim bay (gần nhất chưa chắc đi đường gần nhất)
+const WALK_M_PER_MIN = 80;    // đi bộ ~4,8 km/h
+const fmtDist = (m) => (m >= 1000 ? `${fmtNum(Math.round(m / 100) / 10)} km` : `${fmtNum(Math.round(m / 10) * 10)} m`);
+
+// Ứng viên chỉ đường của mỗi nhóm: công trình đã duyệt gần nhất theo đường chim bay; nhóm Tiểu học không lấy trường THPT
+function nearestByGroup(source, lat, lng) {
+  const out = {};
+  INFRA_CODES.forEach(code => { out[code] = []; });
+  source.forEach(item => {
+    if (!INFRA_CODES.includes(item.type) || !isApproved(item.status) || !hasValidCoord(item)) return;
+    if (item.type === '4-TH' && layerType(item) !== '4-TH') return;
+    const ilat = Number(item.lat), ilng = Number(item.lng);
+    out[item.type].push({ lat: ilat, lng: ilng, ref: item, d: distanceMeters(lat, lng, ilat, ilng) });
+  });
+  INFRA_CODES.forEach(code => { out[code] = out[code].sort((a, b) => a.d - b.d).slice(0, ROUTE_CANDIDATES); });
+  return out;
+}
+
+// Tuyến theo mạng giao thông từ vị trí tra cứu tới công trình gần nhất mỗi nhóm: nét màu theo nhóm, vòng sáng ở công trình,
+// chấm sáng chạy từ vị trí về phía công trình (như khi click công trình); nhóm không nối được đường thì ghi khoảng cách chim bay
+async function showAccessRoutes(lat, lng, m, cands, popup, seq) {
+  const group = m === planMap ? planLayers.singleIso : layers.singleIso;
+  const box = () => (popup.isOpen() ? popup.getElement()?.querySelector('.js-routes') : null);
+  const codes = INFRA_CODES.filter(code => cands[code].length);
+  if (!codes.length) {
+    const el = box();
+    if (el) el.innerHTML = `<div class="sug-card ineligible">(Chưa có công trình đã duyệt)</div>`;
+    return;
+  }
+  let result = null, error = null;
+  try { result = await computeAccessRoutes(lat, lng, cands); } catch (err) { error = err; }
+  if (seq !== singleIsoSeq) return;
+
+  const rows = codes.map(code => {
+    const r = result && result.routes[code];
+    return r ? { code, item: r.ref, distM: r.distM, path: r.path } : { code, item: cands[code][0].ref, airM: cands[code][0].d };
+  }).sort((a, b) => (a.path ? 0 : 1e9) + (a.distM ?? a.airM) - ((b.path ? 0 : 1e9) + (b.distM ?? b.airM)));
+
+  const renderer = selRendererFor(m);
+  const routed = rows.filter(r => r.path);
+  routed.slice().reverse().forEach(r => {          // tuyến ngắn nhất vẽ trên cùng
+    const color = BUFFER_COLORS[r.code] || SEL_ACCENT;
+    const line = { renderer, lineCap: 'round', lineJoin: 'round', interactive: false };
+    group.addLayer(L.polyline(r.path, { ...line, color: '#020617', weight: 7, opacity: 0.5 }));
+    group.addLayer(L.polyline(r.path, { ...line, color, weight: 3.2, opacity: 0.95 }));
+    group.addLayer(L.circleMarker(r.path[r.path.length - 1], { renderer, radius: 9, color, weight: 2.5, fillColor: color, fillOpacity: 0.25, interactive: false }));
+  });
+  if (routed.length) stopFlow = startFlowAnimation(m, group, routed.map(r => r.path));
+
+  const el = box();
+  if (!el) return;
+  let html = error ? `<div class="pp-note c-orange">${ico('alert')}Chưa tải được mạng đường (${escapeHtml(error.message)}) — tạm ghi khoảng cách đường chim bay.</div>` : '';
+  html += rows.map((r, i) => {
+    const dot = `<i class="route-dot" style="background:${BUFFER_COLORS[r.code] || SEL_ACCENT};"></i>`;
+    const head = `${dot}<b>${escapeHtml(infraLabels[r.code] || r.code)}</b><div class="c-cyan">${escapeHtml(r.item.name || 'Công trình')}</div>`;
+    if (!r.path) return `<div class="sug-card route-card ineligible">${head}<div>≈ ${fmtDist(r.airM)} đường chim bay (chưa nối được theo đường)</div></div>`;
+    const radius = effectiveRadius(r.item);
+    const over = r.distM > radius ? ` <span class="c-orange">· vượt bán kính ${fmtNum(radius)} m</span>` : '';
+    return `<div class="sug-card route-card" data-route="${i}" title="Bấm để xem trọn tuyến">${head}
+      <div>${fmtDist(r.distM)} theo đường · ~${Math.max(1, Math.round(r.distM / WALK_M_PER_MIN))} phút đi bộ${over}</div></div>`;
+  }).join('');
+  el.innerHTML = html;
+  el.addEventListener('click', (e) => {
+    const card = e.target.closest('[data-route]');
+    const r = card && rows[Number(card.dataset.route)];
+    if (r) m.fitBounds(L.latLngBounds(r.path), { padding: [50, 50], maxZoom: 17 });
+  });
+}
+
 // Buffer của mỗi công trình là vòng tròn bán kính R: điểm được phục vụ khi khoảng cách ≤ R.
 // Tính trực tiếp trên toàn TP (không phụ thuộc phường đang lọc), dùng được cho cả bản đồ quy hoạch.
 export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
   if (!targetMap) return;
+  clearSingleIsochrone();
+  const routeSeq = singleIsoSeq;
   const isPlan = !!planMap && targetMap === planMap;
   if (state.tempMarker) state.tempMarker.remove();
   state.tempMarker = L.marker([clickLat, clickLng], { interactive: false }).addTo(targetMap);
@@ -1381,12 +1453,18 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
   } else {
     html += `<div class="sug-card priority">${ico('check')}Vị trí tiếp cận đủ 8 nhóm hạ tầng!</div>`;
   }
+  const routeCands = nearestByGroup(source, clickLat, clickLng);
+  html += `<div class="pp-section c-cyan">3. Đường đi tới công trình gần nhất</div>
+    <div class="js-routes"><div class="pp-loading">${ico('clock')}đang tìm đường theo mạng giao thông...</div></div>`;
   html += `</div>`;
 
   const inspectPopup = L.popup({ className: 'inspect-popup', ...popupFitOptions(targetMap, 320, 240) })
     .setLatLng([clickLat, clickLng])
     .setContent(html)
     .openOn(targetMap);
+  addPopupCollapseToggle(inspectPopup);
+  inspectPopup.on('remove', () => { if (singleIsoSeq === routeSeq) clearSingleIsochrone(); });
+  showAccessRoutes(clickLat, clickLng, targetMap, routeCands, inspectPopup, routeSeq);
 
   if (!wardLocal) {
     fetchJson(geeApi(`action=getWardFromPoint&lat=${clickLat.toFixed(6)}&lng=${clickLng.toFixed(6)}`))

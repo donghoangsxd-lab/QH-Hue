@@ -8,6 +8,7 @@ import { escapeHtml, fmtNum, ico, setStatusContent } from './utils.js';
 import { postAdmin, refreshRoadsMeta } from './wardRoads.js';
 import { roadWaysAround } from './serviceArea.js';
 import { refreshRoadNetwork } from './roadNetworkLayer.js';
+import { setDrawAssist } from './drawAssist.js';
 
 const SNAP_M = 20;
 const NET_RADIUS_M = 1000;          // tải mạng lưới quanh đỉnh để bắt dính
@@ -32,6 +33,7 @@ let vertices = [];       // tuyến đang vẽ: [{ lat, lng, node: mã nút đã
 let netNodes = new Map(); // mã nút → { lat, lng } quanh các vùng đã tải
 let netAreas = [];       // [{ lat, lng, r }]
 let listLayer = null, drawLayer = null;
+let guideLine = null;    // nét đứt từ đỉnh cuối tới con trỏ
 
 function setStatus(text, color) {
   const el = $('roadStatus');
@@ -85,9 +87,18 @@ async function addVertex(ll) {
 }
 
 // ================== VẼ ==================
+function onGuideMove(e) {
+  const last = vertices[vertices.length - 1];
+  if (!drawing() || !drawLayer || !last) { guideLine?.remove(); guideLine = null; return; }
+  const latlngs = [[last.lat, last.lng], e.latlng];
+  if (guideLine) guideLine.setLatLngs(latlngs);
+  else guideLine = L.polyline(latlngs, { color: TYPES[selectedType()].color, weight: 2, opacity: 0.85, dashArray: '4,6', interactive: false }).addTo(drawLayer);
+}
+
 function renderDraft() {
   if (!drawLayer) return;
   drawLayer.clearLayers();
+  guideLine = null;
   const color = TYPES[selectedType()].color;
   const latlngs = vertices.map(v => [v.lat, v.lng]);
   if (latlngs.length >= 2) {
@@ -258,7 +269,11 @@ function setDrawing(on) {
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', String(on));
   }
-  if (map) map.getContainer().style.cursor = on ? 'crosshair' : '';
+  if (map) {
+    map.getContainer().style.cursor = on ? 'crosshair' : '';
+    if (on) map.on('mousemove', onGuideMove); else map.off('mousemove', onGuideMove);
+  }
+  setDrawAssist('road', on);
   renderDraft();
 }
 

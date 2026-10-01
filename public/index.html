@@ -69,6 +69,12 @@
     <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.2 1 2.1h5c0-.9.4-1.7 1-2.1A6 6 0 0 0 12 3z"/></symbol>
     <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-sketch" viewBox="0 0 24 24"><path d="M3 17c3-5 5 2 8-3s4-6 6-3"/><path d="m14 21 6.5-6.5-2-2L12 19v2z"/></symbol>
+    <symbol id="i-sk-line" viewBox="0 0 24 24"><path d="M5 19 19 5"/><circle cx="5" cy="19" r="1.6" fill="currentColor"/><circle cx="19" cy="5" r="1.6" fill="currentColor"/></symbol>
+    <symbol id="i-sk-polyline" viewBox="0 0 24 24"><path d="m3 18 6-9 5 6 7-10"/><circle cx="9" cy="9" r="1.4" fill="currentColor"/><circle cx="14" cy="15" r="1.4" fill="currentColor"/></symbol>
+    <symbol id="i-sk-polygon" viewBox="0 0 24 24"><path d="m4 9 7-5 9 4-2 11H7z" fill="currentColor" fill-opacity=".2"/></symbol>
+    <symbol id="i-sk-arrow" viewBox="0 0 24 24"><path d="M4 20 18 6"/><path d="M10 5h9v9" fill="none"/></symbol>
+    <symbol id="i-sk-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity=".15"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><path d="M12 12h8" stroke-dasharray="2 2"/></symbol>
   </svg>
 
   <!-- VÙNG BẢN ĐỒ (co giãn theo panel phải và panel dưới) -->
@@ -96,6 +102,29 @@
       <button type="button" class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích" aria-label="Đo diện tích"><svg class="ico"><use href="#i-area"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnMeasureDist" title="Đo chiều dài" aria-label="Đo chiều dài"><svg class="ico"><use href="#i-ruler"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnInspectMode" title="Bật chế độ tra cứu: click lên bản đồ để xem hạ tầng tiếp cận tại vị trí" aria-label="Chế độ tra cứu" aria-pressed="false"><svg class="ico"><use href="#i-inspect"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnSketch" title="Lớp vẽ tạm (chỉ trong phiên này, không lưu, người khác không thấy)" aria-label="Lớp vẽ tạm" aria-pressed="false" aria-controls="sketchPalette"><svg class="ico"><use href="#i-sketch"/></svg></button>
+
+      <!-- BẢNG CÔNG CỤ LỚP VẼ TẠM (sketchLayer.js) -->
+      <div class="sketch-palette" id="sketchPalette" role="toolbar" aria-label="Công cụ vẽ tạm" hidden>
+        <div class="sketch-row">
+          <button type="button" class="sketch-btn" data-tool="line" title="Đường thẳng" aria-label="Đường thẳng" aria-pressed="false"><svg class="ico"><use href="#i-sk-line"/></svg></button>
+          <button type="button" class="sketch-btn" data-tool="polyline" title="Đường gấp khúc (polyline)" aria-label="Đường gấp khúc" aria-pressed="false"><svg class="ico"><use href="#i-sk-polyline"/></svg></button>
+          <button type="button" class="sketch-btn" data-tool="polygon" title="Đa giác (polygon)" aria-label="Đa giác" aria-pressed="false"><svg class="ico"><use href="#i-sk-polygon"/></svg></button>
+          <button type="button" class="sketch-btn" data-tool="arrow" title="Mũi tên" aria-label="Mũi tên" aria-pressed="false"><svg class="ico"><use href="#i-sk-arrow"/></svg></button>
+          <button type="button" class="sketch-btn" data-tool="circle" title="Vòng tròn" aria-label="Vòng tròn" aria-pressed="false"><svg class="ico"><use href="#i-sk-circle"/></svg></button>
+          <span class="sketch-sep"></span>
+          <button type="button" class="sketch-color" data-color="#f43f5e" title="Đỏ" aria-label="Màu đỏ"></button>
+          <button type="button" class="sketch-color" data-color="#facc15" title="Vàng" aria-label="Màu vàng"></button>
+          <button type="button" class="sketch-color" data-color="#22d3ee" title="Xanh lơ" aria-label="Màu xanh lơ"></button>
+          <button type="button" class="sketch-color" data-color="#a3e635" title="Xanh lá" aria-label="Màu xanh lá"></button>
+          <button type="button" class="sketch-color" data-color="#ffffff" title="Trắng" aria-label="Màu trắng"></button>
+          <span class="sketch-sep"></span>
+          <button type="button" class="sketch-btn" id="btnSketchUndo" title="Hoàn tác (Backspace)" aria-label="Hoàn tác"><svg class="ico"><use href="#i-undo"/></svg></button>
+          <button type="button" class="sketch-btn" id="btnSketchClear" title="Xóa toàn bộ hình vẽ tạm" aria-label="Xóa toàn bộ"><svg class="ico"><use href="#i-trash"/></svg></button>
+          <button type="button" class="sketch-btn" id="btnSketchClose" title="Đóng bảng (hình đã vẽ vẫn giữ)" aria-label="Đóng bảng công cụ vẽ tạm"><svg class="ico"><use href="#i-close"/></svg></button>
+        </div>
+        <div class="sketch-hint" id="sketchHint" aria-live="polite"></div>
+      </div>
     </div>
 
     <button type="button" class="rp-expand-btn ui-panel-format" id="btnExpandRightPanel" title="Mở panel công cụ" aria-label="Mở panel công cụ"><svg class="ico"><use href="#i-chev-left"/></svg></button>
@@ -215,6 +244,7 @@
         </div>
 
         <div id="addBulk" style="display:none;">
+          <div class="cad-pending" id="cadPendingBox" hidden></div>
           <div class="form-grid">
             <label for="cadCrs">Hệ tọa độ</label>
             <select id="cadCrs">
@@ -257,7 +287,16 @@
             </div>
           </details>
           <div id="cadReport"></div>
-          <button type="button" class="btn-submit" id="btnCadSubmit" disabled><svg class="ico"><use href="#i-save"/></svg>GHI VÀO HỆ THỐNG (ADMIN)</button>
+          <div class="cad-guest" id="cadGuest">
+            <div class="cad-guest-note"><svg class="ico"><use href="#i-info"/></svg>Chưa đăng nhập: gửi được file ≤ 2 MB vào hàng chờ, Admin kiểm tra rồi mới đưa lên bản đồ.</div>
+            <div class="form-grid">
+              <label for="cadSender">Người gửi</label>
+              <input type="text" id="cadSender" maxlength="80" placeholder="Họ tên / đơn vị / SĐT (không bắt buộc)" />
+              <label for="cadNote">Ghi chú</label>
+              <input type="text" id="cadNote" maxlength="300" placeholder="Nội dung, nguồn bản vẽ... (không bắt buộc)" />
+            </div>
+          </div>
+          <button type="button" class="btn-submit" id="btnCadSubmit" disabled><svg class="ico"><use href="#i-send"/></svg>GỬI HỒ SƠ CHỜ DUYỆT</button>
           <div id="cadStatus" class="rp-status" role="status" aria-live="polite"></div>
         </div>
 

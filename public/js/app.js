@@ -43,6 +43,7 @@ import { initWardRoads } from './wardRoads.js';
 import { initCustomRoads, handleRoadDrawClick } from './customRoads.js';
 import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
+import { initSketchLayer, handleSketchClick, stopSketchTool } from './sketchLayer.js';
 
 const CITY_NAME = "Thành phố Huế";
 
@@ -128,6 +129,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCustomRoads();
   initPopEdits();
   initRoadNetworkLayer();
+  initSketchLayer();
+  // Bật đo đạc / tra cứu / ghim / vẽ tuyến → bỏ chọn công cụ vẽ tạm (hình đã vẽ vẫn giữ)
+  ['btnMeasureDist', 'btnMeasureArea', 'btnInspectMode', 'btnPickOnMap', 'btnRoadDraw', 'btnPopDraw']
+    .forEach(id => document.getElementById(id)?.addEventListener('click', stopSketchTool));
   restoreAdminSession();
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleCompareMode);
 
@@ -161,6 +166,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   const handleMapClick = (e, targetMap) => {
+    if (state.sketchTool) {
+      if (targetMap === map) handleSketchClick(e.latlng);
+      return;
+    }
     if (state.adminDrawMode) {
       if (targetMap !== map) return;
       if (state.adminDrawMode === 'road') handleRoadDrawClick(e.latlng);

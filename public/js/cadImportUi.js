@@ -18,14 +18,18 @@ const MAX_LISTED = 200;
 // Mỗi lần gửi: tối đa 300 lô (giới hạn máy chủ) và ~2,5 MB (Vercel nhận tối đa 4,5 MB/yêu cầu)
 const CHUNK_MAX_ITEMS = 250;
 const CHUNK_MAX_CHARS = 2500000;
+// Người dùng chưa đăng nhập: chỉ gửi file ≤ 2 MB vào hàng chờ duyệt trên bucket (máy chủ kiểm tra lại), không ghi Sheet
+const GUEST_MAX_BYTES = 2 * 1024 * 1024;
 
 // Lựa chọn cho lô chứa nhiều công trình cùng loại (ngoài ID công trình cần cập nhật)
 const CHOICE_NEW = '__new';
 const CHOICE_SKIP = '__skip';
 
 // current: { fileName, format: 'dxf'|'kml'|'geojson', wgs84, stats, tt16 (file đặt tên layer theo TT16), base (lô trước khi khớp),
-//   result, manual (khớp thủ công), items: Map ID → công trình đang có, levels: Map src → MN/TH/THCS/reject, reviewSrc }
+//   result, manual (khớp thủ công), items: Map ID → công trình đang có, levels: Map src → MN/TH/THCS/reject, reviewSrc,
+//   raw: { ext, text } nội dung file (KMZ đã giải nén) để gửi hàng chờ, pendingId: hồ sơ chờ duyệt Admin đang mở }
 let current = null;
+let pendingItems = null;      // hồ sơ chờ duyệt (Admin), null = chưa tải
 let previewLayer = null;
 let reviewLayer = null;
 let submitting = false;
@@ -37,6 +41,8 @@ const SCHOOL_LEVELS = [['MN', 'Mầm non'], ['TH', 'Tiểu học'], ['THCS', 'TH
 const LEVEL_REJECT = 'reject';
 
 const $ = (id) => document.getElementById(id);
+const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
+const fmtMB = (bytes) => `${fmtNum(Math.round(bytes / 1024 / 1024 * 100) / 100)} MB`;
 
 function setStatus(text, color) {
   const el = $('cadStatus');
@@ -456,9 +462,177 @@ function renderReport() {
   }));
   $('btnCadClear')?.addEventListener('click', () => { if (!submitting) resetImport(); });
   if (btn) {
-    btn.disabled = submitting || !(count.new + count.update) || count.dup > 0 || count.pending > 0 || !result.axes.valid;
-    btn.title = state.currentUserRole !== 'ADMIN' ? 'Cần đăng nhập Admin'
+    // Khách gửi file gốc vào hàng chờ: Admin tự duyệt cấp trường / khớp công trình khi mở hồ sơ
+    btn.disabled = isAdmin()
+      ? submitting || !(count.new + count.update) || count.dup > 0 || count.pending > 0 || !result.axes.valid
+      : submitting || !result.axes.valid || !parcels.some(p => p.ward);
+    btn.title = !isAdmin() ? 'Gửi file vào hàng chờ để Admin kiểm tra (file ≤ 2 MB)'
       : count.pending ? `Còn ${count.pending} lô trường học chờ chọn cấp` : '';
+  }
+}
+
+// Nút ghi / khung thông tin người gửi theo vai trò (gọi khi đăng nhập / đăng xuất)
+function syncRoleUi() {
+  const admin = isAdmin();
+  const btn = $('btnCadSubmit');
+  if (btn) btn.innerHTML = admin ? `${ico('save')}GHI VÀO HỆ THỐNG (ADMIN)` : `${ico('send')}GỬI HỒ SƠ CHỜ DUYỆT`;
+  const guest = $('cadGuest');
+  if (guest) guest.hidden = admin;
+  const box = $('cadPendingBox');
+  if (box) box.hidden = !admin;
+}
+
+export function refreshCadRole() {
+  syncRoleUi();
+  renderReport();
+  if (isAdmin()) loadPendingList();
+  else { pendingItems = null; renderPendingList(); }
+}
+
+// ---- Hồ sơ chờ duyệt (Admin) ----
+
+async function postAdminCad(action, body) {
+  const res = await fetch(geeApi(`action=${action}`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+    body: JSON.stringify(body || {})
+  });
+  if (res.status === 401 || res.status === 403) signOutAdmin();
+  return res;
+}
+
+async function loadPendingList() {
+  if (!isAdmin()) return;
+  try {
+    const res = await postAdminCad('getCadPending');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !Array.isArray(data.items)) throw new Error(data.message || `HTTP ${res.status}`);
+    pendingItems = data.items.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+  } catch (err) {
+    pendingItems = { error: err.message };
+  }
+  renderPendingList();
+}
+
+function renderPendingList() {
+  const box = $('cadPendingBox');
+  if (!box) return;
+  box.hidden = !isAdmin();
+  if (!isAdmin()) { box.innerHTML = ''; return; }
+  const list = Array.isArray(pendingItems) ? pendingItems : [];
+  const head = `<div class="cad-pending-head">${ico('clock')}<b>Hồ sơ chờ duyệt</b>${Array.isArray(pendingItems) ? ` (${list.length})` : ''}
+    <button type="button" class="cad-pending-reload" title="Tải lại danh sách" aria-label="Tải lại danh sách hồ sơ chờ duyệt">${ico('flip')}</button></div>`;
+  let body;
+  if (pendingItems === null) body = `<div class="cad-pending-empty">Đang tải...</div>`;
+  else if (!Array.isArray(pendingItems)) body = `<div class="cad-pending-empty c-red">Chưa tải được: ${escapeHtml(pendingItems.error)}</div>`;
+  else if (!list.length) body = `<div class="cad-pending-empty">Không có hồ sơ nào.</div>`;
+  else {
+    body = list.map(it => {
+      const s = it.summary || {};
+      const at = it.at ? new Date(it.at).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : '';
+      const info = [
+        s.parcels ? `${fmtNum(s.parcels)} lô trong TP` : '',
+        s.create || s.update ? `${fmtNum(s.create || 0)} mới · ${fmtNum(s.update || 0)} cập nhật` : '',
+        (s.wards || []).slice(0, 4).join(', ') + ((s.wards || []).length > 4 ? '…' : '')
+      ].filter(Boolean).join(' · ');
+      const opening = current && current.pendingId === it.id;
+      return `<div class="cad-pending-row${opening ? ' on' : ''}">
+        <div class="cad-row-main"><b>${escapeHtml(it.fileName || it.id)}</b> <small>${fmtMB(it.size || 0)} · ${it.phase === 'QH' ? 'QH' : 'HT'} · ${escapeHtml(at)}</small>
+          ${info ? `<br><small>${escapeHtml(info)}</small>` : ''}
+          ${it.sender || it.note ? `<br><small class="c-cyan">${escapeHtml([it.sender, it.note].filter(Boolean).join(' — '))}</small>` : ''}</div>
+        <button type="button" class="cad-pending-btn" data-open="${escapeHtml(it.id)}" title="Mở file để kiểm tra và ghi">${ico('folder')}Mở</button>
+        <button type="button" class="road-del" data-del="${escapeHtml(it.id)}" title="Từ chối, xóa khỏi hàng chờ" aria-label="Xóa hồ sơ">${ico('trash')}</button>
+      </div>`;
+    }).join('');
+  }
+  box.innerHTML = `${head}<div class="cad-pending-list">${body}</div>`;
+}
+
+async function openPending(id) {
+  const it = Array.isArray(pendingItems) && pendingItems.find(x => x.id === id);
+  if (!it || submitting) return;
+  setStatus('⏳ Đang tải file hồ sơ...', 'var(--accent-orange)');
+  try {
+    const res = await postAdminCad('getCadPendingFile', { id });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || `HTTP ${res.status}`);
+    }
+    const text = await res.text();
+    if ($('cadCrs') && it.crs && [...$('cadCrs').options].some(o => o.value === it.crs)) $('cadCrs').value = it.crs;
+    if ($('cadPhase')) $('cadPhase').value = it.phase === 'QH' ? 'QH' : 'HT';
+    const base = String(it.fileName || 'hoso').replace(/\.(dxf|kml|kmz|geojson|json)$/i, '');
+    await loadFile(new File([text], `${base}.${it.ext}`), id);
+  } catch (err) {
+    setStatus(`❌ Không mở được hồ sơ: ${err.message}`, 'var(--accent-red)');
+  }
+}
+
+async function removePending(id, ask = true) {
+  const it = Array.isArray(pendingItems) && pendingItems.find(x => x.id === id);
+  if (ask && !confirm(`Từ chối và xóa hồ sơ "${it ? it.fileName : id}" khỏi hàng chờ?`)) return false;
+  try {
+    const res = await postAdminCad('removeCadPending', { id });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.message || `HTTP ${res.status}`);
+    if (current && current.pendingId === id) current.pendingId = null;
+    return true;
+  } catch (err) {
+    setStatus(`❌ Chưa xóa được hồ sơ khỏi hàng chờ: ${err.message}`, 'var(--accent-red)');
+    return false;
+  } finally {
+    loadPendingList();
+  }
+}
+
+// ---- Khách gửi hồ sơ ----
+
+async function submitPending() {
+  const raw = current.raw;
+  if (!raw) return;
+  const bytes = new TextEncoder().encode(raw.text).length;
+  if (bytes > GUEST_MAX_BYTES) {
+    setStatus(`⚠️ Nội dung file ${fmtMB(bytes)} vượt giới hạn 2 MB cho người dùng chưa đăng nhập — tách nhỏ file rồi gửi lại.`, 'var(--accent-red)');
+    return;
+  }
+  const parcels = current.result.parcels;
+  const inCity = parcels.filter(p => p.ward);
+  const keys = parcels.map(p => parcelAction(p).key);
+  const wards = [...new Set(inCity.map(p => p.ward))];
+  const sender = String($('cadSender')?.value || '').trim();
+  const note = String($('cadNote')?.value || '').trim();
+  if (!confirm(`Gửi file "${current.fileName}" (${fmtMB(bytes)}) vào hàng chờ duyệt?\n• ${inCity.length} lô trong TP. Huế (${wards.length} phường/xã)\n• Admin kiểm tra rồi mới đưa lên bản đồ; hồ sơ lưu tạm tối đa 30 ngày.`)) return;
+  submitting = true;
+  renderReport();
+  setStatus('⏳ Đang gửi hồ sơ...', 'var(--accent-orange)');
+  try {
+    const res = await fetch(geeApi('action=submitCadPending'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: current.fileName, ext: raw.ext, content: raw.text, phase: globalPhase(), crs: $('cadCrs')?.value || '',
+        sender, note,
+        summary: {
+          parcels: inCity.length,
+          create: keys.filter(k => k === 'new').length,
+          update: keys.filter(k => k === 'update').length,
+          wards: wards.slice(0, 12),
+          kinds: countText(kindCounts(inCity, current.format))
+        }
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+    const name = current.fileName;
+    submitting = false;
+    resetImport(true);
+    if ($('cadNote')) $('cadNote').value = '';
+    setStatus(`✓ Đã gửi hồ sơ "${name}" — Admin sẽ kiểm tra trước khi đưa lên bản đồ.`, 'var(--accent-green)');
+  } catch (err) {
+    setStatus(`❌ ${err.message}`, 'var(--accent-red)');
+  } finally {
+    submitting = false;
+    renderReport();
   }
 }
 
@@ -499,21 +673,30 @@ function analyse({ fit = true } = {}) {
   if (current.reviewSrc != null) markReview(schoolLots().find(p => p.src === current.reviewSrc));
 }
 
-async function loadFile(file) {
+// pendingId: Admin mở hồ sơ chờ duyệt (ghi xong thì tự xóa khỏi hàng chờ)
+async function loadFile(file, pendingId = null) {
   if (!file || submitting) return;
   const ext = (file.name.match(/\.(dxf|kml|kmz|geojson|json)$/i) || [])[1]?.toLowerCase();
   if (!ext) { setStatus('⚠️ Chỉ nhận file .dxf (AutoCAD: Save As → DXF), .kml, .kmz, .geojson hoặc .json.', 'var(--accent-red)'); return; }
+  if (!isAdmin() && file.size > GUEST_MAX_BYTES) {
+    setStatus(`⚠️ Chưa đăng nhập: chỉ nhận file ≤ 2 MB (file này ${fmtMB(file.size)}) — tách nhỏ file theo phường / nhóm layer rồi gửi từng phần.`, 'var(--accent-red)');
+    return;
+  }
   setStatus('⏳ Đang đọc file...', 'var(--accent-orange)');
   await new Promise(r => setTimeout(r, 30));
   try {
-    let parsed;
+    let parsed, text;
     if (ext === 'dxf') {
       const head = await file.slice(0, 22).text();
       if (head.startsWith('AutoCAD Binary DXF')) throw new Error('DXF dạng nhị phân chưa hỗ trợ — lưu lại dạng ASCII DXF.');
-      parsed = parseDxf(await file.text());
+      text = await file.text();
+      parsed = parseDxf(text);
+    } else if (ext === 'json' || ext === 'geojson') {
+      text = await file.text();
+      parsed = parseGeoJson(text);
     } else {
-      parsed = ext === 'json' || ext === 'geojson' ? parseGeoJson(await file.text())
-        : parseKml(ext === 'kmz' ? await unzipKml(await file.arrayBuffer()) : await file.text());
+      text = ext === 'kmz' ? await unzipKml(await file.arrayBuffer()) : await file.text();
+      parsed = parseKml(text);
     }
     if (!parsed.entities.length) {
       const skipped = countText(parsed.stats.skipped || {}, true);
@@ -525,11 +708,13 @@ async function loadFile(file) {
     const tt16 = parsed.entities.some(e => tt16Layer(e.layer));
     current = {
       fileName: file.name, format, wgs84, tt16, entities: parsed.entities, stats: parsed.stats, base: null, result: null,
-      manual: tt16 ? null : createManualMapping(parsed.entities), levels: new Map(), reviewSrc: null, reviewStarted: false
+      manual: tt16 ? null : createManualMapping(parsed.entities), levels: new Map(), reviewSrc: null, reviewStarted: false,
+      raw: { ext: format, text }, pendingId
     };
     lockCrs(wgs84);
     analyse();
-    setStatus('');
+    setStatus(pendingId ? 'Đang mở hồ sơ chờ duyệt — kiểm tra rồi bấm Ghi; ghi xong hồ sơ tự xóa khỏi hàng chờ.' : '');
+    renderPendingList();
   } catch (err) {
     current = null;
     lockCrs(false);
@@ -555,6 +740,7 @@ function resetImport(keepStatus = false) {
   if (!keepStatus) setStatus('');
   const input = $('cadFile');
   if (input) input.value = '';
+  renderPendingList();
 }
 
 // Tên Placemark (KML) bỏ mã loại ở đầu, VD "MN - Trường Hoa Sen" → "Trường Hoa Sen"; chỉ còn mã / số hiệu → ''
@@ -641,10 +827,7 @@ function chunkItems(items) {
 
 async function submitImport() {
   if (!current?.result || submitting) return;
-  if (state.currentUserRole !== 'ADMIN' || !state.authToken) {
-    setStatus('🔒 Cần đăng nhập Admin để ghi hàng loạt.', 'var(--accent-red)');
-    return;
-  }
+  if (!isAdmin()) return submitPending();
   // Lần ghi trước lỗi giữa chừng: ghi tiếp từ phần lỗi, không gửi lại các phần đã ghi (tránh tạo trùng lô)
   if (current.pending) return writeChunks(current.pending);
   const phase = globalPhase();
@@ -667,11 +850,11 @@ async function submitImport() {
 
   return writeChunks({
     phase, summary, fileName: current.fileName, total: items.length, chunks: chunkItems(items), next: 0,
-    done: { created: [], updated: [], skipped: [], polygonsDropped: 0 }
+    done: { created: [], updated: [], skipped: [], polygonsDropped: 0 }, pendingId: current.pendingId || null
   });
 }
 
-// job: { phase, summary, fileName, total, chunks, next, done }; lỗi ở phần nào thì giữ job trong current.pending để ghi tiếp
+// job: { phase, summary, fileName, total, chunks, next, done, pendingId }; lỗi ở phần nào thì giữ job trong current.pending để ghi tiếp
 async function writeChunks(job) {
   const { chunks, done } = job;
   submitting = true;
@@ -699,6 +882,7 @@ async function writeChunks(job) {
     submitting = false;
     resetImport(true);
     setStatus(`✓ Đã thêm ${job.summary} — ${done.created.length} mới, ${done.updated.length} cập nhật${extra ? ` · ${extra}` : ''}.`, 'var(--accent-green)');
+    if (job.pendingId) removePending(job.pendingId, false);
     if (onImported) await onImported();
   } catch (err) {
     const written = done.created.length + done.updated.length;
@@ -722,7 +906,16 @@ export function initCadImport(opts = {}) {
       if (panel) panel.style.display = on ? '' : 'none';
     });
     if (btn.dataset.mode !== 'addSingle') state.isPickMode = false;
+    if (btn.dataset.mode === 'addBulk' && isAdmin()) loadPendingList();
   }));
+  $('cadPendingBox')?.addEventListener('click', (e) => {
+    const open = e.target.closest('[data-open]');
+    if (open) { openPending(open.dataset.open); return; }
+    const del = e.target.closest('[data-del]');
+    if (del) { removePending(del.dataset.del); return; }
+    if (e.target.closest('.cad-pending-reload')) { pendingItems = null; renderPendingList(); loadPendingList(); }
+  });
+  syncRoleUi();
 
   $('cadFile')?.addEventListener('change', (e) => loadFile(e.target.files && e.target.files[0]));
   const drop = $('cadDrop');

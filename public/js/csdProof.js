@@ -130,7 +130,7 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
   const c = data.candidate;
   const group = L.layerGroup();
 
-  if (data.tileUrl) group.addLayer(L.tileLayer(data.tileUrl, { opacity: 0.65, zIndex: 50 }));
+  if (data.tileUrl) group.addLayer(L.tileLayer(data.tileUrl, { maxZoom: 19, opacity: 0.65, zIndex: 50 }));
 
   const wardInfo = (state.wardLabelsList || []).find(w => w.name === data.ward);
   if (wardInfo && wardInfo.geometry) {

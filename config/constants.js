@@ -151,6 +151,8 @@ const constants = {
   GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/infrastructure_hue.json",
   // Ranh lô đất nhập từ DXF (Apps Script dựng từ tab CAD_Polygon)
   CAD_GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/cad_parcels.json",
+  // Hồ sơ file chờ duyệt do người dùng chưa đăng nhập gửi (Apps Script ghi: index.json + <id>.<dxf|kml|geojson>)
+  PENDING_CAD_BASE: "https://storage.googleapis.com/hue-infra-data-us/pending/cad/",
 
   // Cấu hình trên Vercel (Settings → Environment Variables), không ghi vào mã nguồn
   GAS_BASE_URL: process.env.GAS_BASE_URL || "",

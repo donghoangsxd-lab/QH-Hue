@@ -606,6 +606,8 @@ function doPost(e) {
     if (body.action === "markWardNotes") return jsonOutput(markWardNotes(body));
     if (body.action === "saveRoads") return jsonOutput(saveRoads(body));
     if (body.action === "savePopEdits") return jsonOutput(savePopEdits(body));
+    if (body.action === "addPendingCad") return jsonOutput(addPendingCad(body));
+    if (body.action === "removePendingCad") return jsonOutput(removePendingCad(body));
     return jsonOutput({ "error": "Action không hợp lệ" });
   } catch (err) {
     return jsonOutput({ "error": err.toString() });
@@ -761,6 +763,107 @@ function savePopEdits(body) {
   var content = String(body.content || '');
   if (!content || content.length > 2000000) return { "error": "Dữ liệu vùng hiệu chỉnh dân cư rỗng hoặc quá lớn" };
   return { "success": true, "saved": uploadToGCS(content, "pop/edits.json") };
+}
+
+// HỒ SƠ FILE CHỜ DUYỆT: người dùng chưa đăng nhập gửi DXF / KML / GeoJSON ≤ 2 MB (máy chủ webapp đã kiểm tra định dạng,
+// giới hạn tần suất) → lưu tạm trên bucket pending/cad/<id>.<ext> + danh sách pending/cad/index.json, KHÔNG ghi Sheet.
+// Admin mở file trên webapp, kiểm tra rồi ghi bằng importCadBatch; ghi xong / từ chối thì xóa khỏi hàng chờ.
+const PENDING_CAD_PREFIX = "pending/cad/";
+const PENDING_CAD_MAX_FILES = 30;
+const PENDING_CAD_MAX_CHARS = 40000000;
+const PENDING_CAD_KEEP_DAYS = 30;
+
+function gcsObjectUrl(objectName) {
+  return "https://storage.googleapis.com/storage/v1/b/" + BUCKET_NAME + "/o/" + encodeURIComponent(objectName);
+}
+
+function readPendingCadIndex() {
+  var res = UrlFetchApp.fetch(gcsObjectUrl(PENDING_CAD_PREFIX + "index.json") + "?alt=media", {
+    "headers": { "Authorization": "Bearer " + ScriptApp.getOAuthToken() },
+    "muteHttpExceptions": true
+  });
+  var code = res.getResponseCode();
+  if (code === 404) return { "v": 1, "saved": 0, "items": [] };
+  if (code !== 200) throw new Error("Không đọc được danh sách hồ sơ chờ duyệt (" + code + ")");
+  var data = JSON.parse(res.getContentText());
+  return data && Array.isArray(data.items) ? data : { "v": 1, "saved": 0, "items": [] };
+}
+
+function writePendingCadIndex(index) {
+  index.v = 1;
+  index.saved = Date.now();
+  return uploadToGCS(JSON.stringify(index), PENDING_CAD_PREFIX + "index.json");
+}
+
+function deleteFromGCS(objectName) {
+  var res = UrlFetchApp.fetch(gcsObjectUrl(objectName), {
+    "method": "delete",
+    "headers": { "Authorization": "Bearer " + ScriptApp.getOAuthToken() },
+    "muteHttpExceptions": true
+  });
+  var code = res.getResponseCode();
+  return code === 204 || code === 200 || code === 404;
+}
+
+function pendingCadObject(it) {
+  return PENDING_CAD_PREFIX + it.id + "." + it.ext;
+}
+
+// body = { meta: { id, ext, fileName, phase, crs, sender, note, summary }, content: nội dung file }
+function addPendingCad(body) {
+  var meta = body.meta || {};
+  var content = String(body.content || '');
+  if (!/^[a-f0-9]{24}$/.test(String(meta.id || '')) || ["dxf", "kml", "geojson"].indexOf(meta.ext) < 0) {
+    return { "error": "Hồ sơ không hợp lệ" };
+  }
+  if (!content || content.length > 2200000) return { "error": "File rỗng hoặc vượt quá 2 MB" };
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var index = readPendingCadIndex();
+    var now = Date.now();
+    var keepMs = PENDING_CAD_KEEP_DAYS * 86400000;
+    var expired = index.items.filter(function(it) { return now - Number(it.at || 0) > keepMs; });
+    expired.forEach(function(it) { deleteFromGCS(pendingCadObject(it)); });
+    index.items = index.items.filter(function(it) { return now - Number(it.at || 0) <= keepMs; });
+
+    var total = index.items.reduce(function(s, it) { return s + Number(it.size || 0); }, 0);
+    if (index.items.length >= PENDING_CAD_MAX_FILES || total + content.length > PENDING_CAD_MAX_CHARS) {
+      if (expired.length) writePendingCadIndex(index);
+      return { "success": true, "saved": false, "full": true };
+    }
+    if (!uploadToGCS(content, pendingCadObject(meta))) return { "error": "Không ghi được file lên bucket" };
+    meta.size = content.length;
+    meta.at = now;
+    index.items.push(meta);
+    if (!writePendingCadIndex(index)) {
+      deleteFromGCS(pendingCadObject(meta));
+      return { "error": "Không ghi được danh sách hồ sơ chờ duyệt" };
+    }
+    return { "success": true, "saved": true, "count": index.items.length };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// body = { id } — Admin đã ghi file vào Sheet hoặc từ chối
+function removePendingCad(body) {
+  var id = String(body.id || '');
+  if (!/^[a-f0-9]{24}$/.test(id)) return { "error": "Mã hồ sơ không hợp lệ" };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var index = readPendingCadIndex();
+    var it = index.items.filter(function(x) { return x.id === id; })[0];
+    if (!it) return { "success": true, "removed": false, "count": index.items.length };
+    index.items = index.items.filter(function(x) { return x.id !== id; });
+    if (!writePendingCadIndex(index)) return { "error": "Không ghi được danh sách hồ sơ chờ duyệt" };
+    deleteFromGCS(pendingCadObject(it));
+    return { "success": true, "removed": true, "count": index.items.length };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ĐỐI CHIẾU PHƯỜNG: dấu nhắc trong cột Note, VD "⚠ Phường/xã theo tọa độ: Thuận Hóa" (các mục trong Note cách nhau " | ")

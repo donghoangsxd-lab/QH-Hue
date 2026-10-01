@@ -32,6 +32,7 @@ export const state = {
   isPickMode: false,
   isInspectMode: false,
   adminDrawMode: null,     // Admin đang vẽ: 'road' = tuyến đường bổ sung (customRoads.js), 'pop' = vùng hiệu chỉnh dân cư (popEdits.js)
+  sketchTool: null,        // công cụ lớp vẽ tạm đang chọn (sketchLayer.js): 'line' | 'polyline' | 'polygon' | 'arrow' | 'circle'
 
   // Đo đạc khoảng cách / diện tích
   activeMeasureType: null,

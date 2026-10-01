@@ -6,6 +6,7 @@ import { refreshWardCheck } from './wardCheck.js';
 import { fillWardRoadLengths, fillCityRoadDensity, loadRoadTypeLengths, ROAD_TYPES, ROADS_META_EVENT, fmtKm } from './wardRoads.js';
 import { refreshRoadPanel } from './customRoads.js';
 import { refreshPopPanel } from './popEdits.js';
+import { refreshCadRole } from './cadImportUi.js';
 
 let chartInstance = null;
 let infraPieInstance = null;
@@ -161,6 +162,7 @@ function updateAuthUi() {
   }
   refreshRoadPanel();
   refreshPopPanel();
+  refreshCadRole();
   const gBtn = document.getElementById('googleSignInBtn');
   if (gBtn) gBtn.style.display = isAdmin ? 'none' : '';
   refreshWardCheck();

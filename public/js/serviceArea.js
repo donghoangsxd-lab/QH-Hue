@@ -28,6 +28,12 @@ const FETCH_TIMEOUT_MS = 40000; // tổng thời gian chờ mọi máy chủ Ove
 const CACHE_MAX = 30;
 const FLOW_DIRECTIONS = 16; // số hướng minh họa tuyến tiếp cận
 const FLOW_MIN_M = 50;      // bỏ hướng có tuyến ngắn hơn (bị chặn ngay cạnh công trình)
+const ACCESS_MIN_R = 1000;  // chỉ đường từ vị trí tra cứu: bán kính tải đường nhỏ nhất
+const ACCESS_DETOUR = 1.3;  // đường đi thực tế dài hơn đường chim bay ~30%
+const ACCESS_GRID_DEG = 0.003; // tâm tải đường làm tròn theo lưới (~330 m) để các click gần nhau dùng chung cache
+const ACCESS_GRID_PAD_M = 250; // nửa đường chéo ô lưới: bù phần lệch tâm
+const ACCESS_CELL_M = 100;  // ô chỉ mục nút đường khi nối công trình vào mạng
+const ACCESS_SNAP_WEIGHT = 1.5; // đoạn đi bộ ngoài đường (từ nút tới công trình) tính nặng hơn khi chọn nút nối
 
 const cache = new Map();
 
@@ -567,4 +573,86 @@ export async function computeServiceArea(lat, lng, radius, clip = null) {
   pending.catch(() => cache.delete(key));
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
   return pending;
+}
+
+/**
+ * Chỉ đường theo mạng giao thông từ 1 vị trí tới công trình gần nhất của từng nhóm.
+ * groups: { khóa nhóm: [{ lat, lng, ref }] } — vài ứng viên gần nhất theo đường chim bay của mỗi nhóm.
+ * Dijkstra 1 lần từ nút đường gần vị trí, mỗi ứng viên nối vào nút đã tới được gần nó (≤ SNAP_MAX_M).
+ * → { routes: { khóa: { ref, distM, snapM, path: [[lat, lng]...] từ vị trí tới công trình } | null }, radius, snapM }
+ */
+export async function computeAccessRoutes(lat, lng, groups) {
+  const proj = projector(lat, lng);
+  const keys = Object.keys(groups);
+  let need = 0;
+  keys.forEach(key => {
+    const nearest = Math.min(...groups[key].map(c => Math.hypot(...proj.toXY(c.lat, c.lng))));
+    if (Number.isFinite(nearest)) need = Math.max(need, nearest);
+  });
+  const radius = Math.min(SERVER_MAX_RADIUS_M - ACCESS_GRID_PAD_M, Math.max(ACCESS_MIN_R, Math.ceil(need * ACCESS_DETOUR / 500) * 500));
+  const lat0 = Math.round(lat / ACCESS_GRID_DEG) * ACCESS_GRID_DEG;
+  const lng0 = Math.round(lng / ACCESS_GRID_DEG) * ACCESS_GRID_DEG;
+  const ways = await fetchWays(lat0, lng0, radius + ACCESS_GRID_PAD_M, await customRoadsVersion());
+  if (!ways.length) throw new Error('Không có đường giao thông quanh vị trí');
+  const graph = buildGraph(ways, proj);
+
+  // Nút xuất phát: nút gần nhất, trừ khi nó nằm trên mảng đường cụt nhỏ (lối trong khuôn viên) so với nút gần khác
+  const near = [];
+  for (const [id, p] of graph.pos) {
+    const d = Math.hypot(p[0], p[1]);
+    if (d <= SNAP_MAX_M) near.push([d, id]);
+  }
+  if (!near.length) throw new Error(`Vị trí cách đường giao thông quá xa (> ${SNAP_MAX_M} m)`);
+  near.sort((a, b) => a[0] - b[0]);
+  const limit = radius * 2;
+  const tries = [];
+  for (const [d, id] of near.slice(0, 5)) {
+    if (tries.some(t => t.D.has(id))) continue;   // cùng mảng đường với nút đã thử
+    tries.push({ snapM: d, ...dijkstra(graph, id, d, limit) });
+  }
+  const maxReach = Math.max(...tries.map(t => t.D.size));
+  const origin = tries.find(t => t.D.size >= maxReach * 0.5);
+
+  const grid = new Map();
+  const cellKey = (cx, cy) => `${cx}:${cy}`;
+  for (const id of origin.D.keys()) {
+    const p = graph.pos.get(id);
+    const k = cellKey(Math.floor(p[0] / ACCESS_CELL_M), Math.floor(p[1] / ACCESS_CELL_M));
+    if (!grid.has(k)) grid.set(k, []);
+    grid.get(k).push(id);
+  }
+  const span = Math.ceil(SNAP_MAX_M / ACCESS_CELL_M);
+  const attach = (xy) => {
+    const cx = Math.floor(xy[0] / ACCESS_CELL_M), cy = Math.floor(xy[1] / ACCESS_CELL_M);
+    let best = null;
+    for (let dx = -span; dx <= span; dx++) {
+      for (let dy = -span; dy <= span; dy++) {
+        for (const id of grid.get(cellKey(cx + dx, cy + dy)) || []) {
+          const snap = dist(xy, graph.pos.get(id));
+          if (snap > SNAP_MAX_M) continue;
+          const score = origin.D.get(id) + snap * ACCESS_SNAP_WEIGHT;
+          if (!best || score < best.score) best = { id, snap, score };
+        }
+      }
+    }
+    return best;
+  };
+
+  const routes = {};
+  keys.forEach(key => {
+    let best = null;
+    groups[key].forEach(c => {
+      const a = attach(proj.toXY(c.lat, c.lng));
+      if (!a) return;
+      const distM = origin.D.get(a.id) + a.snap;
+      if (!best || distM < best.distM) best = { c, a, distM };
+    });
+    if (!best) { routes[key] = null; return; }
+    const path = [[best.c.lat, best.c.lng]];
+    for (let u = best.a.id; u !== undefined; u = origin.P.get(u)) path.push(proj.toLatLng(...graph.pos.get(u)));
+    path.push([lat, lng]);
+    path.reverse();
+    routes[key] = { ref: best.c.ref, distM: best.distM, snapM: best.a.snap, path };
+  });
+  return { routes, radius, snapM: origin.snapM };
 }

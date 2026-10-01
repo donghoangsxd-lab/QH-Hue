@@ -220,6 +220,45 @@ body.compare-on #mapPlan, body.compare-on #swipeDivider { display: block; }
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
 }
 .map-toolbar .ui-btn-format:hover { background: rgba(30, 41, 59, 0.98); border-color: var(--accent-cyan); }
+
+/* LỚP VẼ TẠM: bảng công cụ mở ngang cạnh nút (top đặt theo nút trong sketchLayer.js) */
+.sketch-palette {
+  position: absolute;
+  left: 42px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-dark);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
+  border: 1px solid var(--border-color);
+  border-radius: var(--r-lg);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+.sketch-palette[hidden] { display: none; }
+.sketch-row { display: flex; align-items: center; gap: 2px; }
+.sketch-btn {
+  width: 30px; height: 30px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; color: var(--text-main);
+  border: 1px solid transparent; border-radius: var(--r-md); cursor: pointer;
+}
+.sketch-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: var(--accent-cyan); }
+.sketch-btn.active { background: var(--accent-cyan); color: var(--text-on-accent); box-shadow: 0 0 8px rgba(var(--cyan-rgb), 0.55); }
+.sketch-btn:disabled { opacity: 0.35; cursor: default; }
+.sketch-color {
+  width: 18px; height: 18px; margin: 0 2px; padding: 0;
+  background: var(--c); border: 2px solid rgba(15, 23, 42, 0.9); border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35); cursor: pointer;
+}
+.sketch-color.active { box-shadow: 0 0 0 2px var(--accent-cyan); }
+.sketch-sep { width: 1px; height: 20px; margin: 0 3px; background: var(--border-color); }
+.sketch-hint { max-width: 420px; padding: 0 4px 2px; font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.35; }
+.sketch-hint:empty { display: none; }
+#map.sketch-mode { cursor: crosshair !important; }
+.sketch-popup .leaflet-popup-content { margin: 6px; }
+.sketch-del { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-red); font-size: var(--fs-sm); padding: 4px 8px; }
 .rp-expand-btn {
   display: flex;
   position: absolute;
@@ -407,6 +446,10 @@ body.right-collapsed .right-panel {
 
 /* POPUP TRA CỨU */
 .inspect-popup .leaflet-popup-content { max-height: 360px; overflow-y: auto; }
+.route-card { position: relative; padding-left: 20px !important; }
+.route-card[data-route] { cursor: pointer; }
+.route-card[data-route]:hover { border-color: var(--accent-cyan); }
+.route-dot { position: absolute; left: 7px; top: 9px; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
 
 /* ĐỀ XUẤT MỚI: lưới 2 cột nhãn | ô nhập */
 .form-grid { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 5px 6px; align-items: center; }
@@ -481,6 +524,23 @@ body.right-collapsed .right-panel {
 .road-del { flex-shrink: 0; width: 24px; height: 22px; padding: 0; border: none; border-radius: var(--r-sm); background: transparent; cursor: pointer; font-size: var(--fs-md); }
 .road-del:hover { background: rgba(var(--red-rgb), 0.2); }
 #addBulk:has(#cadReport:not(:empty)) .cad-hint { display: none; }
+/* Hồ sơ file chờ duyệt: danh sách (Admin) / ô người gửi (chưa đăng nhập) */
+.cad-pending { margin-bottom: 8px; font-size: var(--fs-sm); border: 1px solid rgba(var(--yellow-rgb), 0.45); border-radius: var(--r-md); background: rgba(var(--yellow-rgb), 0.06); }
+.cad-pending[hidden], .cad-guest[hidden] { display: none; }
+.cad-pending-head { display: flex; align-items: center; gap: 4px; padding: 4px 6px; border-bottom: 1px solid var(--border-soft); }
+.cad-pending-head b { flex: 1; }
+.cad-pending-reload { width: 22px; height: 20px; padding: 0; border: none; border-radius: var(--r-sm); background: transparent; color: var(--text-muted); cursor: pointer; }
+.cad-pending-reload:hover { color: var(--accent-cyan); background: rgba(255, 255, 255, 0.08); }
+.cad-pending-list { max-height: 180px; overflow-y: auto; }
+.cad-pending-empty { padding: 5px 6px; color: var(--text-muted); }
+.cad-pending-row { display: flex; align-items: center; gap: 4px; padding: 4px 6px; border-bottom: 1px solid var(--border-soft); }
+.cad-pending-row:last-child { border-bottom: none; }
+.cad-pending-row.on { background: rgba(var(--cyan-rgb), 0.12); box-shadow: inset 2px 0 0 var(--accent-cyan); }
+.cad-pending-btn { flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; font-size: var(--fs-sm); font-family: inherit; color: var(--accent-cyan); background: transparent; border: 1px solid rgba(var(--cyan-rgb), 0.5); border-radius: var(--r-sm); cursor: pointer; }
+.cad-pending-btn:hover { background: rgba(var(--cyan-rgb), 0.15); }
+.cad-guest { margin-top: 8px; }
+.cad-guest-note { display: flex; gap: 5px; align-items: flex-start; margin-bottom: 5px; font-size: var(--fs-sm); line-height: 1.35; color: var(--text-muted); }
+.cad-guest-note .ico { flex-shrink: 0; margin-top: 1px; color: var(--accent-cyan); }
 #cadReport:empty { display: none; }
 #cadReport { margin-top: 8px; font-size: var(--fs-sm); }
 .cad-file { margin-bottom: 4px; line-height: 1.35; }
@@ -935,7 +995,7 @@ table.ward-table th {
 .pp .road-legend { margin: 3px 0 0; flex-wrap: wrap; row-gap: 2px; font-weight: 400; }
 
 /* Nút con mắt cạnh nút đóng: thu popup công trình về dòng tên */
-.infra-popup .pp-title { padding-right: 22px; }
+.infra-popup .pp-title, .inspect-popup .pp-title { padding-right: 22px; }
 .leaflet-container a.pp-collapse-btn {
   position: absolute; top: 0; right: 24px; width: 24px; height: 24px;
   display: flex; align-items: center; justify-content: center;
@@ -943,9 +1003,9 @@ table.ward-table th {
 }
 .leaflet-container a.pp-collapse-btn:hover { color: var(--accent-cyan); }
 .pp-collapse-btn .ico { width: 15px; height: 15px; margin: 0; }
-.infra-popup.pp-collapsed .pp > :not(.pp-title) { display: none; }
-.infra-popup.pp-collapsed .pp-title { padding-bottom: 0; margin-bottom: 0; border-bottom: 0; }
-.infra-popup.pp-collapsed .leaflet-popup-content-wrapper { opacity: 0.92; }
+.pp-collapsed .pp > :not(.pp-title) { display: none; }
+.pp-collapsed .pp-title { padding-bottom: 0; margin-bottom: 0; border-bottom: 0; }
+.pp-collapsed .leaflet-popup-content-wrapper { opacity: 0.92; }
 
 .sug-card { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--r-md); padding: 6px; margin-top: 4px; font-size: var(--fs-sm); }
 .sug-card.priority { border-color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.15); }

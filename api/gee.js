@@ -129,16 +129,57 @@ function requirePostFromApp(req) {
   if (!isAllowedOrigin(req)) throw httpError(403, 'Nguồn gửi yêu cầu không được phép');
 }
 
-const addPointHits = new Map();
-function checkAddPointRate(req) {
+function checkRate(store, req, max, windowMs, message) {
   const ip = String(req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'unknown').split(',')[0].trim();
   const now = Date.now();
-  const windowMs = 10 * 60 * 1000;
-  const hits = (addPointHits.get(ip) || []).filter(t => now - t < windowMs);
-  if (hits.length >= 10) throw httpError(429, 'Gửi quá nhiều đề xuất, vui lòng thử lại sau ít phút');
+  const hits = (store.get(ip) || []).filter(t => now - t < windowMs);
+  if (hits.length >= max) throw httpError(429, message);
   hits.push(now);
-  if (addPointHits.size > 5000) addPointHits.clear();
-  addPointHits.set(ip, hits);
+  if (store.size > 5000) store.clear();
+  store.set(ip, hits);
+}
+
+const addPointHits = new Map();
+function checkAddPointRate(req) {
+  checkRate(addPointHits, req, 10, 10 * 60 * 1000, 'Gửi quá nhiều đề xuất, vui lòng thử lại sau ít phút');
+}
+
+// Hồ sơ file chờ duyệt (người dùng chưa đăng nhập): mỗi IP tối đa 3 file / giờ, mỗi file ≤ 2 MB
+const PENDING_CAD_MAX_BYTES = 2 * 1024 * 1024;
+const PENDING_CAD_EXTS = ['dxf', 'kml', 'geojson'];
+const PENDING_CAD_ID = /^[a-f0-9]{24}$/;
+const cadPendingHits = new Map();
+function checkCadPendingRate(req) {
+  checkRate(cadPendingHits, req, 3, 60 * 60 * 1000, 'Mỗi máy chỉ gửi được 3 file mỗi giờ, vui lòng thử lại sau');
+}
+
+function looksLikeCadFile(ext, content) {
+  if (ext === 'dxf') return content.slice(0, 4000).includes('SECTION') && content.includes('ENTITIES');
+  if (ext === 'kml') return /<kml[\s>]/i.test(content.slice(0, 5000));
+  try {
+    const g = JSON.parse(content);
+    return !!g && (g.type === 'FeatureCollection' || g.type === 'Feature');
+  } catch (e) {
+    return false;
+  }
+}
+
+// Tóm tắt kiểm tra do trình duyệt người gửi tính (chỉ để Admin xem nhanh trong danh sách chờ)
+function parsePendingSummary(s) {
+  if (!s || typeof s !== 'object') return {};
+  const n = (v) => clamp(Math.round(Number(v) || 0), 0, 100000);
+  return {
+    parcels: n(s.parcels), create: n(s.create), update: n(s.update),
+    wards: (Array.isArray(s.wards) ? s.wards : []).slice(0, 12).map(w => sanitizeSheetText(w, 60)).filter(Boolean),
+    kinds: sanitizeSheetText(s.kinds, 200)
+  };
+}
+
+async function readPendingCadIndex() {
+  const r = await axios.get(`${constants.PENDING_CAD_BASE}index.json?v=${Date.now()}`, { timeout: 8000, validateStatus: () => true });
+  if (r.status === 404 || r.status === 403) return { saved: 0, items: [] };
+  if (r.status !== 200 || !r.data || !Array.isArray(r.data.items)) throw httpError(502, 'Không đọc được danh sách hồ sơ chờ duyệt');
+  return { saved: Number(r.data.saved) || 0, items: r.data.items };
 }
 
 function parseCoordInBounds(latRaw, lngRaw) {
@@ -1256,6 +1297,73 @@ module.exports = async (req, res) => {
         skipped: result.skipped || [],
         polygonsDropped: items.reduce((n, it) => n + it.stages.filter(s => !s.geometry && !s.point).length, 0)
       });
+    }
+
+    // Người dùng chưa đăng nhập gửi file DXF / KML / GeoJSON ≤ 2 MB → hàng chờ trên bucket (pending/cad/, không ghi Sheet);
+    // Admin mở lại file trong khung Nhập hàng loạt, kiểm tra rồi mới ghi
+    if (action === 'submitCadPending') {
+      requirePostFromApp(req);
+      const body = readJsonBody(req);
+      const ext = String(body.ext || '').toLowerCase();
+      const content = typeof body.content === 'string' ? body.content : '';
+      if (!PENDING_CAD_EXTS.includes(ext)) return res.status(400).json({ error: true, message: 'Chỉ nhận file .dxf, .kml / .kmz hoặc .geojson' });
+      if (!content || Buffer.byteLength(content, 'utf8') > PENDING_CAD_MAX_BYTES) {
+        return res.status(413).json({ error: true, message: 'File rỗng hoặc vượt quá 2 MB' });
+      }
+      if (!looksLikeCadFile(ext, content)) return res.status(400).json({ error: true, message: `Nội dung file không đúng định dạng ${ext.toUpperCase()}` });
+      checkCadPendingRate(req);
+      const meta = {
+        id: crypto.randomBytes(12).toString('hex'),
+        ext,
+        fileName: sanitizeSheetText(body.fileName, 120) || `hoso.${ext}`,
+        phase: body.phase === 'QH' ? 'QH' : 'HT',
+        crs: /^[A-Z0-9_]{1,20}$/.test(String(body.crs || '')) ? String(body.crs) : '',
+        sender: sanitizeSheetText(body.sender, 80),
+        note: sanitizeSheetText(body.note, 300),
+        summary: parsePendingSummary(body.summary)
+      };
+      const result = await callAppsScript({ action: 'addPendingCad' }, { action: 'addPendingCad', meta, content });
+      if (result.full) {
+        return res.status(503).json({ error: true, message: 'Hàng chờ duyệt đang đầy — vui lòng thử lại sau hoặc liên hệ Sở Xây dựng' });
+      }
+      if (result.saved !== true) {
+        return res.status(502).json({ error: true, message: 'Chưa lưu được hồ sơ (Apps Script chưa triển khai phiên bản mới của Code.gs?)' });
+      }
+      return res.status(200).json({ success: true, id: meta.id, count: result.count || 0 });
+    }
+
+    if (action === 'getCadPending') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const index = await readPendingCadIndex();
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ v: 1, saved: index.saved, items: index.items });
+    }
+
+    // Nội dung 1 file chờ duyệt (bucket không mở CORS cho trình duyệt) → text thô
+    if (action === 'getCadPendingFile') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const id = String(readJsonBody(req).id || '');
+      const it = PENDING_CAD_ID.test(id) ? (await readPendingCadIndex()).items.find(x => x.id === id) : null;
+      if (!it || !PENDING_CAD_EXTS.includes(it.ext)) return res.status(404).json({ error: true, message: 'Không có hồ sơ này trong hàng chờ' });
+      const r = await axios.get(`${constants.PENDING_CAD_BASE}${it.id}.${it.ext}?v=${Date.now()}`, {
+        timeout: 20000, responseType: 'text', transformResponse: x => x, validateStatus: () => true
+      });
+      if (r.status !== 200) return res.status(404).json({ error: true, message: 'File hồ sơ không còn trên bucket' });
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      return res.status(200).send(String(r.data || ''));
+    }
+
+    if (action === 'removeCadPending') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const id = String(readJsonBody(req).id || '');
+      if (!PENDING_CAD_ID.test(id)) return res.status(400).json({ error: true, message: 'Mã hồ sơ không hợp lệ' });
+      const result = await callAppsScript({ action: 'removePendingCad' }, { action: 'removePendingCad', id });
+      if (result.success !== true) return res.status(502).json({ error: true, message: 'Apps Script chưa xóa được hồ sơ' });
+      return res.status(200).json({ success: true, removed: !!result.removed, count: result.count || 0 });
     }
 
     if (action === 'getSingleIsochrone') {
