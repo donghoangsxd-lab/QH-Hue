@@ -42,6 +42,7 @@
     <symbol id="i-maximize" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
     <symbol id="i-minimize" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
     <symbol id="i-flip" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19C5 10 10 5 20 4c-1 10-6 15-15 15z"/><path d="M5 19l8-8"/></symbol>
     <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></symbol>
     <symbol id="i-parcel" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 2.4"/><path d="M4 12h16M12 4v16" stroke-opacity=".45"/></symbol>
     <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 6"/></symbol>
@@ -542,12 +543,13 @@
       <div class="bp-part bp-part2">
         <div class="bp-part-head">
           <div class="bp-title-wrap">
-            <b class="bp-part-title">BẢNG TỔNG HỢP HẠ TẦNG</b>
+            <b class="bp-part-title" id="bpPart2Title">BẢNG TỔNG HỢP HẠ TẦNG</b>
             <select id="wardSelector" class="ward-selector-dropdown" title="Chọn địa bàn phân tích (phường/xã)"></select>
           </div>
           <!-- Chỉ tiêu địa bàn: hàng trên hiện trạng, hàng dưới quy hoạch (cùng cột = cùng chỉ tiêu) -->
           <div class="bp-head-stats" id="bpHeadStats"></div>
           <div class="bp-actions" data-html2canvas-ignore="true">
+            <button type="button" class="bp-btn" id="btnFlipPart2" aria-pressed="false" title="Lật bảng: chỉ tiêu xây dựng đô thị tăng trưởng xanh (Thông tư 01/2018/TT-BXD, hợp nhất tại VBHN 97/2026/VBHN-TT-BXD)"><svg class="ico"><use href="#i-leaf"/></svg>Tăng trưởng xanh</button>
             <button type="button" class="bp-btn bp-icon" id="btnToggleStatTable" title="Xem bảng thông tin" aria-label="Xem bảng thông tin"><svg class="ico"><use href="#i-table"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnExportBottomPdf" title="Xuất báo cáo PDF" aria-label="Xuất báo cáo PDF"><svg class="ico"><use href="#i-printer"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnToggleBottomMax" title="Phóng to toàn màn hình" aria-label="Phóng to toàn màn hình"><svg class="ico"><use href="#i-maximize"/></svg></button>
@@ -555,6 +557,9 @@
         </div>
 
         <div class="bp-part-body">
+          <!-- Thẻ 2 mặt: trước = hạ tầng (biểu đồ / bảng 40 phường / chi tiết phường), sau = chỉ tiêu tăng trưởng xanh (greenGrowth.js) -->
+          <div class="p2-flip" id="part2Flip" data-side="front">
+          <div class="p2-face p2-front">
           <div class="bp-view" id="cityChartView">
             <div class="bp-chart-wrap"><span id="bpChartLegend" class="bp-legend"></span><canvas id="infraChart"></canvas></div>
           </div>
@@ -601,6 +606,11 @@
             </div>
           </div>
           <div class="bp-view" id="wardSummaryView" style="display:none;"></div>
+          </div>
+          <div class="p2-face p2-back" aria-hidden="true">
+            <div class="bp-view" id="gtxView"></div>
+          </div>
+          </div>
         </div>
       </div>
     </div>

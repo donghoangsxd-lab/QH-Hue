@@ -987,6 +987,40 @@ body.bottom-max .rc-road i { animation: rc-grow 0.9s cubic-bezier(0.2, 0.8, 0.2,
 .road-bus .road-bus-pending { color: var(--accent-orange); }
 
 .bp-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* BẢNG 2 LẬT 2 MẶT: TRƯỚC = HẠ TẦNG, SAU = CHỈ TIÊU TĂNG TRƯỞNG XANH (uiComponents.js › setPart2Side) */
+.p2-flip { position: relative; flex: 1; min-height: 0; perspective: 1800px; }
+.p2-face {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  transition: transform 0.7s cubic-bezier(0.4, 0.2, 0.2, 1);
+}
+.p2-back { transform: rotateY(180deg); }
+.p2-flip[data-side="back"] .p2-front { transform: rotateY(-180deg); }
+.p2-flip[data-side="back"] .p2-back { transform: rotateY(0deg); }
+.p2-face[aria-hidden="true"] { pointer-events: none; }
+.bp-part2.gtx-on #btnToggleStatTable { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .p2-face { transition: none; } }
+
+.gtx-bar { display: flex; align-items: center; gap: 12px; flex-shrink: 0; margin-bottom: 4px; font-size: var(--fs-sm); color: var(--text-muted); }
+.gtx-summary b { color: var(--accent-green); }
+.gtx-pick { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.gtx-pick select { height: 20px; font-size: var(--fs-sm); }
+.gtx-filter { height: 20px; font-size: var(--fs-sm); }
+table.gtx-table td.gtx-name { white-space: normal; text-align: left; min-width: 280px; cursor: help; }
+table.gtx-table td.gtx-code { color: var(--accent-cyan); font-weight: 700; }
+table.gtx-table td.gtx-val { text-align: right; min-width: 90px; }
+table.gtx-table td.gtx-val b { color: var(--text-strong); }
+table.gtx-table tr.gtx-group td { text-align: left; font-weight: 700; color: var(--accent-green); background: rgba(var(--green-rgb), 0.12); }
+table.gtx-table .ico { width: 12px; height: 12px; }
+.gtx-na { color: var(--text-muted); font-style: italic; }
+.gtx-wait { color: var(--accent-orange); font-style: italic; }
+.gtx-badge { display: inline-block; padding: 0 6px; border-radius: var(--r-sm); font-size: var(--fs-xs); font-weight: 700; line-height: 15px; cursor: help; border: 1px solid currentColor; }
+.gtx-auto { color: var(--accent-green); }
+.gtx-sat { color: var(--accent-cyan); }
+.gtx-part { color: #facc15; }
+.gtx-map { color: #93c5fd; }
+.gtx-report { color: var(--text-muted); }
 .bp-chart-wrap { flex: 1; min-height: 0; position: relative; }
 body.bottom-max #cityChartView { flex: 0 0 34%; margin-bottom: 8px; }
 
@@ -1127,6 +1161,9 @@ table.ward-table th {
 .bp-body.pdf-export .infra-count-grid,
 .bp-body.pdf-export .road-chart { flex: none; height: 150px; }
 .bp-body.pdf-export .flip-card { overflow: visible; }
+.bp-body.pdf-export .p2-flip,
+.bp-body.pdf-export .p2-face { position: static; transform: none; perspective: none; }
+.bp-body.pdf-export .p2-face[aria-hidden="true"] { display: none; }
 
 /* IN KHỔ A3 (printLayout.js): tạm phóng khung bản đồ theo tỷ lệ khung in để tải đúng vùng ảnh nền */
 #mapArea.print-staging { right: auto; bottom: auto; width: var(--print-w); height: var(--print-h); }

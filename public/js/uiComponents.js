@@ -10,6 +10,7 @@ import { refreshCadRole } from './cadImportUi.js';
 import { loadPopCheck, popCheckBadgeHtml, popCheckCityHtml } from './popCheck.js';
 import { balanceSlot, balanceScaleHtml, toggleBalanceMap, clearBalanceMap, isBalanceMapOn, BALANCE_REF } from './wardBalance.js';
 import { loadNewDevStats, newDevOf, newDevRowHtml } from './newDev.js';
+import { renderGreenGrowth, initGreenGrowthEvents, reloadGreenGrowthRoads } from './greenGrowth.js';
 
 let chartInstance = null;
 let infraPieInstance = null;
@@ -1236,6 +1237,7 @@ export async function renderBottomPanel() {
   setBottomPanelHeader(wardName);
   renderRoadChart();
 
+  renderGtx();
   if (city) {
     clearBalanceMap();
     renderCityHeadStats();
@@ -1252,6 +1254,41 @@ export async function renderBottomPanel() {
   renderWardSummary(wardData);
 }
 
+// Bảng 2 lật 2 mặt: trước = hạ tầng, sau = chỉ tiêu tăng trưởng xanh (greenGrowth.js), dùng chung ô chọn địa bàn
+let part2Back = false;
+
+function renderGtx() {
+  const el = document.getElementById('gtxView');
+  if (!part2Back || !el) return;
+  if (!state.wardStatsData.length) {
+    el.innerHTML = `<div class="rp-empty">${ico('clock')}Đang tổng hợp dữ liệu...</div>`;
+    return;
+  }
+  renderGreenGrowth(el, { wardName: isCityMode() ? '' : state.selectedWard, wards: state.wardStatsData });
+}
+
+function setPart2Side(back) {
+  part2Back = back;
+  const flip = document.getElementById('part2Flip');
+  if (!flip) return;
+  flip.dataset.side = back ? 'back' : 'front';
+  flip.querySelector('.p2-front')?.setAttribute('aria-hidden', String(back));
+  flip.querySelector('.p2-back')?.setAttribute('aria-hidden', String(!back));
+  flip.closest('.bp-part2')?.classList.toggle('gtx-on', back);
+  const title = document.getElementById('bpPart2Title');
+  if (title) title.textContent = back ? 'CHỈ TIÊU TĂNG TRƯỞNG XANH' : 'BẢNG TỔNG HỢP HẠ TẦNG';
+  const btn = document.getElementById('btnFlipPart2');
+  if (btn) {
+    btn.innerHTML = back ? `${ico('table')}Hạ tầng` : `${ico('leaf')}Tăng trưởng xanh`;
+    btn.classList.toggle('active', back);
+    btn.setAttribute('aria-pressed', String(back));
+    btn.title = back
+      ? 'Lật bảng: quay lại bảng tổng hợp hạ tầng'
+      : 'Lật bảng: chỉ tiêu xây dựng đô thị tăng trưởng xanh (Thông tư 01/2018/TT-BXD, hợp nhất tại VBHN 97/2026/VBHN-TT-BXD)';
+  }
+  renderGtx();
+}
+
 let pdfExporting = false;
 export async function exportBottomPanelPdf() {
   const body = document.getElementById('bpBody');
@@ -1264,7 +1301,8 @@ export async function exportBottomPanelPdf() {
     showToast('❌ Không tải được thư viện xuất PDF, kiểm tra kết nối mạng.', 'error');
     return;
   }
-  const fileName = isCityMode() ? 'Bao-Cao-Ha-Tang-TP-Hue.pdf' : `Bao-Cao-${state.selectedWard}.pdf`;
+  const place = isCityMode() ? 'TP-Hue' : state.selectedWard;
+  const fileName = part2Back ? `Chi-Tieu-Tang-Truong-Xanh-${place}.pdf` : (isCityMode() ? 'Bao-Cao-Ha-Tang-TP-Hue.pdf' : `Bao-Cao-${state.selectedWard}.pdf`);
   body.classList.add('pdf-export');
   const done = () => { body.classList.remove('pdf-export'); pdfExporting = false; };
   window.html2pdf().from(body).set({
@@ -1287,7 +1325,12 @@ export function selectWardDetail(wardName) {
 // Click trong bảng 40 phường và bảng chi tiết phường (thay cho onclick nội tuyến)
 export function initBottomPanelEvents() {
   initPart1Flip();
-  document.addEventListener(ROADS_META_EVENT, () => ensureRoadTypes(true));
+  document.addEventListener(ROADS_META_EVENT, () => {
+    ensureRoadTypes(true);
+    reloadGreenGrowthRoads().then(renderGtx).catch(err => console.warn('Tăng trưởng xanh – mạng lưới đường lỗi:', err));
+  });
+  document.getElementById('btnFlipPart2')?.addEventListener('click', () => setPart2Side(!part2Back));
+  initGreenGrowthEvents(document.getElementById('gtxView'), renderGtx);
   document.getElementById('statTableBody')?.addEventListener('click', (e) => {
     const link = e.target.closest('.ward-link');
     if (link) selectWardDetail(link.dataset.ward);
