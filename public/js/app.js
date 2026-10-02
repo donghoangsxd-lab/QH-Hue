@@ -1,4 +1,4 @@
-import { state, bumpDataVersion, BUFFER_COLORS, ICON_GROUP_KEYS, isNetworkType, ntKindOf, NT_KIND_LABELS } from './state.js';
+import { state, bumpDataVersion, BUFFER_COLORS, ICON_GROUP_KEYS, isNetworkType, ntKindOf, NT_KIND_LABELS, parkTierOf } from './state.js';
 import { geeApi, infraListUrl, markDataWritten } from './api.js';
 import {
   initMap,
@@ -48,6 +48,7 @@ import { initFloodSim } from './floodSim.js';
 import { initSatLayers } from './satLayers.js';
 import { initSketchLayer, handleSketchClick, stopSketchTool } from './sketchLayer.js';
 import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
+import { initIntroTour } from './introTour.js';
 
 const CITY_NAME = "Thành phố Huế";
 
@@ -62,7 +63,7 @@ const RADIUS_MIN = 50;
 const RADIUS_MAX = 5000;
 // Bán kính phục vụ theo QCVN 01:2026 (khớp config/constants.js standardRadius, máy chủ tính lại khi ghi Sheet):
 // cấp đô thị và trường THPT 2 km; cấp đơn vị ở: phường ≤ 1 km (Mục 2.3.3.1), xã: trường, y tế, văn hóa, chợ ≤ 2 km (Mục 4.6.2.2);
-// cây xanh nhóm nhà ở 400 m, bãi đỗ xe 500 m
+// cây xanh theo diện tích (parkTierOf): vườn hoa 400 m, công viên khu vực ≥ 1 ha 800 m, công viên đô thị ≥ 5 ha 2 km; bãi đỗ xe 500 m
 const URBAN_RADIUS = 2000;
 const UNIT_DEFAULT_RADIUS = { "1-CV": 400, "2-BDX": 500, "3-MN": 1000, "4-TH": 1000, "5-THCS": 1000, "6-YT": 1000, "7-VH": 1000, "8-TM": 1000 };
 const RURAL_UNIT_RADIUS = 2000;
@@ -75,8 +76,9 @@ function networkRadius(type, ward, name) {
   if (type === '11-PCCC') return /^xã\s/i.test(String(ward || '').trim()) ? 5000 : 3000;
   return NT_SAFETY[ntKindOf({ name })];
 }
-function qcvnRadius(type, nhomHaTang, ward, name) {
+function qcvnRadius(type, nhomHaTang, ward, name, size) {
   if (isNetworkType(type)) return networkRadius(type, ward, name);
+  if (type === '1-CV') return parkTierOf(size, nhomHaTang).radius;
   if (!UNIT_DEFAULT_RADIUS[type]) return null;
   if (nhomHaTang === 'Cấp đô thị' || (type === '4-TH' && isThptName(name))) return URBAN_RADIUS;
   return /^xã\s/i.test(String(ward || '').trim()) && !["1-CV", "2-BDX"].includes(type) ? RURAL_UNIT_RADIUS : UNIT_DEFAULT_RADIUS[type];
@@ -89,7 +91,8 @@ function updateRadiusPreview() {
   const nhom = document.getElementById('newNhomHaTang')?.value;
   const ward = document.getElementById('newWard')?.value || '';
   const name = document.getElementById('newName')?.value;
-  const r = qcvnRadius(type, nhom, ward, name);
+  const size = Number(document.getElementById('newSize')?.value) || 0;
+  const r = qcvnRadius(type, nhom, ward, name, size);
   const nhomEl = document.getElementById('newNhomHaTang');
   if (nhomEl) nhomEl.disabled = isNetworkType(type);
   if (type === '12-NT') {
@@ -106,6 +109,12 @@ function updateRadiusPreview() {
   }
   if (!r) {
     out.textContent = type === '9-CSD' ? 'Không áp dụng (cơ sở chưa sử dụng)' : '—';
+    return;
+  }
+  if (type === '1-CV') {
+    const tier = parkTierOf(size, nhom);
+    const group = tier.urban ? 'cây xanh đô thị' : 'cây xanh đơn vị ở';
+    out.innerHTML = `<b>${r.toLocaleString('vi-VN')} m</b> <small>(${tier.label}, ${group}${size > 0 ? '' : ' — nhập diện tích để xếp hạng: < 1 ha vườn hoa, ≥ 1 ha công viên khu vực, ≥ 5 ha công viên đô thị'})</small>`;
     return;
   }
   const scope = type === '4-TH' && isThptName(name) ? 'trường THPT, cấp đô thị' : nhom === 'Cấp đô thị' ? 'cấp đô thị' : 'cấp đơn vị ở';
@@ -161,6 +170,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initFloodSim();
   initSatLayers();
   initSketchLayer();
+  initIntroTour();
   // Bật đo đạc / tra cứu / ghim / vẽ tuyến → bỏ chọn công cụ phác thảo (hình đã vẽ vẫn giữ)
   ['btnMeasureDist', 'btnMeasureArea', 'btnInspectMode', 'btnPickOnMap', 'btnRoadDraw', 'btnPopDraw']
     .forEach(id => document.getElementById(id)?.addEventListener('click', stopSketchTool));
@@ -216,9 +226,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     if (state.isInspectMode) {
+      if (nearPanelClick) return;
       handleInspectPointClick(e.latlng.lat, e.latlng.lng, targetMap);
     }
   };
+  // Chế độ tra cứu: click trúng / sát mép các bảng đang mở (bấm hụt nút ×, bảng vừa nở ra khi nạp xong kết quả…)
+  // chỉ đóng popup như thường, không tra cứu điểm mới. Đo ở preclick vì popup bị đóng ngay trong preclick.
+  const PANEL_GUARDS = [['.leaflet-popup', 24], ['.leaflet-control, .map-toolbar, .right-panel, .bottom-panel', 10]];
+  let nearPanelClick = false;
+  const isNearPanel = (ev) => {
+    if (!ev || ev.clientX == null) return false;
+    return PANEL_GUARDS.some(([sel, pad]) => [...document.querySelectorAll(sel)].some(el => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && ev.clientX >= r.left - pad && ev.clientX <= r.right + pad
+        && ev.clientY >= r.top - pad && ev.clientY <= r.bottom + pad;
+    }));
+  };
+  [map, planMap].forEach(m => m?.on('preclick', (e) => {
+    nearPanelClick = state.isInspectMode && isNearPanel(e.originalEvent);
+  }));
   map.on('click', (e) => handleMapClick(e, map));
   planMap?.on('click', (e) => handleMapClick(e, planMap));
 
@@ -348,7 +374,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ---------- Thêm điểm đề xuất ----------
-  ['newType', 'newNhomHaTang', 'newWard', 'newName'].forEach(id => {
+  ['newType', 'newNhomHaTang', 'newWard', 'newName', 'newSize'].forEach(id => {
     const el = document.getElementById(id);
     el?.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', updateRadiusPreview);
   });
@@ -413,7 +439,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           id: data.id || `NEW-${Date.now()}`,
           name, ward: data.ward || '', type, nhomHaTang, lat, lng,
           size: phase === 'QH' ? 0 : size,
-          radius: data.radius ?? qcvnRadius(type, nhomHaTang, data.ward, name) ?? 500,
+          radius: data.radius ?? qcvnRadius(type, nhomHaTang, data.ward, name, size) ?? 500,
           sizeHT: phase === 'QH' ? null : size,
           sizeQH: phase === 'QH' ? size : null,
           planChange: phase === 'QH' ? 'new' : 'relocate',

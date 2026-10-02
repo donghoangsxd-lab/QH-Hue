@@ -309,7 +309,7 @@ function parseCadItem(it, defaultPhase) {
   const name = sanitizeSheetText(it.name, 150) || `${layer} (DXF)`;
   return {
     type, idPrefix, nhom, name,
-    radius: qcvnRadius({ id: `${idPrefix}-0`, type, name, nhomHaTang: nhom }, ward),
+    radius: qcvnRadius({ id: `${idPrefix}-0`, type, name, nhomHaTang: nhom, size: first.size }, ward),
     ward, layer, matchId, crossWard: first.crossWard, point,
     lat: pt.lat.toFixed(6), lng: pt.lng.toFixed(6),
     area: first.area,
@@ -583,13 +583,17 @@ async function popPixelSize(popProjection) {
 }
 
 /**
- * Số dân tối đa 1 khu đất/công trình đáp ứng = diện tích ÷ chỉ tiêu m²/người của loại (chỉ tiêu tổng như bảng phường; THPT theo chỉ tiêu riêng).
+ * Số dân tối đa 1 khu đất/công trình đáp ứng = diện tích ÷ chỉ tiêu m²/người của loại (chỉ tiêu tổng như bảng phường; THPT theo chỉ tiêu riêng;
+ * công viên theo hạng: khu vực / đô thị → cây xanh đô thị, vườn hoa → cây xanh đơn vị ở).
  * capacity = null: chưa rõ diện tích (0) hoặc QCVN không quy định chỉ tiêu cho loại/địa bàn → không giới hạn.
  */
 function capacityByQuota(item, size, profile) {
+  const code = constants.resolveTypeCode(item);
   const quota = constants.isThptItem(item)
     ? (constants.baseQuota('THPT', profile) || 0)
-    : constants.quotaFor(constants.resolveTypeCode(item), profile);
+    : code === '1-CV'
+      ? (constants.baseQuota(constants.parkTier({ ...item, size }).urban ? 'CV_DT' : 'CV_DV', profile) || 0)
+      : constants.quotaFor(code, profile);
   return { quota, capacity: quota > 0 && size > 0 ? Math.floor(size / quota) : null };
 }
 
@@ -597,6 +601,7 @@ const capByCapacity = (pop, capacity) => (capacity == null ? pop : Math.min(pop,
 
 /** Bán kính vùng phục vụ của khu đất khi xét loại `code`: theo quy chuẩn của loại và hồ sơ phường/xã */
 function csdCandidateRadius(csd, code, profile) {
+  if (code === '1-CV') return constants.parkTier({ type: code, size: csd.size }).radius;
   return constants.unitRadius(code, profile);
 }
 
@@ -1013,11 +1018,16 @@ function findWardMismatches(items, evaluatedWards) {
 
 // ============================ PHÂN LOẠI & CHỈ TIÊU ============================
 
-// Kịch bản quy hoạch: công trình có QuyMo_QH (bỏ di dời / không thể hiện), diện tích theo QuyMo_QH
+// Kịch bản quy hoạch: công trình có QuyMo_QH (bỏ di dời / không thể hiện), diện tích theo QuyMo_QH;
+// cây xanh đổi hạng (bán kính) theo diện tích quy hoạch
 function getPlanScenarioItems(allDataList) {
   return allDataList
     .filter(it => it.planChange !== 'relocate' && it.planChange !== 'none')
-    .map(it => ({ ...it, size: it.sizeQH ?? it.size }));
+    .map(it => {
+      const plan = { ...it, size: it.sizeQH ?? it.size };
+      if (constants.resolveTypeCode(plan) === '1-CV') plan.radius = constants.parkTier(plan).radius;
+      return plan;
+    });
 }
 
 // Mã dùng để tính quy mô / độ phủ: THPT tách riêng khỏi 4-TH
@@ -1659,7 +1669,7 @@ module.exports = async (req, res) => {
       const evaluatedWardsForAdd = await loadEvaluatedWards(wardVectorParsed);
       const geoWard = assignWardByGeometry(pt.lng, pt.lat, evaluatedWardsForAdd);
       if (!geoWard) return res.status(400).json({ error: true, message: "Vị trí nằm ngoài ranh giới 40 phường/xã" });
-      const radius = qcvnRadius({ type, name, nhomHaTang }, geoWard);
+      const radius = qcvnRadius({ type, name, nhomHaTang, size }, geoWard);
 
       const result = await callAppsScript({
         action: 'addPoint',
@@ -1683,7 +1693,10 @@ module.exports = async (req, res) => {
       const pt = parseCoordInBounds(src.lat, src.lng);
       if (!pt) return res.status(400).json({ error: true, message: "Tọa độ không hợp lệ" });
       const radius = parseRadius(src.radius);
-      const item = { id: String(src.id || '').slice(0, 50), name: String(src.name || '').slice(0, 200), type: String(src.type || '').slice(0, 20) };
+      const item = {
+        id: String(src.id || '').slice(0, 50), name: String(src.name || '').slice(0, 200), type: String(src.type || '').slice(0, 20),
+        nhomHaTang: String(src.nhomHaTang || '').slice(0, 40)
+      };
       const size = clamp(Number(src.size) || 0, 0, 1e8);
 
       let polyCoords;

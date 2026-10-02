@@ -1,7 +1,7 @@
 import {
   state, infraLabels, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_HIGHLIGHT_STYLE, PLAN_CHANGE_INFO,
   BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, getBufferStyle, getPlanScenarioList, effectiveRadius, bumpDataVersion, layerType,
-  isNetworkType, ntKindOf, NT_KIND_LABELS
+  isNetworkType, ntKindOf, NT_KIND_LABELS, parkTierOf
 } from './state.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi, markDataWritten } from './api.js';
@@ -1205,7 +1205,7 @@ async function fetchServedPop(p, radius, polygon) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       lat: Number(p.lat), lng: Number(p.lng), radius, polygon: polygon.geometry.coordinates[0],
-      id: p.id || '', name: p.name || '', type: p.type || '', size: Number(p.size) || 0
+      id: p.id || '', name: p.name || '', type: p.type || '', nhomHaTang: p.nhomHaTang || '', size: Number(p.size) || 0
     })
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1261,35 +1261,62 @@ async function fetchJson(url) {
   return res.json();
 }
 
-// Nút con mắt cạnh nút đóng: thu popup về dòng tên để xem trọn vùng phục vụ (popup neo theo đáy nên mũi chỉ không đổi chỗ).
-// Khi đang thu gọn, bấm ra bản đồ không đóng popup (đóng popup sẽ xóa luôn lớp vùng phục vụ / tuyến tiếp cận);
-// chỉ nút × hoặc chọn công trình / điểm tra cứu khác mới đóng. Leaflet gắn việc đóng khi bấm bản đồ vào sự kiện preclick.
-function addPopupCollapseToggle(popup) {
+// Nút con mắt cạnh nút đóng: thu popup về nhãn tên nhỏ ngay trên vị trí (không khung nền, không nút ×) để xem trọn
+// vùng phục vụ / tuyến tiếp cận; bấm vào nhãn (hoặc bấm lại điểm công trình) để mở lại.
+// Khi đang thu gọn, bấm ra bản đồ không đóng popup (đóng popup sẽ xóa luôn lớp vùng phục vụ / tuyến tiếp cận).
+// Leaflet gắn việc đóng khi bấm bản đồ vào sự kiện preclick; _updateLayout / _updatePosition đo lại khung mà không
+// dựng lại nội dung (setContent / update sẽ mất phần kết quả đã nạp chậm vào DOM).
+const popupCollapse = new WeakMap();
+
+function addPopupCollapseToggle(popup, keepWhat) {
   const container = popup.getElement();
   const ownerMap = popup._map;
   if (!container || !ownerMap) return;
   const btn = L.DomUtil.create('a', 'pp-collapse-btn', container);
   btn.href = '#';
   btn.setAttribute('role', 'button');
-  const render = (collapsed) => {
-    btn.innerHTML = ico(collapsed ? 'eye' : 'eye-off');
-    btn.title = collapsed ? 'Hiện bảng thông tin' : 'Ẩn bảng thông tin để xem toàn bộ vùng phục vụ';
-    btn.setAttribute('aria-label', btn.title);
-    btn.setAttribute('aria-pressed', String(collapsed));
+  btn.innerHTML = ico('eye-off');
+  btn.title = `Ẩn bảng thông tin (giữ ${keepWhat} trên bản đồ)`;
+  btn.setAttribute('aria-label', btn.title);
+  const fullMinWidth = popup.options.minWidth;
+  const closesOnClick = popup.options.closeOnClick ?? ownerMap.options.closePopupOnClick;
+  const setCollapsed = (collapsed) => {
+    container.classList.toggle('pp-collapsed', collapsed);
+    container.title = collapsed ? 'Bấm để hiện lại bảng thông tin' : '';
+    ownerMap.off('preclick', popup.close, popup);
+    if (!collapsed && closesOnClick) ownerMap.on('preclick', popup.close, popup);
+    popup.options.minWidth = collapsed ? 0 : fullMinWidth;
+    popup._updateLayout();
+    popup._updatePosition();
+    if (!collapsed) popup._adjustPan();
   };
-  render(false);
+  popupCollapse.set(popup, {
+    isCollapsed: () => container.classList.contains('pp-collapsed'),
+    expand: () => setCollapsed(false)
+  });
   L.DomEvent.disableClickPropagation(btn);
   L.DomEvent.on(btn, 'click', (e) => {
-    L.DomEvent.preventDefault(e);
-    const collapsed = container.classList.toggle('pp-collapsed');
-    render(collapsed);
-    ownerMap.off('preclick', popup.close, popup);
-    const closesOnClick = popup.options.closeOnClick ?? ownerMap.options.closePopupOnClick;
-    if (!collapsed && closesOnClick) ownerMap.on('preclick', popup.close, popup);
+    L.DomEvent.stop(e);
+    setCollapsed(true);
+  });
+  L.DomEvent.on(container, 'click', () => {
+    if (container.classList.contains('pp-collapsed')) setCollapsed(false);
   });
 }
 
+/** Popup đang thu gọn → mở lại, trả về true; popup không thu gọn → false */
+function expandCollapsedPopup(popup) {
+  const ctl = popup && popup.isOpen() && popupCollapse.get(popup);
+  if (!ctl || !ctl.isCollapsed()) return false;
+  ctl.expand();
+  return true;
+}
+
+let pointPopup = null;   // { popup, id, scenario } của popup công trình đang mở
+
 export function onPointClick(p, targetMap = map) {
+  if (pointPopup && pointPopup.id === p.id && pointPopup.scenario === p.scenario && pointPopup.popup._map === targetMap
+    && expandCollapsedPopup(pointPopup.popup)) return;
   const approved = isApproved(p.status);
   const isCSD = p.type === "9-CSD";
   const isCSDUnapproved = isCSD && !approved;
@@ -1318,7 +1345,10 @@ export function onPointClick(p, targetMap = map) {
     : highlightSingleIsochrone(p.lat, p.lng, itemRadius, groups.singleIso, inViewPoints, clip, roadArea);
   const selSeq = singleIsoSeq;
 
-  const capCongTrinh = formatCapCongTrinhLabel(p.nhomHaTang || p.capCongTrinh || "Cấp đơn vị ở");
+  const park = p.type === '1-CV' ? parkTierOf(p.size, p.nhomHaTang) : null;
+  const capCongTrinh = park
+    ? `${park.label} (${park.urban ? 'cây xanh đô thị' : 'cây xanh đơn vị ở'}${Number(p.size) > 0 ? '' : ', chưa rõ diện tích'})`
+    : formatCapCongTrinhLabel(p.nhomHaTang || p.capCongTrinh || "Cấp đơn vị ở");
 
   let html = `<div class="pp">`;
   html += `<div class="pp-title">${escapeHtml(p.name)}`;
@@ -1370,7 +1400,8 @@ export function onPointClick(p, targetMap = map) {
   const popup = L.popup({ className: 'infra-popup', closeButton: true, autoPan: true, ...popupFitOptions(targetMap, 300, 50) }).setLatLng([p.lat, p.lng]).setContent(html);
   popup.openOn(targetMap);
   popup.getElement()?.querySelector('.js-approve')?.addEventListener('click', () => approvePointStatus(p.id));
-  addPopupCollapseToggle(popup);
+  addPopupCollapseToggle(popup, 'vùng phục vụ');
+  pointPopup = { popup, id: p.id, scenario: p.scenario };
   // Đóng popup thì thoát chế độ âm bản (trừ khi đã chọn công trình khác / chuyển sang thuyết minh CSD)
   popup.on('remove', () => { if (singleIsoSeq === selSeq) clearSingleIsochrone(); });
 
@@ -1668,7 +1699,7 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
     .setLatLng([clickLat, clickLng])
     .setContent(html)
     .openOn(targetMap);
-  addPopupCollapseToggle(inspectPopup);
+  addPopupCollapseToggle(inspectPopup, 'các tuyến kết nối');
   inspectPopup.on('remove', () => { if (singleIsoSeq === routeSeq) clearSingleIsochrone(); });
   showAccessRoutes(clickLat, clickLng, targetMap, routeCands, inspectPopup, routeSeq);
 

@@ -1474,7 +1474,7 @@ function minSizeSummaryHtml(subItems) {
   return ` <span class="min-size-warn" title="Số công trình nhỏ hơn quy mô tối thiểu theo QCVN 01:2026/BXD">${ico('alert')}${below}/${checked} dưới QM tối thiểu</span>`;
 }
 
-const RADIUS_WARN_TITLE = 'Cột BanKinh trong Sheet khác bán kính chuẩn cấp đơn vị ở của phường/xã chứa công trình (theo tọa độ): phường 1.000 m, xã 2.000 m, công viên 400 m, bãi đỗ xe 500 m. Bản đồ, heatmap và độ phủ luôn dùng bán kính chuẩn; cột BanKinh chỉ để đối chiếu.';
+const RADIUS_WARN_TITLE = 'Cột BanKinh trong Sheet khác bán kính chuẩn cấp đơn vị ở của phường/xã chứa công trình (theo tọa độ): phường 1.000 m, xã 2.000 m, bãi đỗ xe 500 m; cây xanh theo diện tích: vườn hoa 400 m, công viên khu vực (≥ 1 ha) 800 m, công viên đô thị (≥ 5 ha) 2.000 m. Bản đồ, heatmap và độ phủ luôn dùng bán kính chuẩn; cột BanKinh chỉ để đối chiếu.';
 
 function radiusCellHtml(sub) {
   const radiusVal = Number(sub.radius || 0);
@@ -1665,7 +1665,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   </tr>`);
 
   [
-    { key: "CV_DV", label: "Công viên đơn vị ở", code: "1-CV_DV" },
+    { key: "CV_DV", label: "Vườn hoa (cây xanh đơn vị ở)", code: "1-CV_DV" },
     { key: "BDX_DV", label: "Bãi đỗ xe đơn vị ở", code: "2-BDX_DV" }
   ].forEach(item => {
     const node = unitRes[item.key];
@@ -1674,7 +1674,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     quotaRow({
       stt: unitIdx++, label: item.label, node, quota: quotaOf(node, item.key), code: item.code, sectionId: `unit_sub_${item.key}`,
       countTarget: parkRule || !isUrbanProfile ? null : totalUnits,
-      extraCount: parkRule ? `<br>${parkRuleHtml(subItems, parkRule, totalUnits)}` : ''
+      extraCount: parkRule ? `<br>${parkRuleHtml([...subItems, ...(urbanRes.CV_DT?.subItems || [])], parkRule, totalUnits)}` : ''
     });
   });
 

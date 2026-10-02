@@ -68,6 +68,20 @@ export function ntKindOf(item) {
   return 'cemetery_hung';
 }
 
+// Hạng cây xanh theo diện tích (m²), khớp PARK_TIERS trong config/constants.js
+export const PARK_TIERS = [
+  { key: "city", label: "Công viên đô thị", minArea: 50000, radius: 2000, urban: true },
+  { key: "area", label: "Công viên khu vực", minArea: 10000, radius: 800, urban: true },
+  { key: "garden", label: "Vườn hoa", minArea: 0, radius: 400, urban: false }
+];
+
+/** Chưa rõ diện tích → theo cấp: cấp đô thị = công viên khu vực, còn lại = vườn hoa */
+export function parkTierOf(size, nhomHaTang) {
+  const s = Number(size) || 0;
+  if (s > 0) return PARK_TIERS.find(t => s >= t.minArea);
+  return /đô thị|do thi/i.test(String(nhomHaTang || '')) ? PARK_TIERS[1] : PARK_TIERS[2];
+}
+
 export function effectiveRadius(item) {
   // Khoảng cách an toàn nghĩa trang là quy định cố định, không theo bán kính giả định; nhà tang lễ = 0 (không có vùng)
   if (item && item.type === '12-NT') return Number(item.radius) || 0;
@@ -145,15 +159,18 @@ export const PLAN_CHANGE_INFO = {
 
 let planListCache = { version: -1, list: [] };
 
-// Dữ liệu bản đồ quy hoạch: công trình có QuyMo_QH (hiện trạng bỏ di dời + quy hoạch mới), diện tích lấy theo QuyMo_QH
+// Dữ liệu bản đồ quy hoạch: công trình có QuyMo_QH (hiện trạng bỏ di dời + quy hoạch mới), diện tích lấy theo QuyMo_QH;
+// cây xanh đổi hạng (bán kính) theo diện tích quy hoạch
+const withPlanRadius = (it) => (it.type === '1-CV' ? { ...it, radius: parkTierOf(it.size, it.nhomHaTang).radius } : it);
+
 export function getPlanScenarioList() {
   if (planListCache.version === state.dataVersion) return planListCache.list;
   const list = [];
   state.rawDataList.forEach(it => {
     if (it.planChange === 'relocate') return;
-    list.push({ ...it, size: it.sizeQH ?? it.size, sizeHT: it.sizeHT ?? it.size, scenario: 'QH' });
+    list.push(withPlanRadius({ ...it, size: it.sizeQH ?? it.size, sizeHT: it.sizeHT ?? it.size, scenario: 'QH' }));
   });
-  state.planDataList.forEach(it => list.push({ ...it, size: it.sizeQH, scenario: 'QH' }));
+  state.planDataList.forEach(it => list.push(withPlanRadius({ ...it, size: it.sizeQH, scenario: 'QH' })));
   planListCache = { version: state.dataVersion, list };
   return list;
 }

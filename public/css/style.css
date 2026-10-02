@@ -1184,7 +1184,7 @@ table.ward-table th {
 .pp-note { margin-top: 6px; font-size: var(--fs-sm); font-style: italic; text-align: center; }
 .pp .road-legend { margin: 3px 0 0; flex-wrap: wrap; row-gap: 2px; font-weight: 400; }
 
-/* Nút con mắt cạnh nút đóng: thu popup công trình về dòng tên */
+/* Nút con mắt cạnh nút đóng: thu popup về nhãn tên nhỏ ngay trên vị trí (bấm nhãn để mở lại) */
 .infra-popup .pp-title, .inspect-popup .pp-title { padding-right: 22px; }
 .leaflet-container a.pp-collapse-btn {
   position: absolute; top: 0; right: 24px; width: 24px; height: 24px;
@@ -1193,9 +1193,24 @@ table.ward-table th {
 }
 .leaflet-container a.pp-collapse-btn:hover { color: var(--accent-cyan); }
 .pp-collapse-btn .ico { width: 15px; height: 15px; margin: 0; }
+/* Đáy nhãn ≈ đỉnh icon công trình (cao 27 px) / đỉnh ghim tra cứu (41 px) */
+.leaflet-popup.pp-collapsed { margin-bottom: 34px; cursor: pointer; }
+.leaflet-popup.inspect-popup.pp-collapsed { margin-bottom: 48px; }
+.leaflet-popup.pp-collapsed .leaflet-popup-content-wrapper {
+  background: transparent !important; border: 0; box-shadow: none; padding: 0;
+}
+.leaflet-popup.pp-collapsed .leaflet-popup-content { margin: 0; }
+.leaflet-popup.pp-collapsed .leaflet-popup-tip-container,
+.leaflet-container .pp-collapsed a.leaflet-popup-close-button,
+.leaflet-container .pp-collapsed a.pp-collapse-btn { display: none; }
+.pp-collapsed .pp { min-width: 0; }
 .pp-collapsed .pp > :not(.pp-title) { display: none; }
-.pp-collapsed .pp-title { padding-bottom: 0; margin-bottom: 0; border-bottom: 0; }
-.pp-collapsed .leaflet-popup-content-wrapper { opacity: 0.92; }
+.leaflet-popup.pp-collapsed .pp-title {
+  justify-content: center; padding: 0; margin: 0; border-bottom: 0;
+  font-size: var(--fs-sm); font-weight: 700; color: #fff; white-space: nowrap;
+  text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000;
+}
+.pp-collapsed .pp-title .badge-pending, .pp-collapsed .pp-title .ico { display: none; }
 
 .sug-card { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--r-md); padding: 6px; margin-top: 4px; font-size: var(--fs-sm); }
 .sug-card.priority { border-color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.15); }
@@ -1573,6 +1588,54 @@ table.ward-table th {
 .legend-unused { color: var(--accent-orange); margin-top: 4px; }
 .legend-pending b { color: var(--accent-red); }
 .legend-plan-dot { background: var(--plan-mark); }
+
+/* THUYẾT MINH KHI KHỞI ĐỘNG (introTour.js): lớp chặn bấm + khung làm nổi + thẻ chạy chữ */
+.tour-root { position: fixed; inset: 0; z-index: 6000; }
+.tour-root[hidden] { display: none; }
+.tour-backdrop { position: absolute; inset: 0; transition: background 0.3s ease; }
+.tour-dim .tour-backdrop { background: rgba(2, 6, 23, 0.6); }
+.tour-spot {
+  position: fixed; pointer-events: none; border-radius: var(--r-lg);
+  box-shadow: 0 0 0 9999px rgba(2, 6, 23, 0.6), 0 0 0 2px var(--accent-cyan), 0 0 18px 4px rgba(var(--cyan-rgb), 0.55);
+  transition: left 0.45s ease, top 0.45s ease, width 0.45s ease, height 0.45s ease;
+  animation: tour-pulse 1.8s ease-in-out infinite;
+}
+@keyframes tour-pulse {
+  50% { box-shadow: 0 0 0 9999px rgba(2, 6, 23, 0.6), 0 0 0 2px var(--accent-cyan), 0 0 26px 8px rgba(var(--cyan-rgb), 0.35); }
+}
+.tour-card {
+  position: fixed; width: min(380px, calc(100vw - 24px)); box-sizing: border-box; padding: 14px 16px 12px;
+  background: var(--bg-card); color: var(--text-main); border: 1px solid rgba(var(--cyan-rgb), 0.45);
+  border-radius: var(--r-lg); box-shadow: var(--panel-shadow); backdrop-filter: var(--panel-blur);
+  transition: left 0.45s ease, top 0.45s ease;
+  animation: tour-in 0.35s ease;
+}
+@keyframes tour-in { from { opacity: 0; transform: translateY(8px); } }
+.tour-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.tour-step { font-size: var(--fs-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.tour-x { background: none; border: 0; color: var(--text-muted); cursor: pointer; padding: 2px; display: flex; }
+.tour-x:hover { color: var(--accent-red); }
+.tour-x .ico { margin: 0; }
+.tour-title { color: var(--accent-cyan); font-size: var(--fs-xl); font-weight: 700; margin-bottom: 8px; line-height: 1.3; }
+.tour-text { font-size: 12.5px; line-height: 1.6; color: var(--text-strong); white-space: pre-line; }
+.tour-text.typing::after { content: '▍'; color: var(--accent-cyan); animation: tour-caret 0.8s steps(1) infinite; }
+@keyframes tour-caret { 50% { opacity: 0; } }
+.tour-bar { height: 2px; margin: 12px 0 10px; background: var(--border-soft); border-radius: 2px; overflow: hidden; }
+.tour-bar > i { display: block; width: 0; height: 100%; background: var(--accent-cyan); }
+.tour-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tour-off { font-size: var(--fs-sm); color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.tour-btns { display: flex; gap: 6px; margin-left: auto; }
+.tour-btns button {
+  font: inherit; font-size: var(--fs-sm); padding: 5px 10px; border-radius: var(--r-md); cursor: pointer;
+  background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color);
+}
+.tour-btns button:hover:not(:disabled) { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.tour-btns button:disabled { opacity: 0.4; cursor: default; }
+.tour-btns .tour-next { background: var(--accent-cyan); color: var(--text-on-accent); border-color: var(--accent-cyan); font-weight: 700; }
+.tour-btns .tour-next:hover { filter: brightness(1.1); color: var(--text-on-accent) !important; }
+@media (prefers-reduced-motion: reduce) {
+  .tour-spot, .tour-card { animation: none; transition: none; }
+}
 
 /* Viền focus khi dùng bàn phím */
 button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:focus-visible {

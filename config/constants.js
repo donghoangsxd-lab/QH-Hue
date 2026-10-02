@@ -4,7 +4,7 @@ const urbanInfraConfig = {
   "YT_DT": { label: "Y tế cấp khu vực", minSize: 1000, radius: 2000, quota: 0.40, nhom: "Cấp đô thị" },
   "VH_DT": { label: "Văn hóa - Thể thao cấp khu vực", minSize: 1000, radius: 2000, quota: 1.60, nhom: "Cấp đô thị" },
   "TM_DT": { label: "Chợ - TMDV cấp khu vực", minSize: 1500, radius: 2000, quota: 0.40, nhom: "Cấp đô thị" },
-  "CV_DT": { label: "Công viên cấp khu vực", minSize: 3000, radius: 2000, quota: 5.00, nhom: "Cấp đô thị" },
+  "CV_DT": { label: "Cây xanh đô thị (công viên khu vực, công viên đô thị)", minSize: 10000, radius: 800, quota: 5.00, nhom: "Cấp đô thị" },
   "BDX_DT": { label: "Bãi đỗ xe khu vực", minSize: 1000, radius: 2000, quota: 1.50, nhom: "Cấp đô thị" }
 };
 
@@ -22,7 +22,7 @@ const unitInfraConfig = {
   "DVCC_ALL": { label: "Tổng đất dịch vụ công cộng đơn vị ở (gồm trường học)", minSize: 0, radius: 0, quota: 2.00, nhom: "Cấp DVƠ",
     sumOf: ["3-MN", "4-TH", "5-THCS", "YT_DV", "VH_DV", "TM_DV"] },
 
-  "CV_DV":  { label: "Cây xanh đơn vị ở", minSize: 500, radius: 400, quota: 2.00, nhom: "Cấp DVƠ" },
+  "CV_DV":  { label: "Vườn hoa (cây xanh đơn vị ở)", minSize: 500, radius: 400, quota: 2.00, nhom: "Cấp DVƠ" },
   "BDX_DV": { label: "Bãi đỗ xe đơn vị ở", minSize: 500, radius: 500, quota: 2.50, nhom: "Cấp DVƠ" }
 };
 
@@ -66,6 +66,22 @@ const MIN_SIZE_RULES = [
 
 // Mỗi đơn vị ở đô thị phát triển mới: ≥ 1 công viên, vườn hoa ≥ 5.000 m² hoặc 2 công viên, vườn hoa ≥ 2.500 m² (Mục 2.2.3.2)
 const UNIT_PARK_RULE = { profiles: ["DT"], large: 5000, medium: 2500 };
+
+// Hạng cây xanh công cộng theo diện tích (m²) → bán kính phục vụ và nhóm chỉ tiêu.
+// Công viên khu vực + công viên đô thị thống kê vào cây xanh đô thị (CV_DT, 5 m²/người); vườn hoa (~0,3 ha, nhỏ hơn vẫn nhận) vào CV_DV.
+// Khớp PARK_TIERS trong public/js/state.js
+const PARK_TIERS = [
+  { key: "city", label: "Công viên đô thị", minArea: 50000, radius: 2000, urban: true },
+  { key: "area", label: "Công viên khu vực", minArea: 10000, radius: 800, urban: true },
+  { key: "garden", label: "Vườn hoa", minArea: 0, radius: 400, urban: false }
+];
+
+/** Chưa rõ diện tích (trống / 0) → theo cột Nhom_HaTang: cấp đô thị = công viên khu vực, còn lại = vườn hoa */
+function parkTierOf(size, urbanNhom) {
+  const s = Number(size) || 0;
+  if (s > 0) return PARK_TIERS.find(t => s >= t.minArea);
+  return urbanNhom ? PARK_TIERS[1] : PARK_TIERS[2];
+}
 
 // D. MẠNG LƯỚI HẠ TẦNG KHÁC — không có chỉ tiêu m²/người theo phường, không tính vào quy mô / độ phủ / heatmap của 8 nhóm
 const NETWORK_CODES = ["10-BUS", "11-PCCC", "12-NT"];
@@ -250,6 +266,7 @@ const constants = {
   PROFILE_QUOTA,
   COUNT_RULES,
   UNIT_PARK_RULE,
+  PARK_TIERS,
   wardProfile,
   wardProfileLabel,
   baseQuota,
@@ -318,8 +335,8 @@ const constants = {
     return name.includes('THPT') || name.includes('TRUNG HOC PHO THONG');
   },
 
-  /** Phân cấp đô thị vs đơn vị ở — thống nhất mọi chỗ */
-  isUrbanLevel: function(item) {
+  /** Cấp theo mã ID / cột Nhom_HaTang */
+  nhomIsUrban: function(item) {
     const prefix = String((item && item.id) || '').split('-')[0].toUpperCase();
     if (prefix === 'THPT' || /_DT$/i.test(prefix)) return true;
     if (/_DV$/i.test(prefix)) return false;
@@ -327,10 +344,22 @@ const constants = {
     return nhom === 'Cap Do Thi';
   },
 
+  /** Hạng cây xanh (PARK_TIERS) theo diện tích item.size — kịch bản quy hoạch truyền size = QuyMo_QH */
+  parkTier: function(item) {
+    return parkTierOf(item && item.size, this.nhomIsUrban(item));
+  },
+
+  /** Phân cấp đô thị vs đơn vị ở — thống nhất mọi chỗ; cây xanh xét theo diện tích */
+  isUrbanLevel: function(item) {
+    if (this.resolveTypeCode(item) === '1-CV') return this.parkTier(item).urban;
+    return this.nhomIsUrban(item);
+  },
+
   /** Bán kính vùng phục vụ theo quy chuẩn: theo cấp, loại công trình và hồ sơ phường/xã chứa công trình */
   standardRadius: function(item, profile = 'DT') {
     if (this.isThptItem(item)) return urbanInfraConfig.THPT.radius;
     const code = this.resolveTypeCode(item);
+    if (code === '1-CV') return this.parkTier(item).radius;
     if (NETWORK_CODES.includes(code)) return this.networkRadius(item, code, profile);
     if (this.isUrbanLevel(item) && CODE_LEVEL_KEYS[code] && urbanInfraConfig[CODE_LEVEL_KEYS[code][0]]) {
       return urbanInfraConfig[CODE_LEVEL_KEYS[code][0]].radius;
@@ -350,11 +379,12 @@ const constants = {
     return this.standardRadius(item, wardProfile(item && item.ward));
   },
 
-  /** Giá trị cột BanKinh khi khác bán kính chuẩn cấp đơn vị ở (chỉ để đối chiếu dữ liệu, không dùng tính toán); null = khớp hoặc không kiểm tra */
+  /** Giá trị cột BanKinh khi khác bán kính chuẩn cấp đơn vị ở / hạng cây xanh (chỉ để đối chiếu dữ liệu, không dùng tính toán); null = khớp hoặc không kiểm tra */
   radiusMismatch: function(item, profile) {
-    if (!item || !(item.sheetRadius > 0) || this.isThptItem(item) || this.isUrbanLevel(item)) return null;
+    if (!item || !(item.sheetRadius > 0) || this.isThptItem(item)) return null;
     const code = this.resolveTypeCode(item);
-    if (!this.infraConfig[code]) return null;
+    if (code === '1-CV') return Number(item.sheetRadius) === this.parkTier(item).radius ? null : Number(item.sheetRadius);
+    if (this.isUrbanLevel(item) || !this.infraConfig[code]) return null;
     return Number(item.sheetRadius) === this.unitRadius(code, profile) ? null : Number(item.sheetRadius);
   },
 
