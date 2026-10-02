@@ -398,6 +398,19 @@ body.right-collapsed .right-panel {
 .tab-body { padding: 8px 10px; box-sizing: border-box; }
 
 /* LỚP DỮ LIỆU */
+/* Thanh đầu tab: tên nhóm, số nhóm đang hiện, nút ẩn/hiện toàn bộ biểu tượng (dính trên cùng khi cuộn) */
+.layer-head { position: sticky; top: -8px; z-index: 2; display: flex; align-items: center; gap: 6px; margin: -8px -10px 6px; padding: 7px 10px 6px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color); }
+.layer-head-title { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; font-size: var(--fs-xs); font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.layer-head-title .ico { width: 13px; height: 13px; margin: 0; color: var(--accent-cyan); }
+.layer-count { flex-shrink: 0; padding: 1px 6px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.12); border: 1px solid rgba(var(--cyan-rgb), 0.35); }
+.layer-count.none { color: var(--text-muted); background: transparent; border-color: var(--border-color); }
+.layer-eye-btn { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border: 1px solid var(--border-color); border-radius: var(--r-md); background: var(--bg-input); color: var(--text-main); font: inherit; font-size: var(--fs-xs); font-weight: 600; cursor: pointer; transition: background var(--ease), border-color var(--ease), color var(--ease); }
+.layer-eye-btn .ico { width: 14px; height: 14px; margin: 0; }
+.layer-eye-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.layer-eye-btn:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
+.layer-eye-btn .eye-show, .layer-eye-btn[aria-pressed="true"] .eye-hide { display: none; }
+.layer-eye-btn[aria-pressed="true"] .eye-show { display: inline; }
+.layer-eye-btn[aria-pressed="true"] { border-color: var(--accent-cyan); background: var(--accent-cyan); color: var(--bg-panel); }
 .layer-row { display: flex; align-items: center; justify-content: space-between; min-height: 21px; font-size: var(--fs-md); line-height: 1.25; }
 .layer-row label { cursor: pointer; color: var(--text-main); }
 .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 13px; height: 13px; margin: 0 6px 0 0; vertical-align: middle; }

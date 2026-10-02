@@ -295,11 +295,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnCollapseRightPanel')?.addEventListener('click', () => setRightPanelCollapsed(true));
   document.getElementById('btnExpandRightPanel')?.addEventListener('click', () => showRightTab(activeTab));
-  document.getElementById('btnToggleSidebar')?.addEventListener('click', () => {
-    const collapsed = document.body.classList.contains('right-collapsed');
-    if (!collapsed && activeTab === 'tabLayers') setRightPanelCollapsed(true);
-    else showRightTab('tabLayers');
-  });
 
   document.getElementById('btnToggleBottomMax')?.addEventListener('click', toggleBottomPanelMaximized);
   document.getElementById('btnToggleStatTable')?.addEventListener('click', toggleStatTable);
@@ -461,20 +456,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // ---------- Ẩn/hiện toàn bộ icon ----------
-  let allIconsVisible = true;
+  // ---------- Ẩn/hiện toàn bộ icon (thanh đầu tab Lớp dữ liệu) ----------
+  // Ẩn: nhớ các nhóm đang bật; Hiện lại: khôi phục đúng các nhóm đó (chưa có thì bật cả 13 nhóm)
+  const ICON_GROUPS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'c11', 'c12', 'c13'];
   const btnEye = document.getElementById('btnToggleAllIcons');
-  btnEye?.addEventListener('click', () => {
-    allIconsVisible = !allIconsVisible;
-    ['c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'c11', 'c12', 'c13'].forEach(gKey => {
-      const chk = document.getElementById(`chk_${gKey}`);
-      if (chk) chk.checked = allIconsVisible;
-      toggleLayer(gKey, allIconsVisible);
-    });
-    btnEye.style.opacity = allIconsVisible ? '1' : '0.5';
-    btnEye.title = allIconsVisible ? 'Ẩn toàn bộ icon' : 'Hiện toàn bộ icon';
-    btnEye.setAttribute('aria-pressed', String(!allIconsVisible));
+  const layerCount = document.getElementById('layerCount');
+  const iconCheck = (k) => document.getElementById(`chk_${k}`);
+  let savedIconGroups = null;
+  const syncEyeButton = () => {
+    const on = ICON_GROUPS.filter(k => iconCheck(k)?.checked).length;
+    if (layerCount) {
+      layerCount.textContent = `${on}/${ICON_GROUPS.length}`;
+      layerCount.classList.toggle('none', on === 0);
+    }
+    if (!btnEye) return;
+    const hidden = on === 0;
+    btnEye.setAttribute('aria-pressed', String(hidden));
+    btnEye.title = hidden ? 'Hiện lại các nhóm công trình đã chọn trước khi ẩn' : 'Ẩn toàn bộ biểu tượng công trình (giữ lựa chọn để hiện lại)';
+  };
+  const setIconGroups = (keys) => ICON_GROUPS.forEach(k => {
+    const chk = iconCheck(k);
+    const on = keys.includes(k);
+    if (!chk || chk.checked === on) return;
+    chk.checked = on;
+    toggleLayer(k, on);
   });
+  btnEye?.addEventListener('click', () => {
+    const on = ICON_GROUPS.filter(k => iconCheck(k)?.checked);
+    if (on.length) { savedIconGroups = on; setIconGroups([]); }
+    else setIconGroups(savedIconGroups || ICON_GROUPS);
+    syncEyeButton();
+  });
+  ICON_GROUPS.forEach(k => iconCheck(k)?.addEventListener('change', syncEyeButton));
+  syncEyeButton();
 
   // ---------- Định vị GPS: 1 marker duy nhất (thay thế lần định vị trước) + tra cứu hạ tầng tại chỗ ----------
   const gpsLayers = [L.layerGroup().addTo(map), planMap ? L.layerGroup().addTo(planMap) : null].filter(Boolean);

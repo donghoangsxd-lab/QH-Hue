@@ -102,8 +102,6 @@
     <div class="map-toolbar" role="toolbar" aria-label="Công cụ bản đồ" aria-orientation="vertical">
       <button type="button" class="ui-btn-format" id="btnToggleCompare" title="So sánh Hiện trạng / Quy hoạch (chia đôi màn hình)" aria-label="So sánh hiện trạng và quy hoạch" aria-pressed="false"><svg class="ico"><use href="#i-compare"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnAuth" title="Đăng nhập quản trị" aria-label="Đăng nhập quản trị"><svg class="ico"><use href="#i-key"/></svg></button>
-      <button type="button" class="ui-btn-format" id="btnToggleSidebar" title="Lớp dữ liệu" aria-label="Lớp dữ liệu"><svg class="ico"><use href="#i-layers"/></svg></button>
-      <button type="button" class="ui-btn-format" id="btnToggleAllIcons" title="Ẩn toàn bộ icon" aria-label="Ẩn/hiện toàn bộ icon" aria-pressed="false"><svg class="ico"><use href="#i-eye"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnLocateGPS" title="Định vị vị trí GPS của bạn" aria-label="Định vị GPS"><svg class="ico"><use href="#i-locate"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnScreenshot" title="Chụp ảnh bản đồ (lưu PNG)" aria-label="Chụp ảnh bản đồ"><svg class="ico"><use href="#i-camera"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnPrintA3" title="Xuất bản đồ khổ A3 (PDF có khung, lưới tọa độ, chú giải)" aria-label="Xuất bản đồ A3"><svg class="ico"><use href="#i-printer"/></svg></button>
@@ -173,6 +171,14 @@
     <div class="rp-body">
       <!-- TAB: LỚP DỮ LIỆU -->
       <div class="tab-body" id="tabLayers">
+        <div class="layer-head">
+          <span class="layer-head-title" title="13 nhóm biểu tượng công trình hạ tầng"><svg class="ico"><use href="#i-layers"/></svg>Công trình</span>
+          <span class="layer-count" id="layerCount" title="Số nhóm công trình đang hiện trên bản đồ">13/13</span>
+          <button type="button" class="layer-eye-btn" id="btnToggleAllIcons" aria-pressed="false" title="Ẩn toàn bộ biểu tượng công trình (giữ lựa chọn để hiện lại)">
+            <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>
+            <span class="eye-hide">Ẩn tất cả</span><span class="eye-show">Hiện lại</span>
+          </button>
+        </div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c1" checked><label for="chk_c1">1. Công viên, điểm xanh</label></div><button type="button" class="btn-dot-buffer" data-buffer="b1" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c2" checked><label for="chk_c2">2. Bãi đỗ xe, trạm sạc</label></div><button type="button" class="btn-dot-buffer" data-buffer="b2" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c3" checked><label for="chk_c3">3. Trường Mầm non</label></div><button type="button" class="btn-dot-buffer" data-buffer="b3" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>

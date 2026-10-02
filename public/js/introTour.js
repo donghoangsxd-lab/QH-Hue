@@ -24,14 +24,14 @@ const STEPS = [
     text: 'Mỗi biểu tượng trên bản đồ là 1 công trình. Bấm vào biểu tượng để xem bảng thông tin và vùng phục vụ của công trình đó.\nNút con mắt trên bảng thu gọn bảng về tên công trình để nhìn trọn vùng phục vụ; bấm lại vào công trình để mở lại bảng.'
   },
   {
-    target: ['#chk_heat', '#btnToggleSidebar'],
+    target: ['#chk_heat', '#btnExpandRightPanel'],
     title: 'Bản đồ độ phủ hạ tầng',
     text: 'Lớp màu nhiệt thể hiện mức độ được phục vụ: nơi nằm trong tầm đi bộ của càng nhiều loại hạ tầng thì màu càng đậm; nơi màu nhạt là nơi còn thiếu. Khoảng cách được tính bám theo đường giao thông, không chỉ theo đường chim bay.'
   },
   {
-    target: ['#rightPanel', '#btnToggleSidebar'],
+    target: ['#rightPanel', '#btnExpandRightPanel'],
     title: 'Bật / tắt lớp dữ liệu',
-    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm nút "Lớp dữ liệu" trên thanh công cụ (hoặc mũi tên ‹ ở mép phải) để mở. Panel dùng để chọn nhóm hạ tầng cần xem. Nút chấm tròn ● bật vùng phủ của từng nhóm. Ngoài ra còn lớp phân bố dân cư (ô 30 m × 30 m), ranh giới 40 phường xã, quỹ đất tiềm năng… Thẻ "Chú giải" giải thích các ký hiệu.'
+    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm mũi tên ‹ ở mép phải để mở, › để thu gọn. Panel dùng để chọn nhóm hạ tầng cần xem; nút con mắt "Ẩn tất cả" ở đầu panel ẩn nhanh mọi biểu tượng công trình và bấm lại để hiện đúng các nhóm đã chọn. Nút chấm tròn ● bật vùng phủ của từng nhóm. Ngoài ra còn lớp phân bố dân cư (ô 30 m × 30 m), ranh giới 40 phường xã, quỹ đất tiềm năng… Thẻ "Chú giải" giải thích các ký hiệu.'
   },
   {
     target: '#btnInspectMode',
