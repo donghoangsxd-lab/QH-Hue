@@ -10,6 +10,7 @@ import { escapeHtml, fmtNum } from './utils.js';
 export const DEV_FROM_DEFAULT = 2020;
 export const DEV_REF = 'QCVN 01:2026/BXD Mục 2.2.3.2, 2.2.3.3';
 export const DEV_MIN_ZOOM = 12;
+const DW_FIRST_YEAR = 2016; // khớp services/satService.js
 const HA = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
 const BASIS = 'Vùng hiện trạng: đất đã xây dựng đến năm gốc (GAIA – ĐH Thanh Hoa, Landsat 30 m, 1985–2018, hợp với GHSL – JRC, '
   + 'ô 100 m có ≥ 15% diện tích công trình; năm gốc từ 2016 hợp thêm Dynamic World năm đó). Vùng phát triển mới: đất xây dựng hiện nay (Google Dynamic World 10 m, nhãn chiếm ưu thế '
@@ -104,7 +105,7 @@ export function newDevRowHtml(wardName) {
 export function devLegend(legend) {
   return `<div><span class="sat-swatch dev-swatch" style="--c:${legend.baseColor}"></span>Vùng hiện trạng (đã xây dựng đến ${legend.from})</div>`
     + `<div><span class="sat-swatch dev-swatch" style="--c:${legend.color}"></span>Vùng phát triển mới (${legend.from} → ${legend.to[0]}–${legend.to[1]})</div>`
-    + `<div class="flood-muted" title="${BASIS}">Phóng to từ mức ${DEV_MIN_ZOOM} để xem ranh. Cơ sở: Dynamic World ${legend.to[0]}–${legend.to[1]} − (GAIA ∪ GHSL) ${legend.from}. Logic tạm, sau này lấy ranh từ quy hoạch.</div>`;
+    + `<div class="flood-muted" title="${BASIS}">Phóng to từ mức ${DEV_MIN_ZOOM} để xem ranh. Cơ sở: Dynamic World ${legend.to[0]}–${legend.to[1]} − (GAIA ∪ GHSL${legend.from >= DW_FIRST_YEAR ? ' ∪ Dynamic World' : ''}) ${legend.from}. Logic tạm, sau này lấy ranh từ quy hoạch.</div>`;
 }
 
 export function devStats(d) {
