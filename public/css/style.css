@@ -1100,8 +1100,6 @@ table.ward-table .wt-bal-head td.wt-note { color: #facc15; }
 .bal-map-btn.active { color: var(--accent-orange); }
 /* Vùng phát triển mới (newDev.js) */
 .sat-swatch.dev-swatch { background: color-mix(in srgb, var(--c) 35%, transparent); border: 2px solid var(--c); }
-.dev-tag { font-size: var(--fs-xs); font-weight: 500; color: var(--text-muted); white-space: nowrap; cursor: help; }
-.dev-tag.dev-on { color: #fb7185; }
 table.ward-table td.wt-dev-note { color: var(--text-main); font-weight: 400; }
 .min-size-warn .ico, .pp-warn .ico { margin-right: 2px; }
 table.ward-table th {

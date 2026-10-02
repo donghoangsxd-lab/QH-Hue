@@ -9,7 +9,7 @@ import { refreshPopPanel } from './popEdits.js';
 import { refreshCadRole } from './cadImportUi.js';
 import { loadPopCheck, popCheckBadgeHtml, popCheckCityHtml } from './popCheck.js';
 import { balanceSlot, balanceScaleHtml, toggleBalanceMap, clearBalanceMap, isBalanceMapOn, BALANCE_REF } from './wardBalance.js';
-import { loadNewDevStats, newDevOf, parkRuleScopeHtml, newDevRowHtml } from './newDev.js';
+import { loadNewDevStats, newDevOf, newDevRowHtml } from './newDev.js';
 
 let chartInstance = null;
 let infraPieInstance = null;
@@ -1516,16 +1516,13 @@ function radiusSummaryHtml(subItems) {
   return wrong ? ` <span class="min-size-warn" title="${RADIUS_WARN_TITLE}">${ico('alert')}${wrong} BK Sheet lệch chuẩn</span>` : '';
 }
 
-// Mỗi đơn vị ở phát triển mới: ≥ 1 công viên ≥ 5.000 m² hoặc 2 công viên ≥ 2.500 m² (Mục 2.2.3.2);
-// phường không có khu phát triển mới (newDev.js) → số liệu chỉ để tham khảo, tô xám
-function parkRuleHtml(subItems, rule, totalUnits, wardName) {
+// Mỗi đơn vị ở phát triển mới: ≥ 1 công viên ≥ 5.000 m² hoặc 2 công viên ≥ 2.500 m² (Mục 2.2.3.2)
+function parkRuleHtml(subItems, rule, totalUnits) {
   const large = subItems.filter(s => Number(s.size) >= rule.large).length;
   const medium = subItems.filter(s => Number(s.size) >= rule.medium && Number(s.size) < rule.large).length;
   const ok = Math.min(totalUnits, large + Math.floor(medium / 2));
   const title = `QCVN 01:2026/BXD Mục 2.2.3.2: mỗi đơn vị ở phát triển mới có ≥ 1 công viên ≥ ${fmtNum(rule.large)} m² hoặc 2 công viên ≥ ${fmtNum(rule.medium)} m²`;
-  const dev = newDevOf(wardName);
-  const cls = dev && !dev.applies ? 'c-muted' : ok >= totalUnits ? 'c-green' : 'c-red';
-  return `<b title="${title}" class="${cls}">${ok}/${totalUnits} ĐVỞ đạt QM</b>${parkRuleScopeHtml(wardName)}`;
+  return `<b title="${title}" class="${ok >= totalUnits ? 'c-green' : 'c-red'}">${ok}/${totalUnits} ĐVỞ đạt QM</b>`;
 }
 
 function zoomLinkHtml(item, fallbackName = 'Công trình') {
@@ -1737,7 +1734,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     quotaRow({
       stt: unitIdx++, label: item.label, node, quota: quotaOf(node, item.key), code: item.code, sectionId: `unit_sub_${item.key}`,
       countTarget: parkRule || !isUrbanProfile ? null : totalUnits,
-      extraCount: parkRule ? `<br>${parkRuleHtml([...subItems, ...(urbanRes.CV_DT?.subItems || [])], parkRule, totalUnits, wardData.Ten_Phuong)}` : ''
+      extraCount: parkRule ? `<br>${parkRuleHtml([...subItems, ...(urbanRes.CV_DT?.subItems || [])], parkRule, totalUnits)}` : ''
     });
   });
   if (isUrbanProfile) parts.push(newDevRowHtml(wardData.Ten_Phuong));

@@ -232,7 +232,7 @@
             <div class="flood-stats" id="lstStats"></div>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Vùng phát triển mới = đất xây dựng hiện nay (Google Dynamic World, Sentinel-2 10 m) trừ đất đã xây dựng đến năm gốc 1990/2000/2010 (GAIA, Landsat 30 m); bỏ mảng < 0,5 ha. QCVN 01:2026/BXD Mục 2.2.3.2 (công viên, vườn hoa mỗi đơn vị ở) và Mục 2.2.3.3 (vườn hoa, bãi đỗ xe ≤ 400 m) chỉ áp cho đơn vị ở / nhóm nhà ở phát triển mới"><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Vùng phát triển mới (Dynamic World)</label></div>
+            <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Khoanh vùng trong từng phường: ranh đỏ = vùng hiện trạng (đã xây dựng đến năm gốc 2020/2010/2000, GAIA Landsat 30 m hợp với GHSL 100 m); ranh xanh = vùng phát triển mới (đất xây dựng hiện nay theo Google Dynamic World 10 m nằm ngoài vùng hiện trạng); bỏ mảng < 0,5 ha. QCVN 01:2026/BXD Mục 2.2.3.2 (công viên, vườn hoa mỗi đơn vị ở) và Mục 2.2.3.3 (vườn hoa, bãi đỗ xe ≤ 400 m) chỉ áp trong vùng phát triển mới. Logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch"><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Vùng phát triển mới (Dynamic World)</label></div>
             <span id="newDevOpBox" class="layer-slider" style="display:none;"><input type="range" id="newDevOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp vùng phát triển mới" aria-label="Độ trong suốt lớp vùng phát triển mới"></span>
           </div>
           <div class="flood-box" id="newDevBox" style="display:none;">

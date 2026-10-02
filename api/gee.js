@@ -370,9 +370,7 @@ let cachedFloodBins = null;   // { version: phiên bản hiệu chỉnh dân cư
 const cachedSatStats = new Map();   // "lst|năm" hoặc "sar|năm|bản dân cư|bản dữ liệu" → kết quả thống kê lớp vệ tinh
 // Tọa độ công trình là 1 điểm trong khu đất: xét rủi ro ngập / nhiệt trong vòng bán kính này quanh điểm
 const RISK_BUFFER_M = 30;
-// Phường có ≥ NEW_DEV_MIN_HA đất xây dựng mới sau năm gốc (satService.newDevImage) được coi là có đơn vị ở / nhóm nhà ở
-// phát triển mới (Mục 2.2.3.2); trong vùng đó kiểm tra vườn hoa, bãi đỗ xe ≤ 400 m (Mục 2.2.3.3, khoảng cách đường chim bay)
-const NEW_DEV_MIN_HA = 10;
+// Trong vùng phát triển mới (satService.newDevImage) kiểm tra vườn hoa, bãi đỗ xe ≤ 400 m (Mục 2.2.3.3, đường chim bay)
 const DEV_SERVICE_M = 400;
 const wardNameOf = (p) => p.tenXa || p.NAME_2 || p.name || 'Phường';
 // Pixel có dân (1/0). Đếm trên lưới raster dân cư (crs popProjection, POP_SCALE_M) như lúc chia dân số phường rồi quy ra người:
@@ -1896,7 +1894,11 @@ module.exports = async (req, res) => {
       if (!sat.DEV_FROM_YEARS.includes(from)) return res.status(400).json({ error: true, message: "Năm gốc không hợp lệ" });
       res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=86400');
       const image = sat.newDevVis(ee, wardVectorParsed, from);
-      return res.status(200).json({ urlFormat: await sat.mapUrl(ee, image), legend: { color: sat.DEV_COLOR, from, to: sat.devRecentYears() }, years: sat.DEV_FROM_YEARS });
+      return res.status(200).json({
+        urlFormat: await sat.mapUrl(ee, image),
+        legend: { color: sat.DEV_COLOR, baseColor: sat.DEV_BASE_COLOR, from, to: sat.devRecentYears() },
+        years: sat.DEV_FROM_YEARS
+      });
     }
 
     if (action === 'getBoundaryTile') {
@@ -2027,8 +2029,9 @@ module.exports = async (req, res) => {
       return res.status(200).json(cachedSatStats.get(key));
     }
 
-    // Đất xây dựng mới từ năm from trong các phường (bộ chỉ tiêu đô thị): diện tích (ha) và tỷ lệ nằm trong 400 m
-    // quanh công viên/vườn hoa, bãi đỗ xe hiện trạng đã duyệt
+    // Vùng hiện trạng / vùng phát triển mới từ năm from trong các phường (bộ chỉ tiêu đô thị). Trong vùng phát triển mới:
+    // dân số ước tính (đơn vị ở, Mục 2.2.3.2), công viên/vườn hoa nằm trong vùng, tỷ lệ diện tích trong 400 m quanh
+    // công viên/vườn hoa, bãi đỗ xe hiện trạng đã duyệt (Mục 2.2.3.3)
     if (action === 'getNewDevStats') {
       const from = Number(req.query.from);
       if (!sat.DEV_FROM_YEARS.includes(from)) return res.status(400).json({ error: true, message: "Năm gốc không hợp lệ" });
@@ -2045,28 +2048,60 @@ module.exports = async (req, res) => {
           return zones.length ? ee.Image(0).byte().paint(ee.FeatureCollection(zones), 1) : ee.Image(0).byte();
         };
         const img = sat.newDevImage(ee, dtWards, from);
+        const dev = img.select('dev');
         const ha = ee.Image.pixelArea().divide(1e4);
-        const devHa = ha.multiply(img.select('dev'));
+        const devHa = ha.multiply(dev);
         const stack = devHa.rename('dev')
+          .addBands(ha.multiply(img.select('base')).rename('base'))
           .addBands(ha.multiply(img.select('built')).rename('built'))
           .addBands(devHa.multiply(near('1-CV')).rename('park'))
           .addBands(devHa.multiply(near('2-BDX')).rename('parking'));
-        const fc = await eeEvaluate(stack.reduceRegions({ collection: dtWards, reducer: ee.Reducer.sum(), crs: sat.DEV_CRS, scale: sat.DEV_SCALE_M, tileScale: 8 })
-          .map(f => ee.Feature(null).copyProperties(f)));
+        const pix = populatedPixels(popRasterNative);
+        const parks = approved.filter(it => constants.resolveTypeCode(it) === '1-CV');
+        const parkPts = ee.FeatureCollection(parks.map((it, i) => ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(RISK_BUFFER_M), { i })));
+        const [fc, popFc, parkHit] = await Promise.all([
+          eeEvaluate(stack.reduceRegions({ collection: dtWards, reducer: ee.Reducer.sum(), crs: sat.DEV_CRS, scale: sat.DEV_SCALE_M, tileScale: 8 })
+            .map(f => ee.Feature(null).copyProperties(f))),
+          eeEvaluate(pix.addBands(pix.multiply(dev).rename('pixDev')).reduceRegions({
+            collection: dtWards, reducer: ee.Reducer.sum().unweighted(), crs: popProjection, scale: POP_SCALE_M, tileScale: 4
+          }).map(f => ee.Feature(null).copyProperties(f))),
+          parks.length
+            ? eeEvaluate(dev.reduceRegions({ collection: parkPts, reducer: ee.Reducer.max(), crs: sat.DEV_CRS, scale: sat.DEV_SCALE_M, tileScale: 4 })
+              .filter(ee.Filter.eq('max', 1)).aggregate_array('i'))
+            : []
+        ]);
+        const popByWard = {};
+        ((popFc && popFc.features) || []).forEach(f => {
+          const p = f.properties || {};
+          popByWard[wardNameOf(p)] = p.pix ? (Number(p.danSoNum) || 0) * (Number(p.pixDev) || 0) / p.pix : 0;
+        });
+        const parksByWard = {};
+        (parkHit || []).forEach(i => {
+          const it = parks[i];
+          const w = it && assignWardByGeometry(it.lng, it.lat, evaluatedWards);
+          if (w) (parksByWard[w] = parksByWard[w] || []).push({ id: it.id, name: it.name, size: Number(it.size) || 0, lat: Number(it.lat), lng: Number(it.lng) });
+        });
         const pctOf = (part, whole) => (whole > 0 ? round1(Math.min(100, (part / whole) * 100)) : null);
         const wards = ((fc && fc.features) || []).map(f => {
           const p = f.properties || {};
-          const dev = Number(p.dev) || 0;
+          const name = wardNameOf(p);
+          const devArea = Number(p.dev) || 0;
           return {
-            name: wardNameOf(p),
-            devHa: round1(dev),
+            name,
+            devHa: round1(devArea),
+            baseHa: round1(Number(p.base) || 0),
             builtHa: round1(Number(p.built) || 0),
-            parkPct: pctOf(Number(p.park) || 0, dev),
-            parkingPct: pctOf(Number(p.parking) || 0, dev)
+            devPop: Math.round(popByWard[name] || 0),
+            parks: parksByWard[name] || [],
+            parkPct: pctOf(Number(p.park) || 0, devArea),
+            parkingPct: pctOf(Number(p.parking) || 0, devArea)
           };
         }).sort((a, b) => b.devHa - a.devHa);
         if (cachedSatStats.size > 40) cachedSatStats.clear();
-        cachedSatStats.set(key, { from, to: sat.devRecentYears(), minHa: NEW_DEV_MIN_HA, serviceM: DEV_SERVICE_M, wards });
+        cachedSatStats.set(key, {
+          from, to: sat.devRecentYears(), serviceM: DEV_SERVICE_M,
+          unitPop: constants.POP_PER_UNIT, parkRule: constants.UNIT_PARK_RULE, wards
+        });
       }
       return res.status(200).json(cachedSatStats.get(key));
     }

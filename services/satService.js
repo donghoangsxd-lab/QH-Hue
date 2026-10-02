@@ -100,20 +100,25 @@ function lstImage(ee, wards, year) {
     .clipToCollection(wards);
 }
 
-// Vùng phát triển mới (QCVN Mục 2.2.3.2, 2.2.3.3 chỉ áp cho đơn vị ở / nhóm nhà ở phát triển mới)
-// = đất xây dựng hiện nay − đất đã xây dựng đến năm gốc:
+// Khoanh vùng trong từng phường (QCVN Mục 2.2.3.2, 2.2.3.3 chỉ áp cho đơn vị ở / nhóm nhà ở phát triển mới):
+// vùng hiện trạng = đất đã xây dựng đến năm gốc; vùng phát triển mới = đất xây dựng hiện nay − vùng hiện trạng.
 //   hiện nay: Google Dynamic World 10 m, nhãn chiếm ưu thế tháng 1–8 (ít mây hơn mùa mưa) của 2 năm gần nhất là "built";
-//   năm gốc: GAIA (Tsinghua FROM-GLC) bề mặt không thấm nước hằng năm 1985–2018, 30 m — nguồn sớm nhất đủ chi tiết.
+//   năm gốc: GAIA (Tsinghua FROM-GLC) bề mặt không thấm nước hằng năm 1985–2018, 30 m, hợp với GHSL GHS_BUILT_S
+//   (JRC, ô 100 m, 5 năm/kỳ) để không bỏ sót khu ở xen cây xanh.
 // Tính trên lưới cố định 20 m, bỏ các mảng < ~0,5 ha (nhà lẻ, nhiễu) để ranh vùng rõ ràng.
-const DEV_FROM_YEARS = [1990, 2000, 2010];
+const DEV_FROM_YEARS = [2000, 2010, 2020];
 const GAIA_FIRST_YEAR = 1985;
 const GAIA_LAST_YEAR = 2018;
+const GHSL_FIRST_EPOCH = 1975;
+const GHSL_LAST_OBS_EPOCH = 2020;
+const GHSL_BUILT_MIN_M2 = 1500;
 const DEV_MONTHS = [1, 8];
 const DW_BUILT = 6;
 const DEV_SCALE_M = 20;
 const DEV_CRS = 'EPSG:32648';
 const DEV_MIN_PATCH_PX = 13;
-const DEV_COLOR = '#f43f5e';
+const DEV_COLOR = '#38bdf8';
+const DEV_BASE_COLOR = '#ef4444';
 const devRecentYears = (now = new Date()) => [now.getFullYear() - 2, now.getFullYear() - 1];
 const devProj = (ee) => ee.Projection(DEV_CRS).atScale(DEV_SCALE_M);
 
@@ -129,31 +134,48 @@ function builtNow(ee, wards) {
     .unmask(0);
 }
 
-/** 1 = đã là bề mặt không thấm nước đến hết năm year (change_year_index: 34 = 1985 … 1 = 2018) */
+/**
+ * 1 = đã xây dựng đến năm year: GAIA đã là bề mặt không thấm nước (change_year_index: 34 = 1985 … 1 = 2018)
+ * hoặc GHSL ô 100 m có diện tích công trình ≥ GHSL_BUILT_MIN_M2 (GAIA bỏ sót nhiều khu ở xen cây xanh như nội thành Huế)
+ */
 function builtBy(ee, year) {
   const y = Math.min(Math.max(year, GAIA_FIRST_YEAR), GAIA_LAST_YEAR);
-  return ee.Image('Tsinghua/FROM-GLC/GAIA/v10').select('change_year_index').gte(GAIA_LAST_YEAR + 1 - y).unmask(0);
+  const gaia = ee.Image('Tsinghua/FROM-GLC/GAIA/v10').select('change_year_index').gte(GAIA_LAST_YEAR + 1 - y).unmask(0);
+  const epoch = Math.min(Math.max(Math.round(year / 5) * 5, GHSL_FIRST_EPOCH), GHSL_LAST_OBS_EPOCH);
+  const ghsl = ee.Image(`JRC/GHSL/P2023A/GHS_BUILT_S/${epoch}`).select('built_surface').gte(GHSL_BUILT_MIN_M2).unmask(0);
+  return gaia.or(ghsl);
 }
 
-/** Ảnh 2 băng 0/1 trên lưới 20 m: dev = phát triển mới sau năm from (mảng ≥ ~0,5 ha), built = đất xây dựng hiện nay */
+// Bỏ các mảng nhỏ hơn DEV_MIN_PATCH_PX ô (nhà lẻ, nhiễu)
+function dropSmallPatches(mask, proj) {
+  const size = mask.selfMask().connectedPixelCount(DEV_MIN_PATCH_PX * 2, true).reproject(proj);
+  return mask.and(size.gte(DEV_MIN_PATCH_PX).unmask(0));
+}
+
+/**
+ * Ảnh 0/1 trên lưới 20 m: base = vùng hiện trạng (đã xây dựng đến năm from), dev = vùng phát triển mới
+ * (đất xây dựng hiện nay chưa có ở năm from), built = đất xây dựng hiện nay
+ */
 function newDevImage(ee, wards, from) {
   const proj = devProj(ee);
   const now = builtNow(ee, wards).reproject(proj);
-  const raw = now.and(builtBy(ee, from).not()).reproject(proj);
-  const patch = raw.selfMask().connectedPixelCount(DEV_MIN_PATCH_PX * 2, true).reproject(proj);
-  const dev = raw.and(patch.gte(DEV_MIN_PATCH_PX).unmask(0));
-  return dev.rename('dev').addBands(now.rename('built')).clipToCollection(wards);
+  const base = builtBy(ee, from).reproject(proj);
+  const dev = dropSmallPatches(now.and(base.not()).reproject(proj), proj);
+  return dev.rename('dev')
+    .addBands(dropSmallPatches(base, proj).rename('base'))
+    .addBands(now.rename('built'))
+    .clipToCollection(wards);
 }
 
-/** Ảnh hiển thị: nền đỏ trong suốt + viền đậm 1 ô quanh mỗi vùng */
+/** Ảnh hiển thị: vùng hiện trạng ranh đỏ, vùng phát triển mới ranh xanh (nền trong suốt + viền 1 ô) */
 function newDevVis(ee, wards, from) {
   const proj = devProj(ee);
-  const dev = newDevImage(ee, wards, from).select('dev');
-  const edge = dev.and(dev.focalMin(1, 'square', 'pixels').not()).reproject(proj);
-  return ee.ImageCollection([
-    dev.selfMask().visualize({ palette: [DEV_COLOR], opacity: 0.35 }),
-    edge.selfMask().visualize({ palette: [DEV_COLOR] })
-  ]).mosaic();
+  const img = newDevImage(ee, wards, from);
+  const zone = (mask, color, fillOpacity) => [
+    mask.selfMask().visualize({ palette: [color], opacity: fillOpacity }),
+    mask.and(mask.focalMin(1, 'square', 'pixels').not()).reproject(proj).selfMask().visualize({ palette: [color] })
+  ];
+  return ee.ImageCollection([...zone(img.select('base'), DEV_BASE_COLOR, 0.12), ...zone(img.select('dev'), DEV_COLOR, 0.3)]).mosaic();
 }
 
 // Dân số mở đối chiếu mẫu số chỉ tiêu m²/người: mỗi ảnh giữ phép chiếu gốc để tổng theo phường đếm đúng từng ô
@@ -173,5 +195,5 @@ function mapUrl(ee, visImage) {
 module.exports = {
   sarYears, lstYears, parseYear, demImage, terrariumImage, sarFloodMask, sarFloodVis, lstImage, mapUrl,
   LST_VIS, FLOOD_SEASON, HOT_SEASON, POP_REFS,
-  newDevImage, newDevVis, devRecentYears, DEV_FROM_YEARS, DEV_COLOR, DEV_SCALE_M, DEV_CRS
+  newDevImage, newDevVis, devRecentYears, DEV_FROM_YEARS, DEV_COLOR, DEV_BASE_COLOR, DEV_SCALE_M, DEV_CRS
 };

@@ -213,7 +213,8 @@ export function satPrintLegend() {
   const dev = runtime.dev;
   if (dev?.visible && dev.legend) {
     const l = dev.legend;
-    out.push(`<div class="pa3-lg-row"><i class="pa3-lg-sym" style="background:${l.color}"></i>Phát triển mới sau ${l.from} (Dynamic World ${l.to[1]} − GAIA ${l.from})</div>`);
+    out.push(`<div class="pa3-lg-row"><i class="pa3-lg-sym" style="background:${l.baseColor}"></i>Vùng hiện trạng (đã xây dựng đến ${l.from}, GAIA/GHSL)</div>`);
+    out.push(`<div class="pa3-lg-row"><i class="pa3-lg-sym" style="background:${l.color}"></i>Vùng phát triển mới ${l.from} → ${l.to[1]} (Dynamic World)</div>`);
   }
   return out.join('');
 }
