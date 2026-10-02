@@ -231,6 +231,15 @@
             <div class="sat-legend" id="lstLegend"></div>
             <div class="flood-stats" id="lstStats"></div>
           </div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Vùng phát triển mới = đất xây dựng hiện nay (Google Dynamic World, Sentinel-2 10 m) trừ đất đã xây dựng đến năm gốc 1990/2000/2010 (GAIA, Landsat 30 m); bỏ mảng < 0,5 ha. QCVN 01:2026/BXD Mục 2.2.3.2 (công viên, vườn hoa mỗi đơn vị ở) và Mục 2.2.3.3 (vườn hoa, bãi đỗ xe ≤ 400 m) chỉ áp cho đơn vị ở / nhóm nhà ở phát triển mới"><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Vùng phát triển mới (Dynamic World)</label></div>
+            <span id="newDevOpBox" class="layer-slider" style="display:none;"><input type="range" id="newDevOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp vùng phát triển mới" aria-label="Độ trong suốt lớp vùng phát triển mới"></span>
+          </div>
+          <div class="flood-box" id="newDevBox" style="display:none;">
+            <div class="sat-pick"><label for="newDevYear">So với năm</label><select id="newDevYear"></select></div>
+            <div class="sat-legend" id="newDevLegend"></div>
+            <div class="flood-stats" id="newDevStats"></div>
+          </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_risk"><label for="chk_risk" title="Lọc công trình (kể cả đề xuất, quy hoạch mới, quỹ đất) có vùng 30 m quanh vị trí bị ngập trong nhiều mùa lũ (Sentinel-1) hoặc nóng hơn mức chung (Landsat), để cân nhắc cải tạo hoặc tránh chọn đất"><svg class="ico ico-layer"><use href="#i-alert"/></svg>Công trình chịu rủi ro ngập / nhiệt</label></div></div>
           <div class="flood-box" id="riskBox" style="display:none;">
             <div class="sat-pick"><label for="riskGroup">Nhóm</label><select id="riskGroup"></select></div>
@@ -556,7 +565,7 @@
                   <tr>
                     <th rowspan="2">STT</th>
                     <th rowspan="2">Tên Phường/Xã</th>
-                    <th rowspan="2">Dân số</th>
+                    <th rowspan="2" title="Dân số hiện trạng dùng làm mẫu số chỉ tiêu m²/người. Chấm màu = đối chiếu với WorldPop 2020 và GHSL 2025 (đã quy về cùng tổng dân số TP): xanh lệch < 15%, vàng 15–30%, đỏ ≥ 30% (QCVN 01:2026/BXD Mục 2.4.3)">Dân số</th>
                     <th rowspan="2" title="Theo thuộc tính diện tích của polygon phường/xã">Diện tích<br>(km²)</th>
                     <th rowspan="2" title="Dân số hiện trạng / diện tích">Mật độ<br>(người/km²)</th>
                     <th colspan="2">1. Công viên</th>

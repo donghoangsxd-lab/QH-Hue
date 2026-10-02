@@ -450,6 +450,12 @@ body.right-collapsed .right-panel {
 #riskBox .sat-pick + .sat-pick { margin-top: 3px; }
 #riskBox .sat-pick label { width: 34px; flex-shrink: 0; }
 #riskBox .flood-stats { margin-top: 4px; }
+/* Đối chiếu dân số với WorldPop / GHSL (popCheck.js) */
+.pc-badge { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; cursor: help; vertical-align: middle; }
+.pc-badge i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pc-ok { color: var(--accent-green); }
+.pc-warn { color: var(--accent-yellow); }
+.pc-bad { color: var(--accent-red); }
 .risk-badge { display: inline-flex; align-items: center; gap: 1px; font-size: var(--fs-xs); white-space: nowrap; }
 .risk-badge .ico { width: 11px; height: 11px; margin: 0; }
 .risk-flood { color: #38bdf8; }
@@ -1085,6 +1091,18 @@ table.ward-table td.wt-road-note { color: var(--text-main); font-weight: 400; }
 .ward-table .wt-empty td:nth-child(2) { text-align: center; color: var(--text-muted); font-style: italic; }
 .ward-table .wt-light { color: var(--text-muted); font-weight: 400; }
 .ward-table .wt-need-approve { color: var(--accent-red); font-size: var(--fs-xs); margin-top: 1px; }
+/* Cân đối từ phường/xã lân cận ≤ 2 km (wardBalance.js) */
+.bal-note { font-size: var(--fs-xs); font-weight: 700; white-space: nowrap; cursor: help; }
+.bal-lent { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; cursor: help; }
+.ward-table .wt-bal td:nth-child(4) { color: #facc15; }
+table.ward-table .wt-bal-head td.wt-note { color: #facc15; }
+.bal-map-btn { margin-left: 8px; font-size: var(--fs-xs); text-decoration: underline; }
+.bal-map-btn.active { color: var(--accent-orange); }
+/* Vùng phát triển mới (newDev.js) */
+.sat-swatch.dev-swatch { background: color-mix(in srgb, var(--c) 35%, transparent); border: 2px solid var(--c); }
+.dev-tag { font-size: var(--fs-xs); font-weight: 500; color: var(--text-muted); white-space: nowrap; cursor: help; }
+.dev-tag.dev-on { color: #fb7185; }
+table.ward-table td.wt-dev-note { color: var(--text-main); font-weight: 400; }
 .min-size-warn .ico, .pp-warn .ico { margin-right: 2px; }
 table.ward-table th {
   position: sticky;

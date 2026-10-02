@@ -1,4 +1,5 @@
-// Lớp vệ tinh (bảng lớp dữ liệu): vùng ngập thực tế mùa lũ (radar Sentinel-1) và nhiệt độ bề mặt mùa nóng (Landsat 8/9).
+// Lớp vệ tinh (bảng lớp dữ liệu): vùng ngập thực tế mùa lũ (radar Sentinel-1), nhiệt độ bề mặt mùa nóng (Landsat 8/9)
+// và vùng phát triển mới (Dynamic World, newDev.js).
 // Ảnh tính trên Google Earth Engine (api/gee.js › getSarFloodTile / getLstTile, services/satService.js), vẽ đồng thời trên
 // bản đồ hiện trạng và quy hoạch; thống kê theo phường chỉ tải khi bật lớp, mỗi năm 1 lần.
 import { map, flyToVisible } from './mapEngine.js';
@@ -6,6 +7,7 @@ import { planMap } from './planMap.js';
 import { state, BUFFER_COLORS, layerType } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum } from './utils.js';
+import { devFromYears, loadNewDevStats, devLegend, devStats, DEV_MIN_ZOOM } from './newDev.js';
 
 const $ = (id) => document.getElementById(id);
 const MAX_LIST = 150;
@@ -44,6 +46,18 @@ const LAYERS = {
     statsQuery: (y) => `action=getLstStats&year=${y}`,
     renderLegend: lstLegend,
     renderStats: lstStats
+  },
+  dev: {
+    ids: { chk: 'chk_newdev', box: 'newDevBox', opBox: 'newDevOpBox', opacity: 'newDevOpacity', year: 'newDevYear', legend: 'newDevLegend', stats: 'newDevStats' },
+    zIndex: 2,
+    minZoom: DEV_MIN_ZOOM,
+    seasons: devFromYears,
+    extra: [],
+    tileQuery: (y) => `action=getNewDevTile&from=${y}`,
+    statsQuery: (y) => `action=getNewDevStats&from=${y}`,
+    loadStats: loadNewDevStats,
+    renderLegend: devLegend,
+    renderStats: devStats
   }
 };
 
@@ -118,7 +132,7 @@ function opacityOf(cfg) {
 }
 
 function setLayerUrl(cfg, rt, url) {
-  const opts = { maxZoom: 19, opacity: opacityOf(cfg), zIndex: cfg.zIndex };
+  const opts = { maxZoom: 19, minZoom: cfg.minZoom || 0, opacity: opacityOf(cfg), zIndex: cfg.zIndex };
   if (rt.left) rt.left.setUrl(url); else rt.left = L.tileLayer(url, opts).addTo(map);
   if (planMap) {
     if (rt.right) rt.right.setUrl(url); else rt.right = L.tileLayer(url, opts).addTo(planMap);
@@ -151,7 +165,7 @@ async function show(key) {
   }
   if (statsEl) statsEl.innerHTML = '<div class="flood-muted">Đang thống kê theo phường/xã (có thể mất 10–30 giây lần đầu)...</div>';
   try {
-    const d = await cached(rt.stats, year, () => getJson(q));
+    const d = await cached(rt.stats, year, () => (cfg.loadStats ? cfg.loadStats(year) : getJson(q)));
     if (seq !== rt.seq || !rt.visible || !statsEl) return;
     statsEl.innerHTML = cfg.renderStats(d, rt);
   } catch (err) {
@@ -195,6 +209,11 @@ export function satPrintLegend() {
     out.push(`<div class="pa3-lg-ramp"><div class="pa3-lg-ramp-title">Nhiệt độ bề mặt tháng 4–8/${escapeHtml(lst.year)} (Landsat, °C)</div>
       <div class="pa3-lg-bar" style="background:linear-gradient(to right, ${l.palette.join(', ')})"></div>
       <div class="pa3-lg-ticks"><span>≤ ${l.min}</span><span>${Math.round((l.min + l.max) / 2)}</span><span>≥ ${l.max}</span></div></div>`);
+  }
+  const dev = runtime.dev;
+  if (dev?.visible && dev.legend) {
+    const l = dev.legend;
+    out.push(`<div class="pa3-lg-row"><i class="pa3-lg-sym" style="background:${l.color}"></i>Phát triển mới sau ${l.from} (Dynamic World ${l.to[1]} − GAIA ${l.from})</div>`);
   }
   return out.join('');
 }

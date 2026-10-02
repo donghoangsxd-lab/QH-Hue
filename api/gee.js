@@ -370,6 +370,10 @@ let cachedFloodBins = null;   // { version: phiên bản hiệu chỉnh dân cư
 const cachedSatStats = new Map();   // "lst|năm" hoặc "sar|năm|bản dân cư|bản dữ liệu" → kết quả thống kê lớp vệ tinh
 // Tọa độ công trình là 1 điểm trong khu đất: xét rủi ro ngập / nhiệt trong vòng bán kính này quanh điểm
 const RISK_BUFFER_M = 30;
+// Phường có ≥ NEW_DEV_MIN_HA đất xây dựng mới sau năm gốc (satService.newDevImage) được coi là có đơn vị ở / nhóm nhà ở
+// phát triển mới (Mục 2.2.3.2); trong vùng đó kiểm tra vườn hoa, bãi đỗ xe ≤ 400 m (Mục 2.2.3.3, khoảng cách đường chim bay)
+const NEW_DEV_MIN_HA = 10;
+const DEV_SERVICE_M = 400;
 const wardNameOf = (p) => p.tenXa || p.NAME_2 || p.name || 'Phường';
 // Pixel có dân (1/0). Đếm trên lưới raster dân cư (crs popProjection, POP_SCALE_M) như lúc chia dân số phường rồi quy ra người:
 // dân trong vùng = dân phường × pixel có dân trong vùng / tổng pixel có dân của phường. Cộng thẳng popRasterNormalized
@@ -1859,6 +1863,42 @@ module.exports = async (req, res) => {
       return res.status(200).json(cachedSatStats.get(key));
     }
 
+    // Đối chiếu dân số phường (thuộc tính danSoNum, mẫu số mọi chỉ tiêu m²/người) với tổng WorldPop / GHSL trong ranh phường
+    if (action === 'getPopCheck') {
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+      const key = 'popcheck';
+      if (!cachedSatStats.has(key)) {
+        const [evaluatedWards, ...sums] = await Promise.all([
+          loadEvaluatedWards(wardVectorParsed),
+          ...sat.POP_REFS.map(src => eeEvaluate(src.image(ee).reduceRegions({
+            collection: wardVectorParsed, reducer: ee.Reducer.sum(), tileScale: 4
+          }).map(f => ee.Feature(null).copyProperties(f))))
+        ]);
+        const byWard = {};
+        evaluatedWards.forEach(w => { byWard[w.name] = { name: w.name, pop: w.pop }; });
+        sat.POP_REFS.forEach((src, i) => {
+          ((sums[i] && sums[i].features) || []).forEach(f => {
+            const p = f.properties || {};
+            const row = byWard[wardNameOf(p)];
+            if (row && p.sum != null) row[src.key] = Math.round(p.sum);
+          });
+        });
+        cachedSatStats.set(key, {
+          sources: sat.POP_REFS.map(({ key: k, label }) => ({ key: k, label })),
+          wards: Object.values(byWard)
+        });
+      }
+      return res.status(200).json(cachedSatStats.get(key));
+    }
+
+    if (action === 'getNewDevTile') {
+      const from = Number(req.query.from);
+      if (!sat.DEV_FROM_YEARS.includes(from)) return res.status(400).json({ error: true, message: "Năm gốc không hợp lệ" });
+      res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=86400');
+      const image = sat.newDevVis(ee, wardVectorParsed, from);
+      return res.status(200).json({ urlFormat: await sat.mapUrl(ee, image), legend: { color: sat.DEV_COLOR, from, to: sat.devRecentYears() }, years: sat.DEV_FROM_YEARS });
+    }
+
     if (action === 'getBoundaryTile') {
       res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
       const wardOutline = ee.Image().byte().paint({ featureCollection: wardVectorParsed, color: 1, width: 2 });
@@ -1983,6 +2023,50 @@ module.exports = async (req, res) => {
         }
         if (cachedSatStats.size > 40) cachedSatStats.clear();
         cachedSatStats.set(key, data);
+      }
+      return res.status(200).json(cachedSatStats.get(key));
+    }
+
+    // Đất xây dựng mới từ năm from trong các phường (bộ chỉ tiêu đô thị): diện tích (ha) và tỷ lệ nằm trong 400 m
+    // quanh công viên/vườn hoa, bãi đỗ xe hiện trạng đã duyệt
+    if (action === 'getNewDevStats') {
+      const from = Number(req.query.from);
+      if (!sat.DEV_FROM_YEARS.includes(from)) return res.status(400).json({ error: true, message: "Năm gốc không hợp lệ" });
+      res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+      const key = `dev|${from}|${getDataVersion()}`;
+      if (!cachedSatStats.has(key)) {
+        const evaluatedWards = await loadEvaluatedWards(wardVectorParsed);
+        const dtNames = evaluatedWards.map(w => w.name).filter(n => constants.wardProfile(n) === 'DT');
+        const dtWards = wardVectorParsed.filter(ee.Filter.inList('tenXa', dtNames));
+        const approved = rawDataList.filter(it => isApprovedStatus(it.status) && Number.isFinite(Number(it.lat)) && Number.isFinite(Number(it.lng)));
+        const near = (code) => {
+          const zones = approved.filter(it => constants.resolveTypeCode(it) === code)
+            .map(it => ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(DEV_SERVICE_M)));
+          return zones.length ? ee.Image(0).byte().paint(ee.FeatureCollection(zones), 1) : ee.Image(0).byte();
+        };
+        const img = sat.newDevImage(ee, dtWards, from);
+        const ha = ee.Image.pixelArea().divide(1e4);
+        const devHa = ha.multiply(img.select('dev'));
+        const stack = devHa.rename('dev')
+          .addBands(ha.multiply(img.select('built')).rename('built'))
+          .addBands(devHa.multiply(near('1-CV')).rename('park'))
+          .addBands(devHa.multiply(near('2-BDX')).rename('parking'));
+        const fc = await eeEvaluate(stack.reduceRegions({ collection: dtWards, reducer: ee.Reducer.sum(), crs: sat.DEV_CRS, scale: sat.DEV_SCALE_M, tileScale: 8 })
+          .map(f => ee.Feature(null).copyProperties(f)));
+        const pctOf = (part, whole) => (whole > 0 ? round1(Math.min(100, (part / whole) * 100)) : null);
+        const wards = ((fc && fc.features) || []).map(f => {
+          const p = f.properties || {};
+          const dev = Number(p.dev) || 0;
+          return {
+            name: wardNameOf(p),
+            devHa: round1(dev),
+            builtHa: round1(Number(p.built) || 0),
+            parkPct: pctOf(Number(p.park) || 0, dev),
+            parkingPct: pctOf(Number(p.parking) || 0, dev)
+          };
+        }).sort((a, b) => b.devHa - a.devHa);
+        if (cachedSatStats.size > 40) cachedSatStats.clear();
+        cachedSatStats.set(key, { from, to: sat.devRecentYears(), minHa: NEW_DEV_MIN_HA, serviceM: DEV_SERVICE_M, wards });
       }
       return res.status(200).json(cachedSatStats.get(key));
     }

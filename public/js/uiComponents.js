@@ -7,6 +7,9 @@ import { fillWardRoadLengths, fillCityRoadDensity, loadRoadTypeLengths, ROAD_TYP
 import { refreshRoadPanel } from './customRoads.js';
 import { refreshPopPanel } from './popEdits.js';
 import { refreshCadRole } from './cadImportUi.js';
+import { loadPopCheck, popCheckBadgeHtml, popCheckCityHtml } from './popCheck.js';
+import { balanceSlot, balanceScaleHtml, toggleBalanceMap, clearBalanceMap, isBalanceMapOn, BALANCE_REF } from './wardBalance.js';
+import { loadNewDevStats, newDevOf, parkRuleScopeHtml, newDevRowHtml } from './newDev.js';
 
 let chartInstance = null;
 let infraPieInstance = null;
@@ -927,7 +930,7 @@ function wardRowHtml(w, idx) {
     <td class="st-name">
       <button type="button" class="ward-link link-btn" data-ward="${name}">${name}</button>
     </td>
-    <td class="st-num st-pop">${fmtNum(w.Dan_So_Vector)}</td>
+    <td class="st-num st-pop">${fmtNum(w.Dan_So_Vector)}${popCheckBadgeHtml(w.Ten_Phuong)}</td>
     <td class="st-num">${w.Dien_Tich_Km2 ? fmtArea(w.Dien_Tich_Km2) : '-'}</td>
     <td class="st-num st-dens">${w.Mat_Do_Dan_So ? fmtNum(w.Mat_Do_Dan_So) : '-'}</td>
     ${cells}
@@ -960,6 +963,17 @@ function patchCombinedTableWardRow(ward) {
   });
   const avgCell = tr.querySelector('.cov-avg');
   if (avgCell) avgCell.textContent = fmtPct(ward.Avg_Coverage_Score);
+}
+
+// Kết quả đối chiếu dân số về sau bảng: điền chấm màu vào cột Dân số và ô Dân số HT trên tiêu đề
+function applyPopCheck() {
+  const byName = new Map(state.wardStatsData.map(w => [w.Ten_Phuong, w]));
+  document.querySelectorAll('#statTableBody tr[data-ward-row]').forEach(tr => {
+    const w = byName.get(tr.getAttribute('data-ward-row'));
+    const cell = tr.querySelector('.st-pop');
+    if (w && cell) cell.innerHTML = fmtNum(w.Dan_So_Vector) + popCheckBadgeHtml(w.Ten_Phuong);
+  });
+  if (headStatsKey()) renderSummaryNote(headStatsKey());
 }
 
 // ================== PANEL THỐNG KÊ DƯỚI ==================
@@ -995,6 +1009,7 @@ export function ensureWardStats() {
         state.wardStatsData = resData.data || [];
         state.cityNetwork = resData.network || null;
         mergeLocalCoverageIntoStats();
+        loadPopCheck().then(applyPopCheck).catch(err => console.warn('Đối chiếu dân số nguồn mở lỗi:', err));
         return state.wardStatsData;
       })
       .catch(err => {
@@ -1109,7 +1124,7 @@ function renderSummaryNote(wardName) {
     ? `Độ phủ: bình quân theo dân số các phường/xã đã tính xong (${readyCount}/${list.length})`
     : 'Độ phủ trung bình 8 nhóm hạ tầng')
     + '\nQuy mô: mức đáp ứng quy mô trung bình theo QCVN 01:2026/BXD';
-  setHeadCell('hsPopHT', wardStatHtml('Dân số HT', fmtNum(pop), 'người',
+  setHeadCell('hsPopHT', wardStatHtml('Dân số HT', fmtNum(pop) + (city ? popCheckCityHtml() : popCheckBadgeHtml(wardName, true)), 'người',
     city ? `Dân số hiện trạng, tổng ${list.length} phường/xã` : 'Dân số hiện trạng'));
   if (city) {
     setHeadCell('hsPopQH', wardStatHtml('Dân số QH', fmtNum(CITY_POP_QH), 'người',
@@ -1222,6 +1237,7 @@ export async function renderBottomPanel() {
   renderRoadChart();
 
   if (city) {
+    clearBalanceMap();
     renderCityHeadStats();
     rebuildCombinedTableBody();
     renderCombinedChart();
@@ -1289,6 +1305,14 @@ export function initBottomPanelEvents() {
     if (toggle) {
       const section = document.getElementById(toggle.dataset.target);
       if (section) setSubSectionOpen(e.currentTarget, toggle.dataset.target, section.style.display === 'none');
+      return;
+    }
+    const balBtn = e.target.closest('[data-action="balance-map"]');
+    if (balBtn && state.selectedWard) {
+      if (toggleBalanceMap(state.selectedWard)) setBottomPanelMaximized(false);
+      const on = isBalanceMapOn(state.selectedWard);
+      balBtn.classList.toggle('active', on);
+      balBtn.textContent = on ? 'Ẩn trên bản đồ' : 'Xem trên bản đồ';
     }
   });
 }
@@ -1365,6 +1389,7 @@ function renderWardSummary(wardData) {
 
   const view = document.getElementById('wardSummaryView');
   if (!view) return;
+  if (!isBalanceMapOn(wardData.Ten_Phuong)) clearBalanceMap();
   const areaKm2 = Number(wardData.Dien_Tich_Km2) || 0;
   view.innerHTML = `<div id="wardSummaryCard">
     <div id="wardQuotaTableContainer">${buildWardQuotaTableHtml(wardData, popProjected)}</div>
@@ -1415,6 +1440,9 @@ function renderWardSummary(wardData) {
   clearTimeout(wardRetryTimer);
   loadWardDetailCoverage(wardData);
   loadWardNetworkCoverage(wardData);
+  if (wardData.parkRule && !newDevOf(wardData.Ten_Phuong)) {
+    loadNewDevStats().then(() => refreshWardQuotaTable(wardData)).catch(err => console.warn('Thống kê vùng phát triển mới lỗi:', err));
+  }
 }
 
 // Trần dân số QH toàn TP: ô nhập dân số QH của phường tô đỏ + tooltip khi tổng vượt trần; toast mỗi lần tổng chuyển từ trong ngưỡng sang vượt ngưỡng
@@ -1488,13 +1516,16 @@ function radiusSummaryHtml(subItems) {
   return wrong ? ` <span class="min-size-warn" title="${RADIUS_WARN_TITLE}">${ico('alert')}${wrong} BK Sheet lệch chuẩn</span>` : '';
 }
 
-// Mỗi đơn vị ở phát triển mới: ≥ 1 công viên ≥ 5.000 m² hoặc 2 công viên ≥ 2.500 m² (Mục 2.2.3.2)
-function parkRuleHtml(subItems, rule, totalUnits) {
+// Mỗi đơn vị ở phát triển mới: ≥ 1 công viên ≥ 5.000 m² hoặc 2 công viên ≥ 2.500 m² (Mục 2.2.3.2);
+// phường không có khu phát triển mới (newDev.js) → số liệu chỉ để tham khảo, tô xám
+function parkRuleHtml(subItems, rule, totalUnits, wardName) {
   const large = subItems.filter(s => Number(s.size) >= rule.large).length;
   const medium = subItems.filter(s => Number(s.size) >= rule.medium && Number(s.size) < rule.large).length;
   const ok = Math.min(totalUnits, large + Math.floor(medium / 2));
   const title = `QCVN 01:2026/BXD Mục 2.2.3.2: mỗi đơn vị ở phát triển mới có ≥ 1 công viên ≥ ${fmtNum(rule.large)} m² hoặc 2 công viên ≥ ${fmtNum(rule.medium)} m²`;
-  return `<b title="${title}" class="${ok >= totalUnits ? 'c-green' : 'c-red'}">${ok}/${totalUnits} ĐVỞ đạt QM</b>`;
+  const dev = newDevOf(wardName);
+  const cls = dev && !dev.applies ? 'c-muted' : ok >= totalUnits ? 'c-green' : 'c-red';
+  return `<b title="${title}" class="${cls}">${ok}/${totalUnits} ĐVỞ đạt QM</b>${parkRuleScopeHtml(wardName)}`;
 }
 
 function zoomLinkHtml(item, fallbackName = 'Công trình') {
@@ -1556,8 +1587,27 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     ? countCellHtml(subItems.length, target)
     : `${subItems.length} cơ sở`);
 
+  // Cân đối từ phường/xã lân cận ≤ 2 km (Bảng 6, Chú thích 4): dòng phụ ô Quy mô + danh sách công trình được tính cân đối
+  const balanceCellHtml = (key, have, req) => {
+    const slot = balanceSlot(wardData.Ten_Phuong, key);
+    const links = slot && slot.borrowed >= 1 ? slot.links : [];
+    return balanceScaleHtml(slot, have, req) + (links.length ? ` ${toggleBtnHtml(`bal_sub_${key}`)}` : '');
+  };
+  const balanceRows = (key) => {
+    const slot = balanceSlot(wardData.Ten_Phuong, key);
+    if (!slot || slot.borrowed < 1 || !slot.links.length) return;
+    parts.push(`</tbody><tbody id="bal_sub_${key}" style="display:none;">`);
+    slot.links.forEach(l => parts.push(`<tr class="wt-sub wt-bal">
+      <td>↳</td>
+      <td>${zoomLinkHtml(l)} <span class="wt-light">· ${escapeHtml(l.ward)}</span></td>
+      <td>${fmtNum(l.area)} m²</td>
+      <td colspan="5" class="wt-note" title="${BALANCE_REF}">Phần dư tính cân đối, cách ranh phường ${fmtNum(l.dist)} m</td>
+    </tr>`));
+    parts.push(`</tbody><tbody>`);
+  };
+
   // Dòng 1 nhóm chỉ tiêu có diện tích, nhu cầu, quy mô, độ phủ; quota null = không quy định cho loại địa bàn
-  const quotaRow = ({ stt, label, node, quota, code, sectionId, countTarget = null, extraCount = '' }) => {
+  const quotaRow = ({ stt, label, node, quota, code, sectionId, countTarget = null, extraCount = '', balanceKey = null }) => {
     const currentArea = node ? Number(node.currentArea || 0) : 0;
     const subItems = (node && node.subItems) || [];
     const required = hasQuota(quota);
@@ -1569,10 +1619,11 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       <td>${required ? quotaText(quota) : NOT_REQUIRED_DASH}</td>
       <td>${required ? `${fmtNum(reqArea)} m²` : NOT_REQUIRED_DASH}</td>
       <td>${countHtmlOf(subItems, countTarget)}${extraCount}</td>
-      <td>${required ? scaleCellHtml(currentArea, reqArea) : `<span class="c-muted" title="${NOT_REQUIRED_TITLE}">Không QĐ</span>`}</td>
+      <td>${required ? scaleCellHtml(currentArea, reqArea) + (balanceKey ? balanceCellHtml(balanceKey, currentArea, reqArea) : '') : `<span class="c-muted" title="${NOT_REQUIRED_TITLE}">Không QĐ</span>`}</td>
       <td>${coverageCellHtml(wardData, code)}</td>
     </tr>`);
     if (subItems.length) subItemRows(sectionId, subItems);
+    if (balanceKey && required) balanceRows(balanceKey);
   };
 
   parts.push(`<div class="ward-table-scroll-container"><table class="ward-table">
@@ -1602,7 +1653,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   let unitIdx = 1;
   unitSchools.forEach(item => {
     const node = unitRes[item.key];
-    quotaRow({ stt: unitIdx++, label: item.label, node, quota: quotaOf(node, item.key), code: item.key, sectionId: `unit_sub_${item.key}`, countTarget: totalUnits });
+    quotaRow({ stt: unitIdx++, label: item.label, node, quota: quotaOf(node, item.key), code: item.key, sectionId: `unit_sub_${item.key}`, countTarget: totalUnits, balanceKey: item.key });
   });
 
   // Mục 4: Dịch vụ công cộng khác đơn vị ở (Y tế + Văn hóa + Chợ): phường theo m²/người, xã theo số cơ sở (Bảng 30)
@@ -1623,9 +1674,10 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     <td>${dvccRequired ? quotaText(dvccQuota) : NOT_REQUIRED_DASH}</td>
     <td>${dvccRequired ? `${fmtNum(dvccReq)} m²` : NOT_REQUIRED_DASH}</td>
     <td>${isUrbanProfile ? countCellHtml(dvccCount, totalUnits) : `${dvccCount} cơ sở`}</td>
-    <td>${dvccRequired ? scaleCellHtml(dvccArea, dvccReq) : '-'}</td>
+    <td>${dvccRequired ? scaleCellHtml(dvccArea, dvccReq) + balanceCellHtml('DVCC_TOTAL', dvccArea, dvccReq) : '-'}</td>
     <td>-</td>
   </tr>`);
+  if (dvccRequired) balanceRows('DVCC_TOTAL');
 
   dvccKeys.forEach(comp => {
     const node = unitRes[comp.key];
@@ -1660,9 +1712,20 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     <td>${quotaText(allQuota)}</td>
     <td>${fmtNum(allReq)} m²</td>
     <td>-</td>
-    <td>${scaleCellHtml(allArea, allReq)}</td>
+    <td>${scaleCellHtml(allArea, allReq)}${balanceScaleHtml(balanceSlot(wardData.Ten_Phuong, 'ALL'), allArea, allReq)}</td>
     <td>-</td>
   </tr>`);
+  const balAll = balanceSlot(wardData.Ten_Phuong, 'ALL');
+  if (balAll && balAll.borrowed >= 1) {
+    const on = isBalanceMapOn(wardData.Ten_Phuong);
+    parts.push(`<tr class="wt-comp wt-bal-head">
+      <td></td>
+      <td colspan="7" class="wt-note" title="${BALANCE_REF}: phường không đủ quỹ đất được tính cân đối từ đất dịch vụ công cộng tại khu vực lân cận, bán kính phục vụ ≤ 2 km. Mỗi m² dư chỉ tính cho 1 phường, ưu tiên công trình gần nhất.">
+        Cân đối từ phường/xã lân cận (Chú thích 4 Bảng 6): tính thêm <b>${fmtNum(Math.round(balAll.borrowed))} m²</b> từ ${balAll.links.length} lượt công trình
+        <button type="button" class="link-btn bal-map-btn${on ? ' active' : ''}" data-action="balance-map">${on ? 'Ẩn trên bản đồ' : 'Xem trên bản đồ'}</button>
+      </td>
+    </tr>`);
+  }
 
   [
     { key: "CV_DV", label: "Vườn hoa (cây xanh đơn vị ở)", code: "1-CV_DV" },
@@ -1674,9 +1737,10 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     quotaRow({
       stt: unitIdx++, label: item.label, node, quota: quotaOf(node, item.key), code: item.code, sectionId: `unit_sub_${item.key}`,
       countTarget: parkRule || !isUrbanProfile ? null : totalUnits,
-      extraCount: parkRule ? `<br>${parkRuleHtml([...subItems, ...(urbanRes.CV_DT?.subItems || [])], parkRule, totalUnits)}` : ''
+      extraCount: parkRule ? `<br>${parkRuleHtml([...subItems, ...(urbanRes.CV_DT?.subItems || [])], parkRule, totalUnits, wardData.Ten_Phuong)}` : ''
     });
   });
+  if (isUrbanProfile) parts.push(newDevRowHtml(wardData.Ten_Phuong));
 
   // C / CÔNG TRÌNH CHƯA DUYỆT (QUY HOẠCH) — nhóm 1–8, TrangThai = FALSE
   sectionHeader('C', 'c', 'CÔNG TRÌNH CHƯA DUYỆT (QUY HOẠCH)');
