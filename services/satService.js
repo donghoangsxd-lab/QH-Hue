@@ -114,6 +114,7 @@ const GHSL_LAST_OBS_EPOCH = 2020;
 const GHSL_BUILT_MIN_M2 = 1500;
 const DEV_MONTHS = [1, 8];
 const DW_BUILT = 6;
+const DW_FIRST_YEAR = 2016;
 const DEV_SCALE_M = 20;
 const DEV_CRS = 'EPSG:32648';
 const DEV_MIN_PATCH_PX = 13;
@@ -122,11 +123,11 @@ const DEV_BASE_COLOR = '#ef4444';
 const devRecentYears = (now = new Date()) => [now.getFullYear() - 2, now.getFullYear() - 1];
 const devProj = (ee) => ee.Projection(DEV_CRS).atScale(DEV_SCALE_M);
 
-function builtNow(ee, wards) {
-  const [r0, r1] = devRecentYears();
+// 1 = Dynamic World nhãn chiếm ưu thế tháng 1–8 các năm y0–y1 là "built"
+function dwBuilt(ee, wards, y0, y1) {
   return ee.ImageCollection('GOOGLE/DYNAMICWORLD/V1')
     .filterBounds(wards.geometry().bounds())
-    .filterDate(`${r0}-01-01`, `${r1 + 1}-01-01`)
+    .filterDate(`${y0}-01-01`, `${y1 + 1}-01-01`)
     .filter(ee.Filter.calendarRange(DEV_MONTHS[0], DEV_MONTHS[1], 'month'))
     .select('label')
     .mode()
@@ -134,16 +135,20 @@ function builtNow(ee, wards) {
     .unmask(0);
 }
 
+const builtNow = (ee, wards) => dwBuilt(ee, wards, ...devRecentYears());
+
 /**
  * 1 = đã xây dựng đến năm year: GAIA đã là bề mặt không thấm nước (change_year_index: 34 = 1985 … 1 = 2018)
- * hoặc GHSL ô 100 m có diện tích công trình ≥ GHSL_BUILT_MIN_M2 (GAIA bỏ sót nhiều khu ở xen cây xanh như nội thành Huế)
+ * hoặc GHSL ô 100 m có diện tích công trình ≥ GHSL_BUILT_MIN_M2 (GAIA bỏ sót nhiều khu ở xen cây xanh như nội thành Huế);
+ * từ DW_FIRST_YEAR hợp thêm Dynamic World năm gốc để so cùng cảm biến với hiện nay (làng xóm xen cây xanh không bị tính là mới)
  */
-function builtBy(ee, year) {
+function builtBy(ee, wards, year) {
   const y = Math.min(Math.max(year, GAIA_FIRST_YEAR), GAIA_LAST_YEAR);
   const gaia = ee.Image('Tsinghua/FROM-GLC/GAIA/v10').select('change_year_index').gte(GAIA_LAST_YEAR + 1 - y).unmask(0);
   const epoch = Math.min(Math.max(Math.round(year / 5) * 5, GHSL_FIRST_EPOCH), GHSL_LAST_OBS_EPOCH);
   const ghsl = ee.Image(`JRC/GHSL/P2023A/GHS_BUILT_S/${epoch}`).select('built_surface').gte(GHSL_BUILT_MIN_M2).unmask(0);
-  return gaia.or(ghsl);
+  const base = gaia.or(ghsl);
+  return year >= DW_FIRST_YEAR ? base.or(dwBuilt(ee, wards, Math.max(DW_FIRST_YEAR, year - 1), year)) : base;
 }
 
 // Bỏ các mảng nhỏ hơn DEV_MIN_PATCH_PX ô (nhà lẻ, nhiễu)
@@ -159,7 +164,7 @@ function dropSmallPatches(mask, proj) {
 function newDevImage(ee, wards, from) {
   const proj = devProj(ee);
   const now = builtNow(ee, wards).reproject(proj);
-  const base = builtBy(ee, from).reproject(proj);
+  const base = builtBy(ee, wards, from).reproject(proj);
   const dev = dropSmallPatches(now.and(base.not()).reproject(proj), proj);
   return dev.rename('dev')
     .addBands(dropSmallPatches(base, proj).rename('base'))

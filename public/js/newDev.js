@@ -12,7 +12,7 @@ export const DEV_REF = 'QCVN 01:2026/BXD Mục 2.2.3.2, 2.2.3.3';
 export const DEV_MIN_ZOOM = 12;
 const HA = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
 const BASIS = 'Vùng hiện trạng: đất đã xây dựng đến năm gốc (GAIA – ĐH Thanh Hoa, Landsat 30 m, 1985–2018, hợp với GHSL – JRC, '
-  + 'ô 100 m có ≥ 15% diện tích công trình). Vùng phát triển mới: đất xây dựng hiện nay (Google Dynamic World 10 m, nhãn chiếm ưu thế '
+  + 'ô 100 m có ≥ 15% diện tích công trình; năm gốc từ 2016 hợp thêm Dynamic World năm đó). Vùng phát triển mới: đất xây dựng hiện nay (Google Dynamic World 10 m, nhãn chiếm ưu thế '
   + 'tháng 1–8) nằm ngoài vùng hiện trạng. Bỏ mảng < 0,5 ha. Logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch.';
 
 // Năm gốc so sánh: khớp DEV_FROM_YEARS trong services/satService.js
@@ -79,9 +79,9 @@ export function newDevRowHtml(wardName) {
   }
   const { units, ok, rule } = zoneParkRule(d, w);
   const ruleTitle = `${DEV_REF}: mỗi đơn vị ở phát triển mới (${fmtNum(d.unitPop)} người) có ≥ 1 công viên ≥ ${fmtNum(rule.large)} m² `
-    + `hoặc 2 công viên ≥ ${fmtNum(rule.medium)} m². Chỉ tính công viên/vườn hoa đã duyệt nằm trong vùng phát triển mới.`;
+    + `hoặc 2 công viên ≥ ${fmtNum(rule.medium)} m². Chỉ tính công viên/vườn hoa đã duyệt nằm trong vùng phát triển mới; công viên chưa rõ diện tích (quy mô 0) không được tính.`;
   const parkList = w.parks.length
-    ? w.parks.slice(0, 3).map(p => `${escapeHtml(p.name || p.id)} (${fmtNum(p.size)} m²)`).join(', ') + (w.parks.length > 3 ? `, +${w.parks.length - 3}` : '')
+    ? w.parks.slice(0, 3).map(p => `${escapeHtml(p.name || p.id)} (${p.size > 0 ? `${fmtNum(p.size)} m²` : 'chưa rõ DT'})`).join(', ') + (w.parks.length > 3 ? `, +${w.parks.length - 3}` : '')
     : 'chưa có công viên/vườn hoa trong vùng';
   const covTitle = `${DEV_REF}: vườn hoa, sân chơi, bãi đỗ xe phục vụ nhóm nhà ở phát triển mới ≤ ${d.serviceM} m đến đại đa số dân cư. `
     + `Tỷ lệ = phần diện tích vùng phát triển mới ${periodText(d)} nằm trong ${d.serviceM} m (đường chim bay) quanh công viên/vườn hoa hoặc bãi đỗ xe hiện trạng đã duyệt.`;
