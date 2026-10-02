@@ -1901,6 +1901,28 @@ module.exports = async (req, res) => {
       });
     }
 
+    // Diện tích đất xây dựng đô thị hiện nay theo phường/xã (Dynamic World 2 năm gần nhất, cùng nguồn lớp "Vùng phát triển mới"):
+    // mẫu số mật độ đường thay cho diện tích tự nhiên
+    if (action === 'getBuiltArea') {
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+      const years = sat.devRecentYears();
+      const key = `built|${years.join('-')}`;
+      if (!cachedSatStats.has(key)) {
+        const km2 = ee.Image.pixelArea().divide(1e6).multiply(sat.builtNowImage(ee, wardVectorParsed)).rename('km2');
+        const fc = await eeEvaluate(km2.reduceRegions({
+          collection: wardVectorParsed, reducer: ee.Reducer.sum(), crs: sat.DEV_CRS, scale: sat.DEV_SCALE_M, tileScale: 8
+        }).map(f => ee.Feature(null).copyProperties(f)));
+        const wards = {};
+        ((fc && fc.features) || []).forEach(f => {
+          const p = f.properties || {};
+          wards[wardNameOf(p)] = Math.round((Number(p.sum) || 0) * 1000) / 1000;
+        });
+        if (cachedSatStats.size > 40) cachedSatStats.clear();
+        cachedSatStats.set(key, { years, scale: sat.DEV_SCALE_M, wards });
+      }
+      return res.status(200).json(cachedSatStats.get(key));
+    }
+
     if (action === 'getBoundaryTile') {
       res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
       const wardOutline = ee.Image().byte().paint({ featureCollection: wardVectorParsed, color: 1, width: 2 });

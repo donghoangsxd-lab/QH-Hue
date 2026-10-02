@@ -1,6 +1,7 @@
 // Tuyến đường hiện trạng Admin vẽ bổ sung (đường mới chưa có trên OpenStreetMap) → roads/v2/custom.json trên bucket.
 // Máy chủ trộn vào mạng lưới OSM khi trả đường cho "phạm vi thực tế"; chiều dài cộng vào mật độ đường theo phường.
 // Đỉnh đặt gần nút đường sẵn có (≤ SNAP_M) dùng lại mã nút đó để tuyến mới nối vào đồ thị đường.
+// Sửa tuyến đã lưu: kéo / chèn / xóa đỉnh trên bản nháp rồi lưu đè đúng mã tuyến (đỉnh bị kéo bỏ mã nút cũ, bắt dính lại).
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { map, wardNameAt, clearMeasure } from './mapEngine.js';
@@ -30,10 +31,12 @@ let savedAt = 0;         // phiên bản danh sách đang sửa (gửi kèm khi 
 let loaded = false;
 let busy = false;
 let vertices = [];       // tuyến đang vẽ: [{ lat, lng, node: mã nút đã bắt dính | null }]
+let editingId = null;    // mã tuyến đang sửa hình dạng (null = vẽ tuyến mới)
 let netNodes = new Map(); // mã nút → { lat, lng } quanh các vùng đã tải
 let netAreas = [];       // [{ lat, lng, r }]
 let listLayer = null, drawLayer = null;
 let guideLine = null;    // nét đứt từ đỉnh cuối tới con trỏ
+let draftLines = [];     // viền + nét tuyến nháp, cập nhật trực tiếp khi kéo đỉnh
 
 function setStatus(text, color) {
   const el = $('roadStatus');
@@ -95,31 +98,97 @@ function onGuideMove(e) {
   else guideLine = L.polyline(latlngs, { color: TYPES[selectedType()].color, weight: 2, opacity: 0.85, dashArray: '4,6', interactive: false }).addTo(drawLayer);
 }
 
+// Đỉnh kéo được (chuột phải: xóa); chấm giữa đoạn: kéo / bấm để chèn đỉnh
+const vertexIcon = (v, color) => L.divIcon({ className: `road-vtx${v.node ? ' snapped' : ''}`, iconSize: [14, 14], html: `<span style="--c:${color}"></span>` });
+const midIcon = () => L.divIcon({ className: 'road-mid', iconSize: [11, 11], html: '<span></span>' });
+
+/** Đỉnh vừa kéo sang chỗ mới: bỏ mã nút cũ, bắt dính lại nếu thả sát nút đường khác */
+async function resnap(v) {
+  v.node = null;
+  busy = true;
+  renderDraft();
+  const ok = await ensureNetwork(v);
+  busy = false;
+  const snap = nearestNode(v);
+  if (snap) Object.assign(v, snap);
+  setStatus(ok ? '' : '⚠ Chưa tải được mạng lưới quanh đỉnh — đỉnh không bắt dính', ok ? '' : 'var(--accent-orange)');
+  renderDraft();
+}
+
+function updateDraftInfo() {
+  const info = $('roadDrawInfo');
+  if (!info) return;
+  const editing = editingId && roads.find(r => r.id === editingId);
+  const snapped = vertices.filter(v => v.node).length;
+  const head = editing ? `Đang sửa <b>${escapeHtml(editing.name || 'Tuyến không tên')}</b> · ` : '';
+  info.innerHTML = vertices.length
+    ? `${head}<b>${vertices.length}</b> đỉnh · dài <b>${fmtLen(lengthM(vertices))}</b> · <span style="color:#22c55e;">${snapped} đỉnh nối mạng lưới</span>`
+    : (drawing() ? 'Click lên bản đồ hiện trạng để đặt đỉnh đầu tiên' : '');
+}
+
 function renderDraft() {
+  updateDraftButtons();
   if (!drawLayer) return;
   drawLayer.clearLayers();
   guideLine = null;
   const color = TYPES[selectedType()].color;
   const latlngs = vertices.map(v => [v.lat, v.lng]);
-  if (latlngs.length >= 2) {
-    L.polyline(latlngs, { color: '#020617', weight: 7, opacity: 0.6, interactive: false }).addTo(drawLayer);
-    L.polyline(latlngs, { color, weight: 4, dashArray: '8,6', interactive: false }).addTo(drawLayer);
-  }
-  vertices.forEach(v => L.circleMarker([v.lat, v.lng], {
-    radius: v.node ? 5 : 4, color: v.node ? '#22c55e' : color, weight: 2, fillColor: v.node ? '#22c55e' : '#0f172a', fillOpacity: 1, interactive: false
-  }).addTo(drawLayer));
+  draftLines = [
+    L.polyline(latlngs, { color: '#020617', weight: 7, opacity: 0.6, interactive: false }).addTo(drawLayer),
+    L.polyline(latlngs, { color, weight: 4, dashArray: '8,6', interactive: false }).addTo(drawLayer)
+  ];
+  const redrawLines = () => {
+    const ll = vertices.map(v => [v.lat, v.lng]);
+    draftLines.forEach(l => l.setLatLngs(ll));
+    updateDraftInfo();
+  };
 
-  const snapped = vertices.filter(v => v.node).length;
-  const info = $('roadDrawInfo');
-  if (info) {
-    info.innerHTML = vertices.length
-      ? `<b>${vertices.length}</b> đỉnh · dài <b>${fmtLen(lengthM(vertices))}</b> · <span style="color:#22c55e;">${snapped} đỉnh nối mạng lưới</span>`
-      : (drawing() ? 'Click lên bản đồ hiện trạng để đặt đỉnh đầu tiên' : '');
+  for (let i = 1; i < vertices.length; i++) {
+    const a = vertices[i - 1], b = vertices[i];
+    let added = null;
+    L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], { icon: midIcon(), draggable: true, keyboard: false, title: 'Kéo hoặc bấm để thêm đỉnh' })
+      .on('dragstart', (e) => { const p = e.target.getLatLng(); added = { lat: p.lat, lng: p.lng, node: null }; vertices.splice(i, 0, added); })
+      .on('drag', (e) => { const p = e.target.getLatLng(); added.lat = p.lat; added.lng = p.lng; redrawLines(); })
+      .on('dragend', () => resnap(added))
+      .on('click', () => {
+        if (added) return;
+        vertices.splice(i, 0, { lat: (a.lat + b.lat) / 2, lng: (a.lng + b.lng) / 2, node: null });
+        renderDraft();
+      })
+      .addTo(drawLayer);
   }
+  vertices.forEach((v, i) => {
+    let start = null;
+    L.marker([v.lat, v.lng], {
+      icon: vertexIcon(v, color), draggable: true, keyboard: false, zIndexOffset: 500,
+      title: `Đỉnh ${i + 1}${v.node ? ' (nối mạng lưới)' : ''} — kéo để di chuyển, chuột phải để xóa`
+    })
+      .on('dragstart', () => { start = { lat: v.lat, lng: v.lng }; })
+      .on('drag', (e) => { const p = e.target.getLatLng(); v.lat = p.lat; v.lng = p.lng; redrawLines(); })
+      .on('dragend', () => {
+        if (start && distM(start, v) >= 0.5) resnap(v);
+        else renderDraft();
+      })
+      .on('contextmenu', (e) => {
+        L.DomEvent.preventDefault(e.originalEvent);
+        vertices.splice(i, 1);
+        renderDraft();
+      })
+      .addTo(drawLayer);
+  });
+  updateDraftInfo();
+}
+
+function updateDraftButtons() {
   const save = $('btnRoadSave');
-  if (save) save.disabled = vertices.length < 2 || busy;
+  if (save) {
+    save.disabled = vertices.length < 2 || busy;
+    save.innerHTML = `${ico('save')}${editingId ? 'LƯU THAY ĐỔI (ADMIN)' : 'LƯU TUYẾN (ADMIN)'}`;
+  }
   const undo = $('btnRoadUndo');
   if (undo) undo.disabled = !vertices.length;
+  const cancel = $('btnRoadCancel');
+  if (cancel) cancel.hidden = !editingId;
 }
 
 function renderRoads() {
@@ -129,6 +198,10 @@ function renderRoads() {
       const latlngs = [];
       for (let i = 0; i < r.flat.length; i += 2) latlngs.push([r.flat[i], r.flat[i + 1]]);
       const t = TYPES[r.g] || TYPES[2];
+      if (r.id === editingId) {
+        L.polyline(latlngs, { color: '#94a3b8', weight: 2, opacity: 0.7, dashArray: '2,6', interactive: false }).addTo(listLayer);
+        return;
+      }
       L.polyline(latlngs, { color: '#020617', weight: 7, opacity: 0.5, interactive: false }).addTo(listLayer);
       L.polyline(latlngs, { color: t.color, weight: 4 })
         .bindTooltip(`${escapeHtml(r.name || 'Tuyến không tên')} · ${t.label}`, { sticky: true })
@@ -144,10 +217,11 @@ function renderRoads() {
     const pts = [];
     for (let i = 0; i < r.flat.length; i += 2) pts.push({ lat: r.flat[i], lng: r.flat[i + 1] });
     const wards = Object.keys(r.len).join(', ');
-    return `<div class="cad-row" data-road="${r.id}" title="Bấm để phóng tới tuyến">
+    return `<div class="cad-row${r.id === editingId ? ' reviewing' : ''}" data-road="${r.id}" title="Bấm để phóng tới tuyến">
       <span class="cad-dot" style="background:${t.color};"></span>
       <div class="cad-row-main"><b>${escapeHtml(r.name || 'Tuyến không tên')}</b><br>
         <small>${t.label} · ${fmtLen(lengthM(pts))}${wards ? ` · ${escapeHtml(wards)}` : ''}</small></div>
+      <button type="button" class="road-del road-edit" data-edit="${r.id}" title="Sửa hình dạng tuyến (kéo, thêm, xóa đỉnh)" aria-label="Sửa tuyến">${ico('pen')}</button>
       <button type="button" class="road-del" data-del="${r.id}" title="Xóa tuyến khỏi bucket" aria-label="Xóa tuyến">${ico('trash')}</button>
     </div>`;
   }).join('');
@@ -205,12 +279,14 @@ async function saveDraft() {
   if (state.currentUserRole !== 'ADMIN') { setStatus('Cần đăng nhập Admin.', 'var(--accent-red)'); return; }
   const len = lengthM(vertices);
   if (len < MIN_LENGTH_M) { setStatus(`Tuyến quá ngắn (< ${MIN_LENGTH_M} m).`, 'var(--accent-orange)'); return; }
+  const editing = editingId && roads.find(r => r.id === editingId);
+  if (editingId && !editing) { setStatus('Tuyến đang sửa không còn trong danh sách (đã bị xóa ở phiên khác).', 'var(--accent-red)'); return; }
   let id = nextNodeId();
   const nodes = vertices.map(v => v.node || id++);
   const g = selectedType();
   const name = String($('roadName')?.value || '').trim().slice(0, 120);
   const road = {
-    id: `R${Date.now().toString(36)}`,
+    id: editing ? editing.id : `R${Date.now().toString(36)}`,
     g, name, nodes,
     flat: vertices.flatMap(v => [Math.round(v.lat * 1e6) / 1e6, Math.round(v.lng * 1e6) / 1e6]),
     len: wardLengths(vertices),
@@ -220,9 +296,16 @@ async function saveDraft() {
   renderDraft();
   setStatus('⏳ Đang ghi tuyến lên bucket...', 'var(--accent-orange)');
   try {
-    await persist([...roads, road], `✓ Đã lưu "${name || 'Tuyến không tên'}" (${TYPES[g].label}, ${fmtLen(len)})`);
+    const label = `"${name || 'Tuyến không tên'}" (${TYPES[g].label}, ${fmtLen(len)})`;
+    await persist(editing ? roads.map(r => (r.id === editing.id ? road : r)) : [...roads, road],
+      editing ? `✓ Đã cập nhật ${label}` : `✓ Đã lưu ${label}`);
     vertices = [];
     if ($('roadName')) $('roadName').value = '';
+    if (editing) {
+      editingId = null;
+      setDrawing(false);
+      renderRoads();
+    }
   } catch (err) {
     setStatus(`❌ ${err.message}`, 'var(--accent-red)');
   } finally {
@@ -235,6 +318,7 @@ async function deleteRoad(id) {
   const r = roads.find(x => x.id === id);
   if (!r || busy) return;
   if (!confirm(`Xóa tuyến "${r.name || 'Tuyến không tên'}" (${(TYPES[r.g] || TYPES[2]).label}) khỏi bucket?`)) return;
+  if (id === editingId) cancelEdit();
   busy = true;
   setStatus('⏳ Đang xóa tuyến...', 'var(--accent-orange)');
   try {
@@ -255,6 +339,33 @@ function zoomToRoad(id) {
   map.fitBounds(L.latLngBounds(latlngs), { maxZoom: 18, padding: [40, 40] });
 }
 
+// ================== SỬA HÌNH DẠNG TUYẾN ĐÃ LƯU ==================
+// Nạp tuyến vào bản nháp (giữ mã nút các đỉnh không di chuyển), lưu đè đúng mã tuyến
+function startEdit(id) {
+  const r = roads.find(x => x.id === id);
+  if (!r || busy) return;
+  if (vertices.length && !editingId && !confirm('Bỏ tuyến đang vẽ dở để sửa tuyến đã lưu?')) return;
+  editingId = id;
+  vertices = r.nodes.map((node, i) => ({ lat: r.flat[2 * i], lng: r.flat[2 * i + 1], node }));
+  if ($('roadType')) $('roadType').value = String(r.g);
+  if ($('roadName')) $('roadName').value = r.name || '';
+  setStatus('Kéo đỉnh để di chuyển, chuột phải vào đỉnh để xóa, kéo/bấm chấm giữa đoạn để thêm đỉnh, click bản đồ để nối dài cuối tuyến.', 'var(--accent-cyan)');
+  zoomToRoad(id);
+  renderRoads();
+  setDrawing(true);
+}
+
+function cancelEdit() {
+  if (!editingId) return;
+  editingId = null;
+  vertices = [];
+  if ($('roadName')) $('roadName').value = '';
+  setStatus('');
+  if (drawing()) setDrawing(false);
+  renderRoads();
+  renderDraft();
+}
+
 // ================== CHẾ ĐỘ VẼ ==================
 function setDrawing(on) {
   if (on) state.adminDrawMode = 'road';
@@ -265,7 +376,7 @@ function setDrawing(on) {
   }
   const btn = $('btnRoadDraw');
   if (btn) {
-    btn.innerHTML = on ? `${ico('stop')}Dừng vẽ` : `${ico('pen')}Vẽ tuyến mới`;
+    btn.innerHTML = on ? `${ico('stop')}Dừng vẽ` : `${ico('pen')}${editingId ? 'Vẽ nối dài' : 'Vẽ tuyến mới'}`;
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', String(on));
   }
@@ -293,6 +404,7 @@ function syncPanel() {
     renderRoads();
     renderDraft();
   } else {
+    cancelEdit();
     if (drawing()) setDrawing(false);
     listLayer?.remove(); listLayer = null;
     drawLayer?.remove(); drawLayer = null;
@@ -315,10 +427,13 @@ export function initCustomRoads() {
   $('btnRoadDraw')?.addEventListener('click', () => setDrawing(!drawing()));
   $('btnRoadUndo')?.addEventListener('click', () => { vertices.pop(); renderDraft(); });
   $('btnRoadSave')?.addEventListener('click', saveDraft);
+  $('btnRoadCancel')?.addEventListener('click', cancelEdit);
   $('roadType')?.addEventListener('change', renderDraft);
   $('roadList')?.addEventListener('click', (e) => {
     const del = e.target.closest('[data-del]');
     if (del) { e.stopPropagation(); deleteRoad(del.dataset.del); return; }
+    const edit = e.target.closest('[data-edit]');
+    if (edit) { e.stopPropagation(); startEdit(edit.dataset.edit); return; }
     const row = e.target.closest('[data-road]');
     if (row) zoomToRoad(row.dataset.road);
   });

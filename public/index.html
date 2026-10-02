@@ -411,9 +411,10 @@
           <div class="road-draw-actions">
             <button type="button" id="btnRoadDraw" aria-pressed="false"><svg class="ico"><use href="#i-pen"/></svg>Vẽ tuyến mới</button>
             <button type="button" id="btnRoadUndo" title="Xóa đỉnh cuối (Backspace)" disabled><svg class="ico"><use href="#i-undo"/></svg>Xóa đỉnh</button>
+            <button type="button" id="btnRoadCancel" title="Bỏ các thay đổi, giữ nguyên tuyến đã lưu" hidden><svg class="ico"><use href="#i-close"/></svg>Hủy sửa</button>
           </div>
           <div id="roadDrawInfo" class="road-draw-info"></div>
-          <div class="cad-hint">Click bản đồ hiện trạng để đặt đỉnh; đỉnh cách nút đường &lt; 1 m mới bắt dính (chấm xanh) — phóng to tối đa rồi click đúng nút để nối tuyến. Esc: dừng vẽ.</div>
+          <div class="cad-hint">Click bản đồ hiện trạng để đặt đỉnh; đỉnh cách nút đường &lt; 1 m mới bắt dính (chấm xanh) — phóng to tối đa rồi click đúng nút để nối tuyến. Kéo đỉnh để di chuyển, chuột phải để xóa đỉnh, kéo chấm giữa đoạn để thêm đỉnh. Sửa tuyến đã lưu: bấm biểu tượng bút ở danh sách. Esc: dừng vẽ.</div>
           <button type="button" class="btn-submit" id="btnRoadSave" disabled title="Ghi đè danh sách tuyến bổ sung roads/v2/custom.json trên bucket"><svg class="ico"><use href="#i-save"/></svg>LƯU TUYẾN (ADMIN)</button>
           <div id="roadStatus" class="rp-status" role="status" aria-live="polite"></div>
           <div id="roadList" class="cad-list"></div>

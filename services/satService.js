@@ -137,6 +137,9 @@ function dwBuilt(ee, wards, y0, y1) {
 
 const builtNow = (ee, wards) => dwBuilt(ee, wards, ...devRecentYears());
 
+/** Đất xây dựng hiện nay (0/1) trên lưới 20 m — cùng lớp "built" của newDevImage, dùng làm mẫu số mật độ đường */
+const builtNowImage = (ee, wards) => builtNow(ee, wards).reproject(devProj(ee)).clipToCollection(wards);
+
 /**
  * 1 = đã xây dựng đến năm year: GAIA đã là bề mặt không thấm nước (change_year_index: 34 = 1985 … 1 = 2018)
  * hoặc GHSL ô 100 m có diện tích công trình ≥ GHSL_BUILT_MIN_M2 (GAIA bỏ sót nhiều khu ở xen cây xanh như nội thành Huế);
@@ -200,5 +203,5 @@ function mapUrl(ee, visImage) {
 module.exports = {
   sarYears, lstYears, parseYear, demImage, terrariumImage, sarFloodMask, sarFloodVis, lstImage, mapUrl,
   LST_VIS, FLOOD_SEASON, HOT_SEASON, POP_REFS,
-  newDevImage, newDevVis, devRecentYears, DEV_FROM_YEARS, DEV_COLOR, DEV_BASE_COLOR, DEV_SCALE_M, DEV_CRS
+  newDevImage, newDevVis, builtNowImage, devRecentYears, DEV_FROM_YEARS, DEV_COLOR, DEV_BASE_COLOR, DEV_SCALE_M, DEV_CRS
 };

@@ -3,7 +3,10 @@ import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js
 import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, showToast, wardStatHtml, ico, setStatusContent, inlineSpriteIcons } from './utils.js';
 import { refreshWardCheck } from './wardCheck.js';
-import { fillWardRoadLengths, fillCityRoadDensity, loadRoadTypeLengths, ROAD_TYPES, ROADS_META_EVENT, fmtKm } from './wardRoads.js';
+import {
+  fillWardRoadLengths, fillCityRoadDensity, loadRoadTypeLengths, ROAD_TYPES, ROADS_META_EVENT, fmtKm,
+  densityArea, densityAreaLabel, BUILT_AREA_EVENT
+} from './wardRoads.js';
 import { refreshRoadPanel } from './customRoads.js';
 import { refreshPopPanel } from './popEdits.js';
 import { refreshCadRole } from './cadImportUi.js';
@@ -767,7 +770,7 @@ function roadChartData() {
   const wards = state.wardStatsData;
   const names = city ? (wards.length ? wards.map(w => w.Ten_Phuong) : Object.keys(roadTypesByWard)) : [state.selectedWard];
   const v = { trunk: 0, named: 0, mixed: 0, kiet: 0, bike: 0 };
-  let have = 0, est = 0, areaKm2 = 0;
+  let have = 0, est = 0, areaKm2 = 0, natural = 0, pending = false;
   names.forEach(name => {
     const t = roadTypesByWard[name];
     if (!t) return;
@@ -778,9 +781,14 @@ function roadChartData() {
     v.kiet += t.kiet;
     v.bike += t.bike;
     const w = wards.find(x => x.Ten_Phuong === name);
-    areaKm2 += Number(w && w.Dien_Tich_Km2) || 0;
+    const a = densityArea(name, Number(w && w.Dien_Tich_Km2) || 0);
+    if (!a) { pending = true; return; }
+    if (!a.built) natural++;
+    areaKm2 += a.km2;
   });
-  return { city, v, have, total: names.length, est, areaKm2 };
+  // Mẫu số mật độ: đất xây dựng đô thị; areaLabel mô tả nguồn (tạm diện tích tự nhiên nếu chưa có)
+  const areaLabel = densityAreaLabel(natural < have, natural < have ? natural : 0);
+  return { city, v, have, total: names.length, est, areaKm2: pending ? 0 : areaKm2, pending, areaLabel };
 }
 
 // Donut cơ cấu chiều dài đường 1+2+3 (không gồm xe đạp, như mật độ đường); types = null → vòng xám chờ dữ liệu
@@ -878,11 +886,13 @@ function renderRoadChart() {
     </div>`;
   }).join('');
   const dens = (km) => (d.areaKm2 > 0 ? (km / d.areaKm2).toFixed(2).replace('.', ',') : '–');
-  const densTip = `Mật độ đến đường khu vực = (đường trục chính + đường khu vực) ${fmtKm(kvKm)} km / ${fmtArea(d.areaKm2)} km² diện tích tự nhiên`
-    + `${d.city ? ` của ${d.have} phường/xã có mạng lưới đường` : ''} — ${scope}`
-    + `\nMật độ đường (gồm nội bộ, kiệt): ${fmtKm(totalKm)} km / ${fmtArea(d.areaKm2)} km² = ${dens(totalKm)} km/km²`;
+  const densTip = d.pending ? 'Đang tính diện tích đất xây dựng đô thị từ ảnh vệ tinh...'
+    : `Mật độ đến đường khu vực = (đường trục chính + đường khu vực) ${fmtKm(kvKm)} km / ${fmtArea(d.areaKm2)} km²`
+      + `${d.city ? ` của ${d.have} phường/xã có mạng lưới đường` : ''} — ${scope}`
+      + `\nMật độ đường (gồm nội bộ, kiệt): ${fmtKm(totalKm)} km / ${fmtArea(d.areaKm2)} km² = ${dens(totalKm)} km/km²`
+      + `\nMẫu số = ${d.areaLabel}`;
   rowsEl.innerHTML = rows;
-  setDensity(`<b>${dens(kvKm)}</b><em>km/km²</em>${d.city && d.have < d.total ? `<em class="road-dens-scope">${d.have}/${d.total} P/X</em>` : ''}`, densTip);
+  setDensity(`<b>${d.pending ? ico('clock') : dens(kvKm)}</b><em>km/km²</em>${d.city && d.have < d.total ? `<em class="road-dens-scope">${d.have}/${d.total} P/X</em>` : ''}`, densTip);
   center.innerHTML = `<b>${fmtKm(totalKm)}</b><small>km đường</small>`;
   updateRoadDonut(types, v);
 }
@@ -890,8 +900,9 @@ function renderRoadChart() {
 // Nhóm E bảng chi tiết phường: chiều dài, mật độ từng loại đường; tổng 1+2+3 = mật độ đường (không gồm đường xe đạp)
 function wardRoadRowsHtml(wardData) {
   const name = wardData.Ten_Phuong;
-  const areaKm2 = Number(wardData.Dien_Tich_Km2) || 0;
-  const dens = (km) => (areaKm2 > 0 ? `${(km / areaKm2).toFixed(2).replace('.', ',')} km/km²` : '');
+  const area = densityArea(name, Number(wardData.Dien_Tich_Km2) || 0);
+  const areaKm2 = area ? area.km2 : 0;
+  const dens = (km) => (areaKm2 > 0 ? `${(km / areaKm2).toFixed(2).replace('.', ',')} km/km²` : ico('clock'));
   if (!roadTypesByWard) return `<tr class="wt-empty"><td>-</td><td colspan="7">${ico('clock')}Đang đọc mạng lưới đường...</td></tr>`;
   const t = roadTypesByWard[name];
   if (!t) return `<tr class="wt-empty"><td>-</td><td colspan="7">${ROAD_MISSING_TITLE}.</td></tr>`;
@@ -913,7 +924,8 @@ function wardRoadRowsHtml(wardData) {
     <td></td>
     <td title="Không gồm đường xe đạp">Tổng đường giao thông (1+2+3)</td>
     <td>${fmtKm(totalKm)} km</td>
-    <td colspan="5" class="wt-note wt-road-note">Mật độ đường ${dens(totalKm)}</td>
+    <td colspan="5" class="wt-note wt-road-note"${area ? ` title="Mẫu số mật độ = ${escapeHtml(densityAreaLabel(area.built))}"` : ''}>Mật độ đường ${dens(totalKm)}`
+    + `${area ? ` <span class="wt-light">/ ${area.built ? 'đất xây dựng' : 'diện tích tự nhiên'} ${fmtArea(areaKm2)} km²</span>` : ''}</td>
   </tr>`);
   return rows.join('');
 }
@@ -1329,6 +1341,7 @@ export function initBottomPanelEvents() {
     ensureRoadTypes(true);
     reloadGreenGrowthRoads().then(renderGtx).catch(err => console.warn('Tăng trưởng xanh – mạng lưới đường lỗi:', err));
   });
+  document.addEventListener(BUILT_AREA_EVENT, () => { if (roadTypesByWard) refreshRoadViews(); });
   document.getElementById('btnFlipPart2')?.addEventListener('click', () => setPart2Side(!part2Back));
   initGreenGrowthEvents(document.getElementById('gtxView'), renderGtx);
   document.getElementById('statTableBody')?.addEventListener('click', (e) => {

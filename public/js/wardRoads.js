@@ -217,12 +217,69 @@ export async function loadRoadTypeLengths() {
 
 export const fmtKm = (v) => KM_FORMAT.format(v);
 
-/** main = đường trục chính + đường khu vực (đường phố có tên), kiet = đường nội bộ; chia cho diện tích tự nhiên (km²) */
-function roadDensityHtml(main, kiet, areaKm2, source) {
+// ================== ĐẤT XÂY DỰNG ĐÔ THỊ: MẪU SỐ MẬT ĐỘ ĐƯỜNG ==================
+// Diện tích khu vực xây dựng theo ảnh vệ tinh mới nhất (api/gee.js › getBuiltArea, Dynamic World 2 năm gần nhất);
+// chưa tải được thì tạm chia cho diện tích tự nhiên và ghi rõ trong chú thích
+export const BUILT_AREA_EVENT = 'built-area-updated';
+let builtPromise = null;
+let builtData = null;     // { years: [y0, y1], scale, wards: { tên phường: km² } }
+let builtFailed = false;
+
+export function loadBuiltAreas() {
+  if (!builtPromise) {
+    builtPromise = fetch(geeApi('action=getBuiltArea'))
+      .then(async r => {
+        const d = await r.json().catch(() => null);
+        if (!r.ok || !d || !d.wards || typeof d.wards !== 'object') throw new Error((d && d.message) || `HTTP ${r.status}`);
+        builtData = d;
+        builtFailed = false;
+      })
+      .catch(err => {
+        console.warn('Chưa tải được diện tích đất xây dựng:', err);
+        builtFailed = true;
+        setTimeout(() => { builtPromise = null; }, 60000);
+      })
+      .then(refreshDensityViews);
+  }
+  return builtPromise;
+}
+
+const builtSource = () => (builtData ? `Dynamic World ${builtData.years[0]}–${builtData.years[1]}` : '');
+
+/**
+ * Mẫu số mật độ đường của 1 phường: { km2, built } — built = đất xây dựng đô thị, false = tạm diện tích tự nhiên
+ * (chưa tải được / phường không có số liệu); null = đang tải
+ */
+export function densityArea(name, naturalKm2) {
+  if (!builtData && !builtFailed) { loadBuiltAreas(); return null; }
+  const v = builtData ? Number(builtData.wards[name]) : 0;
+  if (v > 0) return { km2: v, built: true };
+  return naturalKm2 > 0 ? { km2: naturalKm2, built: false } : null;
+}
+
+/** Tên mẫu số cho chú thích; mixed = số phường phải tạm dùng diện tích tự nhiên */
+export function densityAreaLabel(built, mixed = 0) {
+  if (!built) return 'diện tích tự nhiên (chưa tải được diện tích đất xây dựng từ ảnh vệ tinh)';
+  return `diện tích đất xây dựng đô thị (khu vực xây dựng đo trên ảnh vệ tinh ${builtSource()}, lưới ${builtData.scale || 20} m)`
+    + (mixed ? `; ${mixed} phường/xã chưa có số liệu đất xây dựng tạm dùng diện tích tự nhiên` : '');
+}
+
+function refreshDensityViews() {
+  if (state.selectedWard) fillWardRoadLengths(state.selectedWard);
+  const city = $('cityRoadDensity');
+  if (city && city.dataset.areas) fillCityRoadDensity(city, JSON.parse(city.dataset.areas));
+  document.dispatchEvent(new CustomEvent(BUILT_AREA_EVENT));
+}
+
+const DENSITY_PENDING = (label) => wardStatHtml(label, ico('clock'), 'km/km²', 'Đang tính diện tích đất xây dựng đô thị từ ảnh vệ tinh...');
+
+/** main = đường trục chính + đường khu vực (đường phố có tên), kiet = đường nội bộ; chia cho diện tích đất xây dựng đô thị (km²) */
+function roadDensityHtml(main, kiet, areaKm2, source, areaLabel) {
   const total = main + kiet;
   return wardStatHtml('Mật độ đến đường KV', DENSITY_FORMAT.format(main / areaKm2), 'km/km²',
     `Mật độ đến đường khu vực: (đường trục chính + đường khu vực) ${KM_FORMAT.format(main)} km / ${KM_FORMAT.format(areaKm2)} km² — ${source}\n`
-    + `Mật độ đường (mọi tuyến): ${DENSITY_FORMAT.format(total / areaKm2)} km/km² — tổng chiều dài các tuyến ${KM_FORMAT.format(total)} km (trục chính + khu vực ${KM_FORMAT.format(main)} km, nội bộ ${KM_FORMAT.format(kiet)} km) / diện tích tự nhiên ${KM_FORMAT.format(areaKm2)} km²`);
+    + `Mật độ đường (mọi tuyến): ${DENSITY_FORMAT.format(total / areaKm2)} km/km² — tổng chiều dài các tuyến ${KM_FORMAT.format(total)} km (trục chính + khu vực ${KM_FORMAT.format(main)} km, nội bộ ${KM_FORMAT.format(kiet)} km)\n`
+    + `Mẫu số ${KM_FORMAT.format(areaKm2)} km² = ${areaLabel}`);
 }
 
 const osmDate = (at) => (at ? `OSM ${new Date(at).toLocaleDateString('vi-VN')}` : 'OpenStreetMap');
@@ -234,33 +291,40 @@ export async function fillWardRoadLengths(wardName) {
   const el = $('wardRoadLen');
   if (!el || el.dataset.ward !== wardName) return;
   const d = wards[wardName];
-  const areaKm2 = Number(el.dataset.area) || 0;
-  if (!d || !(areaKm2 > 0)) { el.innerHTML = ''; return; }
+  if (!d) { el.innerHTML = ''; return; }
+  const area = densityArea(wardName, Number(el.dataset.area) || 0);
+  if (!area) { el.innerHTML = builtFailed ? '' : DENSITY_PENDING('Mật độ đến đường KV'); return; }
   const extra = custom.extra[wardName];
   const km = withExtra(d, extra);
   const added = custom.count && extra ? ' + tuyến Admin bổ sung' : '';
-  el.innerHTML = roadDensityHtml(km.main, km.kiet, areaKm2, `theo ${osmDate(d.at)}${added}`);
+  el.innerHTML = roadDensityHtml(km.main, km.kiet, area.km2, `theo ${osmDate(d.at)}${added}`, densityAreaLabel(area.built));
 }
 
 /**
  * Mật độ đường toàn thành phố vào phần tử el: cộng chiều dài các phường/xã đã có mạng lưới đường,
- * chia cho tổng diện tích của chính các phường/xã đó (areas = { tên phường: km² })
+ * chia cho tổng diện tích đất xây dựng đô thị của chính các phường/xã đó (areas = { tên phường: km² diện tích tự nhiên, dự phòng })
  */
 export async function fillCityRoadDensity(el, areas) {
   if (el) el.dataset.areas = JSON.stringify(areas);
   const { wards, custom } = await loadRoadsMeta();
   if (!el || !el.isConnected) return;
-  let main = 0, kiet = 0, areaKm2 = 0, n = 0, at = 0;
+  let main = 0, kiet = 0, areaKm2 = 0, n = 0, at = 0, natural = 0, pending = false;
   Object.entries(areas).forEach(([name, area]) => {
     const d = wards[name];
-    if (!d || !(area > 0)) return;
+    if (!d) return;
+    const a = densityArea(name, area);
+    if (!a) { pending = pending || !builtData; return; }
+    if (!a.built) natural++;
     const km = withExtra(d, custom.extra[name]);
-    main += km.main; kiet += km.kiet; areaKm2 += area; n++;
+    main += km.main; kiet += km.kiet; areaKm2 += a.km2; n++;
     at = Math.max(at, d.at || 0);
   });
+  if (pending) { el.innerHTML = DENSITY_PENDING('Mật độ đến đường KV'); return; }
   const total = Object.keys(areas).length;
+  const allNatural = natural === n;
   el.innerHTML = n && areaKm2 > 0
-    ? roadDensityHtml(main, kiet, areaKm2, `${n}/${total} phường/xã có mạng lưới đường, theo ${osmDate(at)}${customNote(custom.count)}`)
+    ? roadDensityHtml(main, kiet, areaKm2, `${n}/${total} phường/xã có mạng lưới đường, theo ${osmDate(at)}${customNote(custom.count)}`,
+      densityAreaLabel(!allNatural, allNatural ? 0 : natural))
     : '';
 }
 
