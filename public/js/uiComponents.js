@@ -787,7 +787,7 @@ function roadChartData() {
     areaKm2 += a.km2;
   });
   // Mẫu số mật độ: đất xây dựng đô thị; areaLabel mô tả nguồn (tạm diện tích tự nhiên nếu chưa có)
-  const areaLabel = densityAreaLabel(natural < have, natural < have ? natural : 0);
+  const areaLabel = pending ? '' : densityAreaLabel(natural < have, natural < have ? natural : 0);
   return { city, v, have, total: names.length, est, areaKm2: pending ? 0 : areaKm2, pending, areaLabel };
 }
 

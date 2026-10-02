@@ -259,7 +259,7 @@ export function densityArea(name, naturalKm2) {
 
 /** Tên mẫu số cho chú thích; mixed = số phường phải tạm dùng diện tích tự nhiên */
 export function densityAreaLabel(built, mixed = 0) {
-  if (!built) return 'diện tích tự nhiên (chưa tải được diện tích đất xây dựng từ ảnh vệ tinh)';
+  if (!built || !builtData) return 'diện tích tự nhiên (chưa tải được diện tích đất xây dựng từ ảnh vệ tinh)';
   return `diện tích đất xây dựng đô thị (khu vực xây dựng đo trên ảnh vệ tinh ${builtSource()}, lưới ${builtData.scale || 20} m)`
     + (mixed ? `; ${mixed} phường/xã chưa có số liệu đất xây dựng tạm dùng diện tích tự nhiên` : '');
 }
