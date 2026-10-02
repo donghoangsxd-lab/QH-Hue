@@ -49,6 +49,7 @@ import { initSatLayers } from './satLayers.js';
 import { initSketchLayer, handleSketchClick, stopSketchTool } from './sketchLayer.js';
 import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
 import { initIntroTour } from './introTour.js';
+import { initRiskLayer } from './riskLayer.js';
 
 const CITY_NAME = "Thành phố Huế";
 
@@ -169,6 +170,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initTerrainLayer();
   initFloodSim();
   initSatLayers();
+  initRiskLayer();
   initSketchLayer();
   initIntroTour();
   // Bật đo đạc / tra cứu / ghim / vẽ tuyến → bỏ chọn công cụ phác thảo (hình đã vẽ vẫn giữ)
@@ -237,6 +239,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const isNearPanel = (ev) => {
     if (!ev || ev.clientX == null) return false;
     return PANEL_GUARDS.some(([sel, pad]) => [...document.querySelectorAll(sel)].some(el => {
+      if (getComputedStyle(el).pointerEvents === 'none') return false;   // panel đang thu gọn (trong suốt)
       const r = el.getBoundingClientRect();
       return r.width > 0 && ev.clientX >= r.left - pad && ev.clientX <= r.right + pad
         && ev.clientY >= r.top - pad && ev.clientY <= r.bottom + pad;

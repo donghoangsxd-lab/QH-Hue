@@ -3,6 +3,7 @@ import {
   BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, getBufferStyle, getPlanScenarioList, effectiveRadius, bumpDataVersion, layerType,
   isNetworkType, ntKindOf, NT_KIND_LABELS, parkTierOf
 } from './state.js';
+import { peekInfraRisk, riskSummaryHtml } from './riskLayer.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi, markDataWritten } from './api.js';
 import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico } from './utils.js';
@@ -1065,6 +1066,17 @@ function selRendererFor(m) {
   return selRenderers.get(m);
 }
 
+// Nền âm bản: phủ xanh đen ngoài vòng bán kính (nhạt) + trong vòng (đậm), viền nét đứt; trả về vòng tròn turf
+function addNegativeRing(group, m, lat, lng, radius, innerOpacity = SEL_INNER_OPACITY) {
+  const renderer = selRendererFor(m);
+  const circle = turf.circle([lng, lat], radius / 1000, { steps: SEL_RING_STEPS });
+  const ring = circle.geometry.coordinates[0].map(([x, y]) => [y, x]);
+  group.addLayer(L.polygon([WORLD_RING, ring], { renderer, stroke: false, fillColor: SEL_NAVY, fillOpacity: SEL_OUTER_OPACITY, interactive: false }));
+  group.addLayer(L.polygon(ring, { renderer, color: '#7dd3fc', weight: 1.2, opacity: 0.85, dashArray: '4,5', fillColor: SEL_NAVY, fillOpacity: innerOpacity, interactive: false }));
+  m.getContainer().classList.add('sel-active');
+  return circle;
+}
+
 // Đường theo nhóm (serviceArea.js): nền = mọi đường quanh công trình (xanh mờ kiểu bản vẽ), tới được = phần đi được trong bán kính (phát sáng).
 // Vẽ từ nhóm nhỏ lên nhóm lớn để trục chính nằm trên cùng; 'unknown' = mạng lưới lưu cũ chưa phân nhóm.
 const ROAD_STYLES = [
@@ -1154,15 +1166,11 @@ export async function highlightSingleIsochrone(lat, lng, radius, group = layers.
   lat = Number(lat);
   lng = Number(lng);
   const renderer = selRendererFor(m);
-  const circle = turf.circle([lng, lat], radius / 1000, { steps: SEL_RING_STEPS });
-  const ring = circle.geometry.coordinates[0].map(([x, y]) => [y, x]);
-  group.addLayer(L.polygon([WORLD_RING, ring], { renderer, stroke: false, fillColor: SEL_NAVY, fillOpacity: SEL_OUTER_OPACITY, interactive: false }));
-  group.addLayer(L.polygon(ring, { renderer, color: '#7dd3fc', weight: 1.2, opacity: 0.85, dashArray: '4,5', fillColor: SEL_NAVY, fillOpacity: SEL_INNER_OPACITY, interactive: false }));
+  const circle = addNegativeRing(group, m, lat, lng, radius);
   if (clip) {
     group.addLayer(L.geoJSON(clip.feature, { interactive: false, renderer, style: { color: '#fbbf24', weight: 1.6, opacity: 0.9, dashArray: '6,4', fill: false } }));
   }
   group.addLayer(L.marker([lat, lng], { icon: L.divIcon({ className: 'sel-pulse', iconSize: [18, 18] }), interactive: false, keyboard: false, zIndexOffset: -1000 }));
-  m.getContainer().classList.add('sel-active');
   if (!roads) {
     addInRangePoints(group, points, circle, renderer, m);
     return { area: null, polygon: circle, plain: true };
@@ -1386,6 +1394,8 @@ export function onPointClick(p, targetMap = map) {
   if (showServed) {
     html += `<div class="pp-row pp-served js-served"><span>${servedLabel}</span><span class="pp-loading">${ico('clock')}đang tính...</span></div>`;
   }
+  const riskData = peekInfraRisk();
+  if (riskData) html += `<div class="pp-row js-risk"><span>Rủi ro khí hậu</span><span class="pp-loading">${ico('clock')}đang tải...</span></div>`;
   if (isCSD && approved) {
     html += `<div class="pp-section c-orange">${ico('bulb')}ĐỀ XUẤT CHUYỂN ĐỔI CÔNG NĂNG</div>`;
     html += `<div class="js-csd"><div class="pp-loading">${ico('clock')}Đang tính toán không gian...</div></div>`;
@@ -1404,6 +1414,10 @@ export function onPointClick(p, targetMap = map) {
   pointPopup = { popup, id: p.id, scenario: p.scenario };
   // Đóng popup thì thoát chế độ âm bản (trừ khi đã chọn công trình khác / chuyển sang thuyết minh CSD)
   popup.on('remove', () => { if (singleIsoSeq === selSeq) clearSingleIsochrone(); });
+  riskData?.then(d => {
+    const el = popup.isOpen() && popup.getElement()?.querySelector('.js-risk > :last-child');
+    if (el) { el.outerHTML = `<b>${riskSummaryHtml(p, d)}</b>`; popup._updateLayout(); popup._updatePosition(); }
+  }).catch(() => popup.getElement()?.querySelector('.js-risk')?.remove());
 
   // Kết quả tải chậm chỉ ghi vào đúng popup này (popup đã đóng / đã mở popup khác thì bỏ qua)
   const fill = (selector, content) => {
@@ -1641,6 +1655,11 @@ function networkInspectHtml(source, lat, lng, wardName) {
   return html;
 }
 
+// Vòng âm bản quanh vị trí tra cứu: bán kính đi bộ cấp đơn vị ở (mầm non, tiểu học, THCS: 1 km) hoặc bán kính chung giả lập.
+// Đậm vừa phải hơn khi chọn công trình vì bên trong không vẽ mạng đường, cần nhìn xuyên xuống nền vệ tinh.
+const INSPECT_RING_M = 1000;
+const INSPECT_INNER_OPACITY = 0.66;
+
 // Buffer của mỗi công trình là vòng tròn bán kính R: điểm được phục vụ khi khoảng cách ≤ R.
 // Tính trực tiếp trên toàn TP (không phụ thuộc phường đang lọc), dùng được cho cả bản đồ quy hoạch.
 export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
@@ -1663,11 +1682,18 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
   const override = state.globalBufferRadiusOverride;
   const wardLocal = resolveWardNameFromCoords(clickLat, clickLng);
 
+  const ringRadius = override !== null ? override : INSPECT_RING_M;
+  addNegativeRing(isPlan ? planLayers.singleIso : layers.singleIso, targetMap, clickLat, clickLng, ringRadius, INSPECT_INNER_OPACITY);
+  (isPlan ? planRenderer : leftRenderer).highlight(new Set(source
+    .filter(it => hasValidCoord(it) && distanceMeters(clickLat, clickLng, Number(it.lat), Number(it.lng)) <= ringRadius)
+    .map(pointKey)));
+
   let html = `<div class="pp">
     <div class="pp-title">${ico('chart')}MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ${isPlan ? ' (QUY HOẠCH)' : ''}</div>
     <div class="pp-row"><span>Tọa độ</span><b>${clickLat.toFixed(5)}, ${clickLng.toFixed(5)}</b></div>
     <div class="pp-row"><span>Địa bàn</span><b class="js-ward">${wardLocal ? escapeHtml(wardLocal) : ico('clock')}</b></div>
     <div class="pp-row"><span>Bán kính</span><b class="c-green">${override !== null ? `${fmtNum(override)} m (chung)` : 'theo từng công trình'}</b></div>
+    <div class="pp-row"><span>Vòng nét đứt</span><b>${fmtNum(ringRadius)} m${override !== null ? '' : ' <span class="pp-sub">(đi bộ cấp đơn vị ở)</span>'}</b></div>
     <div class="pp-section c-green">1. Tiếp cận: ${coveredCount}/8 nhóm</div>`;
 
   if (coveredCount > 0) {

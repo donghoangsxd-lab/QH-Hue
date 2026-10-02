@@ -19,7 +19,7 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="right-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
   <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
     <symbol id="i-compare" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/><path d="M12 4h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7z" fill="currentColor" fill-opacity=".3" stroke="none"/></symbol>
@@ -230,6 +230,17 @@
             <div class="sat-pick"><label for="lstYear">Mùa nóng</label><select id="lstYear"></select></div>
             <div class="sat-legend" id="lstLegend"></div>
             <div class="flood-stats" id="lstStats"></div>
+          </div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_risk"><label for="chk_risk" title="Lọc công trình (kể cả đề xuất, quy hoạch mới, quỹ đất) có vùng 30 m quanh vị trí bị ngập trong nhiều mùa lũ (Sentinel-1) hoặc nóng hơn mức chung (Landsat), để cân nhắc cải tạo hoặc tránh chọn đất"><svg class="ico ico-layer"><use href="#i-alert"/></svg>Công trình chịu rủi ro ngập / nhiệt</label></div></div>
+          <div class="flood-box" id="riskBox" style="display:none;">
+            <div class="sat-pick"><label for="riskGroup">Nhóm</label><select id="riskGroup"></select></div>
+            <div class="sat-pick"><label for="riskFlood">Ngập</label><select id="riskFlood">
+              <option value="0">Không xét</option><option value="1">≥ 1 mùa lũ</option><option value="2" selected>≥ 2 mùa lũ</option><option value="3">≥ 3 mùa lũ</option><option value="5">≥ 5 mùa lũ</option>
+            </select></div>
+            <div class="sat-pick"><label for="riskHeat">Nhiệt</label><select id="riskHeat">
+              <option value="0">Không xét</option><option value="1">Nóng hơn mức chung ≥ 1 °C</option><option value="2" selected>Nóng hơn mức chung ≥ 2 °C</option><option value="3">Nóng hơn mức chung ≥ 3 °C</option>
+            </select></div>
+            <div class="flood-stats" id="riskStats"></div>
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">phóng to để xem</small></label></div></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">

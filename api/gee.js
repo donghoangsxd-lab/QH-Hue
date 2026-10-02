@@ -368,6 +368,8 @@ const FLOOD_BIN_MIN = -1;
 const FLOOD_BIN_MAX = 40;
 let cachedFloodBins = null;   // { version: phiên bản hiệu chỉnh dân cư, data }
 const cachedSatStats = new Map();   // "lst|năm" hoặc "sar|năm|bản dân cư|bản dữ liệu" → kết quả thống kê lớp vệ tinh
+// Tọa độ công trình là 1 điểm trong khu đất: xét rủi ro ngập / nhiệt trong vòng bán kính này quanh điểm
+const RISK_BUFFER_M = 30;
 const wardNameOf = (p) => p.tenXa || p.NAME_2 || p.name || 'Phường';
 // Pixel có dân (1/0). Đếm trên lưới raster dân cư (crs popProjection, POP_SCALE_M) như lúc chia dân số phường rồi quy ra người:
 // dân trong vùng = dân phường × pixel có dân trong vùng / tổng pixel có dân của phường. Cộng thẳng popRasterNormalized
@@ -1941,6 +1943,46 @@ module.exports = async (req, res) => {
           wards,
           ids: (hit || []).map(i => items[i] && items[i].id).filter(Boolean)
         });
+      }
+      return res.status(200).json(cachedSatStats.get(key));
+    }
+
+    // Rủi ro tại từng công trình (mọi trạng thái, kể cả quy hoạch mới và quỹ đất), mỗi lần gọi 1 năm để vừa giới hạn thời gian:
+    // kind=flood → id công trình có pixel ngập (Sentinel-1) trong vòng RISK_BUFFER_M ở mùa lũ year;
+    // kind=lst → nhiệt độ bề mặt trung bình (Landsat) trong vòng RISK_BUFFER_M ở mùa nóng year
+    if (action === 'getInfraRisk') {
+      const kind = req.query.kind === 'lst' ? 'lst' : 'flood';
+      const year = sat.parseYear(req.query.year, kind === 'lst' ? sat.lstYears() : sat.sarYears());
+      if (year == null) return res.status(400).json({ error: true, message: "Năm không hợp lệ" });
+      res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+      const key = `risk|${kind}|${year}|${getDataVersion()}`;
+      if (!cachedSatStats.has(key)) {
+        const items = allDataList.filter(it => it.id && Number.isFinite(Number(it.lat)) && Number.isFinite(Number(it.lng)));
+        const pts = ee.FeatureCollection(items.map((it, i) => ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(RISK_BUFFER_M), { i })));
+        let data;
+        if (kind === 'flood') {
+          const hit = items.length
+            ? await eeEvaluate(sat.sarFloodMask(ee, wardVectorParsed, year)
+              .reduceRegions({ collection: pts, reducer: ee.Reducer.max(), scale: 20, tileScale: 4 })
+              .filter(ee.Filter.eq('max', 1)).aggregate_array('i'))
+            : [];
+          data = { year, ids: (hit || []).map(i => items[i] && items[i].id).filter(Boolean) };
+        } else {
+          const fc = items.length
+            ? await eeEvaluate(sat.lstImage(ee, wardVectorParsed, year)
+              .reduceRegions({ collection: pts, reducer: ee.Reducer.mean(), scale: 30, tileScale: 4 })
+              .filter(ee.Filter.notNull(['mean']))
+              .map(f => ee.Feature(null, { i: f.get('i'), v: f.get('mean') })))
+            : null;
+          const vals = {};
+          ((fc && fc.features) || []).forEach(f => {
+            const it = items[f.properties.i];
+            if (it) vals[it.id] = round1(f.properties.v);
+          });
+          data = { year, vals };
+        }
+        if (cachedSatStats.size > 40) cachedSatStats.clear();
+        cachedSatStats.set(key, data);
       }
       return res.status(200).json(cachedSatStats.get(key));
     }

@@ -446,6 +446,16 @@ body.right-collapsed .right-panel {
 .sat-legend-ticks { display: flex; justify-content: space-between; margin-top: 1px; }
 .sat-swatch { display: inline-block; width: 14px; height: 9px; margin-right: 5px; border-radius: 2px; vertical-align: -1px; }
 .sat-count { color: #f87171; }
+/* Lọc công trình chịu rủi ro (riskLayer.js) */
+#riskBox .sat-pick + .sat-pick { margin-top: 3px; }
+#riskBox .sat-pick label { width: 34px; flex-shrink: 0; }
+#riskBox .flood-stats { margin-top: 4px; }
+.risk-badge { display: inline-flex; align-items: center; gap: 1px; font-size: var(--fs-xs); white-space: nowrap; }
+.risk-badge .ico { width: 11px; height: 11px; margin: 0; }
+.risk-flood { color: #38bdf8; }
+.risk-heat { color: #fb923c; }
+.risk-k-flood { color: #38bdf8; }
+.risk-k-heat { color: #fb923c; }
 .flood-wards.sat-hot b { color: #f97316; }
 .flood-wards.sat-cool b { color: #60a5fa; }
 .btn-dot-buffer { width: 16px; height: 16px; padding: 0; border: none; font-family: inherit; line-height: 1; border-radius: 50%; background: rgba(148, 163, 184, 0.35); color: var(--text-strong); font-size: var(--fs-xs); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--ease); flex-shrink: 0; }
@@ -510,7 +520,16 @@ body.right-collapsed .right-panel {
 .rp-empty { color: var(--text-muted); font-style: italic; font-size: var(--fs-md); text-align: center; padding: 16px 8px; border: 1px dashed var(--border-color); border-radius: var(--r-md); }
 
 /* POPUP TRA CỨU */
-.inspect-popup .leaflet-popup-content { max-height: 360px; overflow-y: auto; }
+/* Thanh cuộn mảnh tông xanh đen, kẹp sát viền phải khung (lề phải của nội dung chuyển thành padding bên trong vùng cuộn);
+   rãnh chừa trên / dưới cho nút ẩn, nút đóng và góc bo */
+.inspect-popup .leaflet-popup-content { max-height: 360px; overflow-y: auto; margin-right: 0; padding-right: 14px; }
+@supports not selector(::-webkit-scrollbar) {
+  .inspect-popup .leaflet-popup-content { scrollbar-width: thin; scrollbar-color: #1f4a7a rgba(4, 17, 43, 0.85); }
+}
+.inspect-popup .leaflet-popup-content::-webkit-scrollbar { width: 6px; }
+.inspect-popup .leaflet-popup-content::-webkit-scrollbar-track { background: rgba(4, 17, 43, 0.85); margin: 22px 0 10px; border-radius: 3px; }
+.inspect-popup .leaflet-popup-content::-webkit-scrollbar-thumb { background: #1f4a7a; border-radius: 3px; border: 1px solid rgba(var(--cyan-rgb), 0.25); }
+.inspect-popup .leaflet-popup-content::-webkit-scrollbar-thumb:hover { background: #2a6aa8; }
 .route-card { position: relative; padding-left: 20px !important; }
 .route-card[data-route] { cursor: pointer; }
 .route-card[data-route]:hover { border-color: var(--accent-cyan); }
@@ -1199,7 +1218,7 @@ table.ward-table th {
 .leaflet-popup.pp-collapsed .leaflet-popup-content-wrapper {
   background: transparent !important; border: 0; box-shadow: none; padding: 0;
 }
-.leaflet-popup.pp-collapsed .leaflet-popup-content { margin: 0; }
+.leaflet-popup.pp-collapsed .leaflet-popup-content { margin: 0; padding: 0; overflow: visible; }
 .leaflet-popup.pp-collapsed .leaflet-popup-tip-container,
 .leaflet-container .pp-collapsed a.leaflet-popup-close-button,
 .leaflet-container .pp-collapsed a.pp-collapse-btn { display: none; }

@@ -24,14 +24,14 @@ const STEPS = [
     text: 'Mỗi biểu tượng trên bản đồ là 1 công trình. Bấm vào biểu tượng để xem bảng thông tin và vùng phục vụ của công trình đó.\nNút con mắt trên bảng thu gọn bảng về tên công trình để nhìn trọn vùng phục vụ; bấm lại vào công trình để mở lại bảng.'
   },
   {
-    target: '#chk_heat',
+    target: ['#chk_heat', '#btnToggleSidebar'],
     title: 'Bản đồ độ phủ hạ tầng',
     text: 'Lớp màu nhiệt thể hiện mức độ được phục vụ: nơi nằm trong tầm đi bộ của càng nhiều loại hạ tầng thì màu càng đậm; nơi màu nhạt là nơi còn thiếu. Khoảng cách được tính bám theo đường giao thông, không chỉ theo đường chim bay.'
   },
   {
-    target: '#rightPanel',
+    target: ['#rightPanel', '#btnToggleSidebar'],
     title: 'Bật / tắt lớp dữ liệu',
-    text: 'Panel bên phải dùng để chọn nhóm hạ tầng cần xem. Nút chấm tròn ● bật vùng phủ của từng nhóm. Ngoài ra còn lớp phân bố dân cư (ô 30 m × 30 m), ranh giới 40 phường xã, quỹ đất tiềm năng… Thẻ "Chú giải" giải thích các ký hiệu.'
+    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm nút "Lớp dữ liệu" trên thanh công cụ (hoặc mũi tên ‹ ở mép phải) để mở. Panel dùng để chọn nhóm hạ tầng cần xem. Nút chấm tròn ● bật vùng phủ của từng nhóm. Ngoài ra còn lớp phân bố dân cư (ô 30 m × 30 m), ranh giới 40 phường xã, quỹ đất tiềm năng… Thẻ "Chú giải" giải thích các ký hiệu.'
   },
   {
     target: '#btnInspectMode',
@@ -130,14 +130,19 @@ function renderPlay() {
   els.play.title = autoplay ? 'Dừng tự chuyển bước' : 'Tự chuyển sang bước sau';
 }
 
-// Ô tick thì làm nổi cả dòng chứa nó; phần đang ẩn / nằm ngoài màn hình (panel thu gọn) → không làm nổi
-function targetRect(sel) {
-  let el = sel && document.querySelector(sel);
-  if (el?.matches('input')) el = el.closest('div') || el;
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  const visible = r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
-  return visible ? r : null;
+// target: 1 selector hoặc danh sách ưu tiên (lấy phần đầu tiên đang thấy). Ô tick thì làm nổi cả dòng chứa nó;
+// phần đang ẩn / nằm ngoài màn hình / panel thu gọn (trong suốt, không nhận chuột) → bỏ qua
+function targetRect(target) {
+  for (const sel of [].concat(target || [])) {
+    let el = document.querySelector(sel);
+    if (el?.matches('input')) el = el.closest('div') || el;
+    if (!el || el.closest('[hidden]')) continue;
+    const cs = getComputedStyle(el);
+    if (cs.pointerEvents === 'none' || cs.visibility === 'hidden' || el.closest('.right-panel') && document.body.classList.contains('right-collapsed')) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight) return r;
+  }
+  return null;
 }
 
 // Đặt thẻ cạnh phần được làm nổi (phía còn nhiều chỗ nhất), không có phần nổi thì đặt giữa màn hình

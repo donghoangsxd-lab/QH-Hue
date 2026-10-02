@@ -11,7 +11,7 @@ const $ = (id) => document.getElementById(id);
 const MAX_LIST = 150;
 
 // Năm có dữ liệu: khớp sarYears / lstYears trong services/satService.js
-function seasonYears(first, startMMDD, endMMDD) {
+export function seasonYears(first, startMMDD, endMMDD) {
   const now = new Date();
   const y = now.getFullYear();
   const last = now >= new Date(`${y}-${startMMDD}T00:00:00`) ? y : y - 1;
@@ -21,11 +21,14 @@ function seasonYears(first, startMMDD, endMMDD) {
   return { years, partial: last > lastDone ? last : null, def: Math.max(first, lastDone) };
 }
 
+export const sarSeasons = () => seasonYears(2016, '09-15', '12-15');
+export const lstSeasons = () => seasonYears(2014, '04-01', '09-01');
+
 const LAYERS = {
   sar: {
     ids: { chk: 'chk_sarflood', box: 'sarFloodBox', opBox: 'sarFloodOpBox', opacity: 'sarFloodOpacity', year: 'sarFloodYear', legend: 'sarFloodLegend', stats: 'sarFloodStats' },
     zIndex: 3,
-    seasons: () => seasonYears(2016, '09-15', '12-15'),
+    seasons: sarSeasons,
     extra: [['all', 'Số mùa lũ bị ngập (mọi năm)']],
     tileQuery: (y) => `action=getSarFloodTile&year=${y}`,
     statsQuery: (y) => (y === 'all' ? null : `action=getSarFloodStats&year=${y}`),
@@ -35,7 +38,7 @@ const LAYERS = {
   lst: {
     ids: { chk: 'chk_lst', box: 'lstBox', opBox: 'lstOpBox', opacity: 'lstOpacity', year: 'lstYear', legend: 'lstLegend', stats: 'lstStats' },
     zIndex: 1,
-    seasons: () => seasonYears(2014, '04-01', '09-01'),
+    seasons: lstSeasons,
     extra: [],
     tileQuery: (y) => `action=getLstTile&year=${y}`,
     statsQuery: (y) => `action=getLstStats&year=${y}`,
