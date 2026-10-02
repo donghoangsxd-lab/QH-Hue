@@ -119,13 +119,37 @@ async function ensureFacilities() {
 
 const flooded = (list) => list.filter(f => f.elev > 0 && f.elev < level).sort((a, b) => a.elev - b.elev);
 
+// Chấm đỏ tại tâm công trình ngập, to dần theo zoom (zoom 10 → 2 px, zoom ≥ 15 → 6 px);
+// pane riêng trên icon công trình (markerPane 600) để chấm không bị icon / chấm công trình che
+const DOT_PANE = 'floodDotPane';
+const dotRadius = (zoom) => Math.min(6, Math.max(2, 2 + (zoom - 10) * 0.8));
+const dotRenderers = new WeakMap();
+
+function dotRendererFor(m) {
+  if (!dotRenderers.has(m)) {
+    if (!m.getPane(DOT_PANE)) m.createPane(DOT_PANE).style.zIndex = 610;
+    dotRenderers.set(m, L.canvas({ pane: DOT_PANE }));
+  }
+  return dotRenderers.get(m);
+}
+
+function resizeDots() {
+  [[ringsLeft, map], [ringsRight, planMap]].forEach(([group, m]) => {
+    if (!group || !m) return;
+    const radius = dotRadius(m.getZoom());
+    group.eachLayer(dot => dot.setRadius(radius));
+  });
+}
+
 function drawRings() {
   if (planMap && !ringsRight) ringsRight = L.layerGroup().addTo(planMap);
-  [[ringsLeft, 'HT'], [ringsRight, 'QH']].forEach(([group, key]) => {
-    if (!group) return;
+  [[ringsLeft, 'HT', map], [ringsRight, 'QH', planMap]].forEach(([group, key, m]) => {
+    if (!group || !m) return;
     group.clearLayers();
+    const renderer = dotRendererFor(m);
+    const radius = dotRadius(m.getZoom());
     flooded(facilityLists[key]).forEach(f => group.addLayer(L.circleMarker([f.lat, f.lng], {
-      radius: 13, color: '#ef4444', weight: 2.5, fill: false, interactive: false
+      renderer, radius, color: '#7f1d1d', weight: 1, fillColor: '#ef4444', fillOpacity: 1, interactive: false
     })));
   });
 }
@@ -236,10 +260,14 @@ export function setFloodVisible(on) {
     if (!leftLayer) leftLayer = makeLayer().addTo(map);
     if (planMap && !rightLayer) rightLayer = makeLayer().addTo(planMap);
     if (!ringsLeft) ringsLeft = L.layerGroup().addTo(map);
+    map.on('zoomend', resizeDots);
+    planMap?.on('zoomend', resizeDots);
     refresh();
     ensureBins().then(() => { if (visible) renderStats(); });
   } else {
     refreshSeq++;
+    map.off('zoomend', resizeDots);
+    planMap?.off('zoomend', resizeDots);
     leftLayer?.remove(); leftLayer = null;
     rightLayer?.remove(); rightLayer = null;
     ringsLeft?.remove(); ringsLeft = null;

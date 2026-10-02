@@ -310,6 +310,16 @@ const SCREEN_TIERS = [[2300, 'l'], [1700, 'm'], [0, 's']];
 const SPREAD_FACE_W = 338;     // = bề rộng .flip-card khi xoay
 const CITY_CHART_MIN_W = 900;  // biểu đồ 40 phường/xã cần tối thiểu chừng này
 
+// Bề rộng vừa nội dung của bảng (bảng phường giãn 100% nên offsetWidth chỉ là bề rộng khung)
+function naturalWidth(table, fallback) {
+  if (!table || !table.offsetWidth) return fallback;
+  const prev = table.style.width;
+  table.style.width = 'max-content';
+  const w = table.offsetWidth;
+  table.style.width = prev;
+  return w;
+}
+
 const isPart1Spread = () => !!document.getElementById('bpBody')?.classList.contains('bp-spread')
   && !document.body.classList.contains('bottom-max');
 
@@ -323,7 +333,7 @@ function updatePart1Spread() {
   const tier = SCREEN_TIERS.find(([min]) => window.innerWidth >= min)[1];
   document.documentElement.dataset.screen = tier;
   const ward = !isCityMode();
-  const need = ward ? (document.querySelector('#wardSummaryView .ward-table')?.offsetWidth || 700) : CITY_CHART_MIN_W;
+  const need = ward ? naturalWidth(document.querySelector('#wardSummaryView .ward-table'), 700) : CITY_CHART_MIN_W;
   const spread = (tier === 'l' || (tier === 'm' && ward)) && body.clientWidth - 3 * SPREAD_FACE_W - 24 >= need;
   if (body.classList.contains('bp-spread') === spread) return;
   body.classList.toggle('bp-spread', spread);

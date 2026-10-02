@@ -1034,9 +1034,9 @@ table.data-table tfoot .st-total-note { font-weight: 400; font-style: italic; }
   border: 1px solid var(--border-color);
   border-radius: var(--r-md);
 }
-/* Bảng co vừa nội dung (khung cuộn ôm theo bảng), không kéo giãn hết chiều ngang panel */
-.ward-table-scroll-container { align-self: flex-start; max-width: 100%; overflow-x: auto; }
-table.ward-table { border-collapse: collapse; margin-top: 0; font-size: var(--fs-xs); }
+/* Bảng giãn hết chiều ngang còn lại (bề rộng tự nhiên ~780px, dùng để quyết định trải panel: updatePart1Spread) */
+.ward-table-scroll-container { overflow-x: auto; }
+table.ward-table { width: 100%; border-collapse: collapse; margin-top: 0; font-size: var(--fs-xs); }
 table.ward-table th, table.ward-table td { border: 1px solid var(--border-color); padding: 2px 8px; line-height: 15px; white-space: nowrap; }
 /* Căn lề theo cột: STT | Loại | Diện tích | Chỉ tiêu | Nhu cầu | Số lượng | Quy mô | Độ phủ */
 table.ward-table td { text-align: center; }

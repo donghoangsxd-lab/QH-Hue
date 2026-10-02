@@ -1261,10 +1261,13 @@ async function fetchJson(url) {
   return res.json();
 }
 
-// Nút con mắt cạnh nút đóng: thu popup về dòng tên để xem trọn vùng phục vụ (popup neo theo đáy nên mũi chỉ không đổi chỗ)
+// Nút con mắt cạnh nút đóng: thu popup về dòng tên để xem trọn vùng phục vụ (popup neo theo đáy nên mũi chỉ không đổi chỗ).
+// Khi đang thu gọn, bấm ra bản đồ không đóng popup (đóng popup sẽ xóa luôn lớp vùng phục vụ / tuyến tiếp cận);
+// chỉ nút × hoặc chọn công trình / điểm tra cứu khác mới đóng. Leaflet gắn việc đóng khi bấm bản đồ vào sự kiện preclick.
 function addPopupCollapseToggle(popup) {
   const container = popup.getElement();
-  if (!container) return;
+  const ownerMap = popup._map;
+  if (!container || !ownerMap) return;
   const btn = L.DomUtil.create('a', 'pp-collapse-btn', container);
   btn.href = '#';
   btn.setAttribute('role', 'button');
@@ -1278,7 +1281,11 @@ function addPopupCollapseToggle(popup) {
   L.DomEvent.disableClickPropagation(btn);
   L.DomEvent.on(btn, 'click', (e) => {
     L.DomEvent.preventDefault(e);
-    render(container.classList.toggle('pp-collapsed'));
+    const collapsed = container.classList.toggle('pp-collapsed');
+    render(collapsed);
+    ownerMap.off('preclick', popup.close, popup);
+    const closesOnClick = popup.options.closeOnClick ?? ownerMap.options.closePopupOnClick;
+    if (!collapsed && closesOnClick) ownerMap.on('preclick', popup.close, popup);
   });
 }
 
