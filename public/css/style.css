@@ -587,7 +587,7 @@ body.right-collapsed .right-panel {
 .rp-status:empty { display: none; }
 
 /* ĐỀ XUẤT: nhập 1 điểm / hàng loạt DXF */
-.add-mode-switch { display: flex; gap: 3px; padding: 3px; margin-bottom: 8px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-md); }
+.add-mode-switch { display: flex; flex-wrap: wrap; gap: 3px; padding: 3px; margin-bottom: 8px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-md); }
 .add-mode-switch:has(#btnAddRoadMode:not([style*="none"])) { gap: 2px; }
 .add-mode-switch:has(#btnAddRoadMode:not([style*="none"])) .add-mode-btn { padding: 5px 2px; }
 .add-mode-btn { flex: 1; padding: 5px 4px; border: none; border-radius: var(--r-md); background: transparent; color: var(--text-muted); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; white-space: nowrap; }
@@ -1752,6 +1752,29 @@ table.ward-table th {
 @media (prefers-reduced-motion: reduce) {
   .tour-spot, .tour-card { animation: none; transition: none; }
 }
+
+/* Thẩm định đồ án — bảng chiếm panel dưới, không đụng bảng phường */
+#projectReviewHost { display: none; }
+body.project-review #projectReviewHost {
+  display: block;
+  grid-column: 1 / -1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 8px 12px;
+}
+body.project-review .bp-part1,
+body.project-review .bp-part2 { display: none; }
+.review-lead { margin: 0 0 8px; font-size: var(--fs-sm); line-height: 1.4; color: var(--text-muted); }
+.review-actions { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+.review-note { margin: 8px 0; font-size: var(--fs-sm); line-height: 1.45; }
+.review-sheet h4 { margin: 12px 0 6px; font-size: var(--fs-sm); }
+.review-ask { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; padding: 8px; border: 1px solid var(--accent-yellow); border-radius: var(--r-md); }
+.review-ask label { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: var(--fs-sm); }
+.review-ask select { max-width: 100%; }
+.review-drafts { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; font-size: var(--fs-sm); }
+.review-drafts div { display: flex; gap: 4px; align-items: center; }
+.review-drafts span { flex: 1; min-width: 0; }
+.review-drafts button { font: inherit; font-size: var(--fs-sm); }
 
 /* Viền focus khi dùng bàn phím */
 button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:focus-visible {

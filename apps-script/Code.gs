@@ -120,14 +120,17 @@ function findInfraSheet(ss, typeCode) {
   return null;
 }
 
-// Tab hạ tầng theo mã; loại mạng lưới chưa có tab thì tạo tab với dòng tiêu đề chuẩn; loại khác chưa có tab → null
+// Tab hạ tầng theo mã. Loại mạng lưới chưa có tab thì tạo tab đúng tên mã (10-BUS, 11-PCCC, 12-NT), đặt ngay sau 9-CSD.
+// Loại khác chưa có tab → null (không tự tạo, tránh ghi nhầm sang tab đầu tiên).
 function ensureInfraSheet(ss, typeCode) {
   var sheet = findInfraSheet(ss, typeCode);
   if (sheet || !NETWORK_TABS.hasOwnProperty(typeCode)) return sheet;
-  sheet = ss.insertSheet(typeCode + " " + NETWORK_TABS[typeCode]);
+  var after = findInfraSheet(ss, "9-CSD");
+  var index = after ? after.getIndex() : ss.getNumSheets();
+  sheet = ss.insertSheet(typeCode, index);
   sheet.getRange(1, 1, 1, STANDARD_HEADERS.length).setValues([STANDARD_HEADERS]).setFontWeight("bold");
   sheet.setFrozenRows(1);
-  sheet.getRange(2, 5, sheet.getMaxRows() - 1, 2).setNumberFormat("@");
+  sheet.getRange(2, 5, 2, 2).setNumberFormat("@");
   return sheet;
 }
 
@@ -612,6 +615,41 @@ function doGet(e) {
   }
 }
 
+// Body POST: JSON thuần, JSON bị bọc thành chuỗi, hoặc form field payload=
+// Query ?action= vẫn dùng được khi Google không đưa action vào body (đúng lỗi "Action không hợp lệ")
+function parsePostBody(e) {
+  var params = (e && e.parameter) || {};
+  var post = e && e.postData;
+  var raw = post ? String(post.contents || '') : '';
+  if (!raw && post && typeof post.getDataAsString === 'function') {
+    try { raw = String(post.getDataAsString() || ''); } catch (err) { raw = ''; }
+  }
+
+  function asObject(text) {
+    if (!text) return null;
+    var parsed;
+    try { parsed = JSON.parse(text); } catch (err) { return null; }
+    if (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch (err2) { return null; }
+    }
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  }
+
+  var body = asObject(params.payload) || null;
+  if (!body || !body.action) {
+    var text = raw;
+    if (text && text.charAt(0) !== '{' && text.charAt(0) !== '[') {
+      var match = text.match(/(?:^|&)payload=([^&]*)/);
+      if (match) {
+        try { text = decodeURIComponent(match[1].replace(/\+/g, '%20')); } catch (err) { text = ''; }
+      }
+    }
+    body = asObject(text) || body || {};
+  }
+  if (!body.action && params.action) body.action = String(params.action);
+  return body;
+}
+
 // 4. GHI HÀNG LOẠT (POST JSON, CHỈ MÁY CHỦ WEBAPP CÓ KHÓA API_SECRET)
 function doPost(e) {
   try {
@@ -619,15 +657,21 @@ function doPost(e) {
     var secret = PropertiesService.getScriptProperties().getProperty("API_SECRET");
     if (!secret || params.key !== secret) return jsonOutput({ "error": "Sai khóa API" });
 
-    var body = JSON.parse((e.postData && e.postData.contents) || '{}');
-    if (body.action === "importCadBatch") return jsonOutput(importCadBatch(body));
-    if (body.action === "markWardNotes") return jsonOutput(markWardNotes(body));
-    if (body.action === "saveRoads") return jsonOutput(saveRoads(body));
-    if (body.action === "savePopEdits") return jsonOutput(savePopEdits(body));
-    if (body.action === "addPendingCad") return jsonOutput(addPendingCad(body));
-    if (body.action === "removePendingCad") return jsonOutput(removePendingCad(body));
-    if (body.action === "addPendingPoints") return jsonOutput(addPendingPoints(body));
-    return jsonOutput({ "error": "Action không hợp lệ" });
+    var body = parsePostBody(e);
+    var action = String(body.action || '');
+    if (action === "importCadBatch") return jsonOutput(importCadBatch(body));
+    if (action === "markWardNotes") return jsonOutput(markWardNotes(body));
+    if (action === "saveRoads") return jsonOutput(saveRoads(body));
+    if (action === "savePopEdits") return jsonOutput(savePopEdits(body));
+    if (action === "addPendingCad") return jsonOutput(addPendingCad(body));
+    if (action === "removePendingCad") return jsonOutput(removePendingCad(body));
+    if (action === "addPendingPoints") {
+      if (!Array.isArray(body.items) || !body.items.length) {
+        return jsonOutput({ "error": "Không nhận được danh sách điểm. Deploy bản Code.gs này: Manage deployments → Edit → Version: New version." });
+      }
+      return jsonOutput(addPendingPoints(body));
+    }
+    return jsonOutput({ "error": "Action không hợp lệ: " + action });
   } catch (err) {
     return jsonOutput({ "error": err.toString() });
   }
@@ -773,9 +817,11 @@ function importCadBatch(body) {
  */
 function addPendingPoints(body) {
   var items = Array.isArray(body.items) ? body.items : [];
+  if (!items.length) return { "error": "Danh sách điểm rỗng" };
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return { "error": "Script không gắn với Google Sheet (getActiveSpreadsheet trống)" };
   var currentTime = Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm:ss");
-  var created = [], skipped = 0;
+  var created = [], skipped = 0, sheets = [];
 
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -784,19 +830,28 @@ function addPendingPoints(body) {
     items.forEach(function(it) {
       var typeCode = String(it.type || '');
       if (!ctx.hasOwnProperty(typeCode)) {
-        var sheet = ensureInfraSheet(ss, typeCode);
-        if (!sheet) { ctx[typeCode] = null; }
-        else {
-          var data = sheet.getDataRange().getValues();
-          var col = getColumnMap(data[0]);
-          var notes = {};
-          for (var r = 1; r < data.length; r++) notes[String(cellAt(data[r], col.ghiChu) || '')] = true;
-          ctx[typeCode] = { sheet: sheet, data: data, col: col, notes: Object.keys(notes).join('\n'), maxNum: null, rows: [] };
+        var sheet = null;
+        try { sheet = ensureInfraSheet(ss, typeCode); }
+        catch (err) { ctx[typeCode] = { error: err.message || String(err) }; }
+        if (!ctx[typeCode]) {
+          if (!sheet) ctx[typeCode] = { error: "Không có tab " + typeCode };
+          else {
+            var data = sheet.getDataRange().getValues();
+            var col = getColumnMap(data[0]);
+            var noteSet = {};
+            for (var r = 1; r < data.length; r++) {
+              var note = String(cellAt(data[r], col.ghiChu) || '');
+              if (note) noteSet[note] = true;
+              var refInNote = note.match(/OSM:(?:node|way|relation)\/\d+/);
+              if (refInNote) noteSet[refInNote[0]] = true;
+            }
+            ctx[typeCode] = { sheet: sheet, data: data, col: col, noteSet: noteSet, maxNum: null, rows: [] };
+          }
         }
       }
       var c = ctx[typeCode];
       var ref = String(it.ref || '');
-      if (!c || c.col.id < 0 || c.col.lat < 0 || c.col.lng < 0 || (ref && c.notes.indexOf(ref) !== -1)) { skipped++; return; }
+      if (!c || c.error || c.col.id < 0 || c.col.lat < 0 || c.col.lng < 0 || (ref && c.noteSet[ref])) { skipped++; return; }
 
       var prefix = typeCode.split('-')[1];
       if (c.maxNum === null) c.maxNum = maxIdNumber(c.data, c.col.id, prefix);
@@ -808,36 +863,46 @@ function addPendingPoints(body) {
       set(c.col.name, String(it.name || 'Công trình mới').slice(0, 150));
       set(c.col.ward, sheetWard(it.ward));
       set(c.col.nhom, 'Cấp đô thị');
-      set(c.col.lat, String(Number(it.lat)));
-      set(c.col.lng, String(Number(it.lng)));
+      set(c.col.lat, "'" + String(Number(it.lat)));
+      set(c.col.lng, "'" + String(Number(it.lng)));
       set(c.col.quyMoHT, Number(it.size) > 0 ? Number(it.size) : 0);
       if (Number(it.radius) > 0) set(c.col.banKinh, Number(it.radius));
       set(c.col.trangThai, false);
       set(c.col.thoiGian, currentTime);
       set(c.col.ghiChu, "Đề xuất từ OpenStreetMap" + (ref ? " (" + ref + ")" : ""));
+      if (ref) c.noteSet[ref] = true;
       c.rows.push(row);
       created.push(id);
     });
 
     Object.keys(ctx).forEach(function(k) {
       var c = ctx[k];
-      if (!c || !c.rows.length) return;
+      if (!c || c.error || !c.rows.length) return;
       var start = c.sheet.getLastRow() + 1;
-      var target = c.sheet.getRange(start, 1, c.rows.length, c.data[0].length);
+      var width = c.data[0].length;
+      var target = c.sheet.getRange(start, 1, c.rows.length, width);
       if (start > 2) {
-        var template = c.sheet.getRange(start - 1, 1, 1, c.data[0].length);
+        var template = c.sheet.getRange(start - 1, 1, 1, width);
         template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
         template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
       }
       target.setValues(c.rows);
+      if (c.col.lat >= 0) c.sheet.getRange(start, c.col.lat + 1, c.rows.length, 1).setNumberFormat("@");
+      if (c.col.lng >= 0) c.sheet.getRange(start, c.col.lng + 1, c.rows.length, 1).setNumberFormat("@");
+      sheets.push(c.sheet.getName() + " (" + c.rows.length + ")");
     });
     SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
   }
 
+  var failed = Object.keys(ctx).filter(function(k) { return ctx[k] && ctx[k].error; })
+    .map(function(k) { return k + ": " + ctx[k].error; });
+  if (!created.length) {
+    return { "error": failed.length ? failed.join("; ") : "Không ghi được dòng nào", "created": 0, "skipped": skipped };
+  }
   if (created.length) syncSheetsToGCS();
-  return { "success": true, "created": created.length, "skipped": skipped };
+  return { "success": true, "created": created.length, "skipped": skipped, "sheets": sheets, "script": "osm-tabs-1", "warning": failed.join("; ") };
 }
 
 // MẠNG LƯỚI ĐƯỜNG OSM TOÀN THÀNH PHỐ (Admin tải theo phường/xã, máy chủ webapp gửi sang để lưu lên bucket)

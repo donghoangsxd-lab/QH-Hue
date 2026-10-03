@@ -507,14 +507,36 @@ export function tt16Layer(layerName) {
 }
 
 /**
- * Tên layer → { prefix, type, nhom } hoặc null. Nhận tên TT16 (tt16Layer), đúng mã webapp
- * hoặc mã + phần đuôi sau dấu _ - khoảng trắng (VD "MN_QH")
+ * Tiền tố tên file DXF: "QH-TTPN.dxf" → "QH", "HT_AnCuu.dxf" → "HT".
+ * Chữ cái ngay sau HT/QH (VD "QHTTPN.dxf") không tính là tiền tố.
+ */
+export function filePhaseFromName(fileName) {
+  const base = String(fileName || '').replace(/\.[^.]+$/, '').trim()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const m = base.match(/^(HT|QH)(?![A-Za-z])/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+/** Layer mô tả hiện trạng giữ nguyên: token HT đứng riêng ở đầu hoặc cuối (HT, HT_CV, CV_HT, HT_DAT_...). */
+export function layerMarksCurrent(layerName) {
+  const tt = tt16Layer(layerName);
+  if (tt && tt.stage === 'HT') return true;
+  const tokens = String(layerName || '').trim()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+  return tokens[0] === 'HT' || (tokens.length > 1 && tokens[tokens.length - 1] === 'HT');
+}
+
+/**
+ * Tên layer → { prefix, type, nhom } hoặc null. Nhận tên TT16 (tt16Layer), đúng mã webapp,
+ * mã kèm tiền tố / hậu tố giai đoạn (HT_CV, CV_HT, QH_MN) hoặc phần đuôi sau dấu _ - khoảng trắng.
  */
 export function layerToType(layerName) {
   const tt = tt16Layer(layerName);
   if (tt) return tt.prefix ? { prefix: tt.prefix, type: tt.type, nhom: tt.nhom } : null;
   const name = String(layerName || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
-  const prefix = LAYER_PREFIXES[name] ? name : PREFIX_KEYS.find(k => name.startsWith(k + '_'));
+  const core = name.replace(/^(?:QHDD|QHDH|QH|HT)_/, '').replace(/_(?:QHDD|QHDH|QH|HT)$/, '');
+  const prefix = LAYER_PREFIXES[core] ? core : PREFIX_KEYS.find(k => core.startsWith(k + '_'));
   if (!prefix) return null;
   const nhom = prefix === 'THPT' || prefix.endsWith('_DT') ? 'Cấp đô thị' : 'Cấp đơn vị ở';
   return { prefix, type: LAYER_PREFIXES[prefix], nhom };

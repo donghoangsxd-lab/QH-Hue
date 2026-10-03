@@ -203,8 +203,9 @@ async function writePreview() {
       const skip = Number(res.skipped) > 0 ? ` Bỏ qua ${fmtNum(res.skipped)} điểm.` : '';
       throw new Error(`Sheet không thêm dòng nào.${skip} Tab 10-BUS / 12-NT chỉ hiện sau khi ghi được ít nhất 1 điểm.`);
     }
-    showToast(`✓ Đã ghi ${fmtNum(res.created)} điểm chờ duyệt${res.skipped ? `, bỏ qua ${fmtNum(res.skipped)} điểm đã có` : ''}`, 'success');
-    setStatus(`✓ Đã ghi ${fmtNum(res.created)} điểm (TrangThai = FALSE) vào tab 10-BUS / 11-PCCC / 12-NT. Mở từng điểm trên bản đồ để phê duyệt.`, 'var(--accent-green)');
+    const where = (res.sheets || []).length ? ` vào tab ${(res.sheets || []).join(', ')}` : '';
+    showToast(`✓ Đã ghi ${fmtNum(res.created)} điểm chờ duyệt${where}`, 'success');
+    setStatus(`✓ Đã ghi ${fmtNum(res.created)} điểm (TrangThai = FALSE)${where}. Kéo thanh tab Sheet sang phải nếu chưa thấy 10-BUS, 11-PCCC, 12-NT.`, 'var(--accent-green)');
     preview = null;
     busy = false;
     if (onImported) await onImported();

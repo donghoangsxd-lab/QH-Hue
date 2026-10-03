@@ -283,6 +283,7 @@
         <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
           <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true"><svg class="ico"><use href="#i-pen"/></svg>Nhập 1 điểm</button>
           <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ, GeoJSON"><svg class="ico"><use href="#i-folder"/></svg>Nhập hàng loạt</button>
+          <button type="button" class="add-mode-btn" data-mode="addReview" role="tab" aria-selected="false" title="Thẩm định một đồ án quy hoạch theo QCVN 01:2026, không ghi vào bảng phường"><svg class="ico"><use href="#i-table"/></svg>Thẩm định</button>
           <button type="button" class="add-mode-btn" data-mode="addAdmin" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Admin hiệu chỉnh dữ liệu nền: vẽ bổ sung tuyến đường, xóa / thêm pixel dân cư"><svg class="ico"><use href="#i-tool"/></svg>Admin</button>
         </div>
 
@@ -340,6 +341,30 @@
         <div id="statusMsg" class="rp-status" role="status" aria-live="polite"></div>
         </div>
 
+        <div id="addReview" style="display:none;">
+          <p class="review-lead">Tải một file DXF (ASCII, tối đa 5 MB) gồm hatch các khu đất của đồ án. Web tự vẽ đường bao quanh các hatch và chấm chỉ tiêu. Chưa ghi vào Sheet.</p>
+          <div class="form-grid">
+            <label for="reviewCrs">Hệ tọa độ</label>
+            <select id="reviewCrs">
+              <option value="HUE_3" selected>VN-2000 KTT 107°, múi 3°</option>
+              <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
+            </select>
+            <label for="reviewPop">Dân số quy hoạch</label>
+            <input type="number" id="reviewPop" min="0" step="100" placeholder="Ví dụ 61000" title="Số đơn vị ở = dân số / 20.000, làm tròn lên" />
+          </div>
+          <label class="cad-drop" for="reviewFile">
+            <span class="cad-drop-main"><b>Chọn file DXF đồ án</b></span>
+            <span class="cad-drop-types"><i>DXF ≤ 5 MB</i></span>
+            <input type="file" id="reviewFile" accept=".dxf" hidden />
+          </label>
+          <div class="review-actions">
+            <button type="button" class="bp-btn" id="btnReviewPdf" title="Xuất bảng thẩm định"><svg class="ico"><use href="#i-printer"/></svg>PDF</button>
+            <button type="button" class="bp-btn" id="btnReviewSave" title="Lưu bảng trên trình duyệt này"><svg class="ico"><use href="#i-save"/></svg>Lưu hồ sơ</button>
+            <button type="button" class="bp-btn" id="btnReviewDrop" title="Xóa bản đang xem"><svg class="ico"><use href="#i-close"/></svg>Xóa xem trước</button>
+          </div>
+          <div id="reviewDrafts"></div>
+        </div>
+
         <div id="addBulk" style="display:none;">
           <div class="cad-pending" id="cadPendingBox" hidden></div>
           <div class="form-grid">
@@ -349,7 +374,7 @@
               <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
             </select>
             <label for="cadPhase">Giai đoạn</label>
-            <select id="cadPhase" title="Áp dụng cho layer đặt theo mã loại; layer TT16 lấy giai đoạn theo tiền tố HT_ / QHDD_ / QHDH_">
+            <select id="cadPhase" title="Áp dụng khi tên file không có tiền tố HT / QH. Layer TT16 lấy giai đoạn theo tiền tố HT_ / QHDD_ / QHDH_.">
               <option value="HT" selected>Hiện trạng (QuyMo_HT)</option>
               <option value="QH">Quy hoạch (QuyMo_QH)</option>
             </select>
@@ -361,7 +386,7 @@
           </label>
           <details class="cad-hint fold">
             <summary class="cad-hint-title">Quy ước đặt tên</summary>
-            <div class="cad-hint-row"><b>DXF</b><span>Tên layer theo TT 16/2025, VD <code>HT_DAT_HTXH_Yte</code>, hoặc = mã loại</span></div>
+            <div class="cad-hint-row"><b>DXF</b><span>File <code>QH-….dxf</code> vào quy hoạch, <code>HT-….dxf</code> vào hiện trạng. Layer HT trong file QH = giữ nguyên (hai cột quy mô bằng nhau). Tên layer theo TT 16/2025, VD <code>HT_DAT_HTXH_Yte</code>, hoặc = mã loại</span></div>
             <div class="cad-hint-row"><b>KML/KMZ</b><span>Trường <code>Layer</code> / tên Folder = mã loại</span></div>
             <div class="cad-hint-row"><b>GeoJSON</b><span>Thuộc tính <code>Layer</code> = mã loại</span></div>
             <div class="cad-codes">
@@ -508,6 +533,7 @@
   <!-- PANEL TỔNG HỢP PHÍA DƯỚI (1/5 MÀN HÌNH, CÓ THỂ PHÓNG TO TOÀN MÀN HÌNH) -->
   <section class="bottom-panel" id="bottomPanel">
     <div class="bp-body" id="bpBody">
+      <div id="projectReviewHost"></div>
       <!-- PHẦN 1: CƠ CẤU ĐẤT HẠ TẦNG -->
       <!-- Khối xoay 3 mặt: cơ cấu theo diện tích → số lượng 9 loại hạ tầng → hệ thống giao thông (phóng to: xếp chồng) -->
       <div class="bp-part bp-part1">

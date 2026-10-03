@@ -38,6 +38,7 @@ import {
 import { initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleCompareMode } from './planMap.js';
 import { escapeHtml, setStatusContent, showToast } from './utils.js';
 import { initCadImport } from './cadImportUi.js';
+import { initProjectReview } from './projectReview.js';
 import { initWardCheck, refreshWardCheck } from './wardCheck.js';
 import { initOsmImport } from './osmImport.js';
 import { initWardRoads } from './wardRoads.js';
@@ -162,6 +163,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     refreshWardCheck();
   };
   initCadImport({ onImported: reloadAfterSheetWrite });
+  initProjectReview();
   initWardCheck({ onSynced: reloadAfterSheetWrite });
   initOsmImport({ onImported: reloadAfterSheetWrite });
   initWardRoads();

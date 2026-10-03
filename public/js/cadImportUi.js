@@ -6,7 +6,7 @@ import { signOutAdmin } from './uiComponents.js';
 import { escapeHtml, fmtNum, distanceMeters, ico, setStatusContent } from './utils.js';
 import {
   parseDxf, buildParcels, buildParcelsLonLat, assignWards, matchExisting, layerToType, tt16Layer, linkStages, sameSite,
-  LAYER_PREFIXES, SCHOOL_PENDING, CRS_PRESETS
+  filePhaseFromName, layerMarksCurrent, LAYER_PREFIXES, SCHOOL_PENDING, CRS_PRESETS
 } from './cadImport.js';
 import { parseKml, unzipKml } from './kmlImport.js';
 import { parseGeoJson } from './geojsonImport.js';
@@ -87,10 +87,40 @@ function kindCounts(list, format) {
   return counts;
 }
 
-// Giai đoạn ghi quy mô: layer TT16 theo tiền tố, còn lại theo ô Giai đoạn
+// Giai đoạn ghi quy mô: tên file DXF (QH- / HT-) thắng ô Giai đoạn; không có tiền tố thì layer TT16, còn lại theo ô
 const globalPhase = () => ($('cadPhase')?.value === 'QH' ? 'QH' : 'HT');
 const phaseOf = (p) => p.phase || globalPhase();
-const phasesOf = (p) => (p.partner ? [phaseOf(p), phaseOf(p.partner)] : [phaseOf(p)]);
+const phasesOf = (p) => (p.keep ? ['HT', 'QH'] : p.partner ? [phaseOf(p), phaseOf(p.partner)] : [phaseOf(p)]);
+
+// File QH-*.dxf: mọi lô vào quy hoạch, trừ layer HT (giữ nguyên — ghi cả hai cột bằng nhau). File HT-*.dxf: mọi lô vào hiện trạng.
+function applyFilePhase(parcels) {
+  const fp = current && current.filePhase;
+  if (fp !== 'HT' && fp !== 'QH') return;
+  parcels.forEach(p => {
+    p.keep = false;
+    if (fp === 'HT') { p.phase = 'HT'; return; }
+    if (layerMarksCurrent(p.layer)) { p.phase = 'HT'; p.stage = 'HT'; }
+    else { p.phase = 'QH'; if (!p.stage || p.stage === 'HT') p.stage = 'QH'; }
+  });
+}
+
+function markUnchanged(parcels) {
+  if (!current || current.filePhase !== 'QH') return;
+  parcels.forEach(p => {
+    p.keep = p.phase === 'HT' && !p.partner && !p.merged && layerMarksCurrent(p.layer);
+  });
+}
+
+function syncPhaseSelect() {
+  const sel = $('cadPhase');
+  if (!sel) return;
+  const locked = current && (current.filePhase === 'HT' || current.filePhase === 'QH');
+  sel.disabled = !!locked;
+  if (locked) sel.value = current.filePhase;
+  sel.title = locked
+    ? `Theo tên file: ${current.filePhase === 'QH' ? 'quy hoạch (layer HT giữ nguyên hiện trạng)' : 'hiện trạng'}`
+    : 'Áp dụng khi tên file không có tiền tố HT / QH. Layer TT16 lấy giai đoạn theo tiền tố HT_ / QHDD_ / QHDH_.';
+}
 
 // ID công trình lô sẽ cập nhật (null = tạo mới / bỏ qua / ngoài TP)
 function targetId(p) {
@@ -135,7 +165,7 @@ function parcelAction(p) {
   if (p.existingId) return { key: 'exists', label: `Đã có ${p.existingId}`, cls: 'warn' };
   if (p.matchConflict && p.choice === CHOICE_SKIP) return { key: 'skip', label: 'Bỏ qua', cls: 'warn' };
   const id = recordId(p);
-  const both = p.partner ? ' · HT+QH' : '';
+  const both = p.partner ? ' · HT+QH' : p.keep ? ' · giữ nguyên' : '';
   if (id && phasesOf(p).some(ph => dupTargets.has(`${ph}|${id}`))) return { key: 'dup', label: `Trùng ${id}`, cls: 'bad' };
   if (id) return { key: 'update', label: `Cập nhật ${id}${both}`, cls: 'info', id };
   return { key: 'new', label: `Tạo mới${both}`, cls: 'ok' };
@@ -361,9 +391,18 @@ function renderReport() {
     : 'Tọa độ không nằm trong vùng VN-2000 của Huế — kiểm tra lại hệ tọa độ / đơn vị bản vẽ.']);
   else if (result.axes.note) alerts.push(['info', `Đã tự nhận diện bản vẽ: ${escapeHtml(result.axes.note)}.`]);
   if (current.format === 'geojson') alerts.push(['info', current.wgs84 ? 'Tọa độ GeoJSON: WGS84 (kinh độ, vĩ độ).' : 'Tọa độ GeoJSON: mét — tính theo hệ VN-2000 đang chọn ở ô Hệ tọa độ.']);
+  if (current.filePhase === 'QH') {
+    const nKeep = parcels.filter(p => p.keep).length;
+    alerts.push(['info', `File <b>${escapeHtml(fileName)}</b>: tiền tố QH — toàn bộ lô ghi vào quy hoạch (QuyMo_QH). <b>${nKeep}</b> lô layer HT giữ nguyên hiện trạng (QuyMo_HT = QuyMo_QH).`]);
+  } else if (current.filePhase === 'HT') {
+    alerts.push(['info', `File <b>${escapeHtml(fileName)}</b>: tiền tố HT — toàn bộ lô ghi vào hiện trạng (QuyMo_HT).`]);
+  }
   if (current.tt16) {
     const legacy = parcels.filter(p => !p.tt16).length;
-    alerts.push(['info', `Tên layer theo TT 16/2025/TT-BXD — duyệt thẳng, không hỏi xác nhận: <b>${count.tt16HT}</b> lô HT_ → QuyMo_HT, <b>${count.tt16QH}</b> lô QHDD_ / QHDH_ → QuyMo_QH; hậu tố _CT / _CV / _QG = cấp đô thị, _DVO = cấp đơn vị ở.${legacy ? ` ${legacy} lô đặt theo mã webapp ghi vào giai đoạn ${phase === 'QH' ? 'Quy hoạch' : 'Hiện trạng'} (ô Giai đoạn).` : ''}`]);
+    const phaseNote = current.filePhase
+      ? 'Giai đoạn lấy theo tên file.'
+      : `<b>${count.tt16HT}</b> lô HT_ → QuyMo_HT, <b>${count.tt16QH}</b> lô QHDD_ / QHDH_ → QuyMo_QH.${legacy ? ` ${legacy} lô đặt theo mã webapp ghi vào giai đoạn ${phase === 'QH' ? 'Quy hoạch' : 'Hiện trạng'} (ô Giai đoạn).` : ''}`;
+    alerts.push(['info', `Tên layer theo TT 16/2025/TT-BXD — duyệt thẳng, không hỏi xác nhận: ${phaseNote} Hậu tố _CT / _CV / _QG = cấp đô thị, _DVO = cấp đơn vị ở.`]);
     if (count.pending) alerts.push(['warn', `${count.pending} lô Truonghoc thiếu hậu tố _MN / _TH / _THCS (viền vàng nét đứt): chọn cấp trường hoặc từ chối từng lô ở khung duyệt bên dưới trước khi ghi.`]);
     if (count.rejected) alerts.push(['info', `${count.rejected} lô trường học đã từ chối: không ghi.`]);
     if (count.merged) alerts.push(['info', `${count.merged} cặp lô HT_ và QH cùng vị trí, cùng loại: gộp thành 1 công trình, ghi cả QuyMo_HT và QuyMo_QH.`]);
@@ -371,7 +410,7 @@ function renderReport() {
   }
   if (count.cross) alerts.push(['warn', `${count.cross} lô vắt ranh phường (lấn ≥ 5%): ghi quy mô = 0, diện tích thật ghi vào Ghi chú.`]);
   if (count.out) alerts.push(['bad', `${count.out} lô nằm ngoài TP. Huế (đưa lên đầu danh sách, viền xám trên bản đồ): bỏ qua${current.tt16 ? '' : ' — sẽ hỏi xác nhận trước khi ghi'}.`]);
-  if (count.update) alerts.push(['info', `${count.update} lô chứa công trình cùng loại đã có: cập nhật tọa độ + diện tích ${current.tt16 ? 'theo giai đoạn của layer' : phase} cho công trình đó.`]);
+  if (count.update) alerts.push(['info', `${count.update} lô chứa công trình cùng loại đã có: cập nhật tọa độ + diện tích ${current.filePhase === 'QH' ? 'theo tên file (layer HT ghi cả hai cột)' : current.filePhase === 'HT' ? 'vào hiện trạng theo tên file' : current.tt16 ? 'theo giai đoạn của layer' : phase} cho công trình đó.`]);
   if (count.multi) alerts.push(['warn', `${count.multi} lô chứa nhiều công trình cùng loại (đưa lên đầu danh sách): chọn công trình cần cập nhật — mặc định gợi ý công trình gần tâm lô nhất, các công trình còn lại giữ nguyên.`]);
   if (count.dup) alerts.push(['bad', `${count.dup} lô cùng cập nhật 1 công trình: chọn lại (tạo mới / bỏ qua) trước khi ghi.`]);
   if (count.skip) alerts.push(['info', `${count.skip} lô được chọn bỏ qua.`]);
@@ -643,6 +682,7 @@ const parcelKey = (p) => `${p.layer}|${p.lat}|${p.lng}|${p.area}`;
 function refreshParcels() {
   const base = current.base;
   applyLevels(base.parcels);
+  applyFilePhase(base.parcels);
   const existing = [...state.rawDataList, ...state.planDataList];
   matchExisting(base.parcels, existing);
   current.items = new Map(existing.filter(it => it.id).map(it => [it.id, it]));
@@ -653,6 +693,7 @@ function refreshParcels() {
     p.choice = prev && (prev === CHOICE_NEW || prev === CHOICE_SKIP || p.matchConflict.includes(prev)) ? prev : nearestChoice(p);
   });
   const linked = linkStages(base.parcels);
+  markUnchanged(linked.parcels);
   current.result = { ...base, parcels: linked.parcels, stageDupes: linked.stageDupes };
 }
 
@@ -704,14 +745,16 @@ async function loadFile(file, pendingId = null) {
     }
     const format = ext === 'dxf' ? 'dxf' : ext === 'kml' || ext === 'kmz' ? 'kml' : 'geojson';
     const wgs84 = format === 'kml' || (format === 'geojson' && parsed.wgs84);
+    const filePhase = format === 'dxf' ? filePhaseFromName(file.name) : null;
     // File đặt tên layer theo TT16: chỉ nhận layer đúng tên, không khớp thủ công các layer khác
     const tt16 = parsed.entities.some(e => tt16Layer(e.layer));
     current = {
-      fileName: file.name, format, wgs84, tt16, entities: parsed.entities, stats: parsed.stats, base: null, result: null,
+      fileName: file.name, format, wgs84, tt16, filePhase, entities: parsed.entities, stats: parsed.stats, base: null, result: null,
       manual: tt16 ? null : createManualMapping(parsed.entities), levels: new Map(), reviewSrc: null, reviewStarted: false,
       raw: { ext: format, text }, pendingId
     };
     lockCrs(wgs84);
+    syncPhaseSelect();
     analyse();
     setStatus(pendingId ? 'Đang mở hồ sơ chờ duyệt — kiểm tra rồi bấm Ghi; ghi xong hồ sơ tự xóa khỏi hàng chờ.' : '');
     renderPendingList();
@@ -734,6 +777,7 @@ function lockCrs(on) {
 
 function resetImport(keepStatus = false) {
   current = null;
+  syncPhaseSelect();
   lockCrs(false);
   clearPreview();
   renderReport();
@@ -779,10 +823,15 @@ function buildItems() {
       crossWard: !!p.crossWard,
       layer: layerOut(p),
       matchId: action.key === 'update' ? action.id : null,
-      // Quy mô + ranh theo từng giai đoạn: 1 lô, hoặc cặp HT + QH cùng vị trí
-      stages: [p, p.partner].filter(Boolean).map(s => ({
-        phase: phaseOf(s), area: s.area, point: isPoint(s), crossWard: !!s.crossWard, layer: layerOut(s), geometry: geometryOf(s)
-      }))
+      keep: !!p.keep,
+      // Quy mô + ranh theo từng giai đoạn: 1 lô, cặp HT + QH cùng vị trí, hoặc layer HT trong file QH (hai cột bằng nhau)
+      stages: p.keep
+        ? ['HT', 'QH'].map(phase => ({
+          phase, area: p.area, point: isPoint(p), crossWard: !!p.crossWard, layer: layerOut(p), geometry: geometryOf(p)
+        }))
+        : [p, p.partner].filter(Boolean).map(s => ({
+          phase: phaseOf(s), area: s.area, point: isPoint(s), crossWard: !!s.crossWard, layer: layerOut(s), geometry: geometryOf(s)
+        }))
     });
   });
   return items;
@@ -844,7 +893,11 @@ async function submitImport() {
       if (!confirm(`⚠️ Có ${outside.length} lô nằm ngoài TP. Huế (${detail}) sẽ bị BỎ QUA, không ghi vào Sheet.\n\nNếu đây là lỗi vẽ / sai vị trí, bấm Hủy để sửa file rồi nhập lại.\nBấm OK để tiếp tục ghi ${items.length} lô hợp lệ.`)) return;
     }
     const nUpdate = items.filter(it => it.matchId).length;
-    const phaseLabel = phase === 'QH' ? 'Quy hoạch (QuyMo_QH)' : 'Hiện trạng (QuyMo_HT)';
+    const nKeep = items.filter(it => it.keep).length;
+    const phaseLabel = current.filePhase === 'QH'
+      ? (nKeep ? `Quy hoạch theo tên file; ${nKeep} lô layer HT giữ nguyên (QuyMo_HT = QuyMo_QH)` : 'Quy hoạch (QuyMo_QH) theo tên file')
+      : current.filePhase === 'HT' ? 'Hiện trạng (QuyMo_HT) theo tên file'
+        : phase === 'QH' ? 'Quy hoạch (QuyMo_QH)' : 'Hiện trạng (QuyMo_HT)';
     if (!confirm(`Ghi ${items.length} lô vào Google Sheet?\n• ${summary}\n• ${items.length - nUpdate} tạo mới, ${nUpdate} cập nhật\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
   }
 

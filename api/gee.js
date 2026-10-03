@@ -336,9 +336,22 @@ async function callAppsScript(params, body = null) {
 
   let res;
   try {
+    // text/plain: Apps Script đưa nguyên chuỗi JSON vào e.postData.contents.
+    // application/json đôi khi bị bỏ body, doPost chỉ thấy query rồi trả "Action không hợp lệ".
     res = body
-      ? await axios.post(url, JSON.stringify(body), { ...opts, headers: { 'Content-Type': 'application/json' }, maxBodyLength: Infinity })
+      ? await axios.post(url, JSON.stringify(body), {
+          ...opts,
+          maxBodyLength: Infinity,
+          maxRedirects: 0,
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          transformRequest: [data => data]
+        })
       : await axios.get(url, opts);
+    const locHeader = res && res.headers && res.headers.location;
+    const loc = Array.isArray(locHeader) ? locHeader[0] : locHeader;
+    if (body && loc && res.status >= 300 && res.status < 400) {
+      res = await axios.get(String(loc).startsWith('http') ? loc : new URL(loc, url).href, opts);
+    }
   } catch (e) {
     throw httpError(502, 'Không kết nối được Google Apps Script');
   }
@@ -348,7 +361,11 @@ async function callAppsScript(params, body = null) {
   try { data = JSON.parse(text); } catch (e) {}
   if (data && typeof data === 'object') {
     if (res.status >= 400 || data.error || data.success === false) {
-      throw httpError(502, `Apps Script: ${data.error || data.message || 'từ chối yêu cầu'}`);
+      let msg = data.error || data.message || 'từ chối yêu cầu';
+      if (String(msg).indexOf('Action không hợp lệ') === 0) {
+        msg += '. Web app trên Sheet vẫn là bản cũ: Extensions → Apps Script, dán file apps-script/Code.gs, rồi Deploy → Manage deployments → Edit → Version: New version → Deploy. Save không cập nhật web app.';
+      }
+      throw httpError(502, `Apps Script: ${msg}`);
     }
     return data;
   }
@@ -2306,10 +2323,13 @@ module.exports = async (req, res) => {
       const created = Number(result && result.created);
       const skipped = Number(result && result.skipped);
       if (!Number.isFinite(created) || !Number.isFinite(skipped)) {
-        return res.status(502).json({ error: true, message: 'Apps Script không trả số điểm đã ghi. Cần cập nhật script trên Sheet (hàm addPendingPoints).' });
+        return res.status(502).json({
+          error: true,
+          message: 'Apps Script không trả số điểm đã ghi. Dán apps-script/Code.gs vào Sheet rồi Deploy → Manage deployments → Edit → Version: New version → Deploy.'
+        });
       }
       invalidateAllCaches();
-      return res.status(200).json({ success: true, stats, created, skipped });
+      return res.status(200).json({ success: true, stats, created, skipped, sheets: result.sheets || [] });
     }
 
     if (action === 'getWardCoverage') {
