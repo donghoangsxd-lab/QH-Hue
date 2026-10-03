@@ -5,8 +5,10 @@
 // Huế là cố đô, di sản UNESCO: cả 16 đô thị áp Điều 8 khoản 2 điểm d (không cộng hệ số vùng hay miền núi — khoản 3).
 // Không xem xét mật độ dân số trên diện tích tự nhiên (2A.II.04) và mật độ trên đất xây dựng cấp xã (2B.II.04); các tiêu chuẩn đó được điểm tối thiểu (Điều 9 khoản 4 điểm a).
 // Loại I: đủ 10/15 tiêu chuẩn. Loại II, III: không gian, kiến trúc, cảnh quan giữ nguyên; mức tối thiểu tiêu chuẩn khác = 50%, chỉ khi chưa đạt mức quy định.
-import { escapeHtml, fmtNum, ico } from './utils.js';
+import { escapeHtml, fmtNum, ico, isApproved } from './utils.js';
 import { loadRoadTypeLengths, densityArea, loadBuiltAreas } from './wardRoads.js';
+import { state } from './state.js';
+import { geeApi } from './api.js';
 
 export const CLASS_REF = 'Nghị quyết 111/2025/UBTVQH15';
 export const PLAN_REF = 'Quyết định 756/QĐ-UBND ngày 28/02/2026';
@@ -149,7 +151,7 @@ const STD_I = [
     method: 'Chấm theo Bảng 2B loại II. Webapp chưa chấm Bảng 2B.' },
   { code: '1.III.11', group: 'III', name: '≥ 2 đầu mối giao thông cấp khu vực và quốc tế, cửa ngõ, trung tâm kết nối vùng' },
   { code: '1.III.12', group: 'III', calc: 'iBus', inherit: 'QCVN 10-BUS · 0204', name: 'Giao thông hành khách công cộng bao phủ 100% đô thị loại II', target: '≥ 100% đô thị loại II',
-    method: 'Đường sắt đô thị, xe buýt hoặc tàu thủy bao phủ 100% đô thị loại II. Kế thừa trạm dừng đã duyệt (QCVN 01:2026 Mục 2.8.3.3, mã 10-BUS). Chỉ tiêu 0204 là tỷ lệ hành khách, chưa có số liệu. Webapp đếm trạm trong phạm vi, chưa tính dân số trong 500 m, nên chưa kết luận đạt.' },
+    method: 'Đường sắt đô thị, xe buýt hoặc tàu thủy bao phủ 100% đô thị loại II. Webapp tính dân số hiện trạng trong 500 m đi bộ của trạm dừng đã duyệt (QCVN 01:2026 Mục 2.8.3.3, mã 10-BUS), riêng từng đô thị loại II — cùng cách với ô độ phủ trạm xe buýt. Đường sắt đô thị và tàu thủy chưa có lớp. Chỉ tiêu 0204 là tỷ lệ hành khách, chưa có số liệu. Đạt khi mỗi đô thị loại II đạt 100%.' },
   { code: '1.III.13', group: 'III', name: '≥ 5 công trình, khu nhà ở, khu đô thị đạt giải thưởng quốc gia, quốc tế' },
   { code: '1.III.14', group: 'III', name: 'Đô thị thông minh mức độ 1, hoặc 50% đô thị loại II, III chống chịu khí hậu mức khá trở lên' },
   { code: '1.III.15', group: 'III', name: 'Hoàn thành nông thôn mới theo giai đoạn gần nhất đã được công nhận' }
@@ -328,15 +330,98 @@ function targetText(std, urban, which) {
 
 const N0pct = (f) => `${Math.round(f * 100)}%`;
 
+function typeIIBusBases(wards) {
+  return URBANS.filter(u => u.cls === 'II').map(u => {
+    const list = wardsOf(u, wards);
+    return {
+      id: u.id,
+      name: u.name.replace(/^Khu vực đô thị /, ''),
+      expected: (u.units || []).length,
+      wards: list,
+      n: list.reduce((s, w) => s + ((w.network && w.network.bus) || []).length, 0),
+      pop: popOf(list)
+    };
+  });
+}
+
+function approvedBusCount(wards) {
+  const list = state.rawDataList || [];
+  if (list.length) return list.filter(it => it.type === '10-BUS' && isApproved(it.status) && it.lat != null && it.lng != null).length;
+  return (wards || []).reduce((s, w) => s + ((w.network && w.network.bus) || []).length, 0);
+}
+
+function busSig(wards) {
+  const rows = typeIIBusBases(wards).map(r => `${r.id}:${r.expected}:${r.wards.length}:${r.n}:${r.pop}`).join('|');
+  return `${state.dataVersion}|${approvedBusCount(wards)}|${rows}`;
+}
+
+// sig khớp bản dữ liệu đang xem. status: zero = không có trạm đã duyệt; ok = đã cộng dân số; loading | error | wait
+let busCache = { sig: '', status: 'idle', rows: null };
+
+async function mapPool(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const idx = next++;
+      out[idx] = await fn(items[idx], idx);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+function ensureBusCover(wards, redraw) {
+  const sig = busSig(wards);
+  if (busCache.sig === sig && busCache.status !== 'idle') return;
+  const bases = typeIIBusBases(wards);
+  busCache = { sig, status: 'wait', rows: bases.map(r => ({ name: r.name, n: r.n, pct: null })) };
+  if (bases.some(r => r.wards.length !== r.expected)) {
+    busCache.rows.forEach(r => { r.note = 'Thiếu đơn vị trong phạm vi đô thị loại II'; });
+    return;
+  }
+  if (approvedBusCount(wards) === 0) {
+    busCache.status = 'zero';
+    busCache.rows = bases.map(r => ({ name: r.name, n: 0, covered: 0, total: r.pop, pct: r.pop > 0 ? 0 : null }));
+    return;
+  }
+  busCache.status = 'loading';
+  const names = [...new Set(bases.flatMap(r => r.wards.map(w => w.Ten_Phuong)))];
+  mapPool(names, 4, async (name) => {
+    const res = await fetch(geeApi(`action=getNetworkCoverage&ward=${encodeURIComponent(name)}`));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.json();
+    if (!body || !body.bus || body.popTotal == null) throw new Error('Thiếu dân số trong 500 m');
+    return [name, body];
+  }).then(pairs => {
+    if (busCache.sig !== sig) return;
+    const byName = new Map(pairs);
+    busCache.status = 'ok';
+    busCache.rows = bases.map(r => {
+      let covered = 0, total = 0;
+      r.wards.forEach(w => {
+        const g = byName.get(w.Ten_Phuong);
+        covered += Number(g.bus.pop) || 0;
+        total += Number(g.popTotal) || 0;
+      });
+      const pct = total > 0 ? Math.round(covered / total * 1000) / 10 : null;
+      return { name: r.name, n: r.n, covered, total, pct };
+    });
+    redraw();
+  }).catch(() => {
+    if (busCache.sig !== sig) return;
+    busCache.status = 'error';
+    busCache.rows = bases.map(r => ({ name: r.name, n: r.n, pct: null, note: 'Chưa tính được dân số trong 500 m' }));
+    redraw();
+  });
+}
+
 function typeIFacts(wards) {
   const pop = popOf(wards);
   const popUrban = (u) => popOf(wardsOf(u, wards));
   const pop2 = URBANS.filter(u => u.cls === 'II').reduce((s, u) => s + popUrban(u), 0);
   const popFull = URBANS.filter(u => u.cls === 'II' || (u.cls === 'III' && !u.partial)).reduce((s, u) => s + popUrban(u), 0);
-  const bus2 = URBANS.filter(u => u.cls === 'II').map(u => ({
-    name: u.name.replace('Khu vực đô thị ', ''),
-    n: wardsOf(u, wards).reduce((s, w) => s + ((w.network && w.network.bus) || []).length, 0)
-  }));
+  const bus2 = busCache.rows || typeIIBusBases(wards).map(r => ({ name: r.name, n: r.n, pct: null, total: r.pop }));
   return { pop, pop2, rate: pop > 0 ? popFull / pop * 100 : null, bus2 };
 }
 
@@ -351,11 +436,17 @@ function judgeI(std, facts) {
   }
   if (std.calc === 'iBus') {
     const rows = facts.bus2 || [];
-    if (!rows.length) return { level: 'wait', text: '—', note: std.method };
+    if (!rows.length || rows.some(r => r.pct == null)) {
+      const why = rows.map(r => r.note).filter(Boolean)[0];
+      return { level: 'wait', text: '…', note: why || 'Đang tính dân số trong 500 m của trạm đã duyệt.' };
+    }
+    const ok = rows.every(r => r.pct + 1e-6 >= 100);
+    const head = rows.map(r => `${r.name}: ${fmtNum(r.covered)}/${fmtNum(r.total)} người trong 500 m (${fmtNum(r.n)} trạm trong phạm vi).`).join(' ');
+    const zero = busCache.status === 'zero' ? ' Toàn thành phố có 0 trạm xe buýt đã duyệt, nên dân số trong 500 m bằng 0.' : '';
     return {
-      level: 'part',
-      text: rows.map(r => `${r.name} ${fmtNum(r.n)} trạm`).join(' · '),
-      note: std.method
+      level: ok ? 'hi' : 'no',
+      text: rows.map(r => `${r.name} ${N1.format(r.pct)}%`).join(' · '),
+      note: `${head}${zero} ${std.method}`
     };
   }
   if (std.calc === 'iRate') {
@@ -539,12 +630,15 @@ function detailRowsI(wards) {
       ? `<tr class="uc-group"><td colspan="6">${escapeHtml(GROUP_I[std.group])}</td></tr>` : '';
     group = std.group;
     const j = judgeI(std, facts);
+    const val = j.text === '…'
+      ? `<span class="gtx-wait" title="${escapeHtml(j.note || '')}">${ico('clock')}</span>`
+      : (j.text === '—' ? '<span class="gtx-na">—</span>' : escapeHtml(j.text));
     return `${head}<tr>
       <td>${i + 1}</td>
       <td class="uc-code">${std.code}</td>
       <td class="uc-name" title="${escapeHtml(j.note || std.method || '')}">${escapeHtml(std.name)}${inheritHtml(std)}</td>
       <td>${escapeHtml(std.target || 'Đạt / không đạt')}</td>
-      <td class="uc-val">${j.text === '—' ? '<span class="gtx-na">—</span>' : escapeHtml(j.text)}</td>
+      <td class="uc-val" title="${escapeHtml(j.note || '')}">${val}</td>
       <td class="${levelCls(j.level)}">${j.level === 'hi' ? 'Đạt' : (j.level === 'part' ? 'Chưa kết luận' : LEVEL_TEXT[j.level] || 'Chờ số liệu')}</td>
     </tr>`;
   }).join('');
@@ -562,7 +656,8 @@ function ruleNote(urban) {
   return `${HERITAGE_RULE} ${scope}`;
 }
 
-function detailHtml(urban, wards) {
+function detailHtml(urban, wards, redraw) {
+  if (urban.cls === 'I') ensureBusCover(wards, redraw);
   const table = urban.cls === 'I'
     ? `<table class="data-table uc-table"><thead><tr>
         <th>STT</th><th>Mã</th><th>Tiêu chuẩn</th><th>Mục tiêu</th><th>Hiện trạng</th><th>Mức đạt</th>
@@ -578,12 +673,12 @@ function detailHtml(urban, wards) {
     <div class="table-container">${table}</div>`;
 }
 
-function paint(el, wardName, wards) {
+function paint(el, wardName, wards, redraw) {
   measured.clear();
   const picked = mode !== 'auto' && mode !== 'all' ? URBANS.find(u => u.id === mode) : null;
   const autoUrban = mode === 'auto' && wardName ? urbanByWard(wardName) : null;
   const urban = picked || autoUrban;
-  el.innerHTML = urban ? detailHtml(urban, wards) : overviewHtml(wards, wardName);
+  el.innerHTML = urban ? detailHtml(urban, wards, redraw) : overviewHtml(wards, wardName);
 }
 
 /** Vẽ bảng vào el. wardName rỗng = toàn thành phố. */
@@ -595,7 +690,7 @@ export function renderUrbanClass(el, { wardName, wards }) {
   loadBuiltAreas();
   const draw = () => {
     if (!el.isConnected || el.dataset.ward !== key) return;
-    paint(el, key, wards);
+    paint(el, key, wards, draw);
   };
   draw();
   if (!roads) loadRoads().then(draw).catch(err => console.warn('Phân loại đô thị – mạng lưới đường lỗi:', err));

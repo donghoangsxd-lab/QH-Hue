@@ -2303,8 +2303,13 @@ module.exports = async (req, res) => {
         action: 'addPendingPoints',
         items: accepted.map(it => ({ ...it, lat: it.lat.toFixed(6), lng: it.lng.toFixed(6) }))
       });
+      const created = Number(result && result.created);
+      const skipped = Number(result && result.skipped);
+      if (!Number.isFinite(created) || !Number.isFinite(skipped)) {
+        return res.status(502).json({ error: true, message: 'Apps Script không trả số điểm đã ghi. Cần cập nhật script trên Sheet (hàm addPendingPoints).' });
+      }
       invalidateAllCaches();
-      return res.status(200).json({ success: true, stats, created: Number(result.created) || 0, skipped: Number(result.skipped) || 0 });
+      return res.status(200).json({ success: true, stats, created, skipped });
     }
 
     if (action === 'getWardCoverage') {

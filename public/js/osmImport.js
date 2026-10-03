@@ -123,6 +123,14 @@ async function postImport(items, dryRun) {
   return data;
 }
 
+function tallyStats(stats) {
+  return Object.values(stats || {}).reduce((s, row) => ({
+    received: s.received + (Number(row.received) || 0),
+    outside: s.outside + (Number(row.outside) || 0),
+    duplicate: s.duplicate + (Number(row.duplicate) || 0)
+  }), { received: 0, outside: 0, duplicate: 0 });
+}
+
 function setStatus(text, color = 'var(--text-muted)') {
   const el = $('osmStatus');
   if (!el) return;
@@ -165,9 +173,16 @@ async function checkOsm() {
     setStatus(`⏳ Đối chiếu ${fmtNum(items.length)} điểm OSM với dữ liệu hiện có...`, 'var(--accent-orange)');
     const res = await postImport(items, true);
     preview = { items: res.items || [], stats: res.stats || {}, sent: items };
-    setStatus(preview.items.length
-      ? `Có ${fmtNum(preview.items.length)} điểm mới — kiểm tra rồi bấm Ghi để đưa vào Sheet ở trạng thái chờ duyệt.`
-      : '✓ Dữ liệu đã có đủ các điểm OSM, không có điểm mới.', 'var(--accent-green)');
+    const tally = tallyStats(preview.stats);
+    if (preview.items.length) {
+      setStatus(`Có ${fmtNum(preview.items.length)} điểm mới — bấm Ghi điểm chờ duyệt phía dưới. Kiểm tra chưa ghi vào Sheet.`, 'var(--accent-orange)');
+    } else if (tally.duplicate > 0 && tally.outside === 0) {
+      setStatus('✓ Dữ liệu đã có đủ các điểm OSM, không có điểm mới.', 'var(--accent-green)');
+    } else if (!tally.received) {
+      setStatus('Không tìm thấy điểm OSM phù hợp trong 40 phường/xã.');
+    } else {
+      setStatus(`Không có điểm mới để ghi: ${fmtNum(tally.outside)} ngoài ranh, ${fmtNum(tally.duplicate)} trùng.`, 'var(--accent-orange)');
+    }
   } catch (err) {
     setStatus(`❌ ${err.message || 'Không tải được dữ liệu OpenStreetMap'}`, 'var(--accent-red)');
   } finally {
@@ -184,8 +199,12 @@ async function writePreview() {
   setStatus(`⏳ Đang ghi ${fmtNum(preview.items.length)} điểm vào Sheet...`, 'var(--accent-orange)');
   try {
     const res = await postImport(preview.sent, false);
+    if (!(Number(res.created) > 0)) {
+      const skip = Number(res.skipped) > 0 ? ` Bỏ qua ${fmtNum(res.skipped)} điểm.` : '';
+      throw new Error(`Sheet không thêm dòng nào.${skip} Tab 10-BUS / 12-NT chỉ hiện sau khi ghi được ít nhất 1 điểm.`);
+    }
     showToast(`✓ Đã ghi ${fmtNum(res.created)} điểm chờ duyệt${res.skipped ? `, bỏ qua ${fmtNum(res.skipped)} điểm đã có` : ''}`, 'success');
-    setStatus(`✓ Đã ghi ${fmtNum(res.created)} điểm (TrangThai = FALSE). Mở từng điểm trên bản đồ để phê duyệt.`, 'var(--accent-green)');
+    setStatus(`✓ Đã ghi ${fmtNum(res.created)} điểm (TrangThai = FALSE) vào tab 10-BUS / 11-PCCC / 12-NT. Mở từng điểm trên bản đồ để phê duyệt.`, 'var(--accent-green)');
     preview = null;
     busy = false;
     if (onImported) await onImported();
