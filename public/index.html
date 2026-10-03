@@ -50,6 +50,7 @@
     <symbol id="i-flood" viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 9.5V14M17.5 9.5V14"/><path d="M2 17c1.7 0 1.7-1.3 3.3-1.3S7 17 8.7 17s1.6-1.3 3.3-1.3 1.6 1.3 3.3 1.3 1.7-1.3 3.4-1.3S20.3 17 22 17M2 20.5c1.7 0 1.7-1.3 3.3-1.3s1.7 1.3 3.4 1.3 1.6-1.3 3.3-1.3 1.6 1.3 3.3 1.3 1.7-1.3 3.4-1.3 1.6 1.3 3.3 1.3"/></symbol>
     <symbol id="i-sat" viewBox="0 0 24 24"><path d="m9 12 3-3 3 3-3 3z"/><path d="m3.5 6.5 3-3 3 3-3 3zM14.5 17.5l3-3 3 3-3 3z"/><path d="m8 8 1.5 1.5M14.5 14.5 16 16"/><path d="M15 3.5a5.5 5.5 0 0 1 5.5 5.5M15 7a2 2 0 0 1 2 2"/></symbol>
     <symbol id="i-thermo" viewBox="0 0 24 24"><path d="M10 4.5a2 2 0 0 1 4 0v9.8a4 4 0 1 1-4 0z"/><path d="M12 10v7"/><path d="M17 6h3M17 9.5h2"/></symbol>
+    <symbol id="i-stream" viewBox="0 0 24 24"><path d="M6 3c0 4 5 4 5 8.5S6 16 6 21"/><path d="M14 3c0 4 5 4 5 8.5S14 16 14 21"/><path d="m8.5 18.5-2.5 2.5-2.5-2.5"/></symbol>
     <symbol id="i-road" viewBox="0 0 24 24"><path d="M8 3 4 21M16 3l4 18M12 4v3M12 10.5v3M12 17v3"/></symbol>
     <symbol id="i-heat" viewBox="0 0 24 24"><path d="M12 22c4 0 7-2.7 7-6.8 0-3.2-2-5.7-3.6-7.4-.3 2-1.3 3.3-2.6 3.8C13.5 7.5 12 4.5 9.5 2.5 9.6 6 5 9 5 15.2 5 19.3 8 22 12 22z"/></symbol>
     <symbol id="i-radius" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-dasharray="3 2.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 12h9"/></symbol>
@@ -209,7 +210,14 @@
             <div class="terrain-legend-bar" id="terrainLegendBar"></div>
             <div class="terrain-legend-ticks" id="terrainLegendTicks"></div>
             <div class="terrain-legend-foot"><span>Cao độ (m)</span><span id="terrainReadout"></span></div>
-            <label class="terrain-flow-toggle" for="chk_terrainFlow" title="Mũi tên chạy theo hướng xuống dốc của mô hình cao độ 30 m. Vùng bằng phẳng không vẽ vì độ dốc nhỏ hơn sai số khoảng 1–2 m."><input type="checkbox" id="chk_terrainFlow" checked> Hướng nước chảy</label>
+          </div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_drainage"><label for="chk_drainage" title="Mạng lưới thoát nước và khe tụ thủy trích từ mô hình cao độ. Nét đứt chạy theo hướng nước chảy, mũi tên chỉ hạ lưu"><svg class="ico ico-layer"><use href="#i-stream"/></svg>Thoát nước, khe tụ thủy</label></div></div>
+          <div class="layer-legend drainage-legend" id="drainageLegend" style="display:none;">
+            <div class="drainage-legend-row">
+              <svg class="drainage-swatch" viewBox="0 0 44 12" aria-hidden="true"><path d="M2 6h34" stroke="#0e7490" stroke-width="2.2"/><path class="drainage-swatch-dash" d="M2 6h34" stroke="#67e8f9" stroke-width="2.2" stroke-dasharray="6 6"/><path d="M42 6l-8-4.5 2 4.5-2 4.5z" fill="#a5f3fc" stroke="#082f49" stroke-width=".6"/></svg>
+              <span>Nét chạy theo hướng nước chảy, mũi tên chỉ hạ lưu. Nét càng dày càng nhiều nhánh đổ về; thu nhỏ bản đồ thì ẩn bớt khe nhỏ.</span>
+            </div>
+            <div class="drainage-status" id="drainageStatus"></div>
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_flood"><label for="chk_flood" title="Tô mọi vùng có cao độ Copernicus DEM GLO-30 thấp hơn mực nước giả định. Mực nước tính theo cao độ bề mặt (gồm cả nhà và cây; đô thị thường cao hơn nền đất vài mét), không phải số đọc tại trạm thủy văn"><svg class="ico ico-layer"><use href="#i-flood"/></svg>Mô phỏng ngập</label></div></div>
           <div class="flood-box" id="floodBox" style="display:none;">
@@ -342,7 +350,7 @@
         </div>
 
         <div id="addReview" style="display:none;">
-          <p class="review-lead">Tải một file DXF (ASCII, tối đa 5 MB) gồm hatch các khu đất của đồ án. Web tự vẽ đường bao quanh các hatch và chấm chỉ tiêu. Chưa ghi vào Sheet.</p>
+          <p class="review-lead">Tải một file DXF (ASCII, tối đa 5 MB) gồm hatch các khu đất của đồ án. Web tự vẽ đường bao quanh các hatch và chấm chỉ tiêu. Kết quả chỉ ghi vào hệ thống khi bấm Gửi và được Admin duyệt.</p>
           <div class="form-grid">
             <label for="reviewCrs">Hệ tọa độ</label>
             <select id="reviewCrs">
@@ -357,9 +365,16 @@
             <span class="cad-drop-types"><i>DXF ≤ 5 MB</i></span>
             <input type="file" id="reviewFile" accept=".dxf" hidden />
           </label>
+          <div class="form-grid review-send">
+            <label for="reviewReplace">Thay thế đồ án</label>
+            <select id="reviewReplace" title="Đồ án đang có trên web (theo tên file DXF đã nhập) mà hồ sơ này đề xuất thay thế">
+              <option value="">Đồ án mới (không thay thế)</option>
+            </select>
+            <label for="reviewSender">Người gửi</label>
+            <input type="text" id="reviewSender" maxlength="80" placeholder="Tên / đơn vị (tùy chọn)" />
+          </div>
           <div class="review-actions">
-            <button type="button" class="bp-btn" id="btnReviewPdf" title="Xuất bảng thẩm định"><svg class="ico"><use href="#i-printer"/></svg>PDF</button>
-            <button type="button" class="bp-btn" id="btnReviewSave" title="Lưu bảng trên trình duyệt này"><svg class="ico"><use href="#i-save"/></svg>Lưu hồ sơ</button>
+            <button type="button" class="bp-btn review-send-btn" id="btnReviewSend" title="Gửi ranh lô và kết quả thẩm định vào hàng chờ, Admin duyệt rồi mới đưa lên bản đồ"><svg class="ico"><use href="#i-send"/></svg>Gửi lên hệ thống</button>
             <button type="button" class="bp-btn" id="btnReviewDrop" title="Xóa bản đang xem"><svg class="ico"><use href="#i-close"/></svg>Xóa xem trước</button>
           </div>
           <div id="reviewDrafts"></div>

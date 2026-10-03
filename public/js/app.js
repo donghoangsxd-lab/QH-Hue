@@ -46,6 +46,7 @@ import { initCustomRoads, handleRoadDrawClick } from './customRoads.js';
 import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 import { initTerrainLayer } from './terrainLayer.js';
+import { initDrainageLayer } from './drainageLayer.js';
 import { initFloodSim } from './floodSim.js';
 import { initSatLayers } from './satLayers.js';
 import { initSketchLayer, handleSketchClick, stopSketchTool } from './sketchLayer.js';
@@ -171,6 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initPopEdits();
   initRoadNetworkLayer();
   initTerrainLayer();
+  initDrainageLayer();
   initFloodSim();
   initSatLayers();
   initRiskLayer();
@@ -497,7 +499,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Bấm lại cùng ô để khôi phục đúng các lớp đang bật trước đó.
   const FOCUS_CHECKS = [
     ...ICON_GROUPS.map(k => `chk_${k}`),
-    'chk_bound', 'chk_parcel', 'chk_pop', 'chk_terrain', 'chk_flood', 'chk_sarflood',
+    'chk_bound', 'chk_parcel', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_flood', 'chk_sarflood',
     'chk_lst', 'chk_newdev', 'chk_risk', 'chk_roads', 'chk_heat'
   ];
   let focusSnapshot = null;

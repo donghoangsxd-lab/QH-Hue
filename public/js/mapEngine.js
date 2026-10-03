@@ -941,7 +941,7 @@ export async function loadCadParcels() {
     const data = await res.json();
     const next = new Map();
     (data.parcels || []).forEach(p => {
-      if (p && p.id && p.geometry) next.set(`${p.phase === 'QH' ? 'QH' : 'HT'}|${p.id}`, { geometry: p.geometry, layer: p.layer || '' });
+      if (p && p.id && p.geometry) next.set(`${p.phase === 'QH' ? 'QH' : 'HT'}|${p.id}`, { geometry: p.geometry, layer: p.layer || '', file: p.file || '' });
     });
     state.cadParcels = next;
   } catch (err) {

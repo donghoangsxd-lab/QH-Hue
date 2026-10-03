@@ -114,172 +114,6 @@ const TerrainGrid = L.GridLayer.extend({
 
 let visible = false;
 let leftLayer = null, rightLayer = null;
-let flowLeft = null, flowRight = null;
-
-// Hướng chảy: độ dốc trên Copernicus DEM ~30 m. Hai khoảng cách phải cùng hướng và chênh cao ≥ 2 m
-// (sai số vùng bằng khoảng 1–2 m) thì mới vẽ — đồng bằng ven phá không có mũi tên.
-const FLOW_DROP_M = 2;
-const FLOW_MAX_TILES = 36;
-
-function sampleZoom(m) {
-  return Math.max(11, Math.min(13, Math.round(m.getZoom())));
-}
-
-function elevOn(z, x, y, ix, iy) {
-  const elev = elevCache.get(`${z}/${x}/${y}`);
-  if (!elev || ix < 0 || iy < 0 || ix > 255 || iy > 255) return null;
-  return elev[iy * 256 + ix];
-}
-
-function elevAtProject(z, px, py) {
-  const x = Math.floor(px / 256), y = Math.floor(py / 256);
-  return elevOn(z, x, y, Math.floor(px - x * 256), Math.floor(py - y * 256));
-}
-
-function tilesFor(m, z) {
-  const b = m.getBounds().pad(0.15);
-  const nw = m.project(b.getNorthWest(), z);
-  const se = m.project(b.getSouthEast(), z);
-  const out = [];
-  for (let x = Math.floor(nw.x / 256); x <= Math.floor(se.x / 256); x++) {
-    for (let y = Math.floor(nw.y / 256); y <= Math.floor(se.y / 256); y++) out.push({ x, y });
-  }
-  return out;
-}
-
-function buildArrows(m, z) {
-  const size = m.getSize();
-  const gap = 68;
-  const near = 4, far = 8;
-  const arrows = [];
-  for (let sy = gap / 2; sy < size.y; sy += gap) {
-    for (let sx = gap / 2; sx < size.x; sx += gap) {
-      const ll = m.containerPointToLatLng([sx, sy]);
-      const p = m.project(ll, z);
-      const e0 = elevAtProject(z, p.x, p.y);
-      const eE = elevAtProject(z, p.x + far, p.y);
-      const eN = elevAtProject(z, p.x, p.y - far);
-      const eEn = elevAtProject(z, p.x + near, p.y);
-      const eNn = elevAtProject(z, p.x, p.y - near);
-      if (e0 == null || eE == null || eN == null || eEn == null || eNn == null) continue;
-      const gx = eE - e0, gy = eN - e0;
-      if (gx * (eEn - e0) + gy * (eNn - e0) <= 0) continue;
-      if (Math.hypot(gx, gy) < FLOW_DROP_M) continue;
-      // Web Mercator: +x = đông, −y = bắc. Vector lên dốc là (gx, −gy); xuống dốc thì ngược lại.
-      const down = m.unproject(L.point(p.x - gx, p.y + gy), z);
-      arrows.push({ lat: ll.lat, lng: ll.lng, toLat: down.lat, toLng: down.lng });
-    }
-  }
-  return arrows;
-}
-
-const FlowLayer = L.Layer.extend({
-  onAdd(m) {
-    this._map = m;
-    if (!m.getPane('terrainFlowPane')) {
-      const pane = m.createPane('terrainFlowPane');
-      pane.style.zIndex = '250';
-      pane.style.pointerEvents = 'none';
-    }
-    this._canvas = L.DomUtil.create('canvas', 'terrain-flow-canvas', m.getPane('terrainFlowPane'));
-    this._canvas.style.position = 'absolute';
-    this._canvas.style.pointerEvents = 'none';
-    this._arrows = [];
-    this._token = 0;
-    this._reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    m.on('moveend zoomend resize', this._schedule, this);
-    this._schedule();
-    this._loop();
-  },
-  onRemove(m) {
-    this._token++;
-    cancelAnimationFrame(this._raf);
-    m.off('moveend zoomend resize', this._schedule, this);
-    L.DomUtil.remove(this._canvas);
-    this._map = null;
-  },
-  _schedule() {
-    const m = this._map;
-    if (!m) return;
-    const token = ++this._token;
-    const z = sampleZoom(m);
-    const tiles = tilesFor(m, z);
-    if (tiles.length > FLOW_MAX_TILES) { this._arrows = []; return; }
-    Promise.all(tiles.map(t => loadElevTile(z, t.x, t.y).catch(() => null))).then(() => {
-      if (token !== this._token || !this._map) return;
-      this._arrows = buildArrows(this._map, z);
-    });
-  },
-  _loop() {
-    const draw = (now) => {
-      this._raf = requestAnimationFrame(draw);
-      this._paint(this._reduce ? 0 : (now / 1400) % 1);
-    };
-    this._raf = requestAnimationFrame(draw);
-  },
-  _paint(phase) {
-    const m = this._map;
-    const canvas = this._canvas;
-    if (!m || !canvas) return;
-    const size = m.getSize();
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    if (canvas.width !== Math.round(size.x * dpr) || canvas.height !== Math.round(size.y * dpr)) {
-      canvas.width = Math.round(size.x * dpr);
-      canvas.height = Math.round(size.y * dpr);
-      canvas.style.width = `${size.x}px`;
-      canvas.style.height = `${size.y}px`;
-    }
-    const ctx = canvas.getContext('2d');
-    const topLeft = m.containerPointToLayerPoint([0, 0]);
-    L.DomUtil.setPosition(canvas, topLeft);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, size.x, size.y);
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    this._arrows.forEach(a => {
-      const p0 = m.latLngToContainerPoint([a.lat, a.lng]);
-      const p1 = m.latLngToContainerPoint([a.toLat, a.toLng]);
-      let dx = p1.x - p0.x, dy = p1.y - p0.y;
-      const n = Math.hypot(dx, dy);
-      if (!(n > 0)) return;
-      dx /= n; dy /= n;
-      const len = 18;
-      const ox = p0.x + dx * len * phase, oy = p0.y + dy * len * phase;
-      ctx.strokeStyle = 'rgba(15, 23, 42, 0.8)';
-      ctx.fillStyle = '#f8fafc';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.moveTo(ox - dx * 11, oy - dy * 11);
-      ctx.lineTo(ox, oy);
-      ctx.stroke();
-      const px = -dy, py = dx;
-      ctx.beginPath();
-      ctx.moveTo(ox, oy);
-      ctx.lineTo(ox - dx * 7 + px * 3.4, oy - dy * 7 + py * 3.4);
-      ctx.lineTo(ox - dx * 7 - px * 3.4, oy - dy * 7 - py * 3.4);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    });
-  }
-});
-
-function flowWanted() {
-  const el = $('chk_terrainFlow');
-  return !el || el.checked;
-}
-
-function syncFlow() {
-  const on = visible && flowWanted() && !!map;
-  if (!on) {
-    flowLeft?.remove(); flowLeft = null;
-    flowRight?.remove(); flowRight = null;
-    return;
-  }
-  if (!flowLeft) flowLeft = new FlowLayer().addTo(map);
-  if (planMap && !flowRight) flowRight = new FlowLayer().addTo(planMap);
-  else if (!planMap && flowRight) { flowRight.remove(); flowRight = null; }
-}
 
 function opacity() {
   const el = $('terrainOpacity');
@@ -341,7 +175,6 @@ export function setTerrainVisible(on) {
     planMap?.off('mousemove', onMouseMove);
     setReadout('');
   }
-  syncFlow();
 }
 
 function renderLegend() {
@@ -360,7 +193,6 @@ export function initTerrainLayer() {
   if (!map) return;
   renderLegend();
   $('chk_terrain')?.addEventListener('change', (e) => setTerrainVisible(e.target.checked));
-  $('chk_terrainFlow')?.addEventListener('change', syncFlow);
   $('terrainOpacity')?.addEventListener('input', () => {
     const o = opacity();
     leftLayer?.setOpacity(o);

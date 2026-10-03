@@ -1,6 +1,7 @@
-// Đề xuất → Thẩm định đồ án: đọc hatch DXF, chấm QCVN 01:2026, không ghi Sheet.
+// Đề xuất → Thẩm định đồ án: đọc hatch DXF, chấm QCVN 01:2026. Chỉ vào hàng chờ duyệt khi người dùng bấm Gửi.
 import { map } from './mapEngine.js';
-import { BUFFER_COLORS } from './state.js';
+import { state, BUFFER_COLORS } from './state.js';
+import { geeApi } from './api.js';
 import { parseDxf, buildParcels, CRS_PRESETS, tt16Layer } from './cadImport.js';
 import { escapeHtml, fmtNum, ico, showToast, loadHtml2Pdf } from './utils.js';
 import { setBottomPanelMaximized } from './uiComponents.js';
@@ -9,14 +10,24 @@ import {
 } from './projectReviewCore.js';
 
 const STORE_KEY = 'qh_review_dossiers';
+// Hàng chờ duyệt (submitCadPending) nhận tối đa 2 MB nội dung
+const SEND_MAX_BYTES = 2 * 1024 * 1024;
+const ASK_COLOR = '#fb923c';
+const FOCUS_COLOR = '#facc15';
 const $ = (id) => document.getElementById(id);
 
 let session = null;
 let manual = new Map();
 let layerGroup = null;
+let svgRenderer = null;
+let lotLayers = [];
+let focused = '';
 let maxWasOn = false;
+let sending = false;
+let pdfName = 'do-an';
 
 const roleLabel = (role, key) => (role === 'housing' ? 'Đất ở' : role === 'score' ? rowLabel(key) : role === 'other' ? 'Không chấm' : 'Chưa rõ');
+const baseName = (f) => String(f || '').replace(/\.(dxf|kml|kmz|geojson|json)$/i, '');
 
 function loadStore() {
   try {
@@ -87,31 +98,95 @@ function applyTags(parcels) {
   });
 }
 
+// ---- Bản đồ xem trước ----
+
 function clearMap() {
   layerGroup?.remove();
   layerGroup = null;
+  lotLayers = [];
 }
 
-function drawMap(lots, hull) {
+function lotStyle(p) {
+  if (p.role === 'ask') return { color: ASK_COLOR, weight: 2.5, dashArray: '6 4', fillColor: ASK_COLOR, fillOpacity: 0.35 };
+  const color = p.role === 'housing' ? '#4ade80' : p.role === 'other' ? '#94a3b8' : (BUFFER_COLORS[p.type] || '#38bdf8');
+  return { color, weight: 1.2, dashArray: null, fillColor: color, fillOpacity: p.role === 'housing' ? 0.18 : 0.45 };
+}
+
+/** Khung bản đồ trừ phần panel phải đè lên */
+function fitTo(bounds) {
+  if (!map || !bounds || !bounds.isValid()) return;
+  const rp = document.querySelector('.right-panel');
+  const right = rp && rp.offsetParent !== null ? rp.offsetWidth + 24 : 24;
+  map.fitBounds(bounds, { paddingTopLeft: [24, 24], paddingBottomRight: [right, 24], maxZoom: 18 });
+}
+
+function drawMap(lots, hull, fit) {
   clearMap();
   if (!map) return;
+  svgRenderer = svgRenderer || L.svg({ padding: 0.3 });
   layerGroup = L.featureGroup().addTo(map);
-  if (hull) L.geoJSON(hull, { interactive: false, style: { color: '#facc15', weight: 2, dashArray: '7 5', fill: false } }).addTo(layerGroup);
+  if (hull) L.geoJSON(hull, { renderer: svgRenderer, interactive: false, style: { color: FOCUS_COLOR, weight: 2, dashArray: '7 5', fill: false } }).addTo(layerGroup);
   lots.forEach(p => {
     const g = geometryOf(p);
     if (!g) return;
-    const color = p.role === 'housing' ? '#4ade80' : p.role === 'ask' ? '#94a3b8' : (BUFFER_COLORS[p.type] || '#38bdf8');
-    L.geoJSON(g, { interactive: false, style: { color, weight: 1, fillColor: color, fillOpacity: p.role === 'housing' ? 0.18 : 0.45 } }).addTo(layerGroup);
+    const lyr = L.geoJSON(g, { renderer: svgRenderer, style: () => ({ ...lotStyle(p), className: p.role === 'ask' ? 'review-ask-lot' : '' }) })
+      .bindTooltip(`<b>${escapeHtml(p.layer)}</b> · ${fmtNum(Math.round(p.area))} m²<br>${escapeHtml(roleLabel(p.role, p.scoreKey))}${p.role === 'ask' ? ' — bấm để chọn nhóm' : ''}`, { sticky: true })
+      .on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        focusLayer(p.layer, false);
+        revealInSheet(p.layer);
+      })
+      .addTo(layerGroup);
+    lotLayers.push({ p, lyr });
   });
-  const bounds = layerGroup.getBounds();
-  if (bounds.isValid()) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 16 });
+  if (focused) focusLayer(focused, false);
+  if (fit) fitTo(layerGroup.getBounds());
 }
+
+/** Tô vàng toàn bộ hatch của 1 layer trên bản đồ và dòng tương ứng trong bảng */
+function focusLayer(layer, fit) {
+  focused = layer || '';
+  const bounds = L.latLngBounds([]);
+  lotLayers.forEach(({ p, lyr }) => {
+    if (focused && p.layer === focused) {
+      lyr.setStyle({ color: FOCUS_COLOR, weight: 3.5, dashArray: null, fillColor: FOCUS_COLOR, fillOpacity: 0.5 });
+      lyr.bringToFront();
+      bounds.extend(lyr.getBounds());
+    } else {
+      lyr.setStyle(lotStyle(p));
+    }
+  });
+  document.querySelectorAll('#projectReviewHost [data-layer-row]').forEach(el => el.classList.toggle('on', el.dataset.layerRow === focused));
+  if (fit) fitTo(bounds);
+}
+
+function revealInSheet(layer) {
+  const rows = [...document.querySelectorAll('#projectReviewHost [data-layer-row]')].filter(el => el.dataset.layerRow === layer);
+  const el = rows.find(r => r.classList.contains('review-ask-item')) || rows[0];
+  if (!el) return;
+  el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  el.querySelector('select')?.focus({ preventScroll: true });
+}
+
+// ---- Bảng thẩm định ----
 
 function pctCell(pct) {
   if (pct == null) return '<span class="c-muted">—</span>';
   const cls = pct >= 100 ? 'c-green' : 'c-red';
   return `<b class="${cls}">${fmtNum(pct)}%</b>`;
 }
+
+function sheetHead(title) {
+  return `<div class="bp-part-head review-head">
+    <b class="bp-part-title">${title}</b>
+    <div class="review-head-btns review-noprint">
+      <button type="button" class="bp-btn" id="btnReviewPrint" title="Lưu bảng thẩm định ra file PDF">${ico('printer')}In PDF</button>
+      <button type="button" class="bp-btn" id="btnReviewClose">${ico('close')}Đóng</button>
+    </div>
+  </div>`;
+}
+
+const QCVN_HEAD = '<thead><tr><th></th><th>Loại hạ tầng</th><th>Diện tích</th><th>Chỉ tiêu</th><th>Nhu cầu</th><th>Số lượng</th><th>Quy mô</th><th>Độ phủ</th></tr></thead>';
 
 function renderHost() {
   const host = $('projectReviewHost');
@@ -126,16 +201,20 @@ function renderHost() {
   const rollup = layerRollup(session.parcels);
   const asks = rollup.filter(r => r.role === 'ask');
   const units = unitsFromPop(pop);
-  const landRows = rollup.map(r => `<tr>
+  const on = (layer) => (layer === focused ? ' on' : '');
+  const landRows = rollup.map(r => `<tr data-layer-row="${escapeHtml(r.layer)}" data-focus-layer="${escapeHtml(r.layer)}" class="${r.role === 'ask' ? 'review-row-ask' : ''}${on(r.layer)}" title="Bấm để xem trên bản đồ">
     <td>${escapeHtml(r.layer)}</td>
     <td>${r.n}</td>
     <td>${fmtNum(Math.round(r.area))} m²</td>
     <td>${escapeHtml(roleLabel(r.role, r.scoreKey))}</td>
   </tr>`).join('');
-  const askBox = asks.length ? `<div class="review-ask"><b>Layer chưa rõ — chọn nhóm trước khi chốt kết quả</b>${asks.map(r => {
+  const askBox = asks.length ? `<div class="review-ask"><b>${ico('alert')}${asks.length} layer chưa rõ — viền cam nhấp nháy trên bản đồ. Bấm tên layer để phóng tới, rồi chọn nhóm</b>${asks.map(r => {
     const cur = manual.get(r.layer) || '';
     const opts = [`<option value="">Chọn nhóm…</option>`].concat(REVIEW_CHOICES.map(([id, label]) => `<option value="${id}"${cur === id ? ' selected' : ''}>${escapeHtml(label)}</option>`));
-    return `<label>${escapeHtml(r.layer)} <small>(${r.n} hatch, ${fmtNum(Math.round(r.area))} m²)</small><select data-layer="${escapeHtml(r.layer)}">${opts.join('')}</select></label>`;
+    return `<div class="review-ask-item${on(r.layer)}" data-layer-row="${escapeHtml(r.layer)}" data-focus-layer="${escapeHtml(r.layer)}">
+      <span class="review-ask-name">${ico('locate')}${escapeHtml(r.layer)} <small>(${r.n} hatch, ${fmtNum(Math.round(r.area))} m²)</small></span>
+      <select data-layer="${escapeHtml(r.layer)}">${opts.join('')}</select>
+    </div>`;
   }).join('')}</div>` : '';
   const body = [];
   let last = '';
@@ -162,64 +241,131 @@ function renderHost() {
     ? `Đất ở ${fmtNum(scored.housingArea)} m². Độ phủ = phần đất ở nằm trong bán kính tâm hatch.`
     : 'Chưa thấy hatch đất ở (DAT_O, DAT_ODT, DAT_ONT). Hãy gán layer đất ở ở khung trên — chưa có thì cột độ phủ để trống.';
   host.innerHTML = `<div id="projectReviewSheet" class="review-sheet">
-    <div class="bp-part-head">
-      <b class="bp-part-title">THẨM ĐỊNH ĐỒ ÁN · ${escapeHtml(session.fileName)}</b>
-      <button type="button" class="bp-btn" id="btnReviewClose">${ico('close')}Đóng</button>
+    ${sheetHead(`THẨM ĐỊNH ĐỒ ÁN · ${escapeHtml(session.fileName)}`)}
+    <div class="review-cols">
+      <div class="review-col">
+        <div class="review-note">
+          Dân số quy hoạch <b>${pop > 0 ? fmtNum(pop) : 'chưa nhập'}</b> → <b>${units}</b> đơn vị ở (làm tròn lên, ${fmtNum(UNIT_POP)} người/đơn vị, đối chiếu số trường THCS).
+          Ranh vàng nét đứt trên bản đồ là đường bao quanh các hatch, không đọc từ file.
+          ${housingNote} Kết quả chưa cộng vào bảng phường hay thành phố.
+        </div>
+        ${askBox}
+        <h4>Tổng diện tích theo layer</h4>
+        <div class="ward-table-scroll-container"><table class="ward-table review-land">
+          <thead><tr><th>Layer</th><th>Số hatch</th><th>Diện tích</th><th>Nhóm</th></tr></thead>
+          <tbody>${landRows}</tbody>
+        </table></div>
+      </div>
+      <div class="review-col">
+        <h4>Đánh giá QCVN 01:2026/BXD</h4>
+        <div class="ward-table-scroll-container"><table class="ward-table">${QCVN_HEAD}<tbody>${body.join('')}</tbody></table></div>
+      </div>
     </div>
-    <div class="review-note">
-      Dân số quy hoạch <b>${pop > 0 ? fmtNum(pop) : 'chưa nhập'}</b> → <b>${units}</b> đơn vị ở (làm tròn lên, ${fmtNum(UNIT_POP)} người/đơn vị, đối chiếu số trường THCS).
-      Ranh vàng trên bản đồ là đường bao quanh các hatch, không đọc từ file.
-      ${housingNote} Kết quả này chưa ghi vào bảng phường hay thành phố.
-    </div>
-    ${askBox}
-    <h4>Tổng diện tích theo layer</h4>
-    <div class="ward-table-scroll-container"><table class="ward-table review-land">
-      <thead><tr><th>Layer</th><th>Số hatch</th><th>Diện tích</th><th>Nhóm</th></tr></thead>
-      <tbody>${landRows}</tbody>
-    </table></div>
-    <h4>Đánh giá QCVN 01:2026/BXD</h4>
-    <div class="ward-table-scroll-container"><table class="ward-table">
-      <thead><tr><th></th><th>Loại hạ tầng</th><th>Diện tích</th><th>Chỉ tiêu</th><th>Nhu cầu</th><th>Số lượng</th><th>Quy mô</th><th>Độ phủ</th></tr></thead>
-      <tbody>${body.join('')}</tbody>
-    </table></div>
   </div>`;
-  host.querySelectorAll('select[data-layer]').forEach(sel => sel.addEventListener('change', () => {
-    const layer = sel.dataset.layer;
-    if (sel.value) manual.set(layer, sel.value); else manual.delete(layer);
-    applyTags(session.parcels);
-    drawMap(session.parcels, session.hull);
-    renderHost();
-  }));
-  $('btnReviewClose')?.addEventListener('click', closeReview);
   renderDrafts();
 }
 
 function openHost() {
-  if (!document.body.classList.contains('project-review')) maxWasOn = document.body.classList.contains('bottom-max');
+  if (!document.body.classList.contains('project-review')) {
+    maxWasOn = document.body.classList.contains('bottom-max');
+    if (maxWasOn) setBottomPanelMaximized(false);
+  }
   document.body.classList.add('project-review');
-  setBottomPanelMaximized(true);
+  map?.invalidateSize({ pan: false });
 }
 
 function closeReview() {
+  const wasOpen = document.body.classList.contains('project-review');
   document.body.classList.remove('project-review');
-  if (!maxWasOn) setBottomPanelMaximized(false);
+  if (wasOpen && maxWasOn) setBottomPanelMaximized(true);
+  maxWasOn = false;
+  map?.invalidateSize({ pan: false });
   clearMap();
+  focused = '';
   const host = $('projectReviewHost');
   if (host) host.innerHTML = '';
   session = null;
 }
+
+// ---- Danh sách đồ án trên web (theo tên file DXF đã ghi vào CAD_Polygon) ----
+
+function projectList() {
+  const byFile = new Map();
+  state.cadParcels.forEach((v, key) => {
+    const f = String(v.file || '').trim();
+    if (!f) return;
+    if (!byFile.has(f)) byFile.set(f, new Set());
+    byFile.get(f).add(key.slice(key.indexOf('|') + 1));
+  });
+  return [...byFile.entries()].map(([file, ids]) => ({ file, n: ids.size })).sort((a, b) => a.file.localeCompare(b.file, 'vi'));
+}
+
+function fillReplaceList(preferFile) {
+  const sel = $('reviewReplace');
+  if (!sel) return;
+  const cur = sel.value;
+  const list = projectList();
+  sel.innerHTML = '<option value="">Đồ án mới (không thay thế)</option>'
+    + list.map(d => `<option value="${escapeHtml(d.file)}">${escapeHtml(baseName(d.file))} (${d.n} lô)</option>`).join('');
+  const same = preferFile && list.find(d => baseName(d.file).toLowerCase() === baseName(preferFile).toLowerCase());
+  if (same) sel.value = same.file;
+  else if (list.some(d => d.file === cur)) sel.value = cur;
+}
+
+// ---- Hồ sơ đã gửi từ máy này ----
 
 function renderDrafts() {
   const box = $('reviewDrafts');
   if (!box) return;
   const list = loadStore();
   if (!list.length) { box.innerHTML = ''; return; }
-  box.innerHTML = `<div class="review-drafts"><b>Hồ sơ đã lưu trên trình duyệt</b>${list.map(d => `<div>
-    <span>${escapeHtml(d.name)} · ${fmtNum(d.pop)} dân · ${d.units} đơn vị ở</span>
+  box.innerHTML = `<div class="review-drafts"><b>Hồ sơ đã gửi từ máy này</b>${list.map(d => `<div>
+    <span>${escapeHtml(d.name)} · ${fmtNum(d.pop)} dân · ${d.units} đơn vị ở${d.replaces ? ` · thay ${escapeHtml(baseName(d.replaces))}` : ''}</span>
     <button type="button" data-open-draft="${escapeHtml(d.id)}">Xem</button>
     <button type="button" data-del-draft="${escapeHtml(d.id)}">Xóa</button>
   </div>`).join('')}</div>`;
 }
+
+function rememberSent(pop, replaces, sentId) {
+  const list = loadStore();
+  list.unshift({
+    id: sentId || `${Date.now().toString(36)}${Math.random().toString(16).slice(2, 8)}`,
+    name: baseName(session.fileName),
+    fileName: session.fileName,
+    at: new Date().toISOString(),
+    pop,
+    replaces,
+    units: session.scored.units,
+    housingArea: session.scored.housingArea,
+    rows: session.scored.rows.map(r => ({
+      section: r.section, key: r.key, label: r.label, area: r.area, count: r.count,
+      demand: r.demand, scalePct: r.scalePct, coverPct: r.coverPct, quota: r.quota
+    }))
+  });
+  saveStore(list);
+  renderDrafts();
+}
+
+function showDraft(id) {
+  const d = loadStore().find(x => x.id === id);
+  const host = $('projectReviewHost');
+  if (!d || !host) return;
+  openHost();
+  clearMap();
+  session = null;
+  pdfName = d.name;
+  const body = d.rows.map(r => `<tr class="wt-main">
+    <td>${r.section}</td><td>${escapeHtml(r.label)}</td><td>${fmtNum(r.area)} m²</td>
+    <td>${r.quota > 0 ? `${fmtNum(r.quota)} m²/người` : '—'}</td>
+    <td>${r.demand ? `${fmtNum(r.demand)} m²` : '—'}</td><td>${fmtNum(r.count)}</td>
+    <td>${pctCell(r.scalePct)}</td><td>${pctCell(r.coverPct)}</td></tr>`).join('');
+  host.innerHTML = `<div id="projectReviewSheet" class="review-sheet">
+    ${sheetHead(`HỒ SƠ ĐÃ GỬI · ${escapeHtml(d.name)}`)}
+    <div class="review-note">Dân số ${fmtNum(d.pop)} · ${d.units} đơn vị ở · đất ở ${fmtNum(d.housingArea)} m²${d.replaces ? ` · đề xuất thay thế đồ án ${escapeHtml(baseName(d.replaces))}` : ''}. Bản đồ chỉ hiện khi đang mở file.</div>
+    <div class="ward-table-scroll-container"><table class="ward-table">${QCVN_HEAD}<tbody>${body}</tbody></table></div></div>`;
+}
+
+// ---- Đọc file ----
 
 async function readFile(file) {
   if (!file) return;
@@ -245,68 +391,112 @@ async function readFile(file) {
   const built = buildParcels(hatches, { crs });
   built.parcels.forEach(p => { p.reviewKind = hatches[p.src]?.reviewKind || 'ask'; });
   manual = new Map();
+  focused = '';
   applyTags(built.parcels);
   session = { fileName: file.name, parcels: built.parcels, hull: hullOf(built.parcels), scored: null };
+  pdfName = baseName(file.name);
   if (!built.axes.valid) showToast('Tọa độ không nằm trong vùng VN-2000 của Huế — kiểm tra hệ tọa độ', 'error');
   openHost();
-  drawMap(session.parcels, session.hull);
   renderHost();
+  drawMap(session.parcels, session.hull, true);
+  fillReplaceList(file.name);
 }
 
-function saveDraft() {
-  if (!session?.scored) { showToast('Hãy tải file và nhập dân số trước', 'error'); return; }
+// ---- Gửi lên hệ thống: ranh lô (GeoJSON WGS84) + kết quả thẩm định vào hàng chờ duyệt ----
+
+const round6 = (v) => (Array.isArray(v) ? v.map(round6) : Math.round(v * 1e6) / 1e6);
+
+function dossierGeoJson(pop, replaces) {
+  const scored = session.scored;
+  return {
+    type: 'FeatureCollection',
+    review: {
+      source: session.fileName, replaces, pop, units: scored.units, housingArea: scored.housingArea,
+      rows: scored.rows.map(r => ({ key: r.key, area: r.area, count: r.count, demand: r.demand, scalePct: r.scalePct, coverPct: r.coverPct }))
+    },
+    features: session.parcels.map(p => {
+      const g = geometryOf(p);
+      return g && {
+        type: 'Feature',
+        properties: {
+          Layer: p.layer,
+          DienTich: Math.round(Number(p.area) || 0),
+          GiaiDoan: p.phase,
+          NhomThamDinh: p.role === 'score' ? p.scoreKey : p.role
+        },
+        geometry: { type: g.type, coordinates: round6(g.coordinates) }
+      };
+    }).filter(Boolean)
+  };
+}
+
+async function sendDossier() {
+  if (sending) return;
+  if (!session?.scored) { showToast('Hãy tải file DXF đồ án trước', 'error'); return; }
   const pop = Number($('reviewPop')?.value) || 0;
-  const id = `${Date.now().toString(36)}${Math.random().toString(16).slice(2, 8)}`;
-  const list = loadStore();
-  list.unshift({
-    id,
-    name: session.fileName.replace(/\.dxf$/i, ''),
-    fileName: session.fileName,
-    at: new Date().toISOString(),
-    pop,
-    units: session.scored.units,
-    housingArea: session.scored.housingArea,
-    rows: session.scored.rows.map(r => ({
-      section: r.section, key: r.key, label: r.label, area: r.area, count: r.count,
-      demand: r.demand, scalePct: r.scalePct, coverPct: r.coverPct, quota: r.quota
-    }))
-  });
-  saveStore(list);
-  renderDrafts();
-  showToast('Đã lưu hồ sơ trên trình duyệt. Chưa ghi Sheet — gửi admin vào hệ thống là bước sau.');
-}
-
-function showDraft(id) {
-  const d = loadStore().find(x => x.id === id);
-  const host = $('projectReviewHost');
-  if (!d || !host) return;
-  openHost();
-  clearMap();
-  const body = d.rows.map(r => `<tr class="wt-main">
-    <td>${r.section}</td><td>${escapeHtml(r.label)}</td><td>${fmtNum(r.area)} m²</td>
-    <td>${r.quota > 0 ? `${fmtNum(r.quota)} m²/người` : '—'}</td>
-    <td>${r.demand ? `${fmtNum(r.demand)} m²` : '—'}</td><td>${fmtNum(r.count)}</td>
-    <td>${pctCell(r.scalePct)}</td><td>${pctCell(r.coverPct)}</td></tr>`).join('');
-  host.innerHTML = `<div id="projectReviewSheet" class="review-sheet">
-    <div class="bp-part-head"><b class="bp-part-title">HỒ SƠ ĐÃ LƯU · ${escapeHtml(d.name)}</b>
-      <button type="button" class="bp-btn" id="btnReviewClose">${ico('close')}Đóng</button></div>
-    <div class="review-note">Dân số ${fmtNum(d.pop)} · ${d.units} đơn vị ở · đất ở ${fmtNum(d.housingArea)} m². Bản đồ chỉ hiện khi đang mở file.</div>
-    <div class="ward-table-scroll-container"><table class="ward-table"><thead><tr>
-      <th></th><th>Loại hạ tầng</th><th>Diện tích</th><th>Chỉ tiêu</th><th>Nhu cầu</th><th>Số lượng</th><th>Quy mô</th><th>Độ phủ</th>
-    </tr></thead><tbody>${body}</tbody></table></div></div>`;
-  $('btnReviewClose')?.addEventListener('click', closeReview);
+  if (!(pop > 0)) { showToast('Nhập dân số quy hoạch trước khi gửi', 'error'); $('reviewPop')?.focus(); return; }
+  const asks = layerRollup(session.parcels).filter(r => r.role === 'ask');
+  if (asks.length) {
+    showToast(`Còn ${asks.length} layer chưa rõ nhóm — chọn trong bảng thẩm định trước khi gửi`, 'error');
+    focusLayer(asks[0].layer, true);
+    revealInSheet(asks[0].layer);
+    return;
+  }
+  const replaces = $('reviewReplace')?.value || '';
+  const sender = String($('reviewSender')?.value || '').trim();
+  const name = baseName(session.fileName);
+  const content = JSON.stringify(dossierGeoJson(pop, replaces));
+  const bytes = new TextEncoder().encode(content).length;
+  if (bytes > SEND_MAX_BYTES) {
+    showToast(`Ranh lô sau chuyển đổi ${fmtNum(Math.round(bytes / 104857.6) / 10)} MB, vượt 2 MB — tách đồ án thành nhiều file`, 'error');
+    return;
+  }
+  const rated = session.scored.rows.filter(r => r.scalePct != null);
+  const passed = rated.filter(r => r.scalePct >= 100).length;
+  const kinds = `${fmtNum(pop)} dân · ${session.scored.units} đơn vị ở · đạt quy mô ${passed}/${rated.length} chỉ tiêu`;
+  const target = replaces ? `đề xuất THAY THẾ đồ án "${baseName(replaces)}"` : 'đồ án mới (không thay thế)';
+  if (!confirm(`Gửi hồ sơ "${name}" lên hệ thống?\n• ${session.parcels.length} hatch · ${kinds}\n• ${target}\n• Admin kiểm tra rồi mới đưa lên bản đồ; hồ sơ lưu tạm tối đa 30 ngày.`)) return;
+  const btn = $('btnReviewSend');
+  sending = true;
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(geeApi('action=submitCadPending'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: `${name}.geojson`, ext: 'geojson', content, phase: 'QH', crs: '',
+        sender,
+        note: replaces ? `Thẩm định, thay thế đồ án ${baseName(replaces)}` : 'Thẩm định, đồ án mới',
+        kind: 'review',
+        replaces,
+        summary: { parcels: session.parcels.length, create: 0, update: 0, wards: [], kinds }
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+    rememberSent(pop, replaces, data.id);
+    showToast(`Đã gửi hồ sơ "${name}" — Admin duyệt rồi mới đưa lên bản đồ`, 'success');
+  } catch (err) {
+    showToast(`Chưa gửi được: ${err.message}`, 'error');
+  } finally {
+    sending = false;
+    if (btn) btn.disabled = false;
+  }
 }
 
 async function exportPdf() {
   const sheet = $('projectReviewSheet');
   if (!sheet) { showToast('Chưa có bảng thẩm định', 'error'); return; }
+  if (session && layerRollup(session.parcels).some(r => r.role === 'ask')) showToast('Còn layer chưa rõ nhóm — kết quả trong PDF chưa đầy đủ', 'info');
   try { await loadHtml2Pdf(); } catch (e) { showToast('Không tải được thư viện PDF', 'error'); return; }
-  const name = (session?.fileName || 'do-an').replace(/\.dxf$/i, '');
   window.html2pdf().from(sheet).set({
     margin: 6,
-    filename: `Tham-dinh-${name}.pdf`,
+    filename: `Tham-dinh-${pdfName}.pdf`,
     image: { type: 'jpeg', quality: 0.95 },
-    html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+    html2canvas: {
+      scale: 2, useCORS: true, scrollY: 0,
+      ignoreElements: (el) => !!(el.classList && el.classList.contains('review-noprint'))
+    },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
   }).save();
 }
@@ -319,8 +509,7 @@ export function initProjectReview() {
   });
   $('reviewPop')?.addEventListener('input', () => { if (session) renderHost(); });
   $('reviewCrs')?.addEventListener('change', () => { if (session) showToast('Đổi hệ tọa độ thì hãy chọn lại file', 'info'); });
-  $('btnReviewPdf')?.addEventListener('click', exportPdf);
-  $('btnReviewSave')?.addEventListener('click', saveDraft);
+  $('btnReviewSend')?.addEventListener('click', sendDossier);
   $('btnReviewDrop')?.addEventListener('click', () => { closeReview(); showToast('Đã xóa bản xem trước'); });
   $('reviewDrafts')?.addEventListener('click', (e) => {
     const open = e.target.closest('[data-open-draft]');
@@ -330,8 +519,29 @@ export function initProjectReview() {
     saveStore(loadStore().filter(d => d.id !== del.dataset.delDraft));
     renderDrafts();
   });
+  const host = $('projectReviewHost');
+  host?.addEventListener('click', (e) => {
+    if (e.target.closest('#btnReviewClose')) { closeReview(); return; }
+    if (e.target.closest('#btnReviewPrint')) { exportPdf(); return; }
+    if (e.target.closest('select')) return;
+    const row = e.target.closest('[data-focus-layer]');
+    if (row && session) focusLayer(row.dataset.focusLayer, true);
+  });
+  host?.addEventListener('change', (e) => {
+    const sel = e.target.closest('select[data-layer]');
+    if (!sel || !session) return;
+    const layer = sel.dataset.layer;
+    if (sel.value) manual.set(layer, sel.value); else manual.delete(layer);
+    applyTags(session.parcels);
+    renderHost();
+    drawMap(session.parcels, session.hull, false);
+  });
   document.querySelectorAll('.add-mode-btn').forEach(btn => {
-    btn.addEventListener('click', () => { if (btn.dataset.mode !== 'addReview') clearMap(); });
+    btn.addEventListener('click', () => {
+      if (btn.dataset.mode !== 'addReview') { clearMap(); return; }
+      fillReplaceList();
+      if (session && !layerGroup) drawMap(session.parcels, session.hull, false);
+    });
   });
   renderDrafts();
 }

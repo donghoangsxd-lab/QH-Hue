@@ -2,7 +2,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const constants = require('../config/constants');
 const { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, POP_SCALE_M } = require('../services/geeService');
-const { getRawDataList, getCadParcels, invalidateCache, getDataVersion } = require('../services/gcsService');
+const { getRawDataList, getCadParcels, getDrainage, invalidateCache, getDataVersion } = require('../services/gcsService');
 const { requireAdmin, httpError } = require('../services/authService');
 const roads = require('../services/roadsService');
 const popEdits = require('../services/popEditsService');
@@ -1365,6 +1365,21 @@ module.exports = async (req, res) => {
       return res.status(200).json({ parcels });
     }
 
+    // Bucket không mở CORS cho trình duyệt → chuyển tiếp nguyên văn bản TopoJSON (~1 MB), cache biên Vercel 1 giờ
+    if (action === 'getDrainage') {
+      const d = await getDrainage();
+      if (!d || !d.text) {
+        return res.status(404).json({ error: true, message: 'Chưa có lớp thoát nước trên bucket — chạy node scripts/push-thoatnuoc.js' });
+      }
+      res.setHeader('Cache-Control', 'public, max-age=600, s-maxage=3600, stale-while-revalidate=86400');
+      if (d.etag) {
+        res.setHeader('ETag', d.etag);
+        if (req.headers['if-none-match'] === d.etag) return res.status(304).end();
+      }
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.status(200).send(d.text);
+    }
+
     // Mạng lưới đường toàn thành phố (Admin tải từ OSM theo phường, lưu bucket roads/v2/ qua Apps Script)
     // "Phạm vi thực tế": cắt đường quanh công trình từ mạng lưới đã lưu; chưa tải đủ → 404, trình duyệt tự hỏi Overpass
     if (action === 'getRoads') {
@@ -1561,6 +1576,10 @@ module.exports = async (req, res) => {
         note: sanitizeSheetText(body.note, 300),
         summary: parsePendingSummary(body.summary)
       };
+      if (body.kind === 'review' && ext === 'geojson') {
+        meta.kind = 'review';
+        meta.replaces = sanitizeSheetText(body.replaces, 120);
+      }
       const result = await callAppsScript({ action: 'addPendingCad' }, { action: 'addPendingCad', meta, content });
       if (result.full) {
         return res.status(503).json({ error: true, message: 'Hàng chờ duyệt đang đầy — vui lòng thử lại sau hoặc liên hệ Sở Xây dựng' });

@@ -663,6 +663,7 @@ function doPost(e) {
     if (action === "markWardNotes") return jsonOutput(markWardNotes(body));
     if (action === "saveRoads") return jsonOutput(saveRoads(body));
     if (action === "savePopEdits") return jsonOutput(savePopEdits(body));
+    if (action === "saveDrainage") return jsonOutput(saveDrainage(body));
     if (action === "addPendingCad") return jsonOutput(addPendingCad(body));
     if (action === "removePendingCad") return jsonOutput(removePendingCad(body));
     if (action === "addPendingPoints") {
@@ -914,6 +915,16 @@ function saveRoads(body) {
   if (!/^(net_[a-z0-9-]{1,60}_\d{1,2}|index|custom)$/.test(key)) return { "error": "Tên file mạng lưới đường không hợp lệ" };
   if (!content || content.length > 8000000) return { "error": "Dữ liệu mạng lưới đường rỗng hoặc quá lớn" };
   return { "success": true, "saved": uploadToGCS(content, "roads/v2/" + key + ".json") };
+}
+
+// MẠNG LƯỚI THOÁT NƯỚC, KHE TỤ THỦY (TopoJSON do scripts/push-thoatnuoc.js gửi) → file drainage/thoatnuoc.topojson (ghi đè)
+function saveDrainage(body) {
+  var content = String(body.content || '');
+  if (!content || content.length > 8000000) return { "error": "Dữ liệu thoát nước rỗng hoặc quá 8 MB" };
+  var topo;
+  try { topo = JSON.parse(content); } catch (e) { return { "error": "Dữ liệu thoát nước không phải JSON" }; }
+  if (!topo || topo.type !== "Topology" || !Array.isArray(topo.arcs)) return { "error": "Dữ liệu thoát nước không phải TopoJSON" };
+  return { "success": true, "saved": uploadToGCS(content, "drainage/thoatnuoc.topojson"), "size": content.length };
 }
 
 // VÙNG HIỆU CHỈNH RASTER DÂN CƯ (Admin vẽ xóa / thêm pixel dân cư) → file pop/edits.json (ghi đè toàn bộ)

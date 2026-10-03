@@ -577,6 +577,7 @@ function renderPendingList() {
       const opening = current && current.pendingId === it.id;
       return `<div class="cad-pending-row${opening ? ' on' : ''}">
         <div class="cad-row-main"><b>${escapeHtml(it.fileName || it.id)}</b> <small>${fmtMB(it.size || 0)} · ${it.phase === 'QH' ? 'QH' : 'HT'} · ${escapeHtml(at)}</small>
+          ${it.kind === 'review' ? `<br><small class="c-orange">Thẩm định · ${it.replaces ? `thay thế đồ án ${escapeHtml(it.replaces)}` : 'đồ án mới'}</small>` : ''}
           ${info ? `<br><small>${escapeHtml(info)}</small>` : ''}
           ${it.sender || it.note ? `<br><small class="c-cyan">${escapeHtml([it.sender, it.note].filter(Boolean).join(' — '))}</small>` : ''}</div>
         <button type="button" class="cad-pending-btn" data-open="${escapeHtml(it.id)}" title="Mở file để kiểm tra và ghi">${ico('folder')}Mở</button>

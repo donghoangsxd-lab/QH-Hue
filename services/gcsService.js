@@ -144,6 +144,7 @@ async function getCadParcels() {
           phase: String(props.GiaiDoan || '').toUpperCase() === 'QH' ? 'QH' : 'HT',
           layer: String(props.Layer || ''),
           area: Number(props.DienTich) || null,
+          file: String(props.File || ''),
           geometry: ft.geometry
         };
       })
@@ -154,6 +155,33 @@ async function getCadParcels() {
     if (e.response && e.response.status === 404) return [];
     console.error("Lỗi nạp ranh lô GCS:", e.message);
     return cachedParcels || [];
+  }
+}
+
+// ============================ THOÁT NƯỚC (drainage/thoatnuoc.topojson) ============================
+
+let cachedDrainage = null;   // { text, etag }
+
+/** Văn bản TopoJSON thoát nước (giữ nguyên, không parse) + ETag; chưa đẩy file lên bucket → null */
+async function getDrainage() {
+  try {
+    let currentETag = null;
+    try {
+      currentETag = tagOf(await axios.head(bypassEdge(constants.DRAINAGE_GCS_URL), { timeout: 5000 }));
+    } catch (headErr) {
+      if (headErr.response && headErr.response.status === 404) return null;
+    }
+    if (cachedDrainage && currentETag && currentETag === cachedDrainage.etag) return cachedDrainage;
+
+    const response = await axios.get(bypassEdge(constants.DRAINAGE_GCS_URL), {
+      timeout: 20000, responseType: 'text', transformResponse: x => x
+    });
+    cachedDrainage = { text: String(response.data || ''), etag: tagOf(response) || currentETag };
+    return cachedDrainage;
+  } catch (e) {
+    if (e.response && e.response.status === 404) return null;
+    console.error("Lỗi nạp lớp thoát nước GCS:", e.message);
+    return cachedDrainage;
   }
 }
 
@@ -168,4 +196,4 @@ function getDataVersion() {
   return dataVersion;
 }
 
-module.exports = { getRawDataList, getCadParcels, invalidateCache, getDataVersion };
+module.exports = { getRawDataList, getCadParcels, getDrainage, invalidateCache, getDataVersion };
