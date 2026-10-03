@@ -41,7 +41,10 @@ export const state = {
   measurePoints: [],
 
   // Marker tạm trên bản đồ
-  tempMarker: null
+  tempMarker: null,
+
+  // Ô số lượng đang cô lập lớp bản đồ (null = không cô lập). Bấm lại ô đó để khôi phục.
+  facilityFocus: null
 };
 
 export function bumpDataVersion() {

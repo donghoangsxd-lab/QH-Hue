@@ -1,7 +1,8 @@
-import { state, bumpDataVersion, BUFFER_COLORS, ICON_GROUP_KEYS, isNetworkType, ntKindOf, NT_KIND_LABELS, parkTierOf } from './state.js';
+import { state, bumpDataVersion, BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, infraLabels, isNetworkType, ntKindOf, NT_KIND_LABELS, parkTierOf } from './state.js';
 import { geeApi, infraListUrl, markDataWritten } from './api.js';
 import {
   initMap,
+  map,
   toggleLayer,
   toggleBuffer,
   toggleMeasure,
@@ -489,6 +490,71 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   ICON_GROUPS.forEach(k => iconCheck(k)?.addEventListener('change', syncEyeButton));
   syncEyeButton();
+
+  // Bấm ô số lượng: tắt mọi lớp khác (kể cả bản đồ độ phủ), chỉ bật đúng loại công trình, vùng phủ của loại đó và ranh 40 phường xã.
+  // Bấm lại cùng ô để khôi phục đúng các lớp đang bật trước đó.
+  const FOCUS_CHECKS = [
+    ...ICON_GROUPS.map(k => `chk_${k}`),
+    'chk_bound', 'chk_parcel', 'chk_pop', 'chk_terrain', 'chk_flood', 'chk_sarflood',
+    'chk_lst', 'chk_newdev', 'chk_risk', 'chk_roads', 'chk_heat'
+  ];
+  let focusSnapshot = null;
+  const setChecked = (id, on) => {
+    const el = document.getElementById(id);
+    if (!el || el.checked === on) return;
+    el.checked = on;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  const bufferOn = (key) => !!(map && layers[key] && map.hasLayer(layers[key]));
+  const setBuffer = (key, on) => {
+    if (!layers[key] || bufferOn(key) === on) return;
+    toggleBuffer(key, document.querySelector(`.btn-dot-buffer[data-buffer="${key}"]`));
+  };
+  const paintFocus = () => {
+    document.querySelectorAll('[data-focus]').forEach(el => {
+      el.classList.toggle('is-focus', el.dataset.focus === state.facilityFocus);
+    });
+  };
+  const captureFocus = () => ({
+    checks: Object.fromEntries(FOCUS_CHECKS.map(id => [id, !!document.getElementById(id)?.checked])),
+    buffers: Object.fromEntries(Object.values(BUFFER_KEYS).map(key => [key, bufferOn(key)]))
+  });
+  const applyFocusSnapshot = (snap) => {
+    FOCUS_CHECKS.forEach(id => setChecked(id, !!snap.checks[id]));
+    Object.entries(snap.buffers).forEach(([key, on]) => setBuffer(key, !!on));
+  };
+  const focusFacility = (type) => {
+    if (!ICON_GROUP_KEYS[type]) return;
+    if (state.facilityFocus === type) {
+      if (focusSnapshot) applyFocusSnapshot(focusSnapshot);
+      focusSnapshot = null;
+      state.facilityFocus = null;
+      paintFocus();
+      showToast('Đã khôi phục các lớp bản đồ', 'info');
+      return;
+    }
+    if (!focusSnapshot) focusSnapshot = captureFocus();
+    state.facilityFocus = type;
+    const keepChk = `chk_${ICON_GROUP_KEYS[type]}`;
+    const keepBuffer = BUFFER_KEYS[type];
+    FOCUS_CHECKS.forEach(id => setChecked(id, id === keepChk || id === 'chk_bound'));
+    Object.values(BUFFER_KEYS).forEach(key => setBuffer(key, key === keepBuffer));
+    paintFocus();
+    const label = infraLabels[type] || type;
+    showToast(`Chỉ hiện ${label}, vùng phủ và ranh 40 phường xã`, 'info');
+  };
+  const onFocusClick = (e) => {
+    const card = e.target.closest('[data-focus]');
+    if (!card) return;
+    focusFacility(card.dataset.focus);
+  };
+  document.getElementById('infraCountGrid')?.addEventListener('click', onFocusClick);
+  document.getElementById('infraCountGrid')?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    onFocusClick(e);
+    e.preventDefault();
+  });
+  document.getElementById('roadBusRow')?.addEventListener('click', onFocusClick);
 
   // ---------- Định vị GPS: 1 marker duy nhất (thay thế lần định vị trước) + tra cứu hạ tầng tại chỗ ----------
   const gpsLayers = [L.layerGroup().addTo(map), planMap ? L.layerGroup().addTo(planMap) : null].filter(Boolean);

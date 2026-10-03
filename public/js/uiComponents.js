@@ -14,6 +14,7 @@ import { loadPopCheck, popCheckBadgeHtml, popCheckCityHtml } from './popCheck.js
 import { balanceSlot, balanceScaleHtml, toggleBalanceMap, clearBalanceMap, isBalanceMapOn, BALANCE_REF } from './wardBalance.js';
 import { loadNewDevStats, newDevOf, newDevRowHtml } from './newDev.js';
 import { renderGreenGrowth, initGreenGrowthEvents, reloadGreenGrowthRoads } from './greenGrowth.js';
+import { renderUrbanClass, initUrbanClassEvents, reloadUrbanClassRoads } from './urbanClass.js';
 
 let chartInstance = null;
 let infraPieInstance = null;
@@ -249,8 +250,11 @@ function renderBusRow(sourceList, planList) {
   if (!el) return;
   const s = countByType(sourceList, planList, ['10-BUS'])['10-BUS'];
   const color = PIE_COLORS['10-BUS'];
+  el.dataset.focus = '10-BUS';
+  el.classList.toggle('is-focus', state.facilityFocus === '10-BUS');
   el.title = `Trạm dừng xe buýt (QCVN 01:2026 Mục 2.8.3.3: đi bộ tới trạm ≤ 500 m)\nĐã duyệt: ${fmtNum(s.approved)} · Chờ duyệt: ${fmtNum(s.pending)}`
-    + `\nQuy hoạch: ${fmtNum(s.plan)} (chênh ${s.plan - s.approved > 0 ? '+' : ''}${fmtNum(s.plan - s.approved)})`;
+    + `\nQuy hoạch: ${fmtNum(s.plan)} (chênh ${s.plan - s.approved > 0 ? '+' : ''}${fmtNum(s.plan - s.approved)})`
+    + `\nBấm để chỉ hiện lớp này, vùng phủ 500 m và ranh 40 phường xã. Bấm lại để khôi phục.`;
   el.style.setProperty('--c', color);
   el.innerHTML = `<span class="road-stat-label"><svg viewBox="0 0 24 24" aria-hidden="true">${BUS_ICON}</svg>Trạm dừng xe buýt</span>`
     + `<span class="road-stat-val"><b>${fmtNum(s.approved)}</b><em>trạm</em>${planDeltaTag(s.plan - s.approved)}`
@@ -270,8 +274,8 @@ function renderInfraCountCards(sourceList, planList) {
     const total = s.approved + s.pending;
     const approvedPct = total > 0 ? (s.approved / total) * 100 : 0;
     const delta = s.plan - shown;
-    const tip = `${infraLabels[k] || COUNT_CARD_LABELS[k]}\nĐã duyệt: ${fmtNum(s.approved)} · Chờ duyệt: ${fmtNum(s.pending)}\nQuy hoạch: ${fmtNum(s.plan)} (chênh ${delta > 0 ? '+' : ''}${fmtNum(delta)})`;
-    return `<div class="count-card" style="--c:${color}" title="${escapeHtml(tip)}">
+    const tip = `${infraLabels[k] || COUNT_CARD_LABELS[k]}\nĐã duyệt: ${fmtNum(s.approved)} · Chờ duyệt: ${fmtNum(s.pending)}\nQuy hoạch: ${fmtNum(s.plan)} (chênh ${delta > 0 ? '+' : ''}${fmtNum(delta)})\nBấm để chỉ hiện lớp này, vùng phủ và ranh 40 phường xã. Bấm lại để khôi phục.`;
+    return `<div class="count-card${state.facilityFocus === k ? ' is-focus' : ''}" data-focus="${k}" style="--c:${color}" title="${escapeHtml(tip)}" role="button" tabindex="0">
       <div class="count-head">
         <span class="count-icon"><svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${COUNT_CARD_ICONS[k]}</svg></span>
         <span class="count-label">${COUNT_CARD_LABELS[k]}</span>
@@ -1249,6 +1253,7 @@ export async function renderBottomPanel() {
   setBottomPanelHeader(wardName);
   renderRoadChart();
 
+  renderClass();
   renderGtx();
   if (city) {
     clearBalanceMap();
@@ -1266,12 +1271,27 @@ export async function renderBottomPanel() {
   renderWardSummary(wardData);
 }
 
-// Bảng 2 lật 2 mặt: trước = hạ tầng, sau = chỉ tiêu tăng trưởng xanh (greenGrowth.js), dùng chung ô chọn địa bàn
-let part2Back = false;
+// Bảng 2 có 3 trang: hạ tầng, tiêu chí phân loại đô thị (urbanClass.js), tăng trưởng xanh (greenGrowth.js)
+const PART2_PAGES = [
+  { title: 'BẢNG TỔNG HỢP HẠ TẦNG', next: 'Phân loại', icon: 'flag', hint: 'Trang sau: tiêu chí phân loại đô thị (Nghị quyết 111/2025/UBTVQH15, mục tiêu 2030 theo Quyết định 756/QĐ-UBND)' },
+  { title: 'TIÊU CHÍ PHÂN LOẠI ĐÔ THỊ', next: 'Tăng trưởng xanh', icon: 'leaf', hint: 'Trang sau: chỉ tiêu xây dựng đô thị tăng trưởng xanh (Thông tư 01/2018/TT-BXD, hợp nhất tại VBHN 97/2026/VBHN-TT-BXD)' },
+  { title: 'CHỈ TIÊU TĂNG TRƯỞNG XANH', next: 'Hạ tầng', icon: 'table', hint: 'Trang sau: quay lại bảng tổng hợp hạ tầng' }
+];
+let part2Page = 0;
+
+function renderClass() {
+  const el = document.getElementById('classView');
+  if (part2Page !== 1 || !el) return;
+  if (!state.wardStatsData.length) {
+    el.innerHTML = `<div class="rp-empty">${ico('clock')}Đang tổng hợp dữ liệu...</div>`;
+    return;
+  }
+  renderUrbanClass(el, { wardName: isCityMode() ? '' : state.selectedWard, wards: state.wardStatsData });
+}
 
 function renderGtx() {
   const el = document.getElementById('gtxView');
-  if (!part2Back || !el) return;
+  if (part2Page !== 2 || !el) return;
   if (!state.wardStatsData.length) {
     el.innerHTML = `<div class="rp-empty">${ico('clock')}Đang tổng hợp dữ liệu...</div>`;
     return;
@@ -1279,25 +1299,25 @@ function renderGtx() {
   renderGreenGrowth(el, { wardName: isCityMode() ? '' : state.selectedWard, wards: state.wardStatsData });
 }
 
-function setPart2Side(back) {
-  part2Back = back;
+function setPart2Page(page) {
   const flip = document.getElementById('part2Flip');
   if (!flip) return;
-  flip.dataset.side = back ? 'back' : 'front';
-  flip.querySelector('.p2-front')?.setAttribute('aria-hidden', String(back));
-  flip.querySelector('.p2-back')?.setAttribute('aria-hidden', String(!back));
-  flip.closest('.bp-part2')?.classList.toggle('gtx-on', back);
+  part2Page = (page + PART2_PAGES.length) % PART2_PAGES.length;
+  const cur = PART2_PAGES[part2Page];
+  flip.dataset.page = String(part2Page);
+  flip.querySelectorAll('.p2-face').forEach(face => face.setAttribute('aria-hidden', String(Number(face.dataset.page) !== part2Page)));
+  flip.closest('.bp-part2')?.classList.toggle('p2-alt', part2Page !== 0);
   const title = document.getElementById('bpPart2Title');
-  if (title) title.textContent = back ? 'CHỈ TIÊU TĂNG TRƯỞNG XANH' : 'BẢNG TỔNG HỢP HẠ TẦNG';
+  if (title) title.textContent = cur.title;
   const btn = document.getElementById('btnFlipPart2');
   if (btn) {
-    btn.innerHTML = back ? `${ico('table')}Hạ tầng` : `${ico('leaf')}Tăng trưởng xanh`;
-    btn.classList.toggle('active', back);
-    btn.setAttribute('aria-pressed', String(back));
-    btn.title = back
-      ? 'Lật bảng: quay lại bảng tổng hợp hạ tầng'
-      : 'Lật bảng: chỉ tiêu xây dựng đô thị tăng trưởng xanh (Thông tư 01/2018/TT-BXD, hợp nhất tại VBHN 97/2026/VBHN-TT-BXD)';
+    btn.innerHTML = `${ico(cur.icon)}${cur.next}`;
+    btn.classList.toggle('active', part2Page !== 0);
+    btn.setAttribute('aria-pressed', String(part2Page !== 0));
+    btn.title = cur.hint;
   }
+  document.querySelectorAll('#part2Dots i').forEach(dot => dot.classList.toggle('active', Number(dot.dataset.page) === part2Page));
+  renderClass();
   renderGtx();
 }
 
@@ -1314,7 +1334,9 @@ export async function exportBottomPanelPdf() {
     return;
   }
   const place = isCityMode() ? 'TP-Hue' : state.selectedWard;
-  const fileName = part2Back ? `Chi-Tieu-Tang-Truong-Xanh-${place}.pdf` : (isCityMode() ? 'Bao-Cao-Ha-Tang-TP-Hue.pdf' : `Bao-Cao-${state.selectedWard}.pdf`);
+  const fileName = part2Page === 2 ? `Chi-Tieu-Tang-Truong-Xanh-${place}.pdf`
+    : part2Page === 1 ? `Tieu-chi-Phan-loai-Do-thi-${place}.pdf`
+    : (isCityMode() ? 'Bao-Cao-Ha-Tang-TP-Hue.pdf' : `Bao-Cao-${state.selectedWard}.pdf`);
   body.classList.add('pdf-export');
   const done = () => { body.classList.remove('pdf-export'); pdfExporting = false; };
   window.html2pdf().from(body).set({
@@ -1340,10 +1362,19 @@ export function initBottomPanelEvents() {
   document.addEventListener(ROADS_META_EVENT, () => {
     ensureRoadTypes(true);
     reloadGreenGrowthRoads().then(renderGtx).catch(err => console.warn('Tăng trưởng xanh – mạng lưới đường lỗi:', err));
+    reloadUrbanClassRoads().then(renderClass).catch(err => console.warn('Phân loại đô thị – mạng lưới đường lỗi:', err));
   });
-  document.addEventListener(BUILT_AREA_EVENT, () => { if (roadTypesByWard) refreshRoadViews(); });
-  document.getElementById('btnFlipPart2')?.addEventListener('click', () => setPart2Side(!part2Back));
+  document.addEventListener(BUILT_AREA_EVENT, () => {
+    if (roadTypesByWard) refreshRoadViews();
+    renderClass();
+  });
+  document.getElementById('btnFlipPart2')?.addEventListener('click', () => setPart2Page(part2Page + 1));
+  document.getElementById('part2Dots')?.addEventListener('click', (e) => {
+    const dot = e.target.closest('i[data-page]');
+    if (dot) setPart2Page(Number(dot.dataset.page));
+  });
   initGreenGrowthEvents(document.getElementById('gtxView'), renderGtx);
+  initUrbanClassEvents(document.getElementById('classView'), renderClass);
   document.getElementById('statTableBody')?.addEventListener('click', (e) => {
     const link = e.target.closest('.ward-link');
     if (link) selectWardDetail(link.dataset.ward);

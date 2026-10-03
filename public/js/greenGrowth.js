@@ -1,4 +1,4 @@
-// Bảng chỉ tiêu xây dựng đô thị tăng trưởng xanh (mặt sau bảng tổng hợp hạ tầng, uiComponents.js › setPart2Side):
+// Bảng chỉ tiêu xây dựng đô thị tăng trưởng xanh (trang 3 bảng tổng hợp, uiComponents.js › setPart2Page):
 // Thông tư 01/2018/TT-BXD, hợp nhất với Thông tư 09/2025/TT-BXD tại VBHN 97/2026/VBHN-TT-BXD — 24 chỉ tiêu, 4 nhóm
 // (Phụ lục 1 danh mục, Phụ lục 2 khái niệm / phương pháp tính / kỳ công bố / nguồn số liệu).
 // Chỉ tiêu có dữ liệu trong webapp được tính ngay (calc); còn lại là khung chờ số liệu báo cáo (GTX_REPORTED).

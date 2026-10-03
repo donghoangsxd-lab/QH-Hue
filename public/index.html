@@ -556,7 +556,8 @@
           <!-- Chỉ tiêu địa bàn: hàng trên hiện trạng, hàng dưới quy hoạch (cùng cột = cùng chỉ tiêu) -->
           <div class="bp-head-stats" id="bpHeadStats"></div>
           <div class="bp-actions" data-html2canvas-ignore="true">
-            <button type="button" class="bp-btn" id="btnFlipPart2" aria-pressed="false" title="Lật bảng: chỉ tiêu xây dựng đô thị tăng trưởng xanh (Thông tư 01/2018/TT-BXD, hợp nhất tại VBHN 97/2026/VBHN-TT-BXD)"><svg class="ico"><use href="#i-leaf"/></svg>Tăng trưởng xanh</button>
+            <span class="flip-dots" id="part2Dots"><i class="active" data-page="0" title="Bảng tổng hợp hạ tầng"></i><i data-page="1" title="Tiêu chí phân loại đô thị"></i><i data-page="2" title="Chỉ tiêu tăng trưởng xanh"></i></span>
+            <button type="button" class="bp-btn" id="btnFlipPart2" aria-pressed="false" title="Trang sau: tiêu chí phân loại đô thị (Nghị quyết 111/2025/UBTVQH15, mục tiêu 2030 theo Quyết định 756/QĐ-UBND)"><svg class="ico"><use href="#i-flag"/></svg>Phân loại</button>
             <button type="button" class="bp-btn bp-icon" id="btnToggleStatTable" title="Xem bảng thông tin" aria-label="Xem bảng thông tin"><svg class="ico"><use href="#i-table"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnExportBottomPdf" title="Xuất báo cáo PDF" aria-label="Xuất báo cáo PDF"><svg class="ico"><use href="#i-printer"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnToggleBottomMax" title="Phóng to toàn màn hình" aria-label="Phóng to toàn màn hình"><svg class="ico"><use href="#i-maximize"/></svg></button>
@@ -564,9 +565,9 @@
         </div>
 
         <div class="bp-part-body">
-          <!-- Thẻ 2 mặt: trước = hạ tầng (biểu đồ / bảng 40 phường / chi tiết phường), sau = chỉ tiêu tăng trưởng xanh (greenGrowth.js) -->
-          <div class="p2-flip" id="part2Flip" data-side="front">
-          <div class="p2-face p2-front">
+          <!-- 3 trang: 0 hạ tầng, 1 tiêu chí phân loại đô thị (urbanClass.js), 2 tăng trưởng xanh (greenGrowth.js) -->
+          <div class="p2-flip" id="part2Flip" data-page="0">
+          <div class="p2-face" data-page="0">
           <div class="bp-view" id="cityChartView">
             <div class="bp-chart-wrap"><span id="bpChartLegend" class="bp-legend"></span><canvas id="infraChart"></canvas></div>
           </div>
@@ -614,7 +615,10 @@
           </div>
           <div class="bp-view" id="wardSummaryView" style="display:none;"></div>
           </div>
-          <div class="p2-face p2-back" aria-hidden="true">
+          <div class="p2-face" data-page="1" aria-hidden="true">
+            <div class="bp-view" id="classView"></div>
+          </div>
+          <div class="p2-face" data-page="2" aria-hidden="true">
             <div class="bp-view" id="gtxView"></div>
           </div>
           </div>
