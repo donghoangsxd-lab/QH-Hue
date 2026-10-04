@@ -22,7 +22,7 @@ const NICE_STEPS = [50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000, 20000
 const INFRA_LEGEND = [
   ['chk_c1', 'Park.png'], ['chk_c2', 'Parking.png'], ['chk_c3', 'Mamnon.png'], ['chk_c4', 'Tieuhoc.png'],
   ['chk_c5', 'THCS.png'], ['chk_c10', 'THPT.png'], ['chk_c6', 'Yte.png'], ['chk_c7', 'Vanhoa.png'],
-  ['chk_c8', 'Cho.png'], ['chk_c9', 'Unused.png'], ['chk_c11', 'Bus.svg'], ['chk_c12', 'Pccc.svg'], ['chk_c13', 'Nghiatrang.svg']
+  ['chk_c8', 'Cho.png'], ['chk_c9', 'Unused.png'], ['chk_c11', 'Bus.svg'], ['chk_c12', 'Pccc.svg'], ['chk_c13', 'Nghiatrang.svg'], ['chk_c14', 'Noxh.svg']
 ];
 
 const $ = (id) => document.getElementById(id);

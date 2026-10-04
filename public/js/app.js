@@ -17,7 +17,6 @@ import {
   ensurePopulationLayer,
   loadCadParcels,
   setParcelsVisible,
-  setLandVisible,
   flyToVisible,
   centerOnCity,
   layers
@@ -66,6 +65,30 @@ function addTypeSwatches() {
       ?.insertAdjacentHTML('afterbegin', `<i class="layer-swatch" style="background:${BUFFER_COLORS[type]};"></i>`);
   });
 }
+// Nút Nền | Phân tích | Môi trường: mỗi lúc hiện 1 nhóm lớp; số trên nút = số lớp đang bật trong nhóm (kể cả nhóm đang ẩn)
+function initLayerTabs() {
+  const btns = [...document.querySelectorAll('.layer-tab-btn')];
+  const panes = [...document.querySelectorAll('.layer-tab-pane')];
+  if (!btns.length) return;
+  const paneOf = (key) => panes.find(p => p.dataset.layerPane === key);
+  const refreshCounts = () => btns.forEach(btn => {
+    const n = paneOf(btn.dataset.layerTab)?.querySelectorAll('input[type="checkbox"]:checked').length || 0;
+    const badge = btn.querySelector('.layer-tab-count');
+    if (badge) badge.textContent = n ? String(n) : '';
+  });
+  btns.forEach(btn => btn.addEventListener('click', () => {
+    btns.forEach(b => {
+      const on = b === btn;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', String(on));
+      const pane = paneOf(b.dataset.layerTab);
+      if (pane) pane.hidden = !on;
+    });
+  }));
+  panes.forEach(p => p.addEventListener('change', refreshCounts));
+  refreshCounts();
+}
+
 const RADIUS_MIN = 50;
 const RADIUS_MAX = 5000;
 // Bán kính phục vụ theo QCVN 01:2026 (khớp config/constants.js standardRadius, máy chủ tính lại khi ghi Sheet):
@@ -81,6 +104,7 @@ const NT_SAFETY = { funeral: 0, crematorium: 500, cemetery_cat: 100, cemetery_on
 function networkRadius(type, ward, name) {
   if (type === '13-BUS') return 500;
   if (type === '10-PCCC') return /^xã\s/i.test(String(ward || '').trim()) ? 5000 : 3000;
+  if (type === '14-NOXH') return 0;
   return NT_SAFETY[ntKindOf({ name })];
 }
 function qcvnRadius(type, nhomHaTang, ward, name, size) {
@@ -108,6 +132,10 @@ function updateRadiusPreview() {
     out.innerHTML = r
       ? `<b>${r.toLocaleString('vi-VN')} m</b> <small>(khoảng cách an toàn Bảng 23: ${NT_KIND_LABELS[kind].toLowerCase()})</small>`
       : `<small>Nhà tang lễ: không quy định khoảng cách an toàn. Tên ghi rõ "cát táng" / "chôn cất một lần" / "hỏa táng" để áp đúng khoảng cách</small>`;
+    return;
+  }
+  if (type === '14-NOXH') {
+    out.innerHTML = '<small>Nhà ở xã hội: không có bán kính phục vụ, chỉ thể hiện vị trí và diện tích</small>';
     return;
   }
   if (isNetworkType(type)) {
@@ -175,7 +203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCustomRoads();
   initPopEdits();
   initRoadNetworkLayer();
-  initBasemapUi(() => map.getCenter());
+  initBasemapUi();
   initTerrainLayer();
   initDrainageLayer();
   initFloodSim();
@@ -343,7 +371,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   addTypeSwatches();
-  const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'c11', 'c12', 'c13', 'heat'];
+  const layerCheckboxes = ['pop', 'bound', 'c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'c11', 'c12', 'c13', 'c14', 'heat'];
   layerCheckboxes.forEach(key => {
     document.getElementById(`chk_${key}`)?.addEventListener('change', (e) => {
       const targetLayer = key === 'bound' ? 'boundary' : key === 'heat' ? 'heatmap' : key;
@@ -352,7 +380,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   document.getElementById('chk_parcel')?.addEventListener('change', (e) => setParcelsVisible(e.target.checked));
-  document.getElementById('chk_land')?.addEventListener('change', (e) => setLandVisible(e.target.checked));
+  initLayerTabs();
 
   document.querySelectorAll('.btn-dot-buffer').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -469,8 +497,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ---------- Ẩn/hiện toàn bộ icon (thanh đầu tab Lớp dữ liệu) ----------
-  // Ẩn: nhớ các nhóm đang bật; Hiện lại: khôi phục đúng các nhóm đó (chưa có thì bật cả 13 nhóm)
-  const ICON_GROUPS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'c11', 'c12', 'c13'];
+  // Ẩn: nhớ các nhóm đang bật; Hiện lại: khôi phục đúng các nhóm đó (chưa có thì bật cả 14 nhóm)
+  const ICON_GROUPS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'c11', 'c12', 'c13', 'c14'];
   const btnEye = document.getElementById('btnToggleAllIcons');
   const layerCount = document.getElementById('layerCount');
   const iconCheck = (k) => document.getElementById(`chk_${k}`);
@@ -506,7 +534,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Bấm lại cùng ô để khôi phục đúng các lớp đang bật trước đó.
   const FOCUS_CHECKS = [
     ...ICON_GROUPS.map(k => `chk_${k}`),
-    'chk_bound', 'chk_parcel', 'chk_land', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_flood', 'chk_sarflood',
+    'chk_bound', 'chk_parcel', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_flood', 'chk_sarflood',
     'chk_lst', 'chk_newdev', 'chk_risk', 'chk_roads', 'chk_heat'
   ];
   let focusSnapshot = null;

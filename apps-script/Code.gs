@@ -10,10 +10,10 @@ const GEOJSON_FILE_NAME = "infrastructure_hue.json";
 const CAD_FILE_NAME = "cad_parcels.json";
 const CAD_SHEET_NAME = "CAD_Polygon";
 const CAD_HEADERS = ["ID_DoiTuong", "Layer", "DienTich", "File", "ThoiGianNhap", "GeoJSON", "GiaiDoan"];
-const VALID_PREFIXES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-THPT", "7-YT", "8-VH", "9-TM", "10-PCCC", "11-NT", "12-CSD", "13-BUS"];
+const VALID_PREFIXES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-THPT", "7-YT", "8-VH", "9-TM", "10-PCCC", "11-NT", "12-CSD", "13-BUS", "14-NOXH"];
 
 // Mạng lưới hạ tầng khác (QCVN 01:2026 Mục 2.8.3.3, 2.5.13.1, 2.12): tab tự tạo khi ghi điểm đầu tiên
-const NETWORK_TABS = { "13-BUS": "Trạm dừng xe buýt", "10-PCCC": "Trụ sở PCCC", "11-NT": "Nhà tang lễ, nghĩa trang" };
+const NETWORK_TABS = { "13-BUS": "Trạm dừng xe buýt", "10-PCCC": "Trụ sở PCCC", "11-NT": "Nhà tang lễ, nghĩa trang", "14-NOXH": "Nhà ở xã hội" };
 // Loại không cần diện tích: điểm quy hoạch mới được ghi QuyMo_QH = 0
 const NO_AREA_TYPES = ["13-BUS", "10-PCCC"];
 const STANDARD_HEADERS = ["ID_DoiTuong", "Ten_CongTrinh", "Ten_XaPhuong", "Nhom_HaTang", "Latitude", "Longitude",
@@ -57,6 +57,18 @@ function parseCleanNumber(val) {
 function parseOptionalNumber(val) {
   if (val === null || val === undefined || String(val).trim() === '') return null;
   return parseCleanNumber(val);
+}
+
+// Locale vi-VN đọc dấu chấm thập phân thành dấu phân cách nghìn (16.452800 → 16452800): chia 10 tới khi vào miền hợp lệ
+function rescaleCoord(num, limit) {
+  if (!isFinite(num) || num === 0) return num;
+  var k = 0;
+  while (Math.abs(num) / Math.pow(10, k) > limit && k < 12) k++;
+  return k ? Number((num / Math.pow(10, k)).toFixed(7)) : num;
+}
+
+function parseCoordinate(val, limit) {
+  return rescaleCoord(parseCleanNumber(val), limit);
 }
 
 function isValidInfraSheet(sheetName) {
@@ -169,14 +181,16 @@ function collectFeatures(ss) {
     }
 
     var count = 0;
+    // Mã tab (vd. "14-NOXH"): webapp dùng khi tiền tố ID không nhận ra loại
+    var tabCode = sheetName.replace(/\s+/g, ' ').trim().split(' ')[0];
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
       var id = String(row[col.id] || '').trim();
       var name = String(cellAt(row, col.name) || '').trim();
       if (id === '' && name === '') continue;
 
-      var lat = parseCleanNumber(row[col.lat]);
-      var lng = parseCleanNumber(row[col.lng]);
+      var lat = parseCoordinate(row[col.lat], 90);
+      var lng = parseCoordinate(row[col.lng], 180);
       if (lat === 0 || lng === 0) continue;
 
       var quyMoHT = parseOptionalNumber(cellAt(row, col.quyMoHT));
@@ -196,7 +210,8 @@ function collectFeatures(ss) {
           "Ten_QH": String(cellAt(row, col.tenQH) || ''),
           "TrangThai": String(rawStatus === undefined || rawStatus === null ? 'TRUE' : rawStatus).toUpperCase(),
           "ThoiGianCapNhat": String(cellAt(row, col.thoiGian) || ''),
-          "GhiChu": String(cellAt(row, col.ghiChu) || '')
+          "GhiChu": String(cellAt(row, col.ghiChu) || ''),
+          "Tab": tabCode
         }
       });
     }
@@ -389,6 +404,40 @@ function migrateQuyMoColumns() {
       sheet.getRange(1, htIdx + 2).setValue('QuyMo_QH');
     }
     Logger.log("✓ Tab '" + sheetName + "': đã có QuyMo_HT + QuyMo_QH");
+  });
+  syncSheetsToGCS();
+}
+
+// CHẠY 1 LẦN TRONG TRÌNH SOẠN THẢO: sửa ô Latitude/Longitude bị mất dấu thập phân (vd. tab 13-BUS nhập từ CSV:
+// 16.452.800 → 16.4528), ghi lại dạng văn bản để locale không đọc sai lần nữa
+function fixCoordinateCells() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss.getSheets().forEach(function(sheet) {
+    var sheetName = sheet.getName();
+    if (!isValidInfraSheet(sheetName)) return;
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return;
+    var col = getColumnMap(data[0]);
+    if (col.lat < 0 || col.lng < 0) return;
+    var fixed = 0;
+    [[col.lat, 90], [col.lng, 180]].forEach(function(pair) {
+      var c = pair[0], limit = pair[1];
+      var range = sheet.getRange(2, c + 1, data.length - 1, 1);
+      var values = range.getValues();
+      var changed = false;
+      for (var i = 0; i < values.length; i++) {
+        var raw = parseCleanNumber(values[i][0]);
+        if (!raw || Math.abs(raw) <= limit) continue;
+        values[i][0] = String(rescaleCoord(raw, limit));
+        changed = true;
+        fixed++;
+      }
+      if (changed) {
+        range.setNumberFormat("@");
+        range.setValues(values);
+      }
+    });
+    if (fixed) Logger.log("✓ Tab '" + sheetName + "': sửa " + fixed + " ô tọa độ");
   });
   syncSheetsToGCS();
 }

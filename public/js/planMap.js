@@ -29,7 +29,8 @@ export const planLayers = {
   c9: L.layerGroup(), b9: L.layerGroup(),
   c11: L.layerGroup(), b11: L.layerGroup(),
   c12: L.layerGroup(), b12: L.layerGroup(),
-  c13: L.layerGroup(), b13: L.layerGroup()
+  c13: L.layerGroup(), b13: L.layerGroup(),
+  c14: L.layerGroup(), b14: L.layerGroup()
 };
 let planHeatTile = null;
 

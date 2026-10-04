@@ -3,7 +3,7 @@
 // (quy mô, độ phủ trên đất ở) → chuyển phê duyệt vào hàng chờ → Admin phê duyệt thì ghi Sheet qua khung Nhập hàng loạt
 // (Ten_QH = <mã>, khớp / gộp công trình đã có). Bản đồ đẩy lớp hiện trạng lên trước rồi lớp quy hoạch; chia đôi màn hình
 // thì hiện trạng bên trái, quy hoạch bên phải.
-import { map, layers, setReviewScope } from './mapEngine.js';
+import { map, layers, setReviewScope, setLandVisible } from './mapEngine.js';
 import { planMap, isCompareOn, onCompareChange, toggleCompareMode } from './planMap.js';
 import { state, BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, layerType } from './state.js';
 import { geeApi } from './api.js';
@@ -896,6 +896,7 @@ function renderHost() {
       <div class="review-head-btns review-noprint">
         <label class="review-toggle"><input type="checkbox" data-show="HT"${show.HT ? ' checked' : ''}>Hiện trạng</label>
         <label class="review-toggle"><input type="checkbox" data-show="QH"${show.QH ? ' checked' : ''}>Quy hoạch</label>
+        <label class="review-toggle" title="Lô đất ngoài 14 nhóm hạ tầng của các đồ án đã lưu vào Sheet (tab DXF-NN): đất ở, cơ quan, an ninh, quốc phòng, di tích, tôn giáo... để đối chiếu với đồ án đang thẩm định"><input type="checkbox" data-show-land${state.showLand ? ' checked' : ''}>Đồ án đã lưu (DXF)</label>
         <button type="button" class="bp-btn${isCompareOn() ? ' on' : ''}" id="btnReviewCompare" title="Chia đôi màn hình: hiện trạng bên trái, quy hoạch bên phải">${ico('compare')}Chia đôi</button>
         <button type="button" class="bp-btn" id="btnReviewPrint" title="Lưu bảng thẩm định ra file PDF">${ico('printer')}In PDF</button>
         ${sizeBtnsHtml()}
@@ -946,6 +947,7 @@ function closeReview() {
   focusKey = '';
   if (labelsAuto && labelsOverlayOn()) setLabelsOverlay(false);
   labelsAuto = false;
+  if (state.showLand) setLandVisible(false);
   const host = $('projectReviewHost');
   if (host) host.innerHTML = '';
   session = null;
@@ -1357,6 +1359,10 @@ export function initProjectReview() {
   });
   host?.addEventListener('change', (e) => {
     if (!session) return;
+    if (e.target.matches('input[data-show-land]')) {
+      setLandVisible(e.target.checked);
+      return;
+    }
     const toggle = e.target.closest('input[data-show]');
     if (toggle) {
       show[toggle.dataset.show] = toggle.checked;

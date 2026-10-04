@@ -84,7 +84,7 @@ function parkTierOf(size, urbanNhom) {
 }
 
 // D. MẠNG LƯỚI HẠ TẦNG KHÁC — không có chỉ tiêu m²/người theo phường, không tính vào quy mô / độ phủ / heatmap của 8 nhóm
-const NETWORK_CODES = ["13-BUS", "10-PCCC", "11-NT"];
+const NETWORK_CODES = ["13-BUS", "10-PCCC", "11-NT", "14-NOXH"];
 const networkConfig = {
   // Mục 2.8.3.3: đi bộ đến bến ≤ 500 m; khu trung tâm: bến xe buýt cách nhau ≤ 600 m.
   // gapIgnore: bỏ qua trạm cách < 100 m khi tìm trạm kế cận (cặp trạm 2 bên đường)
@@ -92,7 +92,9 @@ const networkConfig = {
   // Mục 2.5.13.1: khu vực trung tâm ≤ 3 km (áp cho phường), khu vực khác ≤ 5 km (xã)
   "10-PCCC": { label: "Trụ sở cảnh sát PCCC", radius: { DT: 3000, XA: 5000, XA_DT: 5000 }, noArea: true },
   // Mục 2.12.1.1: 1 nhà tang lễ / ≤ 250.000 người; 2.12.2.1: nghĩa trang tập trung ≥ 0,04 ha / 1.000 người = 0,4 m²/người
-  "11-NT": { label: "Nhà tang lễ, nghĩa trang", funeralPopPer: 250000, cemeteryQuota: 0.4 }
+  "11-NT": { label: "Nhà tang lễ, nghĩa trang", funeralPopPer: 250000, cemeteryQuota: 0.4 },
+  // Nhà ở xã hội (tab 14-NOXH): chỉ thể hiện vị trí, diện tích; không có bán kính phục vụ
+  "14-NOXH": { label: "Nhà ở xã hội", radius: 0 }
 };
 // Phân loại nhóm 11-NT theo tên; safety = khoảng cách an toàn môi trường tới nhà ở (Bảng 23), 0 = không quy định
 const NT_KINDS = {
@@ -297,12 +299,12 @@ const constants = {
   codeMap: {
     "CV": "1-CV", "BDX": "2-BDX", "MN": "3-MN", "TH": "4-TH",
     "THCS": "5-THCS", "YT": "7-YT", "VH": "8-VH", "TM": "9-TM",
-    "PCCC": "10-PCCC", "NT": "11-NT", "CSD": "12-CSD", "BUS": "13-BUS",
+    "PCCC": "10-PCCC", "NT": "11-NT", "CSD": "12-CSD", "BUS": "13-BUS", "NOXH": "14-NOXH",
     // THPT (tab 6-THPT) tính chung mã 4-TH; isThptItem tách chỉ tiêu và độ phủ riêng
     "THPT": "4-TH",
     "1": "1-CV", "2": "2-BDX", "3": "3-MN", "4": "4-TH", "5": "5-THCS",
     "6": "4-TH", "7": "7-YT", "8": "8-VH", "9": "9-TM",
-    "10": "10-PCCC", "11": "11-NT", "12": "12-CSD", "13": "13-BUS",
+    "10": "10-PCCC", "11": "11-NT", "12": "12-CSD", "13": "13-BUS", "14": "14-NOXH",
     "CV_DT": "1-CV", "CV_DV": "1-CV",
     "BDX_DT": "2-BDX", "BDX_DV": "2-BDX",
     "YT_DT": "7-YT", "YT_DV": "7-YT",

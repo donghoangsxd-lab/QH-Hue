@@ -55,7 +55,7 @@ export function bumpDataVersion() {
 }
 
 // Mạng lưới hạ tầng khác (config/constants.js NETWORK_CODES): không tính quy mô m²/người, độ phủ tổng hợp và heatmap
-export const NETWORK_TYPES = ["13-BUS", "10-PCCC", "11-NT"];
+export const NETWORK_TYPES = ["13-BUS", "10-PCCC", "11-NT", "14-NOXH"];
 export const isNetworkType = (type) => NETWORK_TYPES.includes(type);
 
 // Nhà tang lễ / nghĩa trang (cùng hàm ntKind ở config/constants.js): bán kính = khoảng cách an toàn Bảng 23
@@ -90,7 +90,7 @@ export function parkTierOf(size, nhomHaTang) {
 
 export function effectiveRadius(item) {
   // Khoảng cách an toàn nghĩa trang là quy định cố định, không theo bán kính giả định; nhà tang lễ = 0 (không có vùng)
-  if (item && item.type === '11-NT') return Number(item.radius) || 0;
+  if (item && (item.type === '11-NT' || item.type === '14-NOXH')) return Number(item.radius) || 0;
   if (state.globalBufferRadiusOverride !== null) return state.globalBufferRadiusOverride;
   return Number(item.radius) || Number(item.banKinh) || 500;
 }
@@ -108,7 +108,8 @@ export const infraLabels = {
   "12-CSD": "Cơ sở chưa sử dụng",
   "13-BUS": "Trạm dừng xe buýt",
   "10-PCCC": "Trụ sở cảnh sát PCCC",
-  "11-NT": "Nhà tang lễ, nghĩa trang"
+  "11-NT": "Nhà tang lễ, nghĩa trang",
+  "14-NOXH": "Nhà ở xã hội"
 };
 
 // Ranh giới phường xã: nét viền ghi xám vẽ dưới + nét vàng nhạt vẽ trên (đổ bóng rẻ, không dùng CSS filter)
@@ -119,22 +120,23 @@ export const WARD_HIGHLIGHT_STYLE = { color: '#fb923c', weight: 3.5, dashArray: 
 // Màu hiển thị các lớp hạ tầng (vùng phủ, biểu đồ, ô màu danh sách lớp, màu nền lô khi zoom xa) — mỗi lớp 1 họ màu riêng,
 // không trùng bảng màu sử dụng đất của thẩm định đồ án (projectReviewCore.js): vàng / cam chỉ dành cho đất ở;
 // trường học họ tím → chàm (nhạt dần theo cấp: MN → THPT), cây xanh lục, y tế hồng, văn hóa tím hồng, dịch vụ đỏ,
-// bãi đỗ xe xám xanh, chưa sử dụng xám trắng; PCCC cùng màu đất an ninh, nhà tang lễ cùng màu đất nghĩa trang.
+// bãi đỗ xe xám xanh, chưa sử dụng xám trắng; PCCC cùng màu đất an ninh, nhà tang lễ cùng màu đất nghĩa trang,
+// nhà ở xã hội vàng hổ phách (họ đất ở, khác vàng đất ở #f5d90a).
 // Hoa văn ranh lô khi phóng to vẫn theo đúng màu ACI của TT16 (tt16Symbols.js).
 export const BUFFER_COLORS = {
   "1-CV": "#51cf66", "2-BDX": "#94a3b8", "3-MN": "#d0bfff", "4-TH": "#9775fa", "5-THCS": "#7048e8", "6-THPT": "#4c6ef5",
   "7-YT": "#f06595", "8-VH": "#cc5de8", "9-TM": "#e03131", "12-CSD": "#f1f3f5",
-  "13-BUS": "#00e5ff", "10-PCCC": "#d9480f", "11-NT": "#795548"
+  "13-BUS": "#00e5ff", "10-PCCC": "#d9480f", "11-NT": "#795548", "14-NOXH": "#fab005"
 };
 export const BUFFER_KEYS = {
   "1-CV": "b1", "2-BDX": "b2", "3-MN": "b3", "4-TH": "b4", "5-THCS": "b5", "6-THPT": "b10",
   "7-YT": "b6", "8-VH": "b7", "9-TM": "b8", "12-CSD": "b9",
-  "13-BUS": "b11", "10-PCCC": "b12", "11-NT": "b13"
+  "13-BUS": "b11", "10-PCCC": "b12", "11-NT": "b13", "14-NOXH": "b14"
 };
 export const ICON_GROUP_KEYS = {
   "1-CV": "c1", "2-BDX": "c2", "3-MN": "c3", "4-TH": "c4", "5-THCS": "c5", "6-THPT": "c10",
   "7-YT": "c6", "8-VH": "c7", "9-TM": "c8", "12-CSD": "c9",
-  "13-BUS": "c11", "10-PCCC": "c12", "11-NT": "c13"
+  "13-BUS": "c11", "10-PCCC": "c12", "11-NT": "c13", "14-NOXH": "c14"
 };
 
 // Tab 6-THPT là loại riêng. Dòng cũ còn ở tab 4-TH (mã hoặc tên THPT) vẫn vẽ vào lớp THPT.

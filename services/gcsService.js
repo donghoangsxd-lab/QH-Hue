@@ -29,6 +29,14 @@ function classifyPlanChange(sizeHT, sizeQH) {
 
 // Object công khai không đặt Cache-Control bị cache biên của Google giữ tới 1 giờ: thêm ?v= để HEAD/GET luôn tới bản gốc
 const bypassEdge = (url) => `${url}?v=${Date.now()}`;
+
+// Sheet locale vi-VN đọc dấu chấm thập phân thành dấu phân cách nghìn (16.452800 → 16452800): chia 10 tới khi vào miền hợp lệ
+function rescaleCoord(num, limit) {
+  if (!Number.isFinite(num) || num === 0) return num;
+  let k = 0;
+  while (Math.abs(num) / Math.pow(10, k) > limit && k < 12) k++;
+  return k ? Number((num / Math.pow(10, k)).toFixed(7)) : num;
+}
 const tagOf = (res) => (res && (res.headers['etag'] || res.headers['last-modified'])) || null;
 
 async function getRawDataList() {
@@ -71,6 +79,7 @@ async function getRawDataList() {
 
       const mappedType = constants.codeMap[prefix]
         || constants.codeMap[prefix.replace(/_DT$/i, '').replace(/_DV$/i, '')]
+        || constants.codeMap[String(props.Tab || '').split('-')[0]]
         || "12-CSD";
 
       // Chuẩn hóa Nhóm hạ tầng thông qua hằng số constants
@@ -90,8 +99,8 @@ async function getRawDataList() {
         note: String(props.GhiChu || ''),
         type: mappedType,
         nhomHaTang: assignedNhom, // Bổ sung nhận biết nhóm hạ tầng phục vụ quy chuẩn QCVN
-        lat: parseCoord(coords[1]),
-        lng: parseCoord(coords[0]),
+        lat: rescaleCoord(parseCoord(coords[1]), 90),
+        lng: rescaleCoord(parseCoord(coords[0]), 180),
         size: sizeHT || 0,
         sizeHT,
         sizeQH,
