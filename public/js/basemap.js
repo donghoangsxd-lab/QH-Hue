@@ -7,7 +7,14 @@ const WAYBACK_TILEMAP = 'https://wayback.maptiles.arcgis.com/arcgis/rest/service
 const WAYBACK_PROBE_ZOOM = 17;
 const WAYBACK_MAX_VERSIONS = 12;
 
+const DEFAULT_BASEMAP = 'google';
+
 export const BASEMAPS = {
+  google: {
+    label: 'Google vệ tinh (sắc nét, ít mây)',
+    url: 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+    opts: { maxNativeZoom: 19, subdomains: '0123', attribution: 'Imagery &copy; Google' }
+  },
   esri: {
     label: 'Esri World Imagery',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -17,11 +24,6 @@ export const BASEMAPS = {
     label: 'Esri Wayback (chọn phiên bản ít mây)',
     url: WAYBACK_TILE,
     opts: { maxNativeZoom: 18, attribution: 'Tiles &copy; Esri World Imagery Wayback' }
-  },
-  google: {
-    label: 'Google vệ tinh (sắc nét, ít mây)',
-    url: 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-    opts: { maxNativeZoom: 19, subdomains: '0123', attribution: 'Imagery &copy; Google' }
   },
   s2: {
     label: 'Sentinel-2 không mây 2025 (10 m)',
@@ -50,18 +52,23 @@ function addLabels(m) {
   labelLayers.set(m, L.tileLayer(LABELS.url, { maxZoom: 19, pane: LABELS_PANE, ...LABELS.opts }).addTo(m));
 }
 
-/** Bật / tắt tem đường, tên công trình trên mọi bản đồ đã gắn ảnh nền */
+/** Bật / tắt tem đường, tên công trình trên mọi bản đồ đã gắn ảnh nền (nút nhỏ cuối dòng Mạng lưới đường) */
 export function setLabelsOverlay(on) {
   labelsOn = !!on;
   labelLayers.forEach(layer => layer.remove());
   labelLayers.clear();
   if (labelsOn) maps.forEach((_, m) => addLabels(m));
+  const btn = document.getElementById('btnRoadLabels');
+  if (btn) {
+    btn.classList.toggle('active', labelsOn);
+    btn.setAttribute('aria-pressed', String(labelsOn));
+  }
 }
 
 export const labelsOverlayOn = () => labelsOn;
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}') || {}; } catch (e) { saved = {}; }
-let current = BASEMAPS[saved.key] ? saved.key : 'esri';
+let current = BASEMAPS[saved.key] ? saved.key : DEFAULT_BASEMAP;
 let waybackRelease = Number(saved.release) || null;
 let waybackList = null;   // [{ num, date }] mới → cũ
 
@@ -77,7 +84,7 @@ function persist() {
 
 /** Gắn ảnh nền đang chọn vào bản đồ (gọi khi khởi tạo map / planMap) */
 export function attachBasemap(m) {
-  if (current === 'wayback' && !waybackRelease) current = 'esri';
+  if (current === 'wayback' && !waybackRelease) current = DEFAULT_BASEMAP;
   const layer = createLayer().addTo(m);
   maps.set(m, layer);
   if (labelsOn) {
@@ -149,6 +156,7 @@ export function initBasemapUi(getCenter) {
   const box = document.getElementById('waybackBox');
   const verSel = document.getElementById('waybackSelect');
   const scanBtn = document.getElementById('btnWaybackScan');
+  document.getElementById('btnRoadLabels')?.addEventListener('click', () => setLabelsOverlay(!labelsOn));
   if (!sel) return;
   sel.innerHTML = Object.entries(BASEMAPS).map(([k, d]) => `<option value="${k}">${d.label}</option>`).join('');
   sel.value = current;

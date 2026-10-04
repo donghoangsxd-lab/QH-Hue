@@ -1,6 +1,6 @@
 // Thẩm định đồ án quy hoạch từ hatch DXF: bảng cân đối sử dụng đất theo TT 16/2025/TT-BXD (Phụ lục I Mục 2 / Mục 4)
 // và chấm chỉ tiêu QCVN 01:2026/BXD. Không ghi Sheet, không cộng vào chỉ tiêu phường hay thành phố.
-import { parkTierOf } from './state.js';
+import { parkTierOf, BUFFER_COLORS } from './state.js';
 import { tt16Layer, layerToType } from './cadImport.js';
 
 export const REVIEW_MAX_BYTES = 5 * 1024 * 1024;
@@ -147,6 +147,31 @@ export function landRowByKey(kind, key) {
   return (LANDUSE_TABLES[kind]?.rows || []).find(r => r.key === key) || null;
 }
 
+// Ký hiệu bản đồ theo cùng nguyên tắc chú giải ranh lô: tt16 = khóa hoa văn TT16 (tt16Symbols) khi phóng to;
+// tone = màu nền khi thu nhỏ — màu lớp hạ tầng (BUFFER_COLORS) nếu đầu mục chỉ gồm 1 loại, đầu mục gộp nhiều loại giữ màu riêng.
+// [khóa TT16, gộp nhiều loại]
+const ROW_TT16 = {
+  QHC: { dd_cx: ['1-CV'], ndd_yt: ['7-YT'], ndd_vh: ['8-VH'], nnk_csd: ['12-CSD'] },
+  QHPK: {
+    yt: ['7-YT'], vh: ['8-VH'], tdtt: ['TDTT'], gd: ['3-MN', true], cxcc: ['1-CV'], dv: ['9-TM', true], bdx: ['2-BDX'], csd: ['12-CSD']
+  }
+};
+const SUB_TT16 = { thpt: '6-THPT', mn: '3-MN', th: '4-TH', thcs: '5-THCS', cho: '9-TM' };
+// Lô trường học chưa phân cấp / dịch vụ chưa xác nhận: tô cam như lô đang chờ chọn trên bản đồ
+const PENDING_TONE = '#fb923c';
+const PENDING_SUBS = new Set(['school', 'pending']);
+
+/** Ký hiệu của đầu mục / nhóm con: { tt16: khóa TT16 | null, tone: màu nền khi thu nhỏ } */
+export function landSymbol(kind, rowKey, subKey = '') {
+  const row = landRowByKey(kind, rowKey);
+  const [rowTt16, mixed] = ROW_TT16[kind]?.[rowKey] || [];
+  if (PENDING_SUBS.has(subKey)) return { tt16: rowTt16 || '3-MN', tone: PENDING_TONE };
+  if (SUB_TT16[subKey]) return { tt16: SUB_TT16[subKey], tone: BUFFER_COLORS[SUB_TT16[subKey]] };
+  if (!rowTt16) return { tt16: null, tone: row?.color || '#94a3b8' };
+  const tone = mixed ? row.color : rowTt16 === 'TDTT' ? SPORT_COLOR : BUFFER_COLORS[rowTt16];
+  return { tt16: rowTt16, tone: tone || row.color };
+}
+
 /** Đầu mục chọn được khi gán layer chưa đúng quy định */
 export function landChoices(kind) {
   return (LANDUSE_TABLES[kind]?.rows || []).filter(r => r.key && !r.sumOf);
@@ -209,14 +234,14 @@ export function landUseSummary(lots, kind) {
     if (!r.sub) stt++;
     if (!(ht > 0 || qh > 0)) return;
     out.push({
-      kind: 'row', key: r.key, stt: r.sub ? '' : stt, label: r.label, sym: r.sym, code: (r.codes || []).join(', '), color: r.color, sub: !!r.sub, sum: !!r.sumOf,
+      kind: 'row', key: r.key, stt: r.sub ? '' : stt, label: r.label, sym: r.sym, code: (r.codes || []).join(', '), ...landSymbol(kind, r.key), sub: !!r.sub, sum: !!r.sumOf,
       ...cells(ht, qh)
     });
     (r.subs || []).forEach(([sk, label, sym]) => {
       const sht = sum.HT[`${r.key}/${sk}`] || 0;
       const sqh = sum.QH[`${r.key}/${sk}`] || 0;
       if (!(sht > 0 || sqh > 0)) return;
-      out.push({ kind: 'row', key: `${r.key}/${sk}`, stt: '', label: `- ${label}`, sym, code: '', color: r.color, sub: true, part: true, ...cells(sht, sqh) });
+      out.push({ kind: 'row', key: `${r.key}/${sk}`, stt: '', label: `- ${label}`, sym, code: '', ...landSymbol(kind, r.key, sk), sub: true, part: true, ...cells(sht, sqh) });
     });
   });
   const rows = out.filter(r => {
@@ -296,25 +321,25 @@ export function presetDecision(layerName) {
 
 // ============================ CHẤM CHỈ TIÊU QCVN 01:2026 ============================
 
-// Chỉ tiêu m²/người và bán kính (m) cùng bộ đô thị đang dùng cho bảng phường (hồ sơ DT).
-// Cây xanh lấy bán kính theo hạng diện tích từng hatch, không dùng số ở cột radius.
+// Chỉ tiêu m²/người, bán kính (m) và quy mô tối thiểu mỗi công trình (minSize, m²) cùng bộ đô thị đang dùng cho bảng phường
+// (config/constants.js, hồ sơ DT). Cây xanh lấy bán kính theo hạng diện tích từng hatch, không dùng số ở cột radius.
 export const REVIEW_ROWS = [
-  { section: 'A', key: 'THPT', label: 'Trường THPT', quota: 0.60, radius: 2000 },
-  { section: 'A', key: 'YT_DT', label: 'Y tế cấp đô thị', quota: 0.40, radius: 2000 },
-  { section: 'A', key: 'VH_DT', label: 'Văn hóa - Thể thao cấp đô thị', quota: 1.60, radius: 2000 },
-  { section: 'A', key: 'TM_DT', label: 'Chợ - TMDV cấp đô thị', quota: 0.40, radius: 2000 },
-  { section: 'A', key: 'CV_DT', label: 'Cây xanh đô thị', quota: 5.00, radius: 0 },
-  { section: 'A', key: 'BDX_DT', label: 'Bãi đỗ xe cấp đô thị', quota: 1.50, radius: 2000 },
-  { section: 'B', key: '3-MN', label: 'Trường Mầm non', quota: 0.60, radius: 1000, perUnit: true },
-  { section: 'B', key: '4-TH', label: 'Trường Tiểu học', quota: 0.65, radius: 1000, perUnit: true },
-  { section: 'B', key: '5-THCS', label: 'Trường THCS', quota: 0.55, radius: 1000, perUnit: true },
-  { section: 'B', key: 'YT_DV', label: 'Y tế đơn vị ở', quota: 0, radius: 1000 },
-  { section: 'B', key: 'VH_DV', label: 'Văn hóa thể thao đơn vị ở', quota: 0, radius: 1000 },
-  { section: 'B', key: 'TM_DV', label: 'Chợ - TMDV đơn vị ở', quota: 0, radius: 1000 },
+  { section: 'A', key: 'THPT', label: 'Trường THPT', quota: 0.60, radius: 2000, minSize: 5000 },
+  { section: 'A', key: 'YT_DT', label: 'Y tế cấp đô thị', quota: 0.40, radius: 2000, minSize: 1000 },
+  { section: 'A', key: 'VH_DT', label: 'Văn hóa - Thể thao cấp đô thị', quota: 1.60, radius: 2000, minSize: 1000 },
+  { section: 'A', key: 'TM_DT', label: 'Chợ - TMDV cấp đô thị', quota: 0.40, radius: 2000, minSize: 1500 },
+  { section: 'A', key: 'CV_DT', label: 'Cây xanh đô thị', quota: 5.00, radius: 0, minSize: 10000 },
+  { section: 'A', key: 'BDX_DT', label: 'Bãi đỗ xe cấp đô thị', quota: 1.50, radius: 2000, minSize: 1000 },
+  { section: 'B', key: '3-MN', label: 'Trường Mầm non', quota: 0.60, radius: 1000, perUnit: true, minSize: 800 },
+  { section: 'B', key: '4-TH', label: 'Trường Tiểu học', quota: 0.65, radius: 1000, perUnit: true, minSize: 2000 },
+  { section: 'B', key: '5-THCS', label: 'Trường THCS', quota: 0.55, radius: 1000, perUnit: true, minSize: 2500 },
+  { section: 'B', key: 'YT_DV', label: 'Y tế đơn vị ở', quota: 0, radius: 1000, minSize: 500 },
+  { section: 'B', key: 'VH_DV', label: 'Văn hóa thể thao đơn vị ở', quota: 0, radius: 1000, minSize: 500 },
+  { section: 'B', key: 'TM_DV', label: 'Chợ - TMDV đơn vị ở', quota: 0, radius: 1000, minSize: 1000 },
   { section: 'B', key: 'DVCC_TOTAL', label: 'Dịch vụ công cộng khác đơn vị ở (y tế, văn hóa, chợ)', quota: 0.20, radius: 1000, sumOf: ['YT_DV', 'VH_DV', 'TM_DV'] },
   { section: 'B', key: 'DVCC_ALL', label: 'Tổng đất dịch vụ công cộng đơn vị ở (gồm trường học)', quota: 2.00, radius: 0, sumOf: ['3-MN', '4-TH', '5-THCS', 'YT_DV', 'VH_DV', 'TM_DV'] },
-  { section: 'B', key: 'CV_DV', label: 'Vườn hoa (cây xanh đơn vị ở)', quota: 2.00, radius: 400 },
-  { section: 'B', key: 'BDX_DV', label: 'Bãi đỗ xe đơn vị ở', quota: 2.50, radius: 500 }
+  { section: 'B', key: 'CV_DV', label: 'Vườn hoa (cây xanh đơn vị ở)', quota: 2.00, radius: 400, minSize: 500 },
+  { section: 'B', key: 'BDX_DV', label: 'Bãi đỗ xe đơn vị ở', quota: 2.50, radius: 500, minSize: 500 }
 ];
 
 const ROW_BY_KEY = Object.fromEntries(REVIEW_ROWS.map(r => [r.key, r]));
@@ -409,6 +434,11 @@ export function scoreRows(lots, pop, kind) {
 
 export function rowLabel(key) {
   return (ROW_BY_KEY[key] && ROW_BY_KEY[key].label) || key;
+}
+
+/** Quy mô tối thiểu (m²) mỗi công trình của dòng thẩm định, 0 nếu không quy định */
+export function rowMinSize(key) {
+  return (ROW_BY_KEY[key] && ROW_BY_KEY[key].minSize) || 0;
 }
 
 /** Tên đồ án từ tên file: "HT-ABCD.dxf" → "ABCD" */

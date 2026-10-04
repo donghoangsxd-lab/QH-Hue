@@ -23,6 +23,8 @@ TT16_STYLES["5-THCS"] = TT16_STYLES["3-MN"];
 // Thứ tự hiển thị trong chú giải
 const LEGEND_KEYS = ["1-CV", "2-BDX", "3-MN", "6-THPT", "7-YT", "8-VH", "TDTT", "9-TM", "12-CSD"];
 
+// Từ zoom này (gần 1 lô cụ thể) tô hoa văn TT16, xa hơn tô màu nền lớp
+export const TT16_PATTERN_ZOOM = 17;
 const FILL_OPACITY = 0.3;
 const PATTERN_BG_ALPHA = 0.25;
 
@@ -141,12 +143,20 @@ function styleKey(type, layer) {
  */
 export function tt16ParcelStyle(type, layer, { scenario, detailed, approved }) {
   const key = styleKey(type, layer);
-  const s = TT16_STYLES[key];
+  return tt16SymbolStyle(key, BUFFER_COLORS[type] || TT16_STYLES[key].color, layer, { scenario, detailed, approved });
+}
+
+/**
+ * Cùng nguyên tắc tt16ParcelStyle nhưng chọn thẳng khóa ký hiệu: key = khóa TT16_STYLES (null = đất không có hoa văn TT16,
+ * mọi mức zoom tô màu tone); tone = màu nền khi thu nhỏ.
+ */
+export function tt16SymbolStyle(key, tone, layer, { scenario, detailed, approved = true }) {
+  const s = key ? TT16_STYLES[key] : null;
   const stage = String(layer || '').trim().toUpperCase().split(/[_\s]/)[0];
   const plan = stage === 'QHDD' || stage === 'QHDH' || stage === 'QH' || (stage !== 'HT' && scenario === 'QH');
-  const pattern = detailed ? patternFor(key) : null;
+  const pattern = detailed && s ? patternFor(key) : null;
   const k = PT_PX * (detailed ? 1 : COARSE_FRAME_SCALE);
-  const color = pattern ? s.color : (BUFFER_COLORS[type] || s.color);
+  const color = pattern ? s.color : (tone || (s && s.color) || '#94a3b8');
   return {
     color: approved ? color : '#f87171',
     weight: plan ? +(FRAME_PT * k).toFixed(1) : 1,
@@ -155,8 +165,16 @@ export function tt16ParcelStyle(type, layer, { scenario, detailed, approved }) {
     lineJoin: 'miter',
     dashArray: !approved ? '4,4' : stage === 'QHDH' ? DASH_PT.map(v => +(v * k).toFixed(1)).join(',') : null,
     fillColor: pattern || color,
-    fillOpacity: pattern ? 1 : s.fillOpacity || FILL_OPACITY
+    fillOpacity: pattern ? 1 : (s && s.fillOpacity) || FILL_OPACITY
   };
+}
+
+/** Nền CSS ô mẫu hoa văn TT16 (giống ô trong chú giải), '' nếu không có khóa */
+export function tt16SwatchCss(key) {
+  const tile = key ? tileFor(key) : null;
+  if (!tile) return '';
+  if (!tile.dataUrl) tile.dataUrl = tile.canvas.toDataURL();
+  return `background-image:url(${tile.dataUrl});background-size:${tile.w}px ${tile.h}px;`;
 }
 
 // Mẫu 3 kiểu khung ô ký hiệu (tỷ lệ dày / nét / hở như Phụ lục), vẽ bằng currentColor
@@ -171,8 +189,7 @@ export function renderTt16Legend(container) {
   if (!container) return;
   const rows = LEGEND_KEYS.map(key => {
     const s = TT16_STYLES[key];
-    const tile = tileFor(key);
-    const bg = tile ? `background-image:url(${tile.canvas.toDataURL()});background-size:${tile.w}px ${tile.h}px;` : `background:${s.color};`;
+    const bg = tt16SwatchCss(key) || `background:${s.color};`;
     return `<div class="tt16-row" title="${s.layer} · màu ACI ${s.aci}">
       <i class="tt16-swatch" style="${bg}border-color:${s.color};"></i><span>${s.label}</span><small>${s.aci}</small></div>`;
   }).join('');

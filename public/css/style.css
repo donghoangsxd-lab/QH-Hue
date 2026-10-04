@@ -487,6 +487,9 @@ body.right-collapsed .right-panel {
 .risk-k-heat { color: #fb923c; }
 .flood-wards.sat-hot b { color: #f97316; }
 .flood-wards.sat-cool b { color: #60a5fa; }
+.layer-mini-btn { height: 16px; min-width: 22px; padding: 0 4px; border: none; border-radius: 8px; background: rgba(148, 163, 184, 0.35); color: var(--text-strong); font-family: inherit; font-size: 9.5px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--ease); flex-shrink: 0; }
+.layer-mini-btn:hover { background: rgba(var(--cyan-rgb), 0.45); }
+.layer-mini-btn.active { background: var(--accent-cyan); color: var(--text-on-accent); box-shadow: 0 0 8px rgba(var(--cyan-rgb), 0.6); }
 .btn-dot-buffer { width: 16px; height: 16px; padding: 0; border: none; font-family: inherit; line-height: 1; border-radius: 50%; background: rgba(148, 163, 184, 0.35); color: var(--text-strong); font-size: var(--fs-xs); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--ease); flex-shrink: 0; }
 .btn-dot-buffer:hover { background: rgba(var(--cyan-rgb), 0.45); }
 .btn-dot-buffer.active { background: var(--accent-cyan); color: var(--text-on-accent); box-shadow: 0 0 8px rgba(var(--cyan-rgb), 0.6); }
@@ -1866,7 +1869,8 @@ body.project-review .bp-part2 { display: none; }
 .review-decide-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 4px; border-top: 1px dashed rgba(251, 146, 60, 0.45); color: var(--text-muted); }
 .review-decide-nav > span { flex: 1; font-size: var(--fs-xs, 11px); }
 .review-landuse .lu-code { white-space: nowrap; }
-.review-landuse .lu-code i { display: inline-block; width: 12px; height: 12px; margin-right: 4px; vertical-align: middle; border: 1px solid rgba(0, 0, 0, 0.4); }
+.review-landuse th.lu-code, .review-landuse td.lu-code { text-align: left; }
+.review-landuse .lu-code i { display: inline-block; width: 20px; height: 12px; margin-right: 5px; vertical-align: middle; border: 2px solid; border-radius: 2px; background-color: rgba(15, 23, 42, 0.6); }
 .review-landuse .lu-code small { color: var(--text-muted); font-size: 10px; }
 .review-decide { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; border-color: #fb923c; }
 .review-decide.done { border-color: var(--accent-green); }

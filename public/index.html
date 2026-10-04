@@ -210,8 +210,8 @@
   <aside class="right-panel" id="rightPanel">
     <div class="tab-header rp-tabs" role="tablist">
       <button type="button" class="tab-btn active" data-tab="tabLayers" role="tab" aria-selected="true" aria-controls="tabLayers"><svg class="ico"><use href="#i-layers"/></svg><span>Lớp dữ liệu</span></button>
-      <button type="button" class="tab-btn" data-tab="tabAdd" role="tab" aria-selected="false" aria-controls="tabAdd"><svg class="ico"><use href="#i-plus"/></svg><span>Đề xuất</span></button>
       <button type="button" class="tab-btn" data-tab="tabLegend" role="tab" aria-selected="false" aria-controls="tabLegend"><svg class="ico"><use href="#i-book"/></svg><span>Chú giải</span></button>
+      <button type="button" class="tab-btn" data-tab="tabAdd" role="tab" aria-selected="false" aria-controls="tabAdd"><svg class="ico"><use href="#i-plus"/></svg><span>Đề xuất</span></button>
       <button type="button" class="rp-collapse-btn" id="btnCollapseRightPanel" title="Thu gọn panel" aria-label="Thu gọn panel"><svg class="ico"><use href="#i-chev-right"/></svg></button>
     </div>
 
@@ -325,7 +325,7 @@
             </select></div>
             <div class="flood-stats" id="riskStats"></div>
           </div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">phóng to để xem</small></label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">phóng to để xem</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
             <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
             <span class="road-legend-item"><i style="background:#60a5fa; height:2px;"></i>Khu vực</span>

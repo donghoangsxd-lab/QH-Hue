@@ -10,7 +10,7 @@ import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, show
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
-import { tt16ParcelStyle, renderTt16Legend, landPolylineStyle, landLabel } from './tt16Symbols.js';
+import { tt16ParcelStyle, renderTt16Legend, landPolylineStyle, landLabel, TT16_PATTERN_ZOOM } from './tt16Symbols.js';
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap } from './basemap.js';
 import {
@@ -104,7 +104,33 @@ function isPointInWard(lat, lng, ward) {
 
 // Kết quả lọc được ghi nhớ theo (danh sách, phường, phiên bản dữ liệu) — không phải chạy lại turf cho hàng nghìn điểm mỗi lần vẽ
 const wardFilterMemo = new WeakMap();
+
+// Thẩm định đồ án: các lớp trong panel Lớp dữ liệu chỉ áp trong khung đồ án (như chọn riêng 1 phường),
+// bản đồ độ phủ chuyển sang lớp HT / QH của đồ án.
+// reviewScope: { key, bbox [w, s, e, n], onHeat(on), onHeatOpacity(v) }
+let reviewScope = null;
+
+export function setReviewScope(scope) {
+  if (!scope && !reviewScope) return;
+  reviewScope = scope || null;
+  if (!map) return;
+  renderGroupedPoints();
+  refreshHeatmapOnly();
+}
+
 function getWardFilteredList(sourceList) {
+  if (reviewScope) {
+    const memo = wardFilterMemo.get(sourceList);
+    const tag = `review:${reviewScope.key}`;
+    if (memo && memo.ward === tag && memo.version === state.dataVersion) return memo.result;
+    const [w, s, e, n] = reviewScope.bbox;
+    const result = sourceList.filter(p => {
+      const lat = Number(p.lat), lng = Number(p.lng);
+      return lat >= s && lat <= n && lng >= w && lng <= e;
+    });
+    wardFilterMemo.set(sourceList, { ward: tag, version: state.dataVersion, result });
+    return result;
+  }
   if (!state.selectedWard || state.selectedWard === CITY_NAME) return sourceList;
   const wardInfo = state.wardLabelsList.find(w => w.name === state.selectedWard);
   if (!wardInfo || !wardInfo.geometry) return sourceList;
@@ -351,10 +377,11 @@ function updateWardLabelFontSize() {
 
 export function toggleLayer(layerKey, isChecked) {
   if (!map) return;
+  if (layerKey === 'heatmap' && reviewScope) reviewScope.onHeat?.(!!isChecked);
   if (isChecked) {
     if (layerKey === 'heatmap') {
       if (!map.hasLayer(layers.heatmap)) map.addLayer(layers.heatmap);
-      if (heatStale || !tileHeatmapLayer) refreshHeatmapOnly();
+      if (!reviewScope && (heatStale || !tileHeatmapLayer)) refreshHeatmapOnly();
     } else if (layers[layerKey]) {
       map.addLayer(layers[layerKey]);
     }
@@ -473,7 +500,7 @@ function hasValidCoord(p) {
 // Ranh lô đất CAD chỉ vẽ khi phóng to đủ gần (ở mức toàn thành phố hàng nghìn polygon vừa rối vừa nặng):
 // từ PARCEL_MIN_ZOOM tô màu nền TT16, từ PARCEL_PATTERN_ZOOM (gần 1 lô cụ thể) tô hoa văn TT16
 const PARCEL_MIN_ZOOM = 15;
-const PARCEL_PATTERN_ZOOM = 17;
+const PARCEL_PATTERN_ZOOM = TT16_PATTERN_ZOOM;
 
 // Zoom ≤ ngưỡng (mức toàn thành phố): mỗi phường 1 biểu đồ tròn số công trình theo loại thay cho icon chồng chéo.
 // Đang chọn 1 phường thì luôn hiện icon (phường rộng có thể vừa khung ở zoom thấp, 1 biểu đồ đơn lẻ không có ý nghĩa)
@@ -1052,12 +1079,20 @@ function setLeftHeatUrl(url) {
 export function setHeatOpacity(val) {
   if (tileHeatmapLayer) tileHeatmapLayer.setOpacity(val);
   setPlanHeatOpacity(val);
+  reviewScope?.onHeatOpacity?.(val);
 }
 
 // Heatmap chỉ gọi GEE khi đang bật; tắt thì đánh dấu cũ để lần bật sau tính lại theo địa bàn / bán kính hiện tại
 export async function refreshHeatmapOnly() {
   const seq = ++heatmapFetchSeq;
   planHeatStale = true;
+  if (reviewScope) {
+    heatStale = true;
+    setLeftHeatUrl('');
+    setPlanHeatUrl('');
+    reviewScope.onHeat?.(isHeatOn());
+    return;
+  }
   if (!isHeatOn()) {
     heatStale = true;
     return;
@@ -1076,7 +1111,7 @@ export async function refreshHeatmapOnly() {
 
 // Heatmap quy hoạch trùng hiện trạng nếu trong phạm vi không có công trình mới / di dời đã duyệt
 async function refreshPlanHeat() {
-  if (!isCompareOn() || !isHeatOn()) {
+  if (reviewScope || !isCompareOn() || !isHeatOn()) {
     planHeatStale = true;
     return;
   }
