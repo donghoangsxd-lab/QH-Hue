@@ -736,6 +736,25 @@ function createPointMarker(entry, mode, targetMap) {
   return marker;
 }
 
+// Vùng phủ cùng loại chồng nhau không đậm thêm: nền tô đặc trên pane riêng của từng loại × trạng thái duyệt,
+// độ trong suốt đặt cho cả pane (vùng hợp mờ đều); viền nét đứt vẽ riêng trên canvas chung
+const BUFFER_FILL_Z = 390;
+const bufferFillRenderers = new WeakMap();
+
+function bufferFillRenderer(m, key, approved, opacity) {
+  let byPane = bufferFillRenderers.get(m);
+  if (!byPane) bufferFillRenderers.set(m, byPane = new Map());
+  const name = `bufFill-${key}-${approved ? 'a' : 'p'}`;
+  if (!byPane.has(name)) {
+    const pane = m.getPane(name) || m.createPane(name);
+    pane.style.zIndex = BUFFER_FILL_Z;
+    pane.style.pointerEvents = 'none';
+    byPane.set(name, L.canvas({ pane: name }));
+  }
+  m.getPane(name).style.opacity = String(opacity);
+  return byPane.get(name);
+}
+
 /**
  * Bộ vẽ cho 1 bản đồ:
  * - Chỉ tạo marker cho điểm nằm trong khung nhìn (nới 25%), khi kéo/zoom chỉ thêm/bớt phần chênh lệch.
@@ -915,6 +934,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
   function buildBuffer(key) {
     const group = groups[key];
     const type = BUFFER_TYPE_BY_KEY[key];
+    const m = getMap();
     group.clearLayers();
     list.forEach(p => {
       if (layerType(p) !== type) return;
@@ -922,7 +942,10 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
       if (type === "12-CSD" && !approved) return;
       const radius = effectiveRadius(p);
       if (!(radius > 0)) return;
-      group.addLayer(L.circle([p.lat, p.lng], { radius, ...getBufferStyle(type, approved), interactive: false }));
+      const { fillColor, fillOpacity, ...stroke } = getBufferStyle(type, approved);
+      const renderer = bufferFillRenderer(m, key, approved, fillOpacity);
+      group.addLayer(L.circle([p.lat, p.lng], { radius, renderer, stroke: false, fillColor, fillOpacity: 1, interactive: false }));
+      group.addLayer(L.circle([p.lat, p.lng], { radius, ...stroke, fill: false, interactive: false }));
     });
     builtBuffers.add(key);
   }
