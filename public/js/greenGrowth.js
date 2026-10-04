@@ -203,15 +203,21 @@ const CALC = {
   }
 };
 
-function valueCell(ind, ctx) {
-  if (ctx.ward && !ind.wardLevel) return '<td class="gtx-val"><span class="gtx-na">Chỉ tính cấp TP</span></td>';
+/** Giá trị chỉ tiêu của địa bàn: { html, title, has } — has = có số liệu thật (không phải đang tải / chưa có) */
+function valueOf(ind, ctx) {
+  if (ctx.ward && !ind.wardLevel) return { html: '<span class="gtx-na">Chỉ tính cấp TP</span>', has: false };
   const rep = !ctx.ward && GTX_REPORTED[ind.code];
   if (rep && rep.value != null) {
-    return `<td class="gtx-val" title="${escapeHtml(`${rep.source || 'Báo cáo'}${rep.year ? `, năm ${rep.year}` : ''}`)}"><b>${escapeHtml(String(rep.value))}</b></td>`;
+    return { html: `<b>${escapeHtml(String(rep.value))}</b>`, title: `${rep.source || 'Báo cáo'}${rep.year ? `, năm ${rep.year}` : ''}`, has: true };
   }
   const r = CALC[ind.code] ? CALC[ind.code](ctx) : null;
-  if (r) return `<td class="gtx-val"${r.title ? ` title="${escapeHtml(r.title)}"` : ''}>${r.html}</td>`;
-  return `<td class="gtx-val"><span class="gtx-na"${ind.hint ? ` title="${escapeHtml(ind.hint)}"` : ''}>Chưa có số liệu</span></td>`;
+  if (r) return { ...r, has: !/gtx-(wait|na)/.test(r.html) };
+  return { html: '<span class="gtx-na">Chưa có số liệu</span>', title: ind.hint, has: false };
+}
+
+function valueCell(ind, ctx) {
+  const v = valueOf(ind, ctx);
+  return `<td class="gtx-val"${v.title ? ` title="${escapeHtml(v.title)}"` : ''}>${v.html}</td>`;
 }
 
 function rowHtml(ind, idx, ctx) {
@@ -232,11 +238,57 @@ function rowHtml(ind, idx, ctx) {
   </tr>`;
 }
 
-function hasValue(ind, ctx) {
-  if (ctx.ward && !ind.wardLevel) return false;
-  if (!ctx.ward && GTX_REPORTED[ind.code]?.value != null) return true;
-  const r = CALC[ind.code] && CALC[ind.code](ctx);
-  return !!r && !/gtx-(wait|na)/.test(r.html);
+const hasValue = (ind, ctx) => valueOf(ind, ctx).has;
+
+// ---------- Bảng điểm dạng ô: mỗi nhóm một khối cột, tối đa TILE_ROWS ô mỗi cột (style.css › .gtx-tiles) ----------
+const TILE_ROWS = 4;
+// Tên rút gọn trên ô (tối đa 2 dòng); tên đủ và phương pháp tính ở chú thích
+const GTX_SHORT = {
+  '0101': 'Chi tiền điện so với tổng chi tiêu của hộ', '0102': 'Thất thoát nước sạch',
+  '0103': 'Thu ngân sách từ tài nguyên tự nhiên', '0104': 'Đầu tư dự án mới tăng trưởng xanh',
+  '0105': 'Công trình được cấp chứng chỉ xanh', '0201': 'Cây xanh công cộng bình quân đầu người',
+  '0202': 'Mặt nước tự nhiên suy giảm', '0203': 'Đường chiếu sáng tiết kiệm năng lượng',
+  '0204': 'Vận tải hành khách công cộng', '0205': 'Phương tiện cá nhân hạn chế phát thải',
+  '0206': 'Đường dành riêng cho xe đạp', '0207': 'Chất thải rắn xử lý đạt chuẩn',
+  '0208': 'Nước thải thu gom, xử lý đạt chuẩn', '0209': 'Phường, xã thiệt hại do biến đổi khí hậu',
+  '0210': 'Khu vực ô nhiễm môi trường nặng', '0301': 'Tăng dân số so với tăng đất phi nông nghiệp',
+  '0302': 'Hộ có nhà ở kiên cố', '0303': 'Dân số được cấp nước sạch', '0304': 'Không gian công cộng',
+  '0401': 'Quy hoạch chung lồng ghép tăng trưởng xanh', '0402': 'Chính sách tăng trưởng xanh, biến đổi khí hậu',
+  '0403': 'Dịch vụ công trực tuyến', '0404': 'Cán bộ được đào tạo tăng trưởng xanh',
+  '0405': 'Chương trình nâng cao nhận thức cộng đồng'
+};
+let view = 'auto';
+// Màn s không đủ cao cho 4 hàng ô: mặc định dạng bảng
+const useTiles = () => (view === 'auto' ? document.documentElement.dataset.screen !== 's' : view === 'tiles');
+
+function tileHtml(ind, ctx) {
+  const [cls, label, desc] = KIND_BADGE[ind.kind];
+  const v = valueOf(ind, ctx);
+  const scope = ind.minClass ? ` Áp dụng đô thị loại ${ind.minClass} trở lên (Huế: đô thị loại I).` : '';
+  const meta = `Kỳ công bố: ${ind.period}. Nguồn: ${ind.src}.${ind.annual ? ' Có trong báo cáo hằng năm.' : ''}`;
+  const tip = `${ind.code} ${ind.name} (${ind.unit}).\n${ind.method}.${scope}\n${meta}\n${label}: ${ind.hint ? `${desc}. ${ind.hint}` : desc}${v.title ? `\n${v.title}` : ''}`;
+  return `<div class="gtx-tile ${cls}${v.has ? ' has-val' : ''}" title="${escapeHtml(tip)}">
+      <span class="gtx-tile-top"><b class="gtx-code">${ind.code}</b><span class="gtx-badge ${cls}">${label}</span></span>
+      <span class="gtx-tile-name">${escapeHtml(GTX_SHORT[ind.code] || ind.name)}</span>
+      <span class="gtx-tile-val">${v.html}${v.has ? ` <em>${escapeHtml(ind.unit)}</em>` : ''}</span>
+    </div>`;
+}
+
+function tilesHtml(list, ctx) {
+  const groups = Object.keys(GROUPS).map(g => ({ g, items: list.filter(i => i.code.startsWith(g)) })).filter(x => x.items.length);
+  return `<div class="gtx-tiles">${groups.map(({ g, items }) => `<section class="gtx-tgroup">
+      <h4>${g}. ${GROUPS[g]} <span>${items.filter(i => hasValue(i, ctx)).length}/${items.length}</span></h4>
+      <div class="gtx-tgrid" style="--cols:${Math.ceil(items.length / TILE_ROWS)}">${items.map(i => tileHtml(i, ctx)).join('')}</div>
+    </section>`).join('')}</div>`;
+}
+
+// Thanh trạng thái: số chỉ tiêu theo cách lấy số liệu (Tự tính, vệ tinh, một phần, bản đồ hỗ trợ, chờ báo cáo)
+function kindsHtml(list) {
+  const counts = Object.keys(KIND_BADGE).map(k => [k, list.filter(i => i.kind === k).length]).filter(([, n]) => n);
+  return `<span class="gtx-kinds">
+      <span class="gtx-kbar">${counts.map(([k, n]) => `<i class="${KIND_BADGE[k][0]}" style="flex:${n}" title="${escapeHtml(`${KIND_BADGE[k][1]}: ${n} chỉ tiêu`)}"></i>`).join('')}</span>
+      ${counts.map(([k, n]) => `<span class="${KIND_BADGE[k][0]}" title="${escapeHtml(KIND_BADGE[k][2])}">${KIND_BADGE[k][1]} <b>${n}</b></span>`).join('')}
+    </span>`;
 }
 
 function tableHtml(ctx) {
@@ -244,6 +296,19 @@ function tableHtml(ctx) {
   const filled = list.filter(i => hasValue(i, ctx)).length;
   const place = ctx.ward ? ctx.ward.Ten_Phuong : 'TP Huế';
   const years = sarSeasons().years;
+  const tiles = useTiles();
+  const bar = `<div class="gtx-bar">
+      <span class="gtx-summary" title="${escapeHtml(`${GTX_REF}. Nội thành, khu vực đô thị = các phường thuộc bộ chỉ tiêu đô thị. Năm cơ sở ${GTX_BASE_YEAR} (Điều 2 khoản 4).`)}">
+        Có số liệu <b>${filled}/${list.length}</b> chỉ tiêu · ${escapeHtml(place)} · năm cơ sở ${GTX_BASE_YEAR}</span>
+      ${kindsHtml(list)}
+      <label class="gtx-pick" title="Năm đánh giá cho chỉ tiêu ước tính từ vệ tinh (0209)">Năm đánh giá
+        <select data-gtx="year">${years.map(y => `<option value="${y}"${y === currentYear() ? ' selected' : ''}>${y}</option>`).join('')}</select></label>
+      <button type="button" class="bp-btn gtx-filter${annualOnly ? ' active' : ''}" data-gtx="annual" aria-pressed="${annualOnly}"
+        title="Báo cáo hằng năm dùng 18 chỉ tiêu, không gồm 0201, 0206, 0301, 0302, 0304, 0401 (Điều 5 khoản 5)">18 chỉ tiêu BC hằng năm</button>
+      <button type="button" class="bp-btn gtx-filter${tiles ? '' : ' active'}" data-gtx="view" aria-pressed="${!tiles}"
+        title="Bảng đầy đủ: kỳ công bố, nguồn số liệu, năm cơ sở của từng chỉ tiêu">${ico('table')}Bảng đầy đủ</button>
+    </div>`;
+  if (tiles) return bar + tilesHtml(list, ctx);
   let idx = 0, group = '';
   const rows = list.map(ind => {
     const g = ind.code.slice(0, 2);
@@ -251,14 +316,7 @@ function tableHtml(ctx) {
     group = g;
     return head + rowHtml(ind, ++idx, ctx);
   }).join('');
-  return `<div class="gtx-bar">
-      <span class="gtx-summary" title="${escapeHtml(`${GTX_REF}. Nội thành, khu vực đô thị = các phường thuộc bộ chỉ tiêu đô thị. Năm cơ sở ${GTX_BASE_YEAR} (Điều 2 khoản 4).`)}">
-        Có số liệu <b>${filled}/${list.length}</b> chỉ tiêu · ${escapeHtml(place)} · năm cơ sở ${GTX_BASE_YEAR}</span>
-      <label class="gtx-pick" title="Năm đánh giá cho chỉ tiêu ước tính từ vệ tinh (0209)">Năm đánh giá
-        <select data-gtx="year">${years.map(y => `<option value="${y}"${y === currentYear() ? ' selected' : ''}>${y}</option>`).join('')}</select></label>
-      <button type="button" class="bp-btn gtx-filter${annualOnly ? ' active' : ''}" data-gtx="annual" aria-pressed="${annualOnly}"
-        title="Báo cáo hằng năm dùng 18 chỉ tiêu, không gồm 0201, 0206, 0301, 0302, 0304, 0401 (Điều 5 khoản 5)">18 chỉ tiêu BC hằng năm</button>
-    </div>
+  return `${bar}
     <div class="table-container">
       <table class="data-table gtx-table">
         <thead><tr>
@@ -293,8 +351,9 @@ export function renderGreenGrowth(el, { wardName, wards }) {
 /** Sự kiện trong bảng (lọc 18 chỉ tiêu, đổi năm đánh giá); rerender = vẽ lại bảng của địa bàn đang chọn */
 export function initGreenGrowthEvents(el, rerender) {
   el?.addEventListener('click', (e) => {
-    if (!e.target.closest('[data-gtx="annual"]')) return;
-    annualOnly = !annualOnly;
+    if (e.target.closest('[data-gtx="annual"]')) annualOnly = !annualOnly;
+    else if (e.target.closest('[data-gtx="view"]')) view = useTiles() ? 'table' : 'tiles';
+    else return;
     rerender();
   });
   el?.addEventListener('change', (e) => {

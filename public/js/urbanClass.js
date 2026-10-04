@@ -498,52 +498,121 @@ function readMeasure(std, urban, wards) {
   return measured.get(key);
 }
 
-function overviewCells(urban, wards) {
-  if (urban.cls === 'I') {
-    const facts = typeIFacts(wards);
-    const popCls = facts.pop >= 2500000 ? 'c-green' : 'c-red';
-    const dash = '<td class="uc-val" title="Phụ lục I không có tiêu chuẩn mật độ. Với cấp xã trong thành phố, Điều 8 khoản 2 điểm d cũng không xem xét mật độ dân số."><span class="gtx-na">—</span></td>';
-    const rate = facts.rate == null ? '—' : `≥ ${N1.format(facts.rate)}%`;
-    const rateCls = facts.rate >= 45 ? 'c-green' : 'c-orange';
-    return {
-      cells: `<td class="uc-val" title="Mục tiêu 1.II.07: ≥ 2.500.000 người"><b class="${popCls}">${fmtNum(facts.pop)}</b> <span class="c-muted">/ 2.500.000</span></td>${dash}${dash}${dash}${dash}`,
-      track: `<span class="${facts.pop2 >= 600000 ? 'c-green' : 'c-red'}">Loại II ${fmtNum(facts.pop2)}</span> <span class="c-muted">/ 600.000</span><br><span class="${rateCls}" title="${escapeHtml(STD_I.find(s => s.code === '1.II.08').method)}">Đô thị hóa ${rate}</span>`
-    };
-  }
-  const codes = ['2A.II.03', '2A.II.04', '2A.III.07', '2A.III.20', '2A.III.22'];
-  const bits = [];
-  let pts = 0, max = 0, met = 0, evaluated = 0, pending = false;
+// ---------- Trang tổng quan: thẻ loại I | bảng loại II, III | chi tiết đô thị đang chọn ----------
+// Cột của bảng tổng quan; mật độ dân số (2A.II.04) không xem xét với đô thị di sản nên ghi 1 lần ở thẻ loại I
+const LIST_CODES = ['2A.II.03', '2A.III.07', '2A.III.20', '2A.III.22'];
+// Tên ngắn các tiêu chuẩn webapp tính được (khung chi tiết); tên đủ ở chú thích
+const STD_SHORT = {
+  '2A.II.03': 'Dân số', '2A.II.04': 'Mật độ dân số', '2A.III.07': 'Mật độ đường', '2A.III.13': 'Nhà tang lễ',
+  '2A.III.15': 'Cơ sở giáo dục, đào tạo', '2A.III.16': 'Công trình văn hóa', '2A.III.18': 'Thương mại, dịch vụ',
+  '2A.III.19': 'Đất dịch vụ công cộng / người', '2A.III.20': 'Khu xanh ≥ 2 ha', '2A.III.22': 'Cây xanh / người'
+};
+let picked = null;
+
+// Thanh mức đạt: phần tô = số đo / mức tối đa, vạch = mức tối thiểu tính điểm
+function meterHtml(value, hi, floor, level) {
+  const pct = hi > 0 ? Math.max(0, Math.min(100, (value / hi) * 100)) : 0;
+  const mark = floor != null && hi > 0 ? Math.min(100, (floor / hi) * 100) : null;
+  return `<span class="uc-meter lv-${level}"><i style="width:${pct.toFixed(1)}%"></i>${mark != null ? `<s style="left:${mark.toFixed(1)}%"></s>` : ''}</span>`;
+}
+
+function scoreOf(urban, wards) {
+  const out = { pts: 0, max: 0, met: 0, evaluated: 0, pending: false, levels: [] };
   STD_2A.forEach(std => {
     if (!std.calc || urban.partial) return;
     const m = readMeasure(std, urban, wards);
     const j = judge(std, urban, m);
-    if (j.level === 'wait' && m && m.pending) pending = true;
+    if (j.level === 'wait' && m && m.pending) out.pending = true;
     if (j.pts == null) return;
-    pts += j.pts; max += std.pts.hi; evaluated++;
-    if (j.level === 'hi' || j.level === 'mid' || j.level === 'adj' || j.level === 'skip') met++;
+    out.pts += j.pts; out.max += std.pts.hi; out.evaluated++;
+    out.levels.push(j.level);
+    if (j.level === 'hi' || j.level === 'mid' || j.level === 'adj' || j.level === 'skip') out.met++;
   });
-  const cells = codes.map(code => {
-    const std = STD_2A.find(s => s.code === code);
-    const b = bandOf(std, urban.cls);
-    const tip = `${std.name}. Mục tiêu ${targetText(std, urban, 'hi')}. Mức tối thiểu ${targetText(std, urban, 'lo')}. ${std.method || ''}`;
-    if (densityExempt(urban, std)) {
-      const m = urban.partial ? null : readMeasure(std, urban, wards);
-      const measured = m && m.value != null ? ` Số đo tham khảo: ${fmtNum(m.value)} ${std.unit}.` : '';
-      return `<td class="uc-val" title="${escapeHtml(`${tip}${measured} Tính ${fmtNum(std.pts.lo)} điểm tối thiểu, không chấm đạt hay chưa đạt.`)}"><span class="uc-skip">Không xem xét</span></td>`;
-    }
-    if (urban.partial) return `<td class="uc-val" title="${escapeHtml(tip)}"><span class="gtx-na">—</span></td>`;
+  return out;
+}
+
+function stdTip(std, urban, m, j) {
+  return `${std.code} ${std.name}. Mức tối đa ${targetText(std, urban, 'hi')}. Mức tối thiểu ${targetText(std, urban, 'lo')}.`
+    + `${m && m.note ? `\n${m.note}` : ''}${j ? `\n${LEVEL_TEXT[j.level]}` : ''}`;
+}
+
+function listCell(code, urban, wards) {
+  const std = STD_2A.find(s => s.code === code);
+  const m = readMeasure(std, urban, wards);
+  const j = judge(std, urban, m);
+  if (!m || m.pending || m.value == null) return `<td class="uc-val" title="${escapeHtml(m?.note || stdTip(std, urban))}"><span class="gtx-wait">${ico('clock')}</span></td>`;
+  return `<td class="uc-val" title="${escapeHtml(stdTip(std, urban, m, j))}"><span class="uc-cell">`
+    + `<b class="${levelCls(j.level)}">${j.lower ? '≥ ' : ''}${fmtNum(m.value)}</b>${meterHtml(m.value, bandOf(std, urban.cls).hi, adjustedFloor(std, urban), j.level)}</span></td>`;
+}
+
+function scoreCell(urban, wards) {
+  const sc = scoreOf(urban, wards);
+  if (!sc.evaluated) return `<td class="uc-val"><span class="gtx-wait">${ico('clock')}</span></td>`;
+  const tip = `Đã chấm ${sc.evaluated} tiêu chuẩn webapp tính được, tối đa ${N1.format(sc.max)} điểm của các tiêu chuẩn đó; ${sc.met}/${sc.evaluated} đạt mức tối thiểu. `
+    + `Ngưỡng công nhận cả Bảng 2A là 75/100.${sc.pending ? ' Mật độ đường hoặc số liệu khác vẫn đang tải.' : ''}`;
+  return `<td class="uc-val" title="${escapeHtml(tip)}"><span class="uc-cell"><b>${N1.format(sc.pts)}</b><span class="c-muted">/${N1.format(sc.max)}</span>`
+    + `<span class="uc-dots">${sc.levels.map(l => `<i class="lv-${l}"></i>`).join('')}</span></span></td>`;
+}
+
+function groupRowHtml(cls, n) {
+  const hi = (code) => fmtNum(bandOf(STD_2A.find(s => s.code === code), cls).hi);
+  return `<tr class="uc-group"><td></td><td colspan="2"><b class="uc-${cls}">Loại ${cls}</b> · ${n} đô thị · mức tối đa</td>`
+    + `${LIST_CODES.map(code => `<td class="uc-val uc-max">${hi(code)}</td>`).join('')}<td></td></tr>`;
+}
+
+function cityCardHtml(wards) {
+  const f = typeIFacts(wards);
+  const lv = (ok) => (ok ? 'hi' : 'no');
+  const kpi = (label, value, level, meter, target, tip) => `<div class="uc-kpi" title="${escapeHtml(tip)}">
+      <span>${label}</span><b class="${levelCls(level)}">${value}</b>${meter}<em>${target}</em></div>`;
+  const rateLv = f.rate == null ? 'wait' : (f.rate >= 45 ? 'hi' : 'part');
+  return `<aside class="uc-city">
+      <div class="uc-city-head"><b class="uc-I">Loại I</b><button type="button" class="uc-link" data-uc="hue" title="Xem đủ 15 tiêu chuẩn loại I">Thành phố Huế</button></div>
+      ${kpi('Dân số', fmtNum(f.pop), lv(f.pop >= 2500000), meterHtml(f.pop, 2500000, null, lv(f.pop >= 2500000)), 'mục tiêu ≥ 2.500.000', 'Tiêu chuẩn 1.II.07')}
+      ${kpi('Dân số đô thị loại II', fmtNum(f.pop2), lv(f.pop2 >= 600000), meterHtml(f.pop2, 600000, null, lv(f.pop2 >= 600000)), 'mục tiêu ≥ 600.000', 'Tiêu chuẩn 1.II.09: khu vực trung tâm và Hương Thủy')}
+      ${kpi('Tỷ lệ đô thị hóa', f.rate == null ? '—' : `≥ ${N1.format(f.rate)}%`, rateLv, meterHtml(f.rate || 0, 100, 45, rateLv), 'mục tiêu ≥ 45%', STD_I.find(s => s.code === '1.II.08').method)}
+      <div class="uc-city-note" title="${escapeHtml(`${PLAN_REF}: đến 2030 có 16 đô thị (1 loại I, 2 loại II, 13 loại III). Tiêu chuẩn ${CLASS_REF}.`)}">
+        <b>16 đô thị</b> đến 2030 · di sản UNESCO · QĐ 756. Mật độ dân số không xem xét (Điều 8 khoản 2 điểm d).</div>
+      ${legendHtml()}
+    </aside>`;
+}
+
+function legendHtml() {
+  return `<span class="uc-legend"><span class="c-green">Đạt tối đa</span><span class="c-orange">Đạt tối thiểu</span>`
+    + `<span class="c-red">Chưa đạt</span><span class="uc-skip">Không xem xét</span><span class="uc-legend-mark" title="Vạch trên thanh = mức tối thiểu tính điểm">Vạch = mức tối thiểu</span></span>`;
+}
+
+// Màn s không đủ chỗ cho thẻ loại I: thu về 1 dòng trên bảng (style.css › html[data-screen="s"])
+function cityLineHtml(wards) {
+  const f = typeIFacts(wards);
+  return `<div class="uc-bar uc-sbar"><span class="uc-summary"><b class="uc-I">Loại I</b> <button type="button" class="uc-link" data-uc="hue">Thành phố Huế</button>
+      · dân số ${fmtNum(f.pop)} / 2.500.000 · loại II ${fmtNum(f.pop2)} / 600.000 · đô thị hóa ${f.rate == null ? '—' : `≥ ${N1.format(f.rate)}%`}</span>${legendHtml()}</div>`;
+}
+
+function sideHtml(urban, wards) {
+  const head = `<div class="uc-side-head"><b class="uc-${urban.cls}">Loại ${urban.cls}</b><span class="uc-side-name" title="${escapeHtml(scopeTitle(urban))}">${escapeHtml(urban.name)}</span>`
+    + `<span class="c-muted">${escapeHtml(scopeLabel(urban))}</span></div>`;
+  const more = `<button type="button" class="bp-btn uc-more" data-uc="${urban.id}">Bảng đủ ${STD_2A.length} tiêu chuẩn${ico('chev-right')}</button>`;
+  if (urban.partial) return `${head}<div class="uc-side-note">${ico('info')} ${escapeHtml(urban.note)}</div>${more}`;
+  const sc = scoreOf(urban, wards);
+  const rows = STD_2A.filter(s => s.calc).map(std => {
     const m = readMeasure(std, urban, wards);
     const j = judge(std, urban, m);
-    if (!m || m.pending || m.value == null) return `<td class="uc-val" title="${escapeHtml(m?.note || tip)}"><span class="gtx-wait">${ico('clock')}</span></td>`;
-    const mark = j.lower ? '≥ ' : '';
-    return `<td class="uc-val" title="${escapeHtml(`${tip}\n${m.note || ''}\n${LEVEL_TEXT[j.level]}`)}"><b class="${levelCls(j.level)}">${mark}${fmtNum(m.value)}</b> <span class="c-muted">/ ${fmtNum(b.hi)}</span></td>`;
+    let meter = j.level === 'skip' ? '' : '<span></span>';
+    let val;
+    if (j.level === 'skip') val = '<span class="uc-skip">Không xem xét</span>';
+    else if (!m || m.pending || m.value == null) val = `<span class="gtx-wait">${ico('clock')}</span>`;
+    else {
+      val = `<b class="${levelCls(j.level)}">${j.lower ? '≥ ' : ''}${fmtNum(m.value)}</b>`;
+      meter = meterHtml(m.value, bandOf(std, urban.cls).hi, adjustedFloor(std, urban), j.level);
+    }
+    return `<div class="uc-std" title="${escapeHtml(stdTip(std, urban, m, j))}"><span class="uc-std-name">${escapeHtml(STD_SHORT[std.code] || std.name)}</span>${meter}<span class="uc-std-val">${val}</span></div>`;
   }).join('');
-  const track = urban.partial
-    ? '<span class="gtx-na">Chưa tách ranh</span>'
-    : (evaluated
-      ? `<b title="${escapeHtml(`Đã chấm ${evaluated} tiêu chuẩn webapp tính được, tối đa ${N1.format(max)} điểm của các tiêu chuẩn đó. Ngưỡng công nhận cả Bảng 2A là 75/100.${pending ? ' Mật độ đường hoặc số liệu khác vẫn đang tải.' : ''}`)}">${N1.format(pts)} đ</b> <span class="c-muted">${met}/${evaluated}</span>`
-      : `<span class="gtx-wait">${ico('clock')}</span>`);
-  return { cells, track };
+  const score = sc.evaluated
+    ? `<div class="uc-side-score" title="Ngưỡng công nhận cả Bảng 2A là 75/100 điểm"><span>Đã chấm ${sc.evaluated} tiêu chuẩn · đạt mức tối thiểu ${sc.met}/${sc.evaluated}</span>`
+      + `<b>${N1.format(sc.pts)}<span class="c-muted"> / ${N1.format(sc.max)} điểm</span></b>${meterHtml(sc.pts, sc.max, null, sc.met === sc.evaluated ? 'hi' : 'mid')}</div>`
+    : '';
+  return `${head}${score}<div class="uc-stds">${rows}</div>${more}`;
 }
 
 function overviewHtml(wards, wardName) {
@@ -551,36 +620,42 @@ function overviewHtml(wards, wardName) {
   const banner = outside
     ? `<div class="uc-note">${ico('info')} ${escapeHtml(wardName)} không thuộc 15 đô thị loại II, III đến năm 2030. Bảng dưới là cả hệ thống.</div>`
     : '';
-  const rows = URBANS.map((urban, i) => {
-    const here = containsWard(urban, wardName);
-    const view = overviewCells(urban, wards);
-    return `<tr class="${here ? 'uc-here' : ''}">
-      <td>${i + 1}</td>
-      <td class="uc-name"><button type="button" class="uc-link" data-uc="${urban.id}" title="Xem đủ tiêu chuẩn">${escapeHtml(urban.name)}</button></td>
-      <td><b class="uc-${urban.cls}">${urban.cls === 'I' ? 'I' : urban.cls}</b></td>
-      <td class="uc-scope" title="${escapeHtml(scopeTitle(urban))}">${escapeHtml(scopeLabel(urban))}</td>
-      ${view.cells}
-      <td class="uc-val">${view.track}</td>
-    </tr>`;
+  const full = URBANS.filter(u => u.cls !== 'I' && !u.partial);
+  const partial = URBANS.filter(u => u.partial);
+  const pick = URBANS.find(u => u.id === picked && u.cls !== 'I') || (wardName && urbanByWard(wardName)) || full[0];
+  let stt = 0;
+  const rows = ['II', 'III'].map(cls => {
+    const group = full.filter(u => u.cls === cls);
+    return groupRowHtml(cls, group.length) + group.map(urban => {
+      const cls2 = [containsWard(urban, wardName) ? 'uc-here' : '', urban === pick ? 'uc-sel' : ''].join(' ');
+      return `<tr class="uc-row ${cls2}" data-pick="${urban.id}">
+        <td>${++stt}</td>
+        <td class="uc-name"><button type="button" class="uc-link" data-pick="${urban.id}" title="Xem các tiêu chuẩn ở khung bên phải">${escapeHtml(urban.name)}</button></td>
+        <td class="uc-scope" title="${escapeHtml(scopeTitle(urban))}">${escapeHtml(scopeLabel(urban))}</td>
+        ${LIST_CODES.map(code => listCell(code, urban, wards)).join('')}
+        ${scoreCell(urban, wards)}
+      </tr>`;
+    }).join('');
   }).join('');
-  return `${banner}<div class="uc-bar">
-      <span class="uc-summary" title="${escapeHtml(`${PLAN_REF}: đến 2030 có 16 đô thị (1 loại I, 2 loại II, 13 loại III). Tiêu chuẩn ${CLASS_REF}. Xanh = đạt mức tối đa, vàng = đạt mức tối thiểu hoặc sau Điều 8, đỏ = chưa đạt. Bấm tên đô thị để xem đủ tiêu chuẩn.`)}">
-        <b>16 đô thị</b> đến 2030 · di sản UNESCO · QĐ 756</span>
-        <span class="uc-legend"><span class="c-green">Đạt tối đa</span><span class="c-orange">Đạt tối thiểu</span><span class="uc-skip">Không xem xét</span><span class="c-red">Chưa đạt</span></span>
-    </div>
-    <div class="table-container">
-      <table class="data-table uc-table">
-        <thead><tr>
-          <th>STT</th><th>Đô thị</th><th>Loại</th><th>Phạm vi</th>
-          <th title="Loại I: 1.II.07 ≥ 2.500.000 người. Loại II, III: 2A.II.03">Dân số</th>
-          <th title="2A.II.04. Đô thị di sản không xem xét mật độ này và được điểm tối thiểu. Loại I không có tiêu chuẩn mật độ trong Phụ lục I.">Mật độ</th>
-          <th title="2A.III.07, km đường đô thị / km² đất xây dựng">Mật độ đường</th>
-          <th title="2A.III.20, số khu ≥ 2 ha">Xanh ≥ 2 ha</th>
-          <th title="2A.III.22, m² đất cây xanh cấp đô thị / người">Cây xanh</th>
-          <th title="Điểm các tiêu chuẩn webapp đã chấm / số tiêu chuẩn đạt mức tối thiểu. Ngưỡng công nhận Bảng 2A là 75 điểm">Theo dõi</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
+  const partialRow = `<tr class="uc-partial"><td></td><td colspan="${LIST_CODES.length + 3}"><span class="c-muted">${partial.length} đô thị mới chưa tách ranh:</span> `
+    + partial.map(u => `<button type="button" class="uc-link${u === pick ? ' is-sel' : ''}" data-pick="${u.id}" title="${escapeHtml(u.note)}">${escapeHtml(u.name.replace(/^Đô thị mới /, ''))}</button>`).join(' · ')
+    + '</td></tr>';
+  return `${banner}${cityLineHtml(wards)}<div class="uc-layout">
+      ${cityCardHtml(wards)}
+      <div class="table-container uc-list">
+        <table class="data-table uc-table">
+          <thead><tr>
+            <th>STT</th><th>Đô thị</th><th>Phạm vi</th>
+            <th title="2A.II.03, người">Dân số</th>
+            <th title="2A.III.07, km đường đô thị / km² đất xây dựng">Mật độ đường</th>
+            <th title="2A.III.20, số khu ≥ 2 ha">Khu xanh ≥ 2 ha</th>
+            <th title="2A.III.22, m² đất cây xanh cấp đô thị / người">Cây xanh / người</th>
+            <th title="Điểm các tiêu chuẩn webapp đã chấm / tối đa của các tiêu chuẩn đó; mỗi chấm là 1 tiêu chuẩn. Ngưỡng công nhận Bảng 2A là 75 điểm">Điểm đã chấm</th>
+          </tr></thead>
+          <tbody>${rows}${partialRow}</tbody>
+        </table>
+      </div>
+      <aside class="uc-side">${pick ? sideHtml(pick, wards) : ''}</aside>
     </div>`;
 }
 
@@ -699,8 +774,10 @@ export function renderUrbanClass(el, { wardName, wards }) {
 export function initUrbanClassEvents(el, rerender) {
   el?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-uc]');
-    if (!btn) return;
-    mode = btn.dataset.uc === 'all' ? 'all' : btn.dataset.uc;
+    const pick = !btn && e.target.closest('[data-pick]');
+    if (btn) mode = btn.dataset.uc === 'all' ? 'all' : btn.dataset.uc;
+    else if (pick) picked = pick.dataset.pick;
+    else return;
     rerender();
   });
 }

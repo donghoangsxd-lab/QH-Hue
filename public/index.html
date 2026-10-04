@@ -619,6 +619,11 @@
             </div>
           </div>
         </div>
+        <!-- Chỉ hiện khi trải panel (cột phải, dưới mặt giao thông) hoặc phóng to -->
+        <div class="bp-transit" id="transitPanel">
+          <div class="bp-part-head flip-back-head"><b class="bp-part-title">TỶ LỆ VẬN TẢI HÀNH KHÁCH CÔNG CỘNG</b><span class="transit-tag" title="Chưa có số liệu khảo sát: các tỷ lệ dưới đây chỉ để minh họa bố cục">số liệu minh họa</span></div>
+          <div class="transit-chart" id="transitChart"></div>
+        </div>
       </div>
 
       <!-- PHẦN 2: BẢNG TỔNG HỢP HẠ TẦNG -->
@@ -653,7 +658,8 @@
                   <tr>
                     <th rowspan="2">STT</th>
                     <th rowspan="2">Tên Phường/Xã</th>
-                    <th rowspan="2" title="Dân số hiện trạng dùng làm mẫu số chỉ tiêu m²/người. Chấm màu = đối chiếu với WorldPop 2020 và GHSL 2025 (đã quy về cùng tổng dân số TP): xanh lệch < 15%, vàng 15–30%, đỏ ≥ 30% (QCVN 01:2026/BXD Mục 2.4.3)">Dân số</th>
+                    <th rowspan="2" title="Dân số hiện trạng">Dân số<br>HT</th>
+                    <th rowspan="2" title="Dân số quy hoạch của phường/xã">Dân số<br>QH</th>
                     <th rowspan="2" title="Theo thuộc tính diện tích của polygon phường/xã">Diện tích<br>(km²)</th>
                     <th rowspan="2" title="Dân số hiện trạng / diện tích">Mật độ<br>(người/km²)</th>
                     <th colspan="2">1. Công viên</th>
@@ -661,11 +667,14 @@
                     <th colspan="2">3. Mầm non</th>
                     <th colspan="2">4. Tiểu học</th>
                     <th colspan="2">5. THCS</th>
-                    <th colspan="2">6. Y tế</th>
-                    <th colspan="2">7. Văn hóa</th>
-                    <th colspan="2">8. Thương mại</th>
+                    <th colspan="2" title="Hạ tầng cấp đô thị. Không tính vào cột Tổng cộng (bình quân 8 nhóm còn lại)">6. THPT</th>
+                    <th colspan="2">7. Y tế</th>
+                    <th colspan="2">8. Văn hóa</th>
+                    <th colspan="2">9. Thương mại</th>
+                    <th colspan="2" title="Chỉ tiêu nghĩa trang ≥ 0,4 m²/người tính chung toàn thành phố (QCVN 01:2026/BXD Mục 2.12.2.1). Không tính vào cột Tổng cộng">10. Nghĩa trang</th>
                     <th colspan="2">TỔNG CỘNG</th>
                     <th colspan="4" title="Chiều dài theo OpenStreetMap + tuyến Admin vẽ bổ sung, cắt theo ranh phường/xã">Đường giao thông (km)</th>
+                    <th rowspan="2" title="Số trạm dừng xe buýt đã duyệt trong ranh phường/xã">Trạm<br>xe buýt</th>
                   </tr>
                   <tr>
                     <th>Độ phủ</th><th>Q.Mô</th>
@@ -676,6 +685,8 @@
                     <th>Độ phủ</th><th>Q.Mô</th>
                     <th>Độ phủ</th><th>Q.Mô</th>
                     <th>Độ phủ</th><th>Q.Mô</th>
+                    <th>Độ phủ</th><th>Q.Mô</th>
+                    <th title="Số nhà tang lễ, cơ sở hỏa táng, nghĩa trang đã duyệt">Số lượng</th><th title="Tổng diện tích các nghĩa trang (ha)">D.tích (ha)</th>
                     <th>Độ phủ</th><th>Q.Mô</th>
                     <th title="Quốc lộ, tỉnh lộ, đường chính đô thị, liên khu vực">Trục chính</th>
                     <th title="Đường phố có tên">Khu vực</th>

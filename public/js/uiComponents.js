@@ -10,7 +10,6 @@ import {
 import { refreshRoadPanel } from './customRoads.js';
 import { refreshPopPanel } from './popEdits.js';
 import { refreshCadRole } from './cadImportUi.js';
-import { loadPopCheck, popCheckBadgeHtml, popCheckCityHtml } from './popCheck.js';
 import { balanceSlot, balanceScaleHtml, toggleBalanceMap, clearBalanceMap, isBalanceMapOn, BALANCE_REF } from './wardBalance.js';
 import { loadNewDevStats, newDevOf, newDevRowHtml } from './newDev.js';
 import { renderGreenGrowth, initGreenGrowthEvents, reloadGreenGrowthRoads } from './greenGrowth.js';
@@ -181,9 +180,8 @@ function sumAreaByType(list) {
   const totals = {};
   let sum = 0;
   (list || []).forEach(item => {
-    if (!isApproved(item.status) && item.type !== "12-CSD") return;
-    if (isNetworkType(item.type)) return;
     const type = item.type || 'Khác';
+    if (!isApproved(item.status) || !PIE_LABELS[type]) return;
     const size = Number(item.size || 0);
     // Diện tích = 0 vẫn tính 1 đơn vị để donut không trống
     const weight = size > 0 ? size : 1;
@@ -194,10 +192,12 @@ function sumAreaByType(list) {
 }
 
 const PIE_COLORS = BUFFER_COLORS;
+// 10 loại đất hạ tầng, luôn đủ hàng kể cả khi chưa có công trình; cơ sở chưa sử dụng (12-CSD) không phải hạ tầng nên không tính
 const PIE_LABELS = {
   "1-CV": "Công viên", "2-BDX": "Bãi đỗ xe", "3-MN": "Mầm non", "4-TH": "Tiểu học", "5-THCS": "THCS",
-  "6-THPT": "THPT", "7-YT": "Y tế", "8-VH": "Văn hóa", "9-TM": "Chợ/TTTM", "12-CSD": "Chưa sử dụng", "empty": "Chưa có DL"
+  "6-THPT": "THPT", "7-YT": "Y tế", "8-VH": "Văn hóa", "9-TM": "Chợ/TTTM", "11-NT": "Nghĩa trang"
 };
+const PIE_EMPTY_LABEL = "Chưa có DL";
 
 // ================== MẶT SAU THẺ LẬT: THỐNG KÊ SỐ LƯỢNG 12 LOẠI (4 × 3 Ô) ==================
 // Trạm dừng xe buýt (điểm trên vỉa hè, không có khu đất) thống kê ở mặt Hệ thống giao thông (renderBusRow)
@@ -318,25 +318,25 @@ function setPart1Turn(turn) {
 // Hạng màn hình theo bề rộng CSS px (trình duyệt không đo được inch; Windows phóng to 125–150% làm màn Full HD hẹp lại):
 // s < 1700 (laptop 14–17"), m < 2300 (21–24" Full HD), l ≥ 2300 (27–32" QHD / 4K)
 const SCREEN_TIERS = [[2300, 'l'], [1700, 'm'], [0, 's']];
-const SPREAD_FACE_W = 338;     // = bề rộng .flip-card khi xoay
-const CITY_CHART_MIN_W = 900;  // biểu đồ 40 phường/xã cần tối thiểu chừng này
+const SPREAD_SIDE_W = 338 * 1.08;  // = --side-w ở hệ số 1 (2 cột trái / phải khi trải panel)
+const TABLE_FIT_MIN_FS = 9;        // px: nhỏ hơn thì để bảng cuộn ngang thay vì co chữ tiếp
 
-// Bề rộng vừa nội dung của bảng (bảng phường giãn 100% nên offsetWidth chỉ là bề rộng khung)
+// Hệ số bậc màn hình --k trong style.css (chữ, dòng bảng, bề rộng khối cùng nhân hệ số này)
+function screenScale() {
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--k')) || 1;
+}
+
+// Bề rộng vừa nội dung của bảng (ward-table đặt width: min-content trong style.css nên offsetWidth chính là bề rộng tự nhiên)
 function naturalWidth(table, fallback) {
-  if (!table || !table.offsetWidth) return fallback;
-  const prev = table.style.width;
-  table.style.width = 'max-content';
-  const w = table.offsetWidth;
-  table.style.width = prev;
-  return w;
+  return table && table.offsetWidth ? table.offsetWidth : fallback;
 }
 
 const isPart1Spread = () => !!document.getElementById('bpBody')?.classList.contains('bp-spread')
   && !document.body.classList.contains('bottom-max');
 
 /**
- * Trải 3 mặt khối xoay cạnh nhau khi còn chỗ: màn l luôn trải, màn m chỉ khi xem 1 phường/xã
- * (bảng chỉ tiêu phường hẹp, bỏ trống nửa phải panel), màn s giữ khối xoay
+ * Trải panel thành bố cục đối xứng 3 cột (style.css › bp-spread): màn l luôn trải; màn m chỉ khi xem 1 phường/xã
+ * và bảng chỉ tiêu phường vừa cột giữa; màn s giữ khối xoay
  */
 function updatePart1Spread() {
   const body = document.getElementById('bpBody');
@@ -344,15 +344,73 @@ function updatePart1Spread() {
   const tier = SCREEN_TIERS.find(([min]) => window.innerWidth >= min)[1];
   document.documentElement.dataset.screen = tier;
   const ward = !isCityMode();
-  const need = ward ? naturalWidth(document.querySelector('#wardSummaryView .ward-table'), 700) : CITY_CHART_MIN_W;
-  const spread = (tier === 'l' || (tier === 'm' && ward)) && body.clientWidth - 3 * SPREAD_FACE_W - 24 >= need;
+  const k = screenScale();
+  const room = body.clientWidth - 2 * SPREAD_SIDE_W * k - 24;
+  const spread = tier === 'l'
+    || (tier === 'm' && ward && room >= naturalWidth(document.querySelector('#wardSummaryView .ward-table'), 700 * k));
   if (body.classList.contains('bp-spread') === spread) return;
   body.classList.toggle('bp-spread', spread);
   // Trải ra: tiêu đề cột trái về mặt cơ cấu đất
   setPart1Turn(spread ? part1Turn - (part1Turn % PART1_PAGES.length) : part1Turn);
 }
 
+// ================== TỶ LỆ VẬN TẢI HÀNH KHÁCH CÔNG CỘNG (cột phải khi trải panel) ==================
+// SỐ LIỆU MINH HỌA: chưa có khảo sát cơ cấu phương tiện công cộng của TP. Huế; thay bằng số liệu thật khi có nguồn
+const TRANSIT_SHARE = [
+  { label: 'Xe buýt', pct: 48, color: '#38bdf8', icon: BUS_ICON },
+  { label: 'Taxi / xe hợp đồng', pct: 32, color: '#22c55e',
+    icon: '<path d="M5 17v-5l2-5h10l2 5v5"/><path d="M3 12h18"/><circle cx="7.5" cy="17" r="1.6"/><circle cx="16.5" cy="17" r="1.6"/><path d="M10 4h4v3h-4z"/>' },
+  { label: 'Xích lô', pct: 15, color: '#fb923c',
+    icon: '<circle cx="5.5" cy="17" r="3"/><circle cx="18.5" cy="17" r="3"/><path d="M5.5 17 9 9h6l3.5 8"/><path d="M8 9V6h5"/>' },
+  { label: 'Xe ôm công nghệ', pct: 5, color: '#a78bfa',
+    icon: '<circle cx="5.5" cy="17" r="3"/><circle cx="18.5" cy="17" r="3"/><path d="M5.5 17 10 10h5l3.5 7"/><path d="M14 6h3l1.5 4"/>' }
+];
+
+function renderTransitChart() {
+  const box = document.getElementById('transitChart');
+  if (!box) return;
+  const rows = TRANSIT_SHARE.map(m => `<div class="tr-row" style="--c:${m.color}" title="${escapeHtml(m.label)}: ${m.pct}% (số liệu minh họa)">
+      <span class="tr-name"><svg viewBox="0 0 24 24" aria-hidden="true">${m.icon}</svg>${escapeHtml(m.label)}</span>
+      <span class="tr-track"><i style="--w:${m.pct}%"></i></span>
+      <b class="tr-pct">${m.pct}%</b>
+    </div>`).join('');
+  const ticks = [0, 20, 40, 60, 80, 100].map(v => `<span style="--x:${v}%">${v}%</span>`).join('');
+  box.innerHTML = `${rows}<div class="tr-row"><span></span><span class="tr-ticks">${ticks}</span><span></span></div>`;
+}
+
+// Panel trải: co chữ bảng 40 phường/xã đến khi lọt cột giữa (style.css cho bảng width 100% nên phần dư dàn đều, không hở)
+function fitSpreadTable() {
+  const box = document.querySelector('#citySummaryView .table-container');
+  const table = box && box.querySelector('table.data-table');
+  if (!table) return;
+  table.style.fontSize = '';
+  if (!isPart1Spread() || !box.clientWidth) return;
+  table.style.width = 'max-content';
+  let fs = parseFloat(getComputedStyle(table).fontSize);
+  // Đệm và viền ô không co theo chữ nên lặp vài lượt
+  for (let i = 0; i < 5 && table.offsetWidth > box.clientWidth && fs > TABLE_FIT_MIN_FS; i++) {
+    fs = Math.max(TABLE_FIT_MIN_FS, fs * (box.clientWidth / table.offsetWidth) - 0.05);
+    table.style.fontSize = `${fs.toFixed(2)}px`;
+  }
+  table.style.width = '';
+}
+
+function watchSpreadTable() {
+  const box = document.querySelector('#citySummaryView .table-container');
+  if (!box) return;
+  let raf = 0;
+  const schedule = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; fitSpreadTable(); }); };
+  new ResizeObserver(schedule).observe(box);
+  const mo = new MutationObserver(schedule);
+  ['statTableBody', 'statTableFoot'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) mo.observe(el, { childList: true, subtree: true, characterData: true });
+  });
+}
+
 function initPart1Flip() {
+  renderTransitChart();
+  watchSpreadTable();
   let resizeRaf = 0;
   window.addEventListener('resize', () => {
     if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; updatePart1Spread(); });
@@ -374,18 +432,17 @@ export function updateInfraPieChart(sourceList, planList = []) {
   const ht = sumAreaByType(sourceList);
   const qh = sumAreaByType(planList);
 
-  const keys = Object.keys(PIE_LABELS).filter(k => ht.totals[k] || qh.totals[k]);
-  const isEmpty = keys.length === 0;
-  if (isEmpty) keys.push('empty');
+  const isEmpty = !ht.sum && !qh.sum;
+  const keys = isEmpty ? ['empty'] : Object.keys(PIE_LABELS);
   const htVals = keys.map(k => isEmpty ? 1 : (ht.totals[k] || 0));
   const qhVals = keys.map(k => isEmpty ? 1 : (qh.totals[k] || 0));
   const htPct = keys.map((k, i) => ht.sum > 0 ? (htVals[i] / ht.sum) * 100 : 0);
   const qhPct = keys.map((k, i) => qh.sum > 0 ? (qhVals[i] / qh.sum) * 100 : 0);
   const bgColors = keys.map(k => PIE_COLORS[k] || '#38bdf8');
-  const labels = keys.map(k => PIE_LABELS[k] || k);
+  const labels = keys.map(k => PIE_LABELS[k] || PIE_EMPTY_LABEL);
 
   if (legendContainer) {
-    legendContainer.innerHTML = `<div class="pie-legend-row pie-legend-head"><span>Ký hiệu</span><span>H.Trạng</span><span>QH</span></div>`
+    legendContainer.innerHTML = `<div class="pie-legend-row pie-legend-head"><span>Ký hiệu</span><span>Hiện trạng</span><span>Quy hoạch</span></div>`
       + keys.map((k, idx) => {
         const delta = qhPct[idx] - htPct[idx];
         const qhCls = delta >= 0.1 ? 'c-green' : (delta <= -0.1 ? 'c-red' : 'c-cyan');
@@ -453,6 +510,8 @@ const BACKGROUND_RETRY_DELAYS = [20000, 60000, 180000];
 const DETAIL_RETRY_DELAYS = [15000, 45000, 90000];
 
 const COVERAGE_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "7-YT", "8-VH", "9-TM"];
+// Cột bảng 40 phường/xã: 8 mã trên + THPT (độ phủ Ratio_THPT); cột Tổng cộng vẫn bình quân 8 mã
+const TABLE_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "THPT", "7-YT", "8-VH", "9-TM"];
 const CHART_COVERAGE_COLOR = '#38bdf8';
 const CHART_SCALE_COLOR = '#f59e0b';
 const CHART_PLAN_UP_COLOR = '#22c55e';
@@ -724,6 +783,7 @@ function renderCityTableFoot() {
   if (!list.length) { foot.innerHTML = ''; return; }
   const pop = list.reduce((s, w) => s + (Number(w.Dan_So_Vector) || 0), 0);
   const area = list.reduce((s, w) => s + (Number(w.Dien_Tich_Km2) || 0), 0);
+  const nt = list.map(ntStatsOf).reduce((s, x) => ({ count: s.count + x.count, ha: s.ha + x.ha }), { count: 0, ha: 0 });
   let roadCells;
   if (!roadTypesByWard) {
     roadCells = ROAD_TYPES.map(() => `<td class="st-num st-road">${ROAD_PENDING}</td>`).join('');
@@ -743,10 +803,14 @@ function renderCityTableFoot() {
     <td></td>
     <td class="st-name">Toàn thành phố</td>
     <td class="st-num st-pop">${fmtNum(pop)}</td>
+    <td class="st-num st-pop-qh" title="Tổng dân số QH các phường/xã (dân số QH toàn TP: ${fmtNum(CITY_POP_QH)} người)">${fmtNum(totalPlanPop())}</td>
     <td class="st-num">${fmtArea(area)}</td>
     <td class="st-num st-dens">${area > 0 ? fmtNum(Math.round(pop / area)) : '-'}</td>
-    <td colspan="${COVERAGE_CODES.length * 2 + 2}" class="c-muted st-total-note">Độ phủ / quy mô toàn thành phố: xem thanh tiêu đề</td>
+    <td colspan="${TABLE_CODES.length * 2}" class="c-muted st-total-note">Độ phủ / quy mô toàn thành phố: xem thanh tiêu đề</td>
+    <td class="st-num">${nt.count}</td><td class="st-num">${fmtHa(nt.ha)}</td>
+    <td colspan="2"></td>
     ${roadCells}
+    <td class="st-num st-bus">${fmtNum(list.reduce((s, w) => s + busCountOf(w), 0))}</td>
   </tr>`;
 }
 
@@ -934,26 +998,49 @@ function wardRoadRowsHtml(wardData) {
   return rows.join('');
 }
 
+// Quy mô THPT (cấp đô thị, ngoài 8 mã tính Scale_ ở api/gee.js): diện tích ÷ (chỉ tiêu × dân số QH), như bảng chỉ tiêu phường
+function thptScaleOf(w) {
+  const node = w.urbanResults && w.urbanResults.THPT;
+  const req = node && hasQuota(node.quota) ? Number(node.quota) * planPopOf(w) : 0;
+  return req > 0 ? Math.min(100, (Number(node.currentArea || 0) / req) * 100) : null;
+}
+
+const busCountOf = (w) => ((w.network && w.network.bus) || []).length;
+
+// Nhà tang lễ, nghĩa trang (11-NT) đã duyệt trong phường: chỉ tiêu nghĩa trang tính chung toàn TP (Mục 2.12.2.1)
+// nên bảng ghi số cơ sở và diện tích nghĩa trang thay cho độ phủ / quy mô
+function ntStatsOf(w) {
+  const nt = (w.network && w.network.nt) || [];
+  const ha = nt.filter(it => String(it.ntKind || '').startsWith('cemetery')).reduce((s, it) => s + (Number(it.size) || 0), 0) / 10000;
+  return { count: nt.length, ha };
+}
+const fmtHa = (ha) => ha > 0 ? ha.toLocaleString('vi-VN', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) : '-';
+
 function wardRowHtml(w, idx) {
   const ready = !!w._coverageReady;
-  const cells = COVERAGE_CODES.map(c => {
+  const cells = TABLE_CODES.map(c => {
     const cov = ready ? fmtPct(w[`Ratio_${c}`]) : PENDING_CELL;
-    const scale = w[`Scale_${c}`] === null ? NOT_REQUIRED_DASH : fmtPct(w[`Scale_${c}`]);
+    const scaleVal = c === 'THPT' ? thptScaleOf(w) : w[`Scale_${c}`];
+    const scale = scaleVal == null ? NOT_REQUIRED_DASH : fmtPct(scaleVal);
     return `<td class="cov-cell" data-code="${c}">${cov}</td><td class="st-scale">${scale}</td>`;
   }).join('');
   const name = escapeHtml(w.Ten_Phuong);
+  const nt = ntStatsOf(w);
   return `<tr data-ward-row="${name}">
     <td>${idx + 1}</td>
     <td class="st-name">
       <button type="button" class="ward-link link-btn" data-ward="${name}">${name}</button>
     </td>
-    <td class="st-num st-pop">${fmtNum(w.Dan_So_Vector)}${popCheckBadgeHtml(w.Ten_Phuong)}</td>
+    <td class="st-num st-pop">${fmtNum(w.Dan_So_Vector)}</td>
+    <td class="st-num st-pop-qh">${fmtNum(planPopOf(w))}</td>
     <td class="st-num">${w.Dien_Tich_Km2 ? fmtArea(w.Dien_Tich_Km2) : '-'}</td>
     <td class="st-num st-dens">${w.Mat_Do_Dan_So ? fmtNum(w.Mat_Do_Dan_So) : '-'}</td>
     ${cells}
+    <td class="st-num">${nt.count || '-'}</td><td class="st-num">${fmtHa(nt.ha)}</td>
     <td class="cov-avg">${ready ? fmtPct(w.Avg_Coverage_Score) : PENDING_CELL}</td>
     <td class="st-scale st-scale-avg">${fmtPct(w.Avg_Scale_Score)}</td>
     ${roadCellsHtml(w.Ten_Phuong)}
+    <td class="st-num st-bus">${fmtNum(busCountOf(w))}</td>
   </tr>`;
 }
 
@@ -974,23 +1061,12 @@ function patchCombinedTableWardRow(ward) {
     rebuildCombinedTableBody();
     return;
   }
-  COVERAGE_CODES.forEach(c => {
+  TABLE_CODES.forEach(c => {
     const cell = tr.querySelector(`.cov-cell[data-code="${c}"]`);
     if (cell) cell.textContent = fmtPct(ward[`Ratio_${c}`]);
   });
   const avgCell = tr.querySelector('.cov-avg');
   if (avgCell) avgCell.textContent = fmtPct(ward.Avg_Coverage_Score);
-}
-
-// Kết quả đối chiếu dân số về sau bảng: điền chấm màu vào cột Dân số và ô Dân số HT trên tiêu đề
-function applyPopCheck() {
-  const byName = new Map(state.wardStatsData.map(w => [w.Ten_Phuong, w]));
-  document.querySelectorAll('#statTableBody tr[data-ward-row]').forEach(tr => {
-    const w = byName.get(tr.getAttribute('data-ward-row'));
-    const cell = tr.querySelector('.st-pop');
-    if (w && cell) cell.innerHTML = fmtNum(w.Dan_So_Vector) + popCheckBadgeHtml(w.Ten_Phuong);
-  });
-  if (headStatsKey()) renderSummaryNote(headStatsKey());
 }
 
 // ================== PANEL THỐNG KÊ DƯỚI ==================
@@ -1026,7 +1102,6 @@ export function ensureWardStats() {
         state.wardStatsData = resData.data || [];
         state.cityNetwork = resData.network || null;
         mergeLocalCoverageIntoStats();
-        loadPopCheck().then(applyPopCheck).catch(err => console.warn('Đối chiếu dân số nguồn mở lỗi:', err));
         return state.wardStatsData;
       })
       .catch(err => {
@@ -1141,7 +1216,7 @@ function renderSummaryNote(wardName) {
     ? `Độ phủ: bình quân theo dân số các phường/xã đã tính xong (${readyCount}/${list.length})`
     : 'Độ phủ trung bình 8 nhóm hạ tầng')
     + '\nQuy mô: mức đáp ứng quy mô trung bình theo QCVN 01:2026/BXD';
-  setHeadCell('hsPopHT', wardStatHtml('Dân số HT', fmtNum(pop) + (city ? popCheckCityHtml() : popCheckBadgeHtml(wardName, true)), 'người',
+  setHeadCell('hsPopHT', wardStatHtml('Dân số HT', fmtNum(pop), 'người',
     city ? `Dân số hiện trạng, tổng ${list.length} phường/xã` : 'Dân số hiện trạng'));
   if (city) {
     setHeadCell('hsPopQH', wardStatHtml('Dân số QH', fmtNum(CITY_POP_QH), 'người',
@@ -1233,7 +1308,7 @@ export async function renderBottomPanel() {
   const wardView = document.getElementById('wardSummaryView');
   if (state.wardStatsData.length === 0) {
     if (city && tbody) {
-      tbody.innerHTML = `<tr><td colspan="27" class="st-msg">${ico('clock')}Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="33" class="st-msg">${ico('clock')}Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>`;
     }
     if (!city && wardView) {
       wardView.innerHTML = `<div class="rp-empty">${ico('clock')}Đang tổng hợp dữ liệu quy chuẩn cho ${escapeHtml(wardName)}...</div>`;
@@ -1245,7 +1320,7 @@ export async function renderBottomPanel() {
   } catch (err) {
     if (seq !== bottomRenderSeq) return;
     const msg = `${ico('error')}${escapeHtml(err.message || 'Lỗi nạp dữ liệu từ GEE Server.')}`;
-    if (city && tbody) tbody.innerHTML = `<tr><td colspan="27" class="st-msg c-red">${msg}</td></tr>`;
+    if (city && tbody) tbody.innerHTML = `<tr><td colspan="33" class="st-msg c-red">${msg}</td></tr>`;
     if (!city && wardView) wardView.innerHTML = `<div class="rp-empty c-red">${msg}</div>`;
     return;
   }
@@ -2061,8 +2136,14 @@ function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
     ...planStackDatasets('Quy mô', 'scale', CHART_SCALE_COLOR, scale)
   ];
 
+  const k = screenScale();
+  const tickSize = 10.5 * k;
+  const yTickSize = 12 * k;
+
   // Cập nhật dữ liệu tại chỗ (độ phủ về dần từng phường) thay vì hủy/tạo lại chart
   if (chartInstance && chartInstance.canvas === chartEl) {
+    chartInstance.options.scales.x.ticks.font.size = tickSize;
+    chartInstance.options.scales.y.ticks.font.size = yTickSize;
     chartInstance.data.labels = labels;
     chartInstance.data.datasets.forEach((ds, i) => {
       ds.data = datasets[i].data;
@@ -2102,7 +2183,7 @@ function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
             maxRotation: 45,
             callback: function(value) { return shortWardTick(this.getLabelForValue(value)); },
             color: getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#cbd5e1',
-            font: { size: 10.5, family: getComputedStyle(document.body).fontFamily }
+            font: { size: tickSize, family: getComputedStyle(document.body).fontFamily }
           },
           grid: { color: 'rgba(255,255,255,0.05)' }
         },
@@ -2110,7 +2191,7 @@ function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
           stacked: true,
           beginAtZero: true,
           max: 100,
-          ticks: { color: '#94a3b8' },
+          ticks: { color: '#94a3b8', font: { size: yTickSize } },
           grid: { color: 'rgba(255,255,255,0.05)' }
         }
       }
