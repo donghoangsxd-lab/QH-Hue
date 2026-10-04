@@ -5,6 +5,7 @@ import { planMap, isCompareOn } from './planMap.js';
 import { state } from './state.js';
 import { wgs84ToVn2000 } from './cadImport.js';
 import { satPrintLegend } from './satLayers.js';
+import { basemapLabel } from './basemap.js';
 import { escapeHtml, distanceMeters, loadHtml2Canvas, loadHtml2Pdf, showToast, inlineSpriteIcons } from './utils.js';
 
 const CITY_NAME = 'Thành phố Huế';
@@ -280,7 +281,7 @@ function pageHtml({ img, title, place, grid, size, splitX, scale }) {
       </div>
       <div class="pa3-info">
         <div><b>Hệ tọa độ:</b> VN-2000, KTT 107°00', múi 3° — lưới ${dotted(grid.step)} m</div>
-        <div><b>Ảnh nền:</b> Esri World Imagery</div>
+        <div><b>Ảnh nền:</b> ${escapeHtml(basemapLabel())}</div>
         <div><b>Dữ liệu:</b> Hạ tầng đô thị TP. Huế (Sở Xây dựng), mạng lưới đường OpenStreetMap</div>
         <div><b>Ngày xuất:</b> ${date}</div>
         <div class="pa3-note">Bản đồ phục vụ tham khảo, không thay thế hồ sơ quy hoạch được phê duyệt.</div>

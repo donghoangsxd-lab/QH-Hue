@@ -10,18 +10,18 @@ export const TT16_STYLES = {
   "1-CV": { label: 'Cây xanh sử dụng công cộng', layer: 'DAT_HTXH_CayxanhCC', aci: 72, color: '#66cc00', pattern: 'CayxanhCC' },
   "2-BDX": { label: 'Đất bãi đỗ xe', layer: 'DAT_HTKT_Baidoxe', aci: 252, color: '#696969', pattern: 'Baidoxe' },
   "3-MN": { label: 'Trường THCS, tiểu học, mầm non', layer: 'DAT_HTXH_Truonghoc', aci: 15, color: '#994c4c', pattern: 'Truonghoc' },
-  "THPT": { label: 'Trường THPT', layer: 'DAT_HTXH_TruongTHPT', aci: 24, color: '#992600', pattern: 'THPT' },
-  "6-YT": { label: 'Y tế', layer: 'DAT_HTXH_Yte', aci: 220, color: '#ff00bf', pattern: 'Yte' },
-  "7-VH": { label: 'Văn hóa', layer: 'DAT_HTXH_Vanhoa', aci: 243, color: '#cc667f', pattern: 'Vanhoa' },
+  "6-THPT": { label: 'Trường THPT', layer: 'DAT_HTXH_TruongTHPT', aci: 24, color: '#992600', pattern: 'THPT' },
+  "7-YT": { label: 'Y tế', layer: 'DAT_HTXH_Yte', aci: 220, color: '#ff00bf', pattern: 'Yte' },
+  "8-VH": { label: 'Văn hóa', layer: 'DAT_HTXH_Vanhoa', aci: 243, color: '#cc667f', pattern: 'Vanhoa' },
   "TDTT": { label: 'Thể dục thể thao', layer: 'DAT_HTXH_Theducthethao', aci: 94, color: '#009900', pattern: 'TDTT' },
-  "8-TM": { label: 'Khu dịch vụ (chợ, TTTM)', layer: 'DAT_Dichvu', aci: 12, color: '#cc0000', pattern: 'Dichvu' },
-  "9-CSD": { label: 'Chưa sử dụng', layer: 'DAT_KHAC_Chuasudung', aci: 9, color: '#c0c0c0', pattern: 'Chuasudung', fillOpacity: 0.45 }
+  "9-TM": { label: 'Khu dịch vụ (chợ, TTTM)', layer: 'DAT_Dichvu', aci: 12, color: '#cc0000', pattern: 'Dichvu' },
+  "12-CSD": { label: 'Chưa sử dụng', layer: 'DAT_KHAC_Chuasudung', aci: 9, color: '#c0c0c0', pattern: 'Chuasudung', fillOpacity: 0.45 }
 };
 TT16_STYLES["4-TH"] = TT16_STYLES["3-MN"];
 TT16_STYLES["5-THCS"] = TT16_STYLES["3-MN"];
 
 // Thứ tự hiển thị trong chú giải
-const LEGEND_KEYS = ["1-CV", "2-BDX", "3-MN", "THPT", "6-YT", "7-VH", "TDTT", "8-TM", "9-CSD"];
+const LEGEND_KEYS = ["1-CV", "2-BDX", "3-MN", "6-THPT", "7-YT", "8-VH", "TDTT", "9-TM", "12-CSD"];
 
 const FILL_OPACITY = 0.3;
 const PATTERN_BG_ALPHA = 0.25;
@@ -129,8 +129,8 @@ function patternFor(key) {
 
 // Loại hạ tầng + tên layer gốc → khóa ký hiệu (lô Thể dục thể thao dùng ký hiệu riêng trong nhóm Văn hóa, thể thao)
 function styleKey(type, layer) {
-  if (type === '7-VH' && /THEDUCTHETHAO/i.test(layer || '')) return 'TDTT';
-  return TT16_STYLES[type] ? type : '9-CSD';
+  if (type === '8-VH' && /THEDUCTHETHAO/i.test(layer || '')) return 'TDTT';
+  return TT16_STYLES[type] ? type : '12-CSD';
 }
 
 /**
@@ -185,4 +185,36 @@ export function renderTt16Legend(container) {
       <span>${frameSample('dh')}QH dài hạn</span>
     </div>
     <div class="tt16-note">Zoom 15–16: màu lớp hạ tầng · 17–18: hoa văn, màu TT16</div></details>`;
+}
+
+// Đất chưa có ký hiệu TT16 trong 13 nhóm hạ tầng: chỉ tô viền khi bật lớp ranh đồ án
+const LAND_RULES = [
+  { key: 'o', label: 'Đất ở', color: '#f5d90a', re: /(^|_)(DAT_ODT|DAT_ONT|DAT_O|ODT|ONT|O_LIENKE|O_BIETTHU|O_CHUNGCU)($|_)|DONVIO|NHOMNHAO|HONHOP|LANGXOM|DANCUNT|DAT_NO_/ },
+  { key: 'cc', label: 'Đất công cộng', color: '#e03131', re: /CONGCONG|DAT_CC($|_)|HTCC|DVCC/ },
+  { key: 'dtn', label: 'Đất đào tạo, nghiên cứu', color: '#1e3a8a', re: /DAOTAO|NGHIENCUU|GIAODUC|NCKH|DAT_GD/ },
+  { key: 'cq', label: 'Đất cơ quan, trụ sở', color: '#8d6e63', re: /COQUAN|TRUSO|CQNN|HANHCHINH/ },
+  { key: 'an', label: 'Đất an ninh, quốc phòng', color: '#c5d86d', re: /ANQP|QPAN|ANNINH|QUOCPHONG/ },
+  { key: 'tg', label: 'Đất di tích, tôn giáo', color: '#7f1d1d', re: /DITICH|TONGIAO|TINNGUONG/ }
+];
+
+function foldLayer(layerName) {
+  return String(layerName || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'D').toUpperCase();
+}
+
+export function landRule(layerName) {
+  const s = foldLayer(layerName);
+  return LAND_RULES.find(r => r.re.test(s)) || null;
+}
+
+export function landColor(layerName) {
+  return (landRule(layerName) || {}).color || '';
+}
+
+export function landLabel(layerName) {
+  return (landRule(layerName) || {}).label || 'Đất khác';
+}
+
+export function landPolylineStyle(layerName) {
+  const color = landColor(layerName) || '#94a3b8';
+  return { color, weight: 2, opacity: 0.95, fillColor: color, fillOpacity: 0.08 };
 }

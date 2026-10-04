@@ -181,7 +181,7 @@ function sumAreaByType(list) {
   const totals = {};
   let sum = 0;
   (list || []).forEach(item => {
-    if (!isApproved(item.status) && item.type !== "9-CSD") return;
+    if (!isApproved(item.status) && item.type !== "12-CSD") return;
     if (isNetworkType(item.type)) return;
     const type = item.type || 'Khác';
     const size = Number(item.size || 0);
@@ -196,15 +196,15 @@ function sumAreaByType(list) {
 const PIE_COLORS = BUFFER_COLORS;
 const PIE_LABELS = {
   "1-CV": "Công viên", "2-BDX": "Bãi đỗ xe", "3-MN": "Mầm non", "4-TH": "Tiểu học", "5-THCS": "THCS",
-  "6-YT": "Y tế", "7-VH": "Văn hóa", "8-TM": "Chợ/TTTM", "9-CSD": "Chưa sử dụng", "empty": "Chưa có DL"
+  "6-THPT": "THPT", "7-YT": "Y tế", "8-VH": "Văn hóa", "9-TM": "Chợ/TTTM", "12-CSD": "Chưa sử dụng", "empty": "Chưa có DL"
 };
 
 // ================== MẶT SAU THẺ LẬT: THỐNG KÊ SỐ LƯỢNG 12 LOẠI (4 × 3 Ô) ==================
 // Trạm dừng xe buýt (điểm trên vỉa hè, không có khu đất) thống kê ở mặt Hệ thống giao thông (renderBusRow)
 const COUNT_CARD_LABELS = {
   "1-CV": "Công viên", "2-BDX": "Bãi đỗ xe", "3-MN": "Mầm non", "4-TH": "Tiểu học",
-  "5-THCS": "THCS", "THPT": "THPT", "6-YT": "Y tế", "7-VH": "Văn hóa",
-  "8-TM": "Chợ, TTTM", "11-PCCC": "Trụ sở PCCC", "12-NT": "Nghĩa trang", "9-CSD": "Chưa sử dụng"
+  "5-THCS": "THCS", "6-THPT": "THPT", "7-YT": "Y tế", "8-VH": "Văn hóa",
+  "9-TM": "Chợ, TTTM", "10-PCCC": "Trụ sở PCCC", "11-NT": "Nghĩa trang", "12-CSD": "Chưa sử dụng"
 };
 // Biểu tượng nét (viewBox 24×24, stroke = màu loại)
 const COUNT_CARD_ICONS = {
@@ -213,18 +213,18 @@ const COUNT_CARD_ICONS = {
   "3-MN": '<rect x="4" y="12" width="7" height="7" rx="1"/><rect x="13" y="12" width="7" height="7" rx="1"/><rect x="8.5" y="4" width="7" height="7" rx="1"/>',
   "4-TH": '<path d="M3 10l9-5 9 5"/><path d="M5 10v9h14v-9"/><path d="M10 19v-5h4v5"/>',
   "5-THCS": '<path d="M4 5h5a3 3 0 013 3v12a2 2 0 00-2-2H4z"/><path d="M20 5h-5a3 3 0 00-3 3v12a2 2 0 012-2h6z"/>',
-  "6-YT": '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
-  "7-VH": '<path d="M3 9l9-5 9 5"/><path d="M5 9v9M9.5 9v9M14.5 9v9M19 9v9"/><path d="M3 20h18"/>',
-  "8-TM": '<circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M3 4h2l2.5 11h11l2-8H6.5"/>',
-  "9-CSD": '<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 2.2"/><path d="M12 9v6M9 12h6"/>',
-  "THPT": '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5"/><path d="M22 9v6"/>',
-  "11-PCCC": '<path d="M12 3c1 3 5 5 5 10a5 5 0 01-10 0c0-2.5 1.5-4 2.5-5 .3 1.6 1.2 2.6 2.5 3 0-3-1-5.5 0-8z"/>',
-  "12-NT": '<path d="M7 21V10a5 5 0 0110 0v11"/><path d="M4 21h16"/><path d="M12 9v6M9.5 11.5h5"/>'
+  "7-YT": '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
+  "8-VH": '<path d="M3 9l9-5 9 5"/><path d="M5 9v9M9.5 9v9M14.5 9v9M19 9v9"/><path d="M3 20h18"/>',
+  "9-TM": '<circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M3 4h2l2.5 11h11l2-8H6.5"/>',
+  "12-CSD": '<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 2.2"/><path d="M12 9v6M9 12h6"/>',
+  "6-THPT": '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5"/><path d="M22 9v6"/>',
+  "10-PCCC": '<path d="M12 3c1 3 5 5 5 10a5 5 0 01-10 0c0-2.5 1.5-4 2.5-5 .3 1.6 1.2 2.6 2.5 3 0-3-1-5.5 0-8z"/>',
+  "11-NT": '<path d="M7 21V10a5 5 0 0110 0v11"/><path d="M4 21h16"/><path d="M12 9v6M9.5 11.5h5"/>'
 };
 const BUS_ICON = '<rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 11h16M8 21v-3M16 21v-3"/><circle cx="8" cy="14.5" r="1"/><circle cx="16" cy="14.5" r="1"/>';
 
 // Hiện trạng: số đã duyệt (cơ sở chưa sử dụng: mọi khu đất, như donut) + số chờ duyệt; quy hoạch: số đã duyệt.
-// Trường THPT lưu mã 4-TH → tách theo layerType như lớp bản đồ
+// Dòng THPT cũ còn ở tab 4-TH được layerType đưa về 6-THPT
 function countByType(sourceList, planList, keys) {
   const stats = {};
   keys.forEach(k => { stats[k] = { approved: 0, pending: 0, plan: 0 }; });
@@ -236,7 +236,7 @@ function countByType(sourceList, planList, keys) {
   });
   (planList || []).forEach(it => {
     const s = stats[layerType(it)];
-    if (s && (isApproved(it.status) || it.type === "9-CSD")) s.plan++;
+    if (s && (isApproved(it.status) || it.type === "12-CSD")) s.plan++;
   });
   return stats;
 }
@@ -248,10 +248,10 @@ const planDeltaTag = (delta) => (delta === 0 ? '' :
 function renderBusRow(sourceList, planList) {
   const el = document.getElementById('roadBusRow');
   if (!el) return;
-  const s = countByType(sourceList, planList, ['10-BUS'])['10-BUS'];
-  const color = PIE_COLORS['10-BUS'];
-  el.dataset.focus = '10-BUS';
-  el.classList.toggle('is-focus', state.facilityFocus === '10-BUS');
+  const s = countByType(sourceList, planList, ['13-BUS'])['13-BUS'];
+  const color = PIE_COLORS['13-BUS'];
+  el.dataset.focus = '13-BUS';
+  el.classList.toggle('is-focus', state.facilityFocus === '13-BUS');
   el.title = `Trạm dừng xe buýt (QCVN 01:2026 Mục 2.8.3.3: đi bộ tới trạm ≤ 500 m)\nĐã duyệt: ${fmtNum(s.approved)} · Chờ duyệt: ${fmtNum(s.pending)}`
     + `\nQuy hoạch: ${fmtNum(s.plan)} (chênh ${s.plan - s.approved > 0 ? '+' : ''}${fmtNum(s.plan - s.approved)})`
     + `\nBấm để chỉ hiện lớp này, vùng phủ 500 m và ranh 40 phường xã. Bấm lại để khôi phục.`;
@@ -269,7 +269,7 @@ function renderInfraCountCards(sourceList, planList) {
   grid.innerHTML = Object.keys(COUNT_CARD_LABELS).map(k => {
     const s = stats[k];
     const color = PIE_COLORS[k];
-    const isCsd = k === "9-CSD";
+    const isCsd = k === "12-CSD";
     const shown = isCsd ? s.approved + s.pending : s.approved;
     const total = s.approved + s.pending;
     const approvedPct = total > 0 ? (s.approved / total) * 100 : 0;
@@ -452,7 +452,7 @@ const LEGACY_COVERAGE_KEYS = ['qh_hue_ward_coverage_v4', 'qh_hue_ward_coverage_v
 const BACKGROUND_RETRY_DELAYS = [20000, 60000, 180000];
 const DETAIL_RETRY_DELAYS = [15000, 45000, 90000];
 
-const COVERAGE_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+const COVERAGE_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "7-YT", "8-VH", "9-TM"];
 const CHART_COVERAGE_COLOR = '#38bdf8';
 const CHART_SCALE_COLOR = '#f59e0b';
 const CHART_PLAN_UP_COLOR = '#22c55e';
@@ -460,7 +460,7 @@ const CHART_PLAN_DOWN_COLOR = '#ef4444';
 const COVERAGE_LEVEL_KEYS = [
   ...COVERAGE_CODES,
   "1-CV_DT", "1-CV_DV", "2-BDX_DT", "2-BDX_DV",
-  "6-YT_DT", "6-YT_DV", "7-VH_DT", "7-VH_DV", "8-TM_DT", "8-TM_DV",
+  "7-YT_DT", "7-YT_DV", "8-VH_DT", "8-VH_DV", "9-TM_DT", "9-TM_DV",
   "THPT"
 ];
 
@@ -1589,18 +1589,13 @@ function minSizeSummaryHtml(subItems) {
   return ` <span class="min-size-warn" title="Số công trình nhỏ hơn quy mô tối thiểu theo QCVN 01:2026/BXD">${ico('alert')}${below}/${checked} dưới QM tối thiểu</span>`;
 }
 
-const RADIUS_WARN_TITLE = 'Cột BanKinh trong Sheet khác bán kính chuẩn cấp đơn vị ở của phường/xã chứa công trình (theo tọa độ): phường 1.000 m, xã 2.000 m, bãi đỗ xe 500 m; cây xanh theo diện tích: vườn hoa 400 m, công viên khu vực (≥ 1 ha) 800 m, công viên đô thị (≥ 5 ha) 2.000 m. Bản đồ, heatmap và độ phủ luôn dùng bán kính chuẩn; cột BanKinh chỉ để đối chiếu.';
-
 function radiusCellHtml(sub) {
   const radiusVal = Number(sub.radius || 0);
-  if (!(radiusVal > 0)) return '-';
-  if (sub.sheetRadius == null) return `${fmtNum(radiusVal)} m`;
-  return `${fmtNum(radiusVal)} m<br><span class="min-size-warn" title="${RADIUS_WARN_TITLE} Sửa cột BanKinh thành ${fmtNum(radiusVal)}.">${ico('alert')}Sheet ${fmtNum(sub.sheetRadius)} m</span>`;
+  return radiusVal > 0 ? `${fmtNum(radiusVal)} m` : '-';
 }
 
-function radiusSummaryHtml(subItems) {
-  const wrong = subItems.filter(s => s.sheetRadius != null).length;
-  return wrong ? ` <span class="min-size-warn" title="${RADIUS_WARN_TITLE}">${ico('alert')}${wrong} BK Sheet lệch chuẩn</span>` : '';
+function radiusSummaryHtml() {
+  return '';
 }
 
 // Mỗi đơn vị ở phát triển mới: ≥ 1 công viên ≥ 5.000 m² hoặc 2 công viên ≥ 2.500 m² (Mục 2.2.3.2)
@@ -1718,7 +1713,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
   // A / CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ
   sectionHeader('A', 'a', 'CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ');
-  const urbanCodes = { THPT: 'THPT', YT_DT: '6-YT_DT', VH_DT: '7-VH_DT', TM_DT: '8-TM_DT', CV_DT: '1-CV_DT', BDX_DT: '2-BDX_DT' };
+  const urbanCodes = { THPT: 'THPT', YT_DT: '7-YT_DT', VH_DT: '8-VH_DT', TM_DT: '9-TM_DT', CV_DT: '1-CV_DT', BDX_DT: '2-BDX_DT' };
   let urbanIdx = 1;
   Object.keys(urbanCodes).forEach(key => {
     const node = urbanRes[key];
@@ -1742,9 +1737,9 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
   // Mục 4: Dịch vụ công cộng khác đơn vị ở (Y tế + Văn hóa + Chợ): phường theo m²/người, xã theo số cơ sở (Bảng 30)
   const dvccKeys = [
-    { key: "YT_DV", label: "Y tế đơn vị ở", code: "6-YT_DV", stt: "4.1" },
-    { key: "VH_DV", label: "Văn hóa thể thao đơn vị ở", code: "7-VH_DV", stt: "4.2" },
-    { key: "TM_DV", label: "Chợ - TMDV đơn vị ở", code: "8-TM_DV", stt: "4.3" }
+    { key: "YT_DV", label: "Y tế đơn vị ở", code: "7-YT_DV", stt: "4.1" },
+    { key: "VH_DV", label: "Văn hóa thể thao đơn vị ở", code: "8-VH_DV", stt: "4.2" },
+    { key: "TM_DV", label: "Chợ - TMDV đơn vị ở", code: "9-TM_DV", stt: "4.3" }
   ];
   const dvccQuota = quotaOf(unitRes.DVCC_TOTAL, 'DVCC_TOTAL');
   const dvccRequired = hasQuota(dvccQuota);
@@ -1928,7 +1923,7 @@ function loadWardNetworkCoverage(wardData) {
     });
 }
 
-const NET_TYPE_SHORT = { "10-BUS": "Trạm xe buýt", "11-PCCC": "Trụ sở PCCC", "12-NT": "Nhà tang lễ, nghĩa trang" };
+const NET_TYPE_SHORT = { "13-BUS": "Trạm xe buýt", "10-PCCC": "Trụ sở PCCC", "11-NT": "Nhà tang lễ, nghĩa trang" };
 
 function networkSubRows(sectionId, items, gapMap = null, withType = false) {
   const rows = items.map(it => {

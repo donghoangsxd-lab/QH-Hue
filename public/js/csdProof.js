@@ -270,7 +270,7 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
   }
   if (seq !== requestSeq) return;
 
-  const typeColor = BUFFER_COLORS[data.code] || BUFFER_COLORS['9-CSD'];
+  const typeColor = BUFFER_COLORS[data.code] || BUFFER_COLORS['12-CSD'];
   const c = data.candidate;
   const group = L.layerGroup();
   ensurePanes(targetMap);

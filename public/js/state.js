@@ -17,7 +17,10 @@ export const state = {
   dataVersion: 0,
   // Ranh lô đất nhập từ DXF: "HT|<ID_DoiTuong>" / "QH|<ID_DoiTuong>" → GeoJSON geometry
   cadParcels: new Map(),
-  showParcels: true,
+  showParcels: false,
+  // Ranh đất không thuộc 13 nhóm hạ tầng (sheet DXF-*), tắt khi mở bản đồ
+  landParcels: [],
+  showLand: false,
   wardStatsData: [],
   // Chỉ tiêu mạng lưới toàn TP (getWardStats): { HT, QH } — số nhà tang lễ, diện tích nghĩa trang so với dân số
   cityNetwork: null,
@@ -52,7 +55,7 @@ export function bumpDataVersion() {
 }
 
 // Mạng lưới hạ tầng khác (config/constants.js NETWORK_CODES): không tính quy mô m²/người, độ phủ tổng hợp và heatmap
-export const NETWORK_TYPES = ["10-BUS", "11-PCCC", "12-NT"];
+export const NETWORK_TYPES = ["13-BUS", "10-PCCC", "11-NT"];
 export const isNetworkType = (type) => NETWORK_TYPES.includes(type);
 
 // Nhà tang lễ / nghĩa trang (cùng hàm ntKind ở config/constants.js): bán kính = khoảng cách an toàn Bảng 23
@@ -87,7 +90,7 @@ export function parkTierOf(size, nhomHaTang) {
 
 export function effectiveRadius(item) {
   // Khoảng cách an toàn nghĩa trang là quy định cố định, không theo bán kính giả định; nhà tang lễ = 0 (không có vùng)
-  if (item && item.type === '12-NT') return Number(item.radius) || 0;
+  if (item && item.type === '11-NT') return Number(item.radius) || 0;
   if (state.globalBufferRadiusOverride !== null) return state.globalBufferRadiusOverride;
   return Number(item.radius) || Number(item.banKinh) || 500;
 }
@@ -98,14 +101,14 @@ export const infraLabels = {
   "3-MN": "Trường Mầm non",
   "4-TH": "Trường Tiểu học",
   "5-THCS": "Trường THCS",
-  "THPT": "Trường THPT",
-  "6-YT": "Bệnh viện, Trạm y tế",
-  "7-VH": "Nhà văn hóa, thể thao",
-  "8-TM": "Chợ, Trung tâm thương mại",
-  "9-CSD": "Cơ sở chưa sử dụng",
-  "10-BUS": "Trạm dừng xe buýt",
-  "11-PCCC": "Trụ sở cảnh sát PCCC",
-  "12-NT": "Nhà tang lễ, nghĩa trang"
+  "6-THPT": "Trường THPT",
+  "7-YT": "Bệnh viện, Trạm y tế",
+  "8-VH": "Nhà văn hóa, thể thao",
+  "9-TM": "Chợ, Trung tâm thương mại",
+  "12-CSD": "Cơ sở chưa sử dụng",
+  "13-BUS": "Trạm dừng xe buýt",
+  "10-PCCC": "Trụ sở cảnh sát PCCC",
+  "11-NT": "Nhà tang lễ, nghĩa trang"
 };
 
 // Ranh giới phường xã: nét viền ghi xám vẽ dưới + nét vàng nhạt vẽ trên (đổ bóng rẻ, không dùng CSS filter)
@@ -118,30 +121,32 @@ export const WARD_HIGHLIGHT_STYLE = { color: '#fb923c', weight: 3.5, dashArray: 
 // lớp màu ACI tối của TT16 (trường học, bãi đỗ xe) thay bằng màu tươi, mỗi cấp trường 1 màu riêng.
 // Hoa văn ranh lô khi phóng to vẫn theo đúng màu ACI của TT16 (tt16Symbols.js).
 export const BUFFER_COLORS = {
-  "1-CV": "#7ed321", "2-BDX": "#4dabf7", "3-MN": "#ffd43b", "4-TH": "#ff922b", "5-THCS": "#20c997", "THPT": "#b197fc",
-  "6-YT": "#f06cdb", "7-VH": "#ff8fab", "8-TM": "#ff5c5c", "9-CSD": "#ced4da",
-  "10-BUS": "#00e5ff", "11-PCCC": "#ff3d00", "12-NT": "#a1887f"
+  "1-CV": "#7ed321", "2-BDX": "#4dabf7", "3-MN": "#ffd43b", "4-TH": "#ff922b", "5-THCS": "#20c997", "6-THPT": "#b197fc",
+  "7-YT": "#f06cdb", "8-VH": "#ff8fab", "9-TM": "#ff5c5c", "12-CSD": "#ced4da",
+  "13-BUS": "#00e5ff", "10-PCCC": "#ff3d00", "11-NT": "#a1887f"
 };
 export const BUFFER_KEYS = {
-  "1-CV": "b1", "2-BDX": "b2", "3-MN": "b3", "4-TH": "b4", "5-THCS": "b5", "THPT": "b10",
-  "6-YT": "b6", "7-VH": "b7", "8-TM": "b8", "9-CSD": "b9",
-  "10-BUS": "b11", "11-PCCC": "b12", "12-NT": "b13"
+  "1-CV": "b1", "2-BDX": "b2", "3-MN": "b3", "4-TH": "b4", "5-THCS": "b5", "6-THPT": "b10",
+  "7-YT": "b6", "8-VH": "b7", "9-TM": "b8", "12-CSD": "b9",
+  "13-BUS": "b11", "10-PCCC": "b12", "11-NT": "b13"
 };
 export const ICON_GROUP_KEYS = {
-  "1-CV": "c1", "2-BDX": "c2", "3-MN": "c3", "4-TH": "c4", "5-THCS": "c5", "THPT": "c10",
-  "6-YT": "c6", "7-VH": "c7", "8-TM": "c8", "9-CSD": "c9",
-  "10-BUS": "c11", "11-PCCC": "c12", "12-NT": "c13"
+  "1-CV": "c1", "2-BDX": "c2", "3-MN": "c3", "4-TH": "c4", "5-THCS": "c5", "6-THPT": "c10",
+  "7-YT": "c6", "8-VH": "c7", "9-TM": "c8", "12-CSD": "c9",
+  "13-BUS": "c11", "10-PCCC": "c12", "11-NT": "c13"
 };
 
-// Trường THPT lưu mã 4-TH (chỉ tiêu tính riêng ở máy chủ theo constants.isThptItem); trên bản đồ tách thành lớp riêng
+// Tab 6-THPT là loại riêng. Dòng cũ còn ở tab 4-TH (mã hoặc tên THPT) vẫn vẽ vào lớp THPT.
 const layerTypeMemo = new WeakMap();
 export function layerType(p) {
-  if (!p || p.type !== '4-TH') return p ? p.type : undefined;
+  if (!p) return undefined;
+  if (p.type === '6-THPT') return '6-THPT';
+  if (p.type !== '4-TH') return p.type;
   let t = layerTypeMemo.get(p);
   if (!t) {
     const prefix = String(p.id || '').split('-')[0].toUpperCase();
     const name = String(p.name || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/Đ/g, 'D');
-    t = prefix === 'THPT' || name.includes('THPT') || name.includes('TRUNG HOC PHO THONG') ? 'THPT' : '4-TH';
+    t = prefix === 'THPT' || name.includes('THPT') || name.includes('TRUNG HOC PHO THONG') ? '6-THPT' : '4-TH';
     layerTypeMemo.set(p, t);
   }
   return t;

@@ -14,8 +14,8 @@ const MAX_LIST = 150;
 const DEPTH_STOPS = [[0, [186, 230, 253, 150]], [0.5, [56, 189, 248, 180]], [1.5, [37, 99, 235, 210]], [3, [30, 58, 138, 235]]];
 const DEPTH_STEP = 0.1;
 const SHORT_LABELS = {
-  "1-CV": "Công viên", "2-BDX": "Bãi đỗ xe", "3-MN": "Mầm non", "4-TH": "Tiểu học", "5-THCS": "THCS", "THPT": "THPT",
-  "6-YT": "Y tế", "7-VH": "Văn hóa", "8-TM": "Chợ/TTTM", "9-CSD": "Chưa sử dụng"
+  "1-CV": "Công viên", "2-BDX": "Bãi đỗ xe", "3-MN": "Mầm non", "4-TH": "Tiểu học", "5-THCS": "THCS", "6-THPT": "THPT",
+  "7-YT": "Y tế", "8-VH": "Văn hóa", "9-TM": "Chợ/TTTM", "12-CSD": "Chưa sử dụng"
 };
 
 const $ = (id) => document.getElementById(id);

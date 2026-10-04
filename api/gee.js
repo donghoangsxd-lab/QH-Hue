@@ -277,10 +277,29 @@ function parseCadStage(s, fallbackLayer) {
   };
 }
 
-// Bán kính phục vụ theo QCVN 01:2026 ghi vào cột BanKinh của dòng mới: theo cấp (đô thị / đơn vị ở), loại công trình
-// và phường / xã chứa điểm (constants.standardRadius); cơ sở chưa sử dụng không có vùng phục vụ → null
+// 1 lô đất ngoài 13 nhóm hạ tầng (ghi sheet DXF-NN của đồ án); null nếu không hợp lệ
+function parseLandItem(it) {
+  if (!it || typeof it !== 'object') return null;
+  const pt = parseCoordInBounds(it.lat, it.lng);
+  const area = Number(it.area);
+  const geometry = parseCadGeometry(it.geometry);
+  if (!pt || !geometry || !Number.isFinite(area) || area <= 0 || area > 1e8) return null;
+  const layer = sanitizeSheetText(it.layer, 60);
+  return {
+    name: sanitizeSheetText(it.name, 150) || layer || 'Lô đất',
+    ward: sanitizeSheetText(it.ward, 80),
+    nhom: sanitizeSheetText(it.nhom, 40) || 'Đất khác',
+    layer,
+    lat: pt.lat.toFixed(6), lng: pt.lng.toFixed(6),
+    area: Math.round(area * 10) / 10,
+    phase: it.phase === 'QH' || it.phase === 'HT' ? it.phase : null,
+    geometry: JSON.stringify(geometry).length > CAD_GEOJSON_MAX_CHARS ? null : geometry
+  };
+}
+
+// Bán kính phục vụ theo QCVN 01:2026 (constants.standardRadius). Không ghi vào Sheet — cột I là Ten_QH.
 function qcvnRadius(item, ward) {
-  if (item.type === '9-CSD') return null;
+  if (item.type === '12-CSD') return null;
   return constants.standardRadius(item, constants.wardProfile(ward));
 }
 
@@ -316,6 +335,29 @@ function parseCadItem(it, defaultPhase) {
     size: first.size,
     geometry: first.geometry,
     stages
+  };
+}
+
+function parseLandItem(it, defaultPhase) {
+  if (!it || typeof it !== 'object') return null;
+  const pt = parseCoordInBounds(it.lat, it.lng);
+  const ward = sanitizeSheetText(it.ward, 80);
+  const layer = sanitizeSheetText(it.layer, 80) || 'DAT';
+  if (!pt || !ward) return null;
+  const stage = parseCadStage({
+    phase: defaultPhase, area: it.area, point: false, crossWard: it.crossWard, layer, geometry: it.geometry
+  }, layer);
+  if (!stage || stage.point) return null;
+  return {
+    name: sanitizeSheetText(it.name, 150) || layer,
+    ward,
+    nhom: sanitizeSheetText(it.nhom, 40) || 'Đất khác',
+    layer: stage.layer,
+    lat: pt.lat.toFixed(6),
+    lng: pt.lng.toFixed(6),
+    area: stage.size,
+    geometry: stage.geometry,
+    phase: defaultPhase
   };
 }
 
@@ -636,7 +678,7 @@ const isCemetery = (it) => String(it.ntKind || constants.ntKind(it)).startsWith(
  * coi là cặp trạm 2 chiều đường nên không tính là trạm kế cận
  */
 function busGaps(stopsInWard, allStops) {
-  const { gapMax, gapIgnore } = constants.networkConfig['10-BUS'];
+  const { gapMax, gapIgnore } = constants.networkConfig['13-BUS'];
   const out = [];
   stopsInWard.forEach(s => {
     let nearest = Infinity;
@@ -653,35 +695,35 @@ function busGaps(stopsInWard, allStops) {
 const networkSlim = (it) => ({
   id: it.id, name: it.name, type: it.type, lat: it.lat, lng: it.lng,
   size: Number(it.size) || 0, radius: Number(it.radius) || 0, status: it.status,
-  ...(it.type === '12-NT' ? { ntKind: it.ntKind || constants.ntKind(it) } : {})
+  ...(it.type === '11-NT' ? { ntKind: it.ntKind || constants.ntKind(it) } : {})
 });
 
 /** Tóm tắt mạng lưới của 1 phường: approved = công trình đã duyệt trong phường, pending = điểm chờ duyệt */
 function wardNetworkSummary(approved, pending, allBusStops, profile) {
   const of = (code) => approved.filter(it => it.type === code);
-  const bus = of('10-BUS');
+  const bus = of('13-BUS');
   return {
     bus: bus.map(networkSlim),
     // Khoảng cách trạm ≤ 600 m chỉ áp dụng khu trung tâm đô thị → chỉ xét phường
     busGaps: profile === 'DT' ? busGaps(bus, allBusStops) : [],
     busGapCheck: profile === 'DT',
-    pccc: of('11-PCCC').map(networkSlim),
-    pcccRadius: constants.networkRadius({}, '11-PCCC', profile),
-    nt: of('12-NT').map(networkSlim),
+    pccc: of('10-PCCC').map(networkSlim),
+    pcccRadius: constants.networkRadius({}, '10-PCCC', profile),
+    nt: of('11-NT').map(networkSlim),
     pending: pending.map(networkSlim)
   };
 }
 
 /** Chỉ tiêu toàn thành phố: số nhà tang lễ (Mục 2.12.1.1) và diện tích nghĩa trang (Mục 2.12.2.1) theo dân số quy hoạch */
 function cityNetworkSummary(list, cityPop) {
-  const cfg = constants.networkConfig['12-NT'];
-  const nt = networkItemsOf(list, '12-NT');
+  const cfg = constants.networkConfig['11-NT'];
+  const nt = networkItemsOf(list, '11-NT');
   const cemeteries = nt.filter(isCemetery);
   const kindCount = (k) => nt.filter(it => (it.ntKind || constants.ntKind(it)) === k).length;
   return {
     pop: cityPop,
-    busCount: networkItemsOf(list, '10-BUS').length,
-    pcccCount: networkItemsOf(list, '11-PCCC').length,
+    busCount: networkItemsOf(list, '13-BUS').length,
+    pcccCount: networkItemsOf(list, '10-PCCC').length,
     funeralCount: kindCount('funeral'),
     funeralRequired: Math.max(1, Math.ceil(cityPop / cfg.funeralPopPer)),
     crematoriumCount: kindCount('crematorium'),
@@ -733,7 +775,7 @@ async function computeNetworkCoverage(ee, popRaster, wardGeometry, groups) {
 const OSM_IMPORT_MAX = 1500;
 // Cùng loại đã có trong dữ liệu gần hơn ngưỡng này (m) → coi là trùng, không đề xuất lại
 // (trạm xe buýt nhỏ: cặp trạm 2 chiều đường cách nhau ~20–30 m vẫn là 2 trạm)
-const OSM_DUP_M = { "10-BUS": 12, "11-PCCC": 80, "12-NT": 60 };
+const OSM_DUP_M = { "13-BUS": 12, "10-PCCC": 80, "11-NT": 60 };
 const OSM_REF_RE = /^OSM:(node|way|relation)\/\d{1,12}$/;
 
 /** Điểm OSM trình duyệt gửi lên → điểm hợp lệ (đúng loại, trong 40 phường/xã, chưa có trong dữ liệu) kèm phường và bán kính */
@@ -1076,8 +1118,6 @@ function slimItem(item, profile) {
     slim.minSize = rule.min;
     slim.minSizeRef = rule.ref;
   }
-  const sheetRadius = constants.radiusMismatch(item, profile);
-  if (sheetRadius != null) slim.sheetRadius = sheetRadius;
   return slim;
 }
 
@@ -1200,7 +1240,7 @@ function withTimeout(promise, ms, onTimeoutValue) {
  * Độ phủ 1 phường: 8 loại + tách đô thị/đơn vị ở (tránh ghi đè DT vs DV).
  */
 async function computeSingleWardCoverage(ee, popRasterNormalized, wardGeometry, itemsInWard) {
-  const levelSplitCodes = ["1-CV", "2-BDX", "6-YT", "7-VH", "8-TM"];
+  const levelSplitCodes = ["1-CV", "2-BDX", "7-YT", "8-VH", "9-TM"];
   const ratios = {};
   CODES.forEach(c => { ratios[c] = 0; });
   levelSplitCodes.forEach(c => {
@@ -1525,7 +1565,8 @@ module.exports = async (req, res) => {
       await requireAdmin(req);
       const body = readJsonBody(req);
       const rawItems = Array.isArray(body.items) ? body.items : [];
-      if (!rawItems.length || rawItems.length > CAD_BATCH_MAX) {
+      const rawLands = Array.isArray(body.lands) ? body.lands : [];
+      if (!(rawItems.length + rawLands.length) || rawItems.length + rawLands.length > CAD_BATCH_MAX) {
         return res.status(400).json({ error: true, message: `Mỗi lần gửi 1–${CAD_BATCH_MAX} lô` });
       }
       const phase = body.phase === 'QH' ? 'QH' : 'HT';
@@ -1535,13 +1576,16 @@ module.exports = async (req, res) => {
         if (!item) return res.status(400).json({ error: true, message: `Lô thứ ${i + 1} không hợp lệ (loại, tọa độ, phường, diện tích hoặc giai đoạn)` });
         items.push(item);
       }
+      const lands = rawLands.map(parseLandItem).filter(Boolean);
       const sync = body.sync !== false;
       const result = await callAppsScript({ action: 'importCadBatch' }, {
         action: 'importCadBatch',
         phase,
         fileName: sanitizeSheetText(body.fileName, 120) || 'DXF',
         sync,
-        items
+        items,
+        lands,
+        landsReset: body.landsReset === true
       });
       if (sync) invalidateAllCaches();
       return res.status(200).json({
@@ -1549,6 +1593,8 @@ module.exports = async (req, res) => {
         created: result.created || [],
         updated: result.updated || [],
         skipped: result.skipped || [],
+        lands: Number(result.lands) || 0,
+        landsDropped: rawLands.length - lands.length,
         polygonsDropped: items.reduce((n, it) => n + it.stages.filter(s => !s.geometry && !s.point).length, 0)
       });
     }
@@ -1700,7 +1746,7 @@ module.exports = async (req, res) => {
       const pt = parseCoordInBounds(body.lat, body.lng);
       const noArea = isNetwork && !!constants.networkConfig[type].noArea;
 
-      if (![...CODES, '9-CSD', ...constants.NETWORK_CODES].includes(type)) return res.status(400).json({ error: true, message: "Loại hạ tầng không hợp lệ" });
+      if (![...CODES, '6-THPT', '12-CSD', ...constants.NETWORK_CODES].includes(type)) return res.status(400).json({ error: true, message: "Loại hạ tầng không hợp lệ" });
       if (!name) return res.status(400).json({ error: true, message: "Thiếu tên công trình" });
       if (!pt) return res.status(400).json({ error: true, message: "Tọa độ không hợp lệ hoặc nằm ngoài TP. Huế" });
       if (!Number.isFinite(size) || size < 0 || size > 1e8) return res.status(400).json({ error: true, message: "Diện tích không hợp lệ" });
@@ -2304,11 +2350,11 @@ module.exports = async (req, res) => {
       const isPlan = String(req.query.scenario || '').toUpperCase() === 'QH';
       const list = isPlan ? getPlanScenarioItems(allDataList) : rawDataList;
       const profile = constants.wardProfile(targetWard.name);
-      const pcccR = constants.networkRadius({}, '11-PCCC', profile);
+      const pcccR = constants.networkRadius({}, '10-PCCC', profile);
       const groups = {
-        bus: networkItemsOf(list, '10-BUS'),
-        pccc: networkItemsOf(list, '11-PCCC').map(it => ({ ...it, radius: pcccR })),
-        nt: networkItemsOf(list, '12-NT').filter(it => Number(it.radius) > 0)
+        bus: networkItemsOf(list, '13-BUS'),
+        pccc: networkItemsOf(list, '10-PCCC').map(it => ({ ...it, radius: pcccR })),
+        nt: networkItemsOf(list, '11-NT').filter(it => Number(it.radius) > 0)
       };
       const sig = networkSignature(groups);
       const cacheKey = `${isPlan ? 'QH' : 'HT'}:${targetWard.name}`;
@@ -2460,7 +2506,7 @@ module.exports = async (req, res) => {
         const nhom = String(item.nhomHaTang || '').toLowerCase();
         const approved = isApprovedStatus(item.status);
         const typeCode = item.type || constants.codeMap[prefix] || "";
-        const isCSD = (typeCode === "9-CSD" || prefix === "CSD" || prefix === "9"
+        const isCSD = (typeCode === "12-CSD" || prefix === "CSD"
           || nhom.includes("chưa sử dụng") || nhom.includes("csd"));
         if (isCoverageItem(item)) w.covItems.push(item);
 
@@ -2478,7 +2524,7 @@ module.exports = async (req, res) => {
         const w = wardMap[wardOf(item)];
         if (!w) return;
         if (isCoverageItem(item)) w.planCovItems.push(item);
-        if (item.type !== "9-CSD") w.planItems.push(item);
+        if (item.type !== "12-CSD") w.planItems.push(item);
       });
       allDataList.forEach(item => {
         if (item.planChange !== 'new' && item.planChange !== 'relocate') return;
@@ -2491,7 +2537,7 @@ module.exports = async (req, res) => {
       const approvedAll = rawDataList.filter(it => isApprovedStatus(it.status) && it.lat != null && it.lng != null);
       const coverageCandidates = [];
       const rankAfterCount = [];
-      const allBusStops = networkItemsOf(rawDataList, '10-BUS');
+      const allBusStops = networkItemsOf(rawDataList, '13-BUS');
 
       for (const wName in wardMap) {
         const data = wardMap[wName];
@@ -2529,7 +2575,7 @@ module.exports = async (req, res) => {
         });
 
         const pendingItems = data.pendingItems.map(item => {
-          const code = constants.resolveTypeCode(item) || item.type || "9-CSD";
+          const code = constants.resolveTypeCode(item) || item.type || "12-CSD";
           const size = Number(item.size || 0);
           const reqArea = Math.round(constants.quotaFor(code, profile) * projPop);
           const infraCfg = constants.infraConfig ? constants.infraConfig[code] : null;

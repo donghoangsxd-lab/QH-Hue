@@ -1,7 +1,8 @@
 // =========================================================================
 // GOOGLE APPS SCRIPT: HTXH-HUE (TỐI ƯU BATCH IN-MEMORY & LOCKSERVICE)
 // Quy mô tách 2 cột: QuyMo_HT (hiện trạng) & QuyMo_QH (quy hoạch)
-// Nhập hàng loạt từ DXF: doPost action=importCadBatch, ranh lô lưu ở tab CAD_Polygon → cad_parcels.json
+// Nhập hàng loạt từ DXF: doPost action=importCadBatch; lô hạ tầng ghi vào 13 tab (cột M Geojson),
+// lô đất khác ghi tab DXF-NN của đồ án (Ten_QH); ranh lô xuất ra cad_parcels.json
 // =========================================================================
 
 const BUCKET_NAME = "hue-infra-data-us";
@@ -9,14 +10,15 @@ const GEOJSON_FILE_NAME = "infrastructure_hue.json";
 const CAD_FILE_NAME = "cad_parcels.json";
 const CAD_SHEET_NAME = "CAD_Polygon";
 const CAD_HEADERS = ["ID_DoiTuong", "Layer", "DienTich", "File", "ThoiGianNhap", "GeoJSON", "GiaiDoan"];
-const VALID_PREFIXES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM", "9-CSD", "10-BUS", "11-PCCC", "12-NT"];
+const VALID_PREFIXES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-THPT", "7-YT", "8-VH", "9-TM", "10-PCCC", "11-NT", "12-CSD", "13-BUS"];
 
 // Mạng lưới hạ tầng khác (QCVN 01:2026 Mục 2.8.3.3, 2.5.13.1, 2.12): tab tự tạo khi ghi điểm đầu tiên
-const NETWORK_TABS = { "10-BUS": "Trạm dừng xe buýt", "11-PCCC": "Trụ sở PCCC", "12-NT": "Nhà tang lễ, nghĩa trang" };
+const NETWORK_TABS = { "13-BUS": "Trạm dừng xe buýt", "10-PCCC": "Trụ sở PCCC", "11-NT": "Nhà tang lễ, nghĩa trang" };
 // Loại không cần diện tích: điểm quy hoạch mới được ghi QuyMo_QH = 0
-const NO_AREA_TYPES = ["10-BUS", "11-PCCC"];
+const NO_AREA_TYPES = ["13-BUS", "10-PCCC"];
 const STANDARD_HEADERS = ["ID_DoiTuong", "Ten_CongTrinh", "Ten_XaPhuong", "Nhom_HaTang", "Latitude", "Longitude",
-  "QuyMo_HT", "QuyMo_QH", "BanKinh", "TrangThai", "ThoiGianCapNhat", "Note"];
+  "QuyMo_HT", "QuyMo_QH", "Ten_QH", "TrangThai", "ThoiGianCapNhat", "Note", "Geojson"];
+const GEOJSON_MAX_CHARS = 45000;
 
 // Cột được xác định theo tên tiêu đề dòng 1 (không phân biệt hoa thường, bỏ khoảng trắng)
 const COLUMN_ALIASES = {
@@ -28,8 +30,9 @@ const COLUMN_ALIASES = {
   lng: ['longitude'],
   quyMoHT: ['quymo_ht', 'quymo_s'],
   quyMoQH: ['quymo_qh'],
-  banKinh: ['bankinh'],
+  tenQH: ['ten_qh'],
   trangThai: ['trangthai'],
+  geojson: ['geojson'],
   thoiGian: ['thoigiancapnhat'],
   ghiChu: ['note', 'ghichu']
 };
@@ -120,12 +123,12 @@ function findInfraSheet(ss, typeCode) {
   return null;
 }
 
-// Tab hạ tầng theo mã. Loại mạng lưới chưa có tab thì tạo tab đúng tên mã (10-BUS, 11-PCCC, 12-NT), đặt ngay sau 9-CSD.
+// Tab hạ tầng theo mã. Loại mạng lưới chưa có tab thì tạo tab đúng tên mã (13-BUS, 10-PCCC, 11-NT), đặt ngay sau 12-CSD.
 // Loại khác chưa có tab → null (không tự tạo, tránh ghi nhầm sang tab đầu tiên).
 function ensureInfraSheet(ss, typeCode) {
   var sheet = findInfraSheet(ss, typeCode);
   if (sheet || !NETWORK_TABS.hasOwnProperty(typeCode)) return sheet;
-  var after = findInfraSheet(ss, "9-CSD");
+  var after = findInfraSheet(ss, "12-CSD");
   var index = after ? after.getIndex() : ss.getNumSheets();
   sheet = ss.insertSheet(typeCode, index);
   sheet.getRange(1, 1, 1, STANDARD_HEADERS.length).setValues([STANDARD_HEADERS]).setFontWeight("bold");
@@ -190,7 +193,7 @@ function collectFeatures(ss) {
           "QuyMo_HT": quyMoHT,
           "QuyMo_QH": parseOptionalNumber(cellAt(row, col.quyMoQH)),
           "QuyMo_S": quyMoHT || 0, // giữ cho webapp bản cũ, bằng quy mô hiện trạng
-          "BanKinh": parseOptionalNumber(cellAt(row, col.banKinh)), // trống → null: webapp chỉ đối chiếu khi Sheet có nhập
+          "Ten_QH": String(cellAt(row, col.tenQH) || ''),
           "TrangThai": String(rawStatus === undefined || rawStatus === null ? 'TRUE' : rawStatus).toUpperCase(),
           "ThoiGianCapNhat": String(cellAt(row, col.thoiGian) || ''),
           "GhiChu": String(cellAt(row, col.ghiChu) || '')
@@ -203,41 +206,105 @@ function collectFeatures(ss) {
   return features;
 }
 
-// RANH LÔ ĐẤT (TAB CAD_Polygon) → GEOJSON; chỉ giữ lô còn công trình ở các tab hạ tầng. Không có tab → null
-function collectCadFeatures(ss, pointFeatures) {
-  var sheet = ss.getSheetByName(CAD_SHEET_NAME);
-  if (!sheet || sheet.getLastRow() <= 1) return null;
+function parseGeomCell(text) {
+  try {
+    var geom = JSON.parse(String(text || ''));
+    if (geom && (geom.type === 'Polygon' || geom.type === 'MultiPolygon')) return geom;
+  } catch (e) {}
+  return null;
+}
 
+function pushParcel(out, seen, props, geometry) {
+  var kind = props.Kind === 'DXF' ? 'DXF' : 'INFRA';
+  var phase = props.GiaiDoan === 'QH' ? 'QH' : 'HT';
+  var id = String(props.ID_DoiTuong || '').trim();
+  if (!id || !geometry) return;
+  var key = kind + '|' + phase + '|' + id;
+  if (seen[key]) return;
+  seen[key] = true;
+  props.Kind = kind;
+  props.GiaiDoan = phase;
+  out.push({ "type": "Feature", "geometry": geometry, "properties": props });
+}
+
+// Ranh hạ tầng: cột Geojson trên tab hạ tầng, rồi tab CAD_Polygon cho dòng chưa có cột M.
+// Ranh đất ngoài 13 nhóm: tab DXF-* (không đưa vào infrastructure_hue.json).
+function collectCadFeatures(ss, pointFeatures) {
+  var out = [];
+  var seen = {};
   var live = {};
   pointFeatures.forEach(function(f) { live[f.properties.ID_DoiTuong] = true; });
 
-  var data = sheet.getDataRange().getValues();
-  var col = {};
-  data[0].map(normalizeHeader).forEach(function(h, i) { col[h] = i; });
-  if (col.id_doituong === undefined || col.geojson === undefined) return null;
-
-  var out = [];
-  for (var i = 1; i < data.length; i++) {
-    var id = String(data[i][col.id_doituong] || '').trim();
-    if (!id || !live[id]) continue;
-    var geom = null;
-    try { geom = JSON.parse(String(data[i][col.geojson] || '')); } catch (e) { geom = null; }
-    if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) continue;
-    out.push({
-      "type": "Feature",
-      "geometry": geom,
-      "properties": {
-        "ID_DoiTuong": id,
-        "Layer": String(cellAt(data[i], col.layer === undefined ? -1 : col.layer) || ''),
-        "DienTich": parseCleanNumber(cellAt(data[i], col.dientich === undefined ? -1 : col.dientich)),
-        "File": String(cellAt(data[i], col.file === undefined ? -1 : col.file) || ''),
-        "ThoiGianNhap": String(cellAt(data[i], col.thoigiannhap === undefined ? -1 : col.thoigiannhap) || ''),
-        "GiaiDoan": String(cellAt(data[i], col.giaidoan === undefined ? -1 : col.giaidoan) || '').trim().toUpperCase() === 'QH' ? 'QH' : 'HT'
+  ss.getSheets().forEach(function(sheet) {
+    var sheetName = sheet.getName();
+    var dxf = /^DXF-\d+$/i.test(String(sheetName).trim());
+    if (!dxf && !isValidInfraSheet(sheetName)) return;
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return;
+    var col = getColumnMap(data[0]);
+    if (col.id < 0 || col.geojson < 0) return;
+    for (var i = 1; i < data.length; i++) {
+      var id = String(data[i][col.id] || '').trim();
+      var geom = parseGeomCell(cellAt(data[i], col.geojson));
+      if (!id || !geom) continue;
+      if (!dxf && !live[id]) continue;
+      var note = String(cellAt(data[i], col.ghiChu) || '');
+      var layerMatch = note.match(/Layer\s+([^\s;|]+)/i);
+      var ht = parseOptionalNumber(cellAt(data[i], col.quyMoHT));
+      var qh = parseOptionalNumber(cellAt(data[i], col.quyMoQH));
+      var phases = [];
+      if (dxf) phases.push(qh !== null ? 'QH' : 'HT');
+      else {
+        if (ht !== null) phases.push('HT');
+        if (qh !== null) phases.push('QH');
+        if (!phases.length) phases.push('HT');
       }
-    });
+      phases.forEach(function(ph) {
+        var props = {
+          // ID lô đất đánh lại từ DXF-001 ở mỗi tab đồ án → kèm tên tab cho duy nhất
+          "ID_DoiTuong": dxf ? sheetName + '/' + id : id,
+          "Layer": layerMatch ? layerMatch[1] : '',
+          "DienTich": ph === 'QH' ? (qh || 0) : (ht || 0),
+          "File": String(cellAt(data[i], col.tenQH) || ''),
+          "ThoiGianNhap": String(cellAt(data[i], col.thoiGian) || ''),
+          "GiaiDoan": ph,
+          "Kind": dxf ? 'DXF' : 'INFRA'
+        };
+        if (dxf) {
+          props.Ten = String(cellAt(data[i], col.name) || '');
+          props.Nhom = String(cellAt(data[i], col.nhom) || '');
+          props.XaPhuong = String(cellAt(data[i], col.ward) || '');
+        }
+        pushParcel(out, seen, props, geom);
+      });
+    }
+  });
+
+  var sheet = ss.getSheetByName(CAD_SHEET_NAME);
+  if (sheet && sheet.getLastRow() > 1) {
+    var data = sheet.getDataRange().getValues();
+    var col = {};
+    data[0].map(normalizeHeader).forEach(function(h, i) { col[h] = i; });
+    if (col.id_doituong !== undefined && col.geojson !== undefined) {
+      for (var r = 1; r < data.length; r++) {
+        var id = String(data[r][col.id_doituong] || '').trim();
+        if (!id || !live[id]) continue;
+        var geom = parseGeomCell(data[r][col.geojson]);
+        var ph = String(cellAt(data[r], col.giaidoan === undefined ? -1 : col.giaidoan) || '').trim().toUpperCase() === 'QH' ? 'QH' : 'HT';
+        pushParcel(out, seen, {
+          "ID_DoiTuong": id,
+          "Layer": String(cellAt(data[r], col.layer === undefined ? -1 : col.layer) || ''),
+          "DienTich": parseCleanNumber(cellAt(data[r], col.dientich === undefined ? -1 : col.dientich)),
+          "File": String(cellAt(data[r], col.file === undefined ? -1 : col.file) || ''),
+          "ThoiGianNhap": String(cellAt(data[r], col.thoigiannhap === undefined ? -1 : col.thoigiannhap) || ''),
+          "GiaiDoan": ph,
+          "Kind": "INFRA"
+        }, geom);
+      }
+    }
   }
-  Logger.log("✓ Tab '" + CAD_SHEET_NAME + "': Đóng gói " + out.length + " ranh lô!");
-  return out;
+  Logger.log("✓ Ranh lô: " + out.length);
+  return out.length ? out : null;
 }
 
 // HÀM ĐẨY DỮ LIỆU ĐÈ LÊN GCS BUCKET (VỚI CƠ CHẾ KHÓA LOCKSERVICE)
@@ -360,7 +427,7 @@ function installedOnEdit(e) {
   try {
     lock.waitLock(10000);
     var currentTime = Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm:ss");
-    var isCsdSheet = sheetName.indexOf("9-CSD") === 0;
+    var isCsdSheet = sheetName.indexOf("12-CSD") === 0;
     var touches = function(idx) { return idx >= 0 && startCol <= idx + 1 && endCol >= idx + 1; };
     var touchesStatus = statusCol > 0 && startCol <= statusCol && endCol >= statusCol;
     var touchesWard = touches(col.ward);
@@ -514,7 +581,7 @@ function doGet(e) {
 
     // C. THÊM ĐIỂM MỚI TỪ BẢN ĐỒ (phase=HT: bổ sung hiện trạng | phase=QH: đề xuất quy hoạch mới)
     if (action === "addPoint") {
-      var typeCode = params.type || "9-CSD";
+      var typeCode = params.type || "12-CSD";
       var name = params.name || "Công trình mới";
       var ward = sheetWard(params.ward) || "Thuận Hóa";
       var phase = String(params.phase || 'HT').toUpperCase() === 'QH' ? 'QH' : 'HT';
@@ -554,7 +621,6 @@ function doGet(e) {
       // Chỉ ghi cột quy mô của giai đoạn đang đề xuất (QH: QuyMo_HT để trống = quy hoạch mới)
       if (phase === 'QH') setCell('quyMoQH', size);
       else setCell('quyMoHT', size);
-      if (radius > 0) setCell('banKinh', radius);
       setCell('trangThai', false);
       setCell('thoiGian', currentTime);
       setCell('ghiChu', phase === 'QH' ? "Đề xuất quy hoạch mới từ GEE" : "Thêm mới từ GEE");
@@ -576,7 +642,7 @@ function doGet(e) {
       var targetId = params.id;
       var targetType = params.targetType;
 
-      var csdSheet = findInfraSheet(ss, "9-CSD");
+      var csdSheet = findInfraSheet(ss, "12-CSD");
 
       var updated = false;
       if (csdSheet) {
@@ -684,17 +750,44 @@ function doPost(e) {
  * - stages: [{ phase, size, area, point, crossWard, layer, geometry }] — 1 giai đoạn, hoặc 2 (lô HT + QH cùng vị trí,
  *   tên layer theo TT16); không có stages thì 1 giai đoạn = body.phase với size / area / geometry của item
  * - matchId có trong Sheet → cập nhật tọa độ, phường, quy mô các giai đoạn đang nhập; không có → thêm dòng mới
- * - Chỉ ghi cột quy mô của giai đoạn đang nhập (HT → QuyMo_HT, QH → QuyMo_QH), cột còn lại để nguyên / trống
- * - BanKinh = it.radius (bán kính QCVN 01:2026 do máy chủ webapp tính): ghi cho dòng mới, dòng cập nhật chỉ ghi khi đang trống
+ * - File HT-*.dxf ghi mọi lô vào QuyMo_HT; file QH-*.dxf ghi mọi lô vào QuyMo_QH (kể cả layer có tiền tố HT)
+ * - Trùng điểm: giữ tên trên Sheet, ghi đè lat/lng bằng tâm polygon mới; Ten_QH và Geojson lấy từ file
+ * - Layer không thuộc 13 nhóm hạ tầng → body.lands, ghi sheet DXF-NN theo tên đồ án
  * - sync = false: chưa đẩy lên bucket (máy chủ gửi nhiều phần, chỉ phần cuối đồng bộ)
  */
+function projectTitle(fileName) {
+  var base = String(fileName || '').replace(/\.[^.]+$/, '').trim();
+  var m = base.match(/^(?:HT|QH)[\s_\-]+(.+)$/i);
+  return String(m ? m[1] : base).slice(0, 120);
+}
+
+function filePhaseOf(fileName) {
+  var base = String(fileName || '').replace(/\.[^.]+$/, '').trim();
+  var m = base.match(/^(HT|QH)(?![A-Za-z])/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+// Webapp tính THPT chung mã 4-TH; trên Sheet THPT có tab riêng 6-THPT
+function sheetCodeOf(it) {
+  return String(it.idPrefix || '').toUpperCase() === 'THPT' ? '6-THPT' : String(it.type || '');
+}
+
+function geoCell(geometry) {
+  if (!geometry) return '';
+  var text = JSON.stringify(geometry);
+  return text.length > GEOJSON_MAX_CHARS ? '' : text;
+}
+
 function importCadBatch(body) {
   var items = Array.isArray(body.items) ? body.items : [];
   var phase = body.phase === 'QH' ? 'QH' : 'HT';
   var fileName = String(body.fileName || 'DXF');
+  var filePhase = filePhaseOf(fileName);
+  var project = projectTitle(fileName);
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var currentTime = Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm:ss");
   var created = [], updated = [], skipped = [], polygons = [];
+  var landCount = 0;
 
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -720,13 +813,17 @@ function importCadBatch(body) {
     };
 
     items.forEach(function(it) {
-      var c = getCtx(String(it.type || ''));
+      var c = getCtx(sheetCodeOf(it));
       if (!c || c.col.id < 0 || c.col.lat < 0 || c.col.lng < 0) {
         skipped.push(it.layer + ": không có tab " + it.type + " hợp lệ");
         return;
       }
       var stages = Array.isArray(it.stages) && it.stages.length ? it.stages
         : [{ phase: phase, size: it.size, area: it.area, point: it.point, crossWard: it.crossWard, layer: it.layer, geometry: it.geometry }];
+      if (filePhase && stages.length) {
+        stages = [stages[0]];
+        stages[0].phase = filePhase;
+      }
       var qCols = [];
       for (var k = 0; k < stages.length; k++) {
         stages[k].phase = stages[k].phase === 'QH' ? 'QH' : 'HT';
@@ -754,10 +851,11 @@ function importCadBatch(body) {
         c.sheet.getRange(sheetRow, c.col.lat + 1).setValue(Number(it.lat));
         c.sheet.getRange(sheetRow, c.col.lng + 1).setValue(Number(it.lng));
         if (c.col.ward >= 0) c.sheet.getRange(sheetRow, c.col.ward + 1).setValue(sheetWard(it.ward));
+        if (c.col.nhom >= 0) c.sheet.getRange(sheetRow, c.col.nhom + 1).setValue(sheetNhom(it.nhom));
         stages.forEach(function(st, k) { c.sheet.getRange(sheetRow, qCols[k] + 1).setValue(st.size); });
-        if (c.col.banKinh >= 0 && Number(it.radius) > 0 && String(cellAt(c.data[r], c.col.banKinh) || '').trim() === '') {
-          c.sheet.getRange(sheetRow, c.col.banKinh + 1).setValue(Number(it.radius));
-        }
+        if (c.col.tenQH >= 0) c.sheet.getRange(sheetRow, c.col.tenQH + 1).setValue(project);
+        var geomText = geoCell(stages[0] && stages[0].geometry);
+        if (c.col.geojson >= 0 && geomText) c.sheet.getRange(sheetRow, c.col.geojson + 1).setValue(geomText);
         if (c.col.trangThai >= 0) c.sheet.getRange(sheetRow, c.col.trangThai + 1).setValue(true);
         if (c.col.thoiGian >= 0) c.sheet.getRange(sheetRow, c.col.thoiGian + 1).setValue(currentTime);
         if (c.col.ghiChu >= 0) c.sheet.getRange(sheetRow, c.col.ghiChu + 1).setValue(prevNote ? prevNote + " | " + note : note);
@@ -773,7 +871,8 @@ function importCadBatch(body) {
         set(c.col.lat, Number(it.lat));
         set(c.col.lng, Number(it.lng));
         stages.forEach(function(st, k) { set(qCols[k], st.size); });
-        if (Number(it.radius) > 0) set(c.col.banKinh, Number(it.radius));
+        set(c.col.tenQH, project);
+        set(c.col.geojson, geoCell(stages[0] && stages[0].geometry));
         set(c.col.trangThai, true);
         set(c.col.thoiGian, currentTime);
         set(c.col.ghiChu, note);
@@ -801,14 +900,15 @@ function importCadBatch(body) {
       target.setValues(c.newRows);
     });
 
-    upsertCadPolygons(ss, polygons, fileName, currentTime, phase);
+    upsertCadPolygons(ss, polygons, fileName, currentTime, filePhase || phase);
+    landCount = writeDxfLands(ss, body.lands, project, filePhase || phase, currentTime, body.landsReset === true);
     SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
   }
 
   if (body.sync !== false) syncSheetsToGCS();
-  return { "success": true, "created": created, "updated": updated, "skipped": skipped, "polygons": polygons.length };
+  return { "success": true, "created": created, "updated": updated, "skipped": skipped, "polygons": polygons.length, "lands": landCount };
 }
 
 /**
@@ -867,7 +967,6 @@ function addPendingPoints(body) {
       set(c.col.lat, "'" + String(Number(it.lat)));
       set(c.col.lng, "'" + String(Number(it.lng)));
       set(c.col.quyMoHT, Number(it.size) > 0 ? Number(it.size) : 0);
-      if (Number(it.radius) > 0) set(c.col.banKinh, Number(it.radius));
       set(c.col.trangThai, false);
       set(c.col.thoiGian, currentTime);
       set(c.col.ghiChu, "Đề xuất từ OpenStreetMap" + (ref ? " (" + ref + ")" : ""));
@@ -1118,6 +1217,71 @@ function markWardNotes(body) {
 
   if (marked || cleared) syncSheetsToGCS();
   return { "success": true, "marked": marked, "cleared": cleared, "noNoteColumn": noNoteColumn };
+}
+
+// Một đồ án (Ten_QH) một tab DXF-NN. Nhập lại cùng đồ án thì thay toàn bộ dòng đất của tab đó.
+function ensureDxfSheet(ss, project) {
+  var sheets = ss.getSheets();
+  var maxN = 0;
+  var empty = null;
+  var found = null;
+  sheets.forEach(function(sh) {
+    var m = String(sh.getName()).trim().match(/^DXF-(\d+)$/i);
+    if (!m) return;
+    var n = parseInt(m[1], 10);
+    if (n > maxN) maxN = n;
+    if (sh.getLastRow() < 2) { if (!empty) empty = sh; return; }
+    var col = getColumnMap(getSheetHeaders(sh));
+    if (col.tenQH < 0 || found) return;
+    var val = String(sh.getRange(2, col.tenQH + 1).getValue() || '').trim();
+    if (val === project) found = sh;
+  });
+  if (found) return found;
+  if (empty) return empty;
+  var name = 'DXF-' + ('0' + (maxN + 1)).slice(-2);
+  var sheet = ss.insertSheet(name);
+  sheet.getRange(1, 1, 1, STANDARD_HEADERS.length).setValues([STANDARD_HEADERS]).setFontWeight('bold');
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+// reset = true ở phần đầu tiên của 1 lần nhập: xóa dòng cũ của đồ án rồi ghi lại; các phần sau ghi nối tiếp
+function writeDxfLands(ss, lands, project, phase, currentTime, reset) {
+  if (!Array.isArray(lands) || !lands.length) return 0;
+  var sheet = ensureDxfSheet(ss, project);
+  var headers = getSheetHeaders(sheet);
+  if (headers.length < STANDARD_HEADERS.length) {
+    sheet.getRange(1, 1, 1, STANDARD_HEADERS.length).setValues([STANDARD_HEADERS]).setFontWeight('bold');
+    headers = STANDARD_HEADERS.slice();
+  }
+  var col = getColumnMap(headers);
+  if (reset && sheet.getLastRow() > 1) sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).clearContent();
+  var width = headers.length;
+  var ph = phase === 'QH' ? 'QH' : 'HT';
+  var start = reset ? 2 : Math.max(2, sheet.getLastRow() + 1);
+  var maxNum = start > 2 ? maxIdNumber(sheet.getRange(1, 1, start - 1, width).getValues(), col.id, 'DXF') : 0;
+  var rows = lands.map(function(it, i) {
+    var row = new Array(width).fill('');
+    var set = function(idx, value) { if (idx >= 0 && idx < width) row[idx] = value; };
+    set(col.id, formatId('DXF', maxNum + i + 1));
+    set(col.name, String(it.name || it.layer || 'Lô đất').slice(0, 150));
+    set(col.ward, sheetWard(it.ward));
+    set(col.nhom, String(it.nhom || 'Đất khác').slice(0, 40));
+    set(col.lat, Number(it.lat));
+    set(col.lng, Number(it.lng));
+    // Hồ sơ thẩm định gồm cả HT và QH: giai đoạn theo từng lô, không có thì theo tên file / ô Giai đoạn
+    var lp = it.phase === 'QH' || it.phase === 'HT' ? it.phase : ph;
+    if (lp === 'QH') set(col.quyMoQH, Number(it.area) || 0);
+    else set(col.quyMoHT, Number(it.area) || 0);
+    set(col.tenQH, project);
+    set(col.trangThai, true);
+    set(col.thoiGian, currentTime);
+    set(col.ghiChu, 'Layer ' + String(it.layer || ''));
+    set(col.geojson, geoCell(it.geometry));
+    return row;
+  });
+  sheet.getRange(start, 1, rows.length, width).setValues(rows);
+  return rows.length;
 }
 
 // Ranh lô theo (ID_DoiTuong, GiaiDoan): đã có thì ghi đè, chưa có thì thêm dòng. Dòng cũ chưa có GiaiDoan coi là HT

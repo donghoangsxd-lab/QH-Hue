@@ -1,6 +1,7 @@
 import { state, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_HIGHLIGHT_STYLE } from './state.js';
 import { escapeHtml, wardLabelFontSize } from './utils.js';
 import { addIslandFlags } from './islandFlags.js';
+import { attachBasemap } from './basemap.js';
 
 export let planMap = null;
 let leftMap = null;
@@ -43,13 +44,7 @@ export function initPlanMap(mainMap, mainLayers) {
     zoomSnap: leftMap.options.zoomSnap
   }).setView(leftMap.getCenter(), leftMap.getZoom());
 
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 19,
-    maxNativeZoom: 18,
-    zIndex: 0,
-    crossOrigin: 'anonymous',
-    attribution: 'Tiles &copy; Esri'
-  }).addTo(planMap);
+  attachBasemap(planMap);
 
   planHighlightLayer.addTo(planMap);
   addIslandFlags(planMap);

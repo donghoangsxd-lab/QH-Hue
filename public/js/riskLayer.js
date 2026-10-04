@@ -3,7 +3,7 @@
 // Máy chủ tính từng năm (api/gee.js › getInfraRisk); trình duyệt gọi song song rồi cộng dồn. Chỉ tải khi bật lớp.
 import { map, flyToVisible } from './mapEngine.js';
 import { planMap } from './planMap.js';
-import { state, infraLabels, BUFFER_COLORS, layerType, getPlanScenarioList } from './state.js';
+import { state, infraLabels, BUFFER_COLORS, layerType, getPlanScenarioList, isNetworkType } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, ico, isApproved } from './utils.js';
 import { sarSeasons, lstSeasons } from './satLayers.js';
@@ -184,9 +184,9 @@ export function initRiskLayer() {
   left = L.layerGroup();
   const sel = $('riskGroup');
   if (sel) {
-    const codes = Object.keys(infraLabels).filter(k => !['10-BUS', '11-PCCC', '12-NT'].includes(k));
+    const codes = Object.keys(infraLabels).filter(k => !isNetworkType(k));
     sel.innerHTML = `<option value="all">Mọi nhóm hạ tầng</option>`
-      + codes.map(k => `<option value="${k}">${escapeHtml(infraLabels[k])}${k === '9-CSD' ? ' (quỹ đất)' : ''}</option>`).join('');
+      + codes.map(k => `<option value="${k}">${escapeHtml(infraLabels[k])}${k === '12-CSD' ? ' (quỹ đất)' : ''}</option>`).join('');
   }
   $('chk_risk')?.addEventListener('change', (e) => setVisible(e.target.checked));
   ['riskGroup', 'riskFlood', 'riskHeat'].forEach(id => $(id)?.addEventListener('change', render));

@@ -1,11 +1,19 @@
 // Lớp "Mạng lưới đường" (bảng lớp dữ liệu): đường theo 4 nhóm (kể cả đường xe đạp), gồm cả tuyến Admin vẽ bổ sung — để thấy chỗ còn thiếu đường.
 // Tải theo ô lưới ~2 km quanh khung nhìn qua action getRoads (máy chủ cắt từ mạng lưới trên bucket, có cache CDN / trình duyệt);
-// chỉ hiện từ mức phóng MIN_ZOOM để không tải cả thành phố cùng lúc. Vẽ đồng thời trên bản đồ hiện trạng và quy hoạch.
+// chỉ hiện từ mức phóng MIN_ZOOM để không tải cả thành phố cùng lúc (xa hơn tắt hẳn), nhóm đường lọc theo keysForZoom.
+// Vẽ đồng thời trên bản đồ hiện trạng và quy hoạch.
 import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { roadWaysAround } from './serviceArea.js';
 
 const MIN_ZOOM = 14;
+// Nhóm đường hiện theo mức phóng: xa chỉ trục chính, gần hơn thêm đường khu vực + xe đạp, gần nhất thêm nội bộ / chưa phân loại
+const ZOOM_NAMED = 15;
+const ZOOM_ALL = 16;
+function keysForZoom(z) {
+  if (z >= ZOOM_ALL) return null;
+  return new Set(z >= ZOOM_NAMED ? ['main', 'named', 'bike'] : ['main']);
+}
 const CELL_DEG = 0.02;          // ô lưới ~2,2 × 2,1 km
 const CELL_RADIUS_M = 1600;     // phủ trọn ô (nửa đường chéo ~1,55 km)
 const MAX_CELLS = 60;           // số ô giữ trong bộ nhớ (ngoài các ô đang trong khung nhìn)
@@ -69,7 +77,9 @@ function pump() {
 
 function draw(keys) {
   [leftGroup, rightGroup].forEach(g => g && g.clearLayers());
+  const shown = keysForZoom(map.getZoom());
   STYLES.forEach(([k, s]) => {
+    if (shown && !shown.has(k)) return;
     const lines = [];
     keys.forEach(key => { const c = cells.get(key); if (c && c.lines) lines.push(...c.lines[k]); });
     if (!lines.length) return;
@@ -96,7 +106,10 @@ function update() {
     }
   });
   const loading = keys.filter(k => cells.get(k)?.loading).length;
-  setHint(loading ? `đang tải ${keys.length - loading}/${keys.length} ô...` : '');
+  const z = map.getZoom();
+  setHint(loading ? `đang tải ${keys.length - loading}/${keys.length} ô...`
+    : z < ZOOM_NAMED ? 'trục chính — phóng to xem đường khu vực'
+      : z < ZOOM_ALL ? 'trục chính + khu vực — phóng to xem đường nội bộ' : '');
   draw(keys);
   pump();
 }

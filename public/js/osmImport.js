@@ -19,7 +19,7 @@ const OSM_QUERY = `[out:json][timeout:90][bbox:15.9,106.9,16.9,108.3];
 out geom;`;
 const FETCH_TIMEOUT_MS = 100000;
 const HEDGE_MS = 25000;
-const TYPE_LABELS = { "10-BUS": "Trạm dừng xe buýt", "11-PCCC": "Trụ sở cảnh sát PCCC", "12-NT": "Nhà tang lễ, nghĩa trang" };
+const TYPE_LABELS = { "13-BUS": "Trạm dừng xe buýt", "10-PCCC": "Trụ sở cảnh sát PCCC", "11-NT": "Nhà tang lễ, nghĩa trang" };
 
 let onImported = null;
 let preview = null;   // { items, stats } của lần kiểm tra gần nhất
@@ -70,19 +70,19 @@ function classify(tags) {
   const name = String(t['name:vi'] || t.name || '').trim();
   const f = fold(name);
   if (t.highway === 'bus_stop' || (t.public_transport === 'platform' && t.bus === 'yes')) {
-    return { type: '10-BUS', name: name || 'Trạm dừng xe buýt' };
+    return { type: '13-BUS', name: name || 'Trạm dừng xe buýt' };
   }
   if (t.amenity === 'fire_station') {
     // Trụ nước / bể nước chữa cháy bị gắn nhầm thẻ trụ sở
     if (f.includes('NUOC') && !f.includes('CANH SAT')) return null;
-    return { type: '11-PCCC', name: name || 'Trụ sở cảnh sát PCCC' };
+    return { type: '10-PCCC', name: name || 'Trụ sở cảnh sát PCCC' };
   }
-  if (t.amenity === 'funeral_hall') return { type: '12-NT', name: f.includes('TANG LE') ? name : `Nhà tang lễ ${name}`.trim() };
-  if (t.amenity === 'crematorium') return { type: '12-NT', name: f.includes('HOA TANG') ? name : `Cơ sở hỏa táng ${name}`.trim() };
+  if (t.amenity === 'funeral_hall') return { type: '11-NT', name: f.includes('TANG LE') ? name : `Nhà tang lễ ${name}`.trim() };
+  if (t.amenity === 'crematorium') return { type: '11-NT', name: f.includes('HOA TANG') ? name : `Cơ sở hỏa táng ${name}`.trim() };
   if (t.landuse === 'cemetery' || t.amenity === 'grave_yard') {
     // Lăng mộ di tích (Lăng ..., Bửu Thành) không phải nghĩa trang
     if (/^(LANG|BUU THANH)\b/.test(f)) return null;
-    return { type: '12-NT', name: /NGHIA (TRANG|DIA|TRUNG)|NTLS/.test(f) ? name : `Nghĩa trang ${name}`.trim(), area: true };
+    return { type: '11-NT', name: /NGHIA (TRANG|DIA|TRUNG)|NTLS/.test(f) ? name : `Nghĩa trang ${name}`.trim(), area: true };
   }
   return null;
 }
@@ -201,11 +201,11 @@ async function writePreview() {
     const res = await postImport(preview.sent, false);
     if (!(Number(res.created) > 0)) {
       const skip = Number(res.skipped) > 0 ? ` Bỏ qua ${fmtNum(res.skipped)} điểm.` : '';
-      throw new Error(`Sheet không thêm dòng nào.${skip} Tab 10-BUS / 12-NT chỉ hiện sau khi ghi được ít nhất 1 điểm.`);
+      throw new Error(`Sheet không thêm dòng nào.${skip} Tab 13-BUS / 11-NT chỉ hiện sau khi ghi được ít nhất 1 điểm.`);
     }
     const where = (res.sheets || []).length ? ` vào tab ${(res.sheets || []).join(', ')}` : '';
     showToast(`✓ Đã ghi ${fmtNum(res.created)} điểm chờ duyệt${where}`, 'success');
-    setStatus(`✓ Đã ghi ${fmtNum(res.created)} điểm (TrangThai = FALSE)${where}. Kéo thanh tab Sheet sang phải nếu chưa thấy 10-BUS, 11-PCCC, 12-NT.`, 'var(--accent-green)');
+    setStatus(`✓ Đã ghi ${fmtNum(res.created)} điểm (TrangThai = FALSE)${where}. Kéo thanh tab Sheet sang phải nếu chưa thấy 13-BUS, 10-PCCC, 11-NT.`, 'var(--accent-green)');
     preview = null;
     busy = false;
     if (onImported) await onImported();

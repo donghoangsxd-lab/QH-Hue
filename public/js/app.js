@@ -16,6 +16,7 @@ import {
   ensurePopulationLayer,
   loadCadParcels,
   setParcelsVisible,
+  setLandVisible,
   flyToVisible,
   centerOnCity,
   layers
@@ -53,6 +54,7 @@ import { initSketchLayer, handleSketchClick, stopSketchTool } from './sketchLaye
 import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
 import { initIntroTour } from './introTour.js';
 import { initRiskLayer } from './riskLayer.js';
+import { initBasemapUi } from './basemap.js';
 
 const CITY_NAME = "Thành phố Huế";
 
@@ -69,20 +71,21 @@ const RADIUS_MAX = 5000;
 // cấp đô thị và trường THPT 2 km; cấp đơn vị ở: phường ≤ 1 km (Mục 2.3.3.1), xã: trường, y tế, văn hóa, chợ ≤ 2 km (Mục 4.6.2.2);
 // cây xanh theo diện tích (parkTierOf): vườn hoa 400 m, công viên khu vực ≥ 1 ha 800 m, công viên đô thị ≥ 5 ha 2 km; bãi đỗ xe 500 m
 const URBAN_RADIUS = 2000;
-const UNIT_DEFAULT_RADIUS = { "1-CV": 400, "2-BDX": 500, "3-MN": 1000, "4-TH": 1000, "5-THCS": 1000, "6-YT": 1000, "7-VH": 1000, "8-TM": 1000 };
+const UNIT_DEFAULT_RADIUS = { "1-CV": 400, "2-BDX": 500, "3-MN": 1000, "4-TH": 1000, "5-THCS": 1000, "7-YT": 1000, "8-VH": 1000, "9-TM": 1000 };
 const RURAL_UNIT_RADIUS = 2000;
 const isThptName = (name) => /THPT|TRUNG HOC PHO THONG/.test(String(name || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/Đ/g, 'D'));
 // Mạng lưới: trạm xe buýt 500 m đi bộ (Mục 2.8.3.3), PCCC 3 km phường / 5 km xã (Mục 2.5.13.1), nghĩa trang theo Bảng 23
-const NO_AREA_TYPES = ["10-BUS", "11-PCCC"];
+const NO_AREA_TYPES = ["13-BUS", "10-PCCC"];
 const NT_SAFETY = { funeral: 0, crematorium: 500, cemetery_cat: 100, cemetery_once: 500, cemetery_hung: 1000 };
 function networkRadius(type, ward, name) {
-  if (type === '10-BUS') return 500;
-  if (type === '11-PCCC') return /^xã\s/i.test(String(ward || '').trim()) ? 5000 : 3000;
+  if (type === '13-BUS') return 500;
+  if (type === '10-PCCC') return /^xã\s/i.test(String(ward || '').trim()) ? 5000 : 3000;
   return NT_SAFETY[ntKindOf({ name })];
 }
 function qcvnRadius(type, nhomHaTang, ward, name, size) {
   if (isNetworkType(type)) return networkRadius(type, ward, name);
   if (type === '1-CV') return parkTierOf(size, nhomHaTang).radius;
+  if (type === '6-THPT') return URBAN_RADIUS;
   if (!UNIT_DEFAULT_RADIUS[type]) return null;
   if (nhomHaTang === 'Cấp đô thị' || (type === '4-TH' && isThptName(name))) return URBAN_RADIUS;
   return /^xã\s/i.test(String(ward || '').trim()) && !["1-CV", "2-BDX"].includes(type) ? RURAL_UNIT_RADIUS : UNIT_DEFAULT_RADIUS[type];
@@ -99,7 +102,7 @@ function updateRadiusPreview() {
   const r = qcvnRadius(type, nhom, ward, name, size);
   const nhomEl = document.getElementById('newNhomHaTang');
   if (nhomEl) nhomEl.disabled = isNetworkType(type);
-  if (type === '12-NT') {
+  if (type === '11-NT') {
     const kind = ntKindOf({ name });
     out.innerHTML = r
       ? `<b>${r.toLocaleString('vi-VN')} m</b> <small>(khoảng cách an toàn Bảng 23: ${NT_KIND_LABELS[kind].toLowerCase()})</small>`
@@ -108,11 +111,11 @@ function updateRadiusPreview() {
   }
   if (isNetworkType(type)) {
     const area = !ward ? 'chưa xác định phường/xã' : /^xã\s/i.test(ward.trim()) ? 'xã' : 'phường';
-    out.innerHTML = `<b>${r.toLocaleString('vi-VN')} m</b> <small>(${type === '10-BUS' ? 'phạm vi đi bộ tới trạm' : `bán kính phục vụ PCCC, ${area}`})</small>`;
+    out.innerHTML = `<b>${r.toLocaleString('vi-VN')} m</b> <small>(${type === '13-BUS' ? 'phạm vi đi bộ tới trạm' : `bán kính phục vụ PCCC, ${area}`})</small>`;
     return;
   }
   if (!r) {
-    out.textContent = type === '9-CSD' ? 'Không áp dụng (cơ sở chưa sử dụng)' : '—';
+    out.textContent = type === '12-CSD' ? 'Không áp dụng (cơ sở chưa sử dụng)' : '—';
     return;
   }
   if (type === '1-CV') {
@@ -171,6 +174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCustomRoads();
   initPopEdits();
   initRoadNetworkLayer();
+  initBasemapUi(() => map.getCenter());
   initTerrainLayer();
   initDrainageLayer();
   initFloodSim();
@@ -346,6 +350,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   document.getElementById('chk_parcel')?.addEventListener('change', (e) => setParcelsVisible(e.target.checked));
+  document.getElementById('chk_land')?.addEventListener('change', (e) => setLandVisible(e.target.checked));
 
   document.querySelectorAll('.btn-dot-buffer').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -439,8 +444,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadInfraData();
       } catch (err) {
         const newItem = {
-          id: data.id || `NEW-${Date.now()}`,
-          name, ward: data.ward || '', type, nhomHaTang, lat, lng,
+          id: data.id || `${type === '6-THPT' ? 'THPT' : 'NEW'}-${Date.now()}`,
+          name, ward: data.ward || '', type: type === '6-THPT' ? '4-TH' : type, nhomHaTang, lat, lng,
           size: phase === 'QH' ? 0 : size,
           radius: data.radius ?? qcvnRadius(type, nhomHaTang, data.ward, name, size) ?? 500,
           sizeHT: phase === 'QH' ? null : size,
@@ -499,7 +504,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Bấm lại cùng ô để khôi phục đúng các lớp đang bật trước đó.
   const FOCUS_CHECKS = [
     ...ICON_GROUPS.map(k => `chk_${k}`),
-    'chk_bound', 'chk_parcel', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_flood', 'chk_sarflood',
+    'chk_bound', 'chk_parcel', 'chk_land', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_flood', 'chk_sarflood',
     'chk_lst', 'chk_newdev', 'chk_risk', 'chk_roads', 'chk_heat'
   ];
   let focusSnapshot = null;

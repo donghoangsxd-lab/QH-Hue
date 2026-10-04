@@ -443,10 +443,10 @@ export const LAYER_PREFIXES = {
   CV_DT: '1-CV', CV_DV: '1-CV', CV: '1-CV',
   BDX_DT: '2-BDX', BDX_DV: '2-BDX', BDX: '2-BDX',
   MN: '3-MN', TH: '4-TH', THPT: '4-TH', THCS: '5-THCS',
-  YT_DT: '6-YT', YT_DV: '6-YT', YT: '6-YT',
-  VH_DT: '7-VH', VH_DV: '7-VH', VH: '7-VH',
-  TM_DT: '8-TM', TM_DV: '8-TM', TM: '8-TM',
-  CSD: '9-CSD'
+  YT_DT: '7-YT', YT_DV: '7-YT', YT: '7-YT',
+  VH_DT: '8-VH', VH_DV: '8-VH', VH: '8-VH',
+  TM_DT: '9-TM', TM_DV: '9-TM', TM: '9-TM',
+  CSD: '12-CSD'
 };
 const PREFIX_KEYS = Object.keys(LAYER_PREFIXES).sort((a, b) => b.length - a.length);
 
@@ -576,13 +576,33 @@ function metersApart(a, b) {
   return Math.hypot((a.lat - b.lat) * k, (a.lng - b.lng) * k * Math.cos(a.lat * DEG));
 }
 
+// Bỏ đỉnh cách đỉnh giữ liền trước dưới 0,2 m (sai số cho phép khi rút gọn hatch)
+const VERTEX_GAP_M = 0.2;
+function simplifyRing(ring) {
+  if (!ring || ring.length < 4) return ring;
+  const same = (a, b) => a[0] === b[0] && a[1] === b[1];
+  const closed = same(ring[0], ring[ring.length - 1]);
+  const pts = closed ? ring.slice(0, -1) : ring.slice();
+  const gap = (a, b) => {
+    const lat = ((a[1] + b[1]) / 2) * DEG;
+    return Math.hypot((a[1] - b[1]) * 111320, (a[0] - b[0]) * 111320 * Math.cos(lat));
+  };
+  const kept = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    if (gap(kept[kept.length - 1], pts[i]) >= VERTEX_GAP_M) kept.push(pts[i]);
+  }
+  while (kept.length > 3 && gap(kept[0], kept[kept.length - 1]) < VERTEX_GAP_M) kept.pop();
+  if (kept.length < 3) return ring;
+  return [...kept, kept[0]];
+}
+
 /**
  * Thực thể → lô đất: { layer, name, prefix, type, nhom, area (m²), lat, lng, polygons ([[lng,lat]...] theo vòng) }
  * project(ent) → { toXY(x, y) → [X, Y] mét trên mặt phẳng, toLatLng(X, Y) → [lat, lng] }.
  * Đường khép kín trùng với vùng tô cùng layer (cùng tâm < 1 m, diện tích lệch < 1%) được bỏ để không đếm 2 lần.
  * Thực thể POINT → công trình dạng điểm (area 0, polygons []); điểm nằm trong lô cùng loại, cùng giai đoạn của file được bỏ.
  * Layer TT16: lô mang phase / stage theo tiền tố; Truonghoc thiếu hậu tố → lô chờ chọn cấp (school, pending, type SCHOOL_PENDING);
- * loại đất TT16 ngoài 10 nhóm → tt16Other (bỏ qua).
+ * loại đất TT16 ngoài 13 nhóm hạ tầng và layer không nhận diện → lô đất (land), ghi sheet DXF của đồ án.
  */
 export const SCHOOL_PENDING = 'SCHOOL';
 
@@ -592,14 +612,21 @@ function makeParcels(entities, project) {
   const tt16Other = {};
   entities.forEach((ent, src) => {
     const tt = tt16Layer(ent.layer);
-    if (tt && tt.other && !ent.typeCode) { tt16Other[ent.layer] = (tt16Other[ent.layer] || 0) + 1; return; }
+    const otherLand = !!(tt && tt.other && !ent.typeCode);
+    if (otherLand) tt16Other[ent.layer] = (tt16Other[ent.layer] || 0) + 1;
     // typeCode: mã loại người dùng khớp thủ công cho layer/thuộc tính không theo quy ước
-    const t = ent.typeCode ? layerToType(ent.typeCode)
+    const t = otherLand ? null
+      : ent.typeCode ? layerToType(ent.typeCode)
       : tt && tt.school ? { prefix: '', type: SCHOOL_PENDING, nhom: 'Cấp đơn vị ở' }
         : layerToType(ent.layer);
-    if (!t) { unknownLayers[ent.layer] = (unknownLayers[ent.layer] || 0) + 1; return; }
-    const tag = {
-      src, prefix: t.prefix, type: t.type, nhom: t.nhom, manual: !!ent.typeCode,
+    const land = otherLand || !t;
+    if (!t && !otherLand) unknownLayers[ent.layer] = (unknownLayers[ent.layer] || 0) + 1;
+    if (land && ent.kind === 'POINT') return;
+    const tag = land ? {
+      src, prefix: `LAND:${ent.layer}`, type: null, nhom: '', manual: false, land: true,
+      tt16: !!tt, phase: tt ? tt.phase : null, stage: tt ? tt.stage : null, school: false, pending: false
+    } : {
+      src, prefix: t.prefix, type: t.type, nhom: t.nhom, manual: !!ent.typeCode, land: false,
       tt16: !!tt, phase: tt ? tt.phase : null, stage: tt ? tt.stage : null,
       school: !!(tt && tt.school && !ent.typeCode), pending: !!(tt && tt.school && !ent.typeCode)
     };
@@ -638,7 +665,7 @@ function makeParcels(entities, project) {
       polygons: polys.map(p => p.rings.map(r => {
         const ring = r.map(([X, Y]) => { const [la, lo] = toLatLng(X, Y); return [lo, la]; });
         ring.push(ring[0]);
-        return ring;
+        return simplifyRing(ring);
       }))
     });
   });
@@ -792,6 +819,10 @@ const POINT_EXISTING_M = 20;
  * hoặc 1 công trình nằm trong nhiều lô cùng giai đoạn → p.matchConflict (danh sách ID) để admin chọn.
  * Điểm (không có ranh) gần công trình cùng loại < POINT_EXISTING_M → p.existingId (bỏ qua khi ghi).
  */
+// THPT tính chung mã 4-TH nhưng nằm tab 6-THPT riêng: lô THPT chỉ khớp công trình THPT và ngược lại
+const isThptRecord = (it) => /^THPT-/i.test(String(it.id || '')) || /THPT/i.test(String(it.name || ''));
+const sameKind = (p, it) => p.type === it.type && (p.type !== '4-TH' || (p.prefix === 'THPT') === isThptRecord(it));
+
 export function matchExisting(parcels, existing) {
   const boxes = parcels.map(p => bboxOfRings(p.polygons.map(poly => poly[0])));
   const byParcel = parcels.map(() => []);
@@ -801,7 +832,7 @@ export function matchExisting(parcels, existing) {
     if (p.kind !== 'POINT') return;
     let bestD = POINT_EXISTING_M;
     for (const it of existing) {
-      if (p.type !== it.type || !it.id) continue;
+      if (!sameKind(p, it) || !it.id) continue;
       const d = metersApart(p, { lat: Number(it.lat), lng: Number(it.lng) });
       if (d < bestD) { bestD = d; p.existingId = it.id; }
     }
@@ -811,7 +842,7 @@ export function matchExisting(parcels, existing) {
     if (!Number.isFinite(x) || !Number.isFinite(y) || !it.id) continue;
     parcels.forEach((p, k) => {
       const b = boxes[k];
-      if (p.kind === 'POINT' || p.type !== it.type || x < b[0] || x > b[2] || y < b[1] || y > b[3]) return;
+      if (p.kind === 'POINT' || !sameKind(p, it) || x < b[0] || x > b[2] || y < b[1] || y > b[3]) return;
       if (!inPolys(x, y, p.polygons)) return;
       byParcel[k].push(it.id);
       const key = `${p.phase || ''}|${it.id}`;
@@ -844,7 +875,7 @@ export function sameSite(a, b) {
  * → { parcels, stageDupes (số lô QHDD bị bỏ) }
  */
 export function linkStages(parcels) {
-  const usable = (p) => p.stage && !p.pending && !p.rejected;
+  const usable = (p) => p.stage && !p.land && !p.pending && !p.rejected;
   const qhdh = parcels.filter(p => usable(p) && p.stage === 'QHDH');
   const kept = qhdh.length ? parcels.filter(p => !(usable(p) && p.stage === 'QHDD' && qhdh.some(q => sameSite(p, q)))) : parcels.slice();
   kept.forEach(p => { p.partner = null; p.merged = false; });

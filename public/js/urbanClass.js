@@ -93,26 +93,26 @@ const STD_2A = [
     band: { II: { hi: 90, lo: 80 }, III: { hi: 80, lo: 70 } }, pts: { hi: 3, lo: 2 } },
   { code: '2A.III.12', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', name: 'Tỷ lệ diện tích nghĩa trang nhân dân được xây dựng theo quy hoạch', unit: '%',
     band: { II: { hi: 80, lo: 60 }, III: { hi: 70, lo: 50 } }, pts: { hi: 3, lo: 2 } },
-  { code: '2A.III.13', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', calc: 'funeral', inherit: 'QCVN 12-NT', name: 'Nhà tang lễ', unit: 'cơ sở',
+  { code: '2A.III.13', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', calc: 'funeral', inherit: 'QCVN 11-NT', name: 'Nhà tang lễ', unit: 'cơ sở',
     band: { II: { hi: 2, lo: 1 }, III: { hi: 1, lo: 1 } }, pts: { hi: 3, lo: 2.5 },
-    method: 'Đếm nhà tang lễ đã duyệt, cùng lớp 12-NT của quy chuẩn (QCVN 01:2026 Bảng 23). Loại III: mức tối thiểu là có dự án, mức tối đa là ≥ 1 cơ sở.' },
+    method: 'Đếm nhà tang lễ đã duyệt, cùng lớp 11-NT của quy chuẩn (QCVN 01:2026 Bảng 23). Loại III: mức tối thiểu là có dự án, mức tối đa là ≥ 1 cơ sở.' },
   { code: '2A.III.14', group: 'III', sub: 'III.2 Hạ tầng xã hội', name: 'Số giường bệnh (không gồm trạm y tế cấp xã)', unit: 'giường/10.000 dân',
     band: { II: { hi: 40, lo: 35 }, III: { hi: 35, lo: 30 } }, pts: { hi: 5, lo: 3.75 } },
   { code: '2A.III.15', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'edu', inherit: 'QCVN THPT', name: 'Cơ sở giáo dục, đào tạo', unit: 'cơ sở',
     band: { II: { hi: 25, lo: 10 }, III: { hi: 10, lo: 1 } }, pts: { hi: 5, lo: 3.75 },
     method: 'Gồm đại học, cao đẳng, THPT, trung cấp và dạy nghề. Kế thừa mã THPT đã duyệt — cận dưới. Mầm non, tiểu học, THCS là chỉ tiêu đơn vị ở, không cộng vào tiêu chuẩn này.' },
-  { code: '2A.III.16', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'culture', inherit: 'QCVN 7-VH', name: 'Công trình văn hóa', unit: 'công trình',
+  { code: '2A.III.16', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'culture', inherit: 'QCVN 8-VH', name: 'Công trình văn hóa', unit: 'công trình',
     band: { II: { hi: 20, lo: 10 }, III: { hi: 10, lo: 2 } }, pts: { hi: 5, lo: 3.75 },
-    method: 'Thư viện, bảo tàng, nhà hát, nhà văn hóa, di tích, tượng đài... Kế thừa mã 7-VH đã duyệt — cận dưới, vì cùng nhóm còn công trình thể thao (tiêu chuẩn 2A.III.17 chưa tách được).' },
+    method: 'Thư viện, bảo tàng, nhà hát, nhà văn hóa, di tích, tượng đài... Kế thừa mã 8-VH đã duyệt — cận dưới, vì cùng nhóm còn công trình thể thao (tiêu chuẩn 2A.III.17 chưa tách được).' },
   { code: '2A.III.17', group: 'III', sub: 'III.2 Hạ tầng xã hội', name: 'Công trình thể dục, thể thao', unit: 'công trình',
     band: { II: { hi: 10, lo: 5 }, III: { hi: 5, lo: 2 } }, pts: { hi: 4, lo: 3 },
     method: 'Chưa tách khỏi nhóm văn hóa – thể thao nên chưa chấm.' },
-  { code: '2A.III.18', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'commerce', inherit: 'QCVN 8-TM', name: 'Công trình thương mại, dịch vụ', unit: 'công trình',
+  { code: '2A.III.18', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'commerce', inherit: 'QCVN 9-TM', name: 'Công trình thương mại, dịch vụ', unit: 'công trình',
     band: { II: { hi: 10, lo: 5 }, III: { hi: 5, lo: 2 } }, pts: { hi: 3, lo: 2 },
-    method: 'Chợ, siêu thị, trung tâm thương mại cấp đô thị. Kế thừa mã 8-TM đã duyệt.' },
-  { code: '2A.III.19', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'service', inherit: 'QCVN THPT, 6-YT, 7-VH, 8-TM', name: 'Đất công trình dịch vụ – công cộng bình quân đầu người', unit: 'm²/người',
+    method: 'Chợ, siêu thị, trung tâm thương mại cấp đô thị. Kế thừa mã 9-TM đã duyệt.' },
+  { code: '2A.III.19', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'service', inherit: 'QCVN THPT, 7-YT, 8-VH, 9-TM', name: 'Đất công trình dịch vụ – công cộng bình quân đầu người', unit: 'm²/người',
     band: { II: { hi: 3, lo: 2 }, III: { hi: 2, lo: 1.5 } }, pts: { hi: 3, lo: 2 },
-    method: 'Tổng đất y tế, văn hóa, giáo dục, thể thao, thương mại / dân số. Kế thừa diện tích đã duyệt của THPT, 6-YT, 7-VH, 8-TM — cận dưới, chưa tách sân thể thao.' },
+    method: 'Tổng đất y tế, văn hóa, giáo dục, thể thao, thương mại / dân số. Kế thừa diện tích đã duyệt của THPT, 7-YT, 8-VH, 9-TM — cận dưới, chưa tách sân thể thao.' },
   { code: '2A.III.20', group: 'III', sub: 'III.3 Không gian, kiến trúc, cảnh quan', calc: 'green2', landscape: true, inherit: 'QCVN 1-CV · 0304',
     name: 'Không gian xanh sử dụng công cộng quy mô từ 2 ha', unit: 'khu',
     band: { II: { hi: 4, lo: 2 }, III: { hi: 2, lo: 1 } }, pts: { hi: 4, lo: 3 },
@@ -150,8 +150,8 @@ const STD_I = [
   { code: '1.II.10', group: 'II', name: '≥ 50% số phường đạt trình độ phát triển đô thị loại II', target: '≥ 50% số phường',
     method: 'Chấm theo Bảng 2B loại II. Webapp chưa chấm Bảng 2B.' },
   { code: '1.III.11', group: 'III', name: '≥ 2 đầu mối giao thông cấp khu vực và quốc tế, cửa ngõ, trung tâm kết nối vùng' },
-  { code: '1.III.12', group: 'III', calc: 'iBus', inherit: 'QCVN 10-BUS · 0204', name: 'Giao thông hành khách công cộng bao phủ 100% đô thị loại II', target: '≥ 100% đô thị loại II',
-    method: 'Đường sắt đô thị, xe buýt hoặc tàu thủy bao phủ 100% đô thị loại II. Webapp tính dân số hiện trạng trong 500 m đi bộ của trạm dừng đã duyệt (QCVN 01:2026 Mục 2.8.3.3, mã 10-BUS), riêng từng đô thị loại II — cùng cách với ô độ phủ trạm xe buýt. Đường sắt đô thị và tàu thủy chưa có lớp. Chỉ tiêu 0204 là tỷ lệ hành khách, chưa có số liệu. Đạt khi mỗi đô thị loại II đạt 100%.' },
+  { code: '1.III.12', group: 'III', calc: 'iBus', inherit: 'QCVN 13-BUS · 0204', name: 'Giao thông hành khách công cộng bao phủ 100% đô thị loại II', target: '≥ 100% đô thị loại II',
+    method: 'Đường sắt đô thị, xe buýt hoặc tàu thủy bao phủ 100% đô thị loại II. Webapp tính dân số hiện trạng trong 500 m đi bộ của trạm dừng đã duyệt (QCVN 01:2026 Mục 2.8.3.3, mã 13-BUS), riêng từng đô thị loại II — cùng cách với ô độ phủ trạm xe buýt. Đường sắt đô thị và tàu thủy chưa có lớp. Chỉ tiêu 0204 là tỷ lệ hành khách, chưa có số liệu. Đạt khi mỗi đô thị loại II đạt 100%.' },
   { code: '1.III.13', group: 'III', name: '≥ 5 công trình, khu nhà ở, khu đô thị đạt giải thưởng quốc gia, quốc tế' },
   { code: '1.III.14', group: 'III', name: 'Đô thị thông minh mức độ 1, hoặc 50% đô thị loại II, III chống chịu khí hậu mức khá trở lên' },
   { code: '1.III.15', group: 'III', name: 'Hoàn thành nông thôn mới theo giai đoạn gần nhất đã được công nhận' }
@@ -346,7 +346,7 @@ function typeIIBusBases(wards) {
 
 function approvedBusCount(wards) {
   const list = state.rawDataList || [];
-  if (list.length) return list.filter(it => it.type === '10-BUS' && isApproved(it.status) && it.lat != null && it.lng != null).length;
+  if (list.length) return list.filter(it => it.type === '13-BUS' && isApproved(it.status) && it.lat != null && it.lng != null).length;
   return (wards || []).reduce((s, w) => s + ((w.network && w.network.bus) || []).length, 0);
 }
 

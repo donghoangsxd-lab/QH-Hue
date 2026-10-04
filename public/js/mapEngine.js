@@ -10,8 +10,9 @@ import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, show
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
-import { tt16ParcelStyle, renderTt16Legend } from './tt16Symbols.js';
+import { tt16ParcelStyle, renderTt16Legend, landPolylineStyle, landLabel } from './tt16Symbols.js';
 import { addIslandFlags } from './islandFlags.js';
+import { attachBasemap } from './basemap.js';
 import {
   getCoveredRightWidth, highlightPlanWard, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, onCompareChange
@@ -46,7 +47,7 @@ const CITY_NAME = "Thành phố Huế";
 const CITY_CENTER = [16.4637, 107.5905];
 const CITY_ZOOM = 13;
 const WARD_GEOM_VERSION = 2;
-const INFRA_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+const INFRA_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "7-YT", "8-VH", "9-TM"];
 // Số điểm trong khung nhìn ≤ ngưỡng thì vẽ icon PNG (DOM); vượt ngưỡng vẽ chấm tròn trên canvas cho nhẹ
 const ICON_MAX_VISIBLE = 1500;
 const ICON_FILES = {
@@ -55,19 +56,17 @@ const ICON_FILES = {
   "3-MN": { approved: "Mamnon.png", pending: "Mamnon2.png" },
   "4-TH": { approved: "Tieuhoc.png", pending: "Tieuhoc2.png" },
   "5-THCS": { approved: "THCS.png", pending: "THCS2.png" },
-  "THPT": { approved: "THPT.png", pending: "THPT2.png" },
-  "6-YT": { approved: "Yte.png", pending: "Yte2.png" },
-  "7-VH": { approved: "Vanhoa.png", pending: "Vanhoa2.png" },
-  "8-TM": { approved: "Cho.png", pending: "Cho2.png" },
-  "9-CSD": { approved: "Unused.png", pending: "Unused2.png" },
-  "10-BUS": { approved: "Bus.svg", pending: "Bus2.svg" },
-  "11-PCCC": { approved: "Pccc.svg", pending: "Pccc2.svg" },
-  "12-NT": { approved: "Nghiatrang.svg", pending: "Nghiatrang2.svg" }
+  "6-THPT": { approved: "THPT.png", pending: "THPT2.png" },
+  "7-YT": { approved: "Yte.png", pending: "Yte2.png" },
+  "8-VH": { approved: "Vanhoa.png", pending: "Vanhoa2.png" },
+  "9-TM": { approved: "Cho.png", pending: "Cho2.png" },
+  "12-CSD": { approved: "Unused.png", pending: "Unused2.png" },
+  "13-BUS": { approved: "Bus.svg", pending: "Bus2.svg" },
+  "10-PCCC": { approved: "Pccc.svg", pending: "Pccc2.svg" },
+  "11-NT": { approved: "Nghiatrang.svg", pending: "Nghiatrang2.svg" }
 };
 const BUFFER_TYPE_BY_KEY = Object.fromEntries(Object.entries(BUFFER_KEYS).map(([type, key]) => [key, type]));
 const ICON_LAYER_KEYS = new Set(Object.values(ICON_GROUP_KEYS));
-const ESRI_TILES = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-
 let tileHeatmapLayer = null;
 let currentHeatUrl = '';
 let heatStale = true;
@@ -151,13 +150,7 @@ function resolveWardNameFromCoords(lat, lng) {
 export function initMap() {
   map = L.map('map', { renderer: L.canvas(), maxZoom: 18 }).setView(CITY_CENTER, CITY_ZOOM);
 
-  L.tileLayer(ESRI_TILES, {
-    maxZoom: 19,
-    maxNativeZoom: 18,
-    zIndex: 0,
-    crossOrigin: 'anonymous',
-    attribution: 'Tiles &copy; Esri'
-  }).addTo(map);
+  attachBasemap(map);
 
   measureLayerGroup = L.layerGroup().addTo(map);
   addIslandFlags(map);
@@ -195,6 +188,7 @@ const refreshPlanSoon = debounce(() => planRenderer.refreshPoints(), 60);
 function handleCompareChange(on) {
   ensurePlanHooks();
   leftRenderer.refreshPoints();
+  redrawLands();
   if (!on) {
     // Vùng phục vụ đang vẽ trên bản đồ quy hoạch (bị ẩn): dừng hiệu ứng chấm chạy
     if (planLayers.singleIso.getLayers().length) clearSingleIsochrone();
@@ -876,7 +870,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     list.forEach(p => {
       if (layerType(p) !== type) return;
       const approved = isApproved(p.status);
-      if (type === "9-CSD" && !approved) return;
+      if (type === "12-CSD" && !approved) return;
       const radius = effectiveRadius(p);
       if (!(radius > 0)) return;
       group.addLayer(L.circle([p.lat, p.lng], { radius, ...getBufferStyle(type, approved), interactive: false }));
@@ -940,20 +934,81 @@ export async function loadCadParcels() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const next = new Map();
+    const lands = [];
     (data.parcels || []).forEach(p => {
-      if (p && p.id && p.geometry) next.set(`${p.phase === 'QH' ? 'QH' : 'HT'}|${p.id}`, { geometry: p.geometry, layer: p.layer || '', file: p.file || '' });
+      if (!p || !p.id || !p.geometry) return;
+      const phase = p.phase === 'QH' ? 'QH' : 'HT';
+      if (p.kind === 'DXF') lands.push({ ...p, phase });
+      else next.set(`${phase}|${p.id}`, { geometry: p.geometry, layer: p.layer || '', file: p.file || '' });
     });
     state.cadParcels = next;
+    state.landParcels = lands;
   } catch (err) {
     console.warn('Không tải được ranh lô CAD:', err);
     return;
   }
   redrawParcels();
+  redrawLands();
 }
 
 export function setParcelsVisible(on) {
   state.showParcels = !!on;
   redrawParcels();
+}
+
+// ============================ RANH ĐẤT ĐỒ ÁN (SHEET DXF-NN) ============================
+// Đất ngoài 13 nhóm hạ tầng, viền màu theo loại đất. Không so sánh: bản đồ chính vẽ cả HT và QH (QH nét đứt);
+// đang so sánh: bản đồ hiện trạng vẽ HT, bản đồ quy hoạch vẽ QH
+const landGroups = new Map();
+
+function landPopupHtml(p) {
+  const rows = [
+    ['Loại đất', p.nhom || landLabel(p.layer)],
+    ['Layer', p.layer],
+    ['Diện tích', p.area ? `${fmtNum(Math.round(p.area))} m²` : ''],
+    ['Phường/xã', p.ward],
+    ['Đồ án', p.file],
+    ['Giai đoạn', p.phase === 'QH' ? 'Quy hoạch' : 'Hiện trạng']
+  ].filter(([, v]) => v);
+  return `<div class="land-popup"><b>${escapeHtml(p.name || p.layer || 'Lô đất')}</b>
+    <table>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${escapeHtml(String(v))}</td></tr>`).join('')}</table></div>`;
+}
+
+function drawLandsOn(m, list) {
+  const old = landGroups.get(m);
+  if (old) {
+    old.clearLayers();
+    m.removeLayer(old);
+    landGroups.delete(m);
+  }
+  if (!list.length) return;
+  const group = L.featureGroup();
+  list.forEach(p => {
+    const style = landPolylineStyle(p.layer);
+    const shape = L.geoJSON(p.geometry, {
+      style: p.phase === 'QH' ? { ...style, dashArray: '6 4' } : style,
+      bubblingMouseEvents: false
+    });
+    shape.on('click', (e) => {
+      if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
+      L.popup({ maxWidth: 280 }).setLatLng(e.latlng).setContent(landPopupHtml(p)).openOn(m);
+    });
+    group.addLayer(shape);
+  });
+  group.addTo(m);
+  landGroups.set(m, group);
+}
+
+function redrawLands() {
+  const lands = state.showLand ? state.landParcels : [];
+  const compare = isCompareOn() && !!planMap;
+  if (map) drawLandsOn(map, compare ? lands.filter(p => p.phase === 'HT') : lands);
+  if (planMap) drawLandsOn(planMap, compare ? lands.filter(p => p.phase === 'QH') : []);
+}
+
+export function setLandVisible(on) {
+  state.showLand = !!on;
+  redrawLands();
 }
 
 // ============================ HEATMAP ============================
@@ -1138,7 +1193,7 @@ const WARD_CLIP_TOLERANCE_DEG = 0.0001;
 const wardClipCache = new Map();
 
 function serviceClipFor(p, wardName) {
-  if (p.type === '9-CSD' || layerType(p) === 'THPT' || isNetworkType(p.type)) return null;
+  if (p.type === '12-CSD' || layerType(p) === '6-THPT' || isNetworkType(p.type)) return null;
   if (formatCapCongTrinhLabel(p.nhomHaTang || p.capCongTrinh) === 'Cấp đô thị') return null;
   const ward = wardName && (state.wardLabelsList || []).find(w => w.name === wardName);
   if (!ward || !ward.geometry) return null;
@@ -1326,15 +1381,15 @@ export function onPointClick(p, targetMap = map) {
   if (pointPopup && pointPopup.id === p.id && pointPopup.scenario === p.scenario && pointPopup.popup._map === targetMap
     && expandCollapsedPopup(pointPopup.popup)) return;
   const approved = isApproved(p.status);
-  const isCSD = p.type === "9-CSD";
+  const isCSD = p.type === "12-CSD";
   const isCSDUnapproved = isCSD && !approved;
   const itemRadius = effectiveRadius(p);
   const isPlanScenario = p.scenario === 'QH';
   const isNetwork = isNetworkType(p.type);
-  const ntKind = p.type === '12-NT' ? ntKindOf(p) : null;
+  const ntKind = p.type === '11-NT' ? ntKindOf(p) : null;
   // Nhà tang lễ không có khoảng cách an toàn; PCCC và nghĩa trang xét vòng tròn bán kính, trạm xe buýt theo đường đi bộ
   const noZone = !(itemRadius > 0);
-  const roadArea = !(p.type === '11-PCCC' || p.type === '12-NT');
+  const roadArea = !(p.type === '10-PCCC' || p.type === '11-NT');
 
   // Chỉ để mở 1 popup công trình trên 2 bản đồ
   if (map) map.closePopup();
@@ -1346,7 +1401,7 @@ export function onPointClick(p, targetMap = map) {
   const geoWardNow = resolveWardNameFromCoords(Number(p.lat), Number(p.lng));
   const clip = serviceClipFor(p, geoWardNow);
   const inViewPoints = isCSDUnapproved ? [] : getWardFilteredList(isPlanScenario ? getPlanScenarioList() : state.rawDataList)
-    .filter(q => layerType(q) === selType && (q.type !== '9-CSD' || q === p) && hasValidCoord(q) && targetMap.hasLayer(groups[ICON_GROUP_KEYS[selType]]));
+    .filter(q => layerType(q) === selType && (q.type !== '12-CSD' || q === p) && hasValidCoord(q) && targetMap.hasLayer(groups[ICON_GROUP_KEYS[selType]]));
   if (noZone) clearSingleIsochrone();
   const areaPromise = isCSDUnapproved || noZone
     ? null
@@ -1374,13 +1429,13 @@ export function onPointClick(p, targetMap = map) {
       : (p.planChange === 'relocate' ? '' : ` → QH ${fmtNum(p.sizeQH)} m²`);
     sizeHtml += ` <span class="pp-plan" style="color:${planInfo.color};">(${planInfo.label}${otherSize})</span>`;
   }
-  if (!isNetwork || p.type === '12-NT' || Number(p.size) > 0) {
+  if (!isNetwork || p.type === '11-NT' || Number(p.size) > 0) {
     if (ntKind && !(Number(p.size) > 0)) sizeHtml = 'chưa rõ';
     html += `<div class="pp-row"><span>Diện tích${isPlanScenario ? ' QH' : ''}</span><b>${sizeHtml}</b></div>`;
   }
   if (!isCSDUnapproved) {
-    const radiusLabel = p.type === '10-BUS' ? 'Phạm vi đi bộ (Mục 2.8.3.3)'
-      : p.type === '11-PCCC' ? 'Bán kính phục vụ (Mục 2.5.13.1)'
+    const radiusLabel = p.type === '13-BUS' ? 'Phạm vi đi bộ (Mục 2.8.3.3)'
+      : p.type === '10-PCCC' ? 'Bán kính phục vụ (Mục 2.5.13.1)'
         : ntKind ? 'Khoảng cách an toàn (Bảng 23)' : 'Bán kính phục vụ';
     html += `<div class="pp-row"><span>${radiusLabel}</span><b class="c-cyan">${noZone ? 'không quy định' : `${fmtNum(itemRadius)} m`}</b></div>`;
     if (!noZone && roadArea) {
@@ -1644,9 +1699,9 @@ function networkInspectHtml(source, lat, lng, wardName) {
   };
   const pcccLimit = /^xã\s/i.test(String(wardName || '').trim()) ? 5000 : 3000;
   let html = `<div class="pp-section c-orange">4. Mạng lưới hạ tầng khác</div>`;
-  html += row('Trạm dừng xe buýt', nearest(approvedOf('10-BUS')), 500, 'Mục 2.8.3.3');
-  html += row('Trụ sở cảnh sát PCCC', nearest(approvedOf('11-PCCC')), pcccLimit, 'Mục 2.5.13.1');
-  const inside = approvedOf('12-NT').filter(x => Number(x.it.radius) > 0 && x.d <= Number(x.it.radius));
+  html += row('Trạm dừng xe buýt', nearest(approvedOf('13-BUS')), 500, 'Mục 2.8.3.3');
+  html += row('Trụ sở cảnh sát PCCC', nearest(approvedOf('10-PCCC')), pcccLimit, 'Mục 2.5.13.1');
+  const inside = approvedOf('11-NT').filter(x => Number(x.it.radius) > 0 && x.d <= Number(x.it.radius));
   html += inside.length
     ? inside.map(x => `<div class="sug-card ineligible">${ico('alert')}<b>Trong khoảng cách an toàn (Bảng 23)</b>
         <div class="c-cyan">${escapeHtml(x.it.name || 'Nghĩa trang')}</div>

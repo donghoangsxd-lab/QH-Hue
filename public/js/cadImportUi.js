@@ -1,20 +1,22 @@
 // Tab Đề xuất → "Nhập hàng loạt": đọc file DXF/KML/KMZ/GeoJSON, xem trước các lô trên bản đồ và báo cáo kiểm tra trước khi ghi
 import { state, infraLabels, BUFFER_COLORS } from './state.js';
+import { landColor, landLabel } from './tt16Symbols.js';
 import { map } from './mapEngine.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { escapeHtml, fmtNum, distanceMeters, ico, setStatusContent } from './utils.js';
 import {
   parseDxf, buildParcels, buildParcelsLonLat, assignWards, matchExisting, layerToType, tt16Layer, linkStages, sameSite,
-  filePhaseFromName, layerMarksCurrent, LAYER_PREFIXES, SCHOOL_PENDING, CRS_PRESETS
+  filePhaseFromName, LAYER_PREFIXES, SCHOOL_PENDING, CRS_PRESETS
 } from './cadImport.js';
 import { parseKml, unzipKml } from './kmlImport.js';
 import { parseGeoJson } from './geojsonImport.js';
 import { createManualMapping, selectField, setCode, clearCodes, applyManualMapping, manualMappingHtml } from './cadTypeMapping.js';
 
 // Diện tích tối thiểu theo loại (khớp config/constants.js → infraConfig.minSize)
-const MIN_SIZE = { "1-CV": 300, "2-BDX": 200, "3-MN": 800, "4-TH": 2000, "5-THCS": 2500, "6-YT": 1000, "7-VH": 500, "8-TM": 1500 };
+const MIN_SIZE = { "1-CV": 300, "2-BDX": 200, "3-MN": 800, "4-TH": 2000, "5-THCS": 2500, "7-YT": 1000, "8-VH": 500, "9-TM": 1500 };
 const MAX_LISTED = 200;
+const LAND_KEY = 'zz-land';
 // Mỗi lần gửi: tối đa 300 lô (giới hạn máy chủ) và ~2,5 MB (Vercel nhận tối đa 4,5 MB/yêu cầu)
 const CHUNK_MAX_ITEMS = 250;
 const CHUNK_MAX_CHARS = 2500000;
@@ -92,24 +94,18 @@ const globalPhase = () => ($('cadPhase')?.value === 'QH' ? 'QH' : 'HT');
 const phaseOf = (p) => p.phase || globalPhase();
 const phasesOf = (p) => (p.keep ? ['HT', 'QH'] : p.partner ? [phaseOf(p), phaseOf(p.partner)] : [phaseOf(p)]);
 
-// File QH-*.dxf: mọi lô vào quy hoạch, trừ layer HT (giữ nguyên — ghi cả hai cột bằng nhau). File HT-*.dxf: mọi lô vào hiện trạng.
+// Tên file quyết định cột quy mô: HT- → QuyMo_HT, QH- → QuyMo_QH (kể cả layer có tiền tố HT).
 function applyFilePhase(parcels) {
   const fp = current && current.filePhase;
   if (fp !== 'HT' && fp !== 'QH') return;
   parcels.forEach(p => {
     p.keep = false;
-    if (fp === 'HT') { p.phase = 'HT'; return; }
-    if (layerMarksCurrent(p.layer)) { p.phase = 'HT'; p.stage = 'HT'; }
-    else { p.phase = 'QH'; if (!p.stage || p.stage === 'HT') p.stage = 'QH'; }
+    p.phase = fp;
+    p.stage = fp;
   });
 }
 
-function markUnchanged(parcels) {
-  if (!current || current.filePhase !== 'QH') return;
-  parcels.forEach(p => {
-    p.keep = p.phase === 'HT' && !p.partner && !p.merged && layerMarksCurrent(p.layer);
-  });
-}
+function markUnchanged() {}
 
 function syncPhaseSelect() {
   const sel = $('cadPhase');
@@ -118,7 +114,7 @@ function syncPhaseSelect() {
   sel.disabled = !!locked;
   if (locked) sel.value = current.filePhase;
   sel.title = locked
-    ? `Theo tên file: ${current.filePhase === 'QH' ? 'quy hoạch (layer HT giữ nguyên hiện trạng)' : 'hiện trạng'}`
+    ? `Theo tên file: ${current.filePhase === 'QH' ? 'quy hoạch (mọi layer ghi QuyMo_QH)' : 'hiện trạng (mọi layer ghi QuyMo_HT)'}`
     : 'Áp dụng khi tên file không có tiền tố HT / QH. Layer TT16 lấy giai đoạn theo tiền tố HT_ / QHDD_ / QHDH_.';
 }
 
@@ -159,6 +155,7 @@ const writable = (parcels) => parcels.filter(p => ['new', 'update'].includes(par
 // Trạng thái xử lý của 1 lô khi ghi: bỏ qua / cập nhật / tạo mới; vắt ranh thì quy mô = 0
 function parcelAction(p) {
   if (!p.ward) return { key: 'out', label: 'Ngoài TP', cls: 'bad' };
+  if (p.land) return { key: 'land', label: 'Sheet đồ án', cls: 'info' };
   if (p.pending) return { key: 'pending', label: 'Chờ chọn cấp trường', cls: 'warn' };
   if (p.rejected) return { key: 'rejected', label: 'Đã từ chối', cls: 'bad' };
   if (p.merged) return { key: 'merged', label: 'Gộp với lô HT', cls: 'info' };
@@ -185,7 +182,7 @@ function pickHtml(p, idx) {
 
 // Tên layer hiển thị; lô khớp thủ công / lô trường học đã chọn cấp kèm mã loại đã gán
 const layerText = (p) => (p.manual || (p.school && p.prefix) ? `${p.layer} → ${p.prefix}` : p.layer);
-const typeColor = (p) => (p.pending ? '#facc15' : BUFFER_COLORS[p.type] || '#38bdf8');
+const typeColor = (p) => (p.pending ? '#facc15' : p.land ? (landColor(p.layer) || '#94a3b8') : BUFFER_COLORS[p.type] || '#38bdf8');
 
 function parcelTip(p) {
   const pair = p.partner ? `<br>+ ${escapeHtml(p.partner.layer)} · ${sizeText(p.partner)}` : '';
@@ -363,18 +360,19 @@ function renderReport() {
   const byType = {};
   const count = {
     out: 0, exists: 0, skip: 0, dup: 0, update: 0, new: 0, pending: 0, rejected: 0, merged: 0,
-    cross: 0, small: 0, multi: 0, newPoint: 0, tt16HT: 0, tt16QH: 0
+    cross: 0, small: 0, multi: 0, newPoint: 0, tt16HT: 0, tt16QH: 0, land: 0
   };
   parcels.forEach(p => {
     const a = parcelAction(p);
     count[a.key]++;
     if (p.ward && p.matchConflict) count.multi++;
-    if (p.ward && p.crossWard && !p.rejected) count.cross++;
+    if (p.ward && p.crossWard && !p.rejected && !p.land) count.cross++;
     if (p.ward && !isPoint(p) && MIN_SIZE[p.type] && p.area < MIN_SIZE[p.type]) count.small++;
     if (a.key === 'new' && isPoint(p)) count.newPoint++;
-    if (p.tt16 && p.ward && !p.rejected) count[p.phase === 'HT' ? 'tt16HT' : 'tt16QH']++;
+    if (p.tt16 && !p.land && p.ward && !p.rejected) count[p.phase === 'HT' ? 'tt16HT' : 'tt16QH']++;
     if (p.rejected) return;
-    const t = byType[p.type] || (byType[p.type] = { n: 0, area: 0 });
+    const key = p.land ? LAND_KEY : p.type;
+    const t = byType[key] || (byType[key] = { n: 0, area: 0 });
     t.n++;
     if (p.ward && !p.crossWard) t.area += p.area;
   });
@@ -392,8 +390,7 @@ function renderReport() {
   else if (result.axes.note) alerts.push(['info', `Đã tự nhận diện bản vẽ: ${escapeHtml(result.axes.note)}.`]);
   if (current.format === 'geojson') alerts.push(['info', current.wgs84 ? 'Tọa độ GeoJSON: WGS84 (kinh độ, vĩ độ).' : 'Tọa độ GeoJSON: mét — tính theo hệ VN-2000 đang chọn ở ô Hệ tọa độ.']);
   if (current.filePhase === 'QH') {
-    const nKeep = parcels.filter(p => p.keep).length;
-    alerts.push(['info', `File <b>${escapeHtml(fileName)}</b>: tiền tố QH — toàn bộ lô ghi vào quy hoạch (QuyMo_QH). <b>${nKeep}</b> lô layer HT giữ nguyên hiện trạng (QuyMo_HT = QuyMo_QH).`]);
+    alerts.push(['info', `File <b>${escapeHtml(fileName)}</b>: tiền tố QH — mọi layer, kể cả layer HT, ghi vào QuyMo_QH.`]);
   } else if (current.filePhase === 'HT') {
     alerts.push(['info', `File <b>${escapeHtml(fileName)}</b>: tiền tố HT — toàn bộ lô ghi vào hiện trạng (QuyMo_HT).`]);
   }
@@ -410,7 +407,7 @@ function renderReport() {
   }
   if (count.cross) alerts.push(['warn', `${count.cross} lô vắt ranh phường (lấn ≥ 5%): ghi quy mô = 0, diện tích thật ghi vào Ghi chú.`]);
   if (count.out) alerts.push(['bad', `${count.out} lô nằm ngoài TP. Huế (đưa lên đầu danh sách, viền xám trên bản đồ): bỏ qua${current.tt16 ? '' : ' — sẽ hỏi xác nhận trước khi ghi'}.`]);
-  if (count.update) alerts.push(['info', `${count.update} lô chứa công trình cùng loại đã có: cập nhật tọa độ + diện tích ${current.filePhase === 'QH' ? 'theo tên file (layer HT ghi cả hai cột)' : current.filePhase === 'HT' ? 'vào hiện trạng theo tên file' : current.tt16 ? 'theo giai đoạn của layer' : phase} cho công trình đó.`]);
+  if (count.update) alerts.push(['info', `${count.update} lô chứa công trình cùng loại đã có: giữ tên trên Sheet, ghi đè tọa độ bằng tâm hatch và diện tích ${current.filePhase === 'QH' ? 'vào QuyMo_QH' : current.filePhase === 'HT' ? 'vào QuyMo_HT' : current.tt16 ? 'theo giai đoạn của layer' : phase}.`]);
   if (count.multi) alerts.push(['warn', `${count.multi} lô chứa nhiều công trình cùng loại (đưa lên đầu danh sách): chọn công trình cần cập nhật — mặc định gợi ý công trình gần tâm lô nhất, các công trình còn lại giữ nguyên.`]);
   if (count.dup) alerts.push(['bad', `${count.dup} lô cùng cập nhật 1 công trình: chọn lại (tạo mới / bỏ qua) trước khi ghi.`]);
   if (count.skip) alerts.push(['info', `${count.skip} lô được chọn bỏ qua.`]);
@@ -421,13 +418,14 @@ function renderReport() {
   const unknown = Object.entries(result.unknownLayers);
   const other = Object.entries(result.tt16Other || {});
   const sumOf = (list) => list.reduce((s, [, n]) => s + n, 0);
+  const landSheet = `sheet DXF của đồ án «${escapeHtml(projectName(fileName))}»`;
   if (current.tt16) {
     if (unknown.length || other.length) {
-      alerts.push(['info', `Bỏ qua ${fmtNum(sumOf(other))} đối tượng ở ${other.length} layer TT16 ngoài 10 nhóm theo dõi và ${fmtNum(sumOf(unknown))} đối tượng ở ${unknown.length} layer không theo TT16.`]);
+      alerts.push(['info', `${fmtNum(sumOf(other))} đối tượng ở ${other.length} layer TT16 ngoài 13 nhóm hạ tầng và ${fmtNum(sumOf(unknown))} đối tượng ở ${unknown.length} layer không theo TT16: ranh lô ghi vào ${landSheet} (điểm bỏ qua).`]);
     }
   } else if (unknown.length) {
     const listed = unknown.slice(0, 8).map(([l, n]) => `${escapeHtml(l)} (${n})`).join(', ');
-    alerts.push(['warn', `${UNKNOWN_LABEL[current.format]}: ${sumOf(unknown)} đối tượng bị bỏ qua — ${listed}${unknown.length > 8 ? ', …' : ''}. Gán loại ở khung <b>Khớp thủ công</b> bên dưới nếu cần nhập.`]);
+    alerts.push(['warn', `${UNKNOWN_LABEL[current.format]}: ${sumOf(unknown)} đối tượng — ${listed}${unknown.length > 8 ? ', …' : ''}. Ranh lô ghi vào ${landSheet}; gán loại ở khung <b>Khớp thủ công</b> bên dưới nếu là hạ tầng.`]);
   }
   const manualCount = parcels.filter(p => p.manual).length;
   if (manualCount) alerts.push(['info', `${manualCount} lô được gán loại thủ công (ghi chú trong Sheet kèm tên layer gốc).`]);
@@ -436,7 +434,7 @@ function renderReport() {
   if (!state.wardLabelsList.some(w => w.geometry)) alerts.push(['bad', 'Chưa tải xong ranh 40 phường xã — mở lại file sau ít giây.']);
 
   const typeRows = Object.entries(byType).sort().map(([type, t]) => `
-    <tr><td><i class="cad-dot" style="background:${type === SCHOOL_PENDING ? '#facc15' : BUFFER_COLORS[type] || '#38bdf8'}"></i>${escapeHtml(type === SCHOOL_PENDING ? 'Trường học chưa rõ cấp' : infraLabels[type] || type)}</td>
+    <tr><td><i class="cad-dot" style="background:${type === SCHOOL_PENDING ? '#facc15' : type === LAND_KEY ? '#a3a3a3' : BUFFER_COLORS[type] || '#38bdf8'}"></i>${escapeHtml(type === SCHOOL_PENDING ? 'Trường học chưa rõ cấp' : type === LAND_KEY ? 'Đất ngoài nhóm hạ tầng (sheet DXF)' : infraLabels[type] || type)}</td>
     <td>${t.n}</td><td>${fmtArea(t.area)}</td></tr>`).join('');
 
   // Lô cần admin chọn (chờ chọn cấp / nhiều công trình / trùng) rồi lô ngoài TP lên đầu để không bị khuất sau giới hạn MAX_LISTED
@@ -468,7 +466,7 @@ function renderReport() {
     ${manualMappingHtml(current.manual)}
     ${parcels.length ? `<table class="cad-table"><thead><tr><th>Loại</th><th>Số lô</th><th>Diện tích tính</th></tr></thead><tbody>${typeRows}</tbody></table>
     <div class="cad-list">${listRows}${parcels.length > MAX_LISTED ? `<div class="cad-more">… và ${parcels.length - MAX_LISTED} lô khác</div>` : ''}</div>` : ''}
-    <div class="cad-foot"><span>Sẽ ghi: ${count.new} mới · ${count.update} cập nhật${count.new + count.update ? ` <small>(${countText(kindCounts(writable(parcels), current.format))})</small>` : ''}</span><button type="button" id="btnCadClear" class="cad-clear">${ico('close')}Xóa xem trước</button></div>`;
+    <div class="cad-foot"><span>Sẽ ghi: ${count.new} mới · ${count.update} cập nhật${count.land ? ` · ${count.land} lô đất (DXF)` : ''}${count.new + count.update ? ` <small>(${countText(kindCounts(writable(parcels), current.format))})</small>` : ''}</span><button type="button" id="btnCadClear" class="cad-clear">${ico('close')}Xóa xem trước</button></div>`;
 
   const list = box.querySelector('.cad-list');
   if (list) list.scrollTop = listScroll;
@@ -503,7 +501,7 @@ function renderReport() {
   if (btn) {
     // Khách gửi file gốc vào hàng chờ: Admin tự duyệt cấp trường / khớp công trình khi mở hồ sơ
     btn.disabled = isAdmin()
-      ? submitting || !(count.new + count.update) || count.dup > 0 || count.pending > 0 || !result.axes.valid
+      ? submitting || !(count.new + count.update + count.land) || count.dup > 0 || count.pending > 0 || !result.axes.valid
       : submitting || !result.axes.valid || !parcels.some(p => p.ward);
     btn.title = !isAdmin() ? 'Gửi file vào hàng chờ để Admin kiểm tra (file ≤ 2 MB)'
       : count.pending ? `Còn ${count.pending} lô trường học chờ chọn cấp` : '';
@@ -577,10 +575,10 @@ function renderPendingList() {
       const opening = current && current.pendingId === it.id;
       return `<div class="cad-pending-row${opening ? ' on' : ''}">
         <div class="cad-row-main"><b>${escapeHtml(it.fileName || it.id)}</b> <small>${fmtMB(it.size || 0)} · ${it.phase === 'QH' ? 'QH' : 'HT'} · ${escapeHtml(at)}</small>
-          ${it.kind === 'review' ? `<br><small class="c-orange">Thẩm định · ${it.replaces ? `thay thế đồ án ${escapeHtml(it.replaces)}` : 'đồ án mới'}</small>` : ''}
+          ${it.kind === 'review' ? `<br><small class="c-orange">Hồ sơ thẩm định${s.kinds ? ` · ${escapeHtml(s.kinds)}` : ''}</small>` : ''}
           ${info ? `<br><small>${escapeHtml(info)}</small>` : ''}
           ${it.sender || it.note ? `<br><small class="c-cyan">${escapeHtml([it.sender, it.note].filter(Boolean).join(' — '))}</small>` : ''}</div>
-        <button type="button" class="cad-pending-btn" data-open="${escapeHtml(it.id)}" title="Mở file để kiểm tra và ghi">${ico('folder')}Mở</button>
+        <button type="button" class="cad-pending-btn" data-open="${escapeHtml(it.id)}" title="${it.kind === 'review' ? 'Mở kết quả thẩm định để kiểm tra và phê duyệt' : 'Mở file để kiểm tra và ghi'}">${ico('folder')}Mở</button>
         <button type="button" class="road-del" data-del="${escapeHtml(it.id)}" title="Từ chối, xóa khỏi hàng chờ" aria-label="Xóa hồ sơ">${ico('trash')}</button>
       </div>`;
     }).join('');
@@ -599,6 +597,12 @@ async function openPending(id) {
       throw new Error(data.message || `HTTP ${res.status}`);
     }
     const text = await res.text();
+    // Hồ sơ thẩm định: mở bảng thẩm định để Admin xem kết quả, phê duyệt thì quay lại đây ghi (importReviewDossier)
+    if (it.kind === 'review') {
+      setStatus('');
+      document.dispatchEvent(new CustomEvent(REVIEW_DOSSIER_EVENT, { detail: { id, item: it, text } }));
+      return;
+    }
     if ($('cadCrs') && it.crs && [...$('cadCrs').options].some(o => o.value === it.crs)) $('cadCrs').value = it.crs;
     if ($('cadPhase')) $('cadPhase').value = it.phase === 'QH' ? 'QH' : 'HT';
     const base = String(it.fileName || 'hoso').replace(/\.(dxf|kml|kmz|geojson|json)$/i, '');
@@ -606,6 +610,28 @@ async function openPending(id) {
   } catch (err) {
     setStatus(`❌ Không mở được hồ sơ: ${err.message}`, 'var(--accent-red)');
   }
+}
+
+export const REVIEW_DOSSIER_EVENT = 'review-dossier-open';
+
+/**
+ * Admin phê duyệt hồ sơ thẩm định: nạp GeoJSON (layer đã chuẩn hóa TT16) vào khung Nhập hàng loạt để khớp công trình đã có,
+ * gộp HT + QH cùng vị trí rồi bấm Ghi; ghi xong hồ sơ tự xóa khỏi hàng chờ. fileName "<Ten_QH>.geojson"
+ */
+export async function importReviewDossier(text, fileName, pendingId) {
+  if (!isAdmin()) return;
+  document.querySelector('.tab-btn[data-tab="tabAdd"]')?.click();
+  document.querySelector('.add-mode-btn[data-mode="addBulk"]')?.click();
+  await loadFile(new File([text], fileName), pendingId);
+}
+
+export function reloadPendingList() {
+  if (isAdmin()) loadPendingList();
+}
+
+/** Admin từ chối hồ sơ (hỏi xác nhận) → true nếu đã xóa khỏi hàng chờ */
+export function rejectPending(id) {
+  return removePending(id, true);
 }
 
 async function removePending(id, ask = true) {
@@ -838,13 +864,39 @@ function buildItems() {
   return items;
 }
 
+// Tên đồ án = tên file bỏ tiền tố HT- / QH- và phần mở rộng (khớp projectTitle trong Apps Script)
+function projectName(fileName) {
+  return String(fileName || '').replace(/\.[^.]+$/, '').replace(/^(HT|QH)[-_\s]+/i, '').trim() || 'DXF';
+}
+
+function buildLands() {
+  const fileBase = projectName(current.fileName);
+  const lands = [];
+  current.result.parcels.forEach((p, idx) => {
+    if (parcelAction(p).key !== 'land' || isPoint(p)) return;
+    lands.push({
+      name: ownName(p) || `${p.layer} – ${fileBase} #${idx + 1}`,
+      ward: p.ward,
+      nhom: landLabel(p.layer),
+      layer: p.layer,
+      lat: p.lat,
+      lng: p.lng,
+      area: p.area,
+      phase: phaseOf(p),
+      crossWard: !!p.crossWard,
+      geometry: p.polygons.length === 1
+        ? { type: 'Polygon', coordinates: p.polygons[0] }
+        : { type: 'MultiPolygon', coordinates: p.polygons }
+    });
+  });
+  return lands;
+}
+
 // Câu báo kết quả kiểu "50 hatch, 30 polygon và 10 điểm (bỏ qua 5 line, 7 pline hở và 15 mtext)"
 function importSummary(items) {
   const { stats, result, format } = current;
   const skipped = { ...(stats.skipped || {}) };
   const add = (label, n) => { if (n) skipped[label] = (skipped[label] || 0) + n; };
-  add('không rõ loại', Object.values(result.unknownLayers).reduce((s, n) => s + n, 0));
-  add('loại đất TT16 ngoài 10 nhóm', Object.values(result.tt16Other || {}).reduce((s, n) => s + n, 0));
   add(format === 'dxf' ? 'polyline trùng hatch' : 'đường trùng polygon', result.duplicatesDropped);
   add('điểm trong lô cùng loại', result.pointsInLots);
   add('lô QHDD trùng QHDH', result.stageDupes);
@@ -882,7 +934,8 @@ async function submitImport() {
   if (current.pending) return writeChunks(current.pending);
   const phase = globalPhase();
   const items = buildItems();
-  if (!items.length) return;
+  const lands = buildLands();
+  if (!items.length && !lands.length) return;
   const summary = importSummary(items);
   // File đặt tên layer theo TT16: ghi thẳng, không hỏi xác nhận (lô ngoài TP tự bỏ qua)
   if (!current.tt16) {
@@ -894,21 +947,25 @@ async function submitImport() {
       if (!confirm(`⚠️ Có ${outside.length} lô nằm ngoài TP. Huế (${detail}) sẽ bị BỎ QUA, không ghi vào Sheet.\n\nNếu đây là lỗi vẽ / sai vị trí, bấm Hủy để sửa file rồi nhập lại.\nBấm OK để tiếp tục ghi ${items.length} lô hợp lệ.`)) return;
     }
     const nUpdate = items.filter(it => it.matchId).length;
-    const nKeep = items.filter(it => it.keep).length;
-    const phaseLabel = current.filePhase === 'QH'
-      ? (nKeep ? `Quy hoạch theo tên file; ${nKeep} lô layer HT giữ nguyên (QuyMo_HT = QuyMo_QH)` : 'Quy hoạch (QuyMo_QH) theo tên file')
+    const phaseLabel = current.filePhase === 'QH' ? 'Quy hoạch (QuyMo_QH) theo tên file'
       : current.filePhase === 'HT' ? 'Hiện trạng (QuyMo_HT) theo tên file'
         : phase === 'QH' ? 'Quy hoạch (QuyMo_QH)' : 'Hiện trạng (QuyMo_HT)';
-    if (!confirm(`Ghi ${items.length} lô vào Google Sheet?\n• ${summary}\n• ${items.length - nUpdate} tạo mới, ${nUpdate} cập nhật\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
+    const landNote = lands.length ? `\n• ${lands.length} lô đất ngoài nhóm hạ tầng → sheet DXF của đồ án` : '';
+    if (!confirm(`Ghi vào Google Sheet?\n• ${summary}\n• ${items.length - nUpdate} công trình mới, ${nUpdate} cập nhật (giữ tên, ghi đè tọa độ bằng tâm hatch)${landNote}\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
   }
 
+  // Lô đất gửi thành các phần riêng sau lô hạ tầng; phần đất đầu tiên xóa dữ liệu cũ của sheet DXF đồ án
+  const chunks = [
+    ...chunkItems(items).map(c => ({ items: c, lands: [] })),
+    ...chunkItems(lands).map((c, i) => ({ items: [], lands: c, landsReset: i === 0 }))
+  ];
   return writeChunks({
-    phase, summary, fileName: current.fileName, total: items.length, chunks: chunkItems(items), next: 0,
-    done: { created: [], updated: [], skipped: [], polygonsDropped: 0 }, pendingId: current.pendingId || null
+    phase, summary, fileName: current.fileName, total: items.length + lands.length, chunks, next: 0,
+    done: { created: [], updated: [], skipped: [], polygonsDropped: 0, lands: 0, landsDropped: 0 }, pendingId: current.pendingId || null
   });
 }
 
-// job: { phase, summary, fileName, total, chunks, next, done, pendingId }; lỗi ở phần nào thì giữ job trong current.pending để ghi tiếp
+// job: { phase, summary, fileName, total, chunks: [{ items, lands, landsReset }], next, done, pendingId }; lỗi ở phần nào thì giữ job trong current.pending để ghi tiếp
 async function writeChunks(job) {
   const { chunks, done } = job;
   submitting = true;
@@ -921,15 +978,22 @@ async function writeChunks(job) {
       const res = await fetch(geeApi('action=importCadBatch'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
-        body: JSON.stringify({ phase: job.phase, fileName: job.fileName, sync: k === chunks.length - 1, items: chunks[k] })
+        body: JSON.stringify({
+          phase: job.phase, fileName: job.fileName, sync: k === chunks.length - 1,
+          items: chunks[k].items, lands: chunks[k].lands, landsReset: !!chunks[k].landsReset
+        })
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401 || res.status === 403) signOutAdmin();
       if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
       ['created', 'updated', 'skipped'].forEach(key => done[key].push(...(data[key] || [])));
       done.polygonsDropped += data.polygonsDropped || 0;
+      done.lands += data.lands || 0;
+      done.landsDropped += data.landsDropped || 0;
     }
     const extra = [
+      done.lands ? `${done.lands} lô đất vào sheet DXF` : '',
+      done.landsDropped ? `${done.landsDropped} lô đất không hợp lệ bị bỏ` : '',
       done.skipped.length ? `máy chủ bỏ qua ${done.skipped.length}: ${done.skipped.slice(0, 3).join('; ')}` : '',
       done.polygonsDropped ? `${done.polygonsDropped} lô ranh quá phức tạp chỉ ghi điểm tâm` : ''
     ].filter(Boolean).join(' · ');

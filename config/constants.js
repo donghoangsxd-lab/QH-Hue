@@ -44,7 +44,7 @@ const PROFILES = Object.keys(PROFILE_QUOTA);
 
 // Bán kính DVCC đơn vị ở tại nông thôn ≤ 2 km (Mục 4.6.2.2)
 const RURAL_UNIT_RADIUS = 2000;
-const RURAL_UNIT_RADIUS_CODES = ["3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"];
+const RURAL_UNIT_RADIUS_CODES = ["3-MN", "4-TH", "5-THCS", "7-YT", "8-VH", "9-TM"];
 
 // Quy tắc đếm cơ sở: THPT khi dân số > 20.000 (Bảng 5, 29); 1 trạm y tế, 1 chợ mỗi xã (Bảng 30)
 const THPT_POP_THRESHOLD = 20000;
@@ -56,12 +56,12 @@ const COUNT_RULES = {
 
 // Quy mô tối thiểu 1 công trình theo tiền tố tên (so sau khi bỏ dấu, viết hoa) — chỉ cảnh báo, diện tích vẫn cộng vào chỉ tiêu
 const MIN_SIZE_RULES = [
-  { profiles: ["XA", "XA_DT"], code: "6-YT", prefixes: ["Trạm y tế"], min: 500, ref: "Bảng 30" },
-  { profiles: ["XA", "XA_DT"], code: "7-VH", prefixes: ["Nhà văn hóa"], min: 1000, ref: "Bảng 30" },
-  { profiles: ["XA", "XA_DT"], code: "7-VH", prefixes: ["Phòng truyền thống", "Thư viện"], min: 200, ref: "Bảng 30" },
-  { profiles: ["XA", "XA_DT"], code: "7-VH", prefixes: ["Cụm công trình văn hóa", "Cụm văn hóa"], min: 5000, ref: "Bảng 30" },
-  { profiles: ["XA", "XA_DT"], code: "8-TM", prefixes: ["Chợ"], excludePrefixes: ["Chợ đầu mối"], min: 1500, ref: "Bảng 30" },
-  { profiles: ["XA", "XA_DT"], code: "8-TM", prefixes: ["Cửa hàng"], min: 300, ref: "Bảng 30" }
+  { profiles: ["XA", "XA_DT"], code: "7-YT", prefixes: ["Trạm y tế"], min: 500, ref: "Bảng 30" },
+  { profiles: ["XA", "XA_DT"], code: "8-VH", prefixes: ["Nhà văn hóa"], min: 1000, ref: "Bảng 30" },
+  { profiles: ["XA", "XA_DT"], code: "8-VH", prefixes: ["Phòng truyền thống", "Thư viện"], min: 200, ref: "Bảng 30" },
+  { profiles: ["XA", "XA_DT"], code: "8-VH", prefixes: ["Cụm công trình văn hóa", "Cụm văn hóa"], min: 5000, ref: "Bảng 30" },
+  { profiles: ["XA", "XA_DT"], code: "9-TM", prefixes: ["Chợ"], excludePrefixes: ["Chợ đầu mối"], min: 1500, ref: "Bảng 30" },
+  { profiles: ["XA", "XA_DT"], code: "9-TM", prefixes: ["Cửa hàng"], min: 300, ref: "Bảng 30" }
 ];
 
 // Mỗi đơn vị ở đô thị phát triển mới: ≥ 1 công viên, vườn hoa ≥ 5.000 m² hoặc 2 công viên, vườn hoa ≥ 2.500 m² (Mục 2.2.3.2)
@@ -84,17 +84,17 @@ function parkTierOf(size, urbanNhom) {
 }
 
 // D. MẠNG LƯỚI HẠ TẦNG KHÁC — không có chỉ tiêu m²/người theo phường, không tính vào quy mô / độ phủ / heatmap của 8 nhóm
-const NETWORK_CODES = ["10-BUS", "11-PCCC", "12-NT"];
+const NETWORK_CODES = ["13-BUS", "10-PCCC", "11-NT"];
 const networkConfig = {
   // Mục 2.8.3.3: đi bộ đến bến ≤ 500 m; khu trung tâm: bến xe buýt cách nhau ≤ 600 m.
   // gapIgnore: bỏ qua trạm cách < 100 m khi tìm trạm kế cận (cặp trạm 2 bên đường)
-  "10-BUS": { label: "Trạm dừng xe buýt", radius: 500, gapMax: 600, gapIgnore: 100, noArea: true },
+  "13-BUS": { label: "Trạm dừng xe buýt", radius: 500, gapMax: 600, gapIgnore: 100, noArea: true },
   // Mục 2.5.13.1: khu vực trung tâm ≤ 3 km (áp cho phường), khu vực khác ≤ 5 km (xã)
-  "11-PCCC": { label: "Trụ sở cảnh sát PCCC", radius: { DT: 3000, XA: 5000, XA_DT: 5000 }, noArea: true },
+  "10-PCCC": { label: "Trụ sở cảnh sát PCCC", radius: { DT: 3000, XA: 5000, XA_DT: 5000 }, noArea: true },
   // Mục 2.12.1.1: 1 nhà tang lễ / ≤ 250.000 người; 2.12.2.1: nghĩa trang tập trung ≥ 0,04 ha / 1.000 người = 0,4 m²/người
-  "12-NT": { label: "Nhà tang lễ, nghĩa trang", funeralPopPer: 250000, cemeteryQuota: 0.4 }
+  "11-NT": { label: "Nhà tang lễ, nghĩa trang", funeralPopPer: 250000, cemeteryQuota: 0.4 }
 };
-// Phân loại nhóm 12-NT theo tên; safety = khoảng cách an toàn môi trường tới nhà ở (Bảng 23), 0 = không quy định
+// Phân loại nhóm 11-NT theo tên; safety = khoảng cách an toàn môi trường tới nhà ở (Bảng 23), 0 = không quy định
 const NT_KINDS = {
   funeral: { label: "Nhà tang lễ", safety: 0 },
   crematorium: { label: "Cơ sở hỏa táng", safety: 500 },
@@ -113,7 +113,7 @@ const URBAN_ORIENTED_SET = new Set(URBAN_ORIENTED_COMMUNES.map(bareWardName));
 const MOUNTAIN_SET = new Set(MOUNTAIN_COMMUNES.map(bareWardName));
 const COMMUNE_SET = new Set([...PLAIN_COMMUNES, ...MOUNTAIN_COMMUNES].map(bareWardName));
 
-/** Loại công trình nhóm 12-NT theo tên (khóa NT_KINDS); nghĩa trang không ghi rõ hình thức → hung táng (khoảng cách lớn nhất) */
+/** Loại công trình nhóm 11-NT theo tên (khóa NT_KINDS); nghĩa trang không ghi rõ hình thức → hung táng (khoảng cách lớn nhất) */
 function ntKind(item) {
   const name = foldName(item && item.name);
   if (name.includes('TANG LE')) return 'funeral';
@@ -165,9 +165,9 @@ const CODE_LEVEL_KEYS = {
   "3-MN": ["3-MN"],
   "4-TH": ["4-TH"],
   "5-THCS": ["5-THCS"],
-  "6-YT": ["YT_DT", "YT_DV"],
-  "7-VH": ["VH_DT", "VH_DV"],
-  "8-TM": ["TM_DT", "TM_DV"]
+  "7-YT": ["YT_DT", "YT_DV"],
+  "8-VH": ["VH_DT", "VH_DV"],
+  "9-TM": ["TM_DT", "TM_DV"]
 };
 
 // Chỉ tiêu DVCC khác đơn vị ở chia cho Y tế / Văn hóa / Chợ theo tỷ lệ diện tích tối thiểu 1 cơ sở (500 : 1000 : 2000) — chỉ phục vụ quy mô theo mã
@@ -246,7 +246,7 @@ const constants = {
   },
 
   // Danh sách mã nhóm hạ tầng tiêu chuẩn phục vụ đánh giá quy chuẩn
-  CODES_TO_CHECK: ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-YT", "7-VH", "8-TM"],
+  CODES_TO_CHECK: ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "7-YT", "8-VH", "9-TM"],
   NETWORK_CODES,
   networkConfig,
   NT_KINDS,
@@ -283,9 +283,9 @@ const constants = {
     "3-MN":   { label: "Trường Mầm non", minSize: 800, radius: 1000 },
     "4-TH":   { label: "Trường Tiểu học", minSize: 2000, radius: 1000 },
     "5-THCS": { label: "Trường THCS", minSize: 2500, radius: 1000 },
-    "6-YT":   { label: "Bệnh viện, Trạm y tế", minSize: 1000, radius: 1000 },
-    "7-VH":   { label: "Nhà văn hóa, thể thao", minSize: 500, radius: 1000 },
-    "8-TM":   { label: "Chợ, Trung tâm thương mại", minSize: 1500, radius: 1000 }
+    "7-YT":   { label: "Bệnh viện, Trạm y tế", minSize: 1000, radius: 1000 },
+    "8-VH":   { label: "Nhà văn hóa, thể thao", minSize: 500, radius: 1000 },
+    "9-TM":   { label: "Chợ, Trung tâm thương mại", minSize: 1500, radius: 1000 }
   },
 
   /** Bán kính mặc định công trình cấp đơn vị ở theo mã và hồ sơ phường/xã */
@@ -296,17 +296,18 @@ const constants = {
 
   codeMap: {
     "CV": "1-CV", "BDX": "2-BDX", "MN": "3-MN", "TH": "4-TH",
-    "THCS": "5-THCS", "YT": "6-YT", "VH": "7-VH", "TM": "8-TM", "CSD": "9-CSD",
-    "1": "1-CV", "2": "2-BDX", "3": "3-MN", "4": "4-TH",
-    "5": "5-THCS", "6": "6-YT", "7": "7-VH", "8": "8-TM", "9": "9-CSD",
-    "BUS": "10-BUS", "PCCC": "11-PCCC", "NT": "12-NT",
-    "10": "10-BUS", "11": "11-PCCC", "12": "12-NT",
+    "THCS": "5-THCS", "YT": "7-YT", "VH": "8-VH", "TM": "9-TM",
+    "PCCC": "10-PCCC", "NT": "11-NT", "CSD": "12-CSD", "BUS": "13-BUS",
+    // THPT (tab 6-THPT) tính chung mã 4-TH; isThptItem tách chỉ tiêu và độ phủ riêng
     "THPT": "4-TH",
+    "1": "1-CV", "2": "2-BDX", "3": "3-MN", "4": "4-TH", "5": "5-THCS",
+    "6": "4-TH", "7": "7-YT", "8": "8-VH", "9": "9-TM",
+    "10": "10-PCCC", "11": "11-NT", "12": "12-CSD", "13": "13-BUS",
     "CV_DT": "1-CV", "CV_DV": "1-CV",
     "BDX_DT": "2-BDX", "BDX_DV": "2-BDX",
-    "YT_DT": "6-YT", "YT_DV": "6-YT",
-    "VH_DT": "7-VH", "VH_DV": "7-VH",
-    "TM_DT": "8-TM", "TM_DV": "8-TM"
+    "YT_DT": "7-YT", "YT_DV": "7-YT",
+    "VH_DT": "8-VH", "VH_DV": "8-VH",
+    "TM_DT": "9-TM", "TM_DV": "9-TM"
   },
 
   isApprovedStatus: function(status) {
@@ -326,8 +327,10 @@ const constants = {
 
   /** Trường THPT: nhóm chỉ tiêu riêng (cấp đô thị), không tính vào quy mô / độ phủ Tiểu học */
   isThptItem: function(item) {
+    if (item && item.type === '6-THPT') return true;
     const prefix = String((item && item.id) || '').split('-')[0].toUpperCase();
     if (prefix === 'THPT') return true;
+    // Dòng cũ còn nằm ở tab Tiểu học, nhận theo tên
     if (this.resolveTypeCode(item) !== '4-TH') return false;
     const name = String((item && item.name) || '')
       .toUpperCase()
@@ -371,7 +374,7 @@ const constants = {
 
   /** Trạm xe buýt: phạm vi đi bộ; PCCC: bán kính theo phường / xã; nhà tang lễ, nghĩa trang: khoảng cách an toàn Bảng 23 */
   networkRadius: function(item, code, profile = 'DT') {
-    if (code === '12-NT') return NT_KINDS[ntKind(item)].safety;
+    if (code === '11-NT') return NT_KINDS[ntKind(item)].safety;
     const r = networkConfig[code].radius;
     return typeof r === 'object' ? (r[profile] || r.DT) : r;
   },
@@ -379,15 +382,6 @@ const constants = {
   /** Bán kính tạm khi chưa xác định được phường/xã theo tọa độ (cột Ten_XaPhuong có thể còn tên cũ trước sáp nhập) */
   defaultRadius: function(item) {
     return this.standardRadius(item, wardProfile(item && item.ward));
-  },
-
-  /** Giá trị cột BanKinh khi khác bán kính chuẩn cấp đơn vị ở / hạng cây xanh (chỉ để đối chiếu dữ liệu, không dùng tính toán); null = khớp hoặc không kiểm tra */
-  radiusMismatch: function(item, profile) {
-    if (!item || !(item.sheetRadius > 0) || this.isThptItem(item)) return null;
-    const code = this.resolveTypeCode(item);
-    if (code === '1-CV') return Number(item.sheetRadius) === this.parkTier(item).radius ? null : Number(item.sheetRadius);
-    if (this.isUrbanLevel(item) || !this.infraConfig[code]) return null;
-    return Number(item.sheetRadius) === this.unitRadius(code, profile) ? null : Number(item.sheetRadius);
   },
 
   cleanWardStr: function(str) {

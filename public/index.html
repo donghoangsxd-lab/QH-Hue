@@ -101,6 +101,38 @@
 
     <!-- THANH CÔNG CỤ DỌC CẠNH TRÁI BẢN ĐỒ -->
     <div class="map-toolbar" role="toolbar" aria-label="Công cụ bản đồ" aria-orientation="vertical">
+      <button type="button" class="ui-btn-format review-launch" id="btnReviewOpen" title="Thẩm định đồ án quy hoạch (QHC 1/10.000, QHPK 1/2.000) theo TT 16/2025 và QCVN 01:2026" aria-label="Thẩm định đồ án quy hoạch" aria-pressed="false" aria-controls="reviewPanel"><svg class="ico"><use href="#i-table"/></svg></button>
+      <div class="review-panel" id="reviewPanel" hidden>
+        <div class="review-panel-head"><b>Thẩm định đồ án quy hoạch</b><button type="button" id="btnReviewPanelClose" title="Đóng" aria-label="Đóng"><svg class="ico"><use href="#i-close"/></svg></button></div>
+        <ol class="review-form">
+          <li><span class="review-step">1</span><div><label>Loại hồ sơ</label>
+            <div class="review-kind">
+              <label><input type="radio" name="reviewKind" value="QHC" checked>QHC <small>1/10.000</small></label>
+              <label><input type="radio" name="reviewKind" value="QHPK">QHPK <small>1/2.000</small></label>
+            </div></div></li>
+          <li><span class="review-step">2</span><div><label for="reviewPopHT">Dân số hiện trạng</label>
+            <input type="number" id="reviewPopHT" min="0" step="100" placeholder="Chỉ để so sánh (tùy chọn)"></div></li>
+          <li><span class="review-step">3</span><div><label for="reviewPopQH">Dân số quy hoạch</label>
+            <input type="number" id="reviewPopQH" min="0" step="100" placeholder="VD 61000 → 4 đơn vị ở" title="Số đơn vị ở = dân số / 20.000, làm tròn lên"></div></li>
+          <li><span class="review-step">4</span><div><label for="reviewFileHT">File hiện trạng</label>
+            <label class="review-file" for="reviewFileHT"><svg class="ico"><use href="#i-file"/></svg><span id="reviewFileHTName">Chọn HT-&lt;mã&gt;.dxf</span></label>
+            <input type="file" id="reviewFileHT" accept=".dxf" hidden></div></li>
+          <li><span class="review-step">5</span><div><label for="reviewFileQH">File quy hoạch</label>
+            <label class="review-file" for="reviewFileQH"><svg class="ico"><use href="#i-file"/></svg><span id="reviewFileQHName">Chọn QH-&lt;mã&gt;.dxf</span></label>
+            <input type="file" id="reviewFileQH" accept=".dxf" hidden></div></li>
+          <li><span class="review-step">6</span><div>
+            <button type="button" class="review-start" id="btnReviewStart"><svg class="ico"><use href="#i-send"/></svg>Đồng ý gửi</button></div></li>
+        </ol>
+        <div class="review-panel-opt">
+          <label for="reviewCrs">Hệ tọa độ</label>
+          <select id="reviewCrs">
+            <option value="HUE_3" selected>VN-2000 KTT 107°, múi 3°</option>
+            <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
+          </select>
+        </div>
+        <p class="review-panel-note">DXF ASCII ≤ 5 MB, hatch đặt tên layer theo TT 16/2025 (HT_ / QHDH_DAT_…). Hai file cùng mã đồ án; mã này ghi vào cột Ten_QH khi được duyệt.</p>
+        <div id="reviewDrafts"></div>
+      </div>
       <button type="button" class="ui-btn-format" id="btnToggleCompare" title="So sánh Hiện trạng / Quy hoạch (chia đôi màn hình)" aria-label="So sánh hiện trạng và quy hoạch" aria-pressed="false"><svg class="ico"><use href="#i-compare"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnAuth" title="Đăng nhập quản trị" aria-label="Đăng nhập quản trị"><svg class="ico"><use href="#i-key"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnLocateGPS" title="Định vị vị trí GPS của bạn" aria-label="Định vị GPS"><svg class="ico"><use href="#i-locate"/></svg></button>
@@ -189,15 +221,22 @@
         <div class="layer-row"><div><input type="checkbox" id="chk_c6" checked><label for="chk_c6">7. Cơ sở Y tế</label></div><button type="button" class="btn-dot-buffer" data-buffer="b6" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c7" checked><label for="chk_c7">8. Nhà văn hóa, thể thao</label></div><button type="button" class="btn-dot-buffer" data-buffer="b7" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c8" checked><label for="chk_c8">9. Chợ, TTTM</label></div><button type="button" class="btn-dot-buffer" data-buffer="b8" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c9" checked><label for="chk_c9">10. Cơ sở chưa sử dụng</label></div></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c9" checked><label for="chk_c9">12. Cơ sở chưa sử dụng</label></div></div>
         <div class="layer-group-title" title="Không tính vào quy mô m²/người, độ phủ tổng hợp và bản đồ độ phủ">Mạng lưới hạ tầng khác</div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c11"><label for="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3)">11. Trạm dừng xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" title="Bật/tắt phạm vi 500 m" aria-label="Bật/tắt phạm vi 500 m" aria-pressed="false">●</button></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c12"><label for="chk_c12" title="Bán kính phục vụ ≤ 3 km phường, ≤ 5 km xã (QCVN 01:2026 Mục 2.5.13.1)">12. Trụ sở cảnh sát PCCC</label></div><button type="button" class="btn-dot-buffer" data-buffer="b12" title="Bật/tắt bán kính phục vụ" aria-label="Bật/tắt bán kính phục vụ" aria-pressed="false">●</button></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c13"><label for="chk_c13" title="Vùng đệm = khoảng cách an toàn tới khu dân cư (QCVN 01:2026 Bảng 23)">13. Nhà tang lễ, nghĩa trang</label></div><button type="button" class="btn-dot-buffer" data-buffer="b13" title="Bật/tắt khoảng cách an toàn" aria-label="Bật/tắt khoảng cách an toàn" aria-pressed="false">●</button></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c12"><label for="chk_c12" title="Bán kính phục vụ ≤ 3 km phường, ≤ 5 km xã (QCVN 01:2026 Mục 2.5.13.1)">10. Trụ sở cảnh sát PCCC</label></div><button type="button" class="btn-dot-buffer" data-buffer="b12" title="Bật/tắt bán kính phục vụ" aria-label="Bật/tắt bán kính phục vụ" aria-pressed="false">●</button></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c13"><label for="chk_c13" title="Vùng đệm = khoảng cách an toàn tới khu dân cư (QCVN 01:2026 Bảng 23)">11. Nhà tang lễ, nghĩa trang</label></div><button type="button" class="btn-dot-buffer" data-buffer="b13" title="Bật/tắt khoảng cách an toàn" aria-label="Bật/tắt khoảng cách an toàn" aria-pressed="false">●</button></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c11"><label for="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3)">13. Trạm dừng xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" title="Bật/tắt phạm vi 500 m" aria-label="Bật/tắt phạm vi 500 m" aria-pressed="false">●</button></div>
 
         <div class="rp-settings">
+          <div class="sat-pick basemap-pick"><label for="basemapSelect" title="Ảnh vệ tinh nền cho cả bản đồ hiện trạng và quy hoạch; lựa chọn được ghi nhớ"><svg class="ico ico-layer"><use href="#i-sat"/></svg>Ảnh nền</label><select id="basemapSelect"></select></div>
+          <div class="sat-pick basemap-pick" id="waybackBox" style="display:none;">
+            <label for="waybackSelect" title="Các phiên bản ảnh Esri khác nhau tại tâm khung nhìn, mới → cũ. Chọn bản ít mây">Phiên bản</label>
+            <select id="waybackSelect"></select>
+            <button type="button" id="btnWaybackScan" class="basemap-scan" title="Dò lại các phiên bản ảnh tại vị trí đang xem" aria-label="Dò lại phiên bản ảnh">↻</button>
+          </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div></div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_parcel" checked><label for="chk_parcel"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Ranh lô đất hạ tầng <small class="layer-hint">phóng to để xem</small></label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_parcel"><label for="chk_parcel"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Ranh lô đất hạ tầng <small class="layer-hint">phóng to để xem</small></label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_land"><label for="chk_land" title="Đất ngoài 13 nhóm hạ tầng từ các sheet DXF-NN: đất ở vàng, công cộng đỏ, đào tạo xanh dương thẫm, cơ quan nâu, an ninh quốc phòng lá chuối nhạt, di tích tôn giáo đỏ sẫm"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Ranh đất đồ án (DXF)</label></div></div>
           <div class="layer-row">
             <div><input type="checkbox" id="chk_pop"><label for="chk_pop"><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư</label></div>
             <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
@@ -291,7 +330,6 @@
         <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
           <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true"><svg class="ico"><use href="#i-pen"/></svg>Nhập 1 điểm</button>
           <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ, GeoJSON"><svg class="ico"><use href="#i-folder"/></svg>Nhập hàng loạt</button>
-          <button type="button" class="add-mode-btn" data-mode="addReview" role="tab" aria-selected="false" title="Thẩm định một đồ án quy hoạch theo QCVN 01:2026, không ghi vào bảng phường"><svg class="ico"><use href="#i-table"/></svg>Thẩm định</button>
           <button type="button" class="add-mode-btn" data-mode="addAdmin" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Admin hiệu chỉnh dữ liệu nền: vẽ bổ sung tuyến đường, xóa / thêm pixel dân cư"><svg class="ico"><use href="#i-tool"/></svg>Admin</button>
         </div>
 
@@ -304,13 +342,14 @@
           <option value="3-MN">3. Trường Mầm non</option>
           <option value="4-TH">4. Trường Tiểu học</option>
           <option value="5-THCS">5. Trường THCS</option>
-          <option value="6-YT">6. Bệnh viện, Trạm y tế</option>
-          <option value="7-VH">7. Nhà văn hóa, thể thao</option>
-          <option value="8-TM">8. Chợ, Trung tâm thương mại</option>
-          <option value="9-CSD" selected>9. Cơ sở chưa sử dụng</option>
-          <option value="10-BUS">10. Trạm dừng xe buýt</option>
-          <option value="11-PCCC">11. Trụ sở cảnh sát PCCC</option>
-          <option value="12-NT">12. Nhà tang lễ, nghĩa trang</option>
+          <option value="6-THPT">6. Trường THPT</option>
+          <option value="7-YT">7. Bệnh viện, Trạm y tế</option>
+          <option value="8-VH">8. Nhà văn hóa, thể thao</option>
+          <option value="9-TM">9. Chợ, Trung tâm thương mại</option>
+          <option value="10-PCCC">10. Trụ sở cảnh sát PCCC</option>
+          <option value="11-NT">11. Nhà tang lễ, nghĩa trang</option>
+          <option value="12-CSD" selected>12. Cơ sở chưa sử dụng</option>
+          <option value="13-BUS">13. Trạm dừng xe buýt</option>
         </select>
 
         <label for="newPhase">Giai đoạn</label>
@@ -341,43 +380,12 @@
         <label for="newSize">Diện tích</label>
         <input type="number" id="newSize" placeholder="m² (vd 1000)" min="0" step="1" />
 
-        <label for="newRadius" title="Bán kính phục vụ tự xác định theo QCVN 01:2026/BXD, ghi vào cột BanKinh">Bán kính</label>
+        <label for="newRadius" title="Bán kính phục vụ tự xác định theo QCVN 01:2026/BXD (tính trong webapp, không ghi Sheet)">Bán kính</label>
         <output id="newRadius" class="rp-radius" for="newType newNhomHaTang newWard newName">—</output>
         </div>
 
         <button type="button" class="btn-submit" id="btnSubmitNewPoint"><svg class="ico"><use href="#i-send"/></svg>GỬI ĐỀ XUẤT MỚI</button>
         <div id="statusMsg" class="rp-status" role="status" aria-live="polite"></div>
-        </div>
-
-        <div id="addReview" style="display:none;">
-          <p class="review-lead">Tải một file DXF (ASCII, tối đa 5 MB) gồm hatch các khu đất của đồ án. Web tự vẽ đường bao quanh các hatch và chấm chỉ tiêu. Kết quả chỉ ghi vào hệ thống khi bấm Gửi và được Admin duyệt.</p>
-          <div class="form-grid">
-            <label for="reviewCrs">Hệ tọa độ</label>
-            <select id="reviewCrs">
-              <option value="HUE_3" selected>VN-2000 KTT 107°, múi 3°</option>
-              <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
-            </select>
-            <label for="reviewPop">Dân số quy hoạch</label>
-            <input type="number" id="reviewPop" min="0" step="100" placeholder="Ví dụ 61000" title="Số đơn vị ở = dân số / 20.000, làm tròn lên" />
-          </div>
-          <label class="cad-drop" for="reviewFile">
-            <span class="cad-drop-main"><b>Chọn file DXF đồ án</b></span>
-            <span class="cad-drop-types"><i>DXF ≤ 5 MB</i></span>
-            <input type="file" id="reviewFile" accept=".dxf" hidden />
-          </label>
-          <div class="form-grid review-send">
-            <label for="reviewReplace">Thay thế đồ án</label>
-            <select id="reviewReplace" title="Đồ án đang có trên web (theo tên file DXF đã nhập) mà hồ sơ này đề xuất thay thế">
-              <option value="">Đồ án mới (không thay thế)</option>
-            </select>
-            <label for="reviewSender">Người gửi</label>
-            <input type="text" id="reviewSender" maxlength="80" placeholder="Tên / đơn vị (tùy chọn)" />
-          </div>
-          <div class="review-actions">
-            <button type="button" class="bp-btn review-send-btn" id="btnReviewSend" title="Gửi ranh lô và kết quả thẩm định vào hàng chờ, Admin duyệt rồi mới đưa lên bản đồ"><svg class="ico"><use href="#i-send"/></svg>Gửi lên hệ thống</button>
-            <button type="button" class="bp-btn" id="btnReviewDrop" title="Xóa bản đang xem"><svg class="ico"><use href="#i-close"/></svg>Xóa xem trước</button>
-          </div>
-          <div id="reviewDrafts"></div>
         </div>
 
         <div id="addBulk" style="display:none;">
@@ -500,11 +508,11 @@
         </div>
 
         <div id="addOsm" style="display:none;">
-          <div class="cad-hint">Tải điểm OpenStreetMap trong 40 phường/xã, ghi vào tab 10-BUS / 11-PCCC / 12-NT của Sheet ở trạng thái <b>chờ duyệt</b>. Điểm đã có (cùng mã OSM, hoặc cùng loại ở rất gần) tự bỏ qua; lăng mộ di tích và trụ nước chữa cháy không được nhập.</div>
+          <div class="cad-hint">Tải điểm OpenStreetMap trong 40 phường/xã, ghi vào tab 13-BUS / 10-PCCC / 11-NT của Sheet ở trạng thái <b>chờ duyệt</b>. Điểm đã có (cùng mã OSM, hoặc cùng loại ở rất gần) tự bỏ qua; lăng mộ di tích và trụ nước chữa cháy không được nhập.</div>
           <div class="osm-types">
-            <label><input type="checkbox" class="osm-type" value="10-BUS" checked>Trạm dừng xe buýt</label>
-            <label><input type="checkbox" class="osm-type" value="11-PCCC" checked>Trụ sở cảnh sát PCCC</label>
-            <label><input type="checkbox" class="osm-type" value="12-NT" checked>Nhà tang lễ, nghĩa trang</label>
+            <label><input type="checkbox" class="osm-type" value="13-BUS" checked>Trạm dừng xe buýt</label>
+            <label><input type="checkbox" class="osm-type" value="10-PCCC" checked>Trụ sở cảnh sát PCCC</label>
+            <label><input type="checkbox" class="osm-type" value="11-NT" checked>Nhà tang lễ, nghĩa trang</label>
           </div>
           <button type="button" class="btn-submit" id="btnOsmCheck"><svg class="ico"><use href="#i-inspect"/></svg>KIỂM TRA DỮ LIỆU OSM</button>
           <div id="osmStatus" class="rp-status" role="status" aria-live="polite"></div>

@@ -68,7 +68,7 @@ async function getRawDataList() {
 
       const mappedType = constants.codeMap[prefix]
         || constants.codeMap[prefix.replace(/_DT$/i, '').replace(/_DV$/i, '')]
-        || "9-CSD";
+        || "12-CSD";
 
       // Chuẩn hóa Nhóm hạ tầng thông qua hằng số constants
       const rawNhom = props.Nhom_HaTang || props.nhomHaTang;
@@ -95,11 +95,9 @@ async function getRawDataList() {
         planChange: classifyPlanChange(sizeHT, sizeQH),
         status: isStatusTrue
       };
-      if (mappedType === '12-NT') item.ntKind = constants.ntKind(item);
-      // Bán kính luôn theo quy chuẩn (api/gee.js tính lại theo phường/xã chứa công trình); cột BanKinh chỉ để đối chiếu
-      const banKinh = parseArea(props.BanKinh);
+      if (mappedType === '11-NT') item.ntKind = constants.ntKind(item);
+      item.tenQH = String(props.Ten_QH || '');
       item.radius = constants.defaultRadius(item);
-      item.sheetRadius = banKinh > 0 ? banKinh : null;
       return item;
     }).filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng)
       && Math.abs(item.lat) <= 90 && Math.abs(item.lng) <= 180);
@@ -145,6 +143,10 @@ async function getCadParcels() {
           layer: String(props.Layer || ''),
           area: Number(props.DienTich) || null,
           file: String(props.File || ''),
+          kind: String(props.Kind || '').toUpperCase() === 'DXF' ? 'DXF' : 'INFRA',
+          name: String(props.Ten || ''),
+          nhom: String(props.Nhom || ''),
+          ward: String(props.XaPhuong || ''),
           geometry: ft.geometry
         };
       })
