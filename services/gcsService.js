@@ -15,10 +15,13 @@ function parseArea(val) {
 
 // Ô trống = giai đoạn đó không có công trình; số 0 = có công trình nhưng chưa rõ diện tích (không so sánh được)
 // HT trống + QH có = quy hoạch mới; HT có + QH trống = di dời; cả 2 trống = không thể hiện ở bản đồ nào
+// Biến động diện tích QH so với HT không quá PLAN_CHANGE_MIN_RATIO coi như giữ nguyên (không đánh dấu tăng / giảm)
+const PLAN_CHANGE_MIN_RATIO = 0.05;
 function classifyPlanChange(sizeHT, sizeQH) {
   if (sizeHT === null) return sizeQH === null ? 'none' : 'new';
   if (sizeQH === null) return 'relocate';
   if (sizeHT === 0 || sizeQH === 0) return 'keep';
+  if (Math.abs(sizeQH - sizeHT) <= sizeHT * PLAN_CHANGE_MIN_RATIO) return 'keep';
   if (sizeQH > sizeHT) return 'expand';
   if (sizeQH < sizeHT) return 'shrink';
   return 'keep';

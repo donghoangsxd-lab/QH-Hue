@@ -102,36 +102,56 @@
     <!-- THANH CÔNG CỤ DỌC CẠNH TRÁI BẢN ĐỒ -->
     <div class="map-toolbar" role="toolbar" aria-label="Công cụ bản đồ" aria-orientation="vertical">
       <button type="button" class="ui-btn-format review-launch" id="btnReviewOpen" title="Thẩm định đồ án quy hoạch (QHC 1/10.000, QHPK 1/2.000) theo TT 16/2025 và QCVN 01:2026" aria-label="Thẩm định đồ án quy hoạch" aria-pressed="false" aria-controls="reviewPanel"><svg class="ico"><use href="#i-table"/></svg></button>
-      <div class="review-panel" id="reviewPanel" hidden>
-        <div class="review-panel-head"><b>Thẩm định đồ án quy hoạch</b><button type="button" id="btnReviewPanelClose" title="Đóng" aria-label="Đóng"><svg class="ico"><use href="#i-close"/></svg></button></div>
-        <ol class="review-form">
-          <li><span class="review-step">1</span><div><label>Loại hồ sơ</label>
-            <div class="review-kind">
-              <label><input type="radio" name="reviewKind" value="QHC" checked>QHC <small>1/10.000</small></label>
-              <label><input type="radio" name="reviewKind" value="QHPK">QHPK <small>1/2.000</small></label>
-            </div></div></li>
-          <li><span class="review-step">2</span><div><label for="reviewPopHT">Dân số hiện trạng</label>
-            <input type="number" id="reviewPopHT" min="0" step="100" placeholder="Chỉ để so sánh (tùy chọn)"></div></li>
-          <li><span class="review-step">3</span><div><label for="reviewPopQH">Dân số quy hoạch</label>
-            <input type="number" id="reviewPopQH" min="0" step="100" placeholder="VD 61000 → 4 đơn vị ở" title="Số đơn vị ở = dân số / 20.000, làm tròn lên"></div></li>
-          <li><span class="review-step">4</span><div><label for="reviewFileHT">File hiện trạng</label>
-            <label class="review-file" for="reviewFileHT"><svg class="ico"><use href="#i-file"/></svg><span id="reviewFileHTName">Chọn HT-&lt;mã&gt;.dxf</span></label>
-            <input type="file" id="reviewFileHT" accept=".dxf" hidden></div></li>
-          <li><span class="review-step">5</span><div><label for="reviewFileQH">File quy hoạch</label>
-            <label class="review-file" for="reviewFileQH"><svg class="ico"><use href="#i-file"/></svg><span id="reviewFileQHName">Chọn QH-&lt;mã&gt;.dxf</span></label>
-            <input type="file" id="reviewFileQH" accept=".dxf" hidden></div></li>
-          <li><span class="review-step">6</span><div>
-            <button type="button" class="review-start" id="btnReviewStart"><svg class="ico"><use href="#i-send"/></svg>Đồng ý gửi</button></div></li>
-        </ol>
-        <div class="review-panel-opt">
-          <label for="reviewCrs">Hệ tọa độ</label>
-          <select id="reviewCrs">
-            <option value="HUE_3" selected>VN-2000 KTT 107°, múi 3°</option>
-            <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
-          </select>
+      <div class="review-panel" id="reviewPanel" role="dialog" aria-labelledby="reviewPanelTitle" hidden>
+        <div class="tab-header review-panel-head">
+          <div class="review-panel-title" id="reviewPanelTitle"><svg class="ico"><use href="#i-table"/></svg>Thẩm định đồ án</div>
+          <button type="button" class="rp-collapse-btn" id="btnReviewPanelClose" title="Đóng" aria-label="Đóng"><svg class="ico"><use href="#i-close"/></svg></button>
         </div>
-        <p class="review-panel-note">DXF ASCII ≤ 5 MB, hatch đặt tên layer theo TT 16/2025 (HT_ / QHDH_DAT_…). Hai file cùng mã đồ án; mã này ghi vào cột Ten_QH khi được duyệt.</p>
-        <div id="reviewDrafts"></div>
+        <div class="rp-body">
+          <div class="tab-body add-point-form">
+            <div class="add-mode-switch review-kind" role="radiogroup" aria-label="Loại hồ sơ">
+              <label class="add-mode-btn"><input type="radio" name="reviewKind" value="QHC" checked>QHC · 1/10.000</label>
+              <label class="add-mode-btn"><input type="radio" name="reviewKind" value="QHPK">QHPK · 1/2.000</label>
+            </div>
+            <div class="form-grid review-grid">
+              <label for="reviewPopHT">Dân số HT</label>
+              <input type="number" id="reviewPopHT" min="0" step="100" placeholder="Dân số hiện trạng (người)">
+              <label for="reviewPopQH">Dân số QH</label>
+              <input type="number" id="reviewPopQH" min="0" step="100" placeholder="Dân số quy hoạch (người)" title="Số đơn vị ở = dân số / 20.000, làm tròn lên">
+              <label for="reviewCrs">Hệ tọa độ</label>
+              <select id="reviewCrs">
+                <option value="HUE_3" selected>VN-2000 KTT 107°, múi 3°</option>
+                <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
+              </select>
+            </div>
+            <div class="review-files">
+              <label class="cad-drop review-file" for="reviewFileHT">
+                <span class="cad-drop-main"><b>File hiện trạng</b></span>
+                <span class="review-file-name" id="reviewFileHTName">Chọn HT-&lt;mã&gt;.dxf</span>
+                <input type="file" id="reviewFileHT" accept=".dxf" hidden>
+              </label>
+              <label class="cad-drop review-file" for="reviewFileQH">
+                <span class="cad-drop-main"><b>File quy hoạch</b></span>
+                <span class="review-file-name" id="reviewFileQHName">Chọn QH-&lt;mã&gt;.dxf</span>
+                <input type="file" id="reviewFileQH" accept=".dxf" hidden>
+              </label>
+            </div>
+            <button type="button" class="btn-submit" id="btnReviewStart"><svg class="ico"><use href="#i-send"/></svg>ĐỒNG Ý GỬI THẨM ĐỊNH</button>
+            <div class="cad-hint review-hint">
+              <div class="cad-hint-title">Chuẩn bị file DXF</div>
+              <ol>
+                <li>Lưu 2 file <b>HT-ABC.dxf</b> và <b>QH-ABC.dxf</b> (DXF ASCII ≤ 5 MB, cùng mã đồ án ABC — mã này ghi vào cột Ten_QH khi được duyệt).</li>
+                <li>Đặt tên layer hatch bám sát Thông tư 16/2025/TT-BXD (tiền tố HT_ / QHDD_ / QHDH_). Trong file QH, đất ở giữ lại để layer <b>HT_</b> (vd. HT_DAT_O_Nhomnhao), đất ở mới để layer <b>QHDH_</b> / <b>QHDD_</b>.</li>
+                <li>Tách các layer sau bằng hậu tố để quét nhanh:
+                  <br><b>_MN / _TH / _THCS</b> cho lớp Đất trường học;
+                  <br><b>_CHO / _TM</b> cho lớp Đất dịch vụ.
+                  <br><i>VD: HT_DAT_HTXH_Truonghoc_MN; QHDH_DAT_Dichvu_Cho</i></li>
+                <li>Đất thể thao được thống kê vào nhóm văn hóa - thể thao; nên tô hatch tông <b class="review-hint-green">xanh lá</b> để dễ nhận biết.</li>
+              </ol>
+            </div>
+            <div id="reviewDrafts"></div>
+          </div>
+        </div>
       </div>
       <button type="button" class="ui-btn-format" id="btnToggleCompare" title="So sánh Hiện trạng / Quy hoạch (chia đôi màn hình)" aria-label="So sánh hiện trạng và quy hoạch" aria-pressed="false"><svg class="ico"><use href="#i-compare"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnAuth" title="Đăng nhập quản trị" aria-label="Đăng nhập quản trị"><svg class="ico"><use href="#i-key"/></svg></button>

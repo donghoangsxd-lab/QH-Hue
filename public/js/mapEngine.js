@@ -1795,6 +1795,19 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
   }
 }
 
+// Tắt chế độ tra cứu: gỡ kết quả đang hiện (kể cả bảng đã ẩn — bảng ẩn không tự đóng khi click bản đồ)
+export function clearInspectResult() {
+  let had = false;
+  [map, planMap].forEach(m => m?.eachLayer(l => {
+    if (l instanceof L.Popup && l.options.className === 'inspect-popup') { m.closePopup(l); had = true; }
+  }));
+  if (had && state.tempMarker) {
+    state.tempMarker.remove();
+    state.tempMarker = null;
+  }
+  clearSingleIsochrone();
+}
+
 // ============================ PHÊ DUYỆT (ADMIN) ============================
 
 export async function approvePointStatus(pointId) {

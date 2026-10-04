@@ -14,7 +14,7 @@ import { importReviewDossier, rejectPending, REVIEW_DOSSIER_EVENT } from './cadI
 import { setLabelsOverlay } from './basemap.js';
 import {
   REVIEW_MAX_BYTES, LANDUSE_TABLES, classifyLand, landChoices, landRowByKey, landUseSummary, landSubKey, importLayerName, decisionKind,
-  presetDecision, tagParcel, lotRadius, scoreRows, rowLabel, UNIT_POP, THPT_POP_MIN, projectOfFile
+  presetDecision, tagParcel, lotRadius, scoreRows, rowLabel, newLandControl, residentialSubAreas, UNIT_POP, THPT_POP_MIN, projectOfFile
 } from './projectReviewCore.js';
 
 const STORE_KEY = 'qh_review_dossiers_v2';
@@ -38,7 +38,15 @@ const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 //   openRows (dòng thẩm định đang xổ danh sách), reviewId (lô đang hỏi), pendingId (Admin mở hồ sơ chờ), dossierText }
 let session = null;
 // Bán kính phục vụ tắt mặc định (chỉ vẽ cho nhóm / lô đang chọn); tem đường bật khi duyệt từng lô
-let show = { HT: true, QH: true, buffer: false, labels: false };
+let show = { HT: true, QH: true, buffer: false, labels: false, heat: true };
+// Bản đồ nhiệt riêng của đồ án (cùng thang GEE với bản đồ độ phủ toàn TP, bán kính QCVN của lô hạ tầng); sig = nhóm điểm đã gửi
+const heat = {
+  HT: { sig: '', url: '', seq: 0, tile: null, tileUrl: '', tileMap: null },
+  QH: { sig: '', url: '', seq: 0, tile: null, tileUrl: '', tileMap: null }
+};
+const REVIEW_HEAT_OPACITY = 0.45;
+// Bản đồ độ phủ toàn TP ẩn khi thẩm định, đóng thẩm định thì trả lại trạng thái cũ (null = chưa ẩn)
+let cityHeatWas = null;
 const drawn = { HT: null, QH: null };
 let lotLayers = [];
 let focusKey = '';
@@ -213,6 +221,7 @@ function clearMap() {
   clearTimeout(qhTimer);
   clearPhase('HT');
   clearPhase('QH');
+  resetHeat();
   lotLayers = [];
 }
 
@@ -240,8 +249,99 @@ function lotTip(lot) {
   return `<b>${lot.phase}</b> · ${escapeHtml(lot.layer)} · ${fmtNum(Math.round(lot.area))} m²<br>${escapeHtml(what)}${lot.radius ? ` · R ${fmtNum(lot.radius)} m` : ''}`;
 }
 
+// ---------- Bản đồ nhiệt HT / QH ----------
+
+function heatGroups(phase) {
+  const groups = {};
+  session.lots.forEach(lot => {
+    if (lot.phase !== phase || !usable(lot) || lot.role !== 'score' || !lot.type || !(lot.radius > 0)) return;
+    if (!Number.isFinite(lot.lat) || !Number.isFinite(lot.lng)) return;
+    (groups[lot.type] = groups[lot.type] || []).push([Number(lot.lat.toFixed(6)), Number(lot.lng.toFixed(6)), Math.round(lot.radius)]);
+  });
+  return groups;
+}
+
+function clearHeat(phase) {
+  const h = heat[phase];
+  if (h.tile) h.tile.remove();
+  h.tile = null;
+}
+
+function resetHeat() {
+  ['HT', 'QH'].forEach(ph => {
+    clearHeat(ph);
+    Object.assign(heat[ph], { sig: '', url: '', seq: heat[ph].seq + 1, tileUrl: '', tileMap: null });
+  });
+}
+
+// Chia đôi màn hình: mỗi bên một lớp; bản đồ chung: chỉ lớp QH (HT khi đang ẩn QH) để hai lớp không chồng nhau
+function heatVisible(phase) {
+  if (!session || !show.heat || !show[phase]) return false;
+  return isCompareOn() || phase === 'QH' || !show.QH;
+}
+
+function drawHeat(phase) {
+  const h = heat[phase];
+  const m = targetMap(phase);
+  const want = heatVisible(phase) && h.url && m;
+  if (want && h.tile && h.tileUrl === h.url && h.tileMap === m) return;
+  clearHeat(phase);
+  if (!want) return;
+  h.tile = L.tileLayer(h.url, { maxZoom: 19, opacity: REVIEW_HEAT_OPACITY }).addTo(m);
+  h.tileUrl = h.url;
+  h.tileMap = m;
+}
+
+async function updateHeat(phase) {
+  if (!heatVisible(phase)) { clearHeat(phase); return; }
+  const h = heat[phase];
+  const groups = heatGroups(phase);
+  const sig = JSON.stringify(groups);
+  if (sig !== h.sig) {
+    h.sig = sig;
+    h.url = '';
+    const seq = ++h.seq;
+    clearHeat(phase);
+    if (!Object.keys(groups).length) return;
+    try {
+      const res = await fetch(geeApi('action=getHeatmapTile'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groups })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const url = ((await res.json()) || {}).urlFormat || '';
+      if (seq !== h.seq) return;
+      h.url = url;
+    } catch (err) {
+      if (seq === h.seq) h.sig = '';
+      console.warn(`Lỗi bản đồ nhiệt ${phase} của đồ án:`, err);
+      return;
+    }
+  }
+  drawHeat(phase);
+}
+
+/** Ẩn bản đồ độ phủ toàn TP khi vào thẩm định (on = false), trả lại khi đóng (on = true) */
+function setCityHeat(on) {
+  const chk = $('chk_heat');
+  if (!chk) return;
+  if (!on) {
+    if (cityHeatWas === null) cityHeatWas = chk.checked;
+    if (!chk.checked) return;
+    chk.checked = false;
+  } else {
+    const restore = cityHeatWas;
+    cityHeatWas = null;
+    if (!restore || chk.checked) return;
+    chk.checked = true;
+  }
+  chk.dispatchEvent(new Event('change'));
+}
+
 function drawPhase(phase) {
   clearPhase(phase);
+  updateHeat(phase);
   const m = targetMap(phase);
   if (!session || !show[phase] || !m) return;
   const g = L.featureGroup();
@@ -304,7 +404,11 @@ const focusMatch = (lot) => {
   if (k === 'ask') return lot.layer === v;
   if (k === 'land') {
     const [row, sub] = v.split('/');
-    if (sub) return lot.landKey === row && lot.subKey === sub;
+    if (sub) {
+      if (lot.landKey !== row) return false;
+      const split = residentialSubAreas(lot, session.kind);
+      return split ? sub in split : lot.subKey === sub;
+    }
     return lot.landKey === row || (landRowByKey(session.kind, row)?.sumOf || []).includes(lot.landKey);
   }
   if (k === 'score') return lot.phase === 'QH' && (lot.scoreKey === v || (REVIEW_SUM[v] || []).includes(lot.scoreKey));
@@ -448,7 +552,7 @@ function landTableHtml() {
     const key = `land:${r.key}`;
     return `<tr class="lu-row${r.sub ? ' lu-sub' : ''}${r.part ? ' lu-part' : ''}${focusKey === key ? ' on' : ''}" data-focus="${key}" title="Bấm để xem các lô trên bản đồ">
       <td>${r.stt}</td><td>${escapeHtml(r.label)}</td>
-      <td class="lu-code"><i style="background:${r.color}"></i>${r.code ? `<small>${escapeHtml(r.code)}</small>` : ''}</td>
+      <td class="lu-code"${r.code ? ` title="Tên phân lớp TT16: ${escapeHtml(r.code)}"` : ''}><i style="background:${r.color}"></i>${escapeHtml(r.sym || '')}</td>
       <td>${haCell(r.htHa)}</td><td>${pctTxt(r.htPct)}</td><td>${haCell(r.qhHa)}</td><td>${pctTxt(r.qhPct)}</td></tr>`;
   }).join('');
   const totalLabel = sum.sections.length ? `TỔNG CỘNG (${sum.sections.join(' + ')})` : 'TỔNG CỘNG';
@@ -551,8 +655,35 @@ function computeScore() {
   scored.rows.forEach(row => {
     row.coverPct = row.members.some(p => p.radius > 0) ? coverPct(row.members, housingFeature) : null;
   });
+  scored.control = newLandControl(session.lots, session.kind, session.popHT, session.popQH);
   session.scored = scored;
   return scored;
+}
+
+/** Bảng kiểm soát dân số mới và chỉ tiêu đất đơn vị ở mới bình quân */
+function controlTableHtml(ctl) {
+  const label = ctl.landLabel.charAt(0).toUpperCase() + ctl.landLabel.slice(1);
+  const ha = (m2) => fmtNum(Math.round(m2 / 100) / 100);
+  let verdict = '<span class="c-muted">—</span>';
+  if (ctl.ratio != null) {
+    verdict = ctl.pass == null
+      ? '<span class="c-muted">Tham khảo</span>'
+      : `<b class="${ctl.pass ? 'c-green' : 'c-red'}">${ctl.pass ? 'Đạt' : 'Vượt'} (≤ ${ctl.max} m²/người)</b>`;
+  }
+  const row = (name, value, note = '') => `<tr class="wt-main"><td></td><td>${name}</td><td>${value}</td><td>${note}</td></tr>`;
+  return `<h4>Kiểm soát dân số mới và ${escapeHtml(ctl.landLabel)} mới</h4>
+    <div class="ward-table-scroll-container"><table class="ward-table review-control">
+      <thead><tr><th></th><th>Chỉ tiêu</th><th>Giá trị</th><th>Đánh giá</th></tr></thead>
+      <tbody>
+        ${row('Dân số hiện trạng', `${fmtNum(session.popHT)} người`)}
+        ${row('Dân số quy hoạch', `${fmtNum(session.popQH)} người`)}
+        ${row('Dân số mới tăng thêm', `<b>${fmtNum(ctl.newPop)} người</b>`, '= QH − HT')}
+        ${row(`${label} hiện trạng`, session.files.HT ? `${ha(ctl.currentArea)} ha` : '—', 'File HT')}
+        ${row(`${label} hiện trạng theo QH (OHT)`, `${ha(ctl.existingArea)} ha`, 'File QH, layer HT_…')}
+        ${row(`${label} mới (OQH)`, `${ha(ctl.newArea)} ha`, 'File QH, layer QHDD_ / QHDH_ / QH_…')}
+        ${row(`Chỉ tiêu ${escapeHtml(ctl.landLabel)} mới bình quân`, ctl.ratio != null ? `<b>${fmtNum(ctl.ratio)} m²/người</b>` : '—', verdict)}
+      </tbody>
+    </table></div>`;
 }
 
 function actionsHtml(open) {
@@ -592,6 +723,7 @@ function renderHost() {
         <label class="review-toggle"><input type="checkbox" data-show="HT"${show.HT ? ' checked' : ''}>Hiện trạng</label>
         <label class="review-toggle"><input type="checkbox" data-show="QH"${show.QH ? ' checked' : ''}>Quy hoạch</label>
         <label class="review-toggle" title="Tắt: chỉ vẽ bán kính của nhóm / công trình đang chọn"><input type="checkbox" data-show="buffer"${show.buffer ? ' checked' : ''}>Bán kính</label>
+        <label class="review-toggle" title="Bản đồ nhiệt độ phủ riêng của lớp hiện trạng / quy hoạch (bán kính QCVN của lô hạ tầng); bản đồ độ phủ toàn TP tạm ẩn"><input type="checkbox" data-show="heat"${show.heat ? ' checked' : ''}>Bản đồ nhiệt</label>
         <label class="review-toggle" title="Tem tên đường, tên công trình phủ trên ranh lô"><input type="checkbox" data-show="labels"${show.labels ? ' checked' : ''}>Tem đường</label>
         <button type="button" class="bp-btn${isCompareOn() ? ' on' : ''}" id="btnReviewCompare" title="Chia đôi màn hình: hiện trạng bên trái, quy hoạch bên phải">${ico('compare')}Chia đôi</button>
         <button type="button" class="bp-btn" id="btnReviewPrint" title="Lưu bảng thẩm định ra file PDF">${ico('printer')}In PDF</button>
@@ -600,7 +732,7 @@ function renderHost() {
     </div>
     <div class="review-note">
       ${escapeHtml(table.label)} · file ${session.files.HT ? `<b>${escapeHtml(session.files.HT)}</b> (${htN} lô)` : '<i>không có file hiện trạng</i>'} và <b>${escapeHtml(session.files.QH)}</b> (${qhN} lô).
-      Dân số hiện trạng <b>${session.popHT > 0 ? fmtNum(session.popHT) : '—'}</b> (chỉ để so sánh) · dân số quy hoạch <b>${fmtNum(session.popQH)}</b>${session.kind === 'QHC'
+      Dân số hiện trạng <b>${session.popHT > 0 ? fmtNum(session.popHT) : '—'}</b> · dân số quy hoạch <b>${fmtNum(session.popQH)}</b> · dân số mới tăng thêm <b>${fmtNum(scored.control.newPop)}</b>${session.kind === 'QHC'
         ? ' — thẩm định công trình hạ tầng cấp đô thị (bảng A).'
         : ` → <b>${scored.units}</b> đơn vị ở (${fmtNum(UNIT_POP)} người/đơn vị, làm tròn lên) — thẩm định cấp đơn vị ở (bảng B)${Number(session.popQH) > THPT_POP_MIN ? ', có đất trường THPT (dân số trên 20.000 người)' : ''}.`}
       ${housingNote}
@@ -609,7 +741,7 @@ function renderHost() {
     ${session.pendingId ? '' : decisionHtml()}
     <div class="review-cols">
       <div class="review-col">${landTableHtml()}</div>
-      <div class="review-col">${scoreTableHtml(scored)}</div>
+      <div class="review-col">${controlTableHtml(scored.control)}${scoreTableHtml(scored)}</div>
     </div>
     ${actionsHtml(open)}
   </div>`;
@@ -634,9 +766,15 @@ function closeReview() {
   clearMap();
   focusKey = '';
   if (show.labels) setLabels(false);
+  setCityHeat(true);
   const host = $('projectReviewHost');
   if (host) host.innerHTML = '';
   session = null;
+}
+
+/** Có đủ 2 file HT + QH: tự chia đôi màn hình (hiện trạng trái, quy hoạch phải) trước khi vẽ */
+function autoCompare(lots) {
+  if (!isCompareOn() && lots.some(l => l.phase === 'HT') && lots.some(l => l.phase === 'QH')) toggleCompareMode();
 }
 
 function newSession(fields) {
@@ -650,6 +788,7 @@ function newSession(fields) {
   };
   session.byId = new Map(session.lots.map(l => [l.id, l]));
   applyTags();
+  setCityHeat(false);
   openHost();
   renderHost();
   fitTo(allBounds(), 17);
@@ -716,6 +855,7 @@ async function startReview() {
     const crs = CRS_PRESETS[$('reviewCrs')?.value] || CRS_PRESETS.HUE_3;
     const lots = [...(fHT ? await readHatches(fHT, 'HT', crs) : []), ...await readHatches(fQH, 'QH', crs)];
     togglePanel(false);
+    autoCompare(lots);
     newSession({ kind, project, popHT, popQH, files: { HT: fHT ? fHT.name : '', QH: fQH.name }, lots });
   } catch (err) {
     showToast(err.message, 'error');
@@ -739,7 +879,7 @@ function dossierGeoJson() {
     type: 'FeatureCollection',
     review: {
       v: 2, kind: session.kind, project: session.project, popHT: session.popHT, popQH: session.popQH, files: session.files,
-      units: scored.units, housingArea: scored.housingArea,
+      units: scored.units, housingArea: scored.housingArea, control: scored.control,
       landuse: land.rows.filter(r => r.kind === 'row').map(r => ({ key: r.key, htHa: r.htHa, qhHa: r.qhHa })),
       rows: scored.rows.map(r => ({ key: r.key, area: r.area, count: r.count, demand: r.demand, scalePct: r.scalePct, coverPct: r.coverPct }))
     },
@@ -770,7 +910,9 @@ function resultSummary() {
   const rated = session.scored.rows.filter(r => r.scalePct != null);
   const passed = rated.filter(r => r.scalePct >= 100).length;
   const level = session.kind === 'QHC' ? 'cấp đô thị' : `${session.scored.units} đơn vị ở`;
-  return `${LANDUSE_TABLES[session.kind].short} · ${fmtNum(session.popQH)} dân QH · ${level} · đạt quy mô ${passed}/${rated.length} chỉ tiêu`;
+  const ctl = session.scored.control;
+  const ratio = ctl.ratio != null ? ` · đất ở mới ${fmtNum(ctl.ratio)} m²/người${ctl.pass === false ? ' (vượt)' : ''}` : '';
+  return `${LANDUSE_TABLES[session.kind].short} · ${fmtNum(session.popQH)} dân QH · ${level} · đạt quy mô ${passed}/${rated.length} chỉ tiêu${ratio}`;
 }
 
 async function sendDossier() {
@@ -861,6 +1003,7 @@ function openDossier({ id, item, text }) {
     if (p.QuyetDinh) decisions.set(lot.id, String(p.QuyetDinh));
     return lot;
   }).filter(l => l.polygons.length && Number.isFinite(l.lat) && Number.isFinite(l.lng));
+  autoCompare(lots);
   newSession({
     kind: meta.kind, project: String(meta.project || projectOfFile(item.fileName)), popHT: Number(meta.popHT) || 0, popQH: Number(meta.popQH) || 0,
     files: meta.files || { HT: '', QH: item.fileName }, lots, layerChoice, decisions,
@@ -888,7 +1031,7 @@ function rememberSent(sentId) {
     id: sentId || `${Date.now().toString(36)}${Math.random().toString(16).slice(2, 8)}`,
     kind: session.kind, name: session.project, at: new Date().toISOString(),
     popHT: session.popHT, popQH: session.popQH, units: session.scored.units, housingArea: session.scored.housingArea,
-    landHtml: landTableHtml(), totalQH: land.totalQH,
+    landHtml: landTableHtml(), controlHtml: controlTableHtml(session.scored.control), totalQH: land.totalQH,
     rows: session.scored.rows.map(r => ({ section: r.section, label: r.label, area: r.area, count: r.count, demand: r.demand, scalePct: r.scalePct, coverPct: r.coverPct, quota: r.quota }))
   });
   saveStore(list);
@@ -927,7 +1070,7 @@ function showDraft(id) {
     <div class="review-note">Dân số HT ${fmtNum(d.popHT || 0)} · QH ${fmtNum(d.popQH)} · ${d.units} đơn vị ở · đất ở ${fmtNum(d.housingArea)} m². Bản đồ chỉ hiện khi đang mở file.</div>
     <div class="review-cols">
       <div class="review-col">${d.landHtml || ''}</div>
-      <div class="review-col"><h4>Thẩm định QCVN 01:2026/BXD</h4><div class="ward-table-scroll-container"><table class="ward-table">${QCVN_HEAD}<tbody>${body}</tbody></table></div></div>
+      <div class="review-col">${d.controlHtml || ''}<h4>Thẩm định QCVN 01:2026/BXD</h4><div class="ward-table-scroll-container"><table class="ward-table">${QCVN_HEAD}<tbody>${body}</tbody></table></div></div>
     </div></div>`;
 }
 

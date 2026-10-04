@@ -12,6 +12,7 @@ import {
   refreshHeatmapOnly,
   setHeatOpacity,
   handleInspectPointClick,
+  clearInspectResult,
   loadBoundaryLayer,
   ensurePopulationLayer,
   loadCadParcels,
@@ -277,6 +278,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     mapEl?.classList.toggle('inspect-mode', on);
     planEl?.classList.toggle('inspect-mode', on);
     if (on) state.isPickMode = false;
+    else clearInspectResult();
   };
   btnInspectMode?.addEventListener('click', () => setInspectMode(!state.isInspectMode));
 
