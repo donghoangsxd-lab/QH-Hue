@@ -140,13 +140,12 @@
             <div class="cad-hint review-hint">
               <div class="cad-hint-title">Chuẩn bị file DXF</div>
               <ol>
-                <li>Lưu 2 file <b>HT-ABC.dxf</b> và <b>QH-ABC.dxf</b> (DXF ASCII ≤ 5 MB, cùng mã đồ án ABC — mã này ghi vào cột Ten_QH khi được duyệt).</li>
-                <li>Đặt tên layer hatch bám sát Thông tư 16/2025/TT-BXD (tiền tố HT_ / QHDD_ / QHDH_). Trong file QH, đất ở giữ lại để layer <b>HT_</b> (vd. HT_DAT_O_Nhomnhao), đất ở mới để layer <b>QHDH_</b> / <b>QHDD_</b>.</li>
-                <li>Tách các layer sau bằng hậu tố để quét nhanh:
+                <li>Mở file CAD, chọn hatch các loại đất và lưu thành 2 file <b>HT-ABC.dxf</b> và <b>QH-ABC.dxf</b> (≤ 5 MB, trong đó ABC là mã tên đồ án).</li>
+                <li>Tên layer hatch theo Thông tư 16/2025/TT-BXD. Một số lớp cần tách bằng hậu tố để quét nhanh:
                   <br><b>_MN / _TH / _THCS</b> cho lớp Đất trường học;
                   <br><b>_CHO / _TM</b> cho lớp Đất dịch vụ.
-                  <br><i>VD: HT_DAT_HTXH_Truonghoc_MN; QHDH_DAT_Dichvu_Cho</i></li>
-                <li>Đất thể thao được thống kê vào nhóm văn hóa - thể thao; nên tô hatch tông <b class="review-hint-green">xanh lá</b> để dễ nhận biết.</li>
+                  <br><i>VD: HT_DAT_HTXH_Truonghoc_MN; QHDH_DAT_Dichvu_Cho.</i></li>
+                <li>Các lớp đối tượng đặt tên không đúng cần người dùng chọn thủ công.</li>
               </ol>
             </div>
             <div id="reviewDrafts"></div>

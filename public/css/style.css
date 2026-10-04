@@ -1761,8 +1761,15 @@ table.ward-table th {
   .tour-spot, .tour-card { animation: none; transition: none; }
 }
 
-/* Thẩm định đồ án — bảng chiếm nửa dưới màn hình, nửa trên để xem ranh lô; không đụng bảng phường */
-body.project-review { --bottom-h: 50vh; }
+/* Thẩm định đồ án — bảng chiếm phần dưới màn hình, phần trên để xem ranh lô; không đụng bảng phường.
+   review-min: chỉ còn thanh tiêu đề; review-max: bảng phủ toàn màn hình */
+body.project-review { --bottom-h: 46vh; }
+body.project-review.review-min { --bottom-h: calc(var(--bp-head-h) + 1px); }
+body.project-review.review-min #projectReviewHost { overflow: hidden; }
+body.project-review.review-min .review-sheet > :not(.review-head) { display: none; }
+body.project-review.review-max .bottom-panel { top: 0; height: auto; z-index: 2500; }
+.review-size-min .ico { transform: rotate(90deg); }
+.review-size-min.up .ico { transform: rotate(-90deg); }
 #projectReviewHost { display: none; }
 body.project-review #projectReviewHost {
   display: block;
@@ -1819,11 +1826,24 @@ body.project-review .bp-part2 { display: none; }
 .review-hint li { margin: 2px 0; }
 .review-hint li b { font-weight: 600; color: var(--text-main); }
 .review-hint i { color: var(--accent-cyan); font-style: normal; font-size: var(--fs-xs); }
-.review-hint .review-hint-green { color: var(--accent-green); }
 .review-note { margin: 8px 0; font-size: var(--fs-sm); line-height: 1.45; }
-.review-sheet h4 { margin: 12px 0 6px; font-size: var(--fs-sm); }
+.review-sheet h4 { margin: 6px 0 4px; font-size: var(--fs-sm); }
 .review-sheet > .review-head { position: sticky; top: 0; z-index: 2; margin: 0 -8px; background: var(--bg-panel); }
-.review-head-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.review-head .bp-part-title { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.review-head-btns { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.review-head-btns > * { flex-shrink: 0; }
+/* Hàng thẻ đầu bảng: thông tin đồ án | kiểm soát đất ở | layer chưa đúng | duyệt lô — xếp cùng hàng, tự xuống dòng khi hẹp */
+.review-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 6px; margin: 6px 0; align-items: stretch; }
+.review-card { min-width: 0; padding: 5px 8px; border: 1px solid var(--border-color); border-radius: var(--r-md); background: rgba(255, 255, 255, 0.03); font-size: var(--fs-xs, 11px); line-height: 1.35; }
+.review-card-title { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; font-size: var(--fs-sm); font-weight: 600; color: var(--accent-cyan); }
+.review-card-title .ico { flex-shrink: 0; width: 13px; height: 13px; }
+.review-card-foot { display: block; margin-top: 3px; color: var(--text-muted); }
+.review-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 1px 8px; }
+.review-kv > span:nth-child(odd) { color: var(--text-muted); white-space: nowrap; }
+.review-file-cell { display: flex; gap: 6px; min-width: 0; }
+.review-file-cell b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.review-file-cell em { flex-shrink: 0; font-style: normal; color: var(--text-muted); }
+.review-ctl .review-card-title { color: var(--accent-green); }
 .review-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); cursor: pointer; }
 .review-sub { margin: -2px 0 6px; font-size: var(--fs-xs, 11px); color: var(--text-muted); }
 .review-sheet .bp-btn.on { border-color: #fb923c; color: #fdba74; background: rgba(251, 146, 60, 0.16); }
@@ -1841,33 +1861,42 @@ body.project-review .bp-part2 { display: none; }
 .review-landuse tr.lu-part td:nth-child(2) { padding-left: 22px; }
 .review-score tbody[data-members] tr td:nth-child(2) { padding-left: 18px; }
 .review-score .sub-toggle { margin-left: 4px; }
-.review-decide-tip { display: block; margin-top: 3px; color: var(--text-muted); }
-.review-decide > span { flex: 1 1 260px; line-height: 1.4; }
-.review-decide-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 6px; border-top: 1px dashed rgba(251, 146, 60, 0.45); color: var(--text-muted); }
+.review-decide-tip { display: block; margin-top: 2px; color: var(--text-muted); }
+.review-decide > span { flex: 1 1 200px; line-height: 1.35; }
+.review-decide-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 4px; border-top: 1px dashed rgba(251, 146, 60, 0.45); color: var(--text-muted); }
 .review-decide-nav > span { flex: 1; font-size: var(--fs-xs, 11px); }
 .review-landuse .lu-code { white-space: nowrap; }
 .review-landuse .lu-code i { display: inline-block; width: 12px; height: 12px; margin-right: 4px; vertical-align: middle; border: 1px solid rgba(0, 0, 0, 0.4); }
 .review-landuse .lu-code small { color: var(--text-muted); font-size: 10px; }
-.review-decide { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; padding: 8px; border: 1px solid #fb923c; border-radius: var(--r-md); font-size: var(--fs-sm); }
+.review-decide { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; border-color: #fb923c; }
 .review-decide.done { border-color: var(--accent-green); }
 .review-decide.active { flex-direction: column; align-items: stretch; background: rgba(251, 146, 60, 0.08); }
 .review-decide .ico { color: #fb923c; margin-right: 4px; }
 .review-decide.done .ico { color: var(--accent-green); }
+.review-decide-head { margin-bottom: 0; color: #fdba74; font-weight: 500; }
 .review-decide-info { color: var(--text-muted); overflow-wrap: anywhere; }
-.review-decide-btns, .review-decide-nav { display: flex; flex-wrap: wrap; gap: 6px; }
-.review-decide-nav { justify-content: flex-end; }
-.review-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border-color); font-size: var(--fs-sm); }
+.review-decide-btns, .review-decide-nav { display: flex; flex-wrap: wrap; gap: 4px; }
+.review-decide-nav { justify-content: flex-end; align-items: center; }
+.review-card .bp-btn { height: 22px; padding: 0 7px; font-size: var(--fs-xs, 11px); }
+.review-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-color); font-size: var(--fs-sm); }
 .review-foot > span { flex: 1 1 260px; line-height: 1.4; }
 .review-foot input { min-width: 180px; }
-.review-cols { display: grid; grid-template-columns: minmax(380px, 1.15fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+/* Bảng cân đối đất co theo nội dung (tối đa 520px), bảng QCVN lấp phần còn lại */
+.review-cols { display: grid; grid-template-columns: fit-content(520px) minmax(0, 1fr); gap: 10px; align-items: start; }
 @media (max-width: 900px) { .review-cols { grid-template-columns: minmax(0, 1fr); } }
-.review-ask { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; padding: 8px; border: 1px solid #fb923c; border-radius: var(--r-md); font-size: var(--fs-sm); }
-.review-ask > b { color: #fb923c; }
-.review-ask-item { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 3px 4px; border-radius: var(--r-md); cursor: pointer; }
+.review-col-land table.review-landuse { width: auto; }
+.review-sheet table.ward-table th, .review-sheet table.ward-table td { padding: 1px 6px; }
+.review-landuse td:nth-child(2) { white-space: normal; min-width: 150px; max-width: 230px; line-height: 1.3; }
+.review-landuse thead th { line-height: 1.25; }
+.review-ask { border-color: #fb923c; }
+.review-ask .review-card-title { color: #fb923c; }
+.review-ask-list { display: flex; flex-direction: column; gap: 1px; max-height: 120px; overflow-y: auto; scrollbar-width: thin; }
+.review-ask-item { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 180px); align-items: center; gap: 6px; padding: 1px 3px; border-radius: var(--r-md); cursor: pointer; }
 .review-ask-item:hover, .review-ask-item.on { background: rgba(var(--yellow-rgb), 0.16); }
-.review-ask-name { flex: 1; min-width: 140px; overflow-wrap: anywhere; }
+.review-ask-name { min-width: 0; overflow-wrap: anywhere; }
+.review-ask-name small { color: var(--text-muted); }
 .review-ask-name .ico { color: var(--accent-yellow); }
-.review-ask select { max-width: 100%; }
+.review-ask select { width: 100%; height: 22px; padding: 0 2px; font-size: var(--fs-xs, 11px); }
 .review-drafts { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; font-size: var(--fs-sm); }
 .review-drafts div { display: flex; gap: 4px; align-items: center; }
 .review-drafts span { flex: 1; min-width: 0; }

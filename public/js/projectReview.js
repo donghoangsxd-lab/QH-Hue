@@ -511,7 +511,7 @@ function decisionHtml() {
   const intro = `${schools ? `${schools} lô trường học chưa rõ cấp` : ''}${schools && markets ? ' · ' : ''}${markets ? `${markets} lô dịch vụ cần xác nhận chợ / TTTM` : ''}`;
   const stats = decisionStats(queue);
   if (!lot) {
-    return `<div class="review-decide${left ? '' : ' done'}">${ico(left ? 'alert' : 'check')}<span>${left ? `Còn <b>${left}</b>/${queue.length} lô cần xác nhận (${intro}).` : `Đã xác nhận đủ ${queue.length} lô (${intro}).`}${stats ? ` Đã nhận diện: ${stats}.` : ''}
+    return `<div class="review-card review-decide${left ? '' : ' done'}">${ico(left ? 'alert' : 'check')}<span>${left ? `Còn <b>${left}</b>/${queue.length} lô cần xác nhận (${intro}).` : `Đã xác nhận đủ ${queue.length} lô (${intro}).`}${stats ? ` Đã nhận diện: ${stats}.` : ''}
       <small class="review-decide-tip">Đặt tên layer có hậu tố để nhận diện ngay: trường học _MN / _TH / _THCS; DAT_DICHVU_CHO, _TTTM hoặc _KHAC (dịch vụ khác).</small></span>
       <button type="button" class="bp-btn" data-decide-start>${left ? 'Duyệt từng lô' : 'Xem lại'}</button></div>`;
   }
@@ -522,8 +522,8 @@ function decisionHtml() {
   const hitTxt = hits.length ? `Công trình đã có trong lô: ${hits.slice(0, 3).map(h => `<b>${escapeHtml(h.name || h.id)}</b>`).join(', ')}${hits.length > 3 ? '…' : ''}` : '';
   const srcTxt = lot.decision && lot.decisionSrc !== 'user' ? ` · đang gán <b>${DECISION_LABEL[lot.decision]}</b> ${SRC_LABEL[lot.decisionSrc]}` : '';
   const restSame = queue.filter(l => l.decisionKind === lot.decisionKind && isUnresolvedDecision(l)).length;
-  return `<div class="review-decide active">
-    <div class="review-decide-head">${ico('alert')}${q} <b>${at + 1}/${queue.length}</b> · còn ${left}</div>
+  return `<div class="review-card review-decide active">
+    <div class="review-decide-head review-card-title">${ico('alert')}<span>${q} <b>${at + 1}/${queue.length}</b> · còn ${left}</span></div>
     <div class="review-decide-info">${lot.phase === 'HT' ? 'Hiện trạng' : 'Quy hoạch'} · ${escapeHtml(lot.layer)} · ${fmtNum(Math.round(lot.area))} m²${srcTxt}${hitTxt ? `<br>${hitTxt}` : ''}</div>
     <div class="review-decide-btns">${choices.map(([v, label]) => `<button type="button" class="bp-btn${lot.decision === v ? ' on' : ''}${v === 'NO' ? ' rej' : ''}" data-decide="${v}">${label}</button>`).join('')}</div>
     ${restSame > 1 ? `<div class="review-decide-bulk">Gán cho ${restSame} lô cùng loại còn lại: ${choices.map(([v, label]) => `<button type="button" class="bp-btn" data-decide-all="${v}">${label}</button>`).join('')}</div>` : ''}
@@ -556,12 +556,11 @@ function landTableHtml() {
       <td>${haCell(r.htHa)}</td><td>${pctTxt(r.htPct)}</td><td>${haCell(r.qhHa)}</td><td>${pctTxt(r.qhPct)}</td></tr>`;
   }).join('');
   const totalLabel = sum.sections.length ? `TỔNG CỘNG (${sum.sections.join(' + ')})` : 'TỔNG CỘNG';
-  return `<h4>Bảng tổng hợp sử dụng đất — ${escapeHtml(table.short)}</h4>
-    <div class="review-sub">${escapeHtml(table.title)}</div>
+  return `<h4 title="${escapeHtml(table.title)}">Bảng tổng hợp sử dụng đất — ${escapeHtml(table.short)}</h4>
     <div class="ward-table-scroll-container"><table class="ward-table review-landuse">
       <thead>
-        <tr><th rowspan="2">STT</th><th rowspan="2">${session.kind === 'QHC' ? 'Nhóm chức năng / Loại chức năng sử dụng đất' : 'Chức năng sử dụng của ô phố / ô đất'}</th><th rowspan="2">Ký hiệu</th><th colspan="2">Hiện trạng</th><th colspan="2">Quy hoạch</th></tr>
-        <tr><th>Diện tích (ha)</th><th>Tỷ lệ (%)</th><th>Diện tích (ha)</th><th>Tỷ lệ (%)</th></tr>
+        <tr><th rowspan="2">TT</th><th rowspan="2">${session.kind === 'QHC' ? 'Loại chức năng sử dụng đất' : 'Chức năng ô phố / ô đất'}</th><th rowspan="2">KH</th><th colspan="2">Hiện trạng</th><th colspan="2">Quy hoạch</th></tr>
+        <tr><th>ha</th><th>%</th><th>ha</th><th>%</th></tr>
       </thead>
       <tbody>${body}
         <tr class="lu-total"><td></td><td colspan="2">${totalLabel}</td><td>${haCell(sum.totalHT)}</td><td>${sum.totalHT > 0 ? '100' : ''}</td><td>${haCell(sum.totalQH)}</td><td>${sum.totalQH > 0 ? '100' : ''}</td></tr>
@@ -573,7 +572,7 @@ function askHtml() {
   const asks = askLayers();
   if (!asks.length || session.pendingId) return '';
   const choices = landChoices(session.kind);
-  return `<div class="review-ask"><b>${ico('alert')}Layer đặt tên chưa đúng quy định TT16 (viền cam trên bản đồ) — xác minh đầu mục sử dụng đất</b>${asks.map(r => {
+  return `<div class="review-card review-ask"><b class="review-card-title" title="Viền cam trên bản đồ — chọn đầu mục sử dụng đất cho từng layer">${ico('alert')}Layer chưa đúng TT16 (${asks.length}) — chọn đầu mục</b><div class="review-ask-list">${asks.map(r => {
     const cur = session.layerChoice.get(r.layer) || '';
     const opts = [`<option value="">Chọn đầu mục…</option>`]
       .concat(choices.map(c => `<option value="${c.key}"${cur === c.key ? ' selected' : ''}>${escapeHtml(c.label)}</option>`))
@@ -583,7 +582,7 @@ function askHtml() {
       <span class="review-ask-name">${ico('locate')}${escapeHtml(r.layer)} <small>(${[...r.phases].join(' + ')} · ${r.n} hatch · ${fmtNum(Math.round(r.area))} m²)</small></span>
       <select data-layer="${escapeHtml(r.layer)}">${opts.join('')}</select>
     </div>`;
-  }).join('')}</div>`;
+  }).join('')}</div></div>`;
 }
 
 function pctCell(pct) {
@@ -660,16 +659,56 @@ function computeScore() {
   return scored;
 }
 
-/** Bảng kiểm soát dân số mới và chỉ tiêu đất đơn vị ở mới bình quân */
+const haOf = (m2) => fmtNum(Math.round(m2 / 100) / 100);
+const capFirst = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function controlVerdict(ctl) {
+  if (ctl.ratio == null) return '<span class="c-muted">—</span>';
+  return ctl.pass == null
+    ? '<span class="c-muted">Tham khảo</span>'
+    : `<b class="${ctl.pass ? 'c-green' : 'c-red'}">${ctl.pass ? 'Đạt' : 'Vượt'} (≤ ${ctl.max} m²/người)</b>`;
+}
+
+/** Thẻ gọn trên hàng đầu của bảng thẩm định: đất ở HT / giữ lại / mới và chỉ tiêu bình quân */
+function controlCardHtml(ctl) {
+  const label = capFirst(ctl.landLabel);
+  return `<div class="review-card review-ctl">
+    <div class="review-card-title">${ico('chart')}Kiểm soát ${escapeHtml(ctl.landLabel)} mới</div>
+    <div class="review-kv">
+      <span title="File HT">${label} HT</span><span>${session.files.HT ? `<b>${haOf(ctl.currentArea)}</b> ha` : '—'}</span>
+      <span title="File QH, layer HT_…">Giữ lại (OHT)</span><span><b>${haOf(ctl.existingArea)}</b> ha</span>
+      <span title="File QH, layer QHDD_ / QHDH_ / QH_…">Đất ở mới (OQH)</span><span><b>${haOf(ctl.newArea)}</b> ha</span>
+      <span title="Đất ở mới / dân số mới tăng thêm">Bình quân mới</span><span>${ctl.ratio != null ? `<b>${fmtNum(ctl.ratio)}</b> m²/người · ` : ''}${controlVerdict(ctl)}</span>
+    </div>
+  </div>`;
+}
+
+// Cỡ bảng thẩm định: 'min' chỉ còn thanh tiêu đề, 'normal' nửa dưới màn hình, 'max' phủ toàn màn hình
+let hostSize = 'normal';
+
+function sizeBtnsHtml() {
+  const min = hostSize === 'min', max = hostSize === 'max';
+  return `<button type="button" class="bp-btn bp-icon review-size-min${min ? ' up' : ''}" data-host-size="${min ? 'normal' : 'min'}" title="${min ? 'Mở lại bảng' : 'Thu nhỏ bảng (chỉ giữ thanh tiêu đề, bản đồ toàn màn hình)'}">${ico('chev-right')}</button>
+    <button type="button" class="bp-btn bp-icon" data-host-size="${max ? 'normal' : 'max'}" title="${max ? 'Thu về nửa màn hình' : 'Phóng to bảng toàn màn hình'}">${ico(max ? 'minimize' : 'maximize')}</button>`;
+}
+
+function setHostSize(size) {
+  hostSize = size;
+  document.body.classList.toggle('review-min', size === 'min');
+  document.body.classList.toggle('review-max', size === 'max');
+  document.querySelectorAll('#projectReviewHost .review-head-btns').forEach(box => {
+    box.querySelectorAll('[data-host-size]').forEach(b => b.remove());
+    box.querySelector('#btnReviewClose')?.insertAdjacentHTML('beforebegin', sizeBtnsHtml());
+  });
+  map?.invalidateSize({ pan: false });
+  planMap?.invalidateSize({ pan: false });
+}
+
+/** Bảng kiểm soát dân số mới và chỉ tiêu đất đơn vị ở mới bình quân (hồ sơ đã gửi, PDF) */
 function controlTableHtml(ctl) {
-  const label = ctl.landLabel.charAt(0).toUpperCase() + ctl.landLabel.slice(1);
-  const ha = (m2) => fmtNum(Math.round(m2 / 100) / 100);
-  let verdict = '<span class="c-muted">—</span>';
-  if (ctl.ratio != null) {
-    verdict = ctl.pass == null
-      ? '<span class="c-muted">Tham khảo</span>'
-      : `<b class="${ctl.pass ? 'c-green' : 'c-red'}">${ctl.pass ? 'Đạt' : 'Vượt'} (≤ ${ctl.max} m²/người)</b>`;
-  }
+  const label = capFirst(ctl.landLabel);
+  const ha = haOf;
+  const verdict = controlVerdict(ctl);
   const row = (name, value, note = '') => `<tr class="wt-main"><td></td><td>${name}</td><td>${value}</td><td>${note}</td></tr>`;
   return `<h4>Kiểm soát dân số mới và ${escapeHtml(ctl.landLabel)} mới</h4>
     <div class="ward-table-scroll-container"><table class="ward-table review-control">
@@ -715,6 +754,10 @@ function renderHost() {
   const housingNote = scored.housingArea > 0
     ? `Đất ở quy hoạch (${session.kind === 'QHC' ? 'đơn vị ở + hỗn hợp' : 'nhóm nhà ở + hỗn hợp'}) ${fmtNum(scored.housingArea)} m². Độ phủ = phần đất ở nằm trong bán kính phục vụ tính từ tâm lô.`
     : `Chưa có lô đất ở quy hoạch (${session.kind === 'QHC' ? 'DAT_DD_Donvio, DAT_DD_Honhop' : 'DAT_O_Nhomnhao, DAT_O_Honhop_Nhomo'}) — cột độ phủ để trống.`;
+  const level = session.kind === 'QHC'
+    ? 'Cấp đô thị (bảng A)'
+    : `Cấp đơn vị ở (bảng B${Number(session.popQH) > THPT_POP_MIN ? ' + THPT' : ''}) · <b>${scored.units}</b> đơn vị ở`;
+  const fileCell = (name, n) => (name ? `<b title="${escapeHtml(name)}">${escapeHtml(name)}</b><em>${n} lô</em>` : '<i class="c-muted">không có file</i>');
   const scrollTop = host.scrollTop;
   host.innerHTML = `<div id="projectReviewSheet" class="review-sheet">
     <div class="bp-part-head review-head">
@@ -727,21 +770,28 @@ function renderHost() {
         <label class="review-toggle" title="Tem tên đường, tên công trình phủ trên ranh lô"><input type="checkbox" data-show="labels"${show.labels ? ' checked' : ''}>Tem đường</label>
         <button type="button" class="bp-btn${isCompareOn() ? ' on' : ''}" id="btnReviewCompare" title="Chia đôi màn hình: hiện trạng bên trái, quy hoạch bên phải">${ico('compare')}Chia đôi</button>
         <button type="button" class="bp-btn" id="btnReviewPrint" title="Lưu bảng thẩm định ra file PDF">${ico('printer')}In PDF</button>
+        ${sizeBtnsHtml()}
         <button type="button" class="bp-btn" id="btnReviewClose">${ico('close')}Đóng</button>
       </div>
     </div>
-    <div class="review-note">
-      ${escapeHtml(table.label)} · file ${session.files.HT ? `<b>${escapeHtml(session.files.HT)}</b> (${htN} lô)` : '<i>không có file hiện trạng</i>'} và <b>${escapeHtml(session.files.QH)}</b> (${qhN} lô).
-      Dân số hiện trạng <b>${session.popHT > 0 ? fmtNum(session.popHT) : '—'}</b> · dân số quy hoạch <b>${fmtNum(session.popQH)}</b> · dân số mới tăng thêm <b>${fmtNum(scored.control.newPop)}</b>${session.kind === 'QHC'
-        ? ' — thẩm định công trình hạ tầng cấp đô thị (bảng A).'
-        : ` → <b>${scored.units}</b> đơn vị ở (${fmtNum(UNIT_POP)} người/đơn vị, làm tròn lên) — thẩm định cấp đơn vị ở (bảng B)${Number(session.popQH) > THPT_POP_MIN ? ', có đất trường THPT (dân số trên 20.000 người)' : ''}.`}
-      ${housingNote}
+    <div class="review-top">
+      <div class="review-card review-info">
+        <div class="review-card-title">${ico('info')}${escapeHtml(table.label)}</div>
+        <div class="review-kv">
+          <span>File HT</span><span class="review-file-cell">${fileCell(session.files.HT, htN)}</span>
+          <span>File QH</span><span class="review-file-cell">${fileCell(session.files.QH, qhN)}</span>
+          <span>Dân số</span><span>HT <b>${session.popHT > 0 ? fmtNum(session.popHT) : '—'}</b> → QH <b>${fmtNum(session.popQH)}</b> <b class="c-green">(+${fmtNum(scored.control.newPop)})</b></span>
+          <span>Thẩm định</span><span title="${fmtNum(UNIT_POP)} người / đơn vị ở, làm tròn lên">${level}</span>
+        </div>
+        <small class="review-card-foot">${housingNote}</small>
+      </div>
+      ${controlCardHtml(scored.control)}
+      ${askHtml()}
+      ${session.pendingId ? '' : decisionHtml()}
     </div>
-    ${askHtml()}
-    ${session.pendingId ? '' : decisionHtml()}
     <div class="review-cols">
-      <div class="review-col">${landTableHtml()}</div>
-      <div class="review-col">${controlTableHtml(scored.control)}${scoreTableHtml(scored)}</div>
+      <div class="review-col review-col-land">${landTableHtml()}</div>
+      <div class="review-col">${scoreTableHtml(scored)}</div>
     </div>
     ${actionsHtml(open)}
   </div>`;
@@ -758,6 +808,7 @@ function openHost() {
 }
 
 function closeReview() {
+  if (hostSize !== 'normal') setHostSize('normal');
   const wasOpen = document.body.classList.contains('project-review');
   document.body.classList.remove('project-review');
   if (wasOpen && maxWasOn) setBottomPanelMaximized(true);
@@ -813,6 +864,17 @@ function fileLabel(slot) {
   const out = $(slot === 'HT' ? 'reviewFileHTName' : 'reviewFileQHName');
   const f = input?.files && input.files[0];
   if (out) out.textContent = f ? `${f.name} · ${fmtNum(Math.round(f.size / 1024))} KB` : (slot === 'HT' ? 'Chọn HT-<mã>.dxf' : 'Chọn QH-<mã>.dxf');
+  if (f) detectKind(f.name);
+}
+
+/** Tên file có từ khóa QHPK → QHPK 1/2.000, QHC → QHC 1/10.000 (xét QHPK trước) */
+function detectKind(fileName) {
+  const name = String(fileName || '').toUpperCase();
+  const kind = /QHPK/.test(name) ? 'QHPK' : /QHC/.test(name) ? 'QHC' : '';
+  const radio = kind && document.querySelector(`input[name="reviewKind"][value="${kind}"]`);
+  if (!radio || radio.checked) return;
+  radio.checked = true;
+  showToast(`Nhận diện theo tên file: ${LANDUSE_TABLES[kind].label}`, 'info');
 }
 
 async function readHatches(file, phase, crs) {
@@ -1065,6 +1127,7 @@ function showDraft(id) {
     <div class="bp-part-head review-head"><b class="bp-part-title">HỒ SƠ ĐÃ GỬI · ${escapeHtml(d.kind)} · ${escapeHtml(d.name)}</b>
       <div class="review-head-btns review-noprint">
         <button type="button" class="bp-btn" id="btnReviewPrint">${ico('printer')}In PDF</button>
+        ${sizeBtnsHtml()}
         <button type="button" class="bp-btn" id="btnReviewClose">${ico('close')}Đóng</button>
       </div></div>
     <div class="review-note">Dân số HT ${fmtNum(d.popHT || 0)} · QH ${fmtNum(d.popQH)} · ${d.units} đơn vị ở · đất ở ${fmtNum(d.housingArea)} m². Bản đồ chỉ hiện khi đang mở file.</div>
@@ -1081,6 +1144,7 @@ async function exportPdf() {
     const open = unresolved();
     if (open.layers || open.lots) showToast('Còn layer / lô chưa xác nhận — kết quả trong PDF chưa đầy đủ', 'info');
   }
+  if (hostSize === 'min') setHostSize('normal');
   try { await loadHtml2Pdf(); } catch (e) { showToast('Không tải được thư viện PDF', 'error'); return; }
   window.html2pdf().from(sheet).set({
     margin: 6,
@@ -1115,6 +1179,8 @@ export function initProjectReview() {
     const t = e.target;
     if (t.closest('#btnReviewClose')) { closeReview(); return; }
     if (t.closest('#btnReviewPrint')) { exportPdf(); return; }
+    const size = t.closest('[data-host-size]');
+    if (size) { setHostSize(size.dataset.hostSize); return; }
     if (!session) return;
     if (t.closest('#btnReviewCompare')) { toggleCompareMode(); return; }
     if (t.closest('#btnReviewCancel')) { if (confirm('Hủy bỏ hồ sơ thẩm định đang xem?')) closeReview(); return; }
