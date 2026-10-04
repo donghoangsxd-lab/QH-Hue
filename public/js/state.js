@@ -116,14 +116,15 @@ export const WARD_BOUNDARY_SHADOW_STYLE = { color: '#64748b', weight: 4, opacity
 export const WARD_BOUNDARY_LINE_STYLE = { color: '#fde68a', weight: 1.6, opacity: 0.95, fill: false, interactive: false };
 export const WARD_HIGHLIGHT_STYLE = { color: '#fb923c', weight: 3.5, dashArray: '6,6', fillColor: '#fb923c', fillOpacity: 0.15, interactive: false };
 
-// Màu hiển thị 10 lớp hạ tầng (vùng phủ, biểu đồ, ô màu danh sách lớp, màu nền lô khi zoom xa) — tông sáng nổi trên nền
-// vệ tinh / giao diện tối, giữ họ màu của TT 16/2025 (cây xanh lục, y tế hồng tím, văn hóa hồng, dịch vụ đỏ, chưa sử dụng xám);
-// lớp màu ACI tối của TT16 (trường học, bãi đỗ xe) thay bằng màu tươi, mỗi cấp trường 1 màu riêng.
+// Màu hiển thị các lớp hạ tầng (vùng phủ, biểu đồ, ô màu danh sách lớp, màu nền lô khi zoom xa) — mỗi lớp 1 họ màu riêng,
+// không trùng bảng màu sử dụng đất của thẩm định đồ án (projectReviewCore.js): vàng / cam chỉ dành cho đất ở;
+// trường học họ tím → chàm (nhạt dần theo cấp: MN → THPT), cây xanh lục, y tế hồng, văn hóa tím hồng, dịch vụ đỏ,
+// bãi đỗ xe xám xanh, chưa sử dụng xám trắng; PCCC cùng màu đất an ninh, nhà tang lễ cùng màu đất nghĩa trang.
 // Hoa văn ranh lô khi phóng to vẫn theo đúng màu ACI của TT16 (tt16Symbols.js).
 export const BUFFER_COLORS = {
-  "1-CV": "#7ed321", "2-BDX": "#4dabf7", "3-MN": "#ffd43b", "4-TH": "#ff922b", "5-THCS": "#20c997", "6-THPT": "#b197fc",
-  "7-YT": "#f06cdb", "8-VH": "#ff8fab", "9-TM": "#ff5c5c", "12-CSD": "#ced4da",
-  "13-BUS": "#00e5ff", "10-PCCC": "#ff3d00", "11-NT": "#a1887f"
+  "1-CV": "#51cf66", "2-BDX": "#94a3b8", "3-MN": "#d0bfff", "4-TH": "#9775fa", "5-THCS": "#7048e8", "6-THPT": "#4c6ef5",
+  "7-YT": "#f06595", "8-VH": "#cc5de8", "9-TM": "#e03131", "12-CSD": "#f1f3f5",
+  "13-BUS": "#00e5ff", "10-PCCC": "#d9480f", "11-NT": "#795548"
 };
 export const BUFFER_KEYS = {
   "1-CV": "b1", "2-BDX": "b2", "3-MN": "b3", "4-TH": "b4", "5-THCS": "b5", "6-THPT": "b10",

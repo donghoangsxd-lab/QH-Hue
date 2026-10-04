@@ -1869,7 +1869,13 @@ body.project-review .bp-part2 { display: none; }
 .review-decide-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 4px; border-top: 1px dashed rgba(251, 146, 60, 0.45); color: var(--text-muted); }
 .review-decide-nav > span { flex: 1; font-size: var(--fs-xs, 11px); }
 .review-landuse .lu-code { white-space: nowrap; }
-.review-landuse th.lu-code, .review-landuse td.lu-code { text-align: left; }
+table.review-landuse th.lu-code, table.review-landuse td.lu-code { text-align: left; }
+table.review-landuse td:nth-child(n+4) { text-align: right; }
+.review-landuse tr.lu-undet td { font-style: italic; border-top: 1px dashed var(--border-color); }
+/* Viền đỏ nét đứt nhấp nháy quanh công trình vừa zoom tới từ bảng thẩm định */
+.review-flash { animation: review-flash 0.7s ease-in-out infinite alternate, review-flash-dash 1.2s linear infinite; }
+@keyframes review-flash { from { stroke-opacity: 1; } to { stroke-opacity: 0.15; } }
+@keyframes review-flash-dash { to { stroke-dashoffset: -28; } }
 .review-landuse .lu-code i { display: inline-block; width: 20px; height: 12px; margin-right: 5px; vertical-align: middle; border: 2px solid; border-radius: 2px; background-color: rgba(15, 23, 42, 0.6); }
 .review-landuse .lu-code small { color: var(--text-muted); font-size: 10px; }
 .review-decide { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; border-color: #fb923c; }

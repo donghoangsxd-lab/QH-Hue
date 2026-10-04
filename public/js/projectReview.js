@@ -16,7 +16,7 @@ import { tt16SymbolStyle, tt16SwatchCss, TT16_PATTERN_ZOOM } from './tt16Symbols
 import {
   REVIEW_MAX_BYTES, LANDUSE_TABLES, classifyLand, landChoices, landRowByKey, landUseSummary, landSubKey, importLayerName, decisionKind,
   presetDecision, tagParcel, lotRadius, scoreRows, rowLabel, rowMinSize, newLandControl, residentialSubAreas, landSymbol, UNIT_POP, THPT_POP_MIN,
-  projectOfFile
+  projectOfFile, PENDING_TONE, UNDETERMINED_KEY
 } from './projectReviewCore.js';
 
 const STORE_KEY = 'qh_review_dossiers_v2';
@@ -240,6 +240,7 @@ function clearMap() {
   clearPhase('HT');
   clearPhase('QH');
   resetHeat();
+  clearFlash();
   lotLayers = [];
 }
 
@@ -248,10 +249,13 @@ const isDetailed = (m) => !!m && m.getZoom() >= TT16_PATTERN_ZOOM;
 // Cùng nguyên tắc chú giải ranh lô và bảng tổng hợp (cột Ký hiệu): thu nhỏ tô màu lớp, phóng to tô hoa văn TT16;
 // viền theo giai đoạn của layer (HT mảnh, QHDD dải liền, QHDH dải nét đứt) — lớp hiện trạng và quy hoạch chung một bộ ký hiệu
 function lotStyle(lot) {
-  if (lot.ask || isUnresolvedDecision(lot)) {
-    return { color: ASK_COLOR, weight: 2.5, opacity: 1, dashArray: '6 4', fillColor: ASK_COLOR, fillOpacity: 0.3 };
+  // Chờ xác nhận tô đen: layer sai quy định viền đen liền, lô chờ chọn cấp trường / chợ - TTTM viền cam nét đứt (bấm để chọn)
+  if (lot.ask) return { color: PENDING_TONE, weight: 2, opacity: 1, dashArray: null, fillColor: PENDING_TONE, fillOpacity: 0.6 };
+  if (isUnresolvedDecision(lot)) {
+    return { color: ASK_COLOR, weight: 2.5, opacity: 1, dashArray: '6 4', fillColor: PENDING_TONE, fillOpacity: 0.6 };
   }
-  const sym = landSymbol(session.kind, lot.landKey, lot.subKey);
+  const split = residentialSubAreas(lot, session.kind);
+  const sym = landSymbol(session.kind, lot.landKey, split ? Object.keys(split)[0] : lot.subKey);
   return tt16SymbolStyle(sym.tt16, sym.tone, lot.layer, { scenario: lot.phase, detailed: isDetailed(targetMap(lot.phase)) });
 }
 
@@ -456,6 +460,7 @@ const focusMatch = (lot) => {
   if (k === 'lot') return lot.id === v;
   if (k === 'ask') return lot.layer === v;
   if (k === 'land') {
+    if (v === UNDETERMINED_KEY) return !!lot.ask;
     const [row, sub] = v.split('/');
     if (sub) {
       if (lot.landKey !== row) return false;
@@ -487,11 +492,40 @@ function applyFocus(fit) {
   if (fit) fitTo(bounds, 17);
 }
 
+// Viền đỏ nét đứt nhấp nháy tạm thời quanh lô vừa zoom tới (SVG riêng để chạy hiệu ứng CSS; bản đồ chính vẽ canvas)
+const FLASH_MS = 4500;
+const flashRenderers = new WeakMap();
+let flash = null;
+
+function clearFlash() {
+  if (!flash) return;
+  clearTimeout(flash.timer);
+  flash.layer.remove();
+  flash = null;
+}
+
+function flashLot(lot) {
+  clearFlash();
+  if (!lot) return;
+  const m = targetMap(lot.phase);
+  const geom = geometryOf(lot);
+  if (!m || !geom) return;
+  if (!flashRenderers.has(m)) flashRenderers.set(m, L.svg({ padding: 0.3 }));
+  const layer = L.geoJSON(geom, {
+    renderer: flashRenderers.get(m),
+    style: { className: 'review-flash', color: '#ff1f1f', weight: 3.5, opacity: 1, dashArray: '8 6', fill: false },
+    interactive: false
+  }).addTo(m);
+  flash = { layer, timer: setTimeout(clearFlash, FLASH_MS) };
+}
+
 function focusRow(key, fit = true) {
   const prev = focusKey;
   focusKey = focusKey === key && !fit ? '' : key;
   if (focusDrawsBuffer(prev) || focusDrawsBuffer(focusKey)) drawPhase('QH');
   applyFocus(fit);
+  if (fit && focusKey.startsWith('lot:')) flashLot(session.byId.get(focusKey.slice(4)));
+  else clearFlash();
   const el = document.querySelector(`#projectReviewHost [data-focus="${CSS.escape(focusKey)}"]`);
   el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
@@ -590,9 +624,20 @@ function decisionHtml() {
 const haCell = (v) => (v > 0 ? fmtNum(v) : '');
 const pctTxt = (v) => (v > 0 ? fmtNum(v) : '');
 
-// Ô ký hiệu: nền hoa văn TT16 như chú giải (khi phóng to), viền = màu tô khi thu nhỏ; đất không có hoa văn TT16 tô đặc
+// Ô ký hiệu: nền hoa văn TT16 như chú giải (khi phóng to), viền = màu tô khi thu nhỏ; đất không có hoa văn TT16 tô đặc.
+// Hoa văn ô lặp lớn (y tế, trường học) thu nửa cho vừa ô nhỏ
+const SWATCH_HALF = new Set(['7-YT', '3-MN', '4-TH', '5-THCS', '6-THPT']);
 function swatchHtml(r) {
-  return `<i style="${tt16SwatchCss(r.tt16) || `background:${r.tone};`}border-color:${r.tone}"></i>`;
+  const bg = tt16SwatchCss(r.tt16, SWATCH_HALF.has(r.tt16) ? 0.5 : 1) || `background:${r.tone};`;
+  return `<i style="${bg}border-color:${r.tone}"></i>`;
+}
+
+function landRowTitle(r) {
+  if (r.undetermined) {
+    const gap = [r.gapHtHa > 0 ? `HT ${fmtNum(r.gapHtHa)} ha` : '', r.gapQhHa > 0 ? `QH ${fmtNum(r.gapQhHa)} ha` : ''].filter(Boolean).join(', ');
+    return `Tạm thời: lô có layer chưa rõ đầu mục (tô đen trên bản đồ)${gap ? ` + phần chênh ${gap} để tổng hiện trạng = tổng quy hoạch` : ''}`;
+  }
+  return 'Bấm để xem các lô trên bản đồ';
 }
 
 function landTableHtml() {
@@ -604,7 +649,7 @@ function landTableHtml() {
         <td>${haCell(r.htHa)}</td><td>${pctTxt(r.htPct)}</td><td>${haCell(r.qhHa)}</td><td>${pctTxt(r.qhPct)}</td></tr>`;
     }
     const key = `land:${r.key}`;
-    return `<tr class="lu-row${r.sub ? ' lu-sub' : ''}${r.part ? ' lu-part' : ''}${focusKey === key ? ' on' : ''}" data-focus="${key}" title="Bấm để xem các lô trên bản đồ">
+    return `<tr class="lu-row${r.sub ? ' lu-sub' : ''}${r.part ? ' lu-part' : ''}${r.undetermined ? ' lu-undet' : ''}${focusKey === key ? ' on' : ''}" data-focus="${key}" title="${escapeHtml(landRowTitle(r))}">
       <td>${r.stt}</td><td>${escapeHtml(r.label)}</td>
       <td class="lu-code" title="${r.code ? `Tên phân lớp TT16: ${escapeHtml(r.code)}. ` : ''}Bản đồ: thu nhỏ tô màu viền ô, phóng to (zoom ≥ ${TT16_PATTERN_ZOOM}) tô hoa văn TT16">${swatchHtml(r)}${escapeHtml(r.sym || '')}</td>
       <td>${haCell(r.htHa)}</td><td>${pctTxt(r.htPct)}</td><td>${haCell(r.qhHa)}</td><td>${pctTxt(r.qhPct)}</td></tr>`;
@@ -626,7 +671,7 @@ function askHtml() {
   const asks = askLayers();
   if (!asks.length || session.pendingId) return '';
   const choices = landChoices(session.kind);
-  return `<div class="review-card review-ask"><b class="review-card-title" title="Viền cam trên bản đồ — chọn đầu mục sử dụng đất cho từng layer">${ico('alert')}Layer chưa đúng TT16 (${asks.length}) — chọn đầu mục</b><div class="review-ask-list">${asks.map(r => {
+  return `<div class="review-card review-ask"><b class="review-card-title" title="Tô đen trên bản đồ, tạm tính vào dòng Chưa xác định — chọn đầu mục sử dụng đất cho từng layer">${ico('alert')}Layer chưa đúng TT16 (${asks.length}) — chọn đầu mục</b><div class="review-ask-list">${asks.map(r => {
     const cur = session.layerChoice.get(r.layer) || '';
     const opts = [`<option value="">Chọn đầu mục…</option>`]
       .concat(choices.map(c => `<option value="${c.key}"${cur === c.key ? ' selected' : ''}>${escapeHtml(c.label)}</option>`))
@@ -644,7 +689,10 @@ function pctCell(pct) {
   return `<b class="${pct >= 100 ? 'c-green' : 'c-red'}">${fmtNum(pct)}%</b>`;
 }
 
-const QCVN_HEAD = '<thead><tr><th></th><th>Loại hạ tầng</th><th>Diện tích</th><th>Chỉ tiêu</th><th>Nhu cầu</th><th>Số lượng</th><th>Quy mô</th><th>Độ phủ</th></tr></thead>';
+const QCVN_HEAD = `<thead><tr><th></th><th>Loại hạ tầng / Tên công trình</th><th>Diện tích (m²)</th><th>Chỉ tiêu (m²/người)</th>
+  <th title="Dòng nhóm: chỉ tiêu × dân số quy hoạch. Dòng công trình: diện tích tối thiểu mỗi công trình">Tổng nhu cầu (m²)</th>
+  <th>Số lượng (công trình)</th><th title="Dòng nhóm: diện tích / tổng nhu cầu. Dòng công trình: đạt / chưa đạt diện tích tối thiểu">Đánh giá quy mô (%)</th>
+  <th>Đánh giá độ phủ (%)</th></tr></thead>`;
 
 // Tên công trình trong danh sách xổ xuống: tên theo quyết định (Chợ, Trường Mầm non…) hoặc tên dòng, đánh số theo thứ tự lô
 function memberName(lot) {
@@ -653,9 +701,15 @@ function memberName(lot) {
 
 const MIN_SIZE_TITLE = 'Quy mô tối thiểu mỗi công trình theo QCVN 01:2026/BXD (cùng ngưỡng bảng chi tiết phường)';
 
-function minSizeBadge(lot) {
-  const min = minSizeWarn(lot);
-  return min ? ` <span class="min-size-warn" title="${MIN_SIZE_TITLE}: ${fmtNum(min)} m²">${ico('alert')}&lt; ${fmtNum(min)} m²</span>` : '';
+/** Đánh giá quy mô tối thiểu của 1 công trình (cột Đánh giá quy mô của dòng công trình) */
+function minVerdictHtml(lot) {
+  const min = rowMinSize(lot.scoreKey);
+  if (!min) return '<span class="c-muted">—</span>';
+  const pct = Math.round(lot.area / min * 1000) / 10;
+  const title = `${MIN_SIZE_TITLE}: ${fmtNum(min)} m² · đạt ${fmtNum(pct)}%`;
+  return lot.area >= min
+    ? `<b class="c-green" title="${title}">Đạt QM tối thiểu</b>`
+    : `<span class="min-size-warn" title="${title}">${ico('alert')}Chưa đạt (${fmtNum(pct)}%)</span>`;
 }
 
 /** Số công trình dưới quy mô tối thiểu / số công trình có ngưỡng của dòng (dòng cộng bỏ qua để khỏi đếm đôi) */
@@ -663,29 +717,38 @@ function minSizeSummary(row) {
   if (row.sumOf) return '';
   const checked = row.members.filter(p => rowMinSize(p.scoreKey) > 0);
   const below = checked.filter(p => minSizeWarn(p)).length;
-  return below ? ` <span class="min-size-warn" title="${MIN_SIZE_TITLE}">${ico('alert')}${below}/${checked.length} dưới QM tối thiểu</span>` : '';
+  return below ? `<br><span class="min-size-warn" title="${MIN_SIZE_TITLE}">${ico('alert')}${below}/${checked.length} dưới QM tối thiểu</span>` : '';
 }
 
 function memberRowsHtml(row) {
   const open = session.openRows.has(row.key);
-  return `</tbody><tbody data-members="${row.key}"${open ? '' : ' hidden'}>${row.members.map(p => `<tr class="wt-sub${focusKey === `lot:${p.id}` ? ' on' : ''}" data-focus="lot:${p.id}">
+  return `</tbody><tbody data-members="${row.key}"${open ? '' : ' hidden'}>${row.members.map(p => {
+    const min = rowMinSize(p.scoreKey);
+    return `<tr class="wt-sub${focusKey === `lot:${p.id}` ? ' on' : ''}" data-focus="lot:${p.id}">
       <td>-</td>
       <td><button type="button" class="link-btn" data-zoom-lot="${p.id}" title="${p.pointName ? 'Tên theo công trình đã có trong dữ liệu nằm trong lô. ' : ''}Zoom tới công trình">${escapeHtml(memberName(p))}</button></td>
-      <td>${fmtNum(Math.round(p.area))} m²${minSizeBadge(p)}</td>
-      <td>-</td><td>-</td><td>-</td>
-      <td colspan="2" class="wt-radius">${p.radius ? `R ${fmtNum(p.radius)} m` : '-'}</td>
-    </tr>`).join('')}</tbody><tbody>`;
+      <td>${fmtNum(Math.round(p.area))}</td>
+      <td>-</td>
+      <td${min ? ` title="Diện tích tối thiểu mỗi công trình (${MIN_SIZE_TITLE})"` : ''}>${min ? `≥ ${fmtNum(min)}` : '-'}</td>
+      <td>-</td>
+      <td>${minVerdictHtml(p)}</td>
+      <td>-</td>
+    </tr>`;
+  }).join('')}</tbody><tbody>`;
+}
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+function scoreTableTitle(scored) {
+  const head = `Bảng thẩm định ${LANDUSE_TABLES[session.kind].short} theo QCVN 01:2026/BXD`;
+  return session.kind === 'QHC'
+    ? `${head} - Đánh giá hạ tầng cấp đô thị.`
+    : `${head} - Đánh giá hạ tầng cấp đơn vị ở: ${pad2(scored.units)} đơn vị ở.`;
 }
 
 function scoreTableHtml(scored) {
   const body = [];
-  let last = '';
   scored.rows.forEach(row => {
-    if (row.section !== last) {
-      last = row.section;
-      const title = row.section === 'A' ? 'A · CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ' : `B · CÔNG TRÌNH HẠ TẦNG CẤP ĐƠN VỊ Ở (quy hoạch: ${scored.units} đơn vị ở)`;
-      body.push(`<tr class="wt-section wt-${row.section === 'A' ? 'a' : 'b'}"><td>${row.section}</td><td colspan="7">${title}</td></tr>`);
-    }
     const count = row.perUnit && scored.units > 0 ? `${row.count} / ${scored.units}` : fmtNum(row.count);
     const key = `score:${row.key}`;
     const open = session.openRows.has(row.key);
@@ -693,20 +756,18 @@ function scoreTableHtml(scored) {
       ? ` <button type="button" class="sub-toggle" data-members-toggle="${row.key}" aria-expanded="${open}" aria-label="Hiện/ẩn danh sách công trình">${open ? '▲' : '▼'}</button>`
       : '';
     body.push(`<tr class="wt-main${focusKey === key ? ' on' : ''}" data-focus="${key}" title="Bấm để xem các lô và bán kính phục vụ">
-      <td></td><td>${escapeHtml(row.label)}${toggle}${minSizeSummary(row)}</td>
-      <td>${fmtNum(row.area)} m²</td>
-      <td>${row.quota > 0 ? `${fmtNum(row.quota)} m²/người` : '—'}</td>
-      <td>${row.demand ? `${fmtNum(row.demand)} m²` : '—'}</td>
+      <td></td><td>${escapeHtml(row.label)}${toggle}</td>
+      <td>${fmtNum(row.area)}</td>
+      <td>${row.quota > 0 ? fmtNum(row.quota) : '—'}</td>
+      <td>${row.demand ? fmtNum(row.demand) : '—'}</td>
       <td>${count}</td>
-      <td>${pctCell(row.scalePct)}</td>
+      <td>${pctCell(row.scalePct)}${minSizeSummary(row)}</td>
       <td>${row.members.length ? pctCell(row.coverPct) : '<span class="c-muted">—</span>'}</td>
     </tr>`);
     if (row.members.length) body.push(memberRowsHtml(row));
   });
-  const level = session.kind === 'QHC'
-    ? 'cấp đô thị (bảng A)'
-    : `cấp đơn vị ở (bảng B${Number(session.popQH) > THPT_POP_MIN ? ' + trường THPT' : ''})`;
-  return `<h4>Thẩm định QCVN 01:2026/BXD — lớp quy hoạch, ${level}</h4>
+  const thpt = session.kind === 'QHPK' && Number(session.popQH) > THPT_POP_MIN ? ` · gồm trường THPT (dân số trên ${fmtNum(THPT_POP_MIN)} người)` : '';
+  return `<h4 title="Lớp quy hoạch${thpt}">${escapeHtml(scoreTableTitle(scored))}</h4>
     <div class="ward-table-scroll-container"><table class="ward-table review-score">${QCVN_HEAD}<tbody>${body.join('')}</tbody></table></div>`;
 }
 
@@ -1191,9 +1252,9 @@ function showDraft(id) {
   setReviewScope(null);
   openHost();
   const body = d.rows.map(r => `<tr class="wt-main">
-    <td>${r.section}</td><td>${escapeHtml(r.label)}</td><td>${fmtNum(r.area)} m²</td>
-    <td>${r.quota > 0 ? `${fmtNum(r.quota)} m²/người` : '—'}</td>
-    <td>${r.demand ? `${fmtNum(r.demand)} m²` : '—'}</td><td>${fmtNum(r.count)}</td>
+    <td></td><td>${escapeHtml(r.label)}</td><td>${fmtNum(r.area)}</td>
+    <td>${r.quota > 0 ? fmtNum(r.quota) : '—'}</td>
+    <td>${r.demand ? fmtNum(r.demand) : '—'}</td><td>${fmtNum(r.count)}</td>
     <td>${pctCell(r.scalePct)}</td><td>${pctCell(r.coverPct)}</td></tr>`).join('');
   host.innerHTML = `<div id="projectReviewSheet" class="review-sheet">
     <div class="bp-part-head review-head"><b class="bp-part-title">HỒ SƠ ĐÃ GỬI · ${escapeHtml(d.kind)} · ${escapeHtml(d.name)}</b>
@@ -1205,7 +1266,7 @@ function showDraft(id) {
     <div class="review-note">Dân số HT ${fmtNum(d.popHT || 0)} · QH ${fmtNum(d.popQH)} · ${d.units} đơn vị ở · đất ở ${fmtNum(d.housingArea)} m². Bản đồ chỉ hiện khi đang mở file.</div>
     <div class="review-cols">
       <div class="review-col">${d.landHtml || ''}</div>
-      <div class="review-col">${d.controlHtml || ''}<h4>Thẩm định QCVN 01:2026/BXD</h4><div class="ward-table-scroll-container"><table class="ward-table">${QCVN_HEAD}<tbody>${body}</tbody></table></div></div>
+      <div class="review-col">${d.controlHtml || ''}<h4>Bảng thẩm định ${escapeHtml(d.kind)} theo QCVN 01:2026/BXD${d.kind === 'QHC' ? ' - Đánh giá hạ tầng cấp đô thị.' : ` - Đánh giá hạ tầng cấp đơn vị ở: ${pad2(d.units)} đơn vị ở.`}</h4><div class="ward-table-scroll-container"><table class="ward-table">${QCVN_HEAD}<tbody>${body}</tbody></table></div></div>
     </div></div>`;
 }
 

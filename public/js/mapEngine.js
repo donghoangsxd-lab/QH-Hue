@@ -1088,6 +1088,7 @@ export async function refreshHeatmapOnly() {
   planHeatStale = true;
   if (reviewScope) {
     heatStale = true;
+    planHeatSeq++;
     setLeftHeatUrl('');
     setPlanHeatUrl('');
     reviewScope.onHeat?.(isHeatOn());
@@ -1127,7 +1128,7 @@ async function refreshPlanHeat() {
   }
   try {
     const url = await requestHeatTile(planList);
-    if (seq === planHeatSeq) setPlanHeatUrl(url);
+    if (seq === planHeatSeq && !reviewScope) setPlanHeatUrl(url);
   } catch (err) {
     if (seq === planHeatSeq) planHeatStale = true;
     console.warn("Lỗi cập nhật heatmap quy hoạch:", err);

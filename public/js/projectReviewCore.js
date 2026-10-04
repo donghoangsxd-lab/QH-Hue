@@ -14,79 +14,82 @@ export const UNIT_POP = 20000;
 // split: đầu mục đất ở chia hiện trạng / mới theo phần diện tích lô quy hoạch chồng lên đất ở hiện trạng
 const C = (key, label, sym, codes, color, extra = {}) => ({ key, label, sym, codes, color, ...extra });
 const SCHOOL_SUBS = [['thpt', 'Trường THPT', 'THPT'], ['mn', 'Trường mầm non', 'MN'], ['th', 'Trường tiểu học', 'TH'], ['thcs', 'Trường THCS', 'THCS'], ['school', 'Trường học chưa phân cấp', 'TRH']];
-// Đất thể thao thống kê chung nhóm văn hóa - thể thao nhưng tô tông xanh lá cho dễ nhận biết
-const SPORT_COLOR = '#40c057';
+// Bảng màu: mỗi đầu mục 1 màu không trùng trong cùng bảng; vàng / cam chỉ dành cho đất ở, trường học họ tím → chàm,
+// y tế / văn hóa / dịch vụ họ hồng - đỏ, cây xanh lục, mặt nước lam, hạ tầng kỹ thuật xám; an ninh (gồm PCCC) gạch cam,
+// nghĩa trang (gồm nhà tang lễ) nâu — khớp BUFFER_COLORS của lớp hạ tầng (state.js).
+// Đất thể thao thống kê chung nhóm văn hóa - thể thao nhưng tô tông xanh ngọc cho dễ nhận biết
+const SPORT_COLOR = '#20c997';
 
 const QHC_ROWS = [
   { section: 'I', label: 'Khu đất dân dụng' },
   C('dd_o', 'Đơn vị ở', 'DVO', ['DAT_DD_DONVIO'], '#f5d90a', { split: true, subs: [['ht', 'Đất đơn vị ở hiện trạng', 'OHT'], ['moi', 'Đất đơn vị ở mới', 'OQH']] }),
-  C('dd_hh', 'Hỗn hợp (đơn vị ở và dịch vụ - công cộng)', 'HH', ['DAT_DD_HONHOP'], '#f59f00'),
-  C('dd_dvcc', 'Dịch vụ - công cộng', 'DVCC', ['DAT_DD_DVCCDOTHI', 'DAT_DD_TRUONGTHPT', 'DAT_DD_TRUONGHOC'], '#e03131', { subs: [...SCHOOL_SUBS, ['other', 'Dịch vụ - công cộng khác', 'DVCC-K']] }),
-  C('dd_cq', 'Cơ quan, trụ sở cấp đô thị', 'CQ', ['DAT_DD_COQUANDOTHI'], '#8d6e63'),
-  C('dd_cx', 'Cây xanh sử dụng công cộng', 'CXCC', ['DAT_DD_CAYXANHCCDOTHI'], '#2f9e44'),
-  C('dd_gt', 'Giao thông đô thị', 'GT', ['DAT_DD_GIAOTHONGDOTHI'], '#adb5bd'),
-  C('dd_ht', 'Hạ tầng kỹ thuật khác cấp đô thị', 'HTKT', ['DAT_DD_HTKHACDOTHI'], '#868e96'),
+  C('dd_hh', 'Hỗn hợp (đơn vị ở và dịch vụ - công cộng)', 'HH', ['DAT_DD_HONHOP'], '#ffa94d'),
+  C('dd_dvcc', 'Dịch vụ - công cộng', 'DVCC', ['DAT_DD_DVCCDOTHI', 'DAT_DD_TRUONGTHPT', 'DAT_DD_TRUONGHOC'], '#a61e4d', { subs: [...SCHOOL_SUBS, ['other', 'Dịch vụ - công cộng khác', 'DVCC-K']] }),
+  C('dd_cq', 'Cơ quan, trụ sở cấp đô thị', 'CQ', ['DAT_DD_COQUANDOTHI'], '#a1887f'),
+  C('dd_cx', 'Cây xanh sử dụng công cộng', 'CXCC', ['DAT_DD_CAYXANHCCDOTHI'], '#51cf66'),
+  C('dd_gt', 'Giao thông đô thị', 'GT', ['DAT_DD_GIAOTHONGDOTHI'], '#dee2e6'),
+  C('dd_ht', 'Hạ tầng kỹ thuật khác cấp đô thị', 'HTKT', ['DAT_DD_HTKHACDOTHI'], '#5c677d'),
   { section: 'II', label: 'Khu đất ngoài dân dụng' },
-  C('ndd_cn', 'Sản xuất công nghiệp', 'CN', ['DAT_NDD_CONGNGHIEP'], '#9c36b5'),
+  C('ndd_cn', 'Sản xuất công nghiệp', 'CN', ['DAT_NDD_CONGNGHIEP'], '#862e9c'),
   C('ndd_dt', 'Trung tâm đào tạo, nghiên cứu', 'ĐT-NC', ['DAT_NDD_DAOTAO'], '#1e3a8a'),
   C('ndd_cq', 'Cơ quan, trụ sở ngoài đô thị', 'CQ-N', ['DAT_NDD_COQUAN'], '#8d6e63'),
-  C('ndd_yt', 'Trung tâm y tế', 'YT', ['DAT_NDD_YTE'], '#e64980'),
-  C('ndd_vh', 'Trung tâm văn hóa, thể dục thể thao', 'VH-TT', ['DAT_NDD_VANHOATHETHAO'], '#d6336c'),
-  C('ndd_dl', 'Dịch vụ, du lịch', 'DL', ['DAT_NDD_DULICH'], '#f783ac'),
-  C('ndd_cxhc', 'Cây xanh sử dụng hạn chế', 'CXHC', ['DAT_NDD_CAYXANHSDHC'], '#69db7c'),
-  C('ndd_cxcd', 'Cây xanh chuyên dụng (nếu có)', 'CXCD', ['DAT_NDD_CAYXANHCD'], '#37b24d'),
+  C('ndd_yt', 'Trung tâm y tế', 'YT', ['DAT_NDD_YTE'], '#f06595'),
+  C('ndd_vh', 'Trung tâm văn hóa, thể dục thể thao', 'VH-TT', ['DAT_NDD_VANHOATHETHAO'], '#cc5de8'),
+  C('ndd_dl', 'Dịch vụ, du lịch', 'DL', ['DAT_NDD_DULICH'], '#fcc2d7'),
+  C('ndd_cxhc', 'Cây xanh sử dụng hạn chế', 'CXHC', ['DAT_NDD_CAYXANHSDHC'], '#b2f2bb'),
+  C('ndd_cxcd', 'Cây xanh chuyên dụng (nếu có)', 'CXCD', ['DAT_NDD_CAYXANHCD'], '#2b8a3e'),
   C('ndd_dtich', 'Di tích, tôn giáo', 'DT-TG', ['DAT_NDD_DITICH'], '#7f1d1d'),
-  C('ndd_nt', 'Điểm dân cư nông thôn', 'DCNT', ['DAT_NDD_DANCUNT'], '#ffe066'),
-  C('ndd_an', 'An ninh', 'AN', ['DAT_NDD_ANNINH'], '#c5d86d'),
-  C('ndd_qp', 'Quốc phòng', 'QP', ['DAT_NDD_QUOCPHONG'], '#a9c25d'),
-  C('ndd_gt', 'Giao thông đối ngoại', 'GTĐN', ['DAT_NDD_GIAOTHONGDN', 'DAT_NDD_GIAOTHONG', 'DAT_NDD_GIAOTHONGDOINGOAI'], '#ced4da'),
-  C('ndd_ht', 'Hạ tầng kỹ thuật khác ngoài đô thị', 'HTK', ['DAT_NDD_HTKHACDOINGOAI', 'DAT_NDD_HTKTKHAC', 'DAT_NDD_HTKHAC', 'DAT_NDD_HATANGKHAC'], '#868e96'),
+  C('ndd_nt', 'Điểm dân cư nông thôn', 'DCNT', ['DAT_NDD_DANCUNT'], '#d8b56d'),
+  C('ndd_an', 'An ninh (bao gồm trụ sở cảnh sát PCCC)', 'AN', ['DAT_NDD_ANNINH'], '#d9480f'),
+  C('ndd_qp', 'Quốc phòng', 'QP', ['DAT_NDD_QUOCPHONG'], '#5c940d'),
+  C('ndd_gt', 'Giao thông đối ngoại', 'GTĐN', ['DAT_NDD_GIAOTHONGDN', 'DAT_NDD_GIAOTHONG', 'DAT_NDD_GIAOTHONGDOINGOAI'], '#c5cbd3'),
+  C('ndd_ht', 'Hạ tầng kỹ thuật khác ngoài đô thị', 'HTK', ['DAT_NDD_HTKHACDOINGOAI', 'DAT_NDD_HTKTKHAC', 'DAT_NDD_HTKHAC', 'DAT_NDD_HATANGKHAC'], '#495057'),
   { section: 'III', label: 'Khu đất nông nghiệp và chức năng khác' },
   C('nnk_nn', 'Sản xuất nông nghiệp', 'NN', ['DAT_NNK_NONGNGHIEP'], '#a9e34b'),
-  C('nnk_ln', 'Lâm nghiệp (rừng sản xuất, rừng phòng hộ và rừng đặc dụng)', 'LN', ['DAT_NNK_RUNGSANXUAT', 'DAT_NNK_RUNGPHONGHO', 'DAT_NNK_RUNGDACDUNG', 'DAT_NNK_LAMNGHIEP'], '#2b8a3e'),
-  C('nnk_ts', 'Nuôi trồng thủy sản', 'TS', ['DAT_NNK_THUYSAN'], '#74c0fc'),
-  C('nnk_csd', 'Chưa sử dụng (đất bằng và đồi núi chưa sử dụng)', 'CSD', ['DAT_NNK_CHUASUDUNG'], '#dee2e6'),
-  C('nnk_ho', 'Hồ, ao, đầm', 'HO', ['DAT_NNK_HONUOC'], '#4dabf7'),
+  C('nnk_ln', 'Lâm nghiệp (rừng sản xuất, rừng phòng hộ và rừng đặc dụng)', 'LN', ['DAT_NNK_RUNGSANXUAT', 'DAT_NNK_RUNGPHONGHO', 'DAT_NNK_RUNGDACDUNG', 'DAT_NNK_LAMNGHIEP'], '#087f5b'),
+  C('nnk_ts', 'Nuôi trồng thủy sản', 'TS', ['DAT_NNK_THUYSAN'], '#99e9f2'),
+  C('nnk_csd', 'Chưa sử dụng (đất bằng và đồi núi chưa sử dụng)', 'CSD', ['DAT_NNK_CHUASUDUNG'], '#f1f3f5'),
+  C('nnk_ho', 'Hồ, ao, đầm', 'HO', ['DAT_NNK_HONUOC'], '#74c0fc'),
   C('nnk_song', 'Sông, suối, kênh, rạch', 'SS', ['DAT_NNK_SONGSUOI'], '#339af0'),
-  C('nnk_bien', 'Mặt nước ven biển', 'MNB', ['DAT_NNK_MATNUOCBIEN'], '#1c7ed6')
+  C('nnk_bien', 'Mặt nước ven biển', 'MNB', ['DAT_NNK_MATNUOCBIEN'], '#1864ab')
 ];
 
 const QHPK_ROWS = [
   C('o', 'Nhóm nhà ở', 'NO', ['DAT_O_NHOMNHAO'], '#f5d90a', { split: true, subs: [['ht', 'Nhóm nhà ở hiện trạng', 'OHT'], ['moi', 'Nhóm nhà ở mới', 'OQH']] }),
-  C('hh', 'Hỗn hợp nhóm nhà ở và dịch vụ', 'HH', ['DAT_O_HONHOP_NHOMO', 'DAT_O_HONHOP'], '#f59f00'),
-  C('lx', 'Khu làng xóm, dân cư nông thôn', 'LX', ['DAT_O_LANGXOM'], '#ffe066'),
-  C('yt', 'Y tế', 'YT', ['DAT_HTXH_YTE'], '#e64980'),
-  C('vh', 'Văn hóa', 'VH', ['DAT_HTXH_VANHOA'], '#d6336c'),
+  C('hh', 'Hỗn hợp nhóm nhà ở và dịch vụ', 'HH', ['DAT_O_HONHOP_NHOMO', 'DAT_O_HONHOP'], '#ffa94d'),
+  C('lx', 'Khu làng xóm, dân cư nông thôn', 'LX', ['DAT_O_LANGXOM'], '#d8b56d'),
+  C('yt', 'Y tế', 'YT', ['DAT_HTXH_YTE'], '#f06595'),
+  C('vh', 'Văn hóa', 'VH', ['DAT_HTXH_VANHOA'], '#cc5de8'),
   C('tdtt', 'Thể dục thể thao', 'VH-TT', ['DAT_NDD_VANHOATHETHAO', 'DAT_HTXH_THEDUCTHETHAO'], SPORT_COLOR),
-  C('gd', 'Giáo dục', 'GD', ['DAT_HTXH_TRUONGTHPT', 'DAT_HTXH_TRUONGHOC'], '#1971c2', { subs: [...SCHOOL_SUBS, ['other', 'Giáo dục khác', 'GD-K']] }),
-  C('cxcc', 'Cây xanh sử dụng công cộng', 'CXCC', ['DAT_HTXH_CAYXANHCC'], '#2f9e44'),
-  C('cxhc', 'Cây xanh sử dụng hạn chế', 'CXHC', ['DAT_CAYXANHHANCHE'], '#69db7c'),
-  C('cxcd', 'Cây xanh chuyên dụng', 'CXCD', ['DAT_CAYXANHCHUYENDUNG'], '#37b24d'),
-  C('sx', 'Sản xuất, kho bãi', 'SX', ['DAT_SX_CONGNGHIEP'], '#9c36b5'),
-  C('ks', 'Khai thác, chế biến khoáng sản, sản xuất vật liệu xây dựng', 'KS', ['DAT_SX_VATLIEU'], '#862e9c'),
+  C('gd', 'Giáo dục', 'GD', ['DAT_HTXH_TRUONGTHPT', 'DAT_HTXH_TRUONGHOC'], '#5f3dc4', { subs: [...SCHOOL_SUBS, ['other', 'Giáo dục khác', 'GD-K']] }),
+  C('cxcc', 'Cây xanh sử dụng công cộng', 'CXCC', ['DAT_HTXH_CAYXANHCC'], '#51cf66'),
+  C('cxhc', 'Cây xanh sử dụng hạn chế', 'CXHC', ['DAT_CAYXANHHANCHE'], '#b2f2bb'),
+  C('cxcd', 'Cây xanh chuyên dụng', 'CXCD', ['DAT_CAYXANHCHUYENDUNG'], '#2b8a3e'),
+  C('sx', 'Sản xuất, kho bãi', 'SX', ['DAT_SX_CONGNGHIEP'], '#862e9c'),
+  C('ks', 'Khai thác, chế biến khoáng sản, sản xuất vật liệu xây dựng', 'KS', ['DAT_SX_VATLIEU'], '#495057'),
   C('dtnc', 'Đào tạo, nghiên cứu', 'ĐT-NC', ['DAT_DAOTAONC'], '#1e3a8a'),
-  C('cq', 'Cơ quan, trụ sở', 'CQ', ['DAT_COQUAN'], '#8d6e63'),
-  C('dv', 'Khu dịch vụ (không bao gồm dịch vụ du lịch)', 'DV', ['DAT_DICHVU'], '#ff8787', {
+  C('cq', 'Cơ quan, trụ sở', 'CQ', ['DAT_COQUAN'], '#a1887f'),
+  C('dv', 'Khu dịch vụ (không bao gồm dịch vụ du lịch)', 'DV', ['DAT_DICHVU'], '#ffa8a8', {
     subs: [['cho', 'Đất chợ, trung tâm thương mại', 'CHO'], ['pending', 'Chưa xác nhận chợ / trung tâm thương mại', 'DV?'], ['other', 'Đất dịch vụ khác', 'DVK']]
   }),
-  C('dl', 'Khu dịch vụ - du lịch', 'DL', ['DAT_DULICH'], '#f783ac'),
+  C('dl', 'Khu dịch vụ - du lịch', 'DL', ['DAT_DULICH'], '#fcc2d7'),
   C('dtich', 'Di tích, tôn giáo', 'DT-TG', ['DAT_DITICH_TONGIAO', 'DAT_DITICHTONGIAO'], '#7f1d1d'),
-  C('an', 'An ninh', 'AN', ['DAT_ANNINH'], '#c5d86d'),
-  C('qp', 'Quốc phòng', 'QP', ['DAT_QUOCPHONG', 'DAT_NDD_QUOCPHONG'], '#a9c25d'),
-  C('gt', 'Đường giao thông', 'GT', ['DAT_HTKT_DUONGGT', 'DAT_NDD_GIAOTHONGDN'], '#adb5bd'),
-  C('bdx', 'Bãi đỗ xe', 'BDX', ['DAT_HTKT_BAIDOXE'], '#495057'),
-  C('ntr', 'Nghĩa trang (bao gồm cả nhà tang lễ, cơ sở hỏa táng)', 'NTR', ['DAT_HTKT_NGHIATRANG'], '#5c5f66'),
-  C('htk', 'Hệ thống công trình hạ tầng kỹ thuật khác', 'HTK', ['DAT_NDD_HTKHACDOINGOAI', 'DAT_HTKT_HATANGKHAC', 'DAT_HTKT_HTKTKHAC', 'DAT_HTKT_KHAC'], '#868e96'),
+  C('an', 'An ninh (bao gồm trụ sở cảnh sát PCCC)', 'AN', ['DAT_ANNINH'], '#d9480f'),
+  C('qp', 'Quốc phòng', 'QP', ['DAT_QUOCPHONG', 'DAT_NDD_QUOCPHONG'], '#5c940d'),
+  C('gt', 'Đường giao thông', 'GT', ['DAT_HTKT_DUONGGT', 'DAT_NDD_GIAOTHONGDN'], '#dee2e6'),
+  C('bdx', 'Bãi đỗ xe', 'BDX', ['DAT_HTKT_BAIDOXE'], '#94a3b8'),
+  C('ntr', 'Nghĩa trang (bao gồm cả nhà tang lễ, cơ sở hỏa táng)', 'NTR', ['DAT_HTKT_NGHIATRANG'], '#795548'),
+  C('htk', 'Hệ thống công trình hạ tầng kỹ thuật khác', 'HTK', ['DAT_NDD_HTKHACDOINGOAI', 'DAT_HTKT_HATANGKHAC', 'DAT_HTKT_HTKTKHAC', 'DAT_HTKT_KHAC'], '#5c677d'),
   C('nn', 'Sản xuất nông nghiệp', 'NN', ['DAT_NN_NONGNGHIEP'], '#a9e34b'),
-  C('ln', 'Lâm nghiệp', 'LN', [], '#2b8a3e', { sumOf: ['rsx', 'rph', 'rdd'] }),
-  C('rsx', '- Rừng sản xuất', 'RSX', ['DAT_NN_RUNGSANXUAT'], '#2b8a3e', { sub: true }),
-  C('rph', '- Rừng phòng hộ', 'RPH', ['DAT_NN_RUNGPHONGHO'], '#237032', { sub: true }),
-  C('rdd', '- Rừng đặc dụng', 'RĐD', ['DAT_NN_RUNGDACDUNG'], '#1b5e28', { sub: true }),
-  C('ts', 'Nuôi trồng thủy sản', 'TS', ['DAT_NN_THUYSAN'], '#74c0fc'),
-  C('csd', 'Đất chưa sử dụng', 'CSD', ['DAT_KHAC_CHUASUDUNG'], '#dee2e6'),
-  C('ho', 'Hồ, ao, đầm', 'HO', ['DAT_KHAC_HONUOC'], '#4dabf7'),
+  C('ln', 'Lâm nghiệp', 'LN', [], '#087f5b', { sumOf: ['rsx', 'rph', 'rdd'] }),
+  C('rsx', '- Rừng sản xuất', 'RSX', ['DAT_NN_RUNGSANXUAT'], '#099268', { sub: true }),
+  C('rph', '- Rừng phòng hộ', 'RPH', ['DAT_NN_RUNGPHONGHO'], '#087f5b', { sub: true }),
+  C('rdd', '- Rừng đặc dụng', 'RĐD', ['DAT_NN_RUNGDACDUNG'], '#065f46', { sub: true }),
+  C('ts', 'Nuôi trồng thủy sản', 'TS', ['DAT_NN_THUYSAN'], '#99e9f2'),
+  C('csd', 'Đất chưa sử dụng', 'CSD', ['DAT_KHAC_CHUASUDUNG'], '#f1f3f5'),
+  C('ho', 'Hồ, ao, đầm', 'HO', ['DAT_KHAC_HONUOC'], '#74c0fc'),
   C('song', 'Sông, suối, kênh, rạch', 'SS', ['DAT_KHAC_SONGSUOI'], '#339af0'),
-  C('bien', 'Mặt nước ven biển', 'MNB', ['DAT_KHAC_MATNUOCBIEN'], '#1c7ed6')
+  C('bien', 'Mặt nước ven biển', 'MNB', ['DAT_KHAC_MATNUOCBIEN'], '#1864ab')
 ];
 
 // housing: đầu mục đất ở làm mẫu số độ phủ (QHC: đơn vị ở + hỗn hợp; QHPK: nhóm nhà ở + hỗn hợp)
@@ -103,8 +106,9 @@ export const LANDUSE_TABLES = {
 };
 
 const STAGES = new Set(['HT', 'QHDD', 'QHDH', 'QH']);
-// Hậu tố cấp TT16 + quy ước nội bộ: _CHO / _TM (_TTTM) / _KHAC cho DAT_DICHVU (chợ, trung tâm thương mại, dịch vụ khác)
-const LEVEL_SUFFIX = new Set(['QG', 'CV', 'CT', 'CH', 'DVO', 'MN', 'TH', 'THCS', 'CHO', 'TM', 'TTTM', 'KHAC']);
+// Hậu tố cấp TT16 + quy ước nội bộ: _CHO / _TM (_TTTM) / _KHAC cho DAT_DICHVU (chợ, trung tâm thương mại, dịch vụ khác);
+// _PCCC (trụ sở PCCC → đất an ninh), _TANGLE (nhà tang lễ → đất nghĩa trang)
+const LEVEL_SUFFIX = new Set(['QG', 'CV', 'CT', 'CH', 'DVO', 'MN', 'TH', 'THCS', 'CHO', 'TM', 'TTTM', 'KHAC', 'PCCC', 'TANGLE']);
 const PRESET_SUFFIX = { CHO: 'CHO', TM: 'TTTM', TTTM: 'TTTM', KHAC: 'NO' };
 const codeIndex = {};
 Object.entries(LANDUSE_TABLES).forEach(([kind, t]) => {
@@ -157,16 +161,24 @@ const ROW_TT16 = {
   }
 };
 const SUB_TT16 = { thpt: '6-THPT', mn: '3-MN', th: '4-TH', thcs: '5-THCS', cho: '9-TM' };
-// Lô trường học chưa phân cấp / dịch vụ chưa xác nhận: tô cam như lô đang chờ chọn trên bản đồ
-const PENDING_TONE = '#fb923c';
+// Đất ở hiện trạng (giữ lại) vàng đậm, đất ở mới vàng nhạt; đầu mục đất ở giữ vàng chuẩn
+const SUB_TONE = { ht: '#e0a800', moi: '#fff3bf' };
+// Lô chờ người dùng xác nhận (layer sai quy định, trường chưa phân cấp, dịch vụ chưa rõ chợ / TTTM): tô đen
+export const PENDING_TONE = '#111111';
 const PENDING_SUBS = new Set(['school', 'pending']);
+// Đầu mục "Chưa xác định" cuối bảng cân đối: lô layer chưa rõ đầu mục + phần chênh để tổng HT = tổng QH
+export const UNDETERMINED_KEY = 'undetermined';
+// Chênh lệch tổng HT / QH dưới ngưỡng này (m²) coi là sai số vẽ hatch, không dồn vào "Chưa xác định"
+const BALANCE_MIN_M2 = 1;
 
 /** Ký hiệu của đầu mục / nhóm con: { tt16: khóa TT16 | null, tone: màu nền khi thu nhỏ } */
 export function landSymbol(kind, rowKey, subKey = '') {
+  if (rowKey === UNDETERMINED_KEY) return { tt16: null, tone: PENDING_TONE };
   const row = landRowByKey(kind, rowKey);
   const [rowTt16, mixed] = ROW_TT16[kind]?.[rowKey] || [];
   if (PENDING_SUBS.has(subKey)) return { tt16: rowTt16 || '3-MN', tone: PENDING_TONE };
   if (SUB_TT16[subKey]) return { tt16: SUB_TT16[subKey], tone: BUFFER_COLORS[SUB_TT16[subKey]] };
+  if (SUB_TONE[subKey]) return { tt16: null, tone: SUB_TONE[subKey] };
   if (!rowTt16) return { tt16: null, tone: row?.color || '#94a3b8' };
   const tone = mixed ? row.color : rowTt16 === 'TDTT' ? SPORT_COLOR : BUFFER_COLORS[rowTt16];
   return { tt16: rowTt16, tone: tone || row.color };
@@ -194,17 +206,20 @@ export function landSubKey(lot, kind) {
 
 /**
  * Bảng cân đối: diện tích (ha) và tỷ lệ (%) hiện trạng / quy hoạch theo đúng thứ tự và số thứ tự mẫu TT16,
- * chỉ liệt kê đầu mục (và nhóm con) có diện tích HT hoặc QH > 0.
- * lots: [{ phase, layer, landKey, subKey, area (m²) }]; landKey 'skip' / null không tính.
+ * chỉ liệt kê đầu mục (và nhóm con) có diện tích HT hoặc QH > 0; dòng cuối "Chưa xác định" gồm lô chưa rõ đầu mục (landKey null)
+ * và phần chênh để tổng HT = tổng QH khi có cả 2 file.
+ * lots: [{ phase, layer, landKey, subKey, area (m²) }]; landKey 'skip' không tính.
  */
 export function landUseSummary(lots, kind) {
   const table = LANDUSE_TABLES[kind];
   const sum = { HT: {}, QH: {} };
   const add = (ph, key, v) => { sum[ph][key] = (sum[ph][key] || 0) + v; };
+  const undet = { HT: 0, QH: 0 };
   lots.forEach(p => {
-    if (!p.landKey || p.landKey === 'skip') return;
+    if (p.landKey === 'skip') return;
     const ph = p.phase === 'HT' ? 'HT' : 'QH';
     const v = Number(p.area) || 0;
+    if (!p.landKey) { undet[ph] += v; return; }
     add(ph, p.landKey, v);
     const split = residentialSubAreas(p, kind);
     if (split) Object.entries(split).forEach(([k, a]) => add(ph, `${p.landKey}/${k}`, a));
@@ -213,6 +228,16 @@ export function landUseSummary(lots, kind) {
   const leafRows = table.rows.filter(r => r.key && !r.sumOf);
   const total = { HT: 0, QH: 0 };
   leafRows.forEach(r => { total.HT += sum.HT[r.key] || 0; total.QH += sum.QH[r.key] || 0; });
+  // Cùng 1 ranh đồ án nên tổng HT = tổng QH: bên thiếu (hatch chưa phủ hết ranh) dồn phần chênh vào "Chưa xác định"
+  total.HT += undet.HT;
+  total.QH += undet.QH;
+  const gap = { HT: 0, QH: 0 };
+  if (lots.some(p => p.phase === 'HT') && lots.some(p => p.phase !== 'HT') && Math.abs(total.QH - total.HT) >= BALANCE_MIN_M2) {
+    const side = total.QH > total.HT ? 'HT' : 'QH';
+    gap[side] = Math.abs(total.QH - total.HT);
+    undet[side] += gap[side];
+    total[side] += gap[side];
+  }
   const pct = (v, t) => (t > 0 ? Math.round(v / t * 1000) / 10 : 0);
   const ha = (m2) => Math.round(m2 / 100) / 100;
   const cells = (ht, qh) => ({ htHa: ha(ht), htPct: pct(ht, total.HT), qhHa: ha(qh), qhPct: pct(qh, total.QH) });
@@ -250,6 +275,12 @@ export function landUseSummary(lots, kind) {
     Object.assign(r, cells(t.HT, t.QH));
     return t.HT > 0 || t.QH > 0;
   });
+  if (undet.HT > 0 || undet.QH > 0) {
+    rows.push({
+      kind: 'row', key: UNDETERMINED_KEY, stt: '', label: 'Chưa xác định (tạm thời)', sym: 'CXĐ', code: '', ...landSymbol(kind, UNDETERMINED_KEY),
+      undetermined: true, gapHtHa: ha(gap.HT), gapQhHa: ha(gap.QH), ...cells(undet.HT, undet.QH)
+    });
+  }
   return { rows, totalHT: ha(total.HT), totalQH: ha(total.QH), sections: Object.keys(sectionTotals) };
 }
 

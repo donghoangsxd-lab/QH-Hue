@@ -169,12 +169,13 @@ export function tt16SymbolStyle(key, tone, layer, { scenario, detailed, approved
   };
 }
 
-/** Nền CSS ô mẫu hoa văn TT16 (giống ô trong chú giải), '' nếu không có khóa */
-export function tt16SwatchCss(key) {
+/** Nền CSS ô mẫu hoa văn TT16 (giống ô trong chú giải), '' nếu không có khóa; scale thu nhỏ hoa văn trong ô nhỏ */
+export function tt16SwatchCss(key, scale = 1) {
   const tile = key ? tileFor(key) : null;
   if (!tile) return '';
   if (!tile.dataUrl) tile.dataUrl = tile.canvas.toDataURL();
-  return `background-image:url(${tile.dataUrl});background-size:${tile.w}px ${tile.h}px;`;
+  const w = +(tile.w * scale).toFixed(1), h = +(tile.h * scale).toFixed(1);
+  return `background-image:url(${tile.dataUrl});background-size:${w}px ${h}px;`;
 }
 
 // Mẫu 3 kiểu khung ô ký hiệu (tỷ lệ dày / nét / hở như Phụ lục), vẽ bằng currentColor
@@ -207,10 +208,10 @@ export function renderTt16Legend(container) {
 // Đất chưa có ký hiệu TT16 trong 13 nhóm hạ tầng: chỉ tô viền khi bật lớp ranh đồ án
 const LAND_RULES = [
   { key: 'o', label: 'Đất ở', color: '#f5d90a', re: /(^|_)(DAT_ODT|DAT_ONT|DAT_O|ODT|ONT|O_LIENKE|O_BIETTHU|O_CHUNGCU)($|_)|DONVIO|NHOMNHAO|HONHOP|LANGXOM|DANCUNT|DAT_NO_/ },
-  { key: 'cc', label: 'Đất công cộng', color: '#e03131', re: /CONGCONG|DAT_CC($|_)|HTCC|DVCC/ },
+  { key: 'cc', label: 'Đất công cộng', color: '#a61e4d', re: /CONGCONG|DAT_CC($|_)|HTCC|DVCC/ },
   { key: 'dtn', label: 'Đất đào tạo, nghiên cứu', color: '#1e3a8a', re: /DAOTAO|NGHIENCUU|GIAODUC|NCKH|DAT_GD/ },
-  { key: 'cq', label: 'Đất cơ quan, trụ sở', color: '#8d6e63', re: /COQUAN|TRUSO|CQNN|HANHCHINH/ },
-  { key: 'an', label: 'Đất an ninh, quốc phòng', color: '#c5d86d', re: /ANQP|QPAN|ANNINH|QUOCPHONG/ },
+  { key: 'cq', label: 'Đất cơ quan, trụ sở', color: '#a1887f', re: /COQUAN|TRUSO|CQNN|HANHCHINH/ },
+  { key: 'an', label: 'Đất an ninh, quốc phòng', color: '#d9480f', re: /ANQP|QPAN|ANNINH|QUOCPHONG/ },
   { key: 'tg', label: 'Đất di tích, tôn giáo', color: '#7f1d1d', re: /DITICH|TONGIAO|TINNGUONG/ }
 ];
 
