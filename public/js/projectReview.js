@@ -11,9 +11,10 @@ import { parseDxf, buildParcels, CRS_PRESETS, layerToType } from './cadImport.js
 import { escapeHtml, fmtNum, ico, showToast, loadHtml2Pdf } from './utils.js';
 import { setBottomPanelMaximized } from './uiComponents.js';
 import { importReviewDossier, rejectPending, REVIEW_DOSSIER_EVENT } from './cadImportUi.js';
+import { setLabelsOverlay } from './basemap.js';
 import {
-  REVIEW_MAX_BYTES, LANDUSE_TABLES, classifyLand, landChoices, landRowByKey, landUseSummary, importLayerName, decisionKind,
-  tagParcel, lotRadius, scoreRows, rowLabel, UNIT_POP, projectOfFile
+  REVIEW_MAX_BYTES, LANDUSE_TABLES, classifyLand, landChoices, landRowByKey, landUseSummary, landSubKey, importLayerName, decisionKind,
+  presetDecision, tagParcel, lotRadius, scoreRows, rowLabel, UNIT_POP, THPT_POP_MIN, projectOfFile
 } from './projectReviewCore.js';
 
 const STORE_KEY = 'qh_review_dossiers_v2';
@@ -25,13 +26,19 @@ const QH_DELAY_MS = 900;
 const SCHOOL_CHOICES = [['MN', 'Mầm non'], ['TH', 'Tiểu học'], ['THCS', 'THCS'], ['NO', 'Không phải trường']];
 const MARKET_CHOICES = [['CHO', 'Chợ'], ['TTTM', 'Trung tâm thương mại'], ['NO', 'Không — dịch vụ khác']];
 const DECISION_NAME = { MN: 'Trường Mầm non', TH: 'Trường Tiểu học', THCS: 'Trường THCS', CHO: 'Chợ', TTTM: 'Trung tâm thương mại' };
+const DECISION_LABEL = { MN: 'Mầm non', TH: 'Tiểu học', THCS: 'THCS', CHO: 'Chợ', TTTM: 'Trung tâm thương mại', NO: 'Không thuộc nhóm' };
+// Công trình đã có trong dữ liệu nằm trong lô → gợi ý cấp trường / chợ - TTTM
+const SCHOOL_TYPES = { '3-MN': 'MN', '4-TH': 'TH', '5-THCS': 'THCS' };
+const SRC_LABEL = { layer: 'theo hậu tố layer', data: 'theo công trình đã có trong dữ liệu', user: 'đã chọn' };
 const $ = (id) => document.getElementById(id);
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 
-// session: { kind QHC/QHPK, project, popHT, popQH, files {HT, QH}, lots, layerChoice Map layer → đầu mục | 'skip',
-//   decisions Map lotId → MN/TH/THCS/CHO/TTTM/NO, reviewId (lô đang hỏi), pendingId (Admin mở hồ sơ chờ), dossierText }
+// session: { kind QHC/QHPK, project, popHT, popQH, files {HT, QH}, lots, byId, layerChoice Map layer → đầu mục | 'skip',
+//   decisions Map lotId → MN/TH/THCS/CHO/TTTM/NO (người dùng chọn), queue (thứ tự duyệt theo vị trí), hitCache,
+//   openRows (dòng thẩm định đang xổ danh sách), reviewId (lô đang hỏi), pendingId (Admin mở hồ sơ chờ), dossierText }
 let session = null;
-let show = { HT: true, QH: true, buffer: true };
+// Bán kính phục vụ tắt mặc định (chỉ vẽ cho nhóm / lô đang chọn); tem đường bật khi duyệt từng lô
+let show = { HT: true, QH: true, buffer: false, labels: false };
 const drawn = { HT: null, QH: null };
 let lotLayers = [];
 let focusKey = '';
@@ -39,10 +46,60 @@ let qhTimer = null;
 let maxWasOn = false;
 let sending = false;
 
-const isUnresolvedDecision = (lot) => lot.decisionKind && !session.decisions.has(lot.id);
+const isUnresolvedDecision = (lot) => !!lot.decisionKind && !lot.decision;
 const usable = (lot) => lot.landKey && lot.landKey !== 'skip';
 
 // ============================ PHÂN LOẠI LÔ ============================
+
+/** Công trình trường học / chợ - TTTM đã có (hiện trạng + quy hoạch) có tâm nằm trong lô */
+function dataHits(lot) {
+  if (session.hitCache.has(lot.id)) return session.hitCache.get(lot.id);
+  const f = featureOf(lot);
+  let hits = [];
+  if (f) {
+    const [x0, y0, x1, y1] = turf.bbox(f);
+    hits = [...(state.rawDataList || []), ...(state.planDataList || [])].filter(it => {
+      if (!SCHOOL_TYPES[it.type] && it.type !== '9-TM') return false;
+      const x = Number(it.lng), y = Number(it.lat);
+      if (!(x >= x0 && x <= x1 && y >= y0 && y <= y1)) return false;
+      try { return turf.booleanPointInPolygon([x, y], f); } catch (e) { return false; }
+    });
+  }
+  session.hitCache.set(lot.id, hits);
+  return hits;
+}
+
+function suggestFromData(lot) {
+  const hits = dataHits(lot);
+  if (lot.decisionKind === 'school') {
+    const schools = hits.filter(h => SCHOOL_TYPES[h.type] && !/THPT/i.test(`${h.id} ${h.name || ''}`));
+    const levels = [...new Set(schools.map(h => SCHOOL_TYPES[h.type]))];
+    return levels.length === 1 ? { value: levels[0], name: schools[0].name || schools[0].id } : null;
+  }
+  const market = hits.find(h => h.type === '9-TM');
+  return market ? { value: /chợ|\bcho\b/i.test(market.name || '') ? 'CHO' : 'TTTM', name: market.name || market.id } : null;
+}
+
+// Thứ tự duyệt: trường học trước, chợ - TTTM sau; hiện trạng trước, quy hoạch sau; trong nhóm đi lô gần nhất kế tiếp
+function orderQueue() {
+  const lots = session.lots.filter(l => usable(l) && l.decisionKind);
+  const ids = [];
+  [['school', 'HT'], ['school', 'QH'], ['market', 'HT'], ['market', 'QH']].forEach(([k, ph]) => {
+    const rest = lots.filter(l => l.decisionKind === k && l.phase === ph);
+    let cur = rest.length ? rest.reduce((a, b) => (b.lat > a.lat ? b : a)) : null;
+    while (cur) {
+      ids.push(cur.id);
+      rest.splice(rest.indexOf(cur), 1);
+      let best = null, bestD = Infinity;
+      rest.forEach(l => {
+        const d = (l.lat - cur.lat) ** 2 + ((l.lng - cur.lng) * 0.96) ** 2;
+        if (d < bestD) { bestD = d; best = l; }
+      });
+      cur = best;
+    }
+  });
+  session.queue = ids;
+}
 
 function applyTags() {
   const kind = session.kind;
@@ -52,19 +109,31 @@ function applyTags() {
     lot.landKey = chosen || (auto ? auto.key : null);
     lot.ask = !lot.landKey;
     lot.prefix = null; lot.type = null; lot.nhom = ''; lot.role = 'other'; lot.scoreKey = null; lot.radius = 0;
-    lot.decisionKind = ''; lot.importLayer = null;
+    lot.decisionKind = ''; lot.decision = ''; lot.decisionSrc = ''; lot.hitName = ''; lot.importLayer = null; lot.subKey = ''; lot.displayName = '';
     if (!usable(lot)) return;
     const chosenKey = chosen && chosen !== 'skip' ? chosen : null;
     lot.decisionKind = decisionKind(importLayerName(lot, kind, chosenKey, null));
-    const dec = lot.decisionKind ? session.decisions.get(lot.id) : undefined;
-    lot.importLayer = importLayerName(lot, kind, chosenKey, lot.decisionKind === 'school' || dec === 'NO' ? dec : undefined);
+    if (lot.decisionKind) {
+      const user = session.decisions.get(lot.id);
+      const preset = !user && presetDecision(lot.layer);
+      const hint = !user && !preset ? suggestFromData(lot) : null;
+      lot.decision = user || preset || (hint ? hint.value : '');
+      lot.decisionSrc = user ? 'user' : preset ? 'layer' : hint ? 'data' : '';
+      lot.hitName = hint ? hint.name : '';
+    }
+    const dec = lot.decision;
+    lot.importLayer = importLayerName(lot, kind, chosenKey, dec || undefined);
     const t = lot.decisionKind && !dec ? null : layerToType(lot.importLayer);
     if (t) { lot.prefix = t.prefix; lot.type = t.type; lot.nhom = t.nhom; }
-    const tag = tagParcel(lot, kind);
+    const tag = tagParcel(lot, kind, session.popQH);
     lot.role = tag.role;
     lot.scoreKey = tag.scoreKey;
     lot.radius = lot.role === 'score' ? lotRadius(lot) : 0;
+    lot.subKey = landSubKey(lot, kind);
   });
+  const ids = session.lots.filter(l => usable(l) && l.decisionKind).map(l => l.id);
+  const queued = new Set(session.queue || []);
+  if (!session.queue || ids.length !== queued.size || ids.some(id => !queued.has(id))) orderQueue();
 }
 
 function askLayers() {
@@ -80,8 +149,7 @@ function askLayers() {
   return [...byLayer.values()].sort((a, b) => b.area - a.area);
 }
 
-const decisionQueue = () => session.lots.filter(l => usable(l) && l.decisionKind)
-  .sort((a, b) => (a.decisionKind === b.decisionKind ? 0 : a.decisionKind === 'school' ? -1 : 1) || (a.phase === b.phase ? 0 : a.phase === 'HT' ? -1 : 1));
+const decisionQueue = () => (session.queue || []).map(id => session.byId.get(id)).filter(l => l && usable(l) && l.decisionKind);
 
 function unresolved() {
   return {
@@ -166,8 +234,9 @@ const targetMap = (phase) => (phase === 'QH' && isCompareOn() && planMap ? planM
 
 function lotTip(lot) {
   const what = lot.ask ? 'Layer chưa đúng quy định — chọn đầu mục ở bảng'
-    : lot.decisionKind && !session.decisions.has(lot.id) ? (lot.decisionKind === 'school' ? 'Chọn cấp trường' : 'Có phải chợ / TTTM?')
-      : lot.role === 'score' ? rowLabel(lot.scoreKey) : landRowByKey(session.kind, lot.landKey)?.label || 'Không tính';
+    : isUnresolvedDecision(lot) ? (lot.decisionKind === 'school' ? 'Bấm để chọn cấp trường' : 'Bấm để xác nhận chợ / TTTM')
+      : lot.role === 'score' ? rowLabel(lot.scoreKey)
+        : `${landRowByKey(session.kind, lot.landKey)?.label || 'Không tính'}${lot.decision ? ` · ${DECISION_LABEL[lot.decision]}` : ''}`;
   return `<b>${lot.phase}</b> · ${escapeHtml(lot.layer)} · ${fmtNum(Math.round(lot.area))} m²<br>${escapeHtml(what)}${lot.radius ? ` · R ${fmtNum(lot.radius)} m` : ''}`;
 }
 
@@ -185,14 +254,14 @@ function drawPhase(phase) {
       .on('click', (e) => {
         L.DomEvent.stopPropagation(e);
         if (lot.decisionKind && !session.pendingId) { openDecision(lot.id); return; }
-        focusRow(lot.ask ? `ask:${lot.layer}` : `land:${lot.landKey}`, false);
+        focusRow(lot.ask ? `ask:${lot.layer}` : lot.role === 'score' && lot.phase === 'QH' ? `lot:${lot.id}` : `land:${lot.landKey}`, false);
       });
     g.addLayer(shape);
     lotLayers.push({ lot, shape });
     if (lot.role === 'score') {
       const color = BUFFER_COLORS[lot.type] || '#38bdf8';
       g.addLayer(L.circleMarker([lot.lat, lot.lng], { radius: 4.5, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 1, interactive: false }));
-      if (phase === 'QH' && show.buffer && lot.radius > 0) {
+      if (phase === 'QH' && lot.radius > 0 && (show.buffer || bufferFocused(lot))) {
         g.addLayer(L.circle([lot.lat, lot.lng], { radius: lot.radius, color, weight: 1.2, dashArray: '6 5', fillColor: color, fillOpacity: 0.05, interactive: false }));
       }
     }
@@ -233,11 +302,18 @@ const focusMatch = (lot) => {
   const [k, v] = [focusKey.slice(0, focusKey.indexOf(':')), focusKey.slice(focusKey.indexOf(':') + 1)];
   if (k === 'lot') return lot.id === v;
   if (k === 'ask') return lot.layer === v;
-  if (k === 'land') return lot.landKey === v || (landRowByKey(session.kind, v)?.sumOf || []).includes(lot.landKey);
+  if (k === 'land') {
+    const [row, sub] = v.split('/');
+    if (sub) return lot.landKey === row && lot.subKey === sub;
+    return lot.landKey === row || (landRowByKey(session.kind, row)?.sumOf || []).includes(lot.landKey);
+  }
   if (k === 'score') return lot.phase === 'QH' && (lot.scoreKey === v || (REVIEW_SUM[v] || []).includes(lot.scoreKey));
   return false;
 };
 const REVIEW_SUM = { DVCC_TOTAL: ['YT_DV', 'VH_DV', 'TM_DV'], DVCC_ALL: ['3-MN', '4-TH', '5-THCS', 'YT_DV', 'VH_DV', 'TM_DV'] };
+const focusDrawsBuffer = (key) => key.startsWith('score:') || key.startsWith('lot:');
+/** Vòng bán kính của nhóm / lô đang chọn vẫn vẽ khi tắt "Bán kính" */
+const bufferFocused = (lot) => !!focusKey && focusDrawsBuffer(focusKey) && focusMatch(lot);
 
 function applyFocus(fit) {
   const bounds = L.latLngBounds([]);
@@ -251,20 +327,30 @@ function applyFocus(fit) {
     }
   });
   document.querySelectorAll('#projectReviewHost [data-focus]').forEach(el => el.classList.toggle('on', el.dataset.focus === focusKey));
-  if (fit) fitTo(bounds, focusKey.startsWith('lot:') ? 18 : 17);
+  if (fit) fitTo(bounds, 17);
 }
 
 function focusRow(key, fit = true) {
+  const prev = focusKey;
   focusKey = focusKey === key && !fit ? '' : key;
+  if (focusDrawsBuffer(prev) || focusDrawsBuffer(focusKey)) drawPhase('QH');
   applyFocus(fit);
   const el = document.querySelector(`#projectReviewHost [data-focus="${CSS.escape(focusKey)}"]`);
   el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function setLabels(on) {
+  show.labels = !!on;
+  setLabelsOverlay(show.labels);
+  const box = document.querySelector('#projectReviewHost input[data-show="labels"]');
+  if (box) box.checked = show.labels;
 }
 
 // ============================ DUYỆT TỪNG ĐỐI TƯỢNG (TRƯỜNG HỌC / THƯƠNG MẠI) ============================
 
 function openDecision(id) {
   session.reviewId = id;
+  if (!show.labels) setLabels(true);
   renderHost();
   focusRow(`lot:${id}`, true);
 }
@@ -273,15 +359,12 @@ function nextDecision(afterId) {
   const queue = decisionQueue();
   const at = queue.findIndex(l => l.id === afterId);
   const ordered = [...queue.slice(at + 1), ...queue.slice(0, at + 1)];
-  return ordered.find(l => !session.decisions.has(l.id)) || null;
+  return ordered.find(isUnresolvedDecision) || null;
 }
 
-function decide(value) {
-  const id = session.reviewId;
-  if (!id) return;
-  session.decisions.set(id, value);
+function afterDecisions(fromId) {
   applyTags();
-  const next = nextDecision(id);
+  const next = nextDecision(fromId);
   session.reviewId = next ? next.id : null;
   renderHost();
   drawAll(false);
@@ -289,27 +372,59 @@ function decide(value) {
   else { focusKey = ''; applyFocus(false); }
 }
 
+function decide(value) {
+  const id = session.reviewId;
+  if (!id) return;
+  session.decisions.set(id, value);
+  afterDecisions(id);
+}
+
+/** Gán 1 lựa chọn cho mọi lô cùng loại (trường học / dịch vụ) còn chưa xác nhận */
+function decideAll(value) {
+  const cur = session.byId.get(session.reviewId);
+  if (!cur) return;
+  const rest = decisionQueue().filter(l => l.decisionKind === cur.decisionKind && isUnresolvedDecision(l));
+  if (!rest.length) return;
+  const what = cur.decisionKind === 'school' ? 'lô trường học' : 'lô dịch vụ';
+  if (!confirm(`Gán "${DECISION_LABEL[value]}" cho ${rest.length} ${what} còn chưa xác nhận?`)) return;
+  rest.forEach(l => session.decisions.set(l.id, value));
+  afterDecisions(cur.id);
+}
+
+function decisionStats(queue) {
+  const by = { layer: 0, data: 0, user: 0 };
+  queue.forEach(l => { if (l.decisionSrc) by[l.decisionSrc]++; });
+  return Object.entries(by).filter(([, n]) => n).map(([k, n]) => `${n} ${SRC_LABEL[k]}`).join(' · ');
+}
+
 function decisionHtml() {
   const queue = decisionQueue();
   if (!queue.length) return '';
-  const left = queue.filter(l => !session.decisions.has(l.id)).length;
+  const left = queue.filter(isUnresolvedDecision).length;
   const lot = queue.find(l => l.id === session.reviewId);
   const schools = queue.filter(l => l.decisionKind === 'school').length;
   const markets = queue.length - schools;
-  const intro = `${schools ? `${schools} lô trường học chưa rõ cấp` : ''}${schools && markets ? ' · ' : ''}${markets ? `${markets} lô thương mại dịch vụ cần xác nhận chợ / TTTM` : ''}`;
+  const intro = `${schools ? `${schools} lô trường học chưa rõ cấp` : ''}${schools && markets ? ' · ' : ''}${markets ? `${markets} lô dịch vụ cần xác nhận chợ / TTTM` : ''}`;
+  const stats = decisionStats(queue);
   if (!lot) {
-    return `<div class="review-decide${left ? '' : ' done'}">${ico(left ? 'alert' : 'check')}${left ? `Còn <b>${left}</b>/${queue.length} lô cần xác nhận (${intro}).` : `Đã xác nhận đủ ${queue.length} lô (${intro}).`}
+    return `<div class="review-decide${left ? '' : ' done'}">${ico(left ? 'alert' : 'check')}<span>${left ? `Còn <b>${left}</b>/${queue.length} lô cần xác nhận (${intro}).` : `Đã xác nhận đủ ${queue.length} lô (${intro}).`}${stats ? ` Đã nhận diện: ${stats}.` : ''}
+      <small class="review-decide-tip">Đặt tên layer có hậu tố để nhận diện ngay: trường học _MN / _TH / _THCS; DAT_DICHVU_CHO, _TTTM hoặc _KHAC (dịch vụ khác).</small></span>
       <button type="button" class="bp-btn" data-decide-start>${left ? 'Duyệt từng lô' : 'Xem lại'}</button></div>`;
   }
   const at = queue.indexOf(lot);
   const choices = lot.decisionKind === 'school' ? SCHOOL_CHOICES : MARKET_CHOICES;
-  const cur = session.decisions.get(lot.id);
-  const q = lot.decisionKind === 'school' ? 'Lô trường học chưa rõ cấp — chọn cấp trường' : 'Lô thương mại dịch vụ — đây có phải chợ hoặc trung tâm thương mại không? (cửa hàng, karaoke… chọn Không)';
+  const q = lot.decisionKind === 'school' ? 'Lô trường học chưa rõ cấp — chọn cấp trường' : 'Lô dịch vụ — đây có phải chợ hoặc trung tâm thương mại không? (cửa hàng, karaoke… chọn Không)';
+  const hits = dataHits(lot);
+  const hitTxt = hits.length ? `Công trình đã có trong lô: ${hits.slice(0, 3).map(h => `<b>${escapeHtml(h.name || h.id)}</b>`).join(', ')}${hits.length > 3 ? '…' : ''}` : '';
+  const srcTxt = lot.decision && lot.decisionSrc !== 'user' ? ` · đang gán <b>${DECISION_LABEL[lot.decision]}</b> ${SRC_LABEL[lot.decisionSrc]}` : '';
+  const restSame = queue.filter(l => l.decisionKind === lot.decisionKind && isUnresolvedDecision(l)).length;
   return `<div class="review-decide active">
     <div class="review-decide-head">${ico('alert')}${q} <b>${at + 1}/${queue.length}</b> · còn ${left}</div>
-    <div class="review-decide-info">${lot.phase === 'HT' ? 'Hiện trạng' : 'Quy hoạch'} · ${escapeHtml(lot.layer)} · ${fmtNum(Math.round(lot.area))} m²</div>
-    <div class="review-decide-btns">${choices.map(([v, label]) => `<button type="button" class="bp-btn${cur === v ? ' on' : ''}${v === 'NO' ? ' rej' : ''}" data-decide="${v}">${label}</button>`).join('')}</div>
+    <div class="review-decide-info">${lot.phase === 'HT' ? 'Hiện trạng' : 'Quy hoạch'} · ${escapeHtml(lot.layer)} · ${fmtNum(Math.round(lot.area))} m²${srcTxt}${hitTxt ? `<br>${hitTxt}` : ''}</div>
+    <div class="review-decide-btns">${choices.map(([v, label]) => `<button type="button" class="bp-btn${lot.decision === v ? ' on' : ''}${v === 'NO' ? ' rej' : ''}" data-decide="${v}">${label}</button>`).join('')}</div>
+    ${restSame > 1 ? `<div class="review-decide-bulk">Gán cho ${restSame} lô cùng loại còn lại: ${choices.map(([v, label]) => `<button type="button" class="bp-btn" data-decide-all="${v}">${label}</button>`).join('')}</div>` : ''}
     <div class="review-decide-nav">
+      <span class="c-muted">Bật "Tem đường" để xem tên đường, công trình quanh lô</span>
       <button type="button" class="bp-btn" data-decide-nav="-1">‹ Trước</button>
       <button type="button" class="bp-btn" data-decide-nav="1">Sau ›</button>
       <button type="button" class="bp-btn" data-decide-close>Đóng</button>
@@ -331,7 +446,7 @@ function landTableHtml() {
         <td>${haCell(r.htHa)}</td><td>${pctTxt(r.htPct)}</td><td>${haCell(r.qhHa)}</td><td>${pctTxt(r.qhPct)}</td></tr>`;
     }
     const key = `land:${r.key}`;
-    return `<tr class="lu-row${r.sub ? ' lu-sub' : ''}${focusKey === key ? ' on' : ''}" data-focus="${key}" title="Bấm để xem các lô trên bản đồ">
+    return `<tr class="lu-row${r.sub ? ' lu-sub' : ''}${r.part ? ' lu-part' : ''}${focusKey === key ? ' on' : ''}" data-focus="${key}" title="Bấm để xem các lô trên bản đồ">
       <td>${r.stt}</td><td>${escapeHtml(r.label)}</td>
       <td class="lu-code"><i style="background:${r.color}"></i>${r.code ? `<small>${escapeHtml(r.code)}</small>` : ''}</td>
       <td>${haCell(r.htHa)}</td><td>${pctTxt(r.htPct)}</td><td>${haCell(r.qhHa)}</td><td>${pctTxt(r.qhPct)}</td></tr>`;
@@ -374,6 +489,22 @@ function pctCell(pct) {
 
 const QCVN_HEAD = '<thead><tr><th></th><th>Loại hạ tầng</th><th>Diện tích</th><th>Chỉ tiêu</th><th>Nhu cầu</th><th>Số lượng</th><th>Quy mô</th><th>Độ phủ</th></tr></thead>';
 
+// Tên công trình trong danh sách xổ xuống: tên theo quyết định (Chợ, Trường Mầm non…) hoặc tên dòng, đánh số theo thứ tự lô
+function memberName(lot) {
+  return lot.displayName || `${DECISION_NAME[lot.decision] || rowLabel(lot.scoreKey)}`;
+}
+
+function memberRowsHtml(row) {
+  const open = session.openRows.has(row.key);
+  return `</tbody><tbody data-members="${row.key}"${open ? '' : ' hidden'}>${row.members.map(p => `<tr class="wt-sub${focusKey === `lot:${p.id}` ? ' on' : ''}" data-focus="lot:${p.id}">
+      <td>-</td>
+      <td><button type="button" class="link-btn" data-zoom-lot="${p.id}" title="Zoom tới công trình">${escapeHtml(memberName(p))}</button></td>
+      <td>${fmtNum(Math.round(p.area))} m²</td>
+      <td>-</td><td>-</td><td>-</td>
+      <td colspan="2" class="wt-radius">${p.radius ? `R ${fmtNum(p.radius)} m` : '-'}</td>
+    </tr>`).join('')}</tbody><tbody>`;
+}
+
 function scoreTableHtml(scored) {
   const body = [];
   let last = '';
@@ -385,8 +516,12 @@ function scoreTableHtml(scored) {
     }
     const count = row.perUnit && scored.units > 0 ? `${row.count} / ${scored.units}` : fmtNum(row.count);
     const key = `score:${row.key}`;
+    const open = session.openRows.has(row.key);
+    const toggle = row.members.length
+      ? ` <button type="button" class="sub-toggle" data-members-toggle="${row.key}" aria-expanded="${open}" aria-label="Hiện/ẩn danh sách công trình">${open ? '▲' : '▼'}</button>`
+      : '';
     body.push(`<tr class="wt-main${focusKey === key ? ' on' : ''}" data-focus="${key}" title="Bấm để xem các lô và bán kính phục vụ">
-      <td></td><td>${escapeHtml(row.label)}</td>
+      <td></td><td>${escapeHtml(row.label)}${toggle}</td>
       <td>${fmtNum(row.area)} m²</td>
       <td>${row.quota > 0 ? `${fmtNum(row.quota)} m²/người` : '—'}</td>
       <td>${row.demand ? `${fmtNum(row.demand)} m²` : '—'}</td>
@@ -394,14 +529,24 @@ function scoreTableHtml(scored) {
       <td>${pctCell(row.scalePct)}</td>
       <td>${row.members.length ? pctCell(row.coverPct) : '<span class="c-muted">—</span>'}</td>
     </tr>`);
+    if (row.members.length) body.push(memberRowsHtml(row));
   });
-  return `<h4>Thẩm định QCVN 01:2026/BXD — lớp quy hoạch</h4>
+  const level = session.kind === 'QHC'
+    ? 'cấp đô thị (bảng A)'
+    : `cấp đơn vị ở (bảng B${Number(session.popQH) > THPT_POP_MIN ? ' + trường THPT' : ''})`;
+  return `<h4>Thẩm định QCVN 01:2026/BXD — lớp quy hoạch, ${level}</h4>
     <div class="ward-table-scroll-container"><table class="ward-table review-score">${QCVN_HEAD}<tbody>${body.join('')}</tbody></table></div>`;
 }
 
 function computeScore() {
   const qhLots = session.lots.filter(l => l.phase === 'QH' && usable(l) && !l.ask);
-  const scored = scoreRows(qhLots, session.popQH);
+  const scored = scoreRows(qhLots, session.popQH, session.kind);
+  const seq = {};
+  scored.planned.forEach(p => {
+    const base = DECISION_NAME[p.decision] || rowLabel(p.scoreKey);
+    seq[base] = (seq[base] || 0) + 1;
+    p.displayName = `${base} ${seq[base]}`;
+  });
   const housingFeature = unionAll(scored.housing.map(featureOf));
   scored.rows.forEach(row => {
     row.coverPct = row.members.some(p => p.radius > 0) ? coverPct(row.members, housingFeature) : null;
@@ -446,7 +591,8 @@ function renderHost() {
       <div class="review-head-btns review-noprint">
         <label class="review-toggle"><input type="checkbox" data-show="HT"${show.HT ? ' checked' : ''}>Hiện trạng</label>
         <label class="review-toggle"><input type="checkbox" data-show="QH"${show.QH ? ' checked' : ''}>Quy hoạch</label>
-        <label class="review-toggle"><input type="checkbox" data-show="buffer"${show.buffer ? ' checked' : ''}>Bán kính</label>
+        <label class="review-toggle" title="Tắt: chỉ vẽ bán kính của nhóm / công trình đang chọn"><input type="checkbox" data-show="buffer"${show.buffer ? ' checked' : ''}>Bán kính</label>
+        <label class="review-toggle" title="Tem tên đường, tên công trình phủ trên ranh lô"><input type="checkbox" data-show="labels"${show.labels ? ' checked' : ''}>Tem đường</label>
         <button type="button" class="bp-btn${isCompareOn() ? ' on' : ''}" id="btnReviewCompare" title="Chia đôi màn hình: hiện trạng bên trái, quy hoạch bên phải">${ico('compare')}Chia đôi</button>
         <button type="button" class="bp-btn" id="btnReviewPrint" title="Lưu bảng thẩm định ra file PDF">${ico('printer')}In PDF</button>
         <button type="button" class="bp-btn" id="btnReviewClose">${ico('close')}Đóng</button>
@@ -454,7 +600,9 @@ function renderHost() {
     </div>
     <div class="review-note">
       ${escapeHtml(table.label)} · file ${session.files.HT ? `<b>${escapeHtml(session.files.HT)}</b> (${htN} lô)` : '<i>không có file hiện trạng</i>'} và <b>${escapeHtml(session.files.QH)}</b> (${qhN} lô).
-      Dân số hiện trạng <b>${session.popHT > 0 ? fmtNum(session.popHT) : '—'}</b> (chỉ để so sánh) · dân số quy hoạch <b>${fmtNum(session.popQH)}</b> → <b>${scored.units}</b> đơn vị ở (${fmtNum(UNIT_POP)} người/đơn vị, làm tròn lên).
+      Dân số hiện trạng <b>${session.popHT > 0 ? fmtNum(session.popHT) : '—'}</b> (chỉ để so sánh) · dân số quy hoạch <b>${fmtNum(session.popQH)}</b>${session.kind === 'QHC'
+        ? ' — thẩm định công trình hạ tầng cấp đô thị (bảng A).'
+        : ` → <b>${scored.units}</b> đơn vị ở (${fmtNum(UNIT_POP)} người/đơn vị, làm tròn lên) — thẩm định cấp đơn vị ở (bảng B)${Number(session.popQH) > THPT_POP_MIN ? ', có đất trường THPT (dân số trên 20.000 người)' : ''}.`}
       ${housingNote}
     </div>
     ${askHtml()}
@@ -485,9 +633,27 @@ function closeReview() {
   map?.invalidateSize({ pan: false });
   clearMap();
   focusKey = '';
+  if (show.labels) setLabels(false);
   const host = $('projectReviewHost');
   if (host) host.innerHTML = '';
   session = null;
+}
+
+function newSession(fields) {
+  clearMap();
+  focusKey = '';
+  show.buffer = false;
+  session = {
+    layerChoice: new Map(), decisions: new Map(), reviewId: null, pendingId: null, sender: '', scored: null, dossierText: '',
+    queue: null, hitCache: new Map(), openRows: new Set(),
+    ...fields
+  };
+  session.byId = new Map(session.lots.map(l => [l.id, l]));
+  applyTags();
+  openHost();
+  renderHost();
+  fitTo(allBounds(), 17);
+  drawAll(true);
 }
 
 // ============================ BƯỚC 1: ĐỌC HỒ SƠ ============================
@@ -549,20 +715,8 @@ async function startReview() {
   try {
     const crs = CRS_PRESETS[$('reviewCrs')?.value] || CRS_PRESETS.HUE_3;
     const lots = [...(fHT ? await readHatches(fHT, 'HT', crs) : []), ...await readHatches(fQH, 'QH', crs)];
-    clearMap();
-    session = {
-      kind, project, popHT, popQH, files: { HT: fHT ? fHT.name : '', QH: fQH.name }, lots,
-      layerChoice: new Map(), decisions: new Map(), reviewId: null, pendingId: null, sender: '', scored: null
-    };
-    focusKey = '';
-    applyTags();
-    const first = decisionQueue()[0];
-    session.reviewId = !askLayers().length && first ? first.id : null;
     togglePanel(false);
-    openHost();
-    renderHost();
-    fitTo(allBounds(), 17);
-    drawAll(true);
+    newSession({ kind, project, popHT, popQH, files: { HT: fHT ? fHT.name : '', QH: fQH.name }, lots });
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
@@ -575,8 +729,7 @@ async function startReview() {
 const round6 = (v) => (Array.isArray(v) ? v.map(round6) : Math.round(v * 1e6) / 1e6);
 
 function lotName(lot, idx) {
-  const dec = session.decisions.get(lot.id);
-  return DECISION_NAME[dec] ? `${DECISION_NAME[dec]} ${session.project} ${idx + 1}` : '';
+  return DECISION_NAME[lot.decision] ? `${DECISION_NAME[lot.decision]} ${session.project} ${idx + 1}` : '';
 }
 
 function dossierGeoJson() {
@@ -604,7 +757,7 @@ function dossierGeoJson() {
           Lng: round6(lot.lng),
           Muc: lot.landKey,
           Chon: session.layerChoice.get(lot.layer) || '',
-          QuyetDinh: session.decisions.get(lot.id) || '',
+          QuyetDinh: lot.decision || '',
           ...(name ? { Ten: name } : {})
         },
         geometry: { type: g.type, coordinates: round6(g.coordinates) }
@@ -616,7 +769,8 @@ function dossierGeoJson() {
 function resultSummary() {
   const rated = session.scored.rows.filter(r => r.scalePct != null);
   const passed = rated.filter(r => r.scalePct >= 100).length;
-  return `${LANDUSE_TABLES[session.kind].short} · ${fmtNum(session.popQH)} dân QH · ${session.scored.units} đơn vị ở · đạt quy mô ${passed}/${rated.length} chỉ tiêu`;
+  const level = session.kind === 'QHC' ? 'cấp đô thị' : `${session.scored.units} đơn vị ở`;
+  return `${LANDUSE_TABLES[session.kind].short} · ${fmtNum(session.popQH)} dân QH · ${level} · đạt quy mô ${passed}/${rated.length} chỉ tiêu`;
 }
 
 async function sendDossier() {
@@ -707,18 +861,11 @@ function openDossier({ id, item, text }) {
     if (p.QuyetDinh) decisions.set(lot.id, String(p.QuyetDinh));
     return lot;
   }).filter(l => l.polygons.length && Number.isFinite(l.lat) && Number.isFinite(l.lng));
-  clearMap();
-  session = {
+  newSession({
     kind: meta.kind, project: String(meta.project || projectOfFile(item.fileName)), popHT: Number(meta.popHT) || 0, popQH: Number(meta.popQH) || 0,
-    files: meta.files || { HT: '', QH: item.fileName }, lots, layerChoice, decisions, reviewId: null,
-    pendingId: id, dossierText: text, sender: item.sender || '', scored: null
-  };
-  focusKey = '';
-  applyTags();
-  openHost();
-  renderHost();
-  fitTo(allBounds(), 17);
-  drawAll(true);
+    files: meta.files || { HT: '', QH: item.fileName }, lots, layerChoice, decisions,
+    pendingId: id, dossierText: text, sender: item.sender || ''
+  });
 }
 
 // ============================ HỒ SƠ ĐÃ GỬI TỪ MÁY NÀY ============================
@@ -833,11 +980,26 @@ export function initProjectReview() {
     if (t.closest('#btnReviewReject')) { reject(); return; }
     const dec = t.closest('[data-decide]');
     if (dec) { decide(dec.dataset.decide); return; }
+    const all = t.closest('[data-decide-all]');
+    if (all) { decideAll(all.dataset.decideAll); return; }
     if (t.closest('[data-decide-start]')) {
-      const first = decisionQueue().find(l => !session.decisions.has(l.id)) || decisionQueue()[0];
+      const first = decisionQueue().find(isUnresolvedDecision) || decisionQueue()[0];
       if (first) openDecision(first.id);
       return;
     }
+    const tog = t.closest('[data-members-toggle]');
+    if (tog) {
+      const key = tog.dataset.membersToggle;
+      const open = !session.openRows.has(key);
+      if (open) session.openRows.add(key); else session.openRows.delete(key);
+      const list = host.querySelector(`tbody[data-members="${CSS.escape(key)}"]`);
+      if (list) list.hidden = !open;
+      tog.textContent = open ? '▲' : '▼';
+      tog.setAttribute('aria-expanded', String(open));
+      return;
+    }
+    const zoom = t.closest('[data-zoom-lot]');
+    if (zoom) { focusRow(`lot:${zoom.dataset.zoomLot}`, true); return; }
     const nav = t.closest('[data-decide-nav]');
     if (nav) {
       const queue = decisionQueue();
@@ -846,7 +1008,7 @@ export function initProjectReview() {
       if (next) openDecision(next.id);
       return;
     }
-    if (t.closest('[data-decide-close]')) { session.reviewId = null; focusKey = ''; renderHost(); applyFocus(false); return; }
+    if (t.closest('[data-decide-close]')) { session.reviewId = null; focusKey = ''; renderHost(); drawPhase('QH'); applyFocus(false); return; }
     if (t.closest('select, input, label')) return;
     const row = t.closest('[data-focus]');
     if (row) focusRow(row.dataset.focus, true);
@@ -855,6 +1017,7 @@ export function initProjectReview() {
     if (!session) return;
     const toggle = e.target.closest('input[data-show]');
     if (toggle) {
+      if (toggle.dataset.show === 'labels') { setLabels(toggle.checked); return; }
       show[toggle.dataset.show] = toggle.checked;
       drawAll(false);
       return;

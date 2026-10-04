@@ -470,7 +470,8 @@ const TT16_LANDS = {
 };
 const TT16_URBAN_SUFFIX = new Set(['CT', 'CV', 'QG']);
 const TT16_SCHOOL_SUFFIX = new Set(['MN', 'TH', 'THCS']);
-const TT16_SUFFIX = new Set([...TT16_URBAN_SUFFIX, ...TT16_SCHOOL_SUFFIX, 'DVO']);
+// _CHO / _TTTM: quy ước nội bộ (ngoài TT16) đánh dấu lô DAT_DICHVU là chợ / trung tâm thương mại
+const TT16_SUFFIX = new Set([...TT16_URBAN_SUFFIX, ...TT16_SCHOOL_SUFFIX, 'DVO', 'CHO', 'TTTM']);
 // Mã có biến thể cấp đô thị (_DT) trong LAYER_PREFIXES
 const URBAN_CODES = new Set(['CV', 'BDX', 'YT', 'VH', 'TM']);
 

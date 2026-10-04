@@ -1848,6 +1848,14 @@ body.project-review .bp-part2 { display: none; }
 .review-landuse tr.lu-section td { font-weight: 700; background: rgba(251, 146, 60, 0.12); }
 .review-landuse tr.lu-total td { font-weight: 700; border-top: 2px solid var(--border-color); }
 .review-landuse tr.lu-sub td:nth-child(2) { padding-left: 18px; font-style: italic; }
+.review-landuse tr.lu-part td { color: var(--text-muted); font-size: var(--fs-xs, 11px); }
+.review-landuse tr.lu-part td:nth-child(2) { padding-left: 22px; }
+.review-score tbody[data-members] tr td:nth-child(2) { padding-left: 18px; }
+.review-score .sub-toggle { margin-left: 4px; }
+.review-decide-tip { display: block; margin-top: 3px; color: var(--text-muted); }
+.review-decide > span { flex: 1 1 260px; line-height: 1.4; }
+.review-decide-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 6px; border-top: 1px dashed rgba(251, 146, 60, 0.45); color: var(--text-muted); }
+.review-decide-nav > span { flex: 1; font-size: var(--fs-xs, 11px); }
 .review-landuse .lu-code { white-space: nowrap; }
 .review-landuse .lu-code i { display: inline-block; width: 12px; height: 12px; margin-right: 4px; vertical-align: middle; border: 1px solid rgba(0, 0, 0, 0.4); }
 .review-landuse .lu-code small { color: var(--text-muted); font-size: 10px; }

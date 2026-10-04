@@ -9,13 +9,15 @@ export const UNIT_POP = 20000;
 // ============================ BẢNG CÂN ĐỐI SỬ DỤNG ĐẤT ============================
 // codes: tên phân lớp TT16 (viết hoa, không dấu, bỏ tiền tố HT_ / QHDD_ / QHDH_ và hậu tố cấp _QG / _CV / _CT / _CH / _DVO)
 // Đầu mục có sumOf là dòng cộng (Lâm nghiệp QHPK), không tính vào tổng để khỏi cộng đôi.
+// subs: nhóm đất con tách riêng phục vụ thẩm định (theo cấp trường / quyết định chợ, TTTM của từng lô), không phải mã TT16
 const C = (key, label, codes, color, extra = {}) => ({ key, label, codes, color, ...extra });
+const SCHOOL_SUBS = [['thpt', 'Trường THPT'], ['mn', 'Trường mầm non'], ['th', 'Trường tiểu học'], ['thcs', 'Trường THCS'], ['school', 'Trường học chưa phân cấp']];
 
 const QHC_ROWS = [
   { section: 'I', label: 'Khu đất dân dụng' },
   C('dd_o', 'Đơn vị ở', ['DAT_DD_DONVIO'], '#f5d90a'),
   C('dd_hh', 'Hỗn hợp (đơn vị ở và dịch vụ - công cộng)', ['DAT_DD_HONHOP'], '#f59f00'),
-  C('dd_dvcc', 'Dịch vụ - công cộng', ['DAT_DD_DVCCDOTHI', 'DAT_DD_TRUONGTHPT', 'DAT_DD_TRUONGHOC'], '#e03131'),
+  C('dd_dvcc', 'Dịch vụ - công cộng', ['DAT_DD_DVCCDOTHI', 'DAT_DD_TRUONGTHPT', 'DAT_DD_TRUONGHOC'], '#e03131', { subs: [...SCHOOL_SUBS, ['other', 'Dịch vụ - công cộng khác']] }),
   C('dd_cq', 'Cơ quan, trụ sở cấp đô thị', ['DAT_DD_COQUANDOTHI'], '#8d6e63'),
   C('dd_cx', 'Cây xanh sử dụng công cộng', ['DAT_DD_CAYXANHCCDOTHI'], '#2f9e44'),
   C('dd_gt', 'Giao thông đô thị', ['DAT_DD_GIAOTHONGDOTHI'], '#adb5bd'),
@@ -52,7 +54,7 @@ const QHPK_ROWS = [
   C('yt', 'Y tế', ['DAT_HTXH_YTE'], '#e64980'),
   C('vh', 'Văn hóa', ['DAT_HTXH_VANHOA'], '#d6336c'),
   C('tdtt', 'Thể dục thể thao', ['DAT_NDD_VANHOATHETHAO', 'DAT_HTXH_THEDUCTHETHAO'], '#f06595'),
-  C('gd', 'Giáo dục', ['DAT_HTXH_TRUONGTHPT', 'DAT_HTXH_TRUONGHOC'], '#1971c2'),
+  C('gd', 'Giáo dục', ['DAT_HTXH_TRUONGTHPT', 'DAT_HTXH_TRUONGHOC'], '#1971c2', { subs: [...SCHOOL_SUBS, ['other', 'Giáo dục khác']] }),
   C('cxcc', 'Cây xanh sử dụng công cộng', ['DAT_HTXH_CAYXANHCC'], '#2f9e44'),
   C('cxhc', 'Cây xanh sử dụng hạn chế', ['DAT_CAYXANHHANCHE'], '#69db7c'),
   C('cxcd', 'Cây xanh chuyên dụng', ['DAT_CAYXANHCHUYENDUNG'], '#37b24d'),
@@ -60,7 +62,9 @@ const QHPK_ROWS = [
   C('ks', 'Khai thác, chế biến khoáng sản, sản xuất vật liệu xây dựng', ['DAT_SX_VATLIEU'], '#862e9c'),
   C('dtnc', 'Đào tạo, nghiên cứu', ['DAT_DAOTAONC'], '#1e3a8a'),
   C('cq', 'Cơ quan, trụ sở', ['DAT_COQUAN'], '#8d6e63'),
-  C('dv', 'Khu dịch vụ (không bao gồm dịch vụ du lịch)', ['DAT_DICHVU'], '#ff8787'),
+  C('dv', 'Khu dịch vụ (không bao gồm dịch vụ du lịch)', ['DAT_DICHVU'], '#ff8787', {
+    subs: [['cho', 'Đất chợ, trung tâm thương mại'], ['pending', 'Chưa xác nhận chợ / trung tâm thương mại'], ['other', 'Đất dịch vụ khác']]
+  }),
   C('dl', 'Khu dịch vụ - du lịch', ['DAT_DULICH'], '#f783ac'),
   C('dtich', 'Di tích, tôn giáo', ['DAT_DITICH_TONGIAO', 'DAT_DITICHTONGIAO'], '#7f1d1d'),
   C('an', 'An ninh', ['DAT_ANNINH'], '#c5d86d'),
@@ -88,7 +92,9 @@ export const LANDUSE_TABLES = {
 };
 
 const STAGES = new Set(['HT', 'QHDD', 'QHDH', 'QH']);
-const LEVEL_SUFFIX = new Set(['QG', 'CV', 'CT', 'CH', 'DVO', 'MN', 'TH', 'THCS']);
+// Hậu tố cấp TT16 + quy ước nội bộ: _CHO / _TTTM / _KHAC cho DAT_DICHVU (chợ, trung tâm thương mại, dịch vụ khác)
+const LEVEL_SUFFIX = new Set(['QG', 'CV', 'CT', 'CH', 'DVO', 'MN', 'TH', 'THCS', 'CHO', 'TTTM', 'KHAC']);
+const PRESET_SUFFIX = { CHO: 'CHO', TTTM: 'TTTM', KHAC: 'NO' };
 const codeIndex = {};
 Object.entries(LANDUSE_TABLES).forEach(([kind, t]) => {
   codeIndex[kind] = new Map();
@@ -136,22 +142,42 @@ export function landChoices(kind) {
 }
 
 /**
- * Bảng cân đối: diện tích (ha) và tỷ lệ (%) hiện trạng / quy hoạch theo đúng thứ tự mẫu.
- * lots: [{ phase, landKey, area (m²) }]; landKey 'skip' / null không tính.
+ * Nhóm đất con của lô trong đầu mục có subs: cấp trường (thpt / mn / th / thcs / school chưa phân cấp),
+ * chợ - TTTM (cho / pending chưa xác nhận), còn lại other. lot.prefix / decisionKind / decision do giao diện gán.
+ */
+export function landSubKey(lot, kind) {
+  const row = landRowByKey(kind, lot.landKey);
+  if (!row || !row.subs) return '';
+  const base = String(lot.prefix || '').replace(/_(DT|DV)$/, '');
+  if (base === 'THPT') return 'thpt';
+  if (base === 'MN' || base === 'TH' || base === 'THCS') return base.toLowerCase();
+  if (lot.decisionKind === 'school' && !lot.decision) return 'school';
+  if (lot.decisionKind === 'market') return lot.decision === 'CHO' || lot.decision === 'TTTM' ? 'cho' : lot.decision ? 'other' : 'pending';
+  return 'other';
+}
+
+/**
+ * Bảng cân đối: diện tích (ha) và tỷ lệ (%) hiện trạng / quy hoạch theo đúng thứ tự và số thứ tự mẫu TT16,
+ * chỉ liệt kê đầu mục (và nhóm con) có diện tích HT hoặc QH > 0.
+ * lots: [{ phase, landKey, subKey, area (m²) }]; landKey 'skip' / null không tính.
  */
 export function landUseSummary(lots, kind) {
   const table = LANDUSE_TABLES[kind];
   const sum = { HT: {}, QH: {} };
+  const add = (ph, key, v) => { sum[ph][key] = (sum[ph][key] || 0) + v; };
   lots.forEach(p => {
     if (!p.landKey || p.landKey === 'skip') return;
     const ph = p.phase === 'HT' ? 'HT' : 'QH';
-    sum[ph][p.landKey] = (sum[ph][p.landKey] || 0) + (Number(p.area) || 0);
+    const v = Number(p.area) || 0;
+    add(ph, p.landKey, v);
+    if (p.subKey) add(ph, `${p.landKey}/${p.subKey}`, v);
   });
   const leafRows = table.rows.filter(r => r.key && !r.sumOf);
   const total = { HT: 0, QH: 0 };
   leafRows.forEach(r => { total.HT += sum.HT[r.key] || 0; total.QH += sum.QH[r.key] || 0; });
   const pct = (v, t) => (t > 0 ? Math.round(v / t * 1000) / 10 : 0);
   const ha = (m2) => Math.round(m2 / 100) / 100;
+  const cells = (ht, qh) => ({ htHa: ha(ht), htPct: pct(ht, total.HT), qhHa: ha(qh), qhPct: pct(qh, total.QH) });
   let section = null, stt = 0;
   const out = [];
   const sectionTotals = {};
@@ -168,30 +194,39 @@ export function landUseSummary(lots, kind) {
     const qh = keys.reduce((s, k) => s + (sum.QH[k] || 0), 0);
     if (section && !r.sumOf) { sectionTotals[section].HT += ht; sectionTotals[section].QH += qh; }
     if (!r.sub) stt++;
+    if (!(ht > 0 || qh > 0)) return;
     out.push({
       kind: 'row', key: r.key, stt: r.sub ? '' : stt, label: r.label, code: (r.codes || [])[0] || '', color: r.color, sub: !!r.sub, sum: !!r.sumOf,
-      htHa: ha(ht), htPct: pct(ht, total.HT), qhHa: ha(qh), qhPct: pct(qh, total.QH)
+      ...cells(ht, qh)
+    });
+    (r.subs || []).forEach(([sk, label]) => {
+      const sht = sum.HT[`${r.key}/${sk}`] || 0;
+      const sqh = sum.QH[`${r.key}/${sk}`] || 0;
+      if (!(sht > 0 || sqh > 0)) return;
+      out.push({ kind: 'row', key: `${r.key}/${sk}`, stt: '', label: `- ${label}`, code: '', color: r.color, sub: true, part: true, ...cells(sht, sqh) });
     });
   });
-  out.forEach(r => {
-    if (r.kind !== 'section') return;
+  const rows = out.filter(r => {
+    if (r.kind !== 'section') return true;
     const t = sectionTotals[r.section];
-    Object.assign(r, { htHa: ha(t.HT), htPct: pct(t.HT, total.HT), qhHa: ha(t.QH), qhPct: pct(t.QH, total.QH) });
+    Object.assign(r, cells(t.HT, t.QH));
+    return t.HT > 0 || t.QH > 0;
   });
-  return { rows: out, totalHT: ha(total.HT), totalQH: ha(total.QH), sections: Object.keys(sectionTotals) };
+  return { rows, totalHT: ha(total.HT), totalQH: ha(total.QH), sections: Object.keys(sectionTotals) };
 }
 
 /**
  * Tên layer đưa vào hệ thống (chuẩn TT16, khớp cadImport.tt16Layer):
  *   - tiền tố theo file: file HT → HT_, file QH giữ QHDD_ / QHDH_ / QH_, không có thì QHDH_
  *   - layer gán tay → mã đầu tiên của đầu mục; cấp trường đã chọn → thêm hậu tố _MN / _TH / _THCS;
- *     lô dịch vụ / trường học xác nhận không thuộc nhóm hạ tầng → thêm _KHAC (ghi sheet DXF như đất khác)
+ *     chợ / TTTM → _CHO / _TTTM; lô dịch vụ / trường học không thuộc nhóm hạ tầng → _KHAC (ghi sheet DXF như đất khác)
  */
 export function importLayerName(lot, kind, chosenKey, decision) {
   const own = layerStage(lot.layer);
   const stage = lot.phase === 'HT' ? 'HT' : (own && own !== 'HT' ? own : 'QHDH');
   let core = chosenKey ? (landRowByKey(kind, chosenKey)?.codes || [])[0] || layerCore(lot.layer) : layerCore(lot.layer);
-  if (decision === 'MN' || decision === 'TH' || decision === 'THCS') core += `_${decision}`;
+  if (decision) core = core.replace(/_(CHO|TTTM|KHAC)$/, '');
+  if (decision === 'MN' || decision === 'TH' || decision === 'THCS' || decision === 'CHO' || decision === 'TTTM') core += `_${decision}`;
   else if (decision === 'NO') core += '_KHAC';
   return `${stage}_${core}`;
 }
@@ -201,7 +236,13 @@ export function decisionKind(layerName) {
   const tt = tt16Layer(layerName);
   if (tt && tt.school) return 'school';
   const t = layerToType(layerName);
-  return t && t.type === '9-TM' ? 'market' : '';
+  if (t && t.type === '9-TM') return 'market';
+  return /_DAT_DICHVU_KHAC$/.test(tokens(layerName).join('_')) ? 'market' : '';
+}
+
+/** Quyết định đặt sẵn qua hậu tố layer: DAT_DICHVU_CHO → CHO, _TTTM → TTTM, _KHAC → NO (dịch vụ khác) */
+export function presetDecision(layerName) {
+  return PRESET_SUFFIX[tokens(layerName).pop()] || '';
 }
 
 // ============================ CHẤM CHỈ TIÊU QCVN 01:2026 ============================
@@ -229,25 +270,44 @@ export const REVIEW_ROWS = [
 
 const ROW_BY_KEY = Object.fromEntries(REVIEW_ROWS.map(r => [r.key, r]));
 
-function scoreKeyOf(p) {
-  const prefix = p.prefix || '';
-  if (prefix === 'THPT') return 'THPT';
-  if (prefix === 'CV_DT' || prefix === 'CV_DV') return prefix;
-  if (prefix === 'CV' || p.type === '1-CV') return parkTierOf(p.area, p.nhom).urban ? 'CV_DT' : 'CV_DV';
-  if (prefix.endsWith('_DT') || prefix.endsWith('_DV')) return prefix;
-  return { MN: '3-MN', TH: '4-TH', THCS: '5-THCS', YT: 'YT_DV', VH: 'VH_DV', TM: 'TM_DV', BDX: 'BDX_DV' }[prefix] || null;
+// QHPK có trên 20.000 dân (từ 2 đơn vị ở) thì thẩm định thêm đất trường THPT
+export const THPT_POP_MIN = 20000;
+const THPT_UNIT_ROW = { ...ROW_BY_KEY.THPT, section: 'B', label: `Trường THPT (quy mô dân số trên ${THPT_POP_MIN.toLocaleString('vi-VN')} người)` };
+
+/** Các dòng thẩm định theo loại hồ sơ: QHC → bảng A (cấp đô thị); QHPK → bảng B (cấp đơn vị ở) + THPT khi dân số > 20.000 */
+export function reviewRowsFor(kind, pop) {
+  if (kind === 'QHC') return REVIEW_ROWS.filter(r => r.section === 'A');
+  const rows = REVIEW_ROWS.filter(r => r.section === 'B');
+  if (Number(pop) > THPT_POP_MIN) rows.splice(rows.findIndex(r => r.key === '5-THCS') + 1, 0, THPT_UNIT_ROW);
+  return rows;
 }
 
-/** Vai trò lô: 'housing' (mẫu số độ phủ), 'score' (chấm chỉ tiêu, scoreKey), 'other'. p.prefix/type/nhom theo layer chuẩn hóa */
-export function tagParcel(p, kind) {
+// Mã loại (bỏ cấp _DT / _DV) → dòng thẩm định: QHC gom mọi lô về cấp đô thị, QHPK gom về cấp đơn vị ở
+const SCORE_KEYS = {
+  QHC: { THPT: 'THPT', YT: 'YT_DT', VH: 'VH_DT', TM: 'TM_DT', CV: 'CV_DT', BDX: 'BDX_DT' },
+  QHPK: { MN: '3-MN', TH: '4-TH', THCS: '5-THCS', THPT: 'THPT', YT: 'YT_DV', VH: 'VH_DV', TM: 'TM_DV', CV: 'CV_DV', BDX: 'BDX_DV' }
+};
+
+function scoreKeyOf(p, kind) {
+  const base = String(p.prefix || '').replace(/_(DT|DV)$/, '');
+  return (SCORE_KEYS[kind] || {})[base] || null;
+}
+
+/**
+ * Vai trò lô: 'housing' (mẫu số độ phủ), 'score' (chấm chỉ tiêu, scoreKey), 'other'. p.prefix/type/nhom theo layer chuẩn hóa.
+ * Lô thuộc loại không có dòng trong bảng của hồ sơ (VD trường học trong QHC, THPT của QHPK ≤ 20.000 dân) → 'other'.
+ */
+export function tagParcel(p, kind, pop) {
   if (LANDUSE_TABLES[kind]?.housing.includes(p.landKey)) return { role: 'housing', scoreKey: null };
-  const scoreKey = p.prefix ? scoreKeyOf(p) : null;
-  return scoreKey ? { role: 'score', scoreKey } : { role: 'other', scoreKey: null };
+  const scoreKey = p.prefix ? scoreKeyOf(p, kind) : null;
+  if (!scoreKey || !reviewRowsFor(kind, pop).some(r => r.key === scoreKey)) return { role: 'other', scoreKey: null };
+  return { role: 'score', scoreKey };
 }
 
+/** Bán kính phục vụ của lô: cây xanh theo hạng diện tích, còn lại theo dòng thẩm định */
 export function lotRadius(p) {
-  if (p.scoreKey === 'CV_DT' || p.scoreKey === 'CV_DV' || p.type === '1-CV') {
-    return parkTierOf(p.area, p.scoreKey === 'CV_DT' ? 'Cấp đô thị' : p.nhom).radius;
+  if (p.scoreKey === 'CV_DT' || p.scoreKey === 'CV_DV') {
+    return parkTierOf(p.area, p.scoreKey === 'CV_DT' ? 'Cấp đô thị' : 'Cấp đơn vị ở').radius;
   }
   const row = ROW_BY_KEY[p.scoreKey];
   return row && row.radius ? row.radius : 0;
@@ -264,8 +324,8 @@ function round1(n) {
   return Math.round(n * 10) / 10;
 }
 
-/** Bảng A/B trên các lô quy hoạch: diện tích, nhu cầu, % quy mô. Độ phủ do giao diện tính trên đất ở. */
-export function scoreRows(lots, pop) {
+/** Bảng thẩm định (A với QHC, B với QHPK) trên các lô quy hoạch: diện tích, nhu cầu, % quy mô. Độ phủ do giao diện tính trên đất ở. */
+export function scoreRows(lots, pop, kind) {
   const units = unitsFromPop(pop);
   const people = Number(pop) > 0 ? Number(pop) : 0;
   const planned = lots.filter(p => p.role === 'score' && p.scoreKey);
@@ -274,7 +334,7 @@ export function scoreRows(lots, pop) {
     (byKey[p.scoreKey] = byKey[p.scoreKey] || []).push(p);
   });
   const areaOf = (key) => (byKey[key] || []).reduce((s, p) => s + (Number(p.area) || 0), 0);
-  const rows = REVIEW_ROWS.map(def => {
+  const rows = reviewRowsFor(kind, pop).map(def => {
     const members = def.sumOf ? def.sumOf.flatMap(k => byKey[k] || []) : (byKey[def.key] || []);
     const area = def.sumOf ? def.sumOf.reduce((s, k) => s + areaOf(k), 0) : areaOf(def.key);
     const demand = def.quota > 0 && people > 0 ? def.quota * people : 0;

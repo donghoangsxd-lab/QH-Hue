@@ -30,7 +30,35 @@ export const BASEMAPS = {
   }
 };
 
+// Tem đường + tên công trình (nền trong suốt) phủ trên ranh lô để nhận biết vị trí khi duyệt từng khu đất
+const LABELS = {
+  url: 'https://mt{s}.google.com/vt/lyrs=h&hl=vi&x={x}&y={y}&z={z}',
+  opts: { maxNativeZoom: 19, subdomains: '0123', attribution: 'Nhãn &copy; Google' }
+};
+const LABELS_PANE = 'labelsPane';
+
 const maps = new Map();   // bản đồ → lớp ảnh nền đang gắn
+const labelLayers = new Map();   // bản đồ → lớp tem đang gắn
+let labelsOn = false;
+
+function addLabels(m) {
+  if (!m.getPane(LABELS_PANE)) {
+    const pane = m.createPane(LABELS_PANE);
+    pane.style.zIndex = 450;
+    pane.style.pointerEvents = 'none';
+  }
+  labelLayers.set(m, L.tileLayer(LABELS.url, { maxZoom: 19, pane: LABELS_PANE, ...LABELS.opts }).addTo(m));
+}
+
+/** Bật / tắt tem đường, tên công trình trên mọi bản đồ đã gắn ảnh nền */
+export function setLabelsOverlay(on) {
+  labelsOn = !!on;
+  labelLayers.forEach(layer => layer.remove());
+  labelLayers.clear();
+  if (labelsOn) maps.forEach((_, m) => addLabels(m));
+}
+
+export const labelsOverlayOn = () => labelsOn;
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}') || {}; } catch (e) { saved = {}; }
 let current = BASEMAPS[saved.key] ? saved.key : 'esri';
@@ -52,6 +80,10 @@ export function attachBasemap(m) {
   if (current === 'wayback' && !waybackRelease) current = 'esri';
   const layer = createLayer().addTo(m);
   maps.set(m, layer);
+  if (labelsOn) {
+    labelLayers.get(m)?.remove();
+    addLabels(m);
+  }
   return layer;
 }
 
