@@ -425,7 +425,8 @@ const CSD_MIN_COVERAGE_PCT = 0.5;
 // Bậc cao độ (m) của bảng dân số / diện tích theo cao độ: dưới FLOOD_BIN_MIN gộp vào bậc đầu, từ FLOOD_BIN_MAX gộp vào bậc cuối
 const FLOOD_BIN_MIN = -1;
 const FLOOD_BIN_MAX = 40;
-let cachedFloodBins = null;   // { version: phiên bản hiệu chỉnh dân cư, data }
+let cachedFloodBins = null;   // { version: phiên bản hiệu chỉnh dân cư, dem: nguồn cao độ, data }
+const FLOOD_DEM = 'fabdem-hue';
 const cachedSatStats = new Map();   // "lst|năm" hoặc "sar|năm|bản dân cư|bản dữ liệu" → kết quả thống kê lớp vệ tinh
 // Tọa độ công trình là 1 điểm trong khu đất: xét rủi ro ngập / nhiệt trong vòng bán kính này quanh điểm
 const RISK_BUFFER_M = 30;
@@ -1864,12 +1865,12 @@ module.exports = async (req, res) => {
       return res.status(200).json({ urlFormat: mapId.urlFormat });
     }
 
-    // Mô phỏng ngập (floodSim.js): dân số và diện tích mỗi phường theo từng mét cao độ GLO-30 (cùng nguồn lớp địa hình);
+    // Mô phỏng ngập (floodSim.js): dân số và diện tích mỗi phường theo từng mét cao độ nền FABDEM (cùng nguồn lớp địa hình);
     // trình duyệt tự cộng các bậc thấp hơn mực nước nên kéo thanh mực nước không phải gọi lại máy chủ
     if (action === 'getFloodBins') {
       res.setHeader('Cache-Control', req.query.pv ? 'no-store' : 's-maxage=3600, stale-while-revalidate=86400');
       const version = getPopEditsVersion();
-      if (cachedFloodBins && cachedFloodBins.version === version) return res.status(200).json(cachedFloodBins.data);
+      if (cachedFloodBins && cachedFloodBins.version === version && cachedFloodBins.dem === FLOOD_DEM) return res.status(200).json(cachedFloodBins.data);
       const bin = sat.demImage(ee).round().clamp(FLOOD_BIN_MIN, FLOOD_BIN_MAX).rename('bin');
       const img = populatedPixels(popRasterNative).addBands(ee.Image.pixelArea().rename('area')).addBands(bin);
       const fc = await eeEvaluate(img.reduceRegions({
@@ -1889,11 +1890,11 @@ module.exports = async (req, res) => {
         };
       });
       const data = { binMin: FLOOD_BIN_MIN, binMax: FLOOD_BIN_MAX, wards };
-      cachedFloodBins = { version, data };
+      cachedFloodBins = { version, dem: FLOOD_DEM, data };
       return res.status(200).json(data);
     }
 
-    // Cao độ Copernicus DEM GLO-30 dạng ô Terrarium: terrainLayer.js / floodSim.js giải mã ngay trên trình duyệt
+    // Cao độ nền FABDEM dạng ô Terrarium: terrainLayer.js / floodSim.js giải mã ngay trên trình duyệt
     if (action === 'getDemTile') {
       res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=3600');
       return res.status(200).json({ urlFormat: await sat.mapUrl(ee, sat.terrariumImage(ee)) });

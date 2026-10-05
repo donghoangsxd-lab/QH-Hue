@@ -1,6 +1,6 @@
-// Lớp "Địa hình (cao độ)" (bảng lớp dữ liệu): tô màu nhiệt theo cao độ — vùng trũng xanh dương đậm, núi cao đỏ đậm.
-// Nguồn Copernicus DEM GLO-30 (ESA, ~30 m) do GEE trả về dạng ô Terrarium (cao độ = R*256 + G + B/256 − 32768 m),
-// cùng nguồn bảng dân số theo cao độ của mô phỏng ngập; GEE lỗi thì dùng ô SRTM của AWS Terrain Tiles (cùng định dạng).
+// Lớp "Địa hình (cao độ nền)" (bảng lớp dữ liệu): tô màu nhiệt theo cao độ — vùng trũng xanh dương đậm, núi cao đỏ đậm.
+// Nguồn FABDEM (đã gỡ nhà và tán cây) do GEE trả về dạng ô Terrarium (cao độ = R*256 + G + B/256 − 32768 m),
+// cùng nguồn bảng dân số theo cao độ của mô phỏng ngập; GEE lỗi thì dùng ô SRTM của AWS Terrain Tiles (cao độ bề mặt).
 // Giải mã và tô màu ngay trên trình duyệt; vẽ đồng thời trên bản đồ hiện trạng và quy hoạch.
 import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
@@ -8,20 +8,23 @@ import { geeApi } from './api.js';
 import { fmtNum } from './utils.js';
 
 const AWS_URL = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
-const SOURCES = { glo30: 'Cao độ: Copernicus DEM GLO-30 (ESA) qua Google Earth Engine', srtm: 'Cao độ: SRTM/GMTED qua AWS Terrain Tiles' };
+const SOURCES = {
+  fabdem: 'Cao độ nền: FABDEM (Hawker & Neal 2021, CC BY 4.0). Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA',
+  srtm: 'Cao độ bề mặt: SRTM/GMTED (còn mái nhà và tán cây) qua AWS Terrain Tiles'
+};
 let tileUrlPromise = null;
-let attribution = SOURCES.glo30;
+let attribution = SOURCES.fabdem;
 
 function tileUrl() {
   if (!tileUrlPromise) {
-    tileUrlPromise = fetch(geeApi('action=getDemTile'))
+    tileUrlPromise = fetch(geeApi('action=getDemTile&dem=fabdem'))
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then(d => {
         if (!d || !d.urlFormat) throw new Error('phản hồi không có urlFormat');
         return d.urlFormat;
       })
       .catch(err => {
-        console.warn('Không lấy được ô cao độ GLO-30, dùng SRTM (AWS):', err.message);
+        console.warn('Không lấy được ô cao độ FABDEM, dùng SRTM (AWS):', err.message);
         attribution = SOURCES.srtm;
         return AWS_URL;
       });
@@ -160,7 +163,7 @@ export function setTerrainVisible(on) {
   if (box) box.style.display = visible ? '' : 'none';
   if (!map) return;
   if (visible) {
-    // Chờ biết nguồn ô (GLO-30 hay SRTM dự phòng) để ghi nguồn đúng
+    // Chờ biết nguồn ô (FABDEM hay SRTM dự phòng) để ghi nguồn đúng
     tileUrl().then(() => {
       if (!visible) return;
       if (!leftLayer) leftLayer = makeLayer().addTo(map);

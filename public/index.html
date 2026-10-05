@@ -253,7 +253,7 @@
           </div>
           <div class="layer-tab-pane" data-layer-pane="env" role="tabpanel" hidden>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_terrain"><label for="chk_terrain" title="Cao độ Copernicus DEM GLO-30 ~30 m (ESA, qua Google Earth Engine). Là cao độ bề mặt (gồm cả cây, nhà), sai số khoảng 1–2 m ở vùng bằng phẳng"><svg class="ico ico-layer"><use href="#i-terrain"/></svg>Địa hình (cao độ)</label></div>
+            <div><input type="checkbox" id="chk_terrain"><label for="chk_terrain" title="Cao độ nền FABDEM ~30 m (Hawker &amp; Neal 2021, CC BY 4.0): đã gỡ nhà và tán cây khỏi Copernicus GLO-30, hệ EGM2008, trong ranh Huế. Ngoài vùng dữ liệu vẫn là cao độ bề mặt GLO-30. FABDEM is produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved."><svg class="ico ico-layer"><use href="#i-terrain"/></svg>Địa hình (cao độ nền)</label></div>
             <span id="terrainBox" class="layer-slider" style="display:none;"><input type="range" id="terrainOpacity" class="opacity-slider" min="0" max="100" value="55" title="Độ trong suốt lớp địa hình" aria-label="Độ trong suốt lớp địa hình"></span>
           </div>
           <div class="terrain-legend layer-legend" id="terrainLegend" style="display:none;">
@@ -269,7 +269,7 @@
             </div>
             <div class="drainage-status" id="drainageStatus"></div>
           </div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_flood"><label for="chk_flood" title="Tô mọi vùng có cao độ Copernicus DEM GLO-30 thấp hơn mực nước giả định. Mực nước tính theo cao độ bề mặt (gồm cả nhà và cây; đô thị thường cao hơn nền đất vài mét), không phải số đọc tại trạm thủy văn"><svg class="ico ico-layer"><use href="#i-flood"/></svg>Mô phỏng ngập</label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_flood"><label for="chk_flood" title="Tô mọi vùng có cao độ nền FABDEM thấp hơn mực nước giả định. Mực nước theo hệ EGM2008, không phải số đọc tại trạm thủy văn. Ô 30 m là nền trung bình, không phải cao độ nền từng lô"><svg class="ico ico-layer"><use href="#i-flood"/></svg>Mô phỏng ngập</label></div></div>
           <div class="flood-box" id="floodBox" style="display:none;">
             <div class="flood-level">
               <label for="floodLevel">Mực nước</label>

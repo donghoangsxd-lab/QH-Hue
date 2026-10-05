@@ -32,8 +32,8 @@ const LAYERS = {
     zIndex: 3,
     seasons: sarSeasons,
     extra: [['all', 'Số mùa lũ bị ngập (mọi năm)']],
-    tileQuery: (y) => `action=getSarFloodTile&year=${y}`,
-    statsQuery: (y) => (y === 'all' ? null : `action=getSarFloodStats&year=${y}`),
+    tileQuery: (y) => `action=getSarFloodTile&year=${y}&dem=fabdem`,
+    statsQuery: (y) => (y === 'all' ? null : `action=getSarFloodStats&year=${y}&dem=fabdem`),
     renderLegend: sarLegend,
     renderStats: sarStats
   },

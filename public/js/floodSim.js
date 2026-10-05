@@ -1,4 +1,4 @@
-// Mô phỏng ngập theo mực nước (bảng lớp dữ liệu): pixel có cao độ (Copernicus DEM GLO-30, terrainLayer.js) thấp hơn mực nước
+// Mô phỏng ngập theo mực nước (bảng lớp dữ liệu): pixel có cao độ nền (FABDEM, terrainLayer.js) thấp hơn mực nước
 // được tô theo độ sâu, kèm công trình hạ tầng bị ngập (hiện trạng / quy hoạch) và dân số, diện tích ngập theo phường (GEE getFloodBins).
 // Tính theo cao độ (mọi vùng thấp hơn mực nước), không loang từ sông: DEM 30 m đo mặt sông hẹp sai lệch vài mét nên loang sẽ bị chặn giả.
 import { map, flyToVisible } from './mapEngine.js';
@@ -160,7 +160,7 @@ let binsData = null;
 
 function ensureBins() {
   if (!binsPromise) {
-    binsPromise = fetch(geeApi('action=getFloodBins'))
+    binsPromise = fetch(geeApi('action=getFloodBins&dem=fabdem'))
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then(d => {
         if (!d || !Array.isArray(d.wards)) throw new Error('phản hồi không có bảng phường');

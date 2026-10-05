@@ -1,7 +1,11 @@
-// Lớp dữ liệu vệ tinh lấy thẳng từ danh mục Google Earth Engine (không cần asset riêng):
-// cao độ Copernicus DEM GLO-30, vùng ngập mùa lũ từ radar Sentinel-1, nhiệt độ bề mặt từ Landsat 8/9.
+// Lớp dữ liệu vệ tinh lấy thẳng từ danh mục Google Earth Engine:
+// cao độ nền FABDEM (asset cắt Huế), vùng ngập mùa lũ từ radar Sentinel-1, nhiệt độ bề mặt từ Landsat 8/9.
 
-const DEM_COLLECTION = 'COPERNICUS/DEM/GLO30';
+// FABDEM bản Việt Nam (Hawker & Neal, 2021, CC BY 4.0), cắt theo HUE_BOUNDS.
+// Đã gỡ nhà và tán cây khỏi Copernicus GLO-30. Mét, geoid EGM2008, lưới ~30 m.
+const DEM_ASSET = 'projects/optimistic-yew-488501-s0/assets/FABDEM-Hue';
+// Chỉ lấp pixel FABDEM không có số (biển, ngoài ranh) và giữ phép chiếu 1". Vẫn là cao độ bề mặt.
+const DEM_COLLECTION = 'COPERNICUS/DEM/GLO30_2024_1';
 
 // Sentinel-1 phủ đều Việt Nam từ 2016; Landsat 8 có đủ mùa nóng từ 2014
 const SAR_FIRST_YEAR = 2016;
@@ -34,10 +38,12 @@ function parseYear(raw, years) {
   return years.includes(y) ? y : null;
 }
 
-/** Cao độ GLO-30 (m, geoid EGM2008); gán lại phép chiếu gốc để tính độ dốc đúng 30 m */
+/** Cao độ nền FABDEM trong ranh Huế; ngoài mask (biển, ngoài ranh) giữ GLO-30. Phép chiếu GLO-30 để độ dốc vẫn đúng ~30 m */
 function demImage(ee) {
   const col = ee.ImageCollection(DEM_COLLECTION).select('DEM');
-  return col.mosaic().setDefaultProjection(col.first().projection()).rename('elevation');
+  const glo = col.mosaic().setDefaultProjection(col.first().projection()).rename('elevation');
+  const fab = ee.Image(DEM_ASSET).select('elevation');
+  return glo.where(fab.mask(), fab);
 }
 
 /** Ô PNG mã hóa Terrarium (cao độ = R*256 + G + B/256 − 32768) để trình duyệt tự giải mã như ô AWS cũ */
