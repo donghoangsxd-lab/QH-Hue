@@ -248,7 +248,7 @@
 
         <div class="rp-settings">
           <div class="layer-tab-switch" role="tablist" aria-label="Nhóm lớp bản đồ">
-            <button type="button" class="layer-tab-btn active" data-layer-tab="analysis" role="tab" aria-selected="true" title="Ranh giới, ranh lô đất, bản đồ độ phủ, dân cư, mạng lưới đường">Nền, phân tích<span class="layer-tab-count"></span></button>
+            <button type="button" class="layer-tab-btn active" data-layer-tab="analysis" role="tab" aria-selected="true" title="Ranh giới, mạng lưới đường, dân cư, ranh lô đất, vùng phát triển mới, bản đồ độ phủ">Nền, phân tích<span class="layer-tab-count"></span></button>
             <button type="button" class="layer-tab-btn" data-layer-tab="env" role="tab" aria-selected="false" title="Lớp môi trường, viễn thám (Google Earth Engine)">Môi trường<span class="layer-tab-count"></span></button>
           </div>
           <div class="layer-tab-pane" data-layer-pane="env" role="tabpanel" hidden>
@@ -297,15 +297,6 @@
             <div class="sat-legend" id="lstLegend"></div>
             <div class="flood-stats" id="lstStats"></div>
           </div>
-          <div class="layer-row">
-            <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Khoanh vùng trong từng phường: ranh đỏ = vùng hiện trạng (đã xây dựng đến năm gốc 2020/2010/2000, GAIA Landsat 30 m hợp với GHSL 100 m); ranh xanh = vùng phát triển mới (đất xây dựng hiện nay theo Google Dynamic World 10 m nằm ngoài vùng hiện trạng); bỏ mảng < 0,5 ha. QCVN 01:2026/BXD Mục 2.2.3.2 (công viên, vườn hoa mỗi đơn vị ở) và Mục 2.2.3.3 (vườn hoa, bãi đỗ xe ≤ 400 m) chỉ áp trong vùng phát triển mới. Logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch"><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Vùng phát triển mới (Dynamic World)</label></div>
-            <span id="newDevOpBox" class="layer-slider" style="display:none;"><input type="range" id="newDevOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp vùng phát triển mới" aria-label="Độ trong suốt lớp vùng phát triển mới"></span>
-          </div>
-          <div class="flood-box" id="newDevBox" style="display:none;">
-            <div class="sat-pick"><label for="newDevYear">So với năm</label><select id="newDevYear"></select></div>
-            <div class="sat-legend" id="newDevLegend"></div>
-            <div class="flood-stats" id="newDevStats"></div>
-          </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_risk"><label for="chk_risk" title="Lọc công trình (kể cả đề xuất, quy hoạch mới, quỹ đất) có vùng 30 m quanh vị trí bị ngập trong nhiều mùa lũ (Sentinel-1) hoặc nóng hơn mức chung (Landsat), để cân nhắc cải tạo hoặc tránh chọn đất"><svg class="ico ico-layer"><use href="#i-alert"/></svg>Công trình chịu rủi ro ngập / nhiệt</label></div></div>
           <div class="flood-box" id="riskBox" style="display:none;">
             <div class="sat-pick"><label for="riskGroup">Nhóm</label><select id="riskGroup"></select></div>
@@ -320,15 +311,6 @@
           </div>
           <div class="layer-tab-pane" data-layer-pane="analysis" role="tabpanel">
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div></div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_parcel"><label for="chk_parcel" title="Ranh khu đất của từng công trình trong 14 nhóm (cột Geojson trên Sheet)"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Ranh lô đất công trình (HTXH) <small class="layer-hint">phóng to để xem</small></label></div></div>
-          <div class="layer-row">
-            <div><input type="checkbox" id="chk_heat" checked><label for="chk_heat"><svg class="ico ico-layer"><use href="#i-heat"/></svg>Bản đồ độ phủ hạ tầng</label></div>
-            <span id="heatBox" class="layer-slider"><input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30" title="Độ trong suốt bản đồ độ phủ" aria-label="Độ trong suốt bản đồ độ phủ"></span>
-          </div>
-          <div class="layer-row">
-            <div><input type="checkbox" id="chk_pop"><label for="chk_pop"><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư</label></div>
-            <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
-          </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">phóng to để xem</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
             <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
@@ -336,6 +318,24 @@
             <span class="road-legend-item"><i style="background:#cbd5e1; height:2px;"></i>Nội bộ</span>
             <span class="road-legend-item" title="Đường dành riêng cho xe đạp: OpenStreetMap + tuyến Admin vẽ bổ sung"><i style="background:repeating-linear-gradient(90deg,#4ade80 0 5px,transparent 5px 8px); height:2px;"></i>Xe đạp</span>
             <span class="road-legend-item"><i style="background:#fde047; height:2px;"></i>Chưa phân loại</span>
+          </div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_pop"><label for="chk_pop"><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư</label></div>
+            <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
+          </div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_parcel"><label for="chk_parcel" title="Ranh khu đất của từng công trình hạ tầng xã hội (HTXH) trong 14 nhóm (cột Geojson trên Sheet)"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Ranh lô đất công trình <small class="layer-hint">phóng to để xem</small></label></div></div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Khoanh vùng trong từng phường: ranh đỏ = vùng hiện trạng (đã xây dựng đến năm gốc 2020/2010/2000, GAIA Landsat 30 m hợp với GHSL 100 m); ranh xanh = vùng phát triển mới (đất xây dựng hiện nay theo Google Dynamic World 10 m nằm ngoài vùng hiện trạng); bỏ mảng < 0,5 ha. QCVN 01:2026/BXD Mục 2.2.3.2 (công viên, vườn hoa mỗi đơn vị ở) và Mục 2.2.3.3 (vườn hoa, bãi đỗ xe ≤ 400 m) chỉ áp trong vùng phát triển mới. Logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch"><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Vùng phát triển mới (Dynamic World)</label></div>
+            <span id="newDevOpBox" class="layer-slider" style="display:none;"><input type="range" id="newDevOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp vùng phát triển mới" aria-label="Độ trong suốt lớp vùng phát triển mới"></span>
+          </div>
+          <div class="flood-box" id="newDevBox" style="display:none;">
+            <div class="sat-pick"><label for="newDevYear">So với năm</label><select id="newDevYear"></select></div>
+            <div class="sat-legend" id="newDevLegend"></div>
+            <div class="flood-stats" id="newDevStats"></div>
+          </div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_heat" checked><label for="chk_heat"><svg class="ico ico-layer"><use href="#i-heat"/></svg>Bản đồ độ phủ hạ tầng</label></div>
+            <span id="heatBox" class="layer-slider"><input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30" title="Độ trong suốt bản đồ độ phủ" aria-label="Độ trong suốt bản đồ độ phủ"></span>
           </div>
           <div class="rp-inline-field">
             <label for="inputIsoRadius"><svg class="ico ico-layer"><use href="#i-radius"/></svg>Giả lập bán kính chung (m)</label>
@@ -668,7 +668,6 @@
                     <th colspan="2">7. Y tế</th>
                     <th colspan="2">8. Văn hóa</th>
                     <th colspan="2">9. Thương mại</th>
-                    <th colspan="2" title="Chỉ tiêu nghĩa trang ≥ 0,4 m²/người tính chung toàn thành phố (QCVN 01:2026/BXD Mục 2.12.2.1). Không tính vào cột Tổng cộng">10. Nghĩa trang</th>
                     <th colspan="2">TỔNG CỘNG</th>
                     <th colspan="4" title="Chiều dài theo OpenStreetMap + tuyến Admin vẽ bổ sung, cắt theo ranh phường/xã">Đường giao thông (km)</th>
                     <th rowspan="2" title="Số trạm dừng xe buýt đã duyệt trong ranh phường/xã">Trạm<br>xe buýt</th>
@@ -683,7 +682,6 @@
                     <th>Độ phủ</th><th>Q.Mô</th>
                     <th>Độ phủ</th><th>Q.Mô</th>
                     <th>Độ phủ</th><th>Q.Mô</th>
-                    <th title="Số nhà tang lễ, cơ sở hỏa táng, nghĩa trang đã duyệt">Số lượng</th><th title="Tổng diện tích các nghĩa trang (ha)">D.tích (ha)</th>
                     <th>Độ phủ</th><th>Q.Mô</th>
                     <th title="Quốc lộ, tỉnh lộ, đường chính đô thị, liên khu vực">Trục chính</th>
                     <th title="Đường phố có tên">Khu vực</th>

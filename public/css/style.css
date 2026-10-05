@@ -434,7 +434,7 @@ body.right-collapsed .right-panel {
 .layer-row { display: flex; align-items: center; justify-content: space-between; min-height: 21px; font-size: var(--fs-md); line-height: 1.25; }
 .layer-row label { cursor: pointer; color: var(--text-main); }
 .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 13px; height: 13px; margin: 0 6px 0 0; vertical-align: middle; }
-.layer-row .layer-hint { color: var(--text-muted); font-size: var(--fs-xs); }
+.layer-row .layer-hint { color: var(--text-muted); font-size: var(--fs-xs); white-space: nowrap; }
 .road-legend.layer-legend { margin: 0 0 4px 22px; flex-wrap: wrap; row-gap: 2px; }
 .terrain-legend { margin: 0 6px 6px 22px; font-size: var(--fs-xs); color: var(--text-muted); }
 .terrain-legend-bar { height: 8px; border-radius: var(--r-sm); }
@@ -866,14 +866,20 @@ body.bottom-max .bottom-panel { top: 0; right: 0; height: auto; z-index: 2500; }
 .bp-part1 .pie-chart-wrap { position: relative; width: calc(117px * var(--k)); height: calc(117px * var(--k)); flex-shrink: 0; align-self: center; }
 .bp-part1 canvas { width: 100% !important; height: 100% !important; display: block; }
 /* Font chú giải = font nhãn phường/xã trên chart (drawCoverageScaleChart) */
+/* Dòng giãn đều theo chiều cao khung, mỗi dòng tối đa 2em để khung cao (màn 32") không bị thưa */
 #pieLegendDetails {
   width: calc(180px * var(--k));
   flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   max-height: 100%;
   overflow: hidden;
   font-size: var(--fs-sm);
   line-height: 1.12;
 }
+#pieLegendDetails > .pie-legend-row { flex: 1 1 auto; max-height: 2em; }
 .pie-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .pie-legend-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pie-legend-row { display: grid; grid-template-columns: minmax(0, 1fr) calc(52px * var(--k)) calc(52px * var(--k)); gap: 4px; align-items: center; }
@@ -1329,12 +1335,14 @@ table.data-table tfoot .st-total-note { font-weight: 400; font-style: italic; }
 /* Bảng rộng đúng phần số liệu: ô nowrap giữ trọn chữ, ô ghi chú gộp cột (wt-note) xuống dòng trong bề rộng đó
    (bề rộng này dùng để quyết định trải panel: updatePart1Spread) */
 .ward-table-scroll-container { overflow-x: auto; }
-/* Panel trải: bảng trái A–B rộng vừa số liệu, bảng phải C–F nhận phần còn lại (cột ghi chú gộp xuống dòng ít hơn) */
+/* Bảng tách đôi A–B | C–F chia đều bề ngang; chỉ cột tên xuống dòng (tên công trình dài không đẩy rộng bảng trái
+   làm bảng phải phải co chữ dưới ngưỡng rồi trả về 1 bảng hẹp) */
 .wt-split { flex: 1; min-height: 0; display: flex; gap: 10px; }
-.wt-split > .ward-table-scroll-container { flex: 0 0 auto; align-self: stretch; }
-.wt-split > .wt-right { flex: 1 1 0; min-width: 0; width: auto; }
-.wt-split > .wt-right table.ward-table { width: 100%; }
-.wt-split > .wt-right :is(.wt-section, .wt-empty) td:nth-child(2) { white-space: normal; }
+.wt-split > .ward-table-scroll-container { flex: 1 1 0; min-width: 0; width: auto; align-self: stretch; }
+.wt-split table.ward-table { width: 100%; }
+.wt-split table.ward-table td:nth-child(2) { white-space: normal; }
+/* Ô ghi chú gộp cột (max-content rất dài) dàn bề rộng sang các cột số: giữ phần lớn cho cột tên để ít phải xuống dòng */
+.wt-split table.ward-table thead th:nth-child(2) { width: 40%; }
 .bp-body.pdf-export .wt-split { display: block; }
 table.ward-table { width: min-content; border-collapse: collapse; margin-top: 0; font-size: var(--fs-xs); }
 table.ward-table th, table.ward-table td { border: 1px solid var(--border-color); padding: 2px 8px; line-height: var(--lh); white-space: nowrap; }

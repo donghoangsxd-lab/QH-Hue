@@ -318,7 +318,6 @@ function setPart1Turn(turn) {
 // Hạng màn hình theo bề rộng CSS px (trình duyệt không đo được inch; Windows phóng to 125–150% làm màn Full HD hẹp lại):
 // s < 1700 (laptop 14–17"), m < 2300 (21–24" Full HD), l ≥ 2300 (27–32" QHD / 4K)
 const SCREEN_TIERS = [[2300, 'l'], [1700, 'm'], [0, 's']];
-const SPREAD_SIDE_W = 338 * 1.08;  // = --side-w ở hệ số 1 (2 cột trái / phải khi trải panel)
 const TABLE_FIT_MIN_FS = 9;        // px: nhỏ hơn thì để bảng cuộn ngang thay vì co chữ tiếp
 
 // Hệ số bậc màn hình --k trong style.css (chữ, dòng bảng, bề rộng khối cùng nhân hệ số này)
@@ -326,28 +325,21 @@ function screenScale() {
   return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--k')) || 1;
 }
 
-// Bề rộng vừa nội dung của bảng (ward-table đặt width: min-content trong style.css nên offsetWidth chính là bề rộng tự nhiên)
-function naturalWidth(table, fallback) {
-  return table && table.offsetWidth ? table.offsetWidth : fallback;
-}
-
 const isPart1Spread = () => !!document.getElementById('bpBody')?.classList.contains('bp-spread')
   && !document.body.classList.contains('bottom-max');
+// Màn m, l: bảng co chữ cho vừa bề ngang (bảng 40 phường xã) và bảng phường được tách đôi; màn s giữ cỡ chữ, cuộn ngang
+const isWideTier = () => document.documentElement.dataset.screen !== 's';
 
 /**
- * Trải panel thành bố cục đối xứng 3 cột (style.css › bp-spread): màn l luôn trải; màn m chỉ khi xem 1 phường/xã
- * và bảng chỉ tiêu phường vừa cột giữa; màn s giữ khối xoay
+ * Trải panel thành bố cục đối xứng 3 cột (style.css › bp-spread) chỉ ở màn l. Màn m (Full HD) panel chỉ cao ~280 px,
+ * mỗi ô cột bên còn ~115 px không đủ cho biểu đồ tròn / thẻ đếm / vận tải công cộng, nên giữ khối xoay như màn s
  */
 function updatePart1Spread() {
   const body = document.getElementById('bpBody');
   if (!body) return;
   const tier = SCREEN_TIERS.find(([min]) => window.innerWidth >= min)[1];
   document.documentElement.dataset.screen = tier;
-  const ward = !isCityMode();
-  const k = screenScale();
-  const room = body.clientWidth - 2 * SPREAD_SIDE_W * k - 24;
-  const spread = tier === 'l'
-    || (tier === 'm' && ward && room >= naturalWidth(document.querySelector('#wardSummaryView .ward-table'), 700 * k));
+  const spread = tier === 'l';
   if (body.classList.contains('bp-spread') === spread) return;
   body.classList.toggle('bp-spread', spread);
   // Trải ra: tiêu đề cột trái về mặt cơ cấu đất
@@ -380,13 +372,13 @@ function renderTransitChart() {
   box.innerHTML = `${rows}<div class="tr-row"><span></span><span class="tr-ticks">${ticks}</span><span></span></div>`;
 }
 
-// Panel trải: co chữ bảng 40 phường/xã đến khi lọt cột giữa (style.css cho bảng width 100% nên phần dư dàn đều, không hở)
+// Màn m, l: co chữ bảng 40 phường/xã đến khi lọt bề ngang khung (panel trải: style.css cho bảng width 100% nên phần dư dàn đều, không hở)
 function fitSpreadTable() {
   const box = document.querySelector('#citySummaryView .table-container');
   const table = box && box.querySelector('table.data-table');
   if (!table) return;
   table.style.fontSize = '';
-  if (!isPart1Spread() || !box.clientWidth) return;
+  if (!isWideTier() || !box.clientWidth) return;
   table.style.width = 'max-content';
   let fs = parseFloat(getComputedStyle(table).fontSize);
   // Đệm và viền ô không co theo chữ nên lặp vài lượt
@@ -410,7 +402,7 @@ function watchSpreadTable() {
   });
 }
 
-// Bảng phường tách đôi (wt-split): co chữ cả 2 bảng đến khi bảng phải không phải cuộn ngang;
+// Bảng phường tách đôi (wt-split): co chữ cả 2 bảng đến khi không bảng nào phải cuộn ngang;
 // phải co dưới WARD_SPLIT_MIN_FS thì về 1 bảng và chỉ thử tách lại khi cột giữa rộng hơn lần thử trước
 const WARD_SPLIT_MIN_FS = 10;
 let wardSplitMinW = 0;
@@ -422,29 +414,29 @@ function currentWardData() {
 
 function wardSplitWanted() {
   const w = document.getElementById('wardSummaryView')?.clientWidth || 0;
-  return isPart1Spread() && (!w || w > wardSplitMinW);
+  return isWideTier() && (!w || w > wardSplitMinW);
 }
 
 function fitWardSplit() {
   const view = document.getElementById('wardSummaryView');
   const split = view && view.querySelector('.wt-split');
-  if (!split) {
-    const wardData = view && view.clientWidth && wardSplitWanted() && currentWardData();
+  if (!split || !isWideTier()) {
+    const wardData = view && view.clientWidth && (split ? true : wardSplitWanted()) && currentWardData();
     if (wardData) refreshWardQuotaTable(wardData);
     return;
   }
   const tables = [...split.querySelectorAll('table.ward-table')];
-  const right = split.querySelector('.wt-right');
-  if (tables.length < 2 || !right) return;
+  if (tables.length < 2) return;
   tables.forEach(t => { t.style.fontSize = ''; });
-  if (!right.clientWidth) return;
+  const boxW = tables[0].parentElement.clientWidth;
+  if (!boxW) return;
+  const overflow = () => Math.max(...tables.map(t => t.offsetWidth - t.parentElement.clientWidth));
   let fs = parseFloat(getComputedStyle(tables[0]).fontSize);
-  for (let i = 0; i < 5 && tables[1].offsetWidth > right.clientWidth && fs > TABLE_FIT_MIN_FS; i++) {
-    const over = tables[1].offsetWidth - right.clientWidth;
-    fs = Math.max(TABLE_FIT_MIN_FS, fs * (split.clientWidth / (split.clientWidth + over)) - 0.05);
+  for (let i = 0; i < 5 && overflow() > 0 && fs > TABLE_FIT_MIN_FS; i++) {
+    fs = Math.max(TABLE_FIT_MIN_FS, fs * (boxW / (boxW + overflow())) - 0.05);
     tables.forEach(t => { t.style.fontSize = `${fs.toFixed(2)}px`; });
   }
-  if (tables[1].offsetWidth > right.clientWidth || fs < WARD_SPLIT_MIN_FS) {
+  if (overflow() > 0 || fs < WARD_SPLIT_MIN_FS) {
     wardSplitMinW = view.clientWidth;
     const wardData = currentWardData();
     if (wardData) refreshWardQuotaTable(wardData);
@@ -849,7 +841,6 @@ function renderCityTableFoot() {
   if (!list.length) { foot.innerHTML = ''; return; }
   const pop = list.reduce((s, w) => s + (Number(w.Dan_So_Vector) || 0), 0);
   const area = list.reduce((s, w) => s + (Number(w.Dien_Tich_Km2) || 0), 0);
-  const nt = list.map(ntStatsOf).reduce((s, x) => ({ count: s.count + x.count, ha: s.ha + x.ha }), { count: 0, ha: 0 });
   let roadCells;
   if (!roadTypesByWard) {
     roadCells = ROAD_TYPES.map(() => `<td class="st-num st-road">${ROAD_PENDING}</td>`).join('');
@@ -873,7 +864,6 @@ function renderCityTableFoot() {
     <td class="st-num">${fmtArea(area)}</td>
     <td class="st-num st-dens">${area > 0 ? fmtNum(Math.round(pop / area)) : '-'}</td>
     <td colspan="${TABLE_CODES.length * 2}" class="c-muted st-total-note">Độ phủ / quy mô toàn thành phố: xem thanh tiêu đề</td>
-    <td class="st-num">${nt.count}</td><td class="st-num">${fmtHa(nt.ha)}</td>
     <td colspan="2"></td>
     ${roadCells}
     <td class="st-num st-bus">${fmtNum(list.reduce((s, w) => s + busCountOf(w), 0))}</td>
@@ -1073,15 +1063,6 @@ function thptScaleOf(w) {
 
 const busCountOf = (w) => ((w.network && w.network.bus) || []).length;
 
-// Nhà tang lễ, nghĩa trang (11-NT) đã duyệt trong phường: chỉ tiêu nghĩa trang tính chung toàn TP (Mục 2.12.2.1)
-// nên bảng ghi số cơ sở và diện tích nghĩa trang thay cho độ phủ / quy mô
-function ntStatsOf(w) {
-  const nt = (w.network && w.network.nt) || [];
-  const ha = nt.filter(it => String(it.ntKind || '').startsWith('cemetery')).reduce((s, it) => s + (Number(it.size) || 0), 0) / 10000;
-  return { count: nt.length, ha };
-}
-const fmtHa = (ha) => ha > 0 ? ha.toLocaleString('vi-VN', { maximumFractionDigits: 1, minimumFractionDigits: 1 }) : '-';
-
 function wardRowHtml(w, idx) {
   const ready = !!w._coverageReady;
   const cells = TABLE_CODES.map(c => {
@@ -1091,7 +1072,6 @@ function wardRowHtml(w, idx) {
     return `<td class="cov-cell" data-code="${c}">${cov}</td><td class="st-scale">${scale}</td>`;
   }).join('');
   const name = escapeHtml(w.Ten_Phuong);
-  const nt = ntStatsOf(w);
   return `<tr data-ward-row="${name}">
     <td>${idx + 1}</td>
     <td class="st-name">
@@ -1102,7 +1082,6 @@ function wardRowHtml(w, idx) {
     <td class="st-num">${w.Dien_Tich_Km2 ? fmtArea(w.Dien_Tich_Km2) : '-'}</td>
     <td class="st-num st-dens">${w.Mat_Do_Dan_So ? fmtNum(w.Mat_Do_Dan_So) : '-'}</td>
     ${cells}
-    <td class="st-num">${nt.count || '-'}</td><td class="st-num">${fmtHa(nt.ha)}</td>
     <td class="cov-avg">${ready ? fmtPct(w.Avg_Coverage_Score) : PENDING_CELL}</td>
     <td class="st-scale st-scale-avg">${fmtPct(w.Avg_Scale_Score)}</td>
     ${roadCellsHtml(w.Ten_Phuong)}
