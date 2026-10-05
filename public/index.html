@@ -248,13 +248,8 @@
 
         <div class="rp-settings">
           <div class="layer-tab-switch" role="tablist" aria-label="Nhóm lớp bản đồ">
-            <button type="button" class="layer-tab-btn active" data-layer-tab="base" role="tab" aria-selected="true">Nền<span class="layer-tab-count"></span></button>
-            <button type="button" class="layer-tab-btn" data-layer-tab="analysis" role="tab" aria-selected="false">Phân tích<span class="layer-tab-count"></span></button>
+            <button type="button" class="layer-tab-btn active" data-layer-tab="analysis" role="tab" aria-selected="true" title="Ranh giới, ranh lô đất, bản đồ độ phủ, dân cư, mạng lưới đường">Nền, phân tích<span class="layer-tab-count"></span></button>
             <button type="button" class="layer-tab-btn" data-layer-tab="env" role="tab" aria-selected="false" title="Lớp môi trường, viễn thám (Google Earth Engine)">Môi trường<span class="layer-tab-count"></span></button>
-          </div>
-          <div class="layer-tab-pane" data-layer-pane="base" role="tabpanel">
-          <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div></div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_parcel"><label for="chk_parcel" title="Ranh khu đất của từng công trình trong 14 nhóm (cột Geojson trên Sheet)"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Ranh lô đất công trình (HTXH) <small class="layer-hint">phóng to để xem</small></label></div></div>
           </div>
           <div class="layer-tab-pane" data-layer-pane="env" role="tabpanel" hidden>
           <div class="layer-row">
@@ -323,7 +318,9 @@
             <div class="flood-stats" id="riskStats"></div>
           </div>
           </div>
-          <div class="layer-tab-pane" data-layer-pane="analysis" role="tabpanel" hidden>
+          <div class="layer-tab-pane" data-layer-pane="analysis" role="tabpanel">
+          <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_parcel"><label for="chk_parcel" title="Ranh khu đất của từng công trình trong 14 nhóm (cột Geojson trên Sheet)"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Ranh lô đất công trình (HTXH) <small class="layer-hint">phóng to để xem</small></label></div></div>
           <div class="layer-row">
             <div><input type="checkbox" id="chk_heat" checked><label for="chk_heat"><svg class="ico ico-layer"><use href="#i-heat"/></svg>Bản đồ độ phủ hạ tầng</label></div>
             <span id="heatBox" class="layer-slider"><input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30" title="Độ trong suốt bản đồ độ phủ" aria-label="Độ trong suốt bản đồ độ phủ"></span>

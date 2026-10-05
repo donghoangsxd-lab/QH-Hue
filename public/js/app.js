@@ -65,7 +65,7 @@ function addTypeSwatches() {
       ?.insertAdjacentHTML('afterbegin', `<i class="layer-swatch" style="background:${BUFFER_COLORS[type]};"></i>`);
   });
 }
-// Nút Nền | Phân tích | Môi trường: mỗi lúc hiện 1 nhóm lớp; số trên nút = số lớp đang bật trong nhóm (kể cả nhóm đang ẩn)
+// Nút Nền, phân tích | Môi trường: mỗi lúc hiện 1 nhóm lớp; số trên nút = số lớp đang bật trong nhóm (kể cả nhóm đang ẩn)
 function initLayerTabs() {
   const btns = [...document.querySelectorAll('.layer-tab-btn')];
   const panes = [...document.querySelectorAll('.layer-tab-pane')];

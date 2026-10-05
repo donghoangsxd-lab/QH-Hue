@@ -659,29 +659,65 @@ function overviewHtml(wards, wardName) {
     </div>`;
 }
 
-function detailRows2A(urban, wards) {
+// Nhóm tiêu đề khi danh sách bắt đầu giữa nhóm (bảng thứ 2 của trang chi tiết) ghi thêm "(tiếp)"
+function groupHeadHtml(std, list, all, groups, cols) {
+  const cont = std === list[0] && std !== all.find(s => s.group === std.group) ? ' (tiếp)' : '';
+  return `<tr class="uc-group"><td colspan="${cols}">${escapeHtml(groups[std.group])}${cont}</td></tr>`;
+}
+
+// Trang chi tiết Bảng 2A: mỗi tiêu chuẩn 1 dòng nên dùng tên ngắn kèm đơn vị; tên đủ, nguồn kế thừa và cách tính ở chú thích
+const SHORT_2A = {
+  '2A.I.01': 'Vai trò, vị trí theo quy hoạch', '2A.I.02': 'Vai trò đô thị trung tâm',
+  '2A.II.03': 'Quy mô dân số (người)', '2A.II.04': 'Mật độ dân số (người/km²)', '2A.II.05': 'Lao động phi nông nghiệp (%)',
+  '2A.III.06': 'Đầu mối giao thông', '2A.III.07': 'Mật độ đường (km/km²)', '2A.III.08': 'Cấp nước sạch tập trung (%)',
+  '2A.III.09': 'Mật độ cống thoát nước (km/km²)', '2A.III.10': 'Công suất xử lý nước thải (%)', '2A.III.11': 'Chất thải rắn được xử lý (%)',
+  '2A.III.12': 'Nghĩa trang theo quy hoạch (%)', '2A.III.13': 'Nhà tang lễ (cơ sở)', '2A.III.14': 'Giường bệnh (/10.000 dân)',
+  '2A.III.15': 'Cơ sở giáo dục, đào tạo (cơ sở)', '2A.III.16': 'Công trình văn hóa', '2A.III.17': 'Công trình thể dục, thể thao',
+  '2A.III.18': 'Công trình thương mại, dịch vụ', '2A.III.19': 'Đất dịch vụ công cộng (m²/người)', '2A.III.20': 'Khu xanh công cộng ≥ 2 ha (khu)',
+  '2A.III.21': 'Tỷ lệ không gian xanh (%)', '2A.III.22': 'Cây xanh công cộng (m²/người)', '2A.III.23': 'Quy chế quản lý kiến trúc'
+};
+const LEVEL_SHORT = { hi: 'Tối đa', mid: 'Tối thiểu', adj: 'Tối thiểu (giảm)', skip: 'Không xét', no: 'Chưa đạt', part: 'Một phần', wait: 'Chờ số liệu', na: 'Chưa tách ranh' };
+
+function nowCellHtml(std, urban, m, j) {
+  if (urban.partial || !std.calc) return '<td class="uc-val">—</td>';
+  if (m && m.pending) return `<td class="uc-val"><span class="gtx-wait">${ico('clock')}</span></td>`;
+  if (!m || m.value == null) return '<td class="uc-val">—</td>';
+  const meter = j.level === 'skip' ? '' : meterHtml(m.value, bandOf(std, urban.cls).hi, adjustedFloor(std, urban), j.level);
+  return `<td class="uc-val"><span class="uc-cell"><b class="${levelCls(j.level)}">${fmtNum(m.value)}</b>${meter}</span></td>`;
+}
+
+// Số không kèm đơn vị (đơn vị ở tên ngắn); * = mức tối thiểu đã giảm theo Điều 8 khoản 2 điểm d
+function targetCellsHtml(std, urban) {
+  const tip = escapeHtml(`Mục tiêu 2030: ${targetText(std, urban, 'hi')}. Mức tối thiểu: ${targetText(std, urban, 'lo')}. ${factorNote(urban, std)}`);
+  if (densityExempt(urban, std)) return `<td colspan="2" class="uc-skip" title="${tip}">Không xem xét</td>`;
+  const q = qualOf(std, urban.cls);
+  const b = bandOf(std, urban.cls);
+  if (q) return `<td title="${tip}">${escapeHtml(q.hi)}</td><td class="c-muted" title="${tip}">${escapeHtml(q.lo)}</td>`;
+  if (!b) return '<td>—</td><td>—</td>';
+  const floor = adjustedFloor(std, urban);
+  return `<td class="uc-val" title="${tip}">${fmtNum(b.hi)}</td><td class="uc-val c-muted" title="${tip}">${fmtNum(floor)}${floor < b.lo ? '*' : ''}</td>`;
+}
+
+function detailRows2A(urban, wards, list) {
   let group = '', sub = '';
-  return STD_2A.map((std, i) => {
-    const head = std.group !== group
-      ? `<tr class="uc-group"><td colspan="8">${escapeHtml(GROUP_2A[std.group])}</td></tr>` : '';
+  return list.map(std => {
+    const head = std.group !== group ? groupHeadHtml(std, list, STD_2A, GROUP_2A, 8) : '';
     group = std.group;
     const subHead = std.sub && std.sub !== sub
       ? `<tr class="uc-sub"><td colspan="8">${escapeHtml(std.sub)}</td></tr>` : '';
     sub = std.sub || sub;
     const m = std.calc && !urban.partial ? readMeasure(std, urban, wards) : null;
     const j = judge(std, urban, m);
-    const now = urban.partial ? '—' : (!std.calc ? '—' : (m && m.pending ? '…' : (m && m.value != null ? fmtNum(m.value) : '—')));
     const pts = j.pts == null ? '—' : `${j.lower ? '≥ ' : ''}${N2.format(j.pts)}`;
-    const tip = [std.method, m && m.note, urban.note].filter(Boolean).join('\n');
+    const tip = [`${std.name}${std.unit ? ` (${std.unit})` : ''}`, std.inherit && `Kế thừa: ${std.inherit}`, std.method, m && m.note, urban.note].filter(Boolean).join('\n');
     return `${head}${subHead}<tr>
-      <td>${i + 1}</td>
+      <td>${STD_2A.indexOf(std) + 1}</td>
       <td class="uc-code">${std.code}</td>
-      <td class="uc-name" title="${escapeHtml(tip)}">${escapeHtml(std.name)}${inheritHtml(std)}</td>
-      <td>${escapeHtml(targetText(std, urban, 'hi'))}</td>
-      <td title="${escapeHtml(factorNote(urban, std))}">${escapeHtml(targetText(std, urban, 'lo'))}</td>
-      <td class="uc-val">${now === '…' ? `<span class="gtx-wait">${ico('clock')}</span>` : escapeHtml(now)}</td>
+      <td class="uc-name" title="${escapeHtml(tip)}">${escapeHtml(SHORT_2A[std.code] || std.name)}${std.inherit ? '<i class="uc-src-dot"></i>' : ''}</td>
+      ${targetCellsHtml(std, urban)}
+      ${nowCellHtml(std, urban, m, j)}
       <td class="uc-val">${escapeHtml(pts)}</td>
-      <td class="${levelCls(j.level)}">${LEVEL_TEXT[j.level]}</td>
+      <td class="${levelCls(j.level)}" title="${LEVEL_TEXT[j.level]}">${LEVEL_SHORT[j.level]}</td>
     </tr>`;
   }).join('');
 }
@@ -697,13 +733,13 @@ function factorNote(urban, std) {
   return `Mức tối thiểu tính điểm = ${N0pct(f)} mức trong Bảng 2A, chỉ khi chưa đạt mức quy định. ${urban.note}`;
 }
 
-function detailRowsI(wards) {
+function detailRowsI(wards, list) {
   const facts = typeIFacts(wards);
   let group = '';
-  return STD_I.map((std, i) => {
-    const head = std.group !== group
-      ? `<tr class="uc-group"><td colspan="6">${escapeHtml(GROUP_I[std.group])}</td></tr>` : '';
+  return list.map(std => {
+    const head = std.group !== group ? groupHeadHtml(std, list, STD_I, GROUP_I, 6) : '';
     group = std.group;
+    const i = STD_I.indexOf(std);
     const j = judgeI(std, facts);
     const val = j.text === '…'
       ? `<span class="gtx-wait" title="${escapeHtml(j.note || '')}">${ico('clock')}</span>`
@@ -731,21 +767,59 @@ function ruleNote(urban) {
   return `${HERITAGE_RULE} ${scope}`;
 }
 
+// Tổng kết dưới bảng thứ 2: điểm / số tiêu chuẩn đạt, quy định áp dụng, chú giải màu
+function detailSumHtml(urban, wards) {
+  let score = '';
+  if (urban.cls === 'I') {
+    const facts = typeIFacts(wards);
+    const need = { I: 4, II: 2, III: 4 };
+    const metOf = (list) => list.filter(s => judgeI(s, facts).level === 'hi').length;
+    const groups = Object.keys(need).map(g => {
+      const list = STD_I.filter(s => s.group === g);
+      const met = metOf(list);
+      return `<span class="${met >= need[g] ? 'c-green' : 'c-orange'}">Nhóm ${g}: ${met}/${list.length} <span class="c-muted">(cần ≥ ${need[g]})</span></span>`;
+    });
+    const met = metOf(STD_I);
+    score = `<div class="uc-side-score"><span>Đạt ${met}/${STD_I.length} tiêu chuẩn · cần ≥ 10 (di sản)</span><b>${met}<span class="c-muted"> / ${STD_I.length}</span></b>`
+      + `${meterHtml(met, STD_I.length, 10, met >= 10 ? 'hi' : 'no')}</div><div class="uc-dsum-groups">${groups.join('')}</div>`;
+  } else if (!urban.partial) {
+    const sc = scoreOf(urban, wards);
+    if (sc.evaluated) {
+      score = `<div class="uc-side-score" title="Ngưỡng công nhận cả Bảng 2A là 75/100 điểm"><span>Đã chấm ${sc.evaluated}/${STD_2A.length} tiêu chuẩn · đạt mức tối thiểu ${sc.met}/${sc.evaluated}</span>`
+        + `<b>${N1.format(sc.pts)}<span class="c-muted"> / ${N1.format(sc.max)} điểm</span></b>${meterHtml(sc.pts, sc.max, null, sc.met === sc.evaluated ? 'hi' : 'mid')}</div>`
+        + `<span>${STD_2A.length - sc.evaluated} tiêu chuẩn còn lại là tiêu chuẩn chữ hoặc chưa có lớp dữ liệu. Ngưỡng công nhận cả Bảng 2A là 75/100.</span>`;
+    }
+  }
+  return `<div class="uc-dsum">${score}<p title="${escapeHtml(urban.note)}">${ico('info')} ${escapeHtml(ruleNote(urban))}</p>${legendHtml()}</div>`;
+}
+
+// Bề rộng cột cố định, chung cho 2 bảng; cột Tiêu chuẩn (rỗng) nhận phần còn lại
+const COLS_2A = ['2.2em', '5.4em', '', '5.6em', '5.6em', '10em', '3.4em', '7.6em'];
+const COLS_I = ['2.2em', '4.4em', '', '9em', '8.5em', '7em'];
+
 function detailHtml(urban, wards, redraw) {
-  if (urban.cls === 'I') ensureBusCover(wards, redraw);
-  const table = urban.cls === 'I'
-    ? `<table class="data-table uc-table"><thead><tr>
-        <th>STT</th><th>Mã</th><th>Tiêu chuẩn</th><th>Mục tiêu</th><th>Hiện trạng</th><th>Mức đạt</th>
-      </tr></thead><tbody>${detailRowsI(wards)}</tbody></table>`
-    : `<table class="data-table uc-table"><thead><tr>
-        <th>STT</th><th>Mã</th><th>Tiêu chuẩn</th><th>Mục tiêu 2030</th><th>Mức tối thiểu</th><th>Hiện trạng</th><th>Điểm</th><th>Mức đạt</th>
-      </tr></thead><tbody>${detailRows2A(urban, wards)}</tbody></table>`;
+  const isI = urban.cls === 'I';
+  if (isI) ensureBusCover(wards, redraw);
+  const cols = (isI ? COLS_I : COLS_2A).map(w => `<col${w ? ` style="width:${w}"` : ''}>`).join('');
+  const head = isI
+    ? '<th>STT</th><th>Mã</th><th>Tiêu chuẩn</th><th>Mục tiêu</th><th>Hiện trạng</th><th>Mức đạt</th>'
+    : '<th>STT</th><th>Mã</th><th title="Tên ngắn; rê chuột xem tên đủ, cách tính. Chấm xanh = kế thừa lớp dữ liệu webapp">Tiêu chuẩn</th>'
+      + '<th title="Mục tiêu 2030 = mức tối đa Bảng 2A">Mục tiêu</th><th title="Mức tối thiểu tính điểm; * = đã giảm còn 50% theo Điều 8 khoản 2 điểm d">Tối thiểu</th>'
+      + '<th>Hiện trạng</th><th>Điểm</th><th>Mức đạt</th>';
+  const table = (rows) => `<table class="data-table uc-table uc-dtable${isI ? '' : ' uc-dtable-2a'}"><colgroup>${cols}</colgroup><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`;
+  // Bảng trái: nhóm I, II (+ III.1 hạ tầng kỹ thuật với Bảng 2A); bảng phải: phần còn lại và tổng kết
+  const list = isI ? STD_I : STD_2A;
+  const firstSub = STD_2A.find(s => s.group === 'III').sub;
+  const left = (s) => s.group !== 'III' || (!isI && s.sub === firstSub);
+  const rows = (part) => (isI ? detailRowsI(wards, part) : detailRows2A(urban, wards, part));
   return `<div class="uc-bar">
       <button type="button" class="bp-btn" data-uc="all">${ico('chev-left')}16 đô thị</button>
       <span class="uc-summary"><b class="uc-${urban.cls}">Loại ${urban.cls}</b> ${escapeHtml(urban.name)} · ${escapeHtml(scopeLabel(urban))}</span>
     </div>
-    <div class="uc-note" title="${escapeHtml(urban.note)}">${ico('info')} ${escapeHtml(ruleNote(urban))}</div>
-    <div class="table-container">${table}</div>`;
+    <div class="uc-dsplit">
+      <div class="uc-dcol">${table(rows(list.filter(left)))}</div>
+      <div class="uc-dcol">${table(rows(list.filter(s => !left(s))))}${detailSumHtml(urban, wards)}</div>
+    </div>`;
 }
 
 function paint(el, wardName, wards, redraw) {

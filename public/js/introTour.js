@@ -31,7 +31,7 @@ const STEPS = [
   {
     target: ['#rightPanel', '#btnExpandRightPanel'],
     title: 'Bật / tắt lớp dữ liệu',
-    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm mũi tên ‹ ở mép phải để mở, › để thu gọn. Panel dùng để chọn nhóm hạ tầng cần xem; nút con mắt "Ẩn tất cả" ở đầu panel ẩn nhanh mọi biểu tượng công trình và bấm lại để hiện đúng các nhóm đã chọn. Nút chấm tròn ● bật vùng phủ của từng nhóm. Bên dưới, các lớp khác chia 3 nút: Nền (ranh 40 phường xã, ranh lô đất công trình), Phân tích (bản đồ độ phủ, phân bố dân cư ô 30 m × 30 m, mạng lưới đường) và Môi trường (địa hình, thoát nước, ngập, nhiệt độ bề mặt…). Thẻ "Chú giải" giải thích các ký hiệu.'
+    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm mũi tên ‹ ở mép phải để mở, › để thu gọn. Panel dùng để chọn nhóm hạ tầng cần xem; nút con mắt "Ẩn tất cả" ở đầu panel ẩn nhanh mọi biểu tượng công trình và bấm lại để hiện đúng các nhóm đã chọn. Nút chấm tròn ● bật vùng phủ của từng nhóm. Bên dưới, các lớp khác chia 2 nút: Nền, phân tích (ranh 40 phường xã, ranh lô đất công trình, bản đồ độ phủ, phân bố dân cư ô 30 m × 30 m, mạng lưới đường) và Môi trường (địa hình, thoát nước, ngập, nhiệt độ bề mặt…). Thẻ "Chú giải" giải thích các ký hiệu.'
   },
   {
     target: '#btnInspectMode',

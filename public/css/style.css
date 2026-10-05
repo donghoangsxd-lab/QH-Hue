@@ -1228,6 +1228,23 @@ table.uc-table tr.uc-partial td { white-space: normal; text-align: left; }
 .uc-std:has(.uc-skip) .uc-std-val { grid-column: 2 / -1; }
 .uc-side-note { line-height: 1.4; }
 .uc-more { align-self: flex-start; margin-top: auto; }
+/* Trang chi tiết 1 đô thị: 2 bảng cạnh nhau cùng bề rộng cột (chỉ cột Tiêu chuẩn nhận phần dư, chữ ít xuống dòng hơn),
+   thiếu chỗ thì xếp chồng; tổng kết và quy định áp dụng nằm dưới bảng phải */
+.uc-dsplit { flex: 1; min-height: 0; overflow: auto; display: flex; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; gap: 10px; }
+.uc-dcol { flex: 1 1 calc(520px * var(--k)); min-width: 0; max-width: calc(820px * var(--k)); display: flex; flex-direction: column; gap: 8px; }
+table.uc-table.uc-dtable { width: 100%; table-layout: fixed; border-top: 1px solid var(--border-color); }
+table.uc-dtable :is(th, td) { white-space: normal; }
+table.uc-dtable td.uc-name { min-width: 0; }
+/* Bảng 2A: mỗi tiêu chuẩn 1 dòng, chữ dài cắt bằng "…" (đủ ở chú thích) */
+table.uc-dtable-2a td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+table.uc-dtable-2a tr.uc-group td, table.uc-dtable-2a tr.uc-sub td { white-space: normal; }
+.uc-src-dot { display: inline-block; width: 5px; height: 5px; margin-left: 5px; border-radius: 50%; vertical-align: middle; background: var(--accent-cyan); }
+.uc-dsum { display: flex; flex-direction: column; gap: 6px; padding: 6px 10px; font-size: var(--fs-xs); line-height: 1.4; color: var(--text-muted);
+  border: 1px solid var(--border-color); border-radius: var(--r-md); background: rgba(15, 23, 42, 0.6); }
+.uc-dsum p { margin: 0; }
+.uc-dsum .ico { width: 12px; height: 12px; }
+.uc-dsum-groups { display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.uc-dsum .uc-legend { flex-wrap: wrap; gap: 2px 10px; margin-left: 0; }
 .uc-city .ico, .uc-side .ico { width: 12px; height: 12px; }
 .bp-chart-wrap { flex: 1; min-height: 0; position: relative; }
 body.bottom-max #cityChartView { flex: 0 0 34%; margin-bottom: 8px; }
@@ -1312,6 +1329,13 @@ table.data-table tfoot .st-total-note { font-weight: 400; font-style: italic; }
 /* Bảng rộng đúng phần số liệu: ô nowrap giữ trọn chữ, ô ghi chú gộp cột (wt-note) xuống dòng trong bề rộng đó
    (bề rộng này dùng để quyết định trải panel: updatePart1Spread) */
 .ward-table-scroll-container { overflow-x: auto; }
+/* Panel trải: bảng trái A–B rộng vừa số liệu, bảng phải C–F nhận phần còn lại (cột ghi chú gộp xuống dòng ít hơn) */
+.wt-split { flex: 1; min-height: 0; display: flex; gap: 10px; }
+.wt-split > .ward-table-scroll-container { flex: 0 0 auto; align-self: stretch; }
+.wt-split > .wt-right { flex: 1 1 0; min-width: 0; width: auto; }
+.wt-split > .wt-right table.ward-table { width: 100%; }
+.wt-split > .wt-right :is(.wt-section, .wt-empty) td:nth-child(2) { white-space: normal; }
+.bp-body.pdf-export .wt-split { display: block; }
 table.ward-table { width: min-content; border-collapse: collapse; margin-top: 0; font-size: var(--fs-xs); }
 table.ward-table th, table.ward-table td { border: 1px solid var(--border-color); padding: 2px 8px; line-height: var(--lh); white-space: nowrap; }
 /* Căn lề theo cột: STT | Loại | Diện tích | Chỉ tiêu | Nhu cầu | Số lượng | Quy mô | Độ phủ */

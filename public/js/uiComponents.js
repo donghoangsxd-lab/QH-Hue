@@ -352,6 +352,8 @@ function updatePart1Spread() {
   body.classList.toggle('bp-spread', spread);
   // Trải ra: tiêu đề cột trái về mặt cơ cấu đất
   setPart1Turn(spread ? part1Turn - (part1Turn % PART1_PAGES.length) : part1Turn);
+  const wardData = currentWardData();
+  if (wardData) refreshWardQuotaTable(wardData);
 }
 
 // ================== TỶ LỆ VẬN TẢI HÀNH KHÁCH CÔNG CỘNG (cột phải khi trải panel) ==================
@@ -408,9 +410,73 @@ function watchSpreadTable() {
   });
 }
 
+// Bảng phường tách đôi (wt-split): co chữ cả 2 bảng đến khi bảng phải không phải cuộn ngang;
+// phải co dưới WARD_SPLIT_MIN_FS thì về 1 bảng và chỉ thử tách lại khi cột giữa rộng hơn lần thử trước
+const WARD_SPLIT_MIN_FS = 10;
+let wardSplitMinW = 0;
+
+function currentWardData() {
+  const card = document.getElementById('wardSummaryCard');
+  return card && !isCityMode() ? state.wardStatsData.find(w => w.Ten_Phuong === card.dataset.ward) : null;
+}
+
+function wardSplitWanted() {
+  const w = document.getElementById('wardSummaryView')?.clientWidth || 0;
+  return isPart1Spread() && (!w || w > wardSplitMinW);
+}
+
+function fitWardSplit() {
+  const view = document.getElementById('wardSummaryView');
+  const split = view && view.querySelector('.wt-split');
+  if (!split) {
+    const wardData = view && view.clientWidth && wardSplitWanted() && currentWardData();
+    if (wardData) refreshWardQuotaTable(wardData);
+    return;
+  }
+  const tables = [...split.querySelectorAll('table.ward-table')];
+  const right = split.querySelector('.wt-right');
+  if (tables.length < 2 || !right) return;
+  tables.forEach(t => { t.style.fontSize = ''; });
+  if (!right.clientWidth) return;
+  let fs = parseFloat(getComputedStyle(tables[0]).fontSize);
+  for (let i = 0; i < 5 && tables[1].offsetWidth > right.clientWidth && fs > TABLE_FIT_MIN_FS; i++) {
+    const over = tables[1].offsetWidth - right.clientWidth;
+    fs = Math.max(TABLE_FIT_MIN_FS, fs * (split.clientWidth / (split.clientWidth + over)) - 0.05);
+    tables.forEach(t => { t.style.fontSize = `${fs.toFixed(2)}px`; });
+  }
+  if (tables[1].offsetWidth > right.clientWidth || fs < WARD_SPLIT_MIN_FS) {
+    wardSplitMinW = view.clientWidth;
+    const wardData = currentWardData();
+    if (wardData) refreshWardQuotaTable(wardData);
+  }
+}
+
+function watchWardSplit() {
+  const view = document.getElementById('wardSummaryView');
+  if (!view) return;
+  let raf = 0;
+  const ro = new ResizeObserver(() => schedule());
+  // Theo dõi cả 2 bảng: mở danh sách công trình có tên dài làm bảng rộng ra (observe mới gọi lại 1 lần nên chỉ thêm bảng mới)
+  const seen = new Set();
+  const schedule = () => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      fitWardSplit();
+      seen.forEach(t => { if (!t.isConnected) { ro.unobserve(t); seen.delete(t); } });
+      view.querySelectorAll('.wt-split table').forEach(t => {
+        if (!seen.has(t)) { seen.add(t); ro.observe(t); }
+      });
+    });
+  };
+  ro.observe(view);
+  new MutationObserver(schedule).observe(view, { childList: true, subtree: true });
+}
+
 function initPart1Flip() {
   renderTransitChart();
   watchSpreadTable();
+  watchWardSplit();
   let resizeRaf = 0;
   window.addEventListener('resize', () => {
     if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; updatePart1Spread(); });
@@ -1780,11 +1846,14 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     if (balanceKey && required) balanceRows(balanceKey);
   };
 
-  parts.push(`<div class="ward-table-scroll-container"><table class="ward-table">
+  // Panel trải (màn lớn): A–B và C–F thành 2 bảng cạnh nhau, mỗi bảng cuộn riêng
+  const split = wardSplitWanted();
+  const head = `<table class="ward-table">
     <thead>
       <tr><th>STT</th><th>Loại hạ tầng</th><th>Diện tích</th><th>Chỉ tiêu</th><th>Nhu cầu DT</th><th>Số lượng</th><th>Quy mô</th><th>Độ phủ</th></tr>
     </thead>
-    <tbody>`);
+    <tbody>`;
+  parts.push(`${split ? '<div class="wt-split">' : ''}<div class="ward-table-scroll-container">${head}`);
 
   // A / CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ
   sectionHeader('A', 'a', 'CÔNG TRÌNH HẠ TẦNG CẤP ĐÔ THỊ');
@@ -1896,6 +1965,8 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   });
   if (isUrbanProfile) parts.push(newDevRowHtml(wardData.Ten_Phuong));
 
+  if (split) parts.push(`</tbody></table></div><div class="ward-table-scroll-container wt-right">${head}`);
+
   // C / CÔNG TRÌNH CHƯA DUYỆT (QUY HOẠCH) — nhóm 1–8, TrangThai = FALSE
   sectionHeader('C', 'c', 'CÔNG TRÌNH CHƯA DUYỆT (QUY HOẠCH)');
   const pendingList = wardData.pendingItems || [];
@@ -1947,7 +2018,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 
   parts.push(networkSectionHtml(wardData));
 
-  parts.push(`</tbody></table></div>`);
+  parts.push(`</tbody></table></div>${split ? '</div>' : ''}`);
   return parts.join('');
 }
 
