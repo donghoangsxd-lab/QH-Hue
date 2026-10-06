@@ -575,9 +575,14 @@ export const lotCodeOf = (attrs) => attrOf(attrs, LOT_CODE_FIELD);
 const MARKET_RE = /(^|[^\p{L}])(chợ|siêu thị|trung tâm thương mại|tttm)(?!\p{L})/iu;
 export const isMarketName = (s) => MARKET_RE.test(String(s || '').normalize('NFC'));
 
-const SCHOOL_NAME_RULES = [['THCS', /trung học cơ sở|(^|[^\p{L}])thcs(?!\p{L})/iu], ['TH', /tiểu học/iu], ['MN', /mầm non|mẫu giáo|nhà trẻ/iu]];
+const SCHOOL_NAME_RULES = [
+  ['THPT', /trung học phổ thông|(^|[^\p{L}])thpt(?!\p{L})/iu],
+  ['THCS', /trung học cơ sở|(^|[^\p{L}])thcs(?!\p{L})/iu],
+  ['TH', /tiểu học/iu],
+  ['MN', /mầm non|mẫu giáo|nhà trẻ/iu]
+];
 
-/** Cấp trường theo tên (VD "Trường tiểu học Lê Lợi"), không rõ thì theo tiền tố ký hiệu lô (MN. / TH. / THCS.); tên gộp nhiều cấp → '' */
+/** Cấp trường theo tên (VD "Trường tiểu học Lê Lợi"), không rõ thì theo tiền tố ký hiệu lô (MN. / TH. / THCS. / THPT.); tên gộp nhiều cấp → '' */
 export function schoolLevelOf(names, lotCode) {
   const hits = new Set();
   names.forEach(n => {
@@ -585,7 +590,7 @@ export function schoolLevelOf(names, lotCode) {
     SCHOOL_NAME_RULES.forEach(([lv, re]) => { if (re.test(s)) hits.add(lv); });
   });
   if (hits.size) return hits.size === 1 ? [...hits][0] : '';
-  const m = String(lotCode || '').match(/^(MN|THCS|TH)(?=[.\-_\s\d])/i);
+  const m = String(lotCode || '').match(/^(MN|THPT|THCS|TH)(?=[.\-_\s\d])/i);
   return m ? m[1].toUpperCase() : '';
 }
 

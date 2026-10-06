@@ -17,7 +17,7 @@ export const TYPE_CODE_OPTIONS = [
   ['TH', 'Trường Tiểu học'],
   ['THCS', 'Trường THCS'],
   ['THPT', 'Trường THPT (cấp đô thị)'],
-  [SCHOOL_PICK, 'Trường học – chọn cấp từng lô'],
+  [SCHOOL_PICK, 'Đất giáo dục, trường học – chọn cấp từng lô (MN / TH / THCS / THPT)'],
   ['YT', 'Bệnh viện, Trạm y tế'],
   ['YT_DT', 'Y tế – cấp đô thị'],
   ['VH', 'Nhà văn hóa, thể thao'],

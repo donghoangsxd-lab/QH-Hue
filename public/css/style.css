@@ -781,8 +781,7 @@ body.right-collapsed .right-panel {
 .cad-review-head { font-weight: 600; }
 .cad-review-head b { color: var(--accent-yellow); }
 .cad-review-info { margin: 2px 0 5px; color: var(--text-muted); overflow-wrap: anywhere; }
-.cad-review-btns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
-.cad-review-btns.market { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cad-review-btns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
 .cad-review-btns button, .cad-review-nav button, .cad-review.done button {
   padding: 4px 2px; font-size: var(--fs-sm); font-weight: 600; font-family: inherit; white-space: nowrap; cursor: pointer;
   color: var(--text-main); background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm);
@@ -793,6 +792,19 @@ body.right-collapsed .right-panel {
 .cad-review-nav button { flex: 1; font-weight: 500; color: var(--text-muted); }
 .cad-review-nav button:hover, .cad-review.done button:hover { color: var(--accent-cyan); border-color: var(--accent-cyan); }
 .cad-review.done button { flex-shrink: 0; padding: 3px 8px; }
+.cad-review-blink { animation: cad-review-blink 0.9s ease-in-out infinite; }
+@keyframes cad-review-blink { 0%, 100% { stroke-opacity: 1; } 50% { stroke-opacity: 0.15; } }
+@media (prefers-reduced-motion: reduce) { .cad-review-blink { animation: none; } }
+.cad-review-hints { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 5px; font-size: var(--fs-sm); }
+.cad-review-hints.muted { color: var(--text-muted); }
+.cad-review-hints .ico { width: 12px; height: 12px; margin-right: 3px; vertical-align: -2px; }
+.cad-rev-hint {
+  max-width: 100%; padding: 2px 6px; font-size: var(--fs-sm); font-family: inherit; overflow-wrap: anywhere; text-align: left; cursor: pointer;
+  color: var(--text-main); background: rgba(var(--cyan-rgb), 0.12); border: 1px solid rgba(var(--cyan-rgb), 0.5); border-radius: var(--r-sm);
+}
+.cad-rev-hint:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.cad-rev-hint b { color: var(--accent-cyan); }
+.cad-rev-hint.off { cursor: default; color: var(--text-muted); background: var(--bg-input); border-color: var(--border-color); }
 /* Khớp thủ công layer / thuộc tính → loại hạ tầng */
 .cad-map { margin-top: 6px; padding: 6px; border: 1px solid rgba(var(--orange-rgb), 0.45); border-radius: var(--r-md); background: rgba(var(--orange-rgb), 0.05); }
 .cad-map-head { font-weight: 600; margin-bottom: 4px; }

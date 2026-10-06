@@ -17,6 +17,8 @@ import { parseShapefileZip } from './shpImport.js';
 import { createManualMapping, selectField, setCode, clearCodes, applyManualMapping, manualMappingHtml } from './cadTypeMapping.js';
 import { projectBoundary, fitBoundary } from './projectLayer.js';
 import { boundaryFromLines } from './boundaryLines.js';
+import { setLabelsOverlay, labelsOverlayOn } from './basemap.js';
+import { queryOverpassHedged } from './serviceArea.js';
 
 // Diện tích tối thiểu theo loại (khớp config/constants.js → infraConfig.minSize)
 const MIN_SIZE = { "1-CV": 300, "2-BDX": 200, "3-MN": 800, "4-TH": 2000, "5-THCS": 2500, "7-YT": 1000, "8-VH": 500, "9-TM": 1500 };
@@ -44,16 +46,24 @@ let current = null;
 let pendingItems = null;      // hồ sơ chờ duyệt (Admin), null = chưa tải
 let previewLayer = null;
 let reviewLayer = null;
+let reviewRenderer = null;
 let submitting = false;
 let onImported = null;
 let dupTargets = new Set();   // "giai đoạn|ID" công trình bị nhiều lô cùng chọn cập nhật
 
-// Cấp trường cho lô Truonghoc thiếu hậu tố
-const SCHOOL_LEVELS = [['MN', 'Mầm non'], ['TH', 'Tiểu học'], ['THCS', 'THCS']];
+// Cấp trường cho lô Truonghoc thiếu hậu tố / đất giáo dục gộp chung (nhiều đồ án gộp cả THPT)
+const SCHOOL_LEVELS = [['MN', 'Mầm non'], ['TH', 'Tiểu học'], ['THCS', 'THCS'], ['THPT', 'THPT']];
 const LEVEL_REJECT = 'reject';
 // Lô "Chợ, TTTM – chọn từng lô": chợ / TTTM theo cấp, hoặc không phải → lô đất sheet DXF
 const MARKET_LEVELS = [['TM', 'Chợ / TTTM', 'Chợ, TTTM cấp đơn vị ở'], ['TM_DT', 'Cấp đô thị', 'Chợ, TTTM cấp đô thị']];
 const LEVEL_LAND = 'land';
+// Lô dịch vụ nhỏ hơn mức này mà không mang tên chợ / TTTM: mặc định không phải chợ / TTTM, chỉ hỏi lô lớn hơn
+const SMALL_MARKET_M2 = 1000;
+// Gợi ý theo nhãn bản đồ: địa điểm có tên trên OSM nằm trong lô hoặc cách ranh lô ≤ HINT_NEAR_M
+const HINT_NEAR_M = 10;
+const HINT_TIMEOUT_MS = 20000;
+const HINT_HEDGE_MS = 4000;
+const HINT_TAGS = ['amenity', 'shop', 'tourism', 'office', 'leisure', 'building', 'healthcare'];
 
 const $ = (id) => document.getElementById(id);
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
@@ -284,6 +294,7 @@ function enrichParcels(parcels) {
   parcels.forEach(p => {
     if (p.market) {
       if ([p.name, ...p.points.map(pt => pt.name)].some(isMarketName)) current.autoLevels.set(p.src, 'TM');
+      else if (p.area > 0 && p.area < SMALL_MARKET_M2) current.autoLevels.set(p.src, LEVEL_LAND);
       return;
     }
     if (!p.school) return;
@@ -376,6 +387,80 @@ function zoomToParcel(p, maxZoom = 18) {
 const pickLots = () => (current?.base?.parcels || []).filter(p => (p.school || p.market) && p.ward);
 // Admin chọn thắng cấp tự nhận theo tên điểm / ký hiệu lô
 const levelOf = (src) => current.levels.get(src) || current.autoLevels?.get(src) || null;
+const isAutoLot = (p) => !current.levels.has(p.src) && !!current.autoLevels?.has(p.src);
+// Danh sách duyệt chỉ gồm lô không tự nhận được (kể cả lô admin đã chọn); lô tự nhận chỉ mở khi bấm vào dòng của lô
+const reviewLots = () => pickLots().filter(p => !isAutoLot(p));
+
+// Đang duyệt từng lô: bật tem đường, tên công trình Google để nhận ra trường / chợ; đóng duyệt thì trả về như trước
+let labelsAuto = false;
+function reviewLabels(on) {
+  if (on && !labelsOverlayOn()) {
+    setLabelsOverlay(true);
+    labelsAuto = true;
+  } else if (!on && labelsAuto) {
+    if (labelsOverlayOn()) setLabelsOverlay(false);
+    labelsAuto = false;
+  }
+}
+
+function hintLevel(p, f) {
+  if (p.market) {
+    const big = f.tags.amenity === 'marketplace' || /^(supermarket|mall|department_store)$/.test(f.tags.shop || '');
+    return big || isMarketName(f.name) ? 'TM' : LEVEL_LAND;
+  }
+  return schoolLevelOf([f.name], '') || (f.tags.amenity === 'kindergarten' ? 'MN' : '');
+}
+
+// Nhãn Google là ảnh, không đọc được chữ: lấy tên địa điểm OSM quanh các lô cần duyệt (1 truy vấn cho mọi lô chưa có gợi ý).
+// current.hints: Map src → [{ name, lv }] | 'loading' | 'fail'
+async function loadMapHints() {
+  const cur = current;
+  if (!cur || typeof turf === 'undefined') return;
+  cur.hints = cur.hints || new Map();
+  const lots = reviewLots().filter(p => !cur.hints.has(p.src) && p.polygons?.length);
+  if (!lots.length) return;
+  lots.forEach(p => cur.hints.set(p.src, 'loading'));
+  let s = 90, w = 180, n = -90, e = -180;
+  lots.forEach(p => p.polygons.forEach(poly => poly[0].forEach(([x, y]) => {
+    s = Math.min(s, y); n = Math.max(n, y); w = Math.min(w, x); e = Math.max(e, x);
+  })));
+  const pad = 0.0003;
+  const box = [s - pad, w - pad, n + pad, e + pad].map(v => v.toFixed(6)).join(',');
+  const q = `[out:json][timeout:20];(${HINT_TAGS.map(t => `nwr["name"]["${t}"](${box});`).join('')});out tags center;`;
+  let feats = null;
+  try {
+    const data = await queryOverpassHedged(q, HINT_TIMEOUT_MS, HINT_HEDGE_MS);
+    feats = (data.elements || [])
+      .map(el => ({ name: el.tags?.name, tags: el.tags || {}, pt: [el.lon ?? el.center?.lon, el.lat ?? el.center?.lat] }))
+      .filter(f => f.name && Number.isFinite(f.pt[0]) && Number.isFinite(f.pt[1]));
+  } catch (err) {
+    console.warn('Không tải được nhãn bản đồ:', err);
+  }
+  if (current !== cur) return;
+  lots.forEach(p => {
+    if (!feats) { cur.hints.set(p.src, 'fail'); return; }
+    const poly = p.polygons.length === 1 ? turf.polygon(p.polygons[0]) : turf.multiPolygon(p.polygons);
+    const zone = turf.buffer(poly, HINT_NEAR_M / 1000, { units: 'kilometers' }) || poly;
+    const seen = new Set();
+    cur.hints.set(p.src, feats
+      .filter(f => turf.booleanPointInPolygon(f.pt, zone) && !seen.has(f.name) && seen.add(f.name))
+      .map(f => ({ name: f.name, lv: hintLevel(p, f) })));
+  });
+  if (cur.reviewSrc != null) renderReport();
+}
+
+function hintsHtml(p) {
+  const h = current.hints?.get(p.src);
+  if (!h) return '';
+  if (h === 'loading') return `<div class="cad-review-hints muted">${ico('pin')}Đang tìm tên địa điểm quanh lô…</div>`;
+  if (h === 'fail') return '<div class="cad-review-hints muted">Không tải được tên địa điểm (máy chủ OSM quá tải) — xem nhãn trên ảnh vệ tinh.</div>';
+  if (!h.length) return '<div class="cad-review-hints muted">Không có tên địa điểm OSM trong lô — xem nhãn trên ảnh vệ tinh.</div>';
+  const label = (lv) => ({ TM: 'Chợ / TTTM', [LEVEL_LAND]: 'Không phải', ...Object.fromEntries(SCHOOL_LEVELS) }[lv]);
+  const chips = h.slice(0, 4).map(({ name, lv }) => lv
+    ? `<button type="button" class="cad-rev-hint" data-lv="${lv}" title="Chọn ${escapeHtml(label(lv))}">${escapeHtml(name)} → <b>${escapeHtml(label(lv))}</b></button>`
+    : `<span class="cad-rev-hint off">${escapeHtml(name)}</span>`).join('');
+  return `<div class="cad-review-hints"><span>Gợi ý theo tên địa điểm:</span>${chips}</div>`;
+}
 
 function applyLevels(parcels) {
   parcels.forEach(p => {
@@ -396,15 +481,19 @@ function applyLevels(parcels) {
     p.rejected = lv === LEVEL_REJECT;
     p.prefix = chosen ? lv : '';
     p.type = chosen ? LAYER_PREFIXES[lv] : SCHOOL_PENDING;
+    p.nhom = lv === 'THPT' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
   });
 }
 
 function markReview(p) {
   clearReviewMark();
   if (!map || !p) return;
+  // Bản đồ vẽ canvas (bỏ qua className): riêng viền lô đang duyệt vẽ SVG để CSS nhấp nháy được
+  reviewRenderer = reviewRenderer || L.svg();
+  const mark = { color: '#ef4444', fill: false, className: 'cad-review-blink', renderer: reviewRenderer };
   reviewLayer = isPoint(p)
-    ? L.circleMarker([p.lat, p.lng], { radius: 14, color: '#facc15', weight: 3, fill: false, interactive: false })
-    : L.geoJSON({ type: 'MultiPolygon', coordinates: p.polygons }, { style: { color: '#facc15', weight: 4, fill: false }, interactive: false });
+    ? L.circleMarker([p.lat, p.lng], { ...mark, radius: 14, weight: 3, interactive: false })
+    : L.geoJSON({ type: 'MultiPolygon', coordinates: p.polygons }, { style: { ...mark, weight: 4 }, interactive: false });
   reviewLayer.addTo(map);
 }
 
@@ -412,9 +501,18 @@ function markReview(p) {
 function openReview(src) {
   const p = pickLots().find(x => x.src === src);
   current.reviewSrc = p ? p.src : null;
+  reviewLabels(!!p);
+  if (p) loadMapHints();
   renderReport();
   markReview(p);
   zoomToParcel(p);
+}
+
+function closeReview() {
+  current.reviewSrc = null;
+  reviewLabels(false);
+  renderReport();
+  clearReviewMark();
 }
 
 // Chọn cấp / từ chối lô đang duyệt; áp dụng luôn cho lô cùng kiểu chưa duyệt cùng vị trí ở giai đoạn khác, rồi sang lô kế tiếp
@@ -432,39 +530,55 @@ function decideReview(level) {
   drawPreview(current.result.parcels, false);
   const next = [...lots.slice(at + 1), ...lots.slice(0, at)].find(q => !levelOf(q.src));
   if (next) openReview(next.src);
-  else { current.reviewSrc = null; renderReport(); clearReviewMark(); }
+  else closeReview();
 }
 
 function reviewHtml() {
-  const lots = pickLots();
-  if (!lots.length) return '';
+  const all = pickLots();
+  if (!all.length) return '';
+  const lots = reviewLots();
   const left = lots.filter(p => !levelOf(p.src)).length;
   const leftOf = (market) => lots.filter(p => !!p.market === market && !levelOf(p.src)).length;
-  const auto = lots.filter(p => !current.levels.has(p.src) && current.autoLevels?.has(p.src)).length;
-  const autoNote = auto ? ` ${auto} lô tự nhận theo tên điểm chức năng / tên lô / ký hiệu lô.` : '';
-  const at = lots.findIndex(p => p.src === current.reviewSrc);
-  if (at < 0) {
+  const autoLots = all.filter(isAutoLot);
+  const small = autoLots.filter(p => current.autoLevels.get(p.src) === LEVEL_LAND).length;
+  const auto = autoLots.length - small;
+  const autoNote = `${auto ? ` ${auto} lô tự nhận theo tên điểm chức năng / tên lô / ký hiệu lô.` : ''}${small
+    ? ` ${small} lô dịch vụ dưới ${fmtNum(SMALL_MARKET_M2)} m² mặc định không phải chợ / TTTM (sheet DXF).` : ''}`;
+  const p = all.find(x => x.src === current.reviewSrc);
+  const at = lots.indexOf(p);
+  if (!p) {
     const parts = [
       leftOf(false) && `<b>${leftOf(false)}</b> lô trường học chưa rõ cấp`,
       leftOf(true) && `<b>${leftOf(true)}</b> lô dịch vụ / thương mại chưa xác nhận chợ / TTTM`
     ].filter(Boolean).join(', ');
-    return `<div class="cad-review done">${ico(left ? 'alert' : 'check')}${left ? `Còn ${parts} — chọn từng lô.`
-      : `Đã duyệt ${lots.length} lô cần chọn từng lô.`}${autoNote}
-      <button type="button" class="cad-rev-open" data-src="${(lots.find(p => !levelOf(p.src)) || lots[0]).src}">${left ? 'Duyệt tiếp' : 'Xem lại'}</button></div>`;
+    const head = left ? `Còn ${parts} — chọn từng lô.` : lots.length ? `Đã duyệt ${lots.length} lô cần chọn từng lô.` : 'Không còn lô cần chọn từng lô.';
+    const open = lots.length ? `<button type="button" class="cad-rev-open" data-src="${(lots.find(q => !levelOf(q.src)) || lots[0]).src}">${left ? 'Duyệt tiếp' : 'Xem lại'}</button>` : '';
+    return `<div class="cad-review done">${ico(left ? 'alert' : 'check')}${head}${autoNote}${open}</div>`;
   }
-  const p = lots[at];
   const lv = levelOf(p.src);
   const btn = (code, label, cls = '', tip = '') => `<button type="button" class="cad-rev-btn${cls}${lv === code ? ' on' : ''}" data-lv="${code}"${tip ? ` title="${tip}"` : ''}>${label}</button>`;
   const btns = p.market
     ? `${MARKET_LEVELS.map(([code, label, tip]) => btn(code, `${ico('check')}${label}`, '', tip)).join('')}${btn(LEVEL_LAND, `${ico('close')}Không phải`, ' rej', 'Không phải chợ / TTTM: ranh lô ghi vào sheet DXF của đồ án')}`
     : `${SCHOOL_LEVELS.map(([code, label]) => btn(code, `${ico('check')}${label}`)).join('')}${btn(LEVEL_REJECT, `${ico('close')}Từ chối`, ' rej')}`;
+  const lvText = { TM: 'chợ / TTTM', TM_DT: 'chợ / TTTM cấp đô thị', [LEVEL_LAND]: 'không phải chợ / TTTM', [LEVEL_REJECT]: 'từ chối',
+    ...Object.fromEntries(SCHOOL_LEVELS.map(([code, label]) => [code, label])) }[lv];
+  const self = isAutoLot(p);
+  const why = !self ? '' : lv === LEVEL_LAND ? ` (dưới ${fmtNum(SMALL_MARKET_M2)} m²)` : ' (theo tên / ký hiệu lô)';
+  const status = lv
+    ? `${p.market ? 'Lô dịch vụ / thương mại' : 'Lô trường học'} — ${self ? 'tự nhận' : 'đã chọn'}: <b>${lvText}</b>${why}`
+    : p.market ? 'Lô dịch vụ / thương mại — có phải chợ / TTTM?' : 'Lô trường học chưa rõ cấp';
+  const pos = at >= 0 ? ` <b>${at + 1}/${lots.length}</b>` : '';
+  const nav = at >= 0
+    ? `<button type="button" class="cad-rev-go" data-src="${lots[(at - 1 + lots.length) % lots.length].src}">‹ Lô trước</button>
+      <button type="button" class="cad-rev-go" data-src="${lots[(at + 1) % lots.length].src}">Lô sau ›</button>`
+    : left ? `<button type="button" class="cad-rev-go" data-src="${lots.find(q => !levelOf(q.src)).src}">Duyệt lô chưa nhận ›</button>` : '';
   return `<div class="cad-review">
-    <div class="cad-review-head">${ico('alert')}${p.market ? 'Lô dịch vụ / thương mại — có phải chợ / TTTM?' : 'Lô trường học chưa rõ cấp'} <b>${at + 1}/${lots.length}</b> · còn ${left} lô chưa duyệt</div>
+    <div class="cad-review-head">${ico(lv ? 'check' : 'alert')}${status}${pos} · còn ${left} lô chưa duyệt</div>
     <div class="cad-review-info">${displayName(p) ? `<b>${escapeHtml(displayName(p))}</b> · ` : ''}${escapeHtml(p.layer)}${p.lotCode ? ` ${escapeHtml(p.lotCode)}` : ''} · ${sizeText(p)} · ${escapeHtml(p.wardParts ? partsText(p) : p.ward)}${p.crossWard ? ' · vắt ranh' : ''}</div>
-    <div class="cad-review-btns${p.market ? ' market' : ''}">${btns}</div>
+    ${hintsHtml(p)}
+    <div class="cad-review-btns">${btns}</div>
     <div class="cad-review-nav">
-      <button type="button" class="cad-rev-go" data-src="${lots[(at - 1 + lots.length) % lots.length].src}">‹ Lô trước</button>
-      <button type="button" class="cad-rev-go" data-src="${lots[(at + 1) % lots.length].src}">Lô sau ›</button>
+      ${nav}
       <button type="button" class="cad-rev-close">Đóng</button>
     </div>
   </div>`;
@@ -473,7 +587,8 @@ function reviewHtml() {
 function bindReview(box) {
   box.querySelectorAll('.cad-rev-btn').forEach(b => b.addEventListener('click', () => decideReview(b.dataset.lv)));
   box.querySelectorAll('.cad-rev-go, .cad-rev-open').forEach(b => b.addEventListener('click', () => openReview(Number(b.dataset.src))));
-  box.querySelector('.cad-rev-close')?.addEventListener('click', () => { current.reviewSrc = null; renderReport(); clearReviewMark(); });
+  box.querySelectorAll('.cad-rev-hint[data-lv]').forEach(b => b.addEventListener('click', () => decideReview(b.dataset.lv)));
+  box.querySelector('.cad-rev-close')?.addEventListener('click', closeReview);
 }
 
 function focusRow(idx) {
@@ -934,6 +1049,10 @@ function analyse({ fit = true } = {}) {
   const first = current.reviewStarted ? null : pickLots().find(p => !levelOf(p.src));
   current.reviewStarted = true;
   if (first) current.reviewSrc = first.src;
+  if (current.reviewSrc != null) {
+    reviewLabels(true);
+    loadMapHints();
+  }
   renderReport();
   drawPreview(current.result.parcels, fit, first);
   if (current.reviewSrc != null) markReview(pickLots().find(p => p.src === current.reviewSrc));
@@ -1196,6 +1315,7 @@ function lockCrs(on) {
 
 function resetImport(keepStatus = false) {
   current = null;
+  reviewLabels(false);
   syncPhaseSelect();
   lockCrs(false);
   clearPreview();
