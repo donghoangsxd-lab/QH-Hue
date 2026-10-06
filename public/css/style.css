@@ -755,6 +755,7 @@ body.right-collapsed .right-panel {
 .osm-table + .btn-submit { margin-top: 8px; }
 .cad-table td { text-align: right; padding: 2px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.2); }
 .cad-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; flex-shrink: 0; }
+.cad-list-title { margin-top: 6px; font-weight: 600; color: var(--accent-yellow); }
 .cad-list { margin-top: 5px; max-height: 170px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--r-md); }
 .cad-row { display: flex; align-items: center; gap: 4px; padding: 3px 5px; cursor: pointer; border-bottom: 1px solid var(--border-soft); transition: background 0.3s; }
 .cad-row:hover, .cad-row.flash { background: rgba(var(--cyan-rgb), 0.14); }

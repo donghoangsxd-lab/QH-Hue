@@ -941,6 +941,26 @@ const POINT_EXISTING_M = 20;
 const isThptRecord = (it) => /^THPT-/i.test(String(it.id || '')) || /THPT/i.test(String(it.name || ''));
 const sameKind = (p, it) => p.type === it.type && (p.type !== '4-TH' || (p.prefix === 'THPT') === isThptRecord(it));
 
+const LEVEL_OF_TYPE = { '3-MN': 'MN', '5-THCS': 'THCS', '6-THPT': 'THPT', '9-TM': 'TM' };
+
+/**
+ * Lô chờ chọn từng lô (đất giáo dục gộp cấp, dịch vụ chờ xác nhận chợ): cấp theo công trình đã có nằm trong lô
+ * (VD lô "dat giao duc" chứa "Trường TH số 1 An Đông" → TH). Không có hoặc nhiều cấp khác nhau → ''.
+ */
+export function existingLevelOf(p, existing) {
+  if (p.kind === 'POINT' || !p.polygons?.length) return '';
+  const want = p.market ? ['9-TM'] : ['3-MN', '4-TH', '5-THCS', '6-THPT'];
+  const [x0, y0, x1, y1] = bboxOfRings(p.polygons.map(poly => poly[0]));
+  const hits = new Set();
+  for (const it of existing) {
+    if (!it.id || !want.includes(it.type)) continue;
+    const x = Number(it.lng), y = Number(it.lat);
+    if (!(x >= x0 && x <= x1 && y >= y0 && y <= y1) || !inPolys(x, y, p.polygons)) continue;
+    hits.add(it.type === '4-TH' ? (isThptRecord(it) ? 'THPT' : 'TH') : LEVEL_OF_TYPE[it.type]);
+  }
+  return hits.size === 1 ? [...hits][0] : '';
+}
+
 export function matchExisting(parcels, existing) {
   const boxes = parcels.map(p => bboxOfRings(p.polygons.map(poly => poly[0])));
   const byParcel = parcels.map(() => []);

@@ -9,7 +9,7 @@ import { escapeHtml, fmtNum, distanceMeters, ico, setStatusContent, planRows } f
 import {
   parseDxf, buildParcels, buildParcelsLonLat, assignWards, matchExisting, layerToType, tt16Layer, linkStages, sameSite,
   filePhaseFromName, LAYER_PREFIXES, SCHOOL_PENDING, MARKET_PENDING, CRS_PRESETS, detectAxes, vn2000ToWgs84,
-  attachPoints, planAttrsOf, lotCodeOf, isMarketName, schoolLevelOf
+  attachPoints, planAttrsOf, lotCodeOf, isMarketName, schoolLevelOf, existingLevelOf
 } from './cadImport.js';
 import { parseKml, unzipKml } from './kmlImport.js';
 import { parseGeoJson } from './geojsonImport.js';
@@ -19,6 +19,7 @@ import { projectBoundary, fitBoundary } from './projectLayer.js';
 import { boundaryFromLines } from './boundaryLines.js';
 import { setLabelsOverlay, labelsOverlayOn } from './basemap.js';
 import { queryOverpassHedged } from './serviceArea.js';
+import { lotKeysOf } from './projectFiles.js';
 
 // Diện tích tối thiểu theo loại (khớp config/constants.js → infraConfig.minSize)
 const MIN_SIZE = { "1-CV": 300, "2-BDX": 200, "3-MN": 800, "4-TH": 2000, "5-THCS": 2500, "7-YT": 1000, "8-VH": 500, "9-TM": 1500 };
@@ -40,6 +41,7 @@ const CHOICE_SKIP = '__skip';
 //   result, manual (khớp thủ công), items: Map ID → công trình đang có, levels: Map src → MN/TH/THCS/reject (Admin chọn),
 //   autoLevels: Map src → cấp trường nhận theo tên điểm / ký hiệu lô, reviewSrc,
 //   takeOver: Set parcelKey lô được chuyển công trình từ đồ án khác sang đồ án đang nhập,
+//   lotKeys: Set "giai đoạn|ID" công trình đã có ranh lô (undefined = đang tải, false = tải lỗi), lotSig: đồ án đã đọc lô,
 //   points: { fileName, entities, wgs84, crs } lớp điểm chức năng, pointStats, notMarket (số lô dịch vụ chuyển sang sheet DXF),
 //   raw: { ext, text } nội dung file (KMZ đã giải nén, shapefile đã chuyển GeoJSON) để gửi hàng chờ, pendingId: hồ sơ chờ duyệt Admin đang mở }
 let current = null;
@@ -197,8 +199,38 @@ function parcelAction(p) {
   if (id && phasesOf(p).some(ph => dupTargets.has(`${ph}|${id}`))) return { key: 'dup', label: `Trùng ${id}`, cls: 'bad' };
   const owner = id ? ownerOf(id) : '';
   if (owner && !takesOver(p)) return { key: 'overlap', label: `${id} thuộc đồ án ${owner}`, cls: 'warn', id, owner };
-  if (id) return { key: 'update', label: `Cập nhật ${id}${owner ? ` · chuyển từ ${owner}` : ''}${both}`, cls: 'info', id, owner };
+  if (id) {
+    const from = owner ? ` · chuyển từ ${owner}` : '';
+    const old = hasOldLot(p, id);
+    if (old === false) return { key: 'update', label: `Ghép điểm ${id}${from}${both}`, cls: 'ok', id, owner, attach: true };
+    return { key: 'update', label: `Cập nhật ${id}${old ? ' · thay ranh cũ' : ''}${from}${both}`, cls: old ? 'warn' : 'info', id, owner, relot: !!old };
+  }
   return { key: 'new', label: `Tạo mới${both}`, cls: 'ok' };
+}
+
+// Công trình id đã có ranh lô ở giai đoạn lô sẽ ghi (null = chưa biết)
+function hasOldLot(p, id) {
+  const keys = current.lotKeys;
+  return keys instanceof Set ? phasesOf(p).some(ph => keys.has(`${ph}|${id}`)) : null;
+}
+
+// Công trình chỉ là điểm thì ghép thẳng; đã có ranh lô mới báo cập nhật (thay ranh cũ)
+function loadLotKeys() {
+  const c = current;
+  const ids = new Set();
+  c.result.parcels.forEach(p => [p.matchId, ...(p.matchConflict || [])].forEach(id => id && ids.add(id)));
+  if (!ids.size) return;
+  const projects = [...new Set([...ids].map(id => String(c.items.get(id)?.tenQH || '').trim()).filter(Boolean))].sort();
+  const sig = projects.join('|');
+  if (c.lotSig === sig) return;
+  c.lotSig = sig;
+  lotKeysOf(projects)
+    .then(keys => { if (c.lotSig === sig) c.lotKeys = keys; })
+    .catch(err => {
+      console.warn('Không đọc được ranh lô công trình đã có:', err);
+      if (c.lotSig === sig) c.lotKeys = false;
+    })
+    .finally(() => { if (current === c && c.lotSig === sig && !submitting) renderReport(); });
 }
 
 function pickHtml(p, idx) {
@@ -272,7 +304,8 @@ function pointsWgs84() {
 
 /**
  * Gộp thuộc tính vào lô: điểm chức năng, chỉ tiêu quy hoạch, ký hiệu lô; cấp trường tự nhận;
- * lô dịch vụ / khớp thủ công vào nhóm TM chỉ giữ khi tên lô, giá trị nhận diện hoặc tên điểm là chợ / siêu thị / TTTM, còn lại → sheet DXF.
+ * lô dịch vụ / khớp thủ công vào nhóm TM chỉ giữ khi tên lô, giá trị nhận diện, tên điểm là chợ / siêu thị / TTTM
+ * hoặc lô chứa chợ / TTTM đã có, còn lại → sheet DXF.
  */
 function enrichParcels(parcels) {
   const pts = pointsWgs84();
@@ -282,23 +315,25 @@ function enrichParcels(parcels) {
     p.lotCode = lotCodeOf(p.attrs);
   });
   current.pointStats = pts.length ? { total: pts.length, outside, lots: parcels.filter(p => p.points.length).length } : null;
+  const existing = [...state.rawDataList, ...state.planDataList];
   let notMarket = 0;
   parcels.forEach(p => {
     if (p.land || p.type !== '9-TM' || !(p.marketCheck || p.manual)) return;
-    if ([p.layer, p.name, ...p.points.map(pt => pt.name)].some(isMarketName)) return;
+    if ([p.layer, p.name, ...p.points.map(pt => pt.name)].some(isMarketName) || existingLevelOf({ ...p, market: true }, existing)) return;
     Object.assign(p, { land: true, type: null, prefix: `LAND:${p.layer}`, nhom: '', manual: false, notMarket: true });
     notMarket++;
   });
   current.notMarket = notMarket;
   current.autoLevels = new Map();
+  // Thứ tự: tên lô / tên điểm / ký hiệu lô → công trình đã có trong lô (để khớp cập nhật) → diện tích lô dịch vụ
   parcels.forEach(p => {
     if (p.market) {
-      if ([p.name, ...p.points.map(pt => pt.name)].some(isMarketName)) current.autoLevels.set(p.src, 'TM');
+      if ([p.name, ...p.points.map(pt => pt.name)].some(isMarketName) || existingLevelOf(p, existing)) current.autoLevels.set(p.src, 'TM');
       else if (p.area > 0 && p.area < SMALL_MARKET_M2) current.autoLevels.set(p.src, LEVEL_LAND);
       return;
     }
     if (!p.school) return;
-    const lv = schoolLevelOf([p.name, ...p.points.map(pt => pt.name)], p.lotCode);
+    const lv = schoolLevelOf([p.name, ...p.points.map(pt => pt.name)], p.lotCode) || existingLevelOf(p, existing);
     if (lv) current.autoLevels.set(p.src, lv);
   });
 }
@@ -542,7 +577,7 @@ function reviewHtml() {
   const autoLots = all.filter(isAutoLot);
   const small = autoLots.filter(p => current.autoLevels.get(p.src) === LEVEL_LAND).length;
   const auto = autoLots.length - small;
-  const autoNote = `${auto ? ` ${auto} lô tự nhận theo tên điểm chức năng / tên lô / ký hiệu lô.` : ''}${small
+  const autoNote = `${auto ? ` ${auto} lô tự nhận theo tên điểm chức năng / tên lô / ký hiệu lô / công trình đã có trong lô.` : ''}${small
     ? ` ${small} lô dịch vụ dưới ${fmtNum(SMALL_MARKET_M2)} m² mặc định không phải chợ / TTTM (sheet DXF).` : ''}`;
   const p = all.find(x => x.src === current.reviewSrc);
   const at = lots.indexOf(p);
@@ -563,7 +598,7 @@ function reviewHtml() {
   const lvText = { TM: 'chợ / TTTM', TM_DT: 'chợ / TTTM cấp đô thị', [LEVEL_LAND]: 'không phải chợ / TTTM', [LEVEL_REJECT]: 'từ chối',
     ...Object.fromEntries(SCHOOL_LEVELS.map(([code, label]) => [code, label])) }[lv];
   const self = isAutoLot(p);
-  const why = !self ? '' : lv === LEVEL_LAND ? ` (dưới ${fmtNum(SMALL_MARKET_M2)} m²)` : ' (theo tên / ký hiệu lô)';
+  const why = !self ? '' : lv === LEVEL_LAND ? ` (dưới ${fmtNum(SMALL_MARKET_M2)} m²)` : ' (theo tên / ký hiệu lô / công trình đã có)';
   const status = lv
     ? `${p.market ? 'Lô dịch vụ / thương mại' : 'Lô trường học'} — ${self ? 'tự nhận' : 'đã chọn'}: <b>${lvText}</b>${why}`
     : p.market ? 'Lô dịch vụ / thương mại — có phải chợ / TTTM?' : 'Lô trường học chưa rõ cấp';
@@ -611,13 +646,15 @@ function renderReport() {
   refreshDupTargets(parcels);
   const byType = {};
   const count = {
-    out: 0, exists: 0, skip: 0, dup: 0, update: 0, new: 0, pending: 0, rejected: 0, merged: 0, overlap: 0,
+    out: 0, exists: 0, skip: 0, dup: 0, update: 0, attach: 0, relot: 0, new: 0, pending: 0, rejected: 0, merged: 0, overlap: 0,
     cross: 0, split: 0, takeOver: 0, small: 0, multi: 0, newPoint: 0, tt16HT: 0, tt16QH: 0, land: 0
   };
   const owners = new Set();
   parcels.forEach(p => {
     const a = parcelAction(p);
     count[a.key]++;
+    if (a.attach) count.attach++;
+    if (a.relot) count.relot++;
     if (a.owner) (a.key === 'overlap' ? owners.add(a.owner) : count.takeOver++);
     if (p.ward && p.matchConflict) count.multi++;
     if (p.ward && p.crossWard && !p.rejected && !p.land) count.cross++;
@@ -695,9 +732,16 @@ function renderReport() {
   if (count.cross) alerts.push(['warn', `${count.cross} lô vắt ranh phường không cắt được theo ranh: ghi quy mô = 0, diện tích thật ghi vào Ghi chú.`]);
   if (count.overlap) alerts.push(['warn', `${count.overlap} lô trùng công trình đang thuộc đồ án khác (${escapeHtml([...owners].slice(0, 3).join(', '))}${owners.size > 3 ? ', …' : ''}): mặc định không ghi đè. Tích «Chuyển sang đồ án này» ở từng lô nếu đồ án đang nhập thay thế đồ án cũ.`]);
   if (count.takeOver) alerts.push(['info', `${count.takeOver} lô chuyển công trình từ đồ án khác sang đồ án «${escapeHtml(activeProjectName())}».`]);
-  if (count.out) alerts.push(['bad', `${count.out} lô nằm ngoài TP. Huế (đưa lên đầu danh sách, viền xám trên bản đồ): bỏ qua${current.tt16 ? '' : ' — sẽ hỏi xác nhận trước khi ghi'}.`]);
-  if (count.update) alerts.push(['info', `${count.update} lô chứa công trình cùng loại đã có: giữ tên trên Sheet, ghi đè tọa độ bằng tâm hatch và diện tích ${current.filePhase === 'QH' ? 'vào QuyMo_QH' : current.filePhase === 'HT' ? 'vào QuyMo_HT' : current.tt16 ? 'theo giai đoạn của layer' : phase}.`]);
-  if (count.multi) alerts.push(['warn', `${count.multi} lô chứa nhiều công trình cùng loại (đưa lên đầu danh sách): chọn công trình cần cập nhật — mặc định gợi ý công trình gần tâm lô nhất, các công trình còn lại giữ nguyên.`]);
+  if (count.out) alerts.push(['bad', `${count.out} lô nằm ngoài TP. Huế (viền xám trên bản đồ): bỏ qua${current.tt16 ? '' : ' — sẽ hỏi xác nhận trước khi ghi'}.`]);
+  const toPhase = current.filePhase === 'QH' ? 'vào QuyMo_QH' : current.filePhase === 'HT' ? 'vào QuyMo_HT' : current.tt16 ? 'theo giai đoạn của layer' : phase;
+  if (count.attach) alerts.push(['info', `${count.attach} lô chứa điểm công trình cùng loại chưa có ranh lô: tự ghép — giữ tên trên Sheet, gán ranh lô, tọa độ tâm lô và diện tích ${toPhase}.`]);
+  if (count.relot) alerts.push(['warn', `${count.relot} lô trùng công trình đã có ranh lô cùng giai đoạn (danh sách lô cần xử lý): ghi sẽ thay ranh cũ, tọa độ và diện tích ${toPhase} — kiểm tra trước khi ghi.`]);
+  const unknownLot = count.update - count.attach - count.relot;
+  if (unknownLot) {
+    const why = current.lotKeys === false ? ' (không đọc được ranh lô cũ)' : current.lotKeys ? '' : ' (đang kiểm tra công trình đã có ranh lô chưa…)';
+    alerts.push(['info', `${unknownLot} lô chứa công trình cùng loại đã có${why}: giữ tên trên Sheet, ghi đè tọa độ bằng tâm lô và diện tích ${toPhase}.`]);
+  }
+  if (count.multi) alerts.push(['warn', `${count.multi} lô chứa nhiều công trình cùng loại (danh sách lô cần xử lý): chọn công trình cần cập nhật — mặc định gợi ý công trình gần tâm lô nhất, các công trình còn lại giữ nguyên.`]);
   if (count.dup) alerts.push(['bad', `${count.dup} lô cùng cập nhật 1 công trình: chọn lại (tạo mới / bỏ qua) trước khi ghi.`]);
   if (count.skip) alerts.push(['info', `${count.skip} lô được chọn bỏ qua.`]);
   if (count.small) alerts.push(['info', `${count.small} lô nhỏ hơn diện tích tối thiểu của loại (vẫn nhập).`]);
@@ -723,16 +767,16 @@ function renderReport() {
   if (!state.wardLabelsList.some(w => w.geometry)) alerts.push(['bad', 'Chưa tải xong ranh 40 phường xã — mở lại file sau ít giây.']);
 
   const typeRows = Object.entries(byType).sort().map(([type, t]) => `
-    <tr><td><i class="cad-dot" style="background:${type === SCHOOL_PENDING || type === MARKET_PENDING ? '#facc15' : type === LAND_O_KEY ? RESIDENTIAL_COLOR : type === LAND_KEY ? '#a3a3a3' : BUFFER_COLORS[type] || '#38bdf8'}"></i>${escapeHtml(type === SCHOOL_PENDING ? 'Trường học chưa rõ cấp' : type === MARKET_PENDING ? 'Dịch vụ / thương mại chưa xác nhận chợ / TTTM' : type === LAND_O_KEY ? 'Đất ở (sheet DXF)' : type === LAND_KEY ? 'Đất ngoài nhóm hạ tầng khác (sheet DXF)' : infraLabels[type] || type)}</td>
+    <tr><td><i class="cad-dot" style="background:${type === SCHOOL_PENDING || type === MARKET_PENDING ? '#facc15' : type === LAND_O_KEY ? RESIDENTIAL_COLOR : type === LAND_KEY ? '#a3a3a3' : BUFFER_COLORS[type] || '#38bdf8'}"></i>${escapeHtml(type === SCHOOL_PENDING ? 'Trường học chưa rõ cấp' : type === MARKET_PENDING ? 'Dịch vụ / thương mại chưa xác nhận chợ / TTTM' : type === LAND_O_KEY ? 'Đất ở (sheet DXF)' : type === LAND_KEY ? 'Đất khác' : infraLabels[type] || type)}</td>
     <td>${t.n}</td><td>${fmtArea(t.area)}</td></tr>`).join('');
 
-  // Lô cần admin chọn (chờ chọn cấp / nhiều công trình / trùng) rồi lô ngoài TP lên đầu để không bị khuất sau giới hạn MAX_LISTED
-  const rank = (p) => {
-    const key = parcelAction(p).key;
-    return p.ward && p.pending ? 3 : (p.ward && p.matchConflict) || key === 'dup' || key === 'overlap' ? 2 : !p.ward ? 1 : 0;
+  // Chỉ liệt kê lô Admin cần xử lý trước khi ghi: nhiều công trình, trùng, thuộc đồ án khác, thay ranh cũ
+  const needsAction = (p) => {
+    const a = parcelAction(p);
+    return !!p.ward && (!!p.matchConflict || a.key === 'dup' || !!a.owner || !!a.relot);
   };
-  const order = parcels.map((_, idx) => idx).sort((a, b) => rank(parcels[b]) - rank(parcels[a]));
-  const listRows = order.slice(0, MAX_LISTED).map(idx => {
+  const actionIdx = parcels.map((_, idx) => idx).filter(idx => needsAction(parcels[idx]));
+  const listRows = actionIdx.slice(0, MAX_LISTED).map(idx => {
     const p = parcels[idx];
     const a = parcelAction(p);
     const pair = p.partner ? `<br><small>+ ${escapeHtml(p.partner.layer)} · ${p.partner.crossWard ? `<s>${fmtArea(p.partner.area)}</s> 0` : sizeText(p.partner)}</small>` : '';
@@ -767,8 +811,9 @@ function renderReport() {
     ${alerts.map(([cls, text]) => `<div class="cad-alert ${cls}">${text}</div>`).join('')}
     ${manualMappingHtml(current.manual)}
     ${parcels.length ? `<table class="cad-table"><thead><tr><th>Loại</th><th>Số lô</th><th>Diện tích tính</th></tr></thead><tbody>${typeRows}</tbody></table>
-    <div class="cad-list">${listRows}${parcels.length > MAX_LISTED ? `<div class="cad-more">… và ${parcels.length - MAX_LISTED} lô khác</div>` : ''}</div>` : ''}
-    <div class="cad-foot"><span>Sẽ ghi: ${count.new} mới · ${count.update} cập nhật${count.land ? ` · ${count.land} lô đất (DXF)` : ''}${count.new + count.update ? ` <small>(${countText(kindCounts(writable(parcels), current.format))})</small>` : ''}</span><button type="button" id="btnCadClear" class="cad-clear">${ico('close')}Xóa xem trước</button></div>`;
+    ${actionIdx.length ? `<div class="cad-list-title">Lô cần xử lý trước khi ghi (${actionIdx.length})</div>
+    <div class="cad-list">${listRows}${actionIdx.length > MAX_LISTED ? `<div class="cad-more">… và ${actionIdx.length - MAX_LISTED} lô khác</div>` : ''}</div>` : ''}` : ''}
+    <div class="cad-foot"><span>Sẽ ghi: ${count.new} mới · ${count.update - count.attach} cập nhật${count.attach ? ` · ${count.attach} ghép điểm` : ''}${count.land ? ` · ${count.land} lô đất (DXF)` : ''}${count.new + count.update ? ` <small>(${countText(kindCounts(writable(parcels), current.format))})</small>` : ''}</span><button type="button" id="btnCadClear" class="cad-clear">${ico('close')}Xóa xem trước</button></div>`;
 
   const list = box.querySelector('.cad-list');
   if (list) list.scrollTop = listScroll;
@@ -1034,6 +1079,7 @@ function refreshParcels() {
   markUnchanged(linked.parcels);
   current.result = { ...base, parcels: linked.parcels, stageDupes: linked.stageDupes };
   current.outsideBoundary = current.boundaryGeom ? outsideBoundaryStats(linked.parcels, current.boundaryGeom) : null;
+  loadLotKeys();
 }
 
 function analyse({ fit = true } = {}) {

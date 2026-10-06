@@ -83,8 +83,8 @@ async function loadEntry(entry) {
   return row;
 }
 
-async function ensureWard() {
-  if (ward.loaded || !wantsWard()) return;
+async function ensureWard(always = false) {
+  if (ward.loaded || (!always && !wantsWard())) return;
   const res = await fetch(geeApi('action=getWardParcels'));
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
@@ -144,6 +144,22 @@ export async function syncLots() {
   if (token !== seq) return;
   composeNow();
   onChange();
+}
+
+// "HT|<ID>" / "QH|<ID>" công trình đã có ranh lô: lô theo phường + file các đồ án tenQHs (không phụ thuộc lớp đang bật)
+export async function lotKeysOf(tenQHs) {
+  await ensureWard(true);
+  const keys = new Set(ward.map.keys());
+  const entries = state.projectCatalog.filter(p => p && !p.sheetOnly && tenQHs.includes(p.tenQH));
+  await pool(entries, 3, async (entry) => {
+    try {
+      const row = await loadEntry(entry);
+      row.parcels.forEach(p => {
+        if (p && p.id && p.geometry && p.kind !== 'DXF') keys.add(`${p.phase === 'QH' ? 'QH' : 'HT'}|${p.id}`);
+      });
+    } catch (err) { console.warn(`Không tải lô đồ án «${entry.tenQH}»:`, err); }
+  });
+  return keys;
 }
 
 export function scheduleLots() {
