@@ -1,14 +1,14 @@
 // Tab Đề xuất → "Nhập hàng loạt": đọc file DXF/KML/KMZ/GeoJSON/shapefile (.zip), xem trước các lô trên bản đồ và báo cáo kiểm tra trước khi ghi.
 // Đồ án gServer: tối đa 3 file — lớp vùng (sử dụng đất), lớp điểm, lớp đường (ranh). Ranh hoặc hiện trạng có thể ghép vào đồ án đã chọn.
 import { state, infraLabels, BUFFER_COLORS } from './state.js';
-import { landColor, landLabel } from './tt16Symbols.js';
+import { landColor, landLabel, landRule, RESIDENTIAL_COLOR } from './tt16Symbols.js';
 import { map } from './mapEngine.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { escapeHtml, fmtNum, distanceMeters, ico, setStatusContent, planRows } from './utils.js';
 import {
   parseDxf, buildParcels, buildParcelsLonLat, assignWards, matchExisting, layerToType, tt16Layer, linkStages, sameSite,
-  filePhaseFromName, LAYER_PREFIXES, SCHOOL_PENDING, CRS_PRESETS, detectAxes, vn2000ToWgs84,
+  filePhaseFromName, LAYER_PREFIXES, SCHOOL_PENDING, MARKET_PENDING, CRS_PRESETS, detectAxes, vn2000ToWgs84,
   attachPoints, planAttrsOf, lotCodeOf, isMarketName, schoolLevelOf
 } from './cadImport.js';
 import { parseKml, unzipKml } from './kmlImport.js';
@@ -22,6 +22,7 @@ import { boundaryFromLines } from './boundaryLines.js';
 const MIN_SIZE = { "1-CV": 300, "2-BDX": 200, "3-MN": 800, "4-TH": 2000, "5-THCS": 2500, "7-YT": 1000, "8-VH": 500, "9-TM": 1500 };
 const MAX_LISTED = 200;
 const LAND_KEY = 'zz-land';
+const LAND_O_KEY = 'zy-land-o';
 // Mỗi lần gửi: tối đa 300 lô (giới hạn máy chủ) và ~2,5 MB (Vercel nhận tối đa 4,5 MB/yêu cầu)
 const CHUNK_MAX_ITEMS = 250;
 const CHUNK_MAX_CHARS = 2500000;
@@ -50,6 +51,9 @@ let dupTargets = new Set();   // "giai đoạn|ID" công trình bị nhiều lô
 // Cấp trường cho lô Truonghoc thiếu hậu tố
 const SCHOOL_LEVELS = [['MN', 'Mầm non'], ['TH', 'Tiểu học'], ['THCS', 'THCS']];
 const LEVEL_REJECT = 'reject';
+// Lô "Chợ, TTTM – chọn từng lô": chợ / TTTM theo cấp, hoặc không phải → lô đất sheet DXF
+const MARKET_LEVELS = [['TM', 'Chợ / TTTM', 'Chợ, TTTM cấp đơn vị ở'], ['TM_DT', 'Cấp đô thị', 'Chợ, TTTM cấp đô thị']];
+const LEVEL_LAND = 'land';
 
 const $ = (id) => document.getElementById(id);
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
@@ -173,7 +177,7 @@ const takesOver = (p) => !!current.takeOver?.has(parcelKey(p));
 function parcelAction(p) {
   if (!p.ward) return { key: 'out', label: 'Ngoài TP', cls: 'bad' };
   if (p.land) return { key: 'land', label: 'Sheet đồ án', cls: 'info' };
-  if (p.pending) return { key: 'pending', label: 'Chờ chọn cấp trường', cls: 'warn' };
+  if (p.pending) return { key: 'pending', label: p.market ? 'Chờ xác nhận chợ / TTTM' : 'Chờ chọn cấp trường', cls: 'warn' };
   if (p.rejected) return { key: 'rejected', label: 'Đã từ chối', cls: 'bad' };
   if (p.merged) return { key: 'merged', label: 'Gộp với lô HT', cls: 'info' };
   if (p.existingId) return { key: 'exists', label: `Đã có ${p.existingId}`, cls: 'warn' };
@@ -200,7 +204,8 @@ function pickHtml(p, idx) {
 }
 
 // Tên layer hiển thị; lô khớp thủ công / lô trường học đã chọn cấp kèm mã loại đã gán
-const layerText = (p) => (p.manual || (p.school && p.prefix) ? `${p.layer} → ${p.prefix || 'chọn cấp'}` : p.layer);
+const layerText = (p) => (p.manual || (p.school && p.prefix)
+  ? `${p.layer} → ${p.land ? 'sheet DXF' : p.prefix || (p.market ? 'chọn chợ / TTTM' : 'chọn cấp')}` : p.layer);
 // "Thuận Hóa 1.200 m² · Phú Xuân 300 m²" (lô vắt ranh đã tách theo phường)
 const partsText = (p) => p.wardParts.map(x => `${x.ward} ${fmtArea(x.area)}`).join(' · ');
 const typeColor = (p) => (p.pending ? '#facc15' : p.land ? (landColor(p.layer) || '#94a3b8') : BUFFER_COLORS[p.type] || '#38bdf8');
@@ -277,6 +282,10 @@ function enrichParcels(parcels) {
   current.notMarket = notMarket;
   current.autoLevels = new Map();
   parcels.forEach(p => {
+    if (p.market) {
+      if ([p.name, ...p.points.map(pt => pt.name)].some(isMarketName)) current.autoLevels.set(p.src, 'TM');
+      return;
+    }
     if (!p.school) return;
     const lv = schoolLevelOf([p.name, ...p.points.map(pt => pt.name)], p.lotCode);
     if (lv) current.autoLevels.set(p.src, lv);
@@ -361,15 +370,25 @@ function zoomToParcel(p, maxZoom = 18) {
   map.fitBounds(bounds, { ...viewPadding(60), maxZoom });
 }
 
-// ---- Duyệt từng lô Truonghoc thiếu hậu tố cấp trường ----
+// ---- Duyệt từng lô: Truonghoc thiếu hậu tố cấp trường, lô "Chợ, TTTM – chọn từng lô" ----
 
 // Lô cần duyệt (trong TP), theo thứ tự trong file
-const schoolLots = () => (current?.base?.parcels || []).filter(p => p.school && p.ward);
+const pickLots = () => (current?.base?.parcels || []).filter(p => (p.school || p.market) && p.ward);
 // Admin chọn thắng cấp tự nhận theo tên điểm / ký hiệu lô
 const levelOf = (src) => current.levels.get(src) || current.autoLevels?.get(src) || null;
 
 function applyLevels(parcels) {
   parcels.forEach(p => {
+    if (p.market) {
+      const lv = levelOf(p.src);
+      const chosen = lv && lv !== LEVEL_LAND;
+      p.pending = !lv;
+      p.land = lv === LEVEL_LAND;
+      p.prefix = chosen ? lv : p.land ? `LAND:${p.layer}` : '';
+      p.type = chosen ? LAYER_PREFIXES[lv] : p.land ? null : MARKET_PENDING;
+      p.nhom = lv === 'TM_DT' ? 'Cấp đô thị' : p.land ? '' : 'Cấp đơn vị ở';
+      return;
+    }
     if (!p.school) return;
     const lv = levelOf(p.src);
     const chosen = lv && lv !== LEVEL_REJECT;
@@ -391,23 +410,23 @@ function markReview(p) {
 
 // Mở lô src để duyệt: tô sáng + zoom tới lô
 function openReview(src) {
-  const p = schoolLots().find(x => x.src === src);
+  const p = pickLots().find(x => x.src === src);
   current.reviewSrc = p ? p.src : null;
   renderReport();
   markReview(p);
   zoomToParcel(p);
 }
 
-// Chọn cấp / từ chối lô đang duyệt; áp dụng luôn cho lô Truonghoc chưa duyệt cùng vị trí ở giai đoạn khác, rồi sang lô kế tiếp
+// Chọn cấp / từ chối lô đang duyệt; áp dụng luôn cho lô cùng kiểu chưa duyệt cùng vị trí ở giai đoạn khác, rồi sang lô kế tiếp
 function decideReview(level) {
-  const lots = schoolLots();
+  const lots = pickLots();
   const at = lots.findIndex(p => p.src === current.reviewSrc);
   const p = lots[at];
   if (!p) return;
   current.levels.set(p.src, level);
-  const spot = (x) => ({ ...x, type: SCHOOL_PENDING, prefix: '' });
+  const spot = (x) => ({ ...x, type: x.market ? MARKET_PENDING : SCHOOL_PENDING, prefix: '' });
   lots.forEach(q => {
-    if (q !== p && !levelOf(q.src) && q.stage !== p.stage && sameSite(spot(q), spot(p))) current.levels.set(q.src, level);
+    if (q !== p && !!q.market === !!p.market && !levelOf(q.src) && q.stage !== p.stage && sameSite(spot(q), spot(p))) current.levels.set(q.src, level);
   });
   refreshParcels();
   drawPreview(current.result.parcels, false);
@@ -417,24 +436,32 @@ function decideReview(level) {
 }
 
 function reviewHtml() {
-  const lots = schoolLots();
+  const lots = pickLots();
   if (!lots.length) return '';
   const left = lots.filter(p => !levelOf(p.src)).length;
+  const leftOf = (market) => lots.filter(p => !!p.market === market && !levelOf(p.src)).length;
   const auto = lots.filter(p => !current.levels.has(p.src) && current.autoLevels?.has(p.src)).length;
-  const autoNote = auto ? ` ${auto} lô tự nhận cấp theo tên điểm chức năng / ký hiệu lô.` : '';
+  const autoNote = auto ? ` ${auto} lô tự nhận theo tên điểm chức năng / tên lô / ký hiệu lô.` : '';
   const at = lots.findIndex(p => p.src === current.reviewSrc);
   if (at < 0) {
-    return `<div class="cad-review done">${ico(left ? 'alert' : 'check')}${left ? `Còn <b>${left}</b>/${lots.length} lô trường học chưa rõ cấp (layer Truonghoc thiếu hậu tố _MN / _TH / _THCS hoặc khớp thủ công «Trường học – chọn cấp từng lô»).`
-      : `Đã rõ cấp ${lots.length} lô trường học cần chọn cấp.`}${autoNote}
+    const parts = [
+      leftOf(false) && `<b>${leftOf(false)}</b> lô trường học chưa rõ cấp`,
+      leftOf(true) && `<b>${leftOf(true)}</b> lô dịch vụ / thương mại chưa xác nhận chợ / TTTM`
+    ].filter(Boolean).join(', ');
+    return `<div class="cad-review done">${ico(left ? 'alert' : 'check')}${left ? `Còn ${parts} — chọn từng lô.`
+      : `Đã duyệt ${lots.length} lô cần chọn từng lô.`}${autoNote}
       <button type="button" class="cad-rev-open" data-src="${(lots.find(p => !levelOf(p.src)) || lots[0]).src}">${left ? 'Duyệt tiếp' : 'Xem lại'}</button></div>`;
   }
   const p = lots[at];
   const lv = levelOf(p.src);
-  const btn = (code, label, cls = '') => `<button type="button" class="cad-rev-btn${cls}${lv === code ? ' on' : ''}" data-lv="${code}">${label}</button>`;
+  const btn = (code, label, cls = '', tip = '') => `<button type="button" class="cad-rev-btn${cls}${lv === code ? ' on' : ''}" data-lv="${code}"${tip ? ` title="${tip}"` : ''}>${label}</button>`;
+  const btns = p.market
+    ? `${MARKET_LEVELS.map(([code, label, tip]) => btn(code, `${ico('check')}${label}`, '', tip)).join('')}${btn(LEVEL_LAND, `${ico('close')}Không phải`, ' rej', 'Không phải chợ / TTTM: ranh lô ghi vào sheet DXF của đồ án')}`
+    : `${SCHOOL_LEVELS.map(([code, label]) => btn(code, `${ico('check')}${label}`)).join('')}${btn(LEVEL_REJECT, `${ico('close')}Từ chối`, ' rej')}`;
   return `<div class="cad-review">
-    <div class="cad-review-head">${ico('alert')}Lô trường học chưa rõ cấp <b>${at + 1}/${lots.length}</b> · còn ${left} lô chưa duyệt</div>
+    <div class="cad-review-head">${ico('alert')}${p.market ? 'Lô dịch vụ / thương mại — có phải chợ / TTTM?' : 'Lô trường học chưa rõ cấp'} <b>${at + 1}/${lots.length}</b> · còn ${left} lô chưa duyệt</div>
     <div class="cad-review-info">${displayName(p) ? `<b>${escapeHtml(displayName(p))}</b> · ` : ''}${escapeHtml(p.layer)}${p.lotCode ? ` ${escapeHtml(p.lotCode)}` : ''} · ${sizeText(p)} · ${escapeHtml(p.wardParts ? partsText(p) : p.ward)}${p.crossWard ? ' · vắt ranh' : ''}</div>
-    <div class="cad-review-btns">${SCHOOL_LEVELS.map(([code, label]) => btn(code, `${ico('check')}${label}`)).join('')}${btn(LEVEL_REJECT, `${ico('close')}Từ chối`, ' rej')}</div>
+    <div class="cad-review-btns${p.market ? ' market' : ''}">${btns}</div>
     <div class="cad-review-nav">
       <button type="button" class="cad-rev-go" data-src="${lots[(at - 1 + lots.length) % lots.length].src}">‹ Lô trước</button>
       <button type="button" class="cad-rev-go" data-src="${lots[(at + 1) % lots.length].src}">Lô sau ›</button>
@@ -484,7 +511,7 @@ function renderReport() {
     if (a.key === 'new' && isPoint(p)) count.newPoint++;
     if (p.tt16 && !p.land && p.ward && !p.rejected) count[p.phase === 'HT' ? 'tt16HT' : 'tt16QH']++;
     if (p.rejected) return;
-    const key = p.land ? LAND_KEY : p.type;
+    const key = p.land ? ((landRule(p.layer) || {}).key === 'o' ? LAND_O_KEY : LAND_KEY) : p.type;
     const t = byType[key] || (byType[key] = { n: 0, area: 0 });
     t.n++;
     if (p.ward && !p.crossWard) t.area += p.area;
@@ -545,7 +572,9 @@ function renderReport() {
     if (count.merged) alerts.push(['info', `${count.merged} cặp lô HT_ và QH cùng vị trí, cùng loại: gộp thành 1 công trình, ghi cả QuyMo_HT và QuyMo_QH.`]);
     if (result.stageDupes) alerts.push(['info', `${result.stageDupes} lô QHDD_ trùng vị trí lô QHDH_ cùng loại: bỏ, dùng diện tích QHDH_.`]);
   }
-  if (count.pending) alerts.push(['warn', `${count.pending} lô trường học chưa rõ cấp (viền vàng nét đứt): chọn cấp trường hoặc từ chối từng lô ở khung duyệt bên dưới trước khi ghi.`]);
+  const pendingMarket = parcels.filter(p => p.pending && p.market && p.ward).length;
+  if (count.pending - pendingMarket > 0) alerts.push(['warn', `${count.pending - pendingMarket} lô trường học chưa rõ cấp (viền vàng nét đứt): chọn cấp trường hoặc từ chối từng lô ở khung duyệt trước khi ghi.`]);
+  if (pendingMarket) alerts.push(['warn', `${pendingMarket} lô dịch vụ / thương mại chưa xác nhận (viền vàng nét đứt): chọn chợ / TTTM hoặc «Không phải» (ranh lô ghi sheet DXF) từng lô ở khung duyệt trước khi ghi.`]);
   if (count.rejected) alerts.push(['info', `${count.rejected} lô trường học đã từ chối: không ghi.`]);
   if (count.split) alerts.push(['warn', `${count.split} lô vắt ranh phường (phần lấn ≥ 5% và ≥ 50 m², nét đứt trắng là ranh cắt): dòng chính giữ nguyên lô (tên, diện tích, ranh, đồ án) tại phường chiếm phần lớn; mỗi phần ở phường khác ghi thêm 1 dòng <code>&lt;ID&gt;.2</code> chỉ để tính diện tích chỉ tiêu phường — không tính thêm số công trình.`]);
   if (count.cross) alerts.push(['warn', `${count.cross} lô vắt ranh phường không cắt được theo ranh: ghi quy mô = 0, diện tích thật ghi vào Ghi chú.`]);
@@ -566,7 +595,7 @@ function renderReport() {
   const landSheet = `sheet DXF của đồ án «${escapeHtml(activeProjectName())}»`;
   if (current.tt16) {
     if (unknown.length || other.length) {
-      alerts.push(['info', `${fmtNum(sumOf(other))} đối tượng ở ${other.length} layer TT16 ngoài 13 nhóm hạ tầng và ${fmtNum(sumOf(unknown))} đối tượng ở ${unknown.length} layer không theo TT16: ranh lô ghi vào ${landSheet} (điểm bỏ qua).`]);
+      alerts.push(['info', `${fmtNum(sumOf(other))} đối tượng ở ${other.length} layer TT16 ngoài 13 nhóm hạ tầng và ${fmtNum(sumOf(unknown))} đối tượng ở ${unknown.length} layer không theo TT16: ranh lô ghi vào ${landSheet} (điểm bỏ qua).${unknown.length ? ' Layer không theo TT16: gán loại ở khung <b>Khớp thủ công</b> nếu là hạ tầng.' : ''}`]);
     }
   } else if (unknown.length) {
     const listed = unknown.slice(0, 8).map(([l, n]) => `${escapeHtml(l)} (${n})`).join(', ');
@@ -579,7 +608,7 @@ function renderReport() {
   if (!state.wardLabelsList.some(w => w.geometry)) alerts.push(['bad', 'Chưa tải xong ranh 40 phường xã — mở lại file sau ít giây.']);
 
   const typeRows = Object.entries(byType).sort().map(([type, t]) => `
-    <tr><td><i class="cad-dot" style="background:${type === SCHOOL_PENDING ? '#facc15' : type === LAND_KEY ? '#a3a3a3' : BUFFER_COLORS[type] || '#38bdf8'}"></i>${escapeHtml(type === SCHOOL_PENDING ? 'Trường học chưa rõ cấp' : type === LAND_KEY ? 'Đất ngoài nhóm hạ tầng (sheet DXF)' : infraLabels[type] || type)}</td>
+    <tr><td><i class="cad-dot" style="background:${type === SCHOOL_PENDING || type === MARKET_PENDING ? '#facc15' : type === LAND_O_KEY ? RESIDENTIAL_COLOR : type === LAND_KEY ? '#a3a3a3' : BUFFER_COLORS[type] || '#38bdf8'}"></i>${escapeHtml(type === SCHOOL_PENDING ? 'Trường học chưa rõ cấp' : type === MARKET_PENDING ? 'Dịch vụ / thương mại chưa xác nhận chợ / TTTM' : type === LAND_O_KEY ? 'Đất ở (sheet DXF)' : type === LAND_KEY ? 'Đất ngoài nhóm hạ tầng khác (sheet DXF)' : infraLabels[type] || type)}</td>
     <td>${t.n}</td><td>${fmtArea(t.area)}</td></tr>`).join('');
 
   // Lô cần admin chọn (chờ chọn cấp / nhiều công trình / trùng) rồi lô ngoài TP lên đầu để không bị khuất sau giới hạn MAX_LISTED
@@ -646,7 +675,7 @@ function renderReport() {
   box.querySelectorAll('.cad-row').forEach(row => row.addEventListener('click', (e) => {
     if (e.target.closest('.cad-pick, .cad-take')) return;
     const p = parcels[Number(row.dataset.idx)];
-    if (p && p.school && p.ward) openReview(p.src);
+    if (p && (p.school || p.market) && p.ward) openReview(p.src);
     else zoomToParcel(p);
   }));
   box.querySelectorAll('.cad-pick').forEach(sel => sel.addEventListener('change', () => {
@@ -675,7 +704,7 @@ function renderReport() {
       ? submitting || !canWrite || count.dup > 0 || count.pending > 0 || !result.axes.valid
       : submitting || current.boundaryOnly || !result.axes.valid || !parcels.some(p => p.ward);
     btn.title = !isAdmin() ? 'Gửi file vào hàng chờ để Admin kiểm tra (file ≤ 2 MB)'
-      : count.pending ? `Còn ${count.pending} lô trường học chờ chọn cấp` : '';
+      : count.pending ? `Còn ${count.pending} lô chờ chọn từng lô (cấp trường / chợ, TTTM)` : '';
   }
 }
 
@@ -901,13 +930,13 @@ function analyse({ fit = true } = {}) {
   enrichParcels(base.parcels);
   current.base = base;
   refreshParcels();
-  // Lần phân tích đầu: mở ngay lô trường học đầu tiên cần chọn cấp
-  const first = current.reviewStarted ? null : schoolLots().find(p => !levelOf(p.src));
+  // Lần phân tích đầu: mở ngay lô đầu tiên cần chọn từng lô
+  const first = current.reviewStarted ? null : pickLots().find(p => !levelOf(p.src));
   current.reviewStarted = true;
   if (first) current.reviewSrc = first.src;
   renderReport();
   drawPreview(current.result.parcels, fit, first);
-  if (current.reviewSrc != null) markReview(schoolLots().find(p => p.src === current.reviewSrc));
+  if (current.reviewSrc != null) markReview(pickLots().find(p => p.src === current.reviewSrc));
 }
 
 // Lỗi định dạng / dung lượng trước khi đọc ('' = hợp lệ)
@@ -1120,11 +1149,11 @@ function openParsed({ file, format, parsed, text, wgs84 }, pendingId, extras) {
   const lines = extras && extras.lines;
   if (format === 'shp' && parsed.crs && CRS_PRESETS[parsed.crs] && $('cadCrs')) $('cadCrs').value = parsed.crs;
   const filePhase = format === 'dxf' || format === 'shp' ? filePhaseFromName(file.name) : null;
-  // File đặt tên layer theo TT16: chỉ nhận layer đúng tên, không khớp thủ công các layer khác
+  // Layer TT16 nhận thẳng; layer khác (kể cả file lẫn tên trước TT16) vào khớp thủ công
   const tt16 = parsed.entities.some(e => tt16Layer(e.layer));
   current = {
     fileName: file.name, format, wgs84, tt16, filePhase, entities: parsed.entities, stats: parsed.stats, base: null, result: null,
-    manual: tt16 ? null : createManualMapping(parsed.entities), levels: new Map(), autoLevels: new Map(), takeOver: new Set(),
+    manual: createManualMapping(parsed.entities), levels: new Map(), autoLevels: new Map(), takeOver: new Set(),
     reviewSrc: null, reviewStarted: false,
     raw: { ext: format === 'shp' ? 'geojson' : format, text }, pendingId,
     crs: parsed.crs || null, crsUnknown: !!parsed.crsUnknown, layers: parsed.layers || [],
@@ -1419,8 +1448,8 @@ async function submitImport() {
   const lands = buildLands();
   if (!items.length && !lands.length) return;
   const summary = importSummary(items);
-  // File đặt tên layer theo TT16: ghi thẳng, không hỏi xác nhận (lô ngoài TP tự bỏ qua)
-  if (!current.tt16) {
+  // File đặt tên layer theo TT16 hoàn toàn: ghi thẳng, không hỏi xác nhận (lô ngoài TP tự bỏ qua)
+  if (!current.tt16 || current.result.parcels.some(p => p.manual)) {
     const outside = current.result.parcels.filter(p => !p.ward);
     if (outside.length) {
       const byLayer = {};

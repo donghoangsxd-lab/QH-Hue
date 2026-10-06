@@ -667,12 +667,15 @@ function simplifyRing(ring) {
  * Đường khép kín trùng với vùng tô cùng layer (cùng tâm < 1 m, diện tích lệch < 1%) được bỏ để không đếm 2 lần.
  * Thực thể POINT → công trình dạng điểm (area 0, polygons []); điểm nằm trong lô cùng loại, cùng giai đoạn của file được bỏ.
  * Layer TT16: lô mang phase / stage theo tiền tố; Truonghoc thiếu hậu tố hoặc khớp thủ công SCHOOL_PICK → lô chờ chọn cấp
- * (school, pending, type SCHOOL_PENDING);
+ * (school, pending, type SCHOOL_PENDING); khớp thủ công MARKET_PICK → lô chờ xác nhận chợ / TTTM (market, pending);
  * loại đất TT16 ngoài 13 nhóm hạ tầng và layer không nhận diện → lô đất (land), ghi sheet DXF của đồ án.
  */
 export const SCHOOL_PENDING = 'SCHOOL';
 // Mã khớp thủ công "Trường học – chọn cấp từng lô": lô vào khung duyệt cấp trường như Truonghoc thiếu hậu tố
 export const SCHOOL_PICK = 'TRUONG';
+// Mã khớp thủ công "Chợ, TTTM – chọn từng lô": lô dịch vụ / thương mại chờ xác nhận chợ / TTTM từng lô (market, pending)
+export const MARKET_PENDING = 'MARKET';
+export const MARKET_PICK = 'CHOTM';
 
 function makeParcels(entities, project) {
   const parcels = [];
@@ -683,9 +686,11 @@ function makeParcels(entities, project) {
     const otherLand = !!(tt && tt.other && !ent.typeCode);
     if (otherLand) tt16Other[ent.layer] = (tt16Other[ent.layer] || 0) + 1;
     const pickSchool = ent.typeCode === SCHOOL_PICK || !!(tt && tt.school && !ent.typeCode);
+    const pickMarket = ent.typeCode === MARKET_PICK;
     // typeCode: mã loại người dùng khớp thủ công cho layer/thuộc tính không theo quy ước
     const t = otherLand ? null
       : pickSchool ? { prefix: '', type: SCHOOL_PENDING, nhom: 'Cấp đơn vị ở' }
+      : pickMarket ? { prefix: '', type: MARKET_PENDING, nhom: 'Cấp đơn vị ở' }
       : ent.typeCode ? layerToType(ent.typeCode)
         : layerToType(ent.layer);
     const land = otherLand || !t;
@@ -697,7 +702,7 @@ function makeParcels(entities, project) {
     } : {
       src, prefix: t.prefix, type: t.type, nhom: t.nhom, manual: !!ent.typeCode, land: false,
       tt16: !!tt, phase: tt ? tt.phase : null, stage: tt ? tt.stage : null,
-      school: pickSchool, pending: pickSchool,
+      school: pickSchool, market: pickMarket, pending: pickSchool || pickMarket,
       marketCheck: !!(tt && tt.marketCheck && !ent.typeCode)
     };
     tag.attrs = ent.attrs || null;

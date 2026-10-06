@@ -782,6 +782,7 @@ body.right-collapsed .right-panel {
 .cad-review-head b { color: var(--accent-yellow); }
 .cad-review-info { margin: 2px 0 5px; color: var(--text-muted); overflow-wrap: anywhere; }
 .cad-review-btns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.cad-review-btns.market { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .cad-review-btns button, .cad-review-nav button, .cad-review.done button {
   padding: 4px 2px; font-size: var(--fs-sm); font-weight: 600; font-family: inherit; white-space: nowrap; cursor: pointer;
   color: var(--text-main); background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm);

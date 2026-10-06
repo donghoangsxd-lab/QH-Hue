@@ -133,7 +133,7 @@ export const WARD_HIGHLIGHT_STYLE = { color: '#fb923c', weight: 3.5, dashArray: 
 // không trùng bảng màu sử dụng đất của thẩm định đồ án (projectReviewCore.js): vàng / cam chỉ dành cho đất ở;
 // trường học họ tím → chàm (nhạt dần theo cấp: MN → THPT), cây xanh lục, y tế hồng, văn hóa tím hồng, dịch vụ đỏ,
 // bãi đỗ xe xám xanh, chưa sử dụng xám trắng; PCCC cùng màu đất an ninh, nhà tang lễ cùng màu đất nghĩa trang,
-// nhà ở xã hội vàng hổ phách (họ đất ở, khác vàng đất ở #f5d90a).
+// nhà ở xã hội vàng hổ phách (họ đất ở, khác vàng sẫm đất ở RESIDENTIAL_COLOR trong tt16Symbols.js).
 // Hoa văn ranh lô khi phóng to vẫn theo đúng màu ACI của TT16 (tt16Symbols.js).
 export const BUFFER_COLORS = {
   "1-CV": "#51cf66", "2-BDX": "#94a3b8", "3-MN": "#d0bfff", "4-TH": "#9775fa", "5-THCS": "#7048e8", "6-THPT": "#4c6ef5",

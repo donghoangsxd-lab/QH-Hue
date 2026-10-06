@@ -205,9 +205,13 @@ export function renderTt16Legend(container) {
     <div class="tt16-note">Zoom 15–16: màu lớp hạ tầng · 17–18: hoa văn, màu TT16</div></details>`;
 }
 
-// Đất chưa có ký hiệu TT16 trong 13 nhóm hạ tầng: chỉ tô viền khi bật lớp ranh đồ án
+export const RESIDENTIAL_COLOR = '#d4a20b';
+
+// Đất chưa có ký hiệu TT16 trong 13 nhóm hạ tầng: chỉ tô viền khi bật lớp ranh đồ án.
+// Đất ở gom mọi cách đặt tên (TT16 DAT_O_*, tên trước TT16 "Đất ở đô thị", "dat o lien ke", làng xóm, biệt thự,
+// liền kề, nhà vườn, chỉnh trang, tái định cư, nhà ở xã hội) về 1 màu.
 const LAND_RULES = [
-  { key: 'o', label: 'Đất ở', color: '#f5d90a', re: /(^|_)(DAT_ODT|DAT_ONT|DAT_O|ODT|ONT|O_LIENKE|O_BIETTHU|O_CHUNGCU)($|_)|DONVIO|NHOMNHAO|HONHOP|LANGXOM|DANCUNT|DAT_NO_/ },
+  { key: 'o', label: 'Đất ở', color: RESIDENTIAL_COLOR, re: /(^|[\s_.-])(DAT[\s_.-]?O|DAT[\s_.-]?ODT|DAT[\s_.-]?ONT|ODT|ONT|NOXH|TDC|NHA[\s_.-]O)($|[\s_.-])|(^|[\s_.-])O[\s_.-](DO[\s_]?THI|NONG[\s_]?THON)|LIEN[\s_]?KE|BIET[\s_]?THU|NHA[\s_]?VUON|CHUNG[\s_]?CU|DONVIO|NHOMNHAO|HONHOP|LANG[\s_]?XOM|DANCUNT|DAT_NO_|CHINH[\s_]?TRANG|TAI[\s_]?DINH[\s_]?CU/ },
   { key: 'cc', label: 'Đất công cộng', color: '#a61e4d', re: /CONGCONG|DAT_CC($|_)|HTCC|DVCC/ },
   { key: 'dtn', label: 'Đất đào tạo, nghiên cứu', color: '#1e3a8a', re: /DAOTAO|NGHIENCUU|GIAODUC|NCKH|DAT_GD/ },
   { key: 'cq', label: 'Đất cơ quan, trụ sở', color: '#a1887f', re: /COQUAN|TRUSO|CQNN|HANHCHINH/ },
