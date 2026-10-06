@@ -706,7 +706,7 @@ function createParcelShape(entry, targetMap, detailed) {
   bindNameTip(shape, p);
   shape.on('click', () => {
     if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
-    onPointClick(entry.point, targetMap);
+    onPointClick(entry.point, targetMap, entry.parcel?.geometry || null);
   });
   return shape;
 }
@@ -1310,6 +1310,12 @@ function addNegativeRing(group, m, lat, lng, radius, innerOpacity = SEL_INNER_OP
   return circle;
 }
 
+// Viền khu đất đang chọn vẽ trên pane âm bản để vẫn nổi khi bật vùng phục vụ; không tự bật chế độ âm bản
+function addParcelOutline(fg, geometry, renderer) {
+  fg.addLayer(L.geoJSON(geometry, { renderer, interactive: false, style: { color: SEL_ACCENT, weight: 7, opacity: 0.35, fill: false } }));
+  fg.addLayer(L.geoJSON(geometry, { renderer, interactive: false, style: { color: '#ffffff', weight: 2.2, opacity: 1, fillColor: SEL_ACCENT, fillOpacity: 0.12 } }));
+}
+
 // Đường theo nhóm (serviceArea.js): nền = mọi đường quanh công trình (xanh mờ kiểu bản vẽ), tới được = phần đi được trong bán kính (phát sáng).
 // Vẽ từ nhóm nhỏ lên nhóm lớn để trục chính nằm trên cùng; 'unknown' = mạng lưới lưu cũ chưa phân nhóm.
 const ROAD_STYLES = [
@@ -1345,13 +1351,6 @@ function addInRangePoints(group, points, polygon, renderer, m) {
     keys.add(pointKey(p));
   });
   (m === planMap ? planRenderer : leftRenderer).highlight(keys);
-}
-
-function roadLegendHtml(area) {
-  const items = ROAD_STYLES.slice().reverse()
-    .filter(([key]) => area.reachRoads[key].length)
-    .map(([, s]) => `<span class="road-legend-item" title="${s.title}"><i style="background:${s.color}; height:${Math.max(2, Math.round(s.reach))}px;"></i>${s.label}</span>`);
-  return items.length ? `<div class="road-legend">${items.join('')}</div>` : '';
 }
 
 function clearSingleIsochrone() {
@@ -1553,9 +1552,100 @@ function expandCollapsedPopup(popup) {
   return true;
 }
 
+// ============================ LỖI 1 RANH LÔ CHỨA NHIỀU CÔNG TRÌNH ============================
+// Ranh lô gắn với công trình theo ID (khóa HT|ID, QH|ID). Toạ độ công trình khác cùng kịch bản rơi vào ranh này
+// thường do nhập trùng điểm trên Sheet: giữ công trình sở hữu ranh (xóa nó sẽ mất ranh lô), đề xuất xóa các điểm còn lại.
+// Mức đề xuất: 'dup' trùng loại + trùng tên/quy mô (gần chắc chắn trùng), 'type' trùng loại, 'overlap' điểm có ranh riêng
+// (lỗi chồng lấn ranh, không xóa), 'mixed' khác loại (có thể công trình hỗn hợp hoặc sai toạ độ, cần kiểm tra).
+const CONFLICT_NAME_SIMILAR = 0.6;
+const CONFLICT_SIZE_TOLERANCE = 0.05;
+const CONFLICT_STOP_WORDS = new Set(['truong', 'thpt', 'thcs', 'th', 'mn', 'mam', 'non', 'tieu', 'hoc', 'tram', 'y', 'te', 'phuong', 'xa']);
+
+function nameTokens(name) {
+  return new Set(String(name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
+    .split(/[^a-z0-9]+/).filter(t => t && !CONFLICT_STOP_WORDS.has(t)));
+}
+
+function nameSimilarity(a, b) {
+  const ta = nameTokens(a), tb = nameTokens(b);
+  if (!ta.size || !tb.size) return 0;
+  let common = 0;
+  ta.forEach(t => { if (tb.has(t)) common++; });
+  return common / Math.min(ta.size, tb.size);
+}
+
+function sameSize(a, b) {
+  const x = Number(a) || 0, y = Number(b) || 0;
+  return x > 0 && y > 0 && Math.abs(x - y) <= CONFLICT_SIZE_TOLERANCE * Math.max(x, y);
+}
+
+function conflictVerdict(owner, q) {
+  if (parcelFor(q)) return { level: 'overlap', reason: 'có ranh lô riêng chồng lấn ranh này — sửa ranh lô, không xóa điểm' };
+  if (layerType(q) !== layerType(owner)) return { level: 'mixed', reason: 'khác loại hạ tầng — kiểm tra công trình hỗn hợp hay sai toạ độ, xóa nếu trùng' };
+  const similar = nameSimilarity(owner.name, q.name) >= CONFLICT_NAME_SIMILAR;
+  const size = sameSize(owner.size, q.size);
+  if (similar || size) return { level: 'dup', reason: `trùng loại${similar ? ', trùng tên' : ''}${size ? ', trùng quy mô' : ''} — đề xuất xóa` };
+  return { level: 'type', reason: 'trùng loại hạ tầng trong cùng ranh lô — đề xuất xóa' };
+}
+
+const CONFLICT_ORDER = { dup: 0, type: 1, mixed: 2, overlap: 3 };
+
+/** Công trình khác (cùng kịch bản) có toạ độ nằm trong ranh lô của owner → [{ point, level, reason, note }] */
+function findParcelConflicts(owner, geometry) {
+  if (!geometry) return [];
+  let feature, bbox;
+  try {
+    feature = turf.feature(geometry);
+    bbox = turf.bbox(feature);
+  } catch (e) { return []; }
+  const list = owner.scenario === 'QH' ? getPlanScenarioList() : state.rawDataList;
+  return list
+    .filter(q => q !== owner && q.id !== owner.id && hasValidCoord(q))
+    .filter(q => {
+      const x = Number(q.lng), y = Number(q.lat);
+      return x >= bbox[0] && x <= bbox[2] && y >= bbox[1] && y <= bbox[3] && turf.booleanPointInPolygon([x, y], feature);
+    })
+    .map(q => {
+      const v = conflictVerdict(owner, q);
+      // Điểm đề xuất xóa nhưng đã duyệt / quy mô lớn hơn: chép thông tin sang điểm giữ lại trước khi xóa
+      const keepInfo = [];
+      if (v.level !== 'overlap' && v.level !== 'mixed') {
+        if (isApproved(q.status) && !isApproved(owner.status)) keepInfo.push('đã duyệt');
+        if ((Number(q.size) || 0) > (Number(owner.size) || 0) * (1 + CONFLICT_SIZE_TOLERANCE)) keepInfo.push(`quy mô lớn hơn (${fmtNum(q.size)} m²)`);
+      }
+      return { point: q, ...v, note: keepInfo.length ? `Điểm này ${keepInfo.join(', ')}: chép sang ${owner.id || owner.name} trước khi xóa.` : '' };
+    })
+    .sort((a, b) => CONFLICT_ORDER[a.level] - CONFLICT_ORDER[b.level]);
+}
+
+function parcelConflictHtml(owner, conflicts) {
+  const label = (q) => `<b>${escapeHtml(q.name)}</b> <span class="pp-sub">${escapeHtml(q.id || 'không ID')} · ${escapeHtml(infraLabels[layerType(q)] || q.type)}${isApproved(q.status) ? '' : ' · chờ duyệt'}</span>`;
+  const drops = conflicts.filter(c => c.level === 'dup' || c.level === 'type').map(c => c.point.id).filter(Boolean);
+  let html = `<div class="pp-section c-red">${ico('alert')}RANH LÔ CHỨA ${conflicts.length + 1} CÔNG TRÌNH</div><div class="pp-conflict">`;
+  html += `<div class="pp-conflict-row keep"><div>${label(owner)}</div><div class="pp-sub c-green">Giữ lại — công trình sở hữu ranh lô</div></div>`;
+  conflicts.forEach((c, idx) => {
+    html += `<div class="pp-conflict-row ${c.level}"><div>${label(c.point)}</div><div class="pp-sub">${escapeHtml(c.reason)}</div>`
+      + (c.note ? `<div class="pp-sub pp-cap-warn">${ico('alert')}${escapeHtml(c.note)}</div>` : '')
+      + `<div class="pp-conflict-actions"><button type="button" class="proof-btn js-conflict-go" data-idx="${idx}">${ico('locate')}Định vị</button>`
+      + (c.point.id ? `<button type="button" class="proof-btn js-conflict-copy" data-id="${escapeHtml(c.point.id)}">Chép ID</button>` : '')
+      + `</div></div>`;
+  });
+  if (drops.length) html += `<div class="pp-note c-orange">Đề xuất xóa dòng ${drops.map(escapeHtml).join(', ')} trong Google Sheet (cột ID_DoiTuong); bản đồ cập nhật sau khi Apps Script đồng bộ.</div>`;
+  return html + `</div>`;
+}
+
+// Vòng nét đứt quanh các điểm vi phạm: đỏ = đề xuất xóa, cam = cần kiểm tra
+function addConflictRings(fg, conflicts, renderer) {
+  conflicts.forEach(c => {
+    const color = c.level === 'dup' || c.level === 'type' ? '#ef4444' : '#f59e0b';
+    fg.addLayer(L.circleMarker([Number(c.point.lat), Number(c.point.lng)], { renderer, radius: 16, color, weight: 2.5, dashArray: '4,3', fill: false, interactive: false }));
+  });
+}
+
 let pointPopup = null;   // { popup, id, scenario } của popup công trình đang mở
 
-export function onPointClick(p, targetMap = map) {
+// parcelGeometry: mở từ ranh lô đất → chỉ viền khu đất + bảng thông tin; âm bản, zoom bán kính và dân số chờ bấm "Xem bán kính phục vụ"
+export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   if (pointPopup && pointPopup.id === p.id && pointPopup.scenario === p.scenario && pointPopup.popup._map === targetMap
     && expandCollapsedPopup(pointPopup.popup)) return;
   const approved = isApproved(p.status);
@@ -1575,6 +1665,7 @@ export function onPointClick(p, targetMap = map) {
   clearCsdProof();
 
   const groups = isPlanScenario ? planLayers : layers;
+  const selMap = isPlanScenario ? planMap : map;
   const selType = layerType(p);
   const geoWardNow = resolveWardNameFromCoords(Number(p.lat), Number(p.lng));
   const clip = serviceClipFor(p, geoWardNow);
@@ -1582,8 +1673,20 @@ export function onPointClick(p, targetMap = map) {
     .filter(q => layerType(q) === selType && (q.type !== '12-CSD' || q === p) && hasValidCoord(q) && targetMap.hasLayer(groups[ICON_GROUP_KEYS[selType]]));
   // Mặc định chỉ vẽ vòng bán kính lý thuyết; vùng phục vụ theo mạng đường + dân số chỉ tính khi bấm nút phân tích
   const hasZone = !isCSDUnapproved && !noZone;
-  if (hasZone) highlightSingleIsochrone(p.lat, p.lng, itemRadius, groups.singleIso, inViewPoints, clip, false);
+  const conflicts = findParcelConflicts(p, parcelGeometry || parcelFor(p)?.geometry);
+  let selMarks = null;
+  const markSelection = () => {
+    if (!selMap || (!parcelGeometry && !conflicts.length)) return;
+    const renderer = selRendererFor(selMap);
+    selMarks = L.featureGroup();
+    if (parcelGeometry) addParcelOutline(selMarks, parcelGeometry, renderer);
+    addConflictRings(selMarks, conflicts, renderer);
+    groups.singleIso.addLayer(selMarks);
+  };
+  if (parcelGeometry) clearSingleIsochrone();
+  else if (hasZone) highlightSingleIsochrone(p.lat, p.lng, itemRadius, groups.singleIso, inViewPoints, clip, false);
   else clearSingleIsochrone();
+  markSelection();
   let selSeq = singleIsoSeq;
 
   const park = p.type === '1-CV' ? parkTierOf(p.size, p.nhomHaTang) : null;
@@ -1621,9 +1724,9 @@ export function onPointClick(p, targetMap = map) {
   if (planList.length) {
     html += `<div class="pp-row"><span>Chỉ tiêu quy hoạch</span><b>${planList.map(([k, v]) => `${k}: ${escapeHtml(v)}`).join('<br>')}${p.tenQH ? `<br><span class="pp-sub">Đồ án ${escapeHtml(p.tenQH)}</span>` : ''}</b></div>`;
   }
-  if (!isCSDUnapproved) {
-    const radiusLabel = p.type === '13-BUS' ? 'Phạm vi đi bộ' : ntKind ? 'Khoảng cách an toàn' : 'Bán kính phục vụ';
-    const radiusRef = p.type === '13-BUS' ? 'Mục 2.8.3.3' : p.type === '10-PCCC' ? 'Mục 2.5.13.1' : ntKind ? 'Bảng 23' : '';
+  const radiusLabel = p.type === '13-BUS' ? 'Phạm vi đi bộ' : ntKind ? 'Khoảng cách an toàn' : 'Bán kính phục vụ';
+  const radiusRef = p.type === '13-BUS' ? 'Mục 2.8.3.3' : p.type === '10-PCCC' ? 'Mục 2.5.13.1' : ntKind ? 'Bảng 23' : '';
+  if (!isCSDUnapproved && !parcelGeometry) {
     const refHtml = radiusRef ? ` <span class="pp-sub">(${radiusRef})</span>` : '';
     html += `<div class="pp-row"><span>${radiusLabel}</span><b class="c-cyan">${noZone ? 'không quy định' : `${fmtNum(itemRadius)}&nbsp;m`}${refHtml}</b></div>`;
   }
@@ -1632,12 +1735,16 @@ export function onPointClick(p, targetMap = map) {
   const showServed = !isCSD && !noZone;
   const servedLabel = ntKind ? 'Dân số trong vùng cách ly' : `Dân số phục vụ${approved ? '' : ' dự kiến'}`;
   const showArea = hasZone && roadArea;
-  if (showArea || showServed) {
+  if (parcelGeometry && (showArea || showServed)) {
+    const refNote = radiusRef ? `, ${radiusRef}` : '';
+    html += `<div class="js-analysis"><button type="button" class="js-analyze proof-btn pp-analyze-btn" title="Phóng tới toàn ${radiusLabel.toLowerCase()}, bật chế độ âm bản, dựng phạm vi thực tế và tính dân số phục vụ">${ico('locate')}Xem ${radiusLabel.toLowerCase()} (${fmtNum(itemRadius)}&nbsp;m${refNote})</button></div>`;
+  } else if (showArea || showServed) {
     const what = showArea
       ? `${p.type === '13-BUS' ? 'Xem phạm vi đi bộ thực tế' : 'Xem phạm vi phục vụ thực tế'}${showServed ? ' & dân số' : ''}`
       : (ntKind ? 'Tính dân số trong vùng cách ly' : 'Tính dân số phục vụ');
     html += `<div class="js-analysis"><button type="button" class="js-analyze proof-btn pp-analyze-btn" title="Dựng vùng phục vụ theo mạng đường và tính dân số (tốn thời gian, chỉ chạy khi bấm)">${ico(showArea ? 'road' : 'users')}${what}</button></div>`;
   }
+  if (conflicts.length) html += parcelConflictHtml(p, conflicts);
   const riskData = peekInfraRisk();
   if (riskData) html += `<div class="pp-row js-risk"><span>Rủi ro khí hậu</span><span class="pp-loading">${ico('clock')}đang tải...</span></div>`;
   if (isCSD && approved) {
@@ -1654,9 +1761,19 @@ export function onPointClick(p, targetMap = map) {
   const popup = L.popup({ className: 'infra-popup', closeButton: true, autoPan: true, ...popupFitOptions(targetMap, 300, 50) }).setLatLng([p.lat, p.lng]).setContent(html);
   popup.openOn(targetMap);
   popup.getElement()?.querySelector('.js-approve')?.addEventListener('click', () => approvePointStatus(p.id));
-  addPopupCollapseToggle(popup, 'vùng phục vụ');
+  popup.getElement()?.querySelectorAll('.js-conflict-go').forEach(btn => btn.addEventListener('click', (e) => {
+    L.DomEvent.stop(e);
+    onPointClick(conflicts[Number(btn.dataset.idx)].point, targetMap);
+  }));
+  popup.getElement()?.querySelectorAll('.js-conflict-copy').forEach(btn => btn.addEventListener('click', (e) => {
+    L.DomEvent.stop(e);
+    navigator.clipboard?.writeText(btn.dataset.id)
+      .then(() => showToast(`Đã chép ID ${btn.dataset.id}`, 'success'))
+      .catch(() => showToast(`Không chép được, ID: ${btn.dataset.id}`, 'error'));
+  }));
+  addPopupCollapseToggle(popup, parcelGeometry ? 'ranh khu đất và vùng phục vụ' : 'vùng phục vụ');
   pointPopup = { popup, id: p.id, scenario: p.scenario };
-  focusServiceRadius(targetMap, p.lat, p.lng, hasZone ? itemRadius : 0);
+  if (!parcelGeometry) focusServiceRadius(targetMap, p.lat, p.lng, hasZone ? itemRadius : 0);
   // Đóng popup thì thoát chế độ âm bản (trừ khi đã chọn công trình khác / chuyển sang thuyết minh CSD)
   popup.on('remove', () => { if (singleIsoSeq === selSeq) clearSingleIsochrone(); });
   riskData?.then(d => {
@@ -1693,14 +1810,19 @@ export function onPointClick(p, targetMap = map) {
     const areaPromise = showArea
       ? highlightSingleIsochrone(p.lat, p.lng, itemRadius, groups.singleIso, inViewPoints, clip, true)
       : null;
+    if (parcelGeometry) {
+      if (!showArea) highlightSingleIsochrone(p.lat, p.lng, itemRadius, groups.singleIso, inViewPoints, clip, false);
+      focusServiceRadius(targetMap, p.lat, p.lng, itemRadius);
+    }
+    markSelection();
     selSeq = singleIsoSeq;
 
     if (areaPromise) {
       areaPromise.then(r => {
+        if (r && selMarks && groups.singleIso.hasLayer(selMarks)) selMarks.bringToFront();
         if (!r || r.plain) return;
         if (r.area) {
-          const pct = Math.round(r.area.areaKm2 / r.area.circleKm2 * 100);
-          fill('.js-area', `<span>Phạm vi thực tế</span><div><b class="c-green">${r.area.areaKm2.toFixed(2)} km²</b> <span class="pp-sub">(${pct}% vòng tròn, theo ${r.area.reachKm.toFixed(1)} km đường tiếp cận)</span>${roadLegendHtml(r.area)}</div>`);
+          fill('.js-area', `<span>Phạm vi thực tế</span><b class="c-green">${r.area.areaKm2.toFixed(2)} km²</b>`);
         } else {
           fill('.js-area', `<span>Phạm vi thực tế</span><span class="pp-sub">máy chủ dữ liệu đường (OpenStreetMap) đang quá tải — tạm hiển thị vòng tròn bán kính, bấm lại công trình sau ít phút.</span>`);
         }

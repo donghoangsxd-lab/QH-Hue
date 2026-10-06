@@ -235,7 +235,7 @@
           <button type="button" class="layer-eye-btn" id="btnProjectsAll" data-layer-sec-only="plan" aria-pressed="false" title="Ẩn / hiện mọi đồ án trong danh sách (không tắt lớp)" aria-label="Ẩn / hiện mọi đồ án" hidden>
             <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>
           </button>
-          <button type="button" class="layer-eye-btn" id="btnToggleAllIcons" data-layer-sec-only="infra" aria-pressed="false" title="Ẩn toàn bộ biểu tượng công trình (giữ lựa chọn để hiện lại)" aria-label="Ẩn / hiện toàn bộ biểu tượng công trình">
+          <button type="button" class="layer-eye-btn" id="btnToggleAllIcons" data-layer-sec-only="infra" aria-pressed="false" title="Bật / tắt toàn bộ 14 nhóm công trình" aria-label="Bật / tắt toàn bộ 14 nhóm công trình">
             <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>
           </button>
         </div>
@@ -328,7 +328,7 @@
           </div>
           <div class="layer-tab-pane" data-layer-pane="analysis" role="tabpanel">
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div></div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung. Thu nhỏ vẫn hiện trục chính; chỉ mức một biểu đồ tròn toàn thành phố là ẩn"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">phóng to để xem</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung. Thu nhỏ vẫn hiện trục chính; chỉ mức một biểu đồ tròn toàn thành phố là ẩn"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(zoom để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
             <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
             <span class="road-legend-item"><i style="background:#60a5fa; height:2px;"></i>Khu vực</span>
@@ -340,9 +340,9 @@
             <div><input type="checkbox" id="chk_pop"><label for="chk_pop"><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư</label></div>
             <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
           </div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_parcel"><label for="chk_parcel" title="Ranh khu đất của từng công trình hạ tầng xã hội (HTXH) trong 14 nhóm (cột Geojson trên Sheet)"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Ranh lô đất công trình <small class="layer-hint">phóng to để xem</small></label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_parcel"><label for="chk_parcel" title="Ranh khu đất của công trình hạ tầng xã hội trong 14 nhóm quản lý theo phường (cột Geojson / CAD_Polygon trên Sheet, không thuộc đồ án nào). Lô của đồ án quy hoạch do mục Quy hoạch vẽ"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Ranh lô đất công trình <small class="layer-hint">(zoom để xem)</small></label></div></div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Khoanh vùng trong từng phường: ranh đỏ = vùng hiện trạng (đã xây dựng đến năm gốc 2020/2010/2000, GAIA Landsat 30 m hợp với GHSL 100 m); ranh xanh = vùng phát triển mới (đất xây dựng hiện nay theo Google Dynamic World 10 m nằm ngoài vùng hiện trạng); bỏ mảng < 0,5 ha. QCVN 01:2026/BXD Mục 2.2.3.2 (công viên, vườn hoa mỗi đơn vị ở) và Mục 2.2.3.3 (vườn hoa, bãi đỗ xe ≤ 400 m) chỉ áp trong vùng phát triển mới. Logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch"><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Vùng phát triển mới (Dynamic World)</label></div>
+            <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Khoanh vùng trong từng phường: ranh đỏ = vùng hiện trạng (đã xây dựng đến năm gốc 2020/2010/2000, GAIA Landsat 30 m hợp với GHSL 100 m); ranh xanh = vùng phát triển mới (đất xây dựng hiện nay theo Google Dynamic World 10 m nằm ngoài vùng hiện trạng); bỏ mảng < 0,5 ha. QCVN 01:2026/BXD Mục 2.2.3.2 (công viên, vườn hoa mỗi đơn vị ở) và Mục 2.2.3.3 (vườn hoa, bãi đỗ xe ≤ 400 m) chỉ áp trong vùng phát triển mới. Logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch"><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Đất xây dựng (vệ tinh)</label></div>
             <span id="newDevOpBox" class="layer-slider" style="display:none;"><input type="range" id="newDevOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp vùng phát triển mới" aria-label="Độ trong suốt lớp vùng phát triển mới"></span>
           </div>
           <div class="flood-box" id="newDevBox" style="display:none;">

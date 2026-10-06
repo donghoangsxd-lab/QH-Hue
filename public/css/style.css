@@ -520,12 +520,6 @@ body.right-collapsed .right-panel {
 #riskBox .sat-pick + .sat-pick { margin-top: 3px; }
 #riskBox .sat-pick label { width: 34px; flex-shrink: 0; }
 #riskBox .flood-stats { margin-top: 4px; }
-/* Đối chiếu dân số với WorldPop / GHSL (popCheck.js) */
-.pc-badge { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; cursor: help; vertical-align: middle; }
-.pc-badge i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.pc-ok { color: var(--accent-green); }
-.pc-warn { color: var(--accent-yellow); }
-.pc-bad { color: var(--accent-red); }
 .risk-badge { display: inline-flex; align-items: center; gap: 1px; font-size: var(--fs-xs); white-space: nowrap; }
 .risk-badge .ico { width: 11px; height: 11px; margin: 0; }
 .risk-flood { color: #38bdf8; }
@@ -1546,8 +1540,13 @@ table.ward-table th {
 .pp-served > :first-child { color: var(--text-main); font-weight: 600; }
 .pp-section { display: flex; align-items: center; margin-top: 7px; font-weight: 700; }
 .pp-note { margin-top: 6px; font-size: var(--fs-sm); font-style: italic; text-align: center; }
-.pp .road-legend { margin: 3px 0 0; flex-wrap: wrap; row-gap: 2px; font-weight: 400; }
-
+/* Lỗi 1 ranh lô chứa nhiều công trình: viền trái xanh = giữ, đỏ = đề xuất xóa, cam = cần kiểm tra */
+.pp-conflict { margin-top: 3px; }
+.pp-conflict-row { margin-top: 4px; padding: 3px 6px; border-left: 3px solid var(--accent-orange); border-radius: var(--r-sm); background: rgba(255, 255, 255, 0.04); }
+.pp-conflict-row.keep { border-left-color: var(--accent-green); }
+.pp-conflict-row.dup, .pp-conflict-row.type { border-left-color: #ef4444; }
+.pp-conflict-actions { display: flex; gap: 4px; }
+.pp-conflict-actions .proof-btn { margin-top: 3px; }
 /* Nút con mắt cạnh nút đóng: thu popup về nhãn tên nhỏ ngay trên vị trí (bấm nhãn để mở lại) */
 .infra-popup .pp-title, .inspect-popup .pp-title { padding-right: 22px; }
 .leaflet-container a.pp-collapse-btn {

@@ -153,7 +153,7 @@ function update() {
   if (z < mainMinZoom()) {
     overviewGen++;
     clearDrawn();
-    setHint('phóng to để xem');
+    setHint('(zoom để xem)');
     return;
   }
   if (z < MIN_ZOOM) {
@@ -192,7 +192,7 @@ export function setRoadNetworkVisible(on) {
     overviewShown = false;
     leftGroup?.remove(); leftGroup = null;
     rightGroup?.remove(); rightGroup = null;
-    setHint('phóng to để xem');
+    setHint('(zoom để xem)');
   }
 }
 

@@ -523,12 +523,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ---------- Ẩn/hiện toàn bộ icon (thanh đầu tab Lớp dữ liệu) ----------
-  // Ẩn: nhớ các nhóm đang bật; Hiện lại: khôi phục đúng các nhóm đó (chưa có thì bật cả 14 nhóm)
+  // Đủ 14 nhóm đang bật: bấm tắt hết; còn nhóm nào tắt: bấm bật cả 14 nhóm
   const ICON_GROUPS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'c11', 'c12', 'c13', 'c14'];
   const btnEye = document.getElementById('btnToggleAllIcons');
   const layerCount = document.getElementById('layerCount');
   const iconCheck = (k) => document.getElementById(`chk_${k}`);
-  let savedIconGroups = null;
   const syncEyeButton = () => {
     const on = ICON_GROUPS.filter(k => iconCheck(k)?.checked).length;
     if (layerCount) {
@@ -536,9 +535,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       layerCount.classList.toggle('none', on === 0);
     }
     if (!btnEye) return;
-    const hidden = on === 0;
-    btnEye.setAttribute('aria-pressed', String(hidden));
-    btnEye.title = hidden ? 'Hiện lại các nhóm công trình đã chọn trước khi ẩn' : 'Ẩn toàn bộ biểu tượng công trình (giữ lựa chọn để hiện lại)';
+    const allOn = on === ICON_GROUPS.length;
+    btnEye.setAttribute('aria-pressed', String(!allOn));
+    btnEye.title = allOn ? 'Tắt toàn bộ 14 nhóm công trình' : 'Bật toàn bộ 14 nhóm công trình';
   };
   const setIconGroups = (keys) => ICON_GROUPS.forEach(k => {
     const chk = iconCheck(k);
@@ -548,9 +547,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleLayer(k, on);
   });
   btnEye?.addEventListener('click', () => {
-    const on = ICON_GROUPS.filter(k => iconCheck(k)?.checked);
-    if (on.length) { savedIconGroups = on; setIconGroups([]); }
-    else setIconGroups(savedIconGroups || ICON_GROUPS);
+    const allOn = ICON_GROUPS.every(k => iconCheck(k)?.checked);
+    setIconGroups(allOn ? [] : ICON_GROUPS);
     syncEyeButton();
   });
   ICON_GROUPS.forEach(k => iconCheck(k)?.addEventListener('change', syncEyeButton));
