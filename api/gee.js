@@ -1499,9 +1499,9 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'getWardParcels') {
-      const parcels = await projects.wardParcels();
+      const ward = await projects.wardParcels();
       res.setHeader('Cache-Control', 'no-store');
-      return res.status(200).json({ parcels });
+      return res.status(200).json(ward);
     }
 
     // Bucket không mở CORS cho trình duyệt → chuyển tiếp nguyên văn bản TopoJSON (~1 MB), cache biên Vercel 1 giờ

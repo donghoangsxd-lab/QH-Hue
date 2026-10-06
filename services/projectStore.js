@@ -7,7 +7,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const constants = require('../config/constants');
 const gcsWrite = require('./gcsWrite');
-const { getCadParcels, invalidateCache } = require('./gcsService');
+const { getCadParcels, getRawDataList, invalidateCache } = require('./gcsService');
 
 const INDEX_NAME = 'projects/index.json';
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -268,27 +268,62 @@ function legacyCatalog(parcels) {
   })).filter(p => p.tenQH);
 }
 
+// Số công trình theo Ten_QH trên Sheet (dòng mảnh phường <ID>.2 đã gộp vào công trình chính) + khung bao các điểm
+async function sheetProjects() {
+  const by = new Map();
+  let list = [];
+  try { list = await getRawDataList(); } catch (err) { console.warn('Đọc danh sách công trình cho danh mục đồ án lỗi:', err.message); }
+  list.forEach(it => {
+    const name = String(it.tenQH || '').trim();
+    if (!name || !Number.isFinite(it.lat) || !Number.isFinite(it.lng)) return;
+    let g = by.get(name);
+    if (!g) by.set(name, g = { ids: new Set(), box: [Infinity, Infinity, -Infinity, -Infinity] });
+    g.ids.add(it.id);
+    g.box = [Math.min(g.box[0], it.lng), Math.min(g.box[1], it.lat), Math.max(g.box[2], it.lng), Math.max(g.box[3], it.lat)];
+  });
+  return by;
+}
+
+// Đồ án chỉ có cột Ten_QH trên Sheet (chưa có ranh tổng / file lô): hiện trong danh mục, không có file để tải
+function sheetOnlyEntry(name, g) {
+  const r = (n) => Math.round(n * 1e6) / 1e6;
+  return {
+    tenQH: name, slug: projectSlug(name), file: name, wards: [], infra: g.ids.size, lands: 0, time: '',
+    boundary: null, bbox: g.box.map(r), landArea: {}, legacy: false, sheetOnly: true, saved: 0
+  };
+}
+
 async function catalog() {
   const stored = await readIndex();
   const saved = (!stored.missing && stored.data && Array.isArray(stored.data.projects)) ? stored.data.projects : [];
   const migrated = !!(stored.data && stored.data.migrated);
-  if (migrated) {
-    return { base: constants.PROJECTS_GCS_BASE, migrated: true, projects: saved };
+  const by = new Map();
+  if (!migrated) {
+    try {
+      legacyCatalog(await getCadParcels()).forEach(p => by.set(p.tenQH, p));
+    } catch (err) {
+      console.warn('Đọc cad_parcels cho danh mục cũ lỗi:', err.message);
+    }
   }
-  let legacy = [];
-  try {
-    legacy = legacyCatalog(await getCadParcels());
-  } catch (err) {
-    console.warn('Đọc cad_parcels cho danh mục cũ lỗi:', err.message);
-  }
-  const by = new Map(legacy.map(p => [p.tenQH, p]));
+  const deleted = new Set();
   saved.forEach(p => {
     if (!p || !p.tenQH) return;
-    if (p.deleted) { by.delete(p.tenQH); return; }
+    if (p.deleted) { deleted.add(p.tenQH); by.delete(p.tenQH); return; }
     by.set(p.tenQH, { ...p, legacy: false });
   });
-  const projects = [...by.values()].filter(p => p.tenQH && !p.deleted).sort((a, b) => String(a.tenQH).localeCompare(String(b.tenQH), 'vi'));
-  return { base: constants.PROJECTS_GCS_BASE, migrated: false, projects };
+  const sheet = await sheetProjects();
+  sheet.forEach((g, name) => {
+    const cur = by.get(name);
+    if (cur) {
+      cur.infra = g.ids.size;
+      if (!cur.bbox) cur.bbox = sheetOnlyEntry(name, g).bbox;
+    } else {
+      by.set(name, sheetOnlyEntry(name, g));
+    }
+  });
+  const projects = [...by.values()].filter(p => p.tenQH && !p.deleted)
+    .sort((a, b) => String(a.tenQH).localeCompare(String(b.tenQH), 'vi'));
+  return { base: constants.PROJECTS_GCS_BASE, migrated, projects };
 }
 
 function dxfNum(id) {
@@ -465,7 +500,7 @@ async function migrationGroups() {
       g.file = file || g.tenQH;
       return;
     }
-    if (kind === 'DXF' || file) {
+    if (file) {
       const g = get(asProjectName(file));
       const row = g && parcelFromFeature(ft);
       if (!row) return;
@@ -558,17 +593,26 @@ async function legacyLots(tenQH) {
   return payload;
 }
 
+// Ranh lô không thuộc đồ án nào: lô công trình theo phường + lô đất DXF cũ chưa gắn Ten_QH
 async function wardParcels() {
-  const parcels = (await getCadParcels()).filter(p => p && p.kind !== 'DXF' && p.kind !== 'PROJECT' && !p.file && p.geometry);
-  const list = parcels.map(p => ({
+  const all = (await getCadParcels()).filter(p => p && p.kind !== 'PROJECT' && !p.file && p.geometry);
+  const parcels = all.filter(p => p.kind !== 'DXF').map(p => ({
     id: p.id, phase: p.phase === 'QH' ? 'QH' : 'HT', layer: p.layer || '', area: p.area ?? null, geometry: p.geometry
   }));
-  if (JSON.stringify(list).length > PROXY_MAX_CHARS) {
+  const lands = all.filter(p => p.kind === 'DXF').map(p => {
+    const row = {
+      kind: 'DXF', id: p.id, phase: p.phase === 'QH' ? 'QH' : 'HT', layer: p.layer || '', area: p.area ?? null,
+      name: p.name || '', nhom: p.nhom || '', ward: p.ward || '', geometry: p.geometry
+    };
+    if (p.plan) row.plan = p.plan;
+    return row;
+  });
+  if (JSON.stringify(parcels).length + JSON.stringify(lands).length > PROXY_MAX_CHARS) {
     const err = new Error('Ranh lô theo phường lớn hơn 4 MB');
     err.status = 413;
     throw err;
   }
-  return list;
+  return { parcels, lands };
 }
 
 module.exports = {

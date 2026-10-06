@@ -12,7 +12,7 @@ let timer = null;
 let seq = 0;
 const force = new Set();
 const cache = new Map();
-const ward = { loaded: false, map: new Map() };
+const ward = { loaded: false, map: new Map(), lands: [] };
 
 export function bindMap(fn, zoom) { getMap = fn; if (zoom) minZoom = zoom; }
 export function onChangeLots(fn) { onChange = fn; }
@@ -30,7 +30,7 @@ function wanted() {
   const parcelLayer = zoom >= minZoom && (state.showParcels || state.showProjects);
   const layerOn = parcelLayer || state.showLand;
   return state.projectCatalog.filter(p => {
-    if (!p || !p.tenQH) return false;
+    if (!p || !p.tenQH || p.sheetOnly) return false;
     if (force.has(p.tenQH)) return state.showLand || !state.hiddenProjects.has(p.tenQH);
     if (!layerOn) return false;
     if (!state.showLand && state.showProjects && state.hiddenProjects.has(p.tenQH)) return false;
@@ -39,10 +39,22 @@ function wanted() {
   });
 }
 
-function wantsWard() {
+// Lô công trình theo phường: theo nút Ranh lô / lớp Đồ án, từ ngưỡng zoom
+function wardLotsOn() {
   const map = getMap();
   if (!map || map.getZoom() < minZoom) return false;
   return state.showParcels || state.showProjects;
+}
+
+// Lô đất cũ chưa gắn đồ án: như lô đất đồ án (showLand mọi zoom, lớp Đồ án từ ngưỡng zoom)
+function wardLandsOn() {
+  const map = getMap();
+  if (!map) return false;
+  return state.showLand || (state.showProjects && map.getZoom() >= minZoom);
+}
+
+function wantsWard() {
+  return wardLotsOn() || wardLandsOn();
 }
 
 async function loadEntry(entry) {
@@ -83,6 +95,8 @@ async function ensureWard() {
     next.set(`${phase}|${p.id}`, { geometry: p.geometry, layer: p.layer || '', file: '' });
   });
   ward.map = next;
+  ward.lands = (data.lands || []).filter(p => p && p.id && p.geometry)
+    .map(p => ({ ...p, file: '', phase: p.phase === 'QH' ? 'QH' : 'HT' }));
   ward.loaded = true;
 }
 
@@ -95,9 +109,8 @@ async function pool(list, n, fn) {
 }
 
 export function composeNow() {
-  const showWard = wantsWard() && ward.loaded;
-  const next = new Map(showWard ? ward.map : []);
-  const lands = [];
+  const next = new Map(ward.loaded && wardLotsOn() ? ward.map : []);
+  const lands = ward.loaded && wardLandsOn() ? ward.lands.slice() : [];
   wanted().forEach(entry => {
     const got = cache.get(entry.tenQH);
     if (!got) return;
@@ -167,4 +180,5 @@ export async function loadCatalog() {
   });
   ward.loaded = false;
   ward.map = new Map();
+  ward.lands = [];
 }

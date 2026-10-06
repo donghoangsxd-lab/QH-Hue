@@ -101,8 +101,17 @@ function saveHidden() {
   try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...state.hiddenProjects])); } catch (e) { /* chế độ riêng tư */ }
 }
 
-// Danh mục lấy từ index (không cần đã tải ranh từng lô). infra/lands là số đếm { size }
+// Danh mục lấy từ index (không cần đã tải ranh từng lô). infra/lands là số đếm { size }.
+// Đồ án chưa có ranh tổng: ranh tạm dựng từ điểm công trình Ten_QH (đã có trong rawDataList)
 function collectProjects() {
+  const pointsOf = new Map();
+  [...state.rawDataList, ...state.planDataList].forEach(it => {
+    const name = String(it.tenQH || '').trim();
+    const lat = Number(it.lat), lng = Number(it.lng);
+    if (!name || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    if (!pointsOf.has(name)) pointsOf.set(name, []);
+    pointsOf.get(name).push([lng, lat]);
+  });
   return state.projectCatalog.map(p => ({
     name: p.tenQH,
     slug: p.slug || '',
@@ -110,7 +119,7 @@ function collectProjects() {
     infra: { size: Number(p.infra) || 0 },
     lands: { size: Number(p.lands) || 0 },
     shapes: [],
-    points: [],
+    points: p.boundary ? [] : (pointsOf.get(p.tenQH) || []),
     area: p.boundary ? {
       id: p.tenQH,
       geometry: p.boundary,
