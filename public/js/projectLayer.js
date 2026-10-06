@@ -15,6 +15,8 @@ const BOUNDARY_MAX_CHARS = 45000;
 // Quá số lô này thì hợp ranh quá chậm trên trình duyệt → dùng bao lồi
 const EXACT_MAX_LOTS = 4000;
 const OUTLINE_STYLE = { color: '#e879f9', weight: 2.4, opacity: 0.95, dashArray: '8 5', fillColor: '#e879f9', fillOpacity: 0.05 };
+const OUTLINE_GIS = { ...OUTLINE_STYLE, weight: 2.6, dashArray: null };
+const OUTLINE_HULL = { ...OUTLINE_STYLE, dashArray: '2 6' };
 
 const $ = (id) => document.getElementById(id);
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
@@ -71,6 +73,18 @@ function fitSize(geom) {
   return hull ? { type: hull.type, coordinates: round6(hull.coordinates) } : null;
 }
 
+/** Rút gọn ranh vừa 45.000 ký tự (ô danh mục). Dùng cho ranh file GIS và ranh tự dựng. */
+export function fitBoundary(geom) {
+  if (!geom || typeof turf === 'undefined') return null;
+  try {
+    const bare = exteriorOnly(geom) || geom;
+    return fitSize(bare);
+  } catch (e) {
+    console.warn('Không rút gọn được ranh đồ án:', e);
+    return null;
+  }
+}
+
 /** Ranh tổng đồ án từ ranh các lô (GeoJSON Polygon / MultiPolygon); không dựng được → null */
 export function projectBoundary(geometries) {
   if (typeof turf === 'undefined') return null;
@@ -120,6 +134,7 @@ function collectProjects() {
     infra: { size: Number(p.infra) || 0 },
     lands: { size: Number(p.lands) || 0 },
     shapes: [],
+    source: p.boundarySource === 'gis' ? 'gis' : (p.boundary ? 'auto' : null),
     points: p.boundary ? [] : (pointsOf.get(p.tenQH) || []),
     area: p.boundary ? {
       id: p.tenQH,
@@ -215,12 +230,13 @@ function renderList() {
   box.innerHTML = migrateBtn + none + visible.map(({ p, idx }) => {
     const on = !state.hiddenProjects.has(p.name);
     const deleting = busy === p.name;
-    const tempNote = p.area ? '' : ' · ranh tạm (bao lồi) — nhập lại file để có ranh đúng';
+    const tempNote = !p.area ? ' · ranh tạm (bao lồi) — nhập file ranh hoặc nhập lại file để có ranh đúng'
+      : p.source === 'gis' ? ' · ranh từ file GIS' : ' · ranh tự dựng từ các lô';
     const where = p.legacy ? 'còn ở file cad_parcels' : 'file riêng trên bucket';
     return `<div class="project-row${on ? '' : ' is-off'}">
       <label class="project-name" title="${escapeHtml(p.name)}${p.area?.ward ? ` — ${escapeHtml(p.area.ward)}` : ''}">
         <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><span>${escapeHtml(p.name)}</span></label>
-      <small class="project-meta" title="Số đếm theo danh mục đồ án (${where})${tempNote}">${metaText(p)}${p.area ? '' : ' *'}${p.legacy ? ' · cũ' : ''}</small>
+      <small class="project-meta" title="Số đếm theo danh mục đồ án (${where})${tempNote}">${metaText(p)}${p.area ? (p.source === 'gis' ? ' · GIS' : ' · tự dựng') : ' *'}${p.legacy ? ' · cũ' : ''}</small>
       <button type="button" class="project-btn" data-zoom="${idx}" title="Phóng tới đồ án" aria-label="Phóng tới đồ án">${ico('locate')}</button>
       ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
     </div>`;
@@ -242,7 +258,7 @@ function drawOutlinesOn(m, list) {
     const geom = outlineOf(p);
     if (!geom) return;
     const shape = L.geoJSON(geom, {
-      style: p.area ? OUTLINE_STYLE : { ...OUTLINE_STYLE, dashArray: '2 6' },
+      style: !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE,
       bubblingMouseEvents: false
     });
     shape.bindTooltip(escapeHtml(p.name), { sticky: true, direction: 'top', className: 'dot-tip' });
@@ -282,7 +298,8 @@ function rebuild() {
 async function deleteProject(p) {
   if (!isAdmin() || busy) return;
   const typed = prompt(`XÓA TOÀN BỘ ĐỒ ÁN «${p.name}»:\n`
-    + `• ${p.infra.size} công trình hạ tầng có Ten_QH = đồ án (kể cả công trình có từ trước đã gán vào đồ án)\n`
+    + `• ${p.infra.size} công trình hạ tầng có Ten_QH = đồ án: dòng do đồ án tạo bị xóa; dòng có sẵn trên Sheet mà đồ án đã ghi đè`
+    + ' được khôi phục giá trị cũ (nếu có sao lưu — đồ án nhập trước khi có sao lưu thì vẫn bị xóa)\n'
     + `• ${p.lands.size} lô đất của đồ án (file trên bucket${p.legacy ? ' / tab DXF cũ' : ''})\n`
     + '• ranh lô trên CAD_Polygon, dòng danh mục DS_DoAn và file projects của đồ án\n\n'
     + 'Không hoàn tác được. Gõ đúng tên đồ án để xác nhận:');
@@ -302,7 +319,8 @@ async function deleteProject(p) {
     if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
     state.hiddenProjects.delete(p.name);
     saveHidden();
-    alert(`Đã xóa đồ án «${p.name}»: ${data.infra} dòng hạ tầng, ${data.lands} lô đất, ${data.polygons} ranh CAD_Polygon.`);
+    const restoredText = data.restored ? `, khôi phục ${data.restored} dòng có sẵn về giá trị trước khi nhập` : '';
+    alert(`Đã xóa đồ án «${p.name}»: ${data.infra} dòng hạ tầng${restoredText}, ${data.lands} lô đất, ${data.polygons} ranh CAD_Polygon.`);
     busy = null;
     if (onDeleted) await onDeleted();
   } catch (err) {

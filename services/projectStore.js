@@ -24,7 +24,8 @@ function setTransport(fn) { transport = fn; }
 function projectTitle(fileName) {
   const base = String(fileName || '').replace(/\.[^.]+$/, '').trim();
   const m = base.match(/^(?:HT|QH)[\s_\-]+(.+)$/i);
-  return String(m ? m[1] : base).slice(0, 120);
+  const name = String(m ? m[1] : base).replace(/-(?:ranh-gioi|diem-chuc-nang)$/i, '').trim();
+  return name.slice(0, 120);
 }
 
 // Cột File của CAD_Polygon là tên file (HT-….dxf); cột Ten_QH và Kind PROJECT là tên đồ án
@@ -345,9 +346,15 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
   const prev = (!got.missing && got.data && got.data.tenQH === name && Array.isArray(got.data.parcels)) ? got.data.parcels : [];
   const infra = new Map();
   const dxf = [];
+  const resetPhase = landsReset === 'HT' || landsReset === 'QH' ? landsReset : null;
   prev.forEach(p => {
     if (!p || !p.geometry) return;
-    if (p.kind === 'DXF') { if (!landsReset) dxf.push(p); return; }
+    if (p.kind === 'DXF') {
+      const phase = p.phase === 'QH' ? 'QH' : 'HT';
+      if (landsReset === true || phase === resetPhase) return;
+      dxf.push(p);
+      return;
+    }
     const phase = p.phase === 'QH' ? 'QH' : 'HT';
     if (infraReset === phase) return;
     infra.set(`${phase}|${p.id}`, p);
@@ -387,18 +394,32 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
   let via = written.via;
   if (registry) {
     const indexed = await updateIndex(cur => {
+      const prevEntry = (cur.projects || []).find(p => p && p.tenQH === name && !p.deleted) || {};
       const projects = (cur.projects || []).filter(p => p.tenQH !== name);
+      const keep = !!registry.keepBoundary;
+      const boundary = keep ? (prevEntry.boundary || null) : (registry.boundary || null);
+      const boundarySource = keep
+        ? (prevEntry.boundarySource || (prevEntry.boundary ? 'auto' : null))
+        : (registry.boundarySource || (boundary ? 'auto' : null));
+      const landArea = {};
+      dxf.forEach(p => {
+        if (!p.ward || !(Number(p.area) > 0)) return;
+        const row = landArea[p.ward] || (landArea[p.ward] = {});
+        const key = p.nhom || 'Đất khác';
+        row[key] = Math.round(((row[key] || 0) + Number(p.area)) * 10) / 10;
+      });
       projects.push({
         tenQH: name,
         slug,
-        file: fileName || name,
-        wards: registry.wards || [],
-        infra: registry.infra || 0,
-        lands: registry.lands || 0,
+        file: fileName || prevEntry.file || name,
+        wards: (registry.wards && registry.wards.length) ? registry.wards : (prevEntry.wards || []),
+        infra: infra.size,
+        lands: dxf.length,
         time: vnStamp(savedAt),
-        boundary: registry.boundary || null,
-        bbox: bboxOf(registry.boundary),
-        landArea: registry.landArea || {},
+        boundary,
+        boundarySource,
+        bbox: bboxOf(boundary),
+        landArea,
         legacy: false,
         saved: savedAt
       });
@@ -408,6 +429,37 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
     via = indexed.via;
   }
   return { slug, via, lands: dxf.length };
+}
+
+async function patchBoundary({ tenQH, boundary, boundarySource }) {
+  const name = String(tenQH || '').trim();
+  if (!name || !boundary) {
+    const err = new Error('Thiếu đồ án hoặc ranh giới');
+    err.status = 400;
+    throw err;
+  }
+  let slug = '';
+  const indexed = await updateIndex(cur => {
+    const projects = (cur.projects || []).slice();
+    const i = projects.findIndex(p => p && p.tenQH === name && !p.deleted);
+    if (i < 0) {
+      const err = new Error(`Chưa có đồ án «${name}» trong danh mục`);
+      err.status = 404;
+      throw err;
+    }
+    const prev = projects[i];
+    slug = prev.slug || projectSlug(name);
+    projects[i] = {
+      ...prev,
+      boundary,
+      boundarySource: boundarySource === 'auto' ? 'auto' : 'gis',
+      bbox: bboxOf(boundary),
+      time: vnStamp(),
+      legacy: false
+    };
+    return { ...cur, projects };
+  });
+  return { slug, via: indexed.via };
 }
 
 async function deleteProjectFiles(tenQH) {
@@ -619,6 +671,6 @@ async function wardParcels() {
 }
 
 module.exports = {
-  setTransport, projectTitle, projectSlug, catalog, saveChunk, deleteProjectFiles,
+  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, deleteProjectFiles,
   migratePage, lotsBySlug, legacyLots, wardParcels
 };

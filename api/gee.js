@@ -308,14 +308,19 @@ function parseLandArea(raw) {
   return out;
 }
 
-// Danh mục đồ án gửi kèm phần cuối của lần nhập: { boundary, wards, infra, lands, landArea }; null nếu không hợp lệ
+// Danh mục đồ án gửi kèm phần cuối của lần nhập.
+// boundarySource: gis (file ranh) | auto (dựng từ lô). keepBoundary: ghép hiện trạng, giữ ranh đang có.
 function parseCadRegistry(reg) {
   if (!reg || typeof reg !== 'object') return null;
   let boundary = parseCadGeometry(reg.boundary);
   if (boundary && JSON.stringify(boundary).length > CAD_GEOJSON_MAX_CHARS) boundary = null;
   const wards = (Array.isArray(reg.wards) ? reg.wards : []).slice(0, 12).map(w => sanitizeSheetText(w, 80)).filter(Boolean);
   const count = (v) => Math.max(0, Math.min(100000, Math.round(Number(v) || 0)));
-  return { boundary, wards, infra: count(reg.infra), lands: count(reg.lands), landArea: parseLandArea(reg.landArea) };
+  const boundarySource = reg.boundarySource === 'gis' ? 'gis' : reg.boundarySource === 'auto' ? 'auto' : null;
+  return {
+    boundary, boundarySource, keepBoundary: reg.keepBoundary === true,
+    wards, infra: count(reg.infra), lands: count(reg.lands), landArea: parseLandArea(reg.landArea)
+  };
 }
 
 // Mảnh phường phụ của lô vắt ranh: { ward, lat, lng, stages: [{ phase, area, geometry }] }, giai đoạn phải thuộc lô chính
@@ -1677,6 +1682,20 @@ module.exports = async (req, res) => {
       requirePostFromApp(req);
       await requireAdmin(req);
       const body = readJsonBody(req);
+      if (body.boundaryOnly) {
+        const registry = parseCadRegistry(body.registry);
+        const tenQH = sanitizeSheetText(body.tenQH, 120);
+        if (!tenQH || !registry || !registry.boundary) {
+          return res.status(400).json({ error: true, message: 'Thiếu tên đồ án hoặc ranh giới' });
+        }
+        try {
+          const saved = await projects.patchBoundary({ tenQH, boundary: registry.boundary, boundarySource: 'gis' });
+          invalidateAllCaches();
+          return res.status(200).json({ success: true, boundaryOnly: true, slug: saved.slug, bucket: saved.via });
+        } catch (err) {
+          return res.status(err.status || 500).json({ error: true, message: err.message || 'Không cập nhật được ranh' });
+        }
+      }
       const rawItems = Array.isArray(body.items) ? body.items : [];
       const rawLands = Array.isArray(body.lands) ? body.lands : [];
       if (!(rawItems.length + rawLands.length) || rawItems.length + rawLands.length > CAD_BATCH_MAX) {
@@ -1684,6 +1703,8 @@ module.exports = async (req, res) => {
       }
       const phase = body.phase === 'QH' ? 'QH' : 'HT';
       const fileName = sanitizeSheetText(body.fileName, 120) || 'DXF';
+      const tenQH = sanitizeSheetText(body.tenQH, 120) || projects.projectTitle(fileName);
+      const landsReset = body.landsReset === 'HT' || body.landsReset === 'QH' ? body.landsReset : body.landsReset === true;
       const items = [];
       for (let i = 0; i < rawItems.length; i++) {
         const item = parseCadItem(rawItems[i], phase);
@@ -1696,7 +1717,9 @@ module.exports = async (req, res) => {
       const sheetItems = items.map(sheetItem);
       let result = { created: [], updated: [], skipped: [], lotIds: [] };
       if (sheetItems.length || registry || sync) {
-        const sheetReg = registry ? { boundary: registry.boundary, wards: registry.wards, infra: registry.infra, lands: registry.lands } : null;
+        const sheetReg = registry && !registry.keepBoundary
+          ? { boundary: registry.boundary, wards: registry.wards, infra: registry.infra, lands: registry.lands }
+          : null;
         result = await callAppsScript({ action: 'importCadBatch' }, {
           action: 'importCadBatch',
           phase,
@@ -1714,12 +1737,12 @@ module.exports = async (req, res) => {
         return res.status(502).json({ error: true, message: 'Apps Script chưa trả mã lô (lotIds). Deploy Code.gs → New version, rồi bấm Ghi lại để ghi tiếp.' });
       }
       const saved = await projects.saveChunk({
-        tenQH: projects.projectTitle(fileName),
+        tenQH,
         fileName,
         items,
         lotIds: result.lotIds || [],
         lands,
-        landsReset: body.landsReset === true,
+        landsReset,
         infraReset: body.infraReset === true ? phase : null,
         registry
       });
@@ -1750,6 +1773,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({
         success: true,
         infra: Number(result.infra) || 0,
+        restored: Number(result.restored) || 0,
         lands: Math.max(Number(result.lands) || 0, removed.landCount || 0),
         polygons: Number(result.polygons) || 0,
         slug: removed.slug

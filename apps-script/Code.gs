@@ -16,6 +16,13 @@ const CAD_HEADERS = ["ID_DoiTuong", "Layer", "DienTich", "File", "ThoiGianNhap",
 // Danh mục đồ án: 1 dòng / đồ án (Ten_QH), ranh tổng dựng ở webapp khi nhập; xóa đồ án thì xóa dòng
 const PROJECT_SHEET_NAME = "DS_DoAn";
 const PROJECT_HEADERS = ["Ten_QH", "File", "Phuong", "SoCongTrinh", "SoLoDat", "ThoiGianNhap", "Geojson"];
+// Sao lưu dòng hạ tầng có sẵn trước khi đồ án ghi đè (lần đầu đồ án chạm vào dòng). Xóa đồ án: dòng có sao lưu được
+// ghi trả giá trị cũ thay vì xóa. Tab ẩn; GiaTriCu = JSON { tên cột: { v | f (công thức) | d (ngày ISO) } }
+const BACKUP_SHEET_NAME = "DoAn_SaoLuu";
+const BACKUP_HEADERS = ["Ten_QH", "Tab", "ID_DoiTuong", "ThoiGian", "GiaTriCu", "GeojsonCu"];
+// Các cột importCadBatch có thể ghi đè trên dòng có sẵn (Geojson lưu riêng cột GeojsonCu)
+const BACKUP_COL_KEYS = ["lat", "lng", "ward", "nhom", "quyMoHT", "quyMoQH", "tenQH", "trangThai", "thoiGian", "ghiChu",
+  "tangCao", "matDoXD", "heSoSDD"];
 const VALID_PREFIXES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-THPT", "7-YT", "8-VH", "9-TM", "10-PCCC", "11-NT", "12-CSD", "13-BUS", "14-NOXH"];
 
 // Mạng lưới hạ tầng khác (QCVN 01:2026 Mục 2.8.3.3, 2.5.13.1, 2.12): tab tự tạo khi ghi điểm đầu tiên
@@ -977,6 +984,7 @@ function importCadBatch(body) {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
+    var backup = readProjectBackup(ss, project);
     var ctx = {};
     var getCtx = function(typeCode) {
       if (ctx.hasOwnProperty(typeCode)) return ctx[typeCode];
@@ -1037,6 +1045,8 @@ function importCadBatch(body) {
         // Cập nhật từng ô (không ghi đè cả dòng để giữ công thức/định dạng sẵn có)
         id = it.matchId;
         var sheetRow = r + 1;
+        // Dòng đã thuộc đồ án này (do đồ án tạo hoặc đã sao lưu ở lần nhập trước) thì không sao lưu lại
+        if (String(cellAt(c.data[r], c.col.tenQH) || '').trim() !== project) snapshotRow(backup, c, r, project, currentTime);
         var prevNote = String(cellAt(c.data[r], c.col.ghiChu) || '').trim();
         c.sheet.getRange(sheetRow, c.col.lat + 1).setValue(Number(it.lat));
         c.sheet.getRange(sheetRow, c.col.lng + 1).setValue(Number(it.lng));
@@ -1097,6 +1107,7 @@ function importCadBatch(body) {
       target.setValues(c.newRows);
     });
 
+    appendProjectBackup(ss, backup);
     upsertCadPolygons(ss, polygons, fileName, currentTime, filePhase || phase);
     landCount = body.skipDxf === true ? 0 : writeDxfLands(ss, body.lands, project, filePhase || phase, currentTime, body.landsReset === true);
     if (body.registry) upsertProjectRegistry(ss, project, fileName, body.registry, currentTime);
@@ -1589,20 +1600,93 @@ function deleteRowBlocks(sheet, rows) {
   }
 }
 
+// { keys: { "tab|id": true }, rows: [{ row, key, values, geojson }] sao lưu sẵn có của đồ án, pending: hàng chờ ghi }
+function readProjectBackup(ss, project) {
+  var out = { keys: {}, rows: [], pending: [] };
+  var sheet = ss.getSheetByName(BACKUP_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return out;
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, BACKUP_HEADERS.length).getValues().forEach(function(v, i) {
+    if (String(v[0] || '').trim() !== project) return;
+    var key = String(v[1]).trim() + '|' + String(v[2]).trim();
+    out.keys[key] = true;
+    out.rows.push({ row: i + 2, key: key, values: v[4], geojson: v[5] });
+  });
+  return out;
+}
+
+function snapshotRow(backup, c, r, project, currentTime) {
+  var tab = String(c.sheet.getName()).trim();
+  var id = String(cellAt(c.data[r], c.col.id) || '').trim();
+  var key = tab + '|' + id;
+  if (!id || backup.keys[key]) return;
+  var headers = c.data[0];
+  var formulas = c.sheet.getRange(r + 1, 1, 1, headers.length).getFormulas()[0];
+  var old = {};
+  BACKUP_COL_KEYS.forEach(function(k) {
+    var idx = c.col[k];
+    if (idx === undefined || idx < 0) return;
+    var v = c.data[r][idx];
+    old[String(headers[idx]).trim()] = formulas[idx] ? { f: formulas[idx] } : v instanceof Date ? { d: v.toISOString() } : { v: v };
+  });
+  var geo = '';
+  if (c.col.geojson >= 0 && !formulas[c.col.geojson]) {
+    old[String(headers[c.col.geojson]).trim()] = { g: true };
+    geo = String(c.data[r][c.col.geojson] || '');
+  }
+  backup.keys[key] = true;
+  backup.pending.push([project, tab, id, currentTime, JSON.stringify(old), geo]);
+}
+
+function appendProjectBackup(ss, backup) {
+  if (!backup.pending.length) return;
+  var sheet = ss.getSheetByName(BACKUP_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(BACKUP_SHEET_NAME);
+    sheet.getRange(1, 1, 1, BACKUP_HEADERS.length).setValues([BACKUP_HEADERS]).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    sheet.hideSheet();
+  }
+  var start = sheet.getLastRow() + 1;
+  sheet.getRange(start, 5, backup.pending.length, 2).setNumberFormat("@");
+  sheet.getRange(start, 1, backup.pending.length, BACKUP_HEADERS.length).setValues(backup.pending);
+  backup.pending = [];
+}
+
+// Ghi trả giá trị cũ theo tên cột (cột đã đổi chỗ vẫn đúng; cột đã bị xóa thì bỏ qua)
+function restoreRow(sheet, headers, rowNum, entry) {
+  var old;
+  try { old = JSON.parse(entry.values || '{}'); } catch (e) { return false; }
+  Object.keys(old).forEach(function(h) {
+    var idx = headers.indexOf(h);
+    if (idx < 0) return;
+    var cell = sheet.getRange(rowNum, idx + 1);
+    var o = old[h] || {};
+    if (o.g) cell.setValue(String(entry.geojson || ''));
+    else if (o.f) cell.setFormula(o.f);
+    else if (o.d) cell.setValue(new Date(o.d));
+    else cell.setValue(o.v === undefined || o.v === null ? '' : o.v);
+  });
+  return true;
+}
+
 /**
- * Xóa toàn bộ 1 đồ án (body.project = Ten_QH): mọi dòng Ten_QH = đồ án ở các tab hạ tầng (kể cả dòng có từ trước
- * và dòng mảnh phường), tab DXF-NN của đồ án, ranh CAD_Polygon của các dòng đó / nhập từ file đồ án, dòng DS_DoAn.
+ * Xóa toàn bộ 1 đồ án (body.project = Ten_QH) ở các tab hạ tầng: dòng do đồ án tạo (kể cả dòng mảnh phường) bị xóa;
+ * dòng có sẵn mà đồ án đã ghi đè (có sao lưu ở DoAn_SaoLuu) được ghi trả giá trị cũ. Xóa thêm tab DXF-NN của đồ án,
+ * ranh CAD_Polygon của các dòng bị xóa / nhập từ file đồ án, dòng DS_DoAn và sao lưu của đồ án.
  */
 function deleteProject(body) {
   var project = String(body.project || '').trim();
   if (!project) return { "error": "Thiếu tên đồ án" };
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ids = {};
-  var infra = 0, lands = 0, polygons = 0;
+  var infra = 0, lands = 0, polygons = 0, restored = 0;
   var tabs = [];
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
+    var backup = readProjectBackup(ss, project);
+    var entryOf = {};
+    backup.rows.forEach(function(e) { entryOf[e.key] = e; });
     ss.getSheets().forEach(function(sheet) {
       var name = String(sheet.getName()).trim();
       var dxf = /^DXF-\d+$/i.test(name);
@@ -1610,11 +1694,17 @@ function deleteProject(body) {
       var data = sheet.getDataRange().getValues();
       var col = getColumnMap(data[0]);
       if (col.tenQH < 0) return;
+      var headers = data[0].map(function(h) { return String(h).trim(); });
       var rows = [];
       for (var r = 1; r < data.length; r++) {
         if (String(data[r][col.tenQH] || '').trim() !== project) continue;
+        if (!dxf && col.id >= 0) {
+          var id = String(data[r][col.id] || '').trim();
+          var entry = entryOf[name + '|' + id];
+          if (entry && restoreRow(sheet, headers, r + 1, entry)) { restored++; continue; }
+          ids[id] = true;
+        }
         rows.push(r + 1);
-        if (!dxf && col.id >= 0) ids[String(data[r][col.id] || '').trim()] = true;
       }
       if (!rows.length) return;
       if (dxf) lands += rows.length; else infra += rows.length;
@@ -1644,11 +1734,14 @@ function deleteProject(body) {
       });
       deleteRowBlocks(reg, regRows);
     }
+
+    var bak = ss.getSheetByName(BACKUP_SHEET_NAME);
+    if (bak && backup.rows.length) deleteRowBlocks(bak, backup.rows.map(function(e) { return e.row; }));
     SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
   }
 
   syncSheetsToGCS(body.syncCad !== false);
-  return { "success": true, "infra": infra, "lands": lands, "polygons": polygons, "tabs": tabs };
+  return { "success": true, "infra": infra, "restored": restored, "lands": lands, "polygons": polygons, "tabs": tabs };
 }
