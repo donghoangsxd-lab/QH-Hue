@@ -1099,7 +1099,7 @@ function infraLotShape(lot, item, m, detailed) {
   bindNameTip(shape, item);
   shape.on('click', () => {
     if (isBusyTool()) return;
-    onPointClick(item, m);
+    onPointClick(item, m, lot.geometry);
   });
   return shape;
 }
