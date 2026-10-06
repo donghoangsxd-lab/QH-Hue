@@ -17,6 +17,7 @@ import {
   getCoveredRightWidth, highlightPlanWard, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, onCompareChange
 } from './planMap.js';
+import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject } from './projectFiles.js';
 
 export let map = null;
 export let measureLayerGroup = null;
@@ -192,7 +193,9 @@ export function initMap() {
   layers.c7.addTo(map); layers.c8.addTo(map); layers.c9.addTo(map); layers.c14.addTo(map);
 
   map.on('zoomend', updateWardLabelFontSize);
-  map.on('moveend', refreshLeftSoon);
+  map.on('moveend', () => { refreshLeftSoon(); scheduleLots(); });
+  bindProjectFiles(() => map, PARCEL_MIN_ZOOM);
+  onChangeLots(() => { redrawParcels(); redrawLands(); });
   updateWardLabelFontSize();
   onCompareChange(handleCompareChange);
   renderTt16Legend(document.getElementById('parcelLegend'));
@@ -1029,38 +1032,32 @@ function redrawParcels() {
   planRenderer.reset();
 }
 
-/** Tải ranh lô từ máy chủ (cad_parcels.json qua cache ETag); lỗi thì giữ ranh đang có */
+/** Tải danh mục đồ án (index.json, không tải lô). Lô từng đồ án tải khi phóng tới / vào khung nhìn. */
 export async function loadCadParcels() {
   try {
-    const res = await fetch(geeApi('action=getCadParcels'));
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const next = new Map();
-    const lands = [];
-    const projects = [];
-    (data.parcels || []).forEach(p => {
-      if (!p || !p.id || !p.geometry) return;
-      if (p.kind === 'PROJECT') return projects.push(p);
-      const phase = p.phase === 'QH' ? 'QH' : 'HT';
-      if (p.kind === 'DXF') lands.push({ ...p, phase });
-      else next.set(`${phase}|${p.id}`, { geometry: p.geometry, layer: p.layer || '', file: p.file || '' });
-    });
-    state.cadParcels = next;
-    state.landParcels = lands;
-    state.projectAreas = projects;
+    await loadCatalog();
   } catch (err) {
-    console.warn('Không tải được ranh lô CAD:', err);
+    console.warn('Không tải được danh mục đồ án:', err);
     return;
   }
+  composeNow();
   redrawParcels();
   redrawLands();
   document.dispatchEvent(new CustomEvent('cadparcels:loaded'));
+  scheduleLots();
 }
 
-/** Lớp Đồ án quy hoạch đổi (bật/tắt, ẩn 1 đồ án, qua ngưỡng zoom): vẽ lại ranh lô công trình và lô đất DXF */
+/** Lớp Đồ án quy hoạch đổi (bật/tắt, ẩn 1 đồ án, qua ngưỡng zoom): vẽ lại ranh lô công trình và lô đất */
 export function refreshProjectLots() {
+  composeNow();
   redrawParcels();
   redrawLands();
+  scheduleLots();
+}
+
+/** Bấm phóng tới: tải file đồ án đó rồi mới vẽ lô */
+export function focusProjectLots(name) {
+  return focusProject(name);
 }
 
 export function setParcelsVisible(on) {
@@ -1112,11 +1109,11 @@ function drawLandsOn(m, list) {
   landGroups.set(m, group);
 }
 
-// showLand (khung Thẩm định đồ án) vẽ mọi lô ở mọi mức zoom; lớp Đồ án quy hoạch chỉ vẽ lô của đồ án đang hiện, từ PARCEL_MIN_ZOOM
+// showLand (khung Thẩm định) vẽ lô đất các đồ án đang giao khung nhìn, mọi mức zoom.
+// Lớp Đồ án quy hoạch chỉ vẽ lô của đồ án đang hiện, từ PARCEL_MIN_ZOOM. Danh sách đã lọc lúc tải file.
 function redrawLands() {
   const byProject = state.showProjects && map && map.getZoom() >= PARCEL_MIN_ZOOM;
-  const lands = state.showLand ? state.landParcels
-    : byProject ? state.landParcels.filter(p => !state.hiddenProjects.has(p.file)) : [];
+  const lands = (state.showLand || byProject) ? state.landParcels : [];
   const compare = isCompareOn() && !!planMap;
   if (map) drawLandsOn(map, compare ? lands.filter(p => p.phase === 'HT') : lands);
   if (planMap) drawLandsOn(planMap, compare ? lands.filter(p => p.phase === 'QH') : []);
@@ -1124,7 +1121,9 @@ function redrawLands() {
 
 export function setLandVisible(on) {
   state.showLand = !!on;
+  composeNow();
   redrawLands();
+  scheduleLots();
 }
 
 // ============================ HEATMAP ============================

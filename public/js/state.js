@@ -15,13 +15,16 @@ export const state = {
   planDataList: [],
   // Tăng mỗi khi danh sách công trình hoặc trạng thái duyệt thay đổi (làm mới các kết quả lọc đã ghi nhớ)
   dataVersion: 0,
-  // Ranh lô đất nhập từ DXF: "HT|<ID_DoiTuong>" / "QH|<ID_DoiTuong>" → GeoJSON geometry
+  // Ranh lô đang vẽ: "HT|<ID>" / "QH|<ID>" → { geometry, layer, file }. Chỉ lô trong khung nhìn (projectFiles.js)
   cadParcels: new Map(),
   showParcels: false,
-  // Ranh đất không thuộc 13 nhóm hạ tầng (sheet DXF-*), tắt khi mở bản đồ
+  // Lô đất ngoài nhóm hạ tầng của đồ án đang xem, tắt khi mở bản đồ
   landParcels: [],
   showLand: false,
-  // Lớp Đồ án quy hoạch (projectLayer.js): ranh tổng từ tab DS_DoAn [{ id: Ten_QH, ward, infraCount, landCount, time, geometry }],
+  // Danh mục đồ án từ projects/index.json (kèm đồ án cũ còn trong cad_parcels đến khi chuyển xong)
+  projectCatalog: [],
+  projectBase: '',
+  // Ranh tổng [{ id: Ten_QH, ward, infraCount, landCount, time, geometry }]
   // đồ án người dùng ẩn (Ten_QH, lưu localStorage)
   projectAreas: [],
   showProjects: false,

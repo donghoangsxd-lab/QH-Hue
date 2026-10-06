@@ -1,9 +1,11 @@
 // =========================================================================
 // GOOGLE APPS SCRIPT: HTXH-HUE (TỐI ƯU BATCH IN-MEMORY & LOCKSERVICE)
 // Quy mô tách 2 cột: QuyMo_HT (hiện trạng) & QuyMo_QH (quy hoạch)
-// Nhập hàng loạt từ DXF: doPost action=importCadBatch; lô hạ tầng ghi vào 13 tab (cột M Geojson),
-// lô đất khác ghi tab DXF-NN của đồ án (Ten_QH); ranh lô + ranh tổng đồ án (tab DS_DoAn) xuất ra cad_parcels.json.
-// Xóa đồ án: doPost action=deleteProject
+// Nhập hàng loạt từ DXF: doPost action=importCadBatch; công trình hạ tầng ghi vào các tab loại (cột Geojson, Ten_QH).
+// Lô đất ngoài nhóm hạ tầng không ghi tab DXF-NN — webapp ghi file projects/<slug>.json trên bucket.
+// Tab DXF-NN cũ vẫn xóa cùng đồ án. Ranh tổng đồ án vẫn ở tab DS_DoAn.
+// syncCad = false: chỉ dựng lại infrastructure_hue.json, không dựng lại cad_parcels.json.
+// Xóa đồ án: doPost action=deleteProject. putBucketObject / deleteBucketObject: ghi file bucket khi Vercel chưa có quyền.
 // =========================================================================
 
 const BUCKET_NAME = "hue-infra-data-us";
@@ -432,7 +434,8 @@ function uploadToGCS(content, fileName) {
 }
 
 // 1. TỰ ĐỘNG ĐÓNG GÓI GEOJSON VÀ UPLOAD LÊN BUCKET (XỬ LÝ MẢNG IN-MEMORY)
-function syncSheetsToGCS() {
+// includeCad = false: chỉ infrastructure_hue.json (nhập / xóa một đồ án không dựng lại cad_parcels.json)
+function syncSheetsToGCS(includeCad) {
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(10000);
@@ -443,9 +446,11 @@ function syncSheetsToGCS() {
     Logger.log("📊 TỔNG SỐ DỮ LIỆU ĐÓNG GÓI BẢN ĐỒ: " + features.length);
     uploadToGCS(JSON.stringify({ "type": "FeatureCollection", "features": features }));
 
-    var cadFeatures = collectCadFeatures(ss, features);
-    if (cadFeatures) {
-      uploadToGCS(JSON.stringify({ "type": "FeatureCollection", "features": cadFeatures }), CAD_FILE_NAME);
+    if (includeCad !== false) {
+      var cadFeatures = collectCadFeatures(ss, features);
+      if (cadFeatures) {
+        uploadToGCS(JSON.stringify({ "type": "FeatureCollection", "features": cadFeatures }), CAD_FILE_NAME);
+      }
     }
 
   } catch (err) {
@@ -853,6 +858,8 @@ function doPost(e) {
     if (action === "importCadBatch") return jsonOutput(importCadBatch(body));
     if (action === "markWardNotes") return jsonOutput(markWardNotes(body));
     if (action === "deleteProject") return jsonOutput(deleteProject(body));
+    if (action === "putBucketObject") return jsonOutput(putBucketObject(body));
+    if (action === "deleteBucketObject") return jsonOutput(deleteBucketObject(body));
     if (action === "saveRoads") return jsonOutput(saveRoads(body));
     if (action === "savePopEdits") return jsonOutput(savePopEdits(body));
     if (action === "saveDrainage") return jsonOutput(saveDrainage(body));
@@ -879,8 +886,9 @@ function doPost(e) {
  * - matchId có trong Sheet → cập nhật tọa độ, phường, quy mô các giai đoạn đang nhập; không có → thêm dòng mới
  * - File HT-*.dxf ghi mọi lô vào QuyMo_HT; file QH-*.dxf ghi mọi lô vào QuyMo_QH (kể cả layer có tiền tố HT)
  * - Trùng điểm: giữ tên trên Sheet, ghi đè lat/lng bằng tâm polygon mới; Ten_QH và Geojson lấy từ file
- * - Layer không thuộc 13 nhóm hạ tầng → body.lands, ghi sheet DXF-NN theo tên đồ án
- * - sync = false: chưa đẩy lên bucket (máy chủ gửi nhiều phần, chỉ phần cuối đồng bộ)
+ * - Layer không thuộc nhóm hạ tầng: webapp ghi file projects/<slug>.json, không gửi lands (skipDxf = true, không tạo tab DXF-NN)
+ * - sync = false: chưa đẩy infrastructure_hue.json. syncCad = false: không dựng lại cad_parcels.json
+ * - lotIds: mã lô cùng thứ tự items (null nếu bỏ qua) để webapp gắn ranh vào file đồ án
  */
 function projectTitle(fileName) {
   var base = String(fileName || '').replace(/\.[^.]+$/, '').trim();
@@ -962,7 +970,7 @@ function importCadBatch(body) {
   var project = projectTitle(fileName);
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var currentTime = Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm:ss");
-  var created = [], updated = [], skipped = [], polygons = [];
+  var created = [], updated = [], skipped = [], polygons = [], lotIds = [];
   var landCount = 0;
 
   var needPlan = items.some(function(it) { return !!it.plan; });
@@ -994,6 +1002,7 @@ function importCadBatch(body) {
       var c = getCtx(sheetCodeOf(it));
       if (!c || c.col.id < 0 || c.col.lat < 0 || c.col.lng < 0) {
         skipped.push(it.layer + ": không có tab " + it.type + " hợp lệ");
+        lotIds.push(null);
         return;
       }
       var stages = Array.isArray(it.stages) && it.stages.length ? it.stages
@@ -1008,6 +1017,7 @@ function importCadBatch(body) {
         var qc = stages[k].phase === 'QH' ? c.col.quyMoQH : c.col.quyMoHT;
         if (qc < 0) {
           skipped.push(it.layer + ": tab " + c.sheet.getName() + " thiếu cột QuyMo_" + stages[k].phase);
+          lotIds.push(null);
           return;
         }
         qCols.push(qc);
@@ -1062,6 +1072,7 @@ function importCadBatch(body) {
         created.push(id);
       }
       writeWardSplits(c, id, it, stages, project, currentTime);
+      lotIds.push(id);
       stages.forEach(function(st) {
         if (st.geometry) polygons.push({ id: id, layer: st.layer, area: st.area, geometry: st.geometry, phase: st.phase });
       });
@@ -1087,15 +1098,15 @@ function importCadBatch(body) {
     });
 
     upsertCadPolygons(ss, polygons, fileName, currentTime, filePhase || phase);
-    landCount = writeDxfLands(ss, body.lands, project, filePhase || phase, currentTime, body.landsReset === true);
+    landCount = body.skipDxf === true ? 0 : writeDxfLands(ss, body.lands, project, filePhase || phase, currentTime, body.landsReset === true);
     if (body.registry) upsertProjectRegistry(ss, project, fileName, body.registry, currentTime);
     SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
   }
 
-  if (body.sync !== false) syncSheetsToGCS();
-  return { "success": true, "created": created, "updated": updated, "skipped": skipped, "polygons": polygons.length, "lands": landCount };
+  if (body.sync !== false) syncSheetsToGCS(body.syncCad !== false);
+  return { "success": true, "created": created, "updated": updated, "skipped": skipped, "polygons": polygons.length, "lands": landCount, "lotIds": lotIds };
 }
 
 /**
@@ -1218,6 +1229,40 @@ function savePopEdits(body) {
   var content = String(body.content || '');
   if (!content || content.length > 2000000) return { "error": "Dữ liệu vùng hiệu chỉnh dân cư rỗng hoặc quá lớn" };
   return { "success": true, "saved": uploadToGCS(content, "pop/edits.json") };
+}
+
+function bucketObjectNameOk(name) {
+  return name === "projects/index.json" || name === "cad_parcels.json" || /^projects\/[a-z0-9]+(?:-[a-z0-9]+)*\.json$/.test(name);
+}
+
+// Vercel dựng nội dung file đồ án; bản này chỉ đẩy lên bucket (không ghi Sheet). Dùng khi service account chưa có quyền ghi.
+function putBucketObject(body) {
+  var name = String(body.name || "");
+  var content = String(body.content || "");
+  if (!bucketObjectNameOk(name)) return { "error": "Tên file bucket không hợp lệ" };
+  if (!content || content.length > 40000000 || content.charAt(0) !== "{") return { "error": "Nội dung file rỗng, không phải JSON hoặc quá lớn" };
+  return { "success": true, "saved": uploadToGCS(content, name) };
+}
+
+function deleteBucketObject(body) {
+  var name = String(body.name || "");
+  if (!/^projects\/[a-z0-9]+(?:-[a-z0-9]+)*\.json$/.test(name) || name === "projects/index.json") {
+    return { "error": "Tên file bucket không hợp lệ" };
+  }
+  try {
+    var token = ScriptApp.getOAuthToken();
+    var url = "https://storage.googleapis.com/storage/v1/b/" + BUCKET_NAME + "/o/" + encodeURIComponent(name);
+    var res = UrlFetchApp.fetch(url, {
+      "method": "delete",
+      "headers": { "Authorization": "Bearer " + token },
+      "muteHttpExceptions": true
+    });
+    var code = res.getResponseCode();
+    if (code === 200 || code === 204 || code === 404) return { "success": true };
+    return { "error": "Xóa file bucket HTTP " + code };
+  } catch (err) {
+    return { "error": String(err) };
+  }
 }
 
 // HỒ SƠ FILE CHỜ DUYỆT: người dùng chưa đăng nhập gửi DXF / KML / GeoJSON ≤ 2 MB (máy chủ webapp đã kiểm tra định dạng,
@@ -1604,6 +1649,6 @@ function deleteProject(body) {
     lock.releaseLock();
   }
 
-  syncSheetsToGCS();
+  syncSheetsToGCS(body.syncCad !== false);
   return { "success": true, "infra": infra, "lands": lands, "polygons": polygons, "tabs": tabs };
 }

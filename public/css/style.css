@@ -447,6 +447,8 @@ body.right-collapsed .right-panel {
 .project-btn:hover:not(:disabled) { border-color: var(--border-color); background: var(--bg-hover); color: var(--accent-cyan); }
 .project-btn.danger:hover:not(:disabled) { color: var(--accent-red); border-color: rgba(var(--red-rgb), 0.5); }
 .project-btn:disabled { opacity: 0.4; cursor: wait; }
+.project-migrate { display: block; width: 100%; margin: 0 0 4px; padding: 3px 6px; font-size: var(--fs-sm); text-align: left; border: 1px dashed rgba(232, 121, 249, 0.65); border-radius: var(--r-md); background: transparent; color: var(--text-muted); cursor: pointer; }
+.project-migrate:disabled { opacity: 0.5; cursor: wait; }
 .road-legend.layer-legend { margin: 0 0 4px 22px; flex-wrap: wrap; row-gap: 2px; }
 .terrain-legend { margin: 0 6px 6px 22px; font-size: var(--fs-xs); color: var(--text-muted); }
 .terrain-legend-bar { height: 8px; border-radius: var(--r-sm); }

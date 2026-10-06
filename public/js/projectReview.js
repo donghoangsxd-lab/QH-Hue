@@ -896,7 +896,7 @@ function renderHost() {
       <div class="review-head-btns review-noprint">
         <label class="review-toggle"><input type="checkbox" data-show="HT"${show.HT ? ' checked' : ''}>Hiện trạng</label>
         <label class="review-toggle"><input type="checkbox" data-show="QH"${show.QH ? ' checked' : ''}>Quy hoạch</label>
-        <label class="review-toggle" title="Lô đất ngoài 14 nhóm hạ tầng của các đồ án đã lưu vào Sheet (tab DXF-NN): đất ở, cơ quan, an ninh, quốc phòng, di tích, tôn giáo... để đối chiếu với đồ án đang thẩm định"><input type="checkbox" data-show-land${state.showLand ? ' checked' : ''}>Đồ án đã lưu (DXF)</label>
+        <label class="review-toggle" title="Lô đất ngoài nhóm hạ tầng của đồ án đã lưu, giao với khung nhìn (file trên bucket; đồ án cũ vẫn đọc được tới khi chuyển xong)"><input type="checkbox" data-show-land${state.showLand ? ' checked' : ''}>Đồ án đã lưu</label>
         <button type="button" class="bp-btn${isCompareOn() ? ' on' : ''}" id="btnReviewCompare" title="Chia đôi màn hình: hiện trạng bên trái, quy hoạch bên phải">${ico('compare')}Chia đôi</button>
         <button type="button" class="bp-btn" id="btnReviewPrint" title="Lưu bảng thẩm định ra file PDF">${ico('printer')}In PDF</button>
         ${sizeBtnsHtml()}

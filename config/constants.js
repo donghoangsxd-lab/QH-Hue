@@ -196,9 +196,13 @@ const PROD_ORIGIN = "https://web-hatang-hue-4.vercel.app";
 const constants = {
   WARD_STATS_CACHE_TTL: 15 * 60 * 1000, // Cache Wards 15 phút
   WARD_GEOMETRY_CACHE_TTL: 6 * 60 * 60 * 1000, // Ranh giới phường gần như không đổi
+  GCS_BUCKET: "hue-infra-data-us",
+  GCS_PUBLIC_BASE: "https://storage.googleapis.com/hue-infra-data-us/",
   GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/infrastructure_hue.json",
-  // Ranh lô đất nhập từ DXF (Apps Script dựng từ tab CAD_Polygon)
+  // Ranh lô công trình không thuộc đồ án (luồng phường). Đồ án nằm ở projects/<slug>.json
   CAD_GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/cad_parcels.json",
+  // Danh mục đồ án + ranh tổng: projects/index.json. Client nhận URL này từ API, không gắn cứng.
+  PROJECTS_GCS_BASE: "https://storage.googleapis.com/hue-infra-data-us/projects/",
   // Hồ sơ file chờ duyệt do người dùng chưa đăng nhập gửi (Apps Script ghi: index.json + <id>.<dxf|kml|geojson>)
   PENDING_CAD_BASE: "https://storage.googleapis.com/hue-infra-data-us/pending/cad/",
   // Mạng lưới thoát nước, khe tụ thủy (TopoJSON, đường vẽ xuôi dòng; scripts/push-thoatnuoc.js đẩy lên)

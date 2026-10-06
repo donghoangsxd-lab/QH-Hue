@@ -1,7 +1,7 @@
 // Lớp Đồ án quy hoạch (panel Lớp dữ liệu): mỗi đồ án (Ten_QH) bật/tắt riêng, phóng tới, Admin xóa toàn bộ đồ án.
 // Zoom < PARCEL_MIN_ZOOM chỉ vẽ ranh tổng đồ án; từ ngưỡng đó vẽ ranh lô (mapEngine.js) và bỏ ranh tổng.
 import { state } from './state.js';
-import { map, PARCEL_MIN_ZOOM, refreshProjectLots } from './mapEngine.js';
+import { map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels } from './mapEngine.js';
 import { planMap, onCompareChange } from './planMap.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
@@ -101,32 +101,25 @@ function saveHidden() {
   try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...state.hiddenProjects])); } catch (e) { /* chế độ riêng tư */ }
 }
 
-// Gom theo Ten_QH: công trình hạ tầng (kèm ranh lô), lô đất DXF, ranh tổng ở tab DS_DoAn
+// Danh mục lấy từ index (không cần đã tải ranh từng lô). infra/lands là số đếm { size }
 function collectProjects() {
-  const byName = new Map();
-  const get = (name) => {
-    let p = byName.get(name);
-    if (!p) byName.set(name, p = { name, infra: new Set(), lands: new Set(), shapes: [], points: [], area: null });
-    return p;
-  };
-  [...state.rawDataList, ...state.planDataList].forEach(it => {
-    const name = String(it.tenQH || '').trim();
-    if (!name) return;
-    const p = get(name);
-    if (p.infra.has(it.id)) return;
-    p.infra.add(it.id);
-    const lot = state.cadParcels.get(`HT|${it.id}`) || state.cadParcels.get(`QH|${it.id}`);
-    if (lot) p.shapes.push(lot.geometry);
-    else if (Number.isFinite(Number(it.lat)) && Number.isFinite(Number(it.lng))) p.points.push([Number(it.lng), Number(it.lat)]);
-  });
-  state.landParcels.forEach(l => {
-    if (!l.file) return;
-    const p = get(l.file);
-    p.lands.add(l.id);
-    p.shapes.push(l.geometry);
-  });
-  state.projectAreas.forEach(a => { get(a.id).area = a; });
-  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  return state.projectCatalog.map(p => ({
+    name: p.tenQH,
+    slug: p.slug || '',
+    legacy: !!p.legacy,
+    infra: { size: Number(p.infra) || 0 },
+    lands: { size: Number(p.lands) || 0 },
+    shapes: [],
+    points: [],
+    area: p.boundary ? {
+      id: p.tenQH,
+      geometry: p.boundary,
+      ward: Array.isArray(p.wards) ? p.wards.join(', ') : '',
+      time: p.time || '',
+      infraCount: Number(p.infra) || 0,
+      landCount: Number(p.lands) || 0
+    } : null
+  })).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
 }
 
 // Đồ án nhập trước khi có tab DS_DoAn: ranh tạm = bao lồi các lô / điểm (nhanh), nhập lại file để có ranh đúng
@@ -154,6 +147,7 @@ function zoomTo(p) {
   const b = boundsOf(p);
   if (!b || !b.isValid() || !map) return;
   map.fitBounds(b.pad(0.1), { maxZoom: PARCEL_MIN_ZOOM + 1 });
+  focusProjectLots(p.name);
 }
 
 function metaText(p) {
@@ -170,16 +164,22 @@ function renderList() {
   box.hidden = !state.showProjects || !projects.length;
   if (box.hidden) { box.innerHTML = ''; return; }
   const admin = isAdmin();
-  box.innerHTML = projects.map((p, idx) => {
+  const legacyN = projects.filter(p => p.legacy).length;
+  const migrating = busy === '__migrate__';
+  const migrateBtn = admin && legacyN
+    ? `<button type="button" class="project-migrate" data-migrate ${migrating || busy ? ' disabled' : ''}>${migrating ? 'Đang chuyển…' : `Chuyển ${legacyN} đồ án cũ lên bucket`}</button>`
+    : '';
+  box.innerHTML = migrateBtn + projects.map((p, idx) => {
     const on = !state.hiddenProjects.has(p.name);
     const deleting = busy === p.name;
     const tempNote = p.area ? '' : ' · ranh tạm (bao lồi) — nhập lại file để có ranh đúng';
+    const where = p.legacy ? 'còn ở file cad_parcels' : 'file riêng trên bucket';
     return `<div class="project-row${on ? '' : ' is-off'}">
       <label class="project-name" title="${escapeHtml(p.name)}${p.area?.ward ? ` — ${escapeHtml(p.area.ward)}` : ''}">
         <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><span>${escapeHtml(p.name)}</span></label>
-      <small class="project-meta" title="Công trình hạ tầng có Ten_QH = đồ án · lô đất ở tab DXF của đồ án${tempNote}">${metaText(p)}${p.area ? '' : ' *'}</small>
+      <small class="project-meta" title="Số đếm theo danh mục đồ án (${where})${tempNote}">${metaText(p)}${p.area ? '' : ' *'}${p.legacy ? ' · cũ' : ''}</small>
       <button type="button" class="project-btn" data-zoom="${idx}" title="Phóng tới đồ án" aria-label="Phóng tới đồ án">${ico('locate')}</button>
-      ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án khỏi Google Sheet" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
+      ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
     </div>`;
   }).join('');
 }
@@ -238,10 +238,10 @@ function rebuild() {
 
 async function deleteProject(p) {
   if (!isAdmin() || busy) return;
-  const typed = prompt(`XÓA TOÀN BỘ ĐỒ ÁN «${p.name}» khỏi Google Sheet:\n`
+  const typed = prompt(`XÓA TOÀN BỘ ĐỒ ÁN «${p.name}»:\n`
     + `• ${p.infra.size} công trình hạ tầng có Ten_QH = đồ án (kể cả công trình có từ trước đã gán vào đồ án)\n`
-    + `• ${p.lands.size} lô đất ở tab DXF của đồ án\n`
-    + '• ranh lô trên CAD_Polygon và dòng danh mục DS_DoAn\n\n'
+    + `• ${p.lands.size} lô đất của đồ án (file trên bucket${p.legacy ? ' / tab DXF cũ' : ''})\n`
+    + '• ranh lô trên CAD_Polygon, dòng danh mục DS_DoAn và file projects của đồ án\n\n'
     + 'Không hoàn tác được. Gõ đúng tên đồ án để xác nhận:');
   if (typed === null) return;
   if (typed.trim() !== p.name) { alert('Tên đồ án không khớp, chưa xóa.'); return; }
@@ -264,6 +264,44 @@ async function deleteProject(p) {
     if (onDeleted) await onDeleted();
   } catch (err) {
     alert(`Không xóa được đồ án: ${err.message}`);
+  } finally {
+    busy = null;
+    renderList();
+  }
+}
+
+async function migrateLegacy() {
+  if (!isAdmin() || busy) return;
+  const n = projects.filter(p => p.legacy).length;
+  if (!n) return;
+  if (!confirm(`Chuyển ${n} đồ án còn trong cad_parcels.json sang file riêng trên bucket?\n\nNên bật Object versioning của bucket trước. Trong lúc chuyển, bản đồ vẫn đọc dữ liệu cũ.`)) return;
+  busy = '__migrate__';
+  renderList();
+  try {
+    let cursor = 0;
+    let total = 1;
+    let last = {};
+    while (cursor < total) {
+      const prev = cursor;
+      const res = await fetch(geeApi('action=migrateProjects'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+        body: JSON.stringify({ cursor })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) signOutAdmin();
+      if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+      cursor = Number(data.cursor) || 0;
+      total = Number(data.total) || 0;
+      last = data;
+      if (data.done) break;
+      if (cursor <= prev) throw new Error('Máy chủ không chuyển tiếp được');
+    }
+    alert(`Đã chuyển ${last.projects != null ? last.projects : n} đồ án lên bucket${last.wardParcels != null ? `. Ranh lô theo phường còn ${last.wardParcels}` : ''}.`);
+    await loadCadParcels();
+    rebuild();
+  } catch (err) {
+    alert(`Chưa chuyển xong: ${err.message}. Bấm lại để chuyển tiếp.`);
   } finally {
     busy = null;
     renderList();
@@ -294,6 +332,7 @@ export function initProjectLayer(opts = {}) {
     refreshAll();
   });
   $('projectList')?.addEventListener('click', (e) => {
+    if (e.target.closest('[data-migrate]')) { migrateLegacy(); return; }
     const zoom = e.target.closest('[data-zoom]');
     if (zoom) { const p = projects[Number(zoom.dataset.zoom)]; if (p) zoomTo(p); return; }
     const del = e.target.closest('[data-del]');

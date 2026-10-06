@@ -1143,6 +1143,22 @@ function importSummary(items) {
   return `${countText(kindCounts(items, format))}${skippedText ? ` (bỏ qua ${skippedText})` : ''}`;
 }
 
+function landAreaByWard() {
+  const out = {};
+  const add = (ward, nhom, area) => {
+    if (!ward || !(Number(area) > 0)) return;
+    const row = out[ward] || (out[ward] = {});
+    row[nhom] = Math.round(((row[nhom] || 0) + Number(area)) * 10) / 10;
+  };
+  current.result.parcels.forEach(p => {
+    if (parcelAction(p).key !== 'land' || isPoint(p)) return;
+    const nhom = landLabel(p.layer);
+    if (p.wardParts && p.wardParts.length) p.wardParts.forEach(part => add(part.ward, nhom, part.area));
+    else add(p.ward, nhom, p.area);
+  });
+  return out;
+}
+
 // Ranh tổng dựng từ mọi lô trong TP. Huế của file (kể cả lô trùng đồ án khác / không ghi), không chỉ lô ghi lần này
 function projectRegistry(items, lands) {
   const geometries = current.result.parcels
@@ -1156,7 +1172,8 @@ function projectRegistry(items, lands) {
     boundary: projectBoundary(geometries),
     wards: [...new Set(wards.filter(Boolean))],
     infra: items.length,
-    lands: lands.length
+    lands: lands.length,
+    landArea: landAreaByWard()
   };
 }
 
@@ -1200,7 +1217,7 @@ async function submitImport() {
     const phaseLabel = current.filePhase === 'QH' ? 'Quy hoạch (QuyMo_QH) theo tên file'
       : current.filePhase === 'HT' ? 'Hiện trạng (QuyMo_HT) theo tên file'
         : phase === 'QH' ? 'Quy hoạch (QuyMo_QH)' : 'Hiện trạng (QuyMo_HT)';
-    const landNote = lands.length ? `\n• ${lands.length} lô đất ngoài nhóm hạ tầng → sheet DXF của đồ án` : '';
+    const landNote = lands.length ? `\n• ${lands.length} lô đất ngoài nhóm hạ tầng → file đồ án trên bucket (không ghi tab DXF)` : '';
     if (!confirm(`Ghi vào Google Sheet?\n• ${summary}\n• ${items.length - nUpdate} công trình mới, ${nUpdate} cập nhật (giữ tên, ghi đè tọa độ bằng tâm hatch)${landNote}\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
   }
 
@@ -1248,7 +1265,7 @@ async function writeChunks(job) {
       done.landsDropped += data.landsDropped || 0;
     }
     const extra = [
-      done.lands ? `${done.lands} lô đất vào sheet DXF` : '',
+      done.lands ? `${done.lands} lô đất vào file đồ án` : '',
       done.landsDropped ? `${done.landsDropped} lô đất không hợp lệ bị bỏ` : '',
       done.skipped.length ? `máy chủ bỏ qua ${done.skipped.length}: ${done.skipped.slice(0, 3).join('; ')}` : '',
       done.polygonsDropped ? `${done.polygonsDropped} lô ranh quá phức tạp chỉ ghi điểm tâm` : ''

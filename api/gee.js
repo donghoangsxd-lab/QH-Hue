@@ -7,6 +7,7 @@ const { requireAdmin, httpError } = require('../services/authService');
 const roads = require('../services/roadsService');
 const popEdits = require('../services/popEditsService');
 const sat = require('../services/satService');
+const projects = require('../services/projectStore');
 
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
@@ -269,8 +270,7 @@ function parseCadStage(s, fallbackLayer) {
   if (!phase || !Number.isFinite(area) || area > 1e8 || (point ? area !== 0 : area <= 0)) return null;
   const crossWard = !point && s.crossWard === true;
   const areaRounded = Math.round(area * 10) / 10;
-  let geometry = point ? null : parseCadGeometry(s.geometry);
-  if (geometry && JSON.stringify(geometry).length > CAD_GEOJSON_MAX_CHARS) geometry = null;
+  const geometry = point ? null : parseCadGeometry(s.geometry);
   return {
     phase, point, crossWard, area: areaRounded, size: crossWard ? 0 : areaRounded,
     layer: sanitizeSheetText(s.layer, 60) || fallbackLayer, geometry
@@ -290,14 +290,32 @@ function parseCadPlan(plan) {
 
 const CAD_SPLITS_MAX = 3;
 
-// Danh mục đồ án gửi kèm phần đầu của lần nhập: { boundary (ranh tổng), wards, infra, lands }; null nếu không hợp lệ
+function parseLandArea(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out = {};
+  Object.keys(raw).slice(0, 40).forEach(w => {
+    const ward = sanitizeSheetText(w, 80);
+    const types = raw[w];
+    if (!ward || !types || typeof types !== 'object' || Array.isArray(types)) return;
+    const row = {};
+    Object.keys(types).slice(0, 40).forEach(k => {
+      const label = sanitizeSheetText(k, 40);
+      const n = Number(types[k]);
+      if (label && Number.isFinite(n) && n >= 0 && n < 1e12) row[label] = Math.round(n * 10) / 10;
+    });
+    if (Object.keys(row).length) out[ward] = row;
+  });
+  return out;
+}
+
+// Danh mục đồ án gửi kèm phần cuối của lần nhập: { boundary, wards, infra, lands, landArea }; null nếu không hợp lệ
 function parseCadRegistry(reg) {
   if (!reg || typeof reg !== 'object') return null;
   let boundary = parseCadGeometry(reg.boundary);
   if (boundary && JSON.stringify(boundary).length > CAD_GEOJSON_MAX_CHARS) boundary = null;
   const wards = (Array.isArray(reg.wards) ? reg.wards : []).slice(0, 12).map(w => sanitizeSheetText(w, 80)).filter(Boolean);
   const count = (v) => Math.max(0, Math.min(100000, Math.round(Number(v) || 0)));
-  return { boundary, wards, infra: count(reg.infra), lands: count(reg.lands) };
+  return { boundary, wards, infra: count(reg.infra), lands: count(reg.lands), landArea: parseLandArea(reg.landArea) };
 }
 
 // Mảnh phường phụ của lô vắt ranh: { ward, lat, lng, stages: [{ phase, area, geometry }] }, giai đoạn phải thuộc lô chính
@@ -316,13 +334,14 @@ function parseCadSplits(raw, layer, phases) {
   return out;
 }
 
-// 1 lô đất ngoài 13 nhóm hạ tầng (ghi sheet DXF-NN của đồ án); null nếu không hợp lệ
+// 1 lô đất ngoài nhóm hạ tầng (ghi file đồ án trên bucket, không vào Sheet); null nếu không hợp lệ
 function parseLandItem(it) {
   if (!it || typeof it !== 'object') return null;
   const pt = parseCoordInBounds(it.lat, it.lng);
   const area = Number(it.area);
   const geometry = parseCadGeometry(it.geometry);
   if (!pt || !geometry || !Number.isFinite(area) || area <= 0 || area > 1e8) return null;
+  if (JSON.stringify(geometry).length > 2000000) return null;
   const layer = sanitizeSheetText(it.layer, 60);
   return {
     name: sanitizeSheetText(it.name, 150) || layer || 'Lô đất',
@@ -333,7 +352,25 @@ function parseLandItem(it) {
     area: Math.round(area * 10) / 10,
     phase: it.phase === 'QH' || it.phase === 'HT' ? it.phase : null,
     plan: parseCadPlan(it.plan),
-    geometry: JSON.stringify(geometry).length > CAD_GEOJSON_MAX_CHARS ? null : geometry
+    geometry
+  };
+}
+
+function sheetGeometry(geometry) {
+  if (!geometry) return null;
+  return JSON.stringify(geometry).length > CAD_GEOJSON_MAX_CHARS ? null : geometry;
+}
+
+// Ô Sheet tối đa 50.000 ký tự: ranh dài hơn vẫn giữ trong file đồ án, Sheet chỉ nhận điểm tâm
+function sheetItem(it) {
+  return {
+    ...it,
+    geometry: sheetGeometry(it.geometry),
+    stages: (it.stages || []).map(s => ({ ...s, geometry: sheetGeometry(s.geometry) })),
+    splits: (it.splits || []).map(sp => ({
+      ...sp,
+      stages: (sp.stages || []).map(s => ({ ...s, geometry: sheetGeometry(s.geometry) }))
+    }))
   };
 }
 
@@ -439,6 +476,15 @@ async function callAppsScript(params, body = null) {
   }
   throw httpError(502, 'Apps Script trả về phản hồi không hợp lệ');
 }
+
+projects.setTransport(async ({ op, name, content }) => {
+  if (op === 'del') {
+    const result = await callAppsScript({ action: 'deleteBucketObject' }, { action: 'deleteBucketObject', name });
+    return result.success === true;
+  }
+  const result = await callAppsScript({ action: 'putBucketObject' }, { action: 'putBucketObject', name, content });
+  return result.saved === true;
+});
 
 // Đề xuất chuyển đổi CSD: độ phủ tăng dưới ngưỡng này (% dân cư phường) coi như không tăng → chọn theo thiếu quy mô
 const CSD_MIN_COVERAGE_PCT = 0.5;
@@ -1437,6 +1483,27 @@ module.exports = async (req, res) => {
       return res.status(200).json({ parcels });
     }
 
+    if (action === 'getProjectIndex') {
+      const cat = await projects.catalog();
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ v: 1, base: cat.base, migrated: cat.migrated, projects: cat.projects });
+    }
+
+    if (action === 'getProjectLots') {
+      const slug = String(req.query.slug || '');
+      const project = String(req.query.project || '');
+      const data = slug ? await projects.lotsBySlug(slug) : await projects.legacyLots(project);
+      if (!data) return res.status(404).json({ error: true, message: 'Không có file đồ án này' });
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json(data);
+    }
+
+    if (action === 'getWardParcels') {
+      const parcels = await projects.wardParcels();
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ parcels });
+    }
+
     // Bucket không mở CORS cho trình duyệt → chuyển tiếp nguyên văn bản TopoJSON (~1 MB), cache biên Vercel 1 giờ
     if (action === 'getDrainage') {
       const d = await getDrainage();
@@ -1616,6 +1683,7 @@ module.exports = async (req, res) => {
         return res.status(400).json({ error: true, message: `Mỗi lần gửi 1–${CAD_BATCH_MAX} lô` });
       }
       const phase = body.phase === 'QH' ? 'QH' : 'HT';
+      const fileName = sanitizeSheetText(body.fileName, 120) || 'DXF';
       const items = [];
       for (let i = 0; i < rawItems.length; i++) {
         const item = parseCadItem(rawItems[i], phase);
@@ -1624,15 +1692,35 @@ module.exports = async (req, res) => {
       }
       const lands = rawLands.map(parseLandItem).filter(Boolean);
       const sync = body.sync !== false;
-      const result = await callAppsScript({ action: 'importCadBatch' }, {
-        action: 'importCadBatch',
-        phase,
-        fileName: sanitizeSheetText(body.fileName, 120) || 'DXF',
-        sync,
+      const registry = parseCadRegistry(body.registry);
+      const sheetItems = items.map(sheetItem);
+      let result = { created: [], updated: [], skipped: [], lotIds: [] };
+      if (sheetItems.length || registry || sync) {
+        const sheetReg = registry ? { boundary: registry.boundary, wards: registry.wards, infra: registry.infra, lands: registry.lands } : null;
+        result = await callAppsScript({ action: 'importCadBatch' }, {
+          action: 'importCadBatch',
+          phase,
+          fileName,
+          sync,
+          syncCad: false,
+          skipDxf: true,
+          items: sheetItems,
+          lands: [],
+          landsReset: false,
+          registry: sheetReg
+        });
+      }
+      if (items.length && !Array.isArray(result.lotIds)) {
+        return res.status(502).json({ error: true, message: 'Apps Script chưa trả mã lô (lotIds). Deploy Code.gs → New version, rồi bấm Ghi lại để ghi tiếp.' });
+      }
+      const saved = await projects.saveChunk({
+        tenQH: projects.projectTitle(fileName),
+        fileName,
         items,
+        lotIds: result.lotIds || [],
         lands,
         landsReset: body.landsReset === true,
-        registry: parseCadRegistry(body.registry)
+        registry
       });
       if (sync) invalidateAllCaches();
       return res.status(200).json({
@@ -1640,27 +1728,40 @@ module.exports = async (req, res) => {
         created: result.created || [],
         updated: result.updated || [],
         skipped: result.skipped || [],
-        lands: Number(result.lands) || 0,
+        lands: lands.length,
         landsDropped: rawLands.length - lands.length,
-        polygonsDropped: items.reduce((n, it) => n + it.stages.filter(s => !s.geometry && !s.point).length, 0)
+        polygonsDropped: items.reduce((n, it) => n + it.stages.filter(s => !s.point && s.geometry && !sheetGeometry(s.geometry)).length, 0),
+        slug: saved.slug,
+        bucket: saved.via
       });
     }
 
-    // Xóa toàn bộ 1 đồ án (Ten_QH): dòng hạ tầng, tab DXF-NN, ranh lô, dòng danh mục DS_DoAn
+    // Xóa toàn bộ 1 đồ án (Ten_QH): dòng hạ tầng, tab DXF-NN cũ, ranh lô, dòng DS_DoAn, file projects/<slug>.json
     if (action === 'deleteProject') {
       requirePostFromApp(req);
       await requireAdmin(req);
       const body = readJsonBody(req);
       const project = sanitizeSheetText(body.project, 120);
       if (!project) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
-      const result = await callAppsScript({ action: 'deleteProject' }, { action: 'deleteProject', project });
+      const removed = await projects.deleteProjectFiles(project);
+      const result = await callAppsScript({ action: 'deleteProject' }, { action: 'deleteProject', project, syncCad: false });
       invalidateAllCaches();
       return res.status(200).json({
         success: true,
         infra: Number(result.infra) || 0,
-        lands: Number(result.lands) || 0,
-        polygons: Number(result.polygons) || 0
+        lands: Math.max(Number(result.lands) || 0, removed.landCount || 0),
+        polygons: Number(result.polygons) || 0,
+        slug: removed.slug
       });
+    }
+
+    if (action === 'migrateProjects') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const page = await projects.migratePage(body.cursor);
+      invalidateAllCaches();
+      return res.status(200).json({ success: true, ...page });
     }
 
     // Người dùng chưa đăng nhập gửi file DXF / KML / GeoJSON ≤ 2 MB → hàng chờ trên bucket (pending/cad/, không ghi Sheet);
