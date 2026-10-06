@@ -192,7 +192,7 @@ export function initMap() {
   layers.c4.addTo(map); layers.c5.addTo(map); layers.c10.addTo(map); layers.c6.addTo(map);
   layers.c7.addTo(map); layers.c8.addTo(map); layers.c9.addTo(map); layers.c14.addTo(map);
 
-  map.on('zoomend', updateWardLabelFontSize);
+  map.on('zoomend', () => { updateWardLabelFontSize(); redrawLandsOnPattern(); });
   map.on('moveend', () => { refreshLeftSoon(); scheduleLots(); });
   bindProjectFiles(() => map, PARCEL_MIN_ZOOM);
   onChangeLots(() => { redrawParcels(); redrawLands(); });
@@ -686,9 +686,11 @@ function bindNameTip(layer, p) {
   layer.bindTooltip(escapeHtml(p.name || ''), { sticky: true, direction: 'top', offset: [0, -10], className: 'dot-tip' });
 }
 
-// Bật lớp Đồ án quy hoạch: lô của đồ án đang hiện luôn vẽ, lô của đồ án đang ẩn không vẽ;
-// lô không thuộc đồ án nào (hoặc lớp Đồ án tắt) theo nút chung "Ranh lô đất công trình"
-function parcelShown(project) {
+// Bật lớp Đồ án quy hoạch: lô của đồ án đang ẩn không vẽ; đồ án đã tải file thì lô do lớp Quy hoạch vẽ (redrawLands)
+// khi bật "Lô hạ tầng trong đồ án", còn lại vẽ cùng marker theo 14 nhóm.
+// Lô không thuộc đồ án nào (hoặc lớp Đồ án tắt) theo nút chung "Ranh lô đất công trình"
+function parcelShown(project, file) {
+  if (state.showProjects && file && state.showProjectInfra && state.projectInfraFiles.has(file) && !state.hiddenProjects.has(file)) return false;
   if (state.showProjects && project) return !state.hiddenProjects.has(project);
   return state.showParcels;
 }
@@ -696,7 +698,7 @@ function parcelShown(project) {
 function createParcelShape(entry, targetMap, detailed) {
   const p = entry.point;
   entry.parcel = parcelFor(p);
-  if (!entry.parcel || !parcelShown(p.tenQH)) return null;
+  if (!entry.parcel || !parcelShown(p.tenQH, entry.parcel.file)) return null;
   const shape = L.geoJSON(entry.parcel.geometry, {
     style: parcelStyle(entry, detailed),
     bubblingMouseEvents: false
@@ -1017,6 +1019,7 @@ export function renderGroupedPoints() {
   });
   leftRenderer.setList(sourceList);
   planRenderer.setList(planList);
+  if (state.projectInfraLots.length) redrawLands();
 }
 
 // Bán kính buffer chung đổi: chỉ vẽ lại vùng phủ, không phải dựng lại marker
@@ -1084,14 +1087,31 @@ function landPopupHtml(p) {
     <table>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${escapeHtml(String(v))}</td></tr>`).join('')}</table></div>`;
 }
 
-function drawLandsOn(m, list) {
+const isBusyTool = () => state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool;
+
+// Lô hạ tầng của đồ án: tô ký hiệu TT16 theo loại công trình trên Sheet (cùng mã lô), bấm mở popup công trình
+function infraLotShape(lot, item, m, detailed) {
+  const style = item
+    ? tt16ParcelStyle(layerType(item), lot.layer, { scenario: lot.phase, detailed, approved: isApproved(item.status) })
+    : landPolylineStyle(lot.layer);
+  const shape = L.geoJSON(lot.geometry, { style, bubblingMouseEvents: false });
+  if (!item) return shape;
+  bindNameTip(shape, item);
+  shape.on('click', () => {
+    if (isBusyTool()) return;
+    onPointClick(item, m);
+  });
+  return shape;
+}
+
+function drawLandsOn(m, list, infra = []) {
   const old = landGroups.get(m);
   if (old) {
     old.clearLayers();
     m.removeLayer(old);
     landGroups.delete(m);
   }
-  if (!list.length) return;
+  if (!list.length && !infra.length) return;
   const group = L.featureGroup();
   list.forEach(p => {
     const style = landPolylineStyle(p.layer);
@@ -1100,23 +1120,52 @@ function drawLandsOn(m, list) {
       bubblingMouseEvents: false
     });
     shape.on('click', (e) => {
-      if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
+      if (isBusyTool()) return;
       L.popup({ maxWidth: 280 }).setLatLng(e.latlng).setContent(landPopupHtml(p)).openOn(m);
     });
     group.addLayer(shape);
   });
+  if (infra.length) {
+    const detailed = m.getZoom() >= PARCEL_PATTERN_ZOOM;
+    // Popup công trình kịch bản QH chỉ dựng được trên bản đồ quy hoạch (planLayers), bản đồ chính dùng bản ghi gốc
+    const byId = new Map([...state.rawDataList, ...state.planDataList].map(it => [it.id, it]));
+    const qhById = m === planMap ? new Map(getPlanScenarioList().map(it => [it.id, it])) : null;
+    infra.forEach(lot => {
+      const item = (qhById && qhById.get(lot.id)) || byId.get(lot.id);
+      group.addLayer(infraLotShape(lot, item, m, detailed));
+    });
+  }
   group.addTo(m);
   landGroups.set(m, group);
 }
 
+let landsDetailed = null;
+
 // showLand (khung Thẩm định) vẽ lô đất các đồ án đang giao khung nhìn, mọi mức zoom.
-// Lớp Đồ án quy hoạch chỉ vẽ lô của đồ án đang hiện, từ PARCEL_MIN_ZOOM. Danh sách đã lọc lúc tải file.
+// Lớp Đồ án quy hoạch vẽ trọn đồ án đang hiện (lô đất + lô hạ tầng) từ PARCEL_MIN_ZOOM. Danh sách đã lọc lúc tải file.
 function redrawLands() {
   const byProject = state.showProjects && map && map.getZoom() >= PARCEL_MIN_ZOOM;
   const lands = (state.showLand || byProject) ? state.landParcels : [];
+  const infra = byProject && state.showProjectInfra
+    ? state.projectInfraLots.filter(l => !state.hiddenProjects.has(l.file)) : [];
   const compare = isCompareOn() && !!planMap;
-  if (map) drawLandsOn(map, compare ? lands.filter(p => p.phase === 'HT') : lands);
-  if (planMap) drawLandsOn(planMap, compare ? lands.filter(p => p.phase === 'QH') : []);
+  landsDetailed = map ? map.getZoom() >= PARCEL_PATTERN_ZOOM : null;
+  const pick = (list, phase) => (compare ? list.filter(p => p.phase === phase) : list);
+  if (map) drawLandsOn(map, pick(lands, 'HT'), pick(infra, 'HT'));
+  if (planMap) drawLandsOn(planMap, compare ? pick(lands, 'QH') : [], compare ? pick(infra, 'QH') : []);
+}
+
+// Qua ngưỡng hoa văn TT16: vẽ lại lô hạ tầng đồ án để đổi kiểu tô
+function redrawLandsOnPattern() {
+  if (!map || !state.projectInfraLots.length) return;
+  const detailed = map.getZoom() >= PARCEL_PATTERN_ZOOM;
+  if (detailed !== landsDetailed) redrawLands();
+}
+
+export function setProjectInfraVisible(on) {
+  state.showProjectInfra = !!on;
+  redrawParcels();
+  redrawLands();
 }
 
 export function setLandVisible(on) {

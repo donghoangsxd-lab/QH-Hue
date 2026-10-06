@@ -111,21 +111,25 @@ async function pool(list, n, fn) {
 export function composeNow() {
   const next = new Map(ward.loaded && wardLotsOn() ? ward.map : []);
   const lands = ward.loaded && wardLandsOn() ? ward.lands.slice() : [];
+  const infra = [];
   wanted().forEach(entry => {
     const got = cache.get(entry.tenQH);
     if (!got) return;
     got.parcels.forEach(p => {
       if (!p || !p.geometry || !p.id) return;
+      const phase = p.phase === 'QH' ? 'QH' : 'HT';
       if (p.kind === 'DXF') {
-        lands.push({ ...p, file: entry.tenQH, phase: p.phase === 'QH' ? 'QH' : 'HT' });
+        lands.push({ ...p, file: entry.tenQH, phase });
         return;
       }
-      const phase = p.phase === 'QH' ? 'QH' : 'HT';
       next.set(`${phase}|${p.id}`, { geometry: p.geometry, layer: p.layer || '', file: entry.tenQH });
+      infra.push({ id: p.id, phase, layer: p.layer || '', area: p.area ?? null, geometry: p.geometry, file: entry.tenQH });
     });
   });
   state.cadParcels = next;
   state.landParcels = lands;
+  state.projectInfraLots = infra;
+  state.projectInfraFiles = new Set(infra.map(l => l.file));
 }
 
 export async function syncLots() {

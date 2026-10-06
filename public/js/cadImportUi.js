@@ -1252,7 +1252,7 @@ async function writeChunks(job) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
         body: JSON.stringify({
           phase: job.phase, fileName: job.fileName, sync: k === chunks.length - 1,
-          items: chunks[k].items, lands: chunks[k].lands, landsReset: !!chunks[k].landsReset,
+          items: chunks[k].items, lands: chunks[k].lands, landsReset: !!chunks[k].landsReset, infraReset: k === 0,
           registry: chunks[k].registry || undefined
         })
       });

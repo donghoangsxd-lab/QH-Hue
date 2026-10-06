@@ -1,7 +1,7 @@
-// Lớp Đồ án quy hoạch (panel Lớp dữ liệu): mỗi đồ án (Ten_QH) bật/tắt riêng, phóng tới, Admin xóa toàn bộ đồ án.
+// Mục Quy hoạch (tab Lớp dữ liệu): mỗi đồ án (Ten_QH) bật/tắt riêng, tìm, phóng tới, Admin xóa / chuyển đồ án cũ.
 // Zoom < PARCEL_MIN_ZOOM chỉ vẽ ranh tổng đồ án; từ ngưỡng đó vẽ ranh lô (mapEngine.js) và bỏ ranh tổng.
 import { state } from './state.js';
-import { map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels } from './mapEngine.js';
+import { map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible } from './mapEngine.js';
 import { planMap, onCompareChange } from './planMap.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
@@ -23,6 +23,7 @@ let projects = [];
 let onDeleted = null;
 let busy = null;
 let belowZoom = null;
+let query = '';
 const outlineGroups = new Map();
 const fallbackCache = new Map();
 
@@ -152,12 +153,24 @@ function boundsOf(p) {
   return null;
 }
 
+function setMaster(on) {
+  const master = $('chk_projects');
+  if (master) master.checked = on;
+  state.showProjects = on;
+}
+
 function zoomTo(p) {
   const b = boundsOf(p);
   if (!b || !b.isValid() || !map) return;
+  let changed = false;
+  if (!state.showProjects) { setMaster(true); changed = true; }
+  if (state.hiddenProjects.delete(p.name)) { saveHidden(); changed = true; }
   map.fitBounds(b.pad(0.1), { maxZoom: PARCEL_MIN_ZOOM + 1 });
+  if (changed) refreshAll();
   focusProjectLots(p.name);
 }
+
+const foldText = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
 
 function metaText(p) {
   const parts = [`${fmtNum(p.infra.size)} CT`, `${fmtNum(p.lands.size)} lô đất`];
@@ -165,20 +178,41 @@ function metaText(p) {
   return parts.join(' · ');
 }
 
-function renderList() {
-  const box = $('projectList');
+function renderHead() {
+  const shownN = projects.filter(p => !state.hiddenProjects.has(p.name)).length;
   const count = $('projectCount');
-  if (count) count.textContent = projects.length ? `${projects.length} đồ án` : 'chưa có';
+  if (count) {
+    count.textContent = projects.length ? `${state.showProjects ? shownN : 0}/${projects.length}` : '0';
+    count.classList.toggle('none', !state.showProjects || !shownN);
+  }
+  const allBtn = $('btnProjectsAll');
+  if (allBtn) {
+    allBtn.disabled = !projects.length;
+    allBtn.setAttribute('aria-pressed', String(!!projects.length && !shownN));
+  }
+  const search = $('projectSearch');
+  if (search) search.hidden = projects.length <= 5;
+}
+
+function renderList() {
+  renderHead();
+  const box = $('projectList');
   if (!box) return;
-  box.hidden = !state.showProjects || !projects.length;
-  if (box.hidden) { box.innerHTML = ''; return; }
+  box.classList.toggle('is-off', !state.showProjects);
+  if (!projects.length) {
+    box.innerHTML = '<div class="project-empty">Chưa có đồ án. Admin nhập file ở tab Đề xuất › Nhập hàng loạt.</div>';
+    return;
+  }
+  const q = foldText(query.trim());
+  const visible = projects.map((p, idx) => ({ p, idx })).filter(({ p }) => !q || foldText(p.name).includes(q));
   const admin = isAdmin();
   const legacyN = projects.filter(p => p.legacy).length;
   const migrating = busy === '__migrate__';
   const migrateBtn = admin && legacyN
     ? `<button type="button" class="project-migrate" data-migrate ${migrating || busy ? ' disabled' : ''}>${migrating ? 'Đang chuyển…' : `Chuyển ${legacyN} đồ án cũ lên bucket`}</button>`
     : '';
-  box.innerHTML = migrateBtn + projects.map((p, idx) => {
+  const none = visible.length ? '' : '<div class="project-empty">Không có đồ án khớp từ khóa.</div>';
+  box.innerHTML = migrateBtn + none + visible.map(({ p, idx }) => {
     const on = !state.hiddenProjects.has(p.name);
     const deleting = busy === p.name;
     const tempNote = p.area ? '' : ' · ranh tạm (bao lồi) — nhập lại file để có ranh đúng';
@@ -331,6 +365,27 @@ export function initProjectLayer(opts = {}) {
       refreshAll();
     });
   }
+  const infraChk = $('chk_projectInfra');
+  if (infraChk) {
+    state.showProjectInfra = infraChk.checked;
+    infraChk.addEventListener('change', () => setProjectInfraVisible(infraChk.checked));
+  }
+  // Ẩn tất cả giữ nguyên lớp bật; đang ẩn hết thì hiện lại toàn bộ (và bật lớp nếu đang tắt)
+  $('btnProjectsAll')?.addEventListener('click', () => {
+    if (!projects.length) return;
+    const anyShown = projects.some(p => !state.hiddenProjects.has(p.name));
+    if (anyShown) projects.forEach(p => state.hiddenProjects.add(p.name));
+    else {
+      projects.forEach(p => state.hiddenProjects.delete(p.name));
+      if (!state.showProjects) setMaster(true);
+    }
+    saveHidden();
+    refreshAll();
+  });
+  $('projectSearch')?.addEventListener('input', (e) => {
+    query = e.target.value || '';
+    renderList();
+  });
   $('projectList')?.addEventListener('change', (e) => {
     const box = e.target.closest('[data-project]');
     const p = box && projects[Number(box.dataset.project)];

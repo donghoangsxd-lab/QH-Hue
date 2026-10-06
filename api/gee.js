@@ -1720,6 +1720,7 @@ module.exports = async (req, res) => {
         lotIds: result.lotIds || [],
         lands,
         landsReset: body.landsReset === true,
+        infraReset: body.infraReset === true ? phase : null,
         registry
       });
       if (sync) invalidateAllCaches();

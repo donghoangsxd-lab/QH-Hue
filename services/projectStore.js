@@ -331,7 +331,8 @@ function dxfNum(id) {
   return m ? Number(m[1]) : 0;
 }
 
-async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, registry }) {
+// infraReset (phần đầu của 1 lần nhập): bỏ lô hạ tầng cũ cùng giai đoạn để lô đã xóa khỏi bản vẽ không còn sót lại
+async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, infraReset, registry }) {
   const name = String(tenQH || '').trim();
   if (!name) {
     const err = new Error('Thiếu tên đồ án');
@@ -347,7 +348,9 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, re
   prev.forEach(p => {
     if (!p || !p.geometry) return;
     if (p.kind === 'DXF') { if (!landsReset) dxf.push(p); return; }
-    infra.set(`${p.phase === 'QH' ? 'QH' : 'HT'}|${p.id}`, p);
+    const phase = p.phase === 'QH' ? 'QH' : 'HT';
+    if (infraReset === phase) return;
+    infra.set(`${phase}|${p.id}`, p);
   });
   (items || []).forEach((it, i) => {
     const id = lotIds && lotIds[i];

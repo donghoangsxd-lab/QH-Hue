@@ -21,6 +21,10 @@ export const state = {
   // Lô đất ngoài nhóm hạ tầng của đồ án đang xem, tắt khi mở bản đồ
   landParcels: [],
   showLand: false,
+  // Lô hạ tầng của đồ án đang xem: lớp Quy hoạch vẽ trọn đồ án, không phụ thuộc bật/tắt 14 nhóm công trình
+  projectInfraLots: [],
+  projectInfraFiles: new Set(),
+  showProjectInfra: true,
   // Danh mục đồ án từ projects/index.json (kèm đồ án cũ còn trong cad_parcels đến khi chuyển xong)
   projectCatalog: [],
   projectBase: '',

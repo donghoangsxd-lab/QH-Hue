@@ -435,7 +435,24 @@ body.right-collapsed .right-panel {
 .layer-row label { cursor: pointer; color: var(--text-main); }
 .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 13px; height: 13px; margin: 0 6px 0 0; vertical-align: middle; }
 .layer-row .layer-hint { color: var(--text-muted); font-size: var(--fs-xs); white-space: nowrap; }
-.project-list { margin: 2px 0 6px 19px; padding-left: 6px; border-left: 2px solid rgba(232, 121, 249, 0.45); max-height: 220px; overflow-y: auto; }
+.layer-sec-head { gap: 4px; padding: 5px 8px; }
+.layer-sec-head .layer-head-title { letter-spacing: .01em; }
+.layer-sec-head .layer-count { padding: 1px 5px; }
+.layer-sec-tab { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 4px; height: 26px; padding: 0 5px; border: 1px solid transparent; border-radius: var(--r-md); background: transparent; font: inherit; cursor: pointer; transition: background var(--ease), border-color var(--ease); }
+.layer-sec-tab:hover { background: var(--bg-hover); }
+.layer-sec-tab:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
+.layer-sec-tab.active { border-color: rgba(var(--cyan-rgb), 0.45); background: rgba(var(--cyan-rgb), 0.08); }
+.layer-sec-tab.active .layer-head-title { color: var(--text-main); }
+.layer-sec-tab[data-layer-sec="plan"].active { border-color: rgba(232, 121, 249, 0.5); background: rgba(232, 121, 249, 0.08); }
+.layer-sec-head .layer-eye-btn { width: 28px; padding: 0; justify-content: center; }
+.layer-sec-head .layer-eye-btn[hidden] { display: none; }
+.layer-sec-head .layer-eye-btn:disabled { opacity: 0.5; cursor: default; }
+.project-search { display: block; width: 100%; box-sizing: border-box; height: 24px; margin: 4px 0 2px; padding: 0 8px; border: 1px solid var(--border-color); border-radius: var(--r-md); background: var(--bg-input); color: var(--text-main); font: inherit; font-size: var(--fs-sm); }
+.project-search[hidden] { display: none; }
+.project-search:focus { outline: none; border-color: #e879f9; }
+.project-list { margin: 2px 0 6px 19px; padding-left: 6px; border-left: 2px solid rgba(232, 121, 249, 0.45); max-height: 260px; overflow-y: auto; }
+.project-list.is-off .project-row { opacity: 0.55; }
+.project-empty { padding: 3px 0; color: var(--text-muted); font-size: var(--fs-xs); }
 .project-row { display: flex; align-items: center; gap: 4px; min-height: 22px; font-size: var(--fs-sm); }
 .project-row.is-off .project-name span, .project-row.is-off .project-meta { opacity: 0.5; }
 .project-name { flex: 1; min-width: 0; display: flex; align-items: center; cursor: pointer; color: var(--text-main); }

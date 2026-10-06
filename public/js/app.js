@@ -66,6 +66,29 @@ function addTypeSwatches() {
       ?.insertAdjacentHTML('afterbegin', `<i class="layer-swatch" style="background:${BUFFER_COLORS[type]};"></i>`);
   });
 }
+// Thanh đầu tab Lớp dữ liệu chia đôi Quy hoạch | Công trình: mỗi lúc hiện 1 mục, nút mắt đổi theo mục đang chọn
+const LAYER_SEC_KEY = 'qh_layer_sec';
+function initLayerSections() {
+  const tabs = [...document.querySelectorAll('.layer-sec-tab')];
+  if (!tabs.length) return;
+  const show = (key) => {
+    tabs.forEach(t => {
+      const on = t.dataset.layerSec === key;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', String(on));
+    });
+    document.querySelectorAll('[data-layer-sec-pane]').forEach(p => { p.hidden = p.dataset.layerSecPane !== key; });
+    document.querySelectorAll('[data-layer-sec-only]').forEach(b => { b.hidden = b.dataset.layerSecOnly !== key; });
+  };
+  tabs.forEach(t => t.addEventListener('click', () => {
+    show(t.dataset.layerSec);
+    try { localStorage.setItem(LAYER_SEC_KEY, t.dataset.layerSec); } catch (e) { /* chế độ riêng tư */ }
+  }));
+  let saved = null;
+  try { saved = localStorage.getItem(LAYER_SEC_KEY); } catch (e) { /* chế độ riêng tư */ }
+  show(tabs.some(t => t.dataset.layerSec === saved) ? saved : 'infra');
+}
+
 // Nút Nền, phân tích | Môi trường: mỗi lúc hiện 1 nhóm lớp; số trên nút = số lớp đang bật trong nhóm (kể cả nhóm đang ẩn)
 function initLayerTabs() {
   const btns = [...document.querySelectorAll('.layer-tab-btn')];
@@ -382,6 +405,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   document.getElementById('chk_parcel')?.addEventListener('change', (e) => setParcelsVisible(e.target.checked));
+  initLayerSections();
   initLayerTabs();
 
   document.querySelectorAll('.btn-dot-buffer').forEach(btn => {

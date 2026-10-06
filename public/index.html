@@ -223,14 +223,23 @@
     <div class="rp-body">
       <!-- TAB: LỚP DỮ LIỆU -->
       <div class="tab-body" id="tabLayers">
-        <div class="layer-head">
-          <span class="layer-head-title" title="14 nhóm biểu tượng công trình hạ tầng"><svg class="ico"><use href="#i-layers"/></svg>Công trình</span>
-          <span class="layer-count" id="layerCount" title="Số nhóm công trình đang hiện trên bản đồ">11/14</span>
-          <button type="button" class="layer-eye-btn" id="btnToggleAllIcons" aria-pressed="false" title="Ẩn toàn bộ biểu tượng công trình (giữ lựa chọn để hiện lại)">
+        <div class="layer-head layer-sec-head" role="tablist" aria-label="Nhóm lớp chính">
+          <button type="button" class="layer-sec-tab" data-layer-sec="plan" role="tab" aria-selected="false" title="Đồ án quy hoạch nhập từ file (cột Ten_QH), mỗi đồ án 1 file trên bucket (projects/), danh mục projects/index.json">
+            <span class="layer-head-title">Quy hoạch</span>
+            <span class="layer-count none" id="projectCount" title="Số đồ án đang hiện / tổng số đồ án">0</span>
+          </button>
+          <button type="button" class="layer-sec-tab active" data-layer-sec="infra" role="tab" aria-selected="true" title="14 nhóm biểu tượng công trình hạ tầng">
+            <span class="layer-head-title">Công trình</span>
+            <span class="layer-count" id="layerCount" title="Số nhóm công trình đang hiện trên bản đồ">11/14</span>
+          </button>
+          <button type="button" class="layer-eye-btn" id="btnProjectsAll" data-layer-sec-only="plan" aria-pressed="false" title="Ẩn / hiện mọi đồ án trong danh sách (không tắt lớp)" aria-label="Ẩn / hiện mọi đồ án" hidden>
             <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>
-            <span class="eye-hide">Ẩn tất cả</span><span class="eye-show">Hiện lại</span>
+          </button>
+          <button type="button" class="layer-eye-btn" id="btnToggleAllIcons" data-layer-sec-only="infra" aria-pressed="false" title="Ẩn toàn bộ biểu tượng công trình (giữ lựa chọn để hiện lại)" aria-label="Ẩn / hiện toàn bộ biểu tượng công trình">
+            <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>
           </button>
         </div>
+        <div class="layer-sec" data-layer-sec-pane="infra" role="tabpanel">
         <div class="layer-row"><div><input type="checkbox" id="chk_c1" checked><label for="chk_c1">1. Công viên, điểm xanh</label></div><button type="button" class="btn-dot-buffer" data-buffer="b1" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c2" checked><label for="chk_c2">2. Bãi đỗ xe, trạm sạc</label></div><button type="button" class="btn-dot-buffer" data-buffer="b2" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c3" checked><label for="chk_c3">3. Trường Mầm non</label></div><button type="button" class="btn-dot-buffer" data-buffer="b3" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
@@ -245,6 +254,14 @@
         <div class="layer-row"><div><input type="checkbox" id="chk_c9" checked><label for="chk_c9">12. Cơ sở chưa sử dụng</label></div></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c11"><label for="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3). Không tính vào quy mô m²/người và bản đồ độ phủ">13. Trạm dừng xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" title="Bật/tắt phạm vi 500 m" aria-label="Bật/tắt phạm vi 500 m" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c14" checked><label for="chk_c14" title="Dữ liệu tab 14-NOXH. Chỉ thể hiện vị trí và diện tích, không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ">14. Nhà ở xã hội</label></div></div>
+
+        </div>
+        <div class="layer-sec" data-layer-sec-pane="plan" role="tabpanel" hidden>
+        <div class="layer-row"><div><input type="checkbox" id="chk_projects"><label for="chk_projects" title="Thu nhỏ: chỉ hiện ranh tổng từng đồ án; phóng to: tải file đồ án trong khung nhìn và vẽ lô hạ tầng, lô đất của đồ án. Ẩn 1 đồ án thì ẩn cả ranh lô công trình của đồ án đó; lô không thuộc đồ án nào vẫn theo nút Ranh lô đất công trình">Hiện đồ án trên bản đồ <small class="layer-hint">phóng to để xem lô</small></label></div></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_projectInfra" checked><label for="chk_projectInfra" title="Bật: lô y tế, trường học, văn hóa, cây xanh... của đồ án đang hiện luôn vẽ cùng lớp Quy hoạch (ký hiệu TT16), không phụ thuộc 14 nhóm Công trình. Tắt: lô hạ tầng hiện theo nhóm công trình đang bật">Lô hạ tầng trong đồ án <small class="layer-hint">không theo 14 nhóm</small></label></div></div>
+        <input type="search" id="projectSearch" class="project-search" placeholder="Tìm đồ án..." aria-label="Tìm đồ án quy hoạch" hidden>
+        <div id="projectList" class="project-list"></div>
+        </div>
 
         <div class="rp-settings">
           <div class="layer-tab-switch" role="tablist" aria-label="Nhóm lớp bản đồ">
@@ -324,8 +341,6 @@
             <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_parcel"><label for="chk_parcel" title="Ranh khu đất của từng công trình hạ tầng xã hội (HTXH) trong 14 nhóm (cột Geojson trên Sheet)"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Ranh lô đất công trình <small class="layer-hint">phóng to để xem</small></label></div></div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_projects"><label for="chk_projects" title="Đồ án quy hoạch nhập từ file (cột Ten_QH, tab DXF-NN, danh mục DS_DoAn). Thu nhỏ: chỉ hiện ranh tổng từng đồ án; phóng to: hiện ranh lô công trình và lô đất của đồ án. Ẩn 1 đồ án thì ẩn cả ranh lô công trình của đồ án đó; lô không thuộc đồ án nào vẫn theo nút Ranh lô đất công trình"><svg class="ico ico-layer"><use href="#i-map"/></svg>Đồ án quy hoạch <small class="layer-hint" id="projectCount"></small></label></div></div>
-          <div id="projectList" class="project-list" hidden></div>
           <div class="layer-row">
             <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Khoanh vùng trong từng phường: ranh đỏ = vùng hiện trạng (đã xây dựng đến năm gốc 2020/2010/2000, GAIA Landsat 30 m hợp với GHSL 100 m); ranh xanh = vùng phát triển mới (đất xây dựng hiện nay theo Google Dynamic World 10 m nằm ngoài vùng hiện trạng); bỏ mảng < 0,5 ha. QCVN 01:2026/BXD Mục 2.2.3.2 (công viên, vườn hoa mỗi đơn vị ở) và Mục 2.2.3.3 (vườn hoa, bãi đỗ xe ≤ 400 m) chỉ áp trong vùng phát triển mới. Logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch"><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Vùng phát triển mới (Dynamic World)</label></div>
             <span id="newDevOpBox" class="layer-slider" style="display:none;"><input type="range" id="newDevOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp vùng phát triển mới" aria-label="Độ trong suốt lớp vùng phát triển mới"></span>
