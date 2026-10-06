@@ -23,6 +23,7 @@ const CUSTOM_MAX_POINTS = 2000;   // số đỉnh tối đa của 1 tuyến vẽ
 
 let indexCache = null;            // { at, data }
 let customCache = null;           // { at, data: { saved, roads } }
+let mainOverviewCache = null;     // { at, lines } đường trục chính rút gọn cả thành phố
 const partCache = new Map();      // "slug_i@at" → ways
 
 const round6 = (v) => Math.round(v * 1e6) / 1e6;
@@ -151,6 +152,27 @@ async function waysAround(lat, lng, r, customMin = 0) {
   return out;
 }
 
+function flatToLine(flat) {
+  const line = [];
+  for (let i = 0; i < flat.length; i += 2) line.push([flat[i], flat[i + 1]]);
+  return line;
+}
+
+/** Đường trục chính rút gọn (main-overview.json) cộng tuyến Admin nhóm 1. null nếu chưa có file rút gọn. */
+async function mainRoadLines(customMin = 0) {
+  if (!mainOverviewCache || Date.now() - mainOverviewCache.at >= INDEX_TTL_MS) {
+    const d = await readPublicJson('main-overview', Date.now());
+    const lines = d && d.v === 1 && Array.isArray(d.lines) ? d.lines : null;
+    mainOverviewCache = { at: Date.now(), lines };
+  }
+  if (!mainOverviewCache.lines) return null;
+  let custom = { roads: [] };
+  try { custom = await readCustomRoads(customMin); } catch (e) { /* vẫn trả đường OSM nếu tuyến bổ sung chưa đọc được */ }
+  const lines = mainOverviewCache.lines.slice();
+  custom.roads.forEach(r => { if (r.g === 1 && Array.isArray(r.flat) && r.flat.length >= 4) lines.push(flatToLine(r.flat)); });
+  return lines;
+}
+
 const isInt = (v) => Number.isSafeInteger(v) && v > 0;
 const isLat = (v) => typeof v === 'number' && v > 10 && v < 25;
 const isLng = (v) => typeof v === 'number' && v > 100 && v < 115;
@@ -238,6 +260,6 @@ function parseCustomRoads(raw) {
 
 module.exports = {
   wardSlug, roadsRadius, readRoadsIndex, readPart, waysAround, parseNetworkPart, parseRoadsIndex, rememberIndex,
-  readCustomRoads, rememberCustom, customExtra, parseCustomRoads,
+  readCustomRoads, rememberCustom, customExtra, parseCustomRoads, mainRoadLines,
   ROADS_MAX_RADIUS, MAX_PART_CHARS, MAX_PARTS
 };

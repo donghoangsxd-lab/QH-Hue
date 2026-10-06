@@ -21,6 +21,11 @@ export const state = {
   // Ranh đất không thuộc 13 nhóm hạ tầng (sheet DXF-*), tắt khi mở bản đồ
   landParcels: [],
   showLand: false,
+  // Lớp Đồ án quy hoạch (projectLayer.js): ranh tổng từ tab DS_DoAn [{ id: Ten_QH, ward, infraCount, landCount, time, geometry }],
+  // đồ án người dùng ẩn (Ten_QH, lưu localStorage)
+  projectAreas: [],
+  showProjects: false,
+  hiddenProjects: new Set(),
   wardStatsData: [],
   // Chỉ tiêu mạng lưới toàn TP (getWardStats): { HT, QH } — số nhà tang lễ, diện tích nghĩa trang so với dân số
   cityNetwork: null,

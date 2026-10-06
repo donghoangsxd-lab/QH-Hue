@@ -39,6 +39,7 @@ import {
 import { initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleCompareMode } from './planMap.js';
 import { escapeHtml, setStatusContent, showToast } from './utils.js';
 import { initCadImport } from './cadImportUi.js';
+import { initProjectLayer } from './projectLayer.js';
 import { initProjectReview } from './projectReview.js';
 import { initWardCheck, refreshWardCheck } from './wardCheck.js';
 import { initOsmImport } from './osmImport.js';
@@ -196,6 +197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     refreshWardCheck();
   };
   initCadImport({ onImported: reloadAfterSheetWrite });
+  initProjectLayer({ onDeleted: reloadAfterSheetWrite });
   initProjectReview();
   initWardCheck({ onSynced: reloadAfterSheetWrite });
   initOsmImport({ onImported: reloadAfterSheetWrite });
@@ -534,7 +536,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Bấm lại cùng ô để khôi phục đúng các lớp đang bật trước đó.
   const FOCUS_CHECKS = [
     ...ICON_GROUPS.map(k => `chk_${k}`),
-    'chk_bound', 'chk_parcel', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_flood', 'chk_sarflood',
+    'chk_bound', 'chk_parcel', 'chk_projects', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_flood', 'chk_sarflood',
     'chk_lst', 'chk_newdev', 'chk_risk', 'chk_roads', 'chk_heat'
   ];
   let focusSnapshot = null;

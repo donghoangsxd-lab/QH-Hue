@@ -120,35 +120,47 @@ export function parseKml(text) {
   return { entities, stats };
 }
 
-/** KMZ (zip) → nội dung KML chính (doc.kml hoặc file .kml nằm nông nhất) */
-export async function unzipKml(buf) {
+/**
+ * Danh sách file trong ZIP (KMZ, shapefile nén): [{ name, read() → Promise<Uint8Array> }].
+ * label: tên định dạng dùng trong thông báo lỗi.
+ */
+export function readZip(buf, label = 'ZIP') {
   const view = new DataView(buf);
   let eocd = -1;
   for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--) {
     if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
   }
-  if (eocd < 0) throw new Error('File KMZ hỏng (không đọc được nội dung nén).');
+  if (eocd < 0) throw new Error(`File ${label} hỏng (không đọc được nội dung nén).`);
   const dec = new TextDecoder();
   const entries = [];
   let p = view.getUint32(eocd + 16, true);
   for (let k = view.getUint16(eocd + 10, true); k > 0 && view.getUint32(p, true) === 0x02014b50; k--) {
     const nameLen = view.getUint16(p + 28, true);
+    const method = view.getUint16(p + 10, true);
+    const size = view.getUint32(p + 20, true);
+    const local = view.getUint32(p + 42, true);
+    const name = dec.decode(new Uint8Array(buf, p + 46, nameLen));
     entries.push({
-      method: view.getUint16(p + 10, true),
-      size: view.getUint32(p + 20, true),
-      local: view.getUint32(p + 42, true),
-      name: dec.decode(new Uint8Array(buf, p + 46, nameLen))
+      name,
+      read: async () => {
+        const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
+        const data = new Uint8Array(buf, start, size);
+        if (method === 0) return data;
+        if (method !== 8) throw new Error(`${label} dùng kiểu nén chưa hỗ trợ — giải nén rồi nén lại bằng ZIP thường.`);
+        if (typeof DecompressionStream === 'undefined') throw new Error(`Trình duyệt chưa hỗ trợ giải nén ${label} — dùng Chrome/Edge bản mới.`);
+        return new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+      }
     });
     p += 46 + nameLen + view.getUint16(p + 30, true) + view.getUint16(p + 32, true);
   }
-  const kmls = entries.filter(e => /\.kml$/i.test(e.name));
+  return entries;
+}
+
+/** KMZ (zip) → nội dung KML chính (doc.kml hoặc file .kml nằm nông nhất) */
+export async function unzipKml(buf) {
+  const kmls = readZip(buf, 'KMZ').filter(e => /\.kml$/i.test(e.name));
   const entry = kmls.find(e => /(^|\/)doc\.kml$/i.test(e.name))
     || kmls.sort((a, b) => a.name.split('/').length - b.name.split('/').length)[0];
   if (!entry) throw new Error('Trong file KMZ không có file .kml.');
-  const start = entry.local + 30 + view.getUint16(entry.local + 26, true) + view.getUint16(entry.local + 28, true);
-  const data = new Uint8Array(buf, start, entry.size);
-  if (entry.method === 0) return dec.decode(data);
-  if (entry.method !== 8) throw new Error('KMZ dùng kiểu nén chưa hỗ trợ — giải nén lấy file .kml rồi nhập.');
-  if (typeof DecompressionStream === 'undefined') throw new Error('Trình duyệt chưa hỗ trợ giải nén KMZ — dùng Chrome/Edge bản mới hoặc giải nén lấy file .kml.');
-  return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+  return new TextDecoder().decode(await entry.read());
 }

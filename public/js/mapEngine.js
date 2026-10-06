@@ -6,7 +6,7 @@ import {
 import { peekInfraRisk, riskSummaryHtml } from './riskLayer.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi, markDataWritten } from './api.js';
-import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico } from './utils.js';
+import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, planRows } from './utils.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
@@ -515,7 +515,7 @@ function hasValidCoord(p) {
 
 // Ranh lô đất CAD chỉ vẽ khi phóng to đủ gần (ở mức toàn thành phố hàng nghìn polygon vừa rối vừa nặng):
 // từ PARCEL_MIN_ZOOM tô màu nền TT16, từ PARCEL_PATTERN_ZOOM (gần 1 lô cụ thể) tô hoa văn TT16
-const PARCEL_MIN_ZOOM = 15;
+export const PARCEL_MIN_ZOOM = 15;
 const PARCEL_PATTERN_ZOOM = TT16_PATTERN_ZOOM;
 
 // Zoom ≤ ngưỡng (mức toàn thành phố): mỗi phường 1 biểu đồ tròn số công trình theo loại thay cho icon chồng chéo.
@@ -527,7 +527,7 @@ const PIE_MAX_PX = 46;
 const PIE_SLICE_GAP_DEG = 1.6;
 const PIE_GAP_COLOR = 'rgba(15, 23, 42, 0.85)';
 // Zoom ≤ ngưỡng (thấy toàn bộ thành phố): gộp 40 biểu đồ phường thành 1 biểu đồ TP, làm nổi ranh giới thành phố
-const CITY_PIE_MAX_ZOOM = 10;
+export const CITY_PIE_MAX_ZOOM = 10;
 const CITY_PIE_PX = 64;
 const CITY_OUTLINE_SIMPLIFY_DEG = 0.0004;
 
@@ -683,10 +683,17 @@ function bindNameTip(layer, p) {
   layer.bindTooltip(escapeHtml(p.name || ''), { sticky: true, direction: 'top', offset: [0, -10], className: 'dot-tip' });
 }
 
+// Bật lớp Đồ án quy hoạch: lô của đồ án đang hiện luôn vẽ, lô của đồ án đang ẩn không vẽ;
+// lô không thuộc đồ án nào (hoặc lớp Đồ án tắt) theo nút chung "Ranh lô đất công trình"
+function parcelShown(project) {
+  if (state.showProjects && project) return !state.hiddenProjects.has(project);
+  return state.showParcels;
+}
+
 function createParcelShape(entry, targetMap, detailed) {
   const p = entry.point;
   entry.parcel = parcelFor(p);
-  if (!entry.parcel) return null;
+  if (!entry.parcel || !parcelShown(p.tenQH)) return null;
   const shape = L.geoJSON(entry.parcel.geometry, {
     style: parcelStyle(entry, detailed),
     bubblingMouseEvents: false
@@ -878,7 +885,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     const groupOf = (p) => groups[ICON_GROUP_KEYS[layerType(p)]] || groups.c9;
     const visible = list.filter(p => bounds.contains([p.lat, p.lng]) && m.hasLayer(groupOf(p)));
     const nextMode = visible.length <= ICON_MAX_VISIBLE ? 'icon' : 'dot';
-    const wantParcels = state.showParcels && state.cadParcels.size > 0 && m.getZoom() >= PARCEL_MIN_ZOOM;
+    const wantParcels = (state.showParcels || state.showProjects) && state.cadParcels.size > 0 && m.getZoom() >= PARCEL_MIN_ZOOM;
     const detail = m.getZoom() >= PARCEL_PATTERN_ZOOM;
     if (nextMode !== mode || wantParcels !== parcelsOn) {
       clearPoints();
@@ -977,11 +984,34 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
 const leftRenderer = createRenderer(() => map, layers, () => true, () => (isCompareOn() ? 'Hiện trạng' : ''));
 const planRenderer = createRenderer(() => planMap, planLayers, () => isCompareOn(), () => 'Quy hoạch');
 
+// Diện tích theo phường đang chọn: lô vắt ranh đã tách (wardParts) chỉ tính phần nằm trong phường — trừ mảnh phường khác
+// khỏi công trình trong phường, cộng mảnh nằm trong phường của công trình phường khác. partKey: 'sizeHT' / 'sizeQH'
+function wardAreaList(fullList, filtered, partKey) {
+  if (filtered === fullList || reviewScope) return filtered;
+  const wardInfo = state.wardLabelsList.find(w => w.name === state.selectedWard);
+  if (!wardInfo || !wardInfo.geometry) return filtered;
+  const partSize = (pt) => Number(pt[partKey]) || 0;
+  const inWard = (pt) => isPointInWard(Number(pt.lat), Number(pt.lng), wardInfo);
+  const own = new Set(filtered);
+  const out = filtered.map(it => (it.wardParts
+    ? { ...it, size: Math.max(0, (Number(it.size) || 0) - it.wardParts.reduce((s, pt) => s + (inWard(pt) ? 0 : partSize(pt)), 0)) }
+    : it));
+  fullList.forEach(it => {
+    if (!it.wardParts || own.has(it)) return;
+    it.wardParts.forEach(pt => { if (partSize(pt) > 0 && inWard(pt)) out.push({ ...it, size: partSize(pt) }); });
+  });
+  return out;
+}
+
 export function renderGroupedPoints() {
   if (!map) return;
   const sourceList = getWardFilteredList(state.rawDataList);
-  const planList = getWardFilteredList(getPlanScenarioList());
-  updateInfraPieChart(sourceList, planList);
+  const planFull = getPlanScenarioList();
+  const planList = getWardFilteredList(planFull);
+  updateInfraPieChart(sourceList, planList, {
+    ht: wardAreaList(state.rawDataList, sourceList, 'sizeHT'),
+    qh: wardAreaList(planFull, planList, 'sizeQH')
+  });
   leftRenderer.setList(sourceList);
   planRenderer.setList(planList);
 }
@@ -1007,18 +1037,28 @@ export async function loadCadParcels() {
     const data = await res.json();
     const next = new Map();
     const lands = [];
+    const projects = [];
     (data.parcels || []).forEach(p => {
       if (!p || !p.id || !p.geometry) return;
+      if (p.kind === 'PROJECT') return projects.push(p);
       const phase = p.phase === 'QH' ? 'QH' : 'HT';
       if (p.kind === 'DXF') lands.push({ ...p, phase });
       else next.set(`${phase}|${p.id}`, { geometry: p.geometry, layer: p.layer || '', file: p.file || '' });
     });
     state.cadParcels = next;
     state.landParcels = lands;
+    state.projectAreas = projects;
   } catch (err) {
     console.warn('Không tải được ranh lô CAD:', err);
     return;
   }
+  redrawParcels();
+  redrawLands();
+  document.dispatchEvent(new CustomEvent('cadparcels:loaded'));
+}
+
+/** Lớp Đồ án quy hoạch đổi (bật/tắt, ẩn 1 đồ án, qua ngưỡng zoom): vẽ lại ranh lô công trình và lô đất DXF */
+export function refreshProjectLots() {
   redrawParcels();
   redrawLands();
 }
@@ -1040,7 +1080,8 @@ function landPopupHtml(p) {
     ['Diện tích', p.area ? `${fmtNum(Math.round(p.area))} m²` : ''],
     ['Phường/xã', p.ward],
     ['Đồ án', p.file],
-    ['Giai đoạn', p.phase === 'QH' ? 'Quy hoạch' : 'Hiện trạng']
+    ['Giai đoạn', p.phase === 'QH' ? 'Quy hoạch' : 'Hiện trạng'],
+    ...planRows(p.plan)
   ].filter(([, v]) => v);
   return `<div class="land-popup"><b>${escapeHtml(p.name || p.layer || 'Lô đất')}</b>
     <table>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${escapeHtml(String(v))}</td></tr>`).join('')}</table></div>`;
@@ -1071,8 +1112,11 @@ function drawLandsOn(m, list) {
   landGroups.set(m, group);
 }
 
+// showLand (khung Thẩm định đồ án) vẽ mọi lô ở mọi mức zoom; lớp Đồ án quy hoạch chỉ vẽ lô của đồ án đang hiện, từ PARCEL_MIN_ZOOM
 function redrawLands() {
-  const lands = state.showLand ? state.landParcels : [];
+  const byProject = state.showProjects && map && map.getZoom() >= PARCEL_MIN_ZOOM;
+  const lands = state.showLand ? state.landParcels
+    : byProject ? state.landParcels.filter(p => !state.hiddenProjects.has(p.file)) : [];
   const compare = isCompareOn() && !!planMap;
   if (map) drawLandsOn(map, compare ? lands.filter(p => p.phase === 'HT') : lands);
   if (planMap) drawLandsOn(planMap, compare ? lands.filter(p => p.phase === 'QH') : []);
@@ -1197,7 +1241,12 @@ const WORLD_RING = [[-85, -180], [-85, 180], [85, 180], [85, -180]];
 const selRenderers = new WeakMap();
 
 function selRendererFor(m) {
-  if (!m.getPane(SEL_PANE)) m.createPane(SEL_PANE).style.zIndex = SEL_PANE_Z;
+  if (!m.getPane(SEL_PANE)) {
+    // Canvas trong suốt của pane này nằm trên ranh lô: không bắt chuột để click lô / ranh đồ án bên dưới
+    const pane = m.createPane(SEL_PANE);
+    pane.style.zIndex = SEL_PANE_Z;
+    pane.style.pointerEvents = 'none';
+  }
   if (!selRenderers.has(m)) selRenderers.set(m, L.canvas({ pane: SEL_PANE }));
   return selRenderers.get(m);
 }
@@ -1513,6 +1562,16 @@ export function onPointClick(p, targetMap = map) {
   if (!isNetwork || p.type === '11-NT' || p.type === '14-NOXH' || Number(p.size) > 0) {
     if (ntKind && !(Number(p.size) > 0)) sizeHtml = 'chưa rõ';
     html += `<div class="pp-row"><span>Diện tích${isPlanScenario ? ' QH' : ''}</span><b>${sizeHtml}</b></div>`;
+  }
+  const splitKey = isPlanScenario ? 'sizeQH' : 'sizeHT';
+  const splitParts = (p.wardParts || []).filter(pt => Number(pt[splitKey]) > 0);
+  if (splitParts.length) {
+    const rest = Math.max(0, Number(p.size) - splitParts.reduce((s, pt) => s + Number(pt[splitKey]), 0));
+    html += `<div class="pp-row"><span>Vắt ranh phường</span><b>${escapeHtml(p.ward || 'Phường chính')}: ${fmtNum(Math.round(rest))}&nbsp;m²${splitParts.map(pt => `<br>${escapeHtml(pt.ward)}: ${fmtNum(Math.round(Number(pt[splitKey])))}&nbsp;m²`).join('')}<br><span class="pp-sub">Diện tích chỉ tiêu phường tính theo từng phần</span></b></div>`;
+  }
+  const planList = planRows(p.plan);
+  if (planList.length) {
+    html += `<div class="pp-row"><span>Chỉ tiêu quy hoạch</span><b>${planList.map(([k, v]) => `${k}: ${escapeHtml(v)}`).join('<br>')}${p.tenQH ? `<br><span class="pp-sub">Đồ án ${escapeHtml(p.tenQH)}</span>` : ''}</b></div>`;
   }
   if (!isCSDUnapproved) {
     const radiusLabel = p.type === '13-BUS' ? 'Phạm vi đi bộ' : ntKind ? 'Khoảng cách an toàn' : 'Bán kính phục vụ';

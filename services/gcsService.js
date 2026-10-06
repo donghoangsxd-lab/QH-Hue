@@ -27,6 +27,31 @@ function classifyPlanChange(sizeHT, sizeQH) {
   return 'keep';
 }
 
+// Cột TangCao / MatDoXD / HeSoSDD (Sheet) → { floors, coverage, far }; không có chỉ tiêu nào → null
+function planOf(props) {
+  const pick = (v) => (v === undefined || v === null ? '' : String(v).trim());
+  const plan = { floors: pick(props.TangCao), coverage: pick(props.MatDoXD), far: pick(props.HeSoSDD) };
+  return plan.floors || plan.coverage || plan.far ? plan : null;
+}
+
+const SPLIT_ID_RE = /^(.+)\.(\d+)$/;
+
+// Dòng mảnh phường <ID>.2 (lô vắt ranh, Apps Script writeWardSplits) không phải công trình riêng:
+// gắn vào công trình chính thành wardParts [{ id, ward, lat, lng, sizeHT, sizeQH }] để thống kê diện tích theo phường
+function attachWardParts(items) {
+  const byId = new Map(items.map(it => [it.id, it]));
+  const out = [];
+  items.forEach(it => {
+    const m = it.id.match(SPLIT_ID_RE);
+    const parent = m && Number(m[2]) >= 2 ? byId.get(m[1]) : null;
+    if (!parent) { out.push(it); return; }
+    (parent.wardParts = parent.wardParts || []).push({
+      id: it.id, ward: it.ward, lat: it.lat, lng: it.lng, sizeHT: it.sizeHT, sizeQH: it.sizeQH
+    });
+  });
+  return out;
+}
+
 // Object công khai không đặt Cache-Control bị cache biên của Google giữ tới 1 giờ: thêm ?v= để HEAD/GET luôn tới bản gốc
 const bypassEdge = (url) => `${url}?v=${Date.now()}`;
 
@@ -109,10 +134,13 @@ async function getRawDataList() {
       };
       if (mappedType === '11-NT') item.ntKind = constants.ntKind(item);
       item.tenQH = String(props.Ten_QH || '');
+      const plan = planOf(props);
+      if (plan) item.plan = plan;
       item.radius = constants.defaultRadius(item);
       return item;
     }).filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng)
       && Math.abs(item.lat) <= 90 && Math.abs(item.lng) <= 180);
+    cachedGeoJSON = attachWardParts(cachedGeoJSON);
 
     // Chỉ tăng phiên bản khi dữ liệu thật sự đổi (HEAD lỗi thì vẫn tải lại nhưng không làm mất các cache tính toán phía sau)
     if (!loadedETag || loadedETag !== lastETag) dataVersion++;
@@ -129,7 +157,10 @@ async function getRawDataList() {
 let cachedParcels = null;
 let lastParcelETag = null;
 
-/** [{ id, phase: 'HT'|'QH', layer, area, geometry }]; file chưa có (chưa nhập DXF lần nào) → [] */
+/**
+ * [{ id, kind, phase: 'HT'|'QH', layer, area, geometry }]; kind INFRA = ranh lô công trình, DXF = lô đất khác,
+ * PROJECT = ranh tổng đồ án (id = Ten_QH, kèm infraCount / landCount / time). File chưa có → []
+ */
 async function getCadParcels() {
   try {
     let currentETag = null;
@@ -149,16 +180,29 @@ async function getCadParcels() {
       .filter(ft => ft && ft.geometry && (ft.geometry.type === 'Polygon' || ft.geometry.type === 'MultiPolygon'))
       .map(ft => {
         const props = ft.properties || {};
+        const kind = String(props.Kind || '').toUpperCase();
+        if (kind === 'PROJECT') {
+          return {
+            id: String(props.ID_DoiTuong || ''),
+            kind,
+            ward: String(props.XaPhuong || ''),
+            infraCount: Number(props.SoCongTrinh) || 0,
+            landCount: Number(props.SoLoDat) || 0,
+            time: String(props.ThoiGianNhap || ''),
+            geometry: ft.geometry
+          };
+        }
         return {
           id: String(props.ID_DoiTuong || ''),
           phase: String(props.GiaiDoan || '').toUpperCase() === 'QH' ? 'QH' : 'HT',
           layer: String(props.Layer || ''),
           area: Number(props.DienTich) || null,
           file: String(props.File || ''),
-          kind: String(props.Kind || '').toUpperCase() === 'DXF' ? 'DXF' : 'INFRA',
+          kind: kind === 'DXF' ? 'DXF' : 'INFRA',
           name: String(props.Ten || ''),
           nhom: String(props.Nhom || ''),
           ward: String(props.XaPhuong || ''),
+          plan: planOf(props),
           geometry: ft.geometry
         };
       })

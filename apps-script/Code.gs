@@ -2,7 +2,8 @@
 // GOOGLE APPS SCRIPT: HTXH-HUE (TỐI ƯU BATCH IN-MEMORY & LOCKSERVICE)
 // Quy mô tách 2 cột: QuyMo_HT (hiện trạng) & QuyMo_QH (quy hoạch)
 // Nhập hàng loạt từ DXF: doPost action=importCadBatch; lô hạ tầng ghi vào 13 tab (cột M Geojson),
-// lô đất khác ghi tab DXF-NN của đồ án (Ten_QH); ranh lô xuất ra cad_parcels.json
+// lô đất khác ghi tab DXF-NN của đồ án (Ten_QH); ranh lô + ranh tổng đồ án (tab DS_DoAn) xuất ra cad_parcels.json.
+// Xóa đồ án: doPost action=deleteProject
 // =========================================================================
 
 const BUCKET_NAME = "hue-infra-data-us";
@@ -10,14 +11,19 @@ const GEOJSON_FILE_NAME = "infrastructure_hue.json";
 const CAD_FILE_NAME = "cad_parcels.json";
 const CAD_SHEET_NAME = "CAD_Polygon";
 const CAD_HEADERS = ["ID_DoiTuong", "Layer", "DienTich", "File", "ThoiGianNhap", "GeoJSON", "GiaiDoan"];
+// Danh mục đồ án: 1 dòng / đồ án (Ten_QH), ranh tổng dựng ở webapp khi nhập; xóa đồ án thì xóa dòng
+const PROJECT_SHEET_NAME = "DS_DoAn";
+const PROJECT_HEADERS = ["Ten_QH", "File", "Phuong", "SoCongTrinh", "SoLoDat", "ThoiGianNhap", "Geojson"];
 const VALID_PREFIXES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-THPT", "7-YT", "8-VH", "9-TM", "10-PCCC", "11-NT", "12-CSD", "13-BUS", "14-NOXH"];
 
 // Mạng lưới hạ tầng khác (QCVN 01:2026 Mục 2.8.3.3, 2.5.13.1, 2.12): tab tự tạo khi ghi điểm đầu tiên
 const NETWORK_TABS = { "13-BUS": "Trạm dừng xe buýt", "10-PCCC": "Trụ sở PCCC", "11-NT": "Nhà tang lễ, nghĩa trang", "14-NOXH": "Nhà ở xã hội" };
 // Loại không cần diện tích: điểm quy hoạch mới được ghi QuyMo_QH = 0
 const NO_AREA_TYPES = ["13-BUS", "10-PCCC"];
+// Chỉ tiêu quy hoạch lô (tầng cao, mật độ xây dựng %, hệ số sử dụng đất) — tab cũ chưa có thì tự thêm cuối dòng tiêu đề khi nhập đồ án
+const PLAN_HEADERS = ["TangCao", "MatDoXD", "HeSoSDD"];
 const STANDARD_HEADERS = ["ID_DoiTuong", "Ten_CongTrinh", "Ten_XaPhuong", "Nhom_HaTang", "Latitude", "Longitude",
-  "QuyMo_HT", "QuyMo_QH", "Ten_QH", "TrangThai", "ThoiGianCapNhat", "Note", "Geojson"];
+  "QuyMo_HT", "QuyMo_QH", "Ten_QH", "TrangThai", "ThoiGianCapNhat", "Note", "Geojson"].concat(PLAN_HEADERS);
 const GEOJSON_MAX_CHARS = 45000;
 
 // Cột được xác định theo tên tiêu đề dòng 1 (không phân biệt hoa thường, bỏ khoảng trắng)
@@ -34,8 +40,12 @@ const COLUMN_ALIASES = {
   trangThai: ['trangthai'],
   geojson: ['geojson'],
   thoiGian: ['thoigiancapnhat'],
-  ghiChu: ['note', 'ghichu']
+  ghiChu: ['note', 'ghichu'],
+  tangCao: ['tangcao'],
+  matDoXD: ['matdoxd', 'matdoxaydung'],
+  heSoSDD: ['hesosdd', 'hesosudungdat']
 };
+const PLAN_KEYS = { floors: 'tangCao', coverage: 'matDoXD', far: 'heSoSDD' };
 
 function getAccessTokenDirect() {
   return ScriptApp.getOAuthToken();
@@ -104,6 +114,43 @@ function cellAt(row, idx) {
 function getSheetHeaders(sheet) {
   var lastCol = sheet.getLastColumn();
   return lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+}
+
+// Thêm cột chỉ tiêu quy hoạch còn thiếu vào cuối dòng tiêu đề (không đụng cột sẵn có)
+function ensurePlanColumns(sheet) {
+  var headers = getSheetHeaders(sheet);
+  var col = getColumnMap(headers);
+  // Khóa COLUMN_ALIASES = tên cột viết thường chữ đầu (TangCao → tangCao)
+  var missing = PLAN_HEADERS.filter(function(h) { return col[h.charAt(0).toLowerCase() + h.slice(1)] < 0; });
+  if (!missing.length) return;
+  sheet.getRange(1, headers.length + 1, 1, missing.length).setValues([missing]).setFontWeight('bold');
+}
+
+// "1,2" / "40" / "3-5" → số nếu được, không thì chuỗi ngắn; trống → ''
+function planValue(v) {
+  var s = String(v === null || v === undefined ? '' : v).trim().replace(',', '.');
+  if (!s) return '';
+  var n = Number(s);
+  return isFinite(n) ? n : s.slice(0, 20);
+}
+
+// plan = { floors, coverage, far } từ webapp → fn(chỉ số cột, giá trị) cho từng chỉ tiêu có giá trị và tab có cột
+function eachPlanValue(plan, col, fn) {
+  if (!plan) return;
+  Object.keys(PLAN_KEYS).forEach(function(k) {
+    var v = planValue(plan[k]);
+    var idx = col[PLAN_KEYS[k]];
+    if (v !== '' && idx >= 0) fn(idx, v);
+  });
+}
+
+// Chỉ tiêu quy hoạch của dòng → thuộc tính GeoJSON (chỉ ô có giá trị, giữ file bucket gọn)
+function planProps(row, col, props) {
+  PLAN_HEADERS.forEach(function(h) {
+    var v = cellAt(row, col[h.charAt(0).toLowerCase() + h.slice(1)]);
+    if (v !== undefined && v !== null && String(v).trim() !== '') props[h] = String(v).trim();
+  });
+  return props;
 }
 
 // Từ 1000 trở đi giữ đủ chữ số (tránh "CV-1000" bị cắt thành "CV-000")
@@ -199,7 +246,7 @@ function collectFeatures(ss) {
       features.push({
         "type": "Feature",
         "geometry": { "type": "Point", "coordinates": [lng, lat] },
-        "properties": {
+        "properties": planProps(row, col, {
           "ID_DoiTuong": id,
           "Ten_CongTrinh": name,
           "Ten_XaPhuong": String(cellAt(row, col.ward) || ''),
@@ -212,7 +259,7 @@ function collectFeatures(ss) {
           "ThoiGianCapNhat": String(cellAt(row, col.thoiGian) || ''),
           "GhiChu": String(cellAt(row, col.ghiChu) || ''),
           "Tab": tabCode
-        }
+        })
       });
     }
     Logger.log("✓ Tab '" + sheetName + "': Đóng gói " + count + " điểm!");
@@ -262,7 +309,8 @@ function collectCadFeatures(ss, pointFeatures) {
       var id = String(data[i][col.id] || '').trim();
       var geom = parseGeomCell(cellAt(data[i], col.geojson));
       if (!id || !geom) continue;
-      if (!dxf && !live[id]) continue;
+      // Dòng mảnh phường (<ID>.2) của lô vắt ranh: ranh lô vẽ theo dòng chính
+      if (!dxf && (!live[id] || /\.\d+$/.test(id))) continue;
       var note = String(cellAt(data[i], col.ghiChu) || '');
       var layerMatch = note.match(/Layer\s+([^\s;|]+)/i);
       var ht = parseOptionalNumber(cellAt(data[i], col.quyMoHT));
@@ -289,6 +337,7 @@ function collectCadFeatures(ss, pointFeatures) {
           props.Ten = String(cellAt(data[i], col.name) || '');
           props.Nhom = String(cellAt(data[i], col.nhom) || '');
           props.XaPhuong = String(cellAt(data[i], col.ward) || '');
+          planProps(data[i], col, props);
         }
         pushParcel(out, seen, props, geom);
       });
@@ -318,8 +367,35 @@ function collectCadFeatures(ss, pointFeatures) {
       }
     }
   }
+  collectProjectFeatures(ss, out);
   Logger.log("✓ Ranh lô: " + out.length);
-  return out.length ? out : null;
+  // Ghi cả khi rỗng: xóa đồ án cuối cùng phải xóa luôn ranh trên bucket
+  return out;
+}
+
+// Ranh tổng đồ án (tab DS_DoAn) → Kind PROJECT trong cad_parcels.json: webapp vẽ ranh đồ án khi thu nhỏ, liệt kê ở panel Lớp dữ liệu
+function collectProjectFeatures(ss, out) {
+  var sheet = ss.getSheetByName(PROJECT_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return;
+  var data = sheet.getDataRange().getValues();
+  var col = {};
+  data[0].map(normalizeHeader).forEach(function(h, i) { col[h] = i; });
+  for (var r = 1; r < data.length; r++) {
+    var name = String(cellAt(data[r], col.ten_qh === undefined ? -1 : col.ten_qh) || '').trim();
+    var geom = parseGeomCell(cellAt(data[r], col.geojson === undefined ? -1 : col.geojson));
+    if (!name || !geom) continue;
+    var time = cellAt(data[r], col.thoigiannhap === undefined ? -1 : col.thoigiannhap);
+    if (time instanceof Date) time = Utilities.formatDate(time, "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm");
+    out.push({ "type": "Feature", "geometry": geom, "properties": {
+      "ID_DoiTuong": name,
+      "Kind": "PROJECT",
+      "File": name,
+      "XaPhuong": String(cellAt(data[r], col.phuong === undefined ? -1 : col.phuong) || ''),
+      "SoCongTrinh": parseCleanNumber(cellAt(data[r], col.socongtrinh === undefined ? -1 : col.socongtrinh)),
+      "SoLoDat": parseCleanNumber(cellAt(data[r], col.solodat === undefined ? -1 : col.solodat)),
+      "ThoiGianNhap": String(time || '')
+    } });
+  }
 }
 
 // HÀM ĐẨY DỮ LIỆU ĐÈ LÊN GCS BUCKET (VỚI CƠ CHẾ KHÓA LOCKSERVICE)
@@ -776,6 +852,7 @@ function doPost(e) {
     var action = String(body.action || '');
     if (action === "importCadBatch") return jsonOutput(importCadBatch(body));
     if (action === "markWardNotes") return jsonOutput(markWardNotes(body));
+    if (action === "deleteProject") return jsonOutput(deleteProject(body));
     if (action === "saveRoads") return jsonOutput(saveRoads(body));
     if (action === "savePopEdits") return jsonOutput(savePopEdits(body));
     if (action === "saveDrainage") return jsonOutput(saveDrainage(body));
@@ -795,7 +872,8 @@ function doPost(e) {
 
 /**
  * Nhập lô đất từ DXF/KML/KMZ. body = { phase: 'HT'|'QH', fileName, sync, items: [{ type, idPrefix, nhom, name, ward,
- * lat, lng, size, area, crossWard, layer, matchId, geometry, stages }] }
+ * lat, lng, size, area, crossWard, layer, matchId, geometry, stages, plan }] }
+ * - plan: { floors, coverage, far } chỉ tiêu quy hoạch lô → cột TangCao / MatDoXD / HeSoSDD (tab chưa có cột thì tự thêm)
  * - stages: [{ phase, size, area, point, crossWard, layer, geometry }] — 1 giai đoạn, hoặc 2 (lô HT + QH cùng vị trí,
  *   tên layer theo TT16); không có stages thì 1 giai đoạn = body.phase với size / area / geometry của item
  * - matchId có trong Sheet → cập nhật tọa độ, phường, quy mô các giai đoạn đang nhập; không có → thêm dòng mới
@@ -827,6 +905,55 @@ function geoCell(geometry) {
   return text.length > GEOJSON_MAX_CHARS ? '' : text;
 }
 
+/**
+ * Lô vắt ranh phường: mỗi mảnh phường phụ 1 dòng <ID>.2, <ID>.3 (cùng tên, nhóm, đồ án, chỉ tiêu; quy mô = phần diện tích trong phường đó).
+ * Dòng mảnh chỉ dùng tính diện tích chỉ tiêu phường (webapp không vẽ, không đếm thêm công trình).
+ * Chỉ ghi quy mô các giai đoạn đang nhập; mảnh cũ không còn: xóa dòng nếu giai đoạn kia cũng trống, không thì chỉ xóa quy mô giai đoạn đang nhập.
+ */
+function writeWardSplits(c, id, it, stages, project, currentTime) {
+  var phases = stages.map(function(st) { return st.phase; });
+  var qColOf = function(ph) { return ph === 'QH' ? c.col.quyMoQH : c.col.quyMoHT; };
+  var written = 0;
+  (Array.isArray(it.splits) ? it.splits : []).forEach(function(sp) {
+    var spStages = (sp.stages || []).filter(function(st) { return phases.indexOf(st.phase) >= 0; });
+    if (!spStages.length) return;
+    written++;
+    var sid = id + '.' + (written + 1);
+    var r = c.idRow[sid];
+    var row = r === undefined ? new Array(c.data[0].length).fill('') : null;
+    var set = row
+      ? function(idx, v) { if (idx >= 0) row[idx] = v; }
+      : function(idx, v) { if (idx >= 0) c.sheet.getRange(r + 1, idx + 1).setValue(v); };
+    set(c.col.id, sid);
+    set(c.col.name, it.name);
+    set(c.col.ward, sheetWard(sp.ward));
+    set(c.col.nhom, sheetNhom(it.nhom));
+    set(c.col.lat, Number(sp.lat));
+    set(c.col.lng, Number(sp.lng));
+    spStages.forEach(function(st) { set(qColOf(st.phase), st.size); });
+    set(c.col.tenQH, project);
+    set(c.col.geojson, geoCell(spStages[0].geometry));
+    set(c.col.trangThai, true);
+    set(c.col.thoiGian, currentTime);
+    set(c.col.ghiChu, "Phần trong " + sp.ward + " của lô " + id + " (tách ranh phường, chỉ tính diện tích chỉ tiêu phường)");
+    eachPlanValue(it.plan, c.col, set);
+    if (row) c.newRows.push(row);
+  });
+  var prefix = id + '.';
+  Object.keys(c.idRow).forEach(function(rid) {
+    if (rid.indexOf(prefix) !== 0) return;
+    var n = Number(rid.slice(prefix.length));
+    if (!(n >= 2) || n <= written + 1) return;
+    var r = c.idRow[rid];
+    var otherFilled = ['HT', 'QH'].some(function(ph) {
+      var qc = qColOf(ph);
+      return phases.indexOf(ph) < 0 && qc >= 0 && String(cellAt(c.data[r], qc)).trim() !== '';
+    });
+    if (!otherFilled) { c.staleRows.push(r); return; }
+    phases.forEach(function(ph) { if (qColOf(ph) >= 0) c.sheet.getRange(r + 1, qColOf(ph) + 1).setValue(''); });
+  });
+}
+
 function importCadBatch(body) {
   var items = Array.isArray(body.items) ? body.items : [];
   var phase = body.phase === 'QH' ? 'QH' : 'HT';
@@ -838,6 +965,7 @@ function importCadBatch(body) {
   var created = [], updated = [], skipped = [], polygons = [];
   var landCount = 0;
 
+  var needPlan = items.some(function(it) { return !!it.plan; });
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
@@ -846,6 +974,7 @@ function importCadBatch(body) {
       if (ctx.hasOwnProperty(typeCode)) return ctx[typeCode];
       var sheet = findInfraSheet(ss, typeCode);
       if (!sheet) return (ctx[typeCode] = null);
+      if (needPlan) ensurePlanColumns(sheet);
       var data = sheet.getDataRange().getValues();
       var col = getColumnMap(data[0]);
       var idRow = {};
@@ -853,7 +982,7 @@ function importCadBatch(body) {
         var rid = String(cellAt(data[r], col.id) || '').trim();
         if (rid) idRow[rid] = r;
       }
-      return (ctx[typeCode] = { sheet: sheet, data: data, col: col, idRow: idRow, maxNum: {}, newRows: [] });
+      return (ctx[typeCode] = { sheet: sheet, data: data, col: col, idRow: idRow, maxNum: {}, newRows: [], staleRows: [] });
     };
     var nextId = function(c, prefix) {
       if (!c.maxNum.hasOwnProperty(prefix)) c.maxNum[prefix] = maxIdNumber(c.data, c.col.id, prefix);
@@ -889,6 +1018,8 @@ function importCadBatch(body) {
           + (st.point ? ", dạng điểm, chưa có diện tích" : "")
           + (st.crossWard ? ", vắt ranh phường, diện tích thật " + st.area + " m²" : "");
       }).join("; ") + ")";
+      var splitWards = (Array.isArray(it.splits) ? it.splits : []).map(function(sp) { return sp.ward; });
+      if (splitWards.length) note += "; vắt ranh phường: phần trong " + splitWards.join(", ") + " ghi dòng ID hậu tố .2, .3";
       var r = it.matchId ? c.idRow[it.matchId] : undefined;
       var id;
 
@@ -908,6 +1039,7 @@ function importCadBatch(body) {
         if (c.col.trangThai >= 0) c.sheet.getRange(sheetRow, c.col.trangThai + 1).setValue(true);
         if (c.col.thoiGian >= 0) c.sheet.getRange(sheetRow, c.col.thoiGian + 1).setValue(currentTime);
         if (c.col.ghiChu >= 0) c.sheet.getRange(sheetRow, c.col.ghiChu + 1).setValue(prevNote ? prevNote + " | " + note : note);
+        eachPlanValue(it.plan, c.col, function(idx, v) { c.sheet.getRange(sheetRow, idx + 1).setValue(v); });
         updated.push(id);
       } else {
         id = nextId(c, String(it.idPrefix || it.type.split('-')[1]));
@@ -925,18 +1057,23 @@ function importCadBatch(body) {
         set(c.col.trangThai, true);
         set(c.col.thoiGian, currentTime);
         set(c.col.ghiChu, note);
+        eachPlanValue(it.plan, c.col, set);
         c.newRows.push(row);
         created.push(id);
       }
+      writeWardSplits(c, id, it, stages, project, currentTime);
       stages.forEach(function(st) {
         if (st.geometry) polygons.push({ id: id, layer: st.layer, area: st.area, geometry: st.geometry, phase: st.phase });
       });
     });
 
-    // Dòng mới ghi 1 lần mỗi tab, chép định dạng + danh sách chọn (Nhom_HaTang, TrangThai) từ dòng dữ liệu cuối
+    // Dòng mới ghi 1 lần mỗi tab, chép định dạng + danh sách chọn (Nhom_HaTang, TrangThai) từ dòng dữ liệu cuối.
+    // Xóa dòng mảnh phường cũ trước (từ dưới lên để chỉ số dòng phía trên không đổi)
     Object.keys(ctx).forEach(function(k) {
       var c = ctx[k];
-      if (!c || !c.newRows.length) return;
+      if (!c) return;
+      c.staleRows.sort(function(a, b) { return b - a; }).forEach(function(r) { c.sheet.deleteRow(r + 1); });
+      if (!c.newRows.length) return;
       var start = c.sheet.getLastRow() + 1;
       var n = c.newRows.length;
       var w = c.data[0].length;
@@ -951,6 +1088,7 @@ function importCadBatch(body) {
 
     upsertCadPolygons(ss, polygons, fileName, currentTime, filePhase || phase);
     landCount = writeDxfLands(ss, body.lands, project, filePhase || phase, currentTime, body.landsReset === true);
+    if (body.registry) upsertProjectRegistry(ss, project, fileName, body.registry, currentTime);
     SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
@@ -1327,6 +1465,7 @@ function writeDxfLands(ss, lands, project, phase, currentTime, reset) {
     set(col.thoiGian, currentTime);
     set(col.ghiChu, 'Layer ' + String(it.layer || ''));
     set(col.geojson, geoCell(it.geometry));
+    eachPlanValue(it.plan, col, set);
     return row;
   });
   sheet.getRange(start, 1, rows.length, width).setValues(rows);
@@ -1366,4 +1505,105 @@ function upsertCadPolygons(ss, polygons, fileName, currentTime, phase) {
     sheet.getRange(start, 6, appends.length, 1).setNumberFormat("@");
     sheet.getRange(start, 1, appends.length, CAD_HEADERS.length).setValues(appends);
   }
+}
+
+// reg = { boundary (GeoJSON ranh tổng), wards: [tên phường], infra, lands } — nhập lại cùng đồ án thì ghi đè dòng cũ
+function upsertProjectRegistry(ss, project, fileName, reg, currentTime) {
+  var sheet = ss.getSheetByName(PROJECT_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(PROJECT_SHEET_NAME);
+    sheet.setFrozenRows(1);
+  }
+  sheet.getRange(1, 1, 1, PROJECT_HEADERS.length).setValues([PROJECT_HEADERS]).setFontWeight('bold');
+  var values = [project, fileName, (Array.isArray(reg.wards) ? reg.wards : []).join(', '),
+    Number(reg.infra) || 0, Number(reg.lands) || 0, currentTime, geoCell(reg.boundary)];
+  var last = sheet.getLastRow();
+  var row = last + 1;
+  if (last > 1) {
+    sheet.getRange(2, 1, last - 1, 1).getValues().some(function(v, i) {
+      if (String(v[0] || '').trim() !== project) return false;
+      row = i + 2;
+      return true;
+    });
+  }
+  sheet.getRange(row, PROJECT_HEADERS.length).setNumberFormat("@");
+  sheet.getRange(row, 1, 1, values.length).setValues([values]);
+}
+
+// Xóa các dòng (số dòng 1-based, tăng dần) theo từng khối liền nhau, từ dưới lên.
+// Sheet không cho xóa hết mọi dòng không cố định: xóa tới dòng cuối thì chèn thêm 1 dòng trống trước
+function deleteRowBlocks(sheet, rows) {
+  var k = rows.length - 1;
+  while (k >= 0) {
+    var end = rows[k];
+    var start = end;
+    while (k > 0 && rows[k - 1] === start - 1) { k--; start--; }
+    if (end >= sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(), 1);
+    sheet.deleteRows(start, end - start + 1);
+    k--;
+  }
+}
+
+/**
+ * Xóa toàn bộ 1 đồ án (body.project = Ten_QH): mọi dòng Ten_QH = đồ án ở các tab hạ tầng (kể cả dòng có từ trước
+ * và dòng mảnh phường), tab DXF-NN của đồ án, ranh CAD_Polygon của các dòng đó / nhập từ file đồ án, dòng DS_DoAn.
+ */
+function deleteProject(body) {
+  var project = String(body.project || '').trim();
+  if (!project) return { "error": "Thiếu tên đồ án" };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ids = {};
+  var infra = 0, lands = 0, polygons = 0;
+  var tabs = [];
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    ss.getSheets().forEach(function(sheet) {
+      var name = String(sheet.getName()).trim();
+      var dxf = /^DXF-\d+$/i.test(name);
+      if ((!dxf && !isValidInfraSheet(name)) || sheet.getLastRow() < 2) return;
+      var data = sheet.getDataRange().getValues();
+      var col = getColumnMap(data[0]);
+      if (col.tenQH < 0) return;
+      var rows = [];
+      for (var r = 1; r < data.length; r++) {
+        if (String(data[r][col.tenQH] || '').trim() !== project) continue;
+        rows.push(r + 1);
+        if (!dxf && col.id >= 0) ids[String(data[r][col.id] || '').trim()] = true;
+      }
+      if (!rows.length) return;
+      if (dxf) lands += rows.length; else infra += rows.length;
+      if (dxf && rows.length === data.length - 1) {
+        ss.deleteSheet(sheet);
+        tabs.push(name);
+        return;
+      }
+      deleteRowBlocks(sheet, rows);
+    });
+
+    var cad = ss.getSheetByName(CAD_SHEET_NAME);
+    if (cad && cad.getLastRow() > 1) {
+      var cadRows = [];
+      cad.getRange(2, 1, cad.getLastRow() - 1, CAD_HEADERS.length).getValues().forEach(function(v, i) {
+        if (ids[String(v[0] || '').trim()] || projectTitle(v[3]) === project) cadRows.push(i + 2);
+      });
+      deleteRowBlocks(cad, cadRows);
+      polygons = cadRows.length;
+    }
+
+    var reg = ss.getSheetByName(PROJECT_SHEET_NAME);
+    if (reg && reg.getLastRow() > 1) {
+      var regRows = [];
+      reg.getRange(2, 1, reg.getLastRow() - 1, 1).getValues().forEach(function(v, i) {
+        if (String(v[0] || '').trim() === project) regRows.push(i + 2);
+      });
+      deleteRowBlocks(reg, regRows);
+    }
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+
+  syncSheetsToGCS();
+  return { "success": true, "infra": infra, "lands": lands, "polygons": polygons, "tabs": tabs };
 }

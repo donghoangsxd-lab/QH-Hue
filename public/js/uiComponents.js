@@ -158,6 +158,7 @@ function updateAuthUi() {
     btnAuth.setAttribute('aria-label', btnAuth.title);
     btnAuth.innerHTML = ico(isAdmin ? 'user' : 'key');
   }
+  document.dispatchEvent(new CustomEvent('auth:change'));
   const signOut = document.getElementById('btnSignOut');
   if (signOut) signOut.style.display = isAdmin ? '' : 'none';
   const wardRoadsBtn = document.getElementById('btnWardRoads');
@@ -483,12 +484,13 @@ function initPart1Flip() {
   });
 }
 
-// Donut 2 vòng đồng tâm: trong = hiện trạng (sourceList), ngoài = quy hoạch (planList)
-export function updateInfraPieChart(sourceList, planList = []) {
+// Donut 2 vòng đồng tâm: trong = hiện trạng (sourceList), ngoài = quy hoạch (planList).
+// areaLists { ht, qh }: danh sách tính diện tích khi lô vắt ranh chỉ tính phần trong phường đang chọn (số lượng vẫn theo sourceList / planList)
+export function updateInfraPieChart(sourceList, planList = [], areaLists = null) {
   renderInfraCountCards(sourceList, planList);
   const legendContainer = document.getElementById('pieLegendDetails');
-  const ht = sumAreaByType(sourceList);
-  const qh = sumAreaByType(planList);
+  const ht = sumAreaByType(areaLists ? areaLists.ht : sourceList);
+  const qh = sumAreaByType(areaLists ? areaLists.qh : planList);
 
   const isEmpty = !ht.sum && !qh.sum;
   const keys = isEmpty ? ['empty'] : Object.keys(PIE_LABELS);

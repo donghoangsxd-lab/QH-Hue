@@ -277,6 +277,45 @@ function parseCadStage(s, fallbackLayer) {
   };
 }
 
+// Chỉ tiêu quy hoạch lô { floors, coverage, far } → cột TangCao / MatDoXD / HeSoSDD; null nếu trống
+function parseCadPlan(plan) {
+  if (!plan || typeof plan !== 'object') return null;
+  const out = {};
+  ['floors', 'coverage', 'far'].forEach(k => {
+    const v = sanitizeSheetText(plan[k], 20);
+    if (v) out[k] = v;
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+const CAD_SPLITS_MAX = 3;
+
+// Danh mục đồ án gửi kèm phần đầu của lần nhập: { boundary (ranh tổng), wards, infra, lands }; null nếu không hợp lệ
+function parseCadRegistry(reg) {
+  if (!reg || typeof reg !== 'object') return null;
+  let boundary = parseCadGeometry(reg.boundary);
+  if (boundary && JSON.stringify(boundary).length > CAD_GEOJSON_MAX_CHARS) boundary = null;
+  const wards = (Array.isArray(reg.wards) ? reg.wards : []).slice(0, 12).map(w => sanitizeSheetText(w, 80)).filter(Boolean);
+  const count = (v) => Math.max(0, Math.min(100000, Math.round(Number(v) || 0)));
+  return { boundary, wards, infra: count(reg.infra), lands: count(reg.lands) };
+}
+
+// Mảnh phường phụ của lô vắt ranh: { ward, lat, lng, stages: [{ phase, area, geometry }] }, giai đoạn phải thuộc lô chính
+function parseCadSplits(raw, layer, phases) {
+  if (!Array.isArray(raw) || !raw.length) return [];
+  if (raw.length > CAD_SPLITS_MAX) return null;
+  const out = [];
+  for (const sp of raw) {
+    if (!sp || typeof sp !== 'object' || !Array.isArray(sp.stages) || !sp.stages.length || sp.stages.length > 2) return null;
+    const pt = parseCoordInBounds(sp.lat, sp.lng);
+    const ward = sanitizeSheetText(sp.ward, 80);
+    const stages = sp.stages.map(s => parseCadStage({ ...s, point: false, crossWard: false }, layer));
+    if (!pt || !ward || stages.some(s => !s || !phases.includes(s.phase))) return null;
+    out.push({ ward, lat: pt.lat.toFixed(6), lng: pt.lng.toFixed(6), stages });
+  }
+  return out;
+}
+
 // 1 lô đất ngoài 13 nhóm hạ tầng (ghi sheet DXF-NN của đồ án); null nếu không hợp lệ
 function parseLandItem(it) {
   if (!it || typeof it !== 'object') return null;
@@ -293,6 +332,7 @@ function parseLandItem(it) {
     lat: pt.lat.toFixed(6), lng: pt.lng.toFixed(6),
     area: Math.round(area * 10) / 10,
     phase: it.phase === 'QH' || it.phase === 'HT' ? it.phase : null,
+    plan: parseCadPlan(it.plan),
     geometry: JSON.stringify(geometry).length > CAD_GEOJSON_MAX_CHARS ? null : geometry
   };
 }
@@ -326,6 +366,8 @@ function parseCadItem(it, defaultPhase) {
   const first = stages[0];
   const nhom = it.nhom === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
   const name = sanitizeSheetText(it.name, 150) || `${layer} (DXF)`;
+  const splits = point ? [] : parseCadSplits(it.splits, layer, stages.map(s => s.phase));
+  if (!splits) return null;
   return {
     type, idPrefix, nhom, name,
     radius: qcvnRadius({ id: `${idPrefix}-0`, type, name, nhomHaTang: nhom, size: first.size }, ward),
@@ -334,30 +376,9 @@ function parseCadItem(it, defaultPhase) {
     area: first.area,
     size: first.size,
     geometry: first.geometry,
+    plan: parseCadPlan(it.plan),
+    splits,
     stages
-  };
-}
-
-function parseLandItem(it, defaultPhase) {
-  if (!it || typeof it !== 'object') return null;
-  const pt = parseCoordInBounds(it.lat, it.lng);
-  const ward = sanitizeSheetText(it.ward, 80);
-  const layer = sanitizeSheetText(it.layer, 80) || 'DAT';
-  if (!pt || !ward) return null;
-  const stage = parseCadStage({
-    phase: defaultPhase, area: it.area, point: false, crossWard: it.crossWard, layer, geometry: it.geometry
-  }, layer);
-  if (!stage || stage.point) return null;
-  return {
-    name: sanitizeSheetText(it.name, 150) || layer,
-    ward,
-    nhom: sanitizeSheetText(it.nhom, 40) || 'Đất khác',
-    layer: stage.layer,
-    lat: pt.lat.toFixed(6),
-    lng: pt.lng.toFixed(6),
-    area: stage.size,
-    geometry: stage.geometry,
-    phase: defaultPhase
   };
 }
 
@@ -1122,6 +1143,16 @@ function slimItem(item, profile) {
   return slim;
 }
 
+// Lô vắt ranh đã tách (item.wardParts, gcsService): bản chính tính phần diện tích còn lại cho phường chứa tọa độ lô,
+// mỗi mảnh phường phụ là bản areaOnly đặt tại mảnh (chỉ cộng diện tích, không thêm vào danh sách / số công trình).
+// partKey: 'sizeHT' (hiện trạng) / 'sizeQH' (quy hoạch)
+function wardShareItems(item, partKey) {
+  const parts = (item.wardParts || []).map(pt => ({ pt, size: Number(pt[partKey]) || 0 })).filter(x => x.size > 0);
+  if (!parts.length) return [item];
+  const rest = Math.max(0, (Number(item.size) || 0) - parts.reduce((s, x) => s + x.size, 0));
+  return [{ ...item, wardArea: rest }, ...parts.map(x => ({ ...item, lat: x.pt.lat, lng: x.pt.lng, wardArea: x.size, areaOnly: true }))];
+}
+
 // Gom diện tích công trình đã duyệt vào các nhóm chỉ tiêu cấp đô thị / cấp đơn vị ở (chỉ tiêu theo hồ sơ phường/xã)
 function bucketWardInfra(items, projPop, { withSubItems = true, profile = 'DT' } = {}) {
   const makeBucket = (key, cfg) => {
@@ -1149,8 +1180,8 @@ function bucketWardInfra(items, projPop, { withSubItems = true, profile = 'DT' }
     const key = levelKeyOf(item);
     const bucket = key && (urbanResults[key] || unitResults[key]);
     if (!bucket) return;
-    bucket.currentArea += Number(item.size || 0);
-    if (withSubItems) bucket.subItems.push(slimItem(item, profile));
+    bucket.currentArea += Number(item.wardArea ?? item.size ?? 0);
+    if (withSubItems && !item.areaOnly) bucket.subItems.push(slimItem(item, profile));
   });
 
   for (const key in constants.unitInfraConfig) {
@@ -1421,6 +1452,20 @@ module.exports = async (req, res) => {
       return res.status(200).send(d.text);
     }
 
+    // Đường trục chính rút gọn cả thành phố (mức phóng còn thấy một lúc nhiều phường, trên mức một biểu đồ tròn)
+    if (action === 'getMainRoads') {
+      const cv = Math.max(0, Math.round(Number(req.query.cv) || 0));
+      let lines = null;
+      try {
+        lines = await roads.mainRoadLines(cv);
+      } catch (err) {
+        console.warn('Đọc đường trục chính lỗi:', err.message);
+      }
+      if (!lines) return res.status(404).json({ error: true, message: 'Chưa có đường trục chính mức toàn thành phố' });
+      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=600, stale-while-revalidate=86400');
+      return res.status(200).json({ v: 1, lines });
+    }
+
     // Mạng lưới đường toàn thành phố (Admin tải từ OSM theo phường, lưu bucket roads/v2/ qua Apps Script)
     // "Phạm vi thực tế": cắt đường quanh công trình từ mạng lưới đã lưu; chưa tải đủ → 404, trình duyệt tự hỏi Overpass
     if (action === 'getRoads') {
@@ -1586,7 +1631,8 @@ module.exports = async (req, res) => {
         sync,
         items,
         lands,
-        landsReset: body.landsReset === true
+        landsReset: body.landsReset === true,
+        registry: parseCadRegistry(body.registry)
       });
       if (sync) invalidateAllCaches();
       return res.status(200).json({
@@ -1597,6 +1643,23 @@ module.exports = async (req, res) => {
         lands: Number(result.lands) || 0,
         landsDropped: rawLands.length - lands.length,
         polygonsDropped: items.reduce((n, it) => n + it.stages.filter(s => !s.geometry && !s.point).length, 0)
+      });
+    }
+
+    // Xóa toàn bộ 1 đồ án (Ten_QH): dòng hạ tầng, tab DXF-NN, ranh lô, dòng danh mục DS_DoAn
+    if (action === 'deleteProject') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const project = sanitizeSheetText(body.project, 120);
+      if (!project) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      const result = await callAppsScript({ action: 'deleteProject' }, { action: 'deleteProject', project });
+      invalidateAllCaches();
+      return res.status(200).json({
+        success: true,
+        infra: Number(result.infra) || 0,
+        lands: Number(result.lands) || 0,
+        polygons: Number(result.polygons) || 0
       });
     }
 
@@ -2250,7 +2313,8 @@ module.exports = async (req, res) => {
       const wardFeat = wardName ? findWardByName(evaluatedWardsCsd, wardName) : null;
       if (!wardFeat || !wardFeat.geometry) throw httpError(400, "Khu đất nằm ngoài ranh giới 40 phường/xã");
       const approvedAll = rawDataList.filter(it => isApprovedStatus(it.status) && it.lat != null && it.lng != null);
-      const approvedInWard = approvedAll.filter(it => assignWardByGeometry(it.lng, it.lat, evaluatedWardsCsd) === wardName);
+      const approvedInWard = approvedAll.flatMap(it => wardShareItems(it, 'sizeHT'))
+        .filter(it => assignWardByGeometry(it.lng, it.lat, evaluatedWardsCsd) === wardName);
       const ward = buildWardContext(wardFeat, approvedInWard);
       return { csd, ward, approvedAll, ...csdSuggestionCandidates(csd, ward, approvedAll) };
     };
@@ -2514,7 +2578,7 @@ module.exports = async (req, res) => {
         if (isCSD) {
           w.csdRaw.push(item);
         } else if (approved) {
-          w.items.push(item);
+          wardShareItems(item, 'sizeHT').forEach(x => wardMap[wardOf(x)]?.items.push(x));
         } else if (CODES.includes(typeCode)) {
           w.pendingItems.push(item);
         }
@@ -2525,7 +2589,7 @@ module.exports = async (req, res) => {
         const w = wardMap[wardOf(item)];
         if (!w) return;
         if (isCoverageItem(item)) w.planCovItems.push(item);
-        if (item.type !== "12-CSD") w.planItems.push(item);
+        if (item.type !== "12-CSD") wardShareItems(item, 'sizeQH').forEach(x => wardMap[wardOf(x)]?.planItems.push(x));
       });
       allDataList.forEach(item => {
         if (item.planChange !== 'new' && item.planChange !== 'relocate') return;

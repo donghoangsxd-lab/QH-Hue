@@ -1,7 +1,7 @@
 // Khớp thủ công loại hạ tầng khi file không đặt tên layer / thuộc tính theo quy ước mã loại:
 // người dùng chọn trường nhận diện (Layer, Folder, thuộc tính...), rồi gán từng giá trị tìm được với 1 loại hạ tầng.
 import { escapeHtml, ico } from './utils.js';
-import { layerToType, tt16Layer } from './cadImport.js';
+import { layerToType, tt16Layer, SCHOOL_PICK } from './cadImport.js';
 
 // Mã loại cho ô chọn (khớp LAYER_PREFIXES; cấp đơn vị ở dùng mã gốc, cấp đô thị thêm _DT)
 export const TYPE_CODE_OPTIONS = [
@@ -13,6 +13,7 @@ export const TYPE_CODE_OPTIONS = [
   ['TH', 'Trường Tiểu học'],
   ['THCS', 'Trường THCS'],
   ['THPT', 'Trường THPT (cấp đô thị)'],
+  [SCHOOL_PICK, 'Trường học – chọn cấp từng lô'],
   ['YT', 'Bệnh viện, Trạm y tế'],
   ['YT_DT', 'Y tế – cấp đô thị'],
   ['VH', 'Nhà văn hóa, thể thao'],
@@ -34,6 +35,7 @@ const GUESS_RULES = [
   ['THCS', /\bthcs\b|trung hoc co so/],
   ['TH', /tieu hoc|\bth\b/],
   ['MN', /mam non|mau giao|nha tre|\bmn\b/],
+  [SCHOOL_PICK, /truong hoc|giao duc/],
   ['CV', /cong vien|cay xanh|vuon hoa|diem xanh|\bpark\b/],
   ['BDX', /bai do|do xe|bai xe|parking|tram sac/],
   ['YT', /y te|benh vien|tram y|phong kham/],
@@ -42,12 +44,18 @@ const GUESS_RULES = [
   ['CSD', /chua su dung|bo trong|dat trong|\bcsd\b/]
 ];
 const URBAN_RE = /do thi|\bdt\b/;
+// Cây xanh hạn chế / chuyên dụng không phải công viên công cộng
+const NOT_PARK_RE = /cay xanh (han che|chuyen dung)/;
+const SCHOOL_CODES = new Set(['THPT', 'THCS', 'TH', 'MN']);
 
 const normalize = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .replace(/đ/gi, 'd').toLowerCase().replace(/[_\-.]+/g, ' ');
 
 function guessCode(value) {
   const s = normalize(value);
+  if (NOT_PARK_RE.test(s)) return '';
+  // Một giá trị gộp nhiều cấp trường (VD "Đất trường THCS_tiểu học_mầm non"): admin chọn cấp từng lô
+  if (GUESS_RULES.filter(([code, re]) => SCHOOL_CODES.has(code) && re.test(s)).length > 1) return SCHOOL_PICK;
   const hit = GUESS_RULES.find(([, re]) => re.test(s));
   if (!hit) return '';
   const urban = `${hit[0]}_DT`;

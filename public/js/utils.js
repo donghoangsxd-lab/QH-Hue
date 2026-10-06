@@ -49,6 +49,24 @@ const PCT_FORMAT = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 1, ma
 export const fmtNum = (value) => NUM_FORMAT.format(Number(value) || 0);
 export const fmtPct = (value) => `${PCT_FORMAT.format(Number(value) || 0)}%`;
 
+const PLAN_NUM_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
+
+/** Chỉ tiêu quy hoạch lô { floors, coverage, far } (số hoặc chuỗi như "3-5"; trống = chưa có) → [[nhãn, giá trị hiển thị]] */
+export function planRows(plan) {
+  if (!plan) return [];
+  const num = (v) => {
+    const n = Number(String(v).replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  };
+  const show = (v, fmt) => (num(v) == null ? String(v) : fmt(num(v)));
+  const rows = [];
+  if (plan.floors) rows.push(['Tầng cao', show(plan.floors, n => `${PLAN_NUM_FORMAT.format(n)} tầng`)]);
+  // Mật độ ghi dạng % (40) hoặc tỉ lệ (0,4)
+  if (plan.coverage) rows.push(['Mật độ xây dựng', show(plan.coverage, n => `${PLAN_NUM_FORMAT.format(n <= 1 ? n * 100 : n)}%`)]);
+  if (plan.far) rows.push(['Hệ số sử dụng đất', show(plan.far, n => PLAN_NUM_FORMAT.format(n))]);
+  return rows;
+}
+
 export function distanceMeters(lat1, lng1, lat2, lng2) {
   const R = 6371000;
   const toRad = (d) => (d * Math.PI) / 180;

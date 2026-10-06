@@ -105,7 +105,7 @@ export function newDevRowHtml(wardName) {
 export function devLegend(legend) {
   return `<div><span class="sat-swatch dev-swatch" style="--c:${legend.baseColor}"></span>Vùng hiện trạng (đã xây dựng đến ${legend.from})</div>`
     + `<div><span class="sat-swatch dev-swatch" style="--c:${legend.color}"></span>Vùng phát triển mới (${legend.from} → ${legend.to[0]}–${legend.to[1]})</div>`
-    + `<div class="flood-muted" title="${BASIS}">Phóng to từ mức ${DEV_MIN_ZOOM} để xem ranh. Cơ sở: Dynamic World ${legend.to[0]}–${legend.to[1]} − (GAIA ∪ GHSL${legend.from >= DW_FIRST_YEAR ? ' ∪ Dynamic World' : ''}) ${legend.from}. Logic tạm, sau này lấy ranh từ quy hoạch.</div>`;
+    + `<div class="flood-muted" title="${BASIS}">Phóng to từ mức ${DEV_MIN_ZOOM} để xem ranh. Cơ sở: Dynamic World ${legend.to[0]}–${legend.to[1]} − (GAIA ∪ GHSL${legend.from >= DW_FIRST_YEAR ? ' ∪ Dynamic World' : ''}) ${legend.from}. Logic tạm, sau này lấy ranh từ quy hoạch. Bản đồ Dynamic World gộp chung các đường, khu công nghiệp, nghĩa trang xây dựng mới vào "Đất xây dựng". Cần kiểm tra kỹ hiện trạng trước khi kết luận.</div>`;
 }
 
 export function devStats(d) {
@@ -122,5 +122,5 @@ export function devStats(d) {
     <div class="flood-kpi"><span>Vùng phát triển mới ${d.from} → nay</span><b>≈ ${HA.format(devSum)} ha · ≈ ${fmtNum(sum('devPop'))} người</b></div>
     ${top.length ? `<div class="flood-sub">Phát triển mới nhiều nhất</div><div class="flood-wards">${top.slice(0, 6).map(chip).join('')}</div>` : ''}
     <div class="flood-kpi"><span>Trong ${d.serviceM} m vườn hoa / bãi đỗ xe</span><b><span class="${pctClass(park)}">${pctText(park)}</span> / <span class="${pctClass(parking)}">${pctText(parking)}</span></b></div>
-    <div class="flood-muted">Dynamic World gộp cả đường, khu công nghiệp vào "đất xây dựng", cần đối chiếu đồ án quy hoạch trước khi kết luận.</div>`;
+    <div class="flood-muted">Bản đồ Dynamic World gộp chung các đường, khu công nghiệp, nghĩa trang xây dựng mới vào "Đất xây dựng". Cần kiểm tra kỹ hiện trạng trước khi kết luận.</div>`;
 }

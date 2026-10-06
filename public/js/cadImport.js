@@ -458,6 +458,7 @@ const TT16_PHASE = { HT: 'HT', QHDD: 'QH', QHDH: 'QH', QH: 'QH' };
 const TT16_LANDS = {
   DAT_DD_CAYXANHCCDOTHI: { code: 'CV', urban: true },
   DAT_HTXH_CAYXANHCC: { code: 'CV' }, DAT_CTHTXH_CAYXANHCC: { code: 'CV' }, DAT_KXD_CAYXANHCC: { code: 'CV' },
+  DAT_CAYXANHCC: { code: 'CV' },
   DAT_HTKT_BAIDOXE: { code: 'BDX' }, DAT_CTHTKT_BAIDOXE: { code: 'BDX' },
   DAT_DD_TRUONGTHPT: { code: 'THPT' }, DAT_HTXH_TRUONGTHPT: { code: 'THPT' }, DAT_CTHTXH_TRUONGTHPT: { code: 'THPT' },
   DAT_DD_TRUONGHOC: { code: 'SCHOOL' }, DAT_HTXH_TRUONGHOC: { code: 'SCHOOL' }, DAT_CTHTXH_TRUONGHOC: { code: 'SCHOOL' },
@@ -466,25 +467,32 @@ const TT16_LANDS = {
   DAT_NDD_VANHOATHETHAO: { code: 'VH', urban: true },
   DAT_HTXH_VANHOA: { code: 'VH' }, DAT_HTXH_THEDUCTHETHAO: { code: 'VH' },
   DAT_CTHTXH_VANHOA: { code: 'VH' }, DAT_CTHTXH_THEDUCTHETHAO: { code: 'VH' }, DAT_KXD_VANHOATHETHAO: { code: 'VH' },
-  DAT_CTHTXD_THUONGMAIDV: { code: 'TM' }, DAT_CTHTXH_THUONGMAIDV: { code: 'TM' }, DAT_DICHVU: { code: 'TM' }
+  DAT_CTHTXD_THUONGMAIDV: { code: 'TM', market: true }, DAT_CTHTXH_THUONGMAIDV: { code: 'TM', market: true },
+  DAT_DICHVU: { code: 'TM', market: true }
 };
 const TT16_URBAN_SUFFIX = new Set(['CT', 'CV', 'QG']);
 const TT16_SCHOOL_SUFFIX = new Set(['MN', 'TH', 'THCS']);
-// _CHO / _TM (_TTTM): quy ước nội bộ (ngoài TT16) đánh dấu lô DAT_DICHVU là chợ / trung tâm thương mại
-const TT16_SUFFIX = new Set([...TT16_URBAN_SUFFIX, ...TT16_SCHOOL_SUFFIX, 'DVO', 'CHO', 'TM', 'TTTM']);
+// _CHO / _TM (_TTTM): quy ước nội bộ (ngoài TT16) đánh dấu lô dịch vụ là chợ / trung tâm thương mại.
+// Lô dịch vụ, thương mại dịch vụ không có hậu tố này (market) chỉ vào nhóm TM khi tên là chợ / siêu thị / TTTM.
+const MARKET_SUFFIX = new Set(['CHO', 'TM', 'TTTM']);
+const TT16_SUFFIX = new Set([...TT16_URBAN_SUFFIX, ...TT16_SCHOOL_SUFFIX, 'DVO', ...MARKET_SUFFIX]);
+// Cách viết khác của cùng loại đất (dữ liệu gServer Huế): "Cayxanhcongcong" = "CayxanhCC"
+const TT16_TOKEN_ALIAS = { CAYXANHCONGCONG: 'CAYXANHCC' };
 // Mã có biến thể cấp đô thị (_DT) trong LAYER_PREFIXES
 const URBAN_CODES = new Set(['CV', 'BDX', 'YT', 'VH', 'TM']);
 
 /**
  * Tên layer TT16 → null (không theo TT16) hoặc { tt16, phase (HT/QH), stage (HT/QHDD/QHDH/QH), ... }:
- *   - thuộc 10 nhóm: thêm { prefix, type, nhom } như layerToType
+ *   - thuộc 10 nhóm: thêm { prefix, type, nhom } như layerToType; marketCheck: lô dịch vụ cần tên chợ / siêu thị / TTTM
  *   - Truonghoc thiếu hậu tố cấp trường: { school: true }
  *   - loại đất TT16 ngoài 10 nhóm (hoặc hậu tố lạ): { other: true }
  * Hậu tố _CT / _CV / _QG → cấp đô thị, _DVO → cấp đơn vị ở; không có hậu tố → theo loại đất.
+ * Dấu gạch ngang tính như gạch dưới (HT-DAT-HTXH-Yte = HT_DAT_HTXH_Yte).
  */
 export function tt16Layer(layerName) {
   const parts = String(layerName || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/gi, 'D').toUpperCase().split(/[_\s]+/).filter(Boolean);
+    .replace(/đ/gi, 'D').toUpperCase().split(/[_\s-]+/).filter(Boolean)
+    .map(t => TT16_TOKEN_ALIAS[t] || t);
   const stage = parts[0];
   if (!TT16_PHASE[stage] || parts[1] !== 'DAT') return null;
   const phase = TT16_PHASE[stage];
@@ -504,7 +512,8 @@ export function tt16Layer(layerName) {
   const urban = suffixes.some(s => TT16_URBAN_SUFFIX.has(s)) || (!suffixes.includes('DVO') && !!land.urban);
   const prefix = urban && URBAN_CODES.has(code) ? `${code}_DT` : code;
   const nhom = prefix === 'THPT' || prefix.endsWith('_DT') ? 'Cấp đô thị' : 'Cấp đơn vị ở';
-  return { tt16: true, phase, stage, prefix, type: LAYER_PREFIXES[prefix], nhom };
+  const marketCheck = !!land.market && !suffixes.some(s => MARKET_SUFFIX.has(s));
+  return { tt16: true, phase, stage, prefix, type: LAYER_PREFIXES[prefix], nhom, marketCheck };
 }
 
 /**
@@ -516,16 +525,6 @@ export function filePhaseFromName(fileName) {
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const m = base.match(/^(HT|QH)(?![A-Za-z])/i);
   return m ? m[1].toUpperCase() : null;
-}
-
-/** Layer mô tả hiện trạng giữ nguyên: token HT đứng riêng ở đầu hoặc cuối (HT, HT_CV, CV_HT, HT_DAT_...). */
-export function layerMarksCurrent(layerName) {
-  const tt = tt16Layer(layerName);
-  if (tt && tt.stage === 'HT') return true;
-  const tokens = String(layerName || '').trim()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
-  return tokens[0] === 'HT' || (tokens.length > 1 && tokens[tokens.length - 1] === 'HT');
 }
 
 /**
@@ -541,6 +540,71 @@ export function layerToType(layerName) {
   if (!prefix) return null;
   const nhom = prefix === 'THPT' || prefix.endsWith('_DT') ? 'Cấp đô thị' : 'Cấp đơn vị ở';
   return { prefix, type: LAYER_PREFIXES[prefix], nhom };
+}
+
+// ---- Thuộc tính lô quy hoạch (gServer Huế; DBF cắt tên trường còn 10 ký tự: hesosddat, matdoxd, kyhieulod) ----
+
+const PLAN_FIELDS = {
+  floors: /^(tang_?cao|so_?tang)$/i,
+  coverage: /^(mat_?do_?(xay_?dung|xd)|mdxd)$/i,
+  far: /^(he_?so_?(su_?dung_?dat|sd_?dat|sdd)|hssdd)$/i
+};
+const LOT_CODE_FIELD = /^ky_?hieu_?lo(_?d(at?)?)?$/i;
+
+function attrOf(attrs, re) {
+  const key = attrs && Object.keys(attrs).find(k => re.test(k));
+  return key ? String(attrs[key] ?? '').trim() : '';
+}
+
+/** Chỉ tiêu quy hoạch → { floors, coverage, far } (chuỗi, '' = chưa có) hoặc null. gServer ghi 0 khi bỏ trống nên 0 = chưa có */
+export function planAttrsOf(attrs) {
+  const out = {};
+  let any = false;
+  Object.entries(PLAN_FIELDS).forEach(([k, re]) => {
+    const v = attrOf(attrs, re).replace(',', '.');
+    out[k] = v && Number(v) !== 0 ? v : '';
+    if (out[k]) any = true;
+  });
+  return any ? out : null;
+}
+
+/** Ký hiệu lô quy hoạch, VD "TM.A-13" */
+export const lotCodeOf = (attrs) => attrOf(attrs, LOT_CODE_FIELD);
+
+// "Trung tâm dịch vụ, thương mại" (nhãn chung) không tính là trung tâm thương mại
+const MARKET_RE = /(^|[^\p{L}])(chợ|siêu thị|trung tâm thương mại|tttm)(?!\p{L})/iu;
+export const isMarketName = (s) => MARKET_RE.test(String(s || '').normalize('NFC'));
+
+const SCHOOL_NAME_RULES = [['THCS', /trung học cơ sở|(^|[^\p{L}])thcs(?!\p{L})/iu], ['TH', /tiểu học/iu], ['MN', /mầm non|mẫu giáo|nhà trẻ/iu]];
+
+/** Cấp trường theo tên (VD "Trường tiểu học Lê Lợi"), không rõ thì theo tiền tố ký hiệu lô (MN. / TH. / THCS.); tên gộp nhiều cấp → '' */
+export function schoolLevelOf(names, lotCode) {
+  const hits = new Set();
+  names.forEach(n => {
+    const s = String(n || '').normalize('NFC');
+    SCHOOL_NAME_RULES.forEach(([lv, re]) => { if (re.test(s)) hits.add(lv); });
+  });
+  if (hits.size) return hits.size === 1 ? [...hits][0] : '';
+  const m = String(lotCode || '').match(/^(MN|THCS|TH)(?=[.\-_\s\d])/i);
+  return m ? m[1].toUpperCase() : '';
+}
+
+/**
+ * Gắn điểm chức năng ({ lat, lng, name, kind } WGS84) vào mọi lô vùng chứa nó → p.points; trả về số điểm nằm ngoài mọi lô.
+ * Lô HT và lô QH chồng nhau cùng nhận điểm.
+ */
+export function attachPoints(parcels, points) {
+  const lots = parcels.filter(p => p.kind !== 'POINT' && p.polygons.length)
+    .map(p => ({ p, b: bboxOfRings(p.polygons.map(poly => poly[0])) }));
+  parcels.forEach(p => { p.points = []; });
+  let outside = 0;
+  points.forEach(pt => {
+    const hits = lots.filter(({ p, b }) => pt.lng >= b[0] && pt.lng <= b[2] && pt.lat >= b[1] && pt.lat <= b[3]
+      && inPolys(pt.lng, pt.lat, p.polygons));
+    if (hits.length) hits.forEach(({ p }) => p.points.push(pt));
+    else outside++;
+  });
+  return outside;
 }
 
 // ============================ LÔ ĐẤT ============================
@@ -598,14 +662,17 @@ function simplifyRing(ring) {
 }
 
 /**
- * Thực thể → lô đất: { layer, name, prefix, type, nhom, area (m²), lat, lng, polygons ([[lng,lat]...] theo vòng) }
+ * Thực thể → lô đất: { layer, name, attrs, prefix, type, nhom, area (m²), lat, lng, polygons ([[lng,lat]...] theo vòng) }
  * project(ent) → { toXY(x, y) → [X, Y] mét trên mặt phẳng, toLatLng(X, Y) → [lat, lng] }.
  * Đường khép kín trùng với vùng tô cùng layer (cùng tâm < 1 m, diện tích lệch < 1%) được bỏ để không đếm 2 lần.
  * Thực thể POINT → công trình dạng điểm (area 0, polygons []); điểm nằm trong lô cùng loại, cùng giai đoạn của file được bỏ.
- * Layer TT16: lô mang phase / stage theo tiền tố; Truonghoc thiếu hậu tố → lô chờ chọn cấp (school, pending, type SCHOOL_PENDING);
+ * Layer TT16: lô mang phase / stage theo tiền tố; Truonghoc thiếu hậu tố hoặc khớp thủ công SCHOOL_PICK → lô chờ chọn cấp
+ * (school, pending, type SCHOOL_PENDING);
  * loại đất TT16 ngoài 13 nhóm hạ tầng và layer không nhận diện → lô đất (land), ghi sheet DXF của đồ án.
  */
 export const SCHOOL_PENDING = 'SCHOOL';
+// Mã khớp thủ công "Trường học – chọn cấp từng lô": lô vào khung duyệt cấp trường như Truonghoc thiếu hậu tố
+export const SCHOOL_PICK = 'TRUONG';
 
 function makeParcels(entities, project) {
   const parcels = [];
@@ -615,10 +682,11 @@ function makeParcels(entities, project) {
     const tt = tt16Layer(ent.layer);
     const otherLand = !!(tt && tt.other && !ent.typeCode);
     if (otherLand) tt16Other[ent.layer] = (tt16Other[ent.layer] || 0) + 1;
+    const pickSchool = ent.typeCode === SCHOOL_PICK || !!(tt && tt.school && !ent.typeCode);
     // typeCode: mã loại người dùng khớp thủ công cho layer/thuộc tính không theo quy ước
     const t = otherLand ? null
+      : pickSchool ? { prefix: '', type: SCHOOL_PENDING, nhom: 'Cấp đơn vị ở' }
       : ent.typeCode ? layerToType(ent.typeCode)
-      : tt && tt.school ? { prefix: '', type: SCHOOL_PENDING, nhom: 'Cấp đơn vị ở' }
         : layerToType(ent.layer);
     const land = otherLand || !t;
     if (!t && !otherLand) unknownLayers[ent.layer] = (unknownLayers[ent.layer] || 0) + 1;
@@ -629,8 +697,10 @@ function makeParcels(entities, project) {
     } : {
       src, prefix: t.prefix, type: t.type, nhom: t.nhom, manual: !!ent.typeCode, land: false,
       tt16: !!tt, phase: tt ? tt.phase : null, stage: tt ? tt.stage : null,
-      school: !!(tt && tt.school && !ent.typeCode), pending: !!(tt && tt.school && !ent.typeCode)
+      school: pickSchool, pending: pickSchool,
+      marketCheck: !!(tt && tt.marketCheck && !ent.typeCode)
     };
+    tag.attrs = ent.attrs || null;
     const { toXY, toLatLng } = project(ent);
     if (ent.kind === 'POINT') {
       const [lat, lng] = toLatLng(...toXY(ent.pt[0], ent.pt[1]));
@@ -731,8 +801,9 @@ export function buildParcelsLonLat(entities) {
 
 // ============================ PHƯỜNG & CÔNG TRÌNH ĐÃ CÓ ============================
 
-// Ranh phường là ranh tổng quát hóa: lô lấn sang phường khác dưới 5% diện tích vẫn coi là nằm trọn
-const WARD_SHARE_MIN = 0.95;
+// Ranh phường là ranh tổng quát hóa: phần lấn sang phường khác dưới 5% diện tích lô hoặc dưới 50 m² coi là sai số số hóa
+const SPLIT_SHARE_MIN = 0.05;
+const SPLIT_AREA_MIN = 50;
 const SAMPLE_STEP_DEG = 0.0001; // ~10 m
 
 function bboxOfRings(rings) {
@@ -765,9 +836,41 @@ function samplePoints(polygons) {
   return pts;
 }
 
+const geomPolys = (g) => (g.type === 'Polygon' ? [g.coordinates] : g.coordinates);
+
+// Điểm đại diện của mảnh: tâm nếu nằm trong mảnh, không thì điểm trên mảnh (turf)
+function pieceAnchor(g, feature, polys) {
+  const [x, y] = g.centroid(feature).geometry.coordinates;
+  const [lng, lat] = inPolys(x, y, polys) ? [x, y] : g.pointOnFeature(feature).geometry.coordinates;
+  return { lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 };
+}
+
 /**
- * Gán phường theo tâm lô và đánh dấu lô vắt ranh (p.ward, p.crossWard, p.wardShares).
- * wards: [{ name, geometry }] (state.wardLabelsList). Cần turf toàn cục để đo phần diện tích lấn ranh.
+ * Chia lô theo ranh phường: mảnh phường chính = lô trừ các mảnh phụ (phần lấn vụn ở lại mảnh chính).
+ * Diện tích mảnh chia theo tỷ lệ turf.area để tổng khớp diện tích lô (đo trên mặt phẳng VN-2000 / cục bộ).
+ */
+function splitByWards(g, p, shape, big) {
+  const others = big.slice(1);
+  let main = shape;
+  for (const o of others) {
+    try { main = g.difference(main, o.part) || main; } catch (e) { return null; }
+  }
+  const pieces = [{ ward: big[0].ward, part: main }, ...others.map(o => ({ ward: o.ward, part: o.part }))]
+    .map(x => ({ ...x, m2: g.area(x.part) }));
+  const sum = pieces.reduce((s, x) => s + x.m2, 0);
+  if (!(sum > 0)) return null;
+  return pieces.map(x => {
+    const polygons = geomPolys(x.part.geometry);
+    return { ward: x.ward, polygons, area: Math.round(p.area * x.m2 / sum * 10) / 10, ...pieceAnchor(g, x.part, polygons) };
+  });
+}
+
+/**
+ * Gán phường và tách lô vắt ranh (p.ward, p.wardParts, p.crossWard, p.wardShares).
+ * - Mỗi phường có phần ≥ SPLIT_SHARE_MIN và ≥ SPLIT_AREA_MIN m² là 1 mảnh: p.wardParts = [{ ward, polygons, area, lat, lng }],
+ *   mảnh đầu thuộc phường chiếm nhiều nhất (= p.ward); chỉ 1 phường đạt ngưỡng → cả lô thuộc phường đó.
+ * - Không có turf / cắt hình lỗi → p.crossWard (ghi quy mô 0 như trước).
+ * wards: [{ name, geometry }] (state.wardLabelsList).
  */
 export function assignWards(parcels, wards) {
   const W = wards.filter(w => w.geometry).map(w => {
@@ -786,28 +889,32 @@ export function assignWards(parcels, wards) {
     p.ward = home ? home.name : null;
     p.crossWard = false;
     p.wardShares = null;
+    p.wardParts = null;
     if (!p.polygons.length) continue;
     const hit = new Set();
     for (const [x, y] of samplePoints(p.polygons)) hit.add(find(x, y));
     if (hit.size === 1 && hit.has(home)) continue;
 
-    const shares = [];
     const g = typeof turf !== 'undefined' ? turf : null;
-    if (g) {
-      const shape = g.multiPolygon(p.polygons);
-      const total = g.area(shape);
-      for (const w of hit) {
-        if (!w) continue;
-        let part = null;
-        try { part = g.intersect(shape, g.feature(w.geometry)); } catch (e) { part = null; }
-        shares.push({ ward: w.name, share: part && total > 0 ? g.area(part) / total : 0 });
-      }
-      shares.sort((a, b) => b.share - a.share);
+    if (!g) { p.crossWard = true; continue; }
+    const shape = g.multiPolygon(p.polygons);
+    const total = g.area(shape);
+    const parts = [];
+    for (const w of hit) {
+      if (!w) continue;
+      let part = null;
+      try { part = g.intersect(shape, g.feature(w.geometry)); } catch (e) { part = null; }
+      const m2 = part ? g.area(part) : 0;
+      parts.push({ ward: w.name, part, share: total > 0 ? m2 / total : 0, area: total > 0 ? p.area * m2 / total : 0 });
     }
-    p.wardShares = shares;
-    const top = shares[0];
-    if (top && top.share >= WARD_SHARE_MIN) p.ward = top.ward;
-    else p.crossWard = true;
+    parts.sort((a, b) => b.share - a.share);
+    p.wardShares = parts.map(({ ward, share }) => ({ ward, share }));
+    const big = parts.filter(x => x.part && x.share >= SPLIT_SHARE_MIN && x.area >= SPLIT_AREA_MIN);
+    if (!big.length) continue;
+    p.ward = big[0].ward;
+    if (big.length === 1) continue;
+    p.wardParts = splitByWards(g, p, shape, big);
+    if (!p.wardParts) p.crossWard = true;
   }
   return parcels;
 }

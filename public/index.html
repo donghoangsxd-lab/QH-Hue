@@ -311,7 +311,7 @@
           </div>
           <div class="layer-tab-pane" data-layer-pane="analysis" role="tabpanel">
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div></div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">phóng to để xem</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung. Thu nhỏ vẫn hiện trục chính; chỉ mức một biểu đồ tròn toàn thành phố là ẩn"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">phóng to để xem</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
             <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
             <span class="road-legend-item"><i style="background:#60a5fa; height:2px;"></i>Khu vực</span>
@@ -324,6 +324,8 @@
             <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_parcel"><label for="chk_parcel" title="Ranh khu đất của từng công trình hạ tầng xã hội (HTXH) trong 14 nhóm (cột Geojson trên Sheet)"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Ranh lô đất công trình <small class="layer-hint">phóng to để xem</small></label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_projects"><label for="chk_projects" title="Đồ án quy hoạch nhập từ file (cột Ten_QH, tab DXF-NN, danh mục DS_DoAn). Thu nhỏ: chỉ hiện ranh tổng từng đồ án; phóng to: hiện ranh lô công trình và lô đất của đồ án. Ẩn 1 đồ án thì ẩn cả ranh lô công trình của đồ án đó; lô không thuộc đồ án nào vẫn theo nút Ranh lô đất công trình"><svg class="ico ico-layer"><use href="#i-map"/></svg>Đồ án quy hoạch <small class="layer-hint" id="projectCount"></small></label></div></div>
+          <div id="projectList" class="project-list" hidden></div>
           <div class="layer-row">
             <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Khoanh vùng trong từng phường: ranh đỏ = vùng hiện trạng (đã xây dựng đến năm gốc 2020/2010/2000, GAIA Landsat 30 m hợp với GHSL 100 m); ranh xanh = vùng phát triển mới (đất xây dựng hiện nay theo Google Dynamic World 10 m nằm ngoài vùng hiện trạng); bỏ mảng < 0,5 ha. QCVN 01:2026/BXD Mục 2.2.3.2 (công viên, vườn hoa mỗi đơn vị ở) và Mục 2.2.3.3 (vườn hoa, bãi đỗ xe ≤ 400 m) chỉ áp trong vùng phát triển mới. Logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch"><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Vùng phát triển mới (Dynamic World)</label></div>
             <span id="newDevOpBox" class="layer-slider" style="display:none;"><input type="range" id="newDevOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp vùng phát triển mới" aria-label="Độ trong suốt lớp vùng phát triển mới"></span>
@@ -349,7 +351,7 @@
       <div class="tab-body add-point-form" id="tabAdd" style="display:none;">
         <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
           <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true"><svg class="ico"><use href="#i-pen"/></svg>Nhập 1 điểm</button>
-          <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ, GeoJSON"><svg class="ico"><use href="#i-folder"/></svg>Nhập hàng loạt</button>
+          <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ, GeoJSON, shapefile (.zip)"><svg class="ico"><use href="#i-folder"/></svg>Nhập hàng loạt</button>
           <button type="button" class="add-mode-btn" data-mode="addAdmin" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Admin hiệu chỉnh dữ liệu nền: vẽ bổ sung tuyến đường, xóa / thêm pixel dân cư"><svg class="ico"><use href="#i-tool"/></svg>Admin</button>
         </div>
 
@@ -425,14 +427,18 @@
           </div>
           <label class="cad-drop" id="cadDrop" for="cadFile">
             <span class="cad-drop-main"><b>Chọn file</b> hoặc kéo thả vào đây</span>
-            <span class="cad-drop-types"><i>DXF</i><i>KML</i><i>KMZ</i><i>GeoJSON</i></span>
-            <input type="file" id="cadFile" accept=".dxf,.kml,.kmz,.geojson,.json" hidden />
+            <span class="cad-drop-types"><i>DXF</i><i>KML</i><i>KMZ</i><i>GeoJSON</i><i>SHP (.zip)</i></span>
+            <span class="cad-drop-sub">Đồ án gServer: chọn cùng lúc 2 file — lớp Chức năng sử dụng đất và lớp Điểm chức năng</span>
+            <input type="file" id="cadFile" accept=".dxf,.kml,.kmz,.geojson,.json,.zip" multiple hidden />
           </label>
+          <input type="file" id="cadPointFile" accept=".kml,.kmz,.geojson,.json,.zip,.dxf" hidden />
           <details class="cad-hint fold">
             <summary class="cad-hint-title">Quy ước đặt tên</summary>
             <div class="cad-hint-row"><b>DXF</b><span>File <code>QH-….dxf</code> vào quy hoạch, <code>HT-….dxf</code> vào hiện trạng. Layer HT trong file QH = giữ nguyên (hai cột quy mô bằng nhau). Tên layer theo TT 16/2025, VD <code>HT_DAT_HTXH_Yte</code>, hoặc = mã loại</span></div>
             <div class="cad-hint-row"><b>KML/KMZ</b><span>Trường <code>Layer</code> / tên Folder = mã loại</span></div>
             <div class="cad-hint-row"><b>GeoJSON</b><span>Thuộc tính <code>Layer</code> = mã loại</span></div>
+            <div class="cad-hint-row"><b>Shapefile</b><span>Nén <code>.shp .shx .dbf .prj</code> thành 1 file <code>.zip</code>, mỗi lớp 1 file .shp. File <code>QH-….zip</code> ghi mọi lô vào QuyMo_QH, <code>HT-….zip</code> vào QuyMo_HT. Trường <code>Layer</code> = mã loại, không có thì tên file .shp = tên layer, VD <code>HT_DAT_HTXH_Yte.shp</code></span></div>
+            <div class="cad-hint-row"><b>Điểm chức năng</b><span>Nạp kèm lớp điểm (trường <code>tendoituong</code>): tên điểm nằm trong lô thành tên công trình, tên Trường tiểu học / mầm non / THCS cho biết cấp trường. Lô dịch vụ, thương mại dịch vụ chỉ vào nhóm <code>TM</code> khi tên là chợ, siêu thị hoặc TTTM, còn lại ghi sheet DXF của đồ án. Tầng cao, mật độ xây dựng, hệ số sử dụng đất của lô ghi vào cột <code>TangCao</code> / <code>MatDoXD</code> / <code>HeSoSDD</code></span></div>
             <div class="cad-codes">
               <code>CV</code><span>Công viên, điểm xanh, vườn hoa</span>
               <code>BDX</code><span>Bãi đỗ xe, trạm sạc xe điện</span>
@@ -444,8 +450,11 @@
               <code>VH</code><span>Nhà văn hóa, thể thao</span>
               <code>TM</code><span>Chợ, Trung tâm thương mại</span>
               <code>CSD</code><span>Cơ sở chưa sử dụng</span>
+              <code>TRUONG</code><span>Trường học – chọn cấp từng lô (khớp thủ công)</span>
             </div>
             <div class="cad-hint-note">Cấp đô thị thêm <code>_DT</code>, VD <code>CV_DT</code></div>
+            <div class="cad-hint-note">Lô vắt ranh phường (phần lấn ≥ 5% và ≥ 50 m²): dòng chính giữ nguyên lô ở phường chiếm phần lớn,
+              phần ở phường khác ghi thêm dòng <code>&lt;ID&gt;.2</code> chỉ để tính diện tích chỉ tiêu phường. Công trình đang thuộc đồ án khác không bị ghi đè trừ khi tích chuyển.</div>
             <div class="cad-hint-note cad-hint-tt16">
               <b>TT16:</b> <code>HT_</code> → QuyMo_HT, <code>QHDD_</code> / <code>QHDH_</code> → QuyMo_QH (bỏ qua ô Giai đoạn);
               hậu tố <code>_CT</code> / <code>_CV</code> = cấp đô thị, <code>_DVO</code> = đơn vị ở; Truonghoc thêm <code>_MN</code> / <code>_TH</code> / <code>_THCS</code>,

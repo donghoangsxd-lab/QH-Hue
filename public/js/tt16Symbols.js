@@ -212,7 +212,9 @@ const LAND_RULES = [
   { key: 'dtn', label: 'Đất đào tạo, nghiên cứu', color: '#1e3a8a', re: /DAOTAO|NGHIENCUU|GIAODUC|NCKH|DAT_GD/ },
   { key: 'cq', label: 'Đất cơ quan, trụ sở', color: '#a1887f', re: /COQUAN|TRUSO|CQNN|HANHCHINH/ },
   { key: 'an', label: 'Đất an ninh, quốc phòng', color: '#d9480f', re: /ANQP|QPAN|ANNINH|QUOCPHONG/ },
-  { key: 'tg', label: 'Đất di tích, tôn giáo', color: '#7f1d1d', re: /DITICH|TONGIAO|TINNGUONG/ }
+  { key: 'tg', label: 'Đất di tích, tôn giáo', color: '#7f1d1d', re: /DITICH|TONGIAO|TINNGUONG/ },
+  // Lô dịch vụ không phải chợ / siêu thị / TTTM (DAT_Dichvu, "Đất khu dịch vụ")
+  { key: 'dv', label: 'Đất dịch vụ, thương mại', color: '#e8590c', re: /DICH[\s_]?VU|THUONG[\s_]?MAI/ }
 ];
 
 function foldLayer(layerName) {

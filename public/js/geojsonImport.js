@@ -3,8 +3,10 @@
 import { layerToType } from './cadImport.js';
 import { openRing } from './kmlImport.js';
 
-const LAYER_FIELD = /^(layer|layer_?name|ten_?layer|lop)$/i;
-const NAME_FIELD = /^(ten_?cong_?trinh|name|ten)$/i;
+// autocad_la: tên layer CAD gốc trên gServer Huế (DBF cắt tên trường còn 10 ký tự)
+export const LAYER_FIELD = /^(layer|layer_?name|ten_?layer|lop|(?:autocad|cad)_?la(?:yer)?)$/i;
+// tendoituong (gServer), DBF cắt còn tendoituon
+const NAME_FIELD = /^(ten_?cong_?trinh|name|ten|ten_?doi_?tuon?g?)$/i;
 
 function pickProp(props, re) {
   const key = Object.keys(props).find(k => re.test(k));
@@ -57,7 +59,11 @@ export function parseGeoJson(text) {
     : data?.type && (data.coordinates || data.geometries) ? [{ type: 'Feature', properties: {}, geometry: data }]
     : null;
   if (!Array.isArray(features)) throw new Error('Không phải GeoJSON (cần FeatureCollection hoặc Feature).');
+  return parseFeatures(features);
+}
 
+/** Mảng Feature GeoJSON (đã đọc) → kết quả như parseGeoJson; dùng chung cho shapefile */
+export function parseFeatures(features) {
   const stats = { feature: features.length, polygon: 0, polyline: 0, point: 0, skipped: {} };
   const skip = (label, n = 1) => { if (n) stats.skipped[label] = (stats.skipped[label] || 0) + n; };
   const entities = [];
