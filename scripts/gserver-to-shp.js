@@ -482,13 +482,16 @@ const KEEP_KHU = /^khu\s+(?:đô thị|dân cư|công nghiệp|du lịch|nhà �
 // Dùng (?=\s|,|$) thay cho \b vì \b không khớp sau chữ có dấu (ố, ã).
 function proposeName(dump) {
   const r0 = (dump.rows && dump.rows.ranh && dump.rows.ranh[0]) || {};
-  const raw = String(r0.tendoan || (dump.meta && dump.meta.tenBanDo) || '').replace(/\s+/g, ' ').trim();
-  const loai = loaiCode(r0.loaiquyhoach) || loaiCode(raw);
+  const raw = String(r0.tendoan || (dump.meta && dump.meta.tenBanDo) || '').replace(/\s+/g, ' ').trim()
+    .replace(/^bản đồ\s+/i, '');
+  const fromRaw = loaiCode(raw);
+  const loai = loaiCode(r0.loaiquyhoach) || (fromRaw !== raw ? fromRaw : '');
   let s = raw.replace(/\([^)]*tỷ lệ[^)]*\)/gi, ' ').replace(/\s+/g, ' ').trim();
   s = s.split(/,?\s+(?:quận|huyện|thành phố|thị xã|tỉnh)(?=\s|,|$)/i)[0].trim();
   s = s.replace(/^quy hoạch\s+(?:phân khu|chi tiết|chung)\s*/i, '');
   s = s.replace(/^khu vực\s+/i, '');
   if (!KEEP_KHU.test(s)) s = s.replace(/^khu\s+/i, '');
+  s = s.replace(/^(?:phường|xã|thị trấn)\s+/i, '');
   s = s.replace(/^trung tâm(?=\s|$)/i, 'TT').trim();
   const place = s ? s.charAt(0).toLocaleUpperCase('vi') + s.slice(1) : '';
   if (loai && place && !place.toUpperCase().startsWith(loai.toUpperCase())) return `${loai} ${place}`;

@@ -20,11 +20,12 @@ function qhStripName(s) {
     .trim();
 }
 
+// names: tên lớp theo mẫu mới trước, mẫu cũ (đồ án 2023 trở về trước) sau.
 const QH_TARGETS = [
-  { key: 'ranh', name: 'ranh gioi quy hoach dang duong', shape: 'PolyLine' },
-  { key: 'vung', name: 'chuc nang su dung dat', shape: 'Polygon' },
-  { key: 'diem', name: 'diem chuc nang', shape: 'Point' },
-  { key: 'ht', name: 'hien trang su dung dat', shape: 'Polygon', optional: true }
+  { key: 'ranh', names: ['ranh gioi quy hoach dang duong', 'duong ranh gioi quy hoach'], shape: 'PolyLine' },
+  { key: 'vung', names: ['chuc nang su dung dat'], shape: 'Polygon' },
+  { key: 'diem', names: ['diem chuc nang'], shape: 'Point', optional: true },
+  { key: 'ht', names: ['hien trang su dung dat'], shape: 'Polygon', optional: true }
 ];
 
 function qhAjax(url) {
@@ -60,10 +61,14 @@ async function qhFetchGserverLayers(options) {
   const infoMs = Date.now() - t0;
 
   const picked = targets.map((t) => {
-    const hit = info.layers.find((l) => l.lopDuLieu && qhStripName(l.tenLopBanDo) === t.name);
+    let hit = null;
+    for (const name of t.names) {
+      hit = info.layers.find((l) => l.lopDuLieu && qhStripName(l.tenLopBanDo) === name);
+      if (hit) break;
+    }
     return hit
       ? { ...t, ten: hit.tenLopBanDo, bang: hit.lopDuLieu, dv: hit.maDichVu, kieu: hit.kieuKhongGian }
-      : { ...t, missing: true };
+      : { ...t, name: t.names[0], missing: true };
   });
   const absent = picked.filter((p) => p.missing && !p.optional).map((p) => p.name);
   if (absent.length) throw new Error('mapid ' + mapid + ' không có lớp: ' + absent.join(', '));
