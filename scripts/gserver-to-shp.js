@@ -474,7 +474,11 @@ function loaiCode(s) {
   return hit ? hit[1] : t;
 }
 
-// "Quy hoạch phân khu (tỷ lệ 1/2000) khu vực Thủy Xuân, quận Thuận Hóa, thành phố Huế" → "QHPK Thủy Xuân".
+// "khu" chỉ giữ khi là một phần tên loại khu (Khu đô thị mới…, Khu dân cư…).
+const KEEP_KHU = /^khu\s+(?:đô thị|dân cư|công nghiệp|du lịch|nhà ở|tái định cư|kinh tế|công nghệ|phức hợp|nghỉ dưỡng)(?=\s|$)/i;
+
+// "Quy hoạch phân khu (tỷ lệ 1/2000) khu vực Thủy Xuân, quận Thuận Hóa, thành phố Huế" → "QHPK Thủy Xuân";
+// "… khu trung tâm phía Tây, …" → "QHPK TT phía Tây".
 // Dùng (?=\s|,|$) thay cho \b vì \b không khớp sau chữ có dấu (ố, ã).
 function proposeName(dump) {
   const r0 = (dump.rows && dump.rows.ranh && dump.rows.ranh[0]) || {};
@@ -483,7 +487,9 @@ function proposeName(dump) {
   let s = raw.replace(/\([^)]*tỷ lệ[^)]*\)/gi, ' ').replace(/\s+/g, ' ').trim();
   s = s.split(/,?\s+(?:quận|huyện|thành phố|thị xã|tỉnh)(?=\s|,|$)/i)[0].trim();
   s = s.replace(/^quy hoạch\s+(?:phân khu|chi tiết|chung)\s*/i, '');
-  s = s.replace(/^[Kk]hu vực\s+/u, '').replace(/^[Kk]hu\s+(?=\p{Lu})/u, '').trim();
+  s = s.replace(/^khu vực\s+/i, '');
+  if (!KEEP_KHU.test(s)) s = s.replace(/^khu\s+/i, '');
+  s = s.replace(/^trung tâm(?=\s|$)/i, 'TT').trim();
   const place = s ? s.charAt(0).toLocaleUpperCase('vi') + s.slice(1) : '';
   if (loai && place && !place.toUpperCase().startsWith(loai.toUpperCase())) return `${loai} ${place}`;
   return place || loai || 'Do an';
