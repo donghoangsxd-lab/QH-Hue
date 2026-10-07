@@ -2037,10 +2037,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, kind: 'INFRA', id, tab: result.tab || '' });
     }
 
-    // Xóa toàn bộ 1 đồ án (Ten_QH): dòng hạ tầng, tab DXF-NN cũ, ranh lô, dòng DS_DoAn, thư mục projects/<slug>/
-    if (action === 'deleteProject') {
-      requirePostFromApp(req);
-      await requireAdmin(req);
     // Admin xóa 1 lô từ bảng thông tin: INFRA xóa dòng Sheet theo ID (kèm ranh lô trong file đồ án), DXF xóa lô khỏi file đồ án
     if (action === 'deleteLot') {
       requirePostFromApp(req);
@@ -2071,6 +2067,10 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, kind: 'INFRA', id, rows: Number(result.rows) || 0, lots });
     }
 
+    // Xóa toàn bộ 1 đồ án (Ten_QH): dòng hạ tầng, tab DXF-NN cũ, ranh lô, dòng DS_DoAn, thư mục projects/<slug>/
+    if (action === 'deleteProject') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
       const body = readJsonBody(req);
       const project = sanitizeSheetText(body.project, 120);
       if (!project) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });

@@ -1616,17 +1616,6 @@ function editInfraRow(body) {
   return { "success": true, "id": id, "tab": found, "missing": missing };
 }
 
-// Một đồ án (Ten_QH) một tab DXF-NN. Nhập lại cùng đồ án thì thay toàn bộ dòng đất của tab đó.
-function ensureDxfSheet(ss, project) {
-  var sheets = ss.getSheets();
-  var maxN = 0;
-  var empty = null;
-  var found = null;
-  sheets.forEach(function(sh) {
-    var m = String(sh.getName()).trim().match(/^DXF-(\d+)$/i);
-    if (!m) return;
-    var n = parseInt(m[1], 10);
-    if (n > maxN) maxN = n;
 /**
  * Admin xóa 1 công trình từ bảng thông tin lô: body = { id }. Xóa dòng ID và các dòng phần vắt ranh <ID>.2, <ID>.3…
  * ở mọi tab hạ tầng, ranh cũ cùng ID ở CAD_Polygon và bản sao lưu đồ án của ID (không còn dòng để ghi trả khi xóa đồ án).
@@ -1681,6 +1670,17 @@ function deleteInfraRow(body) {
   return { "success": true, "id": id, "rows": rowsDeleted, "tabs": tabs };
 }
 
+// Một đồ án (Ten_QH) một tab DXF-NN. Nhập lại cùng đồ án thì thay toàn bộ dòng đất của tab đó.
+function ensureDxfSheet(ss, project) {
+  var sheets = ss.getSheets();
+  var maxN = 0;
+  var empty = null;
+  var found = null;
+  sheets.forEach(function(sh) {
+    var m = String(sh.getName()).trim().match(/^DXF-(\d+)$/i);
+    if (!m) return;
+    var n = parseInt(m[1], 10);
+    if (n > maxN) maxN = n;
     if (sh.getLastRow() < 2) { if (!empty) empty = sh; return; }
     var col = getColumnMap(getSheetHeaders(sh));
     if (col.tenQH < 0 || found) return;
