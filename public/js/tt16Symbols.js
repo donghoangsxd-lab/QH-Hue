@@ -5,7 +5,8 @@
 // color: RGB chuẩn AutoCAD của mã ACI; pattern: khóa ô lặp trong TILES
 export const TT16_STYLES = {
   "1-CV": { label: 'Cây xanh sử dụng công cộng', layer: 'DAT_HTXH_CayxanhCC', aci: 72, color: '#66cc00', pattern: 'CayxanhCC' },
-  "2-BDX": { label: 'Đất bãi đỗ xe', layer: 'DAT_HTKT_Baidoxe', aci: 252, color: '#696969', pattern: 'Baidoxe' },
+  // TT16 cho bãi đỗ xe ACI 252 (xám), gần trùng nghĩa trang ACI 251 nên mượn màu khai thác khoáng sản ACI 175
+  "2-BDX": { label: 'Đất bãi đỗ xe', layer: 'DAT_HTKT_Baidoxe', aci: 175, color: '#4d4d99', pattern: 'Baidoxe' },
   // Thông tư 16 gom ba cấp vào một ký hiệu, màu ACI 15. THCS giữ #994c4c; mầm non và tiểu học sáng hơn, cùng họ gạch đỏ. solidOpacity giúp ba màu này còn tách được khi thu nhỏ (tô đặc).
   "3-MN": { label: 'Trường mầm non', layer: 'DAT_HTXH_Truonghoc', color: '#ff8f70', pattern: 'Truonghoc', solidOpacity: 0.62 },
   "4-TH": { label: 'Trường tiểu học', layer: 'DAT_HTXH_Truonghoc', color: '#e25b48', pattern: 'Truonghoc', solidOpacity: 0.62 },

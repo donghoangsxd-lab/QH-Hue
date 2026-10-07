@@ -1,6 +1,7 @@
 /**
  * Quản lý trạng thái ứng dụng & Danh mục cấu hình UI Frontend
  */
+import { TT16_STYLES } from './tt16Symbols.js';
 
 export const state = {
   // Phân quyền người dùng: 'VIEWER' (mặc định) hoặc 'ADMIN' — chỉ đặt ADMIN sau khi server xác minh Google token
@@ -130,11 +131,14 @@ export const WARD_BOUNDARY_SHADOW_STYLE = { color: '#64748b', weight: 4, opacity
 export const WARD_BOUNDARY_LINE_STYLE = { color: '#fde68a', weight: 1.6, opacity: 0.95, fill: false, interactive: false };
 export const WARD_HIGHLIGHT_STYLE = { color: '#fb923c', weight: 3.5, dashArray: '6,6', fillColor: '#fb923c', fillOpacity: 0.15, interactive: false };
 
-// Màu vùng phủ, biểu đồ và ô màu danh sách lớp. Ranh lô (zoom xa tô đặc, zoom gần kẻ hoa văn) dùng màu ký hiệu TT16 trong tt16Symbols.js.
+// Màu vùng phủ, biểu đồ và ô màu danh sách lớp lấy đúng màu hoa văn ranh lô TT16: PCCC thuộc đất an ninh, nhà tang lễ thuộc đất nghĩa trang.
+const TT16_COLOR_OF = {
+  "1-CV": "1-CV", "2-BDX": "2-BDX", "3-MN": "3-MN", "4-TH": "4-TH", "5-THCS": "5-THCS", "6-THPT": "6-THPT",
+  "7-YT": "7-YT", "8-VH": "8-VH", "9-TM": "9-TM", "12-CSD": "12-CSD", "10-PCCC": "AN", "11-NT": "NTR"
+};
 export const BUFFER_COLORS = {
-  "1-CV": "#51cf66", "2-BDX": "#94a3b8", "3-MN": "#d0bfff", "4-TH": "#9775fa", "5-THCS": "#7048e8", "6-THPT": "#4c6ef5",
-  "7-YT": "#f06595", "8-VH": "#cc5de8", "9-TM": "#e03131", "12-CSD": "#f1f3f5",
-  "13-BUS": "#00e5ff", "10-PCCC": "#d9480f", "11-NT": "#795548", "14-NOXH": "#fab005"
+  ...Object.fromEntries(Object.entries(TT16_COLOR_OF).map(([code, sym]) => [code, TT16_STYLES[sym].color])),
+  "13-BUS": "#00e5ff", "14-NOXH": "#fab005"
 };
 export const BUFFER_KEYS = {
   "1-CV": "b1", "2-BDX": "b2", "3-MN": "b3", "4-TH": "b4", "5-THCS": "b5", "6-THPT": "b10",
