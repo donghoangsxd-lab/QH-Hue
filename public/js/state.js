@@ -17,7 +17,8 @@ export const state = {
   dataVersion: 0,
   // Ranh lô đang vẽ: "HT|<ID>" / "QH|<ID>" → { geometry, layer, file }. Chỉ lô trong khung nhìn (projectFiles.js)
   cadParcels: new Map(),
-  showParcels: false,
+  // Mặc định bật: lô vẽ cùng marker nên bật lớp công trình nào hiện ranh lô lớp đó (khớp ô chk_parcel trong index.html)
+  showParcels: true,
   // Lô đất ngoài nhóm hạ tầng của đồ án đang xem, tắt khi mở bản đồ
   landParcels: [],
   showLand: false,

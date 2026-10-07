@@ -7,6 +7,7 @@ import { geeApi } from './api.js';
 
 let minZoom = 15;
 let getMap = () => null;
+let lotZoom = () => minZoom;
 let onChange = () => {};
 let base = '';
 let timer = null;
@@ -15,7 +16,16 @@ const force = new Set();
 const cache = new Map();
 const ward = { loaded: false, map: new Map(), lands: [] };
 
-export function bindMap(fn, zoom) { getMap = fn; if (zoom) minZoom = zoom; }
+// zoom: ngưỡng lớp Đồ án; lotZoomFn: ngưỡng ranh lô công trình (thấp hơn khi chỉ bật vài nhóm, mapEngine.parcelMinZoom)
+export function bindMap(fn, zoom, lotZoomFn) {
+  getMap = fn;
+  if (zoom) minZoom = zoom;
+  if (lotZoomFn) lotZoom = lotZoomFn;
+}
+
+function parcelLayerOn(zoom) {
+  return (state.showParcels && zoom >= lotZoom()) || (state.showProjects && zoom >= minZoom);
+}
 export function onChangeLots(fn) { onChange = fn; }
 
 function intersects(bbox, bounds) {
@@ -28,8 +38,7 @@ function wanted() {
   if (!map) return [];
   const zoom = map.getZoom();
   const bounds = map.getBounds().pad(0.15);
-  const parcelLayer = zoom >= minZoom && (state.showParcels || state.showProjects);
-  const layerOn = parcelLayer || state.showLand;
+  const layerOn = parcelLayerOn(zoom) || state.showLand;
   return state.projectCatalog.filter(p => {
     if (!p || !p.tenQH || p.sheetOnly) return false;
     if (force.has(p.tenQH)) return state.showLand || !state.hiddenProjects.has(p.tenQH);
@@ -43,8 +52,7 @@ function wanted() {
 // Lô công trình theo phường: theo nút Ranh lô / lớp Đồ án, từ ngưỡng zoom
 function wardLotsOn() {
   const map = getMap();
-  if (!map || map.getZoom() < minZoom) return false;
-  return state.showParcels || state.showProjects;
+  return !!map && parcelLayerOn(map.getZoom());
 }
 
 // Lô đất cũ chưa gắn đồ án: như lô đất đồ án (showLand mọi zoom, lớp Đồ án từ ngưỡng zoom)

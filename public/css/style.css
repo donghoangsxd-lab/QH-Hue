@@ -594,8 +594,8 @@ body.right-collapsed .right-panel {
 .tt16-borders { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 0 0 6px; }
 .tt16-frame { display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 0; height: calc(16px * var(--k)); padding: 0 2px; font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; overflow: hidden; }
 .tt16-frame-ht { border: 1px solid var(--text-main); }
-.tt16-frame-dd { border: 2.5px solid var(--text-main); }
-.tt16-frame-dh { border: 2.5px dashed var(--text-main); }
+.tt16-frame-dd { border: 2px solid var(--text-main); }
+.tt16-frame-dh { border: 2px dashed var(--text-main); }
 .heat-legend { margin: 0 6px 6px 22px; }
 .heat-legend[hidden] { display: none; }
 .heat-legend-sub { font-size: var(--fs-sm); color: var(--text-muted); margin: 1px 0 5px; }
@@ -1614,7 +1614,6 @@ table.ward-table th {
 .pp-edit-btn .ico { width: 14px; height: 14px; margin: 0; }
 .leaflet-container .pp-collapsed a.pp-edit-btn { display: none; }
 .infra-popup.pp-editable .pp-title { padding-right: 46px; }
-.land-lot-popup.pp-editable .land-popup > b:first-child { display: block; padding-right: 22px; }
 .lot-edit { min-width: 240px; font-size: var(--fs-sm); }
 .lot-edit-title { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; padding-right: 40px; font-weight: 700; }
 .lot-edit-title small { font-weight: 400; color: var(--text-muted); }
@@ -2217,7 +2216,24 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
   outline-offset: 2px;
 }
 
-/* Popup ranh đất đồ án (sheet DXF-NN) */
-.land-popup table { border-collapse: collapse; margin-top: 4px; font-size: 12px; }
-.land-popup td { padding: 1px 6px 1px 0; vertical-align: top; }
-.land-popup td:first-child { color: #64748b; white-space: nowrap; }
+/* Popup ranh đất đồ án (sheet DXF-NN): đầu = ô ký hiệu + mã lô + loại đất, 3 ô chỉ tiêu tối đa, bảng thông tin */
+.land-lot-popup .leaflet-popup-content { margin: 12px 14px 10px; }
+.land-popup { font-size: var(--fs-md); line-height: 1.35; }
+.lp-head { display: flex; align-items: center; gap: 10px; padding: 0 22px 9px 0; border-bottom: 1px solid var(--border-soft); }
+.land-lot-popup.pp-editable .lp-head { padding-right: 44px; }
+.lp-swatch { flex: none; width: 30px; height: 30px; border-radius: var(--r-sm); border: 1px solid var(--border-color); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
+.lp-head-main { min-width: 0; }
+.lp-title { color: #fff; font-size: var(--fs-xl); font-weight: 700; letter-spacing: 0.2px; overflow-wrap: anywhere; }
+.lp-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 2px; color: var(--text-muted); font-size: var(--fs-sm); }
+.lp-phase { padding: 1px 7px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+.lp-phase-qh { color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.14); border: 1px solid rgba(var(--orange-rgb), 0.4); }
+.lp-phase-ht { color: var(--accent-green); background: rgba(var(--green-rgb), 0.14); border: 1px solid rgba(var(--green-rgb), 0.4); }
+.lp-stats { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; margin-top: 10px; }
+.lp-stat { padding: 6px 8px; border-radius: var(--r-md); background: rgba(var(--cyan-rgb), 0.07); border: 1px solid rgba(var(--cyan-rgb), 0.22); text-align: center; }
+.lp-stat small { display: block; color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+.lp-stat b { display: block; margin-top: 2px; color: var(--accent-cyan); font-size: var(--fs-xl); font-weight: 700; white-space: nowrap; }
+.lp-stat em { margin-left: 2px; color: var(--text-main); font-size: var(--fs-sm); font-style: normal; font-weight: 400; }
+.lp-info { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 10px 0 0; }
+.lp-info dt { color: var(--text-muted); white-space: nowrap; }
+.lp-info dd { margin: 0; color: var(--text-main); font-weight: 600; overflow-wrap: anywhere; }
+.lp-info dd.lp-mono { font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 400; color: var(--text-muted); }

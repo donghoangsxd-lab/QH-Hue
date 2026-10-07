@@ -51,20 +51,28 @@ export const fmtPct = (value) => `${PCT_FORMAT.format(Number(value) || 0)}%`;
 
 const PLAN_NUM_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 
-/** Chỉ tiêu quy hoạch lô { floors, coverage, far } (số hoặc chuỗi như "3-5"; trống = chưa có) → [[nhãn, giá trị hiển thị]] */
-export function planRows(plan) {
+// Chỉ tiêu là giá trị tối đa cho phép của lô nên số đơn hiển thị kèm "≤"; mật độ ghi dạng % (40) hoặc tỉ lệ (0,4)
+const PLAN_FIELDS = [
+  { key: 'floors', label: 'Tầng cao', short: 'Tầng cao', unit: 'tầng', scale: n => n },
+  { key: 'coverage', label: 'Mật độ xây dựng', short: 'Mật độ XD', unit: '%', scale: n => (n <= 1 ? n * 100 : n) },
+  { key: 'far', label: 'Hệ số sử dụng đất', short: 'Hệ số SDĐ', unit: 'lần', scale: n => n }
+];
+
+/** Chỉ tiêu quy hoạch lô { floors, coverage, far } (số hoặc chuỗi như "3-5"; trống = chưa có) → [{ label, short, value, unit, text }] */
+export function planItems(plan) {
   if (!plan) return [];
-  const num = (v) => {
-    const n = Number(String(v).replace(',', '.'));
-    return Number.isFinite(n) ? n : null;
-  };
-  const show = (v, fmt) => (num(v) == null ? String(v) : fmt(num(v)));
-  const rows = [];
-  if (plan.floors) rows.push(['Tầng cao', show(plan.floors, n => `${PLAN_NUM_FORMAT.format(n)} tầng`)]);
-  // Mật độ ghi dạng % (40) hoặc tỉ lệ (0,4)
-  if (plan.coverage) rows.push(['Mật độ xây dựng', show(plan.coverage, n => `${PLAN_NUM_FORMAT.format(n <= 1 ? n * 100 : n)}%`)]);
-  if (plan.far) rows.push(['Hệ số sử dụng đất', show(plan.far, n => PLAN_NUM_FORMAT.format(n))]);
-  return rows;
+  return PLAN_FIELDS.filter(f => plan[f.key]).map(f => {
+    const raw = plan[f.key];
+    const n = Number(String(raw).replace(',', '.'));
+    if (!Number.isFinite(n)) return { label: f.label, short: f.short, value: String(raw), unit: '', text: String(raw) };
+    const value = `≤${PLAN_NUM_FORMAT.format(f.scale(n))}`;
+    return { label: f.label, short: f.short, value, unit: f.unit, text: f.unit === '%' ? `${value}%` : `${value} ${f.unit}` };
+  });
+}
+
+/** [[nhãn, giá trị hiển thị]] */
+export function planRows(plan) {
+  return planItems(plan).map(it => [it.label, it.text]);
 }
 
 export function distanceMeters(lat1, lng1, lat2, lng2) {

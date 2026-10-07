@@ -103,11 +103,14 @@ const PATTERN_BG_ALPHA = 0.25;
 const PT_PX = 1.6;
 const LINE_PT = 0.72;
 const DOT_R_PT = 0.36;
-// Khung ô ký hiệu: dải QHDD/QHDH dày 2.76pt; QHDH nét 10.68pt, hở 5.4pt
+// Khung ô ký hiệu Phụ lục: dải QHDD/QHDH dày 2.76pt; QHDH nét 10.68pt, hở 5.4pt.
+// Trên bản đồ viền QH cố định FRAME_PX ở mọi zoom, chung cho đợt đầu / dài hạn, giữ tỷ lệ nét–hở của Phụ lục:
+// dày đúng 2.76pt (4.4px) che kín lô hẹp như dải cây xanh dọc đường.
 const FRAME_PT = 2.76;
 const DASH_PT = [10.68, 5.4];
-// Zoom 15–16 (tô màu nền, lô còn nhỏ trên màn hình): thu nhỏ khung theo cùng tỷ lệ
-const COARSE_FRAME_SCALE = 0.6;
+const FRAME_PX = 1.8;
+const HT_FRAME_PX = 1;
+const QHDH_DASH = DASH_PT.map(v => +((v / FRAME_PT) * FRAME_PX).toFixed(1)).join(',');
 
 const r2 = (n) => Math.round(n * 100) / 100;
 
@@ -467,20 +470,26 @@ export function tt16ParcelStyle(type, layer, { scenario, detailed, approved }) {
  */
 export function tt16SymbolStyle(key, tone, layer, { scenario, detailed, approved = true }) {
   const s = key ? TT16_STYLES[key] : null;
-  const stage = String(layer || '').trim().toUpperCase().split(/[_\s]/)[0];
-  const plan = stage === 'QHDD' || stage === 'QHDH' || stage === 'QH' || (stage !== 'HT' && scenario === 'QH');
   const pattern = detailed && s ? patternFor(key) : null;
-  const k = PT_PX * (detailed ? 1 : COARSE_FRAME_SCALE);
   const color = pattern ? s.color : (tone || (s && s.color) || '#94a3b8');
   return {
     color: approved ? color : '#f87171',
-    weight: plan ? +(FRAME_PT * k).toFixed(1) : 1,
     opacity: 0.95,
-    lineCap: 'butt',
-    lineJoin: 'miter',
-    dashArray: !approved ? '4,4' : stage === 'QHDH' ? DASH_PT.map(v => +(v * k).toFixed(1)).join(',') : null,
+    ...frameStyle(layer, scenario, approved),
     fillColor: pattern || color,
     fillOpacity: pattern ? 1 : (s && s.solidOpacity) || (s && s.fillOpacity) || FILL_OPACITY
+  };
+}
+
+// Kiểu viền theo tiền tố layer: HT_ nét mảnh, QHDD_ (hoặc không tiền tố trên kịch bản QH) nét liền, QHDH_ nét đứt
+function frameStyle(layer, scenario, approved = true) {
+  const stage = String(layer || '').trim().toUpperCase().split(/[_\s]/)[0];
+  const plan = stage === 'QHDD' || stage === 'QHDH' || stage === 'QH' || (stage !== 'HT' && scenario === 'QH');
+  return {
+    weight: plan ? FRAME_PX : HT_FRAME_PX,
+    lineCap: 'butt',
+    lineJoin: 'miter',
+    dashArray: !approved ? '4,4' : stage === 'QHDH' ? QHDH_DASH : null
   };
 }
 
@@ -569,6 +578,5 @@ export function landParcelStyle(layerName, { detailed = false, phase = 'HT' } = 
   if (key && TT16_STYLES[key]) {
     return tt16SymbolStyle(key, TT16_STYLES[key].color, layerName, { scenario: phase, detailed });
   }
-  const style = landPolylineStyle(layerName);
-  return phase === 'QH' ? { ...style, dashArray: '6 4' } : style;
+  return { ...landPolylineStyle(layerName), ...frameStyle(layerName, phase) };
 }

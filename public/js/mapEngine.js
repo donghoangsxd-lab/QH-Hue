@@ -6,11 +6,11 @@ import {
 import { peekInfraRisk, riskSummaryHtml } from './riskLayer.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi, markDataWritten } from './api.js';
-import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, planRows } from './utils.js';
+import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, planRows, planItems } from './utils.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
-import { tt16ParcelStyle, renderTt16Legend, landParcelStyle, landLabel, TT16_PATTERN_ZOOM } from './tt16Symbols.js';
+import { tt16ParcelStyle, renderTt16Legend, landParcelStyle, landLabel, landColor, landPatternKey, tt16SwatchCss, TT16_PATTERN_ZOOM } from './tt16Symbols.js';
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap } from './basemap.js';
 import {
@@ -195,7 +195,7 @@ export function initMap() {
 
   map.on('zoomend', () => { updateWardLabelFontSize(); redrawLandsOnPattern(); });
   map.on('moveend', () => { refreshLeftSoon(); scheduleLots(); });
-  bindProjectFiles(() => map, PARCEL_MIN_ZOOM);
+  bindProjectFiles(() => map, PARCEL_MIN_ZOOM, () => parcelMinZoom(map, layers));
   onChangeLots(() => { redrawParcels(); redrawLands(); });
   updateWardLabelFontSize();
   onCompareChange(handleCompareChange);
@@ -414,6 +414,8 @@ export function toggleLayer(layerKey, isChecked) {
   if (ICON_LAYER_KEYS.has(layerKey)) {
     leftRenderer.refreshPoints();
     planRenderer.refreshPoints();
+    // Số nhóm đang bật đổi ngưỡng zoom hiện ranh lô: có thể cần tải lô mà không đợi kéo bản đồ
+    scheduleLots();
   }
 
   const popBox = document.getElementById('popBox');
@@ -520,9 +522,19 @@ function hasValidCoord(p) {
 }
 
 // Ranh lô đất CAD chỉ vẽ khi phóng to đủ gần (ở mức toàn thành phố hàng nghìn polygon vừa rối vừa nặng):
-// từ PARCEL_MIN_ZOOM tô màu nền TT16, từ PARCEL_PATTERN_ZOOM (gần 1 lô cụ thể) tô hoa văn TT16
+// từ PARCEL_MIN_ZOOM tô màu nền TT16, từ PARCEL_PATTERN_ZOOM (gần 1 lô cụ thể) tô hoa văn TT16.
+// Chỉ bật ≤ FOCUS_PARCEL_MAX_GROUPS nhóm công trình (xem riêng 1 loại) thì lô ít: hiện từ FOCUS_PARCEL_MIN_ZOOM
+// để thấy trọn các lô của nhóm đó trong phường
 export const PARCEL_MIN_ZOOM = 15;
+const FOCUS_PARCEL_MIN_ZOOM = 13;
+const FOCUS_PARCEL_MAX_GROUPS = 3;
 const PARCEL_PATTERN_ZOOM = TT16_PATTERN_ZOOM;
+
+function parcelMinZoom(m, groups) {
+  if (!m) return PARCEL_MIN_ZOOM;
+  const on = Object.values(ICON_GROUP_KEYS).filter(k => groups[k] && m.hasLayer(groups[k])).length;
+  return on > 0 && on <= FOCUS_PARCEL_MAX_GROUPS ? FOCUS_PARCEL_MIN_ZOOM : PARCEL_MIN_ZOOM;
+}
 
 // Zoom ≤ ngưỡng (mức toàn thành phố): mỗi phường 1 biểu đồ tròn số công trình theo loại thay cho icon chồng chéo.
 // Đang chọn 1 phường thì luôn hiện icon (phường rộng có thể vừa khung ở zoom thấp, 1 biểu đồ đơn lẻ không có ý nghĩa)
@@ -691,7 +703,7 @@ function bindNameTip(layer, p) {
 
 // Bật lớp Đồ án quy hoạch: lô của đồ án đang ẩn không vẽ; đồ án đã tải file thì lô do lớp Quy hoạch vẽ (redrawLands)
 // khi bật "Lô hạ tầng trong đồ án", còn lại vẽ cùng marker theo 14 nhóm.
-// Lô không thuộc đồ án nào (hoặc lớp Đồ án tắt) theo nút chung "Ranh lô đất công trình"
+// Lô không thuộc đồ án nào (hoặc lớp Đồ án tắt) theo nút chung "Ranh lô theo lớp công trình"
 function parcelShown(project, file) {
   if (state.showProjects && file && state.showProjectInfra && state.projectInfraFiles.has(file) && !state.hiddenProjects.has(file)) return false;
   if (state.showProjects && project) return !state.hiddenProjects.has(project);
@@ -706,6 +718,7 @@ function createParcelShape(entry, targetMap, detailed) {
     style: parcelStyle(entry, detailed),
     bubblingMouseEvents: false
   });
+  bindLotHover(shape);
   bindNameTip(shape, p);
   shape.on('click', () => {
     if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
@@ -896,7 +909,10 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     const groupOf = (p) => groups[ICON_GROUP_KEYS[layerType(p)]] || groups.c9;
     const visible = list.filter(p => bounds.contains([p.lat, p.lng]) && m.hasLayer(groupOf(p)));
     const nextMode = visible.length <= ICON_MAX_VISIBLE ? 'icon' : 'dot';
-    const wantParcels = (state.showParcels || state.showProjects) && state.cadParcels.size > 0 && m.getZoom() >= PARCEL_MIN_ZOOM;
+    // Ranh lô vẽ cùng marker trong nhóm công trình nên bật lớp nào hiện lô lớp đó; bản đồ quy hoạch lấy lô QH (parcelFor)
+    const zoom = m.getZoom();
+    const wantParcels = state.cadParcels.size > 0
+      && ((state.showParcels && zoom >= parcelMinZoom(m, groups)) || (state.showProjects && zoom >= PARCEL_MIN_ZOOM));
     const detail = m.getZoom() >= PARCEL_PATTERN_ZOOM;
     if (nextMode !== mode || wantParcels !== parcelsOn) {
       clearPoints();
@@ -1091,6 +1107,7 @@ export function focusProjectLots(name) {
 export function setParcelsVisible(on) {
   state.showParcels = !!on;
   redrawParcels();
+  scheduleLots();
 }
 
 // ============================ RANH ĐẤT ĐỒ ÁN (SHEET DXF-NN) ============================
@@ -1098,18 +1115,54 @@ export function setParcelsVisible(on) {
 // đang so sánh: bản đồ hiện trạng vẽ HT, bản đồ quy hoạch vẽ QH
 const landGroups = new Map();
 
+// Tên lô từ file đồ án dạng "<layer> <mã lô> – <đồ án> #<stt>": rút còn mã lô; tên Admin đã sửa giữ nguyên
+function landCode(p) {
+  let t = String(p.name || '').trim();
+  if (p.layer && t.startsWith(p.layer)) t = t.slice(p.layer.length);
+  const tail = p.file ? t.lastIndexOf(` – ${p.file}`) : -1;
+  if (tail >= 0) t = t.slice(0, tail);
+  return t.trim();
+}
+
+const LAND_STAGE_LABELS = { QHDD: 'QH đợt đầu', QHDH: 'QH dài hạn' };
+
 function landPopupHtml(p) {
-  const rows = [
-    ['Loại đất', p.nhom || landLabel(p.layer)],
-    ['Layer', p.layer],
+  const type = p.nhom || landLabel(p.layer);
+  const code = landCode(p);
+  const key = landPatternKey(p.layer);
+  const swatch = tt16SwatchCss(key, 0.6) || `background:${landColor(p.layer) || '#94a3b8'};`;
+  const stage = LAND_STAGE_LABELS[String(p.layer || '').toUpperCase().split(/[_\s]/)[0]];
+  const phase = p.phase === 'QH' ? (stage || 'Quy hoạch') : 'Hiện trạng';
+  const stats = planItems(p.plan);
+  const info = [
     ['Diện tích', p.area ? `${fmtNum(Math.round(p.area))} m²` : ''],
     ['Phường/xã', p.ward],
     ['Đồ án', p.file],
-    ['Giai đoạn', p.phase === 'QH' ? 'Quy hoạch' : 'Hiện trạng'],
-    ...planRows(p.plan)
+    ['Layer', p.layer]
   ].filter(([, v]) => v);
-  return `<div class="land-popup"><b>${escapeHtml(p.name || p.layer || 'Lô đất')}</b>
-    <table>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${escapeHtml(String(v))}</td></tr>`).join('')}</table></div>`;
+  return `<div class="land-popup">
+    <div class="lp-head" title="${escapeHtml(p.name || '')}">
+      <i class="lp-swatch" style="${swatch}"></i>
+      <div class="lp-head-main">
+        <div class="lp-title">${escapeHtml(code || type)}</div>
+        <div class="lp-sub">${code ? `<span>${escapeHtml(type)}</span>` : ''}<span class="lp-phase lp-phase-${p.phase === 'QH' ? 'qh' : 'ht'}">${phase}</span></div>
+      </div>
+    </div>
+    ${stats.length ? `<div class="lp-stats">${stats.map(s => `<div class="lp-stat" title="${escapeHtml(s.label)}">
+      <small>${escapeHtml(s.short)}</small><b>${escapeHtml(s.value)}${s.unit ? `<em>${escapeHtml(s.unit)}</em>` : ''}</b></div>`).join('')}</div>` : ''}
+    <dl class="lp-info">${info.map(([k, v]) => `<dt>${k}</dt><dd${k === 'Layer' ? ' class="lp-mono"' : ''}>${escapeHtml(String(v))}</dd>`).join('')}</dl>
+  </div>`;
+}
+
+// Rê chuột lên lô: viền sáng trắng, đưa lô lên trên để không bị lô kề che; rời chuột trả lại kiểu gốc của L.geoJSON
+const LOT_HOVER_STYLE = { color: '#ffffff', weight: 3, opacity: 1, dashArray: null };
+function bindLotHover(shape) {
+  shape.on('mouseover', (e) => {
+    if (isBusyTool()) return;
+    e.layer.setStyle(LOT_HOVER_STYLE);
+    e.layer.bringToFront();
+  });
+  shape.on('mouseout', (e) => shape.resetStyle(e.layer));
 }
 
 const isBusyTool = () => state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool;
@@ -1120,6 +1173,7 @@ function infraLotShape(lot, item, m, detailed) {
     ? tt16ParcelStyle(layerType(item), lot.layer, { scenario: lot.phase, detailed, approved: isApproved(item.status) })
     : landParcelStyle(lot.layer, { detailed, phase: lot.phase });
   const shape = L.geoJSON(lot.geometry, { style, bubblingMouseEvents: false });
+  bindLotHover(shape);
   if (!item) return shape;
   bindNameTip(shape, item);
   shape.on('click', () => {
@@ -1144,9 +1198,10 @@ function drawLandsOn(m, list, infra = []) {
       style: landParcelStyle(p.layer, { detailed, phase: p.phase }),
       bubblingMouseEvents: false
     });
+    bindLotHover(shape);
     shape.on('click', (e) => {
       if (isBusyTool()) return;
-      const popup = L.popup({ maxWidth: 280, className: 'land-lot-popup' }).setLatLng(e.latlng).setContent(landPopupHtml(p)).openOn(m);
+      const popup = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup' }).setLatLng(e.latlng).setContent(landPopupHtml(p)).openOn(m);
       addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
     });
     group.addLayer(shape);
