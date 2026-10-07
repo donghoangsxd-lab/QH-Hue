@@ -214,8 +214,8 @@ function ensurePlanHooks() {
 
 // Khi so sánh, bản đồ còn lại được đồng bộ bằng setView mỗi khung hình (mỗi lần phát moveend): gom lại, vẽ 1 lần khi dừng
 const debounce = (fn, ms) => { let t = null; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; };
-const refreshLeftSoon = debounce(() => leftRenderer.refreshPoints(), 60);
-const refreshPlanSoon = debounce(() => planRenderer.refreshPoints(), 60);
+const refreshLeftSoon = debounce(() => { leftRenderer.refreshPoints(); leftRenderer.refreshBuffers(); }, 60);
+const refreshPlanSoon = debounce(() => { planRenderer.refreshPoints(); planRenderer.refreshBuffers(); }, 60);
 
 function handleCompareChange(on) {
   ensurePlanHooks();
@@ -752,6 +752,8 @@ function createPointMarker(entry, mode, targetMap) {
 // Vùng phủ cùng loại chồng nhau không đậm thêm: nền tô đặc trên pane riêng của từng loại × trạng thái duyệt,
 // độ trong suốt đặt cho cả pane (vùng hợp mờ đều); viền nét đứt vẽ riêng trên canvas chung
 const BUFFER_FILL_Z = 390;
+const BUFFER_VIEW_PAD = 0.25;
+const M_PER_DEG_LAT = 111320;
 const bufferFillRenderers = new WeakMap();
 
 function bufferFillRenderer(m, key, approved, opacity) {
@@ -772,7 +774,8 @@ function bufferFillRenderer(m, key, approved, opacity) {
  * Bộ vẽ cho 1 bản đồ:
  * - Chỉ tạo marker cho điểm nằm trong khung nhìn (nới 25%), khi kéo/zoom chỉ thêm/bớt phần chênh lệch.
  * - Nhiều điểm trong khung nhìn (> ICON_MAX_VISIBLE) thì chuyển sang chấm tròn canvas thay cho icon DOM.
- * - Buffer vẽ bằng L.circle trên canvas, chỉ dựng cho nhóm đang bật.
+ * - Buffer (chỉ hiển thị, không dùng cho heatmap / độ phủ) vẽ bằng L.circle trên canvas, chỉ dựng cho nhóm đang bật và
+ *   vòng tròn chạm khung nhìn (nới 25%); kéo/zoom chỉ thêm/bớt phần chênh lệch như marker.
  * - Ranh lô CAD (nếu có) vẽ cùng nhóm với marker nên bật/tắt theo loại hạ tầng và lọc phường như icon.
  * - Zoom ≤ PIE_MAX_ZOOM: bỏ marker, mỗi phường 1 biểu đồ tròn đếm theo các loại đang bật.
  */
@@ -784,7 +787,7 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
   let parcelDetail = false;
   let pieKey = null;
   const rendered = new Map();
-  const builtBuffers = new Set();
+  const bufferEntries = new Map(); // nhóm buffer → Map(pointKey → [vòng tô, vòng viền])
   const pieGroup = L.layerGroup();
   const outlineRenderer = L.svg({ padding: 0.3 });
   let outlineLayer = null;
@@ -944,35 +947,54 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     refreshPoints();
   }
 
-  function buildBuffer(key) {
+  function syncBuffer(key, m, view) {
     const group = groups[key];
     const type = BUFFER_TYPE_BY_KEY[key];
-    const m = getMap();
-    group.clearLayers();
+    let entries = bufferEntries.get(key);
+    if (!entries) bufferEntries.set(key, entries = new Map());
+    const south = view.getSouth(), north = view.getNorth(), west = view.getWest(), east = view.getEast();
+    const wanted = new Map();
     list.forEach(p => {
       if (layerType(p) !== type) return;
       const approved = isApproved(p.status);
       if (type === "12-CSD" && !approved) return;
       const radius = effectiveRadius(p);
       if (!(radius > 0)) return;
+      const dLat = radius / M_PER_DEG_LAT;
+      const dLng = dLat / Math.max(0.1, Math.cos(p.lat * Math.PI / 180));
+      if (p.lat + dLat < south || p.lat - dLat > north || p.lng + dLng < west || p.lng - dLng > east) return;
+      wanted.set(pointKey(p), { p, radius, approved });
+    });
+    entries.forEach((circles, k) => {
+      if (wanted.has(k)) return;
+      circles.forEach(c => group.removeLayer(c));
+      entries.delete(k);
+    });
+    wanted.forEach(({ p, radius, approved }, k) => {
+      if (entries.has(k)) return;
       const { fillColor, fillOpacity, ...stroke } = getBufferStyle(type, approved);
       const renderer = bufferFillRenderer(m, key, approved, fillOpacity);
-      group.addLayer(L.circle([p.lat, p.lng], { radius, renderer, stroke: false, fillColor, fillOpacity: 1, interactive: false }));
-      group.addLayer(L.circle([p.lat, p.lng], { radius, ...stroke, fill: false, interactive: false }));
+      const circles = [
+        L.circle([p.lat, p.lng], { radius, renderer, stroke: false, fillColor, fillOpacity: 1, interactive: false }),
+        L.circle([p.lat, p.lng], { radius, ...stroke, fill: false, interactive: false })
+      ];
+      circles.forEach(c => group.addLayer(c));
+      entries.set(k, circles);
     });
-    builtBuffers.add(key);
   }
 
   function refreshBuffers() {
     const m = getMap();
     if (!m || !isActive()) return;
+    const view = m.getBounds().pad(BUFFER_VIEW_PAD);
     Object.values(BUFFER_KEYS).forEach(key => {
-      if (m.hasLayer(groups[key]) && !builtBuffers.has(key)) buildBuffer(key);
+      if (m.hasLayer(groups[key])) syncBuffer(key, m, view);
     });
   }
 
+  // Dữ liệu / bán kính giả lập đổi: bỏ hết vòng tròn đã dựng (cùng pointKey có thể đã đổi bán kính)
   function invalidateBuffers() {
-    builtBuffers.clear();
+    bufferEntries.clear();
     Object.values(BUFFER_KEYS).forEach(key => groups[key].clearLayers());
     refreshBuffers();
   }
