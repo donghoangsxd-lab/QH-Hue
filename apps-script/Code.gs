@@ -8,6 +8,7 @@
 // syncCad = false: chỉ dựng lại infrastructure_hue.json, không dựng lại cad_parcels.json.
 // Xóa đồ án: doPost action=deleteProject. putBucketObject / deleteBucketObject: ghi file bucket khi Vercel chưa có quyền.
 // Admin sửa 1 công trình từ bảng thông tin lô: doPost action=editInfraRow.
+// Sau mỗi lần đồng bộ hẹn warmWebappCache (Script Property WEBAPP_URL) để webapp tính sẵn thống kê phường.
 // =========================================================================
 
 const BUCKET_NAME = "hue-infra-data-us";
@@ -461,12 +462,82 @@ function syncSheetsToGCS(includeCad) {
         uploadToGCS(JSON.stringify({ "type": "FeatureCollection", "features": cadFeatures }), CAD_FILE_NAME);
       }
     }
+    scheduleWebappWarm();
 
   } catch (err) {
     Logger.log("❌ Lỗi syncSheetsToGCS: " + err.toString());
   } finally {
     lock.releaseLock();
   }
+}
+
+// TÍNH SẴN TRÊN WEBAPP SAU ĐỒNG BỘ: máy chủ Vercel đếm pixel ứng viên + độ phủ phường đổi chữ ký rồi lưu bucket (cache/v1/),
+// người mở web đầu tiên không phải chờ GEE. Chạy bằng trigger hẹn giờ (không gọi thẳng trong syncSheetsToGCS: doPost từ
+// webapp chỉ chờ 25–55 s). Cần Script Property WEBAPP_URL (vd. https://<tên miền webapp>); thiếu thì bỏ qua.
+const WARM_HANDLER = "warmWebappCache";
+// Gộp nhiều lần sửa liên tiếp vào 1 lượt tính
+const WARM_DELAY_MS = 60 * 1000;
+// Apps Script cắt 1 lượt chạy ở 6 phút: hết ngân sách thì hẹn lượt sau làm tiếp
+const WARM_BUDGET_MS = 4.5 * 60 * 1000;
+
+function scheduleWebappWarm() {
+  try {
+    if (!PropertiesService.getScriptProperties().getProperty("WEBAPP_URL")) return;
+    var pending = ScriptApp.getProjectTriggers().some(function(t) { return t.getHandlerFunction() === WARM_HANDLER; });
+    if (!pending) ScriptApp.newTrigger(WARM_HANDLER).timeBased().after(WARM_DELAY_MS).create();
+  } catch (err) {
+    Logger.log("⚠ Không hẹn được lượt tính sẵn webapp: " + err.toString());
+  }
+}
+
+function warmWebappCache() {
+  // Xóa trigger trước: dữ liệu đổi trong lúc đang tính sẽ hẹn lượt mới
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === WARM_HANDLER) ScriptApp.deleteTrigger(t);
+  });
+  var base = PropertiesService.getScriptProperties().getProperty("WEBAPP_URL");
+  if (!base) {
+    Logger.log("⚠ Chưa có Script Property WEBAPP_URL, bỏ qua tính sẵn");
+    return;
+  }
+  var api = base.replace(/\/+$/, "") + "/api/gee?action=";
+  var started = Date.now();
+  var overBudget = function() { return Date.now() - started > WARM_BUDGET_MS; };
+  var get = function(qs) {
+    try {
+      var res = UrlFetchApp.fetch(api + qs, { "muteHttpExceptions": true });
+      if (res.getResponseCode() !== 200) {
+        Logger.log("⚠ " + qs + " → HTTP " + res.getResponseCode());
+        return null;
+      }
+      return JSON.parse(res.getContentText());
+    } catch (err) {
+      Logger.log("⚠ " + qs + " lỗi: " + err.toString());
+      return null;
+    }
+  };
+
+  var stats = get("getWardStats&fresh=1");
+  if (!stats || !stats.data) return;
+  var counted = 0, covered = 0;
+  (stats.countPending || []).forEach(function(ward) {
+    for (var round = 0; round < 5 && !overBudget(); round++) {
+      var r = get("countWardCandidates&ward=" + encodeURIComponent(ward));
+      if (!r) break;
+      counted += r.counted || 0;
+      if (!r.counted || !r.remaining) break;
+    }
+  });
+  // Phường chưa có độ phủ khớp chữ ký; QH đã lưu thì máy chủ trả ngay từ bucket
+  stats.data.forEach(function(w) {
+    if (overBudget()) return;
+    var ward = encodeURIComponent(w.Ten_Phuong);
+    if (!w._coverageReady && get("getWardCoverage&ward=" + ward)) covered++;
+    if (w.planCovSig && !overBudget() && get("getWardCoverage&scenario=QH&ward=" + ward)) covered++;
+  });
+  Logger.log("🔥 Tính sẵn webapp: đếm " + counted + " ứng viên, " + covered + " lượt độ phủ, "
+    + Math.round((Date.now() - started) / 1000) + " s");
+  if (overBudget()) scheduleWebappWarm();
 }
 
 // CHẠY 1 LẦN TRONG TRÌNH SOẠN THẢO: đổi tiêu đề QuyMo_S -> QuyMo_HT (giữ nguyên giá trị)
