@@ -2774,6 +2774,11 @@ module.exports = async (req, res) => {
       }
       cachedWardStats = null;
       const timing = { start: now - startedAt };
+      const watchdog = setTimeout(() => {
+        if (res.headersSent) return;
+        console.warn('getWardStats quá hạn, timing (ms):', JSON.stringify(timing));
+        res.status(503).json({ error: true, message: 'Thống kê phường quá thời gian, thử lại sau ít phút', timing });
+      }, WARD_STATS_DEADLINE_MS + 2000);
 
       const evaluatedWards = await loadEvaluatedWards(wardVectorParsed);
       timing.wards = Date.now() - startedAt;
@@ -2842,6 +2847,7 @@ module.exports = async (req, res) => {
         if (w) w.planCovChanges.push(item.id);
       });
 
+      timing.classify = Date.now() - startedAt;
       const resultTable = [];
       const approvedAll = rawDataList.filter(it => isApprovedStatus(it.status) && it.lat != null && it.lng != null);
       const coverageCandidates = [];
@@ -2952,6 +2958,8 @@ module.exports = async (req, res) => {
         applyCachedCoverage(calculatedRow);
 
         resultTable.push(calculatedRow);
+        timing.wardRows = resultTable.length;
+        timing.lastWard = Date.now() - startedAt;
       }
 
       timing.rows = Date.now() - startedAt;
@@ -2975,7 +2983,9 @@ module.exports = async (req, res) => {
       cachedWardStatsVersion = getDataVersion();
       lastWardStatsFetch = now;
       timing.total = Date.now() - startedAt;
+      clearTimeout(watchdog);
       console.log('getWardStats timing (ms):', JSON.stringify(timing));
+      if (res.headersSent) return;
 
       return res.status(200).json({ data: resultTable, network: cityNetwork, coverageStatus: 'per_ward', timing });
     }
