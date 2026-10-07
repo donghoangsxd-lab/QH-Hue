@@ -1072,11 +1072,18 @@ async function countCandidatePixels(ee, popRasterNative, candidates, wardKeys) {
     return hit ? Number(hit.sum) || 0 : 0;
   };
   const out = {};
-  ((res.rows && res.rows.features) || []).forEach(f => {
+  const feats = (res.rows && res.rows.features) || [];
+  feats.forEach(f => {
     const p = f.properties || {};
     if (p.k === 'wards') wardKeys.forEach(name => { out[`w:${name}`] = sumIn(p.groups, name); });
     else out[p.k] = sumIn(p.groups, candidates[Number(String(p.k).slice(1))].ward.name);
   });
+  const wardRow = feats.find(f => f.properties && f.properties.k === 'wards');
+  out._debug = {
+    names: wardNames.slice(0, 3), wardKey: wardKeys[0], rows: feats.length,
+    wardGroups: wardRow ? JSON.stringify(wardRow.properties.groups || wardRow.properties).slice(0, 200) : null,
+    c0: feats[0] ? JSON.stringify(feats[0].properties).slice(0, 200) : null
+  };
   return out;
 }
 
