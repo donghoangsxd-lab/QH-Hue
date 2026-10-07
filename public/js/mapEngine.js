@@ -1732,7 +1732,8 @@ function addConflictRings(fg, conflicts, renderer) {
 
 let pointPopup = null;   // { popup, id, scenario } của popup công trình đang mở
 
-// parcelGeometry: mở từ ranh lô đất → chỉ viền khu đất + bảng thông tin; âm bản, zoom bán kính và dân số chờ bấm "Xem bán kính phục vụ"
+// Click chỉ mở bảng thông tin (mở từ ranh lô đất thì kèm viền khu đất); âm bản, zoom bán kính,
+// phạm vi thực tế theo mạng đường và dân số chỉ chạy khi bấm nút phân tích trong popup
 export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   if (pointPopup && pointPopup.id === p.id && pointPopup.scenario === p.scenario && pointPopup.popup._map === targetMap
     && expandCollapsedPopup(pointPopup.popup)) return;
@@ -1759,7 +1760,6 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   const clip = serviceClipFor(p, geoWardNow);
   const inViewPoints = isCSDUnapproved ? [] : getWardFilteredList(isPlanScenario ? getPlanScenarioList() : state.rawDataList)
     .filter(q => layerType(q) === selType && (q.type !== '12-CSD' || q === p) && hasValidCoord(q) && targetMap.hasLayer(groups[ICON_GROUP_KEYS[selType]]));
-  // Mặc định chỉ vẽ vòng bán kính lý thuyết; vùng phục vụ theo mạng đường + dân số chỉ tính khi bấm nút phân tích
   const hasZone = !isCSDUnapproved && !noZone;
   const conflicts = findParcelConflicts(p, parcelGeometry || parcelFor(p)?.geometry);
   let selMarks = null;
@@ -1771,9 +1771,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
     addConflictRings(selMarks, conflicts, renderer);
     groups.singleIso.addLayer(selMarks);
   };
-  if (parcelGeometry) clearSingleIsochrone();
-  else if (hasZone) highlightSingleIsochrone(p.lat, p.lng, itemRadius, groups.singleIso, inViewPoints, clip, false);
-  else clearSingleIsochrone();
+  clearSingleIsochrone();
   markSelection();
   let selSeq = singleIsoSeq;
 
@@ -1829,8 +1827,11 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   } else if (showArea || showServed) {
     const what = showArea
       ? `${p.type === '13-BUS' ? 'Xem phạm vi đi bộ thực tế' : 'Xem phạm vi phục vụ thực tế'}${showServed ? ' & dân số' : ''}`
-      : (ntKind ? 'Tính dân số trong vùng cách ly' : 'Tính dân số phục vụ');
-    html += `<div class="js-analysis"><button type="button" class="js-analyze proof-btn pp-analyze-btn" title="Dựng vùng phục vụ theo mạng đường và tính dân số (tốn thời gian, chỉ chạy khi bấm)">${ico(showArea ? 'road' : 'users')}${what}</button></div>`;
+      : `Xem ${radiusLabel.toLowerCase()} & ${ntKind ? 'dân số vùng cách ly' : 'dân số phục vụ'}`;
+    const tip = showArea
+      ? 'Bật chế độ âm bản, dựng vùng phục vụ theo mạng đường và tính dân số (tốn thời gian, chỉ chạy khi bấm)'
+      : `Bật chế độ âm bản theo ${radiusLabel.toLowerCase()} (đường chim bay) và tính dân số`;
+    html += `<div class="js-analysis"><button type="button" class="js-analyze proof-btn pp-analyze-btn" title="${tip}">${ico(showArea ? 'road' : 'users')}${what}</button></div>`;
   }
   if (conflicts.length) html += parcelConflictHtml(p, conflicts);
   const riskData = peekInfraRisk();
@@ -1862,7 +1863,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   addPopupCollapseToggle(popup, parcelGeometry ? 'ranh khu đất và vùng phục vụ' : 'vùng phục vụ');
   if (parcelGeometry) addLotEditButton(popup, { kind: 'INFRA', item: p });
   pointPopup = { popup, id: p.id, scenario: p.scenario };
-  if (!parcelGeometry) focusServiceRadius(targetMap, p.lat, p.lng, hasZone ? itemRadius : 0);
+  if (!parcelGeometry) focusServiceRadius(targetMap, p.lat, p.lng, 0);
   // Đóng popup thì thoát chế độ âm bản (trừ khi đã chọn công trình khác / chuyển sang thuyết minh CSD)
   popup.on('remove', () => { if (singleIsoSeq === selSeq) clearSingleIsochrone(); });
   riskData?.then(d => {
@@ -1899,10 +1900,8 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
     const areaPromise = showArea
       ? highlightSingleIsochrone(p.lat, p.lng, itemRadius, groups.singleIso, inViewPoints, clip, true)
       : null;
-    if (parcelGeometry) {
-      if (!showArea) highlightSingleIsochrone(p.lat, p.lng, itemRadius, groups.singleIso, inViewPoints, clip, false);
-      focusServiceRadius(targetMap, p.lat, p.lng, itemRadius);
-    }
+    if (!showArea) highlightSingleIsochrone(p.lat, p.lng, itemRadius, groups.singleIso, inViewPoints, clip, false);
+    focusServiceRadius(targetMap, p.lat, p.lng, itemRadius);
     markSelection();
     selSeq = singleIsoSeq;
 
