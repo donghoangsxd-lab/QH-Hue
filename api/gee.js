@@ -560,6 +560,35 @@ const wardNameOf = (p) => p.tenXa || p.NAME_2 || p.name || 'Phường';
 // (phép chiếu mặc định WGS84 do paint) ra gấp ~2,8 lần.
 const populatedPixels = (popRasterNative) => popRasterNative.mask().gt(0).unmask(0).rename('pix');
 
+/**
+ * Diện tích (ha) theo cả 40 phường/xã của vùng hiện trạng (base) và vùng phát triển mới (dev) đúng như ranh đỏ/xanh trên
+ * bản đồ. Đất xây dựng hiện nay = base + dev: dùng chung cho bảng "Vùng phát triển mới" và mẫu số mật độ đường.
+ */
+function loadDevAreas(ee, wardVectorParsed, from) {
+  const key = `devArea|${from}|${sat.devRecentYears().join('-')}`;
+  if (!cachedSatStats.has(key)) {
+    const img = sat.newDevImage(ee, wardVectorParsed, from);
+    const ha = ee.Image.pixelArea().divide(1e4);
+    const stack = ha.multiply(img.select('base')).rename('base').addBands(ha.multiply(img.select('dev')).rename('dev'));
+    const job = eeEvaluate(stack.reduceRegions({
+      collection: wardVectorParsed, reducer: ee.Reducer.sum(), crs: sat.DEV_CRS, scale: sat.DEV_SCALE_M, tileScale: 8
+    }).map(f => ee.Feature(null).copyProperties(f))).then(fc => {
+      const wards = {};
+      ((fc && fc.features) || []).forEach(f => {
+        const p = f.properties || {};
+        wards[wardNameOf(p)] = { baseHa: round1(Number(p.base) || 0), devHa: round1(Number(p.dev) || 0) };
+      });
+      return wards;
+    }).catch(err => {
+      cachedSatStats.delete(key);
+      throw err;
+    });
+    if (cachedSatStats.size > 40) cachedSatStats.clear();
+    cachedSatStats.set(key, job);
+  }
+  return cachedSatStats.get(key);
+}
+
 function invalidateAllCaches() {
   invalidateCache();
   cachedWardStats = null;
@@ -2249,26 +2278,14 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Diện tích đất xây dựng đô thị hiện nay theo phường/xã (Dynamic World 2 năm gần nhất, cùng nguồn lớp "Vùng phát triển mới"):
-    // mẫu số mật độ đường thay cho diện tích tự nhiên
+    // Mẫu số mật độ đường theo phường/xã: đất xây dựng hiện nay = vùng hiện trạng + vùng phát triển mới từ năm gốc mặc định
     if (action === 'getBuiltArea') {
       res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
-      const years = sat.devRecentYears();
-      const key = `built|${years.join('-')}`;
-      if (!cachedSatStats.has(key)) {
-        const km2 = ee.Image.pixelArea().divide(1e6).multiply(sat.builtNowImage(ee, wardVectorParsed)).rename('km2');
-        const fc = await eeEvaluate(km2.reduceRegions({
-          collection: wardVectorParsed, reducer: ee.Reducer.sum(), crs: sat.DEV_CRS, scale: sat.DEV_SCALE_M, tileScale: 8
-        }).map(f => ee.Feature(null).copyProperties(f)));
-        const wards = {};
-        ((fc && fc.features) || []).forEach(f => {
-          const p = f.properties || {};
-          wards[wardNameOf(p)] = Math.round((Number(p.sum) || 0) * 1000) / 1000;
-        });
-        if (cachedSatStats.size > 40) cachedSatStats.clear();
-        cachedSatStats.set(key, { years, scale: sat.DEV_SCALE_M, wards });
-      }
-      return res.status(200).json(cachedSatStats.get(key));
+      const from = sat.DEV_FROM_DEFAULT;
+      const areas = await loadDevAreas(ee, wardVectorParsed, from);
+      const wards = {};
+      Object.entries(areas).forEach(([name, a]) => { wards[name] = Math.round((a.baseHa + a.devHa) * 10) / 1000; });
+      return res.status(200).json({ years: sat.devRecentYears(), from, scale: sat.DEV_SCALE_M, wards });
     }
 
     if (action === 'getBoundaryTile') {
@@ -2399,41 +2416,37 @@ module.exports = async (req, res) => {
       return res.status(200).json(cachedSatStats.get(key));
     }
 
-    // Vùng hiện trạng / vùng phát triển mới từ năm from trong các phường (bộ chỉ tiêu đô thị). Trong vùng phát triển mới:
-    // dân số ước tính (đơn vị ở, Mục 2.2.3.2), công viên/vườn hoa nằm trong vùng, tỷ lệ diện tích trong 400 m quanh
-    // công viên/vườn hoa, bãi đỗ xe hiện trạng đã duyệt (Mục 2.2.3.3)
+    // Vùng hiện trạng / vùng phát triển mới từ năm from trong cả 40 phường/xã. Trong vùng phát triển mới: dân số ước tính
+    // (đơn vị ở, Mục 2.2.3.2), công viên/vườn hoa nằm trong vùng, tỷ lệ diện tích trong 400 m quanh công viên/vườn hoa,
+    // bãi đỗ xe hiện trạng đã duyệt (Mục 2.2.3.3) — chỉ tiêu này chỉ xét ở phường bộ chỉ tiêu đô thị (dt = true)
     if (action === 'getNewDevStats') {
       const from = Number(req.query.from);
       if (!sat.DEV_FROM_YEARS.includes(from)) return res.status(400).json({ error: true, message: "Năm gốc không hợp lệ" });
       res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
-      const key = `dev|${from}|${getDataVersion()}`;
+      const key = `dev|${from}|${sat.devRecentYears().join('-')}|${getDataVersion()}`;
       if (!cachedSatStats.has(key)) {
-        const evaluatedWards = await loadEvaluatedWards(wardVectorParsed);
-        const dtNames = evaluatedWards.map(w => w.name).filter(n => constants.wardProfile(n) === 'DT');
-        const dtWards = wardVectorParsed.filter(ee.Filter.inList('tenXa', dtNames));
+        const [evaluatedWards, areas] = await Promise.all([
+          loadEvaluatedWards(wardVectorParsed),
+          loadDevAreas(ee, wardVectorParsed, from)
+        ]);
         const approved = rawDataList.filter(it => isApprovedStatus(it.status) && Number.isFinite(Number(it.lat)) && Number.isFinite(Number(it.lng)));
         const near = (code) => {
           const zones = approved.filter(it => constants.resolveTypeCode(it) === code)
             .map(it => ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(DEV_SERVICE_M)));
           return zones.length ? ee.Image(0).byte().paint(ee.FeatureCollection(zones), 1) : ee.Image(0).byte();
         };
-        const img = sat.newDevImage(ee, dtWards, from);
-        const dev = img.select('dev');
-        const ha = ee.Image.pixelArea().divide(1e4);
-        const devHa = ha.multiply(dev);
-        const stack = devHa.rename('dev')
-          .addBands(ha.multiply(img.select('base')).rename('base'))
-          .addBands(ha.multiply(img.select('built')).rename('built'))
-          .addBands(devHa.multiply(near('1-CV')).rename('park'))
+        const dev = sat.newDevImage(ee, wardVectorParsed, from).select('dev');
+        const devHa = ee.Image.pixelArea().divide(1e4).multiply(dev);
+        const stack = devHa.multiply(near('1-CV')).rename('park')
           .addBands(devHa.multiply(near('2-BDX')).rename('parking'));
         const pix = populatedPixels(popRasterNative);
         const parks = approved.filter(it => constants.resolveTypeCode(it) === '1-CV');
         const parkPts = ee.FeatureCollection(parks.map((it, i) => ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(RISK_BUFFER_M), { i })));
         const [fc, popFc, parkHit] = await Promise.all([
-          eeEvaluate(stack.reduceRegions({ collection: dtWards, reducer: ee.Reducer.sum(), crs: sat.DEV_CRS, scale: sat.DEV_SCALE_M, tileScale: 8 })
+          eeEvaluate(stack.reduceRegions({ collection: wardVectorParsed, reducer: ee.Reducer.sum(), crs: sat.DEV_CRS, scale: sat.DEV_SCALE_M, tileScale: 8 })
             .map(f => ee.Feature(null).copyProperties(f))),
           eeEvaluate(pix.addBands(pix.multiply(dev).rename('pixDev')).reduceRegions({
-            collection: dtWards, reducer: ee.Reducer.sum().unweighted(), crs: popProjection, scale: POP_SCALE_M, tileScale: 4
+            collection: wardVectorParsed, reducer: ee.Reducer.sum().unweighted(), crs: popProjection, scale: POP_SCALE_M, tileScale: 4
           }).map(f => ee.Feature(null).copyProperties(f))),
           parks.length
             ? eeEvaluate(dev.reduceRegions({ collection: parkPts, reducer: ee.Reducer.max(), crs: sat.DEV_CRS, scale: sat.DEV_SCALE_M, tileScale: 4 })
@@ -2455,12 +2468,14 @@ module.exports = async (req, res) => {
         const wards = ((fc && fc.features) || []).map(f => {
           const p = f.properties || {};
           const name = wardNameOf(p);
-          const devArea = Number(p.dev) || 0;
+          const a = areas[name] || { baseHa: 0, devHa: 0 };
+          const devArea = a.devHa;
           return {
             name,
-            devHa: round1(devArea),
-            baseHa: round1(Number(p.base) || 0),
-            builtHa: round1(Number(p.built) || 0),
+            dt: constants.wardProfile(name) === 'DT',
+            devHa: a.devHa,
+            baseHa: a.baseHa,
+            builtHa: round1(a.baseHa + a.devHa),
             devPop: Math.round(popByWard[name] || 0),
             parks: parksByWard[name] || [],
             parkPct: pctOf(Number(p.park) || 0, devArea),

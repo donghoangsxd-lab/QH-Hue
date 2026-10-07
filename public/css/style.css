@@ -495,6 +495,12 @@ body.right-collapsed .right-panel {
 .flood-muted { color: var(--text-muted); font-style: italic; padding: 2px 0; }
 .flood-wards { display: flex; flex-wrap: wrap; gap: 2px 8px; }
 .flood-wards b { color: var(--accent-cyan); font-weight: 600; }
+.dev-ward-table { margin: 5px 0 2px; }
+.dev-ward-table summary { cursor: pointer; font-weight: 600; color: var(--text-strong); }
+.dev-ward-table table { width: 100%; margin-top: 3px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.dev-ward-table th, .dev-ward-table td { padding: 1px 3px; border-bottom: 1px solid rgba(148, 163, 184, 0.15); text-align: right; }
+.dev-ward-table th:first-child, .dev-ward-table td:first-child { text-align: left; }
+.dev-ward-table th { color: var(--text-muted); font-weight: 600; }
 .flood-phase { display: flex; gap: 4px; margin: 2px 0 4px; }
 .flood-phase button { flex: 1; padding: 2px 6px; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: var(--r-sm); background: transparent; color: var(--text-muted); font: inherit; cursor: pointer; }
 .flood-phase button.active { border-color: var(--accent-cyan); color: var(--text-strong); background: rgba(var(--cyan-rgb), 0.15); }

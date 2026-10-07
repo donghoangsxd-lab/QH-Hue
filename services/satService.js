@@ -108,7 +108,8 @@ function lstImage(ee, wards, year) {
 
 // Khoanh vùng trong từng phường (QCVN Mục 2.2.3.2, 2.2.3.3 chỉ áp cho đơn vị ở / nhóm nhà ở phát triển mới):
 // vùng hiện trạng = đất đã xây dựng đến năm gốc; vùng phát triển mới = đất xây dựng hiện nay − vùng hiện trạng.
-//   hiện nay: Google Dynamic World 10 m, nhãn chiếm ưu thế tháng 1–8 (ít mây hơn mùa mưa) của 2 năm gần nhất là "built";
+//   hiện nay: Google Dynamic World 10 m, nhãn chiếm ưu thế tháng 1–8 (ít mây hơn mùa mưa) của mùa khô gần nhất đã đủ
+//   tháng là "built", cộng đất đang san nền (nhãn "bare" mà năm gốc chưa phải "bare", sát khu đã xây dựng);
 //   năm gốc: GAIA (Tsinghua FROM-GLC) bề mặt không thấm nước hằng năm 1985–2018, 30 m, hợp với GHSL GHS_BUILT_S
 //   (JRC, ô 100 m, 5 năm/kỳ) để không bỏ sót khu ở xen cây xanh.
 // Tính trên lưới cố định 20 m, bỏ các mảng < ~0,5 ha (nhà lẻ, nhiễu) để ranh vùng rõ ràng.
@@ -120,31 +121,52 @@ const GHSL_LAST_OBS_EPOCH = 2020;
 const GHSL_BUILT_MIN_M2 = 1500;
 const DEV_MONTHS = [1, 8];
 const DW_BUILT = 6;
+const DW_BARE = 7;
 const DW_FIRST_YEAR = 2016;
 const DEV_SCALE_M = 20;
 const DEV_CRS = 'EPSG:32648';
 const DEV_MIN_PATCH_PX = 13;
+// Đất "bare" chỉ tính là đang san nền khi cách khu đã xây dựng ≤ 10 ô (200 m): bỏ bãi cát ven biển, rừng trồng mới khai thác
+const CLEARING_NEAR_PX = 10;
+const DEV_FROM_DEFAULT = 2020;
 const DEV_COLOR = '#38bdf8';
 const DEV_BASE_COLOR = '#ef4444';
-const devRecentYears = (now = new Date()) => [now.getFullYear() - 2, now.getFullYear() - 1];
 const devProj = (ee) => ee.Projection(DEV_CRS).atScale(DEV_SCALE_M);
 
-// 1 = Dynamic World nhãn chiếm ưu thế tháng 1–8 các năm y0–y1 là "built"
-function dwBuilt(ee, wards, y0, y1) {
+/** [y, y]: mùa khô gần nhất đã đủ tháng 1–8 (sau tháng 8 là năm nay, trước đó là năm trước) */
+function devRecentYears(now = new Date()) {
+  const y = now.getMonth() + 1 > DEV_MONTHS[1] ? now.getFullYear() : now.getFullYear() - 1;
+  return [y, y];
+}
+
+// Nhãn Dynamic World chiếm ưu thế tháng 1–8 các năm y0–y1 (bị che mây cả mùa thì không có giá trị)
+function dwMode(ee, wards, y0, y1) {
   return ee.ImageCollection('GOOGLE/DYNAMICWORLD/V1')
     .filterBounds(wards.geometry().bounds())
     .filterDate(`${y0}-01-01`, `${y1 + 1}-01-01`)
     .filter(ee.Filter.calendarRange(DEV_MONTHS[0], DEV_MONTHS[1], 'month'))
     .select('label')
-    .mode()
-    .eq(DW_BUILT)
-    .unmask(0);
+    .mode();
 }
 
-const builtNow = (ee, wards) => dwBuilt(ee, wards, ...devRecentYears());
+const dwBuilt = (ee, wards, y0, y1) => dwMode(ee, wards, y0, y1).eq(DW_BUILT).unmask(0);
 
-/** Đất xây dựng hiện nay (0/1) trên lưới 20 m — cùng lớp "built" của newDevImage, dùng làm mẫu số mật độ đường */
-const builtNowImage = (ee, wards) => builtNow(ee, wards).reproject(devProj(ee)).clipToCollection(wards);
+/**
+ * 1 = đất xây dựng hiện nay trên lưới 20 m: nhãn "built" mùa khô gần nhất, hoặc đất đang san nền — nhãn "bare" mà năm
+ * tham chiếu (năm gốc, sớm nhất DW_FIRST_YEAR) chưa phải "bare", cách khu "built" ≤ CLEARING_NEAR_PX ô.
+ * Dynamic World gán công trường đang san lấp là "bare" cho tới khi có nhà nên chỉ dùng "built" sẽ sót các khu mới.
+ */
+function builtNow(ee, wards, from) {
+  const proj = devProj(ee);
+  const [y0, y1] = devRecentYears();
+  const label = dwMode(ee, wards, y0, y1);
+  const built = label.eq(DW_BUILT).unmask(0).reproject(proj);
+  const refYear = Math.min(Math.max(from, DW_FIRST_YEAR), y0 - 1);
+  const wasBare = dwMode(ee, wards, refYear, refYear).eq(DW_BARE).unmask(0);
+  const nearBuilt = built.focalMax(CLEARING_NEAR_PX, 'square', 'pixels').reproject(proj);
+  const clearing = label.eq(DW_BARE).unmask(0).and(wasBare.not()).reproject(proj).and(nearBuilt);
+  return built.or(clearing);
+}
 
 /**
  * 1 = đã xây dựng đến năm year: GAIA đã là bề mặt không thấm nước (change_year_index: 34 = 1985 … 1 = 2018)
@@ -172,7 +194,7 @@ function dropSmallPatches(mask, proj) {
  */
 function newDevImage(ee, wards, from) {
   const proj = devProj(ee);
-  const now = builtNow(ee, wards).reproject(proj);
+  const now = builtNow(ee, wards, from);
   const base = builtBy(ee, wards, from).reproject(proj);
   const dev = dropSmallPatches(now.and(base.not()).reproject(proj), proj);
   return dev.rename('dev')
@@ -209,5 +231,5 @@ function mapUrl(ee, visImage) {
 module.exports = {
   sarYears, lstYears, parseYear, demImage, terrariumImage, sarFloodMask, sarFloodVis, lstImage, mapUrl,
   LST_VIS, FLOOD_SEASON, HOT_SEASON, POP_REFS,
-  newDevImage, newDevVis, builtNowImage, devRecentYears, DEV_FROM_YEARS, DEV_COLOR, DEV_BASE_COLOR, DEV_SCALE_M, DEV_CRS
+  newDevImage, newDevVis, devRecentYears, DEV_FROM_YEARS, DEV_FROM_DEFAULT, DEV_COLOR, DEV_BASE_COLOR, DEV_SCALE_M, DEV_CRS
 };

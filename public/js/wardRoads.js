@@ -5,6 +5,7 @@ import { state } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml, ico, setStatusContent, showToast, wardStatHtml } from './utils.js';
 import { queryOverpassHedged } from './serviceArea.js';
+import { yearsText } from './newDev.js';
 
 const QUERY_TIMEOUT_MS = 170000; // xã miền núi rộng hàng trăm km²
 const QUERY_HEDGE_MS = 25000;    // truy vấn nặng: chờ lâu hơn mới hỏi thêm máy chủ Overpass khác
@@ -218,11 +219,11 @@ export async function loadRoadTypeLengths() {
 export const fmtKm = (v) => KM_FORMAT.format(v);
 
 // ================== ĐẤT XÂY DỰNG ĐÔ THỊ: MẪU SỐ MẬT ĐỘ ĐƯỜNG ==================
-// Diện tích khu vực xây dựng theo ảnh vệ tinh mới nhất (api/gee.js › getBuiltArea, Dynamic World 2 năm gần nhất);
-// chưa tải được thì tạm chia cho diện tích tự nhiên và ghi rõ trong chú thích
+// Đất xây dựng hiện nay = vùng hiện trạng + vùng phát triển mới của lớp "Vùng phát triển mới" (api/gee.js › getBuiltArea),
+// trùng số liệu bảng đất xây dựng; chưa tải được thì tạm chia cho diện tích tự nhiên và ghi rõ trong chú thích
 export const BUILT_AREA_EVENT = 'built-area-updated';
 let builtPromise = null;
-let builtData = null;     // { years: [y0, y1], scale, wards: { tên phường: km² } }
+let builtData = null;     // { years: [y0, y1], from, scale, wards: { tên phường: km² } }
 let builtFailed = false;
 
 export function loadBuiltAreas() {
@@ -244,7 +245,7 @@ export function loadBuiltAreas() {
   return builtPromise;
 }
 
-const builtSource = () => (builtData ? `Dynamic World ${builtData.years[0]}–${builtData.years[1]}` : '');
+const builtSource = () => (builtData ? `Dynamic World ${yearsText(builtData.years)}` : '');
 
 /**
  * Mẫu số mật độ đường của 1 phường: { km2, built } — built = đất xây dựng đô thị, false = tạm diện tích tự nhiên
@@ -260,7 +261,8 @@ export function densityArea(name, naturalKm2) {
 /** Tên mẫu số cho chú thích; mixed = số phường phải tạm dùng diện tích tự nhiên */
 export function densityAreaLabel(built, mixed = 0) {
   if (!built || !builtData) return 'diện tích tự nhiên (chưa tải được diện tích đất xây dựng từ ảnh vệ tinh)';
-  return `diện tích đất xây dựng đô thị (khu vực xây dựng đo trên ảnh vệ tinh ${builtSource()}, lưới ${builtData.scale || 20} m)`
+  const parts = builtData.from ? `đất xây dựng trước ${builtData.from} + mới từ ${builtData.from}, ` : '';
+  return `diện tích đất xây dựng đô thị (${parts}đo trên ảnh vệ tinh ${builtSource()}, lưới ${builtData.scale || 20} m — trùng bảng lớp "Vùng phát triển mới")`
     + (mixed ? `; ${mixed} phường/xã chưa có số liệu đất xây dựng tạm dùng diện tích tự nhiên` : '');
 }
 

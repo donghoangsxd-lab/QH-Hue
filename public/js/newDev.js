@@ -1,8 +1,9 @@
 // Khoanh vùng trong từng phường (logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch):
 //   vùng hiện trạng (ranh đỏ)       = đất đã xây dựng đến năm gốc (GAIA 30 m 1985–2018 ∪ GHSL 100 m)
 //   vùng phát triển mới (ranh xanh) = đất xây dựng hiện nay (Dynamic World 10 m) − vùng hiện trạng
+//   đất xây dựng hiện nay = vùng hiện trạng + vùng phát triển mới (cũng là mẫu số mật độ đường, wardRoads.js)
 // QCVN 01:2026/BXD Mục 2.2.3.2 (công viên, vườn hoa mỗi đơn vị ở) và Mục 2.2.3.3 (vườn hoa, bãi đỗ xe ≤ 400 m) chỉ áp trong
-// vùng phát triển mới, không áp cho cả phường. Số liệu tính trên GEE (api/gee.js › getNewDevStats,
+// vùng phát triển mới của phường bộ chỉ tiêu đô thị, không áp cho cả phường. Số liệu tính trên GEE (api/gee.js › getNewDevStats,
 // services/satService.js › newDevImage), bảng chi tiết phường luôn dùng năm gốc DEV_FROM_DEFAULT.
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum } from './utils.js';
@@ -14,7 +15,12 @@ const DW_FIRST_YEAR = 2016; // khớp services/satService.js
 const HA = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
 const BASIS = 'Vùng hiện trạng: đất đã xây dựng đến năm gốc (GAIA – ĐH Thanh Hoa, Landsat 30 m, 1985–2018, hợp với GHSL – JRC, '
   + 'ô 100 m có ≥ 15% diện tích công trình; năm gốc từ 2016 hợp thêm Dynamic World năm đó). Vùng phát triển mới: đất xây dựng hiện nay (Google Dynamic World 10 m, nhãn chiếm ưu thế '
-  + 'tháng 1–8) nằm ngoài vùng hiện trạng. Bỏ mảng < 0,5 ha. Logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch.';
+  + 'tháng 1–8 của mùa khô gần nhất, gồm cả đất đang san nền sát khu đã xây dựng) nằm ngoài vùng hiện trạng. Bỏ mảng < 0,5 ha. '
+  + 'Tổng đất xây dựng = vùng hiện trạng + vùng phát triển mới, cũng là mẫu số mật độ đường. Logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch.';
+const DW_NOTE = 'Bản đồ Dynamic World gộp chung các đường, khu công nghiệp, nghĩa trang xây dựng mới vào "Đất xây dựng"; đất đang san nền có thể gồm bãi khai thác cát, ruộng bỏ hoang. Cần kiểm tra kỹ hiện trạng trước khi kết luận.';
+
+/** "2026" hoặc "2024–2025" (bản cũ còn trong bộ nhớ đệm trả về 2 năm) */
+export const yearsText = (to) => (to[0] === to[1] ? String(to[0]) : `${to[0]}–${to[1]}`);
 
 // Năm gốc so sánh: khớp DEV_FROM_YEARS trong services/satService.js
 export const devFromYears = () => ({ years: [2020, 2010, 2000], partial: null, def: DEV_FROM_DEFAULT });
@@ -40,7 +46,7 @@ export function loadNewDevStats(from = DEV_FROM_DEFAULT) {
   return promises.get(key);
 }
 
-const periodText = (d) => `${d.from} → ${d.to[0]}–${d.to[1]}`;
+const periodText = (d) => `${d.from} → ${yearsText(d.to)}`;
 
 /** { d, w } của 1 phường theo năm gốc mặc định; null khi chưa tải hoặc phường không có trong thống kê */
 export function newDevOf(wardName) {
@@ -104,23 +110,38 @@ export function newDevRowHtml(wardName) {
 /** Chú giải và thống kê cho bảng lớp vệ tinh (satLayers.js) */
 export function devLegend(legend) {
   return `<div><span class="sat-swatch dev-swatch" style="--c:${legend.baseColor}"></span>Vùng hiện trạng (đã xây dựng đến ${legend.from})</div>`
-    + `<div><span class="sat-swatch dev-swatch" style="--c:${legend.color}"></span>Vùng phát triển mới (${legend.from} → ${legend.to[0]}–${legend.to[1]})</div>`
-    + `<div class="flood-muted" title="${BASIS}">Phóng to từ mức ${DEV_MIN_ZOOM} để xem ranh. Cơ sở: Dynamic World ${legend.to[0]}–${legend.to[1]} − (GAIA ∪ GHSL${legend.from >= DW_FIRST_YEAR ? ' ∪ Dynamic World' : ''}) ${legend.from}. Logic tạm, sau này lấy ranh từ quy hoạch. Bản đồ Dynamic World gộp chung các đường, khu công nghiệp, nghĩa trang xây dựng mới vào "Đất xây dựng". Cần kiểm tra kỹ hiện trạng trước khi kết luận.</div>`;
+    + `<div><span class="sat-swatch dev-swatch" style="--c:${legend.color}"></span>Vùng phát triển mới (${legend.from} → ${yearsText(legend.to)})</div>`
+    + `<div class="flood-muted" title="${BASIS}">Phóng to từ mức ${DEV_MIN_ZOOM} để xem ranh. Cơ sở: Dynamic World ${yearsText(legend.to)} − (GAIA ∪ GHSL${legend.from >= DW_FIRST_YEAR ? ' ∪ Dynamic World' : ''}) ${legend.from}. Logic tạm, sau này lấy ranh từ quy hoạch. ${DW_NOTE}</div>`;
+}
+
+const sumOf = (rows, k) => rows.reduce((s, w) => s + (Number(w[k]) || 0), 0);
+
+// Bảng đủ 40 phường/xã, xếp theo tổng đất xây dựng giảm dần
+function wardTable(d) {
+  const rows = [...d.wards].sort((a, b) => (b.baseHa + b.devHa) - (a.baseHa + a.devHa));
+  const row = (w) => `<tr><td>${escapeHtml(w.name)}</td>`
+    + `<td>${HA.format(w.baseHa + w.devHa)}</td><td>${HA.format(w.baseHa)}</td><td>${HA.format(w.devHa)}</td></tr>`;
+  return `<details class="dev-ward-table"><summary>Chi tiết ${rows.length} phường/xã (ha)</summary>
+    <table><thead><tr><th>Phường/xã</th><th>Tổng ${d.to[1]}</th><th>Trước ${d.from}</th><th>Mới</th></tr></thead>
+    <tbody>${rows.map(row).join('')}</tbody></table></details>`;
 }
 
 export function devStats(d) {
-  const sum = (k) => d.wards.reduce((s, w) => s + (Number(w[k]) || 0), 0);
-  const devSum = sum('devHa');
+  const baseSum = sumOf(d.wards, 'baseHa'), devSum = sumOf(d.wards, 'devHa');
+  const dt = d.wards.filter(w => w.dt !== false);
+  const dtDev = sumOf(dt, 'devHa');
   const weighted = (k) => {
-    const part = d.wards.reduce((s, w) => s + (w[k] == null ? 0 : w[k] * w.devHa), 0);
-    return devSum > 0 ? part / devSum : null;
+    const part = dt.reduce((s, w) => s + (w[k] == null ? 0 : w[k] * w.devHa), 0);
+    return dtDev > 0 ? part / dtDev : null;
   };
-  const top = d.wards.filter(w => w.devHa > 0);
+  const top = [...d.wards].filter(w => w.devHa > 0).sort((a, b) => b.devHa - a.devHa);
   const chip = (w) => `<span>${escapeHtml(w.name)} <b>${HA.format(w.devHa)} ha</b></span>`;
   const park = weighted('parkPct'), parking = weighted('parkingPct');
-  return `<div class="flood-kpi"><span>Vùng hiện trạng đến ${d.from} (${d.wards.length} phường)</span><b>≈ ${HA.format(sum('baseHa'))} ha</b></div>
-    <div class="flood-kpi"><span>Vùng phát triển mới ${d.from} → nay</span><b>≈ ${HA.format(devSum)} ha · ≈ ${fmtNum(sum('devPop'))} người</b></div>
+  return `<div class="flood-kpi" title="${BASIS}"><span>Tổng diện tích đất xây dựng (${yearsText(d.to)}, ${d.wards.length} phường/xã)</span><b>≈ ${HA.format(baseSum + devSum)} ha</b></div>
+    <div class="flood-kpi"><span>Đất xây dựng trước ${d.from} (ranh đỏ)</span><b>≈ ${HA.format(baseSum)} ha</b></div>
+    <div class="flood-kpi"><span>Đất xây dựng mới từ ${d.from} → nay (ranh xanh)</span><b>≈ ${HA.format(devSum)} ha · ≈ ${fmtNum(sumOf(d.wards, 'devPop'))} người</b></div>
     ${top.length ? `<div class="flood-sub">Phát triển mới nhiều nhất</div><div class="flood-wards">${top.slice(0, 6).map(chip).join('')}</div>` : ''}
-    <div class="flood-kpi"><span>Trong ${d.serviceM} m vườn hoa / bãi đỗ xe</span><b><span class="${pctClass(park)}">${pctText(park)}</span> / <span class="${pctClass(parking)}">${pctText(parking)}</span></b></div>
-    <div class="flood-muted">Bản đồ Dynamic World gộp chung các đường, khu công nghiệp, nghĩa trang xây dựng mới vào "Đất xây dựng". Cần kiểm tra kỹ hiện trạng trước khi kết luận.</div>`;
+    <div class="flood-kpi" title="${DEV_REF}: chỉ xét vùng phát triển mới của ${dt.length} phường bộ chỉ tiêu đô thị"><span>Trong ${d.serviceM} m vườn hoa / bãi đỗ xe (${dt.length} phường đô thị)</span><b><span class="${pctClass(park)}">${pctText(park)}</span> / <span class="${pctClass(parking)}">${pctText(parking)}</span></b></div>
+    ${wardTable(d)}
+    <div class="flood-muted">Tổng đất xây dựng cũng là mẫu số mật độ đường giao thông. ${DW_NOTE}</div>`;
 }
