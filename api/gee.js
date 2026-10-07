@@ -345,6 +345,23 @@ function parseCadSplits(raw, layer, phases) {
   return out;
 }
 
+// 1 điểm chức năng (ghi file diem-chuc-nang.json, không vào Sheet)
+function parseCadPoints(raw) {
+  const out = [];
+  raw.slice(0, 20000).forEach(p => {
+    if (!p || typeof p !== 'object') return;
+    const pt = parseCoordInBounds(p.lat, p.lng);
+    if (!pt) return;
+    out.push({
+      name: sanitizeSheetText(p.name, 150),
+      layer: sanitizeSheetText(p.layer, 60),
+      lat: Math.round(pt.lat * 1e6) / 1e6,
+      lng: Math.round(pt.lng * 1e6) / 1e6
+    });
+  });
+  return out;
+}
+
 // 1 lô đất ngoài nhóm hạ tầng (ghi file đồ án trên bucket, không vào Sheet); null nếu không hợp lệ
 function parseLandItem(it) {
   if (!it || typeof it !== 'object') return null;
@@ -1005,6 +1022,40 @@ async function countPopPixels(ee, popRasterNative, regions) {
   return out;
 }
 
+/**
+ * Pixel dân cư phần còn trống của nhiều ứng viên (cùng phép tính candidateGeometries().net) + tổng pixel các phường wardKeys:
+ * { c<i>: số pixel, "w:<phường>": số pixel }. Buffer, hợp buffer công trình cùng loại và phép giao với ranh phường dựng
+ * trên GEE từ điểm + bán kính + chỉ số công trình: dựng sẵn ở Node, bộ mã hóa EE chặn tiến trình hàng chục giây
+ * với vài trăm ứng viên (mỗi ứng viên kéo theo hàng trăm buffer).
+ */
+async function countCandidatePixels(ee, popRasterNative, candidates, wardKeys) {
+  const { wardVectorParsed } = getGeeContext();
+  const exIndex = new Map();
+  const exFeatures = [];
+  const exIdsOf = (c) => c.existing.map(it => {
+    if (!exIndex.has(it)) {
+      exIndex.set(it, exFeatures.length);
+      exFeatures.push(ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]), { i: exFeatures.length, r: Number(it.radius) || 0 }));
+    }
+    return exIndex.get(it);
+  });
+  const cands = ee.FeatureCollection(candidates.map((c, i) => ee.Feature(ee.Geometry.Point([Number(c.lng), Number(c.lat)]), {
+    k: `c${i}`, r: Number(c.radius), wn: c.ward.name, ex: exIdsOf(c)
+  })));
+  const exFc = ee.FeatureCollection(exFeatures);
+  const net = cands.map(f => {
+    const r = ee.Number(f.get('r'));
+    const covered = exFc.filter(ee.Filter.inList('i', ee.List(f.get('ex'))))
+      .map(e => e.buffer(ee.Algorithms.If(ee.Number(e.get('r')).gt(0), e.get('r'), r)))
+      .geometry();
+    const ward = wardVectorParsed.filter(ee.Filter.eq('tenXa', f.get('wn'))).geometry();
+    return ee.Feature(f.geometry().buffer(r).difference(covered, 1).intersection(ward, 1), { k: f.get('k') });
+  });
+  const wards = wardVectorParsed.filter(ee.Filter.inList('tenXa', wardKeys))
+    .map(f => ee.Feature(f.geometry(), { k: ee.String('w:').cat(f.get('tenXa')) }));
+  return countPopPixelsFc(ee, popRasterNative, net.merge(wards));
+}
+
 /** Ngữ cảnh chỉ tiêu của phường: dân số quy hoạch + diện tích hiện có theo nhóm (giống cột quy mô của bảng phường) */
 function buildWardContext(wardFeat, approvedItemsInWard) {
   const pop = wardFeat.pop || 10000;
@@ -1089,30 +1140,15 @@ function rankEligible(suggestions) {
 async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000, { deadline = Infinity, timing = null } = {}) {
   if (!candidates.length) return true;
   const t0 = Date.now();
-  // Mỗi phường 1 đối tượng ee.Geometry: bộ mã hóa EE chỉ gộp trùng theo đối tượng, tạo mới cho từng ứng viên
-  // làm yêu cầu chép lại ranh phường hàng nghìn lần
-  const eeWards = new Map();
-  const wardGeomOf = (ward) => {
-    if (!eeWards.has(ward.name)) eeWards.set(ward.name, ee.Geometry(ward.geometry));
-    return eeWards.get(ward.name);
-  };
-  const uncounted = new Map();
-  candidates.forEach(c => {
-    if (!wardPopPixelCache.has(c.ward.name)) uncounted.set(c.ward.name, c.ward);
-  });
-  const wardKeys = [...uncounted.keys()];
+  const wardKeys = [...new Set(candidates.map(c => c.ward.name))].filter(name => !wardPopPixelCache.has(name));
 
   let counts = null;
   try {
-    if (timeoutMs > 0) {
-      const regions = candidates.map((c, i) => ({ key: `c${i}`, geometry: candidateGeometries(ee, c, wardGeomOf(c.ward)).net }));
-      wardKeys.forEach((name, i) => regions.push({ key: `w${i}`, geometry: wardGeomOf(uncounted.get(name)) }));
-      counts = await withTimeout(countPopPixels(ee, popRaster, regions), timeoutMs, null);
-    }
+    if (timeoutMs > 0) counts = await withTimeout(countCandidatePixels(ee, popRaster, candidates, wardKeys), timeoutMs, null);
   } catch (e) {
     console.warn("fillCoverageGains: GEE lỗi, dùng ước lượng hình học:", e.message);
   }
-  if (counts) wardKeys.forEach((name, i) => wardPopPixelCache.set(name, counts[`w${i}`] || 0));
+  if (counts) wardKeys.forEach(name => wardPopPixelCache.set(name, counts[`w:${name}`] || 0));
   if (timing) timing.gee = Date.now() - t0;
 
   const wardAreas = new Map();
@@ -1811,7 +1847,12 @@ module.exports = async (req, res) => {
       const phase = body.phase === 'QH' ? 'QH' : 'HT';
       const fileName = sanitizeSheetText(body.fileName, 120) || 'DXF';
       const tenQH = sanitizeSheetText(body.tenQH, 120) || projects.projectTitle(fileName);
-      const landsReset = body.landsReset === 'HT' || body.landsReset === 'QH' ? body.landsReset : body.landsReset === true;
+      const named = projects.namedPhase(fileName);
+      let landsReset = body.landsReset === 'HT' || body.landsReset === 'QH' ? body.landsReset : body.landsReset === true;
+      if (landsReset === true && named) landsReset = named;
+      const infraReset = body.infraReset === 'HT' || body.infraReset === 'QH'
+        ? body.infraReset
+        : (body.infraReset === true ? (named || phase) : null);
       const items = [];
       for (let i = 0; i < rawItems.length; i++) {
         const item = parseCadItem(rawItems[i], phase);
@@ -1850,7 +1891,8 @@ module.exports = async (req, res) => {
         lotIds: result.lotIds || [],
         lands,
         landsReset,
-        infraReset: body.infraReset === true ? phase : null,
+        infraReset,
+        points: Array.isArray(body.points) ? parseCadPoints(body.points) : null,
         registry
       });
       if (sync) invalidateAllCaches();
@@ -1893,7 +1935,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, kind: 'INFRA', id, tab: result.tab || '' });
     }
 
-    // Xóa toàn bộ 1 đồ án (Ten_QH): dòng hạ tầng, tab DXF-NN cũ, ranh lô, dòng DS_DoAn, file projects/<slug>.json
+    // Xóa toàn bộ 1 đồ án (Ten_QH): dòng hạ tầng, tab DXF-NN cũ, ranh lô, dòng DS_DoAn, thư mục projects/<slug>/
     if (action === 'deleteProject') {
       requirePostFromApp(req);
       await requireAdmin(req);
