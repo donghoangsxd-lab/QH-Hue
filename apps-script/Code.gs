@@ -7,7 +7,7 @@
 // Tab DXF-NN cũ vẫn xóa cùng đồ án. Ranh tổng đồ án vẫn ở tab DS_DoAn.
 // syncCad = false: chỉ dựng lại infrastructure_hue.json, không dựng lại cad_parcels.json.
 // Xóa đồ án: doPost action=deleteProject. putBucketObject / deleteBucketObject: ghi file bucket khi Vercel chưa có quyền.
-// Admin sửa 1 công trình từ bảng thông tin lô: doPost action=editInfraRow.
+// Admin sửa / xóa 1 công trình từ bảng thông tin lô: doPost action=editInfraRow / deleteInfraRow.
 // Sau mỗi lần đồng bộ hẹn warmWebappCache (Script Property WEBAPP_URL) để webapp tính sẵn thống kê phường.
 // =========================================================================
 
@@ -938,6 +938,7 @@ function doPost(e) {
     if (action === "importCadBatch") return jsonOutput(importCadBatch(body));
     if (action === "markWardNotes") return jsonOutput(markWardNotes(body));
     if (action === "editInfraRow") return jsonOutput(editInfraRow(body));
+    if (action === "deleteInfraRow") return jsonOutput(deleteInfraRow(body));
     if (action === "deleteProject") return jsonOutput(deleteProject(body));
     if (action === "putBucketObject") return jsonOutput(putBucketObject(body));
     if (action === "deleteBucketObject") return jsonOutput(deleteBucketObject(body));
@@ -1615,6 +1616,60 @@ function ensureDxfSheet(ss, project) {
     if (!m) return;
     var n = parseInt(m[1], 10);
     if (n > maxN) maxN = n;
+/**
+ * Admin xóa 1 công trình từ bảng thông tin lô: body = { id }. Xóa dòng ID và các dòng phần vắt ranh <ID>.2, <ID>.3…
+ * ở mọi tab hạ tầng, ranh cũ cùng ID ở CAD_Polygon và bản sao lưu đồ án của ID (không còn dòng để ghi trả khi xóa đồ án).
+ */
+function deleteInfraRow(body) {
+  var id = String(body.id || '').trim();
+  if (!id) return { "error": "Thiếu ID công trình" };
+  var isMine = function(v) {
+    var s = String(v || '').trim();
+    return s === id || (s.indexOf(id + '.') === 0 && /^\d+$/.test(s.slice(id.length + 1)));
+  };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var rowsDeleted = 0;
+  var tabs = [];
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    ss.getSheets().forEach(function(sheet) {
+      if (!isValidInfraSheet(sheet.getName()) || sheet.getLastRow() < 2) return;
+      var data = sheet.getDataRange().getValues();
+      var col = getColumnMap(data[0]);
+      if (col.id < 0) return;
+      var rows = [];
+      for (var r = 1; r < data.length; r++) if (isMine(data[r][col.id])) rows.push(r + 1);
+      if (!rows.length) return;
+      deleteRowBlocks(sheet, rows);
+      rowsDeleted += rows.length;
+      tabs.push(sheet.getName());
+    });
+    if (!rowsDeleted) return { "error": "Không tìm thấy ID công trình: " + id };
+
+    var cad = ss.getSheetByName(CAD_SHEET_NAME);
+    if (cad && cad.getLastRow() > 1) {
+      var cadRows = [];
+      cad.getRange(2, 1, cad.getLastRow() - 1, 1).getValues().forEach(function(v, i) { if (isMine(v[0])) cadRows.push(i + 2); });
+      deleteRowBlocks(cad, cadRows);
+    }
+    var bak = ss.getSheetByName(BACKUP_SHEET_NAME);
+    if (bak && bak.getLastRow() > 1) {
+      var idCol = BACKUP_HEADERS.indexOf("ID_DoiTuong");
+      var bakRows = [];
+      bak.getRange(2, idCol + 1, bak.getLastRow() - 1, 1).getValues().forEach(function(v, i) { if (isMine(v[0])) bakRows.push(i + 2); });
+      deleteRowBlocks(bak, bakRows);
+    }
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+
+  syncSheetsToGCS(false);
+  return { "success": true, "id": id, "rows": rowsDeleted, "tabs": tabs };
+}
+
     if (sh.getLastRow() < 2) { if (!empty) empty = sh; return; }
     var col = getColumnMap(getSheetHeaders(sh));
     if (col.tenQH < 0 || found) return;

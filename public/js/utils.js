@@ -51,22 +51,23 @@ export const fmtPct = (value) => `${PCT_FORMAT.format(Number(value) || 0)}%`;
 
 const PLAN_NUM_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 
-// Chỉ tiêu là giá trị tối đa cho phép của lô nên số đơn hiển thị kèm "≤"; mật độ ghi dạng % (40) hoặc tỉ lệ (0,4)
+// Chỉ tiêu là giá trị tối đa cho phép của lô nên số đơn hiển thị kèm "≤"; mật độ ghi dạng % (40) hoặc tỉ lệ (0,4).
+// icon: biểu tượng trong sprite #i-* (index.html)
 const PLAN_FIELDS = [
-  { key: 'floors', label: 'Tầng cao', short: 'Tầng cao', unit: 'tầng', scale: n => n },
-  { key: 'coverage', label: 'Mật độ xây dựng', short: 'Mật độ XD', unit: '%', scale: n => (n <= 1 ? n * 100 : n) },
-  { key: 'far', label: 'Hệ số sử dụng đất', short: 'Hệ số SDĐ', unit: 'lần', scale: n => n }
+  { key: 'floors', label: 'Tầng cao', short: 'Tầng cao', unit: 'tầng', icon: 'floors', scale: n => n },
+  { key: 'coverage', label: 'Mật độ xây dựng', short: 'Mật độ XD', unit: '%', icon: 'coverage', scale: n => (n <= 1 ? n * 100 : n) },
+  { key: 'far', label: 'Hệ số sử dụng đất', short: 'Hệ số SDĐ', unit: 'lần', icon: 'layers', scale: n => n }
 ];
 
-/** Chỉ tiêu quy hoạch lô { floors, coverage, far } (số hoặc chuỗi như "3-5"; trống = chưa có) → [{ label, short, value, unit, text }] */
+/** Chỉ tiêu quy hoạch lô { floors, coverage, far } (số hoặc chuỗi như "3-5"; trống = chưa có) → [{ label, short, icon, value, unit, text }] */
 export function planItems(plan) {
   if (!plan) return [];
   return PLAN_FIELDS.filter(f => plan[f.key]).map(f => {
     const raw = plan[f.key];
     const n = Number(String(raw).replace(',', '.'));
-    if (!Number.isFinite(n)) return { label: f.label, short: f.short, value: String(raw), unit: '', text: String(raw) };
+    if (!Number.isFinite(n)) return { label: f.label, short: f.short, icon: f.icon, value: String(raw), unit: '', text: String(raw) };
     const value = `≤${PLAN_NUM_FORMAT.format(f.scale(n))}`;
-    return { label: f.label, short: f.short, value, unit: f.unit, text: f.unit === '%' ? `${value}%` : `${value} ${f.unit}` };
+    return { label: f.label, short: f.short, icon: f.icon, value, unit: f.unit, text: f.unit === '%' ? `${value}%` : `${value} ${f.unit}` };
   });
 }
 

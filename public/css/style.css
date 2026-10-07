@@ -1609,11 +1609,20 @@ table.ward-table th {
 }
 .leaflet-container .land-lot-popup a.pp-edit-btn { right: 24px; }
 .leaflet-container a.pp-edit-btn:hover { color: var(--accent-yellow); }
-.pp-edit-btn .ico { width: 14px; height: 14px; margin: 0; }
-.leaflet-container .pp-collapsed a.pp-edit-btn { display: none; }
-.infra-popup.pp-editable .pp-title { padding-right: 46px; }
+/* Nút sọt rác (Admin xóa lô) bên trái nút bút */
+.leaflet-container a.pp-del-btn {
+  position: absolute; top: 0; right: 72px; width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); text-decoration: none; border-radius: var(--r-sm);
+}
+.leaflet-container .land-lot-popup a.pp-del-btn { right: 48px; }
+.leaflet-container a.pp-del-btn:hover { color: var(--accent-red); }
+.leaflet-container a.pp-del-btn.busy { opacity: 0.4; cursor: progress; }
+.pp-edit-btn .ico, .pp-del-btn .ico { width: 14px; height: 14px; margin: 0; }
+.leaflet-container .pp-collapsed a.pp-edit-btn, .leaflet-container .pp-collapsed a.pp-del-btn { display: none; }
+.infra-popup.pp-editable .pp-title { padding-right: 70px; }
 .lot-edit { min-width: 240px; font-size: var(--fs-sm); }
-.lot-edit-title { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; padding-right: 40px; font-weight: 700; }
+.lot-edit-title { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; padding-right: 64px; font-weight: 700; }
 .lot-edit-title small { font-weight: 400; color: var(--text-muted); }
 .lot-edit-row { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 6px; margin-top: 3px; }
 .lot-edit-row > span { color: var(--text-muted); }
@@ -2217,12 +2226,14 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .land-lot-popup .leaflet-popup-content { margin: 12px 14px 10px; }
 .land-popup { font-size: var(--fs-md); line-height: 1.35; }
 .lp-head { display: flex; align-items: center; gap: 10px; padding: 0 22px 9px 0; border-bottom: 1px solid var(--border-soft); }
-.land-lot-popup.pp-editable .lp-head { padding-right: 44px; }
+.land-lot-popup.pp-editable .lp-head { padding-right: 68px; }
 .lp-swatch { flex: none; width: 30px; height: 30px; border-radius: var(--r-sm); border: 1px solid var(--border-color); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
 .lp-head-main { min-width: 0; }
-.lp-title { color: #fff; font-size: var(--fs-xl); font-weight: 700; letter-spacing: 0.2px; overflow-wrap: anywhere; }
-.lp-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 2px; color: var(--text-muted); font-size: var(--fs-sm); }
-.lp-phase { padding: 1px 7px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+/* Mã lô + nhãn giai đoạn chung 1 hàng (mã lô ngắn), loại đất ở hàng dưới */
+.lp-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+.lp-title { min-width: 0; color: #fff; font-size: var(--fs-xl); font-weight: 700; letter-spacing: 0.2px; overflow-wrap: anywhere; }
+.lp-sub { margin-top: 2px; color: var(--text-muted); font-size: var(--fs-sm); }
+.lp-phase { flex: none; padding: 1px 7px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
 .lp-phase-qh { color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.14); border: 1px solid rgba(var(--orange-rgb), 0.4); }
 .lp-phase-ht { color: var(--accent-green); background: rgba(var(--green-rgb), 0.14); border: 1px solid rgba(var(--green-rgb), 0.4); }
 .lp-stats { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; margin-top: 10px; }
@@ -2234,3 +2245,4 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .lp-info dt { color: var(--text-muted); white-space: nowrap; }
 .lp-info dd { margin: 0; color: var(--text-main); font-weight: 600; overflow-wrap: anywhere; }
 .lp-info dd.lp-mono { font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 400; color: var(--text-muted); }
+.lp-stat .ico { display: block; width: 20px; height: 20px; margin: 0 auto 3px; color: var(--accent-cyan); opacity: 0.9; filter: drop-shadow(0 0 3px rgba(var(--cyan-rgb), 0.45)); }

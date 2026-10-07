@@ -1,10 +1,11 @@
-// Admin sửa thông tin 1 lô đồ án ngay trên bảng thông tin (nút bút cạnh nút ẩn / nút đóng):
-//   lô hạ tầng → ghi đè dòng Sheet theo ID (Apps Script editInfraRow), lô đất QH → su-dung-dat.json, lô đất HT → hien-trang.json.
+// Admin sửa / xóa 1 lô đồ án ngay trên bảng thông tin (nút sọt rác, nút bút cạnh nút ẩn / nút đóng):
+//   lô hạ tầng → ghi đè / xóa dòng Sheet theo ID (Apps Script editInfraRow / deleteInfraRow),
+//   lô đất QH → su-dung-dat.json, lô đất HT → hien-trang.json.
 import { state } from './state.js';
 import { geeApi, markDataWritten } from './api.js';
 import { escapeHtml, ico, showToast } from './utils.js';
 import { signOutAdmin } from './uiComponents.js';
-import { patchCachedLand } from './projectFiles.js';
+import { patchCachedLand, removeCachedLot } from './projectFiles.js';
 import { LAND_LABELS, landLabel } from './tt16Symbols.js';
 
 let reloadInfra = null;
@@ -95,8 +96,8 @@ function validate(target, fields) {
   return '';
 }
 
-async function postEdit(body) {
-  const res = await fetch(geeApi('action=editLot'), {
+async function postEdit(body, action = 'editLot') {
+  const res = await fetch(geeApi(`action=${action}`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
     body: JSON.stringify(body)
@@ -171,8 +172,39 @@ function openForm(popup, target, onLandSaved) {
   });
 }
 
+async function deleteLot(popup, target, onLandSaved, btn) {
+  const infra = target.kind === 'INFRA';
+  const p = infra ? target.item : target.land;
+  const label = `${infra ? 'công trình' : 'lô'} ${p.id}${p.name ? ` «${p.name}»` : ''}`;
+  const what = infra
+    ? `Xóa ${label}?\n• Xóa dòng trên Google Sheet (kể cả dòng phần vắt ranh phường) và ranh lô trong file đồ án.\n• Không hoàn tác được trên webapp (khôi phục bằng lịch sử phiên bản của Sheet).`
+    : `Xóa ${label} (${p.phase === 'QH' ? 'quy hoạch' : 'hiện trạng'}) khỏi file đồ án «${p.file}»?\n• Không hoàn tác được trên webapp.`;
+  if (!confirm(what)) return;
+  btn.classList.add('busy');
+  try {
+    if (infra) {
+      markDataWritten();
+      await postEdit({ kind: 'INFRA', id: p.id, tenQH: p.tenQH || '' }, 'deleteLot');
+      if (p.tenQH) removeCachedLot(p.tenQH, { kind: 'INFRA', id: p.id });
+      popup.close();
+      showToast(`✓ Đã xóa ${p.id} khỏi Sheet`, 'success');
+      if (reloadInfra) await reloadInfra();
+    } else {
+      const phase = p.phase === 'QH' ? 'QH' : 'HT';
+      const data = await postEdit({ kind: 'DXF', id: p.id, phase, tenQH: p.file }, 'deleteLot');
+      removeCachedLot(p.file, { kind: 'DXF', id: p.id, phase }, data.saved);
+      popup.close();
+      showToast(`✓ Đã xóa lô ${p.id} khỏi file đồ án`, 'success');
+      if (onLandSaved) onLandSaved();
+    }
+  } catch (err) {
+    btn.classList.remove('busy');
+    showToast(`Không xóa được: ${err.message}`, 'error');
+  }
+}
+
 /**
- * Gắn nút sửa (Admin) vào popup đang mở. target: { kind: 'INFRA', item } | { kind: 'DXF', land };
+ * Gắn nút xóa + nút sửa (Admin) vào popup đang mở. target: { kind: 'INFRA', item } | { kind: 'DXF', land };
  * onLandSaved: vẽ lại lô đất sau khi ghi file đồ án
  */
 export function addLotEditButton(popup, target, onLandSaved = null) {
@@ -191,5 +223,17 @@ export function addLotEditButton(popup, target, onLandSaved = null) {
   L.DomEvent.on(btn, 'click', (e) => {
     L.DomEvent.stop(e);
     openForm(popup, target, onLandSaved);
+  });
+
+  const del = L.DomUtil.create('a', 'pp-del-btn', container);
+  del.href = '#';
+  del.setAttribute('role', 'button');
+  del.innerHTML = ico('trash');
+  del.title = target.kind === 'INFRA' ? 'Xóa công trình (xóa dòng Sheet và ranh lô)' : 'Xóa lô đất khỏi file đồ án';
+  del.setAttribute('aria-label', del.title);
+  L.DomEvent.disableClickPropagation(del);
+  L.DomEvent.on(del, 'click', (e) => {
+    L.DomEvent.stop(e);
+    if (!del.classList.contains('busy')) deleteLot(popup, target, onLandSaved, del);
   });
 }

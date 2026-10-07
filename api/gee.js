@@ -2037,6 +2037,36 @@ module.exports = async (req, res) => {
     if (action === 'deleteProject') {
       requirePostFromApp(req);
       await requireAdmin(req);
+    // Admin xóa 1 lô từ bảng thông tin: INFRA xóa dòng Sheet theo ID (kèm ranh lô trong file đồ án), DXF xóa lô khỏi file đồ án
+    if (action === 'deleteLot') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const id = String(body.id || '').trim();
+      if (!LOT_ID_RE.test(id)) return res.status(400).json({ error: true, message: 'Mã lô không hợp lệ' });
+      const tenQH = sanitizeSheetText(body.tenQH, 120);
+      if (body.kind === 'DXF') {
+        if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+        try {
+          const done = await projects.deleteLot({ tenQH, id, kind: 'DXF', phase: body.phase === 'QH' ? 'QH' : 'HT' });
+          return res.status(200).json({ success: true, kind: 'DXF', id, saved: done.saved, bucket: done.via });
+        } catch (err) {
+          return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được file đồ án' });
+        }
+      }
+      const result = await callAppsScript({ action: 'deleteInfraRow' }, { action: 'deleteInfraRow', id });
+      let lots = 0;
+      if (tenQH) {
+        try {
+          lots = (await projects.deleteLot({ tenQH, id, kind: 'INFRA' })).removed;
+        } catch (err) {
+          console.warn(`Xóa ranh lô ${id} khỏi đồ án «${tenQH}»:`, err.message);
+        }
+      }
+      invalidateAllCaches();
+      return res.status(200).json({ success: true, kind: 'INFRA', id, rows: Number(result.rows) || 0, lots });
+    }
+
       const body = readJsonBody(req);
       const project = sanitizeSheetText(body.project, 120);
       if (!project) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });

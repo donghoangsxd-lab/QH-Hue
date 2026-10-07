@@ -703,6 +703,52 @@ async function patchLand({ tenQH, id, phase, fields }) {
   return { saved: savedAt, via: indexed.via, land: { id: land.id, phase: want, name: land.name || '', nhom: land.nhom || '', plan: land.plan || null } };
 }
 
+// Admin xóa 1 lô khỏi file đồ án: kind 'DXF' = lô đất (id + phase); 'INFRA' = ranh lô công trình mọi giai đoạn của id
+// (dòng Sheet do Apps Script xóa). Lô đất không thấy → 404; ranh công trình không có (điểm, đồ án cũ) → removed 0.
+async function deleteLot({ tenQH, id, kind, phase }) {
+  const name = String(tenQH || '').trim();
+  const infra = kind === 'INFRA';
+  const stored = await readIndex();
+  const entry = ((stored.data && stored.data.projects) || []).find(p => p && p.tenQH === name && !p.deleted);
+  if (!entry || !entry.dir) {
+    if (infra) return { removed: 0 };
+    const err = new Error(`Đồ án «${name}» còn ở file cũ (cad_parcels.json): bấm «Chuyển lô cũ lên bucket» trong panel Đồ án trước khi xóa lô`);
+    err.status = 409;
+    throw err;
+  }
+  const slug = entry.slug || projectSlug(name);
+  const want = phase === 'QH' ? 'QH' : 'HT';
+  const match = infra
+    ? (p) => p && p.kind === 'INFRA' && String(p.id) === id
+    : (p) => p && p.kind === 'DXF' && p.id === id && parcelPhase(p) === want;
+  const savedAt = Date.now();
+  const kept = {};
+  let removed = 0;
+  for (const role of [ROLE_HT, ROLE_QH]) {
+    const doc = await readRoleDoc(slug, role);
+    const parcels = doc && Array.isArray(doc.parcels) ? doc.parcels : [];
+    kept[role] = parcels.filter(p => !match(p));
+    if (kept[role].length === parcels.length) continue;
+    removed += parcels.length - kept[role].length;
+    await writeRole(slug, role, roleDoc(role, name, slug, savedAt, { parcels: kept[role] }));
+  }
+  if (!removed) {
+    if (infra) return { removed: 0 };
+    const err = new Error(`Không tìm thấy lô ${id} (${want}) trong file đồ án «${name}»`);
+    err.status = 404;
+    throw err;
+  }
+  const all = [...kept[ROLE_HT], ...kept[ROLE_QH]];
+  const counts = countParcels(all);
+  const indexed = await updateIndex(cur => ({
+    ...cur,
+    projects: (cur.projects || []).map(p => (p && p.tenQH === name && !p.deleted
+      ? { ...p, saved: savedAt, infra: counts.infra, lands: counts.lands, landArea: landAreaOf(all) }
+      : p))
+  }));
+  return { removed, saved: savedAt, via: indexed.via };
+}
+
 async function deleteProjectFiles(tenQH) {
   const name = String(tenQH || '').trim();
   const stored = await readIndex();
@@ -943,6 +989,6 @@ async function wardParcels() {
 }
 
 module.exports = {
-  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteProjectFiles,
+  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteProjectFiles,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase
 };

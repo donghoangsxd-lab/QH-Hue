@@ -1144,12 +1144,12 @@ function landPopupHtml(p) {
     <div class="lp-head" title="${escapeHtml(p.name || '')}">
       <i class="lp-swatch" style="${swatch}"></i>
       <div class="lp-head-main">
-        <div class="lp-title">${escapeHtml(code || type)}</div>
-        <div class="lp-sub">${code ? `<span>${escapeHtml(type)}</span>` : ''}<span class="lp-phase lp-phase-${p.phase === 'QH' ? 'qh' : 'ht'}">${phase}</span></div>
+        <div class="lp-title-row"><span class="lp-title">${escapeHtml(code || type)}</span><span class="lp-phase lp-phase-${p.phase === 'QH' ? 'qh' : 'ht'}">${phase}</span></div>
+        ${code ? `<div class="lp-sub">${escapeHtml(type)}</div>` : ''}
       </div>
     </div>
     ${stats.length ? `<div class="lp-stats">${stats.map(s => `<div class="lp-stat" title="${escapeHtml(s.label)}">
-      <small>${escapeHtml(s.short)}</small><b>${escapeHtml(s.value)}${s.unit ? `<em>${escapeHtml(s.unit)}</em>` : ''}</b></div>`).join('')}</div>` : ''}
+      ${ico(s.icon)}<small>${escapeHtml(s.short)}</small><b>${escapeHtml(s.value)}${s.unit ? `<em>${escapeHtml(s.unit)}</em>` : ''}</b></div>`).join('')}</div>` : ''}
     <dl class="lp-info">${info.map(([k, v]) => `<dt>${k}</dt><dd${k === 'Layer' ? ' class="lp-mono"' : ''}>${escapeHtml(String(v))}</dd>`).join('')}</dl>
   </div>`;
 }

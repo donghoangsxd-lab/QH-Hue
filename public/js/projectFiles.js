@@ -210,6 +210,21 @@ export function patchCachedLand(tenQH, land, saved) {
   composeNow();
 }
 
+/** Gỡ lô Admin vừa xóa khỏi bộ nhớ đệm: DXF theo id + giai đoạn, INFRA mọi giai đoạn của id */
+export function removeCachedLot(tenQH, { kind, id, phase }, saved) {
+  const row = cache.get(tenQH);
+  const hit = (p) => p && (kind === 'INFRA'
+    ? p.kind === 'INFRA' && String(p.id) === id
+    : p.kind === 'DXF' && p.id === id && (p.phase === 'QH' ? 'QH' : 'HT') === phase);
+  if (row) {
+    row.parcels = row.parcels.filter(p => !hit(p));
+    if (saved) row.saved = saved;
+  }
+  const entry = state.projectCatalog.find(p => p && p.tenQH === tenQH);
+  if (entry && saved) entry.saved = saved;
+  composeNow();
+}
+
 export function scheduleLots() {
   clearTimeout(timer);
   timer = setTimeout(() => { syncLots().catch(err => console.warn('Tải lô đồ án:', err)); }, 120);
