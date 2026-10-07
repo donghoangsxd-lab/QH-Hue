@@ -1553,6 +1553,58 @@ function projectRegistry(items, lands) {
   };
 }
 
+function buildStoredPoints() {
+  const src = current && current.points;
+  if (!src || !Array.isArray(src.entities)) return null;
+  const crs = CRS_PRESETS[src.crs] || CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
+  const out = [];
+  src.entities.forEach(e => {
+    if (!e || e.kind !== 'POINT' || !Array.isArray(e.pt)) return;
+    const x = Number(e.pt[0]);
+    const y = Number(e.pt[1]);
+    let lat;
+    let lng;
+    if (src.wgs84) { lng = x; lat = y; }
+    else {
+      const ll = vn2000ToWgs84(x, y, crs);
+      lat = ll[0];
+      lng = ll[1];
+    }
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    out.push({
+      name: String(e.name || '').slice(0, 150),
+      layer: String(e.layer || '').slice(0, 60),
+      lat: Math.round(lat * 1e6) / 1e6,
+      lng: Math.round(lng * 1e6) / 1e6
+    });
+  });
+  return out;
+}
+
+// Lô đất gửi thành các phần riêng sau lô hạ tầng. Phần đất đầu xóa lô cũ cùng giai đoạn (HT hoặc QH), không xóa giai đoạn kia.
+function buildChunks(items, lands) {
+  const phaseReset = current.filePhase === 'QH' || current.filePhase === 'HT' ? current.filePhase : true;
+  const itemChunks = chunkItems(items).map(c => ({ items: c, lands: [] }));
+  const landChunks = chunkItems(lands).map((c, i) => ({
+    items: [],
+    lands: c,
+    landsReset: i === 0 ? phaseReset : false
+  }));
+  const chunks = [...itemChunks, ...landChunks];
+  if (!landChunks.length && chunks.length) chunks[0].landsReset = phaseReset;
+  const points = buildStoredPoints();
+  if (points && chunks.length) {
+    let best = 0;
+    let bestLen = Infinity;
+    chunks.forEach((c, i) => {
+      const len = JSON.stringify(c).length;
+      if (len < bestLen) { best = i; bestLen = len; }
+    });
+    chunks[best].points = points;
+  }
+  return chunks;
+}
+
 function chunkItems(items) {
   const chunks = [];
   let cur = [], chars = 0;
@@ -1627,29 +1679,29 @@ async function submitImport() {
     const phaseLabel = current.filePhase === 'QH' ? 'Quy hoạch (QuyMo_QH) theo tên file'
       : current.filePhase === 'HT' ? 'Hiện trạng (QuyMo_HT) theo tên file'
         : phase === 'QH' ? 'Quy hoạch (QuyMo_QH)' : 'Hiện trạng (QuyMo_HT)';
-    const landNote = lands.length ? `\n• ${lands.length} lô đất ngoài nhóm hạ tầng → file đồ án trên bucket (không ghi tab DXF)` : '';
+    const landNote = lands.length ? `\n• ${lands.length} lô đất ngoài nhóm hạ tầng → file ${current.filePhase === 'HT' ? 'Hiện trạng' : current.filePhase === 'QH' ? 'Chức năng sử dụng đất' : 'đồ án'} trên bucket` : '';
     const pairNote = $('cadPair')?.value.trim() ? `\n• Ghép vào đồ án «${activeProjectName()}»` : '';
-    const boundNote = current.boundaryGeom ? '\n• Ranh: từ file GIS'
+    const separateNote = current.filePhase === 'HT'
+      ? '\n• File Hiện trạng ghi riêng, không đè Chức năng sử dụng đất'
+      : current.filePhase === 'QH'
+        ? '\n• File Chức năng sử dụng đất ghi riêng, không đè Hiện trạng'
+        : '';
+    const boundNote = current.boundaryGeom ? '\n• Ranh: file Ranh giới QH'
       : current.boundaryFailed ? '\n• Ranh: không khép được file đường, dùng ranh tự dựng'
         : $('cadPair')?.value.trim() ? '\n• Ranh: giữ ranh đang có của đồ án' : '\n• Ranh: tự dựng từ các lô';
-    if (!confirm(`Ghi vào Google Sheet?\n• ${summary}\n• ${items.length - nUpdate} công trình mới, ${nUpdate} cập nhật (giữ tên, ghi đè tọa độ bằng tâm hatch)${landNote}${pairNote}${boundNote}\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
+    if (!confirm(`Ghi vào Google Sheet?\n• ${summary}\n• ${items.length - nUpdate} công trình mới, ${nUpdate} cập nhật (giữ tên, ghi đè tọa độ bằng tâm hatch)${landNote}${pairNote}${separateNote}${boundNote}\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
   }
 
-  // Lô đất gửi thành các phần riêng sau lô hạ tầng; phần đất đầu tiên xóa dữ liệu cũ của sheet DXF đồ án
-  const chunks = [
-    ...chunkItems(items).map(c => ({ items: c, lands: [] })),
-    ...chunkItems(lands).map((c, i) => ({
-      items: [], lands: c,
-      landsReset: i === 0 ? (current.filePhase === 'QH' || current.filePhase === 'HT' ? current.filePhase : true) : false
-    }))
-  ];
+  // Lô đất gửi sau lô hạ tầng. File HT- chỉ xóa lô hiện trạng; file QH- chỉ xóa lô chức năng sử dụng đất.
+  const chunks = buildChunks(items, lands);
   // Danh mục đồ án (tab DS_DoAn) ghi cùng phần cuối, trước khi đồng bộ lên bucket
   submitting = true;
   setStatus('⏳ Đang dựng ranh tổng đồ án...', 'var(--accent-orange)');
   await new Promise(r => setTimeout(r, 0));
   chunks[chunks.length - 1].registry = projectRegistry(items, lands);
   return writeChunks({
-    phase, summary, fileName: submitFileName(), tenQH: activeProjectName(), total: items.length + lands.length, chunks, next: 0,
+    phase, filePhase: current.filePhase === 'QH' || current.filePhase === 'HT' ? current.filePhase : null,
+    summary, fileName: submitFileName(), tenQH: activeProjectName(), total: items.length + lands.length, chunks, next: 0,
     done: { created: [], updated: [], skipped: [], polygonsDropped: 0, lands: 0, landsDropped: 0 }, pendingId: current.pendingId || null
   });
 }
@@ -1664,12 +1716,16 @@ async function writeChunks(job) {
       const k = job.next;
       setStatus(`⏳ Đang ghi ${chunks.length > 1 ? `phần ${k + 1}/${chunks.length}` : `${job.total} lô`}...`, 'var(--accent-orange)');
       markDataWritten();
+      const reset = chunks[k].landsReset;
+      const landsReset = reset === 'HT' || reset === 'QH' ? reset : !!reset;
+      const infraPhase = job.filePhase === 'QH' || job.filePhase === 'HT' ? job.filePhase : job.phase;
       const res = await fetch(geeApi('action=importCadBatch'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
         body: JSON.stringify({
           phase: job.phase, fileName: job.fileName, tenQH: job.tenQH, sync: k === chunks.length - 1,
-          items: chunks[k].items, lands: chunks[k].lands, landsReset: !!chunks[k].landsReset, infraReset: k === 0,
+          items: chunks[k].items, lands: chunks[k].lands, landsReset, infraReset: k === 0 ? infraPhase : null,
+          points: chunks[k].points,
           registry: chunks[k].registry || undefined
         })
       });

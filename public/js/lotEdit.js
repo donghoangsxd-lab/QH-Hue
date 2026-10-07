@@ -1,5 +1,5 @@
 // Admin sửa thông tin 1 lô đồ án ngay trên bảng thông tin (nút bút cạnh nút ẩn / nút đóng):
-//   lô hạ tầng → ghi đè dòng Sheet theo ID (Apps Script editInfraRow), lô đất khác → ghi đè file projects/<slug>.json trên bucket.
+//   lô hạ tầng → ghi đè dòng Sheet theo ID (Apps Script editInfraRow), lô đất QH → su-dung-dat.json, lô đất HT → hien-trang.json.
 import { state } from './state.js';
 import { geeApi, markDataWritten } from './api.js';
 import { escapeHtml, ico, showToast } from './utils.js';

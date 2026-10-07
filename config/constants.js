@@ -199,7 +199,7 @@ const constants = {
   GCS_BUCKET: "hue-infra-data-us",
   GCS_PUBLIC_BASE: "https://storage.googleapis.com/hue-infra-data-us/",
   GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/infrastructure_hue.json",
-  // Ranh lô công trình không thuộc đồ án (luồng phường). Đồ án nằm ở projects/<slug>.json
+  // Ranh lô công trình không thuộc đồ án (luồng phường). Mỗi đồ án một thư mục projects/<slug>/ với 4 file lớp.
   CAD_GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/cad_parcels.json",
   // Danh mục đồ án + ranh tổng: projects/index.json. Client nhận URL này từ API, không gắn cứng.
   PROJECTS_GCS_BASE: "https://storage.googleapis.com/hue-infra-data-us/projects/",

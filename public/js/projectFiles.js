@@ -1,6 +1,7 @@
 // Tải ranh lô theo đồ án: mở bản đồ chỉ có danh mục. File một đồ án tải khi zoom ≥ ngưỡng lô và ranh tổng giao khung nhìn,
 // khi bật ranh lô công trình, khi bấm phóng tới, hoặc khi bật lớp lô đã lưu (showLand).
-// Đồ án chưa chuyển đọc qua API; đồ án mới đọc thẳng bucket theo URL máy chủ trả về (?v= phiên bản trong danh mục).
+// Đồ án thư mục (dir) đọc hien-trang.json + su-dung-dat.json. Đồ án file gộp cũ đọc projects/<slug>.json.
+// Đồ án chưa chuyển đọc qua API. URL bucket do máy chủ trả về (?v= phiên bản trong danh mục).
 import { state } from './state.js';
 import { geeApi } from './api.js';
 
@@ -57,10 +58,33 @@ function wantsWard() {
   return wardLotsOn() || wardLandsOn();
 }
 
+const DIR_ROLES = ['hien-trang', 'su-dung-dat'];
+
+async function loadDir(entry) {
+  const parcels = [];
+  for (const role of DIR_ROLES) {
+    const res = await fetch(`${base}${entry.slug}/${role}.json?v=${entry.saved || 0}`);
+    if (res.status === 404) continue;
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    (data.parcels || []).forEach(p => parcels.push(p));
+  }
+  return parcels;
+}
+
 async function loadEntry(entry) {
   const prev = cache.get(entry.tenQH);
   if (prev && prev.saved === (entry.saved || 0) && prev.legacy === !!entry.legacy && prev.parcels) return prev;
-  if (!entry.legacy && entry.slug && base) {
+  if (!entry.legacy && entry.slug && base && entry.dir) {
+    try {
+      const row = { saved: entry.saved || 0, legacy: false, parcels: await loadDir(entry) };
+      cache.set(entry.tenQH, row);
+      return row;
+    } catch (err) {
+      console.warn(`Đọc thư mục đồ án «${entry.tenQH}» lỗi, hỏi qua API:`, err);
+    }
+  }
+  if (!entry.legacy && entry.slug && base && !entry.dir) {
     try {
       const res = await fetch(`${base}${entry.slug}.json?v=${entry.saved || 0}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

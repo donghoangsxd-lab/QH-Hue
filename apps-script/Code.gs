@@ -2,7 +2,8 @@
 // GOOGLE APPS SCRIPT: HTXH-HUE (TỐI ƯU BATCH IN-MEMORY & LOCKSERVICE)
 // Quy mô tách 2 cột: QuyMo_HT (hiện trạng) & QuyMo_QH (quy hoạch)
 // Nhập hàng loạt từ DXF: doPost action=importCadBatch; công trình hạ tầng ghi vào các tab loại (cột Geojson, Ten_QH).
-// Lô đất ngoài nhóm hạ tầng không ghi tab DXF-NN — webapp ghi file projects/<slug>.json trên bucket.
+// Lô đất ngoài nhóm hạ tầng không ghi tab DXF-NN — webapp ghi thư mục projects/<slug>/ trên bucket
+// (hien-trang, su-dung-dat, diem-chuc-nang, ranh-gioi). File gộp projects/<slug>.json là bản cũ.
 // Tab DXF-NN cũ vẫn xóa cùng đồ án. Ranh tổng đồ án vẫn ở tab DS_DoAn.
 // syncCad = false: chỉ dựng lại infrastructure_hue.json, không dựng lại cad_parcels.json.
 // Xóa đồ án: doPost action=deleteProject. putBucketObject / deleteBucketObject: ghi file bucket khi Vercel chưa có quyền.
@@ -895,7 +896,7 @@ function doPost(e) {
  * - matchId có trong Sheet → cập nhật tọa độ, phường, quy mô các giai đoạn đang nhập; không có → thêm dòng mới
  * - File HT-*.dxf ghi mọi lô vào QuyMo_HT; file QH-*.dxf ghi mọi lô vào QuyMo_QH (kể cả layer có tiền tố HT)
  * - Trùng điểm: giữ tên trên Sheet, ghi đè lat/lng bằng tâm polygon mới; Ten_QH và Geojson lấy từ file
- * - Layer không thuộc nhóm hạ tầng: webapp ghi file projects/<slug>.json, không gửi lands (skipDxf = true, không tạo tab DXF-NN)
+ * - Layer không thuộc nhóm hạ tầng: webapp ghi projects/<slug>/su-dung-dat.json hoặc hien-trang.json, không gửi lands (skipDxf = true)
  * - sync = false: chưa đẩy infrastructure_hue.json. syncCad = false: không dựng lại cad_parcels.json
  * - lotIds: mã lô cùng thứ tự items (null nếu bỏ qua) để webapp gắn ranh vào file đồ án
  */
@@ -1244,8 +1245,16 @@ function savePopEdits(body) {
   return { "success": true, "saved": uploadToGCS(content, "pop/edits.json") };
 }
 
+function bucketProjectJson(name) {
+  return /^projects\/[a-z0-9]+(?:-[a-z0-9]+)*\.json$/.test(name);
+}
+
+function bucketProjectPart(name) {
+  return /^projects\/[a-z0-9]+(?:-[a-z0-9]+)*\/(?:hien-trang|su-dung-dat|diem-chuc-nang|ranh-gioi)\.json$/.test(name);
+}
+
 function bucketObjectNameOk(name) {
-  return name === "projects/index.json" || name === "cad_parcels.json" || /^projects\/[a-z0-9]+(?:-[a-z0-9]+)*\.json$/.test(name);
+  return name === "projects/index.json" || name === "cad_parcels.json" || bucketProjectJson(name) || bucketProjectPart(name);
 }
 
 // Vercel dựng nội dung file đồ án; bản này chỉ đẩy lên bucket (không ghi Sheet). Dùng khi service account chưa có quyền ghi.
@@ -1259,7 +1268,7 @@ function putBucketObject(body) {
 
 function deleteBucketObject(body) {
   var name = String(body.name || "");
-  if (!/^projects\/[a-z0-9]+(?:-[a-z0-9]+)*\.json$/.test(name) || name === "projects/index.json") {
+  if (name === "projects/index.json" || (!bucketProjectJson(name) && !bucketProjectPart(name))) {
     return { "error": "Tên file bucket không hợp lệ" };
   }
   try {

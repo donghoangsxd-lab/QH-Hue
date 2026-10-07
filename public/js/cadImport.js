@@ -646,24 +646,128 @@ function metersApart(a, b) {
   return Math.hypot((a.lat - b.lat) * k, (a.lng - b.lng) * k * Math.cos(a.lat * DEG));
 }
 
-// Bỏ đỉnh cách đỉnh giữ liền trước dưới 0,2 m (sai số cho phép khi rút gọn hatch)
-const VERTEX_GAP_M = 0.2;
-function simplifyRing(ring) {
-  if (!ring || ring.length < 4) return ring;
-  const same = (a, b) => a[0] === b[0] && a[1] === b[1];
-  const closed = same(ring[0], ring[ring.length - 1]);
-  const pts = closed ? ring.slice(0, -1) : ring.slice();
-  const gap = (a, b) => {
-    const lat = ((a[1] + b[1]) / 2) * DEG;
-    return Math.hypot((a[1] - b[1]) * 111320, (a[0] - b[0]) * 111320 * Math.cos(lat));
-  };
-  const kept = [pts[0]];
-  for (let i = 1; i < pts.length; i++) {
-    if (gap(kept[kept.length - 1], pts[i]) >= VERTEX_GAP_M) kept.push(pts[i]);
+// Vòng ngắn giữ nguyên. Vòng dài (nặng khi vẽ và khi ghi bucket) mới rút đỉnh:
+// Douglas–Peucker, dung sai 0,1–0,5 m theo diện tích / chu vi, lệch diện tích không quá 5%.
+const HEAVY_RING_VERTS = 100;
+const TOL_MIN_M = 0.1;
+const TOL_MAX_M = 0.5;
+const AREA_ERR_MAX = 0.05;
+const M_PER_DEG = 111320;
+
+function openVerts(ring) {
+  if (!ring || ring.length < 2) return [];
+  const a = ring[0];
+  const b = ring[ring.length - 1];
+  return a[0] === b[0] && a[1] === b[1] ? ring.slice(0, -1) : ring.slice();
+}
+
+function ringMeasure(pts) {
+  let area = 0;
+  let peri = 0;
+  for (let i = 0, n = pts.length; i < n; i++) {
+    const j = (i + 1) % n;
+    area += pts[i][0] * pts[j][1] - pts[j][0] * pts[i][1];
+    peri += Math.hypot(pts[j][0] - pts[i][0], pts[j][1] - pts[i][1]);
   }
-  while (kept.length > 3 && gap(kept[0], kept[kept.length - 1]) < VERTEX_GAP_M) kept.pop();
-  if (kept.length < 3) return ring;
-  return [...kept, kept[0]];
+  return { area: Math.abs(area) / 2, peri };
+}
+
+function douglasPeucker(pts, tol) {
+  const n = pts.length;
+  const tol2 = tol * tol;
+  const keep = new Uint8Array(n);
+  keep[0] = 1;
+  keep[n - 1] = 1;
+  const stack = [0, n - 1];
+  while (stack.length) {
+    const b = stack.pop();
+    const a = stack.pop();
+    const ax = pts[a][0];
+    const ay = pts[a][1];
+    const dx = pts[b][0] - ax;
+    const dy = pts[b][1] - ay;
+    const len2 = dx * dx + dy * dy;
+    let max = tol2;
+    let idx = -1;
+    for (let i = a + 1; i < b; i++) {
+      const px = pts[i][0] - ax;
+      const py = pts[i][1] - ay;
+      let d;
+      if (len2 === 0) d = px * px + py * py;
+      else {
+        let t = (px * dx + py * dy) / len2;
+        if (t < 0) t = 0;
+        else if (t > 1) t = 1;
+        const ex = px - t * dx;
+        const ey = py - t * dy;
+        d = ex * ex + ey * ey;
+      }
+      if (d > max) { max = d; idx = i; }
+    }
+    if (idx >= 0) {
+      keep[idx] = 1;
+      stack.push(a, idx, idx, b);
+    }
+  }
+  const out = [];
+  for (let i = 0; i < n; i++) if (keep[i]) out.push(pts[i]);
+  return out;
+}
+
+function segOrient(a, b, c) {
+  return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+}
+
+function ringCrosses(pts) {
+  const n = pts.length;
+  if (n > 400) return false;
+  const cross = (a, b, c, d) => {
+    const o1 = segOrient(a, b, c);
+    const o2 = segOrient(a, b, d);
+    const o3 = segOrient(c, d, a);
+    const o4 = segOrient(c, d, b);
+    if (o1 === 0 || o2 === 0 || o3 === 0 || o4 === 0) return false;
+    return (o1 > 0) !== (o2 > 0) && (o3 > 0) !== (o4 > 0);
+  };
+  for (let i = 0; i < n; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % n];
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;
+      if (cross(a, b, pts[j], pts[(j + 1) % n])) return true;
+    }
+  }
+  return false;
+}
+
+function simplifyHeavyRing(ring) {
+  const pts = openVerts(ring);
+  if (pts.length <= HEAVY_RING_VERTS) return ring;
+  const lat0 = pts[0][1];
+  const lng0 = pts[0][0];
+  const cos = Math.cos(lat0 * DEG) || 1e-6;
+  const toM = ([lng, lat]) => [(lng - lng0) * M_PER_DEG * cos, (lat - lat0) * M_PER_DEG];
+  const toLL = ([x, y]) => [lng0 + x / (M_PER_DEG * cos), lat0 + y / M_PER_DEG];
+  const meters = pts.map(toM);
+  const base = ringMeasure(meters);
+  if (!(base.area > 0) || !(base.peri > 0)) return ring;
+  let tol = Math.min(TOL_MAX_M, Math.max(TOL_MIN_M, 0.1 * base.area / base.peri));
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const kept = douglasPeucker(meters, tol);
+    if (kept.length >= pts.length) return ring;
+    if (kept.length >= 3) {
+      const next = ringMeasure(kept);
+      const areaOk = Math.abs(next.area - base.area) / base.area <= AREA_ERR_MAX;
+      if (areaOk && !ringCrosses(kept)) {
+        const out = kept.map(toLL);
+        out.push(out[0].slice());
+        return out;
+      }
+    }
+    tol /= 2;
+    if (tol < 0.05) break;
+  }
+  return ring;
 }
 
 /**
@@ -746,7 +850,7 @@ function makeParcels(entities, project) {
       polygons: polys.map(p => p.rings.map(r => {
         const ring = r.map(([X, Y]) => { const [la, lo] = toLatLng(X, Y); return [lo, la]; });
         ring.push(ring[0]);
-        return simplifyRing(ring);
+        return ring;
       }))
     });
   });
@@ -762,6 +866,9 @@ function makeParcels(entities, project) {
         p.polygons = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
       } catch (e) { /* giữ các mảnh gốc */ }
     }
+  }
+  for (const p of parcels) {
+    if (p.polygons && p.polygons.length) p.polygons = p.polygons.map(poly => poly.map(simplifyHeavyRing));
   }
 
   const fills = parcels.filter(p => FILL_KINDS.has(p.kind));

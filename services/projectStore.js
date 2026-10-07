@@ -1,7 +1,11 @@
 // Đồ án trên bucket:
-//   projects/index.json — danh mục + ranh tổng + diện tích lô đất theo phường × loại đất (không có ranh từng lô)
-//   projects/<slug>.json — ranh lô công trình (INFRA) và lô đất (DXF) của một đồ án
-// Slug: bỏ dấu, chữ thường, tối đa 60 ký tự, thêm 8 ký tự SHA-256 của Ten_QH (cùng tên → cùng file).
+//   projects/index.json — danh mục + ranh tổng (để vẽ khung khi thu nhỏ) + diện tích lô đất theo phường × loại đất
+//   projects/<slug>/hien-trang.json — bản đồ hiện trạng (lô HT)
+//   projects/<slug>/su-dung-dat.json — chức năng sử dụng đất / bản đồ quy hoạch (lô QH)
+//   projects/<slug>/diem-chuc-nang.json — điểm chức năng
+//   projects/<slug>/ranh-gioi.json — ranh giới quy hoạch
+// File cũ projects/<slug>.json vẫn đọc được cho tới lần ghi tiếp theo, rồi tách vào thư mục và xóa.
+// Slug: bỏ dấu, chữ thường, tối đa 60 ký tự, thêm 8 ký tự SHA-256 của Ten_QH (cùng tên → cùng thư mục).
 // Đồ án chưa chuyển (legacy) vẫn nằm trong cad_parcels.json cho tới khi migrate xong.
 const axios = require('axios');
 const crypto = require('crypto');
@@ -327,13 +331,106 @@ async function catalog() {
   return { base: constants.PROJECTS_GCS_BASE, migrated, projects };
 }
 
+const ROLE_HT = 'hien-trang';
+const ROLE_QH = 'su-dung-dat';
+const ROLE_POINTS = 'diem-chuc-nang';
+const ROLE_BOUNDARY = 'ranh-gioi';
+
+function roleName(slug, role) {
+  return `projects/${slug}/${role}.json`;
+}
+
+function legacyName(slug) {
+  return `projects/${slug}.json`;
+}
+
+function parcelPhase(p) {
+  return p && p.phase === 'QH' ? 'QH' : 'HT';
+}
+
+function namedPhase(fileName) {
+  const base = String(fileName || '').replace(/\.[^.]+$/, '').trim();
+  const m = base.match(/^(HT|QH)(?![A-Za-z])/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
 function dxfNum(id) {
   const m = String(id || '').match(/(\d+)$/);
   return m ? Number(m[1]) : 0;
 }
 
-// infraReset (phần đầu của 1 lần nhập): bỏ lô hạ tầng cũ cùng giai đoạn để lô đã xóa khỏi bản vẽ không còn sót lại
-async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, infraReset, registry }) {
+function dxfId(n) {
+  return `DXF-${n < 1000 ? String(n).padStart(3, '0') : String(n)}`;
+}
+
+// Giữ lô giai đoạn kia. resetLands / resetInfra chỉ bỏ lô của đúng giai đoạn đang ghi.
+function applyPhaseParcels(prev, phase, { resetLands, resetInfra, infraAdds, landAdds }) {
+  const infra = new Map();
+  const dxf = [];
+  (prev || []).forEach(p => {
+    if (!p || !p.geometry || parcelPhase(p) !== phase) return;
+    if (p.kind === 'DXF') {
+      if (!resetLands) dxf.push(p);
+      return;
+    }
+    if (resetInfra) return;
+    infra.set(String(p.id), p);
+  });
+  (infraAdds || []).forEach(row => {
+    if (row && row.geometry && parcelPhase(row) === phase) infra.set(String(row.id), row);
+  });
+  (landAdds || []).forEach(row => {
+    if (row && row.geometry && parcelPhase(row) === phase) dxf.push(row);
+  });
+  return [...infra.values(), ...dxf];
+}
+
+function roleDoc(role, name, slug, saved, body) {
+  return { v: 2, role, tenQH: name, slug, saved, ...body };
+}
+
+async function writeRole(slug, role, doc) {
+  return writeText(roleName(slug, role), JSON.stringify(doc));
+}
+
+async function readRoleDoc(slug, role) {
+  const got = await readJson(roleName(slug, role));
+  if (got.missing || !got.data || typeof got.data !== 'object') return null;
+  return got.data;
+}
+
+async function readLegacyParcels(slug, tenQH) {
+  const got = await readJson(legacyName(slug));
+  if (got.missing || !got.data || got.data.tenQH !== tenQH || !Array.isArray(got.data.parcels)) {
+    return { found: !got.missing && !!(got.data && Array.isArray(got.data.parcels)), parcels: [] };
+  }
+  return { found: true, parcels: got.data.parcels };
+}
+
+function splitPhases(parcels) {
+  const ht = [];
+  const qh = [];
+  (parcels || []).forEach(p => {
+    if (!p || !p.geometry) return;
+    (parcelPhase(p) === 'QH' ? qh : ht).push(p);
+  });
+  return { ht, qh };
+}
+
+function countParcels(list) {
+  let infra = 0;
+  let lands = 0;
+  (list || []).forEach(p => {
+    if (!p) return;
+    if (p.kind === 'DXF') lands += 1;
+    else infra += 1;
+  });
+  return { infra, lands };
+}
+
+// infraReset: bỏ lô hạ tầng cũ của giai đoạn đó. landsReset 'HT'|'QH' chỉ xóa lô đất giai đoạn đó; true = cả hai.
+// points: mảng thì ghi đè file điểm chức năng; null = không đụng file điểm.
+async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, infraReset, registry, points }) {
   const name = String(tenQH || '').trim();
   if (!name) {
     const err = new Error('Thiếu tên đồ án');
@@ -341,42 +438,46 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
     throw err;
   }
   const slug = projectSlug(name);
-  const objectName = `projects/${slug}.json`;
-  const got = await readJson(objectName);
-  const prev = (!got.missing && got.data && got.data.tenQH === name && Array.isArray(got.data.parcels)) ? got.data.parcels : [];
-  const infra = new Map();
-  const dxf = [];
-  const resetPhase = landsReset === 'HT' || landsReset === 'QH' ? landsReset : null;
-  prev.forEach(p => {
-    if (!p || !p.geometry) return;
-    if (p.kind === 'DXF') {
-      const phase = p.phase === 'QH' ? 'QH' : 'HT';
-      if (landsReset === true || phase === resetPhase) return;
-      dxf.push(p);
-      return;
-    }
-    const phase = p.phase === 'QH' ? 'QH' : 'HT';
-    if (infraReset === phase) return;
-    infra.set(`${phase}|${p.id}`, p);
-  });
+  const fromName = namedPhase(fileName);
+  let resetLands = landsReset === 'HT' || landsReset === 'QH' || landsReset === true ? landsReset : false;
+  if (resetLands === true && fromName) resetLands = fromName;
+  let resetInfra = infraReset === 'HT' || infraReset === 'QH' ? infraReset : null;
+  if (fromName && resetInfra && resetInfra !== fromName) resetInfra = fromName;
+
+  const htDoc = await readRoleDoc(slug, ROLE_HT);
+  const qhDoc = await readRoleDoc(slug, ROLE_QH);
+  const hadDir = !!(htDoc || qhDoc);
+  let ht = htDoc && Array.isArray(htDoc.parcels) ? htDoc.parcels : [];
+  let qh = qhDoc && Array.isArray(qhDoc.parcels) ? qhDoc.parcels : [];
+  let legacyFound = false;
+  if (!hadDir) {
+    const legacy = await readLegacyParcels(slug, name);
+    legacyFound = legacy.found;
+    const split = splitPhases(legacy.parcels);
+    ht = split.ht;
+    qh = split.qh;
+  }
+
+  const infraAdds = [];
   (items || []).forEach((it, i) => {
     const id = lotIds && lotIds[i];
     if (!id || !it) return;
     (it.stages || []).forEach(st => {
       if (!st || !st.geometry) return;
       const phase = st.phase === 'QH' ? 'QH' : 'HT';
-      infra.set(`${phase}|${id}`, {
+      infraAdds.push({
         kind: 'INFRA', id: String(id), phase, layer: st.layer || '', area: st.area ?? null, geometry: st.geometry
       });
     });
   });
-  let nextNum = dxf.reduce((m, p) => Math.max(m, dxfNum(p.id)), 0);
+  const landAdds = [];
+  let nextNum = [...ht, ...qh].reduce((m, p) => (p && p.kind === 'DXF' ? Math.max(m, dxfNum(p.id)) : m), 0);
   (lands || []).forEach(it => {
     if (!it || !it.geometry) return;
     nextNum += 1;
     const row = {
       kind: 'DXF',
-      id: `DXF-${nextNum < 1000 ? String(nextNum).padStart(3, '0') : String(nextNum)}`,
+      id: dxfId(nextNum),
       phase: it.phase === 'QH' ? 'QH' : 'HT',
       layer: it.layer || '',
       area: it.area ?? null,
@@ -386,12 +487,65 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
       geometry: it.geometry
     };
     if (it.plan) row.plan = it.plan;
-    dxf.push(row);
+    landAdds.push(row);
   });
+
+  const touch = (phase) => resetLands === true || resetLands === phase || resetInfra === phase
+    || infraAdds.some(p => parcelPhase(p) === phase) || landAdds.some(p => parcelPhase(p) === phase);
+  const touchHT = touch('HT') || !hadDir;
+  const touchQH = touch('QH') || !hadDir;
   const savedAt = Date.now();
-  const payload = { v: 1, tenQH: name, slug, saved: savedAt, parcels: [...infra.values(), ...dxf] };
-  const written = await writeText(objectName, JSON.stringify(payload));
-  let via = written.via;
+  if (touchHT) {
+    ht = applyPhaseParcels(ht, 'HT', {
+      resetLands: resetLands === true || resetLands === 'HT',
+      resetInfra: resetInfra === 'HT',
+      infraAdds, landAdds
+    });
+  }
+  if (touchQH) {
+    qh = applyPhaseParcels(qh, 'QH', {
+      resetLands: resetLands === true || resetLands === 'QH',
+      resetInfra: resetInfra === 'QH',
+      infraAdds, landAdds
+    });
+  }
+
+  let via = 'direct';
+  if (touchQH) {
+    const written = await writeRole(slug, ROLE_QH, roleDoc(ROLE_QH, name, slug, savedAt, { parcels: qh }));
+    via = written.via;
+  }
+  if (touchHT) {
+    const written = await writeRole(slug, ROLE_HT, roleDoc(ROLE_HT, name, slug, savedAt, { parcels: ht }));
+    via = written.via;
+  }
+  if (Array.isArray(points)) {
+    const written = await writeRole(slug, ROLE_POINTS, roleDoc(ROLE_POINTS, name, slug, savedAt, { points }));
+    via = written.via;
+  }
+  if (legacyFound || registry) {
+    try { await removeName(legacyName(slug)); } catch (err) { /* file cũ đã xóa hoặc chưa có */ }
+  }
+
+  const all = [...ht, ...qh];
+  if (registry && registry.boundary && !registry.keepBoundary) {
+    const written = await writeRole(slug, ROLE_BOUNDARY, roleDoc(ROLE_BOUNDARY, name, slug, savedAt, {
+      boundary: registry.boundary, boundarySource: registry.boundarySource || 'auto'
+    }));
+    via = written.via;
+  } else if (registry && registry.keepBoundary) {
+    const existingBound = await readRoleDoc(slug, ROLE_BOUNDARY);
+    if (!existingBound || !existingBound.boundary) {
+      const stored = await readIndex();
+      const prevEntry = ((stored.data && stored.data.projects) || []).find(p => p && p.tenQH === name && !p.deleted);
+      if (prevEntry && prevEntry.boundary) {
+        const written = await writeRole(slug, ROLE_BOUNDARY, roleDoc(ROLE_BOUNDARY, name, slug, savedAt, {
+          boundary: prevEntry.boundary, boundarySource: prevEntry.boundarySource || 'auto'
+        }));
+        via = written.via;
+      }
+    }
+  }
   if (registry) {
     const indexed = await updateIndex(cur => {
       const prevEntry = (cur.projects || []).find(p => p && p.tenQH === name && !p.deleted) || {};
@@ -401,25 +555,20 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
       const boundarySource = keep
         ? (prevEntry.boundarySource || (prevEntry.boundary ? 'auto' : null))
         : (registry.boundarySource || (boundary ? 'auto' : null));
-      const landArea = {};
-      dxf.forEach(p => {
-        if (!p.ward || !(Number(p.area) > 0)) return;
-        const row = landArea[p.ward] || (landArea[p.ward] = {});
-        const key = p.nhom || 'Đất khác';
-        row[key] = Math.round(((row[key] || 0) + Number(p.area)) * 10) / 10;
-      });
+      const counts = countParcels(all);
       projects.push({
         tenQH: name,
         slug,
+        dir: true,
         file: fileName || prevEntry.file || name,
         wards: (registry.wards && registry.wards.length) ? registry.wards : (prevEntry.wards || []),
-        infra: infra.size,
-        lands: dxf.length,
+        infra: counts.infra,
+        lands: counts.lands,
         time: vnStamp(savedAt),
         boundary,
         boundarySource,
         bbox: bboxOf(boundary),
-        landArea,
+        landArea: landAreaOf(all),
         legacy: false,
         saved: savedAt
       });
@@ -428,7 +577,7 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
     });
     via = indexed.via;
   }
-  return { slug, via, lands: dxf.length };
+  return { slug, via, lands: all.filter(p => p.kind === 'DXF').length };
 }
 
 async function patchBoundary({ tenQH, boundary, boundarySource }) {
@@ -439,6 +588,7 @@ async function patchBoundary({ tenQH, boundary, boundarySource }) {
     throw err;
   }
   let slug = '';
+  const source = boundarySource === 'auto' ? 'auto' : 'gis';
   const indexed = await updateIndex(cur => {
     const projects = (cur.projects || []).slice();
     const i = projects.findIndex(p => p && p.tenQH === name && !p.deleted);
@@ -452,14 +602,18 @@ async function patchBoundary({ tenQH, boundary, boundarySource }) {
     projects[i] = {
       ...prev,
       boundary,
-      boundarySource: boundarySource === 'auto' ? 'auto' : 'gis',
+      boundarySource: source,
       bbox: bboxOf(boundary),
       time: vnStamp(),
       legacy: false
     };
     return { ...cur, projects };
   });
-  return { slug, via: indexed.via };
+  const savedAt = Date.now();
+  const written = await writeRole(slug, ROLE_BOUNDARY, roleDoc(ROLE_BOUNDARY, name, slug, savedAt, {
+    boundary, boundarySource: source
+  }));
+  return { slug, via: written.via || indexed.via };
 }
 
 const PLAN_FIELD_KEYS = ['floors', 'coverage', 'far'];
@@ -470,11 +624,31 @@ function landAreaOf(parcels) {
   return out;
 }
 
-// Admin sửa 1 lô đất (DXF) của đồ án từ bảng thông tin trên bản đồ: fields = { name?, nhom?, plan?: { floors, coverage, far } }.
-// Chuỗi rỗng trong plan xóa chỉ tiêu đó. Ghi theo generation (ghi chồng thì đọc lại, thử tối đa 3 lần), rồi đổi saved
-// trong danh mục để trình duyệt khác tải lại file đồ án
+function editLandFields(land, fields) {
+  let nhomChanged = false;
+  if (fields.name !== undefined) land.name = fields.name;
+  if (fields.nhom !== undefined) {
+    nhomChanged = land.nhom !== fields.nhom;
+    land.nhom = fields.nhom;
+  }
+  if (fields.plan) {
+    const plan = { ...(land.plan || {}) };
+    PLAN_FIELD_KEYS.forEach(k => {
+      if (fields.plan[k] === undefined) return;
+      if (fields.plan[k]) plan[k] = fields.plan[k];
+      else delete plan[k];
+    });
+    if (Object.keys(plan).length) land.plan = plan;
+    else delete land.plan;
+  }
+  return nhomChanged;
+}
+
+// Admin sửa 1 lô đất (DXF) từ bảng thông tin: fields = { name?, nhom?, plan?: { floors, coverage, far } }.
+// Chuỗi rỗng trong plan xóa chỉ tiêu đó. Lô QH nằm ở su-dung-dat.json, lô HT ở hien-trang.json.
 async function patchLand({ tenQH, id, phase, fields }) {
   const name = String(tenQH || '').trim();
+  const want = phase === 'QH' ? 'QH' : 'HT';
   const stored = await readIndex();
   const entry = ((stored.data && stored.data.projects) || []).find(p => p && p.tenQH === name && !p.deleted);
   if (!entry) {
@@ -482,48 +656,51 @@ async function patchLand({ tenQH, id, phase, fields }) {
     err.status = 409;
     throw err;
   }
-  const objectName = `projects/${entry.slug || projectSlug(name)}.json`;
-  let land = null, parcels = null, savedAt = 0, nhomChanged = false;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const got = await readJson(objectName);
-    parcels = got.data && Array.isArray(got.data.parcels) ? got.data.parcels : null;
-    land = parcels && parcels.find(p => p && p.kind === 'DXF' && p.id === id && (p.phase === 'QH' ? 'QH' : 'HT') === phase);
-    if (!land) {
-      const err = new Error(`Không tìm thấy lô ${id} (${phase}) trong file đồ án «${name}»`);
-      err.status = 404;
-      throw err;
-    }
-    if (fields.name !== undefined) land.name = fields.name;
-    if (fields.nhom !== undefined) {
-      nhomChanged = land.nhom !== fields.nhom;
-      land.nhom = fields.nhom;
-    }
-    if (fields.plan) {
-      const plan = { ...(land.plan || {}) };
-      PLAN_FIELD_KEYS.forEach(k => {
-        if (fields.plan[k] === undefined) return;
-        if (fields.plan[k]) plan[k] = fields.plan[k];
-        else delete plan[k];
-      });
-      if (Object.keys(plan).length) land.plan = plan;
-      else delete land.plan;
-    }
-    savedAt = Date.now();
-    got.data.saved = savedAt;
-    try {
-      await writeText(objectName, JSON.stringify(got.data), got.generation || undefined);
-      break;
-    } catch (err) {
-      if (err.code !== 'GEN' || attempt === 2) throw err;
-    }
+  const slug = entry.slug || projectSlug(name);
+  const role = want === 'QH' ? ROLE_QH : ROLE_HT;
+  let parcels = null;
+  let land = null;
+  let nhomChanged = false;
+  const savedAt = Date.now();
+  const doc = await readRoleDoc(slug, role);
+  if (doc && Array.isArray(doc.parcels)) {
+    parcels = doc.parcels;
+    land = parcels.find(p => p && p.kind === 'DXF' && p.id === id && parcelPhase(p) === want);
   }
+  if (!land && !entry.dir) {
+    const legacy = await readLegacyParcels(slug, name);
+    const split = splitPhases(legacy.parcels);
+    const ht = split.ht;
+    const qh = split.qh;
+    parcels = want === 'QH' ? qh : ht;
+    land = parcels.find(p => p && p.kind === 'DXF' && p.id === id && parcelPhase(p) === want);
+    if (land) {
+      nhomChanged = editLandFields(land, fields);
+      const other = want === 'QH' ? ht : qh;
+      const otherRole = want === 'QH' ? ROLE_HT : ROLE_QH;
+      await writeRole(slug, otherRole, roleDoc(otherRole, name, slug, savedAt, { parcels: other }));
+      await writeRole(slug, role, roleDoc(role, name, slug, savedAt, { parcels }));
+      try { await removeName(legacyName(slug)); } catch (err) { /* file cũ đã xóa */ }
+    }
+  } else if (land) {
+    nhomChanged = editLandFields(land, fields);
+    await writeRole(slug, role, roleDoc(role, name, slug, savedAt, { parcels }));
+  }
+  if (!land) {
+    const err = new Error(`Không tìm thấy lô ${id} (${want}) trong file đồ án «${name}»`);
+    err.status = 404;
+    throw err;
+  }
+  const both = want === 'QH'
+    ? [...((await readRoleDoc(slug, ROLE_HT)) || { parcels: [] }).parcels, ...parcels]
+    : [...parcels, ...((await readRoleDoc(slug, ROLE_QH)) || { parcels: [] }).parcels];
   const indexed = await updateIndex(cur => ({
     ...cur,
     projects: (cur.projects || []).map(p => (p && p.tenQH === name && !p.deleted
-      ? { ...p, saved: savedAt, ...(nhomChanged ? { landArea: landAreaOf(parcels) } : {}) }
+      ? { ...p, dir: true, saved: savedAt, ...(nhomChanged ? { landArea: landAreaOf(both) } : {}) }
       : p))
   }));
-  return { saved: savedAt, via: indexed.via, land: { id: land.id, phase, name: land.name || '', nhom: land.nhom || '', plan: land.plan || null } };
+  return { saved: savedAt, via: indexed.via, land: { id: land.id, phase: want, name: land.name || '', nhom: land.nhom || '', plan: land.plan || null } };
 }
 
 async function deleteProjectFiles(tenQH) {
@@ -532,16 +709,23 @@ async function deleteProjectFiles(tenQH) {
   const projects = (!stored.missing && stored.data && stored.data.projects) || [];
   const entry = projects.find(p => p.tenQH === name);
   const slug = (entry && entry.slug) || projectSlug(name);
-  const objectName = `projects/${slug}.json`;
   let landCount = 0;
-  try {
-    const got = await readJson(objectName);
-    if (!got.missing && got.data && Array.isArray(got.data.parcels)) {
-      landCount = got.data.parcels.filter(p => p.kind === 'DXF').length;
-    }
-  } catch (err) { /* file chưa có */ }
+  const names = [ROLE_HT, ROLE_QH, ROLE_POINTS, ROLE_BOUNDARY].map(role => roleName(slug, role));
+  names.push(legacyName(slug));
+  for (const objectName of names) {
+    try {
+      if (objectName.endsWith(`/${ROLE_HT}.json`) || objectName.endsWith(`/${ROLE_QH}.json`) || objectName === legacyName(slug)) {
+        const got = await readJson(objectName);
+        if (!got.missing && got.data && Array.isArray(got.data.parcels)) {
+          landCount += got.data.parcels.filter(p => p.kind === 'DXF').length;
+        }
+      }
+    } catch (err) { /* file chưa có */ }
+  }
   let via = 'direct';
-  try { via = await removeName(objectName); } catch (err) { /* đồ án cũ chưa có file riêng */ }
+  for (const objectName of names) {
+    try { via = await removeName(objectName); } catch (err) { /* file chưa có */ }
+  }
   const indexed = await updateIndex(cur => {
     const projects = (cur.projects || []).filter(p => p.tenQH !== name);
     if (!cur.migrated) projects.push({ tenQH: name, deleted: true });
@@ -646,14 +830,24 @@ async function migratePage(cursor) {
   let via = 'direct';
   for (const g of slice) {
     const entry = entryOf(g);
-    const payload = { v: 1, tenQH: g.tenQH, slug: entry.slug, saved: entry.saved, parcels: g.parcels };
-    const written = await writeText(`projects/${entry.slug}.json`, JSON.stringify(payload));
-    via = written.via;
+    entry.dir = true;
+    const savedAt = entry.saved;
+    const split = splitPhases(g.parcels);
+    const qhWrite = await writeRole(entry.slug, ROLE_QH, roleDoc(ROLE_QH, g.tenQH, entry.slug, savedAt, { parcels: split.qh }));
+    const htWrite = await writeRole(entry.slug, ROLE_HT, roleDoc(ROLE_HT, g.tenQH, entry.slug, savedAt, { parcels: split.ht }));
+    via = htWrite.via || qhWrite.via;
+    if (g.boundary) {
+      const bound = await writeRole(entry.slug, ROLE_BOUNDARY, roleDoc(ROLE_BOUNDARY, g.tenQH, entry.slug, savedAt, {
+        boundary: g.boundary, boundarySource: 'auto'
+      }));
+      via = bound.via;
+    }
+    try { await removeName(legacyName(entry.slug)); } catch (err) { /* chưa có file gộp */ }
   }
   const next = start + slice.length;
   const done = next >= pending.length;
   if (!done) return { cursor: next, total: pending.length, done: false, via, projects: pending.length };
-  const entries = pending.map(entryOf);
+  const entries = pending.map(g => ({ ...entryOf(g), dir: true }));
   const indexed = await updateIndex(cur => {
     const fresh = new Map(entries.map(e => [e.tenQH, e]));
     (cur.projects || []).forEach(p => { if (p && p.legacy === false && !p.deleted) fresh.set(p.tenQH, p); });
@@ -672,15 +866,29 @@ async function migratePage(cursor) {
 
 async function lotsBySlug(slug) {
   if (!SLUG_RE.test(slug) || slug.length > 80) return null;
-  const got = await readJson(`projects/${slug}.json`);
-  if (got.missing || !got.data) return null;
-  const text = JSON.stringify(got.data);
-  if (text.length > PROXY_MAX_CHARS) {
+  const ht = await readRoleDoc(slug, ROLE_HT);
+  const qh = await readRoleDoc(slug, ROLE_QH);
+  let parcels = null;
+  let saved = 0;
+  let tenQH = '';
+  if (ht || qh) {
+    parcels = [...((ht && ht.parcels) || []), ...((qh && qh.parcels) || [])];
+    saved = Math.max(Number(ht && ht.saved) || 0, Number(qh && qh.saved) || 0);
+    tenQH = (ht && ht.tenQH) || (qh && qh.tenQH) || '';
+  } else {
+    const got = await readJson(legacyName(slug));
+    if (got.missing || !got.data) return null;
+    parcels = Array.isArray(got.data.parcels) ? got.data.parcels : [];
+    saved = got.data.saved || 0;
+    tenQH = got.data.tenQH || '';
+  }
+  const payload = { v: 2, tenQH, slug, saved, parcels };
+  if (JSON.stringify(payload).length > PROXY_MAX_CHARS) {
     const err = new Error('File đồ án lớn hơn 4 MB — trình duyệt cần đọc thẳng bucket (bật CORS cho storage.googleapis.com).');
     err.status = 413;
     throw err;
   }
-  return got.data;
+  return payload;
 }
 
 async function legacyLots(tenQH) {
@@ -736,5 +944,5 @@ async function wardParcels() {
 
 module.exports = {
   setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteProjectFiles,
-  migratePage, lotsBySlug, legacyLots, wardParcels
+  migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase
 };
