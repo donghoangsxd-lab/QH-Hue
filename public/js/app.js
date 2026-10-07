@@ -60,75 +60,90 @@ import { initBasemapUi } from './basemap.js';
 
 const CITY_NAME = "Thành phố Huế";
 
-// Ô màu theo loại hạ tầng ở danh sách lớp, cùng màu vùng phủ (buffer) trên bản đồ (1 nguồn: BUFFER_COLORS)
+// Màu nút vùng phủ theo BUFFER_COLORS. Tên đầy đủ (infraLabels) chỉ gắn khi dòng chưa có chú thích QCVN.
 function addTypeSwatches() {
   Object.entries(ICON_GROUP_KEYS).forEach(([type, key]) => {
-    document.querySelector(`label[for="chk_${key}"]`)
-      ?.insertAdjacentHTML('afterbegin', `<i class="layer-swatch" style="background:${BUFFER_COLORS[type]};"></i>`);
+    const label = document.querySelector(`label[for="chk_${key}"]`);
+    if (label && !label.title && infraLabels[type]) label.title = infraLabels[type];
+    document.querySelector(`.btn-dot-buffer[data-buffer="${BUFFER_KEYS[type]}"]`)
+      ?.style.setProperty('--buf', BUFFER_COLORS[type]);
   });
 }
-// Thanh đầu tab Lớp dữ liệu chia đôi Quy hoạch | Công trình: mỗi lúc hiện 1 mục, nút mắt đổi theo mục đang chọn
-const LAYER_SEC_KEY = 'qh_layer_sec';
-function initLayerSections() {
-  const tabs = [...document.querySelectorAll('.layer-sec-tab')];
-  if (!tabs.length) return;
-  const show = (key) => {
-    tabs.forEach(t => {
-      const on = t.dataset.layerSec === key;
-      t.classList.toggle('active', on);
-      t.setAttribute('aria-selected', String(on));
-    });
-    document.querySelectorAll('[data-layer-sec-pane]').forEach(p => { p.hidden = p.dataset.layerSecPane !== key; });
-    document.querySelectorAll('[data-layer-sec-only]').forEach(b => { b.hidden = b.dataset.layerSecOnly !== key; });
-  };
-  tabs.forEach(t => t.addEventListener('click', () => {
-    show(t.dataset.layerSec);
-    try { localStorage.setItem(LAYER_SEC_KEY, t.dataset.layerSec); } catch (e) { /* chế độ riêng tư */ }
-  }));
-  let saved = null;
-  try { saved = localStorage.getItem(LAYER_SEC_KEY); } catch (e) { /* chế độ riêng tư */ }
-  show(tabs.some(t => t.dataset.layerSec === saved) ? saved : 'infra');
-}
 
-// Tab Chú giải chia đôi Công trình | Quy hoạch, cùng kiểu nút với Lớp dữ liệu
-function initLegendSections() {
-  const root = document.getElementById('tabLegend');
+// Công trình và Quy hoạch mở độc lập. Nền bản đồ, Phân tích, Môi trường là tab lật trang.
+const LAYER_GROUP_KEY = 'qh_layer_groups';
+const LAYER_MAP_KEY = 'qh_layer_map';
+const MAP_PANE_IDS = ['base', 'analysis', 'env'];
+function initLayerMapTabs(initial) {
+  const root = document.getElementById('layerMap');
   if (!root) return;
-  const tabs = [...root.querySelectorAll('.legend-sec-tab')];
-  const show = (key) => {
-    tabs.forEach(t => {
-      const on = t.dataset.legendSec === key;
-      t.classList.toggle('active', on);
-      t.setAttribute('aria-selected', String(on));
+  const buttons = [...root.querySelectorAll('[data-map-tab]')];
+  const show = (id) => {
+    buttons.forEach(btn => {
+      const on = btn.dataset.mapTab === id;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-selected', String(on));
     });
-    root.querySelectorAll('[data-legend-sec-pane]').forEach(p => { p.hidden = p.dataset.legendSecPane !== key; });
+    root.querySelectorAll('[data-map-pane]').forEach(pane => { pane.hidden = pane.dataset.mapPane !== id; });
+    try { localStorage.setItem(LAYER_MAP_KEY, id); } catch (e) { /* chế độ riêng tư */ }
   };
-  tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.legendSec)));
-  show('infra');
-}
-
-// Nút Nền, phân tích | Môi trường: mỗi lúc hiện 1 nhóm lớp; số trên nút = số lớp đang bật trong nhóm (kể cả nhóm đang ẩn)
-function initLayerTabs() {
-  const btns = [...document.querySelectorAll('.layer-tab-btn')];
-  const panes = [...document.querySelectorAll('.layer-tab-pane')];
-  if (!btns.length) return;
-  const paneOf = (key) => panes.find(p => p.dataset.layerPane === key);
-  const refreshCounts = () => btns.forEach(btn => {
-    const n = paneOf(btn.dataset.layerTab)?.querySelectorAll('input[type="checkbox"]:checked').length || 0;
-    const badge = btn.querySelector('.layer-tab-count');
-    if (badge) badge.textContent = n ? String(n) : '';
+  buttons.forEach(btn => btn.addEventListener('click', () => show(btn.dataset.mapTab)));
+  const refreshCounts = () => buttons.forEach(btn => {
+    const pane = root.querySelector(`[data-map-pane="${btn.dataset.mapTab}"]`);
+    const badge = btn.querySelector('.layer-map-count');
+    if (!badge || !pane) return;
+    const n = pane.querySelectorAll('input[type="checkbox"]:checked').length;
+    badge.textContent = n ? String(n) : '';
   });
-  btns.forEach(btn => btn.addEventListener('click', () => {
-    btns.forEach(b => {
-      const on = b === btn;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-selected', String(on));
-      const pane = paneOf(b.dataset.layerTab);
-      if (pane) pane.hidden = !on;
-    });
-  }));
-  panes.forEach(p => p.addEventListener('change', refreshCounts));
+  root.addEventListener('change', refreshCounts);
+  show(MAP_PANE_IDS.includes(initial) ? initial : 'base');
   refreshCounts();
+}
+function initLayerGroups() {
+  const groups = [...document.querySelectorAll('.layer-group')];
+  if (!groups.length) return;
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(LAYER_GROUP_KEY) || 'null'); } catch (e) { /* chế độ riêng tư */ }
+  if (!Array.isArray(saved)) {
+    let old = null;
+    try { old = localStorage.getItem('qh_layer_sec'); } catch (e) { /* chế độ riêng tư */ }
+    saved = old === 'plan' ? ['plan'] : ['infra'];
+  }
+  let mapTab = 'base';
+  try {
+    const stored = localStorage.getItem(LAYER_MAP_KEY);
+    if (MAP_PANE_IDS.includes(stored)) mapTab = stored;
+    else {
+      const hit = [...MAP_PANE_IDS].reverse().find(id => saved.includes(id));
+      if (hit) mapTab = hit;
+    }
+  } catch (e) { /* chế độ riêng tư */ }
+  saved = saved.filter(id => !MAP_PANE_IDS.includes(id));
+  if (!saved.length) saved = ['infra'];
+  const setOpen = (g, on) => {
+    g.classList.toggle('is-open', on);
+    const body = g.querySelector('.layer-group-body');
+    const btn = g.querySelector('.layer-group-toggle');
+    if (body) body.hidden = !on;
+    if (btn) btn.setAttribute('aria-expanded', String(on));
+  };
+  groups.forEach(g => setOpen(g, saved.includes(g.dataset.layerGroup)));
+  const persist = () => {
+    try { localStorage.setItem(LAYER_GROUP_KEY, JSON.stringify(groups.filter(g => g.classList.contains('is-open')).map(g => g.dataset.layerGroup))); } catch (e) { /* chế độ riêng tư */ }
+  };
+  groups.forEach(g => g.querySelector('.layer-group-toggle')?.addEventListener('click', () => {
+    setOpen(g, !g.classList.contains('is-open'));
+    persist();
+  }));
+  const refreshCounts = () => groups.forEach(g => {
+    const badge = g.querySelector('.layer-group-count');
+    if (!badge) return;
+    const n = g.querySelectorAll('.layer-group-body input[type="checkbox"]:checked').length;
+    badge.textContent = n ? String(n) : '';
+  });
+  groups.forEach(g => g.addEventListener('change', refreshCounts));
+  refreshCounts();
+  initLayerMapTabs(mapTab);
 }
 
 const RADIUS_MIN = 50;
@@ -370,7 +385,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     ['tabLayers', 'tabAdd', 'tabLegend'].forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.style.display = id === tabId ? 'block' : 'none';
+      if (!el) return;
+      el.style.display = id === tabId ? (id === 'tabLayers' ? 'flex' : 'block') : 'none';
     });
     if (tabId !== 'tabAdd') state.isPickMode = false;
   };
@@ -424,9 +440,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
   document.getElementById('chk_parcel')?.addEventListener('change', (e) => setParcelsVisible(e.target.checked));
-  initLayerSections();
-  initLegendSections();
-  initLayerTabs();
+  initLayerGroups();
 
   document.querySelectorAll('.btn-dot-buffer').forEach(btn => {
     btn.addEventListener('click', () => {

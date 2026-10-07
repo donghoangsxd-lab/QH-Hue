@@ -174,11 +174,18 @@ function setMaster(on) {
   state.showProjects = on;
 }
 
+function ensureFullLots() {
+  state.showProjectInfra = true;
+  const infraChk = $('chk_projectInfra');
+  if (infraChk) infraChk.checked = true;
+}
+
 function zoomTo(p) {
   const b = boundsOf(p);
   if (!b || !b.isValid() || !map) return;
   let changed = false;
   if (!state.showProjects) { setMaster(true); changed = true; }
+  if (!state.showProjectInfra) { ensureFullLots(); changed = true; }
   if (state.hiddenProjects.delete(p.name)) { saveHidden(); changed = true; }
   map.fitBounds(b.pad(0.1), { maxZoom: PARCEL_MIN_ZOOM + 1 });
   if (changed) refreshAll();
@@ -194,11 +201,11 @@ function metaText(p) {
 }
 
 function renderHead() {
-  const shownN = projects.filter(p => !state.hiddenProjects.has(p.name)).length;
+  const shownN = projects.filter(p => state.showProjects && !state.hiddenProjects.has(p.name)).length;
   const count = $('projectCount');
   if (count) {
-    count.textContent = projects.length ? `${state.showProjects ? shownN : 0}/${projects.length}` : '0';
-    count.classList.toggle('none', !state.showProjects || !shownN);
+    count.textContent = projects.length ? `${shownN}/${projects.length}` : '0';
+    count.classList.toggle('none', !shownN);
   }
   const allBtn = $('btnProjectsAll');
   if (allBtn) {
@@ -213,7 +220,6 @@ function renderList() {
   renderHead();
   const box = $('projectList');
   if (!box) return;
-  box.classList.toggle('is-off', !state.showProjects);
   if (!projects.length) {
     box.innerHTML = '<div class="project-empty">Chưa có đồ án. Admin nhập file ở tab Đề xuất › Nhập hàng loạt.</div>';
     return;
@@ -228,15 +234,14 @@ function renderList() {
     : '';
   const none = visible.length ? '' : '<div class="project-empty">Không có đồ án khớp từ khóa.</div>';
   box.innerHTML = migrateBtn + none + visible.map(({ p, idx }) => {
-    const on = !state.hiddenProjects.has(p.name);
+    const on = state.showProjects && !state.hiddenProjects.has(p.name);
     const deleting = busy === p.name;
     const tempNote = !p.area ? ' · ranh tạm (bao lồi) — nhập file ranh hoặc nhập lại file để có ranh đúng'
       : p.source === 'gis' ? ' · ranh từ file GIS' : ' · ranh tự dựng từ các lô';
     const where = p.legacy ? 'còn ở file cad_parcels' : 'file riêng trên bucket';
     return `<div class="project-row${on ? '' : ' is-off'}">
-      <label class="project-name" title="${escapeHtml(p.name)}${p.area?.ward ? ` — ${escapeHtml(p.area.ward)}` : ''}">
-        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><span>${escapeHtml(p.name)}</span></label>
-      <small class="project-meta" title="Số đếm theo danh mục đồ án (${where})${tempNote}">${metaText(p)}${p.area ? (p.source === 'gis' ? ' · GIS' : ' · tự dựng') : ' *'}${p.legacy ? ' · cũ' : ''}</small>
+      <label class="project-name" title="${escapeHtml(p.name)}${p.area?.ward ? ` — ${escapeHtml(p.area.ward)}` : ''} — ${escapeHtml(metaText(p))} (${where})${tempNote}">
+        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><span>${idx + 1}. ${escapeHtml(p.name)}</span></label>
       <button type="button" class="project-btn" data-zoom="${idx}" title="Phóng tới đồ án" aria-label="Phóng tới đồ án">${ico('locate')}</button>
       ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
     </div>`;
@@ -391,11 +396,14 @@ export function initProjectLayer(opts = {}) {
   // Ẩn tất cả giữ nguyên lớp bật; đang ẩn hết thì hiện lại toàn bộ (và bật lớp nếu đang tắt)
   $('btnProjectsAll')?.addEventListener('click', () => {
     if (!projects.length) return;
-    const anyShown = projects.some(p => !state.hiddenProjects.has(p.name));
-    if (anyShown) projects.forEach(p => state.hiddenProjects.add(p.name));
-    else {
+    const anyShown = projects.some(p => state.showProjects && !state.hiddenProjects.has(p.name));
+    if (anyShown) {
+      projects.forEach(p => state.hiddenProjects.add(p.name));
+      setMaster(false);
+    } else {
       projects.forEach(p => state.hiddenProjects.delete(p.name));
       if (!state.showProjects) setMaster(true);
+      ensureFullLots();
     }
     saveHidden();
     refreshAll();
@@ -408,8 +416,17 @@ export function initProjectLayer(opts = {}) {
     const box = e.target.closest('[data-project]');
     const p = box && projects[Number(box.dataset.project)];
     if (!p) return;
-    if (box.checked) state.hiddenProjects.delete(p.name);
-    else state.hiddenProjects.add(p.name);
+    if (box.checked) {
+      if (!state.showProjects) {
+        projects.forEach(other => { if (other.name !== p.name) state.hiddenProjects.add(other.name); });
+        setMaster(true);
+      }
+      state.hiddenProjects.delete(p.name);
+      ensureFullLots();
+    } else {
+      state.hiddenProjects.add(p.name);
+      if (!projects.some(x => !state.hiddenProjects.has(x.name))) setMaster(false);
+    }
     saveHidden();
     refreshAll();
   });

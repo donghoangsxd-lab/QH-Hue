@@ -24,14 +24,14 @@ const STEPS = [
     text: 'Mỗi biểu tượng trên bản đồ là 1 công trình. Bấm vào biểu tượng để xem bảng thông tin và vùng phục vụ của công trình đó.\nNút con mắt trên bảng thu gọn bảng về tên công trình để nhìn trọn vùng phục vụ; bấm lại vào công trình để mở lại bảng.'
   },
   {
-    target: ['#chk_heat', '[data-layer-tab="analysis"]', '#btnExpandRightPanel'],
+    target: ['#chk_heat', '[data-map-tab="analysis"]', '#btnExpandRightPanel'],
     title: 'Bản đồ độ phủ hạ tầng',
-    text: 'Lớp màu nhiệt thể hiện mức độ được phục vụ: nơi nằm trong tầm đi bộ của càng nhiều loại hạ tầng thì màu càng đậm; nơi màu nhạt là nơi còn thiếu. Khoảng cách được tính bám theo đường giao thông, không chỉ theo đường chim bay.'
+    text: 'Lớp màu nhiệt thể hiện mức độ được phục vụ: nơi nằm trong tầm đi bộ của càng nhiều loại hạ tầng thì màu càng đậm; nơi màu nhạt là nơi còn thiếu. Khoảng cách được tính bám theo đường giao thông, không chỉ theo đường chim bay. Mở tab Phân tích ở panel bên phải để bật lớp này; thanh màu hiện ngay dưới ô bật.'
   },
   {
     target: ['#rightPanel', '#btnExpandRightPanel'],
     title: 'Bật / tắt lớp dữ liệu',
-    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm mũi tên ‹ ở mép phải để mở, › để thu gọn. Panel dùng để chọn nhóm hạ tầng cần xem; nút con mắt "Ẩn tất cả" ở đầu panel ẩn nhanh mọi biểu tượng công trình và bấm lại để hiện đúng các nhóm đã chọn. Nút chấm tròn ● bật vùng phủ của từng nhóm. Bên dưới, các lớp khác chia 2 nút: Nền, phân tích (ranh 40 phường xã, ranh lô đất công trình, bản đồ độ phủ, phân bố dân cư ô 30 m × 30 m, mạng lưới đường) và Môi trường (địa hình, thoát nước, ngập, nhiệt độ bề mặt…). Thẻ "Chú giải" giải thích các ký hiệu.'
+    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm mũi tên ‹ ở mép phải để mở, › để thu gọn. Công trình và Quy hoạch mở theo chiều dọc. Nền bản đồ, Phân tích và Môi trường nằm trên một hàng tab. Số cạnh tên cho biết bao nhiêu lớp đang bật. Thẻ Chú giải chỉ giải thích trạng thái điểm và ký hiệu lô đất.'
   },
   {
     target: '#btnInspectMode',

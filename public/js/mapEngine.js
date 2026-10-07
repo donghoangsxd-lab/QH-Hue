@@ -418,8 +418,10 @@ export function toggleLayer(layerKey, isChecked) {
 
   const popBox = document.getElementById('popBox');
   const heatBox = document.getElementById('heatBox');
+  const heatLegend = document.getElementById('heatLegend');
   if (layerKey === 'pop' && popBox) popBox.style.display = isChecked ? '' : 'none';
   if (layerKey === 'heatmap' && heatBox) heatBox.style.display = isChecked ? '' : 'none';
+  if (layerKey === 'heatmap' && heatLegend) heatLegend.hidden = !isChecked;
 }
 
 export function toggleBuffer(bufferKey, el) {
