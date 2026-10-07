@@ -18,8 +18,13 @@ let cachedWardStatsTtl = 0;
 const WARD_STATS_BUDGET_MS = 30000;
 const WARD_STATS_DEADLINE_MS = 38000;
 const WARD_STATS_ESTIMATE_TTL = 3 * 60 * 1000;
+// Ứng viên chưa có số đếm đã lưu: getWardStats đếm ngay tối đa INLINE (sửa lẻ tẻ), phần còn lại (đổi dữ liệu hàng loạt)
+// trả ước lượng + danh sách phường countPending để client đếm nền từng phường qua countWardCandidates, mỗi lượt tối đa BATCH
+const WARD_STATS_INLINE_COUNT = 800;
+const WARD_COUNT_BATCH = 1500;
 let cachedWardStatsVersion = -1;
 let cachedCityNetwork = null;
+let cachedCountPending = [];
 /** Độ phủ đã tính: { "HT:<phường>" | "QH:<phường>": { sig, ratios, Avg_Coverage_Score } } — chỉ dùng lại khi chữ ký dữ liệu khớp */
 let cachedCoverageByWard = {};
 // Tăng khi đổi cách tính độ phủ để mọi cache cũ (server + trình duyệt) tự hết hiệu lực
@@ -1170,9 +1175,11 @@ function rankEligible(suggestions) {
  * Chỉ ứng viên chưa có số đếm đã lưu (statsStore, khóa theo candidateSig) mới gửi GEE.
  * GEE lỗi / quá hạn (timeoutMs, ≤ 0 = bỏ qua GEE) → ước lượng hình học (coverageMethod = 'estimate'); quá deadline thì
  * ứng viên còn lại để độ phủ 0 cho kịp trả kết quả. prune = bỏ khỏi file đệm số đếm của ứng viên không còn dùng
- * (chỉ khi candidates là toàn bộ ứng viên của thành phố). Trả về true nếu mọi ứng viên đếm được bằng pixel.
+ * (chỉ khi candidates là toàn bộ ứng viên của thành phố). maxCount = số ứng viên chưa đếm tối đa gửi GEE trong lượt này,
+ * phần còn lại ước lượng (timing.uncounted). Trả về true nếu mọi ứng viên đếm được bằng pixel.
  */
-async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000, { deadline = Infinity, timing = null, prune = false } = {}) {
+async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000,
+  { deadline = Infinity, timing = null, prune = false, maxCount = Infinity } = {}) {
   if (!candidates.length) return true;
   const t0 = Date.now();
   const pop = getPopEditsVersion();
@@ -1192,16 +1199,17 @@ async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000, {
     if (stored.counts[sig] != null) counts[`c${i}`] = stored.counts[sig];
     else todo.push(i);
   });
-  if (todo.length || wardKeys.length) {
-    let fresh = null;
+  const batch = todo.slice(0, maxCount);
+  let fresh = null;
+  if (batch.length || wardKeys.length) {
     try {
-      if (timeoutMs > 0) fresh = await withTimeout(countCandidatePixels(ee, popRaster, todo.map(i => candidates[i]), wardKeys), timeoutMs, null);
+      if (timeoutMs > 0) fresh = await withTimeout(countCandidatePixels(ee, popRaster, batch.map(i => candidates[i]), wardKeys), timeoutMs, null);
     } catch (e) {
       console.warn("fillCoverageGains: GEE lỗi, dùng ước lượng hình học:", e.message);
       if (timing) timing.geeError = String(e.message || e).slice(0, 300);
     }
     if (fresh) {
-      todo.forEach((i, j) => {
+      batch.forEach((i, j) => {
         counts[`c${i}`] = fresh[`c${j}`] || 0;
         newCounts[sigs[i]] = counts[`c${i}`];
       });
@@ -1216,7 +1224,8 @@ async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000, {
     if (v > 0 && stored.wardPix[key] !== v) newWardPix[key] = v;
   });
   await statsStore.saveCandidateCounts(newCounts, newWardPix, prune ? new Set(sigs) : null);
-  if (timing) Object.assign(timing, { gee: Date.now() - t0, reused: candidates.length - todo.length, counted: todo.length });
+  const counted = fresh ? batch.length : 0;
+  if (timing) Object.assign(timing, { gee: Date.now() - t0, reused: candidates.length - todo.length, counted, uncounted: todo.length - counted });
 
   const wardAreas = new Map();
   const wardAreaOf = (ward) => {
@@ -2890,14 +2899,17 @@ module.exports = async (req, res) => {
       }
     }
 
-    if (action === 'getWardStats') {
+    // countWardCandidates: dựng bảng như getWardStats nhưng chỉ đếm pixel ứng viên chưa có số đếm của 1 phường rồi lưu
+    if (action === 'getWardStats' || action === 'countWardCandidates') {
+      const countWard = action === 'countWardCandidates' ? String(req.query.ward || '') : null;
       const now = Date.now();
-      if (cachedWardStats && cachedWardStatsVersion === getDataVersion()
+      if (!countWard && !req.query.fresh && cachedWardStats && cachedWardStatsVersion === getDataVersion()
           && (now - lastWardStatsFetch < cachedWardStatsTtl)) {
         cachedWardStats.forEach(applyCachedCoverage);
-        return res.status(200).json({ data: cachedWardStats, network: cachedCityNetwork, coverageStatus: 'cached' });
+        return res.status(200).json({
+          data: cachedWardStats, network: cachedCityNetwork, coverageStatus: 'cached', countPending: cachedCountPending
+        });
       }
-      cachedWardStats = null;
       const timing = { start: now - startedAt };
       const watchdog = setTimeout(() => {
         if (res.headersSent) return;
@@ -2931,6 +2943,10 @@ module.exports = async (req, res) => {
           networkPending: []
         };
       });
+      if (countWard && !wardMap[countWard]) {
+        clearTimeout(watchdog);
+        return res.status(400).json({ error: true, message: 'Không tìm thấy phường/xã' });
+      }
 
       // 1 lượt duyệt hiện trạng: phân loại công trình theo phường
       rawDataList.forEach(item => {
@@ -3087,6 +3103,20 @@ module.exports = async (req, res) => {
         timing.lastWard = Date.now() - startedAt;
       }
 
+      if (countWard) {
+        const list = coverageCandidates.filter(c => c.ward.name === countWard);
+        await fillCoverageGains(ee, popRasterNative, list, Math.min(30000, startedAt + WARD_STATS_BUDGET_MS - Date.now()),
+          { deadline: startedAt + WARD_STATS_DEADLINE_MS, timing, maxCount: WARD_COUNT_BATCH });
+        // Bảng đang giữ trong bộ nhớ instance này còn số ước lượng; instance khác tự hết hạn sau WARD_STATS_ESTIMATE_TTL
+        if (timing.counted) cachedWardStats = null;
+        timing.total = Date.now() - startedAt;
+        clearTimeout(watchdog);
+        if (res.headersSent) return;
+        return res.status(200).json({
+          ward: countWard, candidates: list.length, counted: timing.counted || 0, remaining: timing.uncounted || 0, timing
+        });
+      }
+
       await withTimeout(Promise.all(resultTable.filter(r => !r._coverageReady).map(async r => {
         const stored = await statsStore.getWardEntry(`HT:${r.Ten_Phuong}`, r.covSig);
         if (!stored || !stored.ratios) return;
@@ -3096,7 +3126,9 @@ module.exports = async (req, res) => {
       timing.rows = Date.now() - startedAt;
       const geeBudget = req.query.cov === 'estimate' ? 0 : Math.min(30000, startedAt + WARD_STATS_BUDGET_MS - Date.now());
       const allPixel = await fillCoverageGains(ee, popRasterNative, coverageCandidates, geeBudget,
-        { deadline: startedAt + WARD_STATS_DEADLINE_MS, timing, prune: true });
+        { deadline: startedAt + WARD_STATS_DEADLINE_MS, timing, prune: true, maxCount: WARD_STATS_INLINE_COUNT });
+      const countPending = [...new Set(coverageCandidates
+        .filter(c => c.target.coverageMethod === 'estimate').map(c => c.ward.name))];
       rankAfterCount.forEach(fn => fn());
 
       resultTable.sort((a, b) => b.Dan_So_Vector - a.Dan_So_Vector);
@@ -3111,6 +3143,7 @@ module.exports = async (req, res) => {
       cachedWardStats = resultTable;
       cachedWardStatsTtl = allPixel ? constants.WARD_STATS_CACHE_TTL : WARD_STATS_ESTIMATE_TTL;
       cachedCityNetwork = cityNetwork;
+      cachedCountPending = countPending;
       cachedWardStatsVersion = getDataVersion();
       lastWardStatsFetch = now;
       timing.total = Date.now() - startedAt;
@@ -3118,7 +3151,7 @@ module.exports = async (req, res) => {
       console.log('getWardStats timing (ms):', JSON.stringify(timing));
       if (res.headersSent) return;
 
-      return res.status(200).json({ data: resultTable, network: cityNetwork, coverageStatus: 'per_ward', timing });
+      return res.status(200).json({ data: resultTable, network: cityNetwork, coverageStatus: 'per_ward', countPending, timing });
     }
 
     const planDataList = allDataList.filter(it => it.planChange === 'new');

@@ -743,6 +743,44 @@ async function fillCoverage(wards, scenario, attempt = 0) {
 }
 
 let coverageFillList = null;
+let countPendingWards = [];
+let candidateFillList = null;
+
+/**
+ * Gợi ý độ phủ của khu đất CSD / công trình chờ duyệt máy chủ chưa kịp đếm pixel (đổi dữ liệu hàng loạt) đang là ước lượng:
+ * đếm nền từng phường (mỗi lượt máy chủ đếm 1 phần, gọi lại đến khi hết), xong thì nạp lại 2 danh sách gợi ý của bảng.
+ */
+async function fillCandidateCounts(wardNames) {
+  const list = state.wardStatsData;
+  if (!wardNames.length || !list.length || candidateFillList === list) return;
+  candidateFillList = list;
+  try {
+    let counted = 0;
+    for (const name of wardNames) {
+      for (let round = 0; round < 5 && state.wardStatsData === list; round++) {
+        const r = await fetch(geeApi(`action=countWardCandidates&ward=${encodeURIComponent(name)}`))
+          .then(res => (res.ok ? res.json() : null)).catch(() => null);
+        if (!r) break;
+        counted += r.counted || 0;
+        if (!r.counted || !r.remaining) break;
+      }
+    }
+    if (!counted || state.wardStatsData !== list) return;
+    const fresh = await fetch(geeApi('action=getWardStats&fresh=1'))
+      .then(res => (res.ok ? res.json() : null)).catch(() => null);
+    if (!fresh || state.wardStatsData !== list) return;
+    const byName = new Map((fresh.data || []).map(w => [w.Ten_Phuong, w]));
+    list.forEach(w => {
+      const f = byName.get(w.Ten_Phuong);
+      if (f) Object.assign(w, { csdItems: f.csdItems, pendingItems: f.pendingItems });
+    });
+    countPendingWards = fresh.countPending || [];
+    const cur = currentWardData();
+    if (cur) refreshWardQuotaTable(cur);
+  } finally {
+    if (candidateFillList === list) candidateFillList = null;
+  }
+}
 
 /**
  * Tính độ phủ nền: dân số lớn → nhỏ; hiện trạng trước, quy hoạch sau (chỉ phường có công trình mới/di dời).
@@ -751,6 +789,7 @@ export async function startBackgroundCoverageFill() {
   const list = state.wardStatsData;
   if (!list.length || coverageFillList === list) return;
   coverageFillList = list;
+  fillCandidateCounts(countPendingWards).catch(err => console.warn('Đếm nền gợi ý độ phủ lỗi:', err));
   try {
     mergeLocalCoverageIntoStats();
     rebuildCombinedTableBody();
@@ -1148,6 +1187,7 @@ export function ensureWardStats() {
         if (wardStatsPromise !== promise) return state.wardStatsData;
         state.wardStatsData = resData.data || [];
         state.cityNetwork = resData.network || null;
+        countPendingWards = resData.countPending || [];
         mergeLocalCoverageIntoStats();
         return state.wardStatsData;
       })
