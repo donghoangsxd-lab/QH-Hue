@@ -14,6 +14,7 @@ let lastWardStatsFetch = 0;
 let cachedWardStatsTtl = 0;
 // Vercel cắt hàm ở 60 s (vercel.json): đếm pixel độ phủ phải xong trước mốc này, phần còn lại để ước lượng và trả kết quả
 const WARD_STATS_BUDGET_MS = 42000;
+const WARD_STATS_DEADLINE_MS = 52000;
 const WARD_STATS_ESTIMATE_TTL = 3 * 60 * 1000;
 let cachedWardStatsVersion = -1;
 let cachedCityNetwork = null;
@@ -738,9 +739,8 @@ function geoJsonAreaM2(geometry) {
  * = diện tích (buffer ∩ phường − đã phủ bởi cùng loại) / diện tích phường × 100.
  * Bán kính mặc định 1000m; phần chồng buffer cùng loại bị loại → thường chỉ vài %.
  */
-function estimateCoverageAddPct({ lat, lng, radius, wardGeometry, existingSameType }) {
+function estimateCoverageAddPct({ lat, lng, radius, wardGeometry, wardArea = geoJsonAreaM2(wardGeometry), existingSameType }) {
   const R = Math.max(50, Number(radius) || 1000);
-  const wardArea = geoJsonAreaM2(wardGeometry);
   if (!wardArea || wardArea <= 0 || lat == null || lng == null) return 0;
 
   const bufferArea = Math.PI * R * R;
@@ -1082,11 +1082,12 @@ function rankEligible(suggestions) {
 
 /**
  * Đếm pixel dân cư mới được phục vụ cho mọi ứng viên trong 1 lần gọi GEE, quy đổi % theo tổng pixel dân cư của phường.
- * GEE lỗi / quá hạn (timeoutMs, ≤ 0 = bỏ qua GEE) → ước lượng hình học (coverageMethod = 'estimate').
- * Trả về true nếu mọi ứng viên đếm được bằng pixel.
+ * GEE lỗi / quá hạn (timeoutMs, ≤ 0 = bỏ qua GEE) → ước lượng hình học (coverageMethod = 'estimate'); quá deadline thì
+ * ứng viên còn lại để độ phủ 0 cho kịp trả kết quả. Trả về true nếu mọi ứng viên đếm được bằng pixel.
  */
-async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000) {
+async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000, { deadline = Infinity, timing = null } = {}) {
   if (!candidates.length) return true;
+  const t0 = Date.now();
   // Mỗi phường 1 đối tượng ee.Geometry: bộ mã hóa EE chỉ gộp trùng theo đối tượng, tạo mới cho từng ứng viên
   // làm yêu cầu chép lại ranh phường hàng nghìn lần
   const eeWards = new Map();
@@ -1109,8 +1110,15 @@ async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000) {
     console.warn("fillCoverageGains: GEE lỗi, dùng ước lượng hình học:", e.message);
   }
   if (counts) wardKeys.forEach((name, i) => wardPopPixelCache.set(name, counts[`w${i}`] || 0));
+  if (timing) timing.gee = Date.now() - t0;
 
+  const wardAreas = new Map();
+  const wardAreaOf = (ward) => {
+    if (!wardAreas.has(ward.name)) wardAreas.set(ward.name, geoJsonAreaM2(ward.geometry));
+    return wardAreas.get(ward.name);
+  };
   let allPixel = true;
+  let skipped = 0;
   candidates.forEach((c, i) => {
     const wardTotal = counts ? (wardPopPixelCache.get(c.ward.name) || 0) : 0;
     const capacity = c.target.capacity ?? null;
@@ -1128,10 +1136,14 @@ async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000) {
         coverageAddPct: c.ward.pop > 0 ? round1(clamp((added / c.ward.pop) * 100, 0, 100)) : 0,
         coverageMethod: 'pixel'
       });
+    } else if (Date.now() > deadline) {
+      allPixel = false;
+      skipped++;
+      Object.assign(c.target, { popGained: null, capacityLimited: false, coverageAddPct: 0, coverageMethod: 'estimate' });
     } else {
       allPixel = false;
       const est = estimateCoverageAddPct({
-        lat: c.lat, lng: c.lng, radius: c.radius, wardGeometry: c.ward.geometry, existingSameType: c.existing
+        lat: c.lat, lng: c.lng, radius: c.radius, wardGeometry: c.ward.geometry, wardArea: wardAreaOf(c.ward), existingSameType: c.existing
       });
       const capPct = capacity == null || !(c.ward.pop > 0) ? Infinity : (capacity / c.ward.pop) * 100;
       Object.assign(c.target, {
@@ -1142,6 +1154,7 @@ async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000) {
       });
     }
   });
+  if (timing) Object.assign(timing, { estimate: Date.now() - t0 - (timing.gee || 0), candidates: candidates.length, skipped });
   return allPixel;
 }
 
@@ -2760,8 +2773,10 @@ module.exports = async (req, res) => {
         return res.status(200).json({ data: cachedWardStats, network: cachedCityNetwork, coverageStatus: 'cached' });
       }
       cachedWardStats = null;
+      const timing = { start: now - startedAt };
 
       const evaluatedWards = await loadEvaluatedWards(wardVectorParsed);
+      timing.wards = Date.now() - startedAt;
       const wardOf = (item) => assignWardByGeometry(item.lng, item.lat, evaluatedWards);
 
       const wardMap = {};
@@ -2939,8 +2954,10 @@ module.exports = async (req, res) => {
         resultTable.push(calculatedRow);
       }
 
+      timing.rows = Date.now() - startedAt;
       const geeBudget = Math.min(30000, startedAt + WARD_STATS_BUDGET_MS - Date.now());
-      const allPixel = await fillCoverageGains(ee, popRasterNative, coverageCandidates, geeBudget);
+      const allPixel = await fillCoverageGains(ee, popRasterNative, coverageCandidates, geeBudget,
+        { deadline: startedAt + WARD_STATS_DEADLINE_MS, timing });
       rankAfterCount.forEach(fn => fn());
 
       resultTable.sort((a, b) => b.Dan_So_Vector - a.Dan_So_Vector);
@@ -2957,8 +2974,10 @@ module.exports = async (req, res) => {
       cachedCityNetwork = cityNetwork;
       cachedWardStatsVersion = getDataVersion();
       lastWardStatsFetch = now;
+      timing.total = Date.now() - startedAt;
+      console.log('getWardStats timing (ms):', JSON.stringify(timing));
 
-      return res.status(200).json({ data: resultTable, network: cityNetwork, coverageStatus: 'per_ward' });
+      return res.status(200).json({ data: resultTable, network: cityNetwork, coverageStatus: 'per_ward', timing });
     }
 
     const planDataList = allDataList.filter(it => it.planChange === 'new');
