@@ -1358,8 +1358,9 @@ table.data-table tfoot .st-total-note { font-weight: 400; font-style: italic; }
 .road-legend-item { display: inline-flex; align-items: center; gap: 3px; }
 .road-legend-item i { display: inline-block; width: 12px; border-radius: var(--r-sm); flex-shrink: 0; }
 
-/* Chấm sáng tuyến tiếp cận (flowAnimation.js): trên vùng phục vụ, dưới marker công trình và popup */
-.flow-pane { z-index: 450; pointer-events: none; filter: drop-shadow(0 0 2px #ffffff) drop-shadow(0 0 6px rgba(var(--cyan-rgb), 0.9)); }
+/* Chấm sáng tuyến tiếp cận (flowAnimation.js): trên vùng phục vụ, dưới marker công trình và popup.
+   Không dùng CSS filter: canvas vẽ lại mỗi khung hình, filter làm trình duyệt blur lại cả màn hình → lag */
+.flow-pane { z-index: 450; pointer-events: none; }
 
 /* Chế độ âm bản khi chọn công trình (mapEngine.js highlightSingleIsochrone): icon ngoài phạm vi phục vụ mờ đi */
 .sel-active .custom-infra-icon-png { opacity: 0.35; transition: opacity 0.2s; }

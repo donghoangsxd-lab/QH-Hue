@@ -4,7 +4,9 @@
 const PANE = 'flowPane';
 const DOTS_PER_PATH = 3;
 const SPEED_MPS = 260;     // tốc độ chấm trên bản đồ (m thực địa / giây hiển thị)
-const DOT_STYLE = { radius: 3.8, stroke: false, fillColor: '#ffffff', fillOpacity: 1, interactive: false };
+const FRAME_MS = 1000 / 30;
+// Quầng sáng vẽ bằng nét viền bán trong suốt của chính chấm (thay CSS drop-shadow trên cả canvas)
+const DOT_STYLE = { radius: 4.5, weight: 4, color: '#22d3ee', opacity: 0.45, fillColor: '#ffffff', fillOpacity: 1, interactive: false };
 const END_STYLE = { radius: 3.5, weight: 2, color: '#22d3ee', fillColor: '#0f172a', fillOpacity: 1, interactive: false };
 
 const renderers = new WeakMap();
@@ -24,9 +26,13 @@ function cumulativeMeters(path) {
   return cum;
 }
 
-function pointAt(path, cum, s) {
-  let i = 1;
+// d.seg nhớ đoạn đang chạy: s tăng dần nên chỉ dò tiếp từ đoạn cũ, quay vòng thì dò lại từ đầu
+function pointAt(d, s) {
+  const { path, cum } = d.t;
+  let i = d.seg;
+  if (i >= cum.length || cum[i - 1] > s) i = 1;
   while (i < cum.length - 1 && cum[i] < s) i++;
+  d.seg = i;
   const t = Math.min(1, Math.max(0, (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1)));
   const a = path[i - 1], b = path[i];
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
@@ -35,6 +41,7 @@ function pointAt(path, cum, s) {
 /**
  * paths: [[lat, lng]...] xếp từ rìa vùng phục vụ về công trình. Trả về hàm dừng (gỡ chấm khỏi group).
  * Luôn chạy (kể cả khi hệ điều hành tắt hiệu ứng động): chấm sáng là phần minh họa chính của vùng phục vụ.
+ * Giới hạn 30 khung/giây và tạm dừng khi kéo/zoom bản đồ để không tranh khung hình với các lớp canvas khác.
  */
 export function startFlowAnimation(map, group, paths) {
   if (!map || !group || !paths || !paths.length) return () => {};
@@ -45,28 +52,39 @@ export function startFlowAnimation(map, group, paths) {
 
   tracks.forEach(t => add(L.circleMarker(t.path[0], { ...END_STYLE, renderer })));
 
-  let frame = 0;
   const dots = [];
   tracks.forEach((t, j) => {
     const len = t.cum[t.cum.length - 1];
     for (let k = 0; k < DOTS_PER_PATH; k++) {
-      dots.push({ t, len, phase: ((k / DOTS_PER_PATH) + j * 0.137) % 1, marker: add(L.circleMarker(t.path[0], { ...DOT_STYLE, renderer })) });
+      dots.push({ t, len, seg: 1, phase: ((k / DOTS_PER_PATH) + j * 0.137) % 1, marker: add(L.circleMarker(t.path[0], { ...DOT_STYLE, renderer })) });
     }
   });
+
+  let frame = 0;
+  let last = 0;
+  let paused = false;
   const start = performance.now();
   const tick = (now) => {
     if (!layers.length || !group.hasLayer(layers[0])) return;
+    frame = requestAnimationFrame(tick);
+    if (paused || now - last < FRAME_MS) return;
+    last = now;
     const travelled = ((now - start) / 1000) * SPEED_MPS;
     dots.forEach(d => {
       if (d.len <= 0) return;
-      d.marker.setLatLng(pointAt(d.t.path, d.t.cum, (travelled + d.phase * d.len) % d.len));
+      d.marker.setLatLng(pointAt(d, (travelled + d.phase * d.len) % d.len));
     });
-    frame = requestAnimationFrame(tick);
   };
+  const pause = () => { paused = true; };
+  const resume = () => { paused = false; };
+  map.on('movestart zoomstart', pause);
+  map.on('moveend zoomend', resume);
   frame = requestAnimationFrame(tick);
 
   return () => {
     cancelAnimationFrame(frame);
+    map.off('movestart zoomstart', pause);
+    map.off('moveend zoomend', resume);
     layers.forEach(l => group.removeLayer(l));
   };
 }
