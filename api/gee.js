@@ -1028,37 +1028,56 @@ async function countPopPixelsFc(ee, popRasterNative, fc) {
 }
 
 /**
- * Pixel dân cư phần còn trống của nhiều ứng viên (cùng phép tính candidateGeometries().net) + tổng pixel các phường wardKeys:
- * { c<i>: số pixel, "w:<phường>": số pixel }. Buffer, hợp buffer công trình cùng loại và phép giao với ranh phường dựng
- * trên GEE từ điểm + bán kính + chỉ số công trình: dựng sẵn ở Node, bộ mã hóa EE chặn tiến trình hàng chục giây
- * với vài trăm ứng viên (mỗi ứng viên kéo theo hàng trăm buffer).
+ * Pixel dân cư phần còn trống của nhiều ứng viên + tổng pixel các phường wardKeys: { c<i>: số pixel, "w:<phường>": số pixel }.
+ * Tính bằng raster thay cho hình học của candidateGeometries().net (kết quả tương đương ở mức pixel): mỗi loại vẽ 1 ảnh
+ * "đã phục vụ" từ buffer công trình cùng loại, ứng viên chỉ cộng pixel có dân × chưa phục vụ trong vòng tròn của mình,
+ * nhóm theo mã phường (ảnh tô ranh) rồi lấy nhóm đúng phường ứng viên. Chi phí không tăng theo số công trình lân cận.
  */
 async function countCandidatePixels(ee, popRasterNative, candidates, wardKeys) {
-  const { wardVectorParsed } = getGeeContext();
-  const exIndex = new Map();
-  const exFeatures = [];
-  const exIdsOf = (c) => c.existing.map(it => {
-    if (!exIndex.has(it)) {
-      exIndex.set(it, exFeatures.length);
-      exFeatures.push(ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]), { i: exFeatures.length, r: Number(it.radius) || 0 }));
-    }
-    return exIndex.get(it);
+  const { wardVectorParsed, popProjection } = getGeeContext();
+  const names = wardVectorParsed.aggregate_array('tenXa');
+  const wardId = ee.Image(0).int().paint(wardVectorParsed.map(f => f.set('wi', names.indexOf(f.get('tenXa')).add(1))), 'wi').rename('w');
+  const pix = populatedPixels(popRasterNative);
+  const reducer = ee.Reducer.sum().unweighted().group({ groupField: 1, groupName: 'w' });
+  const reduceOpts = { reducer, crs: popProjection, scale: POP_SCALE_M, tileScale: 4 };
+
+  const byCode = new Map();
+  candidates.forEach((c, i) => {
+    if (!byCode.has(c.code)) byCode.set(c.code, { items: [], existing: new Set(), radius: Number(c.radius) || 0 });
+    const g = byCode.get(c.code);
+    g.items.push(ee.Feature(ee.Geometry.Point([Number(c.lng), Number(c.lat)]).buffer(Number(c.radius)), { k: `c${i}` }));
+    c.existing.forEach(it => g.existing.add(it));
   });
-  const cands = ee.FeatureCollection(candidates.map((c, i) => ee.Feature(ee.Geometry.Point([Number(c.lng), Number(c.lat)]), {
-    k: `c${i}`, r: Number(c.radius), wn: c.ward.name, ex: exIdsOf(c)
-  })));
-  const exFc = ee.FeatureCollection(exFeatures);
-  const net = cands.map(f => {
-    const r = ee.Number(f.get('r'));
-    const covered = exFc.filter(ee.Filter.inList('i', ee.List(f.get('ex'))))
-      .map(e => e.buffer(ee.Algorithms.If(ee.Number(e.get('r')).gt(0), e.get('r'), r)))
-      .geometry();
-    const ward = wardVectorParsed.filter(ee.Filter.eq('tenXa', f.get('wn'))).geometry();
-    return ee.Feature(f.geometry().buffer(r).difference(covered, 1).intersection(ward, 1), { k: f.get('k') });
+  const parts = [...byCode.values()].map(g => {
+    const covered = g.existing.size
+      ? ee.Image(0).byte().paint(ee.FeatureCollection([...g.existing].map(it =>
+        ee.Feature(ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(Number(it.radius) || g.radius)))), 1)
+      : ee.Image(0).byte();
+    return pix.multiply(covered.not()).addBands(wardId)
+      .reduceRegions({ collection: ee.FeatureCollection(g.items), ...reduceOpts })
+      .map(f => ee.Feature(null, { k: f.get('k'), groups: f.get('groups') }));
   });
-  const wards = wardVectorParsed.filter(ee.Filter.inList('tenXa', wardKeys))
-    .map(f => ee.Feature(f.geometry(), { k: ee.String('w:').cat(f.get('tenXa')) }));
-  return countPopPixelsFc(ee, popRasterNative, net.merge(wards));
+  let rows = parts.reduce((acc, fc) => (acc ? acc.merge(fc) : fc), null);
+  if (wardKeys.length) {
+    const totals = ee.Feature(null, pix.addBands(wardId).reduceRegion({
+      ...reduceOpts, geometry: wardVectorParsed.geometry(100).bounds(100), maxPixels: 1e9
+    })).set('k', 'wards');
+    rows = rows ? rows.merge(ee.FeatureCollection([totals])) : ee.FeatureCollection([totals]);
+  }
+  if (!rows) return {};
+  const res = (await eeEvaluate(ee.Dictionary({ names, rows }))) || {};
+  const wardNames = res.names || [];
+  const sumIn = (groups, wardName) => {
+    const hit = (groups || []).find(g => wardNames[Number(g.w) - 1] === wardName);
+    return hit ? Number(hit.sum) || 0 : 0;
+  };
+  const out = {};
+  ((res.rows && res.rows.features) || []).forEach(f => {
+    const p = f.properties || {};
+    if (p.k === 'wards') wardKeys.forEach(name => { out[`w:${name}`] = sumIn(p.groups, name); });
+    else out[p.k] = sumIn(p.groups, candidates[Number(String(p.k).slice(1))].ward.name);
+  });
+  return out;
 }
 
 /** Ngữ cảnh chỉ tiêu của phường: dân số quy hoạch + diện tích hiện có theo nhóm (giống cột quy mô của bảng phường) */
@@ -1110,7 +1129,7 @@ function csdSuggestionCandidates(csd, ward, approvedAll) {
       coverageAddPct: 0
     };
     suggestions.push(s);
-    candidates.push({ lat: csd.lat, lng: csd.lng, radius, existing, ward, target: s });
+    candidates.push({ code, lat: csd.lat, lng: csd.lng, radius, existing, ward, target: s });
   });
   return { suggestions, candidates };
 }
@@ -2961,7 +2980,7 @@ module.exports = async (req, res) => {
             coverageAddPct: 0
           };
           coverageCandidates.push({
-            lat: item.lat, lng: item.lng, radius,
+            code: metricCode(item), lat: item.lat, lng: item.lng, radius,
             existing: nearbySameType(approvedAll, metricCode(item), item.lat, item.lng, radius),
             ward: wardCtx,
             target: row
