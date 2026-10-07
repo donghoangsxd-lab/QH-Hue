@@ -1147,6 +1147,7 @@ async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000, {
     if (timeoutMs > 0) counts = await withTimeout(countCandidatePixels(ee, popRaster, candidates, wardKeys), timeoutMs, null);
   } catch (e) {
     console.warn("fillCoverageGains: GEE lỗi, dùng ước lượng hình học:", e.message);
+    if (timing) timing.geeError = String(e.message || e).slice(0, 300);
   }
   if (counts) wardKeys.forEach(name => wardPopPixelCache.set(name, counts[`w:${name}`] || 0));
   if (timing) timing.gee = Date.now() - t0;
