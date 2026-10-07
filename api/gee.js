@@ -1,5 +1,6 @@
 const axios = require('axios');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const constants = require('../config/constants');
 const { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, POP_SCALE_M } = require('../services/geeService');
 const { getRawDataList, getCadParcels, getDrainage, invalidateCache, getDataVersion } = require('../services/gcsService');
@@ -22,6 +23,14 @@ const WARD_STATS_ESTIMATE_TTL = 3 * 60 * 1000;
 // trả ước lượng + danh sách phường countPending để client đếm nền từng phường qua countWardCandidates, mỗi lượt tối đa BATCH
 const WARD_STATS_INLINE_COUNT = 800;
 const WARD_COUNT_BATCH = 1500;
+// Bảng phường chỉ hiện 2 gợi ý ưu tiên của khu đất CSD với các trường này; chi tiết đầy đủ + loại không đủ diện tích
+// tối thiểu xem ở popup khu đất (analyzeCSD)
+const CSD_ROW_FIELDS = ['code', 'label', 'status', 'basis', 'currentScalePct', 'scaleAddPct', 'coverageAddPct',
+  'coverageMethod', 'capacityLimited', 'capacity', 'quota'];
+const pickFields = (obj, keys) => keys.reduce((o, k) => {
+  if (obj[k] !== undefined) o[k] = obj[k];
+  return o;
+}, {});
 let cachedWardStatsVersion = -1;
 let cachedCityNetwork = null;
 let cachedCountPending = [];
@@ -116,6 +125,18 @@ function readJsonBody(req) {
     try { body = JSON.parse(body); } catch (e) { body = {}; }
   }
   return body && typeof body === 'object' ? body : {};
+}
+
+// Thân JSON nén gzip (client gửi gz=1, Content-Type octet-stream → Vercel đưa req.body dạng Buffer); trần giải nén chặn file nén bất thường
+const GZIP_BODY_MAX_BYTES = 8 * 1024 * 1024;
+function readGzipJsonBody(req) {
+  if (!Buffer.isBuffer(req.body)) return readJsonBody(req);
+  try {
+    const body = JSON.parse(zlib.gunzipSync(req.body, { maxOutputLength: GZIP_BODY_MAX_BYTES }).toString('utf8'));
+    return body && typeof body === 'object' ? body : {};
+  } catch (e) {
+    return {};
+  }
 }
 
 function isAllowedOrigin(req) {
@@ -2254,7 +2275,7 @@ module.exports = async (req, res) => {
 
     if (action === 'getHeatmapTile') {
       if (req.method !== 'POST') return res.status(405).json({ error: true, message: "Phương thức không hợp lệ" });
-      const groups = parseHeatmapGroups(readJsonBody(req));
+      const groups = parseHeatmapGroups(req.query.gz ? readGzipJsonBody(req) : readJsonBody(req));
       const categoryImageLayers = [];
 
       CODES.forEach(code => {
@@ -3023,9 +3044,8 @@ module.exports = async (req, res) => {
             status: item.status,
             needsApproval: !isApprovedStatus(item.status)
           };
-          // Tối đa 2 lựa chọn ưu tiên + danh sách không đủ diện tích tối thiểu
           rankAfterCount.push(() => {
-            row.suggestions = [...rankEligible(suggestions).slice(0, 2), ...suggestions.filter(s => s.status === 'ineligible')];
+            row.suggestions = rankEligible(suggestions).slice(0, 2).map(s => pickFields(s, CSD_ROW_FIELDS));
           });
           return row;
         });

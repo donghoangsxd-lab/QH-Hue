@@ -1194,11 +1194,19 @@ function heatmapGroups(list) {
   return groups;
 }
 
+// Danh sách điểm lớn (~27 byte/điểm) nén gzip trước khi gửi; trình duyệt cũ không có CompressionStream thì gửi JSON thường
+const HEAT_GZIP_MIN_CHARS = 20000;
+
 async function requestHeatTile(list) {
-  const res = await fetch(geeApi('action=getHeatmapTile'), {
+  const json = JSON.stringify({ groups: heatmapGroups(list) });
+  const gz = typeof CompressionStream === 'function' && json.length >= HEAT_GZIP_MIN_CHARS;
+  const body = gz
+    ? await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'))).blob()
+    : json;
+  const res = await fetch(geeApi(`action=getHeatmapTile${gz ? '&gz=1' : ''}`), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ groups: heatmapGroups(list) })
+    headers: { 'Content-Type': gz ? 'application/octet-stream' : 'application/json' },
+    body
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return ((await res.json()) || {}).urlFormat || '';
