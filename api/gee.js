@@ -11,6 +11,10 @@ const projects = require('../services/projectStore');
 
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
+let cachedWardStatsTtl = 0;
+// Vercel cắt hàm ở 60 s (vercel.json): đếm pixel độ phủ phải xong trước mốc này, phần còn lại để ước lượng và trả kết quả
+const WARD_STATS_BUDGET_MS = 42000;
+const WARD_STATS_ESTIMATE_TTL = 3 * 60 * 1000;
 let cachedWardStatsVersion = -1;
 let cachedCityNetwork = null;
 /** Độ phủ đã tính: { "HT:<phường>" | "QH:<phường>": { sig, ratios, Avg_Coverage_Score } } — chỉ dùng lại khi chữ ký dữ liệu khớp */
@@ -970,8 +974,7 @@ function nearbySameType(approvedAll, code, lat, lng, radius) {
 }
 
 /** Buffer ứng viên ∩ phường, và phần còn trống = (buffer − hợp các buffer cùng loại) ∩ phường */
-function candidateGeometries(ee, { lat, lng, radius, existing, ward }) {
-  const wardGeom = ee.Geometry(ward.geometry);
+function candidateGeometries(ee, { lat, lng, radius, existing, ward }, wardGeom = ee.Geometry(ward.geometry)) {
   const buffer = ee.Geometry.Point([lng, lat]).buffer(radius);
   const covered = existing.length > 0
     ? ee.FeatureCollection(existing.map(it =>
@@ -1079,21 +1082,29 @@ function rankEligible(suggestions) {
 
 /**
  * Đếm pixel dân cư mới được phục vụ cho mọi ứng viên trong 1 lần gọi GEE, quy đổi % theo tổng pixel dân cư của phường.
- * GEE lỗi / quá hạn → ước lượng hình học (coverageMethod = 'estimate'). Trả về true nếu mọi ứng viên đếm được bằng pixel.
+ * GEE lỗi / quá hạn (timeoutMs, ≤ 0 = bỏ qua GEE) → ước lượng hình học (coverageMethod = 'estimate').
+ * Trả về true nếu mọi ứng viên đếm được bằng pixel.
  */
-async function fillCoverageGains(ee, popRaster, candidates) {
+async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000) {
   if (!candidates.length) return true;
-  const regions = candidates.map((c, i) => ({ key: `c${i}`, geometry: candidateGeometries(ee, c).net }));
-  const wardGeoms = new Map();
+  // Mỗi phường 1 đối tượng ee.Geometry: bộ mã hóa EE chỉ gộp trùng theo đối tượng, tạo mới cho từng ứng viên
+  // làm yêu cầu chép lại ranh phường hàng nghìn lần
+  const eeWards = new Map();
+  const wardGeomOf = (ward) => {
+    if (!eeWards.has(ward.name)) eeWards.set(ward.name, ee.Geometry(ward.geometry));
+    return eeWards.get(ward.name);
+  };
+  const regions = candidates.map((c, i) => ({ key: `c${i}`, geometry: candidateGeometries(ee, c, wardGeomOf(c.ward)).net }));
+  const uncounted = new Map();
   candidates.forEach(c => {
-    if (!wardPopPixelCache.has(c.ward.name)) wardGeoms.set(c.ward.name, c.ward.geometry);
+    if (!wardPopPixelCache.has(c.ward.name)) uncounted.set(c.ward.name, c.ward);
   });
-  const wardKeys = [...wardGeoms.keys()];
-  wardKeys.forEach((name, i) => regions.push({ key: `w${i}`, geometry: ee.Geometry(wardGeoms.get(name)) }));
+  const wardKeys = [...uncounted.keys()];
+  wardKeys.forEach((name, i) => regions.push({ key: `w${i}`, geometry: wardGeomOf(uncounted.get(name)) }));
 
   let counts = null;
   try {
-    counts = await withTimeout(countPopPixels(ee, popRaster, regions), 30000, null);
+    if (timeoutMs > 0) counts = await withTimeout(countPopPixels(ee, popRaster, regions), timeoutMs, null);
   } catch (e) {
     console.warn("fillCoverageGains: GEE lỗi, dùng ước lượng hình học:", e.message);
   }
@@ -1537,6 +1548,7 @@ function parseHeatmapGroups(body) {
 // ============================ HANDLER ============================
 
 module.exports = async (req, res) => {
+  const startedAt = Date.now();
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
 
@@ -2743,7 +2755,7 @@ module.exports = async (req, res) => {
     if (action === 'getWardStats') {
       const now = Date.now();
       if (cachedWardStats && cachedWardStatsVersion === getDataVersion()
-          && (now - lastWardStatsFetch < constants.WARD_STATS_CACHE_TTL)) {
+          && (now - lastWardStatsFetch < cachedWardStatsTtl)) {
         cachedWardStats.forEach(applyCachedCoverage);
         return res.status(200).json({ data: cachedWardStats, network: cachedCityNetwork, coverageStatus: 'cached' });
       }
@@ -2927,7 +2939,8 @@ module.exports = async (req, res) => {
         resultTable.push(calculatedRow);
       }
 
-      const allPixel = await fillCoverageGains(ee, popRasterNative, coverageCandidates);
+      const geeBudget = Math.min(30000, startedAt + WARD_STATS_BUDGET_MS - Date.now());
+      const allPixel = await fillCoverageGains(ee, popRasterNative, coverageCandidates, geeBudget);
       rankAfterCount.forEach(fn => fn());
 
       resultTable.sort((a, b) => b.Dan_So_Vector - a.Dan_So_Vector);
@@ -2938,8 +2951,9 @@ module.exports = async (req, res) => {
         QH: cityNetworkSummary(getPlanScenarioItems(allDataList), cityPop)
       };
 
-      // Kết quả ước lượng (GEE lỗi) không giữ trong cache để lần sau đếm lại bằng pixel
-      cachedWardStats = allPixel ? resultTable : null;
+      // Kết quả ước lượng (GEE lỗi / quá hạn) chỉ giữ ngắn để lần sau đếm lại bằng pixel mà không tính lại ở mọi lượt mở trang
+      cachedWardStats = resultTable;
+      cachedWardStatsTtl = allPixel ? constants.WARD_STATS_CACHE_TTL : WARD_STATS_ESTIMATE_TTL;
       cachedCityNetwork = cityNetwork;
       cachedWardStatsVersion = getDataVersion();
       lastWardStatsFetch = now;
