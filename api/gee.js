@@ -1096,17 +1096,19 @@ async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000, {
     if (!eeWards.has(ward.name)) eeWards.set(ward.name, ee.Geometry(ward.geometry));
     return eeWards.get(ward.name);
   };
-  const regions = candidates.map((c, i) => ({ key: `c${i}`, geometry: candidateGeometries(ee, c, wardGeomOf(c.ward)).net }));
   const uncounted = new Map();
   candidates.forEach(c => {
     if (!wardPopPixelCache.has(c.ward.name)) uncounted.set(c.ward.name, c.ward);
   });
   const wardKeys = [...uncounted.keys()];
-  wardKeys.forEach((name, i) => regions.push({ key: `w${i}`, geometry: wardGeomOf(uncounted.get(name)) }));
 
   let counts = null;
   try {
-    if (timeoutMs > 0) counts = await withTimeout(countPopPixels(ee, popRaster, regions), timeoutMs, null);
+    if (timeoutMs > 0) {
+      const regions = candidates.map((c, i) => ({ key: `c${i}`, geometry: candidateGeometries(ee, c, wardGeomOf(c.ward)).net }));
+      wardKeys.forEach((name, i) => regions.push({ key: `w${i}`, geometry: wardGeomOf(uncounted.get(name)) }));
+      counts = await withTimeout(countPopPixels(ee, popRaster, regions), timeoutMs, null);
+    }
   } catch (e) {
     console.warn("fillCoverageGains: GEE lỗi, dùng ước lượng hình học:", e.message);
   }
@@ -2964,7 +2966,7 @@ module.exports = async (req, res) => {
       }
 
       timing.rows = Date.now() - startedAt;
-      const geeBudget = Math.min(30000, startedAt + WARD_STATS_BUDGET_MS - Date.now());
+      const geeBudget = req.query.cov === 'estimate' ? 0 : Math.min(30000, startedAt + WARD_STATS_BUDGET_MS - Date.now());
       const allPixel = await fillCoverageGains(ee, popRasterNative, coverageCandidates, geeBudget,
         { deadline: startedAt + WARD_STATS_DEADLINE_MS, timing });
       rankAfterCount.forEach(fn => fn());
