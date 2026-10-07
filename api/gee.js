@@ -1178,13 +1178,15 @@ async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000, {
   const pop = getPopEditsVersion();
   const stored = await statsStore.getCandidateCounts();
   const sigs = candidates.map(c => candidateSig(c, pop));
-  [...new Set(candidates.map(c => c.ward.name))].forEach(name => {
+  const wardNames = [...new Set(candidates.map(c => c.ward.name))];
+  wardNames.forEach(name => {
     const v = stored.wardPix[`${pop}|${name}`];
     if (!wardPopPixelCache.has(name) && v > 0) wardPopPixelCache.set(name, v);
   });
-  const wardKeys = [...new Set(candidates.map(c => c.ward.name))].filter(name => !wardPopPixelCache.has(name));
+  const wardKeys = wardNames.filter(name => !wardPopPixelCache.has(name));
 
   const counts = {};
+  const newCounts = {};
   const todo = [];
   sigs.forEach((sig, i) => {
     if (stored.counts[sig] != null) counts[`c${i}`] = stored.counts[sig];
@@ -1199,21 +1201,21 @@ async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000, {
       if (timing) timing.geeError = String(e.message || e).slice(0, 300);
     }
     if (fresh) {
-      const newCounts = {}, newWardPix = {};
       todo.forEach((i, j) => {
         counts[`c${i}`] = fresh[`c${j}`] || 0;
         newCounts[sigs[i]] = counts[`c${i}`];
       });
-      wardKeys.forEach(name => {
-        const v = fresh[`w:${name}`] || 0;
-        wardPopPixelCache.set(name, v);
-        if (v > 0) newWardPix[`${pop}|${name}`] = v;
-      });
-      await statsStore.saveCandidateCounts(newCounts, newWardPix, prune ? new Set(sigs) : null);
+      wardKeys.forEach(name => wardPopPixelCache.set(name, fresh[`w:${name}`] || 0));
     }
-  } else if (prune) {
-    await statsStore.saveCandidateCounts({}, {}, new Set(sigs));
   }
+  // Tổng pixel phường có thể đã đếm từ trước trong bộ nhớ instance (analyzeCSD, lượt trước) nên lưu mọi phường còn thiếu trong file
+  const newWardPix = {};
+  wardNames.forEach(name => {
+    const key = `${pop}|${name}`;
+    const v = wardPopPixelCache.get(name);
+    if (v > 0 && stored.wardPix[key] !== v) newWardPix[key] = v;
+  });
+  await statsStore.saveCandidateCounts(newCounts, newWardPix, prune ? new Set(sigs) : null);
   if (timing) Object.assign(timing, { gee: Date.now() - t0, reused: candidates.length - todo.length, counted: todo.length });
 
   const wardAreas = new Map();
