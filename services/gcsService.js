@@ -216,32 +216,36 @@ async function getCadParcels() {
   }
 }
 
-// ============================ THOÁT NƯỚC (drainage/thoatnuoc.topojson) ============================
+// ================= LỚP TĨNH THỦY VĂN (drainage/thoatnuoc.topojson, drainage/luuvuc.topojson) =================
 
-let cachedDrainage = null;   // { text, etag }
+const cachedText = {};   // url → { text, etag }
 
-/** Văn bản TopoJSON thoát nước (giữ nguyên, không parse) + ETag; chưa đẩy file lên bucket → null */
-async function getDrainage() {
+/** Văn bản file trên bucket (giữ nguyên, không parse) + ETag; chưa đẩy file lên bucket → null */
+async function getTextFile(url, label) {
   try {
     let currentETag = null;
     try {
-      currentETag = tagOf(await axios.head(bypassEdge(constants.DRAINAGE_GCS_URL), { timeout: 5000 }));
+      currentETag = tagOf(await axios.head(bypassEdge(url), { timeout: 5000 }));
     } catch (headErr) {
       if (headErr.response && headErr.response.status === 404) return null;
     }
-    if (cachedDrainage && currentETag && currentETag === cachedDrainage.etag) return cachedDrainage;
+    const cached = cachedText[url];
+    if (cached && currentETag && currentETag === cached.etag) return cached;
 
-    const response = await axios.get(bypassEdge(constants.DRAINAGE_GCS_URL), {
+    const response = await axios.get(bypassEdge(url), {
       timeout: 20000, responseType: 'text', transformResponse: x => x
     });
-    cachedDrainage = { text: String(response.data || ''), etag: tagOf(response) || currentETag };
-    return cachedDrainage;
+    cachedText[url] = { text: String(response.data || ''), etag: tagOf(response) || currentETag };
+    return cachedText[url];
   } catch (e) {
     if (e.response && e.response.status === 404) return null;
-    console.error("Lỗi nạp lớp thoát nước GCS:", e.message);
-    return cachedDrainage;
+    console.error(`Lỗi nạp ${label} GCS:`, e.message);
+    return cachedText[url] || null;
   }
 }
+
+const getDrainage = () => getTextFile(constants.DRAINAGE_GCS_URL, 'lớp thoát nước');
+const getBasins = () => getTextFile(constants.BASINS_GCS_URL, 'ranh lưu vực');
 
 function invalidateCache() {
   cachedGeoJSON = null;
@@ -254,4 +258,4 @@ function getDataVersion() {
   return dataVersion;
 }
 
-module.exports = { getRawDataList, getCadParcels, getDrainage, invalidateCache, getDataVersion };
+module.exports = { getRawDataList, getCadParcels, getDrainage, getBasins, invalidateCache, getDataVersion };

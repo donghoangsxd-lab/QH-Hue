@@ -2,20 +2,12 @@
 //   node scripts/push-thoatnuoc.js [Thoatnuoc.topojson]         → rút gọn rồi ghi drainage/thoatnuoc.topojson
 //   node scripts/push-thoatnuoc.js [file] --out ban-rut-gon.json  → chỉ ghi bản rút gọn ra máy, không gửi
 //   Mặc định cắt theo ranh 40 phường xã (tải từ webapp); --boundary ranh.geojson dùng file có sẵn, --no-clip không cắt.
-// Cần GAS_BASE_URL và GAS_SECRET (biến môi trường, hoặc .env.local / .env do `vercel env pull` tạo).
+// Cần GAS_BASE_URL và GAS_SECRET (xem scripts/gasClient.js).
 // Đường trong file phải vẽ xuôi dòng (đầu nguồn → hạ lưu): webapp chạy hiệu ứng và đặt mũi tên theo thứ tự đỉnh.
 const fs = require('fs');
 const path = require('path');
-
-function loadEnvFile(name) {
-  const file = path.join(__dirname, '..', name);
-  if (!fs.existsSync(file)) return;
-  fs.readFileSync(file, 'utf8').split(/\r?\n/).forEach(line => {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (!m || process.env[m[1]]) return;
-    process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
-  });
-}
+const { loadEnv, postToAppsScript } = require('./gasClient');
+const { loadBoundary, makeInside } = require('./wardBoundary');
 
 function decodeArc(arc) {
   let x = 0, y = 0;
@@ -78,55 +70,6 @@ function compact(topo, inside) {
 
 // ---- Cắt theo ranh 40 phường xã (đất liền TP. Huế) ----
 
-const BOUNDARY_URL = process.env.BOUNDARY_URL || 'https://web-hatang-hue-4.vercel.app/api/gee?action=getBoundaryVector&v=2';
-
-async function loadBoundary(file) {
-  if (file) return JSON.parse(fs.readFileSync(file, 'utf8'));
-  const res = await fetch(BOUNDARY_URL, { signal: AbortSignal.timeout(90000) });
-  if (!res.ok) throw new Error(`Không tải được ranh phường xã (HTTP ${res.status}) — dùng --boundary <file.geojson>`);
-  return res.json();
-}
-
-/**
- * Hàm (lng, lat) → nằm trong ranh. Tia ngang chẵn–lẻ trên mọi vòng của các phường xã (không chồng nhau, cạnh chung
- * được đếm 2 lần vẫn đúng chẵn lẻ); cạnh chia theo dải vĩ độ để mỗi điểm chỉ xét vài chục cạnh.
- */
-function makeInside(fc) {
-  const E = [];
-  let minY = Infinity, maxY = -Infinity;
-  (fc.features || []).forEach(f => {
-    const g = f && f.geometry;
-    const polys = !g ? [] : g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
-    polys.forEach(poly => poly.forEach(ring => {
-      for (let i = 0; i < ring.length; i++) {
-        const a = ring[i], b = ring[(i + 1) % ring.length];
-        if (a[1] === b[1]) continue;
-        E.push(a[0], a[1], b[0], b[1]);
-        minY = Math.min(minY, a[1], b[1]);
-        maxY = Math.max(maxY, a[1], b[1]);
-      }
-    }));
-  });
-  if (!E.length) throw new Error('Ranh phường xã rỗng');
-  const BANDS = 4096;
-  const h = (maxY - minY) / BANDS;
-  const band = (y) => Math.min(BANDS - 1, Math.max(0, Math.floor((y - minY) / h)));
-  const buckets = Array.from({ length: BANDS }, () => []);
-  for (let e = 0; e < E.length; e += 4) {
-    const b0 = band(Math.min(E[e + 1], E[e + 3])), b1 = band(Math.max(E[e + 1], E[e + 3]));
-    for (let b = b0; b <= b1; b++) buckets[b].push(e);
-  }
-  return (x, y) => {
-    if (y < minY || y >= maxY) return false;
-    let inside = false;
-    for (const e of buckets[band(y)]) {
-      const x1 = E[e], y1 = E[e + 1], x2 = E[e + 2], y2 = E[e + 3];
-      if ((y1 > y) !== (y2 > y) && x < (x2 - x1) * (y - y1) / (y2 - y1) + x1) inside = !inside;
-    }
-    return inside;
-  };
-}
-
 /** Tách 1 đường thành các đoạn nằm trong ranh; chỗ cắt ranh tìm giao điểm bằng chia đôi (12 lần) */
 function clipLine(pts, inside, toLL, quantized) {
   const isIn = (p) => inside(...toLL(p));
@@ -159,38 +102,8 @@ function clipLine(pts, inside, toLL, quantized) {
   return runs.filter(r => r.length >= 2);
 }
 
-async function postToAppsScript(content) {
-  const base = process.env.GAS_BASE_URL;
-  const secret = process.env.GAS_SECRET;
-  if (!base || !secret) throw new Error('Thiếu GAS_BASE_URL / GAS_SECRET (đặt biến môi trường hoặc chạy `vercel env pull .env.local`)');
-  const url = `${base}?action=saveDrainage&key=${encodeURIComponent(secret)}`;
-  // Giống api/gee.js: text/plain để Apps Script nhận nguyên body; doPost trả 302 → GET theo location
-  let res = await fetch(url, {
-    method: 'POST',
-    redirect: 'manual',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: 'saveDrainage', content }),
-    signal: AbortSignal.timeout(120000)
-  });
-  const loc = res.headers.get('location');
-  if (loc && res.status >= 300 && res.status < 400) res = await fetch(new URL(loc, url), { signal: AbortSignal.timeout(60000) });
-  const text = await res.text();
-  let data = null;
-  try { data = JSON.parse(text); } catch (e) { /* phản hồi không phải JSON */ }
-  if (!data) throw new Error(`Apps Script trả về phản hồi lạ (HTTP ${res.status})`);
-  if (data.error) {
-    const hint = String(data.error).indexOf('Action không hợp lệ') === 0
-      ? ' — Apps Script chưa có saveDrainage: dán apps-script/Code.gs rồi Deploy → Manage deployments → Edit → New version'
-      : '';
-    throw new Error(`Apps Script: ${data.error}${hint}`);
-  }
-  if (data.saved !== true) throw new Error('Apps Script chưa ghi được file lên bucket (xem Executions trong Apps Script)');
-  return data;
-}
-
 async function main() {
-  loadEnvFile('.env.local');
-  loadEnvFile('.env');
+  loadEnv();
   const args = process.argv.slice(2);
   const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
   const outFile = opt('--out');
@@ -217,7 +130,7 @@ async function main() {
     console.log(`✓ Đã ghi bản rút gọn: ${outFile}`);
     return;
   }
-  const data = await postToAppsScript(content);
+  const data = await postToAppsScript('saveDrainage', content);
   console.log(`✓ Đã ghi gs://hue-infra-data-us/drainage/thoatnuoc.topojson (${kb(data.size || content.length)})`);
 }
 

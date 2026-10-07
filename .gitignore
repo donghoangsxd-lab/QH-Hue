@@ -5,3 +5,8 @@ node_modules/
 npm-debug.log*
 .DS_Store
 Thumbs.db
+/LuuVucSong.geojson
+/TieuLuuVuc.geojson
+/OTieuNuoc.geojson
+/VungThap.geojson
+/.cache/

@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 const constants = require('../config/constants');
 const { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, POP_SCALE_M } = require('../services/geeService');
-const { getRawDataList, getCadParcels, getDrainage, invalidateCache, getDataVersion } = require('../services/gcsService');
+const { getRawDataList, getCadParcels, getDrainage, getBasins, invalidateCache, getDataVersion } = require('../services/gcsService');
 const { requireAdmin, httpError } = require('../services/authService');
 const roads = require('../services/roadsService');
 const popEdits = require('../services/popEditsService');
@@ -1751,10 +1751,14 @@ module.exports = async (req, res) => {
     }
 
     // Bucket không mở CORS cho trình duyệt → chuyển tiếp nguyên văn bản TopoJSON (~1 MB), cache biên Vercel 1 giờ
-    if (action === 'getDrainage') {
-      const d = await getDrainage();
+    if (action === 'getDrainage' || action === 'getBasins') {
+      const isBasins = action === 'getBasins';
+      const d = await (isBasins ? getBasins() : getDrainage());
       if (!d || !d.text) {
-        return res.status(404).json({ error: true, message: 'Chưa có lớp thoát nước trên bucket — chạy node scripts/push-thoatnuoc.js' });
+        const message = isBasins
+          ? 'Chưa có ranh lưu vực trên bucket — chạy node scripts/push-luuvuc.js'
+          : 'Chưa có lớp thoát nước trên bucket — chạy node scripts/push-thoatnuoc.js';
+        return res.status(404).json({ error: true, message });
       }
       res.setHeader('Cache-Control', 'public, max-age=600, s-maxage=3600, stale-while-revalidate=86400');
       if (d.etag) {

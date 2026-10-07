@@ -14,5 +14,11 @@
   "dependencies": {
     "@google/earthengine": "^0.1.385",
     "axios": "^1.6.8"
+  },
+  "devDependencies": {
+    "@turf/turf": "^7.4.0",
+    "d3-contour": "^4.0.2",
+    "osmtogeojson": "^3.0.0-beta.5",
+    "pngjs": "^7.0.0"
   }
 }

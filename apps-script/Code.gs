@@ -945,6 +945,7 @@ function doPost(e) {
     if (action === "saveRoads") return jsonOutput(saveRoads(body));
     if (action === "savePopEdits") return jsonOutput(savePopEdits(body));
     if (action === "saveDrainage") return jsonOutput(saveDrainage(body));
+    if (action === "saveBasins") return jsonOutput(saveBasins(body));
     if (action === "addPendingCad") return jsonOutput(addPendingCad(body));
     if (action === "removePendingCad") return jsonOutput(removePendingCad(body));
     if (action === "addPendingPoints") {
@@ -1308,6 +1309,16 @@ function saveDrainage(body) {
   try { topo = JSON.parse(content); } catch (e) { return { "error": "Dữ liệu thoát nước không phải JSON" }; }
   if (!topo || topo.type !== "Topology" || !Array.isArray(topo.arcs)) return { "error": "Dữ liệu thoát nước không phải TopoJSON" };
   return { "success": true, "saved": uploadToGCS(content, "drainage/thoatnuoc.topojson"), "size": content.length };
+}
+
+// RANH LƯU VỰC SÔNG + TIỂU LƯU VỰC (TopoJSON do scripts/push-luuvuc.js gửi) → file drainage/luuvuc.topojson (ghi đè)
+function saveBasins(body) {
+  var content = String(body.content || '');
+  if (!content || content.length > 8000000) return { "error": "Dữ liệu lưu vực rỗng hoặc quá 8 MB" };
+  var topo;
+  try { topo = JSON.parse(content); } catch (e) { return { "error": "Dữ liệu lưu vực không phải JSON" }; }
+  if (!topo || topo.type !== "Topology" || !Array.isArray(topo.arcs)) return { "error": "Dữ liệu lưu vực không phải TopoJSON" };
+  return { "success": true, "saved": uploadToGCS(content, "drainage/luuvuc.topojson"), "size": content.length };
 }
 
 // VÙNG HIỆU CHỈNH RASTER DÂN CƯ (Admin vẽ xóa / thêm pixel dân cư) → file pop/edits.json (ghi đè toàn bộ)

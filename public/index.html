@@ -53,6 +53,7 @@
     <symbol id="i-sat" viewBox="0 0 24 24"><path d="m9 12 3-3 3 3-3 3z"/><path d="m3.5 6.5 3-3 3 3-3 3zM14.5 17.5l3-3 3 3-3 3z"/><path d="m8 8 1.5 1.5M14.5 14.5 16 16"/><path d="M15 3.5a5.5 5.5 0 0 1 5.5 5.5M15 7a2 2 0 0 1 2 2"/></symbol>
     <symbol id="i-thermo" viewBox="0 0 24 24"><path d="M10 4.5a2 2 0 0 1 4 0v9.8a4 4 0 1 1-4 0z"/><path d="M12 10v7"/><path d="M17 6h3M17 9.5h2"/></symbol>
     <symbol id="i-stream" viewBox="0 0 24 24"><path d="M6 3c0 4 5 4 5 8.5S6 16 6 21"/><path d="M14 3c0 4 5 4 5 8.5S14 16 14 21"/><path d="m8.5 18.5-2.5 2.5-2.5-2.5"/></symbol>
+    <symbol id="i-basin" viewBox="0 0 24 24"><path d="M12 21C7 18 3 14 4 9s5-6 8-6 7 1 8 6-3 9-8 12z" stroke-dasharray="3 2.5"/><path d="M12 7v10"/><path d="m9.5 14.5 2.5 2.5 2.5-2.5"/></symbol>
     <symbol id="i-road" viewBox="0 0 24 24"><path d="M8 3 4 21M16 3l4 18M12 4v3M12 10.5v3M12 17v3"/></symbol>
     <symbol id="i-heat" viewBox="0 0 24 24"><path d="M12 22c4 0 7-2.7 7-6.8 0-3.2-2-5.7-3.6-7.4-.3 2-1.3 3.3-2.6 3.8C13.5 7.5 12 4.5 9.5 2.5 9.6 6 5 9 5 15.2 5 19.3 8 22 12 22z"/></symbol>
     <symbol id="i-radius" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-dasharray="3 2.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 12h9"/></symbol>
@@ -333,6 +334,23 @@
               <span>Nét chạy theo hướng nước chảy, mũi tên chỉ hạ lưu. Nét càng dày càng nhiều nhánh đổ về; thu nhỏ bản đồ thì ẩn bớt khe nhỏ.</span>
             </div>
             <div class="drainage-status" id="drainageStatus"></div>
+          </div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_basin"><label for="chk_basin" title="Đường phân thủy tính từ cao độ nền FABDEM 30 m, cùng nguồn lớp thoát nước. Bấm nhãn tên để xem diện tích và tô sáng lưu vực"><svg class="ico ico-layer"><use href="#i-basin"/></svg>Lưu vực, đường phân thủy</label></div></div>
+          <div class="layer-legend drainage-legend" id="basinLegend" style="display:none;">
+            <div class="drainage-legend-row">
+              <svg class="drainage-swatch" viewBox="0 0 44 12" aria-hidden="true"><path d="M2 6h40" stroke="#0f172a" stroke-opacity=".55" stroke-width="4.5"/><path d="M2 6h40" stroke="#f8fafc" stroke-width="2" stroke-dasharray="7 5"/></svg>
+              <span>Lưu vực sông (ranh giới đổ về một hệ thống sông)</span>
+            </div>
+            <div class="drainage-legend-row">
+              <svg class="drainage-swatch" viewBox="0 0 44 12" aria-hidden="true"><path d="M2 6h40" stroke="#facc15" stroke-width="1.6" stroke-dasharray="4 4"/></svg>
+              <span>Tiểu lưu vực (đổ về một điểm cửa xả), hiện khi phóng to</span>
+            </div>
+            <div class="drainage-legend-row">
+              <svg class="drainage-swatch" viewBox="0 0 44 12" aria-hidden="true"><path d="M3 6h38" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="0.1 5"/></svg>
+              <span>Ô tiêu nước vùng thấp dưới +10 m (ranh theo sông, kênh bao quanh)</span>
+            </div>
+            <div class="basin-legend-note">Đường phân thủy tính từ FABDEM 30 m; cao độ theo EGM2008, sai số đứng vài mét.</div>
+            <div class="drainage-status" id="basinStatus"></div>
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_flood"><label for="chk_flood" title="Tô mọi vùng có cao độ nền FABDEM thấp hơn mực nước giả định. Mực nước theo hệ EGM2008, không phải số đọc tại trạm thủy văn. Ô 30 m là nền trung bình, không phải cao độ nền từng lô"><svg class="ico ico-layer"><use href="#i-flood"/></svg>Mô phỏng ngập</label></div></div>
           <div class="flood-box" id="floodBox" style="display:none;">

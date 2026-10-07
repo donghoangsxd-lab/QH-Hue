@@ -207,6 +207,8 @@ const constants = {
   PENDING_CAD_BASE: "https://storage.googleapis.com/hue-infra-data-us/pending/cad/",
   // Mạng lưới thoát nước, khe tụ thủy (TopoJSON, đường vẽ xuôi dòng; scripts/push-thoatnuoc.js đẩy lên)
   DRAINAGE_GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/drainage/thoatnuoc.topojson",
+  // Ranh lưu vực sông + tiểu lưu vực (TopoJSON cung dùng chung; scripts/push-luuvuc.js đẩy lên)
+  BASINS_GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/drainage/luuvuc.topojson",
 
   // Cấu hình trên Vercel (Settings → Environment Variables), không ghi vào mã nguồn
   GAS_BASE_URL: process.env.GAS_BASE_URL || "",
