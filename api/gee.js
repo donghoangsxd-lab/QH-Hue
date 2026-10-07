@@ -1174,7 +1174,14 @@ async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000, {
     if (timing) timing.geeError = String(e.message || e).slice(0, 300);
   }
   if (counts) wardKeys.forEach(name => wardPopPixelCache.set(name, counts[`w:${name}`] || 0));
-  if (timing) timing.gee = Date.now() - t0;
+  if (timing) {
+    timing.gee = Date.now() - t0;
+    if (counts) {
+      timing.counted = candidates.filter((c, i) => counts[`c${i}`] > 0).length;
+      timing.wardTotals = wardKeys.filter(name => counts[`w:${name}`] > 0).length + '/' + wardKeys.length;
+      timing.debug = counts._debug;
+    }
+  }
 
   const wardAreas = new Map();
   const wardAreaOf = (ward) => {
