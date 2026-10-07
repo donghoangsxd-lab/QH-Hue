@@ -438,12 +438,13 @@ body.right-collapsed .right-panel {
 .layer-sec-head { gap: 4px; padding: 5px 8px; }
 .layer-sec-head .layer-head-title { letter-spacing: .01em; }
 .layer-sec-head .layer-count { padding: 1px 5px; }
-.layer-sec-tab { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 4px; height: 26px; padding: 0 5px; border: 1px solid transparent; border-radius: var(--r-md); background: transparent; font: inherit; cursor: pointer; transition: background var(--ease), border-color var(--ease); }
-.layer-sec-tab:hover { background: var(--bg-hover); }
-.layer-sec-tab:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
-.layer-sec-tab.active { border-color: rgba(var(--cyan-rgb), 0.45); background: rgba(var(--cyan-rgb), 0.08); }
-.layer-sec-tab.active .layer-head-title { color: var(--text-main); }
-.layer-sec-tab[data-layer-sec="plan"].active { border-color: rgba(232, 121, 249, 0.5); background: rgba(232, 121, 249, 0.08); }
+.layer-sec-tab, .legend-sec-tab { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 4px; height: 26px; padding: 0 5px; border: 1px solid transparent; border-radius: var(--r-md); background: transparent; font: inherit; cursor: pointer; transition: background var(--ease), border-color var(--ease); }
+.legend-sec-tab { justify-content: center; }
+.layer-sec-tab:hover, .legend-sec-tab:hover { background: var(--bg-hover); }
+.layer-sec-tab:focus-visible, .legend-sec-tab:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
+.layer-sec-tab.active, .legend-sec-tab.active { border-color: rgba(var(--cyan-rgb), 0.45); background: rgba(var(--cyan-rgb), 0.08); }
+.layer-sec-tab.active .layer-head-title, .legend-sec-tab.active .layer-head-title { color: var(--text-main); }
+.layer-sec-tab[data-layer-sec="plan"].active, .legend-sec-tab[data-legend-sec="plan"].active { border-color: rgba(232, 121, 249, 0.5); background: rgba(232, 121, 249, 0.08); }
 .layer-sec-head .layer-eye-btn { width: 28px; padding: 0; justify-content: center; }
 .layer-sec-head .layer-eye-btn[hidden] { display: none; }
 .layer-sec-head .layer-eye-btn:disabled { opacity: 0.5; cursor: default; }
@@ -571,18 +572,16 @@ body.right-collapsed .right-panel {
 .fold:not([open]) > summary { margin-bottom: 0; }
 
 /* Chú giải ranh lô đất theo TT16: mẫu hoa văn + màu ACI */
-.tt16-legend { margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--border-color); }
-.tt16-title { font-size: var(--fs-md); font-weight: 700; color: var(--accent-cyan); margin-bottom: 4px; }
-.tt16-title small { font-weight: 400; color: var(--text-muted); }
 .tt16-row { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; font-size: var(--fs-md); }
-.tt16-row span { flex: 1; min-width: 0; }
-.tt16-row small { font-size: var(--fs-xs); color: var(--text-muted); }
+.tt16-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt16-row small { font-size: var(--fs-xs); color: var(--text-muted); flex-shrink: 0; }
 .tt16-row small::before { content: 'ACI '; }
 .tt16-swatch { width: 26px; height: 14px; flex-shrink: 0; border: 1.3px solid; border-radius: var(--r-sm); background-color: rgba(15, 23, 42, 0.6); }
-.tt16-borders { display: flex; flex-wrap: wrap; gap: 3px 10px; margin-top: 5px; font-size: var(--fs-sm); color: var(--text-muted); }
-.tt16-borders span { display: inline-flex; align-items: center; gap: 4px; }
-.tt16-frame { width: 28px; height: 14px; flex-shrink: 0; color: var(--text-main); }
-.tt16-note { margin-top: 3px; font-size: var(--fs-sm); color: var(--text-muted); font-style: italic; }
+.tt16-borders { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 0 0 6px; }
+.tt16-frame { display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 0; height: calc(16px * var(--k)); padding: 0 2px; font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; overflow: hidden; }
+.tt16-frame-ht { border: 1px solid var(--text-main); }
+.tt16-frame-dd { border: 2.5px solid var(--text-main); }
+.tt16-frame-dh { border: 2.5px dashed var(--text-main); }
 .heat-legend { margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--border-color); }
 .heat-legend-title { font-size: var(--fs-md); font-weight: 700; color: var(--accent-orange); }
 .heat-legend-sub { font-size: var(--fs-sm); color: var(--text-muted); margin: 1px 0 5px; }
@@ -1590,6 +1589,32 @@ table.ward-table th {
   text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000;
 }
 .pp-collapsed .pp-title .badge-pending, .pp-collapsed .pp-title .ico { display: none; }
+/* Nút bút (Admin sửa lô) bên trái nút ẩn; popup lô đất không có nút ẩn thì sát nút đóng */
+.leaflet-container a.pp-edit-btn {
+  position: absolute; top: 0; right: 48px; width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); text-decoration: none; border-radius: var(--r-sm);
+}
+.leaflet-container .land-lot-popup a.pp-edit-btn { right: 24px; }
+.leaflet-container a.pp-edit-btn:hover { color: var(--accent-yellow); }
+.pp-edit-btn .ico { width: 14px; height: 14px; margin: 0; }
+.leaflet-container .pp-collapsed a.pp-edit-btn { display: none; }
+.infra-popup.pp-editable .pp-title { padding-right: 46px; }
+.land-lot-popup.pp-editable .land-popup > b:first-child { display: block; padding-right: 22px; }
+.lot-edit { min-width: 240px; font-size: var(--fs-sm); }
+.lot-edit-title { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; padding-right: 40px; font-weight: 700; }
+.lot-edit-title small { font-weight: 400; color: var(--text-muted); }
+.lot-edit-row { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 6px; margin-top: 3px; }
+.lot-edit-row > span { color: var(--text-muted); }
+.lot-edit-row input, .lot-edit-row select, .lot-edit-row textarea {
+  width: 100%; box-sizing: border-box; padding: 3px 5px; font: inherit; color: var(--text-main);
+  background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: var(--r-sm);
+}
+.lot-edit-row textarea { resize: vertical; }
+.lot-edit-msg { min-height: 1em; margin-top: 4px; color: var(--text-muted); }
+.lot-edit-msg.bad { color: var(--accent-red); }
+.lot-edit-btns { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
+.lot-edit-btns .ico { vertical-align: -0.2em; margin-right: 3px; }
 
 .sug-card { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--r-md); padding: 6px; margin-top: 4px; font-size: var(--fs-sm); }
 .sug-card.priority { border-color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.15); }

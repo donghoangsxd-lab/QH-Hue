@@ -462,6 +462,70 @@ async function patchBoundary({ tenQH, boundary, boundarySource }) {
   return { slug, via: indexed.via };
 }
 
+const PLAN_FIELD_KEYS = ['floors', 'coverage', 'far'];
+
+function landAreaOf(parcels) {
+  const out = {};
+  parcels.forEach(p => { if (p && p.kind === 'DXF') addArea(out, p.ward, p.nhom, p.area); });
+  return out;
+}
+
+// Admin sửa 1 lô đất (DXF) của đồ án từ bảng thông tin trên bản đồ: fields = { name?, nhom?, plan?: { floors, coverage, far } }.
+// Chuỗi rỗng trong plan xóa chỉ tiêu đó. Ghi theo generation (ghi chồng thì đọc lại, thử tối đa 3 lần), rồi đổi saved
+// trong danh mục để trình duyệt khác tải lại file đồ án
+async function patchLand({ tenQH, id, phase, fields }) {
+  const name = String(tenQH || '').trim();
+  const stored = await readIndex();
+  const entry = ((stored.data && stored.data.projects) || []).find(p => p && p.tenQH === name && !p.deleted);
+  if (!entry) {
+    const err = new Error(`Đồ án «${name}» còn ở file cũ (cad_parcels.json): bấm «Chuyển lô cũ lên bucket» trong panel Đồ án trước khi sửa lô`);
+    err.status = 409;
+    throw err;
+  }
+  const objectName = `projects/${entry.slug || projectSlug(name)}.json`;
+  let land = null, parcels = null, savedAt = 0, nhomChanged = false;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const got = await readJson(objectName);
+    parcels = got.data && Array.isArray(got.data.parcels) ? got.data.parcels : null;
+    land = parcels && parcels.find(p => p && p.kind === 'DXF' && p.id === id && (p.phase === 'QH' ? 'QH' : 'HT') === phase);
+    if (!land) {
+      const err = new Error(`Không tìm thấy lô ${id} (${phase}) trong file đồ án «${name}»`);
+      err.status = 404;
+      throw err;
+    }
+    if (fields.name !== undefined) land.name = fields.name;
+    if (fields.nhom !== undefined) {
+      nhomChanged = land.nhom !== fields.nhom;
+      land.nhom = fields.nhom;
+    }
+    if (fields.plan) {
+      const plan = { ...(land.plan || {}) };
+      PLAN_FIELD_KEYS.forEach(k => {
+        if (fields.plan[k] === undefined) return;
+        if (fields.plan[k]) plan[k] = fields.plan[k];
+        else delete plan[k];
+      });
+      if (Object.keys(plan).length) land.plan = plan;
+      else delete land.plan;
+    }
+    savedAt = Date.now();
+    got.data.saved = savedAt;
+    try {
+      await writeText(objectName, JSON.stringify(got.data), got.generation || undefined);
+      break;
+    } catch (err) {
+      if (err.code !== 'GEN' || attempt === 2) throw err;
+    }
+  }
+  const indexed = await updateIndex(cur => ({
+    ...cur,
+    projects: (cur.projects || []).map(p => (p && p.tenQH === name && !p.deleted
+      ? { ...p, saved: savedAt, ...(nhomChanged ? { landArea: landAreaOf(parcels) } : {}) }
+      : p))
+  }));
+  return { saved: savedAt, via: indexed.via, land: { id: land.id, phase, name: land.name || '', nhom: land.nhom || '', plan: land.plan || null } };
+}
+
 async function deleteProjectFiles(tenQH) {
   const name = String(tenQH || '').trim();
   const stored = await readIndex();
@@ -671,6 +735,6 @@ async function wardParcels() {
 }
 
 module.exports = {
-  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, deleteProjectFiles,
+  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteProjectFiles,
   migratePage, lotsBySlug, legacyLots, wardParcels
 };

@@ -424,6 +424,56 @@ function parseCadItem(it, defaultPhase) {
   };
 }
 
+// ============================ ADMIN SỬA 1 LÔ ĐỒ ÁN ============================
+
+const LOT_ID_RE = /^[A-Za-z0-9_.\-]{1,40}$/;
+
+// Quy mô sửa tay: '' = xóa ô (giai đoạn đó không có công trình); undefined = không đổi; NaN = không hợp lệ
+function parseEditSize(v) {
+  if (v === undefined) return undefined;
+  const s = String(v ?? '').trim().replace(',', '.');
+  if (!s) return '';
+  const n = Number(s);
+  return Number.isFinite(n) && n >= 0 && n <= 1e8 ? Math.round(n * 10) / 10 : NaN;
+}
+
+// Chỉ tiêu sửa tay: giữ khóa có gửi (kể cả '' để xóa)
+function parseEditPlan(plan) {
+  if (!plan || typeof plan !== 'object') return undefined;
+  const out = {};
+  ['floors', 'coverage', 'far'].forEach(k => { if (plan[k] !== undefined) out[k] = sanitizeSheetText(plan[k], 20); });
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Trường sửa của lô hạ tầng (dòng Sheet); null nếu không hợp lệ */
+function parseInfraEdit(f) {
+  const out = {};
+  if (f.name !== undefined) {
+    out.name = sanitizeSheetText(f.name, 150);
+    if (!out.name) return null;
+  }
+  if (f.nhom !== undefined) out.nhom = f.nhom === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
+  for (const [key, src] of [['quyMoHT', f.sizeHT], ['quyMoQH', f.sizeQH]]) {
+    const v = parseEditSize(src);
+    if (Number.isNaN(v)) return null;
+    if (v !== undefined) out[key] = v;
+  }
+  const plan = parseEditPlan(f.plan);
+  if (plan) out.plan = plan;
+  if (f.note !== undefined) out.note = sanitizeSheetText(f.note, 300);
+  return Object.keys(out).length ? out : null;
+}
+
+/** Trường sửa của lô đất khác (file đồ án trên bucket); null nếu không hợp lệ */
+function parseLandEdit(f) {
+  const out = {};
+  if (f.name !== undefined) out.name = sanitizeSheetText(f.name, 150);
+  if (f.nhom !== undefined) out.nhom = sanitizeSheetText(f.nhom, 40) || 'Đất khác';
+  const plan = parseEditPlan(f.plan);
+  if (plan) out.plan = plan;
+  return Object.keys(out).length ? out : null;
+}
+
 // body != null → POST JSON tới doPost (dữ liệu lớn); còn lại GET tới doGet
 async function callAppsScript(params, body = null) {
   if (!constants.GAS_BASE_URL) {
@@ -1758,6 +1808,32 @@ module.exports = async (req, res) => {
         slug: saved.slug,
         bucket: saved.via
       });
+    }
+
+    // Admin sửa 1 lô từ bảng thông tin: lô hạ tầng (INFRA) ghi dòng Sheet theo ID, lô đất khác (DXF) ghi file đồ án trên bucket
+    if (action === 'editLot') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const id = String(body.id || '').trim();
+      if (!LOT_ID_RE.test(id)) return res.status(400).json({ error: true, message: 'Mã lô không hợp lệ' });
+      const raw = body.fields && typeof body.fields === 'object' ? body.fields : {};
+      if (body.kind === 'DXF') {
+        const tenQH = sanitizeSheetText(body.tenQH, 120);
+        const fields = parseLandEdit(raw);
+        if (!tenQH || !fields) return res.status(400).json({ error: true, message: 'Thiếu đồ án hoặc thông tin cần sửa' });
+        try {
+          const saved = await projects.patchLand({ tenQH, id, phase: body.phase === 'QH' ? 'QH' : 'HT', fields });
+          return res.status(200).json({ success: true, kind: 'DXF', id, saved: saved.saved, land: saved.land, bucket: saved.via });
+        } catch (err) {
+          return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được file đồ án' });
+        }
+      }
+      const fields = parseInfraEdit(raw);
+      if (!fields) return res.status(400).json({ error: true, message: 'Thông tin sửa không hợp lệ (tên trống hoặc quy mô không phải số ≥ 0)' });
+      const result = await callAppsScript({ action: 'editInfraRow' }, { action: 'editInfraRow', id, fields });
+      invalidateAllCaches();
+      return res.status(200).json({ success: true, kind: 'INFRA', id, tab: result.tab || '' });
     }
 
     // Xóa toàn bộ 1 đồ án (Ten_QH): dòng hạ tầng, tab DXF-NN cũ, ranh lô, dòng DS_DoAn, file projects/<slug>.json

@@ -12,7 +12,7 @@ import { escapeHtml, fmtNum, ico, showToast, loadHtml2Pdf, isApproved } from './
 import { setBottomPanelMaximized } from './uiComponents.js';
 import { importReviewDossier, rejectPending, REVIEW_DOSSIER_EVENT } from './cadImportUi.js';
 import { setLabelsOverlay, labelsOverlayOn } from './basemap.js';
-import { tt16SymbolStyle, tt16SwatchCss, TT16_PATTERN_ZOOM } from './tt16Symbols.js';
+import { tt16SymbolStyle, tt16SwatchCss, TT16_PATTERN_ZOOM, landPatternKey } from './tt16Symbols.js';
 import {
   REVIEW_MAX_BYTES, LANDUSE_TABLES, classifyLand, landChoices, landRowByKey, landUseSummary, landSubKey, importLayerName, decisionKind,
   presetDecision, tagParcel, lotRadius, scoreRows, rowLabel, rowMinSize, newLandControl, residentialSubAreas, landSymbol, UNIT_POP, THPT_POP_MIN,
@@ -256,7 +256,8 @@ function lotStyle(lot) {
   }
   const split = residentialSubAreas(lot, session.kind);
   const sym = landSymbol(session.kind, lot.landKey, split ? Object.keys(split)[0] : lot.subKey);
-  return tt16SymbolStyle(sym.tt16, sym.tone, lot.layer, { scenario: lot.phase, detailed: isDetailed(targetMap(lot.phase)) });
+  const key = sym.tt16 || landPatternKey(lot.layer);
+  return tt16SymbolStyle(key, sym.tone, lot.layer, { scenario: lot.phase, detailed: isDetailed(targetMap(lot.phase)) });
 }
 
 // Qua ngưỡng zoom hoa văn thì tô lại các lô của bản đồ đó
@@ -626,7 +627,9 @@ const pctTxt = (v) => (v > 0 ? fmtNum(v) : '');
 
 // Ô ký hiệu: nền hoa văn TT16 như chú giải (khi phóng to), viền = màu tô khi thu nhỏ; đất không có hoa văn TT16 tô đặc.
 // Hoa văn ô lặp lớn (y tế, trường học) thu nửa cho vừa ô nhỏ
-const SWATCH_HALF = new Set(['7-YT', '3-MN', '4-TH', '5-THCS', '6-THPT']);
+const SWATCH_HALF = new Set(['7-YT', '3-MN', '4-TH', '5-THCS', '6-THPT',
+  'O-NO', 'O-HH', 'O-LX', 'CX-HC', 'CX-CD', 'SX-CN', 'SX-VL', 'DT-NC', 'CQ', 'DL', 'DT-TG', 'AN', 'QP', 'GT',
+  'NTR', 'HTK', 'NN', 'RDD', 'RPH', 'RSX', 'TS', 'HO', 'SS', 'MNB']);
 function swatchHtml(r) {
   const bg = tt16SwatchCss(r.tt16, SWATCH_HALF.has(r.tt16) ? 0.5 : 1) || `background:${r.tone};`;
   return `<i style="${bg}border-color:${r.tone}"></i>`;

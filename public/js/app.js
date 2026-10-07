@@ -43,6 +43,7 @@ import { initProjectLayer } from './projectLayer.js';
 import { initProjectReview } from './projectReview.js';
 import { initWardCheck, refreshWardCheck } from './wardCheck.js';
 import { initOsmImport } from './osmImport.js';
+import { initLotEdit } from './lotEdit.js';
 import { initWardRoads } from './wardRoads.js';
 import { initCustomRoads, handleRoadDrawClick } from './customRoads.js';
 import { initPopEdits, handlePopDrawClick } from './popEdits.js';
@@ -87,6 +88,23 @@ function initLayerSections() {
   let saved = null;
   try { saved = localStorage.getItem(LAYER_SEC_KEY); } catch (e) { /* chế độ riêng tư */ }
   show(tabs.some(t => t.dataset.layerSec === saved) ? saved : 'infra');
+}
+
+// Tab Chú giải chia đôi Công trình | Quy hoạch, cùng kiểu nút với Lớp dữ liệu
+function initLegendSections() {
+  const root = document.getElementById('tabLegend');
+  if (!root) return;
+  const tabs = [...root.querySelectorAll('.legend-sec-tab')];
+  const show = (key) => {
+    tabs.forEach(t => {
+      const on = t.dataset.legendSec === key;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', String(on));
+    });
+    root.querySelectorAll('[data-legend-sec-pane]').forEach(p => { p.hidden = p.dataset.legendSecPane !== key; });
+  };
+  tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.legendSec)));
+  show('infra');
 }
 
 // Nút Nền, phân tích | Môi trường: mỗi lúc hiện 1 nhóm lớp; số trên nút = số lớp đang bật trong nhóm (kể cả nhóm đang ẩn)
@@ -224,6 +242,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initProjectReview();
   initWardCheck({ onSynced: reloadAfterSheetWrite });
   initOsmImport({ onImported: reloadAfterSheetWrite });
+  initLotEdit({ onInfraSaved: reloadAfterSheetWrite });
   initWardRoads();
   initCustomRoads();
   initPopEdits();
@@ -406,6 +425,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('chk_parcel')?.addEventListener('change', (e) => setParcelsVisible(e.target.checked));
   initLayerSections();
+  initLegendSections();
   initLayerTabs();
 
   document.querySelectorAll('.btn-dot-buffer').forEach(btn => {

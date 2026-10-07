@@ -573,6 +573,15 @@
 
       <!-- TAB: CHÚ GIẢI -->
       <div class="tab-body" id="tabLegend" style="display:none;">
+        <div class="layer-head layer-sec-head" role="tablist" aria-label="Nhóm chú giải">
+          <button type="button" class="legend-sec-tab active" data-legend-sec="infra" role="tab" aria-selected="true">
+            <span class="layer-head-title">Công trình</span>
+          </button>
+          <button type="button" class="legend-sec-tab" data-legend-sec="plan" role="tab" aria-selected="false">
+            <span class="layer-head-title">Quy hoạch</span>
+          </button>
+        </div>
+        <div data-legend-sec-pane="infra" role="tabpanel">
         <div class="legend-row"><img src="./icons/Park.png" class="legend-icon" alt="" />1. Công viên, điểm xanh, vườn hoa</div>
         <div class="legend-row"><img src="./icons/Parking.png" class="legend-icon" alt="" />2. Bãi đỗ xe, trạm sạc xe điện</div>
         <div class="legend-row"><img src="./icons/Mamnon.png" class="legend-icon" alt="" />3. Trường Mầm non</div>
@@ -589,9 +598,6 @@
         <div class="legend-row"><img src="./icons/Noxh.svg" class="legend-icon" alt="" />14. Nhà ở xã hội</div>
         <div class="legend-row legend-pending"><img src="./icons/Park2.png" class="legend-icon" alt="" /><b>Chưa chấp thuận (Chờ duyệt)</b></div>
         <div class="legend-row"><span class="legend-icon legend-dot"><i class="legend-plan-dot"></i></span>Điểm quy hoạch khác hiện trạng</div>
-
-        <div class="tt16-legend" id="parcelLegend"></div>
-
         <div class="heat-legend">
           <div class="heat-legend-title"><svg class="ico"><use href="#i-heat"/></svg>Bản đồ độ phủ hạ tầng</div>
           <div class="heat-legend-sub">Số nhóm hạ tầng tiếp cận được tại mỗi vị trí</div>
@@ -599,6 +605,10 @@
           <div class="heat-legend-ticks">
             <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
           </div>
+        </div>
+        </div>
+        <div data-legend-sec-pane="plan" role="tabpanel" hidden>
+          <div class="tt16-legend" id="parcelLegend"></div>
         </div>
       </div>
     </div>

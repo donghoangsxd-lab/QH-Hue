@@ -1,15 +1,15 @@
 // Ký hiệu ranh lô theo TT 16/2025/TT-BXD (Phụ lục I, Mục 04 – QHPK 1/2.000, 1/5.000, trang 19–22).
-// Màu = mã ACI cột "Màu" của bảng; hoa văn = nét vector trích từ ô ký hiệu của Phụ lục (1 ô lặp, đơn vị pt).
+// Màu = mã ACI cột "Màu". Chín nhóm hạ tầng trích nét vector từ Phụ lục; các loại đất còn lại của Mục 04 vẽ theo cùng ô ký hiệu.
 // Viền theo khung ô ký hiệu: hiện trạng (HT_) mảnh; quy hoạch đợt đầu (QHDD_) dải liền; dài hạn (QHDH_) dải nét đứt.
-
-import { ico } from './utils.js';
-import { BUFFER_COLORS } from './state.js';
 
 // color: RGB chuẩn AutoCAD của mã ACI; pattern: khóa ô lặp trong TILES
 export const TT16_STYLES = {
   "1-CV": { label: 'Cây xanh sử dụng công cộng', layer: 'DAT_HTXH_CayxanhCC', aci: 72, color: '#66cc00', pattern: 'CayxanhCC' },
   "2-BDX": { label: 'Đất bãi đỗ xe', layer: 'DAT_HTKT_Baidoxe', aci: 252, color: '#696969', pattern: 'Baidoxe' },
-  "3-MN": { label: 'Trường THCS, tiểu học, mầm non', layer: 'DAT_HTXH_Truonghoc', aci: 15, color: '#994c4c', pattern: 'Truonghoc' },
+  // Thông tư 16 gom ba cấp vào một ký hiệu, màu ACI 15. THCS giữ #994c4c; mầm non và tiểu học sáng hơn, cùng họ gạch đỏ. solidOpacity giúp ba màu này còn tách được khi thu nhỏ (tô đặc).
+  "3-MN": { label: 'Trường mầm non', layer: 'DAT_HTXH_Truonghoc', color: '#ff8f70', pattern: 'Truonghoc', solidOpacity: 0.62 },
+  "4-TH": { label: 'Trường tiểu học', layer: 'DAT_HTXH_Truonghoc', color: '#e25b48', pattern: 'Truonghoc', solidOpacity: 0.62 },
+  "5-THCS": { label: 'Trường THCS', layer: 'DAT_HTXH_Truonghoc', aci: 15, color: '#994c4c', pattern: 'Truonghoc', solidOpacity: 0.62 },
   "6-THPT": { label: 'Trường THPT', layer: 'DAT_HTXH_TruongTHPT', aci: 24, color: '#992600', pattern: 'THPT' },
   "7-YT": { label: 'Y tế', layer: 'DAT_HTXH_Yte', aci: 220, color: '#ff00bf', pattern: 'Yte' },
   "8-VH": { label: 'Văn hóa', layer: 'DAT_HTXH_Vanhoa', aci: 243, color: '#cc667f', pattern: 'Vanhoa' },
@@ -17,13 +17,84 @@ export const TT16_STYLES = {
   "9-TM": { label: 'Khu dịch vụ (chợ, TTTM)', layer: 'DAT_Dichvu', aci: 12, color: '#cc0000', pattern: 'Dichvu' },
   "12-CSD": { label: 'Chưa sử dụng', layer: 'DAT_KHAC_Chuasudung', aci: 9, color: '#c0c0c0', pattern: 'Chuasudung', fillOpacity: 0.45 }
 };
-TT16_STYLES["4-TH"] = TT16_STYLES["3-MN"];
-TT16_STYLES["5-THCS"] = TT16_STYLES["3-MN"];
+// Loại đất Mục 04 còn lại (và đầu mục tương ứng của quy hoạch chung). codes: tên phân lớp, bỏ tiền tố giai đoạn
+Object.assign(TT16_STYLES, {
+  "O-NO": { label: 'Nhóm nhà ở', layer: 'DAT_O_Nhomnhao', aci: 42, color: '#cc9900', pattern: 'Nhomnhao' },
+  "O-HH": { label: 'Hỗn hợp nhóm nhà ở và dịch vụ', layer: 'DAT_O_Honhop_Nhomo', aci: 22, color: '#cc3200', pattern: 'Honhop' },
+  "O-LX": { label: 'Làng xóm, dân cư nông thôn', layer: 'DAT_O_Langxom', aci: 57, color: '#7f7f40', pattern: 'Langxom' },
+  "CX-HC": { label: 'Cây xanh sử dụng hạn chế', layer: 'DAT_Cayxanhhanche', aci: 94, color: '#009900', pattern: 'Cayxanhhanche' },
+  "CX-CD": { label: 'Cây xanh chuyên dụng', layer: 'DAT_Cayxanhchuyendung', aci: 126, color: '#007f5f', pattern: 'Cayxanhchuyendung' },
+  "SX-CN": { label: 'Sản xuất công nghiệp, kho bãi', layer: 'DAT_SX_Congnghiep', aci: 192, color: '#6600cc', pattern: 'Congnghiep' },
+  "SX-VL": { label: 'Khai thác khoáng sản, vật liệu xây dựng', layer: 'DAT_SX_Vatlieu', aci: 175, color: '#4d4d99', pattern: 'Vatlieu' },
+  "DT-NC": { label: 'Đào tạo, nghiên cứu', layer: 'DAT_DaotaoNC', aci: 144, color: '#007399', pattern: 'DaotaoNC' },
+  "CQ": { label: 'Cơ quan, trụ sở', layer: 'DAT_Coquan', aci: 34, color: '#994c00', pattern: 'Coquan' },
+  "DL": { label: 'Khu dịch vụ du lịch', layer: 'DAT_Dulich', aci: 210, color: '#ff00ff', pattern: 'Dulich' },
+  "DT-TG": { label: 'Di tích, tôn giáo', layer: 'DAT_Ditich_tongiao', aci: 16, color: '#7f0000', pattern: 'Ditich' },
+  "AN": { label: 'An ninh', layer: 'DAT_Anninh', aci: 64, color: '#739900', pattern: 'Anninh' },
+  "QP": { label: 'Quốc phòng', layer: 'DAT_Quocphong', aci: 79, color: '#394c26', pattern: 'Quocphong' },
+  "GT": { label: 'Đường giao thông', layer: 'DAT_HTKT_DuongGT', aci: 251, color: '#5b5b5b', pattern: 'DuongGT' },
+  "NTR": { label: 'Nghĩa trang', layer: 'DAT_HTKT_Nghiatrang', aci: 251, color: '#5b5b5b', pattern: 'Nghiatrang' },
+  "HTK": { label: 'Hạ tầng kỹ thuật khác', layer: 'DAT_HTKT_Hatangkhac', aci: 199, color: '#39264c', pattern: 'Hatangkhac' },
+  "NN": { label: 'Sản xuất nông nghiệp', layer: 'DAT_NN_Nongnghiep', aci: 3, color: '#00ff00', pattern: 'Nongnghiep' },
+  "RDD": { label: 'Rừng đặc dụng', layer: 'DAT_NN_Rungdacdung', aci: 148, color: '#00394c', pattern: 'Rungdacdung' },
+  "RPH": { label: 'Rừng phòng hộ', layer: 'DAT_NN_Rungphongho', aci: 129, color: '#264c43', pattern: 'Rungphongho' },
+  "RSX": { label: 'Rừng sản xuất', layer: 'DAT_NN_Rungsanxuat', aci: 107, color: '#3f7f4f', pattern: 'Rungsanxuat' },
+  "TS": { label: 'Nuôi trồng thủy sản', layer: 'DAT_NN_Thuysan', aci: 150, color: '#007fff', pattern: 'Thuysan' },
+  "HO": { label: 'Hồ, ao, đầm', layer: 'DAT_KHAC_Honuoc', aci: 154, color: '#004c99', pattern: 'Honuoc' },
+  "SS": { label: 'Sông, suối, kênh, rạch', layer: 'DAT_KHAC_Songsuoi', aci: 152, color: '#0066cc', pattern: 'Songsuoi' },
+  "MNB": { label: 'Mặt nước ven biển', layer: 'DAT_KHAC_Matnuocbien', aci: 152, color: '#0066cc', pattern: 'Matnuocbien' }
+});
 
-// Thứ tự hiển thị trong chú giải
-const LEGEND_KEYS = ["1-CV", "2-BDX", "3-MN", "6-THPT", "7-YT", "8-VH", "TDTT", "9-TM", "12-CSD"];
+const PATTERN_CODES = [
+  ['O-NO', ['DAT_O_NHOMNHAO', 'DAT_DD_DONVIO']],
+  ['O-HH', ['DAT_O_HONHOP_NHOMO', 'DAT_O_HONHOP', 'DAT_DD_HONHOP']],
+  ['O-LX', ['DAT_O_LANGXOM', 'DAT_NDD_DANCUNT']],
+  ['CX-HC', ['DAT_CAYXANHHANCHE', 'DAT_NDD_CAYXANHSDHC']],
+  ['CX-CD', ['DAT_CAYXANHCHUYENDUNG', 'DAT_NDD_CAYXANHCD']],
+  ['SX-CN', ['DAT_SX_CONGNGHIEP', 'DAT_NDD_CONGNGHIEP']],
+  ['SX-VL', ['DAT_SX_VATLIEU']],
+  ['DT-NC', ['DAT_DAOTAONC', 'DAT_NDD_DAOTAO']],
+  ['CQ', ['DAT_COQUAN', 'DAT_DD_COQUANDOTHI', 'DAT_NDD_COQUAN']],
+  ['DL', ['DAT_DULICH', 'DAT_NDD_DULICH']],
+  ['DT-TG', ['DAT_DITICH_TONGIAO', 'DAT_DITICHTONGIAO', 'DAT_NDD_DITICH']],
+  ['AN', ['DAT_ANNINH', 'DAT_NDD_ANNINH']],
+  ['QP', ['DAT_QUOCPHONG', 'DAT_NDD_QUOCPHONG']],
+  ['GT', ['DAT_HTKT_DUONGGT', 'DAT_DD_GIAOTHONGDOTHI', 'DAT_NDD_GIAOTHONGDN', 'DAT_NDD_GIAOTHONG', 'DAT_NDD_GIAOTHONGDOINGOAI']],
+  ['NTR', ['DAT_HTKT_NGHIATRANG']],
+  ['HTK', ['DAT_HTKT_HATANGKHAC', 'DAT_HTKT_HTKTKHAC', 'DAT_HTKT_KHAC', 'DAT_DD_HTKHACDOTHI', 'DAT_NDD_HTKHACDOINGOAI', 'DAT_NDD_HTKTKHAC', 'DAT_NDD_HTKHAC', 'DAT_NDD_HATANGKHAC']],
+  ['NN', ['DAT_NN_NONGNGHIEP', 'DAT_NNK_NONGNGHIEP']],
+  ['RDD', ['DAT_NN_RUNGDACDUNG', 'DAT_NNK_RUNGDACDUNG']],
+  ['RPH', ['DAT_NN_RUNGPHONGHO', 'DAT_NNK_RUNGPHONGHO']],
+  ['RSX', ['DAT_NN_RUNGSANXUAT', 'DAT_NNK_RUNGSANXUAT']],
+  ['TS', ['DAT_NN_THUYSAN', 'DAT_NNK_THUYSAN']],
+  ['HO', ['DAT_KHAC_HONUOC', 'DAT_NNK_HONUOC']],
+  ['SS', ['DAT_KHAC_SONGSUOI', 'DAT_NNK_SONGSUOI']],
+  ['MNB', ['DAT_KHAC_MATNUOCBIEN', 'DAT_NNK_MATNUOCBIEN']],
+  ['1-CV', ['DAT_HTXH_CAYXANHCC', 'DAT_DD_CAYXANHCCDOTHI']],
+  ['2-BDX', ['DAT_HTKT_BAIDOXE']],
+  ['3-MN', ['DAT_HTXH_TRUONGHOC_MN', 'DAT_DD_TRUONGHOC_MN', 'DAT_HTXH_TRUONGHOC', 'DAT_DD_TRUONGHOC']],
+  ['4-TH', ['DAT_HTXH_TRUONGHOC_TH', 'DAT_DD_TRUONGHOC_TH']],
+  ['5-THCS', ['DAT_HTXH_TRUONGHOC_THCS', 'DAT_DD_TRUONGHOC_THCS']],
+  ['6-THPT', ['DAT_HTXH_TRUONGTHPT', 'DAT_DD_TRUONGTHPT']],
+  ['7-YT', ['DAT_HTXH_YTE', 'DAT_NDD_YTE']],
+  ['8-VH', ['DAT_HTXH_VANHOA']],
+  ['TDTT', ['DAT_HTXH_THEDUCTHETHAO', 'DAT_NDD_VANHOATHETHAO']],
+  ['9-TM', ['DAT_DICHVU']],
+  ['12-CSD', ['DAT_KHAC_CHUASUDUNG', 'DAT_NNK_CHUASUDUNG']]
+];
+const patternByCode = new Map();
+PATTERN_CODES.forEach(([key, codes]) => codes.forEach(code => patternByCode.set(code, key)));
+const LAYER_STAGE = new Set(['HT', 'QHDD', 'QHDH', 'QH']);
+const LAYER_LEVEL = new Set(['QG', 'CV', 'CT', 'CH', 'DVO', 'MN', 'TH', 'THCS', 'CHO', 'TM', 'TTTM', 'KHAC', 'PCCC', 'TANGLE']);
 
-// Từ zoom này (gần 1 lô cụ thể) tô hoa văn TT16, xa hơn tô màu nền lớp
+// Thứ tự chú giải Quy hoạch, theo Mục 04 TT16 (bảng cân đối QHPK). Ba cấp trường tách màu, cùng hoa văn.
+const LEGEND_KEYS = [
+  "O-NO", "O-HH", "O-LX", "7-YT", "8-VH", "TDTT", "3-MN", "4-TH", "5-THCS", "6-THPT",
+  "1-CV", "CX-HC", "CX-CD", "SX-CN", "SX-VL", "DT-NC", "CQ", "9-TM", "DL", "DT-TG",
+  "AN", "QP", "GT", "2-BDX", "NTR", "HTK", "NN", "RSX", "RPH", "RDD", "TS", "12-CSD", "HO", "SS", "MNB"
+];
+
+// Từ zoom này tô hoa văn; thu nhỏ hơn tô đặc cùng màu ký hiệu
 export const TT16_PATTERN_ZOOM = 17;
 const FILL_OPACITY = 0.3;
 const PATTERN_BG_ALPHA = 0.25;
@@ -37,6 +108,226 @@ const FRAME_PT = 2.76;
 const DASH_PT = [10.68, 5.4];
 // Zoom 15–16 (tô màu nền, lô còn nhỏ trên màn hình): thu nhỏ khung theo cùng tỷ lệ
 const COARSE_FRAME_SCALE = 0.6;
+
+const r2 = (n) => Math.round(n * 100) / 100;
+
+function pushSeg(out, x0, y0, x1, y1) {
+  out.push(r2(x0), r2(y0), r2(x1), r2(y1));
+}
+
+// Cắt đoạn vào ô [0,w]×[0,h] để hoa văn lặp liền mạch ở mép ô
+function clipSeg(out, w, h, x0, y0, x1, y1) {
+  let t0 = 0, t1 = 1;
+  const dx = x1 - x0, dy = y1 - y0;
+  const p = [-dx, dx, -dy, dy];
+  const q = [x0, w - x0, y0, h - y0];
+  for (let i = 0; i < 4; i++) {
+    if (Math.abs(p[i]) < 1e-8) { if (q[i] < -1e-6) return; }
+    else {
+      const t = q[i] / p[i];
+      if (p[i] < 0) { if (t > t1) return; if (t > t0) t0 = t; }
+      else { if (t < t0) return; if (t < t1) t1 = t; }
+    }
+  }
+  if (t1 - t0 < 1e-3) return;
+  pushSeg(out, x0 + t0 * dx, y0 + t0 * dy, x0 + t1 * dx, y0 + t1 * dy);
+}
+
+function vLines(w, h, step) {
+  const s = [];
+  for (let x = step; x < w - 0.05; x += step) pushSeg(s, x, 0, x, h);
+  return s;
+}
+
+function hLines(w, h, step) {
+  const s = [];
+  for (let y = step; y < h - 0.05; y += step) pushSeg(s, 0, y, w, y);
+  return s;
+}
+
+// dir > 0: nét \; dir < 0: nét /. Cạnh ô là bội của step thì lặp khít
+function diagonals(w, h, step, dir) {
+  const s = [];
+  if (dir > 0) {
+    for (let b = -w; b <= h + step; b += step) clipSeg(s, w, h, 0, b, w, b + w);
+  } else {
+    for (let b = 0; b <= w + h + step; b += step) clipSeg(s, w, h, 0, b, w, b - w);
+  }
+  return s;
+}
+
+function crosshatch(w, h, step) {
+  return diagonals(w, h, step, 1).concat(diagonals(w, h, step, -1));
+}
+
+// Kẻ dọc, giữa hai kẽ là nét chéo ngắn (hỗn hợp nhà ở và dịch vụ)
+function vSlashes(w, h, step) {
+  const s = vLines(w, h, step);
+  const pitch = step * 0.9;
+  const n = Math.round(w / step);
+  for (let i = 0; i < n; i++) {
+    const x0 = i * step;
+    for (let y = -pitch; y < h + pitch; y += pitch) {
+      const phase = (i % 2) * pitch * 0.45;
+      clipSeg(s, w, h, x0 + step * 0.18, y + phase + pitch * 0.62, x0 + step * 0.82, y + phase);
+    }
+  }
+  return s;
+}
+
+function dotGrid(w, h, step, stagger) {
+  const d = [];
+  let row = 0;
+  for (let y = step / 2; y < h - 0.05; y += step) {
+    const ox = stagger && (row % 2) ? step / 2 : 0;
+    for (let x = step / 2 + ox; x < w - 0.05; x += step) d.push(r2(x), r2(y));
+    if (stagger && row % 2) { d.push(0, r2(y)); d.push(r2(w), r2(y)); }
+    row++;
+  }
+  return d;
+}
+
+function plusGrid(w, h, step, arm, stagger) {
+  const s = [];
+  let row = 0;
+  for (let y = step / 2; y < h - 0.05; y += step) {
+    const ox = stagger && (row % 2) ? step / 2 : 0;
+    const xs = [];
+    for (let x = step / 2 + ox; x < w - 0.05; x += step) xs.push(x);
+    if (stagger && row % 2) xs.push(0, w);
+    xs.forEach(x => {
+      clipSeg(s, w, h, x - arm, y, x + arm, y);
+      clipSeg(s, w, h, x, y - arm, x, y + arm);
+    });
+    row++;
+  }
+  return s;
+}
+
+function carets(w, h, step) {
+  const s = [];
+  const hw = step * 0.26, hh = step * 0.2;
+  let row = 0;
+  for (let y = step * 0.55; y < h; y += step * 0.85) {
+    const ox = row % 2 ? step / 2 : 0;
+    for (let x = ox; x <= w + step; x += step) {
+      clipSeg(s, w, h, x - hw, y + hh, x, y - hh);
+      clipSeg(s, w, h, x, y - hh, x + hw, y + hh);
+    }
+    row++;
+  }
+  return s;
+}
+
+function chevrons(w, h, step) {
+  const s = [];
+  const rise = step * 0.34;
+  for (let y = rise; y < h + rise; y += step * 0.72) {
+    for (let x = 0; x < w; x += step) {
+      clipSeg(s, w, h, x, y, x + step / 2, y - rise);
+      clipSeg(s, w, h, x + step / 2, y - rise, x + step, y);
+    }
+  }
+  return s;
+}
+
+function squares(w, h, step) {
+  const s = [];
+  const m = step * 0.2;
+  for (let y = 0; y < h - 0.01; y += step) {
+    for (let x = 0; x < w - 0.01; x += step) {
+      pushSeg(s, x + m, y + m, x + step - m, y + m);
+      pushSeg(s, x + step - m, y + m, x + step - m, y + step - m);
+      pushSeg(s, x + step - m, y + step - m, x + m, y + step - m);
+      pushSeg(s, x + m, y + step - m, x + m, y + m);
+    }
+  }
+  return s;
+}
+
+function hWaves(w, h, rowStep, amp, cycles) {
+  const s = [];
+  const n = cycles * 6;
+  for (let y = rowStep / 2; y < h - 0.05; y += rowStep) {
+    let px = 0, py = y;
+    for (let i = 1; i <= n; i++) {
+      const x = (w * i) / n;
+      const ny = y + amp * Math.sin((i / n) * cycles * Math.PI * 2);
+      pushSeg(s, px, py, x, ny);
+      px = x; py = ny;
+    }
+  }
+  return s;
+}
+
+function hDashes(w, h, dash, gap, rowStep, stagger) {
+  const s = [];
+  const period = dash + gap;
+  let row = 0;
+  for (let y = rowStep / 2; y < h - 0.05; y += rowStep) {
+    const ox = stagger && (row % 2) ? period / 2 : 0;
+    for (let x = -period + ox; x < w; x += period) clipSeg(s, w, h, x, y, x + dash, y);
+    row++;
+  }
+  return s;
+}
+
+function hGaps(w, h, rowStep) {
+  const s = [];
+  const gap = w * 0.22;
+  let row = 0;
+  for (let y = rowStep / 2; y < h - 0.05; y += rowStep) {
+    const g0 = (row % 3) * (w / 3);
+    if (g0 > 0.2) pushSeg(s, 0, y, g0, y);
+    if (g0 + gap < w - 0.2) pushSeg(s, g0 + gap, y, w, y);
+    row++;
+  }
+  return s;
+}
+
+function scales(w, h, step) {
+  const s = [];
+  const rowH = step * 0.52;
+  const parts = 5;
+  let row = 0;
+  for (let y = 0; y < h - 0.01; y += rowH) {
+    const ox = row % 2 ? step / 2 : 0;
+    for (let x = -step + ox; x < w; x += step) {
+      let px = x, py = y;
+      for (let i = 1; i <= parts; i++) {
+        const t = (Math.PI * i) / parts;
+        const nx = x + (step * i) / parts;
+        const ny = y + Math.sin(t) * step * 0.4;
+        clipSeg(s, w, h, px, py, nx, ny);
+        px = nx; py = ny;
+      }
+    }
+    row++;
+  }
+  return s;
+}
+
+function honeycomb(r) {
+  const dx = 1.5 * r;
+  const dy = Math.sqrt(3) * r;
+  const w = r2(dx * 2);
+  const h = r2(dy);
+  const s = [];
+  for (let col = -1; col <= 3; col++) {
+    for (let row = -1; row <= 2; row++) {
+      const cx = col * dx;
+      const cy = row * dy + (((col % 2) + 2) % 2) * (dy / 2);
+      for (let i = 0; i < 6; i++) {
+        const a0 = (Math.PI / 3) * i;
+        const a1 = (Math.PI / 3) * (i + 1);
+        clipSeg(s, w, h,
+          cx + r * Math.cos(a0), cy + r * Math.sin(a0),
+          cx + r * Math.cos(a1), cy + r * Math.sin(a1));
+      }
+    }
+  }
+  return { w, h, segs: s };
+}
 
 // Ô lặp: w × h (pt); segs [x0,y0,x1,y1,…]; dots [x,y,…]; round: đầu nét tròn (hoa văn chấm); dotR: bán kính chấm (pt)
 const TILES = {
@@ -59,7 +350,31 @@ const TILES = {
   Baidoxe: { w: 12.05, h: 8.03,
     segs: [12.05,5.76,0,5.76,12.05,1.68,0,1.68,11.9,7.8,9.86,7.8,8.78,7.8,6.86,7.8,5.78,7.8,3.86,7.8,2.78,7.8,0.74,7.8,11.9,3.72,9.86,3.72,8.78,3.72,6.86,3.72,5.78,3.72,3.86,3.72,2.78,3.72,0.74,3.72] },
   Chuasudung: { w: 10.68, h: 10.72,
-    segs: [0,2.1,10.68,2.1,0,4.86,10.68,4.86,0,7.5,10.68,7.5,0,10.14,10.68,10.14,7.22,8.82,4.58,6.18,1.94,3.42,0,1.56,10.68,1.48,9.98,0.78,7.94,8.82,5.3,6.18,2.54,3.42,0,0.88,10.68,0.88,10.58,0.78,8.66,8.82,5.9,6.18,3.26,3.42,0.62,0.78] }
+    segs: [0,2.1,10.68,2.1,0,4.86,10.68,4.86,0,7.5,10.68,7.5,0,10.14,10.68,10.14,7.22,8.82,4.58,6.18,1.94,3.42,0,1.56,10.68,1.48,9.98,0.78,7.94,8.82,5.3,6.18,2.54,3.42,0,0.88,10.68,0.88,10.58,0.78,8.66,8.82,5.9,6.18,3.26,3.42,0.62,0.78] },
+  Nhomnhao: { w: 8, h: 8, segs: vLines(8, 8, 2) },
+  Honhop: { w: 9, h: 9, segs: vSlashes(9, 9, 2.25) },
+  Langxom: { w: 9, h: 9, segs: diagonals(9, 9, 2.25, 1) },
+  Cayxanhhanche: { w: 9.6, h: 9.6, dotR: 0.42, segs: [], dots: dotGrid(9.6, 9.6, 2.4, false) },
+  Cayxanhchuyendung: { w: 11.2, h: 8.4, dotR: 0.36, segs: [], dots: dotGrid(11.2, 8.4, 2.8, true) },
+  Congnghiep: { w: 9, h: 9, segs: diagonals(9, 9, 2.25, -1) },
+  Vatlieu: { w: 9, h: 9, segs: diagonals(9, 9, 2.25, 1) },
+  DaotaoNC: { w: 9, h: 8.64, segs: chevrons(9, 8.64, 3) },
+  Coquan: { w: 10, h: 8, segs: hLines(10, 8, 2) },
+  Dulich: { w: 10, h: 8.5, segs: carets(10, 8.5, 2.5) },
+  Ditich: { w: 9, h: 9, segs: squares(9, 9, 3) },
+  Anninh: { w: 9, h: 9, segs: crosshatch(9, 9, 2.25) },
+  Quocphong: honeycomb(2.15),
+  DuongGT: { w: 9, h: 9, segs: diagonals(9, 9, 2.25, 1) },
+  Nghiatrang: { w: 10, h: 8, segs: plusGrid(10, 8, 2.5, 0.72, true) },
+  Hatangkhac: { w: 10, h: 7.8, segs: scales(10, 7.8, 2.5) },
+  Nongnghiep: { w: 12, h: 9, dotR: 0.46, segs: [], dots: dotGrid(12, 9, 3, true) },
+  Rungdacdung: { w: 12, h: 8, segs: hWaves(12, 8, 2, 0.55, 3) },
+  Rungphongho: honeycomb(2.7),
+  Rungsanxuat: { w: 9, h: 9, segs: crosshatch(9, 9, 3) },
+  Thuysan: { w: 12, h: 8, segs: hDashes(12, 8, 1.7, 1.3, 2, true) },
+  Honuoc: { w: 9.6, h: 7.2, dotR: 0.32, segs: [], dots: dotGrid(9.6, 7.2, 1.6, false) },
+  Songsuoi: { w: 12, h: 8, segs: hDashes(12, 8, 1.35, 0.85, 1.6, false) },
+  Matnuocbien: { w: 12, h: 8, segs: hGaps(12, 8, 2) }
 };
 
 function hexToRgba(hex, a) {
@@ -138,17 +453,17 @@ function styleKey(type, layer) {
 /**
  * Style Leaflet cho ranh lô. layer: tên layer gốc trong file (tiền tố HT_ / QHDD_ / QHDH_ quyết định kiểu viền);
  * scenario: 'QH' khi vẽ trên bản đồ quy hoạch (layer không có tiền tố thì coi là quy hoạch đợt đầu);
- * detailed: phóng to gần lô → tô hoa văn + viền màu ACI TT16; zoom xa → màu nền và viền theo màu lớp (BUFFER_COLORS, tông sáng).
+ * detailed: phóng to → hoa văn cùng màu ký hiệu; thu nhỏ → tô đặc đúng màu đó.
  * approved = false → viền đỏ nét đứt (chờ duyệt).
  */
 export function tt16ParcelStyle(type, layer, { scenario, detailed, approved }) {
   const key = styleKey(type, layer);
-  return tt16SymbolStyle(key, BUFFER_COLORS[type] || TT16_STYLES[key].color, layer, { scenario, detailed, approved });
+  return tt16SymbolStyle(key, TT16_STYLES[key].color, layer, { scenario, detailed, approved });
 }
 
 /**
- * Cùng nguyên tắc tt16ParcelStyle nhưng chọn thẳng khóa ký hiệu: key = khóa TT16_STYLES (null = đất không có hoa văn TT16,
- * mọi mức zoom tô màu tone); tone = màu nền khi thu nhỏ.
+ * Cùng nguyên tắc tt16ParcelStyle nhưng chọn thẳng khóa ký hiệu: key = khóa TT16_STYLES (null = đất không có hoa văn,
+ * mọi mức zoom tô màu tone); tone = màu tô khi thu nhỏ, mặc định là màu ký hiệu.
  */
 export function tt16SymbolStyle(key, tone, layer, { scenario, detailed, approved = true }) {
   const s = key ? TT16_STYLES[key] : null;
@@ -165,7 +480,7 @@ export function tt16SymbolStyle(key, tone, layer, { scenario, detailed, approved
     lineJoin: 'miter',
     dashArray: !approved ? '4,4' : stage === 'QHDH' ? DASH_PT.map(v => +(v * k).toFixed(1)).join(',') : null,
     fillColor: pattern || color,
-    fillOpacity: pattern ? 1 : (s && s.fillOpacity) || FILL_OPACITY
+    fillOpacity: pattern ? 1 : (s && s.solidOpacity) || (s && s.fillOpacity) || FILL_OPACITY
   };
 }
 
@@ -178,36 +493,26 @@ export function tt16SwatchCss(key, scale = 1) {
   return `background-image:url(${tile.dataUrl});background-size:${w}px ${h}px;`;
 }
 
-// Mẫu 3 kiểu khung ô ký hiệu (tỷ lệ dày / nét / hở như Phụ lục), vẽ bằng currentColor
-function frameSample(kind) {
-  const sw = kind === 'ht' ? 1 : 2.6;
-  const dash = kind === 'dh' ? ` stroke-dasharray="${DASH_PT.map(v => (v / FRAME_PT * sw).toFixed(1)).join(' ')}"` : '';
-  return `<svg class="tt16-frame" viewBox="0 0 28 14" aria-hidden="true"><rect x="${sw / 2}" y="${sw / 2}" width="${28 - sw}" height="${14 - sw}" fill="none" stroke="currentColor" stroke-width="${sw}"${dash}/></svg>`;
-}
-
 /** Chú giải ký hiệu lô đất TT16 vào phần tử container */
 export function renderTt16Legend(container) {
   if (!container) return;
   const rows = LEGEND_KEYS.map(key => {
     const s = TT16_STYLES[key];
     const bg = tt16SwatchCss(key) || `background:${s.color};`;
-    return `<div class="tt16-row" title="${s.layer} · màu ACI ${s.aci}">
-      <i class="tt16-swatch" style="${bg}border-color:${s.color};"></i><span>${s.label}</span><small>${s.aci}</small></div>`;
+    const aci = s.aci != null ? ` · ACI ${s.aci}` : '';
+    return `<div class="tt16-row" title="${s.layer}${aci}">
+      <i class="tt16-swatch" style="${bg}border-color:${s.color};"></i><span>${s.label}</span>${s.aci != null ? `<small>${s.aci}</small>` : ''}</div>`;
   }).join('');
-  container.innerHTML = `<details class="fold">
-    <summary class="tt16-title">${ico('parcel')}Ranh lô đất <small>(ký hiệu TT 16/2025/TT-BXD)</small></summary>
-    ${rows}
-    <div class="tt16-borders">
-      <span>${frameSample('ht')}Hiện trạng</span>
-      <span>${frameSample('dd')}QH đợt đầu</span>
-      <span>${frameSample('dh')}QH dài hạn</span>
-    </div>
-    <div class="tt16-note">Zoom 15–16: màu lớp hạ tầng · 17–18: hoa văn, màu TT16</div></details>`;
+  container.innerHTML = `<div class="tt16-borders">
+      <span class="tt16-frame tt16-frame-ht" title="Hiện trạng">Hiện trạng</span>
+      <span class="tt16-frame tt16-frame-dd" title="Quy hoạch đợt đầu">Đợt đầu</span>
+      <span class="tt16-frame tt16-frame-dh" title="Quy hoạch dài hạn">Dài hạn</span>
+    </div>${rows}`;
 }
 
 export const RESIDENTIAL_COLOR = '#d4a20b';
 
-// Đất chưa có ký hiệu TT16 trong 13 nhóm hạ tầng: chỉ tô viền khi bật lớp ranh đồ án.
+// Layer không có hoa văn TT16: landParcelStyle tô màu nhóm đất ở mọi mức zoom.
 // Đất ở gom mọi cách đặt tên (TT16 DAT_O_*, tên trước TT16 "Đất ở đô thị", "dat o lien ke", làng xóm, biệt thự,
 // liền kề, nhà vườn, chỉnh trang, tái định cư, nhà ở xã hội) về 1 màu.
 const LAND_RULES = [
@@ -220,6 +525,8 @@ const LAND_RULES = [
   // Lô dịch vụ không phải chợ / siêu thị / TTTM (DAT_Dichvu, "Đất khu dịch vụ")
   { key: 'dv', label: 'Đất dịch vụ, thương mại', color: '#e8590c', re: /DICH[\s_]?VU|THUONG[\s_]?MAI/ }
 ];
+
+export const LAND_LABELS = [...LAND_RULES.map(r => r.label), 'Đất khác'];
 
 function foldLayer(layerName) {
   return String(layerName || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'D').toUpperCase();
@@ -241,4 +548,27 @@ export function landLabel(layerName) {
 export function landPolylineStyle(layerName) {
   const color = landColor(layerName) || '#94a3b8';
   return { color, weight: 2, opacity: 0.95, fillColor: color, fillOpacity: 0.08 };
+}
+
+/** Khóa hoa văn TT16 của tên layer đất (bỏ tiền tố giai đoạn và hậu tố cấp), '' nếu không có */
+export function landPatternKey(layerName) {
+  const t = foldLayer(layerName).split(/[_\s.-]+/).filter(Boolean);
+  const core = LAYER_STAGE.has(t[0]) ? t.slice(1) : t.slice();
+  while (core.length) {
+    const hit = patternByCode.get(core.join('_'));
+    if (hit) return hit;
+    if (core.length <= 2 || !LAYER_LEVEL.has(core[core.length - 1])) break;
+    core.pop();
+  }
+  return '';
+}
+
+/** Ranh đất đồ án: thu nhỏ tô đặc màu ký hiệu; phóng tới ngưỡng hoa văn thì kẻ pattern cùng màu */
+export function landParcelStyle(layerName, { detailed = false, phase = 'HT' } = {}) {
+  const key = landPatternKey(layerName);
+  if (key && TT16_STYLES[key]) {
+    return tt16SymbolStyle(key, TT16_STYLES[key].color, layerName, { scenario: phase, detailed });
+  }
+  const style = landPolylineStyle(layerName);
+  return phase === 'QH' ? { ...style, dashArray: '6 4' } : style;
 }

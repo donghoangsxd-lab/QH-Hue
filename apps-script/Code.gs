@@ -6,6 +6,7 @@
 // Tab DXF-NN cũ vẫn xóa cùng đồ án. Ranh tổng đồ án vẫn ở tab DS_DoAn.
 // syncCad = false: chỉ dựng lại infrastructure_hue.json, không dựng lại cad_parcels.json.
 // Xóa đồ án: doPost action=deleteProject. putBucketObject / deleteBucketObject: ghi file bucket khi Vercel chưa có quyền.
+// Admin sửa 1 công trình từ bảng thông tin lô: doPost action=editInfraRow.
 // =========================================================================
 
 const BUCKET_NAME = "hue-infra-data-us";
@@ -864,6 +865,7 @@ function doPost(e) {
     var action = String(body.action || '');
     if (action === "importCadBatch") return jsonOutput(importCadBatch(body));
     if (action === "markWardNotes") return jsonOutput(markWardNotes(body));
+    if (action === "editInfraRow") return jsonOutput(editInfraRow(body));
     if (action === "deleteProject") return jsonOutput(deleteProject(body));
     if (action === "putBucketObject") return jsonOutput(putBucketObject(body));
     if (action === "deleteBucketObject") return jsonOutput(deleteBucketObject(body));
@@ -1460,6 +1462,66 @@ function markWardNotes(body) {
 
   if (marked || cleared) syncSheetsToGCS();
   return { "success": true, "marked": marked, "cleared": cleared, "noNoteColumn": noNoteColumn };
+}
+
+/**
+ * Admin sửa 1 công trình từ bảng thông tin lô trên bản đồ: body = { id, fields: { name, nhom, quyMoHT, quyMoQH, plan, note } }.
+ * Chỉ ghi khóa có trong fields; '' xóa ô (quy mô trống = giai đoạn đó không có công trình).
+ * Ghi từng ô (không ghi lại cả dòng) để giữ định dạng văn bản của Latitude / Longitude và công thức ở cột khác.
+ */
+function editInfraRow(body) {
+  var id = String(body.id || '').trim();
+  var f = body.fields || {};
+  if (!id) return { "error": "Thiếu ID công trình" };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var currentTime = Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm:ss");
+  var found = '';
+  var missing = [];
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var sheets = ss.getSheets();
+    for (var s = 0; s < sheets.length && !found; s++) {
+      var sheet = sheets[s];
+      if (!isValidInfraSheet(sheet.getName())) continue;
+      var data = sheet.getDataRange().getValues();
+      if (data.length <= 1) continue;
+      var col = getColumnMap(data[0]);
+      if (col.id < 0) continue;
+      for (var r = 1; r < data.length; r++) {
+        if (String(data[r][col.id] || '').trim() !== id) continue;
+        if (f.plan) {
+          ensurePlanColumns(sheet);
+          col = getColumnMap(getSheetHeaders(sheet));
+        }
+        var put = function(key, value) {
+          if (col[key] < 0) { missing.push(key); return; }
+          sheet.getRange(r + 1, col[key] + 1).setValue(value);
+        };
+        if (f.hasOwnProperty('name')) put('name', String(f.name));
+        if (f.hasOwnProperty('nhom')) put('nhom', sheetNhom(f.nhom));
+        if (f.hasOwnProperty('quyMoHT')) put('quyMoHT', f.quyMoHT === '' ? '' : parseCleanNumber(f.quyMoHT));
+        if (f.hasOwnProperty('quyMoQH')) put('quyMoQH', f.quyMoQH === '' ? '' : parseCleanNumber(f.quyMoQH));
+        if (f.plan) {
+          Object.keys(PLAN_KEYS).forEach(function(k) {
+            if (f.plan.hasOwnProperty(k)) put(PLAN_KEYS[k], planValue(f.plan[k]));
+          });
+        }
+        if (f.hasOwnProperty('note')) put('ghiChu', String(f.note));
+        if (col.thoiGian >= 0) sheet.getRange(r + 1, col.thoiGian + 1).setValue(currentTime);
+        found = sheet.getName();
+        break;
+      }
+    }
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+
+  if (!found) return { "error": "Không tìm thấy ID công trình: " + id };
+  syncSheetsToGCS(false);
+  return { "success": true, "id": id, "tab": found, "missing": missing };
 }
 
 // Một đồ án (Ten_QH) một tab DXF-NN. Nhập lại cùng đồ án thì thay toàn bộ dòng đất của tab đó.

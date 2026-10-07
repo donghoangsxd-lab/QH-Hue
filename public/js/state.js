@@ -129,12 +129,7 @@ export const WARD_BOUNDARY_SHADOW_STYLE = { color: '#64748b', weight: 4, opacity
 export const WARD_BOUNDARY_LINE_STYLE = { color: '#fde68a', weight: 1.6, opacity: 0.95, fill: false, interactive: false };
 export const WARD_HIGHLIGHT_STYLE = { color: '#fb923c', weight: 3.5, dashArray: '6,6', fillColor: '#fb923c', fillOpacity: 0.15, interactive: false };
 
-// Màu hiển thị các lớp hạ tầng (vùng phủ, biểu đồ, ô màu danh sách lớp, màu nền lô khi zoom xa) — mỗi lớp 1 họ màu riêng,
-// không trùng bảng màu sử dụng đất của thẩm định đồ án (projectReviewCore.js): vàng / cam chỉ dành cho đất ở;
-// trường học họ tím → chàm (nhạt dần theo cấp: MN → THPT), cây xanh lục, y tế hồng, văn hóa tím hồng, dịch vụ đỏ,
-// bãi đỗ xe xám xanh, chưa sử dụng xám trắng; PCCC cùng màu đất an ninh, nhà tang lễ cùng màu đất nghĩa trang,
-// nhà ở xã hội vàng hổ phách (họ đất ở, khác vàng sẫm đất ở RESIDENTIAL_COLOR trong tt16Symbols.js).
-// Hoa văn ranh lô khi phóng to vẫn theo đúng màu ACI của TT16 (tt16Symbols.js).
+// Màu vùng phủ, biểu đồ và ô màu danh sách lớp. Ranh lô (zoom xa tô đặc, zoom gần kẻ hoa văn) dùng màu ký hiệu TT16 trong tt16Symbols.js.
 export const BUFFER_COLORS = {
   "1-CV": "#51cf66", "2-BDX": "#94a3b8", "3-MN": "#d0bfff", "4-TH": "#9775fa", "5-THCS": "#7048e8", "6-THPT": "#4c6ef5",
   "7-YT": "#f06595", "8-VH": "#cc5de8", "9-TM": "#e03131", "12-CSD": "#f1f3f5",

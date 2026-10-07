@@ -10,7 +10,7 @@ import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, show
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
-import { tt16ParcelStyle, renderTt16Legend, landPolylineStyle, landLabel, TT16_PATTERN_ZOOM } from './tt16Symbols.js';
+import { tt16ParcelStyle, renderTt16Legend, landParcelStyle, landLabel, TT16_PATTERN_ZOOM } from './tt16Symbols.js';
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap } from './basemap.js';
 import {
@@ -18,6 +18,7 @@ import {
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, onCompareChange
 } from './planMap.js';
 import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject } from './projectFiles.js';
+import { addLotEditButton } from './lotEdit.js';
 
 export let map = null;
 export let measureLayerGroup = null;
@@ -1093,7 +1094,7 @@ const isBusyTool = () => state.isPickMode || state.activeMeasureType || state.ad
 function infraLotShape(lot, item, m, detailed) {
   const style = item
     ? tt16ParcelStyle(layerType(item), lot.layer, { scenario: lot.phase, detailed, approved: isApproved(item.status) })
-    : landPolylineStyle(lot.layer);
+    : landParcelStyle(lot.layer, { detailed, phase: lot.phase });
   const shape = L.geoJSON(lot.geometry, { style, bubblingMouseEvents: false });
   if (!item) return shape;
   bindNameTip(shape, item);
@@ -1113,20 +1114,20 @@ function drawLandsOn(m, list, infra = []) {
   }
   if (!list.length && !infra.length) return;
   const group = L.featureGroup();
+  const detailed = m.getZoom() >= PARCEL_PATTERN_ZOOM;
   list.forEach(p => {
-    const style = landPolylineStyle(p.layer);
     const shape = L.geoJSON(p.geometry, {
-      style: p.phase === 'QH' ? { ...style, dashArray: '6 4' } : style,
+      style: landParcelStyle(p.layer, { detailed, phase: p.phase }),
       bubblingMouseEvents: false
     });
     shape.on('click', (e) => {
       if (isBusyTool()) return;
-      L.popup({ maxWidth: 280 }).setLatLng(e.latlng).setContent(landPopupHtml(p)).openOn(m);
+      const popup = L.popup({ maxWidth: 280, className: 'land-lot-popup' }).setLatLng(e.latlng).setContent(landPopupHtml(p)).openOn(m);
+      addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
     });
     group.addLayer(shape);
   });
   if (infra.length) {
-    const detailed = m.getZoom() >= PARCEL_PATTERN_ZOOM;
     // Popup công trình kịch bản QH chỉ dựng được trên bản đồ quy hoạch (planLayers), bản đồ chính dùng bản ghi gốc
     const byId = new Map([...state.rawDataList, ...state.planDataList].map(it => [it.id, it]));
     const qhById = m === planMap ? new Map(getPlanScenarioList().map(it => [it.id, it])) : null;
@@ -1157,7 +1158,7 @@ function redrawLands() {
 
 // Qua ngưỡng hoa văn TT16: vẽ lại lô hạ tầng đồ án để đổi kiểu tô
 function redrawLandsOnPattern() {
-  if (!map || !state.projectInfraLots.length) return;
+  if (!map || (!state.projectInfraLots.length && !state.landParcels.length)) return;
   const detailed = map.getZoom() >= PARCEL_PATTERN_ZOOM;
   if (detailed !== landsDetailed) redrawLands();
 }
@@ -1772,6 +1773,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
       .catch(() => showToast(`Không chép được, ID: ${btn.dataset.id}`, 'error'));
   }));
   addPopupCollapseToggle(popup, parcelGeometry ? 'ranh khu đất và vùng phục vụ' : 'vùng phục vụ');
+  if (parcelGeometry) addLotEditButton(popup, { kind: 'INFRA', item: p });
   pointPopup = { popup, id: p.id, scenario: p.scenario };
   if (!parcelGeometry) focusServiceRadius(targetMap, p.lat, p.lng, hasZone ? itemRadius : 0);
   // Đóng popup thì thoát chế độ âm bản (trừ khi đã chọn công trình khác / chuyển sang thuyết minh CSD)

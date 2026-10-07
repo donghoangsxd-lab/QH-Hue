@@ -162,6 +162,22 @@ export async function lotKeysOf(tenQHs) {
   return keys;
 }
 
+// Admin vừa sửa 1 lô đất: chép vào bản đã tải, đổi saved để lần đọc sau khớp danh mục (không tải lại file đồ án)
+export function patchCachedLand(tenQH, land, saved) {
+  const row = cache.get(tenQH);
+  const hit = row && row.parcels.find(p => p && p.kind === 'DXF' && p.id === land.id && (p.phase === 'QH' ? 'QH' : 'HT') === land.phase);
+  if (hit) {
+    hit.name = land.name;
+    hit.nhom = land.nhom;
+    if (land.plan) hit.plan = land.plan;
+    else delete hit.plan;
+  }
+  if (row) row.saved = saved;
+  const entry = state.projectCatalog.find(p => p && p.tenQH === tenQH);
+  if (entry) entry.saved = saved;
+  composeNow();
+}
+
 export function scheduleLots() {
   clearTimeout(timer);
   timer = setTimeout(() => { syncLots().catch(err => console.warn('Tải lô đồ án:', err)); }, 120);

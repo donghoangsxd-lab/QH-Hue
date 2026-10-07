@@ -1,7 +1,8 @@
 // Thẩm định đồ án quy hoạch từ hatch DXF: bảng cân đối sử dụng đất theo TT 16/2025/TT-BXD (Phụ lục I Mục 2 / Mục 4)
 // và chấm chỉ tiêu QCVN 01:2026/BXD. Không ghi Sheet, không cộng vào chỉ tiêu phường hay thành phố.
-import { parkTierOf, BUFFER_COLORS } from './state.js';
+import { parkTierOf } from './state.js';
 import { tt16Layer, layerToType } from './cadImport.js';
+import { TT16_STYLES } from './tt16Symbols.js';
 
 export const REVIEW_MAX_BYTES = 5 * 1024 * 1024;
 export const UNIT_POP = 20000;
@@ -14,10 +15,7 @@ export const UNIT_POP = 20000;
 // split: đầu mục đất ở chia hiện trạng / mới theo phần diện tích lô quy hoạch chồng lên đất ở hiện trạng
 const C = (key, label, sym, codes, color, extra = {}) => ({ key, label, sym, codes, color, ...extra });
 const SCHOOL_SUBS = [['thpt', 'Trường THPT', 'THPT'], ['mn', 'Trường mầm non', 'MN'], ['th', 'Trường tiểu học', 'TH'], ['thcs', 'Trường THCS', 'THCS'], ['school', 'Trường học chưa phân cấp', 'TRH']];
-// Bảng màu: mỗi đầu mục 1 màu không trùng trong cùng bảng; vàng / cam chỉ dành cho đất ở, trường học họ tím → chàm,
-// y tế / văn hóa / dịch vụ họ hồng - đỏ, cây xanh lục, mặt nước lam, hạ tầng kỹ thuật xám; an ninh (gồm PCCC) gạch cam,
-// nghĩa trang (gồm nhà tang lễ) nâu — khớp BUFFER_COLORS của lớp hạ tầng (state.js).
-// Đất thể thao thống kê chung nhóm văn hóa - thể thao nhưng tô tông xanh ngọc cho dễ nhận biết
+// color của mỗi đầu mục chỉ dùng khi dòng không có hoa văn TT16. Có hoa văn thì bản đồ và ô mẫu lấy màu ký hiệu trong tt16Symbols.js.
 const SPORT_COLOR = '#20c997';
 
 const QHC_ROWS = [
@@ -151,18 +149,23 @@ export function landRowByKey(kind, key) {
   return (LANDUSE_TABLES[kind]?.rows || []).find(r => r.key === key) || null;
 }
 
-// Ký hiệu bản đồ theo cùng nguyên tắc chú giải ranh lô: tt16 = khóa hoa văn TT16 (tt16Symbols) khi phóng to;
-// tone = màu nền khi thu nhỏ — màu lớp hạ tầng (BUFFER_COLORS) nếu đầu mục chỉ gồm 1 loại, đầu mục gộp nhiều loại giữ màu riêng.
+// Ký hiệu bản đồ: thu nhỏ tô đặc màu hatch TT16, phóng to kẻ đúng hoa văn cùng màu.
 // [khóa TT16, gộp nhiều loại]
 const ROW_TT16 = {
-  QHC: { dd_cx: ['1-CV'], ndd_yt: ['7-YT'], ndd_vh: ['8-VH'], nnk_csd: ['12-CSD'] },
+  QHC: {
+    dd_o: ['O-NO'], dd_hh: ['O-HH'], dd_cq: ['CQ'], dd_cx: ['1-CV'], dd_gt: ['GT'], dd_ht: ['HTK'],
+    ndd_cn: ['SX-CN'], ndd_dt: ['DT-NC'], ndd_cq: ['CQ'], ndd_yt: ['7-YT'], ndd_vh: ['8-VH'], ndd_dl: ['DL'],
+    ndd_cxhc: ['CX-HC'], ndd_cxcd: ['CX-CD'], ndd_dtich: ['DT-TG'], ndd_nt: ['O-LX'], ndd_an: ['AN'], ndd_qp: ['QP'],
+    ndd_gt: ['GT'], ndd_ht: ['HTK'], nnk_nn: ['NN'], nnk_ts: ['TS'], nnk_csd: ['12-CSD'], nnk_ho: ['HO'], nnk_song: ['SS'], nnk_bien: ['MNB']
+  },
   QHPK: {
-    yt: ['7-YT'], vh: ['8-VH'], tdtt: ['TDTT'], gd: ['3-MN', true], cxcc: ['1-CV'], dv: ['9-TM', true], bdx: ['2-BDX'], csd: ['12-CSD']
+    o: ['O-NO'], hh: ['O-HH'], lx: ['O-LX'], yt: ['7-YT'], vh: ['8-VH'], tdtt: ['TDTT'], gd: ['3-MN', true],
+    cxcc: ['1-CV'], cxhc: ['CX-HC'], cxcd: ['CX-CD'], sx: ['SX-CN'], ks: ['SX-VL'], dtnc: ['DT-NC'], cq: ['CQ'],
+    dv: ['9-TM', true], dl: ['DL'], dtich: ['DT-TG'], an: ['AN'], qp: ['QP'], gt: ['GT'], bdx: ['2-BDX'], ntr: ['NTR'],
+    htk: ['HTK'], nn: ['NN'], rsx: ['RSX'], rph: ['RPH'], rdd: ['RDD'], ts: ['TS'], csd: ['12-CSD'], ho: ['HO'], song: ['SS'], bien: ['MNB']
   }
 };
 const SUB_TT16 = { thpt: '6-THPT', mn: '3-MN', th: '4-TH', thcs: '5-THCS', cho: '9-TM' };
-// Đất ở hiện trạng (giữ lại) vàng đậm, đất ở mới vàng nhạt; đầu mục đất ở giữ vàng chuẩn
-const SUB_TONE = { ht: '#e0a800', moi: '#fff3bf' };
 // Lô chờ người dùng xác nhận (layer sai quy định, trường chưa phân cấp, dịch vụ chưa rõ chợ / TTTM): tô đen
 export const PENDING_TONE = '#111111';
 const PENDING_SUBS = new Set(['school', 'pending']);
@@ -171,17 +174,16 @@ export const UNDETERMINED_KEY = 'undetermined';
 // Chênh lệch tổng HT / QH dưới ngưỡng này (m²) coi là sai số vẽ hatch, không dồn vào "Chưa xác định"
 const BALANCE_MIN_M2 = 1;
 
-/** Ký hiệu của đầu mục / nhóm con: { tt16: khóa TT16 | null, tone: màu nền khi thu nhỏ } */
+/** Ký hiệu của đầu mục / nhóm con: { tt16: khóa TT16 | null, tone: màu tô khi thu nhỏ } */
 export function landSymbol(kind, rowKey, subKey = '') {
   if (rowKey === UNDETERMINED_KEY) return { tt16: null, tone: PENDING_TONE };
   const row = landRowByKey(kind, rowKey);
-  const [rowTt16, mixed] = ROW_TT16[kind]?.[rowKey] || [];
+  const [rowTt16] = ROW_TT16[kind]?.[rowKey] || [];
+  const toneOf = (key, fallback) => (key && TT16_STYLES[key] && TT16_STYLES[key].color) || fallback || '#94a3b8';
   if (PENDING_SUBS.has(subKey)) return { tt16: rowTt16 || '3-MN', tone: PENDING_TONE };
-  if (SUB_TT16[subKey]) return { tt16: SUB_TT16[subKey], tone: BUFFER_COLORS[SUB_TT16[subKey]] };
-  if (SUB_TONE[subKey]) return { tt16: null, tone: SUB_TONE[subKey] };
+  if (SUB_TT16[subKey]) return { tt16: SUB_TT16[subKey], tone: toneOf(SUB_TT16[subKey]) };
   if (!rowTt16) return { tt16: null, tone: row?.color || '#94a3b8' };
-  const tone = mixed ? row.color : rowTt16 === 'TDTT' ? SPORT_COLOR : BUFFER_COLORS[rowTt16];
-  return { tt16: rowTt16, tone: tone || row.color };
+  return { tt16: rowTt16, tone: toneOf(rowTt16, row?.color) };
 }
 
 /** Đầu mục chọn được khi gán layer chưa đúng quy định */
