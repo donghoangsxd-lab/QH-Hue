@@ -70,10 +70,10 @@ function addTypeSwatches() {
   });
 }
 
-// Quy hoạch / Công trình là 2 tab cùng cấp (mở bản đồ luôn ở Quy hoạch); Nền bản đồ, Phân tích, Môi trường là tab lật trang.
+// Quy hoạch / Công trình là 2 tab cùng cấp (mở bản đồ luôn ở Quy hoạch); Bản đồ nền / Bản đồ môi trường là 2 tab ở dưới.
 // Chuyển tab chỉ đổi danh sách đang xem, không bật/tắt lớp trên bản đồ.
 const LAYER_MAP_KEY = 'qh_layer_map';
-const MAP_PANE_IDS = ['base', 'analysis', 'env'];
+const MAP_PANE_IDS = ['base', 'env'];
 function initLayerMapTabs(initial) {
   const root = document.getElementById('layerMap');
   if (!root) return;

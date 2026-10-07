@@ -418,8 +418,9 @@ body.right-collapsed .right-panel {
 .rp-body::-webkit-scrollbar-thumb, .layer-main-pane::-webkit-scrollbar-thumb, .layer-map-pane::-webkit-scrollbar-thumb, #rightPanel .tab-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.25); border-radius: var(--r-sm); }
 .tab-body { padding: 8px 10px; box-sizing: border-box; flex: 1 1 auto; min-height: 0; overflow: auto; }
 
-/* LỚP DỮ LIỆU: Quy hoạch / Công trình là 2 tab cùng cấp ở trên; Nền bản đồ, Phân tích, Môi trường là 3 tab ở dưới. Khung có chiều cao cố định, danh sách cuộn bên trong. */
-#tabLayers { display: flex; flex-direction: column; overflow: hidden; padding: 0; height: calc(100vh - var(--bottom-h) - 86px); max-height: calc(100vh - var(--bottom-h) - 86px); }
+/* LỚP DỮ LIỆU: Quy hoạch / Công trình là 2 tab cùng cấp ở trên; Bản đồ nền / Bản đồ môi trường là 2 tab ở dưới. Khung có chiều cao cố định, danh sách cuộn bên trong.
+   Cao bằng max-height của .right-panel rồi co (flex-shrink) phần thanh tab, thanh tiến độ: panel luôn chạm đáy, cách panel dưới 12px như mép trên. */
+#tabLayers { display: flex; flex-direction: column; overflow: hidden; padding: 0; height: calc(100vh - var(--bottom-h) - 24px); }
 .layer-tree { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; margin: 0; }
 .layer-main { flex: 1 1 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; --main-accent: #e879f9; }
 .layer-main[data-active="infra"] { --main-accent: var(--accent-cyan); }
@@ -429,7 +430,7 @@ body.right-collapsed .right-panel {
 .layer-main-tab:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
 .layer-main-tab.active { color: var(--text-main); border-bottom-color: var(--main-accent); }
 .layer-main-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.layer-main-tabs .layer-eye-btn { width: 28px; height: 26px; margin-left: 4px; padding: 0; justify-content: center; }
+.layer-main-tabs .layer-eye-btn { width: 26px; height: 26px; margin-left: 3px; padding: 0; justify-content: center; box-sizing: border-box; }
 .layer-main-tabs .layer-eye-btn[hidden] { display: none; }
 .layer-main-tabs .layer-eye-btn:disabled { opacity: 0.5; cursor: default; }
 .layer-main-pane { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 10px 8px; }
@@ -439,7 +440,7 @@ body.right-collapsed .right-panel {
 .layer-map-count:empty { display: none; }
 .layer-map { flex: 0 1 auto; display: flex; flex-direction: column; min-height: 0; max-height: 46%; border-top: 1px solid var(--border-soft); }
 .layer-map-tabs { flex: 0 0 auto; display: flex; gap: 0; padding: 0 4px; border-bottom: 1px solid var(--border-soft); background: var(--bg-panel); }
-.layer-map-tab { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 4px; height: 28px; padding: 0 4px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); font: inherit; font-size: var(--fs-xs); font-weight: 700; letter-spacing: .02em; cursor: pointer; }
+.layer-map-tab { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 4px; height: 28px; padding: 0 4px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); font: inherit; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; cursor: pointer; }
 .layer-map-tab:hover { color: var(--text-main); }
 .layer-map-tab:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
 .layer-map-tab.active { color: var(--text-main); border-bottom-color: var(--accent-cyan); }
@@ -453,6 +454,10 @@ body.right-collapsed .right-panel {
 .layer-eye-btn .eye-show, .layer-eye-btn[aria-pressed="true"] .eye-hide { display: none; }
 .layer-eye-btn[aria-pressed="true"] .eye-show { display: inline; }
 .layer-eye-btn[aria-pressed="true"] { border-color: var(--accent-cyan); background: var(--accent-cyan); color: var(--bg-panel); }
+.layer-lot-btn { position: relative; }
+.layer-lot-btn input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+.layer-lot-btn:has(input:checked) { border-color: var(--accent-cyan); background: var(--accent-cyan); color: var(--bg-panel); }
+.layer-lot-btn:has(input:focus-visible) { outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
 .layer-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 24px; font-size: var(--fs-md); line-height: 1.25; }
 .layer-row > div { display: flex; align-items: center; min-width: 0; flex: 1; }
 .layer-row label { display: inline-flex; align-items: center; gap: 5px; min-width: 0; cursor: pointer; color: var(--text-main); }

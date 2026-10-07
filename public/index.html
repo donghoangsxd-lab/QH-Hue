@@ -232,6 +232,9 @@
             <button type="button" class="layer-eye-btn" id="btnProjectsAll" data-main-eye="plan" aria-pressed="false" title="Ẩn / hiện mọi đồ án trong danh sách" aria-label="Ẩn / hiện mọi đồ án">
               <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>
             </button>
+            <label class="layer-eye-btn layer-lot-btn" data-main-eye="infra" title="Ranh lô theo lớp công trình: bật lớp nào hiện ranh lô lớp đó (hiện trạng vẽ lô hiện trạng, so sánh bên quy hoạch vẽ lô quy hoạch). Hiện từ zoom 15; chỉ bật 1–3 nhóm thì hiện từ zoom 13. Tắt để chỉ xem biểu tượng" hidden>
+              <input type="checkbox" id="chk_parcel" checked aria-label="Ranh lô theo lớp công trình"><svg class="ico"><use href="#i-parcel"/></svg>
+            </label>
             <button type="button" class="layer-eye-btn" id="btnToggleAllIcons" data-main-eye="infra" aria-pressed="false" title="Bật / tắt toàn bộ 14 nhóm công trình" aria-label="Bật / tắt toàn bộ 14 nhóm công trình" hidden>
               <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>
             </button>
@@ -268,10 +271,9 @@
         </div>
 
         <div class="layer-map" id="layerMap">
-          <div class="layer-map-tabs" role="tablist" aria-label="Nền bản đồ, phân tích và môi trường">
-            <button type="button" class="layer-map-tab active" role="tab" data-map-tab="base" aria-selected="true" aria-controls="layerPaneBase" title="Ranh giới phường xã, mạng lưới đường, phân bổ dân cư, ranh lô công trình."><span class="layer-map-label">Nền bản đồ</span><span class="layer-count layer-map-count" title="Số lớp đang bật">1</span></button>
-            <button type="button" class="layer-map-tab" role="tab" data-map-tab="analysis" aria-selected="false" aria-controls="layerPaneAnalysis" title="Đất xây dựng theo ảnh vệ tinh, bản đồ độ phủ và bán kính phục vụ giả lập."><span class="layer-map-label">Phân tích</span><span class="layer-count layer-map-count" title="Số lớp đang bật"></span></button>
-            <button type="button" class="layer-map-tab" role="tab" data-map-tab="env" aria-selected="false" aria-controls="layerPaneEnv" title="Địa hình, thoát nước, ngập, nhiệt độ bề mặt và công trình chịu rủi ro."><span class="layer-map-label">Môi trường</span><span class="layer-count layer-map-count" title="Số lớp đang bật"></span></button>
+          <div class="layer-map-tabs" role="tablist" aria-label="Bản đồ nền và bản đồ môi trường">
+            <button type="button" class="layer-map-tab active" role="tab" data-map-tab="base" aria-selected="true" aria-controls="layerPaneBase" title="Ranh giới phường xã, mạng lưới đường, phân bổ dân cư, ranh lô công trình, đất xây dựng theo ảnh vệ tinh, bản đồ độ phủ và bán kính phục vụ giả lập."><span class="layer-map-label">Bản đồ nền</span><span class="layer-count layer-map-count" title="Số lớp đang bật">1</span></button>
+            <button type="button" class="layer-map-tab" role="tab" data-map-tab="env" aria-selected="false" aria-controls="layerPaneEnv" title="Địa hình, thoát nước, ngập, nhiệt độ bề mặt và công trình chịu rủi ro."><span class="layer-map-label">Bản đồ môi trường</span><span class="layer-count layer-map-count" title="Số lớp đang bật"></span></button>
           </div>
           <div class="layer-map-pane" id="layerPaneBase" data-map-pane="base" role="tabpanel">
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div></div>
@@ -287,9 +289,6 @@
             <div><input type="checkbox" id="chk_pop"><label for="chk_pop"><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư</label></div>
             <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
           </div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_parcel" checked><label for="chk_parcel" title="Bật lớp công trình nào thì hiện ranh lô đất của lớp đó: bản đồ hiện trạng vẽ lô hiện trạng, bản đồ quy hoạch (so sánh) vẽ lô quy hoạch. Hiện từ zoom 15; chỉ bật 1–3 nhóm thì hiện từ zoom 13. Tắt ô này để chỉ xem biểu tượng"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Ranh lô theo lớp công trình <small class="layer-hint">(zoom để xem)</small></label></div></div>
-          </div>
-          <div class="layer-map-pane" id="layerPaneAnalysis" data-map-pane="analysis" role="tabpanel" hidden>
           <div class="layer-row">
             <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Khoanh vùng trong từng phường: ranh đỏ = vùng hiện trạng (đã xây dựng đến năm gốc 2020/2010/2000, GAIA Landsat 30 m hợp với GHSL 100 m); ranh xanh = vùng phát triển mới (đất xây dựng hiện nay theo Google Dynamic World 10 m nằm ngoài vùng hiện trạng); bỏ mảng < 0,5 ha. QCVN 01:2026/BXD Mục 2.2.3.2 (công viên, vườn hoa mỗi đơn vị ở) và Mục 2.2.3.3 (vườn hoa, bãi đỗ xe ≤ 400 m) chỉ áp trong vùng phát triển mới. Logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch"><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Đất xây dựng (vệ tinh)</label></div>
             <span id="newDevOpBox" class="layer-slider" style="display:none;"><input type="range" id="newDevOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp vùng phát triển mới" aria-label="Độ trong suốt lớp vùng phát triển mới"></span>

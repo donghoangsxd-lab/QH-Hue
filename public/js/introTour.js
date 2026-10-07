@@ -24,7 +24,7 @@ const STEPS = [
     text: 'Mỗi biểu tượng trên bản đồ là 1 công trình. Bấm vào biểu tượng để xem bảng thông tin và vùng phục vụ của công trình đó.\nNút con mắt trên bảng thu gọn bảng về tên công trình để nhìn trọn vùng phục vụ; bấm lại vào công trình để mở lại bảng.'
   },
   {
-    target: ['#chk_heat', '[data-map-tab="analysis"]', '#btnExpandRightPanel'],
+    target: ['#chk_heat', '[data-map-tab="base"]', '#btnExpandRightPanel'],
     title: 'Bản đồ độ phủ hạ tầng',
     text: 'Lớp màu nhiệt thể hiện mức độ được phục vụ: nơi nằm trong tầm đi bộ của càng nhiều loại hạ tầng thì màu càng đậm; nơi màu nhạt là nơi còn thiếu. Khoảng cách được tính bám theo đường giao thông, không chỉ theo đường chim bay. Mở tab Phân tích ở panel bên phải để bật lớp này; thanh màu hiện ngay dưới ô bật.'
   },
