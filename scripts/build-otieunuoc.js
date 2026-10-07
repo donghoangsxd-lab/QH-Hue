@@ -11,141 +11,28 @@
 // OSM có thể thiếu mương, cống nội thị: mở kết quả trong QGIS kiểm tra, sửa tay nếu cần, rồi chạy push-luuvuc.js.
 const fs = require('fs');
 const path = require('path');
-const { PNG } = require('pngjs');
 const turf = require('@turf/turf');
 const osmtogeojson = require('osmtogeojson');
-const { GEE_API_URL, loadBoundary, makeInside } = require('./wardBoundary');
+const { loadBoundary, makeInside } = require('./wardBoundary');
+const { ROOT, lng2tx, lat2ty, tx2lng, ty2lat, demSource, loadDem, cellSizeM, loadOsm, maskToPolygon } = require('./hydroCommon');
 
-const ROOT = path.join(__dirname, '..');
-const AWS_TERRARIUM = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
-const OVERPASS_URL = process.env.OVERPASS_URL || 'https://overpass-api.de/api/interpreter';
 // Bề rộng hành lang cắt (m) theo loại đường nước; sông lớn thường đã có mặt nước nên hành lang chỉ nối chỗ OSM thiếu mặt nước
 const CUT_WIDTH = { river: 20, canal: 8, stream: 5, drain: 4, ditch: 3 };
-const D2R = Math.PI / 180;
 
-const lng2tx = (lng, z) => (lng + 180) / 360 * 2 ** z;
-const lat2ty = (lat, z) => {
-  const s = Math.sin(lat * D2R);
-  return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * 2 ** z;
-};
-const tx2lng = (t, z) => t / 2 ** z * 360 - 180;
-const ty2lat = (t, z) => Math.atan(Math.sinh(Math.PI * (1 - 2 * t / 2 ** z))) / D2R;
-
-async function demSource() {
-  try {
-    const r = await fetch(`${GEE_API_URL}?action=getDemTile&dem=fabdem`, { signal: AbortSignal.timeout(90000) });
-    const d = await r.json();
-    if (d && d.urlFormat) return { url: d.urlFormat, name: 'FABDEM (cao độ nền)' };
-  } catch (e) { /* GEE lỗi → SRTM */ }
-  return { url: AWS_TERRARIUM, name: 'SRTM qua AWS (cao độ bề mặt, còn mái nhà và tán cây)' };
-}
-
-async function fetchTile(url) {
-  for (let k = 0; k < 3; k++) {
-    try {
-      const r = await fetch(url, { signal: AbortSignal.timeout(60000) });
-      if (r.status === 404 || r.status === 400) return null;
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return PNG.sync.read(Buffer.from(await r.arrayBuffer()));
-    } catch (e) {
-      if (k === 2) throw new Error(`Không tải được ô cao độ ${url}: ${e.message}`);
-    }
-  }
-  return null;
-}
-
-/** Ghép ô Terrarium phủ bbox → { mask: Uint8Array (1 = vùng thấp trong ranh), W, H, tx0, ty0 } */
+/** Lưới cao độ phủ bbox → { mask: Uint8Array (1 = vùng thấp trong ranh), W, H, tx0, ty0 } */
 async function buildLowMask(bbox, z, elevMax, inside, src) {
-  const tx0 = Math.floor(lng2tx(bbox[0], z)), tx1 = Math.floor(lng2tx(bbox[2], z));
-  const ty0 = Math.floor(lat2ty(bbox[3], z)), ty1 = Math.floor(lat2ty(bbox[1], z));
-  const nx = tx1 - tx0 + 1, ny = ty1 - ty0 + 1, W = nx * 256, H = ny * 256;
+  const dem = await loadDem(bbox, z, src);
+  const { elev, W, H, tx0, ty0 } = dem;
   const mask = new Uint8Array(W * H);
-  const jobs = [];
-  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) jobs.push([tx, ty]);
-  let done = 0, empty = 0;
-  const worker = async () => {
-    while (jobs.length) {
-      const [tx, ty] = jobs.pop();
-      const png = await fetchTile(src.url.replace('{z}', z).replace('{x}', tx).replace('{y}', ty));
-      if (!png) { empty++; } else {
-        const ox = (tx - tx0) * 256, oy = (ty - ty0) * 256;
-        for (let py = 0; py < 256; py++) {
-          const lat = ty2lat(ty + (py + 0.5) / 256, z);
-          for (let px = 0; px < 256; px++) {
-            const o = (py * 256 + px) * 4;
-            if (png.data[o + 3] === 0) continue;
-            const e = png.data[o] * 256 + png.data[o + 1] + png.data[o + 2] / 256 - 32768;
-            if (!(e > 0 && e < elevMax)) continue;
-            if (inside(tx2lng(tx + (px + 0.5) / 256, z), lat)) mask[(oy + py) * W + ox + px] = 1;
-          }
-        }
-      }
-      if (++done % 20 === 0) process.stdout.write(`\r… ô cao độ ${done}/${nx * ny}`);
+  for (let y = 0; y < H; y++) {
+    const lat = ty2lat(ty0 + (y + 0.5) / 256, z);
+    for (let x = 0; x < W; x++) {
+      const e = elev[y * W + x];
+      if (!(e > 0 && e < elevMax)) continue;
+      if (inside(tx2lng(tx0 + (x + 0.5) / 256, z), lat)) mask[y * W + x] = 1;
     }
-  };
-  await Promise.all(Array.from({ length: 8 }, worker));
-  process.stdout.write('\r');
-  return { mask, W, H, tx0, ty0, tiles: nx * ny, empty };
-}
-
-const ringAreaPx = (r) => {
-  let s = 0;
-  for (let i = 0, j = r.length - 1; i < r.length; j = i++) s += (r[j][0] + r[i][0]) * (r[j][1] - r[i][1]);
-  return Math.abs(s / 2);
-};
-
-/** Bỏ đỉnh thẳng hàng tuyệt đối (đường viền ô lưới có nhiều đoạn ngang / dọc liên tiếp) — không làm hỏng hình học */
-function dropCollinear(ring) {
-  const out = [];
-  const n = ring.length - 1;
-  for (let i = 0; i < n; i++) {
-    const a = ring[(i - 1 + n) % n], b = ring[i], c = ring[(i + 1) % n];
-    if ((b[0] - a[0]) * (c[1] - b[1]) !== (b[1] - a[1]) * (c[0] - b[0])) out.push(b);
   }
-  out.push(out[0]);
-  return out;
-}
-
-/** Mặt nạ vùng thấp → MultiPolygon kinh / vĩ, bỏ mảnh và lỗ nhỏ hơn minPx pixel */
-async function maskToPolygon({ mask, W, H, tx0, ty0 }, z, minPx) {
-  const { contours } = await import('d3-contour');
-  const mp = contours().size([W, H]).smooth(false).thresholds([0.5])(mask)[0];
-  const toLL = ([x, y]) => [tx2lng(tx0 + x / 256, z), ty2lat(ty0 + y / 256, z)];
-  const polys = [];
-  mp.coordinates.forEach(poly => {
-    if (ringAreaPx(poly[0]) < minPx) return;
-    const rings = [poly[0], ...poly.slice(1).filter(r => ringAreaPx(r) >= minPx)]
-      .map(dropCollinear).filter(r => r.length >= 4).map(r => r.map(toLL));
-    if (rings.length && rings[0].length >= 4) polys.push(rings);
-  });
-  return turf.multiPolygon(polys);
-}
-
-async function loadOsm(bbox, cacheFile, refresh) {
-  if (!refresh && fs.existsSync(cacheFile)) {
-    console.log(`… Dùng sông, kênh OSM đã lưu: ${path.relative(ROOT, cacheFile)} (--refresh-osm để tải lại)`);
-    return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-  }
-  const [w, s, e, n] = bbox;
-  const b = `${s},${w},${n},${e}`;
-  const q = `[out:json][timeout:300];(
-    way["natural"="water"](${b});relation["natural"="water"](${b});
-    way["waterway"="riverbank"](${b});relation["waterway"="riverbank"](${b});
-    way["landuse"="reservoir"](${b});
-    way["waterway"~"^(river|canal|stream|drain|ditch)$"](${b});
-  );(._;>;);out body qt;`;
-  console.log('… Tải sông, kênh, mặt nước từ OpenStreetMap (Overpass, có thể mất vài phút)');
-  const res = await fetch(OVERPASS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'qh-hue/build-otieunuoc' },
-    body: `data=${encodeURIComponent(q)}`,
-    signal: AbortSignal.timeout(400000)
-  });
-  if (!res.ok) throw new Error(`Overpass HTTP ${res.status} — thử lại sau hoặc đặt OVERPASS_URL sang máy chủ khác`);
-  const osm = await res.json();
-  fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
-  fs.writeFileSync(cacheFile, JSON.stringify(osm));
-  return osm;
+  return { mask, W, H, tx0, ty0, tiles: dem.tiles, empty: dem.empty };
 }
 
 async function main() {
@@ -156,7 +43,6 @@ async function main() {
   const minKm2 = Number(opt('--min-km2') ?? 0.05);
   const outFile = opt('--out') || path.join(ROOT, 'OTieuNuoc.geojson');
   const lowFile = opt('--save-low');
-  const cacheFile = path.join(ROOT, '.cache', 'osm-nuoc.json');
   if (!Number.isFinite(elevMax)) throw new Error('--elev phải là cao độ (m)');
   if (!Number.isInteger(z) || z < 10 || z > 14) throw new Error('--zoom từ 10 đến 14 (12 ≈ 36 m/pixel, sát DEM 30 m)');
 
@@ -170,8 +56,7 @@ async function main() {
   const src = await demSource();
   console.log(`… Cao độ: ${src.name}, mức ô ${z}`);
   const grid = await buildLowMask(bbox, z, elevMax, inside, src);
-  const midLat = (bbox[1] + bbox[3]) / 2;
-  const cellM = 40075016 * Math.cos(midLat * D2R) / (256 * 2 ** z);
+  const cellM = cellSizeM((bbox[1] + bbox[3]) / 2, z);
   const low = await maskToPolygon(grid, z, minKm2 * 1e6 / (cellM * cellM));
   console.log(`✓ Vùng thấp 0–${elevMax} m: ${(turf.area(low) / 1e6).toFixed(1)} km², ${low.geometry.coordinates.length} mảnh`
     + ` (${grid.tiles} ô cao độ, ${grid.empty} ô trống) · ${sec()}`);
@@ -190,7 +75,7 @@ async function main() {
   };
   const touchesLow = (f) => turf.coordAll(f).some(([lng, lat]) => isLow(lng, lat));
 
-  const gj = osmtogeojson(await loadOsm(bbox, cacheFile, args.includes('--refresh-osm')));
+  const gj = osmtogeojson(await loadOsm(bbox, args.includes('--refresh-osm')));
   const tagsOf = (f) => (f.properties && (f.properties.tags || f.properties)) || {};
   const water = [], cuts = [];
   gj.features.forEach(f => {

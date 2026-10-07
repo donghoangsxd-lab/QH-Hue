@@ -1,5 +1,6 @@
 // Đẩy ranh lưu vực, đường phân thủy lên bucket qua Apps Script → drainage/luuvuc.topojson (lớp basinLayer.js).
-// Ranh tính trong QGIS/GRASS từ FABDEM, cùng DEM với mạng thoát nước (push-thoatnuoc.js) nên khớp với khe tụ thủy:
+// Lưu vực sông, tiểu lưu vực: node scripts/build-luuvuc.js; ô tiêu nước vùng thấp: node scripts/build-otieunuoc.js.
+// Hoặc tính trong QGIS/GRASS từ FABDEM, cùng DEM với mạng thoát nước (push-thoatnuoc.js) nên khớp với khe tụ thủy:
 //   r.carve (khắc Thoatnuoc vào DEM) → r.watershed → r.stream.basins (tiểu lưu vực) / r.water.outlet (lưu vực sông)
 //   → r.to.vect type=area -s → xuất GeoJSON, CRS EPSG:4326.
 //   Vùng thấp dưới +10 m (đồng bằng, nội thị) không có đường phân thủy địa hình đáng tin: chia ô tiêu nước theo sông, kênh
