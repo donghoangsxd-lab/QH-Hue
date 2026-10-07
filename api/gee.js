@@ -147,11 +147,12 @@ function isAllowedOrigin(req) {
 }
 
 // Đọc dữ liệu công khai cho mọi nguồn; thao tác ghi / POST chỉ nhận từ webapp (danh sách ALLOWED_ORIGINS)
+// Vary: Origin cả khi trả '*': danh sách công trình được CDN / trình duyệt giữ cache, thiếu Vary thì bản của nguồn này bị trả cho nguồn khác
 function applyCors(req, res) {
   const origin = req.headers.origin;
+  res.setHeader('Vary', 'Origin');
   if (origin && isAllowedOrigin(req)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Max-Age', '600');

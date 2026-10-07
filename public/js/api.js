@@ -1,9 +1,9 @@
 /**
- * Live Server (cổng 5500) chỉ phục vụ file tĩnh, không chạy /api/gee.
- * Khi preview tĩnh, gọi API production (CORS * đã bật trên Vercel).
+ * Live Server (5500/5501), python -m http.server (8000/8766)... chỉ phục vụ file tĩnh, không chạy /api/gee.
+ * Khi preview tĩnh, gọi API production; POST cần nguồn nằm trong ALLOWED_ORIGINS (config/constants.js).
  */
 const PROD_GEE = 'https://web-hatang-hue-4.vercel.app/api/gee';
-const STATIC_DEV_PORTS = new Set(['5500', '5501', '8080', '8000']);
+const STATIC_DEV_PORTS = new Set(['5500', '5501', '8080', '8000', '8766']);
 
 export function geeApi(search = '') {
   const useRemote =
