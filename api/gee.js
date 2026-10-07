@@ -992,7 +992,8 @@ function nearbySameType(approvedAll, code, lat, lng, radius) {
 }
 
 /** Buffer ứng viên ∩ phường, và phần còn trống = (buffer − hợp các buffer cùng loại) ∩ phường */
-function candidateGeometries(ee, { lat, lng, radius, existing, ward }, wardGeom = ee.Geometry(ward.geometry)) {
+function candidateGeometries(ee, { lat, lng, radius, existing, ward }) {
+  const wardGeom = ee.Geometry(ward.geometry);
   const buffer = ee.Geometry.Point([lng, lat]).buffer(radius);
   const covered = existing.length > 0
     ? ee.FeatureCollection(existing.map(it =>
@@ -1009,7 +1010,11 @@ function candidateGeometries(ee, { lat, lng, radius, existing, ward }, wardGeom 
  */
 async function countPopPixels(ee, popRasterNative, regions) {
   if (!regions.length) return {};
-  const fc = ee.FeatureCollection(regions.map(r => ee.Feature(r.geometry, { k: r.key })));
+  return countPopPixelsFc(ee, popRasterNative, ee.FeatureCollection(regions.map(r => ee.Feature(r.geometry, { k: r.key }))));
+}
+
+/** Như countPopPixels nhưng nhận sẵn FeatureCollection có thuộc tính k */
+async function countPopPixelsFc(ee, popRasterNative, fc) {
   const reduced = popRasterNative.reduceRegions({
     collection: fc, reducer: ee.Reducer.count(), tileScale: 4
   }).map(f => ee.Feature(null, { k: f.get('k'), n: f.get('count') }));
