@@ -1065,25 +1065,17 @@ async function countCandidatePixels(ee, popRasterNative, candidates, wardKeys) {
     rows = rows ? rows.merge(ee.FeatureCollection([totals])) : ee.FeatureCollection([totals]);
   }
   if (!rows) return {};
-  const res = (await eeEvaluate(ee.Dictionary({ names, rows }))) || {};
-  const wardNames = res.names || [];
+  const [wardNames, fc] = await Promise.all([eeEvaluate(names), eeEvaluate(rows)]);
   const sumIn = (groups, wardName) => {
-    const hit = (groups || []).find(g => wardNames[Number(g.w) - 1] === wardName);
+    const hit = (groups || []).find(g => (wardNames || [])[Number(g.w) - 1] === wardName);
     return hit ? Number(hit.sum) || 0 : 0;
   };
   const out = {};
-  const feats = (res.rows && res.rows.features) || [];
-  feats.forEach(f => {
+  ((fc && fc.features) || []).forEach(f => {
     const p = f.properties || {};
     if (p.k === 'wards') wardKeys.forEach(name => { out[`w:${name}`] = sumIn(p.groups, name); });
     else out[p.k] = sumIn(p.groups, candidates[Number(String(p.k).slice(1))].ward.name);
   });
-  const wardRow = feats.find(f => f.properties && f.properties.k === 'wards');
-  out._debug = {
-    names: wardNames.slice(0, 3), wardKey: wardKeys[0], rows: feats.length,
-    wardGroups: wardRow ? JSON.stringify(wardRow.properties.groups || wardRow.properties).slice(0, 200) : null,
-    c0: feats[0] ? JSON.stringify(feats[0].properties).slice(0, 200) : null
-  };
   return out;
 }
 
@@ -1186,7 +1178,6 @@ async function fillCoverageGains(ee, popRaster, candidates, timeoutMs = 30000, {
     if (counts) {
       timing.counted = candidates.filter((c, i) => counts[`c${i}`] > 0).length;
       timing.wardTotals = wardKeys.filter(name => counts[`w:${name}`] > 0).length + '/' + wardKeys.length;
-      timing.debug = counts._debug;
     }
   }
 
