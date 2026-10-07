@@ -27,6 +27,7 @@ Object.assign(TT16_STYLES, {
   "CX-CD": { label: 'Cây xanh chuyên dụng', layer: 'DAT_Cayxanhchuyendung', aci: 126, color: '#007f5f', pattern: 'Cayxanhchuyendung' },
   "SX-CN": { label: 'Sản xuất công nghiệp, kho bãi', layer: 'DAT_SX_Congnghiep', aci: 192, color: '#6600cc', pattern: 'Congnghiep' },
   "SX-VL": { label: 'Khai thác khoáng sản, VLXD', layer: 'DAT_SX_Vatlieu', aci: 175, color: '#4d4d99', pattern: 'Vatlieu' },
+  "CC-DV": { label: 'Công cộng - dịch vụ', layer: 'DAT_DD_DVCCdothi', color: '#e03131', pattern: 'DVCC' },
   "DT-NC": { label: 'Đào tạo, nghiên cứu', layer: 'DAT_DaotaoNC', aci: 144, color: '#007399', pattern: 'DaotaoNC' },
   "CQ": { label: 'Cơ quan, trụ sở', layer: 'DAT_Coquan', aci: 34, color: '#994c00', pattern: 'Coquan' },
   "DL": { label: 'Khu dịch vụ du lịch', layer: 'DAT_Dulich', aci: 210, color: '#ff00ff', pattern: 'Dulich' },
@@ -55,6 +56,7 @@ const PATTERN_CODES = [
   ['CX-CD', ['DAT_CAYXANHCHUYENDUNG', 'DAT_NDD_CAYXANHCD']],
   ['SX-CN', ['DAT_SX_CONGNGHIEP', 'DAT_NDD_CONGNGHIEP']],
   ['SX-VL', ['DAT_SX_VATLIEU']],
+  ['CC-DV', ['DAT_DD_DVCCDOTHI', 'DAT_DD_DVCC', 'DAT_DVCC', 'DAT_CCDV', 'DAT_CONGCONG', 'DAT_HTCC']],
   ['DT-NC', ['DAT_DAOTAONC', 'DAT_NDD_DAOTAO']],
   ['CQ', ['DAT_COQUAN', 'DAT_DD_COQUANDOTHI', 'DAT_NDD_COQUAN']],
   ['DL', ['DAT_DULICH', 'DAT_NDD_DULICH']],
@@ -92,7 +94,7 @@ const LAYER_LEVEL = new Set(['QG', 'CV', 'CT', 'CH', 'DVO', 'MN', 'TH', 'THCS', 
 // Thứ tự chú giải Quy hoạch, theo Mục 04 TT16 (bảng cân đối QHPK). Ba cấp trường tách màu, cùng hoa văn.
 const LEGEND_KEYS = [
   "O-NO", "O-HH", "O-LX", "7-YT", "8-VH", "TDTT", "3-MN", "4-TH", "5-THCS", "6-THPT",
-  "1-CV", "CX-HC", "CX-CD", "SX-CN", "SX-VL", "DT-NC", "CQ", "9-TM", "DL", "DT-TG",
+  "CC-DV", "1-CV", "CX-HC", "CX-CD", "SX-CN", "SX-VL", "DT-NC", "CQ", "9-TM", "DL", "DT-TG",
   "AN", "QP", "GT", "2-BDX", "NTR", "HTK", "NN", "RSX", "RPH", "RDD", "TS", "DCS", "HO", "SS", "MNB", "12-CSD"
 ];
 
@@ -138,15 +140,16 @@ function clipSeg(out, w, h, x0, y0, x1, y1) {
   pushSeg(out, x0 + t0 * dx, y0 + t0 * dy, x0 + t1 * dx, y0 + t1 * dy);
 }
 
+// Nét ở mép 0 thuộc ô này (mép w / h là mép 0 của ô kế) để khoảng cách đều qua chỗ nối ô
 function vLines(w, h, step) {
   const s = [];
-  for (let x = step; x < w - 0.05; x += step) pushSeg(s, x, 0, x, h);
+  for (let x = 0; x < w - 0.05; x += step) pushSeg(s, x, 0, x, h);
   return s;
 }
 
 function hLines(w, h, step) {
   const s = [];
-  for (let y = step; y < h - 0.05; y += step) pushSeg(s, 0, y, w, y);
+  for (let y = 0; y < h - 0.05; y += step) pushSeg(s, 0, y, w, y);
   return s;
 }
 
@@ -209,29 +212,64 @@ function plusGrid(w, h, step, arm, stagger) {
   return s;
 }
 
-function carets(w, h, step) {
+// Tam giác rỗng xếp so le (đất du lịch)
+function triangles(w, h, step) {
   const s = [];
-  const hw = step * 0.26, hh = step * 0.2;
+  const hw = step * 0.3, hh = step * 0.26;
   let row = 0;
   for (let y = step * 0.55; y < h; y += step * 0.85) {
     const ox = row % 2 ? step / 2 : 0;
     for (let x = ox; x <= w + step; x += step) {
       clipSeg(s, w, h, x - hw, y + hh, x, y - hh);
       clipSeg(s, w, h, x, y - hh, x + hw, y + hh);
+      clipSeg(s, w, h, x + hw, y + hh, x - hw, y + hh);
     }
     row++;
   }
   return s;
 }
 
-function chevrons(w, h, step) {
+// Lát xương cá: ván 2u × u viền kín, xoay 45° (đất đào tạo, nghiên cứu). Trước khi xoay, ván ngang H_k = [k, k+2]×[k, k+1]
+// và ván đứng V_k = [k+1, k+2]×[k-2, k] lát kín theo hai véc tơ (1, 1) và (2, -2) → ô lặp w = 2√2·u, h = √2·u
+function herringbone(u) {
+  const w = r2(2 * Math.SQRT2 * u), h = r2(Math.SQRT2 * u);
   const s = [];
-  const rise = step * 0.34;
-  for (let y = rise; y < h + rise; y += step * 0.72) {
-    for (let x = 0; x < w; x += step) {
-      clipSeg(s, w, h, x, y, x + step / 2, y - rise);
-      clipSeg(s, w, h, x + step / 2, y - rise, x + step, y);
+  const rot = (x, y) => [((x - y) / Math.SQRT2) * u, ((x + y) / Math.SQRT2) * u];
+  const plank = (x0, y0, x1, y1) => {
+    const p = [rot(x0, y0), rot(x1, y0), rot(x1, y1), rot(x0, y1)];
+    for (let i = 0; i < 4; i++) clipSeg(s, w, h, ...p[i], ...p[(i + 1) % 4]);
+  };
+  for (let m = -3; m <= 3; m++) {
+    for (let k = -4; k <= 4; k++) {
+      const ox = k + 2 * m, oy = k - 2 * m;
+      plank(ox, oy, ox + 2, oy + 1);
+      plank(ox + 1, oy - 2, ox + 2, oy);
     }
+  }
+  return { w, h, segs: s };
+}
+
+// Lưới tam giác đều cạnh a, nét 0° / 60° / 120° (đất quốc phòng): ô w = a, h = a√3
+function triNet(a) {
+  const w = a, h = r2(a * Math.sqrt(3));
+  const s = [];
+  pushSeg(s, 0, 0, w, 0);
+  pushSeg(s, 0, h / 2, w, h / 2);
+  for (let k = -1; k <= 1; k++) {
+    clipSeg(s, w, h, k * a, 0, k * a + a, h);
+    clipSeg(s, w, h, k * a + a, 0, k * a, h);
+  }
+  return { w, h, segs: s };
+}
+
+// Đan chéo ±45° bằng nét đôi cách nhau gap (hạ tầng kỹ thuật khác); size là bội của step
+function doubleCross(size, step, gap) {
+  const s = [];
+  for (let b = -size; b <= size * 2; b += step) {
+    [0, gap].forEach(o => {
+      clipSeg(s, size, size, 0, b + o, size, b + o + size);
+      clipSeg(s, size, size, 0, b + o, size, b + o - size);
+    });
   }
   return s;
 }
@@ -285,28 +323,6 @@ function hGaps(w, h, rowStep) {
     const g0 = (row % 3) * (w / 3);
     if (g0 > 0.2) pushSeg(s, 0, y, g0, y);
     if (g0 + gap < w - 0.2) pushSeg(s, g0 + gap, y, w, y);
-    row++;
-  }
-  return s;
-}
-
-function scales(w, h, step) {
-  const s = [];
-  const rowH = step * 0.52;
-  const parts = 5;
-  let row = 0;
-  for (let y = 0; y < h - 0.01; y += rowH) {
-    const ox = row % 2 ? step / 2 : 0;
-    for (let x = -step + ox; x < w; x += step) {
-      let px = x, py = y;
-      for (let i = 1; i <= parts; i++) {
-        const t = (Math.PI * i) / parts;
-        const nx = x + (step * i) / parts;
-        const ny = y + Math.sin(t) * step * 0.4;
-        clipSeg(s, w, h, px, py, nx, ny);
-        px = nx; py = ny;
-      }
-    }
     row++;
   }
   return s;
@@ -367,15 +383,17 @@ const TILES = {
   Cayxanhchuyendung: { w: 11.2, h: 8.4, dotR: 0.36, segs: [], dots: dotGrid(11.2, 8.4, 2.8, true) },
   Congnghiep: { w: 9, h: 9, segs: diagonals(9, 9, 2.25, -1) },
   Vatlieu: { w: 9, h: 9, segs: diagonals(9, 9, 2.25, 1) },
-  DaotaoNC: { w: 9, h: 8.64, segs: chevrons(9, 8.64, 3) },
-  Coquan: { w: 10, h: 8, segs: hLines(10, 8, 2) },
-  Dulich: { w: 10, h: 8.5, segs: carets(10, 8.5, 2.5) },
+  DVCC: { w: 9, h: 9, segs: vLines(9, 9, 2.25).concat(hLines(9, 9, 2.25)) },
+  DaotaoNC: herringbone(3.2),
+  // Kẻ ngang dày, kẻ dọc thưa
+  Coquan: { w: 7, h: 8, segs: hLines(7, 8, 2).concat(vLines(7, 8, 7)) },
+  Dulich: { w: 12, h: 10.2, segs: triangles(12, 10.2, 3) },
   Ditich: { w: 9, h: 9, segs: squares(9, 9, 3) },
   Anninh: { w: 9, h: 9, segs: crosshatch(9, 9, 2.25) },
-  Quocphong: { ...honeycomb(2.15), scale: DENSE_SCALE },
-  DuongGT: { w: 9, h: 9, segs: diagonals(9, 9, 2.25, 1) },
+  Quocphong: triNet(3),
+  DuongGT: { w: 9, h: 9, segs: diagonals(9, 9, 1.8, -1) },
   Nghiatrang: { w: 10, h: 8, segs: plusGrid(10, 8, 2.5, 0.72, true) },
-  Hatangkhac: { w: 10, h: 7.8, segs: scales(10, 7.8, 2.5) },
+  Hatangkhac: { w: 12, h: 12, segs: doubleCross(12, 4, 1.3) },
   Nongnghiep: { w: 12, h: 9, dotR: 0.46, segs: [], dots: dotGrid(12, 9, 3, true) },
   Rungdacdung: { w: 12, h: 8, segs: hWaves(12, 8, 2, 0.55, 3) },
   Rungphongho: { ...honeycomb(2.7), scale: DENSE_SCALE },
@@ -533,8 +551,9 @@ export const RESIDENTIAL_COLOR = '#d4a20b';
 // Đất ở gom mọi cách đặt tên (TT16 DAT_O_*, tên trước TT16 "Đất ở đô thị", "dat o lien ke", làng xóm, biệt thự,
 // liền kề, nhà vườn, chỉnh trang, tái định cư, nhà ở xã hội) về 1 màu.
 const LAND_RULES = [
-  { key: 'o', label: 'Đất ở', color: RESIDENTIAL_COLOR, re: /(^|[\s_.-])(DAT[\s_.-]?O|DAT[\s_.-]?ODT|DAT[\s_.-]?ONT|ODT|ONT|NOXH|TDC|NHA[\s_.-]O)($|[\s_.-])|(^|[\s_.-])O[\s_.-](DO[\s_]?THI|NONG[\s_]?THON)|LIEN[\s_]?KE|BIET[\s_]?THU|NHA[\s_]?VUON|CHUNG[\s_]?CU|DONVIO|NHOMNHAO|HONHOP|LANG[\s_]?XOM|DANCUNT|DAT_NO_|CHINH[\s_]?TRANG|TAI[\s_]?DINH[\s_]?CU/ },
-  { key: 'cc', label: 'Đất công cộng', color: '#a61e4d', re: /CONGCONG|DAT_CC($|_)|HTCC|DVCC/ },
+  { key: 'o', label: 'Đất ở', color: RESIDENTIAL_COLOR, re: /(^|[\s_.-])(DAT[\s_.-]?O|DAT[\s_.-]?ODT|DAT[\s_.-]?ONT|ODT|ONT|NOXH|TDC|NHA[\s_.-]O)($|[\s_.-])|(^|[\s_.-])O[\s_.-](DO[\s_]?THI|NONG[\s_]?THON)|LIEN[\s_]?KE|BIET[\s_]?THU|NHA[\s_]?VUON|CHUNG[\s_]?CU|DONVIO|NHOMNHAO|HON[\s_]?HOP|LANG[\s_]?XOM|DANCUNT|DAT_NO_|CHINH[\s_]?TRANG|TAI[\s_]?DINH[\s_]?CU/ },
+  // Công cộng cấp đô thị / đơn vị ở, "đất dịch vụ công cộng", "đất công cộng dịch vụ"; cây xanh, bãi xe công cộng thuộc loại khác
+  { key: 'cc', label: 'Đất công cộng - dịch vụ', color: '#e03131', re: /(?<!(CAY[\s_.-]?XANH|BAI[\s_.-]?(DO[\s_.-]?)?XE)[\s_.-]*)CONG[\s_.-]?CONG|DAT_CC($|_)|HTCC|DVCC|CCDV/ },
   { key: 'dtn', label: 'Đất đào tạo, nghiên cứu', color: '#1e3a8a', re: /DAOTAO|NGHIENCUU|GIAODUC|NCKH|DAT_GD/ },
   { key: 'cq', label: 'Đất cơ quan, trụ sở', color: '#a1887f', re: /COQUAN|TRUSO|CQNN|HANHCHINH/ },
   { key: 'an', label: 'Đất an ninh, quốc phòng', color: '#d9480f', re: /ANQP|QPAN|ANNINH|QUOCPHONG/ },
@@ -579,7 +598,9 @@ export function landPatternKey(layerName) {
     if (core.length <= 2 || !LAYER_LEVEL.has(core[core.length - 1])) break;
     core.pop();
   }
-  return '';
+  // Đặt tên tự do: hỗn hợp (kể cả "hỗn hợp công cộng") theo ký hiệu hỗn hợp, trước nhóm công cộng - dịch vụ
+  if (/HON[\s_.-]?HOP/.test(foldLayer(layerName))) return 'O-HH';
+  return (landRule(layerName) || {}).key === 'cc' ? 'CC-DV' : '';
 }
 
 /** Ranh đất đồ án: thu nhỏ tô đặc màu ký hiệu; phóng tới ngưỡng hoa văn thì kẻ pattern cùng màu */

@@ -2238,6 +2238,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .lp-phase-ht { color: var(--accent-green); background: rgba(var(--green-rgb), 0.14); border: 1px solid rgba(var(--green-rgb), 0.4); }
 .lp-stats { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; margin-top: 10px; }
 .lp-stat { padding: 6px 8px; border-radius: var(--r-md); background: rgba(var(--cyan-rgb), 0.07); border: 1px solid rgba(var(--cyan-rgb), 0.22); text-align: center; }
+.lp-stat .ico { display: inline-block; width: 17px; height: 17px; margin-right: 4px; vertical-align: -2px; color: var(--accent-cyan); opacity: 0.9; filter: drop-shadow(0 0 3px rgba(var(--cyan-rgb), 0.45)); }
 .lp-stat small { display: block; color: var(--text-muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
 .lp-stat b { display: block; margin-top: 2px; color: var(--accent-cyan); font-size: var(--fs-xl); font-weight: 700; white-space: nowrap; }
 .lp-stat em { margin-left: 2px; color: var(--text-main); font-size: var(--fs-sm); font-style: normal; font-weight: 400; }
@@ -2245,4 +2246,3 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .lp-info dt { color: var(--text-muted); white-space: nowrap; }
 .lp-info dd { margin: 0; color: var(--text-main); font-weight: 600; overflow-wrap: anywhere; }
 .lp-info dd.lp-mono { font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 400; color: var(--text-muted); }
-.lp-stat .ico { display: block; width: 20px; height: 20px; margin: 0 auto 3px; color: var(--accent-cyan); opacity: 0.9; filter: drop-shadow(0 0 3px rgba(var(--cyan-rgb), 0.45)); }

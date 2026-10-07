@@ -1149,7 +1149,7 @@ function landPopupHtml(p) {
       </div>
     </div>
     ${stats.length ? `<div class="lp-stats">${stats.map(s => `<div class="lp-stat" title="${escapeHtml(s.label)}">
-      ${ico(s.icon)}<small>${escapeHtml(s.short)}</small><b>${escapeHtml(s.value)}${s.unit ? `<em>${escapeHtml(s.unit)}</em>` : ''}</b></div>`).join('')}</div>` : ''}
+      <small>${escapeHtml(s.short)}</small><b>${ico(s.icon)}${escapeHtml(s.value)}${s.unit ? `<em>${escapeHtml(s.unit)}</em>` : ''}</b></div>`).join('')}</div>` : ''}
     <dl class="lp-info">${info.map(([k, v]) => `<dt>${k}</dt><dd${k === 'Layer' ? ' class="lp-mono"' : ''}>${escapeHtml(String(v))}</dd>`).join('')}</dl>
   </div>`;
 }

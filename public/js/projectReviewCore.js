@@ -153,7 +153,7 @@ export function landRowByKey(kind, key) {
 // [khóa TT16, gộp nhiều loại]
 const ROW_TT16 = {
   QHC: {
-    dd_o: ['O-NO'], dd_hh: ['O-HH'], dd_cq: ['CQ'], dd_cx: ['1-CV'], dd_gt: ['GT'], dd_ht: ['HTK'],
+    dd_o: ['O-NO'], dd_hh: ['O-HH'], dd_dvcc: ['CC-DV'], dd_cq: ['CQ'], dd_cx: ['1-CV'], dd_gt: ['GT'], dd_ht: ['HTK'],
     ndd_cn: ['SX-CN'], ndd_dt: ['DT-NC'], ndd_cq: ['CQ'], ndd_yt: ['7-YT'], ndd_vh: ['8-VH'], ndd_dl: ['DL'],
     ndd_cxhc: ['CX-HC'], ndd_cxcd: ['CX-CD'], ndd_dtich: ['DT-TG'], ndd_nt: ['O-LX'], ndd_an: ['AN'], ndd_qp: ['QP'],
     ndd_gt: ['GT'], ndd_ht: ['HTK'], nnk_nn: ['NN'], nnk_ts: ['TS'], nnk_csd: ['DCS'], nnk_ho: ['HO'], nnk_song: ['SS'], nnk_bien: ['MNB']
@@ -180,7 +180,7 @@ export function landSymbol(kind, rowKey, subKey = '') {
   const row = landRowByKey(kind, rowKey);
   const [rowTt16] = ROW_TT16[kind]?.[rowKey] || [];
   const toneOf = (key, fallback) => (key && TT16_STYLES[key] && TT16_STYLES[key].color) || fallback || '#94a3b8';
-  if (PENDING_SUBS.has(subKey)) return { tt16: rowTt16 || '3-MN', tone: PENDING_TONE };
+  if (PENDING_SUBS.has(subKey)) return { tt16: subKey === 'school' ? '3-MN' : rowTt16 || '3-MN', tone: PENDING_TONE };
   if (SUB_TT16[subKey]) return { tt16: SUB_TT16[subKey], tone: toneOf(SUB_TT16[subKey]) };
   if (!rowTt16) return { tt16: null, tone: row?.color || '#94a3b8' };
   return { tt16: rowTt16, tone: toneOf(rowTt16, row?.color) };
