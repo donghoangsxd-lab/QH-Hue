@@ -215,7 +215,8 @@
       <button type="button" class="rp-collapse-btn" id="btnCollapseRightPanel" title="Thu gọn panel" aria-label="Thu gọn panel"><svg class="ico"><use href="#i-chev-right"/></svg></button>
     </div>
 
-    <div class="rp-progress">
+    <div class="rp-progress" role="status" aria-live="polite" title="Tiến độ nạp dữ liệu lúc mở bản đồ; xong thì tự ẩn">
+      <span class="rp-progress-label" id="progressLabel">Đang nạp dữ liệu</span>
       <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
       <span id="progressPercent">0%</span>
     </div>
@@ -224,18 +225,18 @@
       <!-- TAB: LỚP DỮ LIỆU -->
       <div class="tab-body" id="tabLayers">
         <div class="layer-tree">
-        <div class="layer-group is-open" data-layer-group="infra">
-          <div class="layer-group-bar">
-            <button type="button" class="layer-group-toggle" aria-expanded="true" aria-controls="layerPaneInfra" title="14 nhóm biểu tượng trên bản đồ. Nút mắt bật hoặc tắt cả nhóm. Nút tròn bật vùng phủ theo QCVN.">
-              <i class="layer-chev" aria-hidden="true"></i>
-              <span class="layer-head-title">Công trình</span>
-              <span class="layer-count" id="layerCount" title="Số nhóm đang hiện / tổng số nhóm">11/14</span>
+        <div class="layer-main" id="layerMain">
+          <div class="layer-main-tabs" role="tablist" aria-label="Quy hoạch và công trình">
+            <button type="button" class="layer-main-tab active" role="tab" data-main-tab="plan" aria-selected="true" aria-controls="layerPanePlan" title="Danh sách đồ án. Bật một đồ án là hiện đủ ranh lô: lô thuộc nhóm hạ tầng và các lô còn lại."><span class="layer-main-label">Quy hoạch</span><span class="layer-count none" id="projectCount" title="Số đồ án đang hiện / tổng số đồ án">0</span></button>
+            <button type="button" class="layer-main-tab" role="tab" data-main-tab="infra" aria-selected="false" aria-controls="layerPaneInfra" title="14 nhóm biểu tượng trên bản đồ. Nút tròn bật vùng phủ theo QCVN."><span class="layer-main-label">Công trình</span><span class="layer-count" id="layerCount" title="Số nhóm đang hiện / tổng số nhóm">11/14</span></button>
+            <button type="button" class="layer-eye-btn" id="btnProjectsAll" data-main-eye="plan" aria-pressed="false" title="Ẩn / hiện mọi đồ án trong danh sách" aria-label="Ẩn / hiện mọi đồ án">
+              <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>
             </button>
-            <button type="button" class="layer-eye-btn" id="btnToggleAllIcons" aria-pressed="false" title="Bật / tắt toàn bộ 14 nhóm công trình" aria-label="Bật / tắt toàn bộ 14 nhóm công trình">
+            <button type="button" class="layer-eye-btn" id="btnToggleAllIcons" data-main-eye="infra" aria-pressed="false" title="Bật / tắt toàn bộ 14 nhóm công trình" aria-label="Bật / tắt toàn bộ 14 nhóm công trình" hidden>
               <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>
             </button>
           </div>
-          <div class="layer-group-body" id="layerPaneInfra">
+          <div class="layer-main-pane" id="layerPaneInfra" data-main-pane="infra" role="tabpanel" hidden>
         <div class="layer-row"><div><input type="checkbox" id="chk_c1" checked><label for="chk_c1"><img src="./icons/Park.png" class="layer-type-icon" alt="" width="14" height="16">1. Công viên, điểm xanh</label></div><button type="button" class="btn-dot-buffer" data-buffer="b1" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c2" checked><label for="chk_c2"><img src="./icons/Parking.png" class="layer-type-icon" alt="" width="14" height="16">2. Bãi đỗ xe, trạm sạc</label></div><button type="button" class="btn-dot-buffer" data-buffer="b2" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c3" checked><label for="chk_c3"><img src="./icons/Mamnon.png" class="layer-type-icon" alt="" width="14" height="16">3. Trường Mầm non</label></div><button type="button" class="btn-dot-buffer" data-buffer="b3" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
@@ -250,20 +251,13 @@
         <div class="layer-row"><div><input type="checkbox" id="chk_c9" checked><label for="chk_c9"><img src="./icons/Unused.png" class="layer-type-icon" alt="" width="14" height="16">12. Cơ sở chưa sử dụng</label></div></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c11"><label for="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Bus.svg" class="layer-type-icon" alt="" width="14" height="16">13. Trạm dừng xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" title="Bật/tắt phạm vi 500 m" aria-label="Bật/tắt phạm vi 500 m" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c14" checked><label for="chk_c14" title="Dữ liệu tab 14-NOXH. Chỉ thể hiện vị trí và diện tích, không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Noxh.svg" class="layer-type-icon" alt="" width="14" height="16">14. Nhà ở xã hội</label></div></div>
-          </div>
+        <div class="layer-status-legend" aria-label="Ghi chú trạng thái điểm">
+          <span class="layer-status-title">Ghi chú:</span>
+          <span title="Admin đã phê duyệt (TrangThai = TRUE)"><img src="./icons/Park.png" class="legend-icon" alt="">Đã duyệt</span>
+          <span class="legend-pending" title="Đề xuất chưa chấp thuận (TrangThai = FALSE)"><img src="./icons/Park2.png" class="legend-icon" alt=""><b>Chờ duyệt</b></span>
         </div>
-        <div class="layer-group" data-layer-group="plan">
-          <div class="layer-group-bar">
-            <button type="button" class="layer-group-toggle" aria-expanded="false" aria-controls="layerPanePlan" title="Danh sách đồ án. Bật một đồ án là hiện đủ ranh lô: lô thuộc nhóm hạ tầng và các lô còn lại.">
-              <i class="layer-chev" aria-hidden="true"></i>
-              <span class="layer-head-title">Quy hoạch</span>
-              <span class="layer-count none" id="projectCount" title="Số đồ án đang hiện / tổng số đồ án">0</span>
-            </button>
-            <button type="button" class="layer-eye-btn" id="btnProjectsAll" aria-pressed="false" title="Ẩn / hiện mọi đồ án trong danh sách" aria-label="Ẩn / hiện mọi đồ án">
-              <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>
-            </button>
           </div>
-          <div class="layer-group-body" id="layerPanePlan" hidden>
+          <div class="layer-main-pane" id="layerPanePlan" data-main-pane="plan" role="tabpanel">
         <div hidden>
           <input type="checkbox" id="chk_projects" title="Thu nhỏ: ranh tổng từng đồ án đang bật. Phóng tới ngưỡng lô: đủ ranh lô của đồ án, gồm lô hạ tầng và các lô còn lại.">
           <input type="checkbox" id="chk_projectInfra" checked title="Lô hạ tầng của đồ án đang bật vẽ cùng lớp Quy hoạch, không theo 14 nhóm Công trình.">
@@ -594,15 +588,8 @@
 
       <!-- TAB: CHÚ GIẢI -->
       <div class="tab-body" id="tabLegend" style="display:none;">
-        <div class="legend-kicker">Trạng thái điểm</div>
-        <div class="legend-row"><img src="./icons/Park.png" class="legend-icon" alt="" />Đã duyệt</div>
-        <div class="legend-row legend-pending"><img src="./icons/Park2.png" class="legend-icon" alt="" /><b>Chờ duyệt</b> — đề xuất chưa chấp thuận</div>
-        <div class="legend-row"><span class="legend-icon legend-dot"><i class="legend-plan-dot"></i></span>Chấm dưới biểu tượng: khác hiện trạng</div>
-        <div class="legend-row"><span class="legend-icon legend-buf" aria-hidden="true"></span>Nút tròn: bật vùng phủ theo QCVN</div>
-        <details class="fold legend-fold">
-          <summary>Ký hiệu lô đất (TT16)</summary>
-          <div class="tt16-legend" id="parcelLegend"></div>
-        </details>
+        <div class="legend-title">Ký hiệu sử dụng đất <small>(theo Thông tư 16/2025/TT-BXD)</small></div>
+        <div class="tt16-legend" id="parcelLegend"></div>
       </div>
     </div>
   </aside>

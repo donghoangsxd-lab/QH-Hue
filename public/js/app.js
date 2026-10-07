@@ -70,8 +70,8 @@ function addTypeSwatches() {
   });
 }
 
-// Công trình và Quy hoạch mở độc lập. Nền bản đồ, Phân tích, Môi trường là tab lật trang.
-const LAYER_GROUP_KEY = 'qh_layer_groups';
+// Quy hoạch / Công trình là 2 tab cùng cấp (mở bản đồ luôn ở Quy hoạch); Nền bản đồ, Phân tích, Môi trường là tab lật trang.
+// Chuyển tab chỉ đổi danh sách đang xem, không bật/tắt lớp trên bản đồ.
 const LAYER_MAP_KEY = 'qh_layer_map';
 const MAP_PANE_IDS = ['base', 'analysis', 'env'];
 function initLayerMapTabs(initial) {
@@ -99,50 +99,31 @@ function initLayerMapTabs(initial) {
   show(MAP_PANE_IDS.includes(initial) ? initial : 'base');
   refreshCounts();
 }
+function initLayerMainTabs() {
+  const root = document.getElementById('layerMain');
+  if (!root) return;
+  const tabs = [...root.querySelectorAll('[data-main-tab]')];
+  const show = (id) => {
+    tabs.forEach(btn => {
+      const on = btn.dataset.mainTab === id;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-selected', String(on));
+    });
+    root.querySelectorAll('[data-main-pane]').forEach(pane => { pane.hidden = pane.dataset.mainPane !== id; });
+    root.querySelectorAll('[data-main-eye]').forEach(eye => { eye.hidden = eye.dataset.mainEye !== id; });
+    root.dataset.active = id;
+  };
+  tabs.forEach(btn => btn.addEventListener('click', () => show(btn.dataset.mainTab)));
+  show('plan');
+}
+
 function initLayerGroups() {
-  const groups = [...document.querySelectorAll('.layer-group')];
-  if (!groups.length) return;
-  let saved = null;
-  try { saved = JSON.parse(localStorage.getItem(LAYER_GROUP_KEY) || 'null'); } catch (e) { /* chế độ riêng tư */ }
-  if (!Array.isArray(saved)) {
-    let old = null;
-    try { old = localStorage.getItem('qh_layer_sec'); } catch (e) { /* chế độ riêng tư */ }
-    saved = old === 'plan' ? ['plan'] : ['infra'];
-  }
+  initLayerMainTabs();
   let mapTab = 'base';
   try {
     const stored = localStorage.getItem(LAYER_MAP_KEY);
     if (MAP_PANE_IDS.includes(stored)) mapTab = stored;
-    else {
-      const hit = [...MAP_PANE_IDS].reverse().find(id => saved.includes(id));
-      if (hit) mapTab = hit;
-    }
   } catch (e) { /* chế độ riêng tư */ }
-  saved = saved.filter(id => !MAP_PANE_IDS.includes(id));
-  if (!saved.length) saved = ['infra'];
-  const setOpen = (g, on) => {
-    g.classList.toggle('is-open', on);
-    const body = g.querySelector('.layer-group-body');
-    const btn = g.querySelector('.layer-group-toggle');
-    if (body) body.hidden = !on;
-    if (btn) btn.setAttribute('aria-expanded', String(on));
-  };
-  groups.forEach(g => setOpen(g, saved.includes(g.dataset.layerGroup)));
-  const persist = () => {
-    try { localStorage.setItem(LAYER_GROUP_KEY, JSON.stringify(groups.filter(g => g.classList.contains('is-open')).map(g => g.dataset.layerGroup))); } catch (e) { /* chế độ riêng tư */ }
-  };
-  groups.forEach(g => g.querySelector('.layer-group-toggle')?.addEventListener('click', () => {
-    setOpen(g, !g.classList.contains('is-open'));
-    persist();
-  }));
-  const refreshCounts = () => groups.forEach(g => {
-    const badge = g.querySelector('.layer-group-count');
-    if (!badge) return;
-    const n = g.querySelectorAll('.layer-group-body input[type="checkbox"]:checked').length;
-    badge.textContent = n ? String(n) : '';
-  });
-  groups.forEach(g => g.addEventListener('change', refreshCounts));
-  refreshCounts();
   initLayerMapTabs(mapTab);
 }
 
@@ -684,13 +665,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ---------- Nạp dữ liệu ban đầu ----------
   const progressBar = document.getElementById('progressBar');
   const progressPercent = document.getElementById('progressPercent');
-  const setProgress = (pct) => {
+  const progressLabel = document.getElementById('progressLabel');
+  const progressRow = document.querySelector('.rp-progress');
+  const setProgress = (pct, label) => {
     if (progressBar) progressBar.style.width = `${pct}%`;
     if (progressPercent) progressPercent.textContent = `${pct}%`;
+    if (progressLabel && label) progressLabel.textContent = label;
   };
 
   try {
-    setProgress(20);
+    setProgress(20, 'Đang tải công trình');
     // Gọi song song: ranh giới (CDN cache), danh sách công trình, thống kê phường; heatmap chờ danh sách công trình
     const boundaryReady = loadBoundaryLayer().then(renderPlanBoundaries);
     const statsReady = ensureWardStats();
@@ -698,7 +682,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (document.getElementById('chk_pop')?.checked) ensurePopulationLayer();
 
     await loadInfraData();
-    setProgress(60);
+    setProgress(60, 'Đang dựng bản đồ');
     renderGroupedPoints();
     loadCadParcels();
     const heatReady = refreshHeatmapOnly();
@@ -730,18 +714,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    setProgress(90);
+    setProgress(90, 'Đang tính độ phủ');
     renderBottomPanel();
     refreshWardCheck();
 
     await heatReady;
-    setProgress(100);
+    setProgress(100, 'Đã nạp xong');
     setTimeout(() => {
-      const progressRow = document.querySelector('.rp-progress');
       if (progressRow) progressRow.style.display = 'none';
     }, 600);
   } catch (err) {
     console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
     showToast('❌ Lỗi nạp dữ liệu bản đồ, vui lòng tải lại trang.', 'error');
+    if (progressRow) progressRow.style.display = 'none';
   }
 });

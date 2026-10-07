@@ -1,0 +1,49 @@
+# 1. TỔNG QUAN DỰ ÁN & MỤC ĐÍCH
+- Dự án: Webapp bản đồ quản lý hạ tầng đô thị TP. Huế (Dự án nội bộ phục vụ nhóm quản lý quy hoạch Sở Xây dựng Huế).
+- Mục đích: Trực quan hóa hạ tầng (công viên, trường học, y tế, chợ, bãi đỗ xe, quỹ đất tiềm năng...) lên bản đồ vệ tinh, hỗ trợ tra cứu, đề xuất điểm mới, và đánh giá độ phủ hạ tầng qua heatmap.
+
+# 2. KIẾN TRÚC HỆ THỐNG & TECH STACK
+- Frontend: Vanilla JS thuần (chia module ES Modules), Leaflet.js, Turf.js, Chart.js.
+- Deployment: Vercel (`web-hatang-hue-4.vercel.app`), auto-deploy từ nhánh `main` trên GitHub (`donghoangsxd-lab/QH-Hue`).
+- Backend/Storage: Google Cloud Storage (Bucket `hue-infra-data-us`, file `infrastructure_hue.json` dạng GeoJSON). Xử lý qua `services/gcsService.js` với cơ chế cache ETag (HEAD request kiểm tra thay đổi trước khi tải lại JSON).
+- Nguồn dữ liệu & Không gian: Google Sheets `HTXH-Hue-06.2026` đồng bộ lên GCS thông qua Apps Script (`syncSheetsToGCS` và trigger `installedOnEdit`), hoàn toàn không phải do GEE đảm nhận (GEE chỉ dùng để phân tích: raster dân số, heatmap, viễn thám). Heatmap, độ phủ và tra cứu chỉ tính điểm có `TrangThai = TRUE`; điểm `FALSE` (đề xuất) vẫn hiển thị trên bản đồ với kiểu riêng (buffer nét đứt đỏ `#f87171`).
+
+# 3. SCHEMA DỮ LIỆU & QUY TẮC NGHIỆP VỤ QUAN TRỌNG
+- **Bán kính hạ tầng:** Bán kính luôn tính theo QCVN qua `constants.defaultRadius` / `standardRadius`. Cột `BanKinh` trong sheet chỉ được lưu vào `sheetRadius` để đối chiếu (`gcsService.js`).
+- Các trường bắt buộc: `ID_DoiTuong`, `Ten_CongTrinh`, `Ten_XaPhuong`, `Nhom_HaTang`, `Latitude`, `Longitude`, `QuyMo_HT`, `QuyMo_QH`, `BanKinh`, `TrangThai` (TRUE/FALSE), `ThoiGianCapNhat`, `Note`.
+- `TrangThai` CHỈ mang nghĩa phê duyệt (FALSE = người đề xuất, TRUE = Admin đã duyệt). Giai đoạn hiện trạng/quy hoạch suy ra từ 2 cột quy mô (`classifyPlanChange` trong `gcsService.js` → `planChange` với các trạng thái `keep`/`new`/`expand`/`shrink`/`relocate`/`none`).
+
+# 4. PHÂN NHÓM HỆ THỐNG DỰ ÁN (20 MODUL CHÍNH)
+Khi cần xử lý yêu cầu, AI phải định vị chính xác nhóm vấn đề sau để khoanh vùng file code cần đọc/sửa, **tuyệt đối không đọc các file dữ liệu thô (GeoJSON, JSON nặng, TIF, XLSX, PDF)**:
+- **[MOD-01] Khung giao diện, Layout & Khởi động:** `public/index.html`, `public/css/style.css`, `public/js/app.js`, `introTour.js`
+- **[MOD-02] Thành phần UI dùng chung:** `utils.js`, `telex.js`, `drawAssist.js`, helper popup trong `mapEngine.js`
+- **[MOD-03] Panel thống kê 40 phường xã & Biểu đồ:** `uiComponents.js`, `urbanClass.js`, `greenGrowth.js`, `wardBalance.js`
+- **[MOD-04] Trạng thái, Hằng số & Quy chuẩn QCVN:** `state.js`, `api.js`, `config/constants.js`
+- **[MOD-05] Động cơ bản đồ Leaflet & Ranh giới phường:** `mapEngine.js` (khởi tạo), `islandFlags.js`
+- **[MOD-06] Lớp hiện trạng (Marker, Buffer, Ranh lô TT16):** `mapEngine.js` (bộ vẽ), `tt16Symbols.js`, `public/icons/`
+- **[MOD-07] Quy hoạch & So sánh Side-by-Side:** `planMap.js`, `state.js`, `gcsService.js`
+- **[MOD-08] Heatmap độ phủ, Đẳng thời & Vùng phục vụ:** `api/gee.js`, `serviceArea.js`, `flowAnimation.js`, `mapEngine.js`. *(Lưu ý: Heatmap trên GEE dùng buffer tròn; "bám đường" là vùng phục vụ Dijkstra ở trình duyệt, còn đẳng thời dùng 16 tia OSRM).*
+- **[MOD-09] Đo đạc, Phác thảo & Xuất bản đồ:** `mapEngine.js` (đo), `sketchLayer.js`, `sketchExport.js`, `printLayout.js`
+- **[MOD-10] Tra cứu, Định vị & Popup thuộc tính:** `mapEngine.js` (click/popup), `csdProof.js`, `app.js`
+- **[MOD-11] Đề xuất điểm mới:** `app.js`, `api/gee.js`, `apps-script/Code.gs`
+- **[MOD-12] Nhập CAD/KML/GeoJSON/OSM & Thẩm định đồ án:** `cadImport*.js`, `cadTypeMapping.js`, `kmlImport.js`, `geojsonImport.js`, `osmImport.js`, `projectReview*.js`
+- **[MOD-13] Xác thực & Phân quyền Admin:** `services/authService.js`, `uiComponents.js`, `wardCheck.js`
+- **[MOD-14] GCS & Cache ETag:** `services/gcsService.js`, `api.js`
+- **[MOD-15] Apps Script (Sheets → GCS & Schema):** `apps-script/Code.gs`, `appsscript.json`
+- **[MOD-16] Dân số GEE & Hiệu chỉnh dân cư:** `geeService.js`, `popEditsService.js`, `popEdits.js`
+- **[MOD-17] Lớp môi trường & Viễn thám:** `satService.js`, `satLayers.js`, `terrainLayer.js`, `floodSim.js`, `riskLayer.js`, `drainageLayer.js`, `newDev.js`
+- **[MOD-18] Mạng lưới giao thông:** `roadsService.js`, `wardRoads.js`, `customRoads.js`, `roadNetworkLayer.js`
+- **[MOD-19] Bắt lỗi, Bảo mật API & Hiệu năng (xuyên suốt):** `api/gee.js` (dòng 100–330), cơ chế cache rải rác.
+- **[MOD-20] Triển khai & Tự động hóa:** `vercel.json`, `package.json`, `.gitignore`, `scripts/push-thoatnuoc.js`
+
+# 5. QUY TẮC BẮT BUỘC KHI AI HỖ TRỢ CODE (CRITICAL RULES)
+1. **Bảo toàn tính năng:** Giữ nguyên các tính năng hiện có, thuật toán đã sử dụng, không tự ý xóa bỏ; chỉ phát triển tiếp hoặc nâng cấp.
+2. **Giữ nguyên phong cách:** Duy trì Vanilla JS thuần (sử dụng ES Modules), tuyệt đối không tự ý chuyển sang framework (React/Vue...) nếu không có yêu cầu rõ ràng.
+3. **Bảo vệ cơ chế Cache:** Khi sửa `gcsService.js` hoặc luồng lấy dữ liệu, bắt buộc duy trì cơ chế cache ETag hiện tại để tối ưu hiệu năng.
+4. **Đồng bộ dữ liệu:** Khi thêm trường dữ liệu mới, cập nhật đồng bộ: Google Sheet → Apps Script export GeoJSON → `constants.js`/`mapEngine.js`.
+5. **Tuân thủ Phân nhóm & Khoanh vùng:** Khi nhận yêu cầu, AI phải tự xác định yêu cầu thuộc nhóm nào trong 20 nhóm trên, chỉ đọc các file thuộc nhóm đó để tiết kiệm token tối đa.
+6. **Cảnh báo hạn mức:** Nếu một yêu cầu bất kỳ buộc AI phải quét vượt quá phạm vi của nhóm vấn đề được chỉ định hoặc ước tính tiêu tốn lượng token lớn bất thường, AI phải dừng lại và hỏi xác nhận từ người dùng trước khi tiến hành.
+7. **An toàn API & Môi trường:** Khi làm việc với các endpoint gọi dữ liệu (GCS, Apps Script, API Vercel), code mới không được thêm domain cứng; frontend gọi API qua `geeApi()` (`api.js`), backend lấy URL/bí mật từ `config/constants.js` (biến môi trường `GAS_BASE_URL`, `GAS_SECRET`, `ALLOWED_ORIGINS`...) để chạy mượt cả ở Local và Production trên Vercel. Các domain mặc định hiện có (`PROD_GEE` trong `api.js`, URL GCS trong `constants.js`, `popEditsService.js`, `roadsService.js`) là fallback có chủ đích, không tự ý sửa.
+8. **Dọn dẹp Map Layer (Leaflet Cleanup):** Khi viết code thao tác với Leaflet (`mapEngine.js`, `planMap.js`), bắt buộc phải xóa/gỡ bỏ các marker, buffer hoặc layer cũ trước khi render layer mới để tránh tình trạng chồng lấn dữ liệu và tràn bộ nhớ (memory leak).
+9. **Lọc comment theo module:** Mỗi lần sửa một module, lọc luôn comment của các đoạn đang đọc/sửa trong module đó: xóa comment lặp lại tên hàm/dòng code, code bị comment bỏ, ghi chú lịch sử; giữ comment nêu căn cứ QCVN/Thông tư (Mục, Bảng), ràng buộc không thấy được từ code và tóm tắt logic phức tạp. Không quét riêng toàn dự án chỉ để xóa comment.
+10. **Ngôn ngữ trao đổi:** Mặc định trao đổi với người dùng hoàn toàn bằng tiếng Việt (câu trả lời, ghi chú tiến độ, câu hỏi xác nhận, tóm tắt kết quả). Thuật ngữ kỹ thuật, tên hàm/biến/file giữ nguyên tiếng Anh. Comment và chuỗi giao diện mới viết bằng tiếng Việt cho đồng bộ với code hiện có; commit message viết tiếng Việt không dấu theo lịch sử repo.
