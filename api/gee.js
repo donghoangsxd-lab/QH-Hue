@@ -12,9 +12,10 @@ const projects = require('../services/projectStore');
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
 let cachedWardStatsTtl = 0;
-// Vercel cắt hàm ở 60 s (vercel.json): đếm pixel độ phủ phải xong trước mốc này, phần còn lại để ước lượng và trả kết quả
-const WARD_STATS_BUDGET_MS = 42000;
-const WARD_STATS_DEADLINE_MS = 52000;
+// Vercel cắt hàm ở 60 s (vercel.json) tính cả khởi động nguội trước khi vào handler: đếm pixel độ phủ dừng ở mốc BUDGET,
+// ước lượng dừng ở mốc DEADLINE, watchdog trả 503 sau DEADLINE + 2 s
+const WARD_STATS_BUDGET_MS = 30000;
+const WARD_STATS_DEADLINE_MS = 38000;
 const WARD_STATS_ESTIMATE_TTL = 3 * 60 * 1000;
 let cachedWardStatsVersion = -1;
 let cachedCityNetwork = null;
