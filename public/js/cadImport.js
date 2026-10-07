@@ -792,8 +792,9 @@ function makeParcels(entities, project) {
   const tt16Other = {};
   entities.forEach((ent, src) => {
     const tt = tt16Layer(ent.layer);
-    const otherLand = !!(tt && tt.other && !ent.typeCode);
-    if (otherLand) tt16Other[ent.layer] = (tt16Other[ent.layer] || 0) + 1;
+    // asLand: lô đất chưa sử dụng (cadTypeMapping.asUnusedLand) — lô đất, không đưa vào khớp thủ công
+    const otherLand = !ent.typeCode && (!!ent.asLand || !!(tt && tt.other));
+    if (otherLand && tt) tt16Other[ent.layer] = (tt16Other[ent.layer] || 0) + 1;
     const pickSchool = ent.typeCode === SCHOOL_PICK || !!(tt && tt.school && !ent.typeCode);
     const pickMarket = ent.typeCode === MARKET_PICK;
     // typeCode: mã loại người dùng khớp thủ công cho layer/thuộc tính không theo quy ước

@@ -14,7 +14,7 @@ import {
 import { parseKml, unzipKml } from './kmlImport.js';
 import { parseGeoJson } from './geojsonImport.js';
 import { parseShapefileZip } from './shpImport.js';
-import { createManualMapping, selectField, setCode, clearCodes, applyManualMapping, manualMappingHtml } from './cadTypeMapping.js';
+import { createManualMapping, selectField, setCode, clearCodes, applyManualMapping, manualMappingHtml, asUnusedLand } from './cadTypeMapping.js';
 import { projectBoundary, fitBoundary } from './projectLayer.js';
 import { boundaryFromLines } from './boundaryLines.js';
 import { setLabelsOverlay, labelsOverlayOn } from './basemap.js';
@@ -32,6 +32,10 @@ const CHUNK_MAX_CHARS = 2500000;
 // Người dùng chưa đăng nhập: chỉ gửi file ≤ 2 MB vào hàng chờ duyệt trên bucket (máy chủ kiểm tra lại), không ghi Sheet
 const GUEST_MAX_BYTES = 2 * 1024 * 1024;
 const FILE_EXT_RE = /\.(dxf|kml|kmz|geojson|json|zip)$/i;
+
+// Cơ sở nhà đất chưa sử dụng (12-CSD) chỉ có vài khu: ranh nhập từng file DXF / KML. GeoJSON / shapefile là dữ liệu
+// nhập đồng loạt (bản đồ hiện trạng sử dụng đất), ở đó "CSD" là mã nhóm đất chưa sử dụng → luôn thành lô đất.
+const CSD_FORMATS = new Set(['dxf', 'kml']);
 
 // Lựa chọn cho lô chứa nhiều công trình cùng loại (ngoài ID công trình cần cập nhật)
 const CHOICE_NEW = '__new';
@@ -687,6 +691,9 @@ function renderReport() {
     alerts.push([current.crs ? 'info' : 'warn', `Shapefile ${fmtNum(current.layers.length)} lớp (${escapeHtml(current.layers.slice(0, 6).join(', '))}${current.layers.length > 6 ? ', …' : ''}). Tọa độ ${current.wgs84 ? 'WGS84 (kinh độ, vĩ độ)' : 'mét — hệ VN-2000 ở ô Hệ tọa độ'}, ${src}.`]);
     if (current.crsUnknown) alerts.push(['warn', 'File .prj dùng hệ tọa độ khác WGS84 / VN-2000 KTT 107° / UTM 48 hoặc các lớp khác hệ nhau — xuất lại về một hệ.']);
   }
+  if (current.csdDemoted) {
+    alerts.push(['info', `${fmtNum(current.csdDemoted)} đối tượng mang mã CSD: ${current.format === 'shp' ? 'shapefile' : 'GeoJSON'} nhập đồng loạt nên coi là <b>đất chưa sử dụng</b> (lô đất, ghi sheet DXF), không phải cơ sở nhà đất chưa sử dụng. Ranh cơ sở chưa sử dụng chỉ nhập từ file DXF / KML.`]);
+  }
   if (current.pointStats) {
     const s = current.pointStats;
     const named = parcels.filter(p => pointLabel(p)).length;
@@ -1082,10 +1089,21 @@ function refreshParcels() {
   loadLotKeys();
 }
 
+function demoteCsd(entities) {
+  current.csdDemoted = 0;
+  if (CSD_FORMATS.has(current.format)) return entities;
+  return entities.map(ent => {
+    const t = layerToType(ent.typeCode || ent.layer);
+    if (!t || t.type !== '12-CSD') return ent;
+    current.csdDemoted++;
+    return asUnusedLand(ent);
+  });
+}
+
 function analyse({ fit = true } = {}) {
   if (!current) return;
   const crs = CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
-  const entities = applyManualMapping(current.entities, current.manual);
+  const entities = demoteCsd(applyManualMapping(current.entities, current.manual));
   const base = current.wgs84 ? buildParcelsLonLat(entities) : buildParcels(entities, { crs });
   assignWards(base.parcels, state.wardLabelsList || []);
   enrichParcels(base.parcels);
@@ -1318,7 +1336,7 @@ function openParsed({ file, format, parsed, text, wgs84 }, pendingId, extras) {
   const tt16 = parsed.entities.some(e => tt16Layer(e.layer));
   current = {
     fileName: file.name, format, wgs84, tt16, filePhase, entities: parsed.entities, stats: parsed.stats, base: null, result: null,
-    manual: createManualMapping(parsed.entities), levels: new Map(), autoLevels: new Map(), takeOver: new Set(),
+    manual: createManualMapping(parsed.entities, { allowCsd: CSD_FORMATS.has(format) }), levels: new Map(), autoLevels: new Map(), takeOver: new Set(),
     reviewSrc: null, reviewStarted: false,
     raw: { ext: format === 'shp' ? 'geojson' : format, text }, pendingId,
     crs: parsed.crs || null, crsUnknown: !!parsed.crsUnknown, layers: parsed.layers || [],

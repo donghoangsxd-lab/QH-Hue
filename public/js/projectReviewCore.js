@@ -156,13 +156,13 @@ const ROW_TT16 = {
     dd_o: ['O-NO'], dd_hh: ['O-HH'], dd_cq: ['CQ'], dd_cx: ['1-CV'], dd_gt: ['GT'], dd_ht: ['HTK'],
     ndd_cn: ['SX-CN'], ndd_dt: ['DT-NC'], ndd_cq: ['CQ'], ndd_yt: ['7-YT'], ndd_vh: ['8-VH'], ndd_dl: ['DL'],
     ndd_cxhc: ['CX-HC'], ndd_cxcd: ['CX-CD'], ndd_dtich: ['DT-TG'], ndd_nt: ['O-LX'], ndd_an: ['AN'], ndd_qp: ['QP'],
-    ndd_gt: ['GT'], ndd_ht: ['HTK'], nnk_nn: ['NN'], nnk_ts: ['TS'], nnk_csd: ['12-CSD'], nnk_ho: ['HO'], nnk_song: ['SS'], nnk_bien: ['MNB']
+    ndd_gt: ['GT'], ndd_ht: ['HTK'], nnk_nn: ['NN'], nnk_ts: ['TS'], nnk_csd: ['DCS'], nnk_ho: ['HO'], nnk_song: ['SS'], nnk_bien: ['MNB']
   },
   QHPK: {
     o: ['O-NO'], hh: ['O-HH'], lx: ['O-LX'], yt: ['7-YT'], vh: ['8-VH'], tdtt: ['TDTT'], gd: ['3-MN', true],
     cxcc: ['1-CV'], cxhc: ['CX-HC'], cxcd: ['CX-CD'], sx: ['SX-CN'], ks: ['SX-VL'], dtnc: ['DT-NC'], cq: ['CQ'],
     dv: ['9-TM', true], dl: ['DL'], dtich: ['DT-TG'], an: ['AN'], qp: ['QP'], gt: ['GT'], bdx: ['2-BDX'], ntr: ['NTR'],
-    htk: ['HTK'], nn: ['NN'], rsx: ['RSX'], rph: ['RPH'], rdd: ['RDD'], ts: ['TS'], csd: ['12-CSD'], ho: ['HO'], song: ['SS'], bien: ['MNB']
+    htk: ['HTK'], nn: ['NN'], rsx: ['RSX'], rph: ['RPH'], rdd: ['RDD'], ts: ['TS'], csd: ['DCS'], ho: ['HO'], song: ['SS'], bien: ['MNB']
   }
 };
 const SUB_TT16 = { thpt: '6-THPT', mn: '3-MN', th: '4-TH', thcs: '5-THCS', cho: '9-TM' };

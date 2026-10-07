@@ -15,7 +15,8 @@ export const TT16_STYLES = {
   "8-VH": { label: 'Văn hóa', layer: 'DAT_HTXH_Vanhoa', aci: 243, color: '#cc667f', pattern: 'Vanhoa' },
   "TDTT": { label: 'Thể dục thể thao', layer: 'DAT_HTXH_Theducthethao', aci: 94, color: '#009900', pattern: 'TDTT' },
   "9-TM": { label: 'Khu dịch vụ (chợ, TTTM)', layer: 'DAT_Dichvu', aci: 12, color: '#cc0000', pattern: 'Dichvu' },
-  "12-CSD": { label: 'Chưa sử dụng', layer: 'DAT_KHAC_Chuasudung', aci: 9, color: '#c0c0c0', pattern: 'Chuasudung', fillOpacity: 0.45 }
+  // Cơ sở nhà đất chưa sử dụng: không có trong TT16 (khác loại đất "Chưa sử dụng" DCS), mượn hoa văn, màu riêng để không lẫn
+  "12-CSD": { label: 'Cơ sở nhà đất chưa sử dụng', layer: 'CSD (ngoài TT16)', color: '#f08c00', pattern: 'Chuasudung', fillOpacity: 0.45 }
 };
 // Loại đất Mục 04 còn lại (và đầu mục tương ứng của quy hoạch chung). codes: tên phân lớp, bỏ tiền tố giai đoạn
 Object.assign(TT16_STYLES, {
@@ -42,7 +43,8 @@ Object.assign(TT16_STYLES, {
   "TS": { label: 'Nuôi trồng thủy sản', layer: 'DAT_NN_Thuysan', aci: 150, color: '#007fff', pattern: 'Thuysan' },
   "HO": { label: 'Hồ, ao, đầm', layer: 'DAT_KHAC_Honuoc', aci: 154, color: '#004c99', pattern: 'Honuoc' },
   "SS": { label: 'Sông, suối, kênh, rạch', layer: 'DAT_KHAC_Songsuoi', aci: 152, color: '#0066cc', pattern: 'Songsuoi' },
-  "MNB": { label: 'Mặt nước ven biển', layer: 'DAT_KHAC_Matnuocbien', aci: 152, color: '#0066cc', pattern: 'Matnuocbien' }
+  "MNB": { label: 'Mặt nước ven biển', layer: 'DAT_KHAC_Matnuocbien', aci: 152, color: '#0066cc', pattern: 'Matnuocbien' },
+  "DCS": { label: 'Đất chưa sử dụng', layer: 'DAT_KHAC_Chuasudung', aci: 9, color: '#c0c0c0', pattern: 'Chuasudung', fillOpacity: 0.45 }
 });
 
 const PATTERN_CODES = [
@@ -80,7 +82,7 @@ const PATTERN_CODES = [
   ['8-VH', ['DAT_HTXH_VANHOA']],
   ['TDTT', ['DAT_HTXH_THEDUCTHETHAO', 'DAT_NDD_VANHOATHETHAO']],
   ['9-TM', ['DAT_DICHVU']],
-  ['12-CSD', ['DAT_KHAC_CHUASUDUNG', 'DAT_NNK_CHUASUDUNG']]
+  ['DCS', ['DAT_KHAC_CHUASUDUNG', 'DAT_NNK_CHUASUDUNG']]
 ];
 const patternByCode = new Map();
 PATTERN_CODES.forEach(([key, codes]) => codes.forEach(code => patternByCode.set(code, key)));
@@ -91,7 +93,7 @@ const LAYER_LEVEL = new Set(['QG', 'CV', 'CT', 'CH', 'DVO', 'MN', 'TH', 'THCS', 
 const LEGEND_KEYS = [
   "O-NO", "O-HH", "O-LX", "7-YT", "8-VH", "TDTT", "3-MN", "4-TH", "5-THCS", "6-THPT",
   "1-CV", "CX-HC", "CX-CD", "SX-CN", "SX-VL", "DT-NC", "CQ", "9-TM", "DL", "DT-TG",
-  "AN", "QP", "GT", "2-BDX", "NTR", "HTK", "NN", "RSX", "RPH", "RDD", "TS", "12-CSD", "HO", "SS", "MNB"
+  "AN", "QP", "GT", "2-BDX", "NTR", "HTK", "NN", "RSX", "RPH", "RDD", "TS", "DCS", "HO", "SS", "MNB", "12-CSD"
 ];
 
 // Từ zoom này tô hoa văn; thu nhỏ hơn tô đặc cùng màu ký hiệu
@@ -452,10 +454,11 @@ function patternFor(key) {
   return tile.pattern;
 }
 
-// Loại hạ tầng + tên layer gốc → khóa ký hiệu (lô Thể dục thể thao dùng ký hiệu riêng trong nhóm Văn hóa, thể thao)
+// Loại hạ tầng + tên layer gốc → khóa ký hiệu (lô Thể dục thể thao dùng ký hiệu riêng trong nhóm Văn hóa, thể thao);
+// loại không có ký hiệu → null (tô màu trung tính), không mượn ký hiệu chưa sử dụng
 function styleKey(type, layer) {
   if (type === '8-VH' && /THEDUCTHETHAO/i.test(layer || '')) return 'TDTT';
-  return TT16_STYLES[type] ? type : '12-CSD';
+  return TT16_STYLES[type] ? type : null;
 }
 
 /**
@@ -466,7 +469,7 @@ function styleKey(type, layer) {
  */
 export function tt16ParcelStyle(type, layer, { scenario, detailed, approved }) {
   const key = styleKey(type, layer);
-  return tt16SymbolStyle(key, TT16_STYLES[key].color, layer, { scenario, detailed, approved });
+  return tt16SymbolStyle(key, key ? TT16_STYLES[key].color : null, layer, { scenario, detailed, approved });
 }
 
 /**
@@ -537,7 +540,9 @@ const LAND_RULES = [
   { key: 'an', label: 'Đất an ninh, quốc phòng', color: '#d9480f', re: /ANQP|QPAN|ANNINH|QUOCPHONG/ },
   { key: 'tg', label: 'Đất di tích, tôn giáo', color: '#7f1d1d', re: /DITICH|TONGIAO|TINNGUONG/ },
   // Lô dịch vụ không phải chợ / siêu thị / TTTM (DAT_Dichvu, "Đất khu dịch vụ")
-  { key: 'dv', label: 'Đất dịch vụ, thương mại', color: '#e8590c', re: /DICH[\s_]?VU|THUONG[\s_]?MAI/ }
+  { key: 'dv', label: 'Đất dịch vụ, thương mại', color: '#e8590c', re: /DICH[\s_]?VU|THUONG[\s_]?MAI/ },
+  // Đất bằng / đồi núi / núi đá chưa sử dụng (mã kiểm kê BCS, DCS, NCS): lô đất, không phải Cơ sở chưa sử dụng (12-CSD)
+  { key: 'csd', label: 'Đất chưa sử dụng', color: '#c0c0c0', re: /CHUA[\s_.-]?SU[\s_.-]?DUNG|(^|[\s_.-])(BCS|DCS|NCS)($|[\s_.-])/ }
 ];
 
 export const LAND_LABELS = [...LAND_RULES.map(r => r.label), 'Đất khác'];

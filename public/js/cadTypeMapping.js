@@ -6,6 +6,9 @@ import { landRule } from './tt16Symbols.js';
 
 // Mã khớp "Đất ở": không phải hạ tầng — lô vẫn ghi sheet DXF, tên layer đổi để luôn tô màu đất ở
 const LAND_O = 'DATO';
+// Mã khớp "Đất chưa sử dụng" (đất bằng / đồi núi chưa sử dụng của bản đồ hiện trạng sử dụng đất): lô đất, ghi sheet DXF.
+// Khác hẳn "Cơ sở chưa sử dụng" (CSD): cơ sở nhà đất đã có hạ tầng xung quanh nhưng bỏ trống — không được gộp.
+const LAND_CSD = 'DATCSD';
 
 // Mã loại cho ô chọn (khớp LAYER_PREFIXES; cấp đơn vị ở dùng mã gốc, cấp đô thị thêm _DT)
 export const TYPE_CODE_OPTIONS = [
@@ -25,7 +28,8 @@ export const TYPE_CODE_OPTIONS = [
   ['TM', 'Chợ, Trung tâm thương mại'],
   ['TM_DT', 'Chợ, TTTM – cấp đô thị'],
   [MARKET_PICK, 'Chợ, TTTM – chọn từng lô'],
-  ['CSD', 'Cơ sở chưa sử dụng'],
+  ['CSD', 'Cơ sở nhà đất chưa sử dụng (chỉ nhập từ DXF / KML)'],
+  [LAND_CSD, 'Đất chưa sử dụng (BCS, DCS, NCS) – sheet DXF, không phải cơ sở'],
   [LAND_O, 'Đất ở – sheet DXF, màu đất ở']
 ];
 const VALID_CODES = new Set(TYPE_CODE_OPTIONS.map(([c]) => c));
@@ -34,6 +38,11 @@ const VALID_CODES = new Set(TYPE_CODE_OPTIONS.map(([c]) => c));
 const MAX_VALUES = 80;
 const EMPTY_KEY = '';
 const MEMORY_KEY = 'qhhue.cadTypeMap';
+
+// Cơ sở chưa sử dụng chỉ gợi ý khi tên nói rõ là cơ sở / nhà đất. "CSD" đứng riêng là mã nhóm đất chưa sử dụng
+// trong kiểm kê đất đai (cùng BCS, DCS, NCS) nên không tính.
+const CSD_FACILITY_RE = /co so (nha dat )?(chua su dung|bo trong|khong su dung|bo hoang)|nha dat (cong )?(chua su dung|bo trong|doi du|khong su dung|bo hoang)/;
+const UNUSED_LAND_RE = /chua su dung|\b(bcs|dcs|ncs)\b|bo hoang|dat trong/;
 
 // Gợi ý loại theo từ khóa trong giá trị (bỏ dấu, không phân biệt hoa thường); thứ tự quan trọng: THCS/THPT trước TH.
 // Nhận cả cách đặt tên layer CAD trước TT 16/2025 ("N - QH - dat TDTT", "dat DVTM", "cay xanh dvo", "01-Green place").
@@ -52,7 +61,8 @@ const GUESS_RULES = [
   ['VH', /van hoa|the thao|\btdtt\b|san van dong|\bnvh\b|cultur|\bsport/],
   [MARKET_PICK, /\bcho\b|thuong mai|\btttm\b|sieu thi|\bdvtm\b|\btmdv\b|dich vu|commercial|\bmarket\b/,
     /hon hop|ket hop|du lich|dich vu cong cong|nha o/],
-  ['CSD', /chua su dung|bo trong|dat trong|\bcsd\b/],
+  ['CSD', CSD_FACILITY_RE],
+  [LAND_CSD, UNUSED_LAND_RE],
   [LAND_O, /\bdat o\b|\bo (do thi|nong thon)\b|\bodt\b|\bont\b|lang xom|biet thu|lien ke|chinh trang|tai dinh cu|\btdc\b|nha o\b|nha vuon|\bnoxh\b|chung cu|nhom nha/,
     /cay xanh|cong vien|truong|y te|bai do|van hoa|the thao/]
 ];
@@ -72,8 +82,15 @@ function guessCode(value) {
   return URBAN_RE.test(s) && VALID_CODES.has(urban) ? urban : hit[0];
 }
 
-const suggestOf = (val, mem) => {
-  const code = val ? mem[normalize(val)] || guessCode(val) : '';
+// Lựa chọn CSD đã nhớ cho giá trị dạng "đất ... chưa sử dụng" (bản cũ tự gợi ý nhầm) bị bỏ, đoán lại theo từ khóa.
+// allowCsd = false (GeoJSON / shapefile): không bao giờ gợi ý CSD.
+const suggestOf = (val, mem, allowCsd) => {
+  if (!val) return '';
+  const s = normalize(val);
+  let code = mem[s];
+  if (code === 'CSD' && UNUSED_LAND_RE.test(s) && !CSD_FACILITY_RE.test(s)) code = '';
+  code = code || guessCode(val);
+  if (code === 'CSD' && !allowCsd) return '';
   return VALID_CODES.has(code) ? code : '';
 };
 
@@ -100,8 +117,9 @@ const isUnknown = (ent) => !tt16Layer(ent.layer) && !layerToType(ent.layer);
  * Tạo trạng thái khớp thủ công cho các thực thể chưa nhận diện được loại; null nếu mọi thực thể đều đúng quy ước.
  * Trường mặc định: trường gợi ý được loại cho nhiều lô nhất (từ khóa / lần khớp trước); hòa thì trường có tên loại đất,
  * rồi trường trùng tên layer đang hiển thị, rồi trường ít giá trị hơn. Không trường nào gợi ý được: trường phân loại như trên.
+ * allowCsd = false: file nhập đồng loạt (GeoJSON / shapefile) không được gán Cơ sở chưa sử dụng.
  */
-export function createManualMapping(entities) {
+export function createManualMapping(entities, { allowCsd = true } = {}) {
   const unknown = entities.filter(isUnknown);
   if (!unknown.length) return null;
   const stat = new Map();
@@ -118,7 +136,7 @@ export function createManualMapping(entities) {
     .map(f => ({
       key: f.key, distinct: f.counts.size, filled: f.filled, sameAsLayer: f.sameAsLayer,
       named: CLASS_FIELD_RE.test(normalize(f.key)) ? 1 : 0,
-      covered: f.counts.size > MAX_VALUES ? 0 : [...f.counts].reduce((s, [val, n]) => s + (suggestOf(val, mem) ? n : 0), 0)
+      covered: f.counts.size > MAX_VALUES ? 0 : [...f.counts].reduce((s, [val, n]) => s + (suggestOf(val, mem, allowCsd) ? n : 0), 0)
     }))
     .sort((a, b) => b.filled - a.filled || a.distinct - b.distinct);
   const byGuess = fields.filter(f => f.covered > 0)
@@ -127,7 +145,7 @@ export function createManualMapping(entities) {
   const categorical = fields.filter(f => f.filled === unknown.length && f.distinct > 1 && f.distinct < f.filled);
   const def = byGuess[0] || [...(categorical.length ? categorical : fields)]
     .sort((a, b) => b.sameAsLayer - a.sameAsLayer || a.distinct - b.distinct)[0];
-  const mapping = { unknownCount: unknown.length, fields, field: null, values: [], codes: new Map(), suggested: new Set() };
+  const mapping = { unknownCount: unknown.length, fields, field: null, values: [], codes: new Map(), suggested: new Set(), allowCsd };
   if (def) selectField(mapping, def.key, entities);
   return mapping;
 }
@@ -145,7 +163,7 @@ export function selectField(mapping, key, entities) {
   mapping.suggested = new Set();
   const mem = loadMemory();
   mapping.values.slice(0, MAX_VALUES).forEach(({ val }) => {
-    const code = suggestOf(val, mem);
+    const code = suggestOf(val, mem, mapping.allowCsd);
     if (code) {
       mapping.codes.set(val, code);
       mapping.suggested.add(val);
@@ -156,7 +174,7 @@ export function selectField(mapping, key, entities) {
 /** Gán loại cho giá trị thứ idx ('' = bỏ qua); nhớ lựa chọn cho các lần nhập sau */
 export function setCode(mapping, idx, code) {
   const item = mapping.values[idx];
-  if (!item) return;
+  if (!item || (code === 'CSD' && !mapping.allowCsd)) return;
   if (VALID_CODES.has(code)) mapping.codes.set(item.val, code); else mapping.codes.delete(item.val);
   mapping.suggested.delete(item.val);
   remember(item.val, VALID_CODES.has(code) ? code : '');
@@ -169,7 +187,7 @@ export function clearCodes(mapping) {
 }
 
 /** Thực thể sau khi khớp: thực thể chưa nhận diện được mà có giá trị đã gán → thêm typeCode; layer hiển thị = giá trị đã khớp.
- *  Đất ở không thêm typeCode (vẫn là lô đất sheet DXF), chỉ đổi layer cho landRule nhận ra. */
+ *  Đất ở / đất chưa sử dụng không thêm typeCode (vẫn là lô đất sheet DXF), chỉ đổi layer cho landRule nhận ra. */
 export function applyManualMapping(entities, mapping) {
   if (!mapping || !mapping.field || !mapping.codes.size) return entities;
   return entities.map(ent => {
@@ -180,12 +198,20 @@ export function applyManualMapping(entities, mapping) {
       const name = val || ent.layer;
       return { ...ent, layer: (landRule(name) || {}).key === 'o' ? name : `Đất ở - ${name}` };
     }
+    if (code === LAND_CSD) return asUnusedLand(ent, val || ent.layer);
     return code ? { ...ent, layer: val || ent.layer, typeCode: code } : ent;
   });
 }
 
-function codeOptions(selected) {
-  return `<option value="">— Bỏ qua —</option>${TYPE_CODE_OPTIONS.map(([code, label]) =>
+/** Lô đất chưa sử dụng: bỏ mã loại, đổi tên layer để không bị nhận là hạ tầng và landRule xếp vào "Đất chưa sử dụng" */
+export function asUnusedLand(ent, name = ent.layer) {
+  const rest = { ...ent };
+  delete rest.typeCode;
+  return { ...rest, asLand: true, layer: (landRule(name) || {}).key === 'csd' ? name : `Đất chưa sử dụng - ${name}` };
+}
+
+function codeOptions(selected, allowCsd) {
+  return `<option value="">— Bỏ qua —</option>${TYPE_CODE_OPTIONS.filter(([code]) => allowCsd || code !== 'CSD').map(([code, label]) =>
     `<option value="${code}"${code === selected ? ' selected' : ''}>${code} · ${escapeHtml(label)}</option>`).join('')}`;
 }
 
@@ -200,7 +226,7 @@ export function manualMappingHtml(mapping) {
     const sug = mapping.suggested.has(val);
     return `<div class="cad-map-row${code ? ' mapped' : ''}">
       <span class="cad-map-val" title="${escapeHtml(val || '(trống)')}">${val ? escapeHtml(val) : '<i>(trống)</i>'} <small>${n} lô</small>${sug ? '<em title="Điền sẵn theo từ khóa hoặc lần khớp trước — kiểm tra lại">gợi ý</em>' : ''}</span>
-      <select class="cad-map-type" data-k="${idx}" aria-label="Loại hạ tầng cho ${escapeHtml(val || 'giá trị trống')}">${codeOptions(code)}</select>
+      <select class="cad-map-type" data-k="${idx}" aria-label="Loại hạ tầng cho ${escapeHtml(val || 'giá trị trống')}">${codeOptions(code, mapping.allowCsd)}</select>
     </div>`;
   }).join('');
   const more = mapping.values.length - shown.length;
