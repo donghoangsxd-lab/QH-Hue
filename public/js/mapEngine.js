@@ -538,9 +538,12 @@ function parcelMinZoom(m, groups) {
 }
 
 // Zoom ≤ ngưỡng (mức toàn thành phố): mỗi phường 1 biểu đồ tròn số công trình theo loại thay cho icon chồng chéo.
+// Zoom < PIE_CLICK_ZOOM mà khung nhìn có > PIE_ICON_LIMIT công trình (nhóm đang bật) cũng chuyển sang biểu đồ;
+// từ PIE_CLICK_ZOOM trở lên luôn hiện icon/chấm để bấm biểu đồ (bay tới PIE_CLICK_ZOOM) không bị kẹt ở biểu đồ.
 // Đang chọn 1 phường thì luôn hiện icon (phường rộng có thể vừa khung ở zoom thấp, 1 biểu đồ đơn lẻ không có ý nghĩa)
 const PIE_MAX_ZOOM = 12;
 const PIE_CLICK_ZOOM = 15;
+const PIE_ICON_LIMIT = 200;
 const PIE_MIN_PX = 22;
 const PIE_MAX_PX = 46;
 const PIE_SLICE_GAP_DEG = 1.6;
@@ -793,7 +796,8 @@ function bufferFillRenderer(m, key, approved, opacity) {
  * - Buffer (chỉ hiển thị, không dùng cho heatmap / độ phủ) vẽ bằng L.circle trên canvas, chỉ dựng cho nhóm đang bật và
  *   vòng tròn chạm khung nhìn (nới 25%); kéo/zoom chỉ thêm/bớt phần chênh lệch như marker.
  * - Ranh lô CAD (nếu có) vẽ cùng nhóm với marker nên bật/tắt theo loại hạ tầng và lọc phường như icon.
- * - Zoom ≤ PIE_MAX_ZOOM: bỏ marker, mỗi phường 1 biểu đồ tròn đếm theo các loại đang bật.
+ * - Zoom ≤ PIE_MAX_ZOOM, hoặc zoom < PIE_CLICK_ZOOM mà khung nhìn > PIE_ICON_LIMIT công trình: bỏ marker,
+ *   mỗi phường 1 biểu đồ tròn đếm theo các loại đang bật.
  */
 function createRenderer(getMap, groups, isActive, scenarioLabel) {
   let list = [];
@@ -891,7 +895,17 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     const m = getMap();
     if (!m || !isActive()) return;
     const wardSelected = state.selectedWard && state.selectedWard !== CITY_NAME;
-    if (m.getZoom() <= PIE_MAX_ZOOM && !wardSelected && state.wardLabelsList.some(w => w.geometry)) {
+    // Nhóm đang tắt: không dựng marker và không tính vào ngưỡng PIE_ICON_LIMIT / ICON_MAX_VISIBLE (bật lại lớp sẽ gọi refreshPoints)
+    const groupOf = (p) => groups[ICON_GROUP_KEYS[layerType(p)]] || groups.c9;
+    const shown = (p) => m.hasLayer(groupOf(p));
+    const tooMany = () => {
+      const view = m.getBounds();
+      let n = 0;
+      return list.some(p => view.contains([p.lat, p.lng]) && shown(p) && ++n > PIE_ICON_LIMIT);
+    };
+    const zoom = m.getZoom();
+    const pieZoom = zoom <= PIE_MAX_ZOOM || (zoom < PIE_CLICK_ZOOM && tooMany());
+    if (pieZoom && !wardSelected && state.wardLabelsList.some(w => w.geometry)) {
       if (mode !== 'pie') {
         clearPoints();
         mode = 'pie';
@@ -906,12 +920,9 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
       m.getContainer().classList.remove('ward-pie-mode');
     }
     const bounds = m.getBounds().pad(0.25);
-    // Nhóm đang tắt: không dựng marker và không tính vào ngưỡng ICON_MAX_VISIBLE (bật lại lớp sẽ gọi refreshPoints)
-    const groupOf = (p) => groups[ICON_GROUP_KEYS[layerType(p)]] || groups.c9;
-    const visible = list.filter(p => bounds.contains([p.lat, p.lng]) && m.hasLayer(groupOf(p)));
+    const visible = list.filter(p => bounds.contains([p.lat, p.lng]) && shown(p));
     const nextMode = visible.length <= ICON_MAX_VISIBLE ? 'icon' : 'dot';
     // Ranh lô vẽ cùng marker trong nhóm công trình nên bật lớp nào hiện lô lớp đó; bản đồ quy hoạch lấy lô QH (parcelFor)
-    const zoom = m.getZoom();
     const wantParcels = state.cadParcels.size > 0
       && ((state.showParcels && zoom >= parcelMinZoom(m, groups)) || (state.showProjects && zoom >= PARCEL_MIN_ZOOM));
     const detail = m.getZoom() >= PARCEL_PATTERN_ZOOM;
