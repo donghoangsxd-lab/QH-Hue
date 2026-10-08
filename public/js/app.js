@@ -28,6 +28,7 @@ import {
   ensureWardStats,
   reloadWardStats,
   toggleBottomPanelMaximized,
+  setBottomPanelCollapsed,
   toggleStatTable,
   exportBottomPanelPdf,
   initGoogleSignIn,
@@ -36,7 +37,10 @@ import {
   signOutAdmin,
   startBackgroundCoverageFill
 } from './uiComponents.js';
-import { initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleCompareMode } from './planMap.js';
+import {
+  initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleSplit, isSplitOn,
+  getViewMode, getSplitKind, onViewChange, setViewMode, toggleViewMode, setSplitKind
+} from './planMap.js';
 import { escapeHtml, setStatusContent, showToast } from './utils.js';
 import { initCadImport } from './cadImportUi.js';
 import { initProjectLayer } from './projectLayer.js';
@@ -204,6 +208,63 @@ function setStatus(text, color) {
   setStatusContent(el, text);
 }
 
+// Thanh tiêu đề: lật Quy hoạch ⇄ Hiện trạng, chia đôi thì chọn cùng tâm / lệch tâm.
+// Mỗi lần đổi giao diện đặt lại lớp mặc định: Quy hoạch / so sánh bật lớp đồ án, Hiện trạng tắt.
+const VIEW_TITLES = {
+  QH: ['Giao diện đồ án quy hoạch', 'BẢN ĐỒ QUY HOẠCH HẠ TẦNG THÀNH PHỐ HUẾ'],
+  HT: ['Giao diện công trình hiện trạng', 'BẢN ĐỒ HIỆN TRẠNG HẠ TẦNG THÀNH PHỐ HUẾ'],
+  split: ['So sánh hiện trạng | quy hoạch', 'SO SÁNH HIỆN TRẠNG – QUY HOẠCH HẠ TẦNG THÀNH PHỐ HUẾ']
+};
+function initMapTitle() {
+  const root = document.getElementById('mapTitle');
+  if (!root) return;
+  const kicker = document.getElementById('mapTitleKicker');
+  const text = document.getElementById('mapTitleText');
+  const flip = document.getElementById('btnFlipView');
+  const flipText = flip?.querySelector('.map-title-flip-text');
+  const setProjects = (on) => {
+    const chk = document.getElementById('chk_projects');
+    if (!chk || chk.checked === on) return;
+    chk.checked = on;
+    chk.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  let last = null;
+  const paint = ({ view, split, kind }) => {
+    const key = split ? 'split' : view;
+    root.dataset.view = key;
+    const [sub, title] = VIEW_TITLES[key];
+    if (kicker) kicker.textContent = split ? `${sub} · ${kind === 'offset' ? 'lệch tâm' : 'cùng tâm'}` : sub;
+    if (text) {
+      text.textContent = title;
+      text.title = title;
+    }
+    if (flip) {
+      const other = view === 'QH' ? 'hiện trạng' : 'quy hoạch';
+      flip.title = `Lật sang bản đồ ${other}`;
+      flip.setAttribute('aria-label', flip.title);
+      if (flipText) flipText.textContent = view === 'QH' ? 'Hiện trạng' : 'Quy hoạch';
+    }
+    root.querySelectorAll('[data-split-kind]').forEach(btn => {
+      const on = btn.dataset.splitKind === kind;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-checked', String(on));
+    });
+    if (key === last) return;
+    if (last !== null) {
+      root.classList.remove('flipping');
+      void root.offsetWidth;
+      root.classList.add('flipping');
+    }
+    last = key;
+    setProjects(key !== 'HT');
+  };
+  root.addEventListener('animationend', () => root.classList.remove('flipping'));
+  onViewChange(paint);
+  flip?.addEventListener('click', toggleViewMode);
+  root.querySelectorAll('[data-split-kind]').forEach(btn => btn.addEventListener('click', () => setSplitKind(btn.dataset.splitKind)));
+  paint({ view: getViewMode(), split: isSplitOn(), kind: getSplitKind() });
+}
+
 async function loadInfraData() {
   const res = await fetch(infraListUrl());
   if (!res.ok) throw new Error(`Lỗi máy chủ (${res.status})`);
@@ -257,7 +318,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   ['btnMeasureDist', 'btnMeasureArea', 'btnInspectMode', 'btnPickOnMap', 'btnRoadDraw', 'btnPopDraw']
     .forEach(id => document.getElementById(id)?.addEventListener('click', stopSketchTool));
   restoreAdminSession();
-  document.getElementById('btnToggleCompare')?.addEventListener('click', toggleCompareMode);
+  document.getElementById('btnToggleCompare')?.addEventListener('click', toggleSplit);
+  initMapTitle();
 
   // ---------- Click bản đồ: dùng chung cho nửa trái (hiện trạng) và nửa phải (quy hoạch) khi so sánh ----------
   let pickSeq = 0;
@@ -289,6 +351,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   const handleMapClick = (e, targetMap) => {
+    // Phác thảo / vẽ tuyến / vùng dân cư chỉ có trên bản đồ hiện trạng
+    if ((state.sketchTool || state.adminDrawMode) && targetMap !== map && !isSplitOn()) {
+      setViewMode('HT');
+      showToast('Phác thảo / vẽ thực hiện trên bản đồ hiện trạng: đã lật sang bản đồ hiện trạng', 'info');
+      targetMap = map;
+    }
     if (state.sketchTool) {
       if (targetMap === map) handleSketchClick(e.latlng);
       return;
@@ -379,6 +447,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btnExpandRightPanel')?.addEventListener('click', () => showRightTab(activeTab));
 
   document.getElementById('btnToggleBottomMax')?.addEventListener('click', toggleBottomPanelMaximized);
+  document.getElementById('btnCollapseBottomPanel')?.addEventListener('click', () => setBottomPanelCollapsed(true));
+  document.getElementById('btnExpandBottomPanel')?.addEventListener('click', () => setBottomPanelCollapsed(false));
   document.getElementById('btnToggleStatTable')?.addEventListener('click', toggleStatTable);
   document.getElementById('btnExportBottomPdf')?.addEventListener('click', exportBottomPanelPdf);
 

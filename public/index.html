@@ -39,6 +39,8 @@
     <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19M9 7h6"/></symbol>
     <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m6 7 5 5-5 5M13 7l5 5-5 5"/></symbol>
     <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="m18 7-5 5 5 5M11 7l-5 5 5 5"/></symbol>
+    <symbol id="i-chev-up" viewBox="0 0 24 24"><path d="m7 18 5-5 5 5M7 11l5-5 5 5"/></symbol>
+    <symbol id="i-chevs-down" viewBox="0 0 24 24"><path d="m7 6 5 5 5-5M7 13l5 5 5-5"/></symbol>
     <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 14.8h18M9 9.5V20M15 9.5V20"/></symbol>
     <symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="9" rx="1.5"/><path d="M7 14h10v7H7z"/></symbol>
     <symbol id="i-maximize" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
@@ -66,6 +68,9 @@
     <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></symbol>
     <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
     <symbol id="i-swap" viewBox="0 0 24 24"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M3 12h18"/></symbol>
+    <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-split-same" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M12 5v14" stroke-dasharray="2 2"/><circle cx="12" cy="12" r="2" fill="currentColor"/></symbol>
+    <symbol id="i-split-offset" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M12 5v14"/><circle cx="7.5" cy="12" r="1.7" fill="currentColor"/><circle cx="16.5" cy="12" r="1.7" fill="currentColor"/></symbol>
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
@@ -101,6 +106,22 @@
       <span class="swipe-handle"><svg class="ico"><use href="#i-swap"/></svg></span>
       <span class="swipe-label swipe-label-right">BẢN ĐỒ QUY HOẠCH</span>
     </div>
+
+    <!-- THANH TIÊU ĐỀ: lật Quy hoạch ⇄ Hiện trạng; chia đôi màn hình thì chọn cùng tâm / lệch tâm -->
+    <header class="map-title" id="mapTitle" data-view="QH">
+      <span class="map-title-mark" aria-hidden="true"><svg class="ico"><use href="#i-map"/></svg></span>
+      <div class="map-title-body">
+        <span class="map-title-kicker" id="mapTitleKicker">Đồ án quy hoạch</span>
+        <h1 class="map-title-text" id="mapTitleText">BẢN ĐỒ QUY HOẠCH HẠ TẦNG THÀNH PHỐ HUẾ</h1>
+      </div>
+      <button type="button" class="map-title-flip" id="btnFlipView" title="Lật sang bản đồ hiện trạng" aria-label="Lật sang bản đồ hiện trạng">
+        <svg class="ico"><use href="#i-flip"/></svg><span class="map-title-flip-text">Hiện trạng</span>
+      </button>
+      <div class="map-title-split" role="radiogroup" aria-label="Kiểu so sánh">
+        <button type="button" class="map-title-seg" data-split-kind="same" role="radio" aria-checked="true" title="Cùng tâm: hai bản đồ chồng khít, kéo thanh trượt để so sánh"><svg class="ico"><use href="#i-split-same"/></svg>Cùng tâm</button>
+        <button type="button" class="map-title-seg" data-split-kind="offset" role="radio" aria-checked="false" title="Lệch tâm: hiện trạng ở giữa nửa trái, quy hoạch ở giữa nửa phải"><svg class="ico"><use href="#i-split-offset"/></svg>Lệch tâm</button>
+      </div>
+    </header>
 
     <!-- THANH CÔNG CỤ DỌC CẠNH TRÁI BẢN ĐỒ -->
     <div class="map-toolbar" role="toolbar" aria-label="Công cụ bản đồ" aria-orientation="vertical">
@@ -155,7 +176,7 @@
           </div>
         </div>
       </div>
-      <button type="button" class="ui-btn-format" id="btnToggleCompare" title="So sánh Hiện trạng / Quy hoạch (chia đôi màn hình)" aria-label="So sánh hiện trạng và quy hoạch" aria-pressed="false"><svg class="ico"><use href="#i-compare"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnToggleCompare" title="Chia đôi màn hình: hiện trạng bên trái, quy hoạch bên phải" aria-label="Chia đôi màn hình so sánh hiện trạng và quy hoạch" aria-pressed="false"><svg class="ico"><use href="#i-compare"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnAuth" title="Đăng nhập quản trị" aria-label="Đăng nhập quản trị"><svg class="ico"><use href="#i-key"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnLocateGPS" title="Định vị vị trí GPS của bạn" aria-label="Định vị GPS"><svg class="ico"><use href="#i-locate"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnScreenshot" title="Chụp ảnh bản đồ (lưu PNG)" aria-label="Chụp ảnh bản đồ"><svg class="ico"><use href="#i-camera"/></svg></button>
@@ -207,6 +228,7 @@
     </div>
 
     <button type="button" class="rp-expand-btn ui-panel-format" id="btnExpandRightPanel" title="Mở panel công cụ" aria-label="Mở panel công cụ"><svg class="ico"><use href="#i-chev-left"/></svg></button>
+    <button type="button" class="rp-expand-btn bp-expand-btn ui-panel-format" id="btnExpandBottomPanel" title="Mở bảng tổng hợp hạ tầng và cơ cấu đất" aria-label="Mở bảng tổng hợp hạ tầng và cơ cấu đất"><svg class="ico"><use href="#i-chev-up"/></svg></button>
   </div>
 
   <!-- PANEL CÔNG CỤ BÊN PHẢI (GỘP TRA CỨU / ĐỀ XUẤT / LỚP DỮ LIỆU / CHÚ GIẢI) -->
@@ -680,6 +702,7 @@
             <button type="button" class="bp-btn bp-icon" id="btnToggleStatTable" title="Xem bảng thông tin" aria-label="Xem bảng thông tin"><svg class="ico"><use href="#i-table"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnExportBottomPdf" title="Xuất báo cáo PDF" aria-label="Xuất báo cáo PDF"><svg class="ico"><use href="#i-printer"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnToggleBottomMax" title="Phóng to toàn màn hình" aria-label="Phóng to toàn màn hình"><svg class="ico"><use href="#i-maximize"/></svg></button>
+            <button type="button" class="bp-btn bp-icon" id="btnCollapseBottomPanel" title="Thu gọn bảng phía dưới" aria-label="Thu gọn bảng phía dưới"><svg class="ico"><use href="#i-chevs-down"/></svg></button>
           </div>
         </div>
 

@@ -2087,6 +2087,22 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, kind: 'INFRA', id, rows: Number(result.rows) || 0, lots });
     }
 
+    // Admin xóa 1 lớp chính của đồ án (layer = su-dung-dat | diem-chuc-nang | ranh-gioi | hien-trang)
+    if (action === 'deleteProjectLayer') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const tenQH = sanitizeSheetText(body.tenQH, 120);
+      const role = String(body.layer ?? '').slice(0, 40);
+      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      try {
+        const done = await projects.deleteLayer({ tenQH, role });
+        return res.status(200).json({ success: true, removed: done.removed, saved: done.saved, counts: done.counts, bucket: done.via });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được file đồ án' });
+      }
+    }
+
     // Xóa toàn bộ 1 đồ án (Ten_QH): dòng hạ tầng, tab DXF-NN cũ, ranh lô, dòng DS_DoAn, thư mục projects/<slug>/
     if (action === 'deleteProject') {
       requirePostFromApp(req);

@@ -39,14 +39,19 @@ const STEPS = [
     text: 'Bật nút này rồi bấm vào một điểm bất kỳ trên bản đồ: trang web cho biết vị trí đó đã nằm trong bán kính phục vụ của những công trình nào, còn thiếu loại nào, kèm tuyến đường đi tới công trình gần nhất.'
   },
   {
-    target: '#btnToggleCompare',
-    title: 'So sánh Hiện trạng – Quy hoạch',
-    text: 'Chia đôi màn hình: bên trái là hiện trạng, bên phải là quy hoạch. Kéo thanh ở giữa để so sánh; chấm màu trên biểu tượng cho biết công trình quy hoạch mới, mở rộng, thu hẹp hay di dời.'
+    target: '#mapTitle',
+    title: 'Bản đồ Quy hoạch / Hiện trạng',
+    text: 'Thanh tiêu đề cho biết bản đồ đang xem. Mở trang là bản đồ quy hoạch (các đồ án); bấm nút lật cuối thanh để sang bản đồ hiện trạng (công trình đang có) và ngược lại.'
   },
   {
-    target: '#bottomPanel',
+    target: '#btnToggleCompare',
+    title: 'So sánh Hiện trạng – Quy hoạch',
+    text: 'Chia đôi màn hình: bên trái là hiện trạng, bên phải là quy hoạch. Trên thanh tiêu đề chọn Cùng tâm (2 bản đồ chồng khít, kéo thanh ở giữa để so sánh) hoặc Lệch tâm (mỗi bản đồ lấy tâm ở giữa nửa màn hình của nó). Chấm màu trên biểu tượng cho biết công trình quy hoạch mới, mở rộng, thu hẹp hay di dời.'
+  },
+  {
+    target: ['#bottomPanel', '#btnExpandBottomPanel'],
     title: 'Bảng chỉ tiêu 40 phường xã',
-    text: 'Bảng phía dưới so sánh diện tích từng loại hạ tầng với chỉ tiêu m²/người của quy chuẩn, kèm biểu đồ cột. Chọn phường/xã trong danh sách để xem riêng từng địa bàn.'
+    text: 'Bảng phía dưới so sánh diện tích từng loại hạ tầng với chỉ tiêu m²/người của quy chuẩn, kèm biểu đồ cột. Chọn phường/xã trong danh sách để xem riêng từng địa bàn. Nút mũi tên kép cuối thanh tiêu đề thu gọn bảng; nút ở góc phải dưới mở lại.'
   },
   {
     target: '.map-toolbar',

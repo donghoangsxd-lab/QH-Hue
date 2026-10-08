@@ -1224,6 +1224,12 @@ export function toggleBottomPanelMaximized() {
   setBottomPanelMaximized(!document.body.classList.contains('bottom-max'));
 }
 
+// Thu gọn cả panel dưới (cơ cấu đất + bảng tổng hợp): bản đồ chiếm hết chiều cao, nút góc phải dưới mở lại
+export function setBottomPanelCollapsed(collapsed) {
+  if (collapsed && document.body.classList.contains('bottom-max')) setBottomPanelMaximized(false);
+  document.body.classList.toggle('bottom-collapsed', collapsed);
+}
+
 let cityTableOn = false;
 
 export function toggleStatTable() {

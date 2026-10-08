@@ -1,6 +1,6 @@
 // Tải ranh lô theo đồ án: mở bản đồ chỉ có danh mục. File một đồ án tải khi zoom ≥ ngưỡng lô và ranh tổng giao khung nhìn,
 // khi bật ranh lô công trình, khi bấm phóng tới, hoặc khi bật lớp lô đã lưu (showLand).
-// Đồ án thư mục (dir) đọc hien-trang.json + su-dung-dat.json. Đồ án file gộp cũ đọc projects/<slug>.json.
+// Đồ án thư mục (dir) đọc hien-trang.json + su-dung-dat.json + diem-chuc-nang.json. Đồ án file gộp cũ đọc projects/<slug>.json.
 // Đồ án chưa chuyển đọc qua API. URL bucket do máy chủ trả về (?v= phiên bản trong danh mục).
 import { state } from './state.js';
 import { geeApi } from './api.js';
@@ -66,18 +66,37 @@ function wantsWard() {
   return wardLotsOn() || wardLandsOn();
 }
 
-const DIR_ROLES = ['hien-trang', 'su-dung-dat'];
+// Lớp dữ liệu chính của đồ án, mỗi lớp = 1 file projects/<slug>/<key>.json. 3 lớp QH nhập từ bộ shapefile
+// (vùng sử dụng đất, điểm chức năng, ranh giới) + lớp hiện trạng (file HT-). Lớp mới (cấp điện, cấp nước…)
+// thêm 1 dòng ở đây và ở LAYER_ROLES (services/projectStore.js).
+export const PROJECT_LAYERS = [
+  { key: 'su-dung-dat', phase: 'QH', kind: 'lots', label: 'Sử dụng đất quy hoạch', color: '#fb923c' },
+  { key: 'diem-chuc-nang', phase: 'QH', kind: 'points', label: 'Điểm chức năng', color: '#facc15' },
+  { key: 'ranh-gioi', phase: 'QH', kind: 'boundary', label: 'Ranh giới quy hoạch', color: '#e879f9' },
+  { key: 'hien-trang', phase: 'HT', kind: 'lots', label: 'Sử dụng đất hiện trạng', color: '#22d3ee' }
+];
+const LOT_LAYER = { HT: 'hien-trang', QH: 'su-dung-dat' };
+
+export const layerKey = (tenQH, key) => `${tenQH}|${key}`;
+export const isLayerHidden = (tenQH, key) => state.hiddenProjectLayers.has(layerKey(tenQH, key));
+
+async function fetchRole(entry, role) {
+  const res = await fetch(`${base}${entry.slug}/${role}.json?v=${entry.saved || 0}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 
 async function loadDir(entry) {
-  const parcels = [];
-  for (const role of DIR_ROLES) {
-    const res = await fetch(`${base}${entry.slug}/${role}.json?v=${entry.saved || 0}`);
-    if (res.status === 404) continue;
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    (data.parcels || []).forEach(p => parcels.push(p));
-  }
-  return parcels;
+  const [ht, qh, pts] = await Promise.all([
+    fetchRole(entry, LOT_LAYER.HT),
+    fetchRole(entry, LOT_LAYER.QH),
+    fetchRole(entry, 'diem-chuc-nang').catch(err => { console.warn(`Không đọc điểm chức năng «${entry.tenQH}»:`, err); return null; })
+  ]);
+  return {
+    parcels: [...((ht && ht.parcels) || []), ...((qh && qh.parcels) || [])],
+    points: (pts && Array.isArray(pts.points)) ? pts.points : []
+  };
 }
 
 async function loadEntry(entry) {
@@ -85,7 +104,7 @@ async function loadEntry(entry) {
   if (prev && prev.saved === (entry.saved || 0) && prev.legacy === !!entry.legacy && prev.parcels) return prev;
   if (!entry.legacy && entry.slug && base && entry.dir) {
     try {
-      const row = { saved: entry.saved || 0, legacy: false, parcels: await loadDir(entry) };
+      const row = { saved: entry.saved || 0, legacy: false, ...(await loadDir(entry)) };
       cache.set(entry.tenQH, row);
       return row;
     } catch (err) {
@@ -110,7 +129,7 @@ async function loadEntry(entry) {
   const res = await fetch(geeApi(q));
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
-  const row = { saved: entry.saved || 0, legacy: !!entry.legacy, parcels: data.parcels || [] };
+  const row = { saved: entry.saved || 0, legacy: !!entry.legacy, parcels: data.parcels || [], points: data.points || [] };
   cache.set(entry.tenQH, row);
   return row;
 }
@@ -144,12 +163,15 @@ export function composeNow() {
   const next = new Map(ward.loaded && wardLotsOn() ? ward.map : []);
   const lands = ward.loaded && wardLandsOn() ? ward.lands.slice() : [];
   const infra = [];
+  const points = [];
   wanted().forEach(entry => {
     const got = cache.get(entry.tenQH);
     if (!got) return;
+    const off = { HT: isLayerHidden(entry.tenQH, LOT_LAYER.HT), QH: isLayerHidden(entry.tenQH, LOT_LAYER.QH) };
     got.parcels.forEach(p => {
       if (!p || !p.geometry || !p.id) return;
       const phase = p.phase === 'QH' ? 'QH' : 'HT';
+      if (off[phase]) return;
       if (p.kind === 'DXF') {
         lands.push({ ...p, file: entry.tenQH, phase });
         return;
@@ -157,9 +179,13 @@ export function composeNow() {
       next.set(`${phase}|${p.id}`, { geometry: p.geometry, layer: p.layer || '', file: entry.tenQH });
       infra.push({ id: p.id, phase, layer: p.layer || '', area: p.area ?? null, geometry: p.geometry, file: entry.tenQH });
     });
+    if (got.points && got.points.length && !isLayerHidden(entry.tenQH, 'diem-chuc-nang')) {
+      got.points.forEach(pt => points.push({ name: pt.name || '', layer: pt.layer || '', lat: pt.lat, lng: pt.lng, file: entry.tenQH }));
+    }
   });
   state.cadParcels = next;
   state.landParcels = lands;
+  state.projectPoints = points;
   state.projectInfraLots = infra;
   state.projectInfraFiles = new Set(infra.map(l => l.file));
 }
@@ -222,6 +248,57 @@ export function removeCachedLot(tenQH, { kind, id, phase }, saved) {
   }
   const entry = state.projectCatalog.find(p => p && p.tenQH === tenQH);
   if (entry && saved) entry.saved = saved;
+  composeNow();
+}
+
+/**
+ * Các lớp chính của 1 đồ án theo PROJECT_LAYERS (tải file đồ án nếu chưa có):
+ * [{ ...định nghĩa lớp, present, lands, infra, area, count, source }]
+ */
+export async function projectLayersOf(tenQH) {
+  const entry = state.projectCatalog.find(p => p && p.tenQH === tenQH && !p.sheetOnly);
+  if (!entry) return [];
+  const row = await loadEntry(entry);
+  return PROJECT_LAYERS.map(def => {
+    const out = { ...def, present: false, lands: 0, infra: 0, area: 0, count: 0, source: null };
+    if (def.kind === 'lots') {
+      row.parcels.forEach(p => {
+        if (!p || !p.geometry || (p.phase === 'QH' ? 'QH' : 'HT') !== def.phase) return;
+        if (p.kind === 'DXF') out.lands += 1;
+        else out.infra += 1;
+        out.area += Number(p.area) || 0;
+      });
+      out.count = out.lands + out.infra;
+    } else if (def.kind === 'points') {
+      out.count = (row.points || []).length;
+    } else if (def.kind === 'boundary') {
+      out.count = entry.boundary ? 1 : 0;
+      out.source = entry.boundary ? (entry.boundarySource === 'gis' ? 'gis' : 'auto') : null;
+    }
+    out.present = out.count > 0;
+    return out;
+  });
+}
+
+/** Gỡ lớp Admin vừa xóa khỏi bộ nhớ đệm; counts = { lands } mới của đồ án (lớp lô) */
+export function removeCachedLayer(tenQH, key, saved, counts) {
+  const def = PROJECT_LAYERS.find(d => d.key === key);
+  const row = cache.get(tenQH);
+  if (row && def) {
+    if (def.kind === 'lots') row.parcels = row.parcels.filter(p => !(p && (p.phase === 'QH' ? 'QH' : 'HT') === def.phase));
+    if (def.kind === 'points') row.points = [];
+    if (saved) row.saved = saved;
+  }
+  const entry = state.projectCatalog.find(p => p && p.tenQH === tenQH);
+  if (entry) {
+    if (saved) entry.saved = saved;
+    if (counts && Number.isFinite(counts.lands)) entry.lands = counts.lands;
+    if (def && def.kind === 'boundary') {
+      entry.boundary = null;
+      entry.boundarySource = null;
+      state.projectAreas = state.projectAreas.filter(a => a.id !== tenQH);
+    }
+  }
   composeNow();
 }
 

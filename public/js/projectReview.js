@@ -4,7 +4,7 @@
 // (Ten_QH = <mã>, khớp / gộp công trình đã có). Bản đồ đẩy lớp hiện trạng lên trước rồi lớp quy hoạch; chia đôi màn hình
 // thì hiện trạng bên trái, quy hoạch bên phải.
 import { map, layers, setReviewScope, setLandVisible } from './mapEngine.js';
-import { planMap, isCompareOn, onCompareChange, toggleCompareMode } from './planMap.js';
+import { planMap, isCompareOn, isSplitOn, onCompareChange, toggleSplit, setSplit, setViewMode } from './planMap.js';
 import { state, BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, layerType } from './state.js';
 import { geeApi } from './api.js';
 import { parseDxf, buildParcels, CRS_PRESETS, layerToType } from './cadImport.js';
@@ -321,7 +321,7 @@ function resetHeat() {
 // Chia đôi màn hình: mỗi bên một lớp; bản đồ chung: chỉ lớp QH (HT khi đang ẩn QH) để hai lớp không chồng nhau
 function heatVisible(phase) {
   if (!session || !show.heat || !show[phase]) return false;
-  return isCompareOn() || phase === 'QH' || !show.QH;
+  return isSplitOn() || phase === 'QH' || !show.QH;
 }
 
 function drawHeat(phase) {
@@ -418,7 +418,7 @@ function drawPhase(phase) {
     if (lot.role === 'score' && groupShown(lot.type)) {
       const color = BUFFER_COLORS[lot.type] || '#38bdf8';
       g.addLayer(L.circleMarker([lot.lat, lot.lng], { radius: 4.5, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 1, interactive: false }));
-      const ring = phase === 'QH' ? groupBufferOn(lot.type) || bufferFocused(lot) : isCompareOn() && groupBufferOn(lot.type);
+      const ring = phase === 'QH' ? groupBufferOn(lot.type) || bufferFocused(lot) : isSplitOn() && groupBufferOn(lot.type);
       if (lot.radius > 0 && ring) {
         g.addLayer(L.circle([lot.lat, lot.lng], { radius: lot.radius, color, weight: 1.2, dashArray: '6 5', fillColor: color, fillOpacity: 0.05, interactive: false }));
       }
@@ -900,7 +900,7 @@ function renderHost() {
         <label class="review-toggle"><input type="checkbox" data-show="HT"${show.HT ? ' checked' : ''}>Hiện trạng</label>
         <label class="review-toggle"><input type="checkbox" data-show="QH"${show.QH ? ' checked' : ''}>Quy hoạch</label>
         <label class="review-toggle" title="Lô đất ngoài nhóm hạ tầng của đồ án đã lưu, giao với khung nhìn (file trên bucket; đồ án cũ vẫn đọc được tới khi chuyển xong)"><input type="checkbox" data-show-land${state.showLand ? ' checked' : ''}>Đồ án đã lưu</label>
-        <button type="button" class="bp-btn${isCompareOn() ? ' on' : ''}" id="btnReviewCompare" title="Chia đôi màn hình: hiện trạng bên trái, quy hoạch bên phải">${ico('compare')}Chia đôi</button>
+        <button type="button" class="bp-btn${isSplitOn() ? ' on' : ''}" id="btnReviewCompare" title="Chia đôi màn hình: hiện trạng bên trái, quy hoạch bên phải">${ico('compare')}Chia đôi</button>
         <button type="button" class="bp-btn" id="btnReviewPrint" title="Lưu bảng thẩm định ra file PDF">${ico('printer')}In PDF</button>
         ${sizeBtnsHtml()}
         <button type="button" class="bp-btn" id="btnReviewClose">${ico('close')}Đóng</button>
@@ -957,9 +957,12 @@ function closeReview() {
   setReviewScope(null);
 }
 
-/** Có đủ 2 file HT + QH: tự chia đôi màn hình (hiện trạng trái, quy hoạch phải) trước khi vẽ */
+/** Có đủ 2 file HT + QH: tự chia đôi màn hình (hiện trạng trái, quy hoạch phải); chỉ 1 file: lật sang bản đồ giai đoạn đó */
 function autoCompare(lots) {
-  if (!isCompareOn() && lots.some(l => l.phase === 'HT') && lots.some(l => l.phase === 'QH')) toggleCompareMode();
+  const ht = lots.some(l => l.phase === 'HT');
+  const qh = lots.some(l => l.phase === 'QH');
+  if (ht && qh) setSplit(true);
+  else if (!isSplitOn() && (ht || qh)) setViewMode(qh ? 'QH' : 'HT');
 }
 
 function newSession(fields) {
@@ -1320,7 +1323,7 @@ export function initProjectReview() {
     const size = t.closest('[data-host-size]');
     if (size) { setHostSize(size.dataset.hostSize); return; }
     if (!session) return;
-    if (t.closest('#btnReviewCompare')) { toggleCompareMode(); return; }
+    if (t.closest('#btnReviewCompare')) { toggleSplit(); return; }
     if (t.closest('#btnReviewCancel')) { if (confirm('Hủy bỏ hồ sơ thẩm định đang xem?')) closeReview(); return; }
     if (t.closest('#btnReviewSend')) { sendDossier(); return; }
     if (t.closest('#btnReviewApprove')) { approve(); return; }
@@ -1396,7 +1399,7 @@ export function initProjectReview() {
   onCompareChange(() => {
     if (!session) return;
     drawAll(false);
-    $('btnReviewCompare')?.classList.toggle('on', isCompareOn());
+    $('btnReviewCompare')?.classList.toggle('on', isSplitOn());
   });
   document.addEventListener(REVIEW_DOSSIER_EVENT, (e) => openDossier(e.detail || {}));
 }

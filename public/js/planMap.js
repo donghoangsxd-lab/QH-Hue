@@ -6,10 +6,17 @@ import { attachBasemap } from './basemap.js';
 export let planMap = null;
 let leftMap = null;
 let leftLayers = null;
+// compareOn: bản đồ quy hoạch đang hiện (chế độ xem QH hoặc chia đôi). Không chia đôi thì planMap phủ kín vùng bản đồ.
 let compareOn = false;
+let viewMode = 'QH';
+let split = false;
+// 'same' = cùng tâm (2 bản đồ chồng khít, kéo thanh trượt); 'offset' = lệch tâm (tâm mỗi bản đồ ở giữa nửa màn hình của nó)
+let splitKind = 'same';
 let dividerRatio = 0.5;
+const SPLIT_KIND_KEY = 'qh_split_kind';
 const planHighlightLayer = L.layerGroup();
 const compareListeners = [];
+const viewListeners = [];
 
 // Cùng khóa với `layers` của bản đồ hiện trạng (mapEngine.js) để bật/tắt đồng thời
 export const planLayers = {
@@ -64,20 +71,40 @@ export function initPlanMap(mainMap, mainLayers) {
     new ResizeObserver(() => {
       planMap.invalidateSize({ pan: false });
       updateDivider();
+      if (compareOn && offsetPx()) alignPlanView();
     }).observe(area);
   }
 
-  setCompareMode(false);
+  try { if (localStorage.getItem(SPLIT_KIND_KEY) === 'offset') splitKind = 'offset'; } catch (e) { /* chế độ riêng tư */ }
+  applyState({ view: viewMode, split: false, kind: splitKind });
   return planMap;
 }
 
+/** Bản đồ quy hoạch đang hiện (xem QH hoặc chia đôi): lớp QH vẽ lên planMap */
 export function isCompareOn() {
   return compareOn;
 }
 
-// Bản đồ quy hoạch chỉ vẽ điểm / buffer / heatmap khi đang bật so sánh
+export function isSplitOn() {
+  return split;
+}
+
+export function getViewMode() {
+  return viewMode;
+}
+
+export function getSplitKind() {
+  return splitKind;
+}
+
+// Bản đồ quy hoạch chỉ vẽ điểm / buffer / heatmap khi đang hiện
 export function onCompareChange(fn) {
   compareListeners.push(fn);
+}
+
+/** fn({ view, split, kind }) mỗi khi đổi chế độ xem / chia đôi */
+export function onViewChange(fn) {
+  viewListeners.push(fn);
 }
 
 // Hiện/ẩn lớp quy hoạch theo đúng trạng thái lớp cùng tên bên bản đồ hiện trạng
@@ -135,40 +162,59 @@ export function setPlanHeatOpacity(val) {
   if (planHeatTile) planHeatTile.setOpacity(val);
 }
 
+const applyView = (dst, center, zoom, options) => {
+  const snap = dst.options.zoomSnap;
+  dst.options.zoomSnap = 0;
+  dst.setView(center, zoom, options);
+  dst.options.zoomSnap = snap;
+};
+
+// Lệch tâm: điểm giữa nửa trái bản đồ hiện trạng hiện ở giữa nửa phải bản đồ quy hoạch → tâm QH = tâm HT lùi W/2 px
+function offsetPx() {
+  return split && splitKind === 'offset' && leftMap ? leftMap.getSize().x / 2 : 0;
+}
+
+function shiftCenter(m, center, zoom, dx) {
+  if (!dx) return center;
+  return m.unproject(m.project(center, zoom).add([dx, 0]), zoom);
+}
+
+/** Đặt lại khung nhìn bản đồ quy hoạch theo bản đồ hiện trạng (cùng tâm / lệch tâm) */
+export function alignPlanView() {
+  if (!planMap || !leftMap) return;
+  const zoom = leftMap.getZoom();
+  applyView(planMap, shiftCenter(leftMap, leftMap.getCenter(), zoom, -offsetPx()), zoom, { animate: false });
+}
+
+// sign: +1 từ HT sang QH (lùi tâm), -1 chiều ngược lại
 function syncMaps(a, b) {
   let lock = false;
 
-  const applyView = (dst, center, zoom, options) => {
-    const snap = dst.options.zoomSnap;
-    dst.options.zoomSnap = 0;
-    dst.setView(center, zoom, options);
-    dst.options.zoomSnap = snap;
-  };
-
-  const bind = (src, dst) => {
+  const bind = (src, dst, sign) => {
     let zooming = false;
     src.on('zoomanim', (e) => {
       if (lock || !compareOn) return;
       zooming = true;
       lock = true;
-      applyView(dst, e.center, e.zoom, { animate: true });
+      applyView(dst, shiftCenter(src, e.center, e.zoom, -sign * offsetPx()), e.zoom, { animate: true });
       lock = false;
     });
     src.on('zoomend', () => { zooming = false; });
     src.on('move', () => {
       if (lock || zooming || !compareOn) return;
       lock = true;
-      applyView(dst, src.getCenter(), src.getZoom(), { animate: false });
+      const zoom = src.getZoom();
+      applyView(dst, shiftCenter(src, src.getCenter(), zoom, -sign * offsetPx()), zoom, { animate: false });
       lock = false;
     });
   };
 
-  bind(a, b);
-  bind(b, a);
+  bind(a, b, 1);
+  bind(b, a, -1);
 }
 
 export function getCoveredRightWidth() {
-  if (!compareOn) return 0;
+  if (!compareOn || !split) return 0;
   const area = document.getElementById('mapArea');
   if (!area) return 0;
   const w = area.clientWidth;
@@ -181,9 +227,14 @@ function updateDivider() {
   const divider = document.getElementById('swipeDivider');
   const planEl = document.getElementById('mapPlan');
   if (!area || !divider || !planEl) return;
-  const x = Math.round(area.clientWidth * dividerRatio);
+  if (!split) {
+    planEl.style.clipPath = 'none';
+    return;
+  }
+  const ratio = splitKind === 'offset' ? 0.5 : dividerRatio;
+  const x = Math.round(area.clientWidth * ratio);
   divider.style.left = `${x}px`;
-  divider.setAttribute('aria-valuenow', String(Math.round(dividerRatio * 100)));
+  divider.setAttribute('aria-valuenow', String(Math.round(ratio * 100)));
   planEl.style.clipPath = `inset(0 0 0 ${x}px)`;
 }
 
@@ -193,6 +244,7 @@ function initDividerDrag() {
   if (!area || !divider) return;
 
   divider.addEventListener('pointerdown', (e) => {
+    if (splitKind === 'offset') return;
     e.preventDefault();
     e.stopPropagation();
     divider.setPointerCapture(e.pointerId);
@@ -213,6 +265,7 @@ function initDividerDrag() {
 
   // Bàn phím: ←/→ dịch 2%, giữ Shift dịch 10%, Home/End về 2 mép
   divider.addEventListener('keydown', (e) => {
+    if (splitKind === 'offset') return;
     const step = e.shiftKey ? 0.1 : 0.02;
     if (e.key === 'ArrowLeft') dividerRatio -= step;
     else if (e.key === 'ArrowRight') dividerRatio += step;
@@ -225,27 +278,69 @@ function initDividerDrag() {
   });
 }
 
-export function setCompareMode(on) {
-  // compareOn phải bật SAU khi planMap đã khớp view, nếu không sự kiện move của invalidateSize sẽ kéo bản đồ trái đi
+// compareOn phải bật SAU khi planMap đã khớp view, nếu không sự kiện move của invalidateSize / panBy sẽ kéo bản đồ kia đi
+function applyState(next) {
+  const wasOffset = split && splitKind === 'offset';
   compareOn = false;
-  document.body.classList.toggle('compare-on', on);
+  viewMode = next.view === 'HT' ? 'HT' : 'QH';
+  split = !!next.split;
+  splitKind = next.kind === 'offset' ? 'offset' : 'same';
+  const shown = split || viewMode === 'QH';
+  const offset = split && splitKind === 'offset';
+  const body = document.body.classList;
+  body.toggle('plan-on', shown);
+  body.toggle('compare-on', split);
+  body.toggle('split-offset', offset);
+  body.toggle('view-ht', !shown);
   const btn = document.getElementById('btnToggleCompare');
   if (btn) {
-    btn.classList.toggle('active', on);
-    btn.setAttribute('aria-pressed', String(on));
-    btn.title = on ? 'Tắt so sánh Hiện trạng / Quy hoạch' : 'So sánh Hiện trạng / Quy hoạch (chia đôi màn hình)';
+    btn.classList.toggle('active', split);
+    btn.setAttribute('aria-pressed', String(split));
+    btn.title = split ? 'Tắt chia đôi màn hình' : 'Chia đôi màn hình: hiện trạng bên trái, quy hoạch bên phải';
   }
-  if (!planMap || !on) {
-    compareListeners.forEach(fn => fn(false));
-    return;
+  if (planMap && leftMap) {
+    // Vào / ra lệch tâm: dời bản đồ hiện trạng 1/4 bề ngang để điểm đang ở giữa màn hình về giữa nửa trái (và ngược lại)
+    if (offset !== wasOffset) {
+      const q = leftMap.getSize().x / 4;
+      leftMap.panBy([offset ? q : -q, 0], { animate: false });
+    }
+    if (shown) {
+      planMap.invalidateSize({ pan: false });
+      alignPlanView();
+    }
+    updateDivider();
   }
-  planMap.invalidateSize({ pan: false });
-  planMap.setView(leftMap.getCenter(), leftMap.getZoom(), { animate: false });
-  updateDivider();
-  compareOn = true;
-  compareListeners.forEach(fn => fn(true));
+  compareOn = shown;
+  compareListeners.forEach(fn => fn(shown));
+  const info = { view: viewMode, split, kind: splitKind };
+  viewListeners.forEach(fn => fn(info));
 }
 
-export function toggleCompareMode() {
-  setCompareMode(!compareOn);
+/** 'QH' = bản đồ quy hoạch (đồ án), 'HT' = bản đồ hiện trạng. Đang chia đôi thì chỉ ghi nhớ, áp dụng khi tắt chia đôi */
+export function setViewMode(mode) {
+  if (split) { viewMode = mode === 'HT' ? 'HT' : 'QH'; return; }
+  applyState({ view: mode, split: false, kind: splitKind });
 }
+
+export function toggleViewMode() {
+  setViewMode(viewMode === 'QH' ? 'HT' : 'QH');
+}
+
+export function setSplit(on) {
+  if (!!on === split) return;
+  applyState({ view: viewMode, split: !!on, kind: splitKind });
+}
+
+export function toggleSplit() {
+  setSplit(!split);
+}
+
+export function setSplitKind(kind) {
+  const k = kind === 'offset' ? 'offset' : 'same';
+  try { localStorage.setItem(SPLIT_KIND_KEY, k); } catch (e) { /* chế độ riêng tư */ }
+  if (k === splitKind) return;
+  if (!split) { splitKind = k; return; }
+  applyState({ view: viewMode, split: true, kind: k });
+}
+
+export const toggleCompareMode = toggleSplit;

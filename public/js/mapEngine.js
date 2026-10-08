@@ -15,9 +15,9 @@ import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap } from './basemap.js';
 import {
   getCoveredRightWidth, highlightPlanWard, planMap, planLayers, syncPlanLayer,
-  setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, onCompareChange
+  setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange
 } from './planMap.js';
-import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject } from './projectFiles.js';
+import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, PROJECT_LAYERS } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
 
 export let map = null;
@@ -302,7 +302,7 @@ function popupFitOptions(targetMap, maxWidth, minWidth) {
   let left = 20;
   let right = 20 + panelW;
   const divider = document.getElementById('swipeDivider');
-  if (isCompareOn() && divider) {
+  if (isSplitOn() && divider) {
     const dividerX = divider.offsetLeft;
     if (targetMap === planMap) left = dividerX + 14;
     else right = Math.max(right, size.x - dividerX + 14);
@@ -1061,7 +1061,7 @@ export function renderGroupedPoints() {
   });
   leftRenderer.setList(sourceList);
   planRenderer.setList(planList);
-  if (state.projectInfraLots.length || state.landParcels.length) redrawLands();
+  if (state.projectInfraLots.length || state.landParcels.length || state.projectPoints.length) redrawLands();
 }
 
 // Bán kính buffer chung đổi: chỉ vẽ lại vùng phủ, không phải dựng lại marker
@@ -1306,9 +1306,40 @@ function redrawLands() {
     ? infraLotsInWardScope(state.projectInfraLots).filter(l => !state.hiddenProjects.has(l.file)) : [];
   const compare = isCompareOn() && !!planMap;
   landsDetailed = map ? map.getZoom() >= PARCEL_PATTERN_ZOOM : null;
-  const pick = (list, phase) => (compare ? list.filter(p => p.phase === phase) : list);
+  // Bản đồ hiện trạng chỉ vẽ lô HT, lô QH chỉ có trên bản đồ quy hoạch (không trộn 2 giai đoạn)
+  const pick = (list, phase) => list.filter(p => p.phase === phase);
   if (map) drawLandsOn(map, pick(lands, 'HT'), pick(infra, 'HT'));
   if (planMap) drawLandsOn(planMap, compare ? pick(lands, 'QH') : [], compare ? pick(infra, 'QH') : []);
+  const points = byProject && compare ? lotsInWardScope(state.projectPoints).filter(pt => !state.hiddenProjects.has(pt.file)) : [];
+  if (planMap) drawProjectPointsOn(planMap, points);
+}
+
+// Điểm chức năng đồ án (lớp QH): chỉ trên bản đồ quy hoạch, cùng ngưỡng zoom với lô
+const pointGroups = new Map();
+const POINT_COLOR = PROJECT_LAYERS.find(d => d.key === 'diem-chuc-nang')?.color || '#facc15';
+
+function drawProjectPointsOn(m, list) {
+  const old = pointGroups.get(m);
+  if (old) {
+    old.clearLayers();
+    m.removeLayer(old);
+    pointGroups.delete(m);
+  }
+  if (!list.length) return;
+  const group = L.featureGroup();
+  list.forEach(pt => {
+    const lat = Number(pt.lat);
+    const lng = Number(pt.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const dot = L.circleMarker([lat, lng], {
+      radius: 4, color: '#1e293b', weight: 1.2, fillColor: POINT_COLOR, fillOpacity: 0.95, bubblingMouseEvents: false
+    });
+    const title = pt.name || pt.layer || 'Điểm chức năng';
+    dot.bindTooltip(`${escapeHtml(title)}${pt.file ? `<br><small>${escapeHtml(pt.file)}</small>` : ''}`, { direction: 'top', className: 'dot-tip' });
+    group.addLayer(dot);
+  });
+  group.addTo(m);
+  pointGroups.set(m, group);
 }
 
 // Qua ngưỡng hoa văn TT16: vẽ lại lô hạ tầng đồ án để đổi kiểu tô

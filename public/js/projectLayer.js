@@ -1,13 +1,17 @@
 // Mục Quy hoạch (tab Lớp dữ liệu): mỗi đồ án (Ten_QH) bật/tắt riêng, tìm, phóng tới, Admin xóa / chuyển đồ án cũ.
-// Zoom < PARCEL_MIN_ZOOM chỉ vẽ ranh tổng đồ án; từ ngưỡng đó vẽ ranh lô (mapEngine.js) và bỏ ranh tổng.
+// Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS): bật/tắt từng lớp, Admin xóa từng lớp.
+// Zoom < PARCEL_MIN_ZOOM vẽ ranh tổng đồ án (bấm để phóng tới); từ ngưỡng đó vẽ lô (mapEngine.js),
+// ranh tổng chỉ còn nét viền không nhận click (đồ án có ranh thật).
 import { state } from './state.js';
 import { map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible } from './mapEngine.js';
 import { planMap, onCompareChange } from './planMap.js';
+import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden } from './projectFiles.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { escapeHtml, fmtNum, ico } from './utils.js';
 
 const HIDDEN_KEY = 'qh_hidden_projects';
+const HIDDEN_LAYERS_KEY = 'qh_hidden_layers';
 // Ranh tổng = hợp các lô nới GAP_M rồi co lại GAP_M: lấp đường / khe giữa các lô rộng ≤ 2·GAP_M
 const GAP_M = 15;
 // Khớp CAD_GEOJSON_MAX_CHARS (api/gee.js) và giới hạn ô Sheet
@@ -28,6 +32,10 @@ let belowZoom = null;
 let query = '';
 const outlineGroups = new Map();
 const fallbackCache = new Map();
+// Danh sách lớp đang mở: Ten_QH → { loading, error, list: projectLayersOf() }
+const expanded = new Set();
+const layerInfo = new Map();
+let layerBusy = null;
 
 // ============================ RANH TỔNG ĐỒ ÁN ============================
 
@@ -109,11 +117,17 @@ function loadHidden() {
   try {
     const saved = JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]');
     if (Array.isArray(saved)) state.hiddenProjects = new Set(saved.map(String));
+    const layers = JSON.parse(localStorage.getItem(HIDDEN_LAYERS_KEY) || '[]');
+    if (Array.isArray(layers)) state.hiddenProjectLayers = new Set(layers.map(String));
   } catch (e) { /* chế độ riêng tư */ }
 }
 
 function saveHidden() {
   try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...state.hiddenProjects])); } catch (e) { /* chế độ riêng tư */ }
+}
+
+function saveHiddenLayers() {
+  try { localStorage.setItem(HIDDEN_LAYERS_KEY, JSON.stringify([...state.hiddenProjectLayers])); } catch (e) { /* chế độ riêng tư */ }
 }
 
 // Danh mục lấy từ index (không cần đã tải ranh từng lô). infra/lands là số đếm { size }.
@@ -239,18 +253,138 @@ function renderList() {
     const tempNote = !p.area ? ' · ranh tạm (bao lồi) — nhập file ranh hoặc nhập lại file để có ranh đúng'
       : p.source === 'gis' ? ' · ranh từ file GIS' : ' · ranh tự dựng từ các lô';
     const where = p.legacy ? 'còn ở file cad_parcels' : 'file riêng trên bucket';
+    const open = expanded.has(p.name);
     return `<div class="project-row${on ? '' : ' is-off'}">
       <label class="project-name" title="${escapeHtml(p.name)}${p.area?.ward ? ` — ${escapeHtml(p.area.ward)}` : ''} — ${escapeHtml(metaText(p))} (${where})${tempNote}">
         <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><span>${idx + 1}. ${escapeHtml(p.name)}</span></label>
+      <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-expand="${idx}" title="${open ? 'Ẩn' : 'Xem'} các lớp dữ liệu của đồ án" aria-label="Các lớp dữ liệu của đồ án" aria-expanded="${open}">${ico('chev-down')}</button>
       <button type="button" class="project-btn" data-zoom="${idx}" title="Phóng tới đồ án" aria-label="Phóng tới đồ án">${ico('locate')}</button>
       ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
+    </div>${open ? layersHtml(p, idx, on, admin) : ''}`;
+  }).join('');
+}
+
+// ============================ LỚP DỮ LIỆU TRONG ĐỒ ÁN ============================
+
+// Số trên dòng lớp (ngắn) và chú thích khi rê chuột (đủ)
+function layerCount(g) {
+  if (g.kind === 'boundary') {
+    if (!g.present) return { short: 'chưa có', full: 'Chưa có ranh — đang dùng ranh tạm (bao lồi). Nhập file ranh giới để có ranh đúng.' };
+    return g.source === 'gis' ? { short: 'GIS', full: 'Ranh từ file GIS' } : { short: 'tự dựng', full: 'Ranh tự dựng từ các lô' };
+  }
+  if (g.kind === 'points') return { short: g.present ? fmtNum(g.count) : 'trống', full: g.present ? `${fmtNum(g.count)} điểm` : 'Chưa có điểm' };
+  if (!g.present) return { short: 'trống', full: 'Chưa có lô' };
+  const parts = [g.lands ? `${fmtNum(g.lands)} lô đất` : '', g.infra ? `${fmtNum(g.infra)} ranh lô công trình` : ''].filter(Boolean);
+  if (g.area) parts.push(`${fmtNum(Math.round(g.area / 100) / 100)} ha`);
+  return { short: fmtNum(g.count), full: parts.join(' · ') };
+}
+
+function layersHtml(p, idx, projectOn, admin) {
+  const info = layerInfo.get(p.name);
+  if (!info || info.loading) return '<div class="project-layers"><div class="project-empty">Đang tải các lớp…</div></div>';
+  if (info.error) return `<div class="project-layers"><div class="project-empty">Không tải được lớp: ${escapeHtml(info.error)}</div></div>`;
+  if (!info.list.length) return '<div class="project-layers"><div class="project-empty">Đồ án chưa có file lớp dữ liệu.</div></div>';
+  const rows = info.list.map((g, li) => {
+    const key = layerKey(p.name, g.key);
+    const on = !state.hiddenProjectLayers.has(key);
+    // Ranh tạm (bao lồi) vẫn bật/tắt được dù chưa có file ranh
+    const toggleable = g.present || g.kind === 'boundary';
+    const count = layerCount(g);
+    const deleting = layerBusy === key;
+    return `<div class="project-layer${on && projectOn && g.present ? '' : ' is-off'}">
+      <label class="project-layer-name" title="${escapeHtml(g.label)} (${g.phase === 'QH' ? 'quy hoạch' : 'hiện trạng'}) — ${escapeHtml(count.full)}">
+        <input type="checkbox" data-layer="${idx}:${li}"${on ? ' checked' : ''}${toggleable ? '' : ' disabled'}>
+        <i class="project-layer-dot ${g.kind}" style="--dot:${g.color}"></i>
+        <b class="project-phase ${g.phase === 'QH' ? 'qh' : 'ht'}">${g.phase}</b>
+        <span>${escapeHtml(g.label)}</span><small>${escapeHtml(count.short)}</small></label>
+      ${admin && g.present && !p.legacy ? `<button type="button" class="project-btn danger" data-layer-del="${idx}:${li}" title="Xóa lớp ${escapeHtml(g.label)} khỏi đồ án" aria-label="Xóa lớp"${layerBusy || busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
     </div>`;
   }).join('');
+  return `<div class="project-layers">${rows}</div>`;
+}
+
+async function loadLayers(p, force = false) {
+  const prev = layerInfo.get(p.name);
+  if (prev && !force && (prev.loading || prev.list)) return;
+  layerInfo.set(p.name, { loading: true });
+  renderList();
+  try {
+    layerInfo.set(p.name, { list: await projectLayersOf(p.name) });
+  } catch (err) {
+    layerInfo.set(p.name, { error: err.message || 'lỗi tải file đồ án' });
+  }
+  renderList();
+}
+
+function toggleExpand(p) {
+  if (expanded.has(p.name)) {
+    expanded.delete(p.name);
+    renderList();
+    return;
+  }
+  expanded.add(p.name);
+  loadLayers(p);
+}
+
+function setLayerOn(p, g, on) {
+  const key = layerKey(p.name, g.key);
+  if (on) state.hiddenProjectLayers.delete(key);
+  else state.hiddenProjectLayers.add(key);
+  saveHiddenLayers();
+  // Bật lớp của đồ án đang ẩn thì hiện luôn đồ án đó
+  if (on && (!state.showProjects || state.hiddenProjects.has(p.name))) {
+    showProject(p);
+    return;
+  }
+  refreshAll();
+}
+
+function deleteNote(g) {
+  if (g.kind === 'boundary') {
+    return '• File ranh giới và ranh tổng trong danh mục bị xóa; đồ án hiện ranh tạm (bao lồi) đến khi nhập lại file ranh\n';
+  }
+  if (g.kind === 'points') return `• ${g.count} điểm chức năng bị xóa khỏi file đồ án trên bucket\n`;
+  const parts = [g.lands ? `${g.lands} lô đất` : '', g.infra ? `${g.infra} ranh lô công trình hạ tầng` : ''].filter(Boolean).join(' và ');
+  return `• ${parts} của lớp bị xóa khỏi file đồ án trên bucket\n`
+    + '• Điểm công trình hạ tầng trên Sheet giữ nguyên (xóa riêng từng công trình trên popup nếu cần)\n';
+}
+
+async function deleteLayer(p, g) {
+  if (!isAdmin() || busy || layerBusy) return;
+  if (!confirm(`XÓA LỚP «${g.label}» khỏi đồ án «${p.name}»?\n\n${deleteNote(g)}\nKhông hoàn tác được.`)) return;
+  const key = layerKey(p.name, g.key);
+  layerBusy = key;
+  renderList();
+  try {
+    markDataWritten();
+    const res = await fetch(geeApi('action=deleteProjectLayer'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+      body: JSON.stringify({ tenQH: p.name, layer: g.key })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) signOutAdmin();
+    if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+    removeCachedLayer(p.name, g.key, data.saved, data.counts);
+    state.hiddenProjectLayers.delete(key);
+    saveHiddenLayers();
+    layerBusy = null;
+    projects = collectProjects();
+    await loadLayers(p, true);
+    refreshAll();
+    const what = g.kind === 'boundary' ? 'ranh giới' : g.kind === 'points' ? `${data.removed} điểm` : `${data.removed} lô`;
+    alert(`Đã xóa lớp «${g.label}» (${what}) khỏi đồ án «${p.name}».`);
+  } catch (err) {
+    alert(`Không xóa được lớp: ${err.message}`);
+  } finally {
+    layerBusy = null;
+    renderList();
+  }
 }
 
 // ============================ VẼ RANH TỔNG ============================
 
-function drawOutlinesOn(m, list) {
+function drawOutlinesOn(m, list, below) {
   const old = outlineGroups.get(m);
   if (old) {
     old.clearLayers();
@@ -262,10 +396,12 @@ function drawOutlinesOn(m, list) {
   list.forEach(p => {
     const geom = outlineOf(p);
     if (!geom) return;
-    const shape = L.geoJSON(geom, {
-      style: !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE,
-      bubblingMouseEvents: false
-    });
+    const style = !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE;
+    if (!below) {
+      group.addLayer(L.geoJSON(geom, { style: { ...style, fillOpacity: 0 }, interactive: false }));
+      return;
+    }
+    const shape = L.geoJSON(geom, { style, bubblingMouseEvents: false });
     shape.bindTooltip(escapeHtml(p.name), { sticky: true, direction: 'top', className: 'dot-tip' });
     shape.on('click', () => {
       if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
@@ -279,9 +415,11 @@ function drawOutlinesOn(m, list) {
 
 function redrawOutlines() {
   const below = !!map && map.getZoom() < PARCEL_MIN_ZOOM;
-  const list = state.showProjects && below ? projects.filter(p => !state.hiddenProjects.has(p.name)) : [];
-  if (map) drawOutlinesOn(map, list);
-  if (planMap) drawOutlinesOn(planMap, list);
+  const list = state.showProjects
+    ? projects.filter(p => !state.hiddenProjects.has(p.name) && !isLayerHidden(p.name, 'ranh-gioi') && (below || p.area))
+    : [];
+  if (map) drawOutlinesOn(map, list, below);
+  if (planMap) drawOutlinesOn(planMap, list, below);
 }
 
 function refreshAll() {
@@ -294,8 +432,23 @@ function rebuild() {
   projects = collectProjects();
   const names = new Set(projects.map(p => p.name));
   [...fallbackCache.keys()].forEach(k => { if (!names.has(k.split('|')[0])) fallbackCache.delete(k); });
+  // Danh mục vừa tải lại (nhập / xóa đồ án): đọc lại lớp của các đồ án đang mở
+  layerInfo.clear();
+  [...expanded].forEach(name => { if (!names.has(name)) expanded.delete(name); });
   redrawOutlines();
   renderList();
+  projects.filter(p => expanded.has(p.name)).forEach(p => loadLayers(p));
+}
+
+function showProject(p) {
+  if (!state.showProjects) {
+    projects.forEach(other => { if (other.name !== p.name) state.hiddenProjects.add(other.name); });
+    setMaster(true);
+  }
+  state.hiddenProjects.delete(p.name);
+  ensureFullLots();
+  saveHidden();
+  refreshAll();
 }
 
 // ============================ XÓA ĐỒ ÁN ============================
@@ -412,26 +565,38 @@ export function initProjectLayer(opts = {}) {
     query = e.target.value || '';
     renderList();
   });
+  // data-layer / data-layer-del = "<chỉ số đồ án>:<chỉ số lớp>"
+  const layerOf = (ref) => {
+    const [pi, li] = String(ref || '').split(':').map(Number);
+    const p = projects[pi];
+    const g = p && layerInfo.get(p.name)?.list?.[li];
+    return g ? { p, g } : null;
+  };
   $('projectList')?.addEventListener('change', (e) => {
+    const layerBox = e.target.closest('[data-layer]');
+    if (layerBox) {
+      const hit = layerOf(layerBox.dataset.layer);
+      if (hit) setLayerOn(hit.p, hit.g, layerBox.checked);
+      return;
+    }
     const box = e.target.closest('[data-project]');
     const p = box && projects[Number(box.dataset.project)];
     if (!p) return;
     if (box.checked) {
-      if (!state.showProjects) {
-        projects.forEach(other => { if (other.name !== p.name) state.hiddenProjects.add(other.name); });
-        setMaster(true);
-      }
-      state.hiddenProjects.delete(p.name);
-      ensureFullLots();
-    } else {
-      state.hiddenProjects.add(p.name);
-      if (!projects.some(x => !state.hiddenProjects.has(x.name))) setMaster(false);
+      showProject(p);
+      return;
     }
+    state.hiddenProjects.add(p.name);
+    if (!projects.some(x => !state.hiddenProjects.has(x.name))) setMaster(false);
     saveHidden();
     refreshAll();
   });
   $('projectList')?.addEventListener('click', (e) => {
     if (e.target.closest('[data-migrate]')) { migrateLegacy(); return; }
+    const expand = e.target.closest('[data-expand]');
+    if (expand) { const p = projects[Number(expand.dataset.expand)]; if (p) toggleExpand(p); return; }
+    const layerDel = e.target.closest('[data-layer-del]');
+    if (layerDel) { const hit = layerOf(layerDel.dataset.layerDel); if (hit) deleteLayer(hit.p, hit.g); return; }
     const zoom = e.target.closest('[data-zoom]');
     if (zoom) { const p = projects[Number(zoom.dataset.zoom)]; if (p) zoomTo(p); return; }
     const del = e.target.closest('[data-del]');

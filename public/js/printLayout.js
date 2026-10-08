@@ -1,7 +1,7 @@
 // Chụp bản đồ (PNG) và in khung bản đồ khổ A3 ngang (PDF): khung + lưới tọa độ VN-2000, hướng Bắc, tỷ lệ, chú giải theo lớp đang bật.
 // html2canvas không hiểu clip-path → khi so sánh chụp riêng 2 bản đồ rồi ghép theo vị trí thanh trượt.
 import { map } from './mapEngine.js';
-import { planMap, isCompareOn } from './planMap.js';
+import { planMap, isCompareOn, isSplitOn, alignPlanView } from './planMap.js';
 import { state } from './state.js';
 import { wgs84ToVn2000 } from './cadImport.js';
 import { satPrintLegend } from './satLayers.js';
@@ -52,6 +52,7 @@ function snap(el, scale, size) {
 async function captureMapCanvas(scale) {
   await loadHtml2Canvas();
   const size = map.getSize();
+  if (isCompareOn() && planMap && !isSplitOn()) return { canvas: await snap($('mapPlan'), scale, size), splitX: null };
   const canvas = await snap($('map'), scale, size);
   if (!isCompareOn() || !planMap) return { canvas, splitX: null };
   const right = await snap($('mapPlan'), scale, size);
@@ -107,7 +108,14 @@ async function stageMap(W, H) {
   const area = $('mapArea');
   const center = map.getCenter(), zoom = map.getZoom();
   const maps = [map, isCompareOn() ? planMap : null].filter(Boolean);
-  const apply = () => maps.forEach(m => { m.invalidateSize({ pan: false }); m.setView(center, zoom, { animate: false }); });
+  const apply = () => {
+    map.invalidateSize({ pan: false });
+    map.setView(center, zoom, { animate: false });
+    if (maps.length > 1) {
+      planMap.invalidateSize({ pan: false });
+      alignPlanView();
+    }
+  };
   area.style.setProperty('--print-w', `${W}px`);
   area.style.setProperty('--print-h', `${H}px`);
   area.classList.add('print-staging');
@@ -295,7 +303,8 @@ export async function exportMapA3() {
   if (!map || busy) return;
   const city = !state.selectedWard || state.selectedWard === CITY_NAME;
   const place = city ? 'THÀNH PHỐ HUẾ' : state.selectedWard.toUpperCase();
-  const defTitle = isCompareOn() ? 'BẢN ĐỒ SO SÁNH HIỆN TRẠNG – QUY HOẠCH HẠ TẦNG XÃ HỘI' : 'BẢN ĐỒ HIỆN TRẠNG HẠ TẦNG XÃ HỘI';
+  const defTitle = isSplitOn() ? 'BẢN ĐỒ SO SÁNH HIỆN TRẠNG – QUY HOẠCH HẠ TẦNG XÃ HỘI'
+    : isCompareOn() ? 'BẢN ĐỒ QUY HOẠCH HẠ TẦNG XÃ HỘI' : 'BẢN ĐỒ HIỆN TRẠNG HẠ TẦNG XÃ HỘI';
   const input = window.prompt('Tiêu đề bản đồ in khổ A3:', defTitle);
   if (input === null) return;
   const title = input.trim() || defTitle;

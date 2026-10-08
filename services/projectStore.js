@@ -749,6 +749,64 @@ async function deleteLot({ tenQH, id, kind, phase }) {
   return { removed, saved: savedAt, via: indexed.via };
 }
 
+// Lớp chính của đồ án = 1 file role (khớp PROJECT_LAYERS ở public/js/projectFiles.js)
+const LAYER_ROLES = [ROLE_QH, ROLE_POINTS, ROLE_BOUNDARY, ROLE_HT];
+
+function layerGone(message) {
+  const err = new Error(message);
+  err.status = 404;
+  return err;
+}
+
+// Admin xóa 1 lớp chính của đồ án. Lớp lô (HT / QH) ghi file rỗng để giữ thư mục đồ án; điểm chức năng, ranh giới xóa file.
+// Xóa ranh vẫn giữ bbox trong danh mục để lô còn được tải theo khung nhìn. Dòng công trình trên Sheet giữ nguyên.
+async function deleteLayer({ tenQH, role }) {
+  const name = String(tenQH || '').trim();
+  if (!LAYER_ROLES.includes(role)) {
+    const err = new Error('Lớp dữ liệu không hợp lệ');
+    err.status = 400;
+    throw err;
+  }
+  const stored = await readIndex();
+  const entry = ((stored.data && stored.data.projects) || []).find(p => p && p.tenQH === name && !p.deleted);
+  if (!entry || !entry.dir) {
+    const err = new Error(`Đồ án «${name}» còn ở file cũ (cad_parcels.json): bấm «Chuyển lô cũ lên bucket» trong panel Đồ án trước khi xóa lớp`);
+    err.status = 409;
+    throw err;
+  }
+  const slug = entry.slug || projectSlug(name);
+  const savedAt = Date.now();
+  const patch = { saved: savedAt };
+  let removed = 0;
+  let counts = null;
+  if (role === ROLE_HT || role === ROLE_QH) {
+    const doc = await readRoleDoc(slug, role);
+    removed = doc && Array.isArray(doc.parcels) ? doc.parcels.length : 0;
+    if (!removed) throw layerGone(`Lớp đã trống trong đồ án «${name}»`);
+    await writeRole(slug, role, roleDoc(role, name, slug, savedAt, { parcels: [] }));
+    const other = await readRoleDoc(slug, role === ROLE_HT ? ROLE_QH : ROLE_HT);
+    const rest = other && Array.isArray(other.parcels) ? other.parcels : [];
+    counts = countParcels(rest);
+    Object.assign(patch, { infra: counts.infra, lands: counts.lands, landArea: landAreaOf(rest) });
+  } else if (role === ROLE_POINTS) {
+    const doc = await readRoleDoc(slug, ROLE_POINTS);
+    if (!doc) throw layerGone(`Đồ án «${name}» chưa có lớp điểm chức năng`);
+    removed = Array.isArray(doc.points) ? doc.points.length : 0;
+    await removeName(roleName(slug, ROLE_POINTS));
+  } else {
+    const doc = await readRoleDoc(slug, ROLE_BOUNDARY);
+    if (!doc && !entry.boundary) throw layerGone(`Đồ án «${name}» chưa có ranh giới`);
+    if (doc) await removeName(roleName(slug, ROLE_BOUNDARY));
+    removed = 1;
+    Object.assign(patch, { boundary: null, boundarySource: null, bbox: entry.bbox || bboxOf(entry.boundary) });
+  }
+  const indexed = await updateIndex(cur => ({
+    ...cur,
+    projects: (cur.projects || []).map(p => (p && p.tenQH === name && !p.deleted ? { ...p, ...patch } : p))
+  }));
+  return { removed, saved: savedAt, via: indexed.via, counts };
+}
+
 async function deleteProjectFiles(tenQH) {
   const name = String(tenQH || '').trim();
   const stored = await readIndex();
@@ -915,12 +973,17 @@ async function lotsBySlug(slug) {
   const ht = await readRoleDoc(slug, ROLE_HT);
   const qh = await readRoleDoc(slug, ROLE_QH);
   let parcels = null;
+  let points = [];
   let saved = 0;
   let tenQH = '';
   if (ht || qh) {
     parcels = [...((ht && ht.parcels) || []), ...((qh && qh.parcels) || [])];
     saved = Math.max(Number(ht && ht.saved) || 0, Number(qh && qh.saved) || 0);
     tenQH = (ht && ht.tenQH) || (qh && qh.tenQH) || '';
+    try {
+      const pts = await readRoleDoc(slug, ROLE_POINTS);
+      if (pts && Array.isArray(pts.points)) points = pts.points;
+    } catch (err) { console.warn(`Đọc điểm chức năng ${slug} lỗi:`, err.message); }
   } else {
     const got = await readJson(legacyName(slug));
     if (got.missing || !got.data) return null;
@@ -928,7 +991,7 @@ async function lotsBySlug(slug) {
     saved = got.data.saved || 0;
     tenQH = got.data.tenQH || '';
   }
-  const payload = { v: 2, tenQH, slug, saved, parcels };
+  const payload = { v: 2, tenQH, slug, saved, parcels, points };
   if (JSON.stringify(payload).length > PROXY_MAX_CHARS) {
     const err = new Error('File đồ án lớn hơn 4 MB — trình duyệt cần đọc thẳng bucket (bật CORS cho storage.googleapis.com).');
     err.status = 413;
@@ -989,6 +1052,6 @@ async function wardParcels() {
 }
 
 module.exports = {
-  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteProjectFiles,
+  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteLayer, deleteProjectFiles,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase
 };
