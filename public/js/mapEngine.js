@@ -6,7 +6,7 @@ import {
 import { peekInfraRisk, riskSummaryHtml } from './riskLayer.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi, markDataWritten } from './api.js';
-import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, planRows, planItems } from './utils.js';
+import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, planItems } from './utils.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
@@ -53,6 +53,8 @@ const WARD_GEOM_VERSION = 2;
 const INFRA_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "7-YT", "8-VH", "9-TM"];
 // Số điểm trong khung nhìn ≤ ngưỡng thì vẽ icon PNG (DOM); vượt ngưỡng vẽ chấm tròn trên canvas cho nhẹ
 const ICON_MAX_VISIBLE = 1500;
+// Đánh dấu công trình quy hoạch khác hiện trạng, khớp --plan-mark (style.css)
+const PLAN_MARK_COLOR = '#38bdf8';
 const ICON_FILES = {
   "1-CV": { approved: "Park.png", pending: "Park2.png" },
   "2-BDX": { approved: "Parking.png", pending: "Parking2.png" },
@@ -750,11 +752,11 @@ function createPointMarker(entry, mode, targetMap) {
       })
     });
   } else {
-    // Viền trắng để chấm nổi trên ảnh vệ tinh; điểm quy hoạch khác hiện trạng viền xanh đậm như chấm biến động của icon
+    // Viền trắng để chấm nổi trên ảnh vệ tinh; điểm quy hoạch khác hiện trạng viền cyan như chấm biến động của icon
     marker = L.circleMarker([p.lat, p.lng], {
       radius: 5,
       weight: planInfo ? 2.5 : 1.5,
-      color: planInfo ? '#22c55e' : '#ffffff',
+      color: planInfo ? PLAN_MARK_COLOR : '#ffffff',
       fillColor: approved ? (BUFFER_COLORS[layerType(p)] || '#38bdf8') : '#f87171',
       fillOpacity: 1,
       bubblingMouseEvents: false
@@ -1138,6 +1140,12 @@ export function landCode(p) {
 
 const LAND_STAGE_LABELS = { QHDD: 'QH đợt đầu', QHDH: 'QH dài hạn' };
 
+function lotStatsHtml(plan) {
+  const stats = planItems(plan);
+  return stats.length ? `<div class="lp-stats">${stats.map(s => `<div class="lp-stat" title="${escapeHtml(s.label)}">
+      <small>${escapeHtml(s.short)}</small><b>${ico(s.icon)}${escapeHtml(s.value)}${s.unit ? `<em>${escapeHtml(s.unit)}</em>` : ''}</b></div>`).join('')}</div>` : '';
+}
+
 function landPopupHtml(p) {
   const key = landPatternKey(p.layer, p.name);
   const nhom = p.nhom || landLabel(p.layer);
@@ -1146,7 +1154,6 @@ function landPopupHtml(p) {
   const swatch = tt16SwatchCss(key, 0.6) || `background:${landColor(p.layer) || '#94a3b8'};`;
   const stage = LAND_STAGE_LABELS[String(p.layer || '').toUpperCase().split(/[_\s]/)[0]];
   const phase = p.phase === 'QH' ? (stage || 'Quy hoạch') : 'Hiện trạng';
-  const stats = planItems(p.plan);
   const info = [
     ['Diện tích', p.area ? `${fmtNum(Math.round(p.area))} m²` : ''],
     ['Phường/xã', p.ward],
@@ -1161,8 +1168,7 @@ function landPopupHtml(p) {
         ${code ? `<div class="lp-sub">${escapeHtml(type)}</div>` : ''}
       </div>
     </div>
-    ${stats.length ? `<div class="lp-stats">${stats.map(s => `<div class="lp-stat" title="${escapeHtml(s.label)}">
-      <small>${escapeHtml(s.short)}</small><b>${ico(s.icon)}${escapeHtml(s.value)}${s.unit ? `<em>${escapeHtml(s.unit)}</em>` : ''}</b></div>`).join('')}</div>` : ''}
+    ${lotStatsHtml(p.plan)}
     <dl class="lp-info">${info.map(([k, v]) => `<dt>${k}</dt><dd${k === 'Layer' ? ' class="lp-mono"' : ''}>${escapeHtml(String(v))}</dd>`).join('')}</dl>
   </div>`;
 }
@@ -1735,6 +1741,22 @@ function formatCapCongTrinhLabel(raw) {
   return original;
 }
 
+// Dòng "Cấp công trình" gọn một dòng: "<công trình> (cấp …)"; y tế phân bệnh viện / trạm y tế theo cấp
+const CAP_NOUNS = {
+  '2-BDX': 'Bãi đỗ xe', '3-MN': 'Trường mầm non', '4-TH': 'Trường tiểu học', '5-THCS': 'Trường THCS', '6-THPT': 'Trường THPT',
+  '8-VH': 'Văn hóa, TDTT', '9-TM': 'Chợ, TTTM', '12-CSD': 'Cơ sở nhà đất', '14-NOXH': 'Nhà ở xã hội'
+};
+function capCongTrinhText(p) {
+  if (p.type === '1-CV') {
+    const park = parkTierOf(p.size, p.nhomHaTang);
+    return `${park.key === 'city' ? 'Công viên' : park.label} (${park.urban ? 'cấp đô thị' : 'cấp đơn vị ở'})`;
+  }
+  const cap = formatCapCongTrinhLabel(p.nhomHaTang || p.capCongTrinh || "Cấp đơn vị ở");
+  const urban = cap === "Cấp đô thị";
+  const noun = p.type === '7-YT' ? (urban ? 'Bệnh viện' : 'Trạm y tế') : CAP_NOUNS[p.type];
+  return noun && /^Cấp /.test(cap) ? `${noun} (${cap.toLowerCase()})` : cap;
+}
+
 function buildDiaBanHtml(geoWard, sheetWard) {
   const geo = (geoWard || "").trim();
   const sheet = (sheetWard || "").trim();
@@ -1896,6 +1918,20 @@ function addConflictRings(fg, conflicts, renderer) {
 
 let pointPopup = null;   // { popup, id, scenario } của popup công trình đang mở
 
+// Ô đầu popup công trình: hoa văn TT16 như ranh lô; loại không có ký hiệu TT16 (PCCC, nghĩa trang, xe buýt...) dùng icon
+function infraSwatchHtml(p, approved) {
+  const type = layerType(p);
+  const css = TT16_STYLES[type] ? tt16SwatchCss(type, 0.6) : '';
+  if (css) return `<i class="lp-swatch" style="${css}"></i>`;
+  const files = ICON_FILES[type] || ICON_FILES['1-CV'];
+  return `<i class="lp-swatch lp-swatch-icon" style="background-image:url(./icons/${approved ? files.approved : files.pending});"></i>`;
+}
+
+// Công trình nhập từ đồ án mang đuôi " – <file> #<stt>": bỏ đuôi, tên đầy đủ ở tooltip đầu bảng
+function infraTitle(name) {
+  return String(name || '').replace(/\s+–\s+[^–]*#\d+$/, '').trim() || String(name || '');
+}
+
 // Click chỉ mở bảng thông tin (mở từ ranh lô đất thì kèm viền khu đất); âm bản, zoom bán kính,
 // phạm vi thực tế theo mạng đường và dân số chỉ chạy khi bấm nút phân tích trong popup
 export function onPointClick(p, targetMap = map, parcelGeometry = null) {
@@ -1939,19 +1975,21 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   markSelection();
   let selSeq = singleIsoSeq;
 
-  const park = p.type === '1-CV' ? parkTierOf(p.size, p.nhomHaTang) : null;
-  const capCongTrinh = park
-    ? `${park.label} (${park.urban ? 'cây xanh đô thị' : 'cây xanh đơn vị ở'}${Number(p.size) > 0 ? '' : ', chưa rõ diện tích'})`
-    : formatCapCongTrinhLabel(p.nhomHaTang || p.capCongTrinh || "Cấp đơn vị ở");
+  const capCongTrinh = capCongTrinhText(p);
+  const capTip = p.type === '1-CV' && !(Number(p.size) > 0) ? ' title="Chưa rõ diện tích: hạng cây xanh suy theo cấp trên Sheet"' : '';
 
-  let html = `<div class="pp">`;
-  html += `<div class="pp-title">${escapeHtml(p.name)}`;
-  if (!approved) html += `<span class="badge-pending">Chờ duyệt</span>`;
-  html += `</div>`;
-  html += `<div class="pp-row"><span>Loại hạ tầng</span><b>${escapeHtml(infraLabels[layerType(p)] || p.type)}</b></div>`;
-  if (ntKind) html += `<div class="pp-row"><span>Hình thức</span><b>${escapeHtml(NT_KIND_LABELS[ntKind] || '')}</b></div>`;
-  html += `<div class="pp-row"><span>Địa bàn</span><b class="js-ward">${buildDiaBanHtml(geoWardNow, p.ward)}</b></div>`;
-  if (!isNetwork) html += `<div class="pp-row"><span>Cấp công trình</span><b class="c-orange">${escapeHtml(capCongTrinh)}</b></div>`;
+  // Cùng khuôn popup lô đất (landPopupHtml); đầu bảng giữ .pp-title để nút ẩn thu popup về nhãn tên
+  const typeLabel = `${infraLabels[layerType(p)] || p.type}${ntKind ? ` · ${NT_KIND_LABELS[ntKind] || ''}` : ''}`;
+  let html = `<div class="pp land-popup">`;
+  html += `<div class="pp-title lp-head" title="${escapeHtml(p.name)}">${infraSwatchHtml(p, approved)}<div class="lp-head-main">`
+    + `<div class="lp-title-row"><span class="lp-title">${escapeHtml(infraTitle(p.name))}</span>`
+    + `<span class="lp-phase lp-phase-${isPlanScenario ? 'qh' : 'ht'}">${isPlanScenario ? 'Quy hoạch' : 'Hiện trạng'}</span>`
+    + `${approved ? '' : '<span class="badge-pending">Chờ duyệt</span>'}</div>`
+    + `<div class="lp-sub">${escapeHtml(typeLabel)}</div></div></div>`;
+  html += lotStatsHtml(p.plan);
+  html += `<div class="lp-info">`;
+  html += `<div class="pp-row"><span>Phường/xã</span><b class="js-ward">${buildDiaBanHtml(geoWardNow, p.ward)}</b></div>`;
+  if (!isNetwork) html += `<div class="pp-row"><span>Cấp công trình</span><b class="c-orange pp-cap"${capTip}>${escapeHtml(capCongTrinh)}</b></div>`;
   const planInfo = PLAN_CHANGE_INFO[p.planChange];
   let sizeHtml = `${fmtNum(p.size)}&nbsp;m²`;
   if (planInfo) {
@@ -1970,16 +2008,16 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
     const rest = Math.max(0, Number(p.size) - splitParts.reduce((s, pt) => s + Number(pt[splitKey]), 0));
     html += `<div class="pp-row"><span>Vắt ranh phường</span><b>${escapeHtml(p.ward || 'Phường chính')}: ${fmtNum(Math.round(rest))}&nbsp;m²${splitParts.map(pt => `<br>${escapeHtml(pt.ward)}: ${fmtNum(Math.round(Number(pt[splitKey])))}&nbsp;m²`).join('')}<br><span class="pp-sub">Diện tích chỉ tiêu phường tính theo từng phần</span></b></div>`;
   }
-  const planList = planRows(p.plan);
-  if (planList.length) {
-    html += `<div class="pp-row"><span>Chỉ tiêu quy hoạch</span><b>${planList.map(([k, v]) => `${k}: ${escapeHtml(v)}`).join('<br>')}${p.tenQH ? `<br><span class="pp-sub">Đồ án ${escapeHtml(p.tenQH)}</span>` : ''}</b></div>`;
-  }
   const radiusLabel = p.type === '13-BUS' ? 'Phạm vi đi bộ' : ntKind ? 'Khoảng cách an toàn' : 'Bán kính phục vụ';
   const radiusRef = p.type === '13-BUS' ? 'Mục 2.8.3.3' : p.type === '10-PCCC' ? 'Mục 2.5.13.1' : ntKind ? 'Bảng 23' : '';
   if (!isCSDUnapproved && !parcelGeometry) {
     const refHtml = radiusRef ? ` <span class="pp-sub">(${radiusRef})</span>` : '';
     html += `<div class="pp-row"><span>${radiusLabel}</span><b class="c-cyan">${noZone ? 'không quy định' : `${fmtNum(itemRadius)}&nbsp;m`}${refHtml}</b></div>`;
   }
+  if (p.tenQH) html += `<div class="pp-row"><span>Đồ án</span><b>${escapeHtml(p.tenQH)}</b></div>`;
+  const riskData = peekInfraRisk();
+  if (riskData) html += `<div class="pp-row js-risk"><span>Rủi ro khí hậu</span><span class="pp-loading">${ico('clock')}đang tải...</span></div>`;
+  html += `</div>`;
 
   const servedCls = approved ? 'c-orange' : 'c-red';
   const showServed = !isCSD && !noZone;
@@ -1998,8 +2036,6 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
     html += `<div class="js-analysis"><button type="button" class="js-analyze proof-btn pp-analyze-btn" title="${tip}">${ico(showArea ? 'road' : 'users')}${what}</button></div>`;
   }
   if (conflicts.length) html += parcelConflictHtml(p, conflicts);
-  const riskData = peekInfraRisk();
-  if (riskData) html += `<div class="pp-row js-risk"><span>Rủi ro khí hậu</span><span class="pp-loading">${ico('clock')}đang tải...</span></div>`;
   if (isCSD && approved) {
     html += `<div class="pp-section c-orange">${ico('bulb')}ĐỀ XUẤT CHUYỂN ĐỔI CÔNG NĂNG</div>`;
     html += `<div class="js-csd"><div class="pp-loading">${ico('clock')}Đang tính toán không gian...</div></div>`;
@@ -2011,7 +2047,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   }
   html += `</div>`;
 
-  const popup = L.popup({ className: 'infra-popup', closeButton: true, autoPan: true, ...popupFitOptions(targetMap, 300, 50) }).setLatLng([p.lat, p.lng]).setContent(html);
+  const popup = L.popup({ className: 'infra-popup', closeButton: true, autoPan: true, ...popupFitOptions(targetMap, 340, 50) }).setLatLng([p.lat, p.lng]).setContent(html);
   popup.openOn(targetMap);
   popup.getElement()?.querySelector('.js-approve')?.addEventListener('click', () => approvePointStatus(p.id));
   popup.getElement()?.querySelectorAll('.js-conflict-go').forEach(btn => btn.addEventListener('click', (e) => {
@@ -2057,7 +2093,11 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
     let rows = '';
     if (showArea) rows += `<div class="pp-row js-area"><span>Phạm vi thực tế</span><span class="pp-loading">${ico('clock')}đang dựng theo mạng đường...</span></div>`;
     if (showServed) rows += `<div class="pp-row pp-served js-served"><span>${servedLabel}</span><span class="pp-loading">${ico('clock')}đang tính...</span></div>`;
-    box.outerHTML = rows;
+    const info = popup.getElement().querySelector('.lp-info');
+    if (info) {
+      info.insertAdjacentHTML('beforeend', rows);
+      box.remove();
+    } else box.outerHTML = rows;
     popup._updateLayout();
     popup._updatePosition();
 

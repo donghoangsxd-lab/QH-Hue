@@ -23,7 +23,7 @@
   --accent-orange: rgb(var(--orange-rgb));
   --accent-red: rgb(var(--red-rgb));
   --accent-yellow: rgb(var(--yellow-rgb));
-  --plan-mark: #22c55e;  /* chấm biến động quy hoạch (khớp PLAN_CHANGE_INFO / planMap.js) */
+  --plan-mark: var(--accent-cyan);  /* chấm biến động quy hoạch (khớp PLAN_MARK_COLOR trong mapEngine.js) */
 
   /* Chữ */
   --text-strong: #f1f5f9;
@@ -773,7 +773,8 @@ body.right-collapsed .right-panel {
 }
 .heat-legend-ticks { display: flex; justify-content: space-between; font-size: var(--fs-sm); font-weight: 700; margin-top: 3px; padding: 0 2px; }
 /* Tâm chấm trùng điểm neo = mũi ghim của icon (iconAnchor [11, 26] trong mapEngine.js), nằm dưới icon */
-.plan-badge { position: absolute; left: 11px; top: 26px; width: 16px; height: 16px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--plan-mark); border: 1.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.6); pointer-events: none; }
+/* Chấm nhỏ ló dưới mũi ghim, không che lô đất */
+.plan-badge { position: absolute; left: 11px; top: 28px; width: 9px; height: 9px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--plan-mark); border: 1px solid #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.6); pointer-events: none; }
 
 .rp-empty { color: var(--text-muted); font-style: italic; font-size: var(--fs-md); text-align: center; padding: 16px 8px; border: 1px dashed var(--border-color); border-radius: var(--r-md); }
 
@@ -2424,3 +2425,18 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .lp-info dt { color: var(--text-muted); white-space: nowrap; }
 .lp-info dd { margin: 0; color: var(--text-main); font-weight: 600; overflow-wrap: anywhere; }
 .lp-info dd.lp-mono { font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 400; color: var(--text-muted); }
+/* Popup công trình hạ tầng cùng khuôn lô đất: dòng .pp-row (kết quả nạp chậm ghi lại cả dòng) xếp vào lưới .lp-info */
+.infra-popup .leaflet-popup-content { margin: 12px 14px 10px; }
+.infra-popup .pp-title.lp-head { flex-wrap: nowrap; gap: 10px; margin: 0; padding: 0 46px 9px 0; color: inherit; font-size: inherit; border-bottom-color: var(--border-soft); }
+.infra-popup.pp-editable .pp-title.lp-head { padding-right: 94px; }
+.lp-swatch-icon { background-color: rgba(255, 255, 255, 0.06); background-position: center; background-size: 18px 22px; background-repeat: no-repeat; }
+.lp-title-row .badge-pending { margin-left: 0; }
+.lp-info > .pp-row { display: contents; }
+.lp-info > .pp-row > :first-child { color: var(--text-muted); }
+.lp-info > .pp-row > :last-child { overflow-wrap: anywhere; }
+.lp-info .pp-cap { white-space: nowrap; }
+.lp-info > .pp-served > :first-child { color: var(--text-main); font-weight: 600; }
+.infra-popup .pp-analyze-btn { width: 100%; margin-top: 10px; }
+.leaflet-popup.infra-popup.pp-collapsed .pp-title.lp-head { padding: 0; }
+.pp-collapsed .lp-head .lp-swatch, .pp-collapsed .lp-head .lp-sub, .pp-collapsed .lp-head .lp-phase { display: none; }
+.leaflet-popup.pp-collapsed .lp-title { font-size: var(--fs-sm); }
