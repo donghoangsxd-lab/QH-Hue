@@ -3,6 +3,7 @@
 import { state, infraLabels, BUFFER_COLORS } from './state.js';
 import { landColor, landLabel, landRule, RESIDENTIAL_COLOR } from './tt16Symbols.js';
 import { map } from './mapEngine.js';
+import { planMap, getViewMode, isSplitOn, onViewChange } from './planMap.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { escapeHtml, fmtNum, distanceMeters, ico, setStatusContent, planRows } from './utils.js';
@@ -357,9 +358,12 @@ function clearPreview() {
   clearReviewMark();
 }
 
+// Giao diện Quy hoạch (không chia đôi): bản đồ quy hoạch phủ kín bản đồ hiện trạng, xem trước phải vẽ lên bản đồ quy hoạch
+const viewMap = () => (planMap && getViewMode() === 'QH' && !isSplitOn() ? planMap : map);
+
 // Lề khi zoom: chừa thêm phần bản đồ bị panel phải (nổi trên bản đồ) che, tối đa 60% bề ngang
 function viewPadding(pad) {
-  const m = map.getContainer().getBoundingClientRect();
+  const m = viewMap().getContainer().getBoundingClientRect();
   const panel = $('rightPanel');
   const r = panel && panel.offsetWidth ? panel.getBoundingClientRect() : null;
   const cover = r && r.left < m.right && r.bottom > m.top ? Math.min(m.right - r.left, m.width * 0.6) : 0;
@@ -372,7 +376,8 @@ function drawPreview(parcels, fit = true, focus = null) {
   const hadPreview = !!previewLayer;
   clearPreview();
   const boundary = current && current.boundaryGeom;
-  if (!map || (!parcels.length && !boundary)) return;
+  const m = viewMap();
+  if (!m || (!parcels.length && !boundary)) return;
   if (!hadPreview) fit = true;
   previewLayer = L.featureGroup();
   if (boundary) {
@@ -410,18 +415,19 @@ function drawPreview(parcels, fit = true, focus = null) {
       { style: { color: '#fff', weight: 1.5, dashArray: '3,3', fill: false }, interactive: false })));
     previewLayer.addLayer(L.circleMarker([p.lat, p.lng], { radius: 4, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 1, interactive: false }));
   });
-  previewLayer.addTo(map);
+  previewLayer.addTo(m);
   if (focus) zoomToParcel(focus);
   else if (fit) {
     const b = previewLayer.getBounds();
-    if (b.isValid()) map.fitBounds(b, { ...viewPadding(40), maxZoom: 17 });
+    if (b.isValid()) m.fitBounds(b, { ...viewPadding(40), maxZoom: 17 });
   }
 }
 
 function zoomToParcel(p, maxZoom = 18) {
-  if (!map || !p) return;
+  const m = viewMap();
+  if (!m || !p) return;
   const bounds = isPoint(p) ? L.latLng(p.lat, p.lng).toBounds(120) : L.geoJSON({ type: 'MultiPolygon', coordinates: p.polygons }).getBounds();
-  map.fitBounds(bounds, { ...viewPadding(60), maxZoom });
+  m.fitBounds(bounds, { ...viewPadding(60), maxZoom });
 }
 
 // ---- Duyệt từng lô: Truonghoc thiếu hậu tố cấp trường, lô "Chợ, TTTM – chọn từng lô" ----
@@ -540,14 +546,15 @@ function applyLevels(parcels) {
 
 function markReview(p) {
   clearReviewMark();
-  if (!map || !p) return;
+  const m = viewMap();
+  if (!m || !p) return;
   // Bản đồ vẽ canvas (bỏ qua className): riêng viền lô đang duyệt vẽ SVG để CSS nhấp nháy được
   reviewRenderer = reviewRenderer || L.svg();
   const mark = { color: '#ef4444', fill: false, className: 'cad-review-blink', renderer: reviewRenderer };
   reviewLayer = isPoint(p)
     ? L.circleMarker([p.lat, p.lng], { ...mark, radius: 14, weight: 3, interactive: false })
     : L.geoJSON({ type: 'MultiPolygon', coordinates: p.polygons }, { style: { ...mark, weight: 4 }, interactive: false });
-  reviewLayer.addTo(map);
+  reviewLayer.addTo(m);
 }
 
 // Mở lô src để duyệt: tô sáng + zoom tới lô
@@ -1828,4 +1835,9 @@ export function initCadImport(opts = {}) {
   $('cadCrs')?.addEventListener('change', analyse);
   $('cadPhase')?.addEventListener('change', renderReport);
   $('btnCadSubmit')?.addEventListener('click', submitImport);
+  onViewChange(() => {
+    if (!previewLayer || !current || !current.result) return;
+    drawPreview(current.result.parcels, false);
+    if (current.reviewSrc != null) markReview(pickLots().find(p => p.src === current.reviewSrc));
+  });
 }
