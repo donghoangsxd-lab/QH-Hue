@@ -9,4 +9,7 @@ Thumbs.db
 /TieuLuuVuc.geojson
 /OTieuNuoc.geojson
 /VungThap.geojson
+/HuongThoat.geojson
 /.cache/
+.vercel
+.env*
