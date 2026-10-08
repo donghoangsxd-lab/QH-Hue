@@ -209,6 +209,8 @@ const constants = {
   DRAINAGE_GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/drainage/thoatnuoc.topojson",
   // Ranh lưu vực sông + tiểu lưu vực (TopoJSON cung dùng chung; scripts/push-luuvuc.js đẩy lên)
   BASINS_GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/drainage/luuvuc.topojson",
+  // Mũi tên hướng thoát nước mặt chia theo ô z12: <z_x_y>.json + index.json (scripts/push-huongthoat.js đẩy lên)
+  DRAIN_ARROWS_GCS_BASE: "https://storage.googleapis.com/hue-infra-data-us/drainage/huongthoat/",
 
   // Cấu hình trên Vercel (Settings → Environment Variables), không ghi vào mã nguồn
   GAS_BASE_URL: process.env.GAS_BASE_URL || "",

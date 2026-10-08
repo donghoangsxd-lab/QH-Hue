@@ -946,6 +946,7 @@ function doPost(e) {
     if (action === "savePopEdits") return jsonOutput(savePopEdits(body));
     if (action === "saveDrainage") return jsonOutput(saveDrainage(body));
     if (action === "saveBasins") return jsonOutput(saveBasins(body));
+    if (action === "saveDrainArrows") return jsonOutput(saveDrainArrows(body));
     if (action === "addPendingCad") return jsonOutput(addPendingCad(body));
     if (action === "removePendingCad") return jsonOutput(removePendingCad(body));
     if (action === "addPendingPoints") {
@@ -1319,6 +1320,30 @@ function saveBasins(body) {
   try { topo = JSON.parse(content); } catch (e) { return { "error": "Dữ liệu lưu vực không phải JSON" }; }
   if (!topo || topo.type !== "Topology" || !Array.isArray(topo.arcs)) return { "error": "Dữ liệu lưu vực không phải TopoJSON" };
   return { "success": true, "saved": uploadToGCS(content, "drainage/luuvuc.topojson"), "size": content.length };
+}
+
+// MŨI TÊN HƯỚNG THOÁT NƯỚC MẶT (scripts/push-huongthoat.js gửi 1 lô) → drainage/huongthoat/<z_x_y>.json theo ô + index.json.
+// content = { index: { at, z, tiles: { "12_x_y": số mũi tên } }, tiles: { "12_x_y": { a: [...] } } }; index ghi sau cùng
+// để webapp không đọc ô của lần ghi dở. Ô cũ không còn trong index được giữ lại nhưng không bao giờ được tải.
+function saveDrainArrows(body) {
+  var content = String(body.content || '');
+  if (!content || content.length > 4000000) return { "error": "Dữ liệu mũi tên thoát nước rỗng hoặc quá 4 MB" };
+  var data;
+  try { data = JSON.parse(content); } catch (e) { return { "error": "Dữ liệu mũi tên thoát nước không phải JSON" }; }
+  var tiles = data && data.tiles, index = data && data.index;
+  if (!tiles || typeof tiles !== "object" || !index || !index.tiles) return { "error": "Thiếu tiles / index" };
+  var keys = Object.keys(tiles);
+  if (!keys.length || keys.length > 500) return { "error": "Số ô không hợp lệ: " + keys.length };
+  for (var i = 0; i < keys.length; i++) {
+    if (!/^\d{1,2}_\d{1,6}_\d{1,6}$/.test(keys[i])) return { "error": "Tên ô không hợp lệ: " + keys[i] };
+    if (!Object.prototype.hasOwnProperty.call(index.tiles, keys[i])) return { "error": "Ô " + keys[i] + " không có trong index" };
+  }
+  var failed = [];
+  keys.forEach(function (k) {
+    if (!uploadToGCS(JSON.stringify(tiles[k]), "drainage/huongthoat/" + k + ".json")) failed.push(k);
+  });
+  if (failed.length) return { "error": "Không ghi được " + failed.length + " ô: " + failed.slice(0, 5).join(", ") };
+  return { "success": true, "saved": uploadToGCS(JSON.stringify(index), "drainage/huongthoat/index.json"), "tiles": keys.length, "size": content.length };
 }
 
 // VÙNG HIỆU CHỈNH RASTER DÂN CƯ (Admin vẽ xóa / thêm pixel dân cư) → file pop/edits.json (ghi đè toàn bộ)

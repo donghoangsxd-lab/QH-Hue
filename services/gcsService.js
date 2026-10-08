@@ -216,7 +216,7 @@ async function getCadParcels() {
   }
 }
 
-// ================= LỚP TĨNH THỦY VĂN (drainage/thoatnuoc.topojson, drainage/luuvuc.topojson) =================
+// ================= LỚP TĨNH THỦY VĂN (drainage/thoatnuoc.topojson, drainage/luuvuc.topojson, drainage/huongthoat/) =================
 
 const cachedText = {};   // url → { text, etag }
 
@@ -246,6 +246,8 @@ async function getTextFile(url, label) {
 
 const getDrainage = () => getTextFile(constants.DRAINAGE_GCS_URL, 'lớp thoát nước');
 const getBasins = () => getTextFile(constants.BASINS_GCS_URL, 'ranh lưu vực');
+/** key: "index" | "12_x_y" (đã kiểm tra ở api/gee.js) */
+const getDrainArrows = (key) => getTextFile(`${constants.DRAIN_ARROWS_GCS_BASE}${key}.json`, 'mũi tên thoát nước');
 
 function invalidateCache() {
   cachedGeoJSON = null;
@@ -258,4 +260,4 @@ function getDataVersion() {
   return dataVersion;
 }
 
-module.exports = { getRawDataList, getCadParcels, getDrainage, getBasins, invalidateCache, getDataVersion };
+module.exports = { getRawDataList, getCadParcels, getDrainage, getBasins, getDrainArrows, invalidateCache, getDataVersion };

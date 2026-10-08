@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 const constants = require('../config/constants');
 const { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, POP_SCALE_M } = require('../services/geeService');
-const { getRawDataList, getCadParcels, getDrainage, getBasins, invalidateCache, getDataVersion } = require('../services/gcsService');
+const { getRawDataList, getCadParcels, getDrainage, getBasins, getDrainArrows, invalidateCache, getDataVersion } = require('../services/gcsService');
 const { requireAdmin, httpError } = require('../services/authService');
 const roads = require('../services/roadsService');
 const popEdits = require('../services/popEditsService');
@@ -1761,6 +1761,26 @@ module.exports = async (req, res) => {
         return res.status(404).json({ error: true, message });
       }
       res.setHeader('Cache-Control', 'public, max-age=600, s-maxage=3600, stale-while-revalidate=86400');
+      if (d.etag) {
+        res.setHeader('ETag', d.etag);
+        if (req.headers['if-none-match'] === d.etag) return res.status(304).end();
+      }
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.status(200).send(d.text);
+    }
+
+    // Mũi tên hướng thoát nước mặt theo ô z12 (t=index | t=12_x_y). Ô gọi kèm v = thời điểm ghi trong index nên cache dài được
+    if (action === 'getDrainArrows') {
+      const t = String(req.query.t || '');
+      if (!/^(index|\d{1,2}_\d{1,6}_\d{1,6})$/.test(t)) return res.status(400).json({ error: true, message: 'Tên ô không hợp lệ' });
+      const d = await getDrainArrows(t);
+      if (!d || !d.text) {
+        const message = t === 'index' ? 'Chưa có mũi tên thoát nước trên bucket — chạy node scripts/push-huongthoat.js' : 'Không có ô này';
+        return res.status(404).json({ error: true, message });
+      }
+      res.setHeader('Cache-Control', t === 'index'
+        ? 'public, max-age=300, s-maxage=600, stale-while-revalidate=86400'
+        : 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400');
       if (d.etag) {
         res.setHeader('ETag', d.etag);
         if (req.headers['if-none-match'] === d.etag) return res.status(304).end();
