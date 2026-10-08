@@ -309,10 +309,14 @@ function shpParts(geom) {
   return parts;
 }
 
+// Tên ngắn nhất được cấp trước: matdoxaydung giữ "matdoxaydu" (webapp đọc mật độ theo tên này),
+// matdoxaydungmin / matdoxaydungmax đứng trước trong dump vẫn nhận hậu tố số.
 function allocDbfNames(fields) {
   const used = new Set();
-  return fields.map((from) => {
-    const base = String(from).replace(/[^A-Za-z0-9_]/g, '') || 'f';
+  const names = new Map();
+  const order = fields.map((from, i) => ({ from, i, base: String(from).replace(/[^A-Za-z0-9_]/g, '') || 'f' }))
+    .sort((a, b) => a.base.length - b.base.length || a.i - b.i);
+  order.forEach(({ from, base }) => {
     let name = base.slice(0, 10);
     let n = 2;
     while (used.has(name.toLowerCase())) {
@@ -321,8 +325,9 @@ function allocDbfNames(fields) {
       n++;
     }
     used.add(name.toLowerCase());
-    return { from, to: name };
+    names.set(from, name);
   });
+  return fields.map((from) => ({ from, to: names.get(from) }));
 }
 
 function fitUtf8(str, maxBytes) {

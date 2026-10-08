@@ -551,9 +551,11 @@ const PLAN_FIELDS = {
   far: /^(he_?so_?(su_?d[a-z_]*|sd_?d(at)?)|hssdd)$/i
 };
 const LOT_CODE_FIELD = /^ky_?hieu_?lo(_?d(at?)?)?$/i;
+// gServer có thêm cột cận dưới / cận trên (matdoxaydungmin, tangcaomax) đứng trước cột chỉ tiêu, thường bằng 0
+const BOUND_FIELD = /_?(min|max)$/i;
 
-function attrOf(attrs, re) {
-  const key = attrs && Object.keys(attrs).find(k => re.test(k));
+function attrOf(attrs, re, skip = null) {
+  const key = attrs && Object.keys(attrs).find(k => re.test(k) && !(skip && skip.test(k)));
   return key ? String(attrs[key] ?? '').trim() : '';
 }
 
@@ -562,7 +564,7 @@ export function planAttrsOf(attrs) {
   const out = {};
   let any = false;
   Object.entries(PLAN_FIELDS).forEach(([k, re]) => {
-    const v = attrOf(attrs, re).replace(',', '.');
+    const v = attrOf(attrs, re, BOUND_FIELD).replace(',', '.');
     out[k] = v && Number(v) !== 0 ? v : '';
     if (out[k]) any = true;
   });
