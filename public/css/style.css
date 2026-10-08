@@ -551,7 +551,8 @@ body.right-collapsed .right-panel {
    Cao bằng max-height của .right-panel rồi co (flex-shrink) phần thanh tab, thanh tiến độ: panel luôn chạm đáy, cách panel dưới 12px như mép trên. */
 #tabLayers { display: flex; flex-direction: column; overflow: hidden; padding: 0; height: calc(100vh - var(--side-gap) - 24px); }
 .layer-tree { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; margin: 0; }
-.layer-main { flex: 1 1 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; --main-accent: #e879f9; }
+/* --project-rgb: màu nhấn danh sách đồ án (đổi sang var(--orange-rgb) nếu muốn tương phản với tab Công trình) */
+.layer-main { flex: 1 1 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; --project-rgb: var(--cyan-rgb); --main-accent: rgb(var(--project-rgb)); }
 .layer-main[data-active="infra"] { --main-accent: var(--accent-cyan); }
 .layer-main-tabs { flex: 0 0 auto; display: flex; align-items: center; gap: 0; padding: 0 8px 0 4px; border-bottom: 1px solid var(--border-soft); background: var(--bg-panel); }
 .layer-main-tab { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 4px; height: 32px; padding: 0 2px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); font: inherit; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; cursor: pointer; }
@@ -596,7 +597,7 @@ body.right-collapsed .right-panel {
 .layer-row .layer-hint { color: var(--text-muted); font-size: var(--fs-xs); white-space: nowrap; }
 .project-search { display: block; width: 100%; box-sizing: border-box; height: 24px; margin: 4px 0 2px; padding: 0 8px; border: 1px solid var(--border-color); border-radius: var(--r-md); background: var(--bg-input); color: var(--text-main); font: inherit; font-size: var(--fs-sm); }
 .project-search[hidden] { display: none; }
-.project-search:focus { outline: none; border-color: #e879f9; }
+.project-search:focus { outline: none; border-color: rgb(var(--project-rgb)); }
 .project-list { margin: 2px 0 4px; padding: 0; }
 .project-list.is-off .project-row { opacity: 0.55; }
 .project-empty { padding: 3px 0; color: var(--text-muted); font-size: var(--fs-xs); }
@@ -604,7 +605,7 @@ body.right-collapsed .right-panel {
 .project-row.is-off .project-name span, .project-row.is-off .project-meta { opacity: 0.5; }
 .project-name { flex: 1; min-width: 0; display: flex; align-items: center; cursor: pointer; color: var(--text-main); }
 .project-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.project-name input { accent-color: #e879f9; width: 13px; height: 13px; margin: 0 5px 0 0; flex-shrink: 0; cursor: pointer; }
+.project-name input { accent-color: rgb(var(--project-rgb)); width: 13px; height: 13px; margin: 0 5px 0 0; flex-shrink: 0; cursor: pointer; }
 .project-meta { flex-shrink: 0; color: var(--text-muted); font-size: var(--fs-xs); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .project-btn { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 1px solid transparent; border-radius: var(--r-md); background: transparent; color: var(--text-muted); cursor: pointer; }
 .project-btn .ico { width: 14px; height: 14px; margin: 0; }
@@ -614,11 +615,11 @@ body.right-collapsed .right-panel {
 .project-expand .ico { transition: transform var(--ease); }
 .project-expand.open { color: var(--accent-cyan); }
 .project-expand.open .ico { transform: rotate(180deg); }
-.project-layers { margin: 1px 0 4px 9px; padding: 2px 0 2px 8px; border-left: 1px dashed rgba(232, 121, 249, 0.45); }
+.project-layers { margin: 1px 0 4px 9px; padding: 2px 0 2px 8px; border-left: 1px dashed rgba(var(--project-rgb), 0.45); }
 .project-layer { display: flex; align-items: center; gap: 4px; min-height: 20px; font-size: var(--fs-xs); }
 .project-layer.is-off .project-layer-name span, .project-layer.is-off .project-layer-dot { opacity: 0.45; }
 .project-layer-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-main); }
-.project-layer-name input { accent-color: #e879f9; width: 12px; height: 12px; margin: 0; flex-shrink: 0; cursor: pointer; }
+.project-layer-name input { accent-color: rgb(var(--project-rgb)); width: 12px; height: 12px; margin: 0; flex-shrink: 0; cursor: pointer; }
 .project-layer-name span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-layer-name small { flex-shrink: 0; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .project-layer-dot { flex-shrink: 0; width: 9px; height: 9px; border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.35); background: var(--dot, #94a3b8); }
@@ -630,7 +631,7 @@ body.right-collapsed .right-panel {
 .project-phase.qh { color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.14); }
 .project-layer .project-btn { width: 20px; height: 20px; }
 .project-layer .project-btn .ico { width: 12px; height: 12px; }
-.project-migrate { display: block; width: 100%; margin: 0 0 4px; padding: 3px 6px; font-size: var(--fs-sm); text-align: left; border: 1px dashed rgba(232, 121, 249, 0.65); border-radius: var(--r-md); background: transparent; color: var(--text-muted); cursor: pointer; }
+.project-migrate { display: block; width: 100%; margin: 0 0 4px; padding: 3px 6px; font-size: var(--fs-sm); text-align: left; border: 1px dashed rgba(var(--project-rgb), 0.65); border-radius: var(--r-md); background: transparent; color: var(--text-muted); cursor: pointer; }
 .project-migrate:disabled { opacity: 0.5; cursor: wait; }
 .road-legend.layer-legend { margin: 0 0 4px 22px; flex-wrap: wrap; row-gap: 2px; }
 .terrain-legend { margin: 0 6px 6px 22px; font-size: var(--fs-xs); color: var(--text-muted); }
@@ -1134,18 +1135,21 @@ body.bottom-collapsed:not(.project-review) .bottom-panel {
 .flip-face[aria-hidden="true"] { pointer-events: none; }
 .flip-back-head { display: none; }
 
-/* PHÓNG TO: 3 BẢNG XẾP CHỒNG Ở CỘT TRÁI, GIỮ CHIỀU CAO NHƯ PANEL THƯỜNG */
+/* PHÓNG TO: 4 BẢNG XẾP CHỒNG Ở CỘT TRÁI. Mỗi bảng cao tối thiểu bằng nội dung (không cắt),
+   phần còn lại của màn hình chia đều cho 4 bảng (flip-card chứa 3 bảng nên grow 3); màn quá thấp thì cuộn cột */
 body.bottom-max .flip-controls { display: none; }
 body.bottom-max .bp-part1 { overflow-y: auto; scrollbar-width: thin; }
-body.bottom-max .flip-card { flex: none; perspective: none; overflow: visible; }
-body.bottom-max .flip-card .flip-inner,
-body.bottom-max .flip-card .flip-face { position: static; transform: none; pointer-events: auto; }
-body.bottom-max .flip-front { height: calc(var(--bottom-h) - var(--bp-head-h) - 2px); }
-body.bottom-max .flip-back-head { display: flex; border-top: 1px solid var(--border-color); }
-body.bottom-max .infra-count-grid,
-body.bottom-max .road-chart,
-body.bottom-max .transit-chart { flex: none; height: calc(var(--bottom-h) - var(--bp-head-h) - 2px); }
-body.bottom-max .bp-transit { display: flex; }
+body.bottom-max .flip-card { flex: 3 0 auto; display: flex; flex-direction: column; perspective: none; overflow: visible; }
+body.bottom-max .flip-card .flip-inner { position: static; transform: none; flex: 1 0 auto; display: flex; flex-direction: column; }
+body.bottom-max .flip-card .flip-face { position: static; transform: none; pointer-events: auto; flex: 1 0 auto; }
+body.bottom-max .flip-back-head { display: flex; height: calc(24px * var(--k)); border-top: 1px solid var(--border-color); }
+body.bottom-max .flip-back-head .bp-part-title { font-size: var(--fs-sm); }
+body.bottom-max .bp-pie-inner { flex: 1 0 auto; align-items: center; }
+body.bottom-max .infra-count-grid { flex: 1 0 auto; grid-auto-rows: minmax(min-content, 1fr); }
+body.bottom-max .road-chart { flex: 1 0 auto; }
+body.bottom-max .bp-part1 .road-donut-wrap { height: calc(112px * var(--k)); }
+body.bottom-max .transit-chart { flex: 1 0 auto; }
+body.bottom-max .bp-transit { display: flex; flex: 1 0 auto; }
 
 /* TỶ LỆ VẬN TẢI HÀNH KHÁCH CÔNG CỘNG: thanh ngang trên lưới 20 %; chỉ hiện khi trải panel hoặc phóng to */
 .bp-transit { display: none; flex-direction: column; min-width: 0; min-height: 0; }
