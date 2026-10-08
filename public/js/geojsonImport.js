@@ -1,7 +1,8 @@
 // Nhập lô đất từ GeoJSON (.geojson / .json): Polygon, MultiPolygon và đường khép kín.
 // Loại hạ tầng theo thuộc tính Layer, không có thì theo tên; tọa độ độ (WGS84) hoặc mét (VN-2000, xuất từ QGIS giữ nguyên hệ).
-import { layerToType } from './cadImport.js';
+import { layerToType, tt16Layer } from './cadImport.js';
 import { openRing } from './kmlImport.js';
+import { landRule } from './tt16Symbols.js';
 
 // autocad_la: tên layer CAD gốc trên gServer Huế (DBF cắt tên trường còn 10 ký tự)
 export const LAYER_FIELD = /^(layer|layer_?name|ten_?layer|lop|(?:autocad|cad)_?la(?:yer)?)$/i;
@@ -14,11 +15,21 @@ function pickProp(props, re) {
   return v == null ? '' : String(v).trim();
 }
 
+// Tên chức năng sử dụng đất (gServer: chucnangsudungdat, DBF cắt còn chucnangsu; loaidat), ưu tiên theo thứ tự
+const CLASS_FIELDS = [/^chuc_?nang/i, /^loai_?dat$/i, /^muc_?dich/i];
+
 function resolveLayer(props, name) {
   const field = pickProp(props, LAYER_FIELD);
   if (field && layerToType(field)) return field;
   const t = name && layerToType(name);
   if (t) return t.prefix;
+  // Tên layer CAD không cho biết loại đất thì lấy tên chức năng sử dụng đất nếu nhận ra nhóm đất
+  if (!field || (!tt16Layer(field) && !landRule(field))) {
+    for (const re of CLASS_FIELDS) {
+      const cls = pickProp(props, re);
+      if (cls && landRule(cls)) return cls;
+    }
+  }
   return field || name || '(không tên)';
 }
 

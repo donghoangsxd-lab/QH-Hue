@@ -542,12 +542,13 @@ export function layerToType(layerName) {
   return { prefix, type: LAYER_PREFIXES[prefix], nhom };
 }
 
-// ---- Thuộc tính lô quy hoạch (gServer Huế; DBF cắt tên trường còn 10 ký tự: hesosddat, matdoxd, kyhieulod) ----
+// ---- Thuộc tính lô quy hoạch (gServer Huế; DBF cắt tên trường còn 10 ký tự: hesosudungdat → hesosudung,
+// matdoxaydung → matdoxaydu, kyhieulodat → kyhieulod) ----
 
 const PLAN_FIELDS = {
   floors: /^(tang_?cao|so_?tang)$/i,
-  coverage: /^(mat_?do_?(xay_?dung|xd)|mdxd)$/i,
-  far: /^(he_?so_?(su_?dung_?dat|sd_?dat|sdd)|hssdd)$/i
+  coverage: /^(mat_?do_?(xay_?d[a-z]*|xd)|mdxd)$/i,
+  far: /^(he_?so_?(su_?d[a-z_]*|sd_?d(at)?)|hssdd)$/i
 };
 const LOT_CODE_FIELD = /^ky_?hieu_?lo(_?d(at?)?)?$/i;
 

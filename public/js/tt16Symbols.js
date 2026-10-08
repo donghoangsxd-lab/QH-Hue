@@ -555,12 +555,16 @@ const LAND_RULES = [
   { key: 'o', label: 'Đất ở', color: RESIDENTIAL_COLOR, re: /(^|[\s_.-])(DAT[\s_.-]?O|DAT[\s_.-]?ODT|DAT[\s_.-]?ONT|ODT|ONT|NOXH|TDC|NHA[\s_.-]O)($|[\s_.-])|(^|[\s_.-])O[\s_.-](DO[\s_]?THI|NONG[\s_]?THON)|LIEN[\s_]?KE|BIET[\s_]?THU|NHA[\s_]?VUON|CHUNG[\s_]?CU|DONVIO|NHOMNHAO|HON[\s_]?HOP|LANG[\s_]?XOM|DANCUNT|DAT_NO_|CHINH[\s_]?TRANG|TAI[\s_]?DINH[\s_]?CU/ },
   // Công cộng cấp đô thị / đơn vị ở, "đất dịch vụ công cộng", "đất công cộng dịch vụ"; cây xanh, bãi xe công cộng thuộc loại khác
   { key: 'cc', label: 'Đất công cộng - dịch vụ', color: '#e03131', re: /(?<!(CAY[\s_.-]?XANH|BAI[\s_.-]?(DO[\s_.-]?)?XE)[\s_.-]*)CONG[\s_.-]?CONG|DAT_CC($|_)|HTCC|DVCC|CCDV/ },
-  { key: 'dtn', label: 'Đất đào tạo, nghiên cứu', color: '#1e3a8a', re: /DAOTAO|NGHIENCUU|GIAODUC|NCKH|DAT_GD/ },
-  { key: 'cq', label: 'Đất cơ quan, trụ sở', color: '#a1887f', re: /COQUAN|TRUSO|CQNN|HANHCHINH/ },
-  { key: 'an', label: 'Đất an ninh, quốc phòng', color: '#d9480f', re: /ANQP|QPAN|ANNINH|QUOCPHONG/ },
-  { key: 'tg', label: 'Đất di tích, tôn giáo', color: '#7f1d1d', re: /DITICH|TONGIAO|TINNGUONG/ },
-  // Lô dịch vụ không phải chợ / siêu thị / TTTM (DAT_Dichvu, "Đất khu dịch vụ")
-  { key: 'dv', label: 'Đất dịch vụ, thương mại', color: '#e8590c', re: /DICH[\s_]?VU|THUONG[\s_]?MAI/ },
+  // Tên layer CAD trước TT16 viết rời, không dấu ("N - QH - dat co quan", "dat di tich", "An ninh", "dat DVTM")
+  { key: 'dtn', label: 'Đất đào tạo, nghiên cứu', color: '#1e3a8a', re: /DAO[\s_]?TAO|NGHIEN[\s_]?CUU|GIAO[\s_]?DUC|NCKH|DAT_GD/ },
+  { key: 'cq', label: 'Đất cơ quan, trụ sở', color: '#a1887f', re: /CO[\s_]?QUAN|TRU[\s_]?SO|CQNN|HANH[\s_]?CHINH/ },
+  { key: 'an', label: 'Đất an ninh, quốc phòng', color: '#d9480f', re: /ANQP|QPAN|(^|[^A-Z])AN[\s_]?NINH|QUOC[\s_]?PHONG/ },
+  { key: 'tg', label: 'Đất di tích, tôn giáo', color: '#7f1d1d', re: /DI[\s_]?TICH|TON[\s_]?GIAO|TIN[\s_]?NGUONG/ },
+  // Lô dịch vụ không phải chợ / siêu thị / TTTM (DAT_Dichvu, "Đất khu dịch vụ"); TMD: mã kiểm kê đất thương mại, dịch vụ
+  { key: 'dv', label: 'Đất dịch vụ, thương mại', color: '#e8590c', re: /DICH[\s_]?VU|THUONG[\s_]?MAI|(^|[\s_.-])(DVTM|TMDV|TMD)($|[\s_.-])/ },
+  // "HG - Mặt nước", "N - AO"; SMN, MNC: mã kiểm kê sông ngòi, kênh rạch / mặt nước chuyên dùng
+  { key: 'nuoc', label: 'Đất mặt nước, sông suối, kênh rạch', color: '#0066cc', re: /MAT[\s_]?NUOC|SONG[\s_]?(SUOI|NGOI)|KENH[\s_]?RACH|HO[\s_]?(NUOC|DIEU[\s_]?HOA)|(^|[\s_.-])(AO|SONG|SUOI|KENH|RACH|SMN|MNC)($|[\s_.-])/ },
+  { key: 'htkt', label: 'Đất hạ tầng kỹ thuật', color: '#39264c', re: /HTKT|HA[\s_]?TANG[\s_]?KY[\s_]?THUAT|DAU[\s_]?MOI/ },
   // Đất bằng / đồi núi / núi đá chưa sử dụng (mã kiểm kê BCS, DCS, NCS): lô đất, không phải Cơ sở chưa sử dụng (12-CSD)
   { key: 'csd', label: 'Đất chưa sử dụng', color: '#c0c0c0', re: /CHUA[\s_.-]?SU[\s_.-]?DUNG|(^|[\s_.-])(BCS|DCS|NCS)($|[\s_.-])/ }
 ];
