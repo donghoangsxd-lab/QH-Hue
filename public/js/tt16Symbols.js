@@ -593,7 +593,61 @@ export function landPolylineStyle(layerName) {
   return { color, weight: 2, opacity: 0.95, fillColor: color, fillOpacity: 0.08 };
 }
 
-/** Khóa hoa văn TT16 của tên layer đất (bỏ tiền tố giai đoạn và hậu tố cấp), '' nếu không có */
+// Lô hạ tầng nhập khớp thủ công: layer "<tên> → <mã loại>" (cadImportUi), mã cấp đô thị thêm _DT
+const TYPE_CODE_PATTERN = { CV: '1-CV', BDX: '2-BDX', MN: '3-MN', TH: '4-TH', THCS: '5-THCS', THPT: '6-THPT', YT: '7-YT', VH: '8-VH', TM: '9-TM', CSD: '12-CSD' };
+
+// Tên layer tự do (shapefile gServer, CAD trước TT16) xét trên chuỗi bỏ dấu, viết hoa, dấu câu thành khoảng trắng.
+// Thứ tự quan trọng: cây xanh trước công cộng ("cây xanh sử dụng công cộng"), thể thao trước văn hóa, công cộng trước dịch vụ.
+const SCHOOL_RE = /TRUONG|GIAO DUC|MAM NON|TIEU HOC|\bTHCS\b|\bTHPT\b/;
+const SCHOOL_LEVELS = [['6-THPT', /\bTHPT\b|TRUNG HOC PHO THONG/], ['5-THCS', /\bTHCS\b|TRUNG HOC CO SO/], ['4-TH', /TIEU HOC|\bTH\b/], ['3-MN', /MAM NON|MAU GIAO|NHA TRE|\bMN\b/]];
+const FREE_PATTERN_RULES = [
+  ['CX-HC', /CAY XANH (SU DUNG )?HAN CHE/],
+  ['CX-CD', /CAY XANH (CHUYEN DUNG|CACH LY)/],
+  ['1-CV', /CAY XANH|CONG VIEN|VUON HOA/],
+  ['2-BDX', /BAI (DO )?XE|\bDO XE/],
+  ['7-YT', /\bY TE\b|BENH VIEN|TRAM Y|PHONG KHAM/],
+  ['TDTT', /THE DUC|THE THAO|\bTDTT\b|SAN VAN DONG/],
+  ['8-VH', /VAN HOA|\bNVH\b/],
+  ['DL', /DU LICH/],
+  ['9-TM', /\bCHO\b|SIEU THI|\bTTTM\b/],
+  ['O-HH', /HON HOP/],
+  ['O-LX', /LANG XOM|DAN CU NONG THON/],
+  ['GT', /GIAO THONG/],
+  ['NTR', /NGHIA (TRANG|DIA)/],
+  ['SX-CN', /CONG NGHIEP|KHO BAI/],
+  ['NN', /NONG NGHIEP/],
+  ['TS', /THUY SAN/]
+];
+// Nhóm đất landRule chưa trúng luật trên → ký hiệu TT16 gần nhất
+const RULE_PATTERN = {
+  o: () => 'O-NO', cc: () => 'CC-DV', dv: () => '9-TM', dtn: () => 'DT-NC', cq: () => 'CQ', tg: () => 'DT-TG',
+  htkt: () => 'HTK', csd: () => 'DCS',
+  an: (s) => (/QUOC PHONG/.test(s) && !/AN NINH/.test(s) ? 'QP' : 'AN'),
+  nuoc: (s) => (/SONG|SUOI|KENH|RACH/.test(s) ? 'SS' : 'HO')
+};
+
+function schoolPatternKey(s) {
+  const hits = SCHOOL_LEVELS.filter(([, re]) => re.test(s));
+  return hits.length === 1 ? hits[0][0] : '4-TH';
+}
+
+function freePatternKey(layerName) {
+  const folded = foldLayer(layerName);
+  const [name, typeCode] = folded.split('→').map(x => x.trim());
+  const s = name.replace(/[^A-Z0-9]+/g, ' ').trim();
+  const base = String(typeCode || '').replace(/_DT$/, '');
+  if (TYPE_CODE_PATTERN[base]) {
+    if (base === 'VH' && /THE DUC|THE THAO|\bTDTT\b/.test(s)) return 'TDTT';
+    return TYPE_CODE_PATTERN[base];
+  }
+  if (SCHOOL_RE.test(s)) return schoolPatternKey(s);
+  const hit = FREE_PATTERN_RULES.find(([, re]) => re.test(s));
+  if (hit) return hit[0];
+  const rule = landRule(name);
+  return rule && RULE_PATTERN[rule.key] ? RULE_PATTERN[rule.key](s) : '';
+}
+
+/** Khóa hoa văn TT16 của tên layer đất (bỏ tiền tố giai đoạn và hậu tố cấp; tên tự do theo từ khóa), '' nếu không có */
 export function landPatternKey(layerName) {
   const t = foldLayer(layerName).split(/[_\s.-]+/).filter(Boolean);
   const core = LAYER_STAGE.has(t[0]) ? t.slice(1) : t.slice();
@@ -603,9 +657,7 @@ export function landPatternKey(layerName) {
     if (core.length <= 2 || !LAYER_LEVEL.has(core[core.length - 1])) break;
     core.pop();
   }
-  // Đặt tên tự do: hỗn hợp (kể cả "hỗn hợp công cộng") theo ký hiệu hỗn hợp, trước nhóm công cộng - dịch vụ
-  if (/HON[\s_.-]?HOP/.test(foldLayer(layerName))) return 'O-HH';
-  return (landRule(layerName) || {}).key === 'cc' ? 'CC-DV' : '';
+  return freePatternKey(layerName);
 }
 
 /** Ranh đất đồ án: thu nhỏ tô đặc màu ký hiệu; phóng tới ngưỡng hoa văn thì kẻ pattern cùng màu */
