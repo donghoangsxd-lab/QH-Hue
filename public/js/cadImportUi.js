@@ -9,7 +9,7 @@ import { escapeHtml, fmtNum, distanceMeters, ico, setStatusContent, planRows } f
 import {
   parseDxf, buildParcels, buildParcelsLonLat, assignWards, matchExisting, layerToType, tt16Layer, linkStages, sameSite,
   filePhaseFromName, LAYER_PREFIXES, SCHOOL_PENDING, MARKET_PENDING, CRS_PRESETS, detectAxes, vn2000ToWgs84,
-  attachPoints, planAttrsOf, lotCodeOf, isMarketName, schoolLevelOf, existingLevelOf
+  attachPoints, planAttrsOf, lotCodeOf, isMarketName, schoolLevelOf, existingLevelOf, existingInLot
 } from './cadImport.js';
 import { parseKml, unzipKml } from './kmlImport.js';
 import { parseGeoJson } from './geojsonImport.js';
@@ -320,10 +320,11 @@ function enrichParcels(parcels) {
   });
   current.pointStats = pts.length ? { total: pts.length, outside, lots: parcels.filter(p => p.points.length).length } : null;
   const existing = [...state.rawDataList, ...state.planDataList];
+  const project = activeProjectName();
   let notMarket = 0;
   parcels.forEach(p => {
     if (p.land || p.type !== '9-TM' || !(p.marketCheck || p.manual)) return;
-    if ([p.layer, p.name, ...p.points.map(pt => pt.name)].some(isMarketName) || existingLevelOf({ ...p, market: true }, existing)) return;
+    if ([p.layer, p.name, ...p.points.map(pt => pt.name)].some(isMarketName) || existingLevelOf({ ...p, market: true }, existing, project)) return;
     Object.assign(p, { land: true, type: null, prefix: `LAND:${p.layer}`, nhom: '', manual: false, notMarket: true });
     notMarket++;
   });
@@ -332,12 +333,15 @@ function enrichParcels(parcels) {
   // Thứ tự: tên lô / tên điểm / ký hiệu lô → công trình đã có trong lô (để khớp cập nhật) → diện tích lô dịch vụ
   parcels.forEach(p => {
     if (p.market) {
-      if ([p.name, ...p.points.map(pt => pt.name)].some(isMarketName) || existingLevelOf(p, existing)) current.autoLevels.set(p.src, 'TM');
+      if ([p.name, ...p.points.map(pt => pt.name)].some(isMarketName) || existingLevelOf(p, existing, project)) current.autoLevels.set(p.src, 'TM');
       else if (p.area > 0 && p.area < SMALL_MARKET_M2) current.autoLevels.set(p.src, LEVEL_LAND);
       return;
     }
     if (!p.school) return;
-    const lv = schoolLevelOf([p.name, ...p.points.map(pt => pt.name)], p.lotCode) || existingLevelOf(p, existing);
+    // Tên điểm / ký hiệu lô và công trình đã có trong lô chỉ ra 2 cấp khác nhau: để admin chọn
+    const byName = schoolLevelOf([p.name, ...p.points.map(pt => pt.name)], p.lotCode);
+    const byExisting = existingLevelOf(p, existing, project);
+    const lv = byName && byExisting && byName !== byExisting ? '' : byName || byExisting;
     if (lv) current.autoLevels.set(p.src, lv);
   });
 }
@@ -488,13 +492,23 @@ async function loadMapHints() {
   if (cur.reviewSrc != null) renderReport();
 }
 
+const levelLabel = (lv) => ({ TM: 'Chợ / TTTM', [LEVEL_LAND]: 'Không phải', ...Object.fromEntries(SCHOOL_LEVELS) }[lv]);
+
+// Công trình đã có trên bản đồ nằm trong lô (bấm để chọn cấp theo công trình đó)
+function existingHtml(p) {
+  const found = existingInLot(p, [...state.rawDataList, ...state.planDataList], activeProjectName());
+  if (!found.length) return '';
+  const chips = found.slice(0, 4).map(f => `<button type="button" class="cad-rev-hint" data-lv="${f.level}" title="Chọn ${escapeHtml(levelLabel(f.level))}">${escapeHtml(f.id)} ${escapeHtml(f.name)}${f.own ? ' <i>(lần nhập trước của đồ án)</i>' : ''} → <b>${escapeHtml(levelLabel(f.level))}</b></button>`).join('');
+  return `<div class="cad-review-hints"><span>Công trình đã có trong lô:</span>${chips}</div>`;
+}
+
 function hintsHtml(p) {
   const h = current.hints?.get(p.src);
   if (!h) return '';
   if (h === 'loading') return `<div class="cad-review-hints muted">${ico('pin')}Đang tìm tên địa điểm quanh lô…</div>`;
   if (h === 'fail') return '<div class="cad-review-hints muted">Không tải được tên địa điểm (máy chủ OSM quá tải) — xem nhãn trên ảnh vệ tinh.</div>';
   if (!h.length) return '<div class="cad-review-hints muted">Không có tên địa điểm OSM trong lô — xem nhãn trên ảnh vệ tinh.</div>';
-  const label = (lv) => ({ TM: 'Chợ / TTTM', [LEVEL_LAND]: 'Không phải', ...Object.fromEntries(SCHOOL_LEVELS) }[lv]);
+  const label = levelLabel;
   const chips = h.slice(0, 4).map(({ name, lv }) => lv
     ? `<button type="button" class="cad-rev-hint" data-lv="${lv}" title="Chọn ${escapeHtml(label(lv))}">${escapeHtml(name)} → <b>${escapeHtml(label(lv))}</b></button>`
     : `<span class="cad-rev-hint off">${escapeHtml(name)}</span>`).join('');
@@ -614,6 +628,7 @@ function reviewHtml() {
   return `<div class="cad-review">
     <div class="cad-review-head">${ico(lv ? 'check' : 'alert')}${status}${pos} · còn ${left} lô chưa duyệt</div>
     <div class="cad-review-info">${displayName(p) ? `<b>${escapeHtml(displayName(p))}</b> · ` : ''}${escapeHtml(p.layer)}${p.lotCode ? ` ${escapeHtml(p.lotCode)}` : ''} · ${sizeText(p)} · ${escapeHtml(p.wardParts ? partsText(p) : p.ward)}${p.crossWard ? ' · vắt ranh' : ''}</div>
+    ${existingHtml(p)}
     ${hintsHtml(p)}
     <div class="cad-review-btns">${btns}</div>
     <div class="cad-review-nav">

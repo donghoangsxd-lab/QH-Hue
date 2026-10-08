@@ -1053,21 +1053,34 @@ const sameKind = (p, it) => p.type === it.type && (p.type !== '4-TH' || (p.prefi
 const LEVEL_OF_TYPE = { '3-MN': 'MN', '5-THCS': 'THCS', '6-THPT': 'THPT', '9-TM': 'TM' };
 
 /**
- * Lô chờ chọn từng lô (đất giáo dục gộp cấp, dịch vụ chờ xác nhận chợ): cấp theo công trình đã có nằm trong lô
- * (VD lô "dat giao duc" chứa "Trường TH số 1 An Đông" → TH). Không có hoặc nhiều cấp khác nhau → ''.
+ * Công trình trường học (hoặc chợ / TTTM khi p.market) đã có nằm trong lô → [{ id, name, level, own }].
+ * own: bản ghi do lần nhập trước của chính đồ án project tạo ra (Ten_QH trùng).
  */
-export function existingLevelOf(p, existing) {
-  if (p.kind === 'POINT' || !p.polygons?.length) return '';
+export function existingInLot(p, existing, project = '') {
+  if (p.kind === 'POINT' || !p.polygons?.length) return [];
   const want = p.market ? ['9-TM'] : ['3-MN', '4-TH', '5-THCS', '6-THPT'];
   const [x0, y0, x1, y1] = bboxOfRings(p.polygons.map(poly => poly[0]));
-  const hits = new Set();
+  const out = [];
   for (const it of existing) {
     if (!it.id || !want.includes(it.type)) continue;
     const x = Number(it.lng), y = Number(it.lat);
     if (!(x >= x0 && x <= x1 && y >= y0 && y <= y1) || !inPolys(x, y, p.polygons)) continue;
-    hits.add(it.type === '4-TH' ? (isThptRecord(it) ? 'THPT' : 'TH') : LEVEL_OF_TYPE[it.type]);
+    const level = it.type === '4-TH' ? (isThptRecord(it) ? 'THPT' : 'TH') : LEVEL_OF_TYPE[it.type];
+    out.push({ id: it.id, name: it.name || '', level, own: !!project && it.tenQH === project });
   }
-  return hits.size === 1 ? [...hits][0] : '';
+  return out;
+}
+
+/**
+ * Lô chờ chọn từng lô (đất giáo dục gộp cấp, dịch vụ chờ xác nhận chợ): cấp theo công trình đã có nằm trong lô
+ * (VD lô "dat giao duc" chứa "Trường TH số 1 An Đông" → TH). Không có hoặc nhiều cấp khác nhau → ''.
+ * Công trình gốc được ưu tiên hơn bản ghi do lần nhập trước của chính đồ án tạo ra, vì lần nhập đó có thể đã chọn sai cấp.
+ */
+export function existingLevelOf(p, existing, project = '') {
+  const found = existingInLot(p, existing, project);
+  const base = found.filter(f => !f.own);
+  const levels = new Set((base.length ? base : found).map(f => f.level));
+  return levels.size === 1 ? [...levels][0] : '';
 }
 
 export function matchExisting(parcels, existing) {
