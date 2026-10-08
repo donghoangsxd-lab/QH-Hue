@@ -261,7 +261,7 @@ function parcelTip(p) {
   const name = displayName(p);
   const plan = planRows(planOf(p)).map(([k, v]) => `${k} ${escapeHtml(v)}`).join(' · ');
   return `${name ? `<b>${escapeHtml(name)}</b><br>` : ''}<b>${escapeHtml(layerText(p))}</b>${p.lotCode ? ` ${escapeHtml(p.lotCode)}` : ''} · ${sizeText(p)}${pair}`
-    + `${plan ? `<br>${plan}` : ''}<br>${p.wardParts ? `Tách theo ranh phường: ${escapeHtml(partsText(p))}` : escapeHtml(p.ward || 'Ngoài TP. Huế')}${p.crossWard ? ' · <span style="color:#f87171">vắt ranh</span>' : ''}<br>${escapeHtml(parcelAction(p).label)}`;
+    + `${plan ? `<br>${plan}` : ''}<br>${p.wardParts ? `Tách theo ranh phường: ${escapeHtml(partsText(p))}` : escapeHtml(p.ward || 'Ngoài TP. Huế (cách ranh > 100 m)')}${p.cityEdge ? ` · sát ranh TP${p.cityEdge.m ? ` (ngoài ${p.cityEdge.m} m)` : ''}` : ''}${p.crossWard ? ' · <span style="color:#f87171">vắt ranh</span>' : ''}<br>${escapeHtml(parcelAction(p).label)}`;
 }
 
 // ---- Lớp điểm chức năng & chỉ tiêu quy hoạch gộp vào lô ----
@@ -666,7 +666,7 @@ function renderReport() {
   const byType = {};
   const count = {
     out: 0, exists: 0, skip: 0, dup: 0, update: 0, attach: 0, relot: 0, new: 0, pending: 0, rejected: 0, merged: 0, overlap: 0,
-    cross: 0, split: 0, takeOver: 0, small: 0, multi: 0, newPoint: 0, tt16HT: 0, tt16QH: 0, land: 0
+    cross: 0, split: 0, takeOver: 0, small: 0, multi: 0, newPoint: 0, tt16HT: 0, tt16QH: 0, land: 0, edge: 0, edgeMoved: 0
   };
   const owners = new Set();
   parcels.forEach(p => {
@@ -676,6 +676,7 @@ function renderReport() {
     if (a.relot) count.relot++;
     if (a.owner) (a.key === 'overlap' ? owners.add(a.owner) : count.takeOver++);
     if (p.ward && p.matchConflict) count.multi++;
+    if (p.cityEdge) { count.edge++; if (p.cityEdge.moved) count.edgeMoved++; }
     if (p.ward && p.crossWard && !p.rejected && !p.land) count.cross++;
     if (p.wardParts && (a.key === 'new' || a.key === 'update')) count.split++;
     if (p.ward && !isPoint(p) && MIN_SIZE[p.type] && p.area < MIN_SIZE[p.type]) count.small++;
@@ -754,7 +755,8 @@ function renderReport() {
   if (count.cross) alerts.push(['warn', `${count.cross} lô vắt ranh phường không cắt được theo ranh: ghi quy mô = 0, diện tích thật ghi vào Ghi chú.`]);
   if (count.overlap) alerts.push(['warn', `${count.overlap} lô trùng công trình đang thuộc đồ án khác (${escapeHtml([...owners].slice(0, 3).join(', '))}${owners.size > 3 ? ', …' : ''}): mặc định không ghi đè. Tích «Chuyển sang đồ án này» ở từng lô nếu đồ án đang nhập thay thế đồ án cũ.`]);
   if (count.takeOver) alerts.push(['info', `${count.takeOver} lô chuyển công trình từ đồ án khác sang đồ án «${escapeHtml(activeProjectName())}».`]);
-  if (count.out) alerts.push(['bad', `${count.out} lô nằm ngoài TP. Huế (viền xám trên bản đồ): bỏ qua${current.tt16 ? '' : ' — sẽ hỏi xác nhận trước khi ghi'}.`]);
+  if (count.out) alerts.push(['bad', `${count.out} lô nằm ngoài TP. Huế, cách ranh hơn 100 m (viền xám trên bản đồ): bỏ qua${current.tt16 ? '' : ' — sẽ hỏi xác nhận trước khi ghi'}.`]);
+  if (count.edge) alerts.push(['info', `${count.edge} lô chạm hoặc nằm ngoài ranh TP. Huế không quá 100 m (ranh ven biển, đầm phá chưa ổn định): vẫn ghi vào phường gần nhất${count.edgeMoved ? `; ${count.edgeMoved} lô có điểm đại diện ngoài ranh được kéo vào sát ranh phường` : ''}.`]);
   const toPhase = current.filePhase === 'QH' ? 'vào QuyMo_QH' : current.filePhase === 'HT' ? 'vào QuyMo_HT' : current.tt16 ? 'theo giai đoạn của layer' : phase;
   if (count.attach) alerts.push(['info', `${count.attach} lô chứa điểm công trình cùng loại chưa có ranh lô: tự ghép — giữ tên trên Sheet, gán ranh lô, tọa độ tâm lô và diện tích ${toPhase}.`]);
   if (count.relot) alerts.push(['warn', `${count.relot} lô trùng công trình đã có ranh lô cùng giai đoạn (danh sách lô cần xử lý): ghi sẽ thay ranh cũ, tọa độ và diện tích ${toPhase} — kiểm tra trước khi ghi.`]);
@@ -1706,7 +1708,7 @@ async function submitImport() {
       const byLayer = {};
       outside.forEach(p => { byLayer[p.layer] = (byLayer[p.layer] || 0) + 1; });
       const detail = Object.entries(byLayer).map(([l, n]) => `${l}: ${n}`).join(', ');
-      if (!confirm(`⚠️ Có ${outside.length} lô nằm ngoài TP. Huế (${detail}) sẽ bị BỎ QUA, không ghi vào Sheet.\n\nNếu đây là lỗi vẽ / sai vị trí, bấm Hủy để sửa file rồi nhập lại.\nBấm OK để tiếp tục ghi ${items.length} lô hợp lệ.`)) return;
+      if (!confirm(`⚠️ Có ${outside.length} lô nằm ngoài TP. Huế, cách ranh hơn 100 m (${detail}) sẽ bị BỎ QUA, không ghi vào Sheet.\n\nNếu đây là lỗi vẽ / sai vị trí, bấm Hủy để sửa file rồi nhập lại.\nBấm OK để tiếp tục ghi ${items.length} lô hợp lệ.`)) return;
     }
     const nUpdate = items.filter(it => it.matchId).length;
     const phaseLabel = current.filePhase === 'QH' ? 'Quy hoạch (QuyMo_QH) theo tên file'

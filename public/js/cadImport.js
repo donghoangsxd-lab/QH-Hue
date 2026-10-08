@@ -924,6 +924,10 @@ export function buildParcelsLonLat(entities) {
 const SPLIT_SHARE_MIN = 0.05;
 const SPLIT_AREA_MIN = 50;
 const SAMPLE_STEP_DEG = 0.0001; // ~10 m
+// Ranh TP phía biển / đầm phá không ổn định: lô ngoài ranh nhưng cách phường gần nhất ≤ CITY_EDGE_M vẫn thuộc phường đó
+const CITY_EDGE_M = 100;
+const EDGE_PAD_DEG = 0.0015; // ~150 m, lọc cạnh ranh phường gần lô
+const EDGE_MAX_PTS = 400;
 
 function bboxOfRings(rings) {
   const b = [Infinity, Infinity, -Infinity, -Infinity];
@@ -984,11 +988,57 @@ function splitByWards(g, p, shape, big) {
   });
 }
 
+// Cạnh ranh phường dạng [ax, ay, bx, by] (độ), tính 1 lần cho mỗi phường
+function wardEdges(w) {
+  if (w.edges) return w.edges;
+  const out = [];
+  for (const poly of w.polys) for (const ring of poly) {
+    for (let i = 0; i + 1 < ring.length; i++) out.push([ring[i][0], ring[i][1], ring[i + 1][0], ring[i + 1][1]]);
+  }
+  return (w.edges = out);
+}
+
+/**
+ * Phường gần lô nhất trong phạm vi EDGE_PAD_DEG → { w, d (m), lat, lng } hoặc null.
+ * lat / lng: điểm trên ranh phường gần lô nhất, dịch vào trong 1 m (để thống kê theo tọa độ vẫn rơi vào phường).
+ */
+function nearestWard(p, W, find) {
+  const all = p.polygons.length ? p.polygons.flatMap(poly => poly[0]) : [[p.lng, p.lat]];
+  const step = Math.max(1, Math.ceil(all.length / EDGE_MAX_PTS));
+  const pts = all.filter((_, i) => i % step === 0);
+  const [x0, y0, x1, y1] = bboxOfRings([pts]);
+  const kx = M_PER_DEG * Math.cos(((y0 + y1) / 2) * DEG), ky = M_PER_DEG;
+  let best = null;
+  for (const w of W) {
+    if (w.bbox[0] > x1 + EDGE_PAD_DEG || w.bbox[2] < x0 - EDGE_PAD_DEG || w.bbox[1] > y1 + EDGE_PAD_DEG || w.bbox[3] < y0 - EDGE_PAD_DEG) continue;
+    const edges = wardEdges(w).filter(([ax, ay, bx, by]) => Math.max(ax, bx) >= x0 - EDGE_PAD_DEG && Math.min(ax, bx) <= x1 + EDGE_PAD_DEG
+      && Math.max(ay, by) >= y0 - EDGE_PAD_DEG && Math.min(ay, by) <= y1 + EDGE_PAD_DEG);
+    for (const [x, y] of pts) {
+      for (const [ax, ay, bx, by] of edges) {
+        const ux = (ax - x) * kx, uy = (ay - y) * ky, dx = (bx - ax) * kx, dy = (by - ay) * ky;
+        const len = dx * dx + dy * dy;
+        const t = len ? Math.min(1, Math.max(0, -(ux * dx + uy * dy) / len)) : 0;
+        const qx = ux + t * dx, qy = uy + t * dy;
+        const d = Math.hypot(qx, qy);
+        if (!best || d < best.d) best = { w, d, x, y, qx, qy };
+      }
+    }
+  }
+  if (!best) return null;
+  const { w, d, x, y, qx, qy } = best;
+  const s = d > 0 ? (d + 1) / d : 1;
+  let lng = x + qx * s / kx, lat = y + qy * s / ky;
+  if (find(lng, lat) !== w) { lng = x + qx / kx; lat = y + qy / ky; }
+  return { w, d, lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 };
+}
+
 /**
  * Gán phường và tách lô vắt ranh (p.ward, p.wardParts, p.crossWard, p.wardShares).
  * - Mỗi phường có phần ≥ SPLIT_SHARE_MIN và ≥ SPLIT_AREA_MIN m² là 1 mảnh: p.wardParts = [{ ward, polygons, area, lat, lng }],
  *   mảnh đầu thuộc phường chiếm nhiều nhất (= p.ward); chỉ 1 phường đạt ngưỡng → cả lô thuộc phường đó.
  * - Không có turf / cắt hình lỗi → p.crossWard (ghi quy mô 0 như trước).
+ * - Lô không thuộc phường nào nhưng chạm ranh TP hoặc cách ranh ≤ CITY_EDGE_M: phường gần nhất,
+ *   p.cityEdge = { m (khoảng cách, 0 = chạm), moved (điểm đại diện đã kéo vào ranh) }. Còn lại p.ward = null (bỏ qua).
  * wards: [{ name, geometry }] (state.wardLabelsList).
  */
 export function assignWards(parcels, wards) {
@@ -1003,19 +1053,21 @@ export function assignWards(parcels, wards) {
     }
     return null;
   };
-  for (const p of parcels) {
+  // → tập phường có điểm mẫu của lô rơi vào (null = điểm ngoài TP)
+  const place = (p) => {
     const home = find(p.lng, p.lat);
     p.ward = home ? home.name : null;
     p.crossWard = false;
     p.wardShares = null;
     p.wardParts = null;
-    if (!p.polygons.length) continue;
-    const hit = new Set();
+    p.cityEdge = null;
+    const hit = new Set([home]);
+    if (!p.polygons.length) return hit;
     for (const [x, y] of samplePoints(p.polygons)) hit.add(find(x, y));
-    if (hit.size === 1 && hit.has(home)) continue;
+    if (hit.size === 1) return hit;
 
     const g = typeof turf !== 'undefined' ? turf : null;
-    if (!g) { p.crossWard = true; continue; }
+    if (!g) { p.crossWard = true; return hit; }
     const shape = g.multiPolygon(p.polygons);
     const total = g.area(shape);
     const parts = [];
@@ -1029,11 +1081,30 @@ export function assignWards(parcels, wards) {
     parts.sort((a, b) => b.share - a.share);
     p.wardShares = parts.map(({ ward, share }) => ({ ward, share }));
     const big = parts.filter(x => x.part && x.share >= SPLIT_SHARE_MIN && x.area >= SPLIT_AREA_MIN);
-    if (!big.length) continue;
+    if (!big.length) return hit;
     p.ward = big[0].ward;
-    if (big.length === 1) continue;
-    p.wardParts = splitByWards(g, p, shape, big);
-    if (!p.wardParts) p.crossWard = true;
+    if (big.length > 1) {
+      p.wardParts = splitByWards(g, p, shape, big);
+      if (!p.wardParts) p.crossWard = true;
+    }
+    return hit;
+  };
+  for (const p of parcels) {
+    const hit = place(p);
+    if (p.ward) continue;
+    // Lô chạm ranh TP (phần trong TP dưới ngưỡng tách) hoặc nằm ngoài nhưng sát ranh: gán phường gần nhất,
+    // điểm đại diện ngoài TP thì kéo vào ranh phường để thống kê theo tọa độ không bỏ sót.
+    const inside = p.wardShares?.find(s => s.share > 0) || [...hit].find(Boolean);
+    const near = nearestWard(p, W, find);
+    const w = inside ? W.find(x => x.name === (inside.ward || inside.name)) : near && near.d <= CITY_EDGE_M ? near.w : null;
+    if (!w) continue;
+    p.ward = w.name;
+    p.cityEdge = { m: inside ? 0 : Math.round(near.d), moved: false };
+    if (near && near.w === w && !find(p.lng, p.lat)) {
+      p.lat = near.lat;
+      p.lng = near.lng;
+      p.cityEdge.moved = true;
+    }
   }
   return parcels;
 }
