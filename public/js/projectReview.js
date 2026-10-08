@@ -256,7 +256,7 @@ function lotStyle(lot) {
   }
   const split = residentialSubAreas(lot, session.kind);
   const sym = landSymbol(session.kind, lot.landKey, split ? Object.keys(split)[0] : lot.subKey);
-  const key = sym.tt16 || landPatternKey(lot.layer);
+  const key = sym.tt16 || landPatternKey(lot.layer, lot.name);
   return tt16SymbolStyle(key, sym.tone, lot.layer, { scenario: lot.phase, detailed: isDetailed(targetMap(lot.phase)) });
 }
 

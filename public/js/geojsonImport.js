@@ -2,7 +2,7 @@
 // Loại hạ tầng theo thuộc tính Layer, không có thì theo tên; tọa độ độ (WGS84) hoặc mét (VN-2000, xuất từ QGIS giữ nguyên hệ).
 import { layerToType, tt16Layer } from './cadImport.js';
 import { openRing } from './kmlImport.js';
-import { landRule } from './tt16Symbols.js';
+import { landRule, landPatternKey } from './tt16Symbols.js';
 
 // autocad_la: tên layer CAD gốc trên gServer Huế (DBF cắt tên trường còn 10 ký tự)
 export const LAYER_FIELD = /^(layer|layer_?name|ten_?layer|lop|(?:autocad|cad)_?la(?:yer)?)$/i;
@@ -16,19 +16,25 @@ function pickProp(props, re) {
 }
 
 // Tên chức năng sử dụng đất (gServer: chucnangsudungdat, DBF cắt còn chucnangsu; loaidat), ưu tiên theo thứ tự
-const CLASS_FIELDS = [/^chuc_?nang/i, /^loai_?dat$/i, /^muc_?dich/i];
+const CLASS_FIELDS = [/^chuc_?nang/i, /^loai_?dat$/i, /^ten_?loai/i, /^muc_?dich/i];
+// Ký hiệu lô (CXCD.A-01, OHT.C-11): chỉ dùng khi nhận ra loại đất
+const CODE_FIELDS = [/^ky_?hieu/i, /^ma_?lo$/i, /^kh_?lo$/i, /^ma_?dat$/i];
+
+const knownLand = (s) => !!(tt16Layer(s) || landRule(s) || landPatternKey(s));
 
 function resolveLayer(props, name) {
   const field = pickProp(props, LAYER_FIELD);
   if (field && layerToType(field)) return field;
   const t = name && layerToType(name);
   if (t) return t.prefix;
-  // Tên layer CAD không cho biết loại đất thì lấy tên chức năng sử dụng đất nếu nhận ra nhóm đất
-  if (!field || (!tt16Layer(field) && !landRule(field))) {
-    for (const re of CLASS_FIELDS) {
-      const cls = pickProp(props, re);
-      if (cls && landRule(cls)) return cls;
-    }
+  // Tên layer CAD (hoặc tên file .shp khi DBF không có trường Layer) không cho biết loại đất: lấy tên chức năng sử dụng đất,
+  // ưu tiên giá trị nhận ra nhóm đất, không thì giá trị đầu tiên có chữ (tên loại đất luôn đọc được), cuối cùng là ký hiệu lô
+  if (!field || !knownLand(field)) {
+    const classes = CLASS_FIELDS.map(re => pickProp(props, re)).filter(v => /\p{L}/u.test(v));
+    const cls = classes.find(knownLand) || classes[0];
+    if (cls) return cls;
+    const code = CODE_FIELDS.map(re => pickProp(props, re)).find(v => v && landPatternKey(v));
+    if (code) return code;
   }
   return field || name || '(không tên)';
 }

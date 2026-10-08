@@ -10,7 +10,7 @@ import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, show
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
-import { tt16ParcelStyle, renderTt16Legend, landParcelStyle, landLabel, landColor, landPatternKey, tt16SwatchCss, TT16_PATTERN_ZOOM } from './tt16Symbols.js';
+import { tt16ParcelStyle, renderTt16Legend, landParcelStyle, landLabel, landColor, landPatternKey, tt16SwatchCss, TT16_PATTERN_ZOOM, TT16_STYLES } from './tt16Symbols.js';
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap } from './basemap.js';
 import {
@@ -1139,9 +1139,10 @@ function landCode(p) {
 const LAND_STAGE_LABELS = { QHDD: 'QH đợt đầu', QHDH: 'QH dài hạn' };
 
 function landPopupHtml(p) {
-  const type = p.nhom || landLabel(p.layer);
+  const key = landPatternKey(p.layer, p.name);
+  const nhom = p.nhom || landLabel(p.layer);
+  const type = nhom === 'Đất khác' && TT16_STYLES[key] ? TT16_STYLES[key].label : nhom;
   const code = landCode(p);
-  const key = landPatternKey(p.layer);
   const swatch = tt16SwatchCss(key, 0.6) || `background:${landColor(p.layer) || '#94a3b8'};`;
   const stage = LAND_STAGE_LABELS[String(p.layer || '').toUpperCase().split(/[_\s]/)[0]];
   const phase = p.phase === 'QH' ? (stage || 'Quy hoạch') : 'Hiện trạng';
@@ -1183,7 +1184,7 @@ const isBusyTool = () => state.isPickMode || state.activeMeasureType || state.ad
 function infraLotShape(lot, item, m, detailed) {
   const style = item
     ? tt16ParcelStyle(layerType(item), lot.layer, { scenario: lot.phase, detailed, approved: isApproved(item.status) })
-    : landParcelStyle(lot.layer, { detailed, phase: lot.phase });
+    : landParcelStyle(lot.layer, { detailed, phase: lot.phase, name: lot.name });
   const shape = L.geoJSON(lot.geometry, { style, bubblingMouseEvents: false });
   bindLotHover(shape);
   if (!item) return shape;
@@ -1207,7 +1208,7 @@ function drawLandsOn(m, list, infra = []) {
   const detailed = m.getZoom() >= PARCEL_PATTERN_ZOOM;
   list.forEach(p => {
     const shape = L.geoJSON(p.geometry, {
-      style: landParcelStyle(p.layer, { detailed, phase: p.phase }),
+      style: landParcelStyle(p.layer, { detailed, phase: p.phase, name: p.name }),
       bubblingMouseEvents: false
     });
     bindLotHover(shape);
