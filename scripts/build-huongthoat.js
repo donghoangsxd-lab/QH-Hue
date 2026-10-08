@@ -2,7 +2,8 @@
 // Thế thoát nước = cao độ FABDEM làm trơn + BETA × khoảng cách tới mặt nước gần nhất: vùng phẳng (dốc < BETA, cao độ nhiễu)
 // do khoảng cách quyết định, vùng gò đồi do cao độ quyết định. Lấp trũng ưu tiên (priority-flood) từ mặt nước → cây dòng chảy
 // mọi ô đều về được sông hồ; đường phân thủy là điểm xa nhất (theo chiều dài đường chảy) đổ vào mỗi nhánh. Mũi tên đặt ở POS
-// (3/4) đường chảy từ phân thủy tới mép nước, bám đoạn đường phố gần đó cùng hướng (thoát nước đô thị bám theo đường).
+// (3/4) đường chảy từ phân thủy tới mép nước, bám đoạn đường phố gần đó cùng hướng (thoát nước đô thị bám theo đường), kéo dài
+// dọc tuyến phố đó ARROW_MIN_M–ARROW_M m; tuyến cùng hướng thoát nước (gần vuông góc bờ sông) ngắn hơn thì bỏ.
 //   node scripts/build-huongthoat.js [--out HuongThoat.geojson] [--preview .cache/huongthoat-preview.html] [--bbox w,s,e,n]
 //     --spacing 200     khoảng cách tối thiểu giữa 2 mũi tên (m)
 //     --pos 0.75        vị trí mũi tên trên quãng phân thủy → mép nước (0 = tâm, 1 = sát sông)
@@ -29,7 +30,12 @@ const SNAP_M = 60;             // ô ứng viên không có đoạn phố cùng 
 const SNAP_DEG = 40;
 const TURN_DEG = 60;           // mũi tên đi tiếp sang tuyến khác ở nút khi lệch hướng < 60°
 const SLOPE_WIN_M = 20;
-const MIN_DESCENT = 0.6;       // thế giảm ≥ 0,6 × độ dốc thế tại chỗ mỗi mét đi dọc mũi tên (lệch hướng thoát nước ≤ ~53°)
+const MIN_DESCENT = 0.6;       // cả mũi tên: thế giảm ≥ 0,6 × độ dốc thế mỗi mét (lệch hướng thoát nước ≤ ~53°)
+const STEP_DESCENT = 0.4;      // từng quãng SLOPE_WIN_M: lệch ≤ ~66° (phố cong nhẹ vẫn đi tiếp)
+const ARROW_M = 260;           // chiều dài mũi tên mong muốn dọc phố
+const ARROW_MIN_M = 200;       // tuyến phố cùng hướng thoát nước ngắn hơn không đủ thể hiện hướng chảy → bỏ
+const OVERLAP_M = 30;
+const MIN_STRAIGHT = 0.8;      // khoảng cách đầu – cuối / chiều dài: mũi tên bẻ góc chữ L sang phố khác thì bỏ
 const MIN_LAKE_M2 = 5000;      // ao, hồ nhỏ hơn không nhận nước của khu vực
 const CELL_M = 100;
 const DEM_Z = 12;              // ô Terrarium mức 12 ≈ 37 m, sát độ phân giải 30 m của FABDEM
@@ -90,6 +96,43 @@ function makeProj(lat0, lng0) {
     fwd: (lat, lng) => [(lng - lng0) * kx, (lat - lat0) * ky],
     inv: (x, y) => [y / ky + lat0, x / kx + lng0]
   };
+}
+
+const polyLen = (p) => {
+  let s = 0;
+  for (let k = 1; k < p.length; k++) s += Math.hypot(p[k][0] - p[k - 1][0], p[k][1] - p[k - 1][1]);
+  return s;
+};
+
+/** Phần đầu dài len (m) của đường gấp khúc */
+function trimPoly(p, len) {
+  const out = [p[0]];
+  let s = 0;
+  for (let k = 1; k < p.length; k++) {
+    const l = Math.hypot(p[k][0] - p[k - 1][0], p[k][1] - p[k - 1][1]);
+    if (s + l >= len) {
+      const t = l ? (len - s) / l : 0;
+      if (t > 0) out.push([p[k - 1][0] + (p[k][0] - p[k - 1][0]) * t, p[k - 1][1] + (p[k][1] - p[k - 1][1]) * t]);
+      return out;
+    }
+    out.push(p[k]);
+    s += l;
+  }
+  return out;
+}
+
+/** Điểm cách đều step (m) dọc đường gấp khúc, gồm cả 2 đầu */
+function samplePoly(p, step) {
+  const out = [p[0]];
+  let carry = 0;
+  for (let k = 1; k < p.length; k++) {
+    const [ax, ay] = p[k - 1], [bx, by] = p[k], l = Math.hypot(bx - ax, by - ay);
+    let d = step - carry;
+    for (; d <= l; d += step) out.push([ax + (bx - ax) * d / l, ay + (by - ay) * d / l]);
+    carry = l - (d - step);
+  }
+  out.push(p[p.length - 1]);
+  return out;
 }
 
 const shoelace = (p) => {
@@ -513,7 +556,17 @@ async function main() {
     }
     return true;
   };
-  let nCands = 0, unsnapped = 0, short = 0;
+  // Điểm mẫu 10 m của các mũi tên đã chọn: mũi tên mới đi sát (< OVERLAP_M) mũi tên cũ trên cùng tuyến thì bỏ
+  const lgrid = new Map();
+  const nearKeptLine = (x, y) => {
+    const cx = Math.floor(x / OVERLAP_M), cy = Math.floor(y / OVERLAP_M);
+    for (let i = cx - 1; i <= cx + 1; i++) for (let j = cy - 1; j <= cy + 1; j++) {
+      const a = lgrid.get(`${i},${j}`);
+      if (a) for (let k = 0; k < a.length; k += 2) if (Math.hypot(a[k] - x, a[k + 1] - y) < OVERLAP_M) return true;
+    }
+    return false;
+  };
+  let nCands = 0, unsnapped = 0, short = 0, bent = 0, downhill = 0, overlap = 0;
   const t0 = Date.now();
   big.forEach(c => {
     let ci0 = Infinity, ci1 = -Infinity, cj0 = Infinity, cj1 = -Infinity;
@@ -586,7 +639,7 @@ async function main() {
       return i < 2 || i >= W - 2 || j < 2 || j >= H - 2 || mask[j * W + i] ? -1 : j * W + i;
     };
     // Độ giảm thế cần có trên quãng len giữa 2 ô: MIN_DESCENT × len × độ dốc thế trung bình tại chỗ (tối thiểu nửa dốc vùng phẳng)
-    const need = (c0, c1, len) => MIN_DESCENT * len * Math.max(0.5 * gFlat, (G[c0] + G[c1]) / 2);
+    const need = (c0, c1, len, rate = MIN_DESCENT) => rate * len * Math.max(0.5 * gFlat, (G[c0] + G[c1]) / 2);
     // Kiểm tra từng 5 m dọc đoạn: không vào nước; trên mỗi quãng SLOPE_WIN_M gần nhất thế phải giảm (xuôi dòng) hoặc tăng
     // (ngược dòng) đủ mức need — phố lệch hướng thoát nước quá ~53° hoặc đi vào đáy trũng kín thì mũi tên dừng
     const guard = (down) => {
@@ -605,7 +658,7 @@ async function main() {
           let w = ss.length - 1;
           while (w > 0 && s - ss[w - 1] <= SLOPE_WIN_M) w--;
           const win = s - ss[w], cw = cs[w];
-          if (win >= SLOPE_WIN_M / 2 && (down ? fill[cw] - fill[cc] : fill[cc] - fill[cw]) < need(cw, cc, win)) return (k - 1) / steps;
+          if (win >= SLOPE_WIN_M / 2 && (down ? fill[cw] - fill[cc] : fill[cc] - fill[cw]) < need(cw, cc, win, STEP_DESCENT)) return (k - 1) / steps;
           ss.push(s); cs.push(cc);
         }
         return 1;
@@ -615,16 +668,24 @@ async function main() {
     cands.sort((p, q) => p.k - q.k || q.R - p.R);
     cands.forEach(cd => {
       if (!farFromKept(cd.x, cd.y)) return;
-      const half = Math.max(40, Math.min(spacing * 0.5, cd.R * 0.25));
-      const down = walk(cd.x, cd.y, cd.r, cd.next, cd.dir, half, guard(true));
-      const up = walk(cd.x, cd.y, cd.r, cd.dir > 0 ? cd.next - 1 : cd.next + 1, -cd.dir, half, guard(false));
-      const line = up.reverse().concat(down.slice(1));
-      let len = 0;
-      for (let k = 1; k < line.length; k++) len += Math.hypot(line[k][0] - line[k - 1][0], line[k][1] - line[k - 1][1]);
-      if (len < 40) { short++; return; }
+      const down = walk(cd.x, cd.y, cd.r, cd.next, cd.dir, ARROW_M, guard(true));
+      const up = walk(cd.x, cd.y, cd.r, cd.dir > 0 ? cd.next - 1 : cd.next + 1, -cd.dir, ARROW_M, guard(false));
+      const dl = polyLen(down), ul = polyLen(up);
+      if (dl + ul < ARROW_MIN_M) { short++; return; }
+      // Lấy đủ ARROW_M, ưu tiên nửa xuôi dòng; phía nào bị chặn sớm thì bù sang phía kia
+      const dt = Math.min(dl, Math.max(ARROW_M / 2, ARROW_M - ul)), ut = Math.min(ul, ARROW_M - dt);
+      const line = trimPoly(up, ut).reverse().concat(trimPoly(down, dt).slice(1));
       const [sx, sy] = line[0], [ex, ey] = line[line.length - 1];
+      if (Math.hypot(ex - sx, ey - sy) < MIN_STRAIGHT * (dt + ut)) { bent++; return; }
       const c0 = cellAt(sx, sy), c1 = cellAt(ex, ey);
-      if (c0 < 0 || c1 < 0 || fill[c0] - fill[c1] < need(c0, c1, Math.hypot(ex - sx, ey - sy))) { short++; return; }
+      if (c0 < 0 || c1 < 0 || fill[c0] - fill[c1] < need(c0, c1, Math.hypot(ex - sx, ey - sy))) { downhill++; return; }
+      const samples = samplePoly(line, 10);
+      if (samples.some(([x, y]) => nearKeptLine(x, y))) { overlap++; return; }
+      samples.forEach(([x, y]) => {
+        const key = `${Math.floor(x / OVERLAP_M)},${Math.floor(y / OVERLAP_M)}`;
+        if (!lgrid.has(key)) lgrid.set(key, []);
+        lgrid.get(key).push(x, y);
+      });
       const kp = { x: cd.x, y: cd.y, line, R: cd.R };
       kept.push(kp);
       const key = `${Math.floor(cd.x / spacing)},${Math.floor(cd.y / spacing)}`;
@@ -642,7 +703,8 @@ async function main() {
     return { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: { r: Math.round(c.R) } };
   }).filter(f => f.geometry.coordinates.length >= 2);
   fs.writeFileSync(outFile, JSON.stringify({ type: 'FeatureCollection', features }));
-  console.log(`✓ ${features.length} mũi tên dọc phố (cách nhau ≥ ${spacing} m, bỏ ${short} ngắn < 40 m hoặc không đi về mặt nước)`
+  console.log(`✓ ${features.length} mũi tên dọc phố dài ${ARROW_MIN_M}–${ARROW_M} m (cách nhau ≥ ${spacing} m; bỏ ${short} tuyến ngắn, ${bent} bẻ góc,`
+    + ` ${downhill} không đi về mặt nước, ${overlap} chồng mũi tên khác)`
     + ` → ${path.relative(ROOT, outFile)}`);
 
   writePreview(previewFile, pbbox, ways, features);
