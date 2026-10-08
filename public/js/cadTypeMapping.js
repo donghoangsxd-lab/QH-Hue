@@ -2,7 +2,7 @@
 // người dùng chọn trường nhận diện (Layer, Folder, thuộc tính...), rồi gán từng giá trị tìm được với 1 loại hạ tầng.
 import { escapeHtml, ico } from './utils.js';
 import { layerToType, tt16Layer, SCHOOL_PICK, MARKET_PICK } from './cadImport.js';
-import { landRule } from './tt16Symbols.js';
+import { landRule, landPatternKey, TT16_STYLES, MANUAL_LAND_KEYS } from './tt16Symbols.js';
 
 // Mã khớp "Đất ở": không phải hạ tầng — lô vẫn ghi sheet DXF, tên layer đổi để luôn tô màu đất ở
 const LAND_O = 'DATO';
@@ -32,7 +32,11 @@ export const TYPE_CODE_OPTIONS = [
   [LAND_CSD, 'Đất chưa sử dụng (BCS, DCS, NCS) – sheet DXF, không phải cơ sở'],
   [LAND_O, 'Đất ở – sheet DXF, màu đất ở']
 ];
-const VALID_CODES = new Set(TYPE_CODE_OPTIONS.map(([c]) => c));
+// Loại đất TT16 ngoài hạ tầng (mặt nước, giao thông, cây xanh chuyên dụng...): lô đất ghi sheet DXF, tô theo ký hiệu đã chọn
+const LAND_KEY_PREFIX = 'DAT:';
+const LAND_TYPE_OPTIONS = MANUAL_LAND_KEYS.map(key => [`${LAND_KEY_PREFIX}${key}`, TT16_STYLES[key].label]);
+const LAND_CODES = new Set([LAND_O, LAND_CSD]);
+const VALID_CODES = new Set([...TYPE_CODE_OPTIONS, ...LAND_TYPE_OPTIONS].map(([c]) => c));
 
 // Hiển thị tối đa số giá trị; trường có nhiều giá trị hơn (tên riêng, mã số...) nên chọn trường khác
 const MAX_VALUES = 80;
@@ -77,7 +81,10 @@ function guessCode(value) {
   // Một giá trị gộp nhiều cấp trường (VD "Đất trường THCS_tiểu học_mầm non"): admin chọn cấp từng lô
   if (GUESS_RULES.filter(([code, re]) => SCHOOL_CODES.has(code) && re.test(s)).length > 1) return SCHOOL_PICK;
   const hit = GUESS_RULES.find(([, re, not]) => re.test(s) && !(not && not.test(s)));
-  if (!hit) return '';
+  if (!hit) {
+    const key = landPatternKey(value);
+    return MANUAL_LAND_KEYS.includes(key) ? `${LAND_KEY_PREFIX}${key}` : '';
+  }
   const urban = `${hit[0]}_DT`;
   return URBAN_RE.test(s) && VALID_CODES.has(urban) ? urban : hit[0];
 }
@@ -199,8 +206,18 @@ export function applyManualMapping(entities, mapping) {
       return { ...ent, layer: (landRule(name) || {}).key === 'o' ? name : `Đất ở - ${name}` };
     }
     if (code === LAND_CSD) return asUnusedLand(ent, val || ent.layer);
+    if (code && code.startsWith(LAND_KEY_PREFIX)) return asLandType(ent, val, code.slice(LAND_KEY_PREFIX.length));
     return code ? { ...ent, layer: val || ent.layer, typeCode: code } : ent;
   });
+}
+
+// Giữ tên gốc khi đã nhận đúng loại; không thì "<tên> → <khóa>" (máy chủ giữ 60 ký tự nên rút tên còn 45)
+function asLandType(ent, val, key) {
+  const rest = { ...ent, asLand: true };
+  delete rest.typeCode;
+  if (landPatternKey(ent.layer, ent.name) === key) return rest;
+  if (val && landPatternKey(val) === key) return { ...rest, layer: val };
+  return { ...rest, layer: `${String(val || ent.layer).slice(0, 45)} → ${key}` };
 }
 
 /** Lô đất chưa sử dụng: bỏ mã loại, đổi tên layer để không bị nhận là hạ tầng và landRule xếp vào "Đất chưa sử dụng" */
@@ -211,8 +228,13 @@ export function asUnusedLand(ent, name = ent.layer) {
 }
 
 function codeOptions(selected, allowCsd) {
-  return `<option value="">— Bỏ qua —</option>${TYPE_CODE_OPTIONS.filter(([code]) => allowCsd || code !== 'CSD').map(([code, label]) =>
-    `<option value="${code}"${code === selected ? ' selected' : ''}>${code} · ${escapeHtml(label)}</option>`).join('')}`;
+  const opt = (code, text) => `<option value="${code}"${code === selected ? ' selected' : ''}>${escapeHtml(text)}</option>`;
+  const infra = TYPE_CODE_OPTIONS.filter(([code]) => !LAND_CODES.has(code) && (allowCsd || code !== 'CSD'))
+    .map(([code, label]) => opt(code, `${code} · ${label}`)).join('');
+  const land = [...TYPE_CODE_OPTIONS.filter(([code]) => LAND_CODES.has(code)), ...LAND_TYPE_OPTIONS]
+    .map(([code, label]) => opt(code, label)).join('');
+  return `<option value="">— Bỏ qua (tự nhận loại đất theo tên) —</option>`
+    + `<optgroup label="Hạ tầng">${infra}</optgroup><optgroup label="Lô đất – sheet DXF, không tính hạ tầng">${land}</optgroup>`;
 }
 
 /** Khung khớp thủ công trong báo cáo nhập file */

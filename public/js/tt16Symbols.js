@@ -571,12 +571,23 @@ const LAND_RULES = [
 
 export const LAND_LABELS = [...LAND_RULES.map(r => r.label), 'Đất khác'];
 
+// Lô đất khớp thủ công (cadTypeMapping): layer "<tên gốc> → <khóa TT16>", khóa quyết định nhóm đất thay cho tên gốc.
+// null: loại TT16 không thuộc nhóm nào của LAND_RULES (thống kê vào "Đất khác"). Đất ở / chưa sử dụng có mã khớp riêng.
+const KEY_LAND_RULE = {
+  'O-HH': 'o', 'O-LX': 'o', 'CC-DV': 'cc', 'CX-HC': null, 'CX-CD': null, 'SX-CN': null, 'SX-VL': null,
+  'DT-NC': 'dtn', CQ: 'cq', DL: 'dv', 'DT-TG': 'tg', AN: 'an', QP: 'an', GT: 'htkt', NTR: 'htkt', HTK: 'htkt',
+  NN: null, RSX: null, RPH: null, RDD: null, TS: null, HO: 'nuoc', SS: 'nuoc', MNB: 'nuoc'
+};
+export const MANUAL_LAND_KEYS = Object.keys(KEY_LAND_RULE);
+
 function foldLayer(layerName) {
   return String(layerName || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'D').toUpperCase();
 }
 
 export function landRule(layerName) {
   const s = foldLayer(layerName);
+  const key = (s.split('→')[1] || '').trim();
+  if (Object.hasOwn(KEY_LAND_RULE, key)) return LAND_RULES.find(r => r.key === KEY_LAND_RULE[key]) || null;
   return LAND_RULES.find(r => r.re.test(s)) || null;
 }
 
@@ -673,6 +684,7 @@ function freePatternKey(text) {
     if (base === 'VH' && /THEDUC|THETHAO|TDTT/.test(compact)) return 'TDTT';
     return TYPE_CODE_PATTERN[base];
   }
+  if (Object.hasOwn(KEY_LAND_RULE, base)) return base;
   const hit = PHRASE_RULES.find(([, re]) => re.test(compact));
   if (hit) return hit[0] === 'SCHOOL' ? schoolPatternKey(compact, words) : hit[0];
   const rule = landRule(name);
