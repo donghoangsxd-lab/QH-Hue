@@ -273,6 +273,7 @@ export async function loadBoundaryLayer() {
     });
     leftRenderer.refreshPoints();
     planRenderer.refreshPoints();
+    if (state.selectedWard && state.selectedWard !== CITY_NAME) redrawLands();
   } catch (err) {
     console.error("Lỗi tải tên 40 phường xã:", err);
   }
@@ -1060,7 +1061,7 @@ export function renderGroupedPoints() {
   });
   leftRenderer.setList(sourceList);
   planRenderer.setList(planList);
-  if (state.projectInfraLots.length) redrawLands();
+  if (state.projectInfraLots.length || state.landParcels.length) redrawLands();
 }
 
 // Bán kính buffer chung đổi: chỉ vẽ lại vùng phủ, không phải dựng lại marker
@@ -1221,13 +1222,88 @@ function drawLandsOn(m, list, infra = []) {
 
 let landsDetailed = null;
 
+// Điểm đại diện của lô: lat/lng nếu có, không thì tâm hình. Ghi nhớ theo đối tượng lô.
+const lotAnchorMemo = new WeakMap();
+function lotAnchor(p) {
+  const hit = lotAnchorMemo.get(p);
+  if (hit) return hit;
+  let lat = Number(p.lat);
+  let lng = Number(p.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    try {
+      const c = turf.centroid(p.geometry).geometry.coordinates;
+      lng = Number(c[0]);
+      lat = Number(c[1]);
+    } catch (e) {
+      lat = NaN;
+      lng = NaN;
+    }
+  }
+  const pt = { lat, lng };
+  lotAnchorMemo.set(p, pt);
+  return pt;
+}
+
+// Cùng phạm vi với điểm công trình: cả thành phố thì giữ nguyên; đang chọn 1 phường thì điểm phải nằm trong ranh;
+// khung thẩm định thì nằm trong bbox đồ án (getWardFilteredList).
+function scopeTag() {
+  if (reviewScope) return `review:${reviewScope.key}`;
+  if (!state.selectedWard || state.selectedWard === CITY_NAME) return '';
+  const wardInfo = state.wardLabelsList.find(w => w.name === state.selectedWard);
+  return wardInfo && wardInfo.geometry ? wardInfo.name : '';
+}
+
+function anchorInScope(p, wardInfo) {
+  const a = lotAnchor(p);
+  if (!Number.isFinite(a.lat) || !Number.isFinite(a.lng)) return false;
+  if (reviewScope) {
+    const [w, s, e, n] = reviewScope.bbox;
+    return a.lat >= s && a.lat <= n && a.lng >= w && a.lng <= e;
+  }
+  return !!wardInfo && isPointInWard(a.lat, a.lng, wardInfo);
+}
+
+const lotScopeMemo = new WeakMap();
+function lotsInWardScope(list) {
+  const tag = scopeTag();
+  if (!tag) return list;
+  const memo = lotScopeMemo.get(list);
+  if (memo && memo.tag === tag && memo.wards === state.wardLabelsList) return memo.result;
+  const wardInfo = tag.startsWith('review:') ? null : state.wardLabelsList.find(w => w.name === tag);
+  // ward gán lúc nhập (phần diện tích lớn nhất) giữ lô vắt ranh; không có ward thì thử tâm hình như điểm công trình
+  const result = list.filter(p => (wardInfo && p.ward === wardInfo.name) || anchorInScope(p, wardInfo));
+  lotScopeMemo.set(list, { tag, wards: state.wardLabelsList, result });
+  return result;
+}
+
+// Lô hạ tầng của đồ án bám điểm công trình: hiện khi chính điểm đó đang được lọc vào phạm vi (id + giai đoạn).
+// Lô không khớp điểm nào thì thử tâm hình như lô đất.
+function infraLotsInWardScope(list) {
+  const tag = scopeTag();
+  if (!tag) return list;
+  const memo = lotScopeMemo.get(list);
+  if (memo && memo.tag === tag && memo.wards === state.wardLabelsList && memo.version === state.dataVersion) return memo.result;
+  const htIn = new Set(getWardFilteredList(state.rawDataList).map(p => p.id));
+  const qhIn = new Set(getWardFilteredList(getPlanScenarioList()).map(p => p.id));
+  const htAll = new Set(state.rawDataList.map(p => p.id));
+  const qhAll = new Set(getPlanScenarioList().map(p => p.id));
+  const wardInfo = tag.startsWith('review:') ? null : state.wardLabelsList.find(w => w.name === tag);
+  const result = list.filter(lot => {
+    const known = lot.phase === 'QH' ? qhAll : htAll;
+    if (!known.has(lot.id)) return anchorInScope(lot, wardInfo);
+    return (lot.phase === 'QH' ? qhIn : htIn).has(lot.id);
+  });
+  lotScopeMemo.set(list, { tag, wards: state.wardLabelsList, version: state.dataVersion, result });
+  return result;
+}
+
 // showLand (khung Thẩm định) vẽ lô đất các đồ án đang giao khung nhìn, mọi mức zoom.
-// Lớp Đồ án quy hoạch vẽ trọn đồ án đang hiện (lô đất + lô hạ tầng) từ PARCEL_MIN_ZOOM. Danh sách đã lọc lúc tải file.
+// Lớp Đồ án quy hoạch vẽ lô đất + lô hạ tầng từ PARCEL_MIN_ZOOM. Chọn phường/xã thì chỉ giữ lô trong phạm vi đó.
 function redrawLands() {
   const byProject = state.showProjects && map && map.getZoom() >= PARCEL_MIN_ZOOM;
-  const lands = (state.showLand || byProject) ? state.landParcels : [];
+  const lands = (state.showLand || byProject) ? lotsInWardScope(state.landParcels) : [];
   const infra = byProject && state.showProjectInfra
-    ? state.projectInfraLots.filter(l => !state.hiddenProjects.has(l.file)) : [];
+    ? infraLotsInWardScope(state.projectInfraLots).filter(l => !state.hiddenProjects.has(l.file)) : [];
   const compare = isCompareOn() && !!planMap;
   landsDetailed = map ? map.getZoom() >= PARCEL_PATTERN_ZOOM : null;
   const pick = (list, phase) => (compare ? list.filter(p => p.phase === phase) : list);
