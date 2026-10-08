@@ -15,7 +15,7 @@ import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap } from './basemap.js';
 import {
   getCoveredRightWidth, highlightPlanWard, planMap, planLayers, syncPlanLayer,
-  setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange
+  setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, getViewMode, setViewMode
 } from './planMap.js';
 import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, PROJECT_LAYERS } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
@@ -1128,7 +1128,7 @@ export function setParcelsVisible(on) {
 const landGroups = new Map();
 
 // Tên lô từ file đồ án dạng "<layer> <mã lô> – <đồ án> #<stt>": rút còn mã lô; tên Admin đã sửa giữ nguyên
-function landCode(p) {
+export function landCode(p) {
   let t = String(p.name || '').trim();
   if (p.layer && t.startsWith(p.layer)) t = t.slice(p.layer.length);
   const tail = p.file ? t.lastIndexOf(` – ${p.file}`) : -1;
@@ -1359,6 +1359,51 @@ function redrawLandsOnPattern() {
   if (!map || (!state.projectInfraLots.length && !state.landParcels.length)) return;
   const detailed = map.getZoom() >= PARCEL_PATTERN_ZOOM;
   if (detailed !== landsDetailed) redrawLands();
+}
+
+// Tìm lô trong đồ án (projectLayer.js): lô QH chỉ vẽ trên bản đồ quy hoạch, lô HT trên bản đồ hiện trạng
+// nên chuyển chế độ xem cho đúng giai đoạn; zoom tối thiểu PARCEL_MIN_ZOOM để lớp lô hiện ra
+// Viền nằm pane riêng trên lớp lô (lô vẽ lại sau khi phóng tới sẽ đè lên overlayPane); popup chừa thanh tiêu đề
+const LOT_FIND_STYLE = { color: '#fde047', weight: 4, opacity: 1, fill: false, dashArray: '8 5' };
+const LOT_FIND_MS = 10000;
+const LOT_FIND_PANE = 'lotFindPane';
+const LOT_POPUP_PAD = { autoPanPaddingTopLeft: [40, 90], autoPanPaddingBottomRight: [40, 20] };
+let lotFind = null;
+
+export function showProjectLot(lot) {
+  if (!map || !lot || !lot.geometry) return;
+  const qh = lot.phase === 'QH';
+  if (qh && !isCompareOn()) setViewMode('QH');
+  else if (!qh && !isSplitOn() && getViewMode() === 'QH') setViewMode('HT');
+  const m = qh && planMap ? planMap : map;
+  if (!m.getPane(LOT_FIND_PANE)) {
+    const pane = m.createPane(LOT_FIND_PANE);
+    pane.style.zIndex = 450;
+    pane.style.pointerEvents = 'none';
+  }
+  const outline = L.geoJSON(lot.geometry, { style: LOT_FIND_STYLE, interactive: false, pane: LOT_FIND_PANE });
+  const bounds = outline.getBounds();
+  if (!bounds.isValid()) return;
+  const zoom = Math.min(18, Math.max(PARCEL_MIN_ZOOM, m.getBoundsZoom(bounds.pad(0.6))));
+  m.setView(bounds.getCenter(), zoom, { animate: false });
+  if (lotFind) lotFind.remove();
+  lotFind = outline.addTo(m);
+  const shown = lotFind;
+  setTimeout(() => { if (lotFind === shown) { shown.remove(); lotFind = null; } }, LOT_FIND_MS);
+
+  let at = bounds.getCenter();
+  try {
+    const c = turf.pointOnFeature(turf.feature(lot.geometry)).geometry.coordinates;
+    at = L.latLng(c[1], c[0]);
+  } catch (e) { /* hình lỗi: dùng tâm khung */ }
+  if (lot.kind === 'DXF') {
+    const popup = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup', ...LOT_POPUP_PAD }).setLatLng(at).setContent(landPopupHtml(lot)).openOn(m);
+    addLotEditButton(popup, { kind: 'DXF', land: lot }, redrawLands);
+    return;
+  }
+  const list = qh ? getPlanScenarioList() : state.rawDataList;
+  const item = list.find(it => it.id === lot.id) || state.rawDataList.find(it => it.id === lot.id);
+  if (item) onPointClick(item, m, lot.geometry);
 }
 
 export function setProjectInfraVisible(on) {

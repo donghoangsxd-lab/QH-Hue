@@ -1,11 +1,14 @@
 // Mục Quy hoạch (tab Lớp dữ liệu): mỗi đồ án (Ten_QH) bật/tắt riêng, tìm, phóng tới, Admin xóa / chuyển đồ án cũ.
-// Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS): bật/tắt từng lớp, Admin xóa từng lớp.
+// Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS): bật/tắt từng lớp, Admin xóa từng lớp, tìm lô trong đồ án.
 // Zoom < PARCEL_MIN_ZOOM vẽ ranh tổng đồ án (bấm để phóng tới); từ ngưỡng đó vẽ lô (mapEngine.js),
 // ranh tổng chỉ còn nét viền không nhận click (đồ án có ranh thật).
 import { state } from './state.js';
-import { map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible } from './mapEngine.js';
+import {
+  map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
+} from './mapEngine.js';
 import { planMap, onCompareChange } from './planMap.js';
-import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden } from './projectFiles.js';
+import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots } from './projectFiles.js';
+import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { escapeHtml, fmtNum, ico } from './utils.js';
@@ -300,7 +303,78 @@ function layersHtml(p, idx, projectOn, admin) {
       ${admin && g.present && !p.legacy ? `<button type="button" class="project-btn danger" data-layer-del="${idx}:${li}" title="Xóa lớp ${escapeHtml(g.label)} khỏi đồ án" aria-label="Xóa lớp"${layerBusy || busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
     </div>`;
   }).join('');
-  return `<div class="project-layers">${rows}</div>`;
+  const lotsN = info.list.filter(g => g.kind === 'lots').reduce((s, g) => s + g.count, 0);
+  const search = lotsN ? `<div class="project-lot-search">
+      <input type="search" class="project-search" data-lot-search="${idx}" value="${escapeHtml(lotQuery.get(p.name) || '')}"
+        placeholder="Tìm trong ${fmtNum(lotsN)} lô: ký hiệu, tên, loại đất…" aria-label="Tìm lô trong đồ án ${escapeHtml(p.name)}">
+      <div class="project-lot-results" data-lot-results="${idx}">${lotResultsHtml(p, idx)}</div>
+    </div>` : '';
+  return `<div class="project-layers">${rows}${search}</div>`;
+}
+
+// ============================ TÌM LÔ TRONG ĐỒ ÁN ============================
+// So khớp bỏ dấu, bỏ khoảng trắng / dấu câu ("cxhca02" khớp "CXHC.A-02"); hoặc lô chứa đủ mọi từ đã gõ ("di tich a02")
+
+const LOT_HIT_MAX = 40;
+const lotQuery = new Map();
+const lotHits = new Map();
+const lotIndex = new WeakMap();
+const flat = (s) => foldText(s).replace(/[^a-z0-9]+/g, '');
+
+function lotTypeLabel(lot) {
+  if (lot.nhom && lot.nhom !== 'Đất khác') return lot.nhom;
+  return TT16_STYLES[landPatternKey(lot.layer, lot.name)]?.label || landLabel(lot.layer);
+}
+
+function lotEntry(tenQH, lot) {
+  let e = lotIndex.get(lot);
+  if (e) return e;
+  const code = landCode({ ...lot, file: tenQH });
+  const type = lotTypeLabel(lot);
+  const text = foldText([code, lot.name, lot.id, lot.layer, type].join(' '));
+  e = { lot, code, type, text, flat: text.replace(/[^a-z0-9]+/g, ''), codeFlat: flat(code) };
+  lotIndex.set(lot, e);
+  return e;
+}
+
+function findLots(tenQH, query) {
+  const words = foldText(query).split(/[^a-z0-9]+/).filter(Boolean);
+  if (!words.length) return [];
+  const q = words.join('');
+  const rank = (e) => (e.codeFlat === q ? 0 : e.codeFlat.startsWith(q) ? 1 : e.codeFlat.includes(q) ? 2 : 3);
+  return cachedLots(tenQH).map(lot => lotEntry(tenQH, lot))
+    .filter(e => e.flat.includes(q) || words.every(w => e.text.includes(w)))
+    .sort((a, b) => rank(a) - rank(b) || a.code.localeCompare(b.code, 'vi', { numeric: true }));
+}
+
+function lotResultsHtml(p, idx) {
+  const query = lotQuery.get(p.name) || '';
+  if (!query.trim()) {
+    lotHits.delete(p.name);
+    return '';
+  }
+  const all = findLots(p.name, query);
+  const hits = all.slice(0, LOT_HIT_MAX);
+  lotHits.set(p.name, hits);
+  if (!hits.length) return '<div class="project-empty">Không có lô khớp.</div>';
+  const more = all.length > hits.length ? `<div class="project-empty">… còn ${fmtNum(all.length - hits.length)} lô, gõ thêm để lọc</div>` : '';
+  return hits.map((e, i) => {
+    const qh = e.lot.phase === 'QH';
+    const area = e.lot.area ? ` · ${fmtNum(Math.round(e.lot.area))} m²` : '';
+    return `<button type="button" class="project-lot-hit" data-lot="${idx}:${i}" title="${escapeHtml(e.lot.name || e.type)} — bấm để phóng tới lô">
+      <b class="project-phase ${qh ? 'qh' : 'ht'}">${qh ? 'QH' : 'HT'}</b><span>${escapeHtml(e.code || e.lot.id)}</span><small>${escapeHtml(e.type)}${area}</small></button>`;
+  }).join('') + more;
+}
+
+// Lô thuộc lớp / đồ án đang ẩn thì bật lên trước khi phóng tới
+function openLot(p, lot) {
+  const phase = lot.phase === 'QH' ? 'QH' : 'HT';
+  if (state.hiddenProjectLayers.delete(layerKey(p.name, phase === 'QH' ? 'su-dung-dat' : 'hien-trang'))) saveHiddenLayers();
+  if (lot.kind !== 'DXF' && !state.showProjectInfra) ensureFullLots();
+  if (!state.showProjects || state.hiddenProjects.has(p.name)) showProject(p);
+  showProjectLot({ ...lot, file: p.name, phase });
+  refreshAll();
+  focusProjectLots(p.name);
 }
 
 async function loadLayers(p, force = false) {
@@ -591,8 +665,26 @@ export function initProjectLayer(opts = {}) {
     saveHidden();
     refreshAll();
   });
+  // Gõ tìm lô chỉ vẽ lại khung kết quả (vẽ lại cả danh sách sẽ mất con trỏ trong ô tìm)
+  $('projectList')?.addEventListener('input', (e) => {
+    const box = e.target.closest('[data-lot-search]');
+    const idx = box ? Number(box.dataset.lotSearch) : -1;
+    const p = projects[idx];
+    if (!p) return;
+    lotQuery.set(p.name, box.value);
+    const out = $('projectList').querySelector(`[data-lot-results="${idx}"]`);
+    if (out) out.innerHTML = lotResultsHtml(p, idx);
+  });
   $('projectList')?.addEventListener('click', (e) => {
     if (e.target.closest('[data-migrate]')) { migrateLegacy(); return; }
+    const lotBtn = e.target.closest('[data-lot]');
+    if (lotBtn) {
+      const [pi, li] = lotBtn.dataset.lot.split(':').map(Number);
+      const p = projects[pi];
+      const hit = p && lotHits.get(p.name)?.[li];
+      if (hit) openLot(p, hit.lot);
+      return;
+    }
     const expand = e.target.closest('[data-expand]');
     if (expand) { const p = projects[Number(expand.dataset.expand)]; if (p) toggleExpand(p); return; }
     const layerDel = e.target.closest('[data-layer-del]');

@@ -280,6 +280,12 @@ export async function projectLayersOf(tenQH) {
   });
 }
 
+/** Lô (HT + QH) của đồ án đã tải (projectLayersOf tải trước); chưa tải → [] */
+export function cachedLots(tenQH) {
+  const row = cache.get(tenQH);
+  return row ? row.parcels.filter(p => p && p.geometry) : [];
+}
+
 /** Gỡ lớp Admin vừa xóa khỏi bộ nhớ đệm; counts = { lands } mới của đồ án (lớp lô) */
 export function removeCachedLayer(tenQH, key, saved, counts) {
   const def = PROJECT_LAYERS.find(d => d.key === key);

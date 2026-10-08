@@ -681,6 +681,14 @@ function freePatternKey(text) {
   return code ? CODE_TOKENS[code] : '';
 }
 
+// Ký hiệu lô (chữ viết tắt liền số: "CXHC.A-02", "DDL2", "OHT.C-11") chỉ rõ chức năng hơn phần mô tả kèm theo
+// ("Điểm di tích CXHC.A-02" là cây xanh hạn chế có di tích bên trong)
+const LOT_CODE_RE = /(?:^|[^A-Z0-9])([A-Z]{2,6})(?=[._-]?(?:[A-Z][._-]?)?\d)/g;
+function lotCodeKey(text) {
+  const code = [...foldLayer(text).matchAll(LOT_CODE_RE)].map(m => m[1]).find(w => CODE_TOKENS[w]);
+  return code ? CODE_TOKENS[code] : '';
+}
+
 // Tên lô ghi lúc nhập: "<layer> <ký hiệu lô> – <tên file> #<thứ tự>" hoặc tên riêng; bỏ phần layer và tên file
 function lotNameText(lotName, layerName) {
   let s = String(lotName || '').split(' – ')[0].trim();
@@ -700,7 +708,7 @@ export function landPatternKey(layerName, lotName = '') {
     core.pop();
   }
   const own = lotName ? lotNameText(lotName, layerName) : '';
-  return freePatternKey(layerName) || (own ? freePatternKey(own) : '');
+  return freePatternKey(layerName) || (own ? lotCodeKey(own) || freePatternKey(own) : '');
 }
 
 /** Ranh đất đồ án: thu nhỏ tô đặc màu ký hiệu; phóng tới ngưỡng hoa văn thì kẻ pattern cùng màu */
