@@ -128,6 +128,14 @@ function getSheetHeaders(sheet) {
   return lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
 }
 
+// Dải ô vượt số dòng/cột của tab báo "Tọa độ của dải ô đích nằm ngoài kích thước của trang tính": chèn thêm trước khi ghi
+function ensureSheetSize(sheet, lastRow, lastCol) {
+  var addRows = lastRow - sheet.getMaxRows();
+  if (addRows > 0) sheet.insertRowsAfter(sheet.getMaxRows(), addRows);
+  var addCols = lastCol - sheet.getMaxColumns();
+  if (addCols > 0) sheet.insertColumnsAfter(sheet.getMaxColumns(), addCols);
+}
+
 // Thêm cột chỉ tiêu quy hoạch còn thiếu vào cuối dòng tiêu đề (không đụng cột sẵn có)
 function ensurePlanColumns(sheet) {
   var headers = getSheetHeaders(sheet);
@@ -135,6 +143,7 @@ function ensurePlanColumns(sheet) {
   // Khóa COLUMN_ALIASES = tên cột viết thường chữ đầu (TangCao → tangCao)
   var missing = PLAN_HEADERS.filter(function(h) { return col[h.charAt(0).toLowerCase() + h.slice(1)] < 0; });
   if (!missing.length) return;
+  ensureSheetSize(sheet, 1, headers.length + missing.length);
   sheet.getRange(1, headers.length + 1, 1, missing.length).setValues([missing]).setFontWeight('bold');
 }
 
@@ -1175,6 +1184,7 @@ function importCadBatch(body) {
       var start = c.sheet.getLastRow() + 1;
       var n = c.newRows.length;
       var w = c.data[0].length;
+      ensureSheetSize(c.sheet, start + n - 1, w);
       var target = c.sheet.getRange(start, 1, n, w);
       if (start > 2) {
         var template = c.sheet.getRange(start - 1, 1, 1, w);
@@ -1266,6 +1276,7 @@ function addPendingPoints(body) {
       if (!c || c.error || !c.rows.length) return;
       var start = c.sheet.getLastRow() + 1;
       var width = c.data[0].length;
+      ensureSheetSize(c.sheet, start + c.rows.length - 1, width);
       var target = c.sheet.getRange(start, 1, c.rows.length, width);
       if (start > 2) {
         var template = c.sheet.getRange(start - 1, 1, 1, width);
@@ -1727,6 +1738,7 @@ function writeDxfLands(ss, lands, project, phase, currentTime, reset) {
   var sheet = ensureDxfSheet(ss, project);
   var headers = getSheetHeaders(sheet);
   if (headers.length < STANDARD_HEADERS.length) {
+    ensureSheetSize(sheet, 1, STANDARD_HEADERS.length);
     sheet.getRange(1, 1, 1, STANDARD_HEADERS.length).setValues([STANDARD_HEADERS]).setFontWeight('bold');
     headers = STANDARD_HEADERS.slice();
   }
@@ -1757,6 +1769,7 @@ function writeDxfLands(ss, lands, project, phase, currentTime, reset) {
     eachPlanValue(it.plan, col, set);
     return row;
   });
+  ensureSheetSize(sheet, start + rows.length - 1, width);
   sheet.getRange(start, 1, rows.length, width).setValues(rows);
   return rows.length;
 }
@@ -1791,6 +1804,7 @@ function upsertCadPolygons(ss, polygons, fileName, currentTime, phase) {
   });
   if (appends.length) {
     var start = sheet.getLastRow() + 1;
+    ensureSheetSize(sheet, start + appends.length - 1, CAD_HEADERS.length);
     sheet.getRange(start, 6, appends.length, 1).setNumberFormat("@");
     sheet.getRange(start, 1, appends.length, CAD_HEADERS.length).setValues(appends);
   }
@@ -1815,6 +1829,7 @@ function upsertProjectRegistry(ss, project, fileName, reg, currentTime) {
       return true;
     });
   }
+  ensureSheetSize(sheet, row, PROJECT_HEADERS.length);
   sheet.getRange(row, PROJECT_HEADERS.length).setNumberFormat("@");
   sheet.getRange(row, 1, 1, values.length).setValues([values]);
 }
@@ -1880,6 +1895,7 @@ function appendProjectBackup(ss, backup) {
     sheet.hideSheet();
   }
   var start = sheet.getLastRow() + 1;
+  ensureSheetSize(sheet, start + backup.pending.length - 1, BACKUP_HEADERS.length);
   sheet.getRange(start, 5, backup.pending.length, 2).setNumberFormat("@");
   sheet.getRange(start, 1, backup.pending.length, BACKUP_HEADERS.length).setValues(backup.pending);
   backup.pending = [];
