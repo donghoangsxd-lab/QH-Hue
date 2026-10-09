@@ -57,6 +57,20 @@ function exteriorOnly(g) {
   return null;
 }
 
+// turf 6.5 (polygon-clipping) hay lỗi "Unable to complete output ring" do sai số dấu phẩy động; làm tròn tọa độ rồi thử lại,
+// không thì cả ranh rơi về bao lồi (phình hàng trăm ha với đồ án ranh lõm)
+const UNION_PRECISIONS = [7, 6, 5];
+
+function safeUnion(a, b) {
+  try { return turf.union(a, b) || a; } catch (e) { /* thử lại với tọa độ làm tròn */ }
+  for (const precision of UNION_PRECISIONS) {
+    try {
+      return turf.union(turf.truncate(a, { precision }), turf.truncate(b, { precision })) || a;
+    } catch (e) { /* giảm độ chính xác */ }
+  }
+  throw new Error('Không hợp được 2 mảnh ranh lô');
+}
+
 function mergedOutline(list) {
   let parts = list.map(g => {
     const lot = turf.simplify(turf.feature(g), { tolerance: 0.00001 });
@@ -65,7 +79,7 @@ function mergedOutline(list) {
   while (parts.length > 1) {
     const next = [];
     for (let i = 0; i < parts.length; i += 2) {
-      next.push(parts[i + 1] ? (turf.union(parts[i], parts[i + 1]) || parts[i]) : parts[i]);
+      next.push(parts[i + 1] ? safeUnion(parts[i], parts[i + 1]) : parts[i]);
     }
     parts = next;
   }

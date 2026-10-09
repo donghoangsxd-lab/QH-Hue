@@ -601,16 +601,18 @@ function proposeName(dump) {
     .replace(/^bản đồ\s+/i, '');
   const fromRaw = loaiCode(raw);
   const loai = loaiCode(r0.loaiquyhoach) || (fromRaw !== raw ? fromRaw : '');
-  let s = raw.replace(/\([^)]*tỷ lệ[^)]*\)/gi, ' ').replace(/\s+/g, ' ').trim();
+  let s = raw.replace(/\([^)]*tỷ lệ[^)]*\)/gi, ' ').replace(/,?\s*tỷ lệ\s*1\s*\/\s*[\d.,]*\d/gi, ' ')
+    .replace(/\s+/g, ' ').trim();
   s = s.split(/,?\s+(?:quận|huyện|thành phố|thị xã|tỉnh)(?=\s|,|$)/i)[0].trim();
-  s = s.replace(/^quy hoạch\s+(?:phân khu|chi tiết|chung)\s*/i, '');
+  s = s.replace(/^(?:quy hoạch\s+(?:phân khu|chi tiết|chung)|QHPK|QHCT|QHC)(?=\s|$)\s*/i, '');
   s = s.replace(/^khu vực\s+/i, '');
   if (!KEEP_KHU.test(s)) s = s.replace(/^khu\s+/i, '');
   s = s.replace(/^(?:phường|xã|thị trấn)\s+/i, '');
   s = s.replace(/^trung tâm(?=\s|$)/i, 'TT').trim();
   const place = s ? s.charAt(0).toLocaleUpperCase('vi') + s.slice(1) : '';
-  if (loai && place && !place.toUpperCase().startsWith(loai.toUpperCase())) return `${loai} ${place}`;
-  return place || loai || 'Do an';
+  // Tên dùng làm tên file zip: không được chứa / \ : * ? " < > |
+  if (loai && place && !place.toUpperCase().startsWith(loai.toUpperCase())) return safeDirName(`${loai} ${place}`);
+  return safeDirName(place || loai || 'Do an');
 }
 
 function writeLayer(dir, base, role, rows, forceCrs) {
