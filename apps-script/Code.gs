@@ -973,6 +973,7 @@ function doPost(e) {
     if (action === "editInfraRow") return jsonOutput(editInfraRow(body));
     if (action === "deleteInfraRow") return jsonOutput(deleteInfraRow(body));
     if (action === "deleteProject") return jsonOutput(deleteProject(body));
+    if (action === "renameProject") return jsonOutput(renameProject(body));
     if (action === "setProjectLink") return jsonOutput(setProjectLink(body));
     if (action === "putBucketObject") return jsonOutput(putBucketObject(body));
     if (action === "putBucketPdf") return jsonOutput(putBucketPdf(body));
@@ -2124,4 +2125,64 @@ function deleteProject(body) {
 
   syncSheetsToGCS(body.syncCad !== false);
   return { "success": true, "infra": infra, "restored": restored, "lands": lands, "polygons": polygons, "tabs": tabs };
+}
+
+// Ghi đè các ô của 1 cột (từ dòng 2) mà next(value) trả chuỗi mới; next trả null = giữ. Ghi theo từng đoạn dòng liền nhau
+function rewriteColumn(sheet, colIdx, next) {
+  if (!sheet || colIdx < 0 || sheet.getLastRow() < 2) return 0;
+  var vals = sheet.getRange(2, colIdx + 1, sheet.getLastRow() - 1, 1).getValues();
+  var changed = 0, start = -1;
+  var flush = function(end) {
+    if (start < 0) return;
+    sheet.getRange(start + 2, colIdx + 1, end - start, 1).setValues(vals.slice(start, end));
+    start = -1;
+  };
+  for (var i = 0; i < vals.length; i++) {
+    var v = next(vals[i][0]);
+    if (v === null) { flush(i); continue; }
+    vals[i][0] = v;
+    changed++;
+    if (start < 0) start = i;
+  }
+  flush(vals.length);
+  return changed;
+}
+
+/**
+ * Đổi tên đồ án (body.project → body.newName) ở mọi nơi Sheet dùng Ten_QH làm khóa: tab hạ tầng, tab DXF-NN, DS_DoAn,
+ * DoAn_SaoLuu; cột File của CAD_Polygon (deleteProject nhận ranh lô theo tên file). Gọi lại lần 2 không đổi gì thêm.
+ */
+function renameProject(body) {
+  var project = String(body.project || '').trim();
+  var newName = String(body.newName || '').trim();
+  if (!project || !newName) return { "error": "Thiếu tên đồ án" };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var same = function(v) { return String(v || '').trim() === project ? newName : null; };
+  var infra = 0, lands = 0, registry = 0, backups = 0, polygons = 0;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    ss.getSheets().forEach(function(sheet) {
+      var name = String(sheet.getName()).trim();
+      var dxf = /^DXF-\d+$/i.test(name);
+      if ((!dxf && !isValidInfraSheet(name)) || sheet.getLastRow() < 2) return;
+      var col = getColumnMap(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]);
+      var n = rewriteColumn(sheet, col.tenQH, same);
+      if (dxf) lands += n; else infra += n;
+    });
+    registry = rewriteColumn(ss.getSheetByName(PROJECT_SHEET_NAME), 0, same);
+    backups = rewriteColumn(ss.getSheetByName(BACKUP_SHEET_NAME), 0, same);
+    polygons = rewriteColumn(ss.getSheetByName(CAD_SHEET_NAME), CAD_HEADERS.indexOf("File"), function(v) {
+      var file = String(v || '').trim();
+      if (projectTitle(file) !== project) return null;
+      var at = file.lastIndexOf(project);
+      return file.slice(0, at) + newName + file.slice(at + project.length);
+    });
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+
+  if (infra || lands) syncSheetsToGCS(false);
+  return { "success": true, "infra": infra, "lands": lands, "registry": registry, "backups": backups, "polygons": polygons };
 }

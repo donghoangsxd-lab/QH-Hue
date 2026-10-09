@@ -12,7 +12,7 @@ import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
-import { escapeHtml, fmtNum, ico } from './utils.js';
+import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 
 const DECISION_MAX_BYTES = 1024 * 1024;
 const HIDDEN_KEY = 'qh_hidden_projects';
@@ -346,6 +346,7 @@ function renderList() {
         <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-expand="${idx}" title="${open ? 'Ẩn' : 'Xem'} các lớp dữ liệu của đồ án" aria-label="Các lớp dữ liệu của đồ án" aria-expanded="${open}">${ico('chev-down')}</button>
         <button type="button" class="project-btn" data-info="${idx}" title="Thông tin đồ án: bảng tổng hợp sử dụng đất và đánh giá chỉ tiêu QCVN 01:2026" aria-label="Thông tin đồ án">${ico('table')}</button>
         ${decisionBtn}
+        ${admin ? `<button type="button" class="project-btn" data-rename="${idx}" title="Đổi tên đồ án (Sheet + danh mục bucket)" aria-label="Đổi tên đồ án"${busy ? ' disabled' : ''}>${ico('pen')}</button>` : ''}
         ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
       </span>
     </div>${open ? decisionNote(p, idx) + layersHtml(p, idx, on, admin) : ''}`;
@@ -860,6 +861,49 @@ async function deleteProject(p) {
   }
 }
 
+// ============================ ĐỔI TÊN ĐỒ ÁN ============================
+
+async function renameProject(p) {
+  if (!isAdmin() || busy) return;
+  if (p.legacy) { alert('Đồ án còn ở file cũ (cad_parcels.json): bấm «Chuyển đồ án cũ lên bucket» trước khi đổi tên.'); return; }
+  const typed = prompt(`Đổi tên đồ án «${p.name}» thành:\n(Không bắt đầu bằng HT- / QH-, tối đa 120 ký tự)`, p.name);
+  if (typed === null) return;
+  const newName = typed.replace(/\s+/g, ' ').trim().slice(0, 120);
+  if (!newName || newName === p.name) return;
+  if (/^(HT|QH)[-_\s]/i.test(newName)) { alert('Tên đồ án không bắt đầu bằng HT- / QH- (tiền tố này dành cho tên file).'); return; }
+  if (projects.some(x => x !== p && x.name === newName)) { alert(`Đã có đồ án «${newName}», chọn tên khác.`); return; }
+  busy = p.name;
+  renderList();
+  try {
+    markDataWritten();
+    const res = await fetch(geeApi('action=renameProject'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+      body: JSON.stringify({ project: p.name, newName })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) signOutAdmin();
+    if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+    if (state.hiddenProjects.delete(p.name)) state.hiddenProjects.add(newName);
+    saveHidden();
+    const prefix = `${p.name}|`;
+    [...state.hiddenProjectLayers].filter(k => k.startsWith(prefix)).forEach(k => {
+      state.hiddenProjectLayers.delete(k);
+      state.hiddenProjectLayers.add(`${newName}|${k.slice(prefix.length)}`);
+    });
+    saveHiddenLayers();
+    expanded.delete(p.name);
+    busy = null;
+    showToast(`Đã đổi tên «${p.name}» → «${newName}» (${data.infra} công trình, ${data.lands} lô tab DXF cũ trên Sheet).`, 'success');
+    if (onDeleted) await onDeleted();
+  } catch (err) {
+    alert(`Không đổi được tên đồ án: ${err.message}\nBấm đổi tên lại với cùng tên mới để ghi tiếp phần còn lại.`);
+  } finally {
+    busy = null;
+    renderList();
+  }
+}
+
 async function migrateLegacy() {
   if (!isAdmin() || busy) return;
   const n = projects.filter(p => p.legacy).length;
@@ -1358,6 +1402,8 @@ export function initProjectLayer(opts = {}) {
     if (layerDel) { const hit = layerOf(layerDel.dataset.layerDel); if (hit) deleteLayer(hit.p, hit.g); return; }
     const info = e.target.closest('[data-info]');
     if (info) { const p = projects[Number(info.dataset.info)]; if (p) document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: p.name })); return; }
+    const ren = e.target.closest('[data-rename]');
+    if (ren) { const p = projects[Number(ren.dataset.rename)]; if (p) renameProject(p); return; }
     const del = e.target.closest('[data-del]');
     if (del) { const p = projects[Number(del.dataset.del)]; if (p) deleteProject(p); }
   });

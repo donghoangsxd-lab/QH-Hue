@@ -830,7 +830,10 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
     err.status = 400;
     throw err;
   }
-  const slug = projectSlug(name);
+  // Đồ án đã đổi tên giữ thư mục cũ: slug lấy từ danh mục, chỉ đồ án mới mới sinh slug theo tên
+  const listed = await readIndex();
+  const known = ((listed.data && listed.data.projects) || []).find(p => p && p.tenQH === name && !p.deleted);
+  const slug = (known && known.slug) || projectSlug(name);
   const fromName = namedPhase(fileName);
   let resetLands = landsReset === 'HT' || landsReset === 'QH' || landsReset === true ? landsReset : false;
   if (resetLands === true && fromName) resetLands = fromName;
@@ -1252,6 +1255,54 @@ async function deleteProjectFiles(tenQH) {
   return { slug, landCount, via: indexed.via || via };
 }
 
+/**
+ * Đổi Ten_QH trong danh mục (projects/index.json) và khóa quyết định phê duyệt; thư mục projects/<slug>/ giữ nguyên.
+ * Gọi lại sau khi đã đổi (Sheet lỗi giữa chừng) thì bỏ qua phần bucket. Đồ án còn ở cad_parcels.json phải chuyển lên bucket trước.
+ */
+async function renameProject(from, to) {
+  const oldName = String(from || '').trim();
+  const newName = String(to || '').trim();
+  const fail = (status, message) => Object.assign(new Error(message), { status });
+  if (!oldName || !newName) throw fail(400, 'Thiếu tên đồ án');
+  if (oldName === newName) throw fail(400, 'Tên mới trùng tên cũ');
+  const stored = await readIndex();
+  const list = (stored.data && stored.data.projects) || [];
+  const live = (name) => list.find(p => p && p.tenQH === name && !p.deleted);
+  if (live(oldName) && live(newName)) throw fail(409, `Đã có đồ án «${newName}», chọn tên khác`);
+  if (!live(oldName)) {
+    const cat = await catalog();
+    const entry = cat.projects.find(p => p.tenQH === oldName);
+    if (entry && entry.legacy) throw fail(409, `Đồ án «${oldName}» còn ở file cũ (cad_parcels.json): bấm «Chuyển lô cũ lên bucket» trước khi đổi tên`);
+    if (cat.projects.some(p => p.tenQH === newName && !live(newName))) throw fail(409, `Đã có đồ án «${newName}», chọn tên khác`);
+    return { slug: '', bucket: false, via: 'direct' };
+  }
+  let slug = '';
+  const indexed = await updateIndex(cur => {
+    const projects = (cur.projects || [])
+      .filter(p => !(p && p.deleted && p.tenQH === newName))
+      .map(p => {
+        if (!p || p.tenQH !== oldName || p.deleted) return p;
+        slug = p.slug || projectSlug(oldName);
+        return { ...p, tenQH: newName, slug };
+      });
+    if (!cur.migrated) projects.push({ tenQH: oldName, deleted: true });
+    projects.sort((a, b) => String(a.tenQH).localeCompare(String(b.tenQH), 'vi'));
+    return { ...cur, projects };
+  });
+  const decisions = await readDecisions();
+  if (decisions.data.items && decisions.data.items[oldName]) {
+    await updateDecisions(cur => {
+      const items = { ...(cur.items || {}) };
+      if (items[oldName]) {
+        items[newName] = items[oldName];
+        delete items[oldName];
+      }
+      return { ...cur, items };
+    });
+  }
+  return { slug, bucket: true, via: indexed.via };
+}
+
 function planOf(props) {
   const pick = (v) => String(v || '').trim();
   const plan = { floors: pick(props.TangCao), coverage: pick(props.MatDoXD), far: pick(props.HeSoSDD) };
@@ -1466,7 +1517,7 @@ async function wardParcels() {
 }
 
 module.exports = {
-  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteLayer, deleteProjectFiles,
+  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteLayer, deleteProjectFiles, renameProject,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase
 };

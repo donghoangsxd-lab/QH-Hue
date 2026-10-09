@@ -2267,6 +2267,31 @@ module.exports = async (req, res) => {
       });
     }
 
+    // Đổi Ten_QH: danh mục bucket trước (thư mục giữ nguyên), rồi Sheet (tab hạ tầng, DXF-NN, DS_DoAn, DoAn_SaoLuu, CAD_Polygon).
+    // Sheet lỗi giữa chừng thì gọi lại với cùng 2 tên: phần bucket đã đổi được bỏ qua
+    if (action === 'renameProject') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const project = sanitizeSheetText(body.project, 120);
+      const newName = sanitizeSheetText(body.newName, 120);
+      if (!project || !newName) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      if (/^(HT|QH)[-_\s]/i.test(newName)) {
+        return res.status(400).json({ error: true, message: 'Tên đồ án không bắt đầu bằng HT- / QH- (tiền tố này dành cho tên file)' });
+      }
+      const renamed = await projects.renameProject(project, newName);
+      const result = await callAppsScript({ action: 'renameProject' }, { action: 'renameProject', project, newName });
+      invalidateAllCaches();
+      return res.status(200).json({
+        success: true,
+        bucket: renamed.bucket,
+        infra: Number(result.infra) || 0,
+        lands: Number(result.lands) || 0,
+        registry: Number(result.registry) || 0,
+        polygons: Number(result.polygons) || 0
+      });
+    }
+
     if (action === 'migrateProjects') {
       requirePostFromApp(req);
       await requireAdmin(req);
