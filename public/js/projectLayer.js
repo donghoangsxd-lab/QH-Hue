@@ -23,12 +23,13 @@ const GAP_M = 15;
 const BOUNDARY_MAX_CHARS = 45000;
 // Quá số lô này thì hợp ranh quá chậm trên trình duyệt → dùng bao lồi
 const EXACT_MAX_LOTS = 4000;
-// Màu viền / nền do projectColor gán theo đồ án; nền mờ 10% ở mọi mức zoom
-const OUTLINE_STYLE = { weight: 2.4, opacity: 0.95, dashArray: '8 5', fillOpacity: 0.1 };
-const OUTLINE_GIS = { ...OUTLINE_STYLE, weight: 2.6, dashArray: null };
-const OUTLINE_HULL = { ...OUTLINE_STYLE, dashArray: '2 6' };
-// Góc vàng trên vòng màu: các đồ án liền nhau trong danh sách (thường gần nhau) lệch màu rõ
-const projectColor = (idx) => `hsl(${Math.round((idx * 137.508) % 360)}, 85%, 62%)`;
+// Màu viền / nền do assignColors gán theo đồ án; nền mờ 10% ở mọi mức zoom
+const OUTLINE_STYLE = { weight: 1.6, opacity: 0.9, dashArray: '6 4', fillOpacity: 0.1 };
+const OUTLINE_GIS = { ...OUTLINE_STYLE, weight: 1.8, dashArray: null };
+const OUTLINE_HULL = { ...OUTLINE_STYLE, dashArray: '2 5' };
+// Bảng màu dịu, đọc rõ trên ảnh vệ tinh; đồ án có khung bao giao nhau không trùng màu
+const PALETTE = ['#fbbf24', '#38bdf8', '#c084fc', '#4ade80', '#f472b6', '#fb923c', '#2dd4bf', '#a3e635', '#f87171', '#818cf8', '#fde047', '#e879f9'];
+const NEIGHBOR_PAD_DEG = 0.003;
 
 const $ = (id) => document.getElementById(id);
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
@@ -149,8 +150,9 @@ function collectProjects() {
     if (!pointsOf.has(name)) pointsOf.set(name, []);
     pointsOf.get(name).push([lng, lat]);
   });
-  return state.projectCatalog.map(p => ({
+  return assignColors(state.projectCatalog.map(p => ({
     name: p.tenQH,
+    short: shortName(p.tenQH),
     slug: p.slug || '',
     legacy: !!p.legacy,
     infra: { size: Number(p.infra) || 0 },
@@ -175,7 +177,53 @@ function collectProjects() {
       at: Number(p.decision.at) || 0,
       embed: p.decision.kind === 'link' ? p.decision.embed === true : true
     } : null
-  })).sort((a, b) => a.name.localeCompare(b.name, 'vi')).map((p, i) => ({ ...p, color: projectColor(i) }));
+  })).sort((a, b) => a.name.localeCompare(b.name, 'vi')));
+}
+
+// Tô màu tham lam theo thứ tự danh sách: lấy màu đầu bảng chưa có ở đồ án kề; kề hết màu thì lấy màu ít dùng nhất quanh nó
+function assignColors(list) {
+  const boxes = list.map(p => {
+    const geom = outlineOf(p);
+    try { return geom ? turf.bbox(turf.feature(geom)) : null; } catch (e) { return null; }
+  });
+  const near = (a, b) => a && b && a[0] - NEIGHBOR_PAD_DEG <= b[2] && b[0] - NEIGHBOR_PAD_DEG <= a[2]
+    && a[1] - NEIGHBOR_PAD_DEG <= b[3] && b[1] - NEIGHBOR_PAD_DEG <= a[3];
+  list.forEach((p, i) => {
+    const used = new Map();
+    for (let j = 0; j < i; j++) {
+      if (near(boxes[i], boxes[j])) used.set(list[j].color, (used.get(list[j].color) || 0) + 1);
+    }
+    p.color = PALETTE.find(c => !used.has(c))
+      || PALETTE.reduce((best, c) => (used.get(c) < used.get(best) ? c : best), PALETTE[i % PALETTE.length]);
+  });
+  return list;
+}
+
+// Nhãn bản đồ: bỏ số thứ tự, tiền tố loại đồ án, cụm "điều chỉnh quy hoạch phân khu…", ngoặc, phần liệt kê sau dấu phẩy / "thuộc";
+// mã khu 1–2 ký tự (A, D…) thành "Khu A"
+const SHORT_MAX = 34;
+const SHORT_KEEP_DASH = 24;
+function shortName(name) {
+  let s = String(name || '').trim()
+    .replace(/^\d+[.)]?\s+/, '')
+    .replace(/^(QHPK|QHCT|QHC|QHCPK|QHPK\.)\s*[-–:]?\s*/i, '')
+    .replace(/^(điều chỉnh\s+)?(cục bộ\s+)?(quy hoạch\s+)?(phân khu|chi tiết|chung)?\s*(xây dựng\s+)?(tỷ lệ\s+1\/[\d.]+\s+)?/i, '')
+    .replace(/^[\s,;:–-]+/, '')
+    .replace(/^(khu vực|xây dựng)\s+/i, '')
+    .replace(/\s*\([^)]*\)?/g, '')
+    .replace(/[\s–-]+$/, '');
+  if (s && s === s.toUpperCase()) s = s.toLowerCase().replace(/(^|\s)(\p{L})/gu, (m, sp, c) => sp + c.toUpperCase());
+  s = s.split(/,|\s+thuộc\s+/i)[0].trim();
+  const parts = s.split(/\s+[-–]\s+/);
+  if (parts.length > 1 && (parts[0].length <= 2 || s.length > SHORT_KEEP_DASH)) s = parts[0];
+  s = s.replace(/(^|\s)phường\s+/gi, '$1').trim();
+  if (s && s.length <= 2) s = `Khu ${s.toUpperCase()}`;
+  if (s.length > SHORT_MAX) {
+    const cut = s.slice(0, SHORT_MAX);
+    s = `${cut.slice(0, cut.lastIndexOf(' ') > 12 ? cut.lastIndexOf(' ') : SHORT_MAX).trim()}…`;
+  }
+  s = s.charAt(0).toUpperCase() + s.slice(1);
+  return s || String(name || '');
 }
 
 // Đồ án nhập trước khi có tab DS_DoAn: ranh tạm = bao lồi các lô / điểm (nhanh), nhập lại file để có ranh đúng
@@ -501,8 +549,77 @@ function labelPointOf(p, geom) {
 }
 
 function projectLabel(p, at) {
-  const icon = L.divIcon({ className: 'project-label', iconSize: null, html: `<span style="--pc:${p.color}">${escapeHtml(p.name)}</span>` });
+  const icon = L.divIcon({
+    className: 'project-label', iconSize: null,
+    html: `<span><i style="background:${p.color}"></i>${escapeHtml(p.short)}</span>`
+  });
   return L.marker(at, { icon, interactive: false, keyboard: false, zIndexOffset: -1000 });
+}
+
+// Kích thước thẻ nhãn (khớp .project-label span trong style.css): chữ 600 11px, chấm màu + đệm ~22px, cao 18px
+const LABEL_FONT = '600 11px';
+const LABEL_PAD_X = 27;
+const LABEL_H = 18;
+const LABEL_GAP = 4;
+let measureCtx = null;
+function labelWidth(text) {
+  if (!measureCtx) {
+    measureCtx = document.createElement('canvas').getContext('2d');
+    measureCtx.font = `${LABEL_FONT} ${getComputedStyle(document.body).fontFamily || 'sans-serif'}`;
+  }
+  return measureCtx.measureText(text).width + LABEL_PAD_X;
+}
+
+const labelGroups = new Map();
+const labelLists = new Map();
+const boundsMemo = new WeakMap();
+const zoomHooked = new WeakSet();
+
+// Nhãn chỉ hiện khi khung ranh trên màn hình đủ chứa thẻ; chồng nhau thì giữ đồ án lớn hơn. Chạy lại mỗi lần zoom.
+function layoutLabels(m) {
+  const old = labelGroups.get(m);
+  if (old) {
+    old.clearLayers();
+    m.removeLayer(old);
+    labelGroups.delete(m);
+  }
+  const list = labelLists.get(m) || [];
+  if (!list.length || typeof turf === 'undefined') return;
+  const cands = [];
+  try {
+    list.forEach(p => {
+      const geom = outlineOf(p);
+      const at = geom ? labelPointOf(p, geom) : null;
+      if (!at) return;
+      let b = boundsMemo.get(geom);
+      if (!b) {
+        b = L.geoJSON(geom).getBounds();
+        boundsMemo.set(geom, b);
+      }
+      const nw = m.latLngToContainerPoint(b.getNorthWest());
+      const se = m.latLngToContainerPoint(b.getSouthEast());
+      const bw = se.x - nw.x;
+      const bh = se.y - nw.y;
+      const w = labelWidth(p.short);
+      if (bw < w * 0.75 || bh < LABEL_H * 1.5) return;
+      const c = m.latLngToContainerPoint(at);
+      cands.push({
+        p, at, size: bw * bh,
+        box: [c.x - w / 2 - LABEL_GAP, c.y - LABEL_H / 2 - LABEL_GAP, c.x + w / 2 + LABEL_GAP, c.y + LABEL_H / 2 + LABEL_GAP]
+      });
+    });
+  } catch (e) { return; }
+  cands.sort((a, b) => b.size - a.size);
+  const placed = [];
+  const group = L.layerGroup();
+  cands.forEach(({ p, at, box }) => {
+    const [x0, y0, x1, y1] = box;
+    if (placed.some(([a0, b0, a1, b1]) => x0 < a1 && a0 < x1 && y0 < b1 && b0 < y1)) return;
+    placed.push(box);
+    group.addLayer(projectLabel(p, at));
+  });
+  group.addTo(m);
+  labelGroups.set(m, group);
 }
 
 function drawOutlinesOn(m, list, below) {
@@ -512,6 +629,12 @@ function drawOutlinesOn(m, list, below) {
     m.removeLayer(old);
     outlineGroups.delete(m);
   }
+  if (!zoomHooked.has(m)) {
+    zoomHooked.add(m);
+    m.on('zoomend', () => layoutLabels(m));
+  }
+  labelLists.set(m, list);
+  layoutLabels(m);
   if (!list.length) return;
   const group = L.featureGroup();
   const shapes = [];
@@ -520,8 +643,6 @@ function drawOutlinesOn(m, list, below) {
     if (!geom) return;
     const base = !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE;
     const style = { ...base, color: p.color, fillColor: p.color };
-    const at = typeof turf !== 'undefined' ? labelPointOf(p, geom) : null;
-    if (at) group.addLayer(projectLabel(p, at));
     if (!below) {
       const shape = L.geoJSON(geom, { style, interactive: false });
       shapes.push(shape);

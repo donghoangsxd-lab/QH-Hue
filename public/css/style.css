@@ -608,13 +608,16 @@ body.right-collapsed .right-panel {
 .project-name input { accent-color: rgb(var(--project-rgb)); width: 13px; height: 13px; margin: 0 5px 0 0; flex-shrink: 0; cursor: pointer; }
 .project-color { flex-shrink: 0; width: 10px; height: 10px; margin-right: 5px; border-radius: 2px; border: 1.5px solid var(--pc); background: color-mix(in srgb, var(--pc) 25%, transparent); }
 .project-row.is-off .project-color { opacity: 0.4; }
-/* Nhãn tên đồ án giữa ranh tổng (divIcon không kích thước, chữ căn giữa điểm neo) */
+/* Nhãn tên đồ án giữa ranh tổng: thẻ tối 1 dòng, chấm màu đồ án; kích thước khớp LABEL_* trong projectLayer.js */
 .leaflet-marker-icon.project-label { pointer-events: none; }
 .project-label span {
-  position: absolute; transform: translate(-50%, -50%); width: max-content; max-width: 200px;
-  font-size: 12px; font-weight: 700; line-height: 1.2; text-align: center; color: var(--pc);
-  text-shadow: 0 0 3px #020617, 0 0 3px #020617, 0 0 6px #020617;
+  position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 5px;
+  height: 18px; padding: 0 7px 0 6px; box-sizing: border-box; white-space: nowrap;
+  font-family: var(--font-sans); font-size: 11px; font-weight: 600; line-height: 1; color: #f1f5f9;
+  background: rgba(15, 23, 42, 0.72); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 9px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
+.project-label i { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; }
 .project-meta { flex-shrink: 0; color: var(--text-muted); font-size: var(--fs-xs); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .project-btn { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 1px solid transparent; border-radius: var(--r-md); background: transparent; color: var(--text-muted); cursor: pointer; }
 .project-btn .ico { width: 14px; height: 14px; margin: 0; }
