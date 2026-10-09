@@ -258,6 +258,18 @@ export function retypeCachedInfra(tenQH, { id, newId, layer }, saved) {
   composeNow();
 }
 
+/** Admin vừa chuyển lô đất DXF (id + giai đoạn) thành công trình: thay bằng lô INFRA server trả về */
+export function convertCachedLand(tenQH, { id, phase }, lot, saved) {
+  const row = cache.get(tenQH);
+  if (row) {
+    row.parcels = row.parcels.map(p => (p && p.kind === 'DXF' && p.id === id && (p.phase === 'QH' ? 'QH' : 'HT') === phase ? lot : p));
+    if (saved) row.saved = saved;
+  }
+  const entry = state.projectCatalog.find(p => p && p.tenQH === tenQH);
+  if (entry && saved) entry.saved = saved;
+  composeNow();
+}
+
 /** Gỡ lô Admin vừa xóa khỏi bộ nhớ đệm: DXF theo id + giai đoạn, INFRA mọi giai đoạn của id */
 export function removeCachedLot(tenQH, { kind, id, phase }, saved) {
   const row = cache.get(tenQH);

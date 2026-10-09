@@ -487,6 +487,8 @@ function parseCadItem(it, defaultPhase) {
 // ============================ ADMIN SỬA 1 LÔ ĐỒ ÁN ============================
 
 const LOT_ID_RE = /^[A-Za-z0-9_.\-]{1,40}$/;
+// Mã tiền tố được chuyển lô đất → công trình (cấp đô thị ghi ở cột Nhom_HaTang, không dùng tiền tố _DT)
+const LAND_TO_INFRA_CODES = new Set(['CV', 'BDX', 'MN', 'TH', 'THCS', 'THPT', 'YT', 'VH', 'TM', 'NT']);
 
 // Quy mô sửa tay: '' = xóa ô (giai đoạn đó không có công trình); undefined = không đổi; NaN = không hợp lệ
 function parseEditSize(v) {
@@ -2116,6 +2118,45 @@ module.exports = async (req, res) => {
       const id = String(body.id || '').trim();
       if (!LOT_ID_RE.test(id)) return res.status(400).json({ error: true, message: 'Mã lô không hợp lệ' });
       const raw = body.fields && typeof body.fields === 'object' ? body.fields : {};
+      if (body.kind === 'DXF' && body.toInfra) {
+        const tenQH = sanitizeSheetText(body.tenQH, 120);
+        const phase = body.phase === 'QH' ? 'QH' : 'HT';
+        const to = typeof body.toInfra === 'object' ? body.toInfra : {};
+        const code = String(to.code || '').toUpperCase();
+        if (!tenQH || !LAND_TO_INFRA_CODES.has(code)) {
+          return res.status(400).json({ error: true, message: 'Thiếu đồ án hoặc loại hạ tầng không hợp lệ' });
+        }
+        try {
+          const land = await projects.readLand({ tenQH, id, phase });
+          const layer = sanitizeSheetText(`${String(raw.layer || land.layer || code).split(' → ')[0].slice(0, 50)} → ${code}`, 60);
+          const item = parseCadItem({
+            type: constants.codeMap[code], idPrefix: code, nhom: to.nhom,
+            name: sanitizeSheetText(raw.name, 150) || land.name, ward: to.ward, lat: to.lat, lng: to.lng, layer,
+            plan: { ...(land.plan || {}), ...(raw.plan && typeof raw.plan === 'object' ? raw.plan : {}) },
+            stages: [{ phase, area: land.area, geometry: land.geometry, layer }]
+          }, phase);
+          if (!item) return res.status(400).json({ error: true, message: 'Lô không chuyển được: thiếu phường, điểm ngoài phạm vi Huế hoặc ranh / diện tích lỗi' });
+          const result = await callAppsScript({ action: 'importCadBatch' }, {
+            action: 'importCadBatch', phase, fileName: `${phase}-${tenQH}`, sync: true, syncCad: false, skipDxf: true,
+            items: [sheetItem(item)], lands: [], landsReset: false, registry: null
+          });
+          const newId = Array.isArray(result.lotIds) ? result.lotIds[0] : null;
+          if (!newId) {
+            const why = (result.skipped || [])[0];
+            return res.status(502).json({ error: true, message: why ? `Sheet bỏ qua: ${why}` : 'Apps Script chưa trả mã công trình: Deploy Code.gs → New version' });
+          }
+          invalidateAllCaches();
+          let done;
+          try {
+            done = await projects.landToInfra({ tenQH, id, phase, newId, layer });
+          } catch (err) {
+            return res.status(500).json({ error: true, message: `Sheet đã có ${newId} nhưng chưa thay được lô ${id} trong file đồ án: ${err.message}` });
+          }
+          return res.status(200).json({ success: true, kind: 'DXF', id, newId, type: item.type, saved: done.saved, lot: done.lot, bucket: done.via });
+        } catch (err) {
+          return res.status(err.status || 500).json({ error: true, message: err.message || 'Không chuyển được lô' });
+        }
+      }
       if (body.kind === 'DXF') {
         const tenQH = sanitizeSheetText(body.tenQH, 120);
         const fields = parseLandEdit(raw);

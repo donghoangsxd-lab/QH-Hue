@@ -446,6 +446,7 @@ export const LAYER_PREFIXES = {
   YT_DT: '7-YT', YT_DV: '7-YT', YT: '7-YT',
   VH_DT: '8-VH', VH_DV: '8-VH', VH: '8-VH',
   TM_DT: '9-TM', TM_DV: '9-TM', TM: '9-TM',
+  NT: '11-NT',
   CSD: '12-CSD'
 };
 const PREFIX_KEYS = Object.keys(LAYER_PREFIXES).sort((a, b) => b.length - a.length);
@@ -453,7 +454,7 @@ const PREFIX_KEYS = Object.keys(LAYER_PREFIXES).sort((a, b) => b.length - a.leng
 // ---- Tên layer theo TT 16/2025/TT-BXD (Phụ lục I): <tiền tố>_<loại đất>[_<hậu tố>] ----
 // Tiền tố → cột quy mô: HT_ → QuyMo_HT; QHDD_ / QHDH_ (QHC, QHPK) và QH_ (QHCT 1/500) → QuyMo_QH
 const TT16_PHASE = { HT: 'HT', QHDD: 'QH', QHDH: 'QH', QH: 'QH' };
-// Loại đất TT16 thuộc 10 nhóm webapp (viết hoa, không dấu) → mã gốc; urban: loại đất vốn cấp đô thị khi không có hậu tố.
+// Loại đất TT16 thuộc các nhóm hạ tầng webapp (viết hoa, không dấu) → mã gốc; urban: loại đất vốn cấp đô thị khi không có hậu tố.
 // SCHOOL: Truonghoc cần hậu tố _MN / _TH / _THCS, thiếu thì admin chọn từng lô.
 const TT16_LANDS = {
   DAT_DD_CAYXANHCCDOTHI: { code: 'CV', urban: true },
@@ -468,7 +469,8 @@ const TT16_LANDS = {
   DAT_HTXH_VANHOA: { code: 'VH' }, DAT_HTXH_THEDUCTHETHAO: { code: 'VH' },
   DAT_CTHTXH_VANHOA: { code: 'VH' }, DAT_CTHTXH_THEDUCTHETHAO: { code: 'VH' }, DAT_KXD_VANHOATHETHAO: { code: 'VH' },
   DAT_CTHTXD_THUONGMAIDV: { code: 'TM', market: true }, DAT_CTHTXH_THUONGMAIDV: { code: 'TM', market: true },
-  DAT_DICHVU: { code: 'TM', market: true }
+  DAT_DICHVU: { code: 'TM', market: true },
+  DAT_HTKT_NGHIATRANG: { code: 'NT' }, DAT_CTHTKT_NGHIATRANG: { code: 'NT' }
 };
 const TT16_URBAN_SUFFIX = new Set(['CT', 'CV', 'QG']);
 const TT16_SCHOOL_SUFFIX = new Set(['MN', 'TH', 'THCS']);

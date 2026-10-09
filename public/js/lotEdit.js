@@ -3,11 +3,13 @@
 //   lô đất QH → su-dung-dat.json, lô đất HT → hien-trang.json.
 // Lô đất còn đổi được lớp (loại đất TT16 → layer mới) và kéo đỉnh ranh (diện tích tính lại theo ranh mới).
 // Công trình đổi được loại hạ tầng (VD THCS → Tiểu học): Apps Script chuyển dòng sang tab loại mới với mã mới.
+// Lô đất thuộc lớp hạ tầng (công viên, trường, y tế, văn hóa, chợ, bãi đỗ xe, nghĩa trang) chuyển được thành công trình trên Sheet.
 import { state, infraLabels } from './state.js';
 import { geeApi, markDataWritten } from './api.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 import { signOutAdmin } from './uiComponents.js';
-import { patchCachedLand, removeCachedLot, retypeCachedInfra, cachedLots } from './projectFiles.js';
+import { wardNameAt } from './mapEngine.js';
+import { patchCachedLand, removeCachedLot, retypeCachedInfra, cachedLots, convertCachedLand } from './projectFiles.js';
 import { LAND_LABELS, landLabel, landPatternKey, layerForPattern, TT16_LAND_KEYS, TT16_STYLES } from './tt16Symbols.js';
 import { startShapeEdit, vertexCount, SHAPE_MAX_VERTICES } from './lotShapeEdit.js';
 
@@ -21,6 +23,12 @@ export function initLotEdit(opts = {}) {
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 const URBAN_RE = /do thi|đô thị|urban/i;
 const PLAN_FIELDS = [['floors', 'Tầng cao', 'VD 3 hoặc 2-5'], ['coverage', 'Mật độ XD (%)', 'VD 40'], ['far', 'Hệ số SDĐ (lần)', 'VD 1,2']];
+
+// Lớp TT16 → tab hạ tầng trên Sheet khi chuyển lô đất thành công trình (TDTT tính chung nhóm văn hóa – thể thao)
+const LAND_INFRA_TYPE = {
+  '1-CV': '1-CV', '2-BDX': '2-BDX', '3-MN': '3-MN', '4-TH': '4-TH', '5-THCS': '5-THCS', '6-THPT': '6-THPT',
+  '7-YT': '7-YT', '8-VH': '8-VH', TDTT: '8-VH', '9-TM': '9-TM', NTR: '11-NT'
+};
 
 // THPT dùng chung loại 4-TH khi tính (constants.codeMap), chỉ tiền tố mã cho biết là THPT
 const infraTypeOf = (p) => (String(p.id || '').split('-')[0].toUpperCase() === 'THPT' ? '6-THPT' : p.type || '');
@@ -70,6 +78,10 @@ function formHtml(target, v) {
     const keep = key && TT16_STYLES[key] ? '' : '<option value="" selected>— Giữ layer hiện tại —</option>';
     html += `<label class="lot-edit-row"><span>Lớp (TT16)</span><select data-layer-key title="Layer hiện tại: ${escapeHtml(land.layer || '(trống)')}">${keep}
       ${TT16_LAND_KEYS.map(k => `<option value="${k}"${k === key ? ' selected' : ''}>${escapeHtml(TT16_STYLES[k].label)}</option>`).join('')}</select></label>`;
+    html += `<div class="lot-edit-infra" hidden>
+      <label class="lot-edit-check"><input type="checkbox" data-to-infra><span>Ghi thành công trình hạ tầng trên Sheet <b class="js-infra-label"></b></span></label>
+      <label class="lot-edit-row" hidden><span>Cấp công trình</span><select data-infra-nhom>
+        ${['Cấp đơn vị ở', 'Cấp đô thị'].map(n => `<option>${n}</option>`).join('')}</select></label></div>`;
     html += input('nhom', 'Loại đất', v.nhom, ' list="lotEditLandTypes" maxlength="40"');
     html += `<datalist id="lotEditLandTypes">${LAND_LABELS.map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist>`;
     if (land.geometry) {
@@ -145,7 +157,27 @@ function bindLandExtras(popup, form, land, msg) {
   const select = form.querySelector('[data-layer-key]');
   const nhomInput = form.querySelector('[data-k="nhom"]');
   const startKey = select ? select.value : '';
+  const infraBox = form.querySelector('.lot-edit-infra');
+  const infraCheck = form.querySelector('[data-to-infra]');
+  const infraNhom = form.querySelector('[data-infra-nhom]');
+  const infraType = () => LAND_INFRA_TYPE[select ? select.value : ''] || '';
+  const syncInfra = () => {
+    if (!infraBox) return;
+    const type = infraType();
+    infraBox.hidden = !type;
+    if (!type) infraCheck.checked = false;
+    else {
+      form.querySelector('.js-infra-label').textContent = `(${infraLabels[type] || type})`;
+      infraNhom.value = CITY_LEVEL_TYPES.has(type) || type === '11-NT' || URBAN_RE.test(`${land.name || ''} ${land.nhom || ''}`)
+        ? 'Cấp đô thị' : 'Cấp đơn vị ở';
+    }
+    infraNhom.closest('.lot-edit-row').hidden = !infraCheck.checked;
+    refit(popup);
+  };
+  syncInfra();
+  infraCheck?.addEventListener('change', syncInfra);
   select?.addEventListener('change', () => {
+    syncInfra();
     if (!select.value || !nhomInput) return;
     nhomInput.value = landLabel(layerForPattern(select.value, land.layer));
   });
@@ -230,7 +262,17 @@ function bindLandExtras(popup, form, land, msg) {
         out.lat = at[1];
         out.lng = at[0];
       }
-      return { fields: out };
+      const type = infraCheck && infraCheck.checked ? infraType() : '';
+      if (!type) return { fields: out };
+      let at = null;
+      try { at = turf.pointOnFeature(turf.feature(out.geometry || original)).geometry.coordinates; } catch (e) { at = null; }
+      if (!at) return { error: 'Không lấy được điểm trong lô để ghi tọa độ công trình' };
+      const ward = wardNameAt(at[1], at[0]) || land.ward || '';
+      if (!ward) return { error: 'Chưa xác định được phường/xã của lô (ranh phường chưa tải xong hoặc lô ngoài 40 phường/xã)' };
+      return {
+        fields: out,
+        toInfra: { type, code: type.split('-')[1], nhom: infraNhom.value, ward, lat: at[1], lng: at[0] }
+      };
     }
   };
 }
@@ -254,6 +296,28 @@ function bindTypeSelect(form, before) {
 function confirmRetype(item, type) {
   const label = infraLabels[type] || type;
   return confirm(`Đổi ${item.id}${item.name ? ` «${item.name}»` : ''} sang loại «${label}»?\n• Dòng Sheet chuyển sang tab ${type} với mã mới (mã ${item.id} không còn dùng).\n• Ranh lô trong file đồ án đổi theo mã mới.\n• Bán kính phục vụ, độ phủ và heatmap tính theo loại mới.`);
+}
+
+function confirmToInfra(land, to) {
+  const label = infraLabels[to.type] || to.type;
+  const phase = land.phase === 'QH' ? 'QH' : 'HT';
+  return confirm(`Chuyển lô ${land.id}${land.name ? ` «${land.name}»` : ''} thành công trình «${label}» (${to.nhom}, ${to.ward})?\n• Ghi dòng mới vào tab ${to.type} trên Google Sheet với mã mới, QuyMo_${phase} = ${areaText(land.area)}.\n• Lô đất trong file đồ án đổi thành ranh lô của công trình đó.\n• Công trình được tính vào độ phủ, chỉ tiêu và heatmap.`);
+}
+
+// Sửa lô trước (layer, tên, ranh…) nếu có, rồi chuyển: Sheet cấp mã mới, file đồ án thay lô DXF bằng lô INFRA
+async function convertLand(land, fields, to) {
+  const phase = land.phase === 'QH' ? 'QH' : 'HT';
+  const base = { kind: 'DXF', id: land.id, phase, tenQH: land.file };
+  if (Object.keys(fields).length) {
+    const data = await postEdit({ ...base, fields });
+    patchCachedLand(land.file, data.land, data.saved);
+  }
+  markDataWritten();
+  const { type, ...toInfra } = to;
+  const data = await postEdit({ ...base, toInfra });
+  convertCachedLand(land.file, { id: land.id, phase }, data.lot, data.saved);
+  showToast(`✓ Lô ${land.id} → công trình ${data.newId} (${infraLabels[type] || type}) trên Sheet`, 'success');
+  if (reloadInfra) await reloadInfra();
 }
 
 async function retypeInfra(item, fields) {
@@ -297,21 +361,29 @@ function openForm(popup, target, onLandSaved) {
   const saveBtn = form.querySelector('.js-lot-save');
   saveBtn.addEventListener('click', async () => {
     const fields = changedFields(form, before);
+    let toInfra = null;
     if (extra) {
       const more = extra.fields();
       if (more.error) { msg.textContent = more.error; msg.className = 'lot-edit-msg bad'; refit(popup); return; }
       Object.assign(fields, more.fields);
+      toInfra = more.toInfra || null;
     }
-    if (!Object.keys(fields).length) { close(); return; }
+    if (!Object.keys(fields).length && !toInfra) { close(); return; }
     const problem = validate(target, fields);
     if (problem) { msg.textContent = problem; msg.className = 'lot-edit-msg bad'; return; }
     if (target.kind === 'INFRA' && fields.type && !confirmRetype(target.item, fields.type)) return;
+    if (toInfra && !confirmToInfra(target.land, toInfra)) return;
     saveBtn.disabled = true;
-    msg.textContent = target.kind !== 'INFRA' ? 'Đang ghi file đồ án…'
-      : fields.type ? 'Đang chuyển tab, cấp mã mới và đồng bộ bucket…' : 'Đang ghi Sheet và đồng bộ bucket…';
+    msg.textContent = toInfra ? 'Đang ghi Sheet, cấp mã công trình và đồng bộ bucket…'
+      : target.kind !== 'INFRA' ? 'Đang ghi file đồ án…'
+        : fields.type ? 'Đang chuyển tab, cấp mã mới và đồng bộ bucket…' : 'Đang ghi Sheet và đồng bộ bucket…';
     msg.className = 'lot-edit-msg';
     try {
-      if (target.kind === 'INFRA' && fields.type) {
+      if (toInfra) {
+        await convertLand(target.land, fields, toInfra);
+        popup.close();
+        if (onLandSaved) onLandSaved();
+      } else if (target.kind === 'INFRA' && fields.type) {
         await retypeInfra(target.item, fields);
         popup.close();
       } else if (target.kind === 'INFRA') {

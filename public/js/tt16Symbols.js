@@ -486,6 +486,7 @@ function isSportText(text) {
  */
 export function infraStyleKey(type, layer, name) {
   if (type === '8-VH' && (isSportText(layer) || isSportText(name))) return 'TDTT';
+  if (type === '11-NT') return 'NTR';
   return TT16_STYLES[type] ? type : null;
 }
 

@@ -1204,6 +1204,66 @@ async function retypeInfraLot({ tenQH, id, newId, layer }) {
   return { changed, saved: savedAt, via: indexed.via || via };
 }
 
+async function dirEntry(name, verb) {
+  const stored = await readIndex();
+  const entry = ((stored.data && stored.data.projects) || []).find(p => p && p.tenQH === name && !p.deleted);
+  if (!entry || !entry.dir) {
+    const err = new Error(`Đồ án «${name}» còn ở file cũ (cad_parcels.json): bấm «Chuyển lô cũ lên bucket» trong panel Đồ án trước khi ${verb}`);
+    err.status = 409;
+    throw err;
+  }
+  return entry;
+}
+
+/** Bản sao 1 lô đất (DXF) trong file đồ án; không thấy → 404 */
+async function readLand({ tenQH, id, phase }) {
+  const name = String(tenQH || '').trim();
+  const want = phase === 'QH' ? 'QH' : 'HT';
+  const entry = await dirEntry(name, 'chuyển lô');
+  const doc = await readRoleDoc(entry.slug || projectSlug(name), want === 'QH' ? ROLE_QH : ROLE_HT);
+  const land = doc && Array.isArray(doc.parcels)
+    ? doc.parcels.find(p => p && p.kind === 'DXF' && p.id === id && parcelPhase(p) === want)
+    : null;
+  if (!land) {
+    const err = new Error(`Không tìm thấy lô ${id} (${want}) trong file đồ án «${name}»`);
+    err.status = 404;
+    throw err;
+  }
+  return JSON.parse(JSON.stringify(land));
+}
+
+// Admin chuyển lô đất thành công trình (Sheet đã cấp mã newId): lô DXF thay bằng lô INFRA cùng ranh, cùng vị trí trong file
+async function landToInfra({ tenQH, id, phase, newId, layer }) {
+  const name = String(tenQH || '').trim();
+  const want = phase === 'QH' ? 'QH' : 'HT';
+  const entry = await dirEntry(name, 'chuyển lô');
+  const slug = entry.slug || projectSlug(name);
+  const role = want === 'QH' ? ROLE_QH : ROLE_HT;
+  const doc = await readRoleDoc(slug, role);
+  const parcels = doc && Array.isArray(doc.parcels) ? doc.parcels : [];
+  const i = parcels.findIndex(p => p && p.kind === 'DXF' && p.id === id && parcelPhase(p) === want);
+  if (i < 0) {
+    const err = new Error(`Không tìm thấy lô ${id} (${want}) trong file đồ án «${name}»`);
+    err.status = 404;
+    throw err;
+  }
+  const land = parcels[i];
+  const lot = { kind: 'INFRA', id: String(newId), phase: want, layer: layer || land.layer || '', area: land.area ?? null, geometry: land.geometry };
+  parcels[i] = lot;
+  const savedAt = Date.now();
+  await writeRole(slug, role, roleDoc(role, name, slug, savedAt, { parcels }));
+  const other = (await readRoleDoc(slug, want === 'QH' ? ROLE_HT : ROLE_QH)) || { parcels: [] };
+  const all = [...parcels, ...(other.parcels || [])];
+  const counts = countParcels(all);
+  const indexed = await updateIndex(cur => ({
+    ...cur,
+    projects: (cur.projects || []).map(p => (p && p.tenQH === name && !p.deleted
+      ? { ...p, saved: savedAt, infra: counts.infra, lands: counts.lands, landArea: landAreaOf(all) }
+      : p))
+  }));
+  return { saved: savedAt, via: indexed.via, lot };
+}
+
 // Lớp chính của đồ án = 1 file role (khớp PROJECT_LAYERS ở public/js/projectFiles.js)
 const LAYER_ROLES = [ROLE_QH, ROLE_POINTS, ROLE_BOUNDARY, ROLE_HT];
 
@@ -1556,7 +1616,7 @@ async function wardParcels() {
 }
 
 module.exports = {
-  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, retypeInfraLot, deleteLayer, deleteProjectFiles, renameProject,
+  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, retypeInfraLot, readLand, landToInfra, deleteLayer, deleteProjectFiles, renameProject,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase
 };

@@ -1102,7 +1102,7 @@ function importCadBatch(body) {
     var ctx = {};
     var getCtx = function(typeCode) {
       if (ctx.hasOwnProperty(typeCode)) return ctx[typeCode];
-      var sheet = findInfraSheet(ss, typeCode);
+      var sheet = ensureInfraSheet(ss, typeCode);
       if (!sheet) return (ctx[typeCode] = null);
       if (needPlan) ensurePlanColumns(sheet);
       var data = sheet.getDataRange().getValues();

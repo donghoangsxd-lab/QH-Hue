@@ -28,6 +28,7 @@ export const TYPE_CODE_OPTIONS = [
   ['TM', 'Chợ, Trung tâm thương mại'],
   ['TM_DT', 'Chợ, TTTM – cấp đô thị'],
   [MARKET_PICK, 'Chợ, TTTM – chọn từng lô'],
+  ['NT', 'Nghĩa trang, nhà tang lễ'],
   ['CSD', 'Cơ sở nhà đất chưa sử dụng (chỉ nhập từ DXF / KML)'],
   [LAND_CSD, 'Đất chưa sử dụng (BCS, DCS, NCS) – sheet DXF, không phải cơ sở'],
   [LAND_O, 'Đất ở – sheet DXF, màu đất ở']
@@ -61,6 +62,7 @@ const GUESS_RULES = [
   ['CV', /cong vien|cay xanh|vuon hoa|diem xanh|\bpark\b|green (place|land)|\bcxcc\b/,
     /cay xanh (su dung )?(han che|chuyen dung|cach ly|giao thong)|for transport/],
   ['BDX', /bai do|do xe|bai xe|parking|tram sac|\bbdx\b/],
+  ['NT', /nghia trang|nghia dia|nha tang le|hoa tang|\bntr\b|\bntd\b|cemetery/],
   ['YT', /y te|benh vien|tram y|phong kham|health|hospital/],
   ['VH', /van hoa|the thao|\btdtt\b|san van dong|\bnvh\b|cultur|\bsport/],
   [MARKET_PICK, /\bcho\b|thuong mai|\btttm\b|sieu thi|\bdvtm\b|\btmdv\b|dich vu|commercial|\bmarket\b/,
@@ -79,7 +81,7 @@ const normalize = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036
 // Khóa TT16 (landPatternKey / ký hiệu lô) → mã khớp; khóa không có ở đây và ngoài MANUAL_LAND_KEYS thì không gợi ý
 const PATTERN_CODE = {
   '1-CV': 'CV', '2-BDX': 'BDX', '3-MN': 'MN', '4-TH': 'TH', '5-THCS': 'THCS', '6-THPT': 'THPT', '7-YT': 'YT',
-  '8-VH': 'VH', TDTT: 'VH', '9-TM': MARKET_PICK, 'O-NO': LAND_O, 'O-LX': LAND_O, DCS: LAND_CSD, SCHOOL: SCHOOL_PICK
+  '8-VH': 'VH', TDTT: 'VH', '9-TM': MARKET_PICK, NTR: 'NT', 'O-NO': LAND_O, 'O-LX': LAND_O, DCS: LAND_CSD, SCHOOL: SCHOOL_PICK
 };
 const codeOfPattern = (key) => PATTERN_CODE[key] || (MANUAL_LAND_KEYS.includes(key) ? `${LAND_KEY_PREFIX}${key}` : '');
 

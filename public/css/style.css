@@ -1739,7 +1739,7 @@ table.ward-table th {
 .pa3-lg-icon { height: 20px; width: auto; flex-shrink: 0; }
 .pa3-lg-sym { display: inline-block; width: 26px; height: 13px; flex-shrink: 0; box-sizing: border-box; }
 .pa3-lg-buffer { border: 1.5px dashed #0284c7; border-radius: 7px; background: rgba(56,189,248,0.22); }
-.pa3-lg-ward { border: 1.8px solid #22d3ee; background: rgba(34,211,238,0.1); }
+.pa3-lg-ward { border: 1.8px solid #ff1f1f; background: rgba(255,31,31,0.1); }
 .pa3-lg-bound { height: 5px; background: #fde68a; border: 1px solid #64748b; }
 .pa3-lg-line { height: 0; border-top: var(--w) solid var(--c); }
 .pa3-lg-dash { border-top-style: dashed; }
@@ -1866,6 +1866,11 @@ table.ward-table th {
 .lot-edit-shape b.bad { color: var(--accent-red); }
 .lot-edit-shape .proof-btn { flex: 0 0 auto; width: auto; padding-left: 8px; padding-right: 8px; }
 .lot-edit-shape .ico { vertical-align: -0.2em; margin-right: 3px; }
+.lot-edit-infra { margin-top: 5px; padding: 4px 6px; border: 1px dashed var(--border-color); border-radius: var(--r-sm); }
+.lot-edit-check { display: flex; align-items: flex-start; gap: 6px; cursor: pointer; line-height: 1.35; }
+.lot-edit-check input { margin: 2px 0 0; flex: 0 0 auto; }
+.lot-edit-infra .lot-edit-row { margin-top: 4px; }
+.lot-edit-infra[hidden], .lot-edit-infra .lot-edit-row[hidden] { display: none; }
 .lot-edit-hint { margin-top: 3px; color: var(--accent-yellow); font-size: var(--fs-xs); line-height: 1.35; }
 
 .sug-card { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--r-md); padding: 6px; margin-top: 4px; font-size: var(--fs-sm); }
