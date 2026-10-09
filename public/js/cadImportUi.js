@@ -47,7 +47,7 @@ const CHOICE_SKIP = '__skip';
 //   autoLevels: Map src → cấp trường nhận theo tên điểm / ký hiệu lô, reviewSrc,
 //   takeOver: Set parcelKey lô được chuyển công trình từ đồ án khác sang đồ án đang nhập,
 //   lotKeys: Set "giai đoạn|ID" công trình đã có ranh lô (undefined = đang tải, false = tải lỗi), lotSig: đồ án đã đọc lô,
-//   points: { fileName, entities, wgs84, crs } lớp điểm chức năng, pointStats, notMarket (số lô dịch vụ chuyển sang sheet DXF),
+//   points: { fileName, entities, wgs84, crs } lớp điểm chức năng, pointStats,
 //   raw: { ext, text } nội dung file (KMZ đã giải nén, shapefile đã chuyển GeoJSON) để gửi hàng chờ, pendingId: hồ sơ chờ duyệt Admin đang mở }
 let current = null;
 let pendingItems = null;      // hồ sơ chờ duyệt (Admin), null = chưa tải
@@ -69,8 +69,13 @@ const EDU_OTHER_RE = /\b(cao dang|trung cap|day nghe|truong nghe|dai hoc|hoc vie
 // Lô "Chợ, TTTM – chọn từng lô": chợ / TTTM theo cấp, hoặc không phải → lô đất sheet DXF
 const MARKET_LEVELS = [['TM', 'Chợ / TTTM', 'Chợ, TTTM cấp đơn vị ở'], ['TM_DT', 'Cấp đô thị', 'Chợ, TTTM cấp đô thị']];
 const LEVEL_LAND = 'land';
-// Lô dịch vụ nhỏ hơn mức này mà không mang tên chợ / TTTM: mặc định không phải chợ / TTTM, chỉ hỏi lô lớn hơn
+// Lô dịch vụ không mang tên chợ / TTTM: dưới SMALL / trên BIG mặc định là lô đất dịch vụ (lớp sử dụng đất),
+// chỉ hỏi có phải chợ / TTTM với lô trong khoảng giữa
 const SMALL_MARKET_M2 = 1000;
+const BIG_MARKET_M2 = 20000;
+const SERVICE_SMALL = 'Dịch vụ khác cấp đơn vị ở';
+const SERVICE_BIG = 'Dịch vụ thương mại cấp đô thị';
+const serviceTier = (p) => (!(p.area > 0) ? '' : p.area < SMALL_MARKET_M2 ? SERVICE_SMALL : p.area > BIG_MARKET_M2 ? SERVICE_BIG : '');
 // Gợi ý theo nhãn bản đồ: địa điểm có tên trên OSM nằm trong lô hoặc cách ranh lô ≤ HINT_NEAR_M
 const HINT_NEAR_M = 10;
 const HINT_TIMEOUT_MS = 20000;
@@ -261,7 +266,11 @@ const layerText = (p) => (p.manual || (p.school && p.prefix)
 // "Thuận Hóa 1.200 m² · Phú Xuân 300 m²" (lô vắt ranh đã tách theo phường)
 const partsText = (p) => p.wardParts.map(x => `${x.ward} ${fmtArea(x.area)}`).join(' · ');
 // Layer ghi cho lô đất: lô giáo dục "Khác" gắn mã DT-NC (tên gốc "Đất giáo dục" sẽ bị nhận là trường học)
-const landLayerOf = (p) => (p.eduOther ? `${p.layer.slice(0, 45)} → ${EDU_OTHER_KEY}` : p.layer);
+const landLayerOf = (p) => {
+  if (p.eduOther) return `${p.layer.slice(0, 45)} → ${EDU_OTHER_KEY}`;
+  const tier = p.market && p.land ? serviceTier(p) : '';
+  return tier ? `${p.layer.slice(0, 45)} → ${tier}` : p.layer;
+};
 const typeColor = (p) => (p.pending ? '#facc15' : p.land ? (landColor(landLayerOf(p)) || '#94a3b8') : BUFFER_COLORS[p.type] || '#38bdf8');
 
 function parcelTip(p) {
@@ -317,7 +326,7 @@ function pointsWgs84() {
 /**
  * Gộp thuộc tính vào lô: điểm chức năng, chỉ tiêu quy hoạch, ký hiệu lô; cấp trường tự nhận;
  * lô dịch vụ / khớp thủ công vào nhóm TM chỉ giữ khi tên lô, giá trị nhận diện, tên điểm là chợ / siêu thị / TTTM
- * hoặc lô chứa chợ / TTTM đã có, còn lại → sheet DXF.
+ * hoặc lô chứa chợ / TTTM đã có, còn lại vào duyệt chợ / TTTM từng lô (tự nhận lô đất theo diện tích, xem serviceTier).
  */
 function enrichParcels(parcels) {
   const pts = pointsWgs84();
@@ -329,20 +338,17 @@ function enrichParcels(parcels) {
   current.pointStats = pts.length ? { total: pts.length, outside, lots: parcels.filter(p => p.points.length).length } : null;
   const existing = [...state.rawDataList, ...state.planDataList];
   const project = activeProjectName();
-  let notMarket = 0;
   parcels.forEach(p => {
     if (p.land || p.type !== '9-TM' || !(p.marketCheck || p.manual)) return;
     if ([p.layer, p.name, ...p.points.map(pt => pt.name)].some(isMarketName) || existingLevelOf({ ...p, market: true }, existing, project)) return;
-    Object.assign(p, { land: true, type: null, prefix: `LAND:${p.layer}`, nhom: '', manual: false, notMarket: true });
-    notMarket++;
+    Object.assign(p, { market: true, pending: true, type: MARKET_PENDING, prefix: '', nhom: 'Cấp đơn vị ở', manual: false });
   });
-  current.notMarket = notMarket;
   current.autoLevels = new Map();
   // Thứ tự: tên lô / tên điểm / ký hiệu lô → công trình đã có trong lô (để khớp cập nhật) → diện tích lô dịch vụ
   parcels.forEach(p => {
     if (p.market) {
       if ([p.name, ...p.points.map(pt => pt.name)].some(isMarketName) || existingLevelOf(p, existing, project)) current.autoLevels.set(p.src, 'TM');
-      else if (p.area > 0 && p.area < SMALL_MARKET_M2) current.autoLevels.set(p.src, LEVEL_LAND);
+      else if (serviceTier(p)) current.autoLevels.set(p.src, LEVEL_LAND);
       return;
     }
     if (!p.school) return;
@@ -610,10 +616,14 @@ function reviewHtml() {
   const left = lots.filter(p => !levelOf(p.src)).length;
   const leftOf = (market) => lots.filter(p => !!p.market === market && !levelOf(p.src)).length;
   const autoLots = all.filter(isAutoLot);
-  const small = autoLots.filter(p => current.autoLevels.get(p.src) === LEVEL_LAND).length;
-  const auto = autoLots.length - small;
+  const byArea = autoLots.filter(p => p.market && current.autoLevels.get(p.src) === LEVEL_LAND);
+  const small = byArea.filter(p => serviceTier(p) === SERVICE_SMALL).length;
+  const big = byArea.length - small;
+  const auto = autoLots.length - byArea.length;
   const autoNote = `${auto ? ` ${auto} lô tự nhận theo tên điểm chức năng / tên lô / ký hiệu lô / công trình đã có trong lô.` : ''}${small
-    ? ` ${small} lô dịch vụ dưới ${fmtNum(SMALL_MARKET_M2)} m² mặc định không phải chợ / TTTM (sheet DXF).` : ''}`;
+    ? ` ${small} lô dịch vụ dưới ${fmtNum(SMALL_MARKET_M2)} m²: đất ${SERVICE_SMALL.toLowerCase()}.` : ''}${big
+    ? ` ${big} lô dịch vụ trên ${fmtNum(BIG_MARKET_M2)} m²: đất ${SERVICE_BIG.toLowerCase()}.` : ''}${small || big
+    ? ` Chỉ hỏi chợ / TTTM với lô ${fmtNum(SMALL_MARKET_M2)}–${fmtNum(BIG_MARKET_M2)} m².` : ''}`;
   const p = all.find(x => x.src === current.reviewSrc);
   const at = lots.indexOf(p);
   if (!p) {
@@ -634,7 +644,9 @@ function reviewHtml() {
     : { TM: 'chợ / TTTM', TM_DT: 'chợ / TTTM cấp đô thị', [LEVEL_LAND]: 'không phải chợ / TTTM', [LEVEL_REJECT]: 'từ chối',
       ...Object.fromEntries(SCHOOL_LEVELS.map(([code, label]) => [code, label])) }[lv];
   const self = isAutoLot(p);
-  const why = !self ? '' : lv === LEVEL_LAND && p.market ? ` (dưới ${fmtNum(SMALL_MARKET_M2)} m²)` : ' (theo tên / ký hiệu lô / công trình đã có)';
+  const why = !self ? '' : lv === LEVEL_LAND && p.market
+    ? ` (${serviceTier(p) === SERVICE_SMALL ? `dưới ${fmtNum(SMALL_MARKET_M2)}` : `trên ${fmtNum(BIG_MARKET_M2)}`} m²: đất ${serviceTier(p).toLowerCase()})`
+    : ' (theo tên / ký hiệu lô / công trình đã có)';
   const status = lv
     ? `${p.market ? 'Lô dịch vụ / thương mại' : 'Lô trường học'} — ${self ? 'tự nhận' : 'đã chọn'}: <b>${lvText}</b>${why}`
     : p.market ? 'Lô dịch vụ / thương mại — có phải chợ / TTTM?' : 'Lô trường học chưa rõ cấp';
@@ -735,8 +747,13 @@ function renderReport() {
   } else if (current.points) {
     alerts.push(['warn', 'Lớp điểm chức năng không có điểm hợp lệ (kiểm tra hệ tọa độ).']);
   }
-  if (current.notMarket) {
-    alerts.push(['info', `${fmtNum(current.notMarket)} lô đất dịch vụ / thương mại không mang tên chợ, siêu thị hay TTTM: không vào nhóm Chợ, TTTM — ranh lô ghi vào sheet DXF của đồ án.${current.points ? '' : ' Nạp kèm lớp Điểm chức năng để nhận ra chợ / siêu thị / TTTM theo tên.'}`]);
+  const serviceLands = parcels.filter(p => p.market && p.land && p.ward);
+  if (serviceLands.length) {
+    const big = serviceLands.filter(p => serviceTier(p) === SERVICE_BIG).length;
+    const small = serviceLands.filter(p => serviceTier(p) === SERVICE_SMALL).length;
+    const parts = [small && `${small} lô dưới ${fmtNum(SMALL_MARKET_M2)} m² → đất ${SERVICE_SMALL.toLowerCase()}`,
+      big && `${big} lô trên ${fmtNum(BIG_MARKET_M2)} m² → đất ${SERVICE_BIG.toLowerCase()}`].filter(Boolean).join(', ');
+    alerts.push(['info', `${serviceLands.length} lô dịch vụ / thương mại không phải chợ / TTTM: ranh lô ghi vào lớp sử dụng đất của đồ án${parts ? ` (${parts})` : ''}.${current.points ? '' : ' Nạp kèm lớp Điểm chức năng để nhận ra chợ / siêu thị / TTTM theo tên.'}`]);
   }
   const planned = parcels.filter(p => planOf(p)).length;
   if (planned) alerts.push(['info', `${fmtNum(planned)} lô có chỉ tiêu quy hoạch: ghi vào cột TangCao, MatDoXD, HeSoSDD của Sheet.`]);
