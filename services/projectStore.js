@@ -1165,6 +1165,45 @@ async function deleteLot({ tenQH, id, kind, phase }) {
   return { removed, saved: savedAt, via: indexed.via };
 }
 
+// Admin đổi loại công trình (Sheet đã cấp mã mới): lô INFRA mã id / id.N đổi sang newId / newId.N, layer mới nếu có
+// (bảng thông tin đồ án đọc loại lô theo layer). Đồ án cũ (cad_parcels.json) hoặc không có lô của id → changed 0.
+async function retypeInfraLot({ tenQH, id, newId, layer }) {
+  const name = String(tenQH || '').trim();
+  const stored = await readIndex();
+  const entry = ((stored.data && stored.data.projects) || []).find(p => p && p.tenQH === name && !p.deleted);
+  if (!entry || !entry.dir) return { changed: 0, saved: 0 };
+  const slug = entry.slug || projectSlug(name);
+  const suffixOf = (v) => {
+    const s = String(v ?? '');
+    if (s === id) return '';
+    const rest = s.startsWith(`${id}.`) ? s.slice(id.length + 1) : '';
+    return /^\d+$/.test(rest) ? `.${rest}` : null;
+  };
+  const savedAt = Date.now();
+  let changed = 0;
+  let via = 'direct';
+  for (const role of [ROLE_HT, ROLE_QH]) {
+    const doc = await readRoleDoc(slug, role);
+    const parcels = doc && Array.isArray(doc.parcels) ? doc.parcels : [];
+    let hits = 0;
+    const next = parcels.map(p => {
+      const sfx = p && p.kind === 'INFRA' ? suffixOf(p.id) : null;
+      if (sfx === null) return p;
+      hits += 1;
+      return { ...p, id: `${newId}${sfx}`, ...(layer ? { layer } : {}) };
+    });
+    if (!hits) continue;
+    changed += hits;
+    via = (await writeRole(slug, role, roleDoc(role, name, slug, savedAt, { parcels: next }))).via;
+  }
+  if (!changed) return { changed: 0, saved: 0 };
+  const indexed = await updateIndex(cur => ({
+    ...cur,
+    projects: (cur.projects || []).map(p => (p && p.tenQH === name && !p.deleted ? { ...p, saved: savedAt } : p))
+  }));
+  return { changed, saved: savedAt, via: indexed.via || via };
+}
+
 // Lớp chính của đồ án = 1 file role (khớp PROJECT_LAYERS ở public/js/projectFiles.js)
 const LAYER_ROLES = [ROLE_QH, ROLE_POINTS, ROLE_BOUNDARY, ROLE_HT];
 
@@ -1517,7 +1556,7 @@ async function wardParcels() {
 }
 
 module.exports = {
-  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteLayer, deleteProjectFiles, renameProject,
+  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, retypeInfraLot, deleteLayer, deleteProjectFiles, renameProject,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase
 };

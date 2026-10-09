@@ -242,6 +242,22 @@ export function patchCachedLand(tenQH, land, saved) {
   composeNow();
 }
 
+/** Admin vừa đổi loại công trình: lô INFRA mã id / id.N trong bộ nhớ đệm sang newId / newId.N, layer mới nếu có */
+export function retypeCachedInfra(tenQH, { id, newId, layer }, saved) {
+  const row = cache.get(tenQH);
+  if (row) {
+    row.parcels = row.parcels.map(p => {
+      const s = p && p.kind === 'INFRA' ? String(p.id) : '';
+      const sfx = s === id ? '' : (s.startsWith(`${id}.`) && /^\d+$/.test(s.slice(id.length + 1)) ? s.slice(id.length) : null);
+      return sfx === null ? p : { ...p, id: `${newId}${sfx}`, ...(layer ? { layer } : {}) };
+    });
+    if (saved) row.saved = saved;
+  }
+  const entry = state.projectCatalog.find(p => p && p.tenQH === tenQH);
+  if (entry && saved) entry.saved = saved;
+  composeNow();
+}
+
 /** Gỡ lô Admin vừa xóa khỏi bộ nhớ đệm: DXF theo id + giai đoạn, INFRA mọi giai đoạn của id */
 export function removeCachedLot(tenQH, { kind, id, phase }, saved) {
   const row = cache.get(tenQH);

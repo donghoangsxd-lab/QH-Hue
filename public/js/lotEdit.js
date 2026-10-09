@@ -2,11 +2,12 @@
 //   lô hạ tầng → ghi đè / xóa dòng Sheet theo ID (Apps Script editInfraRow / deleteInfraRow),
 //   lô đất QH → su-dung-dat.json, lô đất HT → hien-trang.json.
 // Lô đất còn đổi được lớp (loại đất TT16 → layer mới) và kéo đỉnh ranh (diện tích tính lại theo ranh mới).
-import { state } from './state.js';
+// Công trình đổi được loại hạ tầng (VD THCS → Tiểu học): Apps Script chuyển dòng sang tab loại mới với mã mới.
+import { state, infraLabels } from './state.js';
 import { geeApi, markDataWritten } from './api.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 import { signOutAdmin } from './uiComponents.js';
-import { patchCachedLand, removeCachedLot } from './projectFiles.js';
+import { patchCachedLand, removeCachedLot, retypeCachedInfra, cachedLots } from './projectFiles.js';
 import { LAND_LABELS, landLabel, landPatternKey, layerForPattern, TT16_LAND_KEYS, TT16_STYLES } from './tt16Symbols.js';
 import { startShapeEdit, vertexCount, SHAPE_MAX_VERTICES } from './lotShapeEdit.js';
 
@@ -21,8 +22,12 @@ const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 const URBAN_RE = /do thi|đô thị|urban/i;
 const PLAN_FIELDS = [['floors', 'Tầng cao', 'VD 3 hoặc 2-5'], ['coverage', 'Mật độ XD (%)', 'VD 40'], ['far', 'Hệ số SDĐ (lần)', 'VD 1,2']];
 
+// THPT dùng chung loại 4-TH khi tính (constants.codeMap), chỉ tiền tố mã cho biết là THPT
+const infraTypeOf = (p) => (String(p.id || '').split('-')[0].toUpperCase() === 'THPT' ? '6-THPT' : p.type || '');
+
 function infraValues(p) {
   return {
+    type: infraTypeOf(p),
     name: p.name || '',
     nhom: URBAN_RE.test(String(p.nhomHaTang || p.capCongTrinh || '')) ? 'Cấp đô thị' : 'Cấp đơn vị ở',
     sizeHT: p.sizeHT == null ? '' : String(p.sizeHT),
@@ -53,6 +58,8 @@ function formHtml(target, v) {
   let html = `<div class="lot-edit-title">${ico('pen')}${title}</div>`;
   html += input('name', infra ? 'Tên công trình' : 'Tên lô', v.name, ' maxlength="150"');
   if (infra) {
+    html += `<label class="lot-edit-row"><span>Loại hạ tầng</span><select data-k="type" title="Đổi loại: công trình chuyển sang tab loại mới trên Sheet và nhận mã mới">
+      ${Object.entries(infraLabels).map(([code, label]) => `<option value="${code}"${code === v.type ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select></label>`;
     html += `<label class="lot-edit-row"><span>Cấp công trình</span><select data-k="nhom">
       ${['Cấp đơn vị ở', 'Cấp đô thị'].map(n => `<option${n === v.nhom ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`;
     html += input('sizeHT', 'Quy mô HT (m²)', v.sizeHT, ' inputmode="decimal" placeholder="trống = chưa có"');
@@ -86,7 +93,7 @@ function changedFields(form, before) {
   const now = {};
   form.querySelectorAll('[data-k]').forEach(el => { now[el.dataset.k] = el.value.trim(); });
   const out = {};
-  ['name', 'nhom', 'sizeHT', 'sizeQH', 'note'].forEach(k => {
+  ['type', 'name', 'nhom', 'sizeHT', 'sizeQH', 'note'].forEach(k => {
     if (now[k] !== undefined && now[k] !== String(before[k] ?? '').trim()) out[k] = now[k];
   });
   const plan = {};
@@ -228,6 +235,40 @@ function bindLandExtras(popup, form, land, msg) {
   };
 }
 
+// THPT là công trình cấp đô thị (QCVN 01:2026), các trường còn lại cấp đơn vị ở: đổi loại thì gợi ý lại cấp
+const CITY_LEVEL_TYPES = new Set(['6-THPT']);
+const UNIT_LEVEL_TYPES = new Set(['3-MN', '4-TH', '5-THCS']);
+
+function bindTypeSelect(form, before) {
+  const type = form.querySelector('[data-k="type"]');
+  const nhom = form.querySelector('[data-k="nhom"]');
+  const msg = form.querySelector('.lot-edit-msg');
+  type?.addEventListener('change', () => {
+    if (nhom && CITY_LEVEL_TYPES.has(type.value)) nhom.value = 'Cấp đô thị';
+    else if (nhom && UNIT_LEVEL_TYPES.has(type.value)) nhom.value = 'Cấp đơn vị ở';
+    msg.textContent = type.value !== before.type ? `Lưu sẽ chuyển công trình sang tab ${type.value} trên Sheet và cấp mã mới` : '';
+    msg.className = 'lot-edit-msg';
+  });
+}
+
+function confirmRetype(item, type) {
+  const label = infraLabels[type] || type;
+  return confirm(`Đổi ${item.id}${item.name ? ` «${item.name}»` : ''} sang loại «${label}»?\n• Dòng Sheet chuyển sang tab ${type} với mã mới (mã ${item.id} không còn dùng).\n• Ranh lô trong file đồ án đổi theo mã mới.\n• Bán kính phục vụ, độ phủ và heatmap tính theo loại mới.`);
+}
+
+async function retypeInfra(item, fields) {
+  const label = infraLabels[fields.type] || fields.type;
+  const tenQH = item.tenQH || '';
+  const lot = tenQH ? cachedLots(tenQH).find(l => l && l.kind === 'INFRA' && String(l.id) === item.id) : null;
+  const layer = layerForPattern(fields.type, lot?.layer || '');
+  markDataWritten();
+  const data = await postEdit({ kind: 'INFRA', id: item.id, tenQH, fields: { ...fields, ...(layer ? { layer } : {}) } });
+  if (tenQH && data.lots) retypeCachedInfra(tenQH, { id: item.id, newId: data.newId, layer }, data.saved);
+  const lost = data.dropped && data.dropped.length ? ` · tab mới thiếu cột: ${data.dropped.join(', ')}` : '';
+  showToast(`✓ Đã đổi ${item.id} → ${data.newId} (${label})${lost}`, lost ? 'info' : 'success');
+  if (reloadInfra) await reloadInfra();
+}
+
 function openForm(popup, target, onLandSaved) {
   const content = popup.getElement()?.querySelector('.leaflet-popup-content');
   if (!content || content.querySelector('.lot-edit')) return;
@@ -245,6 +286,7 @@ function openForm(popup, target, onLandSaved) {
 
   const msg = form.querySelector('.lot-edit-msg');
   const extra = target.kind === 'INFRA' ? null : bindLandExtras(popup, form, target.land, msg);
+  if (target.kind === 'INFRA') bindTypeSelect(form, before);
   const close = () => {
     if (extra) extra.stop();
     form.remove();
@@ -263,11 +305,16 @@ function openForm(popup, target, onLandSaved) {
     if (!Object.keys(fields).length) { close(); return; }
     const problem = validate(target, fields);
     if (problem) { msg.textContent = problem; msg.className = 'lot-edit-msg bad'; return; }
+    if (target.kind === 'INFRA' && fields.type && !confirmRetype(target.item, fields.type)) return;
     saveBtn.disabled = true;
-    msg.textContent = target.kind === 'INFRA' ? 'Đang ghi Sheet và đồng bộ bucket…' : 'Đang ghi file đồ án…';
+    msg.textContent = target.kind !== 'INFRA' ? 'Đang ghi file đồ án…'
+      : fields.type ? 'Đang chuyển tab, cấp mã mới và đồng bộ bucket…' : 'Đang ghi Sheet và đồng bộ bucket…';
     msg.className = 'lot-edit-msg';
     try {
-      if (target.kind === 'INFRA') {
+      if (target.kind === 'INFRA' && fields.type) {
+        await retypeInfra(target.item, fields);
+        popup.close();
+      } else if (target.kind === 'INFRA') {
         markDataWritten();
         await postEdit({ kind: 'INFRA', id: target.item.id, fields });
         popup.close();

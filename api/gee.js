@@ -2128,7 +2128,39 @@ module.exports = async (req, res) => {
         }
       }
       const fields = parseInfraEdit(raw);
-      if (!fields) return res.status(400).json({ error: true, message: 'Thông tin sửa không hợp lệ (tên trống hoặc quy mô không phải số ≥ 0)' });
+      const type = raw.type === undefined ? '' : String(raw.type);
+      if (type && type !== '6-THPT' && !Object.values(constants.codeMap).includes(type)) {
+        return res.status(400).json({ error: true, message: 'Loại hạ tầng không hợp lệ' });
+      }
+      const editing = Object.keys(raw).some(k => k !== 'type' && k !== 'layer');
+      if ((editing && !fields) || (!editing && !type)) {
+        return res.status(400).json({ error: true, message: 'Thông tin sửa không hợp lệ (tên trống hoặc quy mô không phải số ≥ 0)' });
+      }
+      // Đổi loại = mã mới ở tab loại đích (Apps Script), rồi đổi mã + layer các lô của công trình trong file đồ án
+      if (type) {
+        const result = await callAppsScript({ action: 'retypeInfraRow' }, { action: 'retypeInfraRow', id, type, fields: fields || {} });
+        if (!result.newId) {
+          return res.status(502).json({ error: true, message: 'Apps Script chưa có retypeInfraRow: Deploy Code.gs → Manage deployments → Edit → New version' });
+        }
+        const tenQH = sanitizeSheetText(body.tenQH, 120);
+        const layer = sanitizeSheetText(raw.layer, 60);
+        let lots = 0;
+        let saved = 0;
+        if (tenQH) {
+          try {
+            const done = await projects.retypeInfraLot({ tenQH, id, newId: result.newId, layer });
+            lots = done.changed;
+            saved = done.saved;
+          } catch (err) {
+            console.warn(`Đổi mã lô ${id} → ${result.newId} trong đồ án «${tenQH}»:`, err.message);
+          }
+        }
+        invalidateAllCaches();
+        return res.status(200).json({
+          success: true, kind: 'INFRA', id, newId: result.newId, tab: result.tab || '', lots, saved,
+          dropped: Array.isArray(result.dropped) ? result.dropped : []
+        });
+      }
       const result = await callAppsScript({ action: 'editInfraRow' }, { action: 'editInfraRow', id, fields });
       invalidateAllCaches();
       return res.status(200).json({ success: true, kind: 'INFRA', id, tab: result.tab || '' });
