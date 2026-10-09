@@ -97,7 +97,10 @@ export function parseFeatures(features, { fileLayers = null } = {}) {
     // Thuộc tính dạng chữ/số (để khớp thủ công khi tên không theo quy ước)
     const attrs = {};
     Object.entries(props).forEach(([k, v]) => {
-      if (v != null && typeof v !== 'object') attrs[k] = String(v).trim();
+      if (v == null || typeof v === 'object') return;
+      // Layer = tên file: không đưa vào khớp thủ công (1 giá trị phủ mọi lô, khớp theo từ khóa trong tên đồ án)
+      if (fileLayers && LAYER_FIELD.test(k) && fileLayers.has(String(v).trim())) return;
+      attrs[k] = String(v).trim();
     });
     const out = { poly: [], line: [], open: [], points: [], other: 0 };
     collect(f && f.geometry, out);
