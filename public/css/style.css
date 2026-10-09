@@ -606,7 +606,7 @@ body.right-collapsed .right-panel {
 .project-name { flex: 1; min-width: 0; display: flex; align-items: center; cursor: pointer; color: var(--text-main); }
 .project-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-name input { accent-color: rgb(var(--project-rgb)); width: 13px; height: 13px; margin: 0 5px 0 0; flex-shrink: 0; cursor: pointer; }
-.project-color { flex-shrink: 0; width: 10px; height: 10px; margin-right: 5px; border-radius: 2px; border: 1.5px solid var(--pc); background: color-mix(in srgb, var(--pc) 25%, transparent); }
+.project-color { flex-shrink: 0; width: 8px; height: 8px; margin: 0 6px 0 1px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 0 2px color-mix(in srgb, var(--pc) 25%, transparent); }
 .project-row.is-off .project-color { opacity: 0.4; }
 /* Nhãn tên đồ án giữa ranh tổng: thẻ tối 1 dòng, chấm màu đồ án; kích thước khớp LABEL_* trong projectLayer.js */
 .leaflet-marker-icon.project-label { pointer-events: none; }
@@ -2378,6 +2378,7 @@ body.project-review .bp-part2 { display: none; }
 .review-file-cell { display: flex; gap: 6px; min-width: 0; }
 .review-file-cell b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .review-file-cell em { flex-shrink: 0; font-style: normal; color: var(--text-muted); }
+.review-pop { width: calc(78px * var(--k)); height: 18px; padding: 0 4px; box-sizing: border-box; border: 1px solid var(--border-color); border-radius: var(--r-sm); background: rgba(15, 23, 42, 0.6); color: var(--text-strong); font: inherit; font-weight: 600; }
 .review-ctl .review-card-title { color: var(--accent-green); }
 .review-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); cursor: pointer; }
 .review-sub { margin: -2px 0 6px; font-size: var(--fs-xs, 11px); color: var(--text-muted); }

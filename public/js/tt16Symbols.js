@@ -643,7 +643,7 @@ const PHRASE_RULES = [
   ['RSX', /RUNGSANXUAT/],
   ['TS', /THUYSAN|NUOITRONG/],
   ['NN', /NONGNGHIEP|TRONGLUA|DATLUA|CAYHANGNAM|CAYLAUNAM/],
-  ['HO', /MATNUOC|HONUOC|HODIEUHOA/],
+  ['HO', /MATNUOC|HONUOC|HODIEUHOA|HOAO/],
   ['SS', /SONG|SUOI|KENH|RACH/],
   // Đất dự trữ phát triển: TT16 không có ký hiệu riêng, tô theo đất chưa sử dụng
   ['DCS', /CHUASUDUNG|BOHOANG|DUTRU/]

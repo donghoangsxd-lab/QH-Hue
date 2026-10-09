@@ -77,6 +77,9 @@ export const PROJECT_LAYERS = [
 ];
 const LOT_LAYER = { HT: 'hien-trang', QH: 'su-dung-dat' };
 
+// Danh sách đồ án (projectLayer) → bảng thông tin 1 đồ án (projectReview), detail = tenQH
+export const PROJECT_INFO_EVENT = 'qh:project-info';
+
 export const layerKey = (tenQH, key) => `${tenQH}|${key}`;
 export const isLayerHidden = (tenQH, key) => state.hiddenProjectLayers.has(layerKey(tenQH, key));
 

@@ -8,7 +8,7 @@ import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
 } from './mapEngine.js';
 import { planMap, onCompareChange } from './planMap.js';
-import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots } from './projectFiles.js';
+import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
@@ -327,7 +327,8 @@ function renderList() {
       : '';
     return `<div class="project-row${on ? '' : ' is-off'}">
       <label class="project-name" title="${escapeHtml(p.name)}${p.area?.ward ? ` — ${escapeHtml(p.area.ward)}` : ''} — ${escapeHtml(metaText(p))} (${where})${tempNote}">
-        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><i class="project-color" style="--pc:${p.color}"></i><span>${idx + 1}. ${escapeHtml(p.name)}</span></label>
+        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><i class="project-color" style="--pc:${p.color}" title="Màu ranh đồ án trên bản đồ"></i><span>${idx + 1}. ${escapeHtml(p.name)}</span></label>
+      <button type="button" class="project-btn" data-info="${idx}" title="Thông tin đồ án: bảng tổng hợp sử dụng đất và đánh giá chỉ tiêu QCVN 01:2026" aria-label="Thông tin đồ án">${ico('table')}</button>
       ${decisionBtn}
       <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-expand="${idx}" title="${open ? 'Ẩn' : 'Xem'} các lớp dữ liệu của đồ án" aria-label="Các lớp dữ liệu của đồ án" aria-expanded="${open}">${ico('chev-down')}</button>
       <button type="button" class="project-btn" data-zoom="${idx}" title="Phóng tới đồ án" aria-label="Phóng tới đồ án">${ico('locate')}</button>
@@ -1230,6 +1231,8 @@ export function initProjectLayer(opts = {}) {
     if (layerDel) { const hit = layerOf(layerDel.dataset.layerDel); if (hit) deleteLayer(hit.p, hit.g); return; }
     const zoom = e.target.closest('[data-zoom]');
     if (zoom) { const p = projects[Number(zoom.dataset.zoom)]; if (p) zoomTo(p); return; }
+    const info = e.target.closest('[data-info]');
+    if (info) { const p = projects[Number(info.dataset.info)]; if (p) document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: p.name })); return; }
     const del = e.target.closest('[data-del]');
     if (del) { const p = projects[Number(del.dataset.del)]; if (p) deleteProject(p); }
   });

@@ -16,8 +16,9 @@ import { tt16SymbolStyle, tt16SwatchCss, TT16_PATTERN_ZOOM, landPatternKey } fro
 import {
   REVIEW_MAX_BYTES, LANDUSE_TABLES, classifyLand, landChoices, landRowByKey, landUseSummary, landSubKey, importLayerName, decisionKind,
   presetDecision, tagParcel, lotRadius, scoreRows, rowLabel, rowMinSize, newLandControl, residentialSubAreas, landSymbol, UNIT_POP, THPT_POP_MIN,
-  projectOfFile, PENDING_TONE, UNDETERMINED_KEY
+  projectOfFile, PENDING_TONE, UNDETERMINED_KEY, savedLandTag, savedLotType
 } from './projectReviewCore.js';
+import { projectLayersOf, cachedLots, PROJECT_INFO_EVENT } from './projectFiles.js';
 
 const STORE_KEY = 'qh_review_dossiers_v2';
 // Hàng chờ duyệt (submitCadPending) nhận tối đa 2 MB nội dung
@@ -125,8 +126,40 @@ function orderQueue() {
   session.queue = ids;
 }
 
+// Lô đồ án đã lưu: không có bước xác nhận cấp trường / chợ - TTTM (đã chốt lúc nhập), tên theo dòng Sheet cùng ID
+function tagSaved(lot, sheetRows) {
+  const kind = session.kind;
+  const chosen = session.layerChoice.get(lot.layer);
+  const auto = savedLandTag(kind, lot.pattern, lot.infra);
+  lot.landKey = chosen || auto.landKey;
+  lot.ask = !lot.landKey;
+  const row = chosen && landRowByKey(kind, chosen);
+  Object.assign(lot, {
+    prefix: null, type: null, nhom: '', role: 'other', scoreKey: null, radius: 0, decisionKind: '', decision: '', decisionSrc: '',
+    hitName: '', importLayer: null, displayName: '', pointName: '',
+    subKey: chosen ? (row && row.subs && !row.split ? 'other' : '') : auto.subKey
+  });
+  if (!usable(lot)) return;
+  // Gán tay vào đầu mục gộp nhiều loại (giáo dục, dịch vụ) thì không rõ cấp trường / chợ → không chấm chỉ tiêu
+  const t = !chosen ? savedLotType(lot.layer, lot.pattern, lot.infra)
+    : row && !row.subs ? savedLotType('', landSymbol(kind, chosen).tt16, lot.infra) : null;
+  if (t) { lot.prefix = t.prefix; lot.type = t.type; }
+  const sheetRow = lot.infra && sheetRows.get(lot.sheetId);
+  lot.pointName = (sheetRow && String(sheetRow.name || '').trim()) || existingName(lot);
+  const tag = tagParcel(lot, kind, session.popQH);
+  lot.role = tag.role;
+  lot.scoreKey = tag.scoreKey;
+  lot.radius = lot.role === 'score' ? lotRadius(lot) : 0;
+}
+
 function applyTags() {
   const kind = session.kind;
+  if (session.saved) {
+    const sheetRows = new Map([...(state.rawDataList || []), ...(state.planDataList || [])].map(it => [String(it.id), it]));
+    session.lots.forEach(lot => tagSaved(lot, sheetRows));
+    session.queue = [];
+    return;
+  }
   session.lots.forEach(lot => {
     const chosen = session.layerChoice.get(lot.layer);
     const auto = classifyLand(lot.layer, kind);
@@ -445,7 +478,8 @@ function drawAll(sequential = false) {
 function fitTo(bounds, maxZoom = 18) {
   if (!map || !bounds || !bounds.isValid()) return;
   const rp = document.querySelector('.right-panel');
-  const right = rp && rp.offsetParent !== null ? rp.offsetWidth + 24 : 24;
+  const open = rp && rp.offsetParent !== null && !document.body.classList.contains('right-collapsed');
+  const right = open ? rp.offsetWidth + 24 : 24;
   map.fitBounds(bounds, { paddingTopLeft: [24, 24], paddingBottomRight: [right, 24], maxZoom });
 }
 
@@ -674,7 +708,10 @@ function askHtml() {
   const asks = askLayers();
   if (!asks.length || session.pendingId) return '';
   const choices = landChoices(session.kind);
-  return `<div class="review-card review-ask"><b class="review-card-title" title="Tô đen trên bản đồ, tạm tính vào dòng Chưa xác định — chọn đầu mục sử dụng đất cho từng layer">${ico('alert')}Layer chưa đúng TT16 (${asks.length}) — chọn đầu mục</b><div class="review-ask-list">${asks.map(r => {
+  const head = session.saved
+    ? `Layer chưa nhận diện được (${asks.length}) — chọn đầu mục để tính (chỉ trong lần xem này)`
+    : `Layer chưa đúng TT16 (${asks.length}) — chọn đầu mục`;
+  return `<div class="review-card review-ask"><b class="review-card-title" title="Tô đen trên bản đồ, tạm tính vào dòng Chưa xác định — chọn đầu mục sử dụng đất cho từng layer">${ico('alert')}${head}</b><div class="review-ask-list">${asks.map(r => {
     const cur = session.layerChoice.get(r.layer) || '';
     const opts = [`<option value="">Chọn đầu mục…</option>`]
       .concat(choices.map(c => `<option value="${c.key}"${cur === c.key ? ' selected' : ''}>${escapeHtml(c.label)}</option>`))
@@ -860,6 +897,11 @@ function controlTableHtml(ctl) {
 }
 
 function actionsHtml(open) {
+  if (session.saved) {
+    return `<div class="review-foot review-noprint">
+      <span>Tính từ các lô đã lưu của đồ án (lớp sử dụng đất hiện trạng / quy hoạch). Chỉ xem — không ghi Sheet; dân số nhập ở đây lưu trên máy này.</span>
+    </div>`;
+  }
   if (session.pendingId) {
     return `<div class="review-foot review-noprint">
       <span>Hồ sơ chờ duyệt${session.sender ? ` · người gửi: <b>${escapeHtml(session.sender)}</b>` : ''}. Phê duyệt: dữ liệu chuyển sang khung Nhập hàng loạt để khớp công trình đã có rồi ghi Sheet (Ten_QH = <b>${escapeHtml(session.project)}</b>).</span>
@@ -891,11 +933,18 @@ function renderHost() {
   const level = session.kind === 'QHC'
     ? 'Cấp đô thị (bảng A)'
     : `Cấp đơn vị ở (bảng B${Number(session.popQH) > THPT_POP_MIN ? ' + THPT' : ''}) · <b>${scored.units}</b> đơn vị ở`;
-  const fileCell = (name, n) => (name ? `<b title="${escapeHtml(name)}">${escapeHtml(name)}</b><em>${n} lô</em>` : '<i class="c-muted">không có file</i>');
+  const fileCell = (name, n) => (name ? `<b title="${escapeHtml(name)}">${escapeHtml(name)}</b><em>${n} lô</em>` : `<i class="c-muted">${session.saved ? 'chưa có lớp' : 'không có file'}</i>`);
+  const popInput = (ph) => `<input type="number" class="review-pop" data-pop="${ph}" min="0" step="100" inputmode="numeric" placeholder="nhập" value="${session[`pop${ph}`] > 0 ? session[`pop${ph}`] : ''}" title="Dân số ${ph === 'HT' ? 'hiện trạng' : 'quy hoạch'} (người)">`;
+  const popCell = session.saved
+    ? `HT ${popInput('HT')} → QH ${popInput('QH')}${session.popQH > 0 ? ` <b class="c-green">(+${fmtNum(scored.control.newPop)})</b>` : ''}`
+    : `HT <b>${session.popHT > 0 ? fmtNum(session.popHT) : '—'}</b> → QH <b>${fmtNum(session.popQH)}</b> <b class="c-green">(+${fmtNum(scored.control.newPop)})</b>`;
+  const popHint = session.saved && !(session.popQH > 0)
+    ? '<small class="review-card-foot c-orange">Nhập dân số quy hoạch để tính tổng nhu cầu, số đơn vị ở và % đạt chỉ tiêu.</small>'
+    : '';
   const scrollTop = host.scrollTop;
   host.innerHTML = `<div id="projectReviewSheet" class="review-sheet">
     <div class="bp-part-head review-head">
-      <b class="bp-part-title">THẨM ĐỊNH ${escapeHtml(table.short)} · ${escapeHtml(session.project)}</b>
+      <b class="bp-part-title">${session.saved ? 'THÔNG TIN' : 'THẨM ĐỊNH'} ${escapeHtml(table.short)} · ${escapeHtml(session.project)}</b>
       <div class="review-head-btns review-noprint">
         <label class="review-toggle"><input type="checkbox" data-show="HT"${show.HT ? ' checked' : ''}>Hiện trạng</label>
         <label class="review-toggle"><input type="checkbox" data-show="QH"${show.QH ? ' checked' : ''}>Quy hoạch</label>
@@ -910,16 +959,16 @@ function renderHost() {
       <div class="review-card review-info">
         <div class="review-card-title">${ico('info')}${escapeHtml(table.label)}</div>
         <div class="review-kv">
-          <span>File HT</span><span class="review-file-cell">${fileCell(session.files.HT, htN)}</span>
-          <span>File QH</span><span class="review-file-cell">${fileCell(session.files.QH, qhN)}</span>
-          <span>Dân số</span><span>HT <b>${session.popHT > 0 ? fmtNum(session.popHT) : '—'}</b> → QH <b>${fmtNum(session.popQH)}</b> <b class="c-green">(+${fmtNum(scored.control.newPop)})</b></span>
+          <span>${session.saved ? 'Lớp HT' : 'File HT'}</span><span class="review-file-cell">${fileCell(session.files.HT, htN)}</span>
+          <span>${session.saved ? 'Lớp QH' : 'File QH'}</span><span class="review-file-cell">${fileCell(session.files.QH, qhN)}</span>
+          <span>Dân số</span><span>${popCell}</span>
           <span>Thẩm định</span><span title="${fmtNum(UNIT_POP)} người / đơn vị ở, làm tròn lên">${level}</span>
         </div>
-        <small class="review-card-foot">${housingNote}</small>
+        ${popHint}<small class="review-card-foot">${housingNote}</small>
       </div>
       ${controlCardHtml(scored.control)}
       ${askHtml()}
-      ${session.pendingId ? '' : decisionHtml()}
+      ${session.pendingId || session.saved ? '' : decisionHtml()}
     </div>
     <div class="review-cols">
       <div class="review-col review-col-land">${landTableHtml()}</div>
@@ -1213,6 +1262,64 @@ function openDossier({ id, item, text }) {
   });
 }
 
+// ============================ THÔNG TIN 1 ĐỒ ÁN ĐÃ LƯU ============================
+
+// Danh mục đồ án chưa có dân số: người xem nhập, nhớ theo tên đồ án trên máy này
+const POP_STORE_KEY = 'qh_project_pop_v1';
+const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+const EXISTING_RE = /hien ?tran|hien ?huu|chinh ?trang|cai ?tao|xen ?ghep|bao ?ton/;
+
+function loadPops() {
+  try { return JSON.parse(localStorage.getItem(POP_STORE_KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+
+function savePop(project, popHT, popQH) {
+  const all = loadPops();
+  all[project] = { ht: popHT, qh: popQH };
+  try { localStorage.setItem(POP_STORE_KEY, JSON.stringify(all)); } catch (e) { /* đầy bộ nhớ */ }
+}
+
+/** Đồ án quy hoạch chung → bảng QHC, còn lại (phân khu, chi tiết) → bảng QHPK */
+function kindOfProject(name) {
+  return /(^|[^a-z])qhc([^a-z]|$)|quy hoach chung/.test(fold(name)) ? 'QHC' : 'QHPK';
+}
+
+function savedLot(p, i) {
+  const phase = p.phase === 'QH' ? 'QH' : 'HT';
+  const polygons = polygonsOf(p.geometry);
+  if (!polygons.length) return null;
+  let lat = Number(p.lat), lng = Number(p.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    try { [lng, lat] = turf.pointOnFeature(p.geometry).geometry.coordinates; } catch (e) { return null; }
+  }
+  let area = Number(p.area);
+  if (!(area > 0)) { try { area = turf.area(p.geometry); } catch (e) { area = 0; } }
+  const layer = String(p.layer || '');
+  const name = String(p.name || '');
+  return {
+    id: `${phase}${i}`, phase, layer, name, area, lat, lng, polygons,
+    infra: p.kind !== 'DXF', sheetId: String(p.id), pattern: landPatternKey(layer, name),
+    existing: EXISTING_RE.test(fold(`${layer} ${name}`))
+  };
+}
+
+async function openProjectInfo(project) {
+  if (!project) return;
+  if (session && !session.saved && !session.pendingId && !confirm('Đóng hồ sơ thẩm định đang mở để xem thông tin đồ án?')) return;
+  showToast(`Đang tải lô đất «${project}»…`);
+  try { await projectLayersOf(project); } catch (err) { showToast(`Không tải được đồ án: ${err.message}`, 'error'); return; }
+  const lots = cachedLots(project).map(savedLot).filter(Boolean);
+  if (!lots.length) { showToast('Đồ án chưa có lô sử dụng đất', 'error'); return; }
+  const pop = loadPops()[project] || {};
+  const has = (ph) => lots.some(l => l.phase === ph);
+  autoCompare(lots);
+  newSession({
+    kind: kindOfProject(project), project, popHT: Number(pop.ht) || 0, popQH: Number(pop.qh) || 0,
+    files: { HT: has('HT') ? 'Sử dụng đất hiện trạng' : '', QH: has('QH') ? 'Sử dụng đất quy hoạch' : '' },
+    lots, saved: true
+  });
+}
+
 // ============================ HỒ SƠ ĐÃ GỬI TỪ MÁY NÀY ============================
 
 function loadStore() {
@@ -1289,7 +1396,7 @@ async function exportPdf() {
   try { await loadHtml2Pdf(); } catch (e) { showToast('Không tải được thư viện PDF', 'error'); return; }
   window.html2pdf().from(sheet).set({
     margin: 6,
-    filename: `Tham-dinh-${session ? session.project : 'ho-so'}.pdf`,
+    filename: `${session?.saved ? 'Thong-tin' : 'Tham-dinh'}-${session ? session.project : 'ho-so'}.pdf`,
     image: { type: 'jpeg', quality: 0.95 },
     html2canvas: {
       scale: 2, useCORS: true, scrollY: 0,
@@ -1369,6 +1476,15 @@ export function initProjectReview() {
       setLandVisible(e.target.checked);
       return;
     }
+    const pop = e.target.closest('input[data-pop]');
+    if (pop) {
+      session[`pop${pop.dataset.pop}`] = Math.max(0, Math.round(Number(pop.value) || 0));
+      savePop(session.project, session.popHT, session.popQH);
+      applyTags();
+      renderHost();
+      drawAll(false);
+      return;
+    }
     const toggle = e.target.closest('input[data-show]');
     if (toggle) {
       show[toggle.dataset.show] = toggle.checked;
@@ -1402,4 +1518,5 @@ export function initProjectReview() {
     $('btnReviewCompare')?.classList.toggle('on', isSplitOn());
   });
   document.addEventListener(REVIEW_DOSSIER_EVENT, (e) => openDossier(e.detail || {}));
+  document.addEventListener(PROJECT_INFO_EVENT, (e) => openProjectInfo(e.detail));
 }

@@ -1,7 +1,7 @@
 // Thẩm định đồ án quy hoạch từ hatch DXF: bảng cân đối sử dụng đất theo TT 16/2025/TT-BXD (Phụ lục I Mục 2 / Mục 4)
 // và chấm chỉ tiêu QCVN 01:2026/BXD. Không ghi Sheet, không cộng vào chỉ tiêu phường hay thành phố.
 import { parkTierOf } from './state.js';
-import { tt16Layer, layerToType } from './cadImport.js';
+import { tt16Layer, layerToType, LAYER_PREFIXES } from './cadImport.js';
 import { TT16_STYLES } from './tt16Symbols.js';
 
 export const REVIEW_MAX_BYTES = 5 * 1024 * 1024;
@@ -186,6 +186,50 @@ export function landSymbol(kind, rowKey, subKey = '') {
   return { tt16: rowTt16, tone: toneOf(rowTt16, row?.color) };
 }
 
+// ---------- Lô đồ án đã lưu (tên layer gServer / khớp thủ công "<tên> → <mã>"): đọc qua khóa ký hiệu TT16 của tt16Symbols.landPatternKey ----------
+
+// Khóa TT16 không có đầu mục riêng trong bảng → đầu mục gần nhất
+const PATTERN_ROW_EXTRA = {
+  QHC: { '3-MN': 'dd_dvcc', '4-TH': 'dd_dvcc', '5-THCS': 'dd_dvcc', '6-THPT': 'dd_dvcc', '9-TM': 'dd_dvcc', 'CC-DV': 'dd_dvcc', TDTT: 'ndd_vh',
+    '2-BDX': 'dd_gt', NTR: 'ndd_ht', 'SX-VL': 'ndd_cn', RSX: 'nnk_ln', RPH: 'nnk_ln', RDD: 'nnk_ln', '12-CSD': 'nnk_csd' },
+  QHPK: { '4-TH': 'gd', '5-THCS': 'gd', '6-THPT': 'gd', '12-CSD': 'csd' }
+};
+const PATTERN_ROW = Object.fromEntries(Object.entries(ROW_TT16).map(([kind, rows]) => {
+  const out = {};
+  Object.entries(rows).forEach(([key, [tt16]]) => { if (!(tt16 in out)) out[tt16] = key; });
+  return [kind, { ...out, ...PATTERN_ROW_EXTRA[kind] }];
+}));
+const PATTERN_SCHOOL = { '6-THPT': 'thpt', '3-MN': 'mn', '4-TH': 'th', '5-THCS': 'thcs' };
+const PATTERN_PREFIX = { '1-CV': 'CV', '2-BDX': 'BDX', '3-MN': 'MN', '4-TH': 'TH', '5-THCS': 'THCS', '6-THPT': 'THPT', '7-YT': 'YT', '8-VH': 'VH', TDTT: 'VH', '9-TM': 'TM' };
+
+/**
+ * Đầu mục + nhóm con của lô đã lưu theo khóa ký hiệu TT16. infra: lô ranh công trình (dòng Sheet).
+ * Lô dịch vụ: ranh công trình là chợ / TTTM (lúc nhập đã khớp loại 9-TM), lô đất thường là dịch vụ khác.
+ */
+export function savedLandTag(kind, patternKey, infra) {
+  const landKey = PATTERN_ROW[kind]?.[patternKey] || null;
+  const row = landKey && landRowByKey(kind, landKey);
+  let subKey = '';
+  if (row && row.subs && !row.split) {
+    if (PATTERN_SCHOOL[patternKey]) subKey = PATTERN_SCHOOL[patternKey];
+    else if (row.subs.some(([k]) => k === 'cho')) subKey = infra ? 'cho' : 'other';
+    else subKey = 'other';
+  }
+  return { landKey, subKey };
+}
+
+/** Loại hạ tầng của lô đã lưu: mã sau "→" > layer TT16 > khóa ký hiệu; lô đất dịch vụ thường không tính chợ / TTTM */
+export function savedLotType(layerName, patternKey, infra) {
+  const arrow = String(layerName || '').split('→')[1];
+  const code = arrow ? arrow.trim().toUpperCase() : '';
+  if (LAYER_PREFIXES[code]) return { prefix: code, type: LAYER_PREFIXES[code] };
+  const t = layerName ? layerToType(layerName) : null;
+  if (t) return t;
+  if (patternKey === '9-TM' && !infra) return null;
+  const prefix = PATTERN_PREFIX[patternKey];
+  return prefix ? { prefix, type: LAYER_PREFIXES[prefix] } : null;
+}
+
 /** Đầu mục chọn được khi gán layer chưa đúng quy định */
 export function landChoices(kind) {
   return (LANDUSE_TABLES[kind]?.rows || []).filter(r => r.key && !r.sumOf);
@@ -289,12 +333,13 @@ export function landUseSummary(lots, kind) {
 /**
  * Phần hiện trạng / mới của lô thuộc đầu mục split (đơn vị ở / nhóm nhà ở), cộng thẳng theo layer:
  * file HT → hiện trạng; file QH: layer tiền tố HT_ → đất ở hiện trạng theo quy hoạch, QHDD_ / QHDH_ / QH_ (hoặc không tiền tố) → đất ở mới.
+ * lot.existing: lô đồ án đã lưu có tên layer ghi hiện trạng / chỉnh trang / cải tạo.
  */
 export function residentialSubAreas(lot, kind) {
   const row = landRowByKey(kind, lot.landKey);
   if (!row || !row.split) return null;
   const area = Number(lot.area) || 0;
-  return lot.phase === 'HT' || layerStage(lot.layer) === 'HT' ? { ht: area } : { moi: area };
+  return lot.phase === 'HT' || lot.existing || layerStage(lot.layer) === 'HT' ? { ht: area } : { moi: area };
 }
 
 /**
