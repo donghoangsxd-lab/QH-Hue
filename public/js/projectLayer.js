@@ -1,4 +1,5 @@
 // Mục Quy hoạch (tab Lớp dữ liệu): mỗi đồ án (Ten_QH) bật/tắt riêng, tìm, phóng tới, Admin xóa / chuyển đồ án cũ.
+// Nút file mở PDF quyết định phê duyệt (projects/<slug>/quyet-dinh.pdf, dưới 1 MB). Admin gắn, thay hoặc gỡ.
 // Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS): bật/tắt từng lớp, Admin xóa từng lớp, tìm lô trong đồ án.
 // Zoom < PARCEL_MIN_ZOOM vẽ ranh tổng đồ án (bấm để phóng tới); từ ngưỡng đó vẽ lô (mapEngine.js),
 // ranh tổng chỉ còn nét viền không nhận click (đồ án có ranh thật).
@@ -13,6 +14,7 @@ import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { escapeHtml, fmtNum, ico } from './utils.js';
 
+const DECISION_MAX_BYTES = 1024 * 1024;
 const HIDDEN_KEY = 'qh_hidden_projects';
 const HIDDEN_LAYERS_KEY = 'qh_hidden_layers';
 // Ranh tổng = hợp các lô nới GAP_M rồi co lại GAP_M: lấp đường / khe giữa các lô rộng ≤ 2·GAP_M
@@ -160,6 +162,15 @@ function collectProjects() {
       time: p.time || '',
       infraCount: Number(p.infra) || 0,
       landCount: Number(p.lands) || 0
+    } : null,
+    decision: p.decision && p.decision.slug ? {
+      slug: p.decision.slug,
+      kind: p.decision.kind === 'link' ? 'link' : 'pdf',
+      url: p.decision.kind === 'link' ? String(p.decision.url || '') : '',
+      name: p.decision.name || 'Quyết định phê duyệt',
+      bytes: Number(p.decision.bytes) || 0,
+      at: Number(p.decision.at) || 0,
+      embed: p.decision.kind === 'link' ? p.decision.embed === true : true
     } : null
   })).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
 }
@@ -257,14 +268,26 @@ function renderList() {
       : p.source === 'gis' ? ' · ranh từ file GIS' : ' · ranh tự dựng từ các lô';
     const where = p.legacy ? 'còn ở file cad_parcels' : 'file riêng trên bucket';
     const open = expanded.has(p.name);
+    const decisionTitle = p.decision
+      ? `Xem quyết định phê duyệt: ${p.decision.name}`
+      : 'Gắn quyết định phê duyệt (PDF dưới 1 MB hoặc link)';
+    const decisionBtn = (p.decision || admin)
+      ? `<button type="button" class="project-btn${p.decision ? ' has-decision' : ''}" data-decision="${idx}" title="${escapeHtml(decisionTitle)}" aria-label="${p.decision ? 'Xem quyết định phê duyệt' : 'Gắn quyết định phê duyệt'}"${busy ? ' disabled' : ''}>${ico(p.decision ? 'file' : 'save')}</button>`
+      : '';
     return `<div class="project-row${on ? '' : ' is-off'}">
       <label class="project-name" title="${escapeHtml(p.name)}${p.area?.ward ? ` — ${escapeHtml(p.area.ward)}` : ''} — ${escapeHtml(metaText(p))} (${where})${tempNote}">
         <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><span>${idx + 1}. ${escapeHtml(p.name)}</span></label>
+      ${decisionBtn}
       <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-expand="${idx}" title="${open ? 'Ẩn' : 'Xem'} các lớp dữ liệu của đồ án" aria-label="Các lớp dữ liệu của đồ án" aria-expanded="${open}">${ico('chev-down')}</button>
       <button type="button" class="project-btn" data-zoom="${idx}" title="Phóng tới đồ án" aria-label="Phóng tới đồ án">${ico('locate')}</button>
       ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
-    </div>${open ? layersHtml(p, idx, on, admin) : ''}`;
+    </div>${open ? decisionNote(p, idx) + layersHtml(p, idx, on, admin) : ''}`;
   }).join('');
+}
+
+function decisionNote(p, idx) {
+  if (!p.decision) return '';
+  return `<button type="button" class="project-decision" data-decision="${idx}" title="Xem quyết định phê duyệt">${ico('file')}<span>${escapeHtml(p.decision.name)}</span></button>`;
 }
 
 // ============================ LỚP DỮ LIỆU TRONG ĐỒ ÁN ============================
@@ -601,6 +624,362 @@ async function migrateLegacy() {
   }
 }
 
+// ============================ QUYẾT ĐỊNH PHÊ DUYỆT ============================
+
+let viewerName = '';
+let decisionTarget = null;
+let decisionInput = null;
+let pendingReview = null;
+let pendingPdf = null;
+
+function decisionUrl(p) {
+  if (p.decision && p.decision.kind === 'link' && p.decision.url) return p.decision.url;
+  const slug = p.decision && (p.decision.slug || p.slug);
+  if (!slug) return '';
+  return geeApi(`action=getProjectDecision&slug=${encodeURIComponent(slug)}&v=${p.decision.at || 0}`);
+}
+
+function fmtBytes(n) {
+  const v = Number(n) || 0;
+  if (v < 1024) return v ? `${v} B` : '';
+  if (v < 1024 * 1024) return `${Math.round(v / 1024)} KB`;
+  return `${(v / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+}
+
+function applyDecision(name, decision) {
+  const entry = state.projectCatalog.find(x => x && x.tenQH === name);
+  if (entry) {
+    if (decision) entry.decision = decision;
+    else delete entry.decision;
+  }
+  rebuild();
+  return projects.find(p => p.name === name) || null;
+}
+
+function ensureViewer() {
+  let el = document.getElementById('decisionView');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'decisionView';
+  el.className = 'decision-view';
+  el.hidden = true;
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-labelledby', 'decisionViewTitle');
+  el.innerHTML = `<div class="decision-bar">
+      <b id="decisionViewTitle" data-decision-title></b>
+      <span data-decision-file></span>
+      <a data-decision-open href="#" target="_blank" rel="noopener">Mở tab mới</a>
+      <span data-decision-admin hidden>
+        <button type="button" data-decision-replace>Thay</button>
+        <button type="button" data-decision-remove>Gỡ</button>
+      </span>
+      <button type="button" data-decision-close aria-label="Đóng quyết định">${ico('close')}</button>
+    </div>
+    <form class="decision-assign" data-decision-assign hidden>
+      <input type="url" data-decision-url placeholder="https://… link xem quyết định" aria-label="Link quyết định phê duyệt" autocomplete="off">
+      <button type="submit" data-decision-check>Kiểm tra link</button>
+      <button type="button" data-decision-filepick>Chọn PDF ≤ 1 MB</button>
+      <p data-decision-review>PDF dưới 1 MB: chọn file để xem trước. Link: bấm Kiểm tra để webapp mở trang. Chỉ gán sau khi chấp nhận.</p>
+      <button type="button" data-decision-commit disabled>Gán vào đồ án</button>
+    </form>
+    <div class="decision-note" data-decision-note hidden></div>
+    <iframe title="Quyết định phê duyệt quy hoạch"></iframe>`;
+  document.body.appendChild(el);
+  el.querySelector('[data-decision-close]').addEventListener('click', closeDecision);
+  el.querySelector('[data-decision-assign]').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const p = projects.find(x => x.name === viewerName);
+    if (p) checkDecisionLink(p);
+  });
+  el.querySelector('[data-decision-url]').addEventListener('input', () => {
+    pendingReview = null;
+    const commit = el.querySelector('[data-decision-commit]');
+    if (commit) commit.disabled = true;
+  });
+  el.querySelector('[data-decision-filepick]').addEventListener('click', () => {
+    const p = projects.find(x => x.name === viewerName);
+    if (p) pickDecision(p);
+  });
+  el.querySelector('[data-decision-commit]').addEventListener('click', () => {
+    const p = projects.find(x => x.name === viewerName);
+    if (p) commitDecision(p);
+  });
+  el.querySelector('[data-decision-replace]').addEventListener('click', () => {
+    const p = projects.find(x => x.name === viewerName);
+    if (p) openAssign(p);
+  });
+  el.querySelector('[data-decision-remove]').addEventListener('click', () => {
+    const p = projects.find(x => x.name === viewerName);
+    if (p) removeDecision(p);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !el.hidden) { e.preventDefault(); closeDecision(); }
+  });
+  return el;
+}
+
+function showFrame(el, src, note) {
+  const frame = el.querySelector('iframe');
+  const box = el.querySelector('[data-decision-note]');
+  if (note) {
+    frame.hidden = true;
+    frame.removeAttribute('src');
+    box.hidden = false;
+    box.textContent = note;
+    return;
+  }
+  box.hidden = true;
+  box.textContent = '';
+  frame.hidden = false;
+  if (src) frame.src = src;
+  else frame.removeAttribute('src');
+}
+
+function openDecision(p) {
+  const url = p && decisionUrl(p);
+  if (!url) { alert('Đồ án chưa có quyết định phê duyệt.'); return; }
+  const el = ensureViewer();
+  viewerName = p.name;
+  pendingReview = null;
+  el.hidden = false;
+  el.querySelector('[data-decision-assign]').hidden = true;
+  el.querySelector('[data-decision-title]').textContent = p.name;
+  const size = fmtBytes(p.decision.bytes);
+  el.querySelector('[data-decision-file]').textContent = [p.decision.name || 'Quyết định phê duyệt', p.decision.kind === 'link' ? 'link' : 'PDF', size].filter(Boolean).join(' · ');
+  el.querySelector('[data-decision-admin]').hidden = !isAdmin();
+  el.querySelector('[data-decision-open]').href = url;
+  const embed = p.decision.kind !== 'link' || p.decision.embed === true;
+  showFrame(el, embed ? url : '', embed ? '' : 'Trang này không xem được trong khung. Bấm «Mở tab mới» để đọc quyết định.');
+}
+
+function revokePdfPreview() {
+  if (pendingPdf && pendingPdf.blobUrl) URL.revokeObjectURL(pendingPdf.blobUrl);
+  pendingPdf = null;
+}
+
+function openAssign(p) {
+  if (!isAdmin() || !p) return;
+  const el = ensureViewer();
+  viewerName = p.name;
+  pendingReview = null;
+  revokePdfPreview();
+  el.hidden = false;
+  el.querySelector('[data-decision-title]').textContent = p.name;
+  el.querySelector('[data-decision-file]').textContent = p.decision ? 'Thay quyết định' : 'Chưa gán';
+  el.querySelector('[data-decision-admin]').hidden = false;
+  const assign = el.querySelector('[data-decision-assign]');
+  assign.hidden = false;
+  assign.querySelector('[data-decision-url]').value = p.decision && p.decision.kind === 'link' ? p.decision.url : '';
+  assign.querySelector('[data-decision-review]').textContent = 'PDF dưới 1 MB: chọn file để xem trước. Link: bấm Kiểm tra để webapp mở trang. Chỉ gán sau khi chấp nhận.';
+  assign.querySelector('[data-decision-commit]').disabled = true;
+  el.querySelector('[data-decision-open]').href = p.decision ? decisionUrl(p) : '#';
+  if (!p.decision) showFrame(el, '', '');
+}
+
+function closeDecision() {
+  const el = document.getElementById('decisionView');
+  if (!el || el.hidden) return;
+  el.hidden = true;
+  const frame = el.querySelector('iframe');
+  if (frame) frame.removeAttribute('src');
+  viewerName = '';
+  revokePdfPreview();
+  pendingReview = null;
+}
+
+function ensureDecisionInput() {
+  if (decisionInput) return decisionInput;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/pdf,.pdf';
+  input.hidden = true;
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0];
+    const p = decisionTarget;
+    input.value = '';
+    decisionTarget = null;
+    if (file && p) previewDecisionFile(p, file);
+  });
+  document.body.appendChild(input);
+  decisionInput = input;
+  return input;
+}
+
+function pickDecision(p) {
+  if (!isAdmin() || busy) return;
+  decisionTarget = p;
+  ensureDecisionInput().click();
+}
+
+async function checkDecisionLink(p) {
+  if (!isAdmin() || busy) return;
+  const el = ensureViewer();
+  const input = el.querySelector('[data-decision-url]');
+  const review = el.querySelector('[data-decision-review]');
+  const commit = el.querySelector('[data-decision-commit]');
+  const url = String(input.value || '').trim();
+  pendingReview = null;
+  revokePdfPreview();
+  commit.disabled = true;
+  if (!url) { review.textContent = 'Chưa có link.'; return; }
+  review.textContent = 'Đang mở link…';
+  busy = p.name;
+  try {
+    const res = await fetch(geeApi('action=reviewProjectDecision'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) signOutAdmin();
+    if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+    pendingReview = { tenQH: p.name, url: data.url, name: data.name, bytes: data.bytes, embed: data.embed === true, note: data.note || '' };
+    const size = fmtBytes(data.bytes);
+    review.textContent = [data.note, data.name, size].filter(Boolean).join(' · ') + '. Bấm «Gán vào đồ án» nếu đây đúng quyết định.';
+    commit.disabled = false;
+    el.querySelector('[data-decision-open]').href = data.url;
+    showFrame(el, data.embed ? data.url : '', data.embed ? '' : 'Đã mở được link, nhưng trang không cho nhúng. Bấm «Mở tab mới» để xem trước khi gán.');
+  } catch (err) {
+    review.textContent = err.message;
+    showFrame(el, '', '');
+  } finally {
+    busy = null;
+  }
+}
+
+function commitDecision(p) {
+  if (pendingPdf && pendingPdf.tenQH === p.name) return uploadDecision(p, pendingPdf.file);
+  return commitDecisionLink(p);
+}
+
+function sheetNote(data) {
+  if (data.sheet) return '';
+  return `\n\nQuyết định đã lưu trên webapp. Cột LinkQD trên sheet DS_DoAn chưa ghi được: ${data.sheetMessage || 'hãy triển khai bản Code.gs mới (Deploy → New version).'}`;
+}
+
+async function previewDecisionFile(p, file) {
+  if (!isAdmin() || busy) return;
+  const el = ensureViewer();
+  const review = el.querySelector('[data-decision-review]');
+  const commit = el.querySelector('[data-decision-commit]');
+  pendingReview = null;
+  revokePdfPreview();
+  commit.disabled = true;
+  if (!file || file.size > DECISION_MAX_BYTES) { review.textContent = 'File quyết định phải là PDF nhỏ hơn 1 MB.'; return; }
+  if (file.type && file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) { review.textContent = 'Chỉ nhận file PDF.'; return; }
+  let bytes;
+  try { bytes = new Uint8Array(await file.arrayBuffer()); }
+  catch (e) { review.textContent = 'Không đọc được file.'; return; }
+  if (bytes.length < 5 || String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== '%PDF') {
+    review.textContent = 'Nội dung không phải file PDF.';
+    return;
+  }
+  const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  pendingPdf = { tenQH: p.name, file, blobUrl };
+  review.textContent = `${file.name} · ${fmtBytes(file.size)}. Đã xem trước. Bấm «Gán vào đồ án» để ghi PDF lên bucket.`;
+  commit.disabled = false;
+  el.querySelector('[data-decision-open]').href = blobUrl;
+  showFrame(el, blobUrl, '');
+}
+
+async function commitDecisionLink(p) {
+  if (!isAdmin() || busy || !pendingReview || pendingReview.tenQH !== p.name) return;
+  const el = ensureViewer();
+  const typed = String(el.querySelector('[data-decision-url]').value || '').trim();
+  if (!typed) return;
+  busy = p.name;
+  renderList();
+  try {
+    const res = await fetch(geeApi('action=putProjectDecision'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+      body: JSON.stringify({ tenQH: p.name, url: pendingReview.url })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) signOutAdmin();
+    if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+    pendingReview = null;
+    const next = applyDecision(p.name, {
+      slug: data.slug, kind: 'link', url: data.url, name: data.name, bytes: data.bytes, at: data.at, embed: data.embed === true
+    });
+    if (!data.sheet) alert(`Đã gán link.${sheetNote(data)}`);
+    if (next) openDecision(next);
+  } catch (err) {
+    alert(`Không gán được link: ${err.message}`);
+  } finally {
+    busy = null;
+    renderList();
+  }
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  const size = 0x8000;
+  for (let i = 0; i < bytes.length; i += size) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + size));
+  }
+  return btoa(binary);
+}
+
+async function uploadDecision(p, file) {
+  if (!isAdmin() || busy) return;
+  if (!file || file.size > DECISION_MAX_BYTES) { alert('File quyết định phải là PDF nhỏ hơn 1 MB.'); return; }
+  if (file.type && file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) { alert('Chỉ nhận file PDF.'); return; }
+  let bytes;
+  try { bytes = new Uint8Array(await file.arrayBuffer()); }
+  catch (e) { alert('Không đọc được file.'); return; }
+  if (bytes.length < 5 || String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== '%PDF') {
+    alert('Nội dung không phải file PDF.');
+    return;
+  }
+  busy = p.name;
+  renderList();
+  try {
+    const res = await fetch(geeApi('action=putProjectDecision'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+      body: JSON.stringify({ tenQH: p.name, name: file.name, pdf: bytesToBase64(bytes) })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) signOutAdmin();
+    if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+    revokePdfPreview();
+    const next = applyDecision(p.name, { slug: data.slug, kind: 'pdf', url: '', name: data.name, bytes: data.bytes, at: data.at, embed: true });
+    if (!data.sheet) alert(`Đã ghi PDF lên bucket.${sheetNote(data)}`);
+    if (next) openDecision(next);
+  } catch (err) {
+    alert(`Không ghi được quyết định: ${err.message}`);
+  } finally {
+    busy = null;
+    renderList();
+  }
+}
+
+async function removeDecision(p) {
+  if (!isAdmin() || busy || !p.decision) return;
+  if (!confirm(`Gỡ file quyết định phê duyệt của đồ án «${p.name}»?`)) return;
+  busy = p.name;
+  renderList();
+  try {
+    const res = await fetch(geeApi('action=deleteProjectDecision'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+      body: JSON.stringify({ tenQH: p.name })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) signOutAdmin();
+    if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+    closeDecision();
+    applyDecision(p.name, null);
+  } catch (err) {
+    alert(`Không gỡ được quyết định: ${err.message}`);
+  } finally {
+    busy = null;
+    renderList();
+  }
+}
+
 // ============================ KHỞI TẠO ============================
 
 /** opts.onDeleted: gọi sau khi xóa đồ án để tải lại dữ liệu bản đồ */
@@ -685,6 +1064,12 @@ export function initProjectLayer(opts = {}) {
       if (hit) openLot(p, hit.lot);
       return;
     }
+    const decision = e.target.closest('[data-decision]');
+    if (decision) {
+      const p = projects[Number(decision.dataset.decision)];
+      if (p) { if (p.decision) openDecision(p); else openAssign(p); }
+      return;
+    }
     const expand = e.target.closest('[data-expand]');
     if (expand) { const p = projects[Number(expand.dataset.expand)]; if (p) toggleExpand(p); return; }
     const layerDel = e.target.closest('[data-layer-del]');
@@ -695,7 +1080,11 @@ export function initProjectLayer(opts = {}) {
     if (del) { const p = projects[Number(del.dataset.del)]; if (p) deleteProject(p); }
   });
   document.addEventListener('cadparcels:loaded', rebuild);
-  document.addEventListener('auth:change', renderList);
+  document.addEventListener('auth:change', () => {
+    renderList();
+    const bar = document.querySelector('#decisionView [data-decision-admin]');
+    if (bar) bar.hidden = !isAdmin();
+  });
   map?.on('zoomend', () => {
     const below = map.getZoom() < PARCEL_MIN_ZOOM;
     if (below === belowZoom) return;

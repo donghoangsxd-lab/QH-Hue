@@ -612,6 +612,34 @@ body.right-collapsed .right-panel {
 .project-btn:hover:not(:disabled) { border-color: var(--border-color); background: var(--bg-hover); color: var(--accent-cyan); }
 .project-btn.danger:hover:not(:disabled) { color: var(--accent-red); border-color: rgba(var(--red-rgb), 0.5); }
 .project-btn:disabled { opacity: 0.4; cursor: wait; }
+.project-btn.has-decision { color: var(--accent-orange); }
+.project-decision { display: flex; align-items: center; gap: 4px; width: calc(100% - 18px); margin: 1px 0 2px 18px; padding: 2px 4px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--accent-orange); font: inherit; font-size: var(--fs-xs); text-align: left; cursor: pointer; }
+.project-decision .ico { width: 12px; height: 12px; margin: 0; flex-shrink: 0; }
+.project-decision span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-decision:hover, .project-decision:focus-visible { background: rgba(var(--orange-rgb), 0.14); outline: none; }
+.decision-view { position: fixed; inset: 8px; z-index: 2800; display: flex; flex-direction: column; background: var(--bg-panel); color: var(--text-main); border: 1px solid var(--border-color); border-radius: var(--r-md); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); }
+.decision-view[hidden] { display: none; }
+.decision-bar { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 8px; border-bottom: 1px solid var(--border-color); }
+.decision-bar b { flex: 0 1 42%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
+.decision-bar [data-decision-file] { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: var(--fs-xs); }
+.decision-bar a, .decision-bar button { flex-shrink: 0; border: 1px solid var(--border-color); border-radius: var(--r-md); background: var(--bg-input); color: var(--text-main); font: inherit; font-size: var(--fs-xs); padding: 3px 8px; cursor: pointer; text-decoration: none; }
+.decision-bar a:hover, .decision-bar button:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.decision-bar [data-decision-close] { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; }
+.decision-bar [data-decision-close] .ico { width: 14px; height: 14px; margin: 0; }
+.decision-bar [data-decision-admin] { display: inline-flex; gap: 6px; }
+.decision-bar [data-decision-admin][hidden] { display: none; }
+.decision-assign { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px; border-bottom: 1px solid var(--border-color); }
+.decision-assign[hidden] { display: none; }
+.decision-assign input { flex: 1; min-width: 180px; height: 28px; box-sizing: border-box; padding: 0 8px; border: 1px solid var(--border-color); border-radius: var(--r-md); background: var(--bg-input); color: var(--text-main); font: inherit; font-size: var(--fs-xs); }
+.decision-assign button { border: 1px solid var(--border-color); border-radius: var(--r-md); background: var(--bg-input); color: var(--text-main); font: inherit; font-size: var(--fs-xs); padding: 4px 8px; cursor: pointer; }
+.decision-assign button:hover:not(:disabled) { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.decision-assign button:disabled { opacity: 0.45; cursor: not-allowed; }
+.decision-assign p { flex: 1 1 100%; margin: 0; color: var(--text-muted); font-size: var(--fs-xs); }
+.decision-note { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; color: var(--text-muted); }
+.decision-note[hidden] { display: none; }
+.decision-view iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+.decision-view iframe[hidden] { display: none; }
+@media (max-width: 640px) { .decision-view { inset: 0; border-radius: 0; } }
 .project-expand .ico { transition: transform var(--ease); }
 .project-expand.open { color: var(--accent-cyan); }
 .project-expand.open .ico { transform: rotate(180deg); }

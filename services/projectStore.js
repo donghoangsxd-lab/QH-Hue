@@ -4,11 +4,14 @@
 //   projects/<slug>/su-dung-dat.json — chức năng sử dụng đất / bản đồ quy hoạch (lô QH)
 //   projects/<slug>/diem-chuc-nang.json — điểm chức năng
 //   projects/<slug>/ranh-gioi.json — ranh giới quy hoạch
+//   projects/<slug>/quyet-dinh.pdf — PDF quyết định ≤ 1 MB. Link ngoài nằm ở projects/decisions.json (kind: link), chỉ gán sau khi máy chủ mở được link.
 // File cũ projects/<slug>.json vẫn đọc được cho tới lần ghi tiếp theo, rồi tách vào thư mục và xóa.
 // Slug: bỏ dấu, chữ thường, tối đa 60 ký tự, thêm 8 ký tự SHA-256 của Ten_QH (cùng tên → cùng thư mục).
 // Đồ án chưa chuyển (legacy) vẫn nằm trong cad_parcels.json cho tới khi migrate xong.
 const axios = require('axios');
 const crypto = require('crypto');
+const dns = require('dns').promises;
+const net = require('net');
 const constants = require('../config/constants');
 const gcsWrite = require('./gcsWrite');
 const { getCadParcels, getRawDataList, invalidateCache } = require('./gcsService');
@@ -21,6 +24,7 @@ const SCRIPT_MAX_CHARS = 6000000;
 
 let transport = null;
 let indexCache = null; // { etag, data }
+let decisionsCache = null; // { etag, generation, data }
 let migrateJob = null; // { at, groups, wardFeatures }
 
 function setTransport(fn) { transport = fn; }
@@ -328,7 +332,396 @@ async function catalog() {
   });
   const projects = [...by.values()].filter(p => p.tenQH && !p.deleted)
     .sort((a, b) => String(a.tenQH).localeCompare(String(b.tenQH), 'vi'));
+  await attachDecisions(projects);
   return { base: constants.PROJECTS_GCS_BASE, migrated, projects };
+}
+
+// ============================ QUYẾT ĐỊNH PHÊ DUYỆT (PDF ≤ 1 MB) ============================
+
+const DECISIONS_NAME = 'projects/decisions.json';
+const DECISION_FILE = 'quyet-dinh.pdf';
+const DECISION_MAX_BYTES = 1024 * 1024;
+
+function decisionObject(slug) {
+  return `projects/${slug}/${DECISION_FILE}`;
+}
+
+function decisionFileName(raw) {
+  const base = String(raw || '').replace(/[\u0000-\u001f"\\]/g, '').trim().slice(0, 120);
+  if (!base) return 'Quyet-dinh-phe-duyet.pdf';
+  return /\.pdf$/i.test(base) ? base : `${base}.pdf`;
+}
+
+function pdfOk(buffer) {
+  return Buffer.isBuffer(buffer)
+    && buffer.length >= 5
+    && buffer.length <= DECISION_MAX_BYTES
+    && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
+}
+
+function emptyDecisions() {
+  return { v: 1, items: {} };
+}
+
+function rememberDecisions(data, generation) {
+  decisionsCache = { etag: null, generation: generation || '', data };
+}
+
+async function readDecisions() {
+  let etag = null;
+  try {
+    const head = await axios.head(`${publicUrl(DECISIONS_NAME)}?v=${Date.now()}`, { timeout: 5000, validateStatus: () => true });
+    if (head.status === 404) {
+      decisionsCache = null;
+      return { missing: true, generation: '0', data: emptyDecisions() };
+    }
+    etag = head.headers.etag || head.headers['last-modified'] || null;
+    if (decisionsCache && etag && decisionsCache.etag === etag) {
+      return { missing: false, generation: decisionsCache.generation, data: decisionsCache.data };
+    }
+  } catch (err) { /* HEAD lỗi thì GET */ }
+  const got = await readJson(DECISIONS_NAME);
+  if (got.missing || !got.data || got.data.v !== 1 || !got.data.items || typeof got.data.items !== 'object') {
+    return { missing: !!got.missing, generation: got.generation || '0', data: emptyDecisions() };
+  }
+  decisionsCache = { etag: got.etag || etag, generation: got.generation, data: got.data };
+  return { missing: false, generation: got.generation, data: got.data };
+}
+
+async function updateDecisions(mutator) {
+  let via = 'direct';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const cur = await readDecisions();
+    const next = mutator(cur.data || emptyDecisions());
+    next.v = 1;
+    next.items = next.items && typeof next.items === 'object' ? next.items : {};
+    next.saved = Date.now();
+    try {
+      const written = await writeText(DECISIONS_NAME, JSON.stringify(next), cur.missing ? '0' : (cur.generation || undefined));
+      via = written.via;
+      rememberDecisions(next, written.generation);
+      return { decisions: next, via };
+    } catch (err) {
+      if (err.code !== 'GEN' || attempt === 2) throw err;
+      decisionsCache = null;
+    }
+  }
+  const err = new Error('Xung đột khi cập nhật quyết định phê duyệt');
+  err.status = 409;
+  throw err;
+}
+
+function decisionView(d) {
+  const link = d.kind === 'link' && /^https?:\/\//i.test(String(d.url || ''));
+  return {
+    slug: d.slug,
+    kind: link ? 'link' : 'pdf',
+    url: link ? String(d.url) : '',
+    name: link ? String(d.name || 'Quyết định phê duyệt').slice(0, 120) : decisionFileName(d.name),
+    bytes: Number(d.bytes) || 0,
+    at: Number(d.at) || 0,
+    embed: link ? d.embed === true : true
+  };
+}
+
+async function attachDecisions(projects) {
+  try {
+    const stored = await readDecisions();
+    const items = stored.data.items || {};
+    projects.forEach(p => {
+      const d = items[p.tenQH];
+      if (!d || !d.at || !SLUG_RE.test(String(d.slug || ''))) return;
+      p.decision = decisionView(d);
+    });
+  } catch (err) {
+    console.warn('Đọc quyết định phê duyệt lỗi:', err.message);
+  }
+}
+
+async function writeBytes(name, buffer, contentType) {
+  try {
+    const out = await gcsWrite.putObject(name, buffer, contentType);
+    return { via: 'direct', generation: out.generation };
+  } catch (err) {
+    const denied = err.code === 'NO_SA' || err.status === 401 || err.status === 403;
+    if (!denied) throw err;
+    if (!transport) throw err;
+    const ok = await transport({ op: 'pdf', name, content: buffer.toString('base64') });
+    if (!ok) {
+      const fail = new Error('Không ghi được file PDF lên bucket');
+      fail.status = 502;
+      throw fail;
+    }
+    return { via: 'script', generation: '' };
+  }
+}
+
+const REVIEW_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+
+function rejectReview(message, status = 400) {
+  const err = new Error(message);
+  err.status = status;
+  throw err;
+}
+
+function ipBlocked(ip) {
+  if (net.isIP(ip) === 4) {
+    const p = ip.split('.').map(Number);
+    if (p[0] === 0 || p[0] === 10 || p[0] === 127) return true;
+    if (p[0] === 169 && p[1] === 254) return true;
+    if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return true;
+    if (p[0] === 192 && p[1] === 168) return true;
+    if (p[0] === 100 && p[1] >= 64 && p[1] <= 127) return true;
+    return false;
+  }
+  if (net.isIP(ip) === 6) {
+    const s = ip.toLowerCase();
+    return s === '::1' || s.startsWith('fc') || s.startsWith('fd') || s.startsWith('fe80');
+  }
+  return true;
+}
+
+function hostBlocked(hostname) {
+  const h = String(hostname || '').toLowerCase().replace(/\.$/, '');
+  if (!h || h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local')) return true;
+  if (h === 'metadata.google.internal') return true;
+  if (net.isIP(h)) return ipBlocked(h);
+  return false;
+}
+
+async function publicUrlOf(raw) {
+  let url;
+  try { url = new URL(String(raw || '').trim()); }
+  catch (e) { rejectReview('Link không hợp lệ'); }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') rejectReview('Chỉ nhận link http hoặc https');
+  if (url.username || url.password) rejectReview('Link không được kèm tài khoản');
+  if (hostBlocked(url.hostname)) rejectReview('Link trỏ vào máy nội bộ');
+  if (!net.isIP(url.hostname)) {
+    let ips = [];
+    try { ips = await dns.lookup(url.hostname, { all: true }); }
+    catch (e) { rejectReview('Không phân giải được tên miền'); }
+    if (!ips.length || ips.some(x => ipBlocked(x.address))) rejectReview('Link trỏ vào địa chỉ nội bộ');
+  }
+  return url;
+}
+
+function readHead(stream, limit = 8192) {
+  return new Promise((resolve, reject) => {
+    if (!stream || typeof stream.on !== 'function') { resolve(Buffer.alloc(0)); return; }
+    const chunks = [];
+    let size = 0;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve(Buffer.concat(chunks));
+    };
+    const timer = setTimeout(() => { stream.destroy(); finish(); }, 12000);
+    stream.on('data', (c) => {
+      const buf = Buffer.isBuffer(c) ? c : Buffer.from(c);
+      if (size < limit) chunks.push(buf.slice(0, limit - size));
+      size += buf.length;
+      if (size >= limit) { stream.destroy(); finish(); }
+    });
+    stream.on('end', finish);
+    stream.on('error', (e) => { if (size > 0 || done) finish(); else { clearTimeout(timer); reject(e); } });
+  });
+}
+
+function lengthOf(headers) {
+  const range = String(headers['content-range'] || '');
+  const total = range.match(/\/(\d+)\s*$/);
+  if (total) return Number(total[1]);
+  const n = Number(headers['content-length']);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function nameFrom(headers, url) {
+  const cd = String(headers['content-disposition'] || '');
+  const star = cd.match(/filename\*=(?:UTF-8'')?([^;]+)/i);
+  const plain = cd.match(/filename="?([^";]+)"?/i);
+  let name = '';
+  try { name = decodeURIComponent(String((star && star[1]) || (plain && plain[1]) || '').trim()); }
+  catch (e) { name = String((plain && plain[1]) || '').trim(); }
+  if (!name) {
+    try { name = decodeURIComponent(url.pathname.split('/').filter(Boolean).pop() || ''); }
+    catch (e) { name = ''; }
+  }
+  return name.replace(/[\u0000-\u001f"\\]/g, '').trim().slice(0, 120);
+}
+
+function frameBlocked(headers) {
+  const xfo = String(headers['x-frame-options'] || '').toLowerCase();
+  if (xfo.includes('deny') || xfo.includes('sameorigin')) return true;
+  const csp = String(headers['content-security-policy'] || '').toLowerCase();
+  return csp.includes('frame-ancestors') && !/frame-ancestors\s+\*/.test(csp);
+}
+
+function challengeCookie(buf) {
+  const m = buf.toString('utf8').match(/document\.cookie\s*=\s*"([A-Za-z0-9_-]+)=([^";\s]+)"/);
+  return m ? `${m[1]}=${m[2]}` : '';
+}
+
+async function probeOnce(url, cookie) {
+  const headers = { 'User-Agent': REVIEW_UA, Accept: 'application/pdf,text/html;q=0.9,*/*;q=0.8', Range: 'bytes=0-4095' };
+  if (cookie) headers.Cookie = cookie;
+  const res = await axios.get(url.href, {
+    headers,
+    responseType: 'stream',
+    timeout: 20000,
+    maxRedirects: 0,
+    validateStatus: () => true
+  });
+  const head = await readHead(res.data);
+  return { status: res.status, headers: res.headers || {}, head };
+}
+
+// Mở link (theo tối đa 5 chuyển hướng, vượt 1 lớp cookie chống máy). Chỉ chấp nhận PDF hoặc trang HTML đủ nội dung.
+async function reviewDecisionLink(raw) {
+  let current = await publicUrlOf(raw);
+  let cookie = '';
+  let challenged = false;
+  for (let hop = 0; hop < 5; hop++) {
+    let got;
+    try { got = await probeOnce(current, cookie); }
+    catch (e) { rejectReview('Không mở được link'); }
+    const status = got.status;
+    if (status >= 300 && status < 400 && got.headers.location) {
+      current = await publicUrlOf(new URL(got.headers.location, current).href);
+      continue;
+    }
+    if (status !== 200 && status !== 206) rejectReview(`Link trả về HTTP ${status}`);
+    const type = String(got.headers['content-type'] || '').toLowerCase();
+    const pdf = got.head.slice(0, 5).toString('latin1').startsWith('%PDF') || type.includes('application/pdf');
+    if (!pdf && !cookie) {
+      const nextCookie = challengeCookie(got.head);
+      if (nextCookie) { cookie = nextCookie; challenged = true; hop -= 1; continue; }
+    }
+    const html = type.includes('text/html') && got.head.length > 800 && !challengeCookie(got.head);
+    if (!pdf && !html) rejectReview('Link không phải file PDF hoặc trang xem quyết định');
+    const name = nameFrom(got.headers, current) || (pdf ? 'Quyet-dinh.pdf' : 'Quyết định phê duyệt');
+    const embed = !challenged && !frameBlocked(got.headers);
+    let note = pdf ? 'File PDF' : 'Trang xem quyết định';
+    if (challenged) note += '. Trang có lớp chặn tự động, chỉ mở được ở tab mới';
+    else if (!embed) note += '. Trang không cho nhúng, mở ở tab mới';
+    else note += '. Xem được ngay trong trang';
+    return {
+      ok: true,
+      url: current.href,
+      name,
+      bytes: lengthOf(got.headers),
+      contentType: type.split(';')[0] || (pdf ? 'application/pdf' : 'text/html'),
+      embed,
+      note
+    };
+  }
+  rejectReview('Link chuyển hướng quá nhiều lần');
+}
+
+async function listedProject(tenQH) {
+  const name = String(tenQH || '').trim();
+  if (!name) rejectReview('Thiếu tên đồ án');
+  const listed = await catalog();
+  const entry = listed.projects.find(p => p && p.tenQH === name);
+  if (!entry) rejectReview(`Chưa có đồ án «${name}» trong danh sách`, 404);
+  const slug = String(entry.slug || projectSlug(name));
+  if (!SLUG_RE.test(slug)) rejectReview('Mã đồ án không hợp lệ');
+  return { name, slug };
+}
+
+async function saveDecision({ tenQH, fileName, buffer }) {
+  if (!pdfOk(buffer)) {
+    const err = new Error(buffer && buffer.length > DECISION_MAX_BYTES
+      ? 'File quyết định lớn hơn 1 MB'
+      : 'Chỉ nhận file PDF');
+    err.status = buffer && buffer.length > DECISION_MAX_BYTES ? 413 : 400;
+    throw err;
+  }
+  const { name, slug } = await listedProject(tenQH);
+  const written = await writeBytes(decisionObject(slug), buffer, 'application/pdf');
+  const at = Date.now();
+  const meta = { kind: 'pdf', slug, name: decisionFileName(fileName), bytes: buffer.length, at, embed: true };
+  const indexed = await updateDecisions(cur => {
+    const items = { ...(cur.items || {}) };
+    items[name] = meta;
+    return { ...cur, items };
+  });
+  return { ...decisionView(meta), via: written.via || indexed.via, accessUrl: publicUrl(decisionObject(slug)) };
+}
+
+// Gán link chỉ sau khi reviewDecisionLink mở được trang. File PDF cũ trên bucket bị gỡ.
+async function saveDecisionLink({ tenQH, url }) {
+  const review = await reviewDecisionLink(url);
+  const { name, slug } = await listedProject(tenQH);
+  const at = Date.now();
+  const meta = {
+    kind: 'link', slug, url: review.url, name: review.name, bytes: review.bytes, at, embed: review.embed
+  };
+  const indexed = await updateDecisions(cur => {
+    const items = { ...(cur.items || {}) };
+    items[name] = meta;
+    return { ...cur, items };
+  });
+  try { await removeName(decisionObject(slug)); } catch (err) { /* chưa có PDF trên bucket */ }
+  return { ...decisionView(meta), via: indexed.via, note: review.note };
+}
+
+async function removeDecision(tenQH, fallbackSlug) {
+  const name = String(tenQH || '').trim();
+  const cur = await readDecisions();
+  const item = cur.data.items && cur.data.items[name];
+  const slug = (item && item.slug) || fallbackSlug || '';
+  if (item) {
+    await updateDecisions(base => {
+      const items = { ...(base.items || {}) };
+      delete items[name];
+      return { ...base, items };
+    });
+  }
+  if (SLUG_RE.test(String(slug))) {
+    try { await removeName(decisionObject(slug)); } catch (err) { /* file chưa có */ }
+  }
+  return { slug: slug || '' };
+}
+
+async function readDecision(slug) {
+  const key = String(slug || '');
+  if (!SLUG_RE.test(key)) {
+    const err = new Error('Mã đồ án không hợp lệ');
+    err.status = 400;
+    throw err;
+  }
+  const stored = await readDecisions();
+  const items = stored.data.items || {};
+  const meta = Object.keys(items).map(k => items[k]).find(d => d && d.slug === key && d.at);
+  if (!meta) {
+    const err = new Error('Đồ án chưa có quyết định phê duyệt');
+    err.status = 404;
+    throw err;
+  }
+  if (meta.kind === 'link') {
+    const err = new Error('Quyết định này là link ngoài');
+    err.status = 404;
+    throw err;
+  }
+  const res = await axios.get(`${publicUrl(decisionObject(key))}?v=${meta.at}`, {
+    timeout: 20000,
+    responseType: 'arraybuffer',
+    maxContentLength: DECISION_MAX_BYTES + 4096,
+    validateStatus: () => true
+  });
+  if (res.status === 404) {
+    const err = new Error('File quyết định không còn trên bucket');
+    err.status = 404;
+    throw err;
+  }
+  if (res.status !== 200) {
+    const err = new Error(`Đọc quyết định lỗi HTTP ${res.status}`);
+    err.status = 502;
+    throw err;
+  }
+  return { buffer: Buffer.from(res.data), name: decisionFileName(meta.name), at: Number(meta.at) || 0 };
 }
 
 const ROLE_HT = 'hien-trang';
@@ -830,6 +1223,7 @@ async function deleteProjectFiles(tenQH) {
   for (const objectName of names) {
     try { via = await removeName(objectName); } catch (err) { /* file chưa có */ }
   }
+  try { await removeDecision(name, slug); } catch (err) { console.warn(`Gỡ quyết định đồ án «${name}»:`, err.message); }
   const indexed = await updateIndex(cur => {
     const projects = (cur.projects || []).filter(p => p.tenQH !== name);
     if (!cur.migrated) projects.push({ tenQH: name, deleted: true });
@@ -1053,5 +1447,6 @@ async function wardParcels() {
 
 module.exports = {
   setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteLayer, deleteProjectFiles,
+  saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase
 };

@@ -3,7 +3,8 @@
 // Quy mô tách 2 cột: QuyMo_HT (hiện trạng) & QuyMo_QH (quy hoạch)
 // Nhập hàng loạt từ DXF: doPost action=importCadBatch; công trình hạ tầng ghi vào các tab loại (cột Geojson, Ten_QH).
 // Lô đất ngoài nhóm hạ tầng không ghi tab DXF-NN — webapp ghi thư mục projects/<slug>/ trên bucket
-// (hien-trang, su-dung-dat, diem-chuc-nang, ranh-gioi). File gộp projects/<slug>.json là bản cũ.
+// (hien-trang, su-dung-dat, diem-chuc-nang, ranh-gioi, quyet-dinh.pdf). File gộp projects/<slug>.json là bản cũ.
+// Quyết định phê duyệt: projects/decisions.json + projects/<slug>/quyet-dinh.pdf (≤ 1 MB). putBucketPdf khi Vercel chưa ghi được PDF.
 // Tab DXF-NN cũ vẫn xóa cùng đồ án. Ranh tổng đồ án vẫn ở tab DS_DoAn.
 // syncCad = false: chỉ dựng lại infrastructure_hue.json, không dựng lại cad_parcels.json.
 // Xóa đồ án: doPost action=deleteProject. putBucketObject / deleteBucketObject: ghi file bucket khi Vercel chưa có quyền.
@@ -16,9 +17,10 @@ const GEOJSON_FILE_NAME = "infrastructure_hue.json";
 const CAD_FILE_NAME = "cad_parcels.json";
 const CAD_SHEET_NAME = "CAD_Polygon";
 const CAD_HEADERS = ["ID_DoiTuong", "Layer", "DienTich", "File", "ThoiGianNhap", "GeoJSON", "GiaiDoan"];
-// Danh mục đồ án: 1 dòng / đồ án (Ten_QH), ranh tổng dựng ở webapp khi nhập; xóa đồ án thì xóa dòng
+// Danh mục đồ án: 1 dòng / đồ án (Ten_QH). LinkQD ngay sau tên đồ án là link mở quyết định (PDF trên bucket hoặc link ngoài).
 const PROJECT_SHEET_NAME = "DS_DoAn";
-const PROJECT_HEADERS = ["Ten_QH", "File", "Phuong", "SoCongTrinh", "SoLoDat", "ThoiGianNhap", "Geojson"];
+const PROJECT_LINK_HEADER = "LinkQD";
+const PROJECT_HEADERS = ["Ten_QH", "LinkQD", "File", "Phuong", "SoCongTrinh", "SoLoDat", "ThoiGianNhap", "Geojson"];
 // Sao lưu dòng hạ tầng có sẵn trước khi đồ án ghi đè (lần đầu đồ án chạm vào dòng). Xóa đồ án: dòng có sao lưu được
 // ghi trả giá trị cũ thay vì xóa. Tab ẩn; GiaTriCu = JSON { tên cột: { v | f (công thức) | d (ngày ISO) } }
 const BACKUP_SHEET_NAME = "DoAn_SaoLuu";
@@ -447,6 +449,27 @@ function uploadToGCS(content, fileName) {
     return responseCode === 200;
   } catch (err) {
     Logger.log("❌ Lỗi ngoại lệ Sync GCS: " + err.toString());
+    console.error(err);
+    return false;
+  }
+}
+
+// PDF quyết định phê duyệt (byte[]), contentType application/pdf để trình duyệt xem trực tiếp
+function uploadBytesToGCS(bytes, fileName, contentType) {
+  try {
+    var token = ScriptApp.getOAuthToken();
+    var url = "https://storage.googleapis.com/upload/storage/v1/b/" + BUCKET_NAME + "/o?uploadType=media&name=" + encodeURIComponent(fileName);
+    var response = UrlFetchApp.fetch(url, {
+      "method": "post",
+      "contentType": contentType || "application/octet-stream",
+      "headers": { "Authorization": "Bearer " + token },
+      "payload": bytes,
+      "muteHttpExceptions": true
+    });
+    var code = response.getResponseCode();
+    if (code !== 200) console.error("Lỗi Upload GCS " + fileName + " Code " + code + ": " + response.getContentText());
+    return code === 200;
+  } catch (err) {
     console.error(err);
     return false;
   }
@@ -949,7 +972,9 @@ function doPost(e) {
     if (action === "editInfraRow") return jsonOutput(editInfraRow(body));
     if (action === "deleteInfraRow") return jsonOutput(deleteInfraRow(body));
     if (action === "deleteProject") return jsonOutput(deleteProject(body));
+    if (action === "setProjectLink") return jsonOutput(setProjectLink(body));
     if (action === "putBucketObject") return jsonOutput(putBucketObject(body));
+    if (action === "putBucketPdf") return jsonOutput(putBucketPdf(body));
     if (action === "deleteBucketObject") return jsonOutput(deleteBucketObject(body));
     if (action === "saveRoads") return jsonOutput(saveRoads(body));
     if (action === "savePopEdits") return jsonOutput(savePopEdits(body));
@@ -1372,8 +1397,13 @@ function bucketProjectPart(name) {
   return /^projects\/[a-z0-9]+(?:-[a-z0-9]+)*\/(?:hien-trang|su-dung-dat|diem-chuc-nang|ranh-gioi)\.json$/.test(name);
 }
 
+function bucketDecisionPdf(name) {
+  return /^projects\/[a-z0-9]+(?:-[a-z0-9]+)*\/quyet-dinh\.pdf$/.test(name);
+}
+
 function bucketObjectNameOk(name) {
-  return name === "projects/index.json" || name === "cad_parcels.json" || bucketProjectJson(name) || bucketProjectPart(name);
+  return name === "projects/index.json" || name === "projects/decisions.json" || name === "cad_parcels.json"
+    || bucketProjectJson(name) || bucketProjectPart(name);
 }
 
 // Vercel dựng nội dung file đồ án; bản này chỉ đẩy lên bucket (không ghi Sheet). Dùng khi service account chưa có quyền ghi.
@@ -1385,9 +1415,22 @@ function putBucketObject(body) {
   return { "success": true, "saved": uploadToGCS(content, name) };
 }
 
+function putBucketPdf(body) {
+  var name = String(body.name || "");
+  var b64 = String(body.content || "").replace(/\s+/g, "");
+  if (!bucketDecisionPdf(name)) return { "error": "Tên file bucket không hợp lệ" };
+  if (!b64 || b64.length > 1500000) return { "error": "PDF rỗng hoặc lớn hơn 1 MB" };
+  var bytes;
+  try { bytes = Utilities.base64Decode(b64); } catch (err) { return { "error": "PDF không hợp lệ" }; }
+  if (!bytes || bytes.length < 5 || bytes.length > 1048576) return { "error": "PDF rỗng hoặc lớn hơn 1 MB" };
+  if (bytes[0] !== 37 || bytes[1] !== 80 || bytes[2] !== 68 || bytes[3] !== 70) return { "error": "Không phải file PDF" };
+  if (!uploadBytesToGCS(bytes, name, "application/pdf")) return { "error": "Không ghi được PDF lên bucket" };
+  return { "success": true, "saved": true };
+}
+
 function deleteBucketObject(body) {
   var name = String(body.name || "");
-  if (name === "projects/index.json" || (!bucketProjectJson(name) && !bucketProjectPart(name))) {
+  if (name === "projects/index.json" || name === "projects/decisions.json" || (!bucketProjectJson(name) && !bucketProjectPart(name) && !bucketDecisionPdf(name))) {
     return { "error": "Tên file bucket không hợp lệ" };
   }
   try {
@@ -1810,28 +1853,104 @@ function upsertCadPolygons(ss, polygons, fileName, currentTime, phase) {
   }
 }
 
-// reg = { boundary (GeoJSON ranh tổng), wards: [tên phường], infra, lands } — nhập lại cùng đồ án thì ghi đè dòng cũ
-function upsertProjectRegistry(ss, project, fileName, reg, currentTime) {
+function projectHeaderRow(sheet) {
+  var n = Math.max(sheet.getLastColumn(), 1);
+  return sheet.getRange(1, 1, 1, n).getValues()[0].map(function(h) { return String(h || '').trim(); });
+}
+
+function projectCol(headers, name) {
+  var i = headers.indexOf(name);
+  return i < 0 ? 0 : i + 1;
+}
+
+// Sheet cũ chưa có LinkQD: chèn cột ngay sau Ten_QH, không đẩy lệch dữ liệu các cột kia.
+function ensureProjectSheet(ss) {
   var sheet = ss.getSheetByName(PROJECT_SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(PROJECT_SHEET_NAME);
     sheet.setFrozenRows(1);
+    sheet.getRange(1, 1, 1, PROJECT_HEADERS.length).setValues([PROJECT_HEADERS]).setFontWeight('bold');
+    return sheet;
   }
-  sheet.getRange(1, 1, 1, PROJECT_HEADERS.length).setValues([PROJECT_HEADERS]).setFontWeight('bold');
-  var values = [project, fileName, (Array.isArray(reg.wards) ? reg.wards : []).join(', '),
-    Number(reg.infra) || 0, Number(reg.lands) || 0, currentTime, geoCell(reg.boundary)];
+  var headers = projectHeaderRow(sheet);
+  if (!headers[0]) {
+    sheet.getRange(1, 1, 1, PROJECT_HEADERS.length).setValues([PROJECT_HEADERS]).setFontWeight('bold');
+    return sheet;
+  }
+  if (headers.indexOf(PROJECT_LINK_HEADER) < 0 && headers[0] === "Ten_QH") {
+    sheet.insertColumnAfter(1);
+    sheet.getRange(1, 2).setValue(PROJECT_LINK_HEADER).setFontWeight('bold');
+  }
+  return sheet;
+}
+
+function projectRowOf(sheet, headers, project) {
+  var nameCol = projectCol(headers, "Ten_QH");
   var last = sheet.getLastRow();
-  var row = last + 1;
-  if (last > 1) {
-    sheet.getRange(2, 1, last - 1, 1).getValues().some(function(v, i) {
-      if (String(v[0] || '').trim() !== project) return false;
-      row = i + 2;
-      return true;
-    });
+  if (nameCol && last > 1) {
+    var names = sheet.getRange(2, nameCol, last - 1, 1).getValues();
+    for (var i = 0; i < names.length; i++) {
+      if (String(names[i][0] || '').trim() === project) return i + 2;
+    }
   }
-  ensureSheetSize(sheet, row, PROJECT_HEADERS.length);
-  sheet.getRange(row, PROJECT_HEADERS.length).setNumberFormat("@");
-  sheet.getRange(row, 1, 1, values.length).setValues([values]);
+  return 0;
+}
+
+// reg = { boundary (GeoJSON ranh tổng), wards: [tên phường], infra, lands } — nhập lại cùng đồ án thì ghi đè dòng cũ, giữ LinkQD
+function upsertProjectRegistry(ss, project, fileName, reg, currentTime) {
+  var sheet = ensureProjectSheet(ss);
+  var headers = projectHeaderRow(sheet);
+  var row = projectRowOf(sheet, headers, project);
+  var isNew = !row;
+  if (isNew) row = Math.max(sheet.getLastRow(), 1) + 1;
+  ensureSheetSize(sheet, row, Math.max(headers.length, PROJECT_HEADERS.length));
+  var fields = {
+    "Ten_QH": project,
+    "File": fileName || project,
+    "Phuong": (Array.isArray(reg.wards) ? reg.wards : []).join(', '),
+    "SoCongTrinh": Number(reg.infra) || 0,
+    "SoLoDat": Number(reg.lands) || 0,
+    "ThoiGianNhap": currentTime,
+    "Geojson": geoCell(reg.boundary)
+  };
+  if (isNew) fields[PROJECT_LINK_HEADER] = '';
+  var geoCol = projectCol(headers, "Geojson");
+  if (geoCol) sheet.getRange(row, geoCol).setNumberFormat("@");
+  Object.keys(fields).forEach(function(h) {
+    var c = projectCol(headers, h);
+    if (c) sheet.getRange(row, c).setValue(fields[h]);
+  });
+}
+
+// Ghi hoặc xóa link truy cập quyết định (cột LinkQD). link rỗng = xóa ô.
+function setProjectLink(body) {
+  var project = String(body.project || '').trim();
+  var link = String(body.link || '').trim();
+  if (!project) return { "error": "Thiếu tên đồ án" };
+  if (link.length > 2000) return { "error": "Link quá dài" };
+  if (link && !/^https?:\/\//i.test(link)) return { "error": "Link không hợp lệ" };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ensureProjectSheet(ss);
+    var headers = projectHeaderRow(sheet);
+    var nameCol = projectCol(headers, "Ten_QH");
+    var linkCol = projectCol(headers, PROJECT_LINK_HEADER);
+    if (!nameCol || !linkCol) return { "error": "Sheet DS_DoAn thiếu cột LinkQD" };
+    var row = projectRowOf(sheet, headers, project);
+    if (!row) {
+      row = Math.max(sheet.getLastRow(), 1) + 1;
+      ensureSheetSize(sheet, row, headers.length);
+      sheet.getRange(row, nameCol).setValue(project);
+    }
+    sheet.getRange(row, linkCol).setValue(link);
+    return { "success": true, "row": row };
+  } catch (err) {
+    return { "error": String(err) };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // Xóa các dòng (số dòng 1-based, tăng dần) theo từng khối liền nhau, từ dưới lên.

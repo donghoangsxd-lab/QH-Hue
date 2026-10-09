@@ -66,20 +66,25 @@ function fail(name, status, verb) {
 }
 
 /** Ghi đè object. generation = nếu khớp (0 = chỉ tạo mới); bỏ qua khi không có. */
-async function putJson(name, text, generation) {
+async function putObject(name, body, contentType, generation) {
   const access = await accessToken();
   const q = new URLSearchParams({ uploadType: 'media', name });
   if (generation != null && generation !== '') q.set('ifGenerationMatch', String(generation));
   const url = `https://storage.googleapis.com/upload/storage/v1/b/${constants.GCS_BUCKET}/o?${q}`;
-  const res = await axios.post(url, text, {
-    headers: { Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+  const res = await axios.post(url, body, {
+    headers: { Authorization: `Bearer ${access}`, 'Content-Type': contentType },
     timeout: 55000,
     maxBodyLength: Infinity,
     maxContentLength: Infinity,
-    validateStatus: () => true
+    validateStatus: () => true,
+    transformRequest: [(data) => data]
   });
   if (res.status !== 200) throw fail(name, res.status, 'Ghi');
   return { generation: String((res.data && res.data.generation) || '') };
+}
+
+async function putJson(name, text, generation) {
+  return putObject(name, text, 'application/json', generation);
 }
 
 async function removeObject(name) {
@@ -94,4 +99,4 @@ async function removeObject(name) {
   throw fail(name, res.status, 'Xóa');
 }
 
-module.exports = { putJson, removeObject };
+module.exports = { putJson, putObject, removeObject };

@@ -596,6 +596,10 @@ projects.setTransport(async ({ op, name, content }) => {
     const result = await callAppsScript({ action: 'deleteBucketObject' }, { action: 'deleteBucketObject', name });
     return result.success === true;
   }
+  if (op === 'pdf') {
+    const result = await callAppsScript({ action: 'putBucketPdf' }, { action: 'putBucketPdf', name, content });
+    return result.saved === true;
+  }
   const result = await callAppsScript({ action: 'putBucketObject' }, { action: 'putBucketObject', name, content });
   return result.saved === true;
 });
@@ -1752,6 +1756,22 @@ module.exports = async (req, res) => {
       return res.status(200).json(data);
     }
 
+    // PDF quyết định phê duyệt (≤ 1 MB trên bucket). Cùng nguồn với webapp nên iframe xem được, không phụ thuộc CORS bucket.
+    if (action === 'getProjectDecision') {
+      const slug = String(req.query.slug || '');
+      try {
+        const file = await projects.readDecision(slug);
+        const ascii = String(file.name || 'quyet-dinh.pdf').replace(/[^\w.\-]+/g, '_') || 'quyet-dinh.pdf';
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(file.name || 'quyet-dinh.pdf')}`);
+        res.setHeader('Cache-Control', 'private, max-age=300');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        return res.status(200).send(file.buffer);
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không đọc được quyết định' });
+      }
+    }
+
     if (action === 'getWardParcels') {
       const ward = await projects.wardParcels();
       res.setHeader('Cache-Control', 'no-store');
@@ -2114,6 +2134,73 @@ module.exports = async (req, res) => {
         return res.status(200).json({ success: true, removed: done.removed, saved: done.saved, counts: done.counts, bucket: done.via });
       } catch (err) {
         return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được file đồ án' });
+      }
+    }
+
+    // Admin kiểm tra link quyết định (mở trang, nhận PDF hoặc trang xem) trước khi gán vào đồ án
+    if (action === 'reviewProjectDecision') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const url = String(readJsonBody(req).url || '').trim();
+      if (!url) return res.status(400).json({ error: true, message: 'Thiếu link' });
+      try {
+        const review = await projects.reviewDecisionLink(url);
+        return res.status(200).json({ success: true, ...review });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không kiểm tra được link' });
+      }
+    }
+
+    // Admin gắn PDF ≤ 1 MB hoặc link đã kiểm tra. Link được mở lại trên máy chủ lúc gán.
+    if (action === 'putProjectDecision') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const tenQH = sanitizeSheetText(body.tenQH, 120);
+      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      const url = String(body.url || '').trim();
+      const pdf = typeof body.pdf === 'string' ? body.pdf.replace(/\s+/g, '') : '';
+      if (!url && (!pdf || pdf.length > 1500000)) {
+        return res.status(413).json({ error: true, message: 'File PDF rỗng hoặc lớn hơn 1 MB' });
+      }
+      try {
+        const saved = url
+          ? await projects.saveDecisionLink({ tenQH, url })
+          : await projects.saveDecision({ tenQH, fileName: body.name, buffer: Buffer.from(pdf, 'base64') });
+        const accessUrl = url ? saved.url : saved.accessUrl;
+        let sheet = false;
+        let sheetMessage = '';
+        try {
+          await callAppsScript({ action: 'setProjectLink' }, { action: 'setProjectLink', project: tenQH, link: accessUrl });
+          sheet = true;
+        } catch (err) {
+          sheetMessage = err.message || 'Chưa ghi được cột LinkQD trên sheet';
+        }
+        return res.status(200).json({
+          success: true, kind: saved.kind || (url ? 'link' : 'pdf'), slug: saved.slug, name: saved.name,
+          bytes: saved.bytes, at: saved.at, url: saved.url || '', embed: saved.embed === true,
+          note: saved.note, accessUrl, sheet, sheetMessage, bucket: saved.via
+        });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được quyết định' });
+      }
+    }
+
+    if (action === 'deleteProjectDecision') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const tenQH = sanitizeSheetText(readJsonBody(req).tenQH, 120);
+      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      try {
+        await projects.removeDecision(tenQH);
+        let sheet = false;
+        try {
+          await callAppsScript({ action: 'setProjectLink' }, { action: 'setProjectLink', project: tenQH, link: '' });
+          sheet = true;
+        } catch (err) { /* cột LinkQD xóa khi triển khai Code.gs mới */ }
+        return res.status(200).json({ success: true, sheet });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không gỡ được quyết định' });
       }
     }
 
