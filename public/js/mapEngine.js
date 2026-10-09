@@ -191,9 +191,6 @@ export function initMap() {
   layers.highlightWard.addTo(map);
   layers.heatmap.addTo(map);
   layers.singleIso.addTo(map);
-  layers.c1.addTo(map); layers.c2.addTo(map); layers.c3.addTo(map);
-  layers.c4.addTo(map); layers.c5.addTo(map); layers.c10.addTo(map); layers.c6.addTo(map);
-  layers.c7.addTo(map); layers.c8.addTo(map); layers.c9.addTo(map); layers.c14.addTo(map);
 
   map.on('zoomend', () => { updateWardLabelFontSize(); redrawLandsOnPattern(); });
   map.on('moveend', () => { refreshLeftSoon(); scheduleLots(); });
@@ -604,7 +601,7 @@ function createWardPie(ward, counts, total, size, targetMap, scenarioLabel, city
     direction: 'auto', offset: [size / 2 + 6, 0], className: 'ward-pie-tip', opacity: 1
   });
   marker.on('click', () => {
-    if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
+    if (isBusyTool()) return;
     if (city) targetMap.flyTo(CITY_CENTER, CITY_PIE_MAX_ZOOM + 1);
     else targetMap.flyTo([ward.lat, ward.lng], PIE_CLICK_ZOOM);
   });
@@ -727,7 +724,7 @@ function createParcelShape(entry, targetMap, detailed) {
   bindLotHover(shape);
   bindNameTip(shape, p);
   shape.on('click', () => {
-    if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
+    if (isBusyTool()) return;
     onPointClick(entry.point, targetMap, entry.parcel?.geometry || null);
   });
   return shape;
@@ -764,7 +761,7 @@ function createPointMarker(entry, mode, targetMap) {
   }
   bindNameTip(marker, p);
   marker.on('click', () => {
-    if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
+    if (isBusyTool()) return;
     onPointClick(entry.point, targetMap);
   });
   return marker;
@@ -1184,7 +1181,7 @@ function bindLotHover(shape) {
   shape.on('mouseout', (e) => shape.resetStyle(e.layer));
 }
 
-const isBusyTool = () => state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool;
+const isBusyTool = () => state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool || state.lotShapeEdit;
 
 // Lô hạ tầng của đồ án: tô ký hiệu TT16 theo loại công trình trên Sheet (cùng mã lô), bấm mở popup công trình
 function infraLotShape(lot, item, m, detailed) {

@@ -745,6 +745,29 @@ export function landPatternKey(layerName, lotName = '') {
   return freePatternKey(layerName) || (own ? lotCodeKey(own) || freePatternKey(own) : '');
 }
 
+/** Các loại đất chọn được khi Admin đổi lớp 1 lô (thứ tự chú giải Mục 04) */
+export const TT16_LAND_KEYS = LEGEND_KEYS.filter(k => TT16_STYLES[k]);
+
+const ARROW_CODE = Object.fromEntries(Object.entries(TYPE_CODE_PATTERN).map(([code, key]) => [key, code]));
+
+/**
+ * Tên layer mới khi chuyển lô sang loại đất key: giữ tiền tố giai đoạn (HT_ / QHDD_ / QHDH_ / QH_) của layer cũ
+ * vì viền lô đọc giai đoạn từ đó. Ưu tiên tên phân lớp TT16; loại ngoài TT16 dùng dạng khớp thủ công "<layer cũ> → <mã>".
+ */
+export function layerForPattern(key, oldLayer = '') {
+  if (!TT16_STYLES[key]) return '';
+  const old = String(oldLayer || '').trim();
+  const stage = (old.match(/^(HT|QHDD|QHDH|QH)[_\s.-]/i) || [''])[0];
+  const codes = (PATTERN_CODES.find(([k]) => k === key) || [key, []])[1];
+  const base = old.split('→')[0].trim() || 'Lô';
+  const candidates = [
+    `${stage}${TT16_STYLES[key].layer}`,
+    ...codes.map(c => `${stage}${c}`),
+    `${base} → ${ARROW_CODE[key] || key}`
+  ];
+  return candidates.find(c => c.length <= 60 && landPatternKey(c) === key) || candidates[candidates.length - 1].slice(0, 60);
+}
+
 /** Ranh đất đồ án: thu nhỏ tô đặc màu ký hiệu; phóng tới ngưỡng hoa văn thì kẻ pattern cùng màu */
 export function landParcelStyle(layerName, { detailed = false, phase = 'HT', name = '' } = {}) {
   const key = landPatternKey(layerName, name);

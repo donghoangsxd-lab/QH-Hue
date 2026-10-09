@@ -515,11 +515,42 @@ function parseInfraEdit(f) {
   return Object.keys(out).length ? out : null;
 }
 
+// Diện tích trắc địa (m²), cùng công thức turf.area 6.x ở trình duyệt: vòng ngoài trừ các lỗ
+const AREA_EARTH_R = 6378137;
+function ringAreaM2(ring) {
+  const n = ring.length;
+  if (n < 3) return 0;
+  const rad = Math.PI / 180;
+  let total = 0;
+  for (let i = 0; i < n; i++) {
+    const p1 = ring[i], p2 = ring[(i + 1) % n], p3 = ring[(i + 2) % n];
+    total += (p3[0] - p1[0]) * rad * Math.sin(p2[1] * rad);
+  }
+  return Math.abs(total * AREA_EARTH_R * AREA_EARTH_R / 2);
+}
+
+function geometryAreaM2(g) {
+  const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+  return polys.reduce((sum, rings) => sum + rings.reduce((s, r, i) => s + (i ? -ringAreaM2(r) : ringAreaM2(r)), 0), 0);
+}
+
 /** Trường sửa của lô đất khác (file đồ án trên bucket); null nếu không hợp lệ */
 function parseLandEdit(f) {
   const out = {};
   if (f.name !== undefined) out.name = sanitizeSheetText(f.name, 150);
   if (f.nhom !== undefined) out.nhom = sanitizeSheetText(f.nhom, 40) || 'Đất khác';
+  if (f.layer !== undefined) {
+    out.layer = sanitizeSheetText(f.layer, 60);
+    if (!out.layer) return null;
+  }
+  if (f.geometry !== undefined) {
+    const geometry = parseCadGeometry(f.geometry);
+    const pt = parseCoordInBounds(f.lat, f.lng);
+    if (!geometry || !pt || JSON.stringify(geometry).length > 2000000) return null;
+    const area = geometryAreaM2(geometry);
+    if (!(area > 0) || area > 1e8) return null;
+    Object.assign(out, { geometry, area: Math.round(area * 10) / 10, lat: pt.lat.toFixed(6), lng: pt.lng.toFixed(6) });
+  }
   const plan = parseEditPlan(f.plan);
   if (plan) out.plan = plan;
   return Object.keys(out).length ? out : null;
@@ -2076,7 +2107,7 @@ module.exports = async (req, res) => {
       if (body.kind === 'DXF') {
         const tenQH = sanitizeSheetText(body.tenQH, 120);
         const fields = parseLandEdit(raw);
-        if (!tenQH || !fields) return res.status(400).json({ error: true, message: 'Thiếu đồ án hoặc thông tin cần sửa' });
+        if (!tenQH || !fields) return res.status(400).json({ error: true, message: 'Thiếu đồ án, hoặc thông tin sửa không hợp lệ (layer trống, ranh lô lỗi / ra ngoài phạm vi Huế)' });
         try {
           const saved = await projects.patchLand({ tenQH, id, phase: body.phase === 'QH' ? 'QH' : 'HT', fields });
           return res.status(200).json({ success: true, kind: 'DXF', id, saved: saved.saved, land: saved.land, bucket: saved.via });

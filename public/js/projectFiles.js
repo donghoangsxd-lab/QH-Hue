@@ -220,15 +220,18 @@ export async function lotKeysOf(tenQHs) {
   return keys;
 }
 
-// Admin vừa sửa 1 lô đất: chép vào bản đã tải, đổi saved để lần đọc sau khớp danh mục (không tải lại file đồ án)
+// Admin vừa sửa 1 lô đất: chép vào bản đã tải, đổi saved để lần đọc sau khớp danh mục (không tải lại file đồ án).
+// Thay đối tượng lô mới để các bộ nhớ WeakMap theo lô (chỉ mục tìm lô, điểm neo) tính lại.
 export function patchCachedLand(tenQH, land, saved) {
   const row = cache.get(tenQH);
-  const hit = row && row.parcels.find(p => p && p.kind === 'DXF' && p.id === land.id && (p.phase === 'QH' ? 'QH' : 'HT') === land.phase);
-  if (hit) {
-    hit.name = land.name;
-    hit.nhom = land.nhom;
-    if (land.plan) hit.plan = land.plan;
-    else delete hit.plan;
+  const i = row ? row.parcels.findIndex(p => p && p.kind === 'DXF' && p.id === land.id && (p.phase === 'QH' ? 'QH' : 'HT') === land.phase) : -1;
+  if (i >= 0) {
+    const next = { ...row.parcels[i], name: land.name, nhom: land.nhom };
+    if (land.layer) next.layer = land.layer;
+    if (land.geometry) Object.assign(next, { geometry: land.geometry, area: land.area, lat: land.lat, lng: land.lng });
+    if (land.plan) next.plan = land.plan;
+    else delete next.plan;
+    row.parcels[i] = next;
   }
   if (row) row.saved = saved;
   const entry = state.projectCatalog.find(p => p && p.tenQH === tenQH);

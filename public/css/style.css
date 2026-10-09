@@ -606,6 +606,15 @@ body.right-collapsed .right-panel {
 .project-name { flex: 1; min-width: 0; display: flex; align-items: center; cursor: pointer; color: var(--text-main); }
 .project-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-name input { accent-color: rgb(var(--project-rgb)); width: 13px; height: 13px; margin: 0 5px 0 0; flex-shrink: 0; cursor: pointer; }
+.project-color { flex-shrink: 0; width: 10px; height: 10px; margin-right: 5px; border-radius: 2px; border: 1.5px solid var(--pc); background: color-mix(in srgb, var(--pc) 25%, transparent); }
+.project-row.is-off .project-color { opacity: 0.4; }
+/* Nhãn tên đồ án giữa ranh tổng (divIcon không kích thước, chữ căn giữa điểm neo) */
+.leaflet-marker-icon.project-label { pointer-events: none; }
+.project-label span {
+  position: absolute; transform: translate(-50%, -50%); width: max-content; max-width: 200px;
+  font-size: 12px; font-weight: 700; line-height: 1.2; text-align: center; color: var(--pc);
+  text-shadow: 0 0 3px #020617, 0 0 3px #020617, 0 0 6px #020617;
+}
 .project-meta { flex-shrink: 0; color: var(--text-muted); font-size: var(--fs-xs); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .project-btn { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 1px solid transparent; border-radius: var(--r-md); background: transparent; color: var(--text-muted); cursor: pointer; }
 .project-btn .ico { width: 14px; height: 14px; margin: 0; }
@@ -1844,6 +1853,13 @@ table.ward-table th {
 .lot-edit-msg.bad { color: var(--accent-red); }
 .lot-edit-btns { display: flex; gap: 6px; justify-content: flex-end; margin-top: 4px; }
 .lot-edit-btns .ico { vertical-align: -0.2em; margin-right: 3px; }
+.lot-edit-shape { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
+.lot-edit-shape b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lot-edit-shape b small { font-weight: 400; color: var(--text-muted); }
+.lot-edit-shape b.bad { color: var(--accent-red); }
+.lot-edit-shape .proof-btn { flex: 0 0 auto; width: auto; padding-left: 8px; padding-right: 8px; }
+.lot-edit-shape .ico { vertical-align: -0.2em; margin-right: 3px; }
+.lot-edit-hint { margin-top: 3px; color: var(--accent-yellow); font-size: var(--fs-xs); line-height: 1.35; }
 
 .sug-card { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--r-md); padding: 6px; margin-top: 4px; font-size: var(--fs-sm); }
 .sug-card.priority { border-color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.15); }

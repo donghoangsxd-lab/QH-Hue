@@ -1017,12 +1017,21 @@ function landAreaOf(parcels) {
   return out;
 }
 
+// true khi đổi loại đất hoặc diện tích (phải tính lại landArea trong danh mục)
 function editLandFields(land, fields) {
-  let nhomChanged = false;
+  let statsChanged = false;
   if (fields.name !== undefined) land.name = fields.name;
   if (fields.nhom !== undefined) {
-    nhomChanged = land.nhom !== fields.nhom;
+    statsChanged = land.nhom !== fields.nhom;
     land.nhom = fields.nhom;
+  }
+  if (fields.layer !== undefined) land.layer = fields.layer;
+  if (fields.geometry) {
+    statsChanged = statsChanged || Number(land.area) !== fields.area;
+    land.geometry = fields.geometry;
+    land.area = fields.area;
+    land.lat = fields.lat;
+    land.lng = fields.lng;
   }
   if (fields.plan) {
     const plan = { ...(land.plan || {}) };
@@ -1034,10 +1043,10 @@ function editLandFields(land, fields) {
     if (Object.keys(plan).length) land.plan = plan;
     else delete land.plan;
   }
-  return nhomChanged;
+  return statsChanged;
 }
 
-// Admin sửa 1 lô đất (DXF) từ bảng thông tin: fields = { name?, nhom?, plan?: { floors, coverage, far } }.
+// Admin sửa 1 lô đất (DXF) từ bảng thông tin: fields = { name?, nhom?, layer?, geometry? + area, lat, lng, plan?: { floors, coverage, far } }.
 // Chuỗi rỗng trong plan xóa chỉ tiêu đó. Lô QH nằm ở su-dung-dat.json, lô HT ở hien-trang.json.
 async function patchLand({ tenQH, id, phase, fields }) {
   const name = String(tenQH || '').trim();
@@ -1053,7 +1062,7 @@ async function patchLand({ tenQH, id, phase, fields }) {
   const role = want === 'QH' ? ROLE_QH : ROLE_HT;
   let parcels = null;
   let land = null;
-  let nhomChanged = false;
+  let statsChanged = false;
   const savedAt = Date.now();
   const doc = await readRoleDoc(slug, role);
   if (doc && Array.isArray(doc.parcels)) {
@@ -1068,7 +1077,7 @@ async function patchLand({ tenQH, id, phase, fields }) {
     parcels = want === 'QH' ? qh : ht;
     land = parcels.find(p => p && p.kind === 'DXF' && p.id === id && parcelPhase(p) === want);
     if (land) {
-      nhomChanged = editLandFields(land, fields);
+      statsChanged = editLandFields(land, fields);
       const other = want === 'QH' ? ht : qh;
       const otherRole = want === 'QH' ? ROLE_HT : ROLE_QH;
       await writeRole(slug, otherRole, roleDoc(otherRole, name, slug, savedAt, { parcels: other }));
@@ -1076,7 +1085,7 @@ async function patchLand({ tenQH, id, phase, fields }) {
       try { await removeName(legacyName(slug)); } catch (err) { /* file cũ đã xóa */ }
     }
   } else if (land) {
-    nhomChanged = editLandFields(land, fields);
+    statsChanged = editLandFields(land, fields);
     await writeRole(slug, role, roleDoc(role, name, slug, savedAt, { parcels }));
   }
   if (!land) {
@@ -1090,10 +1099,17 @@ async function patchLand({ tenQH, id, phase, fields }) {
   const indexed = await updateIndex(cur => ({
     ...cur,
     projects: (cur.projects || []).map(p => (p && p.tenQH === name && !p.deleted
-      ? { ...p, dir: true, saved: savedAt, ...(nhomChanged ? { landArea: landAreaOf(both) } : {}) }
+      ? { ...p, dir: true, saved: savedAt, ...(statsChanged ? { landArea: landAreaOf(both) } : {}) }
       : p))
   }));
-  return { saved: savedAt, via: indexed.via, land: { id: land.id, phase: want, name: land.name || '', nhom: land.nhom || '', plan: land.plan || null } };
+  return {
+    saved: savedAt,
+    via: indexed.via,
+    land: {
+      id: land.id, phase: want, name: land.name || '', nhom: land.nhom || '', layer: land.layer || '', plan: land.plan || null,
+      ...(fields.geometry ? { geometry: land.geometry, area: land.area, lat: land.lat, lng: land.lng } : {})
+    }
+  };
 }
 
 // Admin xóa 1 lô khỏi file đồ án: kind 'DXF' = lô đất (id + phase); 'INFRA' = ranh lô công trình mọi giai đoạn của id

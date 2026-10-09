@@ -1,8 +1,8 @@
 // Mục Quy hoạch (tab Lớp dữ liệu): mỗi đồ án (Ten_QH) bật/tắt riêng, tìm, phóng tới, Admin xóa / chuyển đồ án cũ.
 // Nút file mở PDF quyết định phê duyệt (projects/<slug>/quyet-dinh.pdf, dưới 1 MB). Admin gắn, thay hoặc gỡ.
 // Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS): bật/tắt từng lớp, Admin xóa từng lớp, tìm lô trong đồ án.
-// Zoom < PARCEL_MIN_ZOOM vẽ ranh tổng đồ án (bấm để phóng tới); từ ngưỡng đó vẽ lô (mapEngine.js),
-// ranh tổng chỉ còn nét viền không nhận click (đồ án có ranh thật).
+// Mỗi đồ án 1 màu viền + nền mờ, nhãn tên ở giữa ranh. Zoom < PARCEL_MIN_ZOOM ranh tổng bấm được để phóng tới;
+// từ ngưỡng đó vẽ lô (mapEngine.js), ranh tổng nằm dưới lô và không nhận click (đồ án có ranh thật).
 import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
@@ -23,9 +23,12 @@ const GAP_M = 15;
 const BOUNDARY_MAX_CHARS = 45000;
 // Quá số lô này thì hợp ranh quá chậm trên trình duyệt → dùng bao lồi
 const EXACT_MAX_LOTS = 4000;
-const OUTLINE_STYLE = { color: '#e879f9', weight: 2.4, opacity: 0.95, dashArray: '8 5', fillColor: '#e879f9', fillOpacity: 0.05 };
+// Màu viền / nền do projectColor gán theo đồ án; nền mờ 10% ở mọi mức zoom
+const OUTLINE_STYLE = { weight: 2.4, opacity: 0.95, dashArray: '8 5', fillOpacity: 0.1 };
 const OUTLINE_GIS = { ...OUTLINE_STYLE, weight: 2.6, dashArray: null };
 const OUTLINE_HULL = { ...OUTLINE_STYLE, dashArray: '2 6' };
+// Góc vàng trên vòng màu: các đồ án liền nhau trong danh sách (thường gần nhau) lệch màu rõ
+const projectColor = (idx) => `hsl(${Math.round((idx * 137.508) % 360)}, 85%, 62%)`;
 
 const $ = (id) => document.getElementById(id);
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
@@ -172,7 +175,7 @@ function collectProjects() {
       at: Number(p.decision.at) || 0,
       embed: p.decision.kind === 'link' ? p.decision.embed === true : true
     } : null
-  })).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  })).sort((a, b) => a.name.localeCompare(b.name, 'vi')).map((p, i) => ({ ...p, color: projectColor(i) }));
 }
 
 // Đồ án nhập trước khi có tab DS_DoAn: ranh tạm = bao lồi các lô / điểm (nhanh), nhập lại file để có ranh đúng
@@ -276,7 +279,7 @@ function renderList() {
       : '';
     return `<div class="project-row${on ? '' : ' is-off'}">
       <label class="project-name" title="${escapeHtml(p.name)}${p.area?.ward ? ` — ${escapeHtml(p.area.ward)}` : ''} — ${escapeHtml(metaText(p))} (${where})${tempNote}">
-        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><span>${idx + 1}. ${escapeHtml(p.name)}</span></label>
+        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><i class="project-color" style="--pc:${p.color}"></i><span>${idx + 1}. ${escapeHtml(p.name)}</span></label>
       ${decisionBtn}
       <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-expand="${idx}" title="${open ? 'Ẩn' : 'Xem'} các lớp dữ liệu của đồ án" aria-label="Các lớp dữ liệu của đồ án" aria-expanded="${open}">${ico('chev-down')}</button>
       <button type="button" class="project-btn" data-zoom="${idx}" title="Phóng tới đồ án" aria-label="Phóng tới đồ án">${ico('locate')}</button>
@@ -320,7 +323,7 @@ function layersHtml(p, idx, projectOn, admin) {
     return `<div class="project-layer${on && projectOn && g.present ? '' : ' is-off'}">
       <label class="project-layer-name" title="${escapeHtml(g.label)} (${g.phase === 'QH' ? 'quy hoạch' : 'hiện trạng'}) — ${escapeHtml(count.full)}">
         <input type="checkbox" data-layer="${idx}:${li}"${on ? ' checked' : ''}${toggleable ? '' : ' disabled'}>
-        <i class="project-layer-dot ${g.kind}" style="--dot:${g.color}"></i>
+        <i class="project-layer-dot ${g.kind}" style="--dot:${g.kind === 'boundary' ? p.color : g.color}"></i>
         <b class="project-phase ${g.phase === 'QH' ? 'qh' : 'ht'}">${g.phase}</b>
         <span>${escapeHtml(g.label)}</span><small>${escapeHtml(count.short)}</small></label>
       ${admin && g.present && !p.legacy ? `<button type="button" class="project-btn danger" data-layer-del="${idx}:${li}" title="Xóa lớp ${escapeHtml(g.label)} khỏi đồ án" aria-label="Xóa lớp"${layerBusy || busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
@@ -481,6 +484,27 @@ async function deleteLayer(p, g) {
 
 // ============================ VẼ RANH TỔNG ============================
 
+// Nhãn tên đặt tại tâm hình; tâm rơi ra ngoài ranh (ranh lõm, nhiều mảnh) thì lấy 1 điểm nằm trong ranh
+const labelPoints = new Map();
+function labelPointOf(p, geom) {
+  const hit = labelPoints.get(p.name);
+  if (hit && hit.geom === geom) return hit.at;
+  let at = null;
+  try {
+    const f = turf.feature(geom);
+    let c = turf.centroid(f).geometry.coordinates;
+    if (!turf.booleanPointInPolygon(c, f)) c = turf.pointOnFeature(f).geometry.coordinates;
+    at = L.latLng(c[1], c[0]);
+  } catch (e) { at = null; }
+  labelPoints.set(p.name, { geom, at });
+  return at;
+}
+
+function projectLabel(p, at) {
+  const icon = L.divIcon({ className: 'project-label', iconSize: null, html: `<span style="--pc:${p.color}">${escapeHtml(p.name)}</span>` });
+  return L.marker(at, { icon, interactive: false, keyboard: false, zIndexOffset: -1000 });
+}
+
 function drawOutlinesOn(m, list, below) {
   const old = outlineGroups.get(m);
   if (old) {
@@ -490,12 +514,18 @@ function drawOutlinesOn(m, list, below) {
   }
   if (!list.length) return;
   const group = L.featureGroup();
+  const shapes = [];
   list.forEach(p => {
     const geom = outlineOf(p);
     if (!geom) return;
-    const style = !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE;
+    const base = !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE;
+    const style = { ...base, color: p.color, fillColor: p.color };
+    const at = typeof turf !== 'undefined' ? labelPointOf(p, geom) : null;
+    if (at) group.addLayer(projectLabel(p, at));
     if (!below) {
-      group.addLayer(L.geoJSON(geom, { style: { ...style, fillOpacity: 0 }, interactive: false }));
+      const shape = L.geoJSON(geom, { style, interactive: false });
+      shapes.push(shape);
+      group.addLayer(shape);
       return;
     }
     const shape = L.geoJSON(geom, { style, bubblingMouseEvents: false });
@@ -507,6 +537,8 @@ function drawOutlinesOn(m, list, below) {
     group.addLayer(shape);
   });
   group.addTo(m);
+  // Từ ngưỡng lô: nền mờ nằm dưới lô để không phủ màu lên ký hiệu TT16
+  shapes.forEach(s => s.bringToBack());
   outlineGroups.set(m, group);
 }
 
@@ -529,6 +561,7 @@ function rebuild() {
   projects = collectProjects();
   const names = new Set(projects.map(p => p.name));
   [...fallbackCache.keys()].forEach(k => { if (!names.has(k.split('|')[0])) fallbackCache.delete(k); });
+  [...labelPoints.keys()].forEach(k => { if (!names.has(k)) labelPoints.delete(k); });
   // Danh mục vừa tải lại (nhập / xóa đồ án): đọc lại lớp của các đồ án đang mở
   layerInfo.clear();
   [...expanded].forEach(name => { if (!names.has(name)) expanded.delete(name); });
