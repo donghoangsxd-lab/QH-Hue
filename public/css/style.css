@@ -936,12 +936,14 @@ body.right-collapsed .right-panel {
 .cad-list { margin-top: 5px; max-height: 170px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--r-md); }
 .cad-row { display: flex; align-items: center; gap: 4px; padding: 3px 5px; cursor: pointer; border-bottom: 1px solid var(--border-soft); transition: background 0.3s; }
 .cad-row:hover, .cad-row.flash { background: rgba(var(--cyan-rgb), 0.14); }
-.cad-row-main { flex: 1; min-width: 0; line-height: 1.25; }
+.cad-row-main { flex: 1; min-width: 0; line-height: 1.25; overflow-wrap: anywhere; }
 .cad-row-main small { color: var(--text-muted); }
 .cad-pick { display: block; width: 100%; margin-top: 3px; padding: 2px 3px; font-size: var(--fs-sm); font-family: inherit; color: var(--text-main); background: var(--bg-input); border: 1px solid var(--accent-orange); border-radius: var(--r-sm); cursor: pointer; }
 .cad-take { display: flex; align-items: center; gap: 4px; margin-top: 3px; font-size: var(--fs-sm); color: var(--accent-orange); cursor: pointer; }
 .cad-take input { margin: 0; accent-color: var(--accent-orange); }
 .cad-badge { font-size: var(--fs-xs); padding: 1px 5px; border-radius: var(--r-md); white-space: nowrap; font-weight: 600; }
+/* Nhãn dài (tên đồ án chủ sở hữu) không được ép cột tên lô: giới hạn bề rộng, cho xuống dòng */
+.cad-row .cad-badge { flex: 0 1 auto; max-width: 42%; white-space: normal; overflow-wrap: anywhere; text-align: right; }
 .cad-badge.ok { background: rgba(var(--green-rgb), 0.2); color: var(--accent-green); }
 .cad-badge.info { background: rgba(var(--cyan-rgb), 0.18); color: var(--accent-cyan); }
 .cad-badge.warn { background: rgba(var(--orange-rgb), 0.2); color: var(--accent-orange); }

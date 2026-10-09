@@ -43,7 +43,7 @@ const CHOICE_NEW = '__new';
 const CHOICE_SKIP = '__skip';
 
 // current: { fileName, format: 'dxf'|'kml'|'geojson'|'shp', wgs84, stats, tt16 (file đặt tên layer theo TT16), base (lô trước khi khớp),
-//   result, manual (khớp thủ công), items: Map ID → công trình đang có, levels: Map src → MN/TH/THCS/reject (Admin chọn),
+//   result, manual (khớp thủ công), items: Map ID → công trình đang có, levels: Map src → MN/TH/THCS/THPT/land (Khác)/reject (Admin chọn),
 //   autoLevels: Map src → cấp trường nhận theo tên điểm / ký hiệu lô, reviewSrc,
 //   takeOver: Set parcelKey lô được chuyển công trình từ đồ án khác sang đồ án đang nhập,
 //   lotKeys: Set "giai đoạn|ID" công trình đã có ranh lô (undefined = đang tải, false = tải lỗi), lotSig: đồ án đã đọc lô,
@@ -61,6 +61,11 @@ let dupTargets = new Set();   // "giai đoạn|ID" công trình bị nhiều lô
 // Cấp trường cho lô Truonghoc thiếu hậu tố / đất giáo dục gộp chung (nhiều đồ án gộp cả THPT)
 const SCHOOL_LEVELS = [['MN', 'Mầm non'], ['TH', 'Tiểu học'], ['THCS', 'THCS'], ['THPT', 'THPT']];
 const LEVEL_REJECT = 'reject';
+// Lô giáo dục "Khác" (trường nghề, cao đẳng, đại học, trường chuyên biệt): không vào nhóm hạ tầng trường học,
+// ranh lô ghi vào lớp sử dụng đất của đồ án với loại Đất đào tạo, nghiên cứu (TT16 DT-NC)
+const EDU_OTHER_KEY = 'DT-NC';
+const EDU_OTHER_TIP = 'Trường nghề, trung cấp, cao đẳng, đại học, học viện, trường chuyên biệt: không tính hạ tầng trường học, ranh lô ghi vào lớp sử dụng đất của đồ án (Đất đào tạo, nghiên cứu)';
+const EDU_OTHER_RE = /\b(cao dang|trung cap|day nghe|truong nghe|dai hoc|hoc vien|chuyen biet|khiem thi|khiem thinh|khuyet tat|giao duc thuong xuyen|gdtx|giao duc nghe nghiep)\b/;
 // Lô "Chợ, TTTM – chọn từng lô": chợ / TTTM theo cấp, hoặc không phải → lô đất sheet DXF
 const MARKET_LEVELS = [['TM', 'Chợ / TTTM', 'Chợ, TTTM cấp đơn vị ở'], ['TM_DT', 'Cấp đô thị', 'Chợ, TTTM cấp đô thị']];
 const LEVEL_LAND = 'land';
@@ -255,7 +260,9 @@ const layerText = (p) => (p.manual || (p.school && p.prefix)
   ? `${p.layer} → ${p.land ? 'sheet DXF' : p.prefix || (p.market ? 'chọn chợ / TTTM' : 'chọn cấp')}` : p.layer);
 // "Thuận Hóa 1.200 m² · Phú Xuân 300 m²" (lô vắt ranh đã tách theo phường)
 const partsText = (p) => p.wardParts.map(x => `${x.ward} ${fmtArea(x.area)}`).join(' · ');
-const typeColor = (p) => (p.pending ? '#facc15' : p.land ? (landColor(p.layer) || '#94a3b8') : BUFFER_COLORS[p.type] || '#38bdf8');
+// Layer ghi cho lô đất: lô giáo dục "Khác" gắn mã DT-NC (tên gốc "Đất giáo dục" sẽ bị nhận là trường học)
+const landLayerOf = (p) => (p.eduOther ? `${p.layer.slice(0, 45)} → ${EDU_OTHER_KEY}` : p.layer);
+const typeColor = (p) => (p.pending ? '#facc15' : p.land ? (landColor(landLayerOf(p)) || '#94a3b8') : BUFFER_COLORS[p.type] || '#38bdf8');
 
 function parcelTip(p) {
   const pair = p.partner ? `<br>+ ${escapeHtml(p.partner.layer)} · ${sizeText(p.partner)}` : '';
@@ -457,6 +464,7 @@ function hintLevel(p, f) {
     const big = f.tags.amenity === 'marketplace' || /^(supermarket|mall|department_store)$/.test(f.tags.shop || '');
     return big || isMarketName(f.name) ? 'TM' : LEVEL_LAND;
   }
+  if (EDU_OTHER_RE.test(plain(f.name)) || /^(college|university)$/.test(f.tags.amenity || '')) return LEVEL_LAND;
   return schoolLevelOf([f.name], '') || (f.tags.amenity === 'kindergarten' ? 'MN' : '');
 }
 
@@ -498,7 +506,8 @@ async function loadMapHints() {
   if (cur.reviewSrc != null) renderReport();
 }
 
-const levelLabel = (lv) => ({ TM: 'Chợ / TTTM', [LEVEL_LAND]: 'Không phải', ...Object.fromEntries(SCHOOL_LEVELS) }[lv]);
+const levelLabel = (lv, p) => (lv === LEVEL_LAND && p && !p.market ? 'Khác'
+  : { TM: 'Chợ / TTTM', [LEVEL_LAND]: 'Không phải', ...Object.fromEntries(SCHOOL_LEVELS) }[lv]);
 
 // Công trình đã có trên bản đồ nằm trong lô (bấm để chọn cấp theo công trình đó)
 function existingHtml(p) {
@@ -514,7 +523,7 @@ function hintsHtml(p) {
   if (h === 'loading') return `<div class="cad-review-hints muted">${ico('pin')}Đang tìm tên địa điểm quanh lô…</div>`;
   if (h === 'fail') return '<div class="cad-review-hints muted">Không tải được tên địa điểm (máy chủ OSM quá tải) — xem nhãn trên ảnh vệ tinh.</div>';
   if (!h.length) return '<div class="cad-review-hints muted">Không có tên địa điểm OSM trong lô — xem nhãn trên ảnh vệ tinh.</div>';
-  const label = levelLabel;
+  const label = (lv) => levelLabel(lv, p);
   const chips = h.slice(0, 4).map(({ name, lv }) => lv
     ? `<button type="button" class="cad-rev-hint" data-lv="${lv}" title="Chọn ${escapeHtml(label(lv))}">${escapeHtml(name)} → <b>${escapeHtml(label(lv))}</b></button>`
     : `<span class="cad-rev-hint off">${escapeHtml(name)}</span>`).join('');
@@ -535,12 +544,13 @@ function applyLevels(parcels) {
     }
     if (!p.school) return;
     const lv = levelOf(p.src);
-    const chosen = lv && lv !== LEVEL_REJECT;
+    const chosen = lv && lv !== LEVEL_REJECT && lv !== LEVEL_LAND;
     p.pending = !lv;
     p.rejected = lv === LEVEL_REJECT;
-    p.prefix = chosen ? lv : '';
-    p.type = chosen ? LAYER_PREFIXES[lv] : SCHOOL_PENDING;
-    p.nhom = lv === 'THPT' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
+    p.land = p.eduOther = lv === LEVEL_LAND;
+    p.prefix = chosen ? lv : p.land ? `LAND:${p.layer}` : '';
+    p.type = chosen ? LAYER_PREFIXES[lv] : p.land ? null : SCHOOL_PENDING;
+    p.nhom = lv === 'THPT' ? 'Cấp đô thị' : p.land ? '' : 'Cấp đơn vị ở';
   });
 }
 
@@ -619,11 +629,12 @@ function reviewHtml() {
   const btn = (code, label, cls = '', tip = '') => `<button type="button" class="cad-rev-btn${cls}${lv === code ? ' on' : ''}" data-lv="${code}"${tip ? ` title="${tip}"` : ''}>${label}</button>`;
   const btns = p.market
     ? `${MARKET_LEVELS.map(([code, label, tip]) => btn(code, `${ico('check')}${label}`, '', tip)).join('')}${btn(LEVEL_LAND, `${ico('close')}Không phải`, ' rej', 'Không phải chợ / TTTM: ranh lô ghi vào sheet DXF của đồ án')}`
-    : `${SCHOOL_LEVELS.map(([code, label]) => btn(code, `${ico('check')}${label}`)).join('')}${btn(LEVEL_REJECT, `${ico('close')}Từ chối`, ' rej')}`;
-  const lvText = { TM: 'chợ / TTTM', TM_DT: 'chợ / TTTM cấp đô thị', [LEVEL_LAND]: 'không phải chợ / TTTM', [LEVEL_REJECT]: 'từ chối',
-    ...Object.fromEntries(SCHOOL_LEVELS.map(([code, label]) => [code, label])) }[lv];
+    : `${SCHOOL_LEVELS.map(([code, label]) => btn(code, `${ico('check')}${label}`)).join('')}${btn(LEVEL_LAND, `${ico('check')}Khác`, '', EDU_OTHER_TIP)}${btn(LEVEL_REJECT, `${ico('close')}Từ chối`, ' rej')}`;
+  const lvText = !p.market && lv === LEVEL_LAND ? 'khác (đất đào tạo, nghiên cứu — lớp sử dụng đất)'
+    : { TM: 'chợ / TTTM', TM_DT: 'chợ / TTTM cấp đô thị', [LEVEL_LAND]: 'không phải chợ / TTTM', [LEVEL_REJECT]: 'từ chối',
+      ...Object.fromEntries(SCHOOL_LEVELS.map(([code, label]) => [code, label])) }[lv];
   const self = isAutoLot(p);
-  const why = !self ? '' : lv === LEVEL_LAND ? ` (dưới ${fmtNum(SMALL_MARKET_M2)} m²)` : ' (theo tên / ký hiệu lô / công trình đã có)';
+  const why = !self ? '' : lv === LEVEL_LAND && p.market ? ` (dưới ${fmtNum(SMALL_MARKET_M2)} m²)` : ' (theo tên / ký hiệu lô / công trình đã có)';
   const status = lv
     ? `${p.market ? 'Lô dịch vụ / thương mại' : 'Lô trường học'} — ${self ? 'tự nhận' : 'đã chọn'}: <b>${lvText}</b>${why}`
     : p.market ? 'Lô dịch vụ / thương mại — có phải chợ / TTTM?' : 'Lô trường học chưa rõ cấp';
@@ -758,6 +769,8 @@ function renderReport() {
   if (count.pending - pendingMarket > 0) alerts.push(['warn', `${count.pending - pendingMarket} lô trường học chưa rõ cấp (viền vàng nét đứt): chọn cấp trường hoặc từ chối từng lô ở khung duyệt trước khi ghi.`]);
   if (pendingMarket) alerts.push(['warn', `${pendingMarket} lô dịch vụ / thương mại chưa xác nhận (viền vàng nét đứt): chọn chợ / TTTM hoặc «Không phải» (ranh lô ghi sheet DXF) từng lô ở khung duyệt trước khi ghi.`]);
   if (count.rejected) alerts.push(['info', `${count.rejected} lô trường học đã từ chối: không ghi.`]);
+  const eduOther = parcels.filter(p => p.eduOther && p.ward).length;
+  if (eduOther) alerts.push(['info', `${eduOther} lô giáo dục khác (trường nghề, cao đẳng, đại học, trường chuyên biệt): không tính hạ tầng trường học, ranh lô ghi vào lớp sử dụng đất của đồ án (Đất đào tạo, nghiên cứu).`]);
   if (count.split) alerts.push(['warn', `${count.split} lô vắt ranh phường (phần lấn ≥ 5% và ≥ 50 m², nét đứt trắng là ranh cắt): dòng chính giữ nguyên lô (tên, diện tích, ranh, đồ án) tại phường chiếm phần lớn; mỗi phần ở phường khác ghi thêm 1 dòng <code>&lt;ID&gt;.2</code> chỉ để tính diện tích chỉ tiêu phường — không tính thêm số công trình.`]);
   if (count.cross) alerts.push(['warn', `${count.cross} lô vắt ranh phường không cắt được theo ranh: ghi quy mô = 0, diện tích thật ghi vào Ghi chú.`]);
   if (count.overlap) alerts.push(['warn', `${count.overlap} lô trùng công trình đang thuộc đồ án khác (${escapeHtml([...owners].slice(0, 3).join(', '))}${owners.size > 3 ? ', …' : ''}): mặc định không ghi đè. Tích «Chuyển sang đồ án này» ở từng lô nếu đồ án đang nhập thay thế đồ án cũ.`]);
@@ -1512,8 +1525,8 @@ function buildLands() {
     lands.push({
       name: lotName(p, p.layer, fileBase, idx),
       ward: p.ward,
-      nhom: landLabel(p.layer),
-      layer: p.layer,
+      nhom: landLabel(landLayerOf(p)),
+      layer: landLayerOf(p),
       lat: p.lat,
       lng: p.lng,
       area: p.area,
@@ -1555,7 +1568,7 @@ function landAreaByWard() {
   };
   current.result.parcels.forEach(p => {
     if (parcelAction(p).key !== 'land' || isPoint(p)) return;
-    const nhom = landLabel(p.layer);
+    const nhom = landLabel(landLayerOf(p));
     if (p.wardParts && p.wardParts.length) p.wardParts.forEach(part => add(part.ward, nhom, part.area));
     else add(p.ward, nhom, p.area);
   });
