@@ -789,10 +789,14 @@ export const SCHOOL_PICK = 'TRUONG';
 export const MARKET_PENDING = 'MARKET';
 export const MARKET_PICK = 'CHOTM';
 
+// Mảnh vụn số hóa (tam giác vài cm², VD QHPK Kim Long): làm tròn 0,1 m² thành 0, máy chủ từ chối cả lần ghi
+const SLIVER_M2 = 1;
+
 function makeParcels(entities, project) {
   const parcels = [];
   const unknownLayers = {};
   const tt16Other = {};
+  let slivers = 0;
   entities.forEach((ent, src) => {
     const tt = tt16Layer(ent.layer);
     // asLand: lô đất chưa sử dụng (cadTypeMapping.asUnusedLand) — lô đất, không đưa vào khớp thủ công
@@ -834,6 +838,7 @@ function makeParcels(entities, project) {
     if (!polys.length) return;
     const area = polys.reduce((s, p) => s + p.area, 0);
     if (!(area > 0)) return;
+    if (area < SLIVER_M2) { slivers++; return; }
     const main = polys.reduce((a, b) => (b.area > a.area ? b : a));
     // Tâm chung của mọi mảnh (trừ lỗ); rơi ra ngoài lô thì lấy điểm nằm sâu trong mảnh lớn nhất
     let sx = 0, sy = 0;
@@ -889,7 +894,7 @@ function makeParcels(entities, project) {
       && metersApart(h, p) < 1
       && Math.abs(h.area - p.area) <= 0.01 * h.area));
   });
-  return { parcels: kept, duplicatesDropped: parcels.length - kept.length - pointsInLots, pointsInLots, unknownLayers, tt16Other };
+  return { parcels: kept, duplicatesDropped: parcels.length - kept.length - pointsInLots, pointsInLots, slivers, unknownLayers, tt16Other };
 }
 
 /** Thực thể DXF (VN-2000) → { parcels, duplicatesDropped, unknownLayers, axes } */

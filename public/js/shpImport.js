@@ -119,6 +119,7 @@ export async function parseShapefileZip(buf) {
   if (noDbf.length) throw new Error(`Thiếu file .dbf đi kèm: ${noDbf.join(', ')}.shp — nén đủ .shp, .shx, .dbf, .prj.`);
 
   const features = [];
+  const fileLayers = new Set();
   const crsSet = new Set();
   let emptyShapes = 0;
   const text = async (e) => (e ? new TextDecoder().decode(await e.read()) : '');
@@ -128,6 +129,7 @@ export async function parseShapefileZip(buf) {
     const shapes = readShp(await g.shp.read());
     const rows = readDbf(await g.dbf.read(), await text(g.cpg));
     const hasLayer = rows.some(r => r && Object.keys(r).some(k => LAYER_FIELD.test(k)));
+    if (!hasLayer) fileLayers.add(g.name);
     shapes.forEach((geometry, i) => {
       const row = rows[i];
       if (row === null) return;
@@ -137,7 +139,7 @@ export async function parseShapefileZip(buf) {
       features.push({ type: 'Feature', properties, geometry });
     });
   }
-  const parsed = parseFeatures(features);
+  const parsed = parseFeatures(features, { fileLayers });
   if (emptyShapes) parsed.stats.skipped['hình rỗng'] = emptyShapes;
   const known = [...crsSet].filter(c => c !== 'NONE' && c !== 'OTHER');
   const crs = known.length === 1 && crsSet.size === 1 ? known[0] : null;

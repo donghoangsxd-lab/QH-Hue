@@ -791,6 +791,7 @@ function renderReport() {
   if (count.small) alerts.push(['info', `${count.small} lô nhỏ hơn diện tích tối thiểu của loại (vẫn nhập).`]);
   if (count.newPoint) alerts.push(['info', `${count.newPoint} điểm (không có ranh) tạo mới với quy mô = 0 (có công trình, chưa rõ diện tích) — bổ sung diện tích trong Sheet sau.`]);
   if (count.exists) alerts.push(['warn', `${count.exists} điểm cách công trình cùng loại đã có dưới 20 m: coi là đã có, bỏ qua.`]);
+  if (result.slivers) alerts.push(['info', `${result.slivers} mảnh vụn dưới 1 m² (lỗi số hóa): bỏ qua.`]);
   if (result.pointsInLots) alerts.push(['info', `${result.pointsInLots} điểm nằm trong lô cùng loại của file (điểm ghi chú của lô): bỏ qua.`]);
   const unknown = Object.entries(result.unknownLayers);
   const other = Object.entries(result.tt16Other || {});

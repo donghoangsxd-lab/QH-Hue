@@ -22,19 +22,23 @@ const CODE_FIELDS = [/^ky_?hieu/i, /^ma_?lo$/i, /^kh_?lo$/i, /^ma_?dat$/i];
 
 const knownLand = (s) => !!(tt16Layer(s) || landRule(s) || landPatternKey(s));
 
-function resolveLayer(props, name) {
+// fileLayers: tên file .shp dùng làm Layer khi DBF không có trường Layer — tên đồ án ("…Trung tâm Văn hóa Tây Nam")
+// trùng từ khóa loại đất thì mọi lô sẽ nhận nhầm 1 loại, nên chỉ dùng khi không có trường loại đất nào
+function resolveLayer(props, name, fileLayers) {
   const field = pickProp(props, LAYER_FIELD);
-  if (field && layerToType(field)) return field;
+  const real = fileLayers && fileLayers.has(field) ? '' : field;
+  if (real && layerToType(real)) return real;
   const t = name && layerToType(name);
   if (t) return t.prefix;
-  // Tên layer CAD (hoặc tên file .shp khi DBF không có trường Layer) không cho biết loại đất: lấy tên chức năng sử dụng đất,
+  // Tên layer CAD không cho biết loại đất: lấy tên chức năng sử dụng đất,
   // ưu tiên giá trị nhận ra nhóm đất, không thì giá trị đầu tiên có chữ (tên loại đất luôn đọc được), cuối cùng là ký hiệu lô
-  if (!field || !knownLand(field)) {
+  if (!real || !knownLand(real)) {
     const classes = CLASS_FIELDS.map(re => pickProp(props, re)).filter(v => /\p{L}/u.test(v));
     const cls = classes.find(knownLand) || classes[0];
     if (cls) return cls;
     const code = CODE_FIELDS.map(re => pickProp(props, re)).find(v => v && landPatternKey(v));
     if (code) return code;
+    if (!real && name && knownLand(name)) return name;
   }
   return field || name || '(không tên)';
 }
@@ -81,15 +85,15 @@ export function parseGeoJson(text) {
   return parseFeatures(features);
 }
 
-/** Mảng Feature GeoJSON (đã đọc) → kết quả như parseGeoJson; dùng chung cho shapefile */
-export function parseFeatures(features) {
+/** Mảng Feature GeoJSON (đã đọc) → kết quả như parseGeoJson; dùng chung cho shapefile (fileLayers: Set tên file gán làm Layer) */
+export function parseFeatures(features, { fileLayers = null } = {}) {
   const stats = { feature: features.length, polygon: 0, polyline: 0, line: 0, point: 0, skipped: {} };
   const skip = (label, n = 1) => { if (n) stats.skipped[label] = (stats.skipped[label] || 0) + n; };
   const entities = [];
   for (const f of features) {
     const props = (f && f.properties) || {};
     const name = pickProp(props, NAME_FIELD);
-    const layer = resolveLayer(props, name);
+    const layer = resolveLayer(props, name, fileLayers);
     // Thuộc tính dạng chữ/số (để khớp thủ công khi tên không theo quy ước)
     const attrs = {};
     Object.entries(props).forEach(([k, v]) => {
