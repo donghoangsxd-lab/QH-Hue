@@ -1,4 +1,4 @@
-import { state, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_HIGHLIGHT_STYLE } from './state.js';
+import { state, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_FOCUS_STYLE } from './state.js';
 import { escapeHtml, wardLabelFontSize } from './utils.js';
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap } from './basemap.js';
@@ -141,12 +141,35 @@ export function renderPlanBoundaries() {
   });
 }
 
+// Viền phường đang chọn nằm trên ranh đồ án (projectGlowPane 445) và lô đất, dưới nhãn đường (450) và biểu tượng (600)
+const WARD_FOCUS_PANE = 'wardFocusPane';
+const WARD_FOCUS_Z = 448;
+const focusRenderers = new WeakMap();
+
+/** Lớp phường đang chọn trên bản đồ m: nền đỏ nhạt (overlayPane) + quầng tối và viền đỏ tươi (pane riêng) */
+export function wardFocusLayer(m, geometry) {
+  if (!m.getPane(WARD_FOCUS_PANE)) {
+    const pane = m.createPane(WARD_FOCUS_PANE);
+    pane.style.zIndex = WARD_FOCUS_Z;
+    pane.style.pointerEvents = 'none';
+  }
+  if (!focusRenderers.has(m)) focusRenderers.set(m, L.canvas({ pane: WARD_FOCUS_PANE }));
+  const renderer = focusRenderers.get(m);
+  const feature = { type: 'Feature', geometry, properties: {} };
+  const { fill, halo, line } = WARD_FOCUS_STYLE;
+  return L.featureGroup([
+    L.geoJSON(feature, { style: fill, interactive: false }),
+    L.geoJSON(feature, { style: halo, interactive: false, renderer, pane: WARD_FOCUS_PANE }),
+    L.geoJSON(feature, { style: line, interactive: false, renderer, pane: WARD_FOCUS_PANE })
+  ]);
+}
+
 export function highlightPlanWard(wardName) {
   planHighlightLayer.clearLayers();
-  if (!wardName || wardName === "Thành phố Huế") return;
+  if (!planMap || !wardName || wardName === "Thành phố Huế") return;
   const w = (state.wardLabelsList || []).find(x => x.name === wardName);
   if (!w || !w.geometry) return;
-  planHighlightLayer.addLayer(L.geoJSON({ type: 'Feature', geometry: w.geometry }, { style: WARD_HIGHLIGHT_STYLE, interactive: false }));
+  planHighlightLayer.addLayer(wardFocusLayer(planMap, w.geometry));
 }
 
 export function setPlanHeatUrl(url) {

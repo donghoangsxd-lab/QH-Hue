@@ -134,7 +134,12 @@ export const infraLabels = {
 // Ranh giới phường xã: nét viền ghi xám vẽ dưới + nét vàng nhạt vẽ trên (đổ bóng rẻ, không dùng CSS filter)
 export const WARD_BOUNDARY_SHADOW_STYLE = { color: '#64748b', weight: 4, opacity: 0.55, fill: false, interactive: false };
 export const WARD_BOUNDARY_LINE_STYLE = { color: '#fde68a', weight: 1.6, opacity: 0.95, fill: false, interactive: false };
-export const WARD_HIGHLIGHT_STYLE = { color: '#fb923c', weight: 3.5, dashArray: '6,6', fillColor: '#fb923c', fillOpacity: 0.15, interactive: false };
+// Phường đang chọn: nền đỏ nhạt nằm dưới lô đồ án (không che hoa văn), viền đỏ tươi + quầng tối nằm trên ranh đồ án
+export const WARD_FOCUS_STYLE = {
+  fill: { stroke: false, fillColor: '#ff1f1f', fillOpacity: 0.1 },
+  halo: { color: '#1a0505', weight: 7, opacity: 0.5, fill: false, lineJoin: 'round' },
+  line: { color: '#ff1f1f', weight: 3.5, opacity: 1, fill: false, lineJoin: 'round' }
+};
 
 // Màu vùng phủ, biểu đồ và ô màu danh sách lớp lấy đúng màu hoa văn ranh lô TT16: PCCC thuộc đất an ninh, nhà tang lễ thuộc đất nghĩa trang.
 const TT16_COLOR_OF = {

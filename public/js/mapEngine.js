@@ -1,5 +1,5 @@
 import {
-  state, infraLabels, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_HIGHLIGHT_STYLE, PLAN_CHANGE_INFO,
+  state, infraLabels, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, PLAN_CHANGE_INFO,
   BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, getBufferStyle, getPlanScenarioList, effectiveRadius, bumpDataVersion, layerType,
   isNetworkType, ntKindOf, NT_KIND_LABELS, parkTierOf
 } from './state.js';
@@ -14,7 +14,7 @@ import { tt16ParcelStyle, infraStyleKey, renderTt16Legend, landParcelStyle, land
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap } from './basemap.js';
 import {
-  getCoveredRightWidth, highlightPlanWard, planMap, planLayers, syncPlanLayer,
+  getCoveredRightWidth, highlightPlanWard, wardFocusLayer, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, getViewMode, setViewMode
 } from './planMap.js';
 import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, PROJECT_LAYERS } from './projectFiles.js';
@@ -357,7 +357,7 @@ export function highlightWardBoundary(wardName, { fitView = true } = {}) {
 
   const wardInfo = state.wardLabelsList.find(w => w.name === wardName);
   if (wardInfo && wardInfo.geometry) {
-    const highlightLayer = L.geoJSON({ type: "Feature", geometry: wardInfo.geometry, properties: {} }, { style: WARD_HIGHLIGHT_STYLE, interactive: false });
+    const highlightLayer = wardFocusLayer(map, wardInfo.geometry);
     layers.highlightWard.addLayer(highlightLayer);
 
     if (fitView) {
