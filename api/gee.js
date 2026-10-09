@@ -544,19 +544,27 @@ async function callAppsScript(params, body = null) {
   try {
     // text/plain: Apps Script đưa nguyên chuỗi JSON vào e.postData.contents.
     // application/json đôi khi bị bỏ body, doPost chỉ thấy query rồi trả "Action không hợp lệ".
-    res = body
-      ? await axios.post(url, JSON.stringify(body), {
-          ...opts,
-          maxBodyLength: Infinity,
-          maxRedirects: 0,
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          transformRequest: [data => data]
-        })
-      : await axios.get(url, opts);
-    const locHeader = res && res.headers && res.headers.location;
-    const loc = Array.isArray(locHeader) ? locHeader[0] : locHeader;
-    if (body && loc && res.status >= 300 && res.status < 400) {
-      res = await axios.get(String(loc).startsWith('http') ? loc : new URL(loc, url).href, opts);
+    const post = (target) => axios.post(target, JSON.stringify(body), {
+      ...opts,
+      maxBodyLength: Infinity,
+      maxRedirects: 0,
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      transformRequest: [data => data]
+    });
+    const locOf = (r) => {
+      const h = r && r.headers && r.headers.location;
+      return r && r.status >= 300 && r.status < 400 ? (Array.isArray(h) ? h[0] : h) : null;
+    };
+    res = body ? await post(url) : await axios.get(url, opts);
+    // Chuyển hướng sang /exec khác (/a/macros/..., /u/0/...) phải POST lại, đọc bằng GET sẽ rơi vào doGet và mất body.
+    // Chỉ trang kết quả echo (googleusercontent) mới đọc bằng GET
+    let prev = url;
+    for (let hop = 0; body && hop < 3 && locOf(res); hop++) {
+      const next = new URL(String(locOf(res)), prev).href;
+      prev = next;
+      if (/\/exec$/.test(new URL(next).pathname)) { res = await post(next); continue; }
+      res = await axios.get(next, opts);
+      break;
     }
   } catch (e) {
     throw httpError(502, 'Không kết nối được Google Apps Script');
@@ -2004,7 +2012,13 @@ module.exports = async (req, res) => {
         });
       }
       if (items.length && !Array.isArray(result.lotIds)) {
-        return res.status(502).json({ error: true, message: 'Apps Script chưa trả mã lô (lotIds). Deploy Code.gs → New version, rồi bấm Ghi lại để ghi tiếp.' });
+        const asGet = result && result.type === 'FeatureCollection';
+        return res.status(502).json({
+          error: true,
+          message: asGet
+            ? 'Apps Script nhận lệnh ghi thành lệnh đọc (doGet, mất dữ liệu POST), Sheet chưa bị ghi. Kiểm tra GAS_BASE_URL trên Vercel là URL /exec của deployment đang dùng (Manage deployments → Edit → New version, không tạo deployment mới), rồi bấm Ghi lại.'
+            : `Apps Script chưa trả mã lô (lotIds), phản hồi chỉ có: ${Object.keys(result || {}).slice(0, 8).join(', ') || 'rỗng'}. Deploy Code.gs → New version, rồi bấm Ghi lại để ghi tiếp.`
+        });
       }
       const saved = await projects.saveChunk({
         tenQH,
