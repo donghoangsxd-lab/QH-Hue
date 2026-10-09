@@ -83,6 +83,9 @@ export const PROJECT_INFO_EVENT = 'qh:project-info';
 export const layerKey = (tenQH, key) => `${tenQH}|${key}`;
 export const isLayerHidden = (tenQH, key) => state.hiddenProjectLayers.has(layerKey(tenQH, key));
 
+// Điểm chức năng không tên (cây, cột đèn… của lớp điểm gServer không có cột tên) không mang thông tin: bỏ khi tải
+const namedPoints = (list) => (Array.isArray(list) ? list.filter(p => p && String(p.name || '').trim()) : []);
+
 async function fetchRole(entry, role) {
   const res = await fetch(`${base}${entry.slug}/${role}.json?v=${entry.saved || 0}`);
   if (res.status === 404) return null;
@@ -98,7 +101,7 @@ async function loadDir(entry) {
   ]);
   return {
     parcels: [...((ht && ht.parcels) || []), ...((qh && qh.parcels) || [])],
-    points: (pts && Array.isArray(pts.points)) ? pts.points : []
+    points: namedPoints(pts && pts.points)
   };
 }
 
@@ -132,7 +135,7 @@ async function loadEntry(entry) {
   const res = await fetch(geeApi(q));
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
-  const row = { saved: entry.saved || 0, legacy: !!entry.legacy, parcels: data.parcels || [], points: data.points || [] };
+  const row = { saved: entry.saved || 0, legacy: !!entry.legacy, parcels: data.parcels || [], points: namedPoints(data.points) };
   cache.set(entry.tenQH, row);
   return row;
 }

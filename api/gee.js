@@ -382,15 +382,16 @@ function parseCadSplits(raw, layer, phases) {
   return out;
 }
 
-// 1 điểm chức năng (ghi file diem-chuc-nang.json, không vào Sheet)
+// 1 điểm chức năng (ghi file diem-chuc-nang.json, không vào Sheet); điểm không tên bỏ qua
 function parseCadPoints(raw) {
   const out = [];
   raw.slice(0, 20000).forEach(p => {
     if (!p || typeof p !== 'object') return;
     const pt = parseCoordInBounds(p.lat, p.lng);
-    if (!pt) return;
+    const name = sanitizeSheetText(p.name, 150);
+    if (!pt || !name) return;
     out.push({
-      name: sanitizeSheetText(p.name, 150),
+      name,
       layer: sanitizeSheetText(p.layer, 60),
       lat: Math.round(pt.lat * 1e6) / 1e6,
       lng: Math.round(pt.lng * 1e6) / 1e6

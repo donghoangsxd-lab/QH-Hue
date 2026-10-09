@@ -1683,7 +1683,7 @@ function buildStoredPoints() {
   const crs = CRS_PRESETS[src.crs] || CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
   const out = [];
   src.entities.forEach(e => {
-    if (!e || e.kind !== 'POINT' || !Array.isArray(e.pt)) return;
+    if (!e || e.kind !== 'POINT' || !Array.isArray(e.pt) || !String(e.name || '').trim()) return;
     const x = Number(e.pt[0]);
     const y = Number(e.pt[1]);
     let lat;
