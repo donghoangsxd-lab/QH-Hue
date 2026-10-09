@@ -656,7 +656,8 @@ function decisionHtml() {
 
 // ============================ BẢNG ============================
 
-const haCell = (v) => (v > 0 ? fmtNum(v) : '');
+const HA_FORMAT = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const haCell = (v) => (v > 0 ? HA_FORMAT.format(v) : '');
 const pctTxt = (v) => (v > 0 ? fmtNum(v) : '');
 
 // Ô ký hiệu: nền hoa văn TT16 như chú giải (khi phóng to), viền = màu tô khi thu nhỏ; đất không có hoa văn TT16 tô đặc.
@@ -669,7 +670,8 @@ function swatchHtml(r) {
   return `<i style="${bg}border-color:${r.tone}"></i>`;
 }
 
-function landRowTitle(r) {
+function landRowTitle(r, sum) {
+  if (sum.byBoundary && r.key === sum.gtKey) return 'Đất giao thông = diện tích ranh đồ án − tổng các loại đất còn lại';
   if (r.undetermined) {
     const gap = [r.gapHtHa > 0 ? `HT ${fmtNum(r.gapHtHa)} ha` : '', r.gapQhHa > 0 ? `QH ${fmtNum(r.gapQhHa)} ha` : ''].filter(Boolean).join(', ');
     return `Tạm thời: lô có layer chưa rõ đầu mục (tô đen trên bản đồ)${gap ? ` + phần chênh ${gap} để tổng hiện trạng = tổng quy hoạch` : ''}`;
@@ -677,16 +679,29 @@ function landRowTitle(r) {
   return 'Bấm để xem các lô trên bản đồ';
 }
 
+// Ghi chú dưới bảng: nguồn tổng diện tích, hatch giao thông đo được để tự đối chiếu, các loại đất vượt ranh
+function landNotesHtml(sum) {
+  if (!sum.byBoundary) return '';
+  const both = (ht, qh) => [ht > 0 ? `hiện trạng ${haCell(ht)} ha` : '', qh > 0 ? `quy hoạch ${haCell(qh)} ha` : ''].filter(Boolean).join(', ');
+  const src = session.boundarySource === 'gis' ? 'ranh file GIS' : 'ranh tự dựng từ các lô';
+  const notes = [`Tổng cộng = diện tích ${src}${session.boundaryClosed ? ' (đã tự khép kín)' : ''}; đất giao thông = tổng − các loại đất còn lại.`];
+  const hatch = both(sum.gtHatchHtHa, sum.gtHatchQhHa);
+  if (hatch) notes.push(`<b>(Lưu ý: Đất giao thông theo hatch đo được là ${hatch})</b>`);
+  const over = both(sum.overHtHa, sum.overQhHa);
+  if (over) notes.push(`Các loại đất trong ranh cộng lại vượt diện tích ranh (${over}) do lô chồng nhau, đất giao thông tạm ghi 0.`);
+  return notes.map(t => `<div class="review-note">${t}</div>`).join('');
+}
+
 function landTableHtml() {
   const table = LANDUSE_TABLES[session.kind];
-  const sum = landUseSummary(session.lots, session.kind);
+  const sum = landUseSummary(session.lots, session.kind, { boundaryM2: session.boundaryM2 });
   const body = sum.rows.map(r => {
     if (r.kind === 'section') {
       return `<tr class="lu-section"><td>${r.section}</td><td colspan="2">${escapeHtml(r.label)}</td>
         <td>${haCell(r.htHa)}</td><td>${pctTxt(r.htPct)}</td><td>${haCell(r.qhHa)}</td><td>${pctTxt(r.qhPct)}</td></tr>`;
     }
     const key = `land:${r.key}`;
-    return `<tr class="lu-row${r.sub ? ' lu-sub' : ''}${r.part ? ' lu-part' : ''}${r.undetermined ? ' lu-undet' : ''}${focusKey === key ? ' on' : ''}" data-focus="${key}" title="${escapeHtml(landRowTitle(r))}">
+    return `<tr class="lu-row${r.sub ? ' lu-sub' : ''}${r.part ? ' lu-part' : ''}${r.undetermined ? ' lu-undet' : ''}${focusKey === key ? ' on' : ''}" data-focus="${key}" title="${escapeHtml(landRowTitle(r, sum))}">
       <td>${r.stt}</td><td>${escapeHtml(r.label)}</td>
       <td class="lu-code" title="${r.code ? `Tên phân lớp TT16: ${escapeHtml(r.code)}. ` : ''}Bản đồ: thu nhỏ tô màu viền ô, phóng to (zoom ≥ ${TT16_PATTERN_ZOOM}) tô hoa văn TT16">${swatchHtml(r)}${escapeHtml(r.sym || '')}</td>
       <td>${haCell(r.htHa)}</td><td>${pctTxt(r.htPct)}</td><td>${haCell(r.qhHa)}</td><td>${pctTxt(r.qhPct)}</td></tr>`;
@@ -699,9 +714,9 @@ function landTableHtml() {
         <tr><th>ha</th><th>%</th><th>ha</th><th>%</th></tr>
       </thead>
       <tbody>${body}
-        <tr class="lu-total"><td></td><td colspan="2">${totalLabel}</td><td>${haCell(sum.totalHT)}</td><td>${sum.totalHT > 0 ? '100' : ''}</td><td>${haCell(sum.totalQH)}</td><td>${sum.totalQH > 0 ? '100' : ''}</td></tr>
+        <tr class="lu-total"${sum.byBoundary ? ' title="Diện tích theo ranh đồ án"' : ''}><td></td><td colspan="2">${totalLabel}</td><td>${haCell(sum.totalHT)}</td><td>${sum.totalHT > 0 ? '100' : ''}</td><td>${haCell(sum.totalQH)}</td><td>${sum.totalQH > 0 ? '100' : ''}</td></tr>
       </tbody>
-    </table></div>`;
+    </table></div>${landNotesHtml(sum)}`;
 }
 
 function askHtml() {
@@ -1303,15 +1318,68 @@ function savedLot(p, i) {
   };
 }
 
+// Vòng ranh chưa khép (điểm cuối ≠ điểm đầu) thì nối về điểm đầu; dưới 3 đỉnh → bỏ
+function closeRing(ring) {
+  const pts = (ring || []).filter(c => Array.isArray(c) && Number.isFinite(c[0]) && Number.isFinite(c[1]));
+  if (pts.length < 3) return null;
+  const a = pts[0], b = pts[pts.length - 1];
+  if (a[0] === b[0] && a[1] === b[1]) return pts.length >= 4 ? { ring: pts, closed: false } : null;
+  return { ring: [...pts, a], closed: true };
+}
+
+/** Ranh đồ án thành vùng khép kín: Polygon / MultiPolygon, hoặc ranh còn dạng đường (LineString) thì khép kín. Không dựng được → null */
+function closedBoundary(geom) {
+  if (!geom || typeof turf === 'undefined') return null;
+  const shapes = geom.type === 'Polygon' ? [geom.coordinates]
+    : geom.type === 'MultiPolygon' ? geom.coordinates
+    : geom.type === 'LineString' ? [[geom.coordinates]]
+    : geom.type === 'MultiLineString' ? geom.coordinates.map(line => [line]) : [];
+  let closed = false;
+  const polys = [];
+  shapes.forEach(rings => {
+    const fixed = (rings || []).map(closeRing);
+    if (!fixed[0]) return;
+    const holes = fixed.slice(1).filter(Boolean);
+    const poly = [fixed[0].ring, ...holes.map(h => h.ring)];
+    try {
+      turf.polygon(poly);
+      polys.push(poly);
+      if (fixed[0].closed || holes.some(h => h.closed)) closed = true;
+    } catch (e) { /* vòng ranh hỏng */ }
+  });
+  if (!polys.length) return null;
+  const feature = polys.length === 1 ? turf.polygon(polys[0]) : turf.multiPolygon(polys);
+  return { feature, m2: turf.area(feature), closed, bbox: turf.bbox(feature) };
+}
+
+// Phần diện tích lô nằm trong ranh (m²): lô của file đồ án có thể chìa ra ngoài ranh (ao hồ, sông, lớp vùng lân cận)
+function areaInside(bound, geometry, area) {
+  if (!bound || !geometry) return area;
+  try {
+    const [x0, y0, x1, y1] = turf.bbox(geometry);
+    const [bx0, by0, bx1, by1] = bound.bbox;
+    if (x1 < bx0 || x0 > bx1 || y1 < by0 || y0 > by1) return 0;
+    const hit = turf.intersect(bound.feature, turf.feature(geometry));
+    return hit ? Math.min(area, turf.area(hit)) : 0;
+  } catch (e) {
+    try { return turf.booleanPointInPolygon(turf.pointOnFeature(geometry), bound.feature) ? area : 0; } catch (err) { return area; }
+  }
+}
+
 async function openProjectInfo(project) {
   if (!project) return;
   if (session && !session.saved && !session.pendingId && !confirm('Đóng hồ sơ thẩm định đang mở để xem thông tin đồ án?')) return;
   showToast(`Đang tải lô đất «${project}»…`);
   try { await projectLayersOf(project); } catch (err) { showToast(`Không tải được đồ án: ${err.message}`, 'error'); return; }
-  const lots = cachedLots(project).map(savedLot).filter(Boolean);
+  const entry = (state.projectCatalog || []).find(p => p && p.tenQH === project) || {};
+  const bound = closedBoundary(entry.boundary);
+  const lots = cachedLots(project).map((p, i) => {
+    const lot = savedLot(p, i);
+    if (lot && bound) lot.areaIn = areaInside(bound, p.geometry, lot.area);
+    return lot;
+  }).filter(Boolean);
   if (!lots.length) { showToast('Đồ án chưa có lô sử dụng đất', 'error'); return; }
   const pop = loadPops()[project] || {};
-  const entry = (state.projectCatalog || []).find(p => p && p.tenQH === project) || {};
   const has = (ph) => lots.some(l => l.phase === ph);
   autoCompare(lots);
   newSession({
@@ -1319,6 +1387,7 @@ async function openProjectInfo(project) {
     popHT: Number(pop.ht) || Number(entry.popHT) || 0,
     popQH: Number(pop.qh) || Number(entry.popQH) || 0,
     files: { HT: has('HT') ? 'Sử dụng đất hiện trạng' : '', QH: has('QH') ? 'Sử dụng đất quy hoạch' : '' },
+    boundaryM2: bound ? bound.m2 : 0, boundaryClosed: !!bound?.closed, boundarySource: entry.boundarySource === 'gis' ? 'gis' : 'auto',
     lots, saved: true
   });
 }
@@ -1337,7 +1406,7 @@ function saveStore(list) {
 }
 
 function rememberSent(sentId) {
-  const land = landUseSummary(session.lots, session.kind);
+  const land = landUseSummary(session.lots, session.kind, { boundaryM2: session.boundaryM2 });
   const list = loadStore();
   list.unshift({
     id: sentId || `${Date.now().toString(36)}${Math.random().toString(16).slice(2, 8)}`,

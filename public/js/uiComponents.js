@@ -177,11 +177,12 @@ function updateAuthUi() {
 }
 
 // ================== BIỂU ĐỒ DONUT CƠ CẤU DIỆN TÍCH ==================
+// THPT mang type 4-TH khi tính độ phủ (constants.codeMap) nên tách bằng layerType như thẻ số lượng
 function sumAreaByType(list) {
   const totals = {};
   let sum = 0;
   (list || []).forEach(item => {
-    const type = item.type || 'Khác';
+    const type = layerType(item) || 'Khác';
     if (!isApproved(item.status) || !PIE_LABELS[type]) return;
     const size = Number(item.size || 0);
     // Diện tích = 0 vẫn tính 1 đơn vị để donut không trống

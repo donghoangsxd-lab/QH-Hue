@@ -173,6 +173,8 @@ const PENDING_SUBS = new Set(['school', 'pending']);
 export const UNDETERMINED_KEY = 'undetermined';
 // Chênh lệch tổng HT / QH dưới ngưỡng này (m²) coi là sai số vẽ hatch, không dồn vào "Chưa xác định"
 const BALANCE_MIN_M2 = 1;
+// Đầu mục đất giao thông nhận phần còn lại của ranh (QHC: giao thông đô thị; giao thông đối ngoại vẫn tính theo hatch)
+const ROAD_KEY = { QHC: 'dd_gt', QHPK: 'gt' };
 
 /** Ký hiệu của đầu mục / nhóm con: { tt16: khóa TT16 | null, tone: màu tô khi thu nhỏ } */
 export function landSymbol(kind, rowKey, subKey = '') {
@@ -251,41 +253,61 @@ export function landSubKey(lot, kind) {
 }
 
 /**
- * Bảng cân đối: diện tích (ha) và tỷ lệ (%) hiện trạng / quy hoạch theo đúng thứ tự và số thứ tự mẫu TT16,
- * chỉ liệt kê đầu mục (và nhóm con) có diện tích HT hoặc QH > 0; dòng cuối "Chưa xác định" gồm lô chưa rõ đầu mục (landKey null)
- * và phần chênh để tổng HT = tổng QH khi có cả 2 file.
- * lots: [{ phase, layer, landKey, subKey, area (m²) }]; landKey 'skip' không tính.
+ * Bảng cân đối: diện tích (ha, 1 số lẻ) và tỷ lệ (%) hiện trạng / quy hoạch theo đúng thứ tự và số thứ tự mẫu TT16,
+ * chỉ liệt kê đầu mục (và nhóm con) có diện tích HT hoặc QH > 0; dòng cuối "Chưa xác định" gồm lô chưa rõ đầu mục (landKey null).
+ * Có ranh đồ án (boundaryM2): tổng = diện tích ranh, các loại đất lấy phần lô trong ranh (areaIn),
+ * đất giao thông = tổng − các loại đất còn lại (hatch giao thông chỉ để đối chiếu).
+ * Không có ranh: tổng = cộng các lô, phần chênh để tổng HT = tổng QH dồn vào "Chưa xác định".
+ * lots: [{ phase, layer, landKey, subKey, area, areaIn? (m²) }]; landKey 'skip' không tính.
  */
-export function landUseSummary(lots, kind) {
+export function landUseSummary(lots, kind, { boundaryM2 = 0 } = {}) {
   const table = LANDUSE_TABLES[kind];
   const sum = { HT: {}, QH: {} };
   const add = (ph, key, v) => { sum[ph][key] = (sum[ph][key] || 0) + v; };
   const undet = { HT: 0, QH: 0 };
+  const present = { HT: false, QH: false };
+  const bound = Number(boundaryM2) > 0 ? Number(boundaryM2) : 0;
   lots.forEach(p => {
     if (p.landKey === 'skip') return;
     const ph = p.phase === 'HT' ? 'HT' : 'QH';
-    const v = Number(p.area) || 0;
+    present[ph] = true;
+    // Có ranh: chỉ tính phần lô nằm trong ranh (areaIn, m²)
+    const v = bound && Number.isFinite(p.areaIn) ? p.areaIn : Number(p.area) || 0;
     if (!p.landKey) { undet[ph] += v; return; }
     add(ph, p.landKey, v);
-    const split = residentialSubAreas(p, kind);
+    const split = residentialSubAreas(v === p.area ? p : { ...p, area: v }, kind);
     if (split) Object.entries(split).forEach(([k, a]) => add(ph, `${p.landKey}/${k}`, a));
     else if (p.subKey) add(ph, `${p.landKey}/${p.subKey}`, v);
   });
   const leafRows = table.rows.filter(r => r.key && !r.sumOf);
+  const gtKey = ROAD_KEY[kind];
+  const gtHatch = { HT: 0, QH: 0 };
+  const over = { HT: 0, QH: 0 };
+  if (bound) {
+    ['HT', 'QH'].forEach(ph => {
+      if (!present[ph]) return;
+      gtHatch[ph] = sum[ph][gtKey] || 0;
+      const others = leafRows.reduce((s, r) => s + (r.key === gtKey ? 0 : sum[ph][r.key] || 0), 0) + undet[ph];
+      sum[ph][gtKey] = Math.max(0, bound - others);
+      over[ph] = Math.max(0, others - bound);
+    });
+  }
   const total = { HT: 0, QH: 0 };
   leafRows.forEach(r => { total.HT += sum.HT[r.key] || 0; total.QH += sum.QH[r.key] || 0; });
-  // Cùng 1 ranh đồ án nên tổng HT = tổng QH: bên thiếu (hatch chưa phủ hết ranh) dồn phần chênh vào "Chưa xác định"
   total.HT += undet.HT;
   total.QH += undet.QH;
   const gap = { HT: 0, QH: 0 };
-  if (lots.some(p => p.phase === 'HT') && lots.some(p => p.phase !== 'HT') && Math.abs(total.QH - total.HT) >= BALANCE_MIN_M2) {
+  if (bound) {
+    ['HT', 'QH'].forEach(ph => { if (present[ph]) total[ph] = bound; });
+  } else if (present.HT && present.QH && Math.abs(total.QH - total.HT) >= BALANCE_MIN_M2) {
+    // Cùng 1 ranh đồ án nên tổng HT = tổng QH: bên thiếu (hatch chưa phủ hết ranh) dồn phần chênh vào "Chưa xác định"
     const side = total.QH > total.HT ? 'HT' : 'QH';
     gap[side] = Math.abs(total.QH - total.HT);
     undet[side] += gap[side];
     total[side] += gap[side];
   }
   const pct = (v, t) => (t > 0 ? Math.round(v / t * 1000) / 10 : 0);
-  const ha = (m2) => Math.round(m2 / 100) / 100;
+  const ha = (m2) => Math.round(m2 / 1000) / 10;
   const cells = (ht, qh) => ({ htHa: ha(ht), htPct: pct(ht, total.HT), qhHa: ha(qh), qhPct: pct(qh, total.QH) });
   let section = null, stt = 0;
   const out = [];
@@ -327,7 +349,11 @@ export function landUseSummary(lots, kind) {
       undetermined: true, gapHtHa: ha(gap.HT), gapQhHa: ha(gap.QH), ...cells(undet.HT, undet.QH)
     });
   }
-  return { rows, totalHT: ha(total.HT), totalQH: ha(total.QH), sections: Object.keys(sectionTotals) };
+  return {
+    rows, totalHT: ha(total.HT), totalQH: ha(total.QH), sections: Object.keys(sectionTotals),
+    byBoundary: !!bound, gtKey,
+    gtHatchHtHa: ha(gtHatch.HT), gtHatchQhHa: ha(gtHatch.QH), overHtHa: ha(over.HT), overQhHa: ha(over.QH)
+  };
 }
 
 /**

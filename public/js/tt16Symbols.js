@@ -473,10 +473,19 @@ function patternFor(key) {
   return tile.pattern;
 }
 
-// Loại hạ tầng + tên layer gốc → khóa ký hiệu (lô Thể dục thể thao dùng ký hiệu riêng trong nhóm Văn hóa, thể thao);
-// loại không có ký hiệu → null (tô màu trung tính), không mượn ký hiệu chưa sử dụng
-function styleKey(type, layer) {
-  if (type === '8-VH' && /THEDUCTHETHAO/i.test(layer || '')) return 'TDTT';
+// "Văn hóa thể thao" (DAT_NDD_VANHOATHETHAO, nhà văn hóa - thể thao) vẫn là văn hóa; thể thao chỉ khi không kèm văn hóa
+const SPORT_RE = /THEDUC|TDTT|SANVANDONG|SANGOLF|SANBONG|NHATHIDAU|BEBOI/;
+function isSportText(text) {
+  const s = foldLayer(text).replace(/[^A-Z0-9]/g, '');
+  return SPORT_RE.test(s) || (s.includes('THETHAO') && !s.includes('VANHOA'));
+}
+
+/**
+ * Loại hạ tầng + tên layer gốc / tên công trình → khóa ký hiệu. Công trình thể dục thể thao dùng ký hiệu TDTT riêng (xanh)
+ * dù vẫn thuộc loại 8-VH khi tính chỉ tiêu; loại không có ký hiệu → null (tô màu trung tính), không mượn ký hiệu chưa sử dụng
+ */
+export function infraStyleKey(type, layer, name) {
+  if (type === '8-VH' && (isSportText(layer) || isSportText(name))) return 'TDTT';
   return TT16_STYLES[type] ? type : null;
 }
 
@@ -484,10 +493,10 @@ function styleKey(type, layer) {
  * Style Leaflet cho ranh lô. layer: tên layer gốc trong file (tiền tố HT_ / QHDD_ / QHDH_ quyết định kiểu viền);
  * scenario: 'QH' khi vẽ trên bản đồ quy hoạch (layer không có tiền tố thì coi là quy hoạch đợt đầu);
  * detailed: phóng to → hoa văn cùng màu ký hiệu; thu nhỏ → tô đặc đúng màu đó.
- * approved = false → viền đỏ nét đứt (chờ duyệt).
+ * approved = false → viền đỏ nét đứt (chờ duyệt). name: tên công trình (nhận thể dục thể thao khi layer không ghi).
  */
-export function tt16ParcelStyle(type, layer, { scenario, detailed, approved }) {
-  const key = styleKey(type, layer);
+export function tt16ParcelStyle(type, layer, { scenario, detailed, approved, name }) {
+  const key = infraStyleKey(type, layer, name);
   return tt16SymbolStyle(key, key ? TT16_STYLES[key].color : null, layer, { scenario, detailed, approved });
 }
 

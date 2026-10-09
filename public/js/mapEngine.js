@@ -10,7 +10,7 @@ import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, show
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
-import { tt16ParcelStyle, renderTt16Legend, landParcelStyle, landLabel, landColor, landPatternKey, tt16SwatchCss, TT16_PATTERN_ZOOM, TT16_STYLES } from './tt16Symbols.js';
+import { tt16ParcelStyle, infraStyleKey, renderTt16Legend, landParcelStyle, landLabel, landColor, landPatternKey, tt16SwatchCss, TT16_PATTERN_ZOOM, TT16_STYLES } from './tt16Symbols.js';
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap } from './basemap.js';
 import {
@@ -696,7 +696,7 @@ function parcelFor(p) {
 
 function parcelStyle(entry, detailed) {
   const p = entry.point;
-  return tt16ParcelStyle(layerType(p), entry.parcel.layer, { scenario: p.scenario, detailed, approved: isApproved(p.status) });
+  return tt16ParcelStyle(layerType(p), entry.parcel.layer, { scenario: p.scenario, detailed, approved: isApproved(p.status), name: p.name });
 }
 
 // Tên công trình bám theo con trỏ khi rê lên icon / chấm / ranh lô (chưa bấm)
@@ -1186,7 +1186,7 @@ const isBusyTool = () => state.isPickMode || state.activeMeasureType || state.ad
 // Lô hạ tầng của đồ án: tô ký hiệu TT16 theo loại công trình trên Sheet (cùng mã lô), bấm mở popup công trình
 function infraLotShape(lot, item, m, detailed) {
   const style = item
-    ? tt16ParcelStyle(layerType(item), lot.layer, { scenario: lot.phase, detailed, approved: isApproved(item.status) })
+    ? tt16ParcelStyle(layerType(item), lot.layer, { scenario: lot.phase, detailed, approved: isApproved(item.status), name: item.name })
     : landParcelStyle(lot.layer, { detailed, phase: lot.phase, name: lot.name });
   const shape = L.geoJSON(lot.geometry, { style, bubblingMouseEvents: false });
   bindLotHover(shape);
@@ -1750,7 +1750,7 @@ function capCongTrinhText(p) {
   }
   const cap = formatCapCongTrinhLabel(p.nhomHaTang || p.capCongTrinh || "Cấp đơn vị ở");
   const urban = cap === "Cấp đô thị";
-  const noun = p.type === '7-YT' ? (urban ? 'Bệnh viện' : 'Trạm y tế') : CAP_NOUNS[p.type];
+  const noun = p.type === '7-YT' ? (urban ? 'Bệnh viện' : 'Trạm y tế') : CAP_NOUNS[layerType(p)];
   return noun && /^Cấp /.test(cap) ? `${noun} (${cap.toLowerCase()})` : cap;
 }
 
@@ -1918,7 +1918,8 @@ let pointPopup = null;   // { popup, id, scenario } của popup công trình đa
 // Ô đầu popup công trình: hoa văn TT16 như ranh lô; loại không có ký hiệu TT16 (PCCC, nghĩa trang, xe buýt...) dùng icon
 function infraSwatchHtml(p, approved) {
   const type = layerType(p);
-  const css = TT16_STYLES[type] ? tt16SwatchCss(type, 0.6) : '';
+  const key = infraStyleKey(type, parcelFor(p)?.layer, p.name);
+  const css = key ? tt16SwatchCss(key, 0.6) : '';
   if (css) return `<i class="lp-swatch" style="${css}"></i>`;
   const files = ICON_FILES[type] || ICON_FILES['1-CV'];
   return `<i class="lp-swatch lp-swatch-icon" style="background-image:url(./icons/${approved ? files.approved : files.pending});"></i>`;
