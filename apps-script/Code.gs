@@ -20,7 +20,8 @@ const CAD_HEADERS = ["ID_DoiTuong", "Layer", "DienTich", "File", "ThoiGianNhap",
 // Danh mục đồ án: 1 dòng / đồ án (Ten_QH). LinkQD ngay sau tên đồ án là link mở quyết định (PDF trên bucket hoặc link ngoài).
 const PROJECT_SHEET_NAME = "DS_DoAn";
 const PROJECT_LINK_HEADER = "LinkQD";
-const PROJECT_HEADERS = ["Ten_QH", "LinkQD", "File", "Phuong", "SoCongTrinh", "SoLoDat", "ThoiGianNhap", "Geojson"];
+const PROJECT_HEADERS = ["Ten_QH", "LinkQD", "File", "Phuong", "SoCongTrinh", "SoLoDat", "ThoiGianNhap", "Geojson", "DanSoHT", "DanSoQH"];
+const PROJECT_POP_HEADERS = ["DanSoHT", "DanSoQH"];
 // Sao lưu dòng hạ tầng có sẵn trước khi đồ án ghi đè (lần đầu đồ án chạm vào dòng). Xóa đồ án: dòng có sao lưu được
 // ghi trả giá trị cũ thay vì xóa. Tab ẩn; GiaTriCu = JSON { tên cột: { v | f (công thức) | d (ngày ISO) } }
 const BACKUP_SHEET_NAME = "DoAn_SaoLuu";
@@ -1880,6 +1881,14 @@ function ensureProjectSheet(ss) {
   if (headers.indexOf(PROJECT_LINK_HEADER) < 0 && headers[0] === "Ten_QH") {
     sheet.insertColumnAfter(1);
     sheet.getRange(1, 2).setValue(PROJECT_LINK_HEADER).setFontWeight('bold');
+    headers = projectHeaderRow(sheet);
+  }
+  // Sheet cũ chưa có cột dân số: thêm vào cuối hàng tiêu đề
+  var missing = PROJECT_POP_HEADERS.filter(function(h) { return headers.indexOf(h) < 0; });
+  if (missing.length) {
+    var start = headers.length + 1;
+    ensureSheetSize(sheet, 1, start + missing.length - 1);
+    sheet.getRange(1, start, 1, missing.length).setValues([missing]).setFontWeight('bold');
   }
   return sheet;
 }
@@ -1896,7 +1905,8 @@ function projectRowOf(sheet, headers, project) {
   return 0;
 }
 
-// reg = { boundary (GeoJSON ranh tổng), wards: [tên phường], infra, lands } — nhập lại cùng đồ án thì ghi đè dòng cũ, giữ LinkQD
+// reg = { boundary (GeoJSON ranh tổng), wards: [tên phường], infra, lands, popHT, popQH } — nhập lại cùng đồ án thì ghi đè dòng cũ,
+// giữ LinkQD; dân số 0 / thiếu thì giữ ô cũ
 function upsertProjectRegistry(ss, project, fileName, reg, currentTime) {
   var sheet = ensureProjectSheet(ss);
   var headers = projectHeaderRow(sheet);
@@ -1914,6 +1924,8 @@ function upsertProjectRegistry(ss, project, fileName, reg, currentTime) {
     "Geojson": geoCell(reg.boundary)
   };
   if (isNew) fields[PROJECT_LINK_HEADER] = '';
+  if (Number(reg.popHT) > 0) fields["DanSoHT"] = Math.round(Number(reg.popHT));
+  if (Number(reg.popQH) > 0) fields["DanSoQH"] = Math.round(Number(reg.popQH));
   var geoCol = projectCol(headers, "Geojson");
   if (geoCol) sheet.getRange(row, geoCol).setNumberFormat("@");
   Object.keys(fields).forEach(function(h) {

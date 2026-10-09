@@ -949,6 +949,8 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
         ? (prevEntry.boundarySource || (prevEntry.boundary ? 'auto' : null))
         : (registry.boundarySource || (boundary ? 'auto' : null));
       const counts = countParcels(all);
+      const popHT = registry.popHT || prevEntry.popHT || 0;
+      const popQH = registry.popQH || prevEntry.popQH || 0;
       projects.push({
         tenQH: name,
         slug,
@@ -962,6 +964,8 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
         boundarySource,
         bbox: bboxOf(boundary),
         landArea: landAreaOf(all),
+        ...(popHT ? { popHT } : {}),
+        ...(popQH ? { popQH } : {}),
         legacy: false,
         saved: savedAt
       });

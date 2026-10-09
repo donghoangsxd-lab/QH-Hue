@@ -342,8 +342,16 @@ function parseLandArea(raw) {
   return out;
 }
 
+// Dân số đồ án (người); ngoài 1–5.000.000 coi như chưa nhập
+const PROJECT_POP_MAX = 5000000;
+function parseProjectPop(v) {
+  const n = Math.round(Number(v));
+  return n > 0 && n <= PROJECT_POP_MAX ? n : 0;
+}
+
 // Danh mục đồ án gửi kèm phần cuối của lần nhập.
 // boundarySource: gis (file ranh) | auto (dựng từ lô). keepBoundary: ghép hiện trạng, giữ ranh đang có.
+// popHT / popQH: chỉ có khi tạo đồ án mới, 0 = giữ dân số đang có trong danh mục.
 function parseCadRegistry(reg) {
   if (!reg || typeof reg !== 'object') return null;
   let boundary = parseCadGeometry(reg.boundary);
@@ -353,7 +361,8 @@ function parseCadRegistry(reg) {
   const boundarySource = reg.boundarySource === 'gis' ? 'gis' : reg.boundarySource === 'auto' ? 'auto' : null;
   return {
     boundary, boundarySource, keepBoundary: reg.keepBoundary === true,
-    wards, infra: count(reg.infra), lands: count(reg.lands), landArea: parseLandArea(reg.landArea)
+    wards, infra: count(reg.infra), lands: count(reg.lands), landArea: parseLandArea(reg.landArea),
+    popHT: parseProjectPop(reg.popHT), popQH: parseProjectPop(reg.popQH)
   };
 }
 
@@ -2047,7 +2056,10 @@ module.exports = async (req, res) => {
       let result = { created: [], updated: [], skipped: [], lotIds: [] };
       if (sheetItems.length || registry || sync) {
         const sheetReg = registry && !registry.keepBoundary
-          ? { boundary: registry.boundary, wards: registry.wards, infra: registry.infra, lands: registry.lands }
+          ? {
+            boundary: registry.boundary, wards: registry.wards, infra: registry.infra, lands: registry.lands,
+            popHT: registry.popHT, popQH: registry.popQH
+          }
           : null;
         result = await callAppsScript({ action: 'importCadBatch' }, {
           action: 'importCadBatch',
@@ -2287,6 +2299,10 @@ module.exports = async (req, res) => {
         note: sanitizeSheetText(body.note, 300),
         summary: parsePendingSummary(body.summary)
       };
+      const popHT = parseProjectPop(body.popHT);
+      const popQH = parseProjectPop(body.popQH);
+      if (popHT) meta.popHT = popHT;
+      if (popQH) meta.popQH = popQH;
       if (body.kind === 'review' && ext === 'geojson') {
         meta.kind = 'review';
         meta.replaces = sanitizeSheetText(body.replaces, 120);

@@ -505,6 +505,12 @@
               <option value="">Đồ án mới (theo tên file)</option>
             </select>
           </label>
+          <div class="form-grid cad-pop" id="cadPopBox" title="Dân số dùng tính chỉ tiêu QCVN 01:2026 trong bảng Thông tin đồ án. Để trống nếu chưa có.">
+            <label for="cadPopHT">Dân số HT</label>
+            <input type="number" id="cadPopHT" min="0" step="100" inputmode="numeric" placeholder="Dân số hiện trạng (người)" />
+            <label for="cadPopQH">Dân số QH</label>
+            <input type="number" id="cadPopQH" min="0" step="100" inputmode="numeric" placeholder="Dân số quy hoạch (người)" />
+          </div>
           <label class="cad-drop" id="cadDrop" for="cadFile">
             <span class="cad-drop-main"><b>Chọn file</b> hoặc kéo thả vào đây</span>
             <span class="cad-drop-types"><i>DXF</i><i>KML</i><i>KMZ</i><i>GeoJSON</i><i>SHP (.zip)</i></span>

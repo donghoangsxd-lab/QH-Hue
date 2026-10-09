@@ -1010,6 +1010,8 @@ async function openPending(id) {
     }
     if ($('cadCrs') && it.crs && [...$('cadCrs').options].some(o => o.value === it.crs)) $('cadCrs').value = it.crs;
     if ($('cadPhase')) $('cadPhase').value = it.phase === 'QH' ? 'QH' : 'HT';
+    if ($('cadPopHT')) $('cadPopHT').value = Number(it.popHT) > 0 ? it.popHT : '';
+    if ($('cadPopQH')) $('cadPopQH').value = Number(it.popQH) > 0 ? it.popQH : '';
     const base = String(it.fileName || 'hoso').replace(FILE_EXT_RE, '');
     await loadFile(new File([text], `${base}.${it.ext}`), id);
   } catch (err) {
@@ -1078,7 +1080,7 @@ async function submitPending() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fileName: current.fileName, ext: raw.ext, content: raw.text, phase: globalPhase(), crs: $('cadCrs')?.value || '',
-        sender, note,
+        sender, note, ...projectPops(),
         summary: {
           parcels: inCity.length,
           create: keys.filter(k => k === 'new').length,
@@ -1093,6 +1095,7 @@ async function submitPending() {
     const name = current.fileName;
     submitting = false;
     resetImport(true);
+    clearPops();
     if ($('cadNote')) $('cadNote').value = '';
     setStatus(`✓ Đã gửi hồ sơ "${name}" — Admin sẽ kiểm tra trước khi đưa lên bản đồ.`, 'var(--accent-green)');
   } catch (err) {
@@ -1279,6 +1282,7 @@ function fillPairSelect() {
   sel.innerHTML = '<option value="">Đồ án mới (theo tên file)</option>'
     + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
   if (prev && names.includes(prev)) sel.value = prev;
+  syncPopBox();
 }
 
 function suggestPair(name) {
@@ -1286,7 +1290,32 @@ function suggestPair(name) {
   if (!sel || sel.value || !name) return false;
   if (![...sel.options].some(o => o.value === name)) return false;
   sel.value = name;
+  syncPopBox();
   return true;
+}
+
+// Dân số chỉ nhập khi tạo đồ án mới; ghép vào đồ án có sẵn thì giữ dân số trong danh mục
+const POP_MAX = 5000000;
+
+function syncPopBox() {
+  const box = $('cadPopBox');
+  if (box) box.hidden = !!$('cadPair')?.value.trim();
+}
+
+function readPop(id) {
+  const v = Math.round(Number($(id)?.value));
+  return v > 0 && v <= POP_MAX ? v : 0;
+}
+
+function projectPops() {
+  if ($('cadPair')?.value.trim()) return {};
+  const popHT = readPop('cadPopHT');
+  const popQH = readPop('cadPopQH');
+  return { ...(popHT ? { popHT } : {}), ...(popQH ? { popQH } : {}) };
+}
+
+function clearPops() {
+  ['cadPopHT', 'cadPopQH'].forEach(id => { if ($(id)) $(id).value = ''; });
 }
 
 const onlyPoints = (r) => r.parsed.entities.every(e => e.kind === 'POINT');
@@ -1605,7 +1634,8 @@ function projectRegistry(items, lands) {
     wards: [...new Set(wards.filter(Boolean))],
     infra: items.length,
     lands: lands.length,
-    landArea: landAreaByWard()
+    landArea: landAreaByWard(),
+    ...projectPops()
   };
 }
 
@@ -1745,7 +1775,11 @@ async function submitImport() {
     const boundNote = current.boundaryGeom ? '\n• Ranh: file Ranh giới QH'
       : current.boundaryFailed ? '\n• Ranh: không khép được file đường, dùng ranh tự dựng'
         : $('cadPair')?.value.trim() ? '\n• Ranh: giữ ranh đang có của đồ án' : '\n• Ranh: tự dựng từ các lô';
-    if (!confirm(`Ghi vào Google Sheet?\n• ${summary}\n• ${items.length - nUpdate} công trình mới, ${nUpdate} cập nhật (giữ tên, ghi đè tọa độ bằng tâm hatch)${landNote}${pairNote}${separateNote}${boundNote}\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
+    const pops = projectPops();
+    const popNote = pops.popHT || pops.popQH
+      ? `\n• Dân số: HT ${pops.popHT ? fmtNum(pops.popHT) : '—'} · QH ${pops.popQH ? fmtNum(pops.popQH) : '—'} người`
+      : '';
+    if (!confirm(`Ghi vào Google Sheet?\n• ${summary}\n• ${items.length - nUpdate} công trình mới, ${nUpdate} cập nhật (giữ tên, ghi đè tọa độ bằng tâm hatch)${landNote}${pairNote}${separateNote}${boundNote}${popNote}\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
   }
 
   // Lô đất gửi sau lô hạ tầng. File HT- chỉ xóa lô hiện trạng; file QH- chỉ xóa lô chức năng sử dụng đất.
@@ -1801,6 +1835,7 @@ async function writeChunks(job) {
     ].filter(Boolean).join(' · ');
     submitting = false;
     resetImport(true);
+    clearPops();
     setStatus(`✓ Đã thêm ${job.summary} — ${done.created.length} mới, ${done.updated.length} cập nhật${extra ? ` · ${extra}` : ''}.`, 'var(--accent-green)');
     if (job.pendingId) removePending(job.pendingId, false);
     if (onImported) await onImported();
@@ -1838,6 +1873,7 @@ export function initCadImport(opts = {}) {
   syncRoleUi();
 
   $('cadPair')?.addEventListener('focus', fillPairSelect);
+  $('cadPair')?.addEventListener('change', syncPopBox);
   $('cadFile')?.addEventListener('change', (e) => loadFiles(e.target.files));
   $('cadPointFile')?.addEventListener('change', (e) => loadPointsFile(e.target.files && e.target.files[0]));
   const drop = $('cadDrop');

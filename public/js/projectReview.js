@@ -1264,7 +1264,7 @@ function openDossier({ id, item, text }) {
 
 // ============================ THÔNG TIN 1 ĐỒ ÁN ĐÃ LƯU ============================
 
-// Danh mục đồ án chưa có dân số: người xem nhập, nhớ theo tên đồ án trên máy này
+// Dân số mặc định lấy từ danh mục (nhập lúc tạo đồ án); người xem sửa thì nhớ theo tên đồ án trên máy này, ưu tiên hơn danh mục
 const POP_STORE_KEY = 'qh_project_pop_v1';
 const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
 const EXISTING_RE = /hien ?tran|hien ?huu|chinh ?trang|cai ?tao|xen ?ghep|bao ?ton/;
@@ -1311,10 +1311,13 @@ async function openProjectInfo(project) {
   const lots = cachedLots(project).map(savedLot).filter(Boolean);
   if (!lots.length) { showToast('Đồ án chưa có lô sử dụng đất', 'error'); return; }
   const pop = loadPops()[project] || {};
+  const entry = (state.projectCatalog || []).find(p => p && p.tenQH === project) || {};
   const has = (ph) => lots.some(l => l.phase === ph);
   autoCompare(lots);
   newSession({
-    kind: kindOfProject(project), project, popHT: Number(pop.ht) || 0, popQH: Number(pop.qh) || 0,
+    kind: kindOfProject(project), project,
+    popHT: Number(pop.ht) || Number(entry.popHT) || 0,
+    popQH: Number(pop.qh) || Number(entry.popQH) || 0,
     files: { HT: has('HT') ? 'Sử dụng đất hiện trạng' : '', QH: has('QH') ? 'Sử dụng đất quy hoạch' : '' },
     lots, saved: true
   });
