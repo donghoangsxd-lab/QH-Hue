@@ -1,7 +1,9 @@
-// Nối các đoạn ranh có đầu mút cách nhau ≤ 1 m, khép vòng, chỉ giữ vòng ngoài.
+// Nối các đoạn ranh có đầu mút cách nhau ≤ dung sai, khép vòng, chỉ giữ vòng ngoài.
+// Thử dung sai tăng dần (ranh gServer có chỗ hở vài mét); dung sai trên 1 m chỉ khép khi chỗ hở ≤ CLOSE_RATIO chiều dài vòng.
 // Không khép được vòng nào → geometry null (người gọi quay về ranh tự dựng).
 
-const TOL_M = 1;
+const TOLS_M = [1, 5, 25];
+const CLOSE_RATIO = 0.005;
 
 function distM(a, b) {
   const lat = ((a[1] + b[1]) / 2) * Math.PI / 180;
@@ -27,9 +29,9 @@ function pointInRing(pt, ring) {
   return inside;
 }
 
-function clusterOf(pt, clusters) {
+function clusterOf(pt, clusters, tol) {
   for (let i = 0; i < clusters.length; i++) {
-    if (clusters[i].some(q => distM(q, pt) <= TOL_M)) {
+    if (clusters[i].some(q => distM(q, pt) <= tol)) {
       clusters[i].push(pt);
       return i;
     }
@@ -38,12 +40,12 @@ function clusterOf(pt, clusters) {
   return clusters.length - 1;
 }
 
-function stitch(lines) {
+function stitch(lines, tol) {
   let paths = lines.map(l => l.map(p => p.slice())).filter(l => l.length >= 2);
   let guard = 0;
   while (paths.length > 1 && guard++ < 10000) {
     const clusters = [];
-    const ends = paths.map(p => [clusterOf(p[0], clusters), clusterOf(p[p.length - 1], clusters)]);
+    const ends = paths.map(p => [clusterOf(p[0], clusters, tol), clusterOf(p[p.length - 1], clusters, tol)]);
     const uses = clusters.map(() => []);
     ends.forEach((e, i) => {
       if (e[0] === e[1]) return;
@@ -63,12 +65,20 @@ function stitch(lines) {
   return paths;
 }
 
-function closeIfNear(line) {
+function closeIfNear(line, tol) {
   if (line.length < 3) return null;
   const a = line[0];
   const b = line[line.length - 1];
-  const closed = (a[0] === b[0] && a[1] === b[1]) ? line : (distM(a, b) <= TOL_M ? line.concat([[a[0], a[1]]]) : null);
-  return closed && closed.length >= 4 ? closed : null;
+  if (a[0] === b[0] && a[1] === b[1]) return line.length >= 4 ? line : null;
+  const gap = distM(a, b);
+  if (gap > tol) return null;
+  if (gap > 1) {
+    let len = 0;
+    for (let i = 1; i < line.length; i++) len += distM(line[i - 1], line[i]);
+    if (gap > len * CLOSE_RATIO) return null;
+  }
+  const closed = line.concat([[a[0], a[1]]]);
+  return closed.length >= 4 ? closed : null;
 }
 
 function centroid(ring) {
@@ -85,11 +95,21 @@ function centroid(ring) {
 
 /** lines: các đường [[lng, lat], ...]. Trả { geometry, open } — open là số đoạn không khép. */
 export function boundaryFromLines(lines) {
-  const paths = stitch(lines || []);
+  const tries = [];
+  for (const tol of TOLS_M) {
+    const res = boundaryAt(lines || [], tol);
+    if (res.geometry && !res.open) return res;
+    tries.push(res);
+  }
+  return tries.find(r => r.geometry) || tries[tries.length - 1];
+}
+
+function boundaryAt(lines, tol) {
+  const paths = stitch(lines, tol);
   const rings = [];
   let open = 0;
   paths.forEach(p => {
-    const ring = closeIfNear(p);
+    const ring = closeIfNear(p, tol);
     if (ring && Math.abs(ringArea(ring)) > 0) rings.push(ring);
     else open++;
   });

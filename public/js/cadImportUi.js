@@ -770,8 +770,8 @@ function renderReport() {
     if (out && out.checked && out.n) alerts.push(['bad', `${fmtNum(out.n)}/${fmtNum(out.checked)} lô có hơn 5% diện tích nằm ngoài ranh — kiểm tra hệ tọa độ hoặc nhầm file.`]);
   } else if (current.boundaryFailed) {
     alerts.push(['warn', current.boundaryOnly
-      ? 'Không khép được ranh (đầu mút lệch quá 1 m) — không cập nhật được.'
-      : 'Không khép được ranh (đầu mút lệch quá 1 m). Khi ghi sẽ dùng ranh tự dựng từ các lô.']);
+      ? 'Không khép được ranh (đường ranh hở hoặc đầu mút lệch quá xa) — không cập nhật được.'
+      : 'Không khép được ranh (đường ranh hở hoặc đầu mút lệch quá xa). Khi ghi sẽ dùng ranh tự dựng từ các lô.']);
   }
   if (current.tt16) {
     const legacy = parcels.filter(p => !p.tt16).length;
@@ -1401,7 +1401,7 @@ function openBoundary(lineRead, pendingId) {
   };
   setBoundaryFrom(lineRead);
   current.result = {
-    parcels: [], axes: { valid: !!current.boundaryGeom, note: '' }, duplicatesDropped: 0,
+    parcels: [], axes: { valid: true, note: '' }, duplicatesDropped: 0,
     unknownLayers: {}, tt16Other: {}, pointsInLots: 0, stageDupes: 0
   };
   lockCrs(true);
