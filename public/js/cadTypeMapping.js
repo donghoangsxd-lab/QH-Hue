@@ -2,7 +2,7 @@
 // người dùng chọn trường nhận diện (Layer, Folder, thuộc tính...), rồi gán từng giá trị tìm được với 1 loại hạ tầng.
 import { escapeHtml, ico } from './utils.js';
 import { layerToType, tt16Layer, SCHOOL_PICK, MARKET_PICK } from './cadImport.js';
-import { landRule, landPatternKey, TT16_STYLES, MANUAL_LAND_KEYS } from './tt16Symbols.js';
+import { landRule, landPatternKey, lotCodePrefix, lotCodePatternKey, TT16_STYLES, MANUAL_LAND_KEYS } from './tt16Symbols.js';
 
 // Mã khớp "Đất ở": không phải hạ tầng — lô vẫn ghi sheet DXF, tên layer đổi để luôn tô màu đất ở
 const LAND_O = 'DATO';
@@ -76,15 +76,22 @@ const SCHOOL_CODES = new Set(['THPT', 'THCS', 'TH', 'MN']);
 const normalize = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .replace(/đ/gi, 'd').toLowerCase().replace(/[_\-.]+/g, ' ');
 
+// Khóa TT16 (landPatternKey / ký hiệu lô) → mã khớp; khóa không có ở đây và ngoài MANUAL_LAND_KEYS thì không gợi ý
+const PATTERN_CODE = {
+  '1-CV': 'CV', '2-BDX': 'BDX', '3-MN': 'MN', '4-TH': 'TH', '5-THCS': 'THCS', '6-THPT': 'THPT', '7-YT': 'YT',
+  '8-VH': 'VH', TDTT: 'VH', '9-TM': MARKET_PICK, 'O-NO': LAND_O, 'O-LX': LAND_O, DCS: LAND_CSD, SCHOOL: SCHOOL_PICK
+};
+const codeOfPattern = (key) => PATTERN_CODE[key] || (MANUAL_LAND_KEYS.includes(key) ? `${LAND_KEY_PREFIX}${key}` : '');
+
 function guessCode(value) {
+  // Ký hiệu lô viết tắt ("CX4.14", "OB 1.22", "MN.02" = mặt nước) xét trước từ khóa (\bmn\b = mầm non trong tên)
+  const lot = codeOfPattern(lotCodePatternKey(value));
+  if (lot) return /.DT$/.test(lotCodePrefix(value)) && VALID_CODES.has(`${lot}_DT`) ? `${lot}_DT` : lot;
   const s = normalize(value);
   // Một giá trị gộp nhiều cấp trường (VD "Đất trường THCS_tiểu học_mầm non"): admin chọn cấp từng lô
   if (GUESS_RULES.filter(([code, re]) => SCHOOL_CODES.has(code) && re.test(s)).length > 1) return SCHOOL_PICK;
   const hit = GUESS_RULES.find(([, re, not]) => re.test(s) && !(not && not.test(s)));
-  if (!hit) {
-    const key = landPatternKey(value);
-    return MANUAL_LAND_KEYS.includes(key) ? `${LAND_KEY_PREFIX}${key}` : '';
-  }
+  if (!hit) return codeOfPattern(landPatternKey(value));
   const urban = `${hit[0]}_DT`;
   return URBAN_RE.test(s) && VALID_CODES.has(urban) ? urban : hit[0];
 }
@@ -103,6 +110,10 @@ const suggestOf = (val, mem, allowCsd) => {
 
 // Tên trường thường chứa loại đất (gServer: chucnangsudungdat, DBF cắt còn chucnangsu; loaidat; autocad_la)
 const CLASS_FIELD_RE = /chuc ?nang|loai ?dat|muc ?dich|layer|autocad|\blop\b/;
+// Trường không bao giờ cho biết loại đất (so trên tên trường viết thường, bỏ "_"): tọa độ, chỉ tiêu tầng cao / mật độ / hệ số,
+// diện tích, dân số, mã định danh, ngày tháng (gServer: xdaidien, s_ydaidien, tangcaomin, matdoxayd2, hesosudun, objectid...)
+const NON_CLASS_FIELD_RE = /^s?[xy]daidien|^[xyz]$|toado|^(lat|lng|lon|long|latitude|longitude)$|kinhdo|vido|tangcao|matdo|heso|dientich|danso|objectid|^fid$|^id$|madoituon|malienket|mahoso|^ngay|^shape|perimeter|^area$|chieucao|caodo|tangham|sotang|trangthai|thoihan/;
+const NUMERIC_RE = /^-?[\d\s.,]+$/;
 
 function loadMemory() {
   try { return JSON.parse(localStorage.getItem(MEMORY_KEY) || '{}') || {}; } catch (e) { return {}; }
@@ -117,37 +128,75 @@ function remember(value, code) {
 
 // DXF chỉ có tên layer; KML/GeoJSON có thêm thuộc tính do bộ đọc gom
 const attrsOf = (ent) => ent.attrs || { Layer: ent.layer };
+// Trường ký hiệu lô (mỗi lô 1 mã "CX4.14", "OB 1.22"): trường ảo "<trường>#kh" gom theo chữ viết tắt đầu (CX, OB...)
+const CODE_GROUP = '#kh';
+const isGroupKey = (key) => key.endsWith(CODE_GROUP);
+const baseKey = (key) => (isGroupKey(key) ? key.slice(0, -CODE_GROUP.length) : key);
+const rawOf = (ent, key) => attrsOf(ent)[baseKey(key)] || EMPTY_KEY;
+const valueOf = (ent, key) => (isGroupKey(key) ? lotCodePrefix(rawOf(ent, key)) : rawOf(ent, key)) || EMPTY_KEY;
+const fieldLabel = (key) => (isGroupKey(key) ? `${baseKey(key)} (nhóm ký hiệu lô)` : key);
 // Layer TT16 (kể cả loại đất ngoài 10 nhóm, Truonghoc chờ chọn cấp) không đưa vào khớp thủ công
 const isUnknown = (ent) => !tt16Layer(ent.layer) && !layerToType(ent.layer);
 
 /**
  * Tạo trạng thái khớp thủ công cho các thực thể chưa nhận diện được loại; null nếu mọi thực thể đều đúng quy ước.
- * Trường mặc định: trường gợi ý được loại cho nhiều lô nhất (từ khóa / lần khớp trước); hòa thì trường có tên loại đất,
- * rồi trường trùng tên layer đang hiển thị, rồi trường ít giá trị hơn. Không trường nào gợi ý được: trường phân loại như trên.
+ * Trường mặc định: điểm = tỷ lệ lô gợi ý được loại × độ đa dạng loại gợi ý (tránh trường dồn gần hết lô vào 1 loại);
+ * hòa thì trường có tên loại đất, rồi trường trùng tên layer, rồi trường ít giá trị hơn. Không trường nào gợi ý được: trường phân loại.
+ * Bỏ khỏi danh sách: trường tọa độ / chỉ tiêu / diện tích / mã định danh, trường toàn số, trường 1 giá trị (khi còn trường khác).
  * allowCsd = false: file nhập đồng loạt (GeoJSON / shapefile) không được gán Cơ sở chưa sử dụng.
  */
 export function createManualMapping(entities, { allowCsd = true } = {}) {
   const unknown = entities.filter(isUnknown);
   if (!unknown.length) return null;
   const stat = new Map();
+  const add = (key, val, ent) => {
+    const s = stat.get(key) || { key, counts: new Map(), filled: 0, sameAsLayer: 0 };
+    if (val) { s.counts.set(val, (s.counts.get(val) || 0) + 1); s.filled++; }
+    if (val && val === ent.layer) s.sameAsLayer++;
+    stat.set(key, s);
+  };
   unknown.forEach(ent => {
     Object.entries(attrsOf(ent)).forEach(([key, val]) => {
-      const s = stat.get(key) || { key, counts: new Map(), filled: 0, sameAsLayer: 0 };
-      if (val) { s.counts.set(val, (s.counts.get(val) || 0) + 1); s.filled++; }
-      if (val && val === ent.layer) s.sameAsLayer++;
-      stat.set(key, s);
+      add(key, val, ent);
+      const head = lotCodePrefix(val);
+      if (head) add(key + CODE_GROUP, head, ent);
     });
   });
+  // Trường ảo chỉ giữ khi phần lớn giá trị là ký hiệu lô và gom được bớt giá trị
+  [...stat.values()].filter(f => isGroupKey(f.key)).forEach(f => {
+    const base = stat.get(baseKey(f.key));
+    if (!base || f.filled < base.filled * 0.8 || f.counts.size >= base.counts.size) stat.delete(f.key);
+  });
   const mem = loadMemory();
-  const fields = [...stat.values()].filter(f => f.filled > 0)
-    .map(f => ({
+  const candidates = [...stat.values()].filter(f => f.filled > 0 && !NON_CLASS_FIELD_RE.test(baseKey(f.key).toLowerCase().replace(/[\s_]+/g, '')));
+  const numericLots = (f) => [...f.counts].reduce((s, [v, n]) => s + (NUMERIC_RE.test(v) ? n : 0), 0);
+  // Trường mã số (loaidat = 1..14, chú giải nằm ngoài file) chỉ giữ khi không còn trường chữ nào để người dùng tự gán
+  const texty = candidates.filter(f => numericLots(f) < f.filled * 0.9);
+  let fields = texty.length ? texty : candidates;
+  // Trường 1 giá trị (Layer = tên file, chỉ tiêu cố định) không phân biệt được loại đất; chỉ giữ khi không còn trường khác
+  if (fields.some(f => f.counts.size > 1)) fields = fields.filter(f => f.counts.size > 1);
+  fields = fields.map(f => {
+    const byCode = new Map();
+    let covered = 0;
+    if (f.counts.size <= MAX_VALUES) {
+      f.counts.forEach((n, val) => {
+        const code = suggestOf(val, mem, allowCsd);
+        if (!code) return;
+        covered += n;
+        byCode.set(code, (byCode.get(code) || 0) + n);
+      });
+    }
+    // Số loại hiệu dụng 1/Σp² (1 = mọi lô gợi ý cùng 1 loại); từ 2 loại trở lên tính đủ điểm
+    const simpson = covered ? [...byCode.values()].reduce((s, n) => s + (n / covered) ** 2, 0) : 1;
+    const variety = Math.min(1, 1 / simpson / 2);
+    return {
       key: f.key, distinct: f.counts.size, filled: f.filled, sameAsLayer: f.sameAsLayer,
-      named: CLASS_FIELD_RE.test(normalize(f.key)) ? 1 : 0,
-      covered: f.counts.size > MAX_VALUES ? 0 : [...f.counts].reduce((s, [val, n]) => s + (suggestOf(val, mem, allowCsd) ? n : 0), 0)
-    }))
-    .sort((a, b) => b.filled - a.filled || a.distinct - b.distinct);
+      named: CLASS_FIELD_RE.test(normalize(baseKey(f.key))) ? 1 : 0,
+      covered, score: covered / unknown.length * variety
+    };
+  }).sort((a, b) => b.score - a.score || b.filled - a.filled || a.distinct - b.distinct);
   const byGuess = fields.filter(f => f.covered > 0)
-    .sort((a, b) => b.covered - a.covered || b.named - a.named || b.sameAsLayer - a.sameAsLayer || a.distinct - b.distinct);
+    .sort((a, b) => b.score - a.score || b.covered - a.covered || b.named - a.named || b.sameAsLayer - a.sameAsLayer || a.distinct - b.distinct);
   // Ưu tiên trường dạng phân loại (mọi lô đều có, số giá trị ít hơn số lô) — tên riêng từng lô khó khớp hàng loạt
   const categorical = fields.filter(f => f.filled === unknown.length && f.distinct > 1 && f.distinct < f.filled);
   const def = byGuess[0] || [...(categorical.length ? categorical : fields)]
@@ -161,7 +210,7 @@ export function createManualMapping(entities, { allowCsd = true } = {}) {
 export function selectField(mapping, key, entities) {
   const counts = new Map();
   entities.filter(isUnknown).forEach(ent => {
-    const val = attrsOf(ent)[key] || EMPTY_KEY;
+    const val = valueOf(ent, key);
     counts.set(val, (counts.get(val) || 0) + 1);
   });
   mapping.field = key;
@@ -199,8 +248,9 @@ export function applyManualMapping(entities, mapping) {
   if (!mapping || !mapping.field || !mapping.codes.size) return entities;
   return entities.map(ent => {
     if (!isUnknown(ent)) return ent;
-    const val = attrsOf(ent)[mapping.field] || EMPTY_KEY;
-    const code = mapping.codes.get(val);
+    const code = mapping.codes.get(valueOf(ent, mapping.field));
+    // Nhóm ký hiệu: khớp theo nhóm (CX) nhưng giữ mã lô gốc (CX4.14) làm tên layer
+    const val = rawOf(ent, mapping.field);
     if (code === LAND_O) {
       const name = val || ent.layer;
       return { ...ent, layer: (landRule(name) || {}).key === 'o' ? name : `Đất ở - ${name}` };
@@ -241,7 +291,7 @@ function codeOptions(selected, allowCsd) {
 export function manualMappingHtml(mapping) {
   if (!mapping) return '';
   const mappedLots = mapping.values.reduce((s, { val, n }) => s + (mapping.codes.has(val) ? n : 0), 0);
-  const fieldOpts = mapping.fields.map(f => `<option value="${escapeHtml(f.key)}"${f.key === mapping.field ? ' selected' : ''}>${escapeHtml(f.key)} · ${f.distinct} giá trị${f.filled < mapping.unknownCount ? `, ${f.filled}/${mapping.unknownCount} lô có` : ''}</option>`).join('');
+  const fieldOpts = mapping.fields.map(f => `<option value="${escapeHtml(f.key)}"${f.key === mapping.field ? ' selected' : ''}>${escapeHtml(fieldLabel(f.key))} · ${f.distinct} giá trị${f.filled < mapping.unknownCount ? `, ${f.filled}/${mapping.unknownCount} lô có` : ''}</option>`).join('');
   const shown = mapping.values.slice(0, MAX_VALUES);
   const rows = shown.map(({ val, n }, idx) => {
     const code = mapping.codes.get(val) || '';

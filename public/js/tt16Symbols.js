@@ -657,10 +657,32 @@ const CODE_TOKENS = {
   BDX: '2-BDX', BX: '2-BDX', MN: 'HO', TH: '4-TH', THCS: '5-THCS', THPT: '6-THPT', YT: '7-YT', VH: '8-VH', TDTT: 'TDTT',
   CHO: '9-TM', TM: '9-TM', TMDV: '9-TM', DVTM: '9-TM', TTTM: '9-TM', DV: '9-TM', CC: 'CC-DV', CCDV: 'CC-DV', DVCC: 'CC-DV',
   HH: 'O-HH', OHT: 'O-NO', OCT: 'O-NO', OM: 'O-NO', ODT: 'O-NO', NO: 'O-NO', NOXH: 'O-NO', TDC: 'O-NO', LK: 'O-NO', BT: 'O-NO',
-  ONT: 'O-LX', LX: 'O-LX', CQ: 'CQ', DL: 'DL', DDL: 'DL', DNG: 'DL', TG: 'DT-TG', DTTG: 'DT-TG', ANQP: 'AN', QP: 'QP',
+  OB: 'O-NO', OBT: 'O-NO', OL: 'O-NO', OLK: 'O-NO', OH: 'O-NO',
+  ONT: 'O-LX', LX: 'O-LX', CQ: 'CQ', DL: 'DL', DDL: 'DL', DNG: 'DL', TG: 'DT-TG', DTTG: 'DT-TG', TGTN: 'DT-TG', ANQP: 'AN', QP: 'QP',
   GT: 'GT', DGT: 'GT', HTKT: 'HTK', NTR: 'NTR', NTD: 'NTR', CN: 'SX-CN', KCN: 'SX-CN', NN: 'NN', LUA: 'NN', LUC: 'NN',
   RPH: 'RPH', RDD: 'RDD', RSX: 'RSX', NTS: 'TS', DTS: 'TS', SMN: 'SS', MNC: 'HO', DCS: 'DCS', BCS: 'DCS', NCS: 'DCS', CSD: 'DCS', DPT: 'DCS'
 };
+// Chỉ nhận khi cả giá trị là ký hiệu lô ("P2", "SN.01", "DT 1.02"): đứng trong câu thì trùng chữ viết tắt khác (DT = đô thị)
+// SCHOOL: đất giáo dục chưa rõ cấp (khớp thủ công → chọn cấp từng lô)
+const LOT_ONLY_TOKENS = {
+  P: '2-BDX', SN: 'CQ', DT: 'DT-TG', TN: 'DT-TG', AN: 'AN', GD: 'SCHOOL', HTK: 'HTK', DNN: 'NN', SX: 'SX-CN',
+  CVDT: '1-CV', VHDT: '8-VH', YTDT: '7-YT', TMDT: '9-TM'
+};
+
+/** Chữ viết tắt đầu của giá trị chỉ gồm ký hiệu lô viết hoa ("CX4.14" → "CX", "OB 1.22" → "OB", "CV-CX.2" → "CV"); '' nếu không phải */
+export function lotCodePrefix(text) {
+  const s = String(text ?? '').trim();
+  if (!s || s.length > 20 || !/^[A-Z][A-Z0-9\s._\-/]*$/.test(s)) return '';
+  const head = s.match(/^[A-Z]+/)[0];
+  return head.length <= 6 ? head : '';
+}
+
+/** Khóa TT16 theo ký hiệu lô viết tắt (CX/CV cây xanh, OB/OL/OH đất ở, P bãi xe, SN cơ quan, TG/DT/TN tôn giáo – di tích...) */
+export function lotCodePatternKey(text) {
+  const head = lotCodePrefix(text);
+  return head ? CODE_TOKENS[head] || LOT_ONLY_TOKENS[head] || '' : '';
+}
+
 // Cấp trường viết tắt trong tên đã có chữ trường / giáo dục ("Đất trường THCS, TH, MN")
 const SCHOOL_WORDS = { TH: '4-TH', MN: '3-MN' };
 // Nhóm đất landRule (tên tách rời: "dat o", "ODT", "N - AO"...) chưa trúng cụm từ trên → ký hiệu TT16 gần nhất
