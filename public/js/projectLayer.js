@@ -1,4 +1,4 @@
-// Mục Quy hoạch (tab Lớp dữ liệu): mỗi đồ án (Ten_QH) bật/tắt riêng, tìm, phóng tới, Admin xóa / chuyển đồ án cũ.
+// Mục Quy hoạch (tab Lớp dữ liệu): mỗi đồ án (Ten_QH) bật/tắt riêng, tìm, bấm tên để phóng tới, Admin xóa / chuyển đồ án cũ.
 // Nút file mở PDF quyết định phê duyệt (projects/<slug>/quyet-dinh.pdf, dưới 1 MB). Admin gắn, thay hoặc gỡ.
 // Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS): bật/tắt từng lớp, Admin xóa từng lớp, tìm lô trong đồ án.
 // Mỗi đồ án 1 màu viền + nền mờ, nhãn tên ở giữa ranh. Zoom < PARCEL_MIN_ZOOM ranh tổng bấm được để phóng tới;
@@ -326,13 +326,14 @@ function renderList() {
       ? `<button type="button" class="project-btn${p.decision ? ' has-decision' : ''}" data-decision="${idx}" title="${escapeHtml(decisionTitle)}" aria-label="${p.decision ? 'Xem quyết định phê duyệt' : 'Gắn quyết định phê duyệt'}"${busy ? ' disabled' : ''}>${ico(p.decision ? 'file' : 'save')}</button>`
       : '';
     return `<div class="project-row${on ? '' : ' is-off'}">
-      <label class="project-name" title="${escapeHtml(p.name)}${p.area?.ward ? ` — ${escapeHtml(p.area.ward)}` : ''} — ${escapeHtml(metaText(p))} (${where})${tempNote}">
-        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><i class="project-color" style="--pc:${p.color}" title="Màu ranh đồ án trên bản đồ"></i><span>${idx + 1}. ${escapeHtml(p.name)}</span></label>
-      <button type="button" class="project-btn" data-info="${idx}" title="Thông tin đồ án: bảng tổng hợp sử dụng đất và đánh giá chỉ tiêu QCVN 01:2026" aria-label="Thông tin đồ án">${ico('table')}</button>
-      ${decisionBtn}
-      <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-expand="${idx}" title="${open ? 'Ẩn' : 'Xem'} các lớp dữ liệu của đồ án" aria-label="Các lớp dữ liệu của đồ án" aria-expanded="${open}">${ico('chev-down')}</button>
-      <button type="button" class="project-btn" data-zoom="${idx}" title="Phóng tới đồ án" aria-label="Phóng tới đồ án">${ico('locate')}</button>
-      ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
+      <label class="project-name" title="${escapeHtml(p.name)}${p.area?.ward ? ` — ${escapeHtml(p.area.ward)}` : ''} — ${escapeHtml(metaText(p))} (${where})${tempNote}&#10;Bấm tên để phóng tới và làm sáng ranh đồ án">
+        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><span data-focus="${idx}">${idx + 1}. ${escapeHtml(p.name)}</span></label>
+      <span class="project-tools">
+        <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-expand="${idx}" title="${open ? 'Ẩn' : 'Xem'} các lớp dữ liệu của đồ án" aria-label="Các lớp dữ liệu của đồ án" aria-expanded="${open}">${ico('chev-down')}</button>
+        <button type="button" class="project-btn" data-info="${idx}" title="Thông tin đồ án: bảng tổng hợp sử dụng đất và đánh giá chỉ tiêu QCVN 01:2026" aria-label="Thông tin đồ án">${ico('table')}</button>
+        ${decisionBtn}
+        ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
+      </span>
     </div>${open ? decisionNote(p, idx) + layersHtml(p, idx, on, admin) : ''}`;
   }).join('');
 }
@@ -576,6 +577,15 @@ const labelLists = new Map();
 const boundsMemo = new WeakMap();
 const zoomHooked = new WeakSet();
 
+function geomBounds(geom) {
+  let b = boundsMemo.get(geom);
+  if (!b) {
+    b = L.geoJSON(geom).getBounds();
+    boundsMemo.set(geom, b);
+  }
+  return b;
+}
+
 // Nhãn chỉ hiện khi khung ranh trên màn hình đủ chứa thẻ; chồng nhau thì giữ đồ án lớn hơn. Chạy lại mỗi lần zoom.
 function layoutLabels(m) {
   const old = labelGroups.get(m);
@@ -592,11 +602,7 @@ function layoutLabels(m) {
       const geom = outlineOf(p);
       const at = geom ? labelPointOf(p, geom) : null;
       if (!at) return;
-      let b = boundsMemo.get(geom);
-      if (!b) {
-        b = L.geoJSON(geom).getBounds();
-        boundsMemo.set(geom, b);
-      }
+      const b = geomBounds(geom);
       const nw = m.latLngToContainerPoint(b.getNorthWest());
       const se = m.latLngToContainerPoint(b.getSouthEast());
       const bw = se.x - nw.x;
@@ -623,6 +629,98 @@ function layoutLabels(m) {
   labelGroups.set(m, group);
 }
 
+// ============================ VIỀN SÁNG KHI RÊ / BẤM TÊN ============================
+
+// Pane riêng trên lô (pane lô ~400–440), dưới khung tìm lô (450); không bắt chuột
+const GLOW_PANE = 'projectGlowPane';
+const GLOW_Z = 445;
+const GLOW_PIN_MS = 3000;
+const GLOW_STYLES = [
+  { color: '#ffffff', weight: 9, opacity: 0.22 },
+  { color: '#ffffff', weight: 2.6, opacity: 1 }
+];
+const glows = new Map();
+const hovered = new Map();
+let pinnedName = null;
+let pinTimer = null;
+
+const shownMaps = () => [map, planMap].filter(Boolean);
+
+function clearGlow(m) {
+  const cur = glows.get(m);
+  if (!cur) return;
+  m.removeLayer(cur.layer);
+  glows.delete(m);
+}
+
+function updateGlow(m) {
+  const name = hovered.get(m) || pinnedName;
+  const p = name ? (labelLists.get(m) || []).find(x => x.name === name) : null;
+  const cur = glows.get(m);
+  if (cur && p && cur.name === p.name) return;
+  clearGlow(m);
+  const geom = p && outlineOf(p);
+  if (!geom) return;
+  if (!m.getPane(GLOW_PANE)) {
+    const pane = m.createPane(GLOW_PANE);
+    pane.style.zIndex = GLOW_Z;
+    pane.style.pointerEvents = 'none';
+  }
+  const layer = L.featureGroup(GLOW_STYLES.map(s => L.geoJSON(geom, {
+    style: { ...s, fill: false, dashArray: null, lineJoin: 'round' }, interactive: false, pane: GLOW_PANE
+  }))).addTo(m);
+  glows.set(m, { name: p.name, layer });
+}
+
+function setHover(m, name) {
+  if ((hovered.get(m) || null) === (name || null)) return;
+  if (name) hovered.set(m, name); else hovered.delete(m);
+  updateGlow(m);
+}
+
+function pinGlow(p) {
+  pinnedName = p.name;
+  clearTimeout(pinTimer);
+  pinTimer = setTimeout(() => {
+    pinnedName = null;
+    shownMaps().forEach(updateGlow);
+  }, GLOW_PIN_MS);
+  shownMaps().forEach(updateGlow);
+}
+
+// Đồ án nhỏ nhất chứa điểm (đồ án lồng nhau thì sáng đồ án trong)
+function projectAt(m, latlng) {
+  let best = null;
+  let bestSize = Infinity;
+  const pt = [latlng.lng, latlng.lat];
+  (labelLists.get(m) || []).forEach(p => {
+    const geom = outlineOf(p);
+    const b = geom && geomBounds(geom);
+    if (!b || !b.isValid() || !b.contains(latlng)) return;
+    const size = (b.getEast() - b.getWest()) * (b.getNorth() - b.getSouth());
+    if (size >= bestSize) return;
+    try {
+      if (turf.booleanPointInPolygon(pt, turf.feature(geom))) { best = p; bestSize = size; }
+    } catch (e) { /* ranh lỗi: bỏ qua */ }
+  });
+  return best ? best.name : null;
+}
+
+// Từ ngưỡng lô ranh tổng không bắt chuột (lô nằm trên) → dò điểm theo mousemove, gộp 1 lần / khung hình
+function hookHover(m) {
+  let raf = 0;
+  let last = null;
+  m.on('mousemove', (e) => {
+    last = e.latlng;
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      if (m.getZoom() >= PARCEL_MIN_ZOOM && last) setHover(m, projectAt(m, last));
+    });
+  });
+  m.getContainer().addEventListener('mouseleave', () => setHover(m, null));
+}
+
 function drawOutlinesOn(m, list, below) {
   const old = outlineGroups.get(m);
   if (old) {
@@ -630,9 +728,12 @@ function drawOutlinesOn(m, list, below) {
     m.removeLayer(old);
     outlineGroups.delete(m);
   }
+  clearGlow(m);
+  hovered.delete(m);
   if (!zoomHooked.has(m)) {
     zoomHooked.add(m);
     m.on('zoomend', () => layoutLabels(m));
+    hookHover(m);
   }
   labelLists.set(m, list);
   layoutLabels(m);
@@ -652,9 +753,12 @@ function drawOutlinesOn(m, list, below) {
     }
     const shape = L.geoJSON(geom, { style, bubblingMouseEvents: false });
     shape.bindTooltip(escapeHtml(p.name), { sticky: true, direction: 'top', className: 'dot-tip' });
+    shape.on('mouseover', () => setHover(m, p.name));
+    shape.on('mouseout', () => setHover(m, null));
     shape.on('click', () => {
       if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
       zoomTo(p);
+      pinGlow(p);
     });
     group.addLayer(shape);
   });
@@ -662,6 +766,7 @@ function drawOutlinesOn(m, list, below) {
   // Từ ngưỡng lô: nền mờ nằm dưới lô để không phủ màu lên ký hiệu TT16
   shapes.forEach(s => s.bringToBack());
   outlineGroups.set(m, group);
+  updateGlow(m);
 }
 
 function redrawOutlines() {
@@ -1211,6 +1316,14 @@ export function initProjectLayer(opts = {}) {
   });
   $('projectList')?.addEventListener('click', (e) => {
     if (e.target.closest('[data-migrate]')) { migrateLegacy(); return; }
+    // Chặn label bật/tắt checkbox: bấm tên chỉ phóng tới đồ án
+    const focus = e.target.closest('[data-focus]');
+    if (focus) {
+      e.preventDefault();
+      const p = projects[Number(focus.dataset.focus)];
+      if (p) { zoomTo(p); pinGlow(p); }
+      return;
+    }
     const lotBtn = e.target.closest('[data-lot]');
     if (lotBtn) {
       const [pi, li] = lotBtn.dataset.lot.split(':').map(Number);
@@ -1229,8 +1342,6 @@ export function initProjectLayer(opts = {}) {
     if (expand) { const p = projects[Number(expand.dataset.expand)]; if (p) toggleExpand(p); return; }
     const layerDel = e.target.closest('[data-layer-del]');
     if (layerDel) { const hit = layerOf(layerDel.dataset.layerDel); if (hit) deleteLayer(hit.p, hit.g); return; }
-    const zoom = e.target.closest('[data-zoom]');
-    if (zoom) { const p = projects[Number(zoom.dataset.zoom)]; if (p) zoomTo(p); return; }
     const info = e.target.closest('[data-info]');
     if (info) { const p = projects[Number(info.dataset.info)]; if (p) document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: p.name })); return; }
     const del = e.target.closest('[data-del]');

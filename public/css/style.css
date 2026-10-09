@@ -606,8 +606,10 @@ body.right-collapsed .right-panel {
 .project-name { flex: 1; min-width: 0; display: flex; align-items: center; cursor: pointer; color: var(--text-main); }
 .project-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-name input { accent-color: rgb(var(--project-rgb)); width: 13px; height: 13px; margin: 0 5px 0 0; flex-shrink: 0; cursor: pointer; }
-.project-color { flex-shrink: 0; width: 8px; height: 8px; margin: 0 6px 0 1px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 0 2px color-mix(in srgb, var(--pc) 25%, transparent); }
-.project-row.is-off .project-color { opacity: 0.4; }
+.project-name [data-focus] { min-width: 0; }
+.project-name [data-focus]:hover { color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; }
+.project-tools { flex-shrink: 0; display: flex; align-items: center; }
+.project-tools .project-btn { width: 19px; }
 /* Nhãn tên đồ án giữa ranh tổng: thẻ tối 1 dòng, chấm màu đồ án; kích thước khớp LABEL_* trong projectLayer.js */
 .leaflet-marker-icon.project-label { pointer-events: none; }
 .project-label span {
