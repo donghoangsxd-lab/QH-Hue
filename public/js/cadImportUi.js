@@ -764,6 +764,10 @@ function renderReport() {
   }
   const pairName = $('cadPair')?.value.trim();
   if (pairName) alerts.push(['info', `Ghép vào đồ án «${escapeHtml(pairName)}». Phần cùng giai đoạn được ghi đè, phần giai đoạn kia giữ nguyên.`]);
+  const mismatched = pairMismatches();
+  if (mismatched.length) {
+    alerts.push(['warn', `Tên file khác tên đồ án «${escapeHtml(pairName)}»: ${mismatched.map(f => `<b>${escapeHtml(f)}</b>`).join(', ')} — kiểm tra lại có chọn nhầm đồ án hoặc nhầm file không.`]);
+  }
   if (current.boundaryGeom) {
     alerts.push(['info', `Ranh giới từ file${current.boundaryFile ? ` <b>${escapeHtml(current.boundaryFile)}</b>` : ''} — nét liền trên bản đồ.`]);
     const out = current.outsideBoundary;
@@ -1550,6 +1554,23 @@ function projectName(fileName) {
   return String(fileName || '').replace(/\.[^.]+$/, '').replace(/^(HT|QH)[-_\s]+/i, '').replace(/-(?:ranh-gioi|diem-chuc-nang)$/i, '').trim() || 'DXF';
 }
 
+const nameKey = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd')
+  .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+// Các file đang nạp có tên đồ án (theo tên file) khác đồ án chọn ở «Ghép vào đồ án»; bỏ qua dấu, hoa thường, ký tự nối
+function pairMismatches() {
+  const pair = $('cadPair')?.value.trim();
+  if (!pair || !current) return [];
+  const want = nameKey(pair);
+  const files = [...new Set([current.fileName, current.boundaryFile, current.points?.fileName].filter(Boolean))];
+  return files.filter(f => nameKey(projectName(f)) !== want);
+}
+
+const mismatchNote = () => {
+  const bad = pairMismatches();
+  return bad.length ? `\n\n⚠️ Tên file khác tên đồ án đang ghép:\n${bad.map(f => `  – ${f}`).join('\n')}\nKiểm tra lại có chọn nhầm đồ án hoặc nhầm file không.` : '';
+};
+
 function activeProjectName() {
   const pair = $('cadPair')?.value.trim();
   if (pair) return pair;
@@ -1728,7 +1749,7 @@ function chunkItems(items) {
 async function submitBoundary() {
   const name = activeProjectName();
   if (!current.boundaryGeom) return;
-  if (!confirm(`Cập nhật ranh từ file GIS cho đồ án «${name}»?\nKhông ghi lại các lô.`)) return;
+  if (!confirm(`Cập nhật ranh từ file GIS cho đồ án «${name}»?\nKhông ghi lại các lô.${mismatchNote()}`)) return;
   submitting = true;
   renderReport();
   try {
@@ -1796,7 +1817,7 @@ async function submitImport() {
     const popNote = pops.popHT || pops.popQH
       ? `\n• Dân số: HT ${pops.popHT ? fmtNum(pops.popHT) : '—'} · QH ${pops.popQH ? fmtNum(pops.popQH) : '—'} người`
       : '';
-    if (!confirm(`Ghi vào Google Sheet?\n• ${summary}\n• ${items.length - nUpdate} công trình mới, ${nUpdate} cập nhật (giữ tên, ghi đè tọa độ bằng tâm hatch)${landNote}${pairNote}${separateNote}${boundNote}${popNote}\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)`)) return;
+    if (!confirm(`Ghi vào Google Sheet?\n• ${summary}\n• ${items.length - nUpdate} công trình mới, ${nUpdate} cập nhật (giữ tên, ghi đè tọa độ bằng tâm hatch)${landNote}${pairNote}${separateNote}${boundNote}${popNote}\n• Giai đoạn: ${phaseLabel}\n• TrangThai = TRUE (đã duyệt)${mismatchNote()}`)) return;
   }
 
   // Lô đất gửi sau lô hạ tầng. File HT- chỉ xóa lô hiện trạng; file QH- chỉ xóa lô chức năng sử dụng đất.
@@ -1890,7 +1911,7 @@ export function initCadImport(opts = {}) {
   syncRoleUi();
 
   $('cadPair')?.addEventListener('focus', fillPairSelect);
-  $('cadPair')?.addEventListener('change', syncPopBox);
+  $('cadPair')?.addEventListener('change', () => { syncPopBox(); renderReport(); });
   $('cadFile')?.addEventListener('change', (e) => loadFiles(e.target.files));
   $('cadPointFile')?.addEventListener('change', (e) => loadPointsFile(e.target.files && e.target.files[0]));
   const drop = $('cadDrop');
