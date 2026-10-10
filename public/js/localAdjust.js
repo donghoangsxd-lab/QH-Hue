@@ -618,7 +618,7 @@ function importBoxHtml(s) {
     <div class="la-import-fields">
       ${admin ? '' : '<input type="text" id="laSender" maxlength="80" placeholder="Người gửi / đơn vị (bắt buộc)">'}
       <input type="text" id="laNote" maxlength="300" placeholder="Ghi chú: số Quyết định, ngày ban hành…">
-      <span class="la-import-pdf">PDF scan: ${pdf ? `${escapeHtml(pdf.name)} · ${fmtNum(Math.round(pdf.size / 1024))}` : 'không kèm (chọn ở khung nhập trước khi thẩm định)'}</span>
+      <span class="la-import-pdf">PDF scan: ${pdf ? `${escapeHtml(pdf.name)} · ${sizeText(pdf.size)}` : 'không kèm (chọn ở khung nhập trước khi thẩm định)'}</span>
     </div>
     <div class="la-import-btns">
       <button type="button" class="bp-btn la-import-go" id="btnLaSend">${ico('check')}${admin ? 'Đồng ý nhập' : 'Gửi Admin duyệt'}</button>
@@ -661,7 +661,7 @@ function adjustPayload(s) {
   };
 }
 
-const sizeText = (bytes) => (bytes < 1024 ? ${fmtNum(bytes)} B : ${fmtNum(Math.round(bytes / 1024))} KB);
+const sizeText = (bytes) => (bytes < 1024 ? `${fmtNum(bytes)} B` : `${fmtNum(Math.round(bytes / 1024))} KB`);
 
 async function submitImport() {
   if (!sheet || sheet.sent) return;
@@ -875,7 +875,7 @@ export function initLocalAdjust() {
   $('localFile')?.addEventListener('change', () => {
     const f = $('localFile').files && $('localFile').files[0];
     const out = $('localFileName');
-    if (out) out.textContent = f ? `${f.name} · ${fmtNum(Math.round(f.size / 1024))}` : 'DXF: ranh (layer có chữ RANH) + hatch đất';
+    if (out) out.textContent = f ? `${f.name} · ${sizeText(f.size)}` : 'DXF: ranh (layer có chữ RANH) + hatch đất';
   });
   $('localPdf')?.addEventListener('change', () => {
     const input = $('localPdf');
@@ -884,7 +884,7 @@ export function initLocalAdjust() {
     if (bad) { showToast(bad, 'error'); input.value = ''; }
     const ok = !bad && f;
     const out = $('localPdfName');
-    if (out) out.textContent = ok ? `${f.name} · ${fmtNum(Math.round(f.size / 1024))}` : 'Quyết định, bản vẽ điều chỉnh · PDF < 2 MB';
+    if (out) out.textContent = ok ? `${f.name} · ${sizeText(f.size)}` : 'Quyết định, bản vẽ điều chỉnh · PDF < 2 MB';
   });
   $('btnLocalStart')?.addEventListener('click', () => { runAdjust(); });
   $('projectReviewHost')?.addEventListener('click', (e) => {
