@@ -51,6 +51,8 @@ export const layers = {
 const CITY_NAME = "Thành phố Huế";
 const CITY_CENTER = [16.4637, 107.5905];
 const CITY_ZOOM = 13;
+const CITY_BOUNDS = [[15.995, 107.034], [16.743, 108.195]];
+const CITY_FIT_PAD = 12;
 const WARD_GEOM_VERSION = 2;
 const INFRA_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "7-YT", "8-VH", "9-TM"];
 // Số điểm trong khung nhìn ≤ ngưỡng thì vẽ icon PNG (DOM); vượt ngưỡng vẽ chấm tròn trên canvas cho nhẹ
@@ -338,8 +340,14 @@ function focusServiceRadius(targetMap, lat, lng, radius) {
   });
 }
 
+// Thấy trọn ranh thành phố trong phần bản đồ không bị panel phải che
 export function centerOnCity(options = { animate: false }) {
-  flyToVisible(CITY_CENTER, CITY_ZOOM, options);
+  if (!map) return;
+  map.fitBounds(CITY_BOUNDS, {
+    ...options,
+    paddingTopLeft: [CITY_FIT_PAD, CITY_FIT_PAD],
+    paddingBottomRight: [CITY_FIT_PAD + getRightObstruction(), CITY_FIT_PAD]
+  });
 }
 
 export function flyToVisible(latlng, zoom, options) {

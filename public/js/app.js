@@ -79,11 +79,9 @@ function addTypeSwatches() {
   });
 }
 
-// Quy hoạch / Công trình là 2 tab cùng cấp (mở bản đồ luôn ở Quy hoạch); Bản đồ nền / Bản đồ môi trường là 2 tab ở dưới.
-// Chuyển tab chỉ đổi danh sách đang xem, không bật/tắt lớp trên bản đồ.
-const LAYER_MAP_KEY = 'qh_layer_map';
-const MAP_PANE_IDS = ['base', 'env'];
-function initLayerMapTabs(initial) {
+// Quy hoạch / Công trình là 2 tab cùng cấp (mở bản đồ luôn ở Quy hoạch); Bản đồ nền / Bản đồ môi trường là 2 tab ở dưới
+// (mở bản đồ luôn ở Bản đồ nền để thấy lớp Phân loại đô thị đang bật). Chuyển tab chỉ đổi danh sách đang xem, không bật/tắt lớp.
+function initLayerMapTabs() {
   const root = document.getElementById('layerMap');
   if (!root) return;
   const buttons = [...root.querySelectorAll('[data-map-tab]')];
@@ -94,7 +92,6 @@ function initLayerMapTabs(initial) {
       btn.setAttribute('aria-selected', String(on));
     });
     root.querySelectorAll('[data-map-pane]').forEach(pane => { pane.hidden = pane.dataset.mapPane !== id; });
-    try { localStorage.setItem(LAYER_MAP_KEY, id); } catch (e) { /* chế độ riêng tư */ }
   };
   buttons.forEach(btn => btn.addEventListener('click', () => show(btn.dataset.mapTab)));
   const refreshCounts = () => buttons.forEach(btn => {
@@ -105,7 +102,7 @@ function initLayerMapTabs(initial) {
     badge.textContent = n ? String(n) : '';
   });
   root.addEventListener('change', refreshCounts);
-  show(MAP_PANE_IDS.includes(initial) ? initial : 'base');
+  show('base');
   refreshCounts();
 }
 function initLayerMainTabs() {
@@ -128,12 +125,7 @@ function initLayerMainTabs() {
 
 function initLayerGroups() {
   initLayerMainTabs();
-  let mapTab = 'base';
-  try {
-    const stored = localStorage.getItem(LAYER_MAP_KEY);
-    if (MAP_PANE_IDS.includes(stored)) mapTab = stored;
-  } catch (e) { /* chế độ riêng tư */ }
-  initLayerMapTabs(mapTab);
+  initLayerMapTabs();
 }
 
 const RADIUS_MIN = 50;
@@ -285,6 +277,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     new ResizeObserver(() => map.invalidateSize({ pan: false })).observe(mapEl);
   }
 
+  // Panel phải mở sẵn ở Lớp dữ liệu, trừ màn hình hẹp (panel sẽ che gần hết bản đồ)
+  if (window.matchMedia('(max-width: 900px)').matches) document.body.classList.add('right-collapsed');
   initPlanMap(map, layers);
   centerOnCity();
   initBottomPanelEvents();

@@ -1,6 +1,6 @@
 // Lớp "Phân loại đô thị": tô phường, xã theo trình độ phát triển đô thị, nét ranh và ký hiệu loại đô thị; trỏ chuột xem thông tin.
-// Bản đồ hiện trạng: Quyết định 614/QĐ-UBND (urbanStatus.js, ranh dựng bằng scripts/build-urban614.js; 9 đô thị trên một phần
-// xã chưa có ranh thị trấn, xã cũ nên chỉ có ký hiệu). Bản đồ quy hoạch: hệ thống đô thị sau năm 2030 theo Quyết định 756/QĐ-UBND
+// Bản đồ hiện trạng: Quyết định 614/QĐ-UBND (urbanStatus.js, ranh dựng bằng scripts/build-urban614.js; đô thị trên một phần
+// phường, xã tô riêng theo ranh thị trấn, xã cũ). Bản đồ quy hoạch: hệ thống đô thị sau năm 2030 theo Quyết định 756/QĐ-UBND
 // (urbanVision.js, ranh dựng bằng scripts/build-urban-vision.js). Cùng một checkbox, mỗi bản đồ vẽ nội dung của mình.
 import { map } from './mapEngine.js';
 import { planMap, isCompareOn, isSplitOn } from './planMap.js';
@@ -11,6 +11,7 @@ import { VISION_REF, VISION_STAGE, VISION_CLAUSE, URBANS_VISION, visionLevel, vi
 import { planUrbanOf } from './urbanClass.js';
 
 const FILL_PANE = 'urbanAreaPane';
+const TOWN_PANE = 'urbanTownPane';
 const LINE_PANE = 'urbanLinePane';
 const HIT_WEIGHT = 14;
 const WARD_HOVER_MAX_ZOOM = 12;
@@ -44,7 +45,7 @@ const statusContent = {
   dataUrl: 'data/urban614.geojson',
   urbans: URBANS_614,
   wardLevel: (name) => wardLevel614(name)?.level || null,
-  urbanTip(u, { approx = false, hasArea = true } = {}) {
+  urbanTip(u, { approx = false, hasArea = true, inferred = false } = {}) {
     const plan = planUrbanOf(u.plan);
     return [
       `<b class="ua-tip-name">${escapeHtml(u.name)}</b> ${clsTag(u.cls)}`,
@@ -53,6 +54,7 @@ const statusContent = {
       plan ? `Định hướng 2030: ${escapeHtml(plan.name)} (loại ${plan.cls})` : '',
       muted(`Công nhận: ${u.basis}`),
       hasArea ? '' : muted(`Chưa có ranh ${u.before.name.startsWith('Thị trấn') ? 'thị trấn' : 'xã'} cũ, ký hiệu đặt tại ${approx ? 'trung tâm xã mới (gần đúng)' : 'trung tâm cũ'}.`),
+      inferred ? muted(`Suy ra: ranh là vùng không tên chứa trung tâm ${lowerFirst(u.before.name)} cũ trên bản đồ địa giới trước 2020.`) : '',
       muted(STATUS_REF)
     ].filter(Boolean).join('<br>');
   },
@@ -114,8 +116,9 @@ function createUrbanLayer(content) {
   let visible = false;
   let dataPromise = null;
   let fillRenderer = null;
+  let townRenderer = null;
   let lineRenderer = null;
-  const groups = { wards: L.layerGroup(), lines: L.layerGroup(), badges: L.layerGroup() };
+  const groups = { wards: L.layerGroup(), towns: L.layerGroup(), lines: L.layerGroup(), badges: L.layerGroup() };
   const byId = new Map(content.urbans.map(u => [u.id, u]));
 
   // Nền tô phường không nhận chuột (để không chặn công trình, lô đất); tra phường bằng điểm-trong-đa-giác khi rê chuột ở zoom nhỏ
@@ -182,14 +185,23 @@ function createUrbanLayer(content) {
   }
 
   function drawUrbans(fc) {
+    groups.towns.clearLayers();
     groups.lines.clearLayers();
     groups.badges.clearLayers();
+    const op = fillOpacity(m.getZoom());
     // Loại I vẽ trước, loại III sau cùng để nét đô thị nhỏ nằm trên
     const rank = (f) => CLS_RANK[byId.get(f.properties.id)?.cls] ?? 3;
     [...fc.features].sort((a, b) => rank(a) - rank(b)).forEach(f => {
       const u = byId.get(f.properties.id);
       if (!u) return;
       const isArea = f.geometry.type !== 'Point';
+      const inferred = !!f.properties.inferred;
+      if (isArea && u.part && LEVEL_FILL[u.cls]) {
+        groups.towns.addLayer(L.geoJSON(f.geometry, {
+          pane: TOWN_PANE, renderer: townRenderer, interactive: false,
+          style: { stroke: false, fillColor: LEVEL_FILL[u.cls], fillOpacity: op }
+        }));
+      }
       if (isArea) {
         const rings = ringsOf(f.geometry);
         const style = LINE_STYLE[u.cls] || LINE_STYLE.III;
@@ -197,7 +209,7 @@ function createUrbanLayer(content) {
         const line = L.polyline(rings, { pane: LINE_PANE, renderer: lineRenderer, interactive: false, ...style, opacity: 0.95 });
         // Nét trong suốt rộng hơn để dễ trỏ trúng ranh
         const hit = L.polyline(rings, { pane: LINE_PANE, renderer: lineRenderer, weight: HIT_WEIGHT, opacity: 0, bubblingMouseEvents: false });
-        hit.bindTooltip(content.urbanTip(u, {}), tipOpts);
+        hit.bindTooltip(content.urbanTip(u, { inferred }), tipOpts);
         hit.on('mouseover', () => { urbanHover(true)(); line.setStyle({ weight: style.weight + 1.5 }); });
         hit.on('mouseout', () => { urbanHover(false)(); line.setStyle({ weight: style.weight }); });
         groups.lines.addLayer(casing);
@@ -212,7 +224,7 @@ function createUrbanLayer(content) {
         iconSize: [0, 0]
       });
       L.marker([lat, lng], { icon, keyboard: false, zIndexOffset: 600 - 50 * (CLS_RANK[u.cls] ?? 2) })
-        .bindTooltip(content.urbanTip(u, { approx: !!f.properties.approx, hasArea: isArea }), { ...tipOpts, sticky: false, offset: [0, -16] })
+        .bindTooltip(content.urbanTip(u, { approx: !!f.properties.approx, hasArea: isArea, inferred }), { ...tipOpts, sticky: false, offset: [0, -16] })
         .on('mouseover', urbanHover(true))
         .on('mouseout', urbanHover(false))
         .addTo(groups.badges);
@@ -224,6 +236,7 @@ function createUrbanLayer(content) {
     const z = m.getZoom();
     const op = fillOpacity(z);
     groups.wards.eachLayer(g => g.eachLayer?.(l => l.setStyle({ fillOpacity: l.options.uaRural ? op * 0.5 : op })));
+    groups.towns.eachLayer(g => g.setStyle?.({ fillOpacity: op }));
     m.getContainer().classList.toggle('ua-zoom-low', z <= BADGE_SMALL_ZOOM);
     if (z > BADGE_MAX_ZOOM) groups.badges.remove();
     else if (!m.hasLayer(groups.badges)) groups.badges.addTo(m);
@@ -237,10 +250,15 @@ function createUrbanLayer(content) {
       const fillPane = m.getPane(FILL_PANE) || m.createPane(FILL_PANE);
       fillPane.style.zIndex = 390;
       fillPane.style.pointerEvents = 'none';
+      // Đô thị trên một phần xã tô trên nền phường, xã (canvas riêng để không bị nền vẽ lại đè lên)
+      const townPane = m.getPane(TOWN_PANE) || m.createPane(TOWN_PANE);
+      townPane.style.zIndex = 395;
+      townPane.style.pointerEvents = 'none';
       const linePane = m.getPane(LINE_PANE) || m.createPane(LINE_PANE);
       linePane.style.zIndex = 410;
       linePane.style.pointerEvents = 'none';
       fillRenderer = L.canvas({ pane: FILL_PANE });
+      townRenderer = L.canvas({ pane: TOWN_PANE });
       lineRenderer = L.svg({ pane: LINE_PANE });
       m.on('zoomend', restyle);
       m.on('mousemove', onMouseMove);
@@ -257,6 +275,7 @@ function createUrbanLayer(content) {
         return;
       }
       groups.wards.addTo(m);
+      groups.towns.addTo(m);
       groups.lines.addTo(m);
       drawWards();
       try {

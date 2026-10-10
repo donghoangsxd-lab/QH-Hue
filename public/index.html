@@ -19,7 +19,7 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="right-collapsed">
+<body>
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
   <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
     <symbol id="i-compare" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/><path d="M12 4h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7z" fill="currentColor" fill-opacity=".3" stroke="none"/></symbol>
@@ -370,7 +370,7 @@
           </div>
           <div class="layer-map-pane" id="layerPaneBase" data-map-pane="base" role="tabpanel">
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div></div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_urban"><label for="chk_urban" title="Bản đồ hiện trạng: đô thị và phường đạt trình độ phát triển đô thị từ 01/01/2026 theo Quyết định 614/QĐ-UBND ngày 10/02/2026. Bản đồ quy hoạch: hệ thống đô thị sau năm 2030 theo Quyết định 756/QĐ-UBND ngày 28/02/2026. Trỏ chuột vào ranh, ký hiệu hoặc phường để xem thông tin"><svg class="ico ico-layer"><use href="#i-flag"/></svg>Phân loại đô thị <small class="layer-hint">(HT: QĐ 614 · QH: QĐ 756)</small></label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_urban" checked><label for="chk_urban" title="Bản đồ hiện trạng: đô thị và phường đạt trình độ phát triển đô thị từ 01/01/2026 theo Quyết định 614/QĐ-UBND ngày 10/02/2026. Bản đồ quy hoạch: hệ thống đô thị sau năm 2030 theo Quyết định 756/QĐ-UBND ngày 28/02/2026. Trỏ chuột vào ranh, ký hiệu hoặc phường để xem thông tin"><svg class="ico ico-layer"><use href="#i-flag"/></svg>Phân loại đô thị <small class="layer-hint">(HT: QĐ 614 · QH: QĐ 756)</small></label></div></div>
           <div class="layer-legend ua-legend" id="urbanLegend" style="display:none;">
             <span class="ua-legend-item"><i class="ua-badge ua-badge-I"><span>I</span></i>Đô thị loại I (toàn thành phố)</span>
             <span class="ua-legend-item"><i class="ua-badge ua-badge-II"><span>II</span></i>Đô thị loại II</span>
@@ -380,7 +380,7 @@
             <span class="ua-legend-item"><i class="ua-sw" style="background:#ef4444"></i>Phường, xã trình độ loại II</span>
             <span class="ua-legend-item"><i class="ua-sw" style="background:#fb923c"></i>Phường, xã trình độ loại III</span>
             <span class="ua-legend-item"><i class="ua-sw" style="background:#4ade80; opacity:0.6"></i>Nông thôn</span>
-            <span class="ua-legend-note">Hiện trạng: QĐ 614 (từ 01/01/2026); ký hiệu nét đứt là đô thị chưa có ranh riêng.</span>
+            <span class="ua-legend-note">Hiện trạng: QĐ 614 (từ 01/01/2026); đô thị loại V cũ trong xã tô theo ranh thị trấn, xã cũ (địa giới trước 2020).</span>
             <span class="ua-legend-note">Quy hoạch: QĐ 756, giai đoạn sau năm 2030.</span>
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung. Thu nhỏ vẫn hiện trục chính; chỉ mức một biểu đồ tròn toàn thành phố là ẩn"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(zoom để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>

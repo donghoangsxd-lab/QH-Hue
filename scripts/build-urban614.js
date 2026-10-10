@@ -1,9 +1,11 @@
 // Ranh khu vực đô thị hiện trạng theo Quyết định 614/QĐ-UBND ngày 10/02/2026 (Phụ lục I) cho lớp urbanAreaLayer.js.
-//   node scripts/build-urban614.js [đường-dẫn-ra] [--boundary ranh40.geojson]
+//   node scripts/build-urban614.js [đường-dẫn-ra] [--boundary ranh40.geojson] [--xa-cu xaCu.geojson]
 // Ghép từ ranh 40 phường xã đang dùng trên webapp để khớp nét ranh phường. Phần chỉ còn trên ranh trước sáp nhập lấy
 // OpenStreetMap ngày 01/6/2025 (ODbL): Phong Điền = 4 phường + phần phường Phong Quảng thuộc thị xã Phong Điền cũ;
 // Thanh Hà (xã Quảng Thành cũ) = phường Hóa Châu trừ phường Hương Phong, Hương Vinh cũ.
-// 9 đô thị trên một phần xã chưa có ranh thị trấn, xã cũ: chỉ ghi điểm đặt ký hiệu.
+// 9 đô thị trên một phần xã = thị trấn, xã cũ (scripts/data/xaCu-dothiV.geojson, trích lớp bl_xaphuong của WebGIS gServer
+// sở ngành, địa giới trước 2020, trùng phạm vi lúc được công nhận) cắt theo phường, xã hiện nay. --xa-cu nhận cả file
+// tải đủ 153 xã, chọn theo objectid.
 const fs = require('fs');
 const path = require('path');
 const turf = require('@turf/turf');
@@ -27,18 +29,31 @@ const WARD_URBANS = {
   'phong-dien': { units: ['Phong Điền', 'Phong Thái', 'Phong Dinh', 'Phong Phú'], core: ['Phong Thái', 'Phong Dinh'] }
 };
 
-// [lng, lat] trung tâm thị trấn, xã cũ trên OpenStreetMap; approx = chỉ có điểm của xã mới
-const ANCHORS = {
-  'loc-son': { at: [107.73955, 16.34667] },
-  'sia': { at: [107.51427, 16.57493] },
-  'phu-da': { at: [107.71534, 16.43986] },
-  'phu-loc': { at: [107.85898, 16.28035] },
-  'lang-co': { at: [108.07804, 16.24089] },
-  'khe-tre': { at: [107.71849, 16.16842] },
-  'a-luoi': { at: [107.23075, 16.27221] },
-  'vinh-hien': { at: [107.89586, 16.34744] },
-  'vinh-thanh': { at: [107.78461, 16.43324], approx: true }
+// at = [lng, lat] trung tâm thị trấn, xã cũ trên OpenStreetMap (đặt ký hiệu); oid = objectid trong bl_xaphuong;
+// ward = phường, xã hiện nay chứa đô thị. Thị trấn A Lưới cũ không có tên trong lớp: lấy polygon chứa trung tâm thị trấn.
+const OLD_TOWNS = {
+  'loc-son': { at: [107.73955, 16.34667], oid: 122, ward: 'Hưng Lộc' },
+  'sia': { at: [107.51427, 16.57493], oid: 44, ward: 'Quảng Điền' },
+  'phu-da': { at: [107.71534, 16.43986], oid: 69, ward: 'Phú Vang' },
+  'phu-loc': { at: [107.85898, 16.28035], oid: 115, ward: 'Phú Lộc' },
+  'lang-co': { at: [108.07804, 16.24089], oid: 143, ward: 'Chân Mây - Lăng Cô' },
+  'khe-tre': { at: [107.71849, 16.16842], oid: 132, ward: 'Khe Tre' },
+  'a-luoi': { at: [107.23075, 16.27221], oid: 146, ward: 'A Lưới 2', inferred: true },
+  'vinh-hien': { at: [107.89586, 16.34744], oid: 120, ward: 'Vinh Lộc' },
+  'vinh-thanh': { at: [107.78461, 16.43324], oid: 70, ward: 'Phú Vinh' }
 };
+const OLD_TOWNS_FILE = path.join(__dirname, 'data', 'xaCu-dothiV.geojson');
+
+function loadOldTowns(file) {
+  const fc = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const byOid = new Map(fc.features.map(f => [Number(f.properties.objectid), turf.feature(f.geometry)]));
+  return Object.fromEntries(Object.entries(OLD_TOWNS).map(([id, t]) => {
+    const f = byOid.get(t.oid);
+    if (!f) throw new Error(`Thiếu ranh xã cũ objectid ${t.oid} (${id}) trong ${file}`);
+    if (!turf.booleanPointInPolygon(t.at, f)) throw new Error(`Trung tâm ${id} nằm ngoài polygon objectid ${t.oid}`);
+    return [id, f];
+  }));
+}
 
 async function overpass(query) {
   for (let round = 0; round < 4; round++) {
@@ -79,6 +94,8 @@ async function main() {
   const args = process.argv.slice(2);
   const bi = args.indexOf('--boundary');
   const boundaryFile = bi >= 0 ? args.splice(bi, 2)[1] : null;
+  const xi = args.indexOf('--xa-cu');
+  const oldTownsFile = xi >= 0 ? args.splice(xi, 2)[1] : OLD_TOWNS_FILE;
   const dest = args[0] || path.join(__dirname, '..', 'public', 'data', 'urban614.geojson');
 
   const wards = await loadBoundary(boundaryFile);
@@ -104,14 +121,22 @@ async function main() {
     features.push(out);
     console.log(`${id}: ${out.properties.km2} km²`);
   });
-  Object.entries(ANCHORS).forEach(([id, a]) => {
-    features.push(turf.point(a.at, { id, ...(a.approx ? { approx: true } : {}) }));
+  const towns = loadOldTowns(oldTownsFile);
+  Object.entries(OLD_TOWNS).forEach(([id, t]) => {
+    const raw = turf.intersect(turf.featureCollection([towns[id], pick([t.ward])[0]]));
+    if (!raw) throw new Error(`Ranh ${id} không giao ${t.ward}`);
+    const out = areaFeature(id, raw, null);
+    out.properties.anchor = t.at;
+    if (t.inferred) out.properties.inferred = true;
+    features.push(out);
+    console.log(`${id}: ${out.properties.km2} km²`);
   });
 
   const fc = {
     type: 'FeatureCollection',
     ref: 'Quyết định 614/QĐ-UBND ngày 10/02/2026',
-    source: `Ranh 40 phường xã webapp; ranh trước sáp nhập © OpenStreetMap contributors (ODbL), ngày ${OSM_DATE.slice(0, 10)}`,
+    source: `Ranh 40 phường xã webapp; ranh trước sáp nhập © OpenStreetMap contributors (ODbL), ngày ${OSM_DATE.slice(0, 10)}; `
+      + 'thị trấn, xã cũ: WebGIS gServer sở ngành Huế (bl_xaphuong, trước 2020)',
     features
   };
   const text = JSON.stringify(fc);
