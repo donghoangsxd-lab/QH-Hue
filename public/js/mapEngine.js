@@ -749,9 +749,15 @@ function parcelStyle(entry, detailed) {
   return tt16ParcelStyle(layerType(p), entry.parcel.layer, { scenario: p.scenario, detailed, approved: isApproved(p.status), name: p.name });
 }
 
+// Khoảng cách tiếp cận từ vị trí tra cứu tới công trình đích của tuyến (id → chữ), xóa cùng kết quả tra cứu
+const accessNotes = new Map();
+
 // Tên công trình bám theo con trỏ khi rê lên icon / chấm / ranh lô (chưa bấm)
 function bindNameTip(layer, p) {
-  layer.bindTooltip(escapeHtml(p.name || ''), { sticky: true, direction: 'top', offset: [0, -10], className: 'dot-tip' });
+  layer.bindTooltip(() => {
+    const note = accessNotes.get(p.id);
+    return `${escapeHtml(p.name || '')}${note ? ` <span class="tip-note">(${escapeHtml(note)})</span>` : ''}`;
+  }, { sticky: true, direction: 'top', offset: [0, -10], className: 'dot-tip' });
 }
 
 // Bật lớp Đồ án quy hoạch: lô của đồ án đang ẩn không vẽ; đồ án đã tải file thì lô do lớp Quy hoạch vẽ (redrawLands)
@@ -1632,6 +1638,7 @@ function clearSingleIsochrone() {
   singleIsoSeq++;
   if (stopFlow) stopFlow();
   stopFlow = null;
+  accessNotes.clear();
   layers.singleIso.clearLayers();
   planLayers.singleIso.clearLayers();
   [map, planMap].forEach(m => m?.getContainer().classList.remove('sel-active'));
@@ -2314,10 +2321,13 @@ async function showAccessRoutes(lat, lng, m, cands, popup, seq, hiKeys) {
     group.addLayer(L.polyline(r.path, { ...line, color: '#020617', weight: 7, opacity: 0.5 }));
     group.addLayer(L.polyline(r.path, { ...line, color, weight: 3.2, opacity: 0.95 }));
   });
-  rows.forEach(r => {
+  const rings = rows.map(r => {
     const color = BUFFER_COLORS[r.code] || SEL_ACCENT;
-    group.addLayer(L.circleMarker([Number(r.item.lat), Number(r.item.lng)], { renderer, radius: 9, color, weight: 2.5, fillColor: color, fillOpacity: 0.25, interactive: false }));
+    const ring = L.circleMarker([Number(r.item.lat), Number(r.item.lng)], { renderer, radius: 9, color, weight: 2.5, fillColor: color, fillOpacity: 0.25, interactive: false });
+    group.addLayer(ring);
     hiKeys.add(pointKey(r.item));
+    accessNotes.set(r.item.id, r.path ? fmtDist(r.distM) : `≈ ${fmtDist(r.airM)} chim bay`);
+    return ring;
   });
   (isPlan ? planRenderer : leftRenderer).highlight(hiKeys);
   if (routed.length) stopFlow = startFlowAnimation(m, group, routed.map(r => r.path));
@@ -2351,12 +2361,14 @@ async function showAccessRoutes(lat, lng, m, cands, popup, seq, hiKeys) {
     m.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
   });
 
-  // Ranh khu đất công trình gần nhất: bản đồ quy hoạch lấy lô QH, chưa có thì lô hiện trạng; tải file đồ án nếu lô chưa vẽ
+  // Ranh khu đất công trình gần nhất: bản đồ quy hoạch lấy lô QH, chưa có thì lô hiện trạng; tải file đồ án nếu lô chưa vẽ.
+  // Có ranh thì bỏ vòng tròn đích (ranh đã đánh dấu công trình)
   const found = await Promise.all(rows.map(r => infraLotOf(r.item.id, r.item.tenQH, isPlan ? ['QH', 'HT'] : ['HT']).catch(() => null)));
   if (seq !== singleIsoSeq) return;
   found.forEach((lot, i) => {
     if (!lot || !lot.geometry) return;
     lots[i] = lot;
+    group.removeLayer(rings[i]);
     addParcelOutline(group, lot.geometry, renderer, BUFFER_COLORS[rows[i].code] || SEL_ACCENT);
     const sub = popup.isOpen() && popup.getElement()?.querySelector(`[data-route="${i}"] .js-lot`);
     if (!sub) return;

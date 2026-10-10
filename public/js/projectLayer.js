@@ -240,6 +240,15 @@ function shortName(name) {
   return s || String(name || '');
 }
 
+const KIND_FULL = { QHCT: 'Quy hoạch chi tiết', QHPK: 'Quy hoạch phân khu', QHC: 'Quy hoạch chung' };
+
+// Tooltip tên đồ án: diễn giải viết tắt loại đồ án đầu tên và tỷ lệ trong ngoặc, giữ nguyên phần còn lại
+function fullName(name) {
+  return String(name || '').trim()
+    .replace(/^(QHCT|QHPK|QHC)\b\.?/i, (m, k) => KIND_FULL[k.toUpperCase()])
+    .replace(/\(\s*(1\/[\d.]+)\s*\)/g, '(tỷ lệ $1)');
+}
+
 // Đồ án nhập trước khi có tab DS_DoAn: ranh tạm = bao lồi các lô / điểm (nhanh), nhập lại file để có ranh đúng
 function outlineOf(p) {
   if (p.area) return p.area.geometry;
@@ -287,12 +296,6 @@ function zoomTo(p) {
 
 const foldText = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
 
-function metaText(p) {
-  const parts = [`${fmtNum(p.infra.size)} CT`, `${fmtNum(p.lands.size)} lô đất`];
-  if (p.area && p.area.time) parts.push(p.area.time.split(' ')[0]);
-  return parts.join(' · ');
-}
-
 function renderHead() {
   const shownN = projects.filter(p => state.showProjects && !state.hiddenProjects.has(p.name)).length;
   const count = $('projectCount');
@@ -329,9 +332,6 @@ function renderList() {
   box.innerHTML = migrateBtn + none + visible.map(({ p, idx }) => {
     const on = state.showProjects && !state.hiddenProjects.has(p.name);
     const deleting = busy === p.name;
-    const tempNote = !p.area ? ' · ranh tạm (bao lồi) — nhập file ranh hoặc nhập lại file để có ranh đúng'
-      : p.source === 'gis' ? ' · ranh từ file GIS' : ' · ranh tự dựng từ các lô';
-    const where = p.legacy ? 'còn ở file cad_parcels' : 'file riêng trên bucket';
     const open = expanded.has(p.name);
     const decisionTitle = p.decision
       ? `Xem quyết định phê duyệt: ${p.decision.name}`
@@ -340,7 +340,7 @@ function renderList() {
       ? `<button type="button" class="project-btn${p.decision ? ' has-decision' : ''}" data-decision="${idx}" title="${escapeHtml(decisionTitle)}" aria-label="${p.decision ? 'Xem quyết định phê duyệt' : 'Gắn quyết định phê duyệt'}"${busy ? ' disabled' : ''}>${ico(p.decision ? 'file' : 'save')}</button>`
       : '';
     return `<div class="project-row${on ? '' : ' is-off'}${p.name === pickedName ? ' is-picked' : ''}">
-      <label class="project-name" title="${escapeHtml(p.name)}${p.area?.ward ? ` — ${escapeHtml(p.area.ward)}` : ''} — ${escapeHtml(metaText(p))} (${where})${tempNote}&#10;Bấm tên để phóng tới và làm sáng ranh đồ án">
+      <label class="project-name" title="${escapeHtml(fullName(p.name))}">
         <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><span data-focus="${idx}">${idx + 1}. ${escapeHtml(p.name)}</span></label>
       <span class="project-tools">
         <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-expand="${idx}" title="${open ? 'Ẩn' : 'Xem'} các lớp dữ liệu của đồ án" aria-label="Các lớp dữ liệu của đồ án" aria-expanded="${open}">${ico('chev-down')}</button>

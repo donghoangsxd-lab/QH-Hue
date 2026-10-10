@@ -308,6 +308,8 @@ function setPart1Turn(turn) {
   card.querySelectorAll('.flip-face').forEach(face => face.setAttribute('aria-hidden', String(!spread && Number(face.dataset.page) !== page)));
   const title = document.getElementById('bpPart1Title');
   if (title) title.textContent = PART1_PAGES[page].title;
+  const note = document.getElementById('bpPart1Note');
+  if (note) note.hidden = page !== 0;
   const btn = document.getElementById('btnFlipPart1');
   if (btn) {
     btn.innerHTML = `${ico('flip')}${next.short}`;
