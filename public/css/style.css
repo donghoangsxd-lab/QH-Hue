@@ -104,7 +104,7 @@ table { font-variant-numeric: tabular-nums; }
 /* Khai báo trên body (không phải :root) để nhận --bottom-h theo màn hình / thẩm định.
    --bottom-gap: phần đáy dành cho panel dưới; --side-gap: đáy panel phải (thu gọn panel dưới thì chừa nút mở lại) */
 body { --bottom-gap: var(--bottom-h); --side-gap: var(--bottom-h); }
-body.bottom-collapsed:not(.project-review) { --bottom-gap: 0px; --side-gap: calc(var(--tb-btn) + 12px); }
+body.bottom-collapsed:not(.project-review:not(.project-view)) { --bottom-gap: 0px; --side-gap: calc(var(--tb-btn) + 12px); }
 #mapArea {
   position: absolute;
   top: 0;
@@ -476,8 +476,8 @@ body.compare-on .map-title-split { display: inline-flex; }
 body.right-collapsed .rp-expand-btn:not(.bp-expand-btn) { opacity: 1; visibility: visible; transition: opacity 0.2s ease 0.1s, visibility 0s; }
 /* Mở lại panel dưới: đối xứng nút mở panel phải qua cạnh dưới */
 .bp-expand-btn { top: auto; bottom: 12px; }
-body.bottom-collapsed:not(.project-review) .bp-expand-btn { opacity: 1; visibility: visible; transition: opacity 0.2s ease 0.1s, visibility 0s; }
-body.bottom-collapsed:not(.project-review) .leaflet-bottom.leaflet-right { margin-right: calc(var(--tb-btn) + 28px); }
+body.bottom-collapsed:not(.project-review:not(.project-view)) .bp-expand-btn { opacity: 1; visibility: visible; transition: opacity 0.2s ease 0.1s, visibility 0s; }
+body.bottom-collapsed:not(.project-review:not(.project-view)) .leaflet-bottom.leaflet-right { margin-right: calc(var(--tb-btn) + 28px); }
 
 /* ===================== PANEL PHẢI ===================== */
 /* Cao vừa nội dung, chỉ cuộn khi vượt quá khoảng trống phía trên panel dưới */
@@ -645,6 +645,20 @@ body.right-collapsed .right-panel {
 .project-row.is-flash { animation: project-flash 0.8s ease 2; }
 @keyframes project-flash { 50% { background: rgba(var(--cyan-rgb), 0.38); } }
 @media (prefers-reduced-motion: reduce) { .project-row.is-flash { animation: none; } }
+/* Nhóm đồ án theo phường: tiêu đề dính đầu khung khi cuộn; nhóm phường đang chọn tô viền xanh, luôn mở */
+.pg-group { border-bottom: 1px solid var(--border-soft); }
+.pg-head {
+  position: sticky; top: 0; z-index: 1; width: 100%; display: flex; align-items: center; gap: 5px; min-height: 24px; padding: 0 4px;
+  border: 0; background: var(--bg-panel); color: var(--text-main); font: inherit; font-size: var(--fs-sm); font-weight: 600; text-align: left; cursor: pointer;
+}
+.pg-head:hover { color: var(--accent-cyan); }
+.pg-head .ico { width: 12px; height: 12px; flex-shrink: 0; transition: transform var(--ease); }
+.pg-group.open > .pg-head .ico { transform: rotate(90deg); }
+.pg-head span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pg-head small { flex-shrink: 0; min-width: 18px; padding: 0 5px; border-radius: 9px; background: rgba(148, 163, 184, 0.18); color: var(--text-muted); font-size: var(--fs-xs); text-align: center; }
+.pg-group.is-current > .pg-head { color: var(--accent-cyan); box-shadow: inset 3px 0 0 var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.1); cursor: default; }
+.pg-group.is-current > .pg-head small { background: var(--accent-cyan); color: var(--bg-panel); }
+.pg-body { padding: 0 0 4px 10px; }
 .project-tools { flex-shrink: 0; display: flex; align-items: center; }
 .project-tools .project-btn { width: 19px; }
 /* Nhãn tên đồ án giữa ranh tổng: thẻ tối 1 dòng, chấm màu đồ án; kích thước khớp LABEL_* trong projectLayer.js */
@@ -1174,7 +1188,7 @@ body.right-collapsed .right-panel {
 }
 body.bottom-max .bottom-panel { top: 0; right: 0; height: auto; z-index: 2500; }
 /* Thu gọn: trượt xuống dưới mép màn hình, giữ nguyên kích thước để biểu đồ không phải vẽ lại */
-body.bottom-collapsed:not(.project-review) .bottom-panel {
+body.bottom-collapsed:not(.project-review:not(.project-view)) .bottom-panel {
   transform: translateY(100%);
   opacity: 0;
   visibility: hidden;
@@ -2668,15 +2682,15 @@ table.ward-table th {
 
 /* Thẩm định đồ án — bảng chiếm phần dưới màn hình, phần trên để xem ranh lô; không đụng bảng phường.
    review-min: chỉ còn thanh tiêu đề; review-max: bảng phủ toàn màn hình */
-body.project-review { --bottom-h: 46vh; }
+body.project-review:not(.project-view) { --bottom-h: 46vh; }
 /* Màn m / l: cao theo số dòng bảng (cùng công thức panel dưới mặc định), không quá 46vh */
 @media (min-width: 1700px) {
-  body.project-review {
+  body.project-review:not(.project-view) {
     --bp-rows: 13; --bp-max-h: 46vh;
     --bottom-h: min(var(--bp-max-h), calc(var(--bp-head-h) + 10px + (var(--bp-rows) + 3) * var(--row-h)));
   }
 }
-@media (min-width: 2300px) { body.project-review { --bp-rows: 20; } }
+@media (min-width: 2300px) { body.project-review:not(.project-view) { --bp-rows: 20; } }
 body.project-review.review-min { --bottom-h: calc(var(--bp-head-h) + 1px); }
 body.project-review.review-min #projectReviewHost { overflow: hidden; }
 body.project-review.review-min .review-sheet > :not(.review-head) { display: none; }
@@ -2693,6 +2707,70 @@ body.project-review #projectReviewHost {
 }
 body.project-review .bp-part1,
 body.project-review .bp-part2 { display: none; }
+
+/* Thông tin đồ án dạng gọn: cùng khung panel dưới của phường — trái cơ cấu sử dụng đất, phải 2 bảng cuộn riêng */
+body.project-view #projectReviewHost { display: flex; padding: 0; overflow: hidden; }
+.pv-sheet { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); }
+.pv-part2 { border-left: 1px solid var(--border-color); }
+.pv-part2 .bp-part-head { gap: 12px; padding-left: 10px; }
+.pv-part1 .pie-chart-wrap { position: relative; width: calc(117px * var(--k)); height: calc(117px * var(--k)); flex-shrink: 0; align-self: center; }
+.pv-part1 canvas { width: 100% !important; height: 100% !important; display: block; cursor: pointer; }
+.pv-legend {
+  width: calc(232px * var(--k)); flex-shrink: 0; align-self: stretch; max-height: 100%;
+  display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: thin;
+  font-size: var(--fs-sm); line-height: 1.12;
+}
+.pv-legend > .pie-legend-row { flex: 0 0 auto; min-height: 1.5em; padding: 0 3px; border-radius: var(--r-sm); }
+.pv-legend > .pie-legend-row[data-focus] { cursor: pointer; }
+.pv-legend > .pie-legend-row[data-focus]:hover, .pv-legend > .pie-legend-row.on { background: rgba(var(--yellow-rgb), 0.16); }
+.pv-legend > .pie-legend-head { position: sticky; top: 0; z-index: 1; background: var(--bg-panel); }
+.pv-empty { margin: auto; color: var(--text-muted); font-style: italic; }
+.pv-name { max-width: calc(260px * var(--k)); overflow: hidden; text-overflow: ellipsis; color: var(--text-main); font-size: var(--fs-sm); line-height: 1.15; }
+.pv-stats .hs-cell .review-pop { width: calc(62px * var(--k)); height: calc(16px * var(--k)); text-align: center; color: var(--accent-orange); }
+.bp-btn.pv-exit { display: inline-flex; align-items: center; gap: 4px; max-width: calc(200px * var(--k)); border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.bp-btn.pv-exit span { overflow: hidden; text-overflow: ellipsis; }
+.bp-btn.pv-exit:hover { background: var(--accent-cyan); color: var(--bg-panel); }
+.pv-sheet .bp-btn.bp-icon.on { border-color: #fb923c; color: #fdba74; background: rgba(251, 146, 60, 0.16); }
+.pv-body { gap: 4px; }
+.pv-note { flex-shrink: 0; display: flex; align-items: center; gap: 4px; font-size: var(--fs-xs); }
+.pv-cols { flex: 1; min-height: 0; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.4fr); align-items: stretch; }
+.pv-col { min-height: 0; display: flex; flex-direction: column; }
+.pv-col > h4 { flex-shrink: 0; margin: 0 0 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent-cyan); }
+.pv-col > .ward-table-scroll-container { align-self: stretch; width: auto; }
+.pv-col table.ward-table { width: 100%; }
+.pv-col table.review-landuse td:nth-child(2) { min-width: 0; }
+/* Đầu bảng 2 hàng: dính cả khối thead (dính từng ô th thì hàng 2 đè hàng 1) */
+.pv-col table.ward-table thead { position: sticky; top: 0; z-index: 15; }
+.pv-col table.ward-table th { position: static; white-space: normal; line-height: 1.1; vertical-align: middle; }
+.pv-col table.review-score td:nth-child(2) { max-width: calc(190px * var(--k)); overflow: hidden; text-overflow: ellipsis; }
+.pv-col > .review-note { flex-shrink: 0; margin: 3px 0 0; font-size: var(--fs-xs); }
+@media (max-width: 900px) {
+  .pv-sheet { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
+  .pv-cols { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Thanh tiến độ tải lô quy hoạch (chọn phường / đồ án) */
+.lots-progress {
+  position: fixed; z-index: 1200; left: 50%; bottom: calc(var(--bottom-gap) + 14px); transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; padding: 5px 12px;
+  background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
+  border: 1px solid var(--border-color); border-radius: 999px; box-shadow: var(--panel-shadow);
+  color: var(--text-main); font-size: var(--fs-sm); pointer-events: none;
+}
+.lots-progress[hidden] { display: none; }
+.lots-progress-spin { width: 12px; height: 12px; border: 2px solid rgba(56, 189, 248, 0.3); border-top-color: var(--accent-cyan); border-radius: 50%; animation: lots-spin 0.8s linear infinite; }
+.lots-progress-bar { width: 80px; height: 4px; border-radius: 2px; background: rgba(148, 163, 184, 0.25); overflow: hidden; }
+.lots-progress-bar > i { display: block; height: 100%; width: 0; background: var(--accent-cyan); transition: width 0.25s ease; }
+@keyframes lots-spin { to { transform: rotate(360deg); } }
+
+/* Panel dưới đang ẩn mà vừa có thông tin đồ án: nút mở lại nhấp nháy vài lần */
+.bp-expand-btn.has-news { animation: bp-news 0.9s ease-in-out 3; }
+@keyframes bp-news {
+  50% { box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.55), var(--panel-shadow); color: #fff; background: var(--accent-cyan); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lots-progress-spin, .bp-expand-btn.has-news { animation: none; }
+}
 /* Nút mở thẩm định: cam nhạt, tách hẳn khỏi các nút tối của thanh công cụ */
 .map-toolbar .ui-btn-format.review-launch {
   background: #fed7aa;

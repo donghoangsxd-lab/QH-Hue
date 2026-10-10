@@ -258,6 +258,9 @@ export function setStatusContent(el, text, fallbackIcon = null) {
 // Công cụ thao tác trên bản đồ dùng chung click nên chỉ bật 1 cái: công cụ vừa bật phát sự kiện, công cụ khác đang chạy tự hủy.
 // tool: 'measure' | 'inspect' | 'sketch' | 'pick' | 'road' | 'pop'
 export const TOOL_START_EVENT = 'qh:tool-start';
+
+// Chuyển tab panel phải từ module khác (app.js giữ logic panel): detail { tab, open } — open false thì panel đang ẩn vẫn ẩn
+export const RIGHT_TAB_EVENT = 'qh:right-tab';
 export function announceTool(tool) {
   document.dispatchEvent(new CustomEvent(TOOL_START_EVENT, { detail: tool }));
 }

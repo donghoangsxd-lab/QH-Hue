@@ -18,7 +18,7 @@ import {
   getCoveredRightWidth, highlightPlanWard, wardFocusLayer, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, getViewMode, setViewMode, passToolClick
 } from './planMap.js';
-import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, focusedProjectName, infraLotOf, byProjectAreaDesc } from './projectFiles.js';
+import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, focusedProjectName, wardScopeName, infraLotOf, byProjectAreaDesc } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
 import { analyzePlanLand, planLandHtml } from './planLandStats.js';
 
@@ -117,7 +117,8 @@ const wardFilterMemo = new WeakMap();
 
 // Thẩm định đồ án: các lớp trong panel Lớp dữ liệu chỉ áp trong khung đồ án (như chọn riêng 1 phường),
 // bản đồ độ phủ chuyển sang lớp HT / QH của đồ án.
-// reviewScope: { key, bbox [w, s, e, n], onHeat(on), onHeatOpacity(v) }
+// reviewScope: { key, bbox [w, s, e, n], project (đồ án đã lưu đang xem: bảng tự vẽ lô, lớp Quy hoạch bỏ lô của nó),
+//   onHeat(on), onHeatOpacity(v) }
 let reviewScope = null;
 
 export function setReviewScope(scope) {
@@ -126,6 +127,7 @@ export function setReviewScope(scope) {
   if (!map) return;
   renderGroupedPoints();
   refreshHeatmapOnly();
+  redrawLands();
 }
 
 function getWardFilteredList(sourceList) {
@@ -1412,17 +1414,19 @@ function infraLotsInWardScope(list) {
 }
 
 // showLand (khung Thẩm định) vẽ lô đất các đồ án đang giao khung nhìn, mọi mức zoom.
-// Lớp Đồ án quy hoạch vẽ lô đất + lô hạ tầng từ PARCEL_MIN_ZOOM; dưới ngưỡng chỉ vẽ lô của đồ án đang chọn.
-// Chọn phường/xã thì chỉ giữ lô trong phạm vi đó.
+// Lớp Đồ án quy hoạch vẽ lô đất + lô hạ tầng từ PARCEL_MIN_ZOOM, hoặc mọi zoom khi đang chọn 1 phường;
+// dưới ngưỡng chỉ vẽ lô của đồ án đang chọn. Chọn phường/xã thì chỉ giữ lô trong phạm vi đó.
 function redrawLands() {
-  const byProject = state.showProjects && map && map.getZoom() >= PARCEL_MIN_ZOOM;
+  const byProject = state.showProjects && !!map && (!!wardScopeName() || map.getZoom() >= PARCEL_MIN_ZOOM);
   const focus = byProject ? null : focusedProjectName();
+  const own = reviewScope && reviewScope.project;
   const ofFocus = (list) => list.filter(l => l.file === focus);
-  const lands = (state.showLand || byProject) ? lotsInWardScope(state.landParcels)
-    : focus ? lotsInWardScope(ofFocus(state.landParcels)) : [];
-  const infra = !state.showProjectInfra ? []
+  const notOwn = (list) => (own ? list.filter(l => l.file !== own) : list);
+  const lands = notOwn((state.showLand || byProject) ? lotsInWardScope(state.landParcels)
+    : focus ? lotsInWardScope(ofFocus(state.landParcels)) : []);
+  const infra = notOwn(!state.showProjectInfra ? []
     : byProject ? infraLotsInWardScope(state.projectInfraLots).filter(l => !state.hiddenProjects.has(l.file))
-      : focus ? infraLotsInWardScope(ofFocus(state.projectInfraLots)) : [];
+      : focus ? infraLotsInWardScope(ofFocus(state.projectInfraLots)) : []);
   const compare = isCompareOn() && !!planMap;
   landsDetailed = map ? map.getZoom() >= PARCEL_PATTERN_ZOOM : null;
   // Bản đồ hiện trạng chỉ vẽ lô HT, lô QH chỉ có trên bản đồ quy hoạch (không trộn 2 giai đoạn)

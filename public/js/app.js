@@ -41,7 +41,8 @@ import {
   initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleSplit, isSplitOn,
   getViewMode, getSplitKind, onViewChange, setViewMode, toggleViewMode, setSplitKind, isCompareOn
 } from './planMap.js';
-import { escapeHtml, setStatusContent, showToast, announceTool, TOOL_START_EVENT } from './utils.js';
+import { escapeHtml, setStatusContent, showToast, announceTool, TOOL_START_EVENT, RIGHT_TAB_EVENT } from './utils.js';
+import { initViewFlow, wardToPick } from './viewFlow.js';
 import { initCadImport } from './cadImportUi.js';
 import { initProjectLayer } from './projectLayer.js';
 import { initProjectReview } from './projectReview.js';
@@ -207,6 +208,7 @@ function setStatus(text, color) {
 
 // Thanh tiêu đề: lật Quy hoạch ⇄ Hiện trạng, chia đôi thì chọn cùng tâm / lệch tâm.
 // Mỗi lần đổi giao diện đặt lại lớp mặc định: Quy hoạch / so sánh bật lớp đồ án, Hiện trạng tắt.
+// Lúc mở trang giữ lớp đồ án tắt (toàn TP chỉ ranh phường + phân loại đô thị, viewFlow.js).
 const VIEW_TITLES = {
   QH: 'BẢN ĐỒ QUY HOẠCH ĐÔ THỊ THÀNH PHỐ HUẾ',
   HT: 'BẢN ĐỒ HIỆN TRẠNG HẠ TẦNG THÀNH PHỐ HUẾ',
@@ -245,13 +247,14 @@ function initMapTitle() {
       btn.setAttribute('aria-checked', String(on));
     });
     if (key === last) return;
-    if (last !== null) {
+    const first = last === null;
+    if (!first) {
       root.classList.remove('flipping');
       void root.offsetWidth;
       root.classList.add('flipping');
     }
     last = key;
-    setProjects(key !== 'HT');
+    if (!first) setProjects(key !== 'HT');
   };
   root.addEventListener('animationend', () => root.classList.remove('flipping'));
   onViewChange(paint);
@@ -269,6 +272,20 @@ async function loadInfraData() {
   bumpDataVersion();
 }
 
+// Chọn địa bàn từ droplist hoặc bấm bản đồ (đổi lớp theo viewFlow.js qua selectWardDetail)
+async function chooseWard(wardName) {
+  if (state.rawDataList.length === 0) {
+    try {
+      await loadInfraData();
+    } catch (err) {
+      console.error("Lỗi tải dữ liệu điểm hạ tầng:", err);
+      showToast('❌ Không tải được dữ liệu công trình', 'error');
+      return;
+    }
+  }
+  await selectWardDetail(wardName);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   initGoogleSignIn();
   const map = initMap();
@@ -278,11 +295,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     new ResizeObserver(() => map.invalidateSize({ pan: false })).observe(mapEl);
   }
 
-  // Panel phải mở sẵn ở Lớp dữ liệu, trừ màn hình hẹp (panel sẽ che gần hết bản đồ)
-  if (window.matchMedia('(max-width: 900px)').matches) document.body.classList.add('right-collapsed');
+  // Mở trang: panel phải và panel dưới ẩn sẵn (class trên <body>), bản đồ toàn TP
   initPlanMap(map, layers);
   centerOnCity();
   initBottomPanelEvents();
+  initViewFlow();
   // Sau khi máy chủ ghi Sheet (nhập file, ghi dấu nhắc phường): tải lại dữ liệu và làm mới bản đồ, bảng
   const reloadAfterSheetWrite = async () => {
     try { await loadInfraData(); } catch (err) { showToast('⚠️ Chưa tải lại được dữ liệu, thử F5 sau ít phút', 'error'); return; }
@@ -378,8 +395,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       handleInspectPointClick(e.latlng.lat, e.latlng.lng, targetMap);
       return;
     }
-    cadastreClick(e, targetMap);
+    if (cadastreClick(e, targetMap)) return;
+    // Click vừa mở popup của điểm / lô (sự kiện nổi lên bản đồ) thì không đổi phường (đổi phường sẽ đóng popup)
+    if (performance.now() - popupAt < 300) return;
+    const ward = wardToPick(e.latlng, targetMap);
+    if (ward) chooseWard(ward);
   };
+  let popupAt = 0;
+  [map, planMap].forEach(m => m?.on('popupopen', () => { popupAt = performance.now(); }));
   // Chế độ tra cứu: click trúng / sát mép các bảng đang mở (bấm hụt nút ×, bảng vừa nở ra khi nạp xong kết quả…)
   // chỉ đóng popup như thường, không tra cứu điểm mới. Đo ở preclick vì popup bị đóng ngay trong preclick.
   const PANEL_GUARDS = [['.leaflet-popup', 24], ['.leaflet-control, .map-toolbar, .ov-launch, .right-panel, .bottom-panel', 10]];
@@ -431,9 +454,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const setRightPanelCollapsed = (collapsed) => {
     document.body.classList.toggle('right-collapsed', collapsed);
   };
-  const showRightTab = (tabId) => {
+  const showRightTab = (tabId, open = true) => {
     activeTab = tabId;
-    setRightPanelCollapsed(false);
+    if (open) setRightPanelCollapsed(false);
     tabButtons.forEach(btn => {
       const on = btn.dataset.tab === tabId;
       btn.classList.toggle('active', on);
@@ -447,6 +470,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (tabId !== 'tabAdd') state.isPickMode = false;
   };
   tabButtons.forEach(btn => btn.addEventListener('click', () => showRightTab(btn.dataset.tab)));
+  document.addEventListener(RIGHT_TAB_EVENT, (e) => {
+    const { tab, open } = e.detail || {};
+    if (tab) showRightTab(tab, open !== false);
+  });
 
   document.getElementById('btnCollapseRightPanel')?.addEventListener('click', () => setRightPanelCollapsed(true));
   document.getElementById('btnExpandRightPanel')?.addEventListener('click', () => showRightTab(activeTab));
@@ -507,18 +534,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  document.getElementById('wardSelector')?.addEventListener('change', async (e) => {
-    if (state.rawDataList.length === 0) {
-      try {
-        await loadInfraData();
-      } catch (err) {
-        console.error("Lỗi tải dữ liệu điểm hạ tầng:", err);
-        showToast('❌ Không tải được dữ liệu công trình', 'error');
-        return;
-      }
-    }
-    await selectWardDetail(e.target.value || CITY_NAME);
-  });
+  document.getElementById('wardSelector')?.addEventListener('change', (e) => chooseWard(e.target.value || CITY_NAME));
 
   // ---------- Đăng nhập quản trị ----------
   document.getElementById('btnAuth')?.addEventListener('click', toggleAuthModal);

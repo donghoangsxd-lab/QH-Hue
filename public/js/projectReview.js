@@ -8,8 +8,8 @@ import { planMap, isCompareOn, isSplitOn, onCompareChange, toggleSplit, setSplit
 import { state, BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, layerType } from './state.js';
 import { geeApi } from './api.js';
 import { parseDxf, buildParcels, CRS_PRESETS, layerToType } from './cadImport.js';
-import { escapeHtml, fmtNum, ico, showToast, loadHtml2Pdf, isApproved } from './utils.js';
-import { setBottomPanelMaximized } from './uiComponents.js';
+import { escapeHtml, fmtNum, ico, showToast, loadHtml2Pdf, isApproved, wardStatHtml } from './utils.js';
+import { setBottomPanelMaximized, setBottomPanelCollapsed } from './uiComponents.js';
 import { importReviewDossier, rejectPending, REVIEW_DOSSIER_EVENT } from './cadImportUi.js';
 import { setLabelsOverlay, labelsOverlayOn } from './basemap.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_PATTERN_ZOOM, landPatternKey, LOT_OPACITY_EVENT } from './tt16Symbols.js';
@@ -22,6 +22,9 @@ import { projectLayersOf, cachedLots, PROJECT_INFO_EVENT } from './projectFiles.
 import { initGisDossier, handleGisClick } from './gisDossierUi.js';
 
 const STORE_KEY = 'qh_review_dossiers_v2';
+const CITY_NAME = 'Thành phố Huế';
+// Bấm nút thoát của thông tin đồ án (dạng gọn hoặc bảng đầy đủ): viewFlow.js đưa bản đồ về phường / toàn TP
+export const PROJECT_VIEW_EXIT_EVENT = 'qh:project-view-exit';
 // Hàng chờ duyệt (submitCadPending) nhận tối đa 2 MB nội dung
 const SEND_MAX_BYTES = 2 * 1024 * 1024;
 const ASK_COLOR = '#fb923c';
@@ -58,6 +61,8 @@ let focusKey = '';
 let qhTimer = null;
 let maxWasOn = false;
 let sending = false;
+// Lần mở thông tin đồ án mới nhất: bấm đồ án / phường khác khi đang tải thì bỏ kết quả cũ
+let infoSeq = 0;
 
 const isUnresolvedDecision = (lot) => !!lot.decisionKind && !lot.decision;
 const usable = (lot) => lot.landKey && lot.landKey !== 'skip';
@@ -410,6 +415,7 @@ function reviewScopeOf() {
   return {
     key: `${session.project}|${session.files.HT}|${session.files.QH}|${session.lots.length}`,
     bbox: [b.getWest() - SCOPE_PAD_DEG, b.getSouth() - SCOPE_PAD_DEG, b.getEast() + SCOPE_PAD_DEG, b.getNorth() + SCOPE_PAD_DEG],
+    project: session.saved ? session.project : null,
     onHeat: (on) => {
       if (!session) return;
       show.heat = on;
@@ -563,8 +569,9 @@ function focusRow(key, fit = true) {
   applyFocus(fit);
   if (fit && focusKey.startsWith('lot:')) flashLot(session.byId.get(focusKey.slice(4)));
   else clearFlash();
-  const el = document.querySelector(`#projectReviewHost [data-focus="${CSS.escape(focusKey)}"]`);
-  el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  // Xem gọn: cùng đầu mục có ở chú giải donut và trong bảng → cuộn cả hai khung
+  document.querySelectorAll(`#projectReviewHost [data-focus="${CSS.escape(focusKey)}"]`)
+    .forEach(el => el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
 }
 
 // ============================ DUYỆT TỪNG ĐỐI TƯỢNG (TRƯỜNG HỌC / THƯƠNG MẠI) ============================
@@ -884,6 +891,7 @@ function setHostSize(size) {
   hostSize = size;
   document.body.classList.toggle('review-min', size === 'min');
   document.body.classList.toggle('review-max', size === 'max');
+  if (session?.view) renderHost();
   document.querySelectorAll('#projectReviewHost .review-head-btns').forEach(box => {
     box.querySelectorAll('[data-host-size]').forEach(b => b.remove());
     box.querySelector('#btnReviewClose')?.insertAdjacentHTML('beforebegin', sizeBtnsHtml());
@@ -940,6 +948,9 @@ function renderHost() {
   const host = $('projectReviewHost');
   if (!host || !session) return;
   const scored = computeScore();
+  document.body.classList.toggle('project-view', !!session.view);
+  if (session.view) { renderView(host, scored); return; }
+  destroyViewChart();
   const open = unresolved();
   const table = LANDUSE_TABLES[session.kind];
   const htN = session.lots.filter(l => l.phase === 'HT').length;
@@ -963,6 +974,7 @@ function renderHost() {
     <div class="bp-part-head review-head">
       <b class="bp-part-title">${session.saved ? 'THÔNG TIN' : 'THẨM ĐỊNH'} ${escapeHtml(table.short)} · ${escapeHtml(session.project)}</b>
       <div class="review-head-btns review-noprint">
+        ${session.saved ? `<button type="button" class="bp-btn" data-pv-compact title="Về dạng gọn trong panel dưới: cơ cấu sử dụng đất và 2 bảng">${ico('minimize')}Dạng gọn</button>` : ''}
         <label class="review-toggle"><input type="checkbox" data-show="HT"${show.HT ? ' checked' : ''}>Hiện trạng</label>
         <label class="review-toggle"><input type="checkbox" data-show="QH"${show.QH ? ' checked' : ''}>Quy hoạch</label>
         <label class="review-toggle" title="Lô đất ngoài nhóm hạ tầng của đồ án đã lưu, giao với khung nhìn (file trên bucket; đồ án cũ vẫn đọc được tới khi chuyển xong)"><input type="checkbox" data-show-land${state.showLand ? ' checked' : ''}>Đồ án đã lưu</label>
@@ -996,6 +1008,146 @@ function renderHost() {
   host.scrollTop = scrollTop;
 }
 
+// ============================ XEM GỌN ĐỒ ÁN ĐÃ LƯU (PANEL DƯỚI) ============================
+// Cùng bố cục panel dưới của phường: trái donut cơ cấu sử dụng đất (vòng ngoài QH, trong HT), phải 2 bảng đồ án;
+// nút cuối thanh tiêu đề thoát về xem theo đơn vị hành chính. Bảng đầy đủ (thẻ, chọn đầu mục layer…) vẫn mở được.
+
+let viewChart = null;
+function destroyViewChart() {
+  if (viewChart) viewChart.destroy();
+  viewChart = null;
+}
+
+function viewStatsHtml(sum, scored) {
+  const ctl = scored.control;
+  const col = (top, bottom) => `<div class="hs-col"><div class="hs-cell">${top}</div><div class="hs-cell hs-qh">${bottom}</div></div>`;
+  const popInput = (ph) => `<input type="number" class="review-pop" data-pop="${ph}" min="0" step="100" inputmode="numeric" placeholder="nhập" value="${session[`pop${ph}`] > 0 ? session[`pop${ph}`] : ''}">`;
+  const lots = (ph) => fmtNum(session.lots.filter(l => l.phase === ph).length);
+  const area = (v) => (v > 0 ? haCell(v) : '—');
+  const verdict = ctl.ratio == null || ctl.pass == null ? '' : ctl.pass ? 'c-green' : 'c-red';
+  const unitCell = session.kind === 'QHC'
+    ? wardStatHtml('Thẩm định', 'cấp đô thị', '', 'Bảng A: hạ tầng cấp đô thị')
+    : wardStatHtml('Đơn vị ở', fmtNum(scored.units), '', `${fmtNum(UNIT_POP)} người / đơn vị ở, làm tròn lên`);
+  return col(
+    wardStatHtml('Dân số HT', popInput('HT'), 'người', 'Dân số hiện trạng — nhập để tính, lưu trên máy này'),
+    wardStatHtml('Dân số QH', popInput('QH'), 'người', 'Dân số quy hoạch — nhập để tính tổng nhu cầu, số đơn vị ở và % đạt chỉ tiêu')
+  ) + col(
+    wardStatHtml('Diện tích HT', area(sum.totalHT), 'ha', sum.byBoundary ? 'Theo ranh đồ án' : 'Tổng các lô'),
+    wardStatHtml('Diện tích QH', area(sum.totalQH), 'ha', sum.byBoundary ? 'Theo ranh đồ án' : 'Tổng các lô')
+  ) + col(
+    wardStatHtml('Lô HT', lots('HT'), 'lô', 'Lớp sử dụng đất hiện trạng'),
+    wardStatHtml('Lô QH', lots('QH'), 'lô', 'Lớp sử dụng đất quy hoạch')
+  ) + col(
+    wardStatHtml('Dân số tăng', session.popQH > 0 ? `+${fmtNum(ctl.newPop)}` : '—', 'người', 'Dân số QH − dân số HT'),
+    unitCell
+  ) + col(
+    wardStatHtml(`${capFirst(ctl.landLabel)} mới`, haOf(ctl.newArea), 'ha', 'File QH, layer QHDD_ / QHDH_ / QH_…'),
+    wardStatHtml('Bình quân mới', ctl.ratio != null ? `<span class="${verdict}">${fmtNum(ctl.ratio)}</span>` : '—', 'm²/người',
+      ctl.max ? `Đất ở mới / dân số mới tăng thêm, chỉ tiêu ≤ ${ctl.max} m²/người` : 'Đất ở mới / dân số mới tăng thêm')
+  );
+}
+
+function viewLegendHtml(tops) {
+  if (!tops.length) return '<div class="pv-empty">Chưa có lô sử dụng đất</div>';
+  return `<div class="pie-legend-row pie-legend-head"><span>Loại đất</span><span>Hiện trạng</span><span>Quy hoạch</span></div>`
+    + tops.slice().sort((a, b) => b.qhHa - a.qhHa || b.htHa - a.htHa).map(r => {
+      const key = `land:${r.key}`;
+      const d = r.qhPct - r.htPct;
+      const qhCls = r.htHa > 0 && d >= 0.1 ? 'c-green' : (r.htHa > 0 && d <= -0.1 ? 'c-red' : 'c-cyan');
+      return `<div class="pie-legend-row${focusKey === key ? ' on' : ''}" data-focus="${key}" title="${escapeHtml(r.label)}: HT ${haCell(r.htHa) || 0} ha → QH ${haCell(r.qhHa) || 0} ha. Bấm để xem các lô trên bản đồ">
+        <span class="pie-legend-name"><i class="pie-dot" style="background:${r.tone};"></i><span class="pie-legend-text">${escapeHtml(r.label)}</span></span>
+        <b class="c-cyan">${r.htHa > 0 ? `${fmtNum(r.htPct)}%` : '–'}</b><b class="${qhCls}">${r.qhHa > 0 ? `${fmtNum(r.qhPct)}%` : '–'}</b>
+      </div>`;
+    }).join('');
+}
+
+function drawViewChart(tops) {
+  destroyViewChart();
+  const canvas = $('pvLandChart');
+  if (!canvas || typeof Chart === 'undefined' || !tops.length) return;
+  const colors = tops.map(r => r.tone);
+  const ring = (label, ha, pct) => ({ label, data: tops.map(ha), pct: tops.map(pct), backgroundColor: colors, borderWidth: 1, borderColor: 'rgba(15, 23, 42, 0.8)' });
+  viewChart = new Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: tops.map(r => r.label),
+      datasets: [ring('Quy hoạch', r => r.qhHa, r => r.qhPct), ring('Hiện trạng', r => r.htHa, r => r.htPct)]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      layout: { padding: 0 },
+      cutout: '58%',
+      onClick: (e, hits) => { if (hits[0]) focusRow(`land:${tops[hits[0].index].key}`, true); },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => ` ${c.dataset.label} – ${c.label}: ${HA_FORMAT.format(c.raw)} ha (${fmtNum(c.dataset.pct[c.dataIndex] || 0)}%)` } }
+      }
+    }
+  });
+}
+
+function renderView(host, scored) {
+  const table = LANDUSE_TABLES[session.kind];
+  const sum = landUseSummary(session.lots, session.kind, { boundaryM2: session.boundaryM2 });
+  const tops = sum.rows.filter(r => r.kind === 'row' && !r.sub && (r.htHa > 0 || r.qhHa > 0));
+  const ward = state.selectedWard && state.selectedWard !== CITY_NAME ? state.selectedWard : null;
+  const max = hostSize === 'max';
+  const asks = askLayers().length;
+  const scroll = [...host.querySelectorAll('.pv-col')].map(el => el.scrollTop);
+  host.innerHTML = `<div id="projectReviewSheet" class="review-sheet pv-sheet">
+    <div class="bp-part pv-part1">
+      <div class="bp-part-head">
+        <div class="bp-title-wrap">
+          <b class="bp-part-title">CƠ CẤU SỬ DỤNG ĐẤT</b>
+          <span class="bp-part-note">HT ${sum.totalHT > 0 ? `${haCell(sum.totalHT)} ha` : '—'} → QH ${sum.totalQH > 0 ? `${haCell(sum.totalQH)} ha` : '—'}</span>
+        </div>
+      </div>
+      <div class="bp-pie-inner">
+        <div class="pie-chart-wrap"><canvas id="pvLandChart"></canvas></div>
+        <div class="pv-legend">${viewLegendHtml(tops)}</div>
+      </div>
+    </div>
+    <div class="bp-part pv-part2">
+      <div class="bp-part-head">
+        <div class="bp-title-wrap">
+          <b class="bp-part-title">THÔNG TIN ĐỒ ÁN · ${escapeHtml(table.short)}</b>
+          <span class="pv-name" title="${escapeHtml(session.project)}">${escapeHtml(session.project)}</span>
+        </div>
+        <div class="bp-head-stats hs-units pv-stats">${viewStatsHtml(sum, scored)}</div>
+        <div class="bp-actions review-noprint">
+          <button type="button" class="bp-btn bp-icon${isSplitOn() ? ' on' : ''}" id="btnReviewCompare" title="Chia đôi màn hình: hiện trạng bên trái, quy hoạch bên phải" aria-label="Chia đôi màn hình">${ico('compare')}</button>
+          <button type="button" class="bp-btn bp-icon" data-pv-full title="Bảng đầy đủ: thông tin lớp, kiểm soát đất ở mới, chọn đầu mục layer chưa nhận diện" aria-label="Bảng đầy đủ">${ico('table')}</button>
+          <button type="button" class="bp-btn bp-icon" id="btnReviewPrint" title="Lưu thông tin đồ án ra file PDF" aria-label="In PDF">${ico('printer')}</button>
+          <button type="button" class="bp-btn bp-icon" data-host-size="${max ? 'normal' : 'max'}" title="${max ? 'Thu về panel dưới' : 'Phóng to toàn màn hình'}" aria-label="${max ? 'Thu về panel dưới' : 'Phóng to toàn màn hình'}">${ico(max ? 'minimize' : 'maximize')}</button>
+          <button type="button" class="bp-btn bp-icon" data-pv-collapse title="Thu gọn bảng phía dưới" aria-label="Thu gọn bảng phía dưới">${ico('chevs-down')}</button>
+          <button type="button" class="bp-btn pv-exit" data-pv-exit title="Thoát thông tin đồ án, về xem theo đơn vị hành chính">${ico('undo')}<span>${escapeHtml(ward || 'Toàn thành phố')}</span></button>
+        </div>
+      </div>
+      <div class="bp-part-body pv-body">
+        ${asks ? `<div class="pv-note c-orange">${ico('alert')}${asks} layer chưa nhận diện được, tạm tính vào «Chưa xác định» — mở Bảng đầy đủ để chọn đầu mục.</div>` : ''}
+        <div class="review-cols pv-cols">
+          <div class="review-col review-col-land pv-col">${landTableHtml()}</div>
+          <div class="review-col pv-col">${scoreTableHtml(scored)}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  host.querySelectorAll('.pv-col').forEach((el, i) => { el.scrollTop = scroll[i] || 0; });
+  drawViewChart(tops);
+}
+
+// Panel dưới đang thu gọn: nhấp nháy nút mở lại để báo đã có thông tin mới
+function hintCollapsedPanel() {
+  if (!document.body.classList.contains('bottom-collapsed')) return;
+  const btn = $('btnExpandBottomPanel');
+  if (!btn) return;
+  btn.classList.remove('has-news');
+  void btn.offsetWidth;
+  btn.classList.add('has-news');
+}
+
 function openHost() {
   window.dispatchEvent(new Event('qh:review-host-clear'));
   document.body.classList.remove('la-page');
@@ -1013,7 +1165,9 @@ function closeReview() {
   if (hostSize !== 'normal') setHostSize('normal');
   const wasOpen = document.body.classList.contains('project-review');
   const hadSession = !!session;
-  document.body.classList.remove('project-review');
+  infoSeq += 1;
+  destroyViewChart();
+  document.body.classList.remove('project-review', 'project-view');
   if (wasOpen && maxWasOn) setBottomPanelMaximized(true);
   maxWasOn = false;
   map?.invalidateSize({ pan: false });
@@ -1049,8 +1203,9 @@ function newSession(fields) {
   applyTags();
   openHost();
   renderHost();
-  fitTo(allBounds(), 17);
-  drawAll(true);
+  // Xem gọn: danh sách / ranh đồ án đã phóng tới trước khi tải xong
+  if (!session.view) fitTo(allBounds(), 17);
+  drawAll(!session.view);
   setReviewScope(reviewScopeOf());
 }
 
@@ -1373,11 +1528,14 @@ function areaInside(bound, geometry, area) {
   }
 }
 
+// Thông tin đồ án đã lưu: mở dạng gọn trong panel dưới (giữ kiểu xem bản đồ đang dùng, không tự chia đôi)
 async function openProjectInfo(project) {
   if (!project) return;
   if (session && !session.saved && !session.pendingId && !confirm('Đóng hồ sơ thẩm định đang mở để xem thông tin đồ án?')) return;
-  showToast(`Đang tải lô đất «${project}»…`);
+  const seq = ++infoSeq;
+  if (!cachedLots(project).length) showToast(`Đang tải lô đất «${project}»…`);
   try { await projectLayersOf(project); } catch (err) { showToast(`Không tải được đồ án: ${err.message}`, 'error'); return; }
+  if (seq !== infoSeq) return;
   const entry = (state.projectCatalog || []).find(p => p && p.tenQH === project) || {};
   const bound = closedBoundary(entry.boundary);
   const lots = cachedLots(project).map((p, i) => {
@@ -1388,15 +1546,21 @@ async function openProjectInfo(project) {
   if (!lots.length) { showToast('Đồ án chưa có lô sử dụng đất', 'error'); return; }
   const pop = loadPops()[project] || {};
   const has = (ph) => lots.some(l => l.phase === ph);
-  autoCompare(lots);
   newSession({
     kind: kindOfProject(project), project,
     popHT: Number(pop.ht) || Number(entry.popHT) || 0,
     popQH: Number(pop.qh) || Number(entry.popQH) || 0,
     files: { HT: has('HT') ? 'Sử dụng đất hiện trạng' : '', QH: has('QH') ? 'Sử dụng đất quy hoạch' : '' },
     boundaryM2: bound ? bound.m2 : 0, boundaryClosed: !!bound?.closed, boundarySource: entry.boundarySource === 'gis' ? 'gis' : 'auto',
-    lots, saved: true
+    lots, saved: true, view: true
   });
+  hintCollapsedPanel();
+}
+
+/** Đang xem thông tin 1 đồ án đã lưu → đóng (chọn phường / toàn TP); hồ sơ thẩm định chưa gửi thì giữ nguyên */
+export function closeProjectView() {
+  infoSeq += 1;
+  if (session && session.saved) closeReview();
 }
 
 // ============================ HỒ SƠ ĐÃ GỬI TỪ MÁY NÀY ============================
@@ -1473,16 +1637,23 @@ async function exportPdf() {
   }
   if (hostSize === 'min') setHostSize('normal');
   try { await loadHtml2Pdf(); } catch (e) { showToast('Không tải được thư viện PDF', 'error'); return; }
-  window.html2pdf().from(sheet).set({
-    margin: 6,
-    filename: `${($('projectReviewSheet')?.dataset.pdf) || `${session?.saved ? 'Thong-tin' : 'Tham-dinh'}-${session ? session.project : 'ho-so'}`}.pdf`,
-    image: { type: 'jpeg', quality: 0.95 },
-    html2canvas: {
-      scale: 2, useCORS: true, scrollY: 0,
-      ignoreElements: (el) => !!(el.classList && el.classList.contains('review-noprint'))
-    },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-  }).save();
+  // Dạng gọn cuộn trong khung: in theo bảng đầy đủ rồi trả lại dạng gọn
+  const compact = !!session?.view;
+  if (compact) { session.view = false; renderHost(); }
+  try {
+    await window.html2pdf().from($('projectReviewSheet')).set({
+      margin: 6,
+      filename: `${($('projectReviewSheet')?.dataset.pdf) || `${session?.saved ? 'Thong-tin' : 'Tham-dinh'}-${session ? session.project : 'ho-so'}`}.pdf`,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: {
+        scale: 2, useCORS: true, scrollY: 0,
+        ignoreElements: (el) => !!(el.classList && el.classList.contains('review-noprint'))
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    }).save();
+  } finally {
+    if (compact && session) { session.view = true; renderHost(); }
+  }
 }
 
 // ============================ KHỞI TẠO ============================
@@ -1525,8 +1696,20 @@ export function initProjectReview() {
   const host = $('projectReviewHost');
   host?.addEventListener('click', (e) => {
     const t = e.target;
-    if (t.closest('#btnReviewClose')) { closeReview(); return; }
+    if (t.closest('#btnReviewClose, [data-pv-exit]')) {
+      const saved = !!session?.saved;
+      closeReview();
+      if (saved) document.dispatchEvent(new Event(PROJECT_VIEW_EXIT_EVENT));
+      return;
+    }
     if (t.closest('#btnReviewPrint')) { exportPdf(); return; }
+    if (t.closest('[data-pv-collapse]')) { setBottomPanelCollapsed(true); return; }
+    const mode = t.closest('[data-pv-full], [data-pv-compact]');
+    if (mode && session) {
+      session.view = mode.hasAttribute('data-pv-compact');
+      renderHost();
+      return;
+    }
     const size = t.closest('[data-host-size]');
     if (size) { setHostSize(size.dataset.hostSize); return; }
     if (handleGisClick(t)) return;

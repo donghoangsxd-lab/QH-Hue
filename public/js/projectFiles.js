@@ -1,10 +1,18 @@
 // Tải ranh lô theo đồ án: mở bản đồ chỉ có danh mục. File một đồ án tải khi zoom ≥ ngưỡng lô và ranh tổng giao khung nhìn,
-// khi bật ranh lô công trình, khi bấm phóng tới (đồ án đang chọn giữ ở mọi zoom), hoặc khi bật lớp lô đã lưu (showLand).
+// khi bật ranh lô công trình, khi bấm phóng tới (đồ án đang chọn giữ ở mọi zoom), khi đang chọn 1 phường và bật lớp
+// Quy hoạch (mọi đồ án thuộc phường, mọi zoom), hoặc khi bật lớp lô đã lưu (showLand).
 // Đồ án thư mục (dir) đọc hien-trang.json + su-dung-dat.json. Đồ án file gộp cũ đọc projects/<slug>.json.
 // Điểm chức năng chỉ dùng gợi tên lô lúc nhập, không tải / không vẽ (diem-chuc-nang.json cũ trên bucket bỏ qua).
 // Đồ án chưa chuyển đọc qua API. URL bucket do máy chủ trả về (?v= phiên bản trong danh mục).
 import { state } from './state.js';
 import { geeApi } from './api.js';
+
+const CITY_NAME = 'Thành phố Huế';
+// Tiến độ tải file đồ án (detail { done, total }; done = total là xong)
+export const LOTS_PROGRESS_EVENT = 'qh:lots-progress';
+const LOAD_CONCURRENCY = 4;
+// Đang tải nhiều đồ án: vẽ dần phần đã có, tối đa 1 lần / khoảng này (vẽ lại toàn bộ lô khá nặng)
+const PAINT_EVERY_MS = 600;
 
 let minZoom = 15;
 let getMap = () => null;
@@ -35,6 +43,15 @@ export function focusedProjectName() {
   return name && state.showProjects && !state.hiddenProjects.has(name) ? name : null;
 }
 
+/** Phường đang chọn khi lớp Quy hoạch bật → vẽ toàn bộ lô trong phường ở mọi zoom; toàn TP / lớp tắt → null */
+export function wardScopeName() {
+  const w = state.selectedWard;
+  return state.showProjects && w && w !== CITY_NAME ? w : null;
+}
+
+/** Đồ án (mục danh mục) có phần nằm trong phường (danh mục ghi sẵn các phường giao ranh) */
+export const inWard = (entry, wardName) => Array.isArray(entry?.wards) && entry.wards.includes(wardName);
+
 function intersects(bbox, bounds) {
   return bbox[0] <= bounds.getEast() && bbox[2] >= bounds.getWest()
     && bbox[1] <= bounds.getNorth() && bbox[3] >= bounds.getSouth();
@@ -47,10 +64,12 @@ function wanted() {
   const bounds = map.getBounds().pad(0.15);
   const layerOn = parcelLayerOn(zoom) || state.showLand;
   const focus = focusedProjectName();
+  const wardName = wardScopeName();
   return state.projectCatalog.filter(p => {
     if (!p || !p.tenQH || p.sheetOnly) return false;
     if (force.has(p.tenQH)) return state.showLand || !state.hiddenProjects.has(p.tenQH);
     if (p.tenQH === focus) return true;
+    if (wardName && inWard(p, wardName) && !state.hiddenProjects.has(p.tenQH)) return true;
     if (!layerOn) return false;
     if (!state.showLand && state.showProjects && state.hiddenProjects.has(p.tenQH)) return false;
     if (!p.bbox) return !!state.showLand;
@@ -61,14 +80,14 @@ function wanted() {
 // Lô công trình theo phường: theo nút Ranh lô / lớp Đồ án, từ ngưỡng zoom
 function wardLotsOn() {
   const map = getMap();
-  return !!map && parcelLayerOn(map.getZoom());
+  return !!map && (parcelLayerOn(map.getZoom()) || !!wardScopeName());
 }
 
-// Lô đất cũ chưa gắn đồ án: như lô đất đồ án (showLand mọi zoom, lớp Đồ án từ ngưỡng zoom)
+// Lô đất cũ chưa gắn đồ án: như lô đất đồ án (showLand mọi zoom, lớp Đồ án từ ngưỡng zoom hoặc đang chọn phường)
 function wardLandsOn() {
   const map = getMap();
   if (!map) return false;
-  return state.showLand || (state.showProjects && map.getZoom() >= minZoom);
+  return state.showLand || (state.showProjects && map.getZoom() >= minZoom) || !!wardScopeName();
 }
 
 function wantsWard() {
@@ -127,9 +146,21 @@ async function loadDir(entry) {
   return { parcels: [...((ht && ht.parcels) || []), ...((qh && qh.parcels) || [])] };
 }
 
-async function loadEntry(entry) {
+function isFresh(entry) {
   const prev = cache.get(entry.tenQH);
-  if (prev && prev.saved === (entry.saved || 0) && prev.legacy === !!entry.legacy && prev.parcels) return prev;
+  return !!prev && prev.saved === (entry.saved || 0) && prev.legacy === !!entry.legacy && !!prev.parcels;
+}
+
+// Cùng 1 file đang tải (bấm đồ án = vẽ lô + mở bảng thông tin) thì dùng chung 1 lần tải
+const inflight = new Map();
+function loadEntry(entry) {
+  if (isFresh(entry)) return Promise.resolve(cache.get(entry.tenQH));
+  const key = `${entry.tenQH}|${entry.saved || 0}|${!!entry.legacy}`;
+  if (!inflight.has(key)) inflight.set(key, fetchEntry(entry).finally(() => inflight.delete(key)));
+  return inflight.get(key);
+}
+
+async function fetchEntry(entry) {
   if (!entry.legacy && entry.slug && base && entry.dir) {
     try {
       const row = { saved: entry.saved || 0, legacy: false, ...(await loadDir(entry)) };
@@ -213,18 +244,40 @@ export function composeNow() {
   state.projectInfraFiles = new Set(infra.map(l => l.file));
 }
 
+function progress(done, total) {
+  document.dispatchEvent(new CustomEvent(LOTS_PROGRESS_EVENT, { detail: { done, total } }));
+}
+
+// Đồ án ít lô tải trước để bản đồ có lô sớm; lần đồng bộ mới hơn (seq) thay lần cũ, chỉ lần mới nhất báo xong
 export async function syncLots() {
   const token = ++seq;
-  if (wantsWard()) await ensureWard();
-  if (token !== seq) return;
-  const list = wanted();
-  await pool(list, 3, async (entry) => {
-    try { await loadEntry(entry); }
-    catch (err) { console.warn(`Không tải lô đồ án «${entry.tenQH}»:`, err); }
-  });
-  if (token !== seq) return;
-  composeNow();
-  onChange();
+  let total = 0;
+  try {
+    if (wantsWard()) await ensureWard();
+    if (token !== seq) return;
+    const pending = wanted().filter(e => !isFresh(e)).sort((a, b) => (Number(a.lands) || 0) - (Number(b.lands) || 0));
+    total = pending.length;
+    let done = 0;
+    let painted = Date.now();
+    if (total) progress(0, total);
+    await pool(pending, LOAD_CONCURRENCY, async (entry) => {
+      try { await loadEntry(entry); }
+      catch (err) { console.warn(`Không tải lô đồ án «${entry.tenQH}»:`, err); }
+      done += 1;
+      if (token !== seq) return;
+      progress(done, total);
+      if (done < total && Date.now() - painted >= PAINT_EVERY_MS) {
+        painted = Date.now();
+        composeNow();
+        onChange();
+      }
+    });
+    if (token !== seq) return;
+    composeNow();
+    onChange();
+  } finally {
+    if (token === seq) progress(total, total);
+  }
 }
 
 // "HT|<ID>" / "QH|<ID>" công trình đã có ranh lô: lô theo phường + file các đồ án tenQHs (không phụ thuộc lớp đang bật)
@@ -421,6 +474,7 @@ export function scheduleLots() {
 export async function focusProject(tenQH) {
   force.add(tenQH);
   try { await syncLots(); }
+  catch (err) { console.warn('Tải lô đồ án:', err); }
   finally { force.delete(tenQH); }
 }
 

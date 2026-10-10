@@ -356,10 +356,12 @@ async function openParcel(latlng, targetMap, replaced) {
 }
 
 /** Click bản đồ khi không bật công cụ nào: hiện thửa tại điểm bấm (nếu lớp đang bật và đủ mức phóng) */
+/** → true khi click thuộc lớp thửa (đã mở / nhường popup khác), bản đồ không xử lý tiếp */
 export function cadastreClick(e, targetMap) {
-  if (!visible || !targetMap || targetMap.getZoom() < MIN_ZOOM) return;
-  if (performance.now() - foreignAt < 300) return;
+  if (!visible || !targetMap || targetMap.getZoom() < MIN_ZOOM) return false;
+  if (performance.now() - foreignAt < 300) return true;
   openParcel(e.latlng, targetMap, null);
+  return true;
 }
 
 // Lớp thửa vẽ trên lô đồ án nên thắng popup lô. Bấm trúng lô thì lô mở popup và chặn click bản đồ,

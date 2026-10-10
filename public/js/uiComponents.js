@@ -1519,10 +1519,14 @@ export async function exportBottomPanelPdf() {
   }).save().then(done, done);
 }
 
+// Mọi lối chọn địa bàn (droplist, bấm bản đồ, bảng 40 phường) đi qua đây; viewFlow.js nghe WARD_SELECT_EVENT để đổi lớp
+export const WARD_SELECT_EVENT = 'qh:ward-select';
+
 export function selectWardDetail(wardName) {
   setBottomPanelMaximized(false);
   map.closePopup();
   const focusDone = focusWard(wardName);
+  document.dispatchEvent(new CustomEvent(WARD_SELECT_EVENT, { detail: state.selectedWard }));
   renderBottomPanel();
   return focusDone;
 }
