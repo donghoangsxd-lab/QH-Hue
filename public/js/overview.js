@@ -103,21 +103,24 @@ const SECTIONS = [
     title: 'Tra cứu thông tin quy hoạch, hạ tầng',
     items: [
       {
-        id: 'parcel', btn: 'guide', status: 'dev',
+        id: 'parcel', btn: 'guide', status: 'trial',
         title: 'Tra cứu thông tin 1 thửa đất',
-        note: 'Chưa tích hợp API dữ liệu thửa đất, hiện chỉ tra cứu được theo tọa độ',
-        lead: 'Định vị một vị trí theo tọa độ để xem lô quy hoạch tại đó và mức độ tiếp cận hạ tầng. Khi kết nối được cơ sở dữ liệu đất đai, tính năng sẽ tra cứu trực tiếp theo số tờ, số thửa.',
+        note: 'Bản đồ địa chính năm 2016, chưa có Quảng Điền, Phú Lộc, Nam Đông',
+        lead: 'Tra một thửa đất theo số tờ, số thửa hoặc bấm trên bản đồ để xem diện tích, loại đất, địa chỉ; kiểm tra quy hoạch trên thửa: diện tích từng loại đất quy hoạch (m²) và chỉ tiêu các lô quy hoạch.',
         steps: [
-          'Nhập tọa độ (vĩ độ, kinh độ WGS84) vào ô bên dưới rồi bấm <b>Tra cứu</b>: bản đồ phóng tới và ghim vị trí.',
-          'Ở panel phải › <b>Quy hoạch</b>, bật đồ án có ranh bao vị trí cần xem.',
-          'Phóng to tới mức hiện ranh lô, bấm vào lô tại vị trí ghim để xem loại đất theo Thông tư 16/2025/TT-BXD, diện tích và chỉ tiêu lô (tầng cao, mật độ xây dựng, hệ số sử dụng đất nếu đồ án có).'
+          'Ở panel phải › <b>Bản đồ nền</b>, bật lớp <b>Thửa đất địa chính 2016</b> (nút bên dưới). Ranh thửa hiện từ mức phóng 15, số thửa hiện từ mức 18.',
+          'Tìm thửa: chọn xã/phường (địa giới cũ), nhập số tờ, số thửa rồi bấm <b>Tìm</b>; hoặc phóng tới vị trí (có thể nhập tọa độ vào ô bên dưới) và bấm vào thửa.',
+          'Bảng thông tin thửa: diện tích hồ sơ, loại đất theo Thông tư 28/2014/TT-BTNMT, địa chỉ, xã/phường cũ; thửa được viền vàng trên bản đồ.',
+          'Kiểm tra quy hoạch: bấm <b>Xem chỉ tiêu quy hoạch</b> trong bảng thửa. Webapp cắt ranh thửa với lô quy hoạch các đồ án đã nạp, trả về diện tích từng loại đất quy hoạch (m², %), phần chưa có lô quy hoạch và từng lô kèm chỉ tiêu tầng cao, mật độ xây dựng, hệ số sử dụng đất (nếu đồ án có).',
+          'Đang xem bản đồ quy hoạch: bấm vào thửa nằm trên lô vẫn mở bảng thửa; tắt lớp thửa để xem bảng lô như trước.'
         ],
         facts: [
-          'Chưa có số tờ, số thửa, thông tin chủ sử dụng: cần API cơ sở dữ liệu đất đai.',
-          'Thông tin lô lấy từ các đồ án đã nạp vào webapp, chưa phải toàn bộ đồ án được duyệt.'
+          'Dữ liệu thửa từ gis21.hue.gov.vn (lập năm 2016), không gồm thông tin chủ sử dụng; chỉ để tham khảo.',
+          'Quy hoạch chỉ tính các đồ án đã nạp vào webapp và đang hiện; đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn (chi tiết hơn).',
+          'Diện tích quy hoạch tính trên hình thửa (sai số ranh khoảng 0,5 m) nên có thể lệch nhẹ so với diện tích hồ sơ.'
         ],
         coord: true,
-        actions: [openPlanList]
+        actions: [{ label: 'Bật lớp thửa đất', icon: 'parcel', run: () => showLayer('chk_cadastre', { pane: 'base' }) }, openPlanList]
       },
       {
         id: 'access', btn: 'guide', status: 'trial',

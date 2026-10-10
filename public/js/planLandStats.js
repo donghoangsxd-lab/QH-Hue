@@ -3,10 +3,12 @@
 // Các đồ án chồng nhau (quy hoạch phân khu chứa quy hoạch chi tiết, bản điều chỉnh…): ưu tiên đồ án có ranh tổng nhỏ hơn
 // (chi tiết hơn), lô QH theo phường xếp cuối. Phần không rơi vào lô nào ghi "Chưa có lô quy hoạch".
 // Điểm trong lô tính theo hàng (scanline, chẵn-lẻ): lô hàng nghìn đỉnh chỉ cắt mỗi hàng mẫu 1 lần.
+// Một thửa địa chính (analyzeParcelPlan) ít lô nên cắt hình học chính xác thay cho lấy mẫu, cùng thứ tự ưu tiên.
 import { state, infraLabels, BUFFER_COLORS, layerType, getPlanScenarioList } from './state.js';
 import { planLotsIn } from './projectFiles.js';
 import { landLabel, landColor, landPatternKey, infraStyleKey, tt16SwatchCss, TT16_STYLES } from './tt16Symbols.js';
-import { escapeHtml, fmtNum } from './utils.js';
+import { escapeHtml, fmtNum, planItems } from './utils.js';
+import { landCode } from './mapEngine.js';
 
 const SAMPLE_MAX = 40000;
 // Lưới phủ cả khung bao: vùng đo mảnh, chéo thì khung lớn hơn nhiều polygon, giới hạn số ô để không tràn bộ nhớ
@@ -76,16 +78,10 @@ function lotClass(lot, byId) {
   return { label: nhom, color: landColor(lot.layer) || (TT16_STYLES[key] || {}).color || '#94a3b8', key: '' };
 }
 
-/**
- * ring: vòng polygon đo [[lng, lat], …] (đã khép). → { area, rows: [{ label, color, key, area, pct, lots }], none,
- * lotCount, projects: [tên đồ án có lô trong vùng], step (m) }
- */
-export async function analyzePlanLand(ring) {
-  const area = turf.area(turf.polygon([ring]));
-  const box = boxOf([[ring]]);
+// Lô QH giao khung box, xếp theo thứ tự ưu tiên (lô đứng trước giữ phần chồng lấn)
+async function lotsInBox(box) {
   const { projects, wardLots } = await planLotsIn(box);
   projects.sort((a, b) => boxArea(a.bbox) - boxArea(b.bbox));
-
   const byId = new Map([...state.rawDataList, ...state.planDataList, ...getPlanScenarioList()].map(it => [it.id, it]));
   const seenIds = new Set();
   const lots = [];
@@ -101,6 +97,17 @@ export async function analyzePlanLand(ring) {
     push(lot);
   }));
   wardLots.forEach(lot => { if (lot.kind === 'DXF' || !seenIds.has(lot.id)) push(lot); });
+  return { projects, lots, byId };
+}
+
+/**
+ * ring: vòng polygon đo [[lng, lat], …] (đã khép). → { area, rows: [{ label, color, key, area, pct, lots }], none,
+ * lotCount, projects: [tên đồ án có lô trong vùng], step (m) }
+ */
+export async function analyzePlanLand(ring) {
+  const area = turf.area(turf.polygon([ring]));
+  const box = boxOf([[ring]]);
+  const { projects, lots, byId } = await lotsInBox(box);
 
   const midLat = (box[1] + box[3]) / 2;
   const mx = M_PER_DEG * Math.cos(midLat * Math.PI / 180);
@@ -154,15 +161,80 @@ export async function analyzePlanLand(ring) {
   };
 }
 
+// Mảnh giao nhỏ hơn ngưỡng là vệt lệch ranh giữa thửa địa chính và lô CAD, không tính thành loại đất
+const SLIVER_M2 = 0.5;
+
+const closeRing = (r) => (r.length && (r[0][0] !== r[r.length - 1][0] || r[0][1] !== r[r.length - 1][1]) ? [...r, r[0]] : r);
+const toFeature = (polys) => {
+  const ps = polys.map(p => p.map(closeRing)).filter(p => p[0] && p[0].length >= 4);
+  return ps.length === 1 ? turf.polygon(ps[0]) : turf.multiPolygon(ps);
+};
+
+/**
+ * Loại đất QH trên 1 thửa, cắt hình học chính xác: phần thửa còn lại lần lượt giao với lô theo thứ tự ưu tiên.
+ * geometry: Polygon | MultiPolygon (WGS84). → như analyzePlanLand, thêm exact: true và parts: [{ lot, name, label,
+ * color, key, area, pct }] từng lô; hình lô lỗi thì quay về lấy mẫu lưới (exact: false).
+ */
+export async function analyzeParcelPlan(geometry) {
+  const polys = polysOf(geometry);
+  if (!polys.length) throw new Error('thửa không có hình');
+  const parcel = toFeature(polys);
+  const area = turf.area(parcel);
+  const box = boxOf(polys);
+  const { projects, lots, byId } = await lotsInBox(box);
+
+  let rest = parcel;
+  const parts = [];
+  try {
+    for (const { lot, polys: lp } of lots) {
+      if (!rest) break;
+      const shape = toFeature(lp);
+      const inter = turf.intersect(rest, shape);
+      const a = inter ? turf.area(inter) : 0;
+      if (a < SLIVER_M2) continue;
+      parts.push({ lot, area: a });
+      rest = turf.difference(rest, shape);
+    }
+  } catch (err) {
+    console.warn('Cắt hình thửa với lô QH lỗi, chuyển sang lấy mẫu lưới:', err);
+    const res = await analyzePlanLand(closeRing(polys[0][0]));
+    return { ...res, exact: false, parts: [] };
+  }
+
+  const files = new Set();
+  const rows = new Map();
+  const detail = parts.map(({ lot, area: a }) => {
+    const c = lotClass(lot, byId);
+    const row = rows.get(c.label) || rows.set(c.label, { ...c, area: 0, lots: 0 }).get(c.label);
+    row.area += a;
+    row.lots++;
+    if (lot.file) files.add(lot.file);
+    const item = lot.kind !== 'DXF' ? byId.get(lot.id) : null;
+    return { lot, name: item ? item.name : landCode(lot), ...c, area: a, pct: (a / area) * 100 };
+  });
+  const covered = parts.reduce((s, p) => s + p.area, 0);
+  const none = Math.max(0, area - covered);
+  return {
+    area,
+    rows: [...rows.values()].map(r => ({ ...r, pct: (r.area / area) * 100 })).sort((a, b) => b.area - a.area),
+    none: { area: none, pct: (none / area) * 100 },
+    lotCount: parts.length,
+    projects: projects.map(p => p.tenQH).filter(n => files.has(n)),
+    exact: true,
+    parts: detail.sort((a, b) => b.area - a.area)
+  };
+}
+
 const fmtArea = (m2) => (m2 >= 10000 ? `${fmtNum(m2 / 10000)} ha` : `${fmtNum(Math.round(m2))} m²`);
+const fmtM2 = (m2) => `${fmtNum(Math.round(m2))} m²`;
 const fmtPct = (p) => (p > 0 && p < 0.05 ? `<${fmtNum(0.1)}%` : `${fmtNum(Math.round(p * 10) / 10)}%`);
 
-function rowHtml(label, color, key, area, pct, sub = '') {
+function rowHtml(label, color, key, area, pct, sub = '', fmt = fmtArea) {
   const swatch = (key && tt16SwatchCss(key, 0.6)) || `background:${color};`;
   return `<div class="pls-row" title="${escapeHtml(label)}">
     <i class="pls-swatch" style="${swatch}"></i>
     <span class="pls-label">${escapeHtml(label)}${sub ? `<small>${sub}</small>` : ''}</span>
-    <b>${fmtArea(area)}</b><em>${fmtPct(pct)}</em>
+    <b>${fmt(area)}</b><em>${fmtPct(pct)}</em>
     <span class="pls-bar"><span style="width:${Math.min(100, pct)}%;background:${color};"></span></span>
   </div>`;
 }
@@ -182,5 +254,32 @@ export function planLandHtml(res) {
   return `<div class="plan-land-stats">${head}<div class="pls-list">${rows}${none}</div>
     ${shown ? `<div class="pp-sub">Đồ án: ${shown}${more}</div>` : ''}
     <div class="pp-sub">≈ Lấy mẫu lưới ${fmtNum(Math.round(res.step * 10) / 10)} m; đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn (chi tiết hơn). Đồ án đang ẩn không tính.</div>
+  </div>`;
+}
+
+/** Kết quả analyzeParcelPlan trong popup thửa. recorded: diện tích hồ sơ địa chính (m²) để đối chiếu */
+export function parcelPlanHtml(res, recorded) {
+  if (!res.exact) return planLandHtml(res).replace('trong vùng đo', 'trên thửa đất');
+  const covered = res.area - res.none.area;
+  const head = `<div class="pls-head">Quy hoạch trên thửa đất</div>
+    <div class="pp-row"><span>Diện tích hình thửa</span><b>${fmtM2(res.area)}${recorded > 0 ? ` <small>(hồ sơ ${fmtNum(recorded)} m²)</small>` : ''}</b></div>
+    <div class="pp-row"><span>Có lô quy hoạch</span><b>${fmtM2(covered)} (${fmtPct(100 - res.none.pct)}) · ${fmtNum(res.lotCount)} lô</b></div>`;
+  if (!res.rows.length) {
+    return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">Thửa chưa nằm trong lô quy hoạch của đồ án nào đã nhập (hoặc đồ án đang bị ẩn).</div></div>`;
+  }
+  const rows = res.rows.map(r => rowHtml(r.label, r.color, r.key, r.area, r.pct, `${fmtNum(r.lots)} lô`, fmtM2)).join('');
+  const none = res.none.area >= SLIVER_M2 ? rowHtml('Chưa có lô quy hoạch', NONE_COLOR, '', res.none.area, res.none.pct, '', fmtM2) : '';
+  const lots = res.parts.map(p => {
+    const stats = planItems(p.lot.plan).map(s => `${s.short} ${s.text}`).join(' · ');
+    return `<div class="pls-lot">
+      <div class="pls-lot-head"><b>${escapeHtml(p.name || p.label)}</b><span>${fmtM2(p.area)}</span></div>
+      <div class="pls-lot-sub">${escapeHtml(p.label)}${p.lot.file ? ` · ${escapeHtml(p.lot.file)}` : ''}</div>
+      ${stats ? `<div class="pls-lot-plan">${escapeHtml(stats)}</div>` : ''}
+    </div>`;
+  }).join('');
+  return `<div class="plan-land-stats">${head}<div class="pls-list">${rows}${none}</div>
+    <div class="pls-sub-head">Lô quy hoạch và chỉ tiêu</div>
+    <div class="pls-lots">${lots}</div>
+    <div class="pp-sub">Cắt hình học thửa với ranh lô; hình thửa từ tile địa chính (sai số ranh khoảng 0,5 m) nên có thể lệch nhẹ so với diện tích hồ sơ. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn; đồ án đang ẩn không tính.</div>
   </div>`;
 }

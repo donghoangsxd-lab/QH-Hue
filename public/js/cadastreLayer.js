@@ -4,7 +4,8 @@
 import { map } from './mapEngine.js';
 import { planMap, getViewMode, isSplitOn } from './planMap.js';
 import { geeApi } from './api.js';
-import { escapeHtml, fmtNum, showToast } from './utils.js';
+import { escapeHtml, fmtNum, showToast, ico } from './utils.js';
+import { analyzeParcelPlan, parcelPlanHtml } from './planLandStats.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -20,24 +21,36 @@ const PANE = 'cadastrePane';
 const PANE_Z = 410;
 const TILE_CACHE = 96;
 const INDEX_CACHE = 8;
-const FILL_ALPHA = 0.28;
+const FILL_ALPHA = 0.35;
 const STROKE = 'rgba(124, 45, 18, 0.75)';
 const STROKE_PLAN = 'rgba(17, 24, 39, 0.8)';
 const HIGHLIGHT = { color: '#facc15', weight: 3, opacity: 1, fillColor: '#facc15', fillOpacity: 0.12, interactive: false };
 
-// Nhóm hiển thị theo mã loại đất (Thông tư 28/2014/TT-BTNMT, Phụ lục 01); thửa nhiều mục đích lấy mã đầu
+// Nhóm loại đất (mã theo Thông tư 28/2014/TT-BTNMT, Phụ lục 01) cho dòng phụ popup; thửa nhiều mục đích lấy mã đầu
 const GROUPS = [
-  { key: 'o', label: 'Đất ở', color: '#f87171', codes: ['ODT', 'ONT'] },
-  { key: 'nn', label: 'Nông nghiệp', color: '#facc15', codes: ['LUC', 'LUK', 'LUN', 'LUA', 'BHK', 'NHK', 'HNK', 'CLN', 'NKH'] },
-  { key: 'rung', label: 'Rừng', color: '#22c55e', codes: ['RSX', 'RPH', 'RDD'] },
-  { key: 'nuoc', label: 'Mặt nước, thủy sản', color: '#38bdf8', codes: ['NTS', 'LMU', 'SON', 'MNC'] },
-  { key: 'cc', label: 'Cơ quan, công cộng', color: '#e879f9', codes: ['TSC', 'DTS', 'DVH', 'DYT', 'DGD', 'DTT', 'DKH', 'DXH', 'DNG', 'DSK', 'DSH', 'DKV', 'DCH', 'DCK', 'DBV', 'DNL', 'DRA', 'DDT', 'DDL', 'TON', 'TIN', 'NTD', 'CQP', 'CAN'] },
-  { key: 'sx', label: 'Sản xuất, kinh doanh', color: '#a78bfa', codes: ['SKK', 'SKN', 'SKT', 'TMD', 'SKC', 'SKS', 'SKX'] },
-  { key: 'gt', label: 'Giao thông, thủy lợi', color: '#cbd5e1', codes: ['DGT', 'DTL'] },
-  { key: 'khac', label: 'Chưa sử dụng, khác', color: '#a8a29e', codes: [] }
+  { label: 'Đất ở', codes: ['ODT', 'ONT'] },
+  { label: 'Nông nghiệp', codes: ['LUC', 'LUK', 'LUN', 'LUA', 'BHK', 'NHK', 'HNK', 'CLN', 'NKH'] },
+  { label: 'Rừng', codes: ['RSX', 'RPH', 'RDD'] },
+  { label: 'Mặt nước, thủy sản', codes: ['NTS', 'LMU', 'SON', 'MNC'] },
+  { label: 'Cơ quan, công cộng', codes: ['TSC', 'DTS', 'DVH', 'DYT', 'DGD', 'DTT', 'DKH', 'DXH', 'DNG', 'DSK', 'DSH', 'DKV', 'DCH', 'DCK', 'DBV', 'DNL', 'DRA', 'DDT', 'DDL', 'TON', 'TIN', 'NTD', 'CQP', 'CAN'] },
+  { label: 'Sản xuất, kinh doanh', codes: ['SKK', 'SKN', 'SKT', 'TMD', 'SKC', 'SKS', 'SKX'] },
+  { label: 'Giao thông, thủy lợi', codes: ['DGT', 'DTL'] },
+  { label: 'Chưa sử dụng, khác', codes: [] }
 ];
 const GROUP_OF = new Map(GROUPS.flatMap((g) => g.codes.map((c) => [c, g])));
 const OTHER = GROUPS[GROUPS.length - 1];
+
+// Màu nền theo mã loại đất, theo bảng màu ký hiệu bản đồ hiện trạng / quy hoạch sử dụng đất ngành TN&MT
+const PUBLIC = '#ffaaa0';
+const MINE = '#cdaacd';
+const LAND_COLORS = {
+  LUC: '#ffff64', LUK: '#ffff78', LUN: '#ffff8c', LUA: '#ffff78', BHK: '#fff0b4', NHK: '#fff0b4', HNK: '#fff0b4',
+  CLN: '#ffd7aa', NKH: '#f5f08c', RSX: '#b4ffb4', RPH: '#beff1e', RDD: '#6eff64', NTS: '#aaffff', LMU: '#fafafa',
+  ODT: '#ffa0ff', ONT: '#ffd0ff', CQP: '#ff5046', CAN: '#ff5046', DGT: '#ffaa32', DTL: '#aaffff',
+  SON: '#a0ffff', MNC: '#b4ffff', NTD: '#d2d2d2', SKS: MINE, SKX: MINE, DRA: MINE,
+  BCS: '#fafafa', DCS: '#fafafa', NCS: '#e6e6c8'
+};
+const NO_CODE_COLOR = '#d4d4d4';
 
 const LAND_NAMES = {
   LUC: 'Đất chuyên trồng lúa nước', LUK: 'Đất trồng lúa nước còn lại', LUN: 'Đất trồng lúa nương',
@@ -60,6 +73,10 @@ const LAND_NAMES = {
 
 const landCode = (l) => (String(l || '').toUpperCase().match(/[A-Z]{3}/) || [''])[0];
 const groupOf = (l) => GROUP_OF.get(landCode(l)) || OTHER;
+const colorOf = (l) => {
+  const code = landCode(l);
+  return code ? LAND_COLORS[code] || PUBLIC : NO_CODE_COLOR;
+};
 
 const $ = (id) => document.getElementById(id);
 
@@ -160,12 +177,16 @@ function drawTile(canvas, feats, coords, dz, size, dpr, fill) {
   });
   if (fill) {
     ctx.globalAlpha = FILL_ALPHA;
-    GROUPS.forEach((g) => {
-      const list = seen.filter((ft) => groupOf(ft.props.l) === g);
-      if (!list.length) return;
+    const byColor = new Map();
+    seen.forEach((ft) => {
+      const c = colorOf(ft.props.l);
+      if (!byColor.has(c)) byColor.set(c, []);
+      byColor.get(c).push(ft);
+    });
+    byColor.forEach((list, color) => {
       ctx.beginPath();
       list.forEach(trace);
-      ctx.fillStyle = g.color;
+      ctx.fillStyle = color;
       ctx.fill('evenodd');
     });
     ctx.globalAlpha = 1;
@@ -304,13 +325,15 @@ function parcelHtml(p) {
   ].filter(([, v]) => v);
   return `<div class="land-popup">
     <div class="lp-head">
-      <i class="lp-swatch" style="background:${g.color}"></i>
+      <i class="lp-swatch" style="background:${colorOf(p.l)}"></i>
       <div class="lp-head-main">
         <div class="lp-title-row"><span class="lp-title">Thửa ${escapeHtml(p.s)} · Tờ ${escapeHtml(p.t)}</span><span class="lp-phase lp-phase-ht">Địa chính 2016</span></div>
         <div class="lp-sub">${escapeHtml(g.label)}</div>
       </div>
     </div>
     <dl class="lp-info">${info.map(([k, v]) => `<dt>${k}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>
+    <button type="button" class="proof-btn cad-plan-btn" title="Diện tích từng loại đất quy hoạch trên thửa và chỉ tiêu các lô">${ico('area')}Xem chỉ tiêu quy hoạch</button>
+    <div class="cad-plan"></div>
     <div class="pp-sub">Nguồn: gis21.hue.gov.vn (lập năm 2016), chỉ để tham khảo</div>
   </div>`;
 }
@@ -344,15 +367,43 @@ async function openParcel(latlng, targetMap, replaced) {
   if (replaced) targetMap.closePopup(replaced);
   closeParcel();
   const mySeq = clickSeq;
-  const own = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup cadastre-popup' })
-    .setLatLng(latlng).setContent(parcelHtml(found.hit.props));
+  // Nội dung là phần tử DOM: popup.update() của Leaflet dựng lại nội dung dạng chuỗi và làm mất sự kiện nút
+  const content = document.createElement('div');
+  content.innerHTML = parcelHtml(found.hit.props);
+  const own = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup cadastre-popup', autoPanPaddingTopLeft: [40, 90], autoPanPaddingBottomRight: [40, 20] })
+    .setLatLng(latlng).setContent(content);
   popup = own;
   own.on('remove', () => { if (popup === own) { popup = null; clearHighlight(); } });
   own.openOn(targetMap);
-  const shape = await parcelShape(found.hit, DATA_ZOOM, found.x, found.y);
+  const shapeP = parcelShape(found.hit, DATA_ZOOM, found.x, found.y);
+  content.querySelector('.cad-plan-btn')?.addEventListener('click', (e) => showParcelPlan(own, content, e.currentTarget, shapeP, found.hit.props));
+  const shape = await shapeP;
   if (mySeq !== clickSeq || popup !== own) return true;
   highlight = L.geoJSON(shape, { style: HIGHLIGHT, interactive: false }).addTo(targetMap);
   return true;
+}
+
+// Popup tự rộng ra khi có bảng kết quả, giữ nguyên phần thông tin thửa phía trên
+async function showParcelPlan(own, content, btn, shapeP, props) {
+  const box = content.querySelector('.cad-plan');
+  if (!box || btn.disabled) return;
+  btn.disabled = true;
+  btn.innerHTML = `${ico('area')}Đang tải lô quy hoạch các đồ án quanh thửa…`;
+  try {
+    const shape = await shapeP;
+    const res = await analyzeParcelPlan(shape.geometry);
+    if (popup !== own) return;
+    btn.remove();
+    box.innerHTML = parcelPlanHtml(res, Number(props.a));
+  } catch (err) {
+    console.warn('Tra quy hoạch thửa lỗi:', err);
+    if (popup !== own) return;
+    btn.disabled = false;
+    btn.innerHTML = `${ico('area')}Xem chỉ tiêu quy hoạch`;
+    box.innerHTML = `<div class="sug-card ineligible">Không phân tích được: ${escapeHtml(err.message || String(err))}</div>`;
+  }
+  own.options.maxWidth = 380;
+  own.update();
 }
 
 /** Click bản đồ khi không bật công cụ nào: hiện thửa tại điểm bấm (nếu lớp đang bật và đủ mức phóng) */
@@ -501,8 +552,4 @@ export function initCadastreLayer() {
   });
   $('btnCadastreFind')?.addEventListener('click', findParcel);
   ['cadastreTo', 'cadastreThua'].forEach((id) => $(id)?.addEventListener('keydown', (e) => { if (e.key === 'Enter') findParcel(); }));
-  const legend = $('cadastreLegend');
-  if (legend) {
-    legend.innerHTML = GROUPS.map((g) => `<span class="road-legend-item"><i class="cad-sw" style="background:${g.color}"></i>${g.label}</span>`).join('');
-  }
 }

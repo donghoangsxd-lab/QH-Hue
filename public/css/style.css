@@ -1713,8 +1713,6 @@ table.data-table tfoot .st-total-note { font-weight: 400; font-style: italic; }
 .road-legend-item i { display: inline-block; width: 12px; border-radius: var(--r-sm); flex-shrink: 0; }
 
 /* THỬA ĐẤT ĐỊA CHÍNH 2016 (cadastreLayer.js) */
-.cad-legend.layer-legend { margin: 0 0 4px; }
-.road-legend-item i.cad-sw { height: 9px; opacity: 0.6; border: 1px solid rgba(124, 45, 18, 0.75); }
 .cad-find { display: grid; grid-template-columns: minmax(0, 1fr) 42px 48px auto; gap: 4px; align-items: center; }
 .cad-find select, .cad-find input { min-width: 0; height: 22px; padding: 0 4px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm); color: var(--text-main); font: inherit; }
 #cadastreStatus { margin-top: 3px; }
@@ -2283,6 +2281,17 @@ table.ward-table th {
 .pls-row > em { font-style: normal; text-align: right; color: var(--text-muted); }
 .pls-bar { grid-column: 2 / -1; height: 4px; border-radius: 2px; background: rgba(148, 163, 184, 0.18); overflow: hidden; }
 .pls-bar > span { display: block; height: 100%; }
+.pp-row b small { font-weight: 400; color: var(--text-muted); }
+.cad-plan:not(:empty) { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-color); }
+.cad-plan-btn { margin-top: 10px; }
+.pls-sub-head { margin-top: 4px; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-muted); }
+.pls-lots { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; padding-right: 2px; }
+.pls-lot { padding: 4px 6px; border-radius: var(--r-sm); background: rgba(var(--cyan-rgb), 0.06); border: 1px solid rgba(var(--cyan-rgb), 0.18); line-height: 1.35; }
+.pls-lot-head { display: flex; justify-content: space-between; gap: 8px; }
+.pls-lot-head b { overflow-wrap: anywhere; }
+.pls-lot-head span { flex-shrink: 0; font-weight: 600; color: var(--accent-cyan); }
+.pls-lot-sub { font-size: var(--fs-sm); color: var(--text-muted); overflow-wrap: anywhere; }
+.pls-lot-plan { font-size: var(--fs-sm); color: var(--text-main); }
 
 /* Thông báo ngắn */
 .app-toast {
