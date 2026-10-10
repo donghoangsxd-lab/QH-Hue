@@ -4,8 +4,8 @@
 // Sửa tuyến đã lưu: kéo / chèn / xóa đỉnh trên bản nháp rồi lưu đè đúng mã tuyến (đỉnh bị kéo bỏ mã nút cũ, bắt dính lại).
 import { state } from './state.js';
 import { geeApi } from './api.js';
-import { map, wardNameAt, clearMeasure } from './mapEngine.js';
-import { escapeHtml, fmtNum, ico, setStatusContent } from './utils.js';
+import { map, wardNameAt } from './mapEngine.js';
+import { escapeHtml, fmtNum, ico, setStatusContent, announceTool, TOOL_START_EVENT } from './utils.js';
 import { postAdmin, refreshRoadsMeta } from './wardRoads.js';
 import { roadWaysAround } from './serviceArea.js';
 import { refreshRoadNetwork } from './roadNetworkLayer.js';
@@ -368,12 +368,9 @@ function cancelEdit() {
 
 // ================== CHẾ ĐỘ VẼ ==================
 function setDrawing(on) {
+  if (on && !drawing()) announceTool('road');
   if (on) state.adminDrawMode = 'road';
   else if (drawing()) state.adminDrawMode = null;
-  if (on) {
-    clearMeasure();
-    state.isPickMode = false;
-  }
   const btn = $('btnRoadDraw');
   if (btn) {
     btn.innerHTML = on ? `${ico('stop')}Dừng vẽ` : `${ico('pen')}${editingId ? 'Vẽ nối dài' : 'Vẽ tuyến mới'}`;
@@ -425,6 +422,7 @@ export function initCustomRoads() {
   document.querySelectorAll('.tab-btn, .add-mode-btn, .admin-sub-btn, .rp-collapse-btn, #btnExpandRightPanel')
     .forEach(b => b.addEventListener('click', refreshRoadPanel));
   $('btnRoadDraw')?.addEventListener('click', () => setDrawing(!drawing()));
+  document.addEventListener(TOOL_START_EVENT, (e) => { if (e.detail !== 'road' && drawing()) setDrawing(false); });
   $('btnRoadUndo')?.addEventListener('click', () => { vertices.pop(); renderDraft(); });
   $('btnRoadSave')?.addEventListener('click', saveDraft);
   $('btnRoadCancel')?.addEventListener('click', cancelEdit);

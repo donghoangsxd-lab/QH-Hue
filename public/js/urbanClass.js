@@ -59,6 +59,8 @@ const URBANS = [
     note: `Một phần xã Vinh Lộc. Chưa tách ranh giới đô thị. ${HERITAGE}` }
 ];
 
+export const planUrbanOf = (id) => URBANS.find(u => u.id === id) || null;
+
 // Bảng 2A. kind: pop / dens để chọn hệ số Điều 8; landscape = nhóm không gian, kiến trúc, cảnh quan (không giảm khi áp 8.2.d).
 // band theo đơn vị hiển thị (dân số = người). qual = tiêu chuẩn chữ, chưa chấm điểm.
 const GROUP_2A = {

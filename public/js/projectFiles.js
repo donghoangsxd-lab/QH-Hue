@@ -1,5 +1,5 @@
 // Tải ranh lô theo đồ án: mở bản đồ chỉ có danh mục. File một đồ án tải khi zoom ≥ ngưỡng lô và ranh tổng giao khung nhìn,
-// khi bật ranh lô công trình, khi bấm phóng tới, hoặc khi bật lớp lô đã lưu (showLand).
+// khi bật ranh lô công trình, khi bấm phóng tới (đồ án đang chọn giữ ở mọi zoom), hoặc khi bật lớp lô đã lưu (showLand).
 // Đồ án thư mục (dir) đọc hien-trang.json + su-dung-dat.json. Đồ án file gộp cũ đọc projects/<slug>.json.
 // Điểm chức năng chỉ dùng gợi tên lô lúc nhập, không tải / không vẽ (diem-chuc-nang.json cũ trên bucket bỏ qua).
 // Đồ án chưa chuyển đọc qua API. URL bucket do máy chủ trả về (?v= phiên bản trong danh mục).
@@ -29,6 +29,12 @@ function parcelLayerOn(zoom) {
 }
 export function onChangeLots(fn) { onChange = fn; }
 
+/** Đồ án đang chọn còn hiện trên bản đồ (lớp Quy hoạch bật, đồ án không bị ẩn) → Ten_QH, không thì null */
+export function focusedProjectName() {
+  const name = state.focusedProject;
+  return name && state.showProjects && !state.hiddenProjects.has(name) ? name : null;
+}
+
 function intersects(bbox, bounds) {
   return bbox[0] <= bounds.getEast() && bbox[2] >= bounds.getWest()
     && bbox[1] <= bounds.getNorth() && bbox[3] >= bounds.getSouth();
@@ -40,9 +46,11 @@ function wanted() {
   const zoom = map.getZoom();
   const bounds = map.getBounds().pad(0.15);
   const layerOn = parcelLayerOn(zoom) || state.showLand;
+  const focus = focusedProjectName();
   return state.projectCatalog.filter(p => {
     if (!p || !p.tenQH || p.sheetOnly) return false;
     if (force.has(p.tenQH)) return state.showLand || !state.hiddenProjects.has(p.tenQH);
+    if (p.tenQH === focus) return true;
     if (!layerOn) return false;
     if (!state.showLand && state.showProjects && state.hiddenProjects.has(p.tenQH)) return false;
     if (!p.bbox) return !!state.showLand;

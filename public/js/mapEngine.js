@@ -6,7 +6,7 @@ import {
 import { peekInfraRisk, riskSummaryHtml } from './riskLayer.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi, markDataWritten } from './api.js';
-import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, planItems, startTaskProgress, trackTileLoad } from './utils.js';
+import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, planItems, startTaskProgress, trackTileLoad, announceTool, TOOL_START_EVENT } from './utils.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
@@ -18,7 +18,7 @@ import {
   getCoveredRightWidth, highlightPlanWard, wardFocusLayer, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, getViewMode, setViewMode, passToolClick
 } from './planMap.js';
-import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, infraLotOf, byProjectAreaDesc } from './projectFiles.js';
+import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, focusedProjectName, infraLotOf, byProjectAreaDesc } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
 import { analyzePlanLand, planLandHtml } from './planLandStats.js';
 
@@ -194,6 +194,11 @@ export function initMap() {
   layers.heatmap.addTo(map);
   layers.singleIso.addTo(map);
 
+  // Bật công cụ khác: hủy hình đo đang vẽ, đóng bảng công trình (kèm vùng phục vụ) đang mở
+  document.addEventListener(TOOL_START_EVENT, (e) => {
+    if (e.detail !== 'measure' && state.activeMeasureType) clearMeasure();
+    closePointPopup();
+  });
   map.on('zoomend', () => { updateWardLabelFontSize(); redrawLandsOnPattern(); });
   map.on('moveend', () => { refreshLeftSoon(); scheduleLots(); });
   bindProjectFiles(() => map, PARCEL_MIN_ZOOM, () => parcelMinZoom(map, layers));
@@ -450,6 +455,7 @@ export function toggleMeasure(type) {
     clearMeasure();
     return;
   }
+  announceTool('measure');
   clearMeasure();
   state.activeMeasureType = type;
 
@@ -1398,12 +1404,17 @@ function infraLotsInWardScope(list) {
 }
 
 // showLand (khung Thẩm định) vẽ lô đất các đồ án đang giao khung nhìn, mọi mức zoom.
-// Lớp Đồ án quy hoạch vẽ lô đất + lô hạ tầng từ PARCEL_MIN_ZOOM. Chọn phường/xã thì chỉ giữ lô trong phạm vi đó.
+// Lớp Đồ án quy hoạch vẽ lô đất + lô hạ tầng từ PARCEL_MIN_ZOOM; dưới ngưỡng chỉ vẽ lô của đồ án đang chọn.
+// Chọn phường/xã thì chỉ giữ lô trong phạm vi đó.
 function redrawLands() {
   const byProject = state.showProjects && map && map.getZoom() >= PARCEL_MIN_ZOOM;
-  const lands = (state.showLand || byProject) ? lotsInWardScope(state.landParcels) : [];
-  const infra = byProject && state.showProjectInfra
-    ? infraLotsInWardScope(state.projectInfraLots).filter(l => !state.hiddenProjects.has(l.file)) : [];
+  const focus = byProject ? null : focusedProjectName();
+  const ofFocus = (list) => list.filter(l => l.file === focus);
+  const lands = (state.showLand || byProject) ? lotsInWardScope(state.landParcels)
+    : focus ? lotsInWardScope(ofFocus(state.landParcels)) : [];
+  const infra = !state.showProjectInfra ? []
+    : byProject ? infraLotsInWardScope(state.projectInfraLots).filter(l => !state.hiddenProjects.has(l.file))
+      : focus ? infraLotsInWardScope(ofFocus(state.projectInfraLots)) : [];
   const compare = isCompareOn() && !!planMap;
   landsDetailed = map ? map.getZoom() >= PARCEL_PATTERN_ZOOM : null;
   // Bản đồ hiện trạng chỉ vẽ lô HT, lô QH chỉ có trên bản đồ quy hoạch (không trộn 2 giai đoạn)
@@ -2000,6 +2011,12 @@ function addConflictRings(fg, conflicts, renderer) {
 
 let pointPopup = null;   // { popup, id, scenario } của popup công trình đang mở
 
+/** Đóng bảng công trình đang mở (vùng phục vụ, âm bản tự gỡ theo sự kiện remove của popup) */
+export function closePointPopup() {
+  if (pointPopup && pointPopup.popup.isOpen()) pointPopup.popup.remove();
+  pointPopup = null;
+}
+
 // Ô đầu popup công trình: hoa văn TT16 như ranh lô; loại không có ký hiệu TT16 (PCCC, nghĩa trang, xe buýt...) dùng icon
 function infraSwatchHtml(p, approved) {
   const type = layerType(p);
@@ -2031,9 +2048,10 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   const noZone = !(itemRadius > 0);
   const roadArea = !(p.type === '10-PCCC' || p.type === '11-NT');
 
-  // Chỉ để mở 1 popup công trình trên 2 bản đồ
+  // Chỉ để mở 1 popup công trình trên 2 bản đồ; bỏ cả ghim vị trí của lần tra cứu điểm trước
   if (map) map.closePopup();
   if (planMap) planMap.closePopup();
+  if (state.tempMarker) { state.tempMarker.remove(); state.tempMarker = null; }
   clearCsdProof();
 
   const groups = isPlanScenario ? planLayers : layers;

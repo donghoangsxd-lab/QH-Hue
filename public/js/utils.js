@@ -255,6 +255,13 @@ export function setStatusContent(el, text, fallbackIcon = null) {
   el.innerHTML = rest ? `${icon ? ico(icon) : ''}${escapeHtml(rest)}` : '';
 }
 
+// Công cụ thao tác trên bản đồ dùng chung click nên chỉ bật 1 cái: công cụ vừa bật phát sự kiện, công cụ khác đang chạy tự hủy.
+// tool: 'measure' | 'inspect' | 'sketch' | 'pick' | 'road' | 'pop'
+export const TOOL_START_EVENT = 'qh:tool-start';
+export function announceTool(tool) {
+  document.dispatchEvent(new CustomEvent(TOOL_START_EVENT, { detail: tool }));
+}
+
 const TOAST_ICONS = { success: 'check', error: 'error', info: 'info' };
 let toastTimer = null;
 export function showToast(message, type = 'info') {

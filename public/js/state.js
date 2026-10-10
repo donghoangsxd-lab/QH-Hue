@@ -31,10 +31,12 @@ export const state = {
   projectCatalog: [],
   projectBase: '',
   // Ranh tổng [{ id: Ten_QH, ward, infraCount, landCount, time, geometry }]
-  // đồ án người dùng ẩn (Ten_QH, lưu localStorage)
   projectAreas: [],
   showProjects: false,
+  // Đồ án người dùng ẩn (Ten_QH, lưu localStorage)
   hiddenProjects: new Set(),
+  // Đồ án vừa chọn (bấm ranh / tên): lô hiện ở mọi mức zoom, không chờ ngưỡng PARCEL_MIN_ZOOM
+  focusedProject: null,
   // Lớp chính người dùng tắt trong từng đồ án: "<Ten_QH>|<key PROJECT_LAYERS>" (lưu localStorage)
   hiddenProjectLayers: new Set(),
   wardStatsData: [],

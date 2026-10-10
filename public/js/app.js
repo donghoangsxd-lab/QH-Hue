@@ -41,7 +41,7 @@ import {
   initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleSplit, isSplitOn,
   getViewMode, getSplitKind, onViewChange, setViewMode, toggleViewMode, setSplitKind, isCompareOn
 } from './planMap.js';
-import { escapeHtml, setStatusContent, showToast } from './utils.js';
+import { escapeHtml, setStatusContent, showToast, announceTool, TOOL_START_EVENT } from './utils.js';
 import { initCadImport } from './cadImportUi.js';
 import { initProjectLayer } from './projectLayer.js';
 import { initProjectReview } from './projectReview.js';
@@ -59,10 +59,11 @@ import { initDrainageLayer } from './drainageLayer.js';
 import { initBasinLayer } from './basinLayer.js';
 import { initFloodSim } from './floodSim.js';
 import { initSatLayers } from './satLayers.js';
-import { initSketchLayer, handleSketchClick, stopSketchTool } from './sketchLayer.js';
+import { initSketchLayer, handleSketchClick } from './sketchLayer.js';
 import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
 import { initOverview } from './overview.js';
 import { initRiskLayer } from './riskLayer.js';
+import { initUrbanAreaLayer, refreshUrbanAreaLayer } from './urbanAreaLayer.js';
 import { initBasemapUi } from './basemap.js';
 import { PROOF_FOCUS_EVENT } from './csdProof.js';
 
@@ -308,6 +309,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCustomRoads();
   initPopEdits();
   initRoadNetworkLayer();
+  initUrbanAreaLayer();
   initBasemapUi();
   initTerrainLayer();
   initDrainageLayer();
@@ -317,9 +319,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   initRiskLayer();
   initSketchLayer();
   initOverview();
-  // Bật đo đạc / tra cứu / ghim / vẽ tuyến → bỏ chọn công cụ phác thảo (hình đã vẽ vẫn giữ)
-  ['btnMeasureDist', 'btnMeasureArea', 'btnInspectMode', 'btnPickOnMap', 'btnRoadDraw', 'btnPopDraw']
-    .forEach(id => document.getElementById(id)?.addEventListener('click', stopSketchTool));
   restoreAdminSession();
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleSplit);
   initMapTitle();
@@ -408,6 +407,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnInspectMode = document.getElementById('btnInspectMode');
   const planEl = document.getElementById('mapPlan');
   const setInspectMode = (on) => {
+    if (on && !state.isInspectMode) announceTool('inspect');
     state.isInspectMode = on;
     btnInspectMode?.classList.toggle('active', on);
     if (btnInspectMode) {
@@ -422,6 +422,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     else clearInspectResult();
   };
   btnInspectMode?.addEventListener('click', () => setInspectMode(!state.isInspectMode));
+  document.addEventListener(TOOL_START_EVENT, (e) => {
+    if (e.detail !== 'inspect' && state.isInspectMode) setInspectMode(false);
+    if (e.detail !== 'pick') state.isPickMode = false;
+  });
 
   // ---------- Panel phải ----------
   const tabButtons = document.querySelectorAll('.rp-tabs .tab-btn');
@@ -534,6 +538,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   updateRadiusPreview();
   document.getElementById('btnPickOnMap')?.addEventListener('click', () => {
+    announceTool('pick');
     state.isPickMode = true;
     setStatus("👉 Click trực tiếp trên bản đồ để chọn tọa độ...", "var(--accent-orange)");
   });
@@ -648,7 +653,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Bấm lại cùng ô để khôi phục đúng các lớp đang bật trước đó.
   const FOCUS_CHECKS = [
     ...ICON_GROUPS.map(k => `chk_${k}`),
-    'chk_bound', 'chk_parcel', 'chk_projects', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_basin', 'chk_flood', 'chk_sarflood',
+    'chk_bound', 'chk_urban', 'chk_parcel', 'chk_projects', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_basin', 'chk_flood', 'chk_sarflood',
     'chk_lst', 'chk_newdev', 'chk_risk', 'chk_roads', 'chk_heat'
   ];
   let focusSnapshot = null;
@@ -768,6 +773,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setProgress(20, 'Đang tải công trình');
     // Gọi song song: ranh giới (CDN cache), danh sách công trình, thống kê phường; heatmap chờ danh sách công trình
     const boundaryReady = loadBoundaryLayer().then(renderPlanBoundaries);
+    boundaryReady.then(refreshUrbanAreaLayer).catch(() => {});
     const statsReady = ensureWardStats();
     statsReady.catch(() => {});
     if (document.getElementById('chk_pop')?.checked) ensurePopulationLayer();

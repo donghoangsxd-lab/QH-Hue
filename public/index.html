@@ -370,6 +370,16 @@
           </div>
           <div class="layer-map-pane" id="layerPaneBase" data-map-pane="base" role="tabpanel">
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_urban"><label for="chk_urban" title="Danh mục đô thị và phường đạt trình độ phát triển đô thị từ 01/01/2026 theo Quyết định 614/QĐ-UBND ngày 10/02/2026. Trỏ chuột vào ranh, ký hiệu hoặc phường để xem thông tin"><svg class="ico ico-layer"><use href="#i-flag"/></svg>Loại đô thị hiện trạng <small class="layer-hint">(QĐ 614)</small></label></div></div>
+          <div class="layer-legend ua-legend" id="urbanLegend" style="display:none;">
+            <span class="ua-legend-item"><i class="ua-badge ua-badge-I"><span>I</span></i>Đô thị loại I (toàn thành phố)</span>
+            <span class="ua-legend-item"><i class="ua-badge ua-badge-III"><span>III</span></i>Đô thị loại III</span>
+            <span class="ua-legend-item"><i class="ua-sw-line"></i>Ranh đô thị loại III</span>
+            <span class="ua-legend-item"><i class="ua-sw" style="background:#ef4444"></i>Phường trình độ loại II</span>
+            <span class="ua-legend-item"><i class="ua-sw" style="background:#fb923c"></i>Phường trình độ loại III</span>
+            <span class="ua-legend-item"><i class="ua-sw" style="background:#4ade80; opacity:0.6"></i>Xã (nông thôn)</span>
+            <span class="ua-legend-note" title="Thị trấn, xã cũ chưa có ranh trong webapp">Ký hiệu nét đứt: đô thị chưa có ranh riêng</span>
+          </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung. Thu nhỏ vẫn hiện trục chính; chỉ mức một biểu đồ tròn toàn thành phố là ẩn"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(zoom để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
             <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>

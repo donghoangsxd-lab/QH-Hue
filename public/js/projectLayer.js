@@ -3,12 +3,13 @@
 // Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS): bật/tắt từng lớp, Admin xóa từng lớp, tìm lô trong đồ án.
 // Mỗi đồ án 1 màu viền + nền mờ, nhãn tên ở giữa ranh. Zoom < PARCEL_MIN_ZOOM ranh tổng bấm được để phóng tới;
 // từ ngưỡng đó vẽ lô (mapEngine.js), ranh tổng nằm dưới lô và không nhận click (đồ án có ranh thật).
+// Đồ án vừa bấm (state.focusedProject) hiện lô ở mọi zoom; dưới ngưỡng thì ranh tổng xuống dưới để bấm được lô.
 import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
 } from './mapEngine.js';
 import { planMap, onCompareChange, passToolClick } from './planMap.js';
-import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc } from './projectFiles.js';
+import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName } from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
@@ -298,6 +299,7 @@ function zoomTo(p) {
   const b = boundsOf(p);
   if (!b || !b.isValid() || !map) return;
   let changed = false;
+  if (state.focusedProject !== p.name) { state.focusedProject = p.name; changed = true; }
   if (!state.showProjects) { setMaster(true); changed = true; }
   if (!state.showProjectInfra) { ensureFullLots(); changed = true; }
   if (state.hiddenProjects.delete(p.name)) { saveHidden(); changed = true; }
@@ -800,6 +802,7 @@ function drawOutlinesOn(m, list, below) {
   if (!list.length) return;
   const group = L.featureGroup();
   const shapes = [];
+  const focused = below && !!focusedProjectName();
   // Đồ án lớn vẽ trước (nằm dưới): đồ án nhỏ lồng trong QHPK phường nằm trên nên rê / bấm được
   list.slice().sort((a, b) => byProjectAreaDesc(a.name, b.name)).forEach(p => {
     const geom = outlineOf(p);
@@ -813,6 +816,7 @@ function drawOutlinesOn(m, list, below) {
       return;
     }
     const shape = L.geoJSON(geom, { style, bubblingMouseEvents: false });
+    if (focused) shapes.push(shape);
     shape.bindTooltip(escapeHtml(p.name), { sticky: true, direction: 'top', className: 'dot-tip' });
     shape.on('mouseover', () => setHover(m, p.name));
     shape.on('mouseout', () => setHover(m, null));
@@ -825,7 +829,8 @@ function drawOutlinesOn(m, list, below) {
     group.addLayer(shape);
   });
   group.addTo(m);
-  // Từ ngưỡng lô: nền mờ nằm dưới lô để không phủ màu lên ký hiệu TT16; đưa xuống từ nhỏ tới lớn để giữ thứ tự lớn dưới
+  // Có lô đang vẽ (từ ngưỡng, hoặc đồ án đang chọn): nền mờ nằm dưới lô để không phủ màu lên ký hiệu TT16 và không chặn
+  // click vào lô; đưa xuống từ nhỏ tới lớn để giữ thứ tự lớn dưới
   shapes.reverse().forEach(s => s.bringToBack());
   outlineGroups.set(m, group);
   updateGlow(m);

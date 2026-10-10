@@ -2,8 +2,8 @@
 // Hình chỉ nằm trong bộ nhớ trang: không gửi máy chủ, không ghi Sheet / bucket / localStorage → người khác không thấy,
 // đóng hoặc tải lại trang là mất; nút Lưu tải về máy file KML hoặc DXF (sketchExport.js).
 import { state } from './state.js';
-import { map, clearMeasure } from './mapEngine.js';
-import { escapeHtml, fmtNum, ico } from './utils.js';
+import { map } from './mapEngine.js';
+import { escapeHtml, fmtNum, ico, announceTool, TOOL_START_EVENT } from './utils.js';
 import { setDrawAssist } from './drawAssist.js';
 import { attachTelex } from './telex.js';
 import { exportKml, exportDxf } from './sketchExport.js';
@@ -290,10 +290,9 @@ function setTool(tool) {
   if (tool !== 'text') closeEditor(true);
   pts = [];
   cursor = null;
+  if (tool && !state.sketchTool) announceTool('sketch');
   state.sketchTool = tool;
   if (tool) {
-    clearMeasure();
-    state.isPickMode = false;
     map.doubleClickZoom.disable();
   } else {
     map.doubleClickZoom.enable();
@@ -306,7 +305,7 @@ function setTool(tool) {
   syncButtons();
 }
 
-/** Tắt công cụ đang chọn (khi bật đo đạc, tra cứu, vẽ tuyến...); các hình đã vẽ vẫn giữ */
+/** Tắt công cụ đang chọn; các hình đã vẽ vẫn giữ */
 export function stopSketchTool() {
   if (state.sketchTool) setTool(null);
 }
@@ -346,6 +345,8 @@ export function initSketchLayer() {
   const pal = $('sketchPalette');
   pal?.querySelectorAll('[data-color]').forEach(b => { b.style.setProperty('--c', b.dataset.color); });
   $('btnSketch')?.addEventListener('click', () => setOpen(!open));
+  // Bật đo đạc, tra cứu, ghim, vẽ tuyến…: bỏ chọn công cụ phác thảo (hình đã vẽ vẫn giữ)
+  document.addEventListener(TOOL_START_EVENT, (e) => { if (e.detail !== 'sketch') stopSketchTool(); });
   $('sketchTextSize')?.addEventListener('change', () => {
     if (editor) { editor.sizePx = textSize(); refocusEditor(); }
   });

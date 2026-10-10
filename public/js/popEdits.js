@@ -4,8 +4,8 @@
 // Cọ: mỗi nét = đường đi của chuột nới rộng nửa cỡ cọ; các nét gộp (union) thành vùng, lưu như vùng vẽ tay (có thể có lỗ).
 import { state } from './state.js';
 import { geeApi } from './api.js';
-import { map, clearMeasure, loadPopulationLayer } from './mapEngine.js';
-import { escapeHtml, fmtNum, ico, setStatusContent } from './utils.js';
+import { map, loadPopulationLayer } from './mapEngine.js';
+import { escapeHtml, fmtNum, ico, setStatusContent, announceTool, TOOL_START_EVENT } from './utils.js';
 import { postAdmin } from './wardRoads.js';
 import { reloadWardStats } from './uiComponents.js';
 import { setDrawAssist } from './drawAssist.js';
@@ -461,9 +461,8 @@ function zoomToEdit(id) {
 // ================== CHẾ ĐỘ VẼ ==================
 function setDrawing(on) {
   if (on) {
+    if (!drawing()) announceTool('pop');
     state.adminDrawMode = 'pop';
-    clearMeasure();
-    state.isPickMode = false;
   } else if (drawing()) state.adminDrawMode = null;
   stroke = null;
   spaceDown = false;
@@ -529,6 +528,7 @@ export function refreshPopPanel() {
 }
 
 export function initPopEdits() {
+  document.addEventListener(TOOL_START_EVENT, (e) => { if (e.detail !== 'pop' && drawing()) setDrawing(false); });
   // Chuyển công cụ con trong panel Admin: Tuyến đường / Pixel dân cư
   document.querySelectorAll('.admin-sub-btn').forEach(btn => btn.addEventListener('click', () => {
     document.querySelectorAll('.admin-sub-btn').forEach(b => {
