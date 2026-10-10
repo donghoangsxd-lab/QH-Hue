@@ -70,13 +70,11 @@ function cacheTile(key, elev) {
   if (elevCache.size > CACHE_MAX) elevCache.delete(elevCache.keys().next().value);
 }
 
-/** Cao độ (m) 256×256 pixel của 1 ô Terrarium; dùng chung bộ nhớ đệm cho lớp địa hình và mô phỏng ngập */
-export function loadElevTile(z, x, y) {
-  const key = `${z}/${x}/${y}`;
-  const hit = elevCache.get(key);
-  if (hit) return Promise.resolve(hit);
-  if (pending.has(key)) return pending.get(key);
-  const p = tileUrl().then(url => new Promise((resolve, reject) => {
+// GEE trả 429 khi nhiều ô cùng lúc (lớp địa hình loang lổ từng mảng): tải lại sau RETRY_MS, giãn ngẫu nhiên để không dồn đợt
+const RETRY_MS = [1500, 4000, 9000];
+
+function fetchElev(url, z, x, y, attempt = 0) {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
@@ -87,12 +85,26 @@ export function loadElevTile(z, x, y) {
       const px = ctx.getImageData(0, 0, 256, 256).data;
       const elev = new Float32Array(256 * 256);
       for (let i = 0, q = 0; q < px.length; i++, q += 4) elev[i] = Math.round((px[q] * 256 + px[q + 1] + px[q + 2] / 256 - 32768) * 10) / 10;
-      cacheTile(key, elev);
       resolve(elev);
     };
-    img.onerror = () => reject(new Error('terrain tile'));
+    img.onerror = () => {
+      if (attempt >= RETRY_MS.length) { reject(new Error('terrain tile')); return; }
+      setTimeout(() => fetchElev(url, z, x, y, attempt + 1).then(resolve, reject), RETRY_MS[attempt] * (0.75 + Math.random() * 0.5));
+    };
     img.src = L.Util.template(url, { z, x, y });
-  })).finally(() => pending.delete(key));
+  });
+}
+
+/** Cao độ (m) 256×256 pixel của 1 ô Terrarium; dùng chung bộ nhớ đệm cho lớp địa hình và mô phỏng ngập */
+export function loadElevTile(z, x, y) {
+  const key = `${z}/${x}/${y}`;
+  const hit = elevCache.get(key);
+  if (hit) return Promise.resolve(hit);
+  if (pending.has(key)) return pending.get(key);
+  const p = tileUrl()
+    .then(url => fetchElev(url, z, x, y))
+    .then(elev => { cacheTile(key, elev); return elev; })
+    .finally(() => pending.delete(key));
   pending.set(key, p);
   return p;
 }

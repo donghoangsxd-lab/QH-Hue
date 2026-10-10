@@ -772,13 +772,15 @@ body.right-collapsed .right-panel {
 .drainage-status { margin-top: 3px; color: var(--accent-orange); }
 .basin-legend-note { margin-top: 3px; font-style: italic; }
 .basin-label { background: none; border: 0; }
+/* Cỡ chữ, độ đậm khớp LEVELS.font trong basinLayer.js (đo bề rộng để tránh chồng nhãn) */
 .basin-label span {
   position: absolute; transform: translate(-50%, -50%); white-space: nowrap; cursor: pointer;
-  color: #f8fafc; font-size: 12px; font-weight: 700; letter-spacing: .2px;
-  text-shadow: 0 0 3px #0f172a, 0 0 6px #0f172a, 0 1px 2px #0f172a;
+  color: #f8fafc; font-size: 12.5px; font-weight: 700; font-style: italic; letter-spacing: .3px;
+  text-shadow: 0 0 2px rgba(15, 23, 42, .95), 0 0 5px rgba(15, 23, 42, .7);
 }
-.basin-label-sub span { color: #fde68a; font-size: 10.5px; font-weight: 600; }
-.basin-label-low span { color: #bae6fd; font-size: 10.5px; font-weight: 600; }
+.basin-label span:hover { text-decoration: underline; }
+.basin-label-sub span { color: #fde68a; font-size: 11px; font-weight: 600; letter-spacing: .1px; }
+.basin-label-low span { color: #bae6fd; font-size: 10.5px; font-weight: 600; letter-spacing: 0; }
 .basin-note { margin-top: 5px; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.35; }
 .flood-box { margin: 0 6px 6px 22px; font-size: var(--fs-xs); color: var(--text-muted); }
 .flood-level { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }

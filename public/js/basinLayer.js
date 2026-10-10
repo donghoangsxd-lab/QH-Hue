@@ -1,7 +1,9 @@
 // Lớp "Lưu vực, đường phân thủy": drainage/luuvuc.topojson trên bucket (scripts/push-luuvuc.js, tính từ FABDEM cùng nguồn
-// lớp thoát nước). 3 cấp: lưu vực sông (nét đứt trắng viền tối), tiểu lưu vực (nét đứt vàng), ô tiêu nước vùng thấp
-// dưới +10 m (chấm xanh) — vùng thấp không có đường phân thủy địa hình đáng tin nên ranh lấy theo sông, kênh bao quanh.
-// Cạnh chung của 2 vùng là 1 cung: vẽ 1 lần theo cấp cao nhất dùng cung đó.
+// lớp thoát nước). 3 cấp vùng: lưu vực sông, tiểu lưu vực (lồng trong lưu vực sông), ô tiêu nước vùng thấp dưới +10 m —
+// vùng thấp không có đường phân thủy địa hình đáng tin nên ranh lấy theo sông, kênh bao quanh.
+// Kiểu nét theo vùng ở 2 phía cung, không theo cấp của vùng: chỉ cung giữa 2 lưu vực sông (hoặc 2 tiểu lưu vực) là đường
+// phân thủy; mép cắt +10 m giáp ô tiêu nước vẽ như ranh ô, mép ngoài vùng đồi vẽ mảnh mờ.
+// Cung làm mềm Chaikin giữ nguyên 2 đầu (điểm nút) nên các vùng vẫn khép kín, không hở.
 // Nét không nhận click để bên trong lưu vực vẫn tra cứu bản đồ bình thường; bấm nhãn tên để xem thông tin và tô sáng lưu vực.
 import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
@@ -10,38 +12,78 @@ import { escapeHtml } from './utils.js';
 
 const $ = (id) => document.getElementById(id);
 
+// font: [độ đậm, cỡ chữ px] — khớp .basin-label-* trong style.css để đo bề rộng nhãn khi tránh chồng
 const LEVELS = {
   1: {
-    key: 'major', title: 'Lưu vực', short: 'LV', kind: 'Lưu vực sông', lineZoom: 0, labelZoom: 0,
-    line: { color: '#f8fafc', weight: 2.4, dashArray: '9 6' },
-    halo: { color: '#0f172a', opacity: 0.55, weight: 5 },
+    key: 'major', title: 'Lưu vực', short: 'LV', kind: 'Lưu vực sông', labelZoom: 0, font: [700, 12.5],
+    fill: '#f8fafc',
     note: 'Đường phân thủy tính từ cao độ nền FABDEM 30 m.'
   },
   2: {
-    key: 'sub', title: 'Tiểu lưu vực', short: 'TLV', kind: 'Tiểu lưu vực', lineZoom: 11, labelZoom: 13,
-    line: { color: '#facc15', weight: 1.5, dashArray: '5 5', opacity: 0.9 },
-    halo: { color: '#0f172a', opacity: 0.4, weight: 3.5 },
+    key: 'sub', title: 'Tiểu lưu vực', short: 'TLV', kind: 'Tiểu lưu vực', labelZoom: 12, font: [600, 11],
+    fill: '#facc15',
     note: 'Đường phân thủy tính từ cao độ nền FABDEM 30 m.'
   },
   3: {
-    key: 'low', title: 'Ô tiêu nước', short: 'Ô', kind: 'Ô tiêu nước vùng thấp', lineZoom: 0, labelZoom: 12,
-    line: { color: '#38bdf8', weight: 2, dashArray: '1 5', opacity: 0.95 },
+    key: 'low', title: 'Ô tiêu nước', short: 'Ô', kind: 'Ô tiêu nước vùng thấp', labelZoom: 14, font: [600, 10.5],
+    fill: '#38bdf8',
     note: 'Vùng thấp dưới +10 m: ranh theo sông, kênh bao quanh; nước tiêu ra các sông, kênh này qua cống, trạm bơm.'
   }
 };
 
-/** TopoJSON → { arcs: [[lat, lng]…], level: cấp cao nhất dùng mỗi cung (1 sông, 2 tiểu, 3 vùng thấp), basins } */
+// Thứ tự vẽ dưới → trên
+const ARC_STYLES = {
+  edge: { zoom: 10, line: { color: '#f8fafc', weight: 1, opacity: 0.35 } },
+  low: { zoom: 12, line: { color: '#38bdf8', weight: 1.8, dashArray: '1 5', opacity: 0.85 } },
+  sub: {
+    zoom: 11,
+    halo: { color: '#0f172a', opacity: 0.35, weight: 3.2 },
+    line: { color: '#facc15', weight: 1.4, dashArray: '5 5', opacity: 0.95 }
+  },
+  major: {
+    zoom: 0,
+    halo: { color: '#0f172a', opacity: 0.4, weight: 4.5 },
+    line: { color: '#f8fafc', weight: 2.2, dashArray: '10 6' }
+  }
+};
+const SMOOTH_ITER = 2;
+const LABEL_PAD = 4;
+
+/** Làm mềm Chaikin, giữ điểm đầu và cuối */
+function chaikin(pts, iter) {
+  let p = pts;
+  for (let k = 0; k < iter && p.length > 2; k++) {
+    const out = [p[0]];
+    for (let i = 0; i < p.length - 1; i++) {
+      const a = p[i], b = p[i + 1];
+      out.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+    }
+    out.push(p[p.length - 1]);
+    p = out;
+  }
+  return p;
+}
+
+/** Kiểu nét của cung theo số vùng mỗi cấp dùng cung (vùng lồng nhau nên 1 phía có thể có cả lưu vực sông lẫn tiểu lưu vực) */
+function arcClass(n) {
+  if (n[1] >= 2) return 'major';
+  if (n[2] >= 2) return 'sub';
+  if (n[3] >= 1) return 'low';
+  return 'edge';
+}
+
+/** TopoJSON → { arcs: [[lat, lng]…] đã làm mềm, cls: kiểu nét mỗi cung, basins } */
 function decodeTopo(topo) {
   const tf = topo.transform;
   const arcs = (topo.arcs || []).map(arc => {
     let x = 0, y = 0;
-    return arc.map(p => {
+    return chaikin(arc.map(p => {
       if (!tf) return [p[1], p[0]];
       x += p[0]; y += p[1];
       return [y * tf.scale[1] + tf.translate[1], x * tf.scale[0] + tf.translate[0]];
-    });
+    }), SMOOTH_ITER);
   });
-  const level = new Array(arcs.length).fill(0);
+  const uses = arcs.map(() => [0, 0, 0, 0]);
   const obj = topo.objects && (topo.objects.data || Object.values(topo.objects)[0]);
   const basins = [];
   (obj && obj.geometries || []).forEach(g => {
@@ -49,9 +91,12 @@ function decodeTopo(topo) {
     if (!polys.length) return;
     const p = g.properties || {};
     const cap = LEVELS[p.cap] ? Number(p.cap) : 2;
+    const seen = new Set();
     polys.forEach(rings => rings.forEach(ring => ring.forEach(i => {
       const a = i < 0 ? ~i : i;
-      if (!level[a] || cap < level[a]) level[a] = cap;
+      if (seen.has(a)) return;
+      seen.add(a);
+      uses[a][cap]++;
     })));
     basins.push({
       cap,
@@ -65,7 +110,7 @@ function decodeTopo(topo) {
       lp: Array.isArray(p.lp) ? [p.lp[1], p.lp[0]] : null
     });
   });
-  return { arcs, level, basins };
+  return { arcs, cls: uses.map(arcClass), basins };
 }
 
 function ringLatLngs(arcs, ring) {
@@ -123,26 +168,30 @@ function createView(m) {
   if (!m.getPane('basinLabelPane')) m.createPane('basinLabelPane').style.zIndex = '590';
   const renderer = L.canvas({ pane: 'basinPane', padding: 0.3 });
   const line = (latlngs, style) => L.polyline(latlngs, { renderer, interactive: false, lineCap: 'round', lineJoin: 'round', ...style });
-  const groups = {};
-  Object.entries(LEVELS).forEach(([cap, lv]) => {
-    const arcs = data.arcs.filter((_, i) => data.level[i] === Number(cap));
-    groups[cap] = {
-      lv,
-      lines: arcs.length ? L.layerGroup([...(lv.halo ? [line(arcs, lv.halo)] : []), line(arcs, lv.line)]) : null,
-      labels: L.layerGroup()
+  const arcGroups = Object.entries(ARC_STYLES).map(([cls, st]) => {
+    const arcs = data.arcs.filter((_, i) => data.cls[i] === cls);
+    return {
+      zoom: st.zoom,
+      layer: arcs.length ? L.layerGroup([...(st.halo ? [line(arcs, st.halo)] : []), line(arcs, st.line)]) : null
     };
   });
+  const labels = L.layerGroup();
   const highlight = L.layerGroup();
 
+  const family = getComputedStyle(m.getContainer()).fontFamily || 'sans-serif';
+  const ctx = document.createElement('canvas').getContext('2d');
+  const items = [];
   data.basins.forEach(b => {
     if (!b.lp) return;
     const lv = LEVELS[b.cap];
+    const text = labelOf(b);
+    ctx.font = `italic ${lv.font[0]} ${lv.font[1]}px ${family}`;
     const marker = L.marker(b.lp, {
       pane: 'basinLabelPane',
       keyboard: false,
       icon: L.divIcon({
         className: `basin-label basin-label-${lv.key}`,
-        html: `<span title="${escapeHtml(titleOf(b))}">${escapeHtml(labelOf(b))}</span>`,
+        html: `<span title="${escapeHtml(titleOf(b))}">${escapeHtml(text)}</span>`,
         iconSize: null
       })
     });
@@ -150,33 +199,48 @@ function createView(m) {
     marker.on('popupopen', () => {
       highlight.clearLayers();
       L.polygon(b.polys.map(rings => rings.map(r => ringLatLngs(data.arcs, r))), {
-        renderer, interactive: false, color: lv.line.color, weight: lv.line.weight + 1.5, fillColor: lv.line.color, fillOpacity: 0.14
+        renderer, interactive: false, color: lv.fill, weight: 2.5, fillColor: lv.fill, fillOpacity: 0.14
       }).addTo(highlight);
     });
     marker.on('popupclose', () => highlight.clearLayers());
-    groups[b.cap].labels.addLayer(marker);
+    items.push({ b, lv, marker, w: ctx.measureText(text).width + 2 * LABEL_PAD, h: lv.font[1] + 2 * LABEL_PAD });
   });
+  // Ưu tiên giữ nhãn: lưu vực sông → tiểu lưu vực → ô tiêu nước, cùng cấp thì vùng lớn trước
+  items.sort((a, c) => a.b.cap - c.b.cap || c.b.km2 - a.b.km2);
 
-  const toggle = (layer, on) => {
+  const toggle = (layer, on, parent = m) => {
     if (!layer) return;
-    if (on && !m.hasLayer(layer)) layer.addTo(m);
-    else if (!on && m.hasLayer(layer)) m.removeLayer(layer);
+    if (on && !parent.hasLayer(layer)) parent.addLayer(layer);
+    else if (!on && parent.hasLayer(layer)) parent.removeLayer(layer);
+  };
+  /** Nhãn chồng lên nhãn ưu tiên hơn thì ẩn; tính lại mỗi lần đổi mức phóng (tọa độ pixel tuyệt đối không đổi khi kéo) */
+  const placeLabels = (z) => {
+    const boxes = [];
+    items.forEach(it => {
+      let show = z >= it.lv.labelZoom;
+      if (show) {
+        const p = m.project(it.b.lp, z);
+        const r = [p.x - it.w / 2, p.y - it.h / 2, p.x + it.w / 2, p.y + it.h / 2];
+        show = !boxes.some(o => r[0] < o[2] && r[2] > o[0] && r[1] < o[3] && r[3] > o[1]);
+        if (show) boxes.push(r);
+      }
+      toggle(it.marker, show, labels);
+    });
   };
   const update = () => {
     const z = m.getZoom();
-    Object.values(groups).forEach(g => {
-      toggle(g.lines, z >= g.lv.lineZoom);
-      toggle(g.labels, z >= g.lv.labelZoom);
-    });
+    arcGroups.forEach(g => toggle(g.layer, z >= g.zoom));
+    placeLabels(z);
   };
   highlight.addTo(m);
+  labels.addTo(m);
   update();
   m.on('zoomend', update);
 
   return {
     remove() {
       m.off('zoomend', update);
-      const all = Object.values(groups).flatMap(g => [g.lines, g.labels]).concat(highlight, renderer);
+      const all = arcGroups.map(g => g.layer).concat(labels, highlight, renderer);
       all.forEach(l => { if (l && m.hasLayer(l)) m.removeLayer(l); });
     }
   };
