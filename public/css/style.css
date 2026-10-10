@@ -639,6 +639,12 @@ body.right-collapsed .right-panel {
 .project-name input { accent-color: rgb(var(--project-rgb)); width: 13px; height: 13px; margin: 0 5px 0 0; flex-shrink: 0; cursor: pointer; }
 .project-name [data-focus] { min-width: 0; }
 .project-name [data-focus]:hover { color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; }
+/* Đồ án đang chọn (bấm ranh trên bản đồ / bấm tên): nền sáng + vạch trái; vừa cuộn tới thì nháy 2 lần */
+.project-row.is-picked { margin: 0 -4px; padding: 0 4px; border-radius: var(--r-sm); background: rgba(var(--cyan-rgb), 0.12); box-shadow: inset 3px 0 0 var(--accent-cyan); }
+.project-row.is-picked .project-name { color: var(--text-strong); font-weight: 700; }
+.project-row.is-flash { animation: project-flash 0.8s ease 2; }
+@keyframes project-flash { 50% { background: rgba(var(--cyan-rgb), 0.38); } }
+@media (prefers-reduced-motion: reduce) { .project-row.is-flash { animation: none; } }
 .project-tools { flex-shrink: 0; display: flex; align-items: center; }
 .project-tools .project-btn { width: 19px; }
 /* Nhãn tên đồ án giữa ranh tổng: thẻ tối 1 dòng, chấm màu đồ án; kích thước khớp LABEL_* trong projectLayer.js */
@@ -2434,8 +2440,11 @@ table.ward-table th {
 .ov-head-text { flex: 1; min-width: 0; }
 .ov-kicker { font-size: var(--fs-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ov-title { margin: 2px 0 0; font-size: calc(var(--fs-lg) * 1.3); font-weight: 800; letter-spacing: 1px; color: var(--text-strong); line-height: 1.2; }
+.ov-stage { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.ov-ver { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); letter-spacing: 0.02em; white-space: nowrap; }
+.ov-ver[hidden] { display: none; }
 .ov-beta {
-  flex-shrink: 0; display: inline-flex; align-items: center;
+  display: inline-flex; align-items: center;
   padding: 3px 9px; border-radius: 999px;
   font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.03em;
   color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.1); border: 1px solid rgba(var(--orange-rgb), 0.45);
@@ -2455,7 +2464,7 @@ table.ward-table th {
 .ov-intro > .ico { margin: 2px 0 0; color: var(--accent-cyan); }
 .ov-intro p { margin: 0; font-size: calc(var(--fs-md) * 1.08); line-height: 1.6; }
 .ov-intro b { color: var(--text-strong); }
-.ov-legend { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; margin: 10px 0 8px; font-size: var(--fs-xs); color: var(--text-muted); }
+.ov-legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-left: 12px; border-left: 1px solid var(--border-soft); font-size: var(--fs-xs); color: var(--text-muted); }
 
 .ov-badge {
   display: inline-flex; align-items: center; flex-shrink: 0;
@@ -2466,7 +2475,7 @@ table.ward-table th {
 .ov-badge.dev { color: var(--accent-orange); border-color: rgba(var(--orange-rgb), 0.45); background: rgba(var(--orange-rgb), 0.1); }
 .ov-badge.plan { color: var(--text-muted); border-color: var(--border-color); background: rgba(148, 163, 184, 0.08); }
 
-.ov-groups { columns: 2 360px; column-gap: 14px; }
+.ov-groups { columns: 2 360px; column-gap: 14px; margin-top: 12px; }
 .ov-group {
   display: inline-block; width: 100%; box-sizing: border-box;
   break-inside: avoid; margin: 0 0 14px;
@@ -2571,7 +2580,7 @@ table.ward-table th {
 .ov-foot-btns { display: flex; gap: 8px; margin-left: auto; }
 @media (max-width: 700px) {
   .ov-root { padding: 8px; }
-  .ov-beta, .ov-kicker { display: none; }
+  .ov-stage, .ov-kicker, .ov-legend { display: none; }
   .ov-item { flex-wrap: wrap; }
 }
 

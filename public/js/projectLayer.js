@@ -339,7 +339,7 @@ function renderList() {
     const decisionBtn = (p.decision || admin)
       ? `<button type="button" class="project-btn${p.decision ? ' has-decision' : ''}" data-decision="${idx}" title="${escapeHtml(decisionTitle)}" aria-label="${p.decision ? 'Xem quyết định phê duyệt' : 'Gắn quyết định phê duyệt'}"${busy ? ' disabled' : ''}>${ico(p.decision ? 'file' : 'save')}</button>`
       : '';
-    return `<div class="project-row${on ? '' : ' is-off'}">
+    return `<div class="project-row${on ? '' : ' is-off'}${p.name === pickedName ? ' is-picked' : ''}">
       <label class="project-name" title="${escapeHtml(p.name)}${p.area?.ward ? ` — ${escapeHtml(p.area.ward)}` : ''} — ${escapeHtml(metaText(p))} (${where})${tempNote}&#10;Bấm tên để phóng tới và làm sáng ranh đồ án">
         <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><span data-focus="${idx}">${idx + 1}. ${escapeHtml(p.name)}</span></label>
       <span class="project-tools">
@@ -351,6 +351,41 @@ function renderList() {
       </span>
     </div>${open ? decisionNote(p, idx) + layersHtml(p, idx, on, admin) : ''}`;
   }).join('');
+}
+
+// Đồ án đang chọn (bấm ranh trên bản đồ hoặc bấm tên): dòng trong danh sách giữ nền sáng đến khi chọn đồ án khác
+let pickedName = null;
+
+function rowOf(name) {
+  const idx = projects.findIndex(x => x.name === name);
+  return idx < 0 ? null : $('projectList')?.querySelector(`[data-focus="${idx}"]`)?.closest('.project-row') || null;
+}
+
+function markPicked(name) {
+  pickedName = name;
+  $('projectList')?.querySelectorAll('.project-row.is-picked').forEach(r => r.classList.remove('is-picked'));
+  rowOf(name)?.classList.add('is-picked');
+}
+
+// Bấm ranh đồ án trên bản đồ: mở panel Lớp dữ liệu › Quy hoạch, cuộn tới và làm nổi tên đồ án.
+// Mở panel / tab bằng nút sẵn có (logic panel nằm ở app.js); từ khóa tìm đang lọc mất đồ án thì xóa từ khóa.
+function revealInList(p) {
+  document.querySelector('.rp-tabs .tab-btn[data-tab="tabLayers"]')?.click();
+  document.querySelector('[data-main-tab="plan"]')?.click();
+  const q = foldText(query.trim());
+  if (q && !foldText(p.name).includes(q)) {
+    query = '';
+    const search = $('projectSearch');
+    if (search) search.value = '';
+    renderList();
+  }
+  markPicked(p.name);
+  const row = rowOf(p.name);
+  if (!row) return;
+  row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  row.classList.remove('is-flash');
+  void row.offsetWidth;
+  row.classList.add('is-flash');
 }
 
 function decisionNote(p, idx) {
@@ -772,6 +807,7 @@ function drawOutlinesOn(m, list, below) {
       if (passToolClick(m, e)) return;
       zoomTo(p);
       pinGlow(p);
+      revealInList(p);
     });
     group.addLayer(shape);
   });
@@ -1377,7 +1413,7 @@ export function initProjectLayer(opts = {}) {
     if (focus) {
       e.preventDefault();
       const p = projects[Number(focus.dataset.focus)];
-      if (p) { zoomTo(p); pinGlow(p); }
+      if (p) { zoomTo(p); pinGlow(p); markPicked(p.name); }
       return;
     }
     const lotBtn = e.target.closest('[data-lot]');
