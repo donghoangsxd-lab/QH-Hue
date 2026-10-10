@@ -233,14 +233,6 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
 }
 .map-title-mark .ico { margin: 0; width: 1.35em; height: 1.35em; }
 .map-title-body { min-width: 0; display: flex; flex-direction: column; justify-content: center; transform-origin: 50% 50%; }
-.map-title-kicker {
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  letter-spacing: 1.6px;
-  text-transform: uppercase;
-  color: rgb(var(--tone));
-  line-height: 1.2;
-}
 .map-title-text {
   margin: 0;
   font-size: calc(var(--fs-lg) * 1.12);
@@ -300,7 +292,7 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
 body.compare-on .map-title-flip { display: none; }
 body.compare-on .map-title-split { display: inline-flex; }
 @media (max-width: 1100px) {
-  .map-title-kicker, .map-title-flip-text { display: none; }
+  .map-title-flip-text { display: none; }
   .map-title-flip { padding: 0 8px; }
 }
 
@@ -834,6 +826,8 @@ body.right-collapsed .right-panel {
 .route-card { position: relative; padding-left: 20px !important; }
 .route-card[data-route] { cursor: pointer; }
 .route-card[data-route]:hover { border-color: var(--accent-cyan); }
+.route-card .js-lot:empty { display: none; }
+.plan-tag { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; line-height: 1.5; white-space: nowrap; vertical-align: 1px; color: var(--tag); border: 1px solid var(--tag); background: color-mix(in srgb, var(--tag) 14%, transparent); }
 .route-dot { position: absolute; left: 7px; top: 9px; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
 
 /* ĐỀ XUẤT MỚI: lưới 2 cột nhãn | ô nhập */

@@ -7,7 +7,7 @@ import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
 } from './mapEngine.js';
-import { planMap, onCompareChange } from './planMap.js';
+import { planMap, onCompareChange, passToolClick } from './planMap.js';
 import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { geeApi, markDataWritten } from './api.js';
@@ -366,7 +366,6 @@ function layerCount(g) {
     if (!g.present) return { short: 'chưa có', full: 'Chưa có ranh — đang dùng ranh tạm (bao lồi). Nhập file ranh giới để có ranh đúng.' };
     return g.source === 'gis' ? { short: 'GIS', full: 'Ranh từ file GIS' } : { short: 'tự dựng', full: 'Ranh tự dựng từ các lô' };
   }
-  if (g.kind === 'points') return { short: g.present ? fmtNum(g.count) : 'trống', full: g.present ? `${fmtNum(g.count)} điểm` : 'Chưa có điểm' };
   if (!g.present) return { short: 'trống', full: 'Chưa có lô' };
   const parts = [g.lands ? `${fmtNum(g.lands)} lô đất` : '', g.infra ? `${fmtNum(g.infra)} ranh lô công trình` : ''].filter(Boolean);
   if (g.area) parts.push(`${fmtNum(Math.round(g.area / 100) / 100)} ha`);
@@ -508,7 +507,6 @@ function deleteNote(g) {
   if (g.kind === 'boundary') {
     return '• File ranh giới và ranh tổng trong danh mục bị xóa; đồ án hiện ranh tạm (bao lồi) đến khi nhập lại file ranh\n';
   }
-  if (g.kind === 'points') return `• ${g.count} điểm chức năng bị xóa khỏi file đồ án trên bucket\n`;
   const parts = [g.lands ? `${g.lands} lô đất` : '', g.infra ? `${g.infra} ranh lô công trình hạ tầng` : ''].filter(Boolean).join(' và ');
   return `• ${parts} của lớp bị xóa khỏi file đồ án trên bucket\n`
     + '• Điểm công trình hạ tầng trên Sheet giữ nguyên (xóa riêng từng công trình trên popup nếu cần)\n';
@@ -537,7 +535,7 @@ async function deleteLayer(p, g) {
     projects = collectProjects();
     await loadLayers(p, true);
     refreshAll();
-    const what = g.kind === 'boundary' ? 'ranh giới' : g.kind === 'points' ? `${data.removed} điểm` : `${data.removed} lô`;
+    const what = g.kind === 'boundary' ? 'ranh giới' : `${data.removed} lô`;
     alert(`Đã xóa lớp «${g.label}» (${what}) khỏi đồ án «${p.name}».`);
   } catch (err) {
     alert(`Không xóa được lớp: ${err.message}`);
@@ -770,8 +768,8 @@ function drawOutlinesOn(m, list, below) {
     shape.bindTooltip(escapeHtml(p.name), { sticky: true, direction: 'top', className: 'dot-tip' });
     shape.on('mouseover', () => setHover(m, p.name));
     shape.on('mouseout', () => setHover(m, null));
-    shape.on('click', () => {
-      if (state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool) return;
+    shape.on('click', (e) => {
+      if (passToolClick(m, e)) return;
       zoomTo(p);
       pinGlow(p);
     });

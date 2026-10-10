@@ -4,7 +4,7 @@
 // (Ten_QH = <mã>, khớp / gộp công trình đã có). Bản đồ đẩy lớp hiện trạng lên trước rồi lớp quy hoạch; chia đôi màn hình
 // thì hiện trạng bên trái, quy hoạch bên phải.
 import { map, layers, setReviewScope, setLandVisible } from './mapEngine.js';
-import { planMap, isCompareOn, isSplitOn, onCompareChange, toggleSplit, setSplit, setViewMode } from './planMap.js';
+import { planMap, isCompareOn, isSplitOn, onCompareChange, toggleSplit, setSplit, setViewMode, passToolClick } from './planMap.js';
 import { state, BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, layerType } from './state.js';
 import { geeApi } from './api.js';
 import { parseDxf, buildParcels, CRS_PRESETS, layerToType } from './cadImport.js';
@@ -443,6 +443,7 @@ function drawPhase(phase) {
       .bindTooltip(lotTip(lot), { sticky: true })
       .on('click', (e) => {
         L.DomEvent.stopPropagation(e);
+        if (passToolClick(m, e)) return;
         if (lot.decisionKind && !session.pendingId) { openDecision(lot.id); return; }
         focusRow(lot.ask ? `ask:${lot.layer}` : lot.role === 'score' && lot.phase === 'QH' ? `lot:${lot.id}` : `land:${lot.landKey}`, false);
       });

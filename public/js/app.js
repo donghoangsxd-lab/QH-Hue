@@ -39,7 +39,7 @@ import {
 } from './uiComponents.js';
 import {
   initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleSplit, isSplitOn,
-  getViewMode, getSplitKind, onViewChange, setViewMode, toggleViewMode, setSplitKind
+  getViewMode, getSplitKind, onViewChange, setViewMode, toggleViewMode, setSplitKind, isCompareOn
 } from './planMap.js';
 import { escapeHtml, setStatusContent, showToast } from './utils.js';
 import { initCadImport } from './cadImportUi.js';
@@ -211,14 +211,13 @@ function setStatus(text, color) {
 // Thanh tiêu đề: lật Quy hoạch ⇄ Hiện trạng, chia đôi thì chọn cùng tâm / lệch tâm.
 // Mỗi lần đổi giao diện đặt lại lớp mặc định: Quy hoạch / so sánh bật lớp đồ án, Hiện trạng tắt.
 const VIEW_TITLES = {
-  QH: ['Giao diện đồ án quy hoạch', 'BẢN ĐỒ QUY HOẠCH HẠ TẦNG THÀNH PHỐ HUẾ'],
-  HT: ['Giao diện công trình hiện trạng', 'BẢN ĐỒ HIỆN TRẠNG HẠ TẦNG THÀNH PHỐ HUẾ'],
-  split: ['So sánh hiện trạng | quy hoạch', 'SO SÁNH HIỆN TRẠNG – QUY HOẠCH HẠ TẦNG THÀNH PHỐ HUẾ']
+  QH: 'BẢN ĐỒ QUY HOẠCH ĐÔ THỊ THÀNH PHỐ HUẾ',
+  HT: 'BẢN ĐỒ HIỆN TRẠNG HẠ TẦNG THÀNH PHỐ HUẾ',
+  split: 'SO SÁNH HIỆN TRẠNG – QUY HOẠCH HẠ TẦNG THÀNH PHỐ HUẾ'
 };
 function initMapTitle() {
   const root = document.getElementById('mapTitle');
   if (!root) return;
-  const kicker = document.getElementById('mapTitleKicker');
   const text = document.getElementById('mapTitleText');
   const flip = document.getElementById('btnFlipView');
   const flipText = flip?.querySelector('.map-title-flip-text');
@@ -232,8 +231,7 @@ function initMapTitle() {
   const paint = ({ view, split, kind }) => {
     const key = split ? 'split' : view;
     root.dataset.view = key;
-    const [sub, title] = VIEW_TITLES[key];
-    if (kicker) kicker.textContent = split ? `${sub} · ${kind === 'offset' ? 'lệch tâm' : 'cùng tâm'}` : sub;
+    const title = VIEW_TITLES[key];
     if (text) {
       text.textContent = title;
       text.title = title;
@@ -724,7 +722,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             .bindPopup(`<b>Vị trí hiện tại của bạn</b><br/>${escapeHtml(lat.toFixed(5))}, ${escapeHtml(lng.toFixed(5))}`)
             .addTo(g);
         });
-        handleInspectPointClick(lat, lng);
+        handleInspectPointClick(lat, lng, isCompareOn() && !isSplitOn() && planMap ? planMap : map);
       },
       () => showToast('Không thể lấy được vị trí GPS của bạn.', 'error'),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }

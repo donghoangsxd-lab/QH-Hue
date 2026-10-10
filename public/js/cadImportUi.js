@@ -1677,34 +1677,6 @@ function projectRegistry(items, lands) {
   };
 }
 
-function buildStoredPoints() {
-  const src = current && current.points;
-  if (!src || !Array.isArray(src.entities)) return null;
-  const crs = CRS_PRESETS[src.crs] || CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
-  const out = [];
-  src.entities.forEach(e => {
-    if (!e || e.kind !== 'POINT' || !Array.isArray(e.pt) || !String(e.name || '').trim()) return;
-    const x = Number(e.pt[0]);
-    const y = Number(e.pt[1]);
-    let lat;
-    let lng;
-    if (src.wgs84) { lng = x; lat = y; }
-    else {
-      const ll = vn2000ToWgs84(x, y, crs);
-      lat = ll[0];
-      lng = ll[1];
-    }
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    out.push({
-      name: String(e.name || '').slice(0, 150),
-      layer: String(e.layer || '').slice(0, 60),
-      lat: Math.round(lat * 1e6) / 1e6,
-      lng: Math.round(lng * 1e6) / 1e6
-    });
-  });
-  return out;
-}
-
 // Lô đất gửi thành các phần riêng sau lô hạ tầng. Phần đất đầu xóa lô cũ cùng giai đoạn (HT hoặc QH), không xóa giai đoạn kia.
 function buildChunks(items, lands) {
   const phaseReset = current.filePhase === 'QH' || current.filePhase === 'HT' ? current.filePhase : true;
@@ -1716,16 +1688,6 @@ function buildChunks(items, lands) {
   }));
   const chunks = [...itemChunks, ...landChunks];
   if (!landChunks.length && chunks.length) chunks[0].landsReset = phaseReset;
-  const points = buildStoredPoints();
-  if (points && chunks.length) {
-    let best = 0;
-    let bestLen = Infinity;
-    chunks.forEach((c, i) => {
-      const len = JSON.stringify(c).length;
-      if (len < bestLen) { best = i; bestLen = len; }
-    });
-    chunks[best].points = points;
-  }
   return chunks;
 }
 

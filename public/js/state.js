@@ -37,8 +37,6 @@ export const state = {
   hiddenProjects: new Set(),
   // Lớp chính người dùng tắt trong từng đồ án: "<Ten_QH>|<key PROJECT_LAYERS>" (lưu localStorage)
   hiddenProjectLayers: new Set(),
-  // Điểm chức năng các đồ án đang vẽ: [{ name, layer, lat, lng, file: Ten_QH }]
-  projectPoints: [],
   wardStatsData: [],
   // Chỉ tiêu mạng lưới toàn TP (getWardStats): { HT, QH } — số nhà tang lễ, diện tích nghĩa trang so với dân số
   cityNetwork: null,

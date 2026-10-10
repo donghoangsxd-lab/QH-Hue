@@ -877,8 +877,9 @@ function listen(port, dir, opts) {
   console.log(JSON.stringify({ listen: `http://127.0.0.1:${port}/dump`, script: `http://127.0.0.1:${port}/fetch.js`, dir, out: o.out || null, count: o.count || null }));
 }
 
+// Windows bỏ dấu chấm / khoảng trắng cuối tên thư mục → thư mục tạo ra không mở được, phải cắt trước
 function safeDirName(s) {
-  return String(s).replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').trim();
+  return String(s).replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/[.\s]+$/, '').trim();
 }
 
 function main() {

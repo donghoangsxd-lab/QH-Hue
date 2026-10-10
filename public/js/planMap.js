@@ -122,6 +122,22 @@ export function syncAllPlanLayers() {
   Object.keys(planLayers).forEach(syncPlanLayer);
 }
 
+/**
+ * Lô, ranh đồ án, icon công trình chặn click lan lên bản đồ (bubblingMouseEvents: false). Đang đo / ghim / vẽ thì chuyển
+ * click cho bản đồ m (app.js xử lý). Tra cứu chỉ chuyển click trên vùng (area): bấm icon công trình vẫn mở bảng công trình.
+ * Trả true khi click đã được xử lý theo công cụ (nơi gọi bỏ hành vi riêng của lô / icon).
+ */
+export function passToolClick(m, e, area = true) {
+  if (state.lotShapeEdit) return true;
+  const tool = state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool || (area && state.isInspectMode);
+  if (!tool) return false;
+  if (m && e && e.latlng) {
+    const ev = { latlng: e.latlng, layerPoint: e.layerPoint, containerPoint: e.containerPoint, originalEvent: e.originalEvent };
+    m.fire('preclick', ev).fire('click', ev);
+  }
+  return true;
+}
+
 export function renderPlanBoundaries() {
   const group = planLayers.boundary;
   group.clearLayers();

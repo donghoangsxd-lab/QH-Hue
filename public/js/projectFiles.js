@@ -1,6 +1,7 @@
 // Tải ranh lô theo đồ án: mở bản đồ chỉ có danh mục. File một đồ án tải khi zoom ≥ ngưỡng lô và ranh tổng giao khung nhìn,
 // khi bật ranh lô công trình, khi bấm phóng tới, hoặc khi bật lớp lô đã lưu (showLand).
-// Đồ án thư mục (dir) đọc hien-trang.json + su-dung-dat.json + diem-chuc-nang.json. Đồ án file gộp cũ đọc projects/<slug>.json.
+// Đồ án thư mục (dir) đọc hien-trang.json + su-dung-dat.json. Đồ án file gộp cũ đọc projects/<slug>.json.
+// Điểm chức năng chỉ dùng gợi tên lô lúc nhập, không tải / không vẽ (diem-chuc-nang.json cũ trên bucket bỏ qua).
 // Đồ án chưa chuyển đọc qua API. URL bucket do máy chủ trả về (?v= phiên bản trong danh mục).
 import { state } from './state.js';
 import { geeApi } from './api.js';
@@ -66,12 +67,10 @@ function wantsWard() {
   return wardLotsOn() || wardLandsOn();
 }
 
-// Lớp dữ liệu chính của đồ án, mỗi lớp = 1 file projects/<slug>/<key>.json. 3 lớp QH nhập từ bộ shapefile
-// (vùng sử dụng đất, điểm chức năng, ranh giới) + lớp hiện trạng (file HT-). Lớp mới (cấp điện, cấp nước…)
-// thêm 1 dòng ở đây và ở LAYER_ROLES (services/projectStore.js).
+// Lớp dữ liệu chính của đồ án, mỗi lớp = 1 file projects/<slug>/<key>.json: 2 lớp QH (vùng sử dụng đất, ranh giới)
+// + lớp hiện trạng (file HT-). Lớp mới (cấp điện, cấp nước…) thêm 1 dòng ở đây và ở LAYER_ROLES (services/projectStore.js).
 export const PROJECT_LAYERS = [
   { key: 'su-dung-dat', phase: 'QH', kind: 'lots', label: 'Sử dụng đất quy hoạch', color: '#fb923c' },
-  { key: 'diem-chuc-nang', phase: 'QH', kind: 'points', label: 'Điểm chức năng', color: '#facc15' },
   { key: 'ranh-gioi', phase: 'QH', kind: 'boundary', label: 'Ranh giới quy hoạch', color: '#e879f9' },
   { key: 'hien-trang', phase: 'HT', kind: 'lots', label: 'Sử dụng đất hiện trạng', color: '#22d3ee' }
 ];
@@ -83,9 +82,6 @@ export const PROJECT_INFO_EVENT = 'qh:project-info';
 export const layerKey = (tenQH, key) => `${tenQH}|${key}`;
 export const isLayerHidden = (tenQH, key) => state.hiddenProjectLayers.has(layerKey(tenQH, key));
 
-// Điểm chức năng không tên (cây, cột đèn… của lớp điểm gServer không có cột tên) không mang thông tin: bỏ khi tải
-const namedPoints = (list) => (Array.isArray(list) ? list.filter(p => p && String(p.name || '').trim()) : []);
-
 async function fetchRole(entry, role) {
   const res = await fetch(`${base}${entry.slug}/${role}.json?v=${entry.saved || 0}`);
   if (res.status === 404) return null;
@@ -94,15 +90,8 @@ async function fetchRole(entry, role) {
 }
 
 async function loadDir(entry) {
-  const [ht, qh, pts] = await Promise.all([
-    fetchRole(entry, LOT_LAYER.HT),
-    fetchRole(entry, LOT_LAYER.QH),
-    fetchRole(entry, 'diem-chuc-nang').catch(err => { console.warn(`Không đọc điểm chức năng «${entry.tenQH}»:`, err); return null; })
-  ]);
-  return {
-    parcels: [...((ht && ht.parcels) || []), ...((qh && qh.parcels) || [])],
-    points: namedPoints(pts && pts.points)
-  };
+  const [ht, qh] = await Promise.all([fetchRole(entry, LOT_LAYER.HT), fetchRole(entry, LOT_LAYER.QH)]);
+  return { parcels: [...((ht && ht.parcels) || []), ...((qh && qh.parcels) || [])] };
 }
 
 async function loadEntry(entry) {
@@ -135,7 +124,7 @@ async function loadEntry(entry) {
   const res = await fetch(geeApi(q));
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
-  const row = { saved: entry.saved || 0, legacy: !!entry.legacy, parcels: data.parcels || [], points: namedPoints(data.points) };
+  const row = { saved: entry.saved || 0, legacy: !!entry.legacy, parcels: data.parcels || [] };
   cache.set(entry.tenQH, row);
   return row;
 }
@@ -169,7 +158,6 @@ export function composeNow() {
   const next = new Map(ward.loaded && wardLotsOn() ? ward.map : []);
   const lands = ward.loaded && wardLandsOn() ? ward.lands.slice() : [];
   const infra = [];
-  const points = [];
   wanted().forEach(entry => {
     const got = cache.get(entry.tenQH);
     if (!got) return;
@@ -185,13 +173,9 @@ export function composeNow() {
       next.set(`${phase}|${p.id}`, { geometry: p.geometry, layer: p.layer || '', file: entry.tenQH });
       infra.push({ id: p.id, phase, layer: p.layer || '', area: p.area ?? null, geometry: p.geometry, file: entry.tenQH });
     });
-    if (got.points && got.points.length && !isLayerHidden(entry.tenQH, 'diem-chuc-nang')) {
-      got.points.forEach(pt => points.push({ name: pt.name || '', layer: pt.layer || '', lat: pt.lat, lng: pt.lng, file: entry.tenQH }));
-    }
   });
   state.cadParcels = next;
   state.landParcels = lands;
-  state.projectPoints = points;
   state.projectInfraLots = infra;
   state.projectInfraFiles = new Set(infra.map(l => l.file));
 }
@@ -224,6 +208,35 @@ export async function lotKeysOf(tenQHs) {
     } catch (err) { console.warn(`Không tải lô đồ án «${entry.tenQH}»:`, err); }
   });
   return keys;
+}
+
+/**
+ * Ranh lô công trình id theo thứ tự giai đoạn phases → { geometry, layer, file, phase } | null. Mỗi giai đoạn tìm lô đang vẽ,
+ * file đồ án tenQH rồi lô theo phường; chỉ đọc bộ nhớ đệm / tải file, không đổi lớp đang vẽ.
+ */
+export async function infraLotOf(id, tenQH, phases = ['QH', 'HT']) {
+  if (!id) return null;
+  const entry = tenQH && state.projectCatalog.find(p => p && !p.sheetOnly && p.tenQH === tenQH);
+  let row = null;
+  let wardTried = false;
+  for (const ph of phases) {
+    const key = `${ph}|${id}`;
+    if (state.cadParcels.has(key)) return { ...state.cadParcels.get(key), phase: ph };
+    if (entry && !row) {
+      row = await loadEntry(entry).catch(err => {
+        console.warn(`Không tải lô đồ án «${entry.tenQH}»:`, err);
+        return { parcels: [] };
+      });
+    }
+    const p = row && row.parcels.find(x => x && x.id === id && x.kind !== 'DXF' && x.geometry && (x.phase === 'QH' ? 'QH' : 'HT') === ph);
+    if (p) return { geometry: p.geometry, layer: p.layer || '', file: entry.tenQH, phase: ph };
+    if (!wardTried) {
+      wardTried = true;
+      await ensureWard(true).catch(err => console.warn('Không tải lô theo phường:', err));
+    }
+    if (ward.map.has(key)) return { ...ward.map.get(key), phase: ph };
+  }
+  return null;
 }
 
 // Admin vừa sửa 1 lô đất: chép vào bản đã tải, đổi saved để lần đọc sau khớp danh mục (không tải lại file đồ án).
@@ -306,8 +319,6 @@ export async function projectLayersOf(tenQH) {
         out.area += Number(p.area) || 0;
       });
       out.count = out.lands + out.infra;
-    } else if (def.kind === 'points') {
-      out.count = (row.points || []).length;
     } else if (def.kind === 'boundary') {
       out.count = entry.boundary ? 1 : 0;
       out.source = entry.boundary ? (entry.boundarySource === 'gis' ? 'gis' : 'auto') : null;
@@ -329,7 +340,6 @@ export function removeCachedLayer(tenQH, key, saved, counts) {
   const row = cache.get(tenQH);
   if (row && def) {
     if (def.kind === 'lots') row.parcels = row.parcels.filter(p => !(p && (p.phase === 'QH' ? 'QH' : 'HT') === def.phase));
-    if (def.kind === 'points') row.points = [];
     if (saved) row.saved = saved;
   }
   const entry = state.projectCatalog.find(p => p && p.tenQH === tenQH);
