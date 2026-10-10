@@ -2016,20 +2016,23 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     parts.push(`<tr class="wt-empty"><td>-</td><td colspan="7">Không có công trình nhóm 1–8 đang chờ duyệt trong phường.</td></tr>`);
   }
 
-  // D / CÁC CƠ SỞ CHƯA SỬ DỤNG
-  sectionHeader('D', 'd', 'CÁC CƠ SỞ CHƯA SỬ DỤNG');
+  // D / CÁC CƠ SỞ CHƯA SỬ DỤNG — khu đất quy hoạch giữ lại, gợi ý chuyển đổi căn cứ quy mô / độ phủ theo quy hoạch
+  sectionHeader('D', 'd', 'CÁC CƠ SỞ CHƯA SỬ DỤNG (ĐỀ XUẤT CHUYỂN ĐỔI THEO QUY HOẠCH)');
   const csdList = wardData.csdItems || [];
   if (csdList.length > 0) {
     csdList.forEach((csd, csdIdx) => {
       const needApprove = csd.needsApproval || !isApproved(csd.status);
       const needApproveNote = needApprove ? `<div class="wt-need-approve">(Cần phê duyệt)</div>` : '';
+      const commercial = (csd.suggestions || []).find(s => s.status === 'commercial');
       const eligibleSugg = (csd.suggestions || []).filter(s => s.status === 'eligible');
-      const suggestionHtml = eligibleSugg.length > 0
-        ? eligibleSugg.slice(0, 2).map((s, idx) => s.basis === 'scale'
-          ? `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bù thiếu quy mô: phường đạt <b class="c-red">${fmtPct(s.currentScalePct)}</b> → <b class="c-green">${fmtPct(Math.min(100, s.currentScalePct + s.scaleAddPct))}</b>, độ phủ không tăng).</div>`
-          : `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bổ sung <b class="c-green">${fmtPct(s.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(s.coverageAddPct)}</b> độ phủ${s.coverageMethod === 'estimate' ? ', ước lượng' : ''}${capacityNote(s)}).</div>`
-        ).join('')
-        : `<div class="c-muted"><i>Chưa có gợi ý phù hợp</i></div>`;
+      const suggestionHtml = commercial
+        ? `<div>Đề xuất: <b class="c-orange">${escapeHtml(commercial.label)}</b> (${escapeHtml(commercial.note || '')}).</div>`
+        : eligibleSugg.length > 0
+          ? eligibleSugg.slice(0, 2).map((s, idx) => s.basis === 'scale'
+            ? `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bù thiếu quy mô: theo quy hoạch phường đạt <b class="c-red">${fmtPct(s.currentScalePct)}</b> → <b class="c-green">${fmtPct(Math.min(100, s.currentScalePct + s.scaleAddPct))}</b>, độ phủ không tăng).</div>`
+            : `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bổ sung <b class="c-green">${fmtPct(s.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(s.coverageAddPct)}</b> độ phủ${s.coverageMethod === 'estimate' ? ', ước lượng' : ''}${capacityNote(s)}).</div>`
+          ).join('')
+          : `<div class="c-muted"><i>Chưa có gợi ý phù hợp</i></div>`;
 
       parts.push(`<tr class="wt-item wt-top">
         <td>${csdIdx + 1}</td>

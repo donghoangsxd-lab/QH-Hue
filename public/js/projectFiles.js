@@ -67,6 +67,31 @@ function wantsWard() {
   return wardLotsOn() || wardLandsOn();
 }
 
+// Diện tích ranh tổng (m²) theo danh mục, để vẽ đồ án lớn dưới, đồ án nhỏ lồng bên trong nằm trên.
+// Đồ án chưa có ranh và lô phường (không thuộc đồ án) → Infinity (dưới cùng).
+let entryIndex = { catalog: null, byName: new Map() };
+const boundaryArea = new WeakMap();
+export function projectAreaOf(tenQH) {
+  if (entryIndex.catalog !== state.projectCatalog) {
+    entryIndex = { catalog: state.projectCatalog, byName: new Map((state.projectCatalog || []).filter(p => p && p.tenQH).map(p => [p.tenQH, p])) };
+  }
+  const g = tenQH ? entryIndex.byName.get(tenQH)?.boundary : null;
+  if (!g || typeof turf === 'undefined') return Infinity;
+  if (!boundaryArea.has(g)) {
+    let area = Infinity;
+    try { area = turf.area(turf.feature(g)); } catch (e) { /* ranh lỗi: coi như chưa có */ }
+    boundaryArea.set(g, area);
+  }
+  return boundaryArea.get(g);
+}
+
+/** So sánh để sort: đồ án diện tích lớn trước (vẽ trước = nằm dưới) */
+export function byProjectAreaDesc(a, b) {
+  const x = projectAreaOf(a);
+  const y = projectAreaOf(b);
+  return x === y ? 0 : x < y ? 1 : -1;
+}
+
 // Lớp dữ liệu chính của đồ án, mỗi lớp = 1 file projects/<slug>/<key>.json: 2 lớp QH (vùng sử dụng đất, ranh giới)
 // + lớp hiện trạng (file HT-). Lớp mới (cấp điện, cấp nước…) thêm 1 dòng ở đây và ở LAYER_ROLES (services/projectStore.js).
 export const PROJECT_LAYERS = [

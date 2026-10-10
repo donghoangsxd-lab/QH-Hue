@@ -8,7 +8,7 @@ import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
 } from './mapEngine.js';
 import { planMap, onCompareChange, passToolClick } from './planMap.js';
-import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT } from './projectFiles.js';
+import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc } from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
@@ -23,8 +23,9 @@ const GAP_M = 15;
 const BOUNDARY_MAX_CHARS = 45000;
 // Quá số lô này thì hợp ranh quá chậm trên trình duyệt → dùng bao lồi
 const EXACT_MAX_LOTS = 4000;
-// Màu viền / nền do assignColors gán theo đồ án; nền mờ 10% ở mọi mức zoom
-const OUTLINE_STYLE = { weight: 1.6, opacity: 0.9, dashArray: '6 4', fillOpacity: 0.1 };
+// Màu viền / nền do assignColors gán theo đồ án; nền mờ 10% ở mọi mức zoom.
+// nonzero: ranh có mảnh trùng nhau vẫn tô kín (evenodd mặc định khoét thành lỗ, rê / bấm bên trong không trúng)
+const OUTLINE_STYLE = { weight: 1.6, opacity: 0.9, dashArray: '6 4', fillOpacity: 0.1, fillRule: 'nonzero' };
 const OUTLINE_GIS = { ...OUTLINE_STYLE, weight: 1.8, dashArray: null };
 const OUTLINE_HULL = { ...OUTLINE_STYLE, dashArray: '2 5' };
 // Bảng màu dịu, đọc rõ trên ảnh vệ tinh; đồ án có khung bao giao nhau không trùng màu
@@ -104,11 +105,22 @@ function fitSize(geom) {
   return hull ? { type: hull.type, coordinates: round6(hull.coordinates) } : null;
 }
 
+// File GIS có đối tượng ranh lặp / chồng nhau → hợp thành 1 vùng (mảnh trùng làm sai diện tích và hướng tô nền)
+function dissolveParts(g) {
+  if (!g || g.type !== 'MultiPolygon' || g.coordinates.length < 2) return g;
+  try {
+    const merged = g.coordinates.map(c => turf.polygon(c)).reduce((a, b) => safeUnion(a, b));
+    return exteriorOnly(merged.geometry) || g;
+  } catch (e) {
+    return g;
+  }
+}
+
 /** Rút gọn ranh vừa 45.000 ký tự (ô danh mục). Dùng cho ranh file GIS và ranh tự dựng. */
 export function fitBoundary(geom) {
   if (!geom || typeof turf === 'undefined') return null;
   try {
-    const bare = exteriorOnly(geom) || geom;
+    const bare = dissolveParts(exteriorOnly(geom) || geom);
     return fitSize(bare);
   } catch (e) {
     console.warn('Không rút gọn được ranh đồ án:', e);
@@ -788,7 +800,8 @@ function drawOutlinesOn(m, list, below) {
   if (!list.length) return;
   const group = L.featureGroup();
   const shapes = [];
-  list.forEach(p => {
+  // Đồ án lớn vẽ trước (nằm dưới): đồ án nhỏ lồng trong QHPK phường nằm trên nên rê / bấm được
+  list.slice().sort((a, b) => byProjectAreaDesc(a.name, b.name)).forEach(p => {
     const geom = outlineOf(p);
     if (!geom) return;
     const base = !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE;
@@ -812,8 +825,8 @@ function drawOutlinesOn(m, list, below) {
     group.addLayer(shape);
   });
   group.addTo(m);
-  // Từ ngưỡng lô: nền mờ nằm dưới lô để không phủ màu lên ký hiệu TT16
-  shapes.forEach(s => s.bringToBack());
+  // Từ ngưỡng lô: nền mờ nằm dưới lô để không phủ màu lên ký hiệu TT16; đưa xuống từ nhỏ tới lớn để giữ thứ tự lớn dưới
+  shapes.reverse().forEach(s => s.bringToBack());
   outlineGroups.set(m, group);
   updateGlow(m);
 }

@@ -1,11 +1,14 @@
 /**
- * Minh chứng trực quan cho đề xuất chuyển đổi khu đất chưa sử dụng (CSD):
- * vùng phục vụ của khu đất, công trình cùng loại lân cận đã trừ, vùng giao còn trống và đúng các pixel dân cư đã đếm.
+ * Minh chứng trực quan cho đề xuất chuyển đổi khu đất chưa sử dụng (CSD) theo kịch bản quy hoạch:
+ * vùng phục vụ của khu đất, công trình cùng loại theo quy hoạch đã trừ, vùng giao còn trống và đúng các pixel dân cư đã đếm.
  * Mọi hình và số liệu lấy từ server (action=explainCSD) — cùng phép tính với % độ phủ trong popup / bảng phường.
+ * Khi mở, app.js (nghe PROOF_FOCUS_EVENT) tắt các lớp khác, chỉ giữ công trình cùng loại kèm ranh lô; đóng thì khôi phục.
  */
 import { state, BUFFER_COLORS } from './state.js';
 import { geeApi } from './api.js';
-import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
+import { escapeHtml, fmtNum, ico, showToast, startTaskProgress, trackTileLoad } from './utils.js';
+
+export const PROOF_FOCUS_EVENT = 'csd-proof-focus';
 
 const CANDIDATE_COLOR = '#facc15';
 const NET_COLOR = '#22d3ee';
@@ -31,13 +34,32 @@ function ensurePanes(m) {
 // Mỗi lúc chỉ 1 lớp minh chứng; requestSeq bỏ qua kết quả trả về muộn của lần bấm trước
 let active = null;
 let requestSeq = 0;
+let task = null;
+let focused = false;
 
-export function clearCsdProof() {
+// Tiến độ: GEE đếm pixel dân cư (theo thời gian, tới SERVER_PCT) → dựng lớp → tải ô ảnh minh chứng
+const SERVER_PCT = 80;
+const SERVER_TAU_MS = 3500;
+const DRAW_PCT = 85;
+
+function setLayerFocus(type) {
+  focused = !!type;
+  window.dispatchEvent(new CustomEvent(PROOF_FOCUS_EVENT, { detail: { type } }));
+}
+
+function clearProofLayers() {
   requestSeq++;
+  task?.cancel();
+  task = null;
   if (!active) return;
   active.group.remove();
   active.panel.remove();
   active = null;
+}
+
+export function clearCsdProof() {
+  clearProofLayers();
+  if (focused) setLayerFocus(null);
 }
 
 function pulseMarker(lat, lng, color, tooltip, permanent = false) {
@@ -141,7 +163,7 @@ function scaleBlockHtml(data, label) {
     <div class="proof-block-title"><span>Quy mô ${label} của phường</span><b>cần ${fmtNum(sc.required)} m²</b></div>
     <div class="proof-bar proof-bar-scale">${bar(sc.currentPct, 'seg-exist')}${bar(addPct, 'seg-add')}</div>
     <div class="proof-bar-legend">
-      <span><i class="seg-exist"></i>Hiện có ${fmtNum(sc.existing)} m² <b>${fmtNum(sc.currentPct)}%</b></span>
+      <span><i class="seg-exist"></i>Theo quy hoạch ${fmtNum(sc.existing)} m² <b>${fmtNum(sc.currentPct)}%</b></span>
       <span><i class="seg-add"></i>Khu đất +${fmtNum(used)} m² <b>+${fmtNum(Math.round(addPct * 10) / 10)}%</b></span>
       <span><i class="seg-gap"></i>Còn thiếu ${fmtNum(Math.max(0, sc.deficit - used))} m²</span>
     </div>
@@ -186,19 +208,20 @@ function buildPanelHtml(data, typeColor) {
     ${isScale ? scaleBlockHtml(data, label) + coverageHtml : coverageHtml + scaleBlockHtml(data, label)}
     <div class="proof-legend">
       ${legendItem(`border:2px dashed ${CANDIDATE_COLOR};`, 'Phạm vi khu đất')}
-      ${legendItem(`background:${typeColor}22; border:1.5px dashed ${typeColor};`, existingN ? `${existingN} ${label} hiện có` : `Chưa có ${label} gần đây`)}
+      ${legendItem(`background:${typeColor}22; border:1.5px dashed ${typeColor};`, existingN ? `${existingN} ${label} theo quy hoạch` : `Quy hoạch chưa có ${label} gần đây`)}
       ${legendItem(`background:${NET_COLOR}22; border:2px solid ${NET_COLOR};`, 'Vùng chưa được phục vụ')}
       ${legendItem('background:#22c55e;', 'Dân đã được phục vụ')}
       ${legendItem('background:#ffd400;', 'Dân sẽ được phục vụ thêm')}
     </div>
-    ${existingN ? `<details class="proof-more"><summary>${label} hiện có ở gần (${existingN})</summary><ul>${listed}${more}</ul></details>` : ''}
+    ${existingN ? `<details class="proof-more"><summary>${label} theo quy hoạch ở gần (${existingN})</summary><ul>${listed}${more}</ul></details>` : ''}
     <details class="proof-more">
       <summary>Cách tính chi tiết</summary>
-      <div class="proof-muted proof-note">Bản đồ dân cư chia thành ô vuông ${cell} × ${cell} m; chỉ đếm ô có người ở.</div>
+      <div class="proof-muted proof-note">Căn cứ kịch bản quy hoạch: công trình đã duyệt có quy mô quy hoạch (gồm quy hoạch mới, bỏ công trình di dời), diện tích theo QuyMo_QH, nhu cầu theo dân số dự báo.
+        Bản đồ dân cư chia thành ô vuông ${cell} × ${cell} m, chỉ đếm ô có người ở; chưa có lớp phân bố dân cư quy hoạch nên dùng phân bố hiện trạng.</div>
       <table class="proof-table">
       <tr class="proof-group"><td colspan="2">① Ô dân cư chưa được phục vụ</td></tr>
       <tr><td>Ô dân cư trong phạm vi phục vụ</td><td>${fmtNum(px.buffer)} ô</td></tr>
-      <tr><td>− Đã có ${label} khác phục vụ</td><td>${fmtNum(px.covered)} ô</td></tr>
+      <tr><td>− Đã có ${label} theo quy hoạch phục vụ</td><td>${fmtNum(px.covered)} ô</td></tr>
       <tr class="proof-strong"><td>= Chưa được phục vụ</td><td>${fmtNum(px.net)} ô</td></tr>
       <tr class="proof-group"><td colspan="2">② Số dân được phục vụ thêm</td></tr>
       <tr><td>Dân số phường</td><td>${fmtNum(pop.ward)} người</td></tr>
@@ -220,10 +243,10 @@ function summaryHtml(data, label) {
   const sc = data.scale;
   if (isScaleBasis(data)) {
     const n = data.existing.length;
-    const head = `Khu đất đã nằm trong phạm vi của ${n ? `${n} ${label} hiện có` : `${label} hiện có`} nên độ phủ không tăng.`;
+    const head = `Khu đất đã nằm trong phạm vi của ${n ? `${n} ${label} theo quy hoạch` : `${label} theo quy hoạch`} nên độ phủ không tăng.`;
     if (!sc) return `<p>${head} Diện tích khu đất đáp ứng thêm <b class="c-green">${fmtNum(data.scaleAddPct)}%</b> nhu cầu ${label} của phường theo chỉ tiêu.</p>`;
-    return `<p>${head} Phường mới đạt <b class="c-red">${fmtNum(sc.currentPct)}%</b> chỉ tiêu (thiếu ${fmtNum(sc.deficit)} m²) —
-      bổ sung khu đất giúp <b>giảm tải</b> cho các cơ sở hiện có.</p>`;
+    return `<p>${head} Theo quy hoạch, phường mới đạt <b class="c-red">${fmtNum(sc.currentPct)}%</b> chỉ tiêu (thiếu ${fmtNum(sc.deficit)} m²) —
+      bổ sung khu đất giúp <b>giảm tải</b> cho các cơ sở theo quy hoạch.</p>`;
   }
   const pop = data.population;
   if (pop.capacity != null && pop.reach > pop.added) {
@@ -239,8 +262,8 @@ function scaleRowsHtml(data) {
   const used = Math.min(sc.siteArea, sc.deficit);
   return `
       <tr class="proof-group"><td colspan="2">④ Bù thiếu quy mô theo chỉ tiêu</td></tr>
-      <tr><td>Nhu cầu của phường theo chỉ tiêu</td><td>${fmtNum(sc.required)} m²</td></tr>
-      <tr><td>− Hiện có (đạt ${fmtNum(sc.currentPct)}%)</td><td>${fmtNum(sc.existing)} m²</td></tr>
+      <tr><td>Nhu cầu của phường theo chỉ tiêu (dân số dự báo)</td><td>${fmtNum(sc.required)} m²</td></tr>
+      <tr><td>− Theo quy hoạch (đạt ${fmtNum(sc.currentPct)}%)</td><td>${fmtNum(sc.existing)} m²</td></tr>
       <tr class="proof-strong"><td>= Còn thiếu</td><td>${fmtNum(sc.deficit)} m²</td></tr>
       <tr><td>Khu đất bù vào${sc.siteArea > sc.deficit ? ' (chỉ tính phần thiếu)' : ''}</td><td>${fmtNum(used)} m²</td></tr>
       <tr class="proof-result"><td>= Quy mô sau bổ sung</td><td>${fmtNum(sc.currentPct)}% → ${fmtNum(sc.afterPct)}%</td></tr>`;
@@ -253,9 +276,11 @@ function scaleRowsHtml(data) {
  * @param fit       { padTopLeft, padBottomRight } — vùng bản đồ không bị che (panel phải / thanh so sánh)
  */
 export async function showCsdProof(csd, suggestion, targetMap, fit) {
-  clearCsdProof();
+  clearProofLayers();
   const seq = requestSeq;
-  showToast(`Đang lập thuyết minh "${suggestion.label}"...`, 'info');
+  const myTask = task = startTaskProgress(`Thuyết minh "${suggestion.label}"`);
+  myTask.creep(SERVER_PCT, SERVER_TAU_MS, 'Đang đếm dân cư trong vùng phục vụ (GEE)');
+  setLayerFocus(suggestion.code);
 
   let data;
   try {
@@ -265,17 +290,28 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
     data = await res.json();
     if (!res.ok || data.error) throw new Error(data.message || `HTTP ${res.status}`);
   } catch (err) {
-    if (seq === requestSeq) showToast(`Không lập được thuyết minh: ${err.message}`, 'error');
+    if (seq === requestSeq) {
+      myTask.fail('Không lập được thuyết minh');
+      task = null;
+      setLayerFocus(null);
+      showToast(`Không lập được thuyết minh: ${err.message}`, 'error');
+    }
     return;
   }
   if (seq !== requestSeq) return;
+  myTask.set(DRAW_PCT, 'Đang dựng lớp minh chứng');
 
   const typeColor = BUFFER_COLORS[data.code] || BUFFER_COLORS['12-CSD'];
   const c = data.candidate;
   const group = L.layerGroup();
   ensurePanes(targetMap);
 
-  if (data.tileUrl) group.addLayer(L.tileLayer(data.tileUrl, { maxZoom: 19, opacity: 0.8, zIndex: 50 }));
+  let tiles = null;
+  if (data.tileUrl) {
+    const tileLayer = L.tileLayer(data.tileUrl, { maxZoom: 19, opacity: 0.8, zIndex: 50 });
+    tiles = trackTileLoad(tileLayer, (n, total) => myTask.set(DRAW_PCT + (100 - DRAW_PCT) * (n / Math.max(total, 1)), 'Đang tải ảnh pixel dân cư'));
+    group.addLayer(tileLayer);
+  }
 
   // Làm tối bản đồ ngoài phạm vi khu đất (cả icon) để mắt tập trung vào vùng phân tích
   const hole = turf.circle([c.lng, c.lat], c.radius / 1000, { steps: 128 }).geometry.coordinates[0].map(([x, y]) => [y, x]);
@@ -341,6 +377,11 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
   countUp(panel.getContainer());
 
   active = { group, panel };
+  Promise.resolve(tiles).then(() => {
+    if (task !== myTask) return;
+    myTask.done('Đã lập thuyết minh');
+    task = null;
+  });
 
   targetMap.closePopup();
   const bounds = L.latLng(c.lat, c.lng).toBounds(c.radius * 2.3);

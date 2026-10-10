@@ -62,6 +62,7 @@ import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
 import { initOverview } from './overview.js';
 import { initRiskLayer } from './riskLayer.js';
 import { initBasemapUi } from './basemap.js';
+import { PROOF_FOCUS_EVENT } from './csdProof.js';
 
 const CITY_NAME = "Thành phố Huế";
 
@@ -703,6 +704,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
   });
   document.getElementById('roadBusRow')?.addEventListener('click', onFocusClick);
+
+  // Thuyết minh phương án CSD: chỉ giữ công trình cùng loại kèm ranh lô (tắt lớp Quy hoạch để ranh lô vẽ theo lớp công trình),
+  // tắt vùng phủ vì lớp minh chứng tự vẽ phạm vi phục vụ; đóng thuyết minh thì khôi phục các lớp trước đó
+  let proofSnapshot = null;
+  window.addEventListener(PROOF_FOCUS_EVENT, (e) => {
+    const type = e.detail && e.detail.type;
+    if (!type) {
+      if (proofSnapshot) applyFocusSnapshot(proofSnapshot);
+      proofSnapshot = null;
+      return;
+    }
+    if (!proofSnapshot) proofSnapshot = captureFocus();
+    const keepChk = ICON_GROUP_KEYS[type] ? `chk_${ICON_GROUP_KEYS[type]}` : null;
+    FOCUS_CHECKS.forEach(id => setChecked(id, id === keepChk || id === 'chk_parcel'));
+    Object.values(BUFFER_KEYS).forEach(key => setBuffer(key, false));
+  });
 
   // ---------- Định vị GPS: 1 marker duy nhất (thay thế lần định vị trước) + tra cứu hạ tầng tại chỗ ----------
   const gpsLayers = [L.layerGroup().addTo(map), planMap ? L.layerGroup().addTo(planMap) : null].filter(Boolean);

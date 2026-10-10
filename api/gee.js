@@ -26,7 +26,7 @@ const WARD_COUNT_BATCH = 1500;
 // Bảng phường chỉ hiện 2 gợi ý ưu tiên của khu đất CSD với các trường này; chi tiết đầy đủ + loại không đủ diện tích
 // tối thiểu xem ở popup khu đất (analyzeCSD)
 const CSD_ROW_FIELDS = ['code', 'label', 'status', 'basis', 'currentScalePct', 'scaleAddPct', 'coverageAddPct',
-  'coverageMethod', 'capacityLimited', 'capacity', 'quota'];
+  'coverageMethod', 'capacityLimited', 'capacity', 'quota', 'note'];
 const pickFields = (obj, keys) => keys.reduce((o, k) => {
   if (obj[k] !== undefined) o[k] = obj[k];
   return o;
@@ -1180,9 +1180,24 @@ function buildWardContext(wardFeat, approvedItemsInWard) {
   return { name: wardFeat.name, geometry: wardFeat.geometry, pop, projPop, profile, urbanResults, unitResults };
 }
 
+/** Khu đất chưa sử dụng: theo mã loại, tiền tố ID hoặc cột nhóm hạ tầng trên Sheet */
+function isCsdItem(item) {
+  const prefix = String(item.id || '').split('-')[0];
+  const nhom = String(item.nhomHaTang || '').toLowerCase();
+  const typeCode = item.type || constants.codeMap[prefix] || "";
+  return typeCode === "12-CSD" || prefix === "CSD" || nhom.includes("chưa sử dụng") || nhom.includes("csd");
+}
+
+/** Công trình đã duyệt theo kịch bản quy hoạch (gồm quy hoạch mới, bỏ di dời, diện tích QuyMo_QH) — căn cứ đề xuất CSD */
+function planApprovedItems(allDataList) {
+  return getPlanScenarioItems(allDataList).filter(it => isApprovedStatus(it.status) && it.lat != null && it.lng != null);
+}
+
 /**
- * Lọc 8 loại cho 1 khu đất: (1) bỏ loại có DT tối thiểu lớn hơn khu đất, (2) bỏ loại phường đã đủ 100% quy mô.
+ * Lọc 8 loại cho 1 khu đất, căn cứ kịch bản quy hoạch (ward.urbanResults / unitResults và approvedAll là số liệu quy hoạch):
+ * (1) bỏ loại có DT tối thiểu lớn hơn khu đất, (2) bỏ loại phường đã đủ 100% quy mô.
  * Loại còn lại thành ứng viên chờ đếm pixel dân cư bổ sung (fillCoverageGains).
+ * commercial: mọi loại đều đủ quy mô và vị trí đã được phục vụ → đề xuất khai thác đất thương mại, dịch vụ.
  */
 function csdSuggestionCandidates(csd, ward, approvedAll) {
   const size = Number(csd.size || 0);
@@ -1192,14 +1207,15 @@ function csdSuggestionCandidates(csd, ward, approvedAll) {
     const cfg = constants.infraConfig[code] || {};
     const label = cfg.label || code;
     const minSize = cfg.minSize || 0;
-    if (size < minSize) {
-      suggestions.push({ code, label, minSize, status: 'ineligible' });
-      return;
-    }
     const reqArea = Math.round(ward.projPop * constants.quotaFor(code, ward.profile));
     const existArea = codeCurrentArea(code, ward.urbanResults, ward.unitResults);
-    if (reqArea <= 0 || existArea >= reqArea) {
-      suggestions.push({ code, label, status: 'fulfilled' });
+    const scaleFull = reqArea <= 0 || existArea >= reqArea;
+    if (size < minSize) {
+      suggestions.push({ code, label, minSize, status: 'ineligible', scaleFull, noQuota: reqArea <= 0 });
+      return;
+    }
+    if (scaleFull) {
+      suggestions.push({ code, label, status: 'fulfilled', scaleFull, noQuota: reqArea <= 0 });
       return;
     }
     const radius = csdCandidateRadius(csd, code, ward.profile);
@@ -1222,7 +1238,33 @@ function csdSuggestionCandidates(csd, ward, approvedAll) {
     suggestions.push(s);
     candidates.push({ code, lat: csd.lat, lng: csd.lng, radius, existing, ward, target: s });
   });
-  return { suggestions, candidates };
+  const commercial = csdCommercialSuggestion(csd, suggestions, approvedAll);
+  return { suggestions, candidates, commercial };
+}
+
+/** Vị trí nằm trong bán kính phục vụ của ít nhất 1 công trình cùng loại (danh sách đã duyệt theo quy hoạch) */
+function isSiteServed(approvedAll, code, lat, lng) {
+  return approvedAll.some(it => metricCode(it) === code
+    && distMeters(Number(lat), Number(lng), Number(it.lat), Number(it.lng)) <= (Number(it.radius) || 0));
+}
+
+/**
+ * Tại vị trí, cả 8 nhóm đều đạt theo quy hoạch: phường đủ 100% quy mô và vị trí đã nằm trong vùng phục vụ của công trình
+ * cùng loại (loại QCVN không quy định chỉ tiêu cho phường/xã thì chỉ xét độ phủ khi có công trình) → không cần thêm
+ * hạ tầng xã hội, đề xuất khai thác đất thương mại, dịch vụ. Không đạt thì null.
+ */
+function csdCommercialSuggestion(csd, suggestions, approvedAll) {
+  if (!suggestions.every(s => s.scaleFull)) return null;
+  const unserved = suggestions.filter(s => !s.noQuota && !isSiteServed(approvedAll, s.code, csd.lat, csd.lng));
+  if (unserved.length) return null;
+  return {
+    code: 'TMDV',
+    label: 'Đất thương mại, dịch vụ',
+    status: 'commercial',
+    isTopPriority: true,
+    basis: 'commercial',
+    note: 'Theo quy hoạch, phường đã đủ 100% quy mô và vị trí đã nằm trong phạm vi phục vụ của cả 8 nhóm hạ tầng'
+  };
 }
 
 /** Cơ sở chọn công năng: mở rộng độ phủ (phục vụ thêm dân chưa có công trình) hay bù thiếu quy mô của phường */
@@ -3000,11 +3042,15 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Khu đất CSD theo id (lấy diện tích từ sheet); không có id thì dùng tọa độ + diện tích gửi lên
+    // Khu đất CSD theo id (diện tích QuyMo_QH trên sheet); không có id thì dùng tọa độ + diện tích gửi lên.
+    // Mọi số liệu đánh giá lấy theo kịch bản quy hoạch, không dùng hiện trạng
     const resolveCsdRequest = async () => {
       const id = String(req.query.id || '').trim();
-      const byId = id ? rawDataList.find(it => it.id === id) : null;
-      let csd = byId;
+      const record = id ? allDataList.find(it => it.id === id) : null;
+      if (record && (record.planChange === 'relocate' || record.planChange === 'none')) {
+        throw httpError(400, "Quy hoạch không giữ khu đất này (QuyMo_QH trống) nên không đề xuất chuyển đổi công năng");
+      }
+      let csd = record ? getPlanScenarioItems([record])[0] : null;
       if (!csd) {
         const pt = parseCoordInBounds(req.query.lat, req.query.lng);
         if (!pt) throw httpError(400, "Tọa độ không hợp lệ");
@@ -3014,18 +3060,20 @@ module.exports = async (req, res) => {
       const wardName = assignWardByGeometry(csd.lng, csd.lat, evaluatedWardsCsd);
       const wardFeat = wardName ? findWardByName(evaluatedWardsCsd, wardName) : null;
       if (!wardFeat || !wardFeat.geometry) throw httpError(400, "Khu đất nằm ngoài ranh giới 40 phường/xã");
-      const approvedAll = rawDataList.filter(it => isApprovedStatus(it.status) && it.lat != null && it.lng != null);
-      const approvedInWard = approvedAll.flatMap(it => wardShareItems(it, 'sizeHT'))
+      const approvedAll = planApprovedItems(allDataList);
+      const approvedInWard = approvedAll.flatMap(it => wardShareItems(it, 'sizeQH'))
         .filter(it => assignWardByGeometry(it.lng, it.lat, evaluatedWardsCsd) === wardName);
       const ward = buildWardContext(wardFeat, approvedInWard);
       return { csd, ward, approvedAll, ...csdSuggestionCandidates(csd, ward, approvedAll) };
     };
 
     if (action === 'analyzeCSD') {
-      const { ward, suggestions, candidates } = await resolveCsdRequest();
+      const { ward, suggestions, candidates, commercial } = await resolveCsdRequest();
+      if (commercial) return res.status(200).json({ ward: ward.name, basis: 'plan', suggestions: [commercial], ineligible: [] });
       await fillCoverageGains(ee, popRasterNative, candidates);
       return res.status(200).json({
         ward: ward.name,
+        basis: 'plan',
         suggestions: rankEligible(suggestions).slice(0, 2),
         ineligible: suggestions.filter(s => s.status === 'ineligible')
       });
@@ -3041,7 +3089,7 @@ module.exports = async (req, res) => {
         const s = suggestions.find(x => x.code === code);
         const reason = s && s.status === 'ineligible'
           ? `Khu đất nhỏ hơn diện tích tối thiểu (${s.minSize} m²)`
-          : 'Phường đã đạt 100% quy mô loại này';
+          : 'Theo quy hoạch, phường đã đạt 100% quy mô loại này';
         return res.status(400).json({ error: true, message: reason });
       }
 
@@ -3297,28 +3345,29 @@ module.exports = async (req, res) => {
           return;
         }
         const prefix = String(item.id || '').split('-')[0];
-        const nhom = String(item.nhomHaTang || '').toLowerCase();
-        const approved = isApprovedStatus(item.status);
         const typeCode = item.type || constants.codeMap[prefix] || "";
-        const isCSD = (typeCode === "12-CSD" || prefix === "CSD"
-          || nhom.includes("chưa sử dụng") || nhom.includes("csd"));
         if (isCoverageItem(item)) w.covItems.push(item);
-
-        if (isCSD) {
-          w.csdRaw.push(item);
-        } else if (approved) {
+        // Khu đất CSD xét ở lượt quy hoạch bên dưới
+        if (isCsdItem(item)) return;
+        if (isApprovedStatus(item.status)) {
           wardShareItems(item, 'sizeHT').forEach(x => wardMap[wardOf(x)]?.items.push(x));
         } else if (CODES.includes(typeCode)) {
           w.pendingItems.push(item);
         }
       });
 
-      getPlanScenarioItems(allDataList).forEach(item => {
+      // Lượt quy hoạch: quy mô QH của phường và danh sách khu đất CSD được quy hoạch giữ lại (căn cứ đề xuất chuyển đổi)
+      const planScenario = getPlanScenarioItems(allDataList);
+      planScenario.forEach(item => {
         if (item.lat == null || item.lng == null) return;
         const w = wardMap[wardOf(item)];
         if (!w) return;
         if (isCoverageItem(item)) w.planCovItems.push(item);
-        if (item.type !== "12-CSD") wardShareItems(item, 'sizeQH').forEach(x => wardMap[wardOf(x)]?.planItems.push(x));
+        if (isCsdItem(item)) {
+          w.csdRaw.push(item);
+          return;
+        }
+        wardShareItems(item, 'sizeQH').forEach(x => wardMap[wardOf(x)]?.planItems.push(x));
       });
       allDataList.forEach(item => {
         if (item.planChange !== 'new' && item.planChange !== 'relocate') return;
@@ -3330,6 +3379,7 @@ module.exports = async (req, res) => {
       timing.classify = Date.now() - startedAt;
       const resultTable = [];
       const approvedAll = rawDataList.filter(it => isApprovedStatus(it.status) && it.lat != null && it.lng != null);
+      const planApprovedAll = planScenario.filter(it => isApprovedStatus(it.status) && it.lat != null && it.lng != null);
       const coverageCandidates = [];
       const rankAfterCount = [];
       const allBusStops = networkItemsOf(rawDataList, '13-BUS');
@@ -3346,10 +3396,11 @@ module.exports = async (req, res) => {
         const planBuckets = bucketWardInfra(data.planItems, projPop, { withSubItems: false, profile });
         const planScales = scaleByCode(planBuckets.urbanResults, planBuckets.unitResults, projPop, profile);
 
-        // Gợi ý chuyển đổi quỹ đất chưa sử dụng (CSD): cùng logic với popup khu đất, % độ phủ đếm pixel sau vòng lặp
+        // Gợi ý chuyển đổi quỹ đất chưa sử dụng (CSD) theo quy hoạch: cùng logic với popup khu đất, % độ phủ đếm pixel sau vòng lặp
         const wardCtx = { name: wName, geometry: wardGeom, pop, projPop, profile, urbanResults, unitResults };
+        const csdCtx = { ...wardCtx, urbanResults: planBuckets.urbanResults, unitResults: planBuckets.unitResults };
         const csdItems = data.csdRaw.map(item => {
-          const { suggestions, candidates } = csdSuggestionCandidates(item, wardCtx, approvedAll);
+          const { suggestions, candidates, commercial } = csdSuggestionCandidates(item, csdCtx, planApprovedAll);
           coverageCandidates.push(...candidates);
           const row = {
             id: item.id,
@@ -3363,7 +3414,9 @@ module.exports = async (req, res) => {
             needsApproval: !isApprovedStatus(item.status)
           };
           rankAfterCount.push(() => {
-            row.suggestions = rankEligible(suggestions).slice(0, 2).map(s => pickFields(s, CSD_ROW_FIELDS));
+            row.suggestions = commercial
+              ? [pickFields(commercial, CSD_ROW_FIELDS)]
+              : rankEligible(suggestions).slice(0, 2).map(s => pickFields(s, CSD_ROW_FIELDS));
           });
           return row;
         });

@@ -2242,6 +2242,26 @@ table.ward-table th {
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
 .app-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* Tiến độ tác vụ chờ GEE (utils.js › startTaskProgress): xếp chồng giữa phía trên bản đồ, dưới thanh tiêu đề */
+.task-progress-stack {
+  position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 4900;
+  display: flex; flex-direction: column; gap: 6px; width: min(86vw, 320px); pointer-events: none;
+}
+.task-progress {
+  padding: 6px 10px 7px; border-radius: var(--r-md); border: 1px solid var(--border-color);
+  background: rgba(15, 23, 42, 0.94); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.4s ease;
+}
+.task-progress .tp-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; font-size: var(--fs-sm); color: var(--text-main); }
+.task-progress .tp-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-progress .tp-pct { flex-shrink: 0; color: var(--accent-cyan); font-variant-numeric: tabular-nums; }
+.task-progress .progress-bar-fill { background: var(--accent-cyan); }
+.task-progress.is-done { opacity: 0; transition-delay: 0.3s; }
+.task-progress.is-done .progress-bar-fill { background: var(--accent-green); }
+.task-progress.is-done .tp-pct { color: var(--accent-green); }
+.task-progress.is-error { border-color: var(--accent-red); }
+.task-progress.is-error .progress-bar-fill { background: var(--accent-red); }
 .app-toast.success { border-color: var(--accent-green); }
 .app-toast.error { border-color: var(--accent-red); }
 .app-toast.info { border-color: var(--accent-cyan); }

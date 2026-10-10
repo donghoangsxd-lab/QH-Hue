@@ -6,7 +6,7 @@ import {
 import { peekInfraRisk, riskSummaryHtml } from './riskLayer.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi, markDataWritten } from './api.js';
-import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, planItems } from './utils.js';
+import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, planItems, startTaskProgress, trackTileLoad } from './utils.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
@@ -18,7 +18,7 @@ import {
   getCoveredRightWidth, highlightPlanWard, wardFocusLayer, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, getViewMode, setViewMode, passToolClick
 } from './planMap.js';
-import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, infraLotOf } from './projectFiles.js';
+import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, infraLotOf, byProjectAreaDesc } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
 import { analyzePlanLand, planLandHtml } from './planLandStats.js';
 
@@ -1226,15 +1226,31 @@ function landPopupHtml(p) {
   </div>`;
 }
 
-// Rê chuột lên lô: viền sáng trắng, đưa lô lên trên để không bị lô kề che; rời chuột trả lại kiểu gốc của L.geoJSON
-const LOT_HOVER_STYLE = { color: '#ffffff', weight: 3, opacity: 1, dashArray: null };
+// Rê chuột lên lô: viền sáng trắng vẽ trên pane riêng (không đổi thứ tự vẽ lô: đồ án nhỏ trên đồ án lớn,
+// giao thông dưới cùng — bringToFront trên canvas đảo thứ tự vĩnh viễn). Pane dưới viền sáng đồ án (445), không bắt chuột.
+const LOT_HOVER_STYLE = { color: '#ffffff', weight: 3, opacity: 1, dashArray: null, fill: false, interactive: false };
+const LOT_HOVER_PANE = 'lotHoverPane';
+const LOT_HOVER_Z = 444;
+let lotHoverMark = null;
+
+function clearLotHover() {
+  lotHoverMark?.remove();
+  lotHoverMark = null;
+}
+
 function bindLotHover(shape) {
   shape.on('mouseover', (e) => {
-    if (isBusyTool()) return;
-    e.layer.setStyle(LOT_HOVER_STYLE);
-    e.layer.bringToFront();
+    const m = shape._map;
+    if (isBusyTool() || !m || !e.layer.getLatLngs) return;
+    clearLotHover();
+    if (!m.getPane(LOT_HOVER_PANE)) {
+      const pane = m.createPane(LOT_HOVER_PANE);
+      pane.style.zIndex = LOT_HOVER_Z;
+      pane.style.pointerEvents = 'none';
+    }
+    lotHoverMark = L.polygon(e.layer.getLatLngs(), { ...LOT_HOVER_STYLE, pane: LOT_HOVER_PANE }).addTo(m);
   });
-  shape.on('mouseout', (e) => shape.resetStyle(e.layer));
+  shape.on('mouseout remove', clearLotHover);
 }
 
 const isBusyTool = () => state.isPickMode || state.activeMeasureType || state.adminDrawMode || state.sketchTool || state.lotShapeEdit;
@@ -1255,6 +1271,26 @@ function infraLotShape(lot, item, m, detailed) {
   return shape;
 }
 
+function landLotShape(p, m, detailed) {
+  const shape = L.geoJSON(p.geometry, {
+    style: landParcelStyle(p.layer, { detailed, phase: p.phase, name: p.name }),
+    bubblingMouseEvents: false
+  });
+  bindLotHover(shape);
+  shape.on('click', (e) => {
+    if (passToolClick(m, e)) return;
+    const popup = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup' }).setLatLng(e.latlng).setContent(landPopupHtml(p)).openOn(m);
+    addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
+  });
+  return shape;
+}
+
+// Thứ tự vẽ (vẽ sau nằm trên): đồ án diện tích lớn trước để đồ án nhỏ lồng bên trong không bị che và bấm được;
+// trong 1 đồ án: đất giao thông dưới cùng, rồi lô đất khác, lô hạ tầng trên cùng
+const LOT_RANK_TRAFFIC = 0;
+const LOT_RANK_LAND = 1;
+const LOT_RANK_INFRA = 2;
+
 function drawLandsOn(m, list, infra = []) {
   const old = landGroups.get(m);
   if (old) {
@@ -1265,28 +1301,21 @@ function drawLandsOn(m, list, infra = []) {
   if (!list.length && !infra.length) return;
   const group = L.featureGroup();
   const detailed = m.getZoom() >= PARCEL_PATTERN_ZOOM;
-  list.forEach(p => {
-    const shape = L.geoJSON(p.geometry, {
-      style: landParcelStyle(p.layer, { detailed, phase: p.phase, name: p.name }),
-      bubblingMouseEvents: false
-    });
-    bindLotHover(shape);
-    shape.on('click', (e) => {
-      if (passToolClick(m, e)) return;
-      const popup = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup' }).setLatLng(e.latlng).setContent(landPopupHtml(p)).openOn(m);
-      addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
-    });
-    group.addLayer(shape);
+  const ordered = [
+    ...list.map(p => ({ p, rank: landPatternKey(p.layer, p.name) === 'GT' ? LOT_RANK_TRAFFIC : LOT_RANK_LAND })),
+    ...infra.map(p => ({ p, rank: LOT_RANK_INFRA }))
+  ].sort((a, b) => byProjectAreaDesc(a.p.file, b.p.file) || a.rank - b.rank);
+  // Popup công trình kịch bản QH chỉ dựng được trên bản đồ quy hoạch (planLayers), bản đồ chính dùng bản ghi gốc
+  const byId = infra.length ? new Map([...state.rawDataList, ...state.planDataList].map(it => [it.id, it])) : null;
+  const qhById = infra.length && m === planMap ? new Map(getPlanScenarioList().map(it => [it.id, it])) : null;
+  ordered.forEach(({ p, rank }) => {
+    if (rank !== LOT_RANK_INFRA) {
+      group.addLayer(landLotShape(p, m, detailed));
+      return;
+    }
+    const item = (qhById && qhById.get(p.id)) || byId.get(p.id);
+    group.addLayer(infraLotShape(p, item, m, detailed));
   });
-  if (infra.length) {
-    // Popup công trình kịch bản QH chỉ dựng được trên bản đồ quy hoạch (planLayers), bản đồ chính dùng bản ghi gốc
-    const byId = new Map([...state.rawDataList, ...state.planDataList].map(it => [it.id, it]));
-    const qhById = m === planMap ? new Map(getPlanScenarioList().map(it => [it.id, it])) : null;
-    infra.forEach(lot => {
-      const item = (qhById && qhById.get(lot.id)) || byId.get(lot.id);
-      group.addLayer(infraLotShape(lot, item, m, detailed));
-    });
-  }
   group.addTo(m);
   landGroups.set(m, group);
 }
@@ -1484,13 +1513,15 @@ async function requestHeatTile(list) {
   return ((await res.json()) || {}).urlFormat || '';
 }
 
-function setLeftHeatUrl(url) {
+// beforeAdd(layer): gắn theo dõi tải ô ảnh trước khi layer vào bản đồ
+function setLeftHeatUrl(url, beforeAdd = null) {
   currentHeatUrl = url;
   layers.heatmap.clearLayers();
   tileHeatmapLayer = null;
   if (!url) return;
   const heatOpacityEl = document.getElementById('heatOpacity');
   tileHeatmapLayer = L.tileLayer(url, { maxZoom: 19, opacity: heatOpacityEl ? heatOpacityEl.value / 100 : 0.3 });
+  if (beforeAdd) beforeAdd(tileHeatmapLayer);
   layers.heatmap.addLayer(tileHeatmapLayer);
 }
 
@@ -1500,10 +1531,18 @@ export function setHeatOpacity(val) {
   reviewScope?.onHeatOpacity?.(val);
 }
 
+// Tiến độ heatmap: GEE dựng ảnh (chạy theo thời gian, tới HEAT_SERVER_PCT) rồi tải ô ảnh trong khung nhìn (theo số ô)
+const HEAT_SERVER_PCT = 50;
+const HEAT_SERVER_TAU_MS = 4000;
+const HEAT_TILES_PCT = 45;
+let heatTask = null;
+
 // Heatmap chỉ gọi GEE khi đang bật; tắt thì đánh dấu cũ để lần bật sau tính lại theo địa bàn / bán kính hiện tại
 export async function refreshHeatmapOnly() {
   const seq = ++heatmapFetchSeq;
   planHeatStale = true;
+  heatTask?.cancel();
+  heatTask = null;
   if (reviewScope) {
     heatStale = true;
     planHeatSeq++;
@@ -1517,13 +1556,27 @@ export async function refreshHeatmapOnly() {
     return;
   }
   heatStale = false;
+  const task = heatTask = startTaskProgress('Đang tính bản đồ độ phủ hạ tầng (GEE)');
+  task.creep(HEAT_SERVER_PCT, HEAT_SERVER_TAU_MS);
   try {
     const url = await requestHeatTile(getWardFilteredList(state.rawDataList));
     if (seq !== heatmapFetchSeq) return;
-    setLeftHeatUrl(url);
-    await refreshPlanHeat();
+    task.set(HEAT_SERVER_PCT, 'Đang tải ảnh bản đồ độ phủ');
+    let tiles = null;
+    setLeftHeatUrl(url, layer => {
+      if (!map || !map.hasLayer(layers.heatmap)) return;
+      tiles = trackTileLoad(layer, (n, total) => task.set(HEAT_SERVER_PCT + HEAT_TILES_PCT * (n / Math.max(total, 1))));
+    });
+    const planDone = refreshPlanHeat();
+    Promise.all([tiles, planDone]).then(() => {
+      if (heatTask === task) task.done('Đã tải bản đồ độ phủ');
+    });
+    await planDone;
   } catch (err) {
-    if (seq === heatmapFetchSeq) heatStale = true;
+    if (seq === heatmapFetchSeq) {
+      heatStale = true;
+      task.fail('Không tải được bản đồ độ phủ, bật lại lớp để thử lại');
+    }
     console.error("Lỗi cập nhật heatmap theo địa bàn:", err);
   }
 }
@@ -1795,7 +1848,12 @@ function buildDiaBanHtml(geoWard, sheetWard) {
 
 async function fetchJson(url) {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const err = new Error((body && body.message) || `HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
   return res.json();
 }
 
@@ -2062,7 +2120,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   }
   if (conflicts.length) html += parcelConflictHtml(p, conflicts);
   if (isCSD && approved) {
-    html += `<div class="pp-section c-orange">${ico('bulb')}ĐỀ XUẤT CHUYỂN ĐỔI CÔNG NĂNG</div>`;
+    html += `<div class="pp-section c-orange">${ico('bulb')}ĐỀ XUẤT CHUYỂN ĐỔI CÔNG NĂNG <span class="pp-sub">(căn cứ quy hoạch)</span></div>`;
     html += `<div class="js-csd"><div class="pp-loading">${ico('clock')}Đang tính toán không gian...</div></div>`;
   }
   if (!approved) {
@@ -2173,11 +2231,16 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
         const suggestions = res.suggestions || [];
         let sugHtml = "";
         suggestions.forEach((s, idx) => {
+          if (s.status === 'commercial') {
+            sugHtml += `<div class="sug-card priority"><div>${ico('flag')}<b>${escapeHtml(s.label)}</b> <span class="badge-priority">ĐỀ XUẤT</span></div>
+              <div class="pp-sub">${escapeHtml(s.note || '')}: khai thác quỹ đất cho thương mại, dịch vụ.</div></div>`;
+            return;
+          }
           const priorityBadge = s.isTopPriority ? `<span class="badge-priority">ƯU TIÊN HÀNG ĐẦU</span>` : "";
           const cls = s.isTopPriority ? "sug-card priority" : "sug-card";
           const estimateNote = s.coverageMethod === 'estimate' ? ` <span title="GEE bận: ước lượng theo diện tích">(ước lượng)</span>` : '';
           const basisNote = s.basis === 'scale'
-            ? `Bù thiếu quy mô: phường đạt <b class="c-red">${fmtNum(s.currentScalePct)}%</b> → <b class="c-green">${fmtNum(Math.min(100, s.currentScalePct + s.scaleAddPct))}%</b> (độ phủ không tăng)`
+            ? `Bù thiếu quy mô: theo quy hoạch phường đạt <b class="c-red">${fmtNum(s.currentScalePct)}%</b> → <b class="c-green">${fmtNum(Math.min(100, s.currentScalePct + s.scaleAddPct))}%</b> (độ phủ không tăng)`
             : `Bổ sung <b class="c-green">${fmtNum(s.scaleAddPct)}%</b> quy mô, <b class="c-cyan">${fmtNum(s.coverageAddPct)}%</b> độ phủ${estimateNote}`
               + (s.capacityLimited ? `<br>Quy mô chỉ đáp ứng ~${fmtNum(s.capacity)} người (${QUOTA_FORMAT.format(s.quota)} m²/người)` : '');
           sugHtml += `<div class="${cls}"><div>${ico('flag')}<b>${escapeHtml(s.label)}</b> ${priorityBadge}</div>
@@ -2187,7 +2250,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
         (res.ineligible || []).forEach(inEl => {
           sugHtml += `<div class="sug-card ineligible">${ico('error')}<b>${escapeHtml(inEl.label)}</b> (Không đủ DT min: ${fmtNum(inEl.minSize)} m²)</div>`;
         });
-        const base = sugHtml || `<div class="sug-card">${ico('check')}Vị trí đã phủ đủ hạ tầng.</div>`;
+        const base = sugHtml || `<div class="sug-card">${ico('check')}Theo quy hoạch, phường đã đủ quy mô các loại hạ tầng khu đất đáp ứng được diện tích tối thiểu.</div>`;
         fill('.js-csd', base + `<div class="pp-note c-red">(Cần phê duyệt)</div>`);
         popup.getElement()?.querySelectorAll('.proof-btn').forEach(btn => {
           btn.addEventListener('click', () => {
@@ -2200,7 +2263,9 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
           });
         });
       })
-      .catch(() => fill('.js-csd', `<div class="sug-card ineligible">Chưa tính được đề xuất (GEE đang bận), mở lại sau.</div>`));
+      .catch(err => fill('.js-csd', `<div class="sug-card ineligible">${err.status === 400
+        ? escapeHtml(err.message)
+        : 'Chưa tính được đề xuất (GEE đang bận), mở lại sau.'}</div>`));
   }
 }
 
