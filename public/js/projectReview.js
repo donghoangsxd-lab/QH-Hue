@@ -19,6 +19,7 @@ import {
   projectOfFile, PENDING_TONE, UNDETERMINED_KEY, savedLandTag, savedLotType
 } from './projectReviewCore.js';
 import { projectLayersOf, cachedLots, PROJECT_INFO_EVENT } from './projectFiles.js';
+import { initGisDossier, handleGisClick } from './gisDossierUi.js';
 
 const STORE_KEY = 'qh_review_dossiers_v2';
 // Hàng chờ duyệt (submitCadPending) nhận tối đa 2 MB nội dung
@@ -1469,7 +1470,7 @@ async function exportPdf() {
   try { await loadHtml2Pdf(); } catch (e) { showToast('Không tải được thư viện PDF', 'error'); return; }
   window.html2pdf().from(sheet).set({
     margin: 6,
-    filename: `${session?.saved ? 'Thong-tin' : 'Tham-dinh'}-${session ? session.project : 'ho-so'}.pdf`,
+    filename: `${($('projectReviewSheet')?.dataset.pdf) || `${session?.saved ? 'Thong-tin' : 'Tham-dinh'}-${session ? session.project : 'ho-so'}`}.pdf`,
     image: { type: 'jpeg', quality: 0.95 },
     html2canvas: {
       scale: 2, useCORS: true, scrollY: 0,
@@ -1486,6 +1487,17 @@ export function initProjectReview() {
   $('btnReviewPanelClose')?.addEventListener('click', () => togglePanel(false));
   ['HT', 'QH'].forEach(slot => $(slot === 'HT' ? 'reviewFileHT' : 'reviewFileQH')?.addEventListener('change', () => fileLabel(slot)));
   $('btnReviewStart')?.addEventListener('click', startReview);
+  initGisDossier({
+    hasSession: () => !!session,
+    sizeHtml: () => sizeBtnsHtml(),
+    closePanel: () => togglePanel(false),
+    replaceSheet(html) {
+      closeReview();
+      openHost();
+      const host = $('projectReviewHost');
+      if (host) host.innerHTML = html;
+    }
+  });
   $('reviewDrafts')?.addEventListener('click', (e) => {
     const open = e.target.closest('[data-open-draft]');
     if (open) { showDraft(open.dataset.openDraft); return; }
@@ -1502,6 +1514,7 @@ export function initProjectReview() {
     if (t.closest('#btnReviewPrint')) { exportPdf(); return; }
     const size = t.closest('[data-host-size]');
     if (size) { setHostSize(size.dataset.hostSize); return; }
+    if (handleGisClick(t)) return;
     if (!session) return;
     if (t.closest('#btnReviewCompare')) { toggleSplit(); return; }
     if (t.closest('#btnReviewCancel')) { if (confirm('Hủy bỏ hồ sơ thẩm định đang xem?')) closeReview(); return; }

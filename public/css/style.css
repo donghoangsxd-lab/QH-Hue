@@ -2667,6 +2667,10 @@ body.project-review .bp-part2 { display: none; }
 .review-hint li { margin: 2px 0; }
 .review-hint li b { font-weight: 600; color: var(--text-main); }
 .review-hint i { color: var(--accent-cyan); font-style: normal; font-size: var(--fs-xs); }
+.gis-zip { margin-top: 6px; }
+.gis-pkgs { display: flex; flex-direction: column; gap: 2px; }
+.gis-pkgs em { font-style: normal; }
+.gis-issues td:last-child { white-space: normal; min-width: calc(220px * var(--k)); }
 .review-note { margin: 8px 0; font-size: var(--fs-sm); line-height: 1.45; }
 .review-sheet h4 { margin: 6px 0 4px; font-size: var(--fs-sm); }
 .review-sheet > .review-head { position: sticky; top: 0; z-index: 2; margin: 0 -8px; background: var(--bg-panel); }

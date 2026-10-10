@@ -138,17 +138,44 @@ export function readZip(buf, label = 'ZIP') {
     const nameLen = view.getUint16(p + 28, true);
     const method = view.getUint16(p + 10, true);
     const size = view.getUint32(p + 20, true);
+    const usize = view.getUint32(p + 24, true);
     const local = view.getUint32(p + 42, true);
     const name = dec.decode(new Uint8Array(buf, p + 46, nameLen));
     entries.push({
       name,
-      read: async () => {
+      method,
+      size,
+      usize,
+      // maxBytes: dừng sau bấy nhiêu byte đã giải nén (đọc 100 byte đầu .shp, không giải cả file tọa độ)
+      read: async (opts) => {
+        const maxBytes = opts && opts.maxBytes > 0 ? opts.maxBytes : 0;
+        if (size === 0xffffffff) throw new Error(`${label} dạng ZIP64 — chọn thư mục trên máy thay vì file nén.`);
         const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
         const data = new Uint8Array(buf, start, size);
-        if (method === 0) return data;
+        if (method === 0) return maxBytes ? data.subarray(0, maxBytes) : data;
         if (method !== 8) throw new Error(`${label} dùng kiểu nén chưa hỗ trợ — giải nén rồi nén lại bằng ZIP thường.`);
         if (typeof DecompressionStream === 'undefined') throw new Error(`Trình duyệt chưa hỗ trợ giải nén ${label} — dùng Chrome/Edge bản mới.`);
-        return new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+        const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+        if (!maxBytes) return new Uint8Array(await new Response(stream).arrayBuffer());
+        const reader = stream.getReader();
+        const chunks = [];
+        let got = 0;
+        while (got < maxBytes) {
+          const step = await reader.read();
+          if (step.done) break;
+          chunks.push(step.value);
+          got += step.value.length;
+        }
+        try { await reader.cancel(); } catch (e) { /* luồng đã đóng */ }
+        const out = new Uint8Array(Math.min(got, maxBytes));
+        let o = 0;
+        for (const c of chunks) {
+          const n = Math.min(c.length, out.length - o);
+          if (n > 0) out.set(c.subarray(0, n), o);
+          o += n;
+          if (o >= out.length) break;
+        }
+        return out;
       }
     });
     p += 46 + nameLen + view.getUint16(p + 30, true) + view.getUint16(p + 32, true);

@@ -86,6 +86,21 @@ function readDbf(buf, cpg) {
   return rows;
 }
 
+/** 100 byte đầu .shp → 'A' vùng | 'P' điểm | 'L' đường | '' lớp rỗng | null không đọc được.
+ *  multi: MultiPoint (vẫn tính là điểm, người chấm ghi cảnh báo). */
+export function shpHeaderKind(buf) {
+  if (!buf || buf.byteLength < 100) return null;
+  const v = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  if (v.getInt32(0, false) !== 9994) return null;
+  const t = v.getInt32(32, true);
+  if (SHP_POLYGON.has(t)) return { kind: 'A', multi: false };
+  if (SHP_LINE.has(t)) return { kind: 'L', multi: false };
+  if (SHP_POINT.has(t)) return { kind: 'P', multi: false };
+  if (SHP_MULTIPOINT.has(t)) return { kind: 'P', multi: true };
+  if (t === 0) return { kind: '', multi: false };
+  return { kind: null, multi: false };
+}
+
 /** Nội dung .prj → 'WGS84' | mã CRS_PRESETS | null (không có / hệ khác) */
 export function prjToCrs(prj) {
   const s = String(prj || '').trim().toUpperCase();

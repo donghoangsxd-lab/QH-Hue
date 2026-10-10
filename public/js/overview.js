@@ -176,6 +176,22 @@ const SECTIONS = [
         actions: [{ label: 'Mở công cụ thẩm định', icon: 'table', run: reviewOn }]
       },
       {
+        id: 'gis16', btn: 'guide', status: 'trial',
+        title: 'Kiểm tra hồ sơ GIS theo Phụ lục II Thông tư 16/2025',
+        note: 'Đọc trên máy, không gửi file đi. File Geodatabase (.gdb) chưa mở được bên trong',
+        lead: 'Chọn thư mục HoSoGIS để đối chiếu bốn gói dữ liệu, tên lớp, kiểu hình và sáu trường thuộc tính bắt buộc.',
+        steps: [
+          'Bấm nút <b>Thẩm định đồ án</b> (nút màu cam đầu thanh công cụ bên trái), chọn <b>Hồ sơ GIS</b>.',
+          'Bấm <b>Chọn thư mục HoSoGIS</b> (Chrome hoặc Edge). Hộp thoại có thể ghi tải lên — file vẫn chỉ đọc trên máy.',
+          'Bấm <b>Kiểm tra thành phần</b>. Bảng ở nửa dưới màn hình ghi Không đạt, Cảnh báo hoặc Đạt.'
+        ],
+        facts: [
+          'Shapefile chỉ đọc đầu file .shp, file .dbf và .prj. Phần tọa độ bỏ qua.',
+          'Thiếu chuyên đề trong Phần 3 là cảnh báo, vì danh mục đó là tham khảo.'
+        ],
+        actions: [{ label: 'Mở công cụ thẩm định', icon: 'table', run: reviewOn }]
+      },
+      {
         id: 'terrain', btn: 'guide', status: 'dev',
         title: 'Chồng lớp bản đồ địa hình',
         note: 'Dữ liệu vệ tinh kích thước ô 30 m × 30 m, sai số ±1,0 m',
