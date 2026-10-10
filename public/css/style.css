@@ -762,6 +762,7 @@ body.right-collapsed .right-panel {
 .terrain-legend-ticks span:last-child { transform: translateX(-100%); }
 .terrain-legend-foot { display: flex; justify-content: space-between; gap: 6px; }
 #terrainReadout { color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.terrain-shade { display: flex; align-items: center; gap: 6px; margin-top: 4px; cursor: pointer; }
 .drainage-legend-row { display: flex; align-items: flex-start; gap: 6px; line-height: 1.35; }
 .drainage-swatch { flex: 0 0 44px; height: 12px; margin-top: 2px; fill: none; }
 .drainage-swatch-dash { animation: drainage-dash 0.9s linear infinite; }

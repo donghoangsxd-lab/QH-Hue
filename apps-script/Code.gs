@@ -984,6 +984,7 @@ function doPost(e) {
     if (action === "saveDrainage") return jsonOutput(saveDrainage(body));
     if (action === "saveBasins") return jsonOutput(saveBasins(body));
     if (action === "saveDrainArrows") return jsonOutput(saveDrainArrows(body));
+    if (action === "saveHillshade") return jsonOutput(saveHillshade(body));
     if (action === "addPendingCad") return jsonOutput(addPendingCad(body));
     if (action === "removePendingCad") return jsonOutput(removePendingCad(body));
     if (action === "addPendingPoints") {
@@ -1383,6 +1384,35 @@ function saveDrainArrows(body) {
   });
   if (failed.length) return { "error": "Không ghi được " + failed.length + " ô: " + failed.slice(0, 5).join(", ") };
   return { "success": true, "saved": uploadToGCS(JSON.stringify(index), "drainage/huongthoat/index.json"), "tiles": keys.length, "size": content.length };
+}
+
+// ĐỔ BÓNG ĐỊA HÌNH (scripts/build-hillshade.js gửi từng lô) → terrain/hillshade/<z_x_y>.png + index.json.
+// content = { tiles: { "12_x_y": PNG base64 }, index?: { at, scale, minZoom, maxZoom, tiles } }; index chỉ có ở lô cuối
+// để webapp không đọc bộ ô ghi dở.
+function saveHillshade(body) {
+  var content = String(body.content || '');
+  if (!content || content.length > 6000000) return { "error": "Dữ liệu đổ bóng rỗng hoặc quá 6 MB" };
+  var data;
+  try { data = JSON.parse(content); } catch (e) { return { "error": "Dữ liệu đổ bóng không phải JSON" }; }
+  var tiles = (data && data.tiles) || {}, index = data && data.index;
+  var keys = Object.keys(tiles);
+  if (keys.length > 100) return { "error": "Quá 100 ô trong một lô" };
+  if (!keys.length && !index) return { "error": "Thiếu tiles / index" };
+  if (index && (!index.tiles || typeof index.tiles !== "object")) return { "error": "index thiếu danh sách ô" };
+  var failed = [];
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (!/^\d{1,2}_\d{1,6}_\d{1,6}$/.test(k)) return { "error": "Tên ô không hợp lệ: " + k };
+    var bytes;
+    try { bytes = Utilities.base64Decode(String(tiles[k])); } catch (err) { return { "error": "Ô " + k + " không phải base64" }; }
+    if (!bytes || bytes.length < 8 || bytes.length > 400000 || bytes[1] !== 80 || bytes[2] !== 78 || bytes[3] !== 71) {
+      return { "error": "Ô " + k + " không phải PNG hợp lệ" };
+    }
+    if (!uploadBytesToGCS(bytes, "terrain/hillshade/" + k + ".png", "image/png")) failed.push(k);
+  }
+  if (failed.length) return { "error": "Không ghi được " + failed.length + " ô: " + failed.slice(0, 5).join(", ") };
+  var saved = index ? uploadToGCS(JSON.stringify(index), "terrain/hillshade/index.json") : true;
+  return { "success": true, "saved": saved, "tiles": keys.length };
 }
 
 // VÙNG HIỆU CHỈNH RASTER DÂN CƯ (Admin vẽ xóa / thêm pixel dân cư) → file pop/edits.json (ghi đè toàn bộ)

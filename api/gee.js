@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 const constants = require('../config/constants');
 const { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, POP_SCALE_M } = require('../services/geeService');
-const { getRawDataList, getCadParcels, getDrainage, getBasins, getDrainArrows, invalidateCache, getDataVersion } = require('../services/gcsService');
+const { getRawDataList, getCadParcels, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion } = require('../services/gcsService');
 const { requireAdmin, httpError } = require('../services/authService');
 const roads = require('../services/roadsService');
 const popEdits = require('../services/popEditsService');
@@ -1913,6 +1913,27 @@ module.exports = async (req, res) => {
       }
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       return res.status(200).send(d.text);
+    }
+
+    // Đổ bóng địa hình tĩnh (t=index | t=z_x_y). Ô gọi kèm v = thời điểm ghi trong index nên cache dài được
+    if (action === 'getHillshade') {
+      const t = String(req.query.t || '');
+      if (!/^(index|\d{1,2}_\d{1,6}_\d{1,6})$/.test(t)) return res.status(400).json({ error: true, message: 'Tên ô không hợp lệ' });
+      const d = await getHillshade(t);
+      const body = d && (t === 'index' ? d.text : d.buf);
+      if (!body || !body.length) {
+        const message = t === 'index' ? 'Chưa có đổ bóng địa hình trên bucket — chạy node scripts/build-hillshade.js' : 'Không có ô này';
+        return res.status(404).json({ error: true, message });
+      }
+      res.setHeader('Cache-Control', t === 'index'
+        ? 'public, max-age=300, s-maxage=600, stale-while-revalidate=86400'
+        : 'public, max-age=604800, s-maxage=2592000, immutable');
+      if (d.etag) {
+        res.setHeader('ETag', d.etag);
+        if (req.headers['if-none-match'] === d.etag) return res.status(304).end();
+      }
+      res.setHeader('Content-Type', t === 'index' ? 'application/json; charset=utf-8' : 'image/png');
+      return res.status(200).send(body);
     }
 
     // Đường trục chính rút gọn cả thành phố (mức phóng còn thấy một lúc nhiều phường, trên mức một biểu đồ tròn)

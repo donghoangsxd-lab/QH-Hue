@@ -20,6 +20,7 @@ const LEVELS = {
   2: {
     key: 'sub', title: 'Tiểu lưu vực', short: 'TLV', kind: 'Tiểu lưu vực', lineZoom: 11, labelZoom: 13,
     line: { color: '#facc15', weight: 1.5, dashArray: '5 5', opacity: 0.9 },
+    halo: { color: '#0f172a', opacity: 0.4, weight: 3.5 },
     note: 'Đường phân thủy tính từ cao độ nền FABDEM 30 m.'
   },
   3: {

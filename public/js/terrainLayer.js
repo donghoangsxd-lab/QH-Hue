@@ -2,6 +2,8 @@
 // Nguồn FABDEM (đã gỡ nhà và tán cây) do GEE trả về dạng ô Terrarium (cao độ = R*256 + G + B/256 − 32768 m),
 // cùng nguồn bảng dân số theo cao độ của mô phỏng ngập; GEE lỗi thì dùng ô SRTM của AWS Terrain Tiles (cao độ bề mặt).
 // Giải mã và tô màu ngay trên trình duyệt; vẽ đồng thời trên bản đồ hiện trạng và quy hoạch.
+// Đổ bóng địa hình: ô hệ số tĩnh trên bucket (terrain/hillshade/, scripts/build-hillshade.js), nhân thẳng vào màu
+// trong canvas để in / chụp bản đồ (html2canvas) vẫn giữ bóng.
 import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { geeApi } from './api.js';
@@ -95,18 +97,98 @@ export function loadElevTile(z, x, y) {
   return p;
 }
 
+// Giới hạn hệ số đổ bóng: sườn khuất không tối hẳn, sườn đón sáng không cháy màu
+const SHADE_MIN = 0.3, SHADE_MAX = 1.3;
+let shadeOn = true;
+let shadeIndexPromise = null;
+const shadeCache = new Map();   // "z_x_y" → Uint8Array 256×256 (giá trị = hệ số × index.scale)
+const shadePending = new Map();
+
+function shadeIndex() {
+  if (!shadeIndexPromise) {
+    shadeIndexPromise = fetch(geeApi('action=getHillshade&t=index'))
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then(idx => (idx && idx.tiles && idx.scale > 0 ? idx : null))
+      .catch(err => {
+        console.warn('Không tải được đổ bóng địa hình:', err.message);
+        return null;
+      });
+  }
+  return shadeIndexPromise;
+}
+
+/** Ô hệ số đổ bóng; null khi ô không có trong index (mặt bằng, biển) hoặc tải lỗi */
+function loadShadeTile(idx, z, x, y) {
+  const key = `${z}_${x}_${y}`;
+  if (!idx.tiles[key]) return Promise.resolve(null);
+  if (shadeCache.has(key)) return Promise.resolve(shadeCache.get(key));
+  if (shadePending.has(key)) return shadePending.get(key);
+  const p = new Promise(resolve => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 256;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const px = ctx.getImageData(0, 0, 256, 256).data;
+      const v = new Uint8Array(256 * 256);
+      for (let i = 0, q = 0; i < v.length; i++, q += 4) v[i] = px[q];
+      shadeCache.set(key, v);
+      if (shadeCache.size > CACHE_MAX) shadeCache.delete(shadeCache.keys().next().value);
+      resolve(v);
+    };
+    img.onerror = () => resolve(null);
+    img.src = geeApi(`action=getHillshade&t=${key}&v=${encodeURIComponent(idx.at || '')}`);
+  }).finally(() => shadePending.delete(key));
+  shadePending.set(key, p);
+  return p;
+}
+
+/** Hệ số đổ bóng 256×256 cho ô (z, x, y) của lớp địa hình; mức trên index.maxZoom nội suy song tuyến từ ô cha */
+async function shadeFor(z, x, y) {
+  if (!shadeOn) return null;
+  const idx = await shadeIndex();
+  if (!idx || z < idx.minZoom) return null;
+  const k = Math.max(0, z - idx.maxZoom);
+  const src = await loadShadeTile(idx, z - k, x >> k, y >> k);
+  if (!src) return null;
+  const inv = 1 / idx.scale;
+  const fac = (v) => Math.min(SHADE_MAX, Math.max(SHADE_MIN, v * inv));
+  const out = new Float32Array(256 * 256);
+  if (!k) {
+    for (let i = 0; i < out.length; i++) out[i] = fac(src[i]);
+    return out;
+  }
+  const n = 2 ** k;
+  const ox = (x - ((x >> k) << k)) * 256 / n, oy = (y - ((y >> k) << k)) * 256 / n;
+  for (let j = 0; j < 256; j++) {
+    const v = Math.min(255, Math.max(0, oy + (j + 0.5) / n - 0.5));
+    const y0 = Math.floor(v), y1 = Math.min(255, y0 + 1), ty = v - y0;
+    for (let i = 0; i < 256; i++) {
+      const u = Math.min(255, Math.max(0, ox + (i + 0.5) / n - 0.5));
+      const x0 = Math.floor(u), x1 = Math.min(255, x0 + 1), tx = u - x0;
+      const top = src[y0 * 256 + x0] * (1 - tx) + src[y0 * 256 + x1] * tx;
+      const bot = src[y1 * 256 + x0] * (1 - tx) + src[y1 * 256 + x1] * tx;
+      out[j * 256 + i] = fac(top * (1 - ty) + bot * ty);
+    }
+  }
+  return out;
+}
+
 const TerrainGrid = L.GridLayer.extend({
   createTile(coords, done) {
     const tile = document.createElement('canvas');
     tile.width = tile.height = 256;
-    loadElevTile(coords.z, coords.x, coords.y).then(elev => {
+    Promise.all([loadElevTile(coords.z, coords.x, coords.y), shadeFor(coords.z, coords.x, coords.y)]).then(([elev, shade]) => {
       const ctx = tile.getContext('2d');
       const data = ctx.createImageData(256, 256);
       const px = data.data;
       for (let i = 0, p = 0; i < elev.length; i++, p += 4) {
         const e = elev[i];
         const m = e <= 0 ? 0 : e >= LUT_MAX ? LUT_MAX : Math.round(e);
-        px[p] = LUT[m * 3]; px[p + 1] = LUT[m * 3 + 1]; px[p + 2] = LUT[m * 3 + 2]; px[p + 3] = 255;
+        const f = shade ? shade[i] : 1;
+        px[p] = LUT[m * 3] * f; px[p + 1] = LUT[m * 3 + 1] * f; px[p + 2] = LUT[m * 3 + 2] * f; px[p + 3] = 255;
       }
       ctx.putImageData(data, 0, 0);
       done(null, tile);
@@ -200,5 +282,10 @@ export function initTerrainLayer() {
     const o = opacity();
     leftLayer?.setOpacity(o);
     rightLayer?.setOpacity(o);
+  });
+  $('chk_hillshade')?.addEventListener('change', (e) => {
+    shadeOn = e.target.checked;
+    leftLayer?.redraw();
+    rightLayer?.redraw();
   });
 }

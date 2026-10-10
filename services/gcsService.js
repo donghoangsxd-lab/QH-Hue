@@ -216,7 +216,7 @@ async function getCadParcels() {
   }
 }
 
-// ================= LỚP TĨNH THỦY VĂN (drainage/thoatnuoc.topojson, drainage/luuvuc.topojson, drainage/huongthoat/) =================
+// ================= LỚP TĨNH (drainage/thoatnuoc.topojson, drainage/luuvuc.topojson, drainage/huongthoat/, terrain/hillshade/) =================
 
 const cachedText = {};   // url → { text, etag }
 
@@ -249,6 +249,39 @@ const getBasins = () => getTextFile(constants.BASINS_GCS_URL, 'ranh lưu vực')
 /** key: "index" | "12_x_y" (đã kiểm tra ở api/gee.js) */
 const getDrainArrows = (key) => getTextFile(`${constants.DRAIN_ARROWS_GCS_BASE}${key}.json`, 'mũi tên thoát nước');
 
+const cachedBinary = new Map();   // url → { buf, etag }, bỏ mục cũ nhất khi quá BINARY_CACHE_MAX
+const BINARY_CACHE_MAX = 300;
+
+/** File nhị phân trên bucket + ETag (cùng cơ chế HEAD kiểm tra phiên bản như getTextFile); không có → null */
+async function getBinaryFile(url, label) {
+  try {
+    let currentETag = null;
+    try {
+      currentETag = tagOf(await axios.head(bypassEdge(url), { timeout: 5000 }));
+    } catch (headErr) {
+      if (headErr.response && headErr.response.status === 404) return null;
+    }
+    const cached = cachedBinary.get(url);
+    if (cached && currentETag && currentETag === cached.etag) return cached;
+
+    const response = await axios.get(bypassEdge(url), { timeout: 20000, responseType: 'arraybuffer' });
+    const entry = { buf: Buffer.from(response.data), etag: tagOf(response) || currentETag };
+    cachedBinary.delete(url);
+    cachedBinary.set(url, entry);
+    if (cachedBinary.size > BINARY_CACHE_MAX) cachedBinary.delete(cachedBinary.keys().next().value);
+    return entry;
+  } catch (e) {
+    if (e.response && e.response.status === 404) return null;
+    console.error(`Lỗi nạp ${label} GCS:`, e.message);
+    return cachedBinary.get(url) || null;
+  }
+}
+
+/** key: "index" (JSON) | "z_x_y" (PNG, đã kiểm tra ở api/gee.js) */
+const getHillshade = (key) => (key === 'index'
+  ? getTextFile(`${constants.HILLSHADE_GCS_BASE}index.json`, 'chỉ mục đổ bóng địa hình')
+  : getBinaryFile(`${constants.HILLSHADE_GCS_BASE}${key}.png`, 'ô đổ bóng địa hình'));
+
 function invalidateCache() {
   cachedGeoJSON = null;
   lastETag = null;
@@ -260,4 +293,4 @@ function getDataVersion() {
   return dataVersion;
 }
 
-module.exports = { getRawDataList, getCadParcels, getDrainage, getBasins, getDrainArrows, invalidateCache, getDataVersion };
+module.exports = { getRawDataList, getCadParcels, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion };
