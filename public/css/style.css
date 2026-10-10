@@ -2754,7 +2754,8 @@ body.project-view #projectReviewHost { display: flex; padding: 0; overflow: hidd
 .pv-col table.review-score td:nth-child(2) { max-width: calc(190px * var(--k)); overflow: hidden; text-overflow: ellipsis; }
 .pv-col > .review-note { flex-shrink: 0; margin: 3px 0 0; font-size: var(--fs-xs); }
 @media (max-width: 900px) {
-  .pv-sheet { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
+  .pv-sheet { grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; overflow-y: auto; }
+  .pv-part1 .bp-pie-inner { flex: none; height: calc(125px * var(--k)); }
   .pv-cols { grid-template-columns: minmax(0, 1fr); }
 }
 

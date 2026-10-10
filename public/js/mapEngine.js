@@ -1295,10 +1295,24 @@ function landLotShape(p, m, detailed) {
   bindLotHover(shape);
   shape.on('click', (e) => {
     if (passToolClick(m, e)) return;
-    const popup = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup' }).setLatLng(e.latlng).setContent(landPopupHtml(p)).openOn(m);
-    addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
+    openLandPopup(p, m, e.latlng);
   });
   return shape;
+}
+
+function openLandPopup(p, m, latlng) {
+  const popup = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup' }).setLatLng(latlng).setContent(landPopupHtml(p)).openOn(m);
+  addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
+}
+
+/** Popup lô đồ án như khi bấm lô trên bản đồ: lô đất → thẻ sử dụng đất, lô hạ tầng → popup công trình bám lô */
+export function openLotPopup(p, m, latlng) {
+  if (!p || !m || !latlng) return;
+  const item = p.kind === 'DXF' ? null
+    : (m === planMap && getPlanScenarioList().find(it => it.id === p.id))
+      || state.rawDataList.find(it => it.id === p.id) || state.planDataList.find(it => it.id === p.id);
+  if (item) onPointClick(item, m, p.geometry);
+  else openLandPopup(p, m, latlng);
 }
 
 // Thứ tự vẽ (vẽ sau nằm trên): đồ án diện tích lớn trước để đồ án nhỏ lồng bên trong không bị che và bấm được;

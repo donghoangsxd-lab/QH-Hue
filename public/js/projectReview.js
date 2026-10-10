@@ -3,7 +3,7 @@
 // (quy mô, độ phủ trên đất ở) → chuyển phê duyệt vào hàng chờ → Admin phê duyệt thì ghi Sheet qua khung Nhập hàng loạt
 // (Ten_QH = <mã>, khớp / gộp công trình đã có). Bản đồ đẩy lớp hiện trạng lên trước rồi lớp quy hoạch; chia đôi màn hình
 // thì hiện trạng bên trái, quy hoạch bên phải.
-import { map, layers, setReviewScope, setLandVisible } from './mapEngine.js';
+import { map, layers, setReviewScope, setLandVisible, openLotPopup } from './mapEngine.js';
 import { planMap, isCompareOn, isSplitOn, onCompareChange, toggleSplit, setSplit, setViewMode, passToolClick } from './planMap.js';
 import { state, BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, layerType } from './state.js';
 import { geeApi } from './api.js';
@@ -452,6 +452,8 @@ function drawPhase(phase) {
         L.DomEvent.stopPropagation(e);
         if (passToolClick(m, e)) return;
         if (lot.decisionKind && !session.pendingId) { openDecision(lot.id); return; }
+        // Xem đồ án đã lưu: bấm lô xem thông tin lô (lớp thửa đang bật thì thửa thay popup lô) thay vì chọn dòng bảng
+        if (session.view && lot.src) { openLotPopup(lot.src, m, e.latlng); return; }
         focusRow(lot.ask ? `ask:${lot.layer}` : lot.role === 'score' && lot.phase === 'QH' ? `lot:${lot.id}` : `land:${lot.landKey}`, false);
       });
     g.addLayer(shape);
@@ -570,8 +572,20 @@ function focusRow(key, fit = true) {
   if (fit && focusKey.startsWith('lot:')) flashLot(session.byId.get(focusKey.slice(4)));
   else clearFlash();
   // Xem gọn: cùng đầu mục có ở chú giải donut và trong bảng → cuộn cả hai khung
-  document.querySelectorAll(`#projectReviewHost [data-focus="${CSS.escape(focusKey)}"]`)
-    .forEach(el => el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+  if (focusKey) document.querySelectorAll(`#projectReviewHost [data-focus="${CSS.escape(focusKey)}"]`).forEach(scrollNearest);
+}
+
+// Chỉ cuộn khung cuộn gần nhất: scrollIntoView cuộn cả khung cha overflow:hidden (host, panel dưới) làm lệch bố cục
+function scrollNearest(el) {
+  let box = el.parentElement;
+  while (box && box !== document.body
+    && !(box.scrollHeight > box.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(box).overflowY))) box = box.parentElement;
+  if (!box || box === document.body) return;
+  const b = box.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  const head = el.closest('tbody') ? (box.querySelector('thead')?.getBoundingClientRect().height || 0) : 0;
+  if (r.top < b.top + head) box.scrollBy({ top: r.top - b.top - head - 4, behavior: 'smooth' });
+  else if (r.bottom > b.bottom) box.scrollBy({ top: r.bottom - b.bottom + 4, behavior: 'smooth' });
 }
 
 // ============================ DUYỆT TỪNG ĐỐI TƯỢNG (TRƯỜNG HỌC / THƯƠNG MẠI) ============================
@@ -1476,7 +1490,7 @@ function savedLot(p, i) {
   return {
     id: `${phase}${i}`, phase, layer, name, area, lat, lng, polygons,
     infra: p.kind !== 'DXF', sheetId: String(p.id), pattern: landPatternKey(layer, name),
-    existing: EXISTING_RE.test(fold(`${layer} ${name}`))
+    existing: EXISTING_RE.test(fold(`${layer} ${name}`)), src: p
   };
 }
 
