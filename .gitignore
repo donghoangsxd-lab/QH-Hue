@@ -11,5 +11,6 @@ Thumbs.db
 /VungThap.geojson
 /HuongThoat.geojson
 /.cache/
+/public/version.json
 .vercel
 .env*

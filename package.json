@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "vercel dev",
-    "build": "echo 'No build step required'"
+    "build": "node scripts/write-version.js"
   },
   "dependencies": {
     "@google/earthengine": "^0.1.385",

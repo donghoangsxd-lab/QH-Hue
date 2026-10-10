@@ -386,9 +386,6 @@ function listHtml() {
       <p><b>Giới thiệu chung:</b> Trang web có mục đích phi thương mại, được lập phục vụ công tác quản lý chuyên ngành của
       Sở Xây dựng thành phố Huế và đang trong giai đoạn thử nghiệm. Trang hỗ trợ xử lý các nhóm vấn đề chính sau đây:</p>
     </div>
-    <div class="ov-legend" aria-label="Chú thích trạng thái">
-      <span>Trạng thái:</span>${Object.keys(STATUS).map(badge).join('')}
-    </div>
     <div class="ov-groups">
       ${SECTIONS.map((sec, i) => `<section class="ov-group">
         <header class="ov-group-head">
@@ -475,6 +472,19 @@ function submitCoord(form) {
   lookupAt(pt);
 }
 
+// version.json do bước build khi deploy ghi (scripts/write-version.js); chạy local không có file thì ẩn dòng version
+function loadVersion(el) {
+  fetch('./version.json', { cache: 'no-store' })
+    .then(r => (r.ok ? r.json() : null))
+    .then(v => {
+      if (!el || !v?.label) return;
+      el.textContent = v.label;
+      el.title = `Thời điểm triển khai bản web hiện tại${v.commit ? ` (commit ${v.commit})` : ''}`;
+      el.hidden = false;
+    })
+    .catch(() => { /* chưa có version.json */ });
+}
+
 function build() {
   root = document.createElement('div');
   root.className = 'ov-root';
@@ -487,12 +497,18 @@ function build() {
           <div class="ov-kicker">Bản đồ quy hoạch và hạ tầng đô thị TP. Huế · Sở Xây dựng thành phố Huế</div>
           <h2 class="ov-title" id="ovTitle">GIỚI THIỆU TỔNG QUAN</h2>
         </div>
-        <span class="ov-beta">${ico('clock')}Giai đoạn thử nghiệm</span>
+        <div class="ov-stage">
+          <span class="ov-beta">${ico('clock')}Giai đoạn thử nghiệm</span>
+          <span class="ov-ver" hidden></span>
+        </div>
         <button type="button" class="ov-x" title="Đóng" aria-label="Đóng">${ico('close')}</button>
       </header>
       <div class="ov-body"></div>
       <footer class="ov-foot">
         <label class="ov-off"><input type="checkbox"> Không tự hiện khi mở trang</label>
+        <div class="ov-legend" aria-label="Chú thích trạng thái">
+          <span>Trạng thái:</span>${Object.keys(STATUS).map(badge).join('')}
+        </div>
         <div class="ov-foot-btns">
           <button type="button" class="ov-ghost" data-ov-tour>${ico('help')}Hướng dẫn thao tác cơ bản</button>
           <button type="button" class="ov-primary" data-ov-close>${ico('map')}Vào bản đồ</button>
@@ -501,6 +517,7 @@ function build() {
     </div>`;
   document.body.appendChild(root);
   els = { body: root.querySelector('.ov-body'), off: root.querySelector('.ov-off input') };
+  loadVersion(root.querySelector('.ov-ver'));
 
   root.addEventListener('click', (e) => {
     if (e.target === root) { close(); return; }
