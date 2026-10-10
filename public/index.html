@@ -638,8 +638,38 @@
 
       <!-- TAB: CHÚ GIẢI -->
       <div class="tab-body" id="tabLegend" style="display:none;">
-        <div class="legend-title">Ký hiệu sử dụng đất <small>(theo Thông tư 16/2025/TT-BXD)</small></div>
-        <div class="tt16-legend" id="parcelLegend"></div>
+        <div class="layer-tree">
+        <div class="layer-main legend-main">
+          <div class="layer-main-tabs">
+            <span class="layer-main-tab active legend-head" title="Ký hiệu ranh lô theo Thông tư 16/2025/TT-BXD, Phụ lục I Mục 04 (QHPK 1/2.000, 1/5.000). Thu nhỏ tô đặc màu ký hiệu; phóng to từ mức 17 hiện hoa văn"><span class="layer-main-label">Ký hiệu sử dụng đất</span><span class="layer-count" id="legendCount">0</span></span>
+            <button type="button" class="layer-eye-btn" id="btnLegendFold" aria-pressed="false" title="Thu gọn mọi nhóm" aria-label="Thu gọn / mở mọi nhóm ký hiệu"><svg class="ico"><use href="#i-chevs-down"/></svg></button>
+          </div>
+          <div class="layer-main-pane">
+            <input type="search" id="legendSearch" class="project-search" placeholder="Tìm loại đất, tên layer CAD..." aria-label="Tìm ký hiệu sử dụng đất">
+            <div class="tt16-legend" id="parcelLegend"></div>
+          </div>
+        </div>
+
+        <div class="layer-map legend-display">
+          <div class="layer-map-tabs">
+            <span class="layer-map-tab active legend-head"><span class="layer-map-label">Hiển thị lô đất</span></span>
+          </div>
+          <div class="layer-map-pane">
+            <div class="layer-row lot-opacity-row">
+              <label for="lotOpacity" title="Độ trong suốt phần tô màu / hoa văn của mọi lô đất và lô công trình (hiện trạng, quy hoạch, thẩm định). Viền lô giữ nguyên; kéo về 0% chỉ còn viền"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Độ trong suốt</label>
+              <input type="range" id="lotOpacity" class="opacity-slider" min="0" max="100" step="5" value="100" aria-label="Độ trong suốt lô đất">
+              <button type="button" class="lot-opacity-value" id="lotOpacityValue" title="Bấm để trả về mặc định (100%)">100%</button>
+            </div>
+            <div class="legend-sub">Viền lô theo giai đoạn</div>
+            <div class="tt16-frames">
+              <div class="tt16-row"><i class="tt16-frame tt16-frame-ht"></i><span>Hiện trạng</span></div>
+              <div class="tt16-row"><i class="tt16-frame tt16-frame-dd"></i><span>QH đợt đầu</span></div>
+              <div class="tt16-row" title="Công trình đề xuất chưa được Admin duyệt (TrangThai = FALSE)"><i class="tt16-frame tt16-frame-pending"></i><span>Chờ duyệt</span></div>
+              <div class="tt16-row"><i class="tt16-frame tt16-frame-dh"></i><span>QH dài hạn</span></div>
+            </div>
+          </div>
+        </div>
+        </div>
       </div>
     </div>
   </aside>

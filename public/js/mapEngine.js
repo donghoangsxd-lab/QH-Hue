@@ -10,7 +10,8 @@ import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, show
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
-import { tt16ParcelStyle, infraStyleKey, renderTt16Legend, landParcelStyle, landLabel, landColor, landPatternKey, tt16SwatchCss, TT16_PATTERN_ZOOM, TT16_STYLES } from './tt16Symbols.js';
+import { tt16ParcelStyle, infraStyleKey, landParcelStyle, landLabel, landColor, landPatternKey, tt16SwatchCss, TT16_PATTERN_ZOOM, TT16_STYLES, LOT_OPACITY_EVENT } from './tt16Symbols.js';
+import { initLegendPanel } from './legendPanel.js';
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap } from './basemap.js';
 import {
@@ -19,6 +20,7 @@ import {
 } from './planMap.js';
 import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, infraLotOf } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
+import { analyzePlanLand, planLandHtml } from './planLandStats.js';
 
 export let map = null;
 export let measureLayerGroup = null;
@@ -198,7 +200,8 @@ export function initMap() {
   onChangeLots(() => { redrawParcels(); redrawLands(); });
   updateWardLabelFontSize();
   onCompareChange(handleCompareChange);
-  renderTt16Legend(document.getElementById('parcelLegend'));
+  initLegendPanel();
+  window.addEventListener(LOT_OPACITY_EVENT, () => { redrawParcels(); redrawLands(); });
 
   return map;
 }
@@ -461,6 +464,7 @@ export function clearMeasure() {
   state.activeMeasureType = null;
   state.measurePoints = [];
   [measureLayerGroup, planMeasureGroup].forEach(g => g && g.clearLayers());
+  closePlanLand();
 
   const btnDist = document.getElementById('btnMeasureDist');
   const btnArea = document.getElementById('btnMeasureArea');
@@ -483,6 +487,7 @@ export function handleMeasureClick(latlng) {
 function drawMeasure() {
   const groups = [measureLayerGroup, planMeasureGroup].filter(Boolean);
   groups.forEach(g => g.clearLayers());
+  closePlanLand();
   const pts = state.measurePoints;
   if (!pts.length) return;
   const isArea = state.activeMeasureType === 'area';
@@ -503,12 +508,57 @@ function drawMeasure() {
     if (!isArea && latlngs.length >= 2) L.polyline(latlngs, { color, weight: 3, dashArray: '4,4', interactive: false }).addTo(g);
     if (isArea && latlngs.length >= 3) L.polygon(latlngs, { color, weight: 2, fillColor: color, fillOpacity: 0.2, interactive: false }).addTo(g);
     if (label) {
-      L.marker(latlngs[latlngs.length - 1], {
+      const btn = isArea ? `<button type="button" class="measure-plan-btn" title="Thống kê, tỷ lệ các loại đất quy hoạch trong vùng đo">${ico('area')}Phân tích QH</button>` : '';
+      const marker = L.marker(latlngs[latlngs.length - 1], {
         interactive: false,
-        icon: L.divIcon({ className: 'measure-label', html: `<span style="border-color:${color};">${label}</span>`, iconSize: [0, 0] })
+        icon: L.divIcon({ className: 'measure-label', html: `<span style="border-color:${color};">${label}${btn}</span>`, iconSize: [0, 0] })
       }).addTo(g);
+      const el = btn && marker.getElement();
+      if (el) {
+        L.DomEvent.disableClickPropagation(el);
+        el.querySelector('.measure-plan-btn')?.addEventListener('click', () => openPlanLand(g === planMeasureGroup ? planMap : map));
+      }
     }
   });
+}
+
+// Popup phân tích sử dụng đất QH của vùng đo: đổi hình đo (thêm đỉnh / tắt đo) thì đóng và bỏ kết quả đang tính dở
+let planLandPopup = null;
+let planLandSeq = 0;
+
+function closePlanLand() {
+  planLandSeq++;
+  if (planLandPopup) {
+    planLandPopup.remove();
+    planLandPopup = null;
+  }
+}
+
+async function openPlanLand(m) {
+  const pts = state.measurePoints;
+  if (!m || pts.length < 3) return;
+  closePlanLand();
+  const seq = planLandSeq;
+  const ring = [...pts, pts[0]];
+  let at = L.latLng(pts[0][1], pts[0][0]);
+  try {
+    const c = turf.centroid(turf.polygon([ring])).geometry.coordinates;
+    at = L.latLng(c[1], c[0]);
+  } catch (e) { /* polygon tự cắt: đặt popup ở đỉnh đầu */ }
+  const popup = L.popup({ maxWidth: 360, minWidth: 300, className: 'land-lot-popup plan-land-popup', autoPanPaddingTopLeft: [40, 90] })
+    .setLatLng(at)
+    .setContent('<div class="plan-land-stats"><div class="pls-head">Sử dụng đất quy hoạch trong vùng đo</div><div class="pp-sub">Đang tải lô quy hoạch các đồ án trong vùng…</div></div>')
+    .openOn(m);
+  planLandPopup = popup;
+  popup.on('remove', () => { if (planLandPopup === popup) planLandPopup = null; });
+  try {
+    const res = await analyzePlanLand(ring);
+    if (seq !== planLandSeq || !popup.isOpen()) return;
+    popup.setContent(planLandHtml(res));
+  } catch (err) {
+    console.warn('Phân tích sử dụng đất quy hoạch lỗi:', err);
+    if (seq === planLandSeq && popup.isOpen()) popup.setContent(`<div class="plan-land-stats"><div class="sug-card ineligible">Không phân tích được: ${escapeHtml(err.message || String(err))}</div></div>`);
+  }
 }
 
 // ============================ VẼ ĐIỂM HẠ TẦNG (TỐI ƯU CHO HÀNG NGHÌN ĐIỂM) ============================

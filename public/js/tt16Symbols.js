@@ -92,12 +92,42 @@ PATTERN_CODES.forEach(([key, codes]) => codes.forEach(code => patternByCode.set(
 const LAYER_STAGE = new Set(['HT', 'QHDD', 'QHDH', 'QH']);
 const LAYER_LEVEL = new Set(['QG', 'CV', 'CT', 'CH', 'DVO', 'MN', 'TH', 'THCS', 'CHO', 'TM', 'TTTM', 'KHAC', 'PCCC', 'TANGLE']);
 
-// Thứ tự chú giải Quy hoạch, theo Mục 04 TT16 (bảng cân đối QHPK). Ba cấp trường tách màu, cùng hoa văn.
-const LEGEND_KEYS = [
-  "O-NO", "O-HH", "O-LX", "7-YT", "8-VH", "TDTT", "3-MN", "4-TH", "5-THCS", "6-THPT",
-  "CC-DV", "1-CV", "CX-HC", "CX-CD", "SX-CN", "SX-VL", "DT-NC", "CQ", "9-TM", "DL", "DT-TG",
-  "AN", "QP", "GT", "2-BDX", "NTR", "HTK", "NN", "RSX", "RPH", "RDD", "TS", "DCS", "HO", "SS", "MNB", "12-CSD"
+// Nhóm và thứ tự chú giải Quy hoạch, theo Mục 04 TT16 (bảng cân đối QHPK). Ba cấp trường tách màu, cùng hoa văn.
+const LEGEND_GROUPS = [
+  ['Đất ở', ["O-NO", "O-HH", "O-LX"]],
+  ['Hạ tầng xã hội', ["7-YT", "8-VH", "TDTT", "3-MN", "4-TH", "5-THCS", "6-THPT"]],
+  ['Công cộng, cây xanh', ["CC-DV", "1-CV", "CX-HC", "CX-CD"]],
+  ['Sản xuất', ["SX-CN", "SX-VL"]],
+  ['Cơ quan, dịch vụ, di tích', ["DT-NC", "CQ", "9-TM", "DL", "DT-TG"]],
+  ['An ninh, quốc phòng', ["AN", "QP"]],
+  ['Hạ tầng kỹ thuật', ["GT", "2-BDX", "NTR", "HTK"]],
+  ['Nông, lâm nghiệp, thủy sản', ["NN", "RSX", "RPH", "RDD", "TS"]],
+  ['Mặt nước, đất khác', ["DCS", "HO", "SS", "MNB", "12-CSD"]]
 ];
+const LEGEND_KEYS = LEGEND_GROUPS.flatMap(([, keys]) => keys);
+export const LEGEND_COUNT = LEGEND_KEYS.length;
+
+// Độ đục phần tô lô đất (thanh trượt ở Chú giải): nhân vào fillOpacity của ký hiệu, 1 = đúng mẫu; viền giữ nguyên.
+// Đổi giá trị phát LOT_OPACITY_EVENT để các bộ vẽ lô tô lại
+const LOT_OPACITY_KEY = 'qh_lot_opacity';
+export const LOT_OPACITY_EVENT = 'qh:lot-opacity';
+let lotOpacity = (() => {
+  try {
+    const raw = localStorage.getItem(LOT_OPACITY_KEY);
+    const v = raw === null ? NaN : Number(raw);
+    return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
+  } catch (e) { return 1; }
+})();
+
+export const getLotOpacity = () => lotOpacity;
+
+export function setLotOpacity(v) {
+  const next = Math.min(1, Math.max(0, Number(v)));
+  if (!Number.isFinite(next) || next === lotOpacity) return;
+  lotOpacity = next;
+  try { localStorage.setItem(LOT_OPACITY_KEY, String(next)); } catch (e) { /* chế độ riêng tư */ }
+  window.dispatchEvent(new CustomEvent(LOT_OPACITY_EVENT, { detail: next }));
+}
 
 // Từ zoom này tô hoa văn; thu nhỏ hơn tô đặc cùng màu ký hiệu
 export const TT16_PATTERN_ZOOM = 17;
@@ -514,7 +544,7 @@ export function tt16SymbolStyle(key, tone, layer, { scenario, detailed, approved
     opacity: 0.95,
     ...frameStyle(layer, scenario, approved),
     fillColor: pattern || color,
-    fillOpacity: pattern ? 1 : (s && s.solidOpacity) || (s && s.fillOpacity) || FILL_OPACITY
+    fillOpacity: (pattern ? 1 : (s && s.solidOpacity) || (s && s.fillOpacity) || FILL_OPACITY) * lotOpacity
   };
 }
 
@@ -539,21 +569,20 @@ export function tt16SwatchCss(key, scale = 1) {
   return `background-image:url(${tile.dataUrl});background-size:${w}px ${h}px;`;
 }
 
-/** Chú giải ký hiệu lô đất TT16 vào phần tử container */
+/** Chú giải ký hiệu lô đất TT16 theo nhóm vào phần tử container; data-search: chữ bỏ dấu để lọc (legendPanel.js) */
 export function renderTt16Legend(container) {
   if (!container) return;
-  const rows = LEGEND_KEYS.map(key => {
-    const s = TT16_STYLES[key];
-    const bg = tt16SwatchCss(key) || `background:${s.color};`;
-    const aci = s.aci != null ? ` · ACI ${s.aci}` : '';
-    return `<div class="tt16-row" title="${s.layer}${aci}">
-      <i class="tt16-swatch" style="${bg}border-color:${s.color};"></i><span>${s.label}</span></div>`;
-  }).join('');
-  container.innerHTML = `<div class="tt16-borders">
-      <span class="tt16-frame tt16-frame-ht" title="Hiện trạng">Hiện trạng</span>
-      <span class="tt16-frame tt16-frame-dd" title="Quy hoạch đợt đầu">QH đợt đầu</span>
-      <span class="tt16-frame tt16-frame-dh" title="Quy hoạch dài hạn">QH dài hạn</span>
-    </div>${rows}`;
+  container.innerHTML = LEGEND_GROUPS.map(([name, keys]) => {
+    const rows = keys.map(key => {
+      const s = TT16_STYLES[key];
+      const bg = tt16SwatchCss(key) || `background:${s.color};`;
+      const aci = s.aci != null ? ` · ACI ${s.aci}` : '';
+      const search = foldLayer(`${s.label} ${s.layer} ${key}`).toLowerCase();
+      return `<div class="tt16-row" title="${s.label}\nLayer: ${s.layer}${aci}" data-search="${search}">
+        <i class="tt16-swatch" style="${bg}border-color:${s.color};"></i><span>${s.label}</span></div>`;
+    }).join('');
+    return `<details class="tt16-group" open><summary><span class="tt16-group-name">${name}</span><span class="tt16-group-count">${keys.length}</span></summary>${rows}</details>`;
+  }).join('') + '<div class="tt16-empty" hidden>Không có ký hiệu khớp từ khóa.</div>';
 }
 
 export const RESIDENTIAL_COLOR = '#d4a20b';
@@ -611,7 +640,7 @@ export function landLabel(layerName) {
 
 export function landPolylineStyle(layerName) {
   const color = landColor(layerName) || '#94a3b8';
-  return { color, weight: 2, opacity: 0.95, fillColor: color, fillOpacity: 0.08 };
+  return { color, weight: 2, opacity: 0.95, fillColor: color, fillOpacity: 0.08 * lotOpacity };
 }
 
 // Lô hạ tầng nhập khớp thủ công: layer "<tên> → <mã loại>" (cadImportUi), mã cấp đô thị thêm _DT

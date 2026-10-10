@@ -239,6 +239,31 @@ export async function infraLotOf(id, tenQH, phases = ['QH', 'HT']) {
   return null;
 }
 
+/**
+ * Lô quy hoạch (giai đoạn QH) trong khung bbox [w, s, e, n]: file các đồ án có ranh tổng giao khung + lô QH theo phường.
+ * Bỏ đồ án đang ẩn hoặc đã tắt lớp sử dụng đất QH; chỉ tải / đọc bộ nhớ đệm, không đổi lớp đang vẽ.
+ * → { projects: [{ tenQH, bbox, lots }], wardLots }
+ */
+export async function planLotsIn(bbox) {
+  const entries = state.projectCatalog.filter(p => p && p.tenQH && !p.sheetOnly && Array.isArray(p.bbox)
+    && !state.hiddenProjects.has(p.tenQH) && !isLayerHidden(p.tenQH, LOT_LAYER.QH)
+    && p.bbox[0] <= bbox[2] && p.bbox[2] >= bbox[0] && p.bbox[1] <= bbox[3] && p.bbox[3] >= bbox[1]);
+  const projects = [];
+  await pool(entries, 3, async (entry) => {
+    try {
+      const row = await loadEntry(entry);
+      const lots = row.parcels.filter(p => p && p.geometry && p.phase === 'QH').map(p => ({ ...p, file: entry.tenQH }));
+      if (lots.length) projects.push({ tenQH: entry.tenQH, bbox: entry.bbox, lots });
+    } catch (err) { console.warn(`Không tải lô đồ án «${entry.tenQH}»:`, err); }
+  });
+  await ensureWard(true).catch(err => console.warn('Không tải lô theo phường:', err));
+  const wardLots = [
+    ...[...ward.map].filter(([k]) => k.startsWith('QH|')).map(([k, v]) => ({ ...v, id: k.slice(3), phase: 'QH' })),
+    ...ward.lands.filter(p => p.phase === 'QH').map(p => ({ ...p, kind: 'DXF' }))
+  ];
+  return { projects, wardLots };
+}
+
 // Admin vừa sửa 1 lô đất: chép vào bản đã tải, đổi saved để lần đọc sau khớp danh mục (không tải lại file đồ án).
 // Thay đối tượng lô mới để các bộ nhớ WeakMap theo lô (chỉ mục tìm lô, điểm neo) tính lại.
 export function patchCachedLand(tenQH, land, saved) {

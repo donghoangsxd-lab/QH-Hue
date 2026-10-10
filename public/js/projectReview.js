@@ -12,7 +12,7 @@ import { escapeHtml, fmtNum, ico, showToast, loadHtml2Pdf, isApproved } from './
 import { setBottomPanelMaximized } from './uiComponents.js';
 import { importReviewDossier, rejectPending, REVIEW_DOSSIER_EVENT } from './cadImportUi.js';
 import { setLabelsOverlay, labelsOverlayOn } from './basemap.js';
-import { tt16SymbolStyle, tt16SwatchCss, TT16_PATTERN_ZOOM, landPatternKey } from './tt16Symbols.js';
+import { tt16SymbolStyle, tt16SwatchCss, TT16_PATTERN_ZOOM, landPatternKey, LOT_OPACITY_EVENT } from './tt16Symbols.js';
 import {
   REVIEW_MAX_BYTES, LANDUSE_TABLES, classifyLand, landChoices, landRowByKey, landUseSummary, landSubKey, importLayerName, decisionKind,
   presetDecision, tagParcel, lotRadius, scoreRows, rowLabel, rowMinSize, newLandControl, residentialSubAreas, landSymbol, UNIT_POP, THPT_POP_MIN,
@@ -1583,6 +1583,10 @@ export function initProjectReview() {
   });
   layerTab?.addEventListener('change', (e) => {
     if (session && /^chk_c\d+$/.test(e.target.id || '')) drawAll(false);
+  });
+
+  window.addEventListener(LOT_OPACITY_EVENT, () => {
+    if (session && lotLayers.length) applyFocus(false);
   });
 
   onCompareChange(() => {

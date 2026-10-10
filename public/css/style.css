@@ -770,9 +770,24 @@ body.right-collapsed .right-panel {
   text-align: center; font-weight: bold; font-size: var(--fs-md); box-sizing: border-box;
 }
 
-/* CHÚ GIẢI: chỉ ký hiệu sử dụng đất TT16. Trạng thái duyệt nằm cuối nhóm Công trình ở tab Lớp dữ liệu. */
-.legend-title { margin: 0 0 8px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.legend-title small { font-size: calc(9px * var(--k)); font-weight: 400; text-transform: none; color: var(--text-muted); }
+/* CHÚ GIẢI: cùng khung tab Lớp dữ liệu — trên: ký hiệu sử dụng đất TT16 theo nhóm; dưới: hiển thị lô đất (độ trong suốt, viền giai đoạn).
+   Trạng thái duyệt của điểm công trình nằm cuối nhóm Công trình ở tab Lớp dữ liệu. */
+#tabLegend { flex-direction: column; overflow: hidden; padding: 0; height: calc(100vh - var(--side-gap) - 24px); }
+.legend-head { cursor: default; }
+.legend-head:hover { color: var(--text-main); }
+.layer-main-tabs .legend-head { justify-content: flex-start; padding-left: 6px; }
+#btnLegendFold .ico { transform: rotate(180deg); transition: transform var(--ease); }
+#btnLegendFold[aria-pressed="true"] { border-color: var(--border-color); background: var(--bg-input); color: var(--text-main); }
+#btnLegendFold[aria-pressed="true"] .ico { transform: none; }
+#btnLegendFold:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.legend-display { flex: 0 0 auto; }
+.legend-display .layer-map-tab { justify-content: flex-start; padding-left: 10px; }
+.legend-sub { margin: 6px 0 2px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: var(--text-muted); }
+.lot-opacity-row { gap: 8px; }
+.lot-opacity-row label { flex-shrink: 0; white-space: nowrap; }
+.lot-opacity-row .opacity-slider { flex: 1 1 auto; min-width: 60px; margin: 0; }
+.lot-opacity-value { min-width: 38px; padding: 1px 4px; border: 1px solid var(--border-color); border-radius: var(--r-sm); background: var(--bg-input); color: var(--accent-cyan); font: inherit; font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; cursor: pointer; }
+.lot-opacity-value:hover { border-color: var(--accent-cyan); }
 .legend-icon { width: 14px; height: 18px; vertical-align: middle; flex-shrink: 0; }
 .layer-status-legend { display: flex; align-items: center; gap: 16px; margin-top: 4px; padding: 5px 0 1px 4px; border-top: 1px solid var(--border-soft); font-size: var(--fs-sm); color: var(--text-muted); }
 .layer-status-legend span { display: inline-flex; align-items: center; gap: 5px; }
@@ -786,15 +801,33 @@ body.right-collapsed .right-panel {
 .fold[open] > summary { margin-bottom: 4px; }
 .fold:not([open]) > summary { margin-bottom: 0; }
 
-/* Chú giải ranh lô đất theo TT16: mẫu hoa văn + màu ACI */
-.tt16-row { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; font-size: var(--fs-md); }
+/* Chú giải ranh lô đất theo TT16: mẫu hoa văn + màu ACI, gom nhóm thu gọn được */
+.tt16-legend { margin: 4px 0 2px; }
+.tt16-group { border-bottom: 1px solid var(--border-soft); }
+.tt16-group[hidden] { display: none; }
+.tt16-group > summary { display: flex; align-items: center; gap: 6px; height: 26px; list-style: none; cursor: pointer; user-select: none; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; color: var(--text-muted); }
+.tt16-group > summary::-webkit-details-marker { display: none; }
+.tt16-group > summary::before { content: ''; width: 5px; height: 5px; margin: 0 3px 0 2px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform var(--ease); flex-shrink: 0; }
+.tt16-group[open] > summary::before { transform: rotate(45deg); }
+.tt16-group > summary:hover, .tt16-group[open] > summary { color: var(--text-main); }
+.tt16-group > summary:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
+.tt16-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt16-group-count { flex-shrink: 0; min-width: 18px; padding: 0 5px; border: 1px solid var(--border-color); border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; color: var(--text-muted); }
+.tt16-group[open] { padding-bottom: 4px; }
+.tt16-row { display: flex; align-items: center; gap: 8px; min-height: 22px; padding: 0 4px 0 6px; border-radius: var(--r-sm); font-size: var(--fs-md); line-height: 1.25; color: var(--text-main); }
+.tt16-row[hidden] { display: none; }
+.tt16-group .tt16-row:hover { background: rgba(255, 255, 255, 0.05); }
 .tt16-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tt16-swatch { width: 28px; height: 14px; box-sizing: border-box; flex-shrink: 0; border: 1.3px solid; border-radius: 0; background-color: rgba(15, 23, 42, 0.6); }
-.tt16-borders { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin: 0 0 6px; }
-.tt16-frame { display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-width: 0; height: calc(16px * var(--k)); padding: 0 2px; font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; overflow: hidden; }
+.tt16-swatch { width: 28px; height: 14px; box-sizing: border-box; flex-shrink: 0; border: 1.3px solid; border-radius: 2px; background-color: rgba(15, 23, 42, 0.6); }
+.tt16-empty { padding: 10px 4px; font-size: var(--fs-sm); color: var(--text-muted); text-align: center; }
+.tt16-empty[hidden] { display: none; }
+.tt16-frames { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 6px; }
+.tt16-frames .tt16-row { min-height: 20px; padding-left: 2px; font-size: var(--fs-sm); }
+.tt16-frame { display: block; width: 28px; height: 14px; box-sizing: border-box; flex-shrink: 0; background: rgba(148, 163, 184, 0.12); }
 .tt16-frame-ht { border: 1px solid var(--text-main); }
 .tt16-frame-dd { border: 2px solid var(--text-main); }
 .tt16-frame-dh { border: 2px dashed var(--text-main); }
+.tt16-frame-pending { border: 1.5px dashed #f87171; }
 .heat-legend { margin: 0 6px 6px 22px; }
 .heat-legend[hidden] { display: none; }
 .heat-legend-sub { font-size: var(--fs-sm); color: var(--text-muted); margin: 1px 0 5px; }
@@ -2107,6 +2140,38 @@ table.ward-table th {
   font-weight: 700;
   pointer-events: none;
 }
+.measure-label .measure-plan-btn {
+  pointer-events: auto;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--accent-cyan);
+  border-radius: var(--r-md);
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--text-main);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.measure-label .measure-plan-btn:hover { background: rgba(56, 189, 248, 0.35); }
+
+/* Phân tích sử dụng đất quy hoạch trong vùng đo diện tích */
+.plan-land-stats { display: flex; flex-direction: column; gap: 4px; }
+.plan-land-stats .pls-head { font-weight: 700; color: var(--accent-cyan); margin-bottom: 2px; }
+.pls-list { display: flex; flex-direction: column; gap: 5px; margin: 6px 0 4px; max-height: 300px; overflow-y: auto; padding-right: 2px; }
+.pls-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto 46px;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 2px;
+}
+.pls-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, 0.35); }
+.pls-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pls-label small { margin-left: 5px; color: var(--text-muted); font-size: var(--fs-sm); }
+.pls-row > b { font-weight: 600; white-space: nowrap; }
+.pls-row > em { font-style: normal; text-align: right; color: var(--text-muted); }
+.pls-bar { grid-column: 2 / -1; height: 4px; border-radius: 2px; background: rgba(148, 163, 184, 0.18); overflow: hidden; }
+.pls-bar > span { display: block; height: 100%; }
 
 /* Thông báo ngắn */
 .app-toast {

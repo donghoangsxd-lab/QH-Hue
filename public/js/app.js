@@ -435,7 +435,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ['tabLayers', 'tabAdd', 'tabLegend'].forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
-      el.style.display = id === tabId ? (id === 'tabLayers' ? 'flex' : 'block') : 'none';
+      el.style.display = id === tabId ? (id === 'tabAdd' ? 'block' : 'flex') : 'none';
     });
     if (tabId !== 'tabAdd') state.isPickMode = false;
   };
