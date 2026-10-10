@@ -615,6 +615,187 @@ function proposeName(dump) {
   return safeDirName(place || loai || 'Do an');
 }
 
+// Bảng gServer dùng chung (QHPK_… không tiền tố đồ án) chứa ranh và lô của nhiều đồ án.
+// Ranh có ≥ 2 tendoan: chọn nhóm khớp tên bản đồ nhất (chỉ đếm từ không chung mọi nhóm),
+// giữ dòng vùng / điểm / HT có tâm nằm trong ranh nhóm đó. Tọa độ thô cùng hệ nên so trực tiếp.
+function nameTokens(s) {
+  return new Set(String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd')
+    .toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+}
+
+function ringAreaAbs(ring) {
+  return Math.abs(signedArea(closeRing(ring.map((p) => p.slice()))));
+}
+
+// Tính quanh đỉnh đầu: tọa độ tuyệt đối (~107, ~16) làm tích chéo mất chính xác với lô nhỏ / suy biến
+function ringCentroid(ring) {
+  const o = ring[0];
+  const r = closeRing(ring.map((p) => [p[0] - o[0], p[1] - o[1]]));
+  const box = emptyBox();
+  bboxOfPoints(ring, box);
+  const mid = [(box.minx + box.maxx) / 2, (box.miny + box.maxy) / 2];
+  let sx = 0, sy = 0, a = 0;
+  for (let i = 0; i < r.length - 1; i++) {
+    const c = r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1];
+    sx += (r[i][0] + r[i + 1][0]) * c;
+    sy += (r[i][1] + r[i + 1][1]) * c;
+    a += c;
+  }
+  if (!a) return mid;
+  const c = [sx / (3 * a) + o[0], sy / (3 * a) + o[1]];
+  const ok = Number.isFinite(c[0]) && c[0] >= box.minx && c[0] <= box.maxx && c[1] >= box.miny && c[1] <= box.maxy;
+  return ok ? c : mid;
+}
+
+function inRing(pt, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function rowAnchor(row) {
+  const g = flatGeom(parseWkt(row.geom));
+  const outers = g.polygons.map((p) => p[0]).filter((r) => r && r.length >= 3);
+  if (outers.length) return ringCentroid(outers.reduce((a, b) => (ringAreaAbs(b) > ringAreaAbs(a) ? b : a)));
+  if (g.points.length) return g.points[0];
+  const line = g.lines.find((l) => l.length);
+  return line ? line[Math.floor(line.length / 2)] : null;
+}
+
+// Vòng ranh từ cả vùng (_A) lẫn đường (_L): ranh vùng có khi chỉ là dải hẹp dọc ranh
+function zoneRings(rows) {
+  const rings = [];
+  const loose = [];
+  rows.forEach((row) => {
+    const g = flatGeom(parseWkt(row.geom));
+    g.polygons.forEach((p) => { if (p[0] && p[0].length >= 3) rings.push(p[0]); });
+    g.lines.forEach((l) => {
+      if (l.length < 3) return;
+      if (samePt(l[0], l[l.length - 1])) rings.push(l);
+      else loose.push(l);
+    });
+  });
+  if (loose.length) rings.push([].concat(...loose));
+  return rings;
+}
+
+const isLonLat = (p) => Math.abs(p[0]) <= 180 && Math.abs(p[1]) <= 90;
+
+function segDistM(p, a, b) {
+  const kx = isLonLat(p) ? 111320 * Math.cos(p[1] * Math.PI / 180) : 1;
+  const ky = isLonLat(p) ? 110540 : 1;
+  const ax = (a[0] - p[0]) * kx, ay = (a[1] - p[1]) * ky;
+  const bx = (b[0] - p[0]) * kx, by = (b[1] - p[1]) * ky;
+  const dx = bx - ax, dy = by - ay;
+  const len = dx * dx + dy * dy;
+  const t = len ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len)) : 0;
+  return Math.hypot(ax + t * dx, ay + t * dy);
+}
+
+function nearZones(pt, zones, m) {
+  return zones.some((z) => z.some((q, i) => i > 0 && segDistM(pt, z[i - 1], q) <= m));
+}
+
+function zoneBox(rows) {
+  const box = emptyBox();
+  rows.forEach((row) => {
+    const g = flatGeom(parseWkt(row.geom));
+    g.polygons.forEach((p) => bboxOfPoints(p[0] || [], box));
+    g.lines.forEach((l) => bboxOfPoints(l, box));
+  });
+  return box;
+}
+
+const boxesTouch = (a, b) => a.minx <= b.maxx && b.minx <= a.maxx && a.miny <= b.maxy && b.miny <= a.maxy;
+
+// Lô nằm hẳn ngoài ranh (tâm cách ranh > FAR_M, không đỉnh nào trong ranh) là lô nền / lô đồ án lân cận:
+// bỏ để webapp không ghép nhầm vào đồ án khác. Lô cắt ngang ranh (sông chảy qua) vẫn giữ.
+const FAR_M = 500;
+
+function rowVertices(row) {
+  const g = flatGeom(parseWkt(row.geom));
+  return g.points.concat(...g.lines, ...g.polygons.map((p) => p[0] || []));
+}
+
+function trimOutside(dump, ranh) {
+  const zones = ranh.length ? zoneRings(ranh) : [];
+  if (!zones.length) return { dump, scope: null };
+  const rows = { ...dump.rows };
+  const kept = {};
+  ['vung', 'diem', 'ht'].forEach((key) => {
+    const src = (dump.rows && dump.rows[key]) || [];
+    if (!src.length) return;
+    rows[key] = src.filter((row) => {
+      const pt = rowAnchor(row);
+      if (!pt || zones.some((z) => inRing(pt, z)) || nearZones(pt, zones, FAR_M)) return true;
+      return rowVertices(row).some((v) => zones.some((z) => inRing(v, z)));
+    });
+    if (rows[key].length < src.length) kept[key] = [rows[key].length, src.length];
+  });
+  if (!Object.keys(kept).length) return { dump, scope: null };
+  const detail = Object.entries(kept).map(([k, [n, t]]) => `${k} ${n}/${t}`).join(', ');
+  return {
+    dump: { ...dump, rows },
+    scope: { kept, warning: `bỏ lô nằm hẳn ngoài ranh, cách hơn ${FAR_M} m (giữ ${detail}) — lô nền hoặc lô của đồ án lân cận` }
+  };
+}
+
+function scopeDump(dump) {
+  const ranh = (dump.rows && dump.rows.ranh) || [];
+  const groups = new Map();
+  ranh.forEach((r) => {
+    const key = String(r.tendoan || '').replace(/\s+/g, ' ').trim();
+    if (!key) return;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  });
+  if (groups.size < 2) return trimOutside(dump, ranh);
+  const names = [...groups.keys()];
+  const boxes = new Map(names.map((k) => [k, zoneBox(groups.get(k))]));
+  // Các ranh chồng nhau (ranh cũ / ranh điều chỉnh) là cùng một đồ án
+  if (names.every((a) => names.every((b) => boxesTouch(boxes.get(a), boxes.get(b))))) {
+    return trimOutside(dump, ranh);
+  }
+  const title = nameTokens(dump.meta && dump.meta.tenBanDo);
+  const toks = [...groups.keys()].map(nameTokens);
+  const common = new Set([...toks[0]].filter((t) => toks.every((s) => s.has(t))));
+  const scored = [...groups.keys()].map((k, i) => ({ k, score: [...toks[i]].filter((t) => !common.has(t) && title.has(t)).length }))
+    .sort((a, b) => b.score - a.score);
+  if (!scored[0].score || scored[0].score === scored[1].score) {
+    return { dump, scope: { groups: names, chosen: null, warning: `ranh chứa ${groups.size} đồ án, không xác định được đồ án của bản đồ — giữ nguyên, kiểm tra lại` } };
+  }
+  const chosen = scored[0].k;
+  const home = boxes.get(chosen);
+  const mine = new Set(names.filter((k) => boxesTouch(boxes.get(k), home)));
+  const keyOf = (r) => String(r.tendoan || '').replace(/\s+/g, ' ').trim();
+  const ownRanh = ranh.filter((r) => (keyOf(r) ? mine.has(keyOf(r)) : boxesTouch(zoneBox([r]), home)))
+    .sort((a, b) => (keyOf(b) === chosen) - (keyOf(a) === chosen));
+  const zones = zoneRings(ownRanh);
+  if (!zones.length) {
+    return { dump, scope: { groups: names, chosen, warning: `ranh chứa ${groups.size} đồ án nhưng ranh «${chosen}» không khép được — giữ nguyên` } };
+  }
+  const rows = { ...dump.rows, ranh: ownRanh };
+  const kept = { ranh: [rows.ranh.length, ranh.length] };
+  ['vung', 'diem', 'ht'].forEach((key) => {
+    const src = (dump.rows && dump.rows[key]) || [];
+    if (!src.length) return;
+    rows[key] = src.filter((row) => {
+      const pt = rowAnchor(row);
+      return pt && zones.some((z) => inRing(pt, z));
+    });
+    kept[key] = [rows[key].length, src.length];
+  });
+  const detail = Object.entries(kept).map(([k, [n, t]]) => `${k} ${n}/${t}`).join(', ');
+  return {
+    dump: { ...dump, rows },
+    scope: { groups: names, chosen, kept, warning: `bảng dùng chung ${groups.size} đồ án — chỉ giữ phần trong ranh «${chosen}» (${detail})` }
+  };
+}
+
 function writeLayer(dir, base, role, rows, forceCrs) {
   const lg = layerGeoms(rows, role, forceCrs);
   const geoms = lg.items.map((i) => i.geom);
@@ -794,9 +975,31 @@ function selftest() {
   for (let i = 0; i < 4; i++) firstPart.push([content.readDoubleLE(pt0 + i * 16), content.readDoubleLE(pt0 + i * 16 + 8)]);
   const outerCw = signedArea(firstPart.concat([firstPart[0]])) < 0;
   fs.rmSync(tmp, { recursive: true, force: true });
-  const ok = name === 'QHPK Thử nghiệm' && outerCw && typesOk && crsOk
+
+  const shared = scopeDump({
+    meta: { tenBanDo: 'QHPK Khu đô thị sinh thái biển Cảnh Dương, huyện Phú Lộc' },
+    rows: {
+      ranh: [
+        { geom: 'POLYGON ((108 16.3, 108.01 16.3, 108.01 16.31, 108 16.31, 108 16.3))', tendoan: 'Quy hoạch phân khu Khu đô thị du lịch sinh thái biển Cảnh Dương, huyện Phú Lộc' },
+        { geom: 'LINESTRING (107.68 16.4, 107.7 16.4, 107.7 16.42, 107.68 16.4)', tendoan: 'Quy hoạch phân khu phường Thuỷ Lương, thị xã Hương Thuỷ' }
+      ],
+      vung: [
+        { geom: 'POLYGON ((108.002 16.302, 108.004 16.302, 108.004 16.304, 108.002 16.302))', kyhieulodat: 'CD' },
+        { geom: 'POLYGON ((107.69 16.401, 107.695 16.401, 107.695 16.405, 107.69 16.401))', kyhieulodat: 'TL' }
+      ],
+      diem: [{ geom: 'POINT (108.005 16.305)' }, { geom: 'POINT (107.69 16.402)' }]
+    }
+  });
+  const trimmed = scopeDump(dump);
+  const scopeOk = trimmed.dump.rows.vung.length === 2 && trimmed.dump.rows.vung[0].malienket === 'A'
+    && dump.rows.vung.length === 5
+    && shared.scope && /Cảnh Dương/.test(shared.scope.chosen || '')
+    && shared.dump.rows.ranh.length === 1 && shared.dump.rows.vung.length === 1
+    && shared.dump.rows.vung[0].kyhieulodat === 'CD' && shared.dump.rows.diem.length === 1;
+
+  const ok = name === 'QHPK Thử nghiệm' && outerCw && typesOk && crsOk && scopeOk
     && check.every((c) => c.walked && c.records === c.geojson && c.cpg === 'UTF-8' && c.code === 9994);
-  return { ok, name, outerCw, typesOk, crsOk, counts, check };
+  return { ok, name, outerCw, typesOk, crsOk, scopeOk, counts, check };
 }
 
 // opts.out: ghi shapefile ngay khi nhận dump vào <out>/QH-mapid<id>-<tên đề xuất>.
@@ -836,18 +1039,19 @@ function listen(port, dir, opts) {
     req.on('end', () => {
       try {
         const buf = Buffer.concat(chunks);
-        const dump = JSON.parse(buf.toString('utf8'));
-        const map = (dump.meta && dump.meta.map) || 'unknown';
+        const raw = JSON.parse(buf.toString('utf8'));
+        const map = (raw.meta && raw.meta.map) || 'unknown';
         const file = path.join(dir, `mapid${map}.json`);
         fs.writeFileSync(file, buf);
+        const { dump, scope } = scopeDump(raw);
         const proposed = proposeName(dump);
         const layers = Object.keys(ROLES).map((key) => {
           const rows = (dump.rows && dump.rows[key]) || [];
           const metaLayer = ((dump.meta && dump.meta.layers) || []).find((l) => l.key === key);
           return rows.length ? layerSummary(key, rows, metaLayer, o.crs) : { key, skipped: true, n: 0 };
         });
-        const info = { file, bytes: buf.length, proposed, tenBanDo: dump.meta && dump.meta.tenBanDo, layers };
-        const warnings = layers.flatMap((l) => (l.warnings || []).map((w) => `${l.key}: ${w}`));
+        const info = { file, bytes: buf.length, proposed, tenBanDo: dump.meta && dump.meta.tenBanDo, layers, ...(scope ? { scope } : {}) };
+        const warnings = (scope ? [scope.warning] : []).concat(layers.flatMap((l) => (l.warnings || []).map((w) => `${l.key}: ${w}`)));
         let reply = { ok: true, map, proposed, bytes: buf.length, warnings };
         if (o.out) {
           const w0 = Date.now();
@@ -906,7 +1110,7 @@ function main() {
     console.error('Thiếu --dump, --listen hoặc --selftest');
     process.exit(1);
   }
-  const dump = JSON.parse(fs.readFileSync(args.dump, 'utf8'));
+  const { dump, scope } = scopeDump(JSON.parse(fs.readFileSync(args.dump, 'utf8')));
   const proposed = proposeName(dump);
   const metaLayers = (dump.meta && dump.meta.layers) || [];
   const layers = Object.keys(ROLES).map((key) => {
@@ -915,12 +1119,12 @@ function main() {
     return layerSummary(key, rows, metaLayers.find((l) => l.key === key), forceCrs);
   });
   if (!args.name || !args.out) {
-    console.log(JSON.stringify({ proposed, tenBanDo: dump.meta && dump.meta.tenBanDo, map: dump.meta && dump.meta.map, layers, wrote: false }));
+    console.log(JSON.stringify({ proposed, tenBanDo: dump.meta && dump.meta.tenBanDo, map: dump.meta && dump.meta.map, scope, layers, wrote: false }));
     return;
   }
   const written = exportDump(dump, args.name, args.out, forceCrs);
   const verified = verifyOut(args.out);
-  console.log(JSON.stringify({ proposed, name: args.name, out: args.out, layers, written, verified }));
+  console.log(JSON.stringify({ proposed, name: args.name, out: args.out, scope, layers, written, verified }));
 }
 
 if (require.main === module) main();

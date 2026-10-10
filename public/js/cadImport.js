@@ -933,9 +933,11 @@ export function buildParcelsLonLat(entities) {
 const SPLIT_SHARE_MIN = 0.05;
 const SPLIT_AREA_MIN = 50;
 const SAMPLE_STEP_DEG = 0.0001; // ~10 m
-// Ranh TP phía biển / đầm phá không ổn định: lô ngoài ranh nhưng cách phường gần nhất ≤ CITY_EDGE_M vẫn thuộc phường đó
-const CITY_EDGE_M = 100;
-const EDGE_PAD_DEG = 0.0015; // ~150 m, lọc cạnh ranh phường gần lô
+// Nhập hàng loạt: lô ngoài ranh nhưng cách phường gần nhất ≤ CITY_EDGE_M vẫn thuộc phường đó
+// (ranh ven biển, đầm phá chưa ổn định, và công trình sát ranh TP). Xa hơn thì bỏ.
+export const CITY_EDGE_M = 2000;
+// Lọc cạnh ranh phường gần lô: đủ CITY_EDGE_M theo kinh độ ở vĩ độ Huế, thêm lề để cạnh đúng ngưỡng không bị cắt
+const EDGE_PAD_DEG = CITY_EDGE_M / (M_PER_DEG * Math.cos(16.5 * DEG)) * 1.15;
 const EDGE_MAX_PTS = 400;
 
 function bboxOfRings(rings) {
