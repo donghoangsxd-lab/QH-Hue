@@ -727,6 +727,7 @@ body.right-collapsed .right-panel {
 .ua-legend-note { flex-basis: 100%; font-style: italic; }
 .ua-sw { display: inline-block; width: 12px; height: 9px; border-radius: 2px; opacity: 0.75; }
 .ua-sw-line { display: inline-block; width: 16px; border-top: 2px dashed #f8fafc; }
+.ua-sw-line.ua-sw-solid { border-top-style: solid; border-top-width: 3px; }
 .ua-badge-icon { overflow: visible; }
 .ua-badge {
   position: absolute; left: 0; top: 0; transform: translate(-50%, -50%);
@@ -736,6 +737,7 @@ body.right-collapsed .right-panel {
   font: 800 11px/1 'Times New Roman', serif; color: #b91c1c; cursor: help;
 }
 .ua-badge-I { width: 40px; height: 40px; font-size: 16px; border-width: 4px; }
+.ua-badge-II { width: 34px; height: 34px; font-size: 13px; }
 .ua-badge-point { border-style: dashed; }
 .ua-badge-name {
   position: absolute; left: 0; top: 18px; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
@@ -743,6 +745,7 @@ body.right-collapsed .right-panel {
   text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000;
 }
 .ua-badge-I + .ua-badge-name { top: 24px; font-size: 12px; }
+.ua-badge-II + .ua-badge-name { top: 21px; }
 /* Toàn thành phố (zoom ≤ 10) các ký hiệu sát nhau: thu nhỏ, chỉ giữ tên đô thị loại I, tên còn lại xem khi trỏ chuột */
 .ua-zoom-low .ua-badge:not(.ua-badge-I) { width: 22px; height: 22px; border-width: 2px; font-size: 9px; box-shadow: 0 0 0 1.5px #fff, 0 1px 4px rgba(0, 0, 0, 0.5); }
 .ua-zoom-low .ua-badge:not(.ua-badge-I) + .ua-badge-name { display: none; }

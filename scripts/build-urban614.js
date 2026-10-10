@@ -9,6 +9,7 @@ const path = require('path');
 const turf = require('@turf/turf');
 const osmtogeojson = require('osmtogeojson');
 const { loadBoundary } = require('./wardBoundary');
+const { union, dropSlivers, wardPicker, areaFeature } = require('./urbanGeo');
 
 const OSM_DATE = '2025-06-01T00:00:00Z';
 const OSM_REL = { phongDien: 7051224, huongPhong: 15852553, huongVinh: 15852552 };
@@ -17,8 +18,6 @@ const OVERPASS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.private.coffee/api/interpreter'
 ];
-const TOL = 0.0003; // ~30 m, đủ cho mức thu nhỏ toàn thành phố
-const SLIVER_M2 = 300000; // mảnh lệch nét giữa 2 nguồn ranh
 
 // Đô thị ghép trọn phường, xã: units = toàn bộ; core = phường lõi để đặt ký hiệu
 const WARD_URBANS = {
@@ -40,37 +39,6 @@ const ANCHORS = {
   'vinh-hien': { at: [107.89586, 16.34744] },
   'vinh-thanh': { at: [107.78461, 16.43324], approx: true }
 };
-
-const bare = (name) => String(name || '')
-  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  .replace(/đ/g, 'd').replace(/Đ/g, 'D')
-  .replace(/[-–—]/g, ' ')
-  .replace(/\s+/g, ' ').trim().toUpperCase()
-  .replace(/^(PHUONG|XA)\s+/, '');
-
-const union = (feats) => (feats.length === 1 ? feats[0] : turf.union(turf.featureCollection(feats)));
-
-function dropSlivers(feature) {
-  if (!feature) return null;
-  const g = feature.geometry;
-  const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
-  const kept = polys
-    .map(([outer, ...holes]) => [outer, ...holes.filter(h => turf.area(turf.polygon([h])) >= SLIVER_M2)])
-    .filter(p => turf.area(turf.polygon(p)) >= SLIVER_M2);
-  if (!kept.length) return null;
-  return kept.length === 1 ? turf.polygon(kept[0]) : turf.multiPolygon(kept);
-}
-
-function slim(feature) {
-  const s = turf.simplify(feature, { tolerance: TOL, highQuality: true });
-  return turf.truncate(s, { precision: 5, coordinates: 2 });
-}
-
-function anchorOf(feature) {
-  const c = turf.centerOfMass(feature);
-  const pt = turf.booleanPointInPolygon(c, feature) ? c : turf.pointOnFeature(feature);
-  return pt.geometry.coordinates.map(v => Math.round(v * 1e5) / 1e5);
-}
 
 async function overpass(query) {
   for (let round = 0; round < 4; round++) {
@@ -114,13 +82,8 @@ async function main() {
   const dest = args[0] || path.join(__dirname, '..', 'public', 'data', 'urban614.geojson');
 
   const wards = await loadBoundary(boundaryFile);
-  const byName = new Map(wards.features.map(f => [bare(f.properties.tenXa || f.properties.name), turf.feature(f.geometry)]));
-  const pick = (names) => names.map(n => {
-    const f = byName.get(bare(n));
-    if (!f) throw new Error(`Không có ranh ${n}`);
-    return f;
-  });
-  console.log(`${byName.size} phường xã`);
+  const { pick, size } = wardPicker(wards);
+  console.log(`${size} phường xã`);
 
   const old = await loadOldUnits();
   console.log('Đã tải ranh OSM 01/6/2025');
@@ -136,12 +99,8 @@ async function main() {
 
   const features = [];
   Object.entries(areas).forEach(([id, raw]) => {
-    const clean = dropSlivers(raw);
-    if (!clean) throw new Error(`Ranh ${id} rỗng sau khi lọc mảnh`);
     const core = WARD_URBANS[id]?.core;
-    const anchor = anchorOf(core ? union(pick(core)) : clean);
-    const out = slim(clean);
-    out.properties = { id, anchor, km2: Math.round(turf.area(clean) / 1e4) / 100 };
+    const out = areaFeature(id, raw, core ? union(pick(core)) : null);
     features.push(out);
     console.log(`${id}: ${out.properties.km2} km²`);
   });
