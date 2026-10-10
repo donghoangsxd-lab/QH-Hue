@@ -54,6 +54,7 @@ import { initWardRoads } from './wardRoads.js';
 import { initCustomRoads, handleRoadDrawClick } from './customRoads.js';
 import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
+import { initCadastreLayer, cadastreClick } from './cadastreLayer.js';
 import { initTerrainLayer } from './terrainLayer.js';
 import { initDrainageLayer } from './drainageLayer.js';
 import { initBasinLayer } from './basinLayer.js';
@@ -303,6 +304,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCustomRoads();
   initPopEdits();
   initRoadNetworkLayer();
+  initCadastreLayer();
   initUrbanAreaLayer();
   initBasemapUi();
   initTerrainLayer();
@@ -374,7 +376,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (state.isInspectMode) {
       if (nearPanelClick) return;
       handleInspectPointClick(e.latlng.lat, e.latlng.lng, targetMap);
+      return;
     }
+    cadastreClick(e, targetMap);
   };
   // Chế độ tra cứu: click trúng / sát mép các bảng đang mở (bấm hụt nút ×, bảng vừa nở ra khi nạp xong kết quả…)
   // chỉ đóng popup như thường, không tra cứu điểm mới. Đo ở preclick vì popup bị đóng ngay trong preclick.
@@ -648,7 +652,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const FOCUS_CHECKS = [
     ...ICON_GROUPS.map(k => `chk_${k}`),
     'chk_bound', 'chk_urban', 'chk_parcel', 'chk_projects', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_basin', 'chk_flood', 'chk_sarflood',
-    'chk_lst', 'chk_newdev', 'chk_risk', 'chk_roads', 'chk_heat'
+    'chk_lst', 'chk_newdev', 'chk_risk', 'chk_roads', 'chk_cadastre', 'chk_heat'
   ];
   let focusSnapshot = null;
   const setChecked = (id, on) => {

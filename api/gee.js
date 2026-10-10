@@ -1936,6 +1936,13 @@ module.exports = async (req, res) => {
       return res.status(200).send(body);
     }
 
+    // Thửa đất địa chính 2016: client đọc PMTiles và chỉ mục thẳng từ bucket, chỉ nhận URL từ đây
+    if (action === 'getCadastreInfo') {
+      const base = constants.CADASTRE_GCS_BASE;
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
+      return res.status(200).json({ pmtiles: base + 'thuadat-2016.pmtiles', indexBase: base + 'index/', year: 2016 });
+    }
+
     // Đường trục chính rút gọn cả thành phố (mức phóng còn thấy một lúc nhiều phường, trên mức một biểu đồ tròn)
     if (action === 'getMainRoads') {
       const cv = Math.max(0, Math.round(Number(req.query.cv) || 0));

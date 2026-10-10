@@ -392,6 +392,20 @@
             <span class="road-legend-item"><i style="background:#fde047; height:2px;"></i>Chưa phân loại</span>
           </div>
           <div class="layer-row">
+            <div><input type="checkbox" id="chk_cadastre"><label for="chk_cadastre" title="Thửa đất địa chính tỉnh Thừa Thiên Huế cũ (gis21.hue.gov.vn, lập năm 2016): số tờ, số thửa, diện tích, loại đất, địa chỉ; không gồm tên chủ sử dụng. Hiện từ mức phóng 15, bấm vào thửa để xem thông tin. Nguồn chưa có Quảng Điền, Phú Lộc, Nam Đông."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Thửa đất địa chính 2016 <small class="layer-hint" id="cadastreHint">(zoom để xem)</small></label></div>
+            <span id="cadastreOpBox" class="layer-slider" style="display:none;"><input type="range" id="cadastreOpacity" class="opacity-slider" min="0" max="100" value="100" title="Độ trong suốt lớp thửa đất" aria-label="Độ trong suốt lớp thửa đất"></span>
+          </div>
+          <div class="flood-box" id="cadastreBox" style="display:none;">
+            <div class="road-legend layer-legend cad-legend" id="cadastreLegend"></div>
+            <div class="cad-find">
+              <select id="cadastreXa" aria-label="Xã/phường (địa giới cũ)"><option value="">Chọn xã/phường (địa giới cũ)</option></select>
+              <input type="text" id="cadastreTo" inputmode="numeric" placeholder="Tờ" aria-label="Số tờ bản đồ">
+              <input type="text" id="cadastreThua" inputmode="numeric" placeholder="Thửa" aria-label="Số thửa">
+              <button type="button" class="layer-mini-btn" id="btnCadastreFind" title="Tìm thửa theo xã, số tờ, số thửa">Tìm</button>
+            </div>
+            <div class="flood-stats" id="cadastreStatus"></div>
+          </div>
+          <div class="layer-row">
             <div><input type="checkbox" id="chk_pop"><label for="chk_pop"><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư</label></div>
             <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
           </div>

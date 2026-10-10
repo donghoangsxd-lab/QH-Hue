@@ -213,6 +213,9 @@ const constants = {
   DRAIN_ARROWS_GCS_BASE: "https://storage.googleapis.com/hue-infra-data-us/drainage/huongthoat/",
   // Đổ bóng địa hình FABDEM: ô PNG xám <z_x_y>.png mức 8–12 + index.json (scripts/build-hillshade.js đẩy lên)
   HILLSHADE_GCS_BASE: "https://storage.googleapis.com/hue-infra-data-us/terrain/hillshade/",
+  // Thửa đất địa chính 2016 (gis21.hue.gov.vn): thuadat-2016.pmtiles + index/xa.json, index/<maxa>.json
+  // (scripts/cadastre-to-pmtiles.mjs tạo). Trình duyệt đọc PMTiles thẳng từ bucket bằng HTTP Range, cần CORS cho header Range.
+  CADASTRE_GCS_BASE: "https://storage.googleapis.com/hue-infra-data-us/cadastre/",
 
   // Cấu hình trên Vercel (Settings → Environment Variables), không ghi vào mã nguồn
   GAS_BASE_URL: process.env.GAS_BASE_URL || "",

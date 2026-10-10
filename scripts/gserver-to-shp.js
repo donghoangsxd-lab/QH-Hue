@@ -1129,4 +1129,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { parseWkt, detectCrs, proposeName, exportDump, selftest };
+module.exports = { parseWkt, detectCrs, proposeName, exportDump, writeLayer, verifyOut, safeDirName, selftest };

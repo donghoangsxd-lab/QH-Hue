@@ -1698,6 +1698,14 @@ table.data-table tfoot .st-total-note { font-weight: 400; font-style: italic; }
 .road-legend-item { display: inline-flex; align-items: center; gap: 3px; }
 .road-legend-item i { display: inline-block; width: 12px; border-radius: var(--r-sm); flex-shrink: 0; }
 
+/* THỬA ĐẤT ĐỊA CHÍNH 2016 (cadastreLayer.js) */
+.cad-legend.layer-legend { margin: 0 0 4px; }
+.road-legend-item i.cad-sw { height: 9px; opacity: 0.6; border: 1px solid rgba(124, 45, 18, 0.75); }
+.cad-find { display: grid; grid-template-columns: minmax(0, 1fr) 42px 48px auto; gap: 4px; align-items: center; }
+.cad-find select, .cad-find input { min-width: 0; height: 22px; padding: 0 4px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm); color: var(--text-main); font: inherit; }
+#cadastreStatus { margin-top: 3px; }
+#cadastreStatus:empty { display: none; }
+
 /* Chấm sáng tuyến tiếp cận (flowAnimation.js): trên vùng phục vụ, dưới marker công trình và popup.
    Không dùng CSS filter: canvas vẽ lại mỗi khung hình, filter làm trình duyệt blur lại cả màn hình → lag */
 .flow-pane { z-index: 450; pointer-events: none; }
