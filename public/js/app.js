@@ -59,7 +59,7 @@ import { initFloodSim } from './floodSim.js';
 import { initSatLayers } from './satLayers.js';
 import { initSketchLayer, handleSketchClick, stopSketchTool } from './sketchLayer.js';
 import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
-import { initIntroTour } from './introTour.js';
+import { initOverview } from './overview.js';
 import { initRiskLayer } from './riskLayer.js';
 import { initBasemapUi } from './basemap.js';
 
@@ -311,7 +311,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initSatLayers();
   initRiskLayer();
   initSketchLayer();
-  initIntroTour();
+  initOverview();
   // Bật đo đạc / tra cứu / ghim / vẽ tuyến → bỏ chọn công cụ phác thảo (hình đã vẽ vẫn giữ)
   ['btnMeasureDist', 'btnMeasureArea', 'btnInspectMode', 'btnPickOnMap', 'btnRoadDraw', 'btnPopDraw']
     .forEach(id => document.getElementById(id)?.addEventListener('click', stopSketchTool));
@@ -380,7 +380,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
   // Chế độ tra cứu: click trúng / sát mép các bảng đang mở (bấm hụt nút ×, bảng vừa nở ra khi nạp xong kết quả…)
   // chỉ đóng popup như thường, không tra cứu điểm mới. Đo ở preclick vì popup bị đóng ngay trong preclick.
-  const PANEL_GUARDS = [['.leaflet-popup', 24], ['.leaflet-control, .map-toolbar, .right-panel, .bottom-panel', 10]];
+  const PANEL_GUARDS = [['.leaflet-popup', 24], ['.leaflet-control, .map-toolbar, .ov-launch, .right-panel, .bottom-panel', 10]];
   let nearPanelClick = false;
   const isNearPanel = (ev) => {
     if (!ev || ev.clientX == null) return false;

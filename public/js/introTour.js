@@ -1,5 +1,5 @@
-// Thuyết minh khi khởi động: thẻ giới thiệu chạy chữ chậm + làm nổi phần giao diện liên quan, cho người dùng không chuyên.
-// Tự hiện ở lần mở trang đầu (tắt bằng ô "Không tự hiện"), xem lại bằng nút ? trên thanh công cụ.
+// Hướng dẫn thao tác cơ bản: thẻ chạy chữ chậm + làm nổi phần giao diện liên quan, cho người dùng không chuyên.
+// Mở từ bảng Giới thiệu tổng quan (overview.js); ô "Không tự hiện" dùng chung khóa với bảng đó.
 import { ico } from './utils.js';
 
 const STORAGE_KEY = 'qhhue_intro_off';
@@ -59,9 +59,9 @@ const STEPS = [
     text: 'Thanh công cụ bên trái còn có: đo chiều dài, đo diện tích, định vị GPS, chụp ảnh, xuất bản đồ A3 và phác thảo.\nỞ thẻ "Đề xuất", bạn có thể đề xuất công trình mới; đề xuất được đánh dấu "Chờ duyệt" cho đến khi quản trị viên Sở Xây dựng phê duyệt.'
   },
   {
-    target: '#btnIntroTour',
-    title: 'Xem lại hướng dẫn',
-    text: 'Bấm nút ? này bất cứ lúc nào để xem lại phần giới thiệu. Chúc bạn khám phá bản đồ hiệu quả!'
+    target: '#btnOverview',
+    title: 'Giới thiệu tổng quan',
+    text: 'Nút ở góc trên bên trái mở bảng giới thiệu các nhóm tính năng chính, kèm hướng dẫn và lối mở nhanh từng tính năng. Chúc bạn khám phá bản đồ hiệu quả!'
   }
 ];
 
@@ -90,7 +90,7 @@ function build() {
     <div class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tourTitle">
       <div class="tour-head">
         <span class="tour-step"></span>
-        <button type="button" class="tour-x" title="Đóng giới thiệu" aria-label="Đóng giới thiệu">${ico('close')}</button>
+        <button type="button" class="tour-x" title="Đóng hướng dẫn" aria-label="Đóng hướng dẫn">${ico('close')}</button>
       </div>
       <div class="tour-title" id="tourTitle"></div>
       <div class="tour-text" aria-live="polite"></div>
@@ -229,7 +229,7 @@ function go(i) {
   if (i < 0 || i >= STEPS.length) return;
   step = i;
   const s = STEPS[step];
-  els.stepLbl.textContent = `Giới thiệu ${step + 1}/${STEPS.length}`;
+  els.stepLbl.textContent = `Hướng dẫn ${step + 1}/${STEPS.length}`;
   els.title.textContent = s.title;
   els.prev.disabled = step === 0;
   els.next.textContent = step === STEPS.length - 1 ? 'Bắt đầu sử dụng' : 'Tiếp ›';
@@ -258,12 +258,5 @@ function close() {
   clearTimers();
   typing = false;
   if (root) root.hidden = true;
-  document.getElementById('btnIntroTour')?.focus({ preventScroll: true });
-}
-
-export function initIntroTour() {
-  document.getElementById('btnIntroTour')?.addEventListener('click', openIntroTour);
-  let off = false;
-  try { off = localStorage.getItem(STORAGE_KEY) === '1'; } catch { /* chế độ riêng tư */ }
-  if (!off) setTimeout(openIntroTour, 1200);
+  document.getElementById('btnOverview')?.focus({ preventScroll: true });
 }
