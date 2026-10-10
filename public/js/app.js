@@ -45,6 +45,8 @@ import { escapeHtml, setStatusContent, showToast } from './utils.js';
 import { initCadImport } from './cadImportUi.js';
 import { initProjectLayer } from './projectLayer.js';
 import { initProjectReview } from './projectReview.js';
+import { initLocalAdjust } from './localAdjust.js';
+import { initAdjustLayer } from './adjustLayer.js';
 import { initWardCheck, refreshWardCheck } from './wardCheck.js';
 import { initOsmImport } from './osmImport.js';
 import { initLotEdit } from './lotEdit.js';
@@ -297,6 +299,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCadImport({ onImported: reloadAfterSheetWrite });
   initProjectLayer({ onDeleted: reloadAfterSheetWrite });
   initProjectReview();
+  initLocalAdjust();
+  initAdjustLayer();
   initWardCheck({ onSynced: reloadAfterSheetWrite });
   initOsmImport({ onImported: reloadAfterSheetWrite });
   initLotEdit({ onInfraSaved: reloadAfterSheetWrite });

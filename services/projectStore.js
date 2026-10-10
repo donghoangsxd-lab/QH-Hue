@@ -5,6 +5,7 @@
 //   projects/<slug>/diem-chuc-nang.json — điểm chức năng
 //   projects/<slug>/ranh-gioi.json — ranh giới quy hoạch
 //   projects/<slug>/quyet-dinh.pdf — PDF quyết định ≤ 1 MB. Link ngoài nằm ở projects/decisions.json (kind: link), chỉ gán sau khi máy chủ mở được link.
+//   projects/<slug>/adjust/<id>.json|.pdf — hồ sơ điều chỉnh cục bộ, chỉ mục ở projects/adjustments.json
 // File cũ projects/<slug>.json vẫn đọc được cho tới lần ghi tiếp theo, rồi tách vào thư mục và xóa.
 // Slug: bỏ dấu, chữ thường, tối đa 60 ký tự, thêm 8 ký tự SHA-256 của Ten_QH (cùng tên → cùng thư mục).
 // Đồ án chưa chuyển (legacy) vẫn nằm trong cad_parcels.json cho tới khi migrate xong.
@@ -1593,6 +1594,229 @@ async function legacyLots(tenQH) {
   return payload;
 }
 
+// ============================ ĐIỀU CHỈNH CỤC BỘ ============================
+// projects/adjustments.json — chỉ mục { v, items: [meta] }, gồm cả hồ sơ chờ duyệt (status pending | approved)
+// projects/<slug>/adjust/<id>.json — ranh + lô đất mới; projects/<slug>/adjust/<id>.pdf — QĐ / bản vẽ scan ≤ 2 MB
+const ADJUST_INDEX = 'projects/adjustments.json';
+const ADJUST_ID_RE = /^[a-f0-9]{16}$/;
+const ADJUST_PDF_MAX_BYTES = 2 * 1024 * 1024;
+const ADJUST_DOC_MAX_CHARS = 1500000;
+const ADJUST_PENDING_MAX = 40;
+const ADJUST_LOTS_MAX = 400;
+// Người gửi chưa đăng nhập chỉ gắn PDF cho hồ sơ vừa tạo, chưa có PDF, trong khoảng thời gian này
+const ADJUST_PDF_WINDOW_MS = 15 * 60 * 1000;
+let adjustCache = null; // { etag, generation, data }
+
+function adjustError(message, status) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
+function adjustObject(slug, id, ext) {
+  return `projects/${slug}/adjust/${id}.${ext}`;
+}
+
+function emptyAdjust() {
+  return { v: 1, items: [] };
+}
+
+async function readAdjustIndex() {
+  let etag = null;
+  try {
+    const head = await axios.head(`${publicUrl(ADJUST_INDEX)}?v=${Date.now()}`, { timeout: 5000, validateStatus: () => true });
+    if (head.status === 404) {
+      adjustCache = null;
+      return { missing: true, generation: '0', data: emptyAdjust() };
+    }
+    etag = head.headers.etag || head.headers['last-modified'] || null;
+    if (adjustCache && etag && adjustCache.etag === etag) {
+      return { missing: false, generation: adjustCache.generation, data: adjustCache.data };
+    }
+  } catch (err) { /* HEAD lỗi thì GET */ }
+  const got = await readJson(ADJUST_INDEX);
+  if (got.missing || !got.data || got.data.v !== 1 || !Array.isArray(got.data.items)) {
+    return { missing: !!got.missing, generation: got.generation || '0', data: emptyAdjust() };
+  }
+  adjustCache = { etag: got.etag || etag, generation: got.generation, data: got.data };
+  return { missing: false, generation: got.generation, data: got.data };
+}
+
+async function updateAdjustIndex(mutator) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const cur = await readAdjustIndex();
+    const next = mutator({ ...cur.data, items: [...(cur.data.items || [])] });
+    next.v = 1;
+    next.saved = Date.now();
+    try {
+      const written = await writeText(ADJUST_INDEX, JSON.stringify(next), cur.missing ? '0' : (cur.generation || undefined));
+      adjustCache = { etag: null, generation: written.generation || '', data: next };
+      return { data: next, via: written.via };
+    } catch (err) {
+      if (err.code !== 'GEN' || attempt === 2) throw err;
+      adjustCache = null;
+    }
+  }
+  throw adjustError('Xung đột khi cập nhật danh sách điều chỉnh cục bộ', 409);
+}
+
+const r7 = (n) => Math.round(n * 1e7) / 1e7;
+
+function cleanRing(ring) {
+  const b = constants.HUE_BOUNDS;
+  if (!Array.isArray(ring) || ring.length < 4 || ring.length > 20000) return null;
+  const out = [];
+  for (const c of ring) {
+    if (!Array.isArray(c)) return null;
+    const lng = Number(c[0]), lat = Number(c[1]);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+    if (lat < b.minLat || lat > b.maxLat || lng < b.minLng || lng > b.maxLng) return null;
+    out.push([r7(lng), r7(lat)]);
+  }
+  return out;
+}
+
+function cleanPolygonGeometry(g) {
+  if (!g || (g.type !== 'Polygon' && g.type !== 'MultiPolygon') || !Array.isArray(g.coordinates)) return null;
+  const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+  if (!polys.length || polys.length > 200) return null;
+  const out = [];
+  for (const poly of polys) {
+    if (!Array.isArray(poly) || !poly.length) return null;
+    const rings = poly.map(cleanRing);
+    if (rings.some(r => !r)) return null;
+    out.push(rings);
+  }
+  return out.length === 1 ? { type: 'Polygon', coordinates: out[0] } : { type: 'MultiPolygon', coordinates: out };
+}
+
+function cleanText(raw, max) {
+  return String(raw ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().replace(/^[=+\-@]+/, '').slice(0, max);
+}
+
+function cleanAdjustLot(l) {
+  const geometry = cleanPolygonGeometry(l && l.geometry);
+  if (!geometry) return null;
+  return {
+    geometry,
+    layer: cleanText(l.layer, 120),
+    landKey: /^[a-z0-9_]{1,40}$/.test(String(l.landKey || '')) ? String(l.landKey) : '',
+    subKey: /^[a-z0-9_]{1,20}$/.test(String(l.subKey || '')) ? String(l.subKey) : '',
+    label: cleanText(l.label, 100),
+    tone: /^#[0-9a-fA-F]{6}$/.test(String(l.tone || '')) ? String(l.tone) : '',
+    area: Math.max(0, Math.round(Number(l.area) || 0))
+  };
+}
+
+function adjustView(it) {
+  return {
+    id: it.id, tenQH: it.tenQH, slug: it.slug, status: it.status, title: it.title || '', codes: it.codes || [],
+    boundary: it.boundary, bbox: it.bbox, lots: it.lots || 0, at: it.at || 0, stamp: it.stamp || '',
+    sender: it.sender || '', note: it.note || '', verdict: it.verdict || '', pdf: it.pdf || null,
+    approvedAt: it.approvedAt || 0
+  };
+}
+
+/** Hồ sơ điều chỉnh cục bộ mới: Admin ghi thẳng (approved), người dùng vào hàng chờ (pending) */
+async function saveAdjustment({ tenQH, boundary, lots, codes, title, sender, note, verdict, approved, by }) {
+  const bound = cleanPolygonGeometry(boundary);
+  if (!bound) throw adjustError('Ranh điều chỉnh không hợp lệ hoặc nằm ngoài TP. Huế', 400);
+  if (!Array.isArray(lots) || !lots.length) throw adjustError('Hồ sơ chưa có lô đất trong ranh điều chỉnh', 400);
+  if (lots.length > ADJUST_LOTS_MAX) throw adjustError(`Tối đa ${ADJUST_LOTS_MAX} lô đất mỗi hồ sơ`, 413);
+  const clean = lots.map(cleanAdjustLot);
+  if (clean.some(l => !l)) throw adjustError('Có lô đất sai hình học hoặc nằm ngoài TP. Huế', 400);
+  const { name, slug } = await listedProject(tenQH);
+  if (!approved) {
+    const cur = await readAdjustIndex();
+    if (cur.data.items.filter(x => x.status === 'pending').length >= ADJUST_PENDING_MAX) {
+      throw adjustError('Hàng chờ duyệt điều chỉnh cục bộ đang đầy, vui lòng thử lại sau', 503);
+    }
+  }
+  const id = crypto.randomBytes(8).toString('hex');
+  const text = JSON.stringify({ v: 1, id, tenQH: name, boundary: bound, lots: clean });
+  if (text.length > ADJUST_DOC_MAX_CHARS) throw adjustError('Hình ranh và lô đất lớn hơn 1,5 MB, hãy giản lược đỉnh trong CAD', 413);
+  await writeText(adjustObject(slug, id, 'json'), text);
+  const at = Date.now();
+  const meta = {
+    id, tenQH: name, slug, status: approved ? 'approved' : 'pending',
+    title: cleanText(title, 300),
+    codes: (Array.isArray(codes) ? codes : []).slice(0, 60).map(c => cleanText(c, 30)).filter(Boolean),
+    boundary: bound, bbox: bboxOf(bound), lots: clean.length, at, stamp: vnStamp(at),
+    sender: cleanText(sender, 80), note: cleanText(note, 300), verdict: cleanText(verdict, 40), pdf: null
+  };
+  if (approved) { meta.approvedAt = at; meta.by = cleanText(by, 120); }
+  const saved = await updateAdjustIndex(cur => ({ ...cur, items: [...cur.items, meta] }));
+  return { ...adjustView(meta), via: saved.via };
+}
+
+function pdfBytesOk(buffer) {
+  return Buffer.isBuffer(buffer) && buffer.length >= 5 && buffer.length <= ADJUST_PDF_MAX_BYTES
+    && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
+}
+
+async function attachAdjustPdf({ id, fileName, buffer, admin }) {
+  if (!ADJUST_ID_RE.test(String(id || ''))) throw adjustError('Mã hồ sơ không hợp lệ', 400);
+  if (!pdfBytesOk(buffer)) {
+    throw adjustError(buffer && buffer.length > ADJUST_PDF_MAX_BYTES ? 'File PDF lớn hơn 2 MB' : 'Chỉ nhận file PDF', buffer && buffer.length > ADJUST_PDF_MAX_BYTES ? 413 : 400);
+  }
+  const it = (await readAdjustIndex()).data.items.find(x => x.id === id);
+  if (!it) throw adjustError('Không có hồ sơ điều chỉnh này', 404);
+  if (!admin && (it.status !== 'pending' || it.pdf || Date.now() - (it.at || 0) > ADJUST_PDF_WINDOW_MS)) {
+    throw adjustError('Chỉ gắn PDF ngay sau khi gửi hồ sơ', 403);
+  }
+  await writeBytes(adjustObject(it.slug, id, 'pdf'), buffer, 'application/pdf');
+  const pdf = { name: decisionFileName(fileName), bytes: buffer.length, at: Date.now() };
+  await updateAdjustIndex(cur => ({ ...cur, items: cur.items.map(x => (x.id === id ? { ...x, pdf } : x)) }));
+  return pdf;
+}
+
+async function listAdjustments({ admin }) {
+  const items = (await readAdjustIndex()).data.items || [];
+  return items.filter(x => x && ADJUST_ID_RE.test(String(x.id)) && (admin || x.status === 'approved')).map(adjustView);
+}
+
+async function findAdjustment(id, admin) {
+  if (!ADJUST_ID_RE.test(String(id || ''))) throw adjustError('Mã hồ sơ không hợp lệ', 400);
+  const it = (await readAdjustIndex()).data.items.find(x => x.id === id);
+  if (!it || (!admin && it.status !== 'approved')) throw adjustError('Không có hồ sơ điều chỉnh này', 404);
+  return it;
+}
+
+async function readAdjustment(id, { admin }) {
+  const it = await findAdjustment(id, admin);
+  const got = await readJson(adjustObject(it.slug, it.id, 'json'));
+  if (got.missing || !got.data || !Array.isArray(got.data.lots)) throw adjustError('File hồ sơ không còn trên bucket', 404);
+  return { ...adjustView(it), lots: got.data.lots };
+}
+
+async function readAdjustPdf(id, { admin }) {
+  const it = await findAdjustment(id, admin);
+  if (!it.pdf) throw adjustError('Hồ sơ không kèm file PDF', 404);
+  const res = await axios.get(`${publicUrl(adjustObject(it.slug, it.id, 'pdf'))}?v=${it.pdf.at || 0}`, {
+    timeout: 20000, responseType: 'arraybuffer', maxContentLength: ADJUST_PDF_MAX_BYTES + 4096, validateStatus: () => true
+  });
+  if (res.status !== 200) throw adjustError(res.status === 404 ? 'File PDF không còn trên bucket' : `Đọc PDF lỗi HTTP ${res.status}`, res.status === 404 ? 404 : 502);
+  return { buffer: Buffer.from(res.data), name: decisionFileName(it.pdf.name) };
+}
+
+async function approveAdjustment(id, by) {
+  await findAdjustment(id, true);
+  const at = Date.now();
+  await updateAdjustIndex(cur => ({
+    ...cur, items: cur.items.map(x => (x.id === id ? { ...x, status: 'approved', approvedAt: at, by: cleanText(by, 120) } : x))
+  }));
+  return { id, approvedAt: at };
+}
+
+async function removeAdjustment(id) {
+  const it = await findAdjustment(id, true);
+  await updateAdjustIndex(cur => ({ ...cur, items: cur.items.filter(x => x.id !== id) }));
+  for (const ext of ['json', 'pdf']) {
+    try { await removeName(adjustObject(it.slug, it.id, ext)); } catch (err) { /* file chưa có */ }
+  }
+  return { id };
+}
+
 // Ranh lô không thuộc đồ án nào: lô công trình theo phường + lô đất DXF cũ chưa gắn Ten_QH
 async function wardParcels() {
   const all = (await getCadParcels()).filter(p => p && p.kind !== 'PROJECT' && !p.file && p.geometry);
@@ -1618,5 +1842,6 @@ async function wardParcels() {
 module.exports = {
   setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, retypeInfraLot, readLand, landToInfra, deleteLayer, deleteProjectFiles, renameProject,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision,
-  migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase
+  migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase,
+  saveAdjustment, attachAdjustPdf, listAdjustments, readAdjustment, readAdjustPdf, approveAdjustment, removeAdjustment
 };

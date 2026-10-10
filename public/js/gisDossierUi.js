@@ -199,11 +199,14 @@ export function initGisDossier(hooks) {
   document.querySelectorAll('input[name="reviewMode"]').forEach(radio => {
     radio.addEventListener('change', () => {
       if (!radio.checked) return;
-      const gis = radio.value === 'gis';
+      const mode = radio.value;
       const dxf = $('reviewDxfPane');
       const pane = $('reviewGisPane');
-      if (dxf) dxf.hidden = gis;
-      if (pane) pane.hidden = !gis;
+      const local = $('reviewLocalPane');
+      if (dxf) dxf.hidden = mode !== 'dxf';
+      if (pane) pane.hidden = mode !== 'gis';
+      if (local) local.hidden = mode !== 'local';
+      if (mode === 'local') window.dispatchEvent(new Event('qh:local-adjust-open'));
     });
   });
   $('btnGisFolder')?.addEventListener('click', async () => {

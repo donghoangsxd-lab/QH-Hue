@@ -997,6 +997,8 @@ function renderHost() {
 }
 
 function openHost() {
+  window.dispatchEvent(new Event('qh:review-host-clear'));
+  document.body.classList.remove('la-page');
   if (!document.body.classList.contains('project-review')) {
     maxWasOn = document.body.classList.contains('bottom-max');
     if (maxWasOn) setBottomPanelMaximized(false);
@@ -1006,8 +1008,11 @@ function openHost() {
 }
 
 function closeReview() {
+  window.dispatchEvent(new Event('qh:review-host-clear'));
+  document.body.classList.remove('la-page');
   if (hostSize !== 'normal') setHostSize('normal');
   const wasOpen = document.body.classList.contains('project-review');
+  const hadSession = !!session;
   document.body.classList.remove('project-review');
   if (wasOpen && maxWasOn) setBottomPanelMaximized(true);
   maxWasOn = false;
@@ -1016,7 +1021,7 @@ function closeReview() {
   focusKey = '';
   if (labelsAuto && labelsOverlayOn()) setLabelsOverlay(false);
   labelsAuto = false;
-  if (state.showLand) setLandVisible(false);
+  if (hadSession && state.showLand) setLandVisible(false);
   const host = $('projectReviewHost');
   if (host) host.innerHTML = '';
   session = null;
@@ -1481,6 +1486,16 @@ async function exportPdf() {
 }
 
 // ============================ KHỞI TẠO ============================
+
+/** Hồ sơ cân đối đất đang mở, chưa chuyển phê duyệt */
+export function reviewHostDirty() {
+  return !!(session && !session.saved && !session.pendingId);
+}
+
+/** Đóng bảng thẩm định hoặc trang điều chỉnh cục bộ để trả nửa dưới màn hình */
+export function dismissReviewHost() {
+  closeReview();
+}
 
 export function initProjectReview() {
   $('btnReviewOpen')?.addEventListener('click', () => togglePanel());

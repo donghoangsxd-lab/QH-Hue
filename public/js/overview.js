@@ -176,6 +176,25 @@ const SECTIONS = [
         actions: [{ label: 'Mở công cụ thẩm định', icon: 'table', run: reviewOn }]
       },
       {
+        id: 'local-adjust', btn: 'guide', status: 'trial',
+        title: 'Thẩm định điều chỉnh cục bộ',
+        note: 'Thẩm định giả định, nhập hồ sơ khi đồng ý',
+        lead: 'Chọn đồ án đang điều chỉnh, nộp ranh khu vực và hatch sử dụng đất mới. Máy kiểm tra phạm vi, bảng tăng giảm và chỉ tiêu cả đồ án. Độ phủ bán kính tính ngầm.',
+        steps: [
+          'Bấm nút <b>Thẩm định đồ án</b> (nút màu cam đầu thanh công cụ bên trái), chọn <b>Điều chỉnh</b>.',
+          'Chọn đồ án trong danh sách, nhập dân số quy hoạch và file DXF (layer ranh có chữ RANH, hatch đất theo Thông tư 16).',
+          'Bấm <b>Thẩm định điều chỉnh</b>. Kết quả dựng thành tờ bản vẽ: hai bản vẽ trước / sau, bảng cơ cấu sử dụng đất, bảng chỉ tiêu, cột ký hiệu và khung tên. Chỉ tiêu tụt dưới 100% ghi Không đảm bảo.',
+          'Bấm <b>Xuất PDF A3</b> để tải tờ bản vẽ khổ A3 ngang đem in.',
+          'Đồng ý kết quả thì bấm <b>Nhập hồ sơ</b> (kèm PDF scan Quyết định, bản vẽ dưới 2 MB nếu có). Admin ghi thẳng, người dùng thường gửi vào hàng chờ duyệt.',
+          'Trên bản đồ quy hoạch, ranh điều chỉnh là nét đứt magenta, nền sọc nghiêng. Bấm vào ranh để thể hiện theo điều chỉnh (che nền, vẽ lô mới) hoặc xem PDF.'
+        ],
+        facts: [
+          'Phạm vi nằm ngoài ranh đồ án thì dừng, không tính tiếp.',
+          'Độ phủ (đất ở nằm trong bán kính phục vụ) giảm xuống dưới 100% thì có một dòng thông báo. Hai hình chỉ so sánh sử dụng đất.'
+        ],
+        actions: [{ label: 'Mở công cụ thẩm định', icon: 'table', run: reviewOn }]
+      },
+      {
         id: 'gis16', btn: 'guide', status: 'trial',
         title: 'Kiểm tra hồ sơ GIS theo Phụ lục II Thông tư 16/2025',
         note: 'Đọc trên máy, không gửi file đi. File Geodatabase (.gdb) chưa mở được bên trong',
@@ -298,9 +317,9 @@ const SECTIONS = [
       {
         id: 'urbanClass', btn: 'report', status: 'trial',
         title: 'Kiểm soát mức độ đáp ứng chỉ tiêu hạ tầng hiện tại theo tiêu chí phân loại đô thị',
-        lead: 'Chấm 16 đô thị theo tiêu chí phân loại đô thị của Nghị quyết 111/2025/UBTVQH15, so với mục tiêu 2030 tại Quyết định 756/QĐ-UBND.',
+        lead: 'Hiện trạng 14 đô thị và 21 phường theo Quyết định 614/QĐ-UBND; chấm 16 đô thị theo tiêu chí Nghị quyết 111/2025/UBTVQH15, so với mục tiêu 2030 tại Quyết định 756/QĐ-UBND.',
         steps: [
-          'Mở bảng tổng hợp phía dưới, chuyển sang trang <b>Tiêu chí phân loại đô thị</b>.',
+          'Mở bảng tổng hợp phía dưới, chuyển sang trang <b>Tiêu chí phân loại đô thị</b>; chọn <b>Hiện trạng 2026</b> hoặc <b>Mục tiêu 2030</b>.',
           'Chọn phường, xã trong danh sách để xem chi tiết từng tiêu chuẩn: đạt, chưa đạt, điểm số.',
           'Bấm biểu tượng máy in trên thanh tiêu đề bảng để xuất báo cáo PDF.'
         ],

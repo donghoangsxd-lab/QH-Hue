@@ -56,6 +56,14 @@ export function basemapLabel() {
   return BASEMAP.label;
 }
 
+/** Gỡ ảnh nền đã gắn bằng attachBasemap (bản đồ phụ đóng thì không còn trỏ vào lớp đã hủy) */
+export function detachBasemap(m) {
+  const base = maps.get(m);
+  if (base) { base.remove(); maps.delete(m); }
+  const labels = labelLayers.get(m);
+  if (labels) { labels.remove(); labelLayers.delete(m); }
+}
+
 /** Nút tem đường "Aa" trong panel lớp */
 export function initBasemapUi() {
   document.getElementById('btnRoadLabels')?.addEventListener('click', () => setLabelsOverlay(!labelsOn));

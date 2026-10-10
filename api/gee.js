@@ -190,6 +190,19 @@ function checkCadPendingRate(req) {
   checkRate(cadPendingHits, req, 3, 60 * 60 * 1000, 'Mỗi máy chỉ gửi được 3 file mỗi giờ, vui lòng thử lại sau');
 }
 
+// Hồ sơ điều chỉnh cục bộ của người dùng chưa đăng nhập: mỗi IP tối đa 4 hồ sơ / giờ; PDF ≤ 2 MB (base64 ~ 2,8 triệu ký tự)
+const adjustHits = new Map();
+function checkAdjustRate(req) {
+  checkRate(adjustHits, req, 4, 60 * 60 * 1000, 'Mỗi máy chỉ gửi được 4 hồ sơ điều chỉnh mỗi giờ, vui lòng thử lại sau');
+}
+const ADJUST_PDF_B64_MAX = 2800000;
+
+// Có token mà không phải Admin (hết hạn, tài khoản khác) thì xử lý như người dùng thường
+async function adminOrNull(req) {
+  if (!req.headers.authorization) return null;
+  try { return await requireAdmin(req); } catch (err) { return null; }
+}
+
 function looksLikeCadFile(ext, content) {
   if (ext === 'dxf') return content.slice(0, 4000).includes('SECTION') && content.includes('ENTITIES');
   if (ext === 'kml') return /<kml[\s>]/i.test(content.slice(0, 5000));
@@ -2490,6 +2503,68 @@ module.exports = async (req, res) => {
       const result = await callAppsScript({ action: 'removePendingCad' }, { action: 'removePendingCad', id });
       if (result.success !== true) return res.status(502).json({ error: true, message: 'Apps Script chưa xóa được hồ sơ' });
       return res.status(200).json({ success: true, removed: !!result.removed, count: result.count || 0 });
+    }
+
+    // ---- Hồ sơ điều chỉnh cục bộ: Admin ghi thẳng, người dùng vào hàng chờ; PDF ≤ 2 MB gửi ở yêu cầu thứ hai ----
+    if (action === 'submitAdjust') {
+      requirePostFromApp(req);
+      const admin = await adminOrNull(req);
+      if (!admin) checkAdjustRate(req);
+      const body = readJsonBody(req);
+      const tenQH = sanitizeSheetText(body.tenQH, 120);
+      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      const saved = await projects.saveAdjustment({
+        tenQH, boundary: body.boundary, lots: body.lots, codes: body.codes, title: body.title,
+        sender: body.sender, note: body.note, verdict: body.verdict, approved: !!admin, by: admin ? admin.email : ''
+      });
+      return res.status(200).json({ success: true, item: saved });
+    }
+
+    if (action === 'putAdjustPdf') {
+      requirePostFromApp(req);
+      const admin = await adminOrNull(req);
+      const body = readJsonBody(req);
+      const pdf = typeof body.pdf === 'string' ? body.pdf.replace(/\s+/g, '') : '';
+      if (!pdf || pdf.length > ADJUST_PDF_B64_MAX) return res.status(413).json({ error: true, message: 'File PDF rỗng hoặc lớn hơn 2 MB' });
+      const saved = await projects.attachAdjustPdf({ id: String(body.id || ''), fileName: body.name, buffer: Buffer.from(pdf, 'base64'), admin: !!admin });
+      return res.status(200).json({ success: true, pdf: saved });
+    }
+
+    // GET: hồ sơ đã duyệt (vẽ lên bản đồ quy hoạch). POST kèm token Admin: thêm hồ sơ chờ duyệt
+    if (action === 'getAdjustments') {
+      const admin = req.method === 'POST' ? await requireAdmin(req) : null;
+      if (admin) requirePostFromApp(req);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ v: 1, items: await projects.listAdjustments({ admin: !!admin }) });
+    }
+
+    if (action === 'getAdjustDetail') {
+      const admin = req.method === 'POST' ? await requireAdmin(req) : null;
+      if (admin) requirePostFromApp(req);
+      const id = String(admin ? readJsonBody(req).id : req.query.id || '');
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json(await projects.readAdjustment(id, { admin: !!admin }));
+    }
+
+    if (action === 'getAdjustPdf') {
+      const admin = req.method === 'POST' ? await requireAdmin(req) : null;
+      if (admin) requirePostFromApp(req);
+      const id = String(admin ? readJsonBody(req).id : req.query.id || '');
+      const file = await projects.readAdjustPdf(id, { admin: !!admin });
+      const ascii = String(file.name).replace(/[^\w.\-]+/g, '_') || 'dieu-chinh.pdf';
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(file.name)}`);
+      res.setHeader('Cache-Control', admin ? 'no-store' : 'private, max-age=300');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return res.status(200).send(file.buffer);
+    }
+
+    if (action === 'approveAdjust' || action === 'removeAdjust') {
+      requirePostFromApp(req);
+      const user = await requireAdmin(req);
+      const id = String(readJsonBody(req).id || '');
+      const done = action === 'approveAdjust' ? await projects.approveAdjustment(id, user.email) : await projects.removeAdjustment(id);
+      return res.status(200).json({ success: true, ...done });
     }
 
     if (action === 'getSingleIsochrone') {

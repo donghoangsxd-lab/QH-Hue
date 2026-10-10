@@ -139,6 +139,7 @@
             <div class="add-mode-switch review-kind" role="radiogroup" aria-label="Cách thẩm định">
               <label class="add-mode-btn"><input type="radio" name="reviewMode" value="dxf" checked>Cân đối đất</label>
               <label class="add-mode-btn"><input type="radio" name="reviewMode" value="gis">Hồ sơ GIS</label>
+              <label class="add-mode-btn" title="Thẩm định điều chỉnh cục bộ trên một đồ án đã có"><input type="radio" name="reviewMode" value="local">Điều chỉnh</label>
             </div>
             <div id="reviewDxfPane">
             <div class="add-mode-switch review-kind" role="radiogroup" aria-label="Loại hồ sơ">
@@ -201,6 +202,45 @@
                   <li>Thiếu một chuyên đề trong Phần 3 chỉ là cảnh báo, vì danh mục đó là tham khảo.</li>
                 </ol>
               </div>
+            </div>
+            <div id="reviewLocalPane" hidden>
+              <p class="review-note">Chọn đồ án quy hoạch đang điều chỉnh, gửi file DXF gồm ranh khu vực và các hatch lô đất mới trong ranh. Xem kết quả thẩm định, đồng ý thì bấm <b>Nhập hồ sơ</b> để ghi ranh điều chỉnh lên bản đồ quy hoạch (người dùng thường gửi Admin duyệt).</p>
+              <div class="form-grid review-grid">
+                <label for="localProject">Đồ án</label>
+                <select id="localProject"><option value="">Chọn đồ án quy hoạch</option></select>
+                <label for="localPopQH">Dân số QH</label>
+                <input type="number" id="localPopQH" min="0" step="100" placeholder="Dân số quy hoạch (người)">
+                <label for="localCrs">Hệ tọa độ</label>
+                <select id="localCrs">
+                  <option value="HUE_3" selected>VN-2000 KTT 107°, múi 3°</option>
+                  <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
+                </select>
+              </div>
+              <div class="add-mode-switch review-kind" role="radiogroup" aria-label="Loại đồ án điều chỉnh">
+                <label class="add-mode-btn"><input type="radio" name="localKind" value="QHC">QHC · 1/10.000</label>
+                <label class="add-mode-btn"><input type="radio" name="localKind" value="QHPK" checked>QHPK · 1/2.000</label>
+              </div>
+              <label class="cad-drop review-file" for="localFile">
+                <span class="cad-drop-main"><b>File điều chỉnh</b></span>
+                <span class="review-file-name" id="localFileName">DXF: ranh (layer có chữ RANH) + hatch đất</span>
+                <input type="file" id="localFile" accept=".dxf" hidden>
+              </label>
+              <label class="cad-drop review-file" for="localPdf">
+                <span class="cad-drop-main"><b>PDF scan</b> (không bắt buộc)</span>
+                <span class="review-file-name" id="localPdfName">Quyết định, bản vẽ điều chỉnh · PDF &lt; 2 MB</span>
+                <input type="file" id="localPdf" accept=".pdf,application/pdf" hidden>
+              </label>
+              <button type="button" class="btn-submit" id="btnLocalStart"><svg class="ico"><use href="#i-send"/></svg>THẨM ĐỊNH ĐIỀU CHỈNH</button>
+              <div class="cad-hint review-hint">
+                <div class="cad-hint-title">Hồ sơ điều chỉnh cục bộ gồm</div>
+                <ol>
+                  <li><b>Ranh giới khu vực điều chỉnh</b>: polygon hoặc polyline khép kín, tên layer có chữ <b>RANH</b> (VD RANH_DIEUCHINH).</li>
+                  <li><b>Hatch các lô đất</b> trong phạm vi điều chỉnh, tên layer theo Thông tư 16/2025/TT-BXD (cùng quy ước với cân đối đất; trường học tách _MN / _TH / _THCS).</li>
+                  <li>(Không bắt buộc) <b>File PDF scan</b> Quyết định, bản vẽ điều chỉnh, dung lượng dưới 2 MB.</li>
+                </ol>
+                <p>Ranh và lô cùng một file DXF, hệ VN-2000. Phạm vi phải nằm trong ranh đồ án đã chọn; chỉ tiêu cả đồ án tụt dưới 100% thì kết quả ghi <b>Không đảm bảo</b>.</p>
+              </div>
+              <div id="adjustPendingBox" class="adj-pending" hidden></div>
             </div>
           </div>
         </div>
@@ -766,7 +806,7 @@
           <div class="bp-head-stats" id="bpHeadStats"></div>
           <div class="bp-actions" data-html2canvas-ignore="true">
             <span class="flip-dots" id="part2Dots"><i class="active" data-page="0" title="Bảng tổng hợp hạ tầng"></i><i data-page="1" title="Tiêu chí phân loại đô thị"></i><i data-page="2" title="Chỉ tiêu tăng trưởng xanh"></i></span>
-            <button type="button" class="bp-btn" id="btnFlipPart2" aria-pressed="false" title="Trang sau: tiêu chí phân loại đô thị (Nghị quyết 111/2025/UBTVQH15, mục tiêu 2030 theo Quyết định 756/QĐ-UBND)"><svg class="ico"><use href="#i-flag"/></svg>Phân loại</button>
+            <button type="button" class="bp-btn" id="btnFlipPart2" aria-pressed="false" title="Trang sau: phân loại đô thị (hiện trạng theo Quyết định 614/QĐ-UBND, mục tiêu 2030 theo Quyết định 756/QĐ-UBND, tiêu chí Nghị quyết 111/2025/UBTVQH15)"><svg class="ico"><use href="#i-flag"/></svg>Phân loại</button>
             <button type="button" class="bp-btn bp-icon" id="btnToggleStatTable" title="Xem bảng thông tin" aria-label="Xem bảng thông tin"><svg class="ico"><use href="#i-table"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnExportBottomPdf" title="Xuất báo cáo PDF" aria-label="Xuất báo cáo PDF"><svg class="ico"><use href="#i-printer"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnToggleBottomMax" title="Phóng to toàn màn hình" aria-label="Phóng to toàn màn hình"><svg class="ico"><use href="#i-maximize"/></svg></button>
