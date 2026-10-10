@@ -1,6 +1,7 @@
 // Bảng theo dõi tiêu chí phân loại đô thị (trang 2 bảng tổng hợp, uiComponents.js › setPart2Page).
 // Nghị quyết 111/2025/UBTVQH15 (hiệu lực 01/01/2026): loại I chấm đạt/không đạt theo Phụ lục I;
 // loại II, III chấm điểm Bảng 2A Phụ lục II (tối đa 100, công nhận khi ≥ 75 và mỗi tiêu chí đạt điểm tối thiểu — Điều 9).
+// Hiện trạng từ 01/01/2026: Quyết định 614/QĐ-UBND ngày 10/02/2026 — 14 đô thị, 21 phường đạt trình độ phát triển đô thị (urbanStatus.js).
 // Mục tiêu 2030: Quyết định 756/QĐ-UBND ngày 28/02/2026 (điều chỉnh quy hoạch thành phố 2021–2030, tầm nhìn 2050) — 16 đô thị.
 // Huế là cố đô, di sản UNESCO: cả 16 đô thị áp Điều 8 khoản 2 điểm d (không cộng hệ số vùng hay miền núi — khoản 3).
 // Không xem xét mật độ dân số trên diện tích tự nhiên (2A.II.04) và mật độ trên đất xây dựng cấp xã (2B.II.04); các tiêu chuẩn đó được điểm tối thiểu (Điều 9 khoản 4 điểm a).
@@ -9,6 +10,7 @@ import { escapeHtml, fmtNum, ico, isApproved } from './utils.js';
 import { loadRoadTypeLengths, densityArea, loadBuiltAreas } from './wardRoads.js';
 import { state } from './state.js';
 import { geeApi } from './api.js';
+import { STATUS_REF, STATUS_DATE, URBANS_614, WARDS_614, RURAL_RULE, bareName as bare, wardLevel614, urbans614Of, urbans614ByPlan } from './urbanStatus.js';
 
 export const CLASS_REF = 'Nghị quyết 111/2025/UBTVQH15';
 export const PLAN_REF = 'Quyết định 756/QĐ-UBND ngày 28/02/2026';
@@ -158,13 +160,6 @@ const STD_I = [
 ];
 
 const LEVEL_TEXT = { hi: 'Đạt mức tối đa', mid: 'Đạt mức tối thiểu', adj: 'Đạt sau giảm mức tối thiểu', skip: 'Không xem xét', no: 'Chưa đạt', part: 'Một phần, chưa chấm', wait: 'Chờ số liệu', na: 'Chưa tách ranh' };
-
-const bare = (name) => String(name || '')
-  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  .replace(/đ/g, 'd').replace(/Đ/g, 'D')
-  .replace(/[-–—]/g, ' ')
-  .replace(/\s+/g, ' ').trim().toUpperCase()
-  .replace(/^(PHUONG|XA)\s+/, '');
 
 const bandOf = (std, cls) => (std.band && (std.band.both || std.band[cls])) || null;
 const qualOf = (std, cls) => (std.qual && (std.qual.both || std.qual[cls])) || null;
@@ -479,6 +474,8 @@ let roadsPromise = null;
 let roads = null;
 let mode = 'auto';
 let seenKey = null;
+// now = hiện trạng theo QĐ 614, plan = mục tiêu 2030 theo QĐ 756; giữ nguyên khi đổi phường
+let view = 'now';
 
 function loadRoads(force = false) {
   if (force) roadsPromise = null;
@@ -640,7 +637,7 @@ function overviewHtml(wards, wardName) {
   const partialRow = `<tr class="uc-partial"><td></td><td colspan="${LIST_CODES.length + 3}"><span class="c-muted">${partial.length} đô thị mới chưa tách ranh:</span> `
     + partial.map(u => `<button type="button" class="uc-link${u === pick ? ' is-sel' : ''}" data-pick="${u.id}" title="${escapeHtml(u.note)}">${escapeHtml(u.name.replace(/^Đô thị mới /, ''))}</button>`).join(' · ')
     + '</td></tr>';
-  return `${banner}${cityLineHtml(wards)}<div class="uc-layout">
+  return `${tabsHtml(`<b>${URBANS.length} đô thị</b> đến 2030 · ${PLAN_REF}`)}${banner}${cityLineHtml(wards)}<div class="uc-layout">
       ${cityCardHtml(wards)}
       <div class="table-container uc-list">
         <table class="data-table uc-table">
@@ -815,6 +812,7 @@ function detailHtml(urban, wards, redraw) {
   return `<div class="uc-bar">
       <button type="button" class="bp-btn" data-uc="all">${ico('chev-left')}16 đô thị</button>
       <span class="uc-summary"><b class="uc-${urban.cls}">Loại ${urban.cls}</b> ${escapeHtml(urban.name)} · ${escapeHtml(scopeLabel(urban))}</span>
+      ${nowChipHtml(urban)}
     </div>
     <div class="uc-dsplit">
       <div class="uc-dcol">${table(rows(list.filter(left)))}</div>
@@ -822,8 +820,113 @@ function detailHtml(urban, wards, redraw) {
     </div>`;
 }
 
+// ---------- Hiện trạng 2026 (QĐ 614): Phụ lục I 14 đô thị | Phụ lục II 21 phường ----------
+function tabsHtml(summary) {
+  const tab = (id, label, tip) => `<button type="button" class="bp-btn${view === id ? ' active' : ''}" data-uc-view="${id}" aria-pressed="${view === id}" title="${escapeHtml(tip)}">${label}</button>`;
+  return `<div class="uc-bar"><span class="uc-tabs">${tab('now', 'Hiện trạng 2026', `${STATUS_REF}, áp dụng từ ${STATUS_DATE}`)}`
+    + `${tab('plan', 'Mục tiêu 2030', `${PLAN_REF}, chấm tiêu chuẩn theo ${CLASS_REF}`)}</span><span class="uc-summary">${summary}</span></div>`;
+}
+
+const classTag = (cls) => `<b class="uc-${cls}">${cls}</b>`;
+
+function planLinkHtml(plan) {
+  return `<button type="button" class="uc-link" data-uc="${plan.id}" title="Xem tiêu chuẩn ${escapeHtml(plan.name)} đến 2030">`
+    + `<span class="uc-${plan.cls}">${plan.cls}</span> ${escapeHtml(plan.name)}</button>`;
+}
+
+function nowChipHtml(urban) {
+  const now = urbans614ByPlan(urban.id);
+  const text = now.length
+    ? now.map(u => `${escapeHtml(u.name)} loại ${classTag(u.cls)}`).join(', ')
+    : 'chưa là đô thị riêng, nằm trong Đô thị Huế loại I';
+  const tip = now.length ? now.map(u => `${u.name}: ${u.scope}. ${u.basis}.`).join('\n') : '';
+  return `<span class="uc-now" title="${escapeHtml(`${STATUS_REF}\n${tip}`)}">Hiện trạng: ${text}</span>`;
+}
+
+function wardNowText(wardName) {
+  const lvl = wardLevel614(wardName);
+  const urbans = urbans614Of(wardName);
+  const head = lvl
+    ? `${wardName}: phường đạt trình độ phát triển đô thị loại ${lvl.level} (trước 01/7/2025: loại ${lvl.before}).${lvl.rural ? ` ${RURAL_RULE}` : ''}`
+    : `${wardName}: đơn vị hành chính nông thôn, không thuộc danh mục phường tại Phụ lục II.`;
+  const tail = urbans.length
+    ? ` Trên địa bàn có ${urbans.map(u => `${u.name} loại ${u.cls} — ${u.scope.charAt(0).toLowerCase()}${u.scope.slice(1)}`).join('; ')}.`
+    : '';
+  return `${head}${tail}`;
+}
+
+const COLS_614_I = ['2.2em', '9em', '9.5em', '4.6em', '', '12em'];
+const COLS_614_II = ['2.2em', '7.6em', '', '4.4em', '4.4em'];
+const colgroup = (cols) => `<colgroup>${cols.map(w => `<col${w ? ` style="width:${w}"` : ''}>`).join('')}</colgroup>`;
+
+function nowUrbanTableHtml(wardName) {
+  const mine = new Set(wardName ? urbans614Of(wardName) : []);
+  const rows = URBANS_614.map((u, i) => {
+    const plan = URBANS.find(p => p.id === u.plan);
+    return `<tr class="${mine.has(u) ? 'uc-here' : ''}">
+      <td>${i + 1}</td>
+      <td class="uc-name"><b class="uc-${u.cls}">${escapeHtml(u.name)}</b></td>
+      <td title="${escapeHtml(`Công nhận loại ${u.before.cls}: ${u.basis}`)}">${escapeHtml(u.before.name)}</td>
+      <td title="Loại trước → sau chuyển tiếp (Điều 15 ${CLASS_REF})"><span class="c-muted">${u.before.cls} →</span> ${classTag(u.cls)}</td>
+      <td class="uc-scope">${escapeHtml(u.scope)}</td>
+      <td>${plan ? planLinkHtml(plan) : '—'}</td>
+    </tr>`;
+  }).join('');
+  const added = URBANS.filter(p => !urbans614ByPlan(p.id).length);
+  const addRow = added.length
+    ? `<tr class="uc-partial"><td></td><td colspan="5"><span class="c-muted">Đến 2030 thêm ${added.length} đô thị chưa có trong danh mục hiện trạng:</span> ${added.map(planLinkHtml).join(' · ')}</td></tr>`
+    : '';
+  return `<table class="data-table uc-table uc-dtable uc-ntable">${colgroup(COLS_614_I)}<thead><tr>
+      <th>STT</th><th>Đô thị</th><th title="Rê chuột xem quyết định công nhận loại đô thị">Trước chuyển tiếp</th><th>Loại</th>
+      <th title="Phường, xã hiện nay kế thừa phạm vi đô thị đã được công nhận">Phạm vi hiện nay</th><th title="${escapeHtml(PLAN_REF)}">Định hướng 2030</th>
+    </tr></thead><tbody>${rows}${addRow}</tbody></table>`;
+}
+
+function nowWardTableHtml(wardName) {
+  const b = bare(wardName);
+  const rows = ['II', 'III'].map(level => {
+    const list = WARDS_614.filter(w => w.level === level);
+    return `<tr class="uc-group"><td colspan="5">Trình độ phát triển đô thị loại ${level} · ${list.length} phường</td></tr>`
+      + list.map(w => `<tr class="${b && bare(w.name) === b ? 'uc-here' : ''}">
+        <td>${WARDS_614.indexOf(w) + 1}</td>
+        <td class="uc-name"><b>${escapeHtml(w.name)}</b>${w.rural ? '<sup title="' + escapeHtml(RURAL_RULE) + '">*</sup>' : ''}</td>
+        <td class="uc-scope c-muted">${escapeHtml(w.from)}</td>
+        <td title="Mức trình độ phát triển cơ sở hạ tầng đô thị trước 01/7/2025">${classTag(w.before)}</td>
+        <td title="Mức trình độ phát triển đô thị sau chuyển tiếp">${classTag(w.level)}</td>
+      </tr>`).join('');
+  }).join('');
+  return `<table class="data-table uc-table uc-dtable uc-ntable">${colgroup(COLS_614_II)}<thead><tr>
+      <th>STT</th><th>Phường</th><th>Nhập từ</th><th title="Trình độ phát triển cơ sở hạ tầng đô thị trước 01/7/2025">Trước</th><th title="Trình độ phát triển đô thị sau chuyển tiếp">Sau</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function nowHtml(wardName, wards) {
+  const n3 = URBANS_614.filter(u => u.cls === 'III').length;
+  const w2 = WARDS_614.filter(w => w.level === 'II').length;
+  const parts = URBANS_614.filter(u => u.part).length;
+  const communes = Math.max(0, wards.length - WARDS_614.length);
+  const summary = `<b>${URBANS_614.length} đô thị</b> (1 loại I, ${n3} loại III) · <b>${WARDS_614.length} phường</b> đạt trình độ phát triển đô thị (${w2} loại II, ${WARDS_614.length - w2} loại III) · ${STATUS_REF}`;
+  const banner = wardName ? `<div class="uc-note">${ico('info')} ${escapeHtml(wardNowText(wardName))}</div>` : '';
+  return `${tabsHtml(summary)}${banner}<div class="uc-dsplit">
+      <div class="uc-dcol">${nowUrbanTableHtml(wardName)}
+        <div class="uc-dsum"><p>${ico('info')} Phụ lục I: danh mục đô thị từ ${STATUS_DATE}. Thị xã loại IV, thị trấn và đô thị loại V chuyển tiếp thành đô thị loại III (Điều 15 ${CLASS_REF}).
+          Phạm vi đô thị sau chuyển tiếp trùng phạm vi đã được công nhận; cột Phạm vi hiện nay là phường, xã kế thừa.</p>
+          <p>${parts} đô thị chỉ chiếm một phần phường, xã và chưa có ranh giới riêng trong webapp nên chưa chấm tiêu chuẩn theo số liệu hiện trạng.</p></div>
+      </div>
+      <div class="uc-dcol">${nowWardTableHtml(wardName)}
+        <div class="uc-dsum"><p><b>*</b> ${escapeHtml(RURAL_RULE)}</p>
+          ${communes ? `<p>${communes} xã còn lại là đơn vị hành chính nông thôn, không thuộc Phụ lục II.</p>` : ''}
+          <p>Điều 3: UBND phường, xã rà soát tiêu chí, tiêu chuẩn phân loại đô thị với trường hợp chuyển tiếp, lập kế hoạch phát triển đô thị và định kỳ đánh giá chất lượng đô thị; Sở Xây dựng lập Chương trình phát triển đô thị thành phố.</p></div>
+      </div>
+    </div>`;
+}
+
 function paint(el, wardName, wards, redraw) {
   measured.clear();
+  if (view === 'now' && (mode === 'auto' || mode === 'all')) {
+    el.innerHTML = nowHtml(wardName, wards);
+    return;
+  }
   const picked = mode !== 'auto' && mode !== 'all' ? URBANS.find(u => u.id === mode) : null;
   const autoUrban = mode === 'auto' && wardName ? urbanByWard(wardName) : null;
   const urban = picked || autoUrban;
@@ -847,10 +950,15 @@ export function renderUrbanClass(el, { wardName, wards }) {
 
 export function initUrbanClassEvents(el, rerender) {
   el?.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-uc]');
-    const pick = !btn && e.target.closest('[data-pick]');
-    if (btn) mode = btn.dataset.uc === 'all' ? 'all' : btn.dataset.uc;
-    else if (pick) picked = pick.dataset.pick;
+    const tab = e.target.closest('[data-uc-view]');
+    const btn = !tab && e.target.closest('[data-uc]');
+    const pick = !tab && !btn && e.target.closest('[data-pick]');
+    if (tab) view = tab.dataset.ucView;
+    else if (btn) {
+      mode = btn.dataset.uc === 'all' ? 'all' : btn.dataset.uc;
+      // Mở chi tiết từ bảng hiện trạng thì nút quay lại về danh sách mục tiêu 2030
+      if (mode !== 'all') view = 'plan';
+    } else if (pick) picked = pick.dataset.pick;
     else return;
     rerender();
   });

@@ -1444,7 +1444,7 @@ export async function renderBottomPanel() {
 
 // Bảng 2 có 3 trang: hạ tầng, tiêu chí phân loại đô thị (urbanClass.js), tăng trưởng xanh (greenGrowth.js)
 const PART2_PAGES = [
-  { title: 'BẢNG TỔNG HỢP HẠ TẦNG', next: 'Phân loại', icon: 'flag', hint: 'Trang sau: tiêu chí phân loại đô thị (Nghị quyết 111/2025/UBTVQH15, mục tiêu 2030 theo Quyết định 756/QĐ-UBND)' },
+  { title: 'BẢNG TỔNG HỢP HẠ TẦNG', next: 'Phân loại', icon: 'flag', hint: 'Trang sau: phân loại đô thị (hiện trạng theo Quyết định 614/QĐ-UBND, mục tiêu 2030 theo Quyết định 756/QĐ-UBND, tiêu chí Nghị quyết 111/2025/UBTVQH15)' },
   { title: 'TIÊU CHÍ PHÂN LOẠI ĐÔ THỊ', next: 'Tăng trưởng xanh', icon: 'leaf', hint: 'Trang sau: chỉ tiêu xây dựng đô thị tăng trưởng xanh (Thông tư 01/2018/TT-BXD, hợp nhất tại VBHN 97/2026/VBHN-TT-BXD)' },
   { title: 'CHỈ TIÊU TĂNG TRƯỞNG XANH', next: 'Hạ tầng', icon: 'table', hint: 'Trang sau: quay lại bảng tổng hợp hạ tầng' }
 ];
