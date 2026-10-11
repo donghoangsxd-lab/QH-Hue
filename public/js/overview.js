@@ -6,6 +6,7 @@ import { map, handleInspectPointClick, zoomToPoint } from './mapEngine.js';
 import { ensureWardStats } from './uiComponents.js';
 import { planMap, getViewMode, isSplitOn } from './planMap.js';
 import { openIntroTour } from './introTour.js';
+import { qhpkCoverRows } from './qhpkCover.js';
 
 const STORAGE_KEY = 'qhhue_intro_off';
 // Khung tọa độ TP. Huế (WGS84): chặn nhập đảo thứ tự hoặc nhập nhầm tọa độ VN-2000
@@ -289,10 +290,22 @@ const SECTIONS = [
         stepsTitle: 'Phương pháp tổng hợp', steps: REPORT_STEPS, facts: REPORT_FACTS, cols: AREA_COLS, actions: [openPlanList]
       },
       {
-        id: 'qhpk', btn: 'report', status: 'dev',
+        id: 'qhpk', btn: 'report', status: 'trial', qhpkCover: true,
         title: 'Tỷ lệ phủ kín quy hoạch phân khu (QHPK)',
-        lead: 'Tỷ lệ diện tích đã có quy hoạch phân khu được phê duyệt trên diện tích đất xây dựng đô thị theo quy hoạch chung.',
-        stepsTitle: 'Phương pháp tổng hợp', steps: REPORT_STEPS, facts: REPORT_FACTS, cols: AREA_COLS, actions: [openPlanList]
+        lead: 'Mỗi đô thị có tỷ lệ phủ kín riêng: tổng diện tích đã lập quy hoạch phân khu trong phạm vi đô thị chia cho diện tích đồ án quy hoạch chung của đô thị đó.',
+        stepsTitle: 'Phương pháp tổng hợp',
+        steps: [
+          'Lấy ranh đồ án QHC của từng đô thị (panel phải › <b>Quy hoạch</b> › QHC 1/10.000); đô thị chưa nạp đồ án QHC hoặc đồ án chưa có ranh GIS (ranh tự dựng theo đường bao lô) tạm lấy phạm vi lập QHC: ranh các phường, xã theo nhu cầu lập quy hoạch, riêng Phong Điền theo ranh thị xã Phong Điền cũ (QĐ 614).',
+          'Cắt ranh các đồ án QHPK 1/2.000 đã nạp theo ranh đô thị, hợp nhất để phần chồng lấn giữa các đồ án chỉ tính một lần.',
+          'Tỷ lệ phủ kín = diện tích QHPK trong đô thị / diện tích đồ án QHC của đô thị. Vùng lõi 1/10.000 và 5 khu vực đô thị xếp dưới QHC thành phố Huế.'
+        ],
+        facts: [
+          'Chỉ tính đồ án đã nạp vào webapp; số liệu tạm tính đến hiện tại, chốt tại kỳ báo cáo năm (31/12).',
+          'Đồ án QHPK thuộc phường, xã khi các lô đất có trên 50% diện tích nằm trong phường cộng lại đạt từ 5 ha (lô vắt ranh lớn đã tách theo phường khi nhập); đồ án liên phường đếm ở mỗi đô thị có phường đạt ngưỡng. Phần ranh lấn nhỏ hơn chỉ cộng vào diện tích.',
+          'Lần mở đầu cần khoảng 10 giây để hợp nhất ranh các đồ án; các lần sau dùng lại kết quả đến khi danh mục đồ án thay đổi.',
+          'Đồ án QHC đã nạp chưa gắn được với đô thị nào được tính riêng trên ranh của chính đồ án.'
+        ],
+        actions: [openPlanList]
       },
       {
         id: 'qhct', btn: 'report', status: 'dev',
@@ -506,6 +519,35 @@ function fillCsdTable(box) {
     .catch(err => { if (box.isConnected) box.innerHTML = `<div class="ov-table-note">Không tải được số liệu: ${escapeHtml(err.message || String(err))}</div>`; });
 }
 
+const haText = (m2) => (m2 == null ? '—' : fmtNum(m2 >= 1e6 ? Math.round(m2 / 1e4) : Math.round(m2 / 1e3) / 10));
+
+function qhpkCoverHtml({ rows, qhpkCount }) {
+  let group = '';
+  const body = rows.map(r => {
+    const head = r.group !== group ? `<tr class="ov-cover-group"><td colspan="5">${escapeHtml(group = r.group)}</td></tr>` : '';
+    const src = r.total == null ? 'Chưa có ranh phạm vi'
+      : r.covered == null ? 'Lỗi hình học khi cắt ranh, chưa tính được'
+        : r.source ? `Ranh đồ án ${r.source}` : r.from614 ? 'Tạm theo ranh đô thị hiện trạng (QĐ 614)'
+          : r.depth ? 'Phạm vi khu vực' : 'Phạm vi lập QHC';
+    const pct = r.ratio == null ? '—' : fmtPct(r.ratio * 100);
+    return `${head}<tr class="ov-cover-d${r.depth}"><td>${escapeHtml(r.label)}<small>${escapeHtml(src)}</small></td>
+      <td>${haText(r.total)}</td><td>${haText(r.covered)}</td><td>${r.projects == null ? '—' : r.projects}</td>
+      <td class="${r.ratio > 0 ? 'c-green' : ''}"><b>${pct}</b></td></tr>`;
+  }).join('');
+  return `<div class="ov-table-note ov-csd-sum">${qhpkCount} đồ án QHPK 1/2.000 đã nạp · số liệu tạm tính đến ${new Date().toLocaleDateString('vi-VN')}</div>
+    <div class="ov-csd-wrap"><table class="ov-table ov-cover">
+      <thead><tr><th>Đô thị</th><th>Diện tích đồ án QHC (ha)</th><th>Đã lập QHPK (ha)</th><th>Số đồ án QHPK</th><th>Tỷ lệ phủ kín</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table></div>`;
+}
+
+function fillQhpkCover(box) {
+  const note = box.querySelector('.ov-table-note');
+  qhpkCoverRows((text) => { if (note && note.isConnected) note.textContent = text; })
+    .then(data => { if (box.isConnected) box.innerHTML = qhpkCoverHtml(data); })
+    .catch(err => { if (box.isConnected) box.innerHTML = `<div class="ov-table-note">Không tính được số liệu: ${escapeHtml(err.message || String(err))}</div>`; });
+}
+
 function zoomCsd(btn) {
   const lat = Number(btn.dataset.lat), lng = Number(btn.dataset.lng);
   close();
@@ -527,6 +569,10 @@ function detailHtml(it) {
     ${it.csdTable ? `<div class="ov-card ov-csd-card">
       <div class="ov-card-title">${ico('table')}Thống kê cơ sở nhà đất dôi dư</div>
       <div data-ov-csd><div class="ov-table-note">Đang tải số liệu các phường, xã…</div></div>
+    </div>` : ''}
+    ${it.qhpkCover ? `<div class="ov-card ov-csd-card">
+      <div class="ov-card-title">${ico('table')}Tỷ lệ phủ kín QHPK theo đô thị</div>
+      <div data-ov-qhpk><div class="ov-table-note">Đang tính diện tích các đồ án QHPK trong từng đô thị…</div></div>
     </div>` : ''}
     <div class="ov-detail-grid">
       <div class="ov-card">
@@ -565,6 +611,8 @@ function showDetail(id) {
   els.body.innerHTML = detailHtml(it);
   const csdBox = els.body.querySelector('[data-ov-csd]');
   if (csdBox) fillCsdTable(csdBox);
+  const qhpkBox = els.body.querySelector('[data-ov-qhpk]');
+  if (qhpkBox) fillQhpkCover(qhpkBox);
   els.body.scrollTop = 0;
   els.body.querySelector('.ov-back')?.focus({ preventScroll: true });
 }

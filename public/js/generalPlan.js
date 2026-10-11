@@ -42,10 +42,11 @@ export const GP_KINDS = {
   town: 'QHC đô thị loại III'
 };
 
-// vision = id đô thị sau 2030 trong urbanVision.js (đối chiếu QĐ 756); future = phạm vi lập rộng hơn đô thị hiện nay để mở rộng sau
+// vision = id đô thị sau 2030 trong urbanVision.js (đối chiếu QĐ 756); future = phạm vi lập rộng hơn đô thị hiện nay để mở rộng sau;
+// scope614 = ranh phạm vi tạm lấy theo ranh đô thị hiện trạng (data/urban614.geojson) thay cho ghép phường, xã
 const PLAN_DEFS = [
   { id: 'hue', kind: 'city', cls: 'I', short: 'Thành phố Huế', name: 'Quy hoạch chung thành phố Huế', vision: 'hue' },
-  { id: 'phong-dien', kind: 'satellite', cls: 'III', short: 'Phong Điền', vision: 'phong-dien',
+  { id: 'phong-dien', kind: 'satellite', cls: 'III', short: 'Phong Điền', vision: 'phong-dien', scope614: 'phong-dien',
     units: ['Phong Điền', 'Phong Thái', 'Phong Dinh', 'Phong Phú', 'Phong Quảng'] },
   { id: 'chan-may', kind: 'satellite', cls: 'III', short: 'Chân Mây', vision: 'chan-may',
     units: ['Chân Mây - Lăng Cô', 'Vinh Lộc', 'Phú Lộc'],

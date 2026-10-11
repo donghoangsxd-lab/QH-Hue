@@ -1,7 +1,8 @@
 // Ranh phạm vi lập quy hoạch chung cho module Quy hoạch chung (generalPlanUi.js): 10 QHC, vùng lõi QHC thành phố Huế
 // và 5 khu vực đô thị trong vùng lõi.
 //   node --experimental-detect-module scripts/build-general-plan.js [đường-dẫn-ra] [--boundary ranh40.geojson]
-// Danh sách lấy từ public/js/generalPlan.js (ES module; Node 20 cần cờ trên để nạp). Mọi phạm vi ghép trọn phường, xã.
+// Danh sách lấy từ public/js/generalPlan.js (ES module; Node 20 cần cờ trên để nạp). Phạm vi ghép trọn phường, xã,
+// trừ QHC có scope614: lấy ranh đô thị hiện trạng cùng id trong public/data/urban614.geojson.
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
@@ -20,9 +21,15 @@ async function main() {
   console.log(`${size} phường xã`);
 
   const all = wards.features.map(f => ({ type: 'Feature', properties: {}, geometry: f.geometry }));
+  const urban614 = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'public', 'data', 'urban614.geojson'), 'utf8'));
+  const from614 = (id) => {
+    const f = urban614.features.find(x => x.properties.id === id);
+    if (!f) throw new Error(`Không có ranh ${id} trong urban614.geojson`);
+    return [{ type: 'Feature', properties: {}, geometry: f.geometry }];
+  };
   const city = GENERAL_PLANS.find(p => p.city);
   const scopes = [
-    ...GENERAL_PLANS.map(p => ({ id: p.id, feats: p.city ? all : pick(p.units) })),
+    ...GENERAL_PLANS.map(p => ({ id: p.id, feats: p.city ? all : p.scope614 ? from614(p.scope614) : pick(p.units) })),
     { id: CORE_ZONE_ID, feats: pick(city.zones[0].units) },
     ...CORE_AREAS.map(a => ({ id: a.id, feats: pick(a.units) }))
   ];

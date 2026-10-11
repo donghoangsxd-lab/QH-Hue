@@ -67,7 +67,7 @@ function scopeText(plan) {
 }
 
 // ---------- Ranh phạm vi trên bản đồ ----------
-function loadScopes() {
+export function loadScopes() {
   if (!scopePromise) {
     scopePromise = fetch(SCOPE_URL)
       .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })

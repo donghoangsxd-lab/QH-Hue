@@ -2807,6 +2807,15 @@ table.ward-table th {
 .ov-csd .link-btn { text-align: left; }
 .ov-csd-ward td, .ov-csd-ward td:first-child { text-align: left; width: auto; font-weight: 700; color: var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.06); }
 .ov-csd .ov-csd-ward small { display: inline; font-weight: 400; color: var(--text-muted); }
+.ov-cover { border-style: hidden; }
+.ov-cover thead th { position: sticky; top: 0; z-index: 1; background: var(--bg-head); }
+.ov-cover td { color: var(--text-main); white-space: nowrap; vertical-align: top; }
+.ov-cover td:first-child { white-space: normal; }
+.ov-cover td small { display: block; color: var(--text-muted); font-size: var(--fs-xs); }
+.ov-cover td.c-green { color: var(--accent-green); }
+.ov-cover .ov-cover-d1 td:first-child { padding-left: 22px; }
+.ov-cover .ov-cover-d2 td:first-child { padding-left: 36px; }
+.ov-cover-group td { text-align: left; font-weight: 700; color: var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.06); }
 .ov-coord {
   display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
   margin-top: 12px; padding: 10px 12px;
