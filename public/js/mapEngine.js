@@ -1462,8 +1462,9 @@ function redrawLands() {
   const own = reviewScope && reviewScope.project;
   const ofFocus = (list) => list.filter(l => l.file === focus);
   const notOwn = (list) => (own ? list.filter(l => l.file !== own) : list);
-  const lands = notOwn((state.showLand || byProject) ? lotsInWardScope(state.landParcels)
-    : focus ? lotsInWardScope(ofFocus(state.landParcels)) : []);
+  const lands = notOwn(state.showLand ? lotsInWardScope(state.landParcels)
+    : byProject ? lotsInWardScope(state.landParcels).filter(l => !state.hiddenProjects.has(l.file))
+      : focus ? lotsInWardScope(ofFocus(state.landParcels)) : []);
   const infra = notOwn(!state.showProjectInfra ? []
     : byProject ? infraLotsInWardScope(state.projectInfraLots).filter(l => !state.hiddenProjects.has(l.file))
       : focus ? infraLotsInWardScope(ofFocus(state.projectInfraLots)) : []);

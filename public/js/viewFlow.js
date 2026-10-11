@@ -110,15 +110,18 @@ function onProjectOpened() {
   setLevel('qhpk', { origin: level === 'qhc10' ? 'qhc10' : null });
 }
 
-// Thoát thông tin đồ án: về lớp gốc (QHC 1/10.000) hoặc phường đang chọn / toàn TP, lô cả phường hiện lại
-function onProjectExit() {
+// Thoát thông tin đồ án: về lớp gốc (QHC 1/10.000) hoặc phường đang chọn / toàn TP, lô cả phường hiện lại.
+// detail.hidden: thoát do bỏ chọn đồ án trong danh sách → đóng thông tin, không hiện lại đồ án của phường
+function onProjectExit(e) {
+  const unchecked = !!e?.detail?.hidden;
+  if (unchecked) closeProjectView();
   clearProjectFocus();
   if (getLevel() === 'qhpk' && levelOrigin() === 'qhc10') {
     setLevel('qhc10');
     return;
   }
   highlightWardBoundary(state.selectedWard, { fitView: true });
-  revealWardProjects(isCity(state.selectedWard) ? null : state.selectedWard);
+  if (!unchecked) revealWardProjects(isCity(state.selectedWard) ? null : state.selectedWard);
 }
 
 // ---------- Click bản đồ ----------

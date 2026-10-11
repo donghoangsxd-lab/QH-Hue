@@ -21,6 +21,7 @@ import { isCoreWard } from './qhc2045.js';
 import { getLevel } from './mapLevel.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
+import { PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
 import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
 import { openOrAssign } from './decisionViewer.js';
 
@@ -1326,6 +1327,10 @@ export function initProjectLayer(opts = {}) {
     state.hiddenProjects.add(p.name);
     if (!projects.some(x => !state.hiddenProjects.has(x.name))) setMaster(false);
     saveHidden();
+    // Bỏ chọn đồ án đang mở = thoát thông tin đồ án (viewFlow.js), nhưng không hiện lại đồ án vừa ẩn
+    if (p.name === focusName || p.name === state.focusedProject) {
+      document.dispatchEvent(new CustomEvent(PROJECT_VIEW_EXIT_EVENT, { detail: { hidden: p.name } }));
+    }
     refreshAll();
   });
   // Gõ tìm lô chỉ vẽ lại khung kết quả (vẽ lại cả danh sách sẽ mất con trỏ trong ô tìm)

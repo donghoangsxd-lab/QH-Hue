@@ -174,7 +174,7 @@ async function setLand(on) {
     layers.frame?.points?.remove();
     layers.frame?.remove();
     layers.land = layers.frame = null;
-    setHint('qhc10Hint', 'khu vực trung tâm');
+    setHint('qhc10Hint', 'Trung tâm');
     return;
   }
   setHint('qhc10Hint', 'đang tải…');
