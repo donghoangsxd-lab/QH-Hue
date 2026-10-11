@@ -580,19 +580,27 @@ export const lotCodeOf = (attrs) => attrOf(attrs, LOT_CODE_FIELD);
 const MARKET_RE = /(^|[^\p{L}])(chợ|siêu thị|trung tâm thương mại|tttm)(?!\p{L})/iu;
 export const isMarketName = (s) => MARKET_RE.test(String(s || '').normalize('NFC'));
 
+// So trên tên đã bỏ dấu, tách chữ / số ("TH1" → "th 1"); nhận cả viết tắt trong tên trường (QHC: "Trường TH Thị trấn 1",
+// "Trường MN Hoa Sen", "PTTH" = THPT, "PTCS" = THCS, "MG" = mẫu giáo)
 const SCHOOL_NAME_RULES = [
-  ['THPT', /trung học phổ thông|(^|[^\p{L}])thpt(?!\p{L})/iu],
-  ['THCS', /trung học cơ sở|(^|[^\p{L}])thcs(?!\p{L})/iu],
-  ['TH', /tiểu học/iu],
-  ['MN', /mầm non|mẫu giáo|nhà trẻ/iu]
+  ['THPT', /\bthpt\b|\bptth\b|trung hoc pho thong|pho thong trung hoc/],
+  ['THCS', /\bthcs\b|\bptcs\b|trung hoc co so/],
+  ['TH', /\bth\b|tieu hoc/],
+  ['MN', /\bmn\b|\bmg\b|mam non|mau giao|nha tre/]
 ];
 
-/** Cấp trường theo tên (VD "Trường tiểu học Lê Lợi"), không rõ thì theo tiền tố ký hiệu lô (MN. / TH. / THCS. / THPT.); tên gộp nhiều cấp → '' */
+const plainName = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd')
+  .toLowerCase().replace(/([a-z])(\d)/g, '$1 $2').replace(/(\d)([a-z])/g, '$1 $2').replace(/[^a-z0-9]+/g, ' ').trim();
+
+/**
+ * Cấp trường theo tên (VD "Trường tiểu học Lê Lợi", "Trường TH Thị trấn 1"), không rõ thì theo tiền tố ký hiệu lô
+ * (MN. / TH. / THCS. / THPT.); tên gộp nhiều cấp ("TH&THCS", liên cấp) → ''
+ */
 export function schoolLevelOf(names, lotCode) {
   const hits = new Set();
   names.forEach(n => {
-    const s = String(n || '').normalize('NFC');
-    SCHOOL_NAME_RULES.forEach(([lv, re]) => { if (re.test(s)) hits.add(lv); });
+    const s = plainName(n);
+    if (s) SCHOOL_NAME_RULES.forEach(([lv, re]) => { if (re.test(s)) hits.add(lv); });
   });
   if (hits.size) return hits.size === 1 ? [...hits][0] : '';
   const m = String(lotCode || '').match(/^(MN|THPT|THCS|TH)(?=[.\-_\s\d])/i);

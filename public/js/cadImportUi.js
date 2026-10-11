@@ -353,7 +353,8 @@ function enrichParcels(parcels) {
     }
     if (!p.school) return;
     // Tên điểm / ký hiệu lô và công trình đã có trong lô chỉ ra 2 cấp khác nhau: để admin chọn
-    const byName = schoolLevelOf([p.name, ...p.points.map(pt => pt.name)], p.lotCode);
+    const names = [p.name, ...p.points.flatMap(pt => [pt.name, pt.kind])];
+    const byName = schoolLevelOf(names, p.lotCode) || (names.some(n => EDU_OTHER_RE.test(plain(n))) ? LEVEL_LAND : '');
     const byExisting = existingLevelOf(p, existing, project);
     const lv = byName && byExisting && byName !== byExisting ? '' : byName || byExisting;
     if (lv) current.autoLevels.set(p.src, lv);
