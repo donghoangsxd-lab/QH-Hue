@@ -19,6 +19,7 @@ import {
   setParcelsVisible,
   flyToVisible,
   centerOnCity,
+  infraClickAt,
   layers
 } from './mapEngine.js';
 import {
@@ -122,7 +123,6 @@ function initLayerMainTabs() {
       btn.setAttribute('aria-selected', String(on));
     });
     root.querySelectorAll('[data-main-pane]').forEach(pane => { pane.hidden = pane.dataset.mainPane !== id; });
-    root.querySelectorAll('[data-main-eye]').forEach(eye => { eye.hidden = eye.dataset.mainEye !== id; });
     root.dataset.active = id;
   };
   tabs.forEach(btn => btn.addEventListener('click', () => show(btn.dataset.mainTab)));
@@ -402,6 +402,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       handleMeasureClick(e.latlng);
       return;
     }
+    // Thứ tự ưu tiên khi bấm: tem công trình > thửa hiện trạng (lớp thửa bật) > lô quy hoạch > phường (cuối cùng).
+    // Lô tự bắt click (không nổi lên bản đồ); lớp thửa giành popup lô trong cadastreLayer.onPopupOpen
+    if (infraClickAt(e, targetMap)) return;
     if (state.isInspectMode) {
       if (nearPanelClick) return;
       handleInspectPointClick(e.latlng.lat, e.latlng.lng, targetMap);

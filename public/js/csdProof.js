@@ -18,7 +18,8 @@ const QUOTA_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }
 const COUNT_MS = 900;
 const CSD_MIN_COVERAGE_PCT = 0.5;   // khớp api/gee.js: dưới ngưỡng này xếp hạng theo thiếu quy mô
 const SPOTLIGHT_OPACITY = 0.5;   // làm tối bản đồ ngoài phạm vi khu đất
-// Lớp tối nằm trên icon công trình (markerPane 600), vòng khu đất và chấm minh chứng nằm trên lớp tối, dưới tooltip (650)
+// Lớp tối nằm trên icon công trình (markerPane 600), vòng khu đất và chấm minh chứng nằm trên lớp tối, dưới tooltip (650).
+// Cả 2 pane xuyên chuột để không che tem; chấm minh chứng là marker interactive nên vẫn tự bắt hover
 const MASK_PANE = 'proofMask';
 const TOP_PANE = 'proofTop';
 
@@ -28,7 +29,11 @@ function ensurePanes(m) {
     p.style.zIndex = 610;
     p.style.pointerEvents = 'none';
   }
-  if (!m.getPane(TOP_PANE)) m.createPane(TOP_PANE).style.zIndex = 620;
+  if (!m.getPane(TOP_PANE)) {
+    const p = m.createPane(TOP_PANE);
+    p.style.zIndex = 620;
+    p.style.pointerEvents = 'none';
+  }
 }
 
 // Mỗi lúc chỉ 1 lớp minh chứng; requestSeq bỏ qua kết quả trả về muộn của lần bấm trước

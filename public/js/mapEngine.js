@@ -811,6 +811,10 @@ function createParcelShape(entry, targetMap, detailed) {
   return shape;
 }
 
+const ICON_SIZE = [26, 32];
+const ICON_ANCHOR = [11, 26];
+const DOT_HIT_PX = 8;
+
 function createPointMarker(entry, mode, targetMap) {
   const p = entry.point;
   const approved = isApproved(p.status);
@@ -825,8 +829,8 @@ function createPointMarker(entry, mode, targetMap) {
       icon: L.divIcon({
         className: 'custom-infra-icon-png',
         html: `${badgeHtml}<img src="${iconUrl}" alt="" style="position: relative; width: 22px; height: 27px; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.5));" />`,
-        iconSize: [26, 32],
-        iconAnchor: [11, 26]
+        iconSize: ICON_SIZE,
+        iconAnchor: ICON_ANCHOR
       })
     });
   } else {
@@ -1045,6 +1049,26 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     rendered.forEach(markSel);
   }
 
+  // Tem đang vẽ có khung (icon) / chấm chứa điểm pixel pt; nhiều tem chồng nhau lấy tem gần tâm nhất
+  function pickAt(pt, m) {
+    if (mode !== 'icon' && mode !== 'dot') return null;
+    const cy = mode === 'icon' ? ICON_SIZE[1] / 2 - ICON_ANCHOR[1] : 0;
+    let best = null;
+    let bestD = Infinity;
+    rendered.forEach(entry => {
+      if (!m.hasLayer(entry.marker)) return;
+      const p = m.latLngToContainerPoint(entry.marker.getLatLng());
+      const dx = pt.x - p.x;
+      const dy = pt.y - p.y;
+      const hit = mode === 'icon'
+        ? dx >= -ICON_ANCHOR[0] && dx <= ICON_SIZE[0] - ICON_ANCHOR[0] && dy >= -ICON_ANCHOR[1] && dy <= ICON_SIZE[1] - ICON_ANCHOR[1]
+        : dx * dx + dy * dy <= DOT_HIT_PX * DOT_HIT_PX;
+      const d = dx * dx + (dy - cy) * (dy - cy);
+      if (hit && d < bestD) { best = entry; bestD = d; }
+    });
+    return best;
+  }
+
   // Vẽ lại toàn bộ marker + ranh lô (dữ liệu ranh vừa tải hoặc bật/tắt lớp ranh)
   function reset() {
     clearPoints();
@@ -1116,11 +1140,20 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
     invalidateBuffers();
   }
 
-  return { setList, refreshPoints, refreshBuffers, invalidateBuffers, reset, highlight };
+  return { setList, refreshPoints, refreshBuffers, invalidateBuffers, reset, highlight, pickAt };
 }
 
 const leftRenderer = createRenderer(() => map, layers, () => true, () => (isCompareOn() ? 'Hiện trạng' : ''));
 const planRenderer = createRenderer(() => planMap, planLayers, () => isCompareOn(), () => 'Quy hoạch');
+
+/** Click bản đồ trúng tem công trình (sự kiện lọt xuống nền do lớp khác đè) → mở công trình như bấm tem, true */
+export function infraClickAt(e, targetMap) {
+  const renderer = targetMap === map ? leftRenderer : targetMap === planMap ? planRenderer : null;
+  const entry = renderer && e?.containerPoint ? renderer.pickAt(e.containerPoint, targetMap) : null;
+  if (!entry) return false;
+  onPointClick(entry.point, targetMap);
+  return true;
+}
 
 // Diện tích theo phường đang chọn: lô vắt ranh đã tách (wardParts) chỉ tính phần nằm trong phường — trừ mảnh phường khác
 // khỏi công trình trong phường, cộng mảnh nằm trong phường của công trình phường khác. partKey: 'sizeHT' / 'sizeQH'

@@ -644,7 +644,14 @@ body.right-collapsed .right-panel {
 .legend-main .layer-main-label small { font-size: 9px; font-weight: 600; letter-spacing: .04em; opacity: .75; }
 .layer-main-tabs .layer-eye-btn { width: 26px; height: 26px; margin-left: 3px; padding: 0; justify-content: center; box-sizing: border-box; }
 .layer-main-tabs .layer-eye-btn[hidden] { display: none; }
-.layer-main-tabs .layer-eye-btn:disabled { opacity: 0.5; cursor: default; }
+.layer-main-tabs .layer-eye-btn:disabled, .layer-pane-tools .layer-eye-btn:disabled { opacity: 0.5; cursor: default; }
+/* Tab Lớp dữ liệu: 3 tab chia đều, chừa bề ngang nút thu gọn panel để thẳng cột với 3 tab trên (.rp-tabs) */
+#layerMain > .layer-main-tabs { padding: 0 34px 0 0; }
+#layerMain > .layer-main-tabs .layer-main-tab { flex: 1 1 0; padding: 0 4px; }
+/* Dòng công cụ đầu pane Quy hoạch / Công trình: số đang hiện + nút bật tắt toàn bộ */
+.layer-pane-tools { display: flex; align-items: center; gap: 6px; padding: 2px 0 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border-soft); }
+.layer-pane-note { flex: 1 1 auto; min-width: 0; font-size: var(--fs-xs); color: var(--text-muted); }
+.layer-pane-note b { color: var(--text-main); font-variant-numeric: tabular-nums; }
 .layer-main-pane { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 10px 8px; }
 .layer-main-pane[hidden] { display: none; }
 .layer-count { flex-shrink: 0; padding: 1px 6px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.12); border: 1px solid rgba(var(--cyan-rgb), 0.35); }
@@ -2760,6 +2767,45 @@ table.ward-table th {
 }
 .ov-btn .ico { margin: 0; }
 .ov-btn:hover { color: var(--text-on-accent); background: var(--accent-cyan); border-color: var(--accent-cyan); }
+.ov-item-btns { flex-shrink: 0; display: flex; gap: 6px; }
+.ov-btn-demo { color: var(--text-on-accent); background: var(--accent-cyan); border-color: var(--accent-cyan); }
+.ov-btn-demo:hover { filter: brightness(1.1); box-shadow: 0 0 10px rgba(var(--cyan-rgb), 0.45); }
+
+/* Thẻ thuyết minh trình diễn trên bản đồ (overviewDemo.js): góc trên trái, cạnh thanh công cụ, dưới hộp Giới thiệu */
+.ovd-card {
+  position: fixed; top: 64px; left: 60px; z-index: 5000;
+  width: min(400px, calc(100vw - 72px)); max-height: calc(100vh - 96px);
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 14px; box-sizing: border-box; overflow: auto;
+  color: var(--text-main); background: var(--bg-card);
+  border: 1px solid rgba(var(--cyan-rgb), 0.55); border-radius: var(--r-lg);
+  box-shadow: var(--panel-shadow), 0 0 18px rgba(var(--cyan-rgb), 0.25);
+  animation: ov-in 0.25s ease;
+}
+.ovd-card[hidden] { display: none; }
+.ovd-head { display: flex; align-items: center; gap: 8px; }
+.ovd-kicker {
+  flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-xs); font-weight: 700; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.ovd-x { display: inline-flex; padding: 2px; color: var(--text-muted); background: none; border: 0; cursor: pointer; }
+.ovd-x:hover { color: var(--accent-red); }
+.ovd-dots { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.ovd-dots li { flex: 1; height: 3px; border-radius: 2px; background: var(--border-color); }
+.ovd-dots li.done { background: rgba(var(--cyan-rgb), 0.5); }
+.ovd-dots li.on { background: var(--accent-cyan); }
+.ovd-title { margin: 0; font-size: var(--fs-lg); font-weight: 800; color: var(--text-strong); line-height: 1.35; }
+.ovd-title span { display: block; font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); }
+.ovd-text { font-size: var(--fs-md); line-height: 1.55; }
+.ovd-text p { margin: 0 0 6px; }
+.ovd-text ul { margin: 0 0 6px; padding-left: 18px; }
+.ovd-text li + li { margin-top: 3px; }
+.ovd-note { font-size: var(--fs-sm); color: var(--text-muted); }
+.ovd-busy { color: var(--text-muted); font-style: italic; }
+.ovd-btns { display: flex; gap: 6px; }
+.ovd-btns [data-ovd="keep"] { margin-right: auto; }
+.ovd-btns button:disabled { opacity: 0.45; cursor: default; filter: none; box-shadow: none; }
+@media (max-width: 700px) { .ovd-card { top: auto; bottom: 8px; left: 8px; width: calc(100vw - 16px); max-height: 50vh; } }
 
 .ov-crumb { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; min-width: 0; }
 .ov-crumb-sec { font-size: var(--fs-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2864,7 +2910,7 @@ table.ward-table th {
   40% { box-shadow: 0 0 0 3px rgba(var(--cyan-rgb), 0.75), 0 0 14px rgba(var(--cyan-rgb), 0.5); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ov-root, .ov-dialog, .ov-flash { animation: none; }
+  .ov-root, .ov-dialog, .ov-flash, .ovd-card { animation: none; }
 }
 
 /* Thẩm định đồ án — bảng chiếm phần dưới màn hình, phần trên để xem ranh lô; không đụng bảng phường.

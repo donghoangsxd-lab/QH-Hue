@@ -1,4 +1,5 @@
 // Giới thiệu tổng quan (nút góc trên trái): giới thiệu webapp + mục lục 5 nhóm tính năng, mỗi mục có hướng dẫn và nút mở thẳng tính năng.
+// Mục có demo: nút «Xem trên bản đồ» chạy chuỗi thao tác trực tiếp kèm thuyết minh (overviewDemo.js).
 // Mở tính năng bằng cách bấm hộ nút / tab / ô tick sẵn có trên giao diện, không đụng trạng thái nội bộ của module khác.
 // Tự hiện ở lần mở trang đầu; ô "Không tự hiện" dùng chung khóa với introTour.js.
 import { ico, showToast, escapeHtml, fmtNum, fmtPct } from './utils.js';
@@ -7,6 +8,8 @@ import { ensureWardStats } from './uiComponents.js';
 import { planMap, getViewMode, isSplitOn } from './planMap.js';
 import { openIntroTour } from './introTour.js';
 import { qhpkCoverRows } from './qhpkCover.js';
+import { floodReport } from './floodSim.js';
+import { startDemo, flash, openLayerTab } from './overviewDemo.js';
 
 const STORAGE_KEY = 'qhhue_intro_off';
 // Khung tọa độ TP. Huế (WGS84): chặn nhập đảo thứ tự hoặc nhập nhầm tọa độ VN-2000
@@ -26,20 +29,6 @@ const BUTTONS = {
 
 // ---------- Mở tính năng có sẵn ----------
 const $ = (id) => document.getElementById(id);
-
-function flash(el) {
-  if (!el) return;
-  el.classList.remove('ov-flash');
-  void el.offsetWidth;
-  el.classList.add('ov-flash');
-  setTimeout(() => el.classList.remove('ov-flash'), 2000);
-}
-
-function openLayerTab({ main, pane } = {}) {
-  document.querySelector('.rp-tabs .tab-btn[data-tab="tabLayers"]')?.click();
-  if (main) document.querySelector(`[data-main-tab="${main}"]`)?.click();
-  if (pane) document.querySelector(`[data-map-tab="${pane}"]`)?.click();
-}
 
 function showLayer(chkId, tabs) {
   openLayerTab(tabs);
@@ -86,6 +75,171 @@ function lookupAt({ lat, lng }) {
   handleInspectPointClick(lat, lng, target);
 }
 
+// ---------- Trình diễn trên bản đồ ----------
+const HUE_CENTER = [16.4637, 107.5909];
+const DEMO_SPOT = { lat: 16.4615, lng: 107.5955 };
+const FLOOD_DEMO_M = 3;
+const SCHOOL_CHKS = ['chk_c3', 'chk_c4', 'chk_c5', 'chk_c10'];
+const SCHOOL_KINDS = { '3-MN': 'mầm non', '4-TH': 'tiểu học', '5-THCS': 'THCS', '6-THPT': 'THPT' };
+const isActive = (b) => b.classList.contains('active');
+const meters = (v) => `${fmtNum(Math.round(v * 10) / 10)} m`;
+const floodedSchools = (r) => (r ? r.flooded.filter(f => SCHOOL_KINDS[f.kind]) : []);
+
+function floodSchoolsHtml(r) {
+  if (!r) return '<p>Chưa lấy được kết quả mô phỏng.</p>';
+  const total = r.all.filter(f => SCHOOL_KINDS[f.kind]).length;
+  const hit = floodedSchools(r);
+  if (!hit.length) return `<p>Ở mực nước ${meters(r.level)} chưa có trường hiện trạng đã duyệt nào trong vùng ngập (tổng ${total} trường).</p>`;
+  const byKind = Object.entries(SCHOOL_KINDS)
+    .map(([k, label]) => [label, hit.filter(f => f.kind === k).length])
+    .filter(([, n]) => n).map(([label, n]) => `${n} ${label}`).join(', ');
+  const deepest = hit.slice(0, 3).map(f => `${escapeHtml(f.name)} (sâu ${meters(f.depth)})`).join('; ');
+  const pop = r.pop != null
+    ? `<li>Khoảng <b>${fmtNum(Math.round(r.pop / 10) * 10)} người</b>${r.popAll ? ` (${fmtPct(r.pop / r.popAll * 100)} dân số)` : ''} sống trong vùng ngập, diện tích ngập ≈ <b>${fmtNum(Math.round(r.area / 1e5) / 10)} km²</b>.</li>`
+    : '';
+  return `<p>Đây là <b>kịch bản giả định</b>: nước dâng tới cao độ ${meters(r.level)} thì <b class="c-red">${hit.length}/${total} trường</b>
+    hiện trạng nằm trong vùng ngập (${byKind}).</p>
+    <ul><li>Ngập sâu nhất: ${deepest}.</li>${pop}
+    <li>Danh sách đủ ở panel phải › <b>Mô phỏng ngập</b>; bấm từng dòng để phóng tới trường.</li></ul>`;
+}
+
+const FLOOD_DEMO = {
+  title: `Kịch bản ngập ${FLOOD_DEMO_M} m và trường học`,
+  scenes: [
+    {
+      title: 'Chuyển sang bản đồ hiện trạng',
+      run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 12); },
+      text: '<p>Kịch bản ngập xét trên các công trình <b>đang hoạt động</b>, nên bản đồ chuyển sang <b>Bản đồ hiện trạng thành phố Huế</b> (tiêu đề giữa phía trên) và đưa về khu vực trung tâm.</p>'
+    },
+    {
+      title: `Giả định mực nước ${FLOOD_DEMO_M} m`,
+      run: async (d) => {
+        d.check('chk_flood', { pane: 'env' });
+        d.range('floodLevel', FLOOD_DEMO_M);
+        await d.wait(800);
+      },
+      text: `<p>Panel phải › <b>Bản đồ môi trường</b> › <b>Mô phỏng ngập</b> đã bật, thanh <b>Mực nước</b> đặt <b>${FLOOD_DEMO_M} m</b>.
+        Mọi ô đất có cao độ nền thấp hơn ${FLOOD_DEMO_M} m được tô xanh theo độ sâu: xanh nhạt ngập nông, xanh đậm ngập sâu.</p>
+        <p class="ovd-note">Cao độ nền FABDEM (ô 30 m, hệ EGM2008), không phải số đọc mực nước tại trạm thủy văn.</p>`
+    },
+    {
+      title: 'Bật tem các trường học',
+      run: (d) => SCHOOL_CHKS.forEach(id => d.check(id, { main: 'infra' })),
+      text: '<p>Panel phải › <b>Công trình</b> đã bật 4 nhóm <b>Mầm non, Tiểu học, THCS, THPT</b>. Trường nằm trong vùng ngập được đánh <b class="c-red">chấm đỏ</b> ngay tại tem công trình.</p>'
+    },
+    {
+      title: `Các trường bị ngập khi nước lên ${FLOOD_DEMO_M} m`,
+      run: async (d) => { d.data.flood = await floodReport(); },
+      text: (d) => floodSchoolsHtml(d.data.flood)
+    },
+    {
+      title: 'Trường ngập sâu nhất',
+      run: (d) => { const top = floodedSchools(d.data.flood)[0]; if (top) d.point(top); },
+      text: (d) => {
+        const top = floodedSchools(d.data.flood)[0];
+        if (!top) return '<p>Không có trường nào trong vùng ngập để phóng tới.</p>';
+        return `<p><b>${escapeHtml(top.name)}</b>: cao độ nền thấp hơn mực nước giả định khoảng <b>${meters(top.depth)}</b>.
+          Bảng thông tin trường mở sẵn (quy mô, bán kính phục vụ) làm cơ sở cân nhắc tôn nền, chống ngập hoặc bố trí điểm trường thay thế.</p>
+          <p class="ovd-note">Bấm <b>Kết thúc</b> để trả bản đồ về như trước, hoặc <b>Giữ bản đồ</b> để tự kéo mực nước, xem các trường khác.</p>`;
+      }
+    }
+  ]
+};
+
+const TERRAIN_DEMO = {
+  title: 'Địa hình và hướng thoát nước',
+  scenes: [
+    {
+      title: 'Phủ lớp cao độ nền',
+      run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 11); d.check('chk_terrain', { pane: 'env' }); },
+      text: '<p>Panel phải › <b>Bản đồ môi trường</b> › <b>Địa hình (cao độ nền)</b> đã bật: màu thể hiện cao độ, vùng trũng thấp ven phá Tam Giang và hạ lưu sông Hương nổi rõ. Di chuột trên bản đồ để đọc cao độ tại vị trí.</p>'
+    },
+    {
+      title: 'Hướng dòng chảy và lưu vực',
+      run: (d) => { d.check('chk_drainage', { pane: 'env' }); d.check('chk_basin', { pane: 'env' }); },
+      text: `<p>Bật thêm <b>Thoát nước, khe tụ thủy</b> và <b>Lưu vực, đường phân thủy</b>: nước mặt dồn theo các khe tụ về vùng trũng,
+        đường phân thủy chia ranh lưu vực — căn cứ xem xét san nền, hướng tuyến thoát nước khi bố trí quy hoạch.</p>
+        <p class="ovd-note">Mô hình FABDEM ô 30 m, sai số khoảng ±1,0 m; không thay thế số liệu đo đạc địa hình.</p>`
+    }
+  ]
+};
+
+const PRIORITY_DEMO = {
+  title: 'Vùng cần ưu tiên đầu tư hạ tầng',
+  scenes: [
+    {
+      title: 'Bản đồ độ phủ hạ tầng',
+      run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 12); d.check('chk_heat', { pane: 'base' }); },
+      text: '<p>Panel phải › <b>Bản đồ nền</b> › <b>Bản đồ độ phủ hạ tầng</b> đã bật: mỗi vị trí tô theo số nhóm hạ tầng tiếp cận được trong bán kính QCVN 01:2026/BXD (1–8 nhóm); màu càng nhạt càng thiếu.</p>'
+    },
+    {
+      title: 'Chồng lớp phân bổ dân cư',
+      run: (d) => d.check('chk_pop', { pane: 'base' }),
+      text: `<p>Bật thêm <b>Phân bổ dân cư</b>: khu <b>đông dân</b> nằm trên vùng <b>độ phủ thấp</b> là nơi nên ưu tiên bố trí công trình mới.
+        Bảng tổng hợp phía dưới cho biết phường, xã còn thiếu chỉ tiêu m²/người.</p>
+        <p class="ovd-note">Độ phủ chỉ tính công trình đã được Admin phê duyệt; vùng đệm tròn theo bán kính quy chuẩn.</p>`
+    }
+  ]
+};
+
+const ACCESS_DEMO = {
+  title: 'Tra cứu tiếp cận hạ tầng tại 1 vị trí',
+  scenes: [
+    {
+      title: 'Bật chế độ tra cứu',
+      run: (d) => { d.view('HT'); d.press('btnInspectMode', isActive); },
+      text: '<p>Nút <b>Tra cứu</b> (con trỏ) trên thanh công cụ trái đã bật. Ở chế độ này, bấm vào bất kỳ vị trí nào trên bản đồ để xem vị trí đó được phục vụ bởi những nhóm hạ tầng nào.</p>'
+    },
+    {
+      title: 'Tra một vị trí mẫu',
+      run: async (d) => {
+        d.fly([DEMO_SPOT.lat, DEMO_SPOT.lng], 16);
+        await d.wait(1500);
+        if (d.alive()) handleInspectPointClick(DEMO_SPOT.lat, DEMO_SPOT.lng, map);
+      },
+      text: `<p>Bảng kết quả liệt kê nhóm hạ tầng <b>đã tiếp cận</b> (vị trí nằm trong bán kính phục vụ theo QCVN 01:2026/BXD) và nhóm <b>còn thiếu</b>,
+        kèm tuyến đường tới công trình gần nhất.</p>
+        <p class="ovd-note">Chỉ tính công trình đã được Admin phê duyệt. Bấm <b>Giữ bản đồ</b> để tự tra các vị trí khác.</p>`
+    }
+  ]
+};
+
+// Cơ sở có phương án tốt nhất, ưu tiên khu đất lớn
+async function topCsd() {
+  const wards = await ensureWardStats();
+  return (wards || []).flatMap(w => (w.csdItems || []).map(c => ({ ...c, ward: w.Ten_Phuong })))
+    .filter(c => Number.isFinite(Number(c.lat)) && Number.isFinite(Number(c.lng)) && !c.needsApproval
+      && (c.suggestions || []).some(s => s.status === 'eligible'))
+    .sort((a, b) => (Number(b.size) || 0) - (Number(a.size) || 0))[0] || null;
+}
+
+const CSD_DEMO = {
+  title: 'Đề xuất công năng cơ sở nhà đất dôi dư',
+  scenes: [
+    {
+      title: 'Các cơ sở chưa sử dụng',
+      run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 12); d.check('chk_c9', { main: 'infra' }); },
+      text: '<p>Panel phải › <b>Công trình</b> › <b>12. Cơ sở chưa sử dụng</b> đã bật: các cơ sở nhà đất dôi dư sau sắp xếp hiện trên bản đồ.</p>'
+    },
+    {
+      title: 'Phương án cho khu đất lớn nhất',
+      run: async (d) => {
+        d.data.csd = await topCsd();
+        const c = d.data.csd;
+        if (c) d.point({ lat: Number(c.lat), lng: Number(c.lng), name: c.name });
+      },
+      text: (d) => {
+        const c = d.data.csd;
+        if (!c) return '<p>Chưa có cơ sở đã duyệt nào có phương án chuyển đổi phù hợp.</p>';
+        const best = c.suggestions.find(s => s.status === 'eligible');
+        return `<p><b>${escapeHtml(c.name || 'Khu đất chưa sử dụng')}</b> (${escapeHtml(c.ward)}, ${fmtNum(c.size)} m²): thuật toán thử chuyển sang từng loại hạ tầng xã hội,
+          phương án tốt nhất là <b class="c-green">${escapeHtml(best.label)}</b> vì bù được nhiều nhất phần thiếu hụt của phường.</p>
+          <p class="ovd-note">Bảng thông tin trên bản đồ liệt kê đủ phương án; bấm <b>Xem thuyết minh</b> để xem vùng phục vụ và dân cư được tính.</p>`;
+      }
+    }
+  ]
+};
+
 // ---------- Nội dung ----------
 const REPORT_STEPS = [
   'Tổng hợp ranh các đồ án đã được phê duyệt (panel phải › <b>Quy hoạch</b>) theo cấp độ quy hoạch.',
@@ -125,7 +279,7 @@ const SECTIONS = [
         actions: [{ label: 'Bật lớp thửa đất', icon: 'parcel', run: () => showLayer('chk_cadastre', { pane: 'base' }) }, openPlanList]
       },
       {
-        id: 'access', btn: 'guide', status: 'trial',
+        id: 'access', btn: 'guide', status: 'trial', demo: ACCESS_DEMO,
         title: 'Tra cứu mức độ tiếp cận hạ tầng tại 1 vị trí theo tọa độ',
         lead: 'Cho biết một vị trí đã nằm trong bán kính phục vụ của những nhóm hạ tầng nào theo QCVN 01:2026/BXD, nhóm nào còn thiếu, kèm tuyến đường tới công trình gần nhất.',
         steps: [
@@ -217,7 +371,7 @@ const SECTIONS = [
         actions: [{ label: 'Mở công cụ thẩm định', icon: 'table', run: reviewOn }]
       },
       {
-        id: 'terrain', btn: 'guide', status: 'dev',
+        id: 'terrain', btn: 'guide', status: 'dev', demo: TERRAIN_DEMO,
         title: 'Chồng lớp bản đồ địa hình',
         note: 'Dữ liệu vệ tinh kích thước ô 30 m × 30 m, sai số ±1,0 m',
         lead: 'Phủ lớp cao độ nền lên bản đồ để xem xét san nền, hướng thoát nước và khu vực trũng thấp khi bố trí quy hoạch.',
@@ -233,7 +387,7 @@ const SECTIONS = [
         actions: [{ label: 'Bật lớp địa hình', icon: 'terrain', run: () => showLayer('chk_terrain', { pane: 'env' }) }]
       },
       {
-        id: 'flood', btn: 'guide', status: 'dev',
+        id: 'flood', btn: 'guide', status: 'dev', demo: FLOOD_DEMO,
         title: 'Chồng lớp bản đồ ngập lụt và giả định kịch bản ngập',
         lead: 'Giả định mực nước để khoanh vùng có nguy cơ ngập, đối chiếu với vùng ngập thực tế qua các mùa lũ từ ảnh radar vệ tinh.',
         steps: [
@@ -379,7 +533,7 @@ const SECTIONS = [
         actions: [{ label: 'Xem báo cáo', icon: 'map', run: () => showBottomPage(3) }]
       },
       {
-        id: 'priority', btn: 'map', status: 'trial',
+        id: 'priority', btn: 'map', status: 'trial', demo: PRIORITY_DEMO,
         title: 'Đề xuất các vùng cần ưu tiên đầu tư hạ tầng',
         lead: 'Bản đồ độ phủ cho biết mỗi vị trí tiếp cận được bao nhiêu nhóm hạ tầng; vùng màu nhạt mà đông dân là vùng nên ưu tiên đầu tư.',
         steps: [
@@ -401,7 +555,7 @@ const SECTIONS = [
     title: 'Thuật toán đề xuất xử lý cho cơ sở dôi dư sau sắp xếp',
     items: [
       {
-        id: 'csd', btn: 'result', status: 'trial', csdTable: true,
+        id: 'csd', btn: 'result', status: 'trial', csdTable: true, demo: CSD_DEMO,
         title: 'Đề xuất công năng cho Cơ sở nhà đất dôi dư',
         lead: 'Với mỗi cơ sở dôi dư (nhóm 12. Cơ sở chưa sử dụng), thuật toán thử chuyển đổi sang từng loại hạ tầng xã hội và xếp hạng theo mức bù đắp phần thiếu hụt của phường theo quy hoạch. Bảng dưới tổng hợp chức năng đề xuất của từng khu đất, nhóm theo phường, xã.',
         steps: [
@@ -443,7 +597,10 @@ function itemHtml(it) {
       <div class="ov-item-title">${it.title}</div>
       <div class="ov-item-meta">${badge(it.status)}${it.note ? `<span class="ov-item-note">${it.note}</span>` : ''}</div>
     </div>
-    <button type="button" class="ov-btn" data-ov-item="${it.id}">${ico(icon)}${label}</button>
+    <div class="ov-item-btns">
+      ${it.demo ? `<button type="button" class="ov-btn ov-btn-demo" data-ov-demo="${it.id}" title="Tự thao tác trên bản đồ kèm thuyết minh">${ico('map')}Xem trên bản đồ</button>` : ''}
+      <button type="button" class="ov-btn" data-ov-item="${it.id}">${ico(icon)}${label}</button>
+    </div>
   </div>`;
 }
 
@@ -592,8 +749,10 @@ function detailHtml(it) {
       <button type="submit" class="ov-primary">${ico('inspect')}Tra cứu</button>
       <span class="ov-coord-msg" role="alert"></span>
     </form>` : ''}
-    ${it.actions?.length ? `<div class="ov-actions">${it.actions.map((a, i) =>
-      `<button type="button" class="${i ? 'ov-ghost' : 'ov-primary'}" data-ov-act="${i}">${ico(a.icon)}${a.label}</button>`).join('')}</div>` : ''}`;
+    ${it.actions?.length || it.demo ? `<div class="ov-actions">
+      ${it.demo ? `<button type="button" class="ov-primary" data-ov-demo="${it.id}">${ico('map')}Xem trình diễn trên bản đồ</button>` : ''}
+      ${(it.actions || []).map((a, i) =>
+        `<button type="button" class="${i || it.demo ? 'ov-ghost' : 'ov-primary'}" data-ov-act="${i}">${ico(a.icon)}${a.label}</button>`).join('')}</div>` : ''}`;
 }
 
 function showList() {
@@ -622,6 +781,13 @@ function runAction(idx) {
   if (!act) return;
   close();
   act.run();
+}
+
+function runDemo(id) {
+  const def = ITEMS.get(id)?.demo;
+  if (!def) return;
+  close();
+  startDemo(def);
 }
 
 function submitCoord(form) {
@@ -685,9 +851,10 @@ function build() {
 
   root.addEventListener('click', (e) => {
     if (e.target === root) { close(); return; }
-    const t = e.target.closest('[data-ov-item], [data-ov-back], [data-ov-act], [data-ov-zoom], [data-ov-tour], [data-ov-close], .ov-x');
+    const t = e.target.closest('[data-ov-item], [data-ov-demo], [data-ov-back], [data-ov-act], [data-ov-zoom], [data-ov-tour], [data-ov-close], .ov-x');
     if (!t) return;
     if (t.dataset.ovItem) showDetail(t.dataset.ovItem);
+    else if (t.dataset.ovDemo) runDemo(t.dataset.ovDemo);
     else if (t.hasAttribute('data-ov-zoom')) zoomCsd(t);
     else if (t.hasAttribute('data-ov-back')) showList();
     else if (t.dataset.ovAct != null) runAction(Number(t.dataset.ovAct));

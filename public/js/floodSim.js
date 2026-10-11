@@ -120,14 +120,19 @@ async function ensureFacilities() {
 const flooded = (list) => list.filter(f => f.elev > 0 && f.elev < level).sort((a, b) => a.elev - b.elev);
 
 // Chấm đỏ tại tâm công trình ngập, to dần theo zoom (zoom 10 → 2 px, zoom ≥ 15 → 6 px);
-// pane riêng trên icon công trình (markerPane 600) để chấm không bị icon / chấm công trình che
+// pane riêng trên icon công trình (markerPane 600) để chấm không bị icon / chấm công trình che.
+// Canvas phủ kín bản đồ và ở lại cả khi tắt ngập: pane phải xuyên chuột, không thì nuốt hover / click của tem bên dưới
 const DOT_PANE = 'floodDotPane';
 const dotRadius = (zoom) => Math.min(6, Math.max(2, 2 + (zoom - 10) * 0.8));
 const dotRenderers = new WeakMap();
 
 function dotRendererFor(m) {
   if (!dotRenderers.has(m)) {
-    if (!m.getPane(DOT_PANE)) m.createPane(DOT_PANE).style.zIndex = 610;
+    if (!m.getPane(DOT_PANE)) {
+      const pane = m.createPane(DOT_PANE);
+      pane.style.zIndex = 610;
+      pane.style.pointerEvents = 'none';
+    }
     dotRenderers.set(m, L.canvas({ pane: DOT_PANE }));
   }
   return dotRenderers.get(m);
@@ -274,6 +279,23 @@ export function setFloodVisible(on) {
     ringsRight?.remove(); ringsRight = null;
     liveTiles.clear();
   }
+}
+
+/**
+ * Kết quả mô phỏng ở mực nước đang đặt, công trình hiện trạng đã duyệt (trình diễn trong overview.js):
+ * { level, all: [{ kind }], flooded: [{ name, kind, lat, lng, depth }] sâu trước, pop, popAll, area } — pop/area null nếu chưa tải được
+ */
+export async function floodReport() {
+  await Promise.all([ensureFacilities(), ensureBins()]);
+  const ex = exposureByWard();
+  return {
+    level,
+    all: facilityLists.HT.map(f => ({ kind: f.kind })),
+    flooded: flooded(facilityLists.HT).map(f => ({ name: f.item.name || 'Công trình', kind: f.kind, lat: f.lat, lng: f.lng, depth: level - f.elev })),
+    pop: ex ? ex.pop : null,
+    popAll: ex ? ex.popAll : null,
+    area: ex ? ex.area : null
+  };
 }
 
 function renderLegend() {
