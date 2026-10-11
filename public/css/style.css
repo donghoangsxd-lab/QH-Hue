@@ -752,6 +752,20 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-head { color: v
 .project-btn.danger:hover:not(:disabled) { color: var(--accent-red); border-color: rgba(var(--red-rgb), 0.5); }
 .project-btn:disabled { opacity: 0.4; cursor: wait; }
 .project-btn.has-decision { color: var(--accent-orange); }
+/* Quyết định phê duyệt của lớp bản đồ (layerDecisions.js): nút dòng lớp và dòng trong tab Chú giải */
+[data-layer-decision][hidden] { display: none; }
+.layer-decisions { display: inline-flex; gap: 3px; flex-shrink: 0; }
+.layer-row:has(.layer-decisions) label { white-space: nowrap; }
+.layer-decision { display: inline-flex; align-items: center; gap: 3px; max-width: 100%; height: 20px; padding: 0 6px; box-sizing: border-box; border: 1px solid var(--border-color); border-radius: var(--r-md); background: transparent; color: var(--text-muted); font: inherit; font-size: var(--fs-xs); white-space: nowrap; cursor: pointer; }
+.layer-decision .ico { width: 12px; height: 12px; margin: 0; flex-shrink: 0; }
+.layer-decision span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.layer-decision:hover:not(:disabled):not(.is-empty) { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.layer-decision.has-decision { color: var(--accent-orange); border-color: rgba(var(--orange-rgb), 0.45); }
+.layer-decision.is-empty { border-style: dashed; opacity: 0.65; cursor: default; }
+.layer-decision:disabled { opacity: 0.4; cursor: wait; }
+.legend-decision { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 4px 0 6px; font-size: var(--fs-xs); color: var(--text-muted); }
+.legend-decision[hidden] { display: none; }
+.legend-decision .layer-decision { min-width: 0; }
 .project-decision { display: flex; align-items: center; gap: 4px; width: calc(100% - 18px); margin: 1px 0 2px 18px; padding: 2px 4px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--accent-orange); font: inherit; font-size: var(--fs-xs); text-align: left; cursor: pointer; }
 .project-decision .ico { width: 12px; height: 12px; margin: 0; flex-shrink: 0; }
 .project-decision span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -811,6 +825,9 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-head { color: v
 
 /* LOẠI ĐÔ THỊ HIỆN TRẠNG (urbanAreaLayer.js) */
 .ua-legend { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 0 0 4px 22px; font-size: var(--fs-xs); color: var(--text-muted); }
+.ua-legend-pane { padding: 2px 0 6px; }
+.ua-legend-pane .ua-legend { margin: 2px 0 6px; gap: 6px 14px; }
+.ua-legend-pane .ua-legend-note { display: block; color: var(--text-muted); font-size: var(--fs-xs); }
 .ua-legend-item { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .ua-legend-note { flex-basis: 100%; font-style: italic; }
 .ua-sw { display: inline-block; width: 12px; height: 9px; border-radius: 2px; opacity: 0.75; }
@@ -1780,15 +1797,16 @@ tr.gp-sub td.uc-name { padding-left: 1.4em; }
 .plan-static .qhc-stages { margin: 2px 0 4px 21px; font-size: var(--fs-sm); }
 .qhc-stages { display: flex; border: 1px solid var(--border-color); border-radius: var(--r-md); overflow: hidden; }
 .qhc-stages[hidden] { display: none; }
-.qhc-stages button { flex: 1; padding: 3px 0; border: 0; border-left: 1px solid var(--border-color); background: transparent; color: var(--text-muted); font: inherit; cursor: pointer; }
+.qhc-stages button { flex: 1 1 auto; padding: 3px 2px; border: 0; border-left: 1px solid var(--border-color); background: transparent; color: var(--text-muted); font: inherit; font-size: var(--fs-xs); white-space: nowrap; cursor: pointer; }
 .qhc-stages button:first-child { border-left: 0; }
 .qhc-stages button:hover { color: var(--text-main); }
 .qhc-stages button[aria-pressed="true"] { background: rgba(var(--orange-rgb), 0.85); color: #1c1917; font-weight: 700; }
+.qhc-stages .qhc-stage-ext[aria-pressed="true"] { background: rgba(244, 63, 94, 0.85); color: #fff; }
 .qhc-sw { flex: none; display: inline-block; width: 14px; height: 11px; border: 1px solid transparent; border-radius: 2px; }
 .qhc-label-icon { background: none; border: 0; }
 .qhc-label { position: absolute; transform: translate(-50%, -50%); padding: 1px 6px; border-radius: var(--r-sm); white-space: nowrap; pointer-events: none; font-size: var(--fs-xs); text-shadow: 0 1px 2px #000; }
 .qhc-label-tv { background: rgba(15, 23, 42, 0.78); border: 1px solid rgba(248, 250, 252, 0.7); color: #f8fafc; font-size: var(--fs-sm); }
-.qhc-label-dc { background: rgba(127, 29, 29, 0.85); border: 1px solid #ef4444; color: #fecaca; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.qhc-label-dc { background: rgba(127, 29, 29, 0.85); border: 1px solid #ef4444; color: #fecaca; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; text-align: center; line-height: 1.35; padding: 2px 8px; }
 .qhc-popup .leaflet-popup-content { margin: 10px 12px; }
 .qhc-pop { font-size: var(--fs-sm); line-height: 1.4; min-width: 220px; }
 .qhc-pop-head { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; font-size: var(--fs-md); }

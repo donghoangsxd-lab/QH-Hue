@@ -1870,6 +1870,13 @@ module.exports = async (req, res) => {
       }
     }
 
+    // Quyết định của lớp bản đồ dùng chung (Phân loại đô thị, QHC 1/25.000, QHC 1/10.000); file đọc qua getProjectDecision
+    if (action === 'getLayerDecisions') {
+      const data = await projects.layerDecisions();
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ success: true, ...data });
+    }
+
     if (action === 'getWardParcels') {
       const ward = await projects.wardParcels();
       res.setHeader('Cache-Control', 'no-store');
@@ -2352,12 +2359,14 @@ module.exports = async (req, res) => {
     }
 
     // Admin gắn PDF ≤ 1 MB hoặc link đã kiểm tra. Link được mở lại trên máy chủ lúc gán.
+    // body.layer: gắn cho lớp bản đồ dùng chung, không ghi cột LinkQD trên sheet DS_DoAn.
     if (action === 'putProjectDecision') {
       requirePostFromApp(req);
       await requireAdmin(req);
       const body = readJsonBody(req);
-      const tenQH = sanitizeSheetText(body.tenQH, 120);
-      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      const layer = String(body.layer || '').slice(0, 40);
+      const tenQH = layer ? '' : sanitizeSheetText(body.tenQH, 120);
+      if (!layer && !tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
       const url = String(body.url || '').trim();
       const pdf = typeof body.pdf === 'string' ? body.pdf.replace(/\s+/g, '') : '';
       if (!url && (!pdf || pdf.length > 1500000)) {
@@ -2365,16 +2374,18 @@ module.exports = async (req, res) => {
       }
       try {
         const saved = url
-          ? await projects.saveDecisionLink({ tenQH, url })
-          : await projects.saveDecision({ tenQH, fileName: body.name, buffer: Buffer.from(pdf, 'base64') });
+          ? await projects.saveDecisionLink({ tenQH, layer, url })
+          : await projects.saveDecision({ tenQH, layer, fileName: body.name, buffer: Buffer.from(pdf, 'base64') });
         const accessUrl = url ? saved.url : saved.accessUrl;
-        let sheet = false;
+        let sheet = !!layer;
         let sheetMessage = '';
-        try {
-          await callAppsScript({ action: 'setProjectLink' }, { action: 'setProjectLink', project: tenQH, link: accessUrl });
-          sheet = true;
-        } catch (err) {
-          sheetMessage = err.message || 'Chưa ghi được cột LinkQD trên sheet';
+        if (!layer) {
+          try {
+            await callAppsScript({ action: 'setProjectLink' }, { action: 'setProjectLink', project: tenQH, link: accessUrl });
+            sheet = true;
+          } catch (err) {
+            sheetMessage = err.message || 'Chưa ghi được cột LinkQD trên sheet';
+          }
         }
         return res.status(200).json({
           success: true, kind: saved.kind || (url ? 'link' : 'pdf'), slug: saved.slug, name: saved.name,
@@ -2389,7 +2400,17 @@ module.exports = async (req, res) => {
     if (action === 'deleteProjectDecision') {
       requirePostFromApp(req);
       await requireAdmin(req);
-      const tenQH = sanitizeSheetText(readJsonBody(req).tenQH, 120);
+      const body = readJsonBody(req);
+      const layer = String(body.layer || '').slice(0, 40);
+      if (layer) {
+        try {
+          await projects.removeLayerDecision(layer);
+          return res.status(200).json({ success: true, sheet: true });
+        } catch (err) {
+          return res.status(err.status || 500).json({ error: true, message: err.message || 'Không gỡ được quyết định' });
+        }
+      }
+      const tenQH = sanitizeSheetText(body.tenQH, 120);
       if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
       try {
         await projects.removeDecision(tenQH);

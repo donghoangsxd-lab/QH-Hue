@@ -1,5 +1,6 @@
-// Tab Chú giải: ký hiệu theo cấp đồ án (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500), mỗi bộ chia nhóm
-// (tìm theo tên loại đất / tên layer CAD, thu gọn từng nhóm; tìm và thu gọn chỉ áp lên bộ đang xem).
+// Tab Chú giải: Phân loại đô thị (ký hiệu + quyết định phê duyệt, phần tĩnh trong index.html) và ký hiệu theo cấp đồ án
+// (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500), mỗi bộ chia nhóm (tìm theo tên loại đất / tên layer CAD,
+// thu gọn từng nhóm; tìm và thu gọn chỉ áp lên bộ đang xem). Mọi phần tử [data-legend-pane] trong tab hiện theo bộ đang xem.
 // Chọn lớp ở droplist (mapLevel.js) thì chuyển sang bộ của cấp đó.
 // + mục Hiển thị lô đất: thanh độ trong suốt phần tô lô và chú giải viền theo giai đoạn.
 import { renderTt16Legend, getLotOpacity, setLotOpacity, LEGEND_SETS } from './tt16Symbols.js';
@@ -22,16 +23,23 @@ export function initLegendPanel() {
     if (n) t.title += ` · ${n} ký hiệu`;
   });
   let active = (tabs.find(t => t.classList.contains('active')) || tabs[0])?.dataset.legendSet || 'QHPK';
-  const showPane = () => list.querySelectorAll('[data-legend-pane]').forEach(p => { p.hidden = p.dataset.legendPane !== active; });
+  const search = document.getElementById('legendSearch');
+  const toggle = document.getElementById('btnLegendFold');
+  const host = document.getElementById('tabLegend') || list;
+  const showPane = () => {
+    host.querySelectorAll('[data-legend-pane]').forEach(p => { p.hidden = p.dataset.legendPane !== active; });
+    const symbols = !!LEGEND_SETS[active];
+    if (search) search.hidden = !symbols;
+    if (toggle) toggle.style.visibility = symbols ? '' : 'hidden';
+  };
   showPane();
   const groupsOf = () => [...list.querySelectorAll(`[data-legend-pane="${active}"] .tt16-group`)];
 
   const empty = list.querySelector('.tt16-empty');
-  const search = document.getElementById('legendSearch');
   // Đang lọc thì mở mọi nhóm có kết quả; xóa từ khóa thì trả lại trạng thái thu / mở người dùng đã chọn
   let savedOpen = null;
   const applySearch = () => {
-    const q = fold(search?.value);
+    const q = LEGEND_SETS[active] ? fold(search?.value) : '';
     const groups = groupsOf();
     if (q && !savedOpen) savedOpen = groups.map(g => g.open);
     let shown = 0;
@@ -52,7 +60,6 @@ export function initLegendPanel() {
   };
   search?.addEventListener('input', applySearch);
 
-  const toggle = document.getElementById('btnLegendFold');
   const syncToggle = () => {
     const allOpen = groupsOf().every(g => g.open || g.hidden);
     toggle?.setAttribute('aria-pressed', String(!allOpen));

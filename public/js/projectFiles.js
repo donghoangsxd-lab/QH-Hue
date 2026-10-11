@@ -519,13 +519,28 @@ function dropLegacyDuplicates(list) {
   return dup.size ? list.filter(p => !(p && dup.has(p.tenQH))) : list;
 }
 
+// Phường chỉ chứa phần vụn của đồ án (hatch lấn khỏi ranh đồ án, lệch mép ranh phường): bỏ khỏi danh sách phường khi
+// diện tích lô đất trong phường dưới MINOR_WARD_M2 và dưới MINOR_WARD_SHARE tổng diện tích lô. Danh sách gốc: wardsAll.
+const MINOR_WARD_M2 = 20000;
+const MINOR_WARD_SHARE = 0.01;
+
+function trimMinorWards(p) {
+  const la = p && p.landArea;
+  if (!la || !Array.isArray(p.wards) || p.wards.length < 2) return p;
+  const sum = (o) => Object.values(o || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+  const total = Object.values(la).reduce((s, o) => s + sum(o), 0);
+  if (!(total > 0)) return p;
+  const wards = p.wards.filter(w => { const a = sum(la[w]); return a >= MINOR_WARD_M2 || a >= MINOR_WARD_SHARE * total; });
+  return wards.length && wards.length < p.wards.length ? { ...p, wards, wardsAll: p.wards } : p;
+}
+
 export async function loadCatalog() {
   const res = await fetch(geeApi('action=getProjectIndex'));
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   base = data.base || '';
   state.projectBase = base;
-  state.projectCatalog = dropLegacyDuplicates(Array.isArray(data.projects) ? data.projects : []);
+  state.projectCatalog = dropLegacyDuplicates(Array.isArray(data.projects) ? data.projects : []).map(trimMinorWards);
   state.projectAreas = state.projectCatalog.filter(p => p && p.boundary).map(p => ({
     id: p.tenQH,
     kind: 'PROJECT',

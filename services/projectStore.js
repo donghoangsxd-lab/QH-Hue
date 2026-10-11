@@ -631,7 +631,41 @@ async function listedProject(tenQH) {
   return { name, slug };
 }
 
-async function saveDecision({ tenQH, fileName, buffer }) {
+// Quyết định gắn cho lớp bản đồ dùng chung (không thuộc danh mục đồ án): khóa "lop:<mã>" trong decisions.json,
+// PDF ở projects/lop-<mã>/quyet-dinh.pdf. Mã trùng data-layer-decision trong index.html.
+const LAYER_DECISIONS = {
+  'do-thi-hien-trang': 'Phân loại đô thị · hiện trạng',
+  'do-thi-quy-hoach': 'Phân loại đô thị · quy hoạch',
+  'qhc-25000': 'QHC đô thị Huế 2045 · 1/25.000',
+  'qhc-10000': 'QHC đô thị Huế 2045 · 1/10.000'
+};
+
+function layerTarget(layer) {
+  const id = String(layer || '');
+  if (!Object.prototype.hasOwnProperty.call(LAYER_DECISIONS, id)) rejectReview('Lớp này không gắn được quyết định phê duyệt');
+  return { name: `lop:${id}`, slug: `lop-${id}` };
+}
+
+function decisionTarget({ tenQH, layer }) {
+  return layer ? layerTarget(layer) : listedProject(tenQH);
+}
+
+async function layerDecisions() {
+  const items = (await readDecisions()).data.items || {};
+  const out = {};
+  Object.keys(LAYER_DECISIONS).forEach(id => {
+    const d = items[`lop:${id}`];
+    if (d && d.at) out[id] = decisionView(d);
+  });
+  return { titles: LAYER_DECISIONS, items: out };
+}
+
+async function removeLayerDecision(layer) {
+  const { name, slug } = layerTarget(layer);
+  return removeDecision(name, slug);
+}
+
+async function saveDecision({ tenQH, layer, fileName, buffer }) {
   if (!pdfOk(buffer)) {
     const err = new Error(buffer && buffer.length > DECISION_MAX_BYTES
       ? 'File quyết định lớn hơn 1 MB'
@@ -639,7 +673,7 @@ async function saveDecision({ tenQH, fileName, buffer }) {
     err.status = buffer && buffer.length > DECISION_MAX_BYTES ? 413 : 400;
     throw err;
   }
-  const { name, slug } = await listedProject(tenQH);
+  const { name, slug } = await decisionTarget({ tenQH, layer });
   const written = await writeBytes(decisionObject(slug), buffer, 'application/pdf');
   const at = Date.now();
   const meta = { kind: 'pdf', slug, name: decisionFileName(fileName), bytes: buffer.length, at, embed: true };
@@ -652,9 +686,10 @@ async function saveDecision({ tenQH, fileName, buffer }) {
 }
 
 // Gán link chỉ sau khi reviewDecisionLink mở được trang. File PDF cũ trên bucket bị gỡ.
-async function saveDecisionLink({ tenQH, url }) {
+async function saveDecisionLink({ tenQH, layer, url }) {
+  const target = await decisionTarget({ tenQH, layer });
   const review = await reviewDecisionLink(url);
-  const { name, slug } = await listedProject(tenQH);
+  const { name, slug } = target;
   const at = Date.now();
   const meta = {
     kind: 'link', slug, url: review.url, name: review.name, bytes: review.bytes, at, embed: review.embed
@@ -1841,7 +1876,7 @@ async function wardParcels() {
 
 module.exports = {
   setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, retypeInfraLot, readLand, landToInfra, deleteLayer, deleteProjectFiles, renameProject,
-  saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision,
+  saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision, layerDecisions, removeLayerDecision,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase,
   saveAdjustment, attachAdjustPdf, listAdjustments, readAdjustment, readAdjustPdf, approveAdjustment, removeAdjustment
 };

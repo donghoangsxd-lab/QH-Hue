@@ -69,6 +69,7 @@ import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
 import { initOverview } from './overview.js';
 import { initRiskLayer } from './riskLayer.js';
 import { initUrbanAreaLayer, refreshUrbanAreaLayer } from './urbanAreaLayer.js';
+import { initLayerDecisions } from './layerDecisions.js';
 import { initBasemapUi } from './basemap.js';
 import { PROOF_FOCUS_EVENT } from './csdProof.js';
 
@@ -330,6 +331,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initRoadNetworkLayer();
   initCadastreLayer();
   initUrbanAreaLayer();
+  initLayerDecisions();
   initQhc2045Layer();
   initQhctLayer();
   document.addEventListener(WARD_PICK_EVENT, (e) => chooseWard(e.detail));

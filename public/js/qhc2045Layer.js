@@ -1,10 +1,9 @@
 // Lớp bản đồ đồ án QHC đô thị Thừa Thiên Huế 2045 (qhc2045.js) trên bản đồ quy hoạch, điều khiển ở panel Lớp dữ liệu:
 //  - chk_qhc25: sơ đồ tổ chức không gian 1/25.000 toàn đô thị (vùng phát triển, mặt nước, cây xanh, ranh khu vực;
 //    chú giải ở tab Chú giải, bộ QHC25 – tt16Symbols.js);
-//  - chk_qhc10: sử dụng đất 1/10.000 khu vực trung tâm (lô theo ký hiệu TT16 Mục 02, viền theo giai đoạn, lọc giai đoạn
-//    ngay dưới dòng lớp) + 4 tiểu vùng, phân khu, điểm chức năng;
-//  - chk_qhc10Ext: ranh 1/10.000 mở rộng theo QĐ 756 (ranh ngoài các phường vùng lõi) + vùng đỏ Hóa Châu, Mỹ Thượng
-//    chưa có trong đồ án cũ.
+//  - chk_qhc10: sử dụng đất 1/10.000 khu vực trung tâm (lô theo ký hiệu TT16 Mục 02, viền theo giai đoạn) + 4 tiểu vùng,
+//    phân khu, điểm chức năng. Hàng nút dưới dòng lớp bật/tắt độc lập từng giai đoạn lô và ranh 1/10.000 mở rộng theo
+//    QĐ 756 (ranh ngoài các phường vùng lõi + vùng đỏ Hóa Châu, Mỹ Thượng chưa có trong đồ án cũ).
 // Vùng, lô của cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400); riêng các đường ranh vẽ ở LINE_PANE
 // để nổi trên ranh 40 phường. Canvas mặc định của planMap (renderer: L.canvas())
 // nằm ở overlayPane, phủ kín bản đồ khi có bất kỳ lớp vector nào và nuốt click của canvas QHC bên dưới, nên click lô / vùng
@@ -29,12 +28,12 @@ const LINE_PANE = ['qhcLinePane', 420];
 const LABEL_MIN_ZOOM = 14;
 const TV_LABEL_MAX_ZOOM = 14;
 const STAGES = [
-  { id: 'all', label: 'Tất cả' },
-  { id: 0, label: 'Hiện trạng' },
-  { id: 1, label: 'Đến 2030' },
-  { id: 2, label: 'Đến 2040' }
+  { id: '0', label: 'Hiện trạng' },
+  { id: '1', label: 'Đến 2030' },
+  { id: '2', label: 'Đến 2045' },
+  { id: 'ext', label: 'Ranh QĐ756', title: 'Ranh 1/10.000 mở rộng theo hệ thống đô thị Quyết định 756/QĐ-UBND: ranh ngoài các phường, xã vùng lõi. Vùng đỏ: phần Hóa Châu, Mỹ Thượng chưa có trong đồ án cũ, đang điều chỉnh bổ sung' }
 ];
-const STAGE_NAMES = ['Hiện trạng', 'Ngắn hạn đến 2030', 'Dài hạn đến 2040'];
+const STAGE_NAMES = ['Hiện trạng', 'Ngắn hạn đến 2030', 'Dài hạn đến 2045'];
 const MISSING_STYLE = { color: '#ef4444', weight: 2.2, dashArray: '8 5', fillColor: '#ef4444', fillOpacity: 0.28, interactive: true };
 const EXT_LINE = { color: '#f43f5e', weight: 3, opacity: 1, dashArray: '12 6' };
 const EXT_HALO = { color: '#0f172a', weight: 6.5, opacity: 0.55 };
@@ -51,7 +50,8 @@ const loading = {};
 const layers = { land: null, frame: null, vision: null, ext: null };
 let renderer = null;
 let lineRenderer = null;
-let stage = 'all';
+const shownStages = new Set([0, 1, 2]);
+let extOn = false;
 let detailed = false;
 
 // ---------- Tải dữ liệu ----------
@@ -110,7 +110,7 @@ function drawLand() {
     pane: PANE[0],
     renderer: ensureRenderer(m),
     bubblingMouseEvents: false,
-    filter: (f) => f.properties.c !== SEA_CODE && (stage === 'all' || f.properties.t === stage),
+    filter: (f) => f.properties.c !== SEA_CODE && shownStages.has(f.properties.t),
     style: lotStyle
   }).on('click', (e) => { if (!passToolClick(m, e)) openLotPopup(e.layer.feature, e.latlng); });
   layers.land.addTo(m);
@@ -189,30 +189,27 @@ async function setLand(on) {
   detailed = m.getZoom() >= TT16_PATTERN_ZOOM;
   drawLand();
   drawFrame();
-  setHint('qhc10Hint', `${fmtNum(data.land.features.length)} lô`);
+  setHint('qhc10Hint', 'Trung tâm');
 }
 
 // ---------- Ranh 1/10.000 mở rộng theo QĐ 756 ----------
+const extVisible = () => extOn && !!$('chk_qhc10')?.checked;
+
 async function setExt(on) {
   const m = target();
   layers.ext?.remove();
   layers.ext = null;
-  if (!on) {
-    setHint('qhc10ExtHint', 'Hóa Châu, Mỹ Thượng');
-    return;
-  }
-  setHint('qhc10ExtHint', 'đang tải…');
+  if (!on) return;
   try {
     await load('frame');
   } catch (err) {
     console.warn('QHC 2045 – không tải được ranh điều chỉnh:', err);
-    setHint('qhc10ExtHint', 'lỗi tải');
     return;
   }
-  if (!$('chk_qhc10Ext')?.checked) return;
+  if (!extVisible() || layers.ext) return;
   const wards = (state.wardLabelsList || []).filter(w => w.geometry && isCoreWard(w.name));
   if (!wards.length) {
-    setHint('qhc10ExtHint', 'chưa tải ranh phường');
+    console.warn('QHC 2045 – chưa tải ranh phường, chưa vẽ được ranh QĐ 756');
     return;
   }
   const r = ensureRenderer(m);
@@ -224,7 +221,7 @@ async function setExt(on) {
         { sticky: true, className: 'ua-tip', opacity: 1 })
       .addTo(group);
     const c = turf.pointOnFeature(f).geometry.coordinates;
-    L.marker([c[1], c[0]], { icon: frameLabel(`Đang điều chỉnh · ${escapeHtml(p.n)}`, 'qhc-label-dc'), interactive: false, keyboard: false }).addTo(group);
+    L.marker([c[1], c[0]], { icon: frameLabel(`Đang điều chỉnh<br>Bổ sung ${escapeHtml(p.n)}`, 'qhc-label-dc'), interactive: false, keyboard: false }).addTo(group);
   });
   const lines = outerWardLines(wards);
   const lr = ensureLineRenderer(m);
@@ -232,7 +229,6 @@ async function setExt(on) {
   L.polyline(lines, { pane: LINE_PANE[0], renderer: lr, interactive: false, ...EXT_LINE }).addTo(group);
   layers.ext = group.addTo(m);
   restack();
-  setHint('qhc10ExtHint', `${wards.length} phường, xã`);
 }
 
 // ---------- Popup tra cứu lô ----------
@@ -404,14 +400,22 @@ function syncStages() {
 function initStages() {
   const box = $('qhcStages');
   if (!box) return;
-  const paint = () => box.querySelectorAll('[data-qhc-stage]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.qhcStage === String(stage))));
-  box.innerHTML = STAGES.map(s => `<button type="button" data-qhc-stage="${s.id}">${s.label}</button>`).join('');
+  const isOn = (id) => (id === 'ext' ? extOn : shownStages.has(Number(id)));
+  const paint = () => box.querySelectorAll('[data-qhc-stage]').forEach(b => b.setAttribute('aria-pressed', String(isOn(b.dataset.qhcStage))));
+  box.innerHTML = STAGES.map(s => `<button type="button" data-qhc-stage="${s.id}"${s.id === 'ext' ? ' class="qhc-stage-ext"' : ''}${s.title ? ` title="${escapeHtml(s.title)}"` : ''}>${s.label}</button>`).join('');
   box.addEventListener('click', (e) => {
     const b = e.target.closest('[data-qhc-stage]');
     if (!b) return;
-    stage = b.dataset.qhcStage === 'all' ? 'all' : Number(b.dataset.qhcStage);
+    const id = b.dataset.qhcStage;
+    if (id === 'ext') {
+      extOn = !extOn;
+      setExt(extVisible());
+    } else {
+      const t = Number(id);
+      if (shownStages.has(t)) shownStages.delete(t); else shownStages.add(t);
+      if (layers.land) drawLand();
+    }
     paint();
-    if (layers.land) drawLand();
   });
   paint();
 }
@@ -451,8 +455,12 @@ export function initQhc2045Layer() {
   const m = target();
   if (!m) return;
   initUi();
-  $('chk_qhc10')?.addEventListener('change', (e) => { if (e.target.checked) ensurePlanView(); setLand(e.target.checked); syncStages(); });
-  $('chk_qhc10Ext')?.addEventListener('change', (e) => { if (e.target.checked) ensurePlanView(); setExt(e.target.checked); });
+  $('chk_qhc10')?.addEventListener('change', (e) => {
+    if (e.target.checked) ensurePlanView();
+    setLand(e.target.checked);
+    setExt(extVisible());
+    syncStages();
+  });
   $('chk_qhc25')?.addEventListener('change', (e) => { if (e.target.checked) ensurePlanView(); setVision(e.target.checked); });
   m.on('zoomend', () => {
     const d = m.getZoom() >= TT16_PATTERN_ZOOM;

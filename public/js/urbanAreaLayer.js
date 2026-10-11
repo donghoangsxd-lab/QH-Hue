@@ -305,8 +305,6 @@ const statusLayer = createUrbanLayer(statusContent);
 const visionLayer = createUrbanLayer(visionContent);
 
 async function setVisible(on, { fit = false } = {}) {
-  const legend = $('urbanLegend');
-  if (legend) legend.style.display = on ? '' : 'none';
   await Promise.all([statusLayer.setVisible(on), visionLayer.setVisible(on)]);
   if (!on || !fit) return;
   const shown = isCompareOn() && !isSplitOn() && planMap ? planMap : map;
