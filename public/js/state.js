@@ -29,6 +29,8 @@ export const state = {
   showProjectInfra: true,
   // Danh mục đồ án từ projects/index.json (kèm đồ án cũ còn trong cad_parcels đến khi chuyển xong)
   projectCatalog: [],
+  // Đồ án cũ bị ẩn vì trùng ranh đồ án đã nhập lại: tên cũ → tên mới (projectFiles.dropLegacyDuplicates)
+  projectLegacyTwins: new Map(),
   projectBase: '',
   // Ranh tổng [{ id: Ten_QH, ward, infraCount, landCount, time, geometry }]
   projectAreas: [],

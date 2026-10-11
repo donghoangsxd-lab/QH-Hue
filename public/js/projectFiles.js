@@ -478,13 +478,54 @@ export async function focusProject(tenQH) {
   finally { force.delete(tenQH); }
 }
 
+// Đồ án cũ (legacy, còn trong cad_parcels.json) đã nhập lại lên bucket dưới tên khác: khung bao gần trùng (IoU) và ranh
+// bản mới nằm trong ranh bản cũ ≥ DUP_SHARE thì ẩn bản cũ. Điều kiện khung bao loại trường hợp đồ án cũ lớn chứa đồ án
+// mới nhỏ. Ẩn luôn khỏi nút «Chuyển đồ án cũ lên bucket» (chuyển sẽ tạo bản trùng trên bucket).
+const DUP_BOX_IOU = 0.85;
+const DUP_SHARE = 0.85;
+
+function boxIou(a, b) {
+  const w = Math.min(a[2], b[2]) - Math.max(a[0], b[0]);
+  const h = Math.min(a[3], b[3]) - Math.max(a[1], b[1]);
+  if (w <= 0 || h <= 0) return 0;
+  const i = w * h;
+  return i / ((a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - i);
+}
+
+// Ranh cũ có thể gồm nhiều mảnh chồng nhau (cùng một vùng ghi 2–3 lần): gộp trước khi giao
+function dissolved(geometry) {
+  if (geometry.type !== 'MultiPolygon') return turf.feature(geometry);
+  return geometry.coordinates.map(c => turf.polygon(c)).reduce((acc, p) => turf.union(acc, p) || acc);
+}
+
+function dropLegacyDuplicates(list) {
+  const fresh = list.filter(p => p && !p.legacy && p.boundary && p.bbox);
+  const dup = new Map();
+  list.forEach(p => {
+    if (!p || !p.legacy || !p.boundary || !p.bbox) return;
+    const cands = fresh.filter(q => boxIou(p.bbox, q.bbox) >= DUP_BOX_IOU);
+    if (!cands.length) return;
+    try {
+      const old = dissolved(p.boundary);
+      const twin = cands.find(q => {
+        const f = turf.feature(q.boundary);
+        const x = turf.intersect(old, f);
+        return x && turf.area(x) >= DUP_SHARE * turf.area(f);
+      });
+      if (twin) dup.set(p.tenQH, twin.tenQH);
+    } catch (e) { /* hình học lỗi: giữ đồ án */ }
+  });
+  state.projectLegacyTwins = dup;
+  return dup.size ? list.filter(p => !(p && dup.has(p.tenQH))) : list;
+}
+
 export async function loadCatalog() {
   const res = await fetch(geeApi('action=getProjectIndex'));
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   base = data.base || '';
   state.projectBase = base;
-  state.projectCatalog = Array.isArray(data.projects) ? data.projects : [];
+  state.projectCatalog = dropLegacyDuplicates(Array.isArray(data.projects) ? data.projects : []);
   state.projectAreas = state.projectCatalog.filter(p => p && p.boundary).map(p => ({
     id: p.tenQH,
     kind: 'PROJECT',
