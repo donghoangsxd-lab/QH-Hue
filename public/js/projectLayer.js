@@ -1,4 +1,4 @@
-// Mục Quy hoạch (tab Lớp dữ liệu): 5 nhóm cấp theo droplist (Hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000,
+// Mục Quy hoạch (tab Lớp dữ liệu): 4 nhóm cấp theo droplist (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000,
 // QHCT 1/500) gồm dòng lớp riêng của cấp (#planStaticRows) và đồ án nhập; trong mỗi cấp đồ án nhóm theo phường
 // (đồ án liên phường có mặt ở mỗi phường), mỗi đồ án (Ten_QH)
 // bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + thông tin ở panel dưới),
@@ -406,10 +406,8 @@ function renderHead() {
   if (search) search.hidden = projects.length <= 5;
 }
 
-// Nhóm cấp trong mục Quy hoạch, cùng thứ tự droplist (mapLevel.js). Nhóm có dòng lớp riêng trong #planStaticRows
-// (data-plan-static) luôn hiện; nhóm chỉ có đồ án nhập thì ẩn khi chưa có đồ án
+// Nhóm cấp trong mục Quy hoạch, cùng thứ tự droplist (mapLevel.js); Hệ thống đô thị nằm ở mục Đô thị riêng
 const LIST_LEVELS = [
-  { key: 'urban', label: 'Hệ thống đô thị', title: 'hệ thống đô thị' },
   { key: 'QHC25', label: 'QHC 1/25.000', title: 'quy hoạch chung tỷ lệ 1/25.000' },
   ...['QHC', 'QHPK'].map(k => PLAN_LEVELS.find(l => l.key === k)),
   { key: 'QHCT', label: 'QHCT 1/500', title: 'quy hoạch chi tiết tỷ lệ 1/500' }

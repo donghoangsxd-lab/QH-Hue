@@ -116,7 +116,7 @@
         <h1 class="map-title-text" id="mapTitleText">BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ</h1>
       </div>
       <button type="button" class="map-title-level" id="btnMapLevel" aria-haspopup="listbox" aria-expanded="false" aria-controls="mapLevelMenu">
-        <svg class="ico"><use href="#i-layers"/></svg><span class="map-title-level-text">Hệ thống đô thị</span><svg class="ico map-title-level-chev"><use href="#i-chev-down"/></svg>
+        <svg class="ico"><use href="#i-layers"/></svg><span class="map-title-level-text">HỆ THỐNG ĐÔ THỊ</span><svg class="ico map-title-level-chev"><use href="#i-chev-down"/></svg>
       </button>
       <div class="map-title-split" role="radiogroup" aria-label="Kiểu so sánh">
         <button type="button" class="map-title-seg" data-split-kind="same" role="radio" aria-checked="true" title="Cùng tâm: hai bản đồ chồng khít, kéo thanh trượt để so sánh"><svg class="ico"><use href="#i-split-same"/></svg>Cùng tâm</button>
@@ -320,10 +320,10 @@
       <div class="tab-body" id="tabLayers">
         <div class="layer-tree">
         <div class="layer-main" id="layerMain">
-          <div class="layer-main-tabs" role="tablist" aria-label="Quy hoạch và công trình">
-            <button type="button" class="layer-main-tab active" role="tab" data-main-tab="plan" aria-selected="true" aria-controls="layerPanePlan" title="Các lớp quy hoạch theo cấp: Hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Bật một đồ án là hiện đủ ranh lô: lô thuộc nhóm hạ tầng và các lô còn lại."><span class="layer-main-label">Quy hoạch</span><span class="layer-count none" id="projectCount" title="Số đồ án đang hiện / tổng số đồ án">0</span></button>
+          <div class="layer-main-tabs" role="tablist" aria-label="Đô thị, quy hoạch và công trình">
+            <button type="button" class="layer-main-tab" role="tab" data-main-tab="urban" aria-selected="false" aria-controls="layerPaneUrban" title="Hệ thống đô thị: phân loại đô thị (HT: QĐ 614 · QH: QĐ 756) và các đô thị, khu vực đô thị theo loại. Mỗi đô thị kèm quy hoạch chung, số QHPK 1/2.000 và mức trưởng thành. Bấm một đô thị để vẽ phạm vi và mở hồ sơ ở bảng dưới"><span class="layer-main-label">Đô thị</span><span class="layer-count" id="gpCount" title="Số đô thị, khu vực đô thị">0</span></button>
+            <button type="button" class="layer-main-tab active" role="tab" data-main-tab="plan" aria-selected="true" aria-controls="layerPanePlan" title="Các lớp quy hoạch theo cấp: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Bật một đồ án là hiện đủ ranh lô: lô thuộc nhóm hạ tầng và các lô còn lại."><span class="layer-main-label">Quy hoạch</span><span class="layer-count none" id="projectCount" title="Số đồ án đang hiện / tổng số đồ án">0</span></button>
             <button type="button" class="layer-main-tab" role="tab" data-main-tab="infra" aria-selected="false" aria-controls="layerPaneInfra" title="14 nhóm biểu tượng trên bản đồ. Nút tròn bật vùng phủ theo QCVN."><span class="layer-main-label">Công trình</span><span class="layer-count none" id="layerCount" title="Số nhóm đang hiện / tổng số nhóm">0/14</span></button>
-            <button type="button" class="layer-main-tab" role="tab" data-main-tab="gp" aria-selected="false" aria-controls="layerPaneGp" title="Quy hoạch chung: mỗi đô thị, khu vực đô thị sau 2030 theo Quyết định 756/QĐ-UBND lập 1 QHC — căn cứ lập QHPK 1/2.000, xác lập chỉ tiêu phân loại, nâng cấp đô thị. Bấm một QHC để vẽ phạm vi và mở hồ sơ ở bảng dưới"><span class="layer-main-label">QHC</span><span class="layer-count" id="gpCount" title="Số quy hoạch chung phải lập">0</span></button>
             <button type="button" class="layer-eye-btn" id="btnProjectsAll" data-main-eye="plan" aria-pressed="false" title="Ẩn / hiện mọi đồ án trong danh sách" aria-label="Ẩn / hiện mọi đồ án">
               <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>
             </button>
@@ -364,7 +364,20 @@
         <div id="projectList" class="project-list"></div>
         <!-- Dòng lớp của từng cấp quy hoạch: projectLayer.js gắn vào nhóm cấp tương ứng (data-plan-static = khóa nhóm) -->
         <div id="planStaticRows" hidden>
-          <div class="plan-static" data-plan-static="urban">
+          <div class="plan-static" data-plan-static="QHC25">
+            <div class="layer-row"><div><input type="checkbox" id="chk_qhc25"><label for="chk_qhc25" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực và điểm đô thị. Bấm một vùng để xem chức năng"><svg class="ico ico-layer"><use href="#i-layers"/></svg>QHC đô thị Huế 2045 <small class="layer-hint" id="qhc25Hint">(toàn đô thị)</small></label></div></div>
+            <div class="layer-legend ua-legend" id="qhc25Legend" style="display:none;"></div>
+          </div>
+          <div class="plan-static" data-plan-static="QHC">
+            <div class="layer-row"><div><input type="checkbox" id="chk_qhc10"><label for="chk_qhc10" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045 (đang điều chỉnh): quy hoạch sử dụng đất khu vực đô thị trung tâm tỷ lệ 1/10.000, ký hiệu TT16 Phụ lục I Mục 02; viền mảnh hiện trạng, liền ngắn hạn 2030, nét đứt dài hạn 2040. Vùng đỏ: phần Hóa Châu, Mỹ Thượng chưa có trong đồ án. Bấm một lô để tra cứu"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>QHC đô thị Huế 2045 <small class="layer-hint" id="qhc10Hint">(khu vực trung tâm)</small></label></div></div>
+          </div>
+          <div class="plan-static" data-plan-static="QHCT">
+            <div class="layer-row"><div><input type="checkbox" id="chk_qhct"><label for="chk_qhct" title="Quy hoạch chi tiết tỷ lệ 1/500: lô đất theo đồ án chi tiết. Dữ liệu sẽ bổ sung sau. Bấm một lô để tra cứu"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Đồ án QHCT 1/500 <small class="layer-hint" id="qhctHint">(chưa có dữ liệu)</small></label></div></div>
+          </div>
+        </div>
+          </div>
+          <div class="layer-main-pane" id="layerPaneUrban" data-main-pane="urban" role="tabpanel" hidden>
+          <div class="urban-static">
             <div class="layer-row"><div><input type="checkbox" id="chk_urban" checked><label for="chk_urban" title="Bản đồ hiện trạng: đô thị và phường đạt trình độ phát triển đô thị từ 01/01/2026 theo Quyết định 614/QĐ-UBND ngày 10/02/2026. Bản đồ quy hoạch: hệ thống đô thị sau năm 2030 theo Quyết định 756/QĐ-UBND ngày 28/02/2026. Trỏ chuột vào ranh, ký hiệu hoặc phường để xem thông tin"><svg class="ico ico-layer"><use href="#i-flag"/></svg>Phân loại đô thị <small class="layer-hint">(HT: QĐ 614 · QH: QĐ 756)</small></label></div></div>
             <div class="layer-legend ua-legend" id="urbanLegend" style="display:none;">
               <span class="ua-legend-item"><i class="ua-badge ua-badge-I"><span>I</span></i>Đô thị loại I (toàn thành phố)</span>
@@ -379,19 +392,6 @@
               <span class="ua-legend-note">Quy hoạch: QĐ 756, giai đoạn sau năm 2030.</span>
             </div>
           </div>
-          <div class="plan-static" data-plan-static="QHC25">
-            <div class="layer-row"><div><input type="checkbox" id="chk_qhc25"><label for="chk_qhc25" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực và điểm đô thị. Bấm một vùng để xem chức năng"><svg class="ico ico-layer"><use href="#i-layers"/></svg>QHC đô thị Huế 2045 <small class="layer-hint" id="qhc25Hint">(toàn đô thị)</small></label></div></div>
-            <div class="layer-legend ua-legend" id="qhc25Legend" style="display:none;"></div>
-          </div>
-          <div class="plan-static" data-plan-static="QHC">
-            <div class="layer-row"><div><input type="checkbox" id="chk_qhc10"><label for="chk_qhc10" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045 (đang điều chỉnh): quy hoạch sử dụng đất khu vực đô thị trung tâm tỷ lệ 1/10.000, ký hiệu TT16 Phụ lục I Mục 02; viền mảnh hiện trạng, liền ngắn hạn 2030, nét đứt dài hạn 2040. Vùng đỏ: phần Hóa Châu, Mỹ Thượng chưa có trong đồ án. Bấm một lô để tra cứu"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>QHC đô thị Huế 2045 <small class="layer-hint" id="qhc10Hint">(khu vực trung tâm)</small></label></div></div>
-          </div>
-          <div class="plan-static" data-plan-static="QHCT">
-            <div class="layer-row"><div><input type="checkbox" id="chk_qhct"><label for="chk_qhct" title="Quy hoạch chi tiết tỷ lệ 1/500: lô đất theo đồ án chi tiết. Dữ liệu sẽ bổ sung sau. Bấm một lô để tra cứu"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Đồ án QHCT 1/500 <small class="layer-hint" id="qhctHint">(chưa có dữ liệu)</small></label></div></div>
-          </div>
-        </div>
-          </div>
-          <div class="layer-main-pane" id="layerPaneGp" data-main-pane="gp" role="tabpanel" hidden>
         <div id="gpList" class="gp-list"></div>
           </div>
         </div>

@@ -1300,8 +1300,19 @@ function landLotShape(p, m, detailed) {
   return shape;
 }
 
+// Viền sáng lô đang chọn: cùng nhóm singleIso với popup công trình nên chọn lô / công trình khác là gỡ viền cũ
 function openLandPopup(p, m, latlng) {
+  (m === map ? planMap : map)?.closePopup();
+  clearSingleIsochrone();
+  const group = m === planMap ? planLayers.singleIso : layers.singleIso;
+  if (p.geometry && group) {
+    const marks = L.featureGroup();
+    addParcelOutline(marks, p.geometry, selRendererFor(m));
+    group.addLayer(marks);
+  }
+  const seq = singleIsoSeq;
   const popup = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup' }).setLatLng(latlng).setContent(landPopupHtml(p)).openOn(m);
+  popup.on('remove', () => { if (singleIsoSeq === seq) clearSingleIsochrone(); });
   addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
 }
 

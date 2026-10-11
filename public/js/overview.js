@@ -1,8 +1,9 @@
 // Giới thiệu tổng quan (nút góc trên trái): giới thiệu webapp + mục lục 5 nhóm tính năng, mỗi mục có hướng dẫn và nút mở thẳng tính năng.
 // Mở tính năng bằng cách bấm hộ nút / tab / ô tick sẵn có trên giao diện, không đụng trạng thái nội bộ của module khác.
 // Tự hiện ở lần mở trang đầu; ô "Không tự hiện" dùng chung khóa với introTour.js.
-import { ico, showToast } from './utils.js';
-import { map, handleInspectPointClick } from './mapEngine.js';
+import { ico, showToast, escapeHtml, fmtNum, fmtPct } from './utils.js';
+import { map, handleInspectPointClick, zoomToPoint } from './mapEngine.js';
+import { ensureWardStats } from './uiComponents.js';
 import { planMap, getViewMode, isSplitOn } from './planMap.js';
 import { openIntroTour } from './introTour.js';
 
@@ -164,7 +165,7 @@ const SECTIONS = [
       {
         id: 'qcvn', btn: 'guide', status: 'dev',
         title: 'Kiểm tra chỉ tiêu theo QCVN 01:2026/BXD',
-        note: 'Lồng ghép so sánh bản hiện trạng sử dụng đất và Quy hoạch sử dụng đất. Tính toán chỉ tiêu dân số. Cần xuất file .dwg thành .dxf để đọc (hatch và ranh giới quy hoạch).',
+        note: 'So sánh Hiện trạng sử dụng đất và Quy hoạch sử dụng đất. Tính toán chỉ tiêu dân số. Cần xuất file .dwg thành .dxf để đọc (hatch và ranh giới quy hoạch).',
         lead: 'Đọc bản vẽ hiện trạng và quy hoạch của đồ án, tổng hợp cơ cấu sử dụng đất và đối chiếu chỉ tiêu đất hạ tầng xã hội với QCVN 01:2026/BXD.',
         steps: [
           'Bấm nút <b>Thẩm định đồ án</b> (nút màu cam đầu thanh công cụ bên trái).',
@@ -387,21 +388,21 @@ const SECTIONS = [
     title: 'Thuật toán đề xuất xử lý cho cơ sở dôi dư sau sắp xếp',
     items: [
       {
-        id: 'csd', btn: 'result', status: 'trial',
-        title: 'Đề xuất phương án sử dụng cho từng cơ sở nhà đất dôi dư',
-        lead: 'Với mỗi cơ sở dôi dư (nhóm 12. Cơ sở chưa sử dụng), thuật toán thử chuyển đổi sang từng loại hạ tầng xã hội và xếp hạng theo mức bù đắp phần thiếu hụt của phường.',
+        id: 'csd', btn: 'result', status: 'trial', csdTable: true,
+        title: 'Đề xuất công năng cho Cơ sở nhà đất dôi dư',
+        lead: 'Với mỗi cơ sở dôi dư (nhóm 12. Cơ sở chưa sử dụng), thuật toán thử chuyển đổi sang từng loại hạ tầng xã hội và xếp hạng theo mức bù đắp phần thiếu hụt của phường theo quy hoạch. Bảng dưới tổng hợp chức năng đề xuất của từng khu đất, nhóm theo phường, xã.',
         steps: [
-          'Bật nhóm <b>12. Cơ sở chưa sử dụng</b> ở panel phải › <b>Công trình</b>.',
-          'Bấm vào biểu tượng cơ sở đã duyệt: bảng thông tin liệt kê các phương án chuyển đổi, phương án tốt nhất gắn nhãn <b>Ưu tiên hàng đầu</b>.',
+          'Bấm tên khu đất trong bảng để phóng tới vị trí và mở bảng thông tin của cơ sở.',
+          'Bảng thông tin liệt kê các phương án chuyển đổi, phương án tốt nhất gắn nhãn <b>Ưu tiên hàng đầu</b>.',
           'Mỗi phương án nêu phần quy mô (m²/người) và độ phủ dân số được bổ sung; loại không đủ diện tích tối thiểu bị loại.',
           'Bấm <b>Xem thuyết minh</b> để xem vùng phục vụ, công trình cùng loại lân cận đã trừ, vùng còn trống và pixel dân cư được tính.'
         ],
         facts: [
           'Kết quả là gợi ý kỹ thuật, cần cấp có thẩm quyền xem xét, phê duyệt.',
-          'Cơ sở chưa được Admin duyệt không chạy thuật toán.'
+          'Cơ sở chưa được Admin duyệt gắn nhãn <b>Cần phê duyệt</b>; bảng thông tin trên bản đồ chỉ chạy thuật toán cho cơ sở đã duyệt.'
         ],
         actions: [{
-          label: 'Xem kết quả đề xuất', icon: 'bulb',
+          label: 'Xem trên bản đồ', icon: 'map',
           run: () => {
             showLayer('chk_c9', { main: 'infra' });
             showToast('Bấm vào biểu tượng cơ sở chưa sử dụng trên bản đồ để xem phương án đề xuất', 'info');
@@ -458,6 +459,61 @@ function reportTableHtml(cols) {
   </div>`;
 }
 
+// Bảng cơ sở dôi dư: csdItems của getWardStats (cùng nguồn mục D bảng tổng hợp phường), gợi ý đã xếp hạng sẵn ở máy chủ
+function csdSuggestionHtml(csd) {
+  const sugg = csd.suggestions || [];
+  const commercial = sugg.find(s => s.status === 'commercial');
+  if (commercial) {
+    return `<b class="c-orange">${escapeHtml(commercial.label)}</b>${commercial.note ? `<small>${escapeHtml(commercial.note)}</small>` : ''}`;
+  }
+  const [first, second] = sugg.filter(s => s.status === 'eligible');
+  if (!first) return '<i class="c-muted">Chưa có gợi ý phù hợp</i>';
+  const gain = first.basis === 'scale'
+    ? `bù thiếu quy mô: ${fmtPct(first.currentScalePct)} → ${fmtPct(Math.min(100, first.currentScalePct + first.scaleAddPct))}`
+    : `+${fmtPct(first.scaleAddPct)} quy mô · +${fmtPct(first.coverageAddPct)} độ phủ${first.coverageMethod === 'estimate' ? ' (ước lượng)' : ''}`;
+  return `<b class="c-green">${escapeHtml(first.label)}</b><small>${gain}</small>${second ? `<small>Phương án 2: ${escapeHtml(second.label)}</small>` : ''}`;
+}
+
+function csdTableHtml(wards) {
+  const groups = wards
+    .map(w => ({ ward: w.Ten_Phuong, items: (w.csdItems || []).slice().sort((a, b) => (b.size || 0) - (a.size || 0)) }))
+    .filter(g => g.items.length)
+    .sort((a, b) => a.ward.localeCompare(b.ward, 'vi'));
+  const total = groups.reduce((n, g) => n + g.items.length, 0);
+  if (!total) return '<div class="ov-table-note">Chưa có cơ sở nhà đất dôi dư nào trong dữ liệu.</div>';
+  const area = groups.reduce((s, g) => s + g.items.reduce((t, c) => t + (Number(c.size) || 0), 0), 0);
+  let stt = 0;
+  const rows = groups.map(g => `<tr class="ov-csd-ward"><td colspan="4">${escapeHtml(g.ward)} <small>· ${g.items.length} cơ sở</small></td></tr>
+    ${g.items.map(c => {
+      const lat = Number(c.lat), lng = Number(c.lng);
+      const name = escapeHtml(c.name || 'Khu đất chưa sử dụng');
+      const link = Number.isFinite(lat) && Number.isFinite(lng)
+        ? `<button type="button" class="link-btn" data-ov-zoom data-lat="${lat}" data-lng="${lng}" data-name="${name}" title="Phóng tới vị trí khu đất">${name}</button>`
+        : name;
+      return `<tr><td>${++stt}</td><td>${link}${c.needsApproval ? '<small class="c-orange">Cần phê duyệt</small>' : ''}</td>
+        <td>${fmtNum(c.size)}</td><td class="ov-csd-sugg">${csdSuggestionHtml(c)}</td></tr>`;
+    }).join('')}`).join('');
+  return `<div class="ov-table-note ov-csd-sum">${total} cơ sở · ${groups.length} phường, xã · tổng ${fmtNum(area)} m²</div>
+    <div class="ov-csd-wrap"><table class="ov-table ov-csd">
+      <thead><tr><th>STT</th><th>Tên khu đất</th><th>Diện tích (m²)</th><th>Chức năng đề xuất</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+function fillCsdTable(box) {
+  ensureWardStats()
+    .then(wards => { if (box.isConnected) box.innerHTML = csdTableHtml(wards || []); })
+    .catch(err => { if (box.isConnected) box.innerHTML = `<div class="ov-table-note">Không tải được số liệu: ${escapeHtml(err.message || String(err))}</div>`; });
+}
+
+function zoomCsd(btn) {
+  const lat = Number(btn.dataset.lat), lng = Number(btn.dataset.lng);
+  close();
+  const chk = $('chk_c9');
+  if (chk && !chk.checked) chk.click();
+  zoomToPoint(lat, lng, btn.dataset.name || '');
+}
+
 function detailHtml(it) {
   const sec = SECTIONS[it.section];
   return `
@@ -468,6 +524,10 @@ function detailHtml(it) {
     <h3 class="ov-detail-title">${it.title}${badge(it.status)}</h3>
     ${it.note ? `<p class="ov-detail-note">${ico('alert')}${it.note}</p>` : ''}
     <p class="ov-lead">${it.lead}</p>
+    ${it.csdTable ? `<div class="ov-card ov-csd-card">
+      <div class="ov-card-title">${ico('table')}Thống kê cơ sở nhà đất dôi dư</div>
+      <div data-ov-csd><div class="ov-table-note">Đang tải số liệu các phường, xã…</div></div>
+    </div>` : ''}
     <div class="ov-detail-grid">
       <div class="ov-card">
         <div class="ov-card-title">${ico('book')}${it.stepsTitle || 'Các bước thực hiện'}</div>
@@ -503,6 +563,8 @@ function showDetail(id) {
   current = it;
   root.classList.add('ov-in-detail');
   els.body.innerHTML = detailHtml(it);
+  const csdBox = els.body.querySelector('[data-ov-csd]');
+  if (csdBox) fillCsdTable(csdBox);
   els.body.scrollTop = 0;
   els.body.querySelector('.ov-back')?.focus({ preventScroll: true });
 }
@@ -547,15 +609,15 @@ function build() {
         <div class="ov-head-text">
           <div class="ov-kicker">Bản đồ quy hoạch và hạ tầng đô thị TP. Huế · Sở Xây dựng thành phố Huế</div>
           <h2 class="ov-title" id="ovTitle">GIỚI THIỆU TỔNG QUAN</h2>
-          <p class="ov-head-intro">Trang web có mục đích phi thương mại, được lập phục vụ công tác quản lý chuyên ngành của
-          Phòng Quy hoạch Kiến trúc và Phát triển đô thị - Sở Xây dựng thành phố Huế và đang trong giai đoạn thử nghiệm.
-          Trang cung cấp giải pháp cho các nhóm nghiệp vụ sau:</p>
         </div>
         <div class="ov-stage">
           <span class="ov-beta">${ico('clock')}Giai đoạn thử nghiệm</span>
           <span class="ov-ver" hidden></span>
         </div>
         <button type="button" class="ov-x" title="Đóng" aria-label="Đóng">${ico('close')}</button>
+        <p class="ov-head-intro">Trang web có mục đích phi thương mại, được lập phục vụ công tác quản lý chuyên ngành của
+        Phòng Quy hoạch Kiến trúc và Phát triển đô thị - Sở Xây dựng thành phố Huế và đang trong giai đoạn thử nghiệm.
+        Trang cung cấp giải pháp cho các nhóm nghiệp vụ sau:</p>
       </header>
       <div class="ov-body"></div>
       <footer class="ov-foot">
@@ -575,9 +637,10 @@ function build() {
 
   root.addEventListener('click', (e) => {
     if (e.target === root) { close(); return; }
-    const t = e.target.closest('[data-ov-item], [data-ov-back], [data-ov-act], [data-ov-tour], [data-ov-close], .ov-x');
+    const t = e.target.closest('[data-ov-item], [data-ov-back], [data-ov-act], [data-ov-zoom], [data-ov-tour], [data-ov-close], .ov-x');
     if (!t) return;
     if (t.dataset.ovItem) showDetail(t.dataset.ovItem);
+    else if (t.hasAttribute('data-ov-zoom')) zoomCsd(t);
     else if (t.hasAttribute('data-ov-back')) showList();
     else if (t.dataset.ovAct != null) runAction(Number(t.dataset.ovAct));
     else if (t.hasAttribute('data-ov-tour')) { close(); openIntroTour(); }

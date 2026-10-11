@@ -43,7 +43,7 @@ import {
 } from './planMap.js';
 import { escapeHtml, setStatusContent, showToast, announceTool, TOOL_START_EVENT, RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './utils.js';
 import { initViewFlow, wardFromMapClick } from './viewFlow.js';
-import { initMapLevel, getLevel } from './mapLevel.js';
+import { initMapLevel, getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { initQhc2045Layer } from './qhc2045Layer.js';
 import { initQhctLayer } from './qhctLayer.js';
 import { initCadImport } from './cadImportUi.js';
@@ -84,8 +84,8 @@ function addTypeSwatches() {
   });
 }
 
-// Quy hoạch / Công trình là 2 tab cùng cấp (mở bản đồ luôn ở Quy hoạch); Bản đồ nền / Bản đồ môi trường là 2 tab ở dưới
-// (mở bản đồ luôn ở Bản đồ nền để thấy lớp Phân loại đô thị đang bật). Chuyển tab chỉ đổi danh sách đang xem, không bật/tắt lớp.
+// Đô thị / Quy hoạch / Công trình là 3 tab cùng cấp; đổi lớp ở droplist (mapLevel.js) thì mở tab Đô thị (Hệ thống đô thị)
+// hoặc Quy hoạch (4 cấp còn lại). Bản đồ nền / Bản đồ môi trường là 2 tab ở dưới. Chuyển tab chỉ đổi danh sách đang xem, không bật/tắt lớp.
 function initLayerMapTabs() {
   const root = document.getElementById('layerMap');
   if (!root) return;
@@ -125,7 +125,12 @@ function initLayerMainTabs() {
     root.dataset.active = id;
   };
   tabs.forEach(btn => btn.addEventListener('click', () => show(btn.dataset.mainTab)));
-  show('plan');
+  const tabOf = (level) => (level === 'urban' ? 'urban' : 'plan');
+  document.addEventListener(LEVEL_EVENT, (e) => {
+    const { level, prev } = e.detail || {};
+    if (level !== prev) show(tabOf(level));
+  });
+  show(tabOf(getLevel()));
 }
 
 function initLayerGroups() {

@@ -452,8 +452,9 @@ function drawPhase(phase) {
         L.DomEvent.stopPropagation(e);
         if (passToolClick(m, e)) return;
         if (lot.decisionKind && !session.pendingId) { openDecision(lot.id); return; }
-        // Xem đồ án đã lưu: bấm lô xem thông tin lô (lớp thửa đang bật thì thửa thay popup lô) thay vì chọn dòng bảng
-        if (session.view && lot.src) { openLotPopup(lot.src, m, e.latlng); return; }
+        // Xem đồ án đã lưu: bấm lô xem thông tin lô (lớp thửa đang bật thì thửa thay popup lô) thay vì chọn dòng bảng.
+        // Lô thô trong cache file đồ án không có file: gắn tên đồ án để popup lô đất có nút sửa / xóa (ghi file đồ án)
+        if (session.view && lot.src) { openLotPopup({ ...lot.src, file: lot.src.file || session.project }, m, e.latlng); return; }
         focusRow(lot.ask ? `ask:${lot.layer}` : lot.role === 'score' && lot.phase === 'QH' ? `lot:${lot.id}` : `land:${lot.landKey}`, false);
       });
     g.addLayer(shape);

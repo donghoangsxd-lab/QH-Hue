@@ -284,12 +284,14 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
   transition: all var(--ease);
 }
 .map-title-level .ico { margin: 0; width: 14px; height: 14px; color: rgb(var(--tone)); }
+.map-title-level-text { display: inline-block; text-align: left; white-space: nowrap; }
 .map-title-level .map-title-level-chev { color: var(--text-muted); transition: transform var(--ease); }
 .map-title-level[aria-expanded="true"] .map-title-level-chev { transform: rotate(180deg); }
 .map-title-level:hover { border-color: rgba(var(--tone), 0.9); background: rgba(var(--tone), 0.2); box-shadow: 0 0 10px rgba(var(--tone), 0.35); }
 .map-title[data-view="HT"] .map-title-level { display: none; }
 .level-menu {
   position: fixed; z-index: 1300;
+  box-sizing: border-box;
   max-width: calc(100vw - 16px);
   padding: 4px;
   background: var(--bg-dark);
@@ -301,11 +303,11 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
 .level-item {
   width: 100%;
   display: flex; align-items: center; gap: 6px;
-  padding: 6px 10px;
+  padding: 6px 10px 6px var(--level-indent, 10px);
   text-align: left;
   font: inherit; font-size: var(--fs-sm); font-weight: 700;
   color: var(--text-strong);
-  white-space: nowrap;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   background: transparent;
   border: 0;
   border-radius: var(--r-sm);
@@ -313,6 +315,9 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
   transition: background var(--ease);
 }
 .level-item[hidden] { display: none; }
+.level-item .ico { flex-shrink: 0; width: 14px; height: 14px; margin: 0; color: var(--accent-orange); }
+.level-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.level-item.is-pending .ico { opacity: 0.5; }
 .level-item:hover, .level-item:focus-visible { background: var(--bg-hover); outline: none; }
 .level-item.is-on::after { content: ''; width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: var(--accent-orange); }
 .level-item.is-pending { color: var(--text-muted); font-weight: 600; }
@@ -335,7 +340,7 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
 .map-title-seg.active { color: var(--text-on-accent); background: linear-gradient(90deg, var(--accent-cyan), var(--accent-orange)); }
 body.compare-on .map-title-split { display: inline-flex; }
 @media (max-width: 1100px) {
-  .map-title-level-text { max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
+  .map-title-level-text { max-width: 9.5em; overflow: hidden; text-overflow: ellipsis; }
   .map-title-text { font-size: var(--fs-md); letter-spacing: 0.3px; }
   .map-title-seg { padding: 0 6px; }
 }
@@ -721,7 +726,6 @@ body.right-collapsed .right-panel {
 .plan-static { padding: 3px 0 3px 2px; }
 .pl-group[data-level-group="QHPK"] .project-empty { padding-left: 4px; }
 /* Nhóm cấp của lớp đang chọn ở droplist (body[data-level], mapLevel.js) */
-body[data-level="urban"] .pl-group[data-level-group="urban"] > .pl-head,
 body[data-level="qhc25"] .pl-group[data-level-group="QHC25"] > .pl-head,
 body[data-level="qhc10"] .pl-group[data-level-group="QHC"] > .pl-head,
 body[data-level="qhpk"] .pl-group[data-level-group="QHPK"] > .pl-head,
@@ -1747,7 +1751,7 @@ table.gp-rec td:last-child { text-align: left; }
 table.gp-mat td { overflow: hidden; overflow-wrap: anywhere; }
 .uc-bar .gp-map-btn { margin-left: auto; }
 .gp-list { display: flex; flex-direction: column; gap: 3px; padding-top: 4px; }
-.gp-list > .gp-chain { margin: 0 0 4px; }
+.urban-static { padding: 3px 0 3px 2px; }
 .gp-row {
   display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 6px; align-items: center;
   width: 100%; padding: 4px 6px; box-sizing: border-box; text-align: left; cursor: pointer; font: inherit; color: var(--text-main);
@@ -1761,8 +1765,8 @@ table.gp-mat td { overflow: hidden; overflow-wrap: anywhere; }
 .gp-meta { grid-column: 2 / -1; color: var(--text-muted); font-size: var(--fs-xs); }
 .gp-st-sub { color: #fb923c; }
 .gp-grp { margin-top: 4px; font-size: var(--fs-xs); font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
-.gp-grp-sub { margin: 0 0 0 14px; color: #fb923c; text-transform: none; }
-.gp-row.gp-sub { margin-left: 14px; width: calc(100% - 14px); border-style: dashed; }
+.gp-to { display: inline-flex; align-items: center; font-size: var(--fs-xs); font-weight: 700; white-space: nowrap; }
+.gp-to .ico { width: 10px; height: 10px; }
 tr.gp-sub td.uc-name { padding-left: 1.4em; }
 .gp-clsc { white-space: nowrap; }
 .gp-clsc .ico { width: 9px; height: 9px; vertical-align: middle; }
@@ -2724,7 +2728,7 @@ table.ward-table th {
   background: linear-gradient(90deg, transparent, var(--accent-cyan) 20%, var(--accent-cyan) 48%, var(--accent-orange) 52%, var(--accent-orange) 80%, transparent);
 }
 .ov-head {
-  display: flex; align-items: flex-start; gap: 12px;
+  display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 12px;
   padding: 14px 16px 12px;
   background: var(--bg-head); border-bottom: 1px solid var(--border-soft);
 }
@@ -2752,8 +2756,10 @@ table.ward-table th {
 .ov-x .ico { margin: 0; width: 1.4em; height: 1.4em; }
 .ov-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px 8px; }
 
+/* Hàng riêng dưới tiêu đề, thẳng lề trái với tiêu đề: lùi đúng bề rộng .ov-mark (kể cả viền 2px) + gap 12px */
 .ov-head-intro {
-  margin: 8px 0 0; padding-left: 10px;
+  box-sizing: border-box; width: calc(100% - 38px * var(--k) - 14px);
+  margin: 8px 0 0 calc(38px * var(--k) + 14px); padding-left: 10px;
   border-left: 3px solid var(--accent-cyan);
   font-size: calc(var(--fs-md) * 1.08); line-height: 1.55; color: var(--text-main);
 }
@@ -2837,6 +2843,20 @@ table.ward-table th {
 .ov-table th { color: var(--text-muted); font-weight: 700; background: rgba(30, 41, 59, 0.7); }
 .ov-table td { color: var(--text-muted); }
 .ov-table-note { margin-top: 6px; font-size: var(--fs-xs); color: var(--text-muted); font-style: italic; }
+.ov-csd-card { margin-bottom: 12px; }
+.ov-csd-sum { margin: 0 0 6px; font-style: normal; }
+.ov-csd-wrap { max-height: 46vh; overflow-y: auto; border: 1px solid var(--border-soft); border-radius: var(--r-sm); }
+.ov-csd { border-style: hidden; }
+.ov-csd thead th { position: sticky; top: 0; z-index: 1; background: var(--bg-head); }
+.ov-csd td { color: var(--text-main); vertical-align: top; }
+.ov-csd td:first-child { width: 36px; text-align: center; color: var(--text-muted); }
+.ov-csd td:nth-child(2), .ov-csd td:last-child, .ov-csd th:nth-child(2), .ov-csd th:last-child { text-align: left; }
+.ov-csd td:nth-child(3) { white-space: nowrap; }
+.ov-csd td small { display: block; color: var(--text-muted); font-size: var(--fs-xs); }
+.ov-csd td small.c-orange { color: var(--accent-orange); }
+.ov-csd .link-btn { text-align: left; }
+.ov-csd-ward td, .ov-csd-ward td:first-child { text-align: left; width: auto; font-weight: 700; color: var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.06); }
+.ov-csd .ov-csd-ward small { display: inline; font-weight: 400; color: var(--text-muted); }
 .ov-coord {
   display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
   margin-top: 12px; padding: 10px 12px;

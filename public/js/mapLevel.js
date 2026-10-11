@@ -7,10 +7,10 @@
 //  qhct   QHCT 1/500 (chk_qhct)          bấm lô → thông tin lô (chờ dữ liệu)
 // Chọn từ droplist: bật lớp đó, tắt 4 lớp còn lại. Bật thêm lớp ở panel Lớp dữ liệu để so sánh: lớp đang chọn giữ nguyên;
 // lớp đang chọn bị tắt mà còn lớp khác bật thì chuyển sang lớp đó.
-import { escapeHtml } from './utils.js';
+import { escapeHtml, ico } from './utils.js';
 
 export const LEVELS = [
-  { id: 'urban', chk: 'chk_urban', label: 'Hệ thống đô thị' },
+  { id: 'urban', chk: 'chk_urban', label: 'HỆ THỐNG ĐÔ THỊ' },
   { id: 'qhc25', chk: 'chk_qhc25', label: 'QHC 1/25.000' },
   { id: 'qhc10', chk: 'chk_qhc10', label: 'QHC 1/10.000' },
   { id: 'qhpk', chk: 'chk_projects', label: 'QHPK 1/2.000' },
@@ -100,11 +100,27 @@ function paint() {
   });
 }
 
+// Nút giữ bề rộng của nhãn dài nhất: đổi lớp không làm nút (và menu thẳng hàng với nút) xê dịch
+function fitButton() {
+  const text = button?.querySelector('.map-title-level-text');
+  if (!text) return;
+  const cur = text.textContent;
+  text.style.minWidth = '';
+  const widest = Math.max(...LEVELS.map(l => { text.textContent = l.label; return text.scrollWidth; }));
+  text.textContent = cur;
+  const cap = parseFloat(getComputedStyle(text).maxWidth) || Infinity;
+  text.style.minWidth = `${Math.ceil(Math.min(widest, cap))}px`;
+}
+
+// Menu trùng mép trái / phải với nút; biểu tượng và chữ các mục thẳng cột với biểu tượng, chữ trên nút (cùng gap)
 function placeMenu() {
   const r = button.getBoundingClientRect();
-  menu.style.minWidth = `${Math.round(r.width)}px`;
+  const icon = button.querySelector('.ico');
+  const inset = menu.clientLeft + parseFloat(getComputedStyle(menu).paddingLeft);
   menu.style.top = `${Math.round(r.bottom + 6)}px`;
-  menu.style.left = `${Math.round(Math.max(8, r.right - menu.offsetWidth))}px`;
+  menu.style.left = `${Math.round(r.left)}px`;
+  menu.style.width = `${Math.round(r.width)}px`;
+  if (icon) menu.style.setProperty('--level-indent', `${Math.max(0, Math.round(icon.getBoundingClientRect().left - r.left - inset))}px`);
 }
 
 function openMenu(on) {
@@ -124,7 +140,7 @@ function buildMenu() {
   menu.setAttribute('role', 'listbox');
   menu.setAttribute('aria-label', 'Chọn lớp quy hoạch');
   menu.hidden = true;
-  menu.innerHTML = LEVELS.map(l => `<button type="button" class="level-item${l.pending ? ' is-pending' : ''}" role="option" data-level="${l.id}"${l.pending ? ' title="Chưa có dữ liệu"' : ''}>${escapeHtml(l.label)}</button>`).join('');
+  menu.innerHTML = LEVELS.map(l => `<button type="button" class="level-item${l.pending ? ' is-pending' : ''}" role="option" data-level="${l.id}"${l.pending ? ' title="Chưa có dữ liệu"' : ''}>${ico('layers')}<span>${escapeHtml(l.label)}</span></button>`).join('');
   document.body.appendChild(menu);
   menu.addEventListener('click', (e) => {
     const item = e.target.closest('[data-level]');
@@ -146,11 +162,13 @@ export function initMapLevel() {
   button = document.getElementById('btnMapLevel');
   if (button) {
     buildMenu();
+    fitButton();
+    document.fonts?.ready.then(fitButton);
     button.addEventListener('click', () => openMenu(menu.hidden));
     document.addEventListener('pointerdown', (e) => {
       if (!menu.hidden && !menu.contains(e.target) && !button.contains(e.target)) openMenu(false);
     });
-    window.addEventListener('resize', () => { if (!menu.hidden) placeMenu(); });
+    window.addEventListener('resize', () => { fitButton(); if (!menu.hidden) placeMenu(); });
   }
   document.addEventListener('change', onLayerChange);
   const first = LEVELS.find(l => isOn(l.chk));

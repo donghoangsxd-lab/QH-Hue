@@ -1,4 +1,4 @@
-// Giao diện module Quy hoạch chung (generalPlan.js): tab "QHC" ở panel phải, trang 4 bảng tổng hợp
+// Giao diện module Quy hoạch chung (generalPlan.js): mục "Đô thị" ở panel phải, trang 4 bảng tổng hợp
 // (uiComponents.js › setPart2Page: tổng quan các QHC | chi tiết hồ sơ, phân vùng, QHPK 1/2.000 triển khai, chỉ số trưởng thành)
 // và nét ranh phạm vi trên bản đồ (data/generalPlan.geojson). Khu vực vùng lõi là mục con của QHC thành phố Huế.
 // Chọn ở panel phải hay bảng dưới đều dùng chung picked; không import uiComponents.js (tránh vòng import), mở trang bằng nút sẵn có.
@@ -128,34 +128,43 @@ function pick(id, { page = false } = {}) {
 /** Mở hồ sơ một QHC ở trang Quy hoạch chung (bảng dưới) và vẽ phạm vi */
 export const showGeneralPlan = (id) => pick(id, { page: true });
 
-// ---------- Panel phải: danh mục QHC ----------
+// ---------- Panel phải: mục Đô thị ----------
+// Đô thị là dòng chính; QHC, QHPK, mức trưởng thành là thông tin phụ. Khu vực vùng lõi theo QHC thành phố Huế (1/10.000)
+const URBAN_GROUPS = [
+  { title: 'Đô thị loại I', list: () => [CITY_PLAN] },
+  { title: 'Khu vực đô thị loại II', list: () => CORE_AREAS.filter(a => a.cls === 'II') },
+  { title: 'Khu vực đô thị loại III', list: () => CORE_AREAS.filter(a => a.cls === 'III') },
+  { title: 'Đô thị loại III', list: () => GENERAL_PLANS.filter(p => !p.city) }
+];
+
 function panelRow(plan, c, here) {
   const kids = childProjects(plan, c.catalog).length;
   const mat = c.wards.length ? maturityOf(plan, c) : null;
-  const cls = ['gp-row', plan.parent ? 'gp-sub' : '', plan.id === picked ? 'is-sel' : '', here.has(plan.id) ? 'is-here' : ''].filter(Boolean).join(' ');
+  const cls = ['gp-row', plan.id === picked ? 'is-sel' : '', here.has(plan.id) ? 'is-here' : ''].filter(Boolean).join(' ');
   const tip = [plan.name, plan.parent ? `Vùng lõi ${plan.parent.name} (1/10.000)` : GP_KINDS[plan.kind], clsTip(plan)].join('\n');
+  const qhc = plan.parent
+    ? `<span class="gp-st-sub" title="Không lập QHC riêng; chỉ tiêu do ${escapeHtml(plan.parent.name)} quy định">Theo QHC TP Huế</span>`
+    : `<span class="gp-st-${plan.status}">QHC: ${GP_STATUS[plan.status]}</span>`;
+  const to = plan.target !== plan.cls
+    ? `<span class="gp-to uc-${plan.target}" title="Loại định hướng">${ico('chev-right')}${plan.target}</span>` : '';
   return `<button type="button" class="${cls}" data-gp-pick="${plan.id}" title="${escapeHtml(tip)}">
       <b class="gp-cls uc-${plan.cls}">${plan.cls}</b>
       <span class="gp-name">${escapeHtml(plan.short)}</span>
-      ${statusChip(plan)}
-      <small class="gp-meta">${kids} QHPK · trưởng thành ${mat ? pctText(mat.pct) : '…'}</small>
+      ${to}
+      <small class="gp-meta">${qhc} · ${kids} QHPK · trưởng thành ${mat ? pctText(mat.pct) : '…'}</small>
     </button>`;
 }
 
 function renderPanel() {
   const box = $('gpList');
   if (!box) return;
-  const count = $('gpCount');
-  if (count) count.textContent = String(GENERAL_PLANS.length);
   const c = ctx();
   const here = new Set(state.selectedWard ? generalPlansOfWard(state.selectedWard).map(p => p.id) : []);
-  const groups = KIND_ORDER.map(kind => {
-    const list = GENERAL_PLANS.filter(p => p.kind === kind);
-    const rows = list.map(plan => panelRow(plan, c, here)
-      + (plan.city ? `<div class="gp-grp gp-grp-sub">Vùng lõi 1/10.000 · ${CORE_AREAS.length} khu vực</div>${CORE_AREAS.map(a => panelRow(a, c, here)).join('')}` : '')).join('');
-    return `<div class="gp-grp">${escapeHtml(GP_KINDS[kind])}${list.length > 1 ? ` · ${list.length}` : ''}</div>${rows}`;
-  }).join('');
-  box.innerHTML = `<div class="gp-chain" title="${escapeHtml(GP_PARENT_REF)}">QĐ 756 ${ico('chev-right')} Quy hoạch chung ${ico('chev-right')} QHPK 1/2.000</div>${groups}`;
+  const groups = URBAN_GROUPS.map(g => ({ title: g.title, list: g.list() })).filter(g => g.list.length);
+  const count = $('gpCount');
+  if (count) count.textContent = String(groups.reduce((n, g) => n + g.list.length, 0));
+  box.innerHTML = groups.map(g => `<div class="gp-grp">${escapeHtml(g.title)}${g.list.length > 1 ? ` · ${g.list.length}` : ''}</div>
+    ${g.list.map(plan => panelRow(plan, c, here)).join('')}`).join('');
 }
 
 export const refreshGeneralPlanPanel = renderPanel;
