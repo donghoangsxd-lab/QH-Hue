@@ -17,6 +17,8 @@ import { planMap, onCompareChange, passToolClick } from './planMap.js';
 import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName, wardScopeName } from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
+import { isCoreWard } from './qhc2045.js';
+import { getLevel } from './mapLevel.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
@@ -458,15 +460,22 @@ function renderList() {
     box.innerHTML = migrateBtn + none + rows(visible);
     return;
   }
+  // Đang xem QHC 1/10.000: nhóm QHPK chỉ giữ đồ án và nhóm phường trong vùng lõi
+  const coreOnly = getLevel() === 'qhc10';
   box.innerHTML = migrateBtn + LIST_LEVELS.map(level => {
-    const items = visible.filter(({ p }) => p.level === level.key);
+    const scoped = coreOnly && level.key === 'QHPK';
+    const all = visible.filter(({ p }) => p.level === level.key);
+    const items = scoped ? all.filter(({ p }) => p.wards.some(isCoreWard)) : all;
     const fixed = !!staticOf(level.key);
     if (!fixed && !items.length && level.key !== 'QHPK') return '';
     const open = !closedLevels.has(level.key);
     const empty = level.key === 'QHPK' && !projects.length
       ? '<div class="project-empty">Chưa có đồ án. Admin nhập file ở tab Đề xuất › Nhập hàng loạt.</div>' : '';
-    const body = (fixed ? `<div data-static-slot="${level.key}"></div>` : '') + empty
-      + (open ? wardGroups(items).map(wardHtml).join('') : '');
+    const scopeNote = scoped && all.length
+      ? `<div class="project-scope" title="Đồ án có phường, xã thuộc vùng lõi (phạm vi QHC 1/10.000 mở rộng theo QĐ 756). Chọn lớp khác để xem toàn bộ">${ico('coverage')}<span>Trong phạm vi QHC 1/10.000: <b>${items.length}</b>/${all.length} đồ án</span></div>` : '';
+    const groups = wardGroups(items).filter(([w]) => !scoped || isCoreWard(w));
+    const body = (fixed ? `<div data-static-slot="${level.key}"></div>` : '') + empty + scopeNote
+      + (open ? groups.map(wardHtml).join('') : '');
     return `<div class="pl-group${open ? ' open' : ''}" data-level-group="${level.key}">
       <button type="button" class="pl-head" data-level-toggle="${level.key}" aria-expanded="${open}" title="${open ? 'Thu gọn' : 'Xem'} ${level.title}">
         ${ico('chev-right')}<span>${level.label}</span>${items.length ? `<small>${items.length}</small>` : ''}</button>

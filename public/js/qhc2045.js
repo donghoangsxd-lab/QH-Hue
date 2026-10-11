@@ -22,6 +22,11 @@ export const CENTER_AREAS = CORE_AREAS.filter(a => CENTER_IDS.includes(a.id));
 export const CENTER_UNITS = CENTER_AREAS.flatMap(a => a.units);
 // Phạm vi 1/10.000 của đồ án cũ (4 tiểu vùng A1–A4) gồm cả Hương Thủy, Hương Trà: danh sách phường, xã gom theo khu vực vùng lõi
 export const CORE_GROUPS = CORE_AREAS.map(a => ({ id: a.id, name: a.short, cls: a.cls, units: a.units }));
+// Ranh phường ghi tên đầy đủ ("Phường Thuận Hóa"), danh sách vùng lõi ghi tên gọn: so khớp theo tên gọn
+export const bareWard = (n) => String(n || '').trim().replace(/^(Phường|Xã|Thị trấn)\s+/i, '');
+const coreSet = new Set(CORE_GROUPS.flatMap(g => g.units).map(bareWard));
+/** Phường, xã thuộc phạm vi 1/10.000 (vùng lõi, gồm cả Hóa Châu, Mỹ Thượng mở rộng theo QĐ 756) */
+export const isCoreWard = (n) => coreSet.has(bareWard(n));
 
 export const ZONE_NAMES = { DD: 'Khu đất dân dụng', NDD: 'Khu đất ngoài dân dụng', NNK: 'Nông nghiệp và chức năng khác' };
 const ZONE_TONE = { DD: '#f59e0b', NDD: '#a855f7', NNK: '#65a30d' };
@@ -103,6 +108,16 @@ export const WATER_KINDS = [
   { label: 'Mặt nước biển', color: '#1e3a8a' }
 ];
 export const GREEN_COLOR = '#22c55e';
+
+// Chú giải sơ đồ 1/25.000 (tab Chú giải, bộ QHC25): nhãn bỏ tiền tố "Khu vực" của dữ liệu, màu khớp visionColor
+const zoneRows = (labels) => labels.map(label => ({ label, color: visionColor(label) }));
+export const VISION_LEGEND_GROUPS = [
+  ['Phát triển đô thị, dân cư', zoneRows(['Phát triển đô thị', 'Phát triển đô thị có kiểm soát', 'Đất hỗn hợp', 'Dân cư nông thôn', 'Dự trữ phát triển'])],
+  ['Công cộng, dịch vụ, di sản', zoneRows(['Công cộng - dịch vụ cấp vùng, cấp tỉnh', 'Nghiên cứu, đào tạo cấp vùng, cấp tỉnh', 'Phát triển du lịch tập trung', 'Hoàng thành, di tích, tôn giáo'])],
+  ['Công nghiệp, hạ tầng, quốc phòng', zoneRows(['Phát triển công nghiệp và công nghệ cao', 'Khai thác khoáng sản', 'Giao thông', 'Nghĩa trang và đầu mối hạ tầng kỹ thuật', 'Quốc phòng - an ninh'])],
+  ['Nông nghiệp, lâm nghiệp', zoneRows(['Nông nghiệp và phát triển nông thôn', 'Rừng đặc dụng', 'Rừng phòng hộ', 'Rừng sản xuất', 'Bãi bồi, bãi cát'])],
+  ['Mặt nước, cây xanh', [...WATER_KINDS.slice(0, 2), { label: 'Không gian cây xanh', color: GREEN_COLOR }]]
+];
 
 // Ranh giới khu vực (đường không gian): nét theo loại ranh
 const LINE_STYLES = [

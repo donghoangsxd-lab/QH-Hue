@@ -3,12 +3,12 @@
 // 2. Đổi lớp ở droplist tiêu đề: bật lớp đó, tắt 4 lớp kia, vào luồng riêng của lớp:
 //    - Hệ thống đô thị: bấm phường → chọn phường và sang QHPK (luồng cũ); bấm ký hiệu đô thị trung tâm → QHC 1/10.000.
 //    - QHC 1/25.000: chỉ xem / bấm vùng; bấm bản đồ không đổi địa bàn.
-//    - QHC 1/10.000: thẻ Khu vực trung tâm (tra cứu lô / chọn phường lõi / chọn QHPK); chọn phường lõi giữ lớp,
+//    - QHC 1/10.000: bấm lô tra cứu; panel phải lọc QHPK trong vùng lõi; chọn phường lõi giữ lớp,
 //      phường ngoài vùng lõi sang QHPK.
 //    - QHPK 1/2.000: lô cả phường đang chọn; bấm nền khi nhìn rộng → chọn phường.
 //    - QHCT 1/500: chờ dữ liệu.
-// 3. Mở đồ án (từ danh sách, ranh trên bản đồ, thẻ hoặc popup): sang lớp QHPK, thông tin đồ án thay panel dưới; thoát về
-//    địa bàn đang chọn, hoặc về QHC 1/10.000 nếu mở từ thẻ Khu vực trung tâm.
+// 3. Mở đồ án (từ danh sách, ranh trên bản đồ hoặc popup): sang lớp QHPK, thông tin đồ án thay panel dưới; thoát về
+//    địa bàn đang chọn, hoặc về QHC 1/10.000 nếu mở khi đang xem lớp này.
 // 4. Chọn lại Thành phố Huế: giữ lớp đang xem, tắt các lớp phụ, panel dưới giữ nguyên để xem chỉ tiêu toàn TP.
 // Bản đồ hiện trạng (lật sang hoặc nửa trái khi so sánh): bấm nền khi nhìn rộng → chọn phường.
 import { state } from './state.js';
@@ -18,9 +18,9 @@ import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
 import { revealWardProjects, clearProjectFocus } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT } from './projectFiles.js';
-import { RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './utils.js';
+import { RIGHT_TAB_EVENT } from './utils.js';
 import { URBAN_PICK_EVENT } from './urbanAreaLayer.js';
-import { CORE_NAV_EVENT, fitCenter, isCoreWard, syncCoreCard } from './qhc2045Layer.js';
+import { fitCenter, isCoreWard } from './qhc2045Layer.js';
 import { getLevel, setLevel, levelOrigin, LEVEL_EVENT, LEVELS } from './mapLevel.js';
 
 const CITY_NAME = 'Thành phố Huế';
@@ -56,7 +56,6 @@ function onLevelChange({ level, prev }) {
     closeProjectView();
     clearProjectFocus();
   }
-  syncCoreCard();
   const ward = isCity(state.selectedWard) ? null : state.selectedWard;
   if (level === 'qhpk') {
     if (!state.focusedProject) revealWardProjects(ward);
@@ -69,7 +68,7 @@ function onLevelChange({ level, prev }) {
   else fitCenter();
 }
 
-/** Vào QHC 1/10.000 (thẻ Khu vực trung tâm) */
+/** Vào QHC 1/10.000 (bấm ký hiệu đô thị trung tâm) */
 function enterCore() {
   closeProjectView();
   clearProjectFocus();
@@ -101,7 +100,6 @@ function onWardSelected(name) {
   clearProjectFocus();
   if (isCity(name)) enterCity();
   else enterWard(name);
-  syncCoreCard();
 }
 
 // ---------- Đồ án ----------
@@ -170,13 +168,6 @@ export function initViewFlow() {
   document.addEventListener(WARD_SELECT_EVENT, (e) => onWardSelected(e.detail));
   document.addEventListener(PROJECT_INFO_EVENT, onProjectOpened);
   document.addEventListener(PROJECT_VIEW_EXIT_EVENT, onProjectExit);
-  document.addEventListener(CORE_NAV_EVENT, (e) => {
-    if (e.detail?.to === 'core') enterCore();
-    else {
-      setLevel('urban');
-      if (!isCity(state.selectedWard)) document.dispatchEvent(new CustomEvent(WARD_PICK_EVENT, { detail: CITY_NAME }));
-    }
-  });
   document.addEventListener(URBAN_PICK_EVENT, (e) => { if (CENTER_URBAN_IDS.has(e.detail)) enterCore(); });
   initProgress();
 }

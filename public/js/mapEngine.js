@@ -678,11 +678,10 @@ function createWardPie(ward, counts, total, size, targetMap, scenarioLabel, city
 // nối thành các đường liên tục rồi giản lược; ~0,1 s so với vài giây nếu turf.union 40 phường.
 // Tâm biểu đồ chung = trọng tâm các phường theo diện tích (rơi ra ngoài ranh thì lấy điểm đặt nhãn phường gần nhất)
 let cityShape = null;
-function cityShapeOf(wards) {
-  if (cityShape && cityShape.source === wards) return cityShape;
+/** Ranh ngoài của một nhóm phường (mỗi đường [[lat, lng], ...]); dùng cho ranh TP và ranh vùng lõi QHC */
+export function outerWardLines(wards) {
   const vkey = (p) => `${p[0].toFixed(6)},${p[1].toFixed(6)}`;
   const edges = new Map();
-  let sx = 0, sy = 0, sa = 0;
   wards.forEach(w => {
     const g = w.geometry;
     if (!g) return;
@@ -697,11 +696,6 @@ function cityShapeOf(wards) {
         else edges.set(k, { n: 1, a: ring[i], b: ring[i + 1], ka, kb });
       }
     }));
-    try {
-      const area = turf.area(g);
-      const [x, y] = turf.centroid(g).geometry.coordinates;
-      sx += x * area; sy += y * area; sa += area;
-    } catch (e) { /* hình học lỗi: bỏ qua khi tính tâm */ }
   });
 
   const outer = [...edges.values()].filter(e => e.n === 1);
@@ -733,6 +727,21 @@ function cityShapeOf(wards) {
       : coords;
     lines.push(simple.map(([lng, lat]) => [lat, lng]));
   });
+  return lines;
+}
+
+function cityShapeOf(wards) {
+  if (cityShape && cityShape.source === wards) return cityShape;
+  let sx = 0, sy = 0, sa = 0;
+  wards.forEach(w => {
+    if (!w.geometry) return;
+    try {
+      const area = turf.area(w.geometry);
+      const [x, y] = turf.centroid(w.geometry).geometry.coordinates;
+      sx += x * area; sy += y * area; sa += area;
+    } catch (e) { /* hình học lỗi: bỏ qua khi tính tâm */ }
+  });
+  const lines = outerWardLines(wards);
 
   let center = sa ? { lat: sy / sa, lng: sx / sa } : { lat: CITY_CENTER[0], lng: CITY_CENTER[1] };
   if (!wardNameAt(center.lat, center.lng)) {
@@ -1300,19 +1309,25 @@ function landLotShape(p, m, detailed) {
   return shape;
 }
 
-// Viền sáng lô đang chọn: cùng nhóm singleIso với popup công trình nên chọn lô / công trình khác là gỡ viền cũ
-function openLandPopup(p, m, latlng) {
+/** Mở popup kèm viền sáng lô / vùng đang chọn: cùng nhóm singleIso với popup công trình nên chọn đối tượng khác là gỡ viền cũ */
+export function openOutlinedPopup(m, geometry, popup, latlng) {
   (m === map ? planMap : map)?.closePopup();
   clearSingleIsochrone();
   const group = m === planMap ? planLayers.singleIso : layers.singleIso;
-  if (p.geometry && group) {
+  if (geometry && group) {
     const marks = L.featureGroup();
-    addParcelOutline(marks, p.geometry, selRendererFor(m));
+    addParcelOutline(marks, geometry, selRendererFor(m));
     group.addLayer(marks);
   }
   const seq = singleIsoSeq;
-  const popup = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup' }).setLatLng(latlng).setContent(landPopupHtml(p)).openOn(m);
+  popup.setLatLng(latlng).openOn(m);
   popup.on('remove', () => { if (singleIsoSeq === seq) clearSingleIsochrone(); });
+  return popup;
+}
+
+function openLandPopup(p, m, latlng) {
+  const popup = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup' }).setContent(landPopupHtml(p));
+  openOutlinedPopup(m, p.geometry, popup, latlng);
   addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
 }
 

@@ -2,6 +2,7 @@
 // hiện có; Mục 02 – QHC đô thị 1/10.000 (PL1), bộ chú giải riêng, khóa tiền tố "C-".
 // Màu = mã ACI cột "Màu". Chín nhóm hạ tầng trích nét vector từ Phụ lục; các loại đất còn lại của Mục 04 vẽ theo cùng ô ký hiệu.
 // Viền theo khung ô ký hiệu: hiện trạng (HT_) mảnh; quy hoạch đợt đầu (QHDD_) dải liền; dài hạn (QHDH_) dải nét đứt.
+import { VISION_LEGEND_GROUPS } from './qhc2045.js';
 
 // color: RGB chuẩn AutoCAD của mã ACI; pattern: khóa ô lặp trong TILES
 export const TT16_STYLES = {
@@ -153,7 +154,7 @@ const QHC_LEGEND_GROUPS = [
 // Bộ chưa có nhóm hiện dòng pending; bổ sung ký hiệu: thêm [tên nhóm, [khóa TT16_STYLES]] vào groups
 const legendSet = (groups, pending) => ({ groups, count: groups.reduce((n, [, keys]) => n + keys.length, 0), pending });
 export const LEGEND_SETS = {
-  QHC25: legendSet([], 'Ký hiệu QHC 1/25.000 sẽ bổ sung sau.'),
+  QHC25: legendSet(VISION_LEGEND_GROUPS),
   QHC: legendSet(QHC_LEGEND_GROUPS),
   QHPK: legendSet(LEGEND_GROUPS),
   QHCT: legendSet([], 'Ký hiệu QHCT 1/500 sẽ bổ sung sau.')
@@ -681,8 +682,13 @@ export function tt16SwatchCss(key, scale = 1) {
   return `background-image:url(${tile.dataUrl});background-size:${w}px ${h}px;`;
 }
 
+/** keys: khóa TT16_STYLES hoặc dòng màu đặc { label, color } (bộ QHC25 không theo ký hiệu TT16) */
 function legendGroupHtml([name, keys]) {
   const rows = keys.map(key => {
+    if (typeof key === 'object') {
+      return `<div class="tt16-row" title="${key.label}" data-search="${foldLayer(key.label).toLowerCase()}">
+      <i class="tt16-swatch" style="background:${key.color};border-color:${key.color};"></i><span>${key.label}</span></div>`;
+    }
     const s = TT16_STYLES[key];
     const bg = tt16SwatchCss(key) || `background:${s.color};`;
     const aci = s.aci != null ? ` · ACI ${s.aci}` : '';

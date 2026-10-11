@@ -2,7 +2,7 @@
 // bản đồ quy hoạch theo lớp đang chọn:
 //  urban  Hệ thống đô thị (chk_urban)   bấm phường → chọn phường, sang QHPK như luồng cũ; ký hiệu đô thị trung tâm → QHC 1/10.000
 //  qhc25  QHC 1/25.000 (chk_qhc25)       bấm vùng → chức năng khu vực; bấm bản đồ không đổi địa bàn
-//  qhc10  QHC 1/10.000 (chk_qhc10)       thẻ Khu vực trung tâm: tra cứu lô, chọn phường lõi, chọn QHPK
+//  qhc10  QHC 1/10.000 (chk_qhc10)       tra cứu lô, ranh mở rộng QĐ 756, QHPK lọc theo vùng lõi
 //  qhpk   QHPK 1/2.000 (chk_projects)    bấm ranh / lô → đồ án; bấm nền khi nhìn rộng → chọn phường
 //  qhct   QHCT 1/500 (chk_qhct)          bấm lô → thông tin lô (chờ dữ liệu)
 // Chọn từ droplist: bật lớp đó, tắt 4 lớp còn lại. Bật thêm lớp ở panel Lớp dữ liệu để so sánh: lớp đang chọn giữ nguyên;
@@ -23,7 +23,7 @@ export const LEVEL_EVENT = 'qh:level';
 const byId = new Map(LEVELS.map(l => [l.id, l]));
 const byChk = new Map(LEVELS.map(l => [l.chk, l]));
 let level = DEFAULT_LEVEL;
-// Lớp đã chuyển sang lớp hiện tại (VD mở QHPK từ thẻ Khu vực trung tâm → 'qhc10') để thoát đồ án thì quay lại
+// Lớp đã chuyển sang lớp hiện tại (VD mở QHPK khi đang xem QHC 1/10.000 → 'qhc10') để thoát đồ án thì quay lại
 let origin = null;
 let applying = false;
 let button = null;
