@@ -10,6 +10,9 @@ import { STATUS_REF, URBANS_614, RURAL_RULE, wardLevel614, urbans614Of } from '.
 import { VISION_REF, VISION_STAGE, VISION_CLAUSE, URBANS_VISION, visionLevel, visionUrbansOf } from './urbanVision.js';
 import { planUrbanOf } from './urbanClass.js';
 
+// Bấm ký hiệu đô thị: detail = id đô thị (urbanStatus.js / urbanVision.js); viewFlow.js quyết định có mở view riêng không
+export const URBAN_PICK_EVENT = 'qh:urban-pick';
+
 const FILL_PANE = 'urbanAreaPane';
 const TOWN_PANE = 'urbanTownPane';
 const LINE_PANE = 'urbanLinePane';
@@ -227,6 +230,7 @@ function createUrbanLayer(content) {
         .bindTooltip(content.urbanTip(u, { approx: !!f.properties.approx, hasArea: isArea, inferred }), { ...tipOpts, sticky: false, offset: [0, -16] })
         .on('mouseover', urbanHover(true))
         .on('mouseout', urbanHover(false))
+        .on('click', () => document.dispatchEvent(new CustomEvent(URBAN_PICK_EVENT, { detail: u.id })))
         .addTo(groups.badges);
     });
   }

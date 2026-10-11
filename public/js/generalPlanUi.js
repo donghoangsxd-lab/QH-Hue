@@ -125,6 +125,9 @@ function pick(id, { page = false } = {}) {
   else rerenderPage?.();
 }
 
+/** Mở hồ sơ một QHC ở trang Quy hoạch chung (bảng dưới) và vẽ phạm vi */
+export const showGeneralPlan = (id) => pick(id, { page: true });
+
 // ---------- Panel phải: danh mục QHC ----------
 function panelRow(plan, c, here) {
   const kids = childProjects(plan, c.catalog).length;

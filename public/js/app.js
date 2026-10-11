@@ -41,8 +41,9 @@ import {
   initPlanMap, planMap, planLayers, renderPlanBoundaries, toggleSplit, isSplitOn,
   getViewMode, getSplitKind, onViewChange, setViewMode, toggleViewMode, setSplitKind, isCompareOn
 } from './planMap.js';
-import { escapeHtml, setStatusContent, showToast, announceTool, TOOL_START_EVENT, RIGHT_TAB_EVENT } from './utils.js';
-import { initViewFlow, wardToPick } from './viewFlow.js';
+import { escapeHtml, setStatusContent, showToast, announceTool, TOOL_START_EVENT, RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './utils.js';
+import { initViewFlow, wardToPick, enterCore } from './viewFlow.js';
+import { initQhc2045Layer, isCenterPick } from './qhc2045Layer.js';
 import { initCadImport } from './cadImportUi.js';
 import { initProjectLayer } from './projectLayer.js';
 import { initProjectReview } from './projectReview.js';
@@ -323,6 +324,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   initRoadNetworkLayer();
   initCadastreLayer();
   initUrbanAreaLayer();
+  initQhc2045Layer();
+  document.addEventListener(WARD_PICK_EVENT, (e) => chooseWard(e.detail));
   initBasemapUi();
   initTerrainLayer();
   initDrainageLayer();
@@ -398,6 +401,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (cadastreClick(e, targetMap)) return;
     // Click vừa mở popup của điểm / lô (sự kiện nổi lên bản đồ) thì không đổi phường (đổi phường sẽ đóng popup)
     if (performance.now() - popupAt < 300) return;
+    if (isCenterPick(e.latlng, targetMap)) { enterCore(); return; }
     const ward = wardToPick(e.latlng, targetMap);
     if (ward) chooseWard(ward);
   };

@@ -261,6 +261,8 @@ export const TOOL_START_EVENT = 'qh:tool-start';
 
 // Chuyển tab panel phải từ module khác (app.js giữ logic panel): detail { tab, open } — open false thì panel đang ẩn vẫn ẩn
 export const RIGHT_TAB_EVENT = 'qh:right-tab';
+// Chọn địa bàn từ module khác (thẻ, popup): detail = tên phường; app.js nạp dữ liệu công trình nếu chưa có rồi chọn
+export const WARD_PICK_EVENT = 'qh:ward-pick';
 export function announceTool(tool) {
   document.dispatchEvent(new CustomEvent(TOOL_START_EVENT, { detail: tool }));
 }
