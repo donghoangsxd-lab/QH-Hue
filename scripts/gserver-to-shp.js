@@ -580,9 +580,9 @@ function layerSummary(key, rows, metaLayer, forceCrs) {
 }
 
 const LOAI_CODES = [
-  [/^quy hoạch phân khu/i, 'QHPK'],
-  [/^quy hoạch chi tiết/i, 'QHCT'],
-  [/^quy hoạch chung/i, 'QHC']
+  [/^(?:quy hoạch phân khu|QHPK(?=\s|$))/i, 'QHPK'],
+  [/^(?:quy hoạch chi tiết|QHCT(?=\s|$))/i, 'QHCT'],
+  [/^(?:quy hoạch chung|QHC(?=\s|$))/i, 'QHC']
 ];
 
 function loaiCode(s) {
@@ -597,16 +597,19 @@ const KEEP_KHU = /^khu\s+(?:đô thị|dân cư|công nghiệp|du lịch|nhà �
 // "Quy hoạch phân khu (tỷ lệ 1/2000) khu vực Thủy Xuân, quận Thuận Hóa, thành phố Huế" → "QHPK Thủy Xuân";
 // "… khu trung tâm phía Tây, …" → "QHPK TT phía Tây".
 // Dùng (?=\s|,|$) thay cho \b vì \b không khớp sau chữ có dấu (ố, ã).
+// Tên phải mở đầu bằng mã loại: webapp xếp cấp đồ án theo tiền tố tên (planLevelOf, generalPlan.js),
+// nên "Điều chỉnh Quy hoạch chung TT Phú Lộc - huyện Phú Lộc" → "QHC TT Phú Lộc".
 function proposeName(dump) {
   const r0 = (dump.rows && dump.rows.ranh && dump.rows.ranh[0]) || {};
   const raw = String(r0.tendoan || (dump.meta && dump.meta.tenBanDo) || '').replace(/\s+/g, ' ').trim()
-    .replace(/^bản đồ\s+/i, '');
+    .replace(/^bản đồ\s+/i, '')
+    .replace(/^điều chỉnh(?:\s+(?:tổng thể|cục bộ))?\s+/i, '');
   const fromRaw = loaiCode(raw);
   const loai = loaiCode(r0.loaiquyhoach) || (fromRaw !== raw ? fromRaw : '');
   let s = raw.replace(/\([^)]*tỷ lệ[^)]*\)/gi, ' ').replace(/,?\s*tỷ lệ\s*1\s*\/\s*[\d.,]*\d/gi, ' ')
     .replace(/\s+/g, ' ').trim();
-  s = s.split(/,?\s+(?:quận|huyện|thành phố|thị xã|tỉnh)(?=\s|,|$)/i)[0].trim();
-  s = s.replace(/^(?:quy hoạch\s+(?:phân khu|chi tiết|chung)|QHPK|QHCT|QHC)(?=\s|$)\s*/i, '');
+  s = s.split(/,?\s+(?:quận|huyện|thành phố|thị xã|tỉnh)(?=\s|,|$)/i)[0].replace(/[\s,–-]+$/, '').trim();
+  s = s.replace(/^(?:quy hoạch\s+(?:phân khu|chi tiết|chung)(?:\s+xây dựng)?|QHPK|QHCT|QHC)(?=\s|$)\s*/i, '');
   s = s.replace(/^khu vực\s+/i, '');
   if (!KEEP_KHU.test(s)) s = s.replace(/^khu\s+/i, '');
   s = s.replace(/^(?:phường|xã|thị trấn)\s+/i, '');
@@ -1055,9 +1058,19 @@ function selftest() {
     && Object.keys(lopZip).includes('Chức năng sử dụng đất.shp');
   fs.rmSync(lopTmp, { recursive: true, force: true });
 
-  const ok = name === 'QHPK Thử nghiệm' && outerCw && typesOk && crsOk && scopeOk && lopOk
+  const named = (tenBanDo, ranh) => proposeName({ meta: { tenBanDo }, rows: ranh ? { ranh: [ranh] } : {} });
+  const names = [
+    named('Điều chỉnh Quy hoạch chung TT Phú Lộc - huyện Phú Lộc'),
+    named('x', { tendoan: 'Điều chỉnh QHC TT Phú Lộc, huyện Phú Lộc' }),
+    named('Điều chỉnh Quy hoạch chung xây dựng (tỷ lệ 1:10000) Khu kinh tế Chân Mây-Lăng Cô, tỉnh Thừa Thiên Huế đến năm 2045'),
+    named('QHC Đô thị mới Vinh Hưng, huyện Phú Lộc, thành phố Huế')
+  ];
+  const nameOk = names[0] === 'QHC TT Phú Lộc' && names[1] === 'QHC TT Phú Lộc'
+    && names[2] === 'QHC Khu kinh tế Chân Mây-Lăng Cô' && names[3] === 'QHC Đô thị mới Vinh Hưng';
+
+  const ok = name === 'QHPK Thử nghiệm' && outerCw && typesOk && crsOk && scopeOk && lopOk && nameOk
     && check.every((c) => c.walked && c.records === c.geojson && c.cpg === 'UTF-8' && c.code === 9994);
-  return { ok, name, outerCw, typesOk, crsOk, scopeOk, lopOk, counts, check };
+  return { ok, name, outerCw, typesOk, crsOk, scopeOk, lopOk, nameOk, names, counts, check };
 }
 
 function layerReport(written, verified) {
