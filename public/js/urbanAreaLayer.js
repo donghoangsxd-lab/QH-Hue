@@ -16,6 +16,10 @@ export const URBAN_PICK_EVENT = 'qh:urban-pick';
 const FILL_PANE = 'urbanAreaPane';
 const TOWN_PANE = 'urbanTownPane';
 const LINE_PANE = 'urbanLinePane';
+// Trên nét ranh đô thị (410), QHC (420), viền đồ án (445), điều chỉnh (447) và phường đang chọn (448);
+// dưới nhãn nền (450) và ký hiệu (markerPane 600) để highlight không bị ranh lớp khác che.
+const HOVER_PANE = 'urbanHoverPane';
+const HOVER_Z = 449;
 const HIT_WEIGHT = 14;
 const WARD_HOVER_MAX_ZOOM = 12;
 const LEVEL_FILL = { II: '#ef4444', III: '#fb923c' };
@@ -121,7 +125,9 @@ function createUrbanLayer(content) {
   let fillRenderer = null;
   let townRenderer = null;
   let lineRenderer = null;
-  const groups = { wards: L.layerGroup(), towns: L.layerGroup(), lines: L.layerGroup(), badges: L.layerGroup() };
+  let hoverRenderer = null;
+  const groups = { wards: L.layerGroup(), towns: L.layerGroup(), lines: L.layerGroup(), badges: L.layerGroup(), hover: L.layerGroup() };
+  let hoverId = null;
   const byId = new Map(content.urbans.map(u => [u.id, u]));
 
   // Nền tô phường không nhận chuột (để không chặn công trình, lô đất); tra phường bằng điểm-trong-đa-giác khi rê chuột ở zoom nhỏ
@@ -145,6 +151,33 @@ function createUrbanLayer(content) {
     wardHover = null;
   }
 
+  function clearUrbanHover() {
+    groups.hover.clearLayers();
+    hoverId = null;
+  }
+
+  // Quầng và nét trắng vẽ ở pane trên cùng, không phụ thuộc thứ tự loại I → III trong pane ranh
+  function showUrbanHover(id, rings, style) {
+    if (hoverId === id) return;
+    groups.hover.clearLayers();
+    hoverId = id;
+    const weight = style.weight || 3;
+    const base = { pane: HOVER_PANE, renderer: hoverRenderer, interactive: false, lineJoin: 'round', lineCap: 'round' };
+    groups.hover.addLayer(L.polyline(rings, { ...base, color: '#facc15', weight: weight + 8, opacity: 0.9 }));
+    groups.hover.addLayer(L.polyline(rings, { ...base, color: '#ffffff', weight: Math.max(weight, 3), opacity: 1, dashArray: style.dashArray || null }));
+  }
+
+  function enterUrban(id, rings, style) {
+    pointerOnUrban = true;
+    clearWardHover();
+    if (rings) showUrbanHover(id, rings, style);
+  }
+
+  function leaveUrban() {
+    pointerOnUrban = false;
+    clearUrbanHover();
+  }
+
   function wardAt({ lat, lng }) {
     return wardHits.find(w => lng >= w.bbox[0] && lng <= w.bbox[2] && lat >= w.bbox[1] && lat <= w.bbox[3]
       && turf.booleanPointInPolygon([lng, lat], w.feat));
@@ -158,15 +191,13 @@ function createUrbanLayer(content) {
       clearWardHover();
       wardHover = {
         name: w.name,
-        outline: L.polyline(ringsOf(w.feat.geometry), { pane: FILL_PANE, renderer: fillRenderer, interactive: false, color: '#f8fafc', weight: 1.5, opacity: 0.9 }).addTo(m),
+        outline: L.polyline(ringsOf(w.feat.geometry), { pane: HOVER_PANE, renderer: hoverRenderer, interactive: false, color: '#f8fafc', weight: 2.5, opacity: 1 }).addTo(m),
         tip: L.tooltip({ ...tipOpts, sticky: false }).setContent(content.wardTip(w.name))
       };
     }
     wardHover.tip.setLatLng(e.latlng);
     if (!m.hasLayer(wardHover.tip)) m.openTooltip(wardHover.tip);
   }
-
-  const urbanHover = (on) => () => { pointerOnUrban = on; if (on) clearWardHover(); };
 
   function drawWards() {
     groups.wards.clearLayers();
@@ -191,6 +222,7 @@ function createUrbanLayer(content) {
     groups.towns.clearLayers();
     groups.lines.clearLayers();
     groups.badges.clearLayers();
+    clearUrbanHover();
     const op = fillOpacity(m.getZoom());
     // Loại I vẽ trước, loại III sau cùng để nét đô thị nhỏ nằm trên
     const rank = (f) => CLS_RANK[byId.get(f.properties.id)?.cls] ?? 3;
@@ -199,22 +231,22 @@ function createUrbanLayer(content) {
       if (!u) return;
       const isArea = f.geometry.type !== 'Point';
       const inferred = !!f.properties.inferred;
+      const rings = isArea ? ringsOf(f.geometry) : null;
+      const style = LINE_STYLE[u.cls] || LINE_STYLE.III;
       if (isArea && u.part && LEVEL_FILL[u.cls]) {
         groups.towns.addLayer(L.geoJSON(f.geometry, {
           pane: TOWN_PANE, renderer: townRenderer, interactive: false,
           style: { stroke: false, fillColor: LEVEL_FILL[u.cls], fillOpacity: op }
         }));
       }
-      if (isArea) {
-        const rings = ringsOf(f.geometry);
-        const style = LINE_STYLE[u.cls] || LINE_STYLE.III;
+      if (rings) {
         const casing = L.polyline(rings, { pane: LINE_PANE, renderer: lineRenderer, interactive: false, color: '#0f172a', weight: style.weight + 2.5, opacity: 0.55 });
         const line = L.polyline(rings, { pane: LINE_PANE, renderer: lineRenderer, interactive: false, ...style, opacity: 0.95 });
         // Nét trong suốt rộng hơn để dễ trỏ trúng ranh
         const hit = L.polyline(rings, { pane: LINE_PANE, renderer: lineRenderer, weight: HIT_WEIGHT, opacity: 0, bubblingMouseEvents: false });
         hit.bindTooltip(content.urbanTip(u, { inferred }), tipOpts);
-        hit.on('mouseover', () => { urbanHover(true)(); line.setStyle({ weight: style.weight + 1.5 }); });
-        hit.on('mouseout', () => { urbanHover(false)(); line.setStyle({ weight: style.weight }); });
+        hit.on('mouseover', () => enterUrban(u.id, rings, style));
+        hit.on('mouseout', leaveUrban);
         groups.lines.addLayer(casing);
         groups.lines.addLayer(line);
         groups.lines.addLayer(hit);
@@ -228,8 +260,8 @@ function createUrbanLayer(content) {
       });
       L.marker([lat, lng], { icon, keyboard: false, zIndexOffset: 600 - 50 * (CLS_RANK[u.cls] ?? 2) })
         .bindTooltip(content.urbanTip(u, { approx: !!f.properties.approx, hasArea: isArea, inferred }), { ...tipOpts, sticky: false, offset: [0, -16] })
-        .on('mouseover', urbanHover(true))
-        .on('mouseout', urbanHover(false))
+        .on('mouseover', () => enterUrban(u.id, rings, style))
+        .on('mouseout', leaveUrban)
         .on('click', () => document.dispatchEvent(new CustomEvent(URBAN_PICK_EVENT, { detail: u.id })))
         .addTo(groups.badges);
     });
@@ -261,9 +293,13 @@ function createUrbanLayer(content) {
       const linePane = m.getPane(LINE_PANE) || m.createPane(LINE_PANE);
       linePane.style.zIndex = 410;
       linePane.style.pointerEvents = 'none';
+      const hoverPane = m.getPane(HOVER_PANE) || m.createPane(HOVER_PANE);
+      hoverPane.style.zIndex = HOVER_Z;
+      hoverPane.style.pointerEvents = 'none';
       fillRenderer = L.canvas({ pane: FILL_PANE });
       townRenderer = L.canvas({ pane: TOWN_PANE });
       lineRenderer = L.svg({ pane: LINE_PANE });
+      hoverRenderer = L.svg({ pane: HOVER_PANE });
       m.on('zoomend', restyle);
       m.on('mousemove', onMouseMove);
       m.on('mouseout', clearWardHover);
@@ -274,6 +310,7 @@ function createUrbanLayer(content) {
       if (!visible) {
         Object.values(groups).forEach(g => g.remove());
         clearWardHover();
+        clearUrbanHover();
         pointerOnUrban = false;
         m.getContainer().classList.remove('ua-zoom-low');
         return;
@@ -281,6 +318,7 @@ function createUrbanLayer(content) {
       groups.wards.addTo(m);
       groups.towns.addTo(m);
       groups.lines.addTo(m);
+      groups.hover.addTo(m);
       drawWards();
       try {
         drawUrbans(await loadData());
