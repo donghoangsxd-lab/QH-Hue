@@ -1,4 +1,5 @@
-// Mục Quy hoạch (tab Lớp dữ liệu): đồ án nhóm theo phường (đồ án liên phường có mặt ở mỗi phường), mỗi đồ án (Ten_QH)
+// Mục Quy hoạch (tab Lớp dữ liệu): đồ án nhóm theo cấp (QHPK 1/2.000, QHC 1/10.000), trong mỗi cấp nhóm theo phường
+// (đồ án liên phường có mặt ở mỗi phường), mỗi đồ án (Ten_QH)
 // bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + thông tin ở panel dưới),
 // Admin xóa / chuyển đồ án cũ.
 // Nút file mở PDF quyết định phê duyệt (projects/<slug>/quyet-dinh.pdf, dưới 1 MB). Admin gắn, thay hoặc gỡ.
@@ -38,13 +39,22 @@ const NEIGHBOR_PAD_DEG = 0.003;
 
 const CITY_NAME = 'Thành phố Huế';
 const NO_WARD = 'Chưa xác định phường, xã';
+// Cấp đồ án quyết định bộ ký hiệu (tab Chú giải). Mọi đồ án hiện có là QHPK 1/2.000; chỉ tên bắt đầu bằng "QHC"
+// (không phải QHCT / QHCPK) hoặc "Quy hoạch chung" mới xếp vào QHC 1/10.000
+const PLAN_LEVELS = [
+  { key: 'QHPK', label: 'QHPK 1/2.000', title: 'Quy hoạch phân khu tỷ lệ 1/2.000' },
+  { key: 'QHC', label: 'QHC 1/10.000', title: 'Quy hoạch chung đô thị tỷ lệ 1/10.000' }
+];
+const QHC_NAME_RE = /^\s*(QHC(?![A-Z])|quy hoạch chung(\s|$))/i;
+const planLevelOf = (name) => (QHC_NAME_RE.test(String(name || '')) ? 'QHC' : 'QHPK');
 
 const $ = (id) => document.getElementById(id);
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 
 let projects = [];
-// Nhóm phường đang mở trong danh sách; currentWard = phường đang chọn (nhóm đánh dấu, luôn mở)
+// Nhóm phường đang mở trong danh sách; currentWard = phường đang chọn (nhóm đánh dấu, luôn mở). Nhóm cấp mặc định mở
 const openGroups = new Set();
+const closedLevels = new Set();
 let currentWard = null;
 let onDeleted = null;
 let busy = null;
@@ -189,6 +199,7 @@ function collectProjects() {
   return assignColors(state.projectCatalog.map(p => ({
     name: p.tenQH,
     short: shortName(p.tenQH),
+    level: planLevelOf(p.tenQH),
     wards: Array.isArray(p.wards) ? p.wards : [],
     slug: p.slug || '',
     legacy: !!p.legacy,
@@ -351,6 +362,7 @@ export function revealWardProjects(wardName) {
     if (!state.showProjects) setMaster(true);
     ensureFullLots();
     openGroups.add(currentWard);
+    projects.forEach(p => { if (p.wards.includes(currentWard)) closedLevels.delete(p.level); });
     if (query) {
       query = '';
       const search = $('projectSearch');
@@ -368,9 +380,15 @@ function scrollWithin(el) {
   let box = el.parentElement;
   while (box && !/(auto|scroll)/.test(getComputedStyle(box).overflowY)) box = box.parentElement;
   if (!box) return;
+  // Chừa chỗ cho tiêu đề nhóm cấp / nhóm phường đang dính đầu khung phía trên el
+  let pad = 4;
+  for (let g = el.parentElement; g && g !== box; g = g.parentElement) {
+    const head = g.querySelector(':scope > .pl-head, :scope > .pg-head');
+    if (head && (g.classList.contains('pl-group') || g.classList.contains('pg-group'))) pad += head.offsetHeight;
+  }
   const scale = box.getBoundingClientRect().height / (box.offsetHeight || 1) || 1;
   const dy = (el.getBoundingClientRect().top - box.getBoundingClientRect().top) / scale;
-  box.scrollTo({ top: Math.max(0, box.scrollTop + dy - 4), behavior: 'smooth' });
+  box.scrollTo({ top: Math.max(0, box.scrollTop + dy - pad), behavior: 'smooth' });
 }
 
 const foldText = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
@@ -409,14 +427,24 @@ function renderList() {
     : '';
   const none = visible.length ? '' : '<div class="project-empty">Không có đồ án khớp từ khóa.</div>';
   const rows = (items) => items.map(({ p, idx }) => rowHtml(p, idx, admin)).join('');
-  // Đang tìm: danh sách phẳng; không tìm: nhóm theo phường, nhóm đóng chưa dựng dòng
-  box.innerHTML = migrateBtn + none + (q ? rows(visible) : wardGroups(visible).map(([ward, items]) => {
+  const wardHtml = ([ward, items]) => {
     const cur = ward === currentWard;
     const open = cur || openGroups.has(ward);
     return `<div class="pg-group${open ? ' open' : ''}${cur ? ' is-current' : ''}" data-ward-group="${escapeHtml(ward)}">
       <button type="button" class="pg-head" data-group-toggle="${escapeHtml(ward)}" aria-expanded="${open}" title="${open ? 'Thu gọn' : 'Xem'} các đồ án của ${escapeHtml(ward)}">
         ${ico('chev-right')}<span>${escapeHtml(ward)}</span><small>${items.length}</small></button>
       ${open ? `<div class="pg-body">${rows(items)}</div>` : ''}
+    </div>`;
+  };
+  // Đang tìm: danh sách phẳng; không tìm: nhóm cấp đồ án › nhóm phường, nhóm đóng chưa dựng dòng
+  box.innerHTML = migrateBtn + none + (q ? rows(visible) : PLAN_LEVELS.map(level => {
+    const items = visible.filter(({ p }) => p.level === level.key);
+    if (!items.length) return '';
+    const open = !closedLevels.has(level.key);
+    return `<div class="pl-group${open ? ' open' : ''}" data-level-group="${level.key}">
+      <button type="button" class="pl-head" data-level-toggle="${level.key}" aria-expanded="${open}" title="${open ? 'Thu gọn' : 'Xem'} các đồ án ${level.title}">
+        ${ico('chev-right')}<span>${level.label}</span><small>${items.length}</small></button>
+      ${open ? `<div class="pl-body">${wardGroups(items).map(wardHtml).join('')}</div>` : ''}
     </div>`;
   }).join(''));
 }
@@ -488,6 +516,7 @@ function revealInList(p) {
     if (search) search.value = '';
   }
   if (!query.trim() && !(currentWard && p.wards.includes(currentWard))) openGroups.add(p.wards[0] || NO_WARD);
+  closedLevels.delete(p.level);
   renderList();
   markPicked(p.name);
   const row = rowOf(p.name);
@@ -1592,6 +1621,13 @@ export function initProjectLayer(opts = {}) {
   });
   $('projectList')?.addEventListener('click', (e) => {
     if (e.target.closest('[data-migrate]')) { migrateLegacy(); return; }
+    const level = e.target.closest('[data-level-toggle]');
+    if (level) {
+      const key = level.dataset.levelToggle;
+      if (closedLevels.has(key)) closedLevels.delete(key); else closedLevels.add(key);
+      renderList();
+      return;
+    }
     const group = e.target.closest('[data-group-toggle]');
     if (group) {
       const ward = group.dataset.groupToggle;

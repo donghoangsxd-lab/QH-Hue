@@ -1,4 +1,5 @@
-// Ký hiệu ranh lô theo TT 16/2025/TT-BXD (Phụ lục I, Mục 04 – QHPK 1/2.000, 1/5.000, trang 19–22).
+// Ký hiệu ranh lô theo TT 16/2025/TT-BXD, Phụ lục I: Mục 04 – QHPK 1/2.000, 1/5.000 (trang 19–22), bộ dùng cho mọi đồ án
+// hiện có; Mục 02 – QHC đô thị 1/10.000 (PL1), bộ chú giải riêng, khóa tiền tố "C-".
 // Màu = mã ACI cột "Màu". Chín nhóm hạ tầng trích nét vector từ Phụ lục; các loại đất còn lại của Mục 04 vẽ theo cùng ô ký hiệu.
 // Viền theo khung ô ký hiệu: hiện trạng (HT_) mảnh; quy hoạch đợt đầu (QHDD_) dải liền; dài hạn (QHDH_) dải nét đứt.
 
@@ -47,6 +48,41 @@ Object.assign(TT16_STYLES, {
   "SS": { label: 'Sông, suối, kênh, rạch', layer: 'DAT_KHAC_Songsuoi', aci: 152, color: '#0066cc', pattern: 'Songsuoi' },
   "MNB": { label: 'Mặt nước ven biển', layer: 'DAT_KHAC_Matnuocbien', aci: 152, color: '#0066cc', pattern: 'Matnuocbien' },
   "DCS": { label: 'Đất chưa sử dụng', layer: 'DAT_KHAC_Chuasudung', aci: 9, color: '#c0c0c0', pattern: 'Chuasudung', fillOpacity: 0.45 }
+});
+// QHC 1/10.000 (Mục 02 PL1): ô lặp C_* trích từ Phụ lục, màu theo mã ACI của Mục 02. Văn hóa – TDTT là chấm rải
+// ngẫu nhiên, không có chu kỳ trong ô Phụ lục: dùng lại ô TDTT của Mục 04 (cùng ACI 94).
+// Chưa gắn vào PATTERN_CODES: tên phân lớp DAT_DD_* / DAT_NDD_* / DAT_NNK_* của đồ án hiện có vẫn tô theo bộ QHPK.
+Object.assign(TT16_STYLES, {
+  "C-DVO": { label: 'Đơn vị ở', layer: 'DAT_DD_Donvio', aci: 30, color: '#ff7f00', pattern: 'C_DVO' },
+  "C-HH": { label: 'Hỗn hợp (đơn vị ở và dịch vụ công cộng đô thị)', layer: 'DAT_DD_Honhop', aci: 22, color: '#cc3200', pattern: 'C_HH' },
+  "C-DVCC": { label: 'Dịch vụ - công cộng đô thị', layer: 'DAT_DD_DVCCdothi', aci: 1, color: '#ff0000', pattern: 'C_DVCC' },
+  "C-CQDT": { label: 'Cơ quan, trụ sở đô thị', layer: 'DAT_DD_Coquandothi', aci: 34, color: '#994c00', pattern: 'C_CQDT' },
+  "C-CXDT": { label: 'Cây xanh sử dụng công cộng đô thị', layer: 'DAT_DD_CayxanhCCdothi', aci: 72, color: '#66cc00', pattern: 'C_CXDT' },
+  "C-GTDT": { label: 'Giao thông đô thị', layer: 'DAT_DD_Giaothongdothi', aci: 8, color: '#808080', pattern: 'C_GTDT' },
+  "C-HTDT": { label: 'Hạ tầng kỹ thuật khác cấp đô thị', layer: 'DAT_DD_HTkhacdothi', aci: 195, color: '#734c99', pattern: 'C_HTDT' },
+  "C-CN": { label: 'Sản xuất công nghiệp, kho tàng', layer: 'DAT_NDD_Congnghiep', aci: 192, color: '#6600cc', pattern: 'C_CN' },
+  "C-DT": { label: 'Trung tâm đào tạo, nghiên cứu', layer: 'DAT_NDD_Daotao', aci: 144, color: '#007399', pattern: 'C_DT' },
+  "C-CQ": { label: 'Cơ quan, trụ sở ngoài đô thị', layer: 'DAT_NDD_Coquan', aci: 46, color: '#7f5f00', pattern: 'C_CQ' },
+  "C-DL": { label: 'Dịch vụ, du lịch', layer: 'DAT_NDD_Dulich', aci: 210, color: '#ff00ff', pattern: 'C_DL' },
+  "C-YT": { label: 'Trung tâm y tế', layer: 'DAT_NDD_Yte', aci: 220, color: '#ff00bf', pattern: 'C_YT' },
+  "C-VHTT": { label: 'Trung tâm văn hóa, thể dục thể thao', layer: 'DAT_NDD_Vanhoathethao', aci: 94, color: '#009900', pattern: 'TDTT' },
+  "C-CXHC": { label: 'Cây xanh sử dụng hạn chế', layer: 'DAT_NDD_CayxanhSDHC', aci: 94, color: '#009900', pattern: 'C_CXHC' },
+  "C-CXCD": { label: 'Cây xanh chuyên dụng', layer: 'DAT_NDD_CayxanhCD', aci: 126, color: '#007f5f', pattern: 'C_CXCD' },
+  "C-DTTG": { label: 'Di tích, tôn giáo', layer: 'DAT_NDD_Ditich', aci: 16, color: '#7f0000', pattern: 'C_DTTG' },
+  "C-DCNT": { label: 'Điểm dân cư nông thôn', layer: 'DAT_NDD_DancuNT', aci: 57, color: '#7f7f40', pattern: 'C_DCNT' },
+  "C-AN": { label: 'An ninh', layer: 'DAT_NDD_Anninh', aci: 64, color: '#739900', pattern: 'C_AN' },
+  "C-QP": { label: 'Quốc phòng', layer: 'DAT_NDD_Quocphong', aci: 79, color: '#394c26', pattern: 'C_QP' },
+  "C-GTDN": { label: 'Giao thông đối ngoại', layer: 'DAT_NDD_GiaothongDN', aci: 251, color: '#5b5b5b', pattern: 'C_GTDN' },
+  "C-HTNG": { label: 'Hạ tầng kỹ thuật khác ngoài đô thị', layer: 'DAT_NDD_HTkhacdoingoai', aci: 199, color: '#39264c', pattern: 'C_HTNG' },
+  "C-NN": { label: 'Sản xuất nông nghiệp', layer: 'DAT_NNK_Nongnghiep', aci: 3, color: '#00ff00', pattern: 'C_NN' },
+  "C-RDD": { label: 'Rừng đặc dụng', layer: 'DAT_NNK_Rungdacdung', aci: 148, color: '#00394c', pattern: 'C_RDD' },
+  "C-RPH": { label: 'Rừng phòng hộ', layer: 'DAT_NNK_Rungphongho', aci: 129, color: '#264c43', pattern: 'C_RPH' },
+  "C-RSX": { label: 'Rừng sản xuất', layer: 'DAT_NNK_Rungsanxuat', aci: 107, color: '#3f7f4f', pattern: 'C_RSX' },
+  "C-TS": { label: 'Nuôi trồng thủy sản', layer: 'DAT_NNK_Thuysan', aci: 150, color: '#007fff', pattern: 'C_TS' },
+  "C-CSD": { label: 'Chưa sử dụng', layer: 'DAT_NNK_Chuasudung', aci: 9, color: '#c0c0c0', pattern: 'C_CSD', fillOpacity: 0.45 },
+  "C-HO": { label: 'Hồ, ao, đầm', layer: 'DAT_NNK_Honuoc', aci: 154, color: '#004c99', pattern: 'C_HO' },
+  "C-SS": { label: 'Sông, suối, kênh, rạch', layer: 'DAT_NNK_Songsuoi', aci: 152, color: '#0066cc', pattern: 'C_SS' },
+  "C-MNB": { label: 'Mặt nước ven biển', layer: 'DAT_NNK_Matnuocbien', aci: 152, color: '#0066cc', pattern: 'C_MNB' }
 });
 
 const PATTERN_CODES = [
@@ -105,7 +141,19 @@ const LEGEND_GROUPS = [
   ['Mặt nước, đất khác', ["DCS", "HO", "SS", "MNB", "12-CSD"]]
 ];
 const LEGEND_KEYS = LEGEND_GROUPS.flatMap(([, keys]) => keys);
-export const LEGEND_COUNT = LEGEND_KEYS.length;
+
+// Nhóm và thứ tự chú giải QHC 1/10.000 theo Mục 02 PL1
+const QHC_LEGEND_GROUPS = [
+  ['Khu đất dân dụng', ["C-DVO", "C-HH", "C-DVCC", "C-CQDT", "C-CXDT", "C-GTDT", "C-HTDT"]],
+  ['Khu đất ngoài dân dụng', ["C-CN", "C-DT", "C-CQ", "C-DL", "C-YT", "C-VHTT", "C-CXHC", "C-CXCD", "C-DTTG", "C-DCNT", "C-AN", "C-QP", "C-GTDN", "C-HTNG"]],
+  ['Nông nghiệp và chức năng khác', ["C-NN", "C-RDD", "C-RPH", "C-RSX", "C-TS", "C-CSD", "C-HO", "C-SS", "C-MNB"]]
+];
+
+// Bộ ký hiệu theo cấp đồ án (tab Chú giải); khóa trùng data-legend-set trong index.html
+export const LEGEND_SETS = {
+  QHPK: { groups: LEGEND_GROUPS, count: LEGEND_KEYS.length },
+  QHC: { groups: QHC_LEGEND_GROUPS, count: QHC_LEGEND_GROUPS.reduce((n, [, keys]) => n + keys.length, 0) }
+};
 
 // Độ đục phần tô lô đất (thanh trượt ở Chú giải): nhân vào fillOpacity của ký hiệu, 1 = đúng mẫu; viền giữ nguyên.
 // Đổi giá trị phát LOT_OPACITY_EVENT để các bộ vẽ lô tô lại
@@ -432,7 +480,67 @@ const TILES = {
   Thuysan: { w: 12, h: 8, segs: hDashes(12, 8, 1.7, 1.3, 2, true) },
   Honuoc: { w: 9.6, h: 7.2, dotR: 0.32, segs: [], dots: dotGrid(9.6, 7.2, 1.6, false) },
   Songsuoi: { w: 12, h: 8, segs: hDashes(12, 8, 1.35, 0.85, 1.6, false) },
-  Matnuocbien: { w: 12, h: 8, scale: DENSE_SCALE, segs: hGaps(12, 8, 2) }
+  Matnuocbien: { w: 12, h: 8, scale: DENSE_SCALE, segs: hGaps(12, 8, 2) },
+  // Mục 02 (QHC 1/10.000): ô lặp cắt từ nét vector ô hiện trạng PL1 (dò chu kỳ x / y trên PDF).
+  // Mặt nước ven biển không lặp trong ô Phụ lục: lấy trọn bề ngang ô
+  C_DVO: { w: 2.12, h: 2.12,
+    segs: [0.44,2.12,0.44,0] },
+  C_HH: { w: 14.18, h: 14.16,
+    segs: [10.7,0.44,10.26,0,11.54,0.44,11.13,0,12.5,0.44,12.06,0,0,2.12,14.18,2.12,3.62,7.52,0.02,3.92,4.46,7.52,0.98,3.92,5.42,7.52,1.82,3.92,0,5.72,14.18,5.72,0,9.2,14.18,9.2,10.26,14.16,7.1,11,11.11,14.16,8.06,11,12.06,14.16,8.9,11,0,12.8,14.18,12.8] },
+  C_DVCC: { w: 3.54, h: 7.1,
+    segs: [1.46,7.1,1.46,0,0,2.48,3.54,2.48,0,6.08,3.54,6.08] },
+  C_CQDT: { w: 8.86, h: 6.64,
+    segs: [1.46,6.64,1.46,0,0,1.88,8.86,1.88,0,4.16,8.86,4.16,0,6.32,8.86,6.32] },
+  C_CXDT: { w: 2.87, h: 4.9, round: true,
+    segs: [0.98,1.04,0.98,0.8,0.86,1.04,0.86,0.8,0.98,1.04,1.1,0.92,0.86,1.04,0.86,0.92,0.74,1.04,1.1,1.04,2.42,3.44,2.42,3.32,2.3,3.44,2.3,3.32,2.42,3.44,2.54,3.32,2.3,3.44,2.18,3.32,2.18,3.44,2.54,3.44] },
+  C_GTDT: { w: 2.5, h: 2.5,
+    segs: [0,2.07,2.11,0,2.1,2.5,2.5,2.1] },
+  C_HTDT: { w: 5.67, h: 5.65,
+    segs: [5.67,2.48,4.16,2.48,1.28,2.48,0,2.48,4.16,2.48,4.16,5.24,1.28,2.48,1.28,5.24,5.67,5.24,4.16,5.24,1.28,5.24,0,5.24] },
+  C_CN: { w: 7.51, h: 7.5,
+    segs: [0,0.82,0.82,0,0.76,7.5,7.51,0.75,0,5.62,5.62,0,5.68,7.5,7.51,5.67] },
+  C_DT: { w: 12.83, h: 6.42,
+    segs: [0,5.62,5.62,0,11.06,0.92,11.98,0,12.04,6.42,12.83,5.63,12.83,2.69,10.14,0,1.46,4.16,0,2.7,10.13,6.42,4.7,0.92,5.65,6.42,7.94,4.16] },
+  C_CQ: { w: 5, h: 5,
+    segs: [0,0.05,0.05,0,0.02,5,5,0.02,5,3.75,1.26,0,1.32,5,0,3.67] },
+  C_DL: { w: 5.31, h: 9.2,
+    segs: [2.42,1.76,0.98,4.04,2.42,1.76,3.74,4.04,3.74,4.04,0.98,4.04,5.06,6.32,3.74,8.6,5.06,6.32,5.31,6.75,0,6.91,0.98,8.6,5.31,8.6,3.74,8.6,0.98,8.6,0,8.6] },
+  C_YT: { w: 6.24, h: 6.24,
+    segs: [3.86,2.96,3.86,0,0,2.96,2.18,2.96,3.86,2.96,6.24,2.96,3.86,6.24,3.86,4.64] },
+  C_CXHC: { w: 3.61, h: 3.6,
+    segs: [2,3.44,3.44,1.88,2,2.48,2.6,1.88,2.84,3.44,3.44,2.84] },
+  C_CXCD: { w: 4.04, h: 4.04,
+    segs: [2.36,2.96,3.44,2,3.44,2.96,2.36,2] },
+  C_DTTG: { w: 17, h: 17.01,
+    segs: [13.58,17.01,13.58,0,0.74,17.01,0.74,0,5.06,2.72,5.06,0,9.26,2.72,9.26,0,0,2.72,0.74,2.72,5.06,2.72,9.26,2.72,13.58,2.72,17,2.72,0.74,7.04,5.06,7.04,9.26,7.04,13.58,7.04,5.06,11.24,5.06,7.04,9.26,11.24,9.26,7.04,0.74,11.24,5.06,11.24,9.26,11.24,13.58,11.24,0,15.56,0.74,15.56,5.06,15.56,9.26,15.56,13.58,15.56,17,15.56,5.06,17.01,5.06,15.56,9.26,17.01,9.26,15.56] },
+  C_DCNT: { w: 18.04, h: 18.04,
+    segs: [0,5.35,5.28,0,0,11.36,11.27,0,0,17.38,17.38,0,5.34,18.04,18.04,5.34,11.34,18.04,18.04,11.34,17.34,18.04,18.04,17.34,1.58,0.8,2.32,0,6.74,1.52,8.26,0,12.02,2.24,13.58,0.8,0,2.32,0.74,1.52,17.3,3.08,18.04,2.34,4.58,3.8,6.02,2.24,9.86,4.52,11.3,3.08,15.02,5.24,16.58,3.8,2.3,6.08,3.74,4.52,7.58,6.8,9.02,5.24,12.86,7.52,14.3,6.08,0.02,8.24,1.58,6.8,5.3,9.08,6.74,7.52,10.58,9.8,12.02,8.24,15.86,10.52,17.3,9.08,3.02,11.24,4.58,9.8,8.3,12.08,9.86,10.52,13.58,12.8,15.02,11.24,0.74,13.52,2.3,12.08,6.02,14.24,7.58,12.8,11.3,15.08,12.86,13.52,16.58,15.8,18.02,14.24,3.74,16.52,5.3,15.08,9.02,17.36,10.58,15.8,14.34,18.04,15.86,16.52,2.34,18.04,3.02,17.36] },
+  C_AN: { w: 3.27, h: 5.7,
+    segs: [0,3.25,1.86,0,1.83,5.7,3.27,3.18,3.03,5.7,0,0.44,3.27,0.51,2.98,0,0,1.88,3.27,1.88,0,4.76,3.27,4.76] },
+  C_QP: { w: 5.67, h: 3.3,
+    segs: [0.38,3.3,0.38,0,3.26,3.3,3.26,0,5.67,0.42,0.74,3.3,0.64,0,0,0.37,5.67,3.17,0.18,0,0.28,3.3,0,3.14] },
+  C_GTDN: { w: 2.51, h: 2.5,
+    segs: [0,1.54,1.54,0,1.56,2.5,2.51,1.55] },
+  C_HTNG: { w: 6.01, h: 6.01,
+    segs: [4.7,0.44,5.11,0,4.7,0.44,4.26,0,0.14,1.88,1.7,0.44,3.14,1.88,1.7,0.44,1.7,3.44,3.14,1.88,1.7,3.44,0.14,1.88,3.14,5,4.7,3.44,0.14,5,0,4.85,6.01,4.86,4.7,3.44,0,5.14,0.14,5,5.13,6.01,6.01,5.13,4.24,6.01,3.14,5] },
+  C_NN: { w: 12.03, h: 11.98,
+    segs: [4.7,5.96,4.7,4.4,4.7,5.96,5.78,4.88,4.7,5.96,3.5,4.88,10.7,11.96,10.7,10.4,10.7,11.96,11.78,10.88,10.7,11.96,9.62,10.88] },
+  C_RDD: { w: 4.25, h: 7.35,
+    segs: [3.74,0.08,3.79,0,2.66,0.08,2.62,0,0,0.08,0.62,0.08,1.7,0.08,2.66,0.08,3.74,0.08,4.25,0.08,1.1,0.92,1.7,0.08,1.1,0.92,0.62,0.08,2.66,1.88,3.26,0.92,3.74,1.88,3.26,0.92,0,1.88,0.62,1.88,1.7,1.88,2.66,1.88,3.74,1.88,4.25,1.88,0.02,2.84,0.62,1.88,2.18,2.84,1.7,1.88,1.7,3.68,2.18,2.84,0.62,3.68,0.02,2.84,0,3.68,0.62,3.68,1.7,3.68,2.66,3.68,3.74,3.68,4.25,3.68,3.26,4.64,3.74,3.68,3.26,4.64,2.66,3.68,0.62,5.6,1.1,4.64,1.7,5.6,1.1,4.64,0,5.6,0.62,5.6,1.7,5.6,2.66,5.6,3.74,5.6,4.25,5.6,2.18,6.44,2.66,5.6,4.25,6.31,3.74,5.6,3.77,7.35,4.25,6.58,2.63,7.35,2.18,6.44] },
+  C_RPH: { w: 5.31, h: 3.06,
+    segs: [0.62,1.16,0,0.15,5.31,0.07,5.28,0,2.3,1.16,3.01,0,0.62,1.16,2.3,1.16,3.26,2.72,2.3,1.16,0,2.17,0.62,1.16,5.06,2.72,5.31,2.25,3.26,2.72,5.06,2.72,5.24,3.06,5.06,2.72,3.05,3.06,3.26,2.72] },
+  C_RSX: { w: 5.01, h: 5,
+    segs: [1.46,0.8,2.26,0,3.98,0.8,3.1,0,2.66,2.12,3.98,0.8,2.66,2.12,1.46,0.8,0,2.26,0.14,2.12,3.98,3.32,5.01,2.29,1.46,3.32,0.14,2.12,0.14,4.64,1.46,3.32,0.14,4.64,0,4.49,5.01,4.46,3.98,3.32,2.3,5,2.66,4.64,3.06,5,2.66,4.64] },
+  C_TS: { w: 9.91, h: 14.88,
+    segs: [7.1,2.84,8.06,2,2.18,2.84,7.1,2.84,1.34,3.68,2.18,2.84,7.1,7.76,8.06,6.92,2.18,7.76,7.1,7.76,1.34,8.72,2.18,7.76,7.1,12.8,8.06,11.84,2.18,12.8,7.1,12.8,1.34,13.64,2.18,12.8] },
+  C_CSD: { w: 11.39, h: 11.36,
+    segs: [0,1.14,11.39,1.14,7.94,5.34,5.06,2.46,8.66,5.34,5.78,2.46,9.38,5.34,6.5,2.46,0,3.9,11.39,3.9,0,6.78,11.39,6.78,2.3,10.98,0,8.78,11.39,8.79,10.82,8.22,3.02,10.98,0.14,8.22,3.74,10.98,0.86,8.22,0,9.66,11.39,9.66] },
+  C_HO: { w: 8.5, h: 4.25,
+    segs: [5.06,0.44,7.1,0.44,0.74,2.6,2.9,2.6] },
+  C_SS: { w: 4.95, h: 14.88,
+    segs: [2.18,0.92,4.7,0.92,0,3.32,2.18,3.32,4.7,3.32,4.95,3.32,2.18,5.84,4.7,5.84,0,8.36,2.18,8.36,4.7,8.36,4.95,8.36,2.18,10.76,4.7,10.76,0,13.28,2.18,13.28,4.7,13.28,4.95,13.28] },
+  C_MNB: { w: 56.94, h: 11.4,
+    segs: [0,0.56,56.94,0.56,0,3.68,28.02,3.68,36.06,3.68,56.94,3.68,1.5,5.96,18.54,5.96,20.34,5.96,54.42,5.96,0,6.2,54.66,6.2,6.54,7.52,29.22,7.52,34.86,7.52,56.94,7.52,5.34,11.24,50.7,11.24] }
 };
 
 function hexToRgba(hex, a) {
@@ -569,20 +677,25 @@ export function tt16SwatchCss(key, scale = 1) {
   return `background-image:url(${tile.dataUrl});background-size:${w}px ${h}px;`;
 }
 
-/** Chú giải ký hiệu lô đất TT16 theo nhóm vào phần tử container; data-search: chữ bỏ dấu để lọc (legendPanel.js) */
+function legendGroupHtml([name, keys]) {
+  const rows = keys.map(key => {
+    const s = TT16_STYLES[key];
+    const bg = tt16SwatchCss(key) || `background:${s.color};`;
+    const aci = s.aci != null ? ` · ACI ${s.aci}` : '';
+    const search = foldLayer(`${s.label} ${s.layer} ${key}`).toLowerCase();
+    return `<div class="tt16-row" title="${s.label}\nLayer: ${s.layer}${aci}" data-search="${search}">
+      <i class="tt16-swatch" style="${bg}border-color:${s.color};"></i><span>${s.label}</span></div>`;
+  }).join('');
+  return `<details class="tt16-group" open><summary><span class="tt16-group-name">${name}</span><span class="tt16-group-count">${keys.length}</span></summary>${rows}</details>`;
+}
+
+/** Chú giải ký hiệu lô đất TT16: mỗi bộ (LEGEND_SETS) một khung data-legend-pane, chỉ khung đầu hiện;
+ *  data-search: chữ bỏ dấu để lọc (legendPanel.js) */
 export function renderTt16Legend(container) {
   if (!container) return;
-  container.innerHTML = LEGEND_GROUPS.map(([name, keys]) => {
-    const rows = keys.map(key => {
-      const s = TT16_STYLES[key];
-      const bg = tt16SwatchCss(key) || `background:${s.color};`;
-      const aci = s.aci != null ? ` · ACI ${s.aci}` : '';
-      const search = foldLayer(`${s.label} ${s.layer} ${key}`).toLowerCase();
-      return `<div class="tt16-row" title="${s.label}\nLayer: ${s.layer}${aci}" data-search="${search}">
-        <i class="tt16-swatch" style="${bg}border-color:${s.color};"></i><span>${s.label}</span></div>`;
-    }).join('');
-    return `<details class="tt16-group" open><summary><span class="tt16-group-name">${name}</span><span class="tt16-group-count">${keys.length}</span></summary>${rows}</details>`;
-  }).join('') + '<div class="tt16-empty" hidden>Không có ký hiệu khớp từ khóa.</div>';
+  container.innerHTML = Object.entries(LEGEND_SETS).map(([set, { groups }], i) =>
+    `<div class="tt16-set" data-legend-pane="${set}"${i ? ' hidden' : ''}>${groups.map(legendGroupHtml).join('')}</div>`
+  ).join('') + '<div class="tt16-empty" hidden>Không có ký hiệu khớp từ khóa.</div>';
 }
 
 export const RESIDENTIAL_COLOR = '#d4a20b';

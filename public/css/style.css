@@ -659,6 +659,19 @@ body.right-collapsed .right-panel {
 .pg-group.is-current > .pg-head { color: var(--accent-cyan); box-shadow: inset 3px 0 0 var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.1); cursor: default; }
 .pg-group.is-current > .pg-head small { background: var(--accent-cyan); color: var(--bg-panel); }
 .pg-body { padding: 0 0 4px 10px; }
+/* Nhóm cấp đồ án (QHPK 1/2.000, QHC 1/10.000) bọc các nhóm phường: tiêu đề dính trên cùng, tiêu đề phường dính ngay dưới */
+.pl-head {
+  position: sticky; top: 0; z-index: 2; width: 100%; height: 26px; display: flex; align-items: center; gap: 5px; padding: 0 4px; box-sizing: border-box;
+  border: 0; border-bottom: 1px solid var(--border-soft); background: var(--bg-panel); color: var(--text-main); font: inherit; font-size: var(--fs-xs);
+  font-weight: 700; text-transform: uppercase; letter-spacing: .02em; text-align: left; cursor: pointer;
+}
+.pl-head:hover { color: var(--accent-cyan); }
+.pl-head .ico { width: 12px; height: 12px; flex-shrink: 0; transition: transform var(--ease); }
+.pl-group.open > .pl-head .ico { transform: rotate(90deg); }
+.pl-head span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-head small { flex-shrink: 0; min-width: 18px; padding: 0 5px; border-radius: 9px; background: rgba(var(--cyan-rgb), 0.12); color: var(--accent-cyan); font-size: var(--fs-xs); text-align: center; }
+.pl-body { padding-left: 6px; }
+.pl-body .pg-head { top: 26px; }
 .project-tools { flex-shrink: 0; display: flex; align-items: center; }
 .project-tools .project-btn { width: 19px; }
 /* Nhãn tên đồ án giữa ranh tổng: thẻ tối 1 dòng, chấm màu đồ án; kích thước khớp LABEL_* trong projectLayer.js */
@@ -871,7 +884,6 @@ body.right-collapsed .right-panel {
 #tabLegend { flex-direction: column; overflow: hidden; padding: 0; height: calc(100vh - var(--side-gap) - 24px); }
 .legend-head { cursor: default; }
 .legend-head:hover { color: var(--text-main); }
-.layer-main-tabs .legend-head { justify-content: flex-start; padding-left: 6px; }
 #btnLegendFold .ico { transform: rotate(180deg); transition: transform var(--ease); }
 #btnLegendFold[aria-pressed="true"] { border-color: var(--border-color); background: var(--bg-input); color: var(--text-main); }
 #btnLegendFold[aria-pressed="true"] .ico { transform: none; }
