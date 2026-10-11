@@ -1774,23 +1774,8 @@ tr.gp-sub td.uc-name { padding-left: 1.4em; }
 .gp-clsc { white-space: nowrap; }
 .gp-clsc .ico { width: 9px; height: 9px; vertical-align: middle; }
 
-/* QHC ĐÔ THỊ TT HUẾ 2045 (qhc2045Layer.js): nhãn đồ án dưới tiêu đề, lọc giai đoạn trong panel, nhãn và popup */
+/* QHC ĐÔ THỊ TT HUẾ 2045 (qhc2045Layer.js): lọc giai đoạn trong panel, nhãn và popup */
 .qhc-flag { display: inline-block; padding: 0 5px; border-radius: var(--r-sm); background: rgba(239, 68, 68, 0.16); border: 1px solid rgba(239, 68, 68, 0.7); color: #fca5a5; font-size: var(--fs-xs); font-weight: 700; line-height: 15px; white-space: nowrap; }
-.qhc-dock {
-  position: absolute; z-index: 1050;
-  top: calc(12px + var(--title-h) + 8px);
-  left: calc(50% - (var(--right-w) + 12px) / 2);
-  transform: translateX(-50%);
-  display: none; align-items: center; gap: 6px; padding: 4px 5px 4px 10px;
-  background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
-  border: 1px solid var(--border-color); border-radius: 999px; box-shadow: var(--panel-shadow);
-  font-size: var(--fs-sm); white-space: nowrap; transition: left var(--ease);
-}
-body.right-collapsed .qhc-dock, body.compare-on .qhc-dock { left: 50%; }
-body[data-level="qhc25"].plan-on:not(.bottom-max) .qhc-dock { display: flex; }
-.qhc-dock-name { display: inline-flex; align-items: center; gap: 6px; color: var(--text-main); font-weight: 600; cursor: help; }
-.qhc-dock-name .ico { width: 13px; height: 13px; color: var(--accent-orange); }
-.qhc-dock-hint { padding-right: 6px; color: var(--text-muted); }
 
 .plan-static .qhc-stages { margin: 2px 0 4px 21px; font-size: var(--fs-sm); }
 .qhc-stages { display: flex; border: 1px solid var(--border-color); border-radius: var(--r-md); overflow: hidden; }

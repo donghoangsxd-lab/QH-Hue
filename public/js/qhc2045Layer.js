@@ -1,11 +1,12 @@
 // Lớp bản đồ đồ án QHC đô thị Thừa Thiên Huế 2045 (qhc2045.js) trên bản đồ quy hoạch, điều khiển ở panel Lớp dữ liệu:
 //  - chk_qhc25: sơ đồ tổ chức không gian 1/25.000 toàn đô thị (vùng phát triển, mặt nước, cây xanh, ranh khu vực;
-//    chú giải ở tab Chú giải, bộ QHC25 – tt16Symbols.js); xem lớp này thì có nhãn đồ án dưới tiêu đề;
+//    chú giải ở tab Chú giải, bộ QHC25 – tt16Symbols.js);
 //  - chk_qhc10: sử dụng đất 1/10.000 khu vực trung tâm (lô theo ký hiệu TT16 Mục 02, viền theo giai đoạn, lọc giai đoạn
 //    ngay dưới dòng lớp) + 4 tiểu vùng, phân khu, điểm chức năng;
 //  - chk_qhc10Ext: ranh 1/10.000 mở rộng theo QĐ 756 (ranh ngoài các phường vùng lõi) + vùng đỏ Hóa Châu, Mỹ Thượng
 //    chưa có trong đồ án cũ.
-// Cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400). Canvas mặc định của planMap (renderer: L.canvas())
+// Vùng, lô của cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400); riêng các đường ranh vẽ ở LINE_PANE
+// để nổi trên ranh 40 phường. Canvas mặc định của planMap (renderer: L.canvas())
 // nằm ở overlayPane, phủ kín bản đồ khi có bất kỳ lớp vector nào và nuốt click của canvas QHC bên dưới, nên click lô / vùng
 // được dò lại ở cấp bản đồ (qhcClick, gọi từ app.js) bằng bbox + point-in-polygon.
 import { state } from './state.js';
@@ -22,6 +23,9 @@ import {
 export { isCoreWard };
 
 const PANE = ['qhcPane', 350];
+// Ranh tiểu vùng, phân khu 1/10.000 và ranh mở rộng QĐ 756 nằm trên ranh 40 phường (overlayPane 400), dưới ranh đồ án
+// QHPK (projectGlowPane 445) và viền phường đang chọn (448); không nhận click
+const LINE_PANE = ['qhcLinePane', 420];
 const LABEL_MIN_ZOOM = 14;
 const TV_LABEL_MAX_ZOOM = 14;
 const STAGES = [
@@ -46,6 +50,7 @@ const data = { land: null, frame: null, vision: null };
 const loading = {};
 const layers = { land: null, frame: null, vision: null, ext: null };
 let renderer = null;
+let lineRenderer = null;
 let stage = 'all';
 let detailed = false;
 
@@ -74,7 +79,16 @@ function ensureRenderer(m) {
   return renderer;
 }
 
-/** Thứ tự vẽ trong canvas chung: định hướng 1/25.000 < lô 1/10.000 < khung tiểu vùng < ranh mở rộng */
+function ensureLineRenderer(m) {
+  if (lineRenderer) return lineRenderer;
+  const pane = m.getPane(LINE_PANE[0]) || m.createPane(LINE_PANE[0]);
+  pane.style.zIndex = LINE_PANE[1];
+  pane.style.pointerEvents = 'none';
+  lineRenderer = L.canvas({ pane: LINE_PANE[0], padding: 0.3 });
+  return lineRenderer;
+}
+
+/** Thứ tự vẽ trong canvas chung: định hướng 1/25.000 < lô 1/10.000 < điểm chức năng < vùng đang điều chỉnh */
 function restack() {
   layers.vision?.bringToBack();
   layers.frame?.bringToFront();
@@ -115,18 +129,19 @@ function drawFrame() {
   const m = target();
   layers.frame?.remove();
   const r = ensureRenderer(m);
+  const lr = ensureLineRenderer(m);
   const lines = L.featureGroup();
   const tvLabels = L.layerGroup();
   const ptLayer = L.featureGroup();
   data.frame.features.forEach(f => {
     const p = f.properties;
     if (p.k === 'tv') {
-      L.geoJSON(f, { pane: PANE[0], renderer: r, interactive: false, style: { color: '#0f172a', weight: 5, opacity: 0.45, fill: false } }).addTo(lines);
-      L.geoJSON(f, { pane: PANE[0], renderer: r, interactive: false, style: { color: '#f8fafc', weight: 2.4, opacity: 0.95, dashArray: '12 6', fill: false } }).addTo(lines);
+      L.geoJSON(f, { pane: LINE_PANE[0], renderer: lr, interactive: false, style: { color: '#0f172a', weight: 5, opacity: 0.45, fill: false } }).addTo(lines);
+      L.geoJSON(f, { pane: LINE_PANE[0], renderer: lr, interactive: false, style: { color: '#f8fafc', weight: 2.4, opacity: 0.95, dashArray: '12 6', fill: false } }).addTo(lines);
       const c = turf.pointOnFeature(f).geometry.coordinates;
       L.marker([c[1], c[0]], { icon: frameLabel(`<b>${escapeHtml(p.tv)}</b> ${escapeHtml(p.ten)}`, 'qhc-label-tv'), interactive: false, keyboard: false }).addTo(tvLabels);
     } else if (p.k === 'pk') {
-      L.geoJSON(f, { pane: PANE[0], renderer: r, interactive: false, style: { color: '#e2e8f0', weight: 1.1, opacity: 0.7, dashArray: '3 4', fill: false } }).addTo(lines);
+      L.geoJSON(f, { pane: LINE_PANE[0], renderer: lr, interactive: false, style: { color: '#e2e8f0', weight: 1.1, opacity: 0.7, dashArray: '3 4', fill: false } }).addTo(lines);
     } else if (p.k === 'd') {
       const [lng, lat] = f.geometry.coordinates;
       L.circleMarker([lat, lng], { pane: PANE[0], renderer: r, radius: 3.5, color: '#0f172a', weight: 1, fillColor: p.t ? '#fb923c' : '#f8fafc', fillOpacity: 1 })
@@ -212,8 +227,9 @@ async function setExt(on) {
     L.marker([c[1], c[0]], { icon: frameLabel(`Đang điều chỉnh · ${escapeHtml(p.n)}`, 'qhc-label-dc'), interactive: false, keyboard: false }).addTo(group);
   });
   const lines = outerWardLines(wards);
-  L.polyline(lines, { pane: PANE[0], renderer: r, interactive: false, ...EXT_HALO }).addTo(group);
-  L.polyline(lines, { pane: PANE[0], renderer: r, interactive: false, ...EXT_LINE }).addTo(group);
+  const lr = ensureLineRenderer(m);
+  L.polyline(lines, { pane: LINE_PANE[0], renderer: lr, interactive: false, ...EXT_HALO }).addTo(group);
+  L.polyline(lines, { pane: LINE_PANE[0], renderer: lr, interactive: false, ...EXT_LINE }).addTo(group);
   layers.ext = group.addTo(m);
   restack();
   setHint('qhc10ExtHint', `${wards.length} phường, xã`);
@@ -423,13 +439,6 @@ function onPopupClick(e) {
 }
 
 function initUi() {
-  // Nhãn đồ án dưới tiêu đề khi xem lớp QHC 1/25.000 (hiện / ẩn bằng CSS theo body[data-level])
-  const dock = document.createElement('div');
-  dock.className = 'qhc-dock';
-  dock.innerHTML = `<span class="qhc-dock-name" title="${escapeHtml(`${QHC2045.name}\n${QHC2045.statusNote}`)}">${ico('layers')}${escapeHtml(QHC2045.short)} · 1/25.000<span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></span>
-    <span class="qhc-dock-hint">Bấm một khu vực để xem chức năng</span>`;
-  document.body.appendChild(dock);
-
   // Nút trong popup (lô 1/10.000, vùng 1/25.000) trên cả 2 bản đồ
   [map, planMap].filter(Boolean).forEach(m => m.on('popupopen', (e) => {
     const el = e.popup.getElement();
