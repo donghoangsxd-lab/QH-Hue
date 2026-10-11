@@ -970,6 +970,7 @@ function doPost(e) {
     var action = String(body.action || '');
     if (action === "importCadBatch") return jsonOutput(importCadBatch(body));
     if (action === "markWardNotes") return jsonOutput(markWardNotes(body));
+    if (action === "fixWardNames") return jsonOutput(fixWardNames(body));
     if (action === "editInfraRow") return jsonOutput(editInfraRow(body));
     if (action === "retypeInfraRow") return jsonOutput(retypeInfraRow(body));
     if (action === "deleteInfraRow") return jsonOutput(deleteInfraRow(body));
@@ -1666,6 +1667,69 @@ function markWardNotes(body) {
 
   if (marked || cleared) syncSheetsToGCS();
   return { "success": true, "marked": marked, "cleared": cleared, "noNoteColumn": noNoteColumn };
+}
+
+/**
+ * Admin sửa hàng loạt Ten_XaPhuong theo phường của tọa độ (máy chủ webapp tính): body = { items: [{ id, ward }] }.
+ * Mỗi tab ghi lại cả cột Ten_XaPhuong / Note một lần (cột văn bản, không đụng Latitude / Longitude); dấu nhắc phường trong
+ * Note gỡ luôn vì đã sửa; ThoiGianCapNhat của dòng sửa ghi bằng RangeList (một lệnh / tab).
+ */
+function fixWardNames(body) {
+  var want = {};
+  (Array.isArray(body.items) ? body.items : []).forEach(function(it) {
+    var id = String(it.id || '').trim();
+    var ward = String(it.ward || '').trim();
+    if (id && ward) want[id] = ward.slice(0, 100);
+  });
+  var fixed = 0, tabs = [], noWardColumn = [];
+  var currentTime = Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm:ss");
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    ss.getSheets().forEach(function(sheet) {
+      if (!isValidInfraSheet(sheet.getName())) return;
+      var data = sheet.getDataRange().getValues();
+      if (data.length <= 1) return;
+      var col = getColumnMap(data[0]);
+      if (col.id < 0) return;
+      var rows = [];
+      for (var r = 1; r < data.length; r++) {
+        var id = String(data[r][col.id] || '').trim();
+        if (want[id] && wardKey(data[r][col.ward]) !== wardKey(want[id])) rows.push(r);
+      }
+      if (!rows.length) return;
+      if (col.ward < 0) { noWardColumn.push(sheet.getName()); return; }
+
+      var wards = data.slice(1).map(function(row) { return [row[col.ward]]; });
+      rows.forEach(function(r) { wards[r - 1][0] = want[String(data[r][col.id]).trim()]; });
+      sheet.getRange(2, col.ward + 1, wards.length, 1).setValues(wards);
+
+      if (col.ghiChu >= 0) {
+        var noteChanged = false;
+        var notes = data.slice(1).map(function(row) { return [row[col.ghiChu]]; });
+        rows.forEach(function(r) {
+          var note = String(data[r][col.ghiChu] || '');
+          if (!wardMarkOf(note, WARD_NOTE_PREFIX)) return;
+          notes[r - 1][0] = noteWithWardMark(note, '', WARD_NOTE_PREFIX);
+          noteChanged = true;
+        });
+        if (noteChanged) sheet.getRange(2, col.ghiChu + 1, notes.length, 1).setValues(notes);
+      }
+      if (col.thoiGian >= 0) {
+        sheet.getRangeList(rows.map(function(r) { return sheet.getRange(r + 1, col.thoiGian + 1).getA1Notation(); })).setValue(currentTime);
+      }
+      fixed += rows.length;
+      tabs.push(sheet.getName() + ': ' + rows.length);
+    });
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+
+  if (fixed) syncSheetsToGCS();
+  return { "success": true, "fixed": fixed, "tabs": tabs, "noWardColumn": noWardColumn };
 }
 
 /**

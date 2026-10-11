@@ -3145,6 +3145,27 @@ module.exports = async (req, res) => {
       });
     }
 
+    // Admin: sửa cột Ten_XaPhuong theo phường của tọa độ; công trình nằm ngoài ranh 40 phường/xã giữ nguyên để kiểm tra tay
+    if (action === 'fixWardNames') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const evaluatedWards = await loadEvaluatedWards(wardVectorParsed);
+      const mismatches = findWardMismatches(allDataList, evaluatedWards);
+      const items = mismatches.filter(m => m.coordWard).map(m => ({ id: m.id, ward: shortWard(m.coordWard) }));
+      const outside = mismatches.filter(m => !m.coordWard).map(m => m.id);
+      if (!items.length) return res.status(200).json({ success: true, fixed: 0, outside, unchanged: true });
+      const result = await callAppsScript({ action: 'fixWardNames' }, { action: 'fixWardNames', items });
+      invalidateAllCaches();
+      return res.status(200).json({
+        success: true,
+        requested: items.length,
+        fixed: Number(result.fixed) || 0,
+        tabs: Array.isArray(result.tabs) ? result.tabs : [],
+        noWardColumn: Array.isArray(result.noWardColumn) ? result.noWardColumn : [],
+        outside
+      });
+    }
+
     // Khu đất CSD theo id (diện tích QuyMo_QH trên sheet); không có id thì dùng tọa độ + diện tích gửi lên.
     // Mọi số liệu đánh giá lấy theo kịch bản quy hoạch, không dùng hiện trạng
     const resolveCsdRequest = async () => {

@@ -1,5 +1,6 @@
 // Nhắc Admin: công trình có Ten_XaPhuong (Sheet) khác phường theo tọa độ (bảng thống kê luôn tính theo tọa độ).
-// Nút "Ghi vào cột Note" nhờ máy chủ ghi dấu "⚠ Phường/xã theo tọa độ: …" vào Sheet để sửa nhanh.
+// "Ghi vào cột Note": máy chủ ghi dấu "⚠ Phường/xã theo tọa độ: …" vào Sheet để sửa tay.
+// "Sửa Ten_XaPhuong": máy chủ ghi thẳng phường theo tọa độ vào cột Ten_XaPhuong (trừ công trình ngoài ranh 40 phường/xã).
 import { state } from './state.js';
 import { geeApi, markDataWritten } from './api.js';
 import { escapeHtml, ico, showToast } from './utils.js';
@@ -61,6 +62,7 @@ export function refreshWardCheck() {
   if (state.currentUserRole !== 'ADMIN' || !state.rawDataList.length) { box.hidden = true; return; }
   const list = findWardMismatches();
   const pending = list.filter(m => !m.noted).length;
+  const fixable = list.filter(m => m.coord).length;
   const sig = `${list.length}|${pending}`;
   if (!list.length || dismissedSig === sig) { box.hidden = true; return; }
 
@@ -69,7 +71,8 @@ export function refreshWardCheck() {
       <span class="ward-check-text">${ico('alert')}<b>${list.length}</b> công trình có tên phường trong Sheet khác phường theo tọa độ<br>
         <small>${pending ? `<b>${pending}</b> chưa ghi vào cột Note` : 'Đã ghi chú trong cột Note — chờ sửa cột Ten_XaPhuong'}</small></span>
       <button type="button" class="ward-check-btn" data-act="toggle" aria-expanded="${expanded}">${expanded ? 'Ẩn' : 'Xem'} danh sách</button>
-      ${pending ? `<button type="button" class="ward-check-btn primary" data-act="sync"${busy ? ' disabled' : ''}>${busy ? `${ico('clock')}Đang ghi...` : `${ico('pen')}Ghi vào cột Note`}</button>` : ''}
+      ${pending ? `<button type="button" class="ward-check-btn" data-act="sync"${busy ? ' disabled' : ''}>${busy === 'sync' ? `${ico('clock')}Đang ghi...` : `${ico('pen')}Ghi vào cột Note`}</button>` : ''}
+      ${fixable ? `<button type="button" class="ward-check-btn primary" data-act="fix" data-count="${fixable}" title="Ghi phường theo tọa độ vào cột Ten_XaPhuong cho ${fixable} công trình; công trình ngoài ranh 40 phường/xã giữ nguyên"${busy ? ' disabled' : ''}>${busy === 'fix' ? `${ico('clock')}Đang sửa...` : `${ico('check')}Sửa Ten_XaPhuong (${fixable})`}</button>` : ''}
       <button type="button" class="ward-check-close" data-act="close" aria-label="Ẩn nhắc">${ico('close')}</button>
     </div>
     ${expanded ? `<div class="ward-check-list">${list.slice(0, MAX_LISTED).map(rowHtml).join('')}${list.length > MAX_LISTED ? `<div class="ward-check-more">… và ${list.length - MAX_LISTED} công trình khác</div>` : ''}</div>` : ''}`;
@@ -78,7 +81,7 @@ export function refreshWardCheck() {
 
 async function syncNotes() {
   if (busy) return;
-  busy = true;
+  busy = 'sync';
   refreshWardCheck();
   try {
     markDataWritten();
@@ -103,15 +106,44 @@ async function syncNotes() {
   }
 }
 
+async function fixWardNames(count) {
+  if (busy) return;
+  if (!confirm(`Ghi phường/xã theo tọa độ vào cột Ten_XaPhuong cho ${count} công trình trên Sheet?\nCông trình nằm ngoài ranh 40 phường/xã giữ nguyên. Dấu nhắc phường trong cột Note được gỡ theo.`)) return;
+  busy = 'fix';
+  refreshWardCheck();
+  try {
+    markDataWritten();
+    const res = await fetch(geeApi('action=fixWardNames'), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${state.authToken}` }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) throw new Error('Phiên Admin hết hạn — đăng nhập lại');
+    if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+    const outside = (data.outside || []).length ? ` · ${data.outside.length} công trình ngoài ranh giữ nguyên` : '';
+    const noCol = (data.noWardColumn || []).length ? ` · tab thiếu cột Ten_XaPhuong: ${data.noWardColumn.join(', ')}` : '';
+    showToast(data.unchanged ? '✓ Cột Ten_XaPhuong đã khớp tọa độ' : `✓ Đã sửa Ten_XaPhuong cho ${data.fixed} công trình${outside}${noCol}`, noCol ? 'error' : 'success');
+    busy = false;
+    if (onSynced) await onSynced();
+  } catch (err) {
+    showToast(`❌ ${err.message}`, 'error');
+  } finally {
+    busy = false;
+    refreshWardCheck();
+  }
+}
+
 function onBoxClick(e) {
   const row = e.target.closest('.ward-check-row');
   if (row) {
     zoomToPoint(Number(row.dataset.lat), Number(row.dataset.lng), row.dataset.name);
     return;
   }
-  const act = e.target.closest('[data-act]')?.dataset.act;
+  const btn = e.target.closest('[data-act]');
+  const act = btn?.dataset.act;
   if (act === 'toggle') { expanded = !expanded; refreshWardCheck(); }
   else if (act === 'sync') syncNotes();
+  else if (act === 'fix') fixWardNames(Number(btn.dataset.count) || 0);
   else if (act === 'close') {
     const list = findWardMismatches();
     dismissedSig = `${list.length}|${list.filter(m => !m.noted).length}`;

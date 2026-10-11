@@ -44,7 +44,7 @@ import {
 import { escapeHtml, setStatusContent, showToast, announceTool, TOOL_START_EVENT, RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './utils.js';
 import { initViewFlow, wardFromMapClick } from './viewFlow.js';
 import { initMapLevel, getLevel, LEVEL_EVENT } from './mapLevel.js';
-import { initQhc2045Layer } from './qhc2045Layer.js';
+import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
 import { initQhctLayer } from './qhctLayer.js';
 import { initCadImport } from './cadImportUi.js';
 import { initProjectLayer } from './projectLayer.js';
@@ -408,6 +408,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (cadastreClick(e, targetMap)) return;
     // Click vừa mở popup của điểm / lô (sự kiện nổi lên bản đồ) thì không đổi phường (đổi phường sẽ đóng popup)
     if (performance.now() - popupAt < 300) return;
+    if (qhcClick(e, targetMap)) return;
     // Bấm nền: chọn phường hay không do lớp quy hoạch đang xem quyết định (viewFlow.js)
     const ward = wardFromMapClick(e.latlng, targetMap);
     if (ward) chooseWard(ward);

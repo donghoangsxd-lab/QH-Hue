@@ -5,8 +5,9 @@
 //    ngay dưới dòng lớp) + 4 tiểu vùng, phân khu, điểm chức năng;
 //  - chk_qhc10Ext: ranh 1/10.000 mở rộng theo QĐ 756 (ranh ngoài các phường vùng lõi) + vùng đỏ Hóa Châu, Mỹ Thượng
 //    chưa có trong đồ án cũ.
-// Cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400): canvas chỉ trả click cho đối tượng có tương tác
-// nằm trên cùng; canvas riêng từng lớp thì canvas trên (kể cả khi trống) chặn hết click của lớp dưới.
+// Cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400). Canvas mặc định của planMap (renderer: L.canvas())
+// nằm ở overlayPane, phủ kín bản đồ khi có bất kỳ lớp vector nào và nuốt click của canvas QHC bên dưới, nên click lô / vùng
+// được dò lại ở cấp bản đồ (qhcClick, gọi từ app.js) bằng bbox + point-in-polygon.
 import { state } from './state.js';
 import { map, wardNameAt, outerWardLines, openOutlinedPopup } from './mapEngine.js';
 import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClick } from './planMap.js';
@@ -287,18 +288,7 @@ function drawVision() {
   const fillLayer = L.geoJSON({ type: 'FeatureCollection', features: fills }, {
     pane: PANE[0], renderer: r, bubblingMouseEvents: false,
     style: (f) => { const c = visionColor(zoneName(f)); return { color: c, weight: 0.5, opacity: 0.8, fillColor: c, fillOpacity: 0.5 }; }
-  }).on('click', (e) => {
-    if (passToolClick(m, e)) return;
-    const f = e.layer.feature;
-    const desc = cats.funcs[f.properties.f] || '';
-    const html = `<div class="qhc-pop">
-        <div class="qhc-pop-head"><i class="qhc-sw" style="background:${visionColor(zoneName(f))}"></i><b>${escapeHtml(zoneName(f))}</b></div>
-        ${f.properties.n ? `<div>${escapeHtml(f.properties.n)}</div>` : ''}
-        ${desc ? `<p class="qhc-pop-desc">${escapeHtml(desc)}</p>` : ''}
-        <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · Sơ đồ tổ chức không gian 1/25.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
-      </div>`;
-    openOutlinedPopup(m, f.geometry, L.popup({ maxWidth: 320, className: 'qhc-popup' }).setContent(html), e.latlng);
-  });
+  }).on('click', (e) => { if (!passToolClick(m, e)) openVisionPopup(e.layer.feature, e.latlng); });
   const waterLayer = L.geoJSON({ type: 'FeatureCollection', features: waters }, {
     pane: PANE[0], renderer: r, interactive: false,
     style: (f) => { const c = (WATER_KINDS[f.properties.k] || WATER_KINDS[0]).color; return { color: c, weight: 0.4, fillColor: c, fillOpacity: f.properties.k === 2 ? 0.25 : 0.65 }; }
@@ -317,8 +307,53 @@ function drawVision() {
     }
   });
   layers.vision = L.featureGroup([fillLayer, waterLayer, greenLayer, lineLayer]);
+  layers.vision.fills = fills;
   layers.vision.addTo(m);
   restack();
+}
+
+function openVisionPopup(f, latlng) {
+  const cats = data.vision.cats;
+  const zone = cats.zones[f.properties.k] || 'Khác';
+  const desc = cats.funcs[f.properties.f] || '';
+  const html = `<div class="qhc-pop">
+      <div class="qhc-pop-head"><i class="qhc-sw" style="background:${visionColor(zone)}"></i><b>${escapeHtml(zone)}</b></div>
+      ${f.properties.n ? `<div>${escapeHtml(f.properties.n)}</div>` : ''}
+      ${desc ? `<p class="qhc-pop-desc">${escapeHtml(desc)}</p>` : ''}
+      <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · Sơ đồ tổ chức không gian 1/25.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
+    </div>`;
+  openOutlinedPopup(target(), f.geometry, L.popup({ maxWidth: 320, className: 'qhc-popup' }).setContent(html), latlng);
+}
+
+// ---------- Click cấp bản đồ ----------
+const bboxes = new WeakMap();
+
+/** Đối tượng vẽ sau (nằm trên) chứa điểm [lng, lat] */
+function featureAt(features, lng, lat) {
+  for (let i = features.length - 1; i >= 0; i--) {
+    const f = features[i];
+    if (!f || !f.geometry) continue;
+    let b = bboxes.get(f);
+    if (!b) { b = turf.bbox(f); bboxes.set(f, b); }
+    if (lng < b[0] || lng > b[2] || lat < b[1] || lat > b[3]) continue;
+    try { if (turf.booleanPointInPolygon([lng, lat], f)) return f; } catch (err) { /* hình học lỗi */ }
+  }
+  return null;
+}
+
+/** Click nền bản đồ m (không bật công cụ): mở popup lô 1/10.000 hoặc vùng 1/25.000 tại điểm bấm. → true khi đã mở */
+export function qhcClick(e, m) {
+  if (!m || m !== target() || !e?.latlng) return false;
+  const { lat, lng } = e.latlng;
+  if (layers.land && m.hasLayer(layers.land)) {
+    const f = featureAt(layers.land.getLayers().map(l => l.feature), lng, lat);
+    if (f) { openLotPopup(f, e.latlng); return true; }
+  }
+  if (layers.vision && m.hasLayer(layers.vision)) {
+    const f = featureAt(layers.vision.fills, lng, lat);
+    if (f) { openVisionPopup(f, e.latlng); return true; }
+  }
+  return false;
 }
 
 async function setVision(on) {
