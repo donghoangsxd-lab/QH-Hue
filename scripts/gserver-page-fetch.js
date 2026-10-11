@@ -10,6 +10,8 @@
 // Xem các lớp của đồ án: await qhListLayers(22898)
 // Chỉ định lớp khi tên không theo mẫu (tên lớp hoặc tên bảng, nhiều lớp thì gộp):
 //   { layers: { vung: ['Sử dụng đất khu A', 'Sử dụng đất khu B'], ranh: 'Ranh giới lập QH' } }
+// Tải nguyên lớp theo nhóm trên cây lớp (mã hoặc tên nhóm) / theo lớp, máy nhận ghi mỗi lớp một shapefile:
+//   await qhFetchLayers({ mapid: 21817, nhom: ['62723'], lop: ['Tên lớp'], postUrl: '...' })
 // Không truyền postUrl thì kết quả đồ án cuối nằm ở window.__qhExport.
 
 function qhStripName(s) {
@@ -161,21 +163,14 @@ function qhPickLayers(info, targets, override) {
   }));
 }
 
-async function qhFetchGserverLayers(options) {
-  const opts = options || {};
+// Bộ tải trang dùng chung cho một lượt tải; tiến độ số trang ở window.__qhProgress.
+function qhEngine() {
   const LIMIT = 20;
   const CONC = 6;
   const MAX_TRY = 4;
-  const only = opts.only ? new Set([].concat(opts.only)) : null;
-  const targets = only ? QH_TARGETS.filter((t) => only.has(t.key)) : QH_TARGETS;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const t0 = Date.now();
-  const mapid = Number(opts.mapid || (String(location.href).match(/mapid=(\d+)/i) || [])[1]);
-  if (!mapid) throw new Error('Thiếu mapid');
-  const info = await qhMapInfo(mapid);
-  info.mapid = mapid;
-  const infoMs = Date.now() - t0;
-  const picked = qhPickLayers(info, targets, opts.layers);
+  const progress = { pages: 0, done: 0 };
+  window.__qhProgress = progress;
 
   // gServer bỏ phản hồi khi quá tải: mọi lớp dùng chung tối đa CONC request đồng thời.
   let active = 0;
@@ -232,6 +227,7 @@ async function qhFetchGserverLayers(options) {
     const meta = await limited(() => probe(src));
     const total = meta.total;
     const pages = total > 0 ? Math.ceil(total / LIMIT) : 0;
+    progress.pages += pages;
     const fieldQ = encodeURIComponent(meta.fields.join(','));
     const chunks = await Promise.all(Array.from({ length: pages }, (_, pi) => limited(async () => {
       const data = await ajaxRetry(pageUrl(src, pi, fieldQ), src.ten + ' trang ' + (pi + 1));
@@ -240,12 +236,52 @@ async function qhFetchGserverLayers(options) {
         delete row.s_geo;
         delete row.resultnumber;
       });
+      progress.done++;
       return part;
     })));
     const rows = [];
     chunks.forEach((c) => { if (c) c.forEach((r) => rows.push(r)); });
     return { rows, total, fields: meta.fields, ms: Date.now() - lt0 };
   }
+
+  return { fetchSource };
+}
+
+function qhMapId(opts) {
+  const mapid = Number(opts.mapid || (String(location.href).match(/mapid=(\d+)/i) || [])[1]);
+  if (!mapid) throw new Error('Thiếu mapid');
+  return mapid;
+}
+
+async function qhDeliver(dump, opts) {
+  window.__qhExport = dump;
+  let postMs = 0;
+  let posted = null;
+  if (opts.postUrl) {
+    const p0 = Date.now();
+    const res = await fetch(opts.postUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dump)
+    });
+    if (!res.ok) throw new Error('POST dump thất bại: ' + res.status);
+    posted = await res.json().catch(() => null);
+    postMs = Date.now() - p0;
+  }
+  return { ...dump.meta, postMs, posted };
+}
+
+async function qhFetchGserverLayers(options) {
+  const opts = options || {};
+  const only = opts.only ? new Set([].concat(opts.only)) : null;
+  const targets = only ? QH_TARGETS.filter((t) => only.has(t.key)) : QH_TARGETS;
+  const t0 = Date.now();
+  const mapid = qhMapId(opts);
+  const info = await qhMapInfo(mapid);
+  info.mapid = mapid;
+  const infoMs = Date.now() - t0;
+  const picked = qhPickLayers(info, targets, opts.layers);
+  const { fetchSource } = qhEngine();
 
   const present = picked.filter((p) => p.sources.length);
   const results = await Promise.all(present.map((p) => Promise.all(p.sources.map(fetchSource))));
@@ -281,21 +317,52 @@ async function qhFetchGserverLayers(options) {
   });
   const fetchMs = Date.now() - t0;
   const dump = { meta: { map: mapid, tenBanDo: info.tenBanDo, ms: fetchMs, infoMs, layers }, rows };
-  window.__qhExport = dump;
-  let postMs = 0;
-  let posted = null;
-  if (opts.postUrl) {
-    const p0 = Date.now();
-    const res = await fetch(opts.postUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(dump)
-    });
-    if (!res.ok) throw new Error('POST dump thất bại: ' + res.status);
-    posted = await res.json().catch(() => null);
-    postMs = Date.now() - p0;
+  return qhDeliver(dump, opts);
+}
+
+// Tải nguyên lớp (mọi trường) theo nhóm trên cây lớp và / hoặc theo lớp, không gán vai trò đồ án.
+// nhom: mã nhóm (maLopBanDo) hoặc tên nhóm; lop: tên lớp hoặc tên bảng.
+async function qhFetchLayers(options) {
+  const opts = options || {};
+  const t0 = Date.now();
+  const mapid = qhMapId(opts);
+  const info = await qhMapInfo(mapid);
+  const groups = new Map(info.layers.map((l) => [String(l.maLopBanDo), l.tenLopBanDo]));
+  const groupOf = (l) => (l.nhom ? groups.get(String(l.nhom)) || '' : '');
+  const nhom = [].concat(opts.nhom || []).map(String);
+  const lop = [].concat(opts.lop || []).map(String);
+  const inGroup = (l, w) => String(l.nhom || '') === w || qhStripName(groupOf(l)) === qhStripName(w);
+  const isLayer = (l, w) => l.lopDuLieu === w || qhStripName(l.tenLopBanDo) === qhStripName(w);
+  const data = qhDataLayers(info).filter((l) => qhKind(l.kieuKhongGian));
+  const lost = nhom.filter((w) => !data.some((l) => inGroup(l, w))).concat(lop.filter((w) => !data.some((l) => isLayer(l, w))));
+  if (lost.length) {
+    const list = [...new Set(data.map((l) => String(l.nhom || '')).filter(Boolean))].map((id) => id + ' ' + groups.get(id)).join('; ');
+    throw new Error('mapid ' + mapid + ' không có nhóm / lớp: ' + lost.join(', ') + '. Các nhóm hiện có: ' + (list || '(không có)'));
   }
-  return { ...dump.meta, postMs, posted };
+  const picked = data.filter((l) => nhom.some((w) => inGroup(l, w)) || lop.some((w) => isLayer(l, w)));
+  if (!picked.length) throw new Error('mapid ' + mapid + ': chưa chọn nhóm / lớp (nhom, lop)');
+  const { fetchSource } = qhEngine();
+  const got = await Promise.all(picked.map((l) => fetchSource({ ten: l.tenLopBanDo, bang: l.lopDuLieu, dv: l.maDichVu })));
+  const rows = {};
+  const layers = picked.map((l, i) => {
+    const key = rows[l.lopDuLieu] ? l.maDichVu + '_' + l.lopDuLieu : l.lopDuLieu;
+    rows[key] = got[i].rows;
+    return {
+      key,
+      ten: l.tenLopBanDo,
+      bang: l.lopDuLieu,
+      dv: l.maDichVu,
+      kieu: l.kieuKhongGian,
+      nhom: groupOf(l),
+      total: got[i].total,
+      n: got[i].rows.length,
+      fields: got[i].fields,
+      match: got[i].rows.length === got[i].total,
+      ms: got[i].ms
+    };
+  });
+  const dump = { meta: { kind: 'lop', map: mapid, tenBanDo: info.tenBanDo, ms: Date.now() - t0, layers }, rows };
+  return qhDeliver(dump, opts);
 }
 
 // options.layers theo từng mapid: { layersByMap: { 22898: { vung: '...' } } }
@@ -327,5 +394,6 @@ async function qhFetchMany(mapids, options) {
 if (typeof window !== 'undefined') {
   window.qhFetchGserverLayers = qhFetchGserverLayers;
   window.qhFetchMany = qhFetchMany;
+  window.qhFetchLayers = qhFetchLayers;
   window.qhListLayers = qhListLayers;
 }

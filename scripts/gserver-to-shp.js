@@ -412,10 +412,11 @@ function zipStore(entries) {
     const name = Buffer.from(e.name, 'utf8');
     const compressed = zlib.deflateRawSync(e.data);
     const crc = crc32(e.data);
+    // Cờ 0x0800: tên file UTF-8 (tên lớp tiếng Việt), thiếu cờ thì QGIS / 7-Zip đọc theo CP437
     const local = Buffer.alloc(30);
     local.writeUInt32LE(0x04034b50, 0);
     local.writeUInt16LE(20, 4);
-    local.writeUInt16LE(0, 6);
+    local.writeUInt16LE(0x0800, 6);
     local.writeUInt16LE(8, 8);
     local.writeUInt32LE(crc, 14);
     local.writeUInt32LE(compressed.length, 18);
@@ -426,6 +427,7 @@ function zipStore(entries) {
     central.writeUInt32LE(0x02014b50, 0);
     central.writeUInt16LE(20, 4);
     central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(0x0800, 8);
     central.writeUInt16LE(8, 10);
     central.writeUInt32LE(crc, 16);
     central.writeUInt32LE(compressed.length, 20);
@@ -848,6 +850,37 @@ function exportDump(dump, name, outDir, forceCrs) {
   return written;
 }
 
+function kindRole(kieu) {
+  const s = String(kieu || '').toUpperCase();
+  if (s.includes('POINT')) return { shape: 'Point', shapeType: 1 };
+  if (s.includes('LINE')) return { shape: 'PolyLine', shapeType: 3 };
+  if (s.includes('POLYGON')) return { shape: 'Polygon', shapeType: 5 };
+  return null;
+}
+
+// Dump của qhFetchLayers (meta.kind = 'lop'): mỗi lớp một shapefile theo kiểu hình gServer,
+// thư mục con theo nhóm lớp; không cắt theo ranh, không gán vai trò đồ án.
+function exportLayers(dump, outDir, forceCrs) {
+  const written = [];
+  const used = new Set();
+  ((dump.meta && dump.meta.layers) || []).forEach((l) => {
+    const rows = dump.rows && dump.rows[l.key];
+    const role = kindRole(l.kieu);
+    if (!rows || !rows.length || !role) return;
+    const dir = path.join(outDir, safeDirName(l.nhom || 'Khong nhom'));
+    fs.mkdirSync(dir, { recursive: true });
+    let stem = safeDirName(l.ten || l.key);
+    if (used.has(path.join(dir, stem).toLowerCase())) stem = safeDirName(`${stem} ${l.bang}`);
+    used.add(path.join(dir, stem).toLowerCase());
+    written.push({ key: l.key, ten: l.ten, nhom: l.nhom, total: l.total, dir, ...writeLayer(dir, stem, role, rows, forceCrs) });
+  });
+  return written;
+}
+
+function verifyLayers(written) {
+  return [...new Set(written.map((w) => w.dir))].flatMap((dir) => verifyOut(dir).map((v) => ({ ...v, dir })));
+}
+
 function readShpHeader(buf) {
   return {
     code: buf.readInt32BE(0),
@@ -997,12 +1030,55 @@ function selftest() {
     && shared.dump.rows.ranh.length === 1 && shared.dump.rows.vung.length === 1
     && shared.dump.rows.vung[0].kyhieulodat === 'CD' && shared.dump.rows.diem.length === 1;
 
-  const ok = name === 'QHPK Thử nghiệm' && outerCw && typesOk && crsOk && scopeOk
+  const lopTmp = fs.mkdtempSync(path.join(require('os').tmpdir(), 'qh-lop-'));
+  const lop = receiveLayers({
+    meta: {
+      kind: 'lop',
+      map: 1,
+      tenBanDo: 'Quy hoạch chung Thử nghiệm',
+      layers: [
+        { key: 'a', ten: 'Chức năng sử dụng đất', bang: 'a', kieu: 'POLYGON', nhom: 'Quy hoạch tổng mặt bằng (1:10.000)', total: 1 },
+        { key: 'b', ten: 'Chức năng sử dụng đất', bang: 'b', kieu: 'POLYGON', nhom: 'Quy hoạch tổng mặt bằng (1:10.000)', total: 1 },
+        { key: 'c', ten: 'Quy hoạch đường không gian', bang: 'c', kieu: 'LINESTRING', nhom: 'Sơ đồ không gian (1:25.000)', total: 1 },
+        { key: 'd', ten: 'Điểm', bang: 'd', kieu: 'POINT', nhom: 'Sơ đồ không gian (1:25.000)', total: 2 }
+      ]
+    },
+    rows: {
+      a: [{ geom: 'POLYGON ((107.5 16.4, 107.5 16.5, 107.6 16.5, 107.5 16.4))', ten: 'A' }],
+      b: [{ geom: 'POLYGON ((107.6 16.4, 107.6 16.5, 107.7 16.5, 107.6 16.4))', ten: 'B' }],
+      c: [{ geom: 'LINESTRING (107.5 16.4, 107.6 16.5)' }],
+      d: [{ geom: 'POINT (107.5 16.4)' }, { geom: 'POINT (107.6 16.5)' }]
+    }
+  }, { out: lopTmp });
+  const lopZip = unzip(fs.readFileSync(path.join(lop.out, 'Quy hoạch tổng mặt bằng (1-10.000)', 'Chức năng sử dụng đất.zip')));
+  const lopOk = lop.ok && lop.layers.length === 4 && lop.layers[1].file === 'Chức năng sử dụng đất b.zip'
+    && Object.keys(lopZip).includes('Chức năng sử dụng đất.shp');
+  fs.rmSync(lopTmp, { recursive: true, force: true });
+
+  const ok = name === 'QHPK Thử nghiệm' && outerCw && typesOk && crsOk && scopeOk && lopOk
     && check.every((c) => c.walked && c.records === c.geojson && c.cpg === 'UTF-8' && c.code === 9994);
-  return { ok, name, outerCw, typesOk, crsOk, scopeOk, counts, check };
+  return { ok, name, outerCw, typesOk, crsOk, scopeOk, lopOk, counts, check };
 }
 
-// opts.out: ghi shapefile ngay khi nhận dump vào <out>/QH-mapid<id>-<tên đề xuất>.
+function layerReport(written, verified) {
+  return written.map((w) => {
+    const v = verified.find((x) => x.dir === w.dir && x.zip === w.file);
+    return { nhom: w.nhom, ten: w.ten, file: w.file, total: w.total, n: w.n, crs: w.crs, ok: !!v && v.walked && v.records === v.geojson && w.n === Number(w.total), warnings: w.warnings };
+  });
+}
+
+function receiveLayers(dump, o) {
+  const map = (dump.meta && dump.meta.map) || 'unknown';
+  if (!o.out) return { ok: true, map, kind: 'lop', layers: (dump.meta.layers || []).map((l) => ({ ten: l.ten, n: l.n, total: l.total })) };
+  const w0 = Date.now();
+  const outDir = path.join(o.out, safeDirName(`LOP-mapid${map}-${proposeName(dump)}`));
+  const written = exportLayers(dump, outDir, o.crs);
+  const layers = layerReport(written, verifyLayers(written));
+  return { ok: layers.every((l) => l.ok), map, kind: 'lop', out: outDir, writeMs: Date.now() - w0, layers };
+}
+
+// opts.out: ghi shapefile ngay khi nhận dump vào <out>/QH-mapid<id>-<tên đề xuất>
+// (dump nguyên lớp: <out>/LOP-mapid<id>-<tên>/<nhóm lớp>/<tên lớp>.zip).
 // opts.count: tự tắt sau khi nhận đủ số dump.
 function listen(port, dir, opts) {
   const o = opts || {};
@@ -1041,8 +1117,17 @@ function listen(port, dir, opts) {
         const buf = Buffer.concat(chunks);
         const raw = JSON.parse(buf.toString('utf8'));
         const map = (raw.meta && raw.meta.map) || 'unknown';
-        const file = path.join(dir, `mapid${map}.json`);
+        const file = path.join(dir, `mapid${map}${raw.meta && raw.meta.kind === 'lop' ? '-lop' : ''}.json`);
         fs.writeFileSync(file, buf);
+        if (raw.meta && raw.meta.kind === 'lop') {
+          const reply = receiveLayers(raw, o);
+          console.log(JSON.stringify({ file, bytes: buf.length, ...reply }));
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ bytes: buf.length, ...reply }));
+          received++;
+          if (o.count && received >= o.count) setTimeout(() => process.exit(0), 200);
+          return;
+        }
         const { dump, scope } = scopeDump(raw);
         const proposed = proposeName(dump);
         const layers = Object.keys(ROLES).map((key) => {
@@ -1110,7 +1195,12 @@ function main() {
     console.error('Thiếu --dump, --listen hoặc --selftest');
     process.exit(1);
   }
-  const { dump, scope } = scopeDump(JSON.parse(fs.readFileSync(args.dump, 'utf8')));
+  const input = JSON.parse(fs.readFileSync(args.dump, 'utf8'));
+  if (input.meta && input.meta.kind === 'lop') {
+    console.log(JSON.stringify(receiveLayers(input, { out: args.out && args.out !== true ? args.out : null, crs: forceCrs })));
+    return;
+  }
+  const { dump, scope } = scopeDump(input);
   const proposed = proposeName(dump);
   const metaLayers = (dump.meta && dump.meta.layers) || [];
   const layers = Object.keys(ROLES).map((key) => {
@@ -1129,4 +1219,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { parseWkt, detectCrs, proposeName, exportDump, writeLayer, verifyOut, safeDirName, selftest };
+module.exports = { parseWkt, detectCrs, proposeName, exportDump, exportLayers, writeLayer, verifyOut, safeDirName, selftest };
