@@ -290,43 +290,32 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
 .map-title[data-view="HT"] .map-title-level { display: none; }
 .level-menu {
   position: fixed; z-index: 1300;
-  width: 340px; max-width: calc(100vw - 16px);
-  padding: 6px;
+  max-width: calc(100vw - 16px);
+  padding: 4px;
   background: var(--bg-dark);
   backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
   border: 1px solid var(--border-color);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-md);
   box-shadow: var(--panel-shadow);
 }
-.level-menu-head { padding: 4px 8px 6px; font-size: var(--fs-xs); font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-muted); }
-.level-menu-head small { display: block; margin-top: 2px; font-weight: 500; letter-spacing: 0; text-transform: none; }
 .level-item {
   width: 100%;
-  display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 8px;
-  padding: 7px 8px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px;
   text-align: left;
-  font: inherit;
-  color: var(--text-main);
+  font: inherit; font-size: var(--fs-sm); font-weight: 700;
+  color: var(--text-strong);
+  white-space: nowrap;
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--r-md);
+  border: 0;
+  border-radius: var(--r-sm);
   cursor: pointer;
-  transition: all var(--ease);
+  transition: background var(--ease);
 }
+.level-item[hidden] { display: none; }
 .level-item:hover, .level-item:focus-visible { background: var(--bg-hover); outline: none; }
-.level-item-idx {
-  width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
-  border-radius: 50%; font-size: var(--fs-xs); font-weight: 800;
-  color: var(--text-muted); border: 1px solid var(--border-color);
-}
-.level-item-body { min-width: 0; display: flex; flex-direction: column; }
-.level-item-body b { font-size: var(--fs-sm); color: var(--text-strong); }
-.level-item-body small { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.level-item-scale { font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; }
-.level-item.is-on .level-item-idx { color: var(--accent-orange); border-color: var(--accent-orange); }
-.level-item.is-sel { background: rgba(var(--orange-rgb), 0.14); border-color: rgba(var(--orange-rgb), 0.55); }
-.level-item.is-sel .level-item-idx { color: #1c1917; background: var(--accent-orange); border-color: var(--accent-orange); }
-.level-item[data-level="qhct"] .level-item-body b::after { content: 'Chờ dữ liệu'; margin-left: 6px; padding: 0 5px; border-radius: var(--r-sm); font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); border: 1px dashed var(--border-color); }
+.level-item.is-on::after { content: ''; width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: var(--accent-orange); }
+.level-item.is-pending { color: var(--text-muted); font-weight: 600; }
 .map-title-split { display: none; flex-shrink: 0; gap: 2px; padding: 2px; margin-left: 4px; border: 1px solid var(--border-color); border-radius: var(--r-md); background: rgba(15, 23, 42, 0.6); }
 .map-title-seg {
   display: inline-flex; align-items: center; gap: 4px;
@@ -644,6 +633,10 @@ body.right-collapsed .right-panel {
 .layer-main-tab:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
 .layer-main-tab.active { color: var(--text-main); border-bottom-color: var(--main-accent); }
 .layer-main-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Tab Chú giải: 4 cấp, nhãn 2 dòng (loại đồ án / tỷ lệ) cho vừa bề ngang panel */
+.legend-main .layer-main-tab { height: 34px; }
+.legend-main .layer-main-label { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+.legend-main .layer-main-label small { font-size: 9px; font-weight: 600; letter-spacing: .04em; opacity: .75; }
 .layer-main-tabs .layer-eye-btn { width: 26px; height: 26px; margin-left: 3px; padding: 0; justify-content: center; box-sizing: border-box; }
 .layer-main-tabs .layer-eye-btn[hidden] { display: none; }
 .layer-main-tabs .layer-eye-btn:disabled { opacity: 0.5; cursor: default; }
@@ -725,6 +718,14 @@ body.right-collapsed .right-panel {
 .pl-head small { flex-shrink: 0; min-width: 18px; padding: 0 5px; border-radius: 9px; background: rgba(var(--cyan-rgb), 0.12); color: var(--accent-cyan); font-size: var(--fs-xs); text-align: center; }
 .pl-body { padding-left: 6px; }
 .pl-body .pg-head { top: 26px; }
+.plan-static { padding: 3px 0 3px 2px; }
+.pl-group[data-level-group="QHPK"] .project-empty { padding-left: 4px; }
+/* Nhóm cấp của lớp đang chọn ở droplist (body[data-level], mapLevel.js) */
+body[data-level="urban"] .pl-group[data-level-group="urban"] > .pl-head,
+body[data-level="qhc25"] .pl-group[data-level-group="QHC25"] > .pl-head,
+body[data-level="qhc10"] .pl-group[data-level-group="QHC"] > .pl-head,
+body[data-level="qhpk"] .pl-group[data-level-group="QHPK"] > .pl-head,
+body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-head { color: var(--accent-orange); box-shadow: inset 3px 0 0 var(--accent-orange); }
 .project-tools { flex-shrink: 0; display: flex; align-items: center; }
 .project-tools .project-btn { width: 19px; }
 /* Nhãn tên đồ án giữa ranh tổng: thẻ tối 1 dòng, chấm màu đồ án; kích thước khớp LABEL_* trong projectLayer.js */
@@ -982,6 +983,7 @@ body.right-collapsed .right-panel {
 .tt16-swatch { width: 28px; height: 14px; box-sizing: border-box; flex-shrink: 0; border: 1.3px solid; border-radius: 2px; background-color: rgba(15, 23, 42, 0.6); }
 .tt16-empty { padding: 10px 4px; font-size: var(--fs-sm); color: var(--text-muted); text-align: center; }
 .tt16-empty[hidden] { display: none; }
+.tt16-pending { margin: 8px 0; padding: 12px 8px; border: 1px dashed var(--border-color); border-radius: var(--r-md); font-size: var(--fs-sm); color: var(--text-muted); text-align: center; }
 .tt16-frames { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 6px; }
 .tt16-frames .tt16-row { min-height: 20px; padding-left: 2px; font-size: var(--fs-sm); }
 .tt16-frame { display: block; width: 28px; height: 14px; box-sizing: border-box; flex-shrink: 0; background: rgba(148, 163, 184, 0.12); }
@@ -2358,7 +2360,7 @@ table.ward-table th {
 .island-flag-country { color: #fde047; font-size: 14px; letter-spacing: 0.03em; }
 
 /* Biểu đồ tròn tổng hợp mỗi phường xã ở zoom nhỏ */
-.ward-pie-mode .ward-label-text { display: none; }
+.ward-pie-mode .ward-label-text, .ward-names-off .ward-label-text { display: none; }
 .ward-pie-icon { background: transparent !important; border: none !important; }
 .ward-pie-name {
   position: absolute;

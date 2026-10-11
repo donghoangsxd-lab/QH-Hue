@@ -64,7 +64,24 @@ export function detachBasemap(m) {
   if (labels) { labels.remove(); labelLayers.delete(m); }
 }
 
-/** Nút tem đường "Aa" trong panel lớp */
+// Tên phường xã (nhãn ward-label-icon của mapEngine.js / planMap.js) ẩn bằng class trên body
+const WARD_NAMES_KEY = 'qh_ward_names';
+
+function setWardNames(on) {
+  document.body.classList.toggle('ward-names-off', !on);
+  const btn = document.getElementById('btnWardNames');
+  if (btn) {
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', String(on));
+  }
+  try { localStorage.setItem(WARD_NAMES_KEY, on ? '1' : '0'); } catch (e) { /* chế độ riêng tư */ }
+}
+
+/** Nút "Aa" trong panel lớp: tem đường (dòng Mạng lưới đường), tên phường xã (dòng Ranh giới 40 Phường Xã) */
 export function initBasemapUi() {
   document.getElementById('btnRoadLabels')?.addEventListener('click', () => setLabelsOverlay(!labelsOn));
+  let wardNames = true;
+  try { wardNames = localStorage.getItem(WARD_NAMES_KEY) !== '0'; } catch (e) { /* chế độ riêng tư */ }
+  setWardNames(wardNames);
+  document.getElementById('btnWardNames')?.addEventListener('click', () => setWardNames(document.body.classList.contains('ward-names-off')));
 }

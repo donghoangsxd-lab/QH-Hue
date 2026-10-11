@@ -1,7 +1,11 @@
-// Tab Chú giải: ký hiệu TT16 theo cấp đồ án (QHPK 1/2.000, QHC 1/10.000), mỗi bộ chia nhóm
-// (tìm theo tên loại đất / tên layer CAD, thu gọn từng nhóm; tìm và thu gọn chỉ áp lên bộ đang xem)
+// Tab Chú giải: ký hiệu theo cấp đồ án (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500), mỗi bộ chia nhóm
+// (tìm theo tên loại đất / tên layer CAD, thu gọn từng nhóm; tìm và thu gọn chỉ áp lên bộ đang xem).
+// Chọn lớp ở droplist (mapLevel.js) thì chuyển sang bộ của cấp đó.
 // + mục Hiển thị lô đất: thanh độ trong suốt phần tô lô và chú giải viền theo giai đoạn.
 import { renderTt16Legend, getLotOpacity, setLotOpacity, LEGEND_SETS } from './tt16Symbols.js';
+import { LEVEL_EVENT } from './mapLevel.js';
+
+const LEVEL_SET = { qhc25: 'QHC25', qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
 
 // Kéo thanh trượt: số % đổi ngay, tô lại lô sau khi dừng kéo một nhịp (vẽ lại hàng nghìn lô mỗi bước rất nặng)
 const OPACITY_DELAY_MS = 80;
@@ -14,10 +18,12 @@ export function initLegendPanel() {
   renderTt16Legend(list);
   const tabs = [...document.querySelectorAll('[data-legend-set]')];
   tabs.forEach(t => {
-    const count = t.querySelector('.layer-count');
-    if (count) count.textContent = String(LEGEND_SETS[t.dataset.legendSet]?.count || 0);
+    const n = LEGEND_SETS[t.dataset.legendSet]?.count || 0;
+    if (n) t.title += ` · ${n} ký hiệu`;
   });
   let active = (tabs.find(t => t.classList.contains('active')) || tabs[0])?.dataset.legendSet || 'QHPK';
+  const showPane = () => list.querySelectorAll('[data-legend-pane]').forEach(p => { p.hidden = p.dataset.legendPane !== active; });
+  showPane();
   const groupsOf = () => [...list.querySelectorAll(`[data-legend-pane="${active}"] .tt16-group`)];
 
   const empty = list.querySelector('.tt16-empty');
@@ -42,7 +48,7 @@ export function initLegendPanel() {
       shown += n;
     });
     if (!q) savedOpen = null;
-    if (empty) empty.hidden = shown > 0;
+    if (empty) empty.hidden = !q || shown > 0;
   };
   search?.addEventListener('input', applySearch);
 
@@ -72,11 +78,15 @@ export function initLegendPanel() {
       x.classList.toggle('active', on);
       x.setAttribute('aria-selected', String(on));
     });
-    list.querySelectorAll('[data-legend-pane]').forEach(p => { p.hidden = p.dataset.legendPane !== active; });
+    showPane();
     applySearch();
     syncToggle();
   }));
   syncToggle();
+  document.addEventListener(LEVEL_EVENT, (e) => {
+    const set = LEVEL_SET[e.detail?.level];
+    if (set && set !== active) tabs.find(t => t.dataset.legendSet === set)?.click();
+  });
 
   const slider = document.getElementById('lotOpacity');
   const out = document.getElementById('lotOpacityValue');

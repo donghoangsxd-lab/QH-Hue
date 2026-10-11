@@ -10,11 +10,11 @@
 import { escapeHtml } from './utils.js';
 
 export const LEVELS = [
-  { id: 'urban', chk: 'chk_urban', label: 'Hệ thống đô thị', scale: 'QĐ 614 · QĐ 756', note: 'Phân loại đô thị, trình độ phát triển đô thị 40 phường, xã' },
-  { id: 'qhc25', chk: 'chk_qhc25', label: 'QHC 1/25.000', scale: 'Toàn đô thị', note: 'Định hướng phát triển không gian toàn đô thị (QHC 2045)' },
-  { id: 'qhc10', chk: 'chk_qhc10', label: 'QHC 1/10.000', scale: 'Khu vực trung tâm', note: 'Quy hoạch sử dụng đất khu vực đô thị trung tâm (QHC 2045)' },
-  { id: 'qhpk', chk: 'chk_projects', label: 'QHPK 1/2.000', scale: 'Phân khu', note: 'Quy hoạch phân khu theo phường, xã' },
-  { id: 'qhct', chk: 'chk_qhct', label: 'QHCT 1/500', scale: 'Chi tiết', note: 'Quy hoạch chi tiết, chưa có dữ liệu' }
+  { id: 'urban', chk: 'chk_urban', label: 'Hệ thống đô thị' },
+  { id: 'qhc25', chk: 'chk_qhc25', label: 'QHC 1/25.000' },
+  { id: 'qhc10', chk: 'chk_qhc10', label: 'QHC 1/10.000' },
+  { id: 'qhpk', chk: 'chk_projects', label: 'QHPK 1/2.000' },
+  { id: 'qhct', chk: 'chk_qhct', label: 'QHCT 1/500', pending: true }
 ];
 export const DEFAULT_LEVEL = 'urban';
 /** detail: { level, prev, origin } */
@@ -90,20 +90,19 @@ function paint() {
   if (button) {
     const text = button.querySelector('.map-title-level-text');
     if (text) text.textContent = cur.label;
-    button.title = `Lớp đang xem: ${cur.label} — ${cur.note}. Bấm để chọn lớp khác`;
+    button.title = `Lớp đang xem: ${cur.label}. Bấm để chọn lớp khác`;
     button.dataset.level = level;
   }
   if (!menu) return;
   menu.querySelectorAll('[data-level]').forEach(el => {
-    const on = el.dataset.level === level;
-    el.classList.toggle('is-sel', on);
-    el.setAttribute('aria-selected', String(on));
+    el.hidden = el.dataset.level === level;
     el.classList.toggle('is-on', isOn(byId.get(el.dataset.level).chk));
   });
 }
 
 function placeMenu() {
   const r = button.getBoundingClientRect();
+  menu.style.minWidth = `${Math.round(r.width)}px`;
   menu.style.top = `${Math.round(r.bottom + 6)}px`;
   menu.style.left = `${Math.round(Math.max(8, r.right - menu.offsetWidth))}px`;
 }
@@ -115,7 +114,7 @@ function openMenu(on) {
   if (!on) return;
   paint();
   placeMenu();
-  (menu.querySelector('.is-sel') || menu.querySelector('[data-level]'))?.focus();
+  menu.querySelector('[data-level]:not([hidden])')?.focus();
 }
 
 function buildMenu() {
@@ -125,12 +124,7 @@ function buildMenu() {
   menu.setAttribute('role', 'listbox');
   menu.setAttribute('aria-label', 'Chọn lớp quy hoạch');
   menu.hidden = true;
-  menu.innerHTML = `<div class="level-menu-head">Lớp quy hoạch <small>chọn một lớp · so sánh nhiều lớp: bật ở panel Lớp dữ liệu</small></div>`
-    + LEVELS.map((l, i) => `<button type="button" class="level-item" role="option" data-level="${l.id}" aria-selected="false">
-        <span class="level-item-idx">${i + 1}</span>
-        <span class="level-item-body"><b>${escapeHtml(l.label)}</b><small>${escapeHtml(l.note)}</small></span>
-        <span class="level-item-scale">${escapeHtml(l.scale)}</span>
-      </button>`).join('');
+  menu.innerHTML = LEVELS.map(l => `<button type="button" class="level-item${l.pending ? ' is-pending' : ''}" role="option" data-level="${l.id}"${l.pending ? ' title="Chưa có dữ liệu"' : ''}>${escapeHtml(l.label)}</button>`).join('');
   document.body.appendChild(menu);
   menu.addEventListener('click', (e) => {
     const item = e.target.closest('[data-level]');
@@ -140,7 +134,7 @@ function buildMenu() {
     button.focus();
   });
   menu.addEventListener('keydown', (e) => {
-    const items = [...menu.querySelectorAll('[data-level]')];
+    const items = [...menu.querySelectorAll('[data-level]:not([hidden])')];
     const i = items.indexOf(document.activeElement);
     if (e.key === 'Escape') { openMenu(false); button.focus(); e.preventDefault(); }
     else if (e.key === 'ArrowDown') { items[(i + 1) % items.length].focus(); e.preventDefault(); }

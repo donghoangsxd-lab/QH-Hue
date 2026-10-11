@@ -149,10 +149,14 @@ const QHC_LEGEND_GROUPS = [
   ['Nông nghiệp và chức năng khác', ["C-NN", "C-RDD", "C-RPH", "C-RSX", "C-TS", "C-CSD", "C-HO", "C-SS", "C-MNB"]]
 ];
 
-// Bộ ký hiệu theo cấp đồ án (tab Chú giải); khóa trùng data-legend-set trong index.html
+// Bộ ký hiệu theo cấp đồ án (tab Chú giải); khóa trùng data-legend-set trong index.html.
+// Bộ chưa có nhóm hiện dòng pending; bổ sung ký hiệu: thêm [tên nhóm, [khóa TT16_STYLES]] vào groups
+const legendSet = (groups, pending) => ({ groups, count: groups.reduce((n, [, keys]) => n + keys.length, 0), pending });
 export const LEGEND_SETS = {
-  QHPK: { groups: LEGEND_GROUPS, count: LEGEND_KEYS.length },
-  QHC: { groups: QHC_LEGEND_GROUPS, count: QHC_LEGEND_GROUPS.reduce((n, [, keys]) => n + keys.length, 0) }
+  QHC25: legendSet([], 'Ký hiệu QHC 1/25.000 sẽ bổ sung sau.'),
+  QHC: legendSet(QHC_LEGEND_GROUPS),
+  QHPK: legendSet(LEGEND_GROUPS),
+  QHCT: legendSet([], 'Ký hiệu QHCT 1/500 sẽ bổ sung sau.')
 };
 
 // Độ đục phần tô lô đất (thanh trượt ở Chú giải): nhân vào fillOpacity của ký hiệu, 1 = đúng mẫu; viền giữ nguyên.
@@ -689,12 +693,12 @@ function legendGroupHtml([name, keys]) {
   return `<details class="tt16-group" open><summary><span class="tt16-group-name">${name}</span><span class="tt16-group-count">${keys.length}</span></summary>${rows}</details>`;
 }
 
-/** Chú giải ký hiệu lô đất TT16: mỗi bộ (LEGEND_SETS) một khung data-legend-pane, chỉ khung đầu hiện;
+/** Chú giải ký hiệu lô đất TT16: mỗi bộ (LEGEND_SETS) một khung data-legend-pane, ẩn sẵn (legendPanel.js hiện bộ đang chọn);
  *  data-search: chữ bỏ dấu để lọc (legendPanel.js) */
 export function renderTt16Legend(container) {
   if (!container) return;
-  container.innerHTML = Object.entries(LEGEND_SETS).map(([set, { groups }], i) =>
-    `<div class="tt16-set" data-legend-pane="${set}"${i ? ' hidden' : ''}>${groups.map(legendGroupHtml).join('')}</div>`
+  container.innerHTML = Object.entries(LEGEND_SETS).map(([set, { groups, pending }]) =>
+    `<div class="tt16-set" data-legend-pane="${set}" hidden>${groups.map(legendGroupHtml).join('')}${pending && !groups.length ? `<div class="tt16-pending">${pending}</div>` : ''}</div>`
   ).join('') + '<div class="tt16-empty" hidden>Không có ký hiệu khớp từ khóa.</div>';
 }
 

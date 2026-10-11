@@ -321,7 +321,7 @@
         <div class="layer-tree">
         <div class="layer-main" id="layerMain">
           <div class="layer-main-tabs" role="tablist" aria-label="Quy hoạch và công trình">
-            <button type="button" class="layer-main-tab active" role="tab" data-main-tab="plan" aria-selected="true" aria-controls="layerPanePlan" title="Danh sách đồ án. Bật một đồ án là hiện đủ ranh lô: lô thuộc nhóm hạ tầng và các lô còn lại."><span class="layer-main-label">Quy hoạch</span><span class="layer-count none" id="projectCount" title="Số đồ án đang hiện / tổng số đồ án">0</span></button>
+            <button type="button" class="layer-main-tab active" role="tab" data-main-tab="plan" aria-selected="true" aria-controls="layerPanePlan" title="Các lớp quy hoạch theo cấp: Hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Bật một đồ án là hiện đủ ranh lô: lô thuộc nhóm hạ tầng và các lô còn lại."><span class="layer-main-label">Quy hoạch</span><span class="layer-count none" id="projectCount" title="Số đồ án đang hiện / tổng số đồ án">0</span></button>
             <button type="button" class="layer-main-tab" role="tab" data-main-tab="infra" aria-selected="false" aria-controls="layerPaneInfra" title="14 nhóm biểu tượng trên bản đồ. Nút tròn bật vùng phủ theo QCVN."><span class="layer-main-label">Công trình</span><span class="layer-count none" id="layerCount" title="Số nhóm đang hiện / tổng số nhóm">0/14</span></button>
             <button type="button" class="layer-main-tab" role="tab" data-main-tab="gp" aria-selected="false" aria-controls="layerPaneGp" title="Quy hoạch chung: mỗi đô thị, khu vực đô thị sau 2030 theo Quyết định 756/QĐ-UBND lập 1 QHC — căn cứ lập QHPK 1/2.000, xác lập chỉ tiêu phân loại, nâng cấp đô thị. Bấm một QHC để vẽ phạm vi và mở hồ sơ ở bảng dưới"><span class="layer-main-label">QHC</span><span class="layer-count" id="gpCount" title="Số quy hoạch chung phải lập">0</span></button>
             <button type="button" class="layer-eye-btn" id="btnProjectsAll" data-main-eye="plan" aria-pressed="false" title="Ẩn / hiện mọi đồ án trong danh sách" aria-label="Ẩn / hiện mọi đồ án">
@@ -362,6 +362,34 @@
         </div>
         <input type="search" id="projectSearch" class="project-search" placeholder="Tìm đồ án..." aria-label="Tìm đồ án quy hoạch" hidden>
         <div id="projectList" class="project-list"></div>
+        <!-- Dòng lớp của từng cấp quy hoạch: projectLayer.js gắn vào nhóm cấp tương ứng (data-plan-static = khóa nhóm) -->
+        <div id="planStaticRows" hidden>
+          <div class="plan-static" data-plan-static="urban">
+            <div class="layer-row"><div><input type="checkbox" id="chk_urban" checked><label for="chk_urban" title="Bản đồ hiện trạng: đô thị và phường đạt trình độ phát triển đô thị từ 01/01/2026 theo Quyết định 614/QĐ-UBND ngày 10/02/2026. Bản đồ quy hoạch: hệ thống đô thị sau năm 2030 theo Quyết định 756/QĐ-UBND ngày 28/02/2026. Trỏ chuột vào ranh, ký hiệu hoặc phường để xem thông tin"><svg class="ico ico-layer"><use href="#i-flag"/></svg>Phân loại đô thị <small class="layer-hint">(HT: QĐ 614 · QH: QĐ 756)</small></label></div></div>
+            <div class="layer-legend ua-legend" id="urbanLegend" style="display:none;">
+              <span class="ua-legend-item"><i class="ua-badge ua-badge-I"><span>I</span></i>Đô thị loại I (toàn thành phố)</span>
+              <span class="ua-legend-item"><i class="ua-badge ua-badge-II"><span>II</span></i>Đô thị loại II</span>
+              <span class="ua-legend-item"><i class="ua-badge ua-badge-III"><span>III</span></i>Đô thị loại III</span>
+              <span class="ua-legend-item"><i class="ua-sw-line ua-sw-solid"></i>Ranh đô thị loại II</span>
+              <span class="ua-legend-item"><i class="ua-sw-line"></i>Ranh đô thị loại III</span>
+              <span class="ua-legend-item"><i class="ua-sw" style="background:#ef4444"></i>Phường, xã trình độ loại II</span>
+              <span class="ua-legend-item"><i class="ua-sw" style="background:#fb923c"></i>Phường, xã trình độ loại III</span>
+              <span class="ua-legend-item"><i class="ua-sw" style="background:#4ade80; opacity:0.6"></i>Nông thôn</span>
+              <span class="ua-legend-note">Hiện trạng: QĐ 614 (từ 01/01/2026); đô thị loại V cũ trong xã tô theo ranh thị trấn, xã cũ (địa giới trước 2020).</span>
+              <span class="ua-legend-note">Quy hoạch: QĐ 756, giai đoạn sau năm 2030.</span>
+            </div>
+          </div>
+          <div class="plan-static" data-plan-static="QHC25">
+            <div class="layer-row"><div><input type="checkbox" id="chk_qhc25"><label for="chk_qhc25" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực và điểm đô thị. Bấm một vùng để xem chức năng"><svg class="ico ico-layer"><use href="#i-layers"/></svg>QHC đô thị Huế 2045 <small class="layer-hint" id="qhc25Hint">(toàn đô thị)</small></label></div></div>
+            <div class="layer-legend ua-legend" id="qhc25Legend" style="display:none;"></div>
+          </div>
+          <div class="plan-static" data-plan-static="QHC">
+            <div class="layer-row"><div><input type="checkbox" id="chk_qhc10"><label for="chk_qhc10" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045 (đang điều chỉnh): quy hoạch sử dụng đất khu vực đô thị trung tâm tỷ lệ 1/10.000, ký hiệu TT16 Phụ lục I Mục 02; viền mảnh hiện trạng, liền ngắn hạn 2030, nét đứt dài hạn 2040. Vùng đỏ: phần Hóa Châu, Mỹ Thượng chưa có trong đồ án. Bấm một lô để tra cứu"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>QHC đô thị Huế 2045 <small class="layer-hint" id="qhc10Hint">(khu vực trung tâm)</small></label></div></div>
+          </div>
+          <div class="plan-static" data-plan-static="QHCT">
+            <div class="layer-row"><div><input type="checkbox" id="chk_qhct"><label for="chk_qhct" title="Quy hoạch chi tiết tỷ lệ 1/500: lô đất theo đồ án chi tiết. Dữ liệu sẽ bổ sung sau. Bấm một lô để tra cứu"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Đồ án QHCT 1/500 <small class="layer-hint" id="qhctHint">(chưa có dữ liệu)</small></label></div></div>
+          </div>
+        </div>
           </div>
           <div class="layer-main-pane" id="layerPaneGp" data-main-pane="gp" role="tabpanel" hidden>
         <div id="gpList" class="gp-list"></div>
@@ -374,24 +402,7 @@
             <button type="button" class="layer-map-tab" role="tab" data-map-tab="env" aria-selected="false" aria-controls="layerPaneEnv" title="Địa hình, thoát nước, ngập, nhiệt độ bề mặt và công trình chịu rủi ro."><span class="layer-map-label">Bản đồ môi trường</span><span class="layer-count layer-map-count" title="Số lớp đang bật"></span></button>
           </div>
           <div class="layer-map-pane" id="layerPaneBase" data-map-pane="base" role="tabpanel">
-          <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div></div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_urban" checked><label for="chk_urban" title="Bản đồ hiện trạng: đô thị và phường đạt trình độ phát triển đô thị từ 01/01/2026 theo Quyết định 614/QĐ-UBND ngày 10/02/2026. Bản đồ quy hoạch: hệ thống đô thị sau năm 2030 theo Quyết định 756/QĐ-UBND ngày 28/02/2026. Trỏ chuột vào ranh, ký hiệu hoặc phường để xem thông tin"><svg class="ico ico-layer"><use href="#i-flag"/></svg>Phân loại đô thị <small class="layer-hint">(HT: QĐ 614 · QH: QĐ 756)</small></label></div></div>
-          <div class="layer-legend ua-legend" id="urbanLegend" style="display:none;">
-            <span class="ua-legend-item"><i class="ua-badge ua-badge-I"><span>I</span></i>Đô thị loại I (toàn thành phố)</span>
-            <span class="ua-legend-item"><i class="ua-badge ua-badge-II"><span>II</span></i>Đô thị loại II</span>
-            <span class="ua-legend-item"><i class="ua-badge ua-badge-III"><span>III</span></i>Đô thị loại III</span>
-            <span class="ua-legend-item"><i class="ua-sw-line ua-sw-solid"></i>Ranh đô thị loại II</span>
-            <span class="ua-legend-item"><i class="ua-sw-line"></i>Ranh đô thị loại III</span>
-            <span class="ua-legend-item"><i class="ua-sw" style="background:#ef4444"></i>Phường, xã trình độ loại II</span>
-            <span class="ua-legend-item"><i class="ua-sw" style="background:#fb923c"></i>Phường, xã trình độ loại III</span>
-            <span class="ua-legend-item"><i class="ua-sw" style="background:#4ade80; opacity:0.6"></i>Nông thôn</span>
-            <span class="ua-legend-note">Hiện trạng: QĐ 614 (từ 01/01/2026); đô thị loại V cũ trong xã tô theo ranh thị trấn, xã cũ (địa giới trước 2020).</span>
-            <span class="ua-legend-note">Quy hoạch: QĐ 756, giai đoạn sau năm 2030.</span>
-          </div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_qhc25"><label for="chk_qhc25" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực và điểm đô thị. Bấm một vùng để xem chức năng"><svg class="ico ico-layer"><use href="#i-layers"/></svg>QHC 2045 · định hướng 1/25.000 <small class="layer-hint" id="qhc25Hint">(toàn đô thị)</small></label></div></div>
-          <div class="layer-legend ua-legend" id="qhc25Legend" style="display:none;"></div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_qhc10"><label for="chk_qhc10" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045 (đang điều chỉnh): quy hoạch sử dụng đất khu vực đô thị trung tâm tỷ lệ 1/10.000, ký hiệu TT16 Phụ lục I Mục 02; viền mảnh hiện trạng, liền ngắn hạn 2030, nét đứt dài hạn 2040. Vùng đỏ: phần Hóa Châu, Mỹ Thượng chưa có trong đồ án. Bấm một lô để tra cứu"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>QHC 2045 · sử dụng đất 1/10.000 <small class="layer-hint" id="qhc10Hint">(khu vực trung tâm)</small></label></div></div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_qhct"><label for="chk_qhct" title="Quy hoạch chi tiết tỷ lệ 1/500: lô đất theo đồ án chi tiết. Dữ liệu sẽ bổ sung sau. Bấm một lô để tra cứu"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>QHCT 1/500 <small class="layer-hint" id="qhctHint">(chưa có dữ liệu)</small></label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div><button type="button" class="layer-mini-btn active" id="btnWardNames" title="Bật/tắt tên phường, xã trên bản đồ" aria-label="Bật/tắt tên phường, xã" aria-pressed="true">Aa</button></div>
           <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung. Thu nhỏ vẫn hiện trục chính; chỉ mức một biểu đồ tròn toàn thành phố là ẩn"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(zoom để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
             <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
@@ -750,8 +761,10 @@
         <div class="layer-tree">
         <div class="layer-main legend-main">
           <div class="layer-main-tabs" role="tablist" aria-label="Ký hiệu sử dụng đất theo cấp đồ án">
-            <button type="button" class="layer-main-tab active" role="tab" data-legend-set="QHPK" aria-selected="true" title="Ký hiệu sử dụng đất đồ án quy hoạch phân khu theo Thông tư 16/2025/TT-BXD, Phụ lục I Mục 04 (QHPK 1/2.000, 1/5.000) — bộ đang dùng cho toàn bộ đồ án hiện có. Thu nhỏ tô đặc màu ký hiệu; phóng to từ mức 17 hiện hoa văn"><span class="layer-main-label">QHPK 1/2.000</span><span class="layer-count">0</span></button>
-            <button type="button" class="layer-main-tab" role="tab" data-legend-set="QHC" aria-selected="false" title="Ký hiệu chức năng sử dụng đất đồ án quy hoạch chung đô thị theo Thông tư 16/2025/TT-BXD, Phụ lục I Mục 02 (PL1, tỷ lệ 1/10.000)"><span class="layer-main-label">QHC 1/10.000</span><span class="layer-count">0</span></button>
+            <button type="button" class="layer-main-tab" role="tab" data-legend-set="QHC25" aria-selected="false" title="Ký hiệu sơ đồ tổ chức không gian đồ án quy hoạch chung tỷ lệ 1/25.000 (sẽ bổ sung)"><span class="layer-main-label"><small>QHC</small>1/25.000</span></button>
+            <button type="button" class="layer-main-tab" role="tab" data-legend-set="QHC" aria-selected="false" title="Ký hiệu chức năng sử dụng đất đồ án quy hoạch chung đô thị theo Thông tư 16/2025/TT-BXD, Phụ lục I Mục 02 (PL1, tỷ lệ 1/10.000)"><span class="layer-main-label"><small>QHC</small>1/10.000</span></button>
+            <button type="button" class="layer-main-tab active" role="tab" data-legend-set="QHPK" aria-selected="true" title="Ký hiệu sử dụng đất đồ án quy hoạch phân khu theo Thông tư 16/2025/TT-BXD, Phụ lục I Mục 04 (QHPK 1/2.000, 1/5.000) — bộ đang dùng cho toàn bộ đồ án hiện có. Thu nhỏ tô đặc màu ký hiệu; phóng to từ mức 17 hiện hoa văn"><span class="layer-main-label"><small>QHPK</small>1/2.000</span></button>
+            <button type="button" class="layer-main-tab" role="tab" data-legend-set="QHCT" aria-selected="false" title="Ký hiệu sử dụng đất đồ án quy hoạch chi tiết tỷ lệ 1/500 (sẽ bổ sung)"><span class="layer-main-label"><small>QHCT</small>1/500</span></button>
             <button type="button" class="layer-eye-btn" id="btnLegendFold" aria-pressed="false" title="Thu gọn mọi nhóm" aria-label="Thu gọn / mở mọi nhóm ký hiệu"><svg class="ico"><use href="#i-chevs-down"/></svg></button>
           </div>
           <div class="layer-main-pane">

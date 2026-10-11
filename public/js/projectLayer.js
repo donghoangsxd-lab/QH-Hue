@@ -1,4 +1,5 @@
-// Mục Quy hoạch (tab Lớp dữ liệu): đồ án nhóm theo cấp (QHPK 1/2.000, QHC 1/10.000), trong mỗi cấp nhóm theo phường
+// Mục Quy hoạch (tab Lớp dữ liệu): 5 nhóm cấp theo droplist (Hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000,
+// QHCT 1/500) gồm dòng lớp riêng của cấp (#planStaticRows) và đồ án nhập; trong mỗi cấp đồ án nhóm theo phường
 // (đồ án liên phường có mặt ở mỗi phường), mỗi đồ án (Ten_QH)
 // bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + thông tin ở panel dưới),
 // Admin xóa / chuyển đồ án cũ.
@@ -405,14 +406,35 @@ function renderHead() {
   if (search) search.hidden = projects.length <= 5;
 }
 
+// Nhóm cấp trong mục Quy hoạch, cùng thứ tự droplist (mapLevel.js). Nhóm có dòng lớp riêng trong #planStaticRows
+// (data-plan-static) luôn hiện; nhóm chỉ có đồ án nhập thì ẩn khi chưa có đồ án
+const LIST_LEVELS = [
+  { key: 'urban', label: 'Hệ thống đô thị', title: 'hệ thống đô thị' },
+  { key: 'QHC25', label: 'QHC 1/25.000', title: 'quy hoạch chung tỷ lệ 1/25.000' },
+  ...['QHC', 'QHPK'].map(k => PLAN_LEVELS.find(l => l.key === k)),
+  { key: 'QHCT', label: 'QHCT 1/500', title: 'quy hoạch chi tiết tỷ lệ 1/500' }
+];
+
+const staticOf = (key) => document.querySelector(`[data-plan-static="${key}"]`);
+
+// Dựng lại danh sách (innerHTML) sẽ hủy các ô lớp tĩnh đang gắn bên trong: trả về khung chứa trước, gắn lại sau.
+// Ô lớp phải luôn nằm trong document (các module tra theo id)
+function parkStatic() {
+  $('planStaticRows')?.append(...document.querySelectorAll('[data-plan-static]'));
+}
+
+function mountStatic(box) {
+  box.querySelectorAll('[data-static-slot]').forEach(slot => {
+    const el = staticOf(slot.dataset.staticSlot);
+    if (el) slot.replaceWith(el);
+  });
+}
+
 function renderList() {
   renderHead();
   const box = $('projectList');
   if (!box) return;
-  if (!projects.length) {
-    box.innerHTML = '<div class="project-empty">Chưa có đồ án. Admin nhập file ở tab Đề xuất › Nhập hàng loạt.</div>';
-    return;
-  }
+  parkStatic();
   const q = foldText(query.trim());
   const visible = projects.map((p, idx) => ({ p, idx })).filter(({ p }) => !q || foldText(p.name).includes(q));
   const admin = isAdmin();
@@ -432,17 +454,28 @@ function renderList() {
       ${open ? `<div class="pg-body">${rows(items)}</div>` : ''}
     </div>`;
   };
-  // Đang tìm: danh sách phẳng; không tìm: nhóm cấp đồ án › nhóm phường, nhóm đóng chưa dựng dòng
-  box.innerHTML = migrateBtn + none + (q ? rows(visible) : PLAN_LEVELS.map(level => {
+  // Đang tìm: danh sách phẳng; không tìm: nhóm cấp › (dòng lớp riêng) + nhóm phường, nhóm phường đóng chưa dựng dòng.
+  // Thân nhóm có dòng lớp riêng luôn dựng (ẩn khi đóng) để ô lớp không rời document
+  if (q) {
+    box.innerHTML = migrateBtn + none + rows(visible);
+    return;
+  }
+  box.innerHTML = migrateBtn + LIST_LEVELS.map(level => {
     const items = visible.filter(({ p }) => p.level === level.key);
-    if (!items.length) return '';
+    const fixed = !!staticOf(level.key);
+    if (!fixed && !items.length && level.key !== 'QHPK') return '';
     const open = !closedLevels.has(level.key);
+    const empty = level.key === 'QHPK' && !projects.length
+      ? '<div class="project-empty">Chưa có đồ án. Admin nhập file ở tab Đề xuất › Nhập hàng loạt.</div>' : '';
+    const body = (fixed ? `<div data-static-slot="${level.key}"></div>` : '') + empty
+      + (open ? wardGroups(items).map(wardHtml).join('') : '');
     return `<div class="pl-group${open ? ' open' : ''}" data-level-group="${level.key}">
-      <button type="button" class="pl-head" data-level-toggle="${level.key}" aria-expanded="${open}" title="${open ? 'Thu gọn' : 'Xem'} các đồ án ${level.title}">
-        ${ico('chev-right')}<span>${level.label}</span><small>${items.length}</small></button>
-      ${open ? `<div class="pl-body">${wardGroups(items).map(wardHtml).join('')}</div>` : ''}
+      <button type="button" class="pl-head" data-level-toggle="${level.key}" aria-expanded="${open}" title="${open ? 'Thu gọn' : 'Xem'} ${level.title}">
+        ${ico('chev-right')}<span>${level.label}</span>${items.length ? `<small>${items.length}</small>` : ''}</button>
+      <div class="pl-body"${open ? '' : ' hidden'}>${body}</div>
     </div>`;
-  }).join(''));
+  }).join('');
+  mountStatic(box);
 }
 
 function wardGroups(items) {
