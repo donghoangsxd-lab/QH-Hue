@@ -322,6 +322,7 @@
           <div class="layer-main-tabs" role="tablist" aria-label="Quy hoạch và công trình">
             <button type="button" class="layer-main-tab active" role="tab" data-main-tab="plan" aria-selected="true" aria-controls="layerPanePlan" title="Danh sách đồ án. Bật một đồ án là hiện đủ ranh lô: lô thuộc nhóm hạ tầng và các lô còn lại."><span class="layer-main-label">Quy hoạch</span><span class="layer-count none" id="projectCount" title="Số đồ án đang hiện / tổng số đồ án">0</span></button>
             <button type="button" class="layer-main-tab" role="tab" data-main-tab="infra" aria-selected="false" aria-controls="layerPaneInfra" title="14 nhóm biểu tượng trên bản đồ. Nút tròn bật vùng phủ theo QCVN."><span class="layer-main-label">Công trình</span><span class="layer-count none" id="layerCount" title="Số nhóm đang hiện / tổng số nhóm">0/14</span></button>
+            <button type="button" class="layer-main-tab" role="tab" data-main-tab="gp" aria-selected="false" aria-controls="layerPaneGp" title="Quy hoạch chung: mỗi đô thị, khu vực đô thị sau 2030 theo Quyết định 756/QĐ-UBND lập 1 QHC — căn cứ lập QHPK 1/2.000, xác lập chỉ tiêu phân loại, nâng cấp đô thị. Bấm một QHC để vẽ phạm vi và mở hồ sơ ở bảng dưới"><span class="layer-main-label">QHC</span><span class="layer-count" id="gpCount" title="Số quy hoạch chung phải lập">0</span></button>
             <button type="button" class="layer-eye-btn" id="btnProjectsAll" data-main-eye="plan" aria-pressed="false" title="Ẩn / hiện mọi đồ án trong danh sách" aria-label="Ẩn / hiện mọi đồ án">
               <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>
             </button>
@@ -360,6 +361,9 @@
         </div>
         <input type="search" id="projectSearch" class="project-search" placeholder="Tìm đồ án..." aria-label="Tìm đồ án quy hoạch" hidden>
         <div id="projectList" class="project-list"></div>
+          </div>
+          <div class="layer-main-pane" id="layerPaneGp" data-main-pane="gp" role="tabpanel" hidden>
+        <div id="gpList" class="gp-list"></div>
           </div>
         </div>
 
@@ -837,7 +841,7 @@
           <!-- Chỉ tiêu địa bàn: hàng trên hiện trạng, hàng dưới quy hoạch (cùng cột = cùng chỉ tiêu) -->
           <div class="bp-head-stats" id="bpHeadStats"></div>
           <div class="bp-actions" data-html2canvas-ignore="true">
-            <span class="flip-dots" id="part2Dots"><i class="active" data-page="0" title="Bảng tổng hợp hạ tầng"></i><i data-page="1" title="Tiêu chí phân loại đô thị"></i><i data-page="2" title="Chỉ tiêu tăng trưởng xanh"></i></span>
+            <span class="flip-dots" id="part2Dots"><i class="active" data-page="0" title="Bảng tổng hợp hạ tầng"></i><i data-page="1" title="Tiêu chí phân loại đô thị"></i><i data-page="2" title="Chỉ tiêu tăng trưởng xanh"></i><i data-page="3" title="Quy hoạch chung đô thị"></i></span>
             <button type="button" class="bp-btn" id="btnFlipPart2" aria-pressed="false" title="Trang sau: phân loại đô thị (hiện trạng theo Quyết định 614/QĐ-UBND, mục tiêu 2030 theo Quyết định 756/QĐ-UBND, tiêu chí Nghị quyết 111/2025/UBTVQH15)"><svg class="ico"><use href="#i-flag"/></svg>Phân loại</button>
             <button type="button" class="bp-btn bp-icon" id="btnToggleStatTable" title="Xem bảng thông tin" aria-label="Xem bảng thông tin"><svg class="ico"><use href="#i-table"/></svg></button>
             <button type="button" class="bp-btn bp-icon" id="btnExportBottomPdf" title="Xuất báo cáo PDF" aria-label="Xuất báo cáo PDF"><svg class="ico"><use href="#i-printer"/></svg></button>
@@ -906,6 +910,9 @@
           </div>
           <div class="p2-face" data-page="2" aria-hidden="true">
             <div class="bp-view" id="gtxView"></div>
+          </div>
+          <div class="p2-face" data-page="3" aria-hidden="true">
+            <div class="bp-view" id="gpView"></div>
           </div>
           </div>
         </div>

@@ -970,3 +970,13 @@ export function reloadUrbanClassRoads() {
   roads = null;
   return loadRoads(true);
 }
+
+/** Đo 1 tiêu chuẩn Bảng 2A trên phạm vi bất kỳ { id, cls, units } (module Quy hoạch chung); hi = mức tối đa của loại cls. */
+export function measure2A(code, scope, wards) {
+  const std = STD_2A.find(s => s.code === code);
+  if (!std || !std.calc) return null;
+  const b = bandOf(std, scope.cls);
+  return { std, m: measure(std.calc, scope, wards, roads), hi: b ? b.hi : null };
+}
+
+export const ensureClassRoads = () => loadRoads();

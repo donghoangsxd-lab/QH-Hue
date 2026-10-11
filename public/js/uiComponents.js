@@ -14,6 +14,7 @@ import { balanceSlot, balanceScaleHtml, toggleBalanceMap, clearBalanceMap, isBal
 import { loadNewDevStats, newDevOf, newDevRowHtml } from './newDev.js';
 import { renderGreenGrowth, initGreenGrowthEvents, reloadGreenGrowthRoads } from './greenGrowth.js';
 import { renderUrbanClass, initUrbanClassEvents, reloadUrbanClassRoads } from './urbanClass.js';
+import { renderGeneralPlan, initGeneralPlanEvents, refreshGeneralPlanPanel } from './generalPlanUi.js';
 
 let chartInstance = null;
 let infraPieInstance = null;
@@ -1426,6 +1427,7 @@ export async function renderBottomPanel() {
 
   renderClass();
   renderGtx();
+  renderGp();
   if (city) {
     clearBalanceMap();
     renderCityHeadStats();
@@ -1442,11 +1444,12 @@ export async function renderBottomPanel() {
   renderWardSummary(wardData);
 }
 
-// Bảng 2 có 3 trang: hạ tầng, tiêu chí phân loại đô thị (urbanClass.js), tăng trưởng xanh (greenGrowth.js)
+// Bảng 2 có 4 trang: hạ tầng, tiêu chí phân loại đô thị (urbanClass.js), tăng trưởng xanh (greenGrowth.js), quy hoạch chung (generalPlanUi.js)
 const PART2_PAGES = [
   { title: 'BẢNG TỔNG HỢP HẠ TẦNG', next: 'Phân loại', icon: 'flag', hint: 'Trang sau: phân loại đô thị (hiện trạng theo Quyết định 614/QĐ-UBND, mục tiêu 2030 theo Quyết định 756/QĐ-UBND, tiêu chí Nghị quyết 111/2025/UBTVQH15)' },
   { title: 'TIÊU CHÍ PHÂN LOẠI ĐÔ THỊ', next: 'Tăng trưởng xanh', icon: 'leaf', hint: 'Trang sau: chỉ tiêu xây dựng đô thị tăng trưởng xanh (Thông tư 01/2018/TT-BXD, hợp nhất tại VBHN 97/2026/VBHN-TT-BXD)' },
-  { title: 'CHỈ TIÊU TĂNG TRƯỞNG XANH', next: 'Hạ tầng', icon: 'table', hint: 'Trang sau: quay lại bảng tổng hợp hạ tầng' }
+  { title: 'CHỈ TIÊU TĂNG TRƯỞNG XANH', next: 'Quy hoạch chung', icon: 'map', hint: 'Trang sau: quy hoạch chung từng đô thị theo Quyết định 756/QĐ-UBND — hồ sơ, QHPK 1/2.000 triển khai, chỉ số trưởng thành đô thị' },
+  { title: 'QUY HOẠCH CHUNG ĐÔ THỊ', next: 'Hạ tầng', icon: 'table', hint: 'Trang sau: quay lại bảng tổng hợp hạ tầng' }
 ];
 let part2Page = 0;
 
@@ -1470,6 +1473,17 @@ function renderGtx() {
   renderGreenGrowth(el, { wardName: isCityMode() ? '' : state.selectedWard, wards: state.wardStatsData });
 }
 
+function renderGp() {
+  refreshGeneralPlanPanel();
+  const el = document.getElementById('gpView');
+  if (part2Page !== 3 || !el) return;
+  if (!state.wardStatsData.length) {
+    el.innerHTML = `<div class="rp-empty">${ico('clock')}Đang tổng hợp dữ liệu...</div>`;
+    return;
+  }
+  renderGeneralPlan(el, { wardName: isCityMode() ? '' : state.selectedWard });
+}
+
 function setPart2Page(page) {
   const flip = document.getElementById('part2Flip');
   if (!flip) return;
@@ -1490,6 +1504,7 @@ function setPart2Page(page) {
   document.querySelectorAll('#part2Dots i').forEach(dot => dot.classList.toggle('active', Number(dot.dataset.page) === part2Page));
   renderClass();
   renderGtx();
+  renderGp();
 }
 
 let pdfExporting = false;
@@ -1505,7 +1520,8 @@ export async function exportBottomPanelPdf() {
     return;
   }
   const place = isCityMode() ? 'TP-Hue' : state.selectedWard;
-  const fileName = part2Page === 2 ? `Chi-Tieu-Tang-Truong-Xanh-${place}.pdf`
+  const fileName = part2Page === 3 ? `Quy-hoach-chung-${place}.pdf`
+    : part2Page === 2 ? `Chi-Tieu-Tang-Truong-Xanh-${place}.pdf`
     : part2Page === 1 ? `Tieu-chi-Phan-loai-Do-thi-${place}.pdf`
     : (isCityMode() ? 'Bao-Cao-Ha-Tang-TP-Hue.pdf' : `Bao-Cao-${state.selectedWard}.pdf`);
   body.classList.add('pdf-export');
@@ -1537,11 +1553,12 @@ export function initBottomPanelEvents() {
   document.addEventListener(ROADS_META_EVENT, () => {
     ensureRoadTypes(true);
     reloadGreenGrowthRoads().then(renderGtx).catch(err => console.warn('Tăng trưởng xanh – mạng lưới đường lỗi:', err));
-    reloadUrbanClassRoads().then(renderClass).catch(err => console.warn('Phân loại đô thị – mạng lưới đường lỗi:', err));
+    reloadUrbanClassRoads().then(() => { renderClass(); renderGp(); }).catch(err => console.warn('Phân loại đô thị – mạng lưới đường lỗi:', err));
   });
   document.addEventListener(BUILT_AREA_EVENT, () => {
     if (roadTypesByWard) refreshRoadViews();
     renderClass();
+    renderGp();
   });
   document.getElementById('btnFlipPart2')?.addEventListener('click', () => setPart2Page(part2Page + 1));
   document.getElementById('part2Dots')?.addEventListener('click', (e) => {
@@ -1550,6 +1567,7 @@ export function initBottomPanelEvents() {
   });
   initGreenGrowthEvents(document.getElementById('gtxView'), renderGtx);
   initUrbanClassEvents(document.getElementById('classView'), renderClass);
+  initGeneralPlanEvents(document.getElementById('gpView'), renderGp);
   document.getElementById('statTableBody')?.addEventListener('click', (e) => {
     const link = e.target.closest('.ward-link');
     if (link) selectWardDetail(link.dataset.ward);

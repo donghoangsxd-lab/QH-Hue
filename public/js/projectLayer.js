@@ -15,6 +15,7 @@ import {
 import { planMap, onCompareChange, passToolClick } from './planMap.js';
 import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName, wardScopeName } from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
+import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
@@ -39,14 +40,6 @@ const NEIGHBOR_PAD_DEG = 0.003;
 
 const CITY_NAME = 'Thành phố Huế';
 const NO_WARD = 'Chưa xác định phường, xã';
-// Cấp đồ án quyết định bộ ký hiệu (tab Chú giải). Mọi đồ án hiện có là QHPK 1/2.000; chỉ tên bắt đầu bằng "QHC"
-// (không phải QHCT / QHCPK) hoặc "Quy hoạch chung" mới xếp vào QHC 1/10.000
-const PLAN_LEVELS = [
-  { key: 'QHPK', label: 'QHPK 1/2.000', title: 'Quy hoạch phân khu tỷ lệ 1/2.000' },
-  { key: 'QHC', label: 'QHC 1/10.000', title: 'Quy hoạch chung đô thị tỷ lệ 1/10.000' }
-];
-const QHC_NAME_RE = /^\s*(QHC(?![A-Z])|quy hoạch chung(\s|$))/i;
-const planLevelOf = (name) => (QHC_NAME_RE.test(String(name || '')) ? 'QHC' : 'QHPK');
 
 const $ = (id) => document.getElementById(id);
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
@@ -1670,6 +1663,12 @@ export function initProjectLayer(opts = {}) {
     if (del) { const p = projects[Number(del.dataset.del)]; if (p) deleteProject(p); }
   });
   document.addEventListener('cadparcels:loaded', rebuild);
+  document.addEventListener(OPEN_PROJECT_EVENT, (e) => {
+    const p = projects.find(x => x.name === e.detail);
+    if (!p) return;
+    openProject(p);
+    revealInList(p);
+  });
   document.addEventListener('auth:change', () => {
     renderList();
     const bar = document.querySelector('#decisionView [data-decision-admin]');

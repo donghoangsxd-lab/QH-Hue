@@ -1518,7 +1518,7 @@ body.bottom-max .rc-road i { animation: rc-grow 0.9s cubic-bezier(0.2, 0.8, 0.2,
 
 .bp-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
-/* BẢNG 2, 3 TRANG: HẠ TẦNG → PHÂN LOẠI ĐÔ THỊ → TĂNG TRƯỞNG XANH (uiComponents.js › setPart2Page) */
+/* BẢNG 2, 4 TRANG: HẠ TẦNG → PHÂN LOẠI ĐÔ THỊ → TĂNG TRƯỞNG XANH → QUY HOẠCH CHUNG (uiComponents.js › setPart2Page) */
 .p2-flip { position: relative; flex: 1; min-height: 0; }
 .p2-face {
   position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -1526,7 +1526,8 @@ body.bottom-max .rc-road i { animation: rc-grow 0.9s cubic-bezier(0.2, 0.8, 0.2,
 }
 .p2-flip[data-page="0"] > .p2-face[data-page="0"],
 .p2-flip[data-page="1"] > .p2-face[data-page="1"],
-.p2-flip[data-page="2"] > .p2-face[data-page="2"] { visibility: visible; pointer-events: auto; }
+.p2-flip[data-page="2"] > .p2-face[data-page="2"],
+.p2-flip[data-page="3"] > .p2-face[data-page="3"] { visibility: visible; pointer-events: auto; }
 .p2-face[aria-hidden="true"] { pointer-events: none; }
 .bp-part2.p2-alt #btnToggleStatTable { display: none !important; }
 
@@ -1676,6 +1677,40 @@ table.uc-dtable-2a tr.uc-group td, table.uc-dtable-2a tr.uc-sub td { white-space
 .uc-dsum-groups { display: flex; flex-wrap: wrap; gap: 2px 14px; }
 .uc-dsum .uc-legend { flex-wrap: wrap; gap: 2px 10px; margin-left: 0; }
 .uc-city .ico, .uc-side .ico { width: 12px; height: 12px; }
+
+/* QUY HOẠCH CHUNG (generalPlanUi.js): trang 4 bảng tổng hợp dùng lại khung uc-*; danh mục QHC ở tab QHC panel phải */
+.gp-st { display: inline-block; padding: 0 6px; border-radius: var(--r-sm); border: 1px solid currentColor; font-size: var(--fs-xs); font-weight: 700; line-height: 15px; white-space: nowrap; }
+.gp-st-unknown, .gp-st-none { color: var(--text-muted); }
+.gp-st-drafting, .gp-st-review { color: var(--accent-orange); }
+.gp-st-approved { color: var(--accent-green); }
+.gp-st-revising { color: var(--accent-cyan); }
+.gp-chain { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-size: var(--fs-xs); color: var(--text-muted); white-space: nowrap; cursor: help; }
+.gp-chain .ico { width: 10px; height: 10px; }
+.gp-wrap { flex: 0 1 auto; }
+table.gp-table { width: max-content; }
+table.gp-rec td:last-child { text-align: left; }
+table.gp-mat td { overflow: hidden; overflow-wrap: anywhere; }
+.uc-bar .gp-map-btn { margin-left: auto; }
+.gp-list { display: flex; flex-direction: column; gap: 3px; padding-top: 4px; }
+.gp-list > .gp-chain { margin: 0 0 4px; }
+.gp-row {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 6px; align-items: center;
+  width: 100%; padding: 4px 6px; box-sizing: border-box; text-align: left; cursor: pointer; font: inherit; color: var(--text-main);
+  border: 1px solid var(--border-soft); border-radius: var(--r-md); background: rgba(15, 23, 42, 0.5);
+}
+.gp-row:hover { border-color: var(--accent-cyan); }
+.gp-row.is-here { background: rgba(var(--cyan-rgb), 0.08); }
+.gp-row.is-sel { border-color: #facc15; box-shadow: inset 3px 0 0 #facc15; }
+.gp-cls { grid-row: 1 / span 2; text-align: center; font-size: var(--fs-md); }
+.gp-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); font-weight: 700; }
+.gp-meta { grid-column: 2 / -1; color: var(--text-muted); font-size: var(--fs-xs); }
+.gp-st-sub { color: #fb923c; }
+.gp-grp { margin-top: 4px; font-size: var(--fs-xs); font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.gp-grp-sub { margin: 0 0 0 14px; color: #fb923c; text-transform: none; }
+.gp-row.gp-sub { margin-left: 14px; width: calc(100% - 14px); border-style: dashed; }
+tr.gp-sub td.uc-name { padding-left: 1.4em; }
+.gp-clsc { white-space: nowrap; }
+.gp-clsc .ico { width: 9px; height: 9px; vertical-align: middle; }
 .bp-chart-wrap { flex: 1; min-height: 0; position: relative; }
 body.bottom-max #cityChartView { flex: 0 0 34%; margin-bottom: 8px; }
 

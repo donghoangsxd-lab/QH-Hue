@@ -344,9 +344,24 @@ const SECTIONS = [
         ],
         facts: [
           'Khu vực đô thị tính theo các phường thuộc bộ chỉ tiêu đô thị.',
-          'Bộ tiêu chí đánh giá mức trưởng thành đô thị riêng đang được xây dựng.'
+          'Chỉ số trưởng thành theo từng đô thị đo ở trang Quy hoạch chung (mục dưới).'
         ],
         actions: [{ label: 'Xem báo cáo', icon: 'leaf', run: () => showBottomPage(2) }]
+      },
+      {
+        id: 'generalPlan', btn: 'report', status: 'dev',
+        title: 'Quy hoạch chung từng đô thị và chỉ số trưởng thành đô thị',
+        lead: 'Quy hoạch chung là cấp trung gian giữa Quyết định 756/QĐ-UBND và QHPK 1/2.000, xác lập chỉ tiêu phân loại, nâng cấp đô thị. QHC thành phố Huế (loại I) lập cho toàn thành phố, vùng lõi 1/10.000 gồm khu vực trung tâm, Hương Thủy, Hương Trà, Hóa Châu, Mỹ Thượng; đô thị vệ tinh Phong Điền, Chân Mây và 7 đô thị loại III lập QHC riêng.',
+        steps: [
+          'Panel phải › <b>Lớp dữ liệu</b> › tab <b>QHC</b>: bấm một quy hoạch chung hoặc khu vực vùng lõi để vẽ phạm vi trên bản đồ và mở hồ sơ.',
+          'Bảng tổng hợp phía dưới, trang <b>Quy hoạch chung</b>: tổng quan 10 QHC theo nhóm (thành phố, đô thị vệ tinh, đô thị loại III), 5 khu vực vùng lõi xếp dưới QHC thành phố Huế; bấm tên để xem hồ sơ, phân vùng 1/10.000 – 1/25.000, các QHPK 1/2.000 triển khai và chỉ số trưởng thành.',
+          'Chỉ số trưởng thành = hiện trạng so với chỉ tiêu QHC (khu vực vùng lõi: chỉ tiêu do QHC thành phố Huế quy định); chưa có chỉ tiêu thì so với mức tối đa Bảng 2A Nghị quyết 111/2025/UBTVQH15 của loại đô thị định hướng.'
+        ],
+        facts: [
+          'Hồ sơ QHC (quyết định, thời hạn, chỉ tiêu) đang để khung chờ cập nhật.',
+          'Đồ án tên bắt đầu bằng "QHC" được xếp cấp QHC 1/10.000 và tự gắn vào quy hoạch chung tương ứng.'
+        ],
+        actions: [{ label: 'Xem báo cáo', icon: 'map', run: () => showBottomPage(3) }]
       },
       {
         id: 'priority', btn: 'map', status: 'trial',
