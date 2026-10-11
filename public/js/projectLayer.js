@@ -1,6 +1,6 @@
 // Mục Quy hoạch (tab Lớp dữ liệu): 4 nhóm cấp theo droplist (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000,
-// QHCT 1/500) gồm dòng lớp riêng của cấp (#planStaticRows) và đồ án nhập; trong mỗi cấp đồ án nhóm theo phường
-// (đồ án liên phường có mặt ở mỗi phường), mỗi đồ án (Ten_QH)
+// QHCT 1/500) gồm dòng lớp riêng của cấp (#planStaticRows) và đồ án nhập; QHPK, QHCT nhóm đồ án theo phường
+// (đồ án liên phường có mặt ở mỗi phường), QHC liệt kê thẳng; mỗi đồ án (Ten_QH)
 // bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + thông tin ở panel dưới),
 // Admin xóa / chuyển đồ án cũ.
 // Nút file mở PDF quyết định phê duyệt (projects/<slug>/quyet-dinh.pdf, dưới 1 MB). Admin gắn, thay hoặc gỡ.
@@ -415,6 +415,9 @@ const LIST_LEVELS = [
   { key: 'QHCT', label: 'QHCT 1/500', title: 'quy hoạch chi tiết tỷ lệ 1/500' }
 ];
 
+// Cấp QHC ít đồ án: liệt kê thẳng dưới nhóm cấp, không gom theo phường, xã
+const FLAT_LEVELS = new Set(['QHC25', 'QHC']);
+
 const staticOf = (key) => document.querySelector(`[data-plan-static="${key}"]`);
 
 // Dựng lại danh sách (innerHTML) sẽ hủy các ô lớp tĩnh đang gắn bên trong: trả về khung chứa trước, gắn lại sau.
@@ -454,7 +457,7 @@ function renderList() {
       ${open ? `<div class="pg-body">${rows(items)}</div>` : ''}
     </div>`;
   };
-  // Đang tìm: danh sách phẳng; không tìm: nhóm cấp › (dòng lớp riêng) + nhóm phường, nhóm phường đóng chưa dựng dòng.
+  // Đang tìm: danh sách phẳng; không tìm: nhóm cấp › (dòng lớp riêng) + nhóm phường (QHC: đồ án), nhóm phường đóng chưa dựng dòng.
   // Thân nhóm có dòng lớp riêng luôn dựng (ẩn khi đóng) để ô lớp không rời document
   if (q) {
     box.innerHTML = migrateBtn + none + rows(visible);
@@ -473,9 +476,10 @@ function renderList() {
       ? '<div class="project-empty">Chưa có đồ án. Admin nhập file ở tab Đề xuất › Nhập hàng loạt.</div>' : '';
     const scopeNote = scoped && all.length
       ? `<div class="project-scope" title="Đồ án có phường, xã thuộc vùng lõi (phạm vi QHC 1/10.000 mở rộng theo QĐ 756). Chọn lớp khác để xem toàn bộ">${ico('coverage')}<span>Trong phạm vi QHC 1/10.000: <b>${items.length}</b>/${all.length} đồ án</span></div>` : '';
-    const groups = wardGroups(items).filter(([w]) => !scoped || isCoreWard(w));
-    const body = (fixed ? `<div data-static-slot="${level.key}"></div>` : '') + empty + scopeNote
-      + (open ? groups.map(wardHtml).join('') : '');
+    const list = !open ? ''
+      : FLAT_LEVELS.has(level.key) ? rows(items)
+        : wardGroups(items).filter(([w]) => !scoped || isCoreWard(w)).map(wardHtml).join('');
+    const body = (fixed ? `<div data-static-slot="${level.key}"></div>` : '') + empty + scopeNote + list;
     return `<div class="pl-group${open ? ' open' : ''}" data-level-group="${level.key}">
       <button type="button" class="pl-head" data-level-toggle="${level.key}" aria-expanded="${open}" title="${open ? 'Thu gọn' : 'Xem'} ${level.title}">
         ${ico('chev-right')}<span>${level.label}</span>${items.length ? `<small>${items.length}</small>` : ''}</button>
