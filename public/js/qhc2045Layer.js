@@ -2,8 +2,8 @@
 //  - chk_qhc25: sơ đồ tổ chức không gian 1/25.000 toàn đô thị (vùng phát triển, mặt nước, cây xanh, ranh khu vực, điểm đô thị);
 //  - chk_qhc10: sử dụng đất 1/10.000 khu vực trung tâm (lô theo ký hiệu TT16 Mục 02, viền theo giai đoạn) + 4 tiểu vùng,
 //    phân khu, điểm chức năng và vùng đỏ đang điều chỉnh (Hóa Châu, Mỹ Thượng ngoài đồ án cũ);
-//  - thanh chọn nhanh dưới tiêu đề (toàn thành phố) và thẻ Khu vực trung tâm: full = tra cứu lô / chọn phường / chọn QHPK,
-//    mini = đang xem phường hoặc đồ án trong vùng lõi, bấm để quay lại. viewFlow.js quyết định khi nào vào / ra thẻ.
+//  - thẻ Khu vực trung tâm theo lớp đang xem (mapLevel.js): lớp QHC 1/10.000 → full (tra cứu lô / chọn phường lõi /
+//    chọn QHPK); QHPK mở từ thẻ → mini (nút quay lại); lớp khác → ẩn. Lớp QHC 1/25.000 → nhãn đồ án dưới tiêu đề.
 // Mọi lớp vẽ ở pane riêng dưới lô đồ án QHPK (overlayPane 400) để QHPK 1/2.000 luôn nằm trên QHC.
 import { state } from './state.js';
 import { map, wardNameAt } from './mapEngine.js';
@@ -12,6 +12,7 @@ import { escapeHtml, fmtNum, ico, RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './uti
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT } from './tt16Symbols.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { showGeneralPlan } from './generalPlanUi.js';
+import { getLevel, levelOrigin } from './mapLevel.js';
 import {
   QHC2045, CENTER_UNITS, CORE_GROUPS, ZONE_NAMES, STAGE_LAYERS, landOf,
   visionColor, visionLineStyle, WATER_KINDS, GREEN_COLOR
@@ -21,7 +22,6 @@ import {
 export const CORE_NAV_EVENT = 'qh:qhc-core-nav';
 
 const PANES = { vision: ['qhc25Pane', 340], land: ['qhc10Pane', 350], frame: ['qhc10FramePane', 365] };
-const CENTER_PICK_MAX_ZOOM = 14;
 const LABEL_MIN_ZOOM = 14;
 const TV_LABEL_MAX_ZOOM = 14;
 // Nhãn 26 đô thị của đồ án cũ trùng chỗ ký hiệu hệ thống đô thị QĐ 756 khi nhìn toàn tỉnh: chỉ hiện ở mức phóng vừa
@@ -344,31 +344,11 @@ function ensurePlanView() {
   if (planMap && !isSplitOn() && getViewMode() !== 'QH') setViewMode('QH');
 }
 
-function setChecked(id, on) {
-  const el = $(id);
-  if (!el || el.checked === on) return;
-  el.checked = on;
-  el.dispatchEvent(new Event('change', { bubbles: true }));
-}
-
 function syncToggles() {
-  const on10 = !!$('chk_qhc10')?.checked;
-  const on25 = !!$('chk_qhc25')?.checked;
-  document.querySelectorAll('[data-qhc-chk="chk_qhc10"]').forEach(el => { el.checked = on10; el.setAttribute?.('aria-pressed', String(on10)); });
-  document.querySelectorAll('[data-qhc-chk="chk_qhc25"]').forEach(el => { el.checked = on25; el.setAttribute?.('aria-pressed', String(on25)); });
-  dock?.querySelectorAll('[data-qhc-toggle]').forEach(b => b.setAttribute('aria-pressed', String(!!$(b.dataset.qhcToggle)?.checked)));
-  card?.querySelector('.qhc-stages')?.toggleAttribute('hidden', !on10);
+  card?.querySelector('.qhc-stages')?.toggleAttribute('hidden', !$('chk_qhc10')?.checked);
 }
 
 // ---------- Đô thị trung tâm ----------
-/** Bấm ở màn hình toàn thành phố (nhìn rộng, chưa chọn phường) vào phường thuộc đô thị trung tâm → true */
-export function isCenterPick(latlng, m) {
-  if (!m || !latlng || m.getZoom() > CENTER_PICK_MAX_ZOOM || cardMode) return false;
-  if (state.selectedWard && state.selectedWard !== 'Thành phố Huế') return false;
-  const name = wardNameAt(latlng.lat, latlng.lng);
-  return !!name && centerSet.has(bareWard(name));
-}
-
 /** Phường, xã thuộc phạm vi 1/10.000 của đồ án (vùng lõi) */
 export const isCoreWard = inCore;
 
@@ -386,12 +366,15 @@ export function fitCenter() {
   shown.flyToBounds(b, { paddingTopLeft: [30 + cardW, 30], paddingBottomRight: [30, 30], duration: 0.9 });
 }
 
-export const coreCardMode = () => cardMode;
+/** Phường lõi đang chọn (tên gọn) hoặc null khi xem cả khu vực */
+const coreWardSel = () => (inCore(state.selectedWard) ? bareWard(state.selectedWard) : null);
 
 function coreProjects() {
   const q = projectQuery.trim().toLowerCase();
+  const sel = coreWardSel();
+  const hit = sel ? (w) => bareWard(w) === sel : inCore;
   return (state.projectCatalog || [])
-    .filter(p => p && p.tenQH && planLevelOf(p.tenQH) === 'QHPK' && (p.wards || []).some(inCore))
+    .filter(p => p && p.tenQH && planLevelOf(p.tenQH) === 'QHPK' && (p.wards || []).some(hit))
     .filter(p => !q || `${p.tenQH} ${(p.wards || []).join(' ')}`.toLowerCase().includes(q))
     .sort((a, b) => String(a.tenQH).localeCompare(String(b.tenQH), 'vi'));
 }
@@ -404,10 +387,12 @@ function projectListHtml() {
 }
 
 function fullCardHtml() {
+  const sel = coreWardSel();
   const groups = CORE_GROUPS.map(g => `<div class="qhc-grp">
       <span class="qhc-grp-name"><b class="uc-${g.cls}">${g.cls}</b>${escapeHtml(g.name)}</span>
-      <div class="qhc-chips">${g.units.map(u => `<button type="button" class="qhc-chip${bareWard(state.selectedWard) === bareWard(u) ? ' is-sel' : ''}" data-qhc-ward="${escapeHtml(fullWard(u))}">${escapeHtml(u)}</button>`).join('')}</div>
+      <div class="qhc-chips">${g.units.map(u => `<button type="button" class="qhc-chip${sel === bareWard(u) ? ' is-sel' : ''}" data-qhc-ward="${escapeHtml(fullWard(u))}" aria-pressed="${String(sel === bareWard(u))}">${escapeHtml(u)}</button>`).join('')}</div>
     </div>`).join('');
+  const allChip = `<button type="button" class="qhc-chip qhc-chip-all${sel ? '' : ' is-sel'}" data-qhc-ward="Thành phố Huế" aria-pressed="${String(!sel)}">Cả khu vực</button>`;
   return `<div class="qhc-card-head">
       <button type="button" class="qhc-fold" data-qhc-fold aria-expanded="true" title="Thu gọn / mở thẻ">${ico('chev-up')}</button>
       <div class="qhc-card-title">
@@ -415,15 +400,11 @@ function fullCardHtml() {
         <b>Khu vực đô thị trung tâm</b>
       </div>
       <span class="qhc-flag" title="${escapeHtml(QHC2045.statusNote)}">${escapeHtml(QHC2045.status)}</span>
-      <button type="button" class="qhc-x" data-qhc-nav="city" title="Về toàn thành phố" aria-label="Về toàn thành phố">${ico('close')}</button>
+      <button type="button" class="qhc-x" data-qhc-nav="city" title="Đóng, về Hệ thống đô thị toàn thành phố" aria-label="Đóng, về Hệ thống đô thị toàn thành phố">${ico('close')}</button>
     </div>
     <div class="qhc-card-body">
       <div class="qhc-src" title="${escapeHtml(QHC2045.source)}">${escapeHtml(QHC2045.name)}</div>
       <div class="qhc-sec">
-        <div class="qhc-toggles">
-          <label><input type="checkbox" data-qhc-chk="chk_qhc10">Sử dụng đất 1/10.000</label>
-          <label><input type="checkbox" data-qhc-chk="chk_qhc25">Định hướng 1/25.000</label>
-        </div>
         <div class="qhc-stages" role="group" aria-label="Giai đoạn">${STAGES.map(s => `<button type="button" data-qhc-stage="${s.id}" aria-pressed="${String(s.id === stage)}">${s.label}</button>`).join('')}</div>
         <div class="qhc-note"><i class="qhc-sw qhc-sw-dc"></i>Vùng đỏ: phần Hóa Châu, Mỹ Thượng chưa có trong đồ án, đang điều chỉnh</div>
       </div>
@@ -433,10 +414,11 @@ function fullCardHtml() {
       </div>
       <div class="qhc-sec">
         <div class="qhc-sec-h"><span>2</span>Chọn phường, xã <small>vùng lõi ${coreSet.size} đơn vị</small></div>
+        <div class="qhc-chips">${allChip}</div>
         ${groups}
       </div>
       <div class="qhc-sec">
-        <div class="qhc-sec-h"><span>3</span>Xem QHPK 1/2.000 <b class="layer-count" data-qhc-pcount>${coreProjects().length}</b></div>
+        <div class="qhc-sec-h"><span>3</span>Xem QHPK 1/2.000 <small>${sel ? escapeHtml(sel) : 'cả khu vực'}</small><b class="layer-count" data-qhc-pcount>${coreProjects().length}</b></div>
         <input type="search" class="project-search qhc-search" data-qhc-search placeholder="Tìm đồ án, phường..." value="${escapeHtml(projectQuery)}" aria-label="Tìm đồ án QHPK trong vùng lõi">
         <div class="qhc-plist" data-qhc-plist>${projectListHtml()}</div>
       </div>
@@ -450,13 +432,12 @@ function fullCardHtml() {
 function miniCardHtml() {
   return `<div class="qhc-card-head qhc-mini">
       <button type="button" class="qhc-back" data-qhc-nav="core" title="Quay lại khu vực trung tâm (QHC 1/10.000)">${ico('chev-left')}<span><small>QHC 1/10.000</small><b>Khu vực trung tâm</b></span></button>
-      <label class="qhc-mini-chk" title="Hiện lớp sử dụng đất 1/10.000 dưới lô QHPK"><input type="checkbox" data-qhc-chk="chk_qhc10">1/10.000</label>
       <span class="qhc-flag" title="${escapeHtml(QHC2045.statusNote)}">${escapeHtml(QHC2045.status)}</span>
     </div>`;
 }
 
 /** mode: 'full' | 'mini' | null */
-export function setCoreCard(mode) {
+function setCoreCard(mode) {
   cardMode = mode || null;
   if (!card) return;
   card.hidden = !cardMode;
@@ -464,6 +445,12 @@ export function setCoreCard(mode) {
   card.innerHTML = cardMode === 'full' ? fullCardHtml() : cardMode === 'mini' ? miniCardHtml() : '';
   document.body.classList.toggle('qhc-core-on', !!cardMode);
   syncToggles();
+}
+
+/** Thẻ theo lớp đang xem; gọi lại sau khi đổi lớp / địa bàn để vẽ lại phường đang chọn và danh sách QHPK */
+export function syncCoreCard() {
+  const level = getLevel();
+  setCoreCard(level === 'qhc10' ? 'full' : level === 'qhpk' && levelOrigin() === 'qhc10' ? 'mini' : null);
 }
 
 function refreshProjects() {
@@ -480,13 +467,12 @@ function openLegend() {
 }
 
 function onUiClick(e) {
-  const el = e.target.closest('[data-qhc-ward],[data-qhc-open],[data-qhc-nav],[data-qhc-stage],[data-qhc-fold],[data-qhc-legend],[data-qhc-gp],[data-qhc-toggle]');
+  const el = e.target.closest('[data-qhc-ward],[data-qhc-open],[data-qhc-nav],[data-qhc-stage],[data-qhc-fold],[data-qhc-legend],[data-qhc-gp]');
   if (!el) return;
   const d = el.dataset;
   if (d.qhcWard) { target().closePopup(); document.dispatchEvent(new CustomEvent(WARD_PICK_EVENT, { detail: d.qhcWard })); return; }
   if (d.qhcOpen) { target().closePopup(); document.dispatchEvent(new CustomEvent(OPEN_PROJECT_EVENT, { detail: d.qhcOpen })); return; }
   if (d.qhcNav) { document.dispatchEvent(new CustomEvent(CORE_NAV_EVENT, { detail: { to: d.qhcNav } })); return; }
-  if (d.qhcToggle) { ensurePlanView(); setChecked(d.qhcToggle, !$(d.qhcToggle)?.checked); return; }
   if (d.qhcStage != null) {
     stage = d.qhcStage === 'all' ? 'all' : Number(d.qhcStage);
     card.querySelectorAll('[data-qhc-stage]').forEach(b => b.setAttribute('aria-pressed', String(b === el)));
@@ -509,23 +495,18 @@ function initUi() {
   card.setAttribute('aria-label', 'Khu vực đô thị trung tâm – QHC 1/10.000');
   document.body.appendChild(card);
   card.addEventListener('click', onUiClick);
-  card.addEventListener('change', (e) => {
-    const chk = e.target.closest('[data-qhc-chk]');
-    if (chk) { ensurePlanView(); setChecked(chk.dataset.qhcChk, chk.checked); }
-  });
   card.addEventListener('input', (e) => {
     if (!e.target.matches('[data-qhc-search]')) return;
     projectQuery = e.target.value;
     refreshProjects();
   });
 
+  // Nhãn đồ án dưới tiêu đề khi xem lớp QHC 1/25.000 (hiện / ẩn bằng CSS theo body[data-level])
   dock = document.createElement('div');
   dock.className = 'qhc-dock';
-  dock.innerHTML = `<span class="qhc-dock-name" title="${escapeHtml(`${QHC2045.name}\n${QHC2045.statusNote}`)}">${ico('layers')}${escapeHtml(QHC2045.short)}<span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></span>
-    <button type="button" data-qhc-toggle="chk_qhc25" aria-pressed="false" title="Sơ đồ tổ chức không gian, kiến trúc cảnh quan toàn đô thị">Định hướng 1/25.000</button>
-    <button type="button" data-qhc-toggle="chk_qhc10" aria-pressed="false" title="Quy hoạch sử dụng đất khu vực đô thị trung tâm. Bấm vào đô thị trung tâm trên bản đồ để mở và tra cứu">Sử dụng đất 1/10.000</button>`;
+  dock.innerHTML = `<span class="qhc-dock-name" title="${escapeHtml(`${QHC2045.name}\n${QHC2045.statusNote}`)}">${ico('layers')}${escapeHtml(QHC2045.short)} · 1/25.000<span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></span>
+    <span class="qhc-dock-hint">Bấm một khu vực để xem chức năng</span>`;
   document.body.appendChild(dock);
-  dock.addEventListener('click', onUiClick);
 
   // Nút trong popup (lô 1/10.000, vùng 1/25.000) trên cả 2 bản đồ
   [map, planMap].filter(Boolean).forEach(m => m.on('popupopen', (e) => {
@@ -548,6 +529,5 @@ export function initQhc2045Layer() {
   });
   document.addEventListener(LOT_OPACITY_EVENT, restyleLand);
   document.addEventListener('cadparcels:loaded', refreshProjects);
-  document.addEventListener(OPEN_PROJECT_EVENT, () => { if (cardMode === 'full') setCoreCard('mini'); });
   syncToggles();
 }

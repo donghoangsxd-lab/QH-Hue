@@ -40,8 +40,8 @@ const STEPS = [
   },
   {
     target: '#mapTitle',
-    title: 'Bản đồ Quy hoạch / Hiện trạng',
-    text: 'Thanh tiêu đề cho biết bản đồ đang xem. Mở trang là bản đồ quy hoạch (các đồ án); bấm nút lật cuối thanh để sang bản đồ hiện trạng (công trình đang có) và ngược lại.'
+    title: 'Bản đồ Quy hoạch / Hiện trạng và lớp quy hoạch',
+    text: 'Thanh tiêu đề cho biết bản đồ đang xem. Mở trang là bản đồ quy hoạch; bấm biểu tượng lật trang đầu thanh để sang bản đồ hiện trạng (công trình đang có) và ngược lại. Ô bên phải chọn lớp quy hoạch: Hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500 — chọn một lớp thì các lớp kia tắt; muốn so sánh nhiều lớp thì bật thêm ở panel Lớp dữ liệu.'
   },
   {
     target: '#btnToggleCompare',

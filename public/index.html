@@ -45,6 +45,7 @@
     <symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="9" rx="1.5"/><path d="M7 14h10v7H7z"/></symbol>
     <symbol id="i-maximize" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
     <symbol id="i-minimize" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
+    <symbol id="i-pageflip" viewBox="0 0 24 24"><path d="M3 6.5c2.8-1.2 5.8-1.2 9 .5v13c-3.2-1.7-6.2-1.7-9-.5z"/><path d="M12 7c1.6-2.4 4.4-3.6 8-3.4v10c-3.6-.2-6.4 1-8 3.4"/><path d="M15.5 19.5H21m-2-2 2 2-2 2"/></symbol>
     <symbol id="i-flip" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/></symbol>
     <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19C5 10 10 5 20 4c-1 10-6 15-15 15z"/><path d="M5 19l8-8"/></symbol>
     <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></symbol>
@@ -108,14 +109,14 @@
       <span class="swipe-label swipe-label-right">BẢN ĐỒ QUY HOẠCH</span>
     </div>
 
-    <!-- THANH TIÊU ĐỀ: lật Quy hoạch ⇄ Hiện trạng; chia đôi màn hình thì chọn cùng tâm / lệch tâm -->
+    <!-- THANH TIÊU ĐỀ: nút lật trang Quy hoạch ⇄ Hiện trạng; droplist lớp quy hoạch (mapLevel.js); chia đôi thì chọn cùng tâm / lệch tâm -->
     <header class="map-title" id="mapTitle" data-view="QH">
-      <span class="map-title-mark" aria-hidden="true"><svg class="ico"><use href="#i-map"/></svg></span>
+      <button type="button" class="map-title-mark" id="btnFlipView" title="Lật sang bản đồ hiện trạng" aria-label="Lật sang bản đồ hiện trạng"><svg class="ico"><use href="#i-pageflip"/></svg></button>
       <div class="map-title-body">
-        <h1 class="map-title-text" id="mapTitleText">BẢN ĐỒ QUY HOẠCH ĐÔ THỊ THÀNH PHỐ HUẾ</h1>
+        <h1 class="map-title-text" id="mapTitleText">BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ</h1>
       </div>
-      <button type="button" class="map-title-flip" id="btnFlipView" title="Lật sang bản đồ hiện trạng" aria-label="Lật sang bản đồ hiện trạng">
-        <svg class="ico"><use href="#i-flip"/></svg><span class="map-title-flip-text">Hiện trạng</span>
+      <button type="button" class="map-title-level" id="btnMapLevel" aria-haspopup="listbox" aria-expanded="false" aria-controls="mapLevelMenu">
+        <svg class="ico"><use href="#i-layers"/></svg><span class="map-title-level-text">Hệ thống đô thị</span><svg class="ico map-title-level-chev"><use href="#i-chev-down"/></svg>
       </button>
       <div class="map-title-split" role="radiogroup" aria-label="Kiểu so sánh">
         <button type="button" class="map-title-seg" data-split-kind="same" role="radio" aria-checked="true" title="Cùng tâm: hai bản đồ chồng khít, kéo thanh trượt để so sánh"><svg class="ico"><use href="#i-split-same"/></svg>Cùng tâm</button>
@@ -390,6 +391,7 @@
           <div class="layer-row"><div><input type="checkbox" id="chk_qhc25"><label for="chk_qhc25" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực và điểm đô thị. Bấm một vùng để xem chức năng"><svg class="ico ico-layer"><use href="#i-layers"/></svg>QHC 2045 · định hướng 1/25.000 <small class="layer-hint" id="qhc25Hint">(toàn đô thị)</small></label></div></div>
           <div class="layer-legend ua-legend" id="qhc25Legend" style="display:none;"></div>
           <div class="layer-row"><div><input type="checkbox" id="chk_qhc10"><label for="chk_qhc10" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045 (đang điều chỉnh): quy hoạch sử dụng đất khu vực đô thị trung tâm tỷ lệ 1/10.000, ký hiệu TT16 Phụ lục I Mục 02; viền mảnh hiện trạng, liền ngắn hạn 2030, nét đứt dài hạn 2040. Vùng đỏ: phần Hóa Châu, Mỹ Thượng chưa có trong đồ án. Bấm một lô để tra cứu"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>QHC 2045 · sử dụng đất 1/10.000 <small class="layer-hint" id="qhc10Hint">(khu vực trung tâm)</small></label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_qhct"><label for="chk_qhct" title="Quy hoạch chi tiết tỷ lệ 1/500: lô đất theo đồ án chi tiết. Dữ liệu sẽ bổ sung sau. Bấm một lô để tra cứu"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>QHCT 1/500 <small class="layer-hint" id="qhctHint">(chưa có dữ liệu)</small></label></div></div>
           <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung. Thu nhỏ vẫn hiện trục chính; chỉ mức một biểu đồ tròn toàn thành phố là ẩn"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(zoom để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
             <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>

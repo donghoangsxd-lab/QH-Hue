@@ -343,17 +343,20 @@ export function clearProjectFocus() {
 /**
  * Chọn phường: hiện lại các đồ án của phường đang bị ẩn, bật lớp Quy hoạch, mở và cuộn tới nhóm phường trong danh sách
  * (panel phải giữ nguyên trạng thái ẩn / hiện). Toàn TP: bỏ đánh dấu nhóm.
+ * opts.show = false: đang xem lớp quy hoạch khác (mapLevel.js) — chỉ đánh dấu, cuộn danh sách, không bật lớp Quy hoạch.
  */
-export function revealWardProjects(wardName) {
+export function revealWardProjects(wardName, { show = true } = {}) {
   const next = wardName && wardName !== CITY_NAME ? wardName : null;
   if (next !== currentWard) openGroups.clear();
   currentWard = next;
-  if (currentWard) {
+  if (currentWard && show) {
     let changed = false;
     projects.forEach(p => { if (p.wards.includes(currentWard) && state.hiddenProjects.delete(p.name)) changed = true; });
     if (changed) saveHidden();
     if (!state.showProjects) setMaster(true);
     ensureFullLots();
+  }
+  if (currentWard) {
     openGroups.add(currentWard);
     projects.forEach(p => { if (p.wards.includes(currentWard)) closedLevels.delete(p.level); });
     if (query) {

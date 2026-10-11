@@ -42,8 +42,10 @@ import {
   getViewMode, getSplitKind, onViewChange, setViewMode, toggleViewMode, setSplitKind, isCompareOn
 } from './planMap.js';
 import { escapeHtml, setStatusContent, showToast, announceTool, TOOL_START_EVENT, RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './utils.js';
-import { initViewFlow, wardToPick, enterCore } from './viewFlow.js';
-import { initQhc2045Layer, isCenterPick } from './qhc2045Layer.js';
+import { initViewFlow, wardFromMapClick } from './viewFlow.js';
+import { initMapLevel, getLevel } from './mapLevel.js';
+import { initQhc2045Layer } from './qhc2045Layer.js';
+import { initQhctLayer } from './qhctLayer.js';
 import { initCadImport } from './cadImportUi.js';
 import { initProjectLayer } from './projectLayer.js';
 import { initProjectReview } from './projectReview.js';
@@ -207,23 +209,22 @@ function setStatus(text, color) {
   setStatusContent(el, text);
 }
 
-// Thanh tiêu đề: lật Quy hoạch ⇄ Hiện trạng, chia đôi thì chọn cùng tâm / lệch tâm.
-// Mỗi lần đổi giao diện đặt lại lớp mặc định: Quy hoạch / so sánh bật lớp đồ án, Hiện trạng tắt.
-// Lúc mở trang giữ lớp đồ án tắt (toàn TP chỉ ranh phường + phân loại đô thị, viewFlow.js).
+// Thanh tiêu đề: nút lật trang (biểu tượng bên trái) Quy hoạch ⇄ Hiện trạng, droplist lớp quy hoạch bên phải (mapLevel.js,
+// chỉ hiện trên bản đồ quy hoạch), chia đôi thì chọn cùng tâm / lệch tâm.
+// Lớp đồ án QHPK theo lớp đang chọn: đang xem QHPK thì lật sang hiện trạng tắt, lật về quy hoạch bật lại.
 const VIEW_TITLES = {
-  QH: 'BẢN ĐỒ QUY HOẠCH ĐÔ THỊ THÀNH PHỐ HUẾ',
-  HT: 'BẢN ĐỒ HIỆN TRẠNG HẠ TẦNG THÀNH PHỐ HUẾ',
-  split: 'SO SÁNH HIỆN TRẠNG – QUY HOẠCH ĐÔ THỊ THÀNH PHỐ HUẾ'
+  QH: 'BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ',
+  HT: 'BẢN ĐỒ HIỆN TRẠNG THÀNH PHỐ HUẾ',
+  split: 'SO SÁNH HIỆN TRẠNG – QUY HOẠCH THÀNH PHỐ HUẾ'
 };
 function initMapTitle() {
   const root = document.getElementById('mapTitle');
   if (!root) return;
   const text = document.getElementById('mapTitleText');
   const flip = document.getElementById('btnFlipView');
-  const flipText = flip?.querySelector('.map-title-flip-text');
   const setProjects = (on) => {
     const chk = document.getElementById('chk_projects');
-    if (!chk || chk.checked === on) return;
+    if (!chk || chk.checked === on || getLevel() !== 'qhpk') return;
     chk.checked = on;
     chk.dispatchEvent(new Event('change', { bubbles: true }));
   };
@@ -237,10 +238,9 @@ function initMapTitle() {
       text.title = title;
     }
     if (flip) {
-      const other = view === 'QH' ? 'hiện trạng' : 'quy hoạch';
-      flip.title = `Lật sang bản đồ ${other}`;
+      flip.title = split ? 'Đang so sánh hai bản đồ' : `Lật sang bản đồ ${view === 'QH' ? 'hiện trạng' : 'quy hoạch'}`;
       flip.setAttribute('aria-label', flip.title);
-      if (flipText) flipText.textContent = view === 'QH' ? 'Hiện trạng' : 'Quy hoạch';
+      flip.disabled = split;
     }
     root.querySelectorAll('[data-split-kind]').forEach(btn => {
       const on = btn.dataset.splitKind === kind;
@@ -301,6 +301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   centerOnCity();
   initBottomPanelEvents();
   initViewFlow();
+  initMapLevel();
   // Sau khi máy chủ ghi Sheet (nhập file, ghi dấu nhắc phường): tải lại dữ liệu và làm mới bản đồ, bảng
   const reloadAfterSheetWrite = async () => {
     try { await loadInfraData(); } catch (err) { showToast('⚠️ Chưa tải lại được dữ liệu, thử F5 sau ít phút', 'error'); return; }
@@ -325,6 +326,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCadastreLayer();
   initUrbanAreaLayer();
   initQhc2045Layer();
+  initQhctLayer();
   document.addEventListener(WARD_PICK_EVENT, (e) => chooseWard(e.detail));
   initBasemapUi();
   initTerrainLayer();
@@ -401,8 +403,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (cadastreClick(e, targetMap)) return;
     // Click vừa mở popup của điểm / lô (sự kiện nổi lên bản đồ) thì không đổi phường (đổi phường sẽ đóng popup)
     if (performance.now() - popupAt < 300) return;
-    if (isCenterPick(e.latlng, targetMap)) { enterCore(); return; }
-    const ward = wardToPick(e.latlng, targetMap);
+    // Bấm nền: chọn phường hay không do lớp quy hoạch đang xem quyết định (viewFlow.js)
+    const ward = wardFromMapClick(e.latlng, targetMap);
     if (ward) chooseWard(ward);
   };
   let popupAt = 0;
@@ -671,7 +673,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Bấm lại cùng ô để khôi phục đúng các lớp đang bật trước đó.
   const FOCUS_CHECKS = [
     ...ICON_GROUPS.map(k => `chk_${k}`),
-    'chk_bound', 'chk_urban', 'chk_parcel', 'chk_projects', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_basin', 'chk_flood', 'chk_sarflood',
+    'chk_bound', 'chk_urban', 'chk_qhc25', 'chk_qhc10', 'chk_qhct', 'chk_parcel', 'chk_projects', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_basin', 'chk_flood', 'chk_sarflood',
     'chk_lst', 'chk_newdev', 'chk_risk', 'chk_roads', 'chk_cadastre', 'chk_heat'
   ];
   let focusSnapshot = null;
