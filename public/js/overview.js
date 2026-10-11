@@ -105,7 +105,7 @@ const SECTIONS = [
       {
         id: 'parcel', btn: 'guide', status: 'trial',
         title: 'Tra cứu thông tin 1 thửa đất',
-        note: 'Bản đồ địa chính năm 2016, chưa có Quảng Điền, Phú Lộc, Nam Đông',
+        note: 'Dữ liệu bản đồ địa chính năm 2016 theo GisHue, chưa có các huyện cũ: Quảng Điền, Phú Lộc, Nam Đông',
         lead: 'Tra một thửa đất theo số tờ, số thửa hoặc bấm trên bản đồ để xem diện tích, loại đất, địa chỉ; kiểm tra quy hoạch trên thửa: diện tích từng loại đất quy hoạch (m²) và chỉ tiêu các lô quy hoạch.',
         steps: [
           'Ở panel phải › <b>Bản đồ nền</b>, bật lớp <b>Thửa đất địa chính 2016</b> (nút bên dưới). Ranh thửa hiện từ mức phóng 15, số thửa hiện từ mức 18.',
@@ -164,7 +164,7 @@ const SECTIONS = [
       {
         id: 'qcvn', btn: 'guide', status: 'dev',
         title: 'Kiểm tra chỉ tiêu theo QCVN 01:2026/BXD',
-        note: 'Chưa tích hợp được file .dwg, cần thêm bước xuất ra file .dxf',
+        note: 'Lồng ghép so sánh bản hiện trạng sử dụng đất và Quy hoạch sử dụng đất. Tính toán chỉ tiêu dân số. Cần xuất file .dwg thành .dxf để đọc (hatch và ranh giới quy hoạch).',
         lead: 'Đọc bản vẽ hiện trạng và quy hoạch của đồ án, tổng hợp cơ cấu sử dụng đất và đối chiếu chỉ tiêu đất hạ tầng xã hội với QCVN 01:2026/BXD.',
         steps: [
           'Bấm nút <b>Thẩm định đồ án</b> (nút màu cam đầu thanh công cụ bên trái).',
@@ -181,7 +181,7 @@ const SECTIONS = [
       {
         id: 'local-adjust', btn: 'guide', status: 'trial',
         title: 'Thẩm định điều chỉnh cục bộ',
-        note: 'Thẩm định giả định, nhập hồ sơ khi đồng ý',
+        note: 'Nhập file .dxf chứa ranh giới điều chỉnh, hatch các loại đất sau khi điều chỉnh.',
         lead: 'Chọn đồ án đang điều chỉnh, nộp ranh khu vực và hatch sử dụng đất mới. Máy kiểm tra phạm vi, bảng tăng giảm và chỉ tiêu cả đồ án. Độ phủ bán kính tính ngầm.',
         steps: [
           'Bấm nút <b>Thẩm định đồ án</b> (nút màu cam đầu thanh công cụ bên trái), chọn <b>Điều chỉnh</b>.',
@@ -200,7 +200,7 @@ const SECTIONS = [
       {
         id: 'gis16', btn: 'guide', status: 'trial',
         title: 'Kiểm tra hồ sơ GIS theo Phụ lục II Thông tư 16/2025',
-        note: 'Đọc trên máy, không gửi file đi. File Geodatabase (.gdb) chưa mở được bên trong',
+        note: 'Hỗ trợ kiểm tra thư mục hồ sơ trên máy tính.',
         lead: 'Chọn thư mục HoSoGIS để đối chiếu bốn gói dữ liệu, tên lớp, kiểu hình và sáu trường thuộc tính bắt buộc.',
         steps: [
           'Bấm nút <b>Thẩm định đồ án</b> (nút màu cam đầu thanh công cụ bên trái), chọn <b>Hồ sơ GIS</b>.',
@@ -208,6 +208,7 @@ const SECTIONS = [
           'Bấm <b>Kiểm tra thành phần</b>. Bảng ở nửa dưới màn hình ghi Không đạt, Cảnh báo hoặc Đạt.'
         ],
         facts: [
+          'Đọc trên máy, không gửi file đi. File Geodatabase (.gdb) chưa mở được bên trong.',
           'Shapefile chỉ đọc đầu file .shp, file .dbf và .prj. Phần tọa độ bỏ qua.',
           'Thiếu chuyên đề trong Phần 3 là cảnh báo, vì danh mục đó là tham khảo.'
         ],
@@ -434,11 +435,6 @@ function itemHtml(it) {
 
 function listHtml() {
   return `
-    <div class="ov-intro">
-      ${ico('info')}
-      <p><b>Giới thiệu chung:</b> Trang web có mục đích phi thương mại, được lập phục vụ công tác quản lý chuyên ngành của
-      Sở Xây dựng thành phố Huế và đang trong giai đoạn thử nghiệm. Trang hỗ trợ xử lý các nhóm vấn đề chính sau đây:</p>
-    </div>
     <div class="ov-groups">
       ${SECTIONS.map((sec, i) => `<section class="ov-group">
         <header class="ov-group-head">
@@ -496,6 +492,7 @@ function detailHtml(it) {
 
 function showList() {
   current = null;
+  root.classList.remove('ov-in-detail');
   els.body.innerHTML = listHtml();
   els.body.scrollTop = 0;
 }
@@ -504,6 +501,7 @@ function showDetail(id) {
   const it = ITEMS.get(id);
   if (!it) return;
   current = it;
+  root.classList.add('ov-in-detail');
   els.body.innerHTML = detailHtml(it);
   els.body.scrollTop = 0;
   els.body.querySelector('.ov-back')?.focus({ preventScroll: true });
@@ -549,6 +547,9 @@ function build() {
         <div class="ov-head-text">
           <div class="ov-kicker">Bản đồ quy hoạch và hạ tầng đô thị TP. Huế · Sở Xây dựng thành phố Huế</div>
           <h2 class="ov-title" id="ovTitle">GIỚI THIỆU TỔNG QUAN</h2>
+          <p class="ov-head-intro">Trang web có mục đích phi thương mại, được lập phục vụ công tác quản lý chuyên ngành của
+          Phòng Quy hoạch Kiến trúc và Phát triển đô thị - Sở Xây dựng thành phố Huế và đang trong giai đoạn thử nghiệm.
+          Trang cung cấp giải pháp cho các nhóm nghiệp vụ sau:</p>
         </div>
         <div class="ov-stage">
           <span class="ov-beta">${ico('clock')}Giai đoạn thử nghiệm</span>

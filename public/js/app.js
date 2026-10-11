@@ -212,7 +212,7 @@ function setStatus(text, color) {
 const VIEW_TITLES = {
   QH: 'BẢN ĐỒ QUY HOẠCH ĐÔ THỊ THÀNH PHỐ HUẾ',
   HT: 'BẢN ĐỒ HIỆN TRẠNG HẠ TẦNG THÀNH PHỐ HUẾ',
-  split: 'SO SÁNH HIỆN TRẠNG – QUY HOẠCH HẠ TẦNG THÀNH PHỐ HUẾ'
+  split: 'SO SÁNH HIỆN TRẠNG – QUY HOẠCH ĐÔ THỊ THÀNH PHỐ HUẾ'
 };
 function initMapTitle() {
   const root = document.getElementById('mapTitle');
