@@ -7,7 +7,6 @@
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { planLevelOf } from './generalPlan.js';
-import { levelScope } from './mapLevel.js';
 
 const CITY_NAME = 'Thành phố Huế';
 // Tiến độ tải file đồ án (detail { done, total }; done = total là xong)
@@ -39,14 +38,29 @@ function parcelLayerOn(zoom) {
 }
 export function onChangeLots(fn) { onChange = fn; }
 
-/** Đồ án chỉ hiện nhờ lớp droplist đang xem (VD đồ án QHC khi xem QHC 1/10.000), lớp Quy hoạch đang tắt */
-export const inLevelScope = (name) => !state.showProjects && !!levelScope() && planLevelOf(name) === levelScope();
-
-/** Đồ án hiện trên bản đồ: không bị ẩn, và lớp Quy hoạch bật hoặc cùng cấp với lớp droplist đang xem */
-export function projectShown(name) {
-  if (!name || state.hiddenProjects.has(name)) return false;
-  return state.showProjects || inLevelScope(name);
+// Mỗi cấp đồ án theo ô lớp của cấp đó: QHC → QHC 1/10.000, QHCT → QHCT 1/500, còn lại theo lớp QHPK 1/2.000
+// (chk_projects). Xem QHPK thì đồ án QHC / QHCT tắt cả ranh lẫn lô, trừ khi bật thêm ô lớp cấp đó để so sánh
+const KIND_CHK = { QHC: 'chk_qhc10', QHCT: 'chk_qhct' };
+const kindMemo = new Map();
+function kindOf(name) {
+  const key = String(name || '');
+  if (!kindMemo.has(key)) kindMemo.set(key, planLevelOf(key));
+  return kindMemo.get(key);
 }
+/** Ô lớp riêng của cấp đồ án (QHC / QHCT); đồ án QHPK → null (theo lớp Quy hoạch) */
+export const kindChkOf = (name) => KIND_CHK[kindOf(name)] || null;
+
+/** Cấp của đồ án đang bật trên bản đồ */
+export function kindOn(name) {
+  const id = kindChkOf(name);
+  return id ? !!document.getElementById(id)?.checked : state.showProjects;
+}
+
+/** Lô / ranh của đồ án (Ten_QH) được vẽ: không bị ẩn và cấp đang bật */
+export const lotShown = (name) => !state.hiddenProjects.has(name) && kindOn(name);
+
+/** Đồ án hiện trên bản đồ */
+export const projectShown = (name) => !!name && lotShown(name);
 
 /** Đồ án đang chọn còn hiện trên bản đồ → Ten_QH, không thì null */
 export function focusedProjectName() {
@@ -80,9 +94,9 @@ function wanted() {
     if (!p || !p.tenQH || p.sheetOnly) return false;
     if (force.has(p.tenQH)) return state.showLand || !state.hiddenProjects.has(p.tenQH);
     if (p.tenQH === focus) return true;
-    if (wardName && inWard(p, wardName) && !state.hiddenProjects.has(p.tenQH)) return true;
+    if (wardName && inWard(p, wardName) && lotShown(p.tenQH)) return true;
     if (!layerOn) return false;
-    if (!state.showLand && state.showProjects && state.hiddenProjects.has(p.tenQH)) return false;
+    if (!state.showLand && state.showProjects && !lotShown(p.tenQH)) return false;
     if (!p.bbox) return !!state.showLand;
     return intersects(p.bbox, bounds);
   });

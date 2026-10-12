@@ -3358,10 +3358,10 @@ body.project-review.la-page #projectReviewHost {
 .la-import-go { background: #a21caf; border-color: #d946ef; color: #fff; }
 
 /* Ranh điều chỉnh cục bộ trên bản đồ quy hoạch (adjustLayer.js) */
-.adj-glow { filter: drop-shadow(0 0 3px #ffffff) drop-shadow(0 0 8px #ff00ff); }
+.adj-glow { filter: drop-shadow(0 0 3px #ffffff) drop-shadow(0 0 8px #2f80ff); }
 .adj-popup .leaflet-popup-content { margin: 10px 12px; }
 .adj-pop { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); line-height: 1.35; }
-.adj-pop-kind { font-size: var(--fs-xs); font-weight: 800; letter-spacing: 0.3px; color: #c026d3; }
+.adj-pop-kind { font-size: var(--fs-xs); font-weight: 800; letter-spacing: 0.3px; color: #2563eb; }
 .adj-wait { color: #ea580c; }
 .adj-pop-title { font-weight: 700; }
 .adj-pop-meta { font-size: var(--fs-xs); color: var(--text-muted); }

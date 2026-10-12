@@ -18,7 +18,7 @@ import {
   getCoveredRightWidth, highlightPlanWard, wardFocusLayer, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, getViewMode, setViewMode, passToolClick, shownMaps
 } from './planMap.js';
-import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, focusedProjectName, wardScopeName, infraLotOf, byProjectAreaDesc } from './projectFiles.js';
+import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, focusedProjectName, wardScopeName, infraLotOf, byProjectAreaDesc, lotShown } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
 import { analyzePlanLand, planLandHtml } from './planLandStats.js';
 
@@ -790,8 +790,8 @@ function bindNameTip(layer, p) {
 // khi bật "Lô hạ tầng trong đồ án", còn lại vẽ cùng marker theo 14 nhóm.
 // Lô không thuộc đồ án nào (hoặc lớp Đồ án tắt) theo nút chung "Ranh lô theo lớp công trình"
 function parcelShown(project, file) {
-  if (state.showProjects && file && state.showProjectInfra && state.projectInfraFiles.has(file) && !state.hiddenProjects.has(file)) return false;
-  if (state.showProjects && project) return !state.hiddenProjects.has(project);
+  if (state.showProjects && file && state.showProjectInfra && state.projectInfraFiles.has(file) && lotShown(file)) return false;
+  if (state.showProjects && project) return lotShown(project);
   return state.showParcels;
 }
 
@@ -1497,10 +1497,10 @@ function redrawLands() {
   const ofFocus = (list) => list.filter(l => l.file === focus);
   const notOwn = (list) => (own ? list.filter(l => l.file !== own) : list);
   const lands = notOwn(state.showLand ? lotsInWardScope(state.landParcels)
-    : byProject ? lotsInWardScope(state.landParcels).filter(l => !state.hiddenProjects.has(l.file))
+    : byProject ? lotsInWardScope(state.landParcels).filter(l => lotShown(l.file))
       : focus ? lotsInWardScope(ofFocus(state.landParcels)) : []);
   const infra = notOwn(!state.showProjectInfra ? []
-    : byProject ? infraLotsInWardScope(state.projectInfraLots).filter(l => !state.hiddenProjects.has(l.file))
+    : byProject ? infraLotsInWardScope(state.projectInfraLots).filter(l => lotShown(l.file))
       : focus ? infraLotsInWardScope(ofFocus(state.projectInfraLots)) : []);
   const compare = isCompareOn() && !!planMap;
   landsDetailed = map ? map.getZoom() >= PARCEL_PATTERN_ZOOM : null;

@@ -1,4 +1,5 @@
-// Hồ sơ điều chỉnh cục bộ trên bản đồ quy hoạch (bản đồ chính và khung so sánh): ranh magenta nét đứt dày, nền sọc nghiêng 45°.
+// Hồ sơ điều chỉnh cục bộ trên bản đồ quy hoạch (bản đồ chính và khung so sánh): ranh xanh dương nét đứt dày, nền sọc nghiêng 45°.
+// Nhịp nét lệch nửa chu kỳ với ranh khu vực QHCT (qhctLayer.js): khu vực vừa có QHCT vừa điều chỉnh hiện xen kẽ xanh / đỏ.
 // Rê chuột sáng viền; bấm mở popup để thể hiện theo điều chỉnh (che nền trong ranh, vẽ lô mới lên trên) hoặc xem PDF scan.
 // Admin ghi thẳng; hồ sơ người dùng nằm trong hàng chờ (khung Thẩm định › Điều chỉnh) tới khi Admin duyệt.
 import { state } from './state.js';
@@ -7,14 +8,14 @@ import { planMap, passToolClick } from './planMap.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 
-const MAGENTA = '#ff00ff';
+const BLUE = '#2f80ff';
 // Trên viền sáng ranh đồ án (445), dưới tem đường (450): nền che + lô mới ở 446, ranh ở 447
 const FILL_PANE = 'adjustFillPane';
 const LINE_PANE = 'adjustLinePane';
 const FILL_Z = 446;
 const LINE_Z = 447;
-const LINE_STYLE = { color: MAGENTA, weight: 4, opacity: 1, dashArray: '14 8', lineCap: 'butt' };
-const HOVER_STYLE = { color: '#ff8cff', weight: 6 };
+const LINE_STYLE = { color: BLUE, weight: 4, opacity: 1, dashArray: '12 12', dashOffset: '12', lineCap: 'butt' };
+const HOVER_STYLE = { color: '#93c5fd', weight: 6 };
 export const ADJUST_PDF_MAX_BYTES = 2 * 1024 * 1024;
 
 const $ = (id) => document.getElementById(id);
@@ -93,7 +94,7 @@ function hatchDefs(svg, id) {
   p.setAttribute('width', '10');
   p.setAttribute('height', '10');
   p.setAttribute('patternTransform', 'rotate(45)');
-  p.innerHTML = `<rect width="10" height="10" fill="${MAGENTA}" fill-opacity="0.06"/><line x1="0" y1="0" x2="0" y2="10" stroke="${MAGENTA}" stroke-width="2.2" stroke-opacity="0.75"/>`;
+  p.innerHTML = `<rect width="10" height="10" fill="${BLUE}" fill-opacity="0.06"/><line x1="0" y1="0" x2="0" y2="10" stroke="${BLUE}" stroke-width="2.2" stroke-opacity="0.75"/>`;
   defs.appendChild(p);
 }
 

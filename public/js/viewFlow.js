@@ -56,7 +56,8 @@ function showLayersTab() {
 
 // ---------- Lớp quy hoạch ----------
 function onLevelChange({ level, prev }) {
-  if (prev === 'qhpk' && level !== 'qhpk') {
+  const keepFocus = !!state.focusedProject && planLevelOf(state.focusedProject) === levelScope();
+  if (prev === 'qhpk' && level !== 'qhpk' && !keepFocus) {
     closeProjectView();
     clearProjectFocus();
   }
@@ -129,26 +130,20 @@ function onWardSelected(name) {
 }
 
 // ---------- Đồ án ----------
-// Mở đồ án ở lớp khác (projectLayer bật QHPK không qua checkbox): đồng bộ về lớp QHPK, nhớ lớp gốc để thoát quay lại.
-// Đồ án cùng cấp lớp đang xem (đồ án QHC khi xem QHC 1/10.000) giữ lớp, thu gọn lô TTHuế 2045;
-// đồ án QHC mở từ Hệ thống đô thị sang QHC 1/10.000; đồ án QHCT sang QHCT 1/500.
-// Lớp QHPK hiện mọi đồ án nên giữ lớp (rời lớp QHPK là đóng đồ án đang mở, onLevelChange).
+// Mở đồ án ở lớp khác: sang lớp đúng cấp đồ án (QHC → QHC 1/10.000, QHCT → QHCT 1/500, còn lại QHPK 1/2.000), nhớ lớp gốc
+// để thoát quay lại. Đồ án cùng cấp lớp đang xem giữ lớp, thu gọn lô TTHuế 2045.
 const RETURN_LEVELS = new Set(['qhc10', 'urban']);
+const KIND_LEVEL = { QHC: 'qhc10', QHCT: 'qhct' };
 function onProjectOpened(e) {
   const level = getLevel();
-  if (level === 'qhpk') return;
   const kind = planLevelOf(e?.detail);
+  if (level === 'qhpk' && kind === 'QHPK') return;
   if (levelScope() && kind === levelScope()) {
     setCoreOpen(false);
     return;
   }
-  if (kind === 'QHCT') {
-    setLevel('qhct', { origin: level });
-    setCoreOpen(false);
-    return;
-  }
-  if (level === 'urban' && kind === 'QHC') {
-    setLevel('qhc10', { origin: 'urban' });
+  if (KIND_LEVEL[kind]) {
+    setLevel(KIND_LEVEL[kind], { origin: level });
     setCoreOpen(false);
     return;
   }

@@ -9,8 +9,8 @@
 // từ ngưỡng đó vẽ lô (mapEngine.js), ranh tổng nằm dưới lô và không nhận click (đồ án có ranh thật).
 // Đồ án vừa bấm (state.focusedProject) hiện lô ở mọi zoom; đang chọn phường thì chỉ hiện ranh các đồ án của phường,
 // lô cả phường vẽ ở mọi zoom — ranh tổng xuống dưới để bấm được lô.
-// Lớp droplist có cấp đồ án riêng (QHC 1/10.000 → đồ án QHC, mapLevel.levelScope): đồ án cùng cấp hiện ranh + tên
-// dù lớp QHPK tắt, chỉ đồ án đang chọn mới vẽ lô. Nút mắt cuối tiêu đề nhóm cấp bật / tắt cả nhóm.
+// Đồ án QHC / QHCT hiện theo ô lớp cấp đó (chk_qhc10 / chk_qhct, projectFiles.kindOn), không theo lớp QHPK: lớp droplist
+// QHC 1/10.000 hiện ranh + tên đồ án QHC, chỉ đồ án đang chọn mới vẽ lô. Nút mắt cuối tiêu đề nhóm cấp bật / tắt cả nhóm.
 import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
@@ -18,13 +18,13 @@ import {
 import { planMap, onCompareChange, passToolClick } from './planMap.js';
 import {
   projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName,
-  wardScopeName, projectShown, inLevelScope
+  wardScopeName, projectShown, kindOn, kindChkOf
 } from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { isCoreWard } from './qhc2045.js';
-import { refreshQhctHint } from './qhctLayer.js';
-import { getLevel, levelScope } from './mapLevel.js';
+import { refreshQhct } from './qhctLayer.js';
+import { getLevel, levelScope, LEVEL_EVENT } from './mapLevel.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
@@ -173,9 +173,17 @@ export function projectBoundary(geometries) {
 
 // ============================ DANH SÁCH ĐỒ ÁN ============================
 
+// Bản cũ bật lớp Quy hoạch thì tự ẩn mọi đồ án chưa hiện, kể cả QHC / QHCT (nay theo ô lớp cấp đó): bỏ một lần
+const HIDDEN_KIND_FIX_KEY = 'qh_hidden_kind_fix';
+
 function loadHidden() {
   try {
-    const saved = JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]');
+    let saved = JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]');
+    if (Array.isArray(saved) && !localStorage.getItem(HIDDEN_KIND_FIX_KEY)) {
+      saved = saved.filter(n => planLevelOf(n) === 'QHPK');
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify(saved));
+      localStorage.setItem(HIDDEN_KIND_FIX_KEY, '1');
+    }
     if (Array.isArray(saved)) state.hiddenProjects = new Set(saved.map(String));
     const layers = JSON.parse(localStorage.getItem(HIDDEN_LAYERS_KEY) || '[]');
     if (Array.isArray(layers)) state.hiddenProjectLayers = new Set(layers.map(String));
@@ -315,10 +323,18 @@ function setMaster(on) {
   state.showProjects = on;
 }
 
-// Bật lớp Quy hoạch đang tắt mà chỉ thêm đồ án cần hiện: đồ án chưa hiện (ngoài phạm vi lớp droplist) bị ẩn trước
+// Bật lớp Quy hoạch đang tắt mà chỉ thêm đồ án cần hiện: đồ án QHPK chưa hiện bị ẩn trước
 function enableMaster() {
-  projects.forEach(p => { if (!projectShown(p.name)) state.hiddenProjects.add(p.name); });
+  projects.forEach(p => { if (p.level === 'QHPK' && !projectShown(p.name)) state.hiddenProjects.add(p.name); });
   setMaster(true);
+}
+
+// Cấp của đồ án đang tắt: QHC / QHCT bật ô lớp cấp đó (so sánh, lớp droplist giữ nguyên), QHPK gọi master
+function turnKindOn(p, master) {
+  const chk = $(kindChkOf(p.name));
+  if (!chk) { master(); return; }
+  chk.checked = true;
+  chk.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 function ensureFullLots() {
@@ -332,7 +348,7 @@ function zoomTo(p) {
   if (!b || !b.isValid() || !map) return;
   let changed = false;
   if (state.focusedProject !== p.name) { state.focusedProject = p.name; changed = true; }
-  if (!state.showProjects && !inLevelScope(p.name)) { setMaster(true); changed = true; }
+  if (!kindOn(p.name)) { turnKindOn(p, () => setMaster(true)); changed = true; }
   if (!state.showProjectInfra) { ensureFullLots(); changed = true; }
   if (state.hiddenProjects.delete(p.name)) { saveHidden(); changed = true; }
   map.fitBounds(b.pad(0.1), { maxZoom: PARCEL_MIN_ZOOM + 1 });
@@ -384,7 +400,8 @@ export function revealWardProjects(wardName, { show = true } = {}) {
   }
   if (currentWard) {
     openGroups.add(currentWard);
-    projects.forEach(p => { if (p.wards.includes(currentWard)) closedLevels.delete(p.level); });
+    const active = activeGroup();
+    projects.forEach(p => { if (p.wards.includes(currentWard) && (!active || p.level === active)) closedLevels.delete(p.level); });
     if (query) {
       query = '';
       const search = $('projectSearch');
@@ -429,6 +446,17 @@ const LIST_LEVELS = [
   ...['QHC', 'QHPK', 'QHCT'].map(k => PLAN_LEVELS.find(l => l.key === k))
 ];
 const levelLabel = (key) => LIST_LEVELS.find(l => l.key === key)?.label || key;
+// Lớp droplist (mapLevel.js) → nhóm cấp trong danh sách; Hệ thống đô thị không ứng nhóm nào
+const LEVEL_GROUP = { qhc25: 'QHC25', qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
+const activeGroup = () => LEVEL_GROUP[getLevel()] || null;
+
+// Đổi lớp ở droplist: mở nhóm cấp của lớp đó, thu gọn các nhóm còn lại
+function focusLevelGroup() {
+  const key = activeGroup();
+  if (!key) return;
+  LIST_LEVELS.forEach(l => { if (l.key === key) closedLevels.delete(l.key); else closedLevels.add(l.key); });
+  renderList();
+}
 
 // Ô lớp riêng của cấp (#planStaticRows) bật / tắt cùng nút mắt của nhóm
 const LEVEL_CHK = { QHC25: 'chk_qhc25', QHC: 'chk_qhc10', QHCT: 'chk_qhct' };
@@ -460,7 +488,7 @@ function paintEyes() {
 function setLevelShown(key, on) {
   const list = projects.filter(p => p.level === key);
   if (on) {
-    if (list.length && !state.showProjects && !list.every(p => inLevelScope(p.name))) enableMaster();
+    if (key === 'QHPK' && list.length && !state.showProjects) enableMaster();
     list.forEach(p => state.hiddenProjects.delete(p.name));
     if (list.length) ensureFullLots();
   } else {
@@ -555,7 +583,7 @@ function renderList() {
     </div>`;
   }).join('');
   mountStatic(box);
-  refreshQhctHint();
+  refreshQhct();
 }
 
 function wardGroups(items) {
@@ -1172,7 +1200,7 @@ function rebuild() {
 }
 
 function showProject(p) {
-  if (!state.showProjects && !inLevelScope(p.name)) enableMaster();
+  if (!kindOn(p.name)) turnKindOn(p, enableMaster);
   state.hiddenProjects.delete(p.name);
   ensureFullLots();
   saveHidden();
@@ -1352,8 +1380,15 @@ export function initProjectLayer(opts = {}) {
     state.showProjectInfra = infraChk.checked;
     infraChk.addEventListener('change', () => setProjectInfraVisible(infraChk.checked));
   }
+  // Ô lớp QHC 1/10.000 / QHCT 1/500 quyết định đồ án cấp đó có hiện: vẽ lại 1 lần sau loạt đổi ô (đổi lớp droplist)
+  let redrawQueued = false;
   document.addEventListener('change', (e) => {
-    if (Object.values(LEVEL_CHK).includes(e.target?.id)) paintEyes();
+    const id = e.target?.id;
+    if (!Object.values(LEVEL_CHK).includes(id)) return;
+    paintEyes();
+    if (id === LEVEL_CHK.QHC25 || redrawQueued) return;
+    redrawQueued = true;
+    requestAnimationFrame(() => { redrawQueued = false; refreshAll(); });
   });
   $('projectSearch')?.addEventListener('input', (e) => {
     query = e.target.value || '';
@@ -1459,6 +1494,7 @@ export function initProjectLayer(opts = {}) {
     revealInList(p);
   });
   document.addEventListener('auth:change', renderList);
+  document.addEventListener(LEVEL_EVENT, focusLevelGroup);
   map?.on('zoomend', () => {
     const below = map.getZoom() < PARCEL_MIN_ZOOM;
     if (below === belowZoom) return;
