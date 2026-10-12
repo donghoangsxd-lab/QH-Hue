@@ -197,6 +197,13 @@ function checkAdjustRate(req) {
 }
 const ADJUST_PDF_B64_MAX = 2800000;
 
+// File quyết định người dùng gửi chờ admin duyệt: mỗi IP tối đa 4 file / giờ, mỗi file < 2 MB
+const decisionProposalHits = new Map();
+function checkDecisionProposalRate(req) {
+  checkRate(decisionProposalHits, req, 4, 60 * 60 * 1000, 'Mỗi máy chỉ gửi được 4 file quyết định mỗi giờ, vui lòng thử lại sau');
+}
+const DECISION_PROPOSAL_B64_MAX = 2800000;
+
 // Có token mà không phải Admin (hết hạn, tài khoản khác) thì xử lý như người dùng thường
 async function adminOrNull(req) {
   if (!req.headers.authorization) return null;
@@ -2424,6 +2431,84 @@ module.exports = async (req, res) => {
         return res.status(200).json({ success: true, sheet });
       } catch (err) {
         return res.status(err.status || 500).json({ error: true, message: err.message || 'Không gỡ được quyết định' });
+      }
+    }
+
+    // Người dùng gửi PDF < 2 MB làm quyết định phê duyệt của đồ án. Chưa ghi decisions.json / LinkQD cho tới khi admin duyệt.
+    if (action === 'submitDecisionProposal') {
+      requirePostFromApp(req);
+      const admin = await adminOrNull(req);
+      if (!admin) checkDecisionProposalRate(req);
+      const body = readJsonBody(req);
+      const tenQH = sanitizeSheetText(body.tenQH, 120);
+      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      const pdf = typeof body.pdf === 'string' ? body.pdf.replace(/\s+/g, '') : '';
+      if (!pdf || pdf.length > DECISION_PROPOSAL_B64_MAX) {
+        return res.status(413).json({ error: true, message: 'File PDF rỗng hoặc lớn hơn 2 MB' });
+      }
+      try {
+        const proposal = await projects.saveDecisionProposal({
+          tenQH, fileName: body.name, buffer: Buffer.from(pdf, 'base64')
+        });
+        return res.status(200).json({ success: true, proposal });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không gửi được file quyết định' });
+      }
+    }
+
+    // PDF chờ duyệt: chỉ Admin đọc được (iframe xem trước khi đồng ý / từ chối)
+    if (action === 'getDecisionProposal') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const tenQH = sanitizeSheetText(readJsonBody(req).tenQH, 120);
+      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      try {
+        const file = await projects.readDecisionProposal(tenQH);
+        const ascii = String(file.name || 'quyet-dinh-cho.pdf').replace(/[^\w.\-]+/g, '_') || 'quyet-dinh-cho.pdf';
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(file.name || 'quyet-dinh-cho.pdf')}`);
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        return res.status(200).send(file.buffer);
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không đọc được file chờ duyệt' });
+      }
+    }
+
+    if (action === 'approveDecisionProposal') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const tenQH = sanitizeSheetText(readJsonBody(req).tenQH, 120);
+      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      try {
+        const saved = await projects.approveDecisionProposal(tenQH);
+        let sheet = false;
+        let sheetMessage = '';
+        try {
+          await callAppsScript({ action: 'setProjectLink' }, { action: 'setProjectLink', project: tenQH, link: saved.accessUrl });
+          sheet = true;
+        } catch (err) {
+          sheetMessage = err.message || 'Chưa ghi được cột LinkQD trên sheet';
+        }
+        return res.status(200).json({
+          success: true, kind: 'pdf', slug: saved.slug, name: saved.name, bytes: saved.bytes, at: saved.at,
+          embed: true, accessUrl: saved.accessUrl, sheet, sheetMessage, bucket: saved.via
+        });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không duyệt được quyết định' });
+      }
+    }
+
+    if (action === 'rejectDecisionProposal') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const tenQH = sanitizeSheetText(readJsonBody(req).tenQH, 120);
+      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      try {
+        await projects.rejectDecisionProposal(tenQH);
+        return res.status(200).json({ success: true });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không từ chối được file quyết định' });
       }
     }
 

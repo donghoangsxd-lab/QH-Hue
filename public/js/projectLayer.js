@@ -3,7 +3,8 @@
 // (đồ án liên phường có mặt ở mỗi phường), QHC liệt kê thẳng; mỗi đồ án (Ten_QH)
 // bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + thông tin ở panel dưới),
 // Admin xóa / chuyển đồ án cũ.
-// Nút file mở PDF quyết định phê duyệt (projects/<slug>/quyet-dinh.pdf, dưới 1 MB). Admin gắn, thay hoặc gỡ.
+// Nút file mở PDF quyết định đã duyệt. Admin gắn, thay hoặc gỡ (PDF dưới 1 MB hoặc link).
+// Nút lưu: người dùng gửi PDF nhỏ hơn 2 MB để admin duyệt; đang chờ thì nút đồng hồ, admin bấm để đồng ý hoặc từ chối.
 // Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS): bật/tắt từng lớp, Admin xóa từng lớp, tìm lô trong đồ án.
 // Đồ án có hồ sơ điều chỉnh cục bộ đã duyệt thêm lớp phụ «Điều chỉnh cục bộ» (adjustLayer.js): bật/tắt, danh sách hồ sơ bấm để phóng tới.
 // Mỗi đồ án 1 màu viền + nền mờ, nhãn tên ở giữa ranh. Zoom < PARCEL_MIN_ZOOM ranh tổng bấm được để mở đồ án;
@@ -30,7 +31,7 @@ import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
 import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
-import { openOrAssign } from './decisionViewer.js';
+import { openOrAssign, openPropose, openProposalReview } from './decisionViewer.js';
 import { adjustmentsOf, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 
 const HIDDEN_KEY = 'qh_hidden_projects';
@@ -240,6 +241,11 @@ function collectProjects() {
       bytes: Number(p.decision.bytes) || 0,
       at: Number(p.decision.at) || 0,
       embed: p.decision.kind === 'link' ? p.decision.embed === true : true
+    } : null,
+    proposal: p.proposal && p.proposal.at ? {
+      name: p.proposal.name || 'Quyết định phê duyệt',
+      bytes: Number(p.proposal.bytes) || 0,
+      at: Number(p.proposal.at) || 0
     } : null
   })).sort((a, b) => a.name.localeCompare(b.name, 'vi')));
 }
@@ -610,6 +616,13 @@ function rowHtml(p, idx, admin) {
   const decisionBtn = (p.decision || admin)
     ? `<button type="button" class="project-btn${p.decision ? ' has-decision' : ''}" data-decision="${idx}" title="${escapeHtml(decisionTitle)}" aria-label="${p.decision ? 'Xem quyết định phê duyệt' : 'Gắn quyết định phê duyệt'}"${busy ? ' disabled' : ''}>${ico(p.decision ? 'file' : 'save')}</button>`
     : '';
+  const waiting = !!p.proposal;
+  const proposeTitle = waiting
+    ? (admin ? `Duyệt file quyết định đang chờ: ${p.proposal.name}` : `Đang chờ admin duyệt: ${p.proposal.name}`)
+    : 'Gửi PDF quyết định phê duyệt (nhỏ hơn 2 MB) để admin duyệt';
+  const proposeBtn = (!admin || waiting)
+    ? `<button type="button" class="project-btn${waiting ? ' has-proposal' : ''}" data-propose="${idx}" title="${escapeHtml(proposeTitle)}" aria-label="${escapeHtml(proposeTitle)}"${busy ? ' disabled' : ''}>${ico(waiting ? 'clock' : 'save')}</button>`
+    : '';
   return `<div class="project-row${on ? '' : ' is-off'}${p.name === pickedName ? ' is-picked' : ''}">
       <label class="project-name" title="${escapeHtml(fullName(p.name))} — bấm để mở đồ án">
         <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><span data-focus="${idx}">${idx + 1}. ${escapeHtml(p.name)}</span></label>
@@ -617,10 +630,11 @@ function rowHtml(p, idx, admin) {
         <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-expand="${idx}" title="${open ? 'Ẩn' : 'Xem'} các lớp dữ liệu của đồ án" aria-label="Các lớp dữ liệu của đồ án" aria-expanded="${open}">${ico('chev-down')}</button>
         <button type="button" class="project-btn" data-info="${idx}" title="Thông tin đồ án ở panel dưới: cơ cấu sử dụng đất, bảng tổng hợp sử dụng đất và đánh giá chỉ tiêu QCVN 01:2026" aria-label="Thông tin đồ án">${ico('table')}</button>
         ${decisionBtn}
+        ${proposeBtn}
         ${admin ? `<button type="button" class="project-btn" data-rename="${idx}" title="Đổi tên đồ án (Sheet + danh mục bucket)" aria-label="Đổi tên đồ án"${busy ? ' disabled' : ''}>${ico('pen')}</button>` : ''}
         ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
       </span>
-    </div>${open ? decisionNote(p, idx) + layersHtml(p, idx, on, admin) : ''}`;
+    </div>${open ? decisionNote(p, idx) + proposalNote(p, idx) + layersHtml(p, idx, on, admin) : ''}`;
 }
 
 // Đồ án đang chọn (bấm ranh trên bản đồ hoặc bấm tên): dòng trong danh sách giữ nền sáng đến khi chọn đồ án khác
@@ -670,6 +684,12 @@ function revealInList(p) {
 function decisionNote(p, idx) {
   if (!p.decision) return '';
   return `<button type="button" class="project-decision" data-decision="${idx}" title="Xem quyết định phê duyệt">${ico('file')}<span>${escapeHtml(p.decision.name)}</span></button>`;
+}
+
+function proposalNote(p, idx) {
+  if (!p.proposal) return '';
+  const label = `Chờ duyệt: ${p.proposal.name}`;
+  return `<button type="button" class="project-decision is-wait" data-propose="${idx}" title="${escapeHtml(label)}">${ico('clock')}<span>${escapeHtml(label)}</span></button>`;
 }
 
 // ============================ LỚP DỮ LIỆU TRONG ĐỒ ÁN ============================
@@ -1379,6 +1399,31 @@ function sheetNote(data) {
   return `\n\nQuyết định đã lưu trên webapp. Cột LinkQD trên sheet DS_DoAn chưa ghi được: ${data.sheetMessage || 'hãy triển khai bản Code.gs mới (Deploy → New version).'}`;
 }
 
+function applyProposal(name, proposal) {
+  const entry = state.projectCatalog.find(x => x && x.tenQH === name);
+  if (entry) {
+    if (proposal) entry.proposal = proposal;
+    else delete entry.proposal;
+  }
+  rebuild();
+}
+
+function proposalTarget(p) {
+  const base = decisionTarget(p);
+  return {
+    ...base,
+    proposal: p.proposal || null,
+    onProposed: (proposal) => { applyProposal(p.name, proposal); },
+    onResolved: (decision, data) => {
+      applyProposal(p.name, null);
+      if (!decision) return null;
+      const next = applyDecision(p.name, decision);
+      if (data && !data.sheet) alert(`Đã ghi PDF lên bucket.${sheetNote(data)}`);
+      return next ? decisionTarget(next) : null;
+    }
+  };
+}
+
 function decisionTarget(p) {
   return {
     key: `project:${p.name}`,
@@ -1515,6 +1560,14 @@ export function initProjectLayer(opts = {}) {
     if (decision) {
       const p = projects[Number(decision.dataset.decision)];
       if (p) openOrAssign(decisionTarget(p));
+      return;
+    }
+    const propose = e.target.closest('[data-propose]');
+    if (propose) {
+      const p = projects[Number(propose.dataset.propose)];
+      if (!p) return;
+      if (isAdmin()) openProposalReview(proposalTarget(p));
+      else openPropose(proposalTarget(p));
       return;
     }
     const expand = e.target.closest('[data-expand]');

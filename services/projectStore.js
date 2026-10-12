@@ -4,7 +4,9 @@
 //   projects/<slug>/su-dung-dat.json — chức năng sử dụng đất / bản đồ quy hoạch (lô QH)
 //   projects/<slug>/diem-chuc-nang.json — điểm chức năng
 //   projects/<slug>/ranh-gioi.json — ranh giới quy hoạch
-//   projects/<slug>/quyet-dinh.pdf — PDF quyết định ≤ 1 MB. Link ngoài nằm ở projects/decisions.json (kind: link), chỉ gán sau khi máy chủ mở được link.
+//   projects/<slug>/quyet-dinh.pdf — PDF quyết định đã duyệt (admin gắn ≤ 1 MB, hoặc duyệt file người dùng gửi ≤ 2 MB).
+//   Link ngoài nằm ở projects/decisions.json (kind: link), chỉ gán sau khi máy chủ mở được link.
+//   projects/<slug>/quyet-dinh-cho.pdf + projects/decision-proposals.json — PDF người dùng gửi, chờ admin duyệt.
 //   projects/<slug>/adjust/<id>.json|.pdf — hồ sơ điều chỉnh cục bộ, chỉ mục ở projects/adjustments.json
 // File cũ projects/<slug>.json vẫn đọc được cho tới lần ghi tiếp theo, rồi tách vào thư mục và xóa.
 // Slug: bỏ dấu, chữ thường, tối đa 60 ký tự, thêm 8 ký tự SHA-256 của Ten_QH (cùng tên → cùng thư mục).
@@ -26,6 +28,7 @@ const SCRIPT_MAX_CHARS = 6000000;
 let transport = null;
 let indexCache = null; // { etag, data }
 let decisionsCache = null; // { etag, generation, data }
+let proposalsCache = null; // { etag, generation, data }
 let migrateJob = null; // { at, groups, wardFeatures }
 
 function setTransport(fn) { transport = fn; }
@@ -334,6 +337,7 @@ async function catalog() {
   const projects = [...by.values()].filter(p => p.tenQH && !p.deleted)
     .sort((a, b) => String(a.tenQH).localeCompare(String(b.tenQH), 'vi'));
   await attachDecisions(projects);
+  await attachProposals(projects);
   return { base: constants.PROJECTS_GCS_BASE, migrated, projects };
 }
 
@@ -342,6 +346,9 @@ async function catalog() {
 const DECISIONS_NAME = 'projects/decisions.json';
 const DECISION_FILE = 'quyet-dinh.pdf';
 const DECISION_MAX_BYTES = 1024 * 1024;
+const PROPOSALS_NAME = 'projects/decision-proposals.json';
+const PROPOSAL_FILE = 'quyet-dinh-cho.pdf';
+const PROPOSAL_MAX_BYTES = 2 * 1024 * 1024;
 
 function decisionObject(slug) {
   return `projects/${slug}/${DECISION_FILE}`;
@@ -353,10 +360,10 @@ function decisionFileName(raw) {
   return /\.pdf$/i.test(base) ? base : `${base}.pdf`;
 }
 
-function pdfOk(buffer) {
+function pdfOk(buffer, maxBytes = DECISION_MAX_BYTES) {
   return Buffer.isBuffer(buffer)
     && buffer.length >= 5
-    && buffer.length <= DECISION_MAX_BYTES
+    && buffer.length <= maxBytes
     && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
 }
 
@@ -665,12 +672,13 @@ async function removeLayerDecision(layer) {
   return removeDecision(name, slug);
 }
 
-async function saveDecision({ tenQH, layer, fileName, buffer }) {
-  if (!pdfOk(buffer)) {
-    const err = new Error(buffer && buffer.length > DECISION_MAX_BYTES
-      ? 'File quyết định lớn hơn 1 MB'
+async function saveDecision({ tenQH, layer, fileName, buffer, maxBytes }) {
+  const limit = maxBytes || DECISION_MAX_BYTES;
+  if (!pdfOk(buffer, limit)) {
+    const err = new Error(buffer && buffer.length > limit
+      ? `File quyết định lớn hơn ${limit > DECISION_MAX_BYTES ? '2 MB' : '1 MB'}`
       : 'Chỉ nhận file PDF');
-    err.status = buffer && buffer.length > DECISION_MAX_BYTES ? 413 : 400;
+    err.status = buffer && buffer.length > limit ? 413 : 400;
     throw err;
   }
   const { name, slug } = await decisionTarget({ tenQH, layer });
@@ -744,7 +752,7 @@ async function readDecision(slug) {
   const res = await axios.get(`${publicUrl(decisionObject(key))}?v=${meta.at}`, {
     timeout: 20000,
     responseType: 'arraybuffer',
-    maxContentLength: DECISION_MAX_BYTES + 4096,
+    maxContentLength: PROPOSAL_MAX_BYTES + 4096,
     validateStatus: () => true
   });
   if (res.status === 404) {
@@ -758,6 +766,154 @@ async function readDecision(slug) {
     throw err;
   }
   return { buffer: Buffer.from(res.data), name: decisionFileName(meta.name), at: Number(meta.at) || 0 };
+}
+
+// ============================ QUYẾT ĐỊNH CHỜ DUYỆT (người dùng gửi PDF < 2 MB) ============================
+
+function proposalObject(slug) {
+  return `projects/${slug}/${PROPOSAL_FILE}`;
+}
+
+function emptyProposals() {
+  return { v: 1, items: {} };
+}
+
+function proposalView(d) {
+  return {
+    name: decisionFileName(d.name),
+    bytes: Number(d.bytes) || 0,
+    at: Number(d.at) || 0
+  };
+}
+
+async function readProposals() {
+  let etag = null;
+  try {
+    const head = await axios.head(`${publicUrl(PROPOSALS_NAME)}?v=${Date.now()}`, { timeout: 5000, validateStatus: () => true });
+    if (head.status === 404) {
+      proposalsCache = null;
+      return { missing: true, generation: '0', data: emptyProposals() };
+    }
+    etag = head.headers.etag || head.headers['last-modified'] || null;
+    if (proposalsCache && etag && proposalsCache.etag === etag) {
+      return { missing: false, generation: proposalsCache.generation, data: proposalsCache.data };
+    }
+  } catch (err) { /* HEAD lỗi thì GET */ }
+  const got = await readJson(PROPOSALS_NAME);
+  if (got.missing || !got.data || got.data.v !== 1 || !got.data.items || typeof got.data.items !== 'object') {
+    return { missing: !!got.missing, generation: got.generation || '0', data: emptyProposals() };
+  }
+  proposalsCache = { etag: got.etag || etag, generation: got.generation, data: got.data };
+  return { missing: false, generation: got.generation, data: got.data };
+}
+
+async function updateProposals(mutator) {
+  let via = 'direct';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const cur = await readProposals();
+    const next = mutator(cur.data || emptyProposals());
+    next.v = 1;
+    next.items = next.items && typeof next.items === 'object' ? next.items : {};
+    next.saved = Date.now();
+    try {
+      const written = await writeText(PROPOSALS_NAME, JSON.stringify(next), cur.missing ? '0' : (cur.generation || undefined));
+      via = written.via;
+      proposalsCache = { etag: null, generation: written.generation || '', data: next };
+      return { proposals: next, via };
+    } catch (err) {
+      if (err.code !== 'GEN' || attempt === 2) throw err;
+      proposalsCache = null;
+    }
+  }
+  const err = new Error('Xung đột khi cập nhật file quyết định chờ duyệt');
+  err.status = 409;
+  throw err;
+}
+
+async function attachProposals(projects) {
+  try {
+    const stored = await readProposals();
+    const items = stored.data.items || {};
+    projects.forEach(p => {
+      const d = items[p.tenQH];
+      if (!d || !d.at || !SLUG_RE.test(String(d.slug || ''))) return;
+      p.proposal = proposalView(d);
+    });
+  } catch (err) {
+    console.warn('Đọc quyết định chờ duyệt lỗi:', err.message);
+  }
+}
+
+async function saveDecisionProposal({ tenQH, fileName, buffer }) {
+  if (!pdfOk(buffer, PROPOSAL_MAX_BYTES - 1)) {
+    const err = new Error(buffer && buffer.length >= PROPOSAL_MAX_BYTES ? 'File quyết định lớn hơn 2 MB' : 'Chỉ nhận file PDF');
+    err.status = buffer && buffer.length >= PROPOSAL_MAX_BYTES ? 413 : 400;
+    throw err;
+  }
+  const { name, slug } = await listedProject(tenQH);
+  const cur = await readProposals();
+  if (cur.data.items && cur.data.items[name]) rejectReview('Đồ án đang có file quyết định chờ admin duyệt', 409);
+  await writeBytes(proposalObject(slug), buffer, 'application/pdf');
+  const meta = { slug, name: decisionFileName(fileName), bytes: buffer.length, at: Date.now() };
+  await updateProposals(base => {
+    const items = { ...(base.items || {}) };
+    if (items[name]) rejectReview('Đồ án đang có file quyết định chờ admin duyệt', 409);
+    items[name] = meta;
+    return { ...base, items };
+  });
+  return proposalView(meta);
+}
+
+async function readDecisionProposal(tenQH) {
+  const name = String(tenQH || '').trim();
+  const stored = await readProposals();
+  const meta = stored.data.items && stored.data.items[name];
+  if (!meta || !meta.at || !SLUG_RE.test(String(meta.slug || ''))) rejectReview('Không có file quyết định chờ duyệt', 404);
+  const res = await axios.get(`${publicUrl(proposalObject(meta.slug))}?v=${meta.at}`, {
+    timeout: 20000,
+    responseType: 'arraybuffer',
+    maxContentLength: PROPOSAL_MAX_BYTES + 4096,
+    validateStatus: () => true
+  });
+  if (res.status === 404) rejectReview('File quyết định chờ duyệt không còn trên bucket', 404);
+  if (res.status !== 200) rejectReview(`Đọc file chờ duyệt lỗi HTTP ${res.status}`, 502);
+  return { buffer: Buffer.from(res.data), name: decisionFileName(meta.name), at: Number(meta.at) || 0 };
+}
+
+async function clearProposal(tenQH, fallbackSlug) {
+  const name = String(tenQH || '').trim();
+  const cur = await readProposals();
+  const item = cur.data.items && cur.data.items[name];
+  const slug = (item && item.slug) || fallbackSlug || '';
+  if (item) {
+    await updateProposals(base => {
+      const items = { ...(base.items || {}) };
+      delete items[name];
+      return { ...base, items };
+    });
+  }
+  if (SLUG_RE.test(String(slug))) {
+    try { await removeName(proposalObject(slug)); } catch (err) { /* file chưa có */ }
+  }
+  return { slug: slug || '' };
+}
+
+async function approveDecisionProposal(tenQH) {
+  const { name, slug } = await listedProject(tenQH);
+  const file = await readDecisionProposal(name);
+  const saved = await saveDecision({
+    tenQH: name, fileName: file.name, buffer: file.buffer, maxBytes: PROPOSAL_MAX_BYTES
+  });
+  await clearProposal(name, slug);
+  return saved;
+}
+
+async function rejectDecisionProposal(tenQH) {
+  const { name, slug } = await listedProject(tenQH);
+  const cur = await readProposals();
+  if (!cur.data.items || !cur.data.items[name]) rejectReview('Không có file quyết định chờ duyệt', 404);
+  await clearProposal(name, slug);
+  return { slug };
 }
 
 const ROLE_HT = 'hien-trang';
@@ -1416,6 +1572,7 @@ async function deleteProjectFiles(tenQH) {
     try { via = await removeName(objectName); } catch (err) { /* file chưa có */ }
   }
   try { await removeDecision(name, slug); } catch (err) { console.warn(`Gỡ quyết định đồ án «${name}»:`, err.message); }
+  try { await clearProposal(name, slug); } catch (err) { console.warn(`Gỡ quyết định chờ duyệt «${name}»:`, err.message); }
   const indexed = await updateIndex(cur => {
     const projects = (cur.projects || []).filter(p => p.tenQH !== name);
     if (!cur.migrated) projects.push({ tenQH: name, deleted: true });
@@ -1461,6 +1618,17 @@ async function renameProject(from, to) {
   const decisions = await readDecisions();
   if (decisions.data.items && decisions.data.items[oldName]) {
     await updateDecisions(cur => {
+      const items = { ...(cur.items || {}) };
+      if (items[oldName]) {
+        items[newName] = items[oldName];
+        delete items[oldName];
+      }
+      return { ...cur, items };
+    });
+  }
+  const proposals = await readProposals();
+  if (proposals.data.items && proposals.data.items[oldName]) {
+    await updateProposals(cur => {
       const items = { ...(cur.items || {}) };
       if (items[oldName]) {
         items[newName] = items[oldName];
@@ -2006,6 +2174,7 @@ async function wardParcels() {
 module.exports = {
   setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, deleteLayer, deleteProjectFiles, renameProject,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision, layerDecisions, removeLayerDecision,
+  saveDecisionProposal, readDecisionProposal, approveDecisionProposal, rejectDecisionProposal,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase,
   saveAdjustment, attachAdjustPdf, attachAdjustScan, listAdjustments, readAdjustment, readAdjustPdf, readAdjustScan,
   approveAdjustment, removeAdjustment
