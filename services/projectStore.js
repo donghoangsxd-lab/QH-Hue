@@ -1774,6 +1774,9 @@ function cleanAdjustLot(l) {
   return {
     geometry,
     layer: cleanText(l.layer, 120),
+    // Khóa ký hiệu TT16 (tt16Symbols.js) để vẽ hoa văn; srcLayer: tên layer gốc khi người nhập chọn loại đất thủ công
+    pattern: /^[A-Za-z0-9-]{1,12}$/.test(String(l.pattern || '')) ? String(l.pattern) : '',
+    srcLayer: cleanText(l.srcLayer, 120),
     landKey: /^[a-z0-9_]{1,40}$/.test(String(l.landKey || '')) ? String(l.landKey) : '',
     subKey: /^[a-z0-9_]{1,20}$/.test(String(l.subKey || '')) ? String(l.subKey) : '',
     label: cleanText(l.label, 100),

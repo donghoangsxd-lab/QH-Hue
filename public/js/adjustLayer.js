@@ -1,7 +1,8 @@
 // Hồ sơ điều chỉnh cục bộ trên bản đồ quy hoạch (bản đồ chính và khung so sánh): ranh xanh dương nét đứt dày, nền sọc nghiêng 45°.
 // Nhịp nét lệch nửa chu kỳ với ranh khu vực QHCT (qhctLayer.js): khu vực vừa có QHCT vừa điều chỉnh hiện xen kẽ xanh / đỏ.
-// Rê chuột sáng viền; bấm mở popup để thể hiện theo điều chỉnh (che nền trong ranh, vẽ lô mới lên trên), xem PDF scan
-// hoặc bật ảnh tờ bản vẽ scan đã định vị (scanGeoref.js), độ trong suốt chỉnh ở thanh góc dưới bản đồ.
+// Rê chuột sáng viền; bấm mở popup để thể hiện theo điều chỉnh (lớp che trắng giấu quy hoạch cũ trong ranh, tắt được;
+// lô mới kẻ hoa văn TT16 theo loại đất), xem PDF scan
+// hoặc bật ảnh tờ bản vẽ scan đã định vị (scanGeoref.js), thanh nhỏ ở góc ảnh chỉnh độ trong suốt và tắt ảnh.
 // Admin ghi thẳng; hồ sơ người dùng nằm trong hàng chờ (khung Thẩm định › Điều chỉnh) tới khi Admin duyệt.
 // Trong panel, hồ sơ đã duyệt là lớp phụ «Điều chỉnh cục bộ» của đồ án (projectLayer.js): ẩn theo đồ án / cấp và theo ô lớp.
 import { state } from './state.js';
@@ -11,6 +12,7 @@ import { isLayerHidden, projectShown } from './projectFiles.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 import { ScanOverlay, cornersOf, openGeoref, prepareScan, scanProblem } from './scanGeoref.js';
+import { tt16SymbolStyle, landPatternKey, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT } from './tt16Symbols.js';
 
 const BLUE = '#2f80ff';
 // Trên viền sáng ranh đồ án (445), dưới tem đường (450): nền che + lô mới ở 446, ảnh scan ở 447, ranh ở 448
@@ -35,12 +37,12 @@ let items = [];
 let pendingItems = [];
 const details = new Map();
 const active = new Set();
+const wipeOff = new Set();     // hồ sơ đang thể hiện nhưng bỏ lớp che: hoa văn lô mới chồng lên quy hoạch cũ
 const layers = new Map();
 let viewerUrl = '';
 const scanOn = new Set();
 const scanAlpha = new Map();   // id → độ trong suốt 0–100
 const scanUrls = new Map();    // id → { at, url, blob } ảnh hồ sơ chờ duyệt tải qua POST
-let scanBar = null;
 
 function headers(admin) {
   const h = { 'Content-Type': 'application/json' };
@@ -118,6 +120,20 @@ export async function sendAdjustment(payload, pdfFile, scan) {
 
 const shownMaps = () => [map, planMap].filter(Boolean);
 
+/**
+ * Lô điều chỉnh vẽ như lô quy hoạch: thu nhỏ tô màu ký hiệu TT16, từ TT16_PATTERN_ZOOM kẻ hoa văn (CanvasPattern, cần renderer canvas).
+ * Hồ sơ cũ chưa lưu pattern thì dò lại từ tên layer; không nhận được loại đất thì tô nhạt màu tone.
+ */
+export function adjustLotStyle(lot, detailed) {
+  const saved = TT16_STYLES[lot.pattern] ? lot.pattern : '';
+  const guess = saved || landPatternKey(lot.layer, '') || landPatternKey(lot.srcLayer, '');
+  const key = TT16_STYLES[guess] ? guess : null;
+  return tt16SymbolStyle(key, key ? TT16_STYLES[key].color : lot.tone || '#94a3b8', 'QH', { scenario: 'QH', detailed });
+}
+
+// Lớp che trắng (wipeout) giấu lô quy hoạch cũ trong ranh khi thể hiện theo điều chỉnh
+export const WIPEOUT_STYLE = { stroke: false, fillColor: '#ffffff', fillOpacity: 1 };
+
 // Hồ sơ chờ duyệt Admin đang xem trước luôn hiện
 const visible = (it) => it.status === 'pending' || (projectShown(it.tenQH) && !isLayerHidden(it.tenQH, ADJUST_LAYER_KEY));
 
@@ -141,53 +157,94 @@ function hatchDefs(svg, id) {
   defs.appendChild(p);
 }
 
-// Mỗi bản đồ một cặp renderer SVG riêng: canvas không tô được pattern và không gắn được bóng sáng cho viền
+// Ranh: SVG (nền sọc dùng pattern SVG, viền sáng bằng class). Lớp che + lô mới: canvas để kẻ hoa văn TT16 (CanvasPattern)
 function layersOf(m) {
   if (layers.has(m)) return layers.get(m);
   [[FILL_PANE, FILL_Z], [SCAN_PANE, SCAN_Z], [LINE_PANE, LINE_Z]].forEach(([name, z]) => {
     if (!m.getPane(name)) m.createPane(name).style.zIndex = z;
   });
   m.getPane(SCAN_PANE).style.pointerEvents = 'none';
-  const fillR = L.svg({ pane: FILL_PANE }).addTo(m);
+  const fillR = L.canvas({ pane: FILL_PANE }).addTo(m);
   const lineR = L.svg({ pane: LINE_PANE }).addTo(m);
   const hatchId = `adjHatch${L.stamp(m)}`;
   hatchDefs(lineR._container, hatchId);
   const entry = {
-    fillR, lineR, hatchId, fills: L.layerGroup().addTo(m), lines: L.layerGroup().addTo(m),
-    scans: L.layerGroup().addTo(m), scanById: new Map()
+    map: m, fillR, lineR, hatchId, fills: L.layerGroup().addTo(m), lines: L.layerGroup().addTo(m),
+    scans: L.layerGroup().addTo(m), scanById: new Map(), detailed: null
   };
   layers.set(m, entry);
+  m.on('zoomend', () => {
+    const d = m.getZoom() >= TT16_PATTERN_ZOOM;
+    if (d !== entry.detailed && active.size) drawOn(m);
+  });
   return entry;
 }
 
 function popupHtml(it) {
   const on = active.has(it.id);
   const admin = isAdmin();
-  const scanShown = scanOn.has(it.id);
-  const btn = (act, icon, text, cls = '') => `<button type="button" class="bp-btn ${cls}" data-adj-act="${act}" data-adj-id="${it.id}">${ico(icon)}${text}</button>`;
-  return `<div class="adj-pop">
-    <div class="adj-pop-kind">ĐIỀU CHỈNH CỤC BỘ${it.status === 'pending' ? ' · <span class="adj-wait">chờ duyệt</span>' : ''}</div>
-    <b>${escapeHtml(it.tenQH)}</b>
-    ${it.title ? `<div class="adj-pop-title">${escapeHtml(it.title)}</div>` : ''}
-    <div class="adj-pop-meta">${fmtNum(it.lots || 0)} lô đất mới · ${escapeHtml(it.stamp || '')}${it.sender ? ` · ${escapeHtml(it.sender)}` : ''}${it.verdict ? ` · thẩm định: ${escapeHtml(it.verdict)}` : ''}</div>
-    ${it.note ? `<div class="adj-pop-meta">${escapeHtml(it.note)}</div>` : ''}
-    <div class="adj-pop-btns">
-      ${btn('toggle', on ? 'close' : 'layers', on ? 'Trả lại bản đồ quy hoạch' : 'Thể hiện theo điều chỉnh', on ? '' : 'adj-primary')}
-      ${it.scan ? btn('scan', scanShown ? 'close' : 'map', scanShown ? 'Ẩn bản vẽ scan' : 'Bản vẽ scan') : ''}
-      ${it.pdf ? btn('pdf', 'file', 'Xem QĐ, bản vẽ (PDF)') : '<span class="adj-pop-meta">Không kèm PDF scan</span>'}
-      ${admin && it.scan ? btn('georef', 'pin', 'Định vị lại scan') : ''}
-      ${admin ? btn('scanNew', 'map', it.scan ? 'Thay ảnh scan' : 'Ghép ảnh scan') : ''}
-      ${admin && it.status === 'approved' ? btn('remove', 'trash', 'Xóa hồ sơ', 'adj-danger') : ''}
+  const pending = it.status === 'pending';
+  const data = `data-adj-id="${it.id}"`;
+  const sw = (act, icon, text, hint, checked) => `<button type="button" class="adj-sw" role="switch" aria-checked="${checked}" data-adj-act="${act}" ${data}>
+      <span class="adj-sw-ico">${ico(icon)}</span><span class="adj-sw-text">${text}<small>${hint}</small></span><span class="adj-sw-track"></span>
+    </button>`;
+  const tool = (act, icon, text, cls = '') => `<button type="button" class="adj-tool ${cls}" data-adj-act="${act}" ${data} title="${text}">${ico(icon)}<span>${text}</span></button>`;
+  const facts = [
+    ['Lô đất mới', fmtNum(it.lots || 0)],
+    ['Cập nhật', escapeHtml(it.stamp || '—')],
+    it.sender ? ['Người gửi', escapeHtml(it.sender)] : null,
+    it.verdict ? ['Thẩm định', escapeHtml(it.verdict)] : null
+  ].filter(Boolean);
+  const shows = [
+    on ? sw('wipe', wipeOff.has(it.id) ? 'eye' : 'eye-off', 'Che quy hoạch cũ', 'Phủ trắng lô cũ trong ranh điều chỉnh', !wipeOff.has(it.id)) : '',
+    it.scan ? sw('scan', 'map', 'Bản vẽ scan', 'Ảnh tờ bản vẽ đã định vị trên bản đồ', scanOn.has(it.id)) : ''
+  ].join('');
+  const admins = admin ? [
+    it.scan ? tool('georef', 'pin', 'Định vị lại') : '',
+    tool('scanNew', 'map', it.scan ? 'Thay ảnh' : 'Ghép ảnh scan'),
+    !pending ? tool('remove', 'trash', 'Xóa hồ sơ', 'is-danger') : ''
+  ].join('') : '';
+  return `<div class="adj-pop" data-adj-pop="${it.id}">
+    <div class="adj-pop-head">
+      <span class="adj-pop-badge">${ico('layers')}Điều chỉnh cục bộ</span>
+      <span class="adj-pop-status ${pending ? 'is-wait' : 'is-ok'}">${pending ? 'Chờ duyệt' : 'Đã duyệt'}</span>
     </div>
+    <div class="adj-pop-title">${escapeHtml(it.title || 'Hồ sơ điều chỉnh cục bộ')}</div>
+    <div class="adj-pop-project">${ico('folder')}${escapeHtml(it.tenQH)}</div>
+    <dl class="adj-pop-facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+    ${it.note ? `<p class="adj-pop-note">${escapeHtml(it.note)}</p>` : ''}
+    <button type="button" class="adj-pop-main ${on ? 'is-on' : ''}" data-adj-act="toggle" ${data}>
+      ${ico(on ? 'undo' : 'layers')}${on ? 'Trả lại bản đồ quy hoạch' : 'Thể hiện theo điều chỉnh'}
+    </button>
+    ${shows ? `<div class="adj-pop-sec"><div class="adj-pop-label">Hiển thị</div>${shows}</div>` : ''}
+    <div class="adj-pop-sec">
+      <div class="adj-pop-label">Tài liệu</div>
+      ${it.pdf
+        ? `<button type="button" class="adj-doc" data-adj-act="pdf" ${data}>${ico('file')}<span>Quyết định, bản vẽ điều chỉnh<small>${escapeHtml(it.pdf.name || 'PDF')}</small></span>${ico('chev-right')}</button>`
+        : '<div class="adj-doc is-empty">' + ico('file') + '<span>Chưa kèm PDF quyết định, bản vẽ</span></div>'}
+    </div>
+    ${admins ? `<div class="adj-pop-admin"><div class="adj-pop-label">${ico('key')}Quản trị</div><div class="adj-tools">${admins}</div></div>` : ''}
   </div>`;
 }
 
 // Leaflet chặn click lan ra ngoài popup nên gắn bộ xử lý ngay trên nội dung
 function openPopup(m, it, latlng) {
   const box = document.createElement('div');
+  box.className = 'adj-pop-box';
   box.innerHTML = popupHtml(it);
   box.addEventListener('click', (e) => { e.stopPropagation(); onAction(e); });
-  L.popup({ maxWidth: 320, className: 'adj-popup' }).setLatLng(latlng).setContent(box).openOn(m);
+  box._popup = L.popup({ maxWidth: 340, minWidth: 280, className: 'adj-popup', autoPanPaddingTopLeft: [40, 90] }).setLatLng(latlng).setContent(box).openOn(m);
+}
+
+// Popup đang mở vẽ lại tại chỗ sau mỗi lần bật / tắt (công tắc đổi trạng thái mà không đóng popup)
+function syncPopups() {
+  document.querySelectorAll('.adj-pop-box').forEach(box => {
+    const id = box.querySelector('[data-adj-pop]')?.dataset.adjPop;
+    const it = items.find(x => x.id === id) || pendingItems.find(x => x.id === id);
+    if (!it) { box._popup?.close(); return; }
+    box.innerHTML = popupHtml(it);
+    box._popup?.update();
+  });
 }
 
 function drawScans(L1) {
@@ -201,28 +258,69 @@ function drawScans(L1) {
     const layer = new ScanOverlay(url, cornersOf(it.scan), { pane: SCAN_PANE, opacity: 1 - transparencyOf(it.id) / 100 });
     L1.scans.addLayer(layer);
     L1.scanById.set(it.id, layer);
+    L1.scans.addLayer(scanChip(L1.map, it));
   });
+}
+
+// Góc ảnh nằm trên-phải nhất trên màn hình; phép chiếu bảo giác nên góc này không đổi theo zoom
+function chipCorner(m, g) {
+  const tl = L.latLng(g.tl), tr = L.latLng(g.tr), bl = L.latLng(g.bl);
+  const br = L.latLng(tr.lat + bl.lat - tl.lat, tr.lng + bl.lng - tl.lng);
+  return [tl, tr, br, bl].reduce((best, ll) => {
+    const p = m.latLngToLayerPoint(ll);
+    return p.x - p.y > best.score ? { ll, score: p.x - p.y } : best;
+  }, { ll: tr, score: -Infinity }).ll;
+}
+
+// Thanh nhỏ ở góc ảnh scan: kéo độ trong suốt, nút tắt ảnh
+function scanChip(m, it) {
+  const v = transparencyOf(it.id);
+  const html = `<div class="adj-scanchip" title="${escapeHtml(it.title || it.tenQH)}">
+    <span class="adj-scanchip-ico">${ico('map')}</span>
+    <label class="adj-scanchip-range"><span>Trong suốt</span>
+      <input type="range" min="0" max="100" step="5" value="${v}" data-adj-op="${it.id}" aria-label="Độ trong suốt bản vẽ scan">
+    </label>
+    <output data-adj-opv="${it.id}">${v}%</output>
+    <button type="button" class="adj-scanchip-x" data-adj-act="scan" data-adj-id="${it.id}" title="Tắt bản vẽ scan" aria-label="Tắt bản vẽ scan">${ico('close')}</button>
+  </div>`;
+  const chip = L.marker(chipCorner(m, it.scan), {
+    icon: L.divIcon({ className: 'adj-scanchip-icon', html, iconSize: null, iconAnchor: [0, 0] }),
+    keyboard: false, bubblingMouseEvents: false, zIndexOffset: 1000
+  });
+  chip.on('add', () => {
+    const el = chip.getElement();
+    if (!el) return;
+    L.DomEvent.disableClickPropagation(el);
+    L.DomEvent.disableScrollPropagation(el);
+    el.addEventListener('input', (e) => {
+      const r = e.target.closest('[data-adj-op]');
+      if (r) setTransparency(r.dataset.adjOp, Number(r.value) || 0);
+    });
+    el.addEventListener('click', onAction);
+  });
+  return chip;
 }
 
 function drawOn(m) {
   const L1 = layersOf(m);
   L1.fills.clearLayers();
   L1.lines.clearLayers();
+  L1.detailed = m.getZoom() >= TT16_PATTERN_ZOOM;
   drawScans(L1);
   items.forEach(it => {
     if (!it.boundary || !visible(it)) return;
     const on = active.has(it.id);
     const detail = on ? details.get(it.id)?.value : null;
     if (on && detail) {
-      L1.fills.addLayer(L.geoJSON(it.boundary, {
-        renderer: L1.fillR, interactive: false, style: { stroke: false, fillColor: '#ffffff', fillOpacity: 1 }
-      }));
+      if (!wipeOff.has(it.id)) {
+        L1.fills.addLayer(L.geoJSON(it.boundary, { renderer: L1.fillR, interactive: false, style: WIPEOUT_STYLE }));
+      }
       detail.lots.forEach(lot => {
         const shape = L.geoJSON(lot.geometry, {
-          renderer: L1.fillR, bubblingMouseEvents: false,
-          style: { color: '#1f2937', weight: 0.9, fillColor: lot.tone || '#94a3b8', fillOpacity: 0.88 }
+          renderer: L1.fillR, bubblingMouseEvents: false, style: adjustLotStyle(lot, L1.detailed)
         });
-        shape.bindTooltip(`${escapeHtml(lot.label || lot.layer || 'Lô điều chỉnh')} · ${fmtNum(lot.area || 0)} m²`, { sticky: true, className: 'dot-tip' });
+        const src = lot.srcLayer ? `<br><small>Layer DXF: ${escapeHtml(lot.srcLayer)}</small>` : '';
+        shape.bindTooltip(`${escapeHtml(lot.label || lot.layer || 'Lô điều chỉnh')} · ${fmtNum(lot.area || 0)} m²${src}`, { sticky: true, className: 'dot-tip' });
         shape.on('click', (e) => { if (!passToolClick(m, e)) openPopup(m, it, e.latlng); });
         L1.fills.addLayer(shape);
       });
@@ -242,7 +340,7 @@ function drawOn(m) {
 export function refreshAdjustLayer() {
   if (typeof L === 'undefined') return;
   shownMaps().forEach(drawOn);
-  renderScanBar();
+  syncPopups();
 }
 
 // ============================ ẢNH SCAN ============================
@@ -276,7 +374,6 @@ async function scanUrlOf(it) {
 async function toggleScan(id) {
   const it = items.find(x => x.id === id) || pendingItems.find(x => x.id === id);
   if (!it || !it.scan) return;
-  shownMaps().forEach(m => m.closePopup());
   if (scanOn.has(id)) {
     scanOn.delete(id);
     refreshAdjustLayer();
@@ -292,46 +389,12 @@ async function toggleScan(id) {
   }
 }
 
+// Bản đồ chính và khung so sánh mỗi bên một thanh ở góc ảnh: kéo bên nào cũng đồng bộ bên kia
 function setTransparency(id, value) {
   scanAlpha.set(id, value);
   layers.forEach(L1 => L1.scanById.get(id)?.setOpacity(1 - value / 100));
-  const out = scanBar?.getContainer().querySelector(`[data-adj-opv="${id}"]`);
-  if (out) out.textContent = `${value}%`;
-}
-
-// Thanh độ trong suốt góc dưới trái bản đồ chính: mỗi ảnh đang bật một dòng, áp cho cả bản đồ chính và khung so sánh
-function renderScanBar() {
-  if (!map || typeof L === 'undefined') return;
-  const shown = items.filter(it => it.scan && scanOn.has(it.id) && visible(it));
-  if (!shown.length) {
-    if (scanBar) { scanBar.remove(); scanBar = null; }
-    return;
-  }
-  if (!scanBar) {
-    const Bar = L.Control.extend({
-      options: { position: 'bottomleft' },
-      onAdd() {
-        const el = L.DomUtil.create('div', 'adj-scanbar');
-        L.DomEvent.disableClickPropagation(el);
-        L.DomEvent.disableScrollPropagation(el);
-        el.addEventListener('input', (e) => {
-          const r = e.target.closest('[data-adj-op]');
-          if (r) setTransparency(r.dataset.adjOp, Number(r.value) || 0);
-        });
-        el.addEventListener('click', onAction);
-        return el;
-      }
-    });
-    scanBar = new Bar().addTo(map);
-  }
-  scanBar.getContainer().innerHTML = shown.map(it => {
-    const v = transparencyOf(it.id);
-    return `<div class="adj-scanrow">
-      <span class="adj-scanname" title="${escapeHtml(it.title || it.tenQH)}">Bản vẽ scan · ${escapeHtml(it.tenQH)}</span>
-      <label>Độ trong suốt <input type="range" min="0" max="100" step="5" value="${v}" data-adj-op="${it.id}"><output data-adj-opv="${it.id}">${v}%</output></label>
-      <button type="button" class="bp-btn" data-adj-act="scan" data-adj-id="${it.id}" title="Ẩn bản vẽ scan">${ico('close')}</button>
-    </div>`;
-  }).join('');
+  document.querySelectorAll(`[data-adj-opv="${id}"]`).forEach(out => { out.textContent = `${value}%`; });
+  document.querySelectorAll(`input[data-adj-op="${id}"]`).forEach(r => { if (r !== document.activeElement) r.value = value; });
 }
 
 function pickImage() {
@@ -405,7 +468,6 @@ function detailOf(it) {
 async function toggle(id) {
   const it = items.find(x => x.id === id);
   if (!it) return;
-  shownMaps().forEach(m => m.closePopup());
   if (active.has(id)) {
     active.delete(id);
     refreshAdjustLayer();
@@ -431,6 +493,7 @@ export async function reloadAdjustments() {
     console.warn('Đọc hồ sơ điều chỉnh cục bộ lỗi:', err.message);
   }
   [...active].forEach(id => { if (!items.some(x => x.id === id)) active.delete(id); });
+  [...wipeOff].forEach(id => { if (!active.has(id)) wipeOff.delete(id); });
   [...scanOn].forEach(id => { if (!items.some(x => x.id === id && x.scan)) scanOn.delete(id); });
   refreshAdjustLayer();
   document.dispatchEvent(new CustomEvent(ADJUST_CHANGE_EVENT));
@@ -561,8 +624,15 @@ function onAction(e) {
   if (!el) return;
   const id = el.dataset.adjId;
   const act = el.dataset.adjAct;
-  if (act === 'toggle') toggle(id);
-  else if (act === 'scan') toggleScan(id);
+  if (act === 'toggle' || act === 'scan') {
+    if (el.classList.contains('is-busy')) return;
+    el.classList.add('is-busy');
+    (act === 'toggle' ? toggle(id) : toggleScan(id)).finally(() => { el.classList.remove('is-busy'); syncPopups(); });
+  }
+  else if (act === 'wipe') {
+    if (wipeOff.has(id)) wipeOff.delete(id); else wipeOff.add(id);
+    refreshAdjustLayer();
+  }
   else if (act === 'georef') georefScan(id, false);
   else if (act === 'scanNew') georefScan(id, true);
   else if (act === 'pdf') openPdf(id);
@@ -581,5 +651,6 @@ export function initAdjustLayer() {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('adjViewer')) closeViewer(); });
   document.addEventListener('auth:change', () => { loadAdjustPending(); refreshAdjustLayer(); });
   window.addEventListener('qh:local-adjust-open', loadAdjustPending);
+  window.addEventListener(LOT_OPACITY_EVENT, () => { if (active.size) refreshAdjustLayer(); });
   reloadAdjustments();
 }

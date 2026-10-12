@@ -1,17 +1,22 @@
 // Nhập hàng loạt › Điều chỉnh cục bộ: một hồ sơ đã có Quyết định gồm DXF (ranh + hatch đất), ảnh tờ bản vẽ scan và PDF Quyết định.
 // DXF đọc bằng adjustRecordFromDxf (không chấm QCVN); ảnh phải đặt vào ranh điều chỉnh (kéo, xoay trong scanGeoref.js) trước khi gửi.
 // Admin ghi thẳng, người dùng vào hàng chờ (adjustLayer.js). Lô gốc của đồ án giữ nguyên, hồ sơ chỉ vẽ phủ trên bản đồ quy hoạch.
+// Mỗi layer hatch trong DXF tự nhận loại đất theo tên (landPatternKey); layer chưa nhận hoặc nhận sai thì chọn tay,
+// lựa chọn nhớ theo tên layer cho lần nhập sau.
 import { state } from './state.js';
 import { map } from './mapEngine.js';
 import { CRS_PRESETS } from './cadImport.js';
 import { adjustRecordFromDxf } from './localAdjust.js';
-import { sendAdjustment, pdfProblem } from './adjustLayer.js';
+import { sendAdjustment, pdfProblem, adjustLotStyle, WIPEOUT_STYLE } from './adjustLayer.js';
 import { ScanOverlay, cornersOf, openGeoref, prepareScan, scanProblem } from './scanGeoref.js';
+import { TT16_LAND_KEYS, TT16_STYLES, TT16_PATTERN_ZOOM, tt16SwatchCss } from './tt16Symbols.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 
 const RANH = '#2f80ff';
+const FILL_PANE = 'adjImportFillPane';
 const SCAN_PANE = 'adjImportScanPane';
 const LINE_PANE = 'adjImportLinePane';
+const LAYER_MAP_KEY = 'qh_adjust_layer_map_v1';
 
 const $ = (id) => document.getElementById(id);
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
@@ -30,6 +35,10 @@ let transparency = 30;
 let preview = null;
 let scanLayer = null;
 let lineRenderer = null;
+let fillRenderer = null;
+let previewDetailed = null;
+// Layer DXF → khóa TT16 chọn tay cho file đang mở
+let overrides = {};
 
 const kindOn = () => document.querySelector('input[name="bulkKind"]:checked')?.value === 'adjust';
 
@@ -37,6 +46,20 @@ function sizeText(bytes) {
   if (bytes < 1024) return `${fmtNum(bytes)} B`;
   if (bytes < 1024 * 1024) return `${fmtNum(Math.round(bytes / 1024))} KB`;
   return `${fmtNum(Math.round(bytes / 1024 / 1024 * 10) / 10)} MB`;
+}
+
+function rememberedLayers() {
+  try {
+    const all = JSON.parse(localStorage.getItem(LAYER_MAP_KEY) || '{}');
+    return all && typeof all === 'object' ? all : {};
+  } catch (e) { return {}; }
+}
+
+function rememberLayer(layer, key) {
+  const all = rememberedLayers();
+  if (key) all[layer] = key;
+  else delete all[layer];
+  try { localStorage.setItem(LAYER_MAP_KEY, JSON.stringify(all)); } catch (e) { /* chế độ riêng tư */ }
 }
 
 function fileKind(f) {
@@ -53,13 +76,19 @@ function clearPreview() {
   if (scanLayer) { scanLayer.remove(); scanLayer = null; }
 }
 
+// Lớp che + lô mới (446) trên lô quy hoạch cũ, dưới ảnh scan (447) và ranh (449)
 function ensurePanes() {
+  if (!map.getPane(FILL_PANE)) {
+    map.createPane(FILL_PANE).style.zIndex = 446;
+    map.getPane(FILL_PANE).style.pointerEvents = 'none';
+  }
   if (!map.getPane(SCAN_PANE)) {
     map.createPane(SCAN_PANE).style.zIndex = 447;
     map.getPane(SCAN_PANE).style.pointerEvents = 'none';
   }
   if (!map.getPane(LINE_PANE)) map.createPane(LINE_PANE).style.zIndex = 449;
   if (!lineRenderer) lineRenderer = L.svg({ pane: LINE_PANE });
+  if (!fillRenderer) fillRenderer = L.canvas({ pane: FILL_PANE });
 }
 
 function drawPreview(fit = false) {
@@ -67,11 +96,11 @@ function drawPreview(fit = false) {
   if (!map || typeof L === 'undefined' || !record || !kindOn()) return;
   ensurePanes();
   const p = record.payload;
+  previewDetailed = map.getZoom() >= TT16_PATTERN_ZOOM;
   preview = L.layerGroup().addTo(map);
+  L.geoJSON(p.boundary, { interactive: false, renderer: fillRenderer, style: WIPEOUT_STYLE }).addTo(preview);
   p.lots.forEach(l => {
-    L.geoJSON(l.geometry, {
-      interactive: false, style: { color: '#1f2937', weight: 0.8, fillColor: l.tone || '#94a3b8', fillOpacity: 0.7 }
-    }).addTo(preview);
+    L.geoJSON(l.geometry, { interactive: false, renderer: fillRenderer, style: adjustLotStyle(l, previewDetailed) }).addTo(preview);
   });
   const ring = L.geoJSON(p.boundary, {
     interactive: false, renderer: lineRenderer, style: { color: RANH, weight: 4, dashArray: '12 12', fill: false }
@@ -114,9 +143,46 @@ function dxfStatus() {
   if (recordError) return `<span class="adj-bad">${escapeHtml(recordError)}</span>`;
   if (!record) return '';
   const notes = [`Ranh ${fmtNum(Math.round(record.area / 100) / 100)} ha · ${fmtNum(record.payload.lots.length)} lô mới`];
-  if (record.unknown) notes.push(`<span class="adj-warn">${record.unknown} hatch chưa nhận layer TT16</span>`);
+  if (record.unknown) notes.push(`<span class="adj-warn">${record.unknown} lô chưa có loại đất — chọn ở bảng layer</span>`);
   if (record.loose) notes.push('<span class="adj-warn">đồ án chưa có ranh, kiểm tra theo khung bao lô</span>');
   return notes.join(' · ');
+}
+
+const LAND_OPTIONS = TT16_LAND_KEYS.map(k => [k, TT16_STYLES[k].label]);
+
+// Mỗi layer hatch một dòng: ô mẫu ký hiệu đang dùng, số lô / diện tích, ô chọn loại đất (để trống = tự nhận theo tên)
+function layerTableHtml() {
+  if (!record || reading || !record.layers?.length) return '';
+  const rows = record.layers.map((g, i) => {
+    const picked = TT16_STYLES[overrides[g.layer]] ? overrides[g.layer] : '';
+    const key = picked || g.auto;
+    const sw = key ? tt16SwatchCss(key, 0.7) || `background:${TT16_STYLES[key].color};` : '';
+    const autoText = g.auto ? `Tự nhận: ${TT16_STYLES[g.auto].label}` : '— Chọn loại đất —';
+    const opts = LAND_OPTIONS.map(([k, label]) => `<option value="${k}"${k === picked ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('');
+    return `<div class="adj-layer${key ? '' : ' is-unknown'}">
+      <i class="adj-layer-sw" style="${sw}"></i>
+      <span class="adj-layer-name" title="${escapeHtml(g.layer)}">${escapeHtml(g.layer)}</span>
+      <small>${fmtNum(g.count)} lô · ${fmtNum(Math.round(g.area))} m²</small>
+      <select data-adj-layer="${i}" aria-label="Loại đất của layer ${escapeHtml(g.layer)}"${picked ? ' class="is-manual"' : ''}>
+        <option value="">${escapeHtml(autoText)}</option>${opts}</select>
+    </div>`;
+  }).join('');
+  const bad = record.layers.filter(g => !g.auto && !overrides[g.layer]).length;
+  return `<div class="adj-layers">
+    <div class="adj-layers-head">Layer DXF → loại đất${bad ? ` · <span class="adj-warn">${bad} layer chưa nhận</span>` : ''}</div>${rows}</div>`;
+}
+
+function setLayerKey(idx, key) {
+  const g = record?.layers?.[idx];
+  if (!g) return;
+  if (key) overrides[g.layer] = key;
+  else delete overrides[g.layer];
+  rememberLayer(g.layer, key);
+  const out = record.build(overrides);
+  record.payload = out.payload;
+  record.unknown = out.unknown;
+  render();
+  drawPreview();
 }
 
 function imageStatus() {
@@ -147,7 +213,7 @@ function render() {
   const box = $('adjFileList');
   if (box) {
     const rows = [];
-    if (files.dxf) rows.push(row('dxf', 'DXF', files.dxf, dxfStatus()));
+    if (files.dxf) rows.push(row('dxf', 'DXF', files.dxf, dxfStatus(), layerTableHtml()));
     if (files.image) rows.push(row('image', 'Ảnh', files.image, imageStatus(), imageExtra()));
     if (files.pdf) rows.push(row('pdf', 'PDF', files.pdf, sizeText(files.pdf.size)));
     box.innerHTML = rows.join('');
@@ -184,8 +250,10 @@ async function readRecord() {
   render();
   try {
     const crs = CRS_PRESETS[$('adjCrs')?.value] || CRS_PRESETS.HUE_3;
-    const out = await adjustRecordFromDxf(files.dxf, { name, crs });
+    const saved = rememberedLayers();
+    const out = await adjustRecordFromDxf(files.dxf, { name, crs, overrides: saved });
     if (seq !== readSeq) return;
+    overrides = Object.fromEntries(out.layers.filter(g => TT16_STYLES[saved[g.layer]]).map(g => [g.layer, saved[g.layer]]));
     record = out;
   } catch (err) {
     if (seq !== readSeq) return;
@@ -243,7 +311,7 @@ function addFiles(list) {
 function removeFile(kind) {
   files[kind] = null;
   if (kind === 'image') { prepSeq++; dropScan(); preparing = false; drawPreview(); }
-  if (kind === 'dxf') { readSeq++; record = null; recordError = ''; reading = false; clearPreview(); }
+  if (kind === 'dxf') { readSeq++; record = null; overrides = {}; recordError = ''; reading = false; clearPreview(); }
   render();
 }
 
@@ -264,6 +332,7 @@ function reset() {
   dropScan();
   files = { dxf: null, image: null, pdf: null };
   record = null;
+  overrides = {};
   recordError = '';
   reading = preparing = false;
   ['adjTitle', 'adjNote'].forEach(id => { const el = $(id); if (el) el.value = ''; });
@@ -322,6 +391,13 @@ export function initAdjustImport() {
     if (!el) return;
     if (el.dataset.adjImp === 'del') removeFile(el.dataset.kind);
     else if (el.dataset.adjImp === 'georef') georef();
+  });
+  list?.addEventListener('change', (e) => {
+    const sel = e.target.closest('select[data-adj-layer]');
+    if (sel) setLayerKey(Number(sel.dataset.adjLayer), sel.value);
+  });
+  map?.on('zoomend', () => {
+    if (preview && (map.getZoom() >= TT16_PATTERN_ZOOM) !== previewDetailed) drawPreview();
   });
   list?.addEventListener('input', (e) => {
     const r = e.target.closest('[data-adj-imp="op"]');

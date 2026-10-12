@@ -13,7 +13,7 @@ import { escapeHtml, fmtNum, ico, showToast, loadHtml2Canvas, loadHtml2Pdf } fro
 import { setBottomPanelCollapsed } from './uiComponents.js';
 import { dismissReviewHost, reviewHostDirty } from './projectReview.js';
 import { projectLayersOf, cachedLots } from './projectFiles.js';
-import { landPatternKey } from './tt16Symbols.js';
+import { landPatternKey, layerForPattern, TT16_STYLES } from './tt16Symbols.js';
 import { sendAdjustment, pdfProblem } from './adjustLayer.js';
 import {
   REVIEW_MAX_BYTES, LANDUSE_TABLES, classifyLand, landRowByKey, landSubKey,
@@ -642,19 +642,31 @@ function pageHtml(s) {
   </div>`;
 }
 
+function patternOf(layer) {
+  const key = landPatternKey(layer, '');
+  return TT16_STYLES[key] ? key : '';
+}
+
 function adjustPayload(s) {
   return {
     tenQH: s.name,
     boundary: s.mask.geometry,
-    lots: s.incoming.map(l => ({
-      geometry: l.feature.geometry,
-      layer: l.layer,
-      landKey: l.landKey || UNDETERMINED_KEY,
-      subKey: l.subKey || '',
-      label: legendLabel(s.kind, l),
-      tone: landSymbol(s.kind, l.landKey || UNDETERMINED_KEY, l.subKey).tone,
-      area: Math.round(l.area)
-    })),
+    lots: s.incoming.map(l => {
+      const pattern = l.pattern || patternOf(l.layer);
+      // Loại TT16 không có dòng trong bảng cân bằng đất của cấp đồ án: nhãn, màu theo ký hiệu thay vì "Chưa xác định"
+      const sym = !l.landKey && pattern ? TT16_STYLES[pattern] : null;
+      return {
+        geometry: l.feature.geometry,
+        layer: l.layer,
+        pattern,
+        ...(l.srcLayer && l.srcLayer !== l.layer ? { srcLayer: l.srcLayer } : {}),
+        landKey: l.landKey || UNDETERMINED_KEY,
+        subKey: l.subKey || '',
+        label: sym ? sym.label : legendLabel(s.kind, l),
+        tone: sym ? sym.color : landSymbol(s.kind, l.landKey || UNDETERMINED_KEY, l.subKey).tone,
+        area: Math.round(l.area)
+      };
+    }),
     codes: s.codes.all,
     title: `ĐIỀU CHỈNH CỤC BỘ ${s.name.toLocaleUpperCase('vi')} (${lotsPhrase(s.codes.all)})`,
     verdict: s.bad ? 'Không đảm bảo' : 'Đảm bảo'
@@ -866,9 +878,10 @@ async function runAdjust() {
 
 /**
  * Hồ sơ đã có QĐ phê duyệt (Nhập hàng loạt › Điều chỉnh cục bộ): đọc ranh + hatch, kiểm tra ranh nằm trong đồ án,
- * không chấm QCVN. Trả payload cho sendAdjustment.
+ * không chấm QCVN. overrides: { <layer DXF>: <khóa TT16> } chọn thủ công, thay tên layer bằng tên phân lớp TT16 trước khi
+ * nhận loại đất. Trả { payload, layers, unknown, build(overrides) } — build dựng lại payload không cần đọc lại file.
  */
-export async function adjustRecordFromDxf(file, { name, crs }) {
+export async function adjustRecordFromDxf(file, { name, crs, overrides = {} }) {
   if (typeof turf === 'undefined') throw new Error('Chưa tải thư viện đo diện tích');
   const entry = (state.projectCatalog || []).find(p => p && p.tenQH === name);
   if (!entry) throw new Error('Không thấy đồ án trong danh mục.');
@@ -882,14 +895,33 @@ export async function adjustRecordFromDxf(file, { name, crs }) {
   if (ratio < INSIDE_MIN) {
     throw new Error(`Phạm vi điều chỉnh nằm ngoài đồ án «${name}» (${fmtNum(Math.round((1 - ratio) * 1000) / 10)}% diện tích ngoài ranh).`);
   }
-  const incoming = drawing.hatches.map(h => clipTo(h, drawing.mask, drawing.maskBox)).filter(Boolean).map(h => tagIncoming(h, kind, 0));
-  const payload = adjustPayload({ name, kind, mask: drawing.mask, incoming, codes: codesInside(oldLots, drawing.mask, drawing.maskBox), bad: false });
-  payload.verdict = '';
+  const clipped = drawing.hatches.map(h => clipTo(h, drawing.mask, drawing.maskBox)).filter(Boolean);
+  const groups = new Map();
+  clipped.forEach(h => {
+    const g = groups.get(h.layer) || { layer: h.layer, count: 0, area: 0, auto: patternOf(h.layer) };
+    g.count += 1;
+    g.area += h.area;
+    groups.set(h.layer, g);
+  });
+  const codes = codesInside(oldLots, drawing.mask, drawing.maskBox);
+  const build = (picked = {}) => {
+    const incoming = clipped.map(h => {
+      const key = TT16_STYLES[picked[h.layer]] ? picked[h.layer] : '';
+      const lot = tagIncoming(key ? { ...h, layer: layerForPattern(key, h.layer) || h.layer } : h, kind, 0);
+      lot.srcLayer = h.layer;
+      lot.pattern = key || groups.get(h.layer).auto;
+      return lot;
+    });
+    const payload = adjustPayload({ name, kind, mask: drawing.mask, incoming, codes, bad: false });
+    payload.verdict = '';
+    return { payload, unknown: incoming.filter(l => !l.pattern && !l.landKey).length };
+  };
   return {
-    payload,
+    ...build(overrides),
+    build,
+    layers: [...groups.values()].sort((a, b) => b.area - a.area),
     kind,
     area: turf.area(drawing.mask),
-    unknown: incoming.filter(l => !l.landKey).length,
     loose: extent.how === 'khung'
   };
 }
