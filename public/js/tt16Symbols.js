@@ -1,5 +1,5 @@
 // Ký hiệu ranh lô theo TT 16/2025/TT-BXD, Phụ lục I: Mục 04 – QHPK 1/2.000, 1/5.000 (trang 19–22), bộ dùng cho mọi đồ án
-// hiện có; Mục 02 – QHC đô thị 1/10.000 (PL1), bộ chú giải riêng, khóa tiền tố "C-".
+// hiện có; Mục 02 – QHC đô thị 1/10.000 (PL1), khóa "C-"; Mục 05 – QHCT 1/500 (PL1), khóa "T-", dùng lại ô Mục 04.
 // Màu = mã ACI cột "Màu". Chín nhóm hạ tầng trích nét vector từ Phụ lục; các loại đất còn lại của Mục 04 vẽ theo cùng ô ký hiệu.
 // Viền theo khung ô ký hiệu: hiện trạng (HT_) mảnh; quy hoạch đợt đầu (QHDD_) dải liền; dài hạn (QHDH_) dải nét đứt.
 import { VISION_LEGEND_GROUPS } from './qhc2045.js';
@@ -85,6 +85,46 @@ Object.assign(TT16_STYLES, {
   "C-SS": { label: 'Sông, suối, kênh, rạch', layer: 'DAT_NNK_Songsuoi', aci: 152, color: '#0066cc', pattern: 'C_SS' },
   "C-MNB": { label: 'Mặt nước ven biển', layer: 'DAT_NNK_Matnuocbien', aci: 152, color: '#0066cc', pattern: 'C_MNB' }
 });
+// QHCT 1/500 (Mục 05 PL1): cùng ô hoa văn Mục 04, màu ACI của Mục 05. Riêng nhà ở biệt thự là kẻ dọc đứt (ô Nhaobietthu).
+// Hậu tố cấp _QG / _CV / _CT / _CH / _DVO cùng hoa văn; landPatternKey bỏ hậu tố đó trước khi đối chiếu PATTERN_CODES.
+Object.assign(TT16_STYLES, {
+  "T-LK": { label: 'Nhà ở liền kề', layer: 'DAT_NO_Nhaolienke', aci: 32, color: '#cc6600', pattern: 'Nhomnhao' },
+  "T-BT": { label: 'Nhà ở biệt thự', layer: 'DAT_NO_Nhaobietthu', aci: 56, color: '#7f7f00', pattern: 'Nhaobietthu' },
+  "T-CC": { label: 'Nhà ở chung cư', layer: 'DAT_NO_Nhaochungcu', aci: 40, color: '#ffbf00', pattern: 'Honhop' },
+  "T-CCHH": { label: 'Nhà chung cư hỗn hợp', layer: 'DAT_NO_NhaochungcuHH', aci: 44, color: '#997300', pattern: 'Honhop' },
+  "T-NT": { label: 'Nhà ở nông thôn', layer: 'DAT_NO_Nhaonongthon', aci: 57, color: '#7f7f40', pattern: 'Langxom' },
+  "T-VH": { label: 'Văn hóa', layer: 'DAT_CTHTXH_Vanhoa', aci: 243, color: '#cc667f', pattern: 'Vanhoa' },
+  "T-YT": { label: 'Y tế', layer: 'DAT_CTHTXH_Yte', aci: 220, color: '#ff00bf', pattern: 'Yte' },
+  "T-TH": { label: 'Trường THCS, tiểu học, mầm non', layer: 'DAT_CTHTXH_Truonghoc', aci: 15, color: '#994c4c', pattern: 'Truonghoc' },
+  "T-THPT": { label: 'Trường THPT', layer: 'DAT_CTHTXH_TruongTHPT', aci: 24, color: '#992600', pattern: 'THPT' },
+  "T-TDTT": { label: 'Thể dục thể thao', layer: 'DAT_CTHTXH_Theducthethao', aci: 94, color: '#009900', pattern: 'TDTT' },
+  "T-CXCC": { label: 'Cây xanh công cộng', layer: 'DAT_CTHTXH_CayxanhCC', aci: 72, color: '#66cc00', pattern: 'CayxanhCC' },
+  "T-TM": { label: 'Thương mại dịch vụ', layer: 'DAT_CTHTXD_ThuongmaiDV', aci: 12, color: '#cc0000', pattern: 'Anninh' },
+  "T-CN": { label: 'Công nghiệp, TTCN, kho tàng', layer: 'DAT_CTSX_Congnghiep', aci: 192, color: '#6600cc', pattern: 'Congnghiep' },
+  "T-DT": { label: 'Đào tạo, nghiên cứu', layer: 'DAT_CT_Daotaonghiencuu', aci: 144, color: '#007399', pattern: 'DaotaoNC' },
+  "T-CQ": { label: 'Cơ quan, trụ sở', layer: 'DAT_CT_Coquan', aci: 34, color: '#994c00', pattern: 'Coquan' },
+  "T-DV": { label: 'Dịch vụ', layer: 'DAT_CT_Dichvu', aci: 12, color: '#cc0000', pattern: 'Dichvu' },
+  "T-DL": { label: 'Du lịch', layer: 'DAT_CT_Dulich', aci: 210, color: '#ff00ff', pattern: 'Dulich' },
+  "T-DTTG": { label: 'Di tích, tôn giáo', layer: 'DAT_CT_Ditichtongiao', aci: 16, color: '#7f0000', pattern: 'Ditich' },
+  "T-CXHC": { label: 'Cây xanh sử dụng hạn chế', layer: 'DAT_CT_Cayxanhhanche', aci: 94, color: '#009900', pattern: 'Cayxanhhanche' },
+  "T-CXCD": { label: 'Cây xanh chuyên dụng', layer: 'DAT_CT_Cayxanhchuyendung', aci: 126, color: '#007f5f', pattern: 'Cayxanhchuyendung' },
+  "T-AN": { label: 'An ninh', layer: 'DAT_CT_Anninh', aci: 64, color: '#739900', pattern: 'Anninh' },
+  "T-QP": { label: 'Quốc phòng', layer: 'DAT_CT_Quocphong', aci: 79, color: '#394c26', pattern: 'Quocphong' },
+  "T-GT": { label: 'Đường giao thông', layer: 'DAT_CTHTKT_DuongGT', aci: 251, color: '#5b5b5b', pattern: 'DuongGT' },
+  // ACI 252 đúng Mục 05. Bộ QHPK (2-BDX) mượn ACI 175 vì 252 sát nghĩa trang ACI 251
+  "T-BDX": { label: 'Bãi đỗ xe', layer: 'DAT_CTHTKT_Baidoxe', aci: 252, color: '#848484', pattern: 'Baidoxe' },
+  "T-NTR": { label: 'Nghĩa trang', layer: 'DAT_CTHTKT_Nghiatrang', aci: 251, color: '#5b5b5b', pattern: 'Nghiatrang' },
+  "T-HTK": { label: 'Hạ tầng kỹ thuật khác', layer: 'DAT_CTHTKT_Hatangkhac', aci: 199, color: '#39264c', pattern: 'Hatangkhac' },
+  "T-NN": { label: 'Nông nghiệp', layer: 'DAT_NLK_Nongnghiep', aci: 3, color: '#00ff00', pattern: 'Nongnghiep' },
+  "T-RDD": { label: 'Rừng đặc dụng', layer: 'DAT_NLK_Rungdacdung', aci: 148, color: '#00394c', pattern: 'Rungdacdung' },
+  "T-RPH": { label: 'Rừng phòng hộ', layer: 'DAT_NLK_Rungphongho', aci: 129, color: '#264c43', pattern: 'Rungphongho' },
+  "T-RSX": { label: 'Rừng sản xuất', layer: 'DAT_NLK_Rungsanxuat', aci: 107, color: '#3f7f4f', pattern: 'Rungsanxuat' },
+  "T-TS": { label: 'Nuôi trồng thủy sản', layer: 'DAT_NLK_Thuysan', aci: 150, color: '#007fff', pattern: 'Thuysan' },
+  "T-CSD": { label: 'Chưa sử dụng', layer: 'DAT_NLK_Chuasudung', aci: 9, color: '#c0c0c0', pattern: 'Chuasudung', fillOpacity: 0.45 },
+  "T-HO": { label: 'Hồ, ao, đầm', layer: 'DAT_NLK_Honuoc', aci: 154, color: '#004c99', pattern: 'Honuoc' },
+  "T-SS": { label: 'Sông, suối, kênh, rạch', layer: 'DAT_NLK_Songsuoi', aci: 152, color: '#0066cc', pattern: 'Songsuoi' },
+  "T-MNB": { label: 'Mặt nước ven biển', layer: 'DAT_NLK_Matnuocbien', aci: 152, color: '#0066cc', pattern: 'Matnuocbien' }
+});
 
 const PATTERN_CODES = [
   ['O-NO', ['DAT_O_NHOMNHAO', 'DAT_DD_DONVIO']],
@@ -122,7 +162,42 @@ const PATTERN_CODES = [
   ['8-VH', ['DAT_HTXH_VANHOA']],
   ['TDTT', ['DAT_HTXH_THEDUCTHETHAO', 'DAT_NDD_VANHOATHETHAO']],
   ['9-TM', ['DAT_DICHVU']],
-  ['DCS', ['DAT_KHAC_CHUASUDUNG', 'DAT_NNK_CHUASUDUNG']]
+  ['DCS', ['DAT_KHAC_CHUASUDUNG', 'DAT_NNK_CHUASUDUNG']],
+  ['T-LK', ['DAT_NO_NHAOLIENKE']],
+  ['T-BT', ['DAT_NO_NHAOBIETTHU']],
+  ['T-CC', ['DAT_NO_NHAOCHUNGCU']],
+  ['T-CCHH', ['DAT_NO_NHAOCHUNGCUHH']],
+  ['T-NT', ['DAT_NO_NHAONONGTHON']],
+  ['T-VH', ['DAT_CTHTXH_VANHOA']],
+  ['T-YT', ['DAT_CTHTXH_YTE']],
+  ['T-TH', ['DAT_CTHTXH_TRUONGHOC']],
+  ['T-THPT', ['DAT_CTHTXH_TRUONGTHPT']],
+  ['T-TDTT', ['DAT_CTHTXH_THEDUCTHETHAO']],
+  ['T-CXCC', ['DAT_CTHTXH_CAYXANHCC']],
+  ['T-TM', ['DAT_CTHTXD_THUONGMAIDV']],
+  ['T-CN', ['DAT_CTSX_CONGNGHIEP']],
+  ['T-DT', ['DAT_CT_DAOTAONGHIENCUU']],
+  ['T-CQ', ['DAT_CT_COQUAN']],
+  ['T-DV', ['DAT_CT_DICHVU']],
+  ['T-DL', ['DAT_CT_DULICH']],
+  ['T-DTTG', ['DAT_CT_DITICHTONGIAO']],
+  ['T-CXHC', ['DAT_CT_CAYXANHHANCHE']],
+  ['T-CXCD', ['DAT_CT_CAYXANHCHUYENDUNG']],
+  ['T-AN', ['DAT_CT_ANNINH']],
+  ['T-QP', ['DAT_CT_QUOCPHONG']],
+  ['T-GT', ['DAT_CTHTKT_DUONGGT']],
+  ['T-BDX', ['DAT_CTHTKT_BAIDOXE']],
+  ['T-NTR', ['DAT_CTHTKT_NGHIATRANG']],
+  ['T-HTK', ['DAT_CTHTKT_HATANGKHAC']],
+  ['T-NN', ['DAT_NLK_NONGNGHIEP']],
+  ['T-RDD', ['DAT_NLK_RUNGDACDUNG']],
+  ['T-RPH', ['DAT_NLK_RUNGPHONGHO']],
+  ['T-RSX', ['DAT_NLK_RUNGSANXUAT']],
+  ['T-TS', ['DAT_NLK_THUYSAN']],
+  ['T-CSD', ['DAT_NLK_CHUASUDUNG']],
+  ['T-HO', ['DAT_NLK_HONUOC']],
+  ['T-SS', ['DAT_NLK_SONGSUOI']],
+  ['T-MNB', ['DAT_NLK_MATNUOCBIEN']]
 ];
 const patternByCode = new Map();
 PATTERN_CODES.forEach(([key, codes]) => codes.forEach(code => patternByCode.set(code, key)));
@@ -157,7 +232,14 @@ export const LEGEND_SETS = {
   QHC25: legendSet(VISION_LEGEND_GROUPS),
   QHC: legendSet(QHC_LEGEND_GROUPS),
   QHPK: legendSet(LEGEND_GROUPS),
-  QHCT: legendSet([], 'Ký hiệu QHCT 1/500 sẽ bổ sung sau.')
+  QHCT: legendSet([
+    ['Đất ở', ["T-LK", "T-BT", "T-CC", "T-CCHH", "T-NT"]],
+    ['Hạ tầng xã hội', ["T-VH", "T-YT", "T-TH", "T-THPT", "T-TDTT", "T-CXCC", "T-TM"]],
+    ['Sản xuất, cơ quan, dịch vụ', ["T-CN", "T-DT", "T-CQ", "T-DV", "T-DL", "T-DTTG", "T-CXHC", "T-CXCD"]],
+    ['An ninh, quốc phòng', ["T-AN", "T-QP"]],
+    ['Hạ tầng kỹ thuật', ["T-GT", "T-BDX", "T-NTR", "T-HTK"]],
+    ['Nông nghiệp và đất khác', ["T-NN", "T-RDD", "T-RPH", "T-RSX", "T-TS", "T-CSD", "T-HO", "T-SS", "T-MNB"]]
+  ])
 };
 
 // Độ đục phần tô lô đất (thanh trượt ở Chú giải): nhân vào fillOpacity của ký hiệu, 1 = đúng mẫu; viền giữ nguyên.
@@ -387,6 +469,15 @@ function hWaves(w, h, rowStep, amp, cycles) {
   return s;
 }
 
+function vDashes(w, h, dash, gap, colStep) {
+  const s = [];
+  const period = dash + gap;
+  for (let x = colStep / 2; x < w - 0.05; x += colStep) {
+    for (let y = 0; y < h; y += period) clipSeg(s, w, h, x, y, x, y + dash);
+  }
+  return s;
+}
+
 function hDashes(w, h, dash, gap, rowStep, stagger) {
   const s = [];
   const period = dash + gap;
@@ -461,6 +552,7 @@ const TILES = {
   Chuasudung: { w: 10.68, h: 10.72, scale: DENSE_SCALE,
     segs: [0,2.1,10.68,2.1,0,4.86,10.68,4.86,0,7.5,10.68,7.5,0,10.14,10.68,10.14,7.22,8.82,4.58,6.18,1.94,3.42,0,1.56,10.68,1.48,9.98,0.78,7.94,8.82,5.3,6.18,2.54,3.42,0,0.88,10.68,0.88,10.58,0.78,8.66,8.82,5.9,6.18,3.26,3.42,0.62,0.78] },
   Nhomnhao: { w: 8, h: 8, scale: DENSE_SCALE, segs: vLines(8, 8, 2) },
+  Nhaobietthu: { w: 8, h: 8, scale: DENSE_SCALE, segs: vDashes(8, 8, 1.2, 0.75, 2) },
   Honhop: { w: 9, h: 9, segs: vSlashes(9, 9, 2.25) },
   Langxom: { w: 9, h: 9, segs: diagonals(9, 9, 2.25, 1) },
   Cayxanhhanche: { w: 9.6, h: 9.6, dotR: 0.42, segs: [], dots: dotGrid(9.6, 9.6, 2.4, false) },
