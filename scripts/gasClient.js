@@ -18,7 +18,7 @@ function loadEnv() {
   loadEnvFile('.env');
 }
 
-async function postToAppsScript(action, content) {
+async function postAction(action, body) {
   const base = process.env.GAS_BASE_URL;
   const secret = process.env.GAS_SECRET;
   if (!base || !secret) throw new Error('Thiếu GAS_BASE_URL / GAS_SECRET (đặt biến môi trường hoặc chạy `vercel env pull .env.local`)');
@@ -28,7 +28,7 @@ async function postToAppsScript(action, content) {
     method: 'POST',
     redirect: 'manual',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, content }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(120000)
   });
   const loc = res.headers.get('location');
@@ -43,8 +43,13 @@ async function postToAppsScript(action, content) {
       : '';
     throw new Error(`Apps Script: ${data.error}${hint}`);
   }
+  return data;
+}
+
+async function postToAppsScript(action, content) {
+  const data = await postAction(action, { action, content });
   if (data.saved !== true) throw new Error('Apps Script chưa ghi được file lên bucket (xem Executions trong Apps Script)');
   return data;
 }
 
-module.exports = { loadEnv, postToAppsScript };
+module.exports = { loadEnv, postAction, postToAppsScript };

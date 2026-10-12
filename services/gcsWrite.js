@@ -99,4 +99,4 @@ async function removeObject(name) {
   throw fail(name, res.status, 'Xóa');
 }
 
-module.exports = { putJson, putObject, removeObject };
+module.exports = { accessToken, putJson, putObject, removeObject };

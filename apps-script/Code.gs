@@ -234,6 +234,44 @@ function jsonOutput(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
+// Xếp dòng tab hạ tầng theo Ten_QH rồi ID_DoiTuong để dòng cùng đồ án nằm liền nhau; Ten_QH trống xuống cuối.
+// Webapp và các lệnh sửa dòng đều tìm theo ID nên đổi thứ tự dòng không ảnh hưởng; Range.sort giữ định dạng, danh sách chọn theo dòng.
+// Gọi khi đã giữ ScriptLock.
+function sortSheetsByProject(sheets) {
+  var sorted = [], failed = [];
+  sheets.forEach(function(sheet) {
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    if (lastRow < 3 || lastCol < 1) return;
+    var col = getColumnMap(getSheetHeaders(sheet));
+    if (col.tenQH < 0 || col.id < 0) return;
+    try {
+      sheet.getRange(2, 1, lastRow - 1, lastCol).sort([
+        { column: col.tenQH + 1, ascending: true },
+        { column: col.id + 1, ascending: true }
+      ]);
+      sorted.push(sheet.getName());
+    } catch (err) {
+      failed.push(sheet.getName() + ": " + (err.message || err));
+    }
+  });
+  return { sorted: sorted, failed: failed };
+}
+
+function sortInfraSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  var out;
+  try {
+    out = sortSheetsByProject(ss.getSheets().filter(function(s) { return isValidInfraSheet(s.getName()); }));
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+  return { "success": true, "sorted": out.sorted, "failed": out.failed };
+}
+
 // ĐÓNG GÓI GEOJSON TỪ TOÀN BỘ CÁC TAB HẠ TẦNG (DÙNG CHUNG CHO SYNC GCS VÀ getJson)
 function collectFeatures(ss) {
   var features = [];
@@ -972,8 +1010,10 @@ function doPost(e) {
     if (action === "markWardNotes") return jsonOutput(markWardNotes(body));
     if (action === "fixWardNames") return jsonOutput(fixWardNames(body));
     if (action === "editInfraRow") return jsonOutput(editInfraRow(body));
+    if (action === "sortInfraSheets") return jsonOutput(sortInfraSheets());
     if (action === "retypeInfraRow") return jsonOutput(retypeInfraRow(body));
     if (action === "deleteInfraRow") return jsonOutput(deleteInfraRow(body));
+    if (action === "deleteInfraRows") return jsonOutput(deleteInfraRows(body));
     if (action === "deleteProject") return jsonOutput(deleteProject(body));
     if (action === "renameProject") return jsonOutput(renameProject(body));
     if (action === "setProjectLink") return jsonOutput(setProjectLink(body));
@@ -1223,6 +1263,7 @@ function importCadBatch(body) {
       }
       target.setValues(c.newRows);
     });
+    sortSheetsByProject(Object.keys(ctx).map(function(k) { return ctx[k] && ctx[k].sheet; }).filter(Boolean));
 
     appendProjectBackup(ss, backup);
     upsertCadPolygons(ss, polygons, fileName, currentTime, filePhase || phase);
@@ -1920,9 +1961,35 @@ function retypeInfraRow(body) {
 function deleteInfraRow(body) {
   var id = String(body.id || '').trim();
   if (!id) return { "error": "Thiếu ID công trình" };
-  var isMine = function(v) {
+  var done = removeInfraIds([id]);
+  if (!done.rows) return { "error": "Không tìm thấy ID công trình: " + id };
+  syncSheetsToGCS(false);
+  return { "success": true, "id": id, "rows": done.rows, "tabs": done.tabs };
+}
+
+/**
+ * Xóa nhiều công trình 1 lần (dọn dòng nhập trùng): body = { ids: [...] }, tối đa 500 mã.
+ * Như deleteInfraRow nhưng mỗi tab đọc 1 lần và chỉ đồng bộ bucket 1 lần, để không vượt 6 phút của Apps Script.
+ */
+function deleteInfraRows(body) {
+  var ids = (body && Array.isArray(body.ids) ? body.ids : []).map(function(v) { return String(v || '').trim(); }).filter(Boolean);
+  if (!ids.length) return { "error": "Thiếu danh sách ID công trình" };
+  if (ids.length > 500) return { "error": "Tối đa 500 mã mỗi lần" };
+  var done = removeInfraIds(ids);
+  if (done.rows) syncSheetsToGCS(false);
+  return { "success": true, "rows": done.rows, "tabs": done.tabs, "missing": done.missing };
+}
+
+// Xóa dòng các ID (kèm dòng phần vắt ranh <ID>.N) ở tab hạ tầng, CAD_Polygon, DoAn_SaoLuu; chưa đồng bộ bucket
+function removeInfraIds(ids) {
+  var want = {};
+  ids.forEach(function(id) { want[id] = true; });
+  var found = {};
+  var ownerOf = function(v) {
     var s = String(v || '').trim();
-    return s === id || (s.indexOf(id + '.') === 0 && /^\d+$/.test(s.slice(id.length + 1)));
+    if (want[s]) return s;
+    var m = s.match(/^(.+)\.(\d+)$/);
+    return m && want[m[1]] ? m[1] : null;
   };
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var rowsDeleted = 0;
@@ -1937,34 +2004,36 @@ function deleteInfraRow(body) {
       var col = getColumnMap(data[0]);
       if (col.id < 0) return;
       var rows = [];
-      for (var r = 1; r < data.length; r++) if (isMine(data[r][col.id])) rows.push(r + 1);
+      for (var r = 1; r < data.length; r++) {
+        var owner = ownerOf(data[r][col.id]);
+        if (owner) { rows.push(r + 1); found[owner] = true; }
+      }
       if (!rows.length) return;
       deleteRowBlocks(sheet, rows);
       rowsDeleted += rows.length;
       tabs.push(sheet.getName());
     });
-    if (!rowsDeleted) return { "error": "Không tìm thấy ID công trình: " + id };
 
-    var cad = ss.getSheetByName(CAD_SHEET_NAME);
-    if (cad && cad.getLastRow() > 1) {
-      var cadRows = [];
-      cad.getRange(2, 1, cad.getLastRow() - 1, 1).getValues().forEach(function(v, i) { if (isMine(v[0])) cadRows.push(i + 2); });
-      deleteRowBlocks(cad, cadRows);
-    }
-    var bak = ss.getSheetByName(BACKUP_SHEET_NAME);
-    if (bak && bak.getLastRow() > 1) {
-      var idCol = BACKUP_HEADERS.indexOf("ID_DoiTuong");
-      var bakRows = [];
-      bak.getRange(2, idCol + 1, bak.getLastRow() - 1, 1).getValues().forEach(function(v, i) { if (isMine(v[0])) bakRows.push(i + 2); });
-      deleteRowBlocks(bak, bakRows);
+    if (rowsDeleted) {
+      var cad = ss.getSheetByName(CAD_SHEET_NAME);
+      if (cad && cad.getLastRow() > 1) {
+        var cadRows = [];
+        cad.getRange(2, 1, cad.getLastRow() - 1, 1).getValues().forEach(function(v, i) { if (ownerOf(v[0])) cadRows.push(i + 2); });
+        deleteRowBlocks(cad, cadRows);
+      }
+      var bak = ss.getSheetByName(BACKUP_SHEET_NAME);
+      if (bak && bak.getLastRow() > 1) {
+        var idCol = BACKUP_HEADERS.indexOf("ID_DoiTuong");
+        var bakRows = [];
+        bak.getRange(2, idCol + 1, bak.getLastRow() - 1, 1).getValues().forEach(function(v, i) { if (ownerOf(v[0])) bakRows.push(i + 2); });
+        deleteRowBlocks(bak, bakRows);
+      }
     }
     SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
   }
-
-  syncSheetsToGCS(false);
-  return { "success": true, "id": id, "rows": rowsDeleted, "tabs": tabs };
+  return { rows: rowsDeleted, tabs: tabs, missing: ids.filter(function(id) { return !found[id]; }) };
 }
 
 // Một đồ án (Ten_QH) một tab DXF-NN. Nhập lại cùng đồ án thì thay toàn bộ dòng đất của tab đó.

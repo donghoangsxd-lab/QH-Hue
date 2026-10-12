@@ -866,10 +866,17 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
     err.status = 400;
     throw err;
   }
-  // Đồ án đã đổi tên giữ thư mục cũ: slug lấy từ danh mục, chỉ đồ án mới mới sinh slug theo tên
+  // Đồ án đã đổi tên giữ thư mục cũ: slug lấy từ danh mục, chỉ đồ án mới mới sinh slug theo tên.
+  // Đồ án khác từng mang tên này rồi đổi tên vẫn giữ slug đó → sinh slug khác, tránh ghi đè thư mục của nó.
   const listed = await readIndex();
-  const known = ((listed.data && listed.data.projects) || []).find(p => p && p.tenQH === name && !p.deleted);
-  const slug = (known && known.slug) || projectSlug(name);
+  const listedProjects = (listed.data && listed.data.projects) || [];
+  const known = listedProjects.find(p => p && p.tenQH === name && !p.deleted);
+  let slug = known && known.slug;
+  if (!slug) {
+    const taken = new Set(listedProjects.filter(p => p && !p.deleted && p.slug && p.tenQH !== name).map(p => p.slug));
+    slug = projectSlug(name);
+    for (let n = 2; taken.has(slug); n++) slug = projectSlug(`${name}#${n}`);
+  }
   const fromName = namedPhase(fileName);
   let resetLands = landsReset === 'HT' || landsReset === 'QH' || landsReset === true ? landsReset : false;
   if (resetLands === true && fromName) resetLands = fromName;
@@ -1179,11 +1186,32 @@ async function deleteLot({ tenQH, id, kind, phase }) {
     err.status = 409;
     throw err;
   }
-  const slug = entry.slug || projectSlug(name);
   const want = phase === 'QH' ? 'QH' : 'HT';
   const match = infra
     ? (p) => p && p.kind === 'INFRA' && String(p.id) === id
     : (p) => p && p.kind === 'DXF' && p.id === id && parcelPhase(p) === want;
+  const out = await dropParcels(entry, name, match);
+  if (!out.removed && !infra) {
+    const err = new Error(`Không tìm thấy lô ${id} (${want}) trong file đồ án «${name}»`);
+    err.status = 404;
+    throw err;
+  }
+  return out;
+}
+
+// Gỡ nhiều lô INFRA (kèm mảnh id.N) trong một lần ghi mỗi file vai trò
+async function deleteInfraLots({ tenQH, ids }) {
+  const name = String(tenQH || '').trim();
+  const want = new Set((ids || []).map(String));
+  if (!want.size) return { removed: 0 };
+  const stored = await readIndex();
+  const entry = ((stored.data && stored.data.projects) || []).find(p => p && p.tenQH === name && !p.deleted);
+  if (!entry || !entry.dir) return { removed: 0 };
+  return dropParcels(entry, name, (p) => p && p.kind === 'INFRA' && want.has(String(p.id).replace(/\.\d+$/, '')));
+}
+
+async function dropParcels(entry, name, match) {
+  const slug = entry.slug || projectSlug(name);
   const savedAt = Date.now();
   const kept = {};
   let removed = 0;
@@ -1195,12 +1223,7 @@ async function deleteLot({ tenQH, id, kind, phase }) {
     removed += parcels.length - kept[role].length;
     await writeRole(slug, role, roleDoc(role, name, slug, savedAt, { parcels: kept[role] }));
   }
-  if (!removed) {
-    if (infra) return { removed: 0 };
-    const err = new Error(`Không tìm thấy lô ${id} (${want}) trong file đồ án «${name}»`);
-    err.status = 404;
-    throw err;
-  }
+  if (!removed) return { removed: 0 };
   const all = [...kept[ROLE_HT], ...kept[ROLE_QH]];
   const counts = countParcels(all);
   const indexed = await updateIndex(cur => ({
@@ -1886,7 +1909,7 @@ async function wardParcels() {
 }
 
 module.exports = {
-  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, retypeInfraLot, readLand, landToInfra, deleteLayer, deleteProjectFiles, renameProject,
+  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, deleteLayer, deleteProjectFiles, renameProject,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision, layerDecisions, removeLayerDecision,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase,
   saveAdjustment, attachAdjustPdf, listAdjustments, readAdjustment, readAdjustPdf, approveAdjustment, removeAdjustment
