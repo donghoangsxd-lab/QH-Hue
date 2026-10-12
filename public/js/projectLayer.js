@@ -23,6 +23,7 @@ import {
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { isCoreWard } from './qhc2045.js';
+import { refreshQhctHint } from './qhctLayer.js';
 import { getLevel, levelScope } from './mapLevel.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
@@ -425,8 +426,7 @@ function renderHead() {
 // Nhóm cấp trong mục Quy hoạch, cùng thứ tự droplist (mapLevel.js); Hệ thống đô thị nằm ở mục Đô thị riêng
 const LIST_LEVELS = [
   { key: 'QHC25', label: 'QHC 1/25.000', title: 'quy hoạch chung tỷ lệ 1/25.000' },
-  ...['QHC', 'QHPK'].map(k => PLAN_LEVELS.find(l => l.key === k)),
-  { key: 'QHCT', label: 'QHCT 1/500', title: 'quy hoạch chi tiết tỷ lệ 1/500' }
+  ...['QHC', 'QHPK', 'QHCT'].map(k => PLAN_LEVELS.find(l => l.key === k))
 ];
 const levelLabel = (key) => LIST_LEVELS.find(l => l.key === key)?.label || key;
 
@@ -555,6 +555,7 @@ function renderList() {
     </div>`;
   }).join('');
   mountStatic(box);
+  refreshQhctHint();
 }
 
 function wardGroups(items) {

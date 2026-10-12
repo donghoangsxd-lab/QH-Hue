@@ -6,7 +6,7 @@
 //  qhc10  QHC 1/10.000 (chk_qhc10)       ranh + tên các đồ án QHC, bấm đồ án mới hiện lô; ranh mở rộng QĐ 756,
 //                                        QHPK lọc theo vùng lõi
 //  qhpk   QHPK 1/2.000 (chk_projects)    bấm ranh / lô → đồ án
-//  qhct   QHCT 1/500 (chk_qhct)          bấm lô → thông tin lô (chờ dữ liệu)
+//  qhct   QHCT 1/500 (chk_qhct)          ranh + tên các đồ án QHCT nhập, bấm đồ án → chi tiết; lô QHCT tĩnh (qhctLayer.js)
 // Chọn từ droplist: bật lớp đó, tắt 4 lớp còn lại. Bật thêm lớp ở panel Lớp dữ liệu để so sánh: lớp đang chọn giữ nguyên;
 // lớp đang chọn bị tắt mà còn lớp khác bật thì chuyển sang lớp đó.
 import { escapeHtml, ico } from './utils.js';
@@ -16,7 +16,7 @@ export const LEVELS = [
   { id: 'qhc25', chk: 'chk_qhc25', label: 'QHC 1/25.000' },
   { id: 'qhc10', chk: 'chk_qhc10', label: 'QHC 1/10.000', scope: 'QHC' },
   { id: 'qhpk', chk: 'chk_projects', label: 'QHPK 1/2.000' },
-  { id: 'qhct', chk: 'chk_qhct', label: 'QHCT 1/500', pending: true }
+  { id: 'qhct', chk: 'chk_qhct', label: 'QHCT 1/500', scope: 'QHCT' }
 ];
 export const DEFAULT_LEVEL = 'urban';
 /** detail: { level, prev, origin } */

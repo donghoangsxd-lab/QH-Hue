@@ -10,9 +10,9 @@
 //      bấm nền ngoài đồ án đang mở thì về tổng quan; bấm lô tra cứu; panel phải lọc QHPK trong vùng lõi;
 //      chọn phường lõi giữ lớp, phường ngoài vùng lõi sang QHPK.
 //    - QHPK 1/2.000: lô cả phường đang chọn.
-//    - QHCT 1/500: chờ dữ liệu.
-// 3. Mở đồ án (từ danh sách, ranh trên bản đồ hoặc popup): sang lớp QHPK (đồ án QHC mở từ đô thị: QHC 1/10.000), thông tin
-//    đồ án thay panel dưới; thoát về địa bàn đang chọn, hoặc về lớp đã mở đồ án (QHC 1/10.000, Hệ thống đô thị).
+//    - QHCT 1/500: ranh + tên các đồ án QHCT (planLevelOf), bấm đồ án → chi tiết.
+// 3. Mở đồ án (từ danh sách, ranh trên bản đồ hoặc popup): sang lớp QHPK (đồ án QHC mở từ đô thị: QHC 1/10.000; đồ án QHCT:
+//    QHCT 1/500), thông tin đồ án thay panel dưới; thoát về địa bàn đang chọn, hoặc về lớp đã mở đồ án.
 // 4. Chọn lại Thành phố Huế: giữ lớp đang xem, tắt các lớp phụ, panel dưới giữ nguyên để xem chỉ tiêu toàn TP.
 // Bản đồ hiện trạng (lật sang hoặc nửa trái khi so sánh): bấm nền khi nhìn rộng → chọn phường.
 import { state } from './state.js';
@@ -131,16 +131,23 @@ function onWardSelected(name) {
 // ---------- Đồ án ----------
 // Mở đồ án ở lớp khác (projectLayer bật QHPK không qua checkbox): đồng bộ về lớp QHPK, nhớ lớp gốc để thoát quay lại.
 // Đồ án cùng cấp lớp đang xem (đồ án QHC khi xem QHC 1/10.000) giữ lớp, thu gọn lô TTHuế 2045;
-// đồ án QHC mở từ Hệ thống đô thị sang QHC 1/10.000.
+// đồ án QHC mở từ Hệ thống đô thị sang QHC 1/10.000; đồ án QHCT sang QHCT 1/500.
+// Lớp QHPK hiện mọi đồ án nên giữ lớp (rời lớp QHPK là đóng đồ án đang mở, onLevelChange).
 const RETURN_LEVELS = new Set(['qhc10', 'urban']);
 function onProjectOpened(e) {
   const level = getLevel();
   if (level === 'qhpk') return;
-  if (levelScope() && planLevelOf(e?.detail) === levelScope()) {
+  const kind = planLevelOf(e?.detail);
+  if (levelScope() && kind === levelScope()) {
     setCoreOpen(false);
     return;
   }
-  if (level === 'urban' && planLevelOf(e?.detail) === 'QHC') {
+  if (kind === 'QHCT') {
+    setLevel('qhct', { origin: level });
+    setCoreOpen(false);
+    return;
+  }
+  if (level === 'urban' && kind === 'QHC') {
     setLevel('qhc10', { origin: 'urban' });
     setCoreOpen(false);
     return;
@@ -167,12 +174,9 @@ function onProjectExit(e) {
   const unchecked = !!e?.detail?.hidden;
   if (unchecked) closeProjectView();
   clearProjectFocus();
-  if (levelOrigin() === 'urban') {
-    setLevel('urban');
-    return;
-  }
-  if (getLevel() === 'qhpk' && levelOrigin() === 'qhc10') {
-    setLevel('qhc10');
+  const from = levelOrigin();
+  if (from && from !== getLevel()) {
+    setLevel(from);
     return;
   }
   if (levelScope()) {

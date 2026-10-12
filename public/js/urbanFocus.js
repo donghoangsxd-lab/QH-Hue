@@ -35,17 +35,10 @@ const MASK_STYLE = { stroke: false, fillColor: '#020617', fillOpacity: 0.5, inte
 const WORLD = [[-89.9, -179.9], [-89.9, 179.9], [89.9, 179.9], [89.9, -179.9]];
 // Đồ án cắt ranh đô thị chỉ tính khi phần trong đô thị ≥ tỷ lệ này của phần nhỏ hơn (bỏ đồ án chỉ chạm / lấn mép)
 const MIN_SHARE = 0.05;
-// "QHCT (1/2000)" là quy hoạch chi tiết 1/2.000 theo Luật Quy hoạch đô thị 2009, cùng cấp QHPK hiện nay
-const QHCT_NAME_RE = /^\s*(\d+[.)]?\s+)?(điều chỉnh\s+)?(cục bộ\s+)?(QHCT(?![A-Z])|quy hoạch chi tiết)/i;
-const SCALE_2000_RE = /1\s*\/\s*2\.?000\b/;
 const tipOpts = { sticky: true, direction: 'top', offset: [0, -8], className: 'ua-tip', opacity: 1 };
 // Đang chọn đô thị: ẩn nền tô phân loại đô thị (urbanAreaLayer.js) để màu vùng đồ án không bị pha
 const FOCUS_CLASS = 'urban-focused';
 
-function kindOf(name) {
-  const s = String(name || '');
-  return QHCT_NAME_RE.test(s) && !SCALE_2000_RE.test(s) ? 'QHCT' : planLevelOf(s);
-}
 const target = () => planMap || map;
 const shownMap = () => (planMap && isCompareOn() && !isSplitOn() ? planMap : map);
 const polysOf = (g) => (g?.type === 'Polygon' ? [g.coordinates] : g?.type === 'MultiPolygon' ? g.coordinates : []);
@@ -103,7 +96,7 @@ async function coverage(u) {
   const items = [];
   (state.projectCatalog || []).forEach(p => {
     const geometry = p.tenQH && p.boundary ? clip(p.boundary) : null;
-    if (geometry) items.push({ kind: kindOf(p.tenQH), name: p.tenQH, geometry, open: openProject(p.tenQH) });
+    if (geometry) items.push({ kind: planLevelOf(p.tenQH), name: p.tenQH, geometry, open: openProject(p.tenQH) });
   });
   const [core, qhct] = await Promise.all([coreFrame().catch(() => []), loadQhct().catch(() => null)]);
   const coreGeoms = core.map(f => (f.geometry ? clip(f.geometry) : null)).filter(Boolean);

@@ -1,9 +1,11 @@
-// Lớp QHCT 1/500 (quy hoạch chi tiết) trên bản đồ quy hoạch: khung sẵn, dữ liệu bổ sung sau tại QHCT_URL.
-// Định dạng: FeatureCollection lô đất, properties { tenQH, kyHieu, chucNang, dienTich (m²), mau? }. Chưa có file thì
-// ghi "chưa có dữ liệu" ở dòng lớp, bản đồ không vẽ gì.
+// Lớp QHCT 1/500 (quy hoạch chi tiết) trên bản đồ quy hoạch: lô tĩnh tại QHCT_URL + đồ án QHCT nhập (projectLayer.js vẽ
+// theo planLevelOf). Định dạng lô tĩnh: FeatureCollection, properties { tenQH, kyHieu, chucNang, dienTich (m²), mau? }.
+// Dòng lớp ghi số đồ án nhập và số lô tĩnh; chưa có cả hai thì "chưa có dữ liệu".
+import { state } from './state.js';
 import { map } from './mapEngine.js';
 import { planMap, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { escapeHtml, fmtNum } from './utils.js';
+import { planLevelOf } from './generalPlan.js';
 
 export const QHCT_URL = 'data/qhct/index.json';
 const PANE = 'qhctPane';
@@ -19,6 +21,18 @@ let renderer = null;
 function setHint(text) {
   const el = $('qhctHint');
   if (el) el.textContent = `(${text})`;
+}
+
+function idleHint() {
+  const plans = (state.projectCatalog || []).filter(p => planLevelOf(p.tenQH) === 'QHCT').length;
+  const lots = data ? data.features.length : 0;
+  const parts = [plans && `${fmtNum(plans)} đồ án`, lots && `${fmtNum(lots)} lô`].filter(Boolean);
+  return parts.join(', ') || 'chưa có dữ liệu';
+}
+
+/** Cập nhật dòng lớp khi danh mục đồ án đổi (projectLayer.js) */
+export function refreshQhctHint() {
+  if (!loading) setHint(idleHint());
 }
 
 function load() {
@@ -71,16 +85,15 @@ async function setVisible(on) {
   if (!on) {
     layer?.remove();
     layer = null;
-    setHint(data && data.features.length ? `${fmtNum(data.features.length)} lô` : 'chưa có dữ liệu');
+    setHint(idleHint());
     return;
   }
   if (planMap && !isSplitOn() && getViewMode() !== 'QH') setViewMode('QH');
   setHint('đang tải…');
   await load();
   if (!$('chk_qhct')?.checked) return;
-  if (!data.features.length) { setHint('chưa có dữ liệu'); return; }
-  draw(m);
-  setHint(`${fmtNum(data.features.length)} lô`);
+  if (data.features.length) draw(m);
+  setHint(idleHint());
 }
 
 export function initQhctLayer() {

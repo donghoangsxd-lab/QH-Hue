@@ -13,14 +13,22 @@
 import { URBANS_VISION, VISION_REF, VISION_CLAUSE, visionLevel } from './urbanVision.js';
 import { bareName, wardLevel614, URBANS_614 } from './urbanStatus.js';
 
-// Cấp đồ án quyết định bộ ký hiệu (tab Chú giải). Mọi đồ án hiện có là QHPK 1/2.000; chỉ tên bắt đầu bằng "QHC"
-// (không phải QHCT / QHCPK) hoặc "Quy hoạch chung" mới xếp vào QHC 1/10.000
+// Cấp đồ án suy từ tên (Ten_QH), quyết định lớp droplist khi mở đồ án và bộ ký hiệu (tab Chú giải). Mặc định QHPK 1/2.000;
+// tên bắt đầu bằng "QHC" (không phải QHCT / QHCPK) hoặc "Quy hoạch chung" → QHC 1/10.000; "QHCT" hoặc "Quy hoạch chi tiết"
+// (có thể kèm số thứ tự, "Điều chỉnh", "cục bộ") → QHCT 1/500, trừ tên ghi tỷ lệ 1/2000 (QHCT 1/2.000 theo luật cũ, tương đương QHPK)
 export const PLAN_LEVELS = [
   { key: 'QHPK', label: 'QHPK 1/2.000', title: 'Quy hoạch phân khu tỷ lệ 1/2.000' },
-  { key: 'QHC', label: 'QHC 1/10.000', title: 'Quy hoạch chung đô thị tỷ lệ 1/10.000' }
+  { key: 'QHC', label: 'QHC 1/10.000', title: 'Quy hoạch chung đô thị tỷ lệ 1/10.000' },
+  { key: 'QHCT', label: 'QHCT 1/500', title: 'Quy hoạch chi tiết tỷ lệ 1/500' }
 ];
 const QHC_NAME_RE = /^\s*(QHC(?![A-Z])|quy hoạch chung(\s|$))/i;
-export const planLevelOf = (name) => (QHC_NAME_RE.test(String(name || '')) ? 'QHC' : 'QHPK');
+const QHCT_NAME_RE = /^\s*(\d+[.)]?\s+)?(điều chỉnh\s+)?(cục bộ\s+)?(QHCT(?![A-Z])|quy hoạch chi tiết)/i;
+const SCALE_2000_RE = /1\s*\/\s*2\.?000\b/;
+export function planLevelOf(name) {
+  const s = String(name || '');
+  if (QHC_NAME_RE.test(s)) return 'QHC';
+  return QHCT_NAME_RE.test(s) && !SCALE_2000_RE.test(s) ? 'QHCT' : 'QHPK';
+}
 
 export const GP_PARENT_REF = `${VISION_REF}, ${VISION_CLAUSE}`;
 // detail = Ten_QH; projectLayer.js mở đồ án (phóng tới, thông tin ở panel dưới) và chỉ trong danh sách
