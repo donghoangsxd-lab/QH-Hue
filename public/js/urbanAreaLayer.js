@@ -52,7 +52,7 @@ const statusContent = {
   dataUrl: 'data/urban614.geojson',
   urbans: URBANS_614,
   wardLevel: (name) => wardLevel614(name)?.level || null,
-  urbanTip(u, { approx = false, hasArea = true, inferred = false } = {}) {
+  urbanTip(u, { approx = false, hasArea = true } = {}) {
     const plan = planUrbanOf(u.plan);
     return [
       `<b class="ua-tip-name">${escapeHtml(u.name)}</b> ${clsTag(u.cls)}`,
@@ -61,7 +61,6 @@ const statusContent = {
       plan ? `Định hướng 2030: ${escapeHtml(plan.name)} (loại ${plan.cls})` : '',
       muted(`Công nhận: ${u.basis}`),
       hasArea ? '' : muted(`Chưa có ranh ${u.before.name.startsWith('Thị trấn') ? 'thị trấn' : 'xã'} cũ, ký hiệu đặt tại ${approx ? 'trung tâm xã mới (gần đúng)' : 'trung tâm cũ'}.`),
-      inferred ? muted(`Suy ra: ranh là vùng không tên chứa trung tâm ${lowerFirst(u.before.name)} cũ trên bản đồ địa giới trước 2020.`) : '',
       muted(STATUS_REF)
     ].filter(Boolean).join('<br>');
   },
@@ -88,24 +87,18 @@ const visionContent = {
   urbans: URBANS_VISION,
   wardLevel: (name) => visionLevel(name)?.level || null,
   urbanTip(u) {
-    const before = (u.from2030 || []).map(planUrbanOf).filter(Boolean)
-      .map(p => `${escapeHtml(p.name)} (${p.cls})`);
     return [
       `<b class="ua-tip-name">${escapeHtml(u.name)}</b> ${clsTag(u.cls)}`,
       `${VISION_STAGE}: ${escapeHtml(u.change)}`,
       `Phạm vi: ${escapeHtml(u.scope)}`,
-      before.length ? `Đến 2030: ${before.join(' · ')}` : '',
-      u.inferred ? muted(`Suy ra: ${u.inferred}`) : '',
       muted(`${VISION_REF}, ${VISION_CLAUSE}`)
-    ].filter(Boolean).join('<br>');
+    ].join('<br>');
   },
   wardTip(name) {
     const lvl = visionLevel(name);
     const rows = [`<b class="ua-tip-name">${escapeHtml(name)}</b>`];
     if (lvl) {
-      const by2030 = lvl.by2030 ? `loại ${lvl.by2030}` : 'chưa đạt';
-      rows.push(`${VISION_STAGE}: trình độ phát triển đô thị ${clsTag(lvl.level)} (đến 2030: ${by2030})`);
-      rows.push(muted(`${lvl.inferred ? 'Suy ra: ' : ''}${lvl.basis}`));
+      rows.push(`${VISION_STAGE}: trình độ phát triển đô thị ${clsTag(lvl.level)}`);
     } else {
       rows.push('Đơn vị hành chính nông thôn, chưa định hướng đạt trình độ phát triển đô thị');
     }
@@ -230,7 +223,6 @@ function createUrbanLayer(content) {
       const u = byId.get(f.properties.id);
       if (!u) return;
       const isArea = f.geometry.type !== 'Point';
-      const inferred = !!f.properties.inferred;
       const rings = isArea ? ringsOf(f.geometry) : null;
       const style = LINE_STYLE[u.cls] || LINE_STYLE.III;
       if (isArea && u.part && LEVEL_FILL[u.cls]) {
@@ -244,7 +236,7 @@ function createUrbanLayer(content) {
         const line = L.polyline(rings, { pane: LINE_PANE, renderer: lineRenderer, interactive: false, ...style, opacity: 0.95 });
         // Nét trong suốt rộng hơn để dễ trỏ trúng ranh
         const hit = L.polyline(rings, { pane: LINE_PANE, renderer: lineRenderer, weight: HIT_WEIGHT, opacity: 0, bubblingMouseEvents: false });
-        hit.bindTooltip(content.urbanTip(u, { inferred }), tipOpts);
+        hit.bindTooltip(content.urbanTip(u), tipOpts);
         hit.on('mouseover', () => enterUrban(u.id, rings, style));
         hit.on('mouseout', leaveUrban);
         groups.lines.addLayer(casing);
@@ -259,7 +251,7 @@ function createUrbanLayer(content) {
         iconSize: [0, 0]
       });
       L.marker([lat, lng], { icon, keyboard: false, zIndexOffset: 600 - 50 * (CLS_RANK[u.cls] ?? 2) })
-        .bindTooltip(content.urbanTip(u, { approx: !!f.properties.approx, hasArea: isArea, inferred }), { ...tipOpts, sticky: false, offset: [0, -16] })
+        .bindTooltip(content.urbanTip(u, { approx: !!f.properties.approx, hasArea: isArea }), { ...tipOpts, sticky: false, offset: [0, -16] })
         .on('mouseover', () => enterUrban(u.id, rings, style))
         .on('mouseout', leaveUrban)
         .on('click', () => document.dispatchEvent(new CustomEvent(URBAN_PICK_EVENT, { detail: u.id })))
@@ -356,10 +348,17 @@ export function refreshUrbanAreaLayer() {
   visionLayer.refresh();
 }
 
+let initialDraw = Promise.resolve();
+
+/** Ranh đô thị vẽ xong lần đầu (lớp bật sẵn khi mở trang); nền tô phường còn chờ ranh 40 phường xã (refresh) */
+export function urbanAreaReady() {
+  return initialDraw;
+}
+
 export function initUrbanAreaLayer() {
   if (!map) return;
   statusLayer.init(map);
   if (planMap) visionLayer.init(planMap);
   $chk()?.addEventListener('change', (e) => setVisible(e.target.checked, { fit: true }));
-  if ($chk()?.checked) setVisible(true);
+  if ($chk()?.checked) initialDraw = setVisible(true);
 }

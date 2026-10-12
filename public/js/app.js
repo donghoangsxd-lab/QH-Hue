@@ -69,7 +69,7 @@ import { initSketchLayer, handleSketchClick } from './sketchLayer.js';
 import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
 import { initOverview } from './overview.js';
 import { initRiskLayer } from './riskLayer.js';
-import { initUrbanAreaLayer, refreshUrbanAreaLayer } from './urbanAreaLayer.js';
+import { initUrbanAreaLayer, refreshUrbanAreaLayer, urbanAreaReady } from './urbanAreaLayer.js';
 import { initLayerDecisions } from './layerDecisions.js';
 import { initBasemapUi } from './basemap.js';
 import { PROOF_FOCUS_EVENT } from './csdProof.js';
@@ -794,23 +794,58 @@ document.addEventListener('DOMContentLoaded', async () => {
   const progressPercent = document.getElementById('progressPercent');
   const progressLabel = document.getElementById('progressLabel');
   const progressRow = document.querySelector('.rp-progress');
+  // Thanh mảnh dưới tiêu đề: nhảy theo mốc, giữa 2 mốc nhích dần (chưa chạm mốc sau) để không đứng im khi chờ máy chủ
+  const titleProgress = document.getElementById('titleProgress');
+  const titleFill = titleProgress?.firstElementChild;
+  let titlePct = 0;
+  let titleFloor = 0;
+  const paintTitle = () => {
+    titleFill.style.width = `${titlePct}%`;
+    titleProgress.setAttribute('aria-valuenow', String(Math.round(titlePct)));
+  };
+  const creep = titleFill ? setInterval(() => {
+    const cap = Math.min(titleFloor + 28, 97);
+    if (titlePct >= cap - 0.5) return;
+    titlePct += (cap - titlePct) * 0.06;
+    paintTitle();
+  }, 200) : null;
+  const endTitleProgress = () => {
+    clearInterval(creep);
+    titleProgress?.classList.add('done');
+  };
   const setProgress = (pct, label) => {
     if (progressBar) progressBar.style.width = `${pct}%`;
     if (progressPercent) progressPercent.textContent = `${pct}%`;
     if (progressLabel && label) progressLabel.textContent = label;
+    if (!titleFill) return;
+    titleFloor = pct;
+    titlePct = Math.max(titlePct, pct);
+    if (label) titleProgress.setAttribute('aria-valuetext', label);
+    paintTitle();
+    if (pct >= 100) endTitleProgress();
+  };
+  // 3 mốc xong theo thứ tự bất kỳ: lớp phủ đô thị (chờ ranh 40 phường xã), công trình, độ phủ (chờ công trình)
+  const STEP_LABEL = { urban: 'Đang dựng lớp phủ đô thị', infra: 'Đang tải công trình', heat: 'Đang tính độ phủ' };
+  const pending = new Set(Object.keys(STEP_LABEL));
+  const stepDone = (key) => {
+    if (!pending.delete(key)) return;
+    const next = [...pending][0];
+    const total = Object.keys(STEP_LABEL).length;
+    setProgress(Math.round(10 + 90 * (total - pending.size) / total), next ? STEP_LABEL[next] : 'Đã nạp xong');
   };
 
   try {
-    setProgress(20, 'Đang tải công trình');
+    setProgress(10, STEP_LABEL.urban);
     // Gọi song song: ranh giới (CDN cache), danh sách công trình, thống kê phường; heatmap chờ danh sách công trình
     const boundaryReady = loadBoundaryLayer().then(renderPlanBoundaries);
     boundaryReady.then(refreshUrbanAreaLayer).catch(() => {});
+    Promise.all([boundaryReady, urbanAreaReady()]).then(() => stepDone('urban'), () => {});
     const statsReady = ensureWardStats();
     statsReady.catch(() => {});
     if (document.getElementById('chk_pop')?.checked) ensurePopulationLayer();
 
     await loadInfraData();
-    setProgress(60, 'Đang dựng bản đồ');
+    stepDone('infra');
     renderGroupedPoints();
     loadCadParcels();
     const heatReady = refreshHeatmapOnly();
@@ -842,12 +877,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    setProgress(90, 'Đang tính độ phủ');
     renderBottomPanel();
     refreshWardCheck();
 
     await heatReady;
-    setProgress(100, 'Đã nạp xong');
+    stepDone('heat');
     setTimeout(() => {
       if (progressRow) progressRow.style.display = 'none';
     }, 600);
@@ -855,5 +889,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
     showToast('❌ Lỗi nạp dữ liệu bản đồ, vui lòng tải lại trang.', 'error');
     if (progressRow) progressRow.style.display = 'none';
+    endTitleProgress();
   }
 });

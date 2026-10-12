@@ -222,6 +222,35 @@ body.split-offset .swipe-handle { display: none; }
   background: linear-gradient(90deg, transparent, rgb(var(--tone)) 25%, rgb(var(--tone)) 75%, transparent);
 }
 .map-title[data-view="HT"] { --tone: var(--cyan-rgb); }
+/* Tiến độ nạp lần đầu (app.js): thanh mảnh ở mép dưới tiêu đề, xong thì mờ dần */
+.map-title-progress {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  background: rgba(var(--tone), 0.15);
+  pointer-events: none;
+  transition: opacity 0.6s ease 0.4s;
+}
+.map-title-progress > i {
+  position: relative;
+  display: block;
+  width: 4%;
+  height: 100%;
+  overflow: hidden;
+  background: rgb(var(--tone));
+  box-shadow: 0 0 6px rgba(var(--tone), 0.8);
+  transition: width 0.4s ease;
+}
+.map-title-progress > i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  animation: title-progress-shine 1.2s linear infinite;
+}
+@keyframes title-progress-shine { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.map-title-progress.done { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .map-title-progress > i::after { animation: none; } }
 .map-title[data-view="split"]::before { background: linear-gradient(90deg, transparent, var(--accent-cyan) 20%, var(--accent-cyan) 48%, var(--accent-orange) 52%, var(--accent-orange) 80%, transparent); }
 body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-width: calc(100% - 2 * (var(--ov-w) + 24px)); }
 /* Nút lật trang Quy hoạch ⇄ Hiện trạng (biểu tượng bên trái tiêu đề) */
