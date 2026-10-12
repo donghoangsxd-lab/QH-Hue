@@ -29,6 +29,7 @@ const KINDS = {
   QHCT: { title: 'Quy hoạch chi tiết 1/500', color: '#ef4444', fill: 0.5 }
 };
 const KIND_ORDER = ['QHC', 'QHPK', 'QHCT'];
+const KIND_SCALE = { QHC: 'QHC 1/10.000', QHPK: 'QHPK 1/2.000', QHCT: 'QHCT 1/500' };
 const AREA_STYLE = { weight: 1.6, opacity: 0.95, fillRule: 'nonzero' };
 const AREA_HOVER = 0.65;
 const MASK_STYLE = { stroke: false, fillColor: '#020617', fillOpacity: 0.5, interactive: false };
@@ -133,6 +134,55 @@ function areaOf(geometry) {
   try { return turf.area(geometry); } catch (e) { return 0; }
 }
 
+function fmtHa(m2) {
+  const ha = Math.max(0, m2) / 10000;
+  const digits = ha > 0 && ha < 10 ? 1 : 0;
+  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: digits }).format(ha);
+}
+
+function fmtPct(p) {
+  if (!(p > 0)) return '0%';
+  if (p < 0.5) return '<1%';
+  return `${Math.round(Math.min(100, p))}%`;
+}
+
+// Gộp ranh cùng cấp trước khi đo: đồ án chồng nhau chỉ tính một lần. Mảnh lỗi thì bỏ, không cộng dồn.
+function unionArea(geoms) {
+  const feats = geoms.filter(g => polysOf(g).length).map(g => turf.feature(g));
+  if (!feats.length) return 0;
+  let acc = feats[0];
+  for (let i = 1; i < feats.length; i++) {
+    const piece = feats[i];
+    try {
+      acc = turf.union(acc, piece) || acc;
+    } catch (e) {
+      try {
+        acc = turf.union(turf.truncate(acc, { precision: 6 }), turf.truncate(piece, { precision: 6 })) || acc;
+      } catch (e2) { /* bỏ mảnh không hợp được */ }
+    }
+  }
+  return areaOf(acc.geometry);
+}
+
+function shareStats(items) {
+  const total = areaOf(current.geometry);
+  const stats = {};
+  KIND_ORDER.forEach(k => {
+    const raw = unionArea(items.filter(i => i.kind === k).map(i => i.geometry));
+    const covered = total > 0 ? Math.min(raw, total) : 0;
+    stats[k] = { covered, total, pct: total > 0 ? (covered / total) * 100 : 0 };
+  });
+  return stats;
+}
+
+function rowHtml(k, stat) {
+  const title = `${KINDS[k].title}: phần diện tích đô thị đã phủ. Đồ án chồng nhau chỉ tính một lần.`;
+  const body = stat
+    ? `${KIND_SCALE[k]}: <b>${fmtPct(stat.pct)}</b> diện tích (${fmtHa(stat.covered)}/${fmtHa(stat.total)} ha)`
+    : `${KIND_SCALE[k]}: …`;
+  return `<div class="ufb-row" title="${escapeHtml(title)}"><i style="background:${KINDS[k].color}"></i><span>${body}</span></div>`;
+}
+
 function clearLayers() {
   group?.remove();
   group = null;
@@ -169,7 +219,7 @@ function draw(items) {
   group.addTo(m);
 }
 
-function paintBar(items = null) {
+function paintBar(stats = null) {
   if (!bar) {
     bar = document.createElement('div');
     bar.className = 'urban-focus-bar';
@@ -179,10 +229,9 @@ function paintBar(items = null) {
     document.body.appendChild(bar);
   }
   if (!current || getLevel() !== 'urban') { bar.hidden = true; return; }
-  const count = (k) => (items ? items.filter(i => i.kind === k).length : '…');
-  bar.innerHTML = `<b class="ufb-name" title="${escapeHtml(current.name)}">${escapeHtml(current.name)}</b>
-    ${KIND_ORDER.map(k => `<span class="ufb-kind" title="${escapeHtml(`${KINDS[k].title}: số đồ án trong đô thị`)}"><i style="background:${KINDS[k].color}"></i>${k} ${count(k)}</span>`).join('')}
-    <button type="button" class="ufb-x" title="Bỏ chọn đô thị (Esc)" aria-label="Bỏ chọn đô thị">${ico('close')}</button>`;
+  bar.innerHTML = `<div class="ufb-head"><b class="ufb-name" title="${escapeHtml(current.name)}">${escapeHtml(current.name)}</b>
+    <button type="button" class="ufb-x" title="Bỏ chọn đô thị (Esc)" aria-label="Bỏ chọn đô thị">${ico('close')}</button></div>
+    <div class="ufb-rows">${KIND_ORDER.map(k => rowHtml(k, stats?.[k])).join('')}</div>`;
   bar.hidden = false;
 }
 
@@ -194,7 +243,7 @@ async function render() {
   const items = await coverage(current);
   if (id !== seq || !current || getLevel() !== 'urban') return;
   draw(items);
-  paintBar(items);
+  paintBar(shareStats(items));
 }
 
 function fitFocus() {
