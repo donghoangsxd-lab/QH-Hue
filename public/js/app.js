@@ -57,6 +57,7 @@ import { initOsmImport } from './osmImport.js';
 import { initLotEdit } from './lotEdit.js';
 import { initWardRoads } from './wardRoads.js';
 import { initCustomRoads, handleRoadDrawClick } from './customRoads.js';
+import { initStreetView } from './streetView.js';
 import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 import { initCadastreLayer, cadastreClick } from './cadastreLayer.js';
@@ -438,6 +439,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }));
   map.on('click', (e) => handleMapClick(e, map));
   planMap?.on('click', (e) => handleMapClick(e, planMap));
+  initStreetView([map, planMap]);
 
   document.getElementById('btnMeasureDist')?.addEventListener('click', () => toggleMeasure('distance'));
   document.getElementById('btnMeasureArea')?.addEventListener('click', () => toggleMeasure('area'));

@@ -3037,20 +3037,27 @@ body.project-view #projectReviewHost { display: flex; padding: 0; overflow: hidd
 .lots-progress-bar > i { display: block; height: 100%; width: 0; background: var(--accent-cyan); transition: width 0.25s ease; }
 @keyframes lots-spin { to { transform: rotate(360deg); } }
 
-/* Đô thị đang chọn ở lớp Hệ thống đô thị (urbanFocus.js): tên, số đồ án theo cấp, nút bỏ chọn */
+/* Ghi chú độ phủ quy hoạch của đô thị đang chọn (urbanFocus.js): panel riêng bên trái, không xếp dưới thanh tiêu đề */
 .urban-focus-bar {
-  position: fixed; z-index: 1200; left: 50%; top: calc(var(--title-h) + 22px); transform: translateX(-50%);
-  max-width: min(640px, 70vw);
-  display: flex; align-items: center; gap: 10px; padding: 4px 6px 4px 14px;
+  position: fixed; z-index: 950;
+  top: calc(12px + var(--title-h) + 8px);
+  left: calc(12px + var(--tb-btn) + 12px);
+  max-width: min(440px, calc(100vw - var(--right-w) - var(--tb-btn) - 52px));
+  display: flex; flex-direction: column; gap: 4px; padding: 8px 8px 8px 10px;
   background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
-  border: 1px solid rgba(var(--cyan-rgb), 0.55); border-radius: 999px; box-shadow: var(--panel-shadow);
-  color: var(--text-main); font-size: var(--fs-sm);
+  border: 1px solid rgba(var(--cyan-rgb), 0.55); border-radius: var(--r-lg);
+  box-shadow: var(--panel-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: var(--text-main); font-size: var(--fs-md);
 }
 .urban-focus-bar[hidden] { display: none; }
-.ufb-name { min-width: 0; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ufb-kind { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.ufb-kind i { width: 10px; height: 10px; border-radius: 2px; opacity: 0.85; }
-.ufb-x { display: inline-flex; padding: 3px; color: var(--text-muted); background: none; border: 0; border-radius: 50%; cursor: pointer; }
+.ufb-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ufb-name { flex: 1; min-width: 0; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ufb-rows { display: flex; flex-direction: column; gap: 2px; }
+.ufb-row { display: flex; align-items: flex-start; gap: 6px; min-width: 0; line-height: 1.35; font-variant-numeric: tabular-nums; }
+.ufb-row i { width: 10px; height: 10px; margin-top: 0.28em; border-radius: 2px; flex-shrink: 0; }
+.ufb-row span { min-width: 0; }
+.ufb-row b { font-weight: 800; color: var(--text-strong); }
+.ufb-x { display: inline-flex; flex-shrink: 0; padding: 3px; color: var(--text-muted); background: none; border: 0; border-radius: 50%; cursor: pointer; }
 .ufb-x:hover { color: var(--accent-red); background: rgba(255, 255, 255, 0.08); }
 .ufb-x .ico { margin: 0; }
 .urban-focused .leaflet-urbanArea-pane,
@@ -3375,4 +3382,37 @@ body.project-review.la-page #projectReviewHost {
 .adj-pending-note { font-size: var(--fs-xs); color: var(--text-muted); }
 .adj-row { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; margin-bottom: 6px; border: 1px solid var(--border-color); border-left: 3px solid #d946ef; border-radius: var(--r-md); font-size: var(--fs-sm); }
 .adj-row small { color: var(--text-muted); font-size: var(--fs-xs); }
+
+/* Menu chuột phải trên bản đồ + khung Street View (streetView.js) */
+.map-ctx-menu {
+  position: fixed; z-index: 1400; display: flex; flex-direction: column; min-width: 170px; padding: 4px;
+  background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--r-md); box-shadow: var(--shadow-sm);
+  backdrop-filter: var(--panel-blur);
+}
+.map-ctx-menu button {
+  padding: 5px 8px; border: 0; border-radius: var(--r-sm); background: none; color: var(--text-strong);
+  font: inherit; font-size: var(--fs-md); text-align: left; cursor: pointer;
+}
+.map-ctx-menu button[data-act="copy"] { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-sm); }
+.map-ctx-menu button:hover, .map-ctx-menu button:focus-visible { background: var(--bg-hover); outline: none; }
+.sv-panel {
+  position: fixed; z-index: 1250; left: 60px; bottom: calc(var(--bottom-gap) + 14px);
+  width: min(520px, calc(100vw - 80px)); height: min(340px, 50vh); min-width: 260px; min-height: 180px;
+  display: flex; flex-direction: column; overflow: hidden; resize: both;
+  background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--r-md); box-shadow: var(--panel-shadow);
+}
+.sv-head {
+  display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; cursor: move; user-select: none; touch-action: none;
+  border-bottom: 1px solid var(--border-color); background: var(--bg-head); font-size: var(--fs-sm);
+}
+.sv-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-strong); font-weight: 600; }
+.sv-ext { color: var(--accent-cyan); text-decoration: none; white-space: nowrap; }
+.sv-ext:hover { text-decoration: underline; }
+.sv-close { border: 0; background: none; color: var(--text-muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.sv-close:hover { color: var(--accent-red); }
+.sv-frame { flex: 1; width: 100%; border: 0; background: #1e293b; }
+.sv-panel.is-dragging .sv-frame { pointer-events: none; }
+.sv-pin {
+  border-radius: 50%; background: #f9b31c; border: 2px solid #fff; box-shadow: 0 0 0 3px rgba(249, 179, 28, 0.35), var(--shadow-sm);
+}
 
