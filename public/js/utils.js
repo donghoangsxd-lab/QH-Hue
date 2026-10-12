@@ -374,3 +374,10 @@ export function trackTileLoad(layer, onProgress, timeoutMs = 60000) {
     layer.on('tileloadstart', onStart).on('tileload tileerror', onTile).on('load remove', finish);
   });
 }
+
+/** trackTileLoad cho nhiều layer cùng lúc (2 bản đồ khi chia đôi): onProgress(tổng ô đã xong, tổng ô đã yêu cầu) */
+export function trackTileLoads(layers, onProgress, timeoutMs) {
+  const counts = layers.map(() => [0, 0]);
+  const report = () => onProgress(counts.reduce((s, c) => s + c[0], 0), counts.reduce((s, c) => s + c[1], 0));
+  return Promise.all(layers.map((layer, i) => trackTileLoad(layer, (n, total) => { counts[i] = [n, total]; report(); }, timeoutMs)));
+}

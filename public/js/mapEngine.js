@@ -6,7 +6,7 @@ import {
 import { peekInfraRisk, riskSummaryHtml } from './riskLayer.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi, markDataWritten } from './api.js';
-import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, planItems, startTaskProgress, trackTileLoad, announceTool, TOOL_START_EVENT } from './utils.js';
+import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, planItems, startTaskProgress, trackTileLoad, trackTileLoads, announceTool, TOOL_START_EVENT } from './utils.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
@@ -16,7 +16,7 @@ import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap } from './basemap.js';
 import {
   getCoveredRightWidth, highlightPlanWard, wardFocusLayer, planMap, planLayers, syncPlanLayer,
-  setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, getViewMode, setViewMode, passToolClick
+  setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, getViewMode, setViewMode, passToolClick, shownMaps
 } from './planMap.js';
 import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, focusedProjectName, wardScopeName, infraLotOf, byProjectAreaDesc } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
@@ -2401,8 +2401,15 @@ export function zoomToPoint(lat, lng, name) {
 }
 
 /** pv: phiên bản vùng hiệu chỉnh dân cư Admin vừa lưu (bỏ qua cache CDN, thay ảnh đang hiển thị) */
+const POP_SERVER_PCT = 40;
+const POP_SERVER_TAU_MS = 2500;
+let popTask = null;
+
 export async function loadPopulationLayer(pv) {
   if (!map) return;
+  popTask?.cancel();
+  const task = popTask = startTaskProgress('Đang tính lớp phân bổ dân cư (GEE)');
+  task.creep(POP_SERVER_PCT, POP_SERVER_TAU_MS);
   try {
     const res = await fetch(geeApi(`action=getPopRasterTile${pv ? `&pv=${pv}` : ''}`));
     const data = await res.json();
@@ -2411,14 +2418,24 @@ export async function loadPopulationLayer(pv) {
       const opacity = popOpacityEl ? popOpacityEl.value / 100 : 0.6;
       layers.pop.clearLayers();
       planLayers.pop?.clearLayers();
-      layers.pop.addLayer(L.tileLayer(data.urlFormat, { maxZoom: 19, opacity }));
-      planLayers.pop.addLayer(L.tileLayer(data.urlFormat, { maxZoom: 19, opacity }));
+      const left = L.tileLayer(data.urlFormat, { maxZoom: 19, opacity });
+      const right = L.tileLayer(data.urlFormat, { maxZoom: 19, opacity });
+      // Chỉ đếm ô của bản đồ đang thấy và đang bật lớp (nhóm chưa vào bản đồ thì layer chưa tải ô)
+      const shown = shownMaps();
+      const tracked = [[map, layers.pop, left], [planMap, planLayers.pop, right]]
+        .filter(([m, g]) => m && g && shown.includes(m) && m.hasLayer(g)).map(([, , l]) => l);
+      task.set(POP_SERVER_PCT, 'Đang tải ảnh phân bổ dân cư');
+      trackTileLoads(tracked, (n, total) => task.set(POP_SERVER_PCT + (100 - POP_SERVER_PCT) * 0.98 * (n / Math.max(total, 1))))
+        .then(() => { if (popTask === task) task.done('Đã tải lớp phân bổ dân cư'); });
+      layers.pop.addLayer(left);
+      planLayers.pop.addLayer(right);
       if (pv) popLayerPromise = Promise.resolve(true);
       return true;
     }
   } catch (err) {
     console.error("Lỗi tải lớp raster dân số:", err);
   }
+  task.fail('Không tải được lớp phân bổ dân cư');
   return false;
 }
 

@@ -85,6 +85,12 @@ export function isCompareOn() {
   return compareOn;
 }
 
+/** Bản đồ đang thấy trên màn hình (chia đôi: cả hai). Bản đồ bị ẩn không tải ô ảnh nên không tính tiến độ tải */
+export function shownMaps() {
+  if (!planMap || !compareOn) return leftMap ? [leftMap] : [];
+  return split ? [leftMap, planMap] : [planMap];
+}
+
 export function isSplitOn() {
   return split;
 }

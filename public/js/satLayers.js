@@ -3,10 +3,10 @@
 // Ảnh tính trên Google Earth Engine (api/gee.js › getSarFloodTile / getLstTile, services/satService.js), vẽ đồng thời trên
 // bản đồ hiện trạng và quy hoạch; thống kê theo phường chỉ tải khi bật lớp, mỗi năm 1 lần.
 import { map, flyToVisible } from './mapEngine.js';
-import { planMap } from './planMap.js';
+import { planMap, shownMaps } from './planMap.js';
 import { state, BUFFER_COLORS, layerType } from './state.js';
 import { geeApi } from './api.js';
-import { escapeHtml, fmtNum } from './utils.js';
+import { escapeHtml, fmtNum, startTaskProgress, trackTileLoads } from './utils.js';
 import { devFromYears, loadNewDevStats, devLegend, devStats, DEV_MIN_ZOOM } from './newDev.js';
 
 const $ = (id) => document.getElementById(id);
@@ -28,6 +28,7 @@ export const lstSeasons = () => seasonYears(2014, '04-01', '09-01');
 
 const LAYERS = {
   sar: {
+    label: 'ngập thực tế (Sentinel-1)',
     ids: { chk: 'chk_sarflood', box: 'sarFloodBox', opBox: 'sarFloodOpBox', opacity: 'sarFloodOpacity', year: 'sarFloodYear', legend: 'sarFloodLegend', stats: 'sarFloodStats' },
     zIndex: 3,
     seasons: sarSeasons,
@@ -38,6 +39,7 @@ const LAYERS = {
     renderStats: sarStats
   },
   lst: {
+    label: 'nhiệt độ bề mặt (Landsat)',
     ids: { chk: 'chk_lst', box: 'lstBox', opBox: 'lstOpBox', opacity: 'lstOpacity', year: 'lstYear', legend: 'lstLegend', stats: 'lstStats' },
     zIndex: 1,
     seasons: lstSeasons,
@@ -48,6 +50,7 @@ const LAYERS = {
     renderStats: lstStats
   },
   dev: {
+    label: 'đất xây dựng (vệ tinh)',
     ids: { chk: 'chk_newdev', box: 'newDevBox', opBox: 'newDevOpBox', opacity: 'newDevOpacity', year: 'newDevYear', legend: 'newDevLegend', stats: 'newDevStats' },
     zIndex: 2,
     minZoom: DEV_MIN_ZOOM,
@@ -61,7 +64,10 @@ const LAYERS = {
   }
 };
 
-const runtime = {};   // key → { visible, year, left, right, tiles: Map(năm → Promise), stats: Map(năm → Promise), legend, seq, shown }
+const runtime = {};   // key → { visible, year, left, right, url, task, tiles: Map(năm → Promise), stats: Map(năm → Promise), legend, seq, shown }
+// Tiến độ: GEE dựng ảnh (theo thời gian, tới SERVER_PCT) rồi tải ô ảnh trong khung nhìn (theo số ô)
+const SERVER_PCT = 50;
+const SERVER_TAU_MS = 4000;
 
 async function getJson(query) {
   const r = await fetch(geeApi(query));
@@ -131,12 +137,20 @@ function opacityOf(cfg) {
   return el ? el.value / 100 : 0.7;
 }
 
-function setLayerUrl(cfg, rt, url) {
+// track(layers): gắn đếm ô cho các layer đổi ảnh trên bản đồ đang thấy, gọi trước khi thêm / đổi URL để không sót ô đầu.
+// Cùng URL thì Leaflet không vẽ lại, dưới minZoom không tải ô: không đếm
+function setLayerUrl(cfg, rt, url, track) {
   const opts = { maxZoom: 19, minZoom: cfg.minZoom || 0, opacity: opacityOf(cfg), zIndex: cfg.zIndex };
-  if (rt.left) rt.left.setUrl(url); else rt.left = L.tileLayer(url, opts).addTo(map);
-  if (planMap) {
-    if (rt.right) rt.right.setUrl(url); else rt.right = L.tileLayer(url, opts).addTo(planMap);
-  }
+  const changed = rt.url !== url;
+  rt.url = url;
+  const shown = shownMaps();
+  const sides = [['left', map], ['right', planMap]].filter(([, m]) => m)
+    .map(([side, m]) => ({ side, m, fresh: !rt[side], layer: rt[side] || L.tileLayer(url, opts) }));
+  track(sides.filter(s => changed && shown.includes(s.m) && s.m.getZoom() >= opts.minZoom).map(s => s.layer));
+  sides.forEach(({ side, m, fresh, layer }) => {
+    if (fresh) rt[side] = layer.addTo(m);
+    else if (changed) layer.setUrl(url);
+  });
 }
 
 async function show(key) {
@@ -145,17 +159,29 @@ async function show(key) {
   const year = rt.year;
   const statsEl = $(cfg.ids.stats), legendEl = $(cfg.ids.legend);
   if (statsEl) statsEl.innerHTML = '<div class="flood-muted">Đang tính trên Google Earth Engine...</div>';
+  rt.task?.cancel();
+  const task = rt.task = startTaskProgress(`Đang tính ${cfg.label} (GEE)`);
+  task.creep(SERVER_PCT, SERVER_TAU_MS);
   try {
     const tile = await cached(rt.tiles, year, () => getJson(cfg.tileQuery(year)).then(d => {
       if (!d.urlFormat) throw new Error('máy chủ chưa hỗ trợ lớp này');
       return d;
     }));
-    if (seq !== rt.seq || !rt.visible) return;
-    setLayerUrl(cfg, rt, tile.urlFormat);
+    if (seq !== rt.seq || !rt.visible) { task.cancel(); return; }
+    task.set(SERVER_PCT, `Đang tải ảnh ${cfg.label}`);
+    setLayerUrl(cfg, rt, tile.urlFormat, (tracked) => {
+      trackTileLoads(tracked, (n, total) => task.set(SERVER_PCT + (100 - SERVER_PCT) * 0.98 * (n / Math.max(total, 1))))
+        .then(() => { if (rt.task === task) task.done(`Đã tải ${cfg.label}`); });
+    });
     rt.legend = tile.legend;
     if (legendEl) legendEl.innerHTML = cfg.renderLegend(tile.legend, year);
   } catch (err) {
-    if (seq === rt.seq && statsEl) statsEl.innerHTML = `<div class="flood-muted">Không tải được ảnh vệ tinh: ${escapeHtml(err.message)}</div>`;
+    if (seq === rt.seq) {
+      task.fail(`Không tải được ${cfg.label}`);
+      if (statsEl) statsEl.innerHTML = `<div class="flood-muted">Không tải được ảnh vệ tinh: ${escapeHtml(err.message)}</div>`;
+    } else {
+      task.cancel();
+    }
     return;
   }
   const q = cfg.statsQuery(year);
@@ -181,8 +207,10 @@ function setVisible(key, on) {
     show(key);
   } else {
     rt.seq++;
+    rt.task?.cancel(); rt.task = null;
     rt.left?.remove(); rt.left = null;
     rt.right?.remove(); rt.right = null;
+    rt.url = null;
   }
 }
 
@@ -222,7 +250,7 @@ export function satPrintLegend() {
 export function initSatLayers() {
   if (!map) return;
   Object.entries(LAYERS).forEach(([key, cfg]) => {
-    const rt = runtime[key] = { visible: false, year: null, left: null, right: null, tiles: new Map(), stats: new Map(), legend: null, seq: 0, shown: [] };
+    const rt = runtime[key] = { visible: false, year: null, left: null, right: null, url: null, task: null, tiles: new Map(), stats: new Map(), legend: null, seq: 0, shown: [] };
     fillYears(cfg, rt);
     $(cfg.ids.chk)?.addEventListener('change', (e) => setVisible(key, e.target.checked));
     $(cfg.ids.year)?.addEventListener('change', (e) => {

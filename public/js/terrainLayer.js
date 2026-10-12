@@ -5,9 +5,9 @@
 // Đổ bóng địa hình: ô hệ số tĩnh trên bucket (terrain/hillshade/, scripts/build-hillshade.js), nhân thẳng vào màu
 // trong canvas để in / chụp bản đồ (html2canvas) vẫn giữ bóng.
 import { map } from './mapEngine.js';
-import { planMap } from './planMap.js';
+import { planMap, shownMaps } from './planMap.js';
 import { geeApi } from './api.js';
-import { fmtNum } from './utils.js';
+import { fmtNum, startTaskProgress, trackTileLoads } from './utils.js';
 
 const AWS_URL = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
 const SOURCES = {
@@ -211,6 +211,10 @@ const TerrainGrid = L.GridLayer.extend({
 
 let visible = false;
 let leftLayer = null, rightLayer = null;
+// Tiến độ: chờ GEE trả nguồn ô (theo thời gian, tới SOURCE_PCT) rồi tải ô cao độ trong khung nhìn (theo số ô)
+const SOURCE_PCT = 20;
+const SOURCE_TAU_MS = 1500;
+let task = null;
 
 function opacity() {
   const el = $('terrainOpacity');
@@ -256,12 +260,23 @@ export function setTerrainVisible(on) {
   const box = $('terrainBox');
   if (box) box.style.display = visible ? '' : 'none';
   if (!map) return;
+  task?.cancel();
+  task = null;
   if (visible) {
+    const own = task = startTaskProgress('Đang tải địa hình (cao độ nền)');
+    own.creep(SOURCE_PCT, SOURCE_TAU_MS);
     // Chờ biết nguồn ô (FABDEM hay SRTM dự phòng) để ghi nguồn đúng
     tileUrl().then(() => {
-      if (!visible) return;
-      if (!leftLayer) leftLayer = makeLayer().addTo(map);
-      if (planMap && !rightLayer) rightLayer = makeLayer().addTo(planMap);
+      if (!visible || task !== own) return;
+      if (!leftLayer) leftLayer = makeLayer();
+      if (planMap && !rightLayer) rightLayer = makeLayer();
+      const pairs = [[map, leftLayer], [planMap, rightLayer]].filter(([m, l]) => m && l);
+      const shown = shownMaps();
+      own.set(SOURCE_PCT, 'Đang tải ô cao độ địa hình');
+      trackTileLoads(pairs.filter(([m]) => shown.includes(m)).map(([, l]) => l),
+        (n, total) => own.set(SOURCE_PCT + (100 - SOURCE_PCT) * 0.98 * (n / Math.max(total, 1))))
+        .then(() => { if (task === own) own.done('Đã tải địa hình'); });
+      pairs.forEach(([m, l]) => { if (!m.hasLayer(l)) l.addTo(m); });
     });
     map.on('mousemove', onMouseMove);
     planMap?.on('mousemove', onMouseMove);
