@@ -3,9 +3,11 @@
 // Rê chuột sáng viền; bấm mở popup để thể hiện theo điều chỉnh (che nền trong ranh, vẽ lô mới lên trên), xem PDF scan
 // hoặc bật ảnh tờ bản vẽ scan đã định vị (scanGeoref.js), độ trong suốt chỉnh ở thanh góc dưới bản đồ.
 // Admin ghi thẳng; hồ sơ người dùng nằm trong hàng chờ (khung Thẩm định › Điều chỉnh) tới khi Admin duyệt.
+// Trong panel, hồ sơ đã duyệt là lớp phụ «Điều chỉnh cục bộ» của đồ án (projectLayer.js): ẩn theo đồ án / cấp và theo ô lớp.
 import { state } from './state.js';
 import { map } from './mapEngine.js';
-import { planMap, passToolClick } from './planMap.js';
+import { planMap, passToolClick, isCompareOn } from './planMap.js';
+import { isLayerHidden, projectShown } from './projectFiles.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 import { ScanOverlay, cornersOf, openGeoref, prepareScan, scanProblem } from './scanGeoref.js';
@@ -22,6 +24,9 @@ const SCAN_TRANSPARENCY = 30;
 const LINE_STYLE = { color: BLUE, weight: 4, opacity: 1, dashArray: '12 12', dashOffset: '12', lineCap: 'butt' };
 const HOVER_STYLE = { color: '#93c5fd', weight: 6 };
 export const ADJUST_PDF_MAX_BYTES = 2 * 1024 * 1024;
+// Khóa lớp trong state.hiddenProjectLayers ("<Ten_QH>|dieu-chinh"), cùng cách lưu với PROJECT_LAYERS
+export const ADJUST_LAYER_KEY = 'dieu-chinh';
+export const ADJUST_CHANGE_EVENT = 'qh:adjustments';
 
 const $ = (id) => document.getElementById(id);
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
@@ -113,6 +118,14 @@ export async function sendAdjustment(payload, pdfFile, scan) {
 
 const shownMaps = () => [map, planMap].filter(Boolean);
 
+// Hồ sơ chờ duyệt Admin đang xem trước luôn hiện
+const visible = (it) => it.status === 'pending' || (projectShown(it.tenQH) && !isLayerHidden(it.tenQH, ADJUST_LAYER_KEY));
+
+/** Hồ sơ đã duyệt của 1 đồ án, mới nhất trước */
+export function adjustmentsOf(tenQH) {
+  return items.filter(x => x.status === 'approved' && x.tenQH === tenQH).sort((a, b) => (b.at || 0) - (a.at || 0));
+}
+
 function hatchDefs(svg, id) {
   if (!svg || svg.querySelector(`#${id}`)) return;
   const ns = 'http://www.w3.org/2000/svg';
@@ -182,7 +195,7 @@ function drawScans(L1) {
   L1.scanById.clear();
   if (!ScanOverlay) return;
   items.forEach(it => {
-    if (!it.scan || !scanOn.has(it.id)) return;
+    if (!it.scan || !scanOn.has(it.id) || !visible(it)) return;
     const url = scanSrc(it);
     if (!url) return;
     const layer = new ScanOverlay(url, cornersOf(it.scan), { pane: SCAN_PANE, opacity: 1 - transparencyOf(it.id) / 100 });
@@ -197,7 +210,7 @@ function drawOn(m) {
   L1.lines.clearLayers();
   drawScans(L1);
   items.forEach(it => {
-    if (!it.boundary) return;
+    if (!it.boundary || !visible(it)) return;
     const on = active.has(it.id);
     const detail = on ? details.get(it.id)?.value : null;
     if (on && detail) {
@@ -289,7 +302,7 @@ function setTransparency(id, value) {
 // Thanh độ trong suốt góc dưới trái bản đồ chính: mỗi ảnh đang bật một dòng, áp cho cả bản đồ chính và khung so sánh
 function renderScanBar() {
   if (!map || typeof L === 'undefined') return;
-  const shown = items.filter(it => it.scan && scanOn.has(it.id));
+  const shown = items.filter(it => it.scan && scanOn.has(it.id) && visible(it));
   if (!shown.length) {
     if (scanBar) { scanBar.remove(); scanBar = null; }
     return;
@@ -420,6 +433,19 @@ export async function reloadAdjustments() {
   [...active].forEach(id => { if (!items.some(x => x.id === id)) active.delete(id); });
   [...scanOn].forEach(id => { if (!items.some(x => x.id === id && x.scan)) scanOn.delete(id); });
   refreshAdjustLayer();
+  document.dispatchEvent(new CustomEvent(ADJUST_CHANGE_EVENT));
+}
+
+/** Phóng tới ranh hồ sơ và mở popup (danh sách hồ sơ trong thư mục đồ án) */
+function locate(id) {
+  const it = items.find(x => x.id === id);
+  const m = isCompareOn() && planMap ? planMap : map;
+  if (!it || !it.boundary || !m) return;
+  const bounds = L.geoJSON(it.boundary).getBounds();
+  if (!bounds.isValid()) return;
+  // Đổi zoom không hoạt ảnh thì moveend phát ngay trong fitBounds: gắn trước
+  m.once('moveend', () => openPopup(m, it, bounds.getCenter()));
+  m.fitBounds(bounds, { maxZoom: 18, padding: [40, 40] });
 }
 
 // ============================ XEM PDF ============================
@@ -541,6 +567,7 @@ function onAction(e) {
   else if (act === 'scanNew') georefScan(id, true);
   else if (act === 'pdf') openPdf(id);
   else if (act === 'preview') preview(id);
+  else if (act === 'locate') locate(id);
   else if (act === 'approve') adminCall('approveAdjust', id, 'Đã duyệt, ranh điều chỉnh hiện trên bản đồ quy hoạch');
   else if (act === 'reject' && confirm('Từ chối và xóa hồ sơ điều chỉnh này?')) adminCall('removeAdjust', id, 'Đã từ chối hồ sơ');
   else if (act === 'remove' && confirm('Xóa hồ sơ điều chỉnh cục bộ này khỏi bản đồ quy hoạch?')) {

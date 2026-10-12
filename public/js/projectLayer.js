@@ -5,6 +5,7 @@
 // Admin xóa / chuyển đồ án cũ.
 // Nút file mở PDF quyết định phê duyệt (projects/<slug>/quyet-dinh.pdf, dưới 1 MB). Admin gắn, thay hoặc gỡ.
 // Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS): bật/tắt từng lớp, Admin xóa từng lớp, tìm lô trong đồ án.
+// Đồ án có hồ sơ điều chỉnh cục bộ đã duyệt thêm lớp phụ «Điều chỉnh cục bộ» (adjustLayer.js): bật/tắt, danh sách hồ sơ bấm để phóng tới.
 // Mỗi đồ án 1 màu viền + nền mờ, nhãn tên ở giữa ranh. Zoom < PARCEL_MIN_ZOOM ranh tổng bấm được để mở đồ án;
 // từ ngưỡng đó vẽ lô (mapEngine.js), ranh tổng nằm dưới lô và không nhận click (đồ án có ranh thật).
 // Đồ án vừa bấm (state.focusedProject) hiện lô ở mọi zoom; đang chọn phường thì chỉ hiện ranh các đồ án của phường,
@@ -30,6 +31,7 @@ import { signOutAdmin } from './uiComponents.js';
 import { PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
 import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
 import { openOrAssign } from './decisionViewer.js';
+import { adjustmentsOf, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 
 const HIDDEN_KEY = 'qh_hidden_projects';
 const HIDDEN_LAYERS_KEY = 'qh_hidden_layers';
@@ -71,6 +73,7 @@ const fallbackCache = new Map();
 const expanded = new Set();
 const layerInfo = new Map();
 let layerBusy = null;
+const adjOpen = new Set();
 
 // ============================ RANH TỔNG ĐỒ ÁN ============================
 
@@ -703,7 +706,7 @@ function layersHtml(p, idx, projectOn, admin) {
         <span>${escapeHtml(g.label)}</span><small>${escapeHtml(count.short)}</small></label>
       ${admin && g.present && !p.legacy ? `<button type="button" class="project-btn danger" data-layer-del="${idx}:${li}" title="Xóa lớp ${escapeHtml(g.label)} khỏi đồ án" aria-label="Xóa lớp"${layerBusy || busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
     </div>`;
-  }).join('');
+  }).join('') + adjustRowHtml(p, idx, projectOn);
   const lotsN = info.list.filter(g => g.kind === 'lots').reduce((s, g) => s + g.count, 0);
   const search = lotsN ? `<div class="project-lot-search">
       <input type="search" class="project-search" data-lot-search="${idx}" value="${escapeHtml(lotQuery.get(p.name) || '')}"
@@ -711,6 +714,38 @@ function layersHtml(p, idx, projectOn, admin) {
       <div class="project-lot-results" data-lot-results="${idx}">${lotResultsHtml(p, idx)}</div>
     </div>` : '';
   return `<div class="project-layers">${rows}${search}</div>`;
+}
+
+function adjustRowHtml(p, idx, projectOn) {
+  const list = adjustmentsOf(p.name);
+  if (!list.length) return '';
+  const on = !isLayerHidden(p.name, ADJUST_LAYER_KEY);
+  const open = adjOpen.has(p.name);
+  const docs = open ? `<div class="project-adj-list">${list.map(it => {
+    const meta = [it.stamp, `${fmtNum(it.lots || 0)} lô mới`, it.scan ? 'có bản vẽ scan' : '', it.pdf ? 'có QĐ' : ''].filter(Boolean).join(' · ');
+    return `<button type="button" class="project-lot-hit" data-adj-act="locate" data-adj-id="${escapeHtml(it.id)}" data-adj-project="${idx}" title="${escapeHtml(it.title || 'Điều chỉnh cục bộ')} — bấm để phóng tới ranh điều chỉnh">
+      <span>${escapeHtml(it.title || 'Điều chỉnh cục bộ')}</span><small>${escapeHtml(meta)}</small></button>`;
+  }).join('')}</div>` : '';
+  return `<div class="project-layer${on && projectOn ? '' : ' is-off'}">
+      <label class="project-layer-name" title="Điều chỉnh cục bộ đã duyệt — ${list.length} hồ sơ">
+        <input type="checkbox" data-adj-layer="${idx}"${on ? ' checked' : ''}>
+        <i class="project-layer-dot adjust"></i>
+        <b class="project-phase qh">QH</b>
+        <span>Điều chỉnh cục bộ</span><small>${fmtNum(list.length)}</small></label>
+      <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-adj-open="${idx}" title="${open ? 'Ẩn' : 'Xem'} danh sách hồ sơ điều chỉnh" aria-expanded="${open}">${ico('chev-down')}</button>
+    </div>${docs}`;
+}
+
+function setAdjustOn(p, on) {
+  const key = layerKey(p.name, ADJUST_LAYER_KEY);
+  if (on) state.hiddenProjectLayers.delete(key);
+  else state.hiddenProjectLayers.add(key);
+  saveHiddenLayers();
+  if (on && !projectShown(p.name)) {
+    showProject(p);
+    return;
+  }
+  refreshAll();
 }
 
 // ============================ TÌM LÔ TRONG ĐỒ ÁN ============================
@@ -1183,6 +1218,7 @@ function redrawOutlines() {
 function refreshAll() {
   redrawOutlines();
   refreshProjectLots();
+  refreshAdjustLayer();
   renderList();
 }
 
@@ -1408,6 +1444,12 @@ export function initProjectLayer(opts = {}) {
       if (hit) setLayerOn(hit.p, hit.g, layerBox.checked);
       return;
     }
+    const adjBox = e.target.closest('[data-adj-layer]');
+    if (adjBox) {
+      const p = projects[Number(adjBox.dataset.adjLayer)];
+      if (p) setAdjustOn(p, adjBox.checked);
+      return;
+    }
     const box = e.target.closest('[data-project]');
     const p = box && projects[Number(box.dataset.project)];
     if (!p) return;
@@ -1477,6 +1519,21 @@ export function initProjectLayer(opts = {}) {
     }
     const expand = e.target.closest('[data-expand]');
     if (expand) { const p = projects[Number(expand.dataset.expand)]; if (p) toggleExpand(p); return; }
+    const adjToggle = e.target.closest('[data-adj-open]');
+    if (adjToggle) {
+      const p = projects[Number(adjToggle.dataset.adjOpen)];
+      if (!p) return;
+      if (adjOpen.has(p.name)) adjOpen.delete(p.name); else adjOpen.add(p.name);
+      renderList();
+      return;
+    }
+    // Phóng tới hồ sơ do adjustLayer.js xử lý (bắt ở document); ở đây chỉ bật lại đồ án / lớp đang ẩn để ranh hiện
+    const adjGo = e.target.closest('[data-adj-project]');
+    if (adjGo) {
+      const p = projects[Number(adjGo.dataset.adjProject)];
+      if (p && (isLayerHidden(p.name, ADJUST_LAYER_KEY) || !projectShown(p.name))) setAdjustOn(p, true);
+      return;
+    }
     const layerDel = e.target.closest('[data-layer-del]');
     if (layerDel) { const hit = layerOf(layerDel.dataset.layerDel); if (hit) deleteLayer(hit.p, hit.g); return; }
     const info = e.target.closest('[data-info]');
@@ -1494,6 +1551,7 @@ export function initProjectLayer(opts = {}) {
     revealInList(p);
   });
   document.addEventListener('auth:change', renderList);
+  document.addEventListener(ADJUST_CHANGE_EVENT, renderList);
   document.addEventListener(LEVEL_EVENT, focusLevelGroup);
   map?.on('zoomend', () => {
     const below = map.getZoom() < PARCEL_MIN_ZOOM;
