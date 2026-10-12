@@ -24,7 +24,11 @@ const INDEX_CACHE = 8;
 const FILL_ALPHA = 0.35;
 const STROKE = 'rgba(124, 45, 18, 0.75)';
 const STROKE_PLAN = 'rgba(17, 24, 39, 0.8)';
-const HIGHLIGHT = { color: '#facc15', weight: 3, opacity: 1, fillColor: '#facc15', fillOpacity: 0.12, interactive: false };
+// Thửa đang chọn: trên mọi lớp dữ liệu và marker (600–620), dưới tooltip (650) và popup (700)
+const HL_PANE = 'cadastreHighlightPane';
+const HL_PANE_Z = 630;
+const HIGHLIGHT_HALO = { color: '#111827', weight: 7, opacity: 0.55, fill: false };
+const HIGHLIGHT = { color: '#fde047', weight: 3.5, opacity: 1, fillColor: '#facc15', fillOpacity: 0.22 };
 
 // Nhóm loại đất (mã theo Thông tư 28/2014/TT-BTNMT, Phụ lục 01) cho dòng phụ popup; thửa nhiều mục đích lấy mã đầu
 const GROUPS = [
@@ -382,7 +386,15 @@ async function openParcel(latlng, targetMap, replaced) {
   content.querySelector('.cad-plan-btn')?.addEventListener('click', (e) => showParcelPlan(own, content, e.currentTarget, shapeP, found.hit.props));
   const shape = await shapeP;
   if (mySeq !== clickSeq || popup !== own) return true;
-  highlight = L.geoJSON(shape, { style: HIGHLIGHT, interactive: false }).addTo(targetMap);
+  if (!targetMap.getPane(HL_PANE)) {
+    const pane = targetMap.createPane(HL_PANE);
+    pane.style.zIndex = HL_PANE_Z;
+    pane.style.pointerEvents = 'none';
+  }
+  highlight = L.layerGroup([
+    L.geoJSON(shape, { pane: HL_PANE, style: HIGHLIGHT_HALO, interactive: false }),
+    L.geoJSON(shape, { pane: HL_PANE, style: HIGHLIGHT, interactive: false })
+  ]).addTo(targetMap);
   return true;
 }
 
