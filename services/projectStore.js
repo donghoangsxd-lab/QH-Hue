@@ -1666,9 +1666,14 @@ async function legacyLots(tenQH) {
 // ============================ ĐIỀU CHỈNH CỤC BỘ ============================
 // projects/adjustments.json — chỉ mục { v, items: [meta] }, gồm cả hồ sơ chờ duyệt (status pending | approved)
 // projects/<slug>/adjust/<id>.json — ranh + lô đất mới; projects/<slug>/adjust/<id>.pdf — QĐ / bản vẽ scan ≤ 2 MB
+// projects/<slug>/adjust/<id>.scan — ảnh tờ bản vẽ scan (WebP/PNG/JPEG ≤ 2 MB); thông số định vị (3 góc ảnh) nằm trong chỉ mục
 const ADJUST_INDEX = 'projects/adjustments.json';
 const ADJUST_ID_RE = /^[a-f0-9]{16}$/;
 const ADJUST_PDF_MAX_BYTES = 2 * 1024 * 1024;
+const ADJUST_SCAN_MAX_BYTES = 2 * 1024 * 1024;
+// Tờ A3 rộng hơn ranh điều chỉnh nhiều lần: góc ảnh được phép nằm ngoài khung TP. Huế trong khoảng này (độ)
+const SCAN_MARGIN_DEG = 0.1;
+const SCAN_GCP_MAX = 12;
 const ADJUST_DOC_MAX_CHARS = 1500000;
 const ADJUST_PENDING_MAX = 40;
 const ADJUST_LOTS_MAX = 400;
@@ -1782,7 +1787,7 @@ function adjustView(it) {
     id: it.id, tenQH: it.tenQH, slug: it.slug, status: it.status, title: it.title || '', codes: it.codes || [],
     boundary: it.boundary, bbox: it.bbox, lots: it.lots || 0, at: it.at || 0, stamp: it.stamp || '',
     sender: it.sender || '', note: it.note || '', verdict: it.verdict || '', pdf: it.pdf || null,
-    approvedAt: it.approvedAt || 0
+    scan: it.scan || null, approvedAt: it.approvedAt || 0
   };
 }
 
@@ -1839,6 +1844,93 @@ async function attachAdjustPdf({ id, fileName, buffer, admin }) {
   return pdf;
 }
 
+function scanType(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 12 || buffer.length > ADJUST_SCAN_MAX_BYTES) return '';
+  if (buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  if (buffer[0] === 0x89 && buffer.toString('ascii', 1, 4) === 'PNG') return 'image/png';
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+  return '';
+}
+
+function scanLatLng(p) {
+  const b = constants.HUE_BOUNDS;
+  if (!Array.isArray(p)) return null;
+  const lat = Number(p[0]), lng = Number(p[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < b.minLat - SCAN_MARGIN_DEG || lat > b.maxLat + SCAN_MARGIN_DEG
+    || lng < b.minLng - SCAN_MARGIN_DEG || lng > b.maxLng + SCAN_MARGIN_DEG) return null;
+  return [r7(lat), r7(lng)];
+}
+
+// { w, h, tl, tr, bl: [lat, lng] góc ảnh, gcps: [{ px: [x, y], ll: [lat, lng] }], rms: m }
+function cleanGeoref(g) {
+  if (!g || typeof g !== 'object') return null;
+  const w = Math.round(Number(g.w)), h = Math.round(Number(g.h));
+  if (!(w >= 16 && w <= 12000 && h >= 16 && h <= 12000)) return null;
+  const tl = scanLatLng(g.tl), tr = scanLatLng(g.tr), bl = scanLatLng(g.bl);
+  if (!tl || !tr || !bl) return null;
+  const gcps = (Array.isArray(g.gcps) ? g.gcps : []).slice(0, SCAN_GCP_MAX).map(p => {
+    const x = Number(p && p.px && p.px[0]), y = Number(p && p.px && p.px[1]);
+    const ll = scanLatLng(p && p.ll);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > w || y > h || !ll) return null;
+    return { px: [Math.round(x * 10) / 10, Math.round(y * 10) / 10], ll };
+  }).filter(Boolean);
+  // 'fit': người dùng kéo, xoay ảnh khớp ranh nên không có điểm khống chế; 'gcp': affine giải từ ≥ 3 cặp điểm
+  const mode = g.mode === 'fit' ? 'fit' : 'gcp';
+  if (mode === 'gcp' && gcps.length < 3) return null;
+  return {
+    w, h, tl, tr, bl, mode,
+    gcps: mode === 'fit' ? [] : gcps,
+    rms: mode === 'fit' ? 0 : Math.max(0, Math.round((Number(g.rms) || 0) * 100) / 100)
+  };
+}
+
+/**
+ * Gắn ảnh tờ bản vẽ scan + thông số định vị. Không kèm ảnh: Admin chỉ cập nhật định vị cho ảnh đã có (ghép lại).
+ * Người gửi chưa đăng nhập chỉ gắn một lần cho hồ sơ vừa tạo, như PDF.
+ */
+async function attachAdjustScan({ id, fileName, buffer, georef, admin }) {
+  if (!ADJUST_ID_RE.test(String(id || ''))) throw adjustError('Mã hồ sơ không hợp lệ', 400);
+  const geo = cleanGeoref(georef);
+  if (!geo) throw adjustError('Thông số định vị ảnh không hợp lệ', 400);
+  const it = (await readAdjustIndex()).data.items.find(x => x.id === id);
+  if (!it) throw adjustError('Không có hồ sơ điều chỉnh này', 404);
+  if (!admin && (it.status !== 'pending' || it.scan || Date.now() - (it.at || 0) > ADJUST_PDF_WINDOW_MS)) {
+    throw adjustError('Chỉ gắn ảnh scan ngay sau khi gửi hồ sơ', 403);
+  }
+  let file;
+  if (buffer) {
+    const type = scanType(buffer);
+    if (!type) {
+      throw adjustError(buffer.length > ADJUST_SCAN_MAX_BYTES ? 'Ảnh scan lớn hơn 2 MB' : 'Chỉ nhận ảnh WebP, PNG hoặc JPEG', buffer.length > ADJUST_SCAN_MAX_BYTES ? 413 : 400);
+    }
+    try {
+      await gcsWrite.putObject(adjustObject(it.slug, id, 'scan'), buffer, type);
+    } catch (err) {
+      if (err.code === 'NO_SA' || err.status === 401 || err.status === 403) throw adjustError('Máy chủ chưa có quyền ghi ảnh lên bucket', 502);
+      throw err;
+    }
+    file = { name: cleanText(fileName, 120) || 'ban-ve-scan', bytes: buffer.length, type, at: Date.now() };
+  } else {
+    if (!admin || !it.scan) throw adjustError('Chưa có ảnh scan để định vị lại', 400);
+    file = { name: it.scan.name, bytes: it.scan.bytes, type: it.scan.type, at: it.scan.at };
+  }
+  const scan = { ...file, ...geo, georefAt: Date.now() };
+  await updateAdjustIndex(cur => ({ ...cur, items: cur.items.map(x => (x.id === id ? { ...x, scan } : x)) }));
+  return scan;
+}
+
+async function readAdjustScan(id, { admin }) {
+  const it = await findAdjustment(id, admin);
+  if (!it.scan) throw adjustError('Hồ sơ không kèm ảnh scan', 404);
+  const res = await axios.get(`${publicUrl(adjustObject(it.slug, it.id, 'scan'))}?v=${it.scan.at || 0}`, {
+    timeout: 20000, responseType: 'arraybuffer', maxContentLength: ADJUST_SCAN_MAX_BYTES + 4096, validateStatus: () => true
+  });
+  if (res.status !== 200) throw adjustError(res.status === 404 ? 'Ảnh scan không còn trên bucket' : `Đọc ảnh scan lỗi HTTP ${res.status}`, res.status === 404 ? 404 : 502);
+  const buffer = Buffer.from(res.data);
+  return { buffer, type: scanType(buffer) || it.scan.type || 'application/octet-stream' };
+}
+
 async function listAdjustments({ admin }) {
   const items = (await readAdjustIndex()).data.items || [];
   return items.filter(x => x && ADJUST_ID_RE.test(String(x.id)) && (admin || x.status === 'approved')).map(adjustView);
@@ -1880,7 +1972,7 @@ async function approveAdjustment(id, by) {
 async function removeAdjustment(id) {
   const it = await findAdjustment(id, true);
   await updateAdjustIndex(cur => ({ ...cur, items: cur.items.filter(x => x.id !== id) }));
-  for (const ext of ['json', 'pdf']) {
+  for (const ext of ['json', 'pdf', 'scan']) {
     try { await removeName(adjustObject(it.slug, it.id, ext)); } catch (err) { /* file chưa có */ }
   }
   return { id };
@@ -1912,5 +2004,6 @@ module.exports = {
   setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, deleteLayer, deleteProjectFiles, renameProject,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision, layerDecisions, removeLayerDecision,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase,
-  saveAdjustment, attachAdjustPdf, listAdjustments, readAdjustment, readAdjustPdf, approveAdjustment, removeAdjustment
+  saveAdjustment, attachAdjustPdf, attachAdjustScan, listAdjustments, readAdjustment, readAdjustPdf, readAdjustScan,
+  approveAdjustment, removeAdjustment
 };

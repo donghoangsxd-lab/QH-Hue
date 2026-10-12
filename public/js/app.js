@@ -52,6 +52,7 @@ import { initProjectLayer } from './projectLayer.js';
 import { initProjectReview } from './projectReview.js';
 import { initLocalAdjust } from './localAdjust.js';
 import { initAdjustLayer } from './adjustLayer.js';
+import { initAdjustImport } from './adjustImport.js';
 import { initWardCheck, refreshWardCheck } from './wardCheck.js';
 import { initOsmImport } from './osmImport.js';
 import { initLotEdit } from './lotEdit.js';
@@ -323,6 +324,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initProjectReview();
   initLocalAdjust();
   initAdjustLayer();
+  initAdjustImport();
   initWardCheck({ onSynced: reloadAfterSheetWrite });
   initOsmImport({ onImported: reloadAfterSheetWrite });
   initLotEdit({ onInfraSaved: reloadAfterSheetWrite });

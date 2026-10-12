@@ -3383,6 +3383,71 @@ body.project-review.la-page #projectReviewHost {
 .adj-row { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; margin-bottom: 6px; border: 1px solid var(--border-color); border-left: 3px solid #d946ef; border-radius: var(--r-md); font-size: var(--fs-sm); }
 .adj-row small { color: var(--text-muted); font-size: var(--fs-xs); }
 
+/* Ảnh tờ bản vẽ scan đã định vị: thanh độ trong suốt góc dưới bản đồ (adjustLayer.js) */
+.scan-overlay { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; image-rendering: auto; }
+.adj-scanbar { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-left: 3px solid #2f80ff; border-radius: var(--r-md); box-shadow: var(--shadow-sm); font-size: var(--fs-xs); color: var(--text-main); max-width: 340px; }
+.adj-scanrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.adj-scanname { flex: 1 1 100%; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adj-scanrow label { display: flex; align-items: center; gap: 6px; flex: 1; color: var(--text-muted); }
+.adj-scanrow input[type="range"] { flex: 1; min-width: 90px; }
+.adj-scanrow output { min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+.adj-scanrow .bp-btn { padding: 2px 4px; }
+
+/* Khung chấm điểm ghép ảnh scan (scanGeoref.js) */
+.sg-modal { position: fixed; inset: 0; z-index: 4100; display: flex; background: rgba(2, 6, 23, 0.78); padding: 1.5vh 1.5vw; }
+.sg-box { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-panel, #0f172a); border: 1px solid var(--border-color); border-radius: var(--r-md); overflow: hidden; }
+.sg-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border-color); }
+.sg-head span { flex: 1; min-width: 0; color: var(--text-muted); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sg-hint { padding: 6px 10px; font-size: var(--fs-xs); line-height: 1.4; color: var(--text-muted); border-bottom: 1px solid var(--border-color); }
+.sg-panes { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; min-height: 0; padding: 4px; }
+.sg-pane { position: relative; min-height: 0; border: 1px solid var(--border-color); border-radius: var(--r-sm); overflow: hidden; }
+.sg-map { position: absolute; inset: 0; background: #e5e7eb; }
+.sg-panes:not(.sg-single) .sg-map { cursor: crosshair; }
+.sg-panes .sg-map.sg-over, .sg-panes .sg-map.sg-moving { cursor: move; }
+.sg-panes.sg-single { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.sg-single .sg-pane:first-child { display: none; }
+.sg-modes { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--border-color); border-radius: var(--r-md); }
+.sg-modes .bulk-kind-btn { flex: 0 0 auto; padding: 3px 10px; font-size: var(--fs-xs); }
+.sg-tools { display: flex; flex-wrap: wrap; gap: 4px; }
+.sg-tools[hidden], .sg-foot [hidden] { display: none; }
+.sg-handle span { display: block; width: 14px; height: 14px; margin: 2px; background: #fff; border: 2px solid #2f80ff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); cursor: nwse-resize; }
+.sg-handle-rot span { border-radius: 50%; background: #2f80ff; border-color: #fff; cursor: grab; }
+.sg-tag { position: absolute; top: 6px; right: 6px; z-index: 1000; padding: 1px 6px; border-radius: var(--r-sm); background: rgba(15, 23, 42, 0.8); color: #fff; font-size: var(--fs-xs); pointer-events: none; }
+.sg-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; border-top: 1px solid var(--border-color); }
+.sg-list { flex: 1 1 360px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 0; font-size: var(--fs-xs); }
+.sg-sum { flex: 1 1 100%; font-weight: 700; }
+.sg-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 4px 1px 6px; border: 1px solid var(--border-color); border-radius: var(--r-sm); }
+.sg-chip button { border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+.sg-warn { color: #f59e0b; border-color: #f59e0b; }
+.sg-op { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--text-muted); }
+.sg-op output { min-width: 34px; text-align: right; }
+.sg-foot .bp-btn:disabled, .adj-file-act .bp-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.sg-pin span { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 800; color: #fff; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); }
+.sg-pin-img span { background: #dc2626; }
+.sg-pin-geo span { background: #2563eb; }
+.sg-pin-warn span { background: #f59e0b; }
+@media (max-width: 760px) { .sg-panes { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
+
+/* Nhập hàng loạt › Điều chỉnh cục bộ (adjustImport.js) */
+.bulk-kind-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 1 1 40%; padding: 5px 4px; border-radius: var(--r-md); color: var(--text-muted); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; text-align: center; line-height: 1.2; }
+.bulk-kind-btn input { position: absolute; opacity: 0; pointer-events: none; }
+.bulk-kind-btn:has(input:checked) { background: var(--accent-cyan); color: var(--bg-panel); }
+.bulk-kind-btn:has(input:focus-visible) { outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
+#addBulk:not(.bulk-adjust) #adjImportBox { display: none; }
+#addBulk.bulk-adjust > :not(.bulk-kind):not(#adjImportBox):not(#cadPendingBox) { display: none !important; }
+.adj-files { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+.adj-file { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 6px; align-items: center; padding: 5px 7px; border: 1px solid var(--border-color); border-radius: var(--r-md); font-size: var(--fs-sm); }
+.adj-file-kind { font-size: var(--fs-xs); font-weight: 800; padding: 0 5px; border-radius: var(--r-sm); background: rgba(47, 128, 255, 0.18); color: #60a5fa; }
+.adj-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adj-file-del { border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 16px; line-height: 1; }
+.adj-file-status, .adj-file-act { grid-column: 1 / -1; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.35; }
+.adj-file-act { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
+.adj-file-op { display: flex; align-items: center; gap: 6px; flex: 1; }
+.add-point-form .adj-file-op input[type="range"] { flex: 1; min-width: 80px; width: auto; height: auto; padding: 0; border: 0; background: transparent; }
+.adj-ok { color: #22c55e; }
+.adj-warn { color: #f59e0b; }
+.adj-bad { color: var(--accent-red); }
+
 /* Menu chuột phải trên bản đồ + khung Street View (streetView.js) */
 .map-ctx-menu {
   position: fixed; z-index: 1400; display: flex; flex-direction: column; min-width: 170px; padding: 4px;

@@ -596,6 +596,42 @@
 
         <div id="addBulk" style="display:none;">
           <div class="cad-pending" id="cadPendingBox" hidden></div>
+          <div class="add-mode-switch bulk-kind" role="radiogroup" aria-label="Loại hồ sơ nhập">
+            <label class="bulk-kind-btn"><input type="radio" name="bulkKind" value="plan" checked>Đồ án / hiện trạng</label>
+            <label class="bulk-kind-btn" title="Một hồ sơ điều chỉnh cục bộ đã có Quyết định: DXF + ảnh bản vẽ scan + PDF Quyết định"><input type="radio" name="bulkKind" value="adjust">Điều chỉnh cục bộ</label>
+          </div>
+          <div id="adjImportBox" class="adj-import">
+            <label class="cad-pair" for="adjProject">Đồ án được điều chỉnh
+              <select id="adjProject"><option value="">Chọn đồ án quy hoạch</option></select>
+            </label>
+            <div class="form-grid">
+              <label for="adjCrs">Hệ tọa độ</label>
+              <select id="adjCrs">
+                <option value="HUE_3" selected>VN-2000 KTT 107°, múi 3°</option>
+                <option value="UTM48_6">VN-2000 UTM 48, múi 6°</option>
+              </select>
+              <label for="adjTitle">Tên hồ sơ</label>
+              <input type="text" id="adjTitle" maxlength="300" placeholder="Để trống: tự đặt theo ký hiệu lô" />
+            </div>
+            <label class="cad-drop" id="adjDrop" for="adjFiles">
+              <span class="cad-drop-main"><b>Chọn file</b> hoặc kéo thả vào đây</span>
+              <span class="cad-drop-types"><i>DXF</i><i>JPG · PNG</i><i>PDF</i></span>
+              <span class="cad-drop-sub">DXF bắt buộc: ranh trên layer có chữ RANH + hatch đất theo TT16. Ảnh tờ bản vẽ scan (không bắt buộc) ghép lên bản đồ theo khung bản vẽ đã phê duyệt. PDF Quyết định phê duyệt &lt; 2 MB (không bắt buộc). Không chấm QCVN, lô gốc của đồ án giữ nguyên.</span>
+              <input type="file" id="adjFiles" accept=".dxf,.jpg,.jpeg,.png,.webp,.pdf" multiple hidden />
+            </label>
+            <div id="adjFileList" class="adj-files"></div>
+            <div class="cad-guest" id="adjGuest">
+              <div class="cad-guest-note"><svg class="ico"><use href="#i-info"/></svg>Chưa đăng nhập: hồ sơ vào hàng chờ, Admin kiểm tra rồi mới đưa lên bản đồ quy hoạch.</div>
+              <div class="form-grid">
+                <label for="adjSender">Người gửi</label>
+                <input type="text" id="adjSender" maxlength="80" placeholder="Họ tên / đơn vị / SĐT" />
+                <label for="adjNote">Ghi chú</label>
+                <input type="text" id="adjNote" maxlength="300" placeholder="Số QĐ, nguồn bản vẽ... (không bắt buộc)" />
+              </div>
+            </div>
+            <button type="button" class="btn-submit" id="btnAdjSubmit" disabled><svg class="ico"><use href="#i-send"/></svg>GỬI HỒ SƠ CHỜ DUYỆT</button>
+            <div id="adjStatus" class="rp-status" role="status" aria-live="polite"></div>
+          </div>
           <div class="form-grid">
             <label for="cadCrs">Hệ tọa độ</label>
             <select id="cadCrs">

@@ -2556,7 +2556,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, removed: !!result.removed, count: result.count || 0 });
     }
 
-    // ---- Hồ sơ điều chỉnh cục bộ: Admin ghi thẳng, người dùng vào hàng chờ; PDF ≤ 2 MB gửi ở yêu cầu thứ hai ----
+    // ---- Hồ sơ điều chỉnh cục bộ: Admin ghi thẳng, người dùng vào hàng chờ; PDF, ảnh scan ≤ 2 MB gửi ở các yêu cầu sau ----
     if (action === 'submitAdjust') {
       requirePostFromApp(req);
       const admin = await adminOrNull(req);
@@ -2579,6 +2579,30 @@ module.exports = async (req, res) => {
       if (!pdf || pdf.length > ADJUST_PDF_B64_MAX) return res.status(413).json({ error: true, message: 'File PDF rỗng hoặc lớn hơn 2 MB' });
       const saved = await projects.attachAdjustPdf({ id: String(body.id || ''), fileName: body.name, buffer: Buffer.from(pdf, 'base64'), admin: !!admin });
       return res.status(200).json({ success: true, pdf: saved });
+    }
+
+    // Ảnh tờ bản vẽ scan + 3 góc định vị; Admin gửi riêng georef (không ảnh) để chấm lại điểm
+    if (action === 'putAdjustScan') {
+      requirePostFromApp(req);
+      const admin = await adminOrNull(req);
+      const body = readJsonBody(req);
+      const img = typeof body.image === 'string' ? body.image.replace(/\s+/g, '') : '';
+      if (img.length > ADJUST_PDF_B64_MAX) return res.status(413).json({ error: true, message: 'Ảnh scan lớn hơn 2 MB' });
+      const saved = await projects.attachAdjustScan({
+        id: String(body.id || ''), fileName: body.name, buffer: img ? Buffer.from(img, 'base64') : null, georef: body.georef, admin: !!admin
+      });
+      return res.status(200).json({ success: true, scan: saved });
+    }
+
+    if (action === 'getAdjustScan') {
+      const admin = req.method === 'POST' ? await requireAdmin(req) : null;
+      if (admin) requirePostFromApp(req);
+      const id = String(admin ? readJsonBody(req).id : req.query.id || '');
+      const file = await projects.readAdjustScan(id, { admin: !!admin });
+      res.setHeader('Content-Type', file.type);
+      res.setHeader('Cache-Control', admin ? 'no-store' : 'public, max-age=86400');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return res.status(200).send(file.buffer);
     }
 
     // GET: hồ sơ đã duyệt (vẽ lên bản đồ quy hoạch). POST kèm token Admin: thêm hồ sơ chờ duyệt

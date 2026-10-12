@@ -864,6 +864,36 @@ async function runAdjust() {
   }
 }
 
+/**
+ * Hồ sơ đã có QĐ phê duyệt (Nhập hàng loạt › Điều chỉnh cục bộ): đọc ranh + hatch, kiểm tra ranh nằm trong đồ án,
+ * không chấm QCVN. Trả payload cho sendAdjustment.
+ */
+export async function adjustRecordFromDxf(file, { name, crs }) {
+  if (typeof turf === 'undefined') throw new Error('Chưa tải thư viện đo diện tích');
+  const entry = (state.projectCatalog || []).find(p => p && p.tenQH === name);
+  if (!entry) throw new Error('Không thấy đồ án trong danh mục.');
+  const kind = kindOf(name);
+  const drawing = splitDrawing(await readDxf(file), crs || CRS_PRESETS.HUE_3);
+  await projectLayersOf(name);
+  const oldLots = cachedLots(name).map((p, i) => tagStored(p, i, kind, 0)).filter(Boolean);
+  const extent = extentOf(entry, oldLots);
+  if (!extent) throw new Error('Đồ án chưa có ranh giới để kiểm tra phạm vi.');
+  const ratio = insideRatio(drawing.mask, extent.feature);
+  if (ratio < INSIDE_MIN) {
+    throw new Error(`Phạm vi điều chỉnh nằm ngoài đồ án «${name}» (${fmtNum(Math.round((1 - ratio) * 1000) / 10)}% diện tích ngoài ranh).`);
+  }
+  const incoming = drawing.hatches.map(h => clipTo(h, drawing.mask, drawing.maskBox)).filter(Boolean).map(h => tagIncoming(h, kind, 0));
+  const payload = adjustPayload({ name, kind, mask: drawing.mask, incoming, codes: codesInside(oldLots, drawing.mask, drawing.maskBox), bad: false });
+  payload.verdict = '';
+  return {
+    payload,
+    kind,
+    area: turf.area(drawing.mask),
+    unknown: incoming.filter(l => !l.landKey).length,
+    loose: extent.how === 'khung'
+  };
+}
+
 export function initLocalAdjust() {
   window.addEventListener('qh:review-host-clear', destroyMinis);
   window.addEventListener('qh:local-adjust-open', fillProjects);
