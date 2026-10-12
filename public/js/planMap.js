@@ -1,4 +1,4 @@
-import { state, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_FOCUS_STYLE } from './state.js';
+import { state, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_FOCUS_STYLE, wardDrawFC } from './state.js';
 import { escapeHtml, wardLabelFontSize } from './utils.js';
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap } from './basemap.js';
@@ -148,12 +148,7 @@ export function renderPlanBoundaries() {
   const group = planLayers.boundary;
   group.clearLayers();
   const wards = state.wardLabelsList || [];
-  const fc = {
-    type: 'FeatureCollection',
-    features: wards
-      .filter(w => w.geometry)
-      .map(w => ({ type: 'Feature', geometry: w.geometry, properties: { name: w.name } }))
-  };
+  const fc = wardDrawFC(wards.map(w => ({ type: 'Feature', geometry: w.geometry, properties: { name: w.name } })));
   group.addLayer(L.geoJSON(fc, { style: WARD_BOUNDARY_SHADOW_STYLE, interactive: false }));
   group.addLayer(L.geoJSON(fc, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false }));
   wards.forEach(item => {

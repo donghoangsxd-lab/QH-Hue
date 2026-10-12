@@ -231,10 +231,24 @@ function featureOf(lot) {
   try { return turf.feature(g); } catch (e) { return null; }
 }
 
+// Gộp theo cặp (cây nhị phân): gộp dồn vào 1 khối lớn dần tốn ~n² (800 lô đất ở ~30 s), theo cặp ~n·log n.
+// Cặp gộp lỗi: giữ khối trái, khối phải thử gộp lại từng khối vào kết quả cuối
 function unionAll(features) {
-  let acc = null;
-  features.forEach(f => {
-    if (!f) return;
+  let level = features.filter(Boolean);
+  const failed = [];
+  while (level.length > 1) {
+    const next = [];
+    for (let i = 0; i < level.length; i += 2) {
+      if (i + 1 >= level.length) { next.push(level[i]); continue; }
+      let u = null;
+      try { u = turf.union(level[i], level[i + 1]); } catch (e) { u = null; }
+      if (u) next.push(u);
+      else { next.push(level[i]); failed.push(level[i + 1]); }
+    }
+    level = next;
+  }
+  let acc = level[0] || null;
+  failed.forEach(f => {
     if (!acc) { acc = f; return; }
     try { acc = turf.union(acc, f) || acc; } catch (e) { /* giữ khối đã gộp */ }
   });
@@ -1529,13 +1543,49 @@ function closedBoundary(geom) {
   return { feature, m2: turf.area(feature), closed, bbox: turf.bbox(feature) };
 }
 
-// Phần diện tích lô nằm trong ranh (m²): lô của file đồ án có thể chìa ra ngoài ranh (ao hồ, sông, lớp vùng lân cận)
+// Lưới chỉ mục cạnh ranh: khung lô không chạm khung cạnh nào thì lô nằm trọn trong hoặc trọn ngoài ranh
+const EDGE_GRID = 64;
+function edgeIndex(feature, [x0, y0, x1, y1]) {
+  const cw = (x1 - x0) / EDGE_GRID || 1e-9;
+  const ch = (y1 - y0) / EDGE_GRID || 1e-9;
+  const col = (x) => Math.min(EDGE_GRID - 1, Math.max(0, Math.floor((x - x0) / cw)));
+  const row = (y) => Math.min(EDGE_GRID - 1, Math.max(0, Math.floor((y - y0) / ch)));
+  const cells = new Map();
+  turf.segmentEach(feature, (seg) => {
+    const [[ax, ay], [bx, by]] = seg.geometry.coordinates;
+    const box = [Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by)];
+    for (let i = col(box[0]); i <= col(box[2]); i++) {
+      for (let j = row(box[1]); j <= row(box[3]); j++) {
+        const k = i * EDGE_GRID + j;
+        if (!cells.has(k)) cells.set(k, []);
+        cells.get(k).push(box);
+      }
+    }
+  });
+  return (b) => {
+    for (let i = col(b[0]); i <= col(b[2]); i++) {
+      for (let j = row(b[1]); j <= row(b[3]); j++) {
+        const list = cells.get(i * EDGE_GRID + j);
+        if (list && list.some(s => s[0] <= b[2] && s[2] >= b[0] && s[1] <= b[3] && s[3] >= b[1])) return true;
+      }
+    }
+    return false;
+  };
+}
+
+// Phần diện tích lô nằm trong ranh (m²): lô của file đồ án có thể chìa ra ngoài ranh (ao hồ, sông, lớp vùng lân cận).
+// Chỉ lô vắt qua cạnh ranh mới cắt hình (turf.intersect ~1 ms/lô, đồ án 1.600 lô ~2 s)
 function areaInside(bound, geometry, area) {
   if (!bound || !geometry) return area;
   try {
-    const [x0, y0, x1, y1] = turf.bbox(geometry);
+    const box = turf.bbox(geometry);
+    const [x0, y0, x1, y1] = box;
     const [bx0, by0, bx1, by1] = bound.bbox;
     if (x1 < bx0 || x0 > bx1 || y1 < by0 || y0 > by1) return 0;
+    if (!bound.nearEdge) bound.nearEdge = edgeIndex(bound.feature, bound.bbox);
+    if (!bound.nearEdge(box)) {
+      return turf.booleanPointInPolygon(turf.coordAll(geometry)[0], bound.feature) ? Math.min(area, turf.area(geometry)) : 0;
+    }
     const hit = turf.intersect(bound.feature, turf.feature(geometry));
     return hit ? Math.min(area, turf.area(hit)) : 0;
   } catch (e) {

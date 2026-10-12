@@ -1,5 +1,5 @@
 import {
-  state, infraLabels, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, PLAN_CHANGE_INFO,
+  state, infraLabels, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, wardDrawFC, PLAN_CHANGE_INFO,
   BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, getBufferStyle, getPlanScenarioList, effectiveRadius, bumpDataVersion, layerType,
   isNetworkType, ntKindOf, NT_KIND_LABELS, parkTierOf
 } from './state.js';
@@ -252,8 +252,9 @@ export async function loadBoundaryLayer() {
     
     if (boundData && boundData.features) {
       features = boundData.features;
-      layers.boundary.addLayer(L.geoJSON(boundData, { style: WARD_BOUNDARY_SHADOW_STYLE, interactive: false }));
-      layers.boundary.addLayer(L.geoJSON(boundData, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false }));
+      const drawn = wardDrawFC(features);
+      layers.boundary.addLayer(L.geoJSON(drawn, { style: WARD_BOUNDARY_SHADOW_STYLE, interactive: false }));
+      layers.boundary.addLayer(L.geoJSON(drawn, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false }));
     }
   } catch (err) {
     console.error("Lỗi tải ranh giới vector 40 phường xã:", err);

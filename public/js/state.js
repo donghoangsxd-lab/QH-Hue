@@ -136,6 +136,25 @@ export const infraLabels = {
 // Ranh giới phường xã: nét viền ghi xám vẽ dưới + nét vàng nhạt vẽ trên (đổ bóng rẻ, không dùng CSS filter)
 export const WARD_BOUNDARY_SHADOW_STYLE = { color: '#64748b', weight: 4, opacity: 0.55, fill: false, interactive: false };
 export const WARD_BOUNDARY_LINE_STYLE = { color: '#fde68a', weight: 1.6, opacity: 0.95, fill: false, interactive: false };
+// Ranh phường chỉ để vẽ: rút gọn ~2 m (dưới 1 px tới zoom 17) vì mỗi lần zoom Leaflet chiếu lại toàn bộ đỉnh trên cả
+// 2 bản đồ (ranh gốc ~140 nghìn đỉnh × 2 nét). Tra phường chứa điểm, cắt ranh... vẫn dùng hình gốc
+const WARD_DRAW_TOLERANCE = 0.00002;
+const wardDrawMemo = new WeakMap();
+export function wardDrawFC(features) {
+  return {
+    type: 'FeatureCollection',
+    features: features.filter(f => f && f.geometry).map(f => {
+      let geometry = wardDrawMemo.get(f.geometry);
+      if (!geometry) {
+        try {
+          geometry = turf.simplify({ type: 'Feature', geometry: f.geometry, properties: {} }, { tolerance: WARD_DRAW_TOLERANCE }).geometry;
+        } catch (e) { geometry = f.geometry; }
+        wardDrawMemo.set(f.geometry, geometry);
+      }
+      return { type: 'Feature', geometry, properties: f.properties || {} };
+    })
+  };
+}
 // Phường đang chọn: nền đỏ nhạt nằm dưới lô đồ án (không che hoa văn), viền đỏ tươi + quầng tối nằm trên ranh đồ án
 export const WARD_FOCUS_STYLE = {
   fill: { stroke: false, fillColor: '#ff1f1f', fillOpacity: 0.1 },
