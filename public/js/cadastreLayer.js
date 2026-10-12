@@ -370,6 +370,9 @@ async function openParcel(latlng, targetMap, replaced) {
   // Nội dung là phần tử DOM: popup.update() của Leaflet dựng lại nội dung dạng chuỗi và làm mất sự kiện nút
   const content = document.createElement('div');
   content.innerHTML = parcelHtml(found.hit.props);
+  // Leaflet 1.9 không chặn click trong popup mà dò cha của target lúc click tới bản đồ; nút tự thay nội dung
+  // (target bị gỡ khỏi DOM) làm click lọt xuống: đóng popup và mở lại thửa ngay dưới nút
+  L.DomEvent.on(content, 'click', L.DomEvent.stopPropagation);
   const own = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup cadastre-popup', autoPanPaddingTopLeft: [40, 90], autoPanPaddingBottomRight: [40, 20] })
     .setLatLng(latlng).setContent(content);
   popup = own;
