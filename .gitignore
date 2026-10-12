@@ -15,3 +15,4 @@ Thumbs.db
 .vercel
 .env*
 /optimistic-yew-*.json
+/apps-script/doiTenQHHuongXuan.gs

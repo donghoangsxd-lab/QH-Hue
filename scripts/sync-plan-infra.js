@@ -51,11 +51,13 @@ async function getJson(name, optional = false) {
 async function classifyWithCad() {
   const cad = await import(pathToFileURL(path.join(__dirname, '../public/js/cadImport.js')).href);
   // Lô đất dịch vụ TT16 (DAT_Dichvu...) chỉ là chợ / TTTM khi tên nói rõ, như lúc nhập CAD (cadImportUi);
-  // lô INFRA đã được xác nhận là công trình khi nhập nên không xét lại
+  // lô dịch vụ lớn đã gắn «→ Dịch vụ thương mại cấp đô thị» là hạ tầng TM_DT.
+  // Lô INFRA đã được xác nhận là công trình khi nhập nên không xét lại
   return (layer, name, kind) => {
     const text = String(layer || '');
     let code = '';
     if (text.includes('→')) code = text.split('→').pop().trim().toUpperCase().replace(/_DV$/, '');
+    if (text.includes('→') && text.split('→').pop().trim().normalize('NFC') === 'Dịch vụ thương mại cấp đô thị') code = 'TM_DT';
     if (!sync.CODE_META[code]) {
       const tt = cad.tt16Layer(text.split('→')[0]);
       if (tt && tt.prefix) {

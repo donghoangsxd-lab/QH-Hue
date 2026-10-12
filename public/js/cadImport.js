@@ -1155,7 +1155,8 @@ export function existingInLot(p, existing, project = '') {
     if (!it.id || !want.includes(it.type)) continue;
     const x = Number(it.lng), y = Number(it.lat);
     if (!(x >= x0 && x <= x1 && y >= y0 && y <= y1) || !inPolys(x, y, p.polygons)) continue;
-    const level = it.type === '4-TH' ? (isThptRecord(it) ? 'THPT' : 'TH') : LEVEL_OF_TYPE[it.type];
+    const level = it.type === '4-TH' ? (isThptRecord(it) ? 'THPT' : 'TH')
+      : it.type === '9-TM' && String(it.nhom || '').normalize('NFC') === 'Cấp đô thị' ? 'TM_DT' : LEVEL_OF_TYPE[it.type];
     out.push({ id: it.id, name: it.name || '', level, own: !!project && it.tenQH === project });
   }
   return out;
