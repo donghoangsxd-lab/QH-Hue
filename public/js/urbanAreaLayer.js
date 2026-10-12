@@ -10,7 +10,8 @@ import { STATUS_REF, URBANS_614, RURAL_RULE, wardLevel614, urbans614Of } from '.
 import { VISION_REF, VISION_STAGE, VISION_CLAUSE, URBANS_VISION, visionLevel, visionUrbansOf } from './urbanVision.js';
 import { planUrbanOf } from './urbanClass.js';
 
-// Bấm ký hiệu đô thị: detail = id đô thị (urbanStatus.js / urbanVision.js); viewFlow.js quyết định có mở view riêng không
+// Bấm ký hiệu / nét ranh đô thị: detail = { id, side } — id trong urbanStatus.js (side 'HT') hoặc urbanVision.js (side 'QH');
+// viewFlow.js quyết định chọn đô thị hay mở view riêng
 export const URBAN_PICK_EVENT = 'qh:urban-pick';
 
 const FILL_PANE = 'urbanAreaPane';
@@ -49,6 +50,7 @@ function ringsOf(geometry) {
 
 // ---------- Hiện trạng (QĐ 614) ----------
 const statusContent = {
+  side: 'HT',
   dataUrl: 'data/urban614.geojson',
   urbans: URBANS_614,
   wardLevel: (name) => wardLevel614(name)?.level || null,
@@ -83,6 +85,7 @@ const statusContent = {
 
 // ---------- Quy hoạch dài hạn (QĐ 756, sau 2030) ----------
 const visionContent = {
+  side: 'QH',
   dataUrl: 'data/urbanVision.geojson',
   urbans: URBANS_VISION,
   wardLevel: (name) => visionLevel(name)?.level || null,
@@ -217,6 +220,7 @@ function createUrbanLayer(content) {
     groups.badges.clearLayers();
     clearUrbanHover();
     const op = fillOpacity(m.getZoom());
+    const pick = (id) => document.dispatchEvent(new CustomEvent(URBAN_PICK_EVENT, { detail: { id, side: content.side } }));
     // Loại I vẽ trước, loại III sau cùng để nét đô thị nhỏ nằm trên
     const rank = (f) => CLS_RANK[byId.get(f.properties.id)?.cls] ?? 3;
     [...fc.features].sort((a, b) => rank(a) - rank(b)).forEach(f => {
@@ -239,6 +243,7 @@ function createUrbanLayer(content) {
         hit.bindTooltip(content.urbanTip(u), tipOpts);
         hit.on('mouseover', () => enterUrban(u.id, rings, style));
         hit.on('mouseout', leaveUrban);
+        hit.on('click', () => pick(u.id));
         groups.lines.addLayer(casing);
         groups.lines.addLayer(line);
         groups.lines.addLayer(hit);
@@ -254,7 +259,7 @@ function createUrbanLayer(content) {
         .bindTooltip(content.urbanTip(u, { approx: !!f.properties.approx, hasArea: isArea }), { ...tipOpts, sticky: false, offset: [0, -16] })
         .on('mouseover', () => enterUrban(u.id, rings, style))
         .on('mouseout', leaveUrban)
-        .on('click', () => document.dispatchEvent(new CustomEvent(URBAN_PICK_EVENT, { detail: u.id })))
+        .on('click', () => pick(u.id))
         .addTo(groups.badges);
     });
   }
@@ -327,6 +332,26 @@ function createUrbanLayer(content) {
       let b = null;
       groups.lines.eachLayer(l => { b = b ? b.extend(l.getBounds()) : l.getBounds(); });
       return b;
+    },
+    /** Đô thị có ranh (bỏ đô thị chỉ có ký hiệu điểm) → { id, name, cls, city, geometry } */
+    async feature(id) {
+      const fc = await loadData();
+      const f = fc.features.find(x => x.properties.id === id && x.geometry.type !== 'Point');
+      const u = byId.get(id);
+      return f && u ? { id, name: u.name, cls: u.cls, city: !!u.city, geometry: f.geometry } : null;
+    },
+    /** Đô thị nhỏ nhất (không tính đô thị loại I toàn thành phố) chứa điểm latlng */
+    async at({ lat, lng }) {
+      const fc = await loadData();
+      let best = null;
+      fc.features.forEach(f => {
+        const u = byId.get(f.properties.id);
+        if (!u || u.city || f.geometry.type === 'Point') return;
+        if (!turf.booleanPointInPolygon([lng, lat], f)) return;
+        const area = turf.area(f);
+        if (!best || area < best.area) best = { area, f, u };
+      });
+      return best ? { id: best.u.id, name: best.u.name, cls: best.u.cls, city: false, geometry: best.f.geometry } : null;
     }
   };
 }
@@ -347,6 +372,11 @@ export function refreshUrbanAreaLayer() {
   statusLayer.refresh();
   visionLayer.refresh();
 }
+
+/** Đô thị sau 2030 (QĐ 756) theo id, có ranh; null nếu chỉ có ký hiệu điểm */
+export const urbanVisionFeature = (id) => visionLayer.feature(id).catch(() => null);
+/** Đô thị sau 2030 (QĐ 756) chứa điểm bấm trên bản đồ quy hoạch */
+export const urbanVisionAt = (latlng) => visionLayer.at(latlng).catch(() => null);
 
 let initialDraw = Promise.resolve();
 

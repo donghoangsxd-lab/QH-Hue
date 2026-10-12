@@ -9,8 +9,10 @@ import { escapeHtml, fmtNum, ico } from './utils.js';
 import { loadBuiltAreas } from './wardRoads.js';
 import { measure2A, ensureClassRoads, CLASS_REF } from './urbanClass.js';
 import { STATUS_REF } from './urbanStatus.js';
+import { getLevel } from './mapLevel.js';
 import {
   GENERAL_PLANS, CORE_AREAS, CORE_ZONE_ID, GP_KINDS, GP_STATUS, GP_PARENT_REF, OPEN_PROJECT_EVENT, MATURITY_GROUPS,
+  GP_SCOPE_EVENT, URBAN_FOCUS_EVENT,
   generalPlanOf, generalPlansOfWard, childProjects, planProjectOf, qhpkCoverage, maturityOf, scopeUnits, outerUnits
 } from './generalPlan.js';
 
@@ -79,11 +81,13 @@ export function loadScopes() {
 function clearScope() {
   scopeLayers.forEach(l => l.remove());
   scopeLayers = [];
+  if (scopeId) document.dispatchEvent(new CustomEvent(GP_SCOPE_EVENT, { detail: null }));
   scopeId = null;
 }
 
 // QHC thành phố Huế và khu vực vùng lõi vẽ kèm nét vùng lõi 1/10.000 để thấy quan hệ phạm vi.
-// Vẽ trên cả bản đồ hiện trạng và bản đồ quy hoạch (2 bản đồ đồng bộ khung nhìn); phóng tới trên bản đồ đang hiện
+// Vẽ trên cả bản đồ hiện trạng và bản đồ quy hoạch (2 bản đồ đồng bộ khung nhìn); phóng tới trên bản đồ đang hiện.
+// Lớp Hệ thống đô thị: bản đồ quy hoạch không vẽ nét phạm vi mà chọn đô thị (urbanFocus.js qua GP_SCOPE_EVENT)
 function showScope(id) {
   clearScope();
   if (!map || !id) return;
@@ -96,7 +100,8 @@ function showScope(id) {
     const main = byId(id);
     if (!main) return;
     const core = withCore ? byId(CORE_ZONE_ID) : null;
-    scopeLayers = [map, planMap].filter(Boolean).map(m => {
+    const urbanLevel = getLevel() === 'urban';
+    scopeLayers = [map, planMap].filter(m => m && !(urbanLevel && m === planMap)).map(m => {
       if (!m.getPane(SCOPE_PANE)) {
         const pane = m.createPane(SCOPE_PANE);
         pane.style.zIndex = 415;
@@ -107,6 +112,9 @@ function showScope(id) {
       L.geoJSON(main, { style: id === CORE_ZONE_ID ? CORE_STYLE : SCOPE_STYLE }).addTo(group);
       return group.addTo(m);
     });
+    document.dispatchEvent(new CustomEvent(GP_SCOPE_EVENT, {
+      detail: { id, name: plan ? plan.name : id, geometry: main.geometry, city: !!plan?.city }
+    }));
     const shown = planMap && isCompareOn() && !isSplitOn() ? planMap : map;
     shown.fitBounds(L.geoJSON(main).getBounds(), { padding: [40, 40] });
   }).catch(err => console.warn('Quy hoạch chung – không tải được ranh phạm vi:', err));
@@ -417,5 +425,13 @@ export function initGeneralPlanEvents(el, rerender) {
   });
   document.addEventListener('cadparcels:loaded', renderPanel);
   $('chk_urban')?.addEventListener('change', paintUrbanCount);
+  // Chọn đô thị trên bản đồ thay cho đô thị đang chọn ở mục Đô thị
+  document.addEventListener(URBAN_FOCUS_EVENT, (e) => {
+    if (!picked || !e.detail || e.detail.startsWith('gp:')) return;
+    picked = null;
+    clearScope();
+    renderPanel();
+    rerenderPage?.();
+  });
   renderPanel();
 }

@@ -25,6 +25,10 @@ export const planLevelOf = (name) => (QHC_NAME_RE.test(String(name || '')) ? 'QH
 export const GP_PARENT_REF = `${VISION_REF}, ${VISION_CLAUSE}`;
 // detail = Ten_QH; projectLayer.js mở đồ án (phóng tới, thông tin ở panel dưới) và chỉ trong danh sách
 export const OPEN_PROJECT_EVENT = 'qh:open-project';
+// Phạm vi đô thị chọn ở mục Đô thị (generalPlanUi.js): detail = { id, name, geometry, city } hoặc null khi bỏ chọn
+export const GP_SCOPE_EVENT = 'qh:gp-scope';
+// Đô thị đang chọn ở lớp Hệ thống đô thị (urbanFocus.js): detail = khóa ('u:<id>' chọn trên bản đồ, 'gp:<id>' từ mục Đô thị) hoặc null
+export const URBAN_FOCUS_EVENT = 'qh:urban-focus';
 export const CORE_ZONE_ID = 'hue-core';
 
 export const GP_STATUS = {

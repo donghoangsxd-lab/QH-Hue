@@ -217,6 +217,9 @@ export const isCoreOpen = () => coreOpen && getLevel() === 'qhc10';
 /** Điểm latlng nằm trong ranh 4 tiểu vùng TTHuế 2045 */
 export const coreContains = (latlng) => !!latlng && !!featureAt(tvFeatures(), latlng.lng, latlng.lat);
 
+/** Ranh 4 tiểu vùng TTHuế 2045 (phạm vi đã có QHC 1/10.000), tải nếu chưa có */
+export const coreFrame = () => load('frame').then(tvFeatures);
+
 async function setLand(on) {
   const m = target();
   if (!on) {

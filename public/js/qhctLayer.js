@@ -32,6 +32,9 @@ function load() {
   return loading;
 }
 
+/** Lô QHCT 1/500 (FeatureCollection rỗng khi chưa có file) */
+export const loadQhct = () => load();
+
 function popupHtml(p) {
   const rows = [
     ['Đồ án', p.tenQH],

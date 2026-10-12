@@ -3037,6 +3037,25 @@ body.project-view #projectReviewHost { display: flex; padding: 0; overflow: hidd
 .lots-progress-bar > i { display: block; height: 100%; width: 0; background: var(--accent-cyan); transition: width 0.25s ease; }
 @keyframes lots-spin { to { transform: rotate(360deg); } }
 
+/* Đô thị đang chọn ở lớp Hệ thống đô thị (urbanFocus.js): tên, số đồ án theo cấp, nút bỏ chọn */
+.urban-focus-bar {
+  position: fixed; z-index: 1200; left: 50%; top: calc(var(--title-h) + 22px); transform: translateX(-50%);
+  max-width: min(640px, 70vw);
+  display: flex; align-items: center; gap: 10px; padding: 4px 6px 4px 14px;
+  background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
+  border: 1px solid rgba(var(--cyan-rgb), 0.55); border-radius: 999px; box-shadow: var(--panel-shadow);
+  color: var(--text-main); font-size: var(--fs-sm);
+}
+.urban-focus-bar[hidden] { display: none; }
+.ufb-name { min-width: 0; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ufb-kind { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ufb-kind i { width: 10px; height: 10px; border-radius: 2px; opacity: 0.85; }
+.ufb-x { display: inline-flex; padding: 3px; color: var(--text-muted); background: none; border: 0; border-radius: 50%; cursor: pointer; }
+.ufb-x:hover { color: var(--accent-red); background: rgba(255, 255, 255, 0.08); }
+.ufb-x .ico { margin: 0; }
+.urban-focused .leaflet-urbanArea-pane,
+.urban-focused .leaflet-urbanTown-pane { opacity: 0; }
+
 /* Panel dưới đang ẩn mà vừa có thông tin đồ án: nút mở lại nhấp nháy vài lần */
 .bp-expand-btn.has-news { animation: bp-news 0.9s ease-in-out 3; }
 @keyframes bp-news {

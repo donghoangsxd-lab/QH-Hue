@@ -1,10 +1,11 @@
 // Lớp quy hoạch đang xem (droplist trên thanh tiêu đề). Mỗi lớp một luồng tương tác riêng; viewFlow.js định tuyến click
-// bản đồ quy hoạch theo lớp đang chọn:
-//  urban  Hệ thống đô thị (chk_urban)   bấm phường → chọn phường, sang QHPK như luồng cũ; ký hiệu đô thị trung tâm → QHC 1/10.000
+// bản đồ quy hoạch theo lớp đang chọn (không lớp nào chọn phường từ bản đồ; chọn phường ở droplist bảng tổng hợp):
+//  urban  Hệ thống đô thị (chk_urban)   bấm đô thị → nổi ranh + phạm vi đã có QHC / QHPK / QHCT (urbanFocus.js), bấm vùng
+//                                        đồ án → chi tiết
 //  qhc25  QHC 1/25.000 (chk_qhc25)       bấm vùng → chức năng khu vực; bấm bản đồ không đổi địa bàn
 //  qhc10  QHC 1/10.000 (chk_qhc10)       ranh + tên các đồ án QHC, bấm đồ án mới hiện lô; ranh mở rộng QĐ 756,
 //                                        QHPK lọc theo vùng lõi
-//  qhpk   QHPK 1/2.000 (chk_projects)    bấm ranh / lô → đồ án; bấm nền khi nhìn rộng → chọn phường
+//  qhpk   QHPK 1/2.000 (chk_projects)    bấm ranh / lô → đồ án
 //  qhct   QHCT 1/500 (chk_qhct)          bấm lô → thông tin lô (chờ dữ liệu)
 // Chọn từ droplist: bật lớp đó, tắt 4 lớp còn lại. Bật thêm lớp ở panel Lớp dữ liệu để so sánh: lớp đang chọn giữ nguyên;
 // lớp đang chọn bị tắt mà còn lớp khác bật thì chuyển sang lớp đó.
