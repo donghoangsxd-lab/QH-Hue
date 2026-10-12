@@ -6,6 +6,8 @@ import { planMap, getViewMode, isSplitOn } from './planMap.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, showToast, ico } from './utils.js';
 import { analyzeParcelPlan, parcelPlanHtml } from './planLandStats.js';
+import { parcelQhcHtml } from './qhc2045Layer.js';
+import { getLevel, LEVELS } from './mapLevel.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -398,27 +400,46 @@ async function openParcel(latlng, targetMap, replaced) {
   return true;
 }
 
-// Popup tự rộng ra khi có bảng kết quả, giữ nguyên phần thông tin thửa phía trên
-async function showParcelPlan(own, content, btn, shapeP, props) {
-  const box = content.querySelector('.cad-plan');
+// Popup tự rộng ra khi có bảng kết quả, giữ nguyên phần thông tin thửa phía trên. Lỗi thì trả nút để bấm lại
+async function fillPlan(own, btn, box, busy, task) {
   if (!box || btn.disabled) return;
+  const idle = btn.innerHTML;
   btn.disabled = true;
-  btn.innerHTML = `${ico('area')}Đang tải lô quy hoạch các đồ án quanh thửa…`;
+  btn.innerHTML = `${ico('area')}${busy}`;
   try {
-    const shape = await shapeP;
-    const res = await analyzeParcelPlan(shape.geometry);
+    const html = await task();
     if (popup !== own) return;
     btn.remove();
-    box.innerHTML = parcelPlanHtml(res, Number(props.a));
+    box.innerHTML = html;
   } catch (err) {
     console.warn('Tra quy hoạch thửa lỗi:', err);
     if (popup !== own) return;
     btn.disabled = false;
-    btn.innerHTML = `${ico('area')}Xem chỉ tiêu quy hoạch`;
+    btn.innerHTML = idle;
     box.innerHTML = `<div class="sug-card ineligible">Không phân tích được: ${escapeHtml(err.message || String(err))}</div>`;
   }
   own.options.maxWidth = 380;
   own.update();
+}
+
+const QHC_LEVELS = new Set(['qhc10', 'qhc25']);
+const QHPK_BUSY = 'Đang tải lô quy hoạch các đồ án quanh thửa…';
+
+// Droplist đang ở QHC 1/25.000 / 1/10.000: chỉ tiêu của cấp đó, kèm nút xem tiếp chỉ tiêu QHPK 1/2.000 bên dưới
+function showParcelPlan(own, content, btn, shapeP, props) {
+  const box = content.querySelector('.cad-plan');
+  const recorded = Number(props.a);
+  const qhpk = async () => parcelPlanHtml(await analyzeParcelPlan((await shapeP).geometry), recorded);
+  const level = getLevel();
+  if (!QHC_LEVELS.has(level)) return fillPlan(own, btn, box, QHPK_BUSY, qhpk);
+  const label = LEVELS.find(l => l.id === level)?.label || 'QHC';
+  return fillPlan(own, btn, box, `Đang đối chiếu thửa với ${label}…`, async () => {
+    const html = await parcelQhcHtml((await shapeP).geometry, level, recorded);
+    return `${html}<button type="button" class="proof-btn cad-qhpk-btn" title="Cắt thửa với lô các đồ án QHPK 1/2.000 đã nạp">${ico('area')}Xem chỉ tiêu QHPK 1/2.000</button><div class="cad-plan-qhpk"></div>`;
+  }).then(() => {
+    const sub = box?.querySelector('.cad-qhpk-btn');
+    sub?.addEventListener('click', () => fillPlan(own, sub, box.querySelector('.cad-plan-qhpk'), QHPK_BUSY, qhpk));
+  });
 }
 
 /** Click bản đồ khi không bật công cụ nào: hiện thửa tại điểm bấm (nếu lớp đang bật và đủ mức phóng) */

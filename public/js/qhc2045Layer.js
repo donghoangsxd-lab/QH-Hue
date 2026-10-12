@@ -14,6 +14,7 @@ import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClic
 import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT } from './tt16Symbols.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
+import { analyzeParcelZones, parcelZonesHtml } from './planLandStats.js';
 import {
   QHC2045, CENTER_UNITS, ZONE_NAMES, STAGE_LAYERS, landOf, bareWard, isCoreWard,
   visionColor, visionLineStyle, WATER_KINDS, GREEN_COLOR
@@ -366,6 +367,52 @@ export function qhcClick(e, m) {
     if (f) { openVisionPopup(f, e.latlng); return true; }
   }
   return false;
+}
+
+// ---------- Thửa địa chính (cadastreLayer) đối chiếu với lớp QHC đang xem ----------
+async function parcelVisionHtml(geometry, recorded) {
+  const v = await load('vision');
+  const cats = v.cats;
+  const res = analyzeParcelZones(geometry, v.features.filter(f => f.properties.L === 'v'), (f) => {
+    const zone = cats.zones[f.properties.k] || 'Khác';
+    const name = f.properties.n || zone;
+    return { label: zone, color: visionColor(zone), key: '', name, sub: name !== zone ? zone : '', desc: cats.funcs[f.properties.f] || '' };
+  });
+  return parcelZonesHtml(res, recorded, {
+    title: 'QHC 1/25.000 trên thửa đất', unit: 'vùng', cover: 'Thuộc vùng chức năng', none: 'Ngoài các vùng chức năng',
+    empty: 'Thửa nằm ngoài các vùng của sơ đồ tổ chức không gian 1/25.000.', partsHead: 'Vùng chức năng và định hướng',
+    note: `${QHC2045.short} · Sơ đồ tổ chức không gian 1/25.000 · ${QHC2045.status}`
+  });
+}
+
+async function parcelLandHtml(geometry, recorded) {
+  const [land] = await Promise.all([load('land'), load('frame')]);
+  const feats = land.features.filter(f => f.properties.c !== SEA_CODE && shownStages.has(f.properties.t));
+  const res = analyzeParcelZones(geometry, feats, (f) => {
+    const p = f.properties;
+    const zone = land.zones[p.z];
+    const l = landOf(zone, p.c);
+    const s = l.key ? TT16_STYLES[l.key] : null;
+    return {
+      label: l.label, color: s ? s.color : l.tone, key: s ? l.key : '', name: l.label,
+      sub: [ZONE_NAMES[zone] || zone, STAGE_NAMES[p.t], `lô ${fmtNum(p.a)} ha`].filter(Boolean).join(' · '),
+      desc: p.n != null ? land.notes[p.n] || '' : ''
+    };
+  });
+  const [lng, lat] = turf.pointOnFeature(turf.feature(geometry)).geometry.coordinates;
+  const tv = tvAt(lng, lat);
+  const hidden = STAGE_NAMES.filter((_, i) => !shownStages.has(i));
+  return parcelZonesHtml(res, recorded, {
+    title: 'QHC 1/10.000 trên thửa đất', unit: 'lô', cover: 'Có lô QHC', none: 'Chưa có lô QHC',
+    empty: `Thửa chưa nằm trong lô QHC 1/10.000${hidden.length ? ' của các giai đoạn đang bật' : ''}.`,
+    partsHead: 'Lô sử dụng đất QHC', extra: tv ? [['Tiểu vùng', `${tv.tv} · ${tv.ten}`]] : [],
+    note: `${QHC2045.short} · 1/10.000 · ${QHC2045.status}. Lô chồng nhau giữ lô vẽ trên.${hidden.length ? ` Giai đoạn đang ẩn không tính: ${hidden.join(', ')}.` : ''}`
+  });
+}
+
+/** Thửa đối chiếu với QHC cấp level ('qhc10' | 'qhc25'), cắt hình học như chỉ tiêu QHPK. recorded: diện tích hồ sơ (m²) */
+export function parcelQhcHtml(geometry, level, recorded) {
+  return level === 'qhc25' ? parcelVisionHtml(geometry, recorded) : parcelLandHtml(geometry, recorded);
 }
 
 async function setVision(on) {

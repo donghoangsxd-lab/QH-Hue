@@ -225,6 +225,46 @@ export async function analyzeParcelPlan(geometry) {
   };
 }
 
+/**
+ * Thửa cắt với lớp vùng QHC (lô 1/10.000, vùng 1/25.000). features theo thứ tự vẽ: vùng vẽ sau nằm trên giữ phần
+ * chồng lấn, như khi bấm lô trên bản đồ. classify(f) → { label, color, key, name, sub, desc }.
+ * → { area, rows: [{ label, color, key, area, pct, lots }], none, parts: [{ …classify, area, pct }] }
+ */
+export function analyzeParcelZones(geometry, features, classify) {
+  const polys = polysOf(geometry);
+  if (!polys.length) throw new Error('thửa không có hình');
+  const parcel = toFeature(polys);
+  const area = turf.area(parcel);
+  const box = boxOf(polys);
+  let rest = parcel;
+  const parts = [];
+  for (let i = features.length - 1; i >= 0 && rest; i--) {
+    const fp = polysOf(features[i].geometry);
+    if (!fp.length) continue;
+    const b = boxOf(fp);
+    if (b[0] > box[2] || b[2] < box[0] || b[1] > box[3] || b[3] < box[1]) continue;
+    const shape = toFeature(fp);
+    const inter = turf.intersect(rest, shape);
+    const a = inter ? turf.area(inter) : 0;
+    if (a < SLIVER_M2) continue;
+    parts.push({ ...classify(features[i]), area: a, pct: (a / area) * 100 });
+    rest = turf.difference(rest, shape);
+  }
+  const rows = new Map();
+  parts.forEach(p => {
+    const row = rows.get(p.label) || rows.set(p.label, { label: p.label, color: p.color, key: p.key, area: 0, lots: 0 }).get(p.label);
+    row.area += p.area;
+    row.lots++;
+  });
+  const none = Math.max(0, area - parts.reduce((s, p) => s + p.area, 0));
+  return {
+    area,
+    rows: [...rows.values()].map(r => ({ ...r, pct: (r.area / area) * 100 })).sort((a, b) => b.area - a.area),
+    none: { area: none, pct: (none / area) * 100 },
+    parts: parts.sort((a, b) => b.area - a.area)
+  };
+}
+
 const fmtArea = (m2) => (m2 >= 10000 ? `${fmtNum(m2 / 10000)} ha` : `${fmtNum(Math.round(m2))} m²`);
 const fmtM2 = (m2) => `${fmtNum(Math.round(m2))} m²`;
 const fmtPct = (p) => (p > 0 && p < 0.05 ? `<${fmtNum(0.1)}%` : `${fmtNum(Math.round(p * 10) / 10)}%`);
@@ -281,5 +321,30 @@ export function parcelPlanHtml(res, recorded) {
     <div class="pls-sub-head">Lô quy hoạch và chỉ tiêu</div>
     <div class="pls-lots">${lots}</div>
     <div class="pp-sub">Cắt hình học thửa với ranh lô; hình thửa từ tile địa chính (sai số ranh khoảng 0,5 m) nên có thể lệch nhẹ so với diện tích hồ sơ. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn; đồ án đang ẩn không tính.</div>
+  </div>`;
+}
+
+/**
+ * Kết quả analyzeParcelZones trong popup thửa.
+ * opts: { title, unit ('lô' | 'vùng'), cover, none, empty, partsHead, extra: [[nhãn, giá trị]], note }
+ */
+export function parcelZonesHtml(res, recorded, opts) {
+  const covered = res.area - res.none.area;
+  const extra = (opts.extra || []).map(([k, v]) => `<div class="pp-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('');
+  const head = `<div class="pls-head">${escapeHtml(opts.title)}</div>
+    <div class="pp-row"><span>Diện tích hình thửa</span><b>${fmtM2(res.area)}${recorded > 0 ? ` <small>(hồ sơ ${fmtNum(recorded)} m²)</small>` : ''}</b></div>
+    <div class="pp-row"><span>${escapeHtml(opts.cover)}</span><b>${fmtM2(covered)} (${fmtPct(100 - res.none.pct)}) · ${fmtNum(res.parts.length)} ${opts.unit}</b></div>${extra}`;
+  const note = opts.note ? `<div class="pp-sub">${escapeHtml(opts.note)}</div>` : '';
+  if (!res.parts.length) return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(opts.empty)}</div>${note}</div>`;
+  const rows = res.rows.map(r => rowHtml(r.label, r.color, r.key, r.area, r.pct, `${fmtNum(r.lots)} ${opts.unit}`, fmtM2)).join('');
+  const none = res.none.area >= SLIVER_M2 ? rowHtml(opts.none, NONE_COLOR, '', res.none.area, res.none.pct, '', fmtM2) : '';
+  const parts = res.parts.map(p => `<div class="pls-lot">
+      <div class="pls-lot-head"><b>${escapeHtml(p.name || p.label)}</b><span>${fmtM2(p.area)}</span></div>
+      ${p.sub ? `<div class="pls-lot-sub">${escapeHtml(p.sub)}</div>` : ''}
+      ${p.desc ? `<div class="pls-lot-plan">${escapeHtml(p.desc)}</div>` : ''}
+    </div>`).join('');
+  return `<div class="plan-land-stats">${head}<div class="pls-list">${rows}${none}</div>
+    <div class="pls-sub-head">${escapeHtml(opts.partsHead)}</div>
+    <div class="pls-lots">${parts}</div>${note}
   </div>`;
 }

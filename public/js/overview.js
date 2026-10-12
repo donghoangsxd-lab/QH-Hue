@@ -268,6 +268,7 @@ const SECTIONS = [
           'Tìm thửa: chọn xã/phường (địa giới cũ), nhập số tờ, số thửa rồi bấm <b>Tìm</b>; hoặc phóng tới vị trí (có thể nhập tọa độ vào ô bên dưới) và bấm vào thửa.',
           'Bảng thông tin thửa: diện tích hồ sơ, loại đất theo Thông tư 28/2014/TT-BTNMT, địa chỉ, xã/phường cũ; thửa được viền vàng trên bản đồ.',
           'Kiểm tra quy hoạch: bấm <b>Xem chỉ tiêu quy hoạch</b> trong bảng thửa. Webapp cắt ranh thửa với lô quy hoạch các đồ án đã nạp, trả về diện tích từng loại đất quy hoạch (m², %), phần chưa có lô quy hoạch và từng lô kèm chỉ tiêu tầng cao, mật độ xây dựng, hệ số sử dụng đất (nếu đồ án có).',
+          'Droplist đang ở <b>QHC 1/10.000</b> hoặc <b>QHC 1/25.000</b>: kết quả theo cấp đó (lô sử dụng đất, giai đoạn, tiểu vùng hoặc vùng chức năng, định hướng); bấm tiếp <b>Xem chỉ tiêu QHPK 1/2.000</b> để xem chỉ tiêu các đồ án phân khu bên dưới.',
           'Đang xem bản đồ quy hoạch: bấm vào thửa nằm trên lô vẫn mở bảng thửa; tắt lớp thửa để xem bảng lô như trước.'
         ],
         facts: [
