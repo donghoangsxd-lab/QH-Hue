@@ -2252,9 +2252,11 @@ module.exports = async (req, res) => {
         const tenQH = sanitizeSheetText(body.tenQH, 120);
         const fields = parseLandEdit(raw);
         if (!tenQH || !fields) return res.status(400).json({ error: true, message: 'Thiếu đồ án, hoặc thông tin sửa không hợp lệ (layer trống, ranh lô lỗi / ra ngoài phạm vi Huế)' });
+        const sameLayer = body.sameLayer === true;
+        if (sameLayer && fields.geometry) return res.status(400).json({ error: true, message: 'Sửa đồng loạt cả layer không kèm sửa ranh lô' });
         try {
-          const saved = await projects.patchLand({ tenQH, id, phase: body.phase === 'QH' ? 'QH' : 'HT', fields });
-          return res.status(200).json({ success: true, kind: 'DXF', id, saved: saved.saved, land: saved.land, bucket: saved.via });
+          const saved = await projects.patchLand({ tenQH, id, phase: body.phase === 'QH' ? 'QH' : 'HT', fields, sameLayer });
+          return res.status(200).json({ success: true, kind: 'DXF', id, saved: saved.saved, land: saved.land, lands: saved.lands, bucket: saved.via });
         } catch (err) {
           return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được file đồ án' });
         }

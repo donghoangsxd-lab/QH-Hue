@@ -1,7 +1,8 @@
 // Admin sửa / xóa 1 lô đồ án ngay trên bảng thông tin (nút sọt rác, nút bút cạnh nút ẩn / nút đóng):
 //   lô hạ tầng → ghi đè / xóa dòng Sheet theo ID (Apps Script editInfraRow / deleteInfraRow),
 //   lô đất QH → su-dung-dat.json, lô đất HT → hien-trang.json.
-// Lô đất còn đổi được lớp (loại đất TT16 → layer mới) và kéo đỉnh ranh (diện tích tính lại theo ranh mới).
+// Lô đất còn đổi được lớp (loại đất TT16 → layer mới) và kéo đỉnh ranh (diện tích tính lại theo ranh mới);
+// tích "Sửa cả N lô cùng layer" để ghi tên, loại đất, lớp, chỉ tiêu cho mọi lô cùng layer, cùng giai đoạn trong đồ án.
 // Công trình đổi được loại hạ tầng (VD THCS → Tiểu học): Apps Script chuyển dòng sang tab loại mới với mã mới.
 // Lô đất thuộc lớp hạ tầng (công viên, trường, y tế, văn hóa, chợ, bãi đỗ xe, nghĩa trang) chuyển được thành công trình trên Sheet.
 import { state, infraLabels } from './state.js';
@@ -9,7 +10,7 @@ import { geeApi, markDataWritten } from './api.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 import { signOutAdmin } from './uiComponents.js';
 import { wardNameAt } from './mapEngine.js';
-import { patchCachedLand, removeCachedLot, retypeCachedInfra, cachedLots, convertCachedLand } from './projectFiles.js';
+import { patchCachedLand, patchCachedLands, removeCachedLot, retypeCachedInfra, cachedLots, convertCachedLand } from './projectFiles.js';
 import { LAND_LABELS, landLabel, landPatternKey, layerForPattern, TT16_LAND_KEYS, TT16_STYLES } from './tt16Symbols.js';
 import { startShapeEdit, vertexCount, SHAPE_MAX_VERTICES } from './lotShapeEdit.js';
 
@@ -58,12 +59,24 @@ const input = (key, label, value, extra = '') => `<label class="lot-edit-row"><s
 
 const areaText = (area) => (Number(area) > 0 ? `${fmtNum(Math.round(Number(area)))} m²` : '—');
 
-function formHtml(target, v) {
+const phaseOf = (p) => (p.phase === 'QH' ? 'QH' : 'HT');
+
+// Lô đất cùng file đồ án, cùng giai đoạn, cùng layer với lô đang sửa (kể cả lô đó)
+function sameLayerLots(land) {
+  const layer = land.layer || '';
+  return cachedLots(land.file).filter(p => p.kind === 'DXF' && phaseOf(p) === phaseOf(land) && (p.layer || '') === layer);
+}
+
+function formHtml(target, v, sameCount = 0) {
   const infra = target.kind === 'INFRA';
   const title = infra
     ? `Sửa công trình ${escapeHtml(target.item.id)} <small>(ghi Sheet)</small>`
     : `Sửa lô ${escapeHtml(target.land.id)} <small>(ghi file đồ án)</small>`;
   let html = `<div class="lot-edit-title">${ico('pen')}${title}</div>`;
+  if (!infra && sameCount > 1) {
+    html += `<label class="lot-edit-check" title="Ghi loại đất, lớp TT16, tên và chỉ tiêu cho mọi lô cùng layer trong đồ án; sửa đỉnh và chuyển thành công trình chỉ làm từng lô">
+      <input type="checkbox" data-same-layer><span>Sửa cả <b>${fmtNum(sameCount)}</b> lô cùng layer «${escapeHtml(target.land.layer || '(trống)')}» (${phaseOf(target.land)})</span></label>`;
+  }
   html += input('name', infra ? 'Tên công trình' : 'Tên lô', v.name, ' maxlength="150"');
   if (infra) {
     html += `<label class="lot-edit-row"><span>Loại hạ tầng</span><select data-k="type" title="Đổi loại: công trình chuyển sang tab loại mới trên Sheet và nhận mã mới">
@@ -100,8 +113,8 @@ function formHtml(target, v) {
   return html;
 }
 
-// Chỉ gửi trường đã đổi
-function changedFields(form, before) {
+// Chỉ gửi trường đã đổi. Sửa cả layer: chỉ tiêu đang có giá trị cũng gửi để các lô khác nhận cùng giá trị
+function changedFields(form, before, bulk = false) {
   const now = {};
   form.querySelectorAll('[data-k]').forEach(el => { now[el.dataset.k] = el.value.trim(); });
   const out = {};
@@ -111,7 +124,7 @@ function changedFields(form, before) {
   const plan = {};
   PLAN_FIELDS.forEach(([k]) => {
     const val = now[`plan.${k}`];
-    if (val !== undefined && val !== String(before.plan[k] ?? '').trim()) plan[k] = val;
+    if (val !== undefined && (val !== String(before.plan[k] ?? '').trim() || (bulk && val))) plan[k] = val;
   });
   if (Object.keys(plan).length) out.plan = plan;
   return out;
@@ -161,9 +174,10 @@ function bindLandExtras(popup, form, land, msg) {
   const infraCheck = form.querySelector('[data-to-infra]');
   const infraNhom = form.querySelector('[data-infra-nhom]');
   const infraType = () => LAND_INFRA_TYPE[select ? select.value : ''] || '';
+  let bulk = false;
   const syncInfra = () => {
     if (!infraBox) return;
-    const type = infraType();
+    const type = bulk ? '' : infraType();
     infraBox.hidden = !type;
     if (!type) infraCheck.checked = false;
     else {
@@ -245,14 +259,35 @@ function bindLandExtras(popup, form, land, msg) {
     refit(popup);
   });
 
+  // Sửa cả layer: bỏ ranh đang kéo, ẩn nút sửa đỉnh và mục chuyển thành công trình
+  const setBulk = (on) => {
+    bulk = on;
+    if (on && session) {
+      session.reset(original);
+      stop();
+      shapeBtn.innerHTML = `${ico('pen')}Sửa đỉnh`;
+      shapeBtn.title = 'Kéo đỉnh ranh lô trên bản đồ';
+      if (hint) hint.hidden = true;
+    }
+    if (on) {
+      edited = null;
+      kinked = false;
+      if (areaEl) { areaEl.innerHTML = areaText(land.area); areaEl.classList.remove('bad'); }
+    }
+    if (shapeBtn) shapeBtn.hidden = on;
+    syncInfra();
+  };
+
   return {
     stop,
+    setBulk,
     fields() {
       const out = {};
       if (select && select.value && select.value !== startKey) {
         const layer = layerForPattern(select.value, land.layer);
         if (layer && layer !== land.layer) out.layer = layer;
       }
+      if (bulk) return { fields: out };
       if (edited && JSON.stringify(edited) !== originalJson) {
         if (kinked) return { error: 'Ranh đang tự cắt — kéo lại đỉnh trước khi lưu' };
         let at = null;
@@ -304,6 +339,17 @@ function confirmToInfra(land, to) {
   return confirm(`Chuyển lô ${land.id}${land.name ? ` «${land.name}»` : ''} thành công trình «${label}» (${to.nhom}, ${to.ward})?\n• Ghi dòng mới vào tab ${to.type} trên Google Sheet với mã mới, QuyMo_${phase} = ${areaText(land.area)}.\n• Lô đất trong file đồ án đổi thành ranh lô của công trình đó.\n• Công trình được tính vào độ phủ, chỉ tiêu và heatmap.`);
 }
 
+function confirmBulk(land, fields, count) {
+  const lines = [];
+  if (fields.layer) lines.push(`Layer → ${fields.layer}`);
+  if (fields.nhom !== undefined) lines.push(`Loại đất → ${fields.nhom}`);
+  if (fields.name !== undefined) lines.push(`Tên lô → ${fields.name || '(trống)'}`);
+  PLAN_FIELDS.forEach(([k, label]) => {
+    if (fields.plan && fields.plan[k] !== undefined) lines.push(`${label} → ${fields.plan[k] || '(xóa)'}`);
+  });
+  return confirm(`Ghi cho ${count} lô layer «${land.layer || '(trống)'}» (${phaseOf(land)}) trong đồ án «${land.file}»?\n${lines.map(l => `• ${l}`).join('\n')}\n• Không hoàn tác được trên webapp.`);
+}
+
 // Sửa lô trước (layer, tên, ranh…) nếu có, rồi chuyển: Sheet cấp mã mới, file đồ án thay lô DXF bằng lô INFRA
 async function convertLand(land, fields, to) {
   const phase = land.phase === 'QH' ? 'QH' : 'HT';
@@ -338,9 +384,10 @@ function openForm(popup, target, onLandSaved) {
   if (!content || content.querySelector('.lot-edit')) return;
   const view = content.firstElementChild;
   const before = target.kind === 'INFRA' ? infraValues(target.item) : landValues(target.land);
+  const sameCount = target.kind === 'INFRA' ? 0 : sameLayerLots(target.land).length;
   const form = document.createElement('div');
   form.className = 'lot-edit';
-  form.innerHTML = formHtml(target, before);
+  form.innerHTML = formHtml(target, before, sameCount);
   if (view) view.hidden = true;
   content.appendChild(form);
   L.DomEvent.disableClickPropagation(form);
@@ -351,6 +398,14 @@ function openForm(popup, target, onLandSaved) {
   const msg = form.querySelector('.lot-edit-msg');
   const extra = target.kind === 'INFRA' ? null : bindLandExtras(popup, form, target.land, msg);
   if (target.kind === 'INFRA') bindTypeSelect(form, before);
+  const bulkCheck = form.querySelector('[data-same-layer]');
+  const isBulk = () => !!bulkCheck?.checked;
+  bulkCheck?.addEventListener('change', () => {
+    extra?.setBulk(isBulk());
+    msg.textContent = isBulk() ? `Lưu sẽ ghi cho ${fmtNum(sameCount)} lô; chỉ tiêu đang điền được ghi cho tất cả, ô để trống giữ nguyên chỉ tiêu từng lô` : '';
+    msg.className = 'lot-edit-msg';
+    refit(popup);
+  });
   const close = () => {
     if (extra) extra.stop();
     form.remove();
@@ -360,7 +415,8 @@ function openForm(popup, target, onLandSaved) {
   form.querySelector('.js-lot-cancel').addEventListener('click', close);
   const saveBtn = form.querySelector('.js-lot-save');
   saveBtn.addEventListener('click', async () => {
-    const fields = changedFields(form, before);
+    const bulk = isBulk();
+    const fields = changedFields(form, before, bulk);
     let toInfra = null;
     if (extra) {
       const more = extra.fields();
@@ -373,8 +429,10 @@ function openForm(popup, target, onLandSaved) {
     if (problem) { msg.textContent = problem; msg.className = 'lot-edit-msg bad'; return; }
     if (target.kind === 'INFRA' && fields.type && !confirmRetype(target.item, fields.type)) return;
     if (toInfra && !confirmToInfra(target.land, toInfra)) return;
+    if (bulk && !confirmBulk(target.land, fields, sameCount)) return;
     saveBtn.disabled = true;
     msg.textContent = toInfra ? 'Đang ghi Sheet, cấp mã công trình và đồng bộ bucket…'
+      : bulk ? `Đang ghi ${fmtNum(sameCount)} lô vào file đồ án…`
       : target.kind !== 'INFRA' ? 'Đang ghi file đồ án…'
         : fields.type ? 'Đang chuyển tab, cấp mã mới và đồng bộ bucket…' : 'Đang ghi Sheet và đồng bộ bucket…';
     msg.className = 'lot-edit-msg';
@@ -392,6 +450,14 @@ function openForm(popup, target, onLandSaved) {
         popup.close();
         showToast(`✓ Đã cập nhật ${target.item.id} trên Sheet`, 'success');
         if (reloadInfra) await reloadInfra();
+      } else if (bulk) {
+        const p = target.land;
+        const data = await postEdit({ kind: 'DXF', id: p.id, phase: p.phase, tenQH: p.file, fields, sameLayer: true });
+        const lands = Array.isArray(data.lands) ? data.lands : [data.land];
+        patchCachedLands(p.file, lands, data.saved);
+        popup.close();
+        showToast(`✓ Đã cập nhật ${fmtNum(lands.length)} lô layer «${p.layer || '(trống)'}» trong file đồ án`, 'success');
+        if (onLandSaved) onLandSaved();
       } else {
         const p = target.land;
         const data = await postEdit({ kind: 'DXF', id: p.id, phase: p.phase, tenQH: p.file, fields });

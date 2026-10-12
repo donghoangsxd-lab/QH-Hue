@@ -1091,7 +1091,8 @@ function editLandFields(land, fields) {
 
 // Admin sửa 1 lô đất (DXF) từ bảng thông tin: fields = { name?, nhom?, layer?, geometry? + area, lat, lng, plan?: { floors, coverage, far } }.
 // Chuỗi rỗng trong plan xóa chỉ tiêu đó. Lô QH nằm ở su-dung-dat.json, lô HT ở hien-trang.json.
-async function patchLand({ tenQH, id, phase, fields }) {
+// sameLayer: áp cho mọi lô cùng giai đoạn, cùng layer (trước khi sửa) với lô id; không kèm geometry.
+async function patchLand({ tenQH, id, phase, fields, sameLayer = false }) {
   const name = String(tenQH || '').trim();
   const want = phase === 'QH' ? 'QH' : 'HT';
   const stored = await readIndex();
@@ -1105,8 +1106,16 @@ async function patchLand({ tenQH, id, phase, fields }) {
   const role = want === 'QH' ? ROLE_QH : ROLE_HT;
   let parcels = null;
   let land = null;
+  let targets = [];
   let statsChanged = false;
   const savedAt = Date.now();
+  const editAll = () => {
+    const layer = land.layer || '';
+    targets = sameLayer
+      ? parcels.filter(p => p && p.kind === 'DXF' && parcelPhase(p) === want && (p.layer || '') === layer)
+      : [land];
+    return targets.reduce((changed, p) => editLandFields(p, fields) || changed, false);
+  };
   const doc = await readRoleDoc(slug, role);
   if (doc && Array.isArray(doc.parcels)) {
     parcels = doc.parcels;
@@ -1120,7 +1129,7 @@ async function patchLand({ tenQH, id, phase, fields }) {
     parcels = want === 'QH' ? qh : ht;
     land = parcels.find(p => p && p.kind === 'DXF' && p.id === id && parcelPhase(p) === want);
     if (land) {
-      statsChanged = editLandFields(land, fields);
+      statsChanged = editAll();
       const other = want === 'QH' ? ht : qh;
       const otherRole = want === 'QH' ? ROLE_HT : ROLE_QH;
       await writeRole(slug, otherRole, roleDoc(otherRole, name, slug, savedAt, { parcels: other }));
@@ -1128,7 +1137,7 @@ async function patchLand({ tenQH, id, phase, fields }) {
       try { await removeName(legacyName(slug)); } catch (err) { /* file cũ đã xóa */ }
     }
   } else if (land) {
-    statsChanged = editLandFields(land, fields);
+    statsChanged = editAll();
     await writeRole(slug, role, roleDoc(role, name, slug, savedAt, { parcels }));
   }
   if (!land) {
@@ -1145,13 +1154,15 @@ async function patchLand({ tenQH, id, phase, fields }) {
       ? { ...p, dir: true, saved: savedAt, ...(statsChanged ? { landArea: landAreaOf(both) } : {}) }
       : p))
   }));
+  const out = (p) => ({
+    id: p.id, phase: want, name: p.name || '', nhom: p.nhom || '', layer: p.layer || '', plan: p.plan || null,
+    ...(fields.geometry ? { geometry: p.geometry, area: p.area, lat: p.lat, lng: p.lng } : {})
+  });
   return {
     saved: savedAt,
     via: indexed.via,
-    land: {
-      id: land.id, phase: want, name: land.name || '', nhom: land.nhom || '', layer: land.layer || '', plan: land.plan || null,
-      ...(fields.geometry ? { geometry: land.geometry, area: land.area, lat: land.lat, lng: land.lng } : {})
-    }
+    land: out(land),
+    ...(sameLayer ? { lands: targets.map(out) } : {})
   };
 }
 

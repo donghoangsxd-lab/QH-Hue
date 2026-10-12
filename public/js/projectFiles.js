@@ -353,17 +353,30 @@ export async function planLotsIn(bbox) {
 // Admin vừa sửa 1 lô đất: chép vào bản đã tải, đổi saved để lần đọc sau khớp danh mục (không tải lại file đồ án).
 // Thay đối tượng lô mới để các bộ nhớ WeakMap theo lô (chỉ mục tìm lô, điểm neo) tính lại.
 export function patchCachedLand(tenQH, land, saved) {
+  patchCachedLands(tenQH, [land], saved);
+}
+
+/** Nhiều lô đất vừa sửa (sửa đồng loạt cả layer): vẽ lại một lần */
+export function patchCachedLands(tenQH, lands, saved) {
   const row = cache.get(tenQH);
-  const i = row ? row.parcels.findIndex(p => p && p.kind === 'DXF' && p.id === land.id && (p.phase === 'QH' ? 'QH' : 'HT') === land.phase) : -1;
-  if (i >= 0) {
-    const next = { ...row.parcels[i], name: land.name, nhom: land.nhom };
-    if (land.layer) next.layer = land.layer;
-    if (land.geometry) Object.assign(next, { geometry: land.geometry, area: land.area, lat: land.lat, lng: land.lng });
-    if (land.plan) next.plan = land.plan;
-    else delete next.plan;
-    row.parcels[i] = next;
+  if (row) {
+    const at = new Map();
+    row.parcels.forEach((p, i) => {
+      const key = p && p.kind === 'DXF' ? `${p.phase === 'QH' ? 'QH' : 'HT'}|${p.id}` : '';
+      if (key && !at.has(key)) at.set(key, i);
+    });
+    lands.forEach(land => {
+      const i = at.get(`${land.phase}|${land.id}`);
+      if (i === undefined) return;
+      const next = { ...row.parcels[i], name: land.name, nhom: land.nhom };
+      if (land.layer) next.layer = land.layer;
+      if (land.geometry) Object.assign(next, { geometry: land.geometry, area: land.area, lat: land.lat, lng: land.lng });
+      if (land.plan) next.plan = land.plan;
+      else delete next.plan;
+      row.parcels[i] = next;
+    });
+    row.saved = saved;
   }
-  if (row) row.saved = saved;
   const entry = state.projectCatalog.find(p => p && p.tenQH === tenQH);
   if (entry) entry.saved = saved;
   composeNow();
