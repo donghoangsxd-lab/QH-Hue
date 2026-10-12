@@ -179,8 +179,11 @@ function createUrbanLayer(content) {
       && turf.booleanPointInPolygon([lng, lat], w.feat));
   }
 
+  // Trỏ vào lớp có tooltip riêng (vùng đồ án, lô, công trình...) thì nhường tooltip cho lớp đó
+  const overLayer = (ev) => !!ev?.target?.closest?.('.leaflet-interactive');
+
   function onMouseMove(e) {
-    if (!visible || pointerOnUrban || m.getZoom() > WARD_HOVER_MAX_ZOOM) { clearWardHover(); return; }
+    if (!visible || pointerOnUrban || overLayer(e.originalEvent) || m.getZoom() > WARD_HOVER_MAX_ZOOM) { clearWardHover(); return; }
     const w = wardAt(e.latlng);
     if (!w) { clearWardHover(); return; }
     if (wardHover?.name !== w.name) {
@@ -300,6 +303,8 @@ function createUrbanLayer(content) {
       m.on('zoomend', restyle);
       m.on('mousemove', onMouseMove);
       m.on('mouseout', clearWardHover);
+      // Lớp chặn sự kiện lan lên bản đồ (bubblingMouseEvents: false) thì map không nhận mousemove, bắt ở DOM
+      m.getContainer().addEventListener('mousemove', (ev) => { if (wardHover && overLayer(ev)) clearWardHover(); });
     },
     async setVisible(on) {
       if (!m) return;
