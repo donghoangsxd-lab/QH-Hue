@@ -6,6 +6,8 @@
 // Đồ án chưa chuyển đọc qua API. URL bucket do máy chủ trả về (?v= phiên bản trong danh mục).
 import { state } from './state.js';
 import { geeApi } from './api.js';
+import { planLevelOf } from './generalPlan.js';
+import { levelScope } from './mapLevel.js';
 
 const CITY_NAME = 'Thành phố Huế';
 // Tiến độ tải file đồ án (detail { done, total }; done = total là xong)
@@ -37,10 +39,19 @@ function parcelLayerOn(zoom) {
 }
 export function onChangeLots(fn) { onChange = fn; }
 
-/** Đồ án đang chọn còn hiện trên bản đồ (lớp Quy hoạch bật, đồ án không bị ẩn) → Ten_QH, không thì null */
+/** Đồ án chỉ hiện nhờ lớp droplist đang xem (VD đồ án QHC khi xem QHC 1/10.000), lớp Quy hoạch đang tắt */
+export const inLevelScope = (name) => !state.showProjects && !!levelScope() && planLevelOf(name) === levelScope();
+
+/** Đồ án hiện trên bản đồ: không bị ẩn, và lớp Quy hoạch bật hoặc cùng cấp với lớp droplist đang xem */
+export function projectShown(name) {
+  if (!name || state.hiddenProjects.has(name)) return false;
+  return state.showProjects || inLevelScope(name);
+}
+
+/** Đồ án đang chọn còn hiện trên bản đồ → Ten_QH, không thì null */
 export function focusedProjectName() {
   const name = state.focusedProject;
-  return name && state.showProjects && !state.hiddenProjects.has(name) ? name : null;
+  return projectShown(name) ? name : null;
 }
 
 /** Phường đang chọn khi lớp Quy hoạch bật → vẽ toàn bộ lô trong phường ở mọi zoom; toàn TP / lớp tắt → null */

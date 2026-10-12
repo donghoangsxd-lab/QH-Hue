@@ -3,8 +3,9 @@
 // 2. Đổi lớp ở droplist tiêu đề: bật lớp đó, tắt 4 lớp kia, vào luồng riêng của lớp:
 //    - Hệ thống đô thị: bấm phường → chọn phường và sang QHPK (luồng cũ); bấm ký hiệu đô thị trung tâm → QHC 1/10.000.
 //    - QHC 1/25.000: chỉ xem / bấm vùng; bấm bản đồ không đổi địa bàn.
-//    - QHC 1/10.000: bấm lô tra cứu; panel phải lọc QHPK trong vùng lõi; chọn phường lõi giữ lớp,
-//      phường ngoài vùng lõi sang QHPK.
+//    - QHC 1/10.000: ranh + tên mọi đồ án QHC (TTHuế 2045 và đồ án nhập); bấm một đồ án thì giữ lớp, chỉ vẽ lô đồ án đó,
+//      bấm nền ngoài đồ án đang mở thì về tổng quan; bấm lô tra cứu; panel phải lọc QHPK trong vùng lõi;
+//      chọn phường lõi giữ lớp, phường ngoài vùng lõi sang QHPK.
 //    - QHPK 1/2.000: lô cả phường đang chọn; bấm nền khi nhìn rộng → chọn phường.
 //    - QHCT 1/500: chờ dữ liệu.
 // 3. Mở đồ án (từ danh sách, ranh trên bản đồ hoặc popup): sang lớp QHPK, thông tin đồ án thay panel dưới; thoát về
@@ -16,12 +17,13 @@ import { highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
-import { revealWardProjects, clearProjectFocus } from './projectLayer.js';
+import { revealWardProjects, clearProjectFocus, projectContains } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { RIGHT_TAB_EVENT } from './utils.js';
 import { URBAN_PICK_EVENT } from './urbanAreaLayer.js';
-import { fitCenter, isCoreWard } from './qhc2045Layer.js';
-import { getLevel, setLevel, levelOrigin, LEVEL_EVENT, LEVELS } from './mapLevel.js';
+import { fitCenter, isCoreWard, setCoreOpen, isCoreOpen, coreContains, QHC_CORE_EVENT } from './qhc2045Layer.js';
+import { getLevel, setLevel, levelOrigin, levelScope, LEVEL_EVENT, LEVELS } from './mapLevel.js';
+import { planLevelOf } from './generalPlan.js';
 
 const CITY_NAME = 'Thành phố Huế';
 // Về toàn TP chỉ tắt lớp phụ; ô tùy chọn con (ranh lô công trình, lô hạ tầng đồ án, đổ bóng) không tự vẽ gì nên giữ.
@@ -103,11 +105,29 @@ function onWardSelected(name) {
 }
 
 // ---------- Đồ án ----------
-// Mở đồ án ở lớp khác (projectLayer bật QHPK không qua checkbox): đồng bộ về lớp QHPK, nhớ lớp gốc để thoát quay lại
-function onProjectOpened() {
+// Mở đồ án ở lớp khác (projectLayer bật QHPK không qua checkbox): đồng bộ về lớp QHPK, nhớ lớp gốc để thoát quay lại.
+// Đồ án cùng cấp lớp đang xem (đồ án QHC khi xem QHC 1/10.000) giữ lớp, thu gọn lô TTHuế 2045.
+function onProjectOpened(e) {
   const level = getLevel();
   if (level === 'qhpk') return;
+  if (levelScope() && planLevelOf(e?.detail) === levelScope()) {
+    setCoreOpen(false);
+    return;
+  }
   setLevel('qhpk', { origin: level === 'qhc10' ? 'qhc10' : null });
+}
+
+// Bỏ đồ án đang mở, giữ lớp đang xem: về ranh + tên các đồ án
+function leaveProject() {
+  closeProjectView();
+  clearProjectFocus();
+  revealWardProjects(isCity(state.selectedWard) ? null : state.selectedWard, { show: false });
+}
+
+// Lớp có cấp đồ án (QHC 1/10.000): bấm nền ngoài đồ án đang mở thì thu gọn về tổng quan
+function leaveScopeFocus(latlng) {
+  if (state.focusedProject && !projectContains(state.focusedProject, latlng)) leaveProject();
+  if (isCoreOpen() && !coreContains(latlng)) setCoreOpen(false);
 }
 
 // Thoát thông tin đồ án: về lớp gốc (QHC 1/10.000) hoặc phường đang chọn / toàn TP, lô cả phường hiện lại.
@@ -118,6 +138,10 @@ function onProjectExit(e) {
   clearProjectFocus();
   if (getLevel() === 'qhpk' && levelOrigin() === 'qhc10') {
     setLevel('qhc10');
+    return;
+  }
+  if (levelScope()) {
+    revealWardProjects(isCity(state.selectedWard) ? null : state.selectedWard, { show: false });
     return;
   }
   highlightWardBoundary(state.selectedWard, { fitView: true });
@@ -138,6 +162,7 @@ function wardToPick(latlng, m) {
  */
 export function wardFromMapClick(latlng, m) {
   const planSide = !!planMap && m === planMap;
+  if (planSide && levelScope()) leaveScopeFocus(latlng);
   if (planSide && !WARD_PICK_LEVELS.has(getLevel())) return null;
   return wardToPick(latlng, m);
 }
@@ -172,5 +197,6 @@ export function initViewFlow() {
   document.addEventListener(PROJECT_INFO_EVENT, onProjectOpened);
   document.addEventListener(PROJECT_VIEW_EXIT_EVENT, onProjectExit);
   document.addEventListener(URBAN_PICK_EVENT, (e) => { if (CENTER_URBAN_IDS.has(e.detail)) enterCore(); });
+  document.addEventListener(QHC_CORE_EVENT, () => { if (state.focusedProject) leaveProject(); });
   initProgress();
 }

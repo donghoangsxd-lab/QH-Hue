@@ -2,7 +2,8 @@
 // bản đồ quy hoạch theo lớp đang chọn:
 //  urban  Hệ thống đô thị (chk_urban)   bấm phường → chọn phường, sang QHPK như luồng cũ; ký hiệu đô thị trung tâm → QHC 1/10.000
 //  qhc25  QHC 1/25.000 (chk_qhc25)       bấm vùng → chức năng khu vực; bấm bản đồ không đổi địa bàn
-//  qhc10  QHC 1/10.000 (chk_qhc10)       tra cứu lô, ranh mở rộng QĐ 756, QHPK lọc theo vùng lõi
+//  qhc10  QHC 1/10.000 (chk_qhc10)       ranh + tên các đồ án QHC, bấm đồ án mới hiện lô; ranh mở rộng QĐ 756,
+//                                        QHPK lọc theo vùng lõi
 //  qhpk   QHPK 1/2.000 (chk_projects)    bấm ranh / lô → đồ án; bấm nền khi nhìn rộng → chọn phường
 //  qhct   QHCT 1/500 (chk_qhct)          bấm lô → thông tin lô (chờ dữ liệu)
 // Chọn từ droplist: bật lớp đó, tắt 4 lớp còn lại. Bật thêm lớp ở panel Lớp dữ liệu để so sánh: lớp đang chọn giữ nguyên;
@@ -12,7 +13,7 @@ import { escapeHtml, ico } from './utils.js';
 export const LEVELS = [
   { id: 'urban', chk: 'chk_urban', label: 'HỆ THỐNG ĐÔ THỊ' },
   { id: 'qhc25', chk: 'chk_qhc25', label: 'QHC 1/25.000' },
-  { id: 'qhc10', chk: 'chk_qhc10', label: 'QHC 1/10.000' },
+  { id: 'qhc10', chk: 'chk_qhc10', label: 'QHC 1/10.000', scope: 'QHC' },
   { id: 'qhpk', chk: 'chk_projects', label: 'QHPK 1/2.000' },
   { id: 'qhct', chk: 'chk_qhct', label: 'QHCT 1/500', pending: true }
 ];
@@ -32,6 +33,8 @@ let menu = null;
 export const getLevel = () => level;
 export const levelOrigin = () => origin;
 export const levelChk = (id) => byId.get(id)?.chk || null;
+/** Cấp đồ án nhập (planLevelOf) hiện ranh theo lớp đang xem dù lớp QHPK (chk_projects) tắt; null = không có */
+export const levelScope = () => byId.get(level)?.scope || null;
 const isOn = (id) => !!document.getElementById(id)?.checked;
 
 function setChecked(id, on) {

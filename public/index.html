@@ -322,9 +322,9 @@
         <div class="layer-tree">
         <div class="layer-main" id="layerMain">
           <div class="layer-main-tabs" role="tablist" aria-label="Đô thị, quy hoạch và công trình">
-            <button type="button" class="layer-main-tab" role="tab" data-main-tab="urban" aria-selected="false" aria-controls="layerPaneUrban" title="Hệ thống đô thị: phân loại đô thị (HT: QĐ 614 · QH: QĐ 756) và các đô thị, khu vực đô thị theo loại. Mỗi đô thị kèm quy hoạch chung, số QHPK 1/2.000 và mức trưởng thành. Bấm một đô thị để vẽ phạm vi và mở hồ sơ ở bảng dưới"><span class="layer-main-label">Đô thị</span></button>
-            <button type="button" class="layer-main-tab active" role="tab" data-main-tab="plan" aria-selected="true" aria-controls="layerPanePlan" title="Các lớp quy hoạch theo cấp: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Bật một đồ án là hiện đủ ranh lô: lô thuộc nhóm hạ tầng và các lô còn lại."><span class="layer-main-label">Quy hoạch</span></button>
-            <button type="button" class="layer-main-tab" role="tab" data-main-tab="infra" aria-selected="false" aria-controls="layerPaneInfra" title="14 nhóm biểu tượng trên bản đồ. Nút tròn bật vùng phủ theo QCVN."><span class="layer-main-label">Công trình</span></button>
+            <button type="button" class="layer-main-tab" role="tab" data-main-tab="urban" aria-selected="false" aria-controls="layerPaneUrban" title="Hệ thống đô thị: phân loại đô thị (HT: QĐ 614 · QH: QĐ 756) và các đô thị, khu vực đô thị theo loại. Mỗi đô thị kèm quy hoạch chung, số QHPK 1/2.000 và mức trưởng thành. Bấm một đô thị để vẽ phạm vi và mở hồ sơ ở bảng dưới"><span class="layer-main-label">Đô thị</span><span class="layer-main-count" id="urbanTabCount" title="Số đô thị đang hiện / tổng số"></span></button>
+            <button type="button" class="layer-main-tab active" role="tab" data-main-tab="plan" aria-selected="true" aria-controls="layerPanePlan" title="Các lớp quy hoạch theo cấp: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Bật một đồ án là hiện đủ ranh lô: lô thuộc nhóm hạ tầng và các lô còn lại."><span class="layer-main-label">Quy hoạch</span><span class="layer-main-count" id="planTabCount" title="Số đồ án đang hiện / tổng số"></span></button>
+            <button type="button" class="layer-main-tab" role="tab" data-main-tab="infra" aria-selected="false" aria-controls="layerPaneInfra" title="14 nhóm biểu tượng trên bản đồ. Nút tròn bật vùng phủ theo QCVN."><span class="layer-main-label">Công trình</span><span class="layer-main-count" id="infraTabCount" title="Số nhóm công trình đang bật / tổng số"></span></button>
           </div>
           <div class="layer-main-pane" id="layerPaneInfra" data-main-pane="infra" role="tabpanel" hidden>
         <div class="layer-pane-tools">
@@ -357,12 +357,6 @@
         </div>
           </div>
           <div class="layer-main-pane" id="layerPanePlan" data-main-pane="plan" role="tabpanel">
-        <div class="layer-pane-tools">
-          <span class="layer-pane-note">Đang hiện <b id="projectCount">0</b> đồ án</span>
-          <button type="button" class="layer-eye-btn" id="btnProjectsAll" aria-pressed="false" title="Ẩn / hiện mọi đồ án trong danh sách" aria-label="Ẩn / hiện mọi đồ án">
-            <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>Tất cả
-          </button>
-        </div>
         <div hidden>
           <input type="checkbox" id="chk_projects" title="Thu nhỏ: ranh tổng từng đồ án đang bật. Phóng tới ngưỡng lô: đủ ranh lô của đồ án, gồm lô hạ tầng và các lô còn lại.">
           <input type="checkbox" id="chk_projectInfra" checked title="Lô hạ tầng của đồ án đang bật vẽ cùng lớp Quy hoạch, không theo 14 nhóm Công trình.">

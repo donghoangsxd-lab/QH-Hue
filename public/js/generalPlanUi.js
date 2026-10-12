@@ -155,14 +155,21 @@ function panelRow(plan, c, here) {
     </button>`;
 }
 
+// Tab Đô thị: lớp Phân loại đô thị (chk_urban) bật thì mọi đô thị trong danh sách đều đang hiện trên bản đồ
+let urbanTotal = 0;
+function paintUrbanCount() {
+  const count = $('urbanTabCount');
+  if (count) count.textContent = `(${$('chk_urban')?.checked ? urbanTotal : 0}/${urbanTotal})`;
+}
+
 function renderPanel() {
   const box = $('gpList');
   if (!box) return;
   const c = ctx();
   const here = new Set(state.selectedWard ? generalPlansOfWard(state.selectedWard).map(p => p.id) : []);
   const groups = URBAN_GROUPS.map(g => ({ title: g.title, list: g.list() })).filter(g => g.list.length);
-  const count = $('gpCount');
-  if (count) count.textContent = String(groups.reduce((n, g) => n + g.list.length, 0));
+  urbanTotal = groups.reduce((n, g) => n + g.list.length, 0);
+  paintUrbanCount();
   box.innerHTML = groups.map(g => `<div class="gp-grp">${escapeHtml(g.title)}${g.list.length > 1 ? ` · ${g.list.length}` : ''}</div>
     ${g.list.map(plan => panelRow(plan, c, here)).join('')}`).join('');
 }
@@ -409,5 +416,6 @@ export function initGeneralPlanEvents(el, rerender) {
     else pick(id, { page: true });
   });
   document.addEventListener('cadparcels:loaded', renderPanel);
+  $('chk_urban')?.addEventListener('change', paintUrbanCount);
   renderPanel();
 }

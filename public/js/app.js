@@ -653,6 +653,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const ICON_GROUPS = ['c1', 'c2', 'c3', 'c4', 'c5', 'c10', 'c6', 'c7', 'c8', 'c9', 'c11', 'c12', 'c13', 'c14'];
   const btnEye = document.getElementById('btnToggleAllIcons');
   const layerCount = document.getElementById('layerCount');
+  const tabCount = document.getElementById('infraTabCount');
   const iconCheck = (k) => document.getElementById(`chk_${k}`);
   const syncEyeButton = () => {
     const on = ICON_GROUPS.filter(k => iconCheck(k)?.checked).length;
@@ -660,6 +661,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       layerCount.textContent = `${on}/${ICON_GROUPS.length}`;
       layerCount.classList.toggle('none', on === 0);
     }
+    if (tabCount) tabCount.textContent = `(${on}/${ICON_GROUPS.length})`;
     if (!btnEye) return;
     const allOn = on === ICON_GROUPS.length;
     btnEye.setAttribute('aria-pressed', String(!allOn));

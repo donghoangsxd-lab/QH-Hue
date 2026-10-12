@@ -4,6 +4,8 @@
 //  - chk_qhc10: sử dụng đất 1/10.000 khu vực trung tâm (lô theo ký hiệu TT16 Mục 02, viền theo giai đoạn) + 4 tiểu vùng,
 //    phân khu, điểm chức năng. Hàng nút dưới dòng lớp bật/tắt độc lập từng giai đoạn lô và ranh 1/10.000 mở rộng theo
 //    QĐ 756 (ranh ngoài các phường vùng lõi + vùng đỏ Hóa Châu, Mỹ Thượng chưa có trong đồ án cũ).
+//    Đang xem QHC 1/10.000 (droplist): như các đồ án QHC nhập, chỉ vẽ ranh tiểu vùng + tên đồ án, bấm vào ranh mới vẽ lô;
+//    bật lớp khi xem cấp khác (so sánh) vẽ đủ lô ngay.
 // Vùng, lô của cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400); riêng các đường ranh vẽ ở LINE_PANE
 // để nổi trên ranh 40 phường. Canvas mặc định của planMap (renderer: L.canvas())
 // nằm ở overlayPane, phủ kín bản đồ khi có bất kỳ lớp vector nào và nuốt click của canvas QHC bên dưới, nên click lô / vùng
@@ -15,6 +17,7 @@ import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT } from './tt16Symbols.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { analyzeParcelZones, parcelZonesHtml } from './planLandStats.js';
+import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import {
   QHC2045, CENTER_UNITS, ZONE_NAMES, STAGE_LAYERS, landOf, bareWard, isCoreWard,
   visionColor, visionLineStyle, WATER_KINDS, GREEN_COLOR
@@ -38,6 +41,10 @@ const STAGE_NAMES = ['Hiện trạng', 'Ngắn hạn đến 2030', 'Dài hạn �
 const MISSING_STYLE = { color: '#ef4444', weight: 2.2, dashArray: '8 5', fillColor: '#ef4444', fillOpacity: 0.28, interactive: true };
 const EXT_LINE = { color: '#f43f5e', weight: 3, opacity: 1, dashArray: '12 6' };
 const EXT_HALO = { color: '#0f172a', weight: 6.5, opacity: 0.55 };
+// Mở lô TTHuế 2045 (bấm vào ranh khi đang xem QHC 1/10.000): viewFlow.js bỏ đồ án QHC nhập đang chọn
+export const QHC_CORE_EVENT = 'qh:qhc-core-open';
+const CORE_COLOR = '#f8fafc';
+const CORE_FILL = { stroke: false, fill: true, fillColor: CORE_COLOR, fillOpacity: 0.08 };
 
 // Mã 31 "Mặt nước ven biển": một khối biển ~55.000 ha phủ kín góc bản đồ, không mang thông tin sử dụng đất
 const SEA_CODE = 31;
@@ -48,12 +55,15 @@ const centerSet = new Set(CENTER_UNITS.map(bareWard));
 
 const data = { land: null, frame: null, vision: null };
 const loading = {};
-const layers = { land: null, frame: null, vision: null, ext: null };
+const layers = { land: null, frame: null, vision: null, ext: null, core: null };
 let renderer = null;
 let lineRenderer = null;
 const shownStages = new Set([0, 1, 2]);
 let extOn = false;
 let detailed = false;
+let coreOpen = false;
+const collapsed = () => getLevel() === 'qhc10' && !coreOpen;
+const tvFeatures = () => (data.frame ? data.frame.features.filter(f => f.properties.k === 'tv') : []);
 
 // ---------- Tải dữ liệu ----------
 function load(kind) {
@@ -167,14 +177,55 @@ function zoomFrame() {
   if (z >= LABEL_MIN_ZOOM) { points.addTo(m); points.bringToFront(); } else points.remove();
 }
 
+// Thu gọn: nền mờ trong ranh 4 tiểu vùng + nhãn tên đồ án ở mép trên (nhãn A1–A4 nằm giữa tiểu vùng)
+function drawCore() {
+  layers.core?.remove();
+  layers.core = null;
+  const tv = tvFeatures();
+  if (!collapsed() || !tv.length || !$('chk_qhc10')?.checked) return;
+  const m = target();
+  const fc = { type: 'FeatureCollection', features: tv };
+  const group = L.featureGroup();
+  L.geoJSON(fc, { pane: PANE[0], renderer: ensureRenderer(m), interactive: false, style: CORE_FILL }).addTo(group);
+  const [w, , e, n] = turf.bbox(fc);
+  const icon = L.divIcon({
+    className: 'project-label', iconSize: null,
+    html: `<span title="Bấm vào ranh để xem lô sử dụng đất"><i style="background:${CORE_COLOR}"></i>${escapeHtml(QHC2045.short)}</span>`
+  });
+  L.marker([n, (w + e) / 2], { icon, interactive: false, keyboard: false }).addTo(group);
+  layers.core = group.addTo(m);
+}
+
+function applyCore() {
+  if (!$('chk_qhc10')?.checked || !data.land || !layers.frame) return;
+  if (collapsed()) {
+    layers.land?.remove();
+    layers.land = null;
+  } else if (!layers.land) drawLand();
+  drawCore();
+}
+
+/** Mở / thu gọn lô TTHuế 2045 khi đang xem QHC 1/10.000 */
+export function setCoreOpen(on) {
+  if (coreOpen === on) return;
+  coreOpen = on;
+  applyCore();
+}
+
+export const isCoreOpen = () => coreOpen && getLevel() === 'qhc10';
+
+/** Điểm latlng nằm trong ranh 4 tiểu vùng TTHuế 2045 */
+export const coreContains = (latlng) => !!latlng && !!featureAt(tvFeatures(), latlng.lng, latlng.lat);
+
 async function setLand(on) {
   const m = target();
   if (!on) {
     layers.land?.remove();
+    layers.core?.remove();
     layers.frame?.tvLabels?.remove();
     layers.frame?.points?.remove();
     layers.frame?.remove();
-    layers.land = layers.frame = null;
+    layers.land = layers.frame = layers.core = null;
     setHint('qhc10Hint', 'Trung tâm');
     return;
   }
@@ -188,8 +239,9 @@ async function setLand(on) {
   }
   if (!$('chk_qhc10')?.checked) return;
   detailed = m.getZoom() >= TT16_PATTERN_ZOOM;
-  drawLand();
+  if (!collapsed()) drawLand();
   drawFrame();
+  drawCore();
   setHint('qhc10Hint', 'Trung tâm');
 }
 
@@ -358,6 +410,11 @@ function featureAt(features, lng, lat) {
 export function qhcClick(e, m) {
   if (!m || m !== target() || !e?.latlng) return false;
   const { lat, lng } = e.latlng;
+  if (layers.core && m.hasLayer(layers.core) && featureAt(tvFeatures(), lng, lat)) {
+    setCoreOpen(true);
+    document.dispatchEvent(new CustomEvent(QHC_CORE_EVENT));
+    return true;
+  }
   if (layers.land && m.hasLayer(layers.land)) {
     const f = featureAt(layers.land.getLayers().map(l => l.feature), lng, lat);
     if (f) { openLotPopup(f, e.latlng); return true; }
@@ -515,5 +572,6 @@ export function initQhc2045Layer() {
     zoomFrame();
   });
   document.addEventListener(LOT_OPACITY_EVENT, restyleLand);
+  document.addEventListener(LEVEL_EVENT, () => { coreOpen = false; applyCore(); });
   syncStages();
 }

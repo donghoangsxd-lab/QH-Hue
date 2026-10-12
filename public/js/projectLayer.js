@@ -9,16 +9,21 @@
 // từ ngưỡng đó vẽ lô (mapEngine.js), ranh tổng nằm dưới lô và không nhận click (đồ án có ranh thật).
 // Đồ án vừa bấm (state.focusedProject) hiện lô ở mọi zoom; đang chọn phường thì chỉ hiện ranh các đồ án của phường,
 // lô cả phường vẽ ở mọi zoom — ranh tổng xuống dưới để bấm được lô.
+// Lớp droplist có cấp đồ án riêng (QHC 1/10.000 → đồ án QHC, mapLevel.levelScope): đồ án cùng cấp hiện ranh + tên
+// dù lớp QHPK tắt, chỉ đồ án đang chọn mới vẽ lô. Nút mắt cuối tiêu đề nhóm cấp bật / tắt cả nhóm.
 import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
 } from './mapEngine.js';
 import { planMap, onCompareChange, passToolClick } from './planMap.js';
-import { projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName, wardScopeName } from './projectFiles.js';
+import {
+  projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName,
+  wardScopeName, projectShown, inLevelScope
+} from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { isCoreWard } from './qhc2045.js';
-import { getLevel } from './mapLevel.js';
+import { getLevel, levelScope } from './mapLevel.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
@@ -38,6 +43,8 @@ const EXACT_MAX_LOTS = 4000;
 const OUTLINE_STYLE = { weight: 1.6, opacity: 0.9, dashArray: '6 4', fillOpacity: 0.1, fillRule: 'nonzero' };
 const OUTLINE_GIS = { ...OUTLINE_STYLE, weight: 1.8, dashArray: null };
 const OUTLINE_HULL = { ...OUTLINE_STYLE, dashArray: '2 5' };
+// Đồ án QHC phạm vi rộng, xem ở mức thu nhỏ: viền liền, đậm
+const OUTLINE_QHC = { weight: 2.8, opacity: 1, dashArray: null, fillOpacity: 0.08 };
 // Bảng màu dịu, đọc rõ trên ảnh vệ tinh; đồ án có khung bao giao nhau không trùng màu
 const PALETTE = ['#fbbf24', '#38bdf8', '#c084fc', '#4ade80', '#f472b6', '#fb923c', '#2dd4bf', '#a3e635', '#f87171', '#818cf8', '#fde047', '#e879f9'];
 const NEIGHBOR_PAD_DEG = 0.003;
@@ -307,6 +314,12 @@ function setMaster(on) {
   state.showProjects = on;
 }
 
+// Bật lớp Quy hoạch đang tắt mà chỉ thêm đồ án cần hiện: đồ án chưa hiện (ngoài phạm vi lớp droplist) bị ẩn trước
+function enableMaster() {
+  projects.forEach(p => { if (!projectShown(p.name)) state.hiddenProjects.add(p.name); });
+  setMaster(true);
+}
+
 function ensureFullLots() {
   state.showProjectInfra = true;
   const infraChk = $('chk_projectInfra');
@@ -318,7 +331,7 @@ function zoomTo(p) {
   if (!b || !b.isValid() || !map) return;
   let changed = false;
   if (state.focusedProject !== p.name) { state.focusedProject = p.name; changed = true; }
-  if (!state.showProjects) { setMaster(true); changed = true; }
+  if (!state.showProjects && !inLevelScope(p.name)) { setMaster(true); changed = true; }
   if (!state.showProjectInfra) { ensureFullLots(); changed = true; }
   if (state.hiddenProjects.delete(p.name)) { saveHidden(); changed = true; }
   map.fitBounds(b.pad(0.1), { maxZoom: PARCEL_MIN_ZOOM + 1 });
@@ -334,6 +347,14 @@ function openProject(p) {
   pinGlow(p);
   markPicked(p.name);
   document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: p.name }));
+}
+
+/** Điểm latlng nằm trong ranh tổng của đồ án name */
+export function projectContains(name, latlng) {
+  const p = projects.find(x => x.name === name);
+  const geom = p && outlineOf(p);
+  if (!geom || !latlng || typeof turf === 'undefined') return false;
+  try { return turf.booleanPointInPolygon([latlng.lng, latlng.lat], turf.feature(geom)); } catch (e) { return false; }
 }
 
 /** Bỏ đồ án đang chọn (về xem theo phường / toàn TP); người gọi tự vẽ lại */
@@ -383,7 +404,7 @@ function scrollWithin(el) {
   // Chừa chỗ cho tiêu đề nhóm cấp / nhóm phường đang dính đầu khung phía trên el
   let pad = 4;
   for (let g = el.parentElement; g && g !== box; g = g.parentElement) {
-    const head = g.querySelector(':scope > .pl-head, :scope > .pg-head');
+    const head = g.querySelector(':scope > .pl-hrow, :scope > .pg-head');
     if (head && (g.classList.contains('pl-group') || g.classList.contains('pg-group'))) pad += head.offsetHeight;
   }
   const scale = box.getBoundingClientRect().height / (box.offsetHeight || 1) || 1;
@@ -394,17 +415,9 @@ function scrollWithin(el) {
 const foldText = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
 
 function renderHead() {
-  const shownN = projects.filter(p => state.showProjects && !state.hiddenProjects.has(p.name)).length;
-  const count = $('projectCount');
-  if (count) {
-    count.textContent = projects.length ? `${shownN}/${projects.length}` : '0';
-    count.classList.toggle('none', !shownN);
-  }
-  const allBtn = $('btnProjectsAll');
-  if (allBtn) {
-    allBtn.disabled = !projects.length;
-    allBtn.setAttribute('aria-pressed', String(!!projects.length && !shownN));
-  }
+  const shownN = projects.filter(p => projectShown(p.name)).length;
+  const count = $('planTabCount');
+  if (count) count.textContent = `(${shownN}/${projects.length})`;
   const search = $('projectSearch');
   if (search) search.hidden = projects.length <= 5;
 }
@@ -415,6 +428,57 @@ const LIST_LEVELS = [
   ...['QHC', 'QHPK'].map(k => PLAN_LEVELS.find(l => l.key === k)),
   { key: 'QHCT', label: 'QHCT 1/500', title: 'quy hoạch chi tiết tỷ lệ 1/500' }
 ];
+const levelLabel = (key) => LIST_LEVELS.find(l => l.key === key)?.label || key;
+
+// Ô lớp riêng của cấp (#planStaticRows) bật / tắt cùng nút mắt của nhóm
+const LEVEL_CHK = { QHC25: 'chk_qhc25', QHC: 'chk_qhc10', QHCT: 'chk_qhct' };
+
+// Nút mắt nhóm cấp (sáng = nhóm đang hiện): còn lớp / đồ án nào đang hiện thì bấm tắt hết, đang tắt hết thì bấm bật cả nhóm
+function eyeState(key) {
+  const list = projects.filter(p => p.level === key);
+  const chk = $(LEVEL_CHK[key]);
+  const on = list.some(p => projectShown(p.name)) || !!chk?.checked;
+  const tip = `${on ? 'Tắt' : 'Bật'} tất cả lớp và đồ án ${levelLabel(key)}`;
+  return { on, tip, empty: !list.length && !chk };
+}
+
+function eyeHtml(key) {
+  const { on, tip, empty } = eyeState(key);
+  return `<button type="button" class="layer-eye-btn pl-eye" data-level-eye="${key}" aria-pressed="${on}" title="${escapeHtml(tip)}" aria-label="${escapeHtml(tip)}"${empty ? ' disabled' : ''}>${ico('eye-off', 'eye-hide')}${ico('eye', 'eye-show')}</button>`;
+}
+
+// Ô lớp riêng đổi trạng thái (droplist, bấm ô) không dựng lại danh sách: chỉ cập nhật nút mắt
+function paintEyes() {
+  $('projectList')?.querySelectorAll('[data-level-eye]').forEach(btn => {
+    const { on, tip } = eyeState(btn.dataset.levelEye);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.title = tip;
+    btn.setAttribute('aria-label', tip);
+  });
+}
+
+function setLevelShown(key, on) {
+  const list = projects.filter(p => p.level === key);
+  if (on) {
+    if (list.length && !state.showProjects && !list.every(p => inLevelScope(p.name))) enableMaster();
+    list.forEach(p => state.hiddenProjects.delete(p.name));
+    if (list.length) ensureFullLots();
+  } else {
+    list.forEach(p => state.hiddenProjects.add(p.name));
+    if (state.showProjects && projects.every(p => state.hiddenProjects.has(p.name))) setMaster(false);
+  }
+  saveHidden();
+  const chk = $(LEVEL_CHK[key]);
+  if (chk && chk.checked !== on) {
+    chk.checked = on;
+    chk.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  const focus = state.focusedProject;
+  if (!on && focus && list.some(p => p.name === focus)) {
+    document.dispatchEvent(new CustomEvent(PROJECT_VIEW_EXIT_EVENT, { detail: { hidden: focus } }));
+  }
+  refreshAll();
+}
 
 // Cấp QHC ít đồ án: liệt kê thẳng dưới nhóm cấp, không gom theo phường, xã
 const FLAT_LEVELS = new Set(['QHC25', 'QHC']);
@@ -482,8 +546,11 @@ function renderList() {
         : wardGroups(items).filter(([w]) => !scoped || isCoreWard(w)).map(wardHtml).join('');
     const body = (fixed ? `<div data-static-slot="${level.key}"></div>` : '') + empty + scopeNote + list;
     return `<div class="pl-group${open ? ' open' : ''}" data-level-group="${level.key}">
-      <button type="button" class="pl-head" data-level-toggle="${level.key}" aria-expanded="${open}" title="${open ? 'Thu gọn' : 'Xem'} ${level.title}">
-        ${ico('chev-right')}<span>${level.label}</span>${items.length ? `<small>${items.length}</small>` : ''}</button>
+      <div class="pl-hrow">
+        <button type="button" class="pl-head" data-level-toggle="${level.key}" aria-expanded="${open}" title="${open ? 'Thu gọn' : 'Xem'} ${level.title}">
+          ${ico('chev-right')}<span>${level.label}</span>${items.length ? `<small>${items.length}</small>` : ''}</button>
+        ${eyeHtml(level.key)}
+      </div>
       <div class="pl-body"${open ? '' : ' hidden'}>${body}</div>
     </div>`;
   }).join('');
@@ -502,7 +569,7 @@ function wardGroups(items) {
 }
 
 function rowHtml(p, idx, admin) {
-  const on = state.showProjects && !state.hiddenProjects.has(p.name);
+  const on = projectShown(p.name);
   const deleting = busy === p.name;
   const open = expanded.has(p.name);
   const decisionTitle = p.decision
@@ -676,7 +743,7 @@ function openLot(p, lot) {
   const phase = lot.phase === 'QH' ? 'QH' : 'HT';
   if (state.hiddenProjectLayers.delete(layerKey(p.name, phase === 'QH' ? 'su-dung-dat' : 'hien-trang'))) saveHiddenLayers();
   if (lot.kind !== 'DXF' && !state.showProjectInfra) ensureFullLots();
-  if (!state.showProjects || state.hiddenProjects.has(p.name)) showProject(p);
+  if (!projectShown(p.name)) showProject(p);
   showProjectLot({ ...lot, file: p.name, phase });
   refreshAll();
   focusProjectLots(p.name);
@@ -711,7 +778,7 @@ function setLayerOn(p, g, on) {
   else state.hiddenProjectLayers.add(key);
   saveHiddenLayers();
   // Bật lớp của đồ án đang ẩn thì hiện luôn đồ án đó
-  if (on && (!state.showProjects || state.hiddenProjects.has(p.name))) {
+  if (on && !projectShown(p.name)) {
     showProject(p);
     return;
   }
@@ -814,7 +881,8 @@ function geomBounds(geom) {
   return b;
 }
 
-// Nhãn chỉ hiện khi khung ranh trên màn hình đủ chứa thẻ; chồng nhau thì giữ đồ án lớn hơn. Chạy lại mỗi lần zoom.
+// Nhãn chỉ hiện khi khung ranh trên màn hình đủ chứa thẻ; chồng nhau thì giữ đồ án lớn hơn. Đồ án cùng cấp lớp droplist
+// (QHC khi xem QHC 1/10.000) luôn có nhãn, ưu tiên trước. Chạy lại mỗi lần zoom.
 function layoutLabels(m) {
   const old = labelGroups.get(m);
   if (old) {
@@ -825,6 +893,7 @@ function layoutLabels(m) {
   const list = labelLists.get(m) || [];
   if (!list.length || typeof turf === 'undefined') return;
   const cands = [];
+  const scope = levelScope();
   try {
     list.forEach(p => {
       const geom = shownOutline(p);
@@ -836,15 +905,16 @@ function layoutLabels(m) {
       const bw = se.x - nw.x;
       const bh = se.y - nw.y;
       const w = labelWidth(p.short);
-      if (bw < w * 0.75 || bh < LABEL_H * 1.5) return;
+      const force = !!scope && p.level === scope;
+      if (!force && (bw < w * 0.75 || bh < LABEL_H * 1.5)) return;
       const c = m.latLngToContainerPoint(at);
       cands.push({
-        p, at, size: bw * bh,
+        p, at, size: bw * bh, force,
         box: [c.x - w / 2 - LABEL_GAP, c.y - LABEL_H / 2 - LABEL_GAP, c.x + w / 2 + LABEL_GAP, c.y + LABEL_H / 2 + LABEL_GAP]
       });
     });
   } catch (e) { return; }
-  cands.sort((a, b) => b.size - a.size);
+  cands.sort((a, b) => (b.force - a.force) || (b.size - a.size));
   const placed = [];
   const group = L.layerGroup();
   cands.forEach(({ p, at, box }) => {
@@ -1043,8 +1113,9 @@ function drawOutlinesOn(m, list, below) {
     const geom = shownOutline(p);
     if (!geom) return;
     const base = !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE;
-    const style = { ...base, color: p.color, fillColor: p.color };
-    if (!below) {
+    const style = { ...base, ...(p.level === 'QHC' ? OUTLINE_QHC : null), color: p.color, fillColor: p.color };
+    // Đồ án đang mở theo phạm vi lớp droplist: bấm trong ranh (khe giữa các lô) không mở lại / phóng lại đồ án
+    if (!below || (!state.showProjects && p.name === state.focusedProject)) {
       const shape = L.geoJSON(geom, { style, interactive: false });
       shapes.push(shape);
       group.addLayer(shape);
@@ -1070,13 +1141,12 @@ function drawOutlinesOn(m, list, below) {
   updateGlow(m);
 }
 
+// Chỉ hiện nhờ phạm vi lớp droplist (lớp Quy hoạch tắt): lô các đồ án khác không vẽ ở mọi zoom nên ranh luôn bấm được
 function redrawOutlines() {
-  const below = !!map && map.getZoom() < PARCEL_MIN_ZOOM;
+  const below = !!map && (map.getZoom() < PARCEL_MIN_ZOOM || !state.showProjects);
   const ward = wardScopeName();
-  const list = state.showProjects
-    ? projects.filter(p => !state.hiddenProjects.has(p.name) && !isLayerHidden(p.name, 'ranh-gioi') && (below || p.area)
-      && (!ward || p.wards.includes(ward) || p.name === state.focusedProject))
-    : [];
+  const list = projects.filter(p => projectShown(p.name) && !isLayerHidden(p.name, 'ranh-gioi') && (below || p.area)
+    && (!ward || p.wards.includes(ward) || p.name === state.focusedProject));
   if (map) drawOutlinesOn(map, list, below);
   if (planMap) drawOutlinesOn(planMap, list, below);
 }
@@ -1101,10 +1171,7 @@ function rebuild() {
 }
 
 function showProject(p) {
-  if (!state.showProjects) {
-    projects.forEach(other => { if (other.name !== p.name) state.hiddenProjects.add(other.name); });
-    setMaster(true);
-  }
+  if (!state.showProjects && !inLevelScope(p.name)) enableMaster();
   state.hiddenProjects.delete(p.name);
   ensureFullLots();
   saveHidden();
@@ -1284,20 +1351,8 @@ export function initProjectLayer(opts = {}) {
     state.showProjectInfra = infraChk.checked;
     infraChk.addEventListener('change', () => setProjectInfraVisible(infraChk.checked));
   }
-  // Ẩn tất cả giữ nguyên lớp bật; đang ẩn hết thì hiện lại toàn bộ (và bật lớp nếu đang tắt)
-  $('btnProjectsAll')?.addEventListener('click', () => {
-    if (!projects.length) return;
-    const anyShown = projects.some(p => state.showProjects && !state.hiddenProjects.has(p.name));
-    if (anyShown) {
-      projects.forEach(p => state.hiddenProjects.add(p.name));
-      setMaster(false);
-    } else {
-      projects.forEach(p => state.hiddenProjects.delete(p.name));
-      if (!state.showProjects) setMaster(true);
-      ensureFullLots();
-    }
-    saveHidden();
-    refreshAll();
+  document.addEventListener('change', (e) => {
+    if (Object.values(LEVEL_CHK).includes(e.target?.id)) paintEyes();
   });
   $('projectSearch')?.addEventListener('input', (e) => {
     query = e.target.value || '';
@@ -1345,6 +1400,8 @@ export function initProjectLayer(opts = {}) {
   });
   $('projectList')?.addEventListener('click', (e) => {
     if (e.target.closest('[data-migrate]')) { migrateLegacy(); return; }
+    const eye = e.target.closest('[data-level-eye]');
+    if (eye) { setLevelShown(eye.dataset.levelEye, !eyeState(eye.dataset.levelEye).on); return; }
     const level = e.target.closest('[data-level-toggle]');
     if (level) {
       const key = level.dataset.levelToggle;
