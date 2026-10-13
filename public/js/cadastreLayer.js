@@ -598,6 +598,10 @@ async function openParcel(latlng, targetMap, replaced) {
     if (cardState) closeParcel();
     return false;
   }
+  [map, planMap].forEach(m => {
+    const cls = m?._popup?.options?.className;
+    if (cls === 'infra-popup' || cls === 'inspect-popup') m.closePopup();
+  });
   if (replaced) targetMap.closePopup(replaced);
   const props = found.hit.props;
   const planning = isPlanLevel(getLevel());

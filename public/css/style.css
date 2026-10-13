@@ -1096,6 +1096,21 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .inspect-popup .leaflet-popup-content::-webkit-scrollbar-track { background: rgba(4, 17, 43, 0.85); margin: 22px 0 10px; border-radius: 3px; }
 .inspect-popup .leaflet-popup-content::-webkit-scrollbar-thumb { background: #1f4a7a; border-radius: 3px; border: 1px solid rgba(var(--cyan-rgb), 0.25); }
 .inspect-popup .leaflet-popup-content::-webkit-scrollbar-thumb:hover { background: #2a6aa8; }
+/* Ký hiệu công trình phía trên tên lô đang tiếp cận; gỡ cùng lớp kết quả kiểm tra */
+.leaflet-marker-icon.inspect-lot-pin {
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow: visible; pointer-events: none; background: none; border: 0;
+}
+.inspect-lot-pin img {
+  width: 22px; height: 27px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
+}
+.inspect-lot-pin b {
+  position: absolute; top: 28px; left: 50%; transform: translateX(-50%);
+  max-width: 148px; padding: 1px 5px; border-radius: 4px;
+  background: rgba(2, 6, 23, 0.86); border: 1px solid rgba(125, 211, 252, 0.5);
+  color: #fff; font-size: 11px; font-weight: 700; line-height: 1.25; text-align: center;
+  white-space: normal;
+}
 .route-card { position: relative; padding-left: 20px !important; }
 .route-card[data-route] { cursor: pointer; }
 .route-card[data-route]:hover { border-color: var(--accent-cyan); }
@@ -2147,7 +2162,7 @@ table.ward-table th {
 .pp-conflict-actions .proof-btn { margin-top: 3px; }
 /* Nút con mắt cạnh nút đóng: thu popup về nhãn tên nhỏ ngay trên vị trí (bấm nhãn để mở lại) */
 .infra-popup .pp-title, .inspect-popup .pp-title { padding-right: 22px; }
-.leaflet-container a.pp-collapse-btn {
+.leaflet-container a.pp-collapse-btn, .dock-card a.pp-collapse-btn {
   position: absolute; top: 0; right: 24px; width: 24px; height: 24px;
   display: flex; align-items: center; justify-content: center;
   color: var(--text-muted); text-decoration: none; border-radius: var(--r-sm);
@@ -2163,7 +2178,9 @@ table.ward-table th {
 .leaflet-popup.pp-collapsed .leaflet-popup-content { margin: 0; padding: 0; overflow: visible; }
 .leaflet-popup.pp-collapsed .leaflet-popup-tip-container,
 .leaflet-container .pp-collapsed a.leaflet-popup-close-button,
-.leaflet-container .pp-collapsed a.pp-collapse-btn { display: none; }
+.dock-card.pp-collapsed a.leaflet-popup-close-button,
+.leaflet-container .pp-collapsed a.pp-collapse-btn,
+.dock-card.pp-collapsed a.pp-collapse-btn { display: none; }
 .pp-collapsed .pp { min-width: 0; }
 .pp-collapsed .pp > :not(.pp-title) { display: none; }
 .leaflet-popup.pp-collapsed .pp-title {
@@ -2173,7 +2190,7 @@ table.ward-table th {
 }
 .pp-collapsed .pp-title .badge-pending, .pp-collapsed .pp-title .ico { display: none; }
 /* Nút bút (Admin sửa lô) bên trái nút ẩn; popup lô đất không có nút ẩn thì sát nút đóng */
-.leaflet-container a.pp-edit-btn {
+.leaflet-container a.pp-edit-btn, .dock-card a.pp-edit-btn {
   position: absolute; top: 0; right: 48px; width: 24px; height: 24px;
   display: flex; align-items: center; justify-content: center;
   color: var(--text-muted); text-decoration: none; border-radius: var(--r-sm);
@@ -2181,7 +2198,7 @@ table.ward-table th {
 .leaflet-container .land-lot-popup a.pp-edit-btn { right: 24px; }
 .leaflet-container a.pp-edit-btn:hover { color: var(--accent-yellow); }
 /* Nút sọt rác (Admin xóa lô) bên trái nút bút */
-.leaflet-container a.pp-del-btn {
+.leaflet-container a.pp-del-btn, .dock-card a.pp-del-btn {
   position: absolute; top: 0; right: 72px; width: 24px; height: 24px;
   display: flex; align-items: center; justify-content: center;
   color: var(--text-muted); text-decoration: none; border-radius: var(--r-sm);
@@ -2190,7 +2207,8 @@ table.ward-table th {
 .leaflet-container a.pp-del-btn:hover { color: var(--accent-red); }
 .leaflet-container a.pp-del-btn.busy { opacity: 0.4; cursor: progress; }
 .pp-edit-btn .ico, .pp-del-btn .ico { width: 14px; height: 14px; margin: 0; }
-.leaflet-container .pp-collapsed a.pp-edit-btn, .leaflet-container .pp-collapsed a.pp-del-btn { display: none; }
+.leaflet-container .pp-collapsed a.pp-edit-btn, .leaflet-container .pp-collapsed a.pp-del-btn,
+.dock-card.pp-collapsed a.pp-edit-btn, .dock-card.pp-collapsed a.pp-del-btn { display: none; }
 .infra-popup.pp-editable .pp-title { padding-right: 70px; }
 .lot-edit { min-width: 240px; font-size: var(--fs-sm); }
 .lot-edit-title { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; padding-right: 64px; font-weight: 700; }
@@ -2516,6 +2534,86 @@ table.ward-table th {
   overflow: hidden;
 }
 .cad-card[hidden] { display: none; }
+
+/* Bảng công trình và bảng tiếp cận: cùng góc trái với bảng thửa, không mũi tên, không bám tọa độ */
+.leaflet-popup.dock-card {
+  position: absolute !important;
+  z-index: 1040;
+  top: calc(12px + var(--title-h) + 8px) !important;
+  left: calc(12px + var(--tb-btn) + 8px) !important;
+  bottom: auto !important;
+  right: auto !important;
+  margin: 0 !important;
+  transform: none !important;
+  width: min(280px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
+  max-height: calc((100% - var(--title-h) - 20px) * 0.7);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  text-align: left;
+}
+.dock-card .leaflet-popup-tip-container { display: none; }
+.dock-card .leaflet-popup-content-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: var(--bg-dark) !important;
+  border: 1px solid rgba(var(--cyan-rgb), 0.55);
+  border-radius: var(--r-lg) !important;
+  box-shadow: var(--panel-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.dock-card .leaflet-popup-content {
+  width: auto !important;
+  max-height: none !important;
+  margin: 8px 10px !important;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  line-height: 1.3;
+}
+.dock-card a.leaflet-popup-close-button {
+  position: absolute; top: 2px; right: 2px; width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; padding: 0; text-decoration: none;
+  color: var(--text-muted); font: 16px/22px Tahoma, Verdana, sans-serif;
+  background: transparent; border-radius: var(--r-sm);
+}
+.dock-card a.leaflet-popup-close-button:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.dock-card .pp { min-width: 0; font-size: var(--fs-sm); }
+.dock-card .pp-title, .dock-card .lp-title { font-size: var(--fs-md); }
+.dock-card .pp-row { grid-template-columns: minmax(72px, max-content) minmax(0, 1fr); gap: 1px 6px; }
+.dock-card .pp-row > :first-child { white-space: normal; line-height: 1.25; }
+.dock-card .lp-head { gap: 6px; }
+.dock-card .lp-swatch { width: 22px; height: 22px; }
+.dock-card .lp-stats { gap: 4px; margin-top: 6px; }
+.dock-card .lp-stat { padding: 4px; }
+.dock-card .lp-stat b { font-size: var(--fs-md); }
+.dock-card .lp-info { margin-top: 6px; gap: 2px 8px; font-size: var(--fs-sm); }
+.dock-card .sug-card { padding: 4px 6px; margin-top: 3px; }
+.dock-card .pp-section { margin-top: 6px; font-size: var(--fs-sm); }
+.leaflet-popup.dock-card.pp-collapsed {
+  width: max-content;
+  max-width: min(220px, calc(100% - var(--tb-btn) - 40px));
+  max-height: none;
+  cursor: pointer;
+}
+.leaflet-popup.dock-card.pp-collapsed .leaflet-popup-content-wrapper {
+  background: var(--bg-dark) !important;
+  border: 1px solid rgba(var(--cyan-rgb), 0.55);
+  box-shadow: var(--panel-shadow);
+}
+.leaflet-popup.dock-card.pp-collapsed .leaflet-popup-content { margin: 0 !important; overflow: hidden; }
+.leaflet-popup.dock-card.pp-collapsed .pp-title,
+.leaflet-popup.dock-card.pp-collapsed .lp-title {
+  text-shadow: none;
+  padding: 6px 10px !important;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .cad-tabs {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

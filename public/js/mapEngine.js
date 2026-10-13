@@ -335,12 +335,64 @@ function focusServiceRadius(targetMap, lat, lng, radius) {
   const fit = popupFitOptions(targetMap, 300, 50);
   const center = L.latLng(Number(lat), Number(lng));
   const bounds = radius > 0 ? center.toBounds(radius * 2) : L.latLngBounds(center, center);
+  const left = Math.max(fit.autoPanPaddingTopLeft[0] + 20, dockPad(targetMap));
   targetMap.flyToBounds(bounds, {
-    paddingTopLeft: [fit.autoPanPaddingTopLeft[0] + 20, 40],
+    paddingTopLeft: [left, 40],
     paddingBottomRight: [fit.autoPanPaddingBottomRight[0] + 20, 40],
     maxZoom: radius > 0 ? 17 : Math.max(targetMap.getZoom(), 16),
     duration: 0.8
   });
+}
+
+// Bảng công trình / tiếp cận nằm ở mép trái (cùng chỗ bảng thửa). Pane bản đồ có transform nên không ghim bằng CSS trên popup Leaflet.
+function pinDock(popup) {
+  const el = popup.getElement();
+  const host = document.getElementById('mapArea');
+  if (!el || !host) return;
+  if (el.parentElement !== host) host.appendChild(el);
+  el.classList.add('dock-card');
+  el.style.left = '';
+  el.style.bottom = '';
+  el.style.right = '';
+  el.style.top = '';
+  el.style.transform = '';
+}
+
+function openDockPopup(targetMap, className, html) {
+  document.getElementById('cadParcelCard')?.querySelector('.cad-card-x')?.click();
+  const popup = L.popup({ className, closeButton: true, autoPan: false, maxWidth: 280, minWidth: 0 }).setContent(html);
+  popup._updatePosition = function () { pinDock(this); };
+  popup._animateZoom = function () { pinDock(this); };
+  popup._adjustPan = function () {};
+  const layout = popup._updateLayout.bind(popup);
+  popup._updateLayout = function () { layout(); pinDock(this); };
+  popup.on('remove', () => popup.getElement()?.remove());
+  popup.setLatLng(targetMap.getCenter());
+  popup.openOn(targetMap);
+  pinDock(popup);
+  return popup;
+}
+
+function dockPad(targetMap) {
+  const el = targetMap?._popup?.getElement?.();
+  if (!el?.classList.contains('dock-card')) return 0;
+  const mr = targetMap.getContainer().getBoundingClientRect();
+  return Math.max(0, el.getBoundingClientRect().right - mr.left + 16);
+}
+
+function nudgeOffDock(targetMap, bounds) {
+  const el = targetMap?._popup?.getElement?.();
+  if (!el?.classList.contains('dock-card') || !bounds) return;
+  const sw = targetMap.latLngToContainerPoint(bounds.getSouthWest());
+  const ne = targetMap.latLngToContainerPoint(bounds.getNorthEast());
+  const left = Math.min(sw.x, ne.x);
+  const top = Math.min(sw.y, ne.y);
+  const bottom = Math.max(sw.y, ne.y);
+  const mr = targetMap.getContainer().getBoundingClientRect();
+  const cr = el.getBoundingClientRect();
+  const limit = cr.right - mr.left + 16;
+  const overlapsY = bottom > cr.top - mr.top && top < cr.bottom - mr.top;
+  if (overlapsY && left < limit - 8) targetMap.panBy([left - limit, 0], { animate: true, duration: 0.35 });
 }
 
 // Thấy trọn ranh thành phố trong phần bản đồ không bị panel phải che
@@ -1950,8 +2002,8 @@ async function fetchJson(url) {
   return res.json();
 }
 
-// Nút con mắt cạnh nút đóng: thu popup về nhãn tên nhỏ ngay trên vị trí (không khung nền, không nút ×) để xem trọn
-// vùng phục vụ / tuyến tiếp cận; bấm vào nhãn (hoặc bấm lại điểm công trình) để mở lại.
+// Nút con mắt cạnh nút đóng: thu bảng về một nhãn ở mép trái để xem trọn vùng phục vụ / tuyến tiếp cận;
+// bấm vào nhãn (hoặc bấm lại điểm công trình) để mở lại.
 // Khi đang thu gọn, bấm ra bản đồ không đóng popup (đóng popup sẽ xóa luôn lớp vùng phục vụ / tuyến tiếp cận).
 // Leaflet gắn việc đóng khi bấm bản đồ vào sự kiện preclick; _updateLayout / _updatePosition đo lại khung mà không
 // dựng lại nội dung (setContent / update sẽ mất phần kết quả đã nạp chậm vào DOM).
@@ -2230,8 +2282,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   }
   html += `</div>`;
 
-  const popup = L.popup({ className: 'infra-popup', closeButton: true, autoPan: true, ...popupFitOptions(targetMap, 340, 50) }).setLatLng([p.lat, p.lng]).setContent(html);
-  popup.openOn(targetMap);
+  const popup = openDockPopup(targetMap, 'infra-popup', html);
   popup.getElement()?.querySelector('.js-approve')?.addEventListener('click', () => approvePointStatus(p.id));
   popup.getElement()?.querySelectorAll('.js-conflict-go').forEach(btn => btn.addEventListener('click', (e) => {
     L.DomEvent.stop(e);
@@ -2247,6 +2298,9 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   if (parcelGeometry) addLotEditButton(popup, { kind: 'INFRA', item: p });
   pointPopup = { popup, id: p.id, scenario: p.scenario };
   if (!parcelGeometry) focusServiceRadius(targetMap, p.lat, p.lng, 0);
+  else {
+    try { nudgeOffDock(targetMap, L.geoJSON(parcelGeometry).getBounds()); } catch (e) { /* ranh không đọc được thì giữ khung hình */ }
+  }
   // Đóng popup thì thoát chế độ âm bản (trừ khi đã chọn công trình khác / chuyển sang thuyết minh CSD)
   popup.on('remove', () => { if (singleIsoSeq === selSeq) clearSingleIsochrone(); });
   riskData?.then(d => {
@@ -2625,6 +2679,61 @@ function planChangesHtml(source, lat, lng, ringRadius, num) {
   return html;
 }
 
+// Mỗi nhóm đang phủ tới vị trí: công trình gần nhất. Ký hiệu nằm trên tên, neo tại tâm lô (chưa có ranh thì tại điểm công trình).
+// Cả ký hiệu lẫn tên nằm trong singleIso nên tắt kiểm tra (clearSingleIsochrone) gỡ hết.
+function nearestCovered(groups, lat, lng) {
+  const out = [];
+  INFRA_CODES.forEach(code => {
+    const bag = groups[code];
+    if (!bag || !bag.size) return;
+    let best = null;
+    let bestD = Infinity;
+    bag.forEach(it => {
+      const d = distanceMeters(lat, lng, Number(it.lat), Number(it.lng));
+      if (d < bestD) { best = it; bestD = d; }
+    });
+    if (best) out.push(best);
+  });
+  return out;
+}
+
+function accessLotMarker(it) {
+  const files = ICON_FILES[layerType(it)] || ICON_FILES['1-CV'];
+  const iconUrl = `./icons/${isApproved(it.status) ? files.approved : files.pending}`;
+  return L.marker([Number(it.lat), Number(it.lng)], {
+    interactive: false,
+    keyboard: false,
+    zIndexOffset: 900,
+    icon: L.divIcon({
+      className: 'inspect-lot-pin',
+      html: `<img src="${iconUrl}" alt="" /><b>${escapeHtml(infraTitle(it.name || 'Công trình'))}</b>`,
+      iconSize: [22, 27],
+      iconAnchor: [11, 27]
+    })
+  });
+}
+
+async function showAccessedLots(targetMap, items, seq, isPlan) {
+  if (!items.length) return;
+  const group = isPlan ? planLayers.singleIso : layers.singleIso;
+  const renderer = selRendererFor(targetMap);
+  const markers = items.map(it => {
+    const marker = accessLotMarker(it);
+    group.addLayer(marker);
+    return marker;
+  });
+  const found = await Promise.all(items.map(it => infraLotOf(it.id, it.tenQH, isPlan ? ['QH', 'HT'] : ['HT']).catch(() => null)));
+  if (seq !== singleIsoSeq) return;
+  found.forEach((lot, i) => {
+    if (!lot?.geometry) return;
+    addParcelOutline(group, lot.geometry, renderer, BUFFER_COLORS[layerType(items[i])] || SEL_ACCENT);
+    try {
+      const [x, y] = turf.centroid(lot.geometry).geometry.coordinates;
+      markers[i].setLatLng([y, x]);
+    } catch (e) { /* giữ ký hiệu tại tọa độ công trình */ }
+  });
+}
+
 // Tính trực tiếp trên toàn TP (không phụ thuộc phường đang lọc). Bản đồ quy hoạch dò theo kịch bản QH (gồm công trình
 // quy hoạch mới, bỏ công trình di dời) và so với hiện trạng tại cùng vị trí.
 export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
@@ -2649,6 +2758,7 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
     .filter(it => hasValidCoord(it) && distanceMeters(clickLat, clickLng, Number(it.lat), Number(it.lng)) <= ringRadius)
     .map(pointKey));
   (isPlan ? planRenderer : leftRenderer).highlight(hiKeys);
+  showAccessedLots(targetMap, nearestCovered(coveredGroups, clickLat, clickLng), routeSeq, isPlan);
 
   let html = `<div class="pp">
     <div class="pp-title">${ico('chart')}MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ${isPlan ? ' (QUY HOẠCH)' : ''}</div>
@@ -2694,10 +2804,8 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
   html += networkInspectHtml(source, clickLat, clickLng, wardLocal, num);
   html += `</div>`;
 
-  const inspectPopup = L.popup({ className: 'inspect-popup', ...popupFitOptions(targetMap, 320, 240) })
-    .setLatLng([clickLat, clickLng])
-    .setContent(html)
-    .openOn(targetMap);
+  const inspectPopup = openDockPopup(targetMap, 'inspect-popup', html);
+  nudgeOffDock(targetMap, L.latLng(clickLat, clickLng).toBounds(12));
   addPopupCollapseToggle(inspectPopup, 'các tuyến kết nối');
   inspectPopup.on('remove', () => { if (singleIsoSeq === routeSeq) clearSingleIsochrone(); });
   showAccessRoutes(clickLat, clickLng, targetMap, routeCands, inspectPopup, routeSeq, hiKeys);
