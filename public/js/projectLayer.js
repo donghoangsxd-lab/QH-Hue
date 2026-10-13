@@ -359,7 +359,9 @@ function zoomTo(p) {
   if (!kindOn(p.name)) { turnKindOn(p, () => setMaster(true)); changed = true; }
   if (!state.showProjectInfra) { ensureFullLots(); changed = true; }
   if (state.hiddenProjects.delete(p.name)) { saveHidden(); changed = true; }
-  map.fitBounds(b.pad(0.1), { maxZoom: PARCEL_MIN_ZOOM + 1 });
+  if (p.level === 'QHPK' && !state.lotProjects.has(p.name)) { state.lotProjects.add(p.name); changed = true; }
+  const view = planMap?.getContainer()?.offsetParent ? planMap : map;
+  view.fitBounds(b.pad(0.1), { maxZoom: 18 });
   if (changed) refreshAll();
   focusProjectLots(p.name);
 }
@@ -1199,15 +1201,22 @@ function drawOutlinesOn(m, list, below) {
   const group = L.featureGroup();
   const shapes = [];
   const focused = below && (!!focusedProjectName() || !!wardScopeName() || state.lotProjects.size > 0);
+  // Đồ án đã hiện lô: ranh chỉ còn viền, không tô và không bắt chuột.
+  // QHPK toàn TP: đồ án vừa bấm hoặc đang tick. QHC / QHCT: đồ án đang mở (lớp QHPK tắt nên nhánh «dưới ngưỡng» luôn bật).
+  const lotsOpen = (p) => {
+    if (qhpkBoundaryOnly() && p.level === 'QHPK') return p.name === state.focusedProject || state.lotProjects.has(p.name);
+    return (p.level === 'QHCT' || p.level === 'QHC') && p.name === state.focusedProject;
+  };
   // Đồ án lớn vẽ trước (nằm dưới): đồ án nhỏ lồng trong QHPK phường nằm trên nên rê / bấm được
   list.slice().sort((a, b) => byProjectAreaDesc(a.name, b.name)).forEach(p => {
     const geom = shownOutline(p);
     if (!geom) return;
     const base = !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE;
     const style = { ...base, ...(p.level === 'QHC' ? OUTLINE_QHC : null), color: p.color, fillColor: p.color };
-    // Đồ án đang mở theo phạm vi lớp droplist: bấm trong ranh (khe giữa các lô) không mở lại / phóng lại đồ án
-    if (!below || (!state.showProjects && p.name === state.focusedProject)) {
-      const shape = L.geoJSON(geom, { style, interactive: false });
+    const open = lotsOpen(p);
+    // Đồ án đang mở theo phạm vi lớp droplist, hoặc đã bật lô QHPK: bấm trong ranh không mở lại đồ án
+    if (open || !below || (!state.showProjects && p.name === state.focusedProject)) {
+      const shape = L.geoJSON(geom, { style: open ? { ...style, fillOpacity: 0 } : style, interactive: false });
       shapes.push(shape);
       group.addLayer(shape);
       return;
