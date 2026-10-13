@@ -425,7 +425,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   [map, planMap].forEach(m => m?.on('popupopen', () => { popupAt = performance.now(); }));
   // Chế độ tra cứu: click trúng / sát mép các bảng đang mở (bấm hụt nút ×, bảng vừa nở ra khi nạp xong kết quả…)
   // chỉ đóng popup như thường, không tra cứu điểm mới. Đo ở preclick vì popup bị đóng ngay trong preclick.
-  const PANEL_GUARDS = [['.leaflet-popup', 24], ['.leaflet-control, .map-toolbar, .ov-launch, .right-panel, .bottom-panel', 10]];
+  const PANEL_GUARDS = [['.leaflet-popup', 24], ['.leaflet-control, .map-toolbar, .ov-launch, .right-panel, .bottom-panel, .cad-card', 10]];
   let nearPanelClick = false;
   const isNearPanel = (ev) => {
     if (!ev || ev.clientX == null) return false;

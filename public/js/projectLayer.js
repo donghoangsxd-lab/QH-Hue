@@ -7,10 +7,9 @@
 // Nút lưu: người dùng gửi PDF nhỏ hơn 2 MB để admin duyệt; đang chờ thì nút đồng hồ, admin bấm để đồng ý hoặc từ chối.
 // Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS): bật/tắt từng lớp, Admin xóa từng lớp, tìm lô trong đồ án.
 // Đồ án có hồ sơ điều chỉnh cục bộ đã duyệt thêm lớp phụ «Điều chỉnh cục bộ» (adjustLayer.js): bật/tắt, danh sách hồ sơ bấm để phóng tới.
-// Mỗi đồ án 1 màu viền + nền mờ, nhãn tên ở giữa ranh. Zoom < PARCEL_MIN_ZOOM ranh tổng bấm được để mở đồ án;
-// từ ngưỡng đó vẽ lô (mapEngine.js), ranh tổng nằm dưới lô và không nhận click (đồ án có ranh thật).
-// Đồ án vừa bấm (state.focusedProject) hiện lô ở mọi zoom; đang chọn phường thì chỉ hiện ranh các đồ án của phường,
-// lô cả phường vẽ ở mọi zoom — ranh tổng xuống dưới để bấm được lô.
+// Mỗi đồ án 1 màu viền + nền mờ, nhãn tên ở giữa ranh. QHPK toàn TP (droplist, chưa chọn phường): ranh mọi đồ án QHPK,
+// bấm được ở mọi zoom; lô chỉ đồ án vừa bấm hoặc đang tick trong panel. Chọn phường: ranh các đồ án của phường,
+// lô cả phường ở mọi zoom — ranh tổng xuống dưới để bấm được lô.
 // Đồ án QHC / QHCT hiện theo ô lớp cấp đó (chk_qhc10 / chk_qhct, projectFiles.kindOn), không theo lớp QHPK: lớp droplist
 // QHC 1/10.000 hiện ranh + tên đồ án QHC, chỉ đồ án đang chọn mới vẽ lô. Nút mắt cuối tiêu đề nhóm cấp bật / tắt cả nhóm.
 import { state } from './state.js';
@@ -20,7 +19,7 @@ import {
 import { planMap, onCompareChange, passToolClick } from './planMap.js';
 import {
   projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName,
-  wardScopeName, projectShown, kindOn, kindChkOf
+  wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly
 } from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
@@ -498,10 +497,16 @@ function setLevelShown(key, on) {
   const list = projects.filter(p => p.level === key);
   if (on) {
     if (key === 'QHPK' && list.length && !state.showProjects) enableMaster();
-    list.forEach(p => state.hiddenProjects.delete(p.name));
+    list.forEach(p => {
+      state.hiddenProjects.delete(p.name);
+      if (key === 'QHPK') state.lotProjects.add(p.name);
+    });
     if (list.length) ensureFullLots();
   } else {
-    list.forEach(p => state.hiddenProjects.add(p.name));
+    list.forEach(p => {
+      state.hiddenProjects.add(p.name);
+      if (key === 'QHPK') state.lotProjects.delete(p.name);
+    });
     if (state.showProjects && projects.every(p => state.hiddenProjects.has(p.name))) setMaster(false);
   }
   saveHidden();
@@ -607,7 +612,8 @@ function wardGroups(items) {
 }
 
 function rowHtml(p, idx, admin) {
-  const on = projectShown(p.name);
+  const boundary = qhpkBoundaryOnly() && p.level === 'QHPK';
+  const on = boundary ? state.lotProjects.has(p.name) : projectShown(p.name);
   const deleting = busy === p.name;
   const open = expanded.has(p.name);
   const decisionTitle = p.decision
@@ -623,9 +629,10 @@ function rowHtml(p, idx, admin) {
   const proposeBtn = (!admin || waiting)
     ? `<button type="button" class="project-btn${waiting ? ' has-proposal' : ''}" data-propose="${idx}" title="${escapeHtml(proposeTitle)}" aria-label="${escapeHtml(proposeTitle)}"${busy ? ' disabled' : ''}>${ico(waiting ? 'clock' : 'save')}</button>`
     : '';
-  return `<div class="project-row${on ? '' : ' is-off'}${p.name === pickedName ? ' is-picked' : ''}">
+  const boxTitle = boundary ? 'Hiện lô bên trong đồ án' : 'Hiện đồ án trên bản đồ';
+  return `<div class="project-row${boundary || projectShown(p.name) ? '' : ' is-off'}${p.name === pickedName ? ' is-picked' : ''}">
       <label class="project-name" title="${escapeHtml(fullName(p.name))} — bấm để mở đồ án">
-        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''}><span data-focus="${idx}">${idx + 1}. ${escapeHtml(p.name)}</span></label>
+        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''} title="${boxTitle}"><span data-focus="${idx}">${idx + 1}. ${escapeHtml(p.name)}</span></label>
       <span class="project-tools">
         <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-expand="${idx}" title="${open ? 'Ẩn' : 'Xem'} các lớp dữ liệu của đồ án" aria-label="Các lớp dữ liệu của đồ án" aria-expanded="${open}">${ico('chev-down')}</button>
         <button type="button" class="project-btn" data-info="${idx}" title="Thông tin đồ án ở panel dưới: cơ cấu sử dụng đất, bảng tổng hợp sử dụng đất và đánh giá chỉ tiêu QCVN 01:2026" aria-label="Thông tin đồ án">${ico('table')}</button>
@@ -634,7 +641,7 @@ function rowHtml(p, idx, admin) {
         ${admin ? `<button type="button" class="project-btn" data-rename="${idx}" title="Đổi tên đồ án (Sheet + danh mục bucket)" aria-label="Đổi tên đồ án"${busy ? ' disabled' : ''}>${ico('pen')}</button>` : ''}
         ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
       </span>
-    </div>${open ? decisionNote(p, idx) + proposalNote(p, idx) + layersHtml(p, idx, on, admin) : ''}`;
+    </div>${open ? decisionNote(p, idx) + proposalNote(p, idx) + layersHtml(p, idx, boundary || projectShown(p.name), admin) : ''}`;
 }
 
 // Đồ án đang chọn (bấm ranh trên bản đồ hoặc bấm tên): dòng trong danh sách giữ nền sáng đến khi chọn đồ án khác
@@ -1191,7 +1198,7 @@ function drawOutlinesOn(m, list, below) {
   if (!list.length) return;
   const group = L.featureGroup();
   const shapes = [];
-  const focused = below && (!!focusedProjectName() || !!wardScopeName());
+  const focused = below && (!!focusedProjectName() || !!wardScopeName() || state.lotProjects.size > 0);
   // Đồ án lớn vẽ trước (nằm dưới): đồ án nhỏ lồng trong QHPK phường nằm trên nên rê / bấm được
   list.slice().sort((a, b) => byProjectAreaDesc(a.name, b.name)).forEach(p => {
     const geom = shownOutline(p);
@@ -1225,12 +1232,17 @@ function drawOutlinesOn(m, list, below) {
   updateGlow(m);
 }
 
-// Chỉ hiện nhờ phạm vi lớp droplist (lớp Quy hoạch tắt): lô các đồ án khác không vẽ ở mọi zoom nên ranh luôn bấm được
+// QHPK toàn TP: ranh mọi đồ án QHPK, bấm được cả khi đã phóng gần. Lớp khác: dưới ngưỡng lô thì ranh bấm được
 function redrawOutlines() {
-  const below = !!map && (map.getZoom() < PARCEL_MIN_ZOOM || !state.showProjects);
+  const boundary = qhpkBoundaryOnly();
+  const below = !!map && (boundary || map.getZoom() < PARCEL_MIN_ZOOM || !state.showProjects);
   const ward = wardScopeName();
-  const list = projects.filter(p => projectShown(p.name) && !isLayerHidden(p.name, 'ranh-gioi') && (below || p.area)
-    && (!ward || p.wards.includes(ward) || p.name === state.focusedProject));
+  const list = projects.filter(p => {
+    if (isLayerHidden(p.name, 'ranh-gioi')) return false;
+    if (ward && !p.wards.includes(ward) && p.name !== state.focusedProject) return false;
+    if (boundary && p.level === 'QHPK') return true;
+    return projectShown(p.name) && (below || p.area);
+  });
   if (map) drawOutlinesOn(map, list, below);
   if (planMap) drawOutlinesOn(planMap, list, below);
 }
@@ -1258,8 +1270,17 @@ function rebuild() {
 function showProject(p) {
   if (!kindOn(p.name)) turnKindOn(p, enableMaster);
   state.hiddenProjects.delete(p.name);
+  if (p.level === 'QHPK') state.lotProjects.add(p.name);
   ensureFullLots();
   saveHidden();
+  refreshAll();
+}
+
+// QHPK toàn TP: tick chỉ xin lô, không ghi danh sách ẩn (ranh vẫn hiện)
+function pickProjectLots(p) {
+  state.lotProjects.add(p.name);
+  if (!state.showProjects) enableMaster();
+  ensureFullLots();
   refreshAll();
 }
 
@@ -1499,7 +1520,16 @@ export function initProjectLayer(opts = {}) {
     const p = box && projects[Number(box.dataset.project)];
     if (!p) return;
     if (box.checked) {
-      showProject(p);
+      if (qhpkBoundaryOnly() && p.level === 'QHPK') pickProjectLots(p);
+      else showProject(p);
+      return;
+    }
+    if (qhpkBoundaryOnly() && p.level === 'QHPK') {
+      state.lotProjects.delete(p.name);
+      if (p.name === focusName || p.name === state.focusedProject) {
+        document.dispatchEvent(new CustomEvent(PROJECT_VIEW_EXIT_EVENT, { detail: { hidden: p.name } }));
+      }
+      refreshAll();
       return;
     }
     state.hiddenProjects.add(p.name);

@@ -78,9 +78,10 @@ function lotClass(lot, byId) {
   return { label: nhom, color: landColor(lot.layer) || (TT16_STYLES[key] || {}).color || '#94a3b8', key: '' };
 }
 
-// Lô QH giao khung box, xếp theo thứ tự ưu tiên (lô đứng trước giữ phần chồng lấn)
-async function lotsInBox(box) {
-  const { projects, wardLots } = await planLotsIn(box);
+// Lô QH giao khung box, xếp theo thứ tự ưu tiên (lô đứng trước giữ phần chồng lấn).
+// opts.level khác QHPK: không cộng lô phường (lô không gắn đồ án, không thuộc cấp đó)
+async function lotsInBox(box, opts = {}) {
+  const { projects, wardLots } = await planLotsIn(box, opts);
   projects.sort((a, b) => boxArea(a.bbox) - boxArea(b.bbox));
   const byId = new Map([...state.rawDataList, ...state.planDataList, ...getPlanScenarioList()].map(it => [it.id, it]));
   const seenIds = new Set();
@@ -96,7 +97,9 @@ async function lotsInBox(box) {
     if (lot.kind !== 'DXF') seenIds.add(lot.id);
     push(lot);
   }));
-  wardLots.forEach(lot => { if (lot.kind === 'DXF' || !seenIds.has(lot.id)) push(lot); });
+  if (!opts.level || opts.level === 'QHPK') {
+    wardLots.forEach(lot => { if (lot.kind === 'DXF' || !seenIds.has(lot.id)) push(lot); });
+  }
   return { projects, lots, byId };
 }
 
@@ -165,6 +168,31 @@ export async function analyzePlanLand(ring) {
 const SLIVER_M2 = 0.5;
 
 const closeRing = (r) => (r.length && (r[0][0] !== r[r.length - 1][0] || r[0][1] !== r[r.length - 1][1]) ? [...r, r[0]] : r);
+
+function geomPieces(feature) {
+  if (!feature) return [];
+  const g = feature.type === 'Feature' ? feature.geometry : feature;
+  if (!g?.type) return [];
+  if (g.type === 'GeometryCollection') return (g.geometries || []).flatMap(geomPieces);
+  if (g.type === 'FeatureCollection') return (g.features || []).flatMap(geomPieces);
+  return [g];
+}
+
+function pushGeom(bucket, key, feature) {
+  const bits = geomPieces(feature);
+  if (!bits.length || !key) return;
+  if (!bucket[key]) bucket[key] = [];
+  bucket[key].push(...bits);
+}
+
+function nonePieces(rest) {
+  if (!rest) return [];
+  try {
+    return turf.area(rest) >= SLIVER_M2 ? geomPieces(rest) : [];
+  } catch {
+    return [];
+  }
+}
 const toFeature = (polys) => {
   const ps = polys.map(p => p.map(closeRing)).filter(p => p[0] && p[0].length >= 4);
   return ps.length === 1 ? turf.polygon(ps[0]) : turf.multiPolygon(ps);
@@ -172,16 +200,24 @@ const toFeature = (polys) => {
 
 /**
  * Loại đất QH trên 1 thửa, cắt hình học chính xác: phần thửa còn lại lần lượt giao với lô theo thứ tự ưu tiên.
- * geometry: Polygon | MultiPolygon (WGS84). → như analyzePlanLand, thêm exact: true và parts: [{ lot, name, label,
- * color, key, area, pct }] từng lô; hình lô lỗi thì quay về lấy mẫu lưới (exact: false).
+ * geometry: Polygon | MultiPolygon (WGS84). opts.level / includeHidden truyền cho planLotsIn.
+ * opts.extras: lô tĩnh cắt sau đồ án nhập [{ geometry, label, color, key, name, sub, file }].
+ * → như analyzePlanLand, thêm exact: true và parts từng lô. Cắt theo cấp thì không lấy mẫu lưới (tránh lẫn cấp khác).
  */
-export async function analyzeParcelPlan(geometry) {
+export async function analyzeParcelPlan(geometry, opts = {}) {
   const polys = polysOf(geometry);
   if (!polys.length) throw new Error('thửa không có hình');
   const parcel = toFeature(polys);
   const area = turf.area(parcel);
   const box = boxOf(polys);
-  const { projects, lots, byId } = await lotsInBox(box);
+  const { projects, lots, byId } = await lotsInBox(box, opts);
+  const extras = (opts.extras || []).flatMap(extra => {
+    const ep = polysOf(extra.geometry);
+    if (!ep.length) return [];
+    const b = boxOf(ep);
+    if (b[0] > box[2] || b[2] < box[0] || b[1] > box[3] || b[3] < box[1]) return [];
+    return [{ extra, polys: ep }];
+  });
 
   let rest = parcel;
   const parts = [];
@@ -192,25 +228,55 @@ export async function analyzeParcelPlan(geometry) {
       const inter = turf.intersect(rest, shape);
       const a = inter ? turf.area(inter) : 0;
       if (a < SLIVER_M2) continue;
-      parts.push({ lot, area: a });
+      parts.push({ lot, area: a, geom: inter });
       rest = turf.difference(rest, shape);
+    }
+    for (const { extra, polys: lp } of extras) {
+      if (!rest) break;
+      try {
+        const shape = toFeature(lp);
+        const inter = turf.intersect(rest, shape);
+        const a = inter ? turf.area(inter) : 0;
+        if (a < SLIVER_M2) continue;
+        parts.push({ extra, area: a, geom: inter });
+        rest = turf.difference(rest, shape) || null;
+      } catch (err) {
+        console.warn('Cắt thửa bỏ qua một lô tĩnh:', err);
+      }
     }
   } catch (err) {
     console.warn('Cắt hình thửa với lô QH lỗi, chuyển sang lấy mẫu lưới:', err);
+    if (opts.level || extras.length) throw err;
     const res = await analyzePlanLand(closeRing(polys[0][0]));
-    return { ...res, exact: false, parts: [] };
+    return { ...res, exact: false, parts: [], shapes: { byLabel: {}, none: [] } };
   }
 
   const files = new Set();
   const rows = new Map();
-  const detail = parts.map(({ lot, area: a }) => {
+  const byLabel = {};
+  const detail = parts.map((part) => {
+    const a = part.area;
+    if (part.extra) {
+      const c = part.extra;
+      const row = rows.get(c.label) || rows.set(c.label, { label: c.label, color: c.color, key: c.key || '', area: 0, lots: 0 }).get(c.label);
+      row.area += a;
+      row.lots++;
+      if (c.file) files.add(c.file);
+      pushGeom(byLabel, c.label, part.geom);
+      return {
+        lot: { file: c.file || '', plan: null }, name: c.name || c.label, label: c.label,
+        color: c.color, key: c.key || '', sub: c.sub || '', area: a, pct: (a / area) * 100
+      };
+    }
+    const { lot } = part;
     const c = lotClass(lot, byId);
     const row = rows.get(c.label) || rows.set(c.label, { ...c, area: 0, lots: 0 }).get(c.label);
     row.area += a;
     row.lots++;
+    pushGeom(byLabel, c.label, part.geom);
     if (lot.file) files.add(lot.file);
     const item = lot.kind !== 'DXF' ? byId.get(lot.id) : null;
-    return { lot, name: item ? item.name : landCode(lot), ...c, area: a, pct: (a / area) * 100 };
+    return { lot, name: item ? item.name : landCode(lot), ...c, sub: '', area: a, pct: (a / area) * 100 };
   });
   const covered = parts.reduce((s, p) => s + p.area, 0);
   const none = Math.max(0, area - covered);
@@ -221,7 +287,8 @@ export async function analyzeParcelPlan(geometry) {
     lotCount: parts.length,
     projects: projects.map(p => p.tenQH).filter(n => files.has(n)),
     exact: true,
-    parts: detail.sort((a, b) => b.area - a.area)
+    parts: detail.sort((a, b) => b.area - a.area),
+    shapes: { byLabel, none: nonePieces(rest) }
   };
 }
 
@@ -238,6 +305,7 @@ export function analyzeParcelZones(geometry, features, classify) {
   const box = boxOf(polys);
   let rest = parcel;
   const parts = [];
+  const byLabel = {};
   for (let i = features.length - 1; i >= 0 && rest; i--) {
     const fp = polysOf(features[i].geometry);
     if (!fp.length) continue;
@@ -247,7 +315,9 @@ export function analyzeParcelZones(geometry, features, classify) {
     const inter = turf.intersect(rest, shape);
     const a = inter ? turf.area(inter) : 0;
     if (a < SLIVER_M2) continue;
-    parts.push({ ...classify(features[i]), area: a, pct: (a / area) * 100 });
+    const info = classify(features[i]);
+    parts.push({ ...info, area: a, pct: (a / area) * 100 });
+    pushGeom(byLabel, info.label, inter);
     rest = turf.difference(rest, shape);
   }
   const rows = new Map();
@@ -261,7 +331,8 @@ export function analyzeParcelZones(geometry, features, classify) {
     area,
     rows: [...rows.values()].map(r => ({ ...r, pct: (r.area / area) * 100 })).sort((a, b) => b.area - a.area),
     none: { area: none, pct: (none / area) * 100 },
-    parts: parts.sort((a, b) => b.area - a.area)
+    parts: parts.sort((a, b) => b.area - a.area),
+    shapes: { byLabel, none: nonePieces(rest) }
   };
 }
 
@@ -297,30 +368,109 @@ export function planLandHtml(res) {
   </div>`;
 }
 
-/** Kết quả analyzeParcelPlan trong popup thửa. recorded: diện tích hồ sơ địa chính (m²) để đối chiếu */
-export function parcelPlanHtml(res, recorded) {
-  if (!res.exact) return planLandHtml(res).replace('trong vùng đo', 'trên thửa đất');
+// Biểu đồ tròn loại đất trên thửa. mountParcelPies đọc .pls-pie-data sau khi gắn HTML
+const pieCharts = new Set();
+
+function pieHtml(res, noneLabel) {
+  const slices = res.rows.filter(r => r.area >= SLIVER_M2).map(r => ({
+    key: r.label, label: r.label, color: r.color || '#94a3b8', area: r.area, pct: r.pct
+  }));
+  if (res.none.area >= SLIVER_M2) slices.push({ key: '__none', label: noneLabel, color: NONE_COLOR, area: res.none.area, pct: res.none.pct });
+  if (!slices.length) return '';
+  const legend = slices.map(s => `<li><button type="button" class="pls-pie-item" data-land="${escapeHtml(s.key)}" data-color="${escapeHtml(s.color)}" title="${escapeHtml(s.label)} · ${fmtM2(s.area)} · bấm để tô vùng trên bản đồ">
+    <i style="background:${escapeHtml(s.color)}"></i><span>${escapeHtml(s.label)}</span><em>${escapeHtml(fmtPct(s.pct))}</em>
+  </button></li>`).join('');
+  return `<div class="pls-pie-host">
+    <div class="pls-pie-box"><canvas aria-label="Tỷ lệ các loại đất trên thửa"></canvas></div>
+    <ul class="pls-pie-legend">${legend}</ul>
+    <div class="pls-pie-data" hidden>${escapeHtml(JSON.stringify(slices))}</div>
+  </div>`;
+}
+
+export function clearParcelPies() {
+  pieCharts.forEach(c => { try { c.destroy(); } catch { /* canvas đã gỡ */ } });
+  pieCharts.clear();
+}
+
+export function mountParcelPies(root) {
+  clearParcelPies();
+  if (!root || typeof Chart === 'undefined') return;
+  root.querySelectorAll('.pls-pie-host').forEach(host => {
+    const canvas = host.querySelector('canvas');
+    let slices = [];
+    try { slices = JSON.parse(host.querySelector('.pls-pie-data')?.textContent || '[]'); } catch { slices = []; }
+    if (!canvas || !slices.length) return;
+    const chart = new Chart(canvas.getContext('2d'), {
+      type: 'pie',
+      data: {
+        labels: slices.map(s => s.label),
+        datasets: [{
+          data: slices.map(s => s.area),
+          backgroundColor: slices.map(s => s.color),
+          borderColor: '#0f172a',
+          borderWidth: 1,
+          hoverOffset: 6,
+          offset: slices.map(() => 0)
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { animateRotate: true, duration: 500 },
+        onHover: (evt, els) => { if (evt.native?.target) evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
+        onClick: (_evt, els) => {
+          const s = slices[els?.[0]?.index];
+          if (!s) return;
+          host.dispatchEvent(new CustomEvent('pls-pick', { bubbles: true, detail: { key: s.key, color: s.color } }));
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const s = slices[ctx.dataIndex];
+                return ` ${s.label}: ${fmtM2(s.area)} (${fmtPct(s.pct)})`;
+              }
+            }
+          }
+        }
+      }
+    });
+    chart.$keys = slices.map(s => s.key);
+    pieCharts.add(chart);
+  });
+}
+
+const parcelHead = (title, res, recorded, coverLabel, count, unit) => {
   const covered = res.area - res.none.area;
-  const head = `<div class="pls-head">Quy hoạch trên thửa đất</div>
-    <div class="pp-row"><span>Diện tích hình thửa</span><b>${fmtM2(res.area)}${recorded > 0 ? ` <small>(hồ sơ ${fmtNum(recorded)} m²)</small>` : ''}</b></div>
-    <div class="pp-row"><span>Có lô quy hoạch</span><b>${fmtM2(covered)} (${fmtPct(100 - res.none.pct)}) · ${fmtNum(res.lotCount)} lô</b></div>`;
-  if (!res.rows.length) {
-    return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">Thửa chưa nằm trong lô quy hoạch của đồ án nào đã nhập (hoặc đồ án đang bị ẩn).</div></div>`;
-  }
-  const rows = res.rows.map(r => rowHtml(r.label, r.color, r.key, r.area, r.pct, `${fmtNum(r.lots)} lô`, fmtM2)).join('');
-  const none = res.none.area >= SLIVER_M2 ? rowHtml('Chưa có lô quy hoạch', NONE_COLOR, '', res.none.area, res.none.pct, '', fmtM2) : '';
+  const sheet = recorded > 0 ? ` <small>(hồ sơ ${fmtNum(recorded)} m²)</small>` : '';
+  return `<div class="pls-head">${escapeHtml(title)}</div>
+    <div class="pp-row pls-sheet"><span>Hình thửa</span><b>${fmtM2(res.area)}${sheet}</b></div>
+    <div class="pp-row"><span>${escapeHtml(coverLabel)}</span><b>${fmtM2(covered)} (${escapeHtml(fmtPct(100 - res.none.pct))}) · ${fmtNum(count)} ${unit}</b></div>`;
+};
+
+/** Kết quả analyzeParcelPlan trong bảng thửa. recorded: diện tích hồ sơ địa chính (m²). opts: title, noneLabel, empty, note */
+export function parcelPlanHtml(res, recorded, opts = {}) {
+  if (!res.exact) return planLandHtml(res).replace('trong vùng đo', 'trên thửa đất');
+  const title = opts.title || 'Quy hoạch trên thửa đất';
+  const noneLabel = opts.noneLabel || 'Chưa có lô quy hoạch';
+  const empty = opts.empty || 'Thửa chưa nằm trong lô quy hoạch của đồ án nào đã nhập.';
+  const note = opts.note || 'Cắt hình học thửa với ranh lô; hình thửa từ tile địa chính (sai số ranh khoảng 0,5 m) nên có thể lệch nhẹ so với diện tích hồ sơ. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn; đồ án đang ẩn không tính.';
+  const head = parcelHead(title, res, recorded, 'Có lô quy hoạch', res.lotCount, 'lô');
+  const foot = `<div class="pp-sub" title="${escapeHtml(note)}">${escapeHtml(note)}</div>`;
+  if (!res.rows.length) return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(empty)}</div>${foot}</div>`;
   const lots = res.parts.map(p => {
-    const stats = planItems(p.lot.plan).map(s => `${s.short} ${s.text}`).join(' · ');
-    return `<div class="pls-lot">
+    const stats = planItems(p.lot && p.lot.plan).map(s => `${s.short} ${s.text}`).join(' · ');
+    const sub = p.sub || [p.label, p.lot && p.lot.file].filter(Boolean).join(' · ');
+    return `<div class="pls-lot" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}">
       <div class="pls-lot-head"><b>${escapeHtml(p.name || p.label)}</b><span>${fmtM2(p.area)}</span></div>
-      <div class="pls-lot-sub">${escapeHtml(p.label)}${p.lot.file ? ` · ${escapeHtml(p.lot.file)}` : ''}</div>
+      ${sub ? `<div class="pls-lot-sub">${escapeHtml(sub)}</div>` : ''}
       ${stats ? `<div class="pls-lot-plan">${escapeHtml(stats)}</div>` : ''}
     </div>`;
   }).join('');
-  return `<div class="plan-land-stats">${head}<div class="pls-list">${rows}${none}</div>
+  return `<div class="plan-land-stats">${head}${pieHtml(res, noneLabel)}
     <div class="pls-sub-head">Lô quy hoạch và chỉ tiêu</div>
-    <div class="pls-lots">${lots}</div>
-    <div class="pp-sub">Cắt hình học thửa với ranh lô; hình thửa từ tile địa chính (sai số ranh khoảng 0,5 m) nên có thể lệch nhẹ so với diện tích hồ sơ. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn; đồ án đang ẩn không tính.</div>
+    <div class="pls-lots">${lots}</div>${foot}
   </div>`;
 }
 
@@ -332,18 +482,16 @@ export function parcelZonesHtml(res, recorded, opts) {
   const covered = res.area - res.none.area;
   const extra = (opts.extra || []).map(([k, v]) => `<div class="pp-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('');
   const head = `<div class="pls-head">${escapeHtml(opts.title)}</div>
-    <div class="pp-row"><span>Diện tích hình thửa</span><b>${fmtM2(res.area)}${recorded > 0 ? ` <small>(hồ sơ ${fmtNum(recorded)} m²)</small>` : ''}</b></div>
-    <div class="pp-row"><span>${escapeHtml(opts.cover)}</span><b>${fmtM2(covered)} (${fmtPct(100 - res.none.pct)}) · ${fmtNum(res.parts.length)} ${opts.unit}</b></div>${extra}`;
-  const note = opts.note ? `<div class="pp-sub">${escapeHtml(opts.note)}</div>` : '';
+    <div class="pp-row pls-sheet"><span>Hình thửa</span><b>${fmtM2(res.area)}${recorded > 0 ? ` <small>(hồ sơ ${fmtNum(recorded)} m²)</small>` : ''}</b></div>
+    <div class="pp-row"><span>${escapeHtml(opts.cover)}</span><b>${fmtM2(covered)} (${escapeHtml(fmtPct(100 - res.none.pct))}) · ${fmtNum(res.parts.length)} ${opts.unit}</b></div>${extra}`;
+  const note = opts.note ? `<div class="pp-sub" title="${escapeHtml(opts.note)}">${escapeHtml(opts.note)}</div>` : '';
   if (!res.parts.length) return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(opts.empty)}</div>${note}</div>`;
-  const rows = res.rows.map(r => rowHtml(r.label, r.color, r.key, r.area, r.pct, `${fmtNum(r.lots)} ${opts.unit}`, fmtM2)).join('');
-  const none = res.none.area >= SLIVER_M2 ? rowHtml(opts.none, NONE_COLOR, '', res.none.area, res.none.pct, '', fmtM2) : '';
-  const parts = res.parts.map(p => `<div class="pls-lot">
+  const parts = res.parts.map(p => `<div class="pls-lot" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}">
       <div class="pls-lot-head"><b>${escapeHtml(p.name || p.label)}</b><span>${fmtM2(p.area)}</span></div>
       ${p.sub ? `<div class="pls-lot-sub">${escapeHtml(p.sub)}</div>` : ''}
       ${p.desc ? `<div class="pls-lot-plan">${escapeHtml(p.desc)}</div>` : ''}
     </div>`).join('');
-  return `<div class="plan-land-stats">${head}<div class="pls-list">${rows}${none}</div>
+  return `<div class="plan-land-stats">${head}${pieHtml(res, opts.none)}
     <div class="pls-sub-head">${escapeHtml(opts.partsHead)}</div>
     <div class="pls-lots">${parts}</div>${note}
   </div>`;

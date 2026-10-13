@@ -9,7 +9,8 @@
 //    - QHC 1/10.000: ranh + tên mọi đồ án QHC (TTHuế 2045 và đồ án nhập); bấm một đồ án thì giữ lớp, chỉ vẽ lô đồ án đó,
 //      bấm nền ngoài đồ án đang mở thì về tổng quan; bấm lô tra cứu; panel phải lọc QHPK trong vùng lõi;
 //      chọn phường lõi giữ lớp, phường ngoài vùng lõi sang QHPK.
-//    - QHPK 1/2.000: lô cả phường đang chọn.
+//    - QHPK 1/2.000: toàn TP chỉ ranh các đồ án; bấm ranh hoặc tick đồ án trong panel mới tải lô.
+//      Chọn phường: lô cả phường (chỉ tiêu panel dưới giữ nguyên) và ranh QHCT nằm trong phường.
 //    - QHCT 1/500: ranh + tên các đồ án QHCT (planLevelOf), bấm đồ án → chi tiết.
 // 3. Mở đồ án (từ danh sách, ranh trên bản đồ hoặc popup): sang lớp QHPK (đồ án QHC mở từ đô thị: QHC 1/10.000; đồ án QHCT:
 //    QHCT 1/500), thông tin đồ án thay panel dưới; thoát về địa bàn đang chọn, hoặc về lớp đã mở đồ án.
@@ -63,6 +64,7 @@ function onLevelChange({ level, prev }) {
   }
   const ward = isCity(state.selectedWard) ? null : state.selectedWard;
   if (level === 'qhpk') {
+    if (!ward) state.lotProjects.clear();
     if (!state.focusedProject) revealWardProjects(ward);
     return;
   }

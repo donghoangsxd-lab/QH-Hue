@@ -267,13 +267,13 @@ const SECTIONS = [
           'Ở panel phải › <b>Bản đồ nền</b>, bật lớp <b>Thửa đất địa chính 2016</b> (nút bên dưới). Ranh thửa hiện từ mức phóng 15, số thửa hiện từ mức 18.',
           'Tìm thửa: chọn xã/phường (địa giới cũ), nhập số tờ, số thửa rồi bấm <b>Tìm</b>; hoặc phóng tới vị trí (có thể nhập tọa độ vào ô bên dưới) và bấm vào thửa.',
           'Bảng thông tin thửa: diện tích hồ sơ, loại đất theo Thông tư 28/2014/TT-BTNMT, địa chỉ, xã/phường cũ; thửa được viền vàng trên bản đồ.',
-          'Kiểm tra quy hoạch: bấm <b>Xem chỉ tiêu quy hoạch</b> trong bảng thửa. Webapp cắt ranh thửa với lô quy hoạch các đồ án đã nạp, trả về diện tích từng loại đất quy hoạch (m², %), phần chưa có lô quy hoạch và từng lô kèm chỉ tiêu tầng cao, mật độ xây dựng, hệ số sử dụng đất (nếu đồ án có).',
-          'Droplist đang ở <b>QHC 1/10.000</b> hoặc <b>QHC 1/25.000</b>: kết quả theo cấp đó (lô sử dụng đất, giai đoạn, tiểu vùng hoặc vùng chức năng, định hướng); bấm tiếp <b>Xem chỉ tiêu QHPK 1/2.000</b> để xem chỉ tiêu các đồ án phân khu bên dưới.',
+          'Droplist đang ở <b>QHC</b>, <b>QHPK</b> hoặc <b>QHCT</b>: bảng thửa nằm góc trái, sát thanh công cụ, có 4 trang (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500). Trang đang mở theo lớp droplist; lật trang để xem lớp khác, kể cả khi lớp đó đang tắt. Mỗi trang vẽ biểu đồ tròn các loại đất trên thửa, kèm diện tích và chỉ tiêu từng lô.',
+          'Droplist <b>Hệ thống đô thị</b>: bảng mở tại thửa. Bấm <b>Xem chỉ tiêu quy hoạch</b> để cắt thửa với lô các đồ án đã nạp (diện tích, %, tầng cao, mật độ, hệ số sử dụng đất).',
           'Đang xem bản đồ quy hoạch: bấm vào thửa nằm trên lô vẫn mở bảng thửa; tắt lớp thửa để xem bảng lô như trước.'
         ],
         facts: [
           'Dữ liệu thửa từ gis21.hue.gov.vn (lập năm 2016), không gồm thông tin chủ sử dụng; chỉ để tham khảo.',
-          'Quy hoạch chỉ tính các đồ án đã nạp vào webapp và đang hiện; đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn (chi tiết hơn).',
+          'Bốn trang quy hoạch đối chiếu cả khi lớp đang tắt. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn (chi tiết hơn).',
           'Diện tích quy hoạch tính trên hình thửa (sai số ranh khoảng 0,5 m) nên có thể lệch nhẹ so với diện tích hồ sơ.'
         ],
         coord: true,

@@ -579,10 +579,11 @@ function layerSummary(key, rows, metaLayer, forceCrs) {
   };
 }
 
+// Trường tendoan / loaiquyhoach trên gServer nhập tay: "QH chi tiết", "Quy hoạch, chi tiết", "chi tết", "ĐCQHCT".
 const LOAI_CODES = [
-  [/^(?:quy hoạch phân khu|QHPK(?=\s|$))/i, 'QHPK'],
-  [/^(?:quy hoạch chi tiết|QHCT(?=\s|$))/i, 'QHCT'],
-  [/^(?:quy hoạch chung|QHC(?=\s|$))/i, 'QHC']
+  [/^(?:(?:quy hoạch|QH),?\s+phân khu|(?:ĐC)?QHPK(?=\s|$))/i, 'QHPK'],
+  [/^(?:(?:quy hoạch|QH),?\s+(?:chi ti?ết|tổng mặt bằng)|(?:ĐC)?QHCT(?=\s|$))/i, 'QHCT'],
+  [/^(?:(?:quy hoạch|QH),?\s+chung|(?:ĐC)?QHC(?=\s|$))/i, 'QHC']
 ];
 
 function loaiCode(s) {
@@ -592,7 +593,7 @@ function loaiCode(s) {
 }
 
 // "khu" chỉ giữ khi là một phần tên loại khu (Khu đô thị mới…, Khu dân cư…).
-const KEEP_KHU = /^khu\s+(?:đô thị|dân cư|công nghiệp|du lịch|nhà ở|tái định cư|kinh tế|công nghệ|phức hợp|nghỉ dưỡng)(?=\s|$)/i;
+const KEEP_KHU = /^khu\s+(?:đô thị|dân cư|công nghiệp|du lịch|nhà ở|tái định cư|kinh tế|công nghệ|phức hợp|nghỉ dưỡng|dịch vụ|thương mại)(?=\s|$)/i;
 
 // "Quy hoạch phân khu (tỷ lệ 1/2000) khu vực Thủy Xuân, quận Thuận Hóa, thành phố Huế" → "QHPK Thủy Xuân";
 // "… khu trung tâm phía Tây, …" → "QHPK TT phía Tây".
@@ -607,10 +608,13 @@ function proposeName(dump) {
   const fromRaw = loaiCode(raw);
   const loai = loaiCode(r0.loaiquyhoach) || (fromRaw !== raw ? fromRaw : '');
   let s = raw.replace(/\([^)]*tỷ lệ[^)]*\)/gi, ' ').replace(/,?\s*tỷ lệ\s*1\s*\/\s*[\d.,]*\d/gi, ' ')
-    .replace(/\s+/g, ' ').trim();
-  s = s.split(/,?\s+(?:quận|huyện|thành phố|thị xã|tỉnh)(?=\s|,|$)/i)[0].replace(/[\s,–-]+$/, '').trim();
-  s = s.replace(/^(?:quy hoạch\s+(?:phân khu|chi tiết|chung)(?:\s+xây dựng)?|QHPK|QHCT|QHC)(?=\s|$)\s*/i, '');
-  s = s.replace(/^khu vực\s+/i, '');
+    .replace(/\s+/g, ' ').trim()
+    .replace(/[\s,–-]+(?:đến năm|tầm nhìn|định hướng)\s.*$/i, '');
+  s = s.split(/,?\s+(?:quận|huyện|thành phố|thị xã|tỉnh)(?=\s|,|$)|,\s*(?:phường|xã|thị trấn)(?=\s)/i)[0]
+    .replace(/[\s,–-]+$/, '').trim();
+  s = s.replace(/^(?:(?:quy hoạch|QH),?\s+(?:phân khu|chi ti?ết|chung|tổng mặt bằng)(?:\s+xây dựng)?|(?:ĐC)?(?:QHPK|QHCT|QHC))(?=\s|,|$)[\s,–-]*/i, '');
+  s = s.replace(/^(?:quy hoạch|QH)\s+điều chỉnh\s+/i, '');
+  s = s.replace(/^(?:dự án|khu vực)\s+/i, '');
   if (!KEEP_KHU.test(s)) s = s.replace(/^khu\s+/i, '');
   s = s.replace(/^(?:phường|xã|thị trấn)\s+/i, '');
   s = s.replace(/^trung tâm(?=\s|$)/i, 'TT').trim();
@@ -1063,10 +1067,21 @@ function selftest() {
     named('Điều chỉnh Quy hoạch chung TT Phú Lộc - huyện Phú Lộc'),
     named('x', { tendoan: 'Điều chỉnh QHC TT Phú Lộc, huyện Phú Lộc' }),
     named('Điều chỉnh Quy hoạch chung xây dựng (tỷ lệ 1:10000) Khu kinh tế Chân Mây-Lăng Cô, tỉnh Thừa Thiên Huế đến năm 2045'),
-    named('QHC Đô thị mới Vinh Hưng, huyện Phú Lộc, thành phố Huế')
+    named('QHC Đô thị mới Vinh Hưng, huyện Phú Lộc, thành phố Huế'),
+    named('Quy hoạch chung xây dựng xã Bình Tiến đến năm 2035, định hướng đến năm 2050(Tỷ lệ: 1/5000)'),
+    named('Quy hoạch chung xây dựng xã Phong Xuân, huyện Phong Điền, tỉnh Thừa Thiên Huế đến năm 2030'),
+    named('Quy hoạch phân khu TT Phong Điền – Phong Thu (định hướng thành lập phường)'),
+    named('x', { tendoan: 'Quy hoạch, chi tiết xây dựng - Khu đô thị Phú Mỹ An' }),
+    named('x', { tendoan: 'QH điều chỉnh khu đô thị mới An Cựu', loaiquyhoach: 'ĐCQHCT' }),
+    named('x', { tendoan: 'Quy hoạch chi tết khu tái định cư TDC2', loaiquyhoach: 'QHCT' }),
+    named('Quy hoạch tổng mặt bằng (tỷ lệ 1/500) Khu dịch vụ bãi tắm Thuận An, phường Thuận An, thành phố Huế')
   ];
   const nameOk = names[0] === 'QHC TT Phú Lộc' && names[1] === 'QHC TT Phú Lộc'
-    && names[2] === 'QHC Khu kinh tế Chân Mây-Lăng Cô' && names[3] === 'QHC Đô thị mới Vinh Hưng';
+    && names[2] === 'QHC Khu kinh tế Chân Mây-Lăng Cô' && names[3] === 'QHC Đô thị mới Vinh Hưng'
+    && names[4] === 'QHC Bình Tiến' && names[5] === 'QHC Phong Xuân'
+    && names[6] === 'QHPK TT Phong Điền – Phong Thu (định hướng thành lập phường)'
+    && names[7] === 'QHCT Khu đô thị Phú Mỹ An' && names[8] === 'QHCT Khu đô thị mới An Cựu'
+    && names[9] === 'QHCT Khu tái định cư TDC2' && names[10] === 'QHCT Khu dịch vụ bãi tắm Thuận An';
 
   const ok = name === 'QHPK Thử nghiệm' && outerCw && typesOk && crsOk && scopeOk && lopOk && nameOk
     && check.every((c) => c.walked && c.records === c.geojson && c.cpg === 'UTF-8' && c.code === 9994);

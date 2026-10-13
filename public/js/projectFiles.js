@@ -1,12 +1,13 @@
-// Tải ranh lô theo đồ án: mở bản đồ chỉ có danh mục. File một đồ án tải khi zoom ≥ ngưỡng lô và ranh tổng giao khung nhìn,
-// khi bật ranh lô công trình, khi bấm phóng tới (đồ án đang chọn giữ ở mọi zoom), khi đang chọn 1 phường và bật lớp
-// Quy hoạch (mọi đồ án thuộc phường, mọi zoom), hoặc khi bật lớp lô đã lưu (showLand).
+// Tải ranh lô theo đồ án: mở bản đồ chỉ có danh mục. File một đồ án tải khi bấm phóng tới (đồ án đang chọn, mọi zoom),
+// khi tick đồ án ở QHPK toàn TP, khi đang chọn 1 phường và bật lớp Quy hoạch (mọi đồ án thuộc phường, mọi zoom),
+// khi zoom ≥ ngưỡng lô và ranh tổng giao khung nhìn (không áp dụng QHPK toàn TP), hoặc khi bật lớp lô đã lưu (showLand).
 // Đồ án thư mục (dir) đọc hien-trang.json + su-dung-dat.json. Đồ án file gộp cũ đọc projects/<slug>.json.
 // Điểm chức năng chỉ dùng gợi tên lô lúc nhập, không tải / không vẽ (diem-chuc-nang.json cũ trên bucket bỏ qua).
 // Đồ án chưa chuyển đọc qua API. URL bucket do máy chủ trả về (?v= phiên bản trong danh mục).
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { planLevelOf } from './generalPlan.js';
+import { getLevel } from './mapLevel.js';
 
 const CITY_NAME = 'Thành phố Huế';
 // Tiến độ tải file đồ án (detail { done, total }; done = total là xong)
@@ -33,8 +34,14 @@ export function bindMap(fn, zoom, lotZoomFn) {
   if (lotZoomFn) lotZoom = lotZoomFn;
 }
 
+/** QHPK 1/2.000, chưa chọn phường: bản đồ chỉ ranh. Lô khi bấm ranh (focusedProject) hoặc tick đồ án (lotProjects). */
+export function qhpkBoundaryOnly() {
+  return getLevel() === 'qhpk' && state.showProjects && !wardScopeName();
+}
+
 function parcelLayerOn(zoom) {
-  return (state.showParcels && zoom >= lotZoom()) || (state.showProjects && zoom >= minZoom);
+  const byZoom = state.showProjects && zoom >= minZoom && !qhpkBoundaryOnly();
+  return (state.showParcels && zoom >= lotZoom()) || byZoom;
 }
 export function onChangeLots(fn) { onChange = fn; }
 
@@ -74,6 +81,16 @@ export function wardScopeName() {
   return state.showProjects && w && w !== CITY_NAME ? w : null;
 }
 
+/** Lô của đồ án name được vẽ: phường thì mọi đồ án đang hiện; QHPK toàn TP thì đồ án bấm ranh hoặc tick panel */
+export function projectLotsDrawn(name) {
+  if (!name) return false;
+  if (wardScopeName()) return lotShown(name);
+  if (qhpkBoundaryOnly()) return name === state.focusedProject || state.lotProjects.has(name);
+  const map = getMap();
+  if (state.showProjects && map && map.getZoom() >= minZoom) return lotShown(name);
+  return name === focusedProjectName();
+}
+
 /** Đồ án (mục danh mục) có phần nằm trong phường (danh mục ghi sẵn các phường giao ranh) */
 export const inWard = (entry, wardName) => Array.isArray(entry?.wards) && entry.wards.includes(wardName);
 
@@ -95,6 +112,7 @@ function wanted() {
     if (force.has(p.tenQH)) return state.showLand || !state.hiddenProjects.has(p.tenQH);
     if (p.tenQH === focus) return true;
     if (wardName && inWard(p, wardName) && lotShown(p.tenQH)) return true;
+    if (qhpkBoundaryOnly() && (p.tenQH === state.focusedProject || state.lotProjects.has(p.tenQH))) return true;
     if (!layerOn) return false;
     if (!state.showLand && state.showProjects && !lotShown(p.tenQH)) return false;
     if (!p.bbox) return !!state.showLand;
@@ -112,7 +130,8 @@ function wardLotsOn() {
 function wardLandsOn() {
   const map = getMap();
   if (!map) return false;
-  return state.showLand || (state.showProjects && map.getZoom() >= minZoom) || !!wardScopeName();
+  if (state.showLand || wardScopeName()) return true;
+  return state.showProjects && map.getZoom() >= minZoom && !qhpkBoundaryOnly();
 }
 
 function wantsWard() {
@@ -352,12 +371,14 @@ export async function infraLotOf(id, tenQH, phases = ['QH', 'HT']) {
 
 /**
  * Lô quy hoạch (giai đoạn QH) trong khung bbox [w, s, e, n]: file các đồ án có ranh tổng giao khung + lô QH theo phường.
- * Bỏ đồ án đang ẩn hoặc đã tắt lớp sử dụng đất QH; chỉ tải / đọc bộ nhớ đệm, không đổi lớp đang vẽ.
+ * Mặc định bỏ đồ án đang ẩn hoặc đã tắt lớp sử dụng đất QH. includeHidden: vẫn lấy (bảng thửa khi lớp QH chưa bật).
+ * level: chỉ đồ án cấp đó (planLevelOf: QHC / QHPK / QHCT). Chỉ tải / đọc bộ nhớ đệm, không đổi lớp đang vẽ.
  * → { projects: [{ tenQH, bbox, lots }], wardLots }
  */
-export async function planLotsIn(bbox) {
+export async function planLotsIn(bbox, { level = null, includeHidden = false } = {}) {
   const entries = state.projectCatalog.filter(p => p && p.tenQH && !p.sheetOnly && Array.isArray(p.bbox)
-    && !state.hiddenProjects.has(p.tenQH) && !isLayerHidden(p.tenQH, LOT_LAYER.QH)
+    && (level == null || planLevelOf(p.tenQH) === level)
+    && (includeHidden || (!state.hiddenProjects.has(p.tenQH) && !isLayerHidden(p.tenQH, LOT_LAYER.QH)))
     && p.bbox[0] <= bbox[2] && p.bbox[2] >= bbox[0] && p.bbox[1] <= bbox[3] && p.bbox[3] >= bbox[1]);
   const projects = [];
   await pool(entries, 3, async (entry) => {
