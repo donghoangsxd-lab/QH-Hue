@@ -448,6 +448,25 @@ function nudgeParcel(targetMap, bounds) {
   if (overlapsY && left < limit - 8) targetMap.panBy([left - limit, 0], { animate: true, duration: 0.4 });
 }
 
+// Thửa nhỏ ở mức phóng vừa nhìn không rõ: phóng tới khi ranh chưa chiếm khung nhìn, không thu nhỏ nếu đang gần hơn
+function frameParcel(targetMap, bounds) {
+  if (!targetMap || !bounds?.isValid?.()) return;
+  const el = document.getElementById('cadParcelCard');
+  const cardW = el && !el.hidden ? el.getBoundingClientRect().width + 28 : 48;
+  const padTL = L.point(cardW, 80);
+  const padBR = L.point(40, 40);
+  const fitZ = targetMap.getBoundsZoom(bounds, false, padTL.add(padBR));
+  const zoom = Math.min(targetMap.getMaxZoom(), fitZ);
+  if (targetMap.getZoom() < zoom - 0.2) {
+    targetMap.once('moveend', () => nudgeParcel(targetMap, bounds));
+    targetMap.flyToBounds(bounds, {
+      paddingTopLeft: padTL, paddingBottomRight: padBR, maxZoom: zoom, duration: 0.55
+    });
+    return;
+  }
+  nudgeParcel(targetMap, bounds);
+}
+
 function drawHighlight(shape, targetMap) {
   if (!targetMap.getPane(HL_PANE)) {
     const pane = targetMap.createPane(HL_PANE);
@@ -463,7 +482,7 @@ function drawHighlight(shape, targetMap) {
   if (cardState) {
     cardState.map = targetMap;
     cardState.bounds = bounds;
-    requestAnimationFrame(() => nudgeParcel(targetMap, bounds));
+    requestAnimationFrame(() => frameParcel(targetMap, bounds));
   }
   return bounds;
 }
@@ -497,7 +516,7 @@ function paintLand(geoms, color) {
     style: { color: '#111827', weight: 2, opacity: 1, fillColor: color || '#94a3b8', fillOpacity: 0.62 }
   }).addTo(m);
   const bounds = landFill.getBounds?.();
-  if (bounds?.isValid?.()) nudgeParcel(m, bounds);
+  if (bounds?.isValid?.()) frameParcel(m, bounds);
 }
 
 function markLand(key) {
@@ -728,7 +747,7 @@ function flyAndOpen(lat, lng) {
   const m = activeMap();
   const target = L.latLng(lat, lng);
   m.once('moveend', () => openParcel(target, m));
-  m.flyTo(target, Math.max(m.getZoom(), 18), { duration: 0.8 });
+  m.flyTo(target, Math.max(m.getZoom(), 19), { duration: 0.8 });
 }
 
 async function findParcel() {

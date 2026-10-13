@@ -48,7 +48,7 @@ export function initPlanMap(mainMap, mainLayers) {
     zoomControl: false,
     attributionControl: true,
     renderer: L.canvas(),
-    maxZoom: 18,
+    maxZoom: 21,
     zoomSnap: leftMap.options.zoomSnap
   }).setView(leftMap.getCenter(), leftMap.getZoom());
 

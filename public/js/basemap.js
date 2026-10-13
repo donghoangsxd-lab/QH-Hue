@@ -22,7 +22,7 @@ function addLabels(m) {
     pane.style.zIndex = 450;
     pane.style.pointerEvents = 'none';
   }
-  labelLayers.set(m, L.tileLayer(LABELS.url, { maxZoom: 19, pane: LABELS_PANE, ...LABELS.opts }).addTo(m));
+  labelLayers.set(m, L.tileLayer(LABELS.url, { maxZoom: 21, pane: LABELS_PANE, ...LABELS.opts }).addTo(m));
 }
 
 /** Bật / tắt tem đường, tên công trình trên mọi bản đồ đã gắn ảnh nền (nút nhỏ cuối dòng Mạng lưới đường) */
@@ -43,7 +43,7 @@ export const labelsOverlayOn = () => labelsOn;
 /** Gắn ảnh nền vào bản đồ (gọi khi khởi tạo map / planMap) */
 export function attachBasemap(m) {
   maps.get(m)?.remove();
-  const layer = L.tileLayer(BASEMAP.url, { maxZoom: 19, zIndex: 0, crossOrigin: 'anonymous', ...BASEMAP.opts }).addTo(m);
+  const layer = L.tileLayer(BASEMAP.url, { maxZoom: 21, zIndex: 0, crossOrigin: 'anonymous', ...BASEMAP.opts }).addTo(m);
   maps.set(m, layer);
   if (labelsOn) {
     labelLayers.get(m)?.remove();

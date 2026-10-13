@@ -186,7 +186,7 @@ function resolveWardNameFromCoords(lat, lng) {
 // ============================ KHỞI TẠO BẢN ĐỒ ============================
 
 export function initMap() {
-  map = L.map('map', { renderer: L.canvas(), maxZoom: 18 }).setView(CITY_CENTER, CITY_ZOOM);
+  map = L.map('map', { renderer: L.canvas(), maxZoom: 21 }).setView(CITY_CENTER, CITY_ZOOM);
 
   attachBasemap(map);
 
