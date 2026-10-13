@@ -3,7 +3,7 @@
 // Dòng lớp ghi số đồ án nhập và số lô tĩnh; chưa có cả hai thì "chưa có dữ liệu".
 // Chọn một phường, hoặc đang mở một đồ án, khi lớp QHCT tắt: ranh các đồ án QHCT giao phạm vi đó vẽ đỏ nét đứt dày,
 // phần nằm ngoài phạm vi bị cắt. Toàn TP (chưa chọn phường, chưa mở đồ án) không vẽ các ranh này.
-// Nhịp nét lệch nửa chu kỳ với ranh điều chỉnh cục bộ (adjustLayer.js) nên chỗ trùng ranh hiện xen kẽ đỏ / xanh.
+// Nhịp nét lệch nửa chu kỳ với ranh điều chỉnh cục bộ (adjustLayer.js) nên chỗ trùng ranh hiện xen kẽ đỏ / vàng.
 import { state } from './state.js';
 import { map } from './mapEngine.js';
 import { planMap, isSplitOn, getViewMode, setViewMode, passToolClick } from './planMap.js';
@@ -17,8 +17,8 @@ const DEFAULT_COLOR = '#f472b6';
 // Trên ranh điều chỉnh cục bộ (447), dưới tem đường (450)
 const OUTLINE_PANE = 'qhctOutlinePane';
 const OUTLINE_Z = 448;
-const OUTLINE_STYLE = { color: '#ef4444', weight: 4, opacity: 1, dashArray: '12 12', lineCap: 'butt', fill: false };
-const OUTLINE_HOVER = { color: '#fca5a5', weight: 6 };
+const OUTLINE_STYLE = { color: '#ef4444', weight: 2, opacity: 1, dashArray: '3 3', lineCap: 'butt', fill: false };
+const OUTLINE_HOVER = { color: '#fca5a5', weight: 4 };
 
 const $ = (id) => document.getElementById(id);
 const target = () => planMap || map;

@@ -12,7 +12,7 @@ import { ScanOverlay, cornersOf, openGeoref, prepareScan, scanProblem } from './
 import { TT16_LAND_KEYS, TT16_STYLES, TT16_PATTERN_ZOOM, tt16SwatchCss } from './tt16Symbols.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 
-const RANH = '#2f80ff';
+const RANH = '#f5c400';
 const FILL_PANE = 'adjImportFillPane';
 const SCAN_PANE = 'adjImportScanPane';
 const LINE_PANE = 'adjImportLinePane';
@@ -103,7 +103,7 @@ function drawPreview(fit = false) {
     L.geoJSON(l.geometry, { interactive: false, renderer: fillRenderer, style: adjustLotStyle(l, previewDetailed) }).addTo(preview);
   });
   const ring = L.geoJSON(p.boundary, {
-    interactive: false, renderer: lineRenderer, style: { color: RANH, weight: 4, dashArray: '12 12', fill: false }
+    interactive: false, renderer: lineRenderer, style: { color: RANH, weight: 2, dashArray: '3 3', dashOffset: '3', fill: false }
   }).addTo(preview);
   if (scan && scan.georef && ScanOverlay) {
     scanLayer = new ScanOverlay(scan.url, cornersOf(scan.georef), { pane: SCAN_PANE, opacity: 1 - transparency / 100 }).addTo(map);

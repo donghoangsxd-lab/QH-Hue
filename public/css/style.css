@@ -876,7 +876,7 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-layer-dot { flex-shrink: 0; width: 9px; height: 9px; border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.35); background: var(--dot, #94a3b8); }
 .project-layer-dot.points { width: 7px; height: 7px; margin: 0 1px; border-radius: 50%; border-color: rgba(15, 23, 42, 0.8); }
 .project-layer-dot.boundary { background: transparent; border: 1.5px dashed var(--dot, #e879f9); }
-.project-layer-dot.adjust { border: 1.5px dashed #2f80ff; background: repeating-linear-gradient(45deg, rgba(47, 128, 255, 0.75) 0 1.5px, transparent 1.5px 4px); }
+.project-layer-dot.adjust { border: 1.5px dashed #f5c400; background: repeating-linear-gradient(45deg, rgba(245, 196, 0, 0.95) 0 2.5px, transparent 2.5px 5px); }
 .project-adj-list { margin: 0 0 2px 16px; max-height: 160px; overflow-y: auto; scrollbar-width: thin; }
 .project-adj-list .project-lot-hit span { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
 .project-layer-name input:disabled { cursor: not-allowed; opacity: 0.5; }
@@ -3602,7 +3602,7 @@ body.project-review.la-page #projectReviewHost {
 .la-import-go { background: #a21caf; border-color: #d946ef; color: #fff; }
 
 /* Ranh điều chỉnh cục bộ trên bản đồ quy hoạch (adjustLayer.js) */
-.adj-glow { filter: drop-shadow(0 0 3px #ffffff) drop-shadow(0 0 8px #2f80ff); }
+.adj-glow { filter: drop-shadow(0 0 3px #ffffff) drop-shadow(0 0 8px #f5c400); }
 .adj-popup .leaflet-popup-content-wrapper { padding: 0; overflow: hidden; border-color: rgba(47, 128, 255, 0.45); box-shadow: 0 12px 32px rgba(2, 6, 23, 0.6); }
 .adj-popup .leaflet-popup-content { margin: 0; width: auto !important; }
 .adj-popup .leaflet-popup-close-button { top: 8px !important; right: 8px !important; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-muted) !important; }

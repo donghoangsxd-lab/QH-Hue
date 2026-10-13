@@ -1,5 +1,5 @@
-// Hồ sơ điều chỉnh cục bộ trên bản đồ quy hoạch (bản đồ chính và khung so sánh): ranh xanh dương nét đứt dày, nền sọc nghiêng 45°.
-// Nhịp nét lệch nửa chu kỳ với ranh khu vực QHCT (qhctLayer.js): khu vực vừa có QHCT vừa điều chỉnh hiện xen kẽ xanh / đỏ.
+// Hồ sơ điều chỉnh cục bộ trên bản đồ quy hoạch (bản đồ chính và khung so sánh): ranh vàng nét đứt, nền sọc vàng nghiêng 45°.
+// Nhịp nét lệch nửa chu kỳ với ranh khu vực QHCT (qhctLayer.js): khu vực vừa có QHCT vừa điều chỉnh hiện xen kẽ vàng / đỏ.
 // Rê chuột sáng viền; bấm mở popup để thể hiện theo điều chỉnh (lớp che trắng giấu quy hoạch cũ trong ranh, tắt được;
 // lô mới kẻ hoa văn TT16 theo loại đất), xem PDF scan
 // hoặc bật ảnh tờ bản vẽ scan đã định vị (scanGeoref.js), thanh nhỏ ở góc ảnh chỉnh độ trong suốt và tắt ảnh.
@@ -14,7 +14,7 @@ import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 import { ScanOverlay, cornersOf, openGeoref, prepareScan, scanProblem } from './scanGeoref.js';
 import { tt16SymbolStyle, landPatternKey, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT } from './tt16Symbols.js';
 
-const BLUE = '#2f80ff';
+const YELLOW = '#f5c400';
 // Trên viền sáng ranh đồ án (445), dưới tem đường (450): nền che + lô mới ở 446, ảnh scan ở 447, ranh ở 448
 const FILL_PANE = 'adjustFillPane';
 const SCAN_PANE = 'adjustScanPane';
@@ -23,8 +23,8 @@ const FILL_Z = 446;
 const SCAN_Z = 447;
 const LINE_Z = 448;
 const SCAN_TRANSPARENCY = 30;
-const LINE_STYLE = { color: BLUE, weight: 4, opacity: 1, dashArray: '12 12', dashOffset: '12', lineCap: 'butt' };
-const HOVER_STYLE = { color: '#93c5fd', weight: 6 };
+const LINE_STYLE = { color: YELLOW, weight: 2, opacity: 1, dashArray: '3 3', dashOffset: '3', lineCap: 'butt' };
+const HOVER_STYLE = { color: '#fff1a8', weight: 4 };
 export const ADJUST_PDF_MAX_BYTES = 2 * 1024 * 1024;
 // Khóa lớp trong state.hiddenProjectLayers ("<Ten_QH>|dieu-chinh"), cùng cách lưu với PROJECT_LAYERS
 export const ADJUST_LAYER_KEY = 'dieu-chinh';
@@ -153,7 +153,7 @@ function hatchDefs(svg, id) {
   p.setAttribute('width', '10');
   p.setAttribute('height', '10');
   p.setAttribute('patternTransform', 'rotate(45)');
-  p.innerHTML = `<rect width="10" height="10" fill="${BLUE}" fill-opacity="0.06"/><line x1="0" y1="0" x2="0" y2="10" stroke="${BLUE}" stroke-width="2.2" stroke-opacity="0.75"/>`;
+  p.innerHTML = `<rect width="10" height="10" fill="${YELLOW}" fill-opacity="0.08"/><line x1="0" y1="0" x2="0" y2="10" stroke="${YELLOW}" stroke-width="4" stroke-opacity="0.9"/>`;
   defs.appendChild(p);
 }
 
