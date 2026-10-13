@@ -253,6 +253,26 @@ body.split-offset .swipe-handle { display: none; }
 @media (prefers-reduced-motion: reduce) { .map-title-progress > i::after { animation: none; } }
 .map-title[data-view="split"]::before { background: linear-gradient(90deg, transparent, var(--accent-cyan) 20%, var(--accent-cyan) 48%, var(--accent-orange) 52%, var(--accent-orange) 80%, transparent); }
 body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-width: calc(100% - 2 * (var(--ov-w) + 24px)); }
+/* Góc trên trái, cùng hàng tiêu đề: hiện khi đang chọn đồ án, QHC, phường xã hoặc đô thị (viewFlow.syncEscHint) */
+.esc-hint {
+  position: absolute;
+  top: 12px;
+  left: calc(12px + var(--ov-w) + 12px);
+  height: var(--title-h);
+  margin: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.88);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.esc-hint[hidden] { display: none; }
+#mapArea.print-staging .esc-hint { display: none; }
 /* Nút lật trang Quy hoạch ⇄ Hiện trạng (biểu tượng bên trái tiêu đề) */
 .map-title-mark {
   flex-shrink: 0;

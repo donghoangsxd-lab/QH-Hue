@@ -17,7 +17,7 @@
 // 4. Chọn lại Thành phố Huế: giữ lớp đang xem, tắt các lớp phụ, panel dưới giữ nguyên để xem chỉ tiêu toàn TP.
 // Bản đồ hiện trạng (lật sang hoặc nửa trái khi so sánh): bấm nền khi nhìn rộng → chọn phường.
 import { state } from './state.js';
-import { highlightWardBoundary, wardNameAt } from './mapEngine.js';
+import { map, highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
@@ -25,10 +25,10 @@ import { revealWardProjects, clearProjectFocus, projectContains } from './projec
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { RIGHT_TAB_EVENT } from './utils.js';
 import { URBAN_PICK_EVENT, urbanVisionFeature, urbanVisionAt } from './urbanAreaLayer.js';
-import { focusUrban, clearUrbanFocus, urbanFocusHolds, initUrbanFocus, FOCUS_CORE_EVENT } from './urbanFocus.js';
+import { focusUrban, clearUrbanFocus, urbanFocusHolds, urbanFocused, initUrbanFocus, FOCUS_CORE_EVENT } from './urbanFocus.js';
 import { fitCenter, isCoreWard, setCoreOpen, isCoreOpen, coreContains, QHC_CORE_EVENT } from './qhc2045Layer.js';
 import { getLevel, setLevel, levelOrigin, levelScope, LEVEL_EVENT, LEVELS } from './mapLevel.js';
-import { planLevelOf } from './generalPlan.js';
+import { planLevelOf, URBAN_FOCUS_EVENT } from './generalPlan.js';
 
 const CITY_NAME = 'Thành phố Huế';
 // Về toàn TP chỉ tắt lớp phụ; ô tùy chọn con (ranh lô công trình, lô hạ tầng đồ án, đổ bóng) không tự vẽ gì nên giữ.
@@ -66,13 +66,18 @@ function onLevelChange({ level, prev }) {
   if (level === 'qhpk') {
     if (!ward) state.lotProjects.clear();
     if (!state.focusedProject) revealWardProjects(ward);
+    syncEscHint();
     return;
   }
   revealWardProjects(ward, { show: false });
-  if (level !== 'qhc10' || state.focusedProject) return;
+  if (level !== 'qhc10' || state.focusedProject) {
+    syncEscHint();
+    return;
+  }
   if (ward && !isCoreWard(ward)) selectWardDetail(CITY_NAME);
   else if (ward) highlightWardBoundary(ward, { fitView: true });
   else fitCenter();
+  syncEscHint();
 }
 
 /** Vào QHC 1/10.000 (bấm ký hiệu đô thị trung tâm, hoặc vùng TTHuế 2045 của đô thị đang chọn: openLots mở lô luôn) */
@@ -82,6 +87,7 @@ function enterCore({ openLots = false } = {}) {
   if (!isSplitOn() && getViewMode() !== 'QH') setViewMode('QH');
   setLevel('qhc10');
   if (openLots) setCoreOpen(true);
+  syncEscHint();
 }
 
 // ---------- Hệ thống đô thị ----------
@@ -129,6 +135,7 @@ function onWardSelected(name) {
   clearProjectFocus();
   if (isCity(name)) enterCity();
   else enterWard(name);
+  syncEscHint();
 }
 
 // ---------- Đồ án ----------
@@ -139,17 +146,13 @@ const KIND_LEVEL = { QHC: 'qhc10', QHCT: 'qhct' };
 function onProjectOpened(e) {
   const level = getLevel();
   const kind = planLevelOf(e?.detail);
-  if (level === 'qhpk' && kind === 'QHPK') return;
-  if (levelScope() && kind === levelScope()) {
-    setCoreOpen(false);
-    return;
-  }
-  if (KIND_LEVEL[kind]) {
+  if (level === 'qhpk' && kind === 'QHPK') { /* giữ lớp */ }
+  else if (levelScope() && kind === levelScope()) setCoreOpen(false);
+  else if (KIND_LEVEL[kind]) {
     setLevel(KIND_LEVEL[kind], { origin: level });
     setCoreOpen(false);
-    return;
-  }
-  setLevel('qhpk', { origin: RETURN_LEVELS.has(level) ? level : null });
+  } else setLevel('qhpk', { origin: RETURN_LEVELS.has(level) ? level : null });
+  syncEscHint();
 }
 
 // Bỏ đồ án đang mở, giữ lớp đang xem: về ranh + tên các đồ án
@@ -157,12 +160,14 @@ function leaveProject() {
   closeProjectView();
   clearProjectFocus();
   revealWardProjects(isCity(state.selectedWard) ? null : state.selectedWard, { show: false });
+  syncEscHint();
 }
 
 // Lớp có cấp đồ án (QHC 1/10.000): bấm nền ngoài đồ án đang mở thì thu gọn về tổng quan
 function leaveScopeFocus(latlng) {
   if (state.focusedProject && !projectContains(state.focusedProject, latlng)) leaveProject();
   if (isCoreOpen() && !coreContains(latlng)) setCoreOpen(false);
+  syncEscHint();
 }
 
 // Thoát thông tin đồ án: về lớp gốc (Hệ thống đô thị, QHC 1/10.000) hoặc phường đang chọn / toàn TP, lô cả phường hiện lại.
@@ -178,10 +183,12 @@ function onProjectExit(e) {
   }
   if (levelScope()) {
     revealWardProjects(isCity(state.selectedWard) ? null : state.selectedWard, { show: false });
+    syncEscHint();
     return;
   }
   highlightWardBoundary(state.selectedWard, { fitView: true });
   if (!unchecked) revealWardProjects(isCity(state.selectedWard) ? null : state.selectedWard);
+  syncEscHint();
 }
 
 // ---------- Click bản đồ ----------
@@ -228,14 +235,89 @@ function initProgress() {
   });
 }
 
+function escBusy() {
+  const t = document.activeElement;
+  if (t?.closest?.('input, textarea, select, [contenteditable="true"]')) return true;
+  if (state.sketchTool || state.adminDrawMode || state.isPickMode || state.activeMeasureType || state.lotShapeEdit) return true;
+  return !!document.querySelector('.ov-root:not([hidden]), .tour-root:not([hidden]), #adjViewer, #decisionView:not([hidden]), .cad-card:not([hidden]), .leaflet-popup.dock-card');
+}
+
+function isQhcPopup(pop) {
+  return !!(pop?.isOpen?.() && pop._map && pop._container?.classList.contains('qhc-popup'));
+}
+
+function qhcPopupOpen() {
+  return [map, planMap].some(m => isQhcPopup(m?._popup));
+}
+
+// Leaflet 1.9 closePopup chỉ gọi popup.close(); popup đã gỡ khỏi bản đồ thì _popup vẫn còn, ESC sau bị kẹt ở nhánh này.
+function closeQhcPopup() {
+  let closed = false;
+  for (const m of [map, planMap]) {
+    if (!m) continue;
+    const pop = m._popup;
+    if (!pop?._container?.classList.contains('qhc-popup')) continue;
+    if (isQhcPopup(pop)) {
+      pop._map.removeLayer(pop);
+      closed = true;
+    }
+    if (m._popup === pop) m._popup = null;
+  }
+  return closed;
+}
+
+/** Hiện "Bấm ESC để thoát" khi đang chọn đồ án, lõi QHC, phường xã, đô thị hoặc vùng QHC */
+function syncEscHint() {
+  const hint = document.getElementById('escHint');
+  if (!hint) return;
+  const on = !!(state.focusedProject || isCoreOpen() || !isCity(state.selectedWard) || urbanFocused() || qhcPopupOpen());
+  hint.hidden = !on;
+}
+
+// Lớp trong cùng thoát trước: popup vùng QHC → đồ án → lô lõi QHC → ranh phường xã → đô thị
+function onEscape(e) {
+  if (e.key !== 'Escape' || e.defaultPrevented || escBusy()) return;
+  if (closeQhcPopup()) {
+    e.preventDefault();
+    syncEscHint();
+    return;
+  }
+  if (state.focusedProject) {
+    e.preventDefault();
+    document.dispatchEvent(new CustomEvent(PROJECT_VIEW_EXIT_EVENT));
+    return;
+  }
+  if (isCoreOpen()) {
+    e.preventDefault();
+    setCoreOpen(false);
+    syncEscHint();
+    return;
+  }
+  if (!isCity(state.selectedWard)) {
+    e.preventDefault();
+    selectWardDetail(CITY_NAME);
+    return;
+  }
+  if (urbanFocused()) {
+    e.preventDefault();
+    clearUrbanFocus();
+  }
+}
+
 export function initViewFlow() {
+  document.addEventListener('keydown', onEscape);
   document.addEventListener(LEVEL_EVENT, (e) => onLevelChange(e.detail));
   document.addEventListener(WARD_SELECT_EVENT, (e) => onWardSelected(e.detail));
   document.addEventListener(PROJECT_INFO_EVENT, onProjectOpened);
   document.addEventListener(PROJECT_VIEW_EXIT_EVENT, onProjectExit);
   document.addEventListener(URBAN_PICK_EVENT, (e) => onUrbanPick(e.detail));
+  document.addEventListener(URBAN_FOCUS_EVENT, syncEscHint);
   document.addEventListener(FOCUS_CORE_EVENT, () => enterCore({ openLots: true }));
   initUrbanFocus();
-  document.addEventListener(QHC_CORE_EVENT, () => { if (state.focusedProject) leaveProject(); });
+  document.addEventListener(QHC_CORE_EVENT, () => {
+    if (state.focusedProject) leaveProject();
+    syncEscHint();
+  });
+  [map, planMap].filter(Boolean).forEach(m => m.on('popupopen popupclose', syncEscHint));
   initProgress();
 }

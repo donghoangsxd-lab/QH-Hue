@@ -274,6 +274,9 @@ export function clearUrbanFocus() {
   emitFocus();
 }
 
+/** Đô thị đang chọn và lớp Hệ thống đô thị đang hiện */
+export const urbanFocused = () => !!current && getLevel() === 'urban';
+
 /** Điểm bấm nằm trong đô thị đang chọn (đô thị loại I toàn thành phố không giữ click để còn chọn đô thị bên trong) */
 export function urbanFocusHolds(latlng) {
   if (!current || current.city || !latlng) return false;
@@ -295,10 +298,5 @@ export function initUrbanFocus() {
       return;
     }
     if (getLevel() === 'urban') focusUrban({ key: `gp:${d.id}`, name: d.name, geometry: d.geometry, city: d.city }, { fit: false });
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || !current || getLevel() !== 'urban') return;
-    if (e.target.closest?.('input, textarea, select, [contenteditable="true"]')) return;
-    clearUrbanFocus();
   });
 }

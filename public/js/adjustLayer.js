@@ -164,6 +164,7 @@ function layersOf(m) {
     if (!m.getPane(name)) m.createPane(name).style.zIndex = z;
   });
   m.getPane(SCAN_PANE).style.pointerEvents = 'none';
+  m.getPane(FILL_PANE).style.pointerEvents = 'none';
   const fillR = L.canvas({ pane: FILL_PANE }).addTo(m);
   const lineR = L.svg({ pane: LINE_PANE }).addTo(m);
   const hatchId = `adjHatch${L.stamp(m)}`;
@@ -335,6 +336,21 @@ function drawOn(m) {
     line.on('click', (e) => { if (!passToolClick(m, e)) openPopup(m, it, e.latlng); });
     L1.lines.addLayer(line);
   });
+  syncFillPointer(L1);
+}
+
+// Canvas nền che phủ kín khung, nằm trên ranh đồ án. Để pointer-events auto thì vùng trống cũng nuốt click ranh.
+// Chỉ bắt chuột khi đang vẽ lô điều chỉnh (bấm lô mở hồ sơ).
+function syncFillPointer(L1) {
+  const pane = L1.map.getPane(FILL_PANE);
+  if (!pane) return;
+  let capture = false;
+  L1.fills.eachLayer(layer => {
+    if (capture || !layer.eachLayer) return;
+    layer.eachLayer(l => { if (l.options?.interactive !== false) capture = true; });
+  });
+  pane.style.pointerEvents = capture ? 'auto' : 'none';
+  if (L1.fillR._container) L1.fillR._container.style.pointerEvents = capture ? '' : 'none';
 }
 
 export function refreshAdjustLayer() {
