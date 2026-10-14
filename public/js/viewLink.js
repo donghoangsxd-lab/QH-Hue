@@ -1,10 +1,12 @@
 // Link chia sẻ khung nhìn: query trên URL là trạng thái (không ghi máy chủ, không localStorage).
-// Gồm tâm bản đồ, mức phóng, lớp droplist, các ô lớp đang bật, vùng phủ, chế độ xem và độ mờ thửa.
-// Không gồm phác thảo, đồ án đang tick để hiện lô, hay danh sách đồ án ẩn riêng từng máy.
+// Gồm tâm bản đồ, mức phóng, lớp droplist, các ô lớp đang bật, vùng phủ, chế độ xem, độ mờ thửa
+// và đồ án đang mở (da). Không gồm phác thảo, đồ án khác đang tick để hiện lô, hay danh sách ẩn riêng từng máy.
 import { map, layers, toggleBuffer } from './mapEngine.js';
 import { getViewMode, setViewMode, isSplitOn, setSplit, getSplitKind, setSplitKind } from './planMap.js';
 import { getLevel, setLevel, LEVELS } from './mapLevel.js';
 import { labelsOverlayOn, setLabelsOverlay } from './basemap.js';
+import { focusedProjectName } from './projectFiles.js';
+import { shareOpenProject } from './projectLayer.js';
 import { showToast } from './utils.js';
 
 const LEVEL_CODE = { urban: 'dt', qhc25: '25', qhc10: '10', qhpk: 'pk', qhct: 'ct' };
@@ -100,14 +102,38 @@ function applyChrome(q) {
   if (cam && map) map.setView([cam.lat, cam.lng], cam.z, { animate: false });
 }
 
+function holdCamera() {
+  const cam = readCamera();
+  if (cam && map) map.setView([cam.lat, cam.lng], cam.z, { animate: false });
+}
+
+// Danh mục đồ án nạp sau khung nhìn: gắn trạng thái trước, vẽ lại khi catalog có tên
+function applyOpenProject(q) {
+  const name = (q.get('da') || '').trim();
+  if (!name || name.length > 180) return;
+  const open = () => {
+    const found = shareOpenProject(name);
+    if (found) holdCamera();
+    return found;
+  };
+  if (open()) return;
+  const once = () => {
+    document.removeEventListener('cadparcels:loaded', once);
+    open();
+  };
+  document.addEventListener('cadparcels:loaded', once);
+}
+
 /** Khôi phục khung nhìn nếu URL có tham số chia sẻ. Gọi sau khi ô lớp đã gắn sự kiện. */
 export function applyViewLink() {
   const q = params();
-  if (![...q.keys()].some(k => ['ll', 'ly', 'lv', 'm', 'sp', 'bf', 'lb', 'tho'].includes(k))) return;
+  if (![...q.keys()].some(k => ['ll', 'ly', 'lv', 'm', 'sp', 'bf', 'lb', 'tho', 'da'].includes(k))) return;
   applyLayers(q);
   applyBuffers(q);
   applyChrome(q);
-  showToast('Đã mở khung nhìn được chia sẻ', 'info');
+  applyOpenProject(q);
+  const name = (q.get('da') || '').trim();
+  showToast(name ? `Đã mở khung nhìn và đồ án «${name}»` : 'Đã mở khung nhìn được chia sẻ', 'info');
 }
 
 function buildUrl() {
@@ -135,6 +161,8 @@ function buildUrl() {
   const tho = document.getElementById('cadastreOpacity');
   if (document.getElementById('chk_cadastre')?.checked && tho && tho.value !== '100') q.set('tho', tho.value);
   if (labelsOverlayOn()) q.set('lb', '1');
+  const openName = focusedProjectName();
+  if (openName) q.set('da', openName);
   url.search = q.toString();
   return url.toString();
 }
@@ -163,7 +191,11 @@ export function initViewLink() {
     const link = buildUrl();
     history.replaceState(null, '', link);
     const ok = await copyText(link);
-    showToast(ok ? 'Đã chép link khung nhìn. Gửi link này để người khác mở đúng vị trí và lớp đang bật' : 'Chưa chép được. Hãy chép địa chỉ trên thanh trình duyệt', ok ? 'success' : 'error');
+    const openName = focusedProjectName();
+    const copied = openName
+      ? `Đã chép link. Người nhận mở đúng vị trí, lớp đang bật và đồ án «${openName}»`
+      : 'Đã chép link khung nhìn. Gửi link này để người khác mở đúng vị trí và lớp đang bật';
+    showToast(ok ? copied : 'Chưa chép được. Hãy chép địa chỉ trên thanh trình duyệt', ok ? 'success' : 'error');
   });
   applyViewLink();
 }

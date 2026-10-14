@@ -376,6 +376,28 @@ function openProject(p) {
   document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: p.name }));
 }
 
+// Link chia sẻ: mở đúng đồ án (bỏ ẩn, hiện lô, viền đậm, panel dưới) nhưng giữ nguyên khung nhìn URL
+export function shareOpenProject(name) {
+  const wanted = String(name || '').trim();
+  if (!wanted) return false;
+  const p = projects.find(x => x.name === wanted);
+  state.focusedProject = wanted;
+  if (state.hiddenProjects.delete(wanted)) saveHidden();
+  if (!p || p.level === 'QHPK') state.lotProjects.add(wanted);
+  if (!p) return false;
+  if (!kindOn(p.name)) turnKindOn(p, () => setMaster(true));
+  if (!state.showProjectInfra) ensureFullLots();
+  focusName = p.name;
+  refreshAll();
+  drawFocus();
+  pinGlow(p);
+  markPicked(p.name);
+  focusProjectLots(p.name);
+  revealInList(p);
+  document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: p.name }));
+  return true;
+}
+
 /** Điểm latlng nằm trong ranh tổng của đồ án name */
 export function projectContains(name, latlng) {
   const p = projects.find(x => x.name === name);
