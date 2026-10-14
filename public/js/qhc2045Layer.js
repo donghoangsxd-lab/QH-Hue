@@ -29,6 +29,9 @@ const PANE = ['qhcPane', 350];
 // Ranh tiểu vùng, phân khu 1/10.000 và ranh mở rộng QĐ 756 nằm trên ranh 40 phường (overlayPane 400), dưới ranh đồ án
 // QHPK (projectGlowPane 445) và viền phường đang chọn (448); không nhận click
 const LINE_PANE = ['qhcLinePane', 420];
+// Highlight vùng trung tâm cùng mặt với ranh QHC nhập (Phong Điền, Chân Mây ở overlayPane 400): nền phải nằm trên
+// các ranh đó, nếu không bị che và trông như chỉ còn nét trắng từng quận
+const WASH_PANE = ['qhcWashPane', 430];
 const LABEL_MIN_ZOOM = 14;
 const TV_LABEL_MAX_ZOOM = 14;
 const STAGES = [
@@ -43,9 +46,9 @@ const EXT_LINE = { color: '#f43f5e', weight: 3, opacity: 1, dashArray: '12 6' };
 const EXT_HALO = { color: '#0f172a', weight: 6.5, opacity: 0.55 };
 // Mở lô TTHuế 2045 (bấm vào ranh khi đang xem QHC 1/10.000): viewFlow.js bỏ đồ án QHC nhập đang chọn
 export const QHC_CORE_EVENT = 'qh:qhc-core-open';
-// Vùng đô thị trung tâm = hợp ranh 4 tiểu vùng. Đỏ nhạt, nền nhẹ để còn đọc lô phía trên
+// Cùng cách ranh QHC nhập (OUTLINE_QHC): viền liền đậm, nền màu đồ án. Đỏ nhạt; nền chỉ khi đang thu gọn (chưa mở lô)
 const CORE_WASH = '#f87171';
-const WASH_FILL = { stroke: false, fill: true, fillColor: CORE_WASH, fillOpacity: 0.18, interactive: false };
+const WASH_FILL = 0.2;
 
 // Mã 31 "Mặt nước ven biển": một khối biển ~55.000 ha phủ kín góc bản đồ, không mang thông tin sử dụng đất
 const SEA_CODE = 31;
@@ -56,10 +59,11 @@ const centerSet = new Set(CENTER_UNITS.map(bareWard));
 
 const data = { land: null, frame: null, vision: null };
 const loading = {};
-const layers = { land: null, frame: null, vision: null, ext: null, core: null, wash: null, washLine: null };
+const layers = { land: null, frame: null, vision: null, ext: null, core: null, wash: null };
 let coreUnion = null;
 let renderer = null;
 let lineRenderer = null;
+let washRenderer = null;
 const shownStages = new Set([0, 1, 2]);
 let extOn = false;
 let detailed = false;
@@ -101,14 +105,21 @@ function ensureLineRenderer(m) {
   return lineRenderer;
 }
 
-/** Thứ tự vẽ: định hướng 1/25.000 < nền vùng trung tâm < lô; viền đỏ vùng trung tâm nổi trên ranh trắng từng tiểu vùng */
+function ensureWashRenderer(m) {
+  if (washRenderer) return washRenderer;
+  const pane = m.getPane(WASH_PANE[0]) || m.createPane(WASH_PANE[0]);
+  pane.style.zIndex = WASH_PANE[1];
+  pane.style.pointerEvents = 'none';
+  washRenderer = L.canvas({ pane: WASH_PANE[0], padding: 0.3 });
+  return washRenderer;
+}
+
+/** Thứ tự vẽ trong canvas lô: định hướng 1/25.000 < lô; ranh trắng từng tiểu vùng nổi ở LINE_PANE */
 function restack() {
-  layers.wash?.bringToBack();
   layers.vision?.bringToBack();
   layers.land?.bringToFront();
   layers.frame?.bringToFront();
   layers.frame?.points?.bringToFront();
-  layers.washLine?.bringToFront();
   layers.ext?.bringToFront();
 }
 
@@ -199,24 +210,24 @@ function unionTv() {
   return acc;
 }
 
-// Nền + viền đỏ nhạt của vùng trung tâm, tách khỏi layers.core để click thu gọn vẫn mở lô và click lô không bị nuốt
+// Nền + viền đỏ nhạt của vùng trung tâm. Tách khỏi layers.core để click thu gọn vẫn mở lô.
+// fillRule nonzero: evenodd mặc định khoét lỗ khi hợp 4 quận, giữa vùng không còn nền như các QHC khác
 function drawWash() {
   layers.wash?.remove();
-  layers.washLine?.remove();
-  layers.wash = layers.washLine = null;
+  layers.wash = null;
   if (!$('chk_qhc10')?.checked) return;
   const shape = unionTv();
   if (!shape) return;
   const m = target();
-  const lr = ensureLineRenderer(m);
-  const fill = L.featureGroup();
-  L.geoJSON(shape, { pane: PANE[0], renderer: ensureRenderer(m), interactive: false, style: WASH_FILL }).addTo(fill);
-  const lines = L.featureGroup();
-  L.geoJSON(shape, { pane: LINE_PANE[0], renderer: lr, interactive: false, style: { color: '#0f172a', weight: 7, opacity: 0.45, fill: false } }).addTo(lines);
-  L.geoJSON(shape, { pane: LINE_PANE[0], renderer: lr, interactive: false, style: { color: CORE_WASH, weight: 3.2, opacity: 0.95, fill: false } }).addTo(lines);
-  layers.wash = fill.addTo(m);
-  layers.washLine = lines.addTo(m);
-  restack();
+  layers.wash = L.geoJSON(shape, {
+    pane: WASH_PANE[0],
+    renderer: ensureWashRenderer(m),
+    interactive: false,
+    style: {
+      color: CORE_WASH, weight: 2.8, opacity: 1, dashArray: null, lineJoin: 'round',
+      fill: true, fillColor: CORE_WASH, fillOpacity: collapsed() ? WASH_FILL : 0, fillRule: 'nonzero'
+    }
+  }).addTo(m);
 }
 
 // Thu gọn: nhãn tên đồ án ở mép trên (nhãn A1–A4 nằm giữa tiểu vùng). Nền vùng trung tâm là layers.wash
@@ -243,6 +254,7 @@ function applyCore() {
     layers.land?.remove();
     layers.land = null;
   } else if (!layers.land) drawLand();
+  drawWash();
   drawCore();
 }
 
@@ -267,11 +279,10 @@ async function setLand(on) {
     layers.land?.remove();
     layers.core?.remove();
     layers.wash?.remove();
-    layers.washLine?.remove();
     layers.frame?.tvLabels?.remove();
     layers.frame?.points?.remove();
     layers.frame?.remove();
-    layers.land = layers.frame = layers.core = layers.wash = layers.washLine = null;
+    layers.land = layers.frame = layers.core = layers.wash = null;
     setHint('qhc10Hint', 'Trung tâm');
     return;
   }
