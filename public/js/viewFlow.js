@@ -56,7 +56,7 @@ function showLayersTab() {
 }
 
 // ---------- Lớp quy hoạch ----------
-function onLevelChange({ level, prev }) {
+function onLevelChange({ level, prev, keepView }) {
   const keepFocus = !!state.focusedProject && planLevelOf(state.focusedProject) === levelScope();
   if (prev === 'qhpk' && level !== 'qhpk' && !keepFocus) {
     closeProjectView();
@@ -70,7 +70,8 @@ function onLevelChange({ level, prev }) {
     return;
   }
   revealWardProjects(ward, { show: false });
-  if (level !== 'qhc10' || state.focusedProject) {
+  // Droplist QHC 1/10.000 giữ khung hình đang xem. Bấm đô thị trung tâm vẫn phóng tới vùng trung tâm.
+  if (level !== 'qhc10' || state.focusedProject || keepView) {
     syncEscHint();
     return;
   }

@@ -46,13 +46,14 @@ function setChecked(id, on) {
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-function emit(prev) {
+function emit(prev, extra = {}) {
   paint();
-  document.dispatchEvent(new CustomEvent(LEVEL_EVENT, { detail: { level, prev, origin } }));
+  document.dispatchEvent(new CustomEvent(LEVEL_EVENT, { detail: { level, prev, origin, ...extra } }));
 }
 
-/** Chọn lớp: bật lớp này, tắt 4 lớp còn lại (gọi lại cùng lớp để đặt lại về chỉ một lớp). opts.origin: lớp chuyển sang */
-export function setLevel(id, { origin: from = null } = {}) {
+/** Chọn lớp: bật lớp này, tắt 4 lớp còn lại (gọi lại cùng lớp để đặt lại về chỉ một lớp).
+ *  opts.origin: lớp chuyển sang. opts.keepView: droplist QHC 1/10.000 không phóng khung hình. */
+export function setLevel(id, { origin: from = null, keepView = false } = {}) {
   const next = byId.get(id);
   if (!next) return;
   const prev = level;
@@ -65,7 +66,7 @@ export function setLevel(id, { origin: from = null } = {}) {
   } finally {
     applying = false;
   }
-  emit(prev);
+  emit(prev, keepView ? { keepView: true } : {});
 }
 
 function onLayerChange(e) {
@@ -151,7 +152,7 @@ function buildMenu() {
     const item = e.target.closest('[data-level]');
     if (!item) return;
     openMenu(false);
-    setLevel(item.dataset.level);
+    setLevel(item.dataset.level, { keepView: item.dataset.level === 'qhc10' });
     button.focus();
   });
   menu.addEventListener('keydown', (e) => {
