@@ -38,17 +38,31 @@ function parseYear(raw, years) {
   return years.includes(y) ? y : null;
 }
 
-/** Cao độ nền FABDEM trong ranh Huế; ngoài mask (biển, ngoài ranh) giữ GLO-30. Phép chiếu GLO-30 để độ dốc vẫn đúng ~30 m */
-function demImage(ee) {
-  const col = ee.ImageCollection(DEM_COLLECTION).select('DEM');
+/** Cao độ nền FABDEM trong ranh Huế; ngoài mask (biển, ngoài ranh) giữ GLO-30. Phép chiếu GLO-30 để độ dốc vẫn đúng ~30 m.
+ *  Có region thì chỉ lấy ảnh GLO-30 giao vùng đó và cắt kết quả, không ghép DEM cả thế giới. */
+function demImage(ee, region) {
+  let col = ee.ImageCollection(DEM_COLLECTION).select('DEM');
+  if (region) col = col.filterBounds(region);
   const glo = col.mosaic().setDefaultProjection(col.first().projection()).rename('elevation');
   const fab = ee.Image(DEM_ASSET).select('elevation');
-  return glo.where(fab.mask(), fab);
+  const img = glo.where(fab.mask(), fab);
+  return region ? img.clip(region) : img;
 }
 
-/** Ô PNG mã hóa Terrarium (cao độ = R*256 + G + B/256 − 32768) để trình duyệt tự giải mã như ô AWS cũ */
-function terrariumImage(ee) {
-  const v = demImage(ee).resample('bilinear').unmask(0).add(32768);
+const DEM_BUFFER_M = 10000;
+
+/** Khung bao ngoài thành phố (HUE_BOUNDS) nới thêm 10 km */
+function demRegion(ee, box) {
+  const mid = (box.minLat + box.maxLat) / 2 * Math.PI / 180;
+  const dLat = DEM_BUFFER_M / 111320;
+  const dLng = DEM_BUFFER_M / (111320 * Math.cos(mid));
+  return ee.Geometry.Rectangle([box.minLng - dLng, box.minLat - dLat, box.maxLng + dLng, box.maxLat + dLat]);
+}
+
+/** Ô PNG mã hóa Terrarium (cao độ = R*256 + G + B/256 − 32768) để trình duyệt tự giải mã như ô AWS cũ.
+ *  unmask lấp biển trong vùng bằng 0 m rồi cắt lại, vì unmask mở mask ra ngoài region. */
+function terrariumImage(ee, region) {
+  const v = demImage(ee, region).resample('bilinear').unmask(0).clip(region).add(32768);
   const r = v.divide(256).floor();
   const g = v.floor().subtract(r.multiply(256));
   const b = v.subtract(v.floor()).multiply(256).floor();
@@ -229,7 +243,7 @@ function mapUrl(ee, visImage) {
 }
 
 module.exports = {
-  sarYears, lstYears, parseYear, demImage, terrariumImage, sarFloodMask, sarFloodVis, lstImage, mapUrl,
+  sarYears, lstYears, parseYear, demImage, demRegion, terrariumImage, sarFloodMask, sarFloodVis, lstImage, mapUrl,
   LST_VIS, FLOOD_SEASON, HOT_SEASON, POP_REFS,
   newDevImage, newDevVis, devRecentYears, DEV_FROM_YEARS, DEV_FROM_DEFAULT, DEV_COLOR, DEV_BASE_COLOR, DEV_SCALE_M, DEV_CRS
 };

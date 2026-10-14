@@ -6,7 +6,7 @@ import { planMap } from './planMap.js';
 import { state, BUFFER_COLORS, layerType, getPlanScenarioList } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum } from './utils.js';
-import { loadElevTile, NATIVE_MAX_ZOOM } from './terrainLayer.js';
+import { loadElevTile, NATIVE_MAX_ZOOM, HUE_DEM_BOUNDS } from './terrainLayer.js';
 
 const POINT_ZOOM = 12;          // ô Terrarium dùng để lấy cao độ tại công trình (~36 m/pixel, sát độ phân giải DEM 30 m)
 const MAX_LIST = 150;
@@ -50,7 +50,7 @@ function paintTile(tile, elev) {
   const px = data.data;
   for (let i = 0, p = 0; i < elev.length; i++, p += 4) {
     const e = elev[i];
-    if (e <= 0 || e >= level) continue;
+    if (!Number.isFinite(e) || e <= 0 || e >= level) continue;
     const k = Math.min(DEPTH_MAX_IDX, Math.round((level - e) / DEPTH_STEP)) * 4;
     px[p] = DEPTH_LUT[k]; px[p + 1] = DEPTH_LUT[k + 1]; px[p + 2] = DEPTH_LUT[k + 2]; px[p + 3] = DEPTH_LUT[k + 3];
   }
@@ -71,7 +71,7 @@ const FloodGrid = L.GridLayer.extend({
 });
 
 function makeLayer() {
-  const layer = new FloodGrid({ maxZoom: 19, maxNativeZoom: NATIVE_MAX_ZOOM, zIndex: 2, opacity: 0.85 });
+  const layer = new FloodGrid({ maxZoom: 19, maxNativeZoom: NATIVE_MAX_ZOOM, bounds: HUE_DEM_BOUNDS, zIndex: 2, opacity: 0.85 });
   layer.on('tileunload', (e) => liveTiles.delete(e.tile));
   return layer;
 }
@@ -101,7 +101,10 @@ async function sampleElevations(points) {
   });
   await Promise.all([...byTile.values()].map(({ tx, ty, pts }) =>
     loadElevTile(POINT_ZOOM, tx, ty)
-      .then(elev => pts.forEach(q => pointElev.set(q.key, elev[q.iy * 256 + q.ix])))
+      .then(elev => pts.forEach(q => {
+        const v = elev[q.iy * 256 + q.ix];
+        pointElev.set(q.key, Number.isFinite(v) ? v : null);
+      }))
       .catch(() => pts.forEach(q => pointElev.set(q.key, null)))
   ));
 }

@@ -1,15 +1,26 @@
 // Lớp "Địa hình (cao độ nền)" (bảng lớp dữ liệu): tô màu nhiệt theo cao độ — vùng trũng xanh dương đậm, núi cao đỏ đậm.
 // Nguồn FABDEM (đã gỡ nhà và tán cây) do GEE trả về dạng ô Terrarium (cao độ = R*256 + G + B/256 − 32768 m),
-// cùng nguồn bảng dân số theo cao độ của mô phỏng ngập; GEE lỗi thì dùng ô SRTM của AWS Terrain Tiles (cao độ bề mặt).
+// cắt trong HUE_BOUNDS + 10 km (satService.demRegion). GEE lỗi thì dùng ô SRTM của AWS, nhưng vẫn chỉ tải ô trong khung đó.
 // Giải mã và tô màu ngay trên trình duyệt; vẽ đồng thời trên bản đồ hiện trạng và quy hoạch.
 // Đổ bóng địa hình: ô hệ số tĩnh trên bucket (terrain/hillshade/, scripts/build-hillshade.js), nhân thẳng vào màu
 // trong canvas để in / chụp bản đồ (html2canvas) vẫn giữ bóng.
 import { map } from './mapEngine.js';
 import { planMap, shownMaps } from './planMap.js';
 import { geeApi } from './api.js';
-import { fmtNum, startTaskProgress, trackTileLoads } from './utils.js';
+import { fmtNum, startTaskProgress } from './utils.js';
 
 const AWS_URL = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
+// Khớp HUE_BOUNDS trong config/constants.js, nới 10 km (cùng DEM_BUFFER_M phía máy chủ)
+const DEM_BUFFER_M = 10000;
+const DEM_MID_LAT = ((15.9 + 16.9) / 2) * Math.PI / 180;
+const DEM_DLAT = DEM_BUFFER_M / 111320;
+const DEM_DLNG = DEM_BUFFER_M / (111320 * Math.cos(DEM_MID_LAT));
+export const HUE_DEM_BOUNDS = L.latLngBounds(
+  [15.9 - DEM_DLAT, 106.9 - DEM_DLNG],
+  [16.9 + DEM_DLAT, 108.3 + DEM_DLNG]
+);
+const NODATA = new Float32Array(256 * 256);
+NODATA.fill(NaN);
 const SOURCES = {
   fabdem: 'Cao độ nền: FABDEM (Hawker & Neal 2021, CC BY 4.0). Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA',
   srtm: 'Cao độ bề mặt: SRTM/GMTED (còn mái nhà và tán cây) qua AWS Terrain Tiles'
@@ -84,7 +95,9 @@ function fetchElev(url, z, x, y, attempt = 0) {
       ctx.drawImage(img, 0, 0);
       const px = ctx.getImageData(0, 0, 256, 256).data;
       const elev = new Float32Array(256 * 256);
-      for (let i = 0, q = 0; q < px.length; i++, q += 4) elev[i] = Math.round((px[q] * 256 + px[q + 1] + px[q + 2] / 256 - 32768) * 10) / 10;
+      for (let i = 0, q = 0; q < px.length; i++, q += 4) {
+        elev[i] = px[q + 3] < 128 ? NaN : Math.round((px[q] * 256 + px[q + 1] + px[q + 2] / 256 - 32768) * 10) / 10;
+      }
       resolve(elev);
     };
     img.onerror = () => {
@@ -96,7 +109,18 @@ function fetchElev(url, z, x, y, attempt = 0) {
 }
 
 /** Cao độ (m) 256×256 pixel của 1 ô Terrarium; dùng chung bộ nhớ đệm cho lớp địa hình và mô phỏng ngập */
+function tileInHue(z, x, y) {
+  const n = 2 ** z;
+  const west = x / n * 360 - 180;
+  const east = (x + 1) / n * 360 - 180;
+  const north = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI;
+  const south = Math.atan(Math.sinh(Math.PI * (1 - 2 * (y + 1) / n))) * 180 / Math.PI;
+  return south <= HUE_DEM_BOUNDS.getNorth() && north >= HUE_DEM_BOUNDS.getSouth()
+    && east >= HUE_DEM_BOUNDS.getWest() && west <= HUE_DEM_BOUNDS.getEast();
+}
+
 export function loadElevTile(z, x, y) {
+  if (!tileInHue(z, x, y)) return Promise.resolve(NODATA);
   const key = `${z}/${x}/${y}`;
   const hit = elevCache.get(key);
   if (hit) return Promise.resolve(hit);
@@ -198,6 +222,7 @@ const TerrainGrid = L.GridLayer.extend({
       const px = data.data;
       for (let i = 0, p = 0; i < elev.length; i++, p += 4) {
         const e = elev[i];
+        if (!Number.isFinite(e)) continue;
         const m = e <= 0 ? 0 : e >= LUT_MAX ? LUT_MAX : Math.round(e);
         const f = shade ? shade[i] : 1;
         px[p] = LUT[m * 3] * f; px[p + 1] = LUT[m * 3 + 1] * f; px[p + 2] = LUT[m * 3 + 2] * f; px[p + 3] = 255;
@@ -225,6 +250,7 @@ function makeLayer() {
   return new TerrainGrid({
     maxZoom: 19,
     maxNativeZoom: NATIVE_MAX_ZOOM,
+    bounds: HUE_DEM_BOUNDS,
     opacity: opacity(),
     zIndex: 0,
     attribution
@@ -240,7 +266,8 @@ export function terrainElevationAt(latlng) {
   const elev = elevCache.get(`${z}/${x}/${y}`);
   if (!elev) return null;
   const ix = Math.min(255, Math.floor(p.x - x * 256)), iy = Math.min(255, Math.floor(p.y - y * 256));
-  return elev[iy * 256 + ix];
+  const v = elev[iy * 256 + ix];
+  return Number.isFinite(v) ? v : null;
 }
 
 function setReadout(text) {
@@ -251,6 +278,37 @@ function setReadout(text) {
 function onMouseMove(e) {
   const v = terrainElevationAt(e.latlng);
   setReadout(v === null ? '' : `Tại con trỏ: ${fmtNum(v)} m`);
+}
+
+// Leaflet phát 'load' khi mọi ô đã gọi done(), còn 'tileload' chỉ sau hiệu ứng hiện dần (~200 ms).
+// Đếm tileload/tileerror (mỗi ô một lần) nên thanh không nhảy 100% khi mới xong khoảng 2/3.
+function trackTerrainTiles(layers, onProgress) {
+  const counts = layers.map(() => [0, 0]);
+  const report = () => onProgress(counts.reduce((s, c) => s + c[0], 0), counts.reduce((s, c) => s + c[1], 0));
+  return Promise.all(layers.map((layer, i) => new Promise(resolve => {
+    const seen = new Set();
+    let closed = false;
+    const finish = () => {
+      if (closed) return;
+      closed = true;
+      clearTimeout(timer);
+      layer.off('tileloadstart', onStart).off('tileload tileerror', onDone);
+      resolve();
+    };
+    const onStart = () => { counts[i][1]++; report(); };
+    const onDone = (ev) => {
+      const c = ev.coords;
+      const key = c ? `${c.z}/${c.x}/${c.y}` : '';
+      if (key && seen.has(key)) return;
+      if (key) seen.add(key);
+      counts[i][0]++;
+      report();
+      if (counts[i][1] > 0 && counts[i][0] >= counts[i][1]) finish();
+    };
+    const timer = setTimeout(finish, 60000);
+    layer.on('tileloadstart', onStart).on('tileload tileerror', onDone);
+    queueMicrotask(() => { if (!counts[i][1]) finish(); });
+  })));
 }
 
 export function setTerrainVisible(on) {
@@ -273,9 +331,10 @@ export function setTerrainVisible(on) {
       const pairs = [[map, leftLayer], [planMap, rightLayer]].filter(([m, l]) => m && l);
       const shown = shownMaps();
       own.set(SOURCE_PCT, 'Đang tải ô cao độ địa hình');
-      trackTileLoads(pairs.filter(([m]) => shown.includes(m)).map(([, l]) => l),
-        (n, total) => own.set(SOURCE_PCT + (100 - SOURCE_PCT) * 0.98 * (n / Math.max(total, 1))))
-        .then(() => { if (task === own) own.done('Đã tải địa hình'); });
+      trackTerrainTiles(pairs.filter(([m]) => shown.includes(m)).map(([, l]) => l), (n, total) => {
+        const frac = total ? n / total : 0;
+        own.set(SOURCE_PCT + (100 - SOURCE_PCT) * frac, total ? `Đang tải ô cao độ địa hình (${n}/${total})` : 'Đang tải ô cao độ địa hình');
+      }).then(() => { if (task === own) own.done('Đã tải địa hình'); });
       pairs.forEach(([m, l]) => { if (!m.hasLayer(l)) l.addTo(m); });
     });
     map.on('mousemove', onMouseMove);
