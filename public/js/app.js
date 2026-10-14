@@ -74,6 +74,7 @@ import { initRiskLayer } from './riskLayer.js';
 import { initUrbanAreaLayer, refreshUrbanAreaLayer, urbanAreaReady } from './urbanAreaLayer.js';
 import { initLayerDecisions } from './layerDecisions.js';
 import { initBasemapUi } from './basemap.js';
+import { hasSharedCamera, initViewLink } from './viewLink.js';
 import { PROOF_FOCUS_EVENT } from './csdProof.js';
 
 const CITY_NAME = "Thành phố Huế";
@@ -306,7 +307,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Mở trang: panel phải và panel dưới ẩn sẵn (class trên <body>), bản đồ toàn TP
   initPlanMap(map, layers);
-  centerOnCity();
+  if (!hasSharedCamera()) centerOnCity();
   initBottomPanelEvents();
   initViewFlow();
   initMapLevel();
@@ -794,6 +795,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnScreenshot')?.addEventListener('click', captureMapScreenshot);
   document.getElementById('btnPrintA3')?.addEventListener('click', exportMapA3);
+  initViewLink();
 
   // ---------- Nạp dữ liệu ban đầu ----------
   const progressBar = document.getElementById('progressBar');
