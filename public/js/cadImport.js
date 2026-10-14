@@ -137,6 +137,14 @@ function bulgeRing(verts, bulges) {
   return out;
 }
 
+// Đoạn hở: không nối đỉnh cuối về đỉnh đầu (bulgeRing luôn khép vòng)
+function bulgeOpen(verts, bulges) {
+  const out = [];
+  for (let i = 0; i < verts.length - 1; i++) out.push(...bulgePoints(verts[i], verts[i + 1], bulges[i] || 0));
+  if (verts.length) out.push(verts[verts.length - 1]);
+  return dedupeRing(out);
+}
+
 // Cung tròn / elip của cạnh HATCH; chiều kim đồng hồ (ccw = 0) lưu góc theo chiều ngược lại
 function arcPoints(cx, cy, rx, ry, rot, a0deg, a1deg, ccw) {
   let a0 = a0deg * DEG, a1 = a1deg * DEG;
@@ -218,7 +226,7 @@ function readHatch(tags, i, stats) {
   return [ent, i];
 }
 
-function readLwPolyline(tags, i) {
+function readLwPolyline(tags, i, keepOpen) {
   const ent = { kind: 'LWPOLYLINE', layer: '0', handle: null, closed: false, rings: [] };
   const verts = [], bulges = [];
   for (; i < tags.length && tags[i][0] !== 0; i++) {
@@ -230,12 +238,32 @@ function readLwPolyline(tags, i) {
     else if (code === 20 && verts.length) verts[verts.length - 1][1] = parseFloat(v);
     else if (code === 42 && bulges.length) bulges[bulges.length - 1] = parseFloat(v);
   }
-  const ring = dedupeRing(ent.closed || isClosedByPoints(verts) ? bulgeRing(verts, bulges) : []);
+  const closed = ent.closed || isClosedByPoints(verts);
+  const ring = dedupeRing(closed ? bulgeRing(verts, bulges) : []);
   if (ring.length >= 3) ent.rings.push(ring);
+  else if (keepOpen) {
+    const open = bulgeOpen(verts, bulges);
+    if (open.length >= 2) { ent.kind = 'LINE'; ent.rings.push(open); }
+  }
   return [ent, i];
 }
 
-function readPolyline(tags, i) {
+function readLine(tags, i) {
+  const ent = { kind: 'LINE', layer: '0', rings: [] };
+  let x1 = NaN, y1 = NaN, x2 = NaN, y2 = NaN;
+  for (; i < tags.length && tags[i][0] !== 0; i++) {
+    const [code, v] = tags[i];
+    if (code === 8) ent.layer = v;
+    else if (code === 10) x1 = parseFloat(v);
+    else if (code === 20) y1 = parseFloat(v);
+    else if (code === 11) x2 = parseFloat(v);
+    else if (code === 21) y2 = parseFloat(v);
+  }
+  if ([x1, y1, x2, y2].every(Number.isFinite)) ent.rings.push([[x1, y1], [x2, y2]]);
+  return [ent, i];
+}
+
+function readPolyline(tags, i, keepOpen) {
   const ent = { kind: 'POLYLINE', layer: '0', handle: null, closed: false, rings: [] };
   let flags = 0;
   for (; i < tags.length && tags[i][0] !== 0; i++) {
@@ -257,8 +285,13 @@ function readPolyline(tags, i) {
   }
   if (i < tags.length && tags[i][1] === 'SEQEND') for (i++; i < tags.length && tags[i][0] !== 0; i++);
   const isMesh = (flags & (16 | 64)) !== 0;
-  const ring = !isMesh && (ent.closed || isClosedByPoints(verts)) ? dedupeRing(bulgeRing(verts, bulges)) : [];
+  const closed = !isMesh && (ent.closed || isClosedByPoints(verts));
+  const ring = closed ? dedupeRing(bulgeRing(verts, bulges)) : [];
   if (ring.length >= 3) ent.rings.push(ring);
+  else if (keepOpen && !isMesh) {
+    const open = bulgeOpen(verts, bulges);
+    if (open.length >= 2) { ent.kind = 'LINE'; ent.rings.push(open); }
+  }
   return [ent, i];
 }
 
@@ -304,11 +337,12 @@ export function countSkipped(stats, label, n = 1) {
 }
 
 /**
- * Đọc DXF (văn bản) → { entities: [{kind, layer, rings}], stats } — chỉ HATCH và LWPOLYLINE / POLYLINE khép kín trong ENTITIES;
- * layer đã có hatch thì bỏ polyline kín của layer đó (ranh hatch, đường bao công trình...).
- * Mọi đối tượng khác (line, pline hở, point, text, mtext, dim, block...) đếm vào stats.skipped.
+ * Đọc DXF (văn bản) → { entities: [{kind, layer, rings}], stats } — HATCH và LWPOLYLINE / POLYLINE khép kín trong ENTITIES.
+ * opts.lines: file ranh (RG) — giữ thêm LINE và polyline hở để khép vòng. Lô đất không bật cờ này.
+ * Layer đã có hatch thì bỏ polyline kín của layer đó (ranh hatch, đường bao công trình...).
  */
-export function parseDxf(text) {
+export function parseDxf(text, opts) {
+  const keepOpen = !!(opts && opts.lines);
   const tags = readTags(text);
   const stats = { hatch: 0, polyline: 0, insert: 0, splineEdges: 0, skipped: {}, insUnits: null };
   const entities = [];
@@ -322,8 +356,9 @@ export function parseDxf(text) {
     if (section !== 'ENTITIES') { i++; continue; }
     let ent = null;
     if (v === 'HATCH') { [ent, i] = readHatch(tags, i + 1, stats); }
-    else if (v === 'LWPOLYLINE') { [ent, i] = readLwPolyline(tags, i + 1); }
-    else if (v === 'POLYLINE') { [ent, i] = readPolyline(tags, i + 1); }
+    else if (v === 'LWPOLYLINE') { [ent, i] = readLwPolyline(tags, i + 1, keepOpen); }
+    else if (v === 'POLYLINE') { [ent, i] = readPolyline(tags, i + 1, keepOpen); }
+    else if (v === 'LINE' && keepOpen) { [ent, i] = readLine(tags, i + 1); }
     else {
       if (v === 'INSERT') stats.insert++;
       countSkipped(stats, DXF_SKIP_LABEL[v] || v.toLowerCase());

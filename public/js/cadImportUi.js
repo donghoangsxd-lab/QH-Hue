@@ -1230,15 +1230,16 @@ function fileProblem(file) {
   return '';
 }
 
-// File → { file, format, parsed, text, wgs84 }
-async function readImportFile(file) {
+// File → { file, format, parsed, text, wgs84 }. lines: file ranh RG, giữ LINE và polyline hở.
+async function readImportFile(file, opts) {
   const ext = file.name.match(FILE_EXT_RE)[1].toLowerCase();
+  const asLines = !!(opts && opts.lines);
   let parsed, text;
   if (ext === 'dxf') {
     const head = await file.slice(0, 22).text();
     if (head.startsWith('AutoCAD Binary DXF')) throw new Error('DXF dạng nhị phân chưa hỗ trợ — lưu lại dạng ASCII DXF.');
     text = await file.text();
-    parsed = parseDxf(text);
+    parsed = parseDxf(text, { lines: asLines });
   } else if (ext === 'json' || ext === 'geojson') {
     text = await file.text();
     parsed = parseGeoJson(text);
@@ -1292,6 +1293,9 @@ function fileRole(r) {
   return 'mixed';
 }
 
+// Vòng kín AutoCAD là LWPOLYLINE / HATCH; đoạn hở (LINE) để khép ranh gServer. POLYLINE cũ cũng là vòng.
+const BOUNDARY_RING_KINDS = new Set(['POLYLINE', 'LWPOLYLINE', 'POLYGON', 'HATCH']);
+
 function lineRingsWgs84(r) {
   const crs = CRS_PRESETS[r.parsed.crs] || CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
   const toLL = (x, y) => {
@@ -1301,11 +1305,14 @@ function lineRingsWgs84(r) {
   };
   const lines = [];
   r.parsed.entities.forEach(e => {
-    if (e.kind !== 'LINE' && e.kind !== 'POLYLINE') return;
+    if (e.kind !== 'LINE' && !BOUNDARY_RING_KINDS.has(e.kind)) return;
     (e.rings || []).forEach(ring => {
       const pts = ring.map(([x, y]) => toLL(x, y)).filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]));
       if (pts.length < 2) return;
-      if (e.kind === 'POLYLINE') pts.push(pts[0].slice());
+      if (e.kind !== 'LINE') {
+        const a = pts[0], b = pts[pts.length - 1];
+        if (a[0] !== b[0] || a[1] !== b[1]) pts.push(a.slice());
+      }
       lines.push(pts);
     });
   });
@@ -1446,7 +1453,7 @@ async function reloadDxfSlots() {
   setStatus('⏳ Đang đọc file...', 'var(--accent-orange)');
   await new Promise(r => setTimeout(r, 30));
   try {
-    const read = await Promise.all(chosen.map(s => readImportFile(dxfSlots[s])));
+    const read = await Promise.all(chosen.map(s => readImportFile(dxfSlots[s], { lines: s === 'RG' })));
     const bySlot = {};
     read.forEach(r => { bySlot[dxfNameParts(r.file.name).prefix] = r; });
     const areas = ['QH', 'HT'].map(s => bySlot[s]).filter(Boolean);
