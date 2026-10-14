@@ -4,8 +4,9 @@
 //  - chk_qhc10: sử dụng đất 1/10.000 khu vực trung tâm (lô theo ký hiệu TT16 Mục 02, viền theo giai đoạn) + 4 tiểu vùng,
 //    phân khu, điểm chức năng. Hàng nút dưới dòng lớp bật/tắt độc lập từng giai đoạn lô và ranh 1/10.000 mở rộng theo
 //    QĐ 756 (ranh ngoài các phường vùng lõi + vùng đỏ Hóa Châu, Mỹ Thượng chưa có trong đồ án cũ).
-//    Đang xem QHC 1/10.000 (droplist): như các đồ án QHC nhập, chỉ vẽ ranh tiểu vùng + tên đồ án, bấm vào ranh mới vẽ lô;
-//    bật lớp khi xem cấp khác (so sánh) vẽ đủ lô ngay. Vùng đô thị trung tâm (hợp 4 tiểu vùng) luôn có nền và viền đỏ nhạt.
+//    Đang xem QHC 1/10.000 (droplist) ở toàn thành phố: chỉ vẽ ranh tiểu vùng + tên đồ án, rê chuột vào vùng lõi thì sáng nền,
+//    bấm vào ranh mới vẽ lô. Đang xem một địa điểm (phường, đồ án, hoặc phóng gần): mở thẳng lô, không vẽ ranh.
+//    Bật lớp khi xem cấp khác (so sánh) vẽ đủ lô ngay. Vùng đô thị trung tâm (hợp 4 tiểu vùng) luôn có nền và viền đỏ nhạt.
 // Vùng, lô của cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400); riêng các đường ranh vẽ ở LINE_PANE
 // để nổi trên ranh 40 phường. Canvas mặc định của planMap (renderer: L.canvas())
 // nằm ở overlayPane, phủ kín bản đồ khi có bất kỳ lớp vector nào và nuốt click của canvas QHC bên dưới, nên click lô / vùng
@@ -59,7 +60,7 @@ const centerSet = new Set(CENTER_UNITS.map(bareWard));
 
 const data = { land: null, frame: null, vision: null };
 const loading = {};
-const layers = { land: null, frame: null, vision: null, ext: null, core: null, wash: null };
+const layers = { land: null, frame: null, vision: null, ext: null, core: null, wash: null, hover: null };
 let coreUnion = null;
 let renderer = null;
 let lineRenderer = null;
@@ -68,7 +69,9 @@ const shownStages = new Set([0, 1, 2]);
 let extOn = false;
 let detailed = false;
 let coreOpen = false;
-const collapsed = () => getLevel() === 'qhc10' && !coreOpen;
+// Đang xem một địa điểm rồi chuyển sang QHC 1/25.000 hoặc 1/10.000: chỉ lô / vùng chức năng, không ranh tổng
+let placeLots = false;
+const collapsed = () => getLevel() === 'qhc10' && !coreOpen && !placeLots;
 const tvFeatures = () => (data.frame ? data.frame.features.filter(f => f.properties.k === 'tv') : []);
 
 // ---------- Tải dữ liệu ----------
@@ -212,10 +215,63 @@ function unionTv() {
 
 // Nền + viền đỏ nhạt của vùng trung tâm. Tách khỏi layers.core để click thu gọn vẫn mở lô.
 // fillRule nonzero: evenodd mặc định khoét lỗ khi hợp 4 quận, giữa vùng không còn nền như các QHC khác
+function clearCoreHover() {
+  layers.hover?.remove();
+  layers.hover = null;
+  coreHover = false;
+}
+
+let coreHover = false;
+
+function setCoreHover(on) {
+  on = !!on && collapsed();
+  if (coreHover === on) return;
+  coreHover = on;
+  layers.hover?.remove();
+  layers.hover = null;
+  if (!on) return;
+  const shape = unionTv();
+  const m = target();
+  if (!shape || !m) return;
+  layers.hover = L.geoJSON(shape, {
+    pane: WASH_PANE[0],
+    renderer: ensureWashRenderer(m),
+    interactive: false,
+    style: {
+      color: '#ffffff', weight: 5.5, opacity: 1, fill: true, fillColor: CORE_WASH, fillOpacity: 0.42,
+      fillRule: 'nonzero', lineJoin: 'round'
+    }
+  }).addTo(m);
+}
+
+function bindCoreHover(m) {
+  if (!m || m._qhcCoreHover) return;
+  m._qhcCoreHover = true;
+  let raf = 0;
+  let ev = null;
+  m.getContainer().addEventListener('mousemove', (e) => {
+    ev = e;
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      if (!ev || !collapsed() || !$('chk_qhc10')?.checked) { setCoreHover(false); return; }
+      const ll = m.mouseEventToLatLng(ev);
+      const shape = unionTv();
+      let inside = false;
+      if (shape && ll) {
+        try { inside = turf.booleanPointInPolygon([ll.lng, ll.lat], shape); } catch (err) { inside = false; }
+      }
+      setCoreHover(inside);
+    });
+  });
+  m.getContainer().addEventListener('mouseleave', () => setCoreHover(false));
+}
+
 function drawWash() {
   layers.wash?.remove();
   layers.wash = null;
-  if (!$('chk_qhc10')?.checked) return;
+  clearCoreHover();
+  if (!$('chk_qhc10')?.checked || placeLots) return;
   const shape = unionTv();
   if (!shape) return;
   const m = target();
@@ -249,13 +305,31 @@ function drawCore() {
 }
 
 function applyCore() {
-  if (!$('chk_qhc10')?.checked || !data.land || !layers.frame) return;
+  if (!$('chk_qhc10')?.checked || !data.land) return;
   if (collapsed()) {
     layers.land?.remove();
     layers.land = null;
   } else if (!layers.land) drawLand();
+  if (placeLots) {
+    layers.frame?.remove();
+    layers.core?.remove();
+    layers.frame = layers.core = null;
+    clearCoreHover();
+    layers.wash?.remove();
+    layers.wash = null;
+    return;
+  }
+  if (!layers.frame && data.frame) drawFrame();
   drawWash();
   drawCore();
+}
+
+/** true: đang xem một địa điểm — QHC 1/10.000 chỉ vẽ lô, QHC 1/25.000 bỏ các nét ranh */
+export function setQhcPlaceMode(on) {
+  placeLots = !!on;
+  if (!placeLots) return;
+  if (getLevel() === 'qhc25' && layers.vision) drawVision();
+  if (getLevel() === 'qhc10') applyCore();
 }
 
 /** Mở / thu gọn lô TTHuế 2045 khi đang xem QHC 1/10.000 */
@@ -279,6 +353,7 @@ async function setLand(on) {
     layers.land?.remove();
     layers.core?.remove();
     layers.wash?.remove();
+    clearCoreHover();
     layers.frame?.tvLabels?.remove();
     layers.frame?.points?.remove();
     layers.frame?.remove();
@@ -287,8 +362,9 @@ async function setLand(on) {
     return;
   }
   setHint('qhc10Hint', 'đang tải…');
+  await Promise.resolve();
   try {
-    await Promise.all([load('land'), load('frame')]);
+    await Promise.all(placeLots ? [load('land')] : [load('land'), load('frame')]);
   } catch (err) {
     console.warn('QHC 2045 – không tải được lớp 1/10.000:', err);
     setHint('qhc10Hint', 'lỗi tải');
@@ -297,9 +373,11 @@ async function setLand(on) {
   if (!$('chk_qhc10')?.checked) return;
   detailed = m.getZoom() >= TT16_PATTERN_ZOOM;
   if (!collapsed()) drawLand();
-  drawFrame();
-  drawWash();
-  drawCore();
+  if (!placeLots) {
+    drawFrame();
+    drawWash();
+    drawCore();
+  }
   setHint('qhc10Hint', 'Trung tâm');
 }
 
@@ -405,7 +483,7 @@ function drawVision() {
     if (L_ === 'v') fills.push(f);
     else if (L_ === 'n' && f.properties.k !== 2) waters.push(f);
     else if (L_ === 'x') greens.push(f);
-    else if (L_ === 'r') lines.push(f);
+    else if (L_ === 'r' && !placeLots) lines.push(f);
   });
   const zoneName = (f) => cats.zones[f.properties.k] || 'Khác';
   const fillLayer = L.geoJSON({ type: 'FeatureCollection', features: fills }, {
@@ -635,6 +713,8 @@ export function initQhc2045Layer() {
     zoomFrame();
   });
   document.addEventListener(LOT_OPACITY_EVENT, restyleLand);
-  document.addEventListener(LEVEL_EVENT, () => { coreOpen = false; applyCore(); });
+  document.addEventListener(LEVEL_EVENT, () => { if (!placeLots) applyCore(); });
+  bindCoreHover(map);
+  bindCoreHover(planMap);
   syncStages();
 }

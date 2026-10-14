@@ -52,7 +52,7 @@ function emit(prev, extra = {}) {
 }
 
 /** Chọn lớp: bật lớp này, tắt 4 lớp còn lại (gọi lại cùng lớp để đặt lại về chỉ một lớp).
- *  opts.origin: lớp chuyển sang. opts.keepView: droplist QHC 1/10.000 không phóng khung hình. */
+ *  opts.origin: lớp chuyển sang. opts.keepView: droplist QHC 1/10.000 và 1/25.000 không phóng khung hình. */
 export function setLevel(id, { origin: from = null, keepView = false } = {}) {
   const next = byId.get(id);
   if (!next) return;
@@ -152,7 +152,7 @@ function buildMenu() {
     const item = e.target.closest('[data-level]');
     if (!item) return;
     openMenu(false);
-    setLevel(item.dataset.level, { keepView: item.dataset.level === 'qhc10' });
+    setLevel(item.dataset.level, { keepView: item.dataset.level === 'qhc10' || item.dataset.level === 'qhc25' });
     button.focus();
   });
   menu.addEventListener('keydown', (e) => {

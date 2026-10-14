@@ -5,12 +5,13 @@
 //    - Hệ thống đô thị: bấm ký hiệu, nét ranh hoặc trong ranh một đô thị → chọn đô thị (urbanFocus.js): nổi ranh, tô phạm vi
 //      đã có QHC / QHPK / QHCT, bấm vùng đồ án để mở; vùng QHC đô thị TT Huế 2045 → QHC 1/10.000 và mở lô.
 //      Bấm nền ngoài mọi đô thị thì bỏ chọn.
-//    - QHC 1/25.000: chỉ xem / bấm vùng; bấm bản đồ không đổi địa bàn.
-//    - QHC 1/10.000: ranh + tên mọi đồ án QHC (TTHuế 2045 và đồ án nhập); bấm một đồ án thì giữ lớp, chỉ vẽ lô đồ án đó,
+//    - QHC 1/25.000: chỉ xem / bấm vùng; bấm bản đồ không đổi địa bàn. Đang xem một địa điểm thì chỉ vùng chức năng, không nét ranh, không phóng ra toàn thành phố.
+//    - QHC 1/10.000: toàn thành phố thì ranh + tên (rê vào vùng lõi thì sáng), bấm ranh mới có lô. Đang xem một địa điểm thì mở thẳng lô, không ranh, không phóng ra.
 //      bấm nền ngoài đồ án đang mở thì về tổng quan; bấm lô tra cứu; panel phải lọc QHPK trong vùng lõi;
 //      chọn phường lõi giữ lớp, phường ngoài vùng lõi sang QHPK.
 //    - QHPK 1/2.000: toàn TP chỉ ranh các đồ án; bấm ranh hoặc tick đồ án trong panel mới tải lô.
 //      Chọn phường: lô cả phường (chỉ tiêu panel dưới giữ nguyên) và ranh QHCT nằm trong phường.
+//      Esc khi đang chọn đồ án QHPK: bỏ chọn, giữ lớp và khung nhìn, không phóng ra toàn thành phố.
 //    - QHCT 1/500: ranh + tên các đồ án QHCT (planLevelOf), bấm đồ án → chi tiết.
 // 3. Mở đồ án (từ danh sách, ranh trên bản đồ hoặc popup): sang lớp QHPK (đồ án QHC mở từ đô thị: QHC 1/10.000; đồ án QHCT:
 //    QHCT 1/500), thông tin đồ án thay panel dưới; thoát về địa bàn đang chọn, hoặc về lớp đã mở đồ án.
@@ -26,7 +27,7 @@ import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { RIGHT_TAB_EVENT } from './utils.js';
 import { URBAN_PICK_EVENT, urbanVisionFeature, urbanVisionAt } from './urbanAreaLayer.js';
 import { focusUrban, clearUrbanFocus, urbanFocusHolds, urbanFocused, initUrbanFocus, FOCUS_CORE_EVENT } from './urbanFocus.js';
-import { fitCenter, isCoreWard, setCoreOpen, isCoreOpen, coreContains, QHC_CORE_EVENT } from './qhc2045Layer.js';
+import { fitCenter, isCoreWard, setCoreOpen, isCoreOpen, coreContains, setQhcPlaceMode, QHC_CORE_EVENT } from './qhc2045Layer.js';
 import { getLevel, setLevel, levelOrigin, levelScope, LEVEL_EVENT, LEVELS } from './mapLevel.js';
 import { planLevelOf, URBAN_FOCUS_EVENT } from './generalPlan.js';
 
@@ -36,6 +37,8 @@ const CITY_NAME = 'Thành phố Huế';
 const KEEP = new Set(['chk_bound', 'chk_parcel', 'chk_projectInfra', 'chk_hillshade', ...LEVELS.map(l => l.chk)]);
 // Bấm bản đồ chọn phường chỉ khi nhìn rộng; phóng gần là đang xem chi tiết, bấm không đổi địa bàn
 const WARD_PICK_MAX_ZOOM = 14;
+// Từ mức này trở lên (hoặc đang chọn phường / đồ án) là đang xem một địa điểm, không phải toàn thành phố
+const PLACE_ZOOM = 14;
 // Tải lô nhanh hơn ngưỡng này thì không hiện thanh tiến độ (tránh nháy)
 const PROGRESS_DELAY_MS = 250;
 // Ký hiệu đô thị (QĐ 756) mở QHC 1/10.000 khi bật lớp đô thị để so sánh ở lớp khác
@@ -56,6 +59,13 @@ function showLayersTab() {
 }
 
 // ---------- Lớp quy hoạch ----------
+function viewingPlace() {
+  if (state.focusedProject) return true;
+  if (!isCity(state.selectedWard)) return true;
+  const shown = getViewMode() === 'QH' && planMap ? planMap : map;
+  return !!shown && shown.getZoom() >= PLACE_ZOOM;
+}
+
 function onLevelChange({ level, prev, keepView }) {
   const keepFocus = !!state.focusedProject && planLevelOf(state.focusedProject) === levelScope();
   if (prev === 'qhpk' && level !== 'qhpk' && !keepFocus) {
@@ -64,14 +74,18 @@ function onLevelChange({ level, prev, keepView }) {
   }
   const ward = isCity(state.selectedWard) ? null : state.selectedWard;
   if (level === 'qhpk') {
+    setQhcPlaceMode(false);
     if (!ward) state.lotProjects.clear();
     if (!state.focusedProject) revealWardProjects(ward);
     syncEscHint();
     return;
   }
   revealWardProjects(ward, { show: false });
-  // Droplist QHC 1/10.000 giữ khung hình đang xem. Bấm đô thị trung tâm vẫn phóng tới vùng trung tâm.
-  if (level !== 'qhc10' || state.focusedProject || keepView) {
+  const place = (level === 'qhc10' || level === 'qhc25') && viewingPlace();
+  setQhcPlaceMode(place);
+  if (level === 'qhc10') setCoreOpen(place);
+  // Địa điểm cụ thể, hoặc droplist QHC 1/10.000: giữ khung hình. Bấm đô thị trung tâm (không keepView, không phải địa điểm) vẫn phóng tới vùng trung tâm.
+  if (place || level !== 'qhc10' || state.focusedProject || keepView) {
     syncEscHint();
     return;
   }
@@ -156,7 +170,7 @@ function onProjectOpened(e) {
   syncEscHint();
 }
 
-// Bỏ đồ án đang mở, giữ lớp đang xem: về ranh + tên các đồ án
+// Bỏ đồ án đang mở, giữ lớp và khung nhìn hiện tại
 function leaveProject() {
   closeProjectView();
   clearProjectFocus();
@@ -285,7 +299,9 @@ function onEscape(e) {
   }
   if (state.focusedProject) {
     e.preventDefault();
-    document.dispatchEvent(new CustomEvent(PROJECT_VIEW_EXIT_EVENT));
+    // QHPK: chỉ bỏ chọn. Thoát đủ (về lớp gốc, phóng về địa bàn) dành cho đồ án cấp khác và nút đóng panel.
+    if (planLevelOf(state.focusedProject) === 'QHPK') leaveProject();
+    else document.dispatchEvent(new CustomEvent(PROJECT_VIEW_EXIT_EVENT));
     return;
   }
   if (isCoreOpen()) {
