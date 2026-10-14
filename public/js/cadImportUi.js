@@ -135,8 +135,18 @@ const globalPhase = () => ($('cadPhase')?.value === 'QH' ? 'QH' : 'HT');
 const phaseOf = (p) => p.phase || globalPhase();
 const phasesOf = (p) => (p.keep ? ['HT', 'QH'] : p.partner ? [phaseOf(p), phaseOf(p.partner)] : [phaseOf(p)]);
 
-// Tên file quyết định cột quy mô: HT- → QuyMo_HT, QH- → QuyMo_QH (kể cả layer có tiền tố HT).
+// Tên file quyết định cột quy mô: HT → QuyMo_HT, QH → QuyMo_QH (kể cả layer có tiền tố HT).
+// Cả hai file HT và QH: mỗi lô giữ giai đoạn của đúng file (slotPhase), không gộp về một cột.
 function applyFilePhase(parcels) {
+  if (current && current.bothPhases) {
+    parcels.forEach(p => {
+      if (p.slotPhase !== 'HT' && p.slotPhase !== 'QH') return;
+      p.keep = false;
+      p.phase = p.slotPhase;
+      p.stage = p.slotPhase;
+    });
+    return;
+  }
   const fp = current && current.filePhase;
   if (fp !== 'HT' && fp !== 'QH') return;
   parcels.forEach(p => {
@@ -151,12 +161,15 @@ function markUnchanged() {}
 function syncPhaseSelect() {
   const sel = $('cadPhase');
   if (!sel) return;
-  const locked = current && (current.filePhase === 'HT' || current.filePhase === 'QH');
-  sel.disabled = !!locked;
-  if (locked) sel.value = current.filePhase;
-  sel.title = locked
-    ? `Theo tên file: ${current.filePhase === 'QH' ? 'quy hoạch (mọi layer ghi QuyMo_QH)' : 'hiện trạng (mọi layer ghi QuyMo_HT)'}`
-    : 'Áp dụng khi tên file không có tiền tố HT / QH. Layer TT16 lấy giai đoạn theo tiền tố HT_ / QHDD_ / QHDH_.';
+  const both = !!(current && current.bothPhases);
+  const locked = both || !!(current && (current.filePhase === 'HT' || current.filePhase === 'QH'));
+  sel.disabled = locked;
+  if (!both && locked) sel.value = current.filePhase;
+  sel.title = both
+    ? 'Đang có cả file HT và QH: mỗi file ghi đúng cột quy mô của nó.'
+    : locked
+      ? `Theo tên file: ${current.filePhase === 'QH' ? 'quy hoạch (mọi layer ghi QuyMo_QH)' : 'hiện trạng (mọi layer ghi QuyMo_HT)'}`
+      : 'Áp dụng khi tên file không có tiền tố HT / QH. Layer TT16 lấy giai đoạn theo tiền tố HT_ / QHDD_ / QHDH_.';
 }
 
 // ID công trình lô sẽ cập nhật (null = tạo mới / bỏ qua / ngoài TP)
@@ -770,7 +783,10 @@ function renderReport() {
   }
   const planned = parcels.filter(p => planOf(p)).length;
   if (planned) alerts.push(['info', `${fmtNum(planned)} lô có chỉ tiêu quy hoạch: ghi vào cột TangCao, MatDoXD, HeSoSDD của Sheet.`]);
-  if (current.filePhase === 'QH') {
+  if (current.bothPhases) {
+    const names = current.slotFiles || {};
+    alerts.push(['info', `File <b>${escapeHtml(names.HT || '')}</b> ghi QuyMo_HT, file <b>${escapeHtml(names.QH || '')}</b> ghi QuyMo_QH. Lô cùng vị trí, cùng loại được gộp một công trình.`]);
+  } else if (current.filePhase === 'QH') {
     alerts.push(['info', `File <b>${escapeHtml(fileName)}</b>: tiền tố QH — mọi layer, kể cả layer HT, ghi vào QuyMo_QH.`]);
   } else if (current.filePhase === 'HT') {
     alerts.push(['info', `File <b>${escapeHtml(fileName)}</b>: tiền tố HT — toàn bộ lô ghi vào hiện trạng (QuyMo_HT).`]);
@@ -1091,6 +1107,10 @@ async function removePending(id, ask = true) {
 // ---- Khách gửi hồ sơ ----
 
 async function submitPending() {
+  if (current.bothPhases) {
+    setStatus('⚠️ Chưa đăng nhập: hàng chờ nhận từng file. Chọn một file HT hoặc QH, hoặc đăng nhập Admin để ghi cả hiện trạng và quy hoạch.', 'var(--accent-red)');
+    return;
+  }
   const raw = current.raw;
   if (!raw) return;
   const bytes = new TextEncoder().encode(raw.text).length;
@@ -1357,6 +1377,115 @@ const pointSource = (r) => ({
   fileName: r.file.name, entities: r.parsed.entities.filter(e => e.kind === 'POINT'), wgs84: r.wgs84, crs: r.parsed.crs || null
 });
 
+const DXF_SLOTS = ['RG', 'HT', 'QH'];
+const DXF_SLOT_HINT = { RG: 'RG - QHPK ….dxf', HT: 'HT - QHPK ….dxf', QH: 'QH - QHPK ….dxf' };
+const DXF_SLOT_TITLE = { RG: 'Ranh giới QH', HT: 'Hiện trạng sử dụng đất', QH: 'Quy hoạch sử dụng đất' };
+const dxfSlots = { RG: null, HT: null, QH: null };
+
+function dxfNameParts(fileName) {
+  const base = String(fileName || '').replace(/\.[^.]+$/, '').trim();
+  const m = base.match(/^(RG|HT|QH)\s*[-_]\s*(.+)$/i);
+  if (!m || !m[2].trim()) return null;
+  return { prefix: m[1].toUpperCase(), project: m[2].trim() };
+}
+
+function paintDxfSlot(slot) {
+  const file = dxfSlots[slot];
+  const name = $(`cadFile${slot}Name`);
+  if (name) name.textContent = file ? file.name : DXF_SLOT_HINT[slot];
+  document.querySelector(`.cad-slot-row[data-slot="${slot}"]`)?.classList.toggle('has-file', !!file);
+  const clear = document.querySelector(`[data-clear="${slot}"]`);
+  if (clear) clear.hidden = !file;
+}
+
+function clearDxfSlots() {
+  DXF_SLOTS.forEach(slot => {
+    dxfSlots[slot] = null;
+    const input = $(`cadFile${slot}`);
+    if (input) input.value = '';
+    paintDxfSlot(slot);
+  });
+}
+
+async function onDxfSlot(slot, file) {
+  const input = $(`cadFile${slot}`);
+  if (!file || submitting) {
+    if (input) input.value = '';
+    return;
+  }
+  const parts = dxfNameParts(file.name);
+  if (!parts || parts.prefix !== slot) {
+    setStatus(`⚠️ ${DXF_SLOT_TITLE[slot]} phải đặt tên «${DXF_SLOT_HINT[slot].replace('….', 'tên.')}» (đang là ${file.name}).`, 'var(--accent-red)');
+    if (input) input.value = '';
+    return;
+  }
+  const project = nameKey(parts.project);
+  const diff = DXF_SLOTS.filter(s => s !== slot && dxfSlots[s]).map(s => dxfNameParts(dxfSlots[s].name)).find(p => p && nameKey(p.project) !== project);
+  if (diff) {
+    setStatus(`⚠️ Tên đồ án phải giống nhau. «${slot} - ${parts.project}» khác «${diff.prefix} - ${diff.project}».`, 'var(--accent-red)');
+    if (input) input.value = '';
+    return;
+  }
+  const problem = fileProblem(file);
+  if (problem) {
+    setStatus(problem, 'var(--accent-red)');
+    if (input) input.value = '';
+    return;
+  }
+  dxfSlots[slot] = file;
+  paintDxfSlot(slot);
+  if (input) input.value = '';
+  await reloadDxfSlots();
+}
+
+async function reloadDxfSlots() {
+  const chosen = DXF_SLOTS.filter(s => dxfSlots[s]);
+  if (!chosen.length) { resetImport(); return; }
+  if (submitting) return;
+  fillPairSelect();
+  setStatus('⏳ Đang đọc file...', 'var(--accent-orange)');
+  await new Promise(r => setTimeout(r, 30));
+  try {
+    const read = await Promise.all(chosen.map(s => readImportFile(dxfSlots[s])));
+    const bySlot = {};
+    read.forEach(r => { bySlot[dxfNameParts(r.file.name).prefix] = r; });
+    const areas = ['QH', 'HT'].map(s => bySlot[s]).filter(Boolean);
+    const lines = bySlot.RG || null;
+    if (!areas.length) {
+      const guessed = projectName(lines.file.name);
+      if (!$('cadPair')?.value.trim() && !suggestPair(guessed)) {
+        throw new Error('File ranh giới cần chọn đồ án có sẵn trong «Ghép vào đồ án», hoặc chọn kèm file HT / QH.');
+      }
+      openBoundary(lines, null);
+      return;
+    }
+    areas.forEach(r => {
+      const phase = dxfNameParts(r.file.name).prefix;
+      r.parsed.entities.forEach(e => { e.slotPhase = phase; });
+    });
+    const primary = bySlot.QH || bySlot.HT;
+    const slotFiles = {};
+    DXF_SLOTS.forEach(s => { if (dxfSlots[s]) slotFiles[s] = dxfSlots[s].name; });
+    openParsed({
+      file: primary.file,
+      format: primary.format,
+      parsed: {
+        ...primary.parsed,
+        entities: areas.flatMap(r => r.parsed.entities),
+        layers: areas.flatMap(r => r.parsed.layers || [])
+      },
+      text: primary.text,
+      wgs84: primary.wgs84
+    }, null, { points: null, lines, both: areas.length > 1, slotFiles });
+  } catch (err) {
+    current = null;
+    lockCrs(false);
+    renderReport();
+    clearPreview();
+    setStatus(`❌ ${err.message}`, 'var(--accent-red)');
+  }
+}
+
 const loadFile = (file, pendingId = null) => loadFiles(file ? [file] : [], pendingId);
 
 /**
@@ -1367,6 +1496,28 @@ const loadFile = (file, pendingId = null) => loadFiles(file ? [file] : [], pendi
 async function loadFiles(files, pendingId = null) {
   const list = [...(files || [])].filter(Boolean);
   if (!list.length || submitting) return;
+  if (!pendingId && list.every(file => /\.dxf$/i.test(file.name) && dxfNameParts(file.name))) {
+    const seen = new Set();
+    for (const file of list) {
+      const parts = dxfNameParts(file.name);
+      if (seen.has(parts.prefix)) {
+        setStatus(`⚠️ Trùng mục ${parts.prefix}. Mỗi mục chỉ chọn một file.`, 'var(--accent-red)');
+        return;
+      }
+      seen.add(parts.prefix);
+    }
+    const projects = list.map(file => nameKey(dxfNameParts(file.name).project));
+    if (projects.some(p => p !== projects[0])) {
+      setStatus('⚠️ Các file DXF phải cùng tên đồ án sau tiền tố RG / HT / QH.', 'var(--accent-red)');
+      return;
+    }
+    DXF_SLOTS.forEach(slot => { dxfSlots[slot] = null; });
+    list.forEach(file => { dxfSlots[dxfNameParts(file.name).prefix] = file; });
+    DXF_SLOTS.forEach(paintDxfSlot);
+    if ($('cadFile')) $('cadFile').value = '';
+    await reloadDxfSlots();
+    return;
+  }
   fillPairSelect();
   if (list.length > 3) {
     setStatus('⚠️ Chọn tối đa 3 file: lớp vùng (sử dụng đất), lớp điểm chức năng và lớp ranh giới.', 'var(--accent-red)');
@@ -1432,11 +1583,14 @@ function openParsed({ file, format, parsed, text, wgs84 }, pendingId, extras) {
   const points = extras && extras.points;
   const lines = extras && extras.lines;
   if (format === 'shp' && parsed.crs && CRS_PRESETS[parsed.crs] && $('cadCrs')) $('cadCrs').value = parsed.crs;
-  const filePhase = format === 'dxf' || format === 'shp' ? filePhaseFromName(file.name) : null;
+  const both = !!(extras && extras.both);
+  const filePhase = both ? null : (format === 'dxf' || format === 'shp' ? filePhaseFromName(file.name) : null);
   // Layer TT16 nhận thẳng; layer khác (kể cả file lẫn tên trước TT16) vào khớp thủ công
   const tt16 = parsed.entities.some(e => tt16Layer(e.layer));
   current = {
-    fileName: file.name, format, wgs84, tt16, filePhase, entities: parsed.entities, stats: parsed.stats, base: null, result: null,
+    fileName: both ? `${projectName(file.name)}.dxf` : file.name,
+    format, wgs84, tt16, filePhase, bothPhases: both, slotFiles: extras && extras.slotFiles || null,
+    entities: parsed.entities, stats: parsed.stats, base: null, result: null,
     manual: createManualMapping(parsed.entities, { allowCsd: CSD_FORMATS.has(format) }), levels: new Map(), autoLevels: new Map(), takeOver: new Set(),
     reviewSrc: null, reviewStarted: false,
     raw: { ext: format === 'shp' ? 'geojson' : format, text }, pendingId,
@@ -1487,6 +1641,7 @@ function resetImport(keepStatus = false) {
   renderReport();
   if (!keepStatus) setStatus('');
   ['cadFile', 'cadPointFile'].forEach(id => { if ($(id)) $(id).value = ''; });
+  clearDxfSlots();
   renderPendingList();
 }
 
@@ -1562,9 +1717,9 @@ function buildItems() {
   return items;
 }
 
-// Tên đồ án = tên file bỏ tiền tố HT- / QH- và phần mở rộng (khớp projectTitle trong Apps Script)
+// Tên đồ án = tên file bỏ tiền tố RG / HT / QH và phần mở rộng (khớp projectTitle trong Apps Script)
 function projectName(fileName) {
-  return String(fileName || '').replace(/\.[^.]+$/, '').replace(/^(HT|QH)[-_\s]+/i, '').replace(/-(?:ranh-gioi|diem-chuc-nang)$/i, '').trim() || 'DXF';
+  return String(fileName || '').replace(/\.[^.]+$/, '').replace(/^(RG|HT|QH)[-_\s]+/i, '').replace(/-(?:ranh-gioi|diem-chuc-nang)$/i, '').trim() || 'DXF';
 }
 
 const nameKey = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd')
@@ -1575,7 +1730,10 @@ function pairMismatches() {
   const pair = $('cadPair')?.value.trim();
   if (!pair || !current) return [];
   const want = nameKey(pair);
-  const files = [...new Set([current.fileName, current.boundaryFile, current.points?.fileName].filter(Boolean))];
+  const files = [...new Set([
+    current.fileName, current.boundaryFile, current.points?.fileName,
+    ...(current.slotFiles ? Object.values(current.slotFiles) : [])
+  ].filter(Boolean))];
   return files.filter(f => nameKey(projectName(f)) !== want);
 }
 
@@ -1591,11 +1749,12 @@ function activeProjectName() {
 }
 
 function submitFileName() {
+  if (current?.bothPhases) return `${activeProjectName()}.dxf`;
   const pair = $('cadPair')?.value.trim();
   if (!pair || !current) return current.fileName;
   const phase = current.filePhase === 'QH' || current.filePhase === 'HT' ? current.filePhase : '';
   const ext = (String(current.fileName).match(/\.[^.]+$/) || ['.zip'])[0];
-  return `${phase ? `${phase}-` : ''}${pair}${ext}`;
+  return `${phase ? `${phase} - ` : ''}${pair}${ext}`;
 }
 
 function buildLands() {
@@ -1692,7 +1851,7 @@ function projectRegistry(items, lands) {
 
 // Lô đất gửi thành các phần riêng sau lô hạ tầng. Phần đất đầu xóa lô cũ cùng giai đoạn (HT hoặc QH), không xóa giai đoạn kia.
 function buildChunks(items, lands) {
-  const phaseReset = current.filePhase === 'QH' || current.filePhase === 'HT' ? current.filePhase : true;
+  const phaseReset = current.bothPhases ? true : (current.filePhase === 'QH' || current.filePhase === 'HT' ? current.filePhase : true);
   const itemChunks = chunkItems(items).map(c => ({ items: c, lands: [] }));
   const landChunks = chunkItems(lands).map((c, i) => ({
     items: [],
@@ -1775,12 +1934,15 @@ async function submitImport() {
       if (!confirm(`⚠️ Có ${outside.length} lô nằm ngoài TP. Huế, cách ranh hơn ${fmtNum(CITY_EDGE_M)} m (${detail}) sẽ bị BỎ QUA, không ghi vào Sheet.\n\nNếu đây là lỗi vẽ / sai vị trí, bấm Hủy để sửa file rồi nhập lại.\nBấm OK để tiếp tục ghi ${items.length} lô hợp lệ.`)) return;
     }
     const nUpdate = items.filter(it => it.matchId).length;
-    const phaseLabel = current.filePhase === 'QH' ? 'Quy hoạch (QuyMo_QH) theo tên file'
+    const phaseLabel = current.bothPhases ? 'HT theo file Hiện trạng, QH theo file Quy hoạch'
+      : current.filePhase === 'QH' ? 'Quy hoạch (QuyMo_QH) theo tên file'
       : current.filePhase === 'HT' ? 'Hiện trạng (QuyMo_HT) theo tên file'
         : phase === 'QH' ? 'Quy hoạch (QuyMo_QH)' : 'Hiện trạng (QuyMo_HT)';
-    const landNote = lands.length ? `\n• ${lands.length} lô đất ngoài nhóm hạ tầng → file ${current.filePhase === 'HT' ? 'Hiện trạng' : current.filePhase === 'QH' ? 'Chức năng sử dụng đất' : 'đồ án'} trên bucket` : '';
+    const landNote = lands.length ? `\n• ${lands.length} lô đất ngoài nhóm hạ tầng → file ${current.bothPhases ? 'hiện trạng và quy hoạch' : current.filePhase === 'HT' ? 'Hiện trạng' : current.filePhase === 'QH' ? 'Chức năng sử dụng đất' : 'đồ án'} trên bucket` : '';
     const pairNote = $('cadPair')?.value.trim() ? `\n• Ghép vào đồ án «${activeProjectName()}»` : '';
-    const separateNote = current.filePhase === 'HT'
+    const separateNote = current.bothPhases
+      ? '\n• Ghi cả Hiện trạng sử dụng đất và Quy hoạch sử dụng đất'
+      : current.filePhase === 'HT'
       ? '\n• File Hiện trạng ghi riêng, không đè Chức năng sử dụng đất'
       : current.filePhase === 'QH'
         ? '\n• File Chức năng sử dụng đất ghi riêng, không đè Hiện trạng'
@@ -1803,7 +1965,8 @@ async function submitImport() {
   await new Promise(r => setTimeout(r, 0));
   chunks[chunks.length - 1].registry = projectRegistry(items, lands);
   return writeChunks({
-    phase, filePhase: current.filePhase === 'QH' || current.filePhase === 'HT' ? current.filePhase : null,
+    phase, filePhase: current.bothPhases ? null : (current.filePhase === 'QH' || current.filePhase === 'HT' ? current.filePhase : null),
+    infraReset: current.bothPhases ? 'BOTH' : null,
     summary, fileName: submitFileName(), tenQH: activeProjectName(), total: items.length + lands.length, chunks, next: 0,
     done: { created: [], updated: [], skipped: [], polygonsDropped: 0, lands: 0, landsDropped: 0 }, pendingId: current.pendingId || null
   });
@@ -1821,7 +1984,8 @@ async function writeChunks(job) {
       markDataWritten();
       const reset = chunks[k].landsReset;
       const landsReset = reset === 'HT' || reset === 'QH' ? reset : !!reset;
-      const infraPhase = job.filePhase === 'QH' || job.filePhase === 'HT' ? job.filePhase : job.phase;
+      const infraPhase = job.infraReset === 'BOTH' ? 'BOTH'
+        : (job.filePhase === 'QH' || job.filePhase === 'HT' ? job.filePhase : job.phase);
       const res = await fetch(geeApi('action=importCadBatch'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
@@ -1889,6 +2053,19 @@ export function initCadImport(opts = {}) {
   $('cadPair')?.addEventListener('change', () => { syncPopBox(); renderReport(); });
   $('cadFile')?.addEventListener('change', (e) => loadFiles(e.target.files));
   $('cadPointFile')?.addEventListener('change', (e) => loadPointsFile(e.target.files && e.target.files[0]));
+  DXF_SLOTS.forEach(slot => {
+    $(`cadFile${slot}`)?.addEventListener('change', (e) => onDxfSlot(slot, e.target.files && e.target.files[0]));
+    const drop = document.querySelector(`.cad-slot-row[data-slot="${slot}"] label`);
+    if (!drop) return;
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', (e) => onDxfSlot(slot, e.dataTransfer.files && e.dataTransfer.files[0]));
+  });
+  document.querySelectorAll('.cad-slot-clear').forEach(btn => btn.addEventListener('click', () => {
+    dxfSlots[btn.dataset.clear] = null;
+    paintDxfSlot(btn.dataset.clear);
+    reloadDxfSlots();
+  }));
   const drop = $('cadDrop');
   if (drop) {
     ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));

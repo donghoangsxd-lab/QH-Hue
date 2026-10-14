@@ -1175,6 +1175,17 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .add-mode-btn { flex: 1; padding: 5px 4px; border: none; border-radius: var(--r-md); background: transparent; color: var(--text-muted); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; white-space: nowrap; }
 .add-mode-btn.active { background: var(--accent-cyan); color: var(--bg-panel); }
 .add-point-form select:disabled { opacity: 0.45; cursor: not-allowed; }
+.cad-dxf-slots { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.cad-slot-row { display: flex; align-items: stretch; gap: 4px; }
+.cad-slot-row .cad-slot { flex: 1; margin-top: 0; }
+.cad-slot-row.has-file .cad-slot { border-style: solid; }
+.cad-slot-name { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.35; word-break: break-all; }
+.cad-slot-row.has-file .cad-slot-name { color: var(--accent-cyan); }
+.cad-slot-clear {
+  flex: none; width: 26px; border: 1px solid var(--border-color); border-radius: var(--r-md);
+  background: var(--bg-input); color: var(--text-muted); font-size: 16px; line-height: 1; cursor: pointer;
+}
+.cad-slot-clear:hover { color: var(--accent-red); border-color: var(--accent-red); }
 .add-point-form label.cad-drop {
   display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 8px; padding: 10px 6px; white-space: normal; text-align: center;
   border: 1.5px dashed rgba(var(--cyan-rgb), 0.6); border-radius: var(--r-md); color: var(--text-main); font-size: var(--fs-md); cursor: pointer; background: rgba(var(--cyan-rgb), 0.05); transition: background 0.2s, border-color 0.2s;

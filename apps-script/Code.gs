@@ -1057,7 +1057,7 @@ function doPost(e) {
  */
 function projectTitle(fileName) {
   var base = String(fileName || '').replace(/\.[^.]+$/, '').trim();
-  var m = base.match(/^(?:HT|QH)[\s_\-]+(.+)$/i);
+  var m = base.match(/^(?:RG|HT|QH)[\s_\-]+(.+)$/i);
   return String(m ? m[1] : base).slice(0, 120);
 }
 

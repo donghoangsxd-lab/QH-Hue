@@ -35,7 +35,7 @@ function setTransport(fn) { transport = fn; }
 
 function projectTitle(fileName) {
   const base = String(fileName || '').replace(/\.[^.]+$/, '').trim();
-  const m = base.match(/^(?:HT|QH)[\s_\-]+(.+)$/i);
+  const m = base.match(/^(?:RG|HT|QH)[\s_\-]+(.+)$/i);
   const name = String(m ? m[1] : base).replace(/-(?:ranh-gioi|diem-chuc-nang)$/i, '').trim();
   return name.slice(0, 120);
 }
@@ -1036,8 +1036,8 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
   const fromName = namedPhase(fileName);
   let resetLands = landsReset === 'HT' || landsReset === 'QH' || landsReset === true ? landsReset : false;
   if (resetLands === true && fromName) resetLands = fromName;
-  let resetInfra = infraReset === 'HT' || infraReset === 'QH' ? infraReset : null;
-  if (fromName && resetInfra && resetInfra !== fromName) resetInfra = fromName;
+  let resetInfra = infraReset === 'HT' || infraReset === 'QH' || infraReset === 'BOTH' ? infraReset : null;
+  if (fromName && resetInfra && resetInfra !== fromName && resetInfra !== 'BOTH') resetInfra = fromName;
 
   const htDoc = await readRoleDoc(slug, ROLE_HT);
   const qhDoc = await readRoleDoc(slug, ROLE_QH);
@@ -1085,7 +1085,7 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
     landAdds.push(row);
   });
 
-  const touch = (phase) => resetLands === true || resetLands === phase || resetInfra === phase
+  const touch = (phase) => resetLands === true || resetLands === phase || resetInfra === phase || resetInfra === 'BOTH'
     || infraAdds.some(p => parcelPhase(p) === phase) || landAdds.some(p => parcelPhase(p) === phase);
   const touchHT = touch('HT') || !hadDir;
   const touchQH = touch('QH') || !hadDir;
@@ -1093,14 +1093,14 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
   if (touchHT) {
     ht = applyPhaseParcels(ht, 'HT', {
       resetLands: resetLands === true || resetLands === 'HT',
-      resetInfra: resetInfra === 'HT',
+      resetInfra: resetInfra === 'HT' || resetInfra === 'BOTH',
       infraAdds, landAdds
     });
   }
   if (touchQH) {
     qh = applyPhaseParcels(qh, 'QH', {
       resetLands: resetLands === true || resetLands === 'QH',
-      resetInfra: resetInfra === 'QH',
+      resetInfra: resetInfra === 'QH' || resetInfra === 'BOTH',
       infraAdds, landAdds
     });
   }

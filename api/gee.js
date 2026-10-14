@@ -2140,7 +2140,7 @@ module.exports = async (req, res) => {
       const named = projects.namedPhase(fileName);
       let landsReset = body.landsReset === 'HT' || body.landsReset === 'QH' ? body.landsReset : body.landsReset === true;
       if (landsReset === true && named) landsReset = named;
-      const infraReset = body.infraReset === 'HT' || body.infraReset === 'QH'
+      const infraReset = body.infraReset === 'HT' || body.infraReset === 'QH' || body.infraReset === 'BOTH'
         ? body.infraReset
         : (body.infraReset === true ? (named || phase) : null);
       const items = [];

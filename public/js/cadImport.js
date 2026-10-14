@@ -823,14 +823,15 @@ function makeParcels(entities, project) {
     const land = otherLand || !t;
     if (!t && !otherLand) unknownLayers[ent.layer] = (unknownLayers[ent.layer] || 0) + 1;
     if (land && ent.kind === 'POINT') return;
+    const slotPhase = ent.slotPhase === 'HT' || ent.slotPhase === 'QH' ? ent.slotPhase : null;
     const tag = land ? {
       src, prefix: `LAND:${ent.layer}`, type: null, nhom: '', manual: false, land: true,
-      tt16: !!tt, phase: tt ? tt.phase : null, stage: tt ? tt.stage : null, school: false, pending: false
+      tt16: !!tt, phase: tt ? tt.phase : null, stage: tt ? tt.stage : null, school: false, pending: false, slotPhase
     } : {
       src, prefix: t.prefix, type: t.type, nhom: t.nhom, manual: !!ent.typeCode, land: false,
       tt16: !!tt, phase: tt ? tt.phase : null, stage: tt ? tt.stage : null,
       school: pickSchool, market: pickMarket, pending: pickSchool || pickMarket,
-      marketCheck: !!(tt && tt.marketCheck && !ent.typeCode)
+      marketCheck: !!(tt && tt.marketCheck && !ent.typeCode), slotPhase
     };
     tag.attrs = ent.attrs || null;
     const { toXY, toLatLng } = project(ent);
