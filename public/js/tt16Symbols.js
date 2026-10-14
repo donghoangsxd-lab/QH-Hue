@@ -30,7 +30,8 @@ Object.assign(TT16_STYLES, {
   "CX-CD": { label: 'Cây xanh chuyên dụng', layer: 'DAT_Cayxanhchuyendung', aci: 126, color: '#007f5f', pattern: 'Cayxanhchuyendung' },
   "SX-CN": { label: 'Sản xuất công nghiệp, kho bãi', layer: 'DAT_SX_Congnghiep', aci: 192, color: '#6600cc', pattern: 'Congnghiep' },
   "SX-VL": { label: 'Khai thác khoáng sản, VLXD', layer: 'DAT_SX_Vatlieu', aci: 175, color: '#4d4d99', pattern: 'Vatlieu' },
-  "CC-DV": { label: 'Công cộng - dịch vụ', layer: 'DAT_DD_DVCCdothi', color: '#e03131', pattern: 'DVCC' },
+  // ACI 1 như Mục 02 (C-DVCC). Nền hoa văn và tô đặc đủ đậm: #e03131 alpha 0.25 trên vệ tinh và nền UI tối trông như đen
+  "CC-DV": { label: 'Công cộng - dịch vụ', layer: 'DAT_DD_DVCCdothi', aci: 1, color: '#ff0000', pattern: 'DVCC', solidOpacity: 0.62, fillOpacity: 0.55 },
   "DT-NC": { label: 'Đào tạo, nghiên cứu', layer: 'DAT_DaotaoNC', aci: 144, color: '#007399', pattern: 'DaotaoNC' },
   "CQ": { label: 'Cơ quan, trụ sở', layer: 'DAT_Coquan', aci: 34, color: '#994c00', pattern: 'Coquan' },
   "DL": { label: 'Khu dịch vụ du lịch', layer: 'DAT_Dulich', aci: 210, color: '#ff00ff', pattern: 'Dulich' },
@@ -56,7 +57,7 @@ Object.assign(TT16_STYLES, {
 Object.assign(TT16_STYLES, {
   "C-DVO": { label: 'Đơn vị ở', layer: 'DAT_DD_Donvio', aci: 30, color: '#ff7f00', pattern: 'C_DVO' },
   "C-HH": { label: 'Hỗn hợp (đơn vị ở và dịch vụ công cộng đô thị)', layer: 'DAT_DD_Honhop', aci: 22, color: '#cc3200', pattern: 'C_HH' },
-  "C-DVCC": { label: 'Dịch vụ - công cộng đô thị', layer: 'DAT_DD_DVCCdothi', aci: 1, color: '#ff0000', pattern: 'C_DVCC' },
+  "C-DVCC": { label: 'Dịch vụ - công cộng đô thị', layer: 'DAT_DD_DVCCdothi', aci: 1, color: '#ff0000', pattern: 'C_DVCC', solidOpacity: 0.62, fillOpacity: 0.55 },
   "C-CQDT": { label: 'Cơ quan, trụ sở đô thị', layer: 'DAT_DD_Coquandothi', aci: 34, color: '#994c00', pattern: 'C_CQDT' },
   "C-CXDT": { label: 'Cây xanh sử dụng công cộng đô thị', layer: 'DAT_DD_CayxanhCCdothi', aci: 72, color: '#66cc00', pattern: 'C_CXDT' },
   "C-GTDT": { label: 'Giao thông đô thị', layer: 'DAT_DD_Giaothongdothi', aci: 8, color: '#808080', pattern: 'C_GTDT' },
@@ -700,8 +701,10 @@ function patternFor(key) {
   const tile = tileFor(key);
   if (!tile) return null;
   if (!tile.pattern) {
-    tile.pattern = tile.canvas.getContext('2d').createPattern(tile.canvas, 'repeat');
-    if (tile.r > 1 && tile.pattern.setTransform && typeof DOMMatrix !== 'undefined') {
+    // Context khác context đã vẽ ô: createPattern trên chính canvas nguồn có bản Chrome trả pattern đen
+    const host = document.createElement('canvas').getContext('2d');
+    tile.pattern = host ? host.createPattern(tile.canvas, 'repeat') : null;
+    if (tile.pattern && tile.r > 1 && tile.pattern.setTransform && typeof DOMMatrix !== 'undefined') {
       tile.pattern.setTransform(new DOMMatrix().scale(1 / tile.r));
     }
   }
@@ -782,11 +785,11 @@ function legendGroupHtml([name, keys]) {
       <i class="tt16-swatch" style="background:${key.color};border-color:${key.color};"></i><span>${key.label}</span></div>`;
     }
     const s = TT16_STYLES[key];
-    const bg = tt16SwatchCss(key) || `background:${s.color};`;
+    const bg = tt16SwatchCss(key);
     const aci = s.aci != null ? ` · ACI ${s.aci}` : '';
     const search = foldLayer(`${s.label} ${s.layer} ${key}`).toLowerCase();
     return `<div class="tt16-row" title="${s.label}\nLayer: ${s.layer}${aci}" data-search="${search}">
-      <i class="tt16-swatch" style="${bg}border-color:${s.color};"></i><span>${s.label}</span></div>`;
+      <i class="tt16-swatch" style="background-color:${s.color};${bg}border-color:${s.color};"></i><span>${s.label}</span></div>`;
   }).join('');
   return `<details class="tt16-group" open><summary><span class="tt16-group-name">${name}</span><span class="tt16-group-count">${keys.length}</span></summary>${rows}</details>`;
 }
@@ -808,7 +811,7 @@ export const RESIDENTIAL_COLOR = '#d4a20b';
 const LAND_RULES = [
   { key: 'o', label: 'Đất ở', color: RESIDENTIAL_COLOR, re: /(^|[\s_.-])(DAT[\s_.-]?O|DAT[\s_.-]?ODT|DAT[\s_.-]?ONT|ODT|ONT|NOXH|TDC|NHA[\s_.-]O)($|[\s_.-])|(^|[\s_.-])O[\s_.-](DO[\s_]?THI|NONG[\s_]?THON)|LIEN[\s_]?KE|BIET[\s_]?THU|NHA[\s_]?VUON|CHUNG[\s_]?CU|DONVIO|NHOMNHAO|HON[\s_]?HOP|LANG[\s_]?XOM|DANCUNT|DAT_NO_|CHINH[\s_]?TRANG|TAI[\s_]?DINH[\s_]?CU/ },
   // Công cộng cấp đô thị / đơn vị ở, "đất dịch vụ công cộng", "đất công cộng dịch vụ"; cây xanh, bãi xe công cộng thuộc loại khác
-  { key: 'cc', label: 'Đất công cộng - dịch vụ', color: '#e03131', re: /(?<!(CAY[\s_.-]?XANH|BAI[\s_.-]?(DO[\s_.-]?)?XE)[\s_.-]*)CONG[\s_.-]?CONG|DAT_CC($|_)|HTCC|DVCC|CCDV/ },
+  { key: 'cc', label: 'Đất công cộng - dịch vụ', color: '#ff0000', re: /(?<!(CAY[\s_.-]?XANH|BAI[\s_.-]?(DO[\s_.-]?)?XE)[\s_.-]*)CONG[\s_.-]?CONG|DAT_CC($|_)|HTCC|DVCC|CCDV/ },
   // Tên layer CAD trước TT16 viết rời, không dấu ("N - QH - dat co quan", "dat di tich", "An ninh", "dat DVTM")
   { key: 'dtn', label: 'Đất đào tạo, nghiên cứu', color: '#1e3a8a', re: /DAO[\s_]?TAO|NGHIEN[\s_]?CUU|GIAO[\s_]?DUC|NCKH|DAT_GD/ },
   { key: 'cq', label: 'Đất cơ quan, trụ sở', color: '#a1887f', re: /CO[\s_]?QUAN|TRU[\s_]?SO|CQNN|HANH[\s_]?CHINH/ },

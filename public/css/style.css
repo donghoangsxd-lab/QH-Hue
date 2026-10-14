@@ -3419,6 +3419,7 @@ body.project-view #projectReviewHost { display: flex; padding: 0; overflow: hidd
 .review-decide-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding-top: 4px; border-top: 1px dashed rgba(251, 146, 60, 0.45); color: var(--text-muted); }
 .review-decide-nav > span { flex: 1; font-size: var(--fs-xs, 11px); }
 .review-landuse .lu-code { white-space: nowrap; }
+.review-landuse .lu-delta { white-space: nowrap; }
 table.review-landuse th.lu-code, table.review-landuse td.lu-code { text-align: left; }
 table.review-landuse td:nth-child(n+4) { text-align: right; }
 .review-landuse tr.lu-undet td { font-style: italic; border-top: 1px dashed var(--border-color); }

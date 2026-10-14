@@ -12,13 +12,14 @@ import { escapeHtml, fmtNum, ico, showToast, loadHtml2Pdf, isApproved, wardStatH
 import { setBottomPanelMaximized, setBottomPanelCollapsed } from './uiComponents.js';
 import { importReviewDossier, rejectPending, REVIEW_DOSSIER_EVENT } from './cadImportUi.js';
 import { setLabelsOverlay, labelsOverlayOn } from './basemap.js';
-import { tt16SymbolStyle, tt16SwatchCss, TT16_PATTERN_ZOOM, landPatternKey, LOT_OPACITY_EVENT } from './tt16Symbols.js';
+import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, landPatternKey, LOT_OPACITY_EVENT } from './tt16Symbols.js';
 import {
   REVIEW_MAX_BYTES, LANDUSE_TABLES, classifyLand, landChoices, landRowByKey, landUseSummary, landSubKey, importLayerName, decisionKind,
   presetDecision, tagParcel, lotRadius, scoreRows, rowLabel, rowMinSize, newLandControl, residentialSubAreas, landSymbol, UNIT_POP, THPT_POP_MIN,
   projectOfFile, PENDING_TONE, UNDETERMINED_KEY, savedLandTag, savedLotType
 } from './projectReviewCore.js';
 import { projectLayersOf, cachedLots, PROJECT_INFO_EVENT } from './projectFiles.js';
+import { adjustmentPacks } from './adjustLayer.js';
 import { initGisDossier, handleGisClick } from './gisDossierUi.js';
 
 const STORE_KEY = 'qh_review_dossiers_v2';
@@ -170,6 +171,10 @@ function applyTags() {
     const chosen = session.layerChoice.get(lot.layer);
     const auto = classifyLand(lot.layer, kind);
     lot.landKey = chosen || (auto ? auto.key : null);
+    if (!lot.landKey) {
+      const tagged = savedLandTag(kind, landPatternKey(lot.layer, lot.name), false);
+      if (tagged.landKey) lot.landKey = tagged.landKey;
+    }
     lot.ask = !lot.landKey;
     lot.prefix = null; lot.type = null; lot.nhom = ''; lot.role = 'other'; lot.scoreKey = null; lot.radius = 0;
     lot.decisionKind = ''; lot.decision = ''; lot.decisionSrc = ''; lot.hitName = ''; lot.importLayer = null; lot.subKey = ''; lot.displayName = '';
@@ -303,7 +308,12 @@ const isDetailed = (m) => !!m && m.getZoom() >= TT16_PATTERN_ZOOM;
 // viền theo giai đoạn của layer (HT mảnh, QHDD dải liền, QHDH dải nét đứt) — lớp hiện trạng và quy hoạch chung một bộ ký hiệu
 function lotStyle(lot) {
   // Chờ xác nhận tô đen: layer sai quy định viền đen liền, lô chờ chọn cấp trường / chợ - TTTM viền cam nét đứt (bấm để chọn)
-  if (lot.ask) return { color: PENDING_TONE, weight: 2, opacity: 1, dashArray: null, fillColor: PENDING_TONE, fillOpacity: 0.6 };
+  if (lot.ask) {
+    const key = landPatternKey(lot.layer, lot.name);
+    const s = key && TT16_STYLES[key];
+    if (s) return tt16SymbolStyle(key, s.color, lot.layer, { scenario: lot.phase, detailed: isDetailed(targetMap(lot.phase)) });
+    return { color: PENDING_TONE, weight: 2, opacity: 1, dashArray: null, fillColor: PENDING_TONE, fillOpacity: 0.6 };
+  }
   if (isUnresolvedDecision(lot)) {
     return { color: ASK_COLOR, weight: 2.5, opacity: 1, dashArray: '6 4', fillColor: PENDING_TONE, fillOpacity: 0.6 };
   }
@@ -704,8 +714,8 @@ const SWATCH_HALF = new Set(['7-YT', '3-MN', '4-TH', '5-THCS', '6-THPT',
   'O-NO', 'O-HH', 'O-LX', 'CX-HC', 'CX-CD', 'SX-CN', 'SX-VL', 'DT-NC', 'CQ', 'DL', 'DT-TG', 'AN', 'QP', 'GT',
   'NTR', 'HTK', 'NN', 'RDD', 'RPH', 'RSX', 'TS', 'HO', 'SS', 'MNB']);
 function swatchHtml(r) {
-  const bg = tt16SwatchCss(r.tt16, SWATCH_HALF.has(r.tt16) ? 0.5 : 1) || `background:${r.tone};`;
-  return `<i style="${bg}border-color:${r.tone}"></i>`;
+  const pat = tt16SwatchCss(r.tt16, SWATCH_HALF.has(r.tt16) ? 0.5 : 1);
+  return `<i style="background-color:${r.tone};${pat}border-color:${r.tone}"></i>`;
 }
 
 function landRowTitle(r, sum) {
@@ -719,40 +729,60 @@ function landRowTitle(r, sum) {
 
 // Ghi chú dưới bảng: nguồn tổng diện tích, hatch giao thông đo được để tự đối chiếu, các loại đất vượt ranh
 function landNotesHtml(sum) {
-  if (!sum.byBoundary) return '';
-  const both = (ht, qh) => [ht > 0 ? `hiện trạng ${haCell(ht)} ha` : '', qh > 0 ? `quy hoạch ${haCell(qh)} ha` : ''].filter(Boolean).join(', ');
-  const src = session.boundarySource === 'gis' ? 'ranh file GIS' : 'ranh tự dựng từ các lô';
-  const notes = [`Tổng cộng = diện tích ${src}${session.boundaryClosed ? ' (đã tự khép kín)' : ''}; đất giao thông = tổng − các loại đất còn lại.`];
-  const hatch = both(sum.gtHatchHtHa, sum.gtHatchQhHa);
-  if (hatch) notes.push(`<b>(Lưu ý: Đất giao thông theo hatch đo được là ${hatch})</b>`);
-  const over = both(sum.overHtHa, sum.overQhHa);
-  if (over) notes.push(`Các loại đất trong ranh cộng lại vượt diện tích ranh (${over}) do lô chồng nhau, đất giao thông tạm ghi 0.`);
+  const notes = [];
+  if (sum.byBoundary) {
+    const both = (ht, qh) => [ht > 0 ? `hiện trạng ${haCell(ht)} ha` : '', qh > 0 ? `quy hoạch ${haCell(qh)} ha` : ''].filter(Boolean).join(', ');
+    const src = session.boundarySource === 'gis' ? 'ranh file GIS' : 'ranh tự dựng từ các lô';
+    notes.push(`Tổng cộng = diện tích ${src}${session.boundaryClosed ? ' (đã tự khép kín)' : ''}; đất giao thông = tổng − các loại đất còn lại.`);
+    const hatch = both(sum.gtHatchHtHa, sum.gtHatchQhHa);
+    if (hatch) notes.push(`<b>(Lưu ý: Đất giao thông theo hatch đo được là ${hatch})</b>`);
+    const over = both(sum.overHtHa, sum.overQhHa);
+    if (over) notes.push(`Các loại đất trong ranh cộng lại vượt diện tích ranh (${over}) do lô chồng nhau, đất giao thông tạm ghi 0.`);
+  }
+  notes.push(sum.dcCopied
+    ? 'Chưa có hồ sơ điều chỉnh cục bộ đã duyệt: cột ĐC cục bộ bằng cột Quy hoạch, tăng/giảm = 0.'
+    : `${fmtNum(session.adjustN || 0)} hồ sơ điều chỉnh cục bộ đã duyệt. Cột ĐC cục bộ là quy hoạch sau khi áp lần lượt các hồ sơ (cũ trước, mới sau). Tăng/giảm = ĐC cục bộ − Quy hoạch.`);
   return notes.map(t => `<div class="review-note">${t}</div>`).join('');
+}
+
+function deltaHtml(v) {
+  const n = Number(v) || 0;
+  if (Math.abs(n) < 0.05) return '<td class="c-muted lu-delta">0</td>';
+  return `<td class="${n > 0 ? 'c-green' : 'c-red'} lu-delta">${n > 0 ? '+' : '−'}${haCell(Math.abs(n))}</td>`;
+}
+
+function landNums(r) {
+  return `<td>${haCell(r.htHa)}</td><td>${pctTxt(r.htPct)}</td><td>${haCell(r.qhHa)}</td><td>${pctTxt(r.qhPct)}</td><td>${haCell(r.dcHa)}</td><td>${pctTxt(r.dcPct)}</td>${deltaHtml(r.deltaHa)}`;
+}
+
+function landPlanShort() {
+  if (session.kind === 'QHC') return 'QHC';
+  return /qhct|quy hoach chi tiet/.test(fold(session.project || '')) ? 'QHCT' : 'QHPK';
 }
 
 function landTableHtml() {
   const table = LANDUSE_TABLES[session.kind];
-  const sum = landUseSummary(session.lots, session.kind, { boundaryM2: session.boundaryM2 });
+  const sum = landUseSummary(session.lots, session.kind, { boundaryM2: session.boundaryM2, dcLots: session.dcLots || null });
   const body = sum.rows.map(r => {
     if (r.kind === 'section') {
-      return `<tr class="lu-section"><td>${r.section}</td><td colspan="2">${escapeHtml(r.label)}</td>
-        <td>${haCell(r.htHa)}</td><td>${pctTxt(r.htPct)}</td><td>${haCell(r.qhHa)}</td><td>${pctTxt(r.qhPct)}</td></tr>`;
+      return `<tr class="lu-section"><td>${r.section}</td><td colspan="2">${escapeHtml(r.label)}</td>${landNums(r)}</tr>`;
     }
     const key = `land:${r.key}`;
     return `<tr class="lu-row${r.sub ? ' lu-sub' : ''}${r.part ? ' lu-part' : ''}${r.undetermined ? ' lu-undet' : ''}${focusKey === key ? ' on' : ''}" data-focus="${key}" title="${escapeHtml(landRowTitle(r, sum))}">
       <td>${r.stt}</td><td>${escapeHtml(r.label)}</td>
       <td class="lu-code" title="${r.code ? `Tên phân lớp TT16: ${escapeHtml(r.code)}. ` : ''}Bản đồ: thu nhỏ tô màu viền ô, phóng to (zoom ≥ ${TT16_PATTERN_ZOOM}) tô hoa văn TT16">${swatchHtml(r)}${escapeHtml(r.sym || '')}</td>
-      <td>${haCell(r.htHa)}</td><td>${pctTxt(r.htPct)}</td><td>${haCell(r.qhHa)}</td><td>${pctTxt(r.qhPct)}</td></tr>`;
+      ${landNums(r)}</tr>`;
   }).join('');
   const totalLabel = sum.sections.length ? `TỔNG CỘNG (${sum.sections.join(' + ')})` : 'TỔNG CỘNG';
-  return `<h4 title="${escapeHtml(table.title)}">Bảng tổng hợp sử dụng đất — ${escapeHtml(table.short)}</h4>
+  const pct100 = (v) => (v > 0 ? '100' : '');
+  return `<h4 title="${escapeHtml(table.title)}">Bảng tổng hợp sử dụng đất — ${escapeHtml(landPlanShort())}</h4>
     <div class="ward-table-scroll-container"><table class="ward-table review-landuse">
       <thead>
-        <tr><th rowspan="2">TT</th><th rowspan="2">${session.kind === 'QHC' ? 'Loại chức năng sử dụng đất' : 'Chức năng ô phố / ô đất'}</th><th rowspan="2" class="lu-code">Ký hiệu</th><th colspan="2">Hiện trạng</th><th colspan="2">Quy hoạch</th></tr>
-        <tr><th>ha</th><th>%</th><th>ha</th><th>%</th></tr>
+        <tr><th rowspan="2">TT</th><th rowspan="2">${session.kind === 'QHC' ? 'Loại chức năng sử dụng đất' : 'Chức năng ô phố / ô đất'}</th><th rowspan="2" class="lu-code">Ký hiệu</th><th colspan="2">Hiện trạng</th><th colspan="2">Quy hoạch</th><th colspan="2" title="Quy hoạch sau các hồ sơ điều chỉnh cục bộ đã duyệt. Chưa có hồ sơ thì bằng cột Quy hoạch.">ĐC cục bộ</th><th rowspan="2" class="lu-delta" title="ĐC cục bộ − Quy hoạch (ha)">Tăng/giảm</th></tr>
+        <tr><th>ha</th><th>%</th><th>ha</th><th>%</th><th>ha</th><th>%</th></tr>
       </thead>
       <tbody>${body}
-        <tr class="lu-total"${sum.byBoundary ? ' title="Diện tích theo ranh đồ án"' : ''}><td></td><td colspan="2">${totalLabel}</td><td>${haCell(sum.totalHT)}</td><td>${sum.totalHT > 0 ? '100' : ''}</td><td>${haCell(sum.totalQH)}</td><td>${sum.totalQH > 0 ? '100' : ''}</td></tr>
+        <tr class="lu-total"${sum.byBoundary ? ' title="Diện tích theo ranh đồ án"' : ''}><td></td><td colspan="2">${totalLabel}</td><td>${haCell(sum.totalHT)}</td><td>${pct100(sum.totalHT)}</td><td>${haCell(sum.totalQH)}</td><td>${pct100(sum.totalQH)}</td><td>${haCell(sum.totalDC)}</td><td>${pct100(sum.totalDC)}</td>${deltaHtml(sum.totalDeltaHa)}</tr>
       </tbody>
     </table></div>${landNotesHtml(sum)}`;
 }
@@ -1593,6 +1623,71 @@ function areaInside(bound, geometry, area) {
   }
 }
 
+const ADJUST_SLIVER = 5;
+
+function asFeature(g) {
+  if (!g) return null;
+  try { return g.type === 'Feature' ? g : turf.feature(g); } catch (e) { return null; }
+}
+
+function dcLandOf(raw, kind) {
+  if (raw.landKey && raw.landKey !== UNDETERMINED_KEY && raw.landKey !== 'skip' && landRowByKey(kind, raw.landKey)) {
+    return { landKey: raw.landKey, subKey: raw.subKey || '' };
+  }
+  const pattern = raw.pattern || landPatternKey(raw.layer || raw.srcLayer || '', raw.name || '');
+  return savedLandTag(kind, pattern, false);
+}
+
+// Lô quy hoạch sau các hồ sơ ĐC đã duyệt: cắt phần nằm trong ranh hồ sơ, thay bằng lô mới. Không sửa lô gốc.
+function planAfterAdjust(qhLots, packs, bound, kind) {
+  let lots = qhLots.map(lot => ({ ...lot }));
+  packs.forEach(pack => {
+    const mask = asFeature(pack.boundary);
+    if (!mask || typeof turf === 'undefined') return;
+    let maskBox;
+    try { maskBox = turf.bbox(mask); } catch (e) { return; }
+    const next = [];
+    lots.forEach(lot => {
+      const geom = geometryOf(lot);
+      if (!geom) { next.push(lot); return; }
+      let box;
+      try { box = turf.bbox(geom); } catch (e) { next.push(lot); return; }
+      if (box[2] < maskBox[0] || box[0] > maskBox[2] || box[3] < maskBox[1] || box[1] > maskBox[3]) { next.push(lot); return; }
+      let inside = 0;
+      try {
+        const hit = turf.intersect(turf.feature(geom), mask);
+        inside = hit ? turf.area(hit) : 0;
+      } catch (e) { next.push(lot); return; }
+      if (inside < 1) { next.push(lot); return; }
+      if (lot.area - inside <= Math.max(ADJUST_SLIVER, lot.area * 0.02)) return;
+      let diff = null;
+      try { diff = turf.difference(turf.feature(geom), mask); } catch (e) { diff = null; }
+      if (!diff || !diff.geometry) { next.push(lot); return; }
+      let area = 0;
+      try { area = turf.area(diff); } catch (e) { next.push(lot); return; }
+      if (!(area > ADJUST_SLIVER)) return;
+      const polygons = polygonsOf(diff.geometry);
+      if (!polygons.length) { next.push(lot); return; }
+      next.push({ ...lot, polygons, area, areaIn: bound ? areaInside(bound, diff.geometry, area) : area });
+    });
+    (pack.lots || []).forEach((raw, i) => {
+      const polygons = polygonsOf(raw.geometry);
+      if (!polygons.length) return;
+      const geom = polygons.length === 1 ? { type: 'Polygon', coordinates: polygons[0] } : { type: 'MultiPolygon', coordinates: polygons };
+      let area = Number(raw.area);
+      if (!(area > 0)) { try { area = turf.area(geom); } catch (e) { area = 0; } }
+      const tag = dcLandOf(raw, kind);
+      next.push({
+        id: `dc${pack.at || 0}-${i}`, phase: 'QH', layer: String(raw.layer || ''), name: String(raw.name || ''),
+        area, areaIn: bound ? areaInside(bound, geom, area) : area, polygons,
+        landKey: tag.landKey, subKey: tag.subKey || '', pattern: raw.pattern || ''
+      });
+    });
+    lots = next;
+  });
+  return lots;
+}
+
 // Thông tin đồ án đã lưu: mở dạng gọn trong panel dưới (giữ kiểu xem bản đồ đang dùng, không tự chia đôi)
 async function openProjectInfo(project) {
   if (!project) return;
@@ -1620,6 +1715,13 @@ async function openProjectInfo(project) {
     lots, saved: true, view: true
   });
   hintCollapsedPanel();
+  const kind = session.kind;
+  adjustmentPacks(project).then(packs => {
+    if (seq !== infoSeq || !session || session.project !== project || !packs.length) return;
+    session.dcLots = planAfterAdjust(session.lots.filter(l => l.phase === 'QH'), packs, bound, kind);
+    session.adjustN = packs.length;
+    renderHost();
+  }).catch(() => { /* chưa có hồ sơ ĐC: cột ĐC giữ bằng Quy hoạch */ });
 }
 
 /** Đang xem thông tin 1 đồ án đã lưu → đóng (chọn phường / toàn TP); hồ sơ thẩm định chưa gửi thì giữ nguyên */

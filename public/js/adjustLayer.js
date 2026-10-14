@@ -142,6 +142,19 @@ export function adjustmentsOf(tenQH) {
   return items.filter(x => x.status === 'approved' && x.tenQH === tenQH).sort((a, b) => (b.at || 0) - (a.at || 0));
 }
 
+/** Ranh + lô của các hồ sơ đã duyệt, cũ trước mới sau, để bảng đất tính cột ĐC cục bộ */
+export async function adjustmentPacks(tenQH) {
+  if (!items.length) await reloadAdjustments();
+  const packs = [];
+  for (const it of adjustmentsOf(tenQH).slice().reverse()) {
+    try {
+      const d = await detailOf(it);
+      packs.push({ boundary: d.boundary || it.boundary, lots: Array.isArray(d.lots) ? d.lots : [], at: it.at || 0 });
+    } catch (e) { /* bỏ hồ sơ không tải được */ }
+  }
+  return packs;
+}
+
 function hatchDefs(svg, id) {
   if (!svg || svg.querySelector(`#${id}`)) return;
   const ns = 'http://www.w3.org/2000/svg';

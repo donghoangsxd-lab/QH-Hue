@@ -22,7 +22,7 @@ const QHC_ROWS = [
   { section: 'I', label: 'Khu đất dân dụng' },
   C('dd_o', 'Đơn vị ở', 'DVO', ['DAT_DD_DONVIO'], '#f5d90a', { split: true, subs: [['ht', 'Đất đơn vị ở hiện trạng', 'OHT'], ['moi', 'Đất đơn vị ở mới', 'OQH']] }),
   C('dd_hh', 'Hỗn hợp (đơn vị ở và dịch vụ - công cộng)', 'HH', ['DAT_DD_HONHOP'], '#ffa94d'),
-  C('dd_dvcc', 'Dịch vụ - công cộng', 'DVCC', ['DAT_DD_DVCCDOTHI', 'DAT_DD_TRUONGTHPT', 'DAT_DD_TRUONGHOC'], '#a61e4d', { subs: [...SCHOOL_SUBS, ['other', 'Dịch vụ - công cộng khác', 'DVCC-K']] }),
+  C('dd_dvcc', 'Dịch vụ - công cộng', 'DVCC', ['DAT_DD_DVCCDOTHI', 'DAT_DD_DVCC', 'DAT_DVCC', 'DAT_CCDV', 'DAT_CONGCONG', 'DAT_HTCC', 'DAT_DD_TRUONGTHPT', 'DAT_DD_TRUONGHOC'], '#ff0000', { subs: [...SCHOOL_SUBS, ['other', 'Dịch vụ - công cộng khác', 'DVCC-K']] }),
   C('dd_cq', 'Cơ quan, trụ sở cấp đô thị', 'CQ', ['DAT_DD_COQUANDOTHI'], '#a1887f'),
   C('dd_cx', 'Cây xanh sử dụng công cộng', 'CXCC', ['DAT_DD_CAYXANHCCDOTHI'], '#51cf66'),
   C('dd_gt', 'Giao thông đô thị', 'GT', ['DAT_DD_GIAOTHONGDOTHI'], '#dee2e6'),
@@ -67,6 +67,7 @@ const QHPK_ROWS = [
   C('ks', 'Khai thác, chế biến khoáng sản, sản xuất vật liệu xây dựng', 'KS', ['DAT_SX_VATLIEU'], '#495057'),
   C('dtnc', 'Đào tạo, nghiên cứu', 'ĐT-NC', ['DAT_DAOTAONC'], '#1e3a8a'),
   C('cq', 'Cơ quan, trụ sở', 'CQ', ['DAT_COQUAN'], '#a1887f'),
+  C('ccdv', 'Công cộng - dịch vụ', 'CC', ['DAT_DD_DVCCDOTHI', 'DAT_DD_DVCC', 'DAT_DVCC', 'DAT_CCDV', 'DAT_CONGCONG', 'DAT_HTCC'], '#ff0000'),
   C('dv', 'Khu dịch vụ (không bao gồm dịch vụ du lịch)', 'DV', ['DAT_DICHVU'], '#ffa8a8', {
     subs: [['cho', 'Đất chợ, trung tâm thương mại', 'CHO'], ['pending', 'Chưa xác nhận chợ / trung tâm thương mại', 'DV?'], ['other', 'Đất dịch vụ khác', 'DVK']]
   }),
@@ -160,7 +161,7 @@ const ROW_TT16 = {
   },
   QHPK: {
     o: ['O-NO'], hh: ['O-HH'], lx: ['O-LX'], yt: ['7-YT'], vh: ['8-VH'], tdtt: ['TDTT'], gd: ['3-MN', true],
-    cxcc: ['1-CV'], cxhc: ['CX-HC'], cxcd: ['CX-CD'], sx: ['SX-CN'], ks: ['SX-VL'], dtnc: ['DT-NC'], cq: ['CQ'],
+    cxcc: ['1-CV'], cxhc: ['CX-HC'], cxcd: ['CX-CD'], sx: ['SX-CN'], ks: ['SX-VL'], dtnc: ['DT-NC'], cq: ['CQ'], ccdv: ['CC-DV'],
     dv: ['9-TM', true], dl: ['DL'], dtich: ['DT-TG'], an: ['AN'], qp: ['QP'], gt: ['GT'], bdx: ['2-BDX'], ntr: ['NTR'],
     htk: ['HTK'], nn: ['NN'], rsx: ['RSX'], rph: ['RPH'], rdd: ['RDD'], ts: ['TS'], csd: ['DCS'], ho: ['HO'], song: ['SS'], bien: ['MNB']
   }
@@ -192,9 +193,9 @@ export function landSymbol(kind, rowKey, subKey = '') {
 
 // Khóa TT16 không có đầu mục riêng trong bảng → đầu mục gần nhất
 const PATTERN_ROW_EXTRA = {
-  QHC: { '3-MN': 'dd_dvcc', '4-TH': 'dd_dvcc', '5-THCS': 'dd_dvcc', '6-THPT': 'dd_dvcc', '9-TM': 'dd_dvcc', 'CC-DV': 'dd_dvcc', TDTT: 'ndd_vh',
+  QHC: { '3-MN': 'dd_dvcc', '4-TH': 'dd_dvcc', '5-THCS': 'dd_dvcc', '6-THPT': 'dd_dvcc', '9-TM': 'dd_dvcc', 'CC-DV': 'dd_dvcc', 'C-DVCC': 'dd_dvcc', TDTT: 'ndd_vh',
     '2-BDX': 'dd_gt', NTR: 'ndd_ht', 'SX-VL': 'ndd_cn', RSX: 'nnk_ln', RPH: 'nnk_ln', RDD: 'nnk_ln', '12-CSD': 'nnk_csd' },
-  QHPK: { '4-TH': 'gd', '5-THCS': 'gd', '6-THPT': 'gd', '12-CSD': 'csd' }
+  QHPK: { '4-TH': 'gd', '5-THCS': 'gd', '6-THPT': 'gd', '12-CSD': 'csd', 'C-DVCC': 'ccdv' }
 };
 const PATTERN_ROW = Object.fromEntries(Object.entries(ROW_TT16).map(([kind, rows]) => {
   const out = {};
@@ -253,26 +254,28 @@ export function landSubKey(lot, kind) {
 }
 
 /**
- * Bảng cân đối: diện tích (ha, 1 số lẻ) và tỷ lệ (%) hiện trạng / quy hoạch theo đúng thứ tự và số thứ tự mẫu TT16,
- * chỉ liệt kê đầu mục (và nhóm con) có diện tích HT hoặc QH > 0; dòng cuối "Chưa xác định" gồm lô chưa rõ đầu mục (landKey null).
+ * Bảng cân đối: diện tích (ha, 1 số lẻ) và tỷ lệ (%) hiện trạng / quy hoạch / điều chỉnh cục bộ theo thứ tự mẫu TT16.
+ * Liệt kê đầu mục (và nhóm con) có HT, QH hoặc ĐC > 0; dòng cuối "Chưa xác định" gồm lô chưa rõ đầu mục (landKey null).
  * Có ranh đồ án (boundaryM2): tổng = diện tích ranh, các loại đất lấy phần lô trong ranh (areaIn),
  * đất giao thông = tổng − các loại đất còn lại (hatch giao thông chỉ để đối chiếu).
  * Không có ranh: tổng = cộng các lô, phần chênh để tổng HT = tổng QH dồn vào "Chưa xác định".
+ * dcLots = null: chưa có hồ sơ ĐC đã duyệt, cột ĐC bằng cột Quy hoạch và tăng/giảm = 0.
+ * dcLots: lô quy hoạch sau khi áp lần lượt các hồ sơ (cùng luật ranh, không ép ĐC = HT). Tăng/giảm = ha(ĐC) − ha(QH).
  * lots: [{ phase, layer, landKey, subKey, area, areaIn? (m²) }]; landKey 'skip' không tính.
  */
-export function landUseSummary(lots, kind, { boundaryM2 = 0 } = {}) {
+export function landUseSummary(lots, kind, { boundaryM2 = 0, dcLots = null } = {}) {
   const table = LANDUSE_TABLES[kind];
   const sum = { HT: {}, QH: {} };
   const add = (ph, key, v) => { sum[ph][key] = (sum[ph][key] || 0) + v; };
-  const undet = { HT: 0, QH: 0 };
-  const present = { HT: false, QH: false };
+  const undet = { HT: 0, QH: 0, DC: 0 };
+  const present = { HT: false, QH: false, DC: false };
   const bound = Number(boundaryM2) > 0 ? Number(boundaryM2) : 0;
+  const take = (p) => (bound && Number.isFinite(p.areaIn) ? p.areaIn : Number(p.area) || 0);
   lots.forEach(p => {
     if (p.landKey === 'skip') return;
     const ph = p.phase === 'HT' ? 'HT' : 'QH';
     present[ph] = true;
-    // Có ranh: chỉ tính phần lô nằm trong ranh (areaIn, m²)
-    const v = bound && Number.isFinite(p.areaIn) ? p.areaIn : Number(p.area) || 0;
+    const v = take(p);
     if (!p.landKey) { undet[ph] += v; return; }
     add(ph, p.landKey, v);
     const split = residentialSubAreas(v === p.area ? p : { ...p, area: v }, kind);
@@ -281,18 +284,18 @@ export function landUseSummary(lots, kind, { boundaryM2 = 0 } = {}) {
   });
   const leafRows = table.rows.filter(r => r.key && !r.sumOf);
   const gtKey = ROAD_KEY[kind];
-  const gtHatch = { HT: 0, QH: 0 };
-  const over = { HT: 0, QH: 0 };
-  if (bound) {
-    ['HT', 'QH'].forEach(ph => {
-      if (!present[ph]) return;
-      gtHatch[ph] = sum[ph][gtKey] || 0;
-      const others = leafRows.reduce((s, r) => s + (r.key === gtKey ? 0 : sum[ph][r.key] || 0), 0) + undet[ph];
-      sum[ph][gtKey] = Math.max(0, bound - others);
-      over[ph] = Math.max(0, others - bound);
-    });
-  }
-  const total = { HT: 0, QH: 0 };
+  const gtHatch = { HT: 0, QH: 0, DC: 0 };
+  const over = { HT: 0, QH: 0, DC: 0 };
+  const roadResidual = (ph) => {
+    if (!bound || !present[ph]) return;
+    gtHatch[ph] = sum[ph][gtKey] || 0;
+    const others = leafRows.reduce((s, r) => s + (r.key === gtKey ? 0 : sum[ph][r.key] || 0), 0) + undet[ph];
+    sum[ph][gtKey] = Math.max(0, bound - others);
+    over[ph] = Math.max(0, others - bound);
+  };
+  roadResidual('HT');
+  roadResidual('QH');
+  const total = { HT: 0, QH: 0, DC: 0 };
   leafRows.forEach(r => { total.HT += sum.HT[r.key] || 0; total.QH += sum.QH[r.key] || 0; });
   total.HT += undet.HT;
   total.QH += undet.QH;
@@ -306,9 +309,42 @@ export function landUseSummary(lots, kind, { boundaryM2 = 0 } = {}) {
     undet[side] += gap[side];
     total[side] += gap[side];
   }
+  const dcCopied = !Array.isArray(dcLots);
+  if (dcCopied) {
+    sum.DC = sum.QH;
+    undet.DC = undet.QH;
+    present.DC = present.QH;
+    gtHatch.DC = gtHatch.QH;
+    over.DC = over.QH;
+    total.DC = total.QH;
+  } else {
+    sum.DC = {};
+    dcLots.forEach(p => {
+      if (p.landKey === 'skip') return;
+      present.DC = true;
+      const v = take(p);
+      const key = p.landKey && p.landKey !== UNDETERMINED_KEY ? p.landKey : null;
+      if (!key) { undet.DC += v; return; }
+      add('DC', key, v);
+      const base = { ...p, phase: 'QH', landKey: key, area: v };
+      const split = residentialSubAreas(base, kind);
+      if (split) Object.entries(split).forEach(([k, a]) => add('DC', `${key}/${k}`, a));
+      else if (p.subKey) add('DC', `${key}/${p.subKey}`, v);
+    });
+    roadResidual('DC');
+    leafRows.forEach(r => { total.DC += sum.DC[r.key] || 0; });
+    total.DC += undet.DC;
+    if (bound && present.DC) total.DC = bound;
+  }
   const pct = (v, t) => (t > 0 ? Math.round(v / t * 1000) / 10 : 0);
   const ha = (m2) => Math.round(m2 / 1000) / 10;
-  const cells = (ht, qh) => ({ htHa: ha(ht), htPct: pct(ht, total.HT), qhHa: ha(qh), qhPct: pct(qh, total.QH) });
+  const cells = (ht, qh, dc) => {
+    const htHa = ha(ht), qhHa = ha(qh), dcHa = ha(dc);
+    return {
+      htHa, htPct: pct(ht, total.HT), qhHa, qhPct: pct(qh, total.QH),
+      dcHa, dcPct: pct(dc, total.DC), deltaHa: Math.round((dcHa - qhHa) * 10) / 10
+    };
+  };
   let section = null, stt = 0;
   const out = [];
   const sectionTotals = {};
@@ -316,41 +352,49 @@ export function landUseSummary(lots, kind, { boundaryM2 = 0 } = {}) {
     if (r.section) {
       section = r.section;
       stt = 0;
-      sectionTotals[section] = { HT: 0, QH: 0 };
+      sectionTotals[section] = { HT: 0, QH: 0, DC: 0 };
       out.push({ kind: 'section', section, label: r.label });
       return;
     }
     const keys = r.sumOf || [r.key];
     const ht = keys.reduce((s, k) => s + (sum.HT[k] || 0), 0);
     const qh = keys.reduce((s, k) => s + (sum.QH[k] || 0), 0);
-    if (section && !r.sumOf) { sectionTotals[section].HT += ht; sectionTotals[section].QH += qh; }
+    const dc = keys.reduce((s, k) => s + (sum.DC[k] || 0), 0);
+    if (section && !r.sumOf) {
+      sectionTotals[section].HT += ht;
+      sectionTotals[section].QH += qh;
+      sectionTotals[section].DC += dc;
+    }
     if (!r.sub) stt++;
-    if (!(ht > 0 || qh > 0)) return;
+    if (!(ht > 0 || qh > 0 || dc > 0)) return;
     out.push({
       kind: 'row', key: r.key, stt: r.sub ? '' : stt, label: r.label, sym: r.sym, code: (r.codes || []).join(', '), ...landSymbol(kind, r.key), sub: !!r.sub, sum: !!r.sumOf,
-      ...cells(ht, qh)
+      ...cells(ht, qh, dc)
     });
     (r.subs || []).forEach(([sk, label, sym]) => {
       const sht = sum.HT[`${r.key}/${sk}`] || 0;
       const sqh = sum.QH[`${r.key}/${sk}`] || 0;
-      if (!(sht > 0 || sqh > 0)) return;
-      out.push({ kind: 'row', key: `${r.key}/${sk}`, stt: '', label: `- ${label}`, sym, code: '', ...landSymbol(kind, r.key, sk), sub: true, part: true, ...cells(sht, sqh) });
+      const sdc = sum.DC[`${r.key}/${sk}`] || 0;
+      if (!(sht > 0 || sqh > 0 || sdc > 0)) return;
+      out.push({ kind: 'row', key: `${r.key}/${sk}`, stt: '', label: `- ${label}`, sym, code: '', ...landSymbol(kind, r.key, sk), sub: true, part: true, ...cells(sht, sqh, sdc) });
     });
   });
   const rows = out.filter(r => {
     if (r.kind !== 'section') return true;
     const t = sectionTotals[r.section];
-    Object.assign(r, cells(t.HT, t.QH));
-    return t.HT > 0 || t.QH > 0;
+    Object.assign(r, cells(t.HT, t.QH, t.DC));
+    return t.HT > 0 || t.QH > 0 || t.DC > 0;
   });
-  if (undet.HT > 0 || undet.QH > 0) {
+  if (undet.HT > 0 || undet.QH > 0 || undet.DC > 0) {
     rows.push({
       kind: 'row', key: UNDETERMINED_KEY, stt: '', label: 'Chưa xác định (tạm thời)', sym: 'CXĐ', code: '', ...landSymbol(kind, UNDETERMINED_KEY),
-      undetermined: true, gapHtHa: ha(gap.HT), gapQhHa: ha(gap.QH), ...cells(undet.HT, undet.QH)
+      undetermined: true, gapHtHa: ha(gap.HT), gapQhHa: ha(gap.QH), ...cells(undet.HT, undet.QH, undet.DC)
     });
   }
   return {
-    rows, totalHT: ha(total.HT), totalQH: ha(total.QH), sections: Object.keys(sectionTotals),
+    rows, totalHT: ha(total.HT), totalQH: ha(total.QH), totalDC: ha(total.DC),
+    totalDeltaHa: Math.round((ha(total.DC) - ha(total.QH)) * 10) / 10,
+    dcCopied, sections: Object.keys(sectionTotals),
     byBoundary: !!bound, gtKey,
     gtHatchHtHa: ha(gtHatch.HT), gtHatchQhHa: ha(gtHatch.QH), overHtHa: ha(over.HT), overQhHa: ha(over.QH)
   };

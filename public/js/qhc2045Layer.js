@@ -5,7 +5,7 @@
 //    phân khu, điểm chức năng. Hàng nút dưới dòng lớp bật/tắt độc lập từng giai đoạn lô và ranh 1/10.000 mở rộng theo
 //    QĐ 756 (ranh ngoài các phường vùng lõi + vùng đỏ Hóa Châu, Mỹ Thượng chưa có trong đồ án cũ).
 //    Đang xem QHC 1/10.000 (droplist): như các đồ án QHC nhập, chỉ vẽ ranh tiểu vùng + tên đồ án, bấm vào ranh mới vẽ lô;
-//    bật lớp khi xem cấp khác (so sánh) vẽ đủ lô ngay.
+//    bật lớp khi xem cấp khác (so sánh) vẽ đủ lô ngay. Vùng đô thị trung tâm (hợp 4 tiểu vùng) luôn có nền và viền đỏ nhạt.
 // Vùng, lô của cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400); riêng các đường ranh vẽ ở LINE_PANE
 // để nổi trên ranh 40 phường. Canvas mặc định của planMap (renderer: L.canvas())
 // nằm ở overlayPane, phủ kín bản đồ khi có bất kỳ lớp vector nào và nuốt click của canvas QHC bên dưới, nên click lô / vùng
@@ -43,8 +43,9 @@ const EXT_LINE = { color: '#f43f5e', weight: 3, opacity: 1, dashArray: '12 6' };
 const EXT_HALO = { color: '#0f172a', weight: 6.5, opacity: 0.55 };
 // Mở lô TTHuế 2045 (bấm vào ranh khi đang xem QHC 1/10.000): viewFlow.js bỏ đồ án QHC nhập đang chọn
 export const QHC_CORE_EVENT = 'qh:qhc-core-open';
-const CORE_COLOR = '#f8fafc';
-const CORE_FILL = { stroke: false, fill: true, fillColor: CORE_COLOR, fillOpacity: 0.08 };
+// Vùng đô thị trung tâm = hợp ranh 4 tiểu vùng. Đỏ nhạt, nền nhẹ để còn đọc lô phía trên
+const CORE_WASH = '#f87171';
+const WASH_FILL = { stroke: false, fill: true, fillColor: CORE_WASH, fillOpacity: 0.18, interactive: false };
 
 // Mã 31 "Mặt nước ven biển": một khối biển ~55.000 ha phủ kín góc bản đồ, không mang thông tin sử dụng đất
 const SEA_CODE = 31;
@@ -55,7 +56,8 @@ const centerSet = new Set(CENTER_UNITS.map(bareWard));
 
 const data = { land: null, frame: null, vision: null };
 const loading = {};
-const layers = { land: null, frame: null, vision: null, ext: null, core: null };
+const layers = { land: null, frame: null, vision: null, ext: null, core: null, wash: null, washLine: null };
+let coreUnion = null;
 let renderer = null;
 let lineRenderer = null;
 const shownStages = new Set([0, 1, 2]);
@@ -99,11 +101,14 @@ function ensureLineRenderer(m) {
   return lineRenderer;
 }
 
-/** Thứ tự vẽ trong canvas chung: định hướng 1/25.000 < lô 1/10.000 < điểm chức năng < vùng đang điều chỉnh */
+/** Thứ tự vẽ: định hướng 1/25.000 < nền vùng trung tâm < lô; viền đỏ vùng trung tâm nổi trên ranh trắng từng tiểu vùng */
 function restack() {
+  layers.wash?.bringToBack();
   layers.vision?.bringToBack();
+  layers.land?.bringToFront();
   layers.frame?.bringToFront();
   layers.frame?.points?.bringToFront();
+  layers.washLine?.bringToFront();
   layers.ext?.bringToFront();
 }
 
@@ -177,7 +182,44 @@ function zoomFrame() {
   if (z >= LABEL_MIN_ZOOM) { points.addTo(m); points.bringToFront(); } else points.remove();
 }
 
-// Thu gọn: nền mờ trong ranh 4 tiểu vùng + nhãn tên đồ án ở mép trên (nhãn A1–A4 nằm giữa tiểu vùng)
+// Hợp 4 tiểu vùng thành một vòng. turf 6.5 lỗi "output ring" khi tọa độ lệch số lẻ: làm tròn rồi thử lại
+function unionTv() {
+  if (coreUnion) return coreUnion;
+  const tv = tvFeatures();
+  if (!tv.length) return null;
+  let acc = tv[0];
+  for (let i = 1; i < tv.length; i++) {
+    try { acc = turf.union(acc, tv[i]) || acc; }
+    catch (e) {
+      try { acc = turf.union(turf.truncate(acc, { precision: 5 }), turf.truncate(tv[i], { precision: 5 })) || acc; }
+      catch (err) { /* giữ phần đã gộp */ }
+    }
+  }
+  coreUnion = acc;
+  return acc;
+}
+
+// Nền + viền đỏ nhạt của vùng trung tâm, tách khỏi layers.core để click thu gọn vẫn mở lô và click lô không bị nuốt
+function drawWash() {
+  layers.wash?.remove();
+  layers.washLine?.remove();
+  layers.wash = layers.washLine = null;
+  if (!$('chk_qhc10')?.checked) return;
+  const shape = unionTv();
+  if (!shape) return;
+  const m = target();
+  const lr = ensureLineRenderer(m);
+  const fill = L.featureGroup();
+  L.geoJSON(shape, { pane: PANE[0], renderer: ensureRenderer(m), interactive: false, style: WASH_FILL }).addTo(fill);
+  const lines = L.featureGroup();
+  L.geoJSON(shape, { pane: LINE_PANE[0], renderer: lr, interactive: false, style: { color: '#0f172a', weight: 7, opacity: 0.45, fill: false } }).addTo(lines);
+  L.geoJSON(shape, { pane: LINE_PANE[0], renderer: lr, interactive: false, style: { color: CORE_WASH, weight: 3.2, opacity: 0.95, fill: false } }).addTo(lines);
+  layers.wash = fill.addTo(m);
+  layers.washLine = lines.addTo(m);
+  restack();
+}
+
+// Thu gọn: nhãn tên đồ án ở mép trên (nhãn A1–A4 nằm giữa tiểu vùng). Nền vùng trung tâm là layers.wash
 function drawCore() {
   layers.core?.remove();
   layers.core = null;
@@ -186,11 +228,10 @@ function drawCore() {
   const m = target();
   const fc = { type: 'FeatureCollection', features: tv };
   const group = L.featureGroup();
-  L.geoJSON(fc, { pane: PANE[0], renderer: ensureRenderer(m), interactive: false, style: CORE_FILL }).addTo(group);
   const [w, , e, n] = turf.bbox(fc);
   const icon = L.divIcon({
     className: 'project-label', iconSize: null,
-    html: `<span title="Bấm vào ranh để xem lô sử dụng đất"><i style="background:${CORE_COLOR}"></i>${escapeHtml(QHC2045.short)}</span>`
+    html: `<span title="Bấm vào ranh để xem lô sử dụng đất"><i style="background:${CORE_WASH}"></i>${escapeHtml(QHC2045.short)}</span>`
   });
   L.marker([n, (w + e) / 2], { icon, interactive: false, keyboard: false }).addTo(group);
   layers.core = group.addTo(m);
@@ -225,10 +266,12 @@ async function setLand(on) {
   if (!on) {
     layers.land?.remove();
     layers.core?.remove();
+    layers.wash?.remove();
+    layers.washLine?.remove();
     layers.frame?.tvLabels?.remove();
     layers.frame?.points?.remove();
     layers.frame?.remove();
-    layers.land = layers.frame = layers.core = null;
+    layers.land = layers.frame = layers.core = layers.wash = layers.washLine = null;
     setHint('qhc10Hint', 'Trung tâm');
     return;
   }
@@ -244,6 +287,7 @@ async function setLand(on) {
   detailed = m.getZoom() >= TT16_PATTERN_ZOOM;
   if (!collapsed()) drawLand();
   drawFrame();
+  drawWash();
   drawCore();
   setHint('qhc10Hint', 'Trung tâm');
 }
