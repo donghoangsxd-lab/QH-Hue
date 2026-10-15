@@ -254,7 +254,7 @@
       <button type="button" class="ui-btn-format" id="btnAuth" title="Đăng nhập quản trị" aria-label="Đăng nhập quản trị"><svg class="ico"><use href="#i-key"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnLocateGPS" title="Định vị vị trí GPS của bạn" aria-label="Định vị GPS"><svg class="ico"><use href="#i-locate"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnScreenshot" title="Chụp ảnh bản đồ (lưu PNG)" aria-label="Chụp ảnh bản đồ"><svg class="ico"><use href="#i-camera"/></svg></button>
-      <button type="button" class="ui-btn-format" id="btnPrintA3" title="Xuất bản đồ khổ A3 (PDF có khung, lưới tọa độ, chú giải)" aria-label="Xuất bản đồ A3"><svg class="ico"><use href="#i-printer"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnPrintA3" title="Xuất bản đồ PDF (A3, A2, A1, A0). Mở khung xem trước để kéo bản đồ vào đúng vùng in" aria-label="Xuất bản đồ" aria-pressed="false"><svg class="ico"><use href="#i-printer"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnShareView" title="Chép link khung nhìn hiện tại (vị trí, mức phóng, lớp đang bật, đồ án đang mở) để gửi người khác. Link tự mang trạng thái, không lưu trên máy chủ" aria-label="Chép link khung nhìn"><svg class="ico"><use href="#i-link"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích. Backspace xóa đỉnh vừa tạo; chuột phải trong 1 m quanh đỉnh để xóa đỉnh đó" aria-label="Đo diện tích"><svg class="ico"><use href="#i-area"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnMeasureDist" title="Đo chiều dài. Backspace xóa đỉnh vừa tạo; chuột phải trong 1 m quanh đỉnh để xóa đỉnh đó" aria-label="Đo chiều dài"><svg class="ico"><use href="#i-ruler"/></svg></button>
@@ -300,6 +300,38 @@
           <button type="button" class="sketch-btn sketch-export" data-export="dxf" title="DXF (VN-2000 TT-Huế, KTT 107°00', mét): mở bằng AutoCAD">DXF</button>
         </div>
         <div class="sketch-hint" id="sketchHint" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <!-- KHUNG XEM TRƯỚC KHI IN (printLayout.js): kéo bản đồ vào khung, chọn khổ A3 → A0 -->
+    <div class="print-preview" id="printPreview" hidden>
+      <div class="print-frame" id="printFrame">
+        <span class="print-frame-tag">Vùng in</span>
+        <i class="print-cross"></i>
+        <i class="print-corner tl"></i>
+        <i class="print-corner tr"></i>
+        <i class="print-corner bl"></i>
+        <i class="print-corner br"></i>
+      </div>
+      <div class="print-dock" role="dialog" aria-labelledby="printDockTitle">
+        <div class="print-dock-head">
+          <b id="printDockTitle">Xuất bản đồ</b>
+          <span class="print-scale-live" id="printScaleLive"></span>
+        </div>
+        <div class="print-sizes" role="radiogroup" aria-label="Khổ giấy ngang">
+          <button type="button" data-paper="a3" aria-pressed="true">A3</button>
+          <button type="button" data-paper="a2" aria-pressed="false">A2</button>
+          <button type="button" data-paper="a1" aria-pressed="false">A1</button>
+          <button type="button" data-paper="a0" aria-pressed="false">A0</button>
+        </div>
+        <label class="print-title-lbl">Tiêu đề
+          <input id="printTitle" type="text" maxlength="140" autocomplete="off" spellcheck="false">
+        </label>
+        <p class="print-hint">Kéo hoặc cuộn bản đồ để đưa vùng cần in vào khung. Phần ngoài khung không in. Khổ lớn hơn in cùng vùng đó to hơn.</p>
+        <div class="print-dock-actions">
+          <button type="button" class="print-btn" id="printCancel">Hủy</button>
+          <button type="button" class="print-btn print-btn-go" id="printGo">Xuất PDF</button>
+        </div>
       </div>
     </div>
 

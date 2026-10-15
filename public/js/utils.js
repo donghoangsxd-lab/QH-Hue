@@ -228,6 +228,13 @@ export function loadHtml2Pdf() {
   );
 }
 
+export function loadJsPdf() {
+  return loadScript(
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk'
+  );
+}
+
 export function loadHtml2Canvas() {
   return loadScript(
     'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
