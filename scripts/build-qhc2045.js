@@ -4,6 +4,8 @@
 // Ra public/data/qhc2045/: sdd.json (lô sử dụng đất 1/10.000), khung.json (tiểu vùng, phân khu, điểm chức năng 1/10.000 và
 // vùng đang điều chỉnh), dinhhuong.json (sơ đồ tổ chức không gian 1/25.000). Hình học rút gọn (~2 m lớp 1/10.000, ~6 m lớp
 // 1/25.000), tọa độ 5 chữ số thập phân; thuộc tính chỉ giữ trường dùng trên webapp, chuỗi lặp gom vào bảng cats.
+// giaothong10.json / giaothong25.json: mạng lưới đường bộ (L 'b') + đường sắt (L 's') của nhóm "Quy hoạch giao thông" cùng
+// tỷ lệ — c: cấp đường / loại đường sắt (qhcRoads.js), t: giai đoạn, n: tên, s: ký hiệu mặt cắt, l: chiều dài (m).
 // Vùng đang điều chỉnh = phần phường Hóa Châu, Mỹ Thượng (vùng lõi QHC thành phố Huế mới) nằm ngoài 4 tiểu vùng của đồ án cũ.
 const fs = require('fs');
 const path = require('path');
@@ -129,6 +131,60 @@ function buildVision(dir25) {
   };
 }
 
+// ---------- Mạng lưới giao thông đường bộ + đường sắt (thư mục "Quy hoạch giao thông (1-10.000)" / "(1-25.000)") ----------
+// 1/10.000: cấp đường theo mã caphangduongbo (chú giải gServer). 1/25.000: mã không nhất quán (mã 3 dùng cho cả đường tỉnh
+// và trục chính đô thị) nên lấy theo nhãn trinhbaydulieu ("Đường tỉnh, Hiện trạng").
+const ROAD_CODE_10 = { 1: 'ct', 2: 'ql', 3: 'dt', 5: 'dothi', 6: 'kv' };
+const ROAD_LABEL_25 = [[/cao tốc/i, 'ct'], [/quốc lộ/i, 'ql'], [/tỉnh/i, 'dt'], [/trục chính/i, 'dothi'], [/hầm/i, 'ham']];
+const RAIL_KINDS = [[/tốc độ cao/i, 'tdc'], [/ngầm/i, 'ngam'], [/đô thị/i, 'dsdt'], [/quốc gia|bắc nam/i, 'qg']];
+const ROUTE_PREFIX = { ql: 'QL', dt: 'ĐT' };
+const ROAD_TRAFFIC_DIR = /giao thông/i;
+
+const stageOf = (s) => { const t = text(s); return /hiện trạng/i.test(t) ? 0 : /2030/.test(t) ? 1 : /dài hạn/i.test(t) ? 2 : -1; };
+const lengthM = (f) => Math.round(Number(f.properties.chieudai) > 0 ? Number(f.properties.chieudai) : turf.length(f) * 1000);
+
+// Tên đường gServer ghi số hiệu trần ("49", "10E (Đường vành đai 3)"): thêm tiền tố theo cấp đường; cấp khác (đường đô thị
+// mang số hiệu tuyến cũ) không đoán được QL hay ĐT nên ghi "Tuyến 26"
+function routeName(name, cls) {
+  const n = text(name);
+  if (!/^\d+[A-Z]?\b/i.test(n)) return n;
+  return `${ROUTE_PREFIX[cls] || 'Tuyến '}${n}`;
+}
+
+function roadClass(p, scale) {
+  if (scale === '10') return ROAD_CODE_10[Number(p.caphangduongbo)] || 'kv';
+  const label = text(p.trinhbaydulieu).split(',')[0] || text(p.ghichu);
+  return (ROAD_LABEL_25.find(([re]) => re.test(label)) || [null, ROAD_CODE_10[Number(p.caphangduongbo)] || 'dt'])[1];
+}
+
+function buildTraffic(dir, scale) {
+  const tol = scale === '10' ? TOL_10 : TOL_25;
+  const common = (f, props) => {
+    const p = f.properties;
+    const t = stageOf(p.thoihanquyhoach);
+    if (t >= 0) props.t = t;
+    if (text(p.kyhieumatcat)) props.s = text(p.kyhieumatcat).toUpperCase();
+    props.l = lengthM(f);
+    return feature(f.geometry, props, tol);
+  };
+  const roads = readLayer(dir, 'Mạng lưới giao thông đường bộ').map(f => {
+    const c = roadClass(f.properties, scale);
+    const props = { L: 'b', c };
+    const n = routeName(f.properties.tenduong, c);
+    if (n) props.n = n;
+    return common(f, props);
+  });
+  const rails = readLayer(dir, 'Mạng lưới giao thông đường sắt').map(f => {
+    const p = f.properties;
+    const kind = `${p.ghichu} ${p.tenduong} ${p.trinhbaydulieu}`;
+    const props = { L: 's', c: (RAIL_KINDS.find(([re]) => re.test(kind)) || [null, 'qg'])[1] };
+    if (/nhánh/i.test(kind)) props.nh = 1;
+    if (text(p.tenduong)) props.n = text(p.tenduong);
+    return common(f, props);
+  });
+  return { type: 'FeatureCollection', scale, features: [...roads, ...rails] };
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const bi = args.indexOf('--boundary');
@@ -137,9 +193,14 @@ async function main() {
   if (!src || !fs.existsSync(src)) throw new Error('Cần đường dẫn thư mục LOP-mapid21817-…');
   const dest = args[1] || path.join(__dirname, '..', 'public', 'data', 'qhc2045');
   const sub = fs.readdirSync(src);
-  const dir10 = path.join(src, sub.find(n => DIR_10.test(n)) || '');
-  const dir25 = path.join(src, sub.find(n => DIR_25.test(n)) || '');
-  const wards = await loadBoundary(boundaryFile);
+  const dirOf = (re, traffic) => {
+    const n = sub.find(x => re.test(x) && ROAD_TRAFFIC_DIR.test(x.normalize('NFC')) === traffic);
+    return n ? path.join(src, n) : null;
+  };
+  const dir10 = dirOf(DIR_10, false);
+  const dir25 = dirOf(DIR_25, false);
+  const gt10 = dirOf(DIR_10, true);
+  const gt25 = dirOf(DIR_25, true);
 
   fs.mkdirSync(dest, { recursive: true });
   const write = (name, fc) => {
@@ -147,9 +208,15 @@ async function main() {
     fs.writeFileSync(path.join(dest, name), s);
     console.log(`${name}: ${fc.features.length} đối tượng, ${(s.length / 1048576).toFixed(2)} MB`);
   };
-  write('sdd.json', buildLanduse(dir10));
-  write('khung.json', buildFrame(dir10, wards));
-  write('dinhhuong.json', buildVision(dir25));
+  // Thiếu thư mục nhóm nào thì giữ nguyên file cũ của nhóm đó (tải lại riêng nhóm giao thông không đụng lớp sử dụng đất)
+  const skip = (name) => console.log(`${name}: bỏ qua, không có thư mục nguồn`);
+  if (dir10) {
+    write('sdd.json', buildLanduse(dir10));
+    write('khung.json', buildFrame(dir10, await loadBoundary(boundaryFile)));
+  } else ['sdd.json', 'khung.json'].forEach(skip);
+  if (dir25) write('dinhhuong.json', buildVision(dir25)); else skip('dinhhuong.json');
+  if (gt10) write('giaothong10.json', buildTraffic(gt10, '10')); else skip('giaothong10.json');
+  if (gt25) write('giaothong25.json', buildTraffic(gt25, '25')); else skip('giaothong25.json');
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

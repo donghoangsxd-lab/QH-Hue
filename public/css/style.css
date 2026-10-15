@@ -1296,6 +1296,38 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .tt16-empty { padding: 10px 4px; font-size: var(--fs-sm); color: var(--text-muted); text-align: center; }
 .tt16-empty[hidden] { display: none; }
 .tt16-pending { margin: 8px 0; padding: 12px 8px; border: 1px dashed var(--border-color); border-radius: var(--r-md); font-size: var(--fs-sm); color: var(--text-muted); text-align: center; }
+.road-sections[hidden], .road-net[hidden] { display: none; }
+.qr-sw { flex: none; vertical-align: middle; }
+.qr-legend { padding: 0 4px 6px 6px; font-size: var(--fs-xs); color: var(--text-muted); }
+.qr-sub { margin: 4px 0 2px; color: var(--text-main); font-weight: 600; }
+.qr-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 8px; }
+.qr-item { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.qr-stats-box { margin-top: 8px; }
+.qr-stats { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.qr-stats th, .qr-stats td { padding: 2px 3px; border-bottom: 1px solid var(--border-soft); text-align: right; font-weight: 400; white-space: nowrap; }
+.qr-stats thead th { color: var(--text-main); font-weight: 600; }
+.qr-stats tbody th, .qr-stats thead th:first-child { text-align: left; white-space: normal; }
+.qr-note { margin: 4px 0 0; }
+.qhc-pop-head .qr-sw { margin-right: 2px; }
+.qr-pop-sec { margin-top: 6px; padding: 4px; border-radius: var(--r-md); background: rgba(15, 23, 42, 0.55); }
+.rs-kinds { display: flex; flex-wrap: wrap; gap: 3px 10px; padding: 0 4px 6px 6px; font-size: var(--fs-xs); color: var(--text-muted); }
+.rs-kinds span { display: inline-flex; align-items: center; gap: 4px; }
+.rs-kinds i { width: 14px; height: 8px; border-radius: 1px; }
+.rs-kinds i.rs-red { height: 0; border-top: 1.5px dashed #ef4444; }
+.rs-item { margin: 0 2px 6px 4px; padding: 4px 6px 5px; border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: rgba(15, 23, 42, 0.35); }
+.rs-head { display: flex; align-items: baseline; gap: 6px; font-size: var(--fs-sm); color: var(--text-main); }
+.rs-head b { flex-shrink: 0; color: var(--accent-cyan); font-variant-numeric: tabular-nums; }
+.rs-head span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rs-head em { flex-shrink: 0; font-style: normal; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.rs-missing .rs-head span { color: var(--text-muted); font-style: italic; }
+.rs-svg { display: block; width: 100%; height: auto; margin-top: 2px; }
+.rs-svg text { font-family: inherit; fill: var(--text-main); }
+.rs-svg .rs-w { font-size: 8px; }
+.rs-svg .rs-side { font-size: 7px; fill: var(--text-muted); }
+.rs-svg .rs-b { font-size: 8.5px; font-weight: 700; fill: #fca5a5; }
+.rs-item { container-type: inline-size; }
+/* --rs-n = số ký tự của dãy; co chữ theo bề rộng khung để luôn nằm trên 1 hàng */
+.rs-seq { font-size: min(var(--fs-xs), calc(100cqw / (var(--rs-n) * 0.54))); color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap; overflow: hidden; }
 .tt16-frames { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 6px; }
 .tt16-frames .tt16-row { min-height: 20px; padding-left: 2px; font-size: var(--fs-sm); }
 .tt16-frame { display: block; width: 28px; height: 14px; box-sizing: border-box; flex-shrink: 0; background: rgba(148, 163, 184, 0.12); }

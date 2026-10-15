@@ -1,10 +1,13 @@
 // Tab Chú giải: Phân loại đô thị (ký hiệu + quyết định phê duyệt, phần tĩnh trong index.html) và ký hiệu theo cấp đồ án
 // (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500), mỗi bộ chia nhóm (tìm theo tên loại đất / tên layer CAD,
 // thu gọn từng nhóm; tìm và thu gọn chỉ áp lên bộ đang xem). Mọi phần tử [data-legend-pane] trong tab hiện theo bộ đang xem.
-// Chọn lớp ở droplist (mapLevel.js) thì chuyển sang bộ của cấp đó.
+// Chọn lớp ở droplist (mapLevel.js) thì chuyển sang bộ của cấp đó. Bộ QHC 1/25.000 và 1/10.000 kèm nhóm mạng lưới giao thông
+// (qhcRoads.js); 1/10.000 thêm nhóm mặt cắt ngang đường (roadSections.js).
 // + mục Hiển thị lô đất: thanh độ trong suốt phần tô lô và chú giải viền theo giai đoạn.
 import { renderTt16Legend, getLotOpacity, setLotOpacity, LEGEND_SETS } from './tt16Symbols.js';
 import { LEVEL_EVENT } from './mapLevel.js';
+import { renderRoadSections } from './roadSections.js';
+import { renderTrafficLegend } from './qhcRoads.js';
 
 const LEVEL_SET = { qhc25: 'QHC25', qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
 
@@ -17,6 +20,9 @@ export function initLegendPanel() {
   const list = document.getElementById('parcelLegend');
   if (!list) return;
   renderTt16Legend(list);
+  renderRoadSections(document.getElementById('roadSections'));
+  renderTrafficLegend(document.getElementById('roadNet10'), '10');
+  renderTrafficLegend(document.getElementById('roadNet25'), '25');
   const tabs = [...document.querySelectorAll('[data-legend-set]')];
   tabs.forEach(t => {
     const n = LEGEND_SETS[t.dataset.legendSet]?.count || 0;

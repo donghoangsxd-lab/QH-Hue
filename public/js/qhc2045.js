@@ -12,7 +12,9 @@ export const QHC2045 = {
   urls: {
     land: 'data/qhc2045/sdd.json',
     frame: 'data/qhc2045/khung.json',
-    vision: 'data/qhc2045/dinhhuong.json'
+    vision: 'data/qhc2045/dinhhuong.json',
+    road10: 'data/qhc2045/giaothong10.json',
+    road25: 'data/qhc2045/giaothong25.json'
   }
 };
 
