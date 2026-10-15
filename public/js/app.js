@@ -390,14 +390,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   const handleMapClick = (e, targetMap) => {
-    // Phác thảo / vẽ tuyến / vùng dân cư chỉ có trên bản đồ hiện trạng
-    if ((state.sketchTool || state.adminDrawMode) && targetMap !== map && !isSplitOn()) {
+    // Vẽ tuyến / vùng dân cư chỉ có trên bản đồ hiện trạng. Phác thảo ghi lên bản đồ đang xem.
+    if (state.adminDrawMode && targetMap !== map && !isSplitOn()) {
       setViewMode('HT');
-      showToast('Phác thảo / vẽ thực hiện trên bản đồ hiện trạng: đã lật sang bản đồ hiện trạng', 'info');
+      showToast('Vẽ tuyến / vùng dân cư thực hiện trên bản đồ hiện trạng: đã lật sang bản đồ hiện trạng', 'info');
       targetMap = map;
     }
     if (state.sketchTool) {
-      if (targetMap === map) handleSketchClick(e.latlng);
+      handleSketchClick(e.latlng, targetMap);
       return;
     }
     if (state.adminDrawMode) {

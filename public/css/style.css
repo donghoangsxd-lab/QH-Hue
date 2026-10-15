@@ -716,6 +716,9 @@ body.compare-on .map-title-split { display: inline-flex; }
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
 }
 .sketch-palette[hidden] { display: none; }
+/* Công cụ đang bật: một nút ngay cạnh nút Phác thảo, cùng cỡ nút thanh công cụ */
+.sketch-pin { position: absolute; left: calc(var(--tb-btn) + 8px); z-index: 1; }
+.sketch-pin[hidden] { display: none !important; }
 .sketch-row { display: flex; align-items: center; gap: 2px; }
 .sketch-btn {
   width: 30px; height: 30px; padding: 0;
@@ -735,8 +738,8 @@ body.compare-on .map-title-split { display: inline-flex; }
 .sketch-sep { width: 1px; height: 20px; margin: 0 3px; background: var(--border-color); }
 .sketch-hint { max-width: 420px; padding: 0 4px 2px; font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.35; }
 .sketch-hint:empty { display: none; }
-#map.sketch-mode { cursor: crosshair !important; }
-#map.sketch-text-mode { cursor: text !important; }
+#map.sketch-mode, #mapPlan.sketch-mode { cursor: crosshair !important; }
+#map.sketch-text-mode, #mapPlan.sketch-text-mode { cursor: text !important; }
 .sketch-popup .leaflet-popup-content { margin: 6px; }
 .sketch-menu { display: flex; flex-direction: column; gap: 4px; }
 .sketch-del { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-red); font-size: var(--fs-sm); padding: 4px 8px; }
