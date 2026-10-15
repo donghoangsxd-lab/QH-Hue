@@ -6,6 +6,7 @@ import { state } from './state.js';
 import { map } from './mapEngine.js';
 import { planMap, isCompareOn, isSplitOn } from './planMap.js';
 import { escapeHtml, fmtNum, ico } from './utils.js';
+import { namesOfProject } from './projectNames.js';
 import { loadBuiltAreas } from './wardRoads.js';
 import { measure2A, ensureClassRoads, CLASS_REF } from './urbanClass.js';
 import { STATUS_REF } from './urbanStatus.js';
@@ -302,7 +303,7 @@ function recordTable(plan) {
     ${row('Thời hạn quy hoạch', horizonText(plan))}
     ${builtRow}
     ${row('Đồ án trong danh mục', project
-      ? `<button type="button" class="uc-link" data-gp-open="${escapeHtml(project.tenQH)}">${escapeHtml(project.tenQH)}</button>`
+      ? `<button type="button" class="uc-link" data-gp-open="${escapeHtml(project.tenQH)}" title="${escapeHtml(namesOfProject(project).tenDayDu)}">${escapeHtml(namesOfProject(project).tenRutGon)}</button>`
       : skip('Chưa nạp ranh lô QHC (tên đồ án bắt đầu bằng "QHC" để xếp vào cấp QHC 1/10.000)'))}
     </tbody></table>`;
 }
@@ -334,7 +335,7 @@ function childTable(plan) {
   const kids = childProjects(plan, ctx().catalog).sort((a, b) => String(a.tenQH).localeCompare(String(b.tenQH), 'vi'));
   const rows = kids.length
     ? kids.map((p, i) => `<tr><td>${i + 1}</td>
-        <td class="uc-name"><button type="button" class="uc-link" data-gp-open="${escapeHtml(p.tenQH)}" title="Mở đồ án trên bản đồ">${escapeHtml(p.tenQH)}</button></td>
+        <td class="uc-name"><button type="button" class="uc-link" data-gp-open="${escapeHtml(p.tenQH)}" title="${escapeHtml(namesOfProject(p).tenDayDu)}">${escapeHtml(namesOfProject(p).tenRutGon)}</button></td>
         <td class="uc-scope">${escapeHtml((p.wards || []).join(', '))}</td></tr>`).join('')
     : '<tr><td colspan="3" class="uc-skip">Chưa có đồ án QHPK 1/2.000 trong phạm vi</td></tr>';
   return `<table class="data-table uc-table uc-dtable"><colgroup><col style="width:2.4em"><col><col style="width:11em"></colgroup>

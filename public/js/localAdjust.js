@@ -10,6 +10,7 @@ import { map } from './mapEngine.js';
 import { parseDxf, buildParcels, CRS_PRESETS, layerToType } from './cadImport.js';
 import { attachBasemap, detachBasemap } from './basemap.js';
 import { escapeHtml, fmtNum, ico, showToast, loadHtml2Canvas, loadHtml2Pdf } from './utils.js';
+import { namesOfProject } from './projectNames.js';
 import { setBottomPanelCollapsed } from './uiComponents.js';
 import { dismissReviewHost, reviewHostDirty } from './projectReview.js';
 import { projectLayersOf, cachedLots } from './projectFiles.js';
@@ -791,7 +792,10 @@ function fillProjects() {
   const all = (state.projectCatalog || []).filter(p => p && p.tenQH);
   const drawable = all.filter(p => !p.sheetOnly);
   const list = (drawable.length ? drawable : all).slice().sort((a, b) => a.tenQH.localeCompare(b.tenQH, 'vi'));
-  sel.innerHTML = `<option value="">Chọn đồ án quy hoạch</option>${list.map(p => `<option value="${escapeHtml(p.tenQH)}">${escapeHtml(p.tenQH)}</option>`).join('')}`;
+  sel.innerHTML = `<option value="">Chọn đồ án quy hoạch</option>${list.map(p => {
+    const names = namesOfProject(p);
+    return `<option value="${escapeHtml(p.tenQH)}" title="${escapeHtml(names.tenDayDu)}">${escapeHtml(names.tenRutGon)}</option>`;
+  }).join('')}`;
   if (cur && list.some(p => p.tenQH === cur)) sel.value = cur;
 }
 

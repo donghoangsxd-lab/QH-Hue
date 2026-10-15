@@ -34,6 +34,7 @@ import { PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
 import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
 import { openOrAssign, openAssign, openDecision, openPropose, openProposalReview } from './decisionViewer.js';
 import { adjustmentsOf, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
+import { namesOfProject } from './projectNames.js';
 
 const HIDDEN_KEY = 'qh_hidden_projects';
 const HIDDEN_LAYERS_KEY = 'qh_hidden_layers';
@@ -221,9 +222,12 @@ function collectProjects() {
     if (!pointsOf.has(name)) pointsOf.set(name, []);
     pointsOf.get(name).push([lng, lat]);
   });
-  return assignColors(state.projectCatalog.map(p => ({
-    name: p.tenQH,
-    short: shortName(p.tenQH),
+  return assignColors(state.projectCatalog.map(p => {
+    const names = namesOfProject(p);
+    return {
+    name: names.tenQH,
+    short: names.tenRutGon,
+    full: names.tenDayDu,
     level: planLevelOf(p.tenQH),
     wards: Array.isArray(p.wards) ? p.wards : [],
     slug: p.slug || '',
@@ -266,7 +270,8 @@ function collectProjects() {
       at: Number(d.at) || 0,
       embed: d.kind === 'link' ? d.embed === true : true
     })) : []
-  })).sort((a, b) => a.name.localeCompare(b.name, 'vi')));
+    };
+  }).sort((a, b) => a.name.localeCompare(b.name, 'vi')));
 }
 
 // Tô màu tham lam theo thứ tự danh sách: lấy màu đầu bảng chưa có ở đồ án kề; kề hết màu thì lấy màu ít dùng nhất quanh nó
@@ -286,42 +291,6 @@ function assignColors(list) {
       || PALETTE.reduce((best, c) => (used.get(c) < used.get(best) ? c : best), PALETTE[i % PALETTE.length]);
   });
   return list;
-}
-
-// Nhãn bản đồ: bỏ số thứ tự, tiền tố loại đồ án, cụm "điều chỉnh quy hoạch phân khu…", ngoặc, phần liệt kê sau dấu phẩy / "thuộc";
-// mã khu 1–2 ký tự (A, D…) thành "Khu A"
-const SHORT_MAX = 34;
-const SHORT_KEEP_DASH = 24;
-function shortName(name) {
-  let s = String(name || '').trim()
-    .replace(/^\d+[.)]?\s+/, '')
-    .replace(/^(QHPK|QHCT|QHC|QHCPK|QHPK\.)\s*[-–:]?\s*/i, '')
-    .replace(/^(điều chỉnh\s+)?(cục bộ\s+)?(quy hoạch\s+)?(phân khu|chi tiết|chung)?\s*(xây dựng\s+)?(tỷ lệ\s+1\/[\d.]+\s+)?/i, '')
-    .replace(/^[\s,;:–-]+/, '')
-    .replace(/^(khu vực|xây dựng)\s+/i, '')
-    .replace(/\s*\([^)]*\)?/g, '')
-    .replace(/[\s–-]+$/, '');
-  if (s && s === s.toUpperCase()) s = s.toLowerCase().replace(/(^|\s)(\p{L})/gu, (m, sp, c) => sp + c.toUpperCase());
-  s = s.split(/,|\s+thuộc\s+/i)[0].trim();
-  const parts = s.split(/\s+[-–]\s+/);
-  if (parts.length > 1 && (parts[0].length <= 2 || s.length > SHORT_KEEP_DASH)) s = parts[0];
-  s = s.replace(/(^|\s)phường\s+/gi, '$1').trim();
-  if (s && s.length <= 2) s = `Khu ${s.toUpperCase()}`;
-  if (s.length > SHORT_MAX) {
-    const cut = s.slice(0, SHORT_MAX);
-    s = `${cut.slice(0, cut.lastIndexOf(' ') > 12 ? cut.lastIndexOf(' ') : SHORT_MAX).trim()}…`;
-  }
-  s = s.charAt(0).toUpperCase() + s.slice(1);
-  return s || String(name || '');
-}
-
-const KIND_FULL = { QHCT: 'Quy hoạch chi tiết', QHPK: 'Quy hoạch phân khu', QHC: 'Quy hoạch chung' };
-
-// Tooltip tên đồ án: diễn giải viết tắt loại đồ án đầu tên và tỷ lệ trong ngoặc, giữ nguyên phần còn lại
-function fullName(name) {
-  return String(name || '').trim()
-    .replace(/^(QHCT|QHPK|QHC)\b\.?/i, (m, k) => KIND_FULL[k.toUpperCase()])
-    .replace(/\(\s*(1\/[\d.]+)\s*\)/g, '(tỷ lệ $1)');
 }
 
 // Đồ án nhập trước khi có tab DS_DoAn: ranh tạm = bao lồi các lô / điểm (nhanh), nhập lại file để có ranh đúng
@@ -594,7 +563,7 @@ function renderList() {
   if (!box) return;
   parkStatic();
   const q = foldText(query.trim());
-  const visible = projects.map((p, idx) => ({ p, idx })).filter(({ p }) => !q || foldText(p.name).includes(q));
+  const visible = projects.map((p, idx) => ({ p, idx })).filter(({ p }) => !q || foldText(`${p.name} ${p.short} ${p.full}`).includes(q));
   const admin = isAdmin();
   const legacyN = projects.filter(p => p.legacy).length;
   const migrating = busy === '__migrate__';
@@ -680,8 +649,8 @@ function rowHtml(p, idx, admin) {
     : '';
   const boxTitle = boundary ? 'Hiện lô bên trong đồ án' : 'Hiện đồ án trên bản đồ';
   return `<div class="project-row${boundary || projectShown(p.name) ? '' : ' is-off'}${p.name === pickedName ? ' is-picked' : ''}">
-      <label class="project-name" title="${escapeHtml(fullName(p.name))} — bấm để mở đồ án">
-        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''} title="${boxTitle}"><span data-focus="${idx}">${idx + 1}. ${escapeHtml(p.name)}</span></label>
+      <label class="project-name" title="${escapeHtml(p.full || p.name)} — bấm để mở đồ án">
+        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''} title="${boxTitle}"><span data-focus="${idx}">${idx + 1}. ${escapeHtml(p.short || p.name)}</span></label>
       <span class="project-tools">
         <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-expand="${idx}" title="${open ? 'Ẩn' : 'Xem'} các lớp dữ liệu của đồ án" aria-label="Các lớp dữ liệu của đồ án" aria-expanded="${open}">${ico('chev-down')}</button>
         <button type="button" class="project-btn" data-info="${idx}" title="Thông tin đồ án ở panel dưới: cơ cấu sử dụng đất, bảng tổng hợp sử dụng đất và đánh giá chỉ tiêu QCVN 01:2026" aria-label="Thông tin đồ án">${ico('table')}</button>
@@ -720,7 +689,7 @@ function revealInList(p) {
   document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers', open: false } }));
   document.querySelector('[data-main-tab="plan"]')?.click();
   const q = foldText(query.trim());
-  if (q && !foldText(p.name).includes(q)) {
+  if (q && !foldText(`${p.name} ${p.short} ${p.full}`).includes(q)) {
     query = '';
     const search = $('projectSearch');
     if (search) search.value = '';
@@ -1381,7 +1350,7 @@ function drawOutlinesOn(m, list, below) {
     }
     const shape = L.geoJSON(geom, { style, bubblingMouseEvents: false });
     if (focused) shapes.push(shape);
-    shape.bindTooltip(escapeHtml(p.name), { sticky: true, direction: 'top', className: 'dot-tip' });
+    shape.bindTooltip(escapeHtml(p.full || p.name), { sticky: true, direction: 'top', className: 'dot-tip' });
     shape.on('mouseover', () => setHover(m, p.name));
     shape.on('mouseout', () => setHover(m, null));
     shape.on('click', (e) => {
@@ -1494,7 +1463,7 @@ async function deleteProject(p) {
 async function renameProject(p) {
   if (!isAdmin() || busy) return;
   if (p.legacy) { alert('Đồ án còn ở file cũ (cad_parcels.json): bấm «Chuyển đồ án cũ lên bucket» trước khi đổi tên.'); return; }
-  const typed = prompt(`Đổi tên đồ án «${p.name}» thành:\n(Không bắt đầu bằng HT- / QH-, tối đa 120 ký tự)`, p.name);
+  const typed = prompt(`Đổi tên khóa đồ án «${p.name}» thành:\nTên đầy đủ: ${p.full || p.name}\nTên rút gọn: ${p.short || p.name}\n(Không bắt đầu bằng HT- / QH-, tối đa 120 ký tự. Hai tên hiển thị cập nhật theo tên khóa mới.)`, p.name);
   if (typed === null) return;
   const newName = typed.replace(/\s+/g, ' ').trim().slice(0, 120);
   if (!newName || newName === p.name) return;

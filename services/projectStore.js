@@ -29,6 +29,25 @@ const SCRIPT_MAX_CHARS = 6000000;
 
 let transport = null;
 let indexCache = null; // { etag, data }
+let splitProjectNameFn = null;
+
+async function splitProjectName(tenQH) {
+  if (!splitProjectNameFn) {
+    ({ splitProjectName: splitProjectNameFn } = await import('../public/js/projectNames.js'));
+  }
+  return splitProjectNameFn(tenQH);
+}
+
+function withProjectNames(entry, pair) {
+  if (!entry) return entry;
+  const tenDayDu = String(entry.tenDayDu || '').trim();
+  const tenRutGon = String(entry.tenRutGon || '').trim();
+  return {
+    ...entry,
+    tenDayDu: tenDayDu || pair.tenDayDu,
+    tenRutGon: tenRutGon || pair.tenRutGon
+  };
+}
 let decisionsCache = null; // { etag, generation, data }
 let proposalsCache = null; // { etag, generation, data }
 let migrateJob = null; // { at, groups, wardFeatures }
@@ -338,6 +357,9 @@ async function catalog() {
   });
   const projects = [...by.values()].filter(p => p.tenQH && !p.deleted)
     .sort((a, b) => String(a.tenQH).localeCompare(String(b.tenQH), 'vi'));
+  for (let i = 0; i < projects.length; i++) {
+    projects[i] = withProjectNames(projects[i], await splitProjectName(projects[i].tenQH));
+  }
   await attachDecisions(projects);
   await attachProposals(projects);
   return { base: constants.PROJECTS_GCS_BASE, migrated, projects };
@@ -1271,6 +1293,7 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
     }
   }
   if (registry) {
+    const pair = await splitProjectName(name);
     const indexed = await updateIndex(cur => {
       const prevEntry = (cur.projects || []).find(p => p && p.tenQH === name && !p.deleted) || {};
       const projects = (cur.projects || []).filter(p => p.tenQH !== name);
@@ -1284,6 +1307,8 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
       const popQH = registry.popQH || prevEntry.popQH || 0;
       projects.push({
         tenQH: name,
+        tenDayDu: String(registry.tenDayDu || prevEntry.tenDayDu || '').trim() || pair.tenDayDu,
+        tenRutGon: String(registry.tenRutGon || prevEntry.tenRutGon || '').trim() || pair.tenRutGon,
         slug,
         dir: true,
         file: fileName || prevEntry.file || name,
@@ -1840,13 +1865,14 @@ async function renameProject(from, to) {
     return { slug: '', bucket: false, via: 'direct' };
   }
   let slug = '';
+  const pair = await splitProjectName(newName);
   const indexed = await updateIndex(cur => {
     const projects = (cur.projects || [])
       .filter(p => !(p && p.deleted && p.tenQH === newName))
       .map(p => {
         if (!p || p.tenQH !== oldName || p.deleted) return p;
         slug = p.slug || projectSlug(oldName);
-        return { ...p, tenQH: newName, slug };
+        return { ...p, tenQH: newName, tenDayDu: pair.tenDayDu, tenRutGon: pair.tenRutGon, slug };
       });
     if (!cur.migrated) projects.push({ tenQH: oldName, deleted: true });
     projects.sort((a, b) => String(a.tenQH).localeCompare(String(b.tenQH), 'vi'));
@@ -2173,10 +2199,39 @@ function cleanText(raw, max) {
   return String(raw ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().replace(/^[=+\-@]+/, '').slice(0, max);
 }
 
+function cleanPlan(plan) {
+  if (!plan || typeof plan !== 'object') return null;
+  const out = {};
+  ['floors', 'coverage', 'far'].forEach(k => {
+    const s = cleanText(plan[k], 20);
+    if (s) out[k] = s;
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+// Diện tích trắc địa (m²), cùng công thức turf.area ở trình duyệt: vòng ngoài trừ các lỗ
+const AREA_EARTH_R = 6378137;
+function ringAreaM2(ring) {
+  const n = ring.length;
+  if (n < 3) return 0;
+  const rad = Math.PI / 180;
+  let total = 0;
+  for (let i = 0; i < n; i++) {
+    const p1 = ring[i], p2 = ring[(i + 1) % n], p3 = ring[(i + 2) % n];
+    total += (p3[0] - p1[0]) * rad * Math.sin(p2[1] * rad);
+  }
+  return Math.abs(total * AREA_EARTH_R * AREA_EARTH_R / 2);
+}
+
+function geometryAreaM2(g) {
+  const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+  return polys.reduce((sum, rings) => sum + rings.reduce((s, r, i) => s + (i ? -ringAreaM2(r) : ringAreaM2(r)), 0), 0);
+}
+
 function cleanAdjustLot(l) {
   const geometry = cleanPolygonGeometry(l && l.geometry);
   if (!geometry) return null;
-  return {
+  const row = {
     geometry,
     layer: cleanText(l.layer, 120),
     // Khóa ký hiệu TT16 (tt16Symbols.js) để vẽ hoa văn; srcLayer: tên layer gốc khi người nhập chọn loại đất thủ công
@@ -2188,6 +2243,43 @@ function cleanAdjustLot(l) {
     tone: /^#[0-9a-fA-F]{6}$/.test(String(l.tone || '')) ? String(l.tone) : '',
     area: Math.max(0, Math.round(Number(l.area) || 0))
   };
+  const name = cleanText(l.name, 150);
+  const nhom = cleanText(l.nhom, 40);
+  const plan = cleanPlan(l.plan);
+  if (name) row.name = name;
+  if (nhom) row.nhom = nhom;
+  if (plan) row.plan = plan;
+  return row;
+}
+
+const ADJUST_EDIT_KEYS = ['name', 'nhom', 'layer', 'pattern', 'label', 'tone', 'landKey', 'subKey', 'geometry', 'plan'];
+
+// Chuỗi rỗng trong plan xóa chỉ tiêu đó. Đổi ranh thì tính lại diện tích; không gửi ranh thì giữ diện tích đã lưu
+function mergeAdjustLot(lot, fields) {
+  const next = { ...lot };
+  ['name', 'nhom', 'layer', 'pattern', 'srcLayer', 'landKey', 'subKey', 'label', 'tone'].forEach(k => {
+    if (fields[k] !== undefined) next[k] = fields[k];
+  });
+  if (fields.geometry) {
+    const geometry = cleanPolygonGeometry(fields.geometry);
+    if (!geometry) return null;
+    const area = geometryAreaM2(geometry);
+    if (!(area > 0) || area > 1e8) return null;
+    next.geometry = geometry;
+    next.area = Math.round(area);
+  }
+  if (fields.plan && typeof fields.plan === 'object') {
+    const plan = { ...(next.plan || {}) };
+    ['floors', 'coverage', 'far'].forEach(k => {
+      if (fields.plan[k] === undefined) return;
+      const s = cleanText(fields.plan[k], 20);
+      if (s) plan[k] = s;
+      else delete plan[k];
+    });
+    if (Object.keys(plan).length) next.plan = plan;
+    else delete next.plan;
+  }
+  return next;
 }
 
 function adjustView(it) {
@@ -2368,6 +2460,45 @@ async function readAdjustPdf(id, { admin }) {
   return { buffer: Buffer.from(res.data), name: decisionFileName(it.pdf.name) };
 }
 
+/** Admin sửa 1 lô trong file hồ sơ: lớp, loại đất, chỉ tiêu, ranh. Không đụng lô đồ án bên ngoài */
+async function patchAdjustLot({ id, index, fields }) {
+  if (!fields || typeof fields !== 'object' || !ADJUST_EDIT_KEYS.some(k => fields[k] !== undefined)) {
+    throw adjustError('Thiếu thông tin cần sửa', 400);
+  }
+  const i = Number(index);
+  if (!Number.isInteger(i) || i < 0) throw adjustError('Không xác định được lô đất', 400);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const it = await findAdjustment(id, true);
+    const objectName = adjustObject(it.slug, it.id, 'json');
+    const got = await readJson(objectName);
+    if (got.missing || !got.data || !Array.isArray(got.data.lots)) throw adjustError('File hồ sơ không còn trên bucket', 404);
+    if (i >= got.data.lots.length) throw adjustError('Lô đất không còn trong hồ sơ', 404);
+    const merged = mergeAdjustLot(got.data.lots[i], fields);
+    const clean = merged && cleanAdjustLot(merged);
+    if (!clean) throw adjustError('Thông tin lô không hợp lệ hoặc ranh nằm ngoài TP. Huế', 400);
+    const lots = got.data.lots.slice();
+    lots[i] = clean;
+    const text = JSON.stringify({ ...got.data, lots });
+    if (text.length > ADJUST_DOC_MAX_CHARS) throw adjustError('Hồ sơ lớn hơn 1,5 MB sau khi sửa ranh', 413);
+    try {
+      await writeText(objectName, text, got.generation || undefined);
+    } catch (err) {
+      if (err.code === 'GEN' && attempt < 2) continue;
+      if (err.code === 'GEN') throw adjustError('Hồ sơ vừa được sửa ở phiên khác, bấm Lưu lại', 409);
+      throw err;
+    }
+    const at = Date.now();
+    const stamp = vnStamp(at);
+    try {
+      await updateAdjustIndex(cur => ({
+        ...cur, items: cur.items.map(x => (x.id === id ? { ...x, at, stamp } : x))
+      }));
+    } catch (err) { /* lô đã ghi; mốc thời gian trên danh sách cập nhật lần mở sau */ }
+    return { lot: clean, index: i, at, stamp };
+  }
+  throw adjustError('Không ghi được lô điều chỉnh', 409);
+}
+
 async function approveAdjustment(id, by) {
   await findAdjustment(id, true);
   const at = Date.now();
@@ -2409,11 +2540,11 @@ async function wardParcels() {
 }
 
 module.exports = {
-  setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, deleteLayer, deleteProjectFiles, renameProject,
+  setTransport, projectTitle, projectSlug, splitProjectName, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, deleteLayer, deleteProjectFiles, renameProject,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision, layerDecisions, removeLayerDecision,
   saveProjectDoc, removeProjectDoc, saveNet,
   saveDecisionProposal, readDecisionProposal, approveDecisionProposal, rejectDecisionProposal,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase,
   saveAdjustment, attachAdjustPdf, attachAdjustScan, listAdjustments, readAdjustment, readAdjustPdf, readAdjustScan,
-  approveAdjustment, removeAdjustment
+  patchAdjustLot, approveAdjustment, removeAdjustment
 };

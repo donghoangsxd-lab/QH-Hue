@@ -382,7 +382,9 @@ function parseCadRegistry(reg) {
   return {
     boundary, boundarySource, keepBoundary: reg.keepBoundary === true,
     wards, infra: count(reg.infra), lands: count(reg.lands), landArea: parseLandArea(reg.landArea),
-    popHT: parseProjectPop(reg.popHT), popQH: parseProjectPop(reg.popQH)
+    popHT: parseProjectPop(reg.popHT), popQH: parseProjectPop(reg.popQH),
+    tenDayDu: sanitizeSheetText(reg.tenDayDu, 240),
+    tenRutGon: sanitizeSheetText(reg.tenRutGon, 80)
   };
 }
 
@@ -2155,10 +2157,13 @@ module.exports = async (req, res) => {
       const sheetItems = items.map(sheetItem);
       let result = { created: [], updated: [], skipped: [], lotIds: [] };
       if (sheetItems.length || registry || sync) {
+        const namePair = await projects.splitProjectName(tenQH);
         const sheetReg = registry && !registry.keepBoundary
           ? {
             boundary: registry.boundary, wards: registry.wards, infra: registry.infra, lands: registry.lands,
-            popHT: registry.popHT, popQH: registry.popQH
+            popHT: registry.popHT, popQH: registry.popQH,
+            tenDayDu: registry.tenDayDu || namePair.tenDayDu,
+            tenRutGon: registry.tenRutGon || namePair.tenRutGon
           }
           : null;
         result = await callAppsScript({ action: 'importCadBatch' }, {
@@ -2772,6 +2777,15 @@ module.exports = async (req, res) => {
       res.setHeader('Cache-Control', admin ? 'no-store' : 'private, max-age=300');
       res.setHeader('X-Content-Type-Options', 'nosniff');
       return res.status(200).send(file.buffer);
+    }
+
+    // Admin sửa 1 lô trong hồ sơ (lớp, loại đất, tầng cao, mật độ, hệ số, ranh). Không ghi file đồ án
+    if (action === 'editAdjustLot') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const saved = await projects.patchAdjustLot({ id: String(body.id || ''), index: body.index, fields: body.fields });
+      return res.status(200).json({ success: true, ...saved });
     }
 
     if (action === 'approveAdjust' || action === 'removeAdjust') {
