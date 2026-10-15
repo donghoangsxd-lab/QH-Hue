@@ -486,12 +486,14 @@ function focusLevelGroup() {
 
 // Ô lớp riêng của cấp (#planStaticRows) bật / tắt cùng nút mắt của nhóm
 const LEVEL_CHK = { QHC25: 'chk_qhc25', QHC: 'chk_qhc10', QHCT: 'chk_qhct' };
+// Lớp giao thông QHC 2045 (qhc2045Layer.js) cùng nhóm cấp: nút mắt bật / tắt kèm
+const LEVEL_EXTRA_CHK = { QHC25: 'chk_gt25', QHC: 'chk_gt10' };
 
 // Nút mắt nhóm cấp (sáng = nhóm đang hiện): còn lớp / đồ án nào đang hiện thì bấm tắt hết, đang tắt hết thì bấm bật cả nhóm
 function eyeState(key) {
   const list = projects.filter(p => p.level === key);
   const chk = $(LEVEL_CHK[key]);
-  const on = list.some(p => projectShown(p.name)) || !!chk?.checked;
+  const on = list.some(p => projectShown(p.name)) || !!chk?.checked || !!$(LEVEL_EXTRA_CHK[key])?.checked;
   const tip = `${on ? 'Tắt' : 'Bật'} tất cả lớp và đồ án ${levelLabel(key)}`;
   return { on, tip, empty: !list.length && !chk };
 }
@@ -528,11 +530,12 @@ function setLevelShown(key, on) {
     if (state.showProjects && projects.every(p => state.hiddenProjects.has(p.name))) setMaster(false);
   }
   saveHidden();
-  const chk = $(LEVEL_CHK[key]);
-  if (chk && chk.checked !== on) {
-    chk.checked = on;
-    chk.dispatchEvent(new Event('change', { bubbles: true }));
-  }
+  [LEVEL_CHK[key], LEVEL_EXTRA_CHK[key]].map(id => $(id)).forEach(chk => {
+    if (chk && chk.checked !== on) {
+      chk.checked = on;
+      chk.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
   const focus = state.focusedProject;
   if (!on && focus && list.some(p => p.name === focus)) {
     document.dispatchEvent(new CustomEvent(PROJECT_VIEW_EXIT_EVENT, { detail: { hidden: focus } }));
@@ -1665,6 +1668,7 @@ export function initProjectLayer(opts = {}) {
   let redrawQueued = false;
   document.addEventListener('change', (e) => {
     const id = e.target?.id;
+    if (Object.values(LEVEL_EXTRA_CHK).includes(id)) { paintEyes(); return; }
     if (!Object.values(LEVEL_CHK).includes(id)) return;
     paintEyes();
     if (id === LEVEL_CHK.QHC25 || redrawQueued) return;

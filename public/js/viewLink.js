@@ -21,6 +21,8 @@ const LAYERS = [
   ['pk', 'chk_projects'],
   ['25', 'chk_qhc25'],
   ['10', 'chk_qhc10'],
+  ['g25', 'chk_gt25'],
+  ['g10', 'chk_gt10'],
   ['ct', 'chk_qhct'],
   ['dg', 'chk_roads'],
   ['ds', 'chk_pop'],

@@ -7,14 +7,14 @@
 //    Đang xem QHC 1/10.000 (droplist) ở toàn thành phố: chỉ vẽ đường bao ngoài cả 4 quận + tên đồ án, rê chuột vào vùng lõi thì sáng nền,
 //    bấm vào ranh mới vẽ lô. Đang xem một địa điểm (phường, đồ án, hoặc phóng gần): mở thẳng lô, không vẽ ranh.
 //    Bật lớp khi xem cấp khác (so sánh) vẽ đủ lô ngay. Vùng đô thị trung tâm (hợp 4 tiểu vùng) luôn có nền và viền đỏ nhạt.
-//  - Mạng lưới giao thông đường bộ, đường sắt cùng tỷ lệ (qhcRoads.js) vẽ kèm lô 1/10.000 / vùng 1/25.000, nút
-//    "Mạng lưới giao thông" dưới mỗi lớp bật / tắt chung; 1/10.000 lọc theo nút giai đoạn như lô.
+//  - chk_gt25 / chk_gt10: mạng lưới giao thông đường bộ, đường sắt (qhcRoads.js), lớp riêng không phụ thuộc vùng / lô;
+//    1/10.000 lọc theo nút giai đoạn như lô. Bấm ký hiệu ở chú giải: phóng tới cả loại tuyến và làm nổi, các loại khác mờ.
 // Vùng, lô của cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400); riêng các đường ranh vẽ ở LINE_PANE
 // để nổi trên ranh 40 phường. Canvas mặc định của planMap (renderer: L.canvas())
 // nằm ở overlayPane, phủ kín bản đồ khi có bất kỳ lớp vector nào và nuốt click của canvas QHC bên dưới, nên click lô / vùng
 // được dò lại ở cấp bản đồ (qhcClick, gọi từ app.js) bằng bbox + point-in-polygon.
 import { state } from './state.js';
-import { map, wardNameAt, outerWardLines, openOutlinedPopup } from './mapEngine.js';
+import { map, wardNameAt, outerWardLines, openOutlinedPopup, getRightObstruction } from './mapEngine.js';
 import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClick } from './planMap.js';
 import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
@@ -26,7 +26,9 @@ import {
   QHC2045, CENTER_UNITS, ZONE_NAMES, STAGE_LAYERS, landOf, bareWard, isCoreWard,
   visionColor, visionLineStyle, WATER_KINDS, GREEN_COLOR
 } from './qhc2045.js';
-import { loadTraffic, trafficStyles, trafficRank, trafficPopupHtml, isRail } from './qhcRoads.js';
+import {
+  loadTraffic, trafficStyles, trafficRank, trafficPopupHtml, trafficKey, trafficGlowColor, isRail, ROAD_FOCUS_EVENT, ROAD_FOCUS_STATE
+} from './qhcRoads.js';
 
 export { isCoreWard };
 
@@ -43,7 +45,6 @@ const ROAD_PANE = ['qhcRoadPane', 415];
 const ROAD_HIT_PX = 6;
 const LABEL_MIN_ZOOM = 14;
 const TV_LABEL_MAX_ZOOM = 14;
-const ROAD_BTN_TITLE = 'Mạng lưới giao thông đường bộ, đường sắt của đồ án: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch. Bấm một tuyến để xem tên, cấp, chiều dài và lộ giới theo mặt cắt';
 const STAGES = [
   { id: '0', label: 'Hiện trạng' },
   { id: '1', label: 'Đến 2030' },
@@ -96,7 +97,6 @@ const shownStages = new Set([0, 1, 2]);
 let extOn = false;
 let detailed = false;
 let coreOpen = false;
-let roadsOn = true;
 const roadData = { 10: null, 25: null };
 // Đang xem một địa điểm rồi chuyển sang QHC 1/25.000 hoặc 1/10.000: chỉ lô / vùng chức năng, không ranh tổng
 let placeLots = false;
@@ -165,12 +165,9 @@ function qhcHosts(id, on) {
   return on && target() ? [target()] : [];
 }
 
-// Giao thông đi kèm lớp nền cùng tỷ lệ: gỡ lô thì gỡ đường 1/10.000, gỡ vùng thì gỡ đường 1/25.000
-const ROAD_OF = { land: 'road10', vision: 'road25' };
-
 function clearQhc(m, keys) {
   const b = use(m);
-  keys.flatMap(k => (ROAD_OF[k] ? [k, ROAD_OF[k]] : [k])).forEach(k => {
+  keys.forEach(k => {
     const layer = b.layers[k];
     if (k === 'frame') {
       layer?.tvLabels?.remove();
@@ -210,19 +207,33 @@ function drawLand() {
   }).on('click', (e) => { if (!passToolClick(m, e)) openLotPopup(e.layer.feature, e.latlng); });
   layers.land.addTo(m);
   restack();
-  drawRoads('10');
 }
 
 function dropLand() {
   layers.land?.remove();
   layers.land = null;
-  dropRoads('10');
 }
 
-// ---------- Mạng lưới giao thông (qhcRoads.js) ----------
+// ---------- Mạng lưới giao thông (qhcRoads.js): ô lớp riêng chk_gt10 / chk_gt25, không phụ thuộc lô và vùng ----------
+const ROAD_CHK = { 10: 'chk_gt10', 25: 'chk_gt25' };
+// Loại tuyến đang làm nổi (trafficKey) mỗi tỷ lệ; các loại khác mờ đi
+const roadFocus = { 10: null, 25: null };
+const FOCUS_DIM = 0.22;
+// Canvas không có blur: quầng sáng giả bằng 2 nét rộng cùng màu tuyến, mờ dần ra ngoài, rồi viền trắng sắc sát nét đường.
+// [độ rộng thêm so với nét viền, độ đục, màu (null = màu tuyến)]
+const FOCUS_HALO = [[16, 0.22, null], [9, 0.45, null], [3.5, 1, '#ffffff']];
+const fcOf = (features) => ({ type: 'FeatureCollection', features });
+
 function dropRoads(scale) {
   layers[`road${scale}`]?.remove();
   layers[`road${scale}`] = null;
+}
+
+// So sánh 2 cấp (khung chia đôi): vẽ ở bên đang xem đúng tỷ lệ đó, không có thì ở bản đồ quy hoạch
+function roadHosts(scale) {
+  if (!$(ROAD_CHK[scale])?.checked) return [];
+  const pair = isLevelPair() ? (mapsForLevel(`qhc${scale}`) || []) : [];
+  return pair.length ? pair : [target()].filter(Boolean);
 }
 
 /** Vẽ giao thông tỷ lệ scale lên bản đồ đang chọn (use). 1/10.000 lọc theo nút giai đoạn như lô; đường sắt 1/10.000 không ghi giai đoạn */
@@ -230,32 +241,83 @@ function drawRoads(scale) {
   dropRoads(scale);
   const fc = roadData[scale];
   const m = active?.m;
-  if (!roadsOn || !fc || !m) return;
+  if (!fc || !m) return;
+  const focus = roadFocus[scale];
   const feats = fc.features
     .filter(f => scale !== '10' || f.properties.t == null || shownStages.has(f.properties.t))
     .sort((a, b) => trafficRank(a) - trafficRank(b));
   const r = ensureRoadRenderer(m);
-  const pass = (list, i) => L.geoJSON({ type: 'FeatureCollection', features: list }, {
-    pane: ROAD_PANE[0], renderer: r, interactive: false, style: (f) => trafficStyles(f)[i]
+  const pass = (list, i) => L.geoJSON(fcOf(list), {
+    pane: ROAD_PANE[0], renderer: r, interactive: false,
+    style: (f) => {
+      const st = trafficStyles(f)[i];
+      return focus && trafficKey(f) !== focus ? { ...st, opacity: st.opacity * FOCUS_DIM } : st;
+    }
   });
   const roads = feats.filter(f => !isRail(f));
   const rails = feats.filter(isRail);
-  const group = L.featureGroup([pass(roads, 0), pass(roads, 1), pass(rails, 0), pass(rails, 1)]);
+  const passes = [pass(roads, 0), pass(roads, 1), pass(rails, 0), pass(rails, 1)];
+  if (focus) {
+    const hit = feats.filter(f => trafficKey(f) === focus);
+    FOCUS_HALO.forEach(([extra, opacity, color]) => passes.push(L.geoJSON(fcOf(hit), {
+      pane: ROAD_PANE[0], renderer: r, interactive: false,
+      style: (f) => ({
+        color: color || trafficGlowColor(f), opacity, dashArray: null, lineCap: 'round', lineJoin: 'round',
+        weight: trafficStyles(f)[0].weight + extra
+      })
+    })));
+    passes.push(pass(hit, 0), pass(hit, 1));
+  }
+  const group = L.featureGroup(passes);
   group.feats = feats;
   layers[`road${scale}`] = group.addTo(m);
-}
-
-function redrawRoads() {
-  bagList.forEach(b => {
-    use(b.m);
-    if (b.layers.land) drawRoads('10'); else dropRoads('10');
-    if (b.layers.vision) drawRoads('25'); else dropRoads('25');
-  });
 }
 
 const loadRoads = (scale) => loadTraffic(scale)
   .then(fc => { roadData[scale] = fc; })
   .catch(err => { console.warn(`QHC 2045 – không tải được giao thông 1/${scale}.000:`, err); });
+
+function emitRoadFocus(scale) {
+  document.dispatchEvent(new CustomEvent(ROAD_FOCUS_STATE, { detail: { scale, key: roadFocus[scale] } }));
+}
+
+const roadGen = { 10: 0, 25: 0 };
+async function setRoads(scale) {
+  const gen = ++roadGen[scale];
+  const hosts = roadHosts(scale);
+  [map, planMap].filter(Boolean).forEach(m => { if (!hosts.includes(m)) { use(m); dropRoads(scale); } });
+  if (!hosts.length) {
+    setHint(`gt${scale}Hint`, '');
+    if (roadFocus[scale]) { roadFocus[scale] = null; emitRoadFocus(scale); }
+    return;
+  }
+  if (!roadData[scale]) {
+    setHint(`gt${scale}Hint`, 'đang tải…');
+    await loadRoads(scale);
+    if (gen !== roadGen[scale]) return;
+  }
+  setHint(`gt${scale}Hint`, roadData[scale] ? '' : 'lỗi tải');
+  hosts.forEach(m => { use(m); drawRoads(scale); });
+}
+
+/** Bấm ký hiệu ở chú giải: bật lớp nếu đang tắt, phóng tới toàn bộ loại tuyến key và làm nổi; bấm lại loại đang nổi thì bỏ */
+async function focusRoads(scale, key) {
+  roadFocus[scale] = roadFocus[scale] === key ? null : key;
+  emitRoadFocus(scale);
+  const chk = $(ROAD_CHK[scale]);
+  if (roadFocus[scale] && chk && !chk.checked) {
+    chk.checked = true;
+    chk.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  await setRoads(scale);
+  const focus = roadFocus[scale];
+  const hit = focus && roadData[scale] ? roadData[scale].features.filter(f => trafficKey(f) === focus) : [];
+  const m = roadHosts(scale)[0];
+  if (!hit.length || !m) return;
+  const [w, s, e, n] = turf.bbox(fcOf(hit));
+  const right = isLevelPair() ? 0 : getRightObstruction();
+  m.flyToBounds([[s, w], [n, e]], { paddingTopLeft: [70, 40], paddingBottomRight: [40 + right, 40], duration: 0.8 });
+}
 
 /** Tuyến gần điểm bấm nhất trong ROAD_HIT_PX điểm ảnh (canvas giao thông không nhận click) */
 function roadAt(m, layer, latlng) {
@@ -550,7 +612,7 @@ async function setLand(on) {
   setHint('qhc10Hint', 'đang tải…');
   await Promise.resolve();
   try {
-    await Promise.all([load('land'), loadRoads('10'), ...((placeLots && !isLevelPair()) ? [] : [load('frame')])]);
+    await Promise.all((placeLots && !isLevelPair()) ? [load('land')] : [load('land'), load('frame')]);
   } catch (err) {
     console.warn('QHC 2045 – không tải được lớp 1/10.000:', err);
     setHint('qhc10Hint', 'lỗi tải');
@@ -716,7 +778,6 @@ function drawVision() {
   layers.vision.greenLayer = greenLayer;
   layers.vision.addTo(m);
   restack();
-  drawRoads('25');
 }
 
 function openVisionPopup(f, latlng) {
@@ -748,14 +809,14 @@ function featureAt(features, lng, lat) {
   return null;
 }
 
-/** Click nền bản đồ m (không bật công cụ): mở popup lô 1/10.000 hoặc vùng 1/25.000 tại điểm bấm. → true khi đã mở */
+/** Click nền bản đồ m (không bật công cụ): mở popup tuyến giao thông, lô 1/10.000 hoặc vùng 1/25.000 tại điểm bấm. → true khi đã mở */
 export function qhcClick(e, m) {
   if (!m || !e?.latlng) return false;
-  if (!isLevelPair() && m !== target()) return false;
-  if (isLevelPair() && sideOf(m) !== 'qhc10' && sideOf(m) !== 'qhc25') return false;
   use(m);
+  // Giao thông là lớp riêng, có thể nằm ở bản đồ không đang xem QHC (so sánh 2 cấp không có bên đúng tỷ lệ)
+  const qhcMap = isLevelPair() ? ['qhc10', 'qhc25'].includes(sideOf(m)) : m === target();
   const { lat, lng } = e.latlng;
-  if (layers.core && m.hasLayer(layers.core) && featureAt(tvFeatures(), lng, lat)) {
+  if (qhcMap && layers.core && m.hasLayer(layers.core) && featureAt(tvFeatures(), lng, lat)) {
     setCoreOpen(true);
     document.dispatchEvent(new CustomEvent(QHC_CORE_EVENT));
     return true;
@@ -764,6 +825,7 @@ export function qhcClick(e, m) {
     const f = roadAt(m, layers[`road${scale}`], e.latlng);
     if (f) { openRoadPopup(f, scale, e.latlng); return true; }
   }
+  if (!qhcMap) return false;
   if (layers.land && m.hasLayer(layers.land)) {
     const f = featureAt(layers.land.getLayers().map(l => l.feature), lng, lat);
     if (f) { openLotPopup(f, e.latlng); return true; }
@@ -838,7 +900,7 @@ async function setVision(on) {
   }
   setHint('qhc25Hint', 'đang tải…');
   try {
-    await Promise.all([load('vision'), loadRoads('25')]);
+    await load('vision');
   } catch (err) {
     console.warn('QHC 2045 – không tải được lớp 1/25.000:', err);
     setHint('qhc25Hint', 'lỗi tải');
@@ -855,6 +917,8 @@ function syncQhc() {
   setLand(!!$('chk_qhc10')?.checked);
   setVision(!!$('chk_qhc25')?.checked);
   setExt(extVisible());
+  setRoads('10');
+  setRoads('25');
   syncStages();
 }
 
@@ -863,44 +927,36 @@ function ensurePlanView() {
   if (planMap && !isSplitOn() && getViewMode() !== 'QH') setViewMode('QH');
 }
 
+// Hàng nút giai đoạn hiện khi bật lô 1/10.000 hoặc chỉ bật giao thông 1/10.000 (lọc cả hai)
 function syncStages() {
-  const on = (id, chk) => !!$(chk)?.checked || (isLevelPair() && (mapsForLevel(id) || []).length > 0);
-  const on10 = on('qhc10', 'chk_qhc10');
-  $('qhcStages')?.toggleAttribute('hidden', !on10);
-  $('qhc10Opts')?.toggleAttribute('hidden', !on10);
-  $('qhc25Opts')?.toggleAttribute('hidden', !on('qhc25', 'chk_qhc25'));
+  const show = !!$('chk_qhc10')?.checked || !!$(ROAD_CHK[10])?.checked || (isLevelPair() && (mapsForLevel('qhc10') || []).length > 0);
+  $('qhcStages')?.toggleAttribute('hidden', !show);
 }
 
-const stageBtn = (s) => `<button type="button" data-qhc-stage="${s.id}"${s.id === 'ext' ? ' class="qhc-stage-ext"' : ''}${s.title ? ` title="${escapeHtml(s.title)}"` : ''}>${s.label}</button>`;
-
-// Nút giao thông ở hàng riêng dưới mỗi lớp 1/10.000, 1/25.000 (hàng giai đoạn đã kín chỗ), chung một trạng thái
 function initStages() {
   const box = $('qhcStages');
   if (!box) return;
-  const opts = [$('qhc10Opts'), $('qhc25Opts')].filter(Boolean);
-  const isOn = (id) => (id === 'ext' ? extOn : id === 'road' ? roadsOn : shownStages.has(Number(id)));
-  const paint = () => [box, ...opts].forEach(el => el.querySelectorAll('[data-qhc-stage]')
-    .forEach(b => b.setAttribute('aria-pressed', String(isOn(b.dataset.qhcStage)))));
-  box.innerHTML = STAGES.map(stageBtn).join('');
-  opts.forEach(el => { el.innerHTML = stageBtn({ id: 'road', label: 'Mạng lưới giao thông', title: ROAD_BTN_TITLE }); });
-  const onClick = (e) => {
+  const isOn = (id) => (id === 'ext' ? extOn : shownStages.has(Number(id)));
+  const paint = () => box.querySelectorAll('[data-qhc-stage]').forEach(b => b.setAttribute('aria-pressed', String(isOn(b.dataset.qhcStage))));
+  box.innerHTML = STAGES.map(s => `<button type="button" data-qhc-stage="${s.id}"${s.id === 'ext' ? ' class="qhc-stage-ext"' : ''}${s.title ? ` title="${escapeHtml(s.title)}"` : ''}>${s.label}</button>`).join('');
+  box.addEventListener('click', (e) => {
     const b = e.target.closest('[data-qhc-stage]');
     if (!b) return;
     const id = b.dataset.qhcStage;
     if (id === 'ext') {
       extOn = !extOn;
       setExt(extVisible());
-    } else if (id === 'road') {
-      roadsOn = !roadsOn;
-      redrawRoads();
     } else {
       const t = Number(id);
       if (shownStages.has(t)) shownStages.delete(t); else shownStages.add(t);
-      bagList.forEach(b => { if (b.layers.land) { use(b.m); drawLand(); } });
+      bagList.forEach(b => {
+        use(b.m);
+        if (b.layers.land) drawLand();
+        if (b.layers.road10) drawRoads('10');
+      });
     }
     paint();
-  };
-  [box, ...opts].forEach(el => el.addEventListener('click', onClick));
+  });
   paint();
 }
 
@@ -951,8 +1007,13 @@ export function initQhc2045Layer() {
     if (isLevelPair()) { syncQhc(); return; }
     if (e.target.checked) ensurePlanView();
     setVision(e.target.checked);
-    syncStages();
   });
+  ['10', '25'].forEach(scale => $(ROAD_CHK[scale])?.addEventListener('change', (e) => {
+    if (e.target.checked) ensurePlanView();
+    setRoads(scale);
+    syncStages();
+  }));
+  document.addEventListener(ROAD_FOCUS_EVENT, (e) => { if (e.detail) focusRoads(String(e.detail.scale), e.detail.key); });
   const onZoom = (host) => {
     use(host);
     const d = host.getZoom() >= TT16_PATTERN_ZOOM;

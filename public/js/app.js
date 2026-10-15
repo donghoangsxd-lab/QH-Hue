@@ -695,7 +695,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Bấm lại cùng ô để khôi phục đúng các lớp đang bật trước đó.
   const FOCUS_CHECKS = [
     ...ICON_GROUPS.map(k => `chk_${k}`),
-    'chk_bound', 'chk_urban', 'chk_qhc25', 'chk_qhc10', 'chk_qhct', 'chk_parcel', 'chk_projects', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_basin', 'chk_flood', 'chk_sarflood',
+    'chk_bound', 'chk_urban', 'chk_qhc25', 'chk_qhc10', 'chk_gt25', 'chk_gt10', 'chk_qhct', 'chk_parcel', 'chk_projects', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_basin', 'chk_flood', 'chk_sarflood',
     'chk_lst', 'chk_newdev', 'chk_risk', 'chk_roads', 'chk_cadastre', 'chk_heat'
   ];
   let focusSnapshot = null;

@@ -5,20 +5,21 @@ import { QHC2045 } from './qhc2045.js';
 import { roadSectionOf, roadSectionSvg, fmtWidth } from './roadSections.js';
 import { escapeHtml, fmtNum } from './utils.js';
 
-// rank: thứ tự vẽ (cấp cao nằm trên, hầm nằm dưới mọi đường). label25: nhãn bản vẽ 1/25.000 khi khác 1/10.000
+// rank: thứ tự vẽ (cấp cao nằm trên, hầm nằm dưới mọi đường). label25: nhãn bản vẽ 1/25.000 khi khác 1/10.000.
+// short: nhãn gọn cho nút chú giải (một dòng trong nửa cột panel). glow: màu quầng khi làm nổi nếu màu nét quá tối
 export const ROAD_CLASSES = {
   ham: { label: 'Hầm đường bộ', color: '#a78bfa', weight: 3.2, rank: -1 },
-  kv: { label: 'Đường cấp khu vực', color: '#cbd5e1', weight: 1.6, rank: 0 },
-  dothi: { label: 'Đường cấp đô thị', label25: 'Đường trục chính đô thị', color: '#fde68a', weight: 2.6, rank: 1 },
+  kv: { label: 'Đường cấp khu vực', short: 'Đường cấp KV', color: '#cbd5e1', weight: 1.6, rank: 0 },
+  dothi: { label: 'Đường cấp đô thị', short: 'Đường cấp ĐT', label25: 'Đường trục chính đô thị', short25: 'Trục chính ĐT', color: '#fde68a', weight: 2.6, rank: 1 },
   dt: { label: 'Đường tỉnh', color: '#facc15', weight: 3.2, rank: 2 },
   ql: { label: 'Quốc lộ', color: '#f97316', weight: 4, rank: 3 },
   ct: { label: 'Đường cao tốc', color: '#dc2626', weight: 5, rank: 4 }
 };
 export const RAIL_KINDS = {
-  qg: { label: 'Đường sắt quốc gia', color: '#1e293b' },
-  tdc: { label: 'Đường sắt tốc độ cao', color: '#7c3aed' },
-  dsdt: { label: 'Đường sắt đô thị', color: '#0891b2' },
-  ngam: { label: 'Đường sắt đô thị ngầm', color: '#0891b2', under: true }
+  qg: { label: 'Đường sắt quốc gia', short: 'Đường sắt QG', color: '#1e293b', glow: '#e2e8f0' },
+  tdc: { label: 'Đường sắt tốc độ cao', short: 'Đường sắt CT', color: '#7c3aed' },
+  dsdt: { label: 'Đường sắt đô thị', short: 'Đường sắt ĐT', color: '#0891b2' },
+  ngam: { label: 'Đường sắt đô thị ngầm', short: 'Đường sắt ngầm', color: '#0891b2', under: true }
 };
 // Cùng chỉ số giai đoạn với lô sử dụng đất (nút Hiện trạng / Đến 2030 / Đến 2045): hiện trạng nét liền, quy hoạch nét đứt
 export const ROAD_STAGES = [
@@ -28,6 +29,13 @@ export const ROAD_STAGES = [
 ];
 const CASING = '#0f172a';
 const RAIL_TIES = '#f8fafc';
+
+// Bấm ký hiệu ở chú giải → qhc2045Layer.js phóng tới và làm nổi loại tuyến đó (detail { scale, key }, bấm lại để bỏ);
+// lớp báo lại trạng thái đang nổi để tô nút (detail { scale, key | null })
+export const ROAD_FOCUS_EVENT = 'qh:road-focus';
+export const ROAD_FOCUS_STATE = 'qh:road-focus-state';
+/** Khóa loại tuyến: 'b:ql', 's:tdc'… */
+export const trafficKey = (f) => `${f.properties.L}:${f.properties.c}`;
 
 const cache = {};
 /** FeatureCollection giao thông tỷ lệ scale ('10' | '25'), tải một lần */
@@ -44,6 +52,17 @@ export const isRail = (f) => f.properties.L === 's';
 export const roadClassOf = (p) => ROAD_CLASSES[p.c] || ROAD_CLASSES.kv;
 const railKindOf = (p) => RAIL_KINDS[p.c] || RAIL_KINDS.qg;
 const classLabel = (p, scale) => (p.L === 's' ? railKindOf(p).label : (scale === '25' && roadClassOf(p).label25) || roadClassOf(p).label);
+const shortLabel = (p, scale) => {
+  if (p.L === 's') return railKindOf(p).short || railKindOf(p).label;
+  const c = roadClassOf(p);
+  return (scale === '25' && c.label25 ? c.short25 : c.short) || classLabel(p, scale);
+};
+/** Màu quầng khi làm nổi một loại tuyến */
+export const trafficGlowColor = (f) => {
+  if (!isRail(f)) return roadClassOf(f.properties).color;
+  const k = railKindOf(f.properties);
+  return k.glow || k.color;
+};
 
 /** Thứ tự vẽ: đường cấp thấp dưới, đường sắt trên cùng */
 export const trafficRank = (f) => (isRail(f) ? 10 : roadClassOf(f.properties).rank);
@@ -144,19 +163,34 @@ export function renderTrafficLegend(container, scale) {
   const sample = (props) => ({ properties: props });
   const classes = scale === '25' ? ['ct', 'ql', 'dt', 'dothi', 'ham'] : ['ct', 'ql', 'dt', 'dothi', 'kv'];
   const rails = Object.keys(RAIL_KINDS);
-  const item = (f, label) => `<span class="qr-item">${trafficSwatch(f)}${escapeHtml(label)}</span>`;
-  const roadItems = classes.map(c => item(sample({ L: 'b', c, t: 0 }), classLabel({ L: 'b', c }, scale))).join('');
-  const railItems = rails.map(c => item(sample({ L: 's', c }), RAIL_KINDS[c].label)).join('');
+  // Ô ký hiệu cùng khổ ô «Viền lô theo giai đoạn» (.tt16-frame 28×14): mẫu nét 26×12 vừa trong viền 1px
+  const frame = (f) => `<span class="qr-box">${trafficSwatch(f, 26)}</span>`;
+  const item = (f, label) => `<span class="qr-row">${frame(f)}<span>${escapeHtml(label)}</span></span>`;
+  const btn = (f) => {
+    const p = f.properties;
+    const full = classLabel(p, scale);
+    return `<button type="button" class="qr-row qr-btn" data-road-key="${trafficKey(f)}" aria-pressed="false" title="${escapeHtml(`${full}: phóng tới toàn bộ tuyến và làm nổi; bấm lại để bỏ`)}">${frame(f)}<span>${escapeHtml(shortLabel(p, scale))}</span></button>`;
+  };
+  const roadItems = classes.map(c => btn(sample({ L: 'b', c }))).join('');
+  const railItems = rails.map(c => btn(sample({ L: 's', c }))).join('');
   const stageItems = ROAD_STAGES.map((s, t) => item(sample({ L: 'b', c: 'dothi', t }), s.label)).join('');
   container.innerHTML = `<details class="tt16-group">
     <summary><span class="tt16-group-name">Mạng lưới giao thông</span><span class="tt16-group-count">${classes.length + rails.length}</span></summary>
     <div class="qr-legend">
-      <div class="qr-sub">Cấp đường</div><div class="qr-items">${roadItems}</div>
-      <div class="qr-sub">Đường sắt</div><div class="qr-items">${railItems}</div>
-      <div class="qr-sub">Giai đoạn (kiểu nét)</div><div class="qr-items">${stageItems}</div>
+      <div class="qr-sub">Cấp đường</div><div class="qr-grid">${roadItems}</div>
+      <div class="qr-sub">Đường sắt</div><div class="qr-grid">${railItems}</div>
+      <div class="qr-sub">Giai đoạn (kiểu nét)</div><div class="qr-grid">${stageItems}</div>
       <div class="qr-stats-box"><span class="ua-tip-muted">Mở nhóm để tính chiều dài…</span></div>
     </div>
   </details>`;
+  container.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-road-key]');
+    if (b) document.dispatchEvent(new CustomEvent(ROAD_FOCUS_EVENT, { detail: { scale, key: b.dataset.roadKey } }));
+  });
+  document.addEventListener(ROAD_FOCUS_STATE, (e) => {
+    if (e.detail?.scale !== scale) return;
+    container.querySelectorAll('[data-road-key]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.roadKey === e.detail.key)));
+  });
   const details = container.querySelector('details');
   const box = container.querySelector('.qr-stats-box');
   details.addEventListener('toggle', () => {
