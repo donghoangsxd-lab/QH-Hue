@@ -49,6 +49,7 @@ import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
 import { initQhctLayer } from './qhctLayer.js';
 import { initCadImport } from './cadImportUi.js';
 import { initProjectLayer } from './projectLayer.js';
+import { initProjectBrief } from './projectBrief.js';
 import { initProjectReview } from './projectReview.js';
 import { initLocalAdjust } from './localAdjust.js';
 import { initAdjustLayer } from './adjustLayer.js';
@@ -322,6 +323,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
   initCadImport({ onImported: reloadAfterSheetWrite });
   initProjectLayer({ onDeleted: reloadAfterSheetWrite });
+  initProjectBrief();
   initProjectReview();
   initLocalAdjust();
   initAdjustLayer();

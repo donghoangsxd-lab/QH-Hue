@@ -1,7 +1,7 @@
 // Mục Quy hoạch (tab Lớp dữ liệu): 4 nhóm cấp theo droplist (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000,
 // QHCT 1/500) gồm dòng lớp riêng của cấp (#planStaticRows) và đồ án nhập; QHPK, QHCT nhóm đồ án theo phường
 // (đồ án liên phường có mặt ở mỗi phường), QHC liệt kê thẳng; mỗi đồ án (Ten_QH)
-// bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + thông tin ở panel dưới),
+// bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + bảng góc trái + thông tin ở panel dưới),
 // Admin xóa / chuyển đồ án cũ.
 // Nút file mở PDF quyết định đã duyệt. Admin gắn, thay hoặc gỡ (PDF dưới 1 MB hoặc link).
 // Nút lưu: người dùng gửi PDF nhỏ hơn 2 MB để admin duyệt; đang chờ thì nút đồng hồ, admin bấm để đồng ý hoặc từ chối.
@@ -366,7 +366,7 @@ function zoomTo(p) {
   focusProjectLots(p.name);
 }
 
-// Mở đồ án (tên, nút bảng hoặc ranh trên bản đồ): phóng tới, làm sáng ranh, thông tin đồ án vào panel dưới (projectReview)
+// Mở đồ án (tên, nút bảng hoặc ranh trên bản đồ): phóng tới, làm sáng ranh, bảng góc trái và thông tin ở panel dưới (projectReview)
 function openProject(p) {
   zoomTo(p);
   focusName = p.name;
@@ -406,12 +406,16 @@ export function projectContains(name, latlng) {
   try { return turf.booleanPointInPolygon([latlng.lng, latlng.lat], turf.feature(geom)); } catch (e) { return false; }
 }
 
+// Bảng góc trái (projectBrief.js) ẩn theo sự kiện này
+export const PROJECT_UNFOCUS_EVENT = 'qh:project-unfocus';
+
 /** Bỏ đồ án đang chọn (về xem theo phường / toàn TP); người gọi tự vẽ lại */
 export function clearProjectFocus() {
   state.focusedProject = null;
   focusName = null;
   drawFocus();
   markPicked(null);
+  document.dispatchEvent(new Event(PROJECT_UNFOCUS_EVENT));
 }
 
 /**

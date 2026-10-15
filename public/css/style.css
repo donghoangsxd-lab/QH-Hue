@@ -273,6 +273,185 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
 }
 .esc-hint[hidden] { display: none; }
 #mapArea.print-staging .esc-hint { display: none; }
+
+/* Bảng thông tin đồ án đang mở: mặc định góc dưới trái, cạnh thanh công cụ (projectBrief.js).
+   Panel dưới mở thì lên góc trên trái. --brief theo cấp: QHC xanh, QHPK cam, QHCT vàng. */
+.project-brief {
+  --brief: var(--cyan-rgb);
+  position: absolute;
+  z-index: 1100;
+  top: auto;
+  bottom: 12px;
+  left: calc(12px + var(--tb-btn) + 10px);
+  width: min(276px, calc(100% - var(--tb-btn) - 28px));
+  max-height: min(320px, calc(100% - var(--title-h) - 24px));
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  color: var(--text-main);
+  background: var(--bg-dark);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
+  border: 1px solid rgba(var(--brief), 0.45);
+  border-radius: var(--r-lg);
+  box-shadow: var(--panel-shadow), inset 3px 0 0 rgb(var(--brief));
+}
+.project-brief[data-level="QHPK"] { --brief: var(--orange-rgb); }
+.project-brief[data-level="QHCT"] { --brief: var(--yellow-rgb); }
+.project-brief[hidden] { display: none; }
+#mapArea.print-staging .project-brief { display: none; }
+.project-brief-head { display: flex; align-items: flex-start; gap: 4px; }
+.project-brief-level {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 5px;
+  padding: 0 5px;
+  border-radius: 99px;
+  border: 1px solid rgba(var(--brief), 0.45);
+  background: rgba(var(--brief), 0.16);
+  color: rgb(var(--brief));
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  vertical-align: 1px;
+}
+.project-brief-name {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--text-strong);
+}
+.project-brief-close {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.project-brief-close:hover { color: var(--text-strong); background: var(--bg-hover); }
+.project-brief-hero {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+.project-brief-hero span {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.project-brief-hero strong {
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  line-height: 1;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.project-brief-hero small {
+  margin-left: 4px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0;
+  color: rgb(var(--brief));
+}
+.project-brief-pops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+.project-brief-pops b {
+  font-weight: 800;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.project-brief-pops small {
+  margin-left: 2px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.project-brief-meters {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-soft);
+}
+.project-brief-meter-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.project-brief-meter-top span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.project-brief-meter-top b {
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.project-brief-meter.is-on[data-tone="adjust"] > .project-brief-meter-top b { color: var(--accent-orange); }
+.project-brief-meter.is-on[data-tone="cover"] > .project-brief-meter-top b { color: rgb(var(--brief)); }
+.project-brief-meter.is-zero > .project-brief-meter-top b { color: var(--text-muted); font-weight: 700; }
+.project-brief-track {
+  height: 3px;
+  margin-top: 2px;
+  border-radius: 99px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.project-brief-track i {
+  display: block;
+  height: 100%;
+  width: var(--meter, 0%);
+  border-radius: inherit;
+  background: rgb(var(--brief));
+}
+.project-brief-meter.is-on .project-brief-track i { min-width: 10px; }
+.project-brief-meter[data-tone="adjust"] .project-brief-track i { background: var(--accent-orange); }
+.project-brief-wait { color: var(--text-muted); font-weight: 600; }
+/* Panel dưới đang mở, hoặc tờ thẩm định chiếm đáy: bảng góc trái lên trên để không bị che */
+body:not(.bottom-collapsed) .project-brief,
+body:not(.bottom-collapsed) .cad-card,
+body:not(.bottom-collapsed) .urban-focus-bar,
+body:not(.bottom-collapsed) .ovd-card,
+body.project-review:not(.project-view) .project-brief,
+body.project-review:not(.project-view) .cad-card,
+body.project-review:not(.project-view) .urban-focus-bar,
+body.project-review:not(.project-view) .ovd-card {
+  top: calc(12px + var(--title-h) + 8px);
+  bottom: auto;
+}
+body:not(.bottom-collapsed) .leaflet-popup.dock-card,
+body.project-review:not(.project-view) .leaflet-popup.dock-card {
+  top: calc(12px + var(--title-h) + 8px) !important;
+  bottom: auto !important;
+}
 /* Nút lật trang Quy hoạch ⇄ Hiện trạng (biểu tượng bên trái tiêu đề) */
 .map-title-mark {
   flex-shrink: 0;
@@ -2544,11 +2723,12 @@ table.ward-table th {
 .cad-plan:not(:empty) { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-color); }
 .cad-plan-btn { margin-top: 10px; }
 
-/* Bảng thửa khi droplist đang ở lớp quy hoạch: góc trái, sát thanh công cụ, không che ranh thửa */
+/* Bảng thửa khi droplist đang ở lớp quy hoạch: góc dưới trái, sát thanh công cụ; panel dưới mở thì lên trên */
 .cad-card {
   position: absolute;
   z-index: 1040;
-  top: calc(12px + var(--title-h) + 8px);
+  top: auto;
+  bottom: 12px;
   left: calc(12px + var(--tb-btn) + 8px);
   width: min(280px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
   max-height: calc((100% - var(--title-h) - 20px) * 0.7);
@@ -2566,13 +2746,13 @@ table.ward-table th {
 }
 .cad-card[hidden] { display: none; }
 
-/* Bảng công trình và bảng tiếp cận: cùng góc trái với bảng thửa, không mũi tên, không bám tọa độ */
+/* Bảng công trình và bảng tiếp cận: cùng góc với bảng thửa, không mũi tên, không bám tọa độ */
 .leaflet-popup.dock-card {
   position: absolute !important;
   z-index: 1040;
-  top: calc(12px + var(--title-h) + 8px) !important;
+  top: auto !important;
   left: calc(12px + var(--tb-btn) + 8px) !important;
-  bottom: auto !important;
+  bottom: 12px !important;
   right: auto !important;
   margin: 0 !important;
   transform: none !important;
@@ -3066,9 +3246,9 @@ table.ward-table th {
 .ov-btn-demo { color: var(--text-on-accent); background: var(--accent-cyan); border-color: var(--accent-cyan); }
 .ov-btn-demo:hover { filter: brightness(1.1); box-shadow: 0 0 10px rgba(var(--cyan-rgb), 0.45); }
 
-/* Thẻ thuyết minh trình diễn trên bản đồ (overviewDemo.js): góc trên trái, cạnh thanh công cụ, dưới hộp Giới thiệu */
+/* Thẻ thuyết minh trình diễn (overviewDemo.js): góc dưới trái, cạnh thanh công cụ; panel dưới mở thì lên trên */
 .ovd-card {
-  position: fixed; top: 64px; left: 60px; z-index: 5000;
+  position: fixed; top: auto; bottom: 12px; left: calc(12px + var(--tb-btn) + 10px); z-index: 5000;
   width: min(400px, calc(100vw - 72px)); max-height: calc(100vh - 96px);
   display: flex; flex-direction: column; gap: 8px;
   padding: 12px 14px; box-sizing: border-box; overflow: auto;
@@ -3292,10 +3472,11 @@ body.project-view #projectReviewHost { display: flex; padding: 0; overflow: hidd
 .lots-progress-bar > i { display: block; height: 100%; width: 0; background: var(--accent-cyan); transition: width 0.25s ease; }
 @keyframes lots-spin { to { transform: rotate(360deg); } }
 
-/* Ghi chú độ phủ quy hoạch của đô thị đang chọn (urbanFocus.js): panel riêng bên trái, không xếp dưới thanh tiêu đề */
+/* Ghi chú độ phủ quy hoạch của đô thị đang chọn (urbanFocus.js): góc dưới trái; panel dưới mở thì lên trên */
 .urban-focus-bar {
   position: fixed; z-index: 950;
-  top: calc(12px + var(--title-h) + 8px);
+  top: auto;
+  bottom: 12px;
   left: calc(12px + var(--tb-btn) + 12px);
   max-width: min(440px, calc(100vw - var(--right-w) - var(--tb-btn) - 52px));
   display: flex; flex-direction: column; gap: 4px; padding: 8px 8px 8px 10px;

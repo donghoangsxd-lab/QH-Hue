@@ -1509,10 +1509,23 @@ function loadPops() {
   try { return JSON.parse(localStorage.getItem(POP_STORE_KEY) || '{}') || {}; } catch (e) { return {}; }
 }
 
+export const PROJECT_POP_EVENT = 'qh:project-pop';
+
 function savePop(project, popHT, popQH) {
   const all = loadPops();
   all[project] = { ht: popHT, qh: popQH };
   try { localStorage.setItem(POP_STORE_KEY, JSON.stringify(all)); } catch (e) { /* đầy bộ nhớ */ }
+  document.dispatchEvent(new CustomEvent(PROJECT_POP_EVENT, { detail: project }));
+}
+
+/** Dân số HT / QH của đồ án: số sửa trên máy này, không có thì số trong danh mục */
+export function projectPopulation(name) {
+  const pop = loadPops()[name] || {};
+  const entry = (state.projectCatalog || []).find(p => p && p.tenQH === name) || {};
+  return {
+    ht: Number(pop.ht) || Number(entry.popHT) || 0,
+    qh: Number(pop.qh) || Number(entry.popQH) || 0
+  };
 }
 
 /** Đồ án quy hoạch chung → bảng QHC, còn lại (phân khu, chi tiết) → bảng QHPK */

@@ -34,6 +34,7 @@ const $ = (id) => document.getElementById(id);
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 
 let items = [];
+let adjustmentsReady = false;
 let pendingItems = [];
 const details = new Map();
 const active = new Set();
@@ -136,6 +137,9 @@ export const WIPEOUT_STYLE = { stroke: false, fillColor: '#ffffff', fillOpacity:
 
 // Hồ sơ chờ duyệt Admin đang xem trước luôn hiện
 const visible = (it) => it.status === 'pending' || (projectShown(it.tenQH) && !isLayerHidden(it.tenQH, ADJUST_LAYER_KEY));
+
+/** Đã tải danh sách hồ sơ điều chỉnh ít nhất một lần (kể cả khi lỗi mạng) */
+export const adjustmentsKnown = () => adjustmentsReady;
 
 /** Hồ sơ đã duyệt của 1 đồ án, mới nhất trước */
 export function adjustmentsOf(tenQH) {
@@ -524,6 +528,7 @@ export async function reloadAdjustments() {
   [...active].forEach(id => { if (!items.some(x => x.id === id)) active.delete(id); });
   [...wipeOff].forEach(id => { if (!active.has(id)) wipeOff.delete(id); });
   [...scanOn].forEach(id => { if (!items.some(x => x.id === id && x.scan)) scanOn.delete(id); });
+  adjustmentsReady = true;
   refreshAdjustLayer();
   document.dispatchEvent(new CustomEvent(ADJUST_CHANGE_EVENT));
 }
