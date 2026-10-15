@@ -17,7 +17,7 @@ import { state } from './state.js';
 import { map, wardNameAt, outerWardLines, openOutlinedPopup } from './mapEngine.js';
 import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClick } from './planMap.js';
 import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
-import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT } from './tt16Symbols.js';
+import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { analyzeParcelZones, parcelZonesHtml } from './planLandStats.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
@@ -291,8 +291,33 @@ function openRoadPopup(f, scale, latlng) {
   openOutlinedPopup(active?.m || target(), f.geometry, L.popup({ maxWidth: 320, className: 'qhc-popup' }).setContent(html), latlng);
 }
 
+const VISION_FILL = 0.5;
+const VISION_WATER = 0.65;
+const VISION_SEA = 0.25;
+const VISION_GREEN = 0.6;
+const visionZoneName = (f) => data.vision?.cats?.zones?.[f.properties.k] || 'Khác';
+function visionFillStyle(f) {
+  const c = visionColor(visionZoneName(f));
+  return { color: c, weight: 0.5, opacity: 0.8, fillColor: c, fillOpacity: VISION_FILL * getLotOpacity() };
+}
+function visionWaterStyle(f) {
+  const c = (WATER_KINDS[f.properties.k] || WATER_KINDS[0]).color;
+  const base = f.properties.k === 2 ? VISION_SEA : VISION_WATER;
+  return { color: c, weight: 0.4, fillColor: c, fillOpacity: base * getLotOpacity() };
+}
+function visionGreenStyle() {
+  return { color: GREEN_COLOR, weight: 0.4, fillColor: GREEN_COLOR, fillOpacity: VISION_GREEN * getLotOpacity() };
+}
+
 function restyleLand() {
-  bagList.forEach(b => { if (b.layers.land) b.layers.land.setStyle(lotStyle); });
+  bagList.forEach(b => {
+    if (b.layers.land) b.layers.land.setStyle(lotStyle);
+    const v = b.layers.vision;
+    if (!v) return;
+    v.fillsLayer?.setStyle(visionFillStyle);
+    v.waterLayer?.setStyle(visionWaterStyle);
+    v.greenLayer?.setStyle(visionGreenStyle());
+  });
 }
 
 function frameLabel(text, cls) {
@@ -663,18 +688,17 @@ function drawVision() {
     else if (L_ === 'x') greens.push(f);
     else if (L_ === 'r' && !(placeLots && !isLevelPair())) lines.push(f);
   });
-  const zoneName = (f) => cats.zones[f.properties.k] || 'Khác';
   const fillLayer = L.geoJSON({ type: 'FeatureCollection', features: fills }, {
     pane: PANE[0], renderer: r, bubblingMouseEvents: false,
-    style: (f) => { const c = visionColor(zoneName(f)); return { color: c, weight: 0.5, opacity: 0.8, fillColor: c, fillOpacity: 0.5 }; }
+    style: visionFillStyle
   }).on('click', (e) => { if (!passToolClick(m, e)) openVisionPopup(e.layer.feature, e.latlng); });
   const waterLayer = L.geoJSON({ type: 'FeatureCollection', features: waters }, {
     pane: PANE[0], renderer: r, interactive: false,
-    style: (f) => { const c = (WATER_KINDS[f.properties.k] || WATER_KINDS[0]).color; return { color: c, weight: 0.4, fillColor: c, fillOpacity: f.properties.k === 2 ? 0.25 : 0.65 }; }
+    style: visionWaterStyle
   });
   const greenLayer = L.geoJSON({ type: 'FeatureCollection', features: greens }, {
     pane: PANE[0], renderer: r, interactive: false,
-    style: { color: GREEN_COLOR, weight: 0.4, fillColor: GREEN_COLOR, fillOpacity: 0.6 }
+    style: visionGreenStyle
   });
   const lineLayer = L.geoJSON({ type: 'FeatureCollection', features: lines }, {
     pane: PANE[0], renderer: r,
@@ -687,6 +711,9 @@ function drawVision() {
   });
   layers.vision = L.featureGroup([fillLayer, waterLayer, greenLayer, lineLayer]);
   layers.vision.fills = fills;
+  layers.vision.fillsLayer = fillLayer;
+  layers.vision.waterLayer = waterLayer;
+  layers.vision.greenLayer = greenLayer;
   layers.vision.addTo(m);
   restack();
   drawRoads('25');
@@ -933,7 +960,7 @@ export function initQhc2045Layer() {
     if (active.layers.frame && host.hasLayer(active.layers.frame)) zoomFrame();
   };
   [map, planMap].filter(Boolean).forEach(host => host.on('zoomend', () => onZoom(host)));
-  document.addEventListener(LOT_OPACITY_EVENT, restyleLand);
+  window.addEventListener(LOT_OPACITY_EVENT, restyleLand);
   document.addEventListener(LEVEL_EVENT, () => { if (!isLevelPair() && !placeLots) applyCore(); });
   onSplitPair(() => syncQhc());
   bindCoreHover(map);

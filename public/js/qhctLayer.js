@@ -11,6 +11,7 @@ import { isLevelPair, mapsForLevel, onSplitPair } from './splitPair.js';
 import { escapeHtml, fmtNum } from './utils.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { analyzeParcelPlan, parcelPlanHtml } from './planLandStats.js';
+import { landPatternKey, TT16_STYLES, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
 
 export const QHCT_URL = 'data/qhct/index.json';
 const PANE = 'qhctPane';
@@ -215,6 +216,17 @@ function clearLots(m) {
   drawn.delete(m);
 }
 
+function lotFill(f) {
+  const p = f.properties || {};
+  const key = landPatternKey([p.chucNang, p.kyHieu].filter(Boolean).join(' '));
+  const c = (key === 'BBC' && TT16_STYLES.BBC.color) || p.mau || DEFAULT_COLOR;
+  return { color: c, weight: 1, fillColor: c, fillOpacity: (key === 'BBC' ? 0.55 : 0.45) * getLotOpacity() };
+}
+
+function restyleLots() {
+  qhctMaps().forEach(m => drawn.get(m)?.layer?.setStyle(lotFill));
+}
+
 function draw(m) {
   clearLots(m);
   const pane = m.getPane(PANE) || m.createPane(PANE);
@@ -223,10 +235,7 @@ function draw(m) {
   const layer = L.geoJSON(data, {
     pane: PANE,
     renderer,
-    style: (f) => {
-      const c = f.properties?.mau || DEFAULT_COLOR;
-      return { color: c, weight: 1, fillColor: c, fillOpacity: 0.45 };
-    }
+    style: lotFill
   }).on('click', (e) => m.openPopup(popupHtml(e.layer.feature.properties || {}), e.latlng, { maxWidth: 320, className: 'qhc-popup' }));
   layer.addTo(m);
   drawn.set(m, { layer, renderer });
@@ -262,4 +271,5 @@ export function initQhctLayer() {
   });
   $('chk_projects')?.addEventListener('change', refreshOutlines);
   onSplitPair(() => { setVisible(!!$('chk_qhct')?.checked); refreshOutlines(); });
+  window.addEventListener(LOT_OPACITY_EVENT, restyleLots);
 }

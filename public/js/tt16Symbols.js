@@ -2,7 +2,7 @@
 // hiện có; Mục 02 – QHC đô thị 1/10.000 (PL1), khóa "C-"; Mục 05 – QHCT 1/500 (PL1), khóa "T-", dùng lại ô Mục 04.
 // Màu = mã ACI cột "Màu". Chín nhóm hạ tầng trích nét vector từ Phụ lục; các loại đất còn lại của Mục 04 vẽ theo cùng ô ký hiệu.
 // Viền theo khung ô ký hiệu: hiện trạng (HT_) mảnh; quy hoạch đợt đầu (QHDD_) dải liền; dài hạn (QHDH_) dải nét đứt.
-import { VISION_LEGEND_GROUPS } from './qhc2045.js';
+import { SAND_COLOR, VISION_LEGEND_GROUPS } from './qhc2045.js';
 
 // color: RGB chuẩn AutoCAD của mã ACI; pattern: khóa ô lặp trong TILES
 export const TT16_STYLES = {
@@ -49,7 +49,9 @@ Object.assign(TT16_STYLES, {
   "HO": { label: 'Hồ, ao, đầm', layer: 'DAT_KHAC_Honuoc', aci: 154, color: '#004c99', pattern: 'Honuoc' },
   "SS": { label: 'Sông, suối, kênh, rạch', layer: 'DAT_KHAC_Songsuoi', aci: 152, color: '#0066cc', pattern: 'Songsuoi' },
   "MNB": { label: 'Mặt nước ven biển', layer: 'DAT_KHAC_Matnuocbien', aci: 152, color: '#0066cc', pattern: 'Matnuocbien' },
-  "DCS": { label: 'Đất chưa sử dụng', layer: 'DAT_KHAC_Chuasudung', aci: 9, color: '#c0c0c0', pattern: 'Chuasudung', fillOpacity: 0.45 }
+  "DCS": { label: 'Đất chưa sử dụng', layer: 'DAT_KHAC_Chuasudung', aci: 9, color: '#c0c0c0', pattern: 'Chuasudung', fillOpacity: 0.45 },
+  // TT16 Mục 02/04/05 không có ô hoa văn. Tô đặc cùng màu chú giải sơ đồ 1/25.000.
+  "BBC": { label: 'Bãi bồi, bãi cát', layer: 'DAT_KHAC_Baiboi', color: SAND_COLOR, fillOpacity: 0.55 }
 });
 // QHC 1/10.000 (Mục 02 PL1): ô lặp C_* trích từ Phụ lục, màu theo mã ACI của Mục 02. Văn hóa – TDTT là chấm rải
 // ngẫu nhiên, không có chu kỳ trong ô Phụ lục: dùng lại ô TDTT của Mục 04 (cùng ACI 94).
@@ -164,6 +166,7 @@ const PATTERN_CODES = [
   ['TDTT', ['DAT_HTXH_THEDUCTHETHAO', 'DAT_NDD_VANHOATHETHAO']],
   ['9-TM', ['DAT_DICHVU']],
   ['DCS', ['DAT_KHAC_CHUASUDUNG', 'DAT_NNK_CHUASUDUNG']],
+  ['BBC', ['DAT_KHAC_BAIBOI', 'DAT_KHAC_BAICAT', 'DAT_NNK_BAIBOI', 'DAT_NN_BAIBOI', 'DAT_NLK_BAIBOI']],
   ['T-LK', ['DAT_NO_NHAOLIENKE']],
   ['T-BT', ['DAT_NO_NHAOBIETTHU']],
   ['T-CC', ['DAT_NO_NHAOCHUNGCU']],
@@ -214,7 +217,7 @@ const LEGEND_GROUPS = [
   ['Cơ quan, dịch vụ, di tích', ["DT-NC", "CQ", "9-TM", "DL", "DT-TG"]],
   ['An ninh, quốc phòng', ["AN", "QP"]],
   ['Hạ tầng kỹ thuật', ["GT", "2-BDX", "NTR", "HTK"]],
-  ['Nông, lâm nghiệp, thủy sản', ["NN", "RSX", "RPH", "RDD", "TS"]],
+  ['Nông, lâm nghiệp, thủy sản', ["NN", "RSX", "RPH", "RDD", "BBC", "TS"]],
   ['Mặt nước, đất khác', ["DCS", "HO", "SS", "MNB", "12-CSD"]]
 ];
 const LEGEND_KEYS = LEGEND_GROUPS.flatMap(([, keys]) => keys);
@@ -223,7 +226,7 @@ const LEGEND_KEYS = LEGEND_GROUPS.flatMap(([, keys]) => keys);
 const QHC_LEGEND_GROUPS = [
   ['Khu đất dân dụng', ["C-DVO", "C-HH", "C-DVCC", "C-CQDT", "C-CXDT", "C-GTDT", "C-HTDT"]],
   ['Khu đất ngoài dân dụng', ["C-CN", "C-DT", "C-CQ", "C-DL", "C-YT", "C-VHTT", "C-CXHC", "C-CXCD", "C-DTTG", "C-DCNT", "C-AN", "C-QP", "C-GTDN", "C-HTNG"]],
-  ['Nông nghiệp và chức năng khác', ["C-NN", "C-RDD", "C-RPH", "C-RSX", "C-TS", "C-CSD", "C-HO", "C-SS", "C-MNB"]]
+  ['Nông nghiệp và chức năng khác', ["C-NN", "C-RDD", "C-RPH", "C-RSX", "BBC", "C-TS", "C-CSD", "C-HO", "C-SS", "C-MNB"]]
 ];
 
 // Bộ ký hiệu theo cấp đồ án (tab Chú giải); khóa trùng data-legend-set trong index.html.
@@ -239,7 +242,7 @@ export const LEGEND_SETS = {
     ['Sản xuất, cơ quan, dịch vụ', ["T-CN", "T-DT", "T-CQ", "T-DV", "T-DL", "T-DTTG", "T-CXHC", "T-CXCD"]],
     ['An ninh, quốc phòng', ["T-AN", "T-QP"]],
     ['Hạ tầng kỹ thuật', ["T-GT", "T-BDX", "T-NTR", "T-HTK"]],
-    ['Nông nghiệp và đất khác', ["T-NN", "T-RDD", "T-RPH", "T-RSX", "T-TS", "T-CSD", "T-HO", "T-SS", "T-MNB"]]
+    ['Nông nghiệp và đất khác', ["T-NN", "T-RDD", "T-RPH", "T-RSX", "BBC", "T-TS", "T-CSD", "T-HO", "T-SS", "T-MNB"]]
   ])
 };
 
@@ -823,7 +826,9 @@ const LAND_RULES = [
   { key: 'nuoc', label: 'Đất mặt nước, sông suối, kênh rạch', color: '#0066cc', re: /MAT[\s_]?NUOC|SONG[\s_]?(SUOI|NGOI)|KENH[\s_]?RACH|HO[\s_]?(NUOC|DIEU[\s_]?HOA)|(^|[\s_.-])(AO|SONG|SUOI|KENH|RACH|SMN|MNC)($|[\s_.-])/ },
   { key: 'htkt', label: 'Đất hạ tầng kỹ thuật', color: '#39264c', re: /HTKT|HA[\s_]?TANG[\s_]?KY[\s_]?THUAT|DAU[\s_]?MOI/ },
   // Đất bằng / đồi núi / núi đá chưa sử dụng (mã kiểm kê BCS, DCS, NCS): lô đất, không phải Cơ sở chưa sử dụng (12-CSD)
-  { key: 'csd', label: 'Đất chưa sử dụng', color: '#c0c0c0', re: /CHUA[\s_.-]?SU[\s_.-]?DUNG|(^|[\s_.-])(BCS|DCS|NCS)($|[\s_.-])/ }
+  { key: 'csd', label: 'Đất chưa sử dụng', color: '#c0c0c0', re: /CHUA[\s_.-]?SU[\s_.-]?DUNG|(^|[\s_.-])(BCS|DCS|NCS)($|[\s_.-])/ },
+  // «Bãi cát», «Đất bãi bồi, bãi cát», «Bãi cát, bãi đá», «Đất cát ven biển» — không phải bãi đỗ xe hay địa danh Phú Cát
+  { key: 'bbc', label: 'Bãi bồi, bãi cát', color: SAND_COLOR, re: /BAI[\s_.-]?(BOI|CAT)|CAT[\s_.-]?VEN[\s_.-]?BIEN/ }
 ];
 
 export const LAND_LABELS = [...LAND_RULES.map(r => r.label), 'Đất khác'];
@@ -833,7 +838,7 @@ export const LAND_LABELS = [...LAND_RULES.map(r => r.label), 'Đất khác'];
 const KEY_LAND_RULE = {
   'O-HH': 'o', 'O-LX': 'o', 'CC-DV': 'cc', 'CX-HC': null, 'CX-CD': null, 'SX-CN': null, 'SX-VL': null,
   'DT-NC': 'dtn', CQ: 'cq', DL: 'dv', 'DT-TG': 'tg', AN: 'an', QP: 'an', GT: 'htkt', NTR: 'htkt', HTK: 'htkt',
-  NN: null, RSX: null, RPH: null, RDD: null, TS: null, HO: 'nuoc', SS: 'nuoc', MNB: 'nuoc'
+  NN: null, RSX: null, RPH: null, RDD: null, TS: null, BBC: 'bbc', HO: 'nuoc', SS: 'nuoc', MNB: 'nuoc'
 };
 export const MANUAL_LAND_KEYS = Object.keys(KEY_LAND_RULE);
 
@@ -900,6 +905,7 @@ const PHRASE_RULES = [
   ['RSX', /RUNGSANXUAT/],
   ['TS', /THUYSAN|NUOITRONG/],
   ['NN', /NONGNGHIEP|TRONGLUA|DATLUA|CAYHANGNAM|CAYLAUNAM/],
+  ['BBC', /BAIBOI|BAICAT|CATVENBIEN/],
   ['HO', /MATNUOC|HONUOC|HODIEUHOA|HOAO/],
   ['SS', /SONG|SUOI|KENH|RACH/],
   // Đất dự trữ phát triển: TT16 không có ký hiệu riêng, tô theo đất chưa sử dụng
@@ -945,7 +951,7 @@ const SCHOOL_WORDS = { TH: '4-TH', MN: '3-MN' };
 // Nhóm đất landRule (tên tách rời: "dat o", "ODT", "N - AO"...) chưa trúng cụm từ trên → ký hiệu TT16 gần nhất
 const RULE_PATTERN = {
   o: () => 'O-NO', cc: () => 'CC-DV', dv: () => '9-TM', dtn: () => 'DT-NC', cq: () => 'CQ', tg: () => 'DT-TG',
-  htkt: () => 'HTK', csd: () => 'DCS', an: () => 'AN', nuoc: () => 'HO'
+  htkt: () => 'HTK', csd: () => 'DCS', an: () => 'AN', nuoc: () => 'HO', bbc: () => 'BBC'
 };
 
 function schoolPatternKey(compact, words) {

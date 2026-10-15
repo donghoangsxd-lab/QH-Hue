@@ -80,6 +80,9 @@ export function landOf(zone, code) {
   return { key: null, label: `Mã ${code} · ${ZONE_NAMES[zone] || zone}`, tone: ZONE_TONE[zone] || '#94a3b8' };
 }
 
+// Màu đặc «Bãi bồi, bãi cát» trên sơ đồ 1/25.000. Cấp 1/10.000, 1/2.000, 1/500 dùng lại (khóa BBC trong tt16Symbols.js).
+export const SAND_COLOR = '#fde68a';
+
 // Sơ đồ tổ chức không gian 1/25.000: màu theo tên khu vực phát triển (tên lấy từ dữ liệu, so khớp theo cụm từ)
 const VISION_COLORS = [
   [/có kiểm soát/i, '#fcd34d'],
@@ -98,7 +101,7 @@ const VISION_COLORS = [
   [/rừng phòng hộ/i, '#2f6b5e'],
   [/rừng đặc dụng/i, '#155e75'],
   [/rừng sản xuất/i, '#3f7f4f'],
-  [/bãi bồi|bãi cát/i, '#fde68a'],
+  [/bãi bồi|bãi cát/i, SAND_COLOR],
   [/dự trữ/i, '#d6d3d1'],
   [/giao thông/i, '#9ca3af']
 ];

@@ -1357,7 +1357,8 @@ function landPopupHtml(p) {
   const nhom = p.nhom || landLabel(p.layer);
   const type = nhom === 'Đất khác' && TT16_STYLES[key] ? TT16_STYLES[key].label : nhom;
   const code = landCode(p);
-  const swatch = tt16SwatchCss(key, 0.6) || `background:${landColor(p.layer) || '#94a3b8'};`;
+  const tone = (key && TT16_STYLES[key] && TT16_STYLES[key].color) || landColor(p.layer) || '#94a3b8';
+  const swatch = tt16SwatchCss(key, 0.6) || `background:${tone};`;
   const stage = LAND_STAGE_LABELS[String(p.layer || '').toUpperCase().split(/[_\s]/)[0]];
   const phase = p.phase === 'QH' ? (stage || 'Quy hoạch') : 'Hiện trạng';
   const info = [
