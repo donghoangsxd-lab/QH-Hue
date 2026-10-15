@@ -703,8 +703,7 @@ async function listedProject(tenQH) {
 const LAYER_DECISIONS = {
   'do-thi-hien-trang': 'Phân loại đô thị · hiện trạng',
   'do-thi-quy-hoach': 'Phân loại đô thị · quy hoạch',
-  'qhc-25000': 'QHC đô thị Huế 2045 · 1/25.000',
-  'qhc-10000': 'QHC đô thị Huế 2045 · 1/10.000'
+  'qhc-2045': 'QHC đô thị Huế 2045'
 };
 
 function layerTarget(layer) {

@@ -1026,6 +1026,8 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-btn.danger:hover:not(:disabled) { color: var(--accent-red); border-color: rgba(var(--red-rgb), 0.5); }
 .project-btn:disabled { opacity: 0.4; cursor: wait; }
 .project-btn.has-decision, .project-btn.has-proposal { color: var(--accent-orange); }
+.project-btn.is-empty { opacity: 0.55; }
+.project-name .layer-hint { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 400; }
 /* Quyết định phê duyệt của lớp bản đồ (layerDecisions.js): nút dòng lớp và dòng trong tab Chú giải */
 [data-layer-decision][hidden] { display: none; }
 .layer-decisions { display: inline-flex; gap: 3px; flex-shrink: 0; }

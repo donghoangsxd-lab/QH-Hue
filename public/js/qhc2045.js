@@ -3,6 +3,9 @@
 // Không phụ thuộc DOM / Leaflet: lớp bản đồ và luồng khu vực trung tâm ở qhc2045Layer.js.
 import { CORE_AREAS } from './generalPlan.js';
 
+// Nút bảng trên dòng «QHC đô thị TTHuế 2045 (Trung tâm)»: projectReview.js mở cơ cấu đất và chỉ tiêu
+export const QHC_CENTER_INFO_EVENT = 'qh:qhc-center-info';
+
 export const QHC2045 = {
   name: 'Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065',
   short: 'QHC đô thị TT Huế 2045',

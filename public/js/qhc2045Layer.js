@@ -1,13 +1,13 @@
 // Lớp bản đồ đồ án QHC đô thị Thừa Thiên Huế 2045 (qhc2045.js) trên bản đồ quy hoạch, điều khiển ở panel Lớp dữ liệu:
 //  - chk_qhc25: sơ đồ tổ chức không gian 1/25.000 toàn đô thị (vùng phát triển, mặt nước, cây xanh, ranh khu vực;
-//    chú giải ở tab Chú giải, bộ QHC25 – tt16Symbols.js);
+//    chú giải ở tab Chú giải, bộ QHC25 – tt16Symbols.js). Nằm trong dòng «QHC đô thị Huế 2045 (toàn đô thị)»;
 //  - chk_qhc10: sử dụng đất 1/10.000 khu vực trung tâm (lô theo ký hiệu TT16 Mục 02, viền theo giai đoạn) + 4 tiểu vùng,
 //    phân khu, điểm chức năng. Hàng nút dưới dòng lớp bật/tắt độc lập từng giai đoạn lô và ranh 1/10.000 mở rộng theo
 //    QĐ 756 (ranh ngoài các phường vùng lõi + vùng đỏ Hóa Châu, Mỹ Thượng chưa có trong đồ án cũ).
 //    Đang xem QHC 1/10.000 (droplist) ở toàn thành phố: chỉ vẽ đường bao ngoài cả 4 quận + tên đồ án, rê chuột vào vùng lõi thì sáng nền,
 //    bấm vào ranh mới vẽ lô. Đang xem một địa điểm (phường, đồ án, hoặc phóng gần): mở thẳng lô, không vẽ ranh.
 //    Bật lớp khi xem cấp khác (so sánh) vẽ đủ lô ngay. Vùng đô thị trung tâm (hợp 4 tiểu vùng) luôn có nền và viền đỏ nhạt.
-//  - chk_gt25 / chk_gt10: mạng lưới giao thông đường bộ, đường sắt (qhcRoads.js), lớp riêng không phụ thuộc vùng / lô;
+//  - chk_gt25 / chk_gt10: mạng lưới giao thông đường bộ, đường sắt (qhcRoads.js), lớp trong cùng dòng QHC, không phụ thuộc vùng / lô;
 //    1/10.000 lọc theo nút giai đoạn như lô. Bấm ký hiệu ở chú giải: phóng tới cả loại tuyến và làm nổi, các loại khác mờ.
 // Vùng, lô của cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400); riêng các đường ranh vẽ ở LINE_PANE
 // để nổi trên ranh 40 phường. Canvas mặc định của planMap (renderer: L.canvas())
@@ -23,7 +23,7 @@ import { analyzeParcelZones, parcelZonesHtml } from './planLandStats.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { isLevelPair, sideOf, mapsForLevel, onSplitPair } from './splitPair.js';
 import {
-  QHC2045, CENTER_UNITS, ZONE_NAMES, STAGE_LAYERS, landOf, bareWard, isCoreWard,
+  QHC2045, QHC_CENTER_INFO_EVENT, CENTER_UNITS, ZONE_NAMES, STAGE_LAYERS, landOf, bareWard, isCoreWard,
   visionColor, visionLineStyle, WATER_KINDS, GREEN_COLOR
 } from './qhc2045.js';
 import {
@@ -982,7 +982,64 @@ function onPopupClick(e, host) {
   else document.dispatchEvent(new CustomEvent(OPEN_PROJECT_EVENT, { detail: el.dataset.qhcOpen }));
 }
 
+// Ô đầu dòng bật / tắt cả hai lớp bên trong. Một lớp bật, một lớp tắt thì ô ở trạng thái lưng chừng.
+function syncQhcHead(scale) {
+  const head = document.querySelector(`[data-qhc-head="${scale}"]`);
+  const kids = [...document.querySelectorAll(`[data-qhc-child="${scale}"]`)];
+  if (!head || !kids.length) return;
+  const on = kids.filter(k => k.checked).length;
+  head.checked = on === kids.length;
+  head.indeterminate = on > 0 && on < kids.length;
+  head.closest('.project-row')?.classList.toggle('is-off', on === 0);
+  kids.forEach(k => k.closest('.project-layer')?.classList.toggle('is-off', !k.checked));
+}
+
+function initQhcRows() {
+  let applying = false;
+  document.querySelectorAll('[data-qhc-head]').forEach(head => {
+    const scale = head.dataset.qhcHead;
+    head.addEventListener('change', () => {
+      if (applying) return;
+      const on = head.checked;
+      applying = true;
+      document.querySelectorAll(`[data-qhc-child="${scale}"]`).forEach(k => {
+        if (k.checked === on) return;
+        k.checked = on;
+        k.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      applying = false;
+      syncQhcHead(scale);
+    });
+  });
+  document.querySelectorAll('[data-qhc-child]').forEach(k => {
+    k.addEventListener('change', () => { if (!applying) syncQhcHead(k.dataset.qhcChild); });
+  });
+  document.querySelectorAll('[data-qhc-expand]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const box = document.getElementById(btn.getAttribute('aria-controls'));
+      if (!box) return;
+      const open = box.hidden;
+      box.hidden = !open;
+      btn.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', String(open));
+      btn.title = open ? 'Ẩn các lớp dữ liệu' : 'Xem các lớp dữ liệu';
+    });
+  });
+  document.querySelector('[data-qhc-info]')?.addEventListener('click', () => {
+    const land = $('chk_qhc10');
+    if (land && !land.checked) {
+      land.checked = true;
+      land.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    ensurePlanView();
+    fitCenter();
+    document.dispatchEvent(new Event(QHC_CENTER_INFO_EVENT));
+  });
+  ['25', '10'].forEach(syncQhcHead);
+}
+
 function initUi() {
+  initQhcRows();
   // Nút trong popup (lô 1/10.000, vùng 1/25.000) trên cả 2 bản đồ
   [map, planMap].filter(Boolean).forEach(m => m.on('popupopen', (e) => {
     const el = e.popup.getElement();

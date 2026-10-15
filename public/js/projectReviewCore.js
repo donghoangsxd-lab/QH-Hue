@@ -194,7 +194,12 @@ export function landSymbol(kind, rowKey, subKey = '') {
 // Khóa TT16 không có đầu mục riêng trong bảng → đầu mục gần nhất
 const PATTERN_ROW_EXTRA = {
   QHC: { '3-MN': 'dd_dvcc', '4-TH': 'dd_dvcc', '5-THCS': 'dd_dvcc', '6-THPT': 'dd_dvcc', '9-TM': 'dd_dvcc', 'CC-DV': 'dd_dvcc', 'C-DVCC': 'dd_dvcc', TDTT: 'ndd_vh',
-    '2-BDX': 'dd_gt', NTR: 'ndd_ht', 'SX-VL': 'ndd_cn', RSX: 'nnk_ln', RPH: 'nnk_ln', RDD: 'nnk_ln', '12-CSD': 'nnk_csd' },
+    '2-BDX': 'dd_gt', NTR: 'ndd_ht', 'SX-VL': 'ndd_cn', RSX: 'nnk_ln', RPH: 'nnk_ln', RDD: 'nnk_ln', '12-CSD': 'nnk_csd',
+    'C-DVO': 'dd_o', 'C-HH': 'dd_hh', 'C-CQDT': 'dd_cq', 'C-CXDT': 'dd_cx', 'C-GTDT': 'dd_gt', 'C-HTDT': 'dd_ht',
+    'C-CN': 'ndd_cn', 'C-DT': 'ndd_dt', 'C-CQ': 'ndd_cq', 'C-YT': 'ndd_yt', 'C-VHTT': 'ndd_vh', 'C-DL': 'ndd_dl',
+    'C-CXHC': 'ndd_cxhc', 'C-CXCD': 'ndd_cxcd', 'C-DTTG': 'ndd_dtich', 'C-AN': 'ndd_an', 'C-QP': 'ndd_qp',
+    'C-GTDN': 'ndd_gt', 'C-HTNG': 'ndd_ht', 'C-NN': 'nnk_nn', 'C-RDD': 'nnk_ln', 'C-RPH': 'nnk_ln', 'C-RSX': 'nnk_ln',
+    'C-HO': 'nnk_ho', 'C-SS': 'nnk_song', 'C-MNB': 'nnk_bien' },
   QHPK: { '4-TH': 'gd', '5-THCS': 'gd', '6-THPT': 'gd', '12-CSD': 'csd', 'C-DVCC': 'ccdv' }
 };
 const PATTERN_ROW = Object.fromEntries(Object.entries(ROW_TT16).map(([kind, rows]) => {
@@ -258,12 +263,13 @@ export function landSubKey(lot, kind) {
  * Liệt kê đầu mục (và nhóm con) có HT, QH hoặc ĐC > 0; dòng cuối "Chưa xác định" gồm lô chưa rõ đầu mục (landKey null).
  * Có ranh đồ án (boundaryM2): tổng = diện tích ranh, các loại đất lấy phần lô trong ranh (areaIn),
  * đất giao thông = tổng − các loại đất còn lại (hatch giao thông chỉ để đối chiếu).
- * Không có ranh: tổng = cộng các lô, phần chênh để tổng HT = tổng QH dồn vào "Chưa xác định".
+ * Không có ranh: tổng = cộng các lô; pad (mặc định) dồn phần chênh để tổng HT = tổng QH vào "Chưa xác định".
+ * pad = false khi hai giai đoạn không phủ cùng một ranh (lớp QHC 2045: hiện trạng là nền, quy hoạch chỉ là phần đổi).
  * dcLots = null: chưa có hồ sơ ĐC đã duyệt, cột ĐC bằng cột Quy hoạch và tăng/giảm = 0.
  * dcLots: lô quy hoạch sau khi áp lần lượt các hồ sơ (cùng luật ranh, không ép ĐC = HT). Tăng/giảm = ha(ĐC) − ha(QH).
  * lots: [{ phase, layer, landKey, subKey, area, areaIn? (m²) }]; landKey 'skip' không tính.
  */
-export function landUseSummary(lots, kind, { boundaryM2 = 0, dcLots = null } = {}) {
+export function landUseSummary(lots, kind, { boundaryM2 = 0, dcLots = null, pad = true } = {}) {
   const table = LANDUSE_TABLES[kind];
   const sum = { HT: {}, QH: {} };
   const add = (ph, key, v) => { sum[ph][key] = (sum[ph][key] || 0) + v; };
@@ -302,7 +308,7 @@ export function landUseSummary(lots, kind, { boundaryM2 = 0, dcLots = null } = {
   const gap = { HT: 0, QH: 0 };
   if (bound) {
     ['HT', 'QH'].forEach(ph => { if (present[ph]) total[ph] = bound; });
-  } else if (present.HT && present.QH && Math.abs(total.QH - total.HT) >= BALANCE_MIN_M2) {
+  } else if (pad && present.HT && present.QH && Math.abs(total.QH - total.HT) >= BALANCE_MIN_M2) {
     // Cùng 1 ranh đồ án nên tổng HT = tổng QH: bên thiếu (hatch chưa phủ hết ranh) dồn phần chênh vào "Chưa xác định"
     const side = total.QH > total.HT ? 'HT' : 'QH';
     gap[side] = Math.abs(total.QH - total.HT);

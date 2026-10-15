@@ -21,6 +21,7 @@ import {
 import { projectLayersOf, cachedLots, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { adjustmentPacks } from './adjustLayer.js';
 import { initGisDossier, handleGisClick } from './gisDossierUi.js';
+import { QHC2045, QHC_CENTER_INFO_EVENT, landOf } from './qhc2045.js';
 
 const STORE_KEY = 'qh_review_dossiers_v2';
 const CITY_NAME = 'Thành phố Huế';
@@ -762,7 +763,7 @@ function landPlanShort() {
 
 function landTableHtml() {
   const table = LANDUSE_TABLES[session.kind];
-  const sum = landUseSummary(session.lots, session.kind, { boundaryM2: session.boundaryM2, dcLots: session.dcLots || null });
+  const sum = landUseSummary(session.lots, session.kind, { boundaryM2: session.boundaryM2, dcLots: session.dcLots || null, pad: session.pad !== false });
   const body = sum.rows.map(r => {
     if (r.kind === 'section') {
       return `<tr class="lu-section"><td>${r.section}</td><td colspan="2">${escapeHtml(r.label)}</td>${landNums(r)}</tr>`;
@@ -1149,7 +1150,7 @@ function drawViewChart(tops) {
 
 function renderView(host, scored) {
   const table = LANDUSE_TABLES[session.kind];
-  const sum = landUseSummary(session.lots, session.kind, { boundaryM2: session.boundaryM2 });
+  const sum = landUseSummary(session.lots, session.kind, { boundaryM2: session.boundaryM2, pad: session.pad !== false });
   const tops = sum.rows.filter(r => r.kind === 'row' && !r.sub && (r.htHa > 0 || r.qhHa > 0));
   const ward = state.selectedWard && state.selectedWard !== CITY_NAME ? state.selectedWard : null;
   const max = hostSize === 'max';
@@ -1262,10 +1263,12 @@ function newSession(fields) {
   applyTags();
   openHost();
   renderHost();
+  setReviewScope(reviewScopeOf());
+  // Lớp QHC trung tâm đã vẽ trên bản đồ: chỉ mở bảng chỉ tiêu, không vẽ lại vài nghìn lô
+  if (session.keepMap) return;
   // Xem gọn: danh sách / ranh đồ án đã phóng tới trước khi tải xong
   if (!session.view) fitTo(allBounds(), 17);
   drawAll(!session.view);
-  setReviewScope(reviewScopeOf());
 }
 
 // ============================ BƯỚC 1: ĐỌC HỒ SƠ ============================
@@ -1359,7 +1362,7 @@ function lotName(lot, idx) {
 
 function dossierGeoJson() {
   const scored = session.scored;
-  const land = landUseSummary(session.lots, session.kind);
+  const land = landUseSummary(session.lots, session.kind, { pad: session.pad !== false });
   return {
     type: 'FeatureCollection',
     review: {
@@ -1701,6 +1704,62 @@ function planAfterAdjust(qhLots, packs, bound, kind) {
   return lots;
 }
 
+// Mã 31 «Mặt nước ven biển»: một khối biển phủ kín góc bản đồ, không đưa vào bảng chỉ tiêu
+const QHC_CENTER_NAME = 'QHC đô thị TTHuế 2045 (Trung tâm)';
+const QHC_SEA_CODE = 31;
+
+function qhcCenterLots(fc) {
+  const zones = fc.zones || [];
+  const lots = [];
+  (fc.features || []).forEach((f, i) => {
+    const p = f.properties || {};
+    if (p.c === QHC_SEA_CODE) return;
+    const polygons = polygonsOf(f.geometry);
+    if (!polygons.length) return;
+    const land = landOf(zones[p.z] || '', p.c);
+    const phase = p.t === 0 ? 'HT' : 'QH';
+    const ring = polygons[0][0] || [];
+    let lng = 0, lat = 0;
+    ring.forEach(c => { lng += c[0]; lat += c[1]; });
+    const n = ring.length || 1;
+    lots.push({
+      id: `${phase}${i}`, phase, layer: land.label, name: land.label,
+      area: (Number(p.a) || 0) * 10000, lat: lat / n, lng: lng / n, polygons,
+      infra: false, sheetId: '', pattern: land.key || '', existing: false, src: f
+    });
+  });
+  return lots;
+}
+
+// Nút bảng của dòng QHC trung tâm: cùng bảng cơ cấu đất và chỉ tiêu QCVN với các đồ án QHC, lấy lô 1/10.000
+async function openQhcCenterInfo() {
+  if (session && !session.saved && !session.pendingId && !confirm('Đóng hồ sơ thẩm định đang mở để xem thông tin đồ án?')) return;
+  const seq = ++infoSeq;
+  showToast('Đang tổng hợp chỉ tiêu QHC trung tâm…');
+  let fc;
+  try {
+    const res = await fetch(QHC2045.urls.land);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    fc = await res.json();
+  } catch (err) {
+    showToast(`Không tải được lớp sử dụng đất: ${err.message}`, 'error');
+    return;
+  }
+  if (seq !== infoSeq) return;
+  const lots = qhcCenterLots(fc);
+  if (!lots.length) { showToast('Chưa có lô sử dụng đất', 'error'); return; }
+  const pop = loadPops()[QHC_CENTER_NAME] || {};
+  const has = (ph) => lots.some(l => l.phase === ph);
+  setBottomPanelCollapsed(false);
+  newSession({
+    kind: 'QHC', project: QHC_CENTER_NAME,
+    popHT: Number(pop.ht) || 0, popQH: Number(pop.qh) || 0,
+    files: { HT: has('HT') ? 'Hiện trạng' : '', QH: has('QH') ? 'Quy hoạch đến 2030 và 2045' : '' },
+    boundaryM2: 0, boundaryClosed: false, boundarySource: 'auto',
+    lots, saved: true, view: true, keepMap: true, pad: false
+  });
+}
+
 // Thông tin đồ án đã lưu: mở dạng gọn trong panel dưới (giữ kiểu xem bản đồ đang dùng, không tự chia đôi)
 async function openProjectInfo(project) {
   if (!project) return;
@@ -1757,7 +1816,7 @@ function saveStore(list) {
 }
 
 function rememberSent(sentId) {
-  const land = landUseSummary(session.lots, session.kind, { boundaryM2: session.boundaryM2 });
+  const land = landUseSummary(session.lots, session.kind, { boundaryM2: session.boundaryM2, pad: session.pad !== false });
   const list = loadStore();
   list.unshift({
     id: sentId || `${Date.now().toString(36)}${Math.random().toString(16).slice(2, 8)}`,
@@ -1849,6 +1908,7 @@ export function dismissReviewHost() {
 }
 
 export function initProjectReview() {
+  document.addEventListener(QHC_CENTER_INFO_EVENT, () => openQhcCenterInfo());
   $('btnReviewOpen')?.addEventListener('click', () => togglePanel());
   $('btnReviewPanelClose')?.addEventListener('click', () => togglePanel(false));
   ['HT', 'QH'].forEach(slot => $(slot === 'HT' ? 'reviewFileHT' : 'reviewFileQH')?.addEventListener('change', () => fileLabel(slot)));
@@ -1946,7 +2006,7 @@ export function initProjectReview() {
       savePop(session.project, session.popHT, session.popQH);
       applyTags();
       renderHost();
-      drawAll(false);
+      if (!session.keepMap) drawAll(false);
       return;
     }
     const toggle = e.target.closest('input[data-show]');

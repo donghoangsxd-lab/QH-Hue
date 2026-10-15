@@ -369,12 +369,45 @@
         <!-- Dòng lớp của từng cấp quy hoạch: projectLayer.js gắn vào nhóm cấp tương ứng (data-plan-static = khóa nhóm) -->
         <div id="planStaticRows" hidden>
           <div class="plan-static" data-plan-static="QHC25">
-            <div class="layer-row"><div><input type="checkbox" id="chk_qhc25"><label for="chk_qhc25" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực. Bấm một vùng để xem chức năng"><svg class="ico ico-layer"><use href="#i-layers"/></svg>QHC đô thị Huế 2045 <small class="layer-hint" id="qhc25Hint">(toàn đô thị)</small></label></div><button type="button" class="project-btn" data-layer-decision="qhc-25000" hidden></button></div>
-            <div class="layer-row"><div><input type="checkbox" id="chk_gt25"><label for="chk_gt25" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/25.000, bật / tắt riêng với sơ đồ không gian: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch. Bấm một tuyến để xem tên, cấp, chiều dài; bấm ký hiệu ở tab Chú giải để phóng tới và làm nổi cả loại tuyến"><svg class="ico ico-layer"><use href="#i-road"/></svg>Giao thông QHC 2045 <small class="layer-hint" id="gt25Hint"></small></label></div></div>
+            <div class="project-row" id="qhc25Row">
+              <label class="project-name" title="Bật cả sơ đồ phát triển không gian và quy hoạch giao thông tỷ lệ 1/25.000. Mở mũi tên để bật từng lớp.">
+                <input type="checkbox" id="chk_qhc25head" data-qhc-head="25"><span>QHC đô thị Huế 2045 <small class="layer-hint" id="qhc25Hint">(toàn đô thị)</small></span></label>
+              <span class="project-tools">
+                <button type="button" class="project-btn project-expand" data-qhc-expand="25" aria-expanded="false" aria-controls="qhc25Layers" title="Xem các lớp dữ liệu" aria-label="Các lớp dữ liệu"><svg class="ico"><use href="#i-chev-down"/></svg></button>
+                <button type="button" class="project-btn" data-layer-decision="qhc-2045" data-keep></button>
+              </span>
+            </div>
+            <div class="project-layers" id="qhc25Layers" hidden>
+              <div class="project-layer">
+                <label class="project-layer-name" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065 (đang điều chỉnh): sơ đồ tổ chức không gian, kiến trúc cảnh quan tỷ lệ 1/25.000 — khu vực phát triển, mặt nước, cây xanh, ranh giới khu vực. Bấm một vùng để xem chức năng">
+                  <input type="checkbox" id="chk_qhc25" data-qhc-child="25"><i class="project-layer-dot" style="--dot:#f59e0b"></i><span>Sơ đồ phát triển không gian TP</span></label>
+              </div>
+              <div class="project-layer">
+                <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/25.000: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch. Bấm một tuyến để xem tên, cấp, chiều dài; bấm ký hiệu ở tab Chú giải để phóng tới và làm nổi cả loại tuyến">
+                  <input type="checkbox" id="chk_gt25" data-qhc-child="25"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>QH giao thông (toàn TP)</span><small id="gt25Hint"></small></label>
+              </div>
+            </div>
           </div>
           <div class="plan-static" data-plan-static="QHC">
-            <div class="layer-row"><div><input type="checkbox" id="chk_qhc10"><label for="chk_qhc10" title="Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045 (đang điều chỉnh): quy hoạch sử dụng đất khu vực đô thị trung tâm tỷ lệ 1/10.000, ký hiệu TT16 Phụ lục I Mục 02; viền mảnh hiện trạng, liền ngắn hạn 2030, nét đứt dài hạn 2045. Bật / tắt độc lập từng giai đoạn và ranh QĐ 756 ở hàng nút bên dưới. Bấm một lô để tra cứu"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>QHC đô thị TTHuế 2045 <small class="layer-hint" id="qhc10Hint">(Trung tâm)</small></label></div><button type="button" class="project-btn" data-layer-decision="qhc-10000" hidden></button></div>
-            <div class="layer-row"><div><input type="checkbox" id="chk_gt10"><label for="chk_gt10" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/10.000, bật / tắt riêng với lô sử dụng đất: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch, lọc theo hàng nút giai đoạn. Bấm một tuyến để xem tên, cấp, chiều dài và lộ giới theo mặt cắt; bấm ký hiệu ở tab Chú giải để phóng tới và làm nổi cả loại tuyến"><svg class="ico ico-layer"><use href="#i-road"/></svg>Giao thông TTHuế 2045 <small class="layer-hint" id="gt10Hint"></small></label></div></div>
+            <div class="project-row" id="qhc10Row">
+              <label class="project-name" title="Bật cả quy hoạch sử dụng đất và quy hoạch giao thông khu vực trung tâm tỷ lệ 1/10.000. Mở mũi tên để bật từng lớp.">
+                <input type="checkbox" id="chk_qhc10head" data-qhc-head="10"><span>QHC đô thị TTHuế 2045 <small class="layer-hint" id="qhc10Hint">(Trung tâm)</small></span></label>
+              <span class="project-tools">
+                <button type="button" class="project-btn project-expand" data-qhc-expand="10" aria-expanded="false" aria-controls="qhc10Layers" title="Xem các lớp dữ liệu" aria-label="Các lớp dữ liệu"><svg class="ico"><use href="#i-chev-down"/></svg></button>
+                <button type="button" class="project-btn" data-qhc-info title="Thông tin đồ án ở panel dưới: cơ cấu sử dụng đất, bảng tổng hợp sử dụng đất và đánh giá chỉ tiêu QCVN 01:2026" aria-label="Thông tin đồ án"><svg class="ico"><use href="#i-table"/></svg></button>
+                <button type="button" class="project-btn" data-layer-decision="qhc-2045" data-keep></button>
+              </span>
+            </div>
+            <div class="project-layers" id="qhc10Layers" hidden>
+              <div class="project-layer">
+                <label class="project-layer-name" title="Quy hoạch sử dụng đất khu vực đô thị trung tâm tỷ lệ 1/10.000, ký hiệu TT16 Phụ lục I Mục 02; viền mảnh hiện trạng, liền ngắn hạn 2030, nét đứt dài hạn 2045. Bật / tắt từng giai đoạn và ranh QĐ 756 ở hàng nút bên dưới. Bấm một lô để tra cứu">
+                  <input type="checkbox" id="chk_qhc10" data-qhc-child="10"><i class="project-layer-dot" style="--dot:#38bdf8"></i><span>QH sử dụng đất (trung tâm)</span></label>
+              </div>
+              <div class="project-layer">
+                <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/10.000: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch, lọc theo hàng nút giai đoạn. Bấm một tuyến để xem tên, cấp, chiều dài và lộ giới theo mặt cắt">
+                  <input type="checkbox" id="chk_gt10" data-qhc-child="10"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>QH giao thông (trung tâm)</span><small id="gt10Hint"></small></label>
+              </div>
+            </div>
             <div class="qhc-stages" id="qhcStages" role="group" aria-label="Giai đoạn lô, tuyến giao thông và ranh mở rộng QHC 1/10.000" hidden></div>
           </div>
           <div class="plan-static" data-plan-static="QHCT">
@@ -825,8 +858,6 @@
             <button type="button" class="layer-eye-btn" id="btnLegendFold" aria-pressed="false" title="Thu gọn mọi nhóm" aria-label="Thu gọn / mở mọi nhóm ký hiệu"><svg class="ico"><use href="#i-chevs-down"/></svg></button>
           </div>
           <div class="layer-main-pane">
-            <div class="legend-decision" data-legend-pane="QHC25" hidden><span>Quyết định phê duyệt</span><button type="button" class="layer-decision" data-layer-decision="qhc-25000" data-label-name></button></div>
-            <div class="legend-decision" data-legend-pane="QHC" hidden><span>Quyết định phê duyệt</span><button type="button" class="layer-decision" data-layer-decision="qhc-10000" data-label-name></button></div>
             <input type="search" id="legendSearch" class="project-search" placeholder="Tìm loại đất, tên layer CAD..." aria-label="Tìm ký hiệu sử dụng đất">
             <div class="tt16-legend" id="parcelLegend"></div>
             <div class="tt16-legend road-net" id="roadNet25" data-legend-pane="QHC25" hidden></div>

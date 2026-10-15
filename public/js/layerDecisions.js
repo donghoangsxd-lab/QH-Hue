@@ -1,4 +1,5 @@
-// Quyết định phê duyệt của lớp bản đồ dùng chung (Phân loại đô thị hiện trạng / quy hoạch, QHC 1/25.000, QHC 1/10.000).
+// Quyết định phê duyệt của lớp bản đồ dùng chung (Phân loại đô thị hiện trạng / quy hoạch, QHC 2045).
+// QHC 1/25.000 và QHC 1/10.000 dùng chung một quyết định (mã qhc-2045).
 // Nút [data-layer-decision="<mã>"] ở dòng lớp (tab Lớp dữ liệu) và tab Chú giải; mã khớp LAYER_DECISIONS (projectStore.js).
 // Người dùng xem quyết định đã gắn; Admin gắn / thay / gỡ qua decisionViewer.js.
 // data-label: nhãn cố định cạnh biểu tượng; data-label-name: nhãn là tên file / trang quyết định.
@@ -40,7 +41,7 @@ export function paintLayerDecisions(root = document) {
     const label = btn.hasAttribute('data-label-name')
       ? (d ? d.name : admin ? 'Gắn quyết định' : 'Chưa gắn quyết định')
       : (btn.dataset.label || '');
-    btn.hidden = !d && !admin && !label;
+    btn.hidden = !btn.hasAttribute('data-keep') && !d && !admin && !label;
     btn.disabled = busyId === id;
     btn.classList.toggle('has-decision', !!d);
     btn.classList.toggle('is-empty', !d && !admin);

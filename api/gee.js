@@ -1879,7 +1879,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Quyết định của lớp bản đồ dùng chung (Phân loại đô thị, QHC 1/25.000, QHC 1/10.000); file đọc qua getProjectDecision
+    // Quyết định của lớp bản đồ dùng chung (Phân loại đô thị, QHC 2045); file đọc qua getProjectDecision
     if (action === 'getLayerDecisions') {
       const data = await projects.layerDecisions();
       res.setHeader('Cache-Control', 'no-store');
