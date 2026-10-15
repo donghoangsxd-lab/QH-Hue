@@ -1591,6 +1591,45 @@ function redrawLands() {
   const pick = (list, phase) => list.filter(p => p.phase === phase);
   if (map) drawLandsOn(map, pick(lands, 'HT'), pick(infra, 'HT'));
   if (planMap) drawLandsOn(planMap, compare ? pick(lands, 'QH') : [], compare ? pick(infra, 'QH') : []);
+  redrawNets();
+}
+
+const netGroups = new Map();
+const NET_PANE = 'projectNetPane';
+
+function drawNetsOn(m, list) {
+  const old = netGroups.get(m);
+  if (old) {
+    old.clearLayers();
+    m.removeLayer(old);
+    netGroups.delete(m);
+  }
+  if (!list.length) return;
+  if (!m.getPane(NET_PANE)) {
+    const pane = m.createPane(NET_PANE);
+    pane.style.zIndex = 438;
+  }
+  const group = L.featureGroup();
+  list.forEach(f => {
+    const line = String(f.geometry && f.geometry.type || '').includes('Line');
+    const layer = L.geoJSON(f.geometry, {
+      pane: NET_PANE,
+      style: { color: f.color, weight: line ? 2.6 : 1.4, opacity: 0.92, fillColor: f.color, fillOpacity: line ? 0 : 0.16 }
+    });
+    const tip = [f.label, f.phase === 'QH' ? 'quy hoạch' : 'hiện trạng', f.name, f.props && f.props.loai, f.props && f.props.quyMo && `quy mô ${f.props.quyMo}`, f.props && f.props.congSuat && `công suất ${f.props.congSuat}`].filter(Boolean).join(' · ');
+    layer.bindTooltip(tip, { sticky: true, opacity: 0.95 });
+    group.addLayer(layer);
+  });
+  group.addTo(m);
+  netGroups.set(m, group);
+}
+
+function redrawNets() {
+  const raw = (state.projectNets || []).filter(f => projectLotsDrawn(f.file));
+  const compare = isCompareOn() && !!planMap;
+  const pick = (phase) => raw.filter(f => f.phase === phase);
+  if (map) drawNetsOn(map, pick('HT'));
+  if (planMap) drawNetsOn(planMap, compare ? pick('QH') : []);
 }
 
 // Qua ngưỡng hoa văn TT16: vẽ lại lô hạ tầng đồ án để đổi kiểu tô

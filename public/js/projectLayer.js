@@ -3,9 +3,11 @@
 // (đồ án liên phường có mặt ở mỗi phường), QHC liệt kê thẳng; mỗi đồ án (Ten_QH)
 // bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + bảng góc trái + thông tin ở panel dưới),
 // Admin xóa / chuyển đồ án cũ.
-// Nút file mở PDF quyết định đã duyệt. Admin gắn, thay hoặc gỡ (PDF dưới 1 MB hoặc link).
+// Nút file mở PDF quyết định phê duyệt. Admin gắn, thay hoặc gỡ (PDF dưới 1 MB hoặc link).
+// Mở đồ án: hồ sơ văn bản thêm được nhiều PDF (phê duyệt thêm, đính chính, quy định quản lý).
 // Nút lưu: người dùng gửi PDF nhỏ hơn 2 MB để admin duyệt; đang chờ thì nút đồng hồ, admin bấm để đồng ý hoặc từ chối.
-// Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS): bật/tắt từng lớp, Admin xóa từng lớp, tìm lô trong đồ án.
+// Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS) và bản vẽ hạ tầng (giao thông, cấp nước, thoát nước, cấp điện).
+// Bản vẽ lưu riêng từng đồ án, bật/tắt để xem cùng lớp sử dụng đất. Admin xóa từng lớp, tìm lô trong đồ án.
 // Đồ án có hồ sơ điều chỉnh cục bộ đã duyệt thêm lớp phụ «Điều chỉnh cục bộ» (adjustLayer.js): bật/tắt, danh sách hồ sơ bấm để phóng tới.
 // Mỗi đồ án 1 màu viền + nền mờ, nhãn tên ở giữa ranh. QHPK toàn TP (droplist, chưa chọn phường): ranh mọi đồ án QHPK,
 // bấm được ở mọi zoom; lô chỉ đồ án vừa bấm hoặc đang tick trong panel. Chọn phường: ranh các đồ án của phường,
@@ -19,7 +21,7 @@ import {
 import { planMap, onCompareChange, passToolClick } from './planMap.js';
 import {
   projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName,
-  wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly
+  wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly, ensureProjectNet, noteNetSaved, netFeaturesFromText
 } from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
@@ -30,11 +32,12 @@ import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
 import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
-import { openOrAssign, openPropose, openProposalReview } from './decisionViewer.js';
+import { openOrAssign, openAssign, openDecision, openPropose, openProposalReview } from './decisionViewer.js';
 import { adjustmentsOf, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 
 const HIDDEN_KEY = 'qh_hidden_projects';
 const HIDDEN_LAYERS_KEY = 'qh_hidden_layers';
+const SHOWN_NETS_KEY = 'qh_shown_nets';
 // Ranh tổng = hợp các lô nới GAP_M rồi co lại GAP_M: lấp đường / khe giữa các lô rộng ≤ 2·GAP_M
 const GAP_M = 15;
 // Khớp CAD_GEOJSON_MAX_CHARS (api/gee.js) và giới hạn ô Sheet
@@ -190,6 +193,8 @@ function loadHidden() {
     if (Array.isArray(saved)) state.hiddenProjects = new Set(saved.map(String));
     const layers = JSON.parse(localStorage.getItem(HIDDEN_LAYERS_KEY) || '[]');
     if (Array.isArray(layers)) state.hiddenProjectLayers = new Set(layers.map(String));
+    const nets = JSON.parse(localStorage.getItem(SHOWN_NETS_KEY) || '[]');
+    if (Array.isArray(nets)) state.shownProjectNets = new Set(nets.map(String));
   } catch (e) { /* chế độ riêng tư */ }
 }
 
@@ -199,6 +204,10 @@ function saveHidden() {
 
 function saveHiddenLayers() {
   try { localStorage.setItem(HIDDEN_LAYERS_KEY, JSON.stringify([...state.hiddenProjectLayers])); } catch (e) { /* chế độ riêng tư */ }
+}
+
+function saveShownNets() {
+  try { localStorage.setItem(SHOWN_NETS_KEY, JSON.stringify([...state.shownProjectNets])); } catch (e) { /* chế độ riêng tư */ }
 }
 
 // Danh mục lấy từ index (không cần đã tải ranh từng lô). infra/lands là số đếm { size }.
@@ -245,7 +254,18 @@ function collectProjects() {
       name: p.proposal.name || 'Quyết định phê duyệt',
       bytes: Number(p.proposal.bytes) || 0,
       at: Number(p.proposal.at) || 0
-    } : null
+    } : null,
+    docs: Array.isArray(p.docs) ? p.docs.filter(d => d && d.id && d.at).map(d => ({
+      id: String(d.id),
+      role: d.role,
+      slug: d.slug || p.slug || '',
+      kind: d.kind === 'link' ? 'link' : 'pdf',
+      url: d.kind === 'link' ? String(d.url || '') : '',
+      name: d.name || 'Văn bản',
+      bytes: Number(d.bytes) || 0,
+      at: Number(d.at) || 0,
+      embed: d.kind === 'link' ? d.embed === true : true
+    })) : []
   })).sort((a, b) => a.name.localeCompare(b.name, 'vi')));
 }
 
@@ -644,8 +664,9 @@ function rowHtml(p, idx, admin) {
   const on = boundary ? state.lotProjects.has(p.name) : projectShown(p.name);
   const deleting = busy === p.name;
   const open = expanded.has(p.name);
+  const extraN = (p.docs || []).length;
   const decisionTitle = p.decision
-    ? `Xem quyết định phê duyệt: ${p.decision.name}`
+    ? `Xem quyết định phê duyệt: ${p.decision.name}${extraN ? ` · ${extraN} văn bản kèm` : ''}`
     : 'Gắn quyết định phê duyệt (PDF dưới 1 MB hoặc link)';
   const decisionBtn = (p.decision || admin)
     ? `<button type="button" class="project-btn${p.decision ? ' has-decision' : ''}" data-decision="${idx}" title="${escapeHtml(decisionTitle)}" aria-label="${p.decision ? 'Xem quyết định phê duyệt' : 'Gắn quyết định phê duyệt'}"${busy ? ' disabled' : ''}>${ico(p.decision ? 'file' : 'save')}</button>`
@@ -669,7 +690,7 @@ function rowHtml(p, idx, admin) {
         ${admin ? `<button type="button" class="project-btn" data-rename="${idx}" title="Đổi tên đồ án (Sheet + danh mục bucket)" aria-label="Đổi tên đồ án"${busy ? ' disabled' : ''}>${ico('pen')}</button>` : ''}
         ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
       </span>
-    </div>${open ? decisionNote(p, idx) + proposalNote(p, idx) + layersHtml(p, idx, boundary || projectShown(p.name), admin) : ''}`;
+    </div>${open ? decisionNote(p, idx) + docsHtml(p, idx, admin) + proposalNote(p, idx) + layersHtml(p, idx, boundary || projectShown(p.name), admin) : ''}`;
 }
 
 // Đồ án đang chọn (bấm ranh trên bản đồ hoặc bấm tên): dòng trong danh sách giữ nền sáng đến khi chọn đồ án khác
@@ -716,9 +737,32 @@ function revealInList(p) {
   row.classList.add('is-flash');
 }
 
+const DOC_ROLE = {
+  'phe-duyet': { short: 'PD', label: 'Quyết định phê duyệt' },
+  'dinh-chinh': { short: 'ĐC', label: 'Quyết định đính chính' },
+  'quy-dinh': { short: 'QL', label: 'Quy định quản lý' }
+};
+
 function decisionNote(p, idx) {
   if (!p.decision) return '';
   return `<button type="button" class="project-decision" data-decision="${idx}" title="Xem quyết định phê duyệt">${ico('file')}<span>${escapeHtml(p.decision.name)}</span></button>`;
+}
+
+function docsHtml(p, idx, admin) {
+  const rows = (p.docs || []).map((d, i) => {
+    const role = DOC_ROLE[d.role] || { short: 'VB', label: 'Văn bản' };
+    return `<button type="button" class="project-decision" data-doc="${idx}:${i}" title="${escapeHtml(role.label)}">${ico('file')}<b class="project-phase qh">${role.short}</b><span>${escapeHtml(d.name)}</span></button>`;
+  }).join('');
+  const add = admin && !p.legacy ? `<div class="project-doc-add">
+      <select data-doc-role="${idx}" aria-label="Loại văn bản kèm theo">
+        <option value="dinh-chinh">Quyết định đính chính</option>
+        <option value="quy-dinh">Quy định quản lý</option>
+        <option value="phe-duyet">Quyết định phê duyệt</option>
+      </select>
+      <button type="button" data-doc-add="${idx}"${busy ? ' disabled' : ''}>Thêm PDF</button>
+    </div>` : '';
+  if (!rows && !add) return '';
+  return `<div class="project-docs">${rows}${add}</div>`;
 }
 
 function proposalNote(p, idx) {
@@ -735,6 +779,10 @@ function layerCount(g) {
     if (!g.present) return { short: 'chưa có', full: 'Chưa có ranh — đang dùng ranh tạm (bao lồi). Nhập file ranh giới để có ranh đúng.' };
     return g.source === 'gis' ? { short: 'GIS', full: 'Ranh từ file GIS' } : { short: 'tự dựng', full: 'Ranh tự dựng từ các lô' };
   }
+  if (g.kind === 'net') {
+    if (!g.present) return { short: 'trống', full: 'Chưa có bản vẽ. Admin thêm GeoJSON đường hoặc vùng (kinh độ, vĩ độ). Lớp này bổ trợ sử dụng đất, lưu riêng đồ án.' };
+    return { short: fmtNum(g.count), full: `${fmtNum(g.count)} đối tượng — bật để xem cùng lớp sử dụng đất` };
+  }
   if (!g.present) return { short: 'trống', full: 'Chưa có lô' };
   const parts = [g.lands ? `${fmtNum(g.lands)} lô đất` : '', g.infra ? `${fmtNum(g.infra)} ranh lô công trình` : ''].filter(Boolean);
   if (g.area) parts.push(`${fmtNum(Math.round(g.area / 100) / 100)} ha`);
@@ -746,19 +794,28 @@ function layersHtml(p, idx, projectOn, admin) {
   if (!info || info.loading) return '<div class="project-layers"><div class="project-empty">Đang tải các lớp…</div></div>';
   if (info.error) return `<div class="project-layers"><div class="project-empty">Không tải được lớp: ${escapeHtml(info.error)}</div></div>`;
   if (!info.list.length) return '<div class="project-layers"><div class="project-empty">Đồ án chưa có file lớp dữ liệu.</div></div>';
+  let netNoted = false;
   const rows = info.list.map((g, li) => {
+    if (g.kind === 'net' && !g.present && !admin) return '';
     const key = layerKey(p.name, g.key);
-    const on = !state.hiddenProjectLayers.has(key);
+    const on = g.kind === 'net' ? state.shownProjectNets.has(key) : !state.hiddenProjectLayers.has(key);
     // Ranh tạm (bao lồi) vẫn bật/tắt được dù chưa có file ranh
     const toggleable = g.present || g.kind === 'boundary';
     const count = layerCount(g);
     const deleting = layerBusy === key;
-    return `<div class="project-layer${on && projectOn && g.present ? '' : ' is-off'}">
+    const note = g.kind === 'net' && !netNoted
+      ? (netNoted = true, '<div class="project-net-note">Bản vẽ hạ tầng theo đồ án — bật để xem cùng lớp sử dụng đất</div>')
+      : '';
+    const addNet = admin && g.kind === 'net' && !p.legacy
+      ? `<button type="button" class="project-btn" data-net-add="${idx}:${li}" title="${g.present ? 'Thay bản vẽ GeoJSON' : 'Thêm bản vẽ GeoJSON (kinh độ, vĩ độ)'}" aria-label="${g.present ? 'Thay bản vẽ' : 'Thêm bản vẽ'}"${layerBusy || busy ? ' disabled' : ''}>${ico('save')}</button>`
+      : '';
+    return `${note}<div class="project-layer${on && projectOn && g.present ? '' : ' is-off'}">
       <label class="project-layer-name" title="${escapeHtml(g.label)} (${g.phase === 'QH' ? 'quy hoạch' : 'hiện trạng'}) — ${escapeHtml(count.full)}">
         <input type="checkbox" data-layer="${idx}:${li}"${on ? ' checked' : ''}${toggleable ? '' : ' disabled'}>
         <i class="project-layer-dot ${g.kind}" style="--dot:${g.kind === 'boundary' ? p.color : g.color}"></i>
         <b class="project-phase ${g.phase === 'QH' ? 'qh' : 'ht'}">${g.phase}</b>
         <span>${escapeHtml(g.label)}</span><small>${escapeHtml(count.short)}</small></label>
+      ${addNet}
       ${admin && g.present && !p.legacy ? `<button type="button" class="project-btn danger" data-layer-del="${idx}:${li}" title="Xóa lớp ${escapeHtml(g.label)} khỏi đồ án" aria-label="Xóa lớp"${layerBusy || busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
     </div>`;
   }).join('') + adjustRowHtml(p, idx, projectOn);
@@ -893,24 +950,95 @@ function toggleExpand(p) {
 
 function setLayerOn(p, g, on) {
   const key = layerKey(p.name, g.key);
-  if (on) state.hiddenProjectLayers.delete(key);
+  if (g.kind === 'net') {
+    if (on) state.shownProjectNets.add(key);
+    else state.shownProjectNets.delete(key);
+    saveShownNets();
+  } else if (on) state.hiddenProjectLayers.delete(key);
   else state.hiddenProjectLayers.add(key);
-  saveHiddenLayers();
-  // Bật lớp của đồ án đang ẩn thì hiện luôn đồ án đó
-  if (on && !projectShown(p.name)) {
-    showProject(p);
+  if (g.kind !== 'net') saveHiddenLayers();
+  const after = () => {
+    if (on && !projectShown(p.name)) { showProject(p); return; }
+    refreshAll();
+  };
+  if (on && g.kind === 'net') {
+    ensureProjectNet(p.name, g.key).catch(err => console.warn('Tải bản vẽ:', err)).finally(after);
     return;
   }
-  refreshAll();
+  after();
 }
 
 function deleteNote(g) {
+  if (g.kind === 'net') return '• File bản vẽ của lớp này bị xóa. Các đồ án khác không đổi.\n';
   if (g.kind === 'boundary') {
     return '• File ranh giới và ranh tổng trong danh mục bị xóa; đồ án hiện ranh tạm (bao lồi) đến khi nhập lại file ranh\n';
   }
   const parts = [g.lands ? `${g.lands} lô đất` : '', g.infra ? `${g.infra} ranh lô công trình hạ tầng` : ''].filter(Boolean).join(' và ');
   return `• ${parts} của lớp bị xóa khỏi file đồ án trên bucket\n`
     + '• Điểm công trình hạ tầng trên Sheet giữ nguyên (xóa riêng từng công trình trên popup nếu cần)\n';
+}
+
+let netInput = null;
+let netPick = null;
+
+function pickNetFile(p, g) {
+  if (!isAdmin() || busy || layerBusy || p.legacy) return;
+  netPick = { p, g };
+  if (!netInput) {
+    netInput = document.createElement('input');
+    netInput.type = 'file';
+    netInput.accept = '.geojson,.json,application/geo+json,application/json';
+    netInput.hidden = true;
+    netInput.addEventListener('change', () => {
+      const file = netInput.files && netInput.files[0];
+      const hit = netPick;
+      netInput.value = '';
+      netPick = null;
+      if (file && hit) uploadNet(hit.p, hit.g, file);
+    });
+    document.body.appendChild(netInput);
+  }
+  netInput.click();
+}
+
+async function uploadNet(p, g, file) {
+  if (!isAdmin() || busy || layerBusy) return;
+  let text;
+  try { text = await file.text(); }
+  catch (e) { alert('Không đọc được file.'); return; }
+  let features;
+  try { features = netFeaturesFromText(text); }
+  catch (e) { alert(e.message || 'File không phải GeoJSON.'); return; }
+  if (g.present && !confirm(`Thay bản vẽ «${g.label}» (${g.phase}) của đồ án «${p.name}»?\nFile mới có ${features.length} đối tượng.`)) return;
+  const payload = JSON.stringify({ tenQH: p.name, role: g.key, features });
+  if (payload.length > 1500000) { alert('Bản vẽ lớn hơn 1,5 MB. Tách bớt đối tượng.'); return; }
+  const key = layerKey(p.name, g.key);
+  layerBusy = key;
+  renderList();
+  try {
+    markDataWritten();
+    const res = await fetch(geeApi('action=putProjectNet'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+      body: payload
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) signOutAdmin();
+    if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+    noteNetSaved(p.name, g.key, data.saved, data.count);
+    state.shownProjectNets.add(key);
+    saveShownNets();
+    await ensureProjectNet(p.name, g.key);
+    layerBusy = null;
+    await loadLayers(p, true);
+    refreshAll();
+    showToast(`Đã ghi bản vẽ ${g.label} (${g.phase}): ${data.count} đối tượng.`, 'success');
+  } catch (err) {
+    alert(`Không ghi được bản vẽ: ${err.message}`);
+  } finally {
+    layerBusy = null;
+    renderList();
+  }
 }
 
 async function deleteLayer(p, g) {
@@ -932,11 +1060,15 @@ async function deleteLayer(p, g) {
     removeCachedLayer(p.name, g.key, data.saved, data.counts);
     state.hiddenProjectLayers.delete(key);
     saveHiddenLayers();
+    if (g.kind === 'net') {
+      state.shownProjectNets.delete(key);
+      saveShownNets();
+    }
     layerBusy = null;
     projects = collectProjects();
     await loadLayers(p, true);
     refreshAll();
-    const what = g.kind === 'boundary' ? 'ranh giới' : `${data.removed} lô`;
+    const what = g.kind === 'boundary' ? 'ranh giới' : g.kind === 'net' ? `${data.removed} đối tượng` : `${data.removed} lô`;
     alert(`Đã xóa lớp «${g.label}» (${what}) khỏi đồ án «${p.name}».`);
   } catch (err) {
     alert(`Không xóa được lớp: ${err.message}`);
@@ -1480,6 +1612,35 @@ function proposalTarget(p) {
   };
 }
 
+function applyDocs(name, docs) {
+  const entry = state.projectCatalog.find(x => x && x.tenQH === name);
+  if (entry) entry.docs = Array.isArray(docs) ? docs : [];
+  rebuild();
+  return projects.find(p => p.name === name) || null;
+}
+
+function docTarget(p, doc, role) {
+  const meta = DOC_ROLE[role] || DOC_ROLE[doc && doc.role] || { label: 'Văn bản' };
+  const id = doc && doc.id ? doc.id : '';
+  return {
+    key: `doc:${p.name}:${id || 'new'}:${role || (doc && doc.role) || ''}`,
+    title: p.name,
+    noun: meta.label,
+    decision: doc || null,
+    slug: p.slug,
+    body: { tenQH: p.name, docRole: role || (doc && doc.role) || '', docId: id },
+    isBusy: () => !!busy,
+    setBusy: (on) => { busy = on ? p.name : null; renderList(); },
+    onSaved: (saved, data) => {
+      if (!data || !Array.isArray(data.docs)) return null;
+      const next = applyDocs(p.name, data.docs);
+      if (!saved || !next) return null;
+      const fresh = (next.docs || []).find(d => d.id === saved.id);
+      return fresh ? docTarget(next, fresh, fresh.role) : null;
+    }
+  };
+}
+
 function decisionTarget(p) {
   return {
     key: `project:${p.name}`,
@@ -1492,7 +1653,7 @@ function decisionTarget(p) {
     setBusy: (on) => { busy = on ? p.name : null; renderList(); },
     onSaved: (decision, data) => {
       const next = applyDecision(p.name, decision);
-      if (data && !data.sheet) alert(`${decision && decision.kind === 'link' ? 'Đã gán link.' : 'Đã ghi PDF lên bucket.'}${sheetNote(data)}`);
+      if (decision && data && !data.sheet) alert(`${decision.kind === 'link' ? 'Đã gán link.' : 'Đã ghi PDF lên bucket.'}${sheetNote(data)}`);
       return decision && next ? decisionTarget(next) : null;
     }
   };
@@ -1625,6 +1786,29 @@ export function initProjectLayer(opts = {}) {
     if (decision) {
       const p = projects[Number(decision.dataset.decision)];
       if (p) openOrAssign(decisionTarget(p));
+      return;
+    }
+    const docBtn = e.target.closest('[data-doc]');
+    if (docBtn) {
+      const [pi, di] = docBtn.dataset.doc.split(':').map(Number);
+      const p = projects[pi];
+      const doc = p && (p.docs || [])[di];
+      if (p && doc) openDecision(docTarget(p, doc, doc.role));
+      return;
+    }
+    const docAdd = e.target.closest('[data-doc-add]');
+    if (docAdd) {
+      const p = projects[Number(docAdd.dataset.docAdd)];
+      if (!p || !isAdmin()) return;
+      const role = $('projectList')?.querySelector(`[data-doc-role="${docAdd.dataset.docAdd}"]`)?.value || 'dinh-chinh';
+      if (role === 'phe-duyet' && !p.decision) { openOrAssign(decisionTarget(p)); return; }
+      openAssign(docTarget(p, null, role));
+      return;
+    }
+    const netAdd = e.target.closest('[data-net-add]');
+    if (netAdd) {
+      const hit = layerOf(netAdd.dataset.netAdd);
+      if (hit) pickNetFile(hit.p, hit.g);
       return;
     }
     const propose = e.target.closest('[data-propose]');

@@ -1017,6 +1017,13 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-decision span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-decision:hover, .project-decision:focus-visible { background: rgba(var(--orange-rgb), 0.14); outline: none; }
 .project-decision.is-wait { color: var(--text-muted); }
+.project-docs { margin: 0 0 2px; }
+.project-doc-add { display: flex; align-items: center; gap: 4px; width: calc(100% - 18px); margin: 2px 0 4px 18px; }
+.project-doc-add select { flex: 1; min-width: 0; height: 22px; border: 1px solid var(--border-color); border-radius: var(--r-sm); background: var(--bg-input); color: var(--text-main); font: inherit; font-size: var(--fs-xs); }
+.project-doc-add button { flex-shrink: 0; height: 22px; padding: 0 6px; border: 1px solid var(--border-color); border-radius: var(--r-sm); background: var(--bg-input); color: var(--text-main); font: inherit; font-size: var(--fs-xs); cursor: pointer; }
+.project-doc-add button:hover:not(:disabled) { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.project-doc-add button:disabled { opacity: 0.45; cursor: not-allowed; }
+.project-net-note { margin: 4px 0 2px; color: var(--text-muted); font-size: var(--fs-xs); }
 .decision-assign [data-proposal-note] { flex: 1; min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: var(--fs-xs); }
 .decision-assign [data-proposal-reject]:hover:not(:disabled) { border-color: var(--accent-red); color: var(--accent-red); }
 .decision-view { position: fixed; inset: 8px; z-index: 2800; display: flex; flex-direction: column; background: var(--bg-panel); color: var(--text-main); border: 1px solid var(--border-color); border-radius: var(--r-md); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); }
@@ -1055,6 +1062,7 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-layer-dot { flex-shrink: 0; width: 9px; height: 9px; border-radius: 2px; border: 1px solid rgba(255, 255, 255, 0.35); background: var(--dot, #94a3b8); }
 .project-layer-dot.points { width: 7px; height: 7px; margin: 0 1px; border-radius: 50%; border-color: rgba(15, 23, 42, 0.8); }
 .project-layer-dot.boundary { background: transparent; border: 1.5px dashed var(--dot, #e879f9); }
+.project-layer-dot.net { width: 12px; height: 3px; margin: 0; border: 0; border-radius: 1px; }
 .project-layer-dot.adjust { border: 1.5px dashed #f5c400; background: repeating-linear-gradient(45deg, rgba(245, 196, 0, 0.95) 0 2.5px, transparent 2.5px 5px); }
 .project-adj-list { margin: 0 0 2px 16px; max-height: 160px; overflow-y: auto; scrollbar-width: thin; }
 .project-adj-list .project-lot-hit span { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }

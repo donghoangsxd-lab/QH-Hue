@@ -43,6 +43,10 @@ export const state = {
   lotProjects: new Set(),
   // Lớp chính người dùng tắt trong từng đồ án: "<Ten_QH>|<key PROJECT_LAYERS>" (lưu localStorage)
   hiddenProjectLayers: new Set(),
+  // Bản vẽ hạ tầng người dùng đang bật: "<Ten_QH>|<key>" (lưu localStorage). Mặc định tắt.
+  shownProjectNets: new Set(),
+  // Bản vẽ hạ tầng đang vẽ: { file, phase, key, color, label, name, props, geometry }
+  projectNets: [],
   wardStatsData: [],
   // Chỉ tiêu mạng lưới toàn TP (getWardStats): { HT, QH } — số nhà tang lễ, diện tích nghĩa trang so với dân số
   cityNetwork: null,

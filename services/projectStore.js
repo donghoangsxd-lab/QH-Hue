@@ -4,8 +4,10 @@
 //   projects/<slug>/su-dung-dat.json — chức năng sử dụng đất / bản đồ quy hoạch (lô QH)
 //   projects/<slug>/diem-chuc-nang.json — điểm chức năng
 //   projects/<slug>/ranh-gioi.json — ranh giới quy hoạch
-//   projects/<slug>/quyet-dinh.pdf — PDF quyết định đã duyệt (admin gắn ≤ 1 MB, hoặc duyệt file người dùng gửi ≤ 2 MB).
+//   projects/<slug>/quyet-dinh.pdf — PDF quyết định phê duyệt (admin gắn ≤ 1 MB, hoặc duyệt file người dùng gửi ≤ 2 MB).
+//   projects/<slug>/vb-<id>.pdf — văn bản kèm (đính chính, quy định quản lý, phê duyệt thêm), tối đa 8 file, cùng decisions.json.
 //   Link ngoài nằm ở projects/decisions.json (kind: link), chỉ gán sau khi máy chủ mở được link.
+//   projects/<slug>/ht-|qh-giao-thong|cap-nuoc|thoat-nuoc|cap-dien.json — bản vẽ hạ tầng riêng đồ án (bật/tắt, chưa nối mạng toàn thành phố).
 //   projects/<slug>/quyet-dinh-cho.pdf + projects/decision-proposals.json — PDF người dùng gửi, chờ admin duyệt.
 //   projects/<slug>/adjust/<id>.json|.pdf — hồ sơ điều chỉnh cục bộ, chỉ mục ở projects/adjustments.json
 // File cũ projects/<slug>.json vẫn đọc được cho tới lần ghi tiếp theo, rồi tách vào thư mục và xóa.
@@ -349,6 +351,39 @@ const DECISION_MAX_BYTES = 1024 * 1024;
 const PROPOSALS_NAME = 'projects/decision-proposals.json';
 const PROPOSAL_FILE = 'quyet-dinh-cho.pdf';
 const PROPOSAL_MAX_BYTES = 2 * 1024 * 1024;
+// Văn bản kèm theo quyết định phê duyệt. id 8 ký tự hex, file projects/<slug>/vb-<id>.pdf
+const DOC_ROLES = { 'phe-duyet': 'Quyết định phê duyệt', 'dinh-chinh': 'Quyết định đính chính', 'quy-dinh': 'Quy định quản lý' };
+const DOC_MAX = 8;
+const DOC_ID_RE = /^[a-f0-9]{8}$/;
+
+function docObject(slug, id) {
+  return `projects/${slug}/vb-${id}.pdf`;
+}
+
+function newDocId() {
+  return crypto.randomBytes(4).toString('hex');
+}
+
+function docView(d, slug) {
+  if (!d || !DOC_ID_RE.test(String(d.id || '')) || !Object.prototype.hasOwnProperty.call(DOC_ROLES, d.role)) return null;
+  const link = d.kind === 'link' && /^https?:\/\//i.test(String(d.url || ''));
+  return {
+    id: d.id,
+    role: d.role,
+    slug: slug || d.slug || '',
+    kind: link ? 'link' : 'pdf',
+    url: link ? String(d.url) : '',
+    name: decisionFileName(d.name),
+    bytes: Number(d.bytes) || 0,
+    at: Number(d.at) || 0,
+    embed: link ? d.embed === true : true
+  };
+}
+
+function docsView(item) {
+  const slug = item && item.slug;
+  return (item && Array.isArray(item.docs) ? item.docs : []).map(d => docView(d, slug)).filter(d => d && d.at);
+}
 
 function decisionObject(slug) {
   return `projects/${slug}/${DECISION_FILE}`;
@@ -438,7 +473,10 @@ async function attachDecisions(projects) {
     const items = stored.data.items || {};
     projects.forEach(p => {
       const d = items[p.tenQH];
-      if (!d || !d.at || !SLUG_RE.test(String(d.slug || ''))) return;
+      if (!d || !SLUG_RE.test(String(d.slug || ''))) return;
+      const docs = docsView(d);
+      if (docs.length) p.docs = docs;
+      if (!d.at) return;
       p.decision = decisionView(d);
     });
   } catch (err) {
@@ -687,7 +725,8 @@ async function saveDecision({ tenQH, layer, fileName, buffer, maxBytes }) {
   const meta = { kind: 'pdf', slug, name: decisionFileName(fileName), bytes: buffer.length, at, embed: true };
   const indexed = await updateDecisions(cur => {
     const items = { ...(cur.items || {}) };
-    items[name] = meta;
+    const prev = items[name];
+    items[name] = { ...meta, docs: prev && Array.isArray(prev.docs) ? prev.docs : [] };
     return { ...cur, items };
   });
   return { ...decisionView(meta), via: written.via || indexed.via, accessUrl: publicUrl(decisionObject(slug)) };
@@ -704,52 +743,46 @@ async function saveDecisionLink({ tenQH, layer, url }) {
   };
   const indexed = await updateDecisions(cur => {
     const items = { ...(cur.items || {}) };
-    items[name] = meta;
+    const prev = items[name];
+    items[name] = { ...meta, docs: prev && Array.isArray(prev.docs) ? prev.docs : [] };
     return { ...cur, items };
   });
   try { await removeName(decisionObject(slug)); } catch (err) { /* chưa có PDF trên bucket */ }
   return { ...decisionView(meta), via: indexed.via, note: review.note };
 }
 
-async function removeDecision(tenQH, fallbackSlug) {
+async function removeDecision(tenQH, fallbackSlug, opts = {}) {
+  const keepDocs = opts.keepDocs !== false;
   const name = String(tenQH || '').trim();
   const cur = await readDecisions();
   const item = cur.data.items && cur.data.items[name];
   const slug = (item && item.slug) || fallbackSlug || '';
+  const docs = item && Array.isArray(item.docs) ? item.docs : [];
   if (item) {
     await updateDecisions(base => {
       const items = { ...(base.items || {}) };
-      delete items[name];
+      if (keepDocs && docs.length && SLUG_RE.test(String(item.slug || slug))) {
+        items[name] = { slug: item.slug || slug, docs };
+      } else {
+        delete items[name];
+      }
       return { ...base, items };
     });
   }
   if (SLUG_RE.test(String(slug))) {
     try { await removeName(decisionObject(slug)); } catch (err) { /* file chưa có */ }
+    if (!keepDocs) {
+      for (const d of docs) {
+        if (!d || d.kind === 'link' || !DOC_ID_RE.test(String(d.id || ''))) continue;
+        try { await removeName(docObject(slug, d.id)); } catch (err) { /* file chưa có */ }
+      }
+    }
   }
   return { slug: slug || '' };
 }
 
-async function readDecision(slug) {
-  const key = String(slug || '');
-  if (!SLUG_RE.test(key)) {
-    const err = new Error('Mã đồ án không hợp lệ');
-    err.status = 400;
-    throw err;
-  }
-  const stored = await readDecisions();
-  const items = stored.data.items || {};
-  const meta = Object.keys(items).map(k => items[k]).find(d => d && d.slug === key && d.at);
-  if (!meta) {
-    const err = new Error('Đồ án chưa có quyết định phê duyệt');
-    err.status = 404;
-    throw err;
-  }
-  if (meta.kind === 'link') {
-    const err = new Error('Quyết định này là link ngoài');
-    err.status = 404;
-    throw err;
-  }
-  const res = await axios.get(`${publicUrl(decisionObject(key))}?v=${meta.at}`, {
+async function fetchStoredPdf(objectName, at, fileName) {
+  const res = await axios.get(`${publicUrl(objectName)}?v=${at}`, {
     timeout: 20000,
     responseType: 'arraybuffer',
     maxContentLength: PROPOSAL_MAX_BYTES + 4096,
@@ -765,7 +798,103 @@ async function readDecision(slug) {
     err.status = 502;
     throw err;
   }
-  return { buffer: Buffer.from(res.data), name: decisionFileName(meta.name), at: Number(meta.at) || 0 };
+  return { buffer: Buffer.from(res.data), name: decisionFileName(fileName), at: Number(at) || 0 };
+}
+
+async function readDecision(slug, docId) {
+  const key = String(slug || '');
+  if (!SLUG_RE.test(key)) {
+    const err = new Error('Mã đồ án không hợp lệ');
+    err.status = 400;
+    throw err;
+  }
+  const stored = await readDecisions();
+  const items = stored.data.items || {};
+  const meta = Object.keys(items).map(k => items[k]).find(d => d && d.slug === key);
+  const wantDoc = String(docId || '');
+  if (wantDoc) {
+    if (!DOC_ID_RE.test(wantDoc)) rejectReview('Mã văn bản không hợp lệ');
+    const doc = meta && (meta.docs || []).find(d => d && d.id === wantDoc && d.at);
+    if (!doc) rejectReview('Không có văn bản này trong hồ sơ đồ án', 404);
+    if (doc.kind === 'link') rejectReview('Văn bản này là link ngoài', 404);
+    return fetchStoredPdf(docObject(key, wantDoc), doc.at, doc.name);
+  }
+  if (!meta || !meta.at) rejectReview('Đồ án chưa có quyết định phê duyệt', 404);
+  if (meta.kind === 'link') rejectReview('Quyết định này là link ngoài', 404);
+  return fetchStoredPdf(decisionObject(key), meta.at, meta.name);
+}
+
+async function saveProjectDoc({ tenQH, role, fileName, buffer, url, replaceId }) {
+  if (!Object.prototype.hasOwnProperty.call(DOC_ROLES, role)) rejectReview('Loại văn bản không hợp lệ');
+  const swap = DOC_ID_RE.test(String(replaceId || '')) ? String(replaceId) : '';
+  const { name, slug } = await listedProject(tenQH);
+  const cur = await readDecisions();
+  const prev = cur.data.items && cur.data.items[name];
+  const existing = docsView(prev || {});
+  if (swap && !existing.some(d => d.id === swap)) rejectReview('Không có văn bản này trong hồ sơ đồ án', 404);
+  if (!swap && existing.length >= DOC_MAX) rejectReview(`Mỗi đồ án tối đa ${DOC_MAX} văn bản kèm theo`);
+  const id = swap || newDocId();
+  let meta;
+  let via = 'direct';
+  if (url) {
+    const review = await reviewDecisionLink(url);
+    meta = {
+      id, role, kind: 'link', url: review.url, name: review.name,
+      bytes: review.bytes, at: Date.now(), embed: review.embed
+    };
+  } else {
+    if (!pdfOk(buffer)) {
+      const err = new Error(buffer && buffer.length > DECISION_MAX_BYTES ? 'File PDF lớn hơn 1 MB' : 'Chỉ nhận file PDF');
+      err.status = buffer && buffer.length > DECISION_MAX_BYTES ? 413 : 400;
+      throw err;
+    }
+    const written = await writeBytes(docObject(slug, id), buffer, 'application/pdf');
+    via = written.via;
+    meta = { id, role, kind: 'pdf', name: decisionFileName(fileName), bytes: buffer.length, at: Date.now(), embed: true };
+  }
+  const indexed = await updateDecisions(c => {
+    const items = { ...(c.items || {}) };
+    const old = items[name] && typeof items[name] === 'object' ? items[name] : {};
+    const list = Array.isArray(old.docs) ? old.docs.slice() : [];
+    const at = list.findIndex(d => d && d.id === id);
+    if (at >= 0) list[at] = meta;
+    else list.push(meta);
+    items[name] = { ...old, slug, docs: list };
+    return { ...c, items };
+  });
+  const prevDoc = existing.find(d => d.id === id);
+  if (url && prevDoc && prevDoc.kind !== 'link') {
+    try { await removeName(docObject(slug, id)); } catch (err) { /* chưa có PDF */ }
+  }
+  const item = indexed.decisions.items[name];
+  return { doc: docView(meta, slug), docs: docsView(item), via: via || indexed.via };
+}
+
+async function removeProjectDoc(tenQH, id) {
+  if (!DOC_ID_RE.test(String(id || ''))) rejectReview('Mã văn bản không hợp lệ');
+  const { name, slug } = await listedProject(tenQH);
+  let removed = null;
+  const indexed = await updateDecisions(c => {
+    const items = { ...(c.items || {}) };
+    const old = items[name];
+    if (!old || !Array.isArray(old.docs)) return c;
+    const list = old.docs.filter(d => {
+      if (d && d.id === id) { removed = d; return false; }
+      return true;
+    });
+    if (!removed) return c;
+    const next = { ...old, docs: list };
+    const still = next.at || list.length;
+    if (still) items[name] = next;
+    else delete items[name];
+    return { ...c, items };
+  });
+  if (!removed) rejectReview('Không có văn bản này trong hồ sơ đồ án', 404);
+  if (removed.kind !== 'link' && SLUG_RE.test(slug)) {
+    try { await removeName(docObject(slug, id)); } catch (err) { /* file chưa có */ }
+  }
+  const item = indexed.decisions.items && indexed.decisions.items[name];
+  return { docs: item ? docsView(item) : [] };
 }
 
 // ============================ QUYẾT ĐỊNH CHỜ DUYỆT (người dùng gửi PDF < 2 MB) ============================
@@ -1492,6 +1621,106 @@ async function landToInfra({ tenQH, id, phase, newId, layer }) {
 
 // Lớp chính của đồ án = 1 file role (khớp PROJECT_LAYERS ở public/js/projectFiles.js)
 const LAYER_ROLES = [ROLE_QH, ROLE_POINTS, ROLE_BOUNDARY, ROLE_HT];
+// Bản vẽ hạ tầng riêng từng đồ án. props.quyMo / congSuat / loai giữ để giai đoạn sau đối chiếu đấu nối toàn thành phố; bước này chỉ lưu và vẽ.
+const NET_ROLES = ['ht-giao-thong', 'qh-giao-thong', 'ht-cap-nuoc', 'qh-cap-nuoc', 'ht-thoat-nuoc', 'qh-thoat-nuoc', 'ht-cap-dien', 'qh-cap-dien'];
+const NET_GEOM = new Set(['LineString', 'MultiLineString', 'Polygon', 'MultiPolygon']);
+const NET_MAX_FEATURES = 4000;
+const NET_MAX_CHARS = 1500000;
+
+function clipText(v, n) {
+  return String(v || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, n);
+}
+
+function cleanCoord(c) {
+  if (!Array.isArray(c) || c.length < 2) return null;
+  const x = Number(c[0]);
+  const y = Number(c[1]);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > 180 || Math.abs(y) > 90) return null;
+  return [Math.round(x * 1e6) / 1e6, Math.round(y * 1e6) / 1e6];
+}
+
+function cleanLine(coords) {
+  const pts = (Array.isArray(coords) ? coords : []).map(cleanCoord).filter(Boolean);
+  return pts.length >= 2 ? pts : null;
+}
+
+function closeRing(coords) {
+  const pts = (Array.isArray(coords) ? coords : []).map(cleanCoord).filter(Boolean);
+  if (pts.length >= 3) {
+    const a = pts[0];
+    const b = pts[pts.length - 1];
+    if (a[0] !== b[0] || a[1] !== b[1]) pts.push([a[0], a[1]]);
+  }
+  return pts.length >= 4 ? pts : null;
+}
+
+function cleanGeom(g) {
+  if (!g || !NET_GEOM.has(g.type)) return null;
+  if (g.type === 'LineString') {
+    const pts = cleanLine(g.coordinates);
+    return pts ? { type: 'LineString', coordinates: pts } : null;
+  }
+  if (g.type === 'MultiLineString') {
+    const lines = (g.coordinates || []).map(cleanLine).filter(Boolean);
+    return lines.length ? { type: 'MultiLineString', coordinates: lines } : null;
+  }
+  if (g.type === 'Polygon') {
+    const rings = (g.coordinates || []).map(closeRing).filter(Boolean);
+    return rings.length ? { type: 'Polygon', coordinates: rings } : null;
+  }
+  const polys = (g.coordinates || []).map(poly => (Array.isArray(poly) ? poly.map(closeRing).filter(Boolean) : [])).filter(rings => rings.length);
+  return polys.length ? { type: 'MultiPolygon', coordinates: polys } : null;
+}
+
+function cleanNetProps(raw) {
+  const p = raw && typeof raw === 'object' ? raw : {};
+  const out = {};
+  const quyMo = clipText(p.quyMo, 40);
+  const congSuat = clipText(p.congSuat, 40);
+  const loai = clipText(p.loai, 80);
+  if (quyMo) out.quyMo = quyMo;
+  if (congSuat) out.congSuat = congSuat;
+  if (loai) out.loai = loai;
+  return out;
+}
+
+function cleanNetFeatures(features) {
+  if (!Array.isArray(features)) rejectReview('Thiếu danh sách đối tượng bản vẽ');
+  if (features.length > NET_MAX_FEATURES) rejectReview(`Bản vẽ nhiều hơn ${NET_MAX_FEATURES} đối tượng`);
+  const out = [];
+  features.forEach(f => {
+    const geometry = cleanGeom(f && f.geometry);
+    if (!geometry) return;
+    const row = { id: `f${out.length + 1}`, name: clipText(f.name, 120), geometry };
+    const props = cleanNetProps(f.props);
+    if (Object.keys(props).length) row.props = props;
+    out.push(row);
+  });
+  if (!out.length) rejectReview('Không có đường hoặc vùng hợp lệ (tọa độ kinh độ, vĩ độ)');
+  if (JSON.stringify(out).length > NET_MAX_CHARS) rejectReview('Bản vẽ lớn hơn 1,5 MB');
+  return out;
+}
+
+async function saveNet({ tenQH, role, features }) {
+  if (!NET_ROLES.includes(role)) rejectReview('Lớp bản vẽ không hợp lệ');
+  const name = String(tenQH || '').trim();
+  const stored = await readIndex();
+  const entry = ((stored.data && stored.data.projects) || []).find(p => p && p.tenQH === name && !p.deleted);
+  if (!entry || !entry.dir) {
+    rejectReview(`Đồ án «${name}» chưa có thư mục trên bucket. Nhập lớp sử dụng đất trước khi thêm bản vẽ hạ tầng.`, 409);
+  }
+  const slug = entry.slug || projectSlug(name);
+  if (!SLUG_RE.test(slug)) rejectReview('Mã đồ án không hợp lệ');
+  const clean = cleanNetFeatures(features);
+  const savedAt = Date.now();
+  const written = await writeRole(slug, role, roleDoc(role, name, slug, savedAt, { features: clean }));
+  const nets = { ...(entry.nets || {}), [role]: clean.length };
+  const indexed = await updateIndex(cur => ({
+    ...cur,
+    projects: (cur.projects || []).map(p => (p && p.tenQH === name && !p.deleted ? { ...p, saved: savedAt, nets } : p))
+  }));
+  return { saved: savedAt, count: clean.length, via: indexed.via || written.via };
+}
 
 function layerGone(message) {
   const err = new Error(message);
@@ -1503,7 +1732,7 @@ function layerGone(message) {
 // Xóa ranh vẫn giữ bbox trong danh mục để lô còn được tải theo khung nhìn. Dòng công trình trên Sheet giữ nguyên.
 async function deleteLayer({ tenQH, role }) {
   const name = String(tenQH || '').trim();
-  if (!LAYER_ROLES.includes(role)) {
+  if (!LAYER_ROLES.includes(role) && !NET_ROLES.includes(role)) {
     const err = new Error('Lớp dữ liệu không hợp lệ');
     err.status = 400;
     throw err;
@@ -1520,7 +1749,15 @@ async function deleteLayer({ tenQH, role }) {
   const patch = { saved: savedAt };
   let removed = 0;
   let counts = null;
-  if (role === ROLE_HT || role === ROLE_QH) {
+  if (NET_ROLES.includes(role)) {
+    const doc = await readRoleDoc(slug, role);
+    removed = doc && Array.isArray(doc.features) ? doc.features.length : 0;
+    if (!removed) throw layerGone(`Đồ án «${name}» chưa có bản vẽ này`);
+    await removeName(roleName(slug, role));
+    const nets = { ...(entry.nets || {}) };
+    delete nets[role];
+    Object.assign(patch, { nets });
+  } else if (role === ROLE_HT || role === ROLE_QH) {
     const doc = await readRoleDoc(slug, role);
     removed = doc && Array.isArray(doc.parcels) ? doc.parcels.length : 0;
     if (!removed) throw layerGone(`Lớp đã trống trong đồ án «${name}»`);
@@ -1555,7 +1792,7 @@ async function deleteProjectFiles(tenQH) {
   const entry = projects.find(p => p.tenQH === name);
   const slug = (entry && entry.slug) || projectSlug(name);
   let landCount = 0;
-  const names = [ROLE_HT, ROLE_QH, ROLE_POINTS, ROLE_BOUNDARY].map(role => roleName(slug, role));
+  const names = [ROLE_HT, ROLE_QH, ROLE_POINTS, ROLE_BOUNDARY, ...NET_ROLES].map(role => roleName(slug, role));
   names.push(legacyName(slug));
   for (const objectName of names) {
     try {
@@ -1571,7 +1808,7 @@ async function deleteProjectFiles(tenQH) {
   for (const objectName of names) {
     try { via = await removeName(objectName); } catch (err) { /* file chưa có */ }
   }
-  try { await removeDecision(name, slug); } catch (err) { console.warn(`Gỡ quyết định đồ án «${name}»:`, err.message); }
+  try { await removeDecision(name, slug, { keepDocs: false }); } catch (err) { console.warn(`Gỡ quyết định đồ án «${name}»:`, err.message); }
   try { await clearProposal(name, slug); } catch (err) { console.warn(`Gỡ quyết định chờ duyệt «${name}»:`, err.message); }
   const indexed = await updateIndex(cur => {
     const projects = (cur.projects || []).filter(p => p.tenQH !== name);
@@ -2174,6 +2411,7 @@ async function wardParcels() {
 module.exports = {
   setTransport, projectTitle, projectSlug, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, deleteLayer, deleteProjectFiles, renameProject,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision, layerDecisions, removeLayerDecision,
+  saveProjectDoc, removeProjectDoc, saveNet,
   saveDecisionProposal, readDecisionProposal, approveDecisionProposal, rejectDecisionProposal,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase,
   saveAdjustment, attachAdjustPdf, attachAdjustScan, listAdjustments, readAdjustment, readAdjustPdf, readAdjustScan,

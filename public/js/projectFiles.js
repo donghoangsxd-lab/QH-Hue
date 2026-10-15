@@ -25,6 +25,7 @@ let timer = null;
 let seq = 0;
 const force = new Set();
 const cache = new Map();
+const netCache = new Map();
 const ward = { loaded: false, map: new Map(), lands: [] };
 
 // zoom: ngưỡng lớp Đồ án; lotZoomFn: ngưỡng ranh lô công trình (thấp hơn khi chỉ bật vài nhóm, mapEngine.parcelMinZoom)
@@ -163,12 +164,23 @@ export function byProjectAreaDesc(a, b) {
   return x === y ? 0 : x < y ? 1 : -1;
 }
 
-// Lớp dữ liệu chính của đồ án, mỗi lớp = 1 file projects/<slug>/<key>.json: 2 lớp QH (vùng sử dụng đất, ranh giới)
-// + lớp hiện trạng (file HT-). Lớp mới (cấp điện, cấp nước…) thêm 1 dòng ở đây và ở LAYER_ROLES (services/projectStore.js).
+// Lớp sử dụng đất + ranh. Bản vẽ hạ tầng (NET_LAYERS) là file riêng projects/<slug>/<key>.json, bật/tắt bổ trợ lớp đất.
+// Mỗi lớp = 1 file. Khớp LAYER_ROLES / NET_ROLES trong services/projectStore.js.
+export const NET_LAYERS = [
+  { key: 'ht-giao-thong', phase: 'HT', group: 'giao-thong', label: 'Giao thông', color: '#fbbf24' },
+  { key: 'qh-giao-thong', phase: 'QH', group: 'giao-thong', label: 'Giao thông', color: '#f59e0b' },
+  { key: 'ht-cap-nuoc', phase: 'HT', group: 'cap-nuoc', label: 'Cấp nước', color: '#38bdf8' },
+  { key: 'qh-cap-nuoc', phase: 'QH', group: 'cap-nuoc', label: 'Cấp nước', color: '#0284c7' },
+  { key: 'ht-thoat-nuoc', phase: 'HT', group: 'thoat-nuoc', label: 'Thoát nước', color: '#2dd4bf' },
+  { key: 'qh-thoat-nuoc', phase: 'QH', group: 'thoat-nuoc', label: 'Thoát nước', color: '#0f766e' },
+  { key: 'ht-cap-dien', phase: 'HT', group: 'cap-dien', label: 'Cấp điện', color: '#e879f9' },
+  { key: 'qh-cap-dien', phase: 'QH', group: 'cap-dien', label: 'Cấp điện', color: '#a21caf' }
+];
 export const PROJECT_LAYERS = [
   { key: 'su-dung-dat', phase: 'QH', kind: 'lots', label: 'Sử dụng đất quy hoạch', color: '#fb923c' },
   { key: 'ranh-gioi', phase: 'QH', kind: 'boundary', label: 'Ranh giới quy hoạch', color: '#e879f9' },
-  { key: 'hien-trang', phase: 'HT', kind: 'lots', label: 'Sử dụng đất hiện trạng', color: '#22d3ee' }
+  { key: 'hien-trang', phase: 'HT', kind: 'lots', label: 'Sử dụng đất hiện trạng', color: '#22d3ee' },
+  ...NET_LAYERS.map(d => ({ ...d, kind: 'net' }))
 ];
 const LOT_LAYER = { HT: 'hien-trang', QH: 'su-dung-dat' };
 
@@ -177,6 +189,121 @@ export const PROJECT_INFO_EVENT = 'qh:project-info';
 
 export const layerKey = (tenQH, key) => `${tenQH}|${key}`;
 export const isLayerHidden = (tenQH, key) => state.hiddenProjectLayers.has(layerKey(tenQH, key));
+export const isNetOn = (tenQH, key) => state.shownProjectNets.has(layerKey(tenQH, key));
+
+const NET_GEOM = new Set(['LineString', 'MultiLineString', 'Polygon', 'MultiPolygon']);
+const QUY_MO_RE = /quy\s*mo|duong\s*kinh|tiet\s*dien|^dn$|width|diameter/i;
+const CONG_SUAT_RE = /cong\s*suat|capacity/i;
+const LOAI_RE = /^(loai|type|layer|ten\s*lop)$/i;
+
+function clipProp(props, re, n) {
+  const key = Object.keys(props).find(k => re.test(String(k).replace(/[_-]+/g, ' ')));
+  const v = key == null || props[key] == null ? '' : String(props[key]).trim();
+  return v.slice(0, n);
+}
+
+/** GeoJSON WGS84 (FeatureCollection) → đối tượng đường/vùng để ghi lớp bản vẽ hạ tầng của đồ án */
+export function netFeaturesFromText(text) {
+  let data;
+  try { data = JSON.parse(text); } catch (e) { throw new Error('File JSON lỗi cú pháp.'); }
+  const features = data && data.type === 'FeatureCollection' ? data.features
+    : data && data.type === 'Feature' ? [data]
+    : data && NET_GEOM.has(data.type) ? [{ type: 'Feature', properties: {}, geometry: data }]
+    : null;
+  if (!Array.isArray(features)) throw new Error('Cần GeoJSON (FeatureCollection) gồm đường hoặc vùng.');
+  const out = [];
+  features.forEach(f => {
+    const g = f && f.geometry;
+    if (!g || !NET_GEOM.has(g.type)) return;
+    const props = f.properties && typeof f.properties === 'object' ? f.properties : {};
+    const nameKey = Object.keys(props).find(k => /^(ten|name|ten\s*cong\s*trinh)$/i.test(String(k).replace(/[_-]+/g, ' ')));
+    const row = {
+      name: nameKey ? String(props[nameKey] || '').trim().slice(0, 120) : '',
+      geometry: g,
+      props: {
+        quyMo: clipProp(props, QUY_MO_RE, 40),
+        congSuat: clipProp(props, CONG_SUAT_RE, 40),
+        loai: clipProp(props, LOAI_RE, 80)
+      }
+    };
+    out.push(row);
+  });
+  if (!out.length) throw new Error('Không có đường hoặc vùng trong file.');
+  if (out.length > 4000) throw new Error('File nhiều hơn 4000 đối tượng.');
+  return out;
+}
+
+async function fetchNet(entry, key) {
+  if (!base || !entry || !entry.slug) return [];
+  const cacheKey = layerKey(entry.tenQH, key);
+  const hit = netCache.get(cacheKey);
+  if (hit && hit.saved === (entry.saved || 0)) return hit.features;
+  const res = await fetch(`${base}${entry.slug}/${key}.json?v=${entry.saved || 0}`);
+  if (res.status === 404) {
+    netCache.set(cacheKey, { saved: entry.saved || 0, features: [] });
+    return [];
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  const features = Array.isArray(data.features) ? data.features : [];
+  netCache.set(cacheKey, { saved: entry.saved || 0, features });
+  return features;
+}
+
+async function loadVisibleNets(entry) {
+  const counts = entry && entry.nets;
+  if (!counts || !base || !entry.slug) return;
+  const jobs = NET_LAYERS.filter(d => Number(counts[d.key]) > 0 && isNetOn(entry.tenQH, d.key));
+  await Promise.all(jobs.map(d => fetchNet(entry, d.key).catch(err => {
+    console.warn(`Không tải bản vẽ ${d.key} của «${entry.tenQH}»:`, err);
+  })));
+}
+
+function composeNets() {
+  const out = [];
+  const seen = new Set();
+  wanted().forEach(entry => {
+    if (!entry || seen.has(entry.tenQH)) return;
+    seen.add(entry.tenQH);
+    NET_LAYERS.forEach(def => {
+      if (!isNetOn(entry.tenQH, def.key)) return;
+      const hit = netCache.get(layerKey(entry.tenQH, def.key));
+      if (!hit || !hit.features.length) return;
+      hit.features.forEach(f => {
+        if (!f || !f.geometry) return;
+        out.push({
+          file: entry.tenQH, phase: def.phase, key: def.key, color: def.color, label: def.label,
+          name: f.name || '', props: f.props || {}, geometry: f.geometry
+        });
+      });
+    });
+  });
+  state.projectNets = out;
+}
+
+/** Bật lớp bản vẽ: tải file nếu chưa có rồi vẽ lại */
+export async function ensureProjectNet(tenQH, key) {
+  const entry = state.projectCatalog.find(p => p && p.tenQH === tenQH && !p.sheetOnly);
+  if (!entry || !NET_LAYERS.some(d => d.key === key)) return;
+  await fetchNet(entry, key);
+  composeNow();
+  onChange();
+}
+
+/** Admin vừa ghi bản vẽ: cập nhật số đếm, bỏ bộ nhớ file để lần tải sau lấy bản trên bucket */
+export function noteNetSaved(tenQH, key, saved, count) {
+  const entry = state.projectCatalog.find(p => p && p.tenQH === tenQH);
+  if (entry) {
+    if (saved) entry.saved = saved;
+    const nets = { ...(entry.nets || {}) };
+    if (count > 0) nets[key] = count;
+    else delete nets[key];
+    entry.nets = nets;
+  }
+  const row = cache.get(tenQH);
+  if (row && saved) row.saved = saved;
+  netCache.delete(layerKey(tenQH, key));
+}
 
 async function fetchRole(entry, role) {
   const res = await fetch(`${base}${entry.slug}/${role}.json?v=${entry.saved || 0}`);
@@ -209,6 +336,7 @@ async function fetchEntry(entry) {
     try {
       const row = { saved: entry.saved || 0, legacy: false, ...(await loadDir(entry)) };
       cache.set(entry.tenQH, row);
+      await loadVisibleNets(entry);
       return row;
     } catch (err) {
       console.warn(`Đọc thư mục đồ án «${entry.tenQH}» lỗi, hỏi qua API:`, err);
@@ -286,6 +414,7 @@ export function composeNow() {
   state.landParcels = lands;
   state.projectInfraLots = infra;
   state.projectInfraFiles = new Set(infra.map(l => l.file));
+  composeNets();
 }
 
 function progress(done, total) {
@@ -492,6 +621,8 @@ export async function projectLayersOf(tenQH) {
     } else if (def.kind === 'boundary') {
       out.count = entry.boundary ? 1 : 0;
       out.source = entry.boundary ? (entry.boundarySource === 'gis' ? 'gis' : 'auto') : null;
+    } else if (def.kind === 'net') {
+      out.count = entry.nets && Number(entry.nets[def.key]) || 0;
     }
     out.present = out.count > 0;
     return out;
@@ -510,6 +641,7 @@ export function removeCachedLayer(tenQH, key, saved, counts) {
   const row = cache.get(tenQH);
   if (row && def) {
     if (def.kind === 'lots') row.parcels = row.parcels.filter(p => !(p && (p.phase === 'QH' ? 'QH' : 'HT') === def.phase));
+    if (def.kind === 'net') netCache.delete(layerKey(tenQH, key));
     if (saved) row.saved = saved;
   }
   const entry = state.projectCatalog.find(p => p && p.tenQH === tenQH);
@@ -520,6 +652,11 @@ export function removeCachedLayer(tenQH, key, saved, counts) {
       entry.boundary = null;
       entry.boundarySource = null;
       state.projectAreas = state.projectAreas.filter(a => a.id !== tenQH);
+    }
+    if (def && def.kind === 'net' && entry.nets) {
+      const nets = { ...entry.nets };
+      delete nets[key];
+      entry.nets = nets;
     }
   }
   composeNow();

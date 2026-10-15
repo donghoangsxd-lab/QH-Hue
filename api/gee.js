@@ -1865,7 +1865,7 @@ module.exports = async (req, res) => {
     if (action === 'getProjectDecision') {
       const slug = String(req.query.slug || '');
       try {
-        const file = await projects.readDecision(slug);
+        const file = await projects.readDecision(slug, String(req.query.doc || '').slice(0, 16));
         const ascii = String(file.name || 'quyet-dinh.pdf').replace(/[^\w.\-]+/g, '_') || 'quyet-dinh.pdf';
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(file.name || 'quyet-dinh.pdf')}`);
@@ -2403,6 +2403,61 @@ module.exports = async (req, res) => {
         });
       } catch (err) {
         return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được quyết định' });
+      }
+    }
+
+    // Văn bản kèm hồ sơ đồ án: quyết định phê duyệt thêm, quyết định đính chính, quy định quản lý. Không ghi cột LinkQD.
+    if (action === 'putProjectDoc') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const tenQH = sanitizeSheetText(body.tenQH, 120);
+      const role = String(body.docRole || '').slice(0, 20);
+      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      const url = String(body.url || '').trim();
+      const pdf = typeof body.pdf === 'string' ? body.pdf.replace(/\s+/g, '') : '';
+      if (!url && (!pdf || pdf.length > 1500000)) {
+        return res.status(413).json({ error: true, message: 'File PDF rỗng hoặc lớn hơn 1 MB' });
+      }
+      try {
+        const replaceId = String(body.docId || '').slice(0, 16);
+        const saved = url
+          ? await projects.saveProjectDoc({ tenQH, role, url, replaceId })
+          : await projects.saveProjectDoc({ tenQH, role, fileName: body.name, buffer: Buffer.from(pdf, 'base64'), replaceId });
+        return res.status(200).json({ success: true, doc: saved.doc, docs: saved.docs, bucket: saved.via });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được văn bản' });
+      }
+    }
+
+    if (action === 'deleteProjectDoc') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const tenQH = sanitizeSheetText(body.tenQH, 120);
+      const id = String(body.docId || '').slice(0, 16);
+      if (!tenQH || !id) return res.status(400).json({ error: true, message: 'Thiếu văn bản cần gỡ' });
+      try {
+        const done = await projects.removeProjectDoc(tenQH, id);
+        return res.status(200).json({ success: true, docs: done.docs });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không gỡ được văn bản' });
+      }
+    }
+
+    // Bản vẽ hạ tầng của một đồ án (GeoJSON đường/vùng, WGS84). Lưu riêng, chưa nối mạng toàn thành phố.
+    if (action === 'putProjectNet') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const tenQH = sanitizeSheetText(body.tenQH, 120);
+      const role = String(body.role || '').slice(0, 40);
+      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      try {
+        const done = await projects.saveNet({ tenQH, role, features: body.features });
+        return res.status(200).json({ success: true, saved: done.saved, count: done.count, bucket: done.via });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được bản vẽ' });
       }
     }
 

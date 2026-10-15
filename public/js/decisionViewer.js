@@ -29,7 +29,12 @@ export function decisionUrl(t) {
   if (d.kind === 'link' && d.url) return d.url;
   const slug = d.slug || t.slug;
   if (!slug) return '';
-  return geeApi(`action=getProjectDecision&slug=${encodeURIComponent(slug)}&v=${d.at || 0}`);
+  const doc = t.body && t.body.docId ? `&doc=${encodeURIComponent(t.body.docId)}` : '';
+  return geeApi(`action=getProjectDecision&slug=${encodeURIComponent(slug)}${doc}&v=${d.at || 0}`);
+}
+
+function writeAction(t) {
+  return t && t.body && t.body.docRole ? 'putProjectDoc' : 'putProjectDecision';
 }
 
 export function fmtBytes(n) {
@@ -490,9 +495,12 @@ async function commitLink(t) {
   if (!String(el.querySelector('[data-decision-url]').value || '').trim()) return;
   setBusy(t, true);
   try {
-    const data = await postJson('putProjectDecision', { ...t.body, url: pendingReview.url });
+    const data = await postJson(writeAction(t), { ...t.body, url: pendingReview.url });
     pendingReview = null;
-    saved(t, { slug: data.slug, kind: 'link', url: data.url, name: data.name, bytes: data.bytes, at: data.at, embed: data.embed === true }, data);
+    const decision = t.body && t.body.docRole
+      ? data.doc
+      : { slug: data.slug, kind: 'link', url: data.url, name: data.name, bytes: data.bytes, at: data.at, embed: data.embed === true };
+    saved(t, decision, data);
   } catch (err) {
     alert(`Không gán được link: ${err.message}`);
   } finally {
@@ -518,9 +526,12 @@ async function uploadPdf(t, file) {
   catch (e) { alert(e.message || 'Không đọc được file.'); return; }
   setBusy(t, true);
   try {
-    const data = await postJson('putProjectDecision', { ...t.body, name: file.name, pdf: bytesToBase64(bytes) });
+    const data = await postJson(writeAction(t), { ...t.body, name: file.name, pdf: bytesToBase64(bytes) });
     revokePdfPreview();
-    saved(t, { slug: data.slug, kind: 'pdf', url: '', name: data.name, bytes: data.bytes, at: data.at, embed: true }, data);
+    const decision = t.body && t.body.docRole
+      ? data.doc
+      : { slug: data.slug, kind: 'pdf', url: '', name: data.name, bytes: data.bytes, at: data.at, embed: true };
+    saved(t, decision, data);
   } catch (err) {
     alert(`Không ghi được quyết định: ${err.message}`);
   } finally {
@@ -530,12 +541,14 @@ async function uploadPdf(t, file) {
 
 async function remove(t) {
   if (!isAdmin() || busyOf(t) || !t.decision) return;
-  if (!confirm(`Gỡ file quyết định phê duyệt của ${t.noun || 'đồ án'} «${t.title}»?`)) return;
+  const what = t.body && t.body.docId ? (t.decision && t.decision.name) || 'văn bản này' : 'quyết định phê duyệt';
+  if (!confirm(`Gỡ «${what}» khỏi đồ án «${t.title}»?`)) return;
   setBusy(t, true);
   try {
-    await postJson('deleteProjectDecision', t.body);
+    const action = t.body && t.body.docId ? 'deleteProjectDoc' : 'deleteProjectDecision';
+    const data = await postJson(action, t.body);
     closeDecision();
-    if (t.onSaved) t.onSaved(null, null);
+    if (t.onSaved) t.onSaved(null, data);
   } catch (err) {
     alert(`Không gỡ được quyết định: ${err.message}`);
   } finally {
