@@ -1652,6 +1652,87 @@ body.bottom-collapsed:not(.project-review:not(.project-view)) .bottom-panel {
   transition: transform 0.25s ease, opacity 0.2s ease, visibility 0s linear 0.25s;
 }
 
+
+/* Lát cắt địa hình: phủ đúng panel dưới khi công cụ đang bật */
+.tp-host {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  flex-direction: column;
+  background: var(--bg-panel);
+  box-sizing: border-box;
+}
+.tp-host:not([hidden]) { display: flex; }
+.tp-host[hidden] { display: none !important; }
+.profile-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--bp-head-h);
+  padding: 4px 10px 4px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(30, 41, 59, 0.6);
+}
+.tp-title { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+.tp-note { color: var(--text-muted); font-size: var(--fs-xs); font-style: italic; line-height: 1.15; }
+.tp-stats { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 14px; }
+.tp-stat { display: inline-flex; flex-direction: column; line-height: 1.15; }
+.tp-stat small { font-size: var(--fs-xs); color: var(--text-muted); }
+.tp-stat b { font-size: var(--fs-sm); color: var(--accent-cyan); font-variant-numeric: tabular-nums; }
+.profile-head .bp-btn { margin-left: auto; }
+.tp-chart { position: relative; flex: 1; min-height: 0; padding: 2px 6px 4px; }
+.tp-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--bg-panel);
+  font-size: var(--fs-md);
+}
+.tp-hint[hidden] { display: none !important; }
+.tp-load {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(420px, calc(100% - 48px));
+  box-sizing: border-box;
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(251, 146, 60, 0.55);
+  border-radius: var(--r-md);
+}
+.tp-load[hidden] { display: none !important; }
+.tp-load span { font-size: var(--fs-sm); color: var(--text-main); }
+.tp-load .progress-bar-bg { height: 8px; }
+.tp-load .progress-bar-fill { background: #fb923c; }
+.tp-cursor { background: transparent !important; border: none !important; }
+.tp-cursor span {
+  position: absolute;
+  left: 10px;
+  top: -12px;
+  white-space: nowrap;
+  background: rgba(15, 23, 42, 0.92);
+  color: var(--text-main);
+  border: 1px solid #fb923c;
+  border-radius: var(--r-md);
+  padding: 2px 6px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  pointer-events: none;
+}
+
 /* 2 PHẦN: CƠ CẤU ĐẤT (HẸP) | BẢNG TỔNG HỢP (CO GIÃN) */
 .bp-body {
   flex: 1;

@@ -34,6 +34,7 @@
     <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></symbol>
     <symbol id="i-area" viewBox="0 0 24 24"><path d="M5 19 3.5 8.5 12 3.5l8.5 5L19 19z" fill="currentColor" fill-opacity=".2"/><circle cx="5" cy="19" r="1.4" fill="currentColor"/><circle cx="19" cy="19" r="1.4" fill="currentColor"/><circle cx="12" cy="3.5" r="1.4" fill="currentColor"/></symbol>
     <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7.5 12.5 2 2M10.5 9.5l2 2M13.5 6.5l2 2"/></symbol>
+    <symbol id="i-profile" viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><path d="M4 16c2.2-1 3.2-6 5.5-6s2.2 4 4 4 2.4-7 6.5-8"/></symbol>
     <symbol id="i-inspect" viewBox="0 0 24 24"><path d="m4 3 7 17 2.5-7.5L21 10z"/><path d="m14 14 6 6"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></symbol>
     <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19M9 7h6"/></symbol>
@@ -257,6 +258,7 @@
       <button type="button" class="ui-btn-format" id="btnShareView" title="Chép link khung nhìn hiện tại (vị trí, mức phóng, lớp đang bật, đồ án đang mở) để gửi người khác. Link tự mang trạng thái, không lưu trên máy chủ" aria-label="Chép link khung nhìn"><svg class="ico"><use href="#i-link"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích. Backspace xóa đỉnh vừa tạo; chuột phải trong 1 m quanh đỉnh để xóa đỉnh đó" aria-label="Đo diện tích"><svg class="ico"><use href="#i-area"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnMeasureDist" title="Đo chiều dài. Backspace xóa đỉnh vừa tạo; chuột phải trong 1 m quanh đỉnh để xóa đỉnh đó" aria-label="Đo chiều dài"><svg class="ico"><use href="#i-ruler"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnMeasureProfile" title="Lát cắt địa hình. Chấm các điểm dọc tuyến; biểu đồ hiện ở panel dưới. Backspace xóa đỉnh vừa tạo; chuột phải trong 1 m quanh đỉnh để xóa đỉnh đó" aria-label="Lát cắt địa hình"><svg class="ico"><use href="#i-profile"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnInspectMode" title="Bật chế độ tra cứu: click lên bản đồ để xem hạ tầng tiếp cận tại vị trí" aria-label="Chế độ tra cứu" aria-pressed="false"><svg class="ico"><use href="#i-inspect"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnSketch" title="Phác thảo (chỉ trong phiên này, người khác không thấy; lưu ra file KML / DXF)" aria-label="Phác thảo" aria-pressed="false" aria-controls="sketchPalette"><svg class="ico"><use href="#i-sketch"/></svg></button>
 
@@ -1056,6 +1058,24 @@
             <div class="bp-view" id="gpView"></div>
           </div>
           </div>
+        </div>
+      </div>
+    </div>
+    <div id="terrainProfileHost" class="tp-host" hidden>
+      <div class="profile-head">
+        <div class="tp-title">
+          <b class="bp-part-title">LÁT CẮT ĐỊA HÌNH</b>
+          <span class="tp-note" id="tpNote"></span>
+        </div>
+        <div class="tp-stats" id="tpStats"></div>
+        <button type="button" class="bp-btn bp-icon" id="btnCloseProfile" title="Đóng lát cắt" aria-label="Đóng lát cắt"><svg class="ico"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="tp-chart">
+        <canvas id="terrainProfileChart" aria-label="Biểu đồ lát cắt địa hình"></canvas>
+        <p class="tp-hint" id="tpHint" hidden></p>
+        <div class="tp-load" id="tpLoad" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Tiến độ tải lát cắt địa hình">
+          <span id="tpLoadLabel">Đang tải cao độ nền…</span>
+          <div class="progress-bar-bg"><div class="progress-bar-fill" id="tpLoadFill"></div></div>
         </div>
       </div>
     </div>

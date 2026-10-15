@@ -517,7 +517,39 @@ export function toggleBuffer(bufferKey, el) {
   planRenderer.refreshBuffers();
 }
 
-// ============================ ĐO CHIỀU DÀI / DIỆN TÍCH ============================
+// ============================ ĐO CHIỀU DÀI / DIỆN TÍCH / LÁT CẮT ĐỊA HÌNH ============================
+
+const MEASURE_BTN = {
+  distance: ['btnMeasureDist', 'ruler'],
+  area: ['btnMeasureArea', 'area'],
+  profile: ['btnMeasureProfile', 'profile']
+};
+
+let measureListener = null;
+
+/** Gọi sau mỗi lần đổi hình đo. type: 'distance' | 'area' | 'profile' | null */
+export function setMeasureListener(fn) { measureListener = fn; }
+
+function notifyMeasure() {
+  measureListener?.(state.activeMeasureType, state.measurePoints);
+}
+
+function resetMeasureButtons() {
+  Object.values(MEASURE_BTN).forEach(([id, icon]) => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.classList.remove('active');
+    btn.innerHTML = ico(icon);
+  });
+}
+
+function wipeMeasure() {
+  state.activeMeasureType = null;
+  state.measurePoints = [];
+  [measureLayerGroup, planMeasureGroup].forEach(g => g && g.clearLayers());
+  closePlanLand();
+  resetMeasureButtons();
+}
 
 export function toggleMeasure(type) {
   if (state.activeMeasureType === type) {
@@ -525,32 +557,20 @@ export function toggleMeasure(type) {
     return;
   }
   announceTool('measure');
-  clearMeasure();
+  wipeMeasure();
   state.activeMeasureType = type;
-
-  const btn = document.getElementById(type === 'distance' ? 'btnMeasureDist' : 'btnMeasureArea');
+  const pair = MEASURE_BTN[type];
+  const btn = pair && document.getElementById(pair[0]);
   if (btn) {
     btn.classList.add('active');
     btn.innerHTML = ico('close');
   }
+  notifyMeasure();
 }
 
 export function clearMeasure() {
-  state.activeMeasureType = null;
-  state.measurePoints = [];
-  [measureLayerGroup, planMeasureGroup].forEach(g => g && g.clearLayers());
-  closePlanLand();
-
-  const btnDist = document.getElementById('btnMeasureDist');
-  const btnArea = document.getElementById('btnMeasureArea');
-  if (btnDist) {
-    btnDist.classList.remove('active');
-    btnDist.innerHTML = ico('ruler');
-  }
-  if (btnArea) {
-    btnArea.classList.remove('active');
-    btnArea.innerHTML = ico('area');
-  }
+  wipeMeasure();
+  notifyMeasure();
 }
 
 export function handleMeasureClick(latlng) {
@@ -597,15 +617,20 @@ function drawMeasure() {
   groups.forEach(g => g.clearLayers());
   closePlanLand();
   const pts = state.measurePoints;
-  if (!pts.length) return;
+  if (!pts.length) {
+    notifyMeasure();
+    return;
+  }
   const isArea = state.activeMeasureType === 'area';
-  const color = isArea ? '#f59e0b' : '#38bdf8';
+  const isProfile = state.activeMeasureType === 'profile';
+  const color = isArea ? '#f59e0b' : isProfile ? '#fb923c' : '#38bdf8';
   const latlngs = pts.map(pt => [pt[1], pt[0]]);
 
   let label = '';
   if (!isArea && pts.length >= 2) {
     const meters = turf.length(turf.lineString(pts), { units: 'meters' });
-    label = `${ico('ruler')}Chiều dài: ${meters >= 1000 ? `${fmtNum(meters / 1000)} km` : `${fmtNum(Math.round(meters))} m`}`;
+    const len = meters >= 1000 ? `${fmtNum(meters / 1000)} km` : `${fmtNum(Math.round(meters))} m`;
+    label = isProfile ? `${ico('profile')}Lát cắt: ${len}` : `${ico('ruler')}Chiều dài: ${len}`;
   } else if (isArea && pts.length >= 3) {
     const sqm = turf.area(turf.polygon([[...pts, pts[0]]]));
     label = `${ico('area')}Diện tích: ${sqm >= 10000 ? `${fmtNum(sqm / 10000)} ha` : `${fmtNum(Math.round(sqm))} m²`}`;
@@ -613,7 +638,11 @@ function drawMeasure() {
 
   groups.forEach(g => {
     latlngs.forEach(ll => L.circleMarker(ll, { radius: 4, color, fillColor: color, fillOpacity: 1, interactive: false }).addTo(g));
-    if (!isArea && latlngs.length >= 2) L.polyline(latlngs, { color, weight: 3, dashArray: '4,4', interactive: false }).addTo(g);
+    if (!isArea && latlngs.length >= 2) {
+      const opt = { color, weight: 3, interactive: false };
+      if (!isProfile) opt.dashArray = '4,4';
+      L.polyline(latlngs, opt).addTo(g);
+    }
     if (isArea && latlngs.length >= 3) L.polygon(latlngs, { color, weight: 2, fillColor: color, fillOpacity: 0.2, interactive: false }).addTo(g);
     if (label) {
       const btn = isArea ? `<button type="button" class="measure-plan-btn" title="Thống kê, tỷ lệ các loại đất quy hoạch trong vùng đo">${ico('area')}Phân tích QH</button>` : '';
@@ -628,6 +657,7 @@ function drawMeasure() {
       }
     }
   });
+  notifyMeasure();
 }
 
 // Popup phân tích sử dụng đất QH của vùng đo: đổi hình đo (thêm đỉnh / tắt đo) thì đóng và bỏ kết quả đang tính dở

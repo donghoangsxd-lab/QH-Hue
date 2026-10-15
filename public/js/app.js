@@ -6,6 +6,7 @@ import {
   toggleLayer,
   toggleBuffer,
   toggleMeasure,
+  setMeasureListener,
   handleMeasureClick,
   renderGroupedPoints,
   refreshBuffers,
@@ -65,6 +66,7 @@ import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 import { initCadastreLayer, cadastreClick } from './cadastreLayer.js';
 import { initTerrainLayer } from './terrainLayer.js';
+import { initTerrainProfile, syncTerrainProfile } from './terrainProfile.js';
 import { initDrainageLayer } from './drainageLayer.js';
 import { initBasinLayer } from './basinLayer.js';
 import { initFloodSim } from './floodSim.js';
@@ -344,6 +346,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener(WARD_PICK_EVENT, (e) => chooseWard(e.detail));
   initBasemapUi();
   initTerrainLayer();
+  initTerrainProfile([map, planMap]);
+  setMeasureListener(syncTerrainProfile);
   initDrainageLayer();
   initBasinLayer();
   initFloodSim();
@@ -450,6 +454,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnMeasureDist')?.addEventListener('click', () => toggleMeasure('distance'));
   document.getElementById('btnMeasureArea')?.addEventListener('click', () => toggleMeasure('area'));
+  document.getElementById('btnMeasureProfile')?.addEventListener('click', () => toggleMeasure('profile'));
+  document.getElementById('btnCloseProfile')?.addEventListener('click', () => {
+    if (state.activeMeasureType === 'profile') toggleMeasure('profile');
+  });
 
   const btnInspectMode = document.getElementById('btnInspectMode');
   const planEl = document.getElementById('mapPlan');

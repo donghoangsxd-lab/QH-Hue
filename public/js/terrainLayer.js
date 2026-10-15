@@ -257,6 +257,11 @@ function makeLayer() {
   });
 }
 
+/** Nhãn nguồn cao độ đang dùng (FABDEM, hoặc SRTM khi ô FABDEM không tải được) */
+export function elevationSourceLabel() {
+  return attribution === SOURCES.srtm ? 'SRTM/GMTED' : 'FABDEM 30 m';
+}
+
 /** Cao độ (m) tại vị trí, đọc từ ô đã tải; null nếu ô chưa có */
 export function terrainElevationAt(latlng) {
   if (!map) return null;

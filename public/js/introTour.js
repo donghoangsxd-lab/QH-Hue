@@ -56,7 +56,7 @@ const STEPS = [
   {
     target: '.map-toolbar',
     title: 'Công cụ khác',
-    text: 'Thanh công cụ bên trái còn có: đo chiều dài, đo diện tích, định vị GPS, chụp ảnh, xuất bản đồ A3 và phác thảo.\nỞ thẻ "Đề xuất", bạn có thể đề xuất công trình mới; đề xuất được đánh dấu "Chờ duyệt" cho đến khi quản trị viên Sở Xây dựng phê duyệt.'
+    text: 'Thanh công cụ bên trái còn có: đo chiều dài, đo diện tích, lát cắt địa hình, định vị GPS, chụp ảnh, xuất bản đồ A3 và phác thảo.\nỞ thẻ "Đề xuất", bạn có thể đề xuất công trình mới; đề xuất được đánh dấu "Chờ duyệt" cho đến khi quản trị viên Sở Xây dựng phê duyệt.'
   },
   {
     target: '#btnOverview',
