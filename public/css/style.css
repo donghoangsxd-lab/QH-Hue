@@ -1093,7 +1093,7 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-layer-dot.points { width: 7px; height: 7px; margin: 0 1px; border-radius: 50%; border-color: rgba(15, 23, 42, 0.8); }
 .project-layer-dot.boundary { background: transparent; border: 1.5px dashed var(--dot, #e879f9); }
 .project-layer-dot.net { width: 12px; height: 3px; margin: 0; border: 0; border-radius: 1px; }
-.project-layer-dot.adjust { border: 1.5px dashed #f5c400; background: repeating-linear-gradient(45deg, rgba(245, 196, 0, 0.95) 0 2.5px, transparent 2.5px 5px); }
+.project-layer-dot.adjust { background: transparent; border: 2.5px dashed #1e40af; }
 .project-adj-list { margin: 0 0 2px 16px; max-height: 160px; overflow-y: auto; scrollbar-width: thin; }
 .project-adj-list .project-lot-hit span { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
 .project-layer-name input:disabled { cursor: not-allowed; opacity: 0.5; }
@@ -1445,6 +1445,13 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
   background: var(--bg-input); color: var(--text-muted); font-size: 16px; line-height: 1; cursor: pointer;
 }
 .cad-slot-clear:hover { color: var(--accent-red); border-color: var(--accent-red); }
+.cad-stamp { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; padding: 8px; border: 1px solid #f472b6; border-radius: var(--r-md); background: rgba(244, 114, 182, 0.08); font-size: var(--fs-sm); }
+.cad-stamp b { font-size: var(--fs-sm); }
+.cad-stamp-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.cad-stamp-chip { border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-input); color: var(--text-main); font-size: var(--fs-xs); padding: 3px 8px; cursor: pointer; }
+.cad-stamp-chip.on { border-color: #f472b6; color: #f472b6; }
+.cad-stamp-now { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.adj-stamp { margin-top: 6px; }
 .add-point-form label.cad-drop {
   display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 8px; padding: 10px 6px; white-space: normal; text-align: center;
   border: 1.5px dashed rgba(var(--cyan-rgb), 0.6); border-radius: var(--r-md); color: var(--text-main); font-size: var(--fs-md); cursor: pointer; background: rgba(var(--cyan-rgb), 0.05); transition: background 0.2s, border-color 0.2s;
@@ -3875,7 +3882,13 @@ body.project-review.la-page #projectReviewHost {
 .la-import-go { background: #a21caf; border-color: #d946ef; color: #fff; }
 
 /* Ranh điều chỉnh cục bộ trên bản đồ quy hoạch (adjustLayer.js) */
-.adj-glow { filter: drop-shadow(0 0 3px #ffffff) drop-shadow(0 0 8px #f5c400); }
+.adj-glow { filter: drop-shadow(0 0 3px #ffffff) drop-shadow(0 0 6px #1e40af); }
+.adj-sat-clip { pointer-events: none; }
+.leaflet-adjustSat-pane, .leaflet-adjImportSat-pane { pointer-events: none !important; }
+.adj-lot-popup.pp-editable .lp-head { padding-right: 46px; }
+.leaflet-container .adj-lot-popup a.pp-edit-btn { right: 22px; }
+.adj-lot-file { width: 100%; margin-top: 10px; }
+.adj-lot-file .ico { width: 1em; height: 1em; margin-right: 4px; vertical-align: -0.15em; }
 .adj-popup .leaflet-popup-content-wrapper { padding: 0; overflow: hidden; border-color: rgba(47, 128, 255, 0.45); box-shadow: 0 12px 32px rgba(2, 6, 23, 0.6); }
 .adj-popup .leaflet-popup-content { margin: 0; width: auto !important; }
 .adj-popup .leaflet-popup-close-button { top: 8px !important; right: 8px !important; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-muted) !important; }

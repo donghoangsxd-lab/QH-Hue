@@ -21,6 +21,7 @@ import { boundaryFromLines } from './boundaryLines.js';
 import { setLabelsOverlay, labelsOverlayOn } from './basemap.js';
 import { queryOverpassHedged } from './serviceArea.js';
 import { lotKeysOf } from './projectFiles.js';
+import { parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
 
 // Diện tích tối thiểu theo loại (khớp config/constants.js → infraConfig.minSize)
 const MIN_SIZE = { "1-CV": 300, "2-BDX": 200, "3-MN": 800, "4-TH": 2000, "5-THCS": 2500, "7-YT": 1000, "8-VH": 500, "9-TM": 1500 };
@@ -401,6 +402,28 @@ function viewPadding(pad) {
   return { paddingTopLeft: [pad, pad], paddingBottomRight: [pad + Math.max(0, cover), pad] };
 }
 
+function drawStampMarks() {
+  const view = current && current.stampView;
+  if (!view || !previewLayer) return;
+  const pending = new Set(((current.stampMatch && current.stampMatch.pending) || []).map(s => s.id));
+  view.forEach(s => {
+    const on = pending.has(s.id);
+    const cur = s.id === current.stampPick;
+    const color = cur ? '#f472b6' : on ? '#fb923c' : '#22d3ee';
+    const mark = L.circleMarker([s.lat, s.lng], {
+      radius: cur ? 9 : 6, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95
+    }).bindTooltip(stampLabel(s), { sticky: true });
+    if (on) mark.on('click', (e) => {
+      L.DomEvent.stop(e);
+      khState.pick = s.id;
+      current.stampPick = s.id;
+      renderReport();
+      drawPreview(current.result.parcels, false);
+    });
+    previewLayer.addLayer(mark);
+  });
+}
+
 // fit = false (đổi khớp thủ công): giữ khung nhìn, trừ lần đầu có lô để xem; focus: zoom tới lô này thay cho toàn bộ file
 // (Leaflet bỏ qua lệnh zoom mới khi đang chạy hiệu ứng zoom trước, nên chỉ gọi 1 lệnh)
 function drawPreview(parcels, fit = true, focus = null) {
@@ -440,12 +463,16 @@ function drawPreview(parcels, fit = true, focus = null) {
               ? { color, weight: 2, dashArray: '3,5', fillColor: color, fillOpacity: 0.08 }
               : { color, weight: 2, fillColor: color, fillOpacity: 0.35 };
     const poly = L.geoJSON({ type: 'MultiPolygon', coordinates: p.polygons }, { style, interactive: true }).bindTooltip(() => parcelTip(p), { sticky: true });
-    poly.on('click', () => focusRow(idx));
+    poly.on('click', () => {
+      if (current && current.stampPick) { assignStampTo(String(p.src)); return; }
+      focusRow(idx);
+    });
     previewLayer.addLayer(poly);
     (p.wardParts || []).slice(1).forEach(part => previewLayer.addLayer(L.geoJSON({ type: 'MultiPolygon', coordinates: part.polygons },
       { style: { color: '#fff', weight: 1.5, dashArray: '3,3', fill: false }, interactive: false })));
     previewLayer.addLayer(L.circleMarker([p.lat, p.lng], { radius: 4, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 1, interactive: false }));
   });
+  drawStampMarks();
   previewLayer.addTo(m);
   if (focus) zoomToParcel(focus);
   else if (fit) {
@@ -705,6 +732,20 @@ function focusRow(idx) {
   setTimeout(() => row.classList.remove('flash'), 900);
 }
 
+function stampBoxHtml() {
+  const match = current && current.stampMatch;
+  if (!match || !match.pending.length) return '';
+  const cur = match.pending.find(s => s.id === current.stampPick) || match.pending[0];
+  const chips = match.pending.map(s => `<button type="button" class="cad-stamp-chip${s.id === cur.id ? ' on' : ''}" data-stamp="${escapeHtml(s.id)}">${escapeHtml(stampLabel(s))}</button>`).join('');
+  return `<div class="cad-stamp">
+    <b>Có polygon chứa từ 2 tem, hoặc tem chưa nằm trong lô.</b>
+    <span>Chọn lần lượt từng tem (đang gán màu hồng trên bản đồ) rồi bấm polygon tương ứng. Mỗi lô chỉ nhận một tem.</span>
+    <div class="cad-stamp-list">${chips}</div>
+    <div class="cad-stamp-now"><span>Đang gán: <b>${escapeHtml(stampLabel(cur))}</b></span>
+      <button type="button" class="cad-clear" data-stamp-skip="${escapeHtml(cur.id)}">Bỏ qua tem này</button></div>
+  </div>`;
+}
+
 function renderReport() {
   const box = $('cadReport');
   const btn = $('btnCadSubmit');
@@ -782,7 +823,14 @@ function renderReport() {
     alerts.push(['info', `${urbanService} lô dịch vụ trên ${fmtNum(BIG_MARKET_M2)} m² tự nhận là hạ tầng ${SERVICE_BIG.toLowerCase()} (TM_DT), ghi Sheet như công trình hạ tầng. Lô nào không phải thì bấm vào lô đó, chọn «Không phải».`]);
   }
   const planned = parcels.filter(p => planOf(p)).length;
-  if (planned) alerts.push(['info', `${fmtNum(planned)} lô có chỉ tiêu quy hoạch: ghi vào cột TangCao, MatDoXD, HeSoSDD của Sheet.`]);
+  if (planned) alerts.push(['info', `${fmtNum(planned)} lô có chỉ tiêu quy hoạch (tầng cao, mật độ, hệ số SDĐ)${current.stampFile ? ` từ <b>${escapeHtml(current.stampFile)}</b>` : ''}: ghi vào thuộc tính lô. Lô hạ tầng ghi thêm cột TangCao, MatDoXD, HeSoSDD và KyHieu trên Sheet.`]);
+  if (current.stampFile) {
+    const n = (current.stampView || []).length;
+    const pend = (current.stampMatch && current.stampMatch.pending.length) || 0;
+    const done = (current.stampMatch && current.stampMatch.assigned.length) || 0;
+    if (!n) alerts.push(['warn', `File ký hiệu <b>${escapeHtml(current.stampFile)}</b> không đọc được tem đất (chữ trong vòng tròn, hoặc block có thuộc tính ký hiệu / diện tích / mật độ / tầng cao).`]);
+    else if (!pend) alerts.push(['info', `Tem đất: đã gán ${fmtNum(done)}/${fmtNum(n)} từ <b>${escapeHtml(current.stampFile)}</b> vào polygon bên dưới.`]);
+  }
   if (current.bothPhases) {
     const names = current.slotFiles || {};
     alerts.push(['info', `File <b>${escapeHtml(names.HT || '')}</b> ghi QuyMo_HT, file <b>${escapeHtml(names.QH || '')}</b> ghi QuyMo_QH. Lô cùng vị trí, cùng loại được gộp một công trình.`]);
@@ -902,6 +950,7 @@ function renderReport() {
     <div class="cad-file">${ico('file')}<b>${escapeHtml(fileName)}</b> · ${current.boundaryOnly ? 'chỉ cập nhật ranh' : `${parcels.length} lô`}${dupText}
       <div class="cad-filter">Nhận: <b>${kept}</b>${skipped ? `<br>Bỏ qua (bộ lọc mặc định): ${skipped}` : ''}</div></div>
     ${pointSlot}
+    ${stampBoxHtml()}
     ${reviewHtml()}
     ${alerts.map(([cls, text]) => `<div class="cad-alert ${cls}">${text}</div>`).join('')}
     ${manualMappingHtml(current.manual)}
@@ -952,13 +1001,27 @@ function renderReport() {
     current.points = null;
     analyse({ fit: false });
   });
+  box.querySelectorAll('[data-stamp]').forEach(btn => btn.addEventListener('click', () => {
+    khState.pick = btn.dataset.stamp;
+    current.stampPick = khState.pick;
+    renderReport();
+    drawPreview(current.result.parcels, false);
+  }));
+  box.querySelectorAll('[data-stamp-skip]').forEach(btn => btn.addEventListener('click', () => {
+    const id = btn.dataset.stampSkip;
+    if (id && !khState.skip.includes(id)) khState.skip.push(id);
+    if (id) delete khState.assign[id];
+    analyse({ fit: false });
+  }));
   if (btn) {
     const canWrite = (count.new + count.update + count.land) > 0 || (current.boundaryOnly && current.boundaryGeom);
+    const stampWait = (current.stampMatch && current.stampMatch.pending.length) || 0;
     // Khách gửi file gốc vào hàng chờ: Admin tự duyệt cấp trường / khớp công trình khi mở hồ sơ
     btn.disabled = isAdmin()
-      ? submitting || !canWrite || count.dup > 0 || count.pending > 0 || !result.axes.valid
-      : submitting || current.boundaryOnly || !result.axes.valid || !parcels.some(p => p.ward);
-    btn.title = !isAdmin() ? 'Gửi file vào hàng chờ để Admin kiểm tra (file ≤ 2 MB)'
+      ? submitting || !canWrite || count.dup > 0 || count.pending > 0 || stampWait > 0 || !result.axes.valid
+      : submitting || current.boundaryOnly || !result.axes.valid || stampWait > 0 || !parcels.some(p => p.ward);
+    btn.title = stampWait ? `Còn ${stampWait} tem đất chưa gán vào lô`
+      : !isAdmin() ? 'Gửi file vào hàng chờ để Admin kiểm tra (file ≤ 2 MB)'
       : count.pending ? `Còn ${count.pending} lô chờ chọn từng lô (cấp trường / chợ, TTTM)` : '';
   }
 }
@@ -1195,6 +1258,90 @@ function demoteCsd(entities) {
   });
 }
 
+function resetKh() {
+  khState.file = null;
+  khState.raw = null;
+  khState.fileName = '';
+  khState.assign = {};
+  khState.skip = [];
+  khState.pick = null;
+}
+
+async function ensureKhParsed(force = false) {
+  const file = dxfSlots.KH;
+  if (!file) { resetKh(); return; }
+  if (!force && khState.file === file && khState.raw) return;
+  khState.file = file;
+  khState.fileName = file.name;
+  khState.assign = {};
+  khState.skip = [];
+  khState.pick = null;
+  try {
+    khState.raw = parseLandStampDxf(await file.text());
+  } catch (err) {
+    khState.raw = [];
+    setStatus(`❌ Không đọc được file ký hiệu: ${err.message}`, 'var(--accent-red)');
+  }
+}
+
+function stampToLatLng(stamps, wgs84, crs) {
+  if (wgs84) return (x, y) => [y, x];
+  const axes = detectAxes((stamps || []).map(s => ({ pt: [s.x, s.y] })));
+  const f = axes.valid ? axes.f : (x, y) => [x, y];
+  return (x, y) => {
+    const [E, N] = f(x, y);
+    if (!axes.valid && E > 100 && E < 120 && N > 8 && N < 24) return [N, E];
+    return vn2000ToWgs84(E, N, crs);
+  };
+}
+
+function writeStamp(p, stamp) {
+  [p, p.partner].filter(Boolean).forEach(t => {
+    if (stamp.code) t.lotCode = stamp.code;
+    const plan = { ...(t.plan || {}) };
+    if (stamp.floors) plan.floors = String(stamp.floors);
+    if (stamp.coverage) plan.coverage = String(stamp.coverage);
+    if (stamp.far) plan.far = String(stamp.far);
+    if (plan.floors || plan.coverage || plan.far) t.plan = plan;
+    const m2 = stampAreaM2(stamp.areaRaw, t.area);
+    if (m2) t.stampArea = m2;
+  });
+}
+
+function applyStamps(parcels) {
+  parcels.forEach(p => {
+    [p, p.partner].filter(Boolean).forEach(t => { delete t.stampArea; });
+  });
+  current.stampMatch = null;
+  current.stampView = null;
+  current.stampFile = khState.fileName || '';
+  if (!khState.raw || !khState.raw.length) return;
+  const crs = CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
+  const projected = projectStamps(khState.raw, stampToLatLng(khState.raw, current.wgs84, crs));
+  current.stampView = projected;
+  const lots = parcels.filter(p => p.polygons && p.polygons.length).map(p => ({
+    key: String(p.src),
+    area: p.area,
+    rings: [...p.polygons, ...((p.partner && p.partner.polygons) || [])]
+  }));
+  const byKey = new Map(parcels.map(p => [String(p.src), p]));
+  const match = matchStamps(projected, lots, { assign: khState.assign, skip: khState.skip });
+  current.stampMatch = match;
+  match.assigned.forEach(({ stamp, key }) => {
+    const p = byKey.get(key);
+    if (p) writeStamp(p, stamp);
+  });
+  if (!khState.pick || !match.pending.some(s => s.id === khState.pick)) khState.pick = match.pending[0] ? match.pending[0].id : null;
+  current.stampPick = khState.pick;
+}
+
+function assignStampTo(key) {
+  const id = current && current.stampPick;
+  if (!id) return;
+  khState.assign[id] = key;
+  analyse({ fit: false });
+}
+
 function analyse({ fit = true } = {}) {
   if (!current) return;
   const crs = CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
@@ -1204,6 +1351,7 @@ function analyse({ fit = true } = {}) {
   enrichParcels(base.parcels);
   current.base = base;
   refreshParcels();
+  applyStamps(current.result.parcels);
   // Lần phân tích đầu: mở ngay lô đầu tiên cần chọn từng lô
   const first = current.reviewStarted ? null : pickLots().find(p => !levelOf(p.src));
   current.reviewStarted = true;
@@ -1384,14 +1532,16 @@ const pointSource = (r) => ({
   fileName: r.file.name, entities: r.parsed.entities.filter(e => e.kind === 'POINT'), wgs84: r.wgs84, crs: r.parsed.crs || null
 });
 
-const DXF_SLOTS = ['RG', 'HT', 'QH'];
-const DXF_SLOT_HINT = { RG: 'RG - QHPK ….dxf', HT: 'HT - QHPK ….dxf', QH: 'QH - QHPK ….dxf' };
-const DXF_SLOT_TITLE = { RG: 'Ranh giới QH', HT: 'Hiện trạng sử dụng đất', QH: 'Quy hoạch sử dụng đất' };
-const dxfSlots = { RG: null, HT: null, QH: null };
+const DXF_SLOTS = ['RG', 'HT', 'QH', 'KH'];
+const AREA_SLOTS = ['RG', 'HT', 'QH'];
+const DXF_SLOT_HINT = { RG: 'RG - QHPK ….dxf', HT: 'HT - QHPK ….dxf', QH: 'QH - QHPK ….dxf', KH: 'KH - QHPK ….dxf · không bắt buộc' };
+const DXF_SLOT_TITLE = { RG: 'Ranh giới QH', HT: 'Hiện trạng sử dụng đất', QH: 'Quy hoạch sử dụng đất', KH: 'Ký hiệu lô (tem đất)' };
+const dxfSlots = { RG: null, HT: null, QH: null, KH: null };
+const khState = { file: null, raw: null, fileName: '', assign: {}, skip: [], pick: null };
 
 function dxfNameParts(fileName) {
   const base = String(fileName || '').replace(/\.[^.]+$/, '').trim();
-  const m = base.match(/^(RG|HT|QH)\s*[-_]\s*(.+)$/i);
+  const m = base.match(/^(RG|HT|QH|KH)\s*[-_]\s*(.+)$/i);
   if (!m || !m[2].trim()) return null;
   return { prefix: m[1].toUpperCase(), project: m[2].trim() };
 }
@@ -1442,12 +1592,27 @@ async function onDxfSlot(slot, file) {
   dxfSlots[slot] = file;
   paintDxfSlot(slot);
   if (input) input.value = '';
+  if (slot === 'KH') {
+    await ensureKhParsed(true);
+    if (current) analyse({ fit: false });
+    else setStatus('Đã nhận file ký hiệu. Thêm file hiện trạng hoặc quy hoạch để gán tem vào lô.', 'var(--accent-orange)');
+    return;
+  }
   await reloadDxfSlots();
 }
 
 async function reloadDxfSlots() {
-  const chosen = DXF_SLOTS.filter(s => dxfSlots[s]);
-  if (!chosen.length) { resetImport(); return; }
+  if (dxfSlots.KH) await ensureKhParsed(false);
+  const chosen = AREA_SLOTS.filter(s => dxfSlots[s]);
+  if (!chosen.length) {
+    if (dxfSlots.KH && current) { analyse({ fit: false }); return; }
+    if (dxfSlots.KH) {
+      setStatus('Đã nhận file ký hiệu. Thêm file hiện trạng hoặc quy hoạch để gán tem vào lô.', 'var(--accent-orange)');
+      return;
+    }
+    resetImport();
+    return;
+  }
   if (submitting) return;
   fillPairSelect();
   setStatus('⏳ Đang đọc file...', 'var(--accent-orange)');
@@ -1515,7 +1680,7 @@ async function loadFiles(files, pendingId = null) {
     }
     const projects = list.map(file => nameKey(dxfNameParts(file.name).project));
     if (projects.some(p => p !== projects[0])) {
-      setStatus('⚠️ Các file DXF phải cùng tên đồ án sau tiền tố RG / HT / QH.', 'var(--accent-red)');
+      setStatus('⚠️ Các file DXF phải cùng tên đồ án sau tiền tố RG / HT / QH / KH.', 'var(--accent-red)');
       return;
     }
     DXF_SLOTS.forEach(slot => { dxfSlots[slot] = null; });
@@ -1709,6 +1874,7 @@ function buildItems() {
       splits: wardSplits(p.ward, stageLots),
       area: p.area,
       plan: planOf(p),
+      lotCode: p.lotCode || (p.partner && p.partner.lotCode) || '',
       point: isPoint(p),
       kind: p.kind,
       crossWard: !!p.crossWard,
@@ -1726,7 +1892,7 @@ function buildItems() {
 
 // Tên đồ án = tên file bỏ tiền tố RG / HT / QH và phần mở rộng (khớp projectTitle trong Apps Script)
 function projectName(fileName) {
-  return String(fileName || '').replace(/\.[^.]+$/, '').replace(/^(RG|HT|QH)[-_\s]+/i, '').replace(/-(?:ranh-gioi|diem-chuc-nang)$/i, '').trim() || 'DXF';
+  return String(fileName || '').replace(/\.[^.]+$/, '').replace(/^(RG|HT|QH|KH)[-_\s]+/i, '').replace(/-(?:ranh-gioi|diem-chuc-nang)$/i, '').trim() || 'DXF';
 }
 
 const nameKey = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd')
@@ -1778,6 +1944,8 @@ function buildLands() {
       lng: p.lng,
       area: p.area,
       plan: planOf(p),
+      lotCode: p.lotCode || (p.partner && p.partner.lotCode) || '',
+      stampArea: p.stampArea || (p.partner && p.partner.stampArea) || 0,
       phase: phaseOf(p),
       crossWard: !!p.crossWard,
       geometry: p.polygons.length === 1
@@ -2069,8 +2237,14 @@ export function initCadImport(opts = {}) {
     drop.addEventListener('drop', (e) => onDxfSlot(slot, e.dataTransfer.files && e.dataTransfer.files[0]));
   });
   document.querySelectorAll('.cad-slot-clear').forEach(btn => btn.addEventListener('click', () => {
-    dxfSlots[btn.dataset.clear] = null;
-    paintDxfSlot(btn.dataset.clear);
+    const slot = btn.dataset.clear;
+    dxfSlots[slot] = null;
+    paintDxfSlot(slot);
+    if (slot === 'KH') {
+      resetKh();
+      if (current) analyse({ fit: false });
+      return;
+    }
     reloadDxfSlots();
   }));
   const drop = $('cadDrop');

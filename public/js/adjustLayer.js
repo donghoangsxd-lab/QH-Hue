@@ -1,8 +1,9 @@
-// Hồ sơ điều chỉnh cục bộ trên bản đồ quy hoạch (bản đồ chính và khung so sánh): ranh vàng nét đứt, nền sọc vàng nghiêng 45°.
-// Nhịp nét lệch nửa chu kỳ với ranh khu vực QHCT (qhctLayer.js): khu vực vừa có QHCT vừa điều chỉnh hiện xen kẽ vàng / đỏ.
-// Rê chuột sáng viền; bấm mở popup để thể hiện theo điều chỉnh (lớp che trắng giấu quy hoạch cũ trong ranh, tắt được;
-// lô mới kẻ hoa văn TT16 theo loại đất), xem PDF scan
-// hoặc bật ảnh tờ bản vẽ scan đã định vị (scanGeoref.js), thanh nhỏ ở góc ảnh chỉnh độ trong suốt và tắt ảnh.
+// Hồ sơ điều chỉnh cục bộ trên bản đồ quy hoạch (bản đồ chính và khung so sánh): ranh xanh dương đậm, nét đứt, không tô nền.
+// Nét nằm trên ranh và lô đồ án QHPK. Nhịp nét lệch nửa chu kỳ với ranh khu vực QHCT (qhctLayer.js): chỗ trùng ranh hiện xen kẽ xanh / đỏ.
+// Rê chuột sáng viền; bấm ranh mở popup để thể hiện theo điều chỉnh. Nền trong ranh là ảnh vệ tinh cắt đúng phạm vi
+// (cùng ô ảnh với nền bản đồ, che lô quy hoạch cũ), tắt được; lô mới kẻ hoa văn TT16. Bấm 1 lô mở thẻ lô;
+// Admin sửa lớp, loại đất, tầng cao, mật độ, hệ số và ranh — ghi vào file hồ sơ, không đụng lô đồ án bên ngoài.
+// PDF và ảnh tờ bản vẽ scan đã định vị (scanGeoref.js): thanh nhỏ ở góc ảnh chỉnh độ trong suốt và tắt ảnh.
 // Admin ghi thẳng; hồ sơ người dùng nằm trong hàng chờ (khung Thẩm định › Điều chỉnh) tới khi Admin duyệt.
 // Trong panel, hồ sơ đã duyệt là lớp phụ «Điều chỉnh cục bộ» của đồ án (projectLayer.js): ẩn theo đồ án / cấp và theo ô lớp.
 import { state } from './state.js';
@@ -10,21 +11,29 @@ import { map } from './mapEngine.js';
 import { planMap, passToolClick, isCompareOn } from './planMap.js';
 import { isLayerHidden, projectShown } from './projectFiles.js';
 import { geeApi } from './api.js';
-import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
+import { escapeHtml, fmtNum, ico, planItems, showToast } from './utils.js';
+import { basemapTileSpec } from './basemap.js';
 import { ScanOverlay, cornersOf, openGeoref, prepareScan, scanProblem } from './scanGeoref.js';
-import { tt16SymbolStyle, landPatternKey, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT } from './tt16Symbols.js';
+import { tt16SymbolStyle, landPatternKey, landLabel, layerForPattern, tt16SwatchCss, TT16_STYLES, TT16_LAND_KEYS, LAND_LABELS, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT } from './tt16Symbols.js';
+import { startShapeEdit, vertexCount, SHAPE_MAX_VERTICES } from './lotShapeEdit.js';
+import { savedLandTag } from './projectReviewCore.js';
+import { planLevelOf } from './generalPlan.js';
 
-const YELLOW = '#f5c400';
-// Trên viền sáng ranh đồ án (445), dưới tem đường (450): nền che + lô mới ở 446, ảnh scan ở 447, ranh ở 448
+const BLUE = '#1e40af';
+// Trên ranh đồ án QHPK (overlay 400) và viền sáng đồ án (445), dưới tem đường (450).
+// Ảnh vệ tinh cắt theo ranh và lô mới cùng z 446: pane vệ tinh tạo trước nên lô nằm trên nền.
+// Ảnh scan ở 447, ranh QHCT ở 448, ranh điều chỉnh ở 449 nên luôn nổi trên đồ án được điều chỉnh.
+const SAT_PANE = 'adjustSatPane';
 const FILL_PANE = 'adjustFillPane';
 const SCAN_PANE = 'adjustScanPane';
 const LINE_PANE = 'adjustLinePane';
+const SAT_Z = 446;
 const FILL_Z = 446;
 const SCAN_Z = 447;
-const LINE_Z = 448;
+const LINE_Z = 449;
 const SCAN_TRANSPARENCY = 30;
-const LINE_STYLE = { color: YELLOW, weight: 2, opacity: 1, dashArray: '3 3', dashOffset: '3', lineCap: 'butt' };
-const HOVER_STYLE = { color: '#fff1a8', weight: 4 };
+const LINE_STYLE = { color: BLUE, weight: 5, opacity: 1, dashArray: '3 3', dashOffset: '3', lineCap: 'butt', fill: false };
+const HOVER_STYLE = { color: '#60a5fa', weight: 7, fill: false };
 export const ADJUST_PDF_MAX_BYTES = 2 * 1024 * 1024;
 // Khóa lớp trong state.hiddenProjectLayers ("<Ten_QH>|dieu-chinh"), cùng cách lưu với PROJECT_LAYERS
 export const ADJUST_LAYER_KEY = 'dieu-chinh';
@@ -127,13 +136,156 @@ const shownMaps = () => [map, planMap].filter(Boolean);
  */
 export function adjustLotStyle(lot, detailed) {
   const saved = TT16_STYLES[lot.pattern] ? lot.pattern : '';
-  const guess = saved || landPatternKey(lot.layer, '') || landPatternKey(lot.srcLayer, '');
+  const guess = saved || landPatternKey(lot.layer, lot.name || '') || landPatternKey(lot.srcLayer, '');
   const key = TT16_STYLES[guess] ? guess : null;
   return tt16SymbolStyle(key, key ? TT16_STYLES[key].color : lot.tone || '#94a3b8', 'QH', { scenario: 'QH', detailed });
 }
 
-// Lớp che trắng (wipeout) giấu lô quy hoạch cũ trong ranh khi thể hiện theo điều chỉnh
-export const WIPEOUT_STYLE = { stroke: false, fillColor: '#ffffff', fillOpacity: 1 };
+// ============================ NỀN VỆ TINH CẮT THEO RANH ============================
+// Mỗi ô ảnh Google (cùng URL, cùng cấp zoom với ảnh nền) vẽ lên canvas rồi destination-in theo ranh:
+// trong ranh là đúng ảnh vệ tinh đang xem, ngoài ranh trong suốt nên quy hoạch cũ vẫn hiện.
+// Ô nằm ngoài mọi ranh không tải ảnh. Phóng quá cấp 19 thì Leaflet co giãn ô như ảnh nền nên mép không lệch.
+
+const satClips = new WeakMap();
+let SatClip = null;
+
+function polysFromGeom(g) {
+  const parts = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+  return parts.map(rings => rings
+    .map(ring => ring.map(([lng, lat]) => L.latLng(lat, lng)))
+    .filter(ring => ring.length >= 4)).filter(rings => rings.length);
+}
+
+function clipClass() {
+  if (SatClip) return SatClip;
+  SatClip = L.TileLayer.extend({
+    initialize(spec, pane) {
+      L.TileLayer.prototype.initialize.call(this, spec.url, {
+        pane, maxZoom: spec.maxZoom, maxNativeZoom: spec.maxNativeZoom, subdomains: spec.subdomains,
+        crossOrigin: 'anonymous', fadeAnimation: false, className: 'adj-sat-clip', zIndex: 1
+      });
+      this._polys = [];
+      this._boxes = [];
+    },
+    setGeoms(geoms) {
+      const polys = [];
+      geoms.forEach(g => polys.push(...polysFromGeom(g)));
+      this._polys = polys;
+      this._boxes = polys.map(rings => {
+        const b = L.latLngBounds([]);
+        rings.forEach(ring => ring.forEach(ll => b.extend(ll)));
+        return b;
+      });
+      if (this._map) this.redraw();
+    },
+    _tileBounds(coords, size) {
+      const z = coords.z;
+      const nw = this._map.unproject(L.point(coords.x * size.x, coords.y * size.y), z);
+      const se = this._map.unproject(L.point((coords.x + 1) * size.x, (coords.y + 1) * size.y), z);
+      return L.latLngBounds(nw, se);
+    },
+    _hitPolys(coords, size) {
+      const box = this._tileBounds(coords, size);
+      const hit = [];
+      this._polys.forEach((poly, i) => {
+        if (this._boxes[i].isValid() && this._boxes[i].intersects(box)) hit.push(poly);
+      });
+      return hit;
+    },
+    _mask(polys, coords, size) {
+      const mask = document.createElement('canvas');
+      mask.width = size.x;
+      mask.height = size.y;
+      const ctx = mask.getContext('2d');
+      const origin = L.point(coords.x * size.x, coords.y * size.y);
+      const trace = (rings) => {
+        rings.forEach(ring => {
+          ring.forEach((ll, k) => {
+            const p = this._map.project(ll, coords.z).subtract(origin);
+            if (k) ctx.lineTo(p.x, p.y);
+            else ctx.moveTo(p.x, p.y);
+          });
+          ctx.closePath();
+        });
+      };
+      // Từng polygon một: lỗ dùng evenodd, hai hồ sơ chồng nhau vẫn đặc (không khoét chỗ giao)
+      polys.forEach(rings => {
+        ctx.beginPath();
+        trace(rings);
+        ctx.fill('evenodd');
+      });
+      ctx.beginPath();
+      polys.forEach(trace);
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      return mask;
+    },
+    createTile(coords, done) {
+      const tile = document.createElement('canvas');
+      const size = this.getTileSize();
+      tile.width = size.x;
+      tile.height = size.y;
+      const hit = this._map ? this._hitPolys(coords, size) : [];
+      if (!hit.length) { done(null, tile); return tile; }
+      const url = this.getTileUrl(coords);
+      const paint = (image) => {
+        if (!this._map) { done(null, tile); return; }
+        const ctx = tile.getContext('2d');
+        ctx.drawImage(image, 0, 0, size.x, size.y);
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.drawImage(this._mask(hit, coords, size), 0, 0);
+        done(null, tile);
+      };
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => paint(img);
+      img.onerror = () => {
+        const plain = new Image();
+        plain.onload = () => paint(plain);
+        plain.onerror = () => done(null, tile);
+        plain.src = url;
+      };
+      img.src = url;
+      return tile;
+    }
+  });
+  return SatClip;
+}
+
+function geomSig(geoms) {
+  let h = 2166136261;
+  geoms.forEach(g => {
+    const full = JSON.stringify(g.coordinates);
+    for (let i = 0; i < full.length; i += 64) h = Math.imul(h ^ full.charCodeAt(i), 16777619);
+    h ^= full.length;
+  });
+  return (h >>> 0).toString(36);
+}
+
+/** Bật nền vệ tinh cắt theo các polygon trên một pane. Mảng rỗng thì gỡ lớp. Nhiều pane trên cùng một bản đồ không đè nhau */
+export function setSatelliteClip(m, pane, zIndex, geoms) {
+  if (!m || typeof L === 'undefined') return;
+  let byPane = satClips.get(m);
+  if (!byPane) { byPane = new Map(); satClips.set(m, byPane); }
+  const list = (Array.isArray(geoms) ? geoms : []).filter(g => g && (g.type === 'Polygon' || g.type === 'MultiPolygon'));
+  const prev = byPane.get(pane);
+  if (!list.length) {
+    if (prev) { prev.layer.remove(); byPane.delete(pane); }
+    return;
+  }
+  const sig = geomSig(list);
+  if (prev && prev.sig === sig) return;
+  if (!m.getPane(pane)) {
+    const el = m.createPane(pane);
+    el.style.zIndex = String(zIndex);
+    el.style.pointerEvents = 'none';
+  }
+  const layer = prev ? prev.layer : new (clipClass())(basemapTileSpec(), pane);
+  layer.setGeoms(list);
+  if (!prev) layer.addTo(m);
+  byPane.set(pane, { layer, sig });
+}
 
 // Hồ sơ chờ duyệt Admin đang xem trước luôn hiện
 const visible = (it) => it.status === 'pending' || (projectShown(it.tenQH) && !isLayerHidden(it.tenQH, ADJUST_LAYER_KEY));
@@ -159,24 +311,14 @@ export async function adjustmentPacks(tenQH) {
   return packs;
 }
 
-function hatchDefs(svg, id) {
-  if (!svg || svg.querySelector(`#${id}`)) return;
-  const ns = 'http://www.w3.org/2000/svg';
-  let defs = svg.querySelector('defs');
-  if (!defs) { defs = document.createElementNS(ns, 'defs'); svg.insertBefore(defs, svg.firstChild); }
-  const p = document.createElementNS(ns, 'pattern');
-  p.setAttribute('id', id);
-  p.setAttribute('patternUnits', 'userSpaceOnUse');
-  p.setAttribute('width', '10');
-  p.setAttribute('height', '10');
-  p.setAttribute('patternTransform', 'rotate(45)');
-  p.innerHTML = `<rect width="10" height="10" fill="${YELLOW}" fill-opacity="0.08"/><line x1="0" y1="0" x2="0" y2="10" stroke="${YELLOW}" stroke-width="4" stroke-opacity="0.9"/>`;
-  defs.appendChild(p);
-}
-
-// Ranh: SVG (nền sọc dùng pattern SVG, viền sáng bằng class). Lớp che + lô mới: canvas để kẻ hoa văn TT16 (CanvasPattern)
+// Ranh: SVG (viền sáng bằng class). Lô mới: canvas để kẻ hoa văn TT16.
 function layersOf(m) {
   if (layers.has(m)) return layers.get(m);
+  if (!m.getPane(SAT_PANE)) {
+    const pane = m.createPane(SAT_PANE);
+    pane.style.zIndex = SAT_Z;
+    pane.style.pointerEvents = 'none';
+  }
   [[FILL_PANE, FILL_Z], [SCAN_PANE, SCAN_Z], [LINE_PANE, LINE_Z]].forEach(([name, z]) => {
     if (!m.getPane(name)) m.createPane(name).style.zIndex = z;
   });
@@ -184,10 +326,8 @@ function layersOf(m) {
   m.getPane(FILL_PANE).style.pointerEvents = 'none';
   const fillR = L.canvas({ pane: FILL_PANE }).addTo(m);
   const lineR = L.svg({ pane: LINE_PANE }).addTo(m);
-  const hatchId = `adjHatch${L.stamp(m)}`;
-  hatchDefs(lineR._container, hatchId);
   const entry = {
-    map: m, fillR, lineR, hatchId, fills: L.layerGroup().addTo(m), lines: L.layerGroup().addTo(m),
+    map: m, fillR, lineR, fills: L.layerGroup().addTo(m), lines: L.layerGroup().addTo(m),
     scans: L.layerGroup().addTo(m), scanById: new Map(), detailed: null
   };
   layers.set(m, entry);
@@ -214,7 +354,7 @@ function popupHtml(it) {
     it.verdict ? ['Thẩm định', escapeHtml(it.verdict)] : null
   ].filter(Boolean);
   const shows = [
-    on ? sw('wipe', wipeOff.has(it.id) ? 'eye' : 'eye-off', 'Che quy hoạch cũ', 'Phủ trắng lô cũ trong ranh điều chỉnh', !wipeOff.has(it.id)) : '',
+    on ? sw('wipe', wipeOff.has(it.id) ? 'eye' : 'eye-off', 'Che quy hoạch cũ', 'Ảnh vệ tinh cắt theo ranh, giấu lô quy hoạch cũ', !wipeOff.has(it.id)) : '',
     it.scan ? sw('scan', 'map', 'Bản vẽ scan', 'Ảnh tờ bản vẽ đã định vị trên bản đồ', scanOn.has(it.id)) : ''
   ].join('');
   const admins = admin ? [
@@ -325,27 +465,30 @@ function drawOn(m) {
   L1.lines.clearLayers();
   L1.detailed = m.getZoom() >= TT16_PATTERN_ZOOM;
   drawScans(L1);
+  const clips = [];
+  items.forEach(it => {
+    if (it.boundary && visible(it) && active.has(it.id) && !wipeOff.has(it.id)) clips.push(it.boundary);
+  });
+  setSatelliteClip(m, SAT_PANE, SAT_Z, clips);
   items.forEach(it => {
     if (!it.boundary || !visible(it)) return;
     const on = active.has(it.id);
     const detail = on ? details.get(it.id)?.value : null;
     if (on && detail) {
-      if (!wipeOff.has(it.id)) {
-        L1.fills.addLayer(L.geoJSON(it.boundary, { renderer: L1.fillR, interactive: false, style: WIPEOUT_STYLE }));
-      }
-      detail.lots.forEach(lot => {
+      detail.lots.forEach((lot, index) => {
         const shape = L.geoJSON(lot.geometry, {
           renderer: L1.fillR, bubblingMouseEvents: false, style: adjustLotStyle(lot, L1.detailed)
         });
+        const name = lot.name || lot.label || lot.layer || 'Lô điều chỉnh';
+        const kind = lot.nhom && lot.nhom !== name ? ` · ${escapeHtml(lot.nhom)}` : '';
         const src = lot.srcLayer ? `<br><small>Layer DXF: ${escapeHtml(lot.srcLayer)}</small>` : '';
-        shape.bindTooltip(`${escapeHtml(lot.label || lot.layer || 'Lô điều chỉnh')} · ${fmtNum(lot.area || 0)} m²${src}`, { sticky: true, className: 'dot-tip' });
-        shape.on('click', (e) => { if (!passToolClick(m, e)) openPopup(m, it, e.latlng); });
+        shape.bindTooltip(`${escapeHtml(name)}${kind} · ${fmtNum(lot.area || 0)} m²${src}`, { sticky: true, className: 'dot-tip' });
+        shape.on('click', (e) => { if (!passToolClick(m, e)) openAdjustLot(m, it, lot, index, e.latlng); });
         L1.fills.addLayer(shape);
       });
     }
     const line = L.geoJSON(it.boundary, {
-      renderer: L1.lineR, bubblingMouseEvents: false,
-      style: { ...LINE_STYLE, fill: !on, fillColor: `url(#${L1.hatchId})`, fillOpacity: 1 }
+      renderer: L1.lineR, bubblingMouseEvents: false, style: LINE_STYLE
     });
     line.bindTooltip(`Điều chỉnh cục bộ · ${escapeHtml(it.tenQH)}`, { sticky: true, direction: 'top', className: 'dot-tip' });
     line.on('mouseover', () => line.eachLayer(l => { l.setStyle(HOVER_STYLE); l.getElement()?.classList.add('adj-glow'); }));
@@ -651,6 +794,271 @@ async function adminCall(action, id, okText) {
   } catch (err) {
     showToast(`Không thực hiện được: ${err.message}`, 'error');
   }
+}
+
+const ADJ_PLAN = [['floors', 'Tầng cao', 'VD 3 hoặc 2-5'], ['coverage', 'Mật độ XD (%)', 'VD 40'], ['far', 'Hệ số SDĐ (lần)', 'VD 1,2']];
+const lotInput = (key, label, value, extra = '') => `<label class="lot-edit-row"><span>${label}</span>
+  <input type="text" data-k="${key}" value="${escapeHtml(value)}"${extra}></label>`;
+const areaText = (area) => (Number(area) > 0 ? `${fmtNum(Math.round(Number(area)))} m²` : '—');
+
+function lotPattern(lot) {
+  const saved = TT16_STYLES[lot.pattern] ? lot.pattern : '';
+  const guess = saved || landPatternKey(lot.layer, lot.name || '') || '';
+  return TT16_STYLES[guess] ? guess : '';
+}
+
+function lotKindName(lot) {
+  const key = lotPattern(lot);
+  return lot.nhom || (key && TT16_STYLES[key].label) || lot.label || 'Lô điều chỉnh';
+}
+
+function lotPopupHtml(it, lot) {
+  const key = lotPattern(lot);
+  const typeName = lotKindName(lot);
+  const title = lot.lotCode || lot.name || lot.label || typeName;
+  const swatch = (key && tt16SwatchCss(key, 0.6)) || `background:${lot.tone || '#94a3b8'};`;
+  const stats = planItems(lot.plan);
+  const info = [
+    ['Diện tích', lot.area ? `${fmtNum(Math.round(lot.area))} m²` : ''],
+    lot.stampArea && lot.area && Math.abs(lot.stampArea - lot.area) / lot.area > 0.1 ? ['Diện tích tem', `${fmtNum(Math.round(lot.stampArea))} m²`] : null,
+    ['Loại đất', typeName],
+    ['Đồ án', it.tenQH],
+    ['Layer', lot.layer],
+    lot.srcLayer && lot.srcLayer !== lot.layer ? ['Layer DXF', lot.srcLayer] : null
+  ].filter(row => row && row[1]);
+  const statsHtml = stats.length ? `<div class="lp-stats">${stats.map(s => `<div class="lp-stat" title="${escapeHtml(s.label)}">
+      <small>${escapeHtml(s.short)}</small><b>${ico(s.icon)}${escapeHtml(s.value)}${s.unit ? `<em>${escapeHtml(s.unit)}</em>` : ''}</b></div>`).join('')}</div>` : '';
+  return `<div class="land-popup">
+    <div class="lp-head" title="${escapeHtml(lot.name || title)}">
+      <i class="lp-swatch" style="${swatch}"></i>
+      <div class="lp-head-main">
+        <div class="lp-title-row"><span class="lp-title">${escapeHtml(title)}</span><span class="lp-phase lp-phase-qh">Điều chỉnh</span></div>
+        ${title !== typeName ? `<div class="lp-sub">${escapeHtml(typeName)}</div>` : ''}
+      </div>
+    </div>
+    ${statsHtml}
+    <dl class="lp-info">${info.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd${k.startsWith('Layer') ? ' class="lp-mono"' : ''}>${escapeHtml(String(v))}</dd>`).join('')}</dl>
+    <button type="button" class="proof-btn adj-lot-file" data-adj-lot-file>${ico('layers')}Hồ sơ điều chỉnh</button>
+  </div>`;
+}
+
+function refitPopup(popup) {
+  popup._updateLayout();
+  popup._updatePosition();
+  popup._adjustPan?.();
+}
+
+function lotBefore(lot) {
+  return {
+    name: lot.name || '',
+    nhom: lot.nhom || landLabel(lot.layer) || lot.label || '',
+    pattern: lotPattern(lot),
+    plan: { floors: lot.plan?.floors || '', coverage: lot.plan?.coverage || '', far: lot.plan?.far || '' }
+  };
+}
+
+function lotFormHtml(lot, before) {
+  const keep = before.pattern ? '' : '<option value="" selected>— Giữ layer hiện tại —</option>';
+  const options = TT16_LAND_KEYS.map(k => `<option value="${k}"${k === before.pattern ? ' selected' : ''}>${escapeHtml(TT16_STYLES[k].label)}</option>`).join('');
+  return `<div class="lot-edit-title">${ico('pen')}Sửa lô điều chỉnh <small>(ghi hồ sơ)</small></div>
+    ${lotInput('name', 'Tên lô', before.name, ' maxlength="150" placeholder="Có thể để trống"')}
+    <label class="lot-edit-row"><span>Lớp (TT16)</span><select data-layer-key title="Layer hiện tại: ${escapeHtml(lot.layer || '(trống)')}${lot.srcLayer ? ` · DXF: ${escapeHtml(lot.srcLayer)}` : ''}">${keep}${options}</select></label>
+    ${lotInput('nhom', 'Loại đất', before.nhom, ' list="adjLotLandTypes" maxlength="40"')}
+    <datalist id="adjLotLandTypes">${LAND_LABELS.map(l => `<option value="${escapeHtml(l)}">`).join('')}</datalist>
+    <div class="lot-edit-row"><span>Diện tích</span><div class="lot-edit-shape"><b class="js-lot-area">${areaText(lot.area)}</b>
+      <button type="button" class="proof-btn js-lot-shape" title="Kéo đỉnh ranh lô trên bản đồ">${ico('pen')}Sửa đỉnh</button></div></div>
+    <div class="lot-edit-hint js-lot-shape-hint" hidden>Kéo đỉnh vàng để chỉnh · kéo / bấm chấm trắng giữa cạnh để thêm đỉnh · chuột phải vào đỉnh để xóa. Nền lô cũ vẫn hiện bên dưới để đối chiếu.</div>
+    ${ADJ_PLAN.map(([k, label, ph]) => lotInput(`plan.${k}`, label, before.plan[k], ` maxlength="20" placeholder="${ph}"`)).join('')}
+    <div class="lot-edit-msg"></div>
+    <div class="lot-edit-btns"><button type="button" class="proof-btn js-lot-save">${ico('save')}Lưu</button>
+    <button type="button" class="proof-btn js-lot-cancel">Hủy</button></div>`;
+}
+
+function bindLotFile(box, m, it, latlng) {
+  box.querySelector('[data-adj-lot-file]')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    m.closePopup();
+    openPopup(m, it, latlng);
+  });
+}
+
+function applySavedLot(it, index, saved) {
+  const detail = details.get(it.id)?.value;
+  const lot = detail && detail.lots[index];
+  if (lot && saved.lot) {
+    Object.keys(lot).forEach(k => { if (!(k in saved.lot)) delete lot[k]; });
+    Object.assign(lot, saved.lot);
+  }
+  if (saved.stamp) {
+    [items, pendingItems].forEach(list => list.forEach(x => {
+      if (x.id === it.id) { x.stamp = saved.stamp; x.at = saved.at; }
+    }));
+  }
+  refreshAdjustLayer();
+  document.dispatchEvent(new CustomEvent(ADJUST_CHANGE_EVENT));
+  return lot;
+}
+
+function openLotForm(popup, it, lot, index) {
+  const box = popup.getContent();
+  const m = popup._map;
+  if (!box || !m || box.querySelector('.lot-edit') || !isAdmin()) return;
+  const view = box.querySelector('.land-popup');
+  const before = lotBefore(lot);
+  const form = document.createElement('div');
+  form.className = 'lot-edit';
+  form.innerHTML = lotFormHtml(lot, before);
+  if (view) view.hidden = true;
+  box.appendChild(form);
+  L.DomEvent.disableClickPropagation(form);
+  L.DomEvent.disableScrollPropagation(form);
+  refitPopup(popup);
+  form.querySelector('[data-k="name"]')?.focus();
+
+  const msg = form.querySelector('.lot-edit-msg');
+  const select = form.querySelector('[data-layer-key]');
+  const nhomInput = form.querySelector('[data-k="nhom"]');
+  select?.addEventListener('change', () => {
+    if (!select.value || !nhomInput) return;
+    nhomInput.value = landLabel(layerForPattern(select.value, lot.layer || lot.srcLayer || ''));
+  });
+
+  const areaEl = form.querySelector('.js-lot-area');
+  const shapeBtn = form.querySelector('.js-lot-shape');
+  const hint = form.querySelector('.js-lot-shape-hint');
+  const original = lot.geometry;
+  const originalJson = original ? JSON.stringify(original) : '';
+  let session = null;
+  let edited = null;
+  let kinked = false;
+  const kinksOf = (geom) => turf.kinks(turf.cleanCoords(turf.feature(geom))).features.length;
+  let baseKinks = 0;
+
+  const showArea = (geom) => {
+    edited = geom;
+    let area = 0;
+    try {
+      area = turf.area(turf.feature(geom));
+      kinked = kinksOf(geom) > baseKinks;
+    } catch (e) { kinked = true; }
+    const was = Number(lot.area) || 0;
+    const diff = Math.round(area - was);
+    const delta = was && diff ? ` <small>(cũ ${fmtNum(Math.round(was))} m², ${diff > 0 ? '+' : ''}${fmtNum(diff)})</small>` : '';
+    areaEl.innerHTML = `${areaText(area)}${delta}`;
+    areaEl.classList.toggle('bad', kinked);
+    msg.textContent = kinked ? 'Ranh đang tự cắt — kéo lại đỉnh trước khi lưu' : '';
+    msg.className = kinked ? 'lot-edit-msg bad' : 'lot-edit-msg';
+  };
+  const stop = () => {
+    if (!session) return;
+    const s = session;
+    session = null;
+    state.lotShapeEdit = false;
+    if (popup.isOpen()) m.on('preclick', popup.close, popup);
+    s.stop();
+  };
+  popup.once('remove', stop);
+  shapeBtn?.addEventListener('click', () => {
+    if (session) { session.reset(original); return; }
+    if (!original || typeof turf === 'undefined') return;
+    const n = vertexCount(original);
+    if (n > SHAPE_MAX_VERTICES) {
+      msg.textContent = `Lô có ${fmtNum(n)} đỉnh — quá nhiều để kéo tay (tối đa ${SHAPE_MAX_VERTICES}). Sửa trong CAD rồi nhập lại.`;
+      msg.className = 'lot-edit-msg bad';
+      refitPopup(popup);
+      return;
+    }
+    try { baseKinks = kinksOf(original); } catch (e) { baseKinks = 0; }
+    session = startShapeEdit(m, original, showArea);
+    state.lotShapeEdit = true;
+    m.off('preclick', popup.close, popup);
+    const b = L.geoJSON(original).getBounds();
+    if (b.isValid()) popup.setLatLng([b.getNorth(), b.getCenter().lng]);
+    shapeBtn.innerHTML = `${ico('close')}Khôi phục ranh gốc`;
+    shapeBtn.title = 'Bỏ các đỉnh đã kéo, trở về ranh lúc mở form';
+    if (hint) hint.hidden = false;
+    refitPopup(popup);
+  });
+
+  const closeForm = () => {
+    stop();
+    form.remove();
+    if (view) view.hidden = false;
+    refitPopup(popup);
+  };
+  form.querySelector('.js-lot-cancel')?.addEventListener('click', closeForm);
+  form.querySelector('.js-lot-save')?.addEventListener('click', async () => {
+    const fields = {};
+    const now = {};
+    form.querySelectorAll('[data-k]').forEach(el => { now[el.dataset.k] = el.value.trim(); });
+    if (now.name !== undefined && now.name !== before.name) fields.name = now.name;
+    if (now.nhom !== undefined && now.nhom !== before.nhom) fields.nhom = now.nhom;
+    const plan = {};
+    ADJ_PLAN.forEach(([k]) => {
+      const val = now[`plan.${k}`];
+      if (val !== undefined && val !== before.plan[k]) plan[k] = val;
+    });
+    if (Object.keys(plan).length) fields.plan = plan;
+    if (select && select.value && select.value !== before.pattern) {
+      const layer = layerForPattern(select.value, lot.layer || lot.srcLayer || '');
+      if (layer && layer !== lot.layer) fields.layer = layer;
+      fields.pattern = select.value;
+      fields.label = TT16_STYLES[select.value].label;
+      fields.tone = TT16_STYLES[select.value].color;
+      const tag = savedLandTag(planLevelOf(it.tenQH), select.value, false);
+      fields.landKey = tag.landKey || '';
+      fields.subKey = tag.subKey || '';
+    }
+    if (edited && JSON.stringify(edited) !== originalJson) {
+      if (kinked) { msg.textContent = 'Ranh đang tự cắt — kéo lại đỉnh trước khi lưu'; msg.className = 'lot-edit-msg bad'; return; }
+      fields.geometry = edited;
+    }
+    if (!Object.keys(fields).length) { closeForm(); return; }
+    const btn = form.querySelector('.js-lot-save');
+    if (btn) btn.disabled = true;
+    msg.textContent = 'Đang ghi hồ sơ…';
+    msg.className = 'lot-edit-msg';
+    try {
+      const saved = await readJsonResponse(await fetch(geeApi('action=editAdjustLot'), {
+        method: 'POST', headers: headers(true), body: JSON.stringify({ id: it.id, index, fields })
+      }));
+      stop();
+      const next = applySavedLot(it, index, saved) || lot;
+      box.innerHTML = lotPopupHtml(it, next);
+      bindLotFile(box, m, it, popup.getLatLng());
+      refitPopup(popup);
+      showToast('✓ Đã cập nhật lô trong hồ sơ điều chỉnh', 'success');
+    } catch (err) {
+      if (btn) btn.disabled = false;
+      msg.textContent = err.message || 'Không ghi được';
+      msg.className = 'lot-edit-msg bad';
+      refitPopup(popup);
+    }
+  });
+}
+
+function openAdjustLot(m, it, lot, index, latlng) {
+  const box = document.createElement('div');
+  box.innerHTML = lotPopupHtml(it, lot);
+  bindLotFile(box, m, it, latlng);
+  const popup = L.popup({ maxWidth: 340, minWidth: 280, className: 'land-lot-popup adj-lot-popup', autoPanPaddingTopLeft: [40, 90] })
+    .setLatLng(latlng).setContent(box).openOn(m);
+  if (!isAdmin()) return;
+  const container = popup.getElement();
+  if (!container) return;
+  container.classList.add('pp-editable');
+  const btn = L.DomUtil.create('a', 'pp-edit-btn', container);
+  btn.href = '#';
+  btn.setAttribute('role', 'button');
+  btn.innerHTML = ico('pen');
+  btn.title = 'Sửa thông tin lô trong hồ sơ điều chỉnh';
+  btn.setAttribute('aria-label', btn.title);
+  L.DomEvent.disableClickPropagation(btn);
+  L.DomEvent.on(btn, 'click', (e) => {
+    L.DomEvent.stop(e);
+    openLotForm(popup, it, lot, index);
+  });
 }
 
 function onAction(e) {

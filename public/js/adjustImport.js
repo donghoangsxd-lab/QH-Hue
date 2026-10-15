@@ -5,14 +5,16 @@
 // lựa chọn nhớ theo tên layer cho lần nhập sau.
 import { state } from './state.js';
 import { map } from './mapEngine.js';
-import { CRS_PRESETS } from './cadImport.js';
+import { CRS_PRESETS, detectAxes, vn2000ToWgs84 } from './cadImport.js';
+import { parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
 import { adjustRecordFromDxf } from './localAdjust.js';
-import { sendAdjustment, pdfProblem, adjustLotStyle, WIPEOUT_STYLE } from './adjustLayer.js';
+import { sendAdjustment, pdfProblem, adjustLotStyle, setSatelliteClip } from './adjustLayer.js';
 import { ScanOverlay, cornersOf, openGeoref, prepareScan, scanProblem } from './scanGeoref.js';
 import { TT16_LAND_KEYS, TT16_STYLES, TT16_PATTERN_ZOOM, tt16SwatchCss } from './tt16Symbols.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 
-const RANH = '#f5c400';
+const RANH = '#1e40af';
+const SAT_PANE = 'adjImportSatPane';
 const FILL_PANE = 'adjImportFillPane';
 const SCAN_PANE = 'adjImportScanPane';
 const LINE_PANE = 'adjImportLinePane';
@@ -22,7 +24,7 @@ const $ = (id) => document.getElementById(id);
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 
 // record: kết quả adjustRecordFromDxf; scan: { blob, w, h, url, name, georef } (georef null = chưa định vị)
-let files = { dxf: null, image: null, pdf: null };
+let files = { dxf: null, kh: null, image: null, pdf: null };
 let record = null;
 let recordError = '';
 let reading = false;
@@ -39,6 +41,11 @@ let fillRenderer = null;
 let previewDetailed = null;
 // Layer DXF → khóa TT16 chọn tay cho file đang mở
 let overrides = {};
+let khParsed = null;
+let stampAssign = {};
+let stampSkip = [];
+let stampPick = null;
+let khMatch = null;
 
 const kindOn = () => document.querySelector('input[name="bulkKind"]:checked')?.value === 'adjust';
 
@@ -63,7 +70,7 @@ function rememberLayer(layer, key) {
 }
 
 function fileKind(f) {
-  if (/\.dxf$/i.test(f.name)) return 'dxf';
+  if (/\.dxf$/i.test(f.name)) return /^KH\s*[-_]/i.test(f.name) ? 'kh' : 'dxf';
   if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') return 'pdf';
   if (/\.(jpe?g|png|webp)$/i.test(f.name) || /^image\/(jpeg|png|webp)$/.test(f.type)) return 'image';
   return '';
@@ -71,13 +78,19 @@ function fileKind(f) {
 
 // ============================ XEM TRƯỚC TRÊN BẢN ĐỒ ============================
 
-function clearPreview() {
+function clearPreview(keepSat = false) {
   if (preview) { preview.remove(); preview = null; }
   if (scanLayer) { scanLayer.remove(); scanLayer = null; }
+  if (!keepSat && map) setSatelliteClip(map, SAT_PANE, 446, []);
 }
 
-// Lớp che + lô mới (446) trên lô quy hoạch cũ, dưới ảnh scan (447) và ranh (449)
+// Nền vệ tinh cắt theo ranh (446, tạo trước) rồi lô mới, dưới ảnh scan (447) và ranh (449)
 function ensurePanes() {
+  if (!map.getPane(SAT_PANE)) {
+    const pane = map.createPane(SAT_PANE);
+    pane.style.zIndex = 446;
+    pane.style.pointerEvents = 'none';
+  }
   if (!map.getPane(FILL_PANE)) {
     map.createPane(FILL_PANE).style.zIndex = 446;
     map.getPane(FILL_PANE).style.pointerEvents = 'none';
@@ -91,19 +104,101 @@ function ensurePanes() {
   if (!fillRenderer) fillRenderer = L.canvas({ pane: FILL_PANE });
 }
 
+function ringsOf(geometry) {
+  if (!geometry) return [];
+  if (geometry.type === 'Polygon') return [geometry.coordinates];
+  if (geometry.type === 'MultiPolygon') return geometry.coordinates;
+  return [];
+}
+
+function stampProjector(stamps) {
+  const crs = CRS_PRESETS[$('adjCrs')?.value] || CRS_PRESETS.HUE_3;
+  const axes = detectAxes((stamps || []).map(s => ({ pt: [s.x, s.y] })));
+  const f = axes.valid ? axes.f : (x, y) => [x, y];
+  return (x, y) => {
+    const [E, N] = f(x, y);
+    if (!axes.valid && E > 100 && E < 120 && N > 8 && N < 24) return [N, E];
+    return vn2000ToWgs84(E, N, crs);
+  };
+}
+
+function clearLotStamps() {
+  (record?.payload?.lots || []).forEach(l => {
+    delete l.lotCode;
+    delete l.plan;
+    delete l.stampArea;
+  });
+}
+
+function applyKhToRecord() {
+  khMatch = null;
+  if (!record) return;
+  clearLotStamps();
+  if (!khParsed || !khParsed.stamps.length) return;
+  const projected = projectStamps(khParsed.stamps, stampProjector(khParsed.stamps));
+  const lots = record.payload.lots.map((l, i) => ({
+    key: String(i), phase: 'QH', area: l.area, rings: ringsOf(l.geometry)
+  }));
+  const match = matchStamps(projected, lots, { assign: stampAssign, skip: stampSkip });
+  khMatch = { ...match, view: projected };
+  const byKey = new Map(match.assigned.map(a => [a.key, a.stamp]));
+  record.payload.lots.forEach((l, i) => {
+    const s = byKey.get(String(i));
+    if (!s) return;
+    if (s.code) {
+      l.lotCode = s.code;
+      if (!l.name) l.name = s.code;
+    }
+    const plan = {};
+    if (s.floors) plan.floors = String(s.floors);
+    if (s.coverage) plan.coverage = String(s.coverage);
+    if (s.far) plan.far = String(s.far);
+    if (Object.keys(plan).length) l.plan = plan;
+    const m2 = stampAreaM2(s.areaRaw, l.area);
+    if (m2) l.stampArea = m2;
+  });
+  if (!stampPick || !match.pending.some(s => s.id === stampPick)) stampPick = match.pending[0] ? match.pending[0].id : null;
+}
+
+function assignKh(idx) {
+  if (!stampPick) return;
+  stampAssign[stampPick] = String(idx);
+  applyKhToRecord();
+  render();
+  drawPreview();
+}
+
 function drawPreview(fit = false) {
-  clearPreview();
-  if (!map || typeof L === 'undefined' || !record || !kindOn()) return;
+  clearPreview(true);
+  if (!map || typeof L === 'undefined' || !record || !kindOn()) {
+    if (map) setSatelliteClip(map, SAT_PANE, 446, []);
+    return;
+  }
   ensurePanes();
   const p = record.payload;
   previewDetailed = map.getZoom() >= TT16_PATTERN_ZOOM;
   preview = L.layerGroup().addTo(map);
-  L.geoJSON(p.boundary, { interactive: false, renderer: fillRenderer, style: WIPEOUT_STYLE }).addTo(preview);
-  p.lots.forEach(l => {
-    L.geoJSON(l.geometry, { interactive: false, renderer: fillRenderer, style: adjustLotStyle(l, previewDetailed) }).addTo(preview);
+  setSatelliteClip(map, SAT_PANE, 446, p.boundary ? [p.boundary] : []);
+  p.lots.forEach((l, idx) => {
+    const layer = L.geoJSON(l.geometry, { interactive: !!stampPick, renderer: fillRenderer, style: adjustLotStyle(l, previewDetailed) });
+    if (stampPick) layer.on('click', () => assignKh(idx));
+    layer.addTo(preview);
   });
+  if (khMatch && khMatch.view) {
+    const pending = new Set(khMatch.pending.map(s => s.id));
+    khMatch.view.forEach(s => {
+      const on = pending.has(s.id);
+      const cur = s.id === stampPick;
+      const color = cur ? '#f472b6' : on ? '#fb923c' : '#22d3ee';
+      const mark = L.circleMarker([s.lat, s.lng], {
+        radius: cur ? 9 : 6, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95
+      }).bindTooltip(stampLabel(s), { sticky: true });
+      if (on) mark.on('click', () => { stampPick = s.id; render(); drawPreview(); });
+      mark.addTo(preview);
+    });
+  }
   const ring = L.geoJSON(p.boundary, {
-    interactive: false, renderer: lineRenderer, style: { color: RANH, weight: 2, dashArray: '3 3', dashOffset: '3', fill: false }
+    interactive: false, renderer: lineRenderer, style: { color: RANH, weight: 5, dashArray: '3 3', dashOffset: '3', fill: false }
   }).addTo(preview);
   if (scan && scan.georef && ScanOverlay) {
     scanLayer = new ScanOverlay(scan.url, cornersOf(scan.georef), { pane: SCAN_PANE, opacity: 1 - transparency / 100 }).addTo(map);
@@ -181,6 +276,7 @@ function setLayerKey(idx, key) {
   const out = record.build(overrides);
   record.payload = out.payload;
   record.unknown = out.unknown;
+  applyKhToRecord();
   render();
   drawPreview();
 }
@@ -206,7 +302,28 @@ function imageExtra() {
 }
 
 function canSubmit() {
-  return !!record && !reading && !preparing && !submitting && (!files.image || !!(scan && scan.georef));
+  const stampWait = (khMatch && khMatch.pending.length) || 0;
+  return !!record && !reading && !preparing && !submitting && !stampWait && (!files.image || !!(scan && scan.georef));
+}
+
+function khExtra() {
+  if (!files.kh) return '';
+  if (!khParsed) return '';
+  const n = khParsed.stamps.length;
+  if (!n) return '<div class="adj-stamp adj-warn">Không đọc được tem đất trong file ký hiệu.</div>';
+  const pend = (khMatch && khMatch.pending) || [];
+  const done = (khMatch && khMatch.assigned.length) || 0;
+  if (!record) return `<div class="adj-stamp">Đã đọc ${fmtNum(n)} tem. Thêm DXF ranh + hatch để gán vào lô.</div>`;
+  if (!pend.length) return `<div class="adj-stamp adj-ok">Đã gán ${fmtNum(done)}/${fmtNum(n)} tem vào lô.</div>`;
+  const cur = pend.find(s => s.id === stampPick) || pend[0];
+  const chips = pend.map(s => `<button type="button" class="cad-stamp-chip${s.id === cur.id ? ' on' : ''}" data-adj-imp="stamp" data-stamp="${escapeHtml(s.id)}">${escapeHtml(stampLabel(s))}</button>`).join('');
+  return `<div class="cad-stamp adj-stamp">
+    <b>Có lô chứa từ 2 tem, hoặc tem chưa nằm trong lô.</b>
+    <span>Chọn lần lượt từng tem rồi bấm polygon tương ứng trên bản đồ.</span>
+    <div class="cad-stamp-list">${chips}</div>
+    <div class="cad-stamp-now"><span>Đang gán: <b>${escapeHtml(stampLabel(cur))}</b></span>
+      <button type="button" class="cad-clear" data-adj-imp="stamp-skip" data-stamp="${escapeHtml(cur.id)}">Bỏ qua tem này</button></div>
+  </div>`;
 }
 
 function render() {
@@ -214,6 +331,7 @@ function render() {
   if (box) {
     const rows = [];
     if (files.dxf) rows.push(row('dxf', 'DXF', files.dxf, dxfStatus(), layerTableHtml()));
+    if (files.kh) rows.push(row('kh', 'KH', files.kh, `${fmtNum((khParsed && khParsed.stamps.length) || 0)} tem`, khExtra()));
     if (files.image) rows.push(row('image', 'Ảnh', files.image, imageStatus(), imageExtra()));
     if (files.pdf) rows.push(row('pdf', 'PDF', files.pdf, sizeText(files.pdf.size)));
     box.innerHTML = rows.join('');
@@ -234,6 +352,7 @@ function render() {
     let msg = '';
     if (!files.dxf) msg = 'Thêm file DXF của hồ sơ điều chỉnh.';
     else if (files.image && scan && !scan.georef && record) msg = 'Bấm «Đặt ảnh vào ranh» rồi kéo, xoay ảnh cho khung bản vẽ đã phê duyệt trùng ranh điều chỉnh, hoặc bỏ ảnh.';
+    else if (khMatch && khMatch.pending.length) msg = `Còn ${fmtNum(khMatch.pending.length)} tem đất chưa gán. Chọn từng tem rồi bấm lô trên bản đồ.`;
     status.textContent = msg;
   }
 }
@@ -255,6 +374,7 @@ async function readRecord() {
     if (seq !== readSeq) return;
     overrides = Object.fromEntries(out.layers.filter(g => TT16_STYLES[saved[g.layer]]).map(g => [g.layer, saved[g.layer]]));
     record = out;
+    applyKhToRecord();
   } catch (err) {
     if (seq !== readSeq) return;
     recordError = err.message || 'Không đọc được DXF';
@@ -289,11 +409,13 @@ async function setImage(f) {
   drawPreview();
 }
 
-function addFiles(list) {
+async function addFiles(list) {
   let dxfChanged = false;
+  let khFile = null;
   [...(list || [])].forEach(f => {
     const kind = fileKind(f);
     if (kind === 'dxf') { files.dxf = f; dxfChanged = true; }
+    else if (kind === 'kh') { files.kh = f; khFile = f; }
     else if (kind === 'pdf') {
       const bad = pdfProblem(f);
       if (bad) showToast(bad, 'error');
@@ -304,14 +426,28 @@ function addFiles(list) {
       else setImage(f);
     } else showToast(`Bỏ qua ${f.name}: chỉ nhận DXF, ảnh JPG/PNG/WebP và PDF`, 'error');
   });
+  if (khFile) {
+    stampAssign = {};
+    stampSkip = [];
+    stampPick = null;
+    try { khParsed = { name: khFile.name, stamps: parseLandStampDxf(await khFile.text()) }; }
+    catch (err) { khParsed = { name: khFile.name, stamps: [] }; showToast(`Không đọc được file ký hiệu: ${err.message}`, 'error'); }
+    if (record) applyKhToRecord();
+  }
   if (dxfChanged) readRecord();
-  else render();
+  else { render(); drawPreview(); }
 }
 
 function removeFile(kind) {
   files[kind] = null;
   if (kind === 'image') { prepSeq++; dropScan(); preparing = false; drawPreview(); }
-  if (kind === 'dxf') { readSeq++; record = null; overrides = {}; recordError = ''; reading = false; clearPreview(); }
+  if (kind === 'dxf' || kind === 'kh') {
+    readSeq++;
+    if (kind === 'dxf') { record = null; overrides = {}; recordError = ''; }
+    else { khParsed = null; stampAssign = {}; stampSkip = []; stampPick = null; khMatch = null; if (record) applyKhToRecord(); }
+    reading = false;
+    clearPreview();
+  }
   render();
 }
 
@@ -330,9 +466,14 @@ function reset() {
   readSeq++;
   prepSeq++;
   dropScan();
-  files = { dxf: null, image: null, pdf: null };
+  files = { dxf: null, kh: null, image: null, pdf: null };
   record = null;
   overrides = {};
+  khParsed = null;
+  stampAssign = {};
+  stampSkip = [];
+  stampPick = null;
+  khMatch = null;
   recordError = '';
   reading = preparing = false;
   ['adjTitle', 'adjNote'].forEach(id => { const el = $(id); if (el) el.value = ''; });
@@ -391,6 +532,15 @@ export function initAdjustImport() {
     if (!el) return;
     if (el.dataset.adjImp === 'del') removeFile(el.dataset.kind);
     else if (el.dataset.adjImp === 'georef') georef();
+    else if (el.dataset.adjImp === 'stamp') { stampPick = el.dataset.stamp; render(); drawPreview(); }
+    else if (el.dataset.adjImp === 'stamp-skip') {
+      const id = el.dataset.stamp;
+      if (id && !stampSkip.includes(id)) stampSkip.push(id);
+      if (id) delete stampAssign[id];
+      applyKhToRecord();
+      render();
+      drawPreview();
+    }
   });
   list?.addEventListener('change', (e) => {
     const sel = e.target.closest('select[data-adj-layer]');

@@ -136,6 +136,8 @@ async function getRawDataList() {
       item.tenQH = String(props.Ten_QH || '');
       const plan = planOf(props);
       if (plan) item.plan = plan;
+      const lotCode = String(props.KyHieu || '').trim();
+      if (lotCode) item.lotCode = lotCode;
       item.radius = constants.defaultRadius(item);
       return item;
     }).filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng)

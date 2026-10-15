@@ -440,6 +440,8 @@ function parseLandItem(it) {
     area: Math.round(area * 10) / 10,
     phase: it.phase === 'QH' || it.phase === 'HT' ? it.phase : null,
     plan: parseCadPlan(it.plan),
+    lotCode: sanitizeSheetText(it.lotCode, 40),
+    stampArea: Number(it.stampArea) > 0 && Number(it.stampArea) < 1e8 ? Math.round(Number(it.stampArea)) : 0,
     geometry
   };
 }
@@ -502,6 +504,7 @@ function parseCadItem(it, defaultPhase) {
     size: first.size,
     geometry: first.geometry,
     plan: parseCadPlan(it.plan),
+    lotCode: sanitizeSheetText(it.lotCode, 40),
     splits,
     stages
   };

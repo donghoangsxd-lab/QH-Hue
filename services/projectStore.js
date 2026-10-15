@@ -1232,6 +1232,8 @@ async function saveChunk({ tenQH, fileName, items, lotIds, lands, landsReset, in
       geometry: it.geometry
     };
     if (it.plan) row.plan = it.plan;
+    if (it.lotCode) row.lotCode = String(it.lotCode).slice(0, 40);
+    if (Number(it.stampArea) > 0) row.stampArea = Math.round(Number(it.stampArea));
     landAdds.push(row);
   });
 
@@ -1927,6 +1929,8 @@ function parcelFromFeature(ft) {
     row.ward = String(props.XaPhuong || '');
     const plan = planOf(props);
     if (plan) row.plan = plan;
+    const code = String(props.KyHieu || '').trim();
+    if (code) row.lotCode = code;
   }
   return row;
 }
@@ -2081,6 +2085,8 @@ async function legacyLots(tenQH) {
         row.nhom = p.nhom || '';
         row.ward = p.ward || '';
         if (p.plan) row.plan = p.plan;
+        if (p.lotCode) row.lotCode = p.lotCode;
+        if (p.stampArea) row.stampArea = p.stampArea;
       }
       return row;
     })
@@ -2245,9 +2251,13 @@ function cleanAdjustLot(l) {
   const name = cleanText(l.name, 150);
   const nhom = cleanText(l.nhom, 40);
   const plan = cleanPlan(l.plan);
+  const lotCode = cleanText(l.lotCode, 40);
+  const stampArea = Math.round(Number(l.stampArea) || 0);
   if (name) row.name = name;
   if (nhom) row.nhom = nhom;
   if (plan) row.plan = plan;
+  if (lotCode) row.lotCode = lotCode;
+  if (stampArea > 0) row.stampArea = stampArea;
   return row;
 }
 
@@ -2528,6 +2538,8 @@ async function wardParcels() {
       name: p.name || '', nhom: p.nhom || '', ward: p.ward || '', geometry: p.geometry
     };
     if (p.plan) row.plan = p.plan;
+    if (p.lotCode) row.lotCode = p.lotCode;
+    if (p.stampArea) row.stampArea = p.stampArea;
     return row;
   });
   if (JSON.stringify(parcels).length + JSON.stringify(lands).length > PROXY_MAX_CHARS) {

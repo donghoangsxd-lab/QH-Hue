@@ -654,7 +654,7 @@
             <label class="cad-drop" id="adjDrop" for="adjFiles">
               <span class="cad-drop-main"><b>Chọn file</b> hoặc kéo thả vào đây</span>
               <span class="cad-drop-types"><i>DXF</i><i>JPG · PNG</i><i>PDF</i></span>
-              <span class="cad-drop-sub">DXF bắt buộc: ranh trên layer có chữ RANH + hatch đất theo TT16. Ảnh tờ bản vẽ scan (không bắt buộc) ghép lên bản đồ theo khung bản vẽ đã phê duyệt. PDF Quyết định phê duyệt &lt; 2 MB (không bắt buộc). Không chấm QCVN, lô gốc của đồ án giữ nguyên.</span>
+              <span class="cad-drop-sub">DXF bắt buộc: ranh trên layer có chữ RANH + hatch đất theo TT16. Có thể kèm <b>KH - ….dxf</b> (lớp tem đất). Ảnh tờ bản vẽ scan (không bắt buộc) ghép lên bản đồ theo khung bản vẽ đã phê duyệt. PDF Quyết định phê duyệt &lt; 2 MB (không bắt buộc). Không chấm QCVN, lô gốc của đồ án giữ nguyên.</span>
               <input type="file" id="adjFiles" accept=".dxf,.jpg,.jpeg,.png,.webp,.pdf" multiple hidden />
             </label>
             <div id="adjFileList" class="adj-files"></div>
@@ -718,17 +718,25 @@
               </label>
               <button type="button" class="cad-slot-clear" data-clear="QH" hidden title="Bỏ file quy hoạch" aria-label="Bỏ file quy hoạch">×</button>
             </div>
+            <div class="cad-slot-row" data-slot="KH">
+              <label class="cad-drop cad-slot" for="cadFileKH">
+                <span class="cad-drop-main"><b>Ký hiệu lô (tem đất)</b></span>
+                <span class="cad-slot-name" id="cadFileKHName">KH - QHPK ….dxf · không bắt buộc</span>
+                <input type="file" id="cadFileKH" accept=".dxf" hidden />
+              </label>
+              <button type="button" class="cad-slot-clear" data-clear="KH" hidden title="Bỏ file ký hiệu" aria-label="Bỏ file ký hiệu">×</button>
+            </div>
           </div>
           <label class="cad-drop" id="cadDrop" for="cadFile">
             <span class="cad-drop-main"><b>Định dạng khác</b> hoặc kéo thả vào đây</span>
             <span class="cad-drop-types"><i>KML</i><i>KMZ</i><i>GeoJSON</i><i>SHP (.zip)</i></span>
-            <span class="cad-drop-sub">DXF đồ án chọn ở 3 ô phía trên. KML, KMZ, GeoJSON, shapefile (.zip) và lớp điểm chức năng thả tại đây.</span>
+            <span class="cad-drop-sub">DXF đồ án chọn ở các ô phía trên (kèm KH nếu có tem đất). KML, KMZ, GeoJSON, shapefile (.zip) và lớp điểm chức năng thả tại đây.</span>
             <input type="file" id="cadFile" accept=".dxf,.kml,.kmz,.geojson,.json,.zip" multiple hidden />
           </label>
           <input type="file" id="cadPointFile" accept=".kml,.kmz,.geojson,.json,.zip,.dxf" hidden />
           <details class="cad-hint fold">
             <summary class="cad-hint-title">Quy ước đặt tên</summary>
-            <div class="cad-hint-row"><b>DXF</b><span>Mỗi mục một file: <code>RG - QHPK ….dxf</code> ranh giới, <code>HT - QHPK ….dxf</code> hiện trạng sử dụng đất, <code>QH - QHPK ….dxf</code> quy hoạch sử dụng đất. Phần sau dấu gạch là tên đồ án, phải giống nhau. Tên layer theo TT 16/2025, VD <code>HT_DAT_HTXH_Yte</code>, hoặc = mã loại</span></div>
+            <div class="cad-hint-row"><b>DXF</b><span>Mỗi mục một file: <code>RG - QHPK ….dxf</code> ranh giới, <code>HT - QHPK ….dxf</code> hiện trạng sử dụng đất, <code>QH - QHPK ….dxf</code> quy hoạch sử dụng đất. Kèm <code>KH - QHPK ….dxf</code> (không bắt buộc) là lớp tem đất: ký hiệu, diện tích, mật độ, tầng cao, hệ số sử dụng đất nếu có. Tâm tem gán vào polygon bên dưới. Một polygon có từ 2 tem thì chọn lần lượt từng tem rồi bấm lô tương ứng. Phần sau dấu gạch là tên đồ án, phải giống nhau. Tên layer theo TT 16/2025, VD <code>HT_DAT_HTXH_Yte</code>, hoặc = mã loại</span></div>
             <div class="cad-hint-row"><b>KML/KMZ</b><span>Trường <code>Layer</code> / tên Folder = mã loại</span></div>
             <div class="cad-hint-row"><b>GeoJSON</b><span>Thuộc tính <code>Layer</code> = mã loại</span></div>
             <div class="cad-hint-row"><b>Shapefile</b><span>Nén <code>.shp .shx .dbf .prj</code> thành 1 file <code>.zip</code>, mỗi lớp 1 file .shp. File <code>QH-….zip</code> ghi mọi lô vào QuyMo_QH, <code>HT-….zip</code> vào QuyMo_HT. Trường <code>Layer</code> = mã loại, không có thì tên file .shp = tên layer, VD <code>HT_DAT_HTXH_Yte.shp</code></span></div>

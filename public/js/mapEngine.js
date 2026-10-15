@@ -1356,17 +1356,18 @@ function landPopupHtml(p) {
   const key = landPatternKey(p.layer, p.name);
   const nhom = p.nhom || landLabel(p.layer);
   const type = nhom === 'Đất khác' && TT16_STYLES[key] ? TT16_STYLES[key].label : nhom;
-  const code = landCode(p);
+  const code = p.lotCode || landCode(p);
   const tone = (key && TT16_STYLES[key] && TT16_STYLES[key].color) || landColor(p.layer) || '#94a3b8';
   const swatch = tt16SwatchCss(key, 0.6) || `background:${tone};`;
   const stage = LAND_STAGE_LABELS[String(p.layer || '').toUpperCase().split(/[_\s]/)[0]];
   const phase = p.phase === 'QH' ? (stage || 'Quy hoạch') : 'Hiện trạng';
   const info = [
     ['Diện tích', p.area ? `${fmtNum(Math.round(p.area))} m²` : ''],
+    p.stampArea && p.area && Math.abs(p.stampArea - p.area) / p.area > 0.1 ? ['Diện tích tem', `${fmtNum(Math.round(p.stampArea))} m²`] : null,
     ['Phường/xã', p.ward],
     ['Đồ án', p.file],
     ['Layer', p.layer]
-  ].filter(([, v]) => v);
+  ].filter(row => row && row[1]);
   return `<div class="land-popup">
     <div class="lp-head" title="${escapeHtml(p.name || '')}">
       <i class="lp-swatch" style="${swatch}"></i>
@@ -2369,6 +2370,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
     + `${approved ? '' : '<span class="badge-pending">Chờ duyệt</span>'}</div>`
     + `<div class="lp-sub">${escapeHtml(typeLabel)}</div></div></div>`;
   html += lotStatsHtml(p.plan);
+  if (p.lotCode) html += `<div class="lp-info"><div class="pp-row"><span>Ký hiệu lô</span><b>${escapeHtml(p.lotCode)}</b></div></div>`;
   html += `<div class="lp-info">`;
   html += `<div class="pp-row"><span>Phường/xã</span><b class="js-ward">${buildDiaBanHtml(geoWardNow, p.ward)}</b></div>`;
   if (!isNetwork) html += `<div class="pp-row"><span>Cấp công trình</span><b class="c-orange pp-cap"${capTip}>${escapeHtml(capCongTrinh)}</b></div>`;

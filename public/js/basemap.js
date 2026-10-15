@@ -56,6 +56,16 @@ export function basemapLabel() {
   return BASEMAP.label;
 }
 
+/** Cùng nguồn ảnh với attachBasemap, để lớp cắt nền điều chỉnh cục bộ khớp từng ô ảnh */
+export function basemapTileSpec() {
+  return {
+    url: BASEMAP.url,
+    maxZoom: 21,
+    maxNativeZoom: BASEMAP.opts.maxNativeZoom,
+    subdomains: BASEMAP.opts.subdomains
+  };
+}
+
 /** Gỡ ảnh nền đã gắn bằng attachBasemap (bản đồ phụ đóng thì không còn trỏ vào lớp đã hủy) */
 export function detachBasemap(m) {
   const base = maps.get(m);
