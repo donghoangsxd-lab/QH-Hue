@@ -4,7 +4,7 @@
 //  - chk_qhc10: sử dụng đất 1/10.000 khu vực trung tâm (lô theo ký hiệu TT16 Mục 02, viền theo giai đoạn) + 4 tiểu vùng,
 //    phân khu, điểm chức năng. Hàng nút dưới dòng lớp bật/tắt độc lập từng giai đoạn lô và ranh 1/10.000 mở rộng theo
 //    QĐ 756 (ranh ngoài các phường vùng lõi + vùng đỏ Hóa Châu, Mỹ Thượng chưa có trong đồ án cũ).
-//    Đang xem QHC 1/10.000 (droplist) ở toàn thành phố: chỉ vẽ ranh tiểu vùng + tên đồ án, rê chuột vào vùng lõi thì sáng nền,
+//    Đang xem QHC 1/10.000 (droplist) ở toàn thành phố: chỉ vẽ đường bao ngoài cả 4 quận + tên đồ án, rê chuột vào vùng lõi thì sáng nền,
 //    bấm vào ranh mới vẽ lô. Đang xem một địa điểm (phường, đồ án, hoặc phóng gần): mở thẳng lô, không vẽ ranh.
 //    Bật lớp khi xem cấp khác (so sánh) vẽ đủ lô ngay. Vùng đô thị trung tâm (hợp 4 tiểu vùng) luôn có nền và viền đỏ nhạt.
 // Vùng, lô của cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400); riêng các đường ranh vẽ ở LINE_PANE
@@ -117,7 +117,7 @@ function ensureWashRenderer(m) {
   return washRenderer;
 }
 
-/** Thứ tự vẽ trong canvas lô: định hướng 1/25.000 < lô; ranh trắng từng tiểu vùng nổi ở LINE_PANE */
+/** Thứ tự vẽ trong canvas lô: định hướng 1/25.000 < lô; đường bao ngoài vùng trung tâm nổi ở LINE_PANE */
 function restack() {
   layers.vision?.bringToBack();
   layers.land?.bringToFront();
@@ -163,11 +163,15 @@ function drawFrame() {
   const lines = L.featureGroup();
   const tvLabels = L.layerGroup();
   const ptLayer = L.featureGroup();
+  const outer = unionTv();
+  if (outer) {
+    const lineOpts = { pane: LINE_PANE[0], renderer: lr, interactive: false };
+    L.geoJSON(outer, { ...lineOpts, style: { color: '#0f172a', weight: 5, opacity: 0.45, fill: false } }).addTo(lines);
+    L.geoJSON(outer, { ...lineOpts, style: { color: '#f8fafc', weight: 2.4, opacity: 0.95, dashArray: '12 6', fill: false } }).addTo(lines);
+  }
   data.frame.features.forEach(f => {
     const p = f.properties;
     if (p.k === 'tv') {
-      L.geoJSON(f, { pane: LINE_PANE[0], renderer: lr, interactive: false, style: { color: '#0f172a', weight: 5, opacity: 0.45, fill: false } }).addTo(lines);
-      L.geoJSON(f, { pane: LINE_PANE[0], renderer: lr, interactive: false, style: { color: '#f8fafc', weight: 2.4, opacity: 0.95, dashArray: '12 6', fill: false } }).addTo(lines);
       const c = turf.pointOnFeature(f).geometry.coordinates;
       L.marker([c[1], c[0]], { icon: frameLabel(`<b>${escapeHtml(p.tv)}</b> ${escapeHtml(p.ten)}`, 'qhc-label-tv'), interactive: false, keyboard: false }).addTo(tvLabels);
     } else if (p.k === 'pk') {
@@ -196,7 +200,19 @@ function zoomFrame() {
   if (z >= LABEL_MIN_ZOOM) { points.addTo(m); points.bringToFront(); } else points.remove();
 }
 
-// Hợp 4 tiểu vùng thành một vòng. turf 6.5 lỗi "output ring" khi tọa độ lệch số lẻ: làm tròn rồi thử lại
+// Bỏ các vòng lỗ. Ranh 4 quận không khít nhau nên hợp xong còn hàng trăm khe nhỏ; viền bám theo khe thành nét lỗi giữa các quận.
+function dropHoles(feature) {
+  const g = feature?.geometry;
+  if (!g) return feature;
+  const props = feature.properties || {};
+  if (g.type === 'Polygon') return { type: 'Feature', properties: props, geometry: { type: 'Polygon', coordinates: [g.coordinates[0]] } };
+  if (g.type === 'MultiPolygon') {
+    return { type: 'Feature', properties: props, geometry: { type: 'MultiPolygon', coordinates: g.coordinates.map(rings => [rings[0]]) } };
+  }
+  return feature;
+}
+
+// Hợp 4 tiểu vùng thành một đường bao ngoài. turf 6.5 lỗi "output ring" khi tọa độ lệch số lẻ: làm tròn rồi thử lại
 function unionTv() {
   if (coreUnion) return coreUnion;
   const tv = tvFeatures();
@@ -209,8 +225,8 @@ function unionTv() {
       catch (err) { /* giữ phần đã gộp */ }
     }
   }
-  coreUnion = acc;
-  return acc;
+  coreUnion = dropHoles(acc);
+  return coreUnion;
 }
 
 // Nền + viền đỏ nhạt của vùng trung tâm. Tách khỏi layers.core để click thu gọn vẫn mở lô.
