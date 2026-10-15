@@ -203,6 +203,8 @@ export function initMap() {
     if (e.detail !== 'measure' && state.activeMeasureType) clearMeasure();
     closePointPopup();
   });
+  document.addEventListener('keydown', onMeasureKeyDown);
+  map.on('contextmenu', onMeasureContextMenu);
   map.on('zoomend', () => { updateWardLabelFontSize(); redrawLandsOnPattern(); });
   map.on('moveend', () => { refreshLeftSoon(); scheduleLots(); });
   bindProjectFiles(() => map, PARCEL_MIN_ZOOM, () => parcelMinZoom(map, layers));
@@ -220,6 +222,7 @@ function ensurePlanHooks() {
   if (planHooked || !planMap) return;
   planHooked = true;
   planMeasureGroup = L.layerGroup().addTo(planMap);
+  planMap.on('contextmenu', onMeasureContextMenu);
   planMap.on('moveend', refreshPlanSoon);
 }
 
@@ -549,6 +552,39 @@ export function clearMeasure() {
 
 export function handleMeasureClick(latlng) {
   state.measurePoints.push([latlng.lng, latlng.lat]);
+  drawMeasure();
+}
+
+// Bán kính bắt đỉnh khi chuột phải: 1 m quanh vị trí click; nhiều đỉnh trong vùng thì xóa đỉnh gần nhất
+const MEASURE_VERTEX_HIT_M = 1;
+
+function nearestMeasureIndex(latlng) {
+  let best = -1;
+  let bestD = MEASURE_VERTEX_HIT_M;
+  state.measurePoints.forEach((pt, i) => {
+    const d = distanceMeters(latlng.lat, latlng.lng, pt[1], pt[0]);
+    if (d <= bestD) {
+      bestD = d;
+      best = i;
+    }
+  });
+  return best;
+}
+
+function onMeasureKeyDown(e) {
+  if (!state.activeMeasureType || e.key !== 'Backspace' || !state.measurePoints.length) return;
+  const tag = e.target && e.target.tagName;
+  if ((tag && /^(INPUT|SELECT|TEXTAREA)$/.test(tag)) || e.target.isContentEditable) return;
+  e.preventDefault();
+  state.measurePoints.pop();
+  drawMeasure();
+}
+
+function onMeasureContextMenu(e) {
+  if (!state.activeMeasureType || !state.measurePoints.length || !e.latlng) return;
+  const hit = nearestMeasureIndex(e.latlng);
+  if (hit < 0) return;
+  state.measurePoints.splice(hit, 1);
   drawMeasure();
 }
 
