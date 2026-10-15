@@ -5,7 +5,7 @@
 // phần nằm ngoài phạm vi bị cắt. Toàn TP (chưa chọn phường, chưa mở đồ án) không vẽ các ranh này.
 // Nhịp nét lệch nửa chu kỳ với ranh điều chỉnh cục bộ (adjustLayer.js, xanh dương, z 449) nên chỗ trùng ranh hiện xen kẽ đỏ / xanh.
 import { state } from './state.js';
-import { map } from './mapEngine.js';
+import { map, addPopupCollapseToggle, expandCollapsedPopup } from './mapEngine.js';
 import { planMap, isSplitOn, getViewMode, setViewMode, passToolClick } from './planMap.js';
 import { isLevelPair, mapsForLevel, onSplitPair } from './splitPair.js';
 import { escapeHtml, fmtNum } from './utils.js';
@@ -208,6 +208,7 @@ function popupHtml(p) {
 }
 
 const drawn = new WeakMap();
+let qhctLotPop = null;
 
 function clearLots(m) {
   const d = drawn.get(m);
@@ -227,6 +228,15 @@ function restyleLots() {
   qhctMaps().forEach(m => drawn.get(m)?.layer?.setStyle(lotFill));
 }
 
+function openQhctPopup(m, f, latlng) {
+  if (qhctLotPop && qhctLotPop.f === f && qhctLotPop.map === m && expandCollapsedPopup(qhctLotPop.popup)) return;
+  const popup = L.popup({ maxWidth: 320, className: 'qhc-popup' }).setLatLng(latlng).setContent(popupHtml(f.properties || {}));
+  qhctLotPop = { popup, f, map: m };
+  popup.openOn(m);
+  addPopupCollapseToggle(popup, 'nhãn tên lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
+  popup.on('remove', () => { if (qhctLotPop?.popup === popup) qhctLotPop = null; });
+}
+
 function draw(m) {
   clearLots(m);
   const pane = m.getPane(PANE) || m.createPane(PANE);
@@ -236,7 +246,7 @@ function draw(m) {
     pane: PANE,
     renderer,
     style: lotFill
-  }).on('click', (e) => m.openPopup(popupHtml(e.layer.feature.properties || {}), e.latlng, { maxWidth: 320, className: 'qhc-popup' }));
+  }).on('click', (e) => openQhctPopup(m, e.layer.feature, e.latlng));
   layer.addTo(m);
   drawn.set(m, { layer, renderer });
 }

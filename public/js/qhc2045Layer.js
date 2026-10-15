@@ -14,7 +14,7 @@
 // nằm ở overlayPane, phủ kín bản đồ khi có bất kỳ lớp vector nào và nuốt click của canvas QHC bên dưới, nên click lô / vùng
 // được dò lại ở cấp bản đồ (qhcClick, gọi từ app.js) bằng bbox + point-in-polygon.
 import { state } from './state.js';
-import { map, wardNameAt, outerWardLines, openOutlinedPopup, getRightObstruction } from './mapEngine.js';
+import { map, wardNameAt, outerWardLines, openOutlinedPopup, getRightObstruction, addPopupCollapseToggle, expandCollapsedPopup } from './mapEngine.js';
 import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClick } from './planMap.js';
 import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
@@ -706,7 +706,11 @@ function swatchHtml(land) {
   return `<i class="qhc-sw" style="${bg}border-color:${s ? s.color : land.tone}"></i>`;
 }
 
+let qhcLotPop = null;
+
 function openLotPopup(f, latlng) {
+  const host = active?.m || target();
+  if (qhcLotPop && qhcLotPop.f === f && qhcLotPop.map === host && expandCollapsedPopup(qhcLotPop.popup)) return;
   const p = f.properties;
   const zone = data.land.zones[p.z];
   const land = landOf(zone, p.c);
@@ -733,7 +737,11 @@ function openLotPopup(f, latlng) {
       ${ward ? `<button type="button" class="bp-btn qhc-pop-ward" data-qhc-ward="${escapeHtml(ward)}">${ico('map')}Xem ${escapeHtml(ward)}</button>` : ''}
       <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · 1/10.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
     </div>`;
-  openOutlinedPopup(active?.m || target(), f.geometry, L.popup({ maxWidth: 320, className: 'qhc-popup' }).setContent(html), latlng);
+  const popup = L.popup({ maxWidth: 320, className: 'qhc-popup' }).setContent(html);
+  qhcLotPop = { popup, f, map: host };
+  openOutlinedPopup(host, f.geometry, popup, latlng);
+  addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
+  popup.on('remove', () => { if (qhcLotPop?.popup === popup) qhcLotPop = null; });
 }
 
 // ---------- 1/25.000: sơ đồ tổ chức không gian ----------

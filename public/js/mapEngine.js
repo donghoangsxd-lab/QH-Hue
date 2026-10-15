@@ -1485,10 +1485,29 @@ export function openOutlinedPopup(m, geometry, popup, latlng) {
   return popup;
 }
 
+let openLandInfo = null;
+
+function landInfoKey(p) {
+  return [p.phase || '', p.file || '', p.id || '', p.layer || '', p.lotCode || p.name || ''].join('|');
+}
+
+function trackLandInfo(popup, p, m) {
+  openLandInfo = { popup, key: landInfoKey(p), map: m };
+  popup.on('remove', () => { if (openLandInfo?.popup === popup) openLandInfo = null; });
+}
+
+function reuseLandInfo(p, m) {
+  return !!(openLandInfo && openLandInfo.key === landInfoKey(p) && openLandInfo.map === m
+    && expandCollapsedPopup(openLandInfo.popup));
+}
+
 function openLandPopup(p, m, latlng) {
+  if (reuseLandInfo(p, m)) return;
   const popup = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup' }).setContent(landPopupHtml(p));
   openOutlinedPopup(m, p.geometry, popup, latlng);
+  addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
   addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
+  trackLandInfo(popup, p, m);
 }
 
 /** Popup lô đồ án như khi bấm lô trên bản đồ: lô đất → thẻ sử dụng đất, lô hạ tầng → popup công trình bám lô */
@@ -1778,8 +1797,11 @@ export function showProjectLot(lot) {
     at = L.latLng(c[1], c[0]);
   } catch (e) { /* hình lỗi: dùng tâm khung */ }
   if (lot.kind === 'DXF') {
+    if (reuseLandInfo(lot, m)) return;
     const popup = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup', ...LOT_POPUP_PAD }).setLatLng(at).setContent(landPopupHtml(lot)).openOn(m);
+    addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
     addLotEditButton(popup, { kind: 'DXF', land: lot }, redrawLands);
+    trackLandInfo(popup, lot, m);
     return;
   }
   const list = qh ? getPlanScenarioList() : state.rawDataList;
@@ -2181,27 +2203,28 @@ async function fetchJson(url) {
 }
 
 // Nút con mắt cạnh nút đóng: thu bảng về một nhãn ở mép trái để xem trọn vùng phục vụ / tuyến tiếp cận;
-// bấm vào nhãn (hoặc bấm lại điểm công trình) để mở lại.
+// bấm vào nhãn (hoặc bấm lại điểm công trình / lô đất) để mở lại.
 // Khi đang thu gọn, bấm ra bản đồ không đóng popup (đóng popup sẽ xóa luôn lớp vùng phục vụ / tuyến tiếp cận).
 // Leaflet gắn việc đóng khi bấm bản đồ vào sự kiện preclick; _updateLayout / _updatePosition đo lại khung mà không
 // dựng lại nội dung (setContent / update sẽ mất phần kết quả đã nạp chậm vào DOM).
 const popupCollapse = new WeakMap();
 
-function addPopupCollapseToggle(popup, keepWhat) {
+export function addPopupCollapseToggle(popup, keepWhat, restoreHint = 'Bấm để hiện lại bảng thông tin') {
   const container = popup.getElement();
   const ownerMap = popup._map;
   if (!container || !ownerMap) return;
+  container.classList.add('pp-collapsible');
   const btn = L.DomUtil.create('a', 'pp-collapse-btn', container);
   btn.href = '#';
   btn.setAttribute('role', 'button');
   btn.innerHTML = ico('eye-off');
   btn.title = `Ẩn bảng thông tin (giữ ${keepWhat} trên bản đồ)`;
-  btn.setAttribute('aria-label', btn.title);
+  btn.setAttribute('aria-label', 'Ẩn bảng thông tin');
   const fullMinWidth = popup.options.minWidth;
   const closesOnClick = popup.options.closeOnClick ?? ownerMap.options.closePopupOnClick;
   const setCollapsed = (collapsed) => {
     container.classList.toggle('pp-collapsed', collapsed);
-    container.title = collapsed ? 'Bấm để hiện lại bảng thông tin' : '';
+    container.title = collapsed ? restoreHint : '';
     ownerMap.off('preclick', popup.close, popup);
     if (!collapsed && closesOnClick) ownerMap.on('preclick', popup.close, popup);
     popup.options.minWidth = collapsed ? 0 : fullMinWidth;
@@ -2224,7 +2247,7 @@ function addPopupCollapseToggle(popup, keepWhat) {
 }
 
 /** Popup đang thu gọn → mở lại, trả về true; popup không thu gọn → false */
-function expandCollapsedPopup(popup) {
+export function expandCollapsedPopup(popup) {
   const ctl = popup && popup.isOpen() && popupCollapse.get(popup);
   if (!ctl || !ctl.isCollapsed()) return false;
   ctl.expand();

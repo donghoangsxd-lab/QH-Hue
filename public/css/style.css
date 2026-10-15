@@ -1655,7 +1655,6 @@ body.bottom-collapsed:not(.project-review:not(.project-view)) .bottom-panel {
   transition: transform 0.25s ease, opacity 0.2s ease, visibility 0s linear 0.25s;
 }
 
-
 /* Lát cắt địa hình: phủ đúng panel dưới khi công cụ đang bật */
 .tp-host {
   position: absolute;
@@ -2260,6 +2259,15 @@ tr.gp-sub td.uc-name { padding-left: 1.4em; }
 .qhc-pop { font-size: var(--fs-sm); line-height: 1.4; min-width: 220px; }
 .qhc-pop-head { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; font-size: var(--fs-md); }
 .qhc-pop-table { width: 100%; border-collapse: collapse; }
+.qhc-popup.pp-collapsible .qhc-pop-head { padding-right: 40px; }
+.leaflet-popup.qhc-popup.pp-collapsed .qhc-pop { min-width: 0; }
+.leaflet-popup.qhc-popup.pp-collapsed .qhc-pop > :not(.qhc-pop-head) { display: none; }
+.leaflet-popup.qhc-popup.pp-collapsed .qhc-pop-head { margin: 0; padding-right: 0; }
+.leaflet-popup.qhc-popup.pp-collapsed .qhc-sw { display: none; }
+.leaflet-popup.qhc-popup.pp-collapsed .qhc-pop-head b {
+  font-size: var(--fs-sm); font-weight: 700; color: #fff; white-space: nowrap;
+  text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000;
+}
 .qhc-pop-table th { width: 6.5em; padding: 1px 6px 1px 0; color: var(--text-muted); font-weight: 400; text-align: left; vertical-align: top; }
 .qhc-pop-table td { padding: 1px 0; }
 .qhc-pop-sec { margin: 7px 0 3px; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -2570,13 +2578,13 @@ table.ward-table th {
   text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000;
 }
 .pp-collapsed .pp-title .badge-pending, .pp-collapsed .pp-title .ico { display: none; }
-/* Nút bút (Admin sửa lô) bên trái nút ẩn; popup lô đất không có nút ẩn thì sát nút đóng */
+/* Nút bút (Admin sửa lô) bên trái nút ẩn */
 .leaflet-container a.pp-edit-btn, .dock-card a.pp-edit-btn {
   position: absolute; top: 0; right: 48px; width: 24px; height: 24px;
   display: flex; align-items: center; justify-content: center;
   color: var(--text-muted); text-decoration: none; border-radius: var(--r-sm);
 }
-.leaflet-container .land-lot-popup a.pp-edit-btn { right: 24px; }
+.leaflet-container .land-lot-popup:not(.pp-collapsible) a.pp-edit-btn { right: 24px; }
 .leaflet-container a.pp-edit-btn:hover { color: var(--accent-yellow); }
 /* Nút sọt rác (Admin xóa lô) bên trái nút bút */
 .leaflet-container a.pp-del-btn, .dock-card a.pp-del-btn {
@@ -2584,7 +2592,7 @@ table.ward-table th {
   display: flex; align-items: center; justify-content: center;
   color: var(--text-muted); text-decoration: none; border-radius: var(--r-sm);
 }
-.leaflet-container .land-lot-popup a.pp-del-btn { right: 48px; }
+.leaflet-container .land-lot-popup:not(.pp-collapsible) a.pp-del-btn { right: 48px; }
 .leaflet-container a.pp-del-btn:hover { color: var(--accent-red); }
 .leaflet-container a.pp-del-btn.busy { opacity: 0.4; cursor: progress; }
 .pp-edit-btn .ico, .pp-del-btn .ico { width: 14px; height: 14px; margin: 0; }
@@ -3903,6 +3911,8 @@ body.project-review.la-page #projectReviewHost {
 .la-tbl th, .la-tbl td { border: 1px solid #111827; padding: 2px 4px; vertical-align: middle; }
 .la-tbl th { background: #f3f4f6; font-weight: 700; text-align: center; }
 .la-tbl td.num { text-align: right; white-space: nowrap; }
+.land-lot-popup.pp-collapsible .lp-head { padding-right: 46px; }
+.land-lot-popup.pp-collapsible.pp-editable .lp-head { padding-right: 94px; }
 .la-tbl td.c { text-align: center; }
 .la-tbl td.nw { white-space: nowrap; }
 .la-tbl tr.la-total td { font-weight: 800; }
@@ -3935,8 +3945,15 @@ body.project-review.la-page #projectReviewHost {
 .la-a3 .la-tbl { overflow: visible; }
 .la-a3 .la-tbl table, .la-a3 .la-note { font-size: 13px; }
 .la-a3 .la-note { max-height: none; }
+.leaflet-popup.land-lot-popup.pp-collapsed .land-popup { min-width: 0; }
+.leaflet-popup.land-lot-popup.pp-collapsed .land-popup > :not(.lp-head) { display: none; }
+.leaflet-popup.land-lot-popup.pp-collapsed .lp-head { padding: 0; border-bottom: 0; }
 .la-a3 .la-box { padding: 10px 12px; }
 .la-a3 .la-legend h4 { font-size: 16px; }
+.leaflet-popup.land-lot-popup.pp-collapsed .lp-title {
+  white-space: nowrap;
+  text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000;
+}
 .la-a3 .la-north { width: 40px; height: 56px; top: 10px; right: 12px; }
 .la-a3 .la-sw { width: 44px; height: 20px; }
 .la-a3 .la-agency { flex-basis: 130px; }
