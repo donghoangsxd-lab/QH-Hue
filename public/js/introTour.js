@@ -46,7 +46,7 @@ const STEPS = [
   {
     target: '#btnToggleCompare',
     title: 'So sánh Hiện trạng – Quy hoạch',
-    text: 'Chia đôi màn hình: bên trái là hiện trạng, bên phải là quy hoạch. Trên thanh tiêu đề chọn Cùng tâm (2 bản đồ chồng khít, kéo thanh ở giữa để so sánh) hoặc Lệch tâm (mỗi bản đồ lấy tâm ở giữa nửa màn hình của nó). Chấm màu trên biểu tượng cho biết công trình quy hoạch mới, mở rộng, thu hẹp hay di dời.'
+    text: 'Chia đôi màn hình. Mặc định bên trái là hiện trạng, bên phải là quy hoạch. Hai droplist trên thanh tiêu đề chọn từng bên: Hiện trạng, Quy hoạch, Hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000 hoặc QHCT 1/500 — ví dụ QHC 1/25.000 đối chiếu QHC 1/10.000. Cùng tâm: hai bản đồ chồng khít, kéo thanh ở giữa. Lệch tâm: mỗi bản đồ lấy tâm ở giữa nửa màn hình của nó.'
   },
   {
     target: ['#bottomPanel', '#btnExpandBottomPanel'],

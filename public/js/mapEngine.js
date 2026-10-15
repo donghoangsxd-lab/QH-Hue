@@ -21,6 +21,8 @@ import {
 import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, infraLotOf, byProjectAreaDesc, lotShown } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
 import { analyzePlanLand, planLandHtml } from './planLandStats.js';
+import { planLevelOf } from './generalPlan.js';
+import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
 
 export let map = null;
 export let measureLayerGroup = null;
@@ -485,6 +487,7 @@ export function toggleLayer(layerKey, isChecked) {
     map.removeLayer(layers[layerKey]);
   }
   syncPlanLayer(layerKey);
+  holdPlanChrome();
   if (ICON_LAYER_KEYS.has(layerKey)) {
     leftRenderer.refreshPoints();
     planRenderer.refreshPoints();
@@ -1272,9 +1275,12 @@ export function renderGroupedPoints() {
     ht: wardAreaList(state.rawDataList, sourceList, 'sizeHT'),
     qh: wardAreaList(planFull, planList, 'sizeQH')
   });
-  leftRenderer.setList(sourceList);
-  planRenderer.setList(planList);
+  const leftList = isLevelPair() ? infraListFor(sideOf(map), sourceList, planList) : sourceList;
+  const rightList = isLevelPair() ? infraListFor(sideOf(planMap), sourceList, planList) : planList;
+  leftRenderer.setList(leftList);
+  planRenderer.setList(rightList);
   if (state.projectInfraLots.length || state.landParcels.length) redrawLands();
+  holdPlanChrome();
 }
 
 // Bán kính buffer chung đổi: chỉ vẽ lại vùng phủ, không phải dựng lại marker
@@ -1578,17 +1584,65 @@ function infraLotsInWardScope(list) {
 // showLand (khung Thẩm định) vẽ lô đất các đồ án đang giao khung nhìn, mọi mức zoom.
 // Lớp Đồ án: từ PARCEL_MIN_ZOOM, hoặc mọi zoom khi đang chọn 1 phường. QHPK toàn TP chỉ vẽ lô đồ án
 // đang bấm hoặc đang tick. Chọn phường/xã thì chỉ giữ lô trong phạm vi đó.
+function infraListFor(side, ht, qh) {
+  if (side === 'ht') return ht;
+  if (side === 'qh') return qh;
+  return [];
+}
+
+const PLAN_SIDE = { qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
+
+// Bên đang xem một cấp QH thì gỡ heatmap / dân số để không che lớp đất; thoát so sánh thì trả lại
+function holdPlanChrome() {
+  const apply = (m, groups) => {
+    if (!m || !groups) return;
+    const hide = isLevelPair() && !['ht', 'qh'].includes(sideOf(m));
+    ['pop', 'heatmap'].forEach(k => {
+      const g = groups[k];
+      if (!g) return;
+      if (hide) {
+        if (m.hasLayer(g)) { g._pairHeld = true; g.remove(); }
+      } else if (g._pairHeld) {
+        g._pairHeld = false;
+        g.addTo(m);
+      }
+    });
+  };
+  apply(map, layers);
+  apply(planMap, planLayers);
+}
+
 function redrawLands() {
   const own = reviewScope && reviewScope.project;
   const notOwn = (list) => (own ? list.filter(l => l.file !== own) : list);
-  const lands = notOwn(state.showLand ? lotsInWardScope(state.landParcels)
-    : lotsInWardScope(state.landParcels).filter(l => projectLotsDrawn(l.file)));
-  const infra = notOwn(!state.showProjectInfra ? []
-    : infraLotsInWardScope(state.projectInfraLots).filter(l => projectLotsDrawn(l.file)));
-  const compare = isCompareOn() && !!planMap;
+  const landAll = notOwn(lotsInWardScope(state.landParcels));
+  const infraAll = notOwn(infraLotsInWardScope(state.projectInfraLots));
   landsDetailed = map ? map.getZoom() >= PARCEL_PATTERN_ZOOM : null;
-  // Bản đồ hiện trạng chỉ vẽ lô HT, lô QH chỉ có trên bản đồ quy hoạch (không trộn 2 giai đoạn)
   const pick = (list, phase) => list.filter(p => p.phase === phase);
+  if (isLevelPair()) {
+    const legacyLand = state.showLand ? landAll : landAll.filter(l => projectLotsDrawn(l.file));
+    const legacyInfra = state.showProjectInfra ? infraAll.filter(l => projectLotsDrawn(l.file)) : [];
+    const paint = (m) => {
+      if (!m) return;
+      const side = sideOf(m);
+      if (side === 'ht' || side === 'qh') {
+        const phase = side === 'ht' ? 'HT' : 'QH';
+        drawLandsOn(m, pick(legacyLand, phase), pick(legacyInfra, phase));
+        return;
+      }
+      const level = PLAN_SIDE[side];
+      if (!level || m.getZoom() < PARCEL_MIN_ZOOM) { drawLandsOn(m, [], []); return; }
+      const match = (p) => p.phase === 'QH' && planLevelOf(p.file) === level;
+      drawLandsOn(m, landAll.filter(match), state.showProjectInfra ? infraAll.filter(match) : []);
+    };
+    paint(map);
+    paint(planMap);
+    redrawNets();
+    return;
+  }
+  const lands = state.showLand ? landAll : landAll.filter(l => projectLotsDrawn(l.file));
+  const infra = state.showProjectInfra ? infraAll.filter(l => projectLotsDrawn(l.file)) : [];
+  const compare = isCompareOn() && !!planMap;
   if (map) drawLandsOn(map, pick(lands, 'HT'), pick(infra, 'HT'));
   if (planMap) drawLandsOn(planMap, compare ? pick(lands, 'QH') : [], compare ? pick(infra, 'QH') : []);
   redrawNets();
@@ -1625,8 +1679,25 @@ function drawNetsOn(m, list) {
 }
 
 function redrawNets() {
-  const raw = (state.projectNets || []).filter(f => projectLotsDrawn(f.file));
   const compare = isCompareOn() && !!planMap;
+  if (isLevelPair()) {
+    const paint = (m) => {
+      if (!m) return;
+      const side = sideOf(m);
+      if (side === 'ht' || side === 'qh') {
+        const phase = side === 'ht' ? 'HT' : 'QH';
+        drawNetsOn(m, (state.projectNets || []).filter(f => projectLotsDrawn(f.file) && f.phase === phase));
+        return;
+      }
+      const level = PLAN_SIDE[side];
+      if (!level || m.getZoom() < PARCEL_MIN_ZOOM) { drawNetsOn(m, []); return; }
+      drawNetsOn(m, (state.projectNets || []).filter(f => f.phase === 'QH' && planLevelOf(f.file) === level));
+    };
+    paint(map);
+    paint(planMap);
+    return;
+  }
+  const raw = (state.projectNets || []).filter(f => projectLotsDrawn(f.file));
   const pick = (phase) => raw.filter(f => f.phase === phase);
   if (map) drawNetsOn(map, pick('HT'));
   if (planMap) drawNetsOn(planMap, compare ? pick('QH') : []);
@@ -2944,3 +3015,10 @@ export async function approvePointStatus(pointId) {
     showToast(`❌ Không phê duyệt được: ${err.message}`, 'error');
   }
 }
+
+onSplitPair(() => {
+  if (!map) return;
+  renderGroupedPoints();
+  redrawLands();
+  holdPlanChrome();
+});

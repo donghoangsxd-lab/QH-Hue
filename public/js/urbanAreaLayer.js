@@ -4,6 +4,7 @@
 // (urbanVision.js, ranh dựng bằng scripts/build-urban-vision.js). Cùng một checkbox, mỗi bản đồ vẽ nội dung của mình.
 import { map } from './mapEngine.js';
 import { planMap, isCompareOn, isSplitOn } from './planMap.js';
+import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
 import { state } from './state.js';
 import { escapeHtml } from './utils.js';
 import { STATUS_REF, URBANS_614, RURAL_RULE, wardLevel614, urbans614Of } from './urbanStatus.js';
@@ -363,13 +364,27 @@ function createUrbanLayer(content) {
 
 const statusLayer = createUrbanLayer(statusContent);
 const visionLayer = createUrbanLayer(visionContent);
+const visionLeft = createUrbanLayer(visionContent);
 
 async function setVisible(on, { fit = false } = {}) {
   await Promise.all([statusLayer.setVisible(on), visionLayer.setVisible(on)]);
+  if (isLevelPair()) return syncUrbanPair();
+  await visionLeft.setVisible(false);
   if (!on || !fit) return;
   const shown = isCompareOn() && !isSplitOn() && planMap ? planMap : map;
   const b = statusLayer.bounds() || visionLayer.bounds();
   if (shown.getZoom() > 11 && b && b.isValid()) shown.flyToBounds(b, { padding: [20, 20], maxZoom: 10, duration: 0.8 });
+}
+
+async function syncUrbanPair() {
+  if (!isLevelPair()) {
+    await visionLeft.setVisible(false);
+    await setVisible(!!$chk()?.checked);
+    return;
+  }
+  await statusLayer.setVisible(false);
+  await visionLayer.setVisible(sideOf(planMap) === 'urban');
+  await visionLeft.setVisible(sideOf(map) === 'urban');
 }
 
 /** Gọi lại khi ranh 40 phường xã tải xong (lớp có thể đã bật trước đó). */
@@ -393,7 +408,12 @@ export function urbanAreaReady() {
 export function initUrbanAreaLayer() {
   if (!map) return;
   statusLayer.init(map);
+  visionLeft.init(map);
   if (planMap) visionLayer.init(planMap);
-  $chk()?.addEventListener('change', (e) => setVisible(e.target.checked, { fit: true }));
+  $chk()?.addEventListener('change', (e) => {
+    if (isLevelPair()) { syncUrbanPair(); return; }
+    setVisible(e.target.checked, { fit: true });
+  });
+  onSplitPair(() => { syncUrbanPair(); });
   if ($chk()?.checked) initialDraw = setVisible(true);
 }

@@ -517,6 +517,34 @@ body.project-review:not(.project-view) .leaflet-popup.dock-card {
 .map-title-level[aria-expanded="true"] .map-title-level-chev { transform: rotate(180deg); }
 .map-title-level:hover { border-color: rgba(var(--tone), 0.9); background: rgba(var(--tone), 0.2); box-shadow: 0 0 10px rgba(var(--tone), 0.35); }
 .map-title[data-view="HT"] .map-title-level { display: none; }
+body.compare-on .map-title-level, body.compare-on .map-title-body { display: none; }
+.map-title-pair {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+body.compare-on .map-title-pair { display: inline-flex; }
+body.compare-on .map-title-seg { font-size: 0; gap: 0; padding: 0 8px; }
+body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; height: 1.15em; }
+.split-side-select {
+  height: calc(28px * var(--k));
+  max-width: 9.6rem;
+  padding: 0 6px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--text-strong);
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid var(--border-color);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.split-side-left { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+.split-side-right { color: var(--accent-orange); border-color: var(--accent-orange); }
+.split-side-select:hover, .split-side-select:focus-visible { outline: none; background: var(--bg-hover); }
 .level-menu {
   position: fixed; z-index: 1300;
   box-sizing: border-box;

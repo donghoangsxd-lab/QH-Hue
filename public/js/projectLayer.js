@@ -28,6 +28,7 @@ import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { isCoreWard } from './qhc2045.js';
 import { refreshQhct } from './qhctLayer.js';
 import { getLevel, levelScope, LEVEL_EVENT } from './mapLevel.js';
+import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
@@ -1368,8 +1369,21 @@ function drawOutlinesOn(m, list, below) {
   updateGlow(m);
 }
 
-// QHPK toàn TP: ranh mọi đồ án QHPK, bấm được cả khi đã phóng gần. Lớp khác: dưới ngưỡng lô thì ranh bấm được
+// QHPK toàn TP: ranh mọi đồ án QHPK, bấm được cả khi đã phóng gần. Lớp khác: dưới ngưỡng lô thì ranh bấm được.
+// So sánh cấp độ: mỗi bản đồ chỉ ranh đúng cấp được chọn ở droplist.
+function outlinesFor(m) {
+  const level = { qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' }[sideOf(m)];
+  if (!level) return [];
+  return projects.filter(p => p.level === level && !isLayerHidden(p.name, 'ranh-gioi') && outlineOf(p));
+}
+
 function redrawOutlines() {
+  if (isLevelPair()) {
+    const below = !!map && map.getZoom() < PARCEL_MIN_ZOOM;
+    if (map) drawOutlinesOn(map, outlinesFor(map), below);
+    if (planMap) drawOutlinesOn(planMap, outlinesFor(planMap), below);
+    return;
+  }
   const boundary = qhpkBoundaryOnly();
   const below = !!map && (boundary || map.getZoom() < PARCEL_MIN_ZOOM || !state.showProjects);
   const ward = wardScopeName();
@@ -1657,6 +1671,7 @@ export function initProjectLayer(opts = {}) {
     redrawQueued = true;
     requestAnimationFrame(() => { redrawQueued = false; refreshAll(); });
   });
+  onSplitPair(() => refreshAll());
   $('projectSearch')?.addEventListener('input', (e) => {
     query = e.target.value || '';
     renderList();

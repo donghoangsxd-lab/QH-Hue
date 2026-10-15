@@ -19,6 +19,7 @@ import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPA
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { analyzeParcelZones, parcelZonesHtml } from './planLandStats.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
+import { isLevelPair, sideOf, mapsForLevel, onSplitPair } from './splitPair.js';
 import {
   QHC2045, CENTER_UNITS, ZONE_NAMES, STAGE_LAYERS, landOf, bareWard, isCoreWard,
   visionColor, visionLineStyle, WATER_KINDS, GREEN_COLOR
@@ -60,18 +61,37 @@ const centerSet = new Set(CENTER_UNITS.map(bareWard));
 
 const data = { land: null, frame: null, vision: null };
 const loading = {};
-const layers = { land: null, frame: null, vision: null, ext: null, core: null, wash: null, hover: null };
+// Mỗi bản đồ một bộ lớp: so sánh cấp độ có thể vẽ 1/25.000 một bên và 1/10.000 bên kia
+const bags = new WeakMap();
+const bagList = [];
+let active = null;
+const layers = new Proxy({}, {
+  get(_t, key) { return active ? active.layers[key] : undefined; },
+  set(_t, key, value) { if (active) active.layers[key] = value; return true; }
+});
+function use(m) {
+  if (!m) return active;
+  let b = bags.get(m);
+  if (!b) {
+    b = {
+      m, renderer: null, lineRenderer: null, washRenderer: null, coreHover: false,
+      layers: { land: null, frame: null, vision: null, ext: null, core: null, wash: null, hover: null }
+    };
+    bags.set(m, b);
+    bagList.push(b);
+  }
+  active = b;
+  return b;
+}
 let coreUnion = null;
-let renderer = null;
-let lineRenderer = null;
-let washRenderer = null;
 const shownStages = new Set([0, 1, 2]);
 let extOn = false;
 let detailed = false;
 let coreOpen = false;
 // Đang xem một địa điểm rồi chuyển sang QHC 1/25.000 hoặc 1/10.000: chỉ lô / vùng chức năng, không ranh tổng
 let placeLots = false;
-const collapsed = () => getLevel() === 'qhc10' && !coreOpen && !placeLots;
+const collapsed = () => !isLevelPair() && getLevel() === 'qhc10' && !coreOpen && !placeLots;
+const qhcOn = (m, id, chk) => (isLevelPair() ? sideOf(m) === id : !!$(chk)?.checked && m === target());
 const tvFeatures = () => (data.frame ? data.frame.features.filter(f => f.properties.k === 'tv') : []);
 
 // ---------- Tải dữ liệu ----------
@@ -92,29 +112,51 @@ function setHint(id, text) {
 }
 
 function ensureRenderer(m) {
-  if (renderer) return renderer;
+  const b = use(m);
+  if (b.renderer) return b.renderer;
   const pane = m.getPane(PANE[0]) || m.createPane(PANE[0]);
   pane.style.zIndex = PANE[1];
-  renderer = L.canvas({ pane: PANE[0], padding: 0.3 });
-  return renderer;
+  b.renderer = L.canvas({ pane: PANE[0], padding: 0.3 });
+  return b.renderer;
 }
 
 function ensureLineRenderer(m) {
-  if (lineRenderer) return lineRenderer;
+  const b = use(m);
+  if (b.lineRenderer) return b.lineRenderer;
   const pane = m.getPane(LINE_PANE[0]) || m.createPane(LINE_PANE[0]);
   pane.style.zIndex = LINE_PANE[1];
   pane.style.pointerEvents = 'none';
-  lineRenderer = L.canvas({ pane: LINE_PANE[0], padding: 0.3 });
-  return lineRenderer;
+  b.lineRenderer = L.canvas({ pane: LINE_PANE[0], padding: 0.3 });
+  return b.lineRenderer;
 }
 
 function ensureWashRenderer(m) {
-  if (washRenderer) return washRenderer;
+  const b = use(m);
+  if (b.washRenderer) return b.washRenderer;
   const pane = m.getPane(WASH_PANE[0]) || m.createPane(WASH_PANE[0]);
   pane.style.zIndex = WASH_PANE[1];
   pane.style.pointerEvents = 'none';
-  washRenderer = L.canvas({ pane: WASH_PANE[0], padding: 0.3 });
-  return washRenderer;
+  b.washRenderer = L.canvas({ pane: WASH_PANE[0], padding: 0.3 });
+  return b.washRenderer;
+}
+
+function qhcHosts(id, on) {
+  if (isLevelPair()) return mapsForLevel(id) || [];
+  return on && target() ? [target()] : [];
+}
+
+function clearQhc(m, keys) {
+  const b = use(m);
+  keys.forEach(k => {
+    const layer = b.layers[k];
+    if (k === 'frame') {
+      layer?.tvLabels?.remove();
+      layer?.points?.remove();
+    }
+    layer?.remove();
+    b.layers[k] = null;
+  });
+  b.coreHover = false;
 }
 
 /** Thứ tự vẽ trong canvas lô: định hướng 1/25.000 < lô; đường bao ngoài vùng trung tâm nổi ở LINE_PANE */
@@ -134,7 +176,7 @@ function lotStyle(f) {
 }
 
 function drawLand() {
-  const m = target();
+  const m = active.m;
   layers.land?.remove();
   layers.land = L.geoJSON(data.land, {
     pane: PANE[0],
@@ -148,7 +190,7 @@ function drawLand() {
 }
 
 function restyleLand() {
-  if (layers.land) layers.land.setStyle(lotStyle);
+  bagList.forEach(b => { if (b.layers.land) b.layers.land.setStyle(lotStyle); });
 }
 
 function frameLabel(text, cls) {
@@ -156,7 +198,7 @@ function frameLabel(text, cls) {
 }
 
 function drawFrame() {
-  const m = target();
+  const m = active.m;
   layers.frame?.remove();
   const r = ensureRenderer(m);
   const lr = ensureLineRenderer(m);
@@ -192,7 +234,7 @@ function drawFrame() {
 }
 
 function zoomFrame() {
-  const m = target();
+  const m = active.m;
   if (!layers.frame || !m.hasLayer(layers.frame)) return;
   const z = m.getZoom();
   const { tvLabels, points } = layers.frame;
@@ -234,20 +276,18 @@ function unionTv() {
 function clearCoreHover() {
   layers.hover?.remove();
   layers.hover = null;
-  coreHover = false;
+  if (active) active.coreHover = false;
 }
-
-let coreHover = false;
 
 function setCoreHover(on) {
   on = !!on && collapsed();
-  if (coreHover === on) return;
-  coreHover = on;
+  if (!active || active.coreHover === on) return;
+  active.coreHover = on;
   layers.hover?.remove();
   layers.hover = null;
   if (!on) return;
   const shape = unionTv();
-  const m = target();
+  const m = active.m;
   if (!shape || !m) return;
   layers.hover = L.geoJSON(shape, {
     pane: WASH_PANE[0],
@@ -270,7 +310,8 @@ function bindCoreHover(m) {
     if (raf) return;
     raf = requestAnimationFrame(() => {
       raf = 0;
-      if (!ev || !collapsed() || !$('chk_qhc10')?.checked) { setCoreHover(false); return; }
+      if (!ev || !collapsed() || !qhcOn(m, 'qhc10', 'chk_qhc10')) { use(m); setCoreHover(false); return; }
+      use(m);
       const ll = m.mouseEventToLatLng(ev);
       const shape = unionTv();
       let inside = false;
@@ -280,17 +321,18 @@ function bindCoreHover(m) {
       setCoreHover(inside);
     });
   });
-  m.getContainer().addEventListener('mouseleave', () => setCoreHover(false));
+  m.getContainer().addEventListener('mouseleave', () => { use(m); setCoreHover(false); });
 }
 
 function drawWash() {
   layers.wash?.remove();
   layers.wash = null;
   clearCoreHover();
-  if (!$('chk_qhc10')?.checked || placeLots) return;
+  const m = active?.m;
+  if (!m || (placeLots && !isLevelPair())) return;
+  if (!qhcOn(m, 'qhc10', 'chk_qhc10')) return;
   const shape = unionTv();
   if (!shape) return;
-  const m = target();
   layers.wash = L.geoJSON(shape, {
     pane: WASH_PANE[0],
     renderer: ensureWashRenderer(m),
@@ -307,8 +349,8 @@ function drawCore() {
   layers.core?.remove();
   layers.core = null;
   const tv = tvFeatures();
-  if (!collapsed() || !tv.length || !$('chk_qhc10')?.checked) return;
-  const m = target();
+  if (!collapsed() || !tv.length || !qhcOn(active?.m, 'qhc10', 'chk_qhc10')) return;
+  const m = active.m;
   const fc = { type: 'FeatureCollection', features: tv };
   const group = L.featureGroup();
   const [w, , e, n] = turf.bbox(fc);
@@ -321,7 +363,10 @@ function drawCore() {
 }
 
 function applyCore() {
-  if (!$('chk_qhc10')?.checked || !data.land) return;
+  const m = target();
+  if (!m) return;
+  use(m);
+  if (!qhcOn(m, 'qhc10', 'chk_qhc10') || !data.land) return;
   if (collapsed()) {
     layers.land?.remove();
     layers.land = null;
@@ -343,7 +388,11 @@ function applyCore() {
 /** true: đang xem một địa điểm — QHC 1/10.000 chỉ vẽ lô, QHC 1/25.000 bỏ các nét ranh */
 export function setQhcPlaceMode(on) {
   placeLots = !!on;
+  if (isLevelPair()) { syncQhc(); return; }
   if (!placeLots) return;
+  const m = target();
+  if (!m) return;
+  use(m);
   if (getLevel() === 'qhc25' && layers.vision) drawVision();
   if (getLevel() === 'qhc10') applyCore();
 }
@@ -363,47 +412,62 @@ export const coreContains = (latlng) => !!latlng && !!featureAt(tvFeatures(), la
 /** Ranh 4 tiểu vùng TTHuế 2045 (phạm vi đã có QHC 1/10.000), tải nếu chưa có */
 export const coreFrame = () => load('frame').then(tvFeatures);
 
+let landGen = 0;
 async function setLand(on) {
-  const m = target();
-  if (!on) {
-    layers.land?.remove();
-    layers.core?.remove();
-    layers.wash?.remove();
-    clearCoreHover();
-    layers.frame?.tvLabels?.remove();
-    layers.frame?.points?.remove();
-    layers.frame?.remove();
-    layers.land = layers.frame = layers.core = layers.wash = null;
+  const gen = ++landGen;
+  const maps = qhcHosts('qhc10', on);
+  const both = [map, planMap].filter(Boolean);
+  if (!maps.length) {
+    both.forEach(m => clearQhc(m, ['land', 'core', 'wash', 'hover', 'frame', 'ext']));
     setHint('qhc10Hint', 'Trung tâm');
     return;
   }
   setHint('qhc10Hint', 'đang tải…');
   await Promise.resolve();
   try {
-    await Promise.all(placeLots ? [load('land')] : [load('land'), load('frame')]);
+    await Promise.all((placeLots && !isLevelPair()) ? [load('land')] : [load('land'), load('frame')]);
   } catch (err) {
     console.warn('QHC 2045 – không tải được lớp 1/10.000:', err);
     setHint('qhc10Hint', 'lỗi tải');
     return;
   }
-  if (!$('chk_qhc10')?.checked) return;
-  detailed = m.getZoom() >= TT16_PATTERN_ZOOM;
-  if (!collapsed()) drawLand();
-  if (!placeLots) {
-    drawFrame();
+  if (gen !== landGen) return;
+  const now = qhcHosts('qhc10', !!$('chk_qhc10')?.checked);
+  both.forEach(m => { if (!now.includes(m)) clearQhc(m, ['land', 'core', 'wash', 'hover', 'frame']); });
+  now.forEach(m => {
+    use(m);
+    detailed = m.getZoom() >= TT16_PATTERN_ZOOM;
+    if (!collapsed()) drawLand();
+    else {
+      layers.land?.remove();
+      layers.land = null;
+    }
+    if (placeLots && !isLevelPair()) {
+      layers.frame?.tvLabels?.remove();
+      layers.frame?.points?.remove();
+      layers.frame?.remove();
+      layers.core?.remove();
+      layers.frame = layers.core = null;
+      clearCoreHover();
+      layers.wash?.remove();
+      layers.wash = null;
+      return;
+    }
+    if (data.frame) drawFrame();
     drawWash();
     drawCore();
-  }
+  });
   setHint('qhc10Hint', 'Trung tâm');
 }
 
 // ---------- Ranh 1/10.000 mở rộng theo QĐ 756 ----------
-const extVisible = () => extOn && !!$('chk_qhc10')?.checked;
+const extVisible = () => extOn && (isLevelPair() || !!$('chk_qhc10')?.checked);
 
+let extGen = 0;
 async function setExt(on) {
-  const m = target();
-  layers.ext?.remove();
-  layers.ext = null;
+  const gen = ++extGen;
+  const both = [map, planMap].filter(Boolean);
+  both.forEach(m => { use(m); layers.ext?.remove(); layers.ext = null; });
   if (!on) return;
   try {
     await load('frame');
@@ -411,29 +475,30 @@ async function setExt(on) {
     console.warn('QHC 2045 – không tải được ranh điều chỉnh:', err);
     return;
   }
-  if (!extVisible() || layers.ext) return;
+  if (gen !== extGen || !extOn) return;
+  const maps = qhcHosts('qhc10', !!$('chk_qhc10')?.checked);
   const wards = (state.wardLabelsList || []).filter(w => w.geometry && isCoreWard(w.name));
-  if (!wards.length) {
-    console.warn('QHC 2045 – chưa tải ranh phường, chưa vẽ được ranh QĐ 756');
-    return;
-  }
-  const r = ensureRenderer(m);
-  const group = L.featureGroup();
-  data.frame.features.filter(f => f.properties.k === 'dc').forEach(f => {
-    const p = f.properties;
-    L.geoJSON(f, { pane: PANE[0], renderer: r, style: MISSING_STYLE })
-      .bindTooltip(`<b>Đang điều chỉnh</b> · ${escapeHtml(p.n)} (~${fmtNum(p.a)} ha)<br><span class="ua-tip-muted">Chưa có trong ${escapeHtml(QHC2045.short)}; bổ sung vào phạm vi 1/10.000 theo QĐ 756 khi điều chỉnh QHC thành phố Huế.</span>`,
-        { sticky: true, className: 'ua-tip', opacity: 1 })
-      .addTo(group);
-    const c = turf.pointOnFeature(f).geometry.coordinates;
-    L.marker([c[1], c[0]], { icon: frameLabel(`Đang điều chỉnh<br>Bổ sung ${escapeHtml(p.n)}`, 'qhc-label-dc'), interactive: false, keyboard: false }).addTo(group);
+  if (!wards.length || !data.frame) return;
+  maps.forEach(m => {
+    use(m);
+    const r = ensureRenderer(m);
+    const group = L.featureGroup();
+    data.frame.features.filter(f => f.properties.k === 'dc').forEach(f => {
+      const p = f.properties;
+      L.geoJSON(f, { pane: PANE[0], renderer: r, style: MISSING_STYLE })
+        .bindTooltip(`<b>Đang điều chỉnh</b> · ${escapeHtml(p.n)} (~${fmtNum(p.a)} ha)<br><span class="ua-tip-muted">Chưa có trong ${escapeHtml(QHC2045.short)}; bổ sung vào phạm vi 1/10.000 theo QĐ 756 khi điều chỉnh QHC thành phố Huế.</span>`,
+          { sticky: true, className: 'ua-tip', opacity: 1 })
+        .addTo(group);
+      const c = turf.pointOnFeature(f).geometry.coordinates;
+      L.marker([c[1], c[0]], { icon: frameLabel(`Đang điều chỉnh<br>Bổ sung ${escapeHtml(p.n)}`, 'qhc-label-dc'), interactive: false, keyboard: false }).addTo(group);
+    });
+    const lines = outerWardLines(wards);
+    const lr = ensureLineRenderer(m);
+    L.polyline(lines, { pane: LINE_PANE[0], renderer: lr, interactive: false, ...EXT_HALO }).addTo(group);
+    L.polyline(lines, { pane: LINE_PANE[0], renderer: lr, interactive: false, ...EXT_LINE }).addTo(group);
+    layers.ext = group.addTo(m);
+    restack();
   });
-  const lines = outerWardLines(wards);
-  const lr = ensureLineRenderer(m);
-  L.polyline(lines, { pane: LINE_PANE[0], renderer: lr, interactive: false, ...EXT_HALO }).addTo(group);
-  L.polyline(lines, { pane: LINE_PANE[0], renderer: lr, interactive: false, ...EXT_LINE }).addTo(group);
-  layers.ext = group.addTo(m);
-  restack();
 }
 
 // ---------- Popup tra cứu lô ----------
@@ -484,12 +549,12 @@ function openLotPopup(f, latlng) {
       ${ward ? `<button type="button" class="bp-btn qhc-pop-ward" data-qhc-ward="${escapeHtml(ward)}">${ico('map')}Xem ${escapeHtml(ward)}</button>` : ''}
       <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · 1/10.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
     </div>`;
-  openOutlinedPopup(target(), f.geometry, L.popup({ maxWidth: 320, className: 'qhc-popup' }).setContent(html), latlng);
+  openOutlinedPopup(active?.m || target(), f.geometry, L.popup({ maxWidth: 320, className: 'qhc-popup' }).setContent(html), latlng);
 }
 
 // ---------- 1/25.000: sơ đồ tổ chức không gian ----------
 function drawVision() {
-  const m = target();
+  const m = active.m;
   layers.vision?.remove();
   const r = ensureRenderer(m);
   const cats = data.vision.cats;
@@ -499,7 +564,7 @@ function drawVision() {
     if (L_ === 'v') fills.push(f);
     else if (L_ === 'n' && f.properties.k !== 2) waters.push(f);
     else if (L_ === 'x') greens.push(f);
-    else if (L_ === 'r' && !placeLots) lines.push(f);
+    else if (L_ === 'r' && !(placeLots && !isLevelPair())) lines.push(f);
   });
   const zoneName = (f) => cats.zones[f.properties.k] || 'Khác';
   const fillLayer = L.geoJSON({ type: 'FeatureCollection', features: fills }, {
@@ -539,7 +604,7 @@ function openVisionPopup(f, latlng) {
       ${desc ? `<p class="qhc-pop-desc">${escapeHtml(desc)}</p>` : ''}
       <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · Sơ đồ tổ chức không gian 1/25.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
     </div>`;
-  openOutlinedPopup(target(), f.geometry, L.popup({ maxWidth: 320, className: 'qhc-popup' }).setContent(html), latlng);
+  openOutlinedPopup(active?.m || target(), f.geometry, L.popup({ maxWidth: 320, className: 'qhc-popup' }).setContent(html), latlng);
 }
 
 // ---------- Click cấp bản đồ ----------
@@ -560,7 +625,10 @@ function featureAt(features, lng, lat) {
 
 /** Click nền bản đồ m (không bật công cụ): mở popup lô 1/10.000 hoặc vùng 1/25.000 tại điểm bấm. → true khi đã mở */
 export function qhcClick(e, m) {
-  if (!m || m !== target() || !e?.latlng) return false;
+  if (!m || !e?.latlng) return false;
+  if (!isLevelPair() && m !== target()) return false;
+  if (isLevelPair() && sideOf(m) !== 'qhc10' && sideOf(m) !== 'qhc25') return false;
+  use(m);
   const { lat, lng } = e.latlng;
   if (layers.core && m.hasLayer(layers.core) && featureAt(tvFeatures(), lng, lat)) {
     setCoreOpen(true);
@@ -629,10 +697,13 @@ export function parcelQhcHtml(geometry, level, recorded) {
   return level === 'qhc25' ? parcelVisionHtml(geometry, recorded) : parcelLandHtml(geometry, recorded);
 }
 
+let visionGen = 0;
 async function setVision(on) {
-  if (!on) {
-    layers.vision?.remove();
-    layers.vision = null;
+  const gen = ++visionGen;
+  const maps = qhcHosts('qhc25', on);
+  const both = [map, planMap].filter(Boolean);
+  if (!maps.length) {
+    both.forEach(m => clearQhc(m, ['vision']));
     setHint('qhc25Hint', 'toàn đô thị');
     return;
   }
@@ -644,9 +715,18 @@ async function setVision(on) {
     setHint('qhc25Hint', 'lỗi tải');
     return;
   }
-  if (!$('chk_qhc25')?.checked) return;
-  drawVision();
+  if (gen !== visionGen) return;
+  const now = qhcHosts('qhc25', !!$('chk_qhc25')?.checked);
+  both.forEach(m => { if (!now.includes(m)) clearQhc(m, ['vision']); });
+  now.forEach(m => { use(m); drawVision(); });
   setHint('qhc25Hint', 'toàn đô thị');
+}
+
+function syncQhc() {
+  setLand(!!$('chk_qhc10')?.checked);
+  setVision(!!$('chk_qhc25')?.checked);
+  setExt(extVisible());
+  syncStages();
 }
 
 // ---------- Bật lớp: chuyển sang bản đồ quy hoạch nếu đang xem hiện trạng ----------
@@ -655,7 +735,8 @@ function ensurePlanView() {
 }
 
 function syncStages() {
-  $('qhcStages')?.toggleAttribute('hidden', !$('chk_qhc10')?.checked);
+  const show = !!$('chk_qhc10')?.checked || (isLevelPair() && (mapsForLevel('qhc10') || []).length > 0);
+  $('qhcStages')?.toggleAttribute('hidden', !show);
 }
 
 function initStages() {
@@ -674,7 +755,7 @@ function initStages() {
     } else {
       const t = Number(id);
       if (shownStages.has(t)) shownStages.delete(t); else shownStages.add(t);
-      if (layers.land) drawLand();
+      bagList.forEach(b => { if (b.layers.land) { use(b.m); drawLand(); } });
     }
     paint();
   });
@@ -695,10 +776,10 @@ export function fitCenter() {
   shown.flyToBounds(b, { padding: [30, 30], duration: 0.9 });
 }
 
-function onPopupClick(e) {
+function onPopupClick(e, host) {
   const el = e.target.closest('[data-qhc-ward],[data-qhc-open]');
   if (!el) return;
-  target().closePopup();
+  (host || target())?.closePopup();
   if (el.dataset.qhcWard) document.dispatchEvent(new CustomEvent(WARD_PICK_EVENT, { detail: el.dataset.qhcWard }));
   else document.dispatchEvent(new CustomEvent(OPEN_PROJECT_EVENT, { detail: el.dataset.qhcOpen }));
 }
@@ -707,7 +788,7 @@ function initUi() {
   // Nút trong popup (lô 1/10.000, vùng 1/25.000) trên cả 2 bản đồ
   [map, planMap].filter(Boolean).forEach(m => m.on('popupopen', (e) => {
     const el = e.popup.getElement();
-    if (el && !el.dataset.qhcBound) { el.dataset.qhcBound = '1'; el.addEventListener('click', onPopupClick); }
+    if (el && !el.dataset.qhcBound) { el.dataset.qhcBound = '1'; el.addEventListener('click', (ev) => onPopupClick(ev, m)); }
   }));
   initStages();
 }
@@ -715,21 +796,30 @@ function initUi() {
 export function initQhc2045Layer() {
   const m = target();
   if (!m) return;
+  use(m);
   initUi();
   $('chk_qhc10')?.addEventListener('change', (e) => {
+    if (isLevelPair()) { syncQhc(); return; }
     if (e.target.checked) ensurePlanView();
     setLand(e.target.checked);
     setExt(extVisible());
     syncStages();
   });
-  $('chk_qhc25')?.addEventListener('change', (e) => { if (e.target.checked) ensurePlanView(); setVision(e.target.checked); });
-  m.on('zoomend', () => {
-    const d = m.getZoom() >= TT16_PATTERN_ZOOM;
-    if (d !== detailed) { detailed = d; restyleLand(); }
-    zoomFrame();
+  $('chk_qhc25')?.addEventListener('change', (e) => {
+    if (isLevelPair()) { syncQhc(); return; }
+    if (e.target.checked) ensurePlanView();
+    setVision(e.target.checked);
   });
+  const onZoom = (host) => {
+    use(host);
+    const d = host.getZoom() >= TT16_PATTERN_ZOOM;
+    if (d !== detailed) { detailed = d; restyleLand(); }
+    if (active.layers.frame && host.hasLayer(active.layers.frame)) zoomFrame();
+  };
+  [map, planMap].filter(Boolean).forEach(host => host.on('zoomend', () => onZoom(host)));
   document.addEventListener(LOT_OPACITY_EVENT, restyleLand);
-  document.addEventListener(LEVEL_EVENT, () => { if (!placeLots) applyCore(); });
+  document.addEventListener(LEVEL_EVENT, () => { if (!isLevelPair() && !placeLots) applyCore(); });
+  onSplitPair(() => syncQhc());
   bindCoreHover(map);
   bindCoreHover(planMap);
   syncStages();

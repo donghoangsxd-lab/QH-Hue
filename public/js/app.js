@@ -45,6 +45,7 @@ import {
 import { escapeHtml, setStatusContent, showToast, announceTool, TOOL_START_EVENT, RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './utils.js';
 import { initViewFlow, wardFromMapClick } from './viewFlow.js';
 import { initMapLevel, getLevel, LEVEL_EVENT } from './mapLevel.js';
+import { initSplitPair } from './splitPair.js';
 import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
 import { initQhctLayer } from './qhctLayer.js';
 import { initCadImport } from './cadImportUi.js';
@@ -353,6 +354,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   restoreAdminSession();
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleSplit);
   initMapTitle();
+  initSplitPair(map);
 
   // ---------- Click bản đồ: dùng chung cho nửa trái (hiện trạng) và nửa phải (quy hoạch) khi so sánh ----------
   let pickSeq = 0;

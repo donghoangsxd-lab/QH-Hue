@@ -3,10 +3,11 @@
 // Dòng lớp ghi số đồ án nhập và số lô tĩnh; chưa có cả hai thì "chưa có dữ liệu".
 // Chọn một phường, hoặc đang mở một đồ án, khi lớp QHCT tắt: ranh các đồ án QHCT giao phạm vi đó vẽ đỏ nét đứt dày,
 // phần nằm ngoài phạm vi bị cắt. Toàn TP (chưa chọn phường, chưa mở đồ án) không vẽ các ranh này.
-// Nhịp nét lệch nửa chu kỳ với ranh điều chỉnh cục bộ (adjustLayer.js) nên chỗ trùng ranh hiện xen kẽ đỏ / vàng.
+// Nhịp nét lệch nửa chu kỳ với ranh điều chỉnh cục bộ (adjustLayer.js, xanh dương, z 449) nên chỗ trùng ranh hiện xen kẽ đỏ / xanh.
 import { state } from './state.js';
 import { map } from './mapEngine.js';
 import { planMap, isSplitOn, getViewMode, setViewMode, passToolClick } from './planMap.js';
+import { isLevelPair, mapsForLevel, onSplitPair } from './splitPair.js';
 import { escapeHtml, fmtNum } from './utils.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { analyzeParcelPlan, parcelPlanHtml } from './planLandStats.js';
@@ -14,7 +15,7 @@ import { analyzeParcelPlan, parcelPlanHtml } from './planLandStats.js';
 export const QHCT_URL = 'data/qhct/index.json';
 const PANE = 'qhctPane';
 const DEFAULT_COLOR = '#f472b6';
-// Trên ranh điều chỉnh cục bộ (447), dưới tem đường (450)
+// Dưới ranh điều chỉnh cục bộ (449) và tem đường (450)
 const OUTLINE_PANE = 'qhctOutlinePane';
 const OUTLINE_Z = 448;
 const OUTLINE_STYLE = { color: '#ef4444', weight: 2, opacity: 1, dashArray: '3 3', lineCap: 'butt', fill: false };
@@ -24,8 +25,6 @@ const $ = (id) => document.getElementById(id);
 const target = () => planMap || map;
 let data = null;
 let loading = null;
-let layer = null;
-let renderer = null;
 let outlines = null;
 let outlineKey = null;
 const outlineRenderers = new WeakMap();
@@ -124,6 +123,12 @@ function drawOutlines(m, plans) {
 
 // Ranh khu vực đã có QHCT khi lớp QHCT tắt: đang mở một đồ án (cắt theo ranh đồ án) hoặc đang chọn phường (cắt theo phường, lớp QHPK bật).
 function refreshOutlines() {
+  if (isLevelPair()) {
+    outlines?.remove();
+    outlines = null;
+    outlineKey = null;
+    return;
+  }
   const m = target();
   const host = focusedHost();
   const ward = host ? null : selectedWard();
@@ -201,14 +206,21 @@ function popupHtml(p) {
     <div class="qhc-pop-src">QHCT 1/500</div></div>`;
 }
 
+const drawn = new WeakMap();
+
+function clearLots(m) {
+  const d = drawn.get(m);
+  if (!d) return;
+  d.layer?.remove();
+  drawn.delete(m);
+}
+
 function draw(m) {
-  layer?.remove();
-  if (!renderer) {
-    const pane = m.getPane(PANE) || m.createPane(PANE);
-    pane.style.zIndex = 380;
-    renderer = L.canvas({ pane: PANE });
-  }
-  layer = L.geoJSON(data, {
+  clearLots(m);
+  const pane = m.getPane(PANE) || m.createPane(PANE);
+  pane.style.zIndex = 380;
+  const renderer = L.canvas({ pane: PANE });
+  const layer = L.geoJSON(data, {
     pane: PANE,
     renderer,
     style: (f) => {
@@ -217,26 +229,37 @@ function draw(m) {
     }
   }).on('click', (e) => m.openPopup(popupHtml(e.layer.feature.properties || {}), e.latlng, { maxWidth: 320, className: 'qhc-popup' }));
   layer.addTo(m);
+  drawn.set(m, { layer, renderer });
+}
+
+function qhctMaps() {
+  if (isLevelPair()) return mapsForLevel('qhct') || [];
+  return $('chk_qhct')?.checked && target() ? [target()] : [];
 }
 
 async function setVisible(on) {
-  const m = target();
-  if (!m) return;
-  if (!on) {
-    layer?.remove();
-    layer = null;
+  const maps = isLevelPair() ? qhctMaps() : (on && target() ? [target()] : []);
+  [map, planMap].filter(Boolean).forEach(m => { if (!maps.includes(m)) clearLots(m); });
+  if (!maps.length) {
     setHint(idleHint());
     return;
   }
-  if (planMap && !isSplitOn() && getViewMode() !== 'QH') setViewMode('QH');
+  if (!isLevelPair() && planMap && !isSplitOn() && getViewMode() !== 'QH') setViewMode('QH');
   setHint('đang tải…');
   await load();
-  if (!$('chk_qhct')?.checked) return;
-  if (data.features.length) draw(m);
+  if (!isLevelPair() && !$('chk_qhct')?.checked) return;
+  const now = qhctMaps();
+  [map, planMap].filter(Boolean).forEach(m => { if (!now.includes(m)) clearLots(m); });
+  now.forEach(m => { if (data?.features?.length) draw(m); });
   setHint(idleHint());
 }
 
 export function initQhctLayer() {
-  $('chk_qhct')?.addEventListener('change', (e) => { setVisible(e.target.checked); refreshOutlines(); });
+  $('chk_qhct')?.addEventListener('change', (e) => {
+    if (isLevelPair()) { setVisible(true); refreshOutlines(); return; }
+    setVisible(e.target.checked);
+    refreshOutlines();
+  });
   $('chk_projects')?.addEventListener('change', refreshOutlines);
+  onSplitPair(() => { setVisible(!!$('chk_qhct')?.checked); refreshOutlines(); });
 }

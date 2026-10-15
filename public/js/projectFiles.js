@@ -8,6 +8,8 @@ import { state } from './state.js';
 import { geeApi } from './api.js';
 import { planLevelOf } from './generalPlan.js';
 import { getLevel } from './mapLevel.js';
+import { isLevelPair, sideOf } from './splitPair.js';
+import { planMap } from './planMap.js';
 
 const CITY_NAME = 'Thành phố Huế';
 // Tiến độ tải file đồ án (detail { done, total }; done = total là xong)
@@ -104,7 +106,19 @@ function wanted() {
   const map = getMap();
   if (!map) return [];
   const zoom = map.getZoom();
-  const bounds = map.getBounds().pad(0.15);
+  let bounds = map.getBounds().pad(0.15);
+  if (isLevelPair() && planMap) {
+    try { bounds = bounds.extend(planMap.getBounds()); } catch (e) { /* bản đồ kia chưa có kích thước */ }
+  }
+  if (isLevelPair() && zoom >= minZoom) {
+    const want = new Set([map, planMap].map(m => ({ qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' }[sideOf(m)])).filter(Boolean));
+    return state.projectCatalog.filter(p => {
+      if (!p || !p.tenQH || p.sheetOnly || !want.has(planLevelOf(p.tenQH))) return false;
+      if (state.hiddenProjects.has(p.tenQH)) return false;
+      if (!p.bbox) return true;
+      return intersects(p.bbox, bounds);
+    });
+  }
   const layerOn = parcelLayerOn(zoom) || state.showLand;
   const focus = focusedProjectName();
   const wardName = wardScopeName();
