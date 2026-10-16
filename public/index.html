@@ -306,7 +306,15 @@
     <!-- KHUNG XEM TRƯỚC KHI IN (printLayout.js): kéo bản đồ vào khung, chọn khổ A3 → A0 -->
     <div class="print-preview" id="printPreview" hidden>
       <div class="print-frame" id="printFrame">
-        <span class="print-frame-tag">Vùng in</span>
+        <span class="print-frame-tag" id="printFrameTag">Vùng in</span>
+        <i class="print-cross"></i>
+        <i class="print-corner tl"></i>
+        <i class="print-corner tr"></i>
+        <i class="print-corner bl"></i>
+        <i class="print-corner br"></i>
+      </div>
+      <div class="print-frame" id="printFrameRight" hidden>
+        <span class="print-frame-tag">Quy hoạch</span>
         <i class="print-cross"></i>
         <i class="print-corner tl"></i>
         <i class="print-corner tr"></i>
@@ -324,10 +332,11 @@
           <button type="button" data-paper="a1" aria-pressed="false">A1</button>
           <button type="button" data-paper="a0" aria-pressed="false">A0</button>
         </div>
+        <div class="print-layout-live" id="printLayoutLive">Bố cục: Một khung + cột phải</div>
         <label class="print-title-lbl">Tiêu đề
           <input id="printTitle" type="text" maxlength="140" autocomplete="off" spellcheck="false">
         </label>
-        <p class="print-hint">Kéo hoặc cuộn bản đồ để đưa vùng cần in vào khung. Phần ngoài khung không in. Khổ lớn hơn in cùng vùng đó to hơn.</p>
+        <p class="print-hint">Kéo hoặc cuộn bản đồ để đưa vùng cần in vào khung. Phần ngoài khung không in. Khổ lớn hơn in cùng vùng đó to hơn. Đang chia đôi màn hình thì PDF tự xuất hai ô Hiện trạng | Quy hoạch.</p>
         <div class="print-dock-actions">
           <button type="button" class="print-btn" id="printCancel">Hủy</button>
           <button type="button" class="print-btn print-btn-go" id="printGo">Xuất PDF</button>
