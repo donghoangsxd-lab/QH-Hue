@@ -788,11 +788,13 @@ function legendGroupHtml([name, keys]) {
       <i class="tt16-swatch" style="background:${key.color};border-color:${key.color};"></i><span>${key.label}</span></div>`;
     }
     const s = TT16_STYLES[key];
-    const bg = tt16SwatchCss(key);
+    // Có hoa văn: chỉ background-image (nền UI tối lộ qua alpha ô). Không gắn background-color = màu ký hiệu —
+    // nét pattern cùng màu sẽ biến mất, ô chỉ còn màu đặc.
+    const bg = tt16SwatchCss(key) || `background:${s.color};`;
     const aci = s.aci != null ? ` · ACI ${s.aci}` : '';
     const search = foldLayer(`${s.label} ${s.layer} ${key}`).toLowerCase();
     return `<div class="tt16-row" title="${s.label}\nLayer: ${s.layer}${aci}" data-search="${search}">
-      <i class="tt16-swatch" style="background-color:${s.color};${bg}border-color:${s.color};"></i><span>${s.label}</span></div>`;
+      <i class="tt16-swatch" style="${bg}border-color:${s.color};"></i><span>${s.label}</span></div>`;
   }).join('');
   return `<details class="tt16-group" open><summary><span class="tt16-group-name">${name}</span><span class="tt16-group-count">${keys.length}</span></summary>${rows}</details>`;
 }
