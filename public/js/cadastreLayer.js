@@ -2,12 +2,13 @@
 // Tile vector PMTiles (lớp "thuadat", zoom 15–16) đọc thẳng từ bucket bằng HTTP Range; zoom > 16 phóng to từ tile 16.
 // Bấm vào thửa khi không bật công cụ nào: tra trong tile z16 đã tải, không gọi máy chủ. Tìm tờ/thửa qua chỉ mục từng xã.
 // Droplist đang ở lớp quy hoạch: bảng thửa đặt góc trái (4 trang QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500),
-// đối chiếu được cả khi lớp đó đang tắt. Droplist Hệ thống đô thị giữ popup tại thửa.
+// đối chiếu được cả khi lớp đó đang tắt. Nút Phân tích QH của đo diện tích mở cùng 4 trang trên polygon vùng đo.
+// Droplist Hệ thống đô thị giữ popup tại thửa.
 import { map } from './mapEngine.js';
 import { planMap, getViewMode, isSplitOn } from './planMap.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, showToast, ico } from './utils.js';
-import { analyzeParcelPlan, parcelPlanHtml, mountParcelPies, clearParcelPies } from './planLandStats.js';
+import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
 import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
@@ -420,15 +421,28 @@ function ensureCard() {
   return el;
 }
 
-function cardHtml(p) {
-  const current = getLevel();
+function tabsBar(current, label, closeLabel) {
   const tabs = PLAN_TABS.map(t => {
     const on = t.id === current;
     return `<button type="button" class="cad-tab${on ? ' is-on' : ''}" role="tab" data-cad-tab="${t.id}" aria-selected="${on}" title="${t.name} ${t.scale}"><b>${t.name}</b><small>${t.scale}</small></button>`;
   }).join('');
-  return `<div class="cad-tabs" role="tablist" aria-label="Lớp quy hoạch trên thửa">${tabs}</div>
-    <button type="button" class="cad-card-x" title="Đóng" aria-label="Đóng bảng thửa">${ico('close')}</button>
+  return `<div class="cad-tabs" role="tablist" aria-label="${label}">${tabs}</div>
+    <button type="button" class="cad-card-x" title="Đóng" aria-label="${closeLabel}">${ico('close')}</button>`;
+}
+
+function cardHtml(p) {
+  return `${tabsBar(getLevel(), 'Lớp quy hoạch trên thửa', 'Đóng bảng thửa')}
     <div class="cad-id">${parcelInfoHtml(p)}</div>
+    <div class="cad-page" role="tabpanel"></div>`;
+}
+
+function measureCardHtml(tab, areaM2) {
+  const area = areaM2 >= 10000 ? `${fmtNum(areaM2 / 10000)} ha` : `${fmtNum(Math.round(areaM2))} m²`;
+  return `${tabsBar(tab, 'Lớp quy hoạch trong vùng đo', 'Đóng bảng vùng đo')}
+    <div class="cad-id"><div class="lp-head"><div class="lp-head-main">
+      <div class="lp-title-row"><span class="lp-title">Vùng đo</span></div>
+      <div class="lp-sub">${areaM2 > 0 ? area : ''}</div>
+    </div></div></div>
     <div class="cad-page" role="tabpanel"></div>`;
 }
 
@@ -489,15 +503,20 @@ function drawHighlight(shape, targetMap) {
 
 const QHPK_NOTE = 'Cắt hình học thửa với lô các đồ án QHPK 1/2.000 đã nạp, kể cả khi lớp QHPK hoặc đồ án đang tắt. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn. Hình thửa từ tile địa chính (sai số ranh khoảng 0,5 m) nên có thể lệch nhẹ so với diện tích hồ sơ.';
 
-function planPage(id, geometry, recorded) {
-  if (id === 'qhc25' || id === 'qhc10') return parcelQhcHtml(geometry, id, recorded);
-  if (id === 'qhct') return parcelQhctHtml(geometry, recorded);
+function planPage(id, geometry, recorded, place) {
+  const w = planPlace(place);
+  if (id === 'qhc25' || id === 'qhc10') return parcelQhcHtml(geometry, id, recorded, place);
+  if (id === 'qhct') return parcelQhctHtml(geometry, recorded, place);
+  const note = place === 'measure'
+    ? `Cắt hình học ${w.cut} với lô các đồ án QHPK 1/2.000 đã nạp, kể cả khi lớp QHPK hoặc đồ án đang tắt. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn.`
+    : QHPK_NOTE;
   return analyzeParcelPlan(geometry, { level: 'QHPK', includeHidden: true }).then(res => ({
     html: parcelPlanHtml(res, recorded, {
-      title: 'QHPK 1/2.000 trên thửa đất',
+      title: `QHPK 1/2.000 ${w.on}`,
       noneLabel: 'Đất khác',
-      empty: 'Thửa chưa nằm trong lô QHPK 1/2.000 đã nạp.',
-      note: QHPK_NOTE
+      empty: `${w.it} chưa nằm trong lô QHPK 1/2.000 đã nạp.`,
+      place,
+      note
     }),
     shapes: res.shapes
   }));
@@ -569,7 +588,7 @@ async function showTab(id) {
   clearParcelPies();
   page.innerHTML = `<div class="cad-busy">Đang đối chiếu ${escapeHtml(tab ? `${tab.name} ${tab.scale}` : id)}…</div>`;
   try {
-    const pageData = await planPage(id, st.geom, st.recorded);
+    const pageData = await planPage(id, st.geom, st.recorded, st.place);
     if (cardState !== st) return;
     st.cache.set(id, pageData);
     if (st.tab !== id) return;
@@ -577,10 +596,48 @@ async function showTab(id) {
     mountParcelPies(page);
     nudgeParcel(st.map, st.bounds);
   } catch (err) {
-    console.warn('Tra quy hoạch thửa lỗi:', err);
+    console.warn(st.place === 'measure' ? 'Tra quy hoạch vùng đo lỗi:' : 'Tra quy hoạch thửa lỗi:', err);
     if (cardState !== st || st.tab !== id) return;
     page.innerHTML = `<div class="sug-card ineligible">Không phân tích được: ${escapeHtml(err.message || String(err))}</div>`;
   }
+}
+
+function closeDocked() {
+  [map, planMap].forEach(m => {
+    const cls = m?._popup?.options?.className || '';
+    if (cls === 'infra-popup' || cls === 'inspect-popup') m.closePopup();
+  });
+}
+
+/** Đóng bảng vùng đo; bảng thửa đang mở thì giữ. */
+export function closeMeasurePlan() {
+  if (cardState?.kind === 'measure') closeParcel();
+}
+
+/**
+ * ring: vòng polygon đo [[lng, lat], …] đã khép.
+ * Mở bảng góc trái với 4 cấp như bảng thửa. Đổi hình đo thì mapEngine gọi closeMeasurePlan.
+ */
+export function openMeasurePlan(ring, targetMap) {
+  if (!targetMap || !ring || ring.length < 4) return;
+  closeDocked();
+  closeParcel();
+  const el = ensureCard();
+  const tab = isPlanLevel(getLevel()) ? getLevel() : 'qhpk';
+  const geom = { type: 'Polygon', coordinates: [ring] };
+  let area = 0;
+  let bounds = null;
+  try { area = turf.area(geom); } catch { area = 0; }
+  try { bounds = L.geoJSON(geom).getBounds(); } catch { bounds = null; }
+  cardState = {
+    kind: 'measure', place: 'measure', tab, cache: new Map(),
+    recorded: 0, geom, map: targetMap, bounds, landKey: null
+  };
+  el.innerHTML = measureCardHtml(tab, area);
+  el.hidden = false;
+  el.setAttribute('aria-label', 'Quy hoạch sử dụng đất trong vùng đo');
+  showTab(tab);
+  if (bounds) requestAnimationFrame(() => nudgeParcel(targetMap, bounds));
 }
 
 // replaced: popup lô đồ án mở cùng cú bấm, chỉ đóng khi tìm thấy thửa (không thấy thì giữ popup lô)
@@ -598,10 +655,7 @@ async function openParcel(latlng, targetMap, replaced) {
     if (cardState) closeParcel();
     return false;
   }
-  [map, planMap].forEach(m => {
-    const cls = m?._popup?.options?.className;
-    if (cls === 'infra-popup' || cls === 'inspect-popup') m.closePopup();
-  });
+  closeDocked();
   if (replaced) targetMap.closePopup(replaced);
   const props = found.hit.props;
   const planning = isPlanLevel(getLevel());
@@ -610,7 +664,8 @@ async function openParcel(latlng, targetMap, replaced) {
   const shapeP = parcelShape(found.hit, DATA_ZOOM, found.x, found.y);
   if (planning) {
     const el = ensureCard();
-    cardState = { tab: getLevel(), cache: new Map(), recorded: Number(props.a), geom: null, map: targetMap, bounds: null, landKey: null };
+    cardState = { kind: 'parcel', tab: getLevel(), cache: new Map(), recorded: Number(props.a), geom: null, map: targetMap, bounds: null, landKey: null };
+    el.setAttribute('aria-label', 'Thông tin thửa đất');
     el.innerHTML = cardHtml(props);
     el.hidden = false;
     const shape = await shapeP;

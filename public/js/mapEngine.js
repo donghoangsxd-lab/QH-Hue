@@ -20,7 +20,6 @@ import {
 } from './planMap.js';
 import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, infraLotOf, byProjectAreaDesc, lotShown } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
-import { analyzePlanLand, planLandHtml } from './planLandStats.js';
 import { planLevelOf } from './generalPlan.js';
 import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
 
@@ -539,6 +538,10 @@ function notifyMeasure() {
   measureListener?.(state.activeMeasureType, state.measurePoints);
 }
 
+// Nạp lúc bấm, không import tĩnh: cadastreLayer đã import map từ file này
+const measurePlanApi = () => import('./cadastreLayer.js');
+const dismissMeasurePlan = () => { measurePlanApi().then(m => m.closeMeasurePlan()); };
+
 function resetMeasureButtons() {
   Object.values(MEASURE_BTN).forEach(([id, icon]) => {
     const btn = document.getElementById(id);
@@ -553,7 +556,7 @@ function wipeMeasure() {
   state.measurePoints = [];
   clearMeasureSnap();
   [measureLayerGroup, planMeasureGroup].forEach(g => g && g.clearLayers());
-  closePlanLand();
+  dismissMeasurePlan();
   resetMeasureButtons();
 }
 
@@ -715,7 +718,7 @@ function drawMeasure() {
   measureSnapMarks.forEach(dropSnapMarker);
   measureSnapMarks = [];
   groups.forEach(g => g.clearLayers());
-  closePlanLand();
+  dismissMeasurePlan();
   const pts = state.measurePoints;
   if (!pts.length) {
     measureHover = -1;
@@ -746,7 +749,7 @@ function drawMeasure() {
     }
     if (isArea && latlngs.length >= 3) L.polygon(latlngs, { color, weight: 2, fillColor: color, fillOpacity: 0.2, interactive: false }).addTo(g);
     if (label) {
-      const btn = isArea ? `<button type="button" class="measure-plan-btn" title="Thống kê, tỷ lệ các loại đất quy hoạch trong vùng đo">${ico('area')}Phân tích QH</button>` : '';
+      const btn = isArea ? `<button type="button" class="measure-plan-btn" title="Quy hoạch sử dụng đất trong vùng đo, chuyển 4 cấp như bảng thửa">${ico('area')}Phân tích QH</button>` : '';
       const marker = L.marker(latlngs[latlngs.length - 1], {
         interactive: false,
         icon: L.divIcon({ className: 'measure-label', html: `<span style="border-color:${color};">${label}${btn}</span>`, iconSize: [0, 0] })
@@ -754,52 +757,17 @@ function drawMeasure() {
       const el = btn && marker.getElement();
       if (el) {
         L.DomEvent.disableClickPropagation(el);
-        el.querySelector('.measure-plan-btn')?.addEventListener('click', () => openPlanLand(g === planMeasureGroup ? planMap : map));
+        el.querySelector('.measure-plan-btn')?.addEventListener('click', () => {
+          const ring = [...pts, pts[0]];
+          const host = g === planMeasureGroup ? planMap : map;
+          measurePlanApi().then(m => m.openMeasurePlan(ring, host));
+        });
       }
     }
   });
   if (hover >= 0 && hover < pts.length) paintMeasureSnap(hover, host);
   else measureHover = -1;
   notifyMeasure();
-}
-
-// Popup phân tích sử dụng đất QH của vùng đo: đổi hình đo (thêm đỉnh / tắt đo) thì đóng và bỏ kết quả đang tính dở
-let planLandPopup = null;
-let planLandSeq = 0;
-
-function closePlanLand() {
-  planLandSeq++;
-  if (planLandPopup) {
-    planLandPopup.remove();
-    planLandPopup = null;
-  }
-}
-
-async function openPlanLand(m) {
-  const pts = state.measurePoints;
-  if (!m || pts.length < 3) return;
-  closePlanLand();
-  const seq = planLandSeq;
-  const ring = [...pts, pts[0]];
-  let at = L.latLng(pts[0][1], pts[0][0]);
-  try {
-    const c = turf.centroid(turf.polygon([ring])).geometry.coordinates;
-    at = L.latLng(c[1], c[0]);
-  } catch (e) { /* polygon tự cắt: đặt popup ở đỉnh đầu */ }
-  const popup = L.popup({ maxWidth: 360, minWidth: 300, className: 'land-lot-popup plan-land-popup', autoPanPaddingTopLeft: [40, 90] })
-    .setLatLng(at)
-    .setContent('<div class="plan-land-stats"><div class="pls-head">Sử dụng đất quy hoạch trong vùng đo</div><div class="pp-sub">Đang tải lô quy hoạch các đồ án trong vùng…</div></div>')
-    .openOn(m);
-  planLandPopup = popup;
-  popup.on('remove', () => { if (planLandPopup === popup) planLandPopup = null; });
-  try {
-    const res = await analyzePlanLand(ring);
-    if (seq !== planLandSeq || !popup.isOpen()) return;
-    popup.setContent(planLandHtml(res));
-  } catch (err) {
-    console.warn('Phân tích sử dụng đất quy hoạch lỗi:', err);
-    if (seq === planLandSeq && popup.isOpen()) popup.setContent(`<div class="plan-land-stats"><div class="sug-card ineligible">Không phân tích được: ${escapeHtml(err.message || String(err))}</div></div>`);
-  }
 }
 
 // ============================ VẼ ĐIỂM HẠ TẦNG (TỐI ƯU CHO HÀNG NGHÌN ĐIỂM) ============================
