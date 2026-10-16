@@ -1097,7 +1097,7 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-layer-dot.points { width: 7px; height: 7px; margin: 0 1px; border-radius: 50%; border-color: rgba(15, 23, 42, 0.8); }
 .project-layer-dot.boundary { background: transparent; border: 1.5px dashed var(--dot, #e879f9); }
 .project-layer-dot.net { width: 12px; height: 3px; margin: 0; border: 0; border-radius: 1px; }
-.project-layer-dot.adjust { background: transparent; border: 2.5px dashed #1e40af; }
+.project-layer-dot.adjust { background: transparent; border: 2.5px dashed #22d3ee; }
 .project-adj-list { margin: 0 0 2px 16px; max-height: 160px; overflow-y: auto; scrollbar-width: thin; }
 .project-adj-list .project-lot-hit span { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
 .project-layer-name input:disabled { cursor: not-allowed; opacity: 0.5; }
@@ -4116,7 +4116,7 @@ body.project-review.la-page #projectReviewHost {
 .la-import-go { background: #a21caf; border-color: #d946ef; color: #fff; }
 
 /* Ranh điều chỉnh cục bộ trên bản đồ quy hoạch (adjustLayer.js) */
-.adj-glow { filter: drop-shadow(0 0 3px #ffffff) drop-shadow(0 0 6px #1e40af); }
+.adj-glow { filter: drop-shadow(0 0 3px #ffffff) drop-shadow(0 0 6px #22d3ee); }
 .adj-sat-clip { pointer-events: none; }
 .leaflet-adjustSat-pane, .leaflet-adjImportSat-pane { pointer-events: none !important; }
 .adj-lot-popup.pp-editable .lp-head { padding-right: 46px; }

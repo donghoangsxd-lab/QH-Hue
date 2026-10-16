@@ -1,5 +1,5 @@
-// Hồ sơ điều chỉnh cục bộ trên bản đồ quy hoạch (bản đồ chính và khung so sánh): ranh xanh dương đậm, nét đứt, không tô nền.
-// Nét nằm trên ranh và lô đồ án QHPK. Nhịp nét lệch nửa chu kỳ với ranh khu vực QHCT (qhctLayer.js): chỗ trùng ranh hiện xen kẽ xanh / đỏ.
+// Hồ sơ điều chỉnh cục bộ trên bản đồ quy hoạch (bản đồ chính và khung so sánh): ranh cyan, nét đứt, không tô nền.
+// Nét nằm trên ranh và lô đồ án QHPK. Nhịp nét lệch nửa chu kỳ với ranh khu vực QHCT (qhctLayer.js): chỗ trùng ranh hiện xen kẽ cyan / đỏ.
 // Rê chuột sáng viền; bấm ranh mở popup để thể hiện theo điều chỉnh. Nền trong ranh là ảnh vệ tinh cắt đúng phạm vi
 // (cùng ô ảnh với nền bản đồ, che lô quy hoạch cũ), tắt được; lô mới kẻ hoa văn TT16. Bấm 1 lô mở thẻ lô;
 // Admin sửa lớp, loại đất, tầng cao, mật độ, hệ số và ranh — ghi vào file hồ sơ, không đụng lô đồ án bên ngoài.
@@ -19,7 +19,7 @@ import { startShapeEdit, vertexCount, SHAPE_MAX_VERTICES } from './lotShapeEdit.
 import { savedLandTag } from './projectReviewCore.js';
 import { planLevelOf } from './generalPlan.js';
 
-const BLUE = '#1e40af';
+const CYAN = '#22d3ee';
 // Trên ranh đồ án QHPK (overlay 400) và viền sáng đồ án (445), dưới tem đường (450).
 // Ảnh vệ tinh cắt theo ranh và lô mới cùng z 446: pane vệ tinh tạo trước nên lô nằm trên nền.
 // Ảnh scan ở 447, ranh QHCT ở 448, ranh điều chỉnh ở 449 nên luôn nổi trên đồ án được điều chỉnh.
@@ -32,8 +32,8 @@ const FILL_Z = 446;
 const SCAN_Z = 447;
 const LINE_Z = 449;
 const SCAN_TRANSPARENCY = 30;
-const LINE_STYLE = { color: BLUE, weight: 5, opacity: 1, dashArray: '3 3', dashOffset: '3', lineCap: 'butt', fill: false };
-const HOVER_STYLE = { color: '#60a5fa', weight: 7, fill: false };
+const LINE_STYLE = { color: CYAN, weight: 5, opacity: 1, dashArray: '10 6', dashOffset: '8', lineCap: 'butt', fill: false };
+const HOVER_STYLE = { color: '#a5f3fc', weight: 7, fill: false };
 export const ADJUST_PDF_MAX_BYTES = 2 * 1024 * 1024;
 // Khóa lớp trong state.hiddenProjectLayers ("<Ten_QH>|dieu-chinh"), cùng cách lưu với PROJECT_LAYERS
 export const ADJUST_LAYER_KEY = 'dieu-chinh';
