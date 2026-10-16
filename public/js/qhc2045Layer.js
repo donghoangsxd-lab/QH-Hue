@@ -15,11 +15,11 @@
 // được dò lại ở cấp bản đồ (qhcClick, gọi từ app.js) bằng bbox + point-in-polygon.
 import { state } from './state.js';
 import { map, wardNameAt, outerWardLines, openOutlinedPopup, getRightObstruction, addPopupCollapseToggle, expandCollapsedPopup } from './mapEngine.js';
-import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClick } from './planMap.js';
+import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClick, whenMapsIdle } from './planMap.js';
 import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
-import { analyzeParcelZones, parcelZonesHtml } from './planLandStats.js';
+import { analyzeParcelZones, parcelZonesHtml, planPlace } from './planLandStats.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { isLevelPair, sideOf, mapsForLevel, onSplitPair } from './splitPair.js';
 import {
@@ -296,6 +296,8 @@ async function setRoads(scale) {
     await loadRoads(scale);
     if (gen !== roadGen[scale]) return;
   }
+  await whenMapsIdle(hosts);
+  if (gen !== roadGen[scale]) return;
   setHint(`gt${scale}Hint`, roadData[scale] ? '' : 'lỗi tải');
   hosts.forEach(m => { use(m); drawRoads(scale); });
 }
@@ -619,29 +621,52 @@ async function setLand(on) {
     return;
   }
   if (gen !== landGen) return;
-  const now = qhcHosts('qhc10', !!$('chk_qhc10')?.checked);
-  both.forEach(m => { if (!now.includes(m)) clearQhc(m, ['land', 'core', 'wash', 'hover', 'frame']); });
-  now.forEach(m => {
-    use(m);
-    detailed = m.getZoom() >= TT16_PATTERN_ZOOM;
-    if (!collapsed()) drawLand();
-    else dropLand();
-    if (placeLots && !isLevelPair()) {
-      layers.frame?.tvLabels?.remove();
-      layers.frame?.points?.remove();
-      layers.frame?.remove();
-      layers.core?.remove();
-      layers.frame = layers.core = null;
-      clearCoreHover();
-      layers.wash?.remove();
-      layers.wash = null;
-      return;
+  await whenMapsIdle(both);
+  if (gen !== landGen) return;
+  const paint = () => {
+    if (!isLevelPair() && getLevel() === 'qhc10') {
+      const shown = getViewMode() === 'QH' && planMap ? planMap : map;
+      const city = !state.selectedWard || state.selectedWard === 'Thành phố Huế';
+      // Cùng ngưỡng viewFlow (PLACE_ZOOM 14): zoom trong lúc tải phải được tính lại lúc vẽ, không giữ mức zoom lúc bấm droplist
+      const place = !!(state.focusedProject || !city || (shown && shown.getZoom() >= 14));
+      placeLots = place;
+      coreOpen = place;
     }
-    if (data.frame) drawFrame();
-    drawWash();
-    drawCore();
-  });
-  setHint('qhc10Hint', 'Trung tâm');
+    const now = qhcHosts('qhc10', !!$('chk_qhc10')?.checked);
+    both.forEach(m => { if (!now.includes(m)) clearQhc(m, ['land', 'core', 'wash', 'hover', 'frame']); });
+    now.forEach(m => {
+      use(m);
+      detailed = m.getZoom() >= TT16_PATTERN_ZOOM;
+      if (!collapsed()) drawLand();
+      else dropLand();
+      if (placeLots && !isLevelPair()) {
+        layers.frame?.tvLabels?.remove();
+        layers.frame?.points?.remove();
+        layers.frame?.remove();
+        layers.core?.remove();
+        layers.frame = layers.core = null;
+        clearCoreHover();
+        layers.wash?.remove();
+        layers.wash = null;
+        return;
+      }
+      if (data.frame) drawFrame();
+      drawWash();
+      drawCore();
+    });
+    setHint('qhc10Hint', 'Trung tâm');
+  };
+  try { paint(); }
+  catch (err) {
+    console.warn('QHC 2045 – không vẽ được lớp 1/10.000:', err);
+    await whenMapsIdle(both);
+    if (gen !== landGen) return;
+    try { paint(); }
+    catch (err2) {
+      console.warn('QHC 2045 – không vẽ được lớp 1/10.000:', err2);
+      setHint('qhc10Hint', 'lỗi tải');
+    }
+  }
 }
 
 // ---------- Ranh 1/10.000 mở rộng theo QĐ 756 ----------
@@ -659,6 +684,8 @@ async function setExt(on) {
     console.warn('QHC 2045 – không tải được ranh điều chỉnh:', err);
     return;
   }
+  if (gen !== extGen || !extOn) return;
+  await whenMapsIdle(both);
   if (gen !== extGen || !extOn) return;
   const maps = qhcHosts('qhc10', !!$('chk_qhc10')?.checked);
   const wards = (state.wardLabelsList || []).filter(w => w.geometry && isCoreWard(w.name));
@@ -852,7 +879,8 @@ export function qhcClick(e, m) {
 }
 
 // ---------- Thửa địa chính (cadastreLayer): đối chiếu QHC dù lớp / giai đoạn đang tắt ----------
-async function parcelVisionHtml(geometry, recorded) {
+async function parcelVisionHtml(geometry, recorded, place) {
+  const w = planPlace(place);
   const v = await load('vision');
   const cats = v.cats;
   const res = analyzeParcelZones(geometry, v.features.filter(f => f.properties.L === 'v'), (f) => {
@@ -862,15 +890,17 @@ async function parcelVisionHtml(geometry, recorded) {
   });
   return {
     html: parcelZonesHtml(res, recorded, {
-      title: 'QHC 1/25.000 trên thửa đất', unit: 'vùng', cover: 'Thuộc vùng chức năng', none: 'Ngoài các vùng chức năng',
-      empty: 'Thửa nằm ngoài các vùng của sơ đồ tổ chức không gian 1/25.000.', partsHead: 'Vùng chức năng và định hướng',
+      title: `QHC 1/25.000 ${w.on}`, unit: 'vùng', cover: 'Thuộc vùng chức năng', none: 'Ngoài các vùng chức năng',
+      empty: `${w.it} nằm ngoài các vùng của sơ đồ tổ chức không gian 1/25.000.`, partsHead: 'Vùng chức năng và định hướng',
+      place,
       note: `${QHC2045.short} · Sơ đồ tổ chức không gian 1/25.000 · ${QHC2045.status}. Đối chiếu cả khi lớp đang tắt.`
     }),
     shapes: res.shapes
   };
 }
 
-async function parcelLandHtml(geometry, recorded) {
+async function parcelLandHtml(geometry, recorded, place) {
+  const w = planPlace(place);
   const [land] = await Promise.all([load('land'), load('frame')]);
   const feats = land.features.filter(f => f.properties.c !== SEA_CODE);
   const res = analyzeParcelZones(geometry, feats, (f) => {
@@ -888,18 +918,19 @@ async function parcelLandHtml(geometry, recorded) {
   const tv = tvAt(lng, lat);
   return {
     html: parcelZonesHtml(res, recorded, {
-      title: 'QHC 1/10.000 trên thửa đất', unit: 'lô', cover: 'Có lô QHC', none: 'Chưa có lô QHC',
-      empty: 'Thửa chưa nằm trong lô QHC 1/10.000.',
+      title: `QHC 1/10.000 ${w.on}`, unit: 'lô', cover: 'Có lô QHC', none: 'Chưa có lô QHC',
+      empty: `${w.it} chưa nằm trong lô QHC 1/10.000.`,
       partsHead: 'Lô sử dụng đất QHC', extra: tv ? [['Tiểu vùng', `${tv.tv} · ${tv.ten}`]] : [],
+      place,
       note: `${QHC2045.short} · 1/10.000 · ${QHC2045.status}. Gồm mọi giai đoạn, kể cả khi lớp hoặc giai đoạn đang tắt. Lô chồng nhau giữ lô vẽ trên.`
     }),
     shapes: res.shapes
   };
 }
 
-/** Thửa đối chiếu với QHC cấp level ('qhc10' | 'qhc25'), cắt hình học như chỉ tiêu QHPK. recorded: diện tích hồ sơ (m²) */
-export function parcelQhcHtml(geometry, level, recorded) {
-  return level === 'qhc25' ? parcelVisionHtml(geometry, recorded) : parcelLandHtml(geometry, recorded);
+/** Đối chiếu hình (thửa hoặc vùng đo) với QHC cấp level ('qhc10' | 'qhc25'). recorded: diện tích hồ sơ (m²), 0 nếu là vùng đo */
+export function parcelQhcHtml(geometry, level, recorded, place) {
+  return level === 'qhc25' ? parcelVisionHtml(geometry, recorded, place) : parcelLandHtml(geometry, recorded, place);
 }
 
 let visionGen = 0;
@@ -921,10 +952,25 @@ async function setVision(on) {
     return;
   }
   if (gen !== visionGen) return;
-  const now = qhcHosts('qhc25', !!$('chk_qhc25')?.checked);
-  both.forEach(m => { if (!now.includes(m)) clearQhc(m, ['vision']); });
-  now.forEach(m => { use(m); drawVision(); });
-  setHint('qhc25Hint', 'toàn đô thị');
+  await whenMapsIdle(both);
+  if (gen !== visionGen) return;
+  const paint = () => {
+    const now = qhcHosts('qhc25', !!$('chk_qhc25')?.checked);
+    both.forEach(m => { if (!now.includes(m)) clearQhc(m, ['vision']); });
+    now.forEach(m => { use(m); drawVision(); });
+    setHint('qhc25Hint', 'toàn đô thị');
+  };
+  try { paint(); }
+  catch (err) {
+    console.warn('QHC 2045 – không vẽ được lớp 1/25.000:', err);
+    await whenMapsIdle(both);
+    if (gen !== visionGen) return;
+    try { paint(); }
+    catch (err2) {
+      console.warn('QHC 2045 – không vẽ được lớp 1/25.000:', err2);
+      setHint('qhc25Hint', 'lỗi tải');
+    }
+  }
 }
 
 function syncQhc() {
@@ -1090,6 +1136,12 @@ export function initQhc2045Layer() {
     const d = host.getZoom() >= TT16_PATTERN_ZOOM;
     if (d !== detailed) { detailed = d; restyleLand(); }
     if (active.layers.frame && host.hasLayer(active.layers.frame)) zoomFrame();
+    // Lần vẽ trước bị zoom cắt ngang: ô vẫn bật nhưng không còn lớp trên bản đồ
+    if (!host._animatingZoom && data.land && qhcOn(host, 'qhc10', 'chk_qhc10')) {
+      const bare = collapsed() ? !layers.frame && !layers.core : !layers.land;
+      if (bare) setLand(true);
+    }
+    if (!host._animatingZoom && data.vision && qhcOn(host, 'qhc25', 'chk_qhc25') && !layers.vision) setVision(true);
   };
   [map, planMap].filter(Boolean).forEach(host => host.on('zoomend', () => onZoom(host)));
   window.addEventListener(LOT_OPACITY_EVENT, restyleLand);

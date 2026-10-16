@@ -3,14 +3,14 @@
 // Dòng lớp ghi số đồ án nhập và số lô tĩnh; chưa có cả hai thì "chưa có dữ liệu".
 // Chọn một phường, hoặc đang mở một đồ án, khi lớp QHCT tắt: ranh các đồ án QHCT giao phạm vi đó vẽ đỏ nét đứt dày,
 // phần nằm ngoài phạm vi bị cắt. Toàn TP (chưa chọn phường, chưa mở đồ án) không vẽ các ranh này.
-// Nhịp nét lệch nửa chu kỳ với ranh điều chỉnh cục bộ (adjustLayer.js, xanh dương, z 449) nên chỗ trùng ranh hiện xen kẽ đỏ / xanh.
+// Nhịp nét lệch nửa chu kỳ với ranh điều chỉnh cục bộ (adjustLayer.js, cyan, z 449) nên chỗ trùng ranh hiện xen kẽ đỏ / cyan.
 import { state } from './state.js';
 import { map, addPopupCollapseToggle, expandCollapsedPopup } from './mapEngine.js';
-import { planMap, isSplitOn, getViewMode, setViewMode, passToolClick } from './planMap.js';
+import { planMap, isSplitOn, getViewMode, setViewMode, passToolClick, whenMapsIdle } from './planMap.js';
 import { isLevelPair, mapsForLevel, onSplitPair } from './splitPair.js';
 import { escapeHtml, fmtNum } from './utils.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
-import { analyzeParcelPlan, parcelPlanHtml } from './planLandStats.js';
+import { analyzeParcelPlan, parcelPlanHtml, planPlace } from './planLandStats.js';
 import { landPatternKey, TT16_STYLES, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
 
 export const QHCT_URL = 'data/qhct/index.json';
@@ -19,7 +19,7 @@ const DEFAULT_COLOR = '#f472b6';
 // Dưới ranh điều chỉnh cục bộ (449) và tem đường (450)
 const OUTLINE_PANE = 'qhctOutlinePane';
 const OUTLINE_Z = 448;
-const OUTLINE_STYLE = { color: '#ef4444', weight: 2, opacity: 1, dashArray: '3 3', lineCap: 'butt', fill: false };
+const OUTLINE_STYLE = { color: '#ef4444', weight: 2, opacity: 1, dashArray: '10 6', lineCap: 'butt', fill: false };
 const OUTLINE_HOVER = { color: '#fca5a5', weight: 4 };
 
 const $ = (id) => document.getElementById(id);
@@ -167,8 +167,9 @@ function load() {
 /** Lô QHCT 1/500 (FeatureCollection rỗng khi chưa có file) */
 export const loadQhct = () => load();
 
-/** Thửa cắt với đồ án QHCT đã nạp rồi tới lô tĩnh, kể cả khi lớp QHCT đang tắt */
-export async function parcelQhctHtml(geometry, recorded) {
+/** Hình (thửa hoặc vùng đo) cắt với đồ án QHCT đã nạp rồi tới lô tĩnh, kể cả khi lớp QHCT đang tắt */
+export async function parcelQhctHtml(geometry, recorded, place) {
+  const w = planPlace(place);
   const fc = await load();
   const extras = (fc.features || []).filter(f => f && f.geometry).map(f => {
     const p = f.properties || {};
@@ -184,12 +185,14 @@ export async function parcelQhctHtml(geometry, recorded) {
     };
   });
   const res = await analyzeParcelPlan(geometry, { level: 'QHCT', includeHidden: true, extras });
+  const slip = place === 'measure' ? '' : ' Sai số ranh khoảng 0,5 m.';
   return {
     html: parcelPlanHtml(res, recorded, {
-      title: 'QHCT 1/500 trên thửa đất',
+      title: `QHCT 1/500 ${w.on}`,
       noneLabel: 'Chưa có lô QHCT',
-      empty: 'Thửa chưa nằm trong lô QHCT 1/500 (lô tĩnh hoặc đồ án đã nạp).',
-      note: 'Cắt hình học thửa với lô QHCT 1/500, kể cả khi lớp QHCT hoặc đồ án đang tắt. Đồ án nhập giữ phần chồng lên lô tĩnh. Sai số ranh khoảng 0,5 m.'
+      empty: `${w.it} chưa nằm trong lô QHCT 1/500 (lô tĩnh hoặc đồ án đã nạp).`,
+      place,
+      note: `Cắt hình học ${w.cut} với lô QHCT 1/500, kể cả khi lớp QHCT hoặc đồ án đang tắt. Đồ án nhập giữ phần chồng lên lô tĩnh.${slip}`
     }),
     shapes: res.shapes
   };
@@ -267,9 +270,11 @@ async function setVisible(on) {
   setHint('đang tải…');
   await load();
   if (!isLevelPair() && !$('chk_qhct')?.checked) return;
-  const now = qhctMaps();
-  [map, planMap].filter(Boolean).forEach(m => { if (!now.includes(m)) clearLots(m); });
-  now.forEach(m => { if (data?.features?.length) draw(m); });
+  await whenMapsIdle([map, planMap]);
+  if (!isLevelPair() && !$('chk_qhct')?.checked) return;
+  const shown = qhctMaps();
+  [map, planMap].filter(Boolean).forEach(m => { if (!shown.includes(m)) clearLots(m); });
+  shown.forEach(m => { if (data?.features?.length) draw(m); });
   setHint(idleHint());
 }
 

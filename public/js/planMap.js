@@ -226,31 +226,77 @@ export function alignPlanView() {
   applyView(planMap, shiftCenter(leftMap, leftMap.getCenter(), zoom, -offsetPx()), zoom, { animate: false });
 }
 
-// sign: +1 từ HT sang QH (lùi tâm), -1 chiều ngược lại
+// sign: +1 từ HT sang QH (lùi tâm), -1 chiều ngược lại.
+// leader: bản đồ người dùng đang zoom. Bản đồ kia chỉ đi theo, không setView ngược lại — Leaflet nuốt
+// setView khi _animatingZoom, và setView giữa chừng làm canvas bỏ lần vẽ lớp đang tải.
 function syncMaps(a, b) {
   let lock = false;
+  let leader = null;
+
+  const stopZoomAnim = (m) => {
+    if (!m._animatingZoom) return;
+    m._animatingZoom = false;
+    if (m._mapPane) m._mapPane.classList.remove('leaflet-zoom-anim');
+  };
 
   const bind = (src, dst, sign) => {
     let zooming = false;
     src.on('zoomanim', (e) => {
-      if (lock || !compareOn) return;
+      if (lock || !compareOn || (leader && leader !== src)) return;
+      leader = src;
       zooming = true;
       lock = true;
-      applyView(dst, shiftCenter(src, e.center, e.zoom, -sign * offsetPx()), e.zoom, { animate: true });
+      const center = shiftCenter(src, e.center, e.zoom, -sign * offsetPx());
+      if (dst._animatingZoom) {
+        stopZoomAnim(dst);
+        applyView(dst, center, e.zoom, { animate: false });
+      } else applyView(dst, center, e.zoom, { animate: true });
       lock = false;
     });
-    src.on('zoomend', () => { zooming = false; });
+    src.on('zoomend', () => {
+      zooming = false;
+      if (leader === src) leader = null;
+    });
     src.on('move', () => {
-      if (lock || zooming || !compareOn) return;
+      if (lock || zooming || !compareOn || src._animatingZoom || (leader && leader !== src)) return;
       lock = true;
       const zoom = src.getZoom();
-      applyView(dst, shiftCenter(src, src.getCenter(), zoom, -sign * offsetPx()), zoom, { animate: false });
+      const center = shiftCenter(src, src.getCenter(), zoom, -sign * offsetPx());
+      if (dst._animatingZoom) stopZoomAnim(dst);
+      applyView(dst, center, zoom, { animate: false });
       lock = false;
     });
   };
 
   bind(a, b, 1);
   bind(b, a, -1);
+}
+
+// Vẽ vector sau khi hết zoom. Canvas bỏ _update lúc _animatingZoom; nếu zoomend lỗi thì moveend không chạy, lớp không hiện lại.
+export function whenMapsIdle(maps) {
+  const list = (maps || []).filter(Boolean);
+  if (!list.length || !list.some(m => m._animatingZoom)) return Promise.resolve();
+  return new Promise(resolve => {
+    let timer = 0;
+    let settled = false;
+    const cleanup = () => {
+      clearTimeout(timer);
+      list.forEach(m => m.off('zoomend', onEnd));
+    };
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+    const arm = () => {
+      clearTimeout(timer);
+      timer = setTimeout(finish, 400);
+    };
+    const onEnd = () => { if (list.some(m => m._animatingZoom)) arm(); else finish(); };
+    list.forEach(m => m.on('zoomend', onEnd));
+    arm();
+  });
 }
 
 export function getCoveredRightWidth() {

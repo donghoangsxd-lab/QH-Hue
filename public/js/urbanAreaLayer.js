@@ -3,7 +3,7 @@
 // phường, xã tô riêng theo ranh thị trấn, xã cũ). Bản đồ quy hoạch: hệ thống đô thị sau năm 2030 theo Quyết định 756/QĐ-UBND
 // (urbanVision.js, ranh dựng bằng scripts/build-urban-vision.js). Cùng một checkbox, mỗi bản đồ vẽ nội dung của mình.
 import { map } from './mapEngine.js';
-import { planMap, isCompareOn, isSplitOn } from './planMap.js';
+import { planMap, isCompareOn, isSplitOn, whenMapsIdle } from './planMap.js';
 import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
 import { state } from './state.js';
 import { escapeHtml } from './utils.js';
@@ -324,7 +324,11 @@ function createUrbanLayer(content) {
       groups.hover.addTo(m);
       drawWards();
       try {
-        drawUrbans(await loadData());
+        const fc = await loadData();
+        if (!visible) return;
+        await whenMapsIdle([m]);
+        if (!visible) return;
+        drawUrbans(fc);
       } catch (err) {
         console.warn(`Không tải được ranh đô thị ${content.dataUrl}:`, err);
         return;
