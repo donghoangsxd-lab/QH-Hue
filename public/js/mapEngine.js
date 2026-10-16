@@ -353,7 +353,8 @@ function focusServiceRadius(targetMap, lat, lng, radius) {
   });
 }
 
-// Bảng công trình / tiếp cận nằm ở mép trái (cùng chỗ bảng thửa). Pane bản đồ có transform nên không ghim bằng CSS trên popup Leaflet.
+// Bảng công trình, lô đất ngoài nhóm hạ tầng và bảng tiếp cận nằm ở mép trái (cùng chỗ bảng thửa).
+// Pane bản đồ có transform nên không ghim bằng CSS trên popup Leaflet. Bảng đồ án chiếm cùng góc thì --brief-stack đẩy bảng này lên trên.
 function pinDock(popup) {
   const el = popup.getElement();
   const host = document.getElementById('mapArea');
@@ -1535,13 +1536,13 @@ function landLotShape(p, m, detailed) {
   bindLotHover(shape);
   shape.on('click', (e) => {
     if (passToolClick(m, e)) return;
-    openLandPopup(p, m, e.latlng);
+    openLandPopup(p, m);
   });
   return shape;
 }
 
-/** Mở popup kèm viền sáng lô / vùng đang chọn: cùng nhóm singleIso với popup công trình nên chọn đối tượng khác là gỡ viền cũ */
-export function openOutlinedPopup(m, geometry, popup, latlng) {
+// Viền sáng lô / vùng đang chọn. Cùng nhóm singleIso với popup công trình nên chọn đối tượng khác là gỡ viền cũ.
+function attachSelectionOutline(m, geometry, popup) {
   (m === map ? planMap : map)?.closePopup();
   clearSingleIsochrone();
   const group = m === planMap ? planLayers.singleIso : layers.singleIso;
@@ -1551,8 +1552,13 @@ export function openOutlinedPopup(m, geometry, popup, latlng) {
     group.addLayer(marks);
   }
   const seq = singleIsoSeq;
-  popup.setLatLng(latlng).openOn(m);
   popup.on('remove', () => { if (singleIsoSeq === seq) clearSingleIsochrone(); });
+}
+
+/** Mở popup kèm viền sáng lô / vùng đang chọn */
+export function openOutlinedPopup(m, geometry, popup, latlng) {
+  attachSelectionOutline(m, geometry, popup);
+  popup.setLatLng(latlng).openOn(m);
   return popup;
 }
 
@@ -1572,10 +1578,10 @@ function reuseLandInfo(p, m) {
     && expandCollapsedPopup(openLandInfo.popup));
 }
 
-function openLandPopup(p, m, latlng) {
+function openLandPopup(p, m) {
   if (reuseLandInfo(p, m)) return;
-  const popup = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup' }).setContent(landPopupHtml(p));
-  openOutlinedPopup(m, p.geometry, popup, latlng);
+  const popup = openDockPopup(m, 'land-lot-popup', landPopupHtml(p));
+  attachSelectionOutline(m, p.geometry, popup);
   addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
   addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
   trackLandInfo(popup, p, m);
@@ -1588,7 +1594,7 @@ export function openLotPopup(p, m, latlng) {
     : (m === planMap && getPlanScenarioList().find(it => it.id === p.id))
       || state.rawDataList.find(it => it.id === p.id) || state.planDataList.find(it => it.id === p.id);
   if (item) onPointClick(item, m, p.geometry);
-  else openLandPopup(p, m, latlng);
+  else openLandPopup(p, m);
 }
 
 // Thứ tự vẽ (vẽ sau nằm trên): đồ án diện tích lớn trước để đồ án nhỏ lồng bên trong không bị che và bấm được;
@@ -1838,7 +1844,6 @@ function redrawLandsOnPattern() {
 const LOT_FIND_STYLE = { color: '#fde047', weight: 4, opacity: 1, fill: false, dashArray: '8 5' };
 const LOT_FIND_MS = 10000;
 const LOT_FIND_PANE = 'lotFindPane';
-const LOT_POPUP_PAD = { autoPanPaddingTopLeft: [40, 90], autoPanPaddingBottomRight: [40, 20] };
 let lotFind = null;
 
 export function showProjectLot(lot) {
@@ -1862,17 +1867,8 @@ export function showProjectLot(lot) {
   const shown = lotFind;
   setTimeout(() => { if (lotFind === shown) { shown.remove(); lotFind = null; } }, LOT_FIND_MS);
 
-  let at = bounds.getCenter();
-  try {
-    const c = turf.pointOnFeature(turf.feature(lot.geometry)).geometry.coordinates;
-    at = L.latLng(c[1], c[0]);
-  } catch (e) { /* hình lỗi: dùng tâm khung */ }
   if (lot.kind === 'DXF') {
-    if (reuseLandInfo(lot, m)) return;
-    const popup = L.popup({ maxWidth: 320, minWidth: 260, className: 'land-lot-popup', ...LOT_POPUP_PAD }).setLatLng(at).setContent(landPopupHtml(lot)).openOn(m);
-    addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
-    addLotEditButton(popup, { kind: 'DXF', land: lot }, redrawLands);
-    trackLandInfo(popup, lot, m);
+    openLandPopup(lot, m);
     return;
   }
   const list = qh ? getPlanScenarioList() : state.rawDataList;

@@ -276,7 +276,7 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
 #mapArea.print-staging .print-preview { display: none; }
 
 /* Bảng thông tin đồ án đang mở: mặc định góc dưới trái, cạnh thanh công cụ (projectBrief.js).
-   Panel dưới mở thì lên góc trên trái. --brief theo cấp: QHC xanh, QHPK cam, QHCT vàng. */
+   Bảng lô / công trình ở cùng góc được --brief-stack đẩy lên trên bảng này. Panel dưới mở thì lên góc trên trái. */
 .project-brief {
   --brief: var(--cyan-rgb);
   position: absolute;
@@ -438,19 +438,19 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
 .project-brief-wait { color: var(--text-muted); font-weight: 600; }
 /* Panel dưới đang mở, hoặc tờ thẩm định chiếm đáy: bảng góc trái lên trên để không bị che */
 body:not(.bottom-collapsed) .project-brief,
-body:not(.bottom-collapsed) .cad-card,
 body:not(.bottom-collapsed) .urban-focus-bar,
 body:not(.bottom-collapsed) .ovd-card,
 body.project-review:not(.project-view) .project-brief,
-body.project-review:not(.project-view) .cad-card,
 body.project-review:not(.project-view) .urban-focus-bar,
 body.project-review:not(.project-view) .ovd-card {
   top: calc(12px + var(--title-h) + 8px);
   bottom: auto;
 }
+body:not(.bottom-collapsed) .cad-card,
+body.project-review:not(.project-view) .cad-card,
 body:not(.bottom-collapsed) .leaflet-popup.dock-card,
 body.project-review:not(.project-view) .leaflet-popup.dock-card {
-  top: calc(12px + var(--title-h) + 8px) !important;
+  top: calc(12px + var(--title-h) + 8px + var(--brief-stack, 0px)) !important;
   bottom: auto !important;
 }
 /* Nút lật trang Quy hoạch ⇄ Hiện trạng (biểu tượng bên trái tiêu đề) */
@@ -3041,15 +3041,16 @@ table.ward-table th {
 .cad-plan:not(:empty) { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-color); }
 .cad-plan-btn { margin-top: 10px; }
 
-/* Bảng thửa khi droplist đang ở lớp quy hoạch: góc dưới trái, sát thanh công cụ; panel dưới mở thì lên trên */
+/* Bảng thửa và bảng lô/công trình: góc dưới trái, sát thanh công cụ.
+   Có bảng đồ án thì --brief-stack đẩy chúng lên trên bảng đó. Panel dưới mở thì cả cụm lên góc trên trái. */
 .cad-card {
   position: absolute;
   z-index: 1040;
   top: auto;
-  bottom: 12px;
+  bottom: calc(12px + var(--brief-stack, 0px));
   left: calc(12px + var(--tb-btn) + 8px);
   width: min(280px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
-  max-height: calc((100% - var(--title-h) - 20px) * 0.7);
+  max-height: calc((100% - var(--title-h) - 20px - var(--brief-stack, 0px)) * 0.7);
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -3064,18 +3065,18 @@ table.ward-table th {
 }
 .cad-card[hidden] { display: none; }
 
-/* Bảng công trình và bảng tiếp cận: cùng góc với bảng thửa, không mũi tên, không bám tọa độ */
+/* Bảng công trình, bảng lô đất ngoài nhóm hạ tầng và bảng tiếp cận: cùng góc với bảng thửa */
 .leaflet-popup.dock-card {
   position: absolute !important;
   z-index: 1040;
   top: auto !important;
   left: calc(12px + var(--tb-btn) + 8px) !important;
-  bottom: 12px !important;
+  bottom: calc(12px + var(--brief-stack, 0px)) !important;
   right: auto !important;
   margin: 0 !important;
   transform: none !important;
   width: min(280px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
-  max-height: calc((100% - var(--title-h) - 20px) * 0.7);
+  max-height: calc((100% - var(--title-h) - 20px - var(--brief-stack, 0px)) * 0.7);
   display: flex;
   flex-direction: column;
   pointer-events: auto;

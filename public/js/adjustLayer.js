@@ -1,7 +1,7 @@
 // Hồ sơ điều chỉnh cục bộ trên bản đồ quy hoạch (bản đồ chính và khung so sánh): ranh cyan, nét đứt, không tô nền.
 // Nét nằm trên ranh và lô đồ án QHPK. Nhịp nét lệch nửa chu kỳ với ranh khu vực QHCT (qhctLayer.js): chỗ trùng ranh hiện xen kẽ cyan / đỏ.
-// Rê chuột sáng viền; bấm ranh mở bảng hồ sơ, ghim góc trên trái (không bám điểm bấm). Nền trong ranh là ảnh vệ tinh cắt đúng phạm vi
-// (cùng ô ảnh với nền bản đồ, che lô quy hoạch cũ), tắt được; lô mới kẻ hoa văn TT16. Bấm 1 lô mở thẻ lô;
+// Mặc định trong ranh là chức năng sau điều chỉnh: ảnh vệ tinh cắt đúng phạm vi che lô gốc, lô mới kẻ hoa văn TT16.
+// «Trả lại bản đồ quy hoạch» trong bảng hồ sơ mới hiện lại chức năng gốc. Rê chuột sáng viền; bấm ranh mở bảng, ghim góc trên trái. Bấm 1 lô mở thẻ lô.
 // Admin sửa lớp, loại đất, tầng cao, mật độ, hệ số và ranh — ghi vào file hồ sơ, không đụng lô đồ án bên ngoài.
 // PDF và ảnh tờ bản vẽ scan đã định vị (scanGeoref.js): thanh nhỏ ở góc ảnh chỉnh độ trong suốt và tắt ảnh.
 // Admin ghi thẳng; hồ sơ người dùng nằm trong hàng chờ (khung Thẩm định › Điều chỉnh) tới khi Admin duyệt.
@@ -47,6 +47,9 @@ let adjustmentsReady = false;
 let pendingItems = [];
 const details = new Map();
 const active = new Set();
+const reverted = new Set();    // người dùng chọn «Trả lại bản đồ quy hoạch»: giữ chức năng gốc tới khi bật lại
+const arming = new Set();
+const armFailed = new Set();
 const wipeOff = new Set();     // hồ sơ đang thể hiện nhưng bỏ lớp che: hoa văn lô mới chồng lên quy hoạch cũ
 const layers = new Map();
 let viewerUrl = '';
@@ -489,13 +492,14 @@ function drawOn(m) {
   L1.lines.clearLayers();
   L1.detailed = m.getZoom() >= TT16_PATTERN_ZOOM;
   drawScans(L1);
+  // Cũ trước, mới sau: chỗ hai hồ sơ chồng nhau, chức năng của quyết định mới nằm trên
+  const paint = items.filter(it => it.boundary && visible(it)).sort((a, b) => (a.at || 0) - (b.at || 0));
   const clips = [];
-  items.forEach(it => {
-    if (it.boundary && visible(it) && active.has(it.id) && !wipeOff.has(it.id)) clips.push(it.boundary);
+  paint.forEach(it => {
+    if (active.has(it.id) && !wipeOff.has(it.id)) clips.push(it.boundary);
   });
   setSatelliteClip(m, SAT_PANE, SAT_Z, clips);
-  items.forEach(it => {
-    if (!it.boundary || !visible(it)) return;
+  paint.forEach(it => {
     const on = active.has(it.id);
     const detail = on ? details.get(it.id)?.value : null;
     if (on && detail) {
@@ -537,10 +541,32 @@ function syncFillPointer(L1) {
   if (L1.fillR._container) L1.fillR._container.style.pointerEvents = capture ? '' : 'none';
 }
 
+// Hồ sơ đã duyệt đang hiện trên bản đồ thì tải lô và bật chức năng sau điều chỉnh, trừ hồ sơ người dùng đã trả về gốc
+function armAdjusted() {
+  const todo = items.filter(it => it.status === 'approved' && it.boundary && visible(it)
+    && !reverted.has(it.id) && !active.has(it.id) && !arming.has(it.id) && !armFailed.has(it.id));
+  if (!todo.length) return;
+  todo.forEach(it => arming.add(it.id));
+  Promise.all(todo.map(it => detailOf(it).then(() => it).catch(err => {
+    armFailed.add(it.id);
+    console.warn(`Không tải lô điều chỉnh ${it.id}:`, err.message);
+    return null;
+  }).finally(() => arming.delete(it.id)))).then(list => {
+    let changed = false;
+    list.forEach(it => {
+      if (!it || reverted.has(it.id) || !visible(it) || active.has(it.id)) return;
+      active.add(it.id);
+      changed = true;
+    });
+    if (changed) refreshAdjustLayer();
+  });
+}
+
 export function refreshAdjustLayer() {
   if (typeof L === 'undefined') return;
   shownMaps().forEach(drawOn);
   syncPopups();
+  armAdjusted();
 }
 
 // ============================ ẢNH SCAN ============================
@@ -670,11 +696,15 @@ async function toggle(id) {
   if (!it) return;
   if (active.has(id)) {
     active.delete(id);
+    reverted.add(id);
     refreshAdjustLayer();
     return;
   }
+  reverted.delete(id);
+  armFailed.delete(id);
   try {
     await detailOf(it);
+    if (reverted.has(id)) return;
     active.add(id);
     refreshAdjustLayer();
   } catch (err) {
@@ -692,7 +722,9 @@ export async function reloadAdjustments() {
   } catch (err) {
     console.warn('Đọc hồ sơ điều chỉnh cục bộ lỗi:', err.message);
   }
+  armFailed.clear();
   [...active].forEach(id => { if (!items.some(x => x.id === id)) active.delete(id); });
+  [...reverted].forEach(id => { if (!items.some(x => x.id === id)) reverted.delete(id); });
   [...wipeOff].forEach(id => { if (!active.has(id)) wipeOff.delete(id); });
   [...scanOn].forEach(id => { if (!items.some(x => x.id === id && x.scan)) scanOn.delete(id); });
   adjustmentsReady = true;

@@ -346,7 +346,7 @@ const SECTIONS = [
           'Bấm <b>Thẩm định điều chỉnh</b>. Kết quả dựng thành tờ bản vẽ: hai bản vẽ trước / sau, bảng cơ cấu sử dụng đất, bảng chỉ tiêu, cột ký hiệu và khung tên. Chỉ tiêu tụt dưới 100% ghi Không đảm bảo.',
           'Bấm <b>Xuất PDF A3</b> để tải tờ bản vẽ khổ A3 ngang đem in.',
           'Đồng ý kết quả thì bấm <b>Nhập hồ sơ</b> (kèm PDF scan Quyết định, bản vẽ dưới 2 MB nếu có). Admin ghi thẳng, người dùng thường gửi vào hàng chờ duyệt.',
-          'Trên bản đồ quy hoạch, ranh điều chỉnh là nét đứt cyan, nền sọc nghiêng; ở lớp QHPK 1/2.000, khu vực đã có QHCT 1/500 khoanh nét đứt đỏ. Bấm vào ranh để thể hiện theo điều chỉnh (che nền, vẽ lô mới) hoặc xem PDF.'
+          'Trên bản đồ quy hoạch, trong ranh điều chỉnh (nét đứt cyan) mặc định là chức năng sau điều chỉnh, lô gốc bị che. Bấm ranh rồi chọn «Trả lại bản đồ quy hoạch» để xem lại chức năng gốc, hoặc mở PDF. Ở lớp QHPK 1/2.000, khu vực đã có QHCT 1/500 khoanh nét đứt đỏ.'
         ],
         facts: [
           'Phạm vi nằm ngoài ranh đồ án thì dừng, không tính tiếp.',

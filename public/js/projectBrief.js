@@ -124,6 +124,14 @@ function meterRow(label, title, value, share, tone) {
       <div class="project-brief-meter-top"><span>${label}</span><b>${value}</b></div>${meterBar(share)}</div>`;
 }
 
+function syncBriefStack() {
+  const host = document.getElementById('mapArea');
+  const el = document.getElementById('projectBrief');
+  if (!host || !el) return;
+  const h = el.hidden ? 0 : el.offsetHeight;
+  host.style.setProperty('--brief-stack', h ? `${h + 8}px` : '0px');
+}
+
 function shareLabel(share) {
   if (!share) return WAIT;
   if (share.bare) return share.bare;
@@ -154,6 +162,7 @@ function render(card) {
     <div class="project-brief-hero"><span>Diện tích quy hoạch</span><strong>${area}</strong></div>
     <div class="project-brief-pops"><span>Hiện trạng <b>${peopleHtml(card.pop.ht)}</b></span><span>Quy hoạch <b>${peopleHtml(card.pop.qh)}</b></span></div>
     <div class="project-brief-meters">${list.join('')}</div>`;
+  syncBriefStack();
 }
 
 function hide() {
@@ -163,6 +172,7 @@ function hide() {
   if (!el) return;
   el.hidden = true;
   el.innerHTML = '';
+  syncBriefStack();
 }
 
 async function show(name) {
@@ -206,4 +216,7 @@ export function initProjectBrief() {
   document.addEventListener(PROJECT_UNFOCUS_EVENT, hide);
   document.addEventListener(ADJUST_CHANGE_EVENT, () => { if (openName) show(openName); });
   document.addEventListener(PROJECT_POP_EVENT, (e) => { if (e.detail === openName) show(openName); });
+  const syncStack = () => syncBriefStack();
+  new ResizeObserver(syncStack).observe(el);
+  syncStack();
 }
