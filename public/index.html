@@ -683,8 +683,10 @@
             <label class="bulk-kind-btn" title="Một hồ sơ điều chỉnh cục bộ đã có Quyết định: DXF + ảnh bản vẽ scan + PDF Quyết định"><input type="radio" name="bulkKind" value="adjust">Điều chỉnh cục bộ</label>
           </div>
           <div id="adjImportBox" class="adj-import">
-            <label class="cad-pair" for="adjProject">Đồ án được điều chỉnh
-              <select id="adjProject"><option value="">Chọn đồ án quy hoạch</option></select>
+            <label class="cad-pair" for="adjProjectSearch">Đồ án được điều chỉnh
+              <input type="search" id="adjProjectSearch" class="cad-pair-search" placeholder="Tìm tên đồ án" autocomplete="off" aria-controls="adjProject" title="Gõ một phần tên, không phân biệt dấu">
+              <span class="cad-pair-count" id="adjProjectCount"></span>
+              <select id="adjProject" class="cad-pair-list" size="6"><option value="">Chọn đồ án quy hoạch</option></select>
             </label>
             <div class="form-grid">
               <label for="adjCrs">Hệ tọa độ</label>
@@ -726,8 +728,10 @@
               <option value="QH">Quy hoạch (QuyMo_QH)</option>
             </select>
           </div>
-          <label class="cad-pair" for="cadPair">Ghép vào đồ án
-            <select id="cadPair" title="Chọn đồ án đã có để ghép file ranh giới hoặc lớp hiện trạng. Để trống thì tạo đồ án mới theo tên file.">
+          <label class="cad-pair" for="cadPairSearch">Ghép vào đồ án
+            <input type="search" id="cadPairSearch" class="cad-pair-search" placeholder="Tìm tên đồ án" autocomplete="off" aria-controls="cadPair" title="Gõ một phần tên, không phân biệt dấu. Để trống dòng đầu nếu tạo đồ án mới theo tên file.">
+            <span class="cad-pair-count" id="cadPairCount"></span>
+            <select id="cadPair" class="cad-pair-list" size="6" title="Chọn đồ án đã có để ghép file ranh giới hoặc lớp hiện trạng. Để trống thì tạo đồ án mới theo tên file.">
               <option value="">Đồ án mới (theo tên file)</option>
             </select>
           </label>

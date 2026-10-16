@@ -1482,22 +1482,45 @@ function setBoundaryFrom(lineRead) {
   current.boundaryFile = lineRead.file.name;
 }
 
+const foldName = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+
+function nameHits(names, query) {
+  const words = foldName(query).split(/[^a-z0-9]+/).filter(Boolean);
+  if (!words.length) return names;
+  return names.filter(n => {
+    const parts = foldName(n).split(/[^a-z0-9]+/).filter(Boolean);
+    return words.every(w => parts.some(p => p.startsWith(w)));
+  });
+}
+
+function pairNames() {
+  return [...new Set((state.projectCatalog || []).map(p => String(p.tenQH || '').trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'vi'));
+}
+
 function fillPairSelect() {
   const sel = $('cadPair');
   if (!sel) return;
   const prev = sel.value;
-  const names = [...new Set((state.projectCatalog || []).map(p => String(p.tenQH || '').trim()).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, 'vi'));
+  const names = pairNames();
+  const query = $('cadPairSearch')?.value || '';
+  const hits = nameHits(names, query);
+  const shown = prev && names.includes(prev) && !hits.includes(prev) ? [prev, ...hits] : hits;
   sel.innerHTML = '<option value="">Đồ án mới (theo tên file)</option>'
-    + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
-  if (prev && names.includes(prev)) sel.value = prev;
+    + shown.map(n => `<option value="${escapeHtml(n)}" title="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  if (!prev || shown.includes(prev)) sel.value = prev;
+  sel.size = Math.min(6, Math.max(2, shown.length + 1));
+  const count = $('cadPairCount');
+  if (count) count.textContent = names.length ? (foldName(query).trim() ? `${hits.length}/${names.length} đồ án` : `${names.length} đồ án`) : '';
   syncPopBox();
 }
 
 function suggestPair(name) {
   const sel = $('cadPair');
-  if (!sel || sel.value || !name) return false;
-  if (![...sel.options].some(o => o.value === name)) return false;
+  if (!sel || sel.value || !name || !pairNames().includes(name)) return false;
+  const search = $('cadPairSearch');
+  if (search?.value) search.value = '';
+  fillPairSelect();
   sel.value = name;
   syncPopBox();
   return true;
@@ -2226,6 +2249,14 @@ export function initCadImport(opts = {}) {
 
   $('cadPair')?.addEventListener('focus', fillPairSelect);
   $('cadPair')?.addEventListener('change', () => { syncPopBox(); renderReport(); });
+  $('cadPairSearch')?.addEventListener('input', fillPairSelect);
+  $('cadPairSearch')?.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown') return;
+    const sel = $('cadPair');
+    if (!sel?.options.length) return;
+    e.preventDefault();
+    sel.focus();
+  });
   $('cadFile')?.addEventListener('change', (e) => loadFiles(e.target.files));
   $('cadPointFile')?.addEventListener('change', (e) => loadPointsFile(e.target.files && e.target.files[0]));
   DXF_SLOTS.forEach(slot => {

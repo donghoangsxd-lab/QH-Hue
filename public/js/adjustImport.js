@@ -211,15 +211,36 @@ function drawPreview(fit = false) {
 
 // ============================ GIAO DIỆN ============================
 
+const foldName = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+
+function nameHits(names, query) {
+  const words = foldName(query).split(/[^a-z0-9]+/).filter(Boolean);
+  if (!words.length) return names;
+  return names.filter(n => {
+    const parts = foldName(n).split(/[^a-z0-9]+/).filter(Boolean);
+    return words.every(w => parts.some(p => p.startsWith(w)));
+  });
+}
+
+function projectNames() {
+  const all = (state.projectCatalog || []).filter(p => p && p.tenQH);
+  const drawable = all.filter(p => !p.sheetOnly);
+  return [...new Set((drawable.length ? drawable : all).map(p => p.tenQH))].sort((a, b) => a.localeCompare(b, 'vi'));
+}
+
 function fillProjects() {
   const sel = $('adjProject');
   if (!sel) return;
   const cur = sel.value || $('cadPair')?.value || '';
-  const all = (state.projectCatalog || []).filter(p => p && p.tenQH);
-  const drawable = all.filter(p => !p.sheetOnly);
-  const list = [...new Set((drawable.length ? drawable : all).map(p => p.tenQH))].sort((a, b) => a.localeCompare(b, 'vi'));
-  sel.innerHTML = `<option value="">Chọn đồ án quy hoạch</option>${list.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}`;
-  if (cur && list.includes(cur)) sel.value = cur;
+  const names = projectNames();
+  const query = $('adjProjectSearch')?.value || '';
+  const hits = nameHits(names, query);
+  const shown = cur && names.includes(cur) && !hits.includes(cur) ? [cur, ...hits] : hits;
+  sel.innerHTML = `<option value="">Chọn đồ án quy hoạch</option>${shown.map(n => `<option value="${escapeHtml(n)}" title="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')}`;
+  if (cur && shown.includes(cur)) sel.value = cur;
+  sel.size = Math.min(6, Math.max(2, shown.length + 1));
+  const count = $('adjProjectCount');
+  if (count) count.textContent = names.length ? (foldName(query).trim() ? `${hits.length}/${names.length} đồ án` : `${names.length} đồ án`) : '';
 }
 
 function row(kind, label, f, status, extra = '') {
@@ -518,6 +539,14 @@ export function initAdjustImport() {
   document.querySelectorAll('input[name="bulkKind"]').forEach(r => r.addEventListener('change', syncKind));
   $('adjProject')?.addEventListener('focus', fillProjects);
   $('adjProject')?.addEventListener('change', readRecord);
+  $('adjProjectSearch')?.addEventListener('input', fillProjects);
+  $('adjProjectSearch')?.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown') return;
+    const sel = $('adjProject');
+    if (!sel?.options.length) return;
+    e.preventDefault();
+    sel.focus();
+  });
   $('adjCrs')?.addEventListener('change', readRecord);
   $('adjFiles')?.addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
   const drop = $('adjDrop');
