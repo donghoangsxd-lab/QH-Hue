@@ -340,6 +340,14 @@ const fmtArea = (m2) => (m2 >= 10000 ? `${fmtNum(m2 / 10000)} ha` : `${fmtNum(Ma
 const fmtM2 = (m2) => `${fmtNum(Math.round(m2))} m²`;
 const fmtPct = (p) => (p > 0 && p < 0.05 ? `<${fmtNum(0.1)}%` : `${fmtNum(Math.round(p * 10) / 10)}%`);
 
+/** place 'measure': câu chữ bảng vùng đo; mặc định bảng thửa */
+export function planPlace(place) {
+  if (place === 'measure') {
+    return { on: 'trong vùng đo', it: 'Vùng đo', cut: 'vùng đo', shape: 'Vùng đo', pie: 'trong vùng đo' };
+  }
+  return { on: 'trên thửa đất', it: 'Thửa', cut: 'thửa', shape: 'Hình thửa', pie: 'trên thửa' };
+}
+
 function rowHtml(label, color, key, area, pct, sub = '', fmt = fmtArea) {
   const swatch = (key && tt16SwatchCss(key, 0.6)) || `background:${color};`;
   return `<div class="pls-row" title="${escapeHtml(label)}">
@@ -371,7 +379,7 @@ export function planLandHtml(res) {
 // Biểu đồ tròn loại đất trên thửa. mountParcelPies đọc .pls-pie-data sau khi gắn HTML
 const pieCharts = new Set();
 
-function pieHtml(res, noneLabel) {
+function pieHtml(res, noneLabel, where = 'trên thửa') {
   const slices = res.rows.filter(r => r.area >= SLIVER_M2).map(r => ({
     key: r.label, label: r.label, color: r.color || '#94a3b8', area: r.area, pct: r.pct
   }));
@@ -381,7 +389,7 @@ function pieHtml(res, noneLabel) {
     <i style="background:${escapeHtml(s.color)}"></i><span>${escapeHtml(s.label)}</span><em>${escapeHtml(fmtPct(s.pct))}</em>
   </button></li>`).join('');
   return `<div class="pls-pie-host">
-    <div class="pls-pie-box"><canvas aria-label="Tỷ lệ các loại đất trên thửa"></canvas></div>
+    <div class="pls-pie-box"><canvas aria-label="Tỷ lệ các loại đất ${escapeHtml(where)}"></canvas></div>
     <ul class="pls-pie-legend">${legend}</ul>
     <div class="pls-pie-data" hidden>${escapeHtml(JSON.stringify(slices))}</div>
   </div>`;
@@ -441,22 +449,23 @@ export function mountParcelPies(root) {
   });
 }
 
-const parcelHead = (title, res, recorded, coverLabel, count, unit) => {
+const parcelHead = (title, res, recorded, coverLabel, count, unit, shape = 'Hình thửa') => {
   const covered = res.area - res.none.area;
   const sheet = recorded > 0 ? ` <small>(hồ sơ ${fmtNum(recorded)} m²)</small>` : '';
   return `<div class="pls-head">${escapeHtml(title)}</div>
-    <div class="pp-row pls-sheet"><span>Hình thửa</span><b>${fmtM2(res.area)}${sheet}</b></div>
+    <div class="pp-row pls-sheet"><span>${escapeHtml(shape)}</span><b>${fmtM2(res.area)}${sheet}</b></div>
     <div class="pp-row"><span>${escapeHtml(coverLabel)}</span><b>${fmtM2(covered)} (${escapeHtml(fmtPct(100 - res.none.pct))}) · ${fmtNum(count)} ${unit}</b></div>`;
 };
 
-/** Kết quả analyzeParcelPlan trong bảng thửa. recorded: diện tích hồ sơ địa chính (m²). opts: title, noneLabel, empty, note */
+/** Kết quả analyzeParcelPlan. recorded: diện tích hồ sơ địa chính (m²), 0 nếu là vùng đo. opts: title, noneLabel, empty, note, place */
 export function parcelPlanHtml(res, recorded, opts = {}) {
   if (!res.exact) return planLandHtml(res).replace('trong vùng đo', 'trên thửa đất');
-  const title = opts.title || 'Quy hoạch trên thửa đất';
+  const w = planPlace(opts.place);
+  const title = opts.title || `Quy hoạch ${w.on}`;
   const noneLabel = opts.noneLabel || 'Chưa có lô quy hoạch';
-  const empty = opts.empty || 'Thửa chưa nằm trong lô quy hoạch của đồ án nào đã nhập.';
-  const note = opts.note || 'Cắt hình học thửa với ranh lô; hình thửa từ tile địa chính (sai số ranh khoảng 0,5 m) nên có thể lệch nhẹ so với diện tích hồ sơ. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn; đồ án đang ẩn không tính.';
-  const head = parcelHead(title, res, recorded, 'Có lô quy hoạch', res.lotCount, 'lô');
+  const empty = opts.empty || `${w.it} chưa nằm trong lô quy hoạch của đồ án nào đã nhập.`;
+  const note = opts.note || `Cắt hình học ${w.cut} với ranh lô; hình thửa từ tile địa chính (sai số ranh khoảng 0,5 m) nên có thể lệch nhẹ so với diện tích hồ sơ. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn; đồ án đang ẩn không tính.`;
+  const head = parcelHead(title, res, recorded, 'Có lô quy hoạch', res.lotCount, 'lô', w.shape);
   const foot = `<div class="pp-sub" title="${escapeHtml(note)}">${escapeHtml(note)}</div>`;
   if (!res.rows.length) return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(empty)}</div>${foot}</div>`;
   const lots = res.parts.map(p => {
@@ -468,7 +477,7 @@ export function parcelPlanHtml(res, recorded, opts = {}) {
       ${stats ? `<div class="pls-lot-plan">${escapeHtml(stats)}</div>` : ''}
     </div>`;
   }).join('');
-  return `<div class="plan-land-stats">${head}${pieHtml(res, noneLabel)}
+  return `<div class="plan-land-stats">${head}${pieHtml(res, noneLabel, w.pie)}
     <div class="pls-sub-head">Lô quy hoạch và chỉ tiêu</div>
     <div class="pls-lots">${lots}</div>${foot}
   </div>`;
@@ -476,13 +485,14 @@ export function parcelPlanHtml(res, recorded, opts = {}) {
 
 /**
  * Kết quả analyzeParcelZones trong popup thửa.
- * opts: { title, unit ('lô' | 'vùng'), cover, none, empty, partsHead, extra: [[nhãn, giá trị]], note }
+ * opts: { title, unit ('lô' | 'vùng'), cover, none, empty, partsHead, extra: [[nhãn, giá trị]], note, place }
  */
 export function parcelZonesHtml(res, recorded, opts) {
+  const w = planPlace(opts.place);
   const covered = res.area - res.none.area;
   const extra = (opts.extra || []).map(([k, v]) => `<div class="pp-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('');
   const head = `<div class="pls-head">${escapeHtml(opts.title)}</div>
-    <div class="pp-row pls-sheet"><span>Hình thửa</span><b>${fmtM2(res.area)}${recorded > 0 ? ` <small>(hồ sơ ${fmtNum(recorded)} m²)</small>` : ''}</b></div>
+    <div class="pp-row pls-sheet"><span>${escapeHtml(w.shape)}</span><b>${fmtM2(res.area)}${recorded > 0 ? ` <small>(hồ sơ ${fmtNum(recorded)} m²)</small>` : ''}</b></div>
     <div class="pp-row"><span>${escapeHtml(opts.cover)}</span><b>${fmtM2(covered)} (${escapeHtml(fmtPct(100 - res.none.pct))}) · ${fmtNum(res.parts.length)} ${opts.unit}</b></div>${extra}`;
   const note = opts.note ? `<div class="pp-sub" title="${escapeHtml(opts.note)}">${escapeHtml(opts.note)}</div>` : '';
   if (!res.parts.length) return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(opts.empty)}</div>${note}</div>`;
@@ -491,7 +501,7 @@ export function parcelZonesHtml(res, recorded, opts) {
       ${p.sub ? `<div class="pls-lot-sub">${escapeHtml(p.sub)}</div>` : ''}
       ${p.desc ? `<div class="pls-lot-plan">${escapeHtml(p.desc)}</div>` : ''}
     </div>`).join('');
-  return `<div class="plan-land-stats">${head}${pieHtml(res, opts.none)}
+  return `<div class="plan-land-stats">${head}${pieHtml(res, opts.none, w.pie)}
     <div class="pls-sub-head">${escapeHtml(opts.partsHead)}</div>
     <div class="pls-lots">${parts}</div>${note}
   </div>`;
