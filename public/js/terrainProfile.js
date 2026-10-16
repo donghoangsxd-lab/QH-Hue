@@ -177,7 +177,7 @@ export function syncTerrainProfile(type, points) {
     clearChart();
     setStats(null, null);
     setNote('Cao độ nền FABDEM');
-    setHint('Chấm ít nhất 2 điểm trên bản đồ. Backspace xóa đỉnh vừa chấm; chuột phải trong 1 m quanh đỉnh để xóa đỉnh đó.');
+    setHint('Chấm ít nhất 2 điểm trên bản đồ. Backspace xóa đỉnh vừa chấm. Đỉnh gần con trỏ sáng lên theo mức phóng: chuột phải để xóa đỉnh đó.');
     return;
   }
   clearTimeout(timer);

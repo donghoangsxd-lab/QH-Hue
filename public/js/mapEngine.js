@@ -207,7 +207,9 @@ export function initMap() {
   });
   document.addEventListener('keydown', onMeasureKeyDown);
   map.on('contextmenu', onMeasureContextMenu);
-  map.on('zoomend', () => { updateWardLabelFontSize(); redrawLandsOnPattern(); });
+  map.on('mousemove', onMeasureMouseMove);
+  map.on('mouseout', onMeasureMouseOut);
+  map.on('zoomend', () => { updateWardLabelFontSize(); redrawLandsOnPattern(); refreshMeasureSnap(); });
   map.on('moveend', () => { refreshLeftSoon(); scheduleLots(); });
   bindProjectFiles(() => map, PARCEL_MIN_ZOOM, () => parcelMinZoom(map, layers));
   onChangeLots(() => { redrawParcels(); redrawLands(); });
@@ -225,6 +227,9 @@ function ensurePlanHooks() {
   planHooked = true;
   planMeasureGroup = L.layerGroup().addTo(planMap);
   planMap.on('contextmenu', onMeasureContextMenu);
+  planMap.on('mousemove', onMeasureMouseMove);
+  planMap.on('mouseout', onMeasureMouseOut);
+  planMap.on('zoomend', refreshMeasureSnap);
   planMap.on('moveend', refreshPlanSoon);
 }
 
@@ -546,6 +551,7 @@ function resetMeasureButtons() {
 function wipeMeasure() {
   state.activeMeasureType = null;
   state.measurePoints = [];
+  clearMeasureSnap();
   [measureLayerGroup, planMeasureGroup].forEach(g => g && g.clearLayers());
   closePlanLand();
   resetMeasureButtons();
@@ -573,25 +579,111 @@ export function clearMeasure() {
   notifyMeasure();
 }
 
-export function handleMeasureClick(latlng) {
+export function handleMeasureClick(latlng, hostMap) {
   state.measurePoints.push([latlng.lng, latlng.lat]);
+  measureCursor = latlng;
+  const host = hostMap || measureCursorMap;
+  if (host) {
+    measureCursorMap = host;
+    measureHover = state.measurePoints.length - 1;
+    measureSnapHost = host;
+  }
   drawMeasure();
 }
 
-// Bán kính bắt đỉnh khi chuột phải: 1 m quanh vị trí click; nhiều đỉnh trong vùng thì xóa đỉnh gần nhất
-const MEASURE_VERTEX_HIT_M = 1;
+// Bắt đỉnh gần con trỏ trong bán kính màn hình: cùng số pixel ở mọi mức phóng
+// (zoom nhỏ thì mét trên đất rộng hơn, zoom lớn thì hẹp hơn). Đỉnh bắt được sáng lên; chuột phải xóa đúng đỉnh đó.
+const VERTEX_HIT_PX = 16;
+let measureHover = -1;
+let measureSnapHost = null;
+let measureSnapMarks = [];
+let measureCursor = null;
+let measureCursorMap = null;
 
-function nearestMeasureIndex(latlng) {
+function nearestVertexIndex(m, latlng, points) {
+  if (!m || !latlng || !points.length) return -1;
+  const p = m.latLngToContainerPoint(latlng);
   let best = -1;
-  let bestD = MEASURE_VERTEX_HIT_M;
-  state.measurePoints.forEach((pt, i) => {
-    const d = distanceMeters(latlng.lat, latlng.lng, pt[1], pt[0]);
+  let bestD = VERTEX_HIT_PX;
+  for (let i = 0; i < points.length; i++) {
+    const d = p.distanceTo(m.latLngToContainerPoint([points[i][1], points[i][0]]));
     if (d <= bestD) {
       bestD = d;
       best = i;
     }
-  });
+  }
   return best;
+}
+
+function dropSnapMarker(mk) {
+  if (!mk) return;
+  mk.unbindTooltip();
+  mk.remove();
+}
+
+function clearMeasureSnap() {
+  measureSnapMarks.forEach(dropSnapMarker);
+  measureSnapMarks = [];
+  measureHover = -1;
+  measureSnapHost = null;
+  measureCursor = null;
+  measureCursorMap = null;
+}
+
+function paintMeasureSnap(index, hostMap) {
+  measureSnapMarks.forEach(dropSnapMarker);
+  measureSnapMarks = [];
+  measureHover = index;
+  measureSnapHost = hostMap || null;
+  const pt = index >= 0 ? state.measurePoints[index] : null;
+  if (!pt) return;
+  const ll = [pt[1], pt[0]];
+  const targets = [];
+  if (measureLayerGroup && map) targets.push([measureLayerGroup, map]);
+  if (planMeasureGroup && planMap) targets.push([planMeasureGroup, planMap]);
+  targets.forEach(([g, m]) => {
+    const mk = L.marker(ll, {
+      interactive: false,
+      keyboard: false,
+      zIndexOffset: 900,
+      icon: L.divIcon({ className: 'vtx-snap', html: '<span></span>', iconSize: [22, 22], iconAnchor: [11, 11] })
+    }).addTo(g);
+    if (m === hostMap) {
+      mk.bindTooltip('Chuột phải để xóa điểm', {
+        permanent: true, direction: 'top', offset: [0, -12], className: 'vtx-snap-tip', opacity: 1
+      });
+    }
+    measureSnapMarks.push(mk);
+  });
+}
+
+function onMeasureMouseMove(e) {
+  if (!state.activeMeasureType || !state.measurePoints.length || !e.latlng) {
+    if (measureHover >= 0) paintMeasureSnap(-1, null);
+    return;
+  }
+  measureCursor = e.latlng;
+  measureCursorMap = e.target;
+  const hit = nearestVertexIndex(e.target, e.latlng, state.measurePoints);
+  if (hit === measureHover && (hit < 0 || measureSnapHost === e.target)) return;
+  paintMeasureSnap(hit, e.target);
+}
+
+function onMeasureMouseOut(e) {
+  const rel = e.originalEvent && e.originalEvent.relatedTarget;
+  const box = e.target && e.target.getContainer && e.target.getContainer();
+  if (box && rel && box.contains(rel)) return;
+  if (measureSnapHost === e.target) {
+    measureCursor = null;
+    measureCursorMap = null;
+    paintMeasureSnap(-1, null);
+  }
+}
+
+function refreshMeasureSnap() {
+  if (!state.activeMeasureType || !measureCursor || !measureCursorMap) return;
+  const hit = nearestVertexIndex(measureCursorMap, measureCursor, state.measurePoints);
+  if (hit !== measureHover) paintMeasureSnap(hit, measureCursorMap);
 }
 
 function onMeasureKeyDown(e) {
@@ -605,19 +697,28 @@ function onMeasureKeyDown(e) {
 
 function onMeasureContextMenu(e) {
   if (!state.activeMeasureType || !state.measurePoints.length || !e.latlng) return;
-  const hit = nearestMeasureIndex(e.latlng);
+  const hit = nearestVertexIndex(e.target, e.latlng, state.measurePoints);
   if (hit < 0) return;
   state.measurePoints.splice(hit, 1);
+  measureCursor = e.latlng;
+  measureCursorMap = e.target;
+  measureHover = nearestVertexIndex(e.target, e.latlng, state.measurePoints);
+  measureSnapHost = e.target;
   drawMeasure();
 }
 
 // Vẽ lại toàn bộ hình đo trên cả 2 bản đồ; kết quả hiển thị bằng 1 nhãn duy nhất ở điểm cuối (không chồng popup)
 function drawMeasure() {
   const groups = [measureLayerGroup, planMeasureGroup].filter(Boolean);
+  const hover = measureHover;
+  const host = measureSnapHost;
+  measureSnapMarks.forEach(dropSnapMarker);
+  measureSnapMarks = [];
   groups.forEach(g => g.clearLayers());
   closePlanLand();
   const pts = state.measurePoints;
   if (!pts.length) {
+    measureHover = -1;
     notifyMeasure();
     return;
   }
@@ -657,6 +758,8 @@ function drawMeasure() {
       }
     }
   });
+  if (hover >= 0 && hover < pts.length) paintMeasureSnap(hover, host);
+  else measureHover = -1;
   notifyMeasure();
 }
 

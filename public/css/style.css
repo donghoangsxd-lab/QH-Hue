@@ -2982,6 +2982,37 @@ table.ward-table th {
 }
 .measure-label .measure-plan-btn:hover { background: rgba(56, 189, 248, 0.35); }
 
+/* Đỉnh đang được gợi ý xóa (đo đạc, phác thảo): sáng theo con trỏ, chuột phải xóa */
+.vtx-snap { background: none !important; border: none !important; }
+.vtx-snap span {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 3px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 3px #fde047, 0 0 12px 4px rgba(250, 204, 21, 0.9);
+  animation: vtx-snap-pulse 0.9s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes vtx-snap-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.28); box-shadow: 0 0 0 4px #fff, 0 0 16px 6px rgba(250, 204, 21, 1); }
+}
+@media (prefers-reduced-motion: reduce) { .vtx-snap span { animation: none; } }
+.leaflet-tooltip.vtx-snap-tip {
+  padding: 2px 7px;
+  background: #fde047;
+  color: #0f172a;
+  border: none;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.leaflet-tooltip-top.vtx-snap-tip::before { border-top-color: #fde047; }
+
 /* Phân tích sử dụng đất quy hoạch trong vùng đo diện tích */
 .plan-land-stats { display: flex; flex-direction: column; gap: 4px; }
 .plan-land-stats .pls-head { font-weight: 700; color: var(--accent-cyan); margin-bottom: 2px; }

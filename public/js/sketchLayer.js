@@ -21,6 +21,7 @@ const TOOLS = {
 const COLORS = ['#f43f5e', '#facc15', '#22d3ee', '#a3e635', '#ffffff'];
 const CLOSE_PX = 10;        // click gần đỉnh đầu (px) → khép đa giác
 const DUP_PX = 4;           // click trùng đỉnh cuối (nháy đúp) → bỏ qua
+const VERTEX_HIT_PX = 16;   // đỉnh gần con trỏ trong bán kính này (px, theo mức phóng) sáng lên; chuột phải xóa đỉnh đó
 
 const $ = (id) => document.getElementById(id);
 const hosts = new Map();    // bản đồ Leaflet → { group, draft }
@@ -28,6 +29,9 @@ let drawMap = null;         // bản đồ của nét đang vẽ
 let shapes = [];            // [L.FeatureGroup] theo thứ tự vẽ (để hoàn tác); fg.sketch = dữ liệu để xuất file; fg.sketchHost = bản đồ chứa hình
 let pts = [];               // đỉnh của hình đang vẽ
 let cursor = null;
+let snapAt = -1;
+let snapHost = null;
+let snapMark = null;
 let color = COLORS[0];
 let open = false;
 let collapsed = false;      // đã chọn công cụ: thanh thu thành 1 nút cạnh nút Phác thảo
@@ -58,22 +62,75 @@ function targetPhrase() {
 }
 
 function toolHint(tool) {
-  return tool ? `${TOOLS[tool].hint} · vẽ trên ${targetPhrase()}` : '';
+  if (!tool) return '';
+  const del = tool === 'text' ? '' : ' · đỉnh sáng gần con trỏ: chuột phải để xóa';
+  return `${TOOLS[tool].hint}${del} · vẽ trên ${targetPhrase()}`;
 }
 
 function hostOf(m) {
   if (!m) return null;
   let h = hosts.get(m);
   if (h) return h;
-  h = { group: L.featureGroup().addTo(m), draft: L.layerGroup().addTo(m) };
+  h = { group: L.featureGroup().addTo(m), draft: L.layerGroup().addTo(m), snap: L.layerGroup().addTo(m) };
   hosts.set(m, h);
   m.on('mousemove', onMouseMove);
   m.on('dblclick', onDblClick);
+  m.on('contextmenu', onSketchContextMenu);
+  m.on('zoomend', () => {
+    if (m !== drawMap || !cursor || !state.sketchTool || state.sketchTool === 'text') return;
+    setSnap(nearestSketchIndex(m, cursor), m);
+  });
   return h;
 }
 
 function clearDraft() {
   hosts.forEach(h => h.draft.clearLayers());
+}
+
+function nearestSketchIndex(m, latlng) {
+  if (!m || !latlng || !pts.length) return -1;
+  const p = m.latLngToContainerPoint(latlng);
+  let best = -1;
+  let bestD = VERTEX_HIT_PX;
+  pts.forEach((pt, i) => {
+    const d = p.distanceTo(m.latLngToContainerPoint(pt));
+    if (d <= bestD) {
+      bestD = d;
+      best = i;
+    }
+  });
+  return best;
+}
+
+function clearSnap() {
+  if (snapMark) {
+    snapMark.unbindTooltip();
+    snapMark.remove();
+  }
+  snapMark = null;
+  snapAt = -1;
+  snapHost = null;
+}
+
+function setSnap(index, m) {
+  const ll = index >= 0 ? pts[index] : null;
+  const same = index === snapAt && (index < 0 || (m === snapHost && snapMark && ll && snapMark.getLatLng().equals(L.latLng(ll))));
+  if (same) return;
+  clearSnap();
+  snapAt = index;
+  snapHost = m || null;
+  if (!ll || !m) return;
+  const layer = hosts.get(m)?.snap;
+  if (!layer) return;
+  snapMark = L.marker(ll, {
+    interactive: false,
+    keyboard: false,
+    zIndexOffset: 1000,
+    icon: L.divIcon({ className: 'vtx-snap', html: '<span></span>', iconSize: [22, 22], iconAnchor: [11, 11] })
+  }).addTo(layer);
+  snapMark.bindTooltip('Chuột phải để xóa điểm', {
+    permanent: true, direction: 'top', offset: [0, -12], className: 'vtx-snap-tip', opacity: 1
+  });
 }
 
 /** Đầu mũi tên (tam giác) tại b, cỡ theo chiều dài thân và vĩ độ (tính trên mặt phẳng Mercator) */
@@ -119,7 +176,7 @@ function renderDraft() {
   if (lls.length >= 2) {
     const { layers, text } = shapeLayers(state.sketchTool, lls, color, true);
     layers.forEach(l => l.addTo(draft));
-    setHint(`${tool.label}: ${text} · ${stateName(drawMap)}`);
+    setHint(`${tool.label}: ${text} · ${stateName(drawMap)} · đỉnh sáng: chuột phải để xóa`);
   }
   pts.forEach((p, i) => L.circleMarker(p, {
     radius: i === 0 && state.sketchTool === 'polygon' && pts.length >= 3 ? 6 : 4,
@@ -167,7 +224,7 @@ function finish() {
   const tool = TOOLS[t];
   if (!tool || t === 'text') return;
   const need = tool.points || tool.min;
-  if (pts.length < need) { pts = []; renderDraft(); return; }
+  if (pts.length < need) { pts = []; clearSnap(); renderDraft(); return; }
   const m = drawMap || map;
   const { layers, text } = shapeLayers(t, pts, color, false);
   const fg = L.featureGroup(layers);
@@ -176,6 +233,7 @@ function finish() {
   if (t === 'arrow') fg.sketch.head = arrowHead(pts[0], pts[1]);
   addShape(fg, m);
   pts = [];
+  clearSnap();
   renderDraft();
 }
 
@@ -280,19 +338,35 @@ export function handleSketchClick(latlng, targetMap) {
   // Nét dở thuộc một bản đồ. Chia đôi lệch tâm thì click bên kia là tọa độ khác, bỏ qua.
   if (pts.length && drawMap && m !== drawMap && offsetSplit()) return;
   if (!pts.length) drawMap = m;
+  hostOf(drawMap);
   const last = pts[pts.length - 1];
   if (last && pxDist(last, latlng) < DUP_PX) return;
   if (state.sketchTool === 'polygon' && pts.length >= 3 && pxDist(pts[0], latlng) < CLOSE_PX) { finish(); return; }
   pts.push(latlng);
   if (tool.points && pts.length >= tool.points) { finish(); return; }
+  cursor = latlng;
+  setSnap(pts.length - 1, drawMap);
   renderDraft();
 }
 
 function onMouseMove(e) {
-  if (!state.sketchTool || !pts.length || !drawMap) return;
+  if (!state.sketchTool || state.sketchTool === 'text' || !pts.length || !drawMap) return;
   if (e.target !== drawMap && offsetSplit()) return;
   cursor = e.latlng;
+  if (e.target === drawMap) setSnap(nearestSketchIndex(drawMap, e.latlng), drawMap);
+  else setSnap(-1, null);
   renderDraft();
+}
+
+function onSketchContextMenu(e) {
+  if (!state.sketchTool || state.sketchTool === 'text' || !pts.length || e.target !== drawMap || !e.latlng) return;
+  const hit = nearestSketchIndex(drawMap, e.latlng);
+  if (hit < 0) return;
+  pts.splice(hit, 1);
+  if (!pts.length) cursor = null;
+  setSnap(pts.length ? nearestSketchIndex(drawMap, e.latlng) : -1, drawMap);
+  renderDraft();
+  syncButtons();
 }
 
 function onDblClick(e) {
@@ -371,6 +445,7 @@ function setTool(tool) {
   clearDraft();
   pts = [];
   cursor = null;
+  clearSnap();
   drawMap = null;
   if (tool && !state.sketchTool) announceTool('sketch');
   state.sketchTool = tool;
@@ -434,6 +509,7 @@ export function initSketchLayer() {
       clearDraft();
       pts = [];
       cursor = null;
+      clearSnap();
       drawMap = null;
       syncButtons();
     }
@@ -475,8 +551,12 @@ export function initSketchLayer() {
       return;
     }
     if (e.target.closest('#btnSketchUndo')) {
-      if (pts.length) { pts.pop(); renderDraft(); syncButtons(); }
-      else if (shapes.length) removeShape(shapes[shapes.length - 1]);
+      if (pts.length) {
+        pts.pop();
+        setSnap(cursor && drawMap && pts.length ? nearestSketchIndex(drawMap, cursor) : -1, drawMap);
+        renderDraft();
+        syncButtons();
+      } else if (shapes.length) removeShape(shapes[shapes.length - 1]);
       return;
     }
     if (e.target.closest('#btnSketchClear')) {
@@ -491,9 +571,15 @@ export function initSketchLayer() {
   });
   document.addEventListener('keydown', (e) => {
     if (!state.sketchTool || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
-    if (e.key === 'Escape') { if (pts.length) { pts = []; renderDraft(); syncButtons(); } else setTool(null); }
+    if (e.key === 'Escape') { if (pts.length) { pts = []; cursor = null; clearSnap(); renderDraft(); syncButtons(); } else setTool(null); }
     else if (e.key === 'Enter') finish();
-    else if (e.key === 'Backspace' && pts.length) { e.preventDefault(); pts.pop(); renderDraft(); syncButtons(); }
+    else if (e.key === 'Backspace' && pts.length) {
+      e.preventDefault();
+      pts.pop();
+      setSnap(cursor && drawMap && pts.length ? nearestSketchIndex(drawMap, cursor) : -1, drawMap);
+      renderDraft();
+      syncButtons();
+    }
   });
   syncButtons();
 }

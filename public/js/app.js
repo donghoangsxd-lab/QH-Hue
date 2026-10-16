@@ -411,7 +411,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     if (state.activeMeasureType) {
-      handleMeasureClick(e.latlng);
+      handleMeasureClick(e.latlng, targetMap);
       return;
     }
     // Thứ tự ưu tiên khi bấm: tem công trình > thửa hiện trạng (lớp thửa bật) > lô quy hoạch > phường (cuối cùng).
