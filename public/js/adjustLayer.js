@@ -1,6 +1,6 @@
 // Hồ sơ điều chỉnh cục bộ trên bản đồ quy hoạch (bản đồ chính và khung so sánh): ranh cyan, nét đứt, không tô nền.
 // Nét nằm trên ranh và lô đồ án QHPK. Nhịp nét lệch nửa chu kỳ với ranh khu vực QHCT (qhctLayer.js): chỗ trùng ranh hiện xen kẽ cyan / đỏ.
-// Rê chuột sáng viền; bấm ranh mở popup để thể hiện theo điều chỉnh. Nền trong ranh là ảnh vệ tinh cắt đúng phạm vi
+// Rê chuột sáng viền; bấm ranh mở bảng hồ sơ, ghim góc trên trái (không bám điểm bấm). Nền trong ranh là ảnh vệ tinh cắt đúng phạm vi
 // (cùng ô ảnh với nền bản đồ, che lô quy hoạch cũ), tắt được; lô mới kẻ hoa văn TT16. Bấm 1 lô mở thẻ lô;
 // Admin sửa lớp, loại đất, tầng cao, mật độ, hệ số và ranh — ghi vào file hồ sơ, không đụng lô đồ án bên ngoài.
 // PDF và ảnh tờ bản vẽ scan đã định vị (scanGeoref.js): thanh nhỏ ở góc ảnh chỉnh độ trong suốt và tắt ảnh.
@@ -385,13 +385,37 @@ function popupHtml(it) {
   </div>`;
 }
 
+// Pane bản đồ có transform nên ghim bảng lên #mapArea, cùng cách bảng công trình
+function pinAdjPopup(popup) {
+  const el = popup.getElement();
+  const host = document.getElementById('mapArea');
+  if (!el || !host) return;
+  if (el.parentElement !== host) host.appendChild(el);
+  el.classList.add('adj-dock');
+  el.style.left = '';
+  el.style.bottom = '';
+  el.style.right = '';
+  el.style.top = '';
+  el.style.transform = '';
+}
+
 // Leaflet chặn click lan ra ngoài popup nên gắn bộ xử lý ngay trên nội dung
-function openPopup(m, it, latlng) {
+function openPopup(m, it) {
   const box = document.createElement('div');
   box.className = 'adj-pop-box';
   box.innerHTML = popupHtml(it);
   box.addEventListener('click', (e) => { e.stopPropagation(); onAction(e); });
-  box._popup = L.popup({ maxWidth: 340, minWidth: 280, className: 'adj-popup', autoPanPaddingTopLeft: [40, 90] }).setLatLng(latlng).setContent(box).openOn(m);
+  const popup = L.popup({ maxWidth: 340, minWidth: 280, className: 'adj-popup', autoPan: false, closeButton: true }).setContent(box);
+  box._popup = popup;
+  popup._updatePosition = function () { pinAdjPopup(this); };
+  popup._animateZoom = function () { pinAdjPopup(this); };
+  popup._adjustPan = function () {};
+  const layout = popup._updateLayout.bind(popup);
+  popup._updateLayout = function () { layout(); pinAdjPopup(this); };
+  popup.on('remove', () => popup.getElement()?.remove());
+  popup.setLatLng(m.getCenter());
+  popup.openOn(m);
+  pinAdjPopup(popup);
 }
 
 // Popup đang mở vẽ lại tại chỗ sau mỗi lần bật / tắt (công tắc đổi trạng thái mà không đóng popup)
@@ -493,7 +517,7 @@ function drawOn(m) {
     line.bindTooltip(`Điều chỉnh cục bộ · ${escapeHtml(it.tenQH)}`, { sticky: true, direction: 'top', className: 'dot-tip' });
     line.on('mouseover', () => line.eachLayer(l => { l.setStyle(HOVER_STYLE); l.getElement()?.classList.add('adj-glow'); }));
     line.on('mouseout', () => line.eachLayer(l => { l.setStyle(LINE_STYLE); l.getElement()?.classList.remove('adj-glow'); }));
-    line.on('click', (e) => { if (!passToolClick(m, e)) openPopup(m, it, e.latlng); });
+    line.on('click', (e) => { if (!passToolClick(m, e)) openPopup(m, it); });
     L1.lines.addLayer(line);
   });
   syncFillPointer(L1);
@@ -684,7 +708,7 @@ function locate(id) {
   const bounds = L.geoJSON(it.boundary).getBounds();
   if (!bounds.isValid()) return;
   // Đổi zoom không hoạt ảnh thì moveend phát ngay trong fitBounds: gắn trước
-  m.once('moveend', () => openPopup(m, it, bounds.getCenter()));
+  m.once('moveend', () => openPopup(m, it));
   m.fitBounds(bounds, { maxZoom: 18, padding: [40, 40] });
 }
 
@@ -874,12 +898,12 @@ function lotFormHtml(lot, before) {
     <button type="button" class="proof-btn js-lot-cancel">Hủy</button></div>`;
 }
 
-function bindLotFile(box, m, it, latlng) {
+function bindLotFile(box, m, it) {
   box.querySelector('[data-adj-lot-file]')?.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
     m.closePopup();
-    openPopup(m, it, latlng);
+    openPopup(m, it);
   });
 }
 
@@ -1026,7 +1050,7 @@ function openLotForm(popup, it, lot, index) {
       stop();
       const next = applySavedLot(it, index, saved) || lot;
       box.innerHTML = lotPopupHtml(it, next);
-      bindLotFile(box, m, it, popup.getLatLng());
+      bindLotFile(box, m, it);
       refitPopup(popup);
       showToast('✓ Đã cập nhật lô trong hồ sơ điều chỉnh', 'success');
     } catch (err) {
@@ -1041,7 +1065,7 @@ function openLotForm(popup, it, lot, index) {
 function openAdjustLot(m, it, lot, index, latlng) {
   const box = document.createElement('div');
   box.innerHTML = lotPopupHtml(it, lot);
-  bindLotFile(box, m, it, latlng);
+  bindLotFile(box, m, it);
   const popup = L.popup({ maxWidth: 340, minWidth: 280, className: 'land-lot-popup adj-lot-popup', autoPanPaddingTopLeft: [40, 90] })
     .setLatLng(latlng).setContent(box).openOn(m);
   if (!isAdmin()) return;
