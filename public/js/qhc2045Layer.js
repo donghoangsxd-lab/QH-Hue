@@ -789,6 +789,8 @@ function drawVision() {
 }
 
 function openVisionPopup(f, latlng) {
+  const host = active?.m || target();
+  if (qhcLotPop && qhcLotPop.f === f && qhcLotPop.map === host && expandCollapsedPopup(qhcLotPop.popup)) return;
   const cats = data.vision.cats;
   const zone = cats.zones[f.properties.k] || 'Khác';
   const desc = cats.funcs[f.properties.f] || '';
@@ -798,7 +800,11 @@ function openVisionPopup(f, latlng) {
       ${desc ? `<p class="qhc-pop-desc">${escapeHtml(desc)}</p>` : ''}
       <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · Sơ đồ tổ chức không gian 1/25.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
     </div>`;
-  openOutlinedPopup(active?.m || target(), f.geometry, L.popup({ maxWidth: 320, className: 'qhc-popup' }).setContent(html), latlng);
+  const popup = L.popup({ maxWidth: 320, className: 'qhc-popup' }).setContent(html);
+  qhcLotPop = { popup, f, map: host };
+  openOutlinedPopup(host, f.geometry, popup, latlng);
+  addPopupCollapseToggle(popup, 'viền vùng', 'Bấm lại vào vùng chức năng để hiện bảng thông tin');
+  popup.on('remove', () => { if (qhcLotPop?.popup === popup) qhcLotPop = null; });
 }
 
 // ---------- Click cấp bản đồ ----------
