@@ -235,6 +235,115 @@ const POP_REFS = [
   { key: 'gh', label: 'GHSL 2025', image: (ee) => ee.Image('JRC/GHSL/P2023A/GHS_POP/2025').select('population_count') }
 ];
 
+// Rừng và phủ thực vật (ước tính vệ tinh, không phải ranh 3 loại rừng):
+// ESA WorldCover v200 năm 2021, 10 m, CC BY 4.0; Hansen Global Forest Change v1.13 (Landsat ~30 m, 2000–2025).
+const WORLDCOVER_ID = 'ESA/WorldCover/v200';
+const WORLDCOVER_YEAR = 2021;
+const HANSEN_ID = 'UMD/hansen/global_forest_change_2025_v1_13';
+const HANSEN_LOSS_MAX = 25;
+const TREE_MIN_PCT = 10;
+const FOREST_MODES = ['cover', 'loss'];
+const COVER_CLASSES = [
+  { code: 10, key: 'tree', name: 'Cây che phủ', color: '#006400' },
+  { code: 20, key: 'shrub', name: 'Cây bụi', color: '#ffbb22' },
+  { code: 30, key: 'grass', name: 'Cỏ', color: '#ffff4c' },
+  { code: 40, key: 'crop', name: 'Đất trồng trọt', color: '#f096ff' },
+  { code: 90, key: 'wetland', name: 'Đất ngập nước', color: '#0096a0' },
+  { code: 95, key: 'mangrove', name: 'Rừng ngập mặn', color: '#00cf75' },
+  { code: 80, key: 'water', name: 'Mặt nước', color: '#0064c8' }
+];
+const LOSS_PALETTE = ['#fef08a', '#fbbf24', '#f97316', '#dc2626', '#7f1d1d'];
+const LOSS_LEGEND = { min: 1, max: HANSEN_LOSS_MAX, palette: LOSS_PALETTE, from: 2001, to: 2000 + HANSEN_LOSS_MAX };
+
+// JRC Global Surface Water v1.4: lịch sử năm 1984–2021, waterClass 2 = theo mùa, 3 = thường xuyên
+const GSW_ID = 'JRC/GSW1_4/YearlyHistory';
+const GSW_MIN_YEAR = 1985;
+const GSW_MAX_YEAR = 2021;
+// WorldPop GP 100 m (cùng bộ với POP_REFS) và Dynamic World nhãn built — kỳ 5 năm gần nhất còn dữ liệu mở
+const POP_CHANGE_YEARS = [2015, 2020];
+const BUILT_CHANGE_YEARS = [2016, 2021];
+
+function worldCover(ee) {
+  return ee.ImageCollection(WORLDCOVER_ID).first().select('Map');
+}
+
+function hansen(ee) {
+  return ee.Image(HANSEN_ID);
+}
+
+function forestCoverVis(ee, wards) {
+  const wc = worldCover(ee);
+  const painted = COVER_CLASSES.map(c => wc.eq(c.code).selfMask().visualize({ palette: [c.color] }));
+  return {
+    image: ee.ImageCollection(painted).mosaic().clipToCollection(wards),
+    legend: {
+      mode: 'cover',
+      title: `Phủ thực vật ${WORLDCOVER_YEAR} (ESA WorldCover 10 m)`,
+      classes: COVER_CLASSES.map(({ name, color }) => ({ name, color }))
+    }
+  };
+}
+
+function forestLossVis(ee, wards) {
+  const g = hansen(ee);
+  const tree = g.select('treecover2000').gte(TREE_MIN_PCT);
+  const loss = g.select('lossyear').updateMask(g.select('lossyear').gt(0).and(tree));
+  const under = tree.selfMask().visualize({ palette: ['#14532d'], opacity: 0.4 });
+  const over = loss.visualize({ min: 1, max: HANSEN_LOSS_MAX, palette: LOSS_PALETTE });
+  return {
+    image: ee.ImageCollection([under, over]).mosaic().clipToCollection(wards),
+    legend: { mode: 'loss', title: `Mất rừng ${LOSS_LEGEND.from}–${LOSS_LEGEND.to} (Hansen, tán năm 2000 ≥ ${TREE_MIN_PCT}%)`, ...LOSS_LEGEND }
+  };
+}
+
+/** Diện tích ha theo lớp WorldCover, để reduceRegions */
+function forestCoverArea(ee, wards) {
+  const wc = worldCover(ee).clipToCollection(wards);
+  const ha = ee.Image.pixelArea().divide(1e4);
+  let img = null;
+  COVER_CLASSES.forEach(c => {
+    const band = ha.multiply(wc.eq(c.code)).rename(c.key);
+    img = img ? img.addBands(band) : band;
+  });
+  return img;
+}
+
+/** cover = ha tán năm 2000, loss = ha mất 2001–2025 trên những pixel từng có tán ≥ TREE_MIN_PCT */
+function forestLossArea(ee, wards) {
+  const g = hansen(ee);
+  const tree = g.select('treecover2000').gte(TREE_MIN_PCT);
+  const loss = g.select('lossyear').gt(0).and(tree);
+  const ha = ee.Image.pixelArea().divide(1e4);
+  return ha.multiply(tree).rename('cover').addBands(ha.multiply(loss).rename('loss')).clipToCollection(wards);
+}
+
+function gswClass(ee, year) {
+  return ee.ImageCollection(GSW_ID)
+    .filter(ee.Filter.calendarRange(year, year, 'year'))
+    .mosaic()
+    .select('waterClass');
+}
+
+/** m² mặt nước (theo mùa hoặc thường xuyên) của hai năm, hai band prev / curr */
+function waterPairArea(ee, prev, year, wards) {
+  const m2 = ee.Image.pixelArea();
+  const band = (y, name) => m2.multiply(gswClass(ee, y).gte(2).unmask(0)).rename(name);
+  return band(prev, 'prev').addBands(band(year, 'curr')).clipToCollection(wards);
+}
+
+function worldPopImage(ee, year) {
+  return ee.ImageCollection('WorldPop/GP/100m/pop')
+    .filter(ee.Filter.eq('country', 'VNM'))
+    .filter(ee.Filter.eq('year', year))
+    .mosaic()
+    .select('population');
+}
+
+/** m² nhãn built của Dynamic World một năm (tháng 1–8, cùng cách với vùng phát triển mới) */
+function builtAreaM2(ee, wards, year) {
+  return ee.Image.pixelArea().multiply(dwBuilt(ee, wards, year, year)).rename('m2').clipToCollection(wards);
+}
+
 /** Tạo ô bản đồ từ ảnh đã visualize; ép PNG để không bị nén JPEG (sai giá trị Terrarium) */
 function mapUrl(ee, visImage) {
   return new Promise((resolve, reject) => {
@@ -245,5 +354,9 @@ function mapUrl(ee, visImage) {
 module.exports = {
   sarYears, lstYears, parseYear, demImage, demRegion, terrariumImage, sarFloodMask, sarFloodVis, lstImage, mapUrl,
   LST_VIS, FLOOD_SEASON, HOT_SEASON, POP_REFS,
-  newDevImage, newDevVis, devRecentYears, DEV_FROM_YEARS, DEV_FROM_DEFAULT, DEV_COLOR, DEV_BASE_COLOR, DEV_SCALE_M, DEV_CRS
+  newDevImage, newDevVis, devRecentYears, DEV_FROM_YEARS, DEV_FROM_DEFAULT, DEV_COLOR, DEV_BASE_COLOR, DEV_SCALE_M, DEV_CRS,
+  FOREST_MODES, COVER_CLASSES, WORLDCOVER_YEAR, HANSEN_LOSS_MAX, TREE_MIN_PCT,
+  forestCoverVis, forestLossVis, forestCoverArea, forestLossArea,
+  GSW_MIN_YEAR, GSW_MAX_YEAR, POP_CHANGE_YEARS, BUILT_CHANGE_YEARS,
+  waterPairArea, worldPopImage, builtAreaM2
 };

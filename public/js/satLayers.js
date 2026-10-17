@@ -61,6 +61,18 @@ const LAYERS = {
     loadStats: loadNewDevStats,
     renderLegend: devLegend,
     renderStats: devStats
+  },
+  forest: {
+    label: 'rừng, phủ thực vật',
+    ids: { chk: 'chk_forest', box: 'forestBox', opBox: 'forestOpBox', opacity: 'forestOpacity', year: 'forestYear', legend: 'forestLegend', stats: 'forestStats' },
+    zIndex: 2,
+    seasons: () => ({ years: ['cover', 'loss'], partial: null, def: 'cover' }),
+    yearText: (y) => (y === 'loss' ? 'Mất rừng 2001–2025 (Hansen)' : 'Phủ thực vật 2021 (WorldCover)'),
+    extra: [],
+    tileQuery: (y) => `action=getForestTile&mode=${y}`,
+    statsQuery: (y) => `action=getForestStats&mode=${y}`,
+    renderLegend: forestLegend,
+    renderStats: forestStats
   }
 };
 
@@ -95,6 +107,34 @@ function sarLegend(legend, year) {
     return rampHtml(legend.palette, ticks, 'Số mùa lũ bị ngập');
   }
   return `<span class="sat-swatch" style="background:${legend.color}"></span>Bị ngập ít nhất 1 lần chụp, 15/9–15/12/${year}`;
+}
+
+function forestLegend(legend) {
+  if (legend.mode === 'loss' || legend.palette) {
+    return rampHtml(legend.palette, [legend.from, Math.round((legend.from + legend.to) / 2), legend.to], legend.title);
+  }
+  const rows = (legend.classes || []).map(c => `<span><i class="sat-swatch" style="background:${c.color}"></i>${escapeHtml(c.name)}</span>`).join('');
+  return `<div class="sat-legend-title">${escapeHtml(legend.title || 'Phủ thực vật')}</div><div class="flood-wards">${rows}</div>`;
+}
+
+function forestStats(d) {
+  if (!d || !Array.isArray(d.wards)) return '<div class="flood-muted">Máy chủ chưa trả thống kê rừng.</div>';
+  if (d.mode === 'loss') {
+    const hot = d.wards.slice().sort((a, b) => b.lossHa - a.lossHa).slice(0, 8);
+    const chip = (w) => `<span>${escapeHtml(w.name)} <b>${fmtNum(w.lossHa)}</b></span>`;
+    return `<div class="flood-kpi"><span>Tán cây năm 2000</span><b>≈ ${fmtNum(d.city.coverHa)} ha</b></div>
+      <div class="flood-kpi"><span>Mất rừng 2001–2025</span><b>≈ ${fmtNum(d.city.lossHa)} ha</b></div>
+      <div class="flood-sub">Phường, xã mất nhiều nhất (ha)</div><div class="flood-wards">${hot.map(chip).join('')}</div>
+      <div class="flood-muted">${escapeHtml(d.source)}. Ước tính vệ tinh, không phải ranh 3 loại rừng. Chưa đối chiếu từng lô đồ án.</div>`;
+  }
+  const keys = d.classes || [];
+  const rows = keys.map(c => `<span>${escapeHtml(c.name)} <b>${fmtNum(d.city[c.key])}</b></span>`).join('');
+  const top = d.wards.slice().sort((a, b) => (b.tree || 0) - (a.tree || 0)).slice(0, 6)
+    .map(w => `<span>${escapeHtml(w.name)} <b>${fmtNum(w.tree)}</b></span>`).join('');
+  return `<div class="flood-kpi"><span>Cây che phủ toàn thành phố</span><b>≈ ${fmtNum(d.city.tree)} ha</b></div>
+    <div class="flood-sub">Toàn thành phố (ha)</div><div class="flood-wards">${rows}</div>
+    <div class="flood-sub">Phường, xã nhiều cây che phủ nhất (ha)</div><div class="flood-wards">${top}</div>
+    <div class="flood-muted">${escapeHtml(d.source)}. Ước tính vệ tinh, không phải ranh 3 loại rừng. Chưa đối chiếu từng lô đồ án.</div>`;
 }
 
 function lstLegend(legend) {
@@ -192,6 +232,7 @@ async function show(key) {
   if (statsEl) statsEl.innerHTML = '<div class="flood-muted">Đang thống kê theo phường/xã (có thể mất 10–30 giây lần đầu)...</div>';
   try {
     const d = await cached(rt.stats, year, () => (cfg.loadStats ? cfg.loadStats(year) : getJson(q)));
+    if (d && d.rawDataList && !d.wards && !d.city) throw new Error('máy chủ chưa hỗ trợ thống kê này');
     if (seq !== rt.seq || !rt.visible || !statsEl) return;
     statsEl.innerHTML = cfg.renderStats(d, rt);
   } catch (err) {
@@ -219,7 +260,8 @@ function fillYears(cfg, rt) {
   const { years, partial, def } = cfg.seasons();
   rt.year = String(def);
   if (!sel) return;
-  sel.innerHTML = years.map(y => `<option value="${y}"${String(y) === rt.year ? ' selected' : ''}>${y}${y === partial ? ' (đang cập nhật)' : ''}</option>`).join('')
+  const text = (y) => (cfg.yearText ? cfg.yearText(y) : `${y}${y === partial ? ' (đang cập nhật)' : ''}`);
+  sel.innerHTML = years.map(y => `<option value="${y}"${String(y) === rt.year ? ' selected' : ''}>${text(y)}</option>`).join('')
     + cfg.extra.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
 }
 
@@ -237,6 +279,16 @@ export function satPrintLegend() {
     out.push(`<div class="pa3-lg-ramp"><div class="pa3-lg-ramp-title">Nhiệt độ bề mặt tháng 4–8/${escapeHtml(lst.year)} (Landsat, °C)</div>
       <div class="pa3-lg-bar" style="background:linear-gradient(to right, ${l.palette.join(', ')})"></div>
       <div class="pa3-lg-ticks"><span>≤ ${l.min}</span><span>${Math.round((l.min + l.max) / 2)}</span><span>≥ ${l.max}</span></div></div>`);
+  }
+  const forest = runtime.forest;
+  if (forest?.visible && forest.legend) {
+    const l = forest.legend;
+    if (l.palette) {
+      out.push(`<div class="pa3-lg-ramp"><div class="pa3-lg-ramp-title">${escapeHtml(l.title || 'Mất rừng')}</div>
+        <div class="pa3-lg-bar" style="background:linear-gradient(to right, ${l.palette.join(', ')})"></div></div>`);
+    } else {
+      (l.classes || []).forEach(c => out.push(`<div class="pa3-lg-row"><i class="pa3-lg-sym" style="background:${c.color}"></i>${escapeHtml(c.name)}</div>`));
+    }
   }
   const dev = runtime.dev;
   if (dev?.visible && dev.legend) {
