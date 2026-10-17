@@ -38,6 +38,9 @@ let collapsed = false;      // đã chọn công cụ: thanh thu thành 1 nút c
 let telexOn = true;
 let sketchBtnTitle = '';
 let editor = null;          // { el, latlng, restore, map } ô gõ chữ đang mở
+let hoverFg = null;         // hình đang nằm dưới con trỏ
+let pickFg = null;          // hình vừa click — viền sáng giữ đến khi bấm chỗ khác
+let pickAt = 0;
 
 const proj = (ll) => L.CRS.EPSG3857.project(L.latLng(ll));
 const unproj = (p) => L.CRS.EPSG3857.unproject(p);
@@ -79,6 +82,10 @@ function hostOf(m) {
   m.on('zoomend', () => {
     if (m !== drawMap || !cursor || !state.sketchTool || state.sketchTool === 'text') return;
     setSnap(nearestSketchIndex(m, cursor), m);
+  });
+  m.on('click', () => {
+    if (performance.now() - pickAt < 40) return;
+    setPick(null);
   });
   return h;
 }
@@ -159,11 +166,85 @@ function shapeLayers(tool, lls, c, preview) {
     return { layers: out, text: `Diện tích ${fmtArea(polyArea(lls))} · chu vi ${fmtLen(pathLen([...lls, lls[0]]))}` };
   }
   out.push(L.polyline(lls, halo), L.polyline(lls, { ...line, dashArray: preview ? '6,6' : null }));
+  if (!preview) out.push(L.polyline(lls, { color: c, weight: 18, opacity: 0, className: 'sketch-hit' }));
   if (tool === 'arrow' && lls.length === 2) {
     const head = arrowHead(lls[0], lls[1]);
     if (head) out.push(L.polygon(head, { ...line, weight: 1, fillColor: c, fillOpacity: 1 }));
   }
   return { layers: out, text: `Dài ${fmtLen(pathLen(lls))}` };
+}
+
+function stopShapeEvent(e) {
+  L.DomEvent.stop(e);
+  const raw = e.originalEvent;
+  if (!raw) return;
+  raw._stopped = true;
+  L.DomEvent.preventDefault(raw);
+  L.DomEvent.stopPropagation(raw);
+}
+
+function pointerInside(fg, e) {
+  const to = e?.originalEvent?.relatedTarget;
+  if (!to) return false;
+  let inside = false;
+  fg.eachLayer(l => {
+    const el = l.getElement?.();
+    if (el && (el === to || el.contains?.(to))) inside = true;
+  });
+  return inside;
+}
+
+function applyChrome(fg) {
+  if (!fg) return;
+  const hot = fg === hoverFg || fg === pickFg;
+  const picked = fg === pickFg;
+  fg.eachLayer(l => {
+    const hit = String(l.options?.className || '').includes('sketch-hit');
+    if (hit || l.options?.interactive === false) return;
+    const el = l.getElement?.();
+    if (l.setStyle) {
+      if (!l._skBase) {
+        l._skBase = {
+          color: l.options.color, weight: l.options.weight, opacity: l.options.opacity,
+          fillColor: l.options.fillColor, fillOpacity: l.options.fillOpacity
+        };
+      }
+      if (hot) l.setStyle({ weight: (l._skBase.weight || 3) + (picked ? 3 : 2), opacity: 1 });
+      else l.setStyle(l._skBase);
+      el?.classList.toggle('sketch-edge', hot);
+      el?.classList.toggle('sketch-picked', picked);
+    } else {
+      const body = el?.querySelector?.('.sketch-text-body');
+      body?.classList.toggle('sketch-edge', hot);
+      body?.classList.toggle('sketch-picked', picked);
+    }
+  });
+  if (hot) fg.bringToFront();
+}
+
+function setHover(fg) {
+  if (hoverFg === fg) return;
+  const prev = hoverFg;
+  hoverFg = fg;
+  if (prev) applyChrome(prev);
+  if (fg) applyChrome(fg);
+}
+
+function setPick(fg) {
+  if (fg) pickAt = performance.now();
+  if (pickFg === fg) return;
+  const prev = pickFg;
+  pickFg = fg;
+  if (prev) applyChrome(prev);
+  if (fg) applyChrome(fg);
+}
+
+function armHit(fg) {
+  fg.eachLayer(l => {
+    if (!String(l.options?.className || '').includes('sketch-hit')) return;
+    const el = l.getElement?.();
+    if (el) el.style.pointerEvents = 'stroke';
+  });
 }
 
 function renderDraft() {
@@ -184,29 +265,45 @@ function renderDraft() {
   }).addTo(draft));
 }
 
-/** Click hình đã vẽ (khi không chọn công cụ) → menu nhỏ: sửa chữ / xóa */
+function openShapeMenu(fg, e) {
+  const m = fg.sketchHost || map;
+  const box = L.DomUtil.create('div', 'sketch-menu');
+  if (fg.sketch.tool === 'text') {
+    const edit = L.DomUtil.create('button', 'ui-btn-format sketch-del', box);
+    edit.type = 'button';
+    edit.innerHTML = `${ico('pen')}Sửa chữ`;
+    edit.addEventListener('click', () => {
+      m.closePopup();
+      const s = fg.sketch;
+      removeShape(fg);
+      openTextEditor(s.pts[0], { text: s.text, color: s.color, sizePx: s.sizePx, restore: fg }, m);
+    });
+  }
+  const del = L.DomUtil.create('button', 'ui-btn-format sketch-del', box);
+  del.type = 'button';
+  del.innerHTML = `${ico('trash')}Xóa hình này`;
+  del.addEventListener('click', () => { removeShape(fg); m.closePopup(); });
+  L.popup({ className: 'sketch-popup', closeButton: false }).setLatLng(e.latlng).setContent(box).openOn(m);
+}
+
+/** Hình đã vẽ: rê hoặc click sáng viền; chuột phải mới mở nút xóa (và sửa chữ). */
 function bindShapeMenu(fg) {
+  fg.on('mouseover', () => setHover(fg));
+  fg.on('mouseout', (e) => {
+    if (pointerInside(fg, e) || hoverFg !== fg) return;
+    setHover(null);
+  });
   fg.on('click', (e) => {
-    if (state.sketchTool) return;          // đang vẽ: click để đặt đỉnh, không mở menu
-    L.DomEvent.stopPropagation(e);
-    const m = fg.sketchHost || map;
-    const box = L.DomUtil.create('div', 'sketch-menu');
-    if (fg.sketch.tool === 'text') {
-      const edit = L.DomUtil.create('button', 'ui-btn-format sketch-del', box);
-      edit.type = 'button';
-      edit.innerHTML = `${ico('pen')}Sửa chữ`;
-      edit.addEventListener('click', () => {
-        m.closePopup();
-        const s = fg.sketch;
-        removeShape(fg);
-        openTextEditor(s.pts[0], { text: s.text, color: s.color, sizePx: s.sizePx, restore: fg }, m);
-      });
-    }
-    const del = L.DomUtil.create('button', 'ui-btn-format sketch-del', box);
-    del.type = 'button';
-    del.innerHTML = `${ico('trash')}Xóa hình này`;
-    del.addEventListener('click', () => { removeShape(fg); m.closePopup(); });
-    L.popup({ className: 'sketch-popup', closeButton: false }).setLatLng(e.latlng).setContent(box).openOn(m);
+    if (state.sketchTool && state.sketchTool !== 'text' && pts.length) return;
+    stopShapeEvent(e);
+    (fg.sketchHost || map).closePopup();
+    setPick(fg);
+  });
+  fg.on('contextmenu', (e) => {
+    if (state.sketchTool && state.sketchTool !== 'text' && pts.length) return;
+    stopShapeEvent(e);
+    setPick(fg);
+    openShapeMenu(fg, e);
   });
 }
 
@@ -215,6 +312,7 @@ function addShape(fg, m) {
   fg.sketchHost = host;
   bindShapeMenu(fg);
   fg.addTo(hostOf(host).group);
+  armHit(fg);
   shapes.push(fg);
   syncButtons();
 }
@@ -228,7 +326,7 @@ function finish() {
   const m = drawMap || map;
   const { layers, text } = shapeLayers(t, pts, color, false);
   const fg = L.featureGroup(layers);
-  fg.bindTooltip(`${tool.label} · ${text} · ${stateName(m)}`, { sticky: true, className: 'sketch-tip' });
+  fg.bindTooltip(`${tool.label} · ${text} · ${stateName(m)} · chuột phải để xóa`, { sticky: true, className: 'sketch-tip' });
   fg.sketch = { tool: t, pts: pts.map(p => L.latLng(p)), color };
   if (t === 'arrow') fg.sketch.head = arrowHead(pts[0], pts[1]);
   addShape(fg, m);
@@ -238,6 +336,8 @@ function finish() {
 }
 
 function removeShape(fg) {
+  if (hoverFg === fg) hoverFg = null;
+  if (pickFg === fg) pickFg = null;
   hosts.get(fg.sketchHost)?.group.removeLayer(fg);
   shapes = shapes.filter(s => s !== fg);
   syncButtons();
@@ -253,6 +353,7 @@ function textShape(latlng, text, c, sizePx, m) {
     keyboard: false
   });
   const fg = L.featureGroup([marker]);
+  fg.bindTooltip('Chữ · chuột phải để sửa hoặc xóa', { sticky: true, className: 'sketch-tip' });
   // Chiều cao chữ ngoài thực địa theo mức phóng lúc ghi (để DXF ra đúng cỡ như đang thấy)
   fg.sketch = { tool: 'text', pts: [L.latLng(latlng)], color: c, text, sizePx, heightM: sizePx * metersPerPixel(latlng.lat, m) };
   return fg;
@@ -563,6 +664,8 @@ export function initSketchLayer() {
       if (shapes.length && confirm(`Xóa toàn bộ ${shapes.length} hình phác thảo?`)) {
         hosts.forEach(h => h.group.clearLayers());
         shapes = [];
+        hoverFg = null;
+        pickFg = null;
         syncButtons();
       }
       return;

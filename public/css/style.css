@@ -757,6 +757,11 @@ body.compare-on .map-title-split { display: inline-flex; }
   text-shadow: 0 0 3px #020617, 0 0 2px #020617, 1px 1px 2px #020617;
 }
 .sketch-text-body { padding: 1px 3px; cursor: pointer; }
+.leaflet-overlay-pane svg path.sketch-hit { pointer-events: stroke; cursor: pointer; }
+.leaflet-interactive.sketch-edge { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 3px #fff); cursor: pointer; }
+.leaflet-interactive.sketch-picked { filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 4px rgb(var(--cyan-rgb))); }
+.sketch-text-body.sketch-edge { outline: 2px solid #fff; outline-offset: 3px; border-radius: 2px; }
+.sketch-text-body.sketch-picked { outline: 2px solid var(--accent-cyan); outline-offset: 3px; border-radius: 2px; box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.85); }
 .sketch-text-editor {
   position: absolute; z-index: 1000; min-width: 140px; margin: 0; padding: 0 2px; box-sizing: content-box;
   background: rgba(2, 6, 23, 0.55); border: 1px dashed currentColor; border-radius: var(--r-sm);
