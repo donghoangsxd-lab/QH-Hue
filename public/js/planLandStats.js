@@ -345,6 +345,9 @@ export function planPlace(place) {
   if (place === 'measure') {
     return { on: 'trong vùng đo', it: 'Vùng đo', cut: 'vùng đo', shape: 'Vùng đo', pie: 'trong vùng đo' };
   }
+  if (place === 'invest') {
+    return { on: 'trong ranh dự án', it: 'Ranh dự án', cut: 'ranh dự án', shape: 'Ranh dự án', pie: 'trong ranh dự án' };
+  }
   return { on: 'trên thửa đất', it: 'Thửa', cut: 'thửa', shape: 'Hình thửa', pie: 'trên thửa' };
 }
 

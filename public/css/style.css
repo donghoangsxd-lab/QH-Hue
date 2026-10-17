@@ -3069,6 +3069,23 @@ table.ward-table th {
   overflow: hidden;
 }
 .cad-card[hidden] { display: none; }
+.cad-card.invest-card {
+  top: calc(12px + var(--title-h) + 8px) !important;
+  bottom: auto !important;
+  width: min(340px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
+  max-height: calc(100% - var(--title-h) - 28px);
+}
+.invest-body { flex: 1; min-height: 0; overflow: auto; }
+.invest-card .lp-title { padding-right: 18px; }
+.invest-card .lp-sub { color: var(--text-muted); font-size: var(--fs-sm); margin-top: 2px; }
+.invest-fields { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.invest-card .invest-field { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.invest-card .invest-field > span { color: var(--text-muted); font-size: 10px; line-height: 1.25; }
+.invest-card .invest-field b { font-weight: 600; white-space: pre-wrap; word-break: break-word; }
+.invest-plan-btn { margin-top: 8px; }
+.invest-note { color: var(--text-muted); font-size: var(--fs-sm); margin-top: 4px; }
+.invest-plan { border-top: 1px solid var(--border-color); margin-top: 6px; }
+.leaflet-tooltip.invest-tip { font-size: 12px; font-weight: 600; }
 
 /* Bảng công trình, bảng lô đất ngoài nhóm hạ tầng và bảng tiếp cận: cùng góc với bảng thửa */
 .leaflet-popup.dock-card {

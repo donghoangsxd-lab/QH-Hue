@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 const constants = require('../config/constants');
 const { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, POP_SCALE_M } = require('../services/geeService');
-const { getRawDataList, getCadParcels, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion } = require('../services/gcsService');
+const { getRawDataList, getCadParcels, getInvestCalls, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion } = require('../services/gcsService');
 const { requireAdmin, httpError } = require('../services/authService');
 const roads = require('../services/roadsService');
 const popEdits = require('../services/popEditsService');
@@ -1956,6 +1956,18 @@ module.exports = async (req, res) => {
     }
 
     // Thửa đất địa chính 2016: client đọc PMTiles và chỉ mục thẳng từ bucket, chỉ nhận URL từ đây
+    if (action === 'getInvestCalls') {
+      const d = await getInvestCalls();
+      if (!d || !d.text) return res.status(404).json({ error: true, message: 'Chưa có danh sách sheet 15-DA' });
+      res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');
+      if (d.etag) {
+        res.setHeader('ETag', d.etag);
+        if (req.headers['if-none-match'] === d.etag) return res.status(304).end();
+      }
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      return res.status(200).send(d.text);
+    }
+
     if (action === 'getCadastreInfo') {
       const base = constants.CADASTRE_GCS_BASE;
       res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');

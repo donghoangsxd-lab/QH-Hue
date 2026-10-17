@@ -620,6 +620,7 @@ export function closeMeasurePlan() {
  */
 export function openMeasurePlan(ring, targetMap) {
   if (!targetMap || !ring || ring.length < 4) return;
+  document.dispatchEvent(new CustomEvent('qh-dock-card', { detail: 'cadastre' }));
   closeDocked();
   closeParcel();
   const el = ensureCard();
@@ -655,6 +656,7 @@ async function openParcel(latlng, targetMap, replaced) {
     if (cardState) closeParcel();
     return false;
   }
+  document.dispatchEvent(new CustomEvent('qh-dock-card', { detail: 'cadastre' }));
   closeDocked();
   if (replaced) targetMap.closePopup(replaced);
   const props = found.hit.props;
@@ -873,6 +875,7 @@ export function initCadastreLayer() {
     m?.on('preclick', () => { preclickAt = performance.now(); });
     m?.on('popupopen', (e) => onPopupOpen(e, m));
   });
+  document.addEventListener('qh-dock-card', (e) => { if (e.detail !== 'cadastre' && cardState) closeParcel(); });
   $('chk_cadastre')?.addEventListener('change', (e) => setCadastreVisible(e.target.checked));
   $('cadastreOpacity')?.addEventListener('input', (e) => {
     const v = Number(e.target.value) / 100;
