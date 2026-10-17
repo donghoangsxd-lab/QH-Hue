@@ -157,19 +157,25 @@ function shapeLayers(tool, lls, c, preview) {
   const out = [];
   if (tool === 'circle') {
     const r = distM(lls[0], lls[1]);
+    if (!preview) out.push(L.circle(lls[0], { color: '#ffffff', radius: r, weight: 8, opacity: 0, fill: false, interactive: false }));
     out.push(L.circle(lls[0], { ...line, radius: r, fillColor: c, fillOpacity: 0.12 }));
     if (preview) out.push(L.polyline(lls, { color: c, weight: 1.5, dashArray: '4,5', interactive: false }));
     return { layers: out, text: `Bán kính ${fmtLen(r)} · diện tích ${fmtArea(Math.PI * r * r)}` };
   }
   if (tool === 'polygon' && lls.length >= 3) {
+    if (!preview) out.push(L.polygon(lls, { color: '#ffffff', weight: 8, opacity: 0, fill: false, interactive: false }));
     out.push(L.polygon(lls, { ...line, fillColor: c, fillOpacity: 0.15 }));
     return { layers: out, text: `Diện tích ${fmtArea(polyArea(lls))} · chu vi ${fmtLen(pathLen([...lls, lls[0]]))}` };
   }
   out.push(L.polyline(lls, halo), L.polyline(lls, { ...line, dashArray: preview ? '6,6' : null }));
+  // Nét trong suốt, rộng hơn nét thấy được, để rê chuột và chuột phải trúng đường mảnh
   if (!preview) out.push(L.polyline(lls, { color: c, weight: 18, opacity: 0, className: 'sketch-hit' }));
   if (tool === 'arrow' && lls.length === 2) {
     const head = arrowHead(lls[0], lls[1]);
-    if (head) out.push(L.polygon(head, { ...line, weight: 1, fillColor: c, fillOpacity: 1 }));
+    if (head) {
+      if (!preview) out.push(L.polygon(head, { color: '#ffffff', weight: 6, opacity: 0, fill: false, interactive: false }));
+      out.push(L.polygon(head, { ...line, weight: 1, fillColor: c, fillOpacity: 1 }));
+    }
   }
   return { layers: out, text: `Dài ${fmtLen(pathLen(lls))}` };
 }
@@ -200,7 +206,7 @@ function applyChrome(fg) {
   const picked = fg === pickFg;
   fg.eachLayer(l => {
     const hit = String(l.options?.className || '').includes('sketch-hit');
-    if (hit || l.options?.interactive === false) return;
+    if (hit) return;
     const el = l.getElement?.();
     if (l.setStyle) {
       if (!l._skBase) {
@@ -209,10 +215,14 @@ function applyChrome(fg) {
           fillColor: l.options.fillColor, fillOpacity: l.options.fillOpacity
         };
       }
-      if (hot) l.setStyle({ weight: (l._skBase.weight || 3) + (picked ? 3 : 2), opacity: 1 });
-      else l.setStyle(l._skBase);
-      el?.classList.toggle('sketch-edge', hot);
-      el?.classList.toggle('sketch-picked', picked);
+      const halo = l.options.interactive === false;
+      if (hot) {
+        l.setStyle(halo
+          ? { color: picked ? '#38bdf8' : '#ffffff', weight: (l._skBase.weight || 6) + (picked ? 5 : 3), opacity: 0.95 }
+          : { weight: (l._skBase.weight || 3) + (picked ? 2 : 1), opacity: 1 });
+      } else l.setStyle(l._skBase);
+      el?.classList.toggle('sketch-edge', hot && !halo);
+      el?.classList.toggle('sketch-picked', picked && !halo);
     } else {
       const body = el?.querySelector?.('.sketch-text-body');
       body?.classList.toggle('sketch-edge', hot);

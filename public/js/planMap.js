@@ -239,6 +239,16 @@ function syncMaps(a, b) {
     if (m._mapPane) m._mapPane.classList.remove('leaflet-zoom-anim');
   };
 
+  const sizeMemo = new WeakMap();
+  // invalidateSize({ pan: false }) vẫn phát move và getCenter lệch nửa phần đổi cao (panel dưới mở sau khi tải lô).
+  // Kéo theo lúc đó làm bản đồ đang xem (QH) nhảy xuống, đồ án lệch tâm. Chỉ đồng bộ khi người dùng thực sự dịch khung.
+  const resized = (m) => {
+    const size = m.getSize();
+    const prev = sizeMemo.get(m);
+    sizeMemo.set(m, size.clone());
+    return !!(prev && (prev.x !== size.x || prev.y !== size.y));
+  };
+
   const bind = (src, dst, sign) => {
     let zooming = false;
     src.on('zoomanim', (e) => {
@@ -258,7 +268,7 @@ function syncMaps(a, b) {
       if (leader === src) leader = null;
     });
     src.on('move', () => {
-      if (lock || zooming || !compareOn || src._animatingZoom || (leader && leader !== src)) return;
+      if (lock || zooming || !compareOn || src._animatingZoom || (leader && leader !== src) || resized(src)) return;
       lock = true;
       const zoom = src.getZoom();
       const center = shiftCenter(src, src.getCenter(), zoom, -sign * offsetPx());

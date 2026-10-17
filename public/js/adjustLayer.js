@@ -32,8 +32,9 @@ const FILL_Z = 446;
 const SCAN_Z = 447;
 const LINE_Z = 449;
 const SCAN_TRANSPARENCY = 30;
-const LINE_STYLE = { color: CYAN, weight: 5, opacity: 1, dashArray: '10 6', dashOffset: '8', lineCap: 'butt', fill: false };
-const HOVER_STYLE = { color: '#a5f3fc', weight: 7, fill: false };
+// Cùng độ dày ranh khu vực QHCT (2 px). Nét 5 px khi thu cả đồ án nuốt góc và trông như đứt đoạn.
+const LINE_STYLE = { color: CYAN, weight: 2, opacity: 1, dashArray: '10 6', dashOffset: '8', lineCap: 'butt', lineJoin: 'round', fill: false };
+const HOVER_STYLE = { color: '#a5f3fc', weight: 3.5, lineJoin: 'round', fill: false };
 export const ADJUST_PDF_MAX_BYTES = 2 * 1024 * 1024;
 // Khóa lớp trong state.hiddenProjectLayers ("<Ten_QH>|dieu-chinh"), cùng cách lưu với PROJECT_LAYERS
 export const ADJUST_LAYER_KEY = 'dieu-chinh';

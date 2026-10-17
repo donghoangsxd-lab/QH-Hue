@@ -531,6 +531,9 @@ function honeycomb(r) {
 
 // Hoa văn trích từ Phụ lục thưa hơn hẳn các loại đất khác khi đặt cạnh nhau: thu nhỏ khoảng cách (giữ độ dày nét, cỡ chấm)
 const DENSE_SCALE = 0.7;
+// QHPK 1/2.000: hatch các loại này dày, che nền vệ tinh. Nhân tỷ lệ ô lên 2 (độ dày nét giữ nguyên, khoảng cách nét gấp đôi).
+// Chỉ khóa Mục 04; QHCT dùng lại cùng ô TILES (T-LK, T-CC, T-AN, T-TM…) nên không nằm trong tập này.
+const LOOSE_HATCH_KEYS = new Set(['O-NO', 'O-HH', 'CC-DV', 'AN', 'QP', 'DT-TG', 'HTK']);
 
 // Ô lặp: w × h (pt); segs [x0,y0,x1,y1,…]; dots [x,y,…]; round: đầu nét tròn (hoa văn chấm); dotR: bán kính chấm (pt);
 // scale: tỷ lệ hatch so với Phụ lục (mặc định 1)
@@ -679,7 +682,7 @@ function tileFor(key) {
   const t = s && TILES[s.pattern];
   let tile = null;
   if (t && typeof document !== 'undefined') {
-    const k = t.scale || 1;
+    const k = (t.scale || 1) * (LOOSE_HATCH_KEYS.has(key) ? 2 : 1);
     const w = Math.max(4, Math.round(t.w * PT_PX * k));
     const h = Math.max(4, Math.round(t.h * PT_PX * k));
     const r = Math.max(1, Math.round(window.devicePixelRatio || 1));
