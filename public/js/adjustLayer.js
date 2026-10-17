@@ -9,7 +9,7 @@
 import { state } from './state.js';
 import { map } from './mapEngine.js';
 import { planMap, passToolClick, isCompareOn } from './planMap.js';
-import { isLayerHidden, projectShown } from './projectFiles.js';
+import { isLayerHidden, projectShown, focusedProjectName } from './projectFiles.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, ico, planItems, showToast } from './utils.js';
 import { basemapTileSpec } from './basemap.js';
@@ -291,8 +291,12 @@ export function setSatelliteClip(m, pane, zIndex, geoms) {
   byPane.set(pane, { layer, sig });
 }
 
-// Hồ sơ chờ duyệt Admin đang xem trước luôn hiện
-const visible = (it) => it.status === 'pending' || (projectShown(it.tenQH) && !isLayerHidden(it.tenQH, ADJUST_LAYER_KEY));
+// QHPK 1/2.000 chỉ ranh: không phủ ranh điều chỉnh lên mọi đồ án. Hồ sơ đã duyệt chỉ vẽ khi đang mở đúng đồ án.
+// Hồ sơ chờ duyệt hiện khi Admin bấm «Xem trên bản đồ» hoặc khi đang mở đồ án đó
+const visible = (it) => {
+  if (it.status === 'pending') return active.has(it.id) || scanOn.has(it.id) || focusedProjectName() === it.tenQH;
+  return projectShown(it.tenQH) && !isLayerHidden(it.tenQH, ADJUST_LAYER_KEY) && focusedProjectName() === it.tenQH;
+};
 
 /** Đã tải danh sách hồ sơ điều chỉnh ít nhất một lần (kể cả khi lỗi mạng) */
 export const adjustmentsKnown = () => adjustmentsReady;

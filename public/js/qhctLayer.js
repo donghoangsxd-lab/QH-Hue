@@ -1,8 +1,8 @@
 // Lớp QHCT 1/500 (quy hoạch chi tiết) trên bản đồ quy hoạch: lô tĩnh tại QHCT_URL + đồ án QHCT nhập (projectLayer.js vẽ
 // theo planLevelOf). Định dạng lô tĩnh: FeatureCollection, properties { tenQH, kyHieu, chucNang, dienTich (m²), mau? }.
 // Dòng lớp ghi số đồ án nhập và số lô tĩnh; chưa có cả hai thì "chưa có dữ liệu".
-// Chọn một phường, hoặc đang mở một đồ án, khi lớp QHCT tắt: ranh các đồ án QHCT giao phạm vi đó vẽ đỏ nét đứt dày,
-// phần nằm ngoài phạm vi bị cắt. Toàn TP (chưa chọn phường, chưa mở đồ án) không vẽ các ranh này.
+// Khi lớp QHCT tắt: ranh đỏ nét đứt chỉ hiện lúc đang mở một đồ án, và chỉ phần QHCT nằm trong ranh đồ án đó.
+// Tổng quan QHPK 1/2.000 (chỉ ranh các đồ án) và chọn phường không vẽ các ranh này.
 // Nhịp nét lệch nửa chu kỳ với ranh điều chỉnh cục bộ (adjustLayer.js, cyan, z 449) nên chỗ trùng ranh hiện xen kẽ đỏ / cyan.
 import { state } from './state.js';
 import { map, addPopupCollapseToggle, expandCollapsedPopup } from './mapEngine.js';
@@ -35,39 +35,7 @@ function setHint(text) {
   if (el) el.textContent = `(${text})`;
 }
 
-const CITY_NAME = 'Thành phố Huế';
 const qhctPlans = () => (state.projectCatalog || []).filter(p => p && p.tenQH && planLevelOf(p.tenQH) === 'QHCT');
-
-function selectedWard() {
-  const w = state.selectedWard;
-  return w && w !== CITY_NAME ? w : null;
-}
-
-// null = không giao phường; undefined = chưa cắt được (thiếu ranh phường hoặc hình lỗi)
-const wardClipMemo = new WeakMap();
-function clipToWard(geom, wardName) {
-  let byWard = wardClipMemo.get(geom);
-  if (!byWard) { byWard = new Map(); wardClipMemo.set(geom, byWard); }
-  if (byWard.has(wardName)) return byWard.get(wardName);
-  const ward = state.wardLabelsList.find(w => w.name === wardName);
-  let out;
-  if (!ward || !ward.geometry || typeof turf === 'undefined') out = undefined;
-  else {
-    try {
-      const hit = turf.intersect(turf.feature(geom), turf.feature(ward.geometry));
-      out = hit ? hit.geometry : null;
-    } catch (e) { out = undefined; }
-  }
-  byWard.set(wardName, out);
-  return out;
-}
-
-function outlineInWard(p, wardName) {
-  const clipped = clipToWard(p.boundary, wardName);
-  if (clipped) return clipped;
-  if (clipped === null) return null;
-  return Array.isArray(p.wards) && p.wards.includes(wardName) ? p.boundary : null;
-}
 
 // Đồ án đang mở: chỉ phần QHCT nằm trong ranh đồ án. Cắt lỗi thì giữ nguyên nếu còn giao nhau.
 function clipToProject(geom, mask) {
@@ -122,7 +90,7 @@ function drawOutlines(m, plans) {
   });
 }
 
-// Ranh khu vực đã có QHCT khi lớp QHCT tắt: đang mở một đồ án (cắt theo ranh đồ án) hoặc đang chọn phường (cắt theo phường, lớp QHPK bật).
+// Ranh khu vực đã có QHCT khi lớp QHCT tắt: chỉ đồ án đang mở, cắt theo ranh đồ án đó
 function refreshOutlines() {
   if (isLevelPair()) {
     outlines?.remove();
@@ -132,16 +100,15 @@ function refreshOutlines() {
   }
   const m = target();
   const host = focusedHost();
-  const ward = host ? null : selectedWard();
-  const on = !!m && !$('chk_qhct')?.checked && !!(host || (ward && $('chk_projects')?.checked));
-  const key = on ? `${host ? host.tenQH : ward}|${state.projectCatalog}` : null;
+  const on = !!m && !$('chk_qhct')?.checked && !!host;
+  const key = on ? `${host.tenQH}|${state.projectCatalog}` : null;
   if (key === outlineKey && (!on || outlines)) return;
   outlineKey = key;
   outlines?.remove();
   outlines = null;
   if (!on || typeof L === 'undefined') return;
-  const plans = qhctPlans().filter(p => p.boundary && p.tenQH !== host?.tenQH).map(p => {
-    const boundary = host ? clipToProject(p.boundary, host.boundary) : outlineInWard(p, ward);
+  const plans = qhctPlans().filter(p => p.boundary && p.tenQH !== host.tenQH).map(p => {
+    const boundary = clipToProject(p.boundary, host.boundary);
     return boundary ? { ...p, boundary } : null;
   }).filter(Boolean);
   if (plans.length) drawOutlines(m, plans);

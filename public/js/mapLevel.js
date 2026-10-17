@@ -6,7 +6,7 @@
 //  qhc10  QHC 1/10.000 (chk_qhc10)       ranh + tên các đồ án QHC, bấm đồ án mới hiện lô; ranh mở rộng QĐ 756,
 //                                        QHPK lọc theo vùng lõi
 //  qhpk   QHPK 1/2.000 (chk_projects)    ranh mọi đồ án; bấm ranh hoặc tick đồ án mới hiện lô.
-//                                        Chọn phường: lô cả phường + ranh QHCT trong phường
+//                                        Ranh điều chỉnh và QHCT chỉ khi đang mở một đồ án. Chọn phường: lô cả phường
 //  qhct   QHCT 1/500 (chk_qhct)          ranh + tên các đồ án QHCT nhập, bấm đồ án → chi tiết; lô QHCT tĩnh (qhctLayer.js)
 // Chọn từ droplist: bật lớp đó, tắt 4 lớp còn lại. Bật thêm lớp ở panel Lớp dữ liệu để so sánh: lớp đang chọn giữ nguyên;
 // lớp đang chọn bị tắt mà còn lớp khác bật thì chuyển sang lớp đó.
