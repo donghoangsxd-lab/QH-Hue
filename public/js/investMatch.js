@@ -162,6 +162,8 @@ export function matchInvestRows(features, rows) {
   const idx = features.map(f => {
     const name = f?.properties?.name || '';
     if (!foldInvestName(name)) return -1;
+    const alias = rows.findIndex(r => r && r._alias && r._alias === name);
+    if (alias >= 0) return alias;
     let best = -1;
     let score = 0;
     names.forEach((rowName, i) => {

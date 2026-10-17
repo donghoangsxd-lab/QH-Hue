@@ -3,7 +3,8 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 const constants = require('../config/constants');
 const { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, POP_SCALE_M } = require('../services/geeService');
-const { getRawDataList, getCadParcels, getInvestCalls, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion } = require('../services/gcsService');
+const { getRawDataList, getCadParcels, getInvestCalls, getInvestEdits, forgetTextFile, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion } = require('../services/gcsService');
+const gcsWrite = require('../services/gcsWrite');
 const { requireAdmin, httpError } = require('../services/authService');
 const roads = require('../services/roadsService');
 const popEdits = require('../services/popEditsService');
@@ -125,6 +126,76 @@ function readJsonBody(req) {
     try { body = JSON.parse(body); } catch (e) { body = {}; }
   }
   return body && typeof body === 'object' ? body : {};
+}
+
+const INVEST_EDITS_NAME = 'invest_edits.json';
+const INVEST_EDIT_MAX = 400;
+
+function cleanInvestText(value, max) {
+  return String(value ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim().slice(0, max);
+}
+
+function investProjectName(row) {
+  if (!row || typeof row !== 'object') return '';
+  const key = Object.keys(row).find(k => /tên dự án/i.test(k));
+  return key ? String(row[key] || '').replace(/\s+/g, ' ').trim() : '';
+}
+
+function parseInvestFields(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out = {};
+  Object.keys(raw).slice(0, 40).forEach(k => {
+    const key = cleanInvestText(k, 80);
+    if (!key || key.startsWith('_')) return;
+    const val = cleanInvestText(raw[k], 2000);
+    if (val) out[key] = val;
+  });
+  return investProjectName(out) ? out : null;
+}
+
+function parseInvestCalls(text) {
+  if (!text) return null;
+  try {
+    const data = JSON.parse(text);
+    return data && Array.isArray(data.rows) ? data : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function parseInvestEdits(text) {
+  if (!text) return [];
+  try {
+    const data = JSON.parse(text);
+    const list = data && Array.isArray(data.items) ? data.items : [];
+    return list.filter(it => it && it.key && it.fields && typeof it.fields === 'object').slice(0, INVEST_EDIT_MAX);
+  } catch (e) {
+    return [];
+  }
+}
+
+function applyInvestEdits(base, items) {
+  const data = base ? JSON.parse(JSON.stringify(base)) : { headers: [], rows: [] };
+  if (!Array.isArray(data.rows)) data.rows = [];
+  if (!Array.isArray(data.headers)) data.headers = [];
+  items.forEach(it => {
+    const key = it.key;
+    const match = it.match || '';
+    let row = data.rows.find(r => r && r._alias === key);
+    if (!row && match) row = data.rows.find(r => investProjectName(r) === match);
+    if (!row && !match) row = data.rows.find(r => investProjectName(r) === key);
+    if (!row) {
+      row = {};
+      data.rows.push(row);
+    }
+    const map = row._map;
+    Object.keys(row).forEach(k => { if (!String(k).startsWith('_')) delete row[k]; });
+    Object.assign(row, it.fields);
+    row._alias = key;
+    if (map) row._map = map;
+    Object.keys(it.fields).forEach(k => { if (!data.headers.includes(k)) data.headers.push(k); });
+  });
+  return data;
 }
 
 // Thân JSON nén gzip (client gửi gz=1, Content-Type octet-stream → Vercel đưa req.body dạng Buffer); trần giải nén chặn file nén bất thường
@@ -1959,13 +2030,38 @@ module.exports = async (req, res) => {
     if (action === 'getInvestCalls') {
       const d = await getInvestCalls();
       if (!d || !d.text) return res.status(404).json({ error: true, message: 'Chưa có danh sách sheet 15-DA' });
-      res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');
-      if (d.etag) {
-        res.setHeader('ETag', d.etag);
-        if (req.headers['if-none-match'] === d.etag) return res.status(304).end();
+      const edits = parseInvestEdits((await getInvestEdits())?.text);
+      if (!edits.length) {
+        res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');
+        if (d.etag) {
+          res.setHeader('ETag', d.etag);
+          if (req.headers['if-none-match'] === d.etag) return res.status(304).end();
+        }
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        return res.status(200).send(d.text);
       }
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      return res.status(200).send(d.text);
+      const base = parseInvestCalls(d.text);
+      if (!base) return res.status(404).json({ error: true, message: 'Danh sách sheet 15-DA không đọc được' });
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json(applyInvestEdits(base, edits));
+    }
+
+    if (action === 'saveInvestProject') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const key = cleanInvestText(body.key, 200);
+      const match = cleanInvestText(body.match, 200);
+      const fields = parseInvestFields(body.fields);
+      if (!key || !fields) return res.status(400).json({ error: true, message: 'Thiếu tên dự án hoặc nội dung không hợp lệ' });
+      const current = parseInvestEdits((await getInvestEdits())?.text).filter(it => it.key !== key);
+      current.push({ key, match, fields });
+      if (current.length > INVEST_EDIT_MAX) return res.status(413).json({ error: true, message: 'Quá nhiều dự án đã sửa' });
+      const text = JSON.stringify({ v: 1, saved: Date.now(), items: current });
+      if (text.length > 400000) return res.status(413).json({ error: true, message: 'Bản hiệu chỉnh quá lớn' });
+      await gcsWrite.putJson(INVEST_EDITS_NAME, text);
+      forgetTextFile(constants.INVEST_EDITS_URL);
+      return res.status(200).json({ success: true });
     }
 
     if (action === 'getCadastreInfo') {

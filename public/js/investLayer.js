@@ -2,6 +2,7 @@
 // Cùng nhóm «sử dụng hạ tầng» với nhà ở xã hội: không bán kính phục vụ, không tính độ phủ.
 // Bấm ranh: bảng góc trên trái. Nút kiểm tra quy hoạch cắt polygon với 4 cấp như bảng thửa / vùng đo.
 import { map } from './mapEngine.js';
+import { signOutAdmin } from './uiComponents.js';
 import { planMap, onCompareChange } from './planMap.js';
 import { geeApi } from './api.js';
 import { state } from './state.js';
@@ -18,9 +19,13 @@ const PANE = 'investPane';
 const PANE_Z = 460;
 const HL_PANE = 'investHighlightPane';
 const HL_PANE_Z = 628;
-const BASE = { color: '#fb923c', weight: 1.6, opacity: 0.95, fillColor: '#fb923c', fillOpacity: 0.14, fillRule: 'nonzero' };
-const HOVER = { color: '#fff7ed', weight: 3, opacity: 1, fillColor: '#fdba74', fillOpacity: 0.4 };
-const SELECTED = { color: '#fde047', weight: 3.5, opacity: 1, fillColor: '#facc15', fillOpacity: 0.28 };
+const MAGENTA = '#ff00ff';
+const BASE = {
+  color: MAGENTA, weight: 2.4, opacity: 1, dashArray: '8 5',
+  fillColor: MAGENTA, fillOpacity: 0.14, fillRule: 'nonzero', lineJoin: 'round'
+};
+const HOVER = { ...BASE, weight: 2.8, fillOpacity: 0.24 };
+const HALO = { color: '#ffffff', weight: 7, opacity: 1, fill: false, lineJoin: 'round' };
 const PLAN_TABS = [
   { id: 'qhc25', name: 'QHC', scale: '1/25.000' },
   { id: 'qhc10', name: 'QHC', scale: '1/10.000' },
@@ -33,6 +38,7 @@ const isPlanLevel = (id) => PLAN_TABS.some(t => t.id === id);
 
 let visible = false;
 let ready = null;
+let pack = null;
 let leftGroup = null;
 let rightGroup = null;
 let hovered = null;
@@ -45,6 +51,10 @@ let drawToken = 0;
 
 function toolBusy() {
   return !!(state.sketchTool || state.adminDrawMode || state.isPickMode || state.activeMeasureType || state.isInspectMode);
+}
+
+function isAdmin() {
+  return state.currentUserRole === 'ADMIN' && !!state.authToken;
 }
 
 function titleOf(props) {
@@ -78,11 +88,33 @@ function fieldsHtml(props) {
   const pairs = row
     ? Object.entries(row).filter(([k]) => !String(k).startsWith('_'))
     : [['Lĩnh vực', props.folder || ''], ...Object.entries(props.kml || {})].filter(([, v]) => v);
-  const rows = pairs.map(([k, v]) => `<div class="pp-row invest-field"><span>${escapeHtml(k)}</span><b>${fieldValue(v)}</b></div>`).join('');
+  const rows = pairs.map(([k, v]) => `<div class="invest-field"><span>${escapeHtml(k)}</span><b>${fieldValue(v)}</b></div>`).join('');
   const note = row
     ? ''
     : '<div class="invest-note">Chưa khớp tên với danh sách sheet 15-DA. Đang hiện thông tin ghi trên ranh.</div>';
   return `${rows}${note}`;
+}
+
+function editPairs(props) {
+  const row = props.sheet;
+  const pairs = row
+    ? Object.entries(row).filter(([k]) => k && !String(k).startsWith('_'))
+    : [['Lĩnh vực', props.folder || ''], ...Object.entries(props.kml || {})];
+  if (!pairs.some(([k]) => /tên dự án/i.test(k))) pairs.unshift(['Tên dự án', titleOf(props)]);
+  return pairs;
+}
+
+function editRowHtml(key, value, fresh) {
+  const keyHtml = fresh
+    ? '<input class="invest-edit-key" maxlength="80" placeholder="Tên trường">'
+    : `<span class="invest-edit-key" data-key="${escapeHtml(key)}">${escapeHtml(key)}</span>`;
+  return `<label class="invest-edit-row">${keyHtml}<textarea class="invest-edit-val" maxlength="2000" rows="2">${escapeHtml(value || '')}</textarea></label>`;
+}
+
+function editButtonHtml() {
+  return isAdmin()
+    ? `<button type="button" class="invest-edit" title="Sửa thông tin dự án" aria-label="Sửa thông tin dự án">${ico('pen')}</button>`
+    : '';
 }
 
 function setHint(text) {
@@ -104,6 +136,7 @@ async function loadPack() {
         f.properties.sheet = idx[i] >= 0 ? rows[idx[i]] : null;
         if (idx[i] >= 0) hit++;
       });
+      pack = features;
       setHint(`(${features.length} ranh · ${hit} khớp danh sách)`);
       return features;
     });
@@ -148,7 +181,7 @@ function drawOn(m, features) {
       });
       layer.on('mouseout', () => {
         if (hovered === layer) hovered = null;
-        layer.setStyle(layer === selected ? SELECTED : BASE);
+        layer.setStyle(BASE);
       });
       layer.on('click', (e) => {
         if (toolBusy()) return;
@@ -247,15 +280,17 @@ function frameProject(targetMap, bounds) {
 function selectLayer(layer, targetMap, geom) {
   if (selected && selected !== layer) selected.setStyle(BASE);
   selected = layer || null;
-  if (layer) layer.setStyle(SELECTED);
+  if (layer) {
+    layer.setStyle(BASE);
+    layer.bringToFront();
+  }
   clearHighlight();
   if (!geom || !targetMap) return;
   ensurePane(targetMap, HL_PANE, HL_PANE_Z);
-  highlight = L.geoJSON(geom, {
-    pane: HL_PANE,
-    interactive: false,
-    style: { color: '#111827', weight: 7, opacity: 0.45, fill: false }
-  }).addTo(targetMap);
+  highlight = L.layerGroup([
+    L.geoJSON(geom, { pane: HL_PANE, interactive: false, style: HALO }),
+    L.geoJSON(geom, { pane: HL_PANE, interactive: false, style: BASE })
+  ]).addTo(targetMap);
 }
 
 function closeCard() {
@@ -286,6 +321,10 @@ function ensureCard() {
     const tab = e.target.closest('[data-invest-tab]');
     if (tab) { showTab(tab.dataset.investTab); return; }
     if (e.target.closest('.invest-plan-btn')) { togglePlan(); return; }
+    if (e.target.closest('.invest-edit')) { beginEdit(); return; }
+    if (e.target.closest('.invest-add')) { addEditRow(); return; }
+    if (e.target.closest('.invest-cancel')) { paintCard(); return; }
+    if (e.target.closest('.invest-save')) { saveEdit(); return; }
     if (e.target.closest('.cad-card-x')) closeCard();
   });
   el.addEventListener('pls-pick', (e) => toggleLand(e.detail?.key, e.detail?.color));
@@ -373,6 +412,116 @@ function togglePlan() {
   if (open) showTab(st.tab);
 }
 
+function paintCard() {
+  const st = card;
+  const feature = st?.feature;
+  const el = $('investCard');
+  if (!st || !feature || !el) return;
+  const props = feature.properties || {};
+  const planOpen = !!el.querySelector('.invest-plan') && !el.querySelector('.invest-plan').hidden;
+  st.editing = false;
+  st.saving = false;
+  el.innerHTML = `${editButtonHtml()}<button type="button" class="cad-card-x" title="Đóng" aria-label="Đóng bảng dự án">${ico('close')}</button>
+    <div class="invest-body">
+      <div class="cad-id">
+        <div class="lp-title">${escapeHtml(titleOf(props))}</div>
+        <div class="lp-sub">${st.areaText}${props.folder ? ` · ${escapeHtml(props.folder)}` : ''}</div>
+        <div class="invest-fields">${fieldsHtml(props)}</div>
+        <button type="button" class="proof-btn invest-plan-btn" title="Diện tích từng loại đất quy hoạch trong ranh dự án, đủ 4 cấp">${ico('area')}${planOpen ? 'Ẩn kiểm tra quy hoạch' : 'Kiểm tra quy hoạch theo ranh giới dự án'}</button>
+      </div>
+      <div class="invest-plan"${planOpen ? '' : ' hidden'}>
+        ${tabsBar(st.tab)}
+        <div class="cad-page" role="tabpanel"></div>
+      </div>
+    </div>`;
+  el.hidden = false;
+  if (planOpen) showTab(st.tab, { syncMap: false });
+}
+
+function beginEdit() {
+  const props = card?.feature?.properties;
+  const box = $('investCard')?.querySelector('.invest-fields');
+  if (!props || !box || !isAdmin() || card.editing) return;
+  card.editing = true;
+  box.innerHTML = `<div class="invest-edit-form">${editPairs(props).map(([k, v]) => editRowHtml(k, v, false)).join('')}
+    <button type="button" class="invest-add">Thêm trường</button>
+    <div class="invest-edit-actions"><button type="button" class="proof-btn invest-save">Lưu</button><button type="button" class="invest-cancel">Hủy</button></div>
+    </div>`;
+}
+
+function addEditRow() {
+  const anchor = $('investCard')?.querySelector('.invest-add');
+  if (!anchor) return;
+  anchor.insertAdjacentHTML('beforebegin', editRowHtml('', '', true));
+  anchor.previousElementSibling?.querySelector('input')?.focus();
+}
+
+function applySaved(feature, fields) {
+  const props = feature.properties || {};
+  const key = props.name || '';
+  const match = sheetProjectName(props.sheet) || '';
+  const targets = (pack || [feature]).filter(f => {
+    const p = f.properties || {};
+    return f === feature || (key && p.name === key) || (match && sheetProjectName(p.sheet) === match);
+  });
+  targets.forEach(f => {
+    const prev = f.properties?.sheet;
+    const sheet = { ...fields, _alias: key || f.properties?.name || '' };
+    if (prev && prev._map) sheet._map = prev._map;
+    f.properties.sheet = sheet;
+  });
+  [leftGroup, rightGroup].forEach(g => g?.eachLayer(layer => {
+    const p = layer.feature?.properties;
+    if (p) layer.setTooltipContent(titleOf(p));
+  }));
+}
+
+async function saveEdit() {
+  const st = card;
+  const feature = st?.feature;
+  const el = $('investCard');
+  if (!st || !feature || !el || st.saving) return;
+  const fields = {};
+  el.querySelectorAll('.invest-edit-row').forEach(row => {
+    const keyEl = row.querySelector('.invest-edit-key');
+    const key = String(keyEl?.dataset?.key || keyEl?.value || '').trim();
+    const val = String(row.querySelector('.invest-edit-val')?.value || '').trim();
+    if (key && val) fields[key] = val;
+  });
+  if (!sheetProjectName(fields)) {
+    showToast('Cần giữ tên dự án', 'error');
+    return;
+  }
+  const props = feature.properties || {};
+  const key = String(props.name || titleOf(props)).trim();
+  if (!key) {
+    showToast('Ranh này chưa có tên để lưu', 'error');
+    return;
+  }
+  st.saving = true;
+  const btn = el.querySelector('.invest-save');
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang lưu…'; }
+  try {
+    const res = await fetch(geeApi('action=saveInvestProject'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+      body: JSON.stringify({ key, match: sheetProjectName(props.sheet) || '', fields })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) signOutAdmin();
+    if (!res.ok || !data.success) throw new Error(data.message || 'Không lưu được thông tin dự án');
+    applySaved(feature, fields);
+    st.recorded = recordedM2(feature.properties.sheet);
+    st.cache.clear();
+    paintCard();
+    showToast('Đã lưu thông tin dự án');
+  } catch (err) {
+    st.saving = false;
+    if (btn?.isConnected) { btn.disabled = false; btn.textContent = 'Lưu'; }
+    showToast(err.message || 'Không lưu được thông tin dự án', 'error');
+  }
+}
+
 function openCard(feature, layer, targetMap) {
   if (!feature?.geometry) return;
   document.dispatchEvent(new CustomEvent('qh-dock-card', { detail: 'invest' }));
@@ -385,23 +534,10 @@ function openCard(feature, layer, targetMap) {
   try { area = turf.area(feature); } catch { area = 0; }
   const areaText = area >= 10000 ? `${fmtNum(area / 10000)} ha` : `${fmtNum(Math.round(area))} m²`;
   card = {
-    seq, tab, cache: new Map(), map: targetMap, geom: feature.geometry,
-    recorded: recordedM2(props.sheet), bounds: null, landKey: null
+    seq, tab, cache: new Map(), map: targetMap, feature, geom: feature.geometry,
+    areaText, recorded: recordedM2(props.sheet), bounds: null, landKey: null, editing: false, saving: false
   };
-  el.innerHTML = `<button type="button" class="cad-card-x" title="Đóng" aria-label="Đóng bảng dự án">${ico('close')}</button>
-    <div class="invest-body">
-      <div class="cad-id">
-        <div class="lp-title">${escapeHtml(titleOf(props))}</div>
-        <div class="lp-sub">${areaText}${props.folder ? ` · ${escapeHtml(props.folder)}` : ''}</div>
-        <div class="invest-fields">${fieldsHtml(props)}</div>
-        <button type="button" class="proof-btn invest-plan-btn" title="Diện tích từng loại đất quy hoạch trong ranh dự án, đủ 4 cấp">${ico('area')}Kiểm tra quy hoạch theo ranh giới dự án</button>
-      </div>
-      <div class="invest-plan" hidden>
-        ${tabsBar(tab)}
-        <div class="cad-page" role="tabpanel"></div>
-      </div>
-    </div>`;
-  el.hidden = false;
+  paintCard();
   selectLayer(layer, targetMap, feature.geometry);
   let bounds = null;
   try { bounds = L.geoJSON(feature).getBounds(); } catch { bounds = null; }
@@ -432,6 +568,16 @@ async function setVisible(on) {
 export function initInvestLayer() {
   if (!map) return;
   document.addEventListener('qh-dock-card', (e) => { if (e.detail !== 'invest') closeCard(); });
+  document.addEventListener('auth:change', () => {
+    const el = $('investCard');
+    if (!el || el.hidden || !card) return;
+    if (!isAdmin() && card.editing) paintCard();
+    else if (!card.editing) {
+      const btn = el.querySelector('.invest-edit');
+      if (!isAdmin()) btn?.remove();
+      else if (!btn) el.querySelector('.cad-card-x')?.insertAdjacentHTML('beforebegin', editButtonHtml());
+    }
+  });
   document.addEventListener(TOOL_START_EVENT, () => closeCard());
   document.addEventListener(LEVEL_EVENT, (e) => {
     if (inspectLevelSyncing()) return;

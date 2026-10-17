@@ -247,6 +247,11 @@ async function getTextFile(url, label) {
 }
 
 const getInvestCalls = () => getTextFile(constants.INVEST_GCS_URL, 'danh sách dự án kêu gọi đầu tư');
+const getInvestEdits = () => getTextFile(constants.INVEST_EDITS_URL, 'hiệu chỉnh dự án kêu gọi đầu tư');
+
+function forgetTextFile(url) {
+  delete cachedText[url];
+}
 const getDrainage = () => getTextFile(constants.DRAINAGE_GCS_URL, 'lớp thoát nước');
 const getBasins = () => getTextFile(constants.BASINS_GCS_URL, 'ranh lưu vực');
 /** key: "index" | "12_x_y" (đã kiểm tra ở api/gee.js) */
@@ -296,4 +301,4 @@ function getDataVersion() {
   return dataVersion;
 }
 
-module.exports = { getRawDataList, getCadParcels, getInvestCalls, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion };
+module.exports = { getRawDataList, getCadParcels, getInvestCalls, getInvestEdits, forgetTextFile, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion };

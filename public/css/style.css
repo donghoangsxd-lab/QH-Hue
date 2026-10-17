@@ -3075,13 +3075,42 @@ table.ward-table th {
   width: min(340px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
   max-height: calc(100% - var(--title-h) - 28px);
 }
-.invest-body { flex: 1; min-height: 0; overflow: auto; }
-.invest-card .lp-title { padding-right: 18px; }
+.invest-body { flex: 1; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; }
+.invest-card .lp-title { padding-right: 40px; }
+.invest-edit {
+  position: absolute; top: 4px; right: 24px;
+  display: inline-flex; padding: 3px; color: var(--text-muted);
+  background: none; border: 0; border-radius: 50%; cursor: pointer;
+}
+.invest-edit:hover { color: var(--accent-yellow); background: rgba(255, 255, 255, 0.08); }
+.invest-edit .ico { width: 12px; height: 12px; margin: 0; }
+.invest-edit-form { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.invest-edit-row { display: flex; flex-direction: column; gap: 1px; }
+.invest-edit-key { color: var(--text-muted); font-size: 10px; line-height: 1.25; }
+.invest-edit-key-input, .invest-edit-row input, .invest-edit-row textarea {
+  width: 100%; box-sizing: border-box; padding: 3px 5px; font: inherit; color: var(--text-main);
+  background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: var(--r-sm);
+}
+.invest-edit-row textarea { resize: vertical; }
+.invest-edit-actions { display: flex; gap: 6px; }
+.invest-add, .invest-cancel {
+  align-self: flex-start; padding: 2px 0; color: var(--text-muted);
+  background: none; border: 0; cursor: pointer; font-size: var(--fs-sm);
+}
+.invest-add:hover, .invest-cancel:hover { color: var(--text-main); }
 .invest-card .lp-sub { color: var(--text-muted); font-size: var(--fs-sm); margin-top: 2px; }
-.invest-fields { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
-.invest-card .invest-field { grid-template-columns: minmax(0, 1fr); gap: 0; }
-.invest-card .invest-field > span { color: var(--text-muted); font-size: 10px; line-height: 1.25; }
-.invest-card .invest-field b { font-weight: 600; white-space: pre-wrap; word-break: break-word; }
+.invest-fields { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; min-width: 0; }
+.invest-card .cad-id { min-width: 0; }
+.invest-card .invest-field {
+  display: flex; flex-direction: column; gap: 0; min-width: 0;
+}
+.invest-card .invest-field > span {
+  color: var(--text-muted); font-size: 10px; line-height: 1.25;
+  white-space: normal; overflow-wrap: anywhere;
+}
+.invest-card .invest-field b {
+  font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; min-width: 0;
+}
 .invest-plan-btn { margin-top: 8px; }
 .invest-note { color: var(--text-muted); font-size: var(--fs-sm); margin-top: 4px; }
 .invest-plan { border-top: 1px solid var(--border-color); margin-top: 6px; }
