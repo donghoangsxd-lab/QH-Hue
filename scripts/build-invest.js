@@ -36,13 +36,20 @@ function readSheet(dir) {
   };
   const grid = [...sheet.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)].map(r => {
     const cells = [];
-    for (const c of r[1].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)) {
+    // Ô trống ghi <c r="B25" s="3"/>. Coi "/>" là thẻ mở sẽ nuốt ô kế — mất tên dự án cột C.
+    for (const c of r[1].matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
       const ref = (c[1].match(/r="([A-Z]+)\d+"/) || [])[1] || '';
       const t = (c[1].match(/\bt="([^"]+)"/) || [])[1];
-      const v = (c[2].match(/<v>([\s\S]*?)<\/v>/) || [])[1];
-      const inline = [...c[2].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x => decode(x[1])).join('');
+      const inner = c[2] || '';
+      const v = (inner.match(/<v>([\s\S]*?)<\/v>/) || [])[1];
+      const inline = [...inner.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x => decode(x[1])).join('');
       let val = t === 's' ? (strings[Number(v)] ?? '') : t === 'inlineStr' ? inline : (v || '');
-      cells[colIndex(ref)] = String(val).replace(/\s+/g, ' ').trim();
+      val = String(val).replace(/\s+/g, ' ').trim();
+      if (t !== 's' && t !== 'inlineStr' && /^-?\d+(\.\d+)?$/.test(val)) {
+        const n = Number(val);
+        if (Number.isFinite(n)) val = String(Math.round(n * 10000) / 10000);
+      }
+      cells[colIndex(ref)] = val;
     }
     return cells;
   });
