@@ -389,6 +389,65 @@ export function shareOpenProject(name) {
   return true;
 }
 
+function outlineSize(p) {
+  const b = boundsOf(p);
+  if (!b || !b.isValid()) return Infinity;
+  return (b.getEast() - b.getWest()) * (b.getNorth() - b.getSouth());
+}
+
+function geomsMeet(a, b) {
+  try {
+    const fa = turf.feature(a);
+    const fb = turf.feature(b);
+    if (typeof turf.booleanIntersects === 'function') return turf.booleanIntersects(fa, fb);
+    return !!turf.intersect(fa, fb);
+  } catch (e) { return false; }
+}
+
+/** Đồ án cấp kind có ranh giao hình đang tra cứu */
+function projectsCovering(kind, geom) {
+  if (!geom || typeof turf === 'undefined') return [];
+  let box = null;
+  try { box = turf.bbox(turf.feature(geom)); } catch (e) { box = null; }
+  const hits = [];
+  projects.forEach(p => {
+    if (p.level !== kind) return;
+    const outline = outlineOf(p);
+    const b = outline && boundsOf(p);
+    if (!b || !b.isValid()) return;
+    if (box && (b.getEast() < box[0] || b.getWest() > box[2] || b.getNorth() < box[1] || b.getSouth() > box[3])) return;
+    if (geomsMeet(geom, outline)) hits.push(p);
+  });
+  return hits;
+}
+
+function openMany(hits) {
+  const primary = hits.slice().sort((a, b) => outlineSize(a) - outlineSize(b))[0];
+  if (!primary) return null;
+  const ready = state.focusedProject === primary.name && focusName === primary.name
+    && hits.every(p => state.lotProjects.has(p.name));
+  if (ready) return primary.name;
+  state.lotProjects.clear();
+  let hiddenChanged = false;
+  hits.forEach(p => {
+    if (state.hiddenProjects.delete(p.name)) hiddenChanged = true;
+    state.lotProjects.add(p.name);
+  });
+  if (hiddenChanged) saveHidden();
+  if (!kindOn(primary.name)) turnKindOn(primary, () => setMaster(true));
+  if (!state.showProjectInfra) ensureFullLots();
+  state.focusedProject = primary.name;
+  focusName = primary.name;
+  refreshAll();
+  drawFocus();
+  pinGlow(primary);
+  markPicked(primary.name);
+  focusProjectLots(primary.name);
+  revealInList(primary);
+  document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: primary.name }));
+  return primary.name;
+}
+
 /**
  * Đồ án nhỏ nhất cấp kind (QHPK / QHCT / QHC) chứa điểm: bật lô và viền, giữ nguyên khung nhìn.
  * Không có đồ án tại điểm → null.
@@ -414,6 +473,16 @@ export function openProjectAt(latlng, kind) {
   if (state.focusedProject === best.name && focusName === best.name && lotsOn) return best.name;
   shareOpenProject(best.name);
   return best.name;
+}
+
+/**
+ * Tra cứu theo hình: giao từ 2 đồ án QHPK hoặc QHCT trở lên thì mở lô mọi đồ án giao hình, giữ khung nhìn.
+ * Ít hơn thì vẫn mở đồ án nhỏ nhất chứa điểm.
+ */
+export function openInspectProjects(latlng, kind, geom) {
+  const hits = projectsCovering(kind, geom);
+  if (hits.length >= 2) return openMany(hits);
+  return openProjectAt(latlng, kind);
 }
 
 /** Điểm latlng nằm trong ranh tổng của đồ án name */
@@ -1364,6 +1433,7 @@ function drawOutlinesOn(m, list, below) {
   // QHPK toàn TP: đồ án vừa bấm hoặc đang tick. QHC / QHCT: đồ án đang mở (lớp QHPK tắt nên nhánh «dưới ngưỡng» luôn bật).
   const lotsOpen = (p) => {
     if (qhpkBoundaryOnly() && p.level === 'QHPK') return p.name === state.focusedProject || state.lotProjects.has(p.name);
+    if (p.level === 'QHCT' && state.lotProjects.has(p.name)) return true;
     return (p.level === 'QHCT' || p.level === 'QHC') && p.name === state.focusedProject;
   };
   // Đồ án lớn vẽ trước (nằm dưới): đồ án nhỏ lồng trong QHPK phường nằm trên nên rê / bấm được

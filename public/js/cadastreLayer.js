@@ -579,7 +579,7 @@ async function showTab(id, { syncMap = true } = {}) {
   if (!st || !isPlanLevel(id)) return;
   st.tab = id;
   if (syncMap) {
-    applyInspectLevel(id, geometryPoint(st.geom, st.bounds));
+    applyInspectLevel(id, geometryPoint(st.geom, st.bounds), st.geom);
     const shown = planMap && !isSplitOn() && getViewMode() === 'QH' ? planMap : st.map;
     if (shown && st.map && shown !== st.map && st.geom) {
       st.map = shown;

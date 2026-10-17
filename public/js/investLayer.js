@@ -365,7 +365,7 @@ async function showTab(id, { syncMap = true } = {}) {
   if (!st || !isPlanLevel(id)) return;
   const seq = st.seq;
   st.tab = id;
-  if (syncMap) applyInspectLevel(id, geometryPoint(st.geom, st.bounds));
+  if (syncMap) applyInspectLevel(id, geometryPoint(st.geom, st.bounds), st.geom);
   const el = $('investCard');
   const page = el?.querySelector('.cad-page');
   if (!page) return;

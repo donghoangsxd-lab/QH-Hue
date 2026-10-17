@@ -23,7 +23,7 @@ import { map, highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
-import { revealWardProjects, clearProjectFocus, projectContains, openProjectAt } from './projectLayer.js';
+import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { RIGHT_TAB_EVENT } from './utils.js';
 import { URBAN_PICK_EVENT, urbanVisionFeature, urbanVisionAt } from './urbanAreaLayer.js';
@@ -116,9 +116,10 @@ const PROJECT_KIND = { qhpk: 'QHPK', qhct: 'QHCT' };
 
 /**
  * Tab cấp quy hoạch trên bảng kiểm tra: bật đúng lớp, tắt các lớp quy hoạch khác, giữ khung nhìn.
- * QHPK / QHCT mở đồ án nhỏ nhất đang chứa điểm. QHC 1/10.000 và 1/25.000 vẽ lô / vùng tại khung nhìn.
+ * QHPK / QHCT: hình giao từ 2 đồ án trở lên thì mở hết các đồ án đó, còn lại mở đồ án nhỏ nhất chứa điểm.
+ * QHC 1/10.000 và 1/25.000 vẽ lô / vùng tại khung nhìn.
  */
-export function applyInspectLevel(id, latlng) {
+export function applyInspectLevel(id, latlng, geom) {
   if (!id) return;
   inspectSync++;
   try {
@@ -132,7 +133,7 @@ export function applyInspectLevel(id, latlng) {
   }
   setPreferPlace(false);
   const kind = PROJECT_KIND[id];
-  if (kind) openProjectAt(latlng, kind);
+  if (kind) openInspectProjects(latlng, kind, geom);
 }
 
 /** Vào QHC 1/10.000 (bấm ký hiệu đô thị trung tâm, hoặc vùng TTHuế 2045 của đô thị đang chọn: openLots mở lô luôn) */
