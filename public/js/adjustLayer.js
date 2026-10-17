@@ -334,6 +334,8 @@ function layersOf(m) {
     scans: L.layerGroup().addTo(m), scanById: new Map(), detailed: null
   };
   layers.set(m, entry);
+  // Canvas lô phủ kín khung. pointer-events auto thì chỗ không có lô cũng nuốt click ranh đồ án bên dưới.
+  m.getContainer().addEventListener('click', (ev) => onFillClick(m, ev), true);
   m.on('zoomend', () => {
     const d = m.getZoom() >= TT16_PATTERN_ZOOM;
     if (d !== entry.detailed && active.size) drawOn(m);
@@ -527,18 +529,39 @@ function drawOn(m) {
   syncFillPointer(L1);
 }
 
-// Canvas nền che phủ kín khung, nằm trên ranh đồ án. Để pointer-events auto thì vùng trống cũng nuốt click ranh.
-// Chỉ bắt chuột khi đang vẽ lô điều chỉnh (bấm lô mở hồ sơ).
+// Canvas lô nằm trên ranh đồ án và phủ kín khung. Giữ pointer-events none để click chỗ không có lô
+// xuyên xuống ranh QHPK. Click trúng lô bắt ở capture (onFillClick) rồi mở thẻ lô.
 function syncFillPointer(L1) {
   const pane = L1.map.getPane(FILL_PANE);
-  if (!pane) return;
-  let capture = false;
-  L1.fills.eachLayer(layer => {
-    if (capture || !layer.eachLayer) return;
-    layer.eachLayer(l => { if (l.options?.interactive !== false) capture = true; });
+  if (pane) pane.style.pointerEvents = 'none';
+  if (L1.fillR._container) L1.fillR._container.style.pointerEvents = 'none';
+}
+
+function onFillClick(m, ev) {
+  if (ev.button != null && ev.button !== 0) return;
+  const L1 = layers.get(m);
+  if (!L1 || typeof turf === 'undefined') return;
+  let latlng;
+  try { latlng = m.mouseEventToLatLng(ev); } catch (e) { return; }
+  if (!latlng) return;
+  const pt = [latlng.lng, latlng.lat];
+  let target = null;
+  L1.fills.eachLayer(group => {
+    if (!group.eachLayer) return;
+    let inside = false;
+    group.eachLayer(path => {
+      if (inside || path.options?.interactive === false) return;
+      const b = path.getBounds?.();
+      if (b && b.isValid() && !b.contains(latlng)) return;
+      const f = path.feature;
+      if (!f?.geometry) return;
+      try { if (turf.booleanPointInPolygon(pt, f)) inside = true; } catch (e) { /* lô lỗi */ }
+    });
+    if (inside) target = group;
   });
-  pane.style.pointerEvents = capture ? 'auto' : 'none';
-  if (L1.fillR._container) L1.fillR._container.style.pointerEvents = capture ? '' : 'none';
+  if (!target) return;
+  ev.stopPropagation();
+  target.fire('click', { latlng, originalEvent: ev });
 }
 
 // Hồ sơ đã duyệt đang hiện trên bản đồ thì tải lô và bật chức năng sau điều chỉnh, trừ hồ sơ người dùng đã trả về gốc
