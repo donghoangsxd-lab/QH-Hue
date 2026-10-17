@@ -389,6 +389,33 @@ export function shareOpenProject(name) {
   return true;
 }
 
+/**
+ * Đồ án nhỏ nhất cấp kind (QHPK / QHCT / QHC) chứa điểm: bật lô và viền, giữ nguyên khung nhìn.
+ * Không có đồ án tại điểm → null.
+ */
+export function openProjectAt(latlng, kind) {
+  if (!latlng || !kind || typeof turf === 'undefined') return null;
+  const pt = [latlng.lng, latlng.lat];
+  let best = null;
+  let bestSize = Infinity;
+  projects.forEach(p => {
+    if (p.level !== kind) return;
+    const geom = outlineOf(p);
+    const b = geom && boundsOf(p);
+    if (!b || !b.isValid() || !b.contains(latlng)) return;
+    const size = (b.getEast() - b.getWest()) * (b.getNorth() - b.getSouth());
+    if (size >= bestSize) return;
+    try {
+      if (turf.booleanPointInPolygon(pt, turf.feature(geom))) { best = p; bestSize = size; }
+    } catch (e) { /* ranh lỗi */ }
+  });
+  if (!best) return null;
+  const lotsOn = best.level !== 'QHPK' || state.lotProjects.has(best.name);
+  if (state.focusedProject === best.name && focusName === best.name && lotsOn) return best.name;
+  shareOpenProject(best.name);
+  return best.name;
+}
+
 /** Điểm latlng nằm trong ranh tổng của đồ án name */
 export function projectContains(name, latlng) {
   const p = projects.find(x => x.name === name);

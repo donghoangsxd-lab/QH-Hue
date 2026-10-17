@@ -7,6 +7,7 @@ import { geeApi } from './api.js';
 import { state } from './state.js';
 import { escapeHtml, fmtNum, ico, showToast, TOOL_START_EVENT } from './utils.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
+import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
 import { matchInvestRows, sheetProjectName } from './investMatch.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
 import { parcelQhcHtml } from './qhc2045Layer.js';
@@ -320,11 +321,12 @@ function planPage(id, geometry, recorded) {
   }));
 }
 
-async function showTab(id) {
+async function showTab(id, { syncMap = true } = {}) {
   const st = card;
   if (!st || !isPlanLevel(id)) return;
   const seq = st.seq;
   st.tab = id;
+  if (syncMap) applyInspectLevel(id, geometryPoint(st.geom, st.bounds));
   const el = $('investCard');
   const page = el?.querySelector('.cad-page');
   if (!page) return;
@@ -432,8 +434,9 @@ export function initInvestLayer() {
   document.addEventListener('qh-dock-card', (e) => { if (e.detail !== 'invest') closeCard(); });
   document.addEventListener(TOOL_START_EVENT, () => closeCard());
   document.addEventListener(LEVEL_EVENT, (e) => {
+    if (inspectLevelSyncing()) return;
     const box = $('investCard')?.querySelector('.invest-plan');
-    if (card && box && !box.hidden && isPlanLevel(e.detail?.level)) showTab(e.detail.level);
+    if (card && box && !box.hidden && isPlanLevel(e.detail?.level)) showTab(e.detail.level, { syncMap: false });
   });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !card) return;

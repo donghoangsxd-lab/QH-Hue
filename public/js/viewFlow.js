@@ -23,12 +23,12 @@ import { map, highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
-import { revealWardProjects, clearProjectFocus, projectContains } from './projectLayer.js';
+import { revealWardProjects, clearProjectFocus, projectContains, openProjectAt } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { RIGHT_TAB_EVENT } from './utils.js';
 import { URBAN_PICK_EVENT, urbanVisionFeature, urbanVisionAt } from './urbanAreaLayer.js';
 import { focusUrban, clearUrbanFocus, urbanFocusHolds, urbanFocused, initUrbanFocus, FOCUS_CORE_EVENT } from './urbanFocus.js';
-import { fitCenter, isCoreWard, setCoreOpen, isCoreOpen, coreContains, setQhcPlaceMode, QHC_CORE_EVENT } from './qhc2045Layer.js';
+import { fitCenter, isCoreWard, setCoreOpen, isCoreOpen, coreContains, setQhcPlaceMode, setPreferPlace, QHC_CORE_EVENT } from './qhc2045Layer.js';
 import { getLevel, setLevel, levelOrigin, levelScope, LEVEL_EVENT, LEVELS } from './mapLevel.js';
 import { planLevelOf, URBAN_FOCUS_EVENT } from './generalPlan.js';
 
@@ -68,6 +68,7 @@ function viewingPlace() {
 }
 
 function onLevelChange({ level, prev, keepView }) {
+  if (!inspectSync) setPreferPlace(false);
   const keepFocus = !!state.focusedProject && planLevelOf(state.focusedProject) === levelScope();
   if (prev === 'qhpk' && level !== 'qhpk' && !keepFocus) {
     closeProjectView();
@@ -94,6 +95,44 @@ function onLevelChange({ level, prev, keepView }) {
   else if (ward) highlightWardBoundary(ward, { fitView: true });
   else fitCenter();
   syncEscHint();
+}
+
+// Bảng thửa / vùng đo / ranh dự án đang tự đổi lớp: sự kiện qh:level không được gọi lại bảng (tránh vòng lặp)
+let inspectSync = 0;
+export const inspectLevelSyncing = () => inspectSync > 0;
+
+/** Điểm nằm trong hình (thửa, vùng đo, ranh dự án); không có hình thì tâm khung bao */
+export function geometryPoint(geom, bounds) {
+  if (geom && typeof turf !== 'undefined') {
+    try {
+      const c = turf.pointOnFeature(turf.feature(geom)).geometry.coordinates;
+      if (Number.isFinite(c[0]) && Number.isFinite(c[1])) return L.latLng(c[1], c[0]);
+    } catch { /* hình lỗi */ }
+  }
+  return bounds?.isValid?.() ? bounds.getCenter() : null;
+}
+
+const PROJECT_KIND = { qhpk: 'QHPK', qhct: 'QHCT' };
+
+/**
+ * Tab cấp quy hoạch trên bảng kiểm tra: bật đúng lớp, tắt các lớp quy hoạch khác, giữ khung nhìn.
+ * QHPK / QHCT mở đồ án nhỏ nhất đang chứa điểm. QHC 1/10.000 và 1/25.000 vẽ lô / vùng tại khung nhìn.
+ */
+export function applyInspectLevel(id, latlng) {
+  if (!id) return;
+  inspectSync++;
+  try {
+    setLevel(id, { keepView: true });
+  } finally {
+    inspectSync--;
+  }
+  if (id === 'qhc10' || id === 'qhc25') {
+    setPreferPlace(true);
+    return;
+  }
+  setPreferPlace(false);
+  const kind = PROJECT_KIND[id];
+  if (kind) openProjectAt(latlng, kind);
 }
 
 /** Vào QHC 1/10.000 (bấm ký hiệu đô thị trung tâm, hoặc vùng TTHuế 2045 của đô thị đang chọn: openLots mở lô luôn) */
