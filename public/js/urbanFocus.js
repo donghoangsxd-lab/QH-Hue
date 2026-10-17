@@ -1,6 +1,6 @@
 // Chọn một đô thị ở lớp Hệ thống đô thị (mapLevel 'urban'): bấm ký hiệu, nét ranh, bấm trong ranh đô thị trên bản đồ
 // quy hoạch hoặc chọn ở mục Đô thị (panel phải). Ranh đô thị được làm nổi, ngoài phạm vi che mờ; phạm vi đã có quy hoạch tô
-// theo ranh tổng đồ án cắt trong ranh đô thị, không vẽ lô: QHC vàng, QHPK cam, QHCT đỏ. Bấm vùng đồ án để xem chi tiết.
+// theo ranh tổng đồ án cắt trong ranh đô thị, không vẽ lô: QHC xanh lơ, QHPK cam, QHCT đỏ. Bấm vùng đồ án để xem chi tiết.
 // Bỏ chọn: nút × trên thanh tên đô thị, phím Esc, hoặc bấm nền ngoài mọi đô thị (viewFlow.js).
 // Nguồn: đồ án nhập có ranh tổng (state.projectCatalog, cấp theo tên), ranh 4 tiểu vùng QHC đô thị TT Huế 2045
 // (qhc2045Layer.js) và lô QHCT 1/500 (qhctLayer.js) gộp theo đồ án.
@@ -24,7 +24,7 @@ const AREA_PANE = ['urbanFocusPane', 444];
 const LINE_PANE = ['urbanFocusLinePane', 446];
 // Cấp nhỏ vẽ trên và đậm hơn để không chìm trong vùng QHC phủ rộng
 const KINDS = {
-  QHC: { title: 'Quy hoạch chung', color: '#facc15', fill: 0.2 },
+  QHC: { title: 'Quy hoạch chung', color: '#22d3ee', fill: 0.2 },
   QHPK: { title: 'Quy hoạch phân khu 1/2.000', color: '#fb923c', fill: 0.4 },
   QHCT: { title: 'Quy hoạch chi tiết 1/500', color: '#ef4444', fill: 0.5 }
 };

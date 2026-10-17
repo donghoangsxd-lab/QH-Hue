@@ -127,9 +127,9 @@ export const VISION_LEGEND_GROUPS = [
   ['Mặt nước, cây xanh', [...WATER_KINDS.slice(0, 2), { label: 'Không gian cây xanh', color: GREEN_COLOR }]]
 ];
 
-// Ranh giới khu vực (đường không gian): nét theo loại ranh
+// Ranh giới khu vực (đường không gian): nét theo loại ranh. Không vàng — trùng ranh phường xã và ranh đô thị loại I
 const LINE_STYLES = [
-  [/đô thị trung tâm/i, { color: '#facc15', weight: 3.5, dashArray: null }],
+  [/đô thị trung tâm/i, { color: '#38bdf8', weight: 3.5, dashArray: null }],
   [/trung tâm đô thị/i, { color: '#f97316', weight: 2.5, dashArray: null }],
   [/phát triển đô thị/i, { color: '#ef4444', weight: 2, dashArray: '8 5' }],
   [/kiểm soát đô thị/i, { color: '#f472b6', weight: 2, dashArray: '8 5' }],

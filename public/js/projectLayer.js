@@ -53,8 +53,9 @@ const OUTLINE_GIS = { ...OUTLINE_STYLE, weight: 1.8, dashArray: null };
 const OUTLINE_HULL = { ...OUTLINE_STYLE, dashArray: '2 5' };
 // Đồ án QHC phạm vi rộng, xem ở mức thu nhỏ: viền liền, đậm
 const OUTLINE_QHC = { weight: 2.8, opacity: 1, dashArray: null, fillOpacity: 0.08 };
-// Bảng màu dịu, đọc rõ trên ảnh vệ tinh; đồ án có khung bao giao nhau không trùng màu
-const PALETTE = ['#fbbf24', '#38bdf8', '#c084fc', '#4ade80', '#f472b6', '#fb923c', '#2dd4bf', '#a3e635', '#f87171', '#818cf8', '#fde047', '#e879f9'];
+// Bảng màu dịu, đọc rõ trên ảnh vệ tinh. Không vàng / hổ phách: trùng nét ranh phường xã (#fde68a).
+// Đồ án có khung bao giao nhau không trùng màu
+const PALETTE = ['#f43f5e', '#38bdf8', '#c084fc', '#4ade80', '#f472b6', '#fb923c', '#2dd4bf', '#a3e635', '#f87171', '#818cf8', '#60a5fa', '#e879f9'];
 const NEIGHBOR_PAD_DEG = 0.003;
 
 const CITY_NAME = 'Thành phố Huế';

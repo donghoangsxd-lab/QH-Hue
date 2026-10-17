@@ -19,9 +19,10 @@ import {
 
 const GP_PAGE = 3;
 const SCOPE_URL = 'data/generalPlan.geojson';
-// Ranh phạm vi trùng nét ranh đô thị của lớp Phân loại đô thị (pane 410, urbanAreaLayer.js) nên vẽ ở pane riêng nằm trên
+// Ranh phạm vi trùng nét ranh đô thị của lớp Phân loại đô thị (pane 410, urbanAreaLayer.js) nên vẽ ở pane riêng nằm trên.
+// Cyan, không vàng: nét vàng là ranh phường xã và ranh đô thị loại I
 const SCOPE_PANE = 'gpScopePane';
-const SCOPE_STYLE = { color: '#facc15', weight: 3.5, dashArray: '10 6', fillColor: '#facc15', fillOpacity: 0.06, interactive: false, pane: SCOPE_PANE };
+const SCOPE_STYLE = { color: '#22d3ee', weight: 3.5, dashArray: '10 6', fillColor: '#22d3ee', fillOpacity: 0.06, interactive: false, pane: SCOPE_PANE };
 const CORE_STYLE = { color: '#fb923c', weight: 2.5, dashArray: '4 5', fillColor: '#fb923c', fillOpacity: 0.05, interactive: false, pane: SCOPE_PANE };
 
 const $ = (id) => document.getElementById(id);
