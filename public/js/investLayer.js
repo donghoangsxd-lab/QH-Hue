@@ -13,6 +13,7 @@ import { matchInvestRows, sheetProjectName } from './investMatch.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
 import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
+import { setQuietProjectOutline } from './projectLayer.js';
 
 const PANE = 'investPane';
 // Trên lớp đô thị đang chọn (urbanFocus 444–446, hover 449) để bấm được ranh dự án.
@@ -46,6 +47,7 @@ const BASE = {
 };
 const HOVER = { ...BASE, weight: 2.8, fillOpacity: 0.24 };
 const HALO = { color: '#ffffff', weight: 7, opacity: 1, fill: false, lineJoin: 'round' };
+const LINE = { ...BASE, fill: false };
 const PLAN_TABS = [
   { id: 'qhc25', name: 'QHC', scale: '1/25.000' },
   { id: 'qhc10', name: 'QHC', scale: '1/10.000' },
@@ -226,8 +228,14 @@ function commitGroups(keys, clear) {
   stampGroups();
 }
 
+function planInspecting() {
+  const box = $('investCard')?.querySelector('.invest-plan');
+  return !!(card && box && !box.hidden);
+}
+
 function styleFor(feature) {
   if (card?.grouping && card.picks?.has(feature?.properties?._key)) return PICK;
+  if (planInspecting() && card.members?.includes(feature)) return LINE;
   return BASE;
 }
 
@@ -463,12 +471,14 @@ function drawOn(m, features) {
   projects.forEach(p => p.members.forEach(f => titleByFeature.set(f, p.title)));
   const group = L.geoJSON({ type: 'FeatureCollection', features }, {
     pane: PANE,
+    keyboard: false,
     style: f => styleFor(f),
     onEachFeature: (f, layer) => {
       byFeature.set(f, layer);
       layer.bindTooltip(titleByFeature.get(f) || titleOf(f.properties || {}), { sticky: true, className: 'invest-tip', opacity: 0.95 });
       layer.on('mouseover', () => {
         hovered = layer;
+        if (planInspecting() && card?.members?.includes(f)) return;
         if (layer !== selected && !card?.picks?.has(f.properties?._key)) layer.setStyle(HOVER);
         layer.bringToFront();
       });
@@ -602,13 +612,19 @@ function selectLayer(layer, targetMap, geom) {
   if (!geom || !targetMap) return;
   ensurePane(targetMap, HL_PANE, HL_PANE_Z);
   highlight = L.layerGroup([
-    L.geoJSON(geom, { pane: HL_PANE, interactive: false, style: HALO }),
-    L.geoJSON(geom, { pane: HL_PANE, interactive: false, style: BASE })
+    L.geoJSON(geom, { pane: HL_PANE, interactive: false, keyboard: false, style: HALO }),
+    L.geoJSON(geom, { pane: HL_PANE, interactive: false, keyboard: false, style: LINE })
   ]).addTo(targetMap);
+}
+
+function syncSelectionStyle() {
+  paintPicks();
+  if (selected && card) selectLayer(selected, card.map, card.geom);
 }
 
 function closeCard() {
   openSeq++;
+  setQuietProjectOutline(false);
   card = null;
   selected = null;
   hovered = null;
@@ -730,6 +746,7 @@ function togglePlan() {
   const open = box.hidden;
   box.hidden = !open;
   btn.innerHTML = `${ico('area')}${open ? 'Ẩn kiểm tra quy hoạch' : 'Kiểm tra quy hoạch theo ranh giới dự án'}`;
+  syncSelectionStyle();
   if (open) showTab(st.tab);
 }
 
@@ -968,6 +985,7 @@ function openCard(feature, layer, targetMap) {
   const geom = unionGeom(members);
   const sheet = sheetOf(members, feature);
   ensureCard();
+  setQuietProjectOutline(true);
   const tab = isPlanLevel(getLevel()) ? getLevel() : 'qhpk';
   let area = 0;
   members.forEach(m => { try { area += turf.area(m); } catch { /* mảnh hỏng thì bỏ qua */ } });

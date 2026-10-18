@@ -1320,6 +1320,8 @@ const FOCUS_LINES = [
 const WORLD_RING = [[85, -180], [85, 180], [-85, 180], [-85, -180]];
 const focusLayers = new Map();
 let focusName = null;
+// Bảng dự án kêu gọi đầu tư đang mở: bỏ viền đồ án (hay thành khung chữ nhật) để còn thấy lô bên trong.
+let quietOutline = false;
 
 const outerRings = (geom) => (geom.type === 'Polygon' ? [geom.coordinates[0]]
   : geom.type === 'MultiPolygon' ? geom.coordinates.map(c => c[0]) : []);
@@ -1332,8 +1334,16 @@ function clearFocusOn(m) {
   focusLayers.delete(m);
 }
 
+export function setQuietProjectOutline(on) {
+  on = !!on;
+  if (quietOutline === on) return;
+  quietOutline = on;
+  redrawOutlines();
+  drawFocus();
+}
+
 function drawFocus() {
-  const p = focusName ? projects.find(x => x.name === focusName) : null;
+  const p = !quietOutline && focusName ? projects.find(x => x.name === focusName) : null;
   const geom = p && outlineOf(p);
   shownMaps().forEach(m => {
     clearFocusOn(m);
@@ -1443,9 +1453,10 @@ function drawOutlinesOn(m, list, below) {
     const base = !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE;
     const style = { ...base, ...(p.level === 'QHC' ? OUTLINE_QHC : null), color: p.color, fillColor: p.color };
     const open = lotsOpen(p);
+    const shown = open ? { ...style, fillOpacity: 0, ...(quietOutline ? { opacity: 0 } : {}) } : style;
     // Đồ án đang mở theo phạm vi lớp droplist, hoặc đã bật lô QHPK: bấm trong ranh không mở lại đồ án
     if (open || !below || (!state.showProjects && p.name === state.focusedProject)) {
-      const shape = L.geoJSON(geom, { style: open ? { ...style, fillOpacity: 0 } : style, interactive: false });
+      const shape = L.geoJSON(geom, { style: shown, interactive: false });
       shapes.push(shape);
       group.addLayer(shape);
       return;

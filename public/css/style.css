@@ -3182,7 +3182,11 @@ table.ward-table th {
 .invest-group-bar b { font-size: var(--fs-sm); }
 .invest-group-bar span { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.35; }
 .invest-empty { margin-top: 8px; color: var(--text-muted); font-size: var(--fs-sm); }
-.leaflet-div-icon.invest-pin { background: transparent; border: 0; }
+.leaflet-div-icon.invest-pin,
+.leaflet-marker-icon.invest-pin { background: transparent; border: 0; outline: none; }
+.leaflet-container .leaflet-invest-pane path.leaflet-interactive:focus,
+.leaflet-container .leaflet-investHighlight-pane path:focus,
+.leaflet-marker-icon.invest-pin:focus { outline: none; }
 .invest-mark {
   width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
   border-radius: 50%; color: #fff; background: rgba(15, 23, 42, 0.9);
