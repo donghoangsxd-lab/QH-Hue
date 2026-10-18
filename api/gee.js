@@ -163,15 +163,34 @@ function parseInvestCalls(text) {
   }
 }
 
-function parseInvestEdits(text) {
-  if (!text) return [];
+function parseInvestStore(text) {
+  if (!text) return { items: [], groups: [] };
   try {
     const data = JSON.parse(text);
     const list = data && Array.isArray(data.items) ? data.items : [];
-    return list.filter(it => it && it.key && it.fields && typeof it.fields === 'object').slice(0, INVEST_EDIT_MAX);
+    const items = list.filter(it => it && it.key && it.fields && typeof it.fields === 'object').slice(0, INVEST_EDIT_MAX);
+    const groups = [];
+    (data && Array.isArray(data.groups) ? data.groups : []).forEach(g => {
+      if (groups.length >= 200) return;
+      const keys = [];
+      const seen = new Set();
+      (Array.isArray(g && g.keys) ? g.keys : []).forEach(k => {
+        const key = cleanInvestText(k, 400);
+        if (!key || seen.has(key) || keys.length >= 40) return;
+        seen.add(key);
+        keys.push(key);
+      });
+      if (keys.length < 2) return;
+      groups.push({ id: cleanInvestText(g.id, 40) || ('g' + groups.length), keys });
+    });
+    return { items, groups };
   } catch (e) {
-    return [];
+    return { items: [], groups: [] };
   }
+}
+
+function investStoreText(items, groups) {
+  return JSON.stringify({ v: 1, saved: Date.now(), items, groups });
 }
 
 function applyInvestEdits(base, items) {
@@ -2026,12 +2045,12 @@ module.exports = async (req, res) => {
       return res.status(200).send(body);
     }
 
-    // Thửa đất địa chính 2016: client đọc PMTiles và chỉ mục thẳng từ bucket, chỉ nhận URL từ đây
+    // Danh sách 15-DA, cộng hiệu chỉnh và nhóm ranh admin đã gộp.
     if (action === 'getInvestCalls') {
       const d = await getInvestCalls();
       if (!d || !d.text) return res.status(404).json({ error: true, message: 'Chưa có danh sách sheet 15-DA' });
-      const edits = parseInvestEdits((await getInvestEdits())?.text);
-      if (!edits.length) {
+      const store = parseInvestStore((await getInvestEdits())?.text);
+      if (!store.items.length && !store.groups.length) {
         res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');
         if (d.etag) {
           res.setHeader('ETag', d.etag);
@@ -2042,8 +2061,10 @@ module.exports = async (req, res) => {
       }
       const base = parseInvestCalls(d.text);
       if (!base) return res.status(404).json({ error: true, message: 'Danh sách sheet 15-DA không đọc được' });
+      const data = store.items.length ? applyInvestEdits(base, store.items) : base;
+      data.groups = store.groups;
       res.setHeader('Cache-Control', 'no-store');
-      return res.status(200).json(applyInvestEdits(base, edits));
+      return res.status(200).json(data);
     }
 
     if (action === 'saveInvestProject') {
@@ -2054,16 +2075,47 @@ module.exports = async (req, res) => {
       const match = cleanInvestText(body.match, 200);
       const fields = parseInvestFields(body.fields);
       if (!key || !fields) return res.status(400).json({ error: true, message: 'Thiếu tên dự án hoặc nội dung không hợp lệ' });
-      const current = parseInvestEdits((await getInvestEdits())?.text).filter(it => it.key !== key);
+      const store = parseInvestStore((await getInvestEdits())?.text);
+      const current = store.items.filter(it => it.key !== key);
       current.push({ key, match, fields });
       if (current.length > INVEST_EDIT_MAX) return res.status(413).json({ error: true, message: 'Quá nhiều dự án đã sửa' });
-      const text = JSON.stringify({ v: 1, saved: Date.now(), items: current });
+      const text = investStoreText(current, store.groups);
       if (text.length > 400000) return res.status(413).json({ error: true, message: 'Bản hiệu chỉnh quá lớn' });
       await gcsWrite.putJson(INVEST_EDITS_NAME, text);
       forgetTextFile(constants.INVEST_EDITS_URL);
       return res.status(200).json({ success: true });
     }
 
+    // Gộp nhiều ranh KML thành một dự án. keys là khóa ranh; clear=true thì chỉ gỡ các khóa đó khỏi nhóm.
+    if (action === 'saveInvestGroup') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const keys = [];
+      const seen = new Set();
+      (Array.isArray(body.keys) ? body.keys : []).forEach(k => {
+        const key = cleanInvestText(k, 400);
+        if (!key || seen.has(key) || keys.length >= 40) return;
+        seen.add(key);
+        keys.push(key);
+      });
+      if (!keys.length) return res.status(400).json({ error: true, message: 'Thiếu ranh cần gộp' });
+      const clear = body.clear === true;
+      if (!clear && keys.length < 2) return res.status(400).json({ error: true, message: 'Cần ít nhất hai ranh để thành một dự án' });
+      const store = parseInvestStore((await getInvestEdits())?.text);
+      const drop = new Set(keys);
+      const groups = store.groups
+        .map(g => ({ id: g.id, keys: g.keys.filter(k => !drop.has(k)) }))
+        .filter(g => g.keys.length >= 2);
+      if (!clear) groups.push({ id: 'g' + Date.now().toString(36), keys });
+      const text = investStoreText(store.items, groups);
+      if (text.length > 400000) return res.status(413).json({ error: true, message: 'Bản hiệu chỉnh quá lớn' });
+      await gcsWrite.putJson(INVEST_EDITS_NAME, text);
+      forgetTextFile(constants.INVEST_EDITS_URL);
+      return res.status(200).json({ success: true, groups });
+    }
+
+    // Thửa đất địa chính 2016: client đọc PMTiles và chỉ mục thẳng từ bucket, chỉ nhận URL từ đây
     if (action === 'getCadastreInfo') {
       const base = constants.CADASTRE_GCS_BASE;
       res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');

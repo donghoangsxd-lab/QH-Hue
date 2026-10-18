@@ -3072,7 +3072,7 @@ table.ward-table th {
 .cad-card.invest-card {
   top: calc(12px + var(--title-h) + 8px) !important;
   bottom: auto !important;
-  width: min(340px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
+  width: min(380px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
   max-height: calc(100% - var(--title-h) - 28px);
 }
 .invest-body { flex: 1; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; }
@@ -3114,6 +3114,89 @@ table.ward-table th {
 .invest-plan-btn { margin-top: 8px; }
 .invest-note { color: var(--text-muted); font-size: var(--fs-sm); margin-top: 4px; }
 .invest-plan { border-top: 1px solid var(--border-color); margin-top: 6px; }
+.invest-head { display: flex; gap: 8px; align-items: flex-start; min-width: 0; padding-right: 46px; }
+.invest-badge {
+  flex: none; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; color: var(--accent-cyan); background: rgba(15, 23, 42, 0.72);
+  border: 1px solid currentColor;
+}
+.invest-badge .ico { width: 18px; height: 18px; margin: 0; }
+.invest-head-main { min-width: 0; flex: 1; }
+.invest-kicker {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.invest-kicker b { min-width: 0; overflow-wrap: anywhere; color: var(--accent-cyan); font-weight: 700; }
+.invest-pieces { text-transform: none; letter-spacing: 0; color: var(--text-muted); font-weight: 600; }
+.invest-chip {
+  flex: none; margin-left: auto; padding: 1px 6px; border-radius: 99px;
+  background: rgba(239, 68, 68, 0.16); color: #fecaca; letter-spacing: 0; text-transform: none; font-weight: 700;
+}
+.invest-card .invest-head .lp-title { padding-right: 0; margin-top: 2px; }
+.invest-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 2px; padding-right: 22px; }
+.invest-switch button {
+  padding: 5px 6px; border-radius: var(--r-md); border: 1px solid var(--border-color);
+  background: transparent; color: var(--text-muted); font: inherit; font-size: var(--fs-sm); font-weight: 700;
+  letter-spacing: 0.06em; cursor: pointer;
+}
+.invest-switch button.is-on { background: rgba(var(--cyan-rgb), 0.18); border-color: var(--accent-cyan); color: var(--text-main); }
+.invest-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.invest-stat {
+  min-width: 0; padding: 6px 8px; border-radius: var(--r-md);
+  background: rgba(var(--cyan-rgb), 0.07); border: 1px solid rgba(var(--cyan-rgb), 0.22);
+}
+.invest-stat.is-wide { grid-column: 1 / -1; }
+.invest-stat small {
+  display: flex; align-items: center; gap: 4px; color: var(--text-muted);
+  font-size: var(--fs-xs); letter-spacing: 0.04em; text-transform: uppercase;
+}
+.invest-stat small .ico { width: 12px; height: 12px; margin: 0; color: var(--accent-cyan); }
+.invest-stat b { display: block; margin-top: 2px; color: var(--text-main); font-size: var(--fs-md); font-weight: 700; overflow-wrap: anywhere; }
+.invest-lead, .invest-block {
+  margin-top: 8px; padding: 8px; border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color);
+}
+.invest-lead small, .invest-block h4 {
+  display: block; margin: 0; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.invest-lead p, .invest-copy {
+  margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; font-size: var(--fs-sm);
+}
+.invest-lead p { max-height: 7.6em; overflow: auto; }
+.invest-alert {
+  margin-top: 8px; padding: 6px 8px; border-radius: var(--r-md);
+  background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #fecaca; font-size: var(--fs-sm); line-height: 1.4;
+}
+.invest-group-actions, .invest-group-bar { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.invest-group, .invest-ungroup, .invest-group-cancel {
+  align-self: flex-start; padding: 2px 0; color: var(--text-muted);
+  background: none; border: 0; cursor: pointer; font: inherit; font-size: var(--fs-sm);
+}
+.invest-group .ico, .invest-group-save .ico { margin-right: 0.35em; }
+.invest-group:hover, .invest-ungroup:hover, .invest-group-cancel:hover { color: var(--text-main); }
+.invest-group-bar {
+  padding: 8px; border-radius: var(--r-md); border: 1px solid var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.08);
+}
+.invest-group-bar b { font-size: var(--fs-sm); }
+.invest-group-bar span { color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.35; }
+.invest-empty { margin-top: 8px; color: var(--text-muted); font-size: var(--fs-sm); }
+.leaflet-div-icon.invest-pin { background: transparent; border: 0; }
+.invest-mark {
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; color: #fff; background: rgba(15, 23, 42, 0.9);
+  border: 1.5px solid var(--c, #fff); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45); cursor: pointer;
+}
+.invest-mark .ico { width: 14px; height: 14px; margin: 0; }
+.invest-dot {
+  width: 12px; height: 12px; border-radius: 50%; background: #ef4444; border: 2px solid #fff;
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.65); cursor: pointer; animation: invest-dot 1.8s ease-out infinite;
+}
+@keyframes invest-dot {
+  70% { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
 .leaflet-tooltip.invest-tip { font-size: 12px; font-weight: 600; }
 
 /* Bảng công trình, bảng lô đất ngoài nhóm hạ tầng và bảng tiếp cận: cùng góc với bảng thửa */
