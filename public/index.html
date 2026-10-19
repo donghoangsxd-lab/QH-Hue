@@ -481,6 +481,13 @@
             <button type="button" class="layer-map-tab" role="tab" data-map-tab="env" aria-selected="false" aria-controls="layerPaneEnv" title="Địa hình, thoát nước, ngập, nhiệt độ bề mặt và công trình chịu rủi ro."><span class="layer-map-label">Bản đồ môi trường</span><span class="layer-count layer-map-count" title="Số lớp đang bật"></span></button>
           </div>
           <div class="layer-map-pane" id="layerPaneBase" data-map-pane="base" role="tabpanel">
+          <div class="sat-pick basemap-pick">
+            <label for="basemapSelect" title="Ảnh nền cho bản đồ hiện trạng và quy hoạch. Nền nhạt là CARTO Positron, không tên đường, để lớp quy hoạch nổi hơn. Lựa chọn được ghi nhớ trên máy này"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ảnh nền</label>
+            <select id="basemapSelect" aria-label="Ảnh nền bản đồ">
+              <option value="google">Google vệ tinh</option>
+              <option value="positron">Nền nhạt</option>
+            </select>
+          </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div><button type="button" class="layer-mini-btn active" id="btnWardNames" title="Bật/tắt tên phường, xã trên bản đồ" aria-label="Bật/tắt tên phường, xã" aria-pressed="true">Aa</button></div>
           <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung. Thu nhỏ vẫn hiện trục chính; chỉ mức một biểu đồ tròn toàn thành phố là ẩn"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(zoom để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
