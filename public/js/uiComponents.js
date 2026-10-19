@@ -118,6 +118,7 @@ function setAdminSession(token, info) {
   } catch (e) {}
   updateAuthUi();
   renderGroupedPoints();
+  document.dispatchEvent(new CustomEvent('qh-admin-changed'));
 }
 
 export function signOutAdmin() {
@@ -128,6 +129,7 @@ export function signOutAdmin() {
   try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch (e) {}
   window.google?.accounts?.id?.disableAutoSelect?.();
   updateAuthUi();
+  document.dispatchEvent(new CustomEvent('qh-admin-changed'));
   if (wasAdmin) {
     map.closePopup();
     renderGroupedPoints();

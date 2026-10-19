@@ -2770,6 +2770,23 @@ table.ward-table th {
   font-family: inherit; font-size: var(--fs-sm); font-weight: 700; cursor: pointer;
 }
 .proof-btn:hover { background: rgba(var(--cyan-rgb), 0.25); }
+.ht-assign { margin-top: 6px; }
+.ht-assign:empty { display: none; margin: 0; }
+.ht-form [hidden] { display: none; }
+.ht-badge { margin-top: 4px; padding: 4px 6px; border-radius: var(--r-sm); background: rgba(var(--cyan-rgb), 0.12); color: var(--text-strong); font-size: var(--fs-xs); line-height: 1.35; }
+.ht-form { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; max-height: min(52vh, 380px); overflow: auto; }
+.ht-form label { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-xs); font-weight: 700; color: var(--text-muted); }
+.ht-form input, .ht-form select, .ht-form textarea { width: 100%; box-sizing: border-box; height: 28px; padding: 0 6px; border: 1px solid var(--border-color); border-radius: var(--r-sm); background: var(--bg-input); color: var(--text-main); font: inherit; font-size: var(--fs-sm); }
+.ht-form textarea { height: 48px; padding: 4px 6px; resize: vertical; }
+.ht-row { display: flex; gap: 4px; }
+.ht-row label { flex: 1 1 0; min-width: 0; }
+.ht-cap-note { margin: 0; }
+.ht-actions { display: flex; gap: 4px; }
+.ht-actions .proof-btn { flex: 1 1 0; margin-top: 0; }
+.ht-del { border-color: var(--accent-red) !important; color: var(--accent-red) !important; background: transparent !important; }
+.ht-msg { margin: 0; min-height: 1.2em; font-size: var(--fs-xs); }
+.ht-msg.is-err { color: var(--accent-red); }
+.ht-msg.is-ok { color: var(--accent-green); }
 
 /* ===================== MINH CHỨNG ĐỀ XUẤT CSD ===================== */
 .proof-pulse-icon { background: transparent !important; border: none !important; }
@@ -4864,6 +4881,8 @@ body.project-review.la-page #projectReviewHost {
   body.bottom-collapsed .leaflet-bottom.leaflet-right { margin-bottom: 60px; }
   .leaflet-popup-content-wrapper, .leaflet-popup-tip { max-width: calc(100dvw - 24px); }
   .leaflet-popup-content { font-size: 13px; margin: 8px 10px; }
+  .ht-form { max-height: min(46dvh, 320px); }
+  .ht-form input, .ht-form select, .ht-form textarea, .ht-actions .proof-btn { min-height: 36px; height: auto; font-size: 13px; }
   .inspect-popup .leaflet-popup-content { max-height: 42dvh; }
   .mobile-fs p { font-size: 13px; line-height: 1.4; }
   .mobile-fs:not([hidden]) {

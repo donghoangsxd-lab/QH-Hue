@@ -65,6 +65,7 @@ import { initStreetView } from './streetView.js';
 import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 import { initCadastreLayer, cadastreClick } from './cadastreLayer.js';
+import { initParcelInfra } from './parcelInfra.js';
 import { initInvestLayer } from './investLayer.js';
 import { initTerrainLayer } from './terrainLayer.js';
 import { initTerrainProfile, syncTerrainProfile } from './terrainProfile.js';
@@ -341,6 +342,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initPopEdits();
   initRoadNetworkLayer();
   initCadastreLayer();
+  initParcelInfra();
   initInvestLayer();
   initUrbanAreaLayer();
   initLayerDecisions();

@@ -1916,6 +1916,43 @@ function parseHeatmapGroups(body) {
   return out;
 }
 
+// Gán hạ tầng hiện trạng cho một thửa địa chính. Danh mục khớp constants.PARCEL_INFRA_TYPES.
+function parcelInfraType(code) {
+  return (constants.PARCEL_INFRA_TYPES || []).find(t => t.code === code) || null;
+}
+
+function parcelInfraStatus(id) {
+  return (constants.PARCEL_INFRA_STATUS || []).find(s => s.id === id) || null;
+}
+
+function countCoords(node, acc) {
+  if (!Array.isArray(node)) return acc;
+  if (node.length >= 2 && typeof node[0] === 'number' && typeof node[1] === 'number') return acc + 1;
+  return node.reduce((n, child) => countCoords(child, n), acc);
+}
+
+function parseParcelGeom(raw) {
+  let geom = raw;
+  if (typeof geom === 'string') {
+    try { geom = JSON.parse(geom); } catch (e) { return null; }
+  }
+  if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon') || !Array.isArray(geom.coordinates)) return null;
+  const n = countCoords(geom.coordinates, 0);
+  if (n < 4 || n > 8000) return null;
+  const text = JSON.stringify({ type: geom.type, coordinates: geom.coordinates });
+  if (text.length > 45000) return null;
+  return { type: geom.type, coordinates: geom.coordinates, text };
+}
+
+function parcelCap(type, area, requested) {
+  if (type.cap === 'urban') return 'Cấp đô thị';
+  if (type.cap === 'unit' || type.cap === 'auto') {
+    if (type.cap === 'auto' && area >= 10000) return 'Cấp đô thị';
+    return 'Cấp đơn vị ở';
+  }
+  return requested === 'urban' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
+}
+
 // ============================ HANDLER ============================
 
 module.exports = async (req, res) => {
@@ -3076,9 +3113,84 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, saved: true, state: t.state, bake: current.bake, at: current.saved });
     }
 
+    if (action === 'getParcelInfra') {
+      const result = await callAppsScript({ action: 'getHaTangHienTrang' }, { action: 'getHaTangHienTrang' });
+      const rows = Array.isArray(result.rows) ? result.rows : [];
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ success: true, rows });
+    }
+
     const { ee, wardVectorParsed, popRasterNormalized, popRasterNative, popProjection } = getGeeContext();
 
     // --- Thao tác cần Earth Engine nhưng không cần danh sách công trình ---
+    if (action === 'saveParcelInfra' || action === 'deleteParcelInfra') {
+      requirePostFromApp(req);
+      const user = await requireAdmin(req);
+      const body = readJsonBody(req);
+      const soTo = sanitizeSheetText(body.soTo, 40);
+      const soThua = sanitizeSheetText(body.soThua, 40);
+      const xaPhuong = sanitizeSheetText(body.xaPhuong, 120);
+      if (!soTo || !soThua || !xaPhuong) return res.status(400).json({ error: true, message: 'Thiếu số tờ, số thửa hoặc xã/phường' });
+      if (action === 'deleteParcelInfra') {
+        const result = await callAppsScript({ action: 'deleteHaTangHienTrang' }, {
+          action: 'deleteHaTangHienTrang', soTo, soThua, xaPhuong
+        });
+        invalidateAllCaches();
+        return res.status(200).json({ success: true, id: result.id || null });
+      }
+      const type = parcelInfraType(String(body.loai || ''));
+      const status = parcelInfraStatus(String(body.tinhTrang || ''));
+      const ten = sanitizeSheetText(body.ten, 150);
+      const quyMo = Number(body.quyMo);
+      const dienTich = Number(body.dienTich);
+      const geom = parseParcelGeom(body.geometry);
+      const pt = parseCoordInBounds(body.lat, body.lng);
+      if (!type) return res.status(400).json({ error: true, message: 'Loại công trình không hợp lệ' });
+      if (!status) return res.status(400).json({ error: true, message: 'Chọn tình trạng: đang hoạt động, xuống cấp hoặc ngừng' });
+      if (!ten) return res.status(400).json({ error: true, message: 'Nhập tên công trình' });
+      if (!Number.isFinite(quyMo) || quyMo < 0 || quyMo > 1e7) return res.status(400).json({ error: true, message: 'Quy mô không hợp lệ' });
+      if (!Number.isFinite(dienTich) || dienTich < 0 || dienTich > 1e8) return res.status(400).json({ error: true, message: 'Diện tích không hợp lệ' });
+      if (!(dienTich > 0) && !type.noArea) return res.status(400).json({ error: true, message: 'Diện tích phải lớn hơn 0' });
+      if (type.cap === 'choose' && body.cap !== 'urban' && body.cap !== 'unit') {
+        return res.status(400).json({ error: true, message: 'Chọn cấp hạ tầng: cấp đô thị hoặc cấp đơn vị ở' });
+      }
+      if (!geom) return res.status(400).json({ error: true, message: 'Ranh thửa không hợp lệ hoặc quá chi tiết' });
+      if (!pt) return res.status(400).json({ error: true, message: 'Tọa độ tâm thửa không hợp lệ hoặc nằm ngoài TP. Huế' });
+      const wards = await loadEvaluatedWards(wardVectorParsed);
+      const xaMoi = assignWardByGeometry(pt.lng, pt.lat, wards) || '';
+      const nhom = parcelCap(type, dienTich, body.cap);
+      const result = await callAppsScript({ action: 'saveHaTangHienTrang' }, {
+        action: 'saveHaTangHienTrang',
+        loai: type.code,
+        ten,
+        quyMo,
+        donVi: type.unit || '',
+        dienTich,
+        tinhTrang: status.id,
+        ghiChu: sanitizeSheetText(body.ghiChu, 300),
+        soTo, soThua, xaPhuong,
+        maXa: sanitizeSheetText(body.maXa, 20),
+        diaChi: sanitizeSheetText(body.diaChi, 300),
+        lat: pt.lat.toFixed(6),
+        lng: pt.lng.toFixed(6),
+        geojson: geom.text,
+        nhom,
+        xaMoi,
+        nguoi: sanitizeSheetText(`${user.name || ''} <${user.email}>`, 120)
+      });
+      invalidateAllCaches();
+      return res.status(200).json({
+        success: true,
+        id: result.id || null,
+        updated: !!result.updated,
+        active: status.active,
+        xaMoi,
+        nhom,
+        loai: type.code,
+        ten
+      });
+    }
+
     if (action === 'addPoint') {
       requirePostFromApp(req);
       checkAddPointRate(req);
