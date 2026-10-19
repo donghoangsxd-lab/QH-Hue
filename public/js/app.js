@@ -547,6 +547,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnToggleBottomMax')?.addEventListener('click', toggleBottomPanelMaximized);
   document.getElementById('btnCollapseBottomPanel')?.addEventListener('click', () => setBottomPanelCollapsed(true));
+  const markBpPage = (index) => {
+    document.querySelectorAll('#bpPhonePager button').forEach(b => {
+      b.classList.toggle('is-on', Number(b.dataset.bpPage) === index);
+    });
+  };
+  document.getElementById('bpPhonePager')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-bp-page]');
+    if (!btn) return;
+    const body = document.getElementById('bpBody');
+    const part = body?.querySelectorAll('.bp-part')[Number(btn.dataset.bpPage)];
+    part?.scrollIntoView({ inline: 'start', block: 'nearest', behavior: 'auto' });
+    markBpPage(Number(btn.dataset.bpPage));
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  });
+  document.getElementById('bpBody')?.addEventListener('scroll', () => {
+    const body = document.getElementById('bpBody');
+    if (!body || body.clientWidth < 1) return;
+    markBpPage(Math.round(body.scrollLeft / body.clientWidth));
+  }, { passive: true });
   document.getElementById('btnExpandBottomPanel')?.addEventListener('click', () => setBottomPanelCollapsed(false));
   document.getElementById('btnToggleStatTable')?.addEventListener('click', toggleStatTable);
   document.getElementById('btnExportBottomPdf')?.addEventListener('click', exportBottomPanelPdf);

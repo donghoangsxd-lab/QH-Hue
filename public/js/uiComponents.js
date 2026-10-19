@@ -480,6 +480,7 @@ function initPart1Flip() {
       resizeRaf = 0;
       updatePart1Spread();
       if (chartInstance && phoneLayout()) {
+        chartInstance.resize();
         applyPhoneChartTicks(chartInstance);
         chartInstance.update('none');
       }
@@ -513,7 +514,9 @@ export function updateInfraPieChart(sourceList, planList = [], areaLists = null)
   const labels = keys.map(k => PIE_LABELS[k] || PIE_EMPTY_LABEL);
 
   if (legendContainer) {
-    legendContainer.innerHTML = `<div class="pie-legend-row pie-legend-head"><span>Ký hiệu</span><span>Hiện trạng</span><span>Quy hoạch</span></div>`
+    const htHead = phoneLayout() ? 'HT' : 'Hiện trạng';
+    const qhHead = phoneLayout() ? 'QH' : 'Quy hoạch';
+    legendContainer.innerHTML = `<div class="pie-legend-row pie-legend-head"><span>Ký hiệu</span><span>${htHead}</span><span>${qhHead}</span></div>`
       + keys.map((k, idx) => {
         const delta = qhPct[idx] - htPct[idx];
         const qhCls = delta >= 0.1 ? 'c-green' : (delta <= -0.1 ? 'c-red' : 'c-cyan');
@@ -2267,13 +2270,15 @@ function phoneLayout() {
 }
 
 function applyPhoneChartTicks(chart) {
+  const w = chart.canvas?.parentElement?.clientWidth || chart.canvas?.clientWidth || 320;
   const x = chart.options.scales.x.ticks;
   x.font.size = 11.5;
   x.autoSkip = true;
-  x.maxTicksLimit = 8;
-  x.minRotation = 40;
-  x.maxRotation = 40;
+  x.maxTicksLimit = Math.max(4, Math.min(8, Math.floor(w / 96)));
+  x.minRotation = 0;
+  x.maxRotation = 0;
   chart.options.scales.y.ticks.font.size = 11.5;
+  chart.options.layout.padding = { top: 14, right: 8, bottom: 6, left: 0 };
 }
 
 function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
@@ -2309,7 +2314,7 @@ function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      layout: { padding: { top: 16 } },
+      layout: { padding: phone ? { top: 14, right: 8, bottom: 6, left: 0 } : { top: 16 } },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -2329,9 +2334,9 @@ function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
           stacked: true,
           ticks: {
             autoSkip: phone,
-            ...(phone ? { maxTicksLimit: 8 } : {}),
-            minRotation: phone ? 40 : 45,
-            maxRotation: phone ? 40 : 45,
+            ...(phone ? { maxTicksLimit: 6 } : {}),
+            minRotation: phone ? 0 : 45,
+            maxRotation: phone ? 0 : 45,
             callback: function(value) { return shortWardTick(this.getLabelForValue(value)); },
             color: getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#cbd5e1',
             font: { size: tickSize, family: getComputedStyle(document.body).fontFamily }
@@ -2348,4 +2353,12 @@ function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
       }
     }
   });
+  if (phone) {
+    requestAnimationFrame(() => {
+      if (!chartInstance || chartInstance.canvas !== chartEl) return;
+      chartInstance.resize();
+      applyPhoneChartTicks(chartInstance);
+      chartInstance.update('none');
+    });
+  }
 }
