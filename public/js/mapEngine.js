@@ -15,7 +15,7 @@ import { initLegendPanel } from './legendPanel.js';
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap } from './basemap.js';
 import {
-  getCoveredRightWidth, highlightPlanWard, wardFocusLayer, planMap, planLayers, syncPlanLayer,
+  getCoveredRightWidth, highlightPlanWard, highlightPlanWards, wardFocusLayer, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, getViewMode, setViewMode, passToolClick, shownMaps
 } from './planMap.js';
 import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, infraLotOf, byProjectAreaDesc, lotShown } from './projectFiles.js';
@@ -457,6 +457,36 @@ export function highlightWardBoundary(wardName, { fitView = true } = {}) {
     }
   } else if (fitView && wardInfo && wardInfo.lat != null && wardInfo.lng != null) {
     flyToVisible([wardInfo.lat, wardInfo.lng], 14);
+  }
+}
+
+/** Tô một hoặc nhiều phường (câu hỏi đáp). Một tên thì đi cùng lối chọn phường đang có. */
+export function highlightWardNames(names, { fitView = true } = {}) {
+  const list = [...new Set((names || []).map(s => String(s || '').trim()).filter(Boolean))];
+  if (!layers.highlightWard || !map) return;
+  if (list.length <= 1) {
+    highlightWardBoundary(list[0] || '', { fitView });
+    return;
+  }
+  layers.highlightWard.clearLayers();
+  highlightPlanWards(list);
+  const bounds = L.latLngBounds([]);
+  list.forEach(name => {
+    const wardInfo = state.wardLabelsList.find(w => w.name === name);
+    if (!wardInfo || !wardInfo.geometry) return;
+    const layer = wardFocusLayer(map, wardInfo.geometry);
+    layers.highlightWard.addLayer(layer);
+    const b = layer.getBounds();
+    if (b && b.isValid()) bounds.extend(b);
+  });
+  if (fitView && bounds.isValid()) {
+    map.fitBounds(bounds, {
+      paddingTopLeft: [20, 20],
+      paddingBottomRight: [20 + getRightObstruction(), 20],
+      maxZoom: 13,
+      animate: true,
+      duration: 0.8
+    });
   }
 }
 

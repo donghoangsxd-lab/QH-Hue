@@ -575,7 +575,7 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
 }
 .level-item[hidden] { display: none; }
 .level-item .ico { flex-shrink: 0; width: 14px; height: 14px; margin: 0; color: var(--accent-orange); }
-.level-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.level-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .level-item.is-pending .ico { opacity: 0.5; }
 .level-item:hover, .level-item:focus-visible { background: var(--bg-hover); outline: none; }
 .level-item.is-on::after { content: ''; width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: var(--accent-orange); }
@@ -703,6 +703,40 @@ body.compare-on .map-title-split { display: inline-flex; }
 }
 .map-toolbar .ui-btn-format:hover { background: rgba(30, 41, 59, 0.98); border-color: var(--accent-cyan); }
 
+/* HỎI ĐÁP: câu đã tính sẵn, bấm để tô phường */
+.faq-panel {
+  position: absolute; left: calc(var(--tb-btn) + 20px); top: 72px; z-index: 1000;
+  width: min(380px, calc(100vw - 84px)); max-height: min(72vh, 640px); overflow: auto;
+  padding: 8px 10px 10px; background: var(--bg-dark); color: var(--text-main);
+  backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
+  border: 1px solid var(--border-color); border-radius: var(--r-lg); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+.faq-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.faq-close { width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
+.faq-note { margin: 4px 0 8px; color: var(--text-muted); font-size: var(--fs-xs); }
+.faq-list { display: flex; flex-direction: column; gap: 6px; }
+.faq-item {
+  display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 6px 8px; text-align: left;
+  border: 1px solid var(--border-color); border-radius: var(--r-md); background: transparent; color: inherit;
+  font: inherit; cursor: pointer;
+}
+.faq-item b { font-size: var(--fs-sm); }
+.faq-item span, .faq-item small { color: var(--text-muted); font-size: var(--fs-xs); }
+.faq-item.is-on, .faq-item:hover { border-color: var(--accent-cyan); }
+.faq-priority {
+  display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+.faq-priority[hidden] { display: none; }
+.faq-priority label { font-size: var(--fs-sm); font-weight: 700; }
+.faq-priority select {
+  width: 100%; font: inherit; color: inherit; background: transparent;
+  border: 1px solid var(--border-color); border-radius: var(--r-md); padding: 4px 6px;
+}
+.faq-gap { margin-top: 8px; font-size: var(--fs-xs); color: var(--text-muted); }
+.faq-gap summary { cursor: pointer; color: var(--text-main); }
+.faq-gap p { margin: 6px 0; }
+
 /* PHÁC THẢO: bảng công cụ mở ngang cạnh nút (top đặt theo nút trong sketchLayer.js) */
 .sketch-palette {
   position: absolute;
@@ -820,6 +854,7 @@ body.right-collapsed .right-panel {
   opacity: 0;
   pointer-events: none;
 }
+.rp-sheet-handle { display: none; }
 
 .rp-collapse-btn {
   flex: 0 0 34px;
@@ -1120,6 +1155,9 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-lot-hit small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
 .project-layer .project-btn { width: 20px; height: 20px; }
 .project-layer .project-btn .ico { width: 12px; height: 12px; }
+.project-kml-btn { display: block; width: calc(100% - 22px); margin: 0 0 4px 22px; padding: 3px 6px; font: inherit; font-size: var(--fs-sm); text-align: left; border: 1px dashed rgba(var(--project-rgb), 0.65); border-radius: var(--r-md); background: transparent; color: var(--text-muted); cursor: pointer; }
+.project-kml-btn:hover:not(:disabled) { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+.project-kml-btn:disabled { opacity: 0.5; cursor: wait; }
 .project-migrate { display: block; width: 100%; margin: 0 0 4px; padding: 3px 6px; font-size: var(--fs-sm); text-align: left; border: 1px dashed rgba(var(--project-rgb), 0.65); border-radius: var(--r-md); background: transparent; color: var(--text-muted); cursor: pointer; }
 .project-migrate:disabled { opacity: 0.5; cursor: wait; }
 .road-legend.layer-legend { margin: 0 0 4px 22px; flex-wrap: wrap; row-gap: 2px; }
@@ -1233,6 +1271,8 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .flood-row b { color: #93c5fd; font-weight: 500; white-space: nowrap; }
 /* Lớp vệ tinh (satLayers.js): chọn năm, chú giải; phần thống kê dùng chung kiểu mô phỏng ngập */
 .sat-pick { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }
+.layer-map-pane > .basemap-pick { margin-bottom: 6px; }
+.basemap-pick label { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .sat-pick select { flex: 1; min-width: 0; height: 22px; padding: 0 4px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm); color: var(--text-main); font: inherit; }
 .sat-legend { margin: 4px 0; }
 .sat-legend:empty { display: none; }
@@ -3605,7 +3645,7 @@ table.ward-table th {
   .tour-spot, .tour-card { animation: none; transition: none; }
 }
 
-/* BẢNG GIỚI THIỆU TỔNG QUAN (overview.js): danh mục 5 nhóm tính năng (2 cột) ⇄ trang hướng dẫn từng mục */
+/* BẢNG GIỚI THIỆU TỔNG QUAN (overview.js): mục lục theo mức dùng hằng ngày (2 cột) ⇄ trang hướng dẫn từng mục */
 .ov-root {
   position: fixed; inset: 0; z-index: 5500;
   display: flex; align-items: center; justify-content: center;
@@ -3697,11 +3737,28 @@ table.ward-table th {
 .ov-group-ico { display: flex; color: var(--accent-cyan); }
 .ov-group-ico .ico { margin: 0; }
 .ov-group-title { margin: 0; font-size: var(--fs-md); font-weight: 700; color: var(--text-strong); line-height: 1.35; text-transform: uppercase; letter-spacing: 0.02em; }
-.ov-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; }
+.ov-item { display: block; padding: 0; }
 .ov-item + .ov-item { border-top: 1px solid var(--border-soft); }
-.ov-item:hover { background: var(--bg-hover); }
-.ov-item-main { flex: 1; min-width: 0; }
-.ov-item-title { color: var(--text-strong); font-weight: 600; line-height: 1.4; }
+.ov-item:hover { background: transparent; }
+.ov-fold { margin: 0; }
+.ov-item-sum {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 10px; cursor: pointer; list-style: none;
+}
+.ov-item-sum::-webkit-details-marker { display: none; }
+.ov-item-sum:hover { background: var(--bg-hover); }
+.ov-fold-mark {
+  position: relative; flex-shrink: 0; width: 16px; height: 16px; margin-top: 2px;
+  border-radius: 4px; background: rgba(var(--cyan-rgb), 0.12);
+}
+.ov-fold-mark::before {
+  content: ''; position: absolute; left: 6px; top: 4px;
+  border: 4px solid transparent; border-left: 5px solid var(--accent-cyan);
+}
+.ov-fold[open] > .ov-item-sum .ov-fold-mark::before { left: 3px; top: 6px; border-left-color: transparent; border-top-color: var(--accent-cyan); }
+.ov-steps-inline { margin: 0 12px 10px 34px; font-size: var(--fs-sm); }
+.ov-item-main { display: block; flex: 1; min-width: 0; }
+.ov-item-title { display: block; color: var(--text-strong); font-weight: 600; line-height: 1.4; }
 .ov-item-meta { display: flex; align-items: baseline; gap: 6px; margin-top: 3px; }
 .ov-item-note { font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.45; }
 .ov-btn {
@@ -3847,7 +3904,8 @@ table.ward-table th {
 @media (max-width: 700px) {
   .ov-root { padding: 8px; }
   .ov-stage, .ov-kicker, .ov-legend { display: none; }
-  .ov-item { flex-wrap: wrap; }
+  .ov-item-sum { flex-wrap: wrap; }
+  .ov-item-btns { margin-left: 24px; }
 }
 
 /* Làm nổi nút / dòng lớp vừa được mở từ bảng giới thiệu */
@@ -4479,5 +4537,500 @@ body.project-review.la-page #projectReviewHost {
 .sv-panel.is-dragging .sv-frame { pointer-events: none; }
 .sv-pin {
   border-radius: 50%; background: #f9b31c; border: 2px solid #fff; box-shadow: 0 0 0 3px rgba(249, 179, 28, 0.35), var(--shadow-sm);
+}
+
+.bp-phone-pager { display: none; }
+/* Điện thoại: dọc ≤840px, hoặc cảm ứng + ngang thấp (≤500px, ≤1200px, gồm ~1024×473).
+   Cửa sổ chuột hẹp KHÔNG ăn khối này — desktop giữ nguyên bố cục trước khi có giao diện điện thoại.
+   Cỡ chữ một mức: chú thích 11.5, chữ 13, tiêu đề 14–15. Nút chạm 40–44px.
+   Khóa html/body vào khung nhìn để thanh nowrap không đẩy trang sang trái. --right-w = 0 vì ngăn kéo phủ lên bản đồ. */
+@media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  html, body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+  }
+  :root {
+    --tb-btn: 44px;
+    --title-h: 44px;
+    --right-w: 0px;
+    --k: 1;
+    --fs-xs: 11.5px;
+    --fs-sm: 11.5px;
+    --fs-md: 13px;
+    --fs-lg: 14px;
+    --fs-xl: 15px;
+    --bp-head-h: 40px;
+    --face-w: min(240px, calc(100vw - 28px));
+    --bottom-h: min(46dvh, 280px);
+    --phone-chrome-top: calc(max(8px, env(safe-area-inset-top)) + var(--title-h) + 8px);
+    /* Thẻ trong #mapArea: đáy mapArea đã nằm trên panel dưới. Thanh nút là cột trái, không chiếm đáy. */
+    --phone-dock-bottom: max(8px, env(safe-area-inset-bottom));
+    --phone-tool-left: calc(max(8px, env(safe-area-inset-left)) + var(--tb-btn) + 12px);
+    --phone-fixed-bottom: var(--phone-dock-bottom);
+    /* Panel phải là thẻ góc, không chiếm hết chiều ngang. Dấu để đối chiếu bản production. */
+    --phone-panel-w: min(300px, calc(100vw - var(--phone-tool-left) - 8px));
+    --phone-title-fit: 1;
+  }
+  body:not(.bottom-collapsed) { --phone-fixed-bottom: calc(var(--bottom-h) + var(--phone-dock-bottom)); }
+  body .map-title,
+  body.right-collapsed .map-title,
+  body.compare-on .map-title {
+    top: max(8px, env(safe-area-inset-top));
+    left: 60px;
+    right: auto;
+    transform: none;
+    width: fit-content;
+    max-width: calc(100vw - 60px - 52px - max(8px, env(safe-area-inset-right)));
+    height: var(--title-h);
+    gap: 4px;
+    padding: 0 4px;
+  }
+  /* Panel đang mở: hộp tiêu đề dừng trước panel, không kéo một thanh trống sang phải. */
+  body:not(.right-collapsed) .map-title {
+    max-width: calc(100vw - 60px - var(--phone-panel-w) - 16px);
+  }
+  .map-title-body { flex: 0 1 auto; min-width: 0; }
+  .map-title-text {
+    font-size: 13px;
+    letter-spacing: 0;
+    white-space: nowrap;
+    line-height: 1.15;
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    text-wrap: nowrap;
+    text-overflow: ellipsis;
+  }
+  .map-title-level-text { display: none; }
+  .map-title-level { min-width: 44px; min-height: 40px; padding: 0 6px; }
+  .esc-hint { top: var(--phone-chrome-top); left: max(8px, env(safe-area-inset-left)); height: auto; }
+  .level-item { min-height: 44px; font-size: 13px; padding-top: 8px; padding-bottom: 8px; }
+  .ov-launch { top: max(8px, env(safe-area-inset-top)); left: 8px; }
+  .rp-expand-btn { width: 44px; height: 44px; top: max(8px, env(safe-area-inset-top)); right: 8px; }
+  .bp-expand-btn { top: auto; bottom: max(8px, env(safe-area-inset-bottom)); right: 8px; }
+  /* Cột dọc sát mép trái, dưới tiêu đề, cuộn dọc nếu nút nhiều hơn khoảng trống. Không trải ngang đáy. */
+  .map-toolbar {
+    top: var(--phone-chrome-top);
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: max(8px, env(safe-area-inset-left));
+    right: auto;
+    width: var(--tb-btn);
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: center;
+    max-height: none;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    z-index: 1100;
+    gap: 6px;
+  }
+  body:not(.bottom-collapsed) .map-toolbar { bottom: 8px; }
+  .map-toolbar .ui-btn-format { touch-action: manipulation; flex: 0 0 var(--tb-btn); }
+  #btnReviewOpen, #reviewPanel, #btnScreenshot, #btnPrintA3, #btnExportBottomPdf { display: none !important; }
+  /* Thẻ góc trên-phải, sát mép. Cao theo nội dung, tối đa phần màn hình còn lại; thân tab cuộn. */
+  .right-panel {
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    left: auto;
+    bottom: auto;
+    width: var(--phone-panel-w);
+    height: auto;
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
+    border-radius: var(--r-lg);
+    transform-origin: top right;
+  }
+  body:not(.bottom-collapsed) .right-panel {
+    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - 8px);
+  }
+  body:not(.right-collapsed).bottom-collapsed .bp-expand-btn { right: calc(var(--phone-panel-w) + 12px); }
+  body.right-collapsed .right-panel { transform: translateX(110%); visibility: hidden; }
+  .rp-sheet-handle { display: none; }
+  .rp-collapse-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    padding: 0 10px;
+    color: var(--text-strong);
+    background: #1e293b;
+  }
+  .rp-collapse-btn::after { content: 'Đóng'; font-size: 13px; font-weight: 800; }
+  .rp-body { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  .rp-progress { padding: 2px 8px; }
+  #tabLegend, #tabAdd {
+    height: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)) - 70px);
+  }
+  body:not(.bottom-collapsed) #tabLegend,
+  body:not(.bottom-collapsed) #tabAdd {
+    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - 78px);
+  }
+  /* Lớp dữ liệu: một vùng cuộn cho cả danh sách đồ án và bản đồ nền. Bản đồ nền nằm dưới danh sách, không bóp chiều cao danh sách. */
+  #tabLayers {
+    display: block;
+    height: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)) - 70px);
+  }
+  body:not(.bottom-collapsed) #tabLayers {
+    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - 78px);
+  }
+  #tabLayers .layer-tree,
+  #tabLayers .layer-main,
+  #tabLayers .layer-main-pane,
+  #tabLayers .layer-map,
+  #tabLayers .layer-map-pane {
+    display: block;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    flex: none;
+    overflow: visible;
+  }
+  #tabLayers .layer-main-pane[hidden],
+  #tabLayers .layer-map-pane[hidden] { display: none; }
+  .legend-display { max-height: none; flex: 0 1 auto; min-height: 0; overflow: visible; }
+  .bottom-panel, .bp-body, .bp-part, .bp-part-head { max-width: 100%; }
+  .bottom-panel { overflow: hidden; }
+  .bp-phone-pager {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    padding: 6px 8px 0;
+    background: rgba(30, 41, 59, 0.6);
+  }
+  .bp-phone-pager button {
+    flex: 1 1 0;
+    min-height: 36px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .bp-phone-pager button.is-on { color: var(--text-on-accent); background: var(--accent-cyan); border-color: var(--accent-cyan); }
+  .bp-body {
+    display: flex;
+    flex-direction: row;
+    grid-template-columns: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .bp-part {
+    flex: 0 0 100%;
+    width: 100%;
+    min-width: 100%;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    border-left: 0;
+  }
+  .bp-part-head { min-width: 0; height: auto; min-height: 36px; flex-wrap: nowrap; overflow-x: auto; }
+  .bp-title-wrap { max-width: 58%; }
+  .bp-part-title { overflow: hidden; text-overflow: ellipsis; }
+  .bp-actions { position: sticky; right: 0; background: #1e293b; padding-left: 6px; }
+  .tab-btn, .rp-collapse-btn { min-height: 34px; height: 34px; white-space: nowrap; flex: 0 0 auto; padding: 0 6px; }
+  .tab-btn span { white-space: nowrap; }
+  .rp-tabs { overflow-x: auto; flex-wrap: nowrap; }
+  .legend-main .layer-main-tabs { overflow: hidden; flex-wrap: nowrap; }
+  .legend-main .layer-main-tab { flex: 1 1 0; height: 32px; min-height: 32px; min-width: 0; padding: 0 1px; }
+  .legend-main .layer-main-label { flex-direction: row; gap: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; font-size: 11.5px; justify-content: center; }
+  .legend-main .layer-main-label small { display: none; }
+  #layerMain > .layer-main-tabs { overflow-x: auto; }
+  #layerMain > .layer-main-tabs .layer-main-tab { flex: 0 0 auto; height: 32px; min-height: 32px; padding: 0 4px; }
+  .layer-map-tab { height: 32px; min-height: 32px; }
+  .layer-main-pane, .layer-map-pane, .tab-body { padding: 2px 6px 4px; }
+  .layer-pane-tools { padding: 2px 0 2px; margin-bottom: 2px; }
+  .pl-hrow { height: 32px; }
+  .pl-body .pg-head { top: 32px; }
+  .pg-head, .project-row, .layer-row { min-height: 34px; }
+  .project-search { height: 32px; margin: 2px 0; }
+  .layer-row input[type="checkbox"], .project-name input { width: 18px; height: 18px; }
+  .btn-dot-buffer { width: 32px; height: 32px; }
+  .bottom-panel { border-radius: 16px 16px 0 0; }
+  .bp-btn { min-height: 32px; height: auto; padding: 0 8px; }
+  .bp-part-head { height: auto; min-height: var(--bp-head-h); }
+  .flip-card { width: 100%; perspective: none; }
+  .flip-inner, .flip-face { transform: none !important; }
+  .flip-face[aria-hidden="true"] { display: none !important; }
+  .bp-part1 .pie-chart-wrap { width: 96px; height: 96px; }
+  .bp-chart-wrap { width: 100%; min-height: 0; overflow: hidden; }
+  .bp-chart-wrap canvas { width: 100% !important; height: 100% !important; display: block; }
+  .bp-part-body { overflow: hidden; }
+  .bp-pie-inner { flex: 1; min-height: 0; align-items: stretch; gap: 8px; padding: 4px 8px; }
+  #pieLegendDetails {
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-height: none;
+    height: auto;
+    overflow: auto;
+    justify-content: flex-start;
+  }
+  #pieLegendDetails > .pie-legend-row { flex: 0 0 auto; max-height: none; min-height: 18px; }
+  .pie-legend-row { grid-template-columns: minmax(88px, 1fr) 46px 42px; }
+  .bp-legend { font-size: 11.5px; }
+  .review-panel, .sketch-palette {
+    position: fixed;
+    left: var(--phone-tool-left);
+    right: 8px;
+    top: auto !important;
+    bottom: var(--phone-fixed-bottom);
+    width: auto;
+    max-width: 100%;
+    max-height: min(46dvh, 280px);
+    overflow: auto;
+    z-index: 1400;
+  }
+  .sketch-palette { right: auto; width: min(360px, calc(100vw - 16px)); flex-direction: row; flex-wrap: wrap; }
+  body .project-brief,
+  body:not(.bottom-collapsed) .project-brief,
+  body.project-review:not(.project-view) .project-brief,
+  body .urban-focus-bar,
+  body:not(.bottom-collapsed) .urban-focus-bar,
+  body .ovd-card {
+    top: auto !important;
+    bottom: var(--phone-fixed-bottom) !important;
+    left: var(--phone-tool-left) !important;
+    width: min(320px, calc(100vw - var(--phone-tool-left) - 8px)) !important;
+    max-height: min(30dvh, 168px);
+    overflow: auto;
+  }
+  body .cad-card,
+  body:not(.bottom-collapsed) .cad-card,
+  body.project-review:not(.project-view) .cad-card,
+  body .leaflet-popup.dock-card,
+  body:not(.bottom-collapsed) .leaflet-popup.dock-card,
+  body.project-review:not(.project-view) .leaflet-popup.dock-card {
+    top: auto !important;
+    bottom: calc(var(--phone-dock-bottom) + var(--brief-stack, 0px)) !important;
+    left: var(--phone-tool-left) !important;
+    right: auto !important;
+    width: min(320px, calc(100vw - 16px)) !important;
+    max-width: min(320px, calc(100vw - 16px));
+    max-height: min(42dvh, calc(100dvh - var(--phone-chrome-top) - var(--phone-dock-bottom) - var(--brief-stack, 0px) - 8px));
+  }
+  body .cad-card.invest-card {
+    top: var(--phone-chrome-top) !important;
+    bottom: var(--phone-dock-bottom) !important;
+    max-height: calc(100dvh - var(--phone-chrome-top) - var(--phone-dock-bottom));
+  }
+  .project-brief-close,
+  .cad-card-x,
+  .dock-card a.leaflet-popup-close-button,
+  .ufb-x, .ovd-x, .proof-close, .auth-close-btn, .tour-x, .sv-close {
+    width: 40px; height: 40px; min-width: 40px; min-height: 40px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .cad-tabs { gap: 2px; padding: 4px 40px 0 4px; }
+  .cad-tab { min-height: 40px; padding: 2px 1px; }
+  .cad-tab b, .cad-tab small,
+  .cad-card .pp-sub,
+  .invest-edit-key,
+  .invest-card .invest-field > span,
+  .layer-main-count,
+  .project-phase,
+  .rs-seq,
+  .inspect-lot-pin b { font-size: 11.5px; }
+  .cad-tab small { white-space: normal; line-height: 1.15; text-align: center; }
+  .cad-card .pp-row,
+  .dock-card .pp-row { grid-template-columns: minmax(64px, 36%) minmax(0, 1fr); }
+  .cad-card .pp-row > :first-child { white-space: normal; }
+  .ov-root { padding: 10px; align-items: center; }
+  .ov-dialog { width: min(560px, 100%); max-height: min(86dvh, 560px); height: auto; margin: auto; }
+  .ov-head { padding: 8px 10px 6px; }
+  .ov-mark { width: 28px; height: 28px; }
+  .ov-title { font-size: 15px; letter-spacing: 0.2px; }
+  .ov-head-intro, .ov-lead { width: auto; margin: 6px 0 0; font-size: 13px; line-height: 1.4; }
+  .ov-body { padding: 8px 10px 6px; }
+  .ov-groups { columns: 1; }
+  .ov-group { margin-bottom: 8px; }
+  .ov-group-head, .ov-item-sum { padding: 6px 8px; min-height: 40px; }
+  .ov-detail-title { font-size: 15px; }
+  .ov-detail-grid { grid-template-columns: 1fr; }
+  .ov-stage, .ov-kicker, .ov-legend { display: none; }
+  .ov-foot { padding: 6px 8px; gap: 6px; }
+  .ov-primary, .ov-ghost, .ov-back, .ov-btn { height: 40px; font-size: 13px; }
+  .ov-csd-wrap { max-height: 28dvh; }
+  .print-dock {
+    left: var(--phone-tool-left); right: 8px; width: auto; transform: none;
+    bottom: var(--phone-dock-bottom);
+    max-height: min(46dvh, 240px);
+    overflow: auto;
+  }
+  .print-btn, .print-sizes button, .print-title-lbl input { min-height: 40px; height: 40px; }
+  .auth-modal { width: min(320px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; box-sizing: border-box; }
+  .tour-card { width: min(340px, calc(100vw - 16px)); padding: 10px 12px; }
+  .tour-text { font-size: 13px; }
+  .tour-btns button { min-height: 40px; }
+  .ward-check { top: var(--phone-chrome-top); width: min(92vw, 420px); }
+  .proof-panel { max-height: min(50dvh, 320px); }
+  .sv-panel {
+    left: 8px; right: 8px; width: auto; min-width: 0;
+    bottom: var(--phone-fixed-bottom);
+    height: min(220px, 40dvh);
+  }
+  .add-point-form input, .add-point-form select,
+  .decision-assign input { height: 36px; font-size: 13px; }
+  .project-search { height: 32px; font-size: 13px; }
+  .leaflet-top.leaflet-left { top: var(--phone-chrome-top); left: var(--phone-tool-left) !important; }
+  .leaflet-control-zoom a { width: 44px !important; height: 44px !important; line-height: 44px !important; font-size: 20px; }
+  body.bottom-collapsed .leaflet-bottom.leaflet-right { margin-bottom: 60px; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { max-width: calc(100dvw - 24px); }
+  .leaflet-popup-content { font-size: 13px; margin: 8px 10px; }
+  .inspect-popup .leaflet-popup-content { max-height: 42dvh; }
+  .mobile-fs p { font-size: 13px; line-height: 1.4; }
+  .mobile-fs:not([hidden]) {
+    display: block;
+    position: fixed;
+    z-index: 2600;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    width: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+    top: 60px;
+    padding: 10px 12px;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    border: 1px solid rgba(var(--cyan-rgb), 0.55);
+    border-radius: var(--r-lg);
+    box-shadow: var(--panel-shadow);
+  }
+  .mobile-fs p { margin: 0 0 8px; }
+  .mobile-fs-actions { display: flex; gap: 8px; }
+  .mobile-fs-go, .mobile-fs-later {
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: var(--r-md);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .mobile-fs-go { border: 0; background: var(--accent-cyan); color: var(--text-on-accent); }
+  .mobile-fs-later { border: 1px solid var(--border-color); background: transparent; color: var(--text-main); }
+}
+.mobile-fs { display: none; }
+/* Gợi ý ESC chỉ có nghĩa với bàn phím. Cảm ứng không hiện, kể cả khi chồng lên tiêu đề. */
+@media (pointer: coarse) {
+  .esc-hint { display: none !important; }
+}
+/* Ngang thấp: cột nút trái và panel góc trên-phải (không kéo tiêu đề, không ngăn kéo full-width).
+   Bắt buộc kèm điện thoại: rộng ≤840 và thấp, hoặc cảm ứng ≤1200×500. Cửa sổ chuột 1024×473 giữ desktop. */
+@media ((max-width: 840px) and (max-height: 500px)), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+  :root {
+    --right-w: min(300px, 36vw);
+    --phone-panel-w: var(--right-w);
+    --bottom-h: min(54dvh, 250px);
+    --bp-head-h: 36px;
+  }
+  body .map-title,
+  body.right-collapsed .map-title,
+  body.compare-on .map-title { right: auto; }
+  .map-toolbar {
+    top: var(--phone-chrome-top);
+    bottom: 8px;
+    left: max(8px, env(safe-area-inset-left));
+    right: auto;
+    width: var(--tb-btn);
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: none;
+  }
+  body:not(.right-collapsed) .map-toolbar { right: auto; }
+  body:not(.right-collapsed).bottom-collapsed .bp-expand-btn { right: calc(var(--phone-panel-w) + 12px); }
+  .right-panel {
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: auto;
+    left: auto;
+    width: var(--phone-panel-w);
+    height: auto;
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
+    border-radius: var(--r-lg);
+    transform-origin: top right;
+  }
+  body:not(.bottom-collapsed) .right-panel {
+    bottom: auto;
+    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - 8px);
+  }
+  body.right-collapsed .right-panel { transform: translateX(110%); visibility: hidden; opacity: 0; }
+  .rp-sheet-handle { display: none; }
+  .rp-collapse-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    padding: 0 10px;
+    color: var(--text-strong);
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .rp-collapse-btn::after { content: 'Đóng'; font-size: 13px; font-weight: 800; }
+  #tabLayers, #tabLegend { height: auto; flex: 1 1 auto; min-height: 0; }
+  body .project-brief,
+  body .cad-card,
+  body .leaflet-popup.dock-card,
+  body .urban-focus-bar,
+  body .ovd-card { width: min(280px, 42vw) !important; }
+  .review-panel {
+    left: auto;
+    right: max(8px, env(safe-area-inset-right));
+    top: var(--phone-chrome-top) !important;
+    bottom: var(--phone-dock-bottom);
+    width: min(300px, 40vw);
+    max-height: none;
+  }
+  body.bottom-collapsed .leaflet-bottom.leaflet-right { margin-bottom: 60px; }
+  .mobile-fs:not([hidden]) { top: auto; bottom: var(--phone-dock-bottom); }
+}
+/* Điện thoại dọc: tiêu đề bảng và nút không đè lên nhau; chỉ tiêu xuống dòng dưới. */
+@media (max-width: 840px) {
+  .bp-part2 .bp-part-head { flex-wrap: wrap; align-content: center; overflow: hidden; row-gap: 2px; }
+  .bp-title-wrap { max-width: none; flex: 1 1 auto; min-width: 0; }
+  .bp-head-stats { flex: 1 1 100%; order: 3; height: 22px; }
+}
+/* Dọc hẹp: tiêu đề nằm trên một hàng, panel phải bắt đầu ngay dưới tiêu đề (không kéo full ngang, không phải ngăn kéo đáy). */
+@media (max-width: 700px) {
+  body:not(.right-collapsed) .map-title {
+    max-width: calc(100vw - 68px - max(8px, env(safe-area-inset-right)));
+  }
+  .right-panel {
+    top: calc(max(8px, env(safe-area-inset-top)) + var(--title-h) + 6px);
+  }
+  #tabLayers, #tabLegend, #tabAdd {
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - var(--title-h) - max(8px, env(safe-area-inset-bottom)) - 78px);
+  }
+  body:not(.bottom-collapsed) #tabLayers,
+  body:not(.bottom-collapsed) #tabLegend,
+  body:not(.bottom-collapsed) #tabAdd {
+    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - var(--title-h) - 86px);
+  }
+}
+@media print and (max-width: 840px) {
+  html, body { position: static; inset: auto; width: auto; max-width: none; height: auto; max-height: none; overflow: visible; }
 }
 
