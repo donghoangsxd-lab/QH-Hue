@@ -4652,9 +4652,14 @@ body.project-review.la-page #projectReviewHost {
     align-items: center;
     max-height: none;
     min-width: 0;
+    box-sizing: border-box;
+    padding-bottom: 8px;
     overflow-x: hidden;
     overflow-y: auto;
-    z-index: 1100;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    z-index: 1300;
     gap: 6px;
   }
   body:not(.bottom-collapsed) .map-toolbar { bottom: 8px; }
@@ -4681,16 +4686,19 @@ body.project-review.la-page #projectReviewHost {
   .rp-collapse-btn {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
+    gap: 0;
     flex: 0 0 auto;
     position: sticky;
     right: 0;
     z-index: 1;
-    padding: 0 10px;
+    width: 36px;
+    min-width: 36px;
+    padding: 0;
     color: var(--text-strong);
     background: #1e293b;
   }
-  .rp-collapse-btn::after { content: 'Đóng'; font-size: 13px; font-weight: 800; }
+  .rp-collapse-btn::after { content: none; }
   .rp-body { flex: 1 1 auto; min-height: 0; overflow: hidden; }
   .rp-progress { padding: 2px 8px; }
   #tabLegend, #tabAdd {
@@ -4735,6 +4743,21 @@ body.project-review.la-page #projectReviewHost {
   #tabLayers .layer-main-pane[hidden],
   #tabLayers .layer-map-pane[hidden] { display: none; }
   .legend-display { max-height: none; flex: 0 1 auto; min-height: 0; overflow: visible; }
+  /* Chú giải: .legend-main là flex 1 1 0 + min-height 0. Khi #tabLegend cao theo nội dung, mục đó co về 0
+     và chỉ còn khối "Hiển thị lô đất". Thả flex như tab Lớp dữ liệu để tab con, ô tìm và ký hiệu nằm trong vùng cuộn. */
+  #tabLegend .layer-tree,
+  #tabLegend .legend-main,
+  #tabLegend .layer-main-pane,
+  #tabLegend .legend-display,
+  #tabLegend .layer-map-pane {
+    display: block;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    flex: none;
+    overflow: visible;
+  }
+  #tabLegend [hidden] { display: none !important; }
   .bottom-panel, .bp-body, .bp-part, .bp-part-head { max-width: 100%; }
   .bottom-panel { overflow: hidden; }
   .bp-phone-pager {
@@ -4781,10 +4804,10 @@ body.project-review.la-page #projectReviewHost {
   .tab-btn, .rp-collapse-btn { min-height: 34px; height: 34px; white-space: nowrap; flex: 0 0 auto; padding: 0 6px; }
   .tab-btn span { white-space: nowrap; }
   .rp-tabs { overflow-x: auto; flex-wrap: nowrap; }
-  .legend-main .layer-main-tabs { overflow: hidden; flex-wrap: nowrap; }
-  .legend-main .layer-main-tab { flex: 1 1 0; height: 32px; min-height: 32px; min-width: 0; padding: 0 1px; }
-  .legend-main .layer-main-label { flex-direction: row; gap: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; font-size: 11.5px; justify-content: center; }
-  .legend-main .layer-main-label small { display: none; }
+  .legend-main .layer-main-tabs { overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+  .legend-main .layer-main-tab { flex: 0 0 auto; height: 32px; min-height: 32px; min-width: 0; padding: 0 8px; }
+  .legend-main .layer-main-label { flex-direction: row; gap: 3px; white-space: nowrap; overflow: visible; text-overflow: clip; line-height: 1.2; font-size: 11.5px; justify-content: center; }
+  .legend-main .layer-main-label small { display: inline; font-size: 11.5px; }
   #layerMain > .layer-main-tabs { overflow-x: auto; }
   #layerMain > .layer-main-tabs .layer-main-tab { flex: 0 0 auto; height: 32px; min-height: 32px; padding: 0 4px; }
   .layer-map-tab { height: 32px; min-height: 32px; }
@@ -4988,6 +5011,9 @@ body.project-review.la-page #projectReviewHost {
     overflow-x: hidden;
     overflow-y: auto;
     max-height: none;
+    box-sizing: border-box;
+    padding-bottom: 8px;
+    z-index: 1300;
   }
   body:not(.right-collapsed) .map-toolbar { right: auto; }
   body:not(.right-collapsed).bottom-collapsed .bp-expand-btn { right: calc(var(--phone-panel-w) + 12px); }
@@ -5011,13 +5037,16 @@ body.project-review.la-page #projectReviewHost {
   .rp-collapse-btn {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
+    gap: 0;
     flex: 0 0 auto;
-    padding: 0 10px;
+    width: 36px;
+    min-width: 36px;
+    padding: 0;
     color: var(--text-strong);
     background: rgba(255, 255, 255, 0.08);
   }
-  .rp-collapse-btn::after { content: 'Đóng'; font-size: 13px; font-weight: 800; }
+  .rp-collapse-btn::after { content: none; }
   #tabLayers, #tabLegend { height: auto; flex: 1 1 auto; min-height: 0; }
   body .project-brief,
   body .cad-card,
