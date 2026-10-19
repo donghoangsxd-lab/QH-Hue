@@ -75,6 +75,7 @@ import { initSatLayers } from './satLayers.js';
 import { initSketchLayer, handleSketchClick } from './sketchLayer.js';
 import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
 import { initOverview } from './overview.js';
+import { initMobileShell } from './mobileShell.js';
 import { initRiskLayer } from './riskLayer.js';
 import { initUrbanAreaLayer, refreshUrbanAreaLayer, urbanAreaReady } from './urbanAreaLayer.js';
 import { initLayerDecisions } from './layerDecisions.js';
@@ -357,6 +358,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initRiskLayer();
   initSketchLayer();
   initOverview();
+  initMobileShell();
   restoreAdminSession();
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleSplit);
   initMapTitle();

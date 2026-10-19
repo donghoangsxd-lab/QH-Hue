@@ -4501,3 +4501,118 @@ body.project-review.la-page #projectReviewHost {
   border-radius: 50%; background: #f9b31c; border: 2px solid #fff; box-shadow: 0 0 0 3px rgba(249, 179, 28, 0.35), var(--shadow-sm);
 }
 
+/* Điện thoại (≤840px, gồm 360×800 và 800×360): panel thành ngăn kéo đáy, nút chạm ≥44px, bản đồ còn chỗ */
+@media (max-width: 840px) {
+  :root {
+    --tb-btn: 44px;
+    --title-h: 44px;
+    --right-w: 100%;
+    --bottom-h: min(42dvh, 280px);
+    --fs-xs: 12px;
+    --fs-sm: 13px;
+    --fs-md: 15px;
+    --fs-lg: 16px;
+    --fs-xl: 18px;
+  }
+  body .map-title,
+  body.right-collapsed .map-title,
+  body.compare-on .map-title {
+    top: max(8px, env(safe-area-inset-top));
+    left: 60px;
+    right: 60px;
+    transform: none;
+    max-width: none;
+    width: auto;
+    height: var(--title-h);
+    gap: 4px;
+    padding: 0 4px;
+  }
+  .map-title-text { font-size: 12px; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-title-level-text { display: none; }
+  .map-title-level { min-width: 44px; min-height: 36px; padding: 0 6px; }
+  .ov-launch { top: max(8px, env(safe-area-inset-top)); left: 8px; }
+  .rp-expand-btn { width: 44px; height: 44px; top: max(8px, env(safe-area-inset-top)); right: 8px; }
+  .bp-expand-btn { top: auto; bottom: max(8px, env(safe-area-inset-bottom)); }
+  .map-toolbar {
+    top: auto;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: 8px;
+    right: 60px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    max-height: 148px;
+    z-index: 1100;
+  }
+  body:not(.bottom-collapsed) .map-toolbar { bottom: calc(var(--bottom-h) + 8px); }
+  .map-toolbar .ui-btn-format { touch-action: manipulation; }
+  .right-panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: min(72dvh, 560px);
+    border-radius: 16px 16px 0 0;
+    transform-origin: center bottom;
+  }
+  body.right-collapsed .right-panel { transform: translateY(110%); }
+  .tab-btn, .rp-collapse-btn, .layer-main-tab, .layer-map-tab { min-height: 44px; }
+  .rp-tabs { overflow-x: auto; }
+  .layer-row { min-height: 44px; }
+  .layer-row input[type="checkbox"] { width: 22px; height: 22px; }
+  .btn-dot-buffer { width: 36px; height: 36px; }
+  .bottom-panel { border-radius: 16px 16px 0 0; }
+  .review-panel, .sketch-palette {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    top: auto !important;
+    bottom: 120px;
+    width: auto;
+    max-width: calc(100vw - 16px);
+    max-height: min(60dvh, 420px);
+    z-index: 1400;
+  }
+  .sketch-palette { right: auto; flex-direction: row; flex-wrap: wrap; }
+  .leaflet-top.leaflet-left { top: 58px; }
+  .leaflet-control-zoom a { width: 44px !important; height: 44px !important; line-height: 44px !important; font-size: 20px; }
+  body.bottom-collapsed .leaflet-bottom.leaflet-right { margin-bottom: 108px; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { max-width: calc(100vw - 24px); }
+  .leaflet-popup-content { font-size: 14px; margin: 10px 12px; }
+  .inspect-popup .leaflet-popup-content { max-height: 42dvh; }
+  .mobile-fs:not([hidden]) {
+    display: block;
+    position: fixed;
+    z-index: 2600;
+    left: 8px;
+    right: 8px;
+    top: 60px;
+    padding: 10px 12px;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    border: 1px solid rgba(var(--cyan-rgb), 0.55);
+    border-radius: var(--r-lg);
+    box-shadow: var(--panel-shadow);
+  }
+  .mobile-fs p { margin: 0 0 8px; font-size: 14px; line-height: 1.4; }
+  .mobile-fs-actions { display: flex; gap: 8px; }
+  .mobile-fs-go, .mobile-fs-later {
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: var(--r-md);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .mobile-fs-go { border: 0; background: var(--accent-cyan); color: var(--text-on-accent); }
+  .mobile-fs-later { border: 1px solid var(--border-color); background: transparent; color: var(--text-main); }
+}
+.mobile-fs { display: none; }
+@media (max-width: 840px) and (max-height: 520px) {
+  .map-toolbar { flex-wrap: nowrap; overflow-x: auto; max-height: 52px; }
+  .review-panel, .sketch-palette { bottom: 64px; }
+  body.bottom-collapsed .leaflet-bottom.leaflet-right { margin-bottom: 60px; }
+  .mobile-fs:not([hidden]) { top: auto; bottom: 64px; }
+}
+
