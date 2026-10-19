@@ -1127,7 +1127,20 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 /* LOẠI ĐÔ THỊ HIỆN TRẠNG (urbanAreaLayer.js) */
 .ua-legend { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 0 0 4px 22px; font-size: var(--fs-xs); color: var(--text-muted); }
 .ua-legend-pane { padding: 2px 0 6px; }
-.ua-legend-pane .ua-legend { margin: 2px 0 6px; gap: 6px 14px; }
+.ua-legend-pane .tt16-legend { margin: 0; }
+.ua-legend-pane .tt16-row > i {
+  width: 28px; height: 14px; box-sizing: border-box; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ua-legend-pane .tt16-row > .ua-badge {
+  position: static; transform: none; width: 14px; height: 14px; margin: 0 7px;
+  border-width: 1.5px; font-size: 7px; box-shadow: none; cursor: default;
+}
+.ua-legend-pane .tt16-row > .ua-badge span { flex: none; overflow: visible; text-overflow: clip; }
+.ua-legend-pane .tt16-row > .ua-badge-III { font-size: 6px; letter-spacing: -0.03em; }
+.ua-legend-pane .tt16-row > .ua-sw { width: 28px; height: 14px; border-radius: 2px; border: 1.3px solid rgba(15, 23, 42, 0.45); }
+.ua-legend-pane .tt16-row > .ua-sw-line { width: 28px; height: 0; border-top: 2px dashed #f8fafc; }
+.ua-legend-pane .tt16-row > .ua-sw-line.ua-sw-solid { border-top-style: solid; border-top-width: 3px; }
 .ua-legend-pane .ua-legend-note { display: block; color: var(--text-muted); font-size: var(--fs-xs); }
 .ua-legend-item { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .ua-legend-note { flex-basis: 100%; font-style: italic; }
