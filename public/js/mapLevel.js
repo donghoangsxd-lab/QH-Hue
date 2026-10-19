@@ -118,35 +118,48 @@ function fitButton() {
   text.style.minWidth = `${Math.ceil(Math.min(widest, cap))}px`;
 }
 
-// Menu rộng bằng chữ dài nhất, không khóa theo nút: trên điện thoại nút chỉ còn icon nên khóa theo nút sẽ cắt nhãn còn một chữ.
+// Cùng điều kiện với khối điện thoại trong style.css. Máy tính (chuột, cửa sổ hẹp) giữ menu trùng mép nút.
+const PHONE_LAYOUT = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px))');
+
+// Desktop: menu trùng mép trái / phải với nút. Điện thoại: nút chỉ còn icon nên menu rộng bằng chữ, không cắt nhãn.
 function placeMenu() {
   const r = button.getBoundingClientRect();
   const icon = button.querySelector('.ico');
-  const vw = document.documentElement.clientWidth || window.innerWidth;
-  menu.style.top = `${Math.round(r.bottom + 6)}px`;
-  menu.style.width = 'max-content';
-  menu.style.maxWidth = 'none';
-  menu.querySelectorAll('.level-item').forEach(el => {
-    el.style.width = 'max-content';
-    el.style.overflow = 'visible';
-  });
-  menu.querySelectorAll('.level-item span').forEach(el => {
-    el.style.overflow = 'visible';
-    el.style.minWidth = 'max-content';
-  });
-  const need = menu.scrollWidth;
-  menu.querySelectorAll('.level-item, .level-item span').forEach(el => {
-    el.style.width = '';
-    el.style.overflow = '';
-    el.style.minWidth = '';
-  });
-  const width = Math.min(Math.max(need, Math.round(r.width)), Math.max(160, vw - 16));
-  menu.style.width = `${width}px`;
-  let left = Math.round(r.right - width);
-  if (left < 8) left = 8;
-  if (left + width > vw - 8) left = Math.max(8, vw - 8 - width);
-  menu.style.left = `${left}px`;
   const inset = menu.clientLeft + parseFloat(getComputedStyle(menu).paddingLeft);
+  menu.style.top = `${Math.round(r.bottom + 6)}px`;
+  if (!PHONE_LAYOUT.matches) {
+    menu.style.left = `${Math.round(r.left)}px`;
+    menu.style.width = `${Math.round(r.width)}px`;
+    menu.style.maxWidth = '';
+  } else {
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const items = [...menu.querySelectorAll('.level-item')];
+    const hidden = items.map(el => el.hidden);
+    items.forEach(el => { el.hidden = false; });
+    menu.style.width = 'max-content';
+    menu.style.maxWidth = 'none';
+    items.forEach(el => {
+      el.style.width = 'max-content';
+      el.style.overflow = 'visible';
+    });
+    menu.querySelectorAll('.level-item span').forEach(el => {
+      el.style.overflow = 'visible';
+      el.style.minWidth = 'max-content';
+    });
+    const need = menu.scrollWidth;
+    menu.querySelectorAll('.level-item, .level-item span').forEach(el => {
+      el.style.width = '';
+      el.style.overflow = '';
+      el.style.minWidth = '';
+    });
+    items.forEach((el, i) => { el.hidden = hidden[i]; });
+    const width = Math.min(Math.max(need, Math.round(r.width)), Math.max(160, vw - 16));
+    menu.style.width = `${width}px`;
+    let left = Math.round(r.right - width);
+    if (left < 8) left = 8;
+    if (left + width > vw - 8) left = Math.max(8, vw - 8 - width);
+    menu.style.left = `${left}px`;
+  }
   if (icon) menu.style.setProperty('--level-indent', `${Math.max(0, Math.round(icon.getBoundingClientRect().left - r.left - inset))}px`);
 }
 

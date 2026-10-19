@@ -476,7 +476,14 @@ function initPart1Flip() {
   watchWardSplit();
   let resizeRaf = 0;
   window.addEventListener('resize', () => {
-    if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; updatePart1Spread(); });
+    if (!resizeRaf) resizeRaf = requestAnimationFrame(() => {
+      resizeRaf = 0;
+      updatePart1Spread();
+      if (chartInstance && phoneLayout()) {
+        applyPhoneChartTicks(chartInstance);
+        chartInstance.update('none');
+      }
+    });
   });
   updatePart1Spread();
   document.getElementById('btnFlipPart1')?.addEventListener('click', () => setPart1Turn(part1Turn + 1));
@@ -2254,6 +2261,21 @@ function planStackDatasets(label, stack, color, series) {
   ];
 }
 
+// Cùng mốc với style.css: chỉ điện thoại. Máy tính giữ cỡ nhãn và autoSkip như trước.
+function phoneLayout() {
+  return window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px))').matches;
+}
+
+function applyPhoneChartTicks(chart) {
+  const x = chart.options.scales.x.ticks;
+  x.font.size = 11.5;
+  x.autoSkip = true;
+  x.maxTicksLimit = 8;
+  x.minRotation = 40;
+  x.maxRotation = 40;
+  chart.options.scales.y.ticks.font.size = 11.5;
+}
+
 function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
   const chartEl = document.getElementById('infraChart');
   if (!chartEl || typeof Chart === 'undefined') return;
@@ -2262,14 +2284,16 @@ function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
     ...planStackDatasets('Quy mô', 'scale', CHART_SCALE_COLOR, scale)
   ];
 
+  const phone = phoneLayout();
   const k = screenScale();
-  const tickSize = 10.5 * k;
-  const yTickSize = 12 * k;
+  const tickSize = phone ? 11.5 : 10.5 * k;
+  const yTickSize = phone ? 11.5 : 12 * k;
 
   // Cập nhật dữ liệu tại chỗ (độ phủ về dần từng phường) thay vì hủy/tạo lại chart
   if (chartInstance && chartInstance.canvas === chartEl) {
     chartInstance.options.scales.x.ticks.font.size = tickSize;
     chartInstance.options.scales.y.ticks.font.size = yTickSize;
+    if (phone) applyPhoneChartTicks(chartInstance);
     chartInstance.data.labels = labels;
     chartInstance.data.datasets.forEach((ds, i) => {
       ds.data = datasets[i].data;
@@ -2304,9 +2328,10 @@ function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
         x: {
           stacked: true,
           ticks: {
-            autoSkip: false,
-            minRotation: 45,
-            maxRotation: 45,
+            autoSkip: phone,
+            ...(phone ? { maxTicksLimit: 8 } : {}),
+            minRotation: phone ? 40 : 45,
+            maxRotation: phone ? 40 : 45,
             callback: function(value) { return shortWardTick(this.getLabelForValue(value)); },
             color: getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#cbd5e1',
             font: { size: tickSize, family: getComputedStyle(document.body).fontFamily }
