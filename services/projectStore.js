@@ -4,7 +4,7 @@
 //   projects/<slug>/su-dung-dat.json — chức năng sử dụng đất / bản đồ quy hoạch (lô QH)
 //   projects/<slug>/diem-chuc-nang.json — điểm chức năng
 //   projects/<slug>/ranh-gioi.json — ranh giới quy hoạch
-//   projects/<slug>/quyet-dinh.pdf — PDF quyết định phê duyệt (admin gắn ≤ 1 MB, hoặc duyệt file người dùng gửi ≤ 2 MB).
+//   projects/<slug>/quyet-dinh.pdf — PDF quyết định phê duyệt (admin tối đa 10 MB, người dùng gửi chờ duyệt tối đa 2 MB).
 //   projects/<slug>/vb-<id>.pdf — văn bản kèm (đính chính, quy định quản lý, phê duyệt thêm), tối đa 8 file, cùng decisions.json.
 //   Link ngoài nằm ở projects/decisions.json (kind: link), chỉ gán sau khi máy chủ mở được link.
 //   projects/<slug>/ht-|qh-giao-thong|cap-nuoc|thoat-nuoc|cap-dien.json — bản vẽ hạ tầng riêng đồ án (bật/tắt, chưa nối mạng toàn thành phố).
@@ -18,6 +18,7 @@ const crypto = require('crypto');
 const dns = require('dns').promises;
 const net = require('net');
 const constants = require('../config/constants');
+const pdfLimits = require('./pdfLimits');
 const gcsWrite = require('./gcsWrite');
 const { getCadParcels, getRawDataList, invalidateCache } = require('./gcsService');
 
@@ -365,14 +366,13 @@ async function catalog() {
   return { base: constants.PROJECTS_GCS_BASE, migrated, projects };
 }
 
-// ============================ QUYẾT ĐỊNH PHÊ DUYỆT (PDF ≤ 1 MB) ============================
+// ============================ QUYẾT ĐỊNH PHÊ DUYỆT (admin 10 MB, người dùng 2 MB) ============================
 
 const DECISIONS_NAME = 'projects/decisions.json';
 const DECISION_FILE = 'quyet-dinh.pdf';
-const DECISION_MAX_BYTES = 1024 * 1024;
 const PROPOSALS_NAME = 'projects/decision-proposals.json';
 const PROPOSAL_FILE = 'quyet-dinh-cho.pdf';
-const PROPOSAL_MAX_BYTES = 2 * 1024 * 1024;
+const STAGED_RE = /^[a-f0-9]{32}$/;
 // Văn bản kèm theo quyết định phê duyệt. id 8 ký tự hex, file projects/<slug>/vb-<id>.pdf
 const DOC_ROLES = { 'phe-duyet': 'Quyết định phê duyệt', 'dinh-chinh': 'Quyết định đính chính', 'quy-dinh': 'Quy định quản lý' };
 const DOC_MAX = 8;
@@ -417,11 +417,77 @@ function decisionFileName(raw) {
   return /\.pdf$/i.test(base) ? base : `${base}.pdf`;
 }
 
-function pdfOk(buffer, maxBytes = DECISION_MAX_BYTES) {
+function pdfOk(buffer, maxBytes) {
   return Buffer.isBuffer(buffer)
     && buffer.length >= 5
     && buffer.length <= maxBytes
     && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
+}
+
+function rejectPdf(buffer, maxBytes) {
+  const admin = maxBytes > pdfLimits.PDF_USER_MAX_BYTES;
+  const tooBig = buffer && buffer.length > maxBytes;
+  const err = new Error(tooBig ? pdfLimits.tooBigMessage(admin) : (buffer && buffer.length >= 5 ? 'Chỉ nhận file PDF.' : 'File PDF rỗng.'));
+  err.status = tooBig ? 413 : 400;
+  throw err;
+}
+
+function stagedObject(token) {
+  if (!STAGED_RE.test(String(token || ''))) {
+    const err = new Error('Mã file tải lên không hợp lệ.');
+    err.status = 400;
+    throw err;
+  }
+  return `projects/_pdf-in/${token}.pdf`;
+}
+
+async function discardStaged(name) {
+  try { await gcsWrite.removeObject(name); } catch (err) { /* file tạm không còn */ }
+}
+
+// File admin đã PUT lên projects/_pdf-in. Kiểm tra cỡ, loại, magic %PDF rồi chép sang đích.
+function saPdfError(err) {
+  if (!err || err.code !== 'NO_SA') return err;
+  const next = new Error('Tải PDF lớn hơn 2 MB cần service account ghi bucket (GEE_PRIVATE_KEY, quyền roles/storage.objectAdmin trên hue-infra-data-us).');
+  next.status = 500;
+  return next;
+}
+
+async function takeStagedPdf(token, destName, maxBytes) {
+  const src = stagedObject(token);
+  let meta;
+  try { meta = await gcsWrite.objectMeta(src); }
+  catch (err) { throw saPdfError(err); }
+  if (!meta) {
+    const err = new Error('Không thấy file PDF vừa tải. Chọn lại file.');
+    err.status = 404;
+    throw err;
+  }
+  if (meta.size > maxBytes) {
+    await discardStaged(src);
+    const err = new Error(pdfLimits.tooBigMessage(maxBytes > pdfLimits.PDF_USER_MAX_BYTES));
+    err.status = 413;
+    throw err;
+  }
+  if (meta.contentType && !/^application\/pdf\b/i.test(meta.contentType)) {
+    await discardStaged(src);
+    const err = new Error('Chỉ nhận file PDF.');
+    err.status = 400;
+    throw err;
+  }
+  let head;
+  try { head = await gcsWrite.readBytes(src, 0, 4); }
+  catch (err) { throw saPdfError(err); }
+  if (head.length < 4 || head.toString('ascii', 0, 4) !== '%PDF') {
+    await discardStaged(src);
+    const err = new Error('Chỉ nhận file PDF.');
+    err.status = 400;
+    throw err;
+  }
+  try { await gcsWrite.rewriteObject(src, destName); }
+  catch (err) { throw saPdfError(err); }
+  await discardStaged(src);
+  return meta.size;
 }
 
 function emptyDecisions() {
@@ -731,26 +797,29 @@ async function removeLayerDecision(layer) {
   return removeDecision(name, slug);
 }
 
-async function saveDecision({ tenQH, layer, fileName, buffer, maxBytes }) {
-  const limit = maxBytes || DECISION_MAX_BYTES;
-  if (!pdfOk(buffer, limit)) {
-    const err = new Error(buffer && buffer.length > limit
-      ? `File quyết định lớn hơn ${limit > DECISION_MAX_BYTES ? '2 MB' : '1 MB'}`
-      : 'Chỉ nhận file PDF');
-    err.status = buffer && buffer.length > limit ? 413 : 400;
-    throw err;
-  }
+async function saveDecision({ tenQH, layer, fileName, buffer, stagedToken, maxBytes }) {
+  const limit = maxBytes || pdfLimits.PDF_ADMIN_MAX_BYTES;
   const { name, slug } = await decisionTarget({ tenQH, layer });
-  const written = await writeBytes(decisionObject(slug), buffer, 'application/pdf');
+  const dest = decisionObject(slug);
+  let bytes = 0;
+  let via = 'direct';
+  if (stagedToken) {
+    bytes = await takeStagedPdf(stagedToken, dest, limit);
+  } else {
+    if (!pdfOk(buffer, limit)) rejectPdf(buffer, limit);
+    const written = await writeBytes(dest, buffer, 'application/pdf');
+    via = written.via;
+    bytes = buffer.length;
+  }
   const at = Date.now();
-  const meta = { kind: 'pdf', slug, name: decisionFileName(fileName), bytes: buffer.length, at, embed: true };
+  const meta = { kind: 'pdf', slug, name: decisionFileName(fileName), bytes, at, embed: true };
   const indexed = await updateDecisions(cur => {
     const items = { ...(cur.items || {}) };
     const prev = items[name];
     items[name] = { ...meta, docs: prev && Array.isArray(prev.docs) ? prev.docs : [] };
     return { ...cur, items };
   });
-  return { ...decisionView(meta), via: written.via || indexed.via, accessUrl: publicUrl(decisionObject(slug)) };
+  return { ...decisionView(meta), via: via || indexed.via, accessUrl: publicUrl(decisionObject(slug)) };
 }
 
 // Gán link chỉ sau khi reviewDecisionLink mở được trang. File PDF cũ trên bucket bị gỡ.
@@ -806,7 +875,7 @@ async function fetchStoredPdf(objectName, at, fileName) {
   const res = await axios.get(`${publicUrl(objectName)}?v=${at}`, {
     timeout: 20000,
     responseType: 'arraybuffer',
-    maxContentLength: PROPOSAL_MAX_BYTES + 4096,
+    maxContentLength: pdfLimits.PDF_PROXY_MAX_BYTES + 8192,
     validateStatus: () => true
   });
   if (res.status === 404) {
@@ -838,14 +907,22 @@ async function readDecision(slug, docId) {
     const doc = meta && (meta.docs || []).find(d => d && d.id === wantDoc && d.at);
     if (!doc) rejectReview('Không có văn bản này trong hồ sơ đồ án', 404);
     if (doc.kind === 'link') rejectReview('Văn bản này là link ngoài', 404);
-    return fetchStoredPdf(docObject(key, wantDoc), doc.at, doc.name);
+    return deliverStoredPdf(docObject(key, wantDoc), doc.at, doc.name, doc.bytes);
   }
   if (!meta || !meta.at) rejectReview('Đồ án chưa có quyết định phê duyệt', 404);
   if (meta.kind === 'link') rejectReview('Quyết định này là link ngoài', 404);
-  return fetchStoredPdf(decisionObject(key), meta.at, meta.name);
+  return deliverStoredPdf(decisionObject(key), meta.at, meta.name, meta.bytes);
 }
 
-async function saveProjectDoc({ tenQH, role, fileName, buffer, url, replaceId }) {
+function deliverStoredPdf(objectName, at, fileName, bytes) {
+  const url = `${publicUrl(objectName)}?v=${at || 0}`;
+  if (Number(bytes) > pdfLimits.PDF_PROXY_MAX_BYTES) {
+    return { direct: true, url, name: decisionFileName(fileName), at: Number(at) || 0 };
+  }
+  return fetchStoredPdf(objectName, at, fileName);
+}
+
+async function saveProjectDoc({ tenQH, role, fileName, buffer, url, replaceId, stagedToken }) {
   if (!Object.prototype.hasOwnProperty.call(DOC_ROLES, role)) rejectReview('Loại văn bản không hợp lệ');
   const swap = DOC_ID_RE.test(String(replaceId || '')) ? String(replaceId) : '';
   const { name, slug } = await listedProject(tenQH);
@@ -864,14 +941,18 @@ async function saveProjectDoc({ tenQH, role, fileName, buffer, url, replaceId })
       bytes: review.bytes, at: Date.now(), embed: review.embed
     };
   } else {
-    if (!pdfOk(buffer)) {
-      const err = new Error(buffer && buffer.length > DECISION_MAX_BYTES ? 'File PDF lớn hơn 1 MB' : 'Chỉ nhận file PDF');
-      err.status = buffer && buffer.length > DECISION_MAX_BYTES ? 413 : 400;
-      throw err;
+    const dest = docObject(slug, id);
+    let docBytes = 0;
+    if (stagedToken) {
+      docBytes = await takeStagedPdf(stagedToken, dest, pdfLimits.PDF_ADMIN_MAX_BYTES);
+      via = 'direct';
+    } else {
+      if (!pdfOk(buffer, pdfLimits.PDF_ADMIN_MAX_BYTES)) rejectPdf(buffer, pdfLimits.PDF_ADMIN_MAX_BYTES);
+      const written = await writeBytes(dest, buffer, 'application/pdf');
+      via = written.via;
+      docBytes = buffer.length;
     }
-    const written = await writeBytes(docObject(slug, id), buffer, 'application/pdf');
-    via = written.via;
-    meta = { id, role, kind: 'pdf', name: decisionFileName(fileName), bytes: buffer.length, at: Date.now(), embed: true };
+    meta = { id, role, kind: 'pdf', name: decisionFileName(fileName), bytes: docBytes, at: Date.now(), embed: true };
   }
   const indexed = await updateDecisions(c => {
     const items = { ...(c.items || {}) };
@@ -918,7 +999,7 @@ async function removeProjectDoc(tenQH, id) {
   return { docs: item ? docsView(item) : [] };
 }
 
-// ============================ QUYẾT ĐỊNH CHỜ DUYỆT (người dùng gửi PDF < 2 MB) ============================
+// ============================ QUYẾT ĐỊNH CHỜ DUYỆT (người dùng gửi PDF tối đa 2 MB) ============================
 
 function proposalObject(slug) {
   return `projects/${slug}/${PROPOSAL_FILE}`;
@@ -995,11 +1076,7 @@ async function attachProposals(projects) {
 }
 
 async function saveDecisionProposal({ tenQH, fileName, buffer }) {
-  if (!pdfOk(buffer, PROPOSAL_MAX_BYTES - 1)) {
-    const err = new Error(buffer && buffer.length >= PROPOSAL_MAX_BYTES ? 'File quyết định lớn hơn 2 MB' : 'Chỉ nhận file PDF');
-    err.status = buffer && buffer.length >= PROPOSAL_MAX_BYTES ? 413 : 400;
-    throw err;
-  }
+  if (!pdfOk(buffer, pdfLimits.PDF_USER_MAX_BYTES)) rejectPdf(buffer, pdfLimits.PDF_USER_MAX_BYTES);
   const { name, slug } = await listedProject(tenQH);
   const cur = await readProposals();
   if (cur.data.items && cur.data.items[name]) rejectReview('Đồ án đang có file quyết định chờ admin duyệt', 409);
@@ -1022,7 +1099,7 @@ async function readDecisionProposal(tenQH) {
   const res = await axios.get(`${publicUrl(proposalObject(meta.slug))}?v=${meta.at}`, {
     timeout: 20000,
     responseType: 'arraybuffer',
-    maxContentLength: PROPOSAL_MAX_BYTES + 4096,
+    maxContentLength: pdfLimits.PDF_USER_MAX_BYTES + 4096,
     validateStatus: () => true
   });
   if (res.status === 404) rejectReview('File quyết định chờ duyệt không còn trên bucket', 404);
@@ -1052,7 +1129,7 @@ async function approveDecisionProposal(tenQH) {
   const { name, slug } = await listedProject(tenQH);
   const file = await readDecisionProposal(name);
   const saved = await saveDecision({
-    tenQH: name, fileName: file.name, buffer: file.buffer, maxBytes: PROPOSAL_MAX_BYTES
+    tenQH: name, fileName: file.name, buffer: file.buffer, maxBytes: pdfLimits.PDF_USER_MAX_BYTES
   });
   await clearProposal(name, slug);
   return saved;
@@ -2101,11 +2178,10 @@ async function legacyLots(tenQH) {
 
 // ============================ ĐIỀU CHỈNH CỤC BỘ ============================
 // projects/adjustments.json — chỉ mục { v, items: [meta] }, gồm cả hồ sơ chờ duyệt (status pending | approved)
-// projects/<slug>/adjust/<id>.json — ranh + lô đất mới; projects/<slug>/adjust/<id>.pdf — QĐ / bản vẽ scan ≤ 2 MB
+// projects/<slug>/adjust/<id>.json — ranh + lô đất mới; projects/<slug>/adjust/<id>.pdf — QĐ (người dùng 2 MB, admin 10 MB)
 // projects/<slug>/adjust/<id>.scan — ảnh tờ bản vẽ scan (WebP/PNG/JPEG ≤ 2 MB); thông số định vị (3 góc ảnh) nằm trong chỉ mục
 const ADJUST_INDEX = 'projects/adjustments.json';
 const ADJUST_ID_RE = /^[a-f0-9]{16}$/;
-const ADJUST_PDF_MAX_BYTES = 2 * 1024 * 1024;
 const ADJUST_SCAN_MAX_BYTES = 2 * 1024 * 1024;
 // Tờ A3 rộng hơn ranh điều chỉnh nhiều lần: góc ảnh được phép nằm ngoài khung TP. Huế trong khoảng này (độ)
 const SCAN_MARGIN_DEG = 0.1;
@@ -2332,23 +2408,24 @@ async function saveAdjustment({ tenQH, boundary, lots, codes, title, sender, not
   return { ...adjustView(meta), via: saved.via };
 }
 
-function pdfBytesOk(buffer) {
-  return Buffer.isBuffer(buffer) && buffer.length >= 5 && buffer.length <= ADJUST_PDF_MAX_BYTES
-    && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
-}
-
-async function attachAdjustPdf({ id, fileName, buffer, admin }) {
+async function attachAdjustPdf({ id, fileName, buffer, stagedToken, admin }) {
   if (!ADJUST_ID_RE.test(String(id || ''))) throw adjustError('Mã hồ sơ không hợp lệ', 400);
-  if (!pdfBytesOk(buffer)) {
-    throw adjustError(buffer && buffer.length > ADJUST_PDF_MAX_BYTES ? 'File PDF lớn hơn 2 MB' : 'Chỉ nhận file PDF', buffer && buffer.length > ADJUST_PDF_MAX_BYTES ? 413 : 400);
-  }
+  const limit = admin ? pdfLimits.PDF_ADMIN_MAX_BYTES : pdfLimits.PDF_USER_MAX_BYTES;
+  if (stagedToken && !admin) throw adjustError('Chỉ admin tải được PDF lớn hơn 2 MB.', 403);
   const it = (await readAdjustIndex()).data.items.find(x => x.id === id);
   if (!it) throw adjustError('Không có hồ sơ điều chỉnh này', 404);
   if (!admin && (it.status !== 'pending' || it.pdf || Date.now() - (it.at || 0) > ADJUST_PDF_WINDOW_MS)) {
     throw adjustError('Chỉ gắn PDF ngay sau khi gửi hồ sơ', 403);
   }
-  await writeBytes(adjustObject(it.slug, id, 'pdf'), buffer, 'application/pdf');
-  const pdf = { name: decisionFileName(fileName), bytes: buffer.length, at: Date.now() };
+  const dest = adjustObject(it.slug, id, 'pdf');
+  let bytes = 0;
+  if (stagedToken) bytes = await takeStagedPdf(stagedToken, dest, limit);
+  else {
+    if (!pdfOk(buffer, limit)) rejectPdf(buffer, limit);
+    await writeBytes(dest, buffer, 'application/pdf');
+    bytes = buffer.length;
+  }
+  const pdf = { name: decisionFileName(fileName), bytes, at: Date.now() };
   await updateAdjustIndex(cur => ({ ...cur, items: cur.items.map(x => (x.id === id ? { ...x, pdf } : x)) }));
   return pdf;
 }
@@ -2462,8 +2539,13 @@ async function readAdjustment(id, { admin }) {
 async function readAdjustPdf(id, { admin }) {
   const it = await findAdjustment(id, admin);
   if (!it.pdf) throw adjustError('Hồ sơ không kèm file PDF', 404);
-  const res = await axios.get(`${publicUrl(adjustObject(it.slug, it.id, 'pdf'))}?v=${it.pdf.at || 0}`, {
-    timeout: 20000, responseType: 'arraybuffer', maxContentLength: ADJUST_PDF_MAX_BYTES + 4096, validateStatus: () => true
+  const objectName = adjustObject(it.slug, it.id, 'pdf');
+  const url = `${publicUrl(objectName)}?v=${it.pdf.at || 0}`;
+  if (Number(it.pdf.bytes) > pdfLimits.PDF_PROXY_MAX_BYTES) {
+    return { direct: true, url, name: decisionFileName(it.pdf.name) };
+  }
+  const res = await axios.get(url, {
+    timeout: 20000, responseType: 'arraybuffer', maxContentLength: pdfLimits.PDF_PROXY_MAX_BYTES + 8192, validateStatus: () => true
   });
   if (res.status !== 200) throw adjustError(res.status === 404 ? 'File PDF không còn trên bucket' : `Đọc PDF lỗi HTTP ${res.status}`, res.status === 404 ? 404 : 502);
   return { buffer: Buffer.from(res.data), name: decisionFileName(it.pdf.name) };

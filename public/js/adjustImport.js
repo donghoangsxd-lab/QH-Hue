@@ -438,7 +438,7 @@ async function addFiles(list) {
     if (kind === 'dxf') { files.dxf = f; dxfChanged = true; }
     else if (kind === 'kh') { files.kh = f; khFile = f; }
     else if (kind === 'pdf') {
-      const bad = pdfProblem(f);
+      const bad = pdfProblem(f, isAdmin());
       if (bad) showToast(bad, 'error');
       else files.pdf = f;
     } else if (kind === 'image') {

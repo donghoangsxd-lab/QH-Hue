@@ -99,4 +99,98 @@ async function removeObject(name) {
   throw fail(name, res.status, 'Xóa');
 }
 
-module.exports = { accessToken, putJson, putObject, removeObject };
+function rfc3986(value) {
+  return encodeURIComponent(value).replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+function encodeObjectPath(name) {
+  return String(name || '').split('/').map(rfc3986).join('/');
+}
+
+function utcStamp(date) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${date.getUTCFullYear()}${p(date.getUTCMonth() + 1)}${p(date.getUTCDate())}`
+    + `T${p(date.getUTCHours())}${p(date.getUTCMinutes())}${p(date.getUTCSeconds())}Z`;
+}
+
+// URL PUT V4, khóa Content-Type và đúng số byte. Trình duyệt phải gửi đúng các header trả về.
+function signPutUrl({ name, contentType, bytes, expiresSec = 600, key, now }) {
+  const sa = key || account();
+  const date = now || new Date();
+  const datetime = utcStamp(date);
+  const datestamp = datetime.slice(0, 8);
+  const credentialScope = `${datestamp}/auto/storage/goog4_request`;
+  const credential = `${sa.client_email}/${credentialScope}`;
+  const range = `${bytes},${bytes}`;
+  const host = 'storage.googleapis.com';
+  const signedHeaders = 'content-type;host;x-goog-content-length-range';
+  const canonicalHeaders = `content-type:${contentType}\nhost:${host}\nx-goog-content-length-range:${range}\n`;
+  const canonicalUri = `/${constants.GCS_BUCKET}/${encodeObjectPath(name)}`;
+  const pairs = [
+    ['X-Goog-Algorithm', 'GOOG4-RSA-SHA256'],
+    ['X-Goog-Credential', credential],
+    ['X-Goog-Date', datetime],
+    ['X-Goog-Expires', String(expiresSec)],
+    ['X-Goog-SignedHeaders', signedHeaders]
+  ].map(([k, v]) => [rfc3986(k), rfc3986(v)]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const canonicalQuery = pairs.map(([k, v]) => `${k}=${v}`).join('&');
+  const canonicalRequest = ['PUT', canonicalUri, canonicalQuery, canonicalHeaders, signedHeaders, 'UNSIGNED-PAYLOAD'].join('\n');
+  const hash = crypto.createHash('sha256').update(canonicalRequest).digest('hex');
+  const stringToSign = ['GOOG4-RSA-SHA256', datetime, credentialScope, hash].join('\n');
+  const signature = crypto.createSign('RSA-SHA256').update(stringToSign).sign(sa.private_key).toString('hex');
+  return {
+    url: `https://${host}${canonicalUri}?${canonicalQuery}&X-Goog-Signature=${signature}`,
+    headers: { 'Content-Type': contentType, 'x-goog-content-length-range': range },
+    stringToSign
+  };
+}
+
+function objectApiUrl(name) {
+  return `https://storage.googleapis.com/storage/v1/b/${constants.GCS_BUCKET}/o/${encodeURIComponent(name)}`;
+}
+
+async function objectMeta(name) {
+  const access = await accessToken();
+  const res = await axios.get(objectApiUrl(name), {
+    headers: { Authorization: `Bearer ${access}` },
+    timeout: 15000,
+    validateStatus: () => true
+  });
+  if (res.status === 404) return null;
+  if (res.status !== 200) throw fail(name, res.status, 'Đọc');
+  return { size: Number(res.data && res.data.size) || 0, contentType: String((res.data && res.data.contentType) || '') };
+}
+
+async function readBytes(name, start, end) {
+  const access = await accessToken();
+  const res = await axios.get(`${objectApiUrl(name)}?alt=media`, {
+    headers: { Authorization: `Bearer ${access}`, Range: `bytes=${start}-${end}` },
+    responseType: 'arraybuffer',
+    timeout: 15000,
+    maxContentLength: end - start + 4096,
+    validateStatus: () => true
+  });
+  if (res.status !== 200 && res.status !== 206) throw fail(name, res.status, 'Đọc');
+  return Buffer.from(res.data);
+}
+
+async function rewriteObject(src, dest) {
+  const access = await accessToken();
+  let rewriteToken = '';
+  for (let i = 0; i < 8; i++) {
+    const q = rewriteToken ? `?rewriteToken=${encodeURIComponent(rewriteToken)}` : '';
+    const url = `${objectApiUrl(src)}/rewriteTo/b/${constants.GCS_BUCKET}/o/${encodeURIComponent(dest)}${q}`;
+    const res = await axios.post(url, null, {
+      headers: { Authorization: `Bearer ${access}` },
+      timeout: 30000,
+      validateStatus: () => true
+    });
+    if (res.status !== 200) throw fail(dest, res.status, 'Chép');
+    if (res.data && res.data.done) return;
+    rewriteToken = res.data && res.data.rewriteToken;
+    if (!rewriteToken) throw fail(dest, 502, 'Chép');
+  }
+  throw fail(dest, 502, 'Chép');
+}
+
+module.exports = { accessToken, putJson, putObject, removeObject, signPutUrl, objectMeta, readBytes, rewriteObject };

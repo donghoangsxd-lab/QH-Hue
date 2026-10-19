@@ -345,7 +345,7 @@ const SECTIONS = [
           'Chọn đồ án trong danh sách, nhập dân số quy hoạch và file DXF (layer ranh có chữ RANH, hatch đất theo Thông tư 16).',
           'Bấm <b>Thẩm định điều chỉnh</b>. Kết quả dựng thành tờ bản vẽ: hai bản vẽ trước / sau, bảng cơ cấu sử dụng đất, bảng chỉ tiêu, cột ký hiệu và khung tên. Chỉ tiêu tụt dưới 100% ghi Không đảm bảo.',
           'Bấm <b>Xuất PDF A3</b> để tải tờ bản vẽ khổ A3 ngang đem in.',
-          'Đồng ý kết quả thì bấm <b>Nhập hồ sơ</b> (kèm PDF scan Quyết định, bản vẽ dưới 2 MB nếu có). Admin ghi thẳng, người dùng thường gửi vào hàng chờ duyệt.',
+          'Đồng ý kết quả thì bấm <b>Nhập hồ sơ</b> (kèm PDF Quyết định, bản vẽ: người dùng tối đa 2 MB, admin tối đa 10 MB). Admin ghi thẳng, người dùng thường gửi vào hàng chờ duyệt.',
           'Trên bản đồ quy hoạch, ranh điều chỉnh (nét đứt cyan) và khu vực đã có QHCT 1/500 (nét đứt đỏ) chỉ hiện khi đang mở một đồ án, trong phạm vi đồ án đó. Trong ranh điều chỉnh mặc định là chức năng sau điều chỉnh, lô gốc bị che. Bấm ranh rồi chọn «Trả lại bản đồ quy hoạch» để xem lại chức năng gốc, hoặc mở PDF.'
         ],
         facts: [

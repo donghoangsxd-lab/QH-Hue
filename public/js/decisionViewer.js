@@ -1,17 +1,18 @@
 // Khung xem / gắn quyết định phê duyệt dùng chung cho đồ án (projectLayer.js) và lớp bản đồ (layerDecisions.js).
-// Admin: PDF dưới 1 MB hoặc link đã kiểm tra ghi thẳng (putProjectDecision). Người dùng: PDF nhỏ hơn 2 MB
-// gửi chờ duyệt (submitDecisionProposal); admin mở file, đồng ý thì mới thành quyết định của đồ án.
+// Admin: PDF tối đa 10 MB hoặc link đã kiểm tra ghi thẳng (putProjectDecision). Trên 2 MB tải PUT thẳng bucket.
+// Người dùng: PDF tối đa 2 MB gửi chờ duyệt (submitDecisionProposal); admin mở file, đồng ý thì mới thành quyết định.
 // target: { key, title, noun, decision, proposal, slug, body: { tenQH } | { layer }, isBusy(), setBusy(on),
 //           onSaved(decision | null, data), onProposed(proposal), onResolved(decision | null, data) }
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
 import { ico, showToast } from './utils.js';
+import { PDF_ADMIN_MAX_BYTES, PDF_INLINE_MAX_BYTES, PDF_USER_MAX_BYTES, pdfSizeError, putSignedPdf } from './pdfLimits.js';
 
-export const DECISION_MAX_BYTES = 1024 * 1024;
-export const PROPOSE_MAX_BYTES = 2 * 1024 * 1024;
-const ASSIGN_HINT = 'PDF dưới 1 MB: chọn file để xem trước. Link: bấm Kiểm tra để webapp mở trang. Chỉ gán sau khi chấp nhận.';
-const PROPOSE_HINT = 'Chọn PDF nhỏ hơn 2 MB. Xem trước, rồi bấm «Gửi chờ duyệt». Admin đồng ý thì file mới thành quyết định của đồ án.';
+export const DECISION_MAX_BYTES = PDF_ADMIN_MAX_BYTES;
+export const PROPOSE_MAX_BYTES = PDF_USER_MAX_BYTES;
+const ASSIGN_HINT = 'PDF tối đa 10 MB: chọn file để xem trước. File lớn hơn 2 MB tải thẳng lên bucket. Link: bấm Kiểm tra để webapp mở trang. Chỉ gán sau khi chấp nhận.';
+const PROPOSE_HINT = 'Chọn PDF tối đa 2 MB. Xem trước, rồi bấm «Gửi chờ duyệt». Admin đồng ý thì file mới thành quyết định của đồ án.';
 
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 
@@ -84,12 +85,12 @@ function ensureViewer() {
     <form class="decision-assign" data-decision-assign hidden>
       <input type="url" data-decision-url placeholder="https://… link xem quyết định" aria-label="Link quyết định phê duyệt" autocomplete="off">
       <button type="submit" data-decision-check>Kiểm tra link</button>
-      <button type="button" data-decision-filepick>Chọn PDF ≤ 1 MB</button>
+      <button type="button" data-decision-filepick>Chọn PDF tối đa 10 MB</button>
       <p data-decision-review>${ASSIGN_HINT}</p>
       <button type="button" data-decision-commit disabled>Gán quyết định</button>
     </form>
     <form class="decision-assign" data-decision-propose hidden>
-      <button type="button" data-propose-filepick>Chọn PDF &lt; 2 MB</button>
+      <button type="button" data-propose-filepick>Chọn PDF tối đa 2 MB</button>
       <p data-propose-review>${PROPOSE_HINT}</p>
       <button type="button" data-propose-commit disabled>Gửi chờ duyệt</button>
     </form>
@@ -203,7 +204,7 @@ export function openOrAssign(t) {
   else openAssign(t);
 }
 
-/** Người dùng gửi PDF < 2 MB. Đang có file chờ thì chỉ báo, không gửi thêm. */
+/** Người dùng gửi PDF tối đa 2 MB. Đang có file chờ thì chỉ báo, không gửi thêm. */
 export function openPropose(t) {
   if (!t || isAdmin()) return;
   const el = ensureViewer();
@@ -228,7 +229,7 @@ export function openPropose(t) {
   const btn = form.querySelector('[data-propose-commit]');
   btn.disabled = true;
   btn.textContent = 'Gửi chờ duyệt';
-  showFrame(el, '', 'Chọn file PDF quyết định phê duyệt nhỏ hơn 2 MB.');
+  showFrame(el, '', 'Chọn file PDF quyết định phê duyệt, tối đa 2 MB.');
 }
 
 /** Admin xem file đang chờ, đồng ý thì ghi thành quyết định của đồ án. */
@@ -362,9 +363,9 @@ function commit(t) {
 }
 
 function readPdfError(file, maxBytes = DECISION_MAX_BYTES) {
-  const propose = maxBytes > DECISION_MAX_BYTES;
-  const tooBig = !file || (propose ? file.size >= maxBytes : file.size > maxBytes);
-  if (tooBig) return `File quyết định phải là PDF nhỏ hơn ${propose ? '2 MB' : '1 MB'}.`;
+  if (!file) return 'File PDF rỗng.';
+  const sizeErr = pdfSizeError(file.size, maxBytes > PDF_USER_MAX_BYTES);
+  if (sizeErr) return sizeErr;
   if (file.type && file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) return 'Chỉ nhận file PDF.';
   return '';
 }
@@ -521,12 +522,22 @@ async function uploadPdf(t, file) {
   if (!isAdmin() || busyOf(t)) return;
   const bad = readPdfError(file);
   if (bad) { alert(bad); return; }
-  let bytes;
-  try { bytes = await readPdfBytes(file); }
-  catch (e) { alert(e.message || 'Không đọc được file.'); return; }
   setBusy(t, true);
   try {
-    const data = await postJson(writeAction(t), { ...t.body, name: file.name, pdf: bytesToBase64(bytes) });
+    let data;
+    if (file.size > PDF_INLINE_MAX_BYTES) {
+      const sign = await postJson('signProjectPdf', {
+        ...t.body,
+        purpose: t.body && t.body.docRole ? 'doc' : 'decision',
+        bytes: file.size,
+        name: file.name
+      });
+      await putSignedPdf(sign, file);
+      data = await postJson(writeAction(t), { ...t.body, name: file.name, staged: sign.token, bytes: file.size });
+    } else {
+      const bytes = await readPdfBytes(file);
+      data = await postJson(writeAction(t), { ...t.body, name: file.name, pdf: bytesToBase64(bytes) });
+    }
     revokePdfPreview();
     const decision = t.body && t.body.docRole
       ? data.doc

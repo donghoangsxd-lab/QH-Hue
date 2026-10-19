@@ -3,9 +3,9 @@
 // (đồ án liên phường có mặt ở mỗi phường), QHC liệt kê thẳng; mỗi đồ án (Ten_QH)
 // bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + bảng góc trái + thông tin ở panel dưới),
 // Admin xóa / chuyển đồ án cũ.
-// Nút file mở PDF quyết định phê duyệt. Admin gắn, thay hoặc gỡ (PDF dưới 1 MB hoặc link).
+// Nút file mở PDF quyết định phê duyệt. Admin gắn, thay hoặc gỡ (PDF tối đa 10 MB hoặc link).
 // Mở đồ án: hồ sơ văn bản thêm được nhiều PDF (phê duyệt thêm, đính chính, quy định quản lý).
-// Nút lưu: người dùng gửi PDF nhỏ hơn 2 MB để admin duyệt; đang chờ thì nút đồng hồ, admin bấm để đồng ý hoặc từ chối.
+// Nút lưu: người dùng gửi PDF tối đa 2 MB để admin duyệt; đang chờ thì nút đồng hồ, admin bấm để đồng ý hoặc từ chối.
 // Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS) và bản vẽ hạ tầng (giao thông, cấp nước, thoát nước, cấp điện).
 // Bản vẽ lưu riêng từng đồ án, bật/tắt để xem cùng lớp sử dụng đất. Admin xóa từng lớp, tìm lô trong đồ án.
 // Đồ án có hồ sơ điều chỉnh cục bộ đã duyệt thêm lớp phụ «Điều chỉnh cục bộ» (adjustLayer.js): bật/tắt, danh sách hồ sơ bấm để phóng tới.
@@ -743,14 +743,14 @@ function rowHtml(p, idx, admin) {
   const extraN = (p.docs || []).length;
   const decisionTitle = p.decision
     ? `Xem quyết định phê duyệt: ${p.decision.name}${extraN ? ` · ${extraN} văn bản kèm` : ''}`
-    : 'Gắn quyết định phê duyệt (PDF dưới 1 MB hoặc link)';
+    : 'Gắn quyết định phê duyệt (PDF tối đa 10 MB hoặc link)';
   const decisionBtn = (p.decision || admin)
     ? `<button type="button" class="project-btn${p.decision ? ' has-decision' : ''}" data-decision="${idx}" title="${escapeHtml(decisionTitle)}" aria-label="${p.decision ? 'Xem quyết định phê duyệt' : 'Gắn quyết định phê duyệt'}"${busy ? ' disabled' : ''}>${ico(p.decision ? 'file' : 'save')}</button>`
     : '';
   const waiting = !!p.proposal;
   const proposeTitle = waiting
     ? (admin ? `Duyệt file quyết định đang chờ: ${p.proposal.name}` : `Đang chờ admin duyệt: ${p.proposal.name}`)
-    : 'Gửi PDF quyết định phê duyệt (nhỏ hơn 2 MB) để admin duyệt';
+    : 'Gửi PDF quyết định phê duyệt (tối đa 2 MB) để admin duyệt';
   const proposeBtn = (!admin || waiting)
     ? `<button type="button" class="project-btn${waiting ? ' has-proposal' : ''}" data-propose="${idx}" title="${escapeHtml(proposeTitle)}" aria-label="${escapeHtml(proposeTitle)}"${busy ? ' disabled' : ''}>${ico(waiting ? 'clock' : 'save')}</button>`
     : '';

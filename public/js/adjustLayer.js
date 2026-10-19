@@ -18,6 +18,7 @@ import { tt16SymbolStyle, landPatternKey, landLabel, layerForPattern, tt16Swatch
 import { startShapeEdit, vertexCount, SHAPE_MAX_VERTICES } from './lotShapeEdit.js';
 import { savedLandTag } from './projectReviewCore.js';
 import { planLevelOf } from './generalPlan.js';
+import { pdfLimitText, pdfMaxBytes, pdfSizeError, putSignedPdf } from './pdfLimits.js';
 
 const CYAN = '#22d3ee';
 // Trên ranh đồ án QHPK (overlay 400) và viền sáng đồ án (445), dưới tem đường (450).
@@ -35,7 +36,7 @@ const SCAN_TRANSPARENCY = 30;
 // Cùng độ dày ranh khu vực QHCT (2 px). Nét 5 px khi thu cả đồ án nuốt góc và trông như đứt đoạn.
 const LINE_STYLE = { color: CYAN, weight: 2, opacity: 1, dashArray: '10 6', dashOffset: '8', lineCap: 'butt', lineJoin: 'round', fill: false };
 const HOVER_STYLE = { color: '#a5f3fc', weight: 3.5, lineJoin: 'round', fill: false };
-export const ADJUST_PDF_MAX_BYTES = 2 * 1024 * 1024;
+export const ADJUST_PDF_MAX_BYTES = pdfMaxBytes(false);
 // Khóa lớp trong state.hiddenProjectLayers ("<Ten_QH>|dieu-chinh"), cùng cách lưu với PROJECT_LAYERS
 export const ADJUST_LAYER_KEY = 'dieu-chinh';
 export const ADJUST_CHANGE_EVENT = 'qh:adjustments';
@@ -79,12 +80,15 @@ function fileBase64(file) {
   });
 }
 
-/** Kiểm tra file PDF scan trước khi gửi; trả thông báo lỗi hoặc '' */
-export function pdfProblem(file) {
+/** Kiểm tra file PDF trước khi gửi; trả thông báo lỗi hoặc ''. admin: tối đa 10 MB, người dùng: tối đa 2 MB. */
+export function pdfProblem(file, admin = false) {
   if (!file) return '';
-  if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') return 'Chỉ nhận file PDF';
-  if (file.size >= ADJUST_PDF_MAX_BYTES) return 'File PDF phải nhỏ hơn 2 MB';
-  return '';
+  if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') return 'Chỉ nhận file PDF.';
+  return pdfSizeError(file.size, admin);
+}
+
+export function pdfPickHint(admin) {
+  return `Quyết định, bản vẽ điều chỉnh · PDF tối đa ${pdfLimitText(admin)}`;
 }
 
 /** Gắn ảnh scan + định vị cho hồ sơ; scan.blob rỗng: chỉ cập nhật định vị (Admin ghép lại) */
@@ -110,9 +114,20 @@ export async function sendAdjustment(payload, pdfFile, scan) {
   let scanError = '';
   if (pdfFile) {
     try {
-      const pdf = await fileBase64(pdfFile);
+      const body = { id: data.item.id, name: pdfFile.name };
+      if (admin && pdfFile.size > pdfMaxBytes(false)) {
+        const sign = await readJsonResponse(await fetch(geeApi('action=signProjectPdf'), {
+          method: 'POST', headers: headers(true),
+          body: JSON.stringify({ purpose: 'adjust', bytes: pdfFile.size, name: pdfFile.name, id: data.item.id })
+        }));
+        await putSignedPdf(sign, pdfFile);
+        body.staged = sign.token;
+        body.bytes = pdfFile.size;
+      } else {
+        body.pdf = await fileBase64(pdfFile);
+      }
       const out = await readJsonResponse(await fetch(geeApi('action=putAdjustPdf'), {
-        method: 'POST', headers: headers(admin), body: JSON.stringify({ id: data.item.id, name: pdfFile.name, pdf })
+        method: 'POST', headers: headers(admin), body: JSON.stringify(body)
       }));
       data.item.pdf = out.pdf;
     } catch (err) {
@@ -789,10 +804,19 @@ async function openPdf(id) {
     const res = pending
       ? await fetch(geeApi('action=getAdjustPdf'), { method: 'POST', headers: headers(true), body: JSON.stringify({ id }) })
       : await fetch(geeApi(`action=getAdjustPdf&id=${encodeURIComponent(id)}`));
-    if (!res.ok) await readJsonResponse(res);
-    const blob = new Blob([await res.blob()], { type: 'application/pdf' });
+    const kind = res.headers.get('content-type') || '';
     closeViewer();
-    viewerUrl = URL.createObjectURL(blob);
+    let src = '';
+    if (kind.includes('application/json')) {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) throw new Error(data.message || 'Không tải được PDF');
+      src = data.url;
+    } else {
+      if (!res.ok) await readJsonResponse(res);
+      const blob = new Blob([await res.blob()], { type: 'application/pdf' });
+      viewerUrl = URL.createObjectURL(blob);
+      src = viewerUrl;
+    }
     const box = document.createElement('div');
     box.id = 'adjViewer';
     box.className = 'adj-viewer';
@@ -801,10 +825,10 @@ async function openPdf(id) {
       <div class="adj-viewer-head">
         <b>${escapeHtml(it.pdf.name || 'Quyết định điều chỉnh.pdf')}</b>
         <span>${escapeHtml(it.tenQH)}</span>
-        <a class="bp-btn" href="${viewerUrl}" target="_blank" rel="noopener">${ico('eye')}Mở tab mới</a>
+        <a class="bp-btn" href="${escapeHtml(src)}" target="_blank" rel="noopener">${ico('eye')}Mở tab mới</a>
         <button type="button" class="bp-btn" data-adj-close>${ico('close')}Đóng</button>
       </div>
-      <iframe title="PDF điều chỉnh cục bộ" src="${viewerUrl}"></iframe>
+      <iframe title="PDF điều chỉnh cục bộ" src="${escapeHtml(src)}"></iframe>
     </div>`;
     box.addEventListener('click', (e) => { if (e.target === box || e.target.closest('[data-adj-close]')) closeViewer(); });
     document.body.appendChild(box);

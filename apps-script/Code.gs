@@ -5,7 +5,8 @@
 // Lô đất ngoài nhóm hạ tầng không ghi tab DXF-NN — webapp ghi thư mục projects/<slug>/ trên bucket
 // (hien-trang, su-dung-dat, diem-chuc-nang, ranh-gioi, quyet-dinh.pdf). File gộp projects/<slug>.json là bản cũ.
 // Quyết định phê duyệt: projects/decisions.json + projects/<slug>/quyet-dinh.pdf.
-// File người dùng gửi chờ duyệt: projects/decision-proposals.json + projects/<slug>/quyet-dinh-cho.pdf (< 2 MB).
+// File người dùng gửi chờ duyệt: projects/decision-proposals.json + projects/<slug>/quyet-dinh-cho.pdf (tối đa 2 MB).
+// PDF admin lớn hơn 2 MB không đi qua Apps Script (URL ký trên Vercel, tối đa 10 MB).
 // putBucketPdf khi Vercel chưa ghi được PDF.
 // Tab DXF-NN cũ vẫn xóa cùng đồ án. Ranh tổng đồ án vẫn ở tab DS_DoAn.
 // syncCad = false: chỉ dựng lại infrastructure_hue.json, không dựng lại cad_parcels.json.
@@ -1884,11 +1885,13 @@ function putBucketPdf(body) {
   var name = String(body.name || "");
   var b64 = String(body.content || "").replace(/\s+/g, "");
   if (!bucketDecisionPdf(name)) return { "error": "Tên file bucket không hợp lệ" };
-  if (!b64 || b64.length > 2800000) return { "error": "PDF rỗng hoặc lớn hơn 2 MB" };
+  if (!b64) return { "error": "File PDF rỗng." };
+  if (b64.length > 2796204) return { "error": "File PDF tối đa 2 MB." };
   var bytes;
-  try { bytes = Utilities.base64Decode(b64); } catch (err) { return { "error": "PDF không hợp lệ" }; }
-  if (!bytes || bytes.length < 5 || bytes.length > 2097152) return { "error": "PDF rỗng hoặc lớn hơn 2 MB" };
-  if (bytes[0] !== 37 || bytes[1] !== 80 || bytes[2] !== 68 || bytes[3] !== 70) return { "error": "Không phải file PDF" };
+  try { bytes = Utilities.base64Decode(b64); } catch (err) { return { "error": "File PDF không hợp lệ." }; }
+  if (!bytes || bytes.length < 5) return { "error": "File PDF rỗng." };
+  if (bytes.length > 2097152) return { "error": "File PDF tối đa 2 MB." };
+  if (bytes[0] !== 37 || bytes[1] !== 80 || bytes[2] !== 68 || bytes[3] !== 70) return { "error": "Chỉ nhận file PDF." };
   if (!uploadBytesToGCS(bytes, name, "application/pdf")) return { "error": "Không ghi được PDF lên bucket" };
   return { "success": true, "saved": true };
 }
