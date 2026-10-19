@@ -74,6 +74,7 @@ import { initFloodSim } from './floodSim.js';
 import { initSatLayers } from './satLayers.js';
 import { initOsmOpen } from './osmOpen.js';
 import { initSketchLayer, handleSketchClick } from './sketchLayer.js';
+import { initFaqPanel } from './faqPanel.js';
 import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
 import { initOverview } from './overview.js';
 import { initMobileShell } from './mobileShell.js';
@@ -359,6 +360,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initOsmOpen(map, planMap);
   initRiskLayer();
   initSketchLayer();
+  initFaqPanel();
   initOverview();
   initMobileShell();
   restoreAdminSession();
