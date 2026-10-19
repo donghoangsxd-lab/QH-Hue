@@ -273,6 +273,31 @@ const constants = {
   ntKind,
   isNetworkCode: (code) => NETWORK_CODES.includes(code),
 
+  // Gán hạ tầng hiện trạng cho một thửa địa chính (tab HaTangHienTrang).
+  // cap: urban / unit cố định, choose = admin chọn, auto = công viên theo diện tích (PARK_TIERS).
+  // noArea: điểm không bắt buộc diện tích (cùng NO_AREA_TYPES bên Apps Script).
+  PARCEL_INFRA_TYPES: [
+    { code: "1-CV", label: "Công viên, điểm xanh", unit: "chỗ", prefix: "CV", cap: "auto" },
+    { code: "2-BDX", label: "Bãi đỗ xe, trạm sạc", unit: "chỗ xe", prefix: "BDX", cap: "choose" },
+    { code: "3-MN", label: "Trường Mầm non", unit: "học sinh", prefix: "MN", cap: "unit" },
+    { code: "4-TH", label: "Trường Tiểu học", unit: "học sinh", prefix: "TH", cap: "unit" },
+    { code: "5-THCS", label: "Trường THCS", unit: "học sinh", prefix: "THCS", cap: "unit" },
+    { code: "6-THPT", label: "Trường THPT", unit: "học sinh", prefix: "THPT", cap: "urban" },
+    { code: "7-YT", label: "Bệnh viện, trạm y tế", unit: "giường", prefix: "YT", cap: "choose" },
+    { code: "8-VH", label: "Nhà văn hóa, thể thao", unit: "chỗ", prefix: "VH", cap: "choose" },
+    { code: "9-TM", label: "Chợ, trung tâm thương mại", unit: "điểm", prefix: "TM", cap: "choose" },
+    { code: "10-PCCC", label: "Trụ sở cảnh sát PCCC", unit: "xe", prefix: "PCCC", cap: "urban", noArea: true },
+    { code: "11-NT", label: "Nhà tang lễ, nghĩa trang", unit: "ngôi", prefix: "NT", cap: "unit" },
+    { code: "12-CSD", label: "Cơ sở chưa sử dụng", unit: "", prefix: "CSD", cap: "unit" },
+    { code: "13-BUS", label: "Trạm dừng xe buýt", unit: "điểm", prefix: "BUS", cap: "urban", noArea: true },
+    { code: "14-NOXH", label: "Nhà ở xã hội", unit: "căn", prefix: "NOXH", cap: "unit" }
+  ],
+  PARCEL_INFRA_STATUS: [
+    { id: "hoatdong", label: "Đang hoạt động", active: true },
+    { id: "xuongcap", label: "Xuống cấp", active: true },
+    { id: "ngung", label: "Ngừng hoạt động", active: false }
+  ],
+
   // ---------------------------------------------------------------------------
   // CẤU TRÚC PHÂN LOẠI THEO QCVN 01:2026/BXD
   // ---------------------------------------------------------------------------

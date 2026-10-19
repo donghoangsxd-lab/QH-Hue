@@ -13,6 +13,9 @@
 // Sheet 15-DA (dự án kêu gọi đầu tư) không phải điểm hạ tầng: đóng gói mọi cột sang invest_calls.json.
 // Xóa đồ án: doPost action=deleteProject. putBucketObject / deleteBucketObject: ghi file bucket khi Vercel chưa có quyền.
 // Admin sửa / đổi loại / xóa 1 công trình từ bảng thông tin lô: doPost action=editInfraRow / retypeInfraRow / deleteInfraRow.
+// Gán hạ tầng hiện trạng cho thửa địa chính 2016: tab HaTangHienTrang, doPost saveHaTangHienTrang / deleteHaTangHienTrang / getHaTangHienTrang.
+// Khóa dòng là (số tờ, số thửa, xã/phường cũ). Điểm được đóng vào infrastructure_hue.json để tính độ phủ.
+// Bản web app phải Deploy lại (Manage deployments → Edit → New version) thì các action này mới chạy.
 // Sau mỗi lần đồng bộ hẹn warmWebappCache (Script Property WEBAPP_URL) để webapp tính sẵn thống kê phường.
 // =========================================================================
 
@@ -342,6 +345,7 @@ function collectFeatures(ss) {
     Logger.log("✓ Tab '" + sheetName + "': Đóng gói " + count + " điểm!");
   });
 
+  appendHtFeatures(ss, features);
   return features;
 }
 
@@ -1122,6 +1126,260 @@ function parsePostBody(e) {
   return body;
 }
 
+// Tab gán hạ tầng hiện trạng từ thửa địa chính. Không nằm trong VALID_PREFIXES nên collectFeatures gọi appendHtFeatures riêng.
+const HT_SHEET = "HaTangHienTrang";
+const HT_HEADERS = ["ID_DoiTuong", "SoTo", "SoThua", "XaPhuong", "MaXa", "DiaChi", "Loai", "Ten_CongTrinh",
+  "QuyMo", "DonVi", "DienTich", "TinhTrang", "GhiChu", "GhiChuNguoi", "Latitude", "Longitude", "Geojson",
+  "NguoiGan", "ThoiGianCapNhat", "XaMoi", "Nhom_HaTang"];
+const HT_TYPES = {
+  "1-CV": "CV", "2-BDX": "BDX", "3-MN": "MN", "4-TH": "TH", "5-THCS": "THCS", "6-THPT": "THPT",
+  "7-YT": "YT", "8-VH": "VH", "9-TM": "TM", "10-PCCC": "PCCC", "11-NT": "NT", "12-CSD": "CSD",
+  "13-BUS": "BUS", "14-NOXH": "NOXH"
+};
+const HT_STATUS = { "hoatdong": "Đang hoạt động", "xuongcap": "Xuống cấp", "ngung": "Ngừng hoạt động" };
+
+function htNorm(v) {
+  var s = String(v == null ? "" : v).trim().toLowerCase().replace(/\s+/g, " ");
+  if (/^\d+$/.test(s)) return String(parseInt(s, 10));
+  return s;
+}
+
+function ensureHtSheet(ss) {
+  var sheet = ss.getSheetByName(HT_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(HT_SHEET);
+    sheet.getRange(1, 1, 1, HT_HEADERS.length).setValues([HT_HEADERS]).setFontWeight("bold");
+    sheet.setFrozenRows(1);
+    return sheet;
+  }
+  var headers = getSheetHeaders(sheet);
+  var have = {};
+  headers.forEach(function(h) { have[normalizeHeader(h)] = true; });
+  var missing = HT_HEADERS.filter(function(h) { return !have[normalizeHeader(h)]; });
+  if (missing.length) {
+    ensureSheetSize(sheet, 1, headers.length + missing.length);
+    sheet.getRange(1, headers.length + 1, 1, missing.length).setValues([missing]).setFontWeight("bold");
+  }
+  return sheet;
+}
+
+function htColMap(headers) {
+  var map = {};
+  headers.forEach(function(h, i) { map[normalizeHeader(h)] = i; });
+  return map;
+}
+
+function htCell(row, col, key) {
+  var i = col[normalizeHeader(key)];
+  return i >= 0 ? row[i] : "";
+}
+
+function htPut(row, col, key, value) {
+  var i = col[normalizeHeader(key)];
+  if (i >= 0) row[i] = value;
+}
+
+function nextDcId(data, idIdx, prefix) {
+  var max = 0;
+  var re = new RegExp("^" + prefix + "-DC-(\\d+)$", "i");
+  for (var i = 1; i < data.length; i++) {
+    var m = String(data[i][idIdx] || "").trim().match(re);
+    if (m) max = Math.max(max, parseInt(m[1], 10) || 0);
+  }
+  var n = max + 1;
+  return prefix + "-DC-" + (n < 1000 ? ("00" + n).slice(-3) : String(n));
+}
+
+function htFindRow(data, col, soTo, soThua, xa) {
+  var a = htNorm(soTo), b = htNorm(soThua), c = htNorm(xa);
+  for (var i = 1; i < data.length; i++) {
+    if (htNorm(htCell(data[i], col, "SoTo")) === a
+      && htNorm(htCell(data[i], col, "SoThua")) === b
+      && htNorm(htCell(data[i], col, "XaPhuong")) === c) return i;
+  }
+  return -1;
+}
+
+function htNote(body) {
+  var bits = ["Gán từ thửa địa chính 2016: tờ " + body.soTo + ", thửa " + body.soThua + ", " + body.xaPhuong];
+  bits.push("Tình trạng: " + (HT_STATUS[body.tinhTrang] || body.tinhTrang));
+  if (Number(body.quyMo) > 0) bits.push("Quy mô: " + body.quyMo + (body.donVi ? " " + body.donVi : ""));
+  if (body.ghiChu) bits.push(String(body.ghiChu));
+  return bits.join(". ").slice(0, 500);
+}
+
+function saveHaTangHienTrang(body) {
+  var loai = String(body.loai || "");
+  var prefix = HT_TYPES[loai];
+  if (!prefix) return { "error": "Loại công trình không hợp lệ" };
+  if (!HT_STATUS[body.tinhTrang]) return { "error": "Tình trạng không hợp lệ" };
+  var soTo = String(body.soTo || "").trim();
+  var soThua = String(body.soThua || "").trim();
+  var xa = String(body.xaPhuong || "").trim();
+  var name = String(body.ten || "").trim();
+  if (!soTo || !soThua || !xa) return { "error": "Thiếu số tờ, số thửa hoặc xã/phường" };
+  if (!name) return { "error": "Thiếu tên công trình" };
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ensureHtSheet(ss);
+  var data = sheet.getDataRange().getValues();
+  if (!data.length) data = [HT_HEADERS.slice()];
+  var col = htColMap(data[0]);
+  var rowIdx = htFindRow(data, col, soTo, soThua, xa);
+  var idIdx = col[normalizeHeader("ID_DoiTuong")];
+  var oldId = rowIdx > 0 ? String(htCell(data[rowIdx], col, "ID_DoiTuong") || "") : "";
+  var id = (oldId.indexOf(prefix + "-DC-") === 0) ? oldId : nextDcId(data, idIdx, prefix);
+  var width = Math.max(data[0].length, HT_HEADERS.length);
+  var row = new Array(width).fill("");
+  if (rowIdx > 0) row = data[rowIdx].slice();
+  while (row.length < width) row.push("");
+
+  var active = body.tinhTrang !== "ngung";
+  htPut(row, col, "ID_DoiTuong", id);
+  htPut(row, col, "SoTo", soTo);
+  htPut(row, col, "SoThua", soThua);
+  htPut(row, col, "XaPhuong", xa);
+  htPut(row, col, "MaXa", String(body.maXa || ""));
+  htPut(row, col, "DiaChi", String(body.diaChi || "").slice(0, 300));
+  htPut(row, col, "Loai", loai);
+  htPut(row, col, "Ten_CongTrinh", name.slice(0, 150));
+  htPut(row, col, "QuyMo", body.quyMo === "" || body.quyMo == null ? "" : Number(body.quyMo));
+  htPut(row, col, "DonVi", String(body.donVi || ""));
+  htPut(row, col, "DienTich", Number(body.dienTich) || 0);
+  htPut(row, col, "TinhTrang", body.tinhTrang);
+  htPut(row, col, "GhiChu", htNote(body));
+  htPut(row, col, "GhiChuNguoi", String(body.ghiChu || "").slice(0, 300));
+  htPut(row, col, "Latitude", "'" + String(body.lat));
+  htPut(row, col, "Longitude", "'" + String(body.lng));
+  htPut(row, col, "Geojson", String(body.geojson || "").slice(0, 45000));
+  htPut(row, col, "NguoiGan", String(body.nguoi || "").slice(0, 120));
+  htPut(row, col, "ThoiGianCapNhat", Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm"));
+  htPut(row, col, "XaMoi", String(body.xaMoi || ""));
+  htPut(row, col, "Nhom_HaTang", body.nhom === "Cấp đô thị" ? "Cấp đô thị" : "Cấp đơn vị ở");
+
+  var updated = rowIdx > 0;
+  var sheetRow;
+  if (updated) {
+    ensureSheetSize(sheet, rowIdx + 1, row.length);
+    sheet.getRange(rowIdx + 1, 1, 1, row.length).setValues([row]);
+    sheetRow = rowIdx + 1;
+  } else {
+    sheet.appendRow(row);
+    sheetRow = sheet.getLastRow();
+  }
+  var latCol = col[normalizeHeader("Latitude")];
+  var lngCol = col[normalizeHeader("Longitude")];
+  if (latCol >= 0) sheet.getRange(sheetRow, latCol + 1).setNumberFormat("@");
+  if (lngCol >= 0) sheet.getRange(sheetRow, lngCol + 1).setNumberFormat("@");
+  syncSheetsToGCS();
+  return { "success": true, "id": id, "updated": updated, "active": active };
+}
+
+function deleteHaTangHienTrang(body) {
+  var soTo = String(body.soTo || "").trim();
+  var soThua = String(body.soThua || "").trim();
+  var xa = String(body.xaPhuong || "").trim();
+  if (!soTo || !soThua || !xa) return { "error": "Thiếu số tờ, số thửa hoặc xã/phường" };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(HT_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return { "error": "Thửa này chưa được gán hạ tầng" };
+  var data = sheet.getDataRange().getValues();
+  var col = htColMap(data[0]);
+  var rowIdx = htFindRow(data, col, soTo, soThua, xa);
+  if (rowIdx < 0) return { "error": "Thửa này chưa được gán hạ tầng" };
+  var id = String(htCell(data[rowIdx], col, "ID_DoiTuong") || "");
+  sheet.deleteRow(rowIdx + 1);
+  syncSheetsToGCS();
+  return { "success": true, "id": id };
+}
+
+function listHaTangHienTrang() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(HT_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return { "success": true, "rows": [] };
+  var data = sheet.getDataRange().getValues();
+  var col = htColMap(data[0]);
+  var rows = [];
+  for (var i = 1; i < data.length && rows.length < 2000; i++) {
+    var soTo = String(htCell(data[i], col, "SoTo") || "").trim();
+    var soThua = String(htCell(data[i], col, "SoThua") || "").trim();
+    if (!soTo && !soThua) continue;
+    var geom = null;
+    try { geom = JSON.parse(String(htCell(data[i], col, "Geojson") || "")); } catch (e) { geom = null; }
+    if (geom && geom.type !== "Polygon" && geom.type !== "MultiPolygon") geom = null;
+    rows.push({
+      id: String(htCell(data[i], col, "ID_DoiTuong") || ""),
+      soTo: soTo,
+      soThua: soThua,
+      xaPhuong: String(htCell(data[i], col, "XaPhuong") || ""),
+      maXa: String(htCell(data[i], col, "MaXa") || ""),
+      diaChi: String(htCell(data[i], col, "DiaChi") || ""),
+      loai: String(htCell(data[i], col, "Loai") || ""),
+      ten: String(htCell(data[i], col, "Ten_CongTrinh") || ""),
+      quyMo: htCell(data[i], col, "QuyMo"),
+      donVi: String(htCell(data[i], col, "DonVi") || ""),
+      dienTich: htCell(data[i], col, "DienTich"),
+      tinhTrang: String(htCell(data[i], col, "TinhTrang") || ""),
+      ghiChu: String(htCell(data[i], col, "GhiChu") || ""),
+      ghiChuNguoi: String(htCell(data[i], col, "GhiChuNguoi") || ""),
+      lat: parseCoordinate(htCell(data[i], col, "Latitude"), 90),
+      lng: parseCoordinate(htCell(data[i], col, "Longitude"), 180),
+      geometry: geom,
+      nguoi: String(htCell(data[i], col, "NguoiGan") || ""),
+      thoiGian: String(htCell(data[i], col, "ThoiGianCapNhat") || ""),
+      xaMoi: String(htCell(data[i], col, "XaMoi") || ""),
+      nhom: String(htCell(data[i], col, "Nhom_HaTang") || "")
+    });
+  }
+  return { "success": true, "rows": rows };
+}
+
+// Điểm hạ tầng hiện trạng từ tab HaTangHienTrang → infrastructure_hue.json (độ phủ, vùng phục vụ).
+// QuyMo_QH để trống: công trình chỉ có ở hiện trạng. Ngừng hoạt động ghi TrangThai FALSE, không tính độ phủ.
+function appendHtFeatures(ss, features) {
+  try {
+    var sheet = ss.getSheetByName(HT_SHEET);
+    if (!sheet || sheet.getLastRow() < 2) return;
+    var data = sheet.getDataRange().getValues();
+    var col = htColMap(data[0]);
+    if (col[normalizeHeader("ID_DoiTuong")] == null || col[normalizeHeader("Latitude")] == null) return;
+    var count = 0;
+    for (var i = 1; i < data.length; i++) {
+      var id = String(htCell(data[i], col, "ID_DoiTuong") || "").trim();
+      var name = String(htCell(data[i], col, "Ten_CongTrinh") || "").trim();
+      if (!id || !name) continue;
+      var lat = parseCoordinate(htCell(data[i], col, "Latitude"), 90);
+      var lng = parseCoordinate(htCell(data[i], col, "Longitude"), 180);
+      if (!lat || !lng) continue;
+      var loai = String(htCell(data[i], col, "Loai") || "");
+      var active = String(htCell(data[i], col, "TinhTrang") || "") !== "ngung";
+      var ward = String(htCell(data[i], col, "XaMoi") || htCell(data[i], col, "XaPhuong") || "");
+      count++;
+      features.push({
+        "type": "Feature",
+        "geometry": { "type": "Point", "coordinates": [lng, lat] },
+        "properties": {
+          "ID_DoiTuong": id,
+          "Ten_CongTrinh": name,
+          "Ten_XaPhuong": ward,
+          "Nhom_HaTang": String(htCell(data[i], col, "Nhom_HaTang") || ""),
+          "QuyMo_HT": parseOptionalNumber(htCell(data[i], col, "DienTich")),
+          "QuyMo_QH": null,
+          "QuyMo_S": parseCleanNumber(htCell(data[i], col, "DienTich")),
+          "Ten_QH": "",
+          "TrangThai": active ? "TRUE" : "FALSE",
+          "ThoiGianCapNhat": String(htCell(data[i], col, "ThoiGianCapNhat") || ""),
+          "GhiChu": String(htCell(data[i], col, "GhiChu") || ""),
+          "Tab": loai
+        }
+      });
+    }
+    if (count) Logger.log("✓ Tab '" + HT_SHEET + "': Đóng gói " + count + " điểm!");
+  } catch (err) {
+    Logger.log("⚠ HaTangHienTrang: " + err);
+  }
+}
+
 // 4. GHI HÀNG LOẠT (POST JSON, CHỈ MÁY CHỦ WEBAPP CÓ KHÓA API_SECRET)
 function doPost(e) {
   try {
@@ -1153,6 +1411,9 @@ function doPost(e) {
     if (action === "saveHillshade") return jsonOutput(saveHillshade(body));
     if (action === "addPendingCad") return jsonOutput(addPendingCad(body));
     if (action === "removePendingCad") return jsonOutput(removePendingCad(body));
+    if (action === "saveHaTangHienTrang") return jsonOutput(saveHaTangHienTrang(body));
+    if (action === "deleteHaTangHienTrang") return jsonOutput(deleteHaTangHienTrang(body));
+    if (action === "getHaTangHienTrang") return jsonOutput(listHaTangHienTrang());
     if (action === "addPendingPoints") {
       if (!Array.isArray(body.items) || !body.items.length) {
         return jsonOutput({ "error": "Không nhận được danh sách điểm. Deploy bản Code.gs này: Manage deployments → Edit → Version: New version." });

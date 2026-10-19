@@ -15,6 +15,7 @@ import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
+import { mountParcelAssign } from './parcelInfra.js';
 import { restoreInspectFocus } from './projectLayer.js';
 
 const LIBS = {
@@ -367,7 +368,23 @@ function parcelInfoHtml(p) {
         <div class="lp-sub">${escapeHtml(g.label)}</div>
       </div>
     </div>
-    <dl class="lp-info">${rows}</dl>`;
+    <dl class="lp-info">${rows}</dl>
+    <div class="ht-assign"></div>`;
+}
+
+function mountAssign(root, props, latlng, shapeP) {
+  const xa = xaByCode.get(String(props.m));
+  mountParcelAssign(root?.querySelector('.ht-assign'), {
+    soTo: String(props.t ?? ''),
+    soThua: String(props.s ?? ''),
+    maXa: String(props.m ?? ''),
+    xa: xa ? xa.tenxa : `Mã ${props.m}`,
+    diaChi: String(props.d || ''),
+    dienTich: Number(props.a) > 0 ? Number(props.a) : 0,
+    lat: latlng?.lat,
+    lng: latlng?.lng,
+    geomTask: Promise.resolve(shapeP).then(s => s?.geometry || s)
+  });
 }
 
 function parcelHtml(p) {
@@ -691,6 +708,7 @@ async function openParcel(latlng, targetMap, replaced) {
     el.setAttribute('aria-label', 'Thông tin thửa đất');
     el.innerHTML = cardHtml(props);
     el.hidden = false;
+    mountAssign(el, props, latlng, shapeP);
     const shape = await shapeP;
     if (mySeq !== clickSeq || !cardState) return true;
     cardState.geom = shape.geometry;
@@ -710,6 +728,7 @@ async function openParcel(latlng, targetMap, replaced) {
   own.on('remove', () => { if (popup === own) { popup = null; clearHighlight(); clearParcelPies(); } });
   own.openOn(targetMap);
   content.querySelector('.cad-plan-btn')?.addEventListener('click', (e) => showParcelPlan(own, content, e.currentTarget, shapeP, props));
+  mountAssign(content, props, latlng, shapeP);
   const shape = await shapeP;
   if (mySeq !== clickSeq || popup !== own) return true;
   drawHighlight(shape, targetMap);
