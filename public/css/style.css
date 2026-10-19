@@ -3605,7 +3605,7 @@ table.ward-table th {
   .tour-spot, .tour-card { animation: none; transition: none; }
 }
 
-/* BẢNG GIỚI THIỆU TỔNG QUAN (overview.js): danh mục 5 nhóm tính năng (2 cột) ⇄ trang hướng dẫn từng mục */
+/* BẢNG GIỚI THIỆU TỔNG QUAN (overview.js): mục lục theo mức dùng hằng ngày (2 cột) ⇄ trang hướng dẫn từng mục */
 .ov-root {
   position: fixed; inset: 0; z-index: 5500;
   display: flex; align-items: center; justify-content: center;
@@ -3697,11 +3697,28 @@ table.ward-table th {
 .ov-group-ico { display: flex; color: var(--accent-cyan); }
 .ov-group-ico .ico { margin: 0; }
 .ov-group-title { margin: 0; font-size: var(--fs-md); font-weight: 700; color: var(--text-strong); line-height: 1.35; text-transform: uppercase; letter-spacing: 0.02em; }
-.ov-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; }
+.ov-item { display: block; padding: 0; }
 .ov-item + .ov-item { border-top: 1px solid var(--border-soft); }
-.ov-item:hover { background: var(--bg-hover); }
-.ov-item-main { flex: 1; min-width: 0; }
-.ov-item-title { color: var(--text-strong); font-weight: 600; line-height: 1.4; }
+.ov-item:hover { background: transparent; }
+.ov-fold { margin: 0; }
+.ov-item-sum {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 10px; cursor: pointer; list-style: none;
+}
+.ov-item-sum::-webkit-details-marker { display: none; }
+.ov-item-sum:hover { background: var(--bg-hover); }
+.ov-fold-mark {
+  position: relative; flex-shrink: 0; width: 16px; height: 16px; margin-top: 2px;
+  border-radius: 4px; background: rgba(var(--cyan-rgb), 0.12);
+}
+.ov-fold-mark::before {
+  content: ''; position: absolute; left: 6px; top: 4px;
+  border: 4px solid transparent; border-left: 5px solid var(--accent-cyan);
+}
+.ov-fold[open] > .ov-item-sum .ov-fold-mark::before { left: 3px; top: 6px; border-left-color: transparent; border-top-color: var(--accent-cyan); }
+.ov-steps-inline { margin: 0 12px 10px 34px; font-size: var(--fs-sm); }
+.ov-item-main { display: block; flex: 1; min-width: 0; }
+.ov-item-title { display: block; color: var(--text-strong); font-weight: 600; line-height: 1.4; }
 .ov-item-meta { display: flex; align-items: baseline; gap: 6px; margin-top: 3px; }
 .ov-item-note { font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.45; }
 .ov-btn {
@@ -3847,7 +3864,8 @@ table.ward-table th {
 @media (max-width: 700px) {
   .ov-root { padding: 8px; }
   .ov-stage, .ov-kicker, .ov-legend { display: none; }
-  .ov-item { flex-wrap: wrap; }
+  .ov-item-sum { flex-wrap: wrap; }
+  .ov-item-btns { margin-left: 24px; }
 }
 
 /* Làm nổi nút / dòng lớp vừa được mở từ bảng giới thiệu */
