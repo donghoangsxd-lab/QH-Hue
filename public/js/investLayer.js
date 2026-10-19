@@ -14,7 +14,7 @@ import { editInvestGroups, settleInvestSync } from './investGroups.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
 import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
-import { setQuietProjectOutline } from './projectLayer.js';
+import { setQuietProjectOutline, restoreInspectFocus } from './projectLayer.js';
 
 const PANE = 'investPane';
 // Trên lớp đô thị đang chọn (urbanFocus 444–446, hover 449) để bấm được ranh dự án.
@@ -633,6 +633,7 @@ function syncSelectionStyle() {
 
 function closeCard() {
   openSeq++;
+  restoreInspectFocus();
   setQuietProjectOutline(false);
   card = null;
   selected = null;

@@ -12,6 +12,7 @@ const sat = require('../services/satService');
 const projects = require('../services/projectStore');
 const pdfLimits = require('../services/pdfLimits');
 const statsStore = require('../services/statsStore');
+const osmOpen = require('../services/osmOpen');
 
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
@@ -3053,6 +3054,13 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, ...done });
     }
 
+    // Thể thao, đường sắt, đường thủy nội địa từ OpenStreetMap. Không cần Earth Engine.
+    if (action === 'getOsmOpen') {
+      res.setHeader('Cache-Control', 's-maxage=21600, stale-while-revalidate=86400');
+      const data = await osmOpen.loadOsmOpen();
+      return res.status(200).json(data);
+    }
+
     if (action === 'getSingleIsochrone') {
       const pt = parseCoordInBounds(req.query.lat, req.query.lng);
       if (!pt) return res.status(400).json({ error: true, message: "Tọa độ không hợp lệ" });
@@ -3398,6 +3406,162 @@ module.exports = async (req, res) => {
           return { name: wardNameOf(p), mean: p.mean == null ? null : round1(p.mean) };
         }).filter(w => w.mean != null);
         cachedSatStats.set(key, { year, city: n ? round1(sum / n) : null, wards });
+      }
+      return res.status(200).json(cachedSatStats.get(key));
+    }
+
+    // NDVI trung vị Sentinel-2 cả năm, cắt 40 phường xã. compare = năm nền thì ảnh và thống kê là hiệu (năm − năm nền).
+    // reduceRegions ở lưới 100 m để kịp hạn 60 giây của hàm.
+    if (action === 'getNdviTile' || action === 'getNdviStats') {
+      const years = sat.ndviYears();
+      const year = sat.parseYear(req.query.year, years);
+      const compare = req.query.compare ? sat.parseYear(req.query.compare, years) : null;
+      if (year == null || (req.query.compare && compare == null)) return res.status(400).json({ error: true, message: 'Năm không hợp lệ' });
+      if (compare != null && compare === year) return res.status(400).json({ error: true, message: 'Hai năm so sánh phải khác nhau' });
+      res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=86400');
+      const img = compare == null ? sat.ndviImage(ee, wardVectorParsed, year) : sat.ndviDiff(ee, wardVectorParsed, year, compare);
+      if (action === 'getNdviTile') {
+        const vis = compare == null ? sat.NDVI_VIS : sat.NDVI_DIFF_VIS;
+        return res.status(200).json({
+          urlFormat: await sat.mapUrl(ee, img.visualize(vis)),
+          legend: { ...vis, diff: compare != null, year, compare },
+          years
+        });
+      }
+      const key = `ndvi|${year}|${compare || ''}`;
+      if (!cachedSatStats.has(key)) {
+        const fc = await eeEvaluate(img.reduceRegions({
+          collection: wardVectorParsed,
+          reducer: ee.Reducer.mean().combine(ee.Reducer.count(), null, true),
+          scale: 100,
+          tileScale: 4
+        }).map(f => ee.Feature(null).copyProperties(f)));
+        const ndviRound = (v) => Math.round(v * 100) / 100;
+        let sum = 0, n = 0;
+        const wards = ((fc && fc.features) || []).map(f => {
+          const p = f.properties || {};
+          if (p.mean != null && p.count) { sum += p.mean * p.count; n += p.count; }
+          return { name: wardNameOf(p), mean: p.mean == null ? null : ndviRound(p.mean) };
+        }).filter(w => w.mean != null);
+        cachedSatStats.set(key, { year, compare, city: n ? ndviRound(sum / n) : null, wards });
+      }
+      return res.status(200).json(cachedSatStats.get(key));
+    }
+
+    // Phủ thực vật WorldCover 2021 hoặc mất rừng Hansen 2001–2025, cắt theo ranh phường
+    if (action === 'getForestTile') {
+      const mode = sat.FOREST_MODES.includes(req.query.mode) ? req.query.mode : null;
+      if (!mode) return res.status(400).json({ error: true, message: 'Lớp rừng không hợp lệ' });
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+      const built = mode === 'loss' ? sat.forestLossVis(ee, wardVectorParsed) : sat.forestCoverVis(ee, wardVectorParsed);
+      return res.status(200).json({ urlFormat: await sat.mapUrl(ee, built.image), legend: built.legend, mode });
+    }
+
+    if (action === 'getForestStats') {
+      const mode = sat.FOREST_MODES.includes(req.query.mode) ? req.query.mode : null;
+      if (!mode) return res.status(400).json({ error: true, message: 'Lớp rừng không hợp lệ' });
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+      const key = `forest|${mode}`;
+      if (!cachedSatStats.has(key)) {
+        const image = mode === 'loss' ? sat.forestLossArea(ee, wardVectorParsed) : sat.forestCoverArea(ee, wardVectorParsed);
+        const fc = await eeEvaluate(image.reduceRegions({
+          collection: wardVectorParsed,
+          reducer: ee.Reducer.sum(),
+          scale: 30,
+          tileScale: 4
+        }).map(f => ee.Feature(null).copyProperties(f)));
+        const ha1 = (v) => Math.round((Number(v) || 0) * 10) / 10;
+        const wards = ((fc && fc.features) || []).map(f => {
+          const p = f.properties || {};
+          if (mode === 'loss') return { name: wardNameOf(p), coverHa: ha1(p.cover), lossHa: ha1(p.loss) };
+          const row = { name: wardNameOf(p) };
+          sat.COVER_CLASSES.forEach(c => { row[c.key] = ha1(p[c.key]); });
+          return row;
+        }).filter(w => w.name);
+        const city = {};
+        if (mode === 'loss') {
+          city.coverHa = ha1(wards.reduce((s, w) => s + w.coverHa, 0));
+          city.lossHa = ha1(wards.reduce((s, w) => s + w.lossHa, 0));
+        } else {
+          sat.COVER_CLASSES.forEach(c => { city[c.key] = ha1(wards.reduce((s, w) => s + (w[c.key] || 0), 0)); });
+        }
+        cachedSatStats.set(key, {
+          mode,
+          scale: 30,
+          source: mode === 'loss'
+            ? `Hansen Global Forest Change v1.13, Landsat ~30 m, tán năm 2000 ≥ ${sat.TREE_MIN_PCT}%, mất rừng 2001–${2000 + sat.HANSEN_LOSS_MAX}`
+            : `ESA WorldCover v200, ${sat.WORLDCOVER_YEAR}, 10 m (thống kê lấy mẫu 30 m)`,
+          classes: mode === 'loss' ? null : sat.COVER_CLASSES.map(({ key: k, name }) => ({ key: k, name })),
+          city,
+          wards
+        });
+      }
+      return res.status(200).json(cachedSatStats.get(key));
+    }
+
+    // Chỉ tiêu 0202: m² mặt nước năm trước trừ năm đánh giá (JRC GSW v1.4, đến 2021)
+    if (action === 'getWaterChange') {
+      const year = Number(req.query.year);
+      if (!Number.isInteger(year) || year < sat.GSW_MIN_YEAR || year > sat.GSW_MAX_YEAR) {
+        return res.status(400).json({ error: true, message: `Năm mặt nước phải từ ${sat.GSW_MIN_YEAR} đến ${sat.GSW_MAX_YEAR}` });
+      }
+      const prev = year - 1;
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+      const key = `water|${prev}|${year}`;
+      if (!cachedSatStats.has(key)) {
+        const fc = await eeEvaluate(sat.waterPairArea(ee, prev, year, wardVectorParsed).reduceRegions({
+          collection: wardVectorParsed,
+          reducer: ee.Reducer.sum(),
+          scale: 30,
+          tileScale: 4
+        }).map(f => ee.Feature(null).copyProperties(f)));
+        const m2 = (v) => Math.round(Number(v) || 0);
+        const wards = ((fc && fc.features) || []).map(f => {
+          const p = f.properties || {};
+          const a = m2(p.prev), b = m2(p.curr);
+          return { name: wardNameOf(p), prevM2: a, currM2: b, declineM2: a - b };
+        }).filter(w => w.name);
+        cachedSatStats.set(key, {
+          source: 'JRC Global Surface Water v1.4 YearlyHistory',
+          year, prev, maxYear: sat.GSW_MAX_YEAR,
+          note: 'Mặt nước = pixel waterClass 2 (theo mùa) hoặc 3 (thường xuyên), lưới 30 m. Ước tính vệ tinh, không thay kiểm kê mặt nước.',
+          wards
+        });
+      }
+      return res.status(200).json(cachedSatStats.get(key));
+    }
+
+    // Chỉ tiêu 0301: (dân số cuối/đầu) / (đất xây dựng cuối/đầu). WorldPop 2015–2020, Dynamic World built 2016–2021.
+    if (action === 'getLandPopRatio') {
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
+      const key = 'landpop|2015-2020|2016-2021';
+      if (!cachedSatStats.has(key)) {
+        const [y0, y1] = sat.POP_CHANGE_YEARS;
+        const [b0, b1] = sat.BUILT_CHANGE_YEARS;
+        const sumPop = (year) => eeEvaluate(sat.worldPopImage(ee, year).reduceRegions({
+          collection: wardVectorParsed, reducer: ee.Reducer.sum(), scale: 100, tileScale: 4
+        }).map(f => ee.Feature(null).copyProperties(f)));
+        const sumBuilt = (year) => eeEvaluate(sat.builtAreaM2(ee, wardVectorParsed, year).reduceRegions({
+          collection: wardVectorParsed, reducer: ee.Reducer.sum(), scale: 20, tileScale: 4
+        }).map(f => ee.Feature(null).copyProperties(f)));
+        const [popA, popB, builtA, builtB] = await Promise.all([sumPop(y0), sumPop(y1), sumBuilt(b0), sumBuilt(b1)]);
+        const byName = {};
+        const take = (fc, field, prop) => ((fc && fc.features) || []).forEach(f => {
+          const p = f.properties || {};
+          const name = wardNameOf(p);
+          const row = byName[name] || (byName[name] = { name, pop0: 0, pop1: 0, built0: 0, built1: 0 });
+          row[field] = Math.round(Number(p[prop] != null ? p[prop] : p.sum) || 0);
+        });
+        take(popA, 'pop0', 'population');
+        take(popB, 'pop1', 'population');
+        take(builtA, 'built0', 'm2');
+        take(builtB, 'built1', 'm2');
+        cachedSatStats.set(key, {
+          pop: { source: 'WorldPop GP 100 m, Việt Nam', years: [y0, y1] },
+          land: { source: 'Google Dynamic World, nhãn built (tháng 1–8)', years: [b0, b1], scale: 20 },
+          note: 'Đất phi nông nghiệp ước bằng diện tích nhãn đất xây dựng, không phải kiểm kê đất phi nông nghiệp. Hai kỳ lệch 1 năm vì WorldPop dừng ở 2020 còn Dynamic World đủ năm từ 2016.',
+          wards: Object.values(byName)
+        });
       }
       return res.status(200).json(cachedSatStats.get(key));
     }

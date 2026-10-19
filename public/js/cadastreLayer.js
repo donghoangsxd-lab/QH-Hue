@@ -16,6 +16,7 @@ import { parcelQhctHtml } from './qhctLayer.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
 import { mountParcelAssign } from './parcelInfra.js';
+import { restoreInspectFocus } from './projectLayer.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -419,6 +420,7 @@ function closeParcel() {
   clearHighlight();
   clearLandFill();
   clearParcelPies();
+  restoreInspectFocus();
   const card = document.getElementById('cadParcelCard');
   if (card) { card.hidden = true; card.innerHTML = ''; }
   if (popup) {
