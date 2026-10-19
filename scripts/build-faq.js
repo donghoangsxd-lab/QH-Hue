@@ -93,6 +93,343 @@ function rank(rows) {
   };
 }
 
+// Cùng ngưỡng classifyPlanChange trong services/gcsService.js: HT trống + QH có số = chưa xây.
+const PLAN_CHANGE_MIN_RATIO = 0.05;
+const PRIORITY_TOP = 8;
+const SERVICE_SKIP = new Set(['12-CSD', '14-NOXH', '11-NT']);
+const PRIORITY_METHOD = 'Công trình quy hoạch chưa xây là điểm đã duyệt (TrangThai = TRUE), cột QuyMo_HT trống và QuyMo_QH có số. Điểm được gán vào phường theo tọa độ nằm trong ranh, không theo tên cột Ten_XaPhuong. Quỹ đất (12-CSD) và nhà ở xã hội (14-NOXH) không có bán kính phục vụ nên không xếp. Nhà tang lễ, nghĩa trang (11-NT) chỉ có khoảng cách an toàn (Bảng 23), không phải vùng dân được phục vụ, nên cũng không xếp. Độ phủ thêm dùng đúng ước lượng 81 điểm trên buffer tròn bán kính QCVN (estimateCoverageAddPct): phần buffer nằm trong phường và chưa nằm trong buffer công trình cùng loại đang có (hiện trạng đã duyệt, kể cả điểm sắp di dời). Diện tích ha = tỷ lệ đó × diện tích hình học của ranh. Dân số thêm = tỷ lệ × danSoNum của phường, không vượt sức chứa QuyMo_QH chia chỉ tiêu m²/người. Đây là ước lượng hình học: không đếm pixel dân cư WorldPop (cần Earth Engine) và không bám đường (Dijkstra chỉ chạy khi tra cứu một điểm trên bản đồ). Mỗi phường giữ 8 công trình tăng phủ nhiều nhất, xếp theo dân số thêm rồi đến diện tích thêm.';
+
+function parseArea(val) {
+  if (val === undefined || val === null || String(val).trim() === '') return null;
+  const n = Number(String(val).trim().replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
+function classifyPlanChange(sizeHT, sizeQH) {
+  if (sizeHT === null) return sizeQH === null ? 'none' : 'new';
+  if (sizeQH === null) return 'relocate';
+  if (sizeHT === 0 || sizeQH === 0) return 'keep';
+  if (Math.abs(sizeQH - sizeHT) <= sizeHT * PLAN_CHANGE_MIN_RATIO) return 'keep';
+  if (sizeQH > sizeHT) return 'expand';
+  if (sizeQH < sizeHT) return 'shrink';
+  return 'keep';
+}
+
+function geoJsonAreaM2(geometry) {
+  if (!geometry || !geometry.coordinates) return 0;
+  const ringArea = (ring) => {
+    if (!ring || ring.length < 3) return 0;
+    const lat0 = ring.reduce((s, p) => s + p[1], 0) / ring.length;
+    const mPerDegLat = 111320;
+    const mPerDegLng = 111320 * Math.cos((lat0 * Math.PI) / 180);
+    let sum = 0;
+    for (let i = 0; i < ring.length - 1; i++) {
+      const x1 = ring[i][0] * mPerDegLng;
+      const y1 = ring[i][1] * mPerDegLat;
+      const x2 = ring[i + 1][0] * mPerDegLng;
+      const y2 = ring[i + 1][1] * mPerDegLat;
+      sum += x1 * y2 - x2 * y1;
+    }
+    return Math.abs(sum) / 2;
+  };
+  if (geometry.type === 'Polygon') return ringArea(geometry.coordinates[0]);
+  if (geometry.type === 'MultiPolygon') return geometry.coordinates.reduce((s, poly) => s + ringArea(poly[0]), 0);
+  return 0;
+}
+
+function distMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+function isPointInPolygon(point, vs) {
+  const x = point[0];
+  const y = point[1];
+  let inside = false;
+  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+    const xi = vs[i][0];
+    const yi = vs[i][1];
+    const xj = vs[j][0];
+    const yj = vs[j][1];
+    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function isPointInPolygonRings(point, rings) {
+  if (!rings || !rings[0] || !isPointInPolygon(point, rings[0])) return false;
+  for (let i = 1; i < rings.length; i++) {
+    if (isPointInPolygon(point, rings[i])) return false;
+  }
+  return true;
+}
+
+function normalizeWardGeometry(geometry) {
+  if (!geometry) return null;
+  const polygons = [];
+  const collect = (g) => {
+    if (!g) return;
+    if (g.type === 'Polygon' && Array.isArray(g.coordinates)) polygons.push(g.coordinates);
+    else if (g.type === 'MultiPolygon' && Array.isArray(g.coordinates)) g.coordinates.forEach(p => polygons.push(p));
+    else if (g.type === 'GeometryCollection') (g.geometries || []).forEach(collect);
+  };
+  collect(geometry);
+  if (!polygons.length) return null;
+  if (polygons.length === 1) return { type: 'Polygon', coordinates: polygons[0] };
+  return { type: 'MultiPolygon', coordinates: polygons };
+}
+
+function pointInGeom(lng, lat, geom) {
+  if (!geom) return false;
+  const pt = [lng, lat];
+  if (geom.type === 'Polygon') return isPointInPolygonRings(pt, geom.coordinates);
+  if (geom.type === 'MultiPolygon') return geom.coordinates.some(rings => isPointInPolygonRings(pt, rings));
+  return false;
+}
+
+function inBbox(lng, lat, bbox) {
+  return !!bbox && lng >= bbox[0] && lng <= bbox[2] && lat >= bbox[1] && lat <= bbox[3];
+}
+
+function estimateCoverageAddPct({ lat, lng, radius, wardGeometry, bbox, wardArea, existingSameType }) {
+  const R = Math.max(50, Number(radius) || 1000);
+  if (!wardArea || wardArea <= 0 || lat == null || lng == null) return 0;
+  const bufferArea = Math.PI * R * R;
+  const rings = 5;
+  const perRing = 16;
+  let sampleTotal = 0;
+  let sampleNewInWard = 0;
+  const nearby = (existingSameType || []).filter(ex => ex.lat != null && ex.lng != null
+    && distMeters(lat, lng, Number(ex.lat), Number(ex.lng)) <= R + Math.max(50, Number(ex.radius) || R));
+  const covered = (pLat, pLng) => {
+    for (const ex of nearby) {
+      const rEx = Math.max(50, Number(ex.radius) || R);
+      if (distMeters(pLat, pLng, Number(ex.lat), Number(ex.lng)) <= rEx) return true;
+    }
+    return false;
+  };
+  const consider = (sLat, sLng) => {
+    sampleTotal += 1;
+    if (bbox && !inBbox(sLng, sLat, bbox)) return;
+    if (!pointInGeom(sLng, sLat, wardGeometry)) return;
+    if (covered(sLat, sLng)) return;
+    sampleNewInWard += 1;
+  };
+  consider(lat, lng);
+  for (let ring = 1; ring <= rings; ring++) {
+    const r = (R * ring) / rings;
+    for (let k = 0; k < perRing; k++) {
+      const ang = (2 * Math.PI * k) / perRing + (ring % 2) * (Math.PI / perRing);
+      const dLat = (r * Math.cos(ang)) / 111320;
+      const dLng = (r * Math.sin(ang)) / (111320 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
+      consider(lat + dLat, lng + dLng);
+    }
+  }
+  if (sampleTotal <= 0) return 0;
+  const pct = (Math.min((sampleNewInWard / sampleTotal) * bufferArea, wardArea) / wardArea) * 100;
+  return Number(Math.min(100, Math.max(0, pct)).toFixed(1));
+}
+
+function metricCode(item) {
+  return constants.isThptItem(item) ? 'THPT' : constants.resolveTypeCode(item);
+}
+
+function serviceLabel(item, size) {
+  if (constants.isThptItem(item)) return constants.urbanInfraConfig.THPT.label;
+  const code = constants.resolveTypeCode(item);
+  if (code === '1-CV') return constants.parkTier({ ...item, size }).label;
+  const cfg = constants.infraConfig[code] || constants.networkConfig[code];
+  return (cfg && cfg.label) || 'Hạ tầng';
+}
+
+function capacityOf(item, size, profile) {
+  const code = constants.resolveTypeCode(item);
+  const quota = constants.isThptItem(item)
+    ? (constants.baseQuota('THPT', profile) || 0)
+    : code === '1-CV'
+      ? (constants.baseQuota(constants.parkTier({ ...item, size }).urban ? 'CV_DT' : 'CV_DV', profile) || 0)
+      : constants.quotaFor(code, profile);
+  return quota > 0 && size > 0 ? Math.floor(size / quota) : null;
+}
+
+function mappedType(props) {
+  const prefix = String(props.ID_DoiTuong || '').split('-')[0];
+  return constants.codeMap[prefix]
+    || constants.codeMap[prefix.replace(/_DT$/i, '').replace(/_DV$/i, '')]
+    || constants.codeMap[String(props.Tab || '').split('-')[0]]
+    || null;
+}
+
+function buildPriority(features, boundary, popByWard) {
+  const geoms = [];
+  for (const f of (boundary && boundary.features) || []) {
+    const name = namedWard((f.properties || {}).tenXa || (f.properties || {}).name || '');
+    const geometry = normalizeWardGeometry(f.geometry);
+    if (!name || !geometry) continue;
+    let bbox = null;
+    try { bbox = turf.bbox({ type: 'Feature', geometry, properties: {} }); } catch (e) { bbox = null; }
+    geoms.push({ name, geometry, bbox, areaM2: geoJsonAreaM2(geometry) });
+  }
+  const wardOfPoint = (lng, lat) => {
+    for (const w of geoms) {
+      if (!inBbox(lng, lat, w.bbox)) continue;
+      if (pointInGeom(lng, lat, w.geometry)) return w;
+    }
+    return null;
+  };
+  const ids = new Set(features.map(f => String((f.properties || {}).ID_DoiTuong || '')));
+  const isSplit = (id) => {
+    const m = String(id || '').match(/^(.+)\.(\d+)$/);
+    return !!(m && Number(m[2]) >= 2 && ids.has(m[1]));
+  };
+  const existingByCode = new Map();
+  const candidates = [];
+  let unplaced = 0;
+  let skippedKind = 0;
+  for (const f of features) {
+    const p = f.properties || {};
+    if (!approved(p.TrangThai) || isSplit(p.ID_DoiTuong)) continue;
+    const coords = f.geometry && f.geometry.type === 'Point' ? f.geometry.coordinates : null;
+    if (!coords || !Number.isFinite(Number(coords[0])) || !Number.isFinite(Number(coords[1]))) continue;
+    const type = mappedType(p);
+    if (!type) continue;
+    const sizeHT = parseArea(p.QuyMo_HT !== undefined ? p.QuyMo_HT : p.QuyMo_S);
+    const sizeQH = parseArea(p.QuyMo_QH);
+    const planChange = classifyPlanChange(sizeHT, sizeQH);
+    const prefix = String(p.ID_DoiTuong || '').split('-')[0];
+    let nhom = p.Nhom_HaTang || p.nhomHaTang;
+    if (!nhom && (prefix === 'THPT' || /_DT$/i.test(prefix))) nhom = 'Cap Do Thi';
+    const item = {
+      id: String(p.ID_DoiTuong || ''),
+      name: p.Ten_CongTrinh || 'Chưa đặt tên',
+      type,
+      nhomHaTang: constants.cleanNhomStr(nhom),
+      lat: Number(coords[1]),
+      lng: Number(coords[0]),
+      status: true
+    };
+    const code = metricCode(item);
+    if (!code || SERVICE_SKIP.has(code) || SERVICE_SKIP.has(type)) {
+      if (planChange === 'new') skippedKind++;
+      continue;
+    }
+    const host = wardOfPoint(item.lng, item.lat);
+    const profile = constants.wardProfile(host ? host.name : p.Ten_XaPhuong);
+    if (planChange === 'new') {
+      const size = sizeQH || 0;
+      const radius = constants.standardRadius({ ...item, size }, profile);
+      if (!(radius > 0)) { skippedKind++; continue; }
+      if (!host) { unplaced++; continue; }
+      candidates.push({ item, code, size, radius, host, profile });
+    } else if (planChange !== 'none') {
+      const radius = constants.standardRadius({ ...item, size: sizeHT || 0 }, profile);
+      if (!(radius > 0)) continue;
+      const ex = { lat: item.lat, lng: item.lng, radius };
+      if (!existingByCode.has(code)) existingByCode.set(code, []);
+      existingByCode.get(code).push(ex);
+    }
+  }
+
+  const byWard = new Map(wards.map(name => [name, []]));
+  for (const c of candidates) {
+    const bucket = byWard.get(c.host.name);
+    if (bucket) bucket.push(c);
+  }
+  const missingPop = [];
+  const empty = [];
+  const noBoundary = [];
+  const out = {};
+  for (const name of wards) {
+    const host = geoms.find(w => w.name === name);
+    const pop = popByWard[name] > 0 ? popByWard[name] : null;
+    if (!pop) missingPop.push(name);
+    if (!host) {
+      noBoundary.push(name);
+      out[name] = {
+        pop: null,
+        missingPop: true,
+        facilities: [],
+        note: 'Chưa có ranh phường, xã trong lớp ranh giới nên không gán và không tính được công trình quy hoạch mới.'
+      };
+      continue;
+    }
+    const ranked = [];
+    let zeroGain = 0;
+    for (const c of byWard.get(name) || []) {
+      const pct = estimateCoverageAddPct({
+        lat: c.item.lat,
+        lng: c.item.lng,
+        radius: c.radius,
+        wardGeometry: host.geometry,
+        bbox: host.bbox,
+        wardArea: host.areaM2,
+        existingSameType: existingByCode.get(c.code) || []
+      });
+      if (!(pct > 0)) { zeroGain++; continue; }
+      const areaHa = Math.round((pct / 100) * host.areaM2 / 100) / 100;
+      const capacity = capacityOf(c.item, c.size, c.profile);
+      let popAdded = null;
+      let capacityLimited = false;
+      if (pop) {
+        const reach = pop * pct / 100;
+        const added = capacity == null ? reach : Math.min(reach, capacity);
+        capacityLimited = added < reach;
+        popAdded = Math.round(added);
+      }
+      ranked.push({
+        id: c.item.id,
+        name: c.item.name,
+        type: c.code,
+        typeLabel: serviceLabel(c.item, c.size),
+        lat: c.item.lat,
+        lng: c.item.lng,
+        radius: c.radius,
+        areaHa,
+        pct,
+        popAdded,
+        capacityLimited
+      });
+    }
+    ranked.sort((a, b) => {
+      const ap = a.popAdded == null ? -1 : a.popAdded;
+      const bp = b.popAdded == null ? -1 : b.popAdded;
+      if (bp !== ap) return bp - ap;
+      if (b.areaHa !== a.areaHa) return b.areaHa - a.areaHa;
+      return a.name.localeCompare(b.name, 'vi');
+    });
+    const facilities = ranked.slice(0, PRIORITY_TOP);
+    let note = '';
+    if (!facilities.length && !zeroGain) {
+      empty.push(name);
+      note = 'Không có công trình quy hoạch mới (đã duyệt, có vùng phục vụ) nằm trong ranh phường, xã này.';
+    } else if (!facilities.length) {
+      empty.push(name);
+      note = `Có ${num(zeroGain)} công trình quy hoạch mới, nhưng buffer QCVN đều đã trùng vùng phục vụ cùng loại hiện có hoặc không thêm diện tích trong ranh.`;
+    } else if (zeroGain) {
+      note = `Còn ${num(zeroGain)} công trình quy hoạch mới khác không thêm diện tích phủ trong ranh.`;
+    }
+    if (!pop) note = `${note}${note ? ' ' : ''}Chưa có dân số danSoNum trên ranh, nên chỉ xếp theo diện tích phủ thêm.`.trim();
+    out[name] = { pop, missingPop: !pop, facilities, note };
+  }
+  const outsideNote = unplaced
+    ? ` ${num(unplaced)} công trình quy hoạch mới nằm ngoài ranh 40 phường, xã nên không gắn được vào địa bàn nào.`
+    : '';
+  return {
+    method: PRIORITY_METHOD + outsideNote,
+    missingPop,
+    empty,
+    noBoundary,
+    unplaced,
+    skippedKind,
+    wards: out
+  };
+}
+
 function q(id, question, answer, wardNames, source) {
   return { id, q: question, a: answer, wards: wardNames, source };
 }
@@ -331,6 +668,7 @@ async function main() {
     { q: 'Độ che phủ thực vật (NDVI) theo phường?', why: 'Chưa có lớp NDVI trong bộ số liệu tĩnh.' }
   );
 
+  const priority = buildPriority(features, boundary, popByWard);
   const doc = {
     built: '2026-10-19',
     infraFeatures: features.length,
@@ -339,8 +677,13 @@ async function main() {
     landHits,
     landMiss,
     questions,
-    unanswered: gaps
+    unanswered: gaps,
+    priority
   };
+  console.log(`priority: thiếu dân ${priority.missingPop.length}, không có công trình mới ${priority.empty.length}, không có ranh ${priority.noBoundary.length}, ngoài ranh ${priority.unplaced}, bỏ loại không phục vụ ${priority.skippedKind}`);
+  if (priority.missingPop.length) console.log('thiếu dân:', priority.missingPop.join('; '));
+  if (priority.empty.length) console.log('không xếp được:', priority.empty.join('; '));
+  if (priority.noBoundary.length) console.log('không ranh:', priority.noBoundary.join('; '));
   fs.writeFileSync(OUT, JSON.stringify(doc, null, 2));
   console.log(`faq: ${questions.length} câu, ${gaps.length} câu chưa trả lời, ${OUT}`);
 }
