@@ -76,14 +76,22 @@ export function openRing(pts) {
   return r.length >= 3 ? r : null;
 }
 
+function dedupeLine(pts) {
+  const r = [];
+  for (const p of pts) if (!r.length || !samePt(r[r.length - 1], p)) r.push(p);
+  return r.length >= 2 ? r : null;
+}
+
 /**
- * Đọc KML (văn bản) → { entities: [{kind: 'POLYGON'|'POLYLINE'|'POINT', layer, name, attrs, rings, pt?}], stats }.
- * Bộ lọc mặc định: chỉ nhận Polygon, đường khép kín và Point (Placemark không có vùng); còn lại đếm vào stats.skipped.
+ * Đọc KML (văn bản) → { entities: [{kind: 'POLYGON'|'POLYLINE'|'LINE'|'POINT', layer, name, attrs, rings, pt?}], stats }.
+ * Bộ lọc mặc định: chỉ nhận Polygon, đường khép kín và Point (Placemark không có vùng); đường hở đếm vào stats.skipped.
+ * opts.openLines: giữ LineString chưa khép thành kind 'LINE' (phác thảo). Nhập CAD không bật tùy chọn này.
  */
-export function parseKml(text) {
+export function parseKml(text, opts = {}) {
   const doc = new DOMParser().parseFromString(text, 'application/xml');
   if (doc.getElementsByTagName('parsererror').length) throw new Error('File KML lỗi cấu trúc XML.');
-  const stats = { placemark: 0, polygon: 0, polyline: 0, point: 0, skipped: {} };
+  const openLines = !!opts.openLines;
+  const stats = { placemark: 0, polygon: 0, polyline: 0, line: 0, point: 0, skipped: {} };
   const skip = (label, n = 1) => { stats.skipped[label] = (stats.skipped[label] || 0) + n; };
   const entities = [];
   for (const pm of descendants(doc, 'Placemark')) {
@@ -99,17 +107,23 @@ export function parseKml(text) {
       }
     }
     const lineRings = [];
+    const loose = [];
     const lines = [...descendants(pm, 'LineString'), ...descendants(pm, 'LinearRing').filter(lr => !insidePolygon(lr))];
     for (const ln of lines) {
       const pts = parseCoords(childText(ln, 'coordinates'));
       const r = pts.length > 3 && samePt(pts[0], pts[pts.length - 1]) ? openRing(pts) : null;
-      if (r) lineRings.push(r); else skip('line hở');
+      if (r) lineRings.push(r);
+      else if (openLines) {
+        const line = dedupeLine(pts);
+        if (line) loose.push(line); else skip('line hở');
+      } else skip('line hở');
     }
     if (polyRings.length) { entities.push({ kind: 'POLYGON', layer, name, attrs, rings: polyRings }); stats.polygon++; }
     if (lineRings.length) { entities.push({ kind: 'POLYLINE', layer, name, attrs, rings: lineRings }); stats.polyline++; }
+    if (loose.length) { entities.push({ kind: 'LINE', layer, name, attrs, rings: loose }); stats.line++; }
     const points = descendants(pm, 'Point');
     // Point đi kèm vùng trong cùng Placemark (MultiGeometry) là điểm nhãn của vùng → không nhập riêng
-    if (polyRings.length || lineRings.length) continue;
+    if (polyRings.length || lineRings.length || loose.length) continue;
     let added = 0;
     for (const p of points) {
       const pt = parseCoords(childText(p, 'coordinates'))[0];

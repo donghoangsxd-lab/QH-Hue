@@ -21,7 +21,7 @@ import {
 import { planMap, onCompareChange, passToolClick } from './planMap.js';
 import {
   projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName,
-  wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly, ensureProjectNet, noteNetSaved, netFeaturesFromText
+  wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly, ensureProjectNet, noteNetSaved, netFeaturesFromText, loadCatalog
 } from './projectFiles.js';
 import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
@@ -36,6 +36,7 @@ import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js'
 import { openOrAssign, openAssign, openDecision, openPropose, openProposalReview } from './decisionViewer.js';
 import { adjustmentsOf, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { namesOfProject } from './projectNames.js';
+import { kmlTextFromFile, boundaryPolygonsFromKml } from './kmlLoad.js';
 
 const HIDDEN_KEY = 'qh_hidden_projects';
 const HIDDEN_LAYERS_KEY = 'qh_hidden_layers';
@@ -885,6 +886,9 @@ function layersHtml(p, idx, projectOn, admin) {
     const addNet = admin && g.kind === 'net' && !p.legacy
       ? `<button type="button" class="project-btn" data-net-add="${idx}:${li}" title="${g.present ? 'Thay bản vẽ GeoJSON' : 'Thêm bản vẽ GeoJSON (kinh độ, vĩ độ)'}" aria-label="${g.present ? 'Thay bản vẽ' : 'Thêm bản vẽ'}"${layerBusy || busy ? ' disabled' : ''}>${ico('save')}</button>`
       : '';
+    const kmlBtn = admin && g.kind === 'boundary' && !p.legacy
+      ? `<button type="button" class="project-kml-btn" data-kml-boundary="${idx}" title="Nhập file KML hoặc KMZ (WGS84) làm ranh đồ án. Không ghi lại các lô."${layerBusy || busy ? ' disabled' : ''}>Nhập KML/KMZ</button>`
+      : '';
     return `${note}<div class="project-layer${on && projectOn && g.present ? '' : ' is-off'}">
       <label class="project-layer-name" title="${escapeHtml(g.label)} (${g.phase === 'QH' ? 'quy hoạch' : 'hiện trạng'}) — ${escapeHtml(count.full)}">
         <input type="checkbox" data-layer="${idx}:${li}"${on ? ' checked' : ''}${toggleable ? '' : ' disabled'}>
@@ -893,7 +897,7 @@ function layersHtml(p, idx, projectOn, admin) {
         <span>${escapeHtml(g.label)}</span><small>${escapeHtml(count.short)}</small></label>
       ${addNet}
       ${admin && g.present && !p.legacy ? `<button type="button" class="project-btn danger" data-layer-del="${idx}:${li}" title="Xóa lớp ${escapeHtml(g.label)} khỏi đồ án" aria-label="Xóa lớp"${layerBusy || busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
-    </div>`;
+    </div>${kmlBtn}`;
   }).join('') + adjustRowHtml(p, idx, projectOn);
   const lotsN = info.list.filter(g => g.kind === 'lots').reduce((s, g) => s + g.count, 0);
   const search = lotsN ? `<div class="project-lot-search">
@@ -1056,6 +1060,87 @@ function deleteNote(g) {
 
 let netInput = null;
 let netPick = null;
+
+let kmlInput = null;
+let kmlPick = null;
+
+function geometryFromPolygons(polygons) {
+  const features = polygons.map(g => turf.feature(g));
+  if (features.length === 1) return features[0].geometry;
+  try {
+    let acc = features[0];
+    for (let i = 1; i < features.length; i++) acc = safeUnion(acc, features[i]);
+    return acc.geometry;
+  } catch (e) {
+    return { type: 'MultiPolygon', coordinates: polygons.map(g => g.coordinates) };
+  }
+}
+
+function ringTooLong(geom) {
+  const polys = geom.type === 'Polygon' ? [geom.coordinates] : geom.type === 'MultiPolygon' ? geom.coordinates : [];
+  return polys.some(poly => (poly || []).some(ring => ring.length > 20000));
+}
+
+function pickBoundaryKml(p) {
+  if (!isAdmin() || busy || layerBusy || p.legacy) return;
+  kmlPick = p;
+  if (!kmlInput) {
+    kmlInput = document.createElement('input');
+    kmlInput.type = 'file';
+    kmlInput.accept = '.kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz';
+    kmlInput.hidden = true;
+    kmlInput.addEventListener('change', () => {
+      const file = kmlInput.files && kmlInput.files[0];
+      const hit = kmlPick;
+      kmlInput.value = '';
+      kmlPick = null;
+      if (file && hit) uploadBoundaryKml(hit, file);
+    });
+    document.body.appendChild(kmlInput);
+  }
+  kmlInput.click();
+}
+
+async function uploadBoundaryKml(p, file) {
+  if (!isAdmin() || busy || layerBusy || p.legacy) return;
+  let polygons;
+  try { polygons = boundaryPolygonsFromKml(await kmlTextFromFile(file)); }
+  catch (err) { alert(err.message || 'Không đọc được file KML/KMZ.'); return; }
+  let fitted = null;
+  try { fitted = fitBoundary(geometryFromPolygons(polygons)); }
+  catch (e) { fitted = null; }
+  if (!fitted || ringTooLong(fitted)) {
+    alert('Không rút gọn được ranh vừa 45.000 ký tự. Đơn giản hóa file rồi nhập lại.');
+    return;
+  }
+  if (!confirm(`Cập nhật ranh từ file KML/KMZ cho đồ án «${p.name}»?\n${polygons.length} vùng gộp thành 1 ranh GIS. Không ghi lại các lô.`)) return;
+  layerBusy = layerKey(p.name, 'ranh-gioi');
+  renderList();
+  try {
+    markDataWritten();
+    const res = await fetch(geeApi('action=importCadBatch'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+      body: JSON.stringify({
+        boundaryOnly: true,
+        tenQH: p.name,
+        fileName: file.name,
+        registry: { boundary: fitted, boundarySource: 'gis', wards: [], infra: 0, lands: 0 }
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) signOutAdmin();
+    if (!res.ok || !data.success) throw new Error(data.message || `Lỗi máy chủ (${res.status})`);
+    await loadCatalog();
+    rebuild();
+    showToast(`✓ Đã cập nhật ranh GIS cho đồ án «${p.name}».`, 'success');
+  } catch (err) {
+    alert(err.message || 'Không lưu được ranh.');
+  } finally {
+    layerBusy = null;
+    renderList();
+  }
+}
 
 function pickNetFile(p, g) {
   if (!isAdmin() || busy || layerBusy || p.legacy) return;
@@ -1913,6 +1998,12 @@ export function initProjectLayer(opts = {}) {
       const role = $('projectList')?.querySelector(`[data-doc-role="${docAdd.dataset.docAdd}"]`)?.value || 'dinh-chinh';
       if (role === 'phe-duyet' && !p.decision) { openOrAssign(decisionTarget(p)); return; }
       openAssign(docTarget(p, null, role));
+      return;
+    }
+    const kmlBoundary = e.target.closest('[data-kml-boundary]');
+    if (kmlBoundary) {
+      const p = projects[Number(kmlBoundary.dataset.kmlBoundary)];
+      if (p) pickBoundaryKml(p);
       return;
     }
     const netAdd = e.target.closest('[data-net-add]');
