@@ -10,6 +10,8 @@ const DEM_COLLECTION = 'COPERNICUS/DEM/GLO30_2024_1';
 // Sentinel-1 phủ đều Việt Nam từ 2016; Landsat 8 có đủ mùa nóng từ 2014
 const SAR_FIRST_YEAR = 2016;
 const LST_FIRST_YEAR = 2014;
+// Sentinel-2 SR hài hòa có mặt đều từ 2017
+const NDVI_FIRST_YEAR = 2017;
 // Mùa lũ Huế so với nền mùa khô cùng năm (đồng ruộng chưa ngập lũ); mùa nóng cho nhiệt độ bề mặt
 const FLOOD_SEASON = ['09-15', '12-15'];
 const DRY_SEASON = ['03-01', '07-31'];
@@ -20,6 +22,9 @@ const SAR_WATER_DB = -16;
 const SAR_DROP_DB = -3;
 
 const LST_VIS = { min: 26, max: 44, palette: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026'] };
+// Đỏ (thấp / giảm) → xanh (cao / tăng). Khác biệt năm sau trừ năm trước.
+const NDVI_VIS = { min: -0.1, max: 0.8, palette: ['#a50026', '#d73027', '#f46d43', '#fdae61', '#fee08b', '#d9ef8b', '#a6d96a', '#66bd63', '#1a9850', '#006837'] };
+const NDVI_DIFF_VIS = { min: -0.3, max: 0.3, palette: ['#d73027', '#fc8d59', '#fee08b', '#ffffbf', '#d9ef8b', '#91cf60', '#1a9850'] };
 const FLOOD_COLOR = '#2563eb';
 const FREQ_PALETTE = ['#bae6fd', '#38bdf8', '#2563eb', '#1e3a8a', '#172554'];
 
@@ -31,6 +36,7 @@ function lastSeasonYear([startMMDD], now = new Date()) {
 const range = (a, b) => Array.from({ length: Math.max(0, b - a + 1) }, (_, i) => a + i);
 const sarYears = (now) => range(SAR_FIRST_YEAR, lastSeasonYear(FLOOD_SEASON, now));
 const lstYears = (now) => range(LST_FIRST_YEAR, lastSeasonYear(HOT_SEASON, now));
+const ndviYears = (now = new Date()) => range(NDVI_FIRST_YEAR, now.getFullYear());
 const season = (year, [a, b]) => [`${year}-${a}`, `${year}-${b}`];
 
 function parseYear(raw, years) {
@@ -118,6 +124,30 @@ function lstImage(ee, wards, year) {
     .map(prep)
     .median()
     .clipToCollection(wards);
+}
+
+/**
+ * NDVI trung vị cả năm, Sentinel-2 L2A (B8, B4, 10 m), đã bỏ mây / bóng mây / tuyết theo lớp SCL.
+ * Năm đang diễn ra chỉ gồm ảnh đã chụp.
+ */
+function ndviImage(ee, wards, year) {
+  const clear = (img) => {
+    const scl = img.select('SCL');
+    const ok = scl.neq(0).and(scl.neq(1)).and(scl.neq(3)).and(scl.neq(8)).and(scl.neq(9)).and(scl.neq(10)).and(scl.neq(11));
+    return img.normalizedDifference(['B8', 'B4']).updateMask(ok).rename('ndvi');
+  };
+  return ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+    .filterBounds(wards.geometry().bounds())
+    .filterDate(`${year}-01-01`, `${year + 1}-01-01`)
+    .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 60))
+    .map(clear)
+    .median()
+    .clipToCollection(wards);
+}
+
+/** NDVI năm year trừ NDVI năm compare (dương = tăng cây). */
+function ndviDiff(ee, wards, year, compare) {
+  return ndviImage(ee, wards, year).subtract(ndviImage(ee, wards, compare)).rename('ndvi');
 }
 
 // Khoanh vùng trong từng phường (QCVN Mục 2.2.3.2, 2.2.3.3 chỉ áp cho đơn vị ở / nhóm nhà ở phát triển mới):
@@ -243,7 +273,7 @@ function mapUrl(ee, visImage) {
 }
 
 module.exports = {
-  sarYears, lstYears, parseYear, demImage, demRegion, terrariumImage, sarFloodMask, sarFloodVis, lstImage, mapUrl,
-  LST_VIS, FLOOD_SEASON, HOT_SEASON, POP_REFS,
+  sarYears, lstYears, ndviYears, parseYear, demImage, demRegion, terrariumImage, sarFloodMask, sarFloodVis, lstImage, ndviImage, ndviDiff, mapUrl,
+  LST_VIS, NDVI_VIS, NDVI_DIFF_VIS, FLOOD_SEASON, HOT_SEASON, POP_REFS,
   newDevImage, newDevVis, devRecentYears, DEV_FROM_YEARS, DEV_FROM_DEFAULT, DEV_COLOR, DEV_BASE_COLOR, DEV_SCALE_M, DEV_CRS
 };

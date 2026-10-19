@@ -604,6 +604,16 @@
             <div class="sat-legend" id="lstLegend"></div>
             <div class="flood-stats" id="lstStats"></div>
           </div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_ndvi"><label for="chk_ndvi" title="Chỉ số thực vật NDVI trung vị cả năm từ Sentinel-2 (ESA, 10 m), đã bỏ mây theo lớp SCL. Đỏ là thấp, xanh là cao. Có thể trừ hai năm để xem nơi tăng hoặc giảm."><svg class="ico ico-layer"><use href="#i-leaf"/></svg>NDVI (Sentinel-2)</label></div>
+            <span id="ndviOpBox" class="layer-slider" style="display:none;"><input type="range" id="ndviOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp NDVI" aria-label="Độ trong suốt lớp NDVI"></span>
+          </div>
+          <div class="flood-box" id="ndviBox" style="display:none;">
+            <div class="sat-pick"><label for="ndviYear">Năm</label><select id="ndviYear"></select></div>
+            <div class="sat-pick"><label for="ndviCompare">So sánh</label><select id="ndviCompare"></select></div>
+            <div class="sat-legend" id="ndviLegend"></div>
+            <div class="flood-stats" id="ndviStats"></div>
+          </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_risk"><label for="chk_risk" title="Lọc công trình (kể cả đề xuất, quy hoạch mới, quỹ đất) có vùng 30 m quanh vị trí bị ngập trong nhiều mùa lũ (Sentinel-1) hoặc nóng hơn mức chung (Landsat), để cân nhắc cải tạo hoặc tránh chọn đất"><svg class="ico ico-layer"><use href="#i-alert"/></svg>Công trình chịu rủi ro ngập / nhiệt</label></div></div>
           <div class="flood-box" id="riskBox" style="display:none;">
             <div class="sat-pick"><label for="riskGroup">Nhóm</label><select id="riskGroup"></select></div>
