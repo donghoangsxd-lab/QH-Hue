@@ -239,7 +239,7 @@
               </label>
               <label class="cad-drop review-file" for="localPdf">
                 <span class="cad-drop-main"><b>PDF scan</b> (không bắt buộc)</span>
-                <span class="review-file-name" id="localPdfName">Quyết định, bản vẽ điều chỉnh · PDF &lt; 2 MB</span>
+                <span class="review-file-name" id="localPdfName">Quyết định, bản vẽ điều chỉnh · PDF tối đa 2 MB (admin 10 MB)</span>
                 <input type="file" id="localPdf" accept=".pdf,application/pdf" hidden>
               </label>
               <button type="button" class="btn-submit" id="btnLocalStart"><svg class="ico"><use href="#i-send"/></svg>THẨM ĐỊNH ĐIỀU CHỈNH</button>
@@ -248,7 +248,7 @@
                 <ol>
                   <li><b>Ranh giới khu vực điều chỉnh</b>: polygon hoặc polyline khép kín, tên layer có chữ <b>RANH</b> (VD RANH_DIEUCHINH).</li>
                   <li><b>Hatch các lô đất</b> trong phạm vi điều chỉnh, tên layer theo Thông tư 16/2025/TT-BXD (cùng quy ước với cân đối đất; trường học tách _MN / _TH / _THCS).</li>
-                  <li>(Không bắt buộc) <b>File PDF scan</b> Quyết định, bản vẽ điều chỉnh, dung lượng dưới 2 MB.</li>
+                  <li>(Không bắt buộc) <b>File PDF scan</b> Quyết định, bản vẽ điều chỉnh. Người dùng tối đa 2 MB, admin tối đa 10 MB.</li>
                 </ol>
                 <p>Ranh và lô cùng một file DXF, hệ VN-2000. Phạm vi phải nằm trong ranh đồ án đã chọn; chỉ tiêu cả đồ án tụt dưới 100% thì kết quả ghi <b>Không đảm bảo</b>.</p>
               </div>
@@ -708,7 +708,7 @@
             <label class="cad-drop" id="adjDrop" for="adjFiles">
               <span class="cad-drop-main"><b>Chọn file</b> hoặc kéo thả vào đây</span>
               <span class="cad-drop-types"><i>DXF</i><i>JPG · PNG</i><i>PDF</i></span>
-              <span class="cad-drop-sub">DXF bắt buộc: ranh trên layer có chữ RANH + hatch đất theo TT16. Có thể kèm <b>KH - ….dxf</b> (lớp tem đất). Ảnh tờ bản vẽ scan (không bắt buộc) ghép lên bản đồ theo khung bản vẽ đã phê duyệt. PDF Quyết định phê duyệt &lt; 2 MB (không bắt buộc). Không chấm QCVN, lô gốc của đồ án giữ nguyên.</span>
+              <span class="cad-drop-sub">DXF bắt buộc: ranh trên layer có chữ RANH + hatch đất theo TT16. Có thể kèm <b>KH - ….dxf</b> (lớp tem đất). Ảnh tờ bản vẽ scan (không bắt buộc) ghép lên bản đồ theo khung bản vẽ đã phê duyệt. PDF Quyết định phê duyệt tối đa 2 MB, admin 10 MB (không bắt buộc). Không chấm QCVN, lô gốc của đồ án giữ nguyên.</span>
               <input type="file" id="adjFiles" accept=".dxf,.jpg,.jpeg,.png,.webp,.pdf" multiple hidden />
             </label>
             <div id="adjFileList" class="adj-files"></div>

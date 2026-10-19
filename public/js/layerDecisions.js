@@ -49,7 +49,7 @@ export function paintLayerDecisions(root = document) {
     const name = titles[id] ? ` · ${titles[id]}` : '';
     btn.title = d
       ? `Xem quyết định phê duyệt${name}: ${d.name}`
-      : admin ? `Gắn quyết định phê duyệt${name} (PDF dưới 1 MB hoặc link)` : `Chưa gắn quyết định phê duyệt${name}`;
+      : admin ? `Gắn quyết định phê duyệt${name} (PDF tối đa 10 MB hoặc link)` : `Chưa gắn quyết định phê duyệt${name}`;
     btn.setAttribute('aria-label', d ? 'Xem quyết định phê duyệt' : admin ? 'Gắn quyết định phê duyệt' : 'Chưa gắn quyết định phê duyệt');
   });
 }

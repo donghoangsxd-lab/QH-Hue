@@ -10,6 +10,7 @@ const roads = require('../services/roadsService');
 const popEdits = require('../services/popEditsService');
 const sat = require('../services/satService');
 const projects = require('../services/projectStore');
+const pdfLimits = require('../services/pdfLimits');
 const statsStore = require('../services/statsStore');
 
 let cachedWardStats = null;
@@ -126,6 +127,15 @@ function readJsonBody(req) {
     try { body = JSON.parse(body); } catch (e) { body = {}; }
   }
   return body && typeof body === 'object' ? body : {};
+}
+
+function stagedTokenOf(body) {
+  const token = String((body && body.staged) || '');
+  return /^[a-f0-9]{32}$/.test(token) ? token : '';
+}
+
+function sendInlinePdfError(res, err) {
+  return res.status(err.status || 400).json({ error: true, message: err.message || 'File PDF không hợp lệ.' });
 }
 
 const INVEST_EDITS_NAME = 'invest_edits.json';
@@ -280,19 +290,18 @@ function checkCadPendingRate(req) {
   checkRate(cadPendingHits, req, 3, 60 * 60 * 1000, 'Mỗi máy chỉ gửi được 3 file mỗi giờ, vui lòng thử lại sau');
 }
 
-// Hồ sơ điều chỉnh cục bộ của người dùng chưa đăng nhập: mỗi IP tối đa 4 hồ sơ / giờ; PDF ≤ 2 MB (base64 ~ 2,8 triệu ký tự)
+// Hồ sơ điều chỉnh cục bộ của người dùng chưa đăng nhập: mỗi IP tối đa 4 hồ sơ / giờ. PDF người dùng tối đa 2 MB; admin tối đa 10 MB (phần trên 2 MB tải thẳng bucket).
 const adjustHits = new Map();
 function checkAdjustRate(req) {
   checkRate(adjustHits, req, 4, 60 * 60 * 1000, 'Mỗi máy chỉ gửi được 4 hồ sơ điều chỉnh mỗi giờ, vui lòng thử lại sau');
 }
-const ADJUST_PDF_B64_MAX = 2800000;
+const ADJUST_SCAN_B64_MAX = 2800000;
 
-// File quyết định người dùng gửi chờ admin duyệt: mỗi IP tối đa 4 file / giờ, mỗi file < 2 MB
+// File quyết định người dùng gửi chờ admin duyệt: mỗi IP tối đa 4 file / giờ, mỗi file tối đa 2 MB
 const decisionProposalHits = new Map();
 function checkDecisionProposalRate(req) {
   checkRate(decisionProposalHits, req, 4, 60 * 60 * 1000, 'Mỗi máy chỉ gửi được 4 file quyết định mỗi giờ, vui lòng thử lại sau');
 }
-const DECISION_PROPOSAL_B64_MAX = 2800000;
 
 // Có token mà không phải Admin (hết hạn, tài khoản khác) thì xử lý như người dùng thường
 async function adminOrNull(req) {
@@ -1956,11 +1965,16 @@ module.exports = async (req, res) => {
       return res.status(200).json(data);
     }
 
-    // PDF quyết định phê duyệt (≤ 1 MB trên bucket). Cùng nguồn với webapp nên iframe xem được, không phụ thuộc CORS bucket.
+    // PDF quyết định. File trên 3 MB vượt thân phản hồi của Vercel nên iframe được chuyển tới URL công khai của bucket.
     if (action === 'getProjectDecision') {
       const slug = String(req.query.slug || '');
       try {
         const file = await projects.readDecision(slug, String(req.query.doc || '').slice(0, 16));
+        if (file.direct && file.url) {
+          res.setHeader('Cache-Control', 'private, no-store');
+          res.setHeader('Location', file.url);
+          return res.status(302).end();
+        }
         const ascii = String(file.name || 'quyet-dinh.pdf').replace(/[^\w.\-]+/g, '_') || 'quyet-dinh.pdf';
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(file.name || 'quyet-dinh.pdf')}`);
@@ -2536,7 +2550,38 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Admin gắn PDF ≤ 1 MB hoặc link đã kiểm tra. Link được mở lại trên máy chủ lúc gán.
+    // Admin xin URL PUT (PDF lớn hơn 2 MB, tối đa 10 MB). Content-Type và đúng số byte nằm trong chữ ký.
+    if (action === 'signProjectPdf') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const purpose = String(body.purpose || '');
+      if (!['decision', 'doc', 'adjust'].includes(purpose)) {
+        return res.status(400).json({ error: true, message: 'Không rõ loại file PDF.' });
+      }
+      const bytes = Number(body.bytes);
+      if (!Number.isInteger(bytes) || bytes < 5) return res.status(400).json({ error: true, message: 'File PDF rỗng.' });
+      if (bytes > pdfLimits.PDF_ADMIN_MAX_BYTES) return res.status(413).json({ error: true, message: pdfLimits.tooBigMessage(true) });
+      if (bytes <= pdfLimits.PDF_INLINE_MAX_BYTES) {
+        return res.status(400).json({ error: true, message: 'File PDF tối đa 2 MB gửi kèm yêu cầu, không cần đường tải trực tiếp.' });
+      }
+      const token = crypto.randomBytes(16).toString('hex');
+      try {
+        const signed = gcsWrite.signPutUrl({
+          name: `projects/_pdf-in/${token}.pdf`,
+          contentType: 'application/pdf',
+          bytes
+        });
+        return res.status(200).json({ success: true, token, url: signed.url, headers: signed.headers });
+      } catch (err) {
+        const message = err.code === 'NO_SA'
+          ? 'Tải PDF lớn hơn 2 MB cần service account ghi bucket (GEE_PRIVATE_KEY, quyền roles/storage.objectAdmin trên hue-infra-data-us).'
+          : (err.message || 'Không cấp được đường tải PDF.');
+        return res.status(err.status || 500).json({ error: true, message });
+      }
+    }
+
+    // Admin gắn PDF tối đa 10 MB hoặc link đã kiểm tra. File trên 2 MB đã PUT lên bucket (staged).
     // body.layer: gắn cho lớp bản đồ dùng chung, không ghi cột LinkQD trên sheet DS_DoAn.
     if (action === 'putProjectDecision') {
       requirePostFromApp(req);
@@ -2546,14 +2591,16 @@ module.exports = async (req, res) => {
       const tenQH = layer ? '' : sanitizeSheetText(body.tenQH, 120);
       if (!layer && !tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
       const url = String(body.url || '').trim();
-      const pdf = typeof body.pdf === 'string' ? body.pdf.replace(/\s+/g, '') : '';
-      if (!url && (!pdf || pdf.length > 1500000)) {
-        return res.status(413).json({ error: true, message: 'File PDF rỗng hoặc lớn hơn 1 MB' });
+      const staged = stagedTokenOf(body);
+      let buffer = null;
+      if (!url && !staged) {
+        try { buffer = pdfLimits.inlineBuffer(body.pdf, true); }
+        catch (err) { return sendInlinePdfError(res, err); }
       }
       try {
         const saved = url
           ? await projects.saveDecisionLink({ tenQH, layer, url })
-          : await projects.saveDecision({ tenQH, layer, fileName: body.name, buffer: Buffer.from(pdf, 'base64') });
+          : await projects.saveDecision({ tenQH, layer, fileName: body.name, buffer, stagedToken: staged });
         const accessUrl = url ? saved.url : saved.accessUrl;
         let sheet = !!layer;
         let sheetMessage = '';
@@ -2584,15 +2631,17 @@ module.exports = async (req, res) => {
       const role = String(body.docRole || '').slice(0, 20);
       if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
       const url = String(body.url || '').trim();
-      const pdf = typeof body.pdf === 'string' ? body.pdf.replace(/\s+/g, '') : '';
-      if (!url && (!pdf || pdf.length > 1500000)) {
-        return res.status(413).json({ error: true, message: 'File PDF rỗng hoặc lớn hơn 1 MB' });
+      const staged = stagedTokenOf(body);
+      let buffer = null;
+      if (!url && !staged) {
+        try { buffer = pdfLimits.inlineBuffer(body.pdf, true); }
+        catch (err) { return sendInlinePdfError(res, err); }
       }
       try {
         const replaceId = String(body.docId || '').slice(0, 16);
         const saved = url
           ? await projects.saveProjectDoc({ tenQH, role, url, replaceId })
-          : await projects.saveProjectDoc({ tenQH, role, fileName: body.name, buffer: Buffer.from(pdf, 'base64'), replaceId });
+          : await projects.saveProjectDoc({ tenQH, role, fileName: body.name, buffer, replaceId, stagedToken: staged });
         return res.status(200).json({ success: true, doc: saved.doc, docs: saved.docs, bucket: saved.via });
       } catch (err) {
         return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được văn bản' });
@@ -2658,7 +2707,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Người dùng gửi PDF < 2 MB làm quyết định phê duyệt của đồ án. Chưa ghi decisions.json / LinkQD cho tới khi admin duyệt.
+    // Người dùng gửi PDF tối đa 2 MB làm quyết định phê duyệt của đồ án. Chưa ghi decisions.json / LinkQD cho tới khi admin duyệt.
     if (action === 'submitDecisionProposal') {
       requirePostFromApp(req);
       const admin = await adminOrNull(req);
@@ -2666,13 +2715,12 @@ module.exports = async (req, res) => {
       const body = readJsonBody(req);
       const tenQH = sanitizeSheetText(body.tenQH, 120);
       if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
-      const pdf = typeof body.pdf === 'string' ? body.pdf.replace(/\s+/g, '') : '';
-      if (!pdf || pdf.length > DECISION_PROPOSAL_B64_MAX) {
-        return res.status(413).json({ error: true, message: 'File PDF rỗng hoặc lớn hơn 2 MB' });
-      }
+      let buffer;
+      try { buffer = pdfLimits.inlineBuffer(body.pdf, false); }
+      catch (err) { return sendInlinePdfError(res, err); }
       try {
         const proposal = await projects.saveDecisionProposal({
-          tenQH, fileName: body.name, buffer: Buffer.from(pdf, 'base64')
+          tenQH, fileName: body.name, buffer
         });
         return res.status(200).json({ success: true, proposal });
       } catch (err) {
@@ -2865,7 +2913,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, removed: !!result.removed, count: result.count || 0 });
     }
 
-    // ---- Hồ sơ điều chỉnh cục bộ: Admin ghi thẳng, người dùng vào hàng chờ; PDF, ảnh scan ≤ 2 MB gửi ở các yêu cầu sau ----
+    // ---- Hồ sơ điều chỉnh cục bộ: Admin ghi thẳng, người dùng vào hàng chờ. PDF người dùng 2 MB, admin 10 MB; ảnh scan ≤ 2 MB ----
     if (action === 'submitAdjust') {
       requirePostFromApp(req);
       const admin = await adminOrNull(req);
@@ -2884,9 +2932,13 @@ module.exports = async (req, res) => {
       requirePostFromApp(req);
       const admin = await adminOrNull(req);
       const body = readJsonBody(req);
-      const pdf = typeof body.pdf === 'string' ? body.pdf.replace(/\s+/g, '') : '';
-      if (!pdf || pdf.length > ADJUST_PDF_B64_MAX) return res.status(413).json({ error: true, message: 'File PDF rỗng hoặc lớn hơn 2 MB' });
-      const saved = await projects.attachAdjustPdf({ id: String(body.id || ''), fileName: body.name, buffer: Buffer.from(pdf, 'base64'), admin: !!admin });
+      const staged = stagedTokenOf(body);
+      let buffer = null;
+      if (!staged) {
+        try { buffer = pdfLimits.inlineBuffer(body.pdf, !!admin); }
+        catch (err) { return sendInlinePdfError(res, err); }
+      }
+      const saved = await projects.attachAdjustPdf({ id: String(body.id || ''), fileName: body.name, buffer, stagedToken: staged, admin: !!admin });
       return res.status(200).json({ success: true, pdf: saved });
     }
 
@@ -2896,7 +2948,7 @@ module.exports = async (req, res) => {
       const admin = await adminOrNull(req);
       const body = readJsonBody(req);
       const img = typeof body.image === 'string' ? body.image.replace(/\s+/g, '') : '';
-      if (img.length > ADJUST_PDF_B64_MAX) return res.status(413).json({ error: true, message: 'Ảnh scan lớn hơn 2 MB' });
+      if (img.length > ADJUST_SCAN_B64_MAX) return res.status(413).json({ error: true, message: 'Ảnh scan lớn hơn 2 MB' });
       const saved = await projects.attachAdjustScan({
         id: String(body.id || ''), fileName: body.name, buffer: img ? Buffer.from(img, 'base64') : null, georef: body.georef, admin: !!admin
       });
@@ -2935,6 +2987,10 @@ module.exports = async (req, res) => {
       if (admin) requirePostFromApp(req);
       const id = String(admin ? readJsonBody(req).id : req.query.id || '');
       const file = await projects.readAdjustPdf(id, { admin: !!admin });
+      if (file.direct && file.url) {
+        res.setHeader('Cache-Control', 'no-store');
+        return res.status(200).json({ direct: true, url: file.url, name: file.name });
+      }
       const ascii = String(file.name).replace(/[^\w.\-]+/g, '_') || 'dieu-chinh.pdf';
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(file.name)}`);
