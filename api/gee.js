@@ -2050,14 +2050,15 @@ module.exports = async (req, res) => {
       const d = await getInvestCalls();
       if (!d || !d.text) return res.status(404).json({ error: true, message: 'Chưa có danh sách sheet 15-DA' });
       const store = parseInvestStore((await getInvestEdits())?.text);
+      // groups luôn có mặt, kể cả mảng rỗng: client coi danh sách server là chuẩn.
+      // Không gửi ETag của file 15-DA vì thân phản hồi đã thêm groups.
       if (!store.items.length && !store.groups.length) {
+        const bare = parseInvestCalls(d.text);
+        if (!bare) return res.status(404).json({ error: true, message: 'Danh sách sheet 15-DA không đọc được' });
+        bare.groups = [];
         res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=120');
-        if (d.etag) {
-          res.setHeader('ETag', d.etag);
-          if (req.headers['if-none-match'] === d.etag) return res.status(304).end();
-        }
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        return res.status(200).send(d.text);
+        return res.status(200).json(bare);
       }
       const base = parseInvestCalls(d.text);
       if (!base) return res.status(404).json({ error: true, message: 'Danh sách sheet 15-DA không đọc được' });

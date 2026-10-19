@@ -125,7 +125,7 @@ const FLOOD_DEMO = {
     {
       title: 'Bật tem các trường học',
       run: (d) => SCHOOL_CHKS.forEach(id => d.check(id, { main: 'infra' })),
-      text: '<p>Panel phải › <b>Công trình</b> đã bật 4 nhóm <b>Mầm non, Tiểu học, THCS, THPT</b>. Trường nằm trong vùng ngập được đánh <b class="c-red">chấm đỏ</b> ngay tại tem công trình.</p>'
+      text: '<p>Panel phải › <b>Khu đất</b> đã bật 4 nhóm <b>Mầm non, Tiểu học, THCS, THPT</b>. Trường nằm trong vùng ngập được đánh <b class="c-red">chấm đỏ</b> ngay tại tem công trình.</p>'
     },
     {
       title: `Các trường bị ngập khi nước lên ${FLOOD_DEMO_M} m`,
@@ -219,7 +219,7 @@ const CSD_DEMO = {
     {
       title: 'Các cơ sở chưa sử dụng',
       run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 12); d.check('chk_c9', { main: 'infra' }); },
-      text: '<p>Panel phải › <b>Công trình</b> › <b>12. Cơ sở chưa sử dụng</b> đã bật: các cơ sở nhà đất dôi dư sau sắp xếp hiện trên bản đồ.</p>'
+      text: '<p>Panel phải › <b>Khu đất</b> › <b>12. Cơ sở chưa sử dụng</b> đã bật: các cơ sở nhà đất dôi dư sau sắp xếp hiện trên bản đồ.</p>'
     },
     {
       title: 'Phương án cho khu đất lớn nhất',
@@ -301,7 +301,7 @@ const SECTIONS = [
         title: 'Đánh giá khả năng phục vụ của 1 công trình hạ tầng',
         lead: 'Dựng vùng phục vụ thực tế của công trình theo mạng lưới đường và ước tính số dân được phục vụ, đối chiếu với bán kính quy chuẩn.',
         steps: [
-          'Ở panel phải › <b>Công trình</b>, bật nhóm công trình cần đánh giá.',
+          'Ở panel phải › <b>Khu đất</b>, bật nhóm công trình cần đánh giá.',
           'Bấm vào biểu tượng công trình để mở bảng thông tin: quy mô hiện trạng, quy hoạch và bán kính phục vụ.',
           'Bấm nút <b>Xem vùng / bán kính phục vụ</b> trong bảng: webapp bật chế độ âm bản, dựng phạm vi đi tới được theo đường giao thông và tính dân số phục vụ.',
           'Nút tròn cạnh tên nhóm bật vùng phủ của cả nhóm để so sánh với các công trình lân cận.'

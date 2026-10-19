@@ -4,9 +4,9 @@
 //  - chk_qhc10: sử dụng đất 1/10.000 khu vực trung tâm (lô theo ký hiệu TT16 Mục 02, viền theo giai đoạn) + 4 tiểu vùng,
 //    phân khu, điểm chức năng. Hàng nút dưới dòng lớp bật/tắt độc lập từng giai đoạn lô và ranh 1/10.000 mở rộng theo
 //    QĐ 756 (ranh ngoài các phường vùng lõi + vùng đỏ Hóa Châu, Mỹ Thượng chưa có trong đồ án cũ).
-//    Đang xem QHC 1/10.000 (droplist) ở toàn thành phố: chỉ vẽ đường bao ngoài cả 4 quận + tên đồ án, rê chuột vào vùng lõi thì sáng nền,
-//    bấm vào ranh mới vẽ lô. Đang xem một địa điểm (phường, đồ án, hoặc phóng gần): mở thẳng lô, không vẽ ranh.
-//    Bật lớp khi xem cấp khác (so sánh) vẽ đủ lô ngay. Vùng đô thị trung tâm (hợp 4 tiểu vùng) luôn có nền và viền đỏ nhạt.
+//    Đang xem QHC 1/10.000 (droplist) ở toàn thành phố: đường bao vùng lõi (4 quận) và mọi ranh đồ án QHC 1/10.000 đã nhập
+//    (projectLayer). Rê chuột vào vùng lõi thì sáng nền, bấm vào ranh lõi mới vẽ lô. Đang xem một địa điểm (phường, đồ án, hoặc phóng gần): mở thẳng lô, không vẽ ranh lõi.
+//    Bật lớp khi xem cấp khác (so sánh) vẽ đủ lô ngay. Vùng đô thị trung tâm (hợp 4 tiểu vùng) luôn có nền và viền xanh nhạt.
 //  - chk_gt25 / chk_gt10: mạng lưới giao thông đường bộ, đường sắt (qhcRoads.js), lớp trong cùng dòng QHC, không phụ thuộc vùng / lô;
 //    1/10.000 lọc theo nút giai đoạn như lô. Bấm ký hiệu ở chú giải: phóng tới cả loại tuyến và làm nổi, các loại khác mờ.
 // Vùng, lô của cả ba lớp chung một canvas ở pane dưới lô đồ án QHPK (overlayPane 400); riêng các đường ranh vẽ ở LINE_PANE
@@ -19,7 +19,7 @@ import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClic
 import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
-import { analyzeParcelZones, parcelZonesHtml, planPlace } from './planLandStats.js';
+import { analyzeParcelZones, parcelZonesHtml, analyzeParcelPlan, parcelPlanHtml, planPlace } from './planLandStats.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { isLevelPair, sideOf, mapsForLevel, onSplitPair } from './splitPair.js';
 import {
@@ -57,8 +57,8 @@ const EXT_LINE = { color: '#f43f5e', weight: 3, opacity: 1, dashArray: '12 6' };
 const EXT_HALO = { color: '#0f172a', weight: 6.5, opacity: 0.55 };
 // Mở lô TTHuế 2045 (bấm vào ranh khi đang xem QHC 1/10.000): viewFlow.js bỏ đồ án QHC nhập đang chọn
 export const QHC_CORE_EVENT = 'qh:qhc-core-open';
-// Cùng cách ranh QHC nhập (OUTLINE_QHC): viền liền đậm, nền màu đồ án. Đỏ nhạt; nền chỉ khi đang thu gọn (chưa mở lô)
-const CORE_WASH = '#f87171';
+// Cùng cách ranh QHC nhập (OUTLINE_QHC): viền liền đậm, nền màu đồ án. Xanh nhạt (họ lạnh QHC); nền chỉ khi đang thu gọn (chưa mở lô)
+const CORE_WASH = '#38bdf8';
 const WASH_FILL = 0.2;
 
 // Mã 31 "Mặt nước ven biển": một khối biển ~55.000 ha phủ kín góc bản đồ, không mang thông tin sử dụng đất
@@ -973,30 +973,58 @@ async function parcelVisionHtml(geometry, recorded, place) {
   };
 }
 
+function hitsGeom(geometry, other) {
+  try { return turf.booleanIntersects(turf.feature(geometry), turf.feature(other)); } catch { return false; }
+}
+
+function qhcCoverNames(geometry) {
+  let box = null;
+  try { box = turf.bbox(turf.feature(geometry)); } catch { box = null; }
+  const names = [];
+  (state.projectCatalog || []).forEach(p => {
+    if (!p || !p.tenQH || !p.boundary || planLevelOf(p.tenQH) !== 'QHC') return;
+    const b = p.bbox;
+    if (box && b && (b[2] < box[0] || b[0] > box[2] || b[3] < box[1] || b[1] > box[3])) return;
+    if (hitsGeom(geometry, p.boundary)) names.push(p.tenQH);
+  });
+  if (tvFeatures().some(f => hitsGeom(geometry, f))) names.push(QHC2045.short);
+  return names;
+}
+
 async function parcelLandHtml(geometry, recorded, place) {
   const w = planPlace(place);
   const [land] = await Promise.all([load('land'), load('frame')]);
-  const feats = land.features.filter(f => f.properties.c !== SEA_CODE);
-  const res = analyzeParcelZones(geometry, feats, (f) => {
+  const extras = land.features.filter(f => f.properties.c !== SEA_CODE).map(f => {
     const p = f.properties;
     const zone = land.zones[p.z];
     const l = landOf(zone, p.c);
     const s = l.key ? TT16_STYLES[l.key] : null;
     return {
-      label: l.label, color: s ? s.color : l.tone, key: s ? l.key : '', name: l.label,
-      sub: [ZONE_NAMES[zone] || zone, STAGE_NAMES[p.t], `lô ${fmtNum(p.a)} ha`].filter(Boolean).join(' · '),
-      desc: p.n != null ? land.notes[p.n] || '' : ''
+      geometry: f.geometry,
+      label: l.label,
+      color: s ? s.color : l.tone,
+      key: s ? l.key : '',
+      name: l.label,
+      sub: [ZONE_NAMES[zone] || zone, STAGE_NAMES[p.t], `lô ${fmtNum(p.a)} ha`, QHC2045.short].filter(Boolean).join(' · '),
+      desc: p.n != null ? land.notes[p.n] || '' : '',
+      file: QHC2045.short
     };
   });
+  const res = await analyzeParcelPlan(geometry, { level: 'QHC', includeHidden: true, extras });
   const [lng, lat] = turf.pointOnFeature(turf.feature(geometry)).geometry.coordinates;
   const tv = tvAt(lng, lat);
+  const covers = res.rows.length ? [] : qhcCoverNames(geometry);
+  const empty = covers.length
+    ? `${w.it} nằm trong ${covers.join('; ')} nhưng chưa có lô sử dụng đất phủ lên phần này.`
+    : `${w.it} không nằm trong đồ án QHC 1/10.000 nào.`;
   return {
-    html: parcelZonesHtml(res, recorded, {
-      title: `QHC 1/10.000 ${w.on}`, unit: 'lô', cover: 'Có lô QHC', none: 'Chưa có lô QHC',
-      empty: `${w.it} chưa nằm trong lô QHC 1/10.000.`,
-      partsHead: 'Lô sử dụng đất QHC', extra: tv ? [['Tiểu vùng', `${tv.tv} · ${tv.ten}`]] : [],
+    html: parcelPlanHtml(res, recorded, {
+      title: `QHC 1/10.000 ${w.on}`,
+      noneLabel: 'Chưa có lô QHC',
+      empty,
+      extra: tv ? [['Tiểu vùng', `${tv.tv} · ${tv.ten}`]] : [],
       place,
-      note: `${QHC2045.short} · 1/10.000 · ${QHC2045.status}. Gồm mọi giai đoạn, kể cả khi lớp hoặc giai đoạn đang tắt. Lô chồng nhau giữ lô vẽ trên.`
+      note: `Mọi đồ án QHC 1/10.000 đã nhập và lô vùng lõi ${QHC2045.short}. Đồ án phạm vi nhỏ hơn được ưu tiên; phần còn lại lấy lô vùng lõi. Gồm mọi giai đoạn, kể cả khi lớp đang tắt.`
     }),
     shapes: res.shapes
   };

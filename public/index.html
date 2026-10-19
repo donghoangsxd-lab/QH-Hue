@@ -375,10 +375,10 @@
       <div class="tab-body" id="tabLayers">
         <div class="layer-tree">
         <div class="layer-main" id="layerMain">
-          <div class="layer-main-tabs" role="tablist" aria-label="Đô thị, quy hoạch và công trình">
+          <div class="layer-main-tabs" role="tablist" aria-label="Đô thị, quy hoạch và khu đất">
             <button type="button" class="layer-main-tab" role="tab" data-main-tab="urban" aria-selected="false" aria-controls="layerPaneUrban" title="Hệ thống đô thị: phân loại đô thị (HT: QĐ 614 · QH: QĐ 756) và các đô thị, khu vực đô thị theo loại. Mỗi đô thị kèm quy hoạch chung, số QHPK 1/2.000 và mức trưởng thành. Bấm một đô thị để vẽ phạm vi và mở hồ sơ ở bảng dưới"><span class="layer-main-label">Đô thị</span><span class="layer-main-count" id="urbanTabCount" title="Số đô thị đang hiện / tổng số"></span></button>
             <button type="button" class="layer-main-tab active" role="tab" data-main-tab="plan" aria-selected="true" aria-controls="layerPanePlan" title="Các lớp quy hoạch theo cấp: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Ở QHPK 1/2.000, bản đồ hiện ranh các đồ án; tick một hoặc nhiều đồ án để hiện lô bên trong."><span class="layer-main-label">Quy hoạch</span><span class="layer-main-count" id="planTabCount" title="Số đồ án đang hiện / tổng số"></span></button>
-            <button type="button" class="layer-main-tab" role="tab" data-main-tab="infra" aria-selected="false" aria-controls="layerPaneInfra" title="14 nhóm biểu tượng trên bản đồ. Nút tròn bật vùng phủ theo QCVN."><span class="layer-main-label">Công trình</span><span class="layer-main-count" id="infraTabCount" title="Số nhóm công trình đang bật / tổng số"></span></button>
+            <button type="button" class="layer-main-tab" role="tab" data-main-tab="infra" aria-selected="false" aria-controls="layerPaneInfra" title="14 nhóm biểu tượng trên bản đồ. Nút tròn bật vùng phủ theo QCVN."><span class="layer-main-label">Khu đất</span><span class="layer-main-count" id="infraTabCount" title="Số nhóm công trình đang bật / tổng số"></span></button>
           </div>
           <div class="layer-main-pane" id="layerPaneInfra" data-main-pane="infra" role="tabpanel" hidden>
         <div class="layer-pane-tools">
@@ -414,7 +414,7 @@
           <div class="layer-main-pane" id="layerPanePlan" data-main-pane="plan" role="tabpanel">
         <div hidden>
           <input type="checkbox" id="chk_projects" title="QHPK 1/2.000: ranh các đồ án. Bấm ranh hoặc tick đồ án để hiện lô. Chọn phường thì hiện đủ lô trong phường.">
-          <input type="checkbox" id="chk_projectInfra" checked title="Lô hạ tầng của đồ án đang bật vẽ cùng lớp Quy hoạch, không theo 14 nhóm Công trình.">
+          <input type="checkbox" id="chk_projectInfra" checked title="Lô hạ tầng của đồ án đang bật vẽ cùng lớp Quy hoạch, không theo 14 nhóm Khu đất.">
         </div>
         <input type="search" id="projectSearch" class="project-search" placeholder="Tìm đồ án..." aria-label="Tìm đồ án quy hoạch" hidden>
         <div id="projectList" class="project-list"></div>
@@ -928,16 +928,24 @@
             <div class="tt16-legend road-net" id="roadNet10" data-legend-pane="QHC" hidden></div>
             <div class="tt16-legend road-sections" id="roadSections" data-legend-pane="QHC" hidden></div>
             <div class="ua-legend-pane" data-legend-pane="URBAN" hidden>
-              <div class="legend-sub">Ký hiệu</div>
-              <div class="layer-legend ua-legend" id="urbanLegend">
-                <span class="ua-legend-item"><i class="ua-badge ua-badge-I"><span>I</span></i>Đô thị loại I (toàn thành phố)</span>
-                <span class="ua-legend-item"><i class="ua-badge ua-badge-II"><span>II</span></i>Đô thị loại II</span>
-                <span class="ua-legend-item"><i class="ua-badge ua-badge-III"><span>III</span></i>Đô thị loại III</span>
-                <span class="ua-legend-item"><i class="ua-sw-line ua-sw-solid"></i>Ranh đô thị loại II</span>
-                <span class="ua-legend-item"><i class="ua-sw-line"></i>Ranh đô thị loại III</span>
-                <span class="ua-legend-item"><i class="ua-sw" style="background:#ef4444"></i>Phường, xã trình độ loại II</span>
-                <span class="ua-legend-item"><i class="ua-sw" style="background:#fb923c"></i>Phường, xã trình độ loại III</span>
-                <span class="ua-legend-item"><i class="ua-sw" style="background:#4ade80; opacity:0.6"></i>Nông thôn</span>
+              <div class="tt16-legend" id="urbanLegend">
+                <details class="tt16-group" open>
+                  <summary><span class="tt16-group-name">Cấp đô thị</span><span class="tt16-group-count">3</span></summary>
+                  <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-I"><span>I</span></i><span>Đô thị loại I (toàn thành phố)</span></div>
+                  <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-II"><span>II</span></i><span>Đô thị loại II</span></div>
+                  <div class="tt16-row ua-legend-item"><i class="ua-badge ua-badge-III"><span>III</span></i><span>Đô thị loại III</span></div>
+                </details>
+                <details class="tt16-group" open>
+                  <summary><span class="tt16-group-name">Ranh đô thị</span><span class="tt16-group-count">2</span></summary>
+                  <div class="tt16-row ua-legend-item"><i class="ua-sw-line ua-sw-solid"></i><span>Ranh đô thị loại II</span></div>
+                  <div class="tt16-row ua-legend-item"><i class="ua-sw-line"></i><span>Ranh đô thị loại III</span></div>
+                </details>
+                <details class="tt16-group" open>
+                  <summary><span class="tt16-group-name">Phường, xã</span><span class="tt16-group-count">3</span></summary>
+                  <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#ef4444"></i><span>Phường, xã trình độ loại II</span></div>
+                  <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#fb923c"></i><span>Phường, xã trình độ loại III</span></div>
+                  <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#4ade80; opacity:0.6"></i><span>Nông thôn</span></div>
+                </details>
               </div>
               <div class="legend-sub">Quyết định phê duyệt</div>
               <div class="legend-decision">
