@@ -652,6 +652,16 @@
             <div class="flood-stats" id="lstStats"></div>
           </div>
           <div class="layer-row">
+            <div><input type="checkbox" id="chk_ndvi"><label for="chk_ndvi" title="Chỉ số thực vật NDVI trung vị cả năm từ Sentinel-2 (ESA, 10 m), đã bỏ mây theo lớp SCL. Đỏ là thấp, xanh là cao. Có thể trừ hai năm để xem nơi tăng hoặc giảm."><svg class="ico ico-layer"><use href="#i-leaf"/></svg>NDVI (Sentinel-2)</label></div>
+            <span id="ndviOpBox" class="layer-slider" style="display:none;"><input type="range" id="ndviOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp NDVI" aria-label="Độ trong suốt lớp NDVI"></span>
+          </div>
+          <div class="flood-box" id="ndviBox" style="display:none;">
+            <div class="sat-pick"><label for="ndviYear">Năm</label><select id="ndviYear"></select></div>
+            <div class="sat-pick"><label for="ndviCompare">So sánh</label><select id="ndviCompare"></select></div>
+            <div class="sat-legend" id="ndviLegend"></div>
+            <div class="flood-stats" id="ndviStats"></div>
+          </div>
+          <div class="layer-row">
             <div><input type="checkbox" id="chk_forest"><label for="chk_forest" title="Phủ thực vật năm 2021 theo ESA WorldCover 10 m (cây che phủ, cây bụi, cỏ, đất trồng, đất ngập nước, rừng ngập mặn, mặt nước) hoặc năm mất rừng 2001–2025 theo Hansen Global Forest Change trên pixel có tán cây năm 2000 từ 10%. Ước tính vệ tinh, không phải ranh 3 loại rừng."><svg class="ico ico-layer"><use href="#i-leaf"/></svg>Rừng, phủ thực vật</label></div>
             <span id="forestOpBox" class="layer-slider" style="display:none;"><input type="range" id="forestOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp rừng, phủ thực vật" aria-label="Độ trong suốt lớp rừng, phủ thực vật"></span>
           </div>

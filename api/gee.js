@@ -3298,6 +3298,44 @@ module.exports = async (req, res) => {
       return res.status(200).json(cachedSatStats.get(key));
     }
 
+    // NDVI trung vị Sentinel-2 cả năm, cắt 40 phường xã. compare = năm nền thì ảnh và thống kê là hiệu (năm − năm nền).
+    // reduceRegions ở lưới 100 m để kịp hạn 60 giây của hàm.
+    if (action === 'getNdviTile' || action === 'getNdviStats') {
+      const years = sat.ndviYears();
+      const year = sat.parseYear(req.query.year, years);
+      const compare = req.query.compare ? sat.parseYear(req.query.compare, years) : null;
+      if (year == null || (req.query.compare && compare == null)) return res.status(400).json({ error: true, message: 'Năm không hợp lệ' });
+      if (compare != null && compare === year) return res.status(400).json({ error: true, message: 'Hai năm so sánh phải khác nhau' });
+      res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=86400');
+      const img = compare == null ? sat.ndviImage(ee, wardVectorParsed, year) : sat.ndviDiff(ee, wardVectorParsed, year, compare);
+      if (action === 'getNdviTile') {
+        const vis = compare == null ? sat.NDVI_VIS : sat.NDVI_DIFF_VIS;
+        return res.status(200).json({
+          urlFormat: await sat.mapUrl(ee, img.visualize(vis)),
+          legend: { ...vis, diff: compare != null, year, compare },
+          years
+        });
+      }
+      const key = `ndvi|${year}|${compare || ''}`;
+      if (!cachedSatStats.has(key)) {
+        const fc = await eeEvaluate(img.reduceRegions({
+          collection: wardVectorParsed,
+          reducer: ee.Reducer.mean().combine(ee.Reducer.count(), null, true),
+          scale: 100,
+          tileScale: 4
+        }).map(f => ee.Feature(null).copyProperties(f)));
+        const ndviRound = (v) => Math.round(v * 100) / 100;
+        let sum = 0, n = 0;
+        const wards = ((fc && fc.features) || []).map(f => {
+          const p = f.properties || {};
+          if (p.mean != null && p.count) { sum += p.mean * p.count; n += p.count; }
+          return { name: wardNameOf(p), mean: p.mean == null ? null : ndviRound(p.mean) };
+        }).filter(w => w.mean != null);
+        cachedSatStats.set(key, { year, compare, city: n ? ndviRound(sum / n) : null, wards });
+      }
+      return res.status(200).json(cachedSatStats.get(key));
+    }
+
     // Phủ thực vật WorldCover 2021 hoặc mất rừng Hansen 2001–2025, cắt theo ranh phường
     if (action === 'getForestTile') {
       const mode = sat.FOREST_MODES.includes(req.query.mode) ? req.query.mode : null;
