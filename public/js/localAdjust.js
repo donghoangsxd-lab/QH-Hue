@@ -682,7 +682,7 @@ async function submitImport() {
   const sender = $('laSender')?.value.trim() || '';
   if (!admin && !sender) { showToast('Nhập tên người gửi / đơn vị', 'error'); $('laSender')?.focus(); return; }
   const pdf = pdfPicked();
-  const bad = pdfProblem(pdf);
+  const bad = pdfProblem(pdf, isAdmin());
   if (bad) { showToast(bad, 'error'); return; }
   const btn = $('btnLaSend');
   if (btn) btn.disabled = true;
@@ -946,11 +946,11 @@ export function initLocalAdjust() {
   $('localPdf')?.addEventListener('change', () => {
     const input = $('localPdf');
     const f = input.files && input.files[0];
-    const bad = pdfProblem(f);
+    const bad = pdfProblem(f, isAdmin());
     if (bad) { showToast(bad, 'error'); input.value = ''; }
     const ok = !bad && f;
     const out = $('localPdfName');
-    if (out) out.textContent = ok ? `${f.name} · ${sizeText(f.size)}` : 'Quyết định, bản vẽ điều chỉnh · PDF < 2 MB';
+    if (out) out.textContent = ok ? `${f.name} · ${sizeText(f.size)}` : `Quyết định, bản vẽ điều chỉnh · PDF tối đa ${isAdmin() ? '10 MB' : '2 MB'}`;
   });
   $('btnLocalStart')?.addEventListener('click', () => { runAdjust(); });
   $('projectReviewHost')?.addEventListener('click', (e) => {

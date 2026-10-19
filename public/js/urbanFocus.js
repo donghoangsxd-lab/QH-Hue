@@ -26,7 +26,7 @@ const LINE_PANE = ['urbanFocusLinePane', 446];
 const KINDS = {
   QHC: { title: 'Quy hoạch chung', color: '#22d3ee', fill: 0.2 },
   QHPK: { title: 'Quy hoạch phân khu 1/2.000', color: '#fb923c', fill: 0.4 },
-  QHCT: { title: 'Quy hoạch chi tiết 1/500', color: '#ef4444', fill: 0.5 }
+  QHCT: { title: 'Quy hoạch chi tiết 1/500', color: '#c084fc', fill: 0.5 }
 };
 const KIND_ORDER = ['QHC', 'QHPK', 'QHCT'];
 const KIND_SCALE = { QHC: 'QHC 1/10.000', QHPK: 'QHPK 1/2.000', QHCT: 'QHCT 1/500' };

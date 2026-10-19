@@ -476,7 +476,15 @@ function initPart1Flip() {
   watchWardSplit();
   let resizeRaf = 0;
   window.addEventListener('resize', () => {
-    if (!resizeRaf) resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; updatePart1Spread(); });
+    if (!resizeRaf) resizeRaf = requestAnimationFrame(() => {
+      resizeRaf = 0;
+      updatePart1Spread();
+      if (chartInstance && phoneLayout()) {
+        chartInstance.resize();
+        applyPhoneChartTicks(chartInstance);
+        chartInstance.update('none');
+      }
+    });
   });
   updatePart1Spread();
   document.getElementById('btnFlipPart1')?.addEventListener('click', () => setPart1Turn(part1Turn + 1));
@@ -506,7 +514,9 @@ export function updateInfraPieChart(sourceList, planList = [], areaLists = null)
   const labels = keys.map(k => PIE_LABELS[k] || PIE_EMPTY_LABEL);
 
   if (legendContainer) {
-    legendContainer.innerHTML = `<div class="pie-legend-row pie-legend-head"><span>Ký hiệu</span><span>Hiện trạng</span><span>Quy hoạch</span></div>`
+    const htHead = phoneLayout() ? 'HT' : 'Hiện trạng';
+    const qhHead = phoneLayout() ? 'QH' : 'Quy hoạch';
+    legendContainer.innerHTML = `<div class="pie-legend-row pie-legend-head"><span>Ký hiệu</span><span>${htHead}</span><span>${qhHead}</span></div>`
       + keys.map((k, idx) => {
         const delta = qhPct[idx] - htPct[idx];
         const qhCls = delta >= 0.1 ? 'c-green' : (delta <= -0.1 ? 'c-red' : 'c-cyan');
@@ -2254,6 +2264,23 @@ function planStackDatasets(label, stack, color, series) {
   ];
 }
 
+// Cùng mốc với style.css: chỉ điện thoại. Máy tính giữ cỡ nhãn và autoSkip như trước.
+function phoneLayout() {
+  return window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px))').matches;
+}
+
+function applyPhoneChartTicks(chart) {
+  const w = chart.canvas?.parentElement?.clientWidth || chart.canvas?.clientWidth || 320;
+  const x = chart.options.scales.x.ticks;
+  x.font.size = 11.5;
+  x.autoSkip = true;
+  x.maxTicksLimit = Math.max(4, Math.min(8, Math.floor(w / 96)));
+  x.minRotation = 0;
+  x.maxRotation = 0;
+  chart.options.scales.y.ticks.font.size = 11.5;
+  chart.options.layout.padding = { top: 14, right: 8, bottom: 6, left: 0 };
+}
+
 function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
   const chartEl = document.getElementById('infraChart');
   if (!chartEl || typeof Chart === 'undefined') return;
@@ -2262,14 +2289,16 @@ function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
     ...planStackDatasets('Quy mô', 'scale', CHART_SCALE_COLOR, scale)
   ];
 
+  const phone = phoneLayout();
   const k = screenScale();
-  const tickSize = 10.5 * k;
-  const yTickSize = 12 * k;
+  const tickSize = phone ? 11.5 : 10.5 * k;
+  const yTickSize = phone ? 11.5 : 12 * k;
 
   // Cập nhật dữ liệu tại chỗ (độ phủ về dần từng phường) thay vì hủy/tạo lại chart
   if (chartInstance && chartInstance.canvas === chartEl) {
     chartInstance.options.scales.x.ticks.font.size = tickSize;
     chartInstance.options.scales.y.ticks.font.size = yTickSize;
+    if (phone) applyPhoneChartTicks(chartInstance);
     chartInstance.data.labels = labels;
     chartInstance.data.datasets.forEach((ds, i) => {
       ds.data = datasets[i].data;
@@ -2285,7 +2314,7 @@ function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      layout: { padding: { top: 16 } },
+      layout: { padding: phone ? { top: 14, right: 8, bottom: 6, left: 0 } : { top: 16 } },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -2304,9 +2333,10 @@ function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
         x: {
           stacked: true,
           ticks: {
-            autoSkip: false,
-            minRotation: 45,
-            maxRotation: 45,
+            autoSkip: phone,
+            ...(phone ? { maxTicksLimit: 6 } : {}),
+            minRotation: phone ? 0 : 45,
+            maxRotation: phone ? 0 : 45,
             callback: function(value) { return shortWardTick(this.getLabelForValue(value)); },
             color: getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#cbd5e1',
             font: { size: tickSize, family: getComputedStyle(document.body).fontFamily }
@@ -2323,4 +2353,12 @@ function drawCoverageScaleChart(labels, coverage, scale, animate = true) {
       }
     }
   });
+  if (phone) {
+    requestAnimationFrame(() => {
+      if (!chartInstance || chartInstance.canvas !== chartEl) return;
+      chartInstance.resize();
+      applyPhoneChartTicks(chartInstance);
+      chartInstance.update('none');
+    });
+  }
 }

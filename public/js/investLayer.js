@@ -9,11 +9,12 @@ import { state } from './state.js';
 import { escapeHtml, fmtNum, ico, showToast, TOOL_START_EVENT } from './utils.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
-import { matchInvestRows, sheetProjectName } from './investMatch.js';
+import { matchInvestDetail, sheetProjectName } from './investMatch.js';
+import { editInvestGroups, settleInvestSync } from './investGroups.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
 import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
-import { setQuietProjectOutline } from './projectLayer.js';
+import { setQuietProjectOutline, restoreInspectFocus } from './projectLayer.js';
 
 const PANE = 'investPane';
 // Trên lớp đô thị đang chọn (urbanFocus 444–446, hover 449) để bấm được ranh dự án.
@@ -182,28 +183,24 @@ function projectList(features) {
   return out;
 }
 
-function readLocalGroups() {
+function readStore() {
   try {
     const data = JSON.parse(localStorage.getItem(GROUP_STORE) || '{}');
-    return Array.isArray(data.groups) ? data.groups.filter(g => g && Array.isArray(g.keys) && g.keys.length >= 2) : [];
-  } catch { return []; }
+    const list = Array.isArray(data.groups) ? data.groups.filter(g => g && Array.isArray(g.keys) && g.keys.length >= 2) : [];
+    const ops = Array.isArray(data.ops) ? data.ops.filter(op => op && Array.isArray(op.keys) && op.keys.length) : [];
+    return { groups: list, ops };
+  } catch { return { groups: [], ops: [] }; }
 }
 
-function writeLocalGroups(list) {
-  try { localStorage.setItem(GROUP_STORE, JSON.stringify({ groups: list })); } catch { /* bộ nhớ trình duyệt đầy */ }
+function writeStore(list, ops) {
+  try { localStorage.setItem(GROUP_STORE, JSON.stringify({ groups: list, ops: ops || [] })); } catch { /* bộ nhớ trình duyệt đầy */ }
 }
 
 function adoptGroups(server) {
-  const local = readLocalGroups();
-  if (!Array.isArray(server)) {
-    groups = local;
-    return;
-  }
-  const used = new Set();
-  server.forEach(g => (g.keys || []).forEach(k => used.add(k)));
-  const extra = local.filter(g => g.keys.every(k => !used.has(k)));
-  groups = server.concat(extra);
-  writeLocalGroups(groups);
+  const store = readStore();
+  const settled = settleInvestSync(server, store.groups, store.ops);
+  groups = settled.groups;
+  writeStore(groups, settled.ops);
 }
 
 function stampGroups() {
@@ -218,13 +215,18 @@ function stampGroups() {
 }
 
 function commitGroups(keys, clear) {
-  const drop = new Set(keys);
-  const next = groups
-    .map(g => ({ id: g.id, keys: g.keys.filter(k => !drop.has(k)) }))
-    .filter(g => g.keys.length >= 2);
-  if (!clear && keys.length >= 2) next.push({ id: 'g' + Date.now().toString(36), keys: keys.slice() });
-  groups = next;
-  writeLocalGroups(groups);
+  const store = readStore();
+  groups = editInvestGroups(groups, keys, clear, 'g' + Date.now().toString(36));
+  const opKeys = [];
+  const seen = new Set();
+  keys.forEach(k => {
+    const key = String(k || '').trim();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    opKeys.push(key);
+  });
+  const ops = opKeys.length ? store.ops.concat([{ keys: opKeys, clear: !!clear }]) : store.ops;
+  writeStore(groups, ops);
   stampGroups();
 }
 
@@ -323,10 +325,13 @@ function overviewHtml(st, props) {
   const priority = entry(row, /ưu tiên/i);
   const listed = listedArea(row);
   const pieces = st.pieces > 1 ? `<span class="invest-pieces">${st.pieces} mảnh</span>` : '';
-  const chip = row ? '' : '<span class="invest-chip">Chưa ghép</span>';
+  const ambiguous = !row && !!props._ambiguous;
+  const chip = row ? '' : `<span class="invest-chip">${ambiguous ? 'Chưa chắc' : 'Chưa ghép'}</span>`;
   const alert = row
     ? ''
-    : '<div class="invest-alert">Chưa khớp tên với danh sách sheet 15-DA. Đang hiện thông tin ghi trên ranh.</div>';
+    : ambiguous
+      ? '<div class="invest-alert">Tên gần với nhiều dòng sheet 15-DA, chưa ghép tự động.</div>'
+      : '<div class="invest-alert">Chưa khớp tên với danh sách sheet 15-DA. Đang hiện thông tin ghi trên ranh.</div>';
   const goalHtml = goal
     ? `<div class="invest-lead"><small>Mục tiêu và nhu cầu đầu tư</small><p>${escapeHtml(goal)}</p></div>`
     : '';
@@ -403,17 +408,21 @@ async function loadPack() {
     ready = Promise.all([
       fetch('./data/invest-boundary.geojson').then(r => (r.ok ? r.json() : Promise.reject(new Error('không tải được ranh')))),
       loadRows()
-    ]).then(([fc, loaded]) => {
+    ]).then(async ([fc, loaded]) => {
       const features = (fc && fc.features) || [];
       const rows = loaded.rows || [];
-      const idx = matchInvestRows(features, rows);
+      const detail = matchInvestDetail(features, rows);
       features.forEach((f, i) => {
         f.properties = f.properties || {};
         f.properties._key = featureKey(f);
-        f.properties.sheet = idx[i] >= 0 ? rows[idx[i]] : null;
+        f.properties.sheet = detail[i].index >= 0 ? rows[detail[i].index] : null;
+        f.properties._ambiguous = !!detail[i].ambiguous;
       });
       pack = features;
       adoptGroups(loaded.groups);
+      if (isAdmin()) {
+        try { await flushPending(); } catch { /* gửi lại nhóm chưa lưu lỗi thì vẫn hiện ranh */ }
+      }
       stampGroups();
       refreshHint();
       return features;
@@ -624,6 +633,7 @@ function syncSelectionStyle() {
 
 function closeCard() {
   openSeq++;
+  restoreInspectFocus();
   setQuietProjectOutline(false);
   card = null;
   selected = null;
@@ -933,13 +943,35 @@ async function postGroup(keys, clear) {
     const data = await res.json().catch(() => ({}));
     if (res.status === 401 || res.status === 403) signOutAdmin();
     if (!res.ok || !data.success) return false;
+    const store = readStore();
     if (Array.isArray(data.groups)) {
-      groups = data.groups;
-      writeLocalGroups(groups);
+      const settled = settleInvestSync(data.groups, groups, store.ops);
+      groups = settled.groups;
+      writeStore(groups, settled.ops);
       stampGroups();
+    } else {
+      writeStore(groups, store.ops.slice(1));
     }
     return true;
   } catch { return false; }
+}
+
+let flushing = false;
+async function flushPending() {
+  if (!isAdmin() || flushing) return;
+  flushing = true;
+  try {
+    for (let i = 0; i < 20 && isAdmin(); i++) {
+      const before = readStore().ops;
+      if (!before.length) return;
+      const op = before[0];
+      const ok = await postGroup(op.keys, !!op.clear);
+      if (!ok) return;
+      const after = readStore().ops;
+      const same = after.length === before.length && after[0] && op.keys.join('\0') === after[0].keys.join('\0') && !!after[0].clear === !!op.clear;
+      if (same) writeStore(groups, after.slice(1));
+    }
+  } finally { flushing = false; }
 }
 
 async function finishGroup(keys, clear, feature, host, okText, failText) {
@@ -1027,6 +1059,7 @@ export function initInvestLayer() {
   if (!map) return;
   document.addEventListener('qh-dock-card', (e) => { if (e.detail !== 'invest') closeCard(); });
   document.addEventListener('auth:change', () => {
+    if (ready) void flushPending();
     const el = $('investCard');
     if (!el || el.hidden || !card) return;
     if (!isAdmin()) card.grouping = false;
