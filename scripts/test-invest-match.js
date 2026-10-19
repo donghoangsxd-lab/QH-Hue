@@ -75,6 +75,94 @@ const assert = require('assert');
   assert.strictEqual(one[0].index, 0);
   assert.strictEqual(one[1].index, 0, 'một dòng sheet gắn được nhiều ranh');
 
+  const duongNo = matchInvestDetail(
+    [
+      { properties: { name: 'Khu du lịch sinh thái nghỉ dưỡng tại Phường Dương Nỗ, thành phố Huế' } },
+      { properties: { name: 'Dự án thương mại dịch vụ tại Phường Dương Nỗ (Công ty CĐ Việt Nam nghiên cứu)' } }
+    ],
+    [
+      { 'TÊN DỰ ÁN': 'Dự án thương mại dịch vụ tại phường Dương Nỗ', 'ĐỊA ĐIỂM': 'Phường Dương Nỗ' },
+      { 'TÊN DỰ ÁN': 'Khu du lịch sinh thái nghỉ dưỡng tại phường Dương Nỗ', 'ĐỊA ĐIỂM': 'Phường Dương Nỗ' }
+    ]
+  );
+  assert.strictEqual(duongNo[0].index, 1, 'Dương Nỗ nghỉ dưỡng khớp đúng dòng cùng tên');
+  assert.strictEqual(duongNo[0].ambiguous, false);
+  assert.strictEqual(duongNo[1].index, 0, 'Dương Nỗ thương mại khớp đúng dòng cùng tên');
+
+  const thuyPhuong = matchInvestDetail(
+    [
+      { properties: { name: 'Khu đô thị sinh thái Thủy Phương tại phường Thủy Phương, thị xã Hương Thủy (tại cánh đồng Thanh Lam)-Đạt Phương' } },
+      { properties: { name: 'Khu đô thị tại khu vực cánh đồng Thanh Lam (TNT)' } },
+      { properties: { name: 'Khu đô thị Thủy Phương thuộc khu vực cánh đồng thanh lam-TDH' } }
+    ],
+    [
+      { 'TÊN DỰ ÁN': 'Khu đô thị sinh thái Thủy Phương', 'ĐỊA ĐIỂM': 'Phường Thanh Thủy' },
+      { 'TÊN DỰ ÁN': 'Khu đô thị Thủy Phương thuộc khu vực cánh đồng Thanh Lam', 'ĐỊA ĐIỂM': 'Phường Thanh Thủy' },
+      { 'TÊN DỰ ÁN': 'Khu đô thị tại khu vực cánh đồng Thanh Lam', 'ĐỊA ĐIỂM': 'Phường Thanh Thủy' }
+    ]
+  );
+  assert.strictEqual(thuyPhuong[0].index, 0, 'Thủy Phương sinh thái không bị Thanh Lam giành');
+  assert.strictEqual(thuyPhuong[1].index, 2, 'Thanh Lam (TNT) khớp dòng Thanh Lam');
+  assert.strictEqual(thuyPhuong[2].index, 1);
+
+  const huongPhu = matchInvestDetail(
+    [{ properties: { name: 'Hạ tầng kỹ thuật cụm công nghiệp Hương Phú, xã Khe Tre' } }],
+    [
+      { 'TÊN DỰ ÁN': 'Đầu tư dự án Hạ tầng kỹ thuật tại Cụm Công nghiệp Hương Phú', 'ĐỊA ĐIỂM': 'Xã Khe Tre' },
+      { 'TÊN DỰ ÁN': 'Đầu tư dự án Hạ tầng kỹ thuật tại Cụm Công nghiệp Hương Phú', 'ĐỊA ĐIỂM': 'Xã Khe Tre' }
+    ]
+  );
+  assert.strictEqual(huongPhu[0].ambiguous, false, 'hai dòng sheet trùng hệt thì chọn một');
+  assert.strictEqual(huongPhu[0].index, 0, 'dòng trùng chọn chỉ số đứng trước');
+
+  assert.strictEqual(investNameScore(
+    'Trung tâm phát triển dịch vụ Công nghệ thông tin tại lô DV1 thuộc Khu tái định cư Thuỷ Thanh giai đoạn 3',
+    'Trung tâm phát triển dịch vụ Công nghệ thông tin tại lô DV2 thuộc Khu tái định cư Thuỷ Thanh giai đoạn 3'
+  ), 0, 'DV1 khác DV2');
+  assert.ok(investNameScore(
+    'Trung tâm dịch vụ Công nghệ thông tin tại lô DV1 Thuỷ Thanh',
+    'Trung tâm phát triển dịch vụ Công nghệ thông tin tại lô DV1 thuộc Khu tái định cư Thuỷ Thanh giai đoạn 3'
+  ) >= 0.68, 'DV1 giữ mã lô để khớp cùng lô');
+  const dvLots = matchInvestDetail(
+    [
+      { properties: { name: 'Trung tâm dịch vụ Công nghệ thông tin tại lô DV1 Thuỷ Thanh' } },
+      { properties: { name: 'Trung tâm dịch vụ Công nghệ thông tin tại lô DV2 Thuỷ Thanh' } },
+      { properties: { name: 'Trung tâm dịch vụ Công nghệ thông tin tại lô DV3 Thuỷ Thanh' } }
+    ],
+    [
+      { 'TÊN DỰ ÁN': 'Trung tâm phát triển dịch vụ Công nghệ thông tin tại lô DV3 thuộc Khu tái định cư Thuỷ Thanh giai đoạn 3' },
+      { 'TÊN DỰ ÁN': 'Trung tâm phát triển dịch vụ Công nghệ thông tin tại lô DV1 thuộc Khu tái định cư Thuỷ Thanh giai đoạn 3' },
+      { 'TÊN DỰ ÁN': 'Trung tâm phát triển dịch vụ Công nghệ thông tin tại lô DV2 thuộc Khu tái định cư Thuỷ Thanh giai đoạn 3' }
+    ]
+  );
+  assert.deepStrictEqual(dvLots.map(d => d.index), [1, 2, 0], 'DV1 DV2 DV3 không tráo lô');
+  assert.ok(investNameScore('khu đất DTM3, phường Phú Hậu', 'Dự án Thương mại dịch vụ tại khu đất DTM3, phường Phú Hậu (nay là Phường Phú Xuân, thành phố Huế)') >= 0.68);
+  assert.ok(investNameScore('Dự án du lịch (có ký hiệu DDL3) tại phường Thuỷ Biều, TP Huế', 'Dự án Du lịch (có ký hiệu DDL3)') >= 0.68);
+  assert.ok(investNameScore('B53. 40 Trần Thúc Nhẫn', 'Dự án Thương mại dịch vụ, khách sạn tại số 40 Trần Thúc Nhẫn') >= 0.68, 'số nhà 40 là token phân biệt');
+  assert.ok(investNameScore('B23. Bảo tàng áo dài tư nhân tại phường Kim Long, thành phố Huế', 'Bảo tàng tư nhân áo dài Kim Long') >= 0.68);
+  assert.ok(investNameScore('D22. Cửa hàng kết hợp kho xăng dầu phường Hương Sơ', 'Cửa hàng xăng dầu phường Hương An (Cửa hàng kết hợp kho xăng dầu Hương Sơ)') >= 0.68);
+  assert.ok(investNameScore('Sân gôn Phường Kim Long, xã Bình Điền', 'Sân gôn tại phường Kim Long và xã Bình Điền') >= 0.68);
+  assert.match(foldInvestName('A36. Các dự án CNTT (khu đất DV1)'), /\bdv1\b/);
+  assert.match(foldInvestName('khu đất DTM3'), /\bdtm3\b/);
+  assert.match(foldInvestName('Dự án Du lịch (có ký hiệu DDL3)'), /\bddl3\b/);
+  assert.match(foldInvestName('B53. 40 Trần Thúc Nhẫn'), /\b40\b/);
+  assert.doesNotMatch(foldInvestName('B53. 40 Trần Thúc Nhẫn'), /^b53\b/);
+
+  assert.ok(investNameScore(
+    'A78. Khu đô thị sinh thái khu vực xã Thủy Thanh và khu vực lân cận (Tập đoàn Hòa Phát 359ha)',
+    'Khu đô thị sinh thái khu vực xã Thủy Thanh và khu vực lân cận'
+  ) >= 0.68);
+  assert.ok(investNameScore('KHu đô thị Triều Thuỷ (PA 2)', 'Khu đô thị mới Triều Thủy, xã Phú An, huyện Phú Vang') >= 0.68);
+  assert.ok(investNameScore(
+    'Khách sạn, resort tiêu chuẩn 5 sao tại phường Thuỷ Vân',
+    'Khách sạn, resort tiêu chuẩn 5 sao (tại khu đất có ký hiệu DV-06 thuộc Khu B – Đô thị mới An Vân Dương)'
+  ) >= 0.68);
+  assert.ok(investNameScore(
+    'Dự án xây dựng khu thương mại, kết hợp dịch vụ nhà hàng và khách sạn tại thị trấn Khe Tre, huyện Nam Đông',
+    'Dự án xây dựng khu thương mại, kết hợp dịch vụ nhà hàng và khách sạn Khe Tre'
+  ) >= 0.68);
+  assert.ok(investNameScore('D7. Trung tâm TMDV Khánh Mỹ (ngã tư Tỉnh lộ 9 và Quốc lộ 1A)', 'Trung tâm thương mại dịch vụ Khánh Mỹ') >= 0.68);
+
   const ab = { id: 'g1', keys: ['a', 'b'] };
   const cd = { id: 'g2', keys: ['c', 'd'] };
   const ids = (list) => list.map(g => g.keys.join(','));
