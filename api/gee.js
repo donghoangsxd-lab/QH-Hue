@@ -3122,10 +3122,15 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'getParcelInfra') {
-      const result = await callAppsScript({ action: 'getHaTangHienTrang' }, { action: 'getHaTangHienTrang' });
-      const rows = Array.isArray(result.rows) ? result.rows : [];
       res.setHeader('Cache-Control', 'no-store');
-      return res.status(200).json({ success: true, rows });
+      try {
+        const result = await callAppsScript({ action: 'getHaTangHienTrang' }, { action: 'getHaTangHienTrang' });
+        const rows = Array.isArray(result.rows) ? result.rows : [];
+        return res.status(200).json({ success: true, rows });
+      } catch (err) {
+        // Web app Sheet chưa có action mới: bản đồ vẫn mở, không báo 502. Lời nhắc nằm ở lần admin bấm lưu.
+        return res.status(200).json({ success: true, rows: [], pendingScript: true });
+      }
     }
 
     const { ee, wardVectorParsed, popRasterNormalized, popRasterNative, popProjection } = getGeeContext();
