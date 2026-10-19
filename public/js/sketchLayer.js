@@ -5,7 +5,8 @@
 import { state } from './state.js';
 import { map } from './mapEngine.js';
 import { planMap, shownMaps, isSplitOn, getSplitKind, onViewChange } from './planMap.js';
-import { escapeHtml, fmtNum, ico, announceTool, TOOL_START_EVENT } from './utils.js';
+import { escapeHtml, fmtNum, ico, announceTool, showToast, TOOL_START_EVENT } from './utils.js';
+import { kmlTextFromFile, sketchShapesFromKml } from './kmlLoad.js';
 import { setDrawAssist } from './drawAssist.js';
 import { attachTelex } from './telex.js';
 import { exportKml, exportDxf } from './sketchExport.js';
@@ -596,6 +597,39 @@ function setOpen(on) {
   syncButtons();
 }
 
+async function importKmlFile(file) {
+  let pack;
+  try {
+    pack = sketchShapesFromKml(await kmlTextFromFile(file));
+  } catch (err) {
+    const msg = err.message || 'Không nhập được file KML/KMZ.';
+    setHint(msg);
+    showToast(`❌ ${msg}`, 'error');
+    return;
+  }
+  const host = shownMaps()[0] || map;
+  for (const s of pack.shapes) {
+    if (s.tool === 'text') {
+      addShape(textShape(s.pts[0], s.text, color, textSize(), host), host);
+      continue;
+    }
+    const lls = s.pts.map(p => L.latLng(p.lat, p.lng));
+    const { layers, text } = shapeLayers(s.tool, lls, color, false);
+    const fg = L.featureGroup(layers);
+    fg.sketch = { tool: s.tool, pts: lls, color };
+    const label = TOOLS[s.tool]?.label || 'Hình';
+    fg.bindTooltip(`${label} · ${text} · ${stateName(host)} · chuột phải để xóa`, { sticky: true, className: 'sketch-tip' });
+    addShape(fg, host);
+  }
+  const bounds = L.latLngBounds(pack.shapes.flatMap(s => s.pts.map(p => [p.lat, p.lng])));
+  if (bounds.isValid()) host.fitBounds(bounds, { padding: [28, 28], maxZoom: 16 });
+  if (!open) setOpen(true);
+  const extra = pack.dropped ? ` Bỏ qua ${pack.dropped} hình (lỗi tọa độ hoặc vượt 400 hình).` : '';
+  const msg = `Đã nhập ${pack.shapes.length} hình từ ${file.name} vào phác thảo (chỉ phiên này).${extra}`;
+  setHint(msg);
+  showToast(`✓ Đã nhập ${pack.shapes.length} hình KML/KMZ`, 'success');
+}
+
 function saveAs(kind) {
   closeEditor(true);
   const items = shapes.map(fg => fg.sketch).filter(Boolean);
@@ -678,6 +712,17 @@ export function initSketchLayer() {
         pickFg = null;
         syncButtons();
       }
+      return;
+    }
+    if (e.target.closest('#btnSketchImport')) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz';
+      input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (file) importKmlFile(file);
+      });
+      input.click();
       return;
     }
     if (e.target.closest('#btnSketchClose')) setOpen(false);

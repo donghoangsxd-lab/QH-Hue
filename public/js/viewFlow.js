@@ -23,7 +23,7 @@ import { map, highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
-import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects } from './projectLayer.js';
+import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { RIGHT_TAB_EVENT } from './utils.js';
 import { URBAN_PICK_EVENT, urbanVisionFeature, urbanVisionAt } from './urbanAreaLayer.js';
@@ -121,6 +121,8 @@ const PROJECT_KIND = { qhpk: 'QHPK', qhct: 'QHCT' };
  */
 export function applyInspectLevel(id, latlng, geom) {
   if (!id) return;
+  const kind = PROJECT_KIND[id];
+  if (kind) stashInspectView();
   inspectSync++;
   try {
     setLevel(id, { keepView: true });
@@ -132,7 +134,6 @@ export function applyInspectLevel(id, latlng, geom) {
     return;
   }
   setPreferPlace(false);
-  const kind = PROJECT_KIND[id];
   if (kind) openInspectProjects(latlng, kind, geom);
 }
 

@@ -35,9 +35,9 @@ const INDICATORS = [
     method: 'Số công trình đã nghiệm thu được cấp chứng chỉ công trình xanh / tổng số công trình được nghiệm thu × 100 (đối tượng khoản 3, 4 Điều 52 NĐ 06/2021/NĐ-CP)' },
   { code: '0201', name: 'Diện tích đất cây xanh công cộng bình quân đầu người khu vực nội thành, nội thị', unit: 'm²/người', period: '5 năm', src: SRC_SURVEY, annual: false, kind: 'auto', wardLevel: true,
     method: 'Tổng diện tích đất cây xanh sử dụng công cộng ngoài đơn vị ở (công viên, vườn hoa phục vụ một hay nhiều đơn vị ở, toàn đô thị, cấp vùng; kể cả mặt nước trong công viên nhưng quy đổi không quá 50%) / tổng dân số nội thành' },
-  { code: '0202', name: 'Diện tích mặt nước tự nhiên đô thị suy giảm', unit: 'm²', period: PERIOD_YEAR, src: SRC_SURVEY, annual: true, kind: 'map', wardLevel: true,
+  { code: '0202', name: 'Diện tích mặt nước tự nhiên đô thị suy giảm', unit: 'm²', period: PERIOD_YEAR, src: SRC_SURVEY, annual: true, kind: 'sat', wardLevel: true,
     method: 'Diện tích mặt nước tự nhiên (ao, hồ, kênh mương, sông, suối, rạch) năm trước năm đánh giá − năm đánh giá',
-    hint: 'Sẽ ước tính từ ảnh vệ tinh (JRC Global Surface Water + Dynamic World) theo phường' },
+    hint: 'Ước tính JRC Global Surface Water v1.4: pixel nước theo mùa hoặc thường xuyên, lưới 30 m. Bộ dữ liệu mở đến năm 2021. Không thay kiểm kê mặt nước.' },
   { code: '0203', name: 'Tỷ lệ đường đô thị sử dụng thiết bị, công nghệ tiết kiệm năng lượng hoặc năng lượng tái tạo để chiếu sáng', unit: '%', period: PERIOD_YEAR, src: SRC_REPORT, annual: true, kind: 'report',
     method: 'Chiều dài đường (từ đường khu vực trở lên) chiếu sáng tiết kiệm năng lượng / tổng chiều dài đường đô thị được chiếu sáng trong ranh giới các phường × 100' },
   { code: '0204', name: 'Tỷ lệ vận tải hành khách công cộng', unit: '%', period: PERIOD_YEAR, src: SRC_REPORT, annual: true, kind: 'map', minClass: 'II',
@@ -55,9 +55,9 @@ const INDICATORS = [
     method: 'Số phường, xã chịu thiệt hại trực tiếp do ngập lụt, triều cường, lũ quét, sạt lở đất, xâm nhập mặn trong năm (nguồn chính thức: báo cáo thiệt hại)' },
   { code: '0210', name: 'Số khu vực bị ô nhiễm môi trường nặng cần xử lý', unit: 'khu vực', period: PERIOD_YEAR, src: SRC_REPORT, annual: true, kind: 'report',
     method: 'Số khu vực có môi trường ô nhiễm nặng ảnh hưởng đời sống dân cư, cần xử lý cấp thiết' },
-  { code: '0301', name: 'Tỷ lệ tăng dân số toàn đô thị so với tỷ lệ tăng diện tích đất phi nông nghiệp đô thị', unit: 'lần', period: '5 năm', src: SRC_SURVEY, annual: false, kind: 'map', wardLevel: true,
+  { code: '0301', name: 'Tỷ lệ tăng dân số toàn đô thị so với tỷ lệ tăng diện tích đất phi nông nghiệp đô thị', unit: 'lần', period: '5 năm', src: SRC_SURVEY, annual: false, kind: 'sat', wardLevel: true,
     method: '(Dân số cuối / đầu giai đoạn) / (diện tích đất phi nông nghiệp cuối / đầu giai đoạn)',
-    hint: 'Sẽ ước tính từ dân số và đất xây dựng trên ảnh vệ tinh (như lớp "Vùng phát triển mới"), nguồn chính thức là kiểm kê đất đai' },
+    hint: 'Ước tính: dân số WorldPop 100 m các năm 2015 và 2020; đất phi nông nghiệp thay bằng nhãn đất xây dựng Dynamic World tháng 1–8 các năm 2016 và 2021. Không thay kiểm kê đất đai.' },
   { code: '0302', name: 'Tỷ lệ hộ có nhà ở kiên cố', unit: '%', period: '5 năm', src: SRC_REPORT, annual: false, kind: 'report',
     method: 'Số hộ có nhà ở kiên cố (cột, mái, tường bằng vật liệu bền chắc) / tổng số hộ × 100' },
   { code: '0303', name: 'Tỷ lệ dân số đô thị được cung cấp nước sạch', unit: '%', period: PERIOD_YEAR, src: SRC_REPORT, annual: true, kind: 'report',
@@ -123,6 +123,59 @@ function loadSar(year) {
 }
 
 const currentYear = () => evalYear || sarSeasons().def;
+const GSW_MAX_YEAR = 2021;
+
+let waterResults = new Map();
+const waterPromises = new Map();
+let landPop = null;
+let landPopPromise = null;
+
+function loadWater(year) {
+  const y = Math.min(Math.max(year, 1985), GSW_MAX_YEAR);
+  if (!waterPromises.has(y)) {
+    waterPromises.set(y, fetch(geeApi(`action=getWaterChange&year=${y}`))
+      .then(async r => {
+        const d = await r.json().catch(() => null);
+        if (!r.ok || !d || d.error || !Array.isArray(d.wards)) {
+          const msg = d && d.rawDataList ? 'Máy chủ chưa hỗ trợ ước tính này' : ((d && d.message) || `HTTP ${r.status}`);
+          throw new Error(msg);
+        }
+        waterResults.set(y, d);
+        return d;
+      })
+      .catch(err => {
+        const fail = { error: err.message || String(err) };
+        waterResults.set(y, fail);
+        return fail;
+      }));
+  }
+  return waterPromises.get(y);
+}
+
+function loadLandPop() {
+  if (!landPopPromise) {
+    landPopPromise = fetch(geeApi('action=getLandPopRatio'))
+      .then(async r => {
+        const d = await r.json().catch(() => null);
+        if (!r.ok || !d || d.error || !Array.isArray(d.wards)) {
+          const msg = d && d.rawDataList ? 'Máy chủ chưa hỗ trợ ước tính này' : ((d && d.message) || `HTTP ${r.status}`);
+          throw new Error(msg);
+        }
+        landPop = d;
+        return d;
+      })
+      .catch(err => {
+        landPop = { error: err.message || String(err) };
+        return landPop;
+      });
+  }
+  return landPopPromise;
+}
+
+function sumUrban(ctx, pick) {
+  const list = scopeOf(ctx);
+  return list.reduce((s, w) => s + (pick(w) || 0), 0);
+}
 
 // ---------- Tính chỉ tiêu: trả { html, title } hoặc null (chưa có số liệu) ----------
 const isUrban = (w) => w.profile === 'DT';
@@ -174,6 +227,31 @@ const CALC = {
         + `tổng đường đô thị ${NUM1.format(total)} km (OpenStreetMap + tuyến Admin vẽ bổ sung)`
     };
   },
+  '0202'(ctx) {
+    if (ctx.ward && !isUrban(ctx.ward)) return { html: '<span class="gtx-na">Ngoài khu vực nội thành</span>' };
+    const y = Math.min(currentYear(), GSW_MAX_YEAR);
+    const d = waterResults.get(y);
+    if (!d) return pending(`Đang ước tính mặt nước ${y - 1}–${y}`);
+    if (d.error) return { html: `<span class="gtx-na">${escapeHtml(d.error)}</span>`, title: d.error };
+    const rowOf = (name) => d.wards.find(w => w.name === name);
+    const asked = currentYear();
+    const yearNote = asked > d.maxYear ? ` Năm đánh giá ${asked} vượt dữ liệu mở (đến ${d.maxYear}), dùng ${d.prev}→${d.year}.` : '';
+    if (ctx.ward) {
+      const w = rowOf(ctx.ward.Ten_Phuong);
+      if (!w) return { html: '<span class="gtx-na">Không có pixel</span>' };
+      return {
+        html: `<b>${fmtNum(w.declineM2)}</b>`,
+        title: `${d.source}, ${d.prev}→${d.year}: ${fmtNum(w.prevM2)} → ${fmtNum(w.currM2)} m². Suy giảm = năm trước − năm sau.${yearNote} ${d.note}`
+      };
+    }
+    const decline = sumUrban(ctx, w => rowOf(w.Ten_Phuong)?.declineM2);
+    const prev = sumUrban(ctx, w => rowOf(w.Ten_Phuong)?.prevM2);
+    const curr = sumUrban(ctx, w => rowOf(w.Ten_Phuong)?.currM2);
+    return {
+      html: `<b>${fmtNum(decline)}</b>`,
+      title: `${scopeText(ctx, scopeOf(ctx))}. ${d.source}, ${d.prev}→${d.year}: ${fmtNum(prev)} → ${fmtNum(curr)} m².${yearNote} ${d.note}`
+    };
+  },
   '0209'(ctx) {
     const year = currentYear();
     const d = sarResults.get(year);
@@ -191,6 +269,30 @@ const CALC = {
     return {
       html: `<b>${hit.length}</b> <span class="wt-light">/ ${ctx.wards.length} (${year})</span>`,
       title: `${basis}\n${hit.slice(0, 12).map(w => `${w.name}: ≈ ${fmtNum(Math.round(w.pop / 10) * 10)} người`).join('\n')}${hit.length > 12 ? '\n…' : ''}`
+    };
+  },
+  '0301'(ctx) {
+    if (ctx.ward && !isUrban(ctx.ward)) return { html: '<span class="gtx-na">Ngoài khu vực nội thành</span>' };
+    if (!landPop) return pending('Đang ước tính dân số và đất xây dựng');
+    if (landPop.error) return { html: `<span class="gtx-na">${escapeHtml(landPop.error)}</span>`, title: landPop.error };
+    const rowOf = (name) => landPop.wards.find(w => w.name === name);
+    const pack = (rows) => rows.reduce((s, w) => ({
+      pop0: s.pop0 + (w.pop0 || 0), pop1: s.pop1 + (w.pop1 || 0),
+      built0: s.built0 + (w.built0 || 0), built1: s.built1 + (w.built1 || 0)
+    }), { pop0: 0, pop1: 0, built0: 0, built1: 0 });
+    const rows = ctx.ward ? [rowOf(ctx.ward.Ten_Phuong)].filter(Boolean) : scopeOf(ctx).map(w => rowOf(w.Ten_Phuong)).filter(Boolean);
+    if (!rows.length) return { html: '<span class="gtx-na">Không có pixel</span>' };
+    const t = pack(rows);
+    if (!(t.pop0 > 0) || !(t.built0 > 0) || !(t.pop1 > 0) || !(t.built1 > 0)) {
+      return { html: '<span class="gtx-na">Thiếu số đầu kỳ</span>', title: landPop.note };
+    }
+    const ratio = (t.pop1 / t.pop0) / (t.built1 / t.built0);
+    const [p0, p1] = landPop.pop.years;
+    const [b0, b1] = landPop.land.years;
+    return {
+      html: `<b>${NUM2.format(ratio)}</b>`,
+      title: `${ctx.ward ? ctx.ward.Ten_Phuong : scopeText(ctx, scopeOf(ctx))}. Dân số ${landPop.pop.source} ${p0}→${p1}: ${fmtNum(t.pop0)} → ${fmtNum(t.pop1)} người. `
+        + `Đất xây dựng ${landPop.land.source} ${b0}→${b1}: ${fmtNum(t.built0)} → ${fmtNum(t.built1)} m². ${landPop.note}`
     };
   },
   '0304'(ctx) {
@@ -301,7 +403,7 @@ function tableHtml(ctx) {
       <span class="gtx-summary" title="${escapeHtml(`${GTX_REF}. Nội thành, khu vực đô thị = các phường thuộc bộ chỉ tiêu đô thị. Năm cơ sở ${GTX_BASE_YEAR} (Điều 2 khoản 4).`)}">
         Có số liệu <b>${filled}/${list.length}</b> chỉ tiêu · ${escapeHtml(place)} · năm cơ sở ${GTX_BASE_YEAR}</span>
       ${kindsHtml(list)}
-      <label class="gtx-pick" title="Năm đánh giá cho chỉ tiêu ước tính từ vệ tinh (0209)">Năm đánh giá
+      <label class="gtx-pick" title="Năm đánh giá cho ước tính vệ tinh: 0209 theo mùa lũ đã chọn; 0202 lấy năm đó nếu còn trong JRC GSW (đến 2021), không thì dùng 2020–2021. Chỉ tiêu 0301 giữ kỳ 5 năm cố định.">Năm đánh giá
         <select data-gtx="year">${years.map(y => `<option value="${y}"${y === currentYear() ? ' selected' : ''}>${y}</option>`).join('')}</select></label>
       <button type="button" class="bp-btn gtx-filter${annualOnly ? ' active' : ''}" data-gtx="annual" aria-pressed="${annualOnly}"
         title="Báo cáo hằng năm dùng 18 chỉ tiêu, không gồm 0201, 0206, 0301, 0302, 0304, 0401 (Điều 5 khoản 5)">18 chỉ tiêu BC hằng năm</button>
@@ -346,6 +448,9 @@ export function renderGreenGrowth(el, { wardName, wards }) {
   if (!roads) loadRoads().then(redraw).catch(err => console.warn('Tăng trưởng xanh – mạng lưới đường lỗi:', err));
   const year = currentYear();
   if (!sarResults.has(year)) loadSar(year).then(redraw).catch(err => console.warn('Tăng trưởng xanh – vùng ngập lỗi:', err));
+  const waterYear = Math.min(year, GSW_MAX_YEAR);
+  if (!waterResults.has(waterYear)) loadWater(waterYear).then(redraw).catch(err => console.warn('Tăng trưởng xanh – mặt nước lỗi:', err));
+  if (!landPop) loadLandPop().then(redraw).catch(err => console.warn('Tăng trưởng xanh – dân số/đất xây dựng lỗi:', err));
 }
 
 /** Sự kiện trong bảng (lọc 18 chỉ tiêu, đổi năm đánh giá); rerender = vẽ lại bảng của địa bàn đang chọn */

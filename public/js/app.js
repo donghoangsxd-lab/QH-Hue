@@ -72,10 +72,12 @@ import { initDrainageLayer } from './drainageLayer.js';
 import { initBasinLayer } from './basinLayer.js';
 import { initFloodSim } from './floodSim.js';
 import { initSatLayers } from './satLayers.js';
+import { initOsmOpen } from './osmOpen.js';
 import { initSketchLayer, handleSketchClick } from './sketchLayer.js';
 import { initFaqPanel } from './faqPanel.js';
 import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
 import { initOverview } from './overview.js';
+import { initMobileShell } from './mobileShell.js';
 import { initRiskLayer } from './riskLayer.js';
 import { initUrbanAreaLayer, refreshUrbanAreaLayer, urbanAreaReady } from './urbanAreaLayer.js';
 import { initLayerDecisions } from './layerDecisions.js';
@@ -355,10 +357,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   initBasinLayer();
   initFloodSim();
   initSatLayers();
+  initOsmOpen(map, planMap);
   initRiskLayer();
   initSketchLayer();
   initFaqPanel();
   initOverview();
+  initMobileShell();
   restoreAdminSession();
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleSplit);
   initMapTitle();
@@ -515,9 +519,57 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnCollapseRightPanel')?.addEventListener('click', () => setRightPanelCollapsed(true));
   document.getElementById('btnExpandRightPanel')?.addEventListener('click', () => showRightTab(activeTab));
+  const sheetHandle = document.getElementById('btnSheetHandle');
+  if (sheetHandle) {
+    let sheetDrag = 0;
+    sheetHandle.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      sheetDrag = 0;
+      const y0 = e.clientY;
+      const panel = document.getElementById('rightPanel');
+      const move = (ev) => {
+        const dy = Math.max(0, ev.clientY - y0);
+        sheetDrag = dy;
+        if (panel) panel.style.transform = dy ? `translateY(${dy}px)` : '';
+      };
+      const up = () => {
+        if (panel) panel.style.transform = '';
+        if (sheetDrag > 48) setRightPanelCollapsed(true);
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+    });
+    sheetHandle.addEventListener('click', () => {
+      if (sheetDrag > 8) { sheetDrag = 0; return; }
+      setRightPanelCollapsed(true);
+    });
+  }
 
   document.getElementById('btnToggleBottomMax')?.addEventListener('click', toggleBottomPanelMaximized);
   document.getElementById('btnCollapseBottomPanel')?.addEventListener('click', () => setBottomPanelCollapsed(true));
+  const markBpPage = (index) => {
+    document.querySelectorAll('#bpPhonePager button').forEach(b => {
+      b.classList.toggle('is-on', Number(b.dataset.bpPage) === index);
+    });
+  };
+  document.getElementById('bpPhonePager')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-bp-page]');
+    if (!btn) return;
+    const body = document.getElementById('bpBody');
+    const part = body?.querySelectorAll('.bp-part')[Number(btn.dataset.bpPage)];
+    part?.scrollIntoView({ inline: 'start', block: 'nearest', behavior: 'auto' });
+    markBpPage(Number(btn.dataset.bpPage));
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  });
+  document.getElementById('bpBody')?.addEventListener('scroll', () => {
+    const body = document.getElementById('bpBody');
+    if (!body || body.clientWidth < 1) return;
+    markBpPage(Math.round(body.scrollLeft / body.clientWidth));
+  }, { passive: true });
   document.getElementById('btnExpandBottomPanel')?.addEventListener('click', () => setBottomPanelCollapsed(false));
   document.getElementById('btnToggleStatTable')?.addEventListener('click', toggleStatTable);
   document.getElementById('btnExportBottomPdf')?.addEventListener('click', exportBottomPanelPdf);
@@ -708,7 +760,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const FOCUS_CHECKS = [
     ...ICON_GROUPS.map(k => `chk_${k}`),
     'chk_bound', 'chk_urban', 'chk_qhc25', 'chk_qhc10', 'chk_gt25', 'chk_gt10', 'chk_qhct', 'chk_parcel', 'chk_projects', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_basin', 'chk_flood', 'chk_sarflood',
-    'chk_lst', 'chk_newdev', 'chk_risk', 'chk_roads', 'chk_cadastre', 'chk_invest', 'chk_heat'
+    'chk_lst', 'chk_newdev', 'chk_forest', 'chk_risk', 'chk_roads', 'chk_osmSport', 'chk_osmRail', 'chk_osmWater', 'chk_cadastre', 'chk_invest', 'chk_heat'
   ];
   let focusSnapshot = null;
   const setChecked = (id, on) => {
