@@ -1,9 +1,9 @@
 // Lớp QHCT 1/500 (quy hoạch chi tiết) trên bản đồ quy hoạch: lô tĩnh tại QHCT_URL + đồ án QHCT nhập (projectLayer.js vẽ
 // theo planLevelOf). Định dạng lô tĩnh: FeatureCollection, properties { tenQH, kyHieu, chucNang, dienTich (m²), mau? }.
 // Dòng lớp ghi số đồ án nhập và số lô tĩnh; chưa có cả hai thì "chưa có dữ liệu".
-// Khi lớp QHCT tắt: ranh đỏ nét đứt chỉ hiện lúc đang mở một đồ án, và chỉ phần QHCT nằm trong ranh đồ án đó.
+// Khi lớp QHCT tắt: ranh tím nét đứt chỉ hiện lúc đang mở một đồ án, và chỉ phần QHCT nằm trong ranh đồ án đó.
 // Tổng quan QHPK 1/2.000 (chỉ ranh các đồ án) và chọn phường không vẽ các ranh này.
-// Nhịp nét lệch nửa chu kỳ với ranh điều chỉnh cục bộ (adjustLayer.js, cyan, z 449) nên chỗ trùng ranh hiện xen kẽ đỏ / cyan.
+// Nhịp nét lệch nửa chu kỳ với ranh điều chỉnh cục bộ (adjustLayer.js, cyan, z 449) nên chỗ trùng ranh hiện xen kẽ tím / cyan.
 import { state } from './state.js';
 import { map, addPopupCollapseToggle, expandCollapsedPopup } from './mapEngine.js';
 import { planMap, isSplitOn, getViewMode, setViewMode, passToolClick, whenMapsIdle } from './planMap.js';
@@ -19,8 +19,8 @@ const DEFAULT_COLOR = '#f472b6';
 // Dưới ranh điều chỉnh cục bộ (449) và tem đường (450)
 const OUTLINE_PANE = 'qhctOutlinePane';
 const OUTLINE_Z = 448;
-const OUTLINE_STYLE = { color: '#ef4444', weight: 2, opacity: 1, dashArray: '10 6', lineCap: 'butt', fill: false };
-const OUTLINE_HOVER = { color: '#fca5a5', weight: 4 };
+const OUTLINE_STYLE = { color: '#d946ef', weight: 2, opacity: 1, dashArray: '10 6', lineCap: 'butt', fill: false };
+const OUTLINE_HOVER = { color: '#f0abfc', weight: 4 };
 
 const $ = (id) => document.getElementById(id);
 const target = () => planMap || map;

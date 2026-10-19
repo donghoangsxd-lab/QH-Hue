@@ -18,11 +18,13 @@
   --orange-rgb: 251, 146, 60;
   --red-rgb: 248, 113, 113;
   --yellow-rgb: 250, 204, 21;
+  --purple-rgb: 192, 132, 252;
   --accent-cyan: rgb(var(--cyan-rgb));
   --accent-green: rgb(var(--green-rgb));
   --accent-orange: rgb(var(--orange-rgb));
   --accent-red: rgb(var(--red-rgb));
   --accent-yellow: rgb(var(--yellow-rgb));
+  --accent-purple: rgb(var(--purple-rgb));
   --plan-mark: var(--accent-cyan);  /* chấm biến động quy hoạch (khớp PLAN_MARK_COLOR trong mapEngine.js) */
 
   /* Chữ */
@@ -298,7 +300,7 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
   box-shadow: var(--panel-shadow), inset 3px 0 0 rgb(var(--brief));
 }
 .project-brief[data-level="QHPK"] { --brief: var(--orange-rgb); }
-.project-brief[data-level="QHCT"] { --brief: var(--yellow-rgb); }
+.project-brief[data-level="QHCT"] { --brief: var(--purple-rgb); }
 .project-brief[hidden] { display: none; }
 #mapArea.print-staging .project-brief { display: none; }
 .project-brief-head { display: flex; align-items: flex-start; gap: 4px; }

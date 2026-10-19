@@ -265,7 +265,7 @@ export async function analyzeParcelPlan(geometry, opts = {}) {
       pushGeom(byLabel, c.label, part.geom);
       return {
         lot: { file: c.file || '', plan: null }, name: c.name || c.label, label: c.label,
-        color: c.color, key: c.key || '', sub: c.sub || '', area: a, pct: (a / area) * 100
+        color: c.color, key: c.key || '', sub: c.sub || '', desc: c.desc || '', area: a, pct: (a / area) * 100
       };
     }
     const { lot } = part;
@@ -460,7 +460,7 @@ const parcelHead = (title, res, recorded, coverLabel, count, unit, shape = 'Hìn
     <div class="pp-row"><span>${escapeHtml(coverLabel)}</span><b>${fmtM2(covered)} (${escapeHtml(fmtPct(100 - res.none.pct))}) · ${fmtNum(count)} ${unit}</b></div>`;
 };
 
-/** Kết quả analyzeParcelPlan. recorded: diện tích hồ sơ địa chính (m²), 0 nếu là vùng đo. opts: title, noneLabel, empty, note, place */
+/** Kết quả analyzeParcelPlan. recorded: diện tích hồ sơ địa chính (m²), 0 nếu là vùng đo. opts: title, noneLabel, empty, note, place, extra */
 export function parcelPlanHtml(res, recorded, opts = {}) {
   if (!res.exact) return planLandHtml(res).replace('trong vùng đo', 'trên thửa đất');
   const w = planPlace(opts.place);
@@ -468,7 +468,8 @@ export function parcelPlanHtml(res, recorded, opts = {}) {
   const noneLabel = opts.noneLabel || 'Chưa có lô quy hoạch';
   const empty = opts.empty || `${w.it} chưa nằm trong lô quy hoạch của đồ án nào đã nhập.`;
   const note = opts.note || `Cắt hình học ${w.cut} với ranh lô; hình thửa từ tile địa chính (sai số ranh khoảng 0,5 m) nên có thể lệch nhẹ so với diện tích hồ sơ. Đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn; đồ án đang ẩn không tính.`;
-  const head = parcelHead(title, res, recorded, 'Có lô quy hoạch', res.lotCount, 'lô', w.shape);
+  const extra = (opts.extra || []).map(([k, v]) => `<div class="pp-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('');
+  const head = parcelHead(title, res, recorded, 'Có lô quy hoạch', res.lotCount, 'lô', w.shape) + extra;
   const foot = `<div class="pp-sub" title="${escapeHtml(note)}">${escapeHtml(note)}</div>`;
   if (!res.rows.length) return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(empty)}</div>${foot}</div>`;
   const lots = res.parts.map(p => {
@@ -477,6 +478,7 @@ export function parcelPlanHtml(res, recorded, opts = {}) {
     return `<div class="pls-lot" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}">
       <div class="pls-lot-head"><b>${escapeHtml(p.name || p.label)}</b><span>${fmtM2(p.area)}</span></div>
       ${sub ? `<div class="pls-lot-sub">${escapeHtml(sub)}</div>` : ''}
+      ${p.desc ? `<div class="pls-lot-plan">${escapeHtml(p.desc)}</div>` : ''}
       ${stats ? `<div class="pls-lot-plan">${escapeHtml(stats)}</div>` : ''}
     </div>`;
   }).join('');

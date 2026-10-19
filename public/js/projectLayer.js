@@ -53,9 +53,13 @@ const OUTLINE_GIS = { ...OUTLINE_STYLE, weight: 1.8, dashArray: null };
 const OUTLINE_HULL = { ...OUTLINE_STYLE, dashArray: '2 5' };
 // Đồ án QHC phạm vi rộng, xem ở mức thu nhỏ: viền liền, đậm
 const OUTLINE_QHC = { weight: 2.8, opacity: 1, dashArray: null, fillOpacity: 0.08 };
-// Bảng màu dịu, đọc rõ trên ảnh vệ tinh. Không vàng / hổ phách: trùng nét ranh phường xã (#fde68a).
-// Đồ án có khung bao giao nhau không trùng màu
-const PALETTE = ['#f43f5e', '#38bdf8', '#c084fc', '#4ade80', '#f472b6', '#fb923c', '#2dd4bf', '#a3e635', '#f87171', '#818cf8', '#60a5fa', '#e879f9'];
+// Họ màu theo cấp, đọc rõ trên ảnh vệ tinh. Không vàng / hổ phách: trùng nét ranh phường xã (#fde68a) và đô thị loại I (#facc15).
+// QHC lạnh, QHPK ấm (cam / hồng), QHCT tím. Đồ án cùng cấp có khung bao giao nhau không trùng màu.
+const PALETTES = {
+  QHC: ['#38bdf8', '#0ea5e9', '#22d3ee', '#06b6d4', '#2dd4bf', '#14b8a6', '#60a5fa', '#818cf8'],
+  QHPK: ['#fb923c', '#f97316', '#ea580c', '#c2410c', '#f43f5e', '#e11d48', '#fb7185', '#be123c'],
+  QHCT: ['#c084fc', '#a855f7', '#8b5cf6', '#d946ef', '#e879f9', '#a78bfa', '#f0abfc', '#7c3aed', '#c026d3']
+};
 const NEIGHBOR_PAD_DEG = 0.003;
 
 const CITY_NAME = 'Thành phố Huế';
@@ -276,7 +280,7 @@ function collectProjects() {
   }).sort((a, b) => a.name.localeCompare(b.name, 'vi')));
 }
 
-// Tô màu tham lam theo thứ tự danh sách: lấy màu đầu bảng chưa có ở đồ án kề; kề hết màu thì lấy màu ít dùng nhất quanh nó
+// Tô màu tham lam theo thứ tự danh sách, trong cùng một cấp: lấy màu đầu bảng chưa có ở đồ án kề; kề hết màu thì lấy màu ít dùng nhất quanh nó
 function assignColors(list) {
   const boxes = list.map(p => {
     const geom = outlineOf(p);
@@ -285,12 +289,14 @@ function assignColors(list) {
   const near = (a, b) => a && b && a[0] - NEIGHBOR_PAD_DEG <= b[2] && b[0] - NEIGHBOR_PAD_DEG <= a[2]
     && a[1] - NEIGHBOR_PAD_DEG <= b[3] && b[1] - NEIGHBOR_PAD_DEG <= a[3];
   list.forEach((p, i) => {
+    const palette = PALETTES[p.level] || PALETTES.QHPK;
     const used = new Map();
     for (let j = 0; j < i; j++) {
+      if (list[j].level !== p.level) continue;
       if (near(boxes[i], boxes[j])) used.set(list[j].color, (used.get(list[j].color) || 0) + 1);
     }
-    p.color = PALETTE.find(c => !used.has(c))
-      || PALETTE.reduce((best, c) => (used.get(c) < used.get(best) ? c : best), PALETTE[i % PALETTE.length]);
+    p.color = palette.find(c => !used.has(c))
+      || palette.reduce((best, c) => (used.get(c) < used.get(best) ? c : best), palette[i % palette.length]);
   });
   return list;
 }
@@ -1413,8 +1419,13 @@ function outlineInWard(geom, wardName) {
   return out;
 }
 
+function qhcCityOn() {
+  return !isLevelPair() && getLevel() === 'qhc10' && !!$('chk_qhc10')?.checked;
+}
+
 function shownOutline(p) {
   const full = outlineOf(p);
+  if (full && p.level === 'QHC' && qhcCityOn()) return full;
   const ward = full && wardScopeName();
   return ward && p.name !== state.focusedProject ? outlineInWard(full, ward) : full;
 }
@@ -1497,10 +1508,12 @@ function redrawOutlines() {
     return;
   }
   const boundary = qhpkBoundaryOnly();
+  const qhcCity = qhcCityOn();
   const below = !!map && (boundary || map.getZoom() < PARCEL_MIN_ZOOM || !state.showProjects);
   const ward = wardScopeName();
   const list = projects.filter(p => {
     if (isLayerHidden(p.name, 'ranh-gioi')) return false;
+    if (qhcCity && p.level === 'QHC') return true;
     if (ward && !p.wards.includes(ward) && p.name !== state.focusedProject) return false;
     if (boundary && p.level === 'QHPK') return true;
     return projectShown(p.name) && (below || p.area);

@@ -9,7 +9,8 @@ import { state } from './state.js';
 import { escapeHtml, fmtNum, ico, showToast, TOOL_START_EVENT } from './utils.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
-import { matchInvestRows, sheetProjectName } from './investMatch.js';
+import { matchInvestDetail, sheetProjectName } from './investMatch.js';
+import { mergeInvestGroups } from './investGroups.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
 import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
@@ -194,15 +195,7 @@ function writeLocalGroups(list) {
 }
 
 function adoptGroups(server) {
-  const local = readLocalGroups();
-  if (!Array.isArray(server)) {
-    groups = local;
-    return;
-  }
-  const used = new Set();
-  server.forEach(g => (g.keys || []).forEach(k => used.add(k)));
-  const extra = local.filter(g => g.keys.every(k => !used.has(k)));
-  groups = server.concat(extra);
+  groups = mergeInvestGroups(server, readLocalGroups());
   writeLocalGroups(groups);
 }
 
@@ -220,9 +213,9 @@ function stampGroups() {
 function commitGroups(keys, clear) {
   const drop = new Set(keys);
   const next = groups
-    .map(g => ({ id: g.id, keys: g.keys.filter(k => !drop.has(k)) }))
+    .map(g => ({ id: g.id, keys: g.keys.filter(k => !drop.has(k)), pending: true }))
     .filter(g => g.keys.length >= 2);
-  if (!clear && keys.length >= 2) next.push({ id: 'g' + Date.now().toString(36), keys: keys.slice() });
+  if (!clear && keys.length >= 2) next.push({ id: 'g' + Date.now().toString(36), keys: keys.slice(), pending: true });
   groups = next;
   writeLocalGroups(groups);
   stampGroups();
@@ -323,10 +316,13 @@ function overviewHtml(st, props) {
   const priority = entry(row, /ưu tiên/i);
   const listed = listedArea(row);
   const pieces = st.pieces > 1 ? `<span class="invest-pieces">${st.pieces} mảnh</span>` : '';
-  const chip = row ? '' : '<span class="invest-chip">Chưa ghép</span>';
+  const ambiguous = !row && !!props._ambiguous;
+  const chip = row ? '' : `<span class="invest-chip">${ambiguous ? 'Chưa chắc' : 'Chưa ghép'}</span>`;
   const alert = row
     ? ''
-    : '<div class="invest-alert">Chưa khớp tên với danh sách sheet 15-DA. Đang hiện thông tin ghi trên ranh.</div>';
+    : ambiguous
+      ? '<div class="invest-alert">Tên gần với nhiều dòng sheet 15-DA, chưa ghép tự động.</div>'
+      : '<div class="invest-alert">Chưa khớp tên với danh sách sheet 15-DA. Đang hiện thông tin ghi trên ranh.</div>';
   const goalHtml = goal
     ? `<div class="invest-lead"><small>Mục tiêu và nhu cầu đầu tư</small><p>${escapeHtml(goal)}</p></div>`
     : '';
@@ -406,11 +402,12 @@ async function loadPack() {
     ]).then(([fc, loaded]) => {
       const features = (fc && fc.features) || [];
       const rows = loaded.rows || [];
-      const idx = matchInvestRows(features, rows);
+      const detail = matchInvestDetail(features, rows);
       features.forEach((f, i) => {
         f.properties = f.properties || {};
         f.properties._key = featureKey(f);
-        f.properties.sheet = idx[i] >= 0 ? rows[idx[i]] : null;
+        f.properties.sheet = detail[i].index >= 0 ? rows[detail[i].index] : null;
+        f.properties._ambiguous = !!detail[i].ambiguous;
       });
       pack = features;
       adoptGroups(loaded.groups);
