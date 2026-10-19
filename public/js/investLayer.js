@@ -408,7 +408,7 @@ async function loadPack() {
     ready = Promise.all([
       fetch('./data/invest-boundary.geojson').then(r => (r.ok ? r.json() : Promise.reject(new Error('không tải được ranh')))),
       loadRows()
-    ]).then(([fc, loaded]) => {
+    ]).then(async ([fc, loaded]) => {
       const features = (fc && fc.features) || [];
       const rows = loaded.rows || [];
       const detail = matchInvestDetail(features, rows);
@@ -420,7 +420,9 @@ async function loadPack() {
       });
       pack = features;
       adoptGroups(loaded.groups);
-      if (isAdmin()) await flushPending();
+      if (isAdmin()) {
+        try { await flushPending(); } catch { /* gửi lại nhóm chưa lưu lỗi thì vẫn hiện ranh */ }
+      }
       stampGroups();
       refreshHint();
       return features;
