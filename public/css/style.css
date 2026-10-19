@@ -575,7 +575,7 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
 }
 .level-item[hidden] { display: none; }
 .level-item .ico { flex-shrink: 0; width: 14px; height: 14px; margin: 0; color: var(--accent-orange); }
-.level-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.level-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .level-item.is-pending .ico { opacity: 0.5; }
 .level-item:hover, .level-item:focus-visible { background: var(--bg-hover); outline: none; }
 .level-item.is-on::after { content: ''; width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: var(--accent-orange); }
@@ -820,6 +820,7 @@ body.right-collapsed .right-panel {
   opacity: 0;
   pointer-events: none;
 }
+.rp-sheet-handle { display: none; }
 
 .rp-collapse-btn {
   flex: 0 0 34px;
@@ -4563,11 +4564,48 @@ body.project-review.la-page #projectReviewHost {
     right: 0;
     bottom: 0;
     width: 100%;
-    max-height: min(72dvh, 560px);
+    max-height: min(58dvh, 520px);
     border-radius: 16px 16px 0 0;
     transform-origin: center bottom;
   }
   body.right-collapsed .right-panel { transform: translateY(110%); visibility: hidden; }
+  .rp-sheet-handle {
+    display: block;
+    flex: 0 0 auto;
+    align-self: center;
+    width: 64px;
+    height: 28px;
+    margin: 4px 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    touch-action: none;
+  }
+  .rp-sheet-handle::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 10px auto 0;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.62);
+  }
+  .rp-collapse-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    padding: 0 10px;
+    color: var(--text-strong);
+    background: #1e293b;
+  }
+  .rp-collapse-btn::after { content: 'Đóng'; font-size: 13px; font-weight: 800; }
+  #tabLayers, #tabLegend { height: auto; flex: 1 1 auto; min-height: 0; }
   .bottom-panel, .bp-body, .bp-part, .bp-part-head { max-width: 100%; }
   .bottom-panel { overflow: hidden; }
   .bp-part-head { min-width: 0; overflow-x: auto; }
@@ -4631,6 +4669,34 @@ body.project-review.la-page #projectReviewHost {
   .review-panel, .sketch-palette { bottom: 64px; }
   body.bottom-collapsed .leaflet-bottom.leaflet-right { margin-bottom: 60px; }
   .mobile-fs:not([hidden]) { top: auto; bottom: 64px; }
+}
+/* Điện thoại ngang (kể cả ~1024×473 sau toàn màn hình): panel bên phải, bản đồ còn thấy. Dọc vẫn là ngăn đáy. */
+@media (orientation: landscape) and (max-height: 560px) and (max-width: 1280px) {
+  :root { --right-w: min(360px, 40vw); }
+  .right-panel {
+    top: calc(max(8px, env(safe-area-inset-top)) + var(--title-h) + 8px);
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: auto;
+    width: min(360px, 40vw);
+    max-height: none;
+    height: auto;
+    border-radius: var(--r-lg);
+    transform-origin: right center;
+  }
+  body.right-collapsed .right-panel { transform: translateX(110%); visibility: hidden; opacity: 0; }
+  .rp-sheet-handle { display: none; }
+  .rp-collapse-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+    padding: 0 10px;
+    color: var(--text-strong);
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .rp-collapse-btn::after { content: 'Đóng'; font-size: 13px; font-weight: 800; }
+  #tabLayers, #tabLegend { height: auto; flex: 1 1 auto; min-height: 0; }
 }
 @media print and (max-width: 840px) {
   html, body { position: static; inset: auto; width: auto; max-width: none; height: auto; max-height: none; overflow: visible; }

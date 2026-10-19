@@ -515,6 +515,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnCollapseRightPanel')?.addEventListener('click', () => setRightPanelCollapsed(true));
   document.getElementById('btnExpandRightPanel')?.addEventListener('click', () => showRightTab(activeTab));
+  const sheetHandle = document.getElementById('btnSheetHandle');
+  if (sheetHandle) {
+    let sheetDrag = 0;
+    sheetHandle.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      sheetDrag = 0;
+      const y0 = e.clientY;
+      const panel = document.getElementById('rightPanel');
+      const move = (ev) => {
+        const dy = Math.max(0, ev.clientY - y0);
+        sheetDrag = dy;
+        if (panel) panel.style.transform = dy ? `translateY(${dy}px)` : '';
+      };
+      const up = () => {
+        if (panel) panel.style.transform = '';
+        if (sheetDrag > 48) setRightPanelCollapsed(true);
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+    });
+    sheetHandle.addEventListener('click', () => {
+      if (sheetDrag > 8) { sheetDrag = 0; return; }
+      setRightPanelCollapsed(true);
+    });
+  }
 
   document.getElementById('btnToggleBottomMax')?.addEventListener('click', toggleBottomPanelMaximized);
   document.getElementById('btnCollapseBottomPanel')?.addEventListener('click', () => setBottomPanelCollapsed(true));
