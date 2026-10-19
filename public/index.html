@@ -2,7 +2,14 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hạ tầng Huế">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/pwa-192.png">
   <title>Bản đồ Phân tích Hạ tầng Đô thị TP. Huế (Headless GIS)</title>
   <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
   <link rel="preconnect" href="https://earthengine.googleapis.com" crossorigin>
@@ -311,7 +318,7 @@
       </div>
     </div>
 
-    <!-- KHUNG XEM TRƯỚC KHI IN (printLayout.js): kéo bản đồ vào khung, chọn khổ A3 → A0 -->
+    <!-- KHUNG XEM TRƯỚC KHI IN (printLayout.js): kéo bản đồ vào khung, chọn khổ A4 → A0 -->
     <div class="print-preview" id="printPreview" hidden>
       <div class="print-frame" id="printFrame">
         <span class="print-frame-tag" id="printFrameTag">Vùng in</span>
@@ -335,6 +342,7 @@
           <span class="print-scale-live" id="printScaleLive"></span>
         </div>
         <div class="print-sizes" role="radiogroup" aria-label="Khổ giấy ngang">
+          <button type="button" data-paper="a4" aria-pressed="false">A4</button>
           <button type="button" data-paper="a3" aria-pressed="true">A3</button>
           <button type="button" data-paper="a2" aria-pressed="false">A2</button>
           <button type="button" data-paper="a1" aria-pressed="false">A1</button>
@@ -358,6 +366,7 @@
 
   <!-- PANEL CÔNG CỤ BÊN PHẢI (GỘP TRA CỨU / ĐỀ XUẤT / LỚP DỮ LIỆU / CHÚ GIẢI) -->
   <aside class="right-panel" id="rightPanel">
+    <button type="button" class="rp-sheet-handle" id="btnSheetHandle" aria-label="Kéo xuống hoặc bấm để đóng panel"></button>
     <div class="tab-header rp-tabs" role="tablist">
       <button type="button" class="tab-btn active" data-tab="tabLayers" role="tab" aria-selected="true" aria-controls="tabLayers"><svg class="ico"><use href="#i-layers"/></svg><span>Lớp dữ liệu</span></button>
       <button type="button" class="tab-btn" data-tab="tabLegend" role="tab" aria-selected="false" aria-controls="tabLegend"><svg class="ico"><use href="#i-book"/></svg><span>Chú giải</span></button>
@@ -479,9 +488,16 @@
         <div class="layer-map" id="layerMap">
           <div class="layer-map-tabs" role="tablist" aria-label="Bản đồ nền và bản đồ môi trường">
             <button type="button" class="layer-map-tab active" role="tab" data-map-tab="base" aria-selected="true" aria-controls="layerPaneBase" title="Ranh giới phường xã, mạng lưới đường, phân bổ dân cư, ranh lô công trình, đất xây dựng theo ảnh vệ tinh, bản đồ độ phủ và bán kính phục vụ giả lập."><span class="layer-map-label">Bản đồ nền</span><span class="layer-count layer-map-count" title="Số lớp đang bật">1</span></button>
-            <button type="button" class="layer-map-tab" role="tab" data-map-tab="env" aria-selected="false" aria-controls="layerPaneEnv" title="Địa hình, thoát nước, ngập, nhiệt độ bề mặt và công trình chịu rủi ro."><span class="layer-map-label">Bản đồ môi trường</span><span class="layer-count layer-map-count" title="Số lớp đang bật"></span></button>
+            <button type="button" class="layer-map-tab" role="tab" data-map-tab="env" aria-selected="false" aria-controls="layerPaneEnv" title="Địa hình, thoát nước, ngập, nhiệt độ bề mặt, phủ thực vật và công trình chịu rủi ro."><span class="layer-map-label">Bản đồ môi trường</span><span class="layer-count layer-map-count" title="Số lớp đang bật"></span></button>
           </div>
           <div class="layer-map-pane" id="layerPaneBase" data-map-pane="base" role="tabpanel">
+          <div class="sat-pick basemap-pick">
+            <label for="basemapSelect" title="Ảnh nền cho bản đồ hiện trạng và quy hoạch. Nền nhạt là CARTO Positron, không tên đường, để lớp quy hoạch nổi hơn. Lựa chọn được ghi nhớ trên máy này"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ảnh nền</label>
+            <select id="basemapSelect" aria-label="Ảnh nền bản đồ">
+              <option value="google">Google vệ tinh</option>
+              <option value="positron">Nền nhạt</option>
+            </select>
+          </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div><button type="button" class="layer-mini-btn active" id="btnWardNames" title="Bật/tắt tên phường, xã trên bản đồ" aria-label="Bật/tắt tên phường, xã" aria-pressed="true">Aa</button></div>
           <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung. Thu nhỏ vẫn hiện trục chính; chỉ mức một biểu đồ tròn toàn thành phố là ẩn"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(zoom để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
@@ -490,6 +506,13 @@
             <span class="road-legend-item"><i style="background:#cbd5e1; height:2px;"></i>Nội bộ</span>
             <span class="road-legend-item" title="Đường dành riêng cho xe đạp: OpenStreetMap + tuyến Admin vẽ bổ sung"><i style="background:repeating-linear-gradient(90deg,#4ade80 0 5px,transparent 5px 8px); height:2px;"></i>Xe đạp</span>
             <span class="road-legend-item"><i style="background:#fde047; height:2px;"></i>Chưa phân loại</span>
+          </div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_osmSport"><label for="chk_osmSport" title="Sân, nhà thi đấu, sân vận động, đường chạy, bể bơi, sân gôn, cơ sở tập luyện trên OpenStreetMap (leisure), đã cắt theo ranh 40 phường xã. OSM chưa vẽ đủ. Chỉ để tham khảo, chưa tính điểm phân loại đô thị."><svg class="ico ico-layer"><use href="#i-area"/></svg>Công trình thể thao (OSM)</label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_osmRail"><label for="chk_osmRail" title="Đường sắt và ga đang dùng trên OpenStreetMap (railway=rail, light_rail, subway, tram, station, halt). Không gồm tuyến bỏ, quy hoạch. Huế chưa có đường sắt đô thị trong OSM. Lớp tham chiếu cho tiêu chuẩn giao thông công cộng, chưa tính dân số trong 500 m."><svg class="ico ico-layer"><use href="#i-road"/></svg>Đường sắt (OSM)</label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_osmWater"><label for="chk_osmWater" title="Sông, kênh và bến phà trên OpenStreetMap (waterway=river|canal, amenity=ferry_terminal). Đây là tuyến nước, không phải mạng tàu thủy hành khách. Lớp tham chiếu cho tiêu chuẩn giao thông công cộng."><svg class="ico ico-layer"><use href="#i-stream"/></svg>Đường thủy nội địa (OSM)</label></div></div>
+          <div class="flood-box" id="osmOpenBox" style="display:none;">
+            <div class="sat-legend" id="osmOpenLegend"></div>
+            <div class="flood-stats" id="osmOpenStats"></div>
           </div>
           <div class="layer-row">
             <div><input type="checkbox" id="chk_cadastre"><label for="chk_cadastre" title="Thửa đất địa chính tỉnh Thừa Thiên Huế cũ (gis21.hue.gov.vn, lập năm 2016): số tờ, số thửa, diện tích, loại đất, địa chỉ; không gồm tên chủ sử dụng. Hiện từ mức phóng 15, bấm vào thửa để xem thông tin. Nguồn chưa có Quảng Điền, Phú Lộc, Nam Đông."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Thửa đất địa chính 2016 <small class="layer-hint" id="cadastreHint">(zoom để xem)</small></label></div>
@@ -604,6 +627,15 @@
             <div class="sat-pick"><label for="lstYear">Mùa nóng</label><select id="lstYear"></select></div>
             <div class="sat-legend" id="lstLegend"></div>
             <div class="flood-stats" id="lstStats"></div>
+          </div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_forest"><label for="chk_forest" title="Phủ thực vật năm 2021 theo ESA WorldCover 10 m (cây che phủ, cây bụi, cỏ, đất trồng, đất ngập nước, rừng ngập mặn, mặt nước) hoặc năm mất rừng 2001–2025 theo Hansen Global Forest Change trên pixel có tán cây năm 2000 từ 10%. Ước tính vệ tinh, không phải ranh 3 loại rừng."><svg class="ico ico-layer"><use href="#i-leaf"/></svg>Rừng, phủ thực vật</label></div>
+            <span id="forestOpBox" class="layer-slider" style="display:none;"><input type="range" id="forestOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp rừng, phủ thực vật" aria-label="Độ trong suốt lớp rừng, phủ thực vật"></span>
+          </div>
+          <div class="flood-box" id="forestBox" style="display:none;">
+            <div class="sat-pick"><label for="forestYear">Lớp</label><select id="forestYear"></select></div>
+            <div class="sat-legend" id="forestLegend"></div>
+            <div class="flood-stats" id="forestStats"></div>
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_risk"><label for="chk_risk" title="Lọc công trình (kể cả đề xuất, quy hoạch mới, quỹ đất) có vùng 30 m quanh vị trí bị ngập trong nhiều mùa lũ (Sentinel-1) hoặc nóng hơn mức chung (Landsat), để cân nhắc cải tạo hoặc tránh chọn đất"><svg class="ico ico-layer"><use href="#i-alert"/></svg>Công trình chịu rủi ro ngập / nhiệt</label></div></div>
           <div class="flood-box" id="riskBox" style="display:none;">
@@ -987,6 +1019,10 @@
 
   <!-- PANEL TỔNG HỢP PHÍA DƯỚI (1/5 MÀN HÌNH, CÓ THỂ PHÓNG TO TOÀN MÀN HÌNH) -->
   <section class="bottom-panel" id="bottomPanel">
+    <div class="bp-phone-pager" id="bpPhonePager">
+      <button type="button" data-bp-page="0" class="is-on">Cơ cấu đất</button>
+      <button type="button" data-bp-page="1">Bảng tổng hợp</button>
+    </div>
     <div class="bp-body" id="bpBody">
       <div id="projectReviewHost"></div>
       <!-- PHẦN 1: CƠ CẤU ĐẤT HẠ TẦNG -->
@@ -1143,6 +1179,14 @@
       </div>
     </div>
   </section>
+
+  <div class="mobile-fs" id="mobileFs" hidden>
+    <p id="mobileFsText"></p>
+    <div class="mobile-fs-actions">
+      <button type="button" class="mobile-fs-go" id="btnMobileFs">Toàn màn hình</button>
+      <button type="button" class="mobile-fs-later" id="btnMobileFsLater">Để sau</button>
+    </div>
+  </div>
 
   <!-- MODAL ĐĂNG NHẬP GOOGLE ADMIN -->
   <div id="authModal" class="ui-panel-format auth-modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle" style="display:none;">

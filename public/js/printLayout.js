@@ -1,4 +1,4 @@
-// Chụp bản đồ (PNG) và in khung bản đồ ngang (PDF): khung xem trước để căn vùng in, khổ A3–A0,
+// Chụp bản đồ (PNG) và in khung bản đồ ngang (PDF): khung xem trước để căn vùng in, khổ A4–A0,
 // lưới tọa độ VN-2000, hướng Bắc, tỷ lệ, chú giải theo lớp đang bật và cấp quy hoạch đang chọn.
 // PDF gồm 3 tầng trong khung bản đồ: ảnh nền (ảnh vệ tinh, heatmap), đối tượng vector vẽ lại từ tọa độ (printVector.js),
 // ảnh icon trong suốt. Lưới, khung, chữ, chú giải là vector.
@@ -25,6 +25,7 @@ const DPI = 96;
 const A3 = { pageW: 1587, pageH: 1122, m: 24, side: 372, gutX: 44, gutY: 36 };
 const PAPERS = [
   { id: 'a3', label: 'A3', wMm: 420, hMm: 297 },
+  { id: 'a4', label: 'A4', wMm: 297, hMm: 210 },
   { id: 'a2', label: 'A2', wMm: 594, hMm: 420 },
   { id: 'a1', label: 'A1', wMm: 841, hMm: 594 },
   { id: 'a0', label: 'A0', wMm: 1189, hMm: 841 }

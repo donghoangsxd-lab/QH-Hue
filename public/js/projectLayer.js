@@ -27,7 +27,7 @@ import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { isCoreWard } from './qhc2045.js';
 import { refreshQhct } from './qhctLayer.js';
-import { getLevel, levelScope, LEVEL_EVENT } from './mapLevel.js';
+import { getLevel, setLevel, levelScope, LEVEL_EVENT } from './mapLevel.js';
 import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
@@ -366,6 +366,10 @@ function zoomTo(p) {
 
 // Mở đồ án (tên, nút bảng hoặc ranh trên bản đồ): phóng tới, làm sáng ranh, bảng góc trái và thông tin ở panel dưới (projectReview)
 function openProject(p) {
+  // Bấm ranh là chọn đồ án, không còn là trạng thái tạm của bảng tra cứu
+  inspectSnap = null;
+  viewStash = null;
+  focusExtra = null;
   zoomTo(p);
   focusName = p.name;
   drawFocus();
@@ -378,6 +382,7 @@ function openProject(p) {
 export function shareOpenProject(name) {
   const wanted = String(name || '').trim();
   if (!wanted) return false;
+  focusExtra = null;
   const p = projects.find(x => x.name === wanted);
   state.focusedProject = wanted;
   if (state.hiddenProjects.delete(wanted)) saveHidden();
@@ -428,12 +433,72 @@ function projectsCovering(kind, geom) {
   return hits;
 }
 
+// Hợp ranh ngoài của các đồ án giao vùng tra cứu. Union lỗi thì bỏ phủ tối (hai lỗ chồng nhau bị evenodd tô lại).
+function unionPair(a, b) {
+  const once = (x, y) => {
+    const u = turf.union(x, y);
+    return u ? flattenPoly(u.geometry || u) : null;
+  };
+  const fa = turf.feature(a);
+  const fb = turf.feature(b);
+  try {
+    const u = once(fa, fb);
+    if (u) return u;
+  } catch (e) { /* làm tròn rồi thử lại */ }
+  for (const precision of UNION_PRECISIONS) {
+    try {
+      const u = once(turf.truncate(fa, { precision }), turf.truncate(fb, { precision }));
+      if (u) return u;
+    } catch (e) { /* giảm độ chính xác */ }
+  }
+  return null;
+}
+
+function flattenPoly(g) {
+  if (!g) return null;
+  if (g.type === 'Feature') return flattenPoly(g.geometry);
+  if (g.type === 'Polygon' || g.type === 'MultiPolygon') return exteriorOnly(g);
+  const parts = g.type === 'FeatureCollection' ? (g.features || []).map(f => f.geometry)
+    : g.type === 'GeometryCollection' ? (g.geometries || []) : null;
+  if (!parts) return null;
+  let acc = null;
+  for (const part of parts) {
+    const flat = flattenPoly(part);
+    if (!flat) continue;
+    if (!acc) { acc = flat; continue; }
+    acc = unionPair(acc, flat);
+    if (!acc) return null;
+  }
+  return acc;
+}
+
+function focusCover(hits) {
+  const parts = [];
+  hits.forEach(p => {
+    const g = exteriorOnly(outlineOf(p));
+    if (g) parts.push(g);
+  });
+  if (!parts.length) return { skipMask: true, lines: [] };
+  let acc = parts[0];
+  for (let i = 1; i < parts.length; i++) {
+    const next = unionPair(acc, parts[i]);
+    if (!next) return { skipMask: true, lines: parts };
+    acc = next;
+  }
+  return { skipMask: false, geom: acc, lines: [acc] };
+}
+
 function openMany(hits) {
   const primary = hits.slice().sort((a, b) => outlineSize(a) - outlineSize(b))[0];
   if (!primary) return null;
+  // Lỗ phủ tối = hợp ranh mọi đồ án giao vùng, không phải đồ án nhỏ nhất (lô đồ án kia bị che)
+  focusExtra = focusCover(hits);
   const ready = state.focusedProject === primary.name && focusName === primary.name
-    && hits.every(p => state.lotProjects.has(p.name));
-  if (ready) return primary.name;
+    && hits.every(p => state.lotProjects.has(p.name) && kindOn(p.name));
+  if (ready) {
+    drawFocus();
+    return primary.name;
+  }
   state.lotProjects.clear();
   let hiddenChanged = false;
   hits.forEach(p => {
@@ -441,7 +506,7 @@ function openMany(hits) {
     state.lotProjects.add(p.name);
   });
   if (hiddenChanged) saveHidden();
-  if (!kindOn(primary.name)) turnKindOn(primary, () => setMaster(true));
+  hits.forEach(p => { if (!kindOn(p.name)) turnKindOn(p, () => setMaster(true)); });
   if (!state.showProjectInfra) ensureFullLots();
   state.focusedProject = primary.name;
   focusName = primary.name;
@@ -482,14 +547,33 @@ export function openProjectAt(latlng, kind) {
   return best.name;
 }
 
+// QHPK giao QHCT (hoặc hai đồ án cùng cấp) đều tính là tra cứu nhiều đồ án
+function schemesCovering(kind, geom) {
+  const hits = projectsCovering(kind, geom);
+  const other = kind === 'QHPK' ? 'QHCT' : kind === 'QHCT' ? 'QHPK' : null;
+  if (!other) return hits;
+  const seen = new Set(hits.map(p => p.name));
+  projectsCovering(other, geom).forEach(p => { if (!seen.has(p.name)) hits.push(p); });
+  return hits;
+}
+
 /**
- * Tra cứu theo hình: giao từ 2 đồ án QHPK hoặc QHCT trở lên thì mở lô mọi đồ án giao hình, giữ khung nhìn.
- * Ít hơn thì vẫn mở đồ án nhỏ nhất chứa điểm.
+ * Tra cứu theo hình: giao từ 2 đồ án (cùng cấp hoặc QHPK với QHCT) thì mở lô mọi đồ án đó, phủ tối ngoài hợp ranh.
+ * Một đồ án thì vẫn mở đồ án nhỏ nhất chứa điểm, như trước.
  */
 export function openInspectProjects(latlng, kind, geom) {
-  const hits = projectsCovering(kind, geom);
-  if (hits.length >= 2) return openMany(hits);
-  return openProjectAt(latlng, kind);
+  const hits = schemesCovering(kind, geom);
+  if (hits.length >= 2) {
+    if (!inspectSnap && viewStash) inspectSnap = viewStash;
+    viewStash = null;
+    return openMany(hits);
+  }
+  viewStash = null;
+  const hadExtra = !!focusExtra;
+  focusExtra = null;
+  const name = openProjectAt(latlng, kind);
+  if (hadExtra) drawFocus();
+  return name;
 }
 
 /** Điểm latlng nằm trong ranh tổng của đồ án name */
@@ -507,6 +591,7 @@ export const PROJECT_UNFOCUS_EVENT = 'qh:project-unfocus';
 export function clearProjectFocus() {
   state.focusedProject = null;
   focusName = null;
+  focusExtra = null;
   drawFocus();
   markPicked(null);
   document.dispatchEvent(new Event(PROJECT_UNFOCUS_EVENT));
@@ -1411,8 +1496,73 @@ const FOCUS_LINES = [
 const WORLD_RING = [[85, -180], [85, 180], [-85, 180], [-85, -180]];
 const focusLayers = new Map();
 let focusName = null;
+// Tra cứu giao nhiều đồ án: lỗ phủ tối là hợp ranh, không phải ranh đồ án nhỏ nhất (focusName).
+let focusExtra = null;
+// Ảnh trạng thái trước lần tra cứu nhiều đồ án đầu tiên; đóng bảng thì trả lại. Một đồ án không ghi.
+let inspectSnap = null;
+let viewStash = null;
 // Bảng dự án kêu gọi đầu tư đang mở: bỏ viền đồ án (hay thành khung chữ nhật) để còn thấy lô bên trong.
 let quietOutline = false;
+
+const INSPECT_BOXES = ['chk_urban', 'chk_qhc25', 'chk_qhc10', 'chk_projects', 'chk_qhct', 'chk_projectInfra'];
+
+function takeInspectSnap() {
+  const boxes = {};
+  INSPECT_BOXES.forEach(id => { boxes[id] = !!$(id)?.checked; });
+  return {
+    focused: state.focusedProject,
+    name: focusName,
+    lots: [...state.lotProjects],
+    hidden: [...state.hiddenProjects],
+    level: getLevel(),
+    boxes
+  };
+}
+
+/** Gọi trước setLevel: giữ ảnh màn hình, chỉ chốt khi vùng tra cứu giao từ 2 đồ án. */
+export function stashInspectView() {
+  if (inspectSnap) return;
+  viewStash = takeInspectSnap();
+}
+
+function applyInspectBoxes(boxes) {
+  Object.entries(boxes || {}).forEach(([id, on]) => {
+    const el = $(id);
+    if (!el || el.checked === on) return;
+    el.checked = on;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
+/** Đóng bảng thửa / vùng đo / dự án: trả lớp, lô và phủ tối về trước lần tra cứu nhiều đồ án. */
+export function restoreInspectFocus() {
+  viewStash = null;
+  const snap = inspectSnap;
+  if (!snap) return;
+  inspectSnap = null;
+  focusExtra = null;
+  if (getLevel() !== snap.level) setLevel(snap.level, { keepView: true });
+  state.focusedProject = snap.focused || null;
+  focusName = snap.name || null;
+  state.lotProjects.clear();
+  snap.lots.forEach(n => state.lotProjects.add(n));
+  const want = new Set(snap.hidden);
+  let hiddenChanged = state.hiddenProjects.size !== want.size;
+  if (!hiddenChanged) {
+    for (const n of state.hiddenProjects) {
+      if (!want.has(n)) { hiddenChanged = true; break; }
+    }
+  }
+  state.hiddenProjects.clear();
+  snap.hidden.forEach(n => state.hiddenProjects.add(n));
+  if (hiddenChanged) saveHidden();
+  applyInspectBoxes(snap.boxes);
+  refreshAll();
+  drawFocus();
+  markPicked(snap.focused || null);
+  if (snap.focused) document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: snap.focused }));
+  else document.dispatchEvent(new Event(PROJECT_UNFOCUS_EVENT));
+}
 
 const outerRings = (geom) => (geom.type === 'Polygon' ? [geom.coordinates[0]]
   : geom.type === 'MultiPolygon' ? geom.coordinates.map(c => c[0]) : []);
@@ -1434,22 +1584,28 @@ export function setQuietProjectOutline(on) {
 }
 
 function drawFocus() {
-  const p = !quietOutline && focusName ? projects.find(x => x.name === focusName) : null;
-  const geom = p && outlineOf(p);
+  const extra = !quietOutline ? focusExtra : null;
+  const p = !extra && !quietOutline && focusName ? projects.find(x => x.name === focusName) : null;
+  const geom = extra ? (extra.skipMask ? null : extra.geom) : (p && outlineOf(p));
+  const lines = extra ? extra.lines : (geom ? [geom] : []);
   shownMaps().forEach(m => {
     clearFocusOn(m);
-    if (!geom) return;
+    if (!geom && !lines.length) return;
     if (!m.getPane(FOCUS_PANE)) {
       const pane = m.createPane(FOCUS_PANE);
       pane.style.zIndex = FOCUS_Z;
       pane.style.pointerEvents = 'none';
     }
-    const holes = outerRings(geom).map(r => r.map(([lng, lat]) => [lat, lng]));
     const group = L.featureGroup();
-    if (holes.length) group.addLayer(L.polygon([WORLD_RING, ...holes], { ...FOCUS_MASK, pane: FOCUS_PANE }));
-    FOCUS_LINES.forEach(s => group.addLayer(L.geoJSON(geom, {
-      style: { ...s, fill: false, dashArray: null, lineJoin: 'round' }, interactive: false, pane: FOCUS_PANE
-    })));
+    if (geom) {
+      const holes = outerRings(geom).map(r => r.map(([lng, lat]) => [lat, lng]));
+      if (holes.length) group.addLayer(L.polygon([WORLD_RING, ...holes], { ...FOCUS_MASK, pane: FOCUS_PANE }));
+    }
+    lines.forEach(g => {
+      FOCUS_LINES.forEach(s => group.addLayer(L.geoJSON(g, {
+        style: { ...s, fill: false, dashArray: null, lineJoin: 'round' }, interactive: false, pane: FOCUS_PANE
+      })));
+    });
     group.addTo(m);
     focusLayers.set(m, group);
   });
