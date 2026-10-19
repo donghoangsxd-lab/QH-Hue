@@ -36,6 +36,7 @@
     <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7.5 12.5 2 2M10.5 9.5l2 2M13.5 6.5l2 2"/></symbol>
     <symbol id="i-profile" viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><path d="M4 16c2.2-1 3.2-6 5.5-6s2.2 4 4 4 2.4-7 6.5-8"/></symbol>
     <symbol id="i-inspect" viewBox="0 0 24 24"><path d="m4 3 7 17 2.5-7.5L21 10z"/><path d="m14 14 6 6"/></symbol>
+    <symbol id="i-faq" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.2a2.8 2.8 0 1 1 3.6 2.7c-.7.3-1.3.8-1.3 1.6V14.2"/><path d="M12 17.2h.01"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></symbol>
     <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19M9 7h6"/></symbol>
     <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m6 7 5 5-5 5M13 7l5 5-5 5"/></symbol>
@@ -267,10 +268,23 @@
       <button type="button" class="ui-btn-format" id="btnMeasureDist" title="Đo chiều dài. Backspace xóa đỉnh vừa chấm. Đỉnh gần con trỏ sáng lên theo mức phóng: chuột phải để xóa đỉnh đó" aria-label="Đo chiều dài"><svg class="ico"><use href="#i-ruler"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnMeasureProfile" title="Lát cắt địa hình. Chấm các điểm dọc tuyến; biểu đồ hiện ở panel dưới. Backspace xóa đỉnh vừa chấm. Đỉnh gần con trỏ sáng lên theo mức phóng: chuột phải để xóa đỉnh đó" aria-label="Lát cắt địa hình"><svg class="ico"><use href="#i-profile"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnInspectMode" title="Bật chế độ tra cứu: click lên bản đồ để xem hạ tầng tiếp cận tại vị trí" aria-label="Chế độ tra cứu" aria-pressed="false"><svg class="ico"><use href="#i-inspect"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnFaq" title="Hỏi đáp số liệu đã tính sẵn: bấm câu trả lời để tô phường, xã trên bản đồ" aria-label="Hỏi đáp" aria-pressed="false" aria-controls="faqPanel"><svg class="ico"><use href="#i-faq"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnSketch" title="Phác thảo trên bản đồ đang xem (quy hoạch hoặc hiện trạng; chỉ trong phiên này, người khác không thấy; lưu ra file KML / DXF)" aria-label="Phác thảo" aria-pressed="false" aria-controls="sketchPalette"><svg class="ico"><use href="#i-sketch"/></svg></button>
       <button type="button" class="ui-btn-format sketch-pin" id="btnSketchPin" hidden title="Mở lại bảng công cụ phác thảo" aria-label="Mở lại bảng công cụ phác thảo" aria-pressed="true" aria-expanded="false"><svg class="ico"><use href="#i-sk-line"/></svg></button>
 
       <!-- BẢNG CÔNG CỤ PHÁC THẢO (sketchLayer.js) -->
+      <div class="faq-panel" id="faqPanel" role="dialog" aria-labelledby="faqTitle" hidden>
+        <div class="faq-head">
+          <b id="faqTitle">Hỏi đáp số liệu</b>
+          <button type="button" class="faq-close" id="faqClose" aria-label="Đóng hỏi đáp"><svg class="ico"><use href="#i-close"/></svg></button>
+        </div>
+        <p class="faq-note">Câu trả lời tính sẵn từ dữ liệu đang có. Bấm một câu để tô địa bàn trên bản đồ.</p>
+        <div class="faq-list" id="faqList"></div>
+        <details class="faq-gap">
+          <summary>Câu chưa trả lời được</summary>
+          <div id="faqGap"></div>
+        </details>
+      </div>
       <div class="sketch-palette" id="sketchPalette" role="toolbar" aria-label="Công cụ phác thảo" hidden>
         <div class="sketch-row">
           <button type="button" class="sketch-btn" data-tool="line" title="Đường thẳng" aria-label="Đường thẳng" aria-pressed="false"><svg class="ico"><use href="#i-sk-line"/></svg></button>

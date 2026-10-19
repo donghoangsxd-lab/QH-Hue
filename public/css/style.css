@@ -703,6 +703,30 @@ body.compare-on .map-title-split { display: inline-flex; }
 }
 .map-toolbar .ui-btn-format:hover { background: rgba(30, 41, 59, 0.98); border-color: var(--accent-cyan); }
 
+/* HỎI ĐÁP: câu đã tính sẵn, bấm để tô phường */
+.faq-panel {
+  position: absolute; left: calc(var(--tb-btn) + 20px); top: 72px; z-index: 1000;
+  width: min(380px, calc(100vw - 84px)); max-height: min(72vh, 640px); overflow: auto;
+  padding: 8px 10px 10px; background: var(--bg-dark); color: var(--text-main);
+  backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
+  border: 1px solid var(--border-color); border-radius: var(--r-lg); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+.faq-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.faq-close { width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
+.faq-note { margin: 4px 0 8px; color: var(--text-muted); font-size: var(--fs-xs); }
+.faq-list { display: flex; flex-direction: column; gap: 6px; }
+.faq-item {
+  display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 6px 8px; text-align: left;
+  border: 1px solid var(--border-color); border-radius: var(--r-md); background: transparent; color: inherit;
+  font: inherit; cursor: pointer;
+}
+.faq-item b { font-size: var(--fs-sm); }
+.faq-item span, .faq-item small { color: var(--text-muted); font-size: var(--fs-xs); }
+.faq-item.is-on, .faq-item:hover { border-color: var(--accent-cyan); }
+.faq-gap { margin-top: 8px; font-size: var(--fs-xs); color: var(--text-muted); }
+.faq-gap summary { cursor: pointer; color: var(--text-main); }
+.faq-gap p { margin: 6px 0; }
+
 /* PHÁC THẢO: bảng công cụ mở ngang cạnh nút (top đặt theo nút trong sketchLayer.js) */
 .sketch-palette {
   position: absolute;

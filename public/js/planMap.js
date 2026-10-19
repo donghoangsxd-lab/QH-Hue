@@ -182,11 +182,17 @@ export function wardFocusLayer(m, geometry) {
 }
 
 export function highlightPlanWard(wardName) {
+  highlightPlanWards(wardName ? [wardName] : []);
+}
+
+export function highlightPlanWards(names) {
   planHighlightLayer.clearLayers();
-  if (!planMap || !wardName || wardName === "Thành phố Huế") return;
-  const w = (state.wardLabelsList || []).find(x => x.name === wardName);
-  if (!w || !w.geometry) return;
-  planHighlightLayer.addLayer(wardFocusLayer(planMap, w.geometry));
+  if (!planMap) return;
+  (names || []).forEach(wardName => {
+    if (!wardName || wardName === 'Thành phố Huế') return;
+    const w = (state.wardLabelsList || []).find(x => x.name === wardName);
+    if (w && w.geometry) planHighlightLayer.addLayer(wardFocusLayer(planMap, w.geometry));
+  });
 }
 
 export function setPlanHeatUrl(url) {

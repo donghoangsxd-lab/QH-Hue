@@ -1,0 +1,196 @@
+{
+  "built": "2026-10-19",
+  "infraFeatures": 7177,
+  "placed": 7174,
+  "unplaced": 0,
+  "landHits": 2610,
+  "landMiss": 9,
+  "questions": [
+    {
+      "id": "green-max",
+      "q": "Phường, xã nào có diện tích cây xanh công viên lớn nhất?",
+      "a": "Phường Thuận Hóa: 5,43 ha quy mô hiện trạng đã duyệt (93 công viên, 90 công trình chưa có QuyMo_HT nên không cộng diện tích).",
+      "wards": [
+        "Phường Thuận Hóa"
+      ],
+      "source": "infrastructure_hue.json · TrangThai = TRUE · nhóm 1-CV · QuyMo_HT (m²). Cập nhật bucket 15/10/2026."
+    },
+    {
+      "id": "dens-xa-min",
+      "q": "Xã nào có mật độ dân số thấp nhất?",
+      "a": "Xã A Lưới 5: 8 người/km² (3.760 người / 464,40 km²).",
+      "wards": [
+        "Xã A Lưới 5"
+      ],
+      "source": "Dân số thuộc tính danSoNum trên ranh phường xã; diện tích bảng WARD_AREA_KM2 trong config/constants.js."
+    },
+    {
+      "id": "dens-phuong-max",
+      "q": "Phường nào có mật độ dân số cao nhất?",
+      "a": "Phường Thuận Hóa: 13.068 người/km² (98.923 người / 7,57 km²).",
+      "wards": [
+        "Phường Thuận Hóa"
+      ],
+      "source": "Dân số thuộc tính danSoNum trên ranh phường xã; diện tích bảng WARD_AREA_KM2 trong config/constants.js."
+    },
+    {
+      "id": "land-5-max",
+      "q": "Trên quy hoạch chung 2045, địa bàn nào có đất cây xanh sử dụng công cộng đô thị lớn nhất?",
+      "a": "Phường Kim Long: 129,1 ha. 17 địa bàn có loại đất này trong lớp.",
+      "wards": [
+        "Phường Kim Long"
+      ],
+      "source": "public/data/qhc2045/sdd.json · diện tích lô (ha) theo mã chức năng đất QHC 2045, gán phường bằng tâm lô. Chỉ các lô có trong lớp này, không phải kiểm kê toàn địa bàn."
+    },
+    {
+      "id": "land-5-min",
+      "q": "Trên quy hoạch chung 2045, địa bàn nào có đất cây xanh sử dụng công cộng đô thị nhỏ nhất (trong số có lô)?",
+      "a": "Phường Mỹ Thượng: 7,0 ha. 23 địa bàn không có lô loại này trong lớp QHC 2045.",
+      "wards": [
+        "Phường Mỹ Thượng"
+      ],
+      "source": "public/data/qhc2045/sdd.json · diện tích lô (ha) theo mã chức năng đất QHC 2045, gán phường bằng tâm lô. Chỉ các lô có trong lớp này, không phải kiểm kê toàn địa bàn."
+    },
+    {
+      "id": "land-40-max",
+      "q": "Trên quy hoạch chung 2045, địa bàn nào có đất đơn vị ở lớn nhất?",
+      "a": "Phường Thanh Thủy: 1.629,5 ha. 17 địa bàn có loại đất này trong lớp.",
+      "wards": [
+        "Phường Thanh Thủy"
+      ],
+      "source": "public/data/qhc2045/sdd.json · diện tích lô (ha) theo mã chức năng đất QHC 2045, gán phường bằng tâm lô. Chỉ các lô có trong lớp này, không phải kiểm kê toàn địa bàn."
+    },
+    {
+      "id": "land-40-min",
+      "q": "Trên quy hoạch chung 2045, địa bàn nào có đất đơn vị ở nhỏ nhất (trong số có lô)?",
+      "a": "Phường Thuận Hóa: 308,0 ha. 23 địa bàn không có lô loại này trong lớp QHC 2045.",
+      "wards": [
+        "Phường Thuận Hóa"
+      ],
+      "source": "public/data/qhc2045/sdd.json · diện tích lô (ha) theo mã chức năng đất QHC 2045, gán phường bằng tâm lô. Chỉ các lô có trong lớp này, không phải kiểm kê toàn địa bàn."
+    },
+    {
+      "id": "land-23-max",
+      "q": "Trên quy hoạch chung 2045, địa bàn nào có đất sản xuất nông nghiệp lớn nhất?",
+      "a": "Xã Bình Điền: 1.959,1 ha. 12 địa bàn có loại đất này trong lớp.",
+      "wards": [
+        "Xã Bình Điền"
+      ],
+      "source": "public/data/qhc2045/sdd.json · diện tích lô (ha) theo mã chức năng đất QHC 2045, gán phường bằng tâm lô. Chỉ các lô có trong lớp này, không phải kiểm kê toàn địa bàn."
+    },
+    {
+      "id": "land-23-min",
+      "q": "Trên quy hoạch chung 2045, địa bàn nào có đất sản xuất nông nghiệp nhỏ nhất (trong số có lô)?",
+      "a": "Phường Mỹ Thượng: 19,4 ha. 28 địa bàn không có lô loại này trong lớp QHC 2045.",
+      "wards": [
+        "Phường Mỹ Thượng"
+      ],
+      "source": "public/data/qhc2045/sdd.json · diện tích lô (ha) theo mã chức năng đất QHC 2045, gán phường bằng tâm lô. Chỉ các lô có trong lớp này, không phải kiểm kê toàn địa bàn."
+    },
+    {
+      "id": "land-forest-max",
+      "q": "Trên quy hoạch chung 2045, địa bàn nào có đất lâm nghiệp (rừng đặc dụng, phòng hộ, sản xuất) lớn nhất?",
+      "a": "Phường Phú Bài: 23.653,1 ha. 13 địa bàn có loại đất này trong lớp.",
+      "wards": [
+        "Phường Phú Bài"
+      ],
+      "source": "public/data/qhc2045/sdd.json · diện tích lô (ha) theo mã chức năng đất QHC 2045, gán phường bằng tâm lô. Chỉ các lô có trong lớp này, không phải kiểm kê toàn địa bàn."
+    },
+    {
+      "id": "land-forest-min",
+      "q": "Trên quy hoạch chung 2045, địa bàn nào có đất lâm nghiệp (rừng đặc dụng, phòng hộ, sản xuất) nhỏ nhất (trong số có lô)?",
+      "a": "Xã Hưng Lộc: 0,6 ha. 27 địa bàn không có lô loại này trong lớp QHC 2045.",
+      "wards": [
+        "Xã Hưng Lộc"
+      ],
+      "source": "public/data/qhc2045/sdd.json · diện tích lô (ha) theo mã chức năng đất QHC 2045, gán phường bằng tâm lô. Chỉ các lô có trong lớp này, không phải kiểm kê toàn địa bàn."
+    },
+    {
+      "id": "invest-max",
+      "q": "Địa bàn nào có nhiều dự án kêu gọi đầu tư nhất?",
+      "a": "Phường Thanh Thủy: 23 dự án; Phường Phong Quảng: 17 dự án; Xã Chân Mây - Lăng Cô: 17 dự án. 268 dòng gắn được địa bàn, 1 dòng không khớp tên phường xã.",
+      "wards": [
+        "Phường Thanh Thủy",
+        "Phường Phong Quảng",
+        "Xã Chân Mây - Lăng Cô"
+      ],
+      "source": "public/data/invest-sheet.json · cột ĐỊA ĐIỂM. Một dòng ghi nhiều phường được đếm ở mỗi phường. Đây là danh sách kêu gọi đầu tư, không phải dự án đã cấp phép."
+    },
+    {
+      "id": "invest-min",
+      "q": "Địa bàn nào có ít dự án kêu gọi đầu tư nhất (trong số có ít nhất một dự án)?",
+      "a": "Xã Quảng Điền: 1 dự án. 1 địa bàn không có dòng nào khớp tên.",
+      "wards": [
+        "Xã Quảng Điền"
+      ],
+      "source": "public/data/invest-sheet.json · cột ĐỊA ĐIỂM."
+    },
+    {
+      "id": "school-max",
+      "q": "Địa bàn nào có nhiều trường mầm non, tiểu học, THCS, THPT đã duyệt nhất?",
+      "a": "Xã Chân Mây - Lăng Cô: 75 trường.",
+      "wards": [
+        "Xã Chân Mây - Lăng Cô"
+      ],
+      "source": "infrastructure_hue.json · đã duyệt · tiền tố MN, TH, THCS, THPT."
+    },
+    {
+      "id": "bus-max",
+      "q": "Địa bàn nào có nhiều điểm dừng xe buýt đã duyệt nhất?",
+      "a": "Phường Thuận Hóa: 27 điểm.",
+      "wards": [
+        "Phường Thuận Hóa"
+      ],
+      "source": "infrastructure_hue.json · đã duyệt · nhóm 13-BUS."
+    },
+    {
+      "id": "csd-max",
+      "q": "Địa bàn nào có quỹ đất chưa sử dụng (quy mô hiện trạng đã duyệt) lớn nhất?",
+      "a": "Phường Thuận Hóa: 0,41 ha (4 khu).",
+      "wards": [
+        "Phường Thuận Hóa"
+      ],
+      "source": "infrastructure_hue.json · đã duyệt · nhóm 12-CSD · QuyMo_HT."
+    },
+    {
+      "id": "area-max",
+      "q": "Phường, xã nào có diện tích tự nhiên lớn nhất?",
+      "a": "Phường Phong Điền: 592,48 km².",
+      "wards": [
+        "Phường Phong Điền"
+      ],
+      "source": "Bảng diện tích chính thức 40 phường xã trong config/constants.js (WARD_AREA_KM2)."
+    },
+    {
+      "id": "area-min",
+      "q": "Phường, xã nào có diện tích tự nhiên nhỏ nhất?",
+      "a": "Phường Thuận Hóa: 7,57 km².",
+      "wards": [
+        "Phường Thuận Hóa"
+      ],
+      "source": "Bảng diện tích chính thức 40 phường xã trong config/constants.js (WARD_AREA_KM2)."
+    }
+  ],
+  "unanswered": [
+    {
+      "q": "Diện tích cây xanh công cộng theo kiểm kê đất đai?",
+      "why": "Bucket chỉ có quy mô từng công viên trên sheet, không có lớp kiểm kê cây xanh toàn ranh."
+    },
+    {
+      "q": "Tỷ lệ nhà kiên cố, nước sạch, chất thải rắn theo phường?",
+      "why": "Không có số liệu điều tra trong webapp hay bucket."
+    },
+    {
+      "q": "Số dự án đầu tư đã cấp phép hoặc đang thi công theo phường?",
+      "why": "Chỉ có danh sách kêu gọi đầu tư (invest-sheet.json), không có sổ dự án đã phê duyệt theo phường."
+    },
+    {
+      "q": "Mật độ xây dựng hoặc tầng cao trung bình theo phường?",
+      "why": "Chưa có lớp công trình nhà (Open Buildings / OSM) trong bộ số liệu đang dùng."
+    },
+    {
+      "q": "Độ che phủ thực vật (NDVI) theo phường?",
+      "why": "Chưa có lớp NDVI trong bộ số liệu tĩnh."
+    }
+  ]
+}

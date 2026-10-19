@@ -73,6 +73,7 @@ import { initBasinLayer } from './basinLayer.js';
 import { initFloodSim } from './floodSim.js';
 import { initSatLayers } from './satLayers.js';
 import { initSketchLayer, handleSketchClick } from './sketchLayer.js';
+import { initFaqPanel } from './faqPanel.js';
 import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
 import { initOverview } from './overview.js';
 import { initRiskLayer } from './riskLayer.js';
@@ -356,6 +357,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initSatLayers();
   initRiskLayer();
   initSketchLayer();
+  initFaqPanel();
   initOverview();
   restoreAdminSession();
   document.getElementById('btnToggleCompare')?.addEventListener('click', toggleSplit);
