@@ -528,18 +528,24 @@ const SECTIONS = [
         actions: [{ label: 'Bật lớp dân cư', icon: 'users', run: () => showLayer('chk_pop', { pane: 'base' }) }]
       },
       {
-        id: 'forest', btn: 'guide', status: 'plan',
+        id: 'forest', btn: 'guide', status: 'dev',
         title: 'Chồng lớp phủ thực vật, hiện trạng rừng',
-        note: 'Cảnh báo quy hoạch chuyển mục đích sử dụng đất rừng',
-        lead: 'Dự kiến bổ sung lớp phủ thực vật và hiện trạng rừng để cảnh báo lô quy hoạch chồng lấn lên đất rừng, cần xem xét khi chuyển mục đích sử dụng đất.',
-        stepsTitle: 'Lộ trình dự kiến',
+        note: 'Ước tính vệ tinh, chưa phải ranh 3 loại rừng',
+        lead: 'Phủ lớp phủ thực vật năm 2021 và vùng mất rừng 2001–2025 lên bản đồ, kèm diện tích theo phường, xã, để xem xét khi bố trí quy hoạch trên đất có cây che phủ.',
         steps: [
-          'Bổ sung lớp hiện trạng rừng (ranh 3 loại rừng) và lớp phủ thực vật từ ảnh vệ tinh.',
-          'Chồng ranh lô quy hoạch với lớp rừng, tính diện tích chồng lấn của từng lô.',
-          'Cảnh báo trong bảng thẩm định khi đồ án có lô chuyển mục đích từ đất rừng.'
+          'Panel phải › <b>Bản đồ môi trường</b> › bật <b>Rừng, phủ thực vật</b>.',
+          'Chọn <b>Phủ thực vật 2021</b> (ESA WorldCover 10 m) hoặc <b>Mất rừng 2001–2025</b> (Hansen, trên pixel có tán cây năm 2000 từ 10%).',
+          'Chú giải và bảng hectare nằm ngay dưới ô lớp. Kéo thanh trượt để chỉnh độ trong suốt.'
         ],
-        facts: ['Hiện có thể tham khảo lớp <b>Đất xây dựng (vệ tinh)</b> để xem biến động đất xây dựng qua các năm.'],
-        actions: [{ label: 'Xem lớp Đất xây dựng (vệ tinh)', icon: 'sat', run: () => showLayer('chk_newdev', { pane: 'base' }) }]
+        facts: [
+          'WorldCover 2021 (CC BY 4.0) và Hansen Global Forest Change v1.13 là dữ liệu mở, không thay ranh rừng theo Luật Lâm nghiệp.',
+          'Chưa cảnh báo chồng lô đồ án lên đất rừng trong bảng thẩm định.',
+          'Có thể tham khảo thêm lớp <b>Đất xây dựng (vệ tinh)</b> để xem biến động đất xây dựng qua các năm.'
+        ],
+        actions: [
+          { label: 'Bật lớp rừng, phủ thực vật', icon: 'leaf', run: () => showLayer('chk_forest', { pane: 'env' }) },
+          { label: 'Xem lớp Đất xây dựng (vệ tinh)', icon: 'sat', run: () => showLayer('chk_newdev', { pane: 'base' }) }
+        ]
       },
       {
         id: 'qhc', btn: 'report', status: 'dev',
