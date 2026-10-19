@@ -1233,6 +1233,8 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .flood-row b { color: #93c5fd; font-weight: 500; white-space: nowrap; }
 /* Lớp vệ tinh (satLayers.js): chọn năm, chú giải; phần thống kê dùng chung kiểu mô phỏng ngập */
 .sat-pick { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); }
+.layer-map-pane > .basemap-pick { margin-bottom: 6px; }
+.basemap-pick label { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .sat-pick select { flex: 1; min-width: 0; height: 22px; padding: 0 4px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--r-sm); color: var(--text-main); font: inherit; }
 .sat-legend { margin: 4px 0; }
 .sat-legend:empty { display: none; }

@@ -311,7 +311,7 @@ export function openGeoref(opts) {
     const panes = box.querySelector('#sgPanes');
 
     const geoMap = L.map(box.querySelector('#sgMap'), { maxZoom: 21, attributionControl: false, zoomControl: true, keyboard: false });
-    attachBasemap(geoMap);
+    attachBasemap(geoMap, 'google');
     geoMap.createPane('sgScan').style.zIndex = 390;
     // Leaflet cần tâm nhìn trước khi nhận nét vẽ; ranh nằm trên ảnh (overlayPane 400) và không bắt chuột để kéo ảnh xuyên qua
     const ring = boundary ? L.geoJSON(boundary, { interactive: false, style: { color: RANH, weight: 3, dashArray: '10 6', fill: false } }) : null;
