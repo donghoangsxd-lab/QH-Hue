@@ -2,7 +2,14 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hạ tầng Huế">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/pwa-192.png">
   <title>Bản đồ Phân tích Hạ tầng Đô thị TP. Huế (Headless GIS)</title>
   <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
   <link rel="preconnect" href="https://earthengine.googleapis.com" crossorigin>
@@ -1149,6 +1156,14 @@
       </div>
     </div>
   </section>
+
+  <div class="mobile-fs" id="mobileFs" hidden>
+    <p id="mobileFsText"></p>
+    <div class="mobile-fs-actions">
+      <button type="button" class="mobile-fs-go" id="btnMobileFs">Toàn màn hình</button>
+      <button type="button" class="mobile-fs-later" id="btnMobileFsLater">Để sau</button>
+    </div>
+  </div>
 
   <!-- MODAL ĐĂNG NHẬP GOOGLE ADMIN -->
   <div id="authModal" class="ui-panel-format auth-modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle" style="display:none;">
