@@ -4501,12 +4501,23 @@ body.project-review.la-page #projectReviewHost {
   border-radius: 50%; background: #f9b31c; border: 2px solid #fff; box-shadow: 0 0 0 3px rgba(249, 179, 28, 0.35), var(--shadow-sm);
 }
 
-/* Điện thoại (≤840px, gồm 360×800 và 800×360): panel thành ngăn kéo đáy, nút chạm ≥44px, bản đồ còn chỗ */
+/* Điện thoại (≤840px, gồm 360×800 và 800×360): panel thành ngăn kéo đáy, nút chạm ≥44px, bản đồ còn chỗ.
+   Khóa html/body vào khung nhìn: thanh tiêu đề panel dưới (nowrap) rộng hơn màn hình thì tràn scrollWidth,
+   Chrome Android đẩy cả trang sang trái và chừa dải tối bên phải. --right-w = 0 vì ngăn kéo phủ lên bản đồ, không chiếm cột. */
 @media (max-width: 840px) {
+  html, body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+  }
   :root {
     --tb-btn: 44px;
     --title-h: 44px;
-    --right-w: 100%;
+    --right-w: 0px;
     --bottom-h: min(42dvh, 280px);
     --fs-xs: 12px;
     --fs-sm: 13px;
@@ -4527,7 +4538,7 @@ body.project-review.la-page #projectReviewHost {
     gap: 4px;
     padding: 0 4px;
   }
-  .map-title-text { font-size: 12px; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-title-text { font-size: 12px; letter-spacing: 0; white-space: normal; line-height: 1.15; }
   .map-title-level-text { display: none; }
   .map-title-level { min-width: 44px; min-height: 36px; padding: 0 6px; }
   .ov-launch { top: max(8px, env(safe-area-inset-top)); left: 8px; }
@@ -4556,7 +4567,10 @@ body.project-review.la-page #projectReviewHost {
     border-radius: 16px 16px 0 0;
     transform-origin: center bottom;
   }
-  body.right-collapsed .right-panel { transform: translateY(110%); }
+  body.right-collapsed .right-panel { transform: translateY(110%); visibility: hidden; }
+  .bottom-panel, .bp-body, .bp-part, .bp-part-head { max-width: 100%; }
+  .bottom-panel { overflow: hidden; }
+  .bp-part-head { min-width: 0; overflow-x: auto; }
   .tab-btn, .rp-collapse-btn, .layer-main-tab, .layer-map-tab { min-height: 44px; }
   .rp-tabs { overflow-x: auto; }
   .layer-row { min-height: 44px; }
@@ -4570,7 +4584,7 @@ body.project-review.la-page #projectReviewHost {
     top: auto !important;
     bottom: 120px;
     width: auto;
-    max-width: calc(100vw - 16px);
+    max-width: 100%;
     max-height: min(60dvh, 420px);
     z-index: 1400;
   }
@@ -4578,15 +4592,18 @@ body.project-review.la-page #projectReviewHost {
   .leaflet-top.leaflet-left { top: 58px; }
   .leaflet-control-zoom a { width: 44px !important; height: 44px !important; line-height: 44px !important; font-size: 20px; }
   body.bottom-collapsed .leaflet-bottom.leaflet-right { margin-bottom: 108px; }
-  .leaflet-popup-content-wrapper, .leaflet-popup-tip { max-width: calc(100vw - 24px); }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { max-width: calc(100dvw - 24px); }
   .leaflet-popup-content { font-size: 14px; margin: 10px 12px; }
   .inspect-popup .leaflet-popup-content { max-height: 42dvh; }
   .mobile-fs:not([hidden]) {
     display: block;
     position: fixed;
     z-index: 2600;
-    left: 8px;
-    right: 8px;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    width: auto;
+    max-width: 100%;
+    box-sizing: border-box;
     top: 60px;
     padding: 10px 12px;
     background: var(--bg-dark);
@@ -4614,5 +4631,8 @@ body.project-review.la-page #projectReviewHost {
   .review-panel, .sketch-palette { bottom: 64px; }
   body.bottom-collapsed .leaflet-bottom.leaflet-right { margin-bottom: 60px; }
   .mobile-fs:not([hidden]) { top: auto; bottom: 64px; }
+}
+@media print and (max-width: 840px) {
+  html, body { position: static; inset: auto; width: auto; max-width: none; height: auto; max-height: none; overflow: visible; }
 }
 
