@@ -15,6 +15,7 @@ import { loadNewDevStats, newDevOf, newDevRowHtml } from './newDev.js';
 import { renderGreenGrowth, initGreenGrowthEvents, reloadGreenGrowthRoads } from './greenGrowth.js';
 import { renderUrbanClass, initUrbanClassEvents, reloadUrbanClassRoads } from './urbanClass.js';
 import { renderGeneralPlan, initGeneralPlanEvents, refreshGeneralPlanPanel } from './generalPlanUi.js';
+import { renderImm, initImmEvents, setImmVisible } from './immIndicators.js';
 
 let chartInstance = null;
 let infraPieInstance = null;
@@ -1449,7 +1450,8 @@ const PART2_PAGES = [
   { title: 'BẢNG TỔNG HỢP HẠ TẦNG', next: 'Phân loại', icon: 'flag', hint: 'Trang sau: phân loại đô thị (hiện trạng theo Quyết định 614/QĐ-UBND, mục tiêu 2030 theo Quyết định 756/QĐ-UBND, tiêu chí Nghị quyết 111/2025/UBTVQH15)' },
   { title: 'TIÊU CHÍ PHÂN LOẠI ĐÔ THỊ', next: 'Tăng trưởng xanh', icon: 'leaf', hint: 'Trang sau: chỉ tiêu xây dựng đô thị tăng trưởng xanh (Thông tư 01/2018/TT-BXD, hợp nhất tại VBHN 97/2026/VBHN-TT-BXD)' },
   { title: 'CHỈ TIÊU TĂNG TRƯỞNG XANH', next: 'Quy hoạch chung', icon: 'map', hint: 'Trang sau: quy hoạch chung từng đô thị theo Quyết định 756/QĐ-UBND — hồ sơ, QHPK 1/2.000 triển khai, chỉ số trưởng thành đô thị' },
-  { title: 'QUY HOẠCH CHUNG ĐÔ THỊ', next: 'Hạ tầng', icon: 'table', hint: 'Trang sau: quay lại bảng tổng hợp hạ tầng' }
+  { title: 'QUY HOẠCH CHUNG ĐÔ THỊ', next: 'Hình thái', icon: 'area', hint: 'Trang sau: chỉ tiêu hình thái theo phường (khối, khoảng trống, chức năng, liên kết) từ OpenStreetMap' },
+  { title: 'CHỈ TIÊU HÌNH THÁI', next: 'Hạ tầng', icon: 'table', hint: 'Trang sau: quay lại bảng tổng hợp hạ tầng' }
 ];
 let part2Page = 0;
 
@@ -1471,6 +1473,12 @@ function renderGtx() {
     return;
   }
   renderGreenGrowth(el, { wardName: isCityMode() ? '' : state.selectedWard, wards: state.wardStatsData });
+}
+
+function renderImmPage() {
+  const el = document.getElementById('immView');
+  if (part2Page !== 4 || !el) return;
+  renderImm(el);
 }
 
 function renderGp() {
@@ -1505,6 +1513,8 @@ function setPart2Page(page) {
   renderClass();
   renderGtx();
   renderGp();
+  renderImmPage();
+  setImmVisible(part2Page === 4);
 }
 
 let pdfExporting = false;
@@ -1520,7 +1530,8 @@ export async function exportBottomPanelPdf() {
     return;
   }
   const place = isCityMode() ? 'TP-Hue' : state.selectedWard;
-  const fileName = part2Page === 3 ? `Quy-hoach-chung-${place}.pdf`
+  const fileName = part2Page === 4 ? `Chi-tieu-hinh-thai-${place}.pdf`
+    : part2Page === 3 ? `Quy-hoach-chung-${place}.pdf`
     : part2Page === 2 ? `Chi-Tieu-Tang-Truong-Xanh-${place}.pdf`
     : part2Page === 1 ? `Tieu-chi-Phan-loai-Do-thi-${place}.pdf`
     : (isCityMode() ? 'Bao-Cao-Ha-Tang-TP-Hue.pdf' : `Bao-Cao-${state.selectedWard}.pdf`);
@@ -1568,6 +1579,7 @@ export function initBottomPanelEvents() {
   initGreenGrowthEvents(document.getElementById('gtxView'), renderGtx);
   initUrbanClassEvents(document.getElementById('classView'), renderClass);
   initGeneralPlanEvents(document.getElementById('gpView'), renderGp);
+  initImmEvents(document.getElementById('immView'), renderImmPage);
   document.getElementById('statTableBody')?.addEventListener('click', (e) => {
     const link = e.target.closest('.ward-link');
     if (link) selectWardDetail(link.dataset.ward);

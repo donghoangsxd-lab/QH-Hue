@@ -2081,7 +2081,16 @@ body.bottom-max .rc-road i { animation: rc-grow 0.9s cubic-bezier(0.2, 0.8, 0.2,
 .p2-flip[data-page="0"] > .p2-face[data-page="0"],
 .p2-flip[data-page="1"] > .p2-face[data-page="1"],
 .p2-flip[data-page="2"] > .p2-face[data-page="2"],
-.p2-flip[data-page="3"] > .p2-face[data-page="3"] { visibility: visible; pointer-events: auto; }
+.p2-flip[data-page="3"] > .p2-face[data-page="3"],
+.p2-flip[data-page="4"] > .p2-face[data-page="4"] { visibility: visible; pointer-events: auto; }
+.imm-bar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; margin-bottom: 4px; font-size: var(--fs-sm); color: var(--text-muted); }
+.imm-bar select { height: 22px; font-size: var(--fs-sm); }
+.imm-src { margin: 0 0 6px; font-size: var(--fs-xs); color: var(--text-muted); }
+.imm-table { min-height: 0; }
+.imm-num { text-align: right; font-variant-numeric: tabular-nums; }
+.imm-table tr { cursor: pointer; }
+.imm-limits { margin-top: 6px; font-size: var(--fs-xs); color: var(--text-muted); }
+.imm-limits summary { cursor: pointer; color: var(--text-main); }
 .p2-face[aria-hidden="true"] { pointer-events: none; }
 .bp-part2.p2-alt #btnToggleStatTable { display: none !important; }
 
