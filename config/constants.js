@@ -201,6 +201,10 @@ const constants = {
   GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/infrastructure_hue.json",
   // Ranh lô công trình không thuộc đồ án (luồng phường). Mỗi đồ án một thư mục projects/<slug>/ với 4 file lớp.
   CAD_GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/cad_parcels.json",
+  // Danh sách dự án kêu gọi đầu tư (sheet 15-DA): Apps Script đẩy mỗi lần đồng bộ. Ranh nằm ở public/data.
+  INVEST_GCS_URL: "https://storage.googleapis.com/hue-infra-data-us/invest_calls.json",
+  // Hiệu chỉnh admin ghi đè lên danh sách sheet. Apps Script không ghi file này.
+  INVEST_EDITS_URL: "https://storage.googleapis.com/hue-infra-data-us/invest_edits.json",
   // Danh mục đồ án + ranh tổng: projects/index.json. Client nhận URL này từ API, không gắn cứng.
   PROJECTS_GCS_BASE: "https://storage.googleapis.com/hue-infra-data-us/projects/",
   // Hồ sơ file chờ duyệt do người dùng chưa đăng nhập gửi (Apps Script ghi: index.json + <id>.<dxf|kml|geojson>)

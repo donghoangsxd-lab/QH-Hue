@@ -389,6 +389,102 @@ export function shareOpenProject(name) {
   return true;
 }
 
+function outlineSize(p) {
+  const b = boundsOf(p);
+  if (!b || !b.isValid()) return Infinity;
+  return (b.getEast() - b.getWest()) * (b.getNorth() - b.getSouth());
+}
+
+function geomsMeet(a, b) {
+  try {
+    const fa = turf.feature(a);
+    const fb = turf.feature(b);
+    if (typeof turf.booleanIntersects === 'function') return turf.booleanIntersects(fa, fb);
+    return !!turf.intersect(fa, fb);
+  } catch (e) { return false; }
+}
+
+/** Đồ án cấp kind có ranh giao hình đang tra cứu */
+function projectsCovering(kind, geom) {
+  if (!geom || typeof turf === 'undefined') return [];
+  let box = null;
+  try { box = turf.bbox(turf.feature(geom)); } catch (e) { box = null; }
+  const hits = [];
+  projects.forEach(p => {
+    if (p.level !== kind) return;
+    const outline = outlineOf(p);
+    const b = outline && boundsOf(p);
+    if (!b || !b.isValid()) return;
+    if (box && (b.getEast() < box[0] || b.getWest() > box[2] || b.getNorth() < box[1] || b.getSouth() > box[3])) return;
+    if (geomsMeet(geom, outline)) hits.push(p);
+  });
+  return hits;
+}
+
+function openMany(hits) {
+  const primary = hits.slice().sort((a, b) => outlineSize(a) - outlineSize(b))[0];
+  if (!primary) return null;
+  const ready = state.focusedProject === primary.name && focusName === primary.name
+    && hits.every(p => state.lotProjects.has(p.name));
+  if (ready) return primary.name;
+  state.lotProjects.clear();
+  let hiddenChanged = false;
+  hits.forEach(p => {
+    if (state.hiddenProjects.delete(p.name)) hiddenChanged = true;
+    state.lotProjects.add(p.name);
+  });
+  if (hiddenChanged) saveHidden();
+  if (!kindOn(primary.name)) turnKindOn(primary, () => setMaster(true));
+  if (!state.showProjectInfra) ensureFullLots();
+  state.focusedProject = primary.name;
+  focusName = primary.name;
+  refreshAll();
+  drawFocus();
+  pinGlow(primary);
+  markPicked(primary.name);
+  focusProjectLots(primary.name);
+  revealInList(primary);
+  document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: primary.name }));
+  return primary.name;
+}
+
+/**
+ * Đồ án nhỏ nhất cấp kind (QHPK / QHCT / QHC) chứa điểm: bật lô và viền, giữ nguyên khung nhìn.
+ * Không có đồ án tại điểm → null.
+ */
+export function openProjectAt(latlng, kind) {
+  if (!latlng || !kind || typeof turf === 'undefined') return null;
+  const pt = [latlng.lng, latlng.lat];
+  let best = null;
+  let bestSize = Infinity;
+  projects.forEach(p => {
+    if (p.level !== kind) return;
+    const geom = outlineOf(p);
+    const b = geom && boundsOf(p);
+    if (!b || !b.isValid() || !b.contains(latlng)) return;
+    const size = (b.getEast() - b.getWest()) * (b.getNorth() - b.getSouth());
+    if (size >= bestSize) return;
+    try {
+      if (turf.booleanPointInPolygon(pt, turf.feature(geom))) { best = p; bestSize = size; }
+    } catch (e) { /* ranh lỗi */ }
+  });
+  if (!best) return null;
+  const lotsOn = best.level !== 'QHPK' || state.lotProjects.has(best.name);
+  if (state.focusedProject === best.name && focusName === best.name && lotsOn) return best.name;
+  shareOpenProject(best.name);
+  return best.name;
+}
+
+/**
+ * Tra cứu theo hình: giao từ 2 đồ án QHPK hoặc QHCT trở lên thì mở lô mọi đồ án giao hình, giữ khung nhìn.
+ * Ít hơn thì vẫn mở đồ án nhỏ nhất chứa điểm.
+ */
+export function openInspectProjects(latlng, kind, geom) {
+  const hits = projectsCovering(kind, geom);
+  if (hits.length >= 2) return openMany(hits);
+  return openProjectAt(latlng, kind);
+}
+
 /** Điểm latlng nằm trong ranh tổng của đồ án name */
 export function projectContains(name, latlng) {
   const p = projects.find(x => x.name === name);
@@ -1224,6 +1320,8 @@ const FOCUS_LINES = [
 const WORLD_RING = [[85, -180], [85, 180], [-85, 180], [-85, -180]];
 const focusLayers = new Map();
 let focusName = null;
+// Bảng dự án kêu gọi đầu tư đang mở: bỏ viền đồ án (hay thành khung chữ nhật) để còn thấy lô bên trong.
+let quietOutline = false;
 
 const outerRings = (geom) => (geom.type === 'Polygon' ? [geom.coordinates[0]]
   : geom.type === 'MultiPolygon' ? geom.coordinates.map(c => c[0]) : []);
@@ -1236,8 +1334,16 @@ function clearFocusOn(m) {
   focusLayers.delete(m);
 }
 
+export function setQuietProjectOutline(on) {
+  on = !!on;
+  if (quietOutline === on) return;
+  quietOutline = on;
+  redrawOutlines();
+  drawFocus();
+}
+
 function drawFocus() {
-  const p = focusName ? projects.find(x => x.name === focusName) : null;
+  const p = !quietOutline && focusName ? projects.find(x => x.name === focusName) : null;
   const geom = p && outlineOf(p);
   shownMaps().forEach(m => {
     clearFocusOn(m);
@@ -1337,6 +1443,7 @@ function drawOutlinesOn(m, list, below) {
   // QHPK toàn TP: đồ án vừa bấm hoặc đang tick. QHC / QHCT: đồ án đang mở (lớp QHPK tắt nên nhánh «dưới ngưỡng» luôn bật).
   const lotsOpen = (p) => {
     if (qhpkBoundaryOnly() && p.level === 'QHPK') return p.name === state.focusedProject || state.lotProjects.has(p.name);
+    if (p.level === 'QHCT' && state.lotProjects.has(p.name)) return true;
     return (p.level === 'QHCT' || p.level === 'QHC') && p.name === state.focusedProject;
   };
   // Đồ án lớn vẽ trước (nằm dưới): đồ án nhỏ lồng trong QHPK phường nằm trên nên rê / bấm được
@@ -1346,9 +1453,10 @@ function drawOutlinesOn(m, list, below) {
     const base = !p.area ? OUTLINE_HULL : p.source === 'gis' ? OUTLINE_GIS : OUTLINE_STYLE;
     const style = { ...base, ...(p.level === 'QHC' ? OUTLINE_QHC : null), color: p.color, fillColor: p.color };
     const open = lotsOpen(p);
+    const shown = open ? { ...style, fillOpacity: 0, ...(quietOutline ? { opacity: 0 } : {}) } : style;
     // Đồ án đang mở theo phạm vi lớp droplist, hoặc đã bật lô QHPK: bấm trong ranh không mở lại đồ án
     if (open || !below || (!state.showProjects && p.name === state.focusedProject)) {
-      const shape = L.geoJSON(geom, { style: open ? { ...style, fillOpacity: 0 } : style, interactive: false });
+      const shape = L.geoJSON(geom, { style: shown, interactive: false });
       shapes.push(shape);
       group.addLayer(shape);
       return;

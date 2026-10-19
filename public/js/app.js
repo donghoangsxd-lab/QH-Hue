@@ -65,6 +65,7 @@ import { initStreetView } from './streetView.js';
 import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 import { initCadastreLayer, cadastreClick } from './cadastreLayer.js';
+import { initInvestLayer } from './investLayer.js';
 import { initTerrainLayer } from './terrainLayer.js';
 import { initTerrainProfile, syncTerrainProfile } from './terrainProfile.js';
 import { initDrainageLayer } from './drainageLayer.js';
@@ -340,6 +341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initPopEdits();
   initRoadNetworkLayer();
   initCadastreLayer();
+  initInvestLayer();
   initUrbanAreaLayer();
   initLayerDecisions();
   initQhc2045Layer();
@@ -706,7 +708,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const FOCUS_CHECKS = [
     ...ICON_GROUPS.map(k => `chk_${k}`),
     'chk_bound', 'chk_urban', 'chk_qhc25', 'chk_qhc10', 'chk_gt25', 'chk_gt10', 'chk_qhct', 'chk_parcel', 'chk_projects', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_basin', 'chk_flood', 'chk_sarflood',
-    'chk_lst', 'chk_newdev', 'chk_forest', 'chk_risk', 'chk_roads', 'chk_osmSport', 'chk_osmRail', 'chk_osmWater', 'chk_cadastre', 'chk_heat'
+    'chk_lst', 'chk_newdev', 'chk_forest', 'chk_risk', 'chk_roads', 'chk_osmSport', 'chk_osmRail', 'chk_osmWater', 'chk_cadastre', 'chk_invest', 'chk_heat'
   ];
   let focusSnapshot = null;
   const setChecked = (id, on) => {

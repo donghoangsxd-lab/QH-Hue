@@ -188,6 +188,15 @@ function restack() {
   layers.ext?.bringToFront();
 }
 
+// Kiểm tra thửa / vùng đo: QHC vẽ lô và vùng chức năng tại chỗ, kể cả khi đang nhìn rộng hơn ngưỡng địa điểm
+let preferPlace = false;
+export function setPreferPlace(on) {
+  preferPlace = !!on;
+  if (!preferPlace) return;
+  setQhcPlaceMode(true);
+  if (getLevel() === 'qhc10') setCoreOpen(true);
+}
+
 // ---------- 1/10.000: lô sử dụng đất ----------
 function lotStyle(f) {
   const p = f.properties;
@@ -197,12 +206,18 @@ function lotStyle(f) {
 
 function drawLand() {
   const m = active.m;
+  const stageKey = [...shownStages].sort().join(',');
+  const view = rawBox(m);
+  if (layers.land && m.hasLayer(layers.land) && active.landStages === stageKey && boxHolds(active.landDrawn, view)) return;
+  const box = paddedBox(view);
+  active.landDrawn = box;
+  active.landStages = stageKey;
   layers.land?.remove();
   layers.land = L.geoJSON(data.land, {
     pane: PANE[0],
     renderer: ensureRenderer(m),
     bubblingMouseEvents: false,
-    filter: (f) => f.properties.c !== SEA_CODE && shownStages.has(f.properties.t),
+    filter: (f) => f.properties.c !== SEA_CODE && shownStages.has(f.properties.t) && featureHits(f, box),
     style: lotStyle
   }).on('click', (e) => { if (!passToolClick(m, e)) openLotPopup(e.layer.feature, e.latlng); });
   layers.land.addTo(m);
@@ -628,7 +643,7 @@ async function setLand(on) {
       const shown = getViewMode() === 'QH' && planMap ? planMap : map;
       const city = !state.selectedWard || state.selectedWard === 'Thành phố Huế';
       // Cùng ngưỡng viewFlow (PLACE_ZOOM 14): zoom trong lúc tải phải được tính lại lúc vẽ, không giữ mức zoom lúc bấm droplist
-      const place = !!(state.focusedProject || !city || (shown && shown.getZoom() >= 14));
+      const place = preferPlace || !!(state.focusedProject || !city || (shown && shown.getZoom() >= 14));
       placeLots = place;
       coreOpen = place;
     }
@@ -772,19 +787,30 @@ function openLotPopup(f, latlng) {
 }
 
 // ---------- 1/25.000: sơ đồ tổ chức không gian ----------
+// Vẽ phần giao khung nhìn (thêm 60% mỗi cạnh). Kéo ra ngoài vùng đã vẽ thì mới vẽ thêm, không dựng cả thành phố khi đang phóng gần.
 function drawVision() {
   const m = active.m;
+  const linesOn = !(placeLots && !isLevelPair());
+  const view = rawBox(m);
+  if (layers.vision && m.hasLayer(layers.vision) && active.visionLines === linesOn && boxHolds(active.visionDrawn, view)) return;
+  const box = paddedBox(view);
+  active.visionDrawn = box;
+  active.visionLines = linesOn;
   layers.vision?.remove();
   const r = ensureRenderer(m);
   const cats = data.vision.cats;
   const fills = [], waters = [], greens = [], lines = [];
+  let kept = 0;
   data.vision.features.forEach(f => {
+    if (!featureHits(f, box)) return;
+    kept++;
     const L_ = f.properties.L;
     if (L_ === 'v') fills.push(f);
     else if (L_ === 'n' && f.properties.k !== 2) waters.push(f);
     else if (L_ === 'x') greens.push(f);
-    else if (L_ === 'r' && !(placeLots && !isLevelPair())) lines.push(f);
+    else if (L_ === 'r' && linesOn) lines.push(f);
   });
+  active.visionClipped = kept < data.vision.features.length;
   const fillLayer = L.geoJSON({ type: 'FeatureCollection', features: fills }, {
     pane: PANE[0], renderer: r, bubblingMouseEvents: false,
     style: visionFillStyle
@@ -836,6 +862,54 @@ function openVisionPopup(f, latlng) {
 
 // ---------- Click cấp bản đồ ----------
 const bboxes = new WeakMap();
+
+function geomBox(g) {
+  const b = [Infinity, Infinity, -Infinity, -Infinity];
+  const scan = (c) => {
+    if (!Array.isArray(c)) return;
+    if (typeof c[0] === 'number') {
+      if (c[0] < b[0]) b[0] = c[0];
+      if (c[1] < b[1]) b[1] = c[1];
+      if (c[0] > b[2]) b[2] = c[0];
+      if (c[1] > b[3]) b[3] = c[1];
+      return;
+    }
+    for (let i = 0; i < c.length; i++) scan(c[i]);
+  };
+  if (g?.type === 'GeometryCollection') (g.geometries || []).forEach(part => {
+    const p = geomBox(part);
+    if (!p) return;
+    if (p[0] < b[0]) b[0] = p[0];
+    if (p[1] < b[1]) b[1] = p[1];
+    if (p[2] > b[2]) b[2] = p[2];
+    if (p[3] > b[3]) b[3] = p[3];
+  });
+  else scan(g?.coordinates);
+  return b[0] === Infinity ? null : b;
+}
+
+function rawBox(m) {
+  const b = m.getBounds();
+  return [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+}
+
+function paddedBox(box) {
+  const dx = (box[2] - box[0]) * 0.6;
+  const dy = (box[3] - box[1]) * 0.6;
+  return [box[0] - dx, box[1] - dy, box[2] + dx, box[3] + dy];
+}
+
+const boxHolds = (outer, inner) => !!outer && inner[0] >= outer[0] && inner[2] <= outer[2] && inner[1] >= outer[1] && inner[3] <= outer[3];
+
+function featureHits(f, box) {
+  if (!f?.geometry || !box) return false;
+  let b = bboxes.get(f);
+  if (!b) {
+    b = geomBox(f.geometry);
+    if (b) bboxes.set(f, b);
+  }
+  return !!b && b[0] <= box[2] && b[2] >= box[0] && b[1] <= box[3] && b[3] >= box[1];
+}
 
 /** Đối tượng vẽ sau (nằm trên) chứa điểm [lng, lat] */
 function featureAt(features, lng, lat) {
@@ -958,7 +1032,7 @@ async function setVision(on) {
     const now = qhcHosts('qhc25', !!$('chk_qhc25')?.checked);
     both.forEach(m => { if (!now.includes(m)) clearQhc(m, ['vision']); });
     now.forEach(m => { use(m); drawVision(); });
-    setHint('qhc25Hint', 'toàn đô thị');
+    setHint('qhc25Hint', active?.visionClipped ? 'khung nhìn' : 'toàn đô thị');
   };
   try { paint(); }
   catch (err) {
@@ -1143,7 +1217,17 @@ export function initQhc2045Layer() {
     }
     if (!host._animatingZoom && data.vision && qhcOn(host, 'qhc25', 'chk_qhc25') && !layers.vision) setVision(true);
   };
-  [map, planMap].filter(Boolean).forEach(host => host.on('zoomend', () => onZoom(host)));
+  [map, planMap].filter(Boolean).forEach(host => {
+    host.on('zoomend', () => onZoom(host));
+    host.on('moveend', () => {
+      use(host);
+      if (data.vision && qhcOn(host, 'qhc25', 'chk_qhc25') && layers.vision) {
+        drawVision();
+        setHint('qhc25Hint', active?.visionClipped ? 'khung nhìn' : 'toàn đô thị');
+      }
+      if (data.land && layers.land && host.hasLayer(layers.land) && qhcOn(host, 'qhc10', 'chk_qhc10')) drawLand();
+    });
+  });
   window.addEventListener(LOT_OPACITY_EVENT, restyleLand);
   document.addEventListener(LEVEL_EVENT, () => { if (!isLevelPair() && !placeLots) applyCore(); });
   onSplitPair(() => syncQhc());

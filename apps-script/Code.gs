@@ -9,6 +9,7 @@
 // putBucketPdf khi Vercel chưa ghi được PDF.
 // Tab DXF-NN cũ vẫn xóa cùng đồ án. Ranh tổng đồ án vẫn ở tab DS_DoAn.
 // syncCad = false: chỉ dựng lại infrastructure_hue.json, không dựng lại cad_parcels.json.
+// Sheet 15-DA (dự án kêu gọi đầu tư) không phải điểm hạ tầng: đóng gói mọi cột sang invest_calls.json.
 // Xóa đồ án: doPost action=deleteProject. putBucketObject / deleteBucketObject: ghi file bucket khi Vercel chưa có quyền.
 // Admin sửa / đổi loại / xóa 1 công trình từ bảng thông tin lô: doPost action=editInfraRow / retypeInfraRow / deleteInfraRow.
 // Sau mỗi lần đồng bộ hẹn warmWebappCache (Script Property WEBAPP_URL) để webapp tính sẵn thống kê phường.
@@ -527,6 +528,112 @@ function uploadBytesToGCS(bytes, fileName, contentType) {
   }
 }
 
+function investMapCoords(text) {
+  var s = String(text || '');
+  var patterns = [
+    /(-?\d{1,2}\.\d+)\s*,\s*\+?(-?\d{1,3}\.\d+)/,
+    /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
+    /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/
+  ];
+  for (var i = 0; i < patterns.length; i++) {
+    var m = s.match(patterns[i]);
+    if (!m) continue;
+    var lat = Number(m[1]);
+    var lng = Number(m[2]);
+    if (lat >= 15 && lat <= 18 && lng >= 106 && lng <= 109) return lat + ',' + lng;
+  }
+  return '';
+}
+
+// Link maps.app.goo.gl không có tọa độ. Một lần chuyển hướng ra URL dạng "16.5,+107.6".
+function attachInvestMapPoints(rows) {
+  var key = '';
+  for (var i = 0; i < rows.length && !key; i++) {
+    var names = Object.keys(rows[i]);
+    for (var n = 0; n < names.length; n++) {
+      if (/google|vị trí/i.test(names[n])) { key = names[n]; break; }
+    }
+  }
+  if (!key) return;
+  var cache = CacheService.getScriptCache();
+  var pending = [];
+  for (var r = 0; r < rows.length; r++) {
+    var url = String(rows[r][key] || '');
+    if (!/^https?:\/\//i.test(url)) continue;
+    var hit = '';
+    try { hit = cache.get('inv:' + url) || ''; } catch (e) { hit = ''; }
+    if (hit) {
+      if (hit !== '-') rows[r]._map = hit;
+      continue;
+    }
+    var direct = investMapCoords(url);
+    if (direct) { rows[r]._map = direct; continue; }
+    pending.push({ row: rows[r], url: url });
+  }
+  for (var start = 0; start < pending.length; start += 40) {
+    var slice = pending.slice(start, start + 40);
+    var responses;
+    try {
+      responses = UrlFetchApp.fetchAll(slice.map(function(item) {
+        return { url: item.url, followRedirects: false, muteHttpExceptions: true };
+      }));
+    } catch (err) {
+      continue;
+    }
+    for (var j = 0; j < slice.length; j++) {
+      var point = '';
+      try {
+        var headers = responses[j].getHeaders() || {};
+        var loc = headers.Location || headers.location || '';
+        point = investMapCoords(loc);
+      } catch (e2) { point = ''; }
+      if (point) slice[j].row._map = point;
+      try { cache.put('inv:' + slice[j].url, point || '-', 21600); } catch (e3) {}
+    }
+  }
+}
+
+// Sheet 15-DA: danh sách dự án kêu gọi đầu tư (không có tọa độ điểm). Dòng tiêu đề chứa «TÊN DỰ ÁN».
+function collectInvestCalls(ss) {
+  var sheet = null;
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    var name = String(sheets[i].getName() || '').replace(/\s+/g, ' ').trim();
+    if (name === '15-DA' || name.indexOf('15-DA') === 0) { sheet = sheets[i]; break; }
+  }
+  if (!sheet || sheet.getLastRow() < 2) return null;
+  var data = sheet.getDataRange().getValues();
+  var headerRow = -1;
+  var nameCol = -1;
+  var scan = Math.min(data.length, 40);
+  for (var r = 0; r < scan && headerRow < 0; r++) {
+    for (var c = 0; c < data[r].length; c++) {
+      var head = String(data[r][c] || '').replace(/\s+/g, ' ').trim();
+      if (/tên dự án/i.test(head)) { headerRow = r; nameCol = c; break; }
+    }
+  }
+  if (headerRow < 0) return { headers: [], rows: [] };
+  var headers = data[headerRow].map(function(h) { return String(h || '').replace(/\s+/g, ' ').trim(); });
+  var rows = [];
+  for (var i = headerRow + 1; i < data.length; i++) {
+    var project = String(data[i][nameCol] || '').replace(/\s+/g, ' ').trim();
+    if (!project || /tên dự án/i.test(project)) continue;
+    var fields = {};
+    headers.forEach(function(h, c) {
+      if (!h) return;
+      var v = data[i][c];
+      if (v instanceof Date) v = Utilities.formatDate(v, 'Asia/Ho_Chi_Minh', 'dd/MM/yyyy');
+      else if (typeof v === 'number' && isFinite(v)) v = String(v);
+      else v = String(v == null ? '' : v);
+      v = v.replace(/[ \t\f\v]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim();
+      if (v) fields[h] = v;
+    });
+    if (fields[headers[nameCol]]) rows.push(fields);
+  }
+  attachInvestMapPoints(rows);
+  return { headers: headers.filter(Boolean), rows: rows };
+}
+
 // 1. TỰ ĐỘNG ĐÓNG GÓI GEOJSON VÀ UPLOAD LÊN BUCKET (XỬ LÝ MẢNG IN-MEMORY)
 // includeCad = false: chỉ infrastructure_hue.json (nhập / xóa một đồ án không dựng lại cad_parcels.json)
 function syncSheetsToGCS(includeCad) {
@@ -548,6 +655,8 @@ function syncSheetsToGCS(includeCad) {
         uploadToGCS(JSON.stringify({ "type": "FeatureCollection", "features": cadFeatures }), CAD_FILE_NAME);
       }
     }
+    var investCalls = collectInvestCalls(ss);
+    if (investCalls) uploadToGCS(JSON.stringify(investCalls), "invest_calls.json");
     scheduleWebappWarm();
 
   } catch (err) {

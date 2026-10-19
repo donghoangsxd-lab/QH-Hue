@@ -95,6 +95,13 @@
     <symbol id="i-sk-arrow" viewBox="0 0 24 24"><path d="M4 20 18 6"/><path d="M10 5h9v9" fill="none"/></symbol>
     <symbol id="i-sk-text" viewBox="0 0 24 24"><path d="M5 7V4h14v3M12 4v16M9 20h6"/></symbol>
     <symbol id="i-sk-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity=".15"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><path d="M12 12h8" stroke-dasharray="2 2"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11.2 12 4l8 7.2"/><path d="M6.5 10.2V20h11V10.2"/><path d="M10 20v-5h4v5"/></symbol>
+    <symbol id="i-tour" viewBox="0 0 24 24"><rect x="3.5" y="8" width="17" height="11" rx="1.5"/><path d="M9 8V6.2A1.2 1.2 0 0 1 10.2 5h3.6A1.2 1.2 0 0 1 15 6.2V8M3.5 13h17"/></symbol>
+    <symbol id="i-shop" viewBox="0 0 24 24"><path d="M4 10 6.2 4.5h11.6L20 10"/><path d="M4 10h16v9.5H4z"/><path d="M9.5 19.5v-5h5v5"/><path d="M4 10c1.1 1.3 2.2 1.3 3.3 0S9.5 8.7 10.6 10s2.2 1.3 3.3 0 2.2-1.3 3.3 0 2.1-1.3 3.2 0"/></symbol>
+    <symbol id="i-factory" viewBox="0 0 24 24"><path d="M3 20V9.5l5.2 3.2V9.5L14 13V7.5h2.2l1.6 2.8H21V20z"/><path d="M16.2 7.5V4"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 10-13h-7z"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M9.5 3.5v3.5M12 3.5V7M14.5 3.5V7M9.5 17v3.5M12 17v3.5M14.5 17v3.5M3.5 9.5H7M3.5 12H7M3.5 14.5H7M17 9.5h3.5M17 12h3.5M17 14.5h3.5"/></symbol>
+    <symbol id="i-cross" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/></symbol>
   </svg>
 
   <!-- VÙNG BẢN ĐỒ (co giãn theo panel phải và panel dưới) -->
@@ -397,6 +404,7 @@
         <div class="layer-row"><div><input type="checkbox" id="chk_c9"><label for="chk_c9"><img src="./icons/Unused.png" class="layer-type-icon" alt="" width="14" height="16">12. Cơ sở chưa sử dụng</label></div></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c11"><label for="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Bus.svg" class="layer-type-icon" alt="" width="14" height="16">13. Trạm dừng xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" title="Bật/tắt phạm vi 500 m" aria-label="Bật/tắt phạm vi 500 m" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c14"><label for="chk_c14" title="Dữ liệu tab 14-NOXH. Chỉ thể hiện vị trí và diện tích, không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Noxh.svg" class="layer-type-icon" alt="" width="14" height="16">14. Nhà ở xã hội</label></div></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_invest"><label for="chk_invest" title="Dự án kêu gọi đầu tư, sheet 15-DA. Ranh từ file KML, thông tin từ danh sách. Nhóm sử dụng hạ tầng: không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ"><svg class="ico ico-layer"><use href="#i-coverage"/></svg>15. Dự án kêu gọi đầu tư <small class="layer-hint" id="investHint"></small></label></div></div>
         <div class="layer-status-legend" aria-label="Ghi chú trạng thái điểm">
           <span class="layer-status-title">Ghi chú:</span>
           <span title="Admin đã phê duyệt (TrangThai = TRUE)"><img src="./icons/Park.png" class="legend-icon" alt="">Đã duyệt</span>
@@ -482,7 +490,7 @@
             <span class="road-legend-item" title="Đường dành riêng cho xe đạp: OpenStreetMap + tuyến Admin vẽ bổ sung"><i style="background:repeating-linear-gradient(90deg,#4ade80 0 5px,transparent 5px 8px); height:2px;"></i>Xe đạp</span>
             <span class="road-legend-item"><i style="background:#fde047; height:2px;"></i>Chưa phân loại</span>
           </div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_osmSport"><label for="chk_osmSport" title="Sân, nhà thi đấu, sân vận động, đường chạy, bể bơi, sân gôn, cơ sở tập luyện trên OpenStreetMap (leisure). OSM do cộng đồng vẽ, nhiều sân chưa có. Dùng để chấm tiêu chuẩn thể thao, tách khỏi nhóm văn hóa."><svg class="ico ico-layer"><use href="#i-area"/></svg>Công trình thể thao (OSM)</label></div></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_osmSport"><label for="chk_osmSport" title="Sân, nhà thi đấu, sân vận động, đường chạy, bể bơi, sân gôn, cơ sở tập luyện trên OpenStreetMap (leisure), đã cắt theo ranh 40 phường xã. OSM chưa vẽ đủ. Chỉ để tham khảo, chưa tính điểm phân loại đô thị."><svg class="ico ico-layer"><use href="#i-area"/></svg>Công trình thể thao (OSM)</label></div></div>
           <div class="layer-row"><div><input type="checkbox" id="chk_osmRail"><label for="chk_osmRail" title="Đường sắt và ga đang dùng trên OpenStreetMap (railway=rail, light_rail, subway, tram, station, halt). Không gồm tuyến bỏ, quy hoạch. Huế chưa có đường sắt đô thị trong OSM. Lớp tham chiếu cho tiêu chuẩn giao thông công cộng, chưa tính dân số trong 500 m."><svg class="ico ico-layer"><use href="#i-road"/></svg>Đường sắt (OSM)</label></div></div>
           <div class="layer-row"><div><input type="checkbox" id="chk_osmWater"><label for="chk_osmWater" title="Sông, kênh và bến phà trên OpenStreetMap (waterway=river|canal, amenity=ferry_terminal). Đây là tuyến nước, không phải mạng tàu thủy hành khách. Lớp tham chiếu cho tiêu chuẩn giao thông công cộng."><svg class="ico ico-layer"><use href="#i-stream"/></svg>Đường thủy nội địa (OSM)</label></div></div>
           <div class="flood-box" id="osmOpenBox" style="display:none;">

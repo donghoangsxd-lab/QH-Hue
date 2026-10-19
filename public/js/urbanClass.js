@@ -108,10 +108,10 @@ const STD_2A = [
     method: 'Gồm đại học, cao đẳng, THPT, trung cấp và dạy nghề. Kế thừa mã THPT đã duyệt — cận dưới. Mầm non, tiểu học, THCS là chỉ tiêu đơn vị ở, không cộng vào tiêu chuẩn này.' },
   { code: '2A.III.16', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'culture', inherit: 'QCVN 8-VH', name: 'Công trình văn hóa', unit: 'công trình',
     band: { II: { hi: 20, lo: 10 }, III: { hi: 10, lo: 2 } }, pts: { hi: 5, lo: 3.75 },
-    method: 'Thư viện, bảo tàng, nhà hát, nhà văn hóa, di tích, tượng đài... Kế thừa mã 8-VH đã duyệt — cận dưới. Công trình thể thao chấm riêng ở 2A.III.17 theo OpenStreetMap, không trừ khỏi nhóm này.' },
+    method: 'Thư viện, bảo tàng, nhà hát, nhà văn hóa, di tích, tượng đài... Kế thừa mã 8-VH đã duyệt — cận dưới. Công trình thể thao hiện riêng ở 2A.III.17 để tham khảo, không trừ khỏi nhóm này và chưa tính điểm.' },
   { code: '2A.III.17', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'sports', inherit: 'OSM leisure', name: 'Công trình thể dục, thể thao', unit: 'công trình',
     band: { II: { hi: 10, lo: 5 }, III: { hi: 5, lo: 2 } }, pts: { hi: 4, lo: 3 },
-    method: 'Đếm sân, nhà thi đấu, sân vận động, đường chạy, bể bơi, sân gôn, cơ sở tập luyện trên OpenStreetMap (leisure=pitch, stadium, sports_centre, track, swimming_pool, golf_course, fitness_centre) có điểm đại diện trong phạm vi đô thị. OSM chưa vẽ đủ nên đây là cận dưới.' },
+    method: 'Đếm sân, nhà thi đấu, sân vận động, đường chạy, bể bơi, sân gôn, cơ sở tập luyện trên OpenStreetMap (leisure=pitch, stadium, sports_centre, track, swimming_pool, golf_course, fitness_centre) có điểm đại diện trong phạm vi đô thị, đã cắt theo ranh 40 phường xã. OSM chưa vẽ đủ. Tham khảo, chưa tính điểm.' },
   { code: '2A.III.18', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'commerce', inherit: 'QCVN 9-TM', name: 'Công trình thương mại, dịch vụ', unit: 'công trình',
     band: { II: { hi: 10, lo: 5 }, III: { hi: 5, lo: 2 } }, pts: { hi: 3, lo: 2 },
     method: 'Chợ, siêu thị, trung tâm thương mại cấp đô thị. Kế thừa mã 9-TM đã duyệt.' },
@@ -162,7 +162,7 @@ const STD_I = [
   { code: '1.III.15', group: 'III', name: 'Hoàn thành nông thôn mới theo giai đoạn gần nhất đã được công nhận' }
 ];
 
-const LEVEL_TEXT = { hi: 'Đạt mức tối đa', mid: 'Đạt mức tối thiểu', adj: 'Đạt sau giảm mức tối thiểu', skip: 'Không xem xét', no: 'Chưa đạt', part: 'Một phần, chưa chấm', wait: 'Chờ số liệu', na: 'Chưa tách ranh' };
+const LEVEL_TEXT = { hi: 'Đạt mức tối đa', mid: 'Đạt mức tối thiểu', adj: 'Đạt sau giảm mức tối thiểu', skip: 'Không xem xét', no: 'Chưa đạt', part: 'Một phần, chưa chấm', wait: 'Chờ số liệu', na: 'Chưa tách ranh', ref: 'Tham khảo, chưa tính điểm' };
 
 const bandOf = (std, cls) => (std.band && (std.band.both || std.band[cls])) || null;
 const qualOf = (std, cls) => (std.qual && (std.qual.both || std.qual[cls])) || null;
@@ -283,7 +283,7 @@ function measure(calc, urban, wards, roads) {
     }
     const n = sportsInWards(list.map(w => w.Ten_Phuong));
     if (n == null) return { pending: true, note: 'Chưa gán được công trình thể thao vào phường, xã' };
-    return { value: n, partial: true, note: `${n} công trình thể thao OSM trong phạm vi. ${STD_2A.find(s => s.calc === 'sports').method}` };
+    return { value: n, reference: true, note: `${n} công trình thể thao OSM trong phạm vi. Tham khảo, chưa tính điểm. ${STD_2A.find(s => s.calc === 'sports').method}` };
   }
   if (calc === 'commerce') {
     const n = itemsOf(list, [['urbanResults', 'TM_DT'], ['unitResults', 'TM_DV']]).length;
@@ -316,6 +316,7 @@ function judge(std, urban, m) {
   if (urban.partial) return { level: 'na', pts: null };
   if (!std.calc) return { level: 'wait', pts: null };
   if (!m || m.pending || m.value == null) return { level: 'wait', pts: null };
+  if (m.reference) return { level: 'ref', pts: null };
   if (std.code === '2A.III.13' && urban.cls === 'III' && m.value < 1) return { level: 'wait', pts: null };
   const b = bandOf(std, urban.cls);
   if (!b) return { level: 'wait', pts: null };
@@ -472,7 +473,7 @@ function judgeI(std, facts) {
   return { level: 'wait', text: '—', note: std.method || '' };
 }
 
-const levelCls = (level) => (level === 'hi' ? 'c-green' : (level === 'no' ? 'c-red' : (level === 'skip' || level === 'wait' || level === 'na' ? 'uc-skip' : 'c-orange')));
+const levelCls = (level) => (level === 'hi' ? 'c-green' : (level === 'no' ? 'c-red' : (level === 'skip' || level === 'wait' || level === 'na' || level === 'ref' ? 'uc-skip' : 'c-orange')));
 
 function scopeLabel(urban) {
   if (urban.cls === 'I') return 'Toàn thành phố';
@@ -517,7 +518,7 @@ const LIST_CODES = ['2A.II.03', '2A.III.07', '2A.III.20', '2A.III.22'];
 // Tên ngắn các tiêu chuẩn webapp tính được (khung chi tiết); tên đủ ở chú thích
 const STD_SHORT = {
   '2A.II.03': 'Dân số', '2A.II.04': 'Mật độ dân số', '2A.III.07': 'Mật độ đường', '2A.III.13': 'Nhà tang lễ',
-  '2A.III.15': 'Cơ sở giáo dục, đào tạo', '2A.III.16': 'Công trình văn hóa', '2A.III.17': 'Công trình thể thao (OSM)', '2A.III.18': 'Thương mại, dịch vụ',
+  '2A.III.15': 'Cơ sở giáo dục, đào tạo', '2A.III.16': 'Công trình văn hóa', '2A.III.17': 'Công trình thể thao (tham khảo)', '2A.III.18': 'Thương mại, dịch vụ',
   '2A.III.19': 'Đất dịch vụ công cộng / người', '2A.III.20': 'Khu xanh ≥ 2 ha', '2A.III.22': 'Cây xanh / người'
 };
 let picked = null;
@@ -614,6 +615,7 @@ function sideHtml(urban, wards) {
     let meter = j.level === 'skip' ? '' : '<span></span>';
     let val;
     if (j.level === 'skip') val = '<span class="uc-skip">Không xem xét</span>';
+    else if (m && m.reference && m.value != null) { val = `<b>${fmtNum(m.value)}</b>`; meter = ''; }
     else if (!m || m.pending || m.value == null) val = `<span class="gtx-wait">${ico('clock')}</span>`;
     else {
       val = `<b class="${levelCls(j.level)}">${j.lower ? '≥ ' : ''}${fmtNum(m.value)}</b>`;
@@ -689,11 +691,12 @@ const SHORT_2A = {
   '2A.III.18': 'Công trình thương mại, dịch vụ', '2A.III.19': 'Đất dịch vụ công cộng (m²/người)', '2A.III.20': 'Khu xanh công cộng ≥ 2 ha (khu)',
   '2A.III.21': 'Tỷ lệ không gian xanh (%)', '2A.III.22': 'Cây xanh công cộng (m²/người)', '2A.III.23': 'Quy chế quản lý kiến trúc'
 };
-const LEVEL_SHORT = { hi: 'Tối đa', mid: 'Tối thiểu', adj: 'Tối thiểu (giảm)', skip: 'Không xét', no: 'Chưa đạt', part: 'Một phần', wait: 'Chờ số liệu', na: 'Chưa tách ranh' };
+const LEVEL_SHORT = { hi: 'Tối đa', mid: 'Tối thiểu', adj: 'Tối thiểu (giảm)', skip: 'Không xét', no: 'Chưa đạt', part: 'Một phần', wait: 'Chờ số liệu', na: 'Chưa tách ranh', ref: 'Tham khảo, chưa tính điểm' };
 
 function nowCellHtml(std, urban, m, j) {
   if (urban.partial || !std.calc) return '<td class="uc-val">—</td>';
   if (m && m.pending) return `<td class="uc-val"><span class="gtx-wait">${ico('clock')}</span></td>`;
+  if (m && m.reference && m.value != null) return `<td class="uc-val"><b>${fmtNum(m.value)}</b></td>`;
   if (!m || m.value == null) return '<td class="uc-val">—</td>';
   const meter = j.level === 'skip' ? '' : meterHtml(m.value, bandOf(std, urban.cls).hi, adjustedFloor(std, urban), j.level);
   return `<td class="uc-val"><span class="uc-cell"><b class="${levelCls(j.level)}">${fmtNum(m.value)}</b>${meter}</span></td>`;

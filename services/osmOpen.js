@@ -171,7 +171,10 @@ function collection(elements) {
   return { type: 'FeatureCollection', features };
 }
 
-const QUERY = `[out:json][timeout:80];
+const ATTEMPT_MS = 12000;
+const BUDGET_MS = 48000;
+
+const QUERY = `[out:json][timeout:40];
 (
   node["leisure"~"^(sports_centre|pitch|stadium|track|fitness_centre|swimming_pool|golf_course)$"](${BBOX});
   way["leisure"~"^(sports_centre|pitch|stadium|track|fitness_centre|swimming_pool|golf_course)$"](${BBOX});
@@ -184,10 +187,13 @@ out tags geom;`;
 
 async function fetchOverpass() {
   let last = null;
+  const started = Date.now();
   for (const url of OVERPASS_URLS) {
+    const left = BUDGET_MS - (Date.now() - started);
+    if (left < 2000) break;
     try {
       const res = await axios.post(url, `data=${encodeURIComponent(QUERY)}`, {
-        timeout: 70000,
+        timeout: Math.min(ATTEMPT_MS, left),
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'qh-hue/osm-open' },
         maxContentLength: 25_000_000,
         maxBodyLength: 25_000_000,
@@ -224,4 +230,4 @@ async function loadOsmOpen() {
   return data;
 }
 
-module.exports = { featureOf, collection, loadOsmOpen, haversineKm, LEISURE_VI, RAIL_VI };
+module.exports = { featureOf, collection, loadOsmOpen, haversineKm, LEISURE_VI, RAIL_VI, ATTEMPT_MS, BUDGET_MS, QUERY };
