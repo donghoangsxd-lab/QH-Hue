@@ -4536,6 +4536,9 @@ body.project-review.la-page #projectReviewHost {
     --phone-dock-bottom: max(8px, env(safe-area-inset-bottom));
     --phone-tool-left: calc(max(8px, env(safe-area-inset-left)) + var(--tb-btn) + 12px);
     --phone-fixed-bottom: var(--phone-dock-bottom);
+    /* Panel phải là thẻ góc, không chiếm hết chiều ngang. Dấu để đối chiếu bản production. */
+    --phone-panel-w: min(300px, calc(100vw - var(--phone-tool-left) - 8px));
+    --phone-title-fit: 1;
   }
   body:not(.bottom-collapsed) { --phone-fixed-bottom: calc(var(--bottom-h) + var(--phone-dock-bottom)); }
   body .map-title,
@@ -4543,15 +4546,30 @@ body.project-review.la-page #projectReviewHost {
   body.compare-on .map-title {
     top: max(8px, env(safe-area-inset-top));
     left: 60px;
-    right: 60px;
+    right: auto;
     transform: none;
-    max-width: none;
-    width: auto;
+    width: fit-content;
+    max-width: calc(100vw - 60px - 52px - max(8px, env(safe-area-inset-right)));
     height: var(--title-h);
     gap: 4px;
     padding: 0 4px;
   }
-  .map-title-text { font-size: 13px; letter-spacing: 0; white-space: normal; line-height: 1.15; }
+  /* Panel đang mở: hộp tiêu đề dừng trước panel, không kéo một thanh trống sang phải. */
+  body:not(.right-collapsed) .map-title {
+    max-width: calc(100vw - 60px - var(--phone-panel-w) - 16px);
+  }
+  .map-title-body { flex: 0 1 auto; min-width: 0; }
+  .map-title-text {
+    font-size: 13px;
+    letter-spacing: 0;
+    white-space: nowrap;
+    line-height: 1.15;
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    text-wrap: nowrap;
+    text-overflow: ellipsis;
+  }
   .map-title-level-text { display: none; }
   .map-title-level { min-width: 44px; min-height: 40px; padding: 0 6px; }
   .esc-hint { top: var(--phone-chrome-top); left: max(8px, env(safe-area-inset-left)); height: auto; }
@@ -4579,41 +4597,24 @@ body.project-review.la-page #projectReviewHost {
   body:not(.bottom-collapsed) .map-toolbar { bottom: 8px; }
   .map-toolbar .ui-btn-format { touch-action: manipulation; flex: 0 0 var(--tb-btn); }
   #btnReviewOpen, #reviewPanel, #btnScreenshot, #btnPrintA3, #btnExportBottomPdf { display: none !important; }
+  /* Thẻ góc trên-phải, sát mép. Cao theo nội dung, tối đa phần màn hình còn lại; thân tab cuộn. */
   .right-panel {
-    top: auto;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    height: min(58dvh, 520px);
-    max-height: min(58dvh, 520px);
-    border-radius: 16px 16px 0 0;
-    transform-origin: center bottom;
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    left: auto;
+    bottom: auto;
+    width: var(--phone-panel-w);
+    height: auto;
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
+    border-radius: var(--r-lg);
+    transform-origin: top right;
   }
-  body.right-collapsed .right-panel { transform: translateY(110%); visibility: hidden; }
-  .rp-sheet-handle {
-    display: block;
-    flex: 0 0 auto;
-    align-self: center;
-    width: 64px;
-    height: 28px;
-    margin: 4px 0 0;
-    padding: 0;
-    border: 0;
-    border-radius: 8px;
-    background: transparent;
-    cursor: pointer;
-    touch-action: none;
+  body:not(.bottom-collapsed) .right-panel {
+    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - 8px);
   }
-  .rp-sheet-handle::before {
-    content: '';
-    display: block;
-    width: 40px;
-    height: 4px;
-    margin: 10px auto 0;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.62);
-  }
+  body:not(.right-collapsed).bottom-collapsed .bp-expand-btn { right: calc(var(--phone-panel-w) + 12px); }
+  body.right-collapsed .right-panel { transform: translateX(110%); visibility: hidden; }
+  .rp-sheet-handle { display: none; }
   .rp-collapse-btn {
     display: inline-flex;
     align-items: center;
@@ -4628,11 +4629,18 @@ body.project-review.la-page #projectReviewHost {
   }
   .rp-collapse-btn::after { content: 'Đóng'; font-size: 13px; font-weight: 800; }
   .rp-body { flex: 1 1 auto; min-height: 0; overflow: hidden; }
-  #tabLegend {
+  .rp-progress { padding: 2px 8px; }
+  #tabLegend, #tabAdd {
     height: auto;
     flex: 1 1 auto;
     min-height: 0;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)) - 70px);
+  }
+  body:not(.bottom-collapsed) #tabLegend,
+  body:not(.bottom-collapsed) #tabAdd {
+    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - 78px);
   }
   /* Lớp dữ liệu: một vùng cuộn cho cả danh sách đồ án và bản đồ nền. Bản đồ nền nằm dưới danh sách, không bóp chiều cao danh sách. */
   #tabLayers {
@@ -4644,6 +4652,10 @@ body.project-review.la-page #projectReviewHost {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)) - 70px);
+  }
+  body:not(.bottom-collapsed) #tabLayers {
+    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - 78px);
   }
   #tabLayers .layer-tree,
   #tabLayers .layer-main,
@@ -4659,7 +4671,7 @@ body.project-review.la-page #projectReviewHost {
   }
   #tabLayers .layer-main-pane[hidden],
   #tabLayers .layer-map-pane[hidden] { display: none; }
-  .legend-display { max-height: 46%; flex: 0 1 auto; min-height: 0; overflow: auto; }
+  .legend-display { max-height: none; flex: 0 1 auto; min-height: 0; overflow: visible; }
   .bottom-panel, .bp-body, .bp-part, .bp-part-head { max-width: 100%; }
   .bottom-panel { overflow: hidden; }
   .bp-phone-pager {
@@ -4703,19 +4715,24 @@ body.project-review.la-page #projectReviewHost {
   .bp-title-wrap { max-width: 58%; }
   .bp-part-title { overflow: hidden; text-overflow: ellipsis; }
   .bp-actions { position: sticky; right: 0; background: #1e293b; padding-left: 6px; }
-  .tab-btn, .rp-collapse-btn { min-height: 40px; height: 40px; white-space: nowrap; flex: 0 0 auto; padding: 0 8px; }
+  .tab-btn, .rp-collapse-btn { min-height: 34px; height: 34px; white-space: nowrap; flex: 0 0 auto; padding: 0 6px; }
   .tab-btn span { white-space: nowrap; }
   .rp-tabs { overflow-x: auto; flex-wrap: nowrap; }
-  .layer-row { min-height: 40px; }
   .legend-main .layer-main-tabs { overflow: hidden; flex-wrap: nowrap; }
-  .legend-main .layer-main-tab { flex: 1 1 0; height: 40px; min-height: 40px; min-width: 0; padding: 0 1px; }
+  .legend-main .layer-main-tab { flex: 1 1 0; height: 32px; min-height: 32px; min-width: 0; padding: 0 1px; }
   .legend-main .layer-main-label { flex-direction: row; gap: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; font-size: 11.5px; justify-content: center; }
   .legend-main .layer-main-label small { display: none; }
   #layerMain > .layer-main-tabs { overflow-x: auto; }
-  #layerMain > .layer-main-tabs .layer-main-tab { flex: 0 0 auto; height: 40px; min-height: 40px; }
-  .layer-row { min-height: 44px; }
-  .layer-row input[type="checkbox"] { width: 22px; height: 22px; }
-  .btn-dot-buffer { width: 40px; height: 40px; }
+  #layerMain > .layer-main-tabs .layer-main-tab { flex: 0 0 auto; height: 32px; min-height: 32px; padding: 0 4px; }
+  .layer-map-tab { height: 32px; min-height: 32px; }
+  .layer-main-pane, .layer-map-pane, .tab-body { padding: 2px 6px 4px; }
+  .layer-pane-tools { padding: 2px 0 2px; margin-bottom: 2px; }
+  .pl-hrow { height: 32px; }
+  .pl-body .pg-head { top: 32px; }
+  .pg-head, .project-row, .layer-row { min-height: 34px; }
+  .project-search { height: 32px; margin: 2px 0; }
+  .layer-row input[type="checkbox"], .project-name input { width: 18px; height: 18px; }
+  .btn-dot-buffer { width: 32px; height: 32px; }
   .bottom-panel { border-radius: 16px 16px 0 0; }
   .bp-btn { min-height: 32px; height: auto; padding: 0 8px; }
   .bp-part-head { height: auto; min-height: var(--bp-head-h); }
@@ -4840,7 +4857,8 @@ body.project-review.la-page #projectReviewHost {
     height: min(220px, 40dvh);
   }
   .add-point-form input, .add-point-form select,
-  .project-search, .decision-assign input { height: 40px; font-size: 13px; }
+  .decision-assign input { height: 36px; font-size: 13px; }
+  .project-search { height: 32px; font-size: 13px; }
   .leaflet-top.leaflet-left { top: var(--phone-chrome-top); left: var(--phone-tool-left) !important; }
   .leaflet-control-zoom a { width: 44px !important; height: 44px !important; line-height: 44px !important; font-size: 20px; }
   body.bottom-collapsed .leaflet-bottom.leaflet-right { margin-bottom: 60px; }
@@ -4883,16 +4901,18 @@ body.project-review.la-page #projectReviewHost {
 @media (pointer: coarse) {
   .esc-hint { display: none !important; }
 }
-/* Ngang thấp: một hàng công cụ dưới đáy, panel lớp thành cột phải (không phải ngăn kéo full-width).
+/* Ngang thấp: cột nút trái và panel góc trên-phải (không kéo tiêu đề, không ngăn kéo full-width).
    Bắt buộc kèm điện thoại: rộng ≤840 và thấp, hoặc cảm ứng ≤1200×500. Cửa sổ chuột 1024×473 giữ desktop. */
 @media ((max-width: 840px) and (max-height: 500px)), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
   :root {
     --right-w: min(300px, 36vw);
+    --phone-panel-w: var(--right-w);
     --bottom-h: min(54dvh, 250px);
     --bp-head-h: 36px;
   }
-  body:not(.right-collapsed) .map-title { right: calc(var(--right-w) + 16px); }
-  body.right-collapsed .map-title { right: 60px; }
+  body .map-title,
+  body.right-collapsed .map-title,
+  body.compare-on .map-title { right: auto; }
   .map-toolbar {
     top: var(--phone-chrome-top);
     bottom: 8px;
@@ -4905,18 +4925,21 @@ body.project-review.la-page #projectReviewHost {
     max-height: none;
   }
   body:not(.right-collapsed) .map-toolbar { right: auto; }
-  body:not(.right-collapsed).bottom-collapsed .bp-expand-btn { right: calc(var(--right-w) + 12px); }
-  body:not(.bottom-collapsed) .right-panel { bottom: calc(var(--bottom-h) + 4px); }
+  body:not(.right-collapsed).bottom-collapsed .bp-expand-btn { right: calc(var(--phone-panel-w) + 12px); }
   .right-panel {
-    top: var(--phone-chrome-top);
+    top: max(8px, env(safe-area-inset-top));
     right: max(8px, env(safe-area-inset-right));
-    bottom: max(8px, env(safe-area-inset-bottom));
+    bottom: auto;
     left: auto;
-    width: min(300px, 36vw);
-    max-height: none;
+    width: var(--phone-panel-w);
     height: auto;
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
     border-radius: var(--r-lg);
-    transform-origin: right center;
+    transform-origin: top right;
+  }
+  body:not(.bottom-collapsed) .right-panel {
+    bottom: auto;
+    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - 8px);
   }
   body.right-collapsed .right-panel { transform: translateX(110%); visibility: hidden; opacity: 0; }
   .rp-sheet-handle { display: none; }
@@ -4953,11 +4976,21 @@ body.project-review.la-page #projectReviewHost {
   .bp-title-wrap { max-width: none; flex: 1 1 auto; min-width: 0; }
   .bp-head-stats { flex: 1 1 100%; order: 3; height: 22px; }
 }
-/* Dọc: ngăn kéo phủ đáy màn hình. Khi bảng dưới đang thu, kéo thanh nút lên ngay trên ngăn kéo. */
-@media (max-width: 840px) and (min-height: 501px) {
-  body:not(.right-collapsed).bottom-collapsed .map-toolbar,
-  body:not(.right-collapsed).bottom-collapsed .bp-expand-btn {
-    bottom: calc(min(58dvh, 520px) + 8px);
+/* Dọc hẹp: tiêu đề nằm trên một hàng, panel phải bắt đầu ngay dưới tiêu đề (không kéo full ngang, không phải ngăn kéo đáy). */
+@media (max-width: 700px) {
+  body:not(.right-collapsed) .map-title {
+    max-width: calc(100vw - 68px - max(8px, env(safe-area-inset-right)));
+  }
+  .right-panel {
+    top: calc(max(8px, env(safe-area-inset-top)) + var(--title-h) + 6px);
+  }
+  #tabLayers, #tabLegend, #tabAdd {
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - var(--title-h) - max(8px, env(safe-area-inset-bottom)) - 78px);
+  }
+  body:not(.bottom-collapsed) #tabLayers,
+  body:not(.bottom-collapsed) #tabLegend,
+  body:not(.bottom-collapsed) #tabAdd {
+    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - var(--title-h) - 86px);
   }
 }
 @media print and (max-width: 840px) {
