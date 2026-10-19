@@ -10,7 +10,7 @@ import { escapeHtml, fmtNum, ico, showToast, TOOL_START_EVENT } from './utils.js
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { applyInspectLevel, geometryPoint, inspectLevelSyncing } from './viewFlow.js';
 import { matchInvestDetail, sheetProjectName } from './investMatch.js';
-import { mergeInvestGroups } from './investGroups.js';
+import { editInvestGroups, settleInvestSync } from './investGroups.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace, mountParcelPies, clearParcelPies } from './planLandStats.js';
 import { parcelQhcHtml } from './qhc2045Layer.js';
 import { parcelQhctHtml } from './qhctLayer.js';
@@ -183,20 +183,24 @@ function projectList(features) {
   return out;
 }
 
-function readLocalGroups() {
+function readStore() {
   try {
     const data = JSON.parse(localStorage.getItem(GROUP_STORE) || '{}');
-    return Array.isArray(data.groups) ? data.groups.filter(g => g && Array.isArray(g.keys) && g.keys.length >= 2) : [];
-  } catch { return []; }
+    const list = Array.isArray(data.groups) ? data.groups.filter(g => g && Array.isArray(g.keys) && g.keys.length >= 2) : [];
+    const ops = Array.isArray(data.ops) ? data.ops.filter(op => op && Array.isArray(op.keys) && op.keys.length) : [];
+    return { groups: list, ops };
+  } catch { return { groups: [], ops: [] }; }
 }
 
-function writeLocalGroups(list) {
-  try { localStorage.setItem(GROUP_STORE, JSON.stringify({ groups: list })); } catch { /* bộ nhớ trình duyệt đầy */ }
+function writeStore(list, ops) {
+  try { localStorage.setItem(GROUP_STORE, JSON.stringify({ groups: list, ops: ops || [] })); } catch { /* bộ nhớ trình duyệt đầy */ }
 }
 
 function adoptGroups(server) {
-  groups = mergeInvestGroups(server, readLocalGroups());
-  writeLocalGroups(groups);
+  const store = readStore();
+  const settled = settleInvestSync(server, store.groups, store.ops);
+  groups = settled.groups;
+  writeStore(groups, settled.ops);
 }
 
 function stampGroups() {
@@ -211,13 +215,18 @@ function stampGroups() {
 }
 
 function commitGroups(keys, clear) {
-  const drop = new Set(keys);
-  const next = groups
-    .map(g => ({ id: g.id, keys: g.keys.filter(k => !drop.has(k)), pending: true }))
-    .filter(g => g.keys.length >= 2);
-  if (!clear && keys.length >= 2) next.push({ id: 'g' + Date.now().toString(36), keys: keys.slice(), pending: true });
-  groups = next;
-  writeLocalGroups(groups);
+  const store = readStore();
+  groups = editInvestGroups(groups, keys, clear, 'g' + Date.now().toString(36));
+  const opKeys = [];
+  const seen = new Set();
+  keys.forEach(k => {
+    const key = String(k || '').trim();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    opKeys.push(key);
+  });
+  const ops = opKeys.length ? store.ops.concat([{ keys: opKeys, clear: !!clear }]) : store.ops;
+  writeStore(groups, ops);
   stampGroups();
 }
 
@@ -411,6 +420,7 @@ async function loadPack() {
       });
       pack = features;
       adoptGroups(loaded.groups);
+      if (isAdmin()) await flushPending();
       stampGroups();
       refreshHint();
       return features;
@@ -930,13 +940,35 @@ async function postGroup(keys, clear) {
     const data = await res.json().catch(() => ({}));
     if (res.status === 401 || res.status === 403) signOutAdmin();
     if (!res.ok || !data.success) return false;
+    const store = readStore();
     if (Array.isArray(data.groups)) {
-      groups = data.groups;
-      writeLocalGroups(groups);
+      const settled = settleInvestSync(data.groups, groups, store.ops);
+      groups = settled.groups;
+      writeStore(groups, settled.ops);
       stampGroups();
+    } else {
+      writeStore(groups, store.ops.slice(1));
     }
     return true;
   } catch { return false; }
+}
+
+let flushing = false;
+async function flushPending() {
+  if (!isAdmin() || flushing) return;
+  flushing = true;
+  try {
+    for (let i = 0; i < 20 && isAdmin(); i++) {
+      const before = readStore().ops;
+      if (!before.length) return;
+      const op = before[0];
+      const ok = await postGroup(op.keys, !!op.clear);
+      if (!ok) return;
+      const after = readStore().ops;
+      const same = after.length === before.length && after[0] && op.keys.join('\0') === after[0].keys.join('\0') && !!after[0].clear === !!op.clear;
+      if (same) writeStore(groups, after.slice(1));
+    }
+  } finally { flushing = false; }
 }
 
 async function finishGroup(keys, clear, feature, host, okText, failText) {
@@ -1024,6 +1056,7 @@ export function initInvestLayer() {
   if (!map) return;
   document.addEventListener('qh-dock-card', (e) => { if (e.detail !== 'invest') closeCard(); });
   document.addEventListener('auth:change', () => {
+    if (ready) void flushPending();
     const el = $('investCard');
     if (!el || el.hidden || !card) return;
     if (!isAdmin()) card.grouping = false;

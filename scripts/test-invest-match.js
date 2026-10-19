@@ -2,8 +2,8 @@
 const assert = require('assert');
 
 (async () => {
-  const { investNameScore, matchInvestDetail } = await import('../public/js/investMatch.js');
-  const { mergeInvestGroups } = await import('../public/js/investGroups.js');
+  const { investNameScore, matchInvestDetail, foldInvestName } = await import('../public/js/investMatch.js');
+  const { mergeInvestGroups, editInvestGroups, settleInvestSync } = await import('../public/js/investGroups.js');
 
   const thanhSheet = 'DA khu đô thị Thanh Toàn';
   const thanhBoundary = 'Dự án Khu đô thị sinh thái Thanh Toàn';
@@ -33,6 +33,15 @@ const assert = require('assert');
   assert.ok(investNameScore('ĐMT Điền Hương 95MW (phường Phong Phú)', 'Nhà máy điện mặt trời Điền Hương') >= 0.68);
   assert.ok(investNameScore('Khu đô thị phía Bắc 1', 'Khu đô thị phía Bắc 1, phường Hương An và Phường Kim Trà, thành phố Huế') >= 0.68);
   assert.ok(investNameScore('Chợ Tứ Hạ', 'Dự án đầu tư nâng cấp, mở rộng chợ Tứ Hạ') >= 0.68);
+  assert.ok(investNameScore('05. DA khu đô thị Thanh Toàn', thanhBoundary) >= 0.68, 'mã số đầu 05. phải được gỡ');
+  assert.ok(investNameScore('1. Khu đô thị Thanh Toàn', 'Dự án khu đô thị Thanh Toàn') >= 0.68, 'mã 1. đầu tên phải được gỡ');
+  assert.ok(investNameScore('A51. Khu đô thị Thanh Toàn', thanhBoundary) >= 0.68, 'mã A51. vẫn được gỡ');
+  assert.strictEqual(investNameScore('05. Khu du lịch Phú Vinh 1', '06. Khu du lịch Phú Vinh 2'), 0, 'gỡ mã đầu nhưng giữ số giai đoạn');
+  assert.ok(investNameScore('05. Khu du lịch Phú Vinh 1', '6. Khu du lịch Phú Vinh 1') >= 0.68);
+  assert.match(foldInvestName('Khu du lịch Phú Vinh 1'), /\b1\b/);
+  assert.match(foldInvestName('1. Khu du lịch Phú Vinh 2'), /\b2\b/);
+  assert.doesNotMatch(foldInvestName('1. Khu du lịch Phú Vinh 2'), /^1\b/);
+  assert.doesNotMatch(foldInvestName('05. DA khu đô thị Thanh Toàn'), /^0*5\b/);
 
   const longSheet = 'Khu đô thị sinh thái Thanh Toàn (Dự án Khu đô thị phía Bắc Tố Hữu – Sân bay)';
   const longBoundary = 'Dự án Khu đô thị sinh thái Thanh Toàn (Dự án Khu đô thị phía Bắc Tố Hữu - Sân Bay)';
@@ -76,6 +85,62 @@ const assert = require('assert');
   assert.deepStrictEqual(ids(mergeInvestGroups([cd], [{ ...ab, pending: true }])), ['c,d', 'a,b']);
   assert.deepStrictEqual(ids(mergeInvestGroups([ab], [{ ...ab, pending: true }])), ['a,b']);
   assert.deepStrictEqual(ids(mergeInvestGroups([], [{ keys: ['a', 'b'] }])), []);
+
+  const untouched = { id: 'cd', keys: ['c', 'd'] };
+  const pendingSibling = { id: 'ef', keys: ['e', 'f'], pending: true };
+  const created = editInvestGroups([untouched, pendingSibling], ['a', 'b'], false, 'g-new');
+  assert.strictEqual(created.find(g => g.id === 'cd').pending, undefined, 'nhóm không sửa không thành pending');
+  assert.strictEqual(created.find(g => g.id === 'ef').pending, true, 'nhóm pending cũ giữ cờ');
+  assert.deepStrictEqual(created.find(g => g.id === 'g-new').keys, ['a', 'b']);
+  assert.strictEqual(created.find(g => g.id === 'g-new').pending, true);
+
+  const split = editInvestGroups(
+    [untouched, { id: 'abx', keys: ['a', 'b', 'x'] }],
+    ['x'],
+    true
+  );
+  assert.strictEqual(split.find(g => g.id === 'cd').pending, undefined);
+  assert.deepStrictEqual(split.find(g => g.id === 'abx').keys, ['a', 'b']);
+  assert.strictEqual(split.find(g => g.id === 'abx').pending, true, 'chỉ nhóm vừa bị tách là pending');
+  assert.strictEqual(split.some(g => g.keys.includes('x')), false);
+
+  const dropped = editInvestGroups([untouched, { id: 'ab', keys: ['a', 'b'] }], ['a', 'b'], true);
+  assert.deepStrictEqual(dropped.map(g => g.id), ['cd']);
+  assert.strictEqual(dropped[0].pending, undefined);
+
+  const serverKept = [{ id: 'srv', keys: ['a', 'b'] }];
+  const saved = settleInvestSync(
+    serverKept,
+    [{ id: 'ab', keys: ['a', 'b'], pending: true }, untouched],
+    [{ keys: ['a', 'b'], clear: false }]
+  );
+  assert.deepStrictEqual(ids(saved.groups), ['a,b']);
+  assert.strictEqual(saved.groups[0].pending, undefined, 'ghi server xong thì hết pending');
+  assert.deepStrictEqual(saved.ops, []);
+
+  const otherDeleted = settleInvestSync(
+    [],
+    [untouched, { id: 'ab', keys: ['a', 'b'], pending: true }],
+    [{ keys: ['a', 'b'], clear: false }]
+  );
+  assert.deepStrictEqual(ids(otherDeleted.groups), ['a,b'], 'server xóa nhóm không pending; nhóm pending còn lệnh thì giữ');
+  assert.strictEqual(otherDeleted.groups[0].pending, true);
+  assert.strictEqual(otherDeleted.ops.length, 1);
+
+  const stalePending = settleInvestSync(
+    [],
+    [{ id: 'cd', keys: ['c', 'd'], pending: true }],
+    []
+  );
+  assert.deepStrictEqual(stalePending.groups, [], 'pending không kèm lệnh (bản cũ) không sống lại sau khi server đã xóa');
+
+  const clearLeft = settleInvestSync(
+    [{ id: 'abx', keys: ['a', 'b', 'x'] }],
+    [{ id: 'ab', keys: ['a', 'b'], pending: true }],
+    [{ keys: ['x'], clear: true }]
+  );
+  assert.strictEqual(clearLeft.ops.length, 1, 'tách chưa lên server thì còn lệnh gỡ');
+  assert.deepStrictEqual(clearLeft.ops[0].keys, ['x']);
 
   console.log('test-invest-match: ok');
 })().catch((err) => {

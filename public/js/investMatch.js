@@ -21,7 +21,8 @@ export function foldInvestName(value) {
   const cut = s.search(/\bthuoc\b/);
   if (cut >= 0) s = s.slice(0, cut);
   s = s.replace(/,\s*(?:phuong|xa|thi xa|thi tran|huyen|thanh pho|tp)\b.*$/, ' ');
-  s = s.replace(/^[a-z]{1,3}\d{1,3}[a-z]?[.\-:\s]+/, '');
+  // Mã đầu tờ (A51. / 05. / 1.). Số giai đoạn đứng sau tên (Phú Vinh 1) không nằm ở đầu chuỗi nên giữ.
+  s = s.replace(/^[a-z]{0,3}\d{1,3}[a-z]?[.\-:\s]+/, '');
   s = s
     .replace(/\bccn\b/g, 'cum cong nghiep')
     .replace(/\bhtkt\b/g, 'ha tang ky thuat')
