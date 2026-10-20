@@ -304,6 +304,37 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
 .project-brief[hidden] { display: none; }
 #mapArea.print-staging .project-brief { display: none; }
 .project-brief-head { display: flex; align-items: flex-start; gap: 4px; }
+.project-brief-peers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 0;
+  margin-top: 4px;
+}
+.project-brief-peer {
+  margin: 0;
+  padding: 1px 5px;
+  border: 1px solid transparent;
+  border-radius: 99px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  line-height: 1.35;
+  cursor: pointer;
+}
+.project-brief-peer.is-on {
+  border-color: rgba(var(--brief), 0.45);
+  background: rgba(var(--brief), 0.16);
+  color: rgb(var(--brief));
+}
+.project-brief-peer:hover { color: var(--text-strong); }
+.project-brief-peer-sep {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  padding: 0 1px;
+}
 .project-brief-level {
   display: inline-flex;
   align-items: center;

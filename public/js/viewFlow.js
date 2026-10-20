@@ -116,7 +116,7 @@ const PROJECT_KIND = { qhpk: 'QHPK', qhct: 'QHCT' };
 
 /**
  * Tab cấp quy hoạch trên bảng kiểm tra: bật đúng lớp, tắt các lớp quy hoạch khác, giữ khung nhìn.
- * QHPK / QHCT: hình giao từ 2 đồ án trở lên thì mở hết các đồ án đó, còn lại mở đồ án nhỏ nhất chứa điểm.
+ * QHPK / QHCT: lô của mọi đồ án giao vùng; thẻ và lỗ phủ tối theo cấp của tab.
  * QHC 1/10.000 và 1/25.000 vẽ lô / vùng tại khung nhìn.
  */
 export function applyInspectLevel(id, latlng, geom) {

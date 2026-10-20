@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { PLAN_LEVELS, planLevelOf } from './generalPlan.js';
 import { PROJECT_INFO_EVENT } from './projectFiles.js';
-import { PROJECT_UNFOCUS_EVENT } from './projectLayer.js';
+import { PROJECT_UNFOCUS_EVENT, inspectPeers, selectInspectPeer } from './projectLayer.js';
 import { projectPopulation, PROJECT_POP_EVENT } from './projectReview.js';
 import { adjustmentsOf, adjustmentsKnown, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { escapeHtml, fmtNum, fmtPct } from './utils.js';
@@ -145,6 +145,16 @@ function shareLabel(share) {
   return `${ha(share.used)} ha · ${fmtPct(share.pct)}`;
 }
 
+function peerBar(name) {
+  const peers = inspectPeers();
+  if (peers.length < 2 || !peers.some(p => p.name === name)) return '';
+  return `<div class="project-brief-peers">${peers.map(p => {
+    const on = p.name === name;
+    const label = `${p.level} ${p.short || p.name}`;
+    return `<button type="button" class="project-brief-peer${on ? ' is-on' : ''}" data-brief-peer="${escapeHtml(p.name)}" aria-pressed="${on ? 'true' : 'false'}">${escapeHtml(label)}</button>`;
+  }).join('<span class="project-brief-peer-sep" aria-hidden="true">·</span>')}</div>`;
+}
+
 function render(card) {
   const el = document.getElementById('projectBrief');
   if (!el) return;
@@ -166,6 +176,7 @@ function render(card) {
       <h2 class="project-brief-name"><span class="project-brief-level">${escapeHtml(level ? level.label : card.level)}</span>${escapeHtml(card.name)}</h2>
       <button type="button" class="project-brief-close" data-brief-close aria-label="Ẩn bảng thông tin">×</button>
     </div>
+    ${peerBar(card.name)}
     <div class="project-brief-hero"><span>Diện tích quy hoạch</span><strong>${area}</strong></div>
     <div class="project-brief-pops"><span>Hiện trạng <b>${peopleHtml(card.pop.ht)}</b></span><span>Quy hoạch <b>${peopleHtml(card.pop.qh)}</b></span></div>
     <div class="project-brief-meters">${list.join('')}</div>`;
@@ -218,7 +229,11 @@ export function initProjectBrief() {
   el.setAttribute('role', 'region');
   el.setAttribute('aria-label', 'Thông tin đồ án quy hoạch');
   host.appendChild(el);
-  el.addEventListener('click', (e) => { if (e.target.closest('[data-brief-close]')) hide(); });
+  el.addEventListener('click', (e) => {
+    if (e.target.closest('[data-brief-close]')) { hide(); return; }
+    const peer = e.target.closest('[data-brief-peer]');
+    if (peer && !peer.classList.contains('is-on')) selectInspectPeer(peer.getAttribute('data-brief-peer'));
+  });
   document.addEventListener(PROJECT_INFO_EVENT, (e) => show(e.detail));
   document.addEventListener(PROJECT_UNFOCUS_EVENT, hide);
   document.addEventListener(ADJUST_CHANGE_EVENT, () => { if (openName) show(openName); });
