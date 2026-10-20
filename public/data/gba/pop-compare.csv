@@ -1,0 +1,534 @@
+﻿phuong,chi_tieu,ma,cu,A,B,lech_A,pct_A,lech_B,pct_B,vuot_15_A,vuot_15_B
+Thành phố Huế,Dân số phường (khống chế),dan_so,1452683.0000,1452683.0000,1452683.0000,0.0000,0.0000,0.0000,0.0000,,
+Thành phố Huế,Dân trong vùng phục vụ trường (công trình cùng phường),truong,836133.7771,1228490.5194,1240217.5577,392356.7423,46.9251,404083.7807,48.3276,có,có
+Thành phố Huế,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,264846.4685,352291.1407,365688.4599,87444.6723,33.0171,100841.9914,38.0756,có,có
+Thành phố Huế,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,146880.2034,160728.5083,171567.1685,13848.3049,9.4283,24686.9652,16.8076,,có
+Thành phố Huế,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,890236.8127,1285853.5302,1296045.3468,395616.7175,44.4395,405808.5340,45.5843,có,có
+Thành phố Huế,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,312220.7829,448078.3103,467567.4117,135857.5275,43.5133,155346.6288,49.7554,có,có
+Thành phố Huế,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,167694.0810,198938.8679,211145.3280,31244.7869,18.6320,43451.2470,25.9110,có,có
+Thành phố Huế,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,471222.7986,313486.6211,290009.1091,-157736.1775,-33.4738,-181213.6895,-38.4561,có,có
+Thành phố Huế,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,237108.8375,17619.9095,13549.9406,-219488.9280,-92.5689,-223558.8969,-94.2853,có,có
+Thành phố Huế,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,657365.0354,1452683.0000,1452683.0000,795317.9646,120.9857,795317.9646,120.9857,có,có
+Thành phố Huế,Dân nằm trên lô quy hoạch đất ở,lo_o,236267.5649,852369.4230,881409.6508,616101.8582,260.7645,645142.0860,273.0557,có,có
+Thành phố Huế,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,736532.2000,,,,,,,,
+Thành phố Huế,Dịch tâm dân so với cách chia pixel (m),dich_tam,,1748.4213,1747.9181,1748.4213,,1747.9181,,có,có
+Phường An Cựu,Dân số phường (khống chế),dan_so,55305.0000,55305.0000,55305.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường An Cựu,Dân trong vùng phục vụ trường (công trình cùng phường),truong,22945.3995,41638.0857,42812.5053,18692.6862,81.4659,19867.1058,86.5843,có,có
+Phường An Cựu,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường An Cựu,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,2058.4988,2616.3300,3373.2656,557.8312,27.0989,1314.7668,63.8702,có,có
+Phường An Cựu,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,28764.0893,43140.9255,43745.9872,14376.8362,49.9819,14981.8979,52.0854,có,có
+Phường An Cựu,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,15562.2506,33104.6341,33806.2401,17542.3835,112.7239,18243.9894,117.2323,có,có
+Phường An Cựu,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,6422.5161,18887.1746,19510.0451,12464.6584,194.0775,13087.5290,203.7757,có,có
+Phường An Cựu,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,11802.0596,8109.3830,8753.1612,-3692.6766,-31.2884,-3048.8984,-25.8336,có,có
+Phường An Cựu,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,4720.8238,433.9884,345.6308,-4286.8354,-90.8069,-4375.1930,-92.6786,có,có
+Phường An Cựu,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,36751.0645,55305.0000,55305.0000,18553.9355,50.4854,18553.9355,50.4854,có,có
+Phường An Cựu,Dân nằm trên lô quy hoạch đất ở,lo_o,15370.1241,43850.1865,46557.0138,28480.0625,185.2949,31186.8897,202.9059,có,có
+Phường An Cựu,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,21325.6000,,,,,,,,
+Phường An Cựu,Dịch tâm dân so với cách chia pixel (m),dich_tam,,1018.6311,1055.0155,1018.6311,,1055.0155,,có,có
+Phường Dương Nỗ,Dân số phường (khống chế),dan_so,31692.0000,31692.0000,31692.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Dương Nỗ,Dân trong vùng phục vụ trường (công trình cùng phường),truong,28186.9907,29840.8982,30424.2032,1653.9074,5.8676,2237.2125,7.9370,,
+Phường Dương Nỗ,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Dương Nỗ,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Dương Nỗ,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,28900.5854,30202.1878,30635.8978,1301.6023,4.5037,1735.3124,6.0044,,
+Phường Dương Nỗ,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,20.9881,0.0000,0.0000,-20.9881,-100.0000,-20.9881,-100.0000,,
+Phường Dương Nỗ,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Dương Nỗ,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,29446.2755,24044.0266,23150.8618,-5402.2489,-18.3461,-6295.4137,-21.3793,có,có
+Phường Dương Nỗ,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,14712.6437,588.6179,391.4396,-14124.0258,-95.9992,-14321.2042,-97.3394,có,có
+Phường Dương Nỗ,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,17588.0106,31692.0000,31692.0000,14103.9894,80.1909,14103.9894,80.1909,có,có
+Phường Dương Nỗ,Dân nằm trên lô quy hoạch đất ở,lo_o,8269.3033,27322.0195,28113.0170,19052.7162,230.4029,19843.7137,239.9684,có,có
+Phường Dương Nỗ,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,31692.0000,,,,,,,,
+Phường Dương Nỗ,Dịch tâm dân so với cách chia pixel (m),dich_tam,,110.7094,231.8244,110.7094,,231.8244,,,
+Phường Hóa Châu,Dân số phường (khống chế),dan_so,41328.0000,41328.0000,41328.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Hóa Châu,Dân trong vùng phục vụ trường (công trình cùng phường),truong,32514.1714,36991.4185,37776.9659,4477.2471,13.7701,5262.7944,16.1862,,có
+Phường Hóa Châu,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Hóa Châu,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Hóa Châu,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,35845.7143,40061.0887,40721.8570,4215.3745,11.7598,4876.1427,13.6031,,
+Phường Hóa Châu,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,2298.3429,4671.2373,5868.5672,2372.8944,103.2437,3570.2244,155.3391,có,có
+Phường Hóa Châu,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,210.8571,0.0000,0.0000,-210.8571,-100.0000,-210.8571,-100.0000,có,có
+Phường Hóa Châu,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,39852.0000,34686.6759,33549.0243,-5165.3241,-12.9613,-6302.9757,-15.8160,,có
+Phường Hóa Châu,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,26842.1143,1962.1189,1404.6492,-24879.9954,-92.6901,-25437.4651,-94.7670,có,có
+Phường Hóa Châu,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,21085.7143,41328.0000,41328.0000,20242.2857,96.0000,20242.2857,96.0000,có,có
+Phường Hóa Châu,Dân nằm trên lô quy hoạch đất ở,lo_o,5629.8857,21346.2596,23931.3748,15716.3739,279.1597,18301.4891,325.0775,có,có
+Phường Hóa Châu,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,41328.0000,,,,,,,,
+Phường Hóa Châu,Dịch tâm dân so với cách chia pixel (m),dich_tam,,379.6156,686.8860,379.6156,,686.8860,,,có
+Phường Hương An,Dân số phường (khống chế),dan_so,35885.0000,35885.0000,35885.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Hương An,Dân trong vùng phục vụ trường (công trình cùng phường),truong,14307.2950,22797.9306,24581.5715,8490.6356,59.3448,10274.2765,71.8115,có,có
+Phường Hương An,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,2335.2495,5693.0883,8211.8791,3357.8389,143.7893,5876.6296,251.6489,có,có
+Phường Hương An,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,3284.9176,8001.4427,8228.7981,4716.5252,143.5812,4943.8805,150.5024,có,có
+Phường Hương An,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,16471.2928,28702.0320,30467.9983,12230.7391,74.2549,13996.7054,84.9764,có,có
+Phường Hương An,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,8469.1714,20724.0351,23391.0049,12254.8637,144.6997,14921.8335,176.1900,có,có
+Phường Hương An,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,3284.9176,8001.4427,8228.7981,4716.5252,143.5812,4943.8805,150.5024,có,có
+Phường Hương An,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,21032.8134,12155.6281,11983.4272,-8877.1853,-42.2064,-9049.3862,-43.0251,có,có
+Phường Hương An,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,5635.7354,2061.1069,983.2562,-3574.6285,-63.4279,-4652.4792,-82.5532,có,có
+Phường Hương An,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,14447.4100,35885.0000,35885.0000,21437.5900,148.3836,21437.5900,148.3836,có,có
+Phường Hương An,Dân nằm trên lô quy hoạch đất ở,lo_o,8982.9262,31338.6288,32041.6068,22355.7026,248.8688,23058.6805,256.6945,có,có
+Phường Hương An,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,28959.4000,,,,,,,,
+Phường Hương An,Dịch tâm dân so với cách chia pixel (m),dich_tam,,1766.2087,1987.2894,1766.2087,,1987.2894,,có,có
+Phường Hương Thủy,Dân số phường (khống chế),dan_so,29192.0000,29192.0000,29192.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Hương Thủy,Dân trong vùng phục vụ trường (công trình cùng phường),truong,11651.2397,21068.8566,21814.3482,9417.6169,80.8293,10163.1085,87.2277,có,có
+Phường Hương Thủy,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,2236.5268,3012.8912,3302.6920,776.3644,34.7129,1066.1651,47.6706,có,có
+Phường Hương Thủy,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Hương Thủy,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,15602.4371,25568.7554,25849.2472,9966.3183,63.8767,10246.8102,65.6744,có,có
+Phường Hương Thủy,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,2406.9289,3220.8779,3449.5451,813.9490,33.8169,1042.6162,43.3173,có,có
+Phường Hương Thủy,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Hương Thủy,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,8615.9533,5802.2453,5120.8455,-2813.7080,-32.6570,-3495.1078,-40.5655,có,có
+Phường Hương Thủy,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,4153.5498,171.0545,115.1860,-3982.4953,-95.8817,-4038.3638,-97.2268,có,có
+Phường Hương Thủy,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,12790.8034,29192.0000,29192.0000,16401.1966,128.2265,16401.1966,128.2265,có,có
+Phường Hương Thủy,Dân nằm trên lô quy hoạch đất ở,lo_o,6624.3794,26855.5515,27125.0071,20231.1720,305.4048,20500.6277,309.4724,có,có
+Phường Hương Thủy,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,14557.7000,,,,,,,,
+Phường Hương Thủy,Dịch tâm dân so với cách chia pixel (m),dich_tam,,1650.4126,1593.6007,1650.4126,,1593.6007,,có,có
+Phường Hương Trà,Dân số phường (khống chế),dan_so,33523.0000,33523.0000,33523.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Hương Trà,Dân trong vùng phục vụ trường (công trình cùng phường),truong,6110.4021,23558.2771,23657.3653,17447.8750,285.5438,17546.9632,287.1654,có,có
+Phường Hương Trà,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,3867.0020,12409.6437,13366.5876,8542.6417,220.9112,9499.5856,245.6576,có,có
+Phường Hương Trà,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Hương Trà,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,6895.2553,25151.6733,25140.7224,18256.4180,264.7678,18245.4671,264.6090,có,có
+Phường Hương Trà,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,3974.7930,12896.2292,14017.8845,8921.4362,224.4503,10043.0915,252.6695,có,có
+Phường Hương Trà,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Hương Trà,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,2775.6182,752.1515,517.5020,-2023.4666,-72.9015,-2258.1162,-81.3554,có,có
+Phường Hương Trà,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,454.7433,10.2800,6.8121,-444.4633,-97.7394,-447.9312,-98.5020,có,có
+Phường Hương Trà,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,7134.4166,33523.0000,33523.0000,26388.5834,369.8772,26388.5834,369.8772,có,có
+Phường Hương Trà,Dân nằm trên lô quy hoạch đất ở,lo_o,2199.6100,17463.9650,16742.9187,15264.3550,693.9573,14543.3087,661.1767,có,có
+Phường Hương Trà,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,4643.6000,,,,,,,,
+Phường Hương Trà,Dịch tâm dân so với cách chia pixel (m),dich_tam,,7696.4496,7624.9461,7696.4496,,7624.9461,,có,có
+Phường Kim Long,Dân số phường (khống chế),dan_so,48999.0000,48999.0000,48999.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Kim Long,Dân trong vùng phục vụ trường (công trình cùng phường),truong,8405.0548,37532.1379,38188.9984,29127.0831,346.5425,29783.9436,354.3575,có,có
+Phường Kim Long,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,3105.0230,24070.5336,25215.6720,20965.5107,675.2127,22110.6490,712.0929,có,có
+Phường Kim Long,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Kim Long,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,12022.2465,38994.3032,39691.0532,26972.0567,224.3512,27668.8068,230.1467,có,có
+Phường Kim Long,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,3169.0441,24070.5336,25215.6720,20901.4896,659.5519,22046.6279,695.6870,có,có
+Phường Kim Long,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,182.9174,1357.5866,1869.6969,1174.6692,642.1856,1686.7795,922.1536,có,có
+Phường Kim Long,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,5656.7208,1069.0268,1135.1266,-4587.6939,-81.1017,-4521.5942,-79.9331,có,có
+Phường Kim Long,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,1248.4113,63.9092,51.9213,-1184.5021,-94.8808,-1196.4900,-95.8410,có,có
+Phường Kim Long,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,8876.0671,48999.0000,48999.0000,40122.9329,452.0350,40122.9329,452.0350,có,có
+Phường Kim Long,Dân nằm trên lô quy hoạch đất ở,lo_o,4627.8104,40384.8127,41426.3467,35757.0024,772.6549,36798.5363,795.1609,có,có
+Phường Kim Long,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,13309.2000,,,,,,,,
+Phường Kim Long,Dịch tâm dân so với cách chia pixel (m),dich_tam,,4676.2957,4702.4845,4676.2957,,4702.4845,,có,có
+Phường Kim Trà,Dân số phường (khống chế),dan_so,36296.0000,36296.0000,36296.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Kim Trà,Dân trong vùng phục vụ trường (công trình cùng phường),truong,16911.0560,22492.4467,21412.0550,5581.3907,33.0044,4500.9991,26.6157,có,có
+Phường Kim Trà,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Kim Trà,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Kim Trà,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,21068.6649,30357.9814,29940.6955,9289.3165,44.0907,8872.0306,42.1101,có,có
+Phường Kim Trà,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Kim Trà,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Kim Trà,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,20020.0317,10457.7662,9505.3499,-9562.2656,-47.7635,-10514.6818,-52.5208,có,có
+Phường Kim Trà,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,5708.4045,128.5011,115.8468,-5579.9034,-97.7489,-5592.5577,-97.9706,có,có
+Phường Kim Trà,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,11461.1174,36296.0000,36296.0000,24834.8826,216.6881,24834.8826,216.6881,có,có
+Phường Kim Trà,Dân nằm trên lô quy hoạch đất ở,lo_o,6505.9565,32177.6200,32494.4165,25671.6635,394.5871,25988.4601,399.4564,có,có
+Phường Kim Trà,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,25946.8000,,,,,,,,
+Phường Kim Trà,Dịch tâm dân so với cách chia pixel (m),dich_tam,,1849.0024,1722.2278,1849.0024,,1722.2278,,có,có
+Phường Mỹ Thượng,Dân số phường (khống chế),dan_so,44736.0000,44736.0000,44736.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Mỹ Thượng,Dân trong vùng phục vụ trường (công trình cùng phường),truong,30246.8776,40565.3754,41015.9444,10318.4978,34.1143,10769.0668,35.6039,có,có
+Phường Mỹ Thượng,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Mỹ Thượng,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Mỹ Thượng,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,37747.3910,42083.2288,42457.5875,4335.8378,11.4865,4710.1965,12.4782,,
+Phường Mỹ Thượng,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,2292.4418,6490.0632,7433.6892,4197.6215,183.1070,5141.2475,224.2695,có,có
+Phường Mỹ Thượng,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Mỹ Thượng,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,39505.6716,27527.7094,26358.0949,-11977.9622,-30.3196,-13147.5767,-33.2802,có,có
+Phường Mỹ Thượng,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,23770.1731,1519.8375,1282.8810,-22250.3356,-93.6061,-22487.2921,-94.6030,có,có
+Phường Mỹ Thượng,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,24259.8209,44736.0000,44736.0000,20476.1791,84.4037,20476.1791,84.4037,có,có
+Phường Mỹ Thượng,Dân nằm trên lô quy hoạch đất ở,lo_o,9614.9015,25930.4912,27333.4651,16315.5897,169.6907,17718.5636,184.2823,có,có
+Phường Mỹ Thượng,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,44644.3000,,,,,,,,
+Phường Mỹ Thượng,Dịch tâm dân so với cách chia pixel (m),dich_tam,,1178.8488,1327.4435,1178.8488,,1327.4435,,có,có
+Phường Phong Dinh,Dân số phường (khống chế),dan_so,28012.0000,28012.0000,28012.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Dinh,Dân trong vùng phục vụ trường (công trình cùng phường),truong,6026.8699,16434.1725,14932.8227,10407.3026,172.6817,8905.9528,147.7708,có,có
+Phường Phong Dinh,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Dinh,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Dinh,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,6135.2451,16512.1105,15050.6264,10376.8654,169.1353,8915.3812,145.3142,có,có
+Phường Phong Dinh,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Dinh,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Dinh,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,10370.9124,11559.0149,10637.6694,1188.1025,11.4561,266.7570,2.5722,,
+Phường Phong Dinh,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,3549.2905,236.5016,169.1524,-3312.7889,-93.3367,-3380.1381,-95.2342,có,có
+Phường Phong Dinh,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,5948.5988,28012.0000,28012.0000,22063.4012,370.9008,22063.4012,370.9008,có,có
+Phường Phong Dinh,Dân nằm trên lô quy hoạch đất ở,lo_o,4657.1267,25324.4820,25687.5314,20667.3553,443.7791,21030.4047,451.5747,có,có
+Phường Phong Dinh,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,22495.5000,,,,,,,,
+Phường Phong Dinh,Dịch tâm dân so với cách chia pixel (m),dich_tam,,2305.3126,1977.7705,2305.3126,,1977.7705,,có,có
+Phường Phong Phú,Dân số phường (khống chế),dan_so,19057.0000,19057.0000,19057.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Phú,Dân trong vùng phục vụ trường (công trình cùng phường),truong,5140.3339,13388.1758,13549.7191,8247.8419,160.4534,8409.3852,163.5961,có,có
+Phường Phong Phú,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Phú,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Phú,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,5212.1176,13388.1758,13549.7191,8176.0582,156.8663,8337.6015,159.9657,có,có
+Phường Phong Phú,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Phú,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Phú,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,4104.1525,5685.5534,5306.3535,1581.4010,38.5317,1202.2011,29.2923,có,có
+Phường Phong Phú,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,2165.9938,179.2419,120.4285,-1986.7519,-91.7247,-2045.5652,-94.4400,có,có
+Phường Phong Phú,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,3598.5459,19057.0000,19057.0000,15458.4541,429.5750,15458.4541,429.5750,có,có
+Phường Phong Phú,Dân nằm trên lô quy hoạch đất ở,lo_o,3220.9014,17835.7651,18009.6569,14614.8637,453.7507,14788.7555,459.1496,có,có
+Phường Phong Phú,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,9587.7000,,,,,,,,
+Phường Phong Phú,Dịch tâm dân so với cách chia pixel (m),dich_tam,,1367.0499,1296.9712,1367.0499,,1296.9712,,có,có
+Phường Phong Quảng,Dân số phường (khống chế),dan_so,25728.0000,25728.0000,25728.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Quảng,Dân trong vùng phục vụ trường (công trình cùng phường),truong,14886.0477,16769.0375,18806.9772,1882.9898,12.6494,3920.9294,26.3396,,có
+Phường Phong Quảng,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Quảng,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Quảng,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,14886.0477,16769.0375,18806.9772,1882.9898,12.6494,3920.9294,26.3396,,có
+Phường Phong Quảng,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Quảng,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Quảng,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,8725.4899,4605.3868,4656.0070,-4120.1032,-47.2192,-4069.4830,-46.6390,có,có
+Phường Phong Quảng,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,6270.7083,179.0219,150.6558,-6091.6864,-97.1451,-6120.0524,-97.5975,có,có
+Phường Phong Quảng,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,11675.9486,25728.0000,25728.0000,14052.0514,120.3504,14052.0514,120.3504,có,có
+Phường Phong Quảng,Dân nằm trên lô quy hoạch đất ở,lo_o,3131.4202,8207.4641,11380.9214,5076.0440,162.1004,8249.5012,263.4428,có,có
+Phường Phong Quảng,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,9553.6000,,,,,,,,
+Phường Phong Quảng,Dịch tâm dân so với cách chia pixel (m),dich_tam,,656.7586,509.1824,656.7586,,509.1824,,có,có
+Phường Phong Thái,Dân số phường (khống chế),dan_so,37406.0000,37406.0000,37406.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Thái,Dân trong vùng phục vụ trường (công trình cùng phường),truong,6479.1796,23720.8187,25680.6986,17241.6390,266.1084,19201.5190,296.3573,có,có
+Phường Phong Thái,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,2391.5990,11839.7148,12530.5448,9448.1158,395.0543,10138.9458,423.9400,có,có
+Phường Phong Thái,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Thái,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,6916.4249,26328.3314,28853.9697,19411.9065,280.6639,21937.5448,317.1804,có,có
+Phường Phong Thái,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,2391.5990,11839.7148,12530.5448,9448.1158,395.0543,10138.9458,423.9400,có,có
+Phường Phong Thái,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Thái,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,3683.4600,567.2740,341.7855,-3116.1860,-84.5994,-3341.6745,-90.7211,có,có
+Phường Phong Thái,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,313.0279,7.3040,6.1873,-305.7239,-97.6667,-306.8405,-98.0234,có,có
+Phường Phong Thái,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,4635.7934,37406.0000,37406.0000,32770.2066,706.8953,32770.2066,706.8953,có,có
+Phường Phong Thái,Dân nằm trên lô quy hoạch đất ở,lo_o,4354.2340,34657.2774,34959.6230,30303.0434,695.9443,30605.3891,702.8880,có,có
+Phường Phong Thái,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,5343.7000,,,,,,,,
+Phường Phong Thái,Dịch tâm dân so với cách chia pixel (m),dich_tam,,6353.3122,6425.1214,6353.3122,,6425.1214,,có,có
+Phường Phong Điền,Dân số phường (khống chế),dan_so,27862.0000,27862.0000,27862.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phong Điền,Dân trong vùng phục vụ trường (công trình cùng phường),truong,1365.5378,16268.4457,16972.1684,14902.9079,1091.3581,15606.6306,1142.8926,có,có
+Phường Phong Điền,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,145.4511,3890.2326,4533.8211,3744.7815,2574.5991,4388.3700,3017.0768,có,có
+Phường Phong Điền,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,93.6148,3420.7598,4004.9081,3327.1450,3554.0811,3911.2934,4178.0728,có,có
+Phường Phong Điền,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,1483.5234,17890.6617,18325.8228,16407.1383,1105.9575,16842.2994,1135.2905,có,có
+Phường Phong Điền,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,145.4511,3890.2326,4533.8211,3744.7815,2574.5991,4388.3700,3017.0768,có,có
+Phường Phong Điền,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,93.6148,3420.7598,4004.9081,3327.1450,3554.0811,3911.2934,4178.0728,có,có
+Phường Phong Điền,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,266.5313,6.6123,4.1138,-259.9190,-97.5191,-262.4175,-98.4565,có,có
+Phường Phong Điền,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,0.3868,0.0000,0.0000,-0.3868,-100.0000,-0.3868,-100.0000,,
+Phường Phong Điền,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,1259.5442,27862.0000,27862.0000,26602.4558,2112.0700,26602.4558,2112.0700,có,có
+Phường Phong Điền,Dân nằm trên lô quy hoạch đất ở,lo_o,913.3243,24117.2379,24513.2656,23203.9136,2540.5996,23599.9413,2583.9608,có,có
+Phường Phong Điền,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,709.0000,,,,,,,,
+Phường Phong Điền,Dịch tâm dân so với cách chia pixel (m),dich_tam,,13010.5661,13402.1601,13010.5661,,13402.1601,,có,có
+Phường Phú Bài,Dân số phường (khống chế),dan_so,38410.0000,38410.0000,38410.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phú Bài,Dân trong vùng phục vụ trường (công trình cùng phường),truong,1905.0775,29563.7392,30615.0844,27658.6617,1451.8392,28710.0069,1507.0257,có,có
+Phường Phú Bài,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phú Bài,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phú Bài,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,2651.3579,31164.0034,31852.0642,28512.6456,1075.3979,29200.7064,1101.3491,có,có
+Phường Phú Bài,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,157.5064,4109.4786,4407.5345,3951.9722,2509.0866,4250.0281,2698.3208,có,có
+Phường Phú Bài,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phú Bài,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,560.6478,4784.3329,4759.0352,4223.6851,753.3580,4198.3874,748.8458,có,có
+Phường Phú Bài,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,249.3851,186.5451,161.2739,-62.8401,-25.1980,-88.1112,-35.3314,có,có
+Phường Phú Bài,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,2240.7162,38410.0000,38410.0000,36169.2838,1614.1841,36169.2838,1614.1841,có,có
+Phường Phú Bài,Dân nằm trên lô quy hoạch đất ở,lo_o,930.9754,30920.7633,32256.9436,29989.7879,3221.3299,31325.9683,3364.8547,có,có
+Phường Phú Bài,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,9691.5000,,,,,,,,
+Phường Phú Bài,Dịch tâm dân so với cách chia pixel (m),dich_tam,,14831.4608,15187.2690,14831.4608,,15187.2690,,có,có
+Phường Phú Xuân,Dân số phường (khống chế),dan_so,130247.0000,130247.0000,130247.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Phú Xuân,Dân trong vùng phục vụ trường (công trình cùng phường),truong,130247.0000,130247.0000,130247.0000,-0.0000,-0.0000,-0.0000,-0.0000,,
+Phường Phú Xuân,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,110698.9680,110190.8351,112204.2705,-508.1328,-0.4590,1505.3025,1.3598,,
+Phường Phú Xuân,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,44587.0843,36502.1400,39246.1455,-8084.9443,-18.1329,-5340.9389,-11.9787,có,
+Phường Phú Xuân,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,130247.0000,130247.0000,130247.0000,-0.0000,-0.0000,-0.0000,-0.0000,,
+Phường Phú Xuân,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,114213.2209,111135.4081,112955.2832,-3077.8129,-2.6948,-1257.9377,-1.1014,,
+Phường Phú Xuân,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,57106.6105,49730.1633,52989.8861,-7376.4471,-12.9170,-4116.7244,-7.2088,,
+Phường Phú Xuân,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,38986.2437,8513.1636,7597.4268,-30473.0801,-78.1637,-31388.8169,-80.5125,có,có
+Phường Phú Xuân,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,15484.6771,476.2889,520.3320,-15008.3882,-96.9241,-14964.3451,-96.6397,có,có
+Phường Phú Xuân,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,110369.5067,130247.0000,130247.0000,19877.4933,18.0100,19877.4933,18.0100,có,có
+Phường Phú Xuân,Dân nằm trên lô quy hoạch đất ở,lo_o,47662.0556,114765.6099,118328.2609,67103.5543,140.7903,70666.2053,148.2651,có,có
+Phường Phú Xuân,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,105203.5000,,,,,,,,
+Phường Phú Xuân,Dịch tâm dân so với cách chia pixel (m),dich_tam,,134.7691,99.5081,134.7691,,99.5081,,,
+Phường Thanh Thủy,Dân số phường (khống chế),dan_so,43569.0000,43569.0000,43569.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Thanh Thủy,Dân trong vùng phục vụ trường (công trình cùng phường),truong,17647.6364,33897.6029,35119.7400,16249.9665,92.0801,17472.1036,99.0053,có,có
+Phường Thanh Thủy,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Thanh Thủy,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,438.2839,1644.9706,1663.2854,1206.6867,275.3208,1225.0015,279.4995,có,có
+Phường Thanh Thủy,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,19525.9961,38046.3824,38794.8334,18520.3863,94.8499,19268.8373,98.6830,có,có
+Phường Thanh Thủy,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Thanh Thủy,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,465.1176,1885.8088,1779.6574,1420.6912,305.4477,1314.5397,282.6252,có,có
+Phường Thanh Thủy,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,8398.9511,11113.3971,9655.5167,2714.4459,32.3189,1256.5656,14.9610,có,
+Phường Thanh Thủy,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,5527.7442,916.3971,857.1537,-4611.3471,-83.4219,-4670.5905,-84.4936,có,có
+Phường Thanh Thủy,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,21645.8592,43569.0000,43569.0000,21923.1408,101.2810,21923.1408,101.2810,có,có
+Phường Thanh Thủy,Dân nằm trên lô quy hoạch đất ở,lo_o,1082.2930,2296.2941,1666.1769,1214.0012,112.1694,583.8840,53.9488,có,có
+Phường Thanh Thủy,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,14540.6000,,,,,,,,
+Phường Thanh Thủy,Dịch tâm dân so với cách chia pixel (m),dich_tam,,2517.2428,2368.4278,2517.2428,,2368.4278,,có,có
+Phường Thuận An,Dân số phường (khống chế),dan_so,64689.0000,64689.0000,64689.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Thuận An,Dân trong vùng phục vụ trường (công trình cùng phường),truong,50670.6163,62057.6014,62993.7547,11386.9852,22.4726,12323.1384,24.3201,có,có
+Phường Thuận An,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Thuận An,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Thuận An,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,51035.6783,62478.0827,63186.8307,11442.4043,22.4204,12151.1524,23.8091,có,có
+Phường Thuận An,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Thuận An,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Thuận An,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,36944.2822,29978.9541,28099.6523,-6965.3281,-18.8536,-8844.6299,-23.9405,có,có
+Phường Thuận An,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,23546.5040,2040.0121,1785.4858,-21506.4919,-91.3362,-21761.0181,-92.4172,có,có
+Phường Thuận An,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,37053.8008,64689.0000,64689.0000,27635.1992,74.5813,27635.1992,74.5813,có,có
+Phường Thuận An,Dân nằm trên lô quy hoạch đất ở,lo_o,15259.5948,43092.5424,44867.1721,27832.9475,182.3964,29607.5773,194.0260,có,có
+Phường Thuận An,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,44967.7000,,,,,,,,
+Phường Thuận An,Dịch tâm dân so với cách chia pixel (m),dich_tam,,2247.9822,2385.1028,2247.9822,,2385.1028,,có,có
+Phường Thuận Hóa,Dân số phường (khống chế),dan_so,98923.0000,98923.0000,98923.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Thuận Hóa,Dân trong vùng phục vụ trường (công trình cùng phường),truong,91684.7317,90308.1423,91118.7385,-1376.5894,-1.5014,-565.9932,-0.6173,,
+Phường Thuận Hóa,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,96764.2182,96382.6593,96587.5458,-381.5589,-0.3943,-176.6725,-0.1826,,
+Phường Thuận Hóa,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,81906.7202,82953.7590,84089.9281,1047.0389,1.2783,2183.2079,2.6655,,
+Phường Thuận Hóa,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,96637.2311,98098.8437,98154.3505,1461.6126,1.5125,1517.1194,1.5699,,
+Phường Thuận Hóa,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,98796.0128,98908.4561,98914.2345,112.4432,0.1138,118.2217,0.1197,,
+Phường Thuận Hóa,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,82160.6945,82977.9989,84117.2305,817.3044,0.9948,1956.5360,2.3814,,
+Phường Thuận Hóa,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,5079.4865,1231.3865,1079.9051,-3848.1000,-75.7577,-3999.5814,-78.7399,có,có
+Phường Thuận Hóa,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,1650.8331,111.5035,58.4939,-1539.3296,-93.2456,-1592.3392,-96.4567,có,có
+Phường Thuận Hóa,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,90795.8216,98923.0000,98923.0000,8127.1784,8.9510,8127.1784,8.9510,,
+Phường Thuận Hóa,Dân nằm trên lô quy hoạch đất ở,lo_o,42159.7381,88703.4615,90971.9074,46543.7233,110.3985,48812.1692,115.7791,có,có
+Phường Thuận Hóa,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,28615.9000,,,,,,,,
+Phường Thuận Hóa,Dịch tâm dân so với cách chia pixel (m),dich_tam,,185.7521,125.3738,185.7521,,125.3738,,,
+Phường Thủy Xuân,Dân số phường (khống chế),dan_so,43373.0000,43373.0000,43373.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Thủy Xuân,Dân trong vùng phục vụ trường (công trình cùng phường),truong,14533.4130,19235.2403,16715.5789,4701.8273,32.3518,2182.1659,15.0148,có,có
+Phường Thủy Xuân,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Thủy Xuân,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Thủy Xuân,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,16509.4039,24317.3327,22338.1947,7807.9289,47.2938,5828.7908,35.3059,có,có
+Phường Thủy Xuân,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,4683.0984,13004.2289,14315.0031,8321.1305,177.6843,9631.9047,205.6738,có,có
+Phường Thủy Xuân,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,948.4756,2536.6876,2876.6766,1588.2120,167.4489,1928.2009,203.2947,có,có
+Phường Thủy Xuân,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,4910.3374,972.8328,1011.3254,-3937.5046,-80.1881,-3899.0120,-79.4042,có,có
+Phường Thủy Xuân,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,1995.7508,230.1325,179.3136,-1765.6183,-88.4689,-1816.4372,-91.0152,có,có
+Phường Thủy Xuân,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,22615.2157,43373.0000,43373.0000,20757.7843,91.7868,20757.7843,91.7868,có,có
+Phường Thủy Xuân,Dân nằm trên lô quy hoạch đất ở,lo_o,9474.8763,35370.6658,35774.3002,25895.7895,273.3101,26299.4239,277.5701,có,có
+Phường Thủy Xuân,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,2513.4000,,,,,,,,
+Phường Thủy Xuân,Dịch tâm dân so với cách chia pixel (m),dich_tam,,2945.3140,2941.9907,2945.3140,,2941.9907,,có,có
+Phường Vỹ Dạ,Dân số phường (khống chế),dan_so,49684.0000,49684.0000,49684.0000,0.0000,0.0000,0.0000,0.0000,,
+Phường Vỹ Dạ,Dân trong vùng phục vụ trường (công trình cùng phường),truong,37408.5586,45926.7788,47447.2453,8518.2202,22.7708,10038.6867,26.8353,có,có
+Phường Vỹ Dạ,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,21591.1914,33759.5662,35214.6830,12168.3748,56.3581,13623.4915,63.0975,có,có
+Phường Vỹ Dạ,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,10286.1406,16289.0709,20029.3565,6002.9303,58.3594,9743.2158,94.7218,có,có
+Phường Vỹ Dạ,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,43230.9023,47528.2651,48504.4908,4297.3628,9.9405,5273.5884,12.1987,,
+Phường Vỹ Dạ,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,25278.6758,39237.8748,41916.4952,13959.1990,55.2212,16637.8194,65.8176,có,có
+Phường Vỹ Dạ,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,12566.5586,20816.4058,24823.8949,8249.8472,65.6492,12257.3363,97.5393,có,có
+Phường Vỹ Dạ,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,35031.1016,15778.5789,13664.9817,-19252.5227,-54.9584,-21366.1199,-60.9919,có,có
+Phường Vỹ Dạ,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,18340.3828,1899.0303,1695.8718,-16441.3525,-89.6456,-16644.5110,-90.7533,có,có
+Phường Vỹ Dạ,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,35807.4141,49684.0000,49684.0000,13876.5859,38.7534,13876.5859,38.7534,có,có
+Phường Vỹ Dạ,Dân nằm trên lô quy hoạch đất ở,lo_o,18000.7461,39287.4655,41498.1583,21286.7194,118.2547,23497.4122,130.5358,có,có
+Phường Vỹ Dạ,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,49684.1000,,,,,,,,
+Phường Vỹ Dạ,Dịch tâm dân so với cách chia pixel (m),dich_tam,,624.7218,809.3716,624.7218,,809.3716,,có,có
+Xã A Lưới 1,Dân số phường (khống chế),dan_so,12403.0000,12403.0000,12403.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 1,Dân trong vùng phục vụ trường (công trình cùng phường),truong,3776.5874,11128.2331,11538.4791,7351.6458,194.6637,7761.8918,205.5266,có,có
+Xã A Lưới 1,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 1,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 1,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,3782.7407,11128.2331,11538.4791,7345.4925,194.1844,7755.7385,205.0296,có,có
+Xã A Lưới 1,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 1,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 1,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 1,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 1,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,879.9218,12403.0000,12403.0000,11523.0782,1309.5571,11523.0782,1309.5571,có,có
+Xã A Lưới 1,Dân nằm trên lô quy hoạch đất ở,lo_o,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 1,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,0,,,,,,,,
+Xã A Lưới 1,Dịch tâm dân so với cách chia pixel (m),dich_tam,,389.0600,405.2674,389.0600,,405.2674,,,
+Xã A Lưới 2,Dân số phường (khống chế),dan_so,20496.0000,20496.0000,20496.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 2,Dân trong vùng phục vụ trường (công trình cùng phường),truong,8093.5664,20030.4450,20239.7706,11936.8786,147.4860,12146.2042,150.0723,có,có
+Xã A Lưới 2,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,2586.3548,12727.4856,14246.6477,10141.1308,392.1013,11660.2929,450.8389,có,có
+Xã A Lưới 2,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 2,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,8548.7649,20053.6070,20245.4050,11504.8421,134.5790,11696.6401,136.8226,có,có
+Xã A Lưới 2,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,2586.3548,12727.4856,14246.6477,10141.1308,392.1013,11660.2929,450.8389,có,có
+Xã A Lưới 2,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 2,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 2,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 2,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,3150.1802,20496.0000,20496.0000,17345.8198,550.6294,17345.8198,550.6294,có,có
+Xã A Lưới 2,Dân nằm trên lô quy hoạch đất ở,lo_o,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 2,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,0,,,,,,,,
+Xã A Lưới 2,Dịch tâm dân so với cách chia pixel (m),dich_tam,,3100.0593,3303.5944,3100.0593,,3303.5944,,có,có
+Xã A Lưới 3,Dân số phường (khống chế),dan_so,8976.0000,8976.0000,8976.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 3,Dân trong vùng phục vụ trường (công trình cùng phường),truong,3052.2330,8662.5453,8824.8285,5610.3122,183.8101,5772.5955,189.1270,có,có
+Xã A Lưới 3,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 3,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 3,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,3052.2330,8662.5453,8824.8285,5610.3122,183.8101,5772.5955,189.1270,có,có
+Xã A Lưới 3,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,10.0655,94.0364,123.4379,83.9710,834.2479,113.3725,1126.3507,,có
+Xã A Lưới 3,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 3,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 3,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 3,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,591.4660,8976.0000,8976.0000,8384.5340,1417.5851,8384.5340,1417.5851,có,có
+Xã A Lưới 3,Dân nằm trên lô quy hoạch đất ở,lo_o,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 3,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,0,,,,,,,,
+Xã A Lưới 3,Dịch tâm dân so với cách chia pixel (m),dich_tam,,3794.9622,3925.2241,3794.9622,,3925.2241,,có,có
+Xã A Lưới 4,Dân số phường (khống chế),dan_so,10752.0000,10752.0000,10752.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 4,Dân trong vùng phục vụ trường (công trình cùng phường),truong,3342.9471,10053.7887,9895.7784,6710.8417,200.7463,6552.8314,196.0196,có,có
+Xã A Lưới 4,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 4,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 4,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,3343.3271,10056.0557,9904.2844,6712.7286,200.7799,6560.9573,196.2404,có,có
+Xã A Lưới 4,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 4,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 4,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 4,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 4,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,752.4196,10752.0000,10752.0000,9999.5804,1328.9899,9999.5804,1328.9899,có,có
+Xã A Lưới 4,Dân nằm trên lô quy hoạch đất ở,lo_o,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 4,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,0,,,,,,,,
+Xã A Lưới 4,Dịch tâm dân so với cách chia pixel (m),dich_tam,,3243.3226,2736.6827,3243.3226,,2736.6827,,có,có
+Xã A Lưới 5,Dân số phường (khống chế),dan_so,3760.0000,3760.0000,3760.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 5,Dân trong vùng phục vụ trường (công trình cùng phường),truong,295.0507,890.7454,908.9026,595.6947,201.8957,613.8519,208.0496,có,có
+Xã A Lưới 5,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 5,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 5,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,295.0507,890.7454,908.9026,595.6947,201.8957,613.8519,208.0496,có,có
+Xã A Lưới 5,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 5,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 5,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 5,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 5,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,47.7777,3760.0000,3760.0000,3712.2223,7769.7772,3712.2223,7769.7772,có,có
+Xã A Lưới 5,Dân nằm trên lô quy hoạch đất ở,lo_o,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã A Lưới 5,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,0,,,,,,,,
+Xã A Lưới 5,Dịch tâm dân so với cách chia pixel (m),dich_tam,,8531.0043,8427.8483,8531.0043,,8427.8483,,có,có
+Xã Bình Điền,Dân số phường (khống chế),dan_so,15229.0000,15229.0000,15229.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Bình Điền,Dân trong vùng phục vụ trường (công trình cùng phường),truong,3032.5230,11789.8976,11481.4954,8757.3746,288.7818,8448.9724,278.6120,có,có
+Xã Bình Điền,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,714.6980,6482.1499,6369.7444,5767.4519,806.9775,5655.0464,791.2498,có,có
+Xã Bình Điền,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Bình Điền,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,3032.5230,11789.8976,11481.4954,8757.3746,288.7818,8448.9724,278.6120,có,có
+Xã Bình Điền,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,714.6980,6482.1499,6369.7444,5767.4519,806.9775,5655.0464,791.2498,có,có
+Xã Bình Điền,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Bình Điền,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,37.6652,7.6458,7.0849,-30.0194,-79.7005,-30.5803,-81.1898,,
+Xã Bình Điền,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,28.2489,6.1167,5.3323,-22.1323,-78.3472,-22.9167,-81.1240,,
+Xã Bình Điền,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,1076.7552,15229.0000,15229.0000,14152.2448,1314.3419,14152.2448,1314.3419,có,có
+Xã Bình Điền,Dân nằm trên lô quy hoạch đất ở,lo_o,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Bình Điền,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,45.1000,,,,,,,,
+Xã Bình Điền,Dịch tâm dân so với cách chia pixel (m),dich_tam,,4376.2085,4317.2834,4376.2085,,4317.2834,,có,có
+Xã Chân Mây - Lăng Cô,Dân số phường (khống chế),dan_so,50831.0000,50831.0000,50831.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Chân Mây - Lăng Cô,Dân trong vùng phục vụ trường (công trình cùng phường),truong,17154.7490,44241.6294,44150.3498,27086.8804,157.8973,26995.6008,157.3652,có,có
+Xã Chân Mây - Lăng Cô,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,2607.9071,11425.4819,12291.6531,8817.5748,338.1092,9683.7460,371.3225,có,có
+Xã Chân Mây - Lăng Cô,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Chân Mây - Lăng Cô,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,17154.7490,44241.6294,44150.3498,27086.8804,157.8973,26995.6008,157.3652,có,có
+Xã Chân Mây - Lăng Cô,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,2607.9071,11425.4819,12291.6531,8817.5748,338.1092,9683.7460,371.3225,có,có
+Xã Chân Mây - Lăng Cô,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Chân Mây - Lăng Cô,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,10515.4669,9902.0843,8625.1580,-613.3826,-5.8331,-1890.3089,-17.9765,,có
+Xã Chân Mây - Lăng Cô,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,2322.5001,90.1419,47.4367,-2232.3582,-96.1188,-2275.0633,-97.9575,có,có
+Xã Chân Mây - Lăng Cô,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,3785.2113,50831.0000,50831.0000,47045.7887,1242.8841,47045.7887,1242.8841,có,có
+Xã Chân Mây - Lăng Cô,Dân nằm trên lô quy hoạch đất ở,lo_o,5561.8704,50447.8971,50395.1414,44886.0267,807.0312,44833.2710,806.0826,có,có
+Xã Chân Mây - Lăng Cô,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,36573.1000,,,,,,,,
+Xã Chân Mây - Lăng Cô,Dịch tâm dân so với cách chia pixel (m),dich_tam,,2407.4978,3151.2149,2407.4978,,3151.2149,,có,có
+Xã Hưng Lộc,Dân số phường (khống chế),dan_so,32586.0000,32586.0000,32586.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Hưng Lộc,Dân trong vùng phục vụ trường (công trình cùng phường),truong,18522.2562,32175.7348,32309.3722,13653.4786,73.7139,13787.1160,74.4354,có,có
+Xã Hưng Lộc,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Hưng Lộc,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Hưng Lộc,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,18566.7523,32175.7348,32309.3722,13608.9825,73.2976,13742.6199,74.0174,có,có
+Xã Hưng Lộc,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Hưng Lộc,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Hưng Lộc,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,2420.5895,3666.8595,4130.7818,1246.2700,51.4862,1710.1923,70.6519,có,có
+Xã Hưng Lộc,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,806.8632,180.5167,249.5359,-626.3465,-77.6273,-557.3273,-69.0733,có,có
+Xã Hưng Lộc,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,8190.2545,32586.0000,32586.0000,24395.7455,297.8631,24395.7455,297.8631,có,có
+Xã Hưng Lộc,Dân nằm trên lô quy hoạch đất ở,lo_o,14.8320,16.4106,18.0357,1.5786,10.6429,3.2036,21.5995,,
+Xã Hưng Lộc,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,9389.4000,,,,,,,,
+Xã Hưng Lộc,Dịch tâm dân so với cách chia pixel (m),dich_tam,,5496.0867,5632.7940,5496.0867,,5632.7940,,có,có
+Xã Khe Tre,Dân số phường (khống chế),dan_so,12882.0000,12882.0000,12882.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Khe Tre,Dân trong vùng phục vụ trường (công trình cùng phường),truong,1705.3665,11220.0501,10958.5479,9514.6836,557.9260,9253.1814,542.5919,có,có
+Xã Khe Tre,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Khe Tre,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Khe Tre,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,1934.8475,12045.3593,11877.6735,10110.5118,522.5483,9942.8260,513.8816,có,có
+Xã Khe Tre,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Khe Tre,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Khe Tre,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Khe Tre,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Khe Tre,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,536.0078,12882.0000,12882.0000,12345.9922,2303.3230,12345.9922,2303.3230,có,có
+Xã Khe Tre,Dân nằm trên lô quy hoạch đất ở,lo_o,47.2217,3790.3788,3968.8353,3743.1571,7926.7714,3921.6136,8304.6834,có,có
+Xã Khe Tre,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,0,,,,,,,,
+Xã Khe Tre,Dịch tâm dân so với cách chia pixel (m),dich_tam,,5570.5646,5743.5004,5570.5646,,5743.5004,,có,có
+Xã Long Quảng,Dân số phường (khống chế),dan_so,8883.0000,8883.0000,8883.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Long Quảng,Dân trong vùng phục vụ trường (công trình cùng phường),truong,1239.8031,8599.0380,8663.9577,7359.2348,593.5809,7424.1546,598.8172,có,có
+Xã Long Quảng,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Long Quảng,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Long Quảng,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,1239.8031,8599.0380,8663.9577,7359.2348,593.5809,7424.1546,598.8172,có,có
+Xã Long Quảng,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Long Quảng,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Long Quảng,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Long Quảng,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Long Quảng,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,316.7183,8883.0000,8883.0000,8566.2817,2704.7009,8566.2817,2704.7009,có,có
+Xã Long Quảng,Dân nằm trên lô quy hoạch đất ở,lo_o,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Long Quảng,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,0,,,,,,,,
+Xã Long Quảng,Dịch tâm dân so với cách chia pixel (m),dich_tam,,7028.4107,6974.8301,7028.4107,,6974.8301,,có,có
+Xã Lộc An,Dân số phường (khống chế),dan_so,39217.0000,39217.0000,39217.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Lộc An,Dân trong vùng phục vụ trường (công trình cùng phường),truong,13067.7328,37051.4636,37503.2451,23983.7307,183.5340,24435.5123,186.9912,có,có
+Xã Lộc An,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Lộc An,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Lộc An,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,13426.5722,37064.3427,37512.0378,23637.7705,176.0522,24085.4657,179.3866,có,có
+Xã Lộc An,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Lộc An,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Lộc An,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,3574.5919,6710.0351,5955.0452,3135.4432,87.7147,2380.4532,66.5937,có,có
+Xã Lộc An,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,1709.0874,430.5315,251.6549,-1278.5559,-74.8093,-1457.4325,-85.2755,có,có
+Xã Lộc An,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,7689.7432,39217.0000,39217.0000,31527.2568,409.9910,31527.2568,409.9910,có,có
+Xã Lộc An,Dân nằm trên lô quy hoạch đất ở,lo_o,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Lộc An,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,21517.4000,,,,,,,,
+Xã Lộc An,Dịch tâm dân so với cách chia pixel (m),dich_tam,,6192.7458,6059.0088,6192.7458,,6059.0088,,có,có
+Xã Nam Đông,Dân số phường (khống chế),dan_so,9158.0000,9158.0000,9158.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Nam Đông,Dân trong vùng phục vụ trường (công trình cùng phường),truong,1556.3371,9017.9082,9039.1931,7461.5711,479.4316,7482.8560,480.7992,có,có
+Xã Nam Đông,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Nam Đông,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Nam Đông,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,1572.1962,9017.9082,9039.1931,7445.7120,473.5867,7466.9969,474.9405,có,có
+Xã Nam Đông,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Nam Đông,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Nam Đông,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Nam Đông,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Nam Đông,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,549.0685,9158.0000,9158.0000,8608.9315,1567.9157,8608.9315,1567.9157,có,có
+Xã Nam Đông,Dân nằm trên lô quy hoạch đất ở,lo_o,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Nam Đông,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,0,,,,,,,,
+Xã Nam Đông,Dịch tâm dân so với cách chia pixel (m),dich_tam,,5306.5566,5406.2539,5306.5566,,5406.2539,,có,có
+Xã Phú Hồ,Dân số phường (khống chế),dan_so,23550.0000,23550.0000,23550.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Hồ,Dân trong vùng phục vụ trường (công trình cùng phường),truong,18368.5552,20578.8041,20133.6819,2210.2488,12.0328,1765.1267,9.6095,,
+Xã Phú Hồ,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Hồ,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Hồ,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,19986.3669,22125.6275,21883.0952,2139.2607,10.7036,1896.7284,9.4901,,
+Xã Phú Hồ,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,2473.9731,1855.0622,1928.2113,-618.9109,-25.0169,-545.7618,-22.0601,có,có
+Xã Phú Hồ,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Hồ,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,15772.2734,10442.1139,8526.2481,-5330.1595,-33.7945,-7246.0252,-45.9415,có,có
+Xã Phú Hồ,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,10785.4108,395.5026,259.1619,-10389.9081,-96.3330,-10526.2489,-97.5971,có,có
+Xã Phú Hồ,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,9862.5354,23550.0000,23550.0000,13687.4646,138.7824,13687.4646,138.7824,có,có
+Xã Phú Hồ,Dân nằm trên lô quy hoạch đất ở,lo_o,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Hồ,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,17700.5000,,,,,,,,
+Xã Phú Hồ,Dịch tâm dân so với cách chia pixel (m),dich_tam,,766.1011,327.1154,766.1011,,327.1154,,có,
+Xã Phú Lộc,Dân số phường (khống chế),dan_so,50929.0000,50929.0000,50929.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Lộc,Dân trong vùng phục vụ trường (công trình cùng phường),truong,19031.1495,42834.3245,42556.6624,23803.1750,125.0748,23525.5129,123.6158,có,có
+Xã Phú Lộc,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Lộc,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Lộc,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,19624.7631,43765.2122,43863.1790,24140.4491,123.0101,24238.4158,123.5093,có,có
+Xã Phú Lộc,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,131.9141,0.0000,0.0000,-131.9141,-100.0000,-131.9141,-100.0000,có,có
+Xã Phú Lộc,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Lộc,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,6088.3443,14089.2324,11627.0414,8000.8881,131.4132,5538.6971,90.9721,có,có
+Xã Phú Lộc,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,2587.5463,746.5090,620.8354,-1841.0374,-71.1499,-1966.7109,-76.0068,có,có
+Xã Phú Lộc,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,9416.6392,50929.0000,50929.0000,41512.3608,440.8405,41512.3608,440.8405,có,có
+Xã Phú Lộc,Dân nằm trên lô quy hoạch đất ở,lo_o,2460.7058,36947.6966,38787.2716,34486.9908,1401.5081,36326.5658,1476.2661,có,có
+Xã Phú Lộc,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,26285.3000,,,,,,,,
+Xã Phú Lộc,Dịch tâm dân so với cách chia pixel (m),dich_tam,,2610.5358,2668.8083,2610.5358,,2668.8083,,có,có
+Xã Phú Vang,Dân số phường (khống chế),dan_so,39250.0000,39250.0000,39250.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Vang,Dân trong vùng phục vụ trường (công trình cùng phường),truong,35689.3595,37628.9725,37952.5885,1939.6131,5.4347,2263.2291,6.3415,,
+Xã Phú Vang,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,4192.3671,4574.3545,3507.8477,381.9874,9.1115,-684.5194,-16.3278,,có
+Xã Phú Vang,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Vang,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,36684.8073,38164.9118,38571.6670,1480.1044,4.0347,1886.8597,5.1434,,
+Xã Phú Vang,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,4192.3671,4574.3545,3507.8477,381.9874,9.1115,-684.5194,-16.3278,,có
+Xã Phú Vang,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Vang,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,19264.4692,7895.6681,6617.3970,-11368.8011,-59.0143,-12647.0722,-65.6497,có,có
+Xã Phú Vang,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,13113.1117,337.7927,203.4100,-12775.3190,-97.4240,-12909.7017,-98.4488,có,có
+Xã Phú Vang,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,23661.0307,39250.0000,39250.0000,15588.9693,65.8846,15588.9693,65.8846,có,có
+Xã Phú Vang,Dân nằm trên lô quy hoạch đất ở,lo_o,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Vang,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,14390.6000,,,,,,,,
+Xã Phú Vang,Dịch tâm dân so với cách chia pixel (m),dich_tam,,499.6570,191.6970,499.6570,,191.6970,,,
+Xã Phú Vinh,Dân số phường (khống chế),dan_so,31328.0000,31328.0000,31328.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Vinh,Dân trong vùng phục vụ trường (công trình cùng phường),truong,29198.2579,31299.4960,31283.3950,2101.2381,7.1965,2085.1371,7.1413,,
+Xã Phú Vinh,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Vinh,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Vinh,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,29198.2579,31299.4960,31283.3950,2101.2381,7.1965,2085.1371,7.1413,,
+Xã Phú Vinh,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Vinh,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Phú Vinh,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,8794.3175,1268.9556,992.4662,-7525.3619,-85.5707,-7801.8513,-88.7147,có,có
+Xã Phú Vinh,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,6254.3613,63.3422,29.7663,-6191.0190,-98.9872,-6224.5950,-99.5241,có,có
+Xã Phú Vinh,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,17049.1752,31328.0000,31328.0000,14278.8248,83.7508,14278.8248,83.7508,có,có
+Xã Phú Vinh,Dân nằm trên lô quy hoạch đất ở,lo_o,2843.4023,6404.9529,7642.5061,3561.5505,125.2567,4799.1038,168.7803,có,có
+Xã Phú Vinh,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,3412.9000,,,,,,,,
+Xã Phú Vinh,Dịch tâm dân so với cách chia pixel (m),dich_tam,,404.5805,851.3154,404.5805,,851.3154,,,có
+Xã Quảng Điền,Dân số phường (khống chế),dan_so,41798.0000,41798.0000,41798.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Quảng Điền,Dân trong vùng phục vụ trường (công trình cùng phường),truong,41358.1429,41666.8132,41722.2859,308.6703,0.7463,364.1430,0.8805,,
+Xã Quảng Điền,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,11609.9125,15832.5039,18104.8713,4222.5914,36.3706,6494.9588,55.9432,có,có
+Xã Quảng Điền,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,4224.9432,9300.0352,10931.4813,5075.0920,120.1221,6706.5381,158.7368,có,có
+Xã Quảng Điền,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,41520.1955,41783.7749,41795.3073,263.5794,0.6348,275.1117,0.6626,,
+Xã Quảng Điền,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,11609.9125,15832.5039,18104.8713,4222.5914,36.3706,6494.9588,55.9432,có,có
+Xã Quảng Điền,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,4224.9432,9300.0352,10931.4813,5075.0920,120.1221,6706.5381,158.7368,có,có
+Xã Quảng Điền,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,36091.4328,26965.9927,25199.2607,-9125.4401,-25.2842,-10892.1722,-30.1794,có,có
+Xã Quảng Điền,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,18288.7953,1411.4431,1141.4615,-16877.3522,-92.2825,-17147.3339,-93.7587,có,có
+Xã Quảng Điền,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,24794.0504,41798.0000,41798.0000,17003.9496,68.5808,17003.9496,68.5808,có,có
+Xã Quảng Điền,Dân nằm trên lô quy hoạch đất ở,lo_o,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Quảng Điền,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,40591.5000,,,,,,,,
+Xã Quảng Điền,Dịch tâm dân so với cách chia pixel (m),dich_tam,,102.4821,129.0155,102.4821,,129.0155,,,
+Xã Vinh Lộc,Dân số phường (khống chế),dan_so,36350.0000,36350.0000,36350.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Vinh Lộc,Dân trong vùng phục vụ trường (công trình cùng phường),truong,33981.3671,36187.1814,36251.6719,2205.8142,6.4912,2270.3048,6.6810,,
+Xã Vinh Lộc,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Vinh Lộc,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Vinh Lộc,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,34128.4391,36188.6615,36252.8101,2060.2224,6.0367,2124.3710,6.2246,,
+Xã Vinh Lộc,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Vinh Lộc,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Vinh Lộc,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,13406.7717,5176.1524,4665.9552,-8230.6193,-61.3915,-8740.8165,-65.1970,có,có
+Xã Vinh Lộc,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,8785.6154,254.5891,177.4552,-8531.0263,-97.1022,-8608.1602,-97.9802,có,có
+Xã Vinh Lộc,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,24034.6572,36350.0000,36350.0000,12315.3428,51.2399,12315.3428,51.2399,có,có
+Xã Vinh Lộc,Dân nằm trên lô quy hoạch đất ở,lo_o,5286.8505,11906.4826,12605.3320,6619.6321,125.2094,7318.4815,138.4280,có,có
+Xã Vinh Lộc,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,10905.8000,,,,,,,,
+Xã Vinh Lộc,Dịch tâm dân so với cách chia pixel (m),dich_tam,,421.2508,157.1691,421.2508,,157.1691,,,
+Xã Đan Điền,Dân số phường (khống chế),dan_so,40389.0000,40389.0000,40389.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Đan Điền,Dân trong vùng phục vụ trường (công trình cùng phường),truong,34394.3034,39131.2666,38919.8668,4736.9632,13.7725,4525.5634,13.1579,,
+Xã Đan Điền,Dân trong vùng phục vụ y tế (công trình cùng phường),yte,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Đan Điền,Dân trong vùng phục vụ công viên (công trình cùng phường),congvien,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,,
+Xã Đan Điền,Dân trong vùng phục vụ trường (vùng đệm bắt chéo ranh),truong_cheo,35355.8183,39770.3469,39623.9885,4414.5286,12.4860,4268.1702,12.0720,,
+Xã Đan Điền,Dân trong vùng phục vụ y tế (vùng đệm bắt chéo ranh),yte_cheo,4034.0656,7784.2316,8239.4789,3750.1660,92.9624,4205.4134,104.2475,có,có
+Xã Đan Điền,Dân trong vùng phục vụ công viên (vùng đệm bắt chéo ranh),congvien_cheo,26.8580,24.8045,13.0532,-2.0535,-7.6457,-13.8047,-51.3991,,
+Xã Đan Điền,Dân ở cao độ làm tròn dưới 5 m (Copernicus GLO-30),ngap5,19488.1357,7960.7812,6775.5046,-11527.3545,-59.1506,-12712.6310,-65.2327,có,có
+Xã Đan Điền,Dân ở cao độ làm tròn dưới 2 m (Copernicus GLO-30),ngap2,6086.0137,302.0311,161.9188,-5783.9826,-95.0373,-5924.0949,-97.3395,có,có
+Xã Đan Điền,Dân nằm trong ô 150 m có ít nhất một nhà ở,o_nha,18940.2333,40389.0000,40389.0000,21448.7667,113.2445,21448.7667,113.2445,có,có
+Xã Đan Điền,Dân nằm trên lô quy hoạch đất ở,lo_o,1380.4991,11607.0407,12313.4444,10226.5416,740.7858,10932.9452,791.9560,có,có
+Xã Đan Điền,"Dân cao độ dưới 5 m theo app (FABDEM, chỉ cột cũ)",ngap5_app,26407.8000,,,,,,,,
+Xã Đan Điền,Dịch tâm dân so với cách chia pixel (m),dich_tam,,1377.5993,1514.3169,1377.5993,,1514.3169,,có,có

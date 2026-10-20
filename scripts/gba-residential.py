@@ -326,6 +326,19 @@ def main():
     """).fetchone()[0]
     if mismatch:
         raise SystemExit(f'Lệch nhãn nhà ở và lý do loại: {mismatch}')
+    export = os.environ.get('GBA_EXPORT_LABELED')
+    if export:
+        con.execute(f"""
+            COPY (
+                SELECT id, ward, pop, area_m2, cls, x, y, residential, reason,
+                       CASE WHEN residential THEN area_m2 * (cls + 1) ELSE 0 END AS wb
+                FROM cls
+            ) TO '{export}' (FORMAT PARQUET)
+        """)
+        log(f'xuất nhãn {export}')
+        if os.environ.get('GBA_EXPORT_ONLY') == '1':
+            con.close()
+            return
     summary_drop = {k: pair(f"reason = '{k}'") for k in rules}
     summary_keep = pair('residential')
     summary_apt = pair(f"residential AND cad_res AND area_m2 > {LARGE_M2}")
