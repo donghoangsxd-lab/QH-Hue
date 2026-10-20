@@ -18,6 +18,7 @@ import { map, wardNameAt, outerWardLines, openOutlinedPopup, getRightObstruction
 import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClick, whenMapsIdle } from './planMap.js';
 import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
+import { BASEMAP_EVENT } from './basemap.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { analyzeParcelZones, parcelZonesHtml, analyzeParcelPlan, parcelPlanHtml, planPlace } from './planLandStats.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
@@ -1261,6 +1262,7 @@ export function initQhc2045Layer() {
     });
   });
   window.addEventListener(LOT_OPACITY_EVENT, restyleLand);
+  window.addEventListener(BASEMAP_EVENT, restyleLand);
   document.addEventListener(LEVEL_EVENT, () => { if (!isLevelPair() && !placeLots) applyCore(); });
   onSplitPair(() => syncQhc());
   bindCoreHover(map);

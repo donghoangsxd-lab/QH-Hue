@@ -3,6 +3,7 @@
 // Màu = mã ACI cột "Màu". Chín nhóm hạ tầng trích nét vector từ Phụ lục; các loại đất còn lại của Mục 04 vẽ theo cùng ô ký hiệu.
 // Viền theo khung ô ký hiệu: hiện trạng (HT_) mảnh; quy hoạch đợt đầu (QHDD_) dải liền; dài hạn (QHDH_) dải nét đứt.
 import { SAND_COLOR, VISION_LEGEND_GROUPS } from './qhc2045.js';
+import { isLightBasemap } from './basemap.js';
 
 // color: RGB chuẩn AutoCAD của mã ACI; pattern: khóa ô lặp trong TILES
 export const TT16_STYLES = {
@@ -278,15 +279,16 @@ const PT_PX = 1.6;
 const LINE_PT = 0.72;
 const DOT_R_PT = 0.36;
 // Khung ô ký hiệu Phụ lục: dải QHDD/QHDH dày 2.76pt; QHDH nét 10.68pt, hở 5.4pt.
-// Trên bản đồ viền QH cố định FRAME_PX ở mọi zoom (không lấy 2.76pt ≈ 4.4px vì nét đó che lô hẹp
-// như dải cây xanh dọc đường). Nét sáng hơn màu tô cùng tông, thêm quầng sáng mỏng phía dưới.
+// Trên bản đồ viền QH cố định (không lấy 2.76pt ≈ 4.4px vì nét đó che lô hẹp như dải cây xanh dọc đường).
+// FRAME_PX là nét trước khi làm sáng. Chỉ lô màu tối trên nền vệ tinh dùng nét dày hơn và quầng.
 const FRAME_PT = 2.76;
 const DASH_PT = [10.68, 5.4];
-const FRAME_PX = 2.4;
+const FRAME_PX = 1.8;
+const FRAME_PX_BRIGHT = 2.4;
 const HT_FRAME_PX = 1;
 const FRAME_HALO_PX = 1;
 const FRAME_HALO = '#f8fafc';
-const QHDH_DASH = DASH_PT.map(v => +((v / FRAME_PT) * FRAME_PX).toFixed(1)).join(',');
+const dashFor = (px) => DASH_PT.map(v => +((v / FRAME_PT) * px).toFixed(1)).join(',');
 
 const r2 = (n) => Math.round(n * 100) / 100;
 
@@ -689,6 +691,29 @@ export function lightenTone(hex) {
   return hslToHex(h, s, Math.max(l, nextL));
 }
 
+// Độ chói tương đối WCAG (sRGB tuyến tính). 0.35 trên thang này vẫn gồm đỏ thuần, magenta, xanh TDTT.
+// Ngưỡng 0.18 nằm ngay sau nhóm tối (rừng sản xuất 0.168) và trước vàng/ôliu đã rõ trên vệ tinh (0.190).
+export const OUTLINE_LUMA_MAX = 0.18;
+
+function srgbChannel(c) {
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+export function relativeLuminance(hex) {
+  const m = /^#([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) return 1;
+  const n = parseInt(m[1], 16);
+  const r = srgbChannel((n >> 16) / 255);
+  const g = srgbChannel(((n >> 8) & 255) / 255);
+  const b = srgbChannel((n & 255) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Lô màu tối và đang xem nền vệ tinh: viền sáng hơn, dày hơn, có quầng. */
+export function outlineBright(hex) {
+  return !isLightBasemap() && relativeLuminance(hex) < OUTLINE_LUMA_MAX;
+}
+
 // Canvas của Leaflet chỉ có một nét. Quầng sáng vẽ trước nét màu khi style có casingColor.
 let lotCasingPatched = false;
 function ensureLotCasing() {
@@ -821,26 +846,30 @@ export function tt16SymbolStyle(key, tone, layer, { scenario, detailed, approved
   const s = key ? TT16_STYLES[key] : null;
   const pattern = detailed && s ? patternFor(key) : null;
   const fill = pattern ? s.color : (tone || (s && s.color) || '#94a3b8');
+  const bright = approved && outlineBright(fill);
   return {
-    color: approved ? lightenTone(fill) : '#f87171',
+    color: !approved ? '#f87171' : (bright ? lightenTone(fill) : fill),
     opacity: 0.95,
-    ...frameStyle(layer, scenario, approved),
+    ...frameStyle(layer, scenario, approved, bright),
     fillColor: pattern || fill,
     fillOpacity: (pattern ? 1 : (s && s.solidOpacity) || (s && s.fillOpacity) || FILL_OPACITY) * lotOpacity
   };
 }
 
 // Kiểu viền theo tiền tố layer: HT_ nét mảnh, QHDD_ (hoặc không tiền tố trên kịch bản QH) nét liền, QHDH_ nét đứt
-function frameStyle(layer, scenario, approved = true) {
+function frameStyle(layer, scenario, approved = true, bright = false) {
   const stage = String(layer || '').trim().toUpperCase().split(/[_\s]/)[0];
   const plan = stage === 'QHDD' || stage === 'QHDH' || stage === 'QH' || (stage !== 'HT' && scenario === 'QH');
-  const weight = plan ? FRAME_PX : HT_FRAME_PX;
+  const weight = plan ? (bright ? FRAME_PX_BRIGHT : FRAME_PX) : HT_FRAME_PX;
+  const halo = bright && plan;
   return {
     weight,
     lineCap: 'butt',
     lineJoin: 'miter',
-    dashArray: !approved ? '4,4' : stage === 'QHDH' ? QHDH_DASH : null,
-    ...(plan ? { casingColor: FRAME_HALO, casingWeight: +(weight + FRAME_HALO_PX).toFixed(1), casingOpacity: 0.92 } : {})
+    dashArray: !approved ? '4,4' : stage === 'QHDH' ? dashFor(weight) : null,
+    casingColor: halo ? FRAME_HALO : null,
+    casingWeight: halo ? +(weight + FRAME_HALO_PX).toFixed(1) : null,
+    casingOpacity: halo ? 0.92 : null
   };
 }
 
@@ -867,7 +896,7 @@ function legendGroupHtml([name, keys]) {
     const aci = s.aci != null ? ` · ACI ${s.aci}` : '';
     const search = foldLayer(`${s.label} ${s.layer} ${key}`).toLowerCase();
     return `<div class="tt16-row" title="${s.label}\nLayer: ${s.layer}${aci}" data-search="${search}">
-      <i class="tt16-swatch" style="${bg}border-color:${lightenTone(s.color)};"></i><span>${s.label}</span></div>`;
+      <i class="tt16-swatch" style="${bg}border-color:${s.color};"></i><span>${s.label}</span></div>`;
   }).join('');
   return `<details class="tt16-group" open><summary><span class="tt16-group-name">${name}</span><span class="tt16-group-count">${keys.length}</span></summary>${rows}</details>`;
 }
@@ -1114,6 +1143,7 @@ export function landParcelStyle(layerName, { detailed = false, phase = 'HT', nam
   }
   ensureLotCasing();
   const base = landPolylineStyle(layerName);
-  const frame = frameStyle(layerName, phase);
-  return { ...base, ...frame, color: frame.casingColor ? lightenTone(base.color) : base.color };
+  const bright = outlineBright(base.color);
+  const frame = frameStyle(layerName, phase, true, bright);
+  return { ...base, ...frame, color: bright ? lightenTone(base.color) : base.color };
 }

@@ -1,6 +1,7 @@
-// Viền lô quy hoạch sáng hơn màu tô cùng tông; ô CARTO mờ không được coi là nền dùng được.
-import { lightenTone, tt16SymbolStyle, landParcelStyle } from '../public/js/tt16Symbols.js';
-import { cartoTileUsable } from '../public/js/basemap.js';
+// Viền sáng + quầng chỉ cho lô màu tối (độ chói WCAG < OUTLINE_LUMA_MAX) trên nền vệ tinh.
+// Nền nhạt và lô màu sáng giữ nét, màu, không quầng như trước khi làm sáng.
+import { lightenTone, relativeLuminance, outlineBright, OUTLINE_LUMA_MAX, tt16SymbolStyle, landParcelStyle, TT16_STYLES } from '../public/js/tt16Symbols.js';
+import { cartoTileUsable, selectBasemap, isLightBasemap } from '../public/js/basemap.js';
 
 function hsl(hex) {
   const n = parseInt(hex.slice(1), 16);
@@ -29,36 +30,65 @@ assert(b.l > a.l + 0.2, `quốc phòng phải sáng hơn: ${dark} → ${lit}`);
 assert(Math.abs(b.h - a.h) < 0.04, `giữ hue: ${a.h.toFixed(3)} → ${b.h.toFixed(3)}`);
 assert(b.l < 0.8, `không trắng hóa: ${lit}`);
 
-const green = lightenTone('#009900');
-const g = hsl(green);
-assert(g.h > 0.28 && g.h < 0.4, `xanh vẫn xanh: ${green} h=${g.h.toFixed(3)}`);
+assert(relativeLuminance(dark) < OUTLINE_LUMA_MAX, 'quốc phòng dưới ngưỡng');
+assert(relativeLuminance('#66cc00') > OUTLINE_LUMA_MAX, 'cây xanh công cộng trên ngưỡng');
+assert(relativeLuminance('#00ff00') > OUTLINE_LUMA_MAX, 'nông nghiệp trên ngưỡng');
+assert(relativeLuminance('#c0c0c0') > OUTLINE_LUMA_MAX, 'đất chưa sử dụng trên ngưỡng');
+assert(relativeLuminance('#009900') > OUTLINE_LUMA_MAX, 'thể thao trên ngưỡng');
+assert(relativeLuminance('#3f7f4f') < OUTLINE_LUMA_MAX, 'rừng sản xuất dưới ngưỡng');
+assert(!isLightBasemap(), 'mặc định là nền vệ tinh');
 
-const pale = lightenTone('#c0c0c0');
-assert(hsl(pale).l > hsl('#c0c0c0').l && hsl(pale).l < 0.9, `xám nhạt không mất trên nền sáng: ${pale}`);
+const byColor = new Map();
+Object.values(TT16_STYLES).forEach(s => {
+  if (!/^#[0-9a-f]{6}$/i.test(s.color || '')) return;
+  const row = byColor.get(s.color) || { color: s.color, y: relativeLuminance(s.color), labels: [] };
+  row.labels.push(s.label);
+  byColor.set(s.color, row);
+});
+const qualify = [...byColor.values()].filter(r => r.y < OUTLINE_LUMA_MAX).sort((p, q) => p.y - q.y);
+const skip = [...byColor.values()].filter(r => r.y >= OUTLINE_LUMA_MAX);
+assert(qualify.some(r => r.color === dark), 'quốc phòng nằm trong danh sách làm sáng');
+assert(skip.some(r => r.color.toLowerCase() === '#66cc00'), 'cây xanh không làm sáng');
 
-const plan = tt16SymbolStyle('QP', '#394c26', 'QHDD_DAT_Quocphong', { scenario: 'QH', detailed: false, approved: true });
-assert(plan.fillColor === '#394c26', 'hoa văn/tô giữ màu gốc');
-assert(plan.color !== plan.fillColor && plan.color === lit, `viền là màu đã làm sáng (${plan.color})`);
-assert(plan.weight > 1.8 && plan.weight < 4, `nét dày hơn 1.8 nhưng dưới 4px che lô hẹp (${plan.weight})`);
-assert(plan.casingColor && plan.casingWeight > plan.weight && plan.casingWeight < 4.4, 'quầng sáng mỏng dưới nét màu');
+const plan = tt16SymbolStyle('QP', dark, 'QHDD_DAT_Quocphong', { scenario: 'QH', detailed: false, approved: true });
+assert(plan.fillColor === dark, 'tô giữ màu gốc');
+assert(plan.color === lit, `viền tối trên vệ tinh là màu đã làm sáng (${plan.color})`);
+assert(plan.weight === 2.4, `nét dày 2.4 (${plan.weight})`);
+assert(plan.casingColor && plan.casingWeight === 3.4, 'quầng sáng');
 assert(!plan.dashArray, 'QHDD nét liền');
 
-const pending = tt16SymbolStyle('QP', '#394c26', 'QHDD_DAT_Quocphong', { scenario: 'QH', detailed: false, approved: false });
-assert(pending.color === '#f87171' && pending.dashArray === '4,4', 'chờ duyệt vẫn viền đỏ nét đứt');
-assert(pending.fillColor === '#394c26', 'tô chờ duyệt không đổi');
+const tree = tt16SymbolStyle('1-CV', '#66cc00', 'QHDD_DAT_HTXH_CayxanhCC', { scenario: 'QH', detailed: false });
+assert(tree.color === '#66cc00' && tree.weight === 1.8 && !tree.casingColor, 'cây xanh giữ viền gốc');
 
-const ht = tt16SymbolStyle('QP', '#394c26', 'HT_DAT_Quocphong', { scenario: 'HT', detailed: false, approved: true });
-assert(ht.weight === 1 && !ht.casingColor, 'hiện trạng giữ nét mảnh, không quầng quy hoạch');
-assert(ht.color === lit, 'hiện trạng vẫn sáng viền để khỏi chìm');
+const pending = tt16SymbolStyle('QP', dark, 'QHDD_DAT_Quocphong', { scenario: 'QH', detailed: false, approved: false });
+assert(pending.color === '#f87171' && pending.dashArray === '4,4' && pending.weight === 1.8 && !pending.casingColor, 'chờ duyệt giữ viền đỏ gốc');
 
-const qhdh = tt16SymbolStyle('1-CV', '#66cc00', 'QHDH_DAT_HTXH_CayxanhCC', { scenario: 'QH', detailed: false });
-assert(qhdh.dashArray && qhdh.casingColor, 'dài hạn giữ nét đứt và quầng');
-assert(qhdh.fillColor === '#66cc00' && qhdh.color !== '#66cc00', 'cây xanh: tô gốc, viền sáng hơn');
+const ht = tt16SymbolStyle('QP', dark, 'HT_DAT_Quocphong', { scenario: 'HT', detailed: false, approved: true });
+assert(ht.weight === 1 && !ht.casingColor && ht.color === lit, 'hiện trạng tối chỉ sáng màu, nét mảnh, không quầng');
+
+const qhdh = tt16SymbolStyle('QP', dark, 'QHDH_DAT_Quocphong', { scenario: 'QH', detailed: false });
+assert(qhdh.dashArray === '9.3,4.7' && qhdh.casingColor, 'dài hạn tối: nét đứt theo nét 2.4 và quầng');
+const qhdhLight = tt16SymbolStyle('1-CV', '#66cc00', 'QHDH_DAT_HTXH_CayxanhCC', { scenario: 'QH', detailed: false });
+assert(qhdhLight.dashArray === '7,3.5' && qhdhLight.color === '#66cc00' && !qhdhLight.casingColor, 'dài hạn sáng: nét đứt gốc');
+
+selectBasemap('positron');
+assert(isLightBasemap() && !outlineBright(dark), 'nền nhạt tắt viền sáng');
+const onLight = tt16SymbolStyle('QP', dark, 'QHDD_DAT_Quocphong', { scenario: 'QH', detailed: false, approved: true });
+assert(onLight.color === dark && onLight.weight === 1.8 && !onLight.casingColor, 'cùng lô tối trên nền nhạt trở lại viền gốc');
+const htLight = tt16SymbolStyle('QP', dark, 'HT_DAT_Quocphong', { scenario: 'HT', detailed: false });
+assert(htLight.color === dark && htLight.weight === 1 && !htLight.casingColor, 'hiện trạng trên nền nhạt giữ màu gốc');
+selectBasemap('google');
+const back = tt16SymbolStyle('QP', dark, 'QHDD_DAT_Quocphong', { scenario: 'QH', detailed: false, approved: true });
+assert(back.color === lit && back.casingColor, 'đổi lại vệ tinh thì viền sáng trở lại');
 
 const bare = landParcelStyle('QH_Dat_khac_khong_ma', { phase: 'QH', detailed: false });
-assert(bare.casingColor && bare.weight > 1, 'lô không có khóa TT16 vẫn có viền quy hoạch sáng');
+assert(!bare.casingColor && bare.weight === 1.8, 'lô không khóa, màu nhạt, giữ viền gốc');
 
 assert(cartoTileUsable(2049) === false, 'ô mờ CARTO ~2KB không dùng được');
 assert(cartoTileUsable(18000) === true, 'ô Positron thật vẫn dùng được');
 
-console.log('lot-outline: ok', { dark, lit, green, pale, weight: plan.weight, halo: plan.casingWeight });
+console.log('lot-outline: ok', {
+  threshold: OUTLINE_LUMA_MAX,
+  dark: qualify.map(r => `${r.color} ${r.y.toFixed(3)} ${r.labels[0]}`),
+  light: skip.map(r => `${r.color} ${r.labels[0]}`)
+});

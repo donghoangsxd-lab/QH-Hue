@@ -13,7 +13,7 @@ import { startFlowAnimation } from './flowAnimation.js';
 import { tt16ParcelStyle, infraStyleKey, landParcelStyle, landLabel, landColor, landPatternKey, tt16SwatchCss, TT16_PATTERN_ZOOM, TT16_STYLES, LOT_OPACITY_EVENT } from './tt16Symbols.js';
 import { initLegendPanel } from './legendPanel.js';
 import { addIslandFlags } from './islandFlags.js';
-import { attachBasemap, MAP_MAX_ZOOM, geeTileOpts } from './basemap.js';
+import { attachBasemap, BASEMAP_EVENT, MAP_MAX_ZOOM, geeTileOpts } from './basemap.js';
 import {
   getCoveredRightWidth, highlightPlanWard, highlightPlanWards, wardFocusLayer, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, getViewMode, setViewMode, passToolClick, shownMaps
@@ -227,6 +227,7 @@ export function initMap() {
   onCompareChange(handleCompareChange);
   initLegendPanel();
   window.addEventListener(LOT_OPACITY_EVENT, () => { redrawParcels(); redrawLands(); });
+  window.addEventListener(BASEMAP_EVENT, () => { redrawParcels(); redrawLands(); });
 
   return map;
 }
