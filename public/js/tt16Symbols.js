@@ -278,12 +278,14 @@ const PT_PX = 1.6;
 const LINE_PT = 0.72;
 const DOT_R_PT = 0.36;
 // Khung ô ký hiệu Phụ lục: dải QHDD/QHDH dày 2.76pt; QHDH nét 10.68pt, hở 5.4pt.
-// Trên bản đồ viền QH cố định FRAME_PX ở mọi zoom, chung cho đợt đầu / dài hạn, giữ tỷ lệ nét–hở của Phụ lục:
-// dày đúng 2.76pt (4.4px) che kín lô hẹp như dải cây xanh dọc đường.
+// Trên bản đồ viền QH cố định FRAME_PX ở mọi zoom (không lấy 2.76pt ≈ 4.4px vì nét đó che lô hẹp
+// như dải cây xanh dọc đường). Nét sáng hơn màu tô cùng tông, thêm quầng sáng mỏng phía dưới.
 const FRAME_PT = 2.76;
 const DASH_PT = [10.68, 5.4];
-const FRAME_PX = 1.8;
+const FRAME_PX = 2.4;
 const HT_FRAME_PX = 1;
+const FRAME_HALO_PX = 1;
+const FRAME_HALO = '#f8fafc';
 const QHDH_DASH = DASH_PT.map(v => +((v / FRAME_PT) * FRAME_PX).toFixed(1)).join(',');
 
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -652,6 +654,71 @@ function hexToRgba(hex, a) {
   return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
 }
 
+function hslToHex(h, s, l) {
+  const hue = ((h % 1) + 1) % 1;
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const ch = t => {
+    const x = ((t % 1) + 1) % 1;
+    if (x < 1 / 6) return p + (q - p) * 6 * x;
+    if (x < 1 / 2) return q;
+    if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6;
+    return p;
+  };
+  const byte = t => Math.round(ch(t) * 255).toString(16).padStart(2, '0');
+  return `#${byte(hue + 1 / 3)}${byte(hue)}${byte(hue - 1 / 3)}`;
+}
+
+// Viền sáng hơn màu tô, giữ hue/saturation. Màu đã sáng chỉ nhích nhẹ để không hòa vào nền nhạt.
+export function lightenTone(hex) {
+  const m = /^#([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) return hex || '#e2e8f0';
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
+  }
+  const nextL = l >= 0.70 ? Math.min(0.84, l + 0.06) : Math.min(0.74, l + (0.92 - l) * 0.55);
+  return hslToHex(h, s, Math.max(l, nextL));
+}
+
+// Canvas của Leaflet chỉ có một nét. Quầng sáng vẽ trước nét màu khi style có casingColor.
+let lotCasingPatched = false;
+function ensureLotCasing() {
+  if (lotCasingPatched || typeof L === 'undefined' || !L.Canvas?.prototype?._fillStroke) return;
+  lotCasingPatched = true;
+  const orig = L.Canvas.prototype._fillStroke;
+  L.Canvas.prototype._fillStroke = function (ctx, layer) {
+    const options = layer.options;
+    if (!options?.casingColor) return orig.call(this, ctx, layer);
+    if (options.fill) {
+      ctx.globalAlpha = options.fillOpacity;
+      ctx.fillStyle = options.fillColor || options.color;
+      ctx.fill(options.fillRule || 'evenodd');
+    }
+    if (options.stroke && options.weight !== 0) {
+      if (ctx.setLineDash) ctx.setLineDash(layer.options && layer.options._dashArray || []);
+      ctx.lineCap = options.lineCap;
+      ctx.lineJoin = options.lineJoin;
+      ctx.globalAlpha = options.casingOpacity != null ? options.casingOpacity : 0.9;
+      ctx.lineWidth = options.casingWeight || options.weight;
+      ctx.strokeStyle = options.casingColor;
+      ctx.stroke();
+      ctx.globalAlpha = options.opacity;
+      ctx.lineWidth = options.weight;
+      ctx.strokeStyle = options.color;
+      ctx.stroke();
+    }
+  };
+}
+
 // Vẽ ô lặp 9 lần lệch ±1 ô để nét cắt ở mép ô liền với ô kế bên
 function drawTile(c, t, k) {
   for (let ox = -t.w; ox <= t.w; ox += t.w) {
@@ -750,14 +817,15 @@ export function tt16ParcelStyle(type, layer, { scenario, detailed, approved, nam
  * mọi mức zoom tô màu tone); tone = màu tô khi thu nhỏ, mặc định là màu ký hiệu.
  */
 export function tt16SymbolStyle(key, tone, layer, { scenario, detailed, approved = true }) {
+  ensureLotCasing();
   const s = key ? TT16_STYLES[key] : null;
   const pattern = detailed && s ? patternFor(key) : null;
-  const color = pattern ? s.color : (tone || (s && s.color) || '#94a3b8');
+  const fill = pattern ? s.color : (tone || (s && s.color) || '#94a3b8');
   return {
-    color: approved ? color : '#f87171',
+    color: approved ? lightenTone(fill) : '#f87171',
     opacity: 0.95,
     ...frameStyle(layer, scenario, approved),
-    fillColor: pattern || color,
+    fillColor: pattern || fill,
     fillOpacity: (pattern ? 1 : (s && s.solidOpacity) || (s && s.fillOpacity) || FILL_OPACITY) * lotOpacity
   };
 }
@@ -766,11 +834,13 @@ export function tt16SymbolStyle(key, tone, layer, { scenario, detailed, approved
 function frameStyle(layer, scenario, approved = true) {
   const stage = String(layer || '').trim().toUpperCase().split(/[_\s]/)[0];
   const plan = stage === 'QHDD' || stage === 'QHDH' || stage === 'QH' || (stage !== 'HT' && scenario === 'QH');
+  const weight = plan ? FRAME_PX : HT_FRAME_PX;
   return {
-    weight: plan ? FRAME_PX : HT_FRAME_PX,
+    weight,
     lineCap: 'butt',
     lineJoin: 'miter',
-    dashArray: !approved ? '4,4' : stage === 'QHDH' ? QHDH_DASH : null
+    dashArray: !approved ? '4,4' : stage === 'QHDH' ? QHDH_DASH : null,
+    ...(plan ? { casingColor: FRAME_HALO, casingWeight: +(weight + FRAME_HALO_PX).toFixed(1), casingOpacity: 0.92 } : {})
   };
 }
 
@@ -797,7 +867,7 @@ function legendGroupHtml([name, keys]) {
     const aci = s.aci != null ? ` · ACI ${s.aci}` : '';
     const search = foldLayer(`${s.label} ${s.layer} ${key}`).toLowerCase();
     return `<div class="tt16-row" title="${s.label}\nLayer: ${s.layer}${aci}" data-search="${search}">
-      <i class="tt16-swatch" style="${bg}border-color:${s.color};"></i><span>${s.label}</span></div>`;
+      <i class="tt16-swatch" style="${bg}border-color:${lightenTone(s.color)};"></i><span>${s.label}</span></div>`;
   }).join('');
   return `<details class="tt16-group" open><summary><span class="tt16-group-name">${name}</span><span class="tt16-group-count">${keys.length}</span></summary>${rows}</details>`;
 }
@@ -1042,5 +1112,8 @@ export function landParcelStyle(layerName, { detailed = false, phase = 'HT', nam
   if (key && TT16_STYLES[key]) {
     return tt16SymbolStyle(key, TT16_STYLES[key].color, layerName, { scenario: phase, detailed });
   }
-  return { ...landPolylineStyle(layerName), ...frameStyle(layerName, phase) };
+  ensureLotCasing();
+  const base = landPolylineStyle(layerName);
+  const frame = frameStyle(layerName, phase);
+  return { ...base, ...frame, color: frame.casingColor ? lightenTone(base.color) : base.color };
 }
