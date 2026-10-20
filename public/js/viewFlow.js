@@ -29,7 +29,7 @@ import { RIGHT_TAB_EVENT } from './utils.js';
 import { URBAN_PICK_EVENT, urbanVisionFeature, urbanVisionAt } from './urbanAreaLayer.js';
 import { focusUrban, clearUrbanFocus, urbanFocusHolds, urbanFocused, initUrbanFocus, FOCUS_CORE_EVENT } from './urbanFocus.js';
 import { fitCenter, isCoreWard, setCoreOpen, isCoreOpen, coreContains, setQhcPlaceMode, setPreferPlace, QHC_CORE_EVENT } from './qhc2045Layer.js';
-import { getLevel, setLevel, levelOrigin, levelScope, LEVEL_EVENT, LEVELS } from './mapLevel.js';
+import { getLevel, setLevel, withLevelLock, levelOrigin, levelScope, LEVEL_EVENT, LEVELS } from './mapLevel.js';
 import { planLevelOf, URBAN_FOCUS_EVENT } from './generalPlan.js';
 
 const CITY_NAME = 'Thành phố Huế';
@@ -123,18 +123,20 @@ export function applyInspectLevel(id, latlng, geom) {
   if (!id) return;
   const kind = PROJECT_KIND[id];
   if (kind) stashInspectView();
-  inspectSync++;
-  try {
-    setLevel(id, { keepView: true });
-  } finally {
-    inspectSync--;
-  }
-  if (id === 'qhc10' || id === 'qhc25') {
-    setPreferPlace(true);
-    return;
-  }
-  setPreferPlace(false);
-  if (kind) openInspectProjects(latlng, kind, geom);
+  // Mở đồ án giao vùng (kể cả cấp kia) không được đổi lớp vừa chọn — droplist và danh sách Quy hoạch giữ đúng tab.
+  withLevelLock(() => {
+    inspectSync++;
+    try {
+      setLevel(id, { keepView: true, fromHold: true });
+      if (id === 'qhc10' || id === 'qhc25') setPreferPlace(true);
+      else {
+        setPreferPlace(false);
+        if (kind) openInspectProjects(latlng, kind, geom);
+      }
+    } finally {
+      inspectSync--;
+    }
+  });
 }
 
 /** Vào QHC 1/10.000 (bấm ký hiệu đô thị trung tâm, hoặc vùng TTHuế 2045 của đô thị đang chọn: openLots mở lô luôn) */

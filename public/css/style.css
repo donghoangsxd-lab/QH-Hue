@@ -448,6 +448,15 @@ body.project-review:not(.project-view) .ovd-card {
   top: calc(12px + var(--title-h) + 8px);
   bottom: auto;
 }
+/* Bảng dự án kêu gọi đầu tư đã chiếm cột trái suốt chiều cao: thẻ đồ án sang phải bảng đó.
+   Điện thoại ghi đè left/top/bottom bằng !important trong media query. */
+body:has(#investCard:not([hidden])) .project-brief {
+  left: calc(12px + var(--tb-btn) + 18px + min(380px, calc(100% - var(--tb-btn) - var(--right-w) - 36px)));
+  top: calc(12px + var(--title-h) + 8px);
+  bottom: auto;
+  width: min(276px, calc(100% - var(--tb-btn) - var(--right-w) - 380px - 56px));
+  max-height: min(320px, calc(100% - var(--title-h) - 24px));
+}
 body:not(.bottom-collapsed) .cad-card,
 body.project-review:not(.project-view) .cad-card,
 body:not(.bottom-collapsed) .leaflet-popup.dock-card,
