@@ -11,6 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/pwa-192.png">
   <title>Bản đồ Phân tích Hạ tầng Đô thị TP. Huế (Headless GIS)</title>
+  <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
   <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
   <link rel="preconnect" href="https://earthengine.googleapis.com" crossorigin>
   <!-- Thư viện ghim phiên bản + SRI; html2pdf / html2canvas chỉ tải khi xuất PDF / chụp ảnh (public/js/utils.js).
@@ -529,10 +530,10 @@
           </div>
           <div class="layer-map-pane" id="layerPaneBase" data-map-pane="base" role="tabpanel">
           <div class="sat-pick basemap-pick">
-            <label for="basemapSelect" title="Ảnh nền cho bản đồ hiện trạng và quy hoạch. Nền nhạt không tên đường, để lớp quy hoạch nổi hơn. CARTO Positron khi còn ảnh; nếu không thì nền xám nhạt. Lựa chọn được ghi nhớ trên máy này"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ảnh nền</label>
+            <label for="basemapSelect" title="Ảnh nền cho bản đồ hiện trạng và quy hoạch. Bản đồ đường phố là OpenFreeMap Liberty, có tên đường; nếu không tải được thì nền xám nhạt. Lựa chọn được ghi nhớ trên máy này"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ảnh nền</label>
             <select id="basemapSelect" aria-label="Ảnh nền bản đồ">
               <option value="google">Google vệ tinh</option>
-              <option value="positron">Nền nhạt</option>
+              <option value="positron">Bản đồ đường phố</option>
             </select>
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div><button type="button" class="layer-mini-btn active" id="btnWardNames" title="Bật/tắt tên phường, xã trên bản đồ" aria-label="Bật/tắt tên phường, xã" aria-pressed="true">Aa</button></div>
