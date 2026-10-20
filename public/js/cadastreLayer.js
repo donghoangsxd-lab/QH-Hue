@@ -7,6 +7,7 @@
 // Nút Phân tích QH của đo diện tích mở cùng 4 trang trên polygon vùng đo.
 // Droplist Hệ thống đô thị giữ popup tại thửa.
 import { map } from './mapEngine.js';
+import { MAP_MAX_ZOOM } from './basemap.js';
 import { planMap, getViewMode, isSplitOn } from './planMap.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, showToast, ico } from './utils.js';
@@ -257,7 +258,7 @@ function makeLayer(m, fill) {
     pane.style.pointerEvents = 'none';
   }
   const opacity = Number($('cadastreOpacity')?.value ?? 100) / 100;
-  return new CadastreGrid({ pane: PANE, minZoom: MIN_ZOOM, maxZoom: 22, opacity, fill, updateWhenZooming: false, keepBuffer: 1 }).addTo(m);
+  return new CadastreGrid({ pane: PANE, minZoom: MIN_ZOOM, maxZoom: MAP_MAX_ZOOM, opacity, fill, updateWhenZooming: false, keepBuffer: 1 }).addTo(m);
 }
 
 const activeMap = () => (planMap && !isSplitOn() && getViewMode() === 'QH' ? planMap : map);

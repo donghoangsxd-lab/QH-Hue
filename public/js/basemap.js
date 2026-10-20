@@ -1,17 +1,25 @@
 // Ảnh nền dùng chung cho bản đồ hiện trạng và quy hoạch.
 // Mặc định Google vệ tinh. Nền nhạt là CARTO Positron không nhãn (OSM, miễn phí) để lớp quy hoạch nổi hơn.
 // Lựa chọn ghi trên máy (qhhue.basemap). Lớp cắt nền điều chỉnh cục bộ luôn lấy vệ tinh Google.
+// Mức phóng bản đồ cao hơn ô gốc: Leaflet phóng ô maxNativeZoom, không tắt lớp.
 const STORE_KEY = 'qhhue.basemap';
+
+/** Mức phóng tối đa của mọi bản đồ Leaflet (hiện trạng, quy hoạch, định vị ảnh). */
+export const MAP_MAX_ZOOM = 22;
+// Ảnh GEE (dân cư, heatmap, viễn thám) xin tới z19; cao hơn phóng ô đó.
+export const GEE_NATIVE_ZOOM = 19;
 
 const BASEMAPS = {
   google: {
     label: 'Google vệ tinh',
     url: 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-    opts: { maxNativeZoom: 19, subdomains: '0123', attribution: 'Imagery &copy; Google' }
+    // Vệ tinh Google trên địa bàn Huế còn ảnh tới z22
+    opts: { maxNativeZoom: 22, subdomains: '0123', attribution: 'Imagery &copy; Google' }
   },
   positron: {
     label: 'Nền nhạt',
     url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+    // CARTO Positron (dữ liệu OSM) có ô tới z20
     opts: {
       maxNativeZoom: 20,
       subdomains: 'abcd',
@@ -24,7 +32,7 @@ const BASEMAPS = {
 // Tem đường + tên công trình (nền trong suốt) phủ trên ranh lô để nhận biết vị trí khi duyệt từng khu đất
 const LABELS = {
   url: 'https://mt{s}.google.com/vt/lyrs=h&hl=vi&x={x}&y={y}&z={z}',
-  opts: { maxNativeZoom: 19, subdomains: '0123', attribution: 'Nhãn &copy; Google' }
+  opts: { maxNativeZoom: 22, subdomains: '0123', attribution: 'Nhãn &copy; Google' }
 };
 const LABELS_PANE = 'labelsPane';
 
@@ -41,9 +49,14 @@ function defOf(id) {
   return BASEMAPS[id] || BASEMAPS.google;
 }
 
+// detectRetina của Leaflet giảm maxZoom của layer đi 1 trên màn retina, nên cộng bù để vẫn tới MAP_MAX_ZOOM
+function layerMaxZoom(opts) {
+  return MAP_MAX_ZOOM + (opts && opts.detectRetina ? 1 : 0);
+}
+
 function addBase(m, id) {
   const def = defOf(id);
-  return L.tileLayer(def.url, { maxZoom: 21, zIndex: 0, crossOrigin: 'anonymous', ...def.opts }).addTo(m);
+  return L.tileLayer(def.url, { maxZoom: layerMaxZoom(def.opts), zIndex: 0, crossOrigin: 'anonymous', ...def.opts }).addTo(m);
 }
 
 function addLabels(m) {
@@ -52,7 +65,7 @@ function addLabels(m) {
     pane.style.zIndex = 450;
     pane.style.pointerEvents = 'none';
   }
-  labelLayers.set(m, L.tileLayer(LABELS.url, { maxZoom: 21, pane: LABELS_PANE, ...LABELS.opts }).addTo(m));
+  labelLayers.set(m, L.tileLayer(LABELS.url, { maxZoom: layerMaxZoom(LABELS.opts), pane: LABELS_PANE, ...LABELS.opts }).addTo(m));
 }
 
 /** Bật / tắt tem đường, tên công trình trên mọi bản đồ đã gắn ảnh nền (nút nhỏ cuối dòng Mạng lưới đường) */
@@ -101,7 +114,7 @@ export function basemapTileSpec() {
   const def = BASEMAPS.google;
   return {
     url: def.url,
-    maxZoom: 21,
+    maxZoom: MAP_MAX_ZOOM,
     maxNativeZoom: def.opts.maxNativeZoom,
     subdomains: def.opts.subdomains
   };
@@ -126,6 +139,11 @@ function setWardNames(on) {
     btn.setAttribute('aria-pressed', String(on));
   }
   try { localStorage.setItem(WARD_NAMES_KEY, on ? '1' : '0'); } catch (e) { /* chế độ riêng tư */ }
+}
+
+/** Lớp tile GEE: ô gốc tới GEE_NATIVE_ZOOM, mức cao hơn phóng ô đó. */
+export function geeTileOpts(extra = {}) {
+  return { maxZoom: MAP_MAX_ZOOM, maxNativeZoom: GEE_NATIVE_ZOOM, ...extra };
 }
 
 /** Ô chọn ảnh nền và nút "Aa" trong panel lớp */

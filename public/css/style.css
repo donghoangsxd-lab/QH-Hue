@@ -113,8 +113,9 @@ body.bottom-collapsed:not(.project-review:not(.project-view)) { --bottom-gap: 0p
   left: 0;
   right: 0;
   bottom: var(--bottom-gap);
+  touch-action: none;
 }
-#map { position: absolute; inset: 0; z-index: 0; background: var(--bg-panel); }
+#map { position: absolute; inset: 0; z-index: 0; background: var(--bg-panel); touch-action: none; }
 #map.inspect-mode, #mapPlan.inspect-mode { cursor: crosshair !important; }
 
 /* SO SÁNH HIỆN TRẠNG / QUY HOẠCH (SWIPE) */
@@ -124,6 +125,7 @@ body.bottom-collapsed:not(.project-review:not(.project-view)) { --bottom-gap: 0p
   z-index: 1;
   background: var(--bg-panel);
   display: none;
+  touch-action: none;
 }
 #swipeDivider {
   position: absolute;

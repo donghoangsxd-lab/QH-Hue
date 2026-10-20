@@ -11,7 +11,7 @@ import { parseDxf, buildParcels, CRS_PRESETS, layerToType } from './cadImport.js
 import { escapeHtml, fmtNum, ico, showToast, loadHtml2Pdf, isApproved, wardStatHtml } from './utils.js';
 import { setBottomPanelMaximized, setBottomPanelCollapsed } from './uiComponents.js';
 import { importReviewDossier, rejectPending, REVIEW_DOSSIER_EVENT } from './cadImportUi.js';
-import { setLabelsOverlay, labelsOverlayOn } from './basemap.js';
+import { setLabelsOverlay, labelsOverlayOn, geeTileOpts } from './basemap.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, landPatternKey, LOT_OPACITY_EVENT } from './tt16Symbols.js';
 import {
   REVIEW_MAX_BYTES, LANDUSE_TABLES, classifyLand, landChoices, landRowByKey, landUseSummary, landSubKey, importLayerName, decisionKind,
@@ -396,7 +396,7 @@ function drawHeat(phase) {
   clearHeat(phase);
   if (!want) return;
   const opacityEl = $('heatOpacity');
-  h.tile = L.tileLayer(h.url, { maxZoom: 19, opacity: opacityEl ? opacityEl.value / 100 : 0.3 }).addTo(m);
+  h.tile = L.tileLayer(h.url, geeTileOpts({ opacity: opacityEl ? opacityEl.value / 100 : 0.3 })).addTo(m);
   h.tileUrl = h.url;
   h.tileMap = m;
 }

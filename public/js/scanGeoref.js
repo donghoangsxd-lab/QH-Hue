@@ -4,7 +4,7 @@
 //  - Chấm điểm: cặp điểm ảnh ↔ bản đồ, giải affine 6 tham số (dời, co giãn, xoay, xiên) bằng bình phương tối thiểu.
 // Cả hai tính trong hệ mét Web Mercator. Định vị lưu dạng 3 góc ảnh (trên trái, trên phải, dưới trái);
 // ScanOverlay vẽ bằng ma trận CSS nên không cần plugin.
-import { attachBasemap, detachBasemap } from './basemap.js';
+import { attachBasemap, detachBasemap, MAP_MAX_ZOOM } from './basemap.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 
 export const SCAN_MAX_BYTES = 2 * 1024 * 1024 - 8192;
@@ -310,7 +310,7 @@ export function openGeoref(opts) {
     document.body.appendChild(box);
     const panes = box.querySelector('#sgPanes');
 
-    const geoMap = L.map(box.querySelector('#sgMap'), { maxZoom: 21, attributionControl: false, zoomControl: true, keyboard: false });
+    const geoMap = L.map(box.querySelector('#sgMap'), { maxZoom: MAP_MAX_ZOOM, touchZoom: true, attributionControl: false, zoomControl: true, keyboard: false });
     attachBasemap(geoMap, 'google');
     geoMap.createPane('sgScan').style.zIndex = 390;
     // Leaflet cần tâm nhìn trước khi nhận nét vẽ; ranh nằm trên ảnh (overlayPane 400) và không bắt chuột để kéo ảnh xuyên qua

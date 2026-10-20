@@ -7,6 +7,7 @@
 import { state, BUFFER_COLORS } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, ico, showToast, startTaskProgress, trackTileLoad } from './utils.js';
+import { geeTileOpts } from './basemap.js';
 
 export const PROOF_FOCUS_EVENT = 'csd-proof-focus';
 
@@ -313,7 +314,7 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
 
   let tiles = null;
   if (data.tileUrl) {
-    const tileLayer = L.tileLayer(data.tileUrl, { maxZoom: 19, opacity: 0.8, zIndex: 50 });
+    const tileLayer = L.tileLayer(data.tileUrl, geeTileOpts({ opacity: 0.8, zIndex: 50 }));
     tiles = trackTileLoad(tileLayer, (n, total) => myTask.set(DRAW_PCT + (100 - DRAW_PCT) * (n / Math.max(total, 1)), 'Đang tải ảnh pixel dân cư'));
     group.addLayer(tileLayer);
   }
