@@ -5223,4 +5223,10 @@ body.project-review.la-page #projectReviewHost {
 @media print and (max-width: 840px) {
   html, body { position: static; inset: auto; width: auto; max-width: none; height: auto; max-height: none; overflow: visible; }
 }
+/* Nền đường phố MapLibre nằm dưới mọi lớp Leaflet; chuột và chạm đi xuyên xuống bản đồ. */
+.leaflet-ofm-pane,
+.leaflet-ofm-pane .leaflet-gl-layer,
+.leaflet-ofm-pane canvas {
+  pointer-events: none !important;
+}
 

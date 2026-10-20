@@ -1,7 +1,7 @@
 // Viền sáng + quầng chỉ cho lô màu tối (độ chói WCAG < OUTLINE_LUMA_MAX) trên nền vệ tinh.
 // Nền nhạt và lô màu sáng giữ nét, màu, không quầng như trước khi làm sáng.
 import { lightenTone, relativeLuminance, outlineBright, OUTLINE_LUMA_MAX, tt16SymbolStyle, landParcelStyle, isTransportLand, isNarrowStrip, TT16_STYLES } from '../public/js/tt16Symbols.js';
-import { cartoTileUsable, selectBasemap, isLightBasemap } from '../public/js/basemap.js';
+import { selectBasemap, isLightBasemap, basemapLabel, preferVietnameseLabels } from '../public/js/basemap.js';
 
 function hsl(hex) {
   const n = parseInt(hex.slice(1), 16);
@@ -72,7 +72,8 @@ const qhdhLight = tt16SymbolStyle('1-CV', '#66cc00', 'QHDH_DAT_HTXH_CayxanhCC', 
 assert(qhdhLight.dashArray === '7,3.5' && qhdhLight.color === '#66cc00' && !qhdhLight.casingColor, 'dài hạn sáng: nét đứt gốc');
 
 selectBasemap('positron');
-assert(isLightBasemap() && !outlineBright(dark), 'nền nhạt tắt viền sáng');
+assert(basemapLabel() === 'Bản đồ đường phố', 'nhãn nền đường phố');
+assert(isLightBasemap() && !outlineBright(dark), 'nền đường phố tắt viền sáng');
 const onLight = tt16SymbolStyle('QP', dark, 'QHDD_DAT_Quocphong', { scenario: 'QH', detailed: false, approved: true });
 assert(onLight.color === dark && onLight.weight === 1.8 && !onLight.casingColor, 'cùng lô tối trên nền nhạt trở lại viền gốc');
 const htLight = tt16SymbolStyle('QP', dark, 'HT_DAT_Quocphong', { scenario: 'HT', detailed: false });
@@ -119,8 +120,18 @@ assert(!canal.casingColor && canal.weight <= 1, 'kênh hẹp bỏ quầng');
 const canalWide = tt16SymbolStyle('SS', '#0066cc', 'QHDD_DAT_KHAC_Songsuoi', { scenario: 'QH', detailed: false, geometry: block });
 assert(canalWide.casingColor, 'mặt nước rộng vẫn có quầng');
 
-assert(cartoTileUsable(2049) === false, 'ô mờ CARTO ~2KB không dùng được');
-assert(cartoTileUsable(18000) === true, 'ô Positron thật vẫn dùng được');
+const viStyle = preferVietnameseLabels({
+  layers: [
+    { id: 'road', layout: { 'text-field': ['coalesce', ['get', 'name_en'], ['get', 'name']] } },
+    { id: 'shield', layout: { 'text-field': ['get', 'ref'] } },
+    { id: 'bg', paint: { 'background-color': '#fff' } }
+  ]
+});
+const roadField = viStyle.layers[0].layout['text-field'];
+assert(roadField[0] === 'coalesce' && roadField[1][1] === 'name:vi' && roadField[2][1] === 'name', 'nhãn ưu tiên name:vi rồi name');
+assert(JSON.stringify(roadField[3]) === JSON.stringify(['coalesce', ['get', 'name_en'], ['get', 'name']]), 'giữ biểu thức tên sẵn có');
+assert(JSON.stringify(viStyle.layers[1].layout['text-field']) === JSON.stringify(['get', 'ref']), 'biển số đường giữ ref');
+assert(!viStyle.layers[2].layout, 'lớp không chữ không đổi');
 
 console.log('lot-outline: ok', {
   threshold: OUTLINE_LUMA_MAX,
