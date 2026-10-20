@@ -220,6 +220,8 @@ const constants = {
   // Thửa đất địa chính 2016 (gis21.hue.gov.vn): thuadat-2016.pmtiles + index/xa.json, index/<maxa>.json
   // (scripts/cadastre-to-pmtiles.mjs tạo). Trình duyệt đọc PMTiles thẳng từ bucket bằng HTTP Range, cần CORS cho header Range.
   CADASTRE_GCS_BASE: "https://storage.googleapis.com/hue-infra-data-us/cadastre/",
+  // Dấu chân Global Building Atlas: buildings.pmtiles + agg.json (scripts/build-gba.py). Cần CORS header Range.
+  GBA_GCS_BASE: "https://storage.googleapis.com/hue-infra-data-us/gba/",
 
   // Cấu hình trên Vercel (Settings → Environment Variables), không ghi vào mã nguồn
   GAS_BASE_URL: process.env.GAS_BASE_URL || "",

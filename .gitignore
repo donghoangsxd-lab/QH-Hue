@@ -12,6 +12,7 @@ Thumbs.db
 /HuongThoat.geojson
 /.cache/
 /public/version.json
+/public/data/gba/*.pmtiles
 .vercel
 .env*
 /optimistic-yew-*.json
