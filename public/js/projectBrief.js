@@ -124,11 +124,18 @@ function meterRow(label, title, value, share, tone) {
       <div class="project-brief-meter-top"><span>${label}</span><b>${value}</b></div>${meterBar(share)}</div>`;
 }
 
+const PHONE_LAYOUT = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px))');
+
+function briefBesideInvest() {
+  const invest = document.getElementById('investCard');
+  return !PHONE_LAYOUT.matches && !!(invest && !invest.hidden);
+}
+
 function syncBriefStack() {
   const host = document.getElementById('mapArea');
   const el = document.getElementById('projectBrief');
   if (!host || !el) return;
-  const h = el.hidden ? 0 : el.offsetHeight;
+  const h = el.hidden || briefBesideInvest() ? 0 : el.offsetHeight;
   host.style.setProperty('--brief-stack', h ? `${h + 8}px` : '0px');
 }
 
@@ -218,5 +225,7 @@ export function initProjectBrief() {
   document.addEventListener(PROJECT_POP_EVENT, (e) => { if (e.detail === openName) show(openName); });
   const syncStack = () => syncBriefStack();
   new ResizeObserver(syncStack).observe(el);
+  new MutationObserver(syncStack).observe(host, { subtree: true, attributes: true, attributeFilter: ['hidden'], childList: true });
+  PHONE_LAYOUT.addEventListener('change', syncStack);
   syncStack();
 }

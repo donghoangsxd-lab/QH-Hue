@@ -29,6 +29,8 @@ let level = DEFAULT_LEVEL;
 // Lớp đã chuyển sang lớp hiện tại (VD mở QHPK khi đang xem QHC 1/10.000 → 'qhc10') để thoát đồ án thì quay lại
 let origin = null;
 let applying = false;
+// Tab kiểm tra quy hoạch đang tự chọn lớp: mở đồ án giao vùng không được kéo droplist sang cấp đồ án kia
+let levelLock = 0;
 let button = null;
 let menu = null;
 
@@ -51,9 +53,17 @@ function emit(prev, extra = {}) {
   document.dispatchEvent(new CustomEvent(LEVEL_EVENT, { detail: { level, prev, origin, ...extra } }));
 }
 
+/** Giữ nguyên lớp đang chọn trong lúc chạy fn. setLevel từ mở đồ án bị bỏ qua; chỉ setLevel(..., { fromHold: true }) được đổi. */
+export function withLevelLock(fn) {
+  levelLock += 1;
+  try { return fn(); } finally { levelLock -= 1; }
+}
+
 /** Chọn lớp: bật lớp này, tắt 4 lớp còn lại (gọi lại cùng lớp để đặt lại về chỉ một lớp).
- *  opts.origin: lớp chuyển sang. opts.keepView: droplist QHC 1/10.000 và 1/25.000 không phóng khung hình. */
-export function setLevel(id, { origin: from = null, keepView = false } = {}) {
+ *  opts.origin: lớp chuyển sang. opts.keepView: droplist QHC 1/10.000 và 1/25.000 không phóng khung hình.
+ *  opts.fromHold: được phép đổi lớp khi đang withLevelLock (tab kiểm tra tự chọn). */
+export function setLevel(id, { origin: from = null, keepView = false, fromHold = false } = {}) {
+  if (levelLock && !fromHold) return;
   const next = byId.get(id);
   if (!next) return;
   const prev = level;
@@ -70,7 +80,10 @@ export function setLevel(id, { origin: from = null, keepView = false } = {}) {
 }
 
 function onLayerChange(e) {
-  if (applying) return;
+  if (applying || levelLock) {
+    if (levelLock) paint();
+    return;
+  }
   const l = byChk.get(e.target?.id);
   if (!l) return;
   const prev = level;
