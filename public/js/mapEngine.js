@@ -1705,6 +1705,12 @@ function anchorInScope(p, wardInfo) {
   return !!wardInfo && isPointInWard(a.lat, a.lng, wardInfo);
 }
 
+// Tra cứu giao nhiều đồ án: bảng dưới chỉ mở đồ án nhỏ nhất nên khung bbox của nó cắt mất lô đồ án kia
+// (cùng đang bật trong lotProjects). Đồ án của chính bảng thì bảng tự vẽ, không vẽ thêm ở lớp chung.
+function inspectLotOutsideReview(lot) {
+  return !!(reviewScope && lot?.file && state.lotProjects.has(lot.file) && lot.file !== reviewScope.project);
+}
+
 const lotScopeMemo = new WeakMap();
 function lotsInWardScope(list) {
   const tag = scopeTag();
@@ -1713,7 +1719,7 @@ function lotsInWardScope(list) {
   if (memo && memo.tag === tag && memo.wards === state.wardLabelsList) return memo.result;
   const wardInfo = tag.startsWith('review:') ? null : state.wardLabelsList.find(w => w.name === tag);
   // ward gán lúc nhập (phần diện tích lớn nhất) giữ lô vắt ranh; không có ward thì thử tâm hình như điểm công trình
-  const result = list.filter(p => (wardInfo && p.ward === wardInfo.name) || anchorInScope(p, wardInfo));
+  const result = list.filter(p => inspectLotOutsideReview(p) || (wardInfo && p.ward === wardInfo.name) || anchorInScope(p, wardInfo));
   lotScopeMemo.set(list, { tag, wards: state.wardLabelsList, result });
   return result;
 }
@@ -1731,6 +1737,7 @@ function infraLotsInWardScope(list) {
   const qhAll = new Set(getPlanScenarioList().map(p => p.id));
   const wardInfo = tag.startsWith('review:') ? null : state.wardLabelsList.find(w => w.name === tag);
   const result = list.filter(lot => {
+    if (inspectLotOutsideReview(lot)) return true;
     const known = lot.phase === 'QH' ? qhAll : htAll;
     if (!known.has(lot.id)) return anchorInScope(lot, wardInfo);
     return (lot.phase === 'QH' ? qhIn : htIn).has(lot.id);
