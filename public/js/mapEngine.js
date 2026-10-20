@@ -1567,8 +1567,8 @@ const isBusyTool = () => state.isPickMode || state.activeMeasureType || state.ad
 // Lô hạ tầng của đồ án: tô ký hiệu TT16 theo loại công trình trên Sheet (cùng mã lô), bấm mở popup công trình
 function infraLotShape(lot, item, m, detailed) {
   const style = item
-    ? tt16ParcelStyle(layerType(item), lot.layer, { scenario: lot.phase, detailed, approved: isApproved(item.status), name: item.name })
-    : landParcelStyle(lot.layer, { detailed, phase: lot.phase, name: lot.name });
+    ? tt16ParcelStyle(layerType(item), lot.layer, { scenario: lot.phase, detailed, approved: isApproved(item.status), name: item.name, geometry: lot.geometry })
+    : landParcelStyle(lot.layer, { detailed, phase: lot.phase, name: lot.name, geometry: lot.geometry });
   const shape = L.geoJSON(lot.geometry, { style, bubblingMouseEvents: false });
   bindLotHover(shape);
   if (!item) return shape;
@@ -1582,7 +1582,7 @@ function infraLotShape(lot, item, m, detailed) {
 
 function landLotShape(p, m, detailed) {
   const shape = L.geoJSON(p.geometry, {
-    style: landParcelStyle(p.layer, { detailed, phase: p.phase, name: p.name }),
+    style: landParcelStyle(p.layer, { detailed, phase: p.phase, name: p.name, geometry: p.geometry }),
     bubblingMouseEvents: false
   });
   bindLotHover(shape);

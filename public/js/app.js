@@ -235,11 +235,55 @@ const VIEW_TITLES = {
   HT: 'BẢN ĐỒ HIỆN TRẠNG THÀNH PHỐ HUẾ',
   split: 'SO SÁNH HIỆN TRẠNG – QUY HOẠCH THÀNH PHỐ HUẾ'
 };
+const VIEW_TITLES_SHORT = {
+  QH: 'BẢN ĐỒ QUY HOẠCH TP HUẾ',
+  HT: 'BẢN ĐỒ HIỆN TRẠNG TP HUẾ',
+  split: 'SO SÁNH HT – QH TP HUẾ'
+};
 function initMapTitle() {
   const root = document.getElementById('mapTitle');
   if (!root) return;
   const text = document.getElementById('mapTitleText');
   const flip = document.getElementById('btnFlipView');
+  let titleKey = 'QH';
+  // Hộp tiêu đề vừa chữ, không tràn vào cột công cụ hay panel Lớp dữ liệu.
+  const fitTitle = () => {
+    if (!text) return;
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const toolRight = document.querySelector('.map-toolbar')?.getBoundingClientRect().right ?? 12;
+    const panel = document.getElementById('rightPanel');
+    const panelBox = panel?.getBoundingClientRect();
+    const panelOpen = panel && !document.body.classList.contains('right-collapsed') && panelBox.width > 8 && panelBox.left < vw - 4;
+    const rightBound = (panelOpen ? panelBox.left : vw) - 8;
+    const leftBound = toolRight + 8;
+    root.style.width = 'fit-content';
+    root.style.maxWidth = 'none';
+    const box = root.getBoundingClientRect();
+    const centered = getComputedStyle(root).transform !== 'none';
+    const avail = centered
+      ? Math.floor(2 * Math.min(box.left + box.width / 2 - leftBound, rightBound - (box.left + box.width / 2)))
+      : Math.floor(rightBound - box.left);
+    root.style.maxWidth = `${Math.max(140, avail)}px`;
+    const full = VIEW_TITLES[titleKey] || text.textContent;
+    const short = VIEW_TITLES_SHORT[titleKey] || full;
+    const apply = (label, size) => {
+      text.textContent = label;
+      text.title = full;
+      text.style.fontSize = size ? `${size}px` : '';
+    };
+    const fits = () => root.scrollWidth <= root.clientWidth + 1;
+    apply(full, 0);
+    if (fits()) return;
+    const base = parseFloat(getComputedStyle(text).fontSize) || 14;
+    for (const size of [base - 1, base - 2, Math.max(11, base - 3)]) {
+      apply(full, size);
+      if (fits()) return;
+    }
+    apply(short, 0);
+    if (fits()) return;
+    const base2 = parseFloat(getComputedStyle(text).fontSize) || 13;
+    apply(short, Math.max(11, base2 - 1));
+  };
   const setProjects = (on) => {
     const chk = document.getElementById('chk_projects');
     if (!chk || chk.checked === on || getLevel() !== 'qhpk') return;
@@ -251,10 +295,12 @@ function initMapTitle() {
     const key = split ? 'split' : view;
     root.dataset.view = key;
     const title = VIEW_TITLES[key];
+    titleKey = key;
     if (text) {
       text.textContent = title;
       text.title = title;
     }
+    fitTitle();
     if (flip) {
       flip.title = split ? 'Đang so sánh hai bản đồ' : `Lật sang bản đồ ${view === 'QH' ? 'hiện trạng' : 'quy hoạch'}`;
       flip.setAttribute('aria-label', flip.title);
@@ -280,6 +326,8 @@ function initMapTitle() {
   flip?.addEventListener('click', toggleViewMode);
   root.querySelectorAll('[data-split-kind]').forEach(btn => btn.addEventListener('click', () => setSplitKind(btn.dataset.splitKind)));
   paint({ view: getViewMode(), split: isSplitOn(), kind: getSplitKind() });
+  window.addEventListener('resize', fitTitle);
+  new MutationObserver(fitTitle).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 }
 
 async function loadInfraData() {

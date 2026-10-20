@@ -714,6 +714,83 @@ export function outlineBright(hex) {
   return !isLightBasemap() && relativeLuminance(hex) < OUTLINE_LUMA_MAX;
 }
 
+// Đất giao thông: không viền, không quầng, mọi nền và mọi mức phóng. Tô mờ để còn thấy mặt đường.
+const TRANSPORT_KEYS = new Set(['GT', 'T-GT', 'C-GTDT', 'C-GTDN']);
+const TRANSPORT_RE = /GIAOTHONG|DUONGGT|DUONGGIAO|DUONGPHO|LONGDUONG|LEDUONG|VIAHE|DUONGSAT|BENTHUYEN|BENXE/;
+const ROAD_FILL = 0.32;
+// Dải hẹp (kênh, cây xanh dọc đường): quầng sáng chồng thành lưới. Bề rộng trung bình dưới ngưỡng này thì bỏ quầng.
+const STRIP_WIDTH_M = 18;
+
+export function isTransportLand(key, layerName = '', lotName = '') {
+  if (key && TRANSPORT_KEYS.has(key)) return true;
+  const blob = foldLayer(`${layerName} ${lotName}`).replace(/[^A-Z0-9]/g, '');
+  return TRANSPORT_RE.test(blob);
+}
+
+function roadLotStyle(fill) {
+  const color = fill || '#5b5b5b';
+  return {
+    stroke: false,
+    weight: 0,
+    color,
+    opacity: 0,
+    dashArray: null,
+    lineCap: 'butt',
+    lineJoin: 'miter',
+    casingColor: null,
+    casingWeight: null,
+    casingOpacity: null,
+    fill: true,
+    fillColor: color,
+    fillOpacity: ROAD_FILL * lotOpacity
+  };
+}
+
+function ringWidthM(ring) {
+  if (!ring || ring.length < 4) return Infinity;
+  const lat0 = Number(ring[0][1]) * Math.PI / 180;
+  if (!Number.isFinite(lat0)) return Infinity;
+  const mLng = 111320 * Math.cos(lat0);
+  const pts = [];
+  for (const p of ring) {
+    const x = Number(p[0]) * mLng;
+    const y = Number(p[1]) * 111320;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return Infinity;
+    pts.push([x, y]);
+  }
+  let area = 0, peri = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
+    area += x0 * y1 - x1 * y0;
+    peri += Math.hypot(x1 - x0, y1 - y0);
+  }
+  if (peri < 1) return Infinity;
+  return Math.abs(area) / peri;
+}
+
+/** true khi lô là dải hẹp (bề rộng trung bình dưới STRIP_WIDTH_M). Quầng trên dải này thành lưới. */
+export function isNarrowStrip(geometry) {
+  const g = geometry && geometry.type ? geometry : null;
+  if (!g) return false;
+  const rings = g.type === 'Polygon' ? g.coordinates
+    : g.type === 'MultiPolygon' ? g.coordinates.map(p => p[0])
+    : null;
+  if (!rings || !rings.length) return false;
+  const width = g.type === 'Polygon' ? ringWidthM(rings[0]) : Math.min(...rings.map(ringWidthM));
+  return width < STRIP_WIDTH_M;
+}
+
+function dropStripHalo(style, geometry) {
+  if (!style?.casingColor || !isNarrowStrip(geometry)) return style;
+  return {
+    ...style,
+    weight: Math.min(style.weight || HT_FRAME_PX, HT_FRAME_PX),
+    casingColor: null,
+    casingWeight: null,
+    casingOpacity: null
+  };
+}
+
 // Canvas của Leaflet chỉ có một nét. Quầng sáng vẽ trước nét màu khi style có casingColor.
 let lotCasingPatched = false;
 function ensureLotCasing() {
@@ -832,28 +909,30 @@ export function infraStyleKey(type, layer, name) {
  * detailed: phóng to → hoa văn cùng màu ký hiệu; thu nhỏ → tô đặc đúng màu đó.
  * approved = false → viền đỏ nét đứt (chờ duyệt). name: tên công trình (nhận thể dục thể thao khi layer không ghi).
  */
-export function tt16ParcelStyle(type, layer, { scenario, detailed, approved, name }) {
+export function tt16ParcelStyle(type, layer, { scenario, detailed, approved, name, geometry }) {
   const key = infraStyleKey(type, layer, name);
-  return tt16SymbolStyle(key, key ? TT16_STYLES[key].color : null, layer, { scenario, detailed, approved });
+  return tt16SymbolStyle(key, key ? TT16_STYLES[key].color : null, layer, { scenario, detailed, approved, name, geometry });
 }
 
 /**
  * Cùng nguyên tắc tt16ParcelStyle nhưng chọn thẳng khóa ký hiệu: key = khóa TT16_STYLES (null = đất không có hoa văn,
  * mọi mức zoom tô màu tone); tone = màu tô khi thu nhỏ, mặc định là màu ký hiệu.
  */
-export function tt16SymbolStyle(key, tone, layer, { scenario, detailed, approved = true }) {
+export function tt16SymbolStyle(key, tone, layer, { scenario, detailed, approved = true, name = '', geometry = null } = {}) {
   ensureLotCasing();
   const s = key ? TT16_STYLES[key] : null;
+  const fill = tone || (s && s.color) || '#94a3b8';
+  if (isTransportLand(key, layer, name)) return roadLotStyle(s ? s.color : fill);
   const pattern = detailed && s ? patternFor(key) : null;
-  const fill = pattern ? s.color : (tone || (s && s.color) || '#94a3b8');
-  const bright = approved && outlineBright(fill);
-  return {
-    color: !approved ? '#f87171' : (bright ? lightenTone(fill) : fill),
+  const paint = pattern ? s.color : fill;
+  const bright = approved && outlineBright(paint);
+  return dropStripHalo({
+    color: !approved ? '#f87171' : (bright ? lightenTone(paint) : paint),
     opacity: 0.95,
     ...frameStyle(layer, scenario, approved, bright),
-    fillColor: pattern || fill,
+    fillColor: pattern || paint,
     fillOpacity: (pattern ? 1 : (s && s.solidOpacity) || (s && s.fillOpacity) || FILL_OPACITY) * lotOpacity
-  };
+  }, geometry);
 }
 
 // Kiểu viền theo tiền tố layer: HT_ nét mảnh, QHDD_ (hoặc không tiền tố trên kịch bản QH) nét liền, QHDH_ nét đứt
@@ -1136,14 +1215,15 @@ export function layerForPattern(key, oldLayer = '') {
 }
 
 /** Ranh đất đồ án: thu nhỏ tô đặc màu ký hiệu; phóng tới ngưỡng hoa văn thì kẻ pattern cùng màu */
-export function landParcelStyle(layerName, { detailed = false, phase = 'HT', name = '' } = {}) {
+export function landParcelStyle(layerName, { detailed = false, phase = 'HT', name = '', geometry = null } = {}) {
   const key = landPatternKey(layerName, name);
+  if (isTransportLand(key, layerName, name)) return roadLotStyle(key && TT16_STYLES[key] ? TT16_STYLES[key].color : '#5b5b5b');
   if (key && TT16_STYLES[key]) {
-    return tt16SymbolStyle(key, TT16_STYLES[key].color, layerName, { scenario: phase, detailed });
+    return tt16SymbolStyle(key, TT16_STYLES[key].color, layerName, { scenario: phase, detailed, name, geometry });
   }
   ensureLotCasing();
   const base = landPolylineStyle(layerName);
   const bright = outlineBright(base.color);
   const frame = frameStyle(layerName, phase, true, bright);
-  return { ...base, ...frame, color: bright ? lightenTone(base.color) : base.color };
+  return dropStripHalo({ ...base, ...frame, color: bright ? lightenTone(base.color) : base.color }, geometry);
 }

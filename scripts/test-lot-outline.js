@@ -1,6 +1,6 @@
 // Viền sáng + quầng chỉ cho lô màu tối (độ chói WCAG < OUTLINE_LUMA_MAX) trên nền vệ tinh.
 // Nền nhạt và lô màu sáng giữ nét, màu, không quầng như trước khi làm sáng.
-import { lightenTone, relativeLuminance, outlineBright, OUTLINE_LUMA_MAX, tt16SymbolStyle, landParcelStyle, TT16_STYLES } from '../public/js/tt16Symbols.js';
+import { lightenTone, relativeLuminance, outlineBright, OUTLINE_LUMA_MAX, tt16SymbolStyle, landParcelStyle, isTransportLand, isNarrowStrip, TT16_STYLES } from '../public/js/tt16Symbols.js';
 import { cartoTileUsable, selectBasemap, isLightBasemap } from '../public/js/basemap.js';
 
 function hsl(hex) {
@@ -83,6 +83,41 @@ assert(back.color === lit && back.casingColor, 'đổi lại vệ tinh thì vi�
 
 const bare = landParcelStyle('QH_Dat_khac_khong_ma', { phase: 'QH', detailed: false });
 assert(!bare.casingColor && bare.weight === 1.8, 'lô không khóa, màu nhạt, giữ viền gốc');
+
+function noRoadStroke(style, msg) {
+  assert(style.stroke === false && style.weight === 0 && !style.casingColor, msg);
+  assert(style.fillOpacity > 0 && style.fillOpacity < 0.5, `${msg}: tô mờ`);
+}
+const road = tt16SymbolStyle('GT', '#5b5b5b', 'QHDD_DAT_HTKT_DuongGT', { scenario: 'QH', detailed: true, approved: true });
+noRoadStroke(road, 'đường giao thông không nét không quầng');
+assert(road.color === '#5b5b5b' && road.fillColor === '#5b5b5b', 'đường giữ màu tô');
+const alley = landParcelStyle('QHDD_DAT_CTHTKT_DuongGT', { phase: 'QH', detailed: true, name: 'Đất giao thông kiệt' });
+noRoadStroke(alley, 'kiệt theo layer không nét');
+const urbanGt = tt16SymbolStyle('C-GTDT', '#808080', 'QH_DAT_DD_Giaothongdothi', { scenario: 'QH', detailed: false });
+noRoadStroke(urbanGt, 'giao thông đô thị không nét');
+const outer = landParcelStyle('DAT_NDD_GiaothongDN', { phase: 'QH', detailed: true });
+noRoadStroke(outer, 'giao thông đối ngoại không nét');
+assert(isTransportLand('T-GT', '', '') && isTransportLand('', 'Đường giao thông', 'kiệt 12'), 'nhận lớp đường');
+assert(!isTransportLand('NTR', 'DAT_HTKT_Nghiatrang', 'Nghĩa trang'), 'nghĩa trang không phải đường');
+selectBasemap('positron');
+const roadLight = tt16SymbolStyle('GT', '#5b5b5b', 'QHDD_DAT_HTKT_DuongGT', { scenario: 'QH', detailed: true });
+noRoadStroke(roadLight, 'đường trên nền nhạt cũng không nét');
+selectBasemap('google');
+
+const strip = {
+  type: 'Polygon',
+  coordinates: [[[107.58, 16.47], [107.582, 16.47], [107.582, 16.47005], [107.58, 16.47005], [107.58, 16.47]]]
+};
+const block = {
+  type: 'Polygon',
+  coordinates: [[[107.58, 16.47], [107.581, 16.47], [107.581, 16.471], [107.58, 16.471], [107.58, 16.47]]]
+};
+assert(isNarrowStrip(strip), 'dải hẹp');
+assert(!isNarrowStrip(block), 'lô vuông không phải dải');
+const canal = tt16SymbolStyle('SS', '#0066cc', 'QHDD_DAT_KHAC_Songsuoi', { scenario: 'QH', detailed: false, geometry: strip });
+assert(!canal.casingColor && canal.weight <= 1, 'kênh hẹp bỏ quầng');
+const canalWide = tt16SymbolStyle('SS', '#0066cc', 'QHDD_DAT_KHAC_Songsuoi', { scenario: 'QH', detailed: false, geometry: block });
+assert(canalWide.casingColor, 'mặt nước rộng vẫn có quầng');
 
 assert(cartoTileUsable(2049) === false, 'ô mờ CARTO ~2KB không dùng được');
 assert(cartoTileUsable(18000) === true, 'ô Positron thật vẫn dùng được');
