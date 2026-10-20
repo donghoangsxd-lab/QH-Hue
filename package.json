@@ -9,7 +9,9 @@
   },
   "scripts": {
     "start": "vercel dev",
-    "build": "node scripts/write-version.js"
+    "build": "node scripts/write-version.js",
+    "test": "node scripts/test-scheme-visibility.js",
+    "test:qhc-outlines": "node scripts/test-qhc-outlines.mjs"
   },
   "dependencies": {
     "@google/earthengine": "^0.1.385",

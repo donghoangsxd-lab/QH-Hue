@@ -1,0 +1,15 @@
+// Một nguồn sự thật: đồ án nào của cấp đang chọn được hiện ranh, nhãn và lô.
+// Droplist, panel lớp và bản đồ đều đọc hàm này. Bỏ chọn một đồ án (hidden) hoặc tắt lớp ranh
+// thì đồ án đó biến khỏi danh sách. Đồ án không có hình ranh không tính là ranh đã vẽ.
+// level: 'QHC' | 'QHPK' | 'QHCT'. hidden / layerOff: Set tên đồ án (Ten_QH).
+
+export function enabledSchemes(projects, level, hidden, layerOff) {
+  if (!level) return [];
+  const hide = hidden instanceof Set ? hidden : new Set(hidden || []);
+  const off = layerOff instanceof Set ? layerOff : new Set(layerOff || []);
+  return (projects || []).filter(p => {
+    if (!p || p.level !== level || !p.name) return false;
+    if (hide.has(p.name) || off.has(p.name)) return false;
+    return !!p.boundary;
+  });
+}

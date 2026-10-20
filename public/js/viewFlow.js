@@ -6,7 +6,7 @@
 //      đã có QHC / QHPK / QHCT, bấm vùng đồ án để mở; vùng QHC đô thị TT Huế 2045 → QHC 1/10.000 và mở lô.
 //      Bấm nền ngoài mọi đô thị thì bỏ chọn.
 //    - QHC 1/25.000: chỉ xem / bấm vùng; bấm bản đồ không đổi địa bàn. Đang xem một địa điểm thì chỉ vùng chức năng, không nét ranh, không phóng ra toàn thành phố.
-//    - QHC 1/10.000: toàn thành phố thì ranh + tên (rê vào vùng lõi thì sáng), bấm ranh mới có lô. Đang xem một địa điểm thì mở thẳng lô, không ranh, không phóng ra.
+//    - QHC 1/10.000: ranh + tên mọi đồ án QHC đang bật (kể cả ngoài vùng trung tâm). Droplist phóng khung nếu còn đồ án ngoài màn hình, không phóng riêng vào trung tâm. Đang tra cứu một địa điểm thì giữ khung, mở thẳng lô.
 //      bấm nền ngoài đồ án đang mở thì về tổng quan; bấm lô tra cứu; panel phải lọc QHPK trong vùng lõi;
 //      chọn phường lõi giữ lớp, phường ngoài vùng lõi sang QHPK.
 //    - QHPK 1/2.000: toàn TP chỉ ranh các đồ án; bấm ranh hoặc tick đồ án trong panel mới tải lô.
@@ -23,7 +23,7 @@ import { map, highlightWardBoundary, wardNameAt } from './mapEngine.js';
 import { planMap, setSplit, isSplitOn, getViewMode, setViewMode } from './planMap.js';
 import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
-import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView } from './projectLayer.js';
+import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView, frameVisibleSchemes } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT } from './projectFiles.js';
 import { RIGHT_TAB_EVENT } from './utils.js';
 import { URBAN_PICK_EVENT, urbanVisionFeature, urbanVisionAt } from './urbanAreaLayer.js';
@@ -86,7 +86,16 @@ function onLevelChange({ level, prev, keepView }) {
   const place = (level === 'qhc10' || level === 'qhc25') && viewingPlace();
   setQhcPlaceMode(place);
   if (level === 'qhc10') setCoreOpen(place);
-  // Địa điểm cụ thể, hoặc droplist QHC 1/10.000: giữ khung hình. Bấm đô thị trung tâm (không keepView, không phải địa điểm) vẫn phóng tới vùng trung tâm.
+  // Droplist QHC 1/10.000 (keepView): không phóng vào riêng vùng trung tâm. Đồ án đang bật mà nằm ngoài khung thì phóng tới hợp ranh của chúng và vùng lõi.
+  if (level === 'qhc10' && keepView && !state.focusedProject && !inspectSync) {
+    if (frameVisibleSchemes('QHC')) {
+      setQhcPlaceMode(false);
+      setCoreOpen(false);
+    }
+    syncEscHint();
+    return;
+  }
+  // Địa điểm cụ thể: giữ khung. Bấm đô thị trung tâm (không keepView) vẫn phóng tới vùng trung tâm.
   if (place || level !== 'qhc10' || state.focusedProject || keepView) {
     syncEscHint();
     return;
