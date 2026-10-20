@@ -1414,7 +1414,7 @@ function doPost(e) {
     if (action === "saveHaTangHienTrang") return jsonOutput(saveHaTangHienTrang(body));
     if (action === "deleteHaTangHienTrang") return jsonOutput(deleteHaTangHienTrang(body));
     if (action === "getHaTangHienTrang") return jsonOutput(listHaTangHienTrang());
-    if (action === "scriptVersion") return jsonOutput({ "success": true, "script": "osm-vh-1" });
+    if (action === "scriptVersion") return jsonOutput({ "success": true, "script": "parcel-infra-1" });
     if (action === "addPendingPoints") {
       if (!Array.isArray(body.items) || !body.items.length) {
         return jsonOutput({ "error": "Không nhận được danh sách điểm. Deploy bản Code.gs này: Manage deployments → Edit → Version: New version." });
@@ -1935,7 +1935,8 @@ function importCadBatch(body) {
  * Ghi hàng loạt điểm hiện trạng. Mạng lưới (xe buýt, PCCC, nghĩa trang): TrangThai = FALSE, nhóm Cấp đô thị.
  * Công trình thể thao 8-VH gửi kèm approved = true và nhom (Cấp đô thị / Cấp DVO), Note có nguồn OSM.
  * body = { items: [{ type, name, ward, lat, lng, size, radius, ref, nhom, note, approved }] }
- * ref (VD "OSM:node/123") — dòng có Note chứa cùng ref thì bỏ qua.
+ * ref (VD "OSM:node/123" hoặc "THUA:maxa/tờ/thửa") — dòng có Note chứa cùng ref thì bỏ qua.
+ * keepWard = true thì giữ nguyên Ten_XaPhuong (kể cả tiền tố Phường/Xã), không rút gọn.
  */
 function addPendingPoints(body) {
   var items = Array.isArray(body.items) ? body.items : [];
@@ -1966,6 +1967,8 @@ function addPendingPoints(body) {
               if (note) noteSet[note] = true;
               var refInNote = note.match(/OSM:(?:node|way|relation)\/\d+/);
               if (refInNote) noteSet[refInNote[0]] = true;
+              var thuaRef = note.match(/THUA:\d+\/[^\s,;|]{1,40}\/[^\s,;|]{1,40}/);
+              if (thuaRef) noteSet[thuaRef[0]] = true;
             }
             ctx[typeCode] = { sheet: sheet, data: data, col: col, noteSet: noteSet, maxNum: null, rows: [] };
           }
@@ -1983,7 +1986,7 @@ function addPendingPoints(body) {
       var set = function(idx, value) { if (idx >= 0) row[idx] = value; };
       set(c.col.id, id);
       set(c.col.name, String(it.name || 'Công trình mới').slice(0, 150));
-      set(c.col.ward, sheetWard(it.ward));
+      set(c.col.ward, it.keepWard === true ? String(it.ward || '').replace(/^\s+|\s+$/g, '') : sheetWard(it.ward));
       set(c.col.nhom, it.nhom ? sheetNhom(it.nhom) : 'Cấp đô thị');
       set(c.col.lat, "'" + String(Number(it.lat)));
       set(c.col.lng, "'" + String(Number(it.lng)));
@@ -2026,7 +2029,7 @@ function addPendingPoints(body) {
     return { "error": failed.length ? failed.join("; ") : "Không ghi được dòng nào", "created": 0, "skipped": skipped };
   }
   if (created.length) syncSheetsToGCS();
-  return { "success": true, "created": created.length, "skipped": skipped, "sheets": sheets, "script": "osm-vh-1", "warning": failed.join("; ") };
+  return { "success": true, "created": created.length, "skipped": skipped, "sheets": sheets, "script": "parcel-infra-1", "warning": failed.join("; ") };
 }
 
 // MẠNG LƯỚI ĐƯỜNG OSM TOÀN THÀNH PHỐ (Admin tải theo phường/xã, máy chủ webapp gửi sang để lưu lên bucket)

@@ -3,7 +3,7 @@
 // TrangThai = TRUE, Note = nguồn OSM + mã OSM.
 // Trùng khi Note đã có cùng mã OSM, hoặc cùng tên (bỏ dấu) và cách nhau < 80 m.
 // Chạy: node scripts/import-osm-sports.js
-// Có GAS_BASE_URL + GAS_SECRET thì ghi Sheet (Apps Script phải là bản osm-vh-1). Không có thì ghi CSV/JSON.
+// Có GAS_BASE_URL + GAS_SECRET thì ghi Sheet (Apps Script phải là bản osm-vh-1 hoặc parcel-infra-1). Không có thì ghi CSV/JSON.
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
@@ -12,6 +12,7 @@ const constants = require('../config/constants');
 const { loadEnv, postAction } = require('./gasClient');
 const { loadBoundary } = require('./wardBoundary');
 const sports = require('../services/osmSports');
+const parcelInfra = require('../services/parcelInfraInventory');
 
 const BBOX = '15.9,106.9,16.9,108.3';
 const OVERPASS_URLS = [
@@ -169,8 +170,8 @@ async function writeGas(kept) {
   } catch (err) {
     return { wrote: false, reason: err.message };
   }
-  if (!ver || ver.script !== 'osm-vh-1') {
-    return { wrote: false, reason: `Apps Script trả script=${ver && ver.script}, cần osm-vh-1` };
+  if (!ver || !parcelInfra.OSM_SCRIPT_IDS.includes(ver.script)) {
+    return { wrote: false, reason: `Apps Script trả script=${ver && ver.script}, cần ${parcelInfra.OSM_SCRIPT_IDS.join(' hoặc ')}` };
   }
   let created = 0;
   let skipped = 0;
@@ -190,8 +191,8 @@ async function writeGas(kept) {
       approved: true
     }));
     const res = await postAction('addPendingPoints', { action: 'addPendingPoints', items });
-    if (res.script !== 'osm-vh-1') {
-      return { wrote: false, reason: 'Apps Script ghi điểm nhưng không phải bản osm-vh-1 — dừng, không gửi tiếp', created, skipped };
+    if (!parcelInfra.OSM_SCRIPT_IDS.includes(res.script)) {
+      return { wrote: false, reason: 'Apps Script ghi điểm nhưng không phải bản osm-vh-1 hoặc parcel-infra-1 — dừng, không gửi tiếp', created, skipped };
     }
     created += Number(res.created) || 0;
     skipped += Number(res.skipped) || 0;

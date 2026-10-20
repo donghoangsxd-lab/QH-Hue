@@ -14,6 +14,9 @@ const pdfLimits = require('../services/pdfLimits');
 const statsStore = require('../services/statsStore');
 const osmOpen = require('../services/osmOpen');
 const osmSports = require('../services/osmSports');
+const fs = require('fs');
+const path = require('path');
+const parcelInfra = require('../services/parcelInfraInventory');
 
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
@@ -4083,12 +4086,12 @@ module.exports = async (req, res) => {
         } catch (err) {
           ver = { error: err.message };
         }
-        if (!ver || ver.script !== 'osm-vh-1') {
+        if (!ver || !parcelInfra.OSM_SCRIPT_IDS.includes(ver.script)) {
           return res.status(409).json({
             error: true,
             needRedeploy: true,
             stats,
-            message: 'Chưa ghi Sheet. Web app Apps Script chưa có bản osm-vh-1 (công trình thể thao ghi TrangThai = TRUE, nhóm Cấp đô thị hoặc Cấp DVO). Extensions → Apps Script, dán apps-script/Code.gs, Deploy → Manage deployments → Edit → Version: New version → Deploy, rồi bấm Ghi lại. Nếu không triển khai được, dán scripts/data/osm-sports-8vh.csv vào tab 8-VH (không dán thêm nếu đã bấm Ghi thành công).'
+            message: 'Chưa ghi Sheet. Web app Apps Script cần bản osm-vh-1 hoặc parcel-infra-1 (công trình thể thao ghi TrangThai = TRUE, nhóm Cấp đô thị hoặc Cấp DVO). Extensions → Apps Script, dán apps-script/Code.gs, Deploy → Manage deployments → Edit → Version: New version → Deploy, rồi bấm Ghi lại. Nếu không triển khai được, dán scripts/data/osm-sports-8vh.csv vào tab 8-VH (không dán thêm nếu đã bấm Ghi thành công).'
           });
         }
       }
@@ -4106,6 +4109,116 @@ module.exports = async (req, res) => {
       }
       invalidateAllCaches();
       return res.status(200).json({ success: true, stats, created, skipped, sheets: result.sheets || [] });
+    }
+
+    // Admin: sổ hạ tầng dựng sẵn từ thửa đất 2016. Kiểm tra đọc file; Ghi gửi từng lô đã rà.
+    // Thiếu diện tích, phường/xã hoặc tên thì từ chối cả lô, không ghi ô trống.
+    if (action === 'importParcelInfra') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const includeTraining = body.includeTraining === true;
+      let rawItems = Array.isArray(body.items) ? body.items : null;
+      let fileSummary = null;
+      if (!rawItems) {
+        if (!body.dryRun) {
+          return res.status(400).json({ error: true, message: 'Thiếu danh sách dòng. Bấm Kiểm tra trước khi Ghi.' });
+        }
+        const file = path.join(__dirname, '..', 'scripts', 'data', 'parcel-infra', 'rows.json');
+        if (!fs.existsSync(file)) {
+          return res.status(404).json({ error: true, message: 'Chưa có sổ thửa. Chạy node scripts/build-parcel-infra.js rồi triển khai lại.' });
+        }
+        const payload = JSON.parse(fs.readFileSync(file, 'utf8'));
+        rawItems = Array.isArray(payload) ? payload : (payload.rows || []);
+        fileSummary = payload.summary || null;
+      }
+      if (!body.dryRun && rawItems.length > 500) {
+        return res.status(400).json({ error: true, message: 'Mỗi lần ghi tối đa 500 dòng' });
+      }
+      const wards = await loadEvaluatedWards(wardVectorParsed);
+      const existing = allDataList.map(it => ({
+        name: it.name,
+        lat: it.lat,
+        lng: it.lng,
+        type: constants.isThptItem(it) ? '6-THPT' : it.type,
+        note: it.note
+      }));
+      let prepared;
+      try {
+        prepared = parcelInfra.prepareParcelImport(
+          rawItems,
+          existing,
+          (lat, lng) => assignWardByGeometry(lng, lat, wards),
+          { strict: true, includeTraining }
+        );
+      } catch (err) {
+        if (err && err.counts) {
+          return res.status(400).json({
+            error: true,
+            validationFailed: true,
+            counts: err.counts,
+            message: err.message
+          });
+        }
+        throw err;
+      }
+      if (body.dryRun || !prepared.accepted.length) {
+        return res.status(200).json({
+          success: true,
+          dryRun: true,
+          stats: prepared.stats,
+          items: prepared.accepted,
+          summary: fileSummary,
+          validation: prepared.stats.validation
+        });
+      }
+      let ver = null;
+      try {
+        ver = await callAppsScript({ action: 'scriptVersion' }, { action: 'scriptVersion' });
+      } catch (err) {
+        ver = { error: err.message };
+      }
+      if (!ver || ver.script !== parcelInfra.SCRIPT_ID) {
+        return res.status(409).json({
+          error: true,
+          needRedeploy: true,
+          stats: prepared.stats,
+          message: 'Chưa ghi Sheet. Web app Apps Script chưa có bản parcel-infra-1 (giữ đủ tên phường/xã, bỏ qua thửa đã ghi theo mã THUA). Extensions → Apps Script, dán apps-script/Code.gs, Deploy → Manage deployments → Edit → Version: New version → Deploy, rồi bấm Ghi lại. Nếu không triển khai được, dán CSV trong scripts/data/parcel-infra/ vào đúng tab (không dán thêm nếu đã bấm Ghi thành công).'
+        });
+      }
+      const result = await callAppsScript({ action: 'addPendingPoints' }, {
+        action: 'addPendingPoints',
+        items: prepared.accepted.map(it => ({
+          type: it.type,
+          name: it.name,
+          ward: it.ward,
+          lat: Number(it.lat).toFixed(6),
+          lng: Number(it.lng).toFixed(6),
+          size: it.size,
+          ref: it.ref,
+          nhom: it.nhom,
+          note: it.note,
+          approved: it.approved === true,
+          keepWard: true
+        }))
+      });
+      const created = Number(result && result.created);
+      const skipped = Number(result && result.skipped);
+      if (!Number.isFinite(created) || !Number.isFinite(skipped)) {
+        return res.status(502).json({
+          error: true,
+          message: 'Apps Script không trả số dòng đã ghi. Dán apps-script/Code.gs vào Sheet rồi Deploy → Manage deployments → Edit → Version: New version → Deploy.'
+        });
+      }
+      invalidateAllCaches();
+      return res.status(200).json({
+        success: true,
+        stats: prepared.stats,
+        created,
+        skipped,
+        sheets: result.sheets || [],
+        validation: prepared.stats.validation
+      });
     }
 
     if (action === 'getWardCoverage') {
