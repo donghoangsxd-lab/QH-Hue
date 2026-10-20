@@ -114,7 +114,10 @@ function paint() {
   }
   if (!menu) return;
   menu.querySelectorAll('[data-level]').forEach(el => {
-    el.hidden = el.dataset.level === level;
+    const on = el.dataset.level === level;
+    el.hidden = false;
+    el.classList.toggle('is-current', on);
+    el.setAttribute('aria-selected', String(on));
     el.classList.toggle('is-on', isOn(byId.get(el.dataset.level).chk));
   });
 }
@@ -134,45 +137,27 @@ function fitButton() {
 // Cùng điều kiện với khối điện thoại trong style.css. Máy tính (chuột, cửa sổ hẹp) giữ menu trùng mép nút.
 const PHONE_LAYOUT = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px))');
 
-// Desktop: menu trùng mép trái / phải với nút. Điện thoại: nút chỉ còn icon nên menu rộng bằng chữ, không cắt nhãn.
+// Menu rộng bằng nhãn dài nhất, không cắt chữ. Cao hơn phần màn hình còn lại thì cuộn trong danh sách.
 function placeMenu() {
   const r = button.getBoundingClientRect();
   const icon = button.querySelector('.ico');
   const inset = menu.clientLeft + parseFloat(getComputedStyle(menu).paddingLeft);
-  menu.style.top = `${Math.round(r.bottom + 6)}px`;
-  if (!PHONE_LAYOUT.matches) {
-    menu.style.left = `${Math.round(r.left)}px`;
-    menu.style.width = `${Math.round(r.width)}px`;
-    menu.style.maxWidth = '';
-  } else {
-    const vw = document.documentElement.clientWidth || window.innerWidth;
-    const items = [...menu.querySelectorAll('.level-item')];
-    const hidden = items.map(el => el.hidden);
-    items.forEach(el => { el.hidden = false; });
-    menu.style.width = 'max-content';
-    menu.style.maxWidth = 'none';
-    items.forEach(el => {
-      el.style.width = 'max-content';
-      el.style.overflow = 'visible';
-    });
-    menu.querySelectorAll('.level-item span').forEach(el => {
-      el.style.overflow = 'visible';
-      el.style.minWidth = 'max-content';
-    });
-    const need = menu.scrollWidth;
-    menu.querySelectorAll('.level-item, .level-item span').forEach(el => {
-      el.style.width = '';
-      el.style.overflow = '';
-      el.style.minWidth = '';
-    });
-    items.forEach((el, i) => { el.hidden = hidden[i]; });
-    const width = Math.min(Math.max(need, Math.round(r.width)), Math.max(160, vw - 16));
-    menu.style.width = `${width}px`;
-    let left = Math.round(r.right - width);
-    if (left < 8) left = 8;
-    if (left + width > vw - 8) left = Math.max(8, vw - 8 - width);
-    menu.style.left = `${left}px`;
-  }
+  const vw = document.documentElement.clientWidth || window.innerWidth;
+  const vh = document.documentElement.clientHeight || window.innerHeight;
+  menu.style.width = 'max-content';
+  menu.style.maxWidth = 'none';
+  menu.style.maxHeight = 'none';
+  const need = menu.scrollWidth;
+  const width = Math.min(Math.max(need, 160), Math.max(160, vw - 16));
+  menu.style.width = `${width}px`;
+  let left = PHONE_LAYOUT.matches ? Math.round(r.right - width) : Math.round(r.left);
+  if (left < 8) left = 8;
+  if (left + width > vw - 8) left = Math.max(8, vw - 8 - width);
+  const top = Math.round(r.bottom + 6);
+  const maxH = Math.max(96, vh - top - 8);
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+  menu.style.maxHeight = `${maxH}px`;
   if (icon) menu.style.setProperty('--level-indent', `${Math.max(0, Math.round(icon.getBoundingClientRect().left - r.left - inset))}px`);
 }
 
@@ -183,7 +168,7 @@ function openMenu(on) {
   if (!on) return;
   paint();
   placeMenu();
-  menu.querySelector('[data-level]:not([hidden])')?.focus();
+  (menu.querySelector('[data-level].is-current') || menu.querySelector('[data-level]'))?.focus();
 }
 
 function buildMenu() {
@@ -224,7 +209,9 @@ export function initMapLevel() {
     window.addEventListener('resize', () => { fitButton(); if (!menu.hidden) placeMenu(); });
   }
   document.addEventListener('change', onLayerChange);
-  const first = LEVELS.find(l => isOn(l.chk));
-  level = first ? first.id : DEFAULT_LEVEL;
-  paint();
+  // Mở trang luôn về Hệ thống đô thị. Ô lớp trình duyệt khôi phục từ lần trước không được thắng.
+  // Link chia sẻ (có lv hoặc ly) do viewLink áp sau bước này.
+  const shared = new URLSearchParams(location.search);
+  if (!shared.has('lv') && !shared.has('ly')) setLevel(DEFAULT_LEVEL);
+  else paint();
 }

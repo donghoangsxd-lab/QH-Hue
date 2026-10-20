@@ -157,7 +157,7 @@ export function adjustLotStyle(lot, detailed) {
   const saved = TT16_STYLES[lot.pattern] ? lot.pattern : '';
   const guess = saved || landPatternKey(lot.layer, lot.name || '') || landPatternKey(lot.srcLayer, '');
   const key = TT16_STYLES[guess] ? guess : null;
-  return tt16SymbolStyle(key, key ? TT16_STYLES[key].color : lot.tone || '#94a3b8', 'QH', { scenario: 'QH', detailed });
+  return tt16SymbolStyle(key, key ? TT16_STYLES[key].color : lot.tone || '#94a3b8', 'QH', { scenario: 'QH', detailed, name: lot.name, geometry: lot.geometry });
 }
 
 // ============================ NỀN VỆ TINH CẮT THEO RANH ============================

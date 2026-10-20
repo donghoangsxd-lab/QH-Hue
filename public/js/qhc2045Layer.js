@@ -202,7 +202,7 @@ export function setPreferPlace(on) {
 function lotStyle(f) {
   const p = f.properties;
   const land = landOf(data.land.zones[p.z], p.c);
-  return tt16SymbolStyle(land.key, land.tone, STAGE_LAYERS[p.t], { scenario: 'QH', detailed });
+  return tt16SymbolStyle(land.key, land.tone, STAGE_LAYERS[p.t], { scenario: 'QH', detailed, geometry: f.geometry });
 }
 
 function drawLand() {

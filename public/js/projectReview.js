@@ -312,7 +312,7 @@ function lotStyle(lot) {
   if (lot.ask) {
     const key = landPatternKey(lot.layer, lot.name);
     const s = key && TT16_STYLES[key];
-    if (s) return tt16SymbolStyle(key, s.color, lot.layer, { scenario: lot.phase, detailed: isDetailed(targetMap(lot.phase)) });
+    if (s) return tt16SymbolStyle(key, s.color, lot.layer, { scenario: lot.phase, detailed: isDetailed(targetMap(lot.phase)), name: lot.name, geometry: lot.geometry });
     return { color: PENDING_TONE, weight: 2, opacity: 1, dashArray: null, fillColor: PENDING_TONE, fillOpacity: 0.6 };
   }
   if (isUnresolvedDecision(lot)) {
@@ -321,7 +321,7 @@ function lotStyle(lot) {
   const split = residentialSubAreas(lot, session.kind);
   const sym = landSymbol(session.kind, lot.landKey, split ? Object.keys(split)[0] : lot.subKey);
   const key = sym.tt16 || landPatternKey(lot.layer, lot.name);
-  return tt16SymbolStyle(key, sym.tone, lot.layer, { scenario: lot.phase, detailed: isDetailed(targetMap(lot.phase)) });
+  return tt16SymbolStyle(key, sym.tone, lot.layer, { scenario: lot.phase, detailed: isDetailed(targetMap(lot.phase)), name: lot.name, geometry: lot.geometry });
 }
 
 // Qua ngưỡng zoom hoa văn thì tô lại các lô của bản đồ đó
