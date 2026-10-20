@@ -2,7 +2,7 @@
 export const GBA_CLASSES = ['Thấp', 'Trung bình', 'Cao', 'Rất cao'];
 export const GBA_COLORS = ['#fde68a', '#fb923c', '#ea580c', '#9a3412'];
 
-export const GBA_NOTE = 'Dữ liệu dấu chân công trình Global Building Atlas (Đại học Kỹ thuật Munich, 2025), từ dấu chân Google, OpenStreetMap và Microsoft khoảng năm 2023. Chiều cao chỉ là ước lượng tương đối để thấy nơi nhà cao hơn hoặc dày hơn, phục vụ nhận định nhu cầu hạ tầng. Không phải số mét đo đạc và không dùng để quản lý, khống chế chiều cao công trình. Dân số phân bổ theo dấu chân nhà ở (thửa đất ở, rồi mới loại công trình công cộng, sản xuất và dấu chân quá lớn) nhân bậc chiều cao tương đối, không phải mét. Giấy phép CC BY-NC 4.0 (atlas) và ODbL (OpenStreetMap).';
+export const GBA_NOTE = 'Dữ liệu dấu chân công trình Global Building Atlas (Đại học Kỹ thuật Munich, 2025), từ dấu chân Google, OpenStreetMap và Microsoft khoảng năm 2023. Chiều cao chỉ là ước lượng tương đối để thấy nơi nhà cao hơn hoặc dày hơn, phục vụ nhận định nhu cầu hạ tầng. Không phải số mét đo đạc và không dùng để quản lý, khống chế chiều cao công trình. Dân số phân bổ theo dấu chân nhà ở (thửa đất ở, rồi mới loại công trình công cộng, sản xuất và dấu chân quá lớn; dấu chân quá nhỏ như nhà kho, bếp, mái không tính dù thửa là đất ở) nhân bậc chiều cao tương đối, không phải mét. Giấy phép CC BY-NC 4.0 (atlas) và ODbL (OpenStreetMap).';
 
 export function gbaLotKey(file, phase, id) {
   return [file || '', phase || '', id || ''].join('|');
@@ -56,11 +56,14 @@ const DROP_LABEL = {
   osm: 'OSM',
   infra: 'hạ tầng',
   lot: 'lô quy hoạch',
-  large: 'dấu chân lớn'
+  large: 'dấu chân lớn',
+  small: 'dấu chân nhỏ'
 };
 
 /** Câu mật độ dân số trên sàn nhà ở so với mọi công trình, và công trình bị loại khỏi nhà ở */
-export function gbaWardExtra(ward, largeM2) {
+export function gbaWardExtra(ward, limits = {}) {
+  const largeM2 = typeof limits === 'number' ? limits : limits.largeM2;
+  const smallM2 = typeof limits === 'number' ? 20 : limits.smallM2;
   if (!ward || !Number.isFinite(Number(ward.rn))) return {};
   let densityNote = '';
   if (ward.rw > 0 && ward.tw > 0 && ward.pop > 0 && ward.ratio) {
@@ -72,7 +75,9 @@ export function gbaWardExtra(ward, largeM2) {
   const parts = Object.keys(DROP_LABEL).map((key) => {
     const pair = drop[key];
     if (!pair || !pair[0]) return '';
-    const label = key === 'large' ? `lớn hơn ${num(largeM2 || 500, 0)} m²` : DROP_LABEL[key];
+    const label = key === 'large' ? `lớn hơn ${num(largeM2 || 500, 0)} m²`
+      : key === 'small' ? `nhỏ hơn ${num(smallM2 || 20, 0)} m²`
+      : DROP_LABEL[key];
     return `${label} ${num(pair[0], 0)} (${num(pair[1], 0)} m²)`;
   }).filter(Boolean);
   const dropNote = parts.length ? `Không tính là nhà ở: ${parts.join('; ')}.` : '';

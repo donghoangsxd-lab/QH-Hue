@@ -5,7 +5,7 @@
 # trừ khi thửa là đất ở (giữ chung cư).
 # Trọng số = diện tích dấu chân nhà ở × bậc chiều cao tương đối (1–4), không ghi mét.
 #   python3 scripts/gba-residential.py
-# Ngưỡng: GBA_LARGE_M2. Đầu vào mặc định trong /tmp/gba (xem build-gba.py).
+# Ngưỡng: GBA_LARGE_M2 (dấu chân lớn), GBA_SMALL_M2 (nhà kho, bếp, mái — không phải nhà ở dù thửa là đất ở).
 
 import json
 import math
@@ -18,6 +18,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = os.environ.get('GBA_TMP', '/tmp/gba')
 AGG_PATH = os.path.join(ROOT, 'public', 'data', 'gba', 'agg.json')
 LARGE_M2 = float(os.environ.get('GBA_LARGE_M2', '500'))
+SMALL_M2 = float(os.environ.get('GBA_SMALL_M2', '20'))
 M_PER_DEG = 111320.0
 NEAR_M = 20.0
 
@@ -277,11 +278,21 @@ def main():
         LEFT JOIN infra_hit i ON i.id = b.id
         LEFT JOIN lot_hit h ON h.id = b.id
     """)
-    # Ưu tiên: địa chính, OSM, hạ tầng, lô không phải nhà ở, diện tích lớn, lô nhà ở, còn lại là nhà ở.
+    # Dưới ngưỡng nhỏ: không phải nhà ở dù thửa là đất ở. Chỉ ghi lý do "small" khi quy tắc này
+    # mới loại khỏi nhà ở; công trình đã loại bởi địa chính / OSM / hạ tầng / lô giữ lý do cũ.
     con.execute(f"""
         CREATE TABLE cls AS
         SELECT *,
             CASE
+                WHEN area_m2 < {SMALL_M2} AND (
+                    coalesce(cad_res, false)
+                    OR (
+                        NOT coalesce(cad_non, false)
+                        AND NOT coalesce(osm, false)
+                        AND NOT coalesce(infra, false)
+                        AND (lot_use IS NULL OR lot_use <> 'non')
+                    )
+                ) THEN 'small'
                 WHEN cad_res THEN 'keep'
                 WHEN cad_non THEN 'cad'
                 WHEN osm THEN 'osm'
@@ -292,6 +303,7 @@ def main():
                 ELSE 'keep'
             END AS reason,
             CASE
+                WHEN area_m2 < {SMALL_M2} THEN false
                 WHEN cad_res THEN true
                 WHEN cad_non OR osm OR infra OR lot_use = 'non' THEN false
                 WHEN area_m2 > {LARGE_M2} THEN false
@@ -307,7 +319,13 @@ def main():
         """).fetchone()
         return [int(row[0]), round(float(row[1]))]
 
-    rules = ['cad', 'osm', 'infra', 'lot', 'large']
+    rules = ['cad', 'osm', 'infra', 'lot', 'large', 'small']
+    mismatch = con.execute("""
+        SELECT count(*) FROM cls
+        WHERE (residential AND reason <> 'keep') OR (NOT residential AND reason = 'keep')
+    """).fetchone()[0]
+    if mismatch:
+        raise SystemExit(f'Lệch nhãn nhà ở và lý do loại: {mismatch}')
     summary_drop = {k: pair(f"reason = '{k}'") for k in rules}
     summary_keep = pair('residential')
     summary_apt = pair(f"residential AND cad_res AND area_m2 > {LARGE_M2}")
@@ -332,6 +350,8 @@ def main():
                coalesce(sum(area_m2) FILTER (WHERE reason = 'lot'), 0) AS a_lot,
                count(*) FILTER (WHERE reason = 'large') AS n_large,
                coalesce(sum(area_m2) FILTER (WHERE reason = 'large'), 0) AS a_large,
+               count(*) FILTER (WHERE reason = 'small') AS n_small,
+               coalesce(sum(area_m2) FILTER (WHERE reason = 'small'), 0) AS a_small,
                count(*) FILTER (WHERE residential AND cad_res AND area_m2 > {LARGE_M2}) AS n_apt,
                coalesce(sum(area_m2) FILTER (WHERE residential AND cad_res AND area_m2 > {LARGE_M2}), 0) AS a_apt
         FROM cls
@@ -374,7 +394,7 @@ def main():
     for row in ward_sql:
         (name, pop, n, fp, tw, rn, rfp, rw,
          n_cad, a_cad, n_osm, a_osm, n_infra, a_infra, n_lot, a_lot, n_large, a_large,
-         n_apt, a_apt) = row
+         n_small, a_small, n_apt, a_apt) = row
         w = by_name.get(name)
         if not w:
             continue
@@ -395,7 +415,8 @@ def main():
                 'osm': drop_obj(n_osm, a_osm),
                 'infra': drop_obj(n_infra, a_infra),
                 'lot': drop_obj(n_lot, a_lot),
-                'large': drop_obj(n_large, a_large)
+                'large': drop_obj(n_large, a_large),
+                'small': drop_obj(n_small, a_small)
             },
             'apt': drop_obj(n_apt, a_apt)
         })
@@ -412,8 +433,10 @@ def main():
     total_rw = sum(w.get('rw') or 0 for w in agg['wards'])
     agg['v'] = 2
     agg['largeM2'] = LARGE_M2
+    agg['smallM2'] = SMALL_M2
     agg['res'] = {
         'largeM2': LARGE_M2,
+        'smallM2': SMALL_M2,
         'nearM': NEAR_M,
         'residential': summary_keep,
         'apartmentsKept': summary_apt,
@@ -429,10 +452,12 @@ def main():
         'mã công cộng, sản xuất, giao thông là không phải nhà ở), rồi vùng OSM (amenity, shop, office, '
         'industrial, religious), điểm hạ tầng trong 20 m, chức năng lô quy hoạch, '
         f'và dấu chân lớn hơn {int(LARGE_M2)} m² trừ thửa đất ở. '
+        f'Dấu chân nhỏ hơn {int(SMALL_M2)} m² (nhà kho, bếp, mái) không phải nhà ở dù thửa là đất ở. '
         'Trọng số là diện tích dấu chân nhà ở nhân bậc chiều cao tương đối, không phải mét.'
     )
-    if 'Nhà ở để phân bổ' not in note:
-        agg['note'] = note.rstrip() + extra
+    marker = ' Nhà ở để phân bổ dân số:'
+    base = note.split(marker)[0].rstrip()
+    agg['note'] = base + extra
     with open(AGG_PATH, 'w', encoding='utf-8') as f:
         json.dump(agg, f, ensure_ascii=False, separators=(',', ':'))
     log(f"agg {os.path.getsize(AGG_PATH)/1e6:.1f} MB tỷ lệ {agg['res']['ratio']}")

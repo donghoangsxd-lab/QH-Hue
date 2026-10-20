@@ -1,5 +1,5 @@
 // Nhóm GBA là tương đối: thẻ không ghi mét chiều cao, có mật độ và giấy phép.
-import { GBA_CLASSES, GBA_NOTE, gbaLotKey, gbaStatsHtml } from '../public/js/gbaStats.js';
+import { GBA_CLASSES, GBA_NOTE, gbaLotKey, gbaStatsHtml, gbaWardExtra } from '../public/js/gbaStats.js';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -21,4 +21,10 @@ assert(!/chiều cao[^<]{0,40}\d+([.,]\d+)?\s*m\b/i.test(both), 'nhà ở cũng 
 assert(GBA_NOTE.includes('CC BY-NC 4.0') && GBA_NOTE.includes('ODbL'), 'giấy phép');
 assert(GBA_NOTE.includes('không dùng để quản lý'), 'không dùng khống chế chiều cao');
 assert(GBA_NOTE.includes('Munich') && GBA_NOTE.includes('Google') && GBA_NOTE.includes('Microsoft'), 'nguồn');
+const extra = gbaWardExtra({
+  rn: 10, rw: 100, tw: 150, pop: 1000, ratio: 1.5,
+  drop: { small: [4, 40], cad: [1, 80] }
+}, { largeM2: 500, smallM2: 20 });
+assert(extra.dropNote.includes('nhỏ hơn 20 m² 4'), 'ngưỡng dấu chân nhỏ');
+assert(extra.dropNote.includes('địa chính 1'), 'vẫn liệt kê quy tắc khác');
 console.log('gba: ok');

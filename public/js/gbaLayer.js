@@ -320,7 +320,7 @@ function wardHtml(name) {
   if (!row) return '';
   const line = [row.n, row.fp, row.cov, row.cls, row.fai];
   if (Number.isFinite(Number(row.rn))) line.push(row.rn, row.rfp, row.rcov, null);
-  return gbaStatsHtml(line, gbaWardExtra(row, agg.largeM2));
+  return gbaStatsHtml(line, gbaWardExtra(row, { largeM2: agg.largeM2, smallM2: agg.smallM2 }));
 }
 
 function lotHtml(p) {
