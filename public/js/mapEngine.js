@@ -1797,7 +1797,7 @@ function redrawLands() {
       }
       const level = PLAN_SIDE[side];
       if (!level || m.getZoom() < PARCEL_MIN_ZOOM) { drawLandsOn(m, [], []); return; }
-      const match = (p) => p.phase === 'QH' && planLevelOf(p.file) === level;
+      const match = (p) => p.phase === 'QH' && planLevelOf(p.file) === level && !state.hiddenProjects.has(p.file);
       drawLandsOn(m, landAll.filter(match), state.showProjectInfra ? infraAll.filter(match) : []);
     };
     paint(map);
@@ -1856,7 +1856,7 @@ function redrawNets() {
       }
       const level = PLAN_SIDE[side];
       if (!level || m.getZoom() < PARCEL_MIN_ZOOM) { drawNetsOn(m, []); return; }
-      drawNetsOn(m, (state.projectNets || []).filter(f => f.phase === 'QH' && planLevelOf(f.file) === level));
+      drawNetsOn(m, (state.projectNets || []).filter(f => f.phase === 'QH' && planLevelOf(f.file) === level && !state.hiddenProjects.has(f.file)));
     };
     paint(map);
     paint(planMap);
