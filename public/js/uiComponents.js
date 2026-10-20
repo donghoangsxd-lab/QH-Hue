@@ -1,7 +1,7 @@
 import { state, BUFFER_COLORS, isNetworkType, NT_KIND_LABELS, layerType, infraLabels } from './state.js';
 import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js';
 import { geeApi } from './api.js';
-import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, showToast, wardStatHtml, ico, setStatusContent, inlineSpriteIcons } from './utils.js';
+import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, showToast, wardStatHtml, ico, setStatusContent, inlineSpriteIcons, detailDisclosure } from './utils.js';
 import { refreshWardCheck } from './wardCheck.js';
 import {
   fillWardRoadLengths, fillCityRoadDensity, loadRoadTypeLengths, ROAD_TYPES, ROADS_META_EVENT, fmtKm,
@@ -2019,9 +2019,10 @@ function buildWardQuotaTableHtml(wardData, projPop) {
     const on = isBalanceMapOn(wardData.Ten_Phuong);
     parts.push(`<tr class="wt-comp wt-bal-head">
       <td></td>
-      <td colspan="7" class="wt-note" title="${BALANCE_REF}: phường không đủ quỹ đất được tính cân đối từ đất dịch vụ công cộng tại khu vực lân cận, bán kính phục vụ ≤ 2 km. Mỗi m² dư chỉ tính cho 1 phường, ưu tiên công trình gần nhất.">
-        Cân đối từ phường/xã lân cận (Chú thích 4 Bảng 6): tính thêm <b>${fmtNum(Math.round(balAll.borrowed))} m²</b> từ ${balAll.links.length} lượt công trình
+      <td colspan="7" class="wt-note" title="${BALANCE_REF}">
+        Cân đối từ phường, xã lân cận (Chú thích 4, Bảng 6): tính thêm <b>${fmtNum(Math.round(balAll.borrowed))} m²</b> từ ${balAll.links.length} lượt công trình
         <button type="button" class="link-btn bal-map-btn${on ? ' active' : ''}" data-action="balance-map">${on ? 'Ẩn trên bản đồ' : 'Xem trên bản đồ'}</button>
+        ${detailDisclosure(`<p>Phường, xã không đủ quỹ đất được tính cân đối từ đất dịch vụ công cộng tại khu vực lân cận. Bán kính phục vụ không quá 2 km. Mỗi m² dư chỉ tính cho một phường, xã, ưu tiên công trình gần nhất. ${escapeHtml(BALANCE_REF)}</p>`)}
       </td>
     </tr>`);
   }
@@ -2044,7 +2045,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
   if (split) parts.push(`</tbody></table></div><div class="ward-table-scroll-container wt-right">${head}`);
 
   // C / CÔNG TRÌNH CHƯA DUYỆT (QUY HOẠCH) — nhóm 1–8, TrangThai = FALSE
-  sectionHeader('C', 'c', 'CÔNG TRÌNH CHƯA DUYỆT (QUY HOẠCH)');
+  sectionHeader('C', 'c', 'CÔNG TRÌNH CHƯA PHÊ DUYỆT (QUY HOẠCH)');
   const pendingList = wardData.pendingItems || [];
   if (pendingList.length > 0) {
     pendingList.forEach((pItem, pIdx) => {
@@ -2054,21 +2055,21 @@ function buildWardQuotaTableHtml(wardData, projPop) {
         <td>${zoomLinkHtml(pItem)}${typeNote}</td>
         <td>${fmtNum(pItem.size)} m²</td>
         <td colspan="5" class="wt-note">
-          Sau khi phê duyệt dự kiến bổ sung <b class="c-green">${fmtPct(pItem.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(pItem.coverageAddPct)}</b> độ phủ${pItem.coverageMethod === 'estimate' ? ' (ước lượng)' : ''}${capacityNote(pItem)}
+          Sau khi phê duyệt dự kiến bổ sung <b class="c-green">${fmtPct(pItem.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(pItem.coverageAddPct)}</b> độ phủ${pItem.coverageMethod === 'estimate' ? ' (ước tính)' : ''}${capacityNote(pItem)}
         </td>
       </tr>`);
     });
   } else {
-    parts.push(`<tr class="wt-empty"><td>-</td><td colspan="7">Không có công trình nhóm 1–8 đang chờ duyệt trong phường.</td></tr>`);
+    parts.push(`<tr class="wt-empty"><td>-</td><td colspan="7">Không có công trình nhóm 1–8 chờ phê duyệt trong phường, xã.</td></tr>`);
   }
 
   // D / CÁC CƠ SỞ CHƯA SỬ DỤNG — khu đất quy hoạch giữ lại, gợi ý chuyển đổi căn cứ quy mô / độ phủ theo quy hoạch
-  sectionHeader('D', 'd', 'CÁC CƠ SỞ CHƯA SỬ DỤNG (ĐỀ XUẤT CHUYỂN ĐỔI THEO QUY HOẠCH)');
+  sectionHeader('D', 'd', 'CƠ SỞ CHƯA SỬ DỤNG (ĐỀ XUẤT CHUYỂN ĐỔI THEO QUY HOẠCH)');
   const csdList = wardData.csdItems || [];
   if (csdList.length > 0) {
     csdList.forEach((csd, csdIdx) => {
       const needApprove = csd.needsApproval || !isApproved(csd.status);
-      const needApproveNote = needApprove ? `<div class="wt-need-approve">(Cần phê duyệt)</div>` : '';
+      const needApproveNote = needApprove ? `<div class="wt-need-approve">(Chưa phê duyệt)</div>` : '';
       const commercial = (csd.suggestions || []).find(s => s.status === 'commercial');
       const eligibleSugg = (csd.suggestions || []).filter(s => s.status === 'eligible');
       const suggestionHtml = commercial
@@ -2076,7 +2077,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
         : eligibleSugg.length > 0
           ? eligibleSugg.slice(0, 2).map((s, idx) => s.basis === 'scale'
             ? `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bù thiếu quy mô: theo quy hoạch phường đạt <b class="c-red">${fmtPct(s.currentScalePct)}</b> → <b class="c-green">${fmtPct(Math.min(100, s.currentScalePct + s.scaleAddPct))}</b>, độ phủ không tăng).</div>`
-            : `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bổ sung <b class="c-green">${fmtPct(s.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(s.coverageAddPct)}</b> độ phủ${s.coverageMethod === 'estimate' ? ', ước lượng' : ''}${capacityNote(s)}).</div>`
+            : `<div>Ưu tiên ${idx + 1}: ${escapeHtml(s.label)} (bổ sung <b class="c-green">${fmtPct(s.scaleAddPct)}</b> quy mô, <b class="c-cyan">${fmtPct(s.coverageAddPct)}</b> độ phủ${s.coverageMethod === 'estimate' ? ', ước tính' : ''}${capacityNote(s)}).</div>`
           ).join('')
           : `<div class="c-muted"><i>Chưa có gợi ý phù hợp</i></div>`;
 
@@ -2088,11 +2089,12 @@ function buildWardQuotaTableHtml(wardData, projPop) {
       </tr>`);
     });
   } else {
-    parts.push(`<tr class="wt-empty"><td>-</td><td colspan="7">Không có cơ sở chưa sử dụng nào nằm trong ranh giới phường.</td></tr>`);
+    parts.push(`<tr class="wt-empty"><td>-</td><td colspan="7">Không có cơ sở chưa sử dụng trong ranh phường, xã.</td></tr>`);
   }
 
   // E / MẠNG LƯỚI ĐƯỜNG GIAO THÔNG — điền lại khi đọc xong chỉ mục mạng lưới đường (refreshRoadViews)
-  sectionHeader('E', 'e', 'MẠNG LƯỚI ĐƯỜNG GIAO THÔNG (OpenStreetMap + tuyến Admin bổ sung)');
+  sectionHeader('E', 'e', 'MẠNG LƯỚI ĐƯỜNG GIAO THÔNG');
+  parts.push(`<tr class="wt-comp"><td></td><td colspan="7">${detailDisclosure('<p>Chiều dài lấy từ OpenStreetMap và các tuyến do quản trị viên bổ sung, cắt theo ranh phường, xã.</p>')}</td></tr>`);
   parts.push(`</tbody><tbody id="wardRoadBody">${wardRoadRowsHtml(wardData)}</tbody><tbody>`);
 
   parts.push(networkSectionHtml(wardData));

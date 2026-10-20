@@ -6,7 +6,7 @@
 // vùng phát triển mới của phường bộ chỉ tiêu đô thị, không áp cho cả phường. Số liệu tính trên GEE (api/gee.js › getNewDevStats,
 // services/satService.js › newDevImage), bảng chi tiết phường luôn dùng năm gốc DEV_FROM_DEFAULT.
 import { geeApi } from './api.js';
-import { escapeHtml, fmtNum } from './utils.js';
+import { escapeHtml, fmtNum, detailDisclosure } from './utils.js';
 
 export const DEV_FROM_DEFAULT = 2020;
 export const DEV_REF = 'QCVN 01:2026/BXD Mục 2.2.3.2, 2.2.3.3';
@@ -16,7 +16,7 @@ const HA = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
 const BASIS = 'Vùng hiện trạng: đất đã xây dựng đến năm gốc (GAIA – ĐH Thanh Hoa, Landsat 30 m, 1985–2018, hợp với GHSL – JRC, '
   + 'ô 100 m có ≥ 15% diện tích công trình; năm gốc từ 2016 hợp thêm Dynamic World năm đó). Vùng phát triển mới: đất xây dựng hiện nay (Google Dynamic World 10 m, nhãn chiếm ưu thế '
   + 'tháng 1–8 của mùa khô gần nhất, gồm cả đất đang san nền sát khu đã xây dựng) nằm ngoài vùng hiện trạng. Bỏ mảng < 0,5 ha. '
-  + 'Tổng đất xây dựng = vùng hiện trạng + vùng phát triển mới, cũng là mẫu số mật độ đường. Logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch.';
+  + 'Tổng đất xây dựng bằng vùng hiện trạng cộng vùng phát triển mới, đồng thời là mẫu số mật độ đường. Ranh này là kết quả giải đoán ảnh vệ tinh, sẽ được thay bằng ranh đồ án quy hoạch khi có đủ hồ sơ.';
 const DW_NOTE = 'Bản đồ Dynamic World gộp chung các đường, khu công nghiệp, nghĩa trang xây dựng mới vào "Đất xây dựng"; đất đang san nền có thể gồm bãi khai thác cát, ruộng bỏ hoang. Cần kiểm tra kỹ hiện trạng trước khi kết luận.';
 
 /** "2026" hoặc "2024–2025" (bản cũ còn trong bộ nhớ đệm trả về 2 năm) */
@@ -111,7 +111,8 @@ export function newDevRowHtml(wardName) {
 export function devLegend(legend) {
   return `<div><span class="sat-swatch dev-swatch" style="--c:${legend.baseColor}"></span>Vùng hiện trạng (đã xây dựng đến ${legend.from})</div>`
     + `<div><span class="sat-swatch dev-swatch" style="--c:${legend.color}"></span>Vùng phát triển mới (${legend.from} → ${yearsText(legend.to)})</div>`
-    + `<div class="flood-muted" title="${BASIS}">Phóng to từ mức ${DEV_MIN_ZOOM} để xem ranh. Cơ sở: Dynamic World ${yearsText(legend.to)} − (GAIA ∪ GHSL${legend.from >= DW_FIRST_YEAR ? ' ∪ Dynamic World' : ''}) ${legend.from}. Logic tạm, sau này lấy ranh từ quy hoạch. ${DW_NOTE}</div>`;
+    + `<div class="flood-muted">Phóng to từ mức ${DEV_MIN_ZOOM} để xem ranh.</div>`
+    + detailDisclosure(`<p>${escapeHtml(BASIS)}</p><p>${escapeHtml(DW_NOTE)}</p>`);
 }
 
 const sumOf = (rows, k) => rows.reduce((s, w) => s + (Number(w[k]) || 0), 0);
@@ -121,9 +122,10 @@ function wardTable(d) {
   const rows = [...d.wards].sort((a, b) => (b.baseHa + b.devHa) - (a.baseHa + a.devHa));
   const row = (w) => `<tr><td>${escapeHtml(w.name)}</td>`
     + `<td>${HA.format(w.baseHa + w.devHa)}</td><td>${HA.format(w.baseHa)}</td><td>${HA.format(w.devHa)}</td></tr>`;
-  return `<details class="dev-ward-table"><summary>Chi tiết ${rows.length} phường/xã (ha)</summary>
-    <table><thead><tr><th>Phường/xã</th><th>Tổng ${d.to[1]}</th><th>Trước ${d.from}</th><th>Mới</th></tr></thead>
-    <tbody>${rows.map(row).join('')}</tbody></table></details>`;
+  return `<details class="detail-more"><summary>Xem chi tiết</summary>
+    <div class="detail-more-body"><p>${rows.length} phường, xã (ha)</p>
+    <table><thead><tr><th>Phường, xã</th><th>Tổng ${d.to[1]}</th><th>Trước ${d.from}</th><th>Mới</th></tr></thead>
+    <tbody>${rows.map(row).join('')}</tbody></table></div></details>`;
 }
 
 export function devStats(d) {
@@ -143,5 +145,5 @@ export function devStats(d) {
     ${top.length ? `<div class="flood-sub">Phát triển mới nhiều nhất</div><div class="flood-wards">${top.slice(0, 6).map(chip).join('')}</div>` : ''}
     <div class="flood-kpi" title="${DEV_REF}: chỉ xét vùng phát triển mới của ${dt.length} phường bộ chỉ tiêu đô thị"><span>Trong ${d.serviceM} m vườn hoa / bãi đỗ xe (${dt.length} phường đô thị)</span><b><span class="${pctClass(park)}">${pctText(park)}</span> / <span class="${pctClass(parking)}">${pctText(parking)}</span></b></div>
     ${wardTable(d)}
-    <div class="flood-muted">Tổng đất xây dựng cũng là mẫu số mật độ đường giao thông. ${DW_NOTE}</div>`;
+    ${detailDisclosure(`<p>Tổng đất xây dựng cũng là mẫu số mật độ đường giao thông.</p><p>${escapeHtml(DW_NOTE)}</p><p>${escapeHtml(BASIS)}</p>`)}`;
 }

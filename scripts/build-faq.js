@@ -97,7 +97,7 @@ function rank(rows) {
 const PLAN_CHANGE_MIN_RATIO = 0.05;
 const PRIORITY_TOP = 8;
 const SERVICE_SKIP = new Set(['12-CSD', '14-NOXH', '11-NT']);
-const PRIORITY_METHOD = 'Công trình quy hoạch chưa xây là điểm đã duyệt (TrangThai = TRUE), cột QuyMo_HT trống và QuyMo_QH có số. Điểm được gán vào phường theo tọa độ nằm trong ranh, không theo tên cột Ten_XaPhuong. Quỹ đất (12-CSD) và nhà ở xã hội (14-NOXH) không có bán kính phục vụ nên không xếp. Nhà tang lễ, nghĩa trang (11-NT) chỉ có khoảng cách an toàn (Bảng 23), không phải vùng dân được phục vụ, nên cũng không xếp. Độ phủ thêm dùng đúng ước lượng 81 điểm trên buffer tròn bán kính QCVN (estimateCoverageAddPct): phần buffer nằm trong phường và chưa nằm trong buffer công trình cùng loại đang có (hiện trạng đã duyệt, kể cả điểm sắp di dời). Diện tích ha = tỷ lệ đó × diện tích hình học của ranh. Dân số thêm = tỷ lệ × danSoNum của phường, không vượt sức chứa QuyMo_QH chia chỉ tiêu m²/người. Đây là ước lượng hình học: không đếm pixel dân cư WorldPop (cần Earth Engine) và không bám đường (Dijkstra chỉ chạy khi tra cứu một điểm trên bản đồ). Mỗi phường giữ 8 công trình tăng phủ nhiều nhất, xếp theo dân số thêm rồi đến diện tích thêm.';
+const PRIORITY_METHOD = 'Công trình quy hoạch chưa xây là công trình đã phê duyệt, chưa có quy mô hiện trạng và đã có quy mô quy hoạch. Công trình được gán vào phường, xã theo tọa độ nằm trong ranh, không theo tên phường, xã ghi trên bảng dữ liệu. Quỹ đất chưa sử dụng và nhà ở xã hội không có bán kính phục vụ nên không đưa vào danh sách. Nhà tang lễ và nghĩa trang chỉ có khoảng cách an toàn (Bảng 23), không phải vùng dân được phục vụ, nên cũng không xếp. Độ phủ tăng thêm là ước tính hình học: 81 điểm trên vùng đệm tròn theo bán kính QCVN 01:2026/BXD; chỉ tính phần vùng đệm nằm trong phường, xã và chưa nằm trong vùng phục vụ của công trình cùng loại đang có (hiện trạng đã phê duyệt, kể cả điểm sắp di dời). Diện tích tăng thêm (ha) bằng tỷ lệ đó nhân diện tích ranh. Dân số tăng thêm bằng tỷ lệ đó nhân dân số phường, xã, không vượt sức chứa bằng quy mô quy hoạch chia chỉ tiêu mét vuông trên người. Ước tính này không dùng lớp dân cư vệ tinh và không bám theo mạng đường; mạng đường chỉ dùng khi tra cứu một vị trí trên bản đồ. Mỗi phường, xã giữ 8 công trình làm tăng độ phủ nhiều nhất, xếp theo dân số tăng thêm rồi đến diện tích tăng thêm.';
 
 function parseArea(val) {
   if (val === undefined || val === null || String(val).trim() === '') return null;
@@ -525,9 +525,9 @@ async function main() {
     questions.push(q(
       'green-max',
       'Phường, xã nào có diện tích cây xanh công viên lớn nhất?',
-      `${w}: ${ha(green[w])} ha quy mô hiện trạng đã duyệt (${num(greenN[w])} công viên${greenUnknown[w] ? `, ${num(greenUnknown[w])} công trình chưa có QuyMo_HT nên không cộng diện tích` : ''}).`,
+      `${w}: ${ha(green[w])} ha quy mô hiện trạng đã phê duyệt (${num(greenN[w])} công viên${greenUnknown[w] ? `, ${num(greenUnknown[w])} công trình chưa có quy mô hiện trạng nên không cộng diện tích` : ''}).`,
       [w],
-      'infrastructure_hue.json · TrangThai = TRUE · nhóm 1-CV · QuyMo_HT (m²). Cập nhật bucket 15/10/2026.'
+      'Hạ tầng đã phê duyệt, nhóm cây xanh công viên, quy mô hiện trạng (m²). Cập nhật 15/10/2026.'
     ));
   } else {
     gaps.push({ q: 'Phường nào có diện tích cây xanh lớn nhất?', why: 'Không có công viên đã duyệt với QuyMo_HT > 0.' });
@@ -546,7 +546,7 @@ async function main() {
         'Xã nào có mật độ dân số thấp nhất?',
         `${low[0].ward}: ${num(Math.round(low[0].value))} người/km² (${num(popByWard[low[0].ward])} người / ${num(constants.WARD_AREA_KM2[low[0].ward], 2)} km²).`,
         [low[0].ward],
-        'Dân số thuộc tính danSoNum trên ranh phường xã; diện tích bảng WARD_AREA_KM2 trong config/constants.js.'
+        'Dân số trên ranh phường, xã; diện tích theo bảng diện tích chính thức 40 phường, xã.'
       ));
     }
     if (high[0]) {
@@ -555,14 +555,14 @@ async function main() {
         'Phường nào có mật độ dân số cao nhất?',
         `${high[0].ward}: ${num(Math.round(high[0].value))} người/km² (${num(popByWard[high[0].ward])} người / ${num(constants.WARD_AREA_KM2[high[0].ward], 2)} km²).`,
         [high[0].ward],
-        'Dân số thuộc tính danSoNum trên ranh phường xã; diện tích bảng WARD_AREA_KM2 trong config/constants.js.'
+        'Dân số trên ranh phường, xã; diện tích theo bảng diện tích chính thức 40 phường, xã.'
       ));
     }
   } else {
     gaps.push({ q: 'Xã nào có mật độ dân số thấp nhất?', why: 'Ranh phường xã không kèm dân số danSoNum.' });
   }
 
-  const landNote = 'public/data/qhc2045/sdd.json · diện tích lô (ha) theo mã chức năng đất QHC 2045, gán phường bằng tâm lô. Chỉ các lô có trong lớp này, không phải kiểm kê toàn địa bàn.';
+  const landNote = 'Lớp sử dụng đất QHC 2045, diện tích lô (ha) theo mã chức năng, gán phường, xã theo tâm lô. Chỉ các lô có trong lớp này, không phải kiểm kê toàn địa bàn.';
   if (boundary && landHits) {
     for (const [key, label] of [['5', LAND[5]], ['40', LAND[40]], ['23', LAND[23]], ['forest', LAND.forest]]) {
       const r = rank(rowsOf(land[key]));
@@ -597,16 +597,16 @@ async function main() {
     questions.push(q(
       'invest-max',
       'Địa bàn nào có nhiều dự án kêu gọi đầu tư nhất?',
-      `${top3.map(r => `${r.ward}: ${num(r.value)} dự án`).join('; ')}. ${num(investMatched)} dòng gắn được địa bàn, ${num(investMiss)} dòng không khớp tên phường xã.`,
+      `${top3.map(r => `${r.ward}: ${num(r.value)} dự án`).join('; ')}. ${num(investMatched)} dự án gắn được với địa bàn; ${num(investMiss)} dự án không khớp tên phường, xã.`,
       top3.map(r => r.ward),
-      'public/data/invest-sheet.json · cột ĐỊA ĐIỂM. Một dòng ghi nhiều phường được đếm ở mỗi phường. Đây là danh sách kêu gọi đầu tư, không phải dự án đã cấp phép.'
+      'Danh sách kêu gọi đầu tư, cột địa điểm. Một dòng ghi nhiều phường, xã được đếm ở mỗi địa bàn. Đây không phải dự án đã cấp phép.'
     ));
     questions.push(q(
       'invest-min',
       'Địa bàn nào có ít dự án kêu gọi đầu tư nhất (trong số có ít nhất một dự án)?',
-      `${inv.bottom.ward}: ${num(inv.bottom.value)} dự án. ${num(inv.zero.length)} địa bàn không có dòng nào khớp tên.`,
+      `${inv.bottom.ward}: ${num(inv.bottom.value)} dự án. ${num(inv.zero.length)} địa bàn không có dự án khớp tên.`,
       [inv.bottom.ward],
-      'public/data/invest-sheet.json · cột ĐỊA ĐIỂM.'
+      'Danh sách kêu gọi đầu tư, cột địa điểm.'
     ));
   }
 
@@ -618,7 +618,7 @@ async function main() {
       'Địa bàn nào có nhiều trường mầm non, tiểu học, THCS, THPT đã duyệt nhất?',
       `${w}: ${num(schools[w])} trường.`,
       [w],
-      'infrastructure_hue.json · đã duyệt · tiền tố MN, TH, THCS, THPT.'
+      'Công trình đã phê duyệt, nhóm trường mầm non, tiểu học, THCS, THPT.'
     ));
   }
   const busRank = rank(rowsOf(bus));
@@ -628,7 +628,7 @@ async function main() {
       'Địa bàn nào có nhiều điểm dừng xe buýt đã duyệt nhất?',
       `${busRank.top.ward}: ${num(bus[busRank.top.ward])} điểm.`,
       [busRank.top.ward],
-      'infrastructure_hue.json · đã duyệt · nhóm 13-BUS.'
+      'Công trình đã phê duyệt, nhóm điểm dừng xe buýt.'
     ));
   }
   const csdRank = rank(rowsOf(csd));
@@ -639,7 +639,7 @@ async function main() {
       'Địa bàn nào có quỹ đất chưa sử dụng (quy mô hiện trạng đã duyệt) lớn nhất?',
       `${w}: ${ha(csd[w])} ha (${num(csdN[w])} khu).`,
       [w],
-      'infrastructure_hue.json · đã duyệt · nhóm 12-CSD · QuyMo_HT.'
+      'Công trình đã phê duyệt, nhóm quỹ đất chưa sử dụng, quy mô hiện trạng.'
     ));
   }
 
@@ -649,7 +649,7 @@ async function main() {
     'Phường, xã nào có diện tích tự nhiên lớn nhất?',
     `${byArea[0].ward}: ${num(byArea[0].value, 2)} km².`,
     [byArea[0].ward],
-    'Bảng diện tích chính thức 40 phường xã trong config/constants.js (WARD_AREA_KM2).'
+    'Bảng diện tích chính thức 40 phường, xã.'
   ));
   const small = byArea[byArea.length - 1];
   questions.push(q(
@@ -657,15 +657,15 @@ async function main() {
     'Phường, xã nào có diện tích tự nhiên nhỏ nhất?',
     `${small.ward}: ${num(small.value, 2)} km².`,
     [small.ward],
-    'Bảng diện tích chính thức 40 phường xã trong config/constants.js (WARD_AREA_KM2).'
+    'Bảng diện tích chính thức 40 phường, xã.'
   ));
 
   gaps.push(
-    { q: 'Diện tích cây xanh công cộng theo kiểm kê đất đai?', why: 'Bucket chỉ có quy mô từng công viên trên sheet, không có lớp kiểm kê cây xanh toàn ranh.' },
-    { q: 'Tỷ lệ nhà kiên cố, nước sạch, chất thải rắn theo phường?', why: 'Không có số liệu điều tra trong webapp hay bucket.' },
-    { q: 'Số dự án đầu tư đã cấp phép hoặc đang thi công theo phường?', why: 'Chỉ có danh sách kêu gọi đầu tư (invest-sheet.json), không có sổ dự án đã phê duyệt theo phường.' },
-    { q: 'Mật độ xây dựng hoặc tầng cao trung bình theo phường?', why: 'Chưa có lớp công trình nhà (Open Buildings / OSM) trong bộ số liệu đang dùng.' },
-    { q: 'Độ che phủ thực vật (NDVI) theo phường?', why: 'Chưa có lớp NDVI trong bộ số liệu tĩnh.' }
+    { q: 'Diện tích cây xanh công cộng theo kiểm kê đất đai?', why: 'Hiện chỉ có quy mô từng công viên, chưa có lớp kiểm kê cây xanh trên toàn ranh.' },
+    { q: 'Tỷ lệ nhà kiên cố, nước sạch, chất thải rắn theo phường?', why: 'Chưa có số liệu điều tra trong bộ dữ liệu đang dùng.' },
+    { q: 'Số dự án đầu tư đã cấp phép hoặc đang thi công theo phường?', why: 'Hiện chỉ có danh sách kêu gọi đầu tư, chưa có sổ dự án đã phê duyệt theo phường, xã.' },
+    { q: 'Mật độ xây dựng hoặc tầng cao trung bình theo phường?', why: 'Chưa có lớp công trình nhà trong bộ số liệu đang dùng.' },
+    { q: 'Độ che phủ thực vật theo phường, xã?', why: 'Chưa có lớp chỉ số thực vật trong bộ số liệu tĩnh.' }
   );
 
   const priority = buildPriority(features, boundary, popByWard);

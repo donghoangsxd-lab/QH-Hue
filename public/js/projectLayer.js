@@ -2170,7 +2170,7 @@ function applyDecision(name, decision) {
 
 function sheetNote(data) {
   if (data.sheet) return '';
-  return `\n\nQuyết định đã lưu trên webapp. Cột LinkQD trên sheet DS_DoAn chưa ghi được: ${data.sheetMessage || 'hãy triển khai bản Code.gs mới (Deploy → New version).'}`;
+  return `\n\nQuyết định đã lưu trên ứng dụng. Cột đường dẫn quyết định trên bảng danh sách đồ án chưa ghi được. ${data.sheetMessage || 'Vui lòng liên hệ quản trị hệ thống.'}`;
 }
 
 function applyProposal(name, proposal) {

@@ -259,7 +259,13 @@ export function setStatusContent(el, text, fallbackIcon = null) {
     const m = rest.match(re);
     if (m) { icon = name; rest = rest.slice(m[0].length); break; }
   }
+  rest = rest.replace(/[\u{1F300}-\u{1FAFF}\u2705\u274C\u26A0\uFE0F\u23F3\u2713\u2714\u274E\u2757]/gu, '').replace(/\s{2,}/g, ' ').trim();
   el.innerHTML = rest ? `${icon ? ico(icon) : ''}${escapeHtml(rest)}` : '';
+}
+
+/** Đoạn phương pháp, cách tính hoặc lưu ý: đóng sẵn, bấm «Xem chi tiết» mới mở. html là nội dung đã dựng. */
+export function detailDisclosure(html, label = 'Xem chi tiết') {
+  return `<details class="detail-more"><summary>${escapeHtml(label)}</summary><div class="detail-more-body">${html}</div></details>`;
 }
 
 // Công cụ thao tác trên bản đồ dùng chung click nên chỉ bật 1 cái: công cụ vừa bật phát sự kiện, công cụ khác đang chạy tự hủy.

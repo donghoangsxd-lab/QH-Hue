@@ -298,7 +298,7 @@ async function chooseWard(wardName) {
       await loadInfraData();
     } catch (err) {
       console.error("Lỗi tải dữ liệu điểm hạ tầng:", err);
-      showToast('❌ Không tải được dữ liệu công trình', 'error');
+      showToast('Không tải được dữ liệu công trình.', 'error');
       return;
     }
   }
@@ -322,7 +322,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initMapLevel();
   // Sau khi máy chủ ghi Sheet (nhập file, ghi dấu nhắc phường): tải lại dữ liệu và làm mới bản đồ, bảng
   const reloadAfterSheetWrite = async () => {
-    try { await loadInfraData(); } catch (err) { showToast('⚠️ Chưa tải lại được dữ liệu, thử F5 sau ít phút', 'error'); return; }
+    try { await loadInfraData(); } catch (err) { showToast('Chưa tải lại được dữ liệu. Vui lòng tải lại trang sau ít phút.', 'error'); return; }
     renderGroupedPoints();
     loadCadParcels();
     refreshHeatmapOnly();
@@ -712,20 +712,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const phase = document.getElementById('newPhase')?.value === 'QH' ? 'QH' : 'HT';
 
     if (!name || !Number.isFinite(lat) || !Number.isFinite(lng) || !document.getElementById('newLat')?.value) {
-      setStatus("⚠️ Vui lòng điền đủ Tên và Tọa độ hợp lệ!", "var(--accent-red)");
+      setStatus("Vui lòng nhập đủ tên và tọa độ hợp lệ.", "var(--accent-red)");
       return;
     }
     if (!Number.isFinite(size) || size < 0) {
-      setStatus("⚠️ Diện tích không hợp lệ!", "var(--accent-red)");
+      setStatus("Diện tích không hợp lệ.", "var(--accent-red)");
       return;
     }
     if (phase === 'QH' && !(size > 0) && !NO_AREA_TYPES.includes(type)) {
-      setStatus("⚠️ Điểm quy hoạch mới cần nhập diện tích > 0!", "var(--accent-red)");
+      setStatus("Điểm quy hoạch mới cần diện tích lớn hơn 0 m².", "var(--accent-red)");
       return;
     }
 
     submitting = true;
-    setStatus("🚀 Đang gửi đề xuất...", "var(--accent-orange)");
+    setStatus("Đang gửi đề xuất.", "var(--accent-orange)");
     try {
       markDataWritten();
       const res = await fetch(geeApi('action=addPoint'), {
@@ -735,7 +735,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
-        setStatus(`❌ ${data.message || `Gửi đề xuất thất bại (${res.status})`}`, "var(--accent-red)");
+        setStatus(data.message || `Không gửi được đề xuất (mã ${res.status}).`, "var(--accent-red)");
         return;
       }
 
@@ -768,7 +768,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderGroupedPoints();
       if (state.wardStatsData.length) reloadWardStats();
     } catch (err) {
-      setStatus("❌ Lỗi kết nối máy chủ!", "var(--accent-red)");
+      setStatus("Không kết nối được máy chủ.", "var(--accent-red)");
     } finally {
       submitting = false;
     }
@@ -893,7 +893,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const gpsLayers = [L.layerGroup().addTo(map), planMap ? L.layerGroup().addTo(planMap) : null].filter(Boolean);
   document.getElementById('btnLocateGPS')?.addEventListener('click', () => {
     if (!navigator.geolocation) {
-      showToast('Trình duyệt của bạn không hỗ trợ định vị GPS.', 'error');
+      showToast('Trình duyệt không hỗ trợ định vị.', 'error');
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -909,7 +909,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         handleInspectPointClick(lat, lng, isCompareOn() && !isSplitOn() && planMap ? planMap : map);
       },
-      () => showToast('Không thể lấy được vị trí GPS của bạn.', 'error'),
+      () => showToast('Không lấy được vị trí hiện tại.', 'error'),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   });
@@ -1016,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 600);
   } catch (err) {
     console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
-    showToast('❌ Lỗi nạp dữ liệu bản đồ, vui lòng tải lại trang.', 'error');
+    showToast('Không nạp được dữ liệu bản đồ. Vui lòng tải lại trang.', 'error');
     if (progressRow) progressRow.style.display = 'none';
     endTitleProgress();
   }

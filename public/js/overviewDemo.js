@@ -130,14 +130,14 @@ function render(html) {
   const last = idx === scenes.length - 1;
   card.innerHTML = `
     <header class="ovd-head">
-      <span class="ovd-kicker">${ico('map')}Trình diễn · ${escapeHtml(def.title)}</span>
-      <button type="button" class="ovd-x" data-ovd="exit" title="Thoát, trả bản đồ về như trước (Esc)" aria-label="Thoát trình diễn">${ico('close')}</button>
+      <span class="ovd-kicker">${ico('map')}Minh họa thao tác · ${escapeHtml(def.title)}</span>
+      <button type="button" class="ovd-x" data-ovd="exit" title="Đóng và trả bản đồ về như trước (Esc)" aria-label="Đóng minh họa">${ico('close')}</button>
     </header>
     <ol class="ovd-dots" aria-hidden="true">${scenes.map((_, i) => `<li class="${i < idx ? 'done' : i === idx ? 'on' : ''}"></li>`).join('')}</ol>
     <h3 class="ovd-title"><span>Bước ${idx + 1}/${scenes.length}</span>${escapeHtml(scenes[idx].title)}</h3>
     <div class="ovd-text">${busy ? '<p class="ovd-busy">Đang thao tác trên bản đồ…</p>' : html}</div>
     <footer class="ovd-btns">
-      <button type="button" class="ov-ghost" data-ovd="keep" title="Đóng thuyết minh, giữ nguyên bản đồ để tự thao tác">Giữ bản đồ</button>
+      <button type="button" class="ov-ghost" data-ovd="keep" title="Đóng chú thích, giữ nguyên bản đồ để tự thao tác">Giữ bản đồ</button>
       <button type="button" class="ov-ghost" data-ovd="prev"${idx && !busy ? '' : ' disabled'}>${ico('chev-left')}Trước</button>
       <button type="button" class="ov-primary" data-ovd="next"${busy ? ' disabled' : ''}
         title="${last ? 'Kết thúc, trả bản đồ về như trước' : 'Cảnh tiếp theo (phím →)'}">${last ? `${ico('check')}Kết thúc` : `Tiếp${ico('chev-right')}`}</button>
