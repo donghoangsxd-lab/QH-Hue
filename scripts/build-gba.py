@@ -4,6 +4,7 @@
 #   python3 scripts/build-gba.py
 # Cần duckdb (pip install duckdb) và tippecanoe. Parquet mặc định /tmp/gba/e105_n20_e110_n15.parquet.
 # Đầu ra: public/data/gba/agg.json (nhỏ, đưa vào git) và public/data/gba/buildings.pmtiles (không git).
+# Phân loại nhà ở và trọng số dân số: python3 scripts/gba-residential.py (sau khi có jsonl và thửa).
 # Đẩy bucket (nếu có quyền): gcloud storage cp public/data/gba/buildings.pmtiles gs://hue-infra-data-us/gba/buildings.pmtiles
 #   và agg.json cùng thư mục. Bucket cần CORS cho header Range như lớp thửa đất.
 

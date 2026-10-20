@@ -6,7 +6,7 @@ import { MAP_MAX_ZOOM } from './basemap.js';
 import { geeApi } from './api.js';
 import { detailDisclosure, escapeHtml } from './utils.js';
 import { setWardGbaHtml } from './uiComponents.js';
-import { GBA_CLASSES, GBA_COLORS, GBA_NOTE, gbaLotKey, gbaStatsHtml } from './gbaStats.js';
+import { GBA_CLASSES, GBA_COLORS, GBA_NOTE, gbaLotKey, gbaStatsHtml, gbaWardExtra } from './gbaStats.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -318,7 +318,9 @@ function applyGrid() {
 function wardHtml(name) {
   const row = agg && (agg.wards || []).find((w) => w.name === name);
   if (!row) return '';
-  return gbaStatsHtml([row.n, row.fp, row.cov, row.cls, row.fai]);
+  const line = [row.n, row.fp, row.cov, row.cls, row.fai];
+  if (Number.isFinite(Number(row.rn))) line.push(row.rn, row.rfp, row.rcov, null);
+  return gbaStatsHtml(line, gbaWardExtra(row, agg.largeM2));
 }
 
 function lotHtml(p) {
