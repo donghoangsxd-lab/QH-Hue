@@ -464,6 +464,54 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnMeasureDist')?.addEventListener('click', () => toggleMeasure('distance'));
   document.getElementById('btnMeasureArea')?.addEventListener('click', () => toggleMeasure('area'));
+  initPhoneToolMenus();
+
+  function initPhoneToolMenus() {
+    const menus = [
+      { btn: 'btnMeasurePick', menu: 'measureChooser', target: { distance: 'btnMeasureDist', area: 'btnMeasureArea' } },
+      { btn: 'btnInspectPick', menu: 'inspectChooser', target: { point: 'btnInspectMode', gps: 'btnLocateGPS' } }
+    ];
+    const closeAll = () => menus.forEach(m => {
+      const menu = document.getElementById(m.menu);
+      const btn = document.getElementById(m.btn);
+      if (menu) menu.hidden = true;
+      btn?.setAttribute('aria-expanded', 'false');
+    });
+    menus.forEach(m => {
+      const btn = document.getElementById(m.btn);
+      const menu = document.getElementById(m.menu);
+      if (!btn || !menu) return;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const willOpen = menu.hidden;
+        closeAll();
+        if (!willOpen) return;
+        if (m.menu === 'measureChooser') {
+          menu.querySelectorAll('[data-tb-value]').forEach(el => {
+            el.setAttribute('aria-checked', String(el.dataset.tbValue === state.activeMeasureType));
+          });
+        }
+        menu.hidden = false;
+        const r = btn.getBoundingClientRect();
+        const top = Math.max(4, Math.min(r.top, window.innerHeight - menu.offsetHeight - 4));
+        menu.style.left = `${Math.round(r.right + 6)}px`;
+        menu.style.top = `${Math.round(top)}px`;
+        btn.setAttribute('aria-expanded', 'true');
+      });
+      menu.addEventListener('click', (e) => {
+        const item = e.target.closest('[data-tb-value]');
+        if (!item) return;
+        e.stopPropagation();
+        closeAll();
+        document.getElementById(m.target[item.dataset.tbValue])?.click();
+      });
+    });
+    document.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.tb-phone-pick')) return;
+      closeAll();
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
+  }
   document.getElementById('btnMeasureProfile')?.addEventListener('click', () => toggleMeasure('profile'));
   document.getElementById('btnCloseProfile')?.addEventListener('click', () => {
     if (state.activeMeasureType === 'profile') toggleMeasure('profile');
@@ -481,6 +529,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         ? "Đang bật tra cứu (bấm để tắt)"
         : "Bật chế độ tra cứu: click lên bản đồ để xem hạ tầng tiếp cận tại vị trí";
     }
+    const btnInspectPick = document.getElementById('btnInspectPick');
+    btnInspectPick?.classList.toggle('active', on);
+    btnInspectPick?.setAttribute('aria-pressed', String(on));
     mapEl?.classList.toggle('inspect-mode', on);
     planEl?.classList.toggle('inspect-mode', on);
     if (on) state.isPickMode = false;
