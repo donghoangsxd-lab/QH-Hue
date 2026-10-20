@@ -38,6 +38,9 @@ import { openOrAssign, openAssign, openDecision, openPropose, openProposalReview
 import { adjustmentsOf, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { namesOfProject } from './projectNames.js';
 import { enabledSchemes } from './schemeVisibility.js';
+import {
+  STORAGE_VERSION, STORAGE_VERSION_KEY, HIDDEN_KIND_FIX_KEY, readStorageVersion, parseNameList, migrateHiddenState
+} from './storageSchema.js';
 import { kmlTextFromFile, boundaryPolygonsFromKml } from './kmlLoad.js';
 
 const HIDDEN_KEY = 'qh_hidden_projects';
@@ -191,22 +194,29 @@ export function projectBoundary(geometries) {
 
 // ============================ DANH SÁCH ĐỒ ÁN ============================
 
-// Bản cũ bật lớp Quy hoạch thì tự ẩn mọi đồ án chưa hiện, kể cả QHC / QHCT (nay theo ô lớp cấp đó): bỏ một lần
-const HIDDEN_KIND_FIX_KEY = 'qh_hidden_kind_fix';
-
 function loadHidden() {
   try {
-    let saved = JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]');
-    if (Array.isArray(saved) && !localStorage.getItem(HIDDEN_KIND_FIX_KEY)) {
-      saved = saved.filter(n => planLevelOf(n) === 'QHPK');
-      localStorage.setItem(HIDDEN_KEY, JSON.stringify(saved));
-      localStorage.setItem(HIDDEN_KIND_FIX_KEY, '1');
+    const version = readStorageVersion(localStorage);
+    const saved = parseNameList(localStorage.getItem(HIDDEN_KEY));
+    const layers = parseNameList(localStorage.getItem(HIDDEN_LAYERS_KEY));
+    let projects = saved.list;
+    let layerList = layers.list;
+    let dirty = !saved.ok || !layers.ok;
+    if (version < STORAGE_VERSION) {
+      const next = migrateHiddenState(projects, layerList);
+      projects = next.projects;
+      layerList = next.layers;
+      dirty = true;
+      localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+      localStorage.removeItem(HIDDEN_KIND_FIX_KEY);
     }
-    if (Array.isArray(saved)) state.hiddenProjects = new Set(saved.map(String));
-    const layers = JSON.parse(localStorage.getItem(HIDDEN_LAYERS_KEY) || '[]');
-    if (Array.isArray(layers)) state.hiddenProjectLayers = new Set(layers.map(String));
-    const nets = JSON.parse(localStorage.getItem(SHOWN_NETS_KEY) || '[]');
-    if (Array.isArray(nets)) state.shownProjectNets = new Set(nets.map(String));
+    if (dirty) {
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify(projects));
+      localStorage.setItem(HIDDEN_LAYERS_KEY, JSON.stringify(layerList));
+    }
+    state.hiddenProjects = new Set(projects);
+    state.hiddenProjectLayers = new Set(layerList);
+    state.shownProjectNets = new Set(parseNameList(localStorage.getItem(SHOWN_NETS_KEY)).list);
   } catch (e) { /* chế độ riêng tư */ }
 }
 

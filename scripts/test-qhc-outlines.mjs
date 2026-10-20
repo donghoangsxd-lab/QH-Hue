@@ -106,6 +106,119 @@ function assertCount(label, info) {
   console.log(`${label}: ${info.rendered} ranh`);
 }
 
+async function liveQhcNames() {
+  const res = await fetch('https://web-hatang-hue-4.vercel.app/api/gee?action=getProjectIndex');
+  if (!res.ok) throw new Error(`getProjectIndex HTTP ${res.status}`);
+  const data = await res.json();
+  const names = (data.projects || [])
+    .map(p => p && p.tenQH)
+    .filter(n => typeof n === 'string' && /^\s*QHC(?![A-Z])/i.test(n));
+  if (!names.some(n => /Chân Mây/.test(n))) throw new Error('Danh mục không có QHC Chân Mây');
+  return names;
+}
+
+function seedScript(payload) {
+  const qhpk = 'QHPK Thanh Toàn';
+  const names = [...payload.qhc, qhpk];
+  const layers = [
+    ...payload.qhc.map(n => `${n}|ranh-gioi`),
+    `${qhpk}|ranh-gioi`
+  ];
+  localStorage.setItem('qhhue_intro_off', '1');
+  sessionStorage.setItem('qh_mobile_fs_dismiss', '1');
+  if (sessionStorage.getItem('qh_seed_done') === '1') return;
+  sessionStorage.setItem('qh_seed_done', '1');
+  if (payload.invalid) {
+    localStorage.setItem('qh_hidden_projects', '{"not":"array"}');
+    localStorage.setItem('qh_hidden_layers', '[');
+  } else {
+    localStorage.setItem('qh_hidden_projects', JSON.stringify(names));
+    localStorage.setItem('qh_hidden_layers', JSON.stringify(layers));
+  }
+  localStorage.removeItem('qh_storage_version');
+  if (payload.kindFix) localStorage.setItem('qh_hidden_kind_fix', '1');
+  else localStorage.removeItem('qh_hidden_kind_fix');
+}
+
+async function labelsOnScreen(page) {
+  return page.evaluate(() => {
+    const host = document.querySelector('#mapPlan')?.offsetParent
+      ? document.querySelector('#mapPlan')
+      : document.querySelector('#map');
+    const box = host.getBoundingClientRect();
+    const hits = [...host.querySelectorAll('.project-label span')].map(el => {
+      const r = el.getBoundingClientRect();
+      const text = el.innerText.replace(/\s+/g, ' ').trim();
+      const on = r.width > 0 && r.height > 0
+        && r.left < box.right - 2 && r.right > box.left + 2
+        && r.top < box.bottom - 2 && r.bottom > box.top + 2;
+      return { text, on };
+    });
+    return {
+      chan: hits.some(h => /Chân Mây/.test(h.text) && h.on),
+      core: hits.some(h => /TT Huế 2045/.test(h.text) && h.on),
+      on: hits.filter(h => h.on).map(h => h.text)
+    };
+  });
+}
+
+async function staleDesktop(page, base, { qhc, panel, shot, keepQhpk }) {
+  await page.goto(base, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await waitCatalog(page);
+  if (panel) {
+    await page.click('#btnExpandRightPanel');
+    await page.waitForFunction(() => !document.body.classList.contains('right-collapsed'));
+    await page.waitForTimeout(400);
+  }
+  await openLevel(page, 'qhc10');
+  let seen = null;
+  for (let i = 0; i < 30; i++) {
+    seen = await labelsOnScreen(page);
+    if (seen.chan && seen.core) break;
+    await page.waitForTimeout(400);
+  }
+  if (!seen?.chan || !seen?.core) {
+    throw new Error(`${shot}: nhãn không nằm trong khung ${JSON.stringify(seen)}`);
+  }
+  const stored = await page.evaluate((qhc) => ({
+    version: localStorage.getItem('qh_storage_version'),
+    kind: localStorage.getItem('qh_hidden_kind_fix'),
+    hidden: JSON.parse(localStorage.getItem('qh_hidden_projects') || '[]'),
+    layers: JSON.parse(localStorage.getItem('qh_hidden_layers') || '[]'),
+    qhc
+  }), qhc);
+  if (stored.version !== '2') throw new Error(`${shot}: phiên lưu trữ ${stored.version}`);
+  if (stored.kind) throw new Error(`${shot}: còn cờ qh_hidden_kind_fix`);
+  const still = stored.hidden.filter(n => qhc.includes(n));
+  if (still.length) throw new Error(`${shot}: còn ẩn QHC ${still.join(' | ')}`);
+  if (stored.layers.some(k => qhc.some(n => k === `${n}|ranh-gioi`))) {
+    throw new Error(`${shot}: còn khóa ranh-gioi của QHC`);
+  }
+  if (keepQhpk) {
+    if (!stored.hidden.includes('QHPK Thanh Toàn')) throw new Error(`${shot}: mất ẩn QHPK đã lưu`);
+    if (!stored.layers.includes('QHPK Thanh Toàn|ranh-gioi')) throw new Error(`${shot}: mất ranh-gioi QHPK`);
+  }
+  fs.mkdirSync(shotDir, { recursive: true });
+  const file = path.join(shotDir, shot);
+  await page.screenshot({ path: file });
+  console.log('shot', file, seen.on.join(' | '));
+  const chan = qhc.find(n => /Chân Mây/.test(n));
+  await page.evaluate((name) => {
+    const cur = JSON.parse(localStorage.getItem('qh_hidden_projects') || '[]');
+    if (!cur.includes(name)) cur.push(name);
+    localStorage.setItem('qh_hidden_projects', JSON.stringify(cur));
+  }, chan);
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 45000 });
+  await waitCatalog(page);
+  const kept = await page.evaluate((name) => {
+    const hidden = JSON.parse(localStorage.getItem('qh_hidden_projects') || '[]');
+    return { version: localStorage.getItem('qh_storage_version'), hidden: hidden.includes(name) };
+  }, chan);
+  if (kept.version !== '2' || !kept.hidden) {
+    throw new Error(`${shot}: phiên 2 không giữ bỏ chọn ${JSON.stringify(kept)}`);
+  }
+}
+
 async function openLevel(page, id) {
   const current = await page.getAttribute('#btnMapLevel', 'data-level');
   if (current === id) return;
@@ -193,6 +306,8 @@ async function main() {
     executablePath: chrome,
     args: ['--no-sandbox', '--disable-dev-shm-usage']
   });
+  const qhc = await liveQhcNames();
+  console.log('QHC trong danh mục:', qhc.join(' | '));
   try {
     const desk = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const deskPage = await desk.newPage();
@@ -204,6 +319,20 @@ async function main() {
     await deskPage.goto(base, { waitUntil: 'domcontentloaded', timeout: 45000 });
     await scene(deskPage, 'qhc-desktop.png');
     await desk.close();
+
+    const seeds = [
+      { width: 1920, height: 1080, kindFix: true, invalid: false, panel: true, shot: 'qhc-desk-1920-stuck.png', keepQhpk: true },
+      { width: 1536, height: 864, kindFix: false, invalid: false, panel: false, shot: 'qhc-desk-1536-legacy.png', keepQhpk: true },
+      { width: 1366, height: 768, kindFix: true, invalid: true, panel: false, shot: 'qhc-desk-1366-invalid.png', keepQhpk: false }
+    ];
+    for (const seed of seeds) {
+      const ctx = await browser.newContext({ viewport: { width: seed.width, height: seed.height } });
+      const page = await ctx.newPage();
+      page.on('pageerror', (e) => console.log('ERR', seed.shot, e.message));
+      await page.addInitScript(seedScript, { qhc, kindFix: seed.kindFix, invalid: seed.invalid });
+      await staleDesktop(page, base, { qhc, panel: seed.panel, shot: seed.shot, keepQhpk: seed.keepQhpk });
+      await ctx.close();
+    }
 
     const phone = await browser.newContext({
       viewport: { width: 915, height: 412 },
