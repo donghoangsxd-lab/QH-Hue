@@ -370,6 +370,7 @@ function openProject(p) {
   inspectSnap = null;
   viewStash = null;
   focusExtra = null;
+  levelPeers = [];
   zoomTo(p);
   focusName = p.name;
   drawFocus();
@@ -383,6 +384,7 @@ export function shareOpenProject(name) {
   const wanted = String(name || '').trim();
   if (!wanted) return false;
   focusExtra = null;
+  levelPeers = [];
   const p = projects.find(x => x.name === wanted);
   state.focusedProject = wanted;
   if (state.hiddenProjects.delete(wanted)) saveHidden();
@@ -488,16 +490,81 @@ function focusCover(hits) {
   return { skipMask: false, geom: acc, lines: [acc] };
 }
 
-function openMany(hits) {
-  const primary = hits.slice().sort((a, b) => outlineSize(a) - outlineSize(b))[0];
-  if (!primary) return null;
-  // Lỗ phủ tối = hợp ranh mọi đồ án giao vùng, không phải đồ án nhỏ nhất (lô đồ án kia bị che)
-  focusExtra = focusCover(hits);
-  if (focusExtra) focusExtra.names = hits.map(p => p.name);
+function overlapM2(outline, geom) {
+  if (!outline || !geom || typeof turf === 'undefined') return 0;
+  try {
+    const hit = turf.intersect(turf.feature(outline), turf.feature(geom));
+    return hit ? turf.area(hit) : 0;
+  } catch (e) { return 0; }
+}
+
+// Cùng cấp: diện giao với vùng tra cứu lớn hơn đứng trước; hòa thì ranh rộng hơn
+function byOverlap(list, geom) {
+  return list.map(p => ({ p, m2: overlapM2(outlineOf(p), geom), size: outlineSize(p) }))
+    .sort((a, b) => (b.m2 - a.m2) || (b.size - a.size))
+    .map(row => row.p);
+}
+
+function rememberPeers(list) {
+  levelPeers = list.map(p => ({ name: p.name, short: p.short || p.name, level: p.level }));
+}
+
+/** Đồ án cùng cấp đang tra cứu, xếp theo diện giao giảm dần. Đổi thẻ bằng selectInspectPeer. */
+export function inspectPeers() {
+  return levelPeers.map(p => ({ ...p }));
+}
+
+/** Đổi thẻ / đồ án đang chọn trong cùng cấp. Giữ lô và lỗ phủ tối (hợp ranh cả cấp). */
+export function selectInspectPeer(name) {
+  const wanted = String(name || '');
+  if (!levelPeers.some(p => p.name === wanted)) return false;
+  if (state.focusedProject === wanted && focusName === wanted) return true;
+  const p = projects.find(x => x.name === wanted);
+  if (!p) return false;
+  state.focusedProject = p.name;
+  focusName = p.name;
+  drawFocus();
+  pinGlow(p);
+  markPicked(p.name);
+  focusProjectLots(p.name);
+  document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: p.name }));
+  return true;
+}
+
+function openMany(hits, kind, geom) {
+  const same = byOverlap(hits.filter(p => p.level === kind), geom);
+  const primary = same[0];
+  if (!primary) {
+    rememberPeers([]);
+    focusExtra = null;
+    let hiddenChanged = false;
+    hits.forEach(p => {
+      if (state.hiddenProjects.delete(p.name)) hiddenChanged = true;
+      state.lotProjects.add(p.name);
+    });
+    if (hiddenChanged) saveHidden();
+    const focused = projects.find(x => x.name === state.focusedProject);
+    if (!focused || focused.level !== kind) {
+      state.focusedProject = null;
+      focusName = null;
+      markPicked(null);
+      document.dispatchEvent(new Event(PROJECT_UNFOCUS_EVENT));
+    }
+    refreshAll();
+    drawFocus();
+    return null;
+  }
+  // Lỗ phủ tối theo cấp đang chọn. Lô vẫn lấy mọi đồ án giao vùng (kể cả cấp kia) để không cụt lô.
+  focusExtra = focusCover(same);
+  if (focusExtra) focusExtra.names = same.map(p => p.name);
+  const prevPeers = levelPeers.map(p => p.name).join('\0');
+  rememberPeers(same);
+  const peersChanged = prevPeers !== levelPeers.map(p => p.name).join('\0');
   const ready = state.focusedProject === primary.name && focusName === primary.name
     && hits.every(p => state.lotProjects.has(p.name) && kindOn(p.name));
   if (ready) {
     drawFocus();
+    if (peersChanged) document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: primary.name }));
     return primary.name;
   }
   state.lotProjects.clear();
@@ -559,21 +626,26 @@ function schemesCovering(kind, geom) {
 }
 
 /**
- * Tra cứu theo hình: giao từ 2 đồ án (cùng cấp hoặc QHPK với QHCT) thì mở lô mọi đồ án đó, phủ tối ngoài hợp ranh.
- * Một đồ án thì vẫn mở đồ án nhỏ nhất chứa điểm, như trước.
+ * Tra cứu theo hình: lô của mọi đồ án giao vùng (QHPK và QHCT).
+ * Thẻ và lỗ phủ tối theo cấp đang chọn — đồ án giao vùng rộng nhất của cấp đó.
+ * Một đồ án thì mở đồ án nhỏ nhất của cấp đó chứa điểm.
  */
 export function openInspectProjects(latlng, kind, geom) {
   const hits = schemesCovering(kind, geom);
   if (hits.length >= 2) {
     if (!inspectSnap && viewStash) inspectSnap = viewStash;
     viewStash = null;
-    return openMany(hits);
+    return openMany(hits, kind, geom);
   }
   viewStash = null;
-  const hadExtra = !!focusExtra;
+  const hadExtra = !!focusExtra || levelPeers.length > 0;
+  const hadPeers = levelPeers.length > 0;
+  const already = state.focusedProject;
   focusExtra = null;
+  levelPeers = [];
   const name = openProjectAt(latlng, kind);
   if (hadExtra) drawFocus();
+  if (hadPeers && name && name === already) document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: name }));
   return name;
 }
 
@@ -593,6 +665,7 @@ export function clearProjectFocus() {
   state.focusedProject = null;
   focusName = null;
   focusExtra = null;
+  levelPeers = [];
   drawFocus();
   markPicked(null);
   document.dispatchEvent(new Event(PROJECT_UNFOCUS_EVENT));
@@ -1497,8 +1570,10 @@ const FOCUS_LINES = [
 const WORLD_RING = [[85, -180], [85, 180], [-85, 180], [-85, -180]];
 const focusLayers = new Map();
 let focusName = null;
-// Tra cứu giao nhiều đồ án: lỗ phủ tối là hợp ranh, không phải ranh đồ án nhỏ nhất (focusName).
+// Tra cứu giao nhiều đồ án: lỗ phủ tối là hợp ranh các đồ án đúng cấp đang chọn.
 let focusExtra = null;
+// Cùng cấp với thẻ, xếp theo diện giao với vùng tra cứu. Đổi thẻ không đổi lỗ phủ tối.
+let levelPeers = [];
 // Ảnh trạng thái trước lần tra cứu nhiều đồ án đầu tiên; đóng bảng thì trả lại. Một đồ án không ghi.
 let inspectSnap = null;
 let viewStash = null;
@@ -1542,6 +1617,7 @@ export function restoreInspectFocus() {
   if (!snap) return;
   inspectSnap = null;
   focusExtra = null;
+  levelPeers = [];
   if (getLevel() !== snap.level) setLevel(snap.level, { keepView: true });
   state.focusedProject = snap.focused || null;
   focusName = snap.name || null;
@@ -1797,12 +1873,19 @@ function showProject(p) {
 // Bỏ một đồ án khỏi hợp ranh tra cứu nhiều đồ án; đồ án còn lại giữ lô
 function dropSchemeFromFocus(name) {
   state.lotProjects.delete(name);
-  if (!focusExtra?.names?.includes(name)) return;
+  const wasPeer = levelPeers.some(p => p.name === name);
+  levelPeers = levelPeers.filter(p => p.name !== name);
+  const still = state.focusedProject && state.focusedProject !== name;
+  if (!focusExtra?.names?.includes(name)) {
+    if (wasPeer && still) document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: state.focusedProject }));
+    return;
+  }
   const rest = focusExtra.names.filter(n => n !== name).map(n => projects.find(p => p.name === n)).filter(Boolean);
   if (rest.length >= 2) {
     focusExtra = focusCover(rest);
     if (focusExtra) focusExtra.names = rest.map(p => p.name);
   } else focusExtra = null;
+  if (wasPeer && still) document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: state.focusedProject }));
 }
 
 // QHPK toàn TP: tick hiện lại ranh và lô (bỏ chọn đã ghi đồ án vào danh sách ẩn)
