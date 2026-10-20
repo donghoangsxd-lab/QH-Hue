@@ -573,6 +573,14 @@ function notifyMeasure() {
 const measurePlanApi = () => import('./cadastreLayer.js');
 const dismissMeasurePlan = () => { measurePlanApi().then(m => m.closeMeasurePlan()); };
 
+function syncMeasurePick() {
+  const pick = document.getElementById('btnMeasurePick');
+  if (!pick) return;
+  const on = state.activeMeasureType === 'distance' || state.activeMeasureType === 'area';
+  pick.classList.toggle('active', on);
+  pick.setAttribute('aria-pressed', String(on));
+}
+
 function resetMeasureButtons() {
   Object.values(MEASURE_BTN).forEach(([id, icon]) => {
     const btn = document.getElementById(id);
@@ -580,6 +588,7 @@ function resetMeasureButtons() {
     btn.classList.remove('active');
     btn.innerHTML = ico(icon);
   });
+  syncMeasurePick();
 }
 
 function wipeMeasure() {
@@ -605,6 +614,7 @@ export function toggleMeasure(type) {
     btn.classList.add('active');
     btn.innerHTML = ico('close');
   }
+  syncMeasurePick();
   notifyMeasure();
 }
 

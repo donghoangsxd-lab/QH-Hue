@@ -34,7 +34,7 @@ const STEPS = [
     text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm mũi tên ‹ ở mép phải để mở, › để thu gọn. Khu đất và Quy hoạch mở theo chiều dọc. Nền bản đồ, Phân tích và Môi trường nằm trên một hàng tab. Số cạnh tên cho biết bao nhiêu lớp đang bật. Thẻ Chú giải chỉ giải thích trạng thái điểm và ký hiệu lô đất.'
   },
   {
-    target: '#btnInspectMode',
+    target: ['#btnInspectPick', '#btnInspectMode'],
     title: 'Tra cứu tại một vị trí',
     text: 'Bật nút này rồi bấm vào một điểm bất kỳ trên bản đồ: trang web cho biết vị trí đó đã nằm trong bán kính phục vụ của những công trình nào, còn thiếu loại nào, kèm tuyến đường đi tới công trình gần nhất.'
   },

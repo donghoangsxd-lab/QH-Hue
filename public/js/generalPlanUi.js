@@ -40,6 +40,10 @@ let scopeId = null;
 
 const ctx = () => ({ wards: state.wardStatsData || [], catalog: state.projectCatalog || [], measure2A });
 const pctText = (p) => (p == null ? '—' : `${Math.round(p * 100)}%`);
+const GP_STATUS_SHORT = {
+  unknown: 'Chưa rõ', none: 'Chưa lập', drafting: 'Đang lập',
+  review: 'Thẩm định', approved: 'Đã duyệt', revising: 'Điều chỉnh'
+};
 const meterHtml = (ratio, level) => `<span class="uc-meter lv-${level}"><i style="width:${ratio == null ? 0 : (ratio * 100).toFixed(1)}%"></i></span>`;
 const levelCls = (level) => (level === 'hi' ? 'c-green' : level === 'no' ? 'c-red' : level === 'wait' ? 'uc-skip' : 'c-orange');
 const statusChip = (plan) => (plan.parent
@@ -151,17 +155,25 @@ function panelRow(plan, c, here) {
   const kids = childProjects(plan, c.catalog).length;
   const mat = c.wards.length ? maturityOf(plan, c) : null;
   const cls = ['gp-row', plan.id === picked ? 'is-sel' : '', here.has(plan.id) ? 'is-here' : ''].filter(Boolean).join(' ');
-  const tip = [plan.name, plan.parent ? `Vùng lõi ${plan.parent.name} (1/10.000)` : GP_KINDS[plan.kind], clsTip(plan)].join('\n');
+  const pct = mat ? pctText(mat.pct) : '…';
+  const qhcFull = plan.parent ? 'Theo QHC TP Huế' : `QHC: ${GP_STATUS[plan.status]}`;
+  const qhcShort = plan.parent ? 'QHC TP Huế' : `QHC: ${GP_STATUS_SHORT[plan.status] || GP_STATUS[plan.status]}`;
+  const metaFull = `${qhcFull} · ${kids} QHPK · trưởng thành ${pct}`;
+  const parentTip = plan.parent ? ` title="Không lập QHC riêng; chỉ tiêu do ${escapeHtml(plan.parent.name)} quy định"` : '';
   const qhc = plan.parent
-    ? `<span class="gp-st-sub" title="Không lập QHC riêng; chỉ tiêu do ${escapeHtml(plan.parent.name)} quy định">Theo QHC TP Huế</span>`
+    ? `<span class="gp-st-sub"${parentTip}>Theo QHC TP Huế</span>`
     : `<span class="gp-st-${plan.status}">QHC: ${GP_STATUS[plan.status]}</span>`;
+  const qhcCompact = plan.parent
+    ? `<span class="gp-st-sub"${parentTip}>QHC TP Huế</span>`
+    : `<span class="gp-st-${plan.status}">${escapeHtml(qhcShort)}</span>`;
+  const tip = [plan.name, plan.parent ? `Vùng lõi ${plan.parent.name} (1/10.000)` : GP_KINDS[plan.kind], clsTip(plan), metaFull].join('\n');
   const to = plan.target !== plan.cls
     ? `<span class="gp-to uc-${plan.target}" title="Loại định hướng">${ico('chev-right')}${plan.target}</span>` : '';
   return `<button type="button" class="${cls}" data-gp-pick="${plan.id}" title="${escapeHtml(tip)}">
       <b class="gp-cls uc-${plan.cls}">${plan.cls}</b>
       <span class="gp-name">${escapeHtml(plan.short)}</span>
       ${to}
-      <small class="gp-meta">${qhc} · ${kids} QHPK · trưởng thành ${mat ? pctText(mat.pct) : '…'}</small>
+      <small class="gp-meta" title="${escapeHtml(metaFull)}"><span class="gp-meta-full">${qhc} · ${kids} QHPK · trưởng thành ${pct}</span><span class="gp-meta-short">${qhcCompact} · ${kids} QHPK · ${pct}</span></small>
     </button>`;
 }
 

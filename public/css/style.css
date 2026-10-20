@@ -744,6 +744,7 @@ body.compare-on .map-title-split { display: inline-flex; }
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
 }
 .map-toolbar .ui-btn-format:hover { background: rgba(30, 41, 59, 0.98); border-color: var(--accent-cyan); }
+.tb-phone-pick { display: none; }
 
 /* HỎI ĐÁP: câu đã tính sẵn, bấm để tô phường */
 .faq-panel {
@@ -2349,6 +2350,7 @@ table.gp-mat td { overflow: hidden; overflow-wrap: anywhere; }
 .gp-cls { grid-row: 1 / span 2; text-align: center; font-size: var(--fs-md); }
 .gp-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); font-weight: 700; }
 .gp-meta { grid-column: 2 / -1; color: var(--text-muted); font-size: var(--fs-xs); }
+.gp-meta-short { display: none; }
 .gp-st-sub { color: #fb923c; }
 .gp-grp { margin-top: 4px; font-size: var(--fs-xs); font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .gp-to { display: inline-flex; align-items: center; font-size: var(--fs-xs); font-weight: 700; white-space: nowrap; }
@@ -4715,6 +4717,25 @@ body.project-review.la-page #projectReviewHost {
   body:not(.bottom-collapsed) .map-toolbar { bottom: 8px; }
   .map-toolbar .ui-btn-format { touch-action: manipulation; flex: 0 0 var(--tb-btn); }
   #btnReviewOpen, #reviewPanel, #btnScreenshot, #btnPrintA3, #btnExportBottomPdf { display: none !important; }
+  /* Điện thoại: một nút Đo và một nút Tra cứu, mỗi nút mở menu. Nút gốc giữ cho desktop và cho script bấm hộ. */
+  .tb-phone-pick { display: flex; position: relative; flex: 0 0 var(--tb-btn); width: var(--tb-btn); min-height: 0; }
+  .tb-phone-pick .ui-btn-format { width: 100%; height: 100%; }
+  #btnMeasureArea, #btnMeasureDist, #btnLocateGPS, #btnInspectMode { display: none !important; }
+  .tb-chooser {
+    position: fixed; z-index: 1400; display: flex; flex-direction: column; min-width: 168px; padding: 4px;
+    background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--r-md); box-shadow: var(--panel-shadow);
+  }
+  .tb-chooser[hidden] { display: none !important; }
+  .tb-chooser button {
+    min-height: 40px; padding: 0 10px; border: 0; border-radius: var(--r-sm); background: none;
+    color: var(--text-strong); font: inherit; font-size: 13px; text-align: left; white-space: nowrap; cursor: pointer;
+  }
+  .tb-chooser button:hover, .tb-chooser button:focus-visible { background: var(--bg-hover); outline: none; }
+  .tb-chooser button[aria-checked="true"] { color: var(--accent-cyan); font-weight: 700; }
+  .gp-meta-full { display: none; }
+  .gp-meta-short { display: inline; }
+  .gp-meta { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+  .gp-row { column-gap: 4px; padding: 3px 4px; }
   /* Thẻ góc trên-phải, sát mép. Cao theo nội dung, tối đa phần màn hình còn lại; thân tab cuộn. */
   .right-panel {
     top: max(8px, env(safe-area-inset-top));
@@ -5056,20 +5077,30 @@ body.project-review.la-page #projectReviewHost {
   body .map-title,
   body.right-collapsed .map-title,
   body.compare-on .map-title { right: auto; }
+  :root { --tb-btn: 40px; }
   .map-toolbar {
-    top: var(--phone-chrome-top);
-    bottom: 8px;
-    left: max(8px, env(safe-area-inset-left));
+    top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 2px);
+    bottom: 2px;
+    left: max(4px, env(safe-area-inset-left));
     right: auto;
     width: var(--tb-btn);
     flex-direction: column;
-    overflow-x: hidden;
-    overflow-y: auto;
+    gap: 0;
+    overflow: visible;
     max-height: none;
     box-sizing: border-box;
-    padding-bottom: 8px;
+    padding-bottom: 0;
     z-index: 1300;
   }
+  .map-toolbar .ui-btn-format,
+  .map-toolbar .tb-phone-pick {
+    flex: 1 1 0;
+    width: 100%;
+    height: 0;
+    min-height: 0;
+    max-height: 40px;
+  }
+  .map-toolbar .tb-phone-pick .ui-btn-format { flex: none; width: 100%; height: 100%; max-height: none; }
   body:not(.right-collapsed) .map-toolbar { right: auto; }
   body:not(.right-collapsed).bottom-collapsed .bp-expand-btn { right: calc(var(--phone-panel-w) + 12px); }
   .right-panel {

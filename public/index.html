@@ -273,8 +273,22 @@
       <button type="button" class="ui-btn-format" id="btnShareView" title="Chép link khung nhìn hiện tại (vị trí, mức phóng, lớp đang bật, đồ án đang mở) để gửi người khác. Link tự mang trạng thái, không lưu trên máy chủ" aria-label="Chép link khung nhìn"><svg class="ico"><use href="#i-link"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnMeasureArea" title="Đo diện tích. Backspace xóa đỉnh vừa chấm. Đỉnh gần con trỏ sáng lên theo mức phóng: chuột phải để xóa đỉnh đó" aria-label="Đo diện tích"><svg class="ico"><use href="#i-area"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnMeasureDist" title="Đo chiều dài. Backspace xóa đỉnh vừa chấm. Đỉnh gần con trỏ sáng lên theo mức phóng: chuột phải để xóa đỉnh đó" aria-label="Đo chiều dài"><svg class="ico"><use href="#i-ruler"/></svg></button>
+      <div class="tb-phone-pick" id="tbMeasurePick">
+        <button type="button" class="ui-btn-format" id="btnMeasurePick" title="Đo trên bản đồ: chiều dài hoặc diện tích" aria-label="Đo trên bản đồ" aria-haspopup="menu" aria-expanded="false" aria-controls="measureChooser"><svg class="ico"><use href="#i-ruler"/></svg></button>
+        <div class="tb-chooser" id="measureChooser" role="menu" hidden>
+          <button type="button" role="menuitemradio" data-tb-value="distance" aria-checked="false">Đo chiều dài</button>
+          <button type="button" role="menuitemradio" data-tb-value="area" aria-checked="false">Đo diện tích</button>
+        </div>
+      </div>
       <button type="button" class="ui-btn-format" id="btnMeasureProfile" title="Lát cắt địa hình. Chấm các điểm dọc tuyến; biểu đồ hiện ở panel dưới. Backspace xóa đỉnh vừa chấm. Đỉnh gần con trỏ sáng lên theo mức phóng: chuột phải để xóa đỉnh đó" aria-label="Lát cắt địa hình"><svg class="ico"><use href="#i-profile"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnInspectMode" title="Bật chế độ tra cứu: click lên bản đồ để xem hạ tầng tiếp cận tại vị trí" aria-label="Chế độ tra cứu" aria-pressed="false"><svg class="ico"><use href="#i-inspect"/></svg></button>
+      <div class="tb-phone-pick" id="tbInspectPick">
+        <button type="button" class="ui-btn-format" id="btnInspectPick" title="Tra cứu hạ tầng tại điểm chạm hoặc tại vị trí của bạn" aria-label="Tra cứu hạ tầng" aria-haspopup="menu" aria-expanded="false" aria-controls="inspectChooser" aria-pressed="false"><svg class="ico"><use href="#i-inspect"/></svg></button>
+        <div class="tb-chooser" id="inspectChooser" role="menu" hidden>
+          <button type="button" role="menuitem" data-tb-value="point">Tại điểm chạm</button>
+          <button type="button" role="menuitem" data-tb-value="gps">Tại vị trí của tôi</button>
+        </div>
+      </div>
       <button type="button" class="ui-btn-format" id="btnFaq" title="Hỏi đáp số liệu đã tính sẵn: bấm câu trả lời để tô phường, xã trên bản đồ" aria-label="Hỏi đáp" aria-pressed="false" aria-controls="faqPanel"><svg class="ico"><use href="#i-faq"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnSketch" title="Phác thảo trên bản đồ đang xem (quy hoạch hoặc hiện trạng; chỉ trong phiên này, người khác không thấy; lưu ra file KML / DXF)" aria-label="Phác thảo" aria-pressed="false" aria-controls="sketchPalette"><svg class="ico"><use href="#i-sketch"/></svg></button>
       <button type="button" class="ui-btn-format sketch-pin" id="btnSketchPin" hidden title="Mở lại bảng công cụ phác thảo" aria-label="Mở lại bảng công cụ phác thảo" aria-pressed="true" aria-expanded="false"><svg class="ico"><use href="#i-sk-line"/></svg></button>
