@@ -3004,7 +3004,8 @@ table.ward-table th {
 .proof-more summary::-webkit-details-marker { display: none; }
 .proof-more summary::before { content: '▸'; display: inline-block; width: 12px; transition: transform var(--ease); }
 .proof-more[open] summary::before { transform: rotate(90deg); }
-.proof-more ul { margin: 3px 0 0; padding-left: 16px; max-height: 90px; overflow-y: auto; }
+.proof-more ul,
+.detail-more-body ul.proof-nearby { margin: 3px 0 0; padding-left: 16px; max-height: 90px; overflow-y: auto; }
 .proof-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
 .proof-table td { padding: 2px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.25); }
 .proof-table td:last-child { text-align: right; font-weight: 700; white-space: nowrap; padding-left: 8px; }

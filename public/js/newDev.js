@@ -112,7 +112,7 @@ export function devLegend(legend) {
   return `<div><span class="sat-swatch dev-swatch" style="--c:${legend.baseColor}"></span>Vùng hiện trạng (đã xây dựng đến ${legend.from})</div>`
     + `<div><span class="sat-swatch dev-swatch" style="--c:${legend.color}"></span>Vùng phát triển mới (${legend.from} → ${yearsText(legend.to)})</div>`
     + `<div class="flood-muted">Phóng to từ mức ${DEV_MIN_ZOOM} để xem ranh.</div>`
-    + detailDisclosure(`<p>${escapeHtml(BASIS)}</p><p>${escapeHtml(DW_NOTE)}</p>`);
+    + detailDisclosure(`<p>${escapeHtml(BASIS)}</p><p>${escapeHtml(DW_NOTE)}</p>`, 'Cơ sở giải đoán');
 }
 
 const sumOf = (rows, k) => rows.reduce((s, w) => s + (Number(w[k]) || 0), 0);
@@ -122,10 +122,10 @@ function wardTable(d) {
   const rows = [...d.wards].sort((a, b) => (b.baseHa + b.devHa) - (a.baseHa + a.devHa));
   const row = (w) => `<tr><td>${escapeHtml(w.name)}</td>`
     + `<td>${HA.format(w.baseHa + w.devHa)}</td><td>${HA.format(w.baseHa)}</td><td>${HA.format(w.devHa)}</td></tr>`;
-  return `<details class="detail-more"><summary>Xem chi tiết</summary>
-    <div class="detail-more-body"><p>${rows.length} phường, xã (ha)</p>
-    <table><thead><tr><th>Phường, xã</th><th>Tổng ${d.to[1]}</th><th>Trước ${d.from}</th><th>Mới</th></tr></thead>
-    <tbody>${rows.map(row).join('')}</tbody></table></div></details>`;
+  const table = `<p>${rows.length} phường, xã (ha)</p>`
+    + `<div class="dev-ward-table"><table><thead><tr><th>Phường, xã</th><th>Tổng ${d.to[1]}</th><th>Trước ${d.from}</th><th>Mới</th></tr></thead>`
+    + `<tbody>${rows.map(row).join('')}</tbody></table></div>`;
+  return detailDisclosure(table, 'Số liệu theo phường, xã');
 }
 
 export function devStats(d) {
@@ -145,5 +145,5 @@ export function devStats(d) {
     ${top.length ? `<div class="flood-sub">Phát triển mới nhiều nhất</div><div class="flood-wards">${top.slice(0, 6).map(chip).join('')}</div>` : ''}
     <div class="flood-kpi" title="${DEV_REF}: chỉ xét vùng phát triển mới của ${dt.length} phường bộ chỉ tiêu đô thị"><span>Trong ${d.serviceM} m vườn hoa / bãi đỗ xe (${dt.length} phường đô thị)</span><b><span class="${pctClass(park)}">${pctText(park)}</span> / <span class="${pctClass(parking)}">${pctText(parking)}</span></b></div>
     ${wardTable(d)}
-    ${detailDisclosure(`<p>Tổng đất xây dựng cũng là mẫu số mật độ đường giao thông.</p><p>${escapeHtml(DW_NOTE)}</p><p>${escapeHtml(BASIS)}</p>`)}`;
+    ${detailDisclosure(`<p>Tổng đất xây dựng cũng là mẫu số mật độ đường giao thông.</p><p>${escapeHtml(DW_NOTE)}</p><p>${escapeHtml(BASIS)}</p>`, 'Phương pháp tính')}`;
 }

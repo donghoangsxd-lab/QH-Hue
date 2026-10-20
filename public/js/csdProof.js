@@ -6,7 +6,7 @@
  */
 import { state, BUFFER_COLORS } from './state.js';
 import { geeApi } from './api.js';
-import { escapeHtml, fmtNum, ico, showToast, startTaskProgress, trackTileLoad } from './utils.js';
+import { escapeHtml, fmtNum, ico, showToast, startTaskProgress, trackTileLoad, detailDisclosure } from './utils.js';
 import { geeTileOpts } from './basemap.js';
 
 export const PROOF_FOCUS_EVENT = 'csd-proof-focus';
@@ -219,10 +219,8 @@ function buildPanelHtml(data, typeColor) {
       ${legendItem('background:#22c55e;', 'Dân đã được phục vụ')}
       ${legendItem('background:#ffd400;', 'Dân sẽ được phục vụ thêm')}
     </div>
-    ${existingN ? `<details class="detail-more"><summary>Xem chi tiết</summary><div class="detail-more-body"><p>${label} theo quy hoạch ở gần (${existingN})</p><ul>${listed}${more}</ul></div></details>` : ''}
-    <details class="detail-more">
-      <summary>Xem chi tiết</summary>
-      <div class="detail-more-body">
+    ${existingN ? detailDisclosure(`<p>${label} theo quy hoạch ở gần (${existingN})</p><ul class="proof-nearby">${listed}${more}</ul>`, 'Công trình quy hoạch lân cận') : ''}
+    ${detailDisclosure(`
       <div class="proof-muted proof-note">Căn cứ kịch bản quy hoạch: công trình đã phê duyệt, có quy mô quy hoạch (gồm quy hoạch mới, không gồm công trình di dời). Nhu cầu tính theo dân số dự báo.
         Bản đồ dân cư chia ô vuông ${cell} × ${cell} m; chỉ đếm ô có người. Chưa có lớp phân bố dân cư quy hoạch nên dùng phân bố hiện trạng.</div>
       <table class="proof-table">
@@ -239,9 +237,7 @@ function buildPanelHtml(data, typeColor) {
       <tr class="proof-group"><td colspan="2">③ Độ phủ tăng thêm</td></tr>
       <tr><td>${fmtNum(pop.added)} ÷ ${fmtNum(pop.ward)} người</td><td>${fmtNum(data.coverageAddPct)}%</td></tr>
       ${scaleRowsHtml(data)}
-      </table>
-      </div>
-    </details>`;
+      </table>`, 'Phương pháp tính')}`;
 }
 
 // Độ phủ không tăng (khu đất đã nằm trong phạm vi công trình cùng loại): lý do chọn là phường còn thiếu quy mô theo chỉ tiêu
