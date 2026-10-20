@@ -2,6 +2,7 @@
 // Droplist, panel lớp và bản đồ đều đọc hàm này. Bỏ chọn một đồ án (hidden) hoặc tắt lớp ranh
 // thì đồ án đó biến khỏi danh sách. Đồ án không có hình ranh không tính là ranh đã vẽ.
 // level: 'QHC' | 'QHPK' | 'QHCT'. hidden / layerOff: Set tên đồ án (Ten_QH).
+// Danh sách hidden đọc từ localStorage sau storageSchema.js: bản cũ ghi cả QHC vào qh_hidden_projects.
 
 export function enabledSchemes(projects, level, hidden, layerOff) {
   if (!level) return [];
