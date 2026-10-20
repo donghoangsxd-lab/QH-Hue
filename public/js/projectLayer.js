@@ -12,13 +12,14 @@
 // Mỗi đồ án 1 màu viền + nền mờ, nhãn tên ở giữa ranh. QHPK toàn TP (droplist, chưa chọn phường): ranh mọi đồ án QHPK,
 // bấm được ở mọi zoom; lô chỉ đồ án vừa bấm hoặc đang tick trong panel. Chọn phường: ranh các đồ án của phường,
 // lô cả phường ở mọi zoom — ranh tổng xuống dưới để bấm được lô.
-// Đồ án QHC / QHCT hiện theo ô lớp cấp đó (chk_qhc10 / chk_qhct, projectFiles.kindOn), không theo lớp QHPK: lớp droplist
-// QHC 1/10.000 hiện ranh + tên đồ án QHC, chỉ đồ án đang chọn mới vẽ lô. Nút mắt cuối tiêu đề nhóm cấp bật / tắt cả nhóm.
+// Ranh + nhãn của cấp đang chọn ở droplist lấy từ schemeVisibility.enabledSchemes (không phụ thuộc ô lớp
+// trung tâm vừa bật kịp hay chưa). QHC 1/10.000 hiện mọi đồ án QHC đang bật, kể cả ngoài vùng trung tâm.
+// Lô chỉ đồ án đang chọn. Nút mắt cuối tiêu đề nhóm cấp bật / tắt cả nhóm.
 import { state } from './state.js';
 import {
   map, PARCEL_MIN_ZOOM, refreshProjectLots, focusProjectLots, loadCadParcels, setProjectInfraVisible, showProjectLot, landCode
 } from './mapEngine.js';
-import { planMap, onCompareChange, passToolClick } from './planMap.js';
+import { planMap, getViewMode, onCompareChange, passToolClick } from './planMap.js';
 import {
   projectLayersOf, removeCachedLayer, layerKey, isLayerHidden, cachedLots, PROJECT_INFO_EVENT, byProjectAreaDesc, focusedProjectName,
   wardScopeName, projectShown, kindOn, kindChkOf, qhpkBoundaryOnly, ensureProjectNet, noteNetSaved, netFeaturesFromText, loadCatalog
@@ -36,6 +37,7 @@ import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js'
 import { openOrAssign, openAssign, openDecision, openPropose, openProposalReview } from './decisionViewer.js';
 import { adjustmentsOf, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { namesOfProject } from './projectNames.js';
+import { enabledSchemes } from './schemeVisibility.js';
 import { kmlTextFromFile, boundaryPolygonsFromKml } from './kmlLoad.js';
 
 const HIDDEN_KEY = 'qh_hidden_projects';
@@ -79,6 +81,8 @@ let busy = null;
 let belowZoom = null;
 let query = '';
 const outlineGroups = new Map();
+// Danh mục tới sau khi đã chọn QHC 1/10.000: phóng một lần tới các đồ án còn ngoài khung
+let qhcFrameWait = false;
 const fallbackCache = new Map();
 // Danh sách lớp đang mở: Ten_QH → { loading, error, list: projectLayersOf() }
 const expanded = new Set();
@@ -932,8 +936,7 @@ function wardGroups(items) {
 }
 
 function rowHtml(p, idx, admin) {
-  const boundary = qhpkBoundaryOnly() && p.level === 'QHPK';
-  const on = boundary ? !state.hiddenProjects.has(p.name) : projectShown(p.name);
+  const on = schemeRowOn(p);
   const deleting = busy === p.name;
   const open = expanded.has(p.name);
   const extraN = (p.docs || []).length;
@@ -1777,13 +1780,10 @@ function outlineInWard(geom, wardName) {
   return out;
 }
 
-function qhcCityOn() {
-  return !isLevelPair() && getLevel() === 'qhc10' && !!$('chk_qhc10')?.checked;
-}
-
 function shownOutline(p) {
   const full = outlineOf(p);
-  if (full && p.level === 'QHC' && qhcCityOn()) return full;
+  // QHC 1/10.000: giữ nguyên ranh, không cắt theo phường đang chọn
+  if (full && p.level === 'QHC' && !isLevelPair() && getLevel() === 'qhc10') return full;
   const ward = full && wardScopeName();
   return ward && p.name !== state.focusedProject ? outlineInWard(full, ward) : full;
 }
@@ -1852,10 +1852,60 @@ function drawOutlinesOn(m, list, below) {
 
 // QHPK toàn TP: ranh mọi đồ án QHPK, bấm được cả khi đã phóng gần. Lớp khác: dưới ngưỡng lô thì ranh bấm được.
 // So sánh cấp độ: mỗi bản đồ chỉ ranh đúng cấp được chọn ở droplist.
+const LEVEL_KEY = { qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
+const levelKeyOf = (id) => LEVEL_KEY[id] || null;
+
+function schemeRecords() {
+  return projects.map(p => ({ name: p.name, level: p.level, boundary: !!outlineOf(p) }));
+}
+
+function layerOffNames() {
+  return new Set(projects.filter(p => isLayerHidden(p.name, 'ranh-gioi')).map(p => p.name));
+}
+
+function schemesOnLevel(levelKey) {
+  const names = new Set(enabledSchemes(schemeRecords(), levelKey, state.hiddenProjects, layerOffNames()).map(p => p.name));
+  return projects.filter(p => names.has(p.name));
+}
+
+/** Tên đồ án cấp levelKey đang được vẽ ranh. Test hồi quy và droplist dùng cùng danh sách. */
+export function visibleOutlineNames(levelKey) {
+  return schemesOnLevel(levelKey).map(p => ({ name: p.name, full: p.full || p.name }));
+}
+
+function schemeRowOn(p) {
+  const selected = !isLevelPair() && levelKeyOf(getLevel());
+  if ((selected && p.level === selected) || (qhpkBoundaryOnly() && p.level === 'QHPK')) {
+    return !state.hiddenProjects.has(p.name);
+  }
+  return projectShown(p.name);
+}
+
 function outlinesFor(m) {
-  const level = { qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' }[sideOf(m)];
+  const level = levelKeyOf(sideOf(m));
   if (!level) return [];
-  return projects.filter(p => p.level === level && !state.hiddenProjects.has(p.name) && !isLayerHidden(p.name, 'ranh-gioi') && outlineOf(p));
+  return schemesOnLevel(level);
+}
+
+function outlineList() {
+  const selected = levelKeyOf(getLevel());
+  const boundary = qhpkBoundaryOnly();
+  const below = !!map && (boundary || map.getZoom() < PARCEL_MIN_ZOOM || !state.showProjects);
+  const ward = wardScopeName();
+  const selectedNames = new Set(schemesOnLevel(selected).map(p => p.name));
+  return projects.filter(p => {
+    if (isLayerHidden(p.name, 'ranh-gioi')) return false;
+    if (selected && p.level === selected && selectedNames.has(p.name)) {
+      // Cấp đang chọn: mọi đồ án enabledSchemes. QHC / QHCT không cắt theo phường.
+      if (p.level === 'QHC' || p.level === 'QHCT') return true;
+      if (ward && !p.wards.includes(ward) && p.name !== state.focusedProject) return false;
+      return true;
+    }
+    if (state.hiddenProjects.has(p.name)) return false;
+    if (ward && !p.wards.includes(ward) && p.name !== state.focusedProject) return false;
+    if (boundary && p.level === 'QHPK') return !!outlineOf(p);
+    return projectShown(p.name) && (below || p.area);
+  });
 }
 
 function redrawOutlines() {
@@ -1866,19 +1916,57 @@ function redrawOutlines() {
     return;
   }
   const boundary = qhpkBoundaryOnly();
-  const qhcCity = qhcCityOn();
   const below = !!map && (boundary || map.getZoom() < PARCEL_MIN_ZOOM || !state.showProjects);
-  const ward = wardScopeName();
-  const list = projects.filter(p => {
-    if (isLayerHidden(p.name, 'ranh-gioi')) return false;
-    // QHC 1/10.000 toàn TP: mọi đồ án QHC (kể cả ngoài phường đang chọn), trừ đồ án vừa bỏ chọn
-    if (qhcCity && p.level === 'QHC') return !state.hiddenProjects.has(p.name);
-    if (ward && !p.wards.includes(ward) && p.name !== state.focusedProject) return false;
-    if (boundary && p.level === 'QHPK') return !state.hiddenProjects.has(p.name);
-    return projectShown(p.name) && (below || p.area);
-  });
+  const list = outlineList();
   if (map) drawOutlinesOn(map, list, below);
   if (planMap) drawOutlinesOn(planMap, list, below);
+}
+
+function shownMap() {
+  if (planMap && getViewMode() === 'QH' && planMap.getContainer()?.offsetParent) return planMap;
+  return map;
+}
+
+function boundsOfLevel(levelKey) {
+  let b = null;
+  const add = (bounds) => {
+    if (!bounds || !bounds.isValid()) return;
+    b = b ? b.extend(bounds) : L.latLngBounds(bounds.getSouthWest(), bounds.getNorthEast());
+  };
+  schemesOnLevel(levelKey).forEach(p => add(boundsOf(p)));
+  if (levelKey === 'QHC') {
+    (state.wardLabelsList || []).forEach(w => {
+      if (!w.geometry || !isCoreWard(w.name)) return;
+      try { add(L.geoJSON(w.geometry).getBounds()); } catch (e) { /* ranh phường lỗi */ }
+    });
+  }
+  return b;
+}
+
+/** Phóng khung tới mọi đồ án đang bật của cấp nếu còn đồ án nằm ngoài màn hình. Chưa có danh mục thì hoãn một lần. */
+export function frameVisibleSchemes(levelKey) {
+  if (isLevelPair() || state.focusedProject || focusExtra) {
+    qhcFrameWait = false;
+    return false;
+  }
+  const list = schemesOnLevel(levelKey);
+  if (!list.length) {
+    if (levelKey === 'QHC') qhcFrameWait = true;
+    return false;
+  }
+  qhcFrameWait = false;
+  const m = shownMap();
+  if (!m) return false;
+  const view = m.getBounds();
+  const outside = list.some(p => {
+    const b = boundsOf(p);
+    return b && b.isValid() && !view.intersects(b);
+  });
+  if (!outside) return false;
+  const b = boundsOfLevel(levelKey);
+  if (!b || !b.isValid()) return false;
+  m.flyToBounds(b, { padding: [36, 36], duration: 0.6, maxZoom: 11 });
+  return true;
 }
 
 function refreshAll() {
@@ -1899,6 +1987,7 @@ function rebuild() {
   redrawOutlines();
   renderList();
   projects.filter(p => expanded.has(p.name)).forEach(p => loadLayers(p));
+  if (qhcFrameWait && getLevel() === 'qhc10') frameVisibleSchemes('QHC');
 }
 
 function showProject(p) {
@@ -2347,9 +2436,9 @@ export function initProjectLayer(opts = {}) {
     const below = map.getZoom() < PARCEL_MIN_ZOOM;
     if (below === belowZoom) return;
     belowZoom = below;
-    if (!state.showProjects) return;
+    // QHC / QHCT tắt lớp QHPK (showProjects = false) nhưng ranh cấp đang chọn vẫn phải vẽ lại khi qua ngưỡng lô
     redrawOutlines();
-    refreshProjectLots();
+    if (state.showProjects) refreshProjectLots();
   });
   onCompareChange(redrawOutlines);
   belowZoom = map ? map.getZoom() < PARCEL_MIN_ZOOM : null;
