@@ -2312,7 +2312,7 @@ function buildDiaBanHtml(geoWard, sheetWard) {
   let html = escapeHtml(geo);
   const clean = (s) => String(s || "").replace(/^Phường\s+/i, "").replace(/^Xã\s+/i, "").trim().toLowerCase();
   if (clean(sheet) !== clean(geo)) {
-    html += ` <span class="pp-warn" title="Tên phường trong Sheet khác phường theo tọa độ — cần sửa cột Ten_XaPhuong">${ico('alert')}Sheet: ${escapeHtml(sheet || 'trống')}</span>`;
+    html += ` <span class="pp-warn" title="Tên phường, xã trên bảng dữ liệu khác phường, xã theo tọa độ. Cần sửa cột tên phường, xã.">${ico('alert')}Bảng dữ liệu: ${escapeHtml(sheet || 'trống')}</span>`;
   }
   return html;
 }
@@ -2447,10 +2447,10 @@ function findParcelConflicts(owner, geometry) {
 }
 
 function parcelConflictHtml(owner, conflicts) {
-  const label = (q) => `<b>${escapeHtml(q.name)}</b> <span class="pp-sub">${escapeHtml(q.id || 'không ID')} · ${escapeHtml(infraLabels[layerType(q)] || q.type)}${isApproved(q.status) ? '' : ' · chờ duyệt'}</span>`;
+  const label = (q) => `<b>${escapeHtml(q.name)}</b> <span class="pp-sub">${escapeHtml(q.id || 'chưa có mã')} · ${escapeHtml(infraLabels[layerType(q)] || q.type)}${isApproved(q.status) ? '' : ' · chờ phê duyệt'}</span>`;
   const drops = conflicts.filter(c => c.level === 'dup' || c.level === 'type').map(c => c.point.id).filter(Boolean);
-  let html = `<div class="pp-section c-red">${ico('alert')}RANH LÔ CHỨA ${conflicts.length + 1} CÔNG TRÌNH</div><div class="pp-conflict">`;
-  html += `<div class="pp-conflict-row keep"><div>${label(owner)}</div><div class="pp-sub c-green">Giữ lại — công trình sở hữu ranh lô</div></div>`;
+  let html = `<div class="pp-section c-red">${ico('alert')}Ranh lô chứa ${conflicts.length + 1} công trình</div><div class="pp-conflict">`;
+  html += `<div class="pp-conflict-row keep"><div>${label(owner)}</div><div class="pp-sub c-green">Giữ: công trình gắn với ranh lô</div></div>`;
   conflicts.forEach((c, idx) => {
     html += `<div class="pp-conflict-row ${c.level}"><div>${label(c.point)}</div><div class="pp-sub">${escapeHtml(c.reason)}</div>`
       + (c.note ? `<div class="pp-sub pp-cap-warn">${ico('alert')}${escapeHtml(c.note)}</div>` : '')
@@ -2458,7 +2458,7 @@ function parcelConflictHtml(owner, conflicts) {
       + (c.point.id ? `<button type="button" class="proof-btn js-conflict-copy" data-id="${escapeHtml(c.point.id)}">Chép ID</button>` : '')
       + `</div></div>`;
   });
-  if (drops.length) html += `<div class="pp-note c-orange">Đề xuất xóa dòng ${drops.map(escapeHtml).join(', ')} trong Google Sheet (cột ID_DoiTuong); bản đồ cập nhật sau khi Apps Script đồng bộ.</div>`;
+  if (drops.length) html += `<div class="pp-note c-orange">Đề xuất xóa các dòng ${drops.map(escapeHtml).join(', ')} trên bảng dữ liệu (cột mã đối tượng). Bản đồ cập nhật sau khi đồng bộ.</div>`;
   return html + `</div>`;
 }
 
@@ -2727,7 +2727,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
               + (s.capacityLimited ? `<br>Quy mô chỉ đáp ứng ~${fmtNum(s.capacity)} người (${QUOTA_FORMAT.format(s.quota)} m²/người)` : '');
           sugHtml += `<div class="${cls}"><div>${ico('flag')}<b>${escapeHtml(s.label)}</b> ${priorityBadge}</div>
             <div class="pp-sub">${basisNote}</div>
-            <button type="button" class="proof-btn" data-idx="${idx}">${ico('book')}Xem thuyết minh</button></div>`;
+            <button type="button" class="proof-btn" data-idx="${idx}">${ico('book')}Xem chi tiết</button></div>`;
         });
         (res.ineligible || []).forEach(inEl => {
           sugHtml += `<div class="sug-card ineligible">${ico('error')}<b>${escapeHtml(inEl.label)}</b> (Không đủ DT min: ${fmtNum(inEl.minSize)} m²)</div>`;

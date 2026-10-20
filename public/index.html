@@ -189,12 +189,12 @@
                 <input type="file" id="reviewFileQH" accept=".dxf" hidden>
               </label>
             </div>
-            <button type="button" class="btn-submit" id="btnReviewStart"><svg class="ico"><use href="#i-send"/></svg>ĐỒNG Ý GỬI THẨM ĐỊNH</button>
+            <button type="button" class="btn-submit" id="btnReviewStart"><svg class="ico"><use href="#i-send"/></svg>Gửi thẩm định</button>
             <div class="cad-hint review-hint">
               <div class="cad-hint-title">Chuẩn bị file DXF</div>
               <ol>
-                <li>Mở file CAD, chọn hatch các loại đất và lưu thành 2 file <b>HT-ABC.dxf</b> và <b>QH-ABC.dxf</b> (≤ 5 MB, trong đó ABC là mã tên đồ án).</li>
-                <li>Tên layer hatch theo Thông tư 16/2025/TT-BXD. Một số lớp cần tách bằng hậu tố để quét nhanh:
+                <li>Mở tệp CAD, chọn mẫu tô các loại đất và lưu thành 2 tệp <b>HT-ABC.dxf</b> và <b>QH-ABC.dxf</b> (không quá 5 MB; ABC là mã đồ án).</li>
+                <li>Tên lớp mẫu tô theo Thông tư 16/2025/TT-BXD. Một số lớp cần tách bằng hậu tố để quét nhanh:
                   <br><b>_MN / _TH / _THCS</b> cho lớp Đất trường học;
                   <br><b>_CHO / _TM</b> cho lớp Đất dịch vụ.
                   <br><i>VD: HT_DAT_HTXH_Truonghoc_MN; QHDH_DAT_Dichvu_Cho.</i></li>
@@ -205,7 +205,7 @@
             </div>
             <div id="reviewGisPane" hidden>
               <p class="review-note">Đối chiếu Phụ lục II Thông tư 16/2025: bốn gói NenDiaHinh, HienTrang, QuyHoach, MocGioi, tên lớp, kiểu hình và sáu trường bắt buộc. File đọc trên máy, không gửi đi.</p>
-              <button type="button" class="btn-submit" id="btnGisFolder">CHỌN THƯ MỤC HOSOGIS</button>
+              <button type="button" class="btn-submit" id="btnGisFolder">Chọn thư mục hồ sơ GIS</button>
               <label class="cad-drop review-file gis-zip" for="gisZip">
                 <span class="cad-drop-main"><b>Hoặc chọn file .zip</b></span>
                 <span class="review-file-name" id="gisZipName">Dùng khi trình duyệt không chọn được thư mục</span>
@@ -213,7 +213,7 @@
               </label>
               <input type="file" id="gisDirFallback" webkitdirectory directory multiple hidden>
               <p class="review-note" id="gisPickLabel"></p>
-              <button type="button" class="btn-submit" id="btnGisCheck" disabled>KIỂM TRA THÀNH PHẦN</button>
+              <button type="button" class="btn-submit" id="btnGisCheck" disabled>Kiểm tra thành phần hồ sơ</button>
               <div class="cad-hint review-hint">
                 <div class="cad-hint-title">Máy kiểm những gì</div>
                 <ol>
@@ -224,7 +224,7 @@
               </div>
             </div>
             <div id="reviewLocalPane" hidden>
-              <p class="review-note">Chọn đồ án quy hoạch đang điều chỉnh, gửi file DXF gồm ranh khu vực và các hatch lô đất mới trong ranh. Xem kết quả thẩm định, đồng ý thì bấm <b>Nhập hồ sơ</b> để ghi ranh điều chỉnh lên bản đồ quy hoạch (người dùng thường gửi Admin duyệt).</p>
+              <p class="review-note">Chọn đồ án quy hoạch đang điều chỉnh, gửi tệp DXF gồm ranh khu vực và mẫu tô lô đất mới trong ranh. Xem kết quả thẩm định. Nếu thống nhất, bấm <b>Nhập hồ sơ</b> để ghi ranh điều chỉnh lên bản đồ quy hoạch. Người dùng gửi hồ sơ để quản trị viên phê duyệt.</p>
               <div class="form-grid review-grid">
                 <label for="localProject">Đồ án</label>
                 <select id="localProject"><option value="">Chọn đồ án quy hoạch</option></select>
@@ -242,7 +242,7 @@
               </div>
               <label class="cad-drop review-file" for="localFile">
                 <span class="cad-drop-main"><b>File điều chỉnh</b></span>
-                <span class="review-file-name" id="localFileName">DXF: ranh (layer có chữ RANH) + hatch đất</span>
+                <span class="review-file-name" id="localFileName">DXF: ranh (lớp có chữ RANH) và mẫu tô đất</span>
                 <input type="file" id="localFile" accept=".dxf" hidden>
               </label>
               <label class="cad-drop review-file" for="localPdf">
@@ -250,7 +250,7 @@
                 <span class="review-file-name" id="localPdfName">Quyết định, bản vẽ điều chỉnh · PDF tối đa 2 MB (admin 10 MB)</span>
                 <input type="file" id="localPdf" accept=".pdf,application/pdf" hidden>
               </label>
-              <button type="button" class="btn-submit" id="btnLocalStart"><svg class="ico"><use href="#i-send"/></svg>THẨM ĐỊNH ĐIỀU CHỈNH</button>
+              <button type="button" class="btn-submit" id="btnLocalStart"><svg class="ico"><use href="#i-send"/></svg>Thẩm định điều chỉnh</button>
               <div class="cad-hint review-hint">
                 <div class="cad-hint-title">Hồ sơ điều chỉnh cục bộ gồm</div>
                 <ol>
@@ -265,7 +265,7 @@
           </div>
         </div>
       </div>
-      <button type="button" class="ui-btn-format" id="btnToggleCompare" title="Chia đôi màn hình. Bật rồi chọn từng bên ở droplist: hiện trạng, quy hoạch, hoặc một cấp QH" aria-label="Chia đôi màn hình so sánh" aria-pressed="false"><svg class="ico"><use href="#i-compare"/></svg></button>
+      <button type="button" class="ui-btn-format" id="btnToggleCompare" title="Chia đôi màn hình. Bật rồi chọn từng bên: hiện trạng, quy hoạch, hoặc một cấp quy hoạch" aria-label="Chia đôi màn hình so sánh" aria-pressed="false"><svg class="ico"><use href="#i-compare"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnAuth" title="Đăng nhập quản trị" aria-label="Đăng nhập quản trị"><svg class="ico"><use href="#i-key"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnLocateGPS" title="Định vị vị trí GPS của bạn" aria-label="Định vị GPS"><svg class="ico"><use href="#i-locate"/></svg></button>
       <button type="button" class="ui-btn-format" id="btnScreenshot" title="Chụp ảnh bản đồ (lưu PNG)" aria-label="Chụp ảnh bản đồ"><svg class="ico"><use href="#i-camera"/></svg></button>
@@ -299,19 +299,19 @@
           <b id="faqTitle">Hỏi đáp số liệu</b>
           <button type="button" class="faq-close" id="faqClose" aria-label="Đóng hỏi đáp"><svg class="ico"><use href="#i-close"/></svg></button>
         </div>
-        <p class="faq-note">Câu trả lời tính sẵn từ dữ liệu đang có. Bấm một câu để tô địa bàn trên bản đồ.</p>
+        <p class="faq-note">Câu trả lời được tính sẵn từ dữ liệu hiện có. Bấm một câu để tô địa bàn trên bản đồ.</p>
         <div class="faq-priority" id="faqPriority" hidden>
           <label for="faqWard">Phường, xã cần ưu tiên đầu tư công trình hạ tầng nào theo quy hoạch?</label>
           <select id="faqWard">
             <option value="">Chọn phường, xã</option>
           </select>
-          <p class="faq-note" id="faqPriorityMethod"></p>
+          <div id="faqPriorityMethod"></div>
           <p class="faq-note" id="faqPriorityNote"></p>
           <div class="faq-list" id="faqPriorityList"></div>
         </div>
         <div class="faq-list" id="faqList"></div>
         <details class="faq-gap">
-          <summary>Câu chưa trả lời được</summary>
+          <summary>Câu chưa đủ dữ liệu để trả lời</summary>
           <div id="faqGap"></div>
         </details>
       </div>
@@ -403,7 +403,7 @@
 
   <!-- PANEL CÔNG CỤ BÊN PHẢI (GỘP TRA CỨU / ĐỀ XUẤT / LỚP DỮ LIỆU / CHÚ GIẢI) -->
   <aside class="right-panel" id="rightPanel">
-    <button type="button" class="rp-sheet-handle" id="btnSheetHandle" aria-label="Kéo xuống hoặc bấm để đóng panel"></button>
+    <button type="button" class="rp-sheet-handle" id="btnSheetHandle" aria-label="Kéo xuống hoặc bấm để đóng bảng"></button>
     <div class="tab-header rp-tabs" role="tablist">
       <button type="button" class="tab-btn active" data-tab="tabLayers" role="tab" aria-selected="true" aria-controls="tabLayers"><svg class="ico"><use href="#i-layers"/></svg><span>Lớp dữ liệu</span></button>
       <button type="button" class="tab-btn" data-tab="tabLegend" role="tab" aria-selected="false" aria-controls="tabLegend"><svg class="ico"><use href="#i-book"/></svg><span>Chú giải</span></button>
@@ -454,7 +454,7 @@
         <div class="layer-row"><div><input type="checkbox" id="chk_invest"><label for="chk_invest" title="Dự án kêu gọi đầu tư, sheet 15-DA. Ranh từ file KML, thông tin từ danh sách. Nhóm sử dụng hạ tầng: không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ"><svg class="ico ico-layer"><use href="#i-coverage"/></svg>15. Dự án kêu gọi đầu tư <small class="layer-hint" id="investHint"></small></label></div></div>
         <div class="layer-status-legend" aria-label="Ghi chú trạng thái điểm">
           <span class="layer-status-title">Ghi chú:</span>
-          <span title="Admin đã phê duyệt (TrangThai = TRUE)"><img src="./icons/Park.png" class="legend-icon" alt="">Đã duyệt</span>
+          <span title="Đã được quản trị viên phê duyệt"><img src="./icons/Park.png" class="legend-icon" alt="">Đã phê duyệt</span>
           <span class="legend-pending" title="Đề xuất chưa chấp thuận (TrangThai = FALSE)"><img src="./icons/Park2.png" class="legend-icon" alt=""><b>Chờ duyệt</b></span>
         </div>
           </div>
@@ -536,12 +536,12 @@
             </select>
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div><button type="button" class="layer-mini-btn active" id="btnWardNames" title="Bật/tắt tên phường, xã trên bản đồ" aria-label="Bật/tắt tên phường, xã" aria-pressed="true">Aa</button></div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap + tuyến Admin bổ sung. Thu nhỏ vẫn hiện trục chính; chỉ mức một biểu đồ tròn toàn thành phố là ẩn"><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(zoom để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap và tuyến do quản trị viên bổ sung. Thu nhỏ vẫn hiện trục chính."><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(phóng to để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
             <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
             <span class="road-legend-item"><i style="background:#60a5fa; height:2px;"></i>Khu vực</span>
             <span class="road-legend-item"><i style="background:#cbd5e1; height:2px;"></i>Nội bộ</span>
-            <span class="road-legend-item" title="Đường dành riêng cho xe đạp: OpenStreetMap + tuyến Admin vẽ bổ sung"><i style="background:repeating-linear-gradient(90deg,#4ade80 0 5px,transparent 5px 8px); height:2px;"></i>Xe đạp</span>
+            <span class="road-legend-item" title="Đường xe đạp: OpenStreetMap và tuyến do quản trị viên bổ sung"><i style="background:repeating-linear-gradient(90deg,#4ade80 0 5px,transparent 5px 8px); height:2px;"></i>Xe đạp</span>
             <span class="road-legend-item"><i style="background:#fde047; height:2px;"></i>Chưa phân loại</span>
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_osmRail"><label for="chk_osmRail" title="Đường sắt và ga đang dùng trên OpenStreetMap (railway=rail, light_rail, subway, tram, station, halt). Không gồm tuyến bỏ, quy hoạch. Huế chưa có đường sắt đô thị trong OSM. Lớp tham chiếu cho tiêu chuẩn giao thông công cộng, chưa tính dân số trong 500 m."><svg class="ico ico-layer"><use href="#i-road"/></svg>Đường sắt (OSM)</label></div></div>
@@ -551,7 +551,7 @@
             <div class="flood-stats" id="osmOpenStats"></div>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_cadastre"><label for="chk_cadastre" title="Thửa đất địa chính tỉnh Thừa Thiên Huế cũ (gis21.hue.gov.vn, lập năm 2016): số tờ, số thửa, diện tích, loại đất, địa chỉ; không gồm tên chủ sử dụng. Hiện từ mức phóng 15, bấm vào thửa để xem thông tin. Nguồn chưa có Quảng Điền, Phú Lộc, Nam Đông."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Thửa đất địa chính 2016 <small class="layer-hint" id="cadastreHint">(zoom để xem)</small></label></div>
+            <div><input type="checkbox" id="chk_cadastre"><label for="chk_cadastre" title="Thửa đất địa chính tỉnh Thừa Thiên Huế cũ (gis21.hue.gov.vn, lập năm 2016): số tờ, số thửa, diện tích, loại đất, địa chỉ; không gồm tên chủ sử dụng. Hiện từ mức phóng 15, bấm vào thửa để xem thông tin. Nguồn chưa có Quảng Điền, Phú Lộc, Nam Đông."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Thửa đất địa chính 2016 <small class="layer-hint" id="cadastreHint">(phóng to để xem)</small></label></div>
             <span id="cadastreOpBox" class="layer-slider" style="display:none;"><input type="range" id="cadastreOpacity" class="opacity-slider" min="0" max="100" value="100" title="Độ trong suốt lớp thửa đất" aria-label="Độ trong suốt lớp thửa đất"></span>
           </div>
           <div class="flood-box" id="cadastreBox" style="display:none;">
@@ -568,7 +568,7 @@
             <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Khoanh vùng trong từng phường: ranh đỏ = vùng hiện trạng (đã xây dựng đến năm gốc 2020/2010/2000, GAIA Landsat 30 m hợp với GHSL 100 m); ranh xanh = vùng phát triển mới (đất xây dựng hiện nay theo Google Dynamic World 10 m nằm ngoài vùng hiện trạng); bỏ mảng < 0,5 ha. QCVN 01:2026/BXD Mục 2.2.3.2 (công viên, vườn hoa mỗi đơn vị ở) và Mục 2.2.3.3 (vườn hoa, bãi đỗ xe ≤ 400 m) chỉ áp trong vùng phát triển mới. Logic tạm để thử nghiệm, sau này lấy ranh từ đồ án quy hoạch"><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Đất xây dựng (vệ tinh)</label></div>
+            <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Đất xây dựng theo ảnh vệ tinh. Ranh đỏ: hiện trạng đến năm gốc. Ranh xanh: phát triển mới. Phương pháp nằm trong chú thích khi bật lớp."><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Đất xây dựng (vệ tinh)</label></div>
             <span id="newDevOpBox" class="layer-slider" style="display:none;"><input type="range" id="newDevOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp vùng phát triển mới" aria-label="Độ trong suốt lớp vùng phát triển mới"></span>
           </div>
           <div class="flood-box" id="newDevBox" style="display:none;">
@@ -675,10 +675,11 @@
             <div class="flood-stats" id="ndviStats"></div>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_forest"><label for="chk_forest" title="Phủ thực vật năm 2021 theo ESA WorldCover 10 m (cây che phủ, cây bụi, cỏ, đất trồng, đất ngập nước, rừng ngập mặn, mặt nước) hoặc năm mất rừng 2001–2025 theo Hansen Global Forest Change trên pixel có tán cây năm 2000 từ 10%. Ước tính vệ tinh, không phải ranh 3 loại rừng."><svg class="ico ico-layer"><use href="#i-leaf"/></svg>Rừng, phủ thực vật</label></div>
+            <div><input type="checkbox" id="chk_forest"><label for="chk_forest" title="Ước tính phủ thực vật và mất rừng từ ảnh vệ tinh. Không phải ranh 3 loại rừng."><svg class="ico ico-layer"><use href="#i-leaf"/></svg>Rừng, phủ thực vật</label></div>
             <span id="forestOpBox" class="layer-slider" style="display:none;"><input type="range" id="forestOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp rừng, phủ thực vật" aria-label="Độ trong suốt lớp rừng, phủ thực vật"></span>
           </div>
           <div class="flood-box" id="forestBox" style="display:none;">
+            <details class="detail-more"><summary>Xem chi tiết</summary><div class="detail-more-body"><p>Phủ thực vật năm 2021 theo ảnh vệ tinh ô 10 m (cây che phủ, cây bụi, cỏ, đất trồng, đất ngập nước, rừng ngập mặn, mặt nước), hoặc năm mất rừng 2001–2025 trên ô có tán cây năm 2000 từ 10%. Đây là ước tính, không phải ranh 3 loại rừng.</p></div></details>
             <div class="sat-pick"><label for="forestYear">Lớp</label><select id="forestYear"></select></div>
             <div class="sat-legend" id="forestLegend"></div>
             <div class="flood-stats" id="forestStats"></div>
@@ -704,7 +705,7 @@
         <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
           <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true"><svg class="ico"><use href="#i-pen"/></svg>Nhập 1 điểm</button>
           <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ, GeoJSON, shapefile (.zip)"><svg class="ico"><use href="#i-folder"/></svg>Nhập hàng loạt</button>
-          <button type="button" class="add-mode-btn" data-mode="addAdmin" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Admin hiệu chỉnh dữ liệu nền: vẽ bổ sung tuyến đường, xóa / thêm pixel dân cư"><svg class="ico"><use href="#i-tool"/></svg>Admin</button>
+          <button type="button" class="add-mode-btn" data-mode="addAdmin" id="btnAddRoadMode" role="tab" aria-selected="false" style="display:none;" title="Hiệu chỉnh dữ liệu nền: vẽ bổ sung tuyến đường, xóa hoặc thêm ô dân cư"><svg class="ico"><use href="#i-tool"/></svg>Quản trị</button>
         </div>
 
         <div id="addSingle">
@@ -755,11 +756,11 @@
         <label for="newSize">Diện tích</label>
         <input type="number" id="newSize" placeholder="m² (vd 1000)" min="0" step="1" />
 
-        <label for="newRadius" title="Bán kính phục vụ tự xác định theo QCVN 01:2026/BXD (tính trong webapp, không ghi Sheet)">Bán kính</label>
+        <label for="newRadius" title="Bán kính phục vụ theo QCVN 01:2026/BXD. Giá trị chỉ để xem, không ghi vào bảng dữ liệu.">Bán kính</label>
         <output id="newRadius" class="rp-radius" for="newType newNhomHaTang newWard newName">—</output>
         </div>
 
-        <button type="button" class="btn-submit" id="btnSubmitNewPoint"><svg class="ico"><use href="#i-send"/></svg>GỬI ĐỀ XUẤT MỚI</button>
+        <button type="button" class="btn-submit" id="btnSubmitNewPoint"><svg class="ico"><use href="#i-send"/></svg>Gửi đề xuất</button>
         <div id="statusMsg" class="rp-status" role="status" aria-live="polite"></div>
         </div>
 
@@ -787,12 +788,12 @@
             <label class="cad-drop" id="adjDrop" for="adjFiles">
               <span class="cad-drop-main"><b>Chọn file</b> hoặc kéo thả vào đây</span>
               <span class="cad-drop-types"><i>DXF</i><i>JPG · PNG</i><i>PDF</i></span>
-              <span class="cad-drop-sub">DXF bắt buộc: ranh trên layer có chữ RANH + hatch đất theo TT16. Có thể kèm <b>KH - ….dxf</b> (lớp tem đất). Ảnh tờ bản vẽ scan (không bắt buộc) ghép lên bản đồ theo khung bản vẽ đã phê duyệt. PDF Quyết định phê duyệt tối đa 2 MB, admin 10 MB (không bắt buộc). Không chấm QCVN, lô gốc của đồ án giữ nguyên.</span>
+              <span class="cad-drop-sub">DXF bắt buộc: ranh trên lớp có chữ RANH và mẫu tô đất theo Thông tư 16. Có thể kèm <b>KH - ….dxf</b> (lớp tem đất). Ảnh tờ bản vẽ (không bắt buộc) ghép lên bản đồ theo khung bản vẽ đã phê duyệt. PDF quyết định phê duyệt tối đa 2 MB; quản trị viên tối đa 10 MB (không bắt buộc). Không chấm QCVN. Lô gốc của đồ án giữ nguyên.</span>
               <input type="file" id="adjFiles" accept=".dxf,.jpg,.jpeg,.png,.webp,.pdf" multiple hidden />
             </label>
             <div id="adjFileList" class="adj-files"></div>
             <div class="cad-guest" id="adjGuest">
-              <div class="cad-guest-note"><svg class="ico"><use href="#i-info"/></svg>Chưa đăng nhập: hồ sơ vào hàng chờ, Admin kiểm tra rồi mới đưa lên bản đồ quy hoạch.</div>
+              <div class="cad-guest-note"><svg class="ico"><use href="#i-info"/></svg>Chưa đăng nhập: hồ sơ vào hàng chờ. Quản trị viên kiểm tra trước khi đưa lên bản đồ quy hoạch.</div>
               <div class="form-grid">
                 <label for="adjSender">Người gửi</label>
                 <input type="text" id="adjSender" maxlength="80" placeholder="Họ tên / đơn vị / SĐT" />
@@ -800,7 +801,7 @@
                 <input type="text" id="adjNote" maxlength="300" placeholder="Số QĐ, nguồn bản vẽ... (không bắt buộc)" />
               </div>
             </div>
-            <button type="button" class="btn-submit" id="btnAdjSubmit" disabled><svg class="ico"><use href="#i-send"/></svg>GỬI HỒ SƠ CHỜ DUYỆT</button>
+            <button type="button" class="btn-submit" id="btnAdjSubmit" disabled><svg class="ico"><use href="#i-send"/></svg>Gửi hồ sơ chờ phê duyệt</button>
             <div id="adjStatus" class="rp-status" role="status" aria-live="polite"></div>
           </div>
           <div class="form-grid">
@@ -895,12 +896,12 @@
             <div class="cad-hint-note cad-hint-tt16">
               <b>TT16:</b> <code>HT_</code> → QuyMo_HT, <code>QHDD_</code> / <code>QHDH_</code> → QuyMo_QH (bỏ qua ô Giai đoạn);
               hậu tố <code>_CT</code> / <code>_CV</code> = cấp đô thị, <code>_DVO</code> = đơn vị ở; Truonghoc thêm <code>_MN</code> / <code>_TH</code> / <code>_THCS</code>,
-              thiếu thì chọn cấp từng lô. Chỉ nhận hatch (layer không có hatch mới nhận polyline kín), ghi thẳng không hỏi xác nhận.
+              thiếu thì chọn cấp từng lô. Chỉ nhận mẫu tô (lớp không có mẫu tô thì nhận đường khép kín), ghi trực tiếp, không hỏi xác nhận.
             </div>
           </details>
           <div id="cadReport"></div>
           <div class="cad-guest" id="cadGuest">
-            <div class="cad-guest-note"><svg class="ico"><use href="#i-info"/></svg>Chưa đăng nhập: gửi được file ≤ 2 MB vào hàng chờ, Admin kiểm tra rồi mới đưa lên bản đồ.</div>
+            <div class="cad-guest-note"><svg class="ico"><use href="#i-info"/></svg>Chưa đăng nhập: gửi được tệp không quá 2 MB vào hàng chờ. Quản trị viên kiểm tra trước khi đưa lên bản đồ.</div>
             <div class="form-grid">
               <label for="cadSender">Người gửi</label>
               <input type="text" id="cadSender" maxlength="80" placeholder="Họ tên / đơn vị / SĐT (không bắt buộc)" />
@@ -908,14 +909,14 @@
               <input type="text" id="cadNote" maxlength="300" placeholder="Nội dung, nguồn bản vẽ... (không bắt buộc)" />
             </div>
           </div>
-          <button type="button" class="btn-submit" id="btnCadSubmit" disabled><svg class="ico"><use href="#i-send"/></svg>GỬI HỒ SƠ CHỜ DUYỆT</button>
+          <button type="button" class="btn-submit" id="btnCadSubmit" disabled><svg class="ico"><use href="#i-send"/></svg>Gửi hồ sơ chờ phê duyệt</button>
           <div id="cadStatus" class="rp-status" role="status" aria-live="polite"></div>
         </div>
 
         <div id="addAdmin" style="display:none;">
         <div class="admin-sub-switch" role="tablist" aria-label="Công cụ hiệu chỉnh">
           <button type="button" class="admin-sub-btn active" data-sub="addRoad" role="tab" aria-selected="true"><svg class="ico"><use href="#i-road"/></svg>Tuyến đường</button>
-          <button type="button" class="admin-sub-btn" data-sub="addPop" role="tab" aria-selected="false"><svg class="ico"><use href="#i-users"/></svg>Pixel dân cư</button>
+          <button type="button" class="admin-sub-btn" data-sub="addPop" role="tab" aria-selected="false"><svg class="ico"><use href="#i-users"/></svg>Ô dân cư</button>
           <button type="button" class="admin-sub-btn" data-sub="addOsm" role="tab" aria-selected="false" title="Nhập trạm xe buýt, trụ sở PCCC, nhà tang lễ - nghĩa trang và công trình thể thao từ OpenStreetMap"><svg class="ico"><use href="#i-map"/></svg>Dữ liệu OSM</button>
         </div>
         <div id="addRoad">
@@ -937,7 +938,7 @@
           </div>
           <div id="roadDrawInfo" class="road-draw-info"></div>
           <div class="cad-hint">Click bản đồ hiện trạng để đặt đỉnh; đỉnh cách nút đường &lt; 1 m mới bắt dính (chấm xanh) — phóng to tối đa rồi click đúng nút để nối tuyến. Kéo đỉnh để di chuyển, chuột phải để xóa đỉnh, kéo chấm giữa đoạn để thêm đỉnh. Sửa tuyến đã lưu: bấm biểu tượng bút ở danh sách. Esc: dừng vẽ.</div>
-          <button type="button" class="btn-submit" id="btnRoadSave" disabled title="Ghi đè danh sách tuyến bổ sung roads/v2/custom.json trên bucket"><svg class="ico"><use href="#i-save"/></svg>LƯU TUYẾN (ADMIN)</button>
+          <button type="button" class="btn-submit" id="btnRoadSave" disabled title="Ghi danh sách tuyến đường bổ sung"><svg class="ico"><use href="#i-save"/></svg>Lưu tuyến</button>
           <div id="roadStatus" class="rp-status" role="status" aria-live="polite"></div>
           <div id="roadList" class="cad-list"></div>
         </div>
@@ -946,8 +947,8 @@
           <div class="form-grid">
             <label for="popOp">Thao tác</label>
             <select id="popOp">
-              <option value="remove" selected>Xóa pixel (không có dân)</option>
-              <option value="add">Thêm pixel (khu dân cư mới)</option>
+              <option value="remove" selected>Xóa ô dân cư (không có dân)</option>
+              <option value="add">Thêm ô dân cư (khu dân cư mới)</option>
             </select>
             <label for="popTool">Công cụ</label>
             <select id="popTool">
@@ -964,8 +965,8 @@
             <button type="button" id="btnPopUndo" title="Xóa nét cọ cuối (Backspace / Ctrl+Z)" disabled><svg class="ico"><use href="#i-undo"/></svg>Hoàn tác nét</button>
           </div>
           <div id="popDrawInfo" class="road-draw-info"></div>
-          <div class="cad-hint" id="popHint" title="Vùng thêm được áp sau vùng xóa">Giữ chuột trái và rê để tô. Tổng dân số phường giữ nguyên: xóa pixel thì dân dồn sang pixel còn lại.</div>
-          <button type="button" class="btn-submit" id="btnPopSave" disabled title="Ghi đè danh sách vùng hiệu chỉnh pop/edits.json trên bucket"><svg class="ico"><use href="#i-save"/></svg>LƯU VÙNG (ADMIN)</button>
+          <div class="cad-hint" id="popHint" title="Vùng thêm được áp sau vùng xóa">Giữ chuột và rê để tô. Tổng dân số phường, xã giữ nguyên: xóa ô dân cư thì dân số dồn sang các ô còn lại.</div>
+          <button type="button" class="btn-submit" id="btnPopSave" disabled title="Ghi danh sách vùng hiệu chỉnh dân cư"><svg class="ico"><use href="#i-save"/></svg>Lưu vùng hiệu chỉnh</button>
           <div id="popStatus" class="rp-status" role="status" aria-live="polite"></div>
           <div class="pop-bake">
             <div class="pop-bake-info" id="popAssetInfo"></div>
@@ -982,7 +983,7 @@
             <label><input type="checkbox" class="osm-type" value="11-NT" checked>Nhà tang lễ, nghĩa trang</label>
             <label><input type="checkbox" class="osm-type" value="8-VH">Nhà văn hóa, thể thao (OSM)</label>
           </div>
-          <button type="button" class="btn-submit" id="btnOsmCheck"><svg class="ico"><use href="#i-inspect"/></svg>KIỂM TRA DỮ LIỆU OSM</button>
+          <button type="button" class="btn-submit" id="btnOsmCheck"><svg class="ico"><use href="#i-inspect"/></svg>Kiểm tra dữ liệu OpenStreetMap</button>
           <div id="osmStatus" class="rp-status" role="status" aria-live="polite"></div>
           <div id="osmReport"></div>
         </div>
@@ -1054,7 +1055,7 @@
             <div class="tt16-frames">
               <div class="tt16-row"><i class="tt16-frame tt16-frame-ht"></i><span>Hiện trạng</span></div>
               <div class="tt16-row"><i class="tt16-frame tt16-frame-dd"></i><span>QH đợt đầu</span></div>
-              <div class="tt16-row" title="Công trình đề xuất chưa được Admin duyệt (TrangThai = FALSE)"><i class="tt16-frame tt16-frame-pending"></i><span>Chờ duyệt</span></div>
+              <div class="tt16-row" title="Công trình đề xuất chưa được phê duyệt"><i class="tt16-frame tt16-frame-pending"></i><span>Chờ phê duyệt</span></div>
               <div class="tt16-row"><i class="tt16-frame tt16-frame-dh"></i><span>QH dài hạn</span></div>
             </div>
           </div>
@@ -1167,7 +1168,7 @@
                     <th colspan="2">8. Văn hóa</th>
                     <th colspan="2">9. Thương mại</th>
                     <th colspan="2">TỔNG CỘNG</th>
-                    <th colspan="4" title="Chiều dài theo OpenStreetMap + tuyến Admin vẽ bổ sung, cắt theo ranh phường/xã">Đường giao thông (km)</th>
+                    <th colspan="4" title="Chiều dài theo OpenStreetMap và tuyến do quản trị viên bổ sung, cắt theo ranh phường, xã">Đường giao thông (km)</th>
                     <th rowspan="2" title="Số trạm dừng xe buýt đã duyệt trong ranh phường/xã">Trạm<br>xe buýt</th>
                   </tr>
                   <tr>
@@ -1244,9 +1245,9 @@
       <b id="authModalTitle"><svg class="ico"><use href="#i-key"/></svg>ĐĂNG NHẬP QUẢN TRỊ (ADMIN)</b>
       <button type="button" id="btnCloseAuthModal" class="auth-close-btn" aria-label="Đóng"><svg class="ico"><use href="#i-close"/></svg></button>
     </div>
-    <div class="auth-desc">Đăng nhập bằng tài khoản Google được cấp quyền Admin để thực hiện phê duyệt đề xuất hạ tầng.</div>
+    <div class="auth-desc">Đăng nhập bằng tài khoản Google được cấp quyền quản trị để phê duyệt đề xuất hạ tầng.</div>
     <div id="googleSignInBtn"></div>
-    <button type="button" id="btnWardRoads" class="btn-submit btn-secondary" style="display:none;" title="Tải mạng lưới đường OpenStreetMap của 40 phường/xã lên bucket: dùng chung cho phạm vi thực tế của công trình và chiều dài đường trục chính / kiệt theo phường"><svg class="ico"><use href="#i-road"/></svg>Tải mạng lưới đường toàn thành phố</button>
+    <button type="button" id="btnWardRoads" class="btn-submit btn-secondary" style="display:none;" title="Tải mạng lưới đường OpenStreetMap của 40 phường, xã. Dùng cho phạm vi phục vụ thực tế và chiều dài đường theo phường, xã."><svg class="ico"><use href="#i-road"/></svg>Tải mạng lưới đường toàn thành phố</button>
     <div id="wardRoadsMsg" class="auth-msg" role="status" aria-live="polite"></div>
     <button type="button" id="btnSignOut" class="btn-submit btn-secondary" style="display:none;"><svg class="ico"><use href="#i-logout"/></svg>Đăng xuất quản trị</button>
     <div id="authMsg" class="auth-msg auth-msg-strong" role="status" aria-live="polite"></div>

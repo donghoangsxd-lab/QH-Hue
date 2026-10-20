@@ -6,7 +6,7 @@
  */
 import { state, BUFFER_COLORS } from './state.js';
 import { geeApi } from './api.js';
-import { escapeHtml, fmtNum, ico, showToast, startTaskProgress, trackTileLoad } from './utils.js';
+import { escapeHtml, fmtNum, ico, showToast, startTaskProgress, trackTileLoad, detailDisclosure } from './utils.js';
 import { geeTileOpts } from './basemap.js';
 
 export const PROOF_FOCUS_EVENT = 'csd-proof-focus';
@@ -196,14 +196,14 @@ function buildPanelHtml(data, typeColor) {
   return `
     <div class="proof-head">
       <div class="proof-title">
-        <span class="proof-kicker">${ico('book')}Thuyết minh phương án</span>
+        <span class="proof-kicker">${ico('book')}Chi tiết phương án</span>
         <b><i class="proof-type-dot" style="background:${typeColor}"></i>${label}</b>
       </div>
-      <button type="button" class="proof-close" aria-label="Đóng thuyết minh">${ico('close')}</button>
+      <button type="button" class="proof-close" aria-label="Đóng">${ico('close')}</button>
     </div>
     <div class="proof-site">${ico('pin')}${escapeHtml(data.candidate.name || 'Khu đất chưa sử dụng')} · ${escapeHtml(data.ward)}</div>
     <div class="proof-verdict ${isScale ? 'v-scale' : 'v-coverage'}">
-      <span class="proof-badge">${isScale ? 'BÙ THIẾU QUY MÔ' : 'MỞ RỘNG ĐỘ PHỦ'}</span>
+      <span class="proof-badge">${isScale ? 'Bù thiếu quy mô' : 'Mở rộng độ phủ'}</span>
       ${summaryHtml(data, label)}
     </div>
     <div class="proof-kpis">
@@ -219,11 +219,10 @@ function buildPanelHtml(data, typeColor) {
       ${legendItem('background:#22c55e;', 'Dân đã được phục vụ')}
       ${legendItem('background:#ffd400;', 'Dân sẽ được phục vụ thêm')}
     </div>
-    ${existingN ? `<details class="proof-more"><summary>${label} theo quy hoạch ở gần (${existingN})</summary><ul>${listed}${more}</ul></details>` : ''}
-    <details class="proof-more">
-      <summary>Cách tính chi tiết</summary>
-      <div class="proof-muted proof-note">Căn cứ kịch bản quy hoạch: công trình đã duyệt có quy mô quy hoạch (gồm quy hoạch mới, bỏ công trình di dời), diện tích theo QuyMo_QH, nhu cầu theo dân số dự báo.
-        Bản đồ dân cư chia thành ô vuông ${cell} × ${cell} m, chỉ đếm ô có người ở; chưa có lớp phân bố dân cư quy hoạch nên dùng phân bố hiện trạng.</div>
+    ${existingN ? detailDisclosure(`<p>${label} theo quy hoạch ở gần (${existingN})</p><ul class="proof-nearby">${listed}${more}</ul>`, 'Công trình quy hoạch lân cận') : ''}
+    ${detailDisclosure(`
+      <div class="proof-muted proof-note">Căn cứ kịch bản quy hoạch: công trình đã phê duyệt, có quy mô quy hoạch (gồm quy hoạch mới, không gồm công trình di dời). Nhu cầu tính theo dân số dự báo.
+        Bản đồ dân cư chia ô vuông ${cell} × ${cell} m; chỉ đếm ô có người. Chưa có lớp phân bố dân cư quy hoạch nên dùng phân bố hiện trạng.</div>
       <table class="proof-table">
       <tr class="proof-group"><td colspan="2">① Ô dân cư chưa được phục vụ</td></tr>
       <tr><td>Ô dân cư trong phạm vi phục vụ</td><td>${fmtNum(px.buffer)} ô</td></tr>
@@ -238,8 +237,7 @@ function buildPanelHtml(data, typeColor) {
       <tr class="proof-group"><td colspan="2">③ Độ phủ tăng thêm</td></tr>
       <tr><td>${fmtNum(pop.added)} ÷ ${fmtNum(pop.ward)} người</td><td>${fmtNum(data.coverageAddPct)}%</td></tr>
       ${scaleRowsHtml(data)}
-      </table>
-    </details>`;
+      </table>`, 'Phương pháp tính')}`;
 }
 
 // Độ phủ không tăng (khu đất đã nằm trong phạm vi công trình cùng loại): lý do chọn là phường còn thiếu quy mô theo chỉ tiêu
@@ -284,8 +282,8 @@ function scaleRowsHtml(data) {
 export async function showCsdProof(csd, suggestion, targetMap, fit) {
   clearProofLayers();
   const seq = requestSeq;
-  const myTask = task = startTaskProgress(`Thuyết minh "${suggestion.label}"`);
-  myTask.creep(SERVER_PCT, SERVER_TAU_MS, 'Đang đếm dân cư trong vùng phục vụ (GEE)');
+  const myTask = task = startTaskProgress(`Chi tiết phương án «${suggestion.label}»`);
+  myTask.creep(SERVER_PCT, SERVER_TAU_MS, 'Đang đếm dân cư trong vùng phục vụ');
   setLayerFocus(suggestion.code);
 
   let data;
@@ -297,10 +295,10 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
     if (!res.ok || data.error) throw new Error(data.message || `HTTP ${res.status}`);
   } catch (err) {
     if (seq === requestSeq) {
-      myTask.fail('Không lập được thuyết minh');
+      myTask.fail('Không lập được bảng chi tiết');
       task = null;
       setLayerFocus(null);
-      showToast(`Không lập được thuyết minh: ${err.message}`, 'error');
+      showToast(`Không lập được bảng chi tiết: ${err.message}`, 'error');
     }
     return;
   }
@@ -315,7 +313,7 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
   let tiles = null;
   if (data.tileUrl) {
     const tileLayer = L.tileLayer(data.tileUrl, geeTileOpts({ opacity: 0.8, zIndex: 50 }));
-    tiles = trackTileLoad(tileLayer, (n, total) => myTask.set(DRAW_PCT + (100 - DRAW_PCT) * (n / Math.max(total, 1)), 'Đang tải ảnh pixel dân cư'));
+    tiles = trackTileLoad(tileLayer, (n, total) => myTask.set(DRAW_PCT + (100 - DRAW_PCT) * (n / Math.max(total, 1)), 'Đang tải ảnh dân cư'));
     group.addLayer(tileLayer);
   }
 
@@ -385,7 +383,7 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
   active = { group, panel };
   Promise.resolve(tiles).then(() => {
     if (task !== myTask) return;
-    myTask.done('Đã lập thuyết minh');
+    myTask.done('Đã lập bảng chi tiết');
     task = null;
   });
 

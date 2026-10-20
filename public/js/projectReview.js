@@ -1454,7 +1454,7 @@ async function approve() {
   const pendingId = session.pendingId;
   closeReview();
   await importReviewDossier(text, fileName, pendingId);
-  showToast('Kiểm tra khớp công trình đã có trong khung Nhập hàng loạt rồi bấm GHI VÀO HỆ THỐNG', 'info');
+  showToast('Kiểm tra khớp công trình đã có trong mục Nhập hàng loạt, rồi bấm Ghi vào hệ thống.', 'info');
 }
 
 async function reject() {

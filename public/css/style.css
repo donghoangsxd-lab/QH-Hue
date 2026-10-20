@@ -759,6 +759,47 @@ body.compare-on .map-title-split { display: inline-flex; }
 .faq-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .faq-close { width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
 .faq-note { margin: 4px 0 8px; color: var(--text-muted); font-size: var(--fs-xs); }
+
+/* Khối «Xem chi tiết»: phương pháp, cách tính, lưu ý. Đóng sẵn; phím Enter/Space và chạm đều mở. */
+.detail-more {
+  margin: 8px 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: rgba(15, 23, 42, 0.35);
+}
+.detail-more > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 8px 12px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--accent-cyan);
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.detail-more > summary::-webkit-details-marker { display: none; }
+.detail-more > summary::before {
+  content: '';
+  width: 0; height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+}
+.detail-more[open] > summary::before { transform: rotate(90deg); }
+.detail-more > summary:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: -2px;
+}
+.detail-more-body {
+  padding: 0 12px 10px;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--text-main);
+}
+.detail-more-body p { margin: 0 0 6px; }
+.detail-more-body ul, .detail-more .ov-facts { margin: 0; padding-left: 1.1em; }
 .faq-list { display: flex; flex-direction: column; gap: 6px; }
 .faq-item {
   display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 6px 8px; text-align: left;
@@ -2963,7 +3004,8 @@ table.ward-table th {
 .proof-more summary::-webkit-details-marker { display: none; }
 .proof-more summary::before { content: '▸'; display: inline-block; width: 12px; transition: transform var(--ease); }
 .proof-more[open] summary::before { transform: rotate(90deg); }
-.proof-more ul { margin: 3px 0 0; padding-left: 16px; max-height: 90px; overflow-y: auto; }
+.proof-more ul,
+.detail-more-body ul.proof-nearby { margin: 3px 0 0; padding-left: 16px; max-height: 90px; overflow-y: auto; }
 .proof-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
 .proof-table td { padding: 2px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.25); }
 .proof-table td:last-child { text-align: right; font-weight: 700; white-space: nowrap; padding-left: 8px; }
@@ -5154,6 +5196,7 @@ body.project-review.la-page #projectReviewHost {
 }
 /* Điện thoại dọc: tiêu đề bảng và nút không đè lên nhau; chỉ tiêu xuống dòng dưới. */
 @media (max-width: 840px) {
+  .detail-more > summary { min-height: 44px; }
   .bp-part2 .bp-part-head { flex-wrap: wrap; align-content: center; overflow: hidden; row-gap: 2px; }
   .bp-title-wrap { max-width: none; flex: 1 1 auto; min-width: 0; }
   .bp-head-stats { flex: 1 1 100%; order: 3; height: 22px; }

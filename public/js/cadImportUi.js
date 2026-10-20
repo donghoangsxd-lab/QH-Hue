@@ -1030,7 +1030,7 @@ function renderReport() {
 function syncRoleUi() {
   const admin = isAdmin();
   const btn = $('btnCadSubmit');
-  if (btn) btn.innerHTML = admin ? `${ico('save')}GHI VÀO HỆ THỐNG (ADMIN)` : `${ico('send')}GỬI HỒ SƠ CHỜ DUYỆT`;
+  if (btn) btn.innerHTML = admin ? `${ico('save')}Ghi vào hệ thống` : `${ico('send')}Gửi hồ sơ chờ phê duyệt`;
   const guest = $('cadGuest');
   if (guest) guest.hidden = admin;
   const box = $('cadPendingBox');

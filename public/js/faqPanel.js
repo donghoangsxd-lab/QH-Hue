@@ -1,7 +1,7 @@
 // Hỏi đáp số liệu đã tính sẵn (public/data/faq.json, dựng bằng scripts/build-faq.js).
 // Bấm câu trả lời thì tô các phường, xã nêu trong câu. Câu ưu tiên đầu tư tô thêm công trình và buffer QCVN.
 import { getRightObstruction, highlightWardNames, map } from './mapEngine.js';
-import { escapeHtml, showToast } from './utils.js';
+import { escapeHtml, showToast, detailDisclosure } from './utils.js';
 
 const $ = (id) => document.getElementById(id);
 const vi = (n, d = 0) => Number(n).toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d });
@@ -45,7 +45,7 @@ function renderPriority(doc) {
   const names = Object.keys(priority.wards).sort((a, b) => a.localeCompare(b, 'vi'));
   select.innerHTML = `<option value="">Chọn phường, xã</option>${names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}`;
   const method = $('faqPriorityMethod');
-  if (method) method.textContent = priority.method || '';
+  if (method) method.innerHTML = priority.method ? detailDisclosure(`<p>${escapeHtml(priority.method)}</p>`) : '';
   const note = $('faqPriorityNote');
   if (note) note.textContent = '';
   const list = $('faqPriorityList');
@@ -63,8 +63,8 @@ function showWardPriority(name) {
   if (note) note.textContent = ward.note || '';
   list.innerHTML = (ward.facilities || []).map((item, i) => {
     const pop = item.popAdded == null
-      ? 'chưa có dân số để quy đổi'
-      : `thêm khoảng ${vi(item.popAdded)} người${item.capacityLimited ? ' (chặn bởi sức chứa theo chỉ tiêu m²/người)' : ''}`;
+      ? 'Chưa có số liệu dân số để quy đổi'
+      : `thêm khoảng ${vi(item.popAdded)} người${item.capacityLimited ? ' (không vượt sức chứa theo chỉ tiêu m²/người)' : ''}`;
     return `<button type="button" class="faq-item" data-priority="${i}">
       <b>${escapeHtml(item.name)}</b>
       <span>${escapeHtml(item.typeLabel)} · thêm ${vi(item.areaHa, 2)} ha (${vi(item.pct, 1)}% diện tích phường) · ${escapeHtml(pop)}</span>
@@ -176,7 +176,7 @@ export function initFaqPanel() {
     clearMarks();
     hit.classList.add('is-on');
     if (!item.wards || !item.wards.length) {
-      showToast('Câu này không gắn với một phường, xã cụ thể.', 'error');
+      showToast('Câu trả lời không gắn với một phường, xã cụ thể.', 'error');
       return;
     }
     highlightWardNames(item.wards);

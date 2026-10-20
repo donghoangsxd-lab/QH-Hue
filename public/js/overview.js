@@ -3,7 +3,7 @@
 // Mục có demo: nút «Xem trên bản đồ» chạy chuỗi thao tác trực tiếp kèm thuyết minh (overviewDemo.js).
 // Mở tính năng bằng cách bấm hộ nút / tab / ô tick sẵn có trên giao diện, không đụng trạng thái nội bộ của module khác.
 // Tự hiện ở lần mở trang đầu; ô "Không tự hiện" dùng chung khóa với introTour.js.
-import { ico, showToast, escapeHtml, fmtNum, fmtPct } from './utils.js';
+import { ico, showToast, escapeHtml, fmtNum, fmtPct, detailDisclosure } from './utils.js';
 import { map, handleInspectPointClick, zoomToPoint } from './mapEngine.js';
 import { ensureWardStats } from './uiComponents.js';
 import { planMap, getViewMode, isSplitOn } from './planMap.js';
@@ -17,9 +17,9 @@ const STORAGE_KEY = 'qhhue_intro_off';
 const HUE_BOUNDS = { latMin: 15.9, latMax: 16.85, lngMin: 106.9, lngMax: 108.3 };
 
 const STATUS = {
-  trial: 'Thử nghiệm',
-  dev: 'Đang phát triển',
-  plan: 'Dự kiến'
+  trial: 'Đang vận hành',
+  dev: 'Đang hoàn thiện',
+  plan: 'Dự kiến bổ sung'
 };
 const BUTTONS = {
   guide: ['help', 'Hướng dẫn'],
@@ -119,14 +119,14 @@ const FLOOD_DEMO = {
         d.range('floodLevel', FLOOD_DEMO_M);
         await d.wait(800);
       },
-      text: `<p>Panel phải › <b>Bản đồ môi trường</b> › <b>Mô phỏng ngập</b> đã bật, thanh <b>Mực nước</b> đặt <b>${FLOOD_DEMO_M} m</b>.
+      text: `<p>Bảng bên phải › <b>Bản đồ môi trường</b> › <b>Mô phỏng ngập</b> đã bật, thanh <b>Mực nước</b> đặt <b>${FLOOD_DEMO_M} m</b>.
         Mọi ô đất có cao độ nền thấp hơn ${FLOOD_DEMO_M} m được tô xanh theo độ sâu: xanh nhạt ngập nông, xanh đậm ngập sâu.</p>
         <p class="ovd-note">Cao độ nền FABDEM (ô 30 m, hệ EGM2008), không phải số đọc mực nước tại trạm thủy văn.</p>`
     },
     {
       title: 'Bật tem các trường học',
       run: (d) => SCHOOL_CHKS.forEach(id => d.check(id, { main: 'infra' })),
-      text: '<p>Panel phải › <b>Khu đất</b> đã bật 4 nhóm <b>Mầm non, Tiểu học, THCS, THPT</b>. Trường nằm trong vùng ngập được đánh <b class="c-red">chấm đỏ</b> ngay tại tem công trình.</p>'
+      text: '<p>Bảng bên phải › <b>Khu đất</b> đã bật 4 nhóm <b>Mầm non, Tiểu học, THCS, THPT</b>. Trường nằm trong vùng ngập được đánh <b class="c-red">chấm đỏ</b> ngay tại tem công trình.</p>'
     },
     {
       title: `Các trường bị ngập khi nước lên ${FLOOD_DEMO_M} m`,
@@ -153,7 +153,7 @@ const TERRAIN_DEMO = {
     {
       title: 'Phủ lớp cao độ nền',
       run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 11); d.check('chk_terrain', { pane: 'env' }); },
-      text: '<p>Panel phải › <b>Bản đồ môi trường</b> › <b>Địa hình (cao độ nền)</b> đã bật: màu thể hiện cao độ, vùng trũng thấp ven phá Tam Giang và hạ lưu sông Hương nổi rõ. Di chuột trên bản đồ để đọc cao độ tại vị trí.</p>'
+      text: '<p>Bảng bên phải › <b>Bản đồ môi trường</b> › <b>Địa hình (cao độ nền)</b> đã bật: màu thể hiện cao độ, vùng trũng thấp ven phá Tam Giang và hạ lưu sông Hương nổi rõ. Di chuột trên bản đồ để đọc cao độ tại vị trí.</p>'
     },
     {
       title: 'Hướng dòng chảy và lưu vực',
@@ -171,14 +171,14 @@ const PRIORITY_DEMO = {
     {
       title: 'Bản đồ độ phủ hạ tầng',
       run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 12); d.check('chk_heat', { pane: 'base' }); },
-      text: '<p>Panel phải › <b>Bản đồ nền</b> › <b>Bản đồ độ phủ hạ tầng</b> đã bật: mỗi vị trí tô theo số nhóm hạ tầng tiếp cận được trong bán kính QCVN 01:2026/BXD (1–8 nhóm); màu càng nhạt càng thiếu.</p>'
+      text: '<p>Bảng bên phải › <b>Bản đồ nền</b> › <b>Bản đồ độ phủ hạ tầng</b> đã bật: mỗi vị trí tô theo số nhóm hạ tầng tiếp cận được trong bán kính QCVN 01:2026/BXD (1–8 nhóm); màu càng nhạt càng thiếu.</p>'
     },
     {
       title: 'Chồng lớp phân bổ dân cư',
       run: (d) => d.check('chk_pop', { pane: 'base' }),
       text: `<p>Bật thêm <b>Phân bổ dân cư</b>: khu <b>đông dân</b> nằm trên vùng <b>độ phủ thấp</b> là nơi nên ưu tiên bố trí công trình mới.
         Bảng tổng hợp phía dưới cho biết phường, xã còn thiếu chỉ tiêu m²/người.</p>
-        <p class="ovd-note">Độ phủ chỉ tính công trình đã được Admin phê duyệt; vùng đệm tròn theo bán kính quy chuẩn.</p>`
+        <p class="ovd-note">Độ phủ chỉ tính công trình đã được quản trị viên phê duyệt; vùng đệm tròn theo bán kính quy chuẩn.</p>`
     }
   ]
 };
@@ -200,7 +200,7 @@ const ACCESS_DEMO = {
       },
       text: `<p>Bảng kết quả liệt kê nhóm hạ tầng <b>đã tiếp cận</b> (vị trí nằm trong bán kính phục vụ theo QCVN 01:2026/BXD) và nhóm <b>còn thiếu</b>,
         kèm tuyến đường tới công trình gần nhất.</p>
-        <p class="ovd-note">Chỉ tính công trình đã được Admin phê duyệt. Bấm <b>Giữ bản đồ</b> để tự tra các vị trí khác.</p>`
+        <p class="ovd-note">Chỉ tính công trình đã được quản trị viên phê duyệt. Bấm <b>Giữ bản đồ</b> để tự tra các vị trí khác.</p>`
     }
   ]
 };
@@ -220,7 +220,7 @@ const CSD_DEMO = {
     {
       title: 'Các cơ sở chưa sử dụng',
       run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 12); d.check('chk_c9', { main: 'infra' }); },
-      text: '<p>Panel phải › <b>Khu đất</b> › <b>12. Cơ sở chưa sử dụng</b> đã bật: các cơ sở nhà đất dôi dư sau sắp xếp hiện trên bản đồ.</p>'
+      text: '<p>Bảng bên phải › <b>Khu đất</b> › <b>12. Cơ sở chưa sử dụng</b> đã bật: các cơ sở nhà đất dôi dư sau sắp xếp hiện trên bản đồ.</p>'
     },
     {
       title: 'Phương án cho khu đất lớn nhất',
@@ -233,9 +233,9 @@ const CSD_DEMO = {
         const c = d.data.csd;
         if (!c) return '<p>Chưa có cơ sở đã duyệt nào có phương án chuyển đổi phù hợp.</p>';
         const best = c.suggestions.find(s => s.status === 'eligible');
-        return `<p><b>${escapeHtml(c.name || 'Khu đất chưa sử dụng')}</b> (${escapeHtml(c.ward)}, ${fmtNum(c.size)} m²): thuật toán thử chuyển sang từng loại hạ tầng xã hội,
+        return `<p><b>${escapeHtml(c.name || 'Khu đất chưa sử dụng')}</b> (${escapeHtml(c.ward)}, ${fmtNum(c.size)} m²): đối chiếu lần lượt từng loại hạ tầng xã hội,
           phương án tốt nhất là <b class="c-green">${escapeHtml(best.label)}</b> vì bù được nhiều nhất phần thiếu hụt của phường.</p>
-          <p class="ovd-note">Bảng thông tin trên bản đồ liệt kê đủ phương án; bấm <b>Xem thuyết minh</b> để xem vùng phục vụ và dân cư được tính.</p>`;
+          <p class="ovd-note">Bảng thông tin trên bản đồ liệt kê đủ phương án; bấm <b>Xem chi tiết</b> để xem vùng phục vụ và dân cư được tính.</p>`;
       }
     }
   ]
@@ -262,15 +262,15 @@ const SECTIONS = [
       {
         id: 'parcel', btn: 'guide', status: 'trial',
         title: 'Tra cứu thông tin quy hoạch theo thửa đất',
-        note: 'Dữ liệu bản đồ địa chính năm 2016 theo GisHue, chưa có các huyện cũ: Quảng Điền, Phú Lộc, Nam Đông',
+        note: 'Dữ liệu bản đồ địa chính năm 2016 theo cổng thông tin địa chính tỉnh, chưa có các huyện cũ: Quảng Điền, Phú Lộc, Nam Đông',
         lead: 'Tra một thửa đất theo số tờ, số thửa hoặc bấm trên bản đồ để xem diện tích, loại đất, địa chỉ; kiểm tra quy hoạch trên thửa: diện tích từng loại đất quy hoạch (m²) và chỉ tiêu các lô quy hoạch.',
         steps: [
           'Nếu panel phải đang thu, bấm nút mũi tên <b>Mở panel công cụ</b> ở mép phải. Chọn tab <b>Lớp dữ liệu</b>, phần dưới chọn <b>Bản đồ nền</b>.',
           'Bật lớp <b>Thửa đất địa chính 2016</b>. Ranh thửa hiện từ mức phóng 15, số thửa từ mức 18. Hộp tìm hiện ngay dưới tên lớp.',
           'Tìm theo hồ sơ: trong ô <b>Chọn xã/phường (địa giới cũ)</b>, nhập <b>Tờ</b> và <b>Thửa</b>, bấm <b>Tìm</b>. Hoặc phóng tới vị trí (có thể nhập tọa độ ở cuối trang Hướng dẫn) rồi bấm vào thửa trên bản đồ.',
           'Bảng thửa hiện diện tích hồ sơ, loại đất theo Thông tư 28/2014/TT-BTNMT, địa chỉ và xã/phường cũ. Thửa được viền vàng.',
-          'Droplist trên thanh tiêu đề đang là <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b> hoặc <b>QHCT 1/500</b>: bảng thửa đặt góc trái, sát thanh công cụ, có 4 trang cùng tên bốn cấp đó. Trang đang mở theo lớp droplist; bấm trang khác để xem lớp đó, kể cả khi lớp đang tắt. Mỗi trang có biểu đồ tròn loại đất trên thửa, diện tích và chỉ tiêu từng lô.',
-          'Droplist đang là <b>HỆ THỐNG ĐÔ THỊ</b>: bảng mở ngay tại thửa. Bấm <b>Xem chỉ tiêu quy hoạch</b> để cắt thửa với lô các đồ án đã nạp (diện tích, %, tầng cao, mật độ, hệ số sử dụng đất).',
+          'Danh sách chọn trên thanh tiêu đề đang là <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b> hoặc <b>QHCT 1/500</b>: bảng thửa đặt góc trái, sát thanh công cụ, có 4 trang cùng tên bốn cấp đó. Trang đang mở theo lớp droplist; bấm trang khác để xem lớp đó, kể cả khi lớp đang tắt. Mỗi trang có biểu đồ tròn loại đất trên thửa, diện tích và chỉ tiêu từng lô.',
+          'Danh sách chọn đang là <b>HỆ THỐNG ĐÔ THỊ</b>: bảng mở ngay tại thửa. Bấm <b>Xem chỉ tiêu quy hoạch</b> để cắt thửa với lô các đồ án đã nạp (diện tích, %, tầng cao, mật độ, hệ số sử dụng đất).',
           'Đang xem bản đồ quy hoạch: bấm thửa nằm trên một lô vẫn mở bảng thửa. Tắt lớp <b>Thửa đất địa chính 2016</b> để xem bảng lô như trước.'
         ],
         facts: [
@@ -293,7 +293,7 @@ const SECTIONS = [
         ],
         facts: [
           'Bán kính phục vụ xác định theo QCVN 01:2026/BXD, theo loại, cấp và quy mô từng công trình.',
-          'Chỉ tính công trình đã được Admin phê duyệt.'
+          'Chỉ tính công trình đã được quản trị viên phê duyệt.'
         ],
         coord: true,
         actions: [{ label: 'Bật chế độ tra cứu', icon: 'inspect', run: inspectOn }]
@@ -303,13 +303,13 @@ const SECTIONS = [
         title: 'Đánh giá khả năng phục vụ của 1 công trình hạ tầng',
         lead: 'Dựng vùng phục vụ thực tế của công trình theo mạng lưới đường và ước tính số dân được phục vụ, đối chiếu với bán kính quy chuẩn.',
         steps: [
-          'Panel phải › tab <b>Lớp dữ liệu</b> › <b>Khu đất</b>. Tick nhóm công trình cần xem (ví dụ <b>4. Trường Tiểu học</b>).',
+          'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Khu đất</b>. Chọn nhóm công trình cần xem (ví dụ <b>4. Trường Tiểu học</b>).',
           'Bấm biểu tượng công trình trên bản đồ. Bảng thông tin nêu quy mô hiện trạng, quy hoạch và bán kính phục vụ.',
           'Trong bảng, bấm nút <b>Xem bán kính phục vụ</b> (kèm số mét). Trạm xe buýt là <b>Xem phạm vi đi bộ</b>; nhà tang lễ, nghĩa trang là <b>Xem khoảng cách an toàn</b>. Bản đồ chuyển âm bản, dựng phạm vi đi được theo đường và tính dân số phục vụ.',
           'Nút con mắt trên bảng thu bảng về tên công trình để nhìn trọn vùng; bấm lại công trình để mở bảng. Nút tròn ● cạnh tên nhóm bật vùng phủ cả nhóm (chú thích <b>Bật/tắt vùng phủ</b>, <b>Bật/tắt bán kính phục vụ</b>, <b>Bật/tắt khoảng cách an toàn</b> hoặc <b>Bật/tắt phạm vi 500 m</b> tùy nhóm).'
         ],
         facts: [
-          'Vùng phục vụ tính trên mạng đường OpenStreetMap và tuyến Admin bổ sung (thuật toán Dijkstra).',
+          'Vùng phục vụ tính trên mạng đường OpenStreetMap và tuyến do quản trị viên bổ sung (đường đi ngắn nhất trên mạng đường).',
           'Dân số phục vụ lấy từ lớp phân bổ dân cư đã hiệu chỉnh.'
         ],
         actions: [{ label: 'Mở danh sách công trình', icon: 'layers', run: () => openLayerTab({ main: 'infra' }) }]
@@ -319,7 +319,7 @@ const SECTIONS = [
         title: 'Tra cứu dự án kêu gọi đầu tư',
         lead: 'Xem ranh và thông tin dự án trong danh sách kêu gọi đầu tư, rồi kiểm tra quy hoạch sử dụng đất nằm trong ranh đó.',
         steps: [
-          'Panel phải › tab <b>Lớp dữ liệu</b> › <b>Khu đất</b>. Bật <b>15. Dự án kêu gọi đầu tư</b>.',
+          'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Khu đất</b>. Bật <b>15. Dự án kêu gọi đầu tư</b>.',
           'Bấm ranh dự án trên bản đồ. Bảng góc trái có hai tab <b>Tổng quan</b> và <b>Chi tiết</b>.',
           'Ở <b>Tổng quan</b>, bấm <b>Kiểm tra quy hoạch theo ranh giới dự án</b>. Bảng cắt ranh với lô quy hoạch theo các cấp đang có dữ liệu.',
           'Bấm <b>Ẩn kiểm tra quy hoạch</b> để thu phần đó. Nút đóng ở góc bảng để thoát.'
@@ -342,7 +342,7 @@ const SECTIONS = [
         lead: 'Chọn lớp cần xem ở panel phải. Lớp bật vẽ ngay trên bản đồ đang mở (quy hoạch hoặc hiện trạng).',
         steps: [
           'Nếu panel phải đang thu, bấm <b>Mở panel công cụ</b>. Tab <b>Lớp dữ liệu</b> đang mở mặc định.',
-          'Hàng tab trên: <b>Đô thị</b> (phân loại đô thị và hồ sơ từng đô thị), <b>Quy hoạch</b> (QHC, QHPK, QHCT), <b>Khu đất</b> (công trình hạ tầng). Tick lớp cần hiện.',
+          'Hàng tab trên: <b>Đô thị</b> (phân loại đô thị và hồ sơ từng đô thị), <b>Quy hoạch</b> (QHC, QHPK, QHCT), <b>Khu đất</b> (công trình hạ tầng). Chọn lớp cần hiện.',
           'Ở <b>Khu đất</b>, nút <b>Tất cả</b> bật hoặc tắt các nhóm công trình; ô <b>Ranh lô</b> bật ranh lô theo nhóm đang tick. Số đang bật hiện cạnh tiêu đề tab.',
           'Hàng tab dưới: <b>Bản đồ nền</b> (ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư, độ phủ…) và <b>Bản đồ môi trường</b> (địa hình, ngập…). Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường.'
         ],
@@ -357,7 +357,7 @@ const SECTIONS = [
         title: 'Đọc chú giải ký hiệu',
         lead: 'Tra ký hiệu sử dụng đất, phân loại đô thị và kiểu viền lô theo giai đoạn.',
         steps: [
-          'Panel phải › tab <b>Chú giải</b>.',
+          'Bảng bên phải › tab <b>Chú giải</b>.',
           'Chọn bộ ký hiệu: <b>Đô thị</b>, <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b> hoặc <b>QHCT 1/500</b>.',
           'Gõ vào ô <b>Tìm loại đất, tên layer CAD...</b> để lọc. Nút mũi tên kép <b>Thu gọn / mở mọi nhóm ký hiệu</b> đóng hoặc mở các nhóm.',
           'Phần <b>Hiển thị lô đất</b>: kéo thanh <b>Độ trong suốt</b> (bấm số % để trả về 100%). Bảng <b>Viền lô theo giai đoạn</b> gồm Hiện trạng, QH đợt đầu, Chờ duyệt và QH dài hạn.'
@@ -374,7 +374,7 @@ const SECTIONS = [
         lead: 'Xem một bản đồ toàn màn hình, hoặc chia đôi để đối chiếu hiện trạng và quy hoạch cùng khung nhìn.',
         steps: [
           'Nút lật trang ở đầu thanh tiêu đề (giữa phía trên) chuyển <b>BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ</b> sang bản đồ hiện trạng và ngược lại.',
-          'Droplist cạnh tiêu đề chọn lớp: <b>HỆ THỐNG ĐÔ THỊ</b>, <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b>, <b>QHCT 1/500</b>.',
+          'Danh sách chọn cạnh tiêu đề chọn lớp: <b>HỆ THỐNG ĐÔ THỊ</b>, <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b>, <b>QHCT 1/500</b>.',
           'Thanh công cụ trái, bấm nút <b>Chia đôi màn hình so sánh</b>. Trên tiêu đề chọn <b>Cùng tâm</b> hoặc <b>Lệch tâm</b>.',
           '<b>Cùng tâm</b>: kéo thanh giữa (hoặc phím ← →). Nhãn hai bên là <b>BẢN ĐỒ HIỆN TRẠNG</b> và <b>BẢN ĐỒ QUY HOẠCH</b>. Bấm lại nút chia đôi để tắt.'
         ],
@@ -409,11 +409,11 @@ const SECTIONS = [
         title: 'Mở đồ án, xem lô và quyết định phê duyệt',
         lead: 'Chọn một đồ án trong danh sách hoặc bấm ranh trên bản đồ để xem lô đất, cơ cấu sử dụng đất và file quyết định.',
         steps: [
-          'Panel phải › <b>Lớp dữ liệu</b> › <b>Quy hoạch</b>. Droplist tiêu đề chọn <b>QHPK 1/2.000</b>, <b>QHC 1/10.000</b>, <b>QHC 1/25.000</b> hoặc <b>QHCT 1/500</b>. Danh sách mở đúng nhóm cấp đó.',
-          'Nếu có ô <b>Tìm đồ án...</b>, gõ một phần tên để lọc. Tick ô trước tên, bấm tên đồ án, hoặc bấm ranh trên bản đồ: lô hiện ra, ranh sáng, bảng hồ sơ mở góc trái.',
+          'Bảng bên phải › <b>Lớp dữ liệu</b> › <b>Quy hoạch</b>. Danh sách chọn tiêu đề chọn <b>QHPK 1/2.000</b>, <b>QHC 1/10.000</b>, <b>QHC 1/25.000</b> hoặc <b>QHCT 1/500</b>. Danh sách mở đúng nhóm cấp đó.',
+          'Nếu có ô <b>Tìm đồ án...</b>, gõ một phần tên để lọc. Chọn ô trước tên, bấm tên đồ án, hoặc bấm ranh trên bản đồ: lô hiện ra, ranh sáng, bảng hồ sơ mở góc trái.',
           'Nút mũi tên trên dòng đồ án có chú thích <b>Xem các lớp dữ liệu của đồ án</b>. Nút bảng, chú thích <b>Thông tin đồ án</b>, đưa cơ cấu sử dụng đất và chỉ tiêu QCVN xuống panel dưới.',
-          'Nút tệp: nếu đã gắn file thì chú thích bắt đầu bằng <b>Xem quyết định phê duyệt</b> và mở PDF hoặc link. Admin chưa có file thì chú thích <b>Gắn quyết định phê duyệt (PDF tối đa 10 MB hoặc link)</b>.',
-          'Người dùng chưa là Admin thấy nút gửi file, chú thích <b>Gửi PDF quyết định phê duyệt (tối đa 2 MB) để admin duyệt</b>. Đang chờ thì nút đồng hồ ghi <b>Đang chờ admin duyệt</b>.'
+          'Nút tệp: nếu đã gắn file thì chú thích bắt đầu bằng <b>Xem quyết định phê duyệt</b> và mở PDF hoặc link. Khi chưa gắn tệp, chú thích là <b>Gắn quyết định phê duyệt (PDF tối đa 10 MB hoặc đường dẫn)</b>.',
+          'Người dùng chưa đăng nhập quản trị thấy nút gửi tệp, chú thích <b>Gửi PDF quyết định phê duyệt (tối đa 2 MB) để quản trị viên phê duyệt</b>. Đang chờ thì nút đồng hồ ghi <b>Đang chờ phê duyệt</b>.'
         ],
         facts: [
           'Ở QHPK 1/2.000, ranh mọi đồ án có thể hiện khi lớp bật; lô bên trong chỉ hiện khi tick hoặc bấm đồ án.',
@@ -430,13 +430,13 @@ const SECTIONS = [
       {
         id: 'qcvn', btn: 'guide', status: 'dev',
         title: 'Kiểm tra chỉ tiêu theo QCVN 01:2026/BXD',
-        note: 'So sánh Hiện trạng sử dụng đất và Quy hoạch sử dụng đất. Tính toán chỉ tiêu dân số. Cần xuất file .dwg thành .dxf để đọc (hatch và ranh giới quy hoạch).',
+        note: 'So sánh Hiện trạng sử dụng đất và Quy hoạch sử dụng đất. Tính toán chỉ tiêu dân số. Cần xuất file .dwg thành .dxf để đọc (mẫu tô và ranh giới quy hoạch).',
         lead: 'Đọc bản vẽ hiện trạng và quy hoạch của đồ án, tổng hợp cơ cấu sử dụng đất và đối chiếu chỉ tiêu đất hạ tầng xã hội với QCVN 01:2026/BXD.',
         steps: [
           'Thanh công cụ trái, bấm nút cam <b>Thẩm định đồ án quy hoạch</b>. Khung <b>Thẩm định đồ án</b> mở ra, mục <b>Cân đối đất</b> đang chọn.',
           'Chọn <b>QHC · 1/10.000</b> hoặc <b>QHPK · 1/2.000</b>. Nhập <b>Dân số HT</b>, <b>Dân số QH</b> và <b>Hệ tọa độ</b> (mặc định VN-2000 KTT 107°, múi 3°).',
-          'Chọn <b>File hiện trạng</b> (HT-&lt;mã&gt;.dxf) và <b>File quy hoạch</b> (QH-&lt;mã&gt;.dxf), mỗi file ≤ 5 MB. Tên layer hatch theo Thông tư 16/2025/TT-BXD.',
-          'Bấm <b>ĐỒNG Ý GỬI THẨM ĐỊNH</b>. Bảng kết quả chiếm nửa dưới màn hình; ranh lô hiện trên bản đồ để đối chiếu.'
+          'Chọn <b>File hiện trạng</b> (HT-&lt;mã&gt;.dxf) và <b>File quy hoạch</b> (QH-&lt;mã&gt;.dxf), mỗi file ≤ 5 MB. Tên lớp mẫu tô theo Thông tư 16/2025/TT-BXD.',
+          'Bấm <b>Gửi thẩm định</b>. Bảng kết quả chiếm nửa dưới màn hình; ranh lô hiện trên bản đồ để đối chiếu.'
         ],
         facts: [
           'Chưa đọc trực tiếp định dạng .dwg; cần xuất bản vẽ sang .dxf.',
@@ -447,14 +447,14 @@ const SECTIONS = [
       {
         id: 'local-adjust', btn: 'guide', status: 'trial',
         title: 'Thẩm định điều chỉnh cục bộ',
-        note: 'Nhập file .dxf chứa ranh giới điều chỉnh, hatch các loại đất sau khi điều chỉnh.',
-        lead: 'Chọn đồ án đang điều chỉnh, nộp ranh khu vực và hatch sử dụng đất mới. Máy kiểm tra phạm vi, bảng tăng giảm và chỉ tiêu cả đồ án. Độ phủ bán kính tính ngầm.',
+        note: 'Nhập tệp DXF gồm ranh điều chỉnh và mẫu tô các loại đất sau điều chỉnh.',
+        lead: 'Chọn đồ án đang điều chỉnh, nộp ranh khu vực và mẫu tô sử dụng đất mới. Hệ thống kiểm tra phạm vi, bảng tăng giảm và chỉ tiêu cả đồ án.',
         steps: [
           'Thanh công cụ trái, bấm nút cam <b>Thẩm định đồ án quy hoạch</b>, chọn <b>Điều chỉnh</b>.',
-          'Ở ô <b>Đồ án</b> chọn đồ án quy hoạch. Nhập <b>Dân số QH</b>, chọn <b>QHC · 1/10.000</b> hoặc <b>QHPK · 1/2.000</b>, rồi chọn <b>File điều chỉnh</b> (DXF: layer ranh có chữ RANH, hatch đất theo Thông tư 16). PDF scan không bắt buộc.',
+          'Ở ô <b>Đồ án</b> chọn đồ án quy hoạch. Nhập <b>Dân số QH</b>, chọn <b>QHC · 1/10.000</b> hoặc <b>QHPK · 1/2.000</b>, rồi chọn <b>File điều chỉnh</b> (DXF: lớp ranh có chữ RANH, mẫu tô đất theo Thông tư 16). Tệp PDF bản vẽ không bắt buộc.',
           'Bấm <b>THẨM ĐỊNH ĐIỀU CHỈNH</b>. Kết quả ở panel dưới: hai bản vẽ trước / sau, bảng cơ cấu sử dụng đất, bảng chỉ tiêu, cột ký hiệu và khung tên. Chỉ tiêu tụt dưới 100% ghi <b>Không đảm bảo</b>.',
           'Bấm <b>Xuất PDF A3</b> để tải tờ bản vẽ khổ A3 ngang đem in.',
-          'Đồng ý kết quả thì bấm <b>Nhập hồ sơ</b> (kèm PDF Quyết định, bản vẽ: người dùng tối đa 2 MB, admin tối đa 10 MB). Admin ghi thẳng, người dùng thường gửi vào hàng chờ duyệt.',
+          'Đồng ý kết quả thì bấm <b>Nhập hồ sơ</b> (kèm PDF Quyết định, bản vẽ: người dùng tối đa 2 MB, quản trị viên tối đa 10 MB). Quản trị viên ghi trực tiếp; người dùng gửi vào hàng chờ phê duyệt.',
           'Trên bản đồ quy hoạch, ranh điều chỉnh (nét đứt cyan) và khu vực đã có QHCT 1/500 (nét đứt đỏ) chỉ hiện khi đang mở một đồ án, trong phạm vi đồ án đó. Trong ranh điều chỉnh mặc định là chức năng sau điều chỉnh, lô gốc bị che. Bấm ranh rồi chọn «Trả lại bản đồ quy hoạch» để xem lại chức năng gốc, hoặc mở PDF.'
         ],
         facts: [
@@ -486,7 +486,7 @@ const SECTIONS = [
         note: 'Dữ liệu vệ tinh kích thước ô 30 m × 30 m, sai số ±1,0 m',
         lead: 'Phủ lớp cao độ nền lên bản đồ để xem xét san nền, hướng thoát nước và khu vực trũng thấp khi bố trí quy hoạch.',
         steps: [
-          'Panel phải › <b>Bản đồ môi trường</b> › bật <b>Địa hình (cao độ nền)</b>.',
+          'Bảng bên phải › <b>Bản đồ môi trường</b> › bật <b>Địa hình (cao độ nền)</b>.',
           'Kéo thanh trượt để chỉnh độ trong suốt; di chuột trên bản đồ để đọc cao độ tại vị trí.',
           'Bật thêm <b>Thoát nước, khe tụ thủy</b> và <b>Lưu vực, đường phân thủy</b> để xem hướng dòng chảy.'
         ],
@@ -501,7 +501,7 @@ const SECTIONS = [
         title: 'Chồng lớp bản đồ ngập lụt và giả định kịch bản ngập',
         lead: 'Giả định mực nước để khoanh vùng có nguy cơ ngập, đối chiếu với vùng ngập thực tế qua các mùa lũ từ ảnh radar vệ tinh.',
         steps: [
-          'Panel phải › <b>Bản đồ môi trường</b> › bật <b>Mô phỏng ngập</b>, kéo thanh <b>Mực nước</b> (0,5–15 m) để xem vùng ngập và thống kê diện tích.',
+          'Bảng bên phải › <b>Bản đồ môi trường</b> › bật <b>Mô phỏng ngập</b>, kéo thanh <b>Mực nước</b> (0,5–15 m) để xem vùng ngập và thống kê diện tích.',
           'Bật <b>Ngập thực tế (Sentinel-1)</b> và chọn mùa lũ để xem vùng đã ngập trong thực tế.',
           'Bật <b>Công trình chịu rủi ro ngập / nhiệt</b> để lọc công trình nằm trong vùng ngập nhiều mùa lũ.'
         ],
@@ -517,13 +517,13 @@ const SECTIONS = [
         note: 'Dữ liệu WorldPop kích thước lớn',
         lead: 'Thể hiện phân bổ dân cư theo ô lưới, làm cơ sở tính dân số được phục vụ và đánh giá nhu cầu hạ tầng khi lập quy hoạch.',
         steps: [
-          'Panel phải › tab <b>Lớp dữ liệu</b> › <b>Bản đồ nền</b> › bật <b>Phân bổ dân cư</b>. Kéo thanh trượt cạnh tên lớp để chỉnh độ trong suốt.',
+          'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Bản đồ nền</b> › bật <b>Phân bổ dân cư</b>. Kéo thanh trượt cạnh tên lớp để chỉnh độ trong suốt.',
           'Bật thêm nhóm ở <b>Khu đất</b> và lớp <b>Bản đồ độ phủ hạ tầng</b> để thấy khu đông dân còn thiếu hạ tầng.',
-          'Admin đã đăng nhập: tab <b>Đề xuất</b> › nút <b>Admin</b> › <b>Pixel dân cư</b>. Chọn <b>Xóa pixel (không có dân)</b> hoặc <b>Thêm pixel (khu dân cư mới)</b>, rồi <b>Cọ tô</b> hoặc <b>Vùng đa giác</b>.'
+          'Sau khi đăng nhập quản trị: tab <b>Đề xuất</b> › nút <b>Quản trị</b> › <b>Ô dân cư</b>. Chọn <b>Xóa ô dân cư (không có dân)</b> hoặc <b>Thêm ô dân cư (khu dân cư mới)</b>, rồi <b>Cọ tô</b> hoặc <b>Vùng đa giác</b>.'
         ],
         facts: [
           'Nguồn WorldPop, dung lượng lớn nên lần tải đầu có thể chậm.',
-          'Tổng dân số mỗi phường giữ nguyên khi hiệu chỉnh pixel.'
+          'Tổng dân số mỗi phường, xã giữ nguyên khi hiệu chỉnh ô dân cư.'
         ],
         actions: [{ label: 'Bật lớp dân cư', icon: 'users', run: () => showLayer('chk_pop', { pane: 'base' }) }]
       },
@@ -533,8 +533,8 @@ const SECTIONS = [
         note: 'Ước tính vệ tinh, chưa phải ranh 3 loại rừng',
         lead: 'Phủ lớp phủ thực vật năm 2021 và vùng mất rừng 2001–2025 lên bản đồ, kèm diện tích theo phường, xã, để xem xét khi bố trí quy hoạch trên đất có cây che phủ.',
         steps: [
-          'Panel phải › <b>Bản đồ môi trường</b> › bật <b>Rừng, phủ thực vật</b>.',
-          'Chọn <b>Phủ thực vật 2021</b> (ESA WorldCover 10 m) hoặc <b>Mất rừng 2001–2025</b> (Hansen, trên pixel có tán cây năm 2000 từ 10%).',
+          'Bảng bên phải › <b>Bản đồ môi trường</b> › bật <b>Rừng, phủ thực vật</b>.',
+          'Chọn <b>Phủ thực vật 2021</b> (ESA WorldCover 10 m) hoặc <b>Mất rừng 2001–2025</b> (Hansen, trên ô có tán cây năm 2000 từ 10%).',
           'Chú giải và bảng hectare nằm ngay dưới ô lớp. Kéo thanh trượt để chỉnh độ trong suốt.'
         ],
         facts: [
@@ -559,12 +559,12 @@ const SECTIONS = [
         lead: 'Mỗi đô thị có tỷ lệ phủ kín riêng: tổng diện tích đã lập quy hoạch phân khu trong phạm vi đô thị chia cho diện tích đồ án quy hoạch chung của đô thị đó.',
         stepsTitle: 'Phương pháp tổng hợp',
         steps: [
-          'Lấy ranh đồ án QHC của từng đô thị (panel phải › <b>Quy hoạch</b> › QHC 1/10.000); đô thị chưa nạp đồ án QHC hoặc đồ án chưa có ranh GIS (ranh tự dựng theo đường bao lô) tạm lấy phạm vi lập QHC: ranh các phường, xã theo nhu cầu lập quy hoạch, riêng Phong Điền theo ranh thị xã Phong Điền cũ (QĐ 614).',
+          'Lấy ranh đồ án QHC của từng đô thị (bảng bên phải › <b>Quy hoạch</b> › QHC 1/10.000). Đô thị chưa nạp đồ án QHC hoặc đồ án chưa có ranh GIS (ranh dựng theo đường bao lô) lấy phạm vi lập QHC: ranh các phường, xã theo nhu cầu lập quy hoạch, riêng Phong Điền theo ranh thị xã Phong Điền cũ (QĐ 614).',
           'Cắt ranh các đồ án QHPK 1/2.000 đã nạp theo ranh đô thị, hợp nhất để phần chồng lấn giữa các đồ án chỉ tính một lần.',
           'Tỷ lệ phủ kín = diện tích QHPK trong đô thị / diện tích đồ án QHC của đô thị. Vùng lõi 1/10.000 và 5 khu vực đô thị xếp dưới QHC thành phố Huế.'
         ],
         facts: [
-          'Chỉ tính đồ án đã nạp vào webapp; số liệu tạm tính đến hiện tại, chốt tại kỳ báo cáo năm (31/12).',
+          'Chỉ tính đồ án đã nạp vào ứng dụng; số liệu tính đến hiện tại, chốt tại kỳ báo cáo năm (31/12).',
           'Đồ án QHPK thuộc phường, xã khi các lô đất có trên 50% diện tích nằm trong phường cộng lại đạt từ 5 ha (lô vắt ranh lớn đã tách theo phường khi nhập); đồ án liên phường đếm ở mỗi đô thị có phường đạt ngưỡng. Phần ranh lấn nhỏ hơn chỉ cộng vào diện tích.',
           'Lần mở đầu cần khoảng 10 giây để hợp nhất ranh các đồ án; các lần sau dùng lại kết quả đến khi danh mục đồ án thay đổi.',
           'Đồ án QHC đã nạp chưa gắn được với đô thị nào được tính riêng trên ranh của chính đồ án.'
@@ -587,7 +587,7 @@ const SECTIONS = [
           'Đối chiếu với danh mục đô thị, điểm dân cư phải lập quy chế.',
           'Tính tỷ lệ theo địa bàn và toàn thành phố, chốt số liệu tại kỳ báo cáo năm.'
         ],
-        facts: ['Chưa có danh mục quy chế đã ban hành trong webapp nên chưa công bố số liệu.', REPORT_FACTS[1]],
+        facts: ['Chưa có danh mục quy chế đã ban hành trong ứng dụng nên chưa công bố số liệu.', REPORT_FACTS[1]],
         cols: ['Địa bàn', 'Số phải lập', 'Đã ban hành', 'Tỷ lệ (%)']
       },
       {
@@ -601,7 +601,7 @@ const SECTIONS = [
         ],
         facts: [
           'Loại I chấm đạt / không đạt; loại II, III chấm điểm theo Bảng 2A, công nhận khi đạt từ 75 điểm.',
-          'Tiêu chuẩn chưa có số liệu trong webapp được để trống chờ cập nhật.'
+          'Tiêu chuẩn chưa có số liệu trong ứng dụng được để trống chờ cập nhật.'
         ],
         actions: [{ label: 'Xem báo cáo', icon: 'flag', run: () => showBottomPage(1) }]
       },
@@ -612,7 +612,7 @@ const SECTIONS = [
         lead: 'Theo dõi mức độ hoàn thiện của đô thị qua bộ 24 chỉ tiêu xây dựng đô thị tăng trưởng xanh (4 nhóm) theo Thông tư 01/2018/TT-BXD, hợp nhất với Thông tư 09/2025/TT-BXD.',
         steps: [
           'Mở bảng tổng hợp phía dưới, bấm chấm trang <b>Chỉ tiêu tăng trưởng xanh</b> (nút <b>Phân loại</b> lật lần lượt các trang).',
-          'Chọn phường, xã để xem riêng; chỉ tiêu có dữ liệu trong webapp được tính tự động.',
+          'Chọn phường, xã để xem riêng; chỉ tiêu có dữ liệu trong ứng dụng được tính tự động.',
           'Chỉ tiêu cần số liệu báo cáo của các ngành được để dạng khung chờ cập nhật.'
         ],
         facts: [
@@ -626,7 +626,7 @@ const SECTIONS = [
         title: 'Quy hoạch chung từng đô thị và chỉ số trưởng thành đô thị',
         lead: 'Quy hoạch chung là cấp trung gian giữa Quyết định 756/QĐ-UBND và QHPK 1/2.000, xác lập chỉ tiêu phân loại, nâng cấp đô thị. QHC thành phố Huế (loại I) lập cho toàn thành phố, vùng lõi 1/10.000 gồm khu vực trung tâm, Hương Thủy, Hương Trà, Hóa Châu, Mỹ Thượng; đô thị vệ tinh Phong Điền, Chân Mây và 7 đô thị loại III lập QHC riêng.',
         steps: [
-          'Panel phải › tab <b>Lớp dữ liệu</b> › <b>Đô thị</b>. Bấm một đô thị hoặc khu vực vùng lõi trong danh sách để vẽ phạm vi trên bản đồ và mở hồ sơ.',
+          'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Đô thị</b>. Bấm một đô thị hoặc khu vực vùng lõi trong danh sách để vẽ phạm vi trên bản đồ và mở hồ sơ.',
           'Mở bảng tổng hợp phía dưới (nút mũi tên <b>Mở bảng tổng hợp hạ tầng và cơ cấu đất</b> nếu đang thu). Chấm trang <b>Quy hoạch chung</b>: 10 QHC theo nhóm thành phố, đô thị vệ tinh, đô thị loại III; 5 khu vực vùng lõi xếp dưới QHC thành phố Huế. Bấm tên để xem hồ sơ, phân vùng 1/10.000 – 1/25.000, các QHPK 1/2.000 và chỉ số trưởng thành.',
           'Chỉ số trưởng thành = hiện trạng so với chỉ tiêu QHC (khu vực vùng lõi: chỉ tiêu do QHC thành phố Huế quy định); chưa có chỉ tiêu thì so với mức tối đa Bảng 2A Nghị quyết 111/2025/UBTVQH15 của loại đô thị định hướng.'
         ],
@@ -641,30 +641,30 @@ const SECTIONS = [
         title: 'Đề xuất các vùng cần ưu tiên đầu tư hạ tầng',
         lead: 'Bản đồ độ phủ cho biết mỗi vị trí tiếp cận được bao nhiêu nhóm hạ tầng; vùng màu nhạt mà đông dân là vùng nên ưu tiên đầu tư.',
         steps: [
-          'Panel phải › tab <b>Lớp dữ liệu</b> › <b>Bản đồ nền</b> › bật <b>Bản đồ độ phủ hạ tầng</b>. Thanh màu dưới lớp đếm số nhóm hạ tầng tiếp cận được (1–8).',
+          'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Bản đồ nền</b> › bật <b>Bản đồ độ phủ hạ tầng</b>. Thanh màu dưới lớp đếm số nhóm hạ tầng tiếp cận được (1–8).',
           'Bật thêm <b>Phân bổ dân cư</b> để nhận khu đông dân nằm trong vùng độ phủ thấp.',
-          'Ô <b>Giả lập bán kính chung (m)</b> ngay dưới lớp độ phủ: để trống là bán kính riêng từng công trình; nhập 50–5000 m để thử một bán kính chung.',
+          'Ô <b>Giả lập bán kính chung (m)</b> ngay dưới lớp độ phủ: để trống là bán kính riêng từng công trình; nhập 50–5.000 m để áp một bán kính chung.',
           'Bảng tổng hợp phía dưới cho biết phường, xã còn thiếu chỉ tiêu m²/người.'
         ],
         facts: [
-          'Độ phủ chỉ tính công trình đã được Admin phê duyệt.',
+          'Độ phủ chỉ tính công trình đã được quản trị viên phê duyệt.',
           'Bản đồ độ phủ dùng vùng đệm tròn theo bán kính QCVN; vùng phục vụ bám đường xem ở từng công trình.'
         ],
         actions: [{ label: 'Xem bản đồ độ phủ', icon: 'heat', run: () => showLayer('chk_heat', { pane: 'base' }) }]
       },
       {
         id: 'csd', btn: 'result', status: 'trial', csdTable: true, demo: CSD_DEMO,
-        title: 'Đề xuất công năng cho Cơ sở nhà đất dôi dư',
-        lead: 'Với mỗi cơ sở dôi dư (nhóm 12. Cơ sở chưa sử dụng), thuật toán thử chuyển đổi sang từng loại hạ tầng xã hội và xếp hạng theo mức bù đắp phần thiếu hụt của phường theo quy hoạch. Bảng dưới tổng hợp chức năng đề xuất của từng khu đất, nhóm theo phường, xã.',
+        title: 'Đề xuất chức năng cho cơ sở nhà đất dôi dư',
+        lead: 'Với mỗi cơ sở dôi dư (nhóm 12. Cơ sở chưa sử dụng), đối chiếu lần lượt từng loại hạ tầng xã hội và xếp hạng theo mức bù đắp phần thiếu hụt của phường theo quy hoạch. Bảng dưới tổng hợp chức năng đề xuất của từng khu đất, nhóm theo phường, xã.',
         steps: [
           'Bấm <b>Hướng dẫn</b> của mục này: bảng <b>Thống kê cơ sở nhà đất dôi dư</b> nhóm theo phường, xã. Bấm tên khu đất để phóng tới và mở bảng trên bản đồ.',
           'Bảng trên bản đồ liệt kê các phương án chuyển đổi. Phương án tốt nhất gắn nhãn <b>Ưu tiên hàng đầu</b>.',
           'Mỗi phương án nêu phần quy mô (m²/người) và độ phủ dân số được bổ sung; loại không đủ diện tích tối thiểu bị loại.',
-          'Bấm <b>Xem thuyết minh</b> để xem vùng phục vụ, công trình cùng loại lân cận đã trừ, vùng còn trống và pixel dân cư được tính.'
+          'Bấm <b>Xem chi tiết</b> để xem vùng phục vụ, công trình cùng loại lân cận đã trừ, vùng còn trống và ô dân cư được tính.'
         ],
         facts: [
           'Kết quả là gợi ý kỹ thuật, cần cấp có thẩm quyền xem xét, phê duyệt.',
-          'Cơ sở chưa được Admin duyệt gắn nhãn <b>Cần phê duyệt</b>; bảng thông tin trên bản đồ chỉ chạy thuật toán cho cơ sở đã duyệt.'
+          'Cơ sở chưa được quản trị viên phê duyệt gắn nhãn <b>Chưa phê duyệt</b>; bảng thông tin trên bản đồ chỉ tính phương án cho cơ sở đã phê duyệt.'
         ],
         actions: [{
           label: 'Xem trên bản đồ', icon: 'map',
@@ -677,16 +677,16 @@ const SECTIONS = [
       {
         id: 'propose', btn: 'guide', status: 'trial',
         title: 'Đề xuất điểm hạ tầng mới',
-        lead: 'Gửi một vị trí công trình mới để Admin duyệt. Điểm chưa duyệt hiện tem nhạt, nhãn Chờ duyệt.',
+        lead: 'Gửi một vị trí công trình mới để quản trị viên phê duyệt. Điểm chưa phê duyệt hiện ký hiệu nhạt, nhãn Chờ phê duyệt.',
         steps: [
-          'Panel phải › tab <b>Đề xuất</b>. Mục <b>Nhập 1 điểm</b> đang mở.',
+          'Bảng bên phải › tab <b>Đề xuất</b>. Mục <b>Nhập 1 điểm</b> đang mở.',
           'Chọn <b>Loại</b>, <b>Giai đoạn</b> (Hiện trạng hoặc Quy hoạch mới) và <b>Phân cấp</b> (Cấp đô thị hoặc Cấp đơn vị ở).',
           'Nhập <b>Tên</b>. Ô <b>Tọa độ</b>: gõ vĩ độ, kinh độ, hoặc bấm nút ghim <b>Ghim tọa độ trên bản đồ</b> rồi bấm vị trí. <b>Phường/Xã</b> tự điền theo tọa độ. Nhập <b>Diện tích</b> (m²). Ô <b>Bán kính</b> chỉ đọc, tính theo QCVN.',
-          'Bấm <b>GỬI ĐỀ XUẤT MỚI</b>. Dòng trạng thái ngay dưới nút báo kết quả. Admin duyệt thì điểm thành <b>Đã duyệt</b>.'
+          'Bấm <b>Gửi đề xuất</b>. Dòng trạng thái ngay dưới nút báo kết quả. Sau khi phê duyệt, điểm chuyển thành <b>Đã phê duyệt</b>.'
         ],
         facts: [
           'Mục <b>Nhập hàng loạt</b> nhận DXF, KML, KMZ, GeoJSON, shapefile (.zip). Chưa đăng nhập: file ≤ 2 MB vào hàng chờ.',
-          'Nút <b>Admin</b> trên tab này chỉ hiện sau khi đăng nhập quản trị (tuyến đường, pixel dân cư, dữ liệu OSM).'
+          'Nút <b>Quản trị</b> trên tab này chỉ hiện sau khi đăng nhập quản trị (tuyến đường, ô dân cư, dữ liệu OpenStreetMap).'
         ],
         actions: [{ label: 'Mở tab Đề xuất', icon: 'plus', run: () => { document.querySelector('.rp-tabs .tab-btn[data-tab="tabAdd"]')?.click(); flash($('tabAdd')); } }]
       }
@@ -715,7 +715,7 @@ function itemHtml(it) {
           <span class="ov-item-meta">${badge(it.status)}${it.note ? `<span class="ov-item-note">${it.note}</span>` : ''}</span>
         </span>
         <span class="ov-item-btns">
-          ${it.demo ? `<button type="button" class="ov-btn ov-btn-demo" data-ov-demo="${it.id}" title="Tự thao tác trên bản đồ kèm thuyết minh">${ico('map')}Xem trên bản đồ</button>` : ''}
+          ${it.demo ? `<button type="button" class="ov-btn ov-btn-demo" data-ov-demo="${it.id}" title="Thao tác mẫu trên bản đồ kèm chú thích">${ico('map')}Xem trên bản đồ</button>` : ''}
           <button type="button" class="ov-btn" data-ov-item="${it.id}">${ico(icon)}${label}</button>
         </span>
       </summary>
@@ -760,7 +760,7 @@ function csdSuggestionHtml(csd) {
   if (!first) return '<i class="c-muted">Chưa có gợi ý phù hợp</i>';
   const gain = first.basis === 'scale'
     ? `bù thiếu quy mô: ${fmtPct(first.currentScalePct)} → ${fmtPct(Math.min(100, first.currentScalePct + first.scaleAddPct))}`
-    : `+${fmtPct(first.scaleAddPct)} quy mô · +${fmtPct(first.coverageAddPct)} độ phủ${first.coverageMethod === 'estimate' ? ' (ước lượng)' : ''}`;
+    : `+${fmtPct(first.scaleAddPct)} quy mô · +${fmtPct(first.coverageAddPct)} độ phủ${first.coverageMethod === 'estimate' ? ' (ước tính)' : ''}`;
   return `<b class="c-green">${escapeHtml(first.label)}</b><small>${gain}</small>${second ? `<small>Phương án 2: ${escapeHtml(second.label)}</small>` : ''}`;
 }
 
@@ -780,7 +780,7 @@ function csdTableHtml(wards) {
       const link = Number.isFinite(lat) && Number.isFinite(lng)
         ? `<button type="button" class="link-btn" data-ov-zoom data-lat="${lat}" data-lng="${lng}" data-name="${name}" title="Phóng tới vị trí khu đất">${name}</button>`
         : name;
-      return `<tr><td>${++stt}</td><td>${link}${c.needsApproval ? '<small class="c-orange">Cần phê duyệt</small>' : ''}</td>
+      return `<tr><td>${++stt}</td><td>${link}${c.needsApproval ? '<small class="c-orange">Chưa phê duyệt</small>' : ''}</td>
         <td>${fmtNum(c.size)}</td><td class="ov-csd-sugg">${csdSuggestionHtml(c)}</td></tr>`;
     }).join('')}`).join('');
   return `<div class="ov-table-note ov-csd-sum">${total} cơ sở · ${groups.length} phường, xã · tổng ${fmtNum(area)} m²</div>
@@ -811,7 +811,7 @@ function qhpkCoverHtml({ rows, qhpkCount }) {
       <td>${haText(r.total)}</td><td>${haText(r.covered)}</td><td>${r.projects == null ? '—' : r.projects}</td>
       <td class="${r.ratio > 0 ? 'c-green' : ''}"><b>${pct}</b></td></tr>`;
   }).join('');
-  return `<div class="ov-table-note ov-csd-sum">${qhpkCount} đồ án QHPK 1/2.000 đã nạp · số liệu tạm tính đến ${new Date().toLocaleDateString('vi-VN')}</div>
+  return `<div class="ov-table-note ov-csd-sum">${qhpkCount} đồ án QHPK 1/2.000 đã nạp · số liệu tính đến ${new Date().toLocaleDateString('vi-VN')}</div>
     <div class="ov-csd-wrap"><table class="ov-table ov-cover">
       <thead><tr><th>Đô thị</th><th>Diện tích đồ án QHC (ha)</th><th>Đã lập QHPK (ha)</th><th>Số đồ án QHPK</th><th>Tỷ lệ phủ kín</th></tr></thead>
       <tbody>${body}</tbody>
@@ -851,16 +851,15 @@ function detailHtml(it) {
       <div class="ov-card-title">${ico('table')}Tỷ lệ phủ kín QHPK theo đô thị</div>
       <div data-ov-qhpk><div class="ov-table-note">Đang tính diện tích các đồ án QHPK trong từng đô thị…</div></div>
     </div>` : ''}
-    <div class="ov-detail-grid">
-      <div class="ov-card">
+    ${it.stepsTitle === 'Phương pháp tổng hợp' ? '' : `<div class="ov-card">
         <div class="ov-card-title">${ico('book')}${it.stepsTitle || 'Các bước thực hiện'}</div>
         <ol class="ov-steps">${it.steps.map(s => `<li>${s}</li>`).join('')}</ol>
-      </div>
-      <div class="ov-card ov-card-warn">
-        <div class="ov-card-title">${ico('info')}Dữ liệu và giới hạn</div>
-        <ul class="ov-facts">${it.facts.map(f => `<li>${f}</li>`).join('')}</ul>
-      </div>
-    </div>
+      </div>`}
+    ${detailDisclosure(`
+      ${it.stepsTitle === 'Phương pháp tổng hợp' ? `<p><b>Phương pháp tổng hợp</b></p><ol class="ov-steps">${it.steps.map(s => `<li>${s}</li>`).join('')}</ol>` : ''}
+      <p><b>Dữ liệu và giới hạn</b></p>
+      <ul class="ov-facts">${it.facts.map(f => `<li>${f}</li>`).join('')}</ul>
+    `)}
     ${it.cols ? reportTableHtml(it.cols) : ''}
     ${it.coord ? `<form class="ov-coord" data-ov-coord novalidate>
       <label for="ovCoord">${ico('pin')}Tọa độ vị trí</label>
@@ -870,7 +869,7 @@ function detailHtml(it) {
       <span class="ov-coord-msg" role="alert"></span>
     </form>` : ''}
     ${it.actions?.length || it.demo ? `<div class="ov-actions">
-      ${it.demo ? `<button type="button" class="ov-primary" data-ov-demo="${it.id}">${ico('map')}Xem trình diễn trên bản đồ</button>` : ''}
+      ${it.demo ? `<button type="button" class="ov-primary" data-ov-demo="${it.id}">${ico('map')}Xem minh họa trên bản đồ</button>` : ''}
       ${(it.actions || []).map((a, i) =>
         `<button type="button" class="${i || it.demo ? 'ov-ghost' : 'ov-primary'}" data-ov-act="${i}">${ico(a.icon)}${a.label}</button>`).join('')}</div>` : ''}`;
 }
@@ -926,7 +925,7 @@ function loadVersion(el) {
     .then(v => {
       if (!el || !v?.label) return;
       el.textContent = v.label;
-      el.title = `Thời điểm triển khai bản web hiện tại${v.commit ? ` (commit ${v.commit})` : ''}`;
+      el.title = 'Thời điểm cập nhật bản đang sử dụng';
       el.hidden = false;
     })
     .catch(() => { /* chưa có version.json */ });
@@ -945,14 +944,13 @@ function build() {
           <h2 class="ov-title" id="ovTitle">GIỚI THIỆU TỔNG QUAN</h2>
         </div>
         <div class="ov-stage">
-          <span class="ov-beta">${ico('clock')}Giai đoạn thử nghiệm</span>
           <span class="ov-ver" hidden></span>
         </div>
         <button type="button" class="ov-x" title="Đóng" aria-label="Đóng">${ico('close')}</button>
-        <p class="ov-head-intro">Trang web có mục đích phi thương mại, được lập phục vụ công tác quản lý chuyên ngành của
-        Phòng Quy hoạch Kiến trúc và Phát triển đô thị - Sở Xây dựng thành phố Huế và đang trong giai đoạn thử nghiệm.
-        Mục lục xếp việc dùng hằng ngày lên trước: tra cứu, lớp bản đồ, đồ án, rồi thẩm định và báo cáo.
-        Bấm tên mục để xem các bước; bấm <b>Hướng dẫn</b> để mở đủ chú thích và lối tắt.</p>
+        <p class="ov-head-intro">Trang thông tin phục vụ công tác quản lý quy hoạch và hạ tầng đô thị, không nhằm mục đích thương mại.
+        Đơn vị sử dụng: Phòng Quy hoạch – Kiến trúc và Phát triển đô thị, Sở Xây dựng thành phố Huế.
+        Mục lục sắp theo thứ tự sử dụng: tra cứu, lớp bản đồ, đồ án, thẩm định và báo cáo.
+        Bấm tên mục để xem các bước. Bấm <b>Hướng dẫn</b> để xem chú thích và lối tắt.</p>
       </header>
       <div class="ov-body"></div>
       <footer class="ov-foot">
