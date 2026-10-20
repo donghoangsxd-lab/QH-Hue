@@ -918,6 +918,7 @@
           <button type="button" class="admin-sub-btn active" data-sub="addRoad" role="tab" aria-selected="true"><svg class="ico"><use href="#i-road"/></svg>Tuyến đường</button>
           <button type="button" class="admin-sub-btn" data-sub="addPop" role="tab" aria-selected="false"><svg class="ico"><use href="#i-users"/></svg>Ô dân cư</button>
           <button type="button" class="admin-sub-btn" data-sub="addOsm" role="tab" aria-selected="false" title="Nhập trạm xe buýt, trụ sở PCCC, nhà tang lễ - nghĩa trang và công trình thể thao từ OpenStreetMap"><svg class="ico"><use href="#i-map"/></svg>Dữ liệu OSM</button>
+          <button type="button" class="admin-sub-btn" data-sub="addParcelInfra" role="tab" aria-selected="false" title="Sổ hạ tầng từ thửa đất địa chính 2016, đối chiếu OpenStreetMap, ghi sau khi kiểm tra"><svg class="ico"><use href="#i-map"/></svg>Thửa đất</button>
         </div>
         <div id="addRoad">
           <div class="form-grid">
@@ -976,7 +977,7 @@
         </div>
 
         <div id="addOsm" style="display:none;">
-          <div class="cad-hint">Tải điểm OpenStreetMap trong 40 phường/xã. Xe buýt, PCCC, nghĩa trang ghi tab tương ứng ở trạng thái <b>chờ duyệt</b>. Công trình thể thao ghi vào tab <b>8-VH</b> (nhà văn hóa, thể thao hiện trạng), <b>TrangThai = TRUE</b>, cùng biểu tượng và độ phủ với công trình VH-TT khác. Bỏ điểm trùng mã OSM, hoặc cùng tên và cách nhau dưới 80 m. Lăng mộ di tích và trụ nước chữa cháy không được nhập. Ghi thể thao cần bản Apps Script osm-vh-1 đã triển khai.</div>
+          <div class="cad-hint">Tải điểm OpenStreetMap trong 40 phường/xã. Xe buýt, PCCC, nghĩa trang ghi tab tương ứng ở trạng thái <b>chờ duyệt</b>. Công trình thể thao ghi vào tab <b>8-VH</b> (nhà văn hóa, thể thao hiện trạng), <b>TrangThai = TRUE</b>, cùng biểu tượng và độ phủ với công trình VH-TT khác. Bỏ điểm trùng mã OSM, hoặc cùng tên và cách nhau dưới 80 m. Lăng mộ di tích và trụ nước chữa cháy không được nhập. Ghi thể thao cần bản Apps Script osm-vh-1 hoặc parcel-infra-1 đã triển khai.</div>
           <div class="osm-types">
             <label><input type="checkbox" class="osm-type" value="13-BUS" checked>Trạm dừng xe buýt</label>
             <label><input type="checkbox" class="osm-type" value="10-PCCC" checked>Trụ sở cảnh sát PCCC</label>
@@ -986,6 +987,14 @@
           <button type="button" class="btn-submit" id="btnOsmCheck"><svg class="ico"><use href="#i-inspect"/></svg>Kiểm tra dữ liệu OpenStreetMap</button>
           <div id="osmStatus" class="rp-status" role="status" aria-live="polite"></div>
           <div id="osmReport"></div>
+        </div>
+
+        <div id="addParcelInfra" style="display:none;">
+          <div class="cad-hint">Sổ hạ tầng từ thửa đất địa chính 2016 (mã DCH, DKV, DVH, DXH, DYT, DGD, DTT). Mỗi dòng có đủ diện tích (m² và ha), tên phường/xã theo ranh 40 đơn vị hành chính, và tên công trình. Tên lấy từ OpenStreetMap; nếu không khớp thì lấy tên hoặc chủ sử dụng trên thửa khi có; còn lại ghi tên chung và đánh dấu cần rà soát. Kiểm tra đối chiếu dữ liệu hiện có, chưa ghi Sheet. Ghi cần bản Apps Script parcel-infra-1. Không dán CSV nếu đã bấm Ghi.</div>
+          <label class="osm-types"><input type="checkbox" id="parcelIncludeTraining"> Ghi thêm cơ sở đào tạo (đại học, cao đẳng) vào tab 6-THPT, trạng thái chưa duyệt</label>
+          <button type="button" class="btn-submit" id="btnParcelInfraCheck"><svg class="ico"><use href="#i-inspect"/></svg>Kiểm tra sổ thửa đất</button>
+          <div id="parcelInfraStatus" class="rp-status" role="status" aria-live="polite"></div>
+          <div id="parcelInfraReport" class="parcel-infra-report"></div>
         </div>
         </div>
       </div>

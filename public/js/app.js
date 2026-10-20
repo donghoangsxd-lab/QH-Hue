@@ -58,6 +58,7 @@ import { initAdjustLayer } from './adjustLayer.js';
 import { initAdjustImport } from './adjustImport.js';
 import { initWardCheck, refreshWardCheck } from './wardCheck.js';
 import { initOsmImport } from './osmImport.js';
+import { initParcelInfraImport } from './parcelInfraImport.js';
 import { initLotEdit } from './lotEdit.js';
 import { initWardRoads } from './wardRoads.js';
 import { initCustomRoads, handleRoadDrawClick } from './customRoads.js';
@@ -386,6 +387,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initAdjustImport();
   initWardCheck({ onSynced: reloadAfterSheetWrite });
   initOsmImport({ onImported: reloadAfterSheetWrite });
+  initParcelInfraImport({ onImported: reloadAfterSheetWrite });
   initLotEdit({ onInfraSaved: reloadAfterSheetWrite });
   initWardRoads();
   initCustomRoads();

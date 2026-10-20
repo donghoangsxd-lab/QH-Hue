@@ -1710,6 +1710,7 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .osm-types label { display: block; min-width: 0; cursor: pointer; white-space: normal; line-height: 1.3; }
 .osm-types input { width: auto; height: auto; accent-color: var(--accent-cyan); margin: 0 6px 0 0; vertical-align: -2px; }
 .osm-table + .btn-submit { margin-top: 8px; }
+.parcel-infra-report { max-height: 240px; overflow: auto; }
 .cad-table td { text-align: right; padding: 2px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.2); }
 .cad-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; flex-shrink: 0; }
 .cad-list-title { margin-top: 6px; font-weight: 600; color: var(--accent-yellow); }
