@@ -17,8 +17,12 @@ const BASEMAPS = {
     // Vệ tinh Google trên địa bàn Huế còn ảnh tới z22
     opts: { maxNativeZoom: 22, subdomains: '0123', attribution: 'Imagery &copy; Google' }
   },
-  positron: { label: 'Nền nhạt' }
+  // light: nền trắng/xám (CARTO Positron hoặc Esri Light Gray). Viền lô không làm sáng trên nền này.
+  positron: { label: 'Nền nhạt', light: true }
 };
+
+export const BASEMAP_EVENT = 'qh:basemap';
+export const isLightBasemap = () => !!(BASEMAPS[current] && BASEMAPS[current].light);
 
 // Positron không nhãn, ô gốc tới z20. Không gắn ?key= : repo không giữ khóa CARTO.
 const CARTO_LIGHT = {
@@ -178,6 +182,19 @@ function applyBasemap() {
   });
 }
 
+function emitBasemap() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(BASEMAP_EVENT));
+}
+
+/** Đổi ảnh nền và báo các lớp lô vẽ lại viền. id: 'google' | 'positron'. */
+export function selectBasemap(id) {
+  if (!BASEMAPS[id] || id === current) return;
+  current = id;
+  try { localStorage.setItem(STORE_KEY, current); } catch (e) { /* chế độ riêng tư */ }
+  applyBasemap();
+  emitBasemap();
+}
+
 export function basemapLabel() {
   return defOf(current).label;
 }
@@ -227,9 +244,7 @@ export function initBasemapUi() {
     sel.value = current;
     sel.addEventListener('change', () => {
       if (!BASEMAPS[sel.value]) { sel.value = current; return; }
-      current = sel.value;
-      try { localStorage.setItem(STORE_KEY, current); } catch (e) { /* chế độ riêng tư */ }
-      applyBasemap();
+      selectBasemap(sel.value);
     });
   }
   document.getElementById('btnRoadLabels')?.addEventListener('click', () => setLabelsOverlay(!labelsOn));

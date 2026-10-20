@@ -11,7 +11,7 @@ import { parseDxf, buildParcels, CRS_PRESETS, layerToType } from './cadImport.js
 import { escapeHtml, fmtNum, ico, showToast, loadHtml2Pdf, isApproved, wardStatHtml } from './utils.js';
 import { setBottomPanelMaximized, setBottomPanelCollapsed } from './uiComponents.js';
 import { importReviewDossier, rejectPending, REVIEW_DOSSIER_EVENT } from './cadImportUi.js';
-import { setLabelsOverlay, labelsOverlayOn, geeTileOpts } from './basemap.js';
+import { setLabelsOverlay, labelsOverlayOn, geeTileOpts, BASEMAP_EVENT } from './basemap.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, landPatternKey, LOT_OPACITY_EVENT } from './tt16Symbols.js';
 import {
   REVIEW_MAX_BYTES, LANDUSE_TABLES, classifyLand, landChoices, landRowByKey, landUseSummary, landSubKey, importLayerName, decisionKind,
@@ -2037,6 +2037,9 @@ export function initProjectReview() {
   });
 
   window.addEventListener(LOT_OPACITY_EVENT, () => {
+    if (session && lotLayers.length) applyFocus(false);
+  });
+  window.addEventListener(BASEMAP_EVENT, () => {
     if (session && lotLayers.length) applyFocus(false);
   });
 

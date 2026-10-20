@@ -12,7 +12,7 @@ import { planMap, passToolClick, isCompareOn } from './planMap.js';
 import { isLayerHidden, projectShown, focusedProjectName } from './projectFiles.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, ico, planItems, showToast } from './utils.js';
-import { basemapTileSpec } from './basemap.js';
+import { basemapTileSpec, BASEMAP_EVENT } from './basemap.js';
 import { ScanOverlay, cornersOf, openGeoref, prepareScan, scanProblem } from './scanGeoref.js';
 import { tt16SymbolStyle, landPatternKey, landLabel, layerForPattern, tt16SwatchCss, TT16_STYLES, TT16_LAND_KEYS, LAND_LABELS, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT } from './tt16Symbols.js';
 import { startShapeEdit, vertexCount, SHAPE_MAX_VERTICES } from './lotShapeEdit.js';
@@ -1202,5 +1202,6 @@ export function initAdjustLayer() {
   document.addEventListener('auth:change', () => { loadAdjustPending(); refreshAdjustLayer(); });
   window.addEventListener('qh:local-adjust-open', loadAdjustPending);
   window.addEventListener(LOT_OPACITY_EVENT, () => { if (active.size) refreshAdjustLayer(); });
+  window.addEventListener(BASEMAP_EVENT, () => { if (active.size) refreshAdjustLayer(); });
   reloadAdjustments();
 }
