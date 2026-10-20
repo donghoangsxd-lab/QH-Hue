@@ -287,7 +287,7 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
   bottom: 12px;
   left: calc(12px + var(--tb-btn) + 10px);
   width: min(276px, calc(100% - var(--tb-btn) - 28px));
-  max-height: min(320px, calc(100% - var(--title-h) - 24px));
+  max-height: min(460px, calc(100% - var(--title-h) - 24px));
   overflow: auto;
   box-sizing: border-box;
   padding: 6px 8px;
@@ -304,37 +304,39 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
 .project-brief[hidden] { display: none; }
 #mapArea.print-staging .project-brief { display: none; }
 .project-brief-head { display: flex; align-items: flex-start; gap: 4px; }
-.project-brief-peers {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px 0;
-  margin-top: 4px;
-}
-.project-brief-peer {
-  margin: 0;
-  padding: 1px 5px;
-  border: 1px solid transparent;
-  border-radius: 99px;
-  background: transparent;
+.project-brief-count {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.2px;
   color: var(--text-muted);
+}
+.project-brief-stack { display: flex; flex-direction: column; }
+.project-brief-item {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-soft);
+}
+.project-brief-item:first-child { margin-top: 2px; padding-top: 0; border-top: 0; }
+.project-brief-item .project-brief-name { font-size: var(--fs-sm); }
+.project-brief-item .project-brief-hero strong { font-size: var(--fs-lg); }
+.project-brief-decision {
+  display: block;
+  width: 100%;
+  margin-top: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: rgb(var(--brief));
   font: inherit;
   font-size: var(--fs-xs);
   font-weight: 700;
   line-height: 1.35;
+  text-align: left;
   cursor: pointer;
 }
-.project-brief-peer.is-on {
-  border-color: rgba(var(--brief), 0.45);
-  background: rgba(var(--brief), 0.16);
-  color: rgb(var(--brief));
-}
-.project-brief-peer:hover { color: var(--text-strong); }
-.project-brief-peer-sep {
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-  padding: 0 1px;
-}
+.project-brief-decision:hover { text-decoration: underline; }
 .project-brief-level {
   display: inline-flex;
   align-items: center;
@@ -486,7 +488,7 @@ body:has(#investCard:not([hidden])) .project-brief {
   top: calc(12px + var(--title-h) + 8px);
   bottom: auto;
   width: min(276px, calc(100% - var(--tb-btn) - var(--right-w) - 380px - 56px));
-  max-height: min(320px, calc(100% - var(--title-h) - 24px));
+  max-height: min(460px, calc(100% - var(--title-h) - 24px));
 }
 body:not(.bottom-collapsed) .cad-card,
 body.project-review:not(.project-view) .cad-card,
@@ -3458,7 +3460,7 @@ table.ward-table th {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .cad-page { flex: 1; min-height: 0; overflow: auto; padding: 2px 8px 6px; }
-.cad-page .pls-lots { max-height: 78px; gap: 2px; }
+.cad-page .pls-lots { max-height: none; gap: 2px; }
 .cad-page .pls-lot { padding: 2px 4px; cursor: pointer; }
 .cad-page .pls-lot.is-on { border-color: var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.16); }
 .cad-busy { padding: 6px 2px; color: var(--text-muted); font-size: var(--fs-sm); }
@@ -3502,7 +3504,15 @@ table.ward-table th {
 .pls-pie-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pls-pie-item em { font-style: normal; color: var(--text-muted); white-space: nowrap; }
 .pls-sub-head { margin-top: 4px; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-muted); }
-.pls-lots { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; padding-right: 2px; }
+.pls-scheme-sum { display: flex; flex-direction: column; gap: 1px; margin-top: 2px; }
+.pls-scheme-sum div, .pls-scheme-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 6px;
+  font-size: var(--fs-xs); line-height: 1.35;
+}
+.pls-scheme-sum b, .pls-scheme-head b { min-width: 0; font-weight: 800; color: var(--text-strong); }
+.pls-scheme-sum span, .pls-scheme-head span { flex-shrink: 0; font-weight: 700; color: var(--text-muted); }
+.pls-scheme { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.pls-lots { display: flex; flex-direction: column; gap: 4px; max-height: none; overflow: visible; padding-right: 2px; }
 .pls-lot { padding: 4px 6px; border-radius: var(--r-sm); background: rgba(var(--cyan-rgb), 0.06); border: 1px solid rgba(var(--cyan-rgb), 0.18); line-height: 1.35; }
 .pls-lot-head { display: flex; justify-content: space-between; gap: 8px; }
 .pls-lot-head b { overflow-wrap: anywhere; }
@@ -4907,6 +4917,11 @@ body.project-review.la-page #projectReviewHost {
     width: min(320px, calc(100vw - var(--phone-tool-left) - 8px)) !important;
     max-height: min(30dvh, 168px);
     overflow: auto;
+  }
+  body .project-brief,
+  body:not(.bottom-collapsed) .project-brief,
+  body.project-review:not(.project-view) .project-brief {
+    max-height: min(52dvh, 340px);
   }
   body .cad-card,
   body:not(.bottom-collapsed) .cad-card,

@@ -960,7 +960,11 @@ async function parcelVisionHtml(geometry, recorded, place) {
   const res = analyzeParcelZones(geometry, v.features.filter(f => f.properties.L === 'v'), (f) => {
     const zone = cats.zones[f.properties.k] || 'Khác';
     const name = f.properties.n || zone;
-    return { label: zone, color: visionColor(zone), key: '', name, sub: name !== zone ? zone : '', desc: cats.funcs[f.properties.f] || '' };
+    return {
+      label: zone, color: visionColor(zone), key: '', name,
+      sub: name !== zone ? zone : '', desc: cats.funcs[f.properties.f] || '',
+      file: QHC2045.short
+    };
   });
   return {
     html: parcelZonesHtml(res, recorded, {

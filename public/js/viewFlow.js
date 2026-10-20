@@ -112,26 +112,28 @@ export function geometryPoint(geom, bounds) {
   return bounds?.isValid?.() ? bounds.getCenter() : null;
 }
 
-const PROJECT_KIND = { qhpk: 'QHPK', qhct: 'QHCT' };
+const PROJECT_KIND = { qhpk: 'QHPK', qhct: 'QHCT', qhc10: 'QHC' };
 
 /**
  * Tab cấp quy hoạch trên bảng kiểm tra: bật đúng lớp, tắt các lớp quy hoạch khác, giữ khung nhìn.
- * QHPK / QHCT: lô của mọi đồ án giao vùng; thẻ và lỗ phủ tối theo cấp của tab.
- * QHC 1/10.000 và 1/25.000 vẽ lô / vùng tại khung nhìn.
+ * QHPK / QHCT / QHC 1/10.000: lô của mọi đồ án giao vùng; thẻ liệt kê đồ án đúng cấp đó.
+ * QHC 1/25.000 vẽ vùng tại khung nhìn, không giữ thẻ đồ án cấp khác.
  */
 export function applyInspectLevel(id, latlng, geom) {
   if (!id) return;
   const kind = PROJECT_KIND[id];
-  if (kind) stashInspectView();
+  if (kind || id === 'qhc25') stashInspectView();
   // Mở đồ án giao vùng (kể cả cấp kia) không được đổi lớp vừa chọn — droplist và danh sách Quy hoạch giữ đúng tab.
   withLevelLock(() => {
     inspectSync++;
     try {
       setLevel(id, { keepView: true, fromHold: true });
-      if (id === 'qhc10' || id === 'qhc25') setPreferPlace(true);
-      else {
-        setPreferPlace(false);
-        if (kind) openInspectProjects(latlng, kind, geom);
+      if (id === 'qhc25') {
+        setPreferPlace(true);
+        clearProjectFocus();
+      } else if (kind) {
+        setPreferPlace(id === 'qhc10');
+        openInspectProjects(latlng, kind, geom);
       }
     } finally {
       inspectSync--;

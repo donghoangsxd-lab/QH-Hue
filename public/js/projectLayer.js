@@ -371,6 +371,7 @@ function openProject(p) {
   viewStash = null;
   focusExtra = null;
   levelPeers = [];
+  inspectHostM2 = 0;
   zoomTo(p);
   focusName = p.name;
   drawFocus();
@@ -384,7 +385,10 @@ export function shareOpenProject(name) {
   const wanted = String(name || '').trim();
   if (!wanted) return false;
   focusExtra = null;
-  levelPeers = [];
+  if (!holdPeers) {
+    levelPeers = [];
+    inspectHostM2 = 0;
+  }
   const p = projects.find(x => x.name === wanted);
   state.focusedProject = wanted;
   if (state.hiddenProjects.delete(wanted)) saveHidden();
@@ -505,37 +509,43 @@ function byOverlap(list, geom) {
     .map(row => row.p);
 }
 
-function rememberPeers(list) {
-  levelPeers = list.map(p => ({ name: p.name, short: p.short || p.name, level: p.level }));
+function geomArea(geom) {
+  if (!geom || typeof turf === 'undefined') return 0;
+  try { return turf.area(turf.feature(geom)); } catch (e) { return 0; }
 }
 
-/** Đồ án cùng cấp đang tra cứu, xếp theo diện giao giảm dần. Đổi thẻ bằng selectInspectPeer. */
+function rememberPeers(list, geom) {
+  levelPeers = list.map(p => ({
+    name: p.name,
+    short: p.short || p.name,
+    level: p.level,
+    overlapM2: geom ? overlapM2(outlineOf(p), geom) : 0,
+    decision: p.decision?.name || ''
+  }));
+}
+
+/** Đồ án đúng cấp đang tra cứu, xếp theo diện giao giảm dần. */
 export function inspectPeers() {
   return levelPeers.map(p => ({ ...p }));
 }
 
-/** Đổi thẻ / đồ án đang chọn trong cùng cấp. Giữ lô và lỗ phủ tối (hợp ranh cả cấp). */
-export function selectInspectPeer(name) {
-  const wanted = String(name || '');
-  if (!levelPeers.some(p => p.name === wanted)) return false;
-  if (state.focusedProject === wanted && focusName === wanted) return true;
-  const p = projects.find(x => x.name === wanted);
-  if (!p) return false;
-  state.focusedProject = p.name;
-  focusName = p.name;
-  drawFocus();
-  pinGlow(p);
-  markPicked(p.name);
-  focusProjectLots(p.name);
-  document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: p.name }));
-  return true;
+/** Diện tích hình đang tra cứu (dự án, thửa, vùng đo), để tính phần nằm trong từng đồ án. */
+export function inspectHostArea() {
+  return inspectHostM2;
+}
+
+/** Mở quyết định phê duyệt của một đồ án trong thẻ tra cứu. */
+export function openInspectDecision(name) {
+  const p = projects.find(x => x.name === name);
+  if (!p?.decision) return;
+  openOrAssign(decisionTarget(p));
 }
 
 function openMany(hits, kind, geom) {
   const same = byOverlap(hits.filter(p => p.level === kind), geom);
   const primary = same[0];
   if (!primary) {
-    rememberPeers([]);
+    rememberPeers([], null);
     focusExtra = null;
     let hiddenChanged = false;
     hits.forEach(p => {
@@ -558,7 +568,7 @@ function openMany(hits, kind, geom) {
   focusExtra = focusCover(same);
   if (focusExtra) focusExtra.names = same.map(p => p.name);
   const prevPeers = levelPeers.map(p => p.name).join('\0');
-  rememberPeers(same);
+  rememberPeers(same, geom);
   const peersChanged = prevPeers !== levelPeers.map(p => p.name).join('\0');
   const ready = state.focusedProject === primary.name && focusName === primary.name
     && hits.every(p => state.lotProjects.has(p.name) && kindOn(p.name));
@@ -626,26 +636,51 @@ function schemesCovering(kind, geom) {
 }
 
 /**
- * Tra cứu theo hình: lô của mọi đồ án giao vùng (QHPK và QHCT).
- * Thẻ và lỗ phủ tối theo cấp đang chọn — đồ án giao vùng rộng nhất của cấp đó.
- * Một đồ án thì mở đồ án nhỏ nhất của cấp đó chứa điểm.
+ * Tra cứu theo hình: lô của mọi đồ án giao vùng (QHPK và QHCT, hoặc QHC khi đang ở lớp đó).
+ * Thẻ liệt kê mọi đồ án đúng cấp đang chọn. Lỗ phủ tối là hợp ranh các đồ án đó.
  */
 export function openInspectProjects(latlng, kind, geom) {
+  const hostM2 = geomArea(geom);
   const hits = schemesCovering(kind, geom);
+  const same = byOverlap(hits.filter(p => p.level === kind), geom);
   if (hits.length >= 2) {
     if (!inspectSnap && viewStash) inspectSnap = viewStash;
     viewStash = null;
+    inspectHostM2 = hostM2;
     return openMany(hits, kind, geom);
   }
   viewStash = null;
   const hadExtra = !!focusExtra || levelPeers.length > 0;
-  const hadPeers = levelPeers.length > 0;
   const already = state.focusedProject;
   focusExtra = null;
-  levelPeers = [];
-  const name = openProjectAt(latlng, kind);
+  inspectHostM2 = hostM2;
+  rememberPeers(same, geom);
+  holdPeers = true;
+  let name = null;
+  try {
+    name = same.length ? openProjectAt(latlng, kind) : null;
+    if (!name && same[0]) {
+      shareOpenProject(same[0].name);
+      name = same[0].name;
+    }
+  } finally {
+    holdPeers = false;
+  }
+  if (!name) {
+    inspectHostM2 = 0;
+    rememberPeers([], null);
+    const focused = projects.find(x => x.name === state.focusedProject);
+    if (focused && focused.level !== kind) {
+      state.focusedProject = null;
+      focusName = null;
+      markPicked(null);
+      document.dispatchEvent(new Event(PROJECT_UNFOCUS_EVENT));
+    }
+    if (hadExtra) drawFocus();
+    return null;
+  }
   if (hadExtra) drawFocus();
-  if (hadPeers && name && name === already) document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: name }));
+  if (name === already) document.dispatchEvent(new CustomEvent(PROJECT_INFO_EVENT, { detail: name }));
   return name;
 }
 
@@ -666,6 +701,7 @@ export function clearProjectFocus() {
   focusName = null;
   focusExtra = null;
   levelPeers = [];
+  inspectHostM2 = 0;
   drawFocus();
   markPicked(null);
   document.dispatchEvent(new Event(PROJECT_UNFOCUS_EVENT));
@@ -1572,8 +1608,11 @@ const focusLayers = new Map();
 let focusName = null;
 // Tra cứu giao nhiều đồ án: lỗ phủ tối là hợp ranh các đồ án đúng cấp đang chọn.
 let focusExtra = null;
-// Cùng cấp với thẻ, xếp theo diện giao với vùng tra cứu. Đổi thẻ không đổi lỗ phủ tối.
+// Cùng cấp với thẻ, xếp theo diện giao với vùng tra cứu. Thẻ hiện cả danh sách; lỗ phủ tối là hợp ranh.
 let levelPeers = [];
+let inspectHostM2 = 0;
+// Đang mở đồ án từ tra cứu: shareOpenProject không xóa danh sách đồ án cùng cấp vừa ghi.
+let holdPeers = false;
 // Ảnh trạng thái trước lần tra cứu nhiều đồ án đầu tiên; đóng bảng thì trả lại. Một đồ án không ghi.
 let inspectSnap = null;
 let viewStash = null;
@@ -1618,6 +1657,7 @@ export function restoreInspectFocus() {
   inspectSnap = null;
   focusExtra = null;
   levelPeers = [];
+  inspectHostM2 = 0;
   if (getLevel() !== snap.level) setLevel(snap.level, { keepView: true });
   state.focusedProject = snap.focused || null;
   focusName = snap.name || null;

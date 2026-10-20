@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { PLAN_LEVELS, planLevelOf } from './generalPlan.js';
 import { PROJECT_INFO_EVENT } from './projectFiles.js';
-import { PROJECT_UNFOCUS_EVENT, inspectPeers, selectInspectPeer } from './projectLayer.js';
+import { PROJECT_UNFOCUS_EVENT, inspectPeers, inspectHostArea, openInspectDecision } from './projectLayer.js';
 import { projectPopulation, PROJECT_POP_EVENT } from './projectReview.js';
 import { adjustmentsOf, adjustmentsKnown, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { escapeHtml, fmtNum, fmtPct } from './utils.js';
@@ -145,14 +145,23 @@ function shareLabel(share) {
   return `${ha(share.used)} ha · ${fmtPct(share.pct)}`;
 }
 
-function peerBar(name) {
-  const peers = inspectPeers();
-  if (peers.length < 2 || !peers.some(p => p.name === name)) return '';
-  return `<div class="project-brief-peers">${peers.map(p => {
-    const on = p.name === name;
-    const label = `${p.level} ${p.short || p.name}`;
-    return `<button type="button" class="project-brief-peer${on ? ' is-on' : ''}" data-brief-peer="${escapeHtml(p.name)}" aria-pressed="${on ? 'true' : 'false'}">${escapeHtml(label)}</button>`;
-  }).join('<span class="project-brief-peer-sep" aria-hidden="true">·</span>')}</div>`;
+function metersOf(card) {
+  const count = card.adjN == null ? '' : `${fmtNum(card.adjN)} lần · `;
+  const adjustShare = card.adjN == null ? null : shareOf(card.adjM2, card.hostM2);
+  const adjustValue = card.adjN == null ? WAIT : `${count}${shareLabel(adjustShare)}`;
+  const list = [];
+  if (card.lookupM2 > 0) {
+    const inside = shareOf(card.overlapM2, card.lookupM2);
+    list.push(meterRow('Trong vùng tra cứu', 'Phần diện tích vùng đang tra cứu nằm trong đồ án', shareLabel(inside), inside, 'cover'));
+  }
+  list.push(meterRow('Điều chỉnh cục bộ', 'Số lần và tổng diện tích điều chỉnh cục bộ', adjustValue, adjustShare, 'adjust'));
+  if (card.level === 'QHC') {
+    list.push(meterRow('Đã có QHPK', 'Tổng diện tích khu vực đã có QHPK', shareLabel(shareOf(card.qhpkM2, card.hostM2)), shareOf(card.qhpkM2, card.hostM2), 'cover'));
+  }
+  if (card.level === 'QHC' || card.level === 'QHPK') {
+    list.push(meterRow('Đã có QHCT', 'Tổng diện tích khu vực đã có QHCT', shareLabel(shareOf(card.qhctM2, card.hostM2)), shareOf(card.qhctM2, card.hostM2), 'cover'));
+  }
+  return list;
 }
 
 function render(card) {
@@ -160,26 +169,42 @@ function render(card) {
   if (!el) return;
   const level = PLAN_LEVELS.find(item => item.key === card.level);
   const area = card.hostM2 > 0 ? `${ha(card.hostM2)}<small>ha</small>` : '—';
-  const count = card.adjN == null ? '' : `${fmtNum(card.adjN)} lần · `;
-  const adjustShare = card.adjN == null ? null : shareOf(card.adjM2, card.hostM2);
-  const adjustValue = card.adjN == null ? WAIT : `${count}${shareLabel(adjustShare)}`;
-  const list = [meterRow('Điều chỉnh cục bộ', 'Số lần và tổng diện tích điều chỉnh cục bộ', adjustValue, adjustShare, 'adjust')];
-  if (card.level === 'QHC') {
-    list.push(meterRow('Đã có QHPK', 'Tổng diện tích khu vực đã có QHPK', shareLabel(shareOf(card.qhpkM2, card.hostM2)), shareOf(card.qhpkM2, card.hostM2), 'cover'));
-  }
-  if (card.level === 'QHC' || card.level === 'QHPK') {
-    list.push(meterRow('Đã có QHCT', 'Tổng diện tích khu vực đã có QHCT', shareLabel(shareOf(card.qhctM2, card.hostM2)), shareOf(card.qhctM2, card.hostM2), 'cover'));
-  }
   el.dataset.level = card.level || '';
   el.hidden = false;
   el.innerHTML = `<div class="project-brief-head">
       <h2 class="project-brief-name"><span class="project-brief-level">${escapeHtml(level ? level.label : card.level)}</span>${escapeHtml(card.name)}</h2>
       <button type="button" class="project-brief-close" data-brief-close aria-label="Ẩn bảng thông tin">×</button>
     </div>
-    ${peerBar(card.name)}
     <div class="project-brief-hero"><span>Diện tích quy hoạch</span><strong>${area}</strong></div>
     <div class="project-brief-pops"><span>Hiện trạng <b>${peopleHtml(card.pop.ht)}</b></span><span>Quy hoạch <b>${peopleHtml(card.pop.qh)}</b></span></div>
-    <div class="project-brief-meters">${list.join('')}</div>`;
+    <div class="project-brief-meters">${metersOf(card).join('')}</div>`;
+  syncBriefStack();
+}
+
+function itemHtml(card) {
+  const level = PLAN_LEVELS.find(item => item.key === card.level);
+  const area = card.hostM2 > 0 ? `${ha(card.hostM2)}<small>ha</small>` : '—';
+  const decision = card.decision
+    ? `<button type="button" class="project-brief-decision" data-brief-decision="${escapeHtml(card.name)}">${escapeHtml(card.decision)}</button>`
+    : '';
+  return `<section class="project-brief-item">
+      <h2 class="project-brief-name"><span class="project-brief-level">${escapeHtml(level ? level.label : card.level)}</span>${escapeHtml(card.name)}</h2>
+      <div class="project-brief-hero"><span>Diện tích quy hoạch</span><strong>${area}</strong></div>
+      <div class="project-brief-meters">${metersOf(card).join('')}</div>
+      ${decision}
+    </section>`;
+}
+
+function renderStack(cards) {
+  const el = document.getElementById('projectBrief');
+  if (!el || !cards.length) return;
+  el.dataset.level = cards[0].level || '';
+  el.hidden = false;
+  el.innerHTML = `<div class="project-brief-head">
+      <span class="project-brief-count">${fmtNum(cards.length)} đồ án cùng cấp</span>
+      <button type="button" class="project-brief-close" data-brief-close aria-label="Ẩn bảng thông tin">×</button>
+    </div>
+    <div class="project-brief-stack">${cards.map(itemHtml).join('')}</div>`;
   syncBriefStack();
 }
 
@@ -193,8 +218,43 @@ function hide() {
   syncBriefStack();
 }
 
+async function fillCover(card, token) {
+  const entry = card.entry;
+  if (card.adjs) card.adjM2 = await clippedArea(card.adjs.map(it => it.boundary), entry && entry.boundary, token, false);
+  if (token !== seq) return;
+  if (card.level === 'QHC') card.qhpkM2 = await coveredM2(entry, 'QHPK', token);
+  if (token !== seq) return;
+  if (card.level === 'QHC' || card.level === 'QHPK') card.qhctM2 = await coveredM2(entry, 'QHCT', token);
+}
+
+function cardFromPeer(peer) {
+  const entry = entryOf(peer.name);
+  const level = peer.level || planLevelOf(peer.name);
+  const known = adjustmentsKnown();
+  const adjs = known ? adjustmentsOf(peer.name) : null;
+  return {
+    name: peer.name, level, decision: peer.decision || '', entry, adjs,
+    hostM2: areaM2(entry && entry.boundary),
+    lookupM2: inspectHostArea(),
+    overlapM2: Number(peer.overlapM2) || 0,
+    adjN: adjs ? adjs.length : null, adjM2: null, qhpkM2: null, qhctM2: null
+  };
+}
+
+async function showStack(peers) {
+  const token = ++seq;
+  openName = peers.map(p => p.name).join('\0');
+  const cards = peers.map(cardFromPeer);
+  renderStack(cards);
+  await Promise.all(cards.map(card => fillCover(card, token)));
+  if (token !== seq) return;
+  renderStack(cards);
+}
+
 async function show(name) {
   const project = String(name || '').trim();
+  const peers = inspectPeers();
+  if (project && peers.some(p => p.name === project)) return showStack(peers);
   if (!project) { hide(); return; }
   const token = ++seq;
   openName = project;
@@ -205,18 +265,13 @@ async function show(name) {
   const known = adjustmentsKnown();
   const adjs = known ? adjustmentsOf(project) : null;
   const base = {
-    name: project, level, hostM2, pop,
+    name: project, level, hostM2, pop, entry, adjs,
     adjN: adjs ? adjs.length : null, adjM2: null, qhpkM2: null, qhctM2: null
   };
   render(base);
-  const adjM2 = adjs ? await clippedArea(adjs.map(it => it.boundary), entry && entry.boundary, token, false) : null;
+  await fillCover(base, token);
   if (token !== seq) return;
-  if (adjs) render({ ...base, adjN: adjs.length, adjM2 });
-  const qhpkM2 = level === 'QHC' ? await coveredM2(entry, 'QHPK', token) : null;
-  if (token !== seq) return;
-  const qhctM2 = level === 'QHC' || level === 'QHPK' ? await coveredM2(entry, 'QHCT', token) : null;
-  if (token !== seq) return;
-  render({ ...base, adjN: adjs ? adjs.length : null, adjM2, qhpkM2, qhctM2 });
+  render(base);
 }
 
 export function initProjectBrief() {
@@ -231,13 +286,21 @@ export function initProjectBrief() {
   host.appendChild(el);
   el.addEventListener('click', (e) => {
     if (e.target.closest('[data-brief-close]')) { hide(); return; }
-    const peer = e.target.closest('[data-brief-peer]');
-    if (peer && !peer.classList.contains('is-on')) selectInspectPeer(peer.getAttribute('data-brief-peer'));
+    const decision = e.target.closest('[data-brief-decision]');
+    if (decision) openInspectDecision(decision.getAttribute('data-brief-decision'));
   });
   document.addEventListener(PROJECT_INFO_EVENT, (e) => show(e.detail));
   document.addEventListener(PROJECT_UNFOCUS_EVENT, hide);
-  document.addEventListener(ADJUST_CHANGE_EVENT, () => { if (openName) show(openName); });
-  document.addEventListener(PROJECT_POP_EVENT, (e) => { if (e.detail === openName) show(openName); });
+  document.addEventListener(ADJUST_CHANGE_EVENT, () => {
+    const peers = inspectPeers();
+    if (peers.length && openName) show(peers[0].name);
+    else if (openName) show(openName);
+  });
+  document.addEventListener(PROJECT_POP_EVENT, (e) => {
+    const peers = inspectPeers();
+    if (peers.some(p => p.name === e.detail)) show(peers[0].name);
+    else if (e.detail === openName) show(openName);
+  });
   const syncStack = () => syncBriefStack();
   new ResizeObserver(syncStack).observe(el);
   new MutationObserver(syncStack).observe(host, { subtree: true, attributes: true, attributeFilter: ['hidden'], childList: true });

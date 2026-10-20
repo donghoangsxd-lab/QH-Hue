@@ -9,6 +9,8 @@ import { planLotsIn } from './projectFiles.js';
 import { landLabel, landColor, landPatternKey, infraStyleKey, tt16SwatchCss, TT16_STYLES } from './tt16Symbols.js';
 import { escapeHtml, fmtNum, planItems } from './utils.js';
 import { landCode } from './mapEngine.js';
+import { namesOfProject } from './projectNames.js';
+import { planLevelOf } from './generalPlan.js';
 
 const SAMPLE_MAX = 40000;
 // Lưới phủ cả khung bao: vùng đo mảnh, chéo thì khung lớn hơn nhiều polygon, giới hạn số ô để không tràn bộ nhớ
@@ -460,6 +462,55 @@ const parcelHead = (title, res, recorded, coverLabel, count, unit, shape = 'Hìn
     <div class="pp-row"><span>${escapeHtml(coverLabel)}</span><b>${fmtM2(covered)} (${escapeHtml(fmtPct(100 - res.none.pct))}) · ${fmtNum(count)} ${unit}</b></div>`;
 };
 
+function schemeLabel(file) {
+  if (!file) return '';
+  const entry = (state.projectCatalog || []).find(p => p && p.tenQH === file);
+  if (!entry) return file;
+  const names = namesOfProject(entry);
+  return `${planLevelOf(file)} ${names.tenRutGon || file}`;
+}
+
+function schemeGroups(parts) {
+  const groups = new Map();
+  parts.forEach(p => {
+    const file = (p.lot && p.lot.file) || p.file || '';
+    if (!groups.has(file)) groups.set(file, []);
+    groups.get(file).push(p);
+  });
+  return [...groups.entries()]
+    .map(([file, list]) => ({ file, label: schemeLabel(file), list, area: list.reduce((s, p) => s + p.area, 0) }))
+    .sort((a, b) => b.area - a.area);
+}
+
+function schemeSummary(groups, area) {
+  const named = groups.filter(g => g.label);
+  if (named.length < 2 || !(area > 0)) return '';
+  return `<div class="pls-scheme-sum">${named.map(g => `<div><b>${escapeHtml(g.label)}</b><span>${fmtArea(g.area)} · ${fmtPct(g.area / area * 100)}</span></div>`).join('')}</div>`;
+}
+
+function lotBlock(p, scheme) {
+  const stats = planItems(p.lot && p.lot.plan).map(s => `${s.short} ${s.text}`).join(' · ');
+  const own = p.sub || '';
+  const tag = scheme && !own.includes(scheme) ? scheme : '';
+  const sub = [own, p.label && p.label !== p.name ? p.label : '', tag].filter(Boolean).join(' · ');
+  return `<div class="pls-lot" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}">
+      <div class="pls-lot-head"><b>${escapeHtml(p.name || p.label)}</b><span>${fmtM2(p.area)}</span></div>
+      ${sub ? `<div class="pls-lot-sub">${escapeHtml(sub)}</div>` : ''}
+      ${p.desc ? `<div class="pls-lot-plan">${escapeHtml(p.desc)}</div>` : ''}
+      ${stats ? `<div class="pls-lot-plan">${escapeHtml(stats)}</div>` : ''}
+    </div>`;
+}
+
+function schemeLots(parts, area) {
+  const groups = schemeGroups(parts);
+  const named = groups.filter(g => g.file).length;
+  if (!named) return `<div class="pls-lots">${parts.map(p => lotBlock(p, '')).join('')}</div>`;
+  return groups.map(g => `<section class="pls-scheme">
+      <div class="pls-scheme-head"><b>${escapeHtml(g.label || 'Không gắn đồ án')}</b><span>${fmtArea(g.area)} · ${fmtPct(area > 0 ? g.area / area * 100 : 0)}</span></div>
+      <div class="pls-lots">${g.list.map(p => lotBlock(p, g.label)).join('')}</div>
+    </section>`).join('');
+}
+
 /** Kết quả analyzeParcelPlan. recorded: diện tích hồ sơ địa chính (m²), 0 nếu là vùng đo. opts: title, noneLabel, empty, note, place, extra */
 export function parcelPlanHtml(res, recorded, opts = {}) {
   if (!res.exact) return planLandHtml(res).replace('trong vùng đo', 'trên thửa đất');
@@ -472,19 +523,10 @@ export function parcelPlanHtml(res, recorded, opts = {}) {
   const head = parcelHead(title, res, recorded, 'Có lô quy hoạch', res.lotCount, 'lô', w.shape) + extra;
   const foot = `<div class="pp-sub" title="${escapeHtml(note)}">${escapeHtml(note)}</div>`;
   if (!res.rows.length) return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(empty)}</div>${foot}</div>`;
-  const lots = res.parts.map(p => {
-    const stats = planItems(p.lot && p.lot.plan).map(s => `${s.short} ${s.text}`).join(' · ');
-    const sub = p.sub || [p.label, p.lot && p.lot.file].filter(Boolean).join(' · ');
-    return `<div class="pls-lot" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}">
-      <div class="pls-lot-head"><b>${escapeHtml(p.name || p.label)}</b><span>${fmtM2(p.area)}</span></div>
-      ${sub ? `<div class="pls-lot-sub">${escapeHtml(sub)}</div>` : ''}
-      ${p.desc ? `<div class="pls-lot-plan">${escapeHtml(p.desc)}</div>` : ''}
-      ${stats ? `<div class="pls-lot-plan">${escapeHtml(stats)}</div>` : ''}
-    </div>`;
-  }).join('');
-  return `<div class="plan-land-stats">${head}${pieHtml(res, noneLabel, w.pie)}
+  const groups = schemeGroups(res.parts);
+  return `<div class="plan-land-stats">${head}${schemeSummary(groups, res.area)}${pieHtml(res, noneLabel, w.pie)}
     <div class="pls-sub-head">Lô quy hoạch và chỉ tiêu</div>
-    <div class="pls-lots">${lots}</div>${foot}
+    ${schemeLots(res.parts, res.area)}${foot}
   </div>`;
 }
 
@@ -501,13 +543,9 @@ export function parcelZonesHtml(res, recorded, opts) {
     <div class="pp-row"><span>${escapeHtml(opts.cover)}</span><b>${fmtM2(covered)} (${escapeHtml(fmtPct(100 - res.none.pct))}) · ${fmtNum(res.parts.length)} ${opts.unit}</b></div>${extra}`;
   const note = opts.note ? `<div class="pp-sub" title="${escapeHtml(opts.note)}">${escapeHtml(opts.note)}</div>` : '';
   if (!res.parts.length) return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">${escapeHtml(opts.empty)}</div>${note}</div>`;
-  const parts = res.parts.map(p => `<div class="pls-lot" data-land="${escapeHtml(p.label)}" data-color="${escapeHtml(p.color || '')}">
-      <div class="pls-lot-head"><b>${escapeHtml(p.name || p.label)}</b><span>${fmtM2(p.area)}</span></div>
-      ${p.sub ? `<div class="pls-lot-sub">${escapeHtml(p.sub)}</div>` : ''}
-      ${p.desc ? `<div class="pls-lot-plan">${escapeHtml(p.desc)}</div>` : ''}
-    </div>`).join('');
-  return `<div class="plan-land-stats">${head}${pieHtml(res, opts.none, w.pie)}
+  const groups = schemeGroups(res.parts);
+  return `<div class="plan-land-stats">${head}${schemeSummary(groups, res.area)}${pieHtml(res, opts.none, w.pie)}
     <div class="pls-sub-head">${escapeHtml(opts.partsHead)}</div>
-    <div class="pls-lots">${parts}</div>${note}
+    ${schemeLots(res.parts, res.area)}${note}
   </div>`;
 }
