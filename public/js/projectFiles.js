@@ -88,8 +88,11 @@ export function wardScopeName() {
 export function projectLotsDrawn(name) {
   if (!name) return false;
   if (wardScopeName()) return lotShown(name);
-  if (getLevel() === 'qhct' && state.lotProjects.has(name)) return lotShown(name);
-  if (qhpkBoundaryOnly()) return name === state.focusedProject || state.lotProjects.has(name);
+  if ((getLevel() === 'qhct' || getLevel() === 'qhc10') && state.lotProjects.has(name)) return lotShown(name);
+  if (qhpkBoundaryOnly()) {
+    if (state.hiddenProjects.has(name)) return false;
+    return name === state.focusedProject || state.lotProjects.has(name);
+  }
   const map = getMap();
   if (state.showProjects && map && map.getZoom() >= minZoom) return lotShown(name);
   return name === focusedProjectName();
@@ -127,9 +130,9 @@ function wanted() {
     if (!p || !p.tenQH || p.sheetOnly) return false;
     if (force.has(p.tenQH)) return state.showLand || !state.hiddenProjects.has(p.tenQH);
     if (p.tenQH === focus) return true;
-    if (getLevel() === 'qhct' && state.lotProjects.has(p.tenQH)) return lotShown(p.tenQH);
+    if ((getLevel() === 'qhct' || getLevel() === 'qhc10') && state.lotProjects.has(p.tenQH)) return lotShown(p.tenQH);
     if (wardName && inWard(p, wardName) && lotShown(p.tenQH)) return true;
-    if (qhpkBoundaryOnly() && (p.tenQH === state.focusedProject || state.lotProjects.has(p.tenQH))) return true;
+    if (qhpkBoundaryOnly() && !state.hiddenProjects.has(p.tenQH) && (p.tenQH === state.focusedProject || state.lotProjects.has(p.tenQH))) return true;
     if (!layerOn) return false;
     if (!state.showLand && state.showProjects && !lotShown(p.tenQH)) return false;
     if (!p.bbox) return !!state.showLand;

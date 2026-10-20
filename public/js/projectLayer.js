@@ -493,6 +493,7 @@ function openMany(hits) {
   if (!primary) return null;
   // Lỗ phủ tối = hợp ranh mọi đồ án giao vùng, không phải đồ án nhỏ nhất (lô đồ án kia bị che)
   focusExtra = focusCover(hits);
+  if (focusExtra) focusExtra.names = hits.map(p => p.name);
   const ready = state.focusedProject === primary.name && focusName === primary.name
     && hits.every(p => state.lotProjects.has(p.name) && kindOn(p.name));
   if (ready) {
@@ -823,7 +824,7 @@ function wardGroups(items) {
 
 function rowHtml(p, idx, admin) {
   const boundary = qhpkBoundaryOnly() && p.level === 'QHPK';
-  const on = boundary ? state.lotProjects.has(p.name) : projectShown(p.name);
+  const on = boundary ? !state.hiddenProjects.has(p.name) : projectShown(p.name);
   const deleting = busy === p.name;
   const open = expanded.has(p.name);
   const extraN = (p.docs || []).length;
@@ -840,8 +841,8 @@ function rowHtml(p, idx, admin) {
   const proposeBtn = (!admin || waiting)
     ? `<button type="button" class="project-btn${waiting ? ' has-proposal' : ''}" data-propose="${idx}" title="${escapeHtml(proposeTitle)}" aria-label="${escapeHtml(proposeTitle)}"${busy ? ' disabled' : ''}>${ico(waiting ? 'clock' : 'save')}</button>`
     : '';
-  const boxTitle = boundary ? 'Hiện lô bên trong đồ án' : 'Hiện đồ án trên bản đồ';
-  return `<div class="project-row${boundary || projectShown(p.name) ? '' : ' is-off'}${p.name === pickedName ? ' is-picked' : ''}">
+  const boxTitle = 'Hiện ranh, tên và lô của đồ án';
+  return `<div class="project-row${on ? '' : ' is-off'}${p.name === pickedName ? ' is-picked' : ''}">
       <label class="project-name" title="${escapeHtml(p.full || p.name)} — bấm để mở đồ án">
         <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''} title="${boxTitle}"><span data-focus="${idx}">${idx + 1}. ${escapeHtml(p.short || p.name)}</span></label>
       <span class="project-tools">
@@ -852,7 +853,7 @@ function rowHtml(p, idx, admin) {
         ${admin ? `<button type="button" class="project-btn" data-rename="${idx}" title="Đổi tên đồ án (Sheet + danh mục bucket)" aria-label="Đổi tên đồ án"${busy ? ' disabled' : ''}>${ico('pen')}</button>` : ''}
         ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
       </span>
-    </div>${open ? decisionNote(p, idx) + docsHtml(p, idx, admin) + proposalNote(p, idx) + layersHtml(p, idx, boundary || projectShown(p.name), admin) : ''}`;
+    </div>${open ? decisionNote(p, idx) + docsHtml(p, idx, admin) + proposalNote(p, idx) + layersHtml(p, idx, on, admin) : ''}`;
 }
 
 // Đồ án đang chọn (bấm ranh trên bản đồ hoặc bấm tên): dòng trong danh sách giữ nền sáng đến khi chọn đồ án khác
@@ -1738,7 +1739,7 @@ function drawOutlinesOn(m, list, below) {
 function outlinesFor(m) {
   const level = { qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' }[sideOf(m)];
   if (!level) return [];
-  return projects.filter(p => p.level === level && !isLayerHidden(p.name, 'ranh-gioi') && outlineOf(p));
+  return projects.filter(p => p.level === level && !state.hiddenProjects.has(p.name) && !isLayerHidden(p.name, 'ranh-gioi') && outlineOf(p));
 }
 
 function redrawOutlines() {
@@ -1754,9 +1755,10 @@ function redrawOutlines() {
   const ward = wardScopeName();
   const list = projects.filter(p => {
     if (isLayerHidden(p.name, 'ranh-gioi')) return false;
-    if (qhcCity && p.level === 'QHC') return true;
+    // QHC 1/10.000 toàn TP: mọi đồ án QHC (kể cả ngoài phường đang chọn), trừ đồ án vừa bỏ chọn
+    if (qhcCity && p.level === 'QHC') return !state.hiddenProjects.has(p.name);
     if (ward && !p.wards.includes(ward) && p.name !== state.focusedProject) return false;
-    if (boundary && p.level === 'QHPK') return true;
+    if (boundary && p.level === 'QHPK') return !state.hiddenProjects.has(p.name);
     return projectShown(p.name) && (below || p.area);
   });
   if (map) drawOutlinesOn(map, list, below);
@@ -1786,14 +1788,27 @@ function rebuild() {
 function showProject(p) {
   if (!kindOn(p.name)) turnKindOn(p, enableMaster);
   state.hiddenProjects.delete(p.name);
-  if (p.level === 'QHPK') state.lotProjects.add(p.name);
+  state.lotProjects.add(p.name);
   ensureFullLots();
   saveHidden();
   refreshAll();
 }
 
-// QHPK toàn TP: tick chỉ xin lô, không ghi danh sách ẩn (ranh vẫn hiện)
+// Bỏ một đồ án khỏi hợp ranh tra cứu nhiều đồ án; đồ án còn lại giữ lô
+function dropSchemeFromFocus(name) {
+  state.lotProjects.delete(name);
+  if (!focusExtra?.names?.includes(name)) return;
+  const rest = focusExtra.names.filter(n => n !== name).map(n => projects.find(p => p.name === n)).filter(Boolean);
+  if (rest.length >= 2) {
+    focusExtra = focusCover(rest);
+    if (focusExtra) focusExtra.names = rest.map(p => p.name);
+  } else focusExtra = null;
+}
+
+// QHPK toàn TP: tick hiện lại ranh và lô (bỏ chọn đã ghi đồ án vào danh sách ẩn)
 function pickProjectLots(p) {
+  state.hiddenProjects.delete(p.name);
+  saveHidden();
   state.lotProjects.add(p.name);
   if (!state.showProjects) enableMaster();
   ensureFullLots();
@@ -2071,18 +2086,11 @@ export function initProjectLayer(opts = {}) {
       else showProject(p);
       return;
     }
-    if (qhpkBoundaryOnly() && p.level === 'QHPK') {
-      state.lotProjects.delete(p.name);
-      if (p.name === focusName || p.name === state.focusedProject) {
-        document.dispatchEvent(new CustomEvent(PROJECT_VIEW_EXIT_EVENT, { detail: { hidden: p.name } }));
-      }
-      refreshAll();
-      return;
-    }
+    // Bỏ chọn: ẩn ranh, nhãn, lô đất và lô công trình của đúng đồ án. Đồ án kia trong tra cứu nhiều đồ án giữ nguyên.
     state.hiddenProjects.add(p.name);
-    if (!projects.some(x => !state.hiddenProjects.has(x.name))) setMaster(false);
+    dropSchemeFromFocus(p.name);
+    if (!qhpkBoundaryOnly() && !projects.some(x => !state.hiddenProjects.has(x.name))) setMaster(false);
     saveHidden();
-    // Bỏ chọn đồ án đang mở = thoát thông tin đồ án (viewFlow.js), nhưng không hiện lại đồ án vừa ẩn
     if (p.name === focusName || p.name === state.focusedProject) {
       document.dispatchEvent(new CustomEvent(PROJECT_VIEW_EXIT_EVENT, { detail: { hidden: p.name } }));
     }
