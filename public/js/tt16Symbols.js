@@ -279,15 +279,21 @@ const PT_PX = 1.6;
 const LINE_PT = 0.72;
 const DOT_R_PT = 0.36;
 // Khung ô ký hiệu Phụ lục: dải QHDD/QHDH dày 2.76pt; QHDH nét 10.68pt, hở 5.4pt.
-// Trên bản đồ viền QH cố định (không lấy 2.76pt ≈ 4.4px vì nét đó che lô hẹp như dải cây xanh dọc đường).
-// FRAME_PX là nét trước khi làm sáng. Chỉ lô màu tối trên nền vệ tinh dùng nét dày hơn và quầng.
+// Trên bản đồ không lấy 2.76pt (≈ 4.4px) vì nét đó che lô hẹp. Trước khi làm sáng viền, quy hoạch là 1.8px
+// và hiện trạng là 1px, cùng màu tô. 1.8px thành lưới khi nhiều lô, nên quy hoạch còn 0.8px cùng màu tô.
+// Năm nhóm tối (an ninh, quốc phòng, ba loại rừng) trên nền vệ tinh dùng một nét 0.7px sáng hơn cùng hue, không quầng.
 const FRAME_PT = 2.76;
 const DASH_PT = [10.68, 5.4];
-const FRAME_PX = 1.8;
-const FRAME_PX_BRIGHT = 2.4;
+const FRAME_PX = 0.8;
 const HT_FRAME_PX = 1;
-const FRAME_HALO_PX = 1;
-const FRAME_HALO = '#f8fafc';
+const THIN_LIGHT_PX = 0.7;
+const THIN_LIGHT_KEYS = new Set([
+  'AN', 'C-AN', 'T-AN',
+  'QP', 'C-QP', 'T-QP',
+  'RSX', 'C-RSX', 'T-RSX',
+  'RPH', 'C-RPH', 'T-RPH',
+  'RDD', 'C-RDD', 'T-RDD'
+]);
 const dashFor = (px) => DASH_PT.map(v => +((v / FRAME_PT) * px).toFixed(1)).join(',');
 
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -691,34 +697,15 @@ export function lightenTone(hex) {
   return hslToHex(h, s, Math.max(l, nextL));
 }
 
-// Độ chói tương đối WCAG (sRGB tuyến tính). 0.35 trên thang này vẫn gồm đỏ thuần, magenta, xanh TDTT.
-// Ngưỡng 0.18 nằm ngay sau nhóm tối (rừng sản xuất 0.168) và trước vàng/ôliu đã rõ trên vệ tinh (0.190).
-export const OUTLINE_LUMA_MAX = 0.18;
-
-function srgbChannel(c) {
-  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-}
-
-export function relativeLuminance(hex) {
-  const m = /^#([0-9a-f]{6})$/i.exec(String(hex || '').trim());
-  if (!m) return 1;
-  const n = parseInt(m[1], 16);
-  const r = srgbChannel((n >> 16) / 255);
-  const g = srgbChannel(((n >> 8) & 255) / 255);
-  const b = srgbChannel((n & 255) / 255);
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-/** Lô màu tối và đang xem nền vệ tinh: viền sáng hơn, dày hơn, có quầng. */
-export function outlineBright(hex) {
-  return !isLightBasemap() && relativeLuminance(hex) < OUTLINE_LUMA_MAX;
+/** An ninh, quốc phòng và ba loại rừng trên nền vệ tinh: một nét mỏng sáng hơn cùng hue. */
+export function thinLightOutline(key) {
+  return !isLightBasemap() && THIN_LIGHT_KEYS.has(key);
 }
 
 // Đất giao thông: không viền, không quầng, mọi nền và mọi mức phóng. Tô mờ để còn thấy mặt đường.
 const TRANSPORT_KEYS = new Set(['GT', 'T-GT', 'C-GTDT', 'C-GTDN']);
 const TRANSPORT_RE = /GIAOTHONG|DUONGGT|DUONGGIAO|DUONGPHO|LONGDUONG|LEDUONG|VIAHE|DUONGSAT|BENTHUYEN|BENXE/;
 const ROAD_FILL = 0.32;
-// Dải hẹp (kênh, cây xanh dọc đường): quầng sáng chồng thành lưới. Bề rộng trung bình dưới ngưỡng này thì bỏ quầng.
 const STRIP_WIDTH_M = 18;
 
 export function isTransportLand(key, layerName = '', lotName = '') {
@@ -778,47 +765,6 @@ export function isNarrowStrip(geometry) {
   if (!rings || !rings.length) return false;
   const width = g.type === 'Polygon' ? ringWidthM(rings[0]) : Math.min(...rings.map(ringWidthM));
   return width < STRIP_WIDTH_M;
-}
-
-function dropStripHalo(style, geometry) {
-  if (!style?.casingColor || !isNarrowStrip(geometry)) return style;
-  return {
-    ...style,
-    weight: Math.min(style.weight || HT_FRAME_PX, HT_FRAME_PX),
-    casingColor: null,
-    casingWeight: null,
-    casingOpacity: null
-  };
-}
-
-// Canvas của Leaflet chỉ có một nét. Quầng sáng vẽ trước nét màu khi style có casingColor.
-let lotCasingPatched = false;
-function ensureLotCasing() {
-  if (lotCasingPatched || typeof L === 'undefined' || !L.Canvas?.prototype?._fillStroke) return;
-  lotCasingPatched = true;
-  const orig = L.Canvas.prototype._fillStroke;
-  L.Canvas.prototype._fillStroke = function (ctx, layer) {
-    const options = layer.options;
-    if (!options?.casingColor) return orig.call(this, ctx, layer);
-    if (options.fill) {
-      ctx.globalAlpha = options.fillOpacity;
-      ctx.fillStyle = options.fillColor || options.color;
-      ctx.fill(options.fillRule || 'evenodd');
-    }
-    if (options.stroke && options.weight !== 0) {
-      if (ctx.setLineDash) ctx.setLineDash(layer.options && layer.options._dashArray || []);
-      ctx.lineCap = options.lineCap;
-      ctx.lineJoin = options.lineJoin;
-      ctx.globalAlpha = options.casingOpacity != null ? options.casingOpacity : 0.9;
-      ctx.lineWidth = options.casingWeight || options.weight;
-      ctx.strokeStyle = options.casingColor;
-      ctx.stroke();
-      ctx.globalAlpha = options.opacity;
-      ctx.lineWidth = options.weight;
-      ctx.strokeStyle = options.color;
-      ctx.stroke();
-    }
-  };
 }
 
 // Vẽ ô lặp 9 lần lệch ±1 ô để nét cắt ở mép ô liền với ô kế bên
@@ -919,36 +865,35 @@ export function tt16ParcelStyle(type, layer, { scenario, detailed, approved, nam
  * mọi mức zoom tô màu tone); tone = màu tô khi thu nhỏ, mặc định là màu ký hiệu.
  */
 export function tt16SymbolStyle(key, tone, layer, { scenario, detailed, approved = true, name = '', geometry = null } = {}) {
-  ensureLotCasing();
   const s = key ? TT16_STYLES[key] : null;
   const fill = tone || (s && s.color) || '#94a3b8';
   if (isTransportLand(key, layer, name)) return roadLotStyle(s ? s.color : fill);
   const pattern = detailed && s ? patternFor(key) : null;
   const paint = pattern ? s.color : fill;
-  const bright = approved && outlineBright(paint);
-  return dropStripHalo({
-    color: !approved ? '#f87171' : (bright ? lightenTone(paint) : paint),
+  const light = approved && thinLightOutline(key);
+  return {
+    color: !approved ? '#f87171' : (light ? lightenTone(paint) : paint),
     opacity: 0.95,
-    ...frameStyle(layer, scenario, approved, bright),
+    ...frameStyle(layer, scenario, approved, light),
     fillColor: pattern || paint,
     fillOpacity: (pattern ? 1 : (s && s.solidOpacity) || (s && s.fillOpacity) || FILL_OPACITY) * lotOpacity
-  }, geometry);
+  };
 }
 
-// Kiểu viền theo tiền tố layer: HT_ nét mảnh, QHDD_ (hoặc không tiền tố trên kịch bản QH) nét liền, QHDH_ nét đứt
-function frameStyle(layer, scenario, approved = true, bright = false) {
+// Kiểu viền theo tiền tố layer: HT_ nét mảnh, QHDD_ (hoặc không tiền tố trên kịch bản QH) nét liền, QHDH_ nét đứt.
+// thinLight: một nét 0.7px, không quầng, chỉ khi caller đã quyết nhóm đất và nền vệ tinh.
+function frameStyle(layer, scenario, approved = true, thinLight = false) {
   const stage = String(layer || '').trim().toUpperCase().split(/[_\s]/)[0];
   const plan = stage === 'QHDD' || stage === 'QHDH' || stage === 'QH' || (stage !== 'HT' && scenario === 'QH');
-  const weight = plan ? (bright ? FRAME_PX_BRIGHT : FRAME_PX) : HT_FRAME_PX;
-  const halo = bright && plan;
+  const weight = thinLight ? THIN_LIGHT_PX : (plan ? FRAME_PX : HT_FRAME_PX);
   return {
     weight,
     lineCap: 'butt',
     lineJoin: 'miter',
     dashArray: !approved ? '4,4' : stage === 'QHDH' ? dashFor(weight) : null,
-    casingColor: halo ? FRAME_HALO : null,
-    casingWeight: halo ? +(weight + FRAME_HALO_PX).toFixed(1) : null,
-    casingOpacity: halo ? 0.92 : null
+    casingColor: null,
+    casingWeight: null,
+    casingOpacity: null
   };
 }
 
@@ -1046,7 +991,7 @@ export function landLabel(layerName) {
 
 export function landPolylineStyle(layerName) {
   const color = landColor(layerName) || '#94a3b8';
-  return { color, weight: 2, opacity: 0.95, fillColor: color, fillOpacity: 0.08 * lotOpacity };
+  return { color, weight: FRAME_PX, opacity: 0.95, fillColor: color, fillOpacity: 0.08 * lotOpacity };
 }
 
 // Lô hạ tầng nhập khớp thủ công: layer "<tên> → <mã loại>" (cadImportUi), mã cấp đô thị thêm _DT
@@ -1221,9 +1166,7 @@ export function landParcelStyle(layerName, { detailed = false, phase = 'HT', nam
   if (key && TT16_STYLES[key]) {
     return tt16SymbolStyle(key, TT16_STYLES[key].color, layerName, { scenario: phase, detailed, name, geometry });
   }
-  ensureLotCasing();
   const base = landPolylineStyle(layerName);
-  const bright = outlineBright(base.color);
-  const frame = frameStyle(layerName, phase, true, bright);
-  return dropStripHalo({ ...base, ...frame, color: bright ? lightenTone(base.color) : base.color }, geometry);
+  const frame = frameStyle(layerName, phase, true, false);
+  return { ...base, ...frame, color: base.color };
 }
