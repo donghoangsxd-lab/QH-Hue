@@ -1,5 +1,6 @@
-// Công trình thể thao, đường sắt và đường thủy nội địa từ OpenStreetMap (Overpass), cắt theo khung TP. Huế.
-// Không cần Earth Engine. OSM không đủ so với thực địa: nhiều sân chưa vẽ, Huế chưa có đường sắt đô thị hay mạng tàu thủy hành khách.
+// Đường sắt và đường thủy nội địa từ OpenStreetMap (Overpass), cắt theo khung TP. Huế.
+// Công trình thể thao không còn ở lớp này: nhập vào tab 8-VH (services/osmSports.js).
+// Không cần Earth Engine. Huế chưa có đường sắt đô thị hay mạng tàu thủy hành khách.
 const axios = require('axios');
 
 const BBOX = '15.9,106.9,16.9,108.3';
@@ -10,20 +11,10 @@ const OVERPASS_URLS = [
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter'
 ];
-const LEISURE = new Set(['sports_centre', 'pitch', 'stadium', 'track', 'fitness_centre', 'swimming_pool', 'golf_course']);
 const RAIL_LINE = new Set(['rail', 'light_rail', 'subway', 'narrow_gauge', 'tram']);
 const RAIL_STOP = new Set(['station', 'halt', 'tram_stop']);
 const DEAD = new Set(['abandoned', 'disused', 'razed', 'proposed', 'construction', 'dismantled']);
 
-const LEISURE_VI = {
-  sports_centre: 'Nhà thi đấu, trung tâm thể thao',
-  pitch: 'Sân thể thao',
-  stadium: 'Sân vận động',
-  track: 'Đường chạy',
-  fitness_centre: 'Cơ sở tập luyện',
-  swimming_pool: 'Bể bơi',
-  golf_course: 'Sân gôn'
-};
 const RAIL_VI = {
   rail: 'Đường sắt', light_rail: 'Đường sắt nhẹ', subway: 'Tàu điện ngầm',
   narrow_gauge: 'Đường sắt khổ hẹp', tram: 'Tàu điện',
@@ -94,9 +85,6 @@ function featureOf(el) {
   if (el.type === 'node') {
     const lat = Number(el.lat), lon = Number(el.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-    if (LEISURE.has(tags.leisure)) {
-      return pointFeature('sport', tags.leisure, tags.name || LEISURE_VI[tags.leisure] || tags.leisure, lon, lat, el);
-    }
     if (RAIL_STOP.has(tags.railway) && !deadRail(tags)) {
       return pointFeature('railStop', tags.railway, tags.name || RAIL_VI[tags.railway] || 'Ga', lon, lat, el);
     }
@@ -108,18 +96,6 @@ function featureOf(el) {
   if (el.type !== 'way') return null;
   const coords = cleanCoords(el.geometry);
   if (coords.length < 2) return null;
-  const closed = coords.length >= 4 && coords[0][0] === coords[coords.length - 1][0] && coords[0][1] === coords[coords.length - 1][1];
-  if (LEISURE.has(tags.leisure)) {
-    const mid = midpoint(closed ? coords.slice(0, -1) : coords);
-    const geometry = closed
-      ? { type: 'Polygon', coordinates: [coords] }
-      : { type: 'LineString', coordinates: coords };
-    return {
-      type: 'Feature',
-      geometry,
-      properties: props('sport', tags.leisure, tags.name || LEISURE_VI[tags.leisure] || tags.leisure, mid, lineKm(coords), el)
-    };
-  }
   if (RAIL_LINE.has(tags.railway) && !deadRail(tags)) {
     const mid = midpoint(coords);
     return {
@@ -176,8 +152,6 @@ const BUDGET_MS = 48000;
 
 const QUERY = `[out:json][timeout:40];
 (
-  node["leisure"~"^(sports_centre|pitch|stadium|track|fitness_centre|swimming_pool|golf_course)$"](${BBOX});
-  way["leisure"~"^(sports_centre|pitch|stadium|track|fitness_centre|swimming_pool|golf_course)$"](${BBOX});
   node["railway"~"^(station|halt|tram_stop)$"](${BBOX});
   way["railway"~"^(rail|light_rail|subway|narrow_gauge|tram)$"](${BBOX});
   way["waterway"~"^(river|canal)$"](${BBOX});
@@ -223,11 +197,11 @@ async function loadOsmOpen() {
     at: new Date().toISOString(),
     bbox: BBOX,
     note: 'OSM do cộng đồng vẽ, chưa đủ so với thực địa. Huế chưa có đường sắt đô thị; sông kênh là tuyến nước, không phải tuyến tàu thủy hành khách.',
-    counts: { sport: count('sport'), rail: count('rail'), railStop: count('railStop'), water: count('water'), ferry: count('ferry') },
+    counts: { rail: count('rail'), railStop: count('railStop'), water: count('water'), ferry: count('ferry') },
     geojson: fc
   };
   cache = { at: Date.now(), data };
   return data;
 }
 
-module.exports = { featureOf, collection, loadOsmOpen, haversineKm, LEISURE_VI, RAIL_VI, ATTEMPT_MS, BUDGET_MS, QUERY };
+module.exports = { featureOf, collection, loadOsmOpen, haversineKm, RAIL_VI, ATTEMPT_MS, BUDGET_MS, QUERY };

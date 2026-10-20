@@ -11,7 +11,7 @@ import { loadRoadTypeLengths, densityArea, loadBuiltAreas } from './wardRoads.js
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { STATUS_REF, STATUS_DATE, URBANS_614, WARDS_614, RURAL_RULE, bareName as bare, wardLevel614, urbans614Of, urbans614ByPlan } from './urbanStatus.js';
-import { loadOsmOpen, osmSportsReady, osmLoadNote, sportsInWards, transitNote } from './osmOpen.js';
+import { loadOsmOpen, osmTransitReady, transitNote } from './osmOpen.js';
 
 export const CLASS_REF = 'Nghị quyết 111/2025/UBTVQH15';
 export const PLAN_REF = 'Quyết định 756/QĐ-UBND ngày 28/02/2026';
@@ -108,10 +108,10 @@ const STD_2A = [
     method: 'Gồm đại học, cao đẳng, THPT, trung cấp và dạy nghề. Kế thừa mã THPT đã duyệt — cận dưới. Mầm non, tiểu học, THCS là chỉ tiêu đơn vị ở, không cộng vào tiêu chuẩn này.' },
   { code: '2A.III.16', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'culture', inherit: 'QCVN 8-VH', name: 'Công trình văn hóa', unit: 'công trình',
     band: { II: { hi: 20, lo: 10 }, III: { hi: 10, lo: 2 } }, pts: { hi: 5, lo: 3.75 },
-    method: 'Thư viện, bảo tàng, nhà hát, nhà văn hóa, di tích, tượng đài... Kế thừa mã 8-VH đã duyệt — cận dưới. Công trình thể thao hiện riêng ở 2A.III.17 để tham khảo, không trừ khỏi nhóm này và chưa tính điểm.' },
-  { code: '2A.III.17', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'sports', inherit: 'OSM leisure', name: 'Công trình thể dục, thể thao', unit: 'công trình',
+    method: 'Thư viện, bảo tàng, nhà hát, nhà văn hóa, di tích, tượng đài... Kế thừa mã 8-VH đã duyệt — cận dưới. Sân thể thao cùng mã 8-VH vẫn được đếm ở đây; 2A.III.17 liệt kê riêng phần tên là thể thao, tham khảo, chưa tính điểm.' },
+  { code: '2A.III.17', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'sports', inherit: 'QCVN 8-VH', name: 'Công trình thể dục, thể thao', unit: 'công trình',
     band: { II: { hi: 10, lo: 5 }, III: { hi: 5, lo: 2 } }, pts: { hi: 4, lo: 3 },
-    method: 'Đếm sân, nhà thi đấu, sân vận động, đường chạy, bể bơi, sân gôn, cơ sở tập luyện trên OpenStreetMap (leisure=pitch, stadium, sports_centre, track, swimming_pool, golf_course, fitness_centre) có điểm đại diện trong phạm vi đô thị, đã cắt theo ranh 40 phường xã. OSM chưa vẽ đủ. Tham khảo, chưa tính điểm.' },
+    method: 'Đếm công trình 8-VH đã duyệt có tên sân, nhà thi đấu, sân vận động, đường chạy, bể bơi, sân gôn hoặc cơ sở tập luyện trong phạm vi đô thị. Nguồn gồm dòng Sheet và công trình nhập từ OpenStreetMap. Tham khảo, chưa tính điểm.' },
   { code: '2A.III.18', group: 'III', sub: 'III.2 Hạ tầng xã hội', calc: 'commerce', inherit: 'QCVN 9-TM', name: 'Công trình thương mại, dịch vụ', unit: 'công trình',
     band: { II: { hi: 10, lo: 5 }, III: { hi: 5, lo: 2 } }, pts: { hi: 3, lo: 2 },
     method: 'Chợ, siêu thị, trung tâm thương mại cấp đô thị. Kế thừa mã 9-TM đã duyệt.' },
@@ -211,6 +211,13 @@ function containsWard(urban, wardName) {
 
 const urbanByWard = (wardName) => URBANS.find(u => containsWard(u, wardName)) || null;
 
+function sportInfraName(name) {
+  const s = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  return /THETHAO|THEDUC|TDTT|SANVANDONG|SANGOLF|SANGON|SANBONG|NHATHIDAU|BEBOI|DUONGCHAY|TAPLUYEN|HOBOI|STADIUM|SWIMMING|GOLF|FITNESS|PITCH|SPORT/.test(s)
+    && !s.includes('VANHOA');
+}
+
 function itemsOf(wards, pairs) {
   const out = [];
   wards.forEach(w => pairs.forEach(([bucket, key]) => {
@@ -275,15 +282,9 @@ function measure(calc, urban, wards, roads) {
     return { value: n, partial: true, note: STD_2A.find(s => s.calc === 'culture').method };
   }
   if (calc === 'sports') {
-    if (!osmSportsReady()) {
-      const err = osmLoadNote();
-      return err
-        ? { note: err }
-        : { pending: true, note: 'Đang tải công trình thể thao OpenStreetMap' };
-    }
-    const n = sportsInWards(list.map(w => w.Ten_Phuong));
-    if (n == null) return { pending: true, note: 'Chưa gán được công trình thể thao vào phường, xã' };
-    return { value: n, reference: true, note: `${n} công trình thể thao OSM trong phạm vi. Tham khảo, chưa tính điểm. ${STD_2A.find(s => s.calc === 'sports').method}` };
+    const rows = itemsOf(list, [['urbanResults', 'VH_DT'], ['unitResults', 'VH_DV']]);
+    const n = rows.filter(s => sportInfraName(s.name)).length;
+    return { value: n, reference: true, note: `${n} công trình thể thao trong mã 8-VH đã duyệt. Tham khảo, chưa tính điểm. ${STD_2A.find(s => s.calc === 'sports').method}` };
   }
   if (calc === 'commerce') {
     const n = itemsOf(list, [['urbanResults', 'TM_DT'], ['unitResults', 'TM_DV']]).length;
@@ -965,7 +966,7 @@ export function renderUrbanClass(el, { wardName, wards }) {
   };
   draw();
   if (!roads) loadRoads().then(draw).catch(err => console.warn('Phân loại đô thị – mạng lưới đường lỗi:', err));
-  if (!osmSportsReady()) loadOsmOpen().then(draw).catch(err => console.warn('Phân loại đô thị – OSM lỗi:', err));
+  if (!osmTransitReady()) loadOsmOpen().then(draw).catch(err => console.warn('Phân loại đô thị – OSM lỗi:', err));
 }
 
 export function initUrbanClassEvents(el, rerender) {

@@ -13,6 +13,7 @@ const projects = require('../services/projectStore');
 const pdfLimits = require('../services/pdfLimits');
 const statsStore = require('../services/statsStore');
 const osmOpen = require('../services/osmOpen');
+const osmSports = require('../services/osmSports');
 
 let cachedWardStats = null;
 let lastWardStatsFetch = 0;
@@ -1154,25 +1155,36 @@ async function computeNetworkCoverage(ee, popRaster, wardGeometry, groups) {
 
 // ============================ NHẬP ĐIỂM OPENSTREETMAP (ADMIN) ============================
 
-const OSM_IMPORT_MAX = 1500;
+const OSM_IMPORT_MAX = 4000;
 // Cùng loại đã có trong dữ liệu gần hơn ngưỡng này (m) → coi là trùng, không đề xuất lại
 // (trạm xe buýt nhỏ: cặp trạm 2 chiều đường cách nhau ~20–30 m vẫn là 2 trạm)
 const OSM_DUP_M = { "13-BUS": 12, "10-PCCC": 80, "11-NT": 60 };
 const OSM_REF_RE = /^OSM:(node|way|relation)\/\d{1,12}$/;
 
-/** Điểm OSM trình duyệt gửi lên → điểm hợp lệ (đúng loại, trong 40 phường/xã, chưa có trong dữ liệu) kèm phường và bán kính */
+/** Điểm OSM trình duyệt gửi lên → điểm hợp lệ (đúng loại, trong 40 phường/xã, chưa có trong dữ liệu) kèm phường và bán kính.
+ * 8-VH (thể thao): trùng khi cùng mã OSM, hoặc cùng tên và cách nhau < 80 m; ghi TrangThai = TRUE. */
 function prepareOsmImport(rawItems, allDataList, evaluatedWards) {
   const stats = {};
   constants.NETWORK_CODES.forEach(c => { stats[c] = { received: 0, outside: 0, duplicate: 0, accepted: 0 }; });
-  const known = allDataList.filter(it => constants.isNetworkCode(it.type) && it.lat != null && it.lng != null);
+  stats['8-VH'] = { received: 0, outside: 0, duplicate: 0, accepted: 0 };
+  const known = allDataList.filter(it => (constants.isNetworkCode(it.type) || it.type === '8-VH') && it.lat != null && it.lng != null);
   const knownRefs = new Set();
-  known.forEach(it => {
+  allDataList.forEach(it => {
     const m = String(it.note || '').match(/OSM:(node|way|relation)\/\d+/);
     if (m) knownRefs.add(m[0]);
   });
+  const sportsExisting = [];
+  allDataList.forEach(it => {
+    const ref = String(it.note || '').match(/OSM:(node|way|relation)\/\d+/);
+    if (it.type === '8-VH' && it.lat != null && it.lng != null) {
+      sportsExisting.push({ name: it.name, lat: Number(it.lat), lng: Number(it.lng), note: it.note });
+    } else if (ref) sportsExisting.push({ name: '', note: it.note });
+  });
   const accepted = [];
+  const sportsRaw = [];
   rawItems.forEach(raw => {
     const type = String(raw && raw.type || '');
+    if (type === '8-VH') { sportsRaw.push(raw); return; }
     if (!constants.isNetworkCode(type)) return;
     const st = stats[type];
     st.received++;
@@ -1189,6 +1201,40 @@ function prepareOsmImport(rawItems, allDataList, evaluatedWards) {
     item.radius = constants.standardRadius(item, constants.wardProfile(ward));
     accepted.push(item);
     st.accepted++;
+  });
+  const sportsCandidates = [];
+  sportsRaw.forEach(raw => {
+    const st = stats['8-VH'];
+    st.received++;
+    const pt = parseCoordInBounds(raw.lat, raw.lng);
+    const ref = String(raw.ref || '');
+    if (!pt || !OSM_REF_RE.test(ref)) { st.outside++; return; }
+    const ward = assignWardByGeometry(pt.lng, pt.lat, evaluatedWards);
+    if (!ward) { st.outside++; return; }
+    const kind = String(raw.kind || '');
+    const nhom = raw.nhom === 'Cấp đô thị' || osmSports.URBAN_KINDS.has(kind) ? 'Cấp đô thị' : 'Cấp DVO';
+    const name = sanitizeSheetText(raw.name, 150) || (osmSports.LEISURE_VI[kind] || 'Công trình thể thao');
+    sportsCandidates.push({
+      type: '8-VH',
+      name,
+      ward,
+      lat: pt.lat,
+      lng: pt.lng,
+      size: clamp(Math.round(Number(raw.size) || 0), 0, 1e7),
+      ref,
+      nhom,
+      nhomHaTang: nhom,
+      note: sanitizeSheetText(raw.note, 400) || osmSports.sportNote({}, kind || 'pitch', ref),
+      approved: true,
+      kind
+    });
+  });
+  const { kept, skipped } = osmSports.dedupeSports(sportsCandidates, sportsExisting);
+  skipped.forEach(() => { stats['8-VH'].duplicate++; });
+  kept.forEach(item => {
+    item.radius = constants.standardRadius(item, constants.wardProfile(item.ward));
+    accepted.push(item);
+    stats['8-VH'].accepted++;
   });
   return { accepted, stats };
 }
@@ -4029,6 +4075,22 @@ module.exports = async (req, res) => {
       const { accepted, stats } = prepareOsmImport(rawItems, allDataList, await loadEvaluatedWards(wardVectorParsed));
       if (body.dryRun || !accepted.length) {
         return res.status(200).json({ success: true, dryRun: true, stats, items: accepted });
+      }
+      if (accepted.some(it => it.type === '8-VH')) {
+        let ver = null;
+        try {
+          ver = await callAppsScript({ action: 'scriptVersion' }, { action: 'scriptVersion' });
+        } catch (err) {
+          ver = { error: err.message };
+        }
+        if (!ver || ver.script !== 'osm-vh-1') {
+          return res.status(409).json({
+            error: true,
+            needRedeploy: true,
+            stats,
+            message: 'Chưa ghi Sheet. Web app Apps Script chưa có bản osm-vh-1 (công trình thể thao ghi TrangThai = TRUE, nhóm Cấp đô thị hoặc Cấp DVO). Extensions → Apps Script, dán apps-script/Code.gs, Deploy → Manage deployments → Edit → Version: New version → Deploy, rồi bấm Ghi lại. Nếu không triển khai được, dán scripts/data/osm-sports-8vh.csv vào tab 8-VH (không dán thêm nếu đã bấm Ghi thành công).'
+          });
+        }
       }
       const result = await callAppsScript({ action: 'addPendingPoints' }, {
         action: 'addPendingPoints',

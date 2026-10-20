@@ -544,7 +544,6 @@
             <span class="road-legend-item" title="Đường dành riêng cho xe đạp: OpenStreetMap + tuyến Admin vẽ bổ sung"><i style="background:repeating-linear-gradient(90deg,#4ade80 0 5px,transparent 5px 8px); height:2px;"></i>Xe đạp</span>
             <span class="road-legend-item"><i style="background:#fde047; height:2px;"></i>Chưa phân loại</span>
           </div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_osmSport"><label for="chk_osmSport" title="Sân, nhà thi đấu, sân vận động, đường chạy, bể bơi, sân gôn, cơ sở tập luyện trên OpenStreetMap (leisure), đã cắt theo ranh 40 phường xã. OSM chưa vẽ đủ. Chỉ để tham khảo, chưa tính điểm phân loại đô thị."><svg class="ico ico-layer"><use href="#i-area"/></svg>Công trình thể thao (OSM)</label></div></div>
           <div class="layer-row"><div><input type="checkbox" id="chk_osmRail"><label for="chk_osmRail" title="Đường sắt và ga đang dùng trên OpenStreetMap (railway=rail, light_rail, subway, tram, station, halt). Không gồm tuyến bỏ, quy hoạch. Huế chưa có đường sắt đô thị trong OSM. Lớp tham chiếu cho tiêu chuẩn giao thông công cộng, chưa tính dân số trong 500 m."><svg class="ico ico-layer"><use href="#i-road"/></svg>Đường sắt (OSM)</label></div></div>
           <div class="layer-row"><div><input type="checkbox" id="chk_osmWater"><label for="chk_osmWater" title="Sông, kênh và bến phà trên OpenStreetMap (waterway=river|canal, amenity=ferry_terminal). Đây là tuyến nước, không phải mạng tàu thủy hành khách. Lớp tham chiếu cho tiêu chuẩn giao thông công cộng."><svg class="ico ico-layer"><use href="#i-stream"/></svg>Đường thủy nội địa (OSM)</label></div></div>
           <div class="flood-box" id="osmOpenBox" style="display:none;">
@@ -917,7 +916,7 @@
         <div class="admin-sub-switch" role="tablist" aria-label="Công cụ hiệu chỉnh">
           <button type="button" class="admin-sub-btn active" data-sub="addRoad" role="tab" aria-selected="true"><svg class="ico"><use href="#i-road"/></svg>Tuyến đường</button>
           <button type="button" class="admin-sub-btn" data-sub="addPop" role="tab" aria-selected="false"><svg class="ico"><use href="#i-users"/></svg>Pixel dân cư</button>
-          <button type="button" class="admin-sub-btn" data-sub="addOsm" role="tab" aria-selected="false" title="Nhập trạm xe buýt, trụ sở PCCC, nhà tang lễ - nghĩa trang từ OpenStreetMap"><svg class="ico"><use href="#i-map"/></svg>Dữ liệu OSM</button>
+          <button type="button" class="admin-sub-btn" data-sub="addOsm" role="tab" aria-selected="false" title="Nhập trạm xe buýt, trụ sở PCCC, nhà tang lễ - nghĩa trang và công trình thể thao từ OpenStreetMap"><svg class="ico"><use href="#i-map"/></svg>Dữ liệu OSM</button>
         </div>
         <div id="addRoad">
           <div class="form-grid">
@@ -976,11 +975,12 @@
         </div>
 
         <div id="addOsm" style="display:none;">
-          <div class="cad-hint">Tải điểm OpenStreetMap trong 40 phường/xã, ghi vào tab 13-BUS / 10-PCCC / 11-NT của Sheet ở trạng thái <b>chờ duyệt</b>. Điểm đã có (cùng mã OSM, hoặc cùng loại ở rất gần) tự bỏ qua; lăng mộ di tích và trụ nước chữa cháy không được nhập.</div>
+          <div class="cad-hint">Tải điểm OpenStreetMap trong 40 phường/xã. Xe buýt, PCCC, nghĩa trang ghi tab tương ứng ở trạng thái <b>chờ duyệt</b>. Công trình thể thao ghi vào tab <b>8-VH</b> (nhà văn hóa, thể thao hiện trạng), <b>TrangThai = TRUE</b>, cùng biểu tượng và độ phủ với công trình VH-TT khác. Bỏ điểm trùng mã OSM, hoặc cùng tên và cách nhau dưới 80 m. Lăng mộ di tích và trụ nước chữa cháy không được nhập. Ghi thể thao cần bản Apps Script osm-vh-1 đã triển khai.</div>
           <div class="osm-types">
             <label><input type="checkbox" class="osm-type" value="13-BUS" checked>Trạm dừng xe buýt</label>
             <label><input type="checkbox" class="osm-type" value="10-PCCC" checked>Trụ sở cảnh sát PCCC</label>
             <label><input type="checkbox" class="osm-type" value="11-NT" checked>Nhà tang lễ, nghĩa trang</label>
+            <label><input type="checkbox" class="osm-type" value="8-VH">Nhà văn hóa, thể thao (OSM)</label>
           </div>
           <button type="button" class="btn-submit" id="btnOsmCheck"><svg class="ico"><use href="#i-inspect"/></svg>KIỂM TRA DỮ LIỆU OSM</button>
           <div id="osmStatus" class="rp-status" role="status" aria-live="polite"></div>
