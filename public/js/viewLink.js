@@ -36,7 +36,6 @@ const LAYERS = [
   ['nh', 'chk_lst'],
   ['fr', 'chk_forest'],
   ['rr', 'chk_risk'],
-  ['os', 'chk_osmSport'],
   ['or', 'chk_osmRail'],
   ['ow', 'chk_osmWater'],
   ['c1', 'chk_c1'], ['c2', 'chk_c2'], ['c3', 'chk_c3'], ['c4', 'chk_c4'], ['c5', 'chk_c5'],

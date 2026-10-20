@@ -813,7 +813,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const FOCUS_CHECKS = [
     ...ICON_GROUPS.map(k => `chk_${k}`),
     'chk_bound', 'chk_urban', 'chk_qhc25', 'chk_qhc10', 'chk_gt25', 'chk_gt10', 'chk_qhct', 'chk_parcel', 'chk_projects', 'chk_pop', 'chk_terrain', 'chk_drainage', 'chk_basin', 'chk_flood', 'chk_sarflood',
-    'chk_lst', 'chk_ndvi', 'chk_newdev', 'chk_forest', 'chk_risk', 'chk_roads', 'chk_osmSport', 'chk_osmRail', 'chk_osmWater', 'chk_cadastre', 'chk_invest', 'chk_heat'
+    'chk_lst', 'chk_ndvi', 'chk_newdev', 'chk_forest', 'chk_risk', 'chk_roads', 'chk_osmRail', 'chk_osmWater', 'chk_cadastre', 'chk_invest', 'chk_heat'
   ];
   let focusSnapshot = null;
   const setChecked = (id, on) => {

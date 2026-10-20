@@ -1,4 +1,4 @@
-// Lớp OpenStreetMap cho tiêu chí phân loại đô thị: thể thao (tách khỏi văn hóa), đường sắt, đường thủy nội địa.
+// Lớp OpenStreetMap: đường sắt và đường thủy nội địa. Công trình thể thao nằm trong mã 8-VH, không còn lớp riêng.
 // Tải một lần qua api/gee.js (Overpass). Gán phường khi đã có ranh 40 phường xã.
 import { geeApi } from './api.js';
 import { state } from './state.js';
@@ -8,7 +8,6 @@ import { clipOsmFeatures, countGroups } from './osmClip.js';
 
 const $ = (id) => document.getElementById(id);
 const GROUPS = [
-  { id: 'chk_osmSport', group: 'sport', color: '#ea580c' },
   { id: 'chk_osmRail', group: 'rail', color: '#334155' },
   { id: 'chk_osmWater', group: 'water', color: '#0284c7' }
 ];
@@ -86,25 +85,8 @@ export function loadOsmOpen() {
   return promise;
 }
 
-function rowsOf(group) {
-  const rows = indexRows();
-  if (!rows) return null;
-  return rows.filter(r => r.group === group || (group === 'rail' && r.group === 'railStop') || (group === 'water' && r.group === 'ferry'));
-}
-
-export function osmSportsReady() {
+export function osmTransitReady() {
   return !!indexRows();
-}
-
-export function osmLoadNote() {
-  return loadError;
-}
-
-export function sportsInWards(names) {
-  const rows = rowsOf('sport');
-  if (!rows) return null;
-  const want = new Set((names || []).map(bareName));
-  return rows.filter(r => r.group === 'sport' && want.has(bareName(r.ward))).length;
 }
 
 export function transitNote(names) {
@@ -137,12 +119,12 @@ function draw() {
   const opts = {
     style: (f) => {
       const g = f.properties.group;
-      const color = g === 'water' || g === 'ferry' ? '#0284c7' : (g === 'rail' || g === 'railStop' ? '#334155' : '#ea580c');
+      const color = g === 'water' || g === 'ferry' ? '#0284c7' : '#334155';
       return { color, weight: g === 'rail' || g === 'water' ? 2.5 : 1.5, fillColor: color, fillOpacity: 0.35 };
     },
     pointToLayer: (f, latlng) => L.circleMarker(latlng, {
       radius: 5,
-      color: f.properties.group === 'ferry' ? '#0284c7' : (f.properties.group === 'railStop' ? '#334155' : '#ea580c'),
+      color: f.properties.group === 'ferry' ? '#0284c7' : '#334155',
       weight: 2,
       fillColor: '#fff',
       fillOpacity: 1
@@ -167,8 +149,7 @@ function paintBox(data) {
   if (box) box.style.display = anyOn() ? '' : 'none';
   if (!anyOn()) return;
   if (legend) {
-    legend.innerHTML = `<span><i class="sat-swatch" style="background:#ea580c"></i>Thể thao</span>
-      <span><i class="sat-swatch" style="background:#334155"></i>Đường sắt, ga</span>
+    legend.innerHTML = `<span><i class="sat-swatch" style="background:#334155"></i>Đường sắt, ga</span>
       <span><i class="sat-swatch" style="background:#0284c7"></i>Sông, kênh, bến thủy</span>`;
   }
   if (!stats) return;
@@ -183,7 +164,6 @@ function paintBox(data) {
   }
   const c = countGroups(feats);
   stats.innerHTML = `<div class="flood-wards">
-      <span>Thể thao <b>${fmtNum(c.sport || 0)}</b></span>
       <span>Đoạn đường sắt <b>${fmtNum(c.rail || 0)}</b></span>
       <span>Ga <b>${fmtNum(c.railStop || 0)}</b></span>
       <span>Sông, kênh <b>${fmtNum(c.water || 0)}</b></span>

@@ -1414,6 +1414,7 @@ function doPost(e) {
     if (action === "saveHaTangHienTrang") return jsonOutput(saveHaTangHienTrang(body));
     if (action === "deleteHaTangHienTrang") return jsonOutput(deleteHaTangHienTrang(body));
     if (action === "getHaTangHienTrang") return jsonOutput(listHaTangHienTrang());
+    if (action === "scriptVersion") return jsonOutput({ "success": true, "script": "osm-vh-1" });
     if (action === "addPendingPoints") {
       if (!Array.isArray(body.items) || !body.items.length) {
         return jsonOutput({ "error": "Không nhận được danh sách điểm. Deploy bản Code.gs này: Manage deployments → Edit → Version: New version." });
@@ -1931,9 +1932,10 @@ function importCadBatch(body) {
 }
 
 /**
- * Ghi hàng loạt điểm hiện trạng ở trạng thái chờ duyệt (TrangThai = FALSE), VD điểm OpenStreetMap do Admin nhập.
- * body = { items: [{ type, name, ward, lat, lng, size, radius, ref }] } — ref (VD "OSM:node/123") ghi vào cột Note;
- * dòng có Note chứa cùng ref đã có trong tab thì bỏ qua để nhập lại nhiều lần không bị trùng
+ * Ghi hàng loạt điểm hiện trạng. Mạng lưới (xe buýt, PCCC, nghĩa trang): TrangThai = FALSE, nhóm Cấp đô thị.
+ * Công trình thể thao 8-VH gửi kèm approved = true và nhom (Cấp đô thị / Cấp DVO), Note có nguồn OSM.
+ * body = { items: [{ type, name, ward, lat, lng, size, radius, ref, nhom, note, approved }] }
+ * ref (VD "OSM:node/123") — dòng có Note chứa cùng ref thì bỏ qua.
  */
 function addPendingPoints(body) {
   var items = Array.isArray(body.items) ? body.items : [];
@@ -1982,13 +1984,15 @@ function addPendingPoints(body) {
       set(c.col.id, id);
       set(c.col.name, String(it.name || 'Công trình mới').slice(0, 150));
       set(c.col.ward, sheetWard(it.ward));
-      set(c.col.nhom, 'Cấp đô thị');
+      set(c.col.nhom, it.nhom ? sheetNhom(it.nhom) : 'Cấp đô thị');
       set(c.col.lat, "'" + String(Number(it.lat)));
       set(c.col.lng, "'" + String(Number(it.lng)));
       set(c.col.quyMoHT, Number(it.size) > 0 ? Number(it.size) : 0);
-      set(c.col.trangThai, false);
+      set(c.col.trangThai, it.approved === true);
       set(c.col.thoiGian, currentTime);
-      set(c.col.ghiChu, "Đề xuất từ OpenStreetMap" + (ref ? " (" + ref + ")" : ""));
+      var note = String(it.note || '').slice(0, 500);
+      if (!note) note = "Đề xuất từ OpenStreetMap" + (ref ? " (" + ref + ")" : "");
+      set(c.col.ghiChu, note);
       if (ref) c.noteSet[ref] = true;
       c.rows.push(row);
       created.push(id);
@@ -2022,7 +2026,7 @@ function addPendingPoints(body) {
     return { "error": failed.length ? failed.join("; ") : "Không ghi được dòng nào", "created": 0, "skipped": skipped };
   }
   if (created.length) syncSheetsToGCS();
-  return { "success": true, "created": created.length, "skipped": skipped, "sheets": sheets, "script": "osm-tabs-1", "warning": failed.join("; ") };
+  return { "success": true, "created": created.length, "skipped": skipped, "sheets": sheets, "script": "osm-vh-1", "warning": failed.join("; ") };
 }
 
 // MẠNG LƯỚI ĐƯỜNG OSM TOÀN THÀNH PHỐ (Admin tải theo phường/xã, máy chủ webapp gửi sang để lưu lên bucket)
