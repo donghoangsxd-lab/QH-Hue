@@ -7,6 +7,7 @@ import { state, BUFFER_COLORS, layerType, getPlanScenarioList } from './state.js
 import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum } from './utils.js';
 import { loadElevTile, NATIVE_MAX_ZOOM, HUE_DEM_BOUNDS } from './terrainLayer.js';
+import { MAP_MAX_ZOOM } from './basemap.js';
 
 const POINT_ZOOM = 12;          // ô Terrarium dùng để lấy cao độ tại công trình (~36 m/pixel, sát độ phân giải DEM 30 m)
 const MAX_LIST = 150;
@@ -71,7 +72,7 @@ const FloodGrid = L.GridLayer.extend({
 });
 
 function makeLayer() {
-  const layer = new FloodGrid({ maxZoom: 19, maxNativeZoom: NATIVE_MAX_ZOOM, bounds: HUE_DEM_BOUNDS, zIndex: 2, opacity: 0.85 });
+  const layer = new FloodGrid({ maxZoom: MAP_MAX_ZOOM, maxNativeZoom: NATIVE_MAX_ZOOM, bounds: HUE_DEM_BOUNDS, zIndex: 2, opacity: 0.85 });
   layer.on('tileunload', (e) => liveTiles.delete(e.tile));
   return layer;
 }

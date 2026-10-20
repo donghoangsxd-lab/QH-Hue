@@ -13,7 +13,7 @@ import { startFlowAnimation } from './flowAnimation.js';
 import { tt16ParcelStyle, infraStyleKey, landParcelStyle, landLabel, landColor, landPatternKey, tt16SwatchCss, TT16_PATTERN_ZOOM, TT16_STYLES, LOT_OPACITY_EVENT } from './tt16Symbols.js';
 import { initLegendPanel } from './legendPanel.js';
 import { addIslandFlags } from './islandFlags.js';
-import { attachBasemap } from './basemap.js';
+import { attachBasemap, MAP_MAX_ZOOM, geeTileOpts } from './basemap.js';
 import {
   getCoveredRightWidth, highlightPlanWard, highlightPlanWards, wardFocusLayer, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, getViewMode, setViewMode, passToolClick, shownMaps
@@ -186,8 +186,19 @@ function resolveWardNameFromCoords(lat, lng) {
 
 // ============================ KHỞI TẠO BẢN ĐỒ ============================
 
+// Safari phóng cả trang khi vuốt hai ngón. Bản đồ phóng bằng sự kiện touch của Leaflet.
+let pagePinchBlocked = false;
+function blockPagePinch() {
+  if (pagePinchBlocked) return;
+  pagePinchBlocked = true;
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(type => {
+    document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+  });
+}
+
 export function initMap() {
-  map = L.map('map', { renderer: L.canvas(), maxZoom: 21 }).setView(CITY_CENTER, CITY_ZOOM);
+  map = L.map('map', { renderer: L.canvas(), maxZoom: MAP_MAX_ZOOM, touchZoom: true }).setView(CITY_CENTER, CITY_ZOOM);
+  blockPagePinch();
 
   attachBasemap(map);
 
@@ -1979,7 +1990,7 @@ function setLeftHeatUrl(url, beforeAdd = null) {
   tileHeatmapLayer = null;
   if (!url) return;
   const heatOpacityEl = document.getElementById('heatOpacity');
-  tileHeatmapLayer = L.tileLayer(url, { maxZoom: 19, opacity: heatOpacityEl ? heatOpacityEl.value / 100 : 0.3 });
+  tileHeatmapLayer = L.tileLayer(url, geeTileOpts({ opacity: heatOpacityEl ? heatOpacityEl.value / 100 : 0.3 }));
   if (beforeAdd) beforeAdd(tileHeatmapLayer);
   layers.heatmap.addLayer(tileHeatmapLayer);
 }
@@ -2784,8 +2795,8 @@ export async function loadPopulationLayer(pv) {
       const opacity = popOpacityEl ? popOpacityEl.value / 100 : 0.6;
       layers.pop.clearLayers();
       planLayers.pop?.clearLayers();
-      const left = L.tileLayer(data.urlFormat, { maxZoom: 19, opacity });
-      const right = L.tileLayer(data.urlFormat, { maxZoom: 19, opacity });
+      const left = L.tileLayer(data.urlFormat, geeTileOpts({ opacity }));
+      const right = L.tileLayer(data.urlFormat, geeTileOpts({ opacity }));
       // Chỉ đếm ô của bản đồ đang thấy và đang bật lớp (nhóm chưa vào bản đồ thì layer chưa tải ô)
       const shown = shownMaps();
       const tracked = [[map, layers.pop, left], [planMap, planLayers.pop, right]]

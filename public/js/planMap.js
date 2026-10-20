@@ -1,7 +1,7 @@
 import { state, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_FOCUS_STYLE, wardDrawFC } from './state.js';
 import { escapeHtml, wardLabelFontSize } from './utils.js';
 import { addIslandFlags } from './islandFlags.js';
-import { attachBasemap } from './basemap.js';
+import { attachBasemap, MAP_MAX_ZOOM, geeTileOpts } from './basemap.js';
 
 export let planMap = null;
 let leftMap = null;
@@ -48,7 +48,8 @@ export function initPlanMap(mainMap, mainLayers) {
     zoomControl: false,
     attributionControl: true,
     renderer: L.canvas(),
-    maxZoom: 21,
+    maxZoom: MAP_MAX_ZOOM,
+    touchZoom: true,
     zoomSnap: leftMap.options.zoomSnap
   }).setView(leftMap.getCenter(), leftMap.getZoom());
 
@@ -200,7 +201,7 @@ export function setPlanHeatUrl(url) {
   planHeatTile = null;
   if (!url) return;
   const opacityEl = document.getElementById('heatOpacity');
-  planHeatTile = L.tileLayer(url, { maxZoom: 19, opacity: opacityEl ? opacityEl.value / 100 : 0.3 });
+  planHeatTile = L.tileLayer(url, geeTileOpts({ opacity: opacityEl ? opacityEl.value / 100 : 0.3 }));
   planLayers.heatmap.addLayer(planHeatTile);
 }
 

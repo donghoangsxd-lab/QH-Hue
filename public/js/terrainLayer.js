@@ -8,6 +8,7 @@ import { map } from './mapEngine.js';
 import { planMap, shownMaps } from './planMap.js';
 import { geeApi } from './api.js';
 import { fmtNum, startTaskProgress } from './utils.js';
+import { MAP_MAX_ZOOM } from './basemap.js';
 
 const AWS_URL = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png';
 // Khớp HUE_BOUNDS trong config/constants.js, nới 10 km (cùng DEM_BUFFER_M phía máy chủ)
@@ -248,7 +249,7 @@ function opacity() {
 
 function makeLayer() {
   return new TerrainGrid({
-    maxZoom: 19,
+    maxZoom: MAP_MAX_ZOOM,
     maxNativeZoom: NATIVE_MAX_ZOOM,
     bounds: HUE_DEM_BOUNDS,
     opacity: opacity(),

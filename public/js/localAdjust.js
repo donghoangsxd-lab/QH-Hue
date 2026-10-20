@@ -8,7 +8,7 @@
 import { state } from './state.js';
 import { map } from './mapEngine.js';
 import { parseDxf, buildParcels, CRS_PRESETS, layerToType } from './cadImport.js';
-import { attachBasemap, detachBasemap } from './basemap.js';
+import { attachBasemap, detachBasemap, MAP_MAX_ZOOM } from './basemap.js';
 import { escapeHtml, fmtNum, ico, showToast, loadHtml2Canvas, loadHtml2Pdf } from './utils.js';
 import { namesOfProject } from './projectNames.js';
 import { setBottomPanelCollapsed } from './uiComponents.js';
@@ -463,7 +463,7 @@ function drawMaps(ids, s) {
     const el = $(id);
     if (!el || typeof L === 'undefined') return;
     try {
-      const m = L.map(el, { zoomControl: false, attributionControl: false, preferCanvas: true, zoomSnap: 0.25 });
+      const m = L.map(el, { maxZoom: MAP_MAX_ZOOM, zoomControl: false, attributionControl: false, preferCanvas: true, zoomSnap: 0.25 });
       attachBasemap(m);
       // Canvas của Leaflet cần tâm nhìn trước khi nhận nét vẽ, nếu không sẽ lỗi đọc bounds
       // Lề theo cỡ khung để bản A3 (khung lớn) vẫn thấy các lô xung quanh ranh

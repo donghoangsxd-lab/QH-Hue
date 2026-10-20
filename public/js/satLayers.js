@@ -9,6 +9,7 @@ import { state, BUFFER_COLORS, layerType } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml, fmtNum, startTaskProgress, trackTileLoads } from './utils.js';
 import { devFromYears, loadNewDevStats, devLegend, devStats, DEV_MIN_ZOOM } from './newDev.js';
+import { geeTileOpts } from './basemap.js';
 
 const $ = (id) => document.getElementById(id);
 const MAX_LIST = 150;
@@ -227,7 +228,7 @@ function opacityOf(cfg) {
 // track(layers): gắn đếm ô cho các layer đổi ảnh trên bản đồ đang thấy, gọi trước khi thêm / đổi URL để không sót ô đầu.
 // Cùng URL thì Leaflet không vẽ lại, dưới minZoom không tải ô: không đếm
 function setLayerUrl(cfg, rt, url, track) {
-  const opts = { maxZoom: 19, minZoom: cfg.minZoom || 0, opacity: opacityOf(cfg), zIndex: cfg.zIndex };
+  const opts = geeTileOpts({ minZoom: cfg.minZoom || 0, opacity: opacityOf(cfg), zIndex: cfg.zIndex });
   const changed = rt.url !== url;
   rt.url = url;
   const shown = shownMaps();
