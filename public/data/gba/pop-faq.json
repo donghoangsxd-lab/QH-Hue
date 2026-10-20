@@ -1,0 +1,50 @@
+{
+  "v": 1,
+  "questions": [
+    {
+      "id": "pop-out-school",
+      "q": "Phường, xã nào có nhiều người nhất ở ngoài vùng phục vụ trường học?",
+      "a": "Phường Thủy Xuân: khoảng 20.397 người, sau khi trừ dân chung cư rồi chia phần còn lại theo sàn nhà ở thấp tầng.",
+      "wards": [
+        "Phường Thủy Xuân"
+      ],
+      "source": "Phương pháp B và danh sách chung cư. Vùng phục vụ tính cả trường ở phường bên cạnh. Bán kính QCVN như bản đồ."
+    },
+    {
+      "id": "pop-out-health",
+      "q": "Phường, xã nào có nhiều người nhất ở ngoài vùng phục vụ y tế?",
+      "a": "Phường Thuận An: khoảng 64.689 người.",
+      "wards": [
+        "Phường Thuận An"
+      ],
+      "source": "Phương pháp B và danh sách chung cư. Trạm đã duyệt, có quy mô hiện trạng, bán kính QCVN."
+    },
+    {
+      "id": "pop-out-park",
+      "q": "Phường, xã nào có nhiều người nhất ở ngoài vùng phục vụ công viên?",
+      "a": "Phường Phú Xuân: khoảng 77.023 người.",
+      "wards": [
+        "Phường Phú Xuân"
+      ],
+      "source": "Phương pháp B và danh sách chung cư."
+    },
+    {
+      "id": "pop-flood-5",
+      "q": "Phường, xã nào có nhiều người nhất ở cao độ dưới 5 m?",
+      "a": "Phường Hóa Châu: khoảng 33.545 người (Copernicus GLO-30, mực 5 m).",
+      "wards": [
+        "Phường Hóa Châu"
+      ],
+      "source": "Dân chung cư theo cao độ khối nhà; phần còn lại theo trọng số nhà ở thấp tầng. Không phải FABDEM của thanh mô phỏng cũ."
+    },
+    {
+      "id": "pop-apt-ward",
+      "q": "Phường, xã nào có dân chung cư ước tính cao nhất?",
+      "a": "Phường Thuận Hóa: khoảng 261 người trong 117 chung cư ứng viên.",
+      "wards": [
+        "Phường Thuận Hóa"
+      ],
+      "source": "Danh sách ứng viên. Dân biết trước, không thì số căn × 3,3, không thì số tầng × dấu chân × 0,75 / 25 m²."
+    }
+  ]
+}

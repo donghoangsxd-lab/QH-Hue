@@ -388,6 +388,42 @@ function sanitizeSheetText(raw, maxLen) {
     .slice(0, maxLen);
 }
 
+function chungCuOptionalNumber(raw, min, max) {
+  if (raw === '' || raw == null) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < min || n > max) return null;
+  return n;
+}
+
+// Dòng tab Chung cư gửi từ popup Admin: chỉ giữ trường sheet, bỏ công thức và tọa độ ngoài Huế
+function sanitizeChungCuItems(raw) {
+  if (!Array.isArray(raw) || raw.length > 40) return null;
+  const items = [];
+  for (const it of raw) {
+    if (!it || typeof it !== 'object') return null;
+    const id = sanitizeSheetText(it.id, 40);
+    if (!id || !/^[A-Za-z0-9_-]+$/.test(id)) return null;
+    const pt = parseCoordInBounds(it.lat, it.lng);
+    const confidence = ['high', 'medium', 'low'].includes(it.confidence) ? it.confidence : '';
+    items.push({
+      id,
+      name: sanitizeSheetText(it.name, 180),
+      lat: pt ? Number(pt.lat.toFixed(6)) : null,
+      lng: pt ? Number(pt.lng.toFixed(6)) : null,
+      ward: sanitizeSheetText(it.ward, 80),
+      floors: chungCuOptionalNumber(it.floors, 1, 80),
+      units: chungCuOptionalNumber(it.units, 0, 20000),
+      residents: chungCuOptionalNumber(it.residents, 0, 100000),
+      footprint: chungCuOptionalNumber(it.footprint, 0, 500000),
+      source: sanitizeSheetText(it.source, 40) || 'sheet',
+      confidence,
+      verified: it.verified === true || it.verified === 'TRUE' || it.verified === 1,
+      note: sanitizeSheetText(it.note, 240)
+    });
+  }
+  return items;
+}
+
 // ============================ NHẬP LÔ ĐẤT TỪ DXF ============================
 
 const CAD_BATCH_MAX = 300;
@@ -2229,6 +2265,39 @@ module.exports = async (req, res) => {
       const base = constants.GBA_GCS_BASE;
       res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
       return res.status(200).json({ pmtiles: base + 'buildings.pmtiles', agg: base + 'agg.json' });
+    }
+
+    // Tab Chung cư: Apps Script đọc sheet; chưa deploy thì lấy bản đã đồng bộ trên bucket
+    if (action === 'getChungCu') {
+      let data = null;
+      try {
+        data = await callAppsScript({ action: 'getChungCu' });
+      } catch (err) {
+        console.warn('Đọc tab Chung cư qua Apps Script lỗi:', err.message);
+      }
+      if (!data || !Array.isArray(data.items)) {
+        try {
+          const r = await axios.get(`${constants.GBA_GCS_BASE}chungcu.json`, { timeout: 12000, validateStatus: () => true });
+          if (r.status < 400 && r.data && Array.isArray(r.data.items)) data = r.data;
+        } catch (err) {
+          console.warn('Đọc chungcu.json lỗi:', err.message);
+        }
+      }
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=600');
+      return res.status(200).json({ v: 1, items: (data && data.items) || [] });
+    }
+
+    if (action === 'saveChungCu') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const items = sanitizeChungCuItems(body && body.items);
+      if (!items || !items.length) return res.status(400).json({ error: true, message: 'Không có dòng chung cư hợp lệ' });
+      const result = await callAppsScript({ action: 'saveChungCu' }, { action: 'saveChungCu', items });
+      if (result.saved !== true) {
+        return res.status(502).json({ error: true, message: 'Apps Script chưa ghi được tab Chung cư (đã triển khai phiên bản mới của Code.gs chưa?)' });
+      }
+      return res.status(200).json({ success: true, saved: true, count: result.count || items.length });
     }
 
     // Đường trục chính rút gọn cả thành phố (mức phóng còn thấy một lúc nhiều phường, trên mức một biểu đồ tròn)

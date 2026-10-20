@@ -662,6 +662,7 @@ function syncSheetsToGCS(includeCad) {
     }
     var investCalls = collectInvestCalls(ss);
     if (investCalls) uploadToGCS(JSON.stringify(investCalls), "invest_calls.json");
+    syncChungCu(ss);
     scheduleWebappWarm();
 
   } catch (err) {
@@ -812,6 +813,11 @@ function installedOnEdit(e) {
   var sheet = range.getSheet();
   var sheetName = sheet.getName().trim();
 
+  if (sheetName === "Chung cư") {
+    syncChungCu(SpreadsheetApp.getActiveSpreadsheet());
+    return;
+  }
+
   if (!isValidInfraSheet(sheetName)) return;
 
   var startRow = range.getRow();
@@ -940,6 +946,10 @@ function doGet(e) {
       }
     }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (action === "getChungCu") {
+      return ContentService.createTextOutput(JSON.stringify(readChungCu(ss)))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     var currentTime = Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm:ss");
 
     // A. PHÊ DUYỆT ĐIỂM HẠ TẦNG THÀNH TRUE TỪ BẢN ĐỒ
@@ -1405,6 +1415,7 @@ function doPost(e) {
     if (action === "deleteBucketObject") return jsonOutput(deleteBucketObject(body));
     if (action === "saveRoads") return jsonOutput(saveRoads(body));
     if (action === "savePopEdits") return jsonOutput(savePopEdits(body));
+    if (action === "saveChungCu") return jsonOutput(saveChungCu(body));
     if (action === "saveDrainage") return jsonOutput(saveDrainage(body));
     if (action === "saveBasins") return jsonOutput(saveBasins(body));
     if (action === "saveDrainArrows") return jsonOutput(saveDrainArrows(body));
@@ -3187,4 +3198,108 @@ function renameProject(body) {
 
   if (infra || lands) syncSheetsToGCS(false);
   return { "success": true, "infra": infra, "lands": lands, "registry": registry, "backups": backups, "polygons": polygons };
+}
+
+// Tab Chung cư: admin xác nhận ứng viên (tên, vị trí, tầng, căn, dân, nguồn, cờ đã xác minh).
+const CHUNG_CU_SHEET = "Chung cư";
+const CHUNG_CU_HEADERS = ["ID", "Ten", "KinhDo", "ViDo", "PhuongXa", "SoTang", "SoCan", "DanCu", "DienTich", "Nguon", "TinCay", "DaXacMinh", "GhiChu"];
+const CHUNG_CU_FILE = "gba/chungcu.json";
+
+function ensureChungCuSheet(ss) {
+  var sheet = ss.getSheetByName(CHUNG_CU_SHEET);
+  if (!sheet) sheet = ss.insertSheet(CHUNG_CU_SHEET);
+  var width = CHUNG_CU_HEADERS.length;
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, width).setValues([CHUNG_CU_HEADERS]);
+    sheet.setFrozenRows(1);
+    return sheet;
+  }
+  var headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map(function(h) { return String(h || "").trim(); });
+  if (headers[0] !== "ID") {
+    sheet.insertRowBefore(1);
+    sheet.getRange(1, 1, 1, width).setValues([CHUNG_CU_HEADERS]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function chungCuNumber(v) {
+  if (v === "" || v == null) return null;
+  var n = Number(String(v).replace(",", "."));
+  return isFinite(n) ? n : null;
+}
+
+function readChungCu(ss) {
+  var sheet = ensureChungCuSheet(ss);
+  var data = sheet.getDataRange().getValues();
+  var items = [];
+  for (var r = 1; r < data.length; r++) {
+    var id = String(data[r][0] || "").trim();
+    if (!id) continue;
+    var verified = String(data[r][11] || "").trim().toUpperCase();
+    items.push({
+      id: id,
+      name: String(data[r][1] || ""),
+      lng: chungCuNumber(data[r][2]),
+      lat: chungCuNumber(data[r][3]),
+      ward: String(data[r][4] || ""),
+      floors: chungCuNumber(data[r][5]),
+      units: chungCuNumber(data[r][6]),
+      residents: chungCuNumber(data[r][7]),
+      footprint: chungCuNumber(data[r][8]),
+      source: String(data[r][9] || "sheet"),
+      confidence: String(data[r][10] || ""),
+      verified: verified === "TRUE" || verified === "1" || data[r][11] === true,
+      note: String(data[r][12] || "")
+    });
+  }
+  return { v: 1, items: items };
+}
+
+function syncChungCu(ss) {
+  try {
+    var payload = readChungCu(ss);
+    uploadToGCS(JSON.stringify(payload), CHUNG_CU_FILE);
+    return payload.items.length;
+  } catch (err) {
+    Logger.log("⚠ Chung cư: " + err);
+    return 0;
+  }
+}
+
+function saveChungCu(body) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ensureChungCuSheet(ss);
+  var items = (body && body.items) || [];
+  if (!items.length) return { error: "Không có dòng chung cư" };
+  var data = sheet.getDataRange().getValues();
+  var rowOf = {};
+  for (var r = 1; r < data.length; r++) rowOf[String(data[r][0] || "").trim()] = r + 1;
+  items.forEach(function(it) {
+    var id = String(it.id || "").trim();
+    if (!id) return;
+    var row = [
+      id,
+      String(it.name || ""),
+      it.lng == null ? "" : it.lng,
+      it.lat == null ? "" : it.lat,
+      String(it.ward || ""),
+      it.floors == null ? "" : it.floors,
+      it.units == null ? "" : it.units,
+      it.residents == null ? "" : it.residents,
+      it.footprint == null ? "" : it.footprint,
+      String(it.source || "sheet"),
+      String(it.confidence || ""),
+      it.verified ? "TRUE" : "FALSE",
+      String(it.note || "")
+    ];
+    var at = rowOf[id];
+    if (at) sheet.getRange(at, 1, 1, row.length).setValues([row]);
+    else {
+      sheet.appendRow(row);
+      rowOf[id] = sheet.getLastRow();
+    }
+  });
+  var n = syncChungCu(ss);
+  return { saved: true, count: n };
 }

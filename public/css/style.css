@@ -5236,4 +5236,15 @@ body.project-review.la-page #projectReviewHost {
 .gba-attr { margin: 6px 0 0; font-size: 11px; opacity: 0.85; }
 .gba-stats { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(148, 163, 184, 0.35); font-size: 12px; }
 .gba-stats b { font-size: 12px; }
+.apt-pin { background: none; border: 0; }
+.apt-pin span { display: flex; width: 22px; height: 22px; border-radius: 6px; align-items: center; justify-content: center; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.apt-pin .ico { width: 14px; height: 14px; }
+.apt-summary, .apt-status, .apt-ward { margin: 6px 0 0; font-size: 12px; }
+.apt-pop dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 6px 0; }
+.apt-pop-n { font-weight: 700; margin-top: 2px; }
+.apt-edit { display: flex; flex-direction: column; gap: 4px; }
+.apt-edit label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.apt-edit input[type="number"] { width: 6em; }
+#aptAdmin { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+#aptAdmin[hidden] { display: none; }
 

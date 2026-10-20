@@ -562,6 +562,24 @@
             <div><input type="checkbox" id="chk_gbaGrid"><label for="chk_gbaGrid" title="Lưới khoảng 150 m theo cường độ xây dựng tương đối (dấu chân nhân nhóm chiều cao, so trong địa bàn). Bốn nhóm: Thấp, Trung bình, Cao, Rất cao. Không phải mét chiều cao."><svg class="ico ico-layer"><use href="#i-coverage"/></svg>Cường độ xây dựng tương đối</label></div>
           </div>
           <div class="flood-box" id="gbaBox" style="display:none;"></div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_apt"><label for="chk_apt" title="Chung cư cao tầng: OSM (apartments hoặc nhà ở từ 5 tầng), dấu chân GBA rất cao từ 300 m² trên đất ở hoặc lô nhà ở chung cư / cao tầng / hỗn hợp, và tên đồ án. Dân tính riêng rồi trừ khỏi dân số phường trước khi chia phần còn lại cho nhà thấp tầng."><svg class="ico ico-layer"><use href="#i-floors"/></svg>Chung cư <small class="layer-hint" id="aptHint"></small></label></div>
+          </div>
+          <div class="flood-box" id="aptBox" style="display:none;">
+            <p class="apt-summary" id="aptSummary"></p>
+            <div id="aptAdmin" hidden>
+              <label>Cách chia dân
+                <select id="aptMethod" aria-label="Cách chia dân số">
+                  <option value="b">B + chung cư</option>
+                  <option value="old">Pixel (so sánh)</option>
+                </select>
+              </label>
+              <label>Người/hộ <input id="aptHh" type="number" min="1" max="8" step="0.1" value="3.3"></label>
+              <label>m²/người <input id="aptM2" type="number" min="8" max="80" step="1" value="25"></label>
+              <label>Hiệu suất sàn <input id="aptEff" type="number" min="0.4" max="1" step="0.05" value="0.75"></label>
+              <p id="aptStatus" class="apt-status"></p>
+            </div>
+          </div>
           <div class="flood-box" id="cadastreBox" style="display:none;">
             <div class="cad-find">
               <select id="cadastreXa" aria-label="Xã/phường (địa giới cũ)"><option value="">Chọn xã/phường (địa giới cũ)</option></select>

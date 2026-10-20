@@ -8,6 +8,7 @@ import { geeApi } from './api.js';
 import { escapeHtml, isApproved, fmtNum } from './utils.js';
 import { loadElevTile, NATIVE_MAX_ZOOM, HUE_DEM_BOUNDS } from './terrainLayer.js';
 import { MAP_MAX_ZOOM } from './basemap.js';
+import { POP_METHOD_EVENT, floodPopulation, popMethod } from './popMethod.js';
 
 const POINT_ZOOM = 12;          // ô Terrarium dùng để lấy cao độ tại công trình (~36 m/pixel, sát độ phân giải DEM 30 m)
 const MAX_LIST = 150;
@@ -183,6 +184,22 @@ function ensureBins() {
 
 // Bậc b (cao độ DEM làm tròn mét) ngập khi b < mực nước; diện tích bỏ bậc ≤ 0 m (mặt nước thường xuyên)
 function exposureByWard() {
+  if (popMethod() === 'b') {
+    const built = floodPopulation(level);
+    if (built) {
+      const areaBy = new Map();
+      if (binsData) {
+        binsData.wards.forEach(w => {
+          let wa = 0;
+          (w.bins || []).forEach(([b, , a]) => { if (b < level && b > 0) wa += a; });
+          areaBy.set(w.name, wa);
+        });
+      }
+      const wards = built.wards.map(w => ({ ...w, area: areaBy.get(w.name) || 0 }));
+      const area = wards.reduce((s, w) => s + w.area, 0);
+      return { pop: built.pop, area, popAll: built.popAll, wards, source: 'nhà ở' };
+    }
+  }
   if (!binsData) return null;
   let pop = 0, area = 0, popAll = 0;
   const wards = binsData.wards.map(w => {
@@ -196,7 +213,7 @@ function exposureByWard() {
     pop += wp; area += wa;
     return { name: w.name, pop: wp, area: wa };
   });
-  return { pop, area, popAll, wards: wards.filter(w => w.pop >= 1 || w.area > 0).sort((a, b) => b.pop - a.pop) };
+  return { pop, area, popAll, wards: wards.filter(w => w.pop >= 1 || w.area > 0).sort((a, b) => b.pop - a.pop), source: 'pixel' };
 }
 
 // ---------- Bảng kết quả ----------
@@ -213,7 +230,7 @@ function renderStats() {
 
   const popLine = ex
     ? `<div class="flood-kpi"><span>Diện tích ngập</span><b>≈ ${fmtNum(Math.round(ex.area / 1e5) / 10)} km²</b></div>
-       <div class="flood-kpi"><span>Dân cư trong vùng ngập</span><b>≈ ${fmtNum(Math.round(ex.pop / 10) * 10)} người${ex.popAll ? ` (${fmtNum(Math.round(ex.pop / ex.popAll * 1000) / 10)}%)` : ''}</b></div>`
+       <div class="flood-kpi"><span>Dân cư trong vùng ngập${ex.source === 'nhà ở' ? ' (nhà ở)' : ''}</span><b>≈ ${fmtNum(Math.round(ex.pop / 10) * 10)} người${ex.popAll ? ` (${fmtNum(Math.round(ex.pop / ex.popAll * 1000) / 10)}%)` : ''}</b></div>`
     : `<div class="flood-kpi"><span>Dân cư, diện tích</span><b class="flood-muted">${binsPromise ? 'đang tính...' : 'chưa tải được'}</b></div>`;
   const wardsLine = ex && ex.wards.length
     ? `<div class="flood-sub">Phường/xã ảnh hưởng nhiều nhất</div><div class="flood-wards">${ex.wards.slice(0, 5).map(w =>
@@ -329,4 +346,5 @@ export function initFloodSim() {
     const f = row && shownList[Number(row.dataset.i)];
     if (f) flyToVisible([f.lat, f.lng], 17);
   });
+  window.addEventListener(POP_METHOD_EVENT, () => { if (visible) renderStats(); });
 }

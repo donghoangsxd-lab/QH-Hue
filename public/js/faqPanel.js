@@ -2,6 +2,7 @@
 // Bấm câu trả lời thì tô các phường, xã nêu trong câu. Câu ưu tiên đầu tư tô thêm công trình và buffer QCVN.
 import { getRightObstruction, highlightWardNames, map } from './mapEngine.js';
 import { escapeHtml, showToast, detailDisclosure } from './utils.js';
+import { POP_METHOD_EVENT, spatialQuestions } from './popMethod.js';
 
 const $ = (id) => document.getElementById(id);
 const vi = (n, d = 0) => Number(n).toLocaleString('vi-VN', { maximumFractionDigits: d, minimumFractionDigits: d });
@@ -106,11 +107,16 @@ function showFacility(name, item) {
   }
 }
 
+function shownQuestions(doc) {
+  return [...spatialQuestions(), ...(doc.questions || [])];
+}
+
 function render(doc) {
   const list = $('faqList');
   const gap = $('faqGap');
+  const questions = shownQuestions(doc);
   if (list) {
-    list.innerHTML = doc.questions.map((item, i) => `<button type="button" class="faq-item" data-faq="${i}">
+    list.innerHTML = questions.map((item, i) => `<button type="button" class="faq-item" data-faq="${i}">
       <b>${escapeHtml(item.q)}</b>
       <span>${escapeHtml(item.a)}</span>
       <small>${escapeHtml(item.source || '')}</small>
@@ -145,6 +151,7 @@ export function initFaqPanel() {
     }
   });
   $('faqClose')?.addEventListener('click', () => setOpen(false));
+  window.addEventListener(POP_METHOD_EVENT, () => { if (pack && !panel.hidden) render(pack); });
   $('faqWard')?.addEventListener('change', (e) => {
     const name = e.target.value;
     if (!name) {
@@ -170,7 +177,7 @@ export function initFaqPanel() {
   $('faqList')?.addEventListener('click', (e) => {
     const hit = e.target.closest('[data-faq]');
     if (!hit || !pack) return;
-    const item = pack.questions[Number(hit.dataset.faq)];
+    const item = shownQuestions(pack)[Number(hit.dataset.faq)];
     if (!item) return;
     clearFocus();
     clearMarks();

@@ -1686,8 +1686,18 @@ function loadWardDetailCoverage(wardData, attempt = 0) {
 const UNIT_POP = 20000;
 
 let wardGbaHtml = () => '';
+let wardPopHtml = () => '';
 /** Lớp GBA gắn khối mật độ / nhóm chiều cao tương đối vào thẻ phường */
 export function setWardGbaHtml(fn) { wardGbaHtml = typeof fn === 'function' ? fn : () => ''; }
+/** Phân bổ dân số B + chung cư gắn câu dân vùng phục vụ vào thẻ phường */
+export function setWardPopHtml(fn) { wardPopHtml = typeof fn === 'function' ? fn : () => ''; }
+if (typeof window !== 'undefined') {
+  window.addEventListener('qh:pop-method', () => {
+    const name = state.selectedWard;
+    const ward = (state.wardStatsData || []).find(w => w.Ten_Phuong === name);
+    if (ward && document.getElementById('wardSummaryView')) renderWardSummary(ward);
+  });
+}
 
 function renderWardSummary(wardData) {
   const popCurrent = wardData.Dan_So_Vector || 45000;
@@ -1702,6 +1712,7 @@ function renderWardSummary(wardData) {
   view.innerHTML = `<div id="wardSummaryCard">
     <div id="wardQuotaTableContainer">${buildWardQuotaTableHtml(wardData, popProjected)}</div>
     ${wardGbaHtml(wardData.Ten_Phuong)}
+    ${wardPopHtml(wardData.Ten_Phuong)}
   </div>`;
   document.getElementById('wardSummaryCard').dataset.ward = wardData.Ten_Phuong;
 
