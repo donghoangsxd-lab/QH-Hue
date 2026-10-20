@@ -555,6 +555,13 @@
             <div><input type="checkbox" id="chk_cadastre"><label for="chk_cadastre" title="Thửa đất địa chính tỉnh Thừa Thiên Huế cũ (gis21.hue.gov.vn, lập năm 2016): số tờ, số thửa, diện tích, loại đất, địa chỉ; không gồm tên chủ sử dụng. Hiện từ mức phóng 15, bấm vào thửa để xem thông tin. Nguồn chưa có Quảng Điền, Phú Lộc, Nam Đông."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Thửa đất địa chính 2016 <small class="layer-hint" id="cadastreHint">(phóng to để xem)</small></label></div>
             <span id="cadastreOpBox" class="layer-slider" style="display:none;"><input type="range" id="cadastreOpacity" class="opacity-slider" min="0" max="100" value="100" title="Độ trong suốt lớp thửa đất" aria-label="Độ trong suốt lớp thửa đất"></span>
           </div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_gba"><label for="chk_gba" title="Dấu chân công trình Global Building Atlas (TUM 2025; Google, OpenStreetMap, Microsoft khoảng 2023). Màu là nhóm chiều cao tương đối, không phải số mét, không dùng để quản lý chiều cao. Hiện từ mức phóng 13. Giấy phép CC BY-NC 4.0 và ODbL."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Công trình xây dựng (GBA) <small class="layer-hint" id="gbaHint">(phóng tới mức 13)</small></label></div>
+          </div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_gbaGrid"><label for="chk_gbaGrid" title="Lưới khoảng 150 m theo cường độ xây dựng tương đối (dấu chân nhân nhóm chiều cao, so trong địa bàn). Bốn nhóm: Thấp, Trung bình, Cao, Rất cao. Không phải mét chiều cao."><svg class="ico ico-layer"><use href="#i-coverage"/></svg>Cường độ xây dựng tương đối</label></div>
+          </div>
+          <div class="flood-box" id="gbaBox" style="display:none;"></div>
           <div class="flood-box" id="cadastreBox" style="display:none;">
             <div class="cad-find">
               <select id="cadastreXa" aria-label="Xã/phường (địa giới cũ)"><option value="">Chọn xã/phường (địa giới cũ)</option></select>

@@ -1685,6 +1685,10 @@ function loadWardDetailCoverage(wardData, attempt = 0) {
 
 const UNIT_POP = 20000;
 
+let wardGbaHtml = () => '';
+/** Lớp GBA gắn khối mật độ / nhóm chiều cao tương đối vào thẻ phường */
+export function setWardGbaHtml(fn) { wardGbaHtml = typeof fn === 'function' ? fn : () => ''; }
+
 function renderWardSummary(wardData) {
   const popCurrent = wardData.Dan_So_Vector || 45000;
   if (!wardData.projectedPopulation) wardData.projectedPopulation = Math.round(popCurrent * 1.2);
@@ -1697,6 +1701,7 @@ function renderWardSummary(wardData) {
   const areaKm2 = Number(wardData.Dien_Tich_Km2) || 0;
   view.innerHTML = `<div id="wardSummaryCard">
     <div id="wardQuotaTableContainer">${buildWardQuotaTableHtml(wardData, popProjected)}</div>
+    ${wardGbaHtml(wardData.Ten_Phuong)}
   </div>`;
   document.getElementById('wardSummaryCard').dataset.ward = wardData.Ten_Phuong;
 

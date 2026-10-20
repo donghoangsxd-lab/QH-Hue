@@ -1506,6 +1506,10 @@ function lotStatsHtml(plan) {
       <small>${escapeHtml(s.short)}</small><b>${ico(s.icon)}${escapeHtml(s.value)}${s.unit ? `<em>${escapeHtml(s.unit)}</em>` : ''}</b></div>`).join('')}</div>` : '';
 }
 
+let landPopupExtra = () => '';
+/** Module khác gắn thêm dòng vào thẻ lô đất (GBA), không import vòng */
+export function setLandPopupExtra(fn) { landPopupExtra = typeof fn === 'function' ? fn : () => ''; }
+
 function landPopupHtml(p) {
   const key = landPatternKey(p.layer, p.name);
   const nhom = p.nhom || landLabel(p.layer);
@@ -1532,6 +1536,7 @@ function landPopupHtml(p) {
     </div>
     ${lotStatsHtml(p.plan)}
     <dl class="lp-info">${info.map(([k, v]) => `<dt>${k}</dt><dd${k === 'Layer' ? ' class="lp-mono"' : ''}>${escapeHtml(String(v))}</dd>`).join('')}</dl>
+    ${landPopupExtra(p)}
   </div>`;
 }
 
