@@ -253,7 +253,7 @@ function methodHtml(d) {
   const cem = d.cemeteryCount
     ? ` Đã loại ${fmtNum(d.cemeteryCount)} nghĩa trang đã duyệt bằng vùng đệm quanh điểm.`
     : '';
-  return `NDVI lấy trung bình ô 10 m về lưới 60 m của nhiệt độ bề mặt. ${pop}${ndvi}${cem}`;
+  return `Nhiệt độ bề mặt và NDVI cùng lưới khoảng 60 m. ${pop}${ndvi}${cem}`;
 }
 
 function explainWard(w, ranked) {
@@ -327,7 +327,7 @@ async function getJson(query) {
 function load(part) {
   const key = `${year}|${popQuery()}|${part}`;
   if (!cache.has(key)) {
-    const q = `action=getTreePriority&part=${part}&year=${encodeURIComponent(year)}&pop=${encodeURIComponent(popQuery())}&tv=5`;
+    const q = `action=getTreePriority&part=${part}&year=${encodeURIComponent(year)}&pop=${encodeURIComponent(popQuery())}&tv=6`;
     cache.set(key, getJson(q).catch(err => { cache.delete(key); throw err; }));
   }
   return cache.get(key);
