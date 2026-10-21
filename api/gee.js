@@ -2,7 +2,8 @@ const axios = require('axios');
 const crypto = require('crypto');
 const zlib = require('zlib');
 const constants = require('../config/constants');
-const { initGEE, getGeeContext, ensureNha, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, loadNha, startPopNhaTask, POP_SCALE_M, POP_NHA_ASSET } = require('../services/geeService');
+const { initGEE, getGeeContext, ensureNha, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, loadNha, startPopNhaTask, listRecentTasks, cancelGeeTask, popNhaAssets, promoteNhaAsset, POP_SCALE_M, POP_NHA_ASSET } = require('../services/geeService');
+const { popNhaStatusText } = require('../services/popNhaStatus');
 const { getRawDataList, getCadParcels, getInvestCalls, getInvestEdits, forgetTextFile, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion } = require('../services/gcsService');
 const gcsWrite = require('../services/gcsWrite');
 const { requireAdmin, httpError } = require('../services/authService');
@@ -1077,86 +1078,149 @@ async function readPopNhaTask() {
   }
 }
 
-function popNhaMessage(rec) {
-  if (rec.message) return rec.message;
-      if (rec.phase === 'ready') return 'Nền nhà thấp tầng đã sẵn sàng. Thêm chung cư ở tab NOXH, không cần nạp lại CSV. Tải lại trang sau khoảng 1 phút.';
-  if (rec.phase === 'table') return 'Đang nạp bảng điểm lên Earth Engine. Bấm lại sau vài phút để xuất raster.';
-  if (rec.phase === 'image') return 'Đang xuất raster Pixel-danso-nha. Bấm lại sau vài phút.';
-  return 'Đang xử lý raster dân nhà ở.';
+const POP_NHA_QUEUE_MS = 20 * 60 * 1000;
+
+function withPopNhaText(rec, extra = {}) {
+  const next = { ...rec, message: '' };
+  next.message = popNhaStatusText(next);
+  return { saved: true, ...next, ...extra };
+}
+
+async function popNhaSnapshot() {
+  const out = { assets: null, tasks: [] };
+  try { out.assets = await popNhaAssets(); } catch (err) { out.assetsError = err.message; }
+  try {
+    const tasks = await listRecentTasks(40);
+    out.tasks = tasks.filter(t => /Pixel-danso-nha|QH-Hue_Pixel-danso/i.test(`${t.description} ${t.id}`)).slice(0, 8);
+    out.queued = tasks.filter(t => t.state === 'READY' || t.state === 'RUNNING').length;
+  } catch (err) { out.tasksError = err.message; }
+  return out;
+}
+
+async function cancelPopNha(rec) {
+  if (!rec || !rec.task) return;
+  try { await cancelGeeTask(rec.task); } catch (err) { /* tác vụ đã xong hoặc mã cũ */ }
+}
+
+async function beginPopNha(phase, extra = {}) {
+  try {
+    const started = await startPopNhaTask(phase);
+    return {
+      phase,
+      task: started.task,
+      asset: started.asset,
+      promote: !!started.promote,
+      state: 'READY',
+      at: Date.now(),
+      people: popNhaPeople(),
+      restarts: extra.restarts || 0,
+      note: extra.note || ''
+    };
+  } catch (err) {
+    if (phase === 'image' && err.code === 'NO_TABLE') return beginPopNha('table', extra);
+    throw err;
+  }
 }
 
 /**
- * Một nút admin: thiếu CSV thì báo lệnh tải lên; chưa có tác vụ hoặc tác vụ lỗi thì nạp bảng;
- * bảng xong thì xuất ảnh; ảnh xong thì bật asset. Không cộng dân toàn thành phố trong request 60 giây.
+ * Một nút admin: thiếu CSV thì báo lệnh tải lên; bảng xong thì xuất ảnh; ảnh xong thì bật asset.
+ * Tác vụ kẹt ở READY (Earth Engine chưa chạy) quá 20 phút thì hủy và gửi lại, tối đa 2 lần.
  */
 async function advancePopNha(opts = {}) {
   const csv = await popNhaCsvInfo();
-  if (!csv.ok) return { saved: true, phase: 'csv', state: 'NEED_CSV', message: csv.message };
+  if (!csv.ok) return { saved: true, phase: 'csv', state: 'NEED_CSV', message: csv.message, ...(await popNhaSnapshot()) };
   let rec = await readPopNhaTask();
-  if (opts.rebuild && rec && rec.phase === 'ready') rec = null;
+  if (opts.cancel) {
+    await cancelPopNha(rec);
+    rec = {
+      phase: 'idle', state: 'CANCELLED', task: rec && rec.task, asset: rec && rec.asset,
+      at: Date.now(), people: popNhaPeople(), error: '',
+      message: 'Đã hủy tác vụ. Bấm Chạy lại để nạp tiếp.'
+    };
+    await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(rec));
+    return { saved: true, ...rec, ...(await popNhaSnapshot()) };
+  }
+  if (opts.restart || opts.rebuild) {
+    await cancelPopNha(rec);
+    const note = opts.rebuild ? 'Chạy lại từ CSV trên bucket.' : 'Chạy lại tác vụ.';
+    rec = await beginPopNha(opts.rebuild ? 'table' : 'image', { note, restarts: 0 });
+  }
+  if (rec && rec.phase === 'idle') rec = null;
   if (rec && rec.phase === 'ready') {
     await loadNha();
     const ready = getGeeContext('b');
     if (ready.popSource === 'nha') {
-      return {
-        saved: true, phase: 'ready', state: 'READY', asset: POP_NHA_ASSET, popSource: 'nha',
-        people: rec.people || popNhaPeople(),
-        message: 'Nền Pixel-danso-nha là nhà thấp tầng, nạp một lần. Thêm hoặc sửa chung cư trên tab NOXH rồi tải lại trang; không tải CSV và không bấm Nạp lại. Chỉ bấm Nạp lại từ CSV mới khi vừa thay file nền trên bucket.'
+      rec = {
+        phase: 'ready', state: 'ASSET_READY', asset: POP_NHA_ASSET, popSource: 'nha',
+        people: rec.people || popNhaPeople(), at: rec.at || Date.now()
       };
+      await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(rec));
+      return withPopNhaText(rec, await popNhaSnapshot());
     }
     if (!rec.seenMiss) {
-      rec.seenMiss = true;
-      rec.state = 'ASSET_MISSING';
-      rec.message = 'Chưa đọc được asset Pixel-danso-nha. Bấm lại để nạp từ đầu.';
-      await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(rec));
-      return { saved: true, ...rec };
+      rec = { ...rec, seenMiss: true, state: 'ASSET_MISSING', phase: 'image', error: '' };
+      await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(withPopNhaText(rec)));
+      return withPopNhaText(rec, await popNhaSnapshot());
     }
     rec = null;
   }
   if (rec && rec.task && (rec.phase === 'table' || rec.phase === 'image')) {
-    const t = await getTaskState(rec.task);
+    let t;
+    try {
+      t = await getTaskState(rec.task);
+    } catch (err) {
+      t = { state: rec.state || 'UNKNOWN', error: err.message || '' };
+    }
+    rec = {
+      ...rec,
+      state: t.state,
+      error: t.error || '',
+      description: t.description || rec.description || '',
+      started: t.started,
+      updated: t.updated,
+      people: rec.people || popNhaPeople()
+    };
     if (t.state === 'COMPLETED' && rec.phase === 'table') {
-      const started = await startPopNhaTask('image');
-      rec = { phase: 'image', task: started.task, asset: started.asset, state: 'RUNNING', at: Date.now(), people: popNhaPeople() };
+      rec = await beginPopNha('image', { restarts: rec.restarts || 0 });
     } else if (t.state === 'COMPLETED' && rec.phase === 'image') {
+      try {
+        if (rec.promote || (rec.asset && rec.asset !== POP_NHA_ASSET)) await promoteNhaAsset(rec.asset);
+      } catch (err) {
+        rec = { ...rec, state: 'FAILED', error: `Chưa đổi được ảnh mới vào asset: ${err.message}` };
+        await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(withPopNhaText(rec)));
+        return withPopNhaText(rec, await popNhaSnapshot());
+      }
       await loadNha();
       const ready = getGeeContext('b');
       rec = {
         phase: ready.popSource === 'nha' ? 'ready' : 'image',
-        task: rec.task, asset: POP_NHA_ASSET,
-        state: ready.popSource === 'nha' ? 'READY' : 'ASSET_MISSING',
-        at: Date.now(), people: popNhaPeople(), popSource: ready.popSource,
-        message: ready.popSource === 'nha'
-          ? 'Nền nhà thấp tầng đã sẵn sàng. Chung cư lấy từ tab NOXH lúc mở bản đồ, không cần nạp lại CSV. Tải lại trang sau khoảng 1 phút.'
-          : 'Earth Engine báo xuất xong nhưng chưa đọc được asset. Bấm lại sau một phút.'
+        task: rec.task,
+        asset: POP_NHA_ASSET,
+        state: ready.popSource === 'nha' ? 'ASSET_READY' : 'ASSET_MISSING',
+        at: Date.now(),
+        people: popNhaPeople(),
+        popSource: ready.popSource,
+        error: ready.popSource === 'nha' ? '' : 'Chưa đọc được asset sau khi xuất'
       };
     } else if (t.state === 'FAILED' || t.state === 'CANCELLED') {
-      if (!rec.seenFail) {
-        rec = {
-          ...rec, state: t.state, error: t.error || '', seenFail: true, people: rec.people || popNhaPeople(),
-          message: `Tác vụ ${rec.phase} lỗi: ${t.error || t.state}. Bấm lại để chạy từ đầu.`
-        };
-        await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(rec));
-        return { saved: true, ...rec };
-      }
-      rec = null;
-    } else {
-      rec = { ...rec, state: t.state, error: t.error || '', people: rec.people || popNhaPeople() };
-      rec.message = popNhaMessage(rec);
-      await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(rec));
-      return { saved: true, ...rec };
+      rec.message = '';
+      await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(withPopNhaText(rec)));
+      return withPopNhaText(rec, await popNhaSnapshot());
+    } else if ((t.state === 'READY' || t.state === 'UNKNOWN') && Date.now() - (rec.at || 0) > POP_NHA_QUEUE_MS && (rec.restarts || 0) < 2) {
+      await cancelPopNha(rec);
+      const n = (rec.restarts || 0) + 1;
+      rec = await beginPopNha(rec.phase === 'image' ? 'image' : 'table', {
+        restarts: n,
+        note: `Tác vụ trước đứng ở chờ (${t.state}) quá 20 phút, đã hủy và gửi lại lần ${n}.`
+      });
     }
   }
-  if (!rec) {
-    const started = await startPopNhaTask('table');
-    rec = {
-      phase: 'table', task: started.task, asset: started.asset, state: 'RUNNING',
-      at: Date.now(), people: popNhaPeople()
-    };
-  }
-  rec.message = popNhaMessage(rec);
-  await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(rec));
-  return { saved: true, ...rec };
+  if (!rec) rec = await beginPopNha('table');
+  if (rec.note) rec.message = `${rec.note} ${popNhaStatusText({ ...rec, message: '' })}`.trim();
+  const body = rec.message ? { saved: true, ...rec } : withPopNhaText(rec);
+  if (!body.message) body.message = popNhaStatusText(body);
+  await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(body));
+  return { ...body, ...(await popNhaSnapshot()) };
 }
 
 // ============================ HÌNH HỌC PHƯỜNG ============================
@@ -3568,7 +3632,12 @@ module.exports = async (req, res) => {
       requirePostFromApp(req);
       await requireAdmin(req);
       try {
-        return res.status(200).json(await advancePopNha({ rebuild: readJsonBody(req).rebuild === true }));
+        const body = readJsonBody(req);
+        return res.status(200).json(await advancePopNha({
+          rebuild: body.rebuild === true,
+          cancel: body.cancel === true,
+          restart: body.restart === true
+        }));
       } catch (err) {
         console.error('Nạp Pixel-danso-nha lỗi:', err.message);
         return res.status(502).json({ error: true, message: `GEE không nhận tác vụ nạp dân nhà ở: ${err.message}` });

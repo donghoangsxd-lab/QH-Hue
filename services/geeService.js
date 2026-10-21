@@ -315,7 +315,10 @@ async function startPopNhaTask(phase) {
     err.code = 'NO_TABLE';
     throw err;
   }
-  if (await assetExists(ee, POP_NHA_ASSET)) await deleteAsset(ee, POP_NHA_ASSET);
+  // Giữ ảnh đang dùng. Ảnh mới ghi sang asset tạm, xong mới đổi tên. Xóa trước khi xuất từng làm mất nền khi tác vụ kẹt ở hàng chờ.
+  const live = await assetExists(ee, POP_NHA_ASSET);
+  const assetId = live ? `${POP_NHA_ASSET}-next` : POP_NHA_ASSET;
+  if (assetId !== POP_NHA_ASSET && await assetExists(ee, assetId)) await deleteAsset(ee, assetId);
   const proj = ee.Image(POP_ASSET).projection();
   const summed = ee.FeatureCollection(POP_NHA_TABLE).reduceToImage({
     properties: ['people'],
@@ -332,7 +335,7 @@ async function startPopNhaTask(phase) {
   const task = ee.batch.Export.image.toAsset({
     image: aligned.updateMask(aligned.gt(0)).toFloat(),
     description: 'QH-Hue_Pixel-danso-nha',
-    assetId: POP_NHA_ASSET,
+    assetId,
     pyramidingPolicy: { '.default': 'mean' },
     region: ee.Geometry(bounds),
     crs: projInfo.crs,
@@ -341,7 +344,7 @@ async function startPopNhaTask(phase) {
   });
   await new Promise((resolve, reject) => task.start(resolve, (err) => reject(new Error(String(err)))));
   if (!task.id) throw new Error('GEE không trả về mã tác vụ');
-  return { phase: 'image', task: task.id, asset: POP_NHA_ASSET };
+  return { phase: 'image', task: task.id, asset: assetId, promote: assetId !== POP_NHA_ASSET };
 }
 
 // evaluate của Earth Engine báo lỗi qua tham số thứ 2 của callback; bọc lại để lỗi không bị nuốt thành số 0
@@ -376,18 +379,72 @@ async function startPopBake(assetId) {
   return task.id;
 }
 
-/** Trạng thái tác vụ xuất: { state: READY | RUNNING | COMPLETED | FAILED | CANCELLED | ..., error } */
+function taskView(t, fallbackId) {
+  return {
+    id: t.id || fallbackId || '',
+    state: String(t.state || 'UNKNOWN'),
+    error: t.error_message || '',
+    description: t.description || '',
+    type: t.task_type || '',
+    created: t.creation_timestamp_ms || null,
+    updated: t.update_timestamp_ms || null,
+    started: t.start_timestamp_ms || null,
+    attempt: t.attempt || 0
+  };
+}
+
+/** Trạng thái tác vụ: READY = Earth Engine chưa chạy (PENDING), RUNNING = đang chạy. */
 function getTaskState(taskId) {
   return new Promise((resolve, reject) => {
+    if (!geeContext) return reject(new Error('GEE Context chưa được khởi tạo'));
     geeContext.ee.data.getTaskStatus(taskId, (list, err) => {
       if (err) return reject(new Error(String(err)));
-      const t = (list && list[0]) || {};
-      resolve({ state: String(t.state || 'UNKNOWN'), error: t.error_message || '' });
+      resolve(taskView((list && list[0]) || {}, taskId));
     });
   });
 }
 
+function listRecentTasks(limit = 40) {
+  return new Promise((resolve, reject) => {
+    if (!geeContext) return reject(new Error('GEE Context chưa được khởi tạo'));
+    geeContext.ee.data.getTaskListWithLimit(limit, (res, err) => {
+      if (err) return reject(new Error(String(err)));
+      const tasks = ((res && res.tasks) || []).map(t => taskView(t));
+      resolve(tasks);
+    });
+  });
+}
+
+function cancelGeeTask(taskId) {
+  return new Promise((resolve, reject) => {
+    if (!taskId) return resolve(false);
+    if (!geeContext) return reject(new Error('GEE Context chưa được khởi tạo'));
+    geeContext.ee.data.cancelTask(taskId, (res, err) => (err ? reject(new Error(String(err))) : resolve(res || true)));
+  });
+}
+
+async function popNhaAssets() {
+  const { ee } = getGeeContext('old');
+  const [table, image, next] = await Promise.all([
+    assetExists(ee, POP_NHA_TABLE),
+    assetExists(ee, POP_NHA_ASSET),
+    assetExists(ee, `${POP_NHA_ASSET}-next`)
+  ]);
+  return { table, image, next };
+}
+
+async function promoteNhaAsset(assetId) {
+  if (!assetId || assetId === POP_NHA_ASSET) return POP_NHA_ASSET;
+  const { ee } = getGeeContext('old');
+  if (await assetExists(ee, POP_NHA_ASSET)) await deleteAsset(ee, POP_NHA_ASSET);
+  await new Promise((resolve, reject) => {
+    ee.data.renameAsset(assetId, POP_NHA_ASSET, (res, err) => (err ? reject(new Error(String(err))) : resolve(res)));
+  });
+  return POP_NHA_ASSET;
+}
+
 module.exports = {
   initGEE, getGeeContext, ensureNha, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, loadNha,
-  startPopNhaTask, POP_SCALE_M, POP_NHA_SCALE_M, POP_NHA_ASSET, POP_NHA_CSV
+  startPopNhaTask, listRecentTasks, cancelGeeTask, popNhaAssets, promoteNhaAsset,
+  POP_SCALE_M, POP_NHA_SCALE_M, POP_NHA_ASSET, POP_NHA_CSV
 };
