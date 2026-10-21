@@ -1,12 +1,15 @@
 // Lớp "Thửa đất địa chính 2016" (bảng lớp dữ liệu): 686 nghìn thửa lấy từ gis21.hue.gov.vn, không gồm tên chủ sử dụng.
 // Tile vector PMTiles (lớp "thuadat", zoom 15–16) đọc thẳng từ bucket bằng HTTP Range; zoom > 16 phóng to từ tile 16.
+// Chọn một phường/xã trên droplist: chỉ vẽ phần nền thửa nằm trong ranh phường hiện nay (sau sáp nhập), không theo mã xã cũ.
 // Bấm vào thửa khi không bật công cụ nào: tra trong tile z16 đã tải, không gọi máy chủ. Tìm tờ/thửa qua chỉ mục từng xã.
 // Popup lô neo giữa khung nhìn nên điểm bấm lấy từ preclick, không lấy tọa độ popup.
 // Droplist đang ở lớp quy hoạch: bảng thửa đặt góc trái (4 trang QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500).
 // Bấm một trang thì bật đúng lớp đó (tắt các lớp quy hoạch khác), giữ khung nhìn; QHPK/QHCT mở đồ án chứa thửa.
 // Nút Phân tích QH của đo diện tích mở cùng 4 trang trên polygon vùng đo.
 // Droplist Hệ thống đô thị giữ popup tại thửa.
-import { map } from './mapEngine.js';
+import { map, WARD_BOUNDS_EVENT } from './mapEngine.js';
+import { state } from './state.js';
+import { CITY_SCOPE, boundsOverlap, lngLatToTileLocal, pointInClip, tileBounds, wardClipFor } from './parcelWardClip.js';
 import { MAP_MAX_ZOOM } from './basemap.js';
 import { planMap, getViewMode, isSplitOn } from './planMap.js';
 import { geeApi } from './api.js';
@@ -106,6 +109,8 @@ const indexes = new Map();      // maxa → Promise<{ rows }>
 let popup = null, highlight = null, landFill = null, clickSeq = 0;
 let foreignAt = 0, preclickAt = 0, clickAt = null;
 let cardState = null;
+let wardClip = null;
+let wardClipSig = '';
 
 const PLAN_TABS = [
   { id: 'qhc25', name: 'QHC', scale: '1/25.000' },
@@ -120,9 +125,29 @@ function setHint(text) {
   if (el) el.textContent = text;
 }
 
+function refreshWardClip() {
+  const name = state.selectedWard || '';
+  const next = wardClipFor(name, state.wardLabelsList);
+  const sig = `${name}|${next ? 1 : 0}|${(state.wardLabelsList || []).length}`;
+  if (sig === wardClipSig) return false;
+  wardClipSig = sig;
+  wardClip = next;
+  return true;
+}
+
 function updateHint() {
   if (!visible) return setHint('(zoom để xem)');
-  setHint(map && map.getZoom() < MIN_ZOOM ? '(phóng to mức 15 để xem)' : '');
+  const zoom = map && map.getZoom() < MIN_ZOOM ? '(phóng to mức 15 để xem)' : '';
+  const scope = wardClip && state.selectedWard && state.selectedWard !== CITY_SCOPE ? `· ${state.selectedWard}` : '';
+  setHint([zoom, scope].filter(Boolean).join(' '));
+}
+
+function applyWardClip() {
+  if (!refreshWardClip()) return;
+  if (!visible) return;
+  leftLayer?.redraw();
+  rightLayer?.redraw();
+  updateHint();
 }
 
 function setStatus(html) {
@@ -183,9 +208,57 @@ function loadTile(z, x, y) {
 
 // Vẽ một ô Leaflet từ tile nguồn (ô z > 16 là một phần của tile z16, phóng 2^dz lần).
 // fill = false: chỉ vẽ viền (bản đồ quy hoạch, để không che màu lô đồ án)
+function wardClipPath(clip, coords, dz, size, dpr, extent) {
+  const z = coords.z - dz;
+  const tileX = coords.x >> dz;
+  const tileY = coords.y >> dz;
+  const f = 2 ** dz;
+  const ox = coords.x - (tileX << dz);
+  const oy = coords.y - (tileY << dz);
+  const k = (size * f * dpr) / extent;
+  const view0 = (ox * extent) / f;
+  const view1 = (oy * extent) / f;
+  const view2 = ((ox + 1) * extent) / f;
+  const view3 = ((oy + 1) * extent) / f;
+  const path = new Path2D();
+  let any = false;
+  const geo = tileBounds(coords.z, coords.x, coords.y);
+  clip.rings.forEach(({ ring, bbox }) => {
+    if (!ring.length || !boundsOverlap(bbox, geo)) return;
+    let minx = Infinity;
+    let miny = Infinity;
+    let maxx = -Infinity;
+    let maxy = -Infinity;
+    const pts = ring.map(([lng, lat]) => {
+      const p = lngLatToTileLocal(lng, lat, z, tileX, tileY, extent);
+      if (p[0] < minx) minx = p[0];
+      if (p[1] < miny) miny = p[1];
+      if (p[0] > maxx) maxx = p[0];
+      if (p[1] > maxy) maxy = p[1];
+      return p;
+    });
+    if (maxx < view0 || minx > view2 || maxy < view1 || miny > view3) return;
+    any = true;
+    path.moveTo((pts[0][0] - view0) * k, (pts[0][1] - view1) * k);
+    for (let i = 1; i < pts.length; i++) path.lineTo((pts[i][0] - view0) * k, (pts[i][1] - view1) * k);
+    path.closePath();
+  });
+  return any ? path : null;
+}
+
 function drawTile(canvas, feats, coords, dz, size, dpr, fill) {
-  if (!feats.length) return;
   const ctx = canvas.getContext('2d');
+  const extent = feats[0]?.extent || 4096;
+  const clipPath = wardClip ? wardClipPath(wardClip, coords, dz, size, dpr, extent) : null;
+  if (wardClip && !clipPath) return;
+  if (clipPath) {
+    ctx.save();
+    ctx.clip(clipPath, 'evenodd');
+  }
+  if (!feats.length) {
+    if (clipPath) ctx.restore();
+    return;
+  }
   const ext = feats[0].extent;
   const f = 2 ** dz;
   const ox = coords.x - ((coords.x >> dz) << dz);
@@ -221,7 +294,10 @@ function drawTile(canvas, feats, coords, dz, size, dpr, fill) {
   ctx.strokeStyle = fill ? STROKE : STROKE_PLAN;
   ctx.lineWidth = (coords.z >= 18 ? 1.2 : coords.z >= 17 ? 0.9 : 0.6) * dpr;
   ctx.stroke();
-  if (coords.z < LABEL_ZOOM) return;
+  if (coords.z < LABEL_ZOOM) {
+    if (clipPath) ctx.restore();
+    return;
+  }
   ctx.font = `${10 * dpr}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -234,6 +310,7 @@ function drawTile(canvas, feats, coords, dz, size, dpr, fill) {
     if ((ft.bbox[2] - ft.bbox[0]) * k < 18) return;
     ctx.fillText(String(ft.props.s ?? ''), px(cx), py(cy));
   });
+  if (clipPath) ctx.restore();
 }
 
 const CadastreGrid = L.GridLayer.extend({
@@ -243,6 +320,10 @@ const CadastreGrid = L.GridLayer.extend({
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = size * dpr;
     canvas.height = size * dpr;
+    if (wardClip && !boundsOverlap(wardClip.bbox, tileBounds(coords.z, coords.x, coords.y))) {
+      done(null, canvas);
+      return canvas;
+    }
     const dz = Math.max(0, coords.z - DATA_ZOOM);
     loadTile(coords.z - dz, coords.x >> dz, coords.y >> dz)
       .then((feats) => { drawTile(canvas, feats, coords, dz, size, dpr, this.options.fill); done(null, canvas); })
@@ -328,6 +409,7 @@ async function parcelShape(hit, z, x, y) {
 }
 
 async function parcelAt(latlng) {
+  if (wardClip && !pointInClip(latlng.lng, latlng.lat, wardClip)) return null;
   const [fx, fy] = tileXY(latlng, DATA_ZOOM);
   const x = Math.floor(fx), y = Math.floor(fy);
   const feats = await loadTile(DATA_ZOOM, x, y);
@@ -902,7 +984,10 @@ export function setCadastreVisible(on) {
 
 export function initCadastreLayer() {
   if (!map) return;
+  refreshWardClip();
   map.on('zoomend', updateHint);
+  document.addEventListener('qh:ward-select', applyWardClip);
+  window.addEventListener(WARD_BOUNDS_EVENT, applyWardClip);
   document.addEventListener(LEVEL_EVENT, (e) => {
     if (inspectLevelSyncing()) return;
     if (cardState && isPlanLevel(e.detail?.level)) showTab(e.detail.level, { syncMap: false });
