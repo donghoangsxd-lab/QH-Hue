@@ -1,17 +1,23 @@
-// Ưu tiên trồng cây xanh: ô nóng ~100 m và bảng hạng phường, xã. Số liệu là mức tương đối.
+// Vùng cần trồng cây: polygon nóng, ít cây, có dân cư. Bảng phường chỉ mở khi bấm.
 import { map, flyToVisible } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { popQuery } from './popMethod.js';
-import { escapeHtml, fmtNum, startTaskProgress, trackTileLoads } from './utils.js';
-import { geeTileOpts } from './basemap.js';
+import { escapeHtml, fmtNum, isApproved, distanceMeters, startTaskProgress } from './utils.js';
 import { seasonYears } from './satLayers.js';
 
 const $ = (id) => document.getElementById(id);
 const PANE = 'treePriorityPane';
-const PANE_Z = 360;
+const PANE_Z = 560;
+const NEAR_M = 180;
+const NEAR_TYPES = new Set(['3-MN', '4-TH', '5-THCS', '6-THPT', '9-TM', '8-VH', '1-CV', '7-YT']);
 const NDVI_FMT = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const LEVELS = {
+  3: { label: 'Rất cần', color: '#b91c1c', stroke: '#7f1d1d', fill: 0.62 },
+  2: { label: 'Cần', color: '#c2410c', stroke: '#9a3412', fill: 0.55 },
+  1: { label: 'Theo dõi', color: '#a16207', stroke: '#713f12', fill: 0.48 }
+};
 
 const mapsOf = () => [map, planMap].filter(Boolean);
 
@@ -19,19 +25,45 @@ let visible = false;
 let year = null;
 let seq = 0;
 let task = null;
-let data = null;
+let zoneData = null;
+let wardData = null;
 let popup = null;
-let tiles = [];
-let choros = [];
+let polys = [];
+let selected = -1;
 const cache = new Map();
+const renderers = new WeakMap();
 
 function treeYears() {
-  const now = new Date();
-  const { years, def } = seasonYears(2017, '04-01', '09-01');
-  return { years: years.filter(y => y >= 2017).slice(0, 4), partial: now.getFullYear(), def };
+  const { years } = seasonYears(2017, '04-01', '09-01');
+  const list = years.filter(y => y >= 2017).slice(0, 4);
+  const partial = new Date().getFullYear();
+  const def = list.includes(2025) ? 2025 : (list.find(y => y !== partial) || list[0]);
+  return { years: list, partial, def };
 }
 
-const renderers = new WeakMap();
+function lotHead(code) {
+  const m = String(code || '').toUpperCase().match(/[A-Z]+/);
+  return m ? m[0] : '';
+}
+
+function marketName(name) {
+  const nm = String(name || '').toUpperCase();
+  return nm.includes('CHỢ') || /(^|[^A-Z])CHO([^A-Z]|$)/.test(nm);
+}
+
+function landKind({ lotCode, facilityType, name, density, ndvi } = {}) {
+  const head = lotHead(lotCode);
+  const type = String(facilityType || '');
+  if (head === 'DGD' || type === '3-MN' || type === '4-TH' || type === '5-THCS' || type === '6-THPT') return 'sân trường';
+  if (head === 'TMD' || type === '9-TM' || marketName(name)) return 'khu chợ';
+  if (head === 'DGT' || head === 'GT') return 'dải phố';
+  if (head === 'DTT' || type === '8-VH') return 'sân thể thao';
+  const dense = Number(density);
+  if (head === 'ODT' || head === 'ONT' || (Number.isFinite(dense) && dense >= 40)) return 'khu ở';
+  const green = Number(ndvi);
+  if (Number.isFinite(dense) && dense >= 15 && Number.isFinite(green) && green < 0.28) return 'sân, bãi';
+  return 'khu dân cư';
+}
 
 function wardsReady() {
   return (state.wardLabelsList || []).some(w => w.geometry);
@@ -58,50 +90,173 @@ function rendererFor(m) {
   return renderers.get(m);
 }
 
-function scoreColor(score) {
-  const t = Math.max(0, Math.min(100, Number(score))) / 100;
-  const stops = t < 0.5 ? ['#1a9850', '#fee08b'] : ['#fee08b', '#d73027'];
-  const u = t < 0.5 ? t / 0.5 : (t - 0.5) / 0.5;
-  const parse = (hex) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
-  const a = parse(stops[0]);
-  const b = parse(stops[1]);
-  const c = a.map((v, i) => Math.round(v + (b[i] - v) * u));
-  return `#${c.map(n => n.toString(16).padStart(2, '0')).join('')}`;
-}
-
 function opacity() {
   const el = $('treeOpacity');
-  return el ? Number(el.value) / 100 : 0.7;
+  return el ? Number(el.value) / 100 : 1;
 }
 
-function styleOf(score, fillScale) {
-  if (score == null) {
-    return { color: '#64748b', weight: 1, opacity: 0.45, fillColor: '#94a3b8', fillOpacity: 0.05 };
-  }
+function styleOf(level, on) {
+  const s = LEVELS[level] || LEVELS[1];
   return {
-    color: scoreColor(score),
-    weight: 1,
-    opacity: 0.85,
-    fillColor: scoreColor(score),
-    fillOpacity: Math.max(0.12, Math.min(0.34, fillScale))
+    color: s.stroke,
+    weight: on ? 2.5 : 1.5,
+    opacity: 0.95,
+    fillColor: s.color,
+    fillOpacity: s.fill * opacity()
   };
 }
 
 function clearLayers() {
-  tiles.forEach(layer => layer.remove());
-  choros.forEach(layer => layer.remove());
-  tiles = [];
-  choros = [];
+  polys.forEach(layer => layer.remove());
+  polys = [];
   popup?.remove();
   popup = null;
+  selected = -1;
 }
 
-function wardGeom(name) {
-  return (state.wardLabelsList || []).find(w => w.name === name) || null;
+function pointInWard(lat, lng) {
+  if (lat == null || lng == null || typeof turf === 'undefined') return '';
+  const pt = turf.point([Number(lng), Number(lat)]);
+  for (const w of state.wardLabelsList || []) {
+    if (!w.geometry) continue;
+    try {
+      if (turf.booleanPointInPolygon(pt, turf.feature(w.geometry))) return w.name || '';
+    } catch (e) { /* ranh hỏng thì bỏ qua */ }
+  }
+  return '';
 }
 
-function explain(w) {
-  const ranked = data && data.ranked ? data.ranked : 0;
+function firstCoord(geom) {
+  let c = geom && geom.coordinates;
+  while (Array.isArray(c) && Array.isArray(c[0])) c = c[0];
+  if (!Array.isArray(c) || c.length < 2 || !Number.isFinite(Number(c[0]))) return null;
+  return { lng: Number(c[0]), lat: Number(c[1]) };
+}
+
+function nearestFacility(lat, lng) {
+  if (lat == null || lng == null) return null;
+  let best = null;
+  let bestD = NEAR_M;
+  for (const it of state.rawDataList || []) {
+    if (!it || !NEAR_TYPES.has(it.type) || !isApproved(it.status)) continue;
+    const ilat = Number(it.lat);
+    const ilng = Number(it.lng);
+    if (!Number.isFinite(ilat) || !Number.isFinite(ilng)) continue;
+    const d = distanceMeters(lat, lng, ilat, ilng);
+    if (d < bestD) { bestD = d; best = it; }
+  }
+  return best;
+}
+
+function enrichZone(z) {
+  const spot = (z.lat != null && z.lng != null) ? z : (firstCoord(z.geometry) || z);
+  const ward = z.ward || pointInWard(spot.lat, spot.lng);
+  const near = nearestFacility(spot.lat, spot.lng);
+  const land = landKind({
+    lotCode: z.lotCode || (near && near.lotCode),
+    facilityType: near && near.type,
+    name: near && near.name,
+    density: z.popHa,
+    ndvi: z.ndvi
+  });
+  const nearName = near && near.name ? String(near.name).replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+  return { ...z, ward, land, near: nearName, spotLat: spot.lat, spotLng: spot.lng };
+}
+
+function zoneTitle(z) {
+  const ward = z.ward || 'Khu vực';
+  let t = `${ward} · ${z.land || 'khu dân cư'}`;
+  if (z.near) t += ` · gần ${z.near}`;
+  return t;
+}
+
+function explain(z) {
+  const label = (LEVELS[z.level] || {}).label || '—';
+  const gap = z.lstGap;
+  const gapTxt = gap == null
+    ? ''
+    : (gap > 0
+      ? `, cao hơn trung bình thành phố ${fmtNum(gap)} °C`
+      : (gap < 0 ? `, thấp hơn trung bình thành phố ${fmtNum(Math.abs(gap))} °C` : ', ngang trung bình thành phố'));
+  return `<b>${escapeHtml(zoneTitle(z))}</b><br>Mức: ${label}.<br>`
+    + `Diện tích khoảng ${z.ha == null ? '—' : fmtNum(z.ha)} ha.<br>`
+    + `Nhiệt độ bề mặt ${z.lst == null ? '—' : fmtNum(z.lst)} °C${gapTxt}.<br>`
+    + `NDVI ${z.ndvi == null ? '—' : NDVI_FMT.format(z.ndvi)}.<br>`
+    + `Dân cư trong vùng khoảng ${z.pop == null ? '—' : fmtNum(z.pop)} người.<br>`
+    + `Loại đất ước tính: ${escapeHtml(z.land || 'khu dân cư')}.<br>`
+    + 'Đã loại mặt nước, rừng, đất nông nghiệp và nghĩa trang.<br>'
+    + 'Kết quả mang tính tham khảo, không thay quy hoạch cây xanh.';
+}
+
+function paintSelected() {
+  polys.forEach(layer => layer.setStyle(f => styleOf(f.properties.level, f.properties.i === selected)));
+}
+
+function openZone(index, latlng, targetMap) {
+  const z = zoneData && zoneData.zones && zoneData.zones[index];
+  if (!z) return;
+  selected = index;
+  document.querySelectorAll('#treeZones .tree-zone').forEach(btn => btn.classList.toggle('is-on', Number(btn.dataset.i) === index));
+  paintSelected();
+  const at = latlng || (z.spotLat != null ? [z.spotLat, z.spotLng] : (z.lat != null ? [z.lat, z.lng] : null));
+  if (z.lat != null) flyToVisible([z.lat, z.lng], 16);
+  else if (z.spotLat != null) flyToVisible([z.spotLat, z.spotLng], 16);
+  const m = targetMap || map;
+  if (!m || !at) return;
+  popup?.remove();
+  popup = L.popup({ maxWidth: 300, className: 'tree-popup' }).setLatLng(at).setContent(explain(z)).openOn(m);
+}
+
+function drawZones(zones) {
+  const features = zones.map((z, i) => ({
+    type: 'Feature',
+    properties: { i, level: z.level },
+    geometry: z.geometry
+  }));
+  const fc = { type: 'FeatureCollection', features };
+  return mapsOf().map(m => {
+    const layer = L.geoJSON(fc, {
+      pane: PANE,
+      renderer: rendererFor(m),
+      interactive: true,
+      style: f => styleOf(f.properties.level, f.properties.i === selected),
+      onEachFeature: (feat, path) => {
+        path.on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+          openZone(feat.properties.i, e.latlng, m);
+        });
+      }
+    });
+    layer.addTo(m);
+    return layer;
+  });
+}
+
+function listHtml(zones) {
+  const top = (zones || []).slice(0, 20);
+  if (!top.length) return '<div class="flood-muted">Không có vùng đạt ngưỡng trong năm này.</div>';
+  return top.map((z, i) => {
+    const s = LEVELS[z.level] || LEVELS[1];
+    return `<button type="button" class="tree-zone" data-i="${i}">
+      <i class="tree-swatch" style="background:${s.color}"></i>
+      <span>${escapeHtml(zoneTitle(z))}</span>
+      <b>${z.ha == null ? '—' : fmtNum(z.ha)} ha</b>
+    </button>`;
+  }).join('');
+}
+
+function methodHtml(d) {
+  const pop = d.popSource === 'nha'
+    ? 'Dân số lấy theo raster nhà ở.'
+    : 'Dân cư lấy theo raster pixel vì chưa có raster nhà ở, chỉ để tham khảo.';
+  const ndvi = Number(d.year) === new Date().getFullYear() ? ` NDVI năm ${d.year} chưa đủ 12 tháng.` : '';
+  const cem = d.cemeteryCount
+    ? ` Đã loại ${fmtNum(d.cemeteryCount)} nghĩa trang đã duyệt bằng vùng đệm quanh điểm.`
+    : '';
+  return `NDVI lấy trung bình ô 10 m về lưới 30 m của nhiệt độ bề mặt. ${pop}${ndvi}${cem}`;
+}
+
+function explainWard(w, ranked) {
   if (w.rank == null) {
     return `<b>${escapeHtml(w.name)}</b><br>Đất xây dựng ước tính dưới 15 ha nên không xếp hạng.<br>Kết quả mang tính tham khảo, không thay quy hoạch cây xanh.`;
   }
@@ -120,62 +275,19 @@ function explain(w) {
     + 'Kết quả mang tính tham khảo, không thay quy hoạch cây xanh.';
 }
 
-function openWard(index, latlng, targetMap) {
-  const w = data && data.wards && data.wards[index];
+function openWard(index) {
+  const w = wardData && wardData.wards && wardData.wards[index];
   if (!w) return;
   document.querySelectorAll('#treeTable tr').forEach(tr => tr.classList.toggle('is-on', Number(tr.dataset.i) === index));
-  const geom = wardGeom(w.name);
-  const m = targetMap || map;
-  const at = latlng || (geom ? [geom.lat, geom.lng] : null);
+  const geom = (state.wardLabelsList || []).find(g => g.name === w.name);
+  const m = map;
   if (geom) flyToVisible([geom.lat, geom.lng], 13);
-  if (!m || !at) return;
+  if (!m || !geom) return;
   popup?.remove();
-  popup = L.popup({ maxWidth: 280, className: 'tree-popup' }).setLatLng(at).setContent(explain(w)).openOn(m);
-}
-
-function choropleth(wards) {
-  const fill = opacity() * 0.35;
-  const features = [];
-  wards.forEach((w, i) => {
-    const g = wardGeom(w.name);
-    if (!g || !g.geometry) return;
-    features.push({ type: 'Feature', properties: { i, score: w.score }, geometry: g.geometry });
-  });
-  const fc = { type: 'FeatureCollection', features };
-  return mapsOf().map(m => {
-    const layer = L.geoJSON(fc, {
-      pane: PANE,
-      renderer: rendererFor(m),
-      interactive: true,
-      style: f => styleOf(f.properties.score, fill),
-      onEachFeature: (feat, path) => {
-        path.on('click', (e) => {
-          L.DomEvent.stopPropagation(e);
-          openWard(feat.properties.i, e.latlng, m);
-        });
-      }
-    });
-    layer.addTo(m);
-    return layer;
-  });
-}
-
-function legendHtml(cellM) {
-  const palette = ['#1a9850', '#91cf60', '#fee08b', '#fc8d59', '#d73027'];
-  return `<div class="sat-legend-title">Mức ưu tiên trên ô khoảng ${cellM || 100} m</div>
-    <div class="sat-legend-bar" style="background:linear-gradient(90deg, ${palette.join(', ')})"></div>
-    <div class="sat-legend-ticks"><span>Thấp</span><span>Cao</span></div>`;
-}
-
-function methodHtml(d) {
-  const pop = d.popSource === 'nha'
-    ? 'Dân số lấy theo raster nhà ở.'
-    : 'Dân số lấy theo raster pixel vì chưa có raster nhà ở.';
-  const ndvi = d.ndviPartial ? ` NDVI năm ${d.year} chưa đủ 12 tháng.` : '';
-  const cem = d.cemeteryCount
-    ? ` Đã loại ${fmtNum(d.cemeteryCount)} nghĩa trang đã duyệt bằng vùng đệm quanh điểm.`
-    : ' Chưa có điểm nghĩa trang đã duyệt để loại.';
-  return `${pop}${ndvi}${cem} Thang màu trên bản đồ là thang cố định, khác với hạng trong bảng.`;
+  popup = L.popup({ maxWidth: 280, className: 'tree-popup' })
+    .setLatLng([geom.lat, geom.lng])
+    .setContent(explainWard(w, wardData.ranked || 0))
+    .openOn(m);
 }
 
 function tableHtml(d) {
@@ -212,57 +324,69 @@ async function getJson(query) {
   return d;
 }
 
-async function show() {
-  const my = ++seq;
+function load(part) {
+  const key = `${year}|${popQuery()}|${part}`;
+  if (!cache.has(key)) {
+    const q = `action=getTreePriority&part=${part}&year=${encodeURIComponent(year)}&pop=${encodeURIComponent(popQuery())}`;
+    cache.set(key, getJson(q).catch(err => { cache.delete(key); throw err; }));
+  }
+  return cache.get(key);
+}
+
+function refreshNames() {
+  if (!zoneData || !zoneData.zones) return;
+  zoneData.zones = zoneData.zones.map(enrichZone);
+  const box = $('treeZones');
+  if (box) box.innerHTML = listHtml(zoneData.zones);
+  if (selected >= 0) {
+    document.querySelectorAll('#treeZones .tree-zone').forEach(btn => btn.classList.toggle('is-on', Number(btn.dataset.i) === selected));
+  }
+}
+
+async function loadWards() {
+  const my = seq;
   const stats = $('treeStats');
-  if (stats) stats.innerHTML = '<div class="flood-muted">Đang tính trên Google Earth Engine.</div>';
-  task?.cancel();
-  task = startTaskProgress('Đang tính ưu tiên trồng cây (GEE)');
-  task.creep(50, 4000);
-  const load = (part) => {
-    const key = `${year}|${popQuery()}|${part}`;
-    if (!cache.has(key)) {
-      const q = `action=getTreePriority&part=${part}&year=${encodeURIComponent(year)}&pop=${encodeURIComponent(popQuery())}`;
-      cache.set(key, getJson(q).catch(err => { cache.delete(key); throw err; }));
-    }
-    return cache.get(key);
-  };
-  const tileP = load('tile');
+  if (stats) stats.innerHTML = '<div class="flood-muted">Đang tính bảng phường, xã.</div>';
   try {
     const d = await load('stats');
-    if (my !== seq || !visible) { task.cancel(); return; }
+    if (my !== seq || !visible) return;
     await waitWards();
-    if (my !== seq || !visible) { task.cancel(); return; }
-    task.set(50, 'Đang tải lưới ưu tiên');
-    clearLayers();
-    data = d;
-    const legend = $('treeLegend');
-    const method = $('treeMethod');
-    if (legend) legend.innerHTML = legendHtml(d.cellM);
-    if (method) method.textContent = methodHtml(d);
+    if (my !== seq || !visible) return;
+    wardData = d;
     if (stats) stats.innerHTML = tableHtml(d);
-    choros = choropleth(d.wards || []);
-    try {
-      const tile = await tileP;
-      if (my !== seq || !visible) { task.cancel(); return; }
-      if (tile.urlFormat) {
-        const opts = geeTileOpts({ opacity: opacity(), zIndex: 2 });
-        const layers = mapsOf().map(m => L.tileLayer(tile.urlFormat, opts));
-        trackTileLoads(layers, (n, total) => task.set(50 + 48 * (n / Math.max(total, 1))))
-          .then(() => { if (task && my === seq) task.done('Đã tải ưu tiên trồng cây'); });
-        layers.forEach((layer, i) => layer.addTo(mapsOf()[i]));
-        tiles = layers;
-        if (tile.cellM && legend) legend.innerHTML = legendHtml(tile.cellM);
-      } else if (task) task.done('Đã có bảng xếp hạng');
-    } catch (err) {
-      if (my === seq && stats) stats.insertAdjacentHTML('beforeend', `<div class="flood-muted">Chưa tải được lưới: ${escapeHtml(err.message)}</div>`);
-      task?.done('Đã có bảng xếp hạng');
-    }
   } catch (err) {
-    tileP.catch(() => {});
+    if (my !== seq) return;
+    if (stats) stats.innerHTML = `<div class="flood-muted">Chưa tính được bảng: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function show() {
+  const my = ++seq;
+  const box = $('treeZones');
+  if (box) box.innerHTML = '<div class="flood-muted">Đang khoanh vùng trên Google Earth Engine.</div>';
+  task?.cancel();
+  task = startTaskProgress('Đang khoanh vùng ưu tiên trồng cây');
+  task.creep(90, 8000);
+  try {
+    const d = await load('zones');
+    if (my !== seq || !visible) { task.cancel(); return; }
+    clearLayers();
+    const zones = (d.zones || []).map(enrichZone);
+    zoneData = { ...d, zones };
+    const method = $('treeMethod');
+    if (method) method.textContent = methodHtml(d);
+    if (box) box.innerHTML = listHtml(zones);
+    polys = drawZones(zones);
+    task.done(zones.length ? 'Đã có vùng ưu tiên trồng cây' : 'Không có vùng đạt ngưỡng');
+    if (!wardsReady()) {
+      waitWards().then(() => { if (my === seq && visible) refreshNames(); });
+    }
+    const details = $('treeWardDetails');
+    if (details && details.open) loadWards();
+  } catch (err) {
     if (my !== seq) { task?.cancel(); return; }
-    task?.fail('Không tính được ưu tiên trồng cây');
-    if (stats) stats.innerHTML = `<div class="flood-muted">Chưa tính được: ${escapeHtml(err.message)}</div>`;
+    task?.fail('Không khoanh được vùng ưu tiên');
+    if (box) box.innerHTML = `<div class="flood-muted">Chưa tính được: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -282,10 +406,7 @@ function setVisible(on) {
 }
 
 function applyOpacity() {
-  const o = opacity();
-  tiles.forEach(layer => layer.setOpacity(o));
-  const fill = o * 0.35;
-  choros.forEach(layer => layer.setStyle(f => styleOf(f.properties.score, fill)));
+  polys.forEach(layer => layer.setStyle(f => styleOf(f.properties.level, f.properties.i === selected)));
 }
 
 export function initTreeLayer() {
@@ -300,14 +421,23 @@ export function initTreeLayer() {
     }).join('');
     sel.addEventListener('change', () => {
       year = sel.value;
+      wardData = null;
       if (visible) show();
     });
   }
   $('chk_tree').addEventListener('change', (e) => setVisible(e.target.checked));
   $('treeOpacity')?.addEventListener('input', applyOpacity);
+  $('treeZones')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tree-zone');
+    if (!btn) return;
+    openZone(Number(btn.dataset.i));
+  });
   $('treeStats')?.addEventListener('click', (e) => {
     const row = e.target.closest('tr[data-i]');
     if (!row) return;
     openWard(Number(row.dataset.i));
+  });
+  $('treeWardDetails')?.addEventListener('toggle', (e) => {
+    if (e.target.open && visible) loadWards();
   });
 }

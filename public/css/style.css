@@ -1351,7 +1351,17 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .tree-table th { color: var(--text-muted); font-weight: 600; }
 .tree-table tbody tr { cursor: pointer; }
 .tree-table tbody tr:hover, .tree-table tbody tr.is-on { background: rgba(var(--cyan-rgb), 0.12); }
-@media (max-height: 500px) { .tree-scroll { max-height: 110px; } }
+.tree-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 3px 0 2px; color: var(--text-strong); }
+.tree-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 3px; vertical-align: -1px; }
+.tree-zones { max-height: 180px; overflow: auto; margin-top: 2px; }
+.tree-zone { display: flex; align-items: center; gap: 5px; width: 100%; padding: 2px 2px; border: none; background: transparent; color: var(--text-muted); font: inherit; text-align: left; cursor: pointer; }
+.tree-zone:hover, .tree-zone.is-on { background: rgba(var(--cyan-rgb), 0.12); color: var(--text-strong); }
+.tree-zone span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-zone b { color: var(--text-strong); font-weight: 500; white-space: nowrap; }
+@media (max-height: 500px) {
+  .tree-scroll { max-height: 110px; }
+  .tree-zones { max-height: 96px; }
+}
 .flood-phase { display: flex; gap: 4px; margin: 2px 0 4px; }
 .flood-phase button { flex: 1; padding: 2px 6px; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: var(--r-sm); background: transparent; color: var(--text-muted); font: inherit; cursor: pointer; }
 .flood-phase button.active { border-color: var(--accent-cyan); color: var(--text-strong); background: rgba(var(--cyan-rgb), 0.15); }

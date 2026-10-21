@@ -1,10 +1,22 @@
-// Ưu tiên trồng cây: điểm tương đối giữa các phường, xã (nóng + ít cây + đông trên đất xây dựng).
-// Ảnh vệ tinh chỉ để xếp hạng tham khảo. Rừng và đất nông nghiệp không vào mẫu số.
+// Ưu tiên trồng cây: vùng liền mạch cần chú ý (nóng, ít cây, có dân cư) và bảng phường phụ.
+// Ảnh vệ tinh chỉ để khoanh vùng tham khảo. Rừng, đất nông nghiệp, mặt nước và nghĩa trang không tính.
 const sat = require('./satService');
 
 const MIN_BUILT_HA = 15;
 const TREE_SCALE_M = 100;
+const ZONE_SCALE_M = 30;
+const NDVI_FINE_M = 10;
+const ZONE_MIN_HA = 0.5;
+const ZONE_MIN_PIXELS = 8;
+const ZONE_LIMIT = 160;
 const TREE_FIRST_YEAR = 2017;
+const LST_L3 = 36.5;
+const NDVI_L3 = 0.32;
+const LST_L2 = 35.5;
+const NDVI_L2 = 0.38;
+const LST_L1 = 34;
+const NDVI_L1 = 0.45;
+const RES_POP_HA = 15;
 const LST_REF = 30;
 const LST_SPAN = 12;
 const NDVI_REF = 0.55;
@@ -14,6 +26,9 @@ const URBAN_MIN = 0.25;
 const GHSL_BUILT_MIN = 1500;
 const DW_BUILT = 6;
 const DW_WATER = 0;
+const DW_TREES = 1;
+const DW_CROPS = 4;
+const DW_SHRUB = 5;
 const BLOCK_M = 20;
 const CEMETERY_MIN_M = 40;
 const CEMETERY_MAX_M = 600;
@@ -25,6 +40,12 @@ const TREE_VIS = {
   max: 1,
   palette: ['#1a9850', '#91cf60', '#fee08b', '#fc8d59', '#d73027']
 };
+
+const ZONE_LEVELS = [
+  { id: 3, label: 'Rất cần', color: '#b91c1c', fill: 0.62 },
+  { id: 2, label: 'Cần', color: '#c2410c', fill: 0.55 },
+  { id: 1, label: 'Theo dõi', color: '#a16207', fill: 0.48 }
+];
 
 const round1 = (v) => Math.round(v * 10) / 10;
 const round2 = (v) => Math.round(v * 100) / 100;
@@ -226,9 +247,83 @@ function urbanMask(ee, wards, year, cemeteryImg) {
   const ghsl = ee.Image('JRC/GHSL/P2023A/GHS_BUILT_S/2020').select('built_surface').unmask(0).gte(GHSL_BUILT_MIN);
   const water = ee.Image('JRC/GSW1_4/GlobalSurfaceWater').select('seasonality').unmask(0).gte(10)
     .or(dw.eq(DW_WATER).unmask(0));
-  let urban = dw.eq(DW_BUILT).unmask(0).or(ghsl).and(water.not());
+  const forestFarm = dw.eq(DW_TREES).or(dw.eq(DW_CROPS)).or(dw.eq(DW_SHRUB)).unmask(0);
+  let urban = dw.eq(DW_BUILT).unmask(0).or(ghsl.and(forestFarm.not())).and(water.not());
   if (cemeteryImg) urban = urban.and(cemeteryImg.not());
   return urban.rename('urban').clipToCollection(wards);
+}
+
+function lotHead(code) {
+  const m = String(code || '').toUpperCase().match(/[A-Z]+/);
+  return m ? m[0] : '';
+}
+
+function marketName(name) {
+  const nm = String(name || '').toUpperCase();
+  return nm.includes('CHỢ') || /(^|[^A-Z])CHO([^A-Z]|$)/.test(nm);
+}
+
+/** Loại đất ước tính. Mã lô (nếu có) ưu tiên hơn mật độ. */
+function landKind({ lotCode, facilityType, name, density, ndvi } = {}) {
+  const head = lotHead(lotCode);
+  const type = String(facilityType || '');
+  if (head === 'DGD' || type === '3-MN' || type === '4-TH' || type === '5-THCS' || type === '6-THPT') return 'sân trường';
+  if (head === 'TMD' || type === '9-TM' || marketName(name)) return 'khu chợ';
+  if (head === 'DGT' || head === 'GT') return 'dải phố';
+  if (head === 'DTT' || type === '8-VH') return 'sân thể thao';
+  const dense = finite(density);
+  if (head === 'ODT' || head === 'ONT' || (dense != null && dense >= 40)) return 'khu ở';
+  const green = finite(ndvi);
+  if (dense != null && dense >= RES_POP_HA && green != null && green < 0.28) return 'sân, bãi';
+  return 'khu dân cư';
+}
+
+/** Mức 3/2/1 theo ngưỡng cố định mùa nóng 2025. Không đủ điều kiện thì 0 (ẩn). */
+function zoneLevel(lst, ndvi, residential) {
+  if (residential !== true) return 0;
+  const t = finite(lst);
+  const n = finite(ndvi);
+  if (t == null || n == null) return 0;
+  if (t >= LST_L3 && n <= NDVI_L3) return 3;
+  if (t >= LST_L2 && n <= NDVI_L2) return 2;
+  if (t >= LST_L1 && n <= NDVI_L1) return 1;
+  return 0;
+}
+
+function usableGeom(g) {
+  return !!g && (g.type === 'Polygon' || g.type === 'MultiPolygon') && Array.isArray(g.coordinates) && g.coordinates.length > 0;
+}
+
+/** GeoJSON reduceToVectors → vùng đã sắp mức cao rồi diện tích lớn. Bỏ mảnh dưới 0,5 ha. */
+function normalizeZones(fc, city) {
+  const cityLst = finite(city && (city.lst != null ? city.lst : city.lst_mean));
+  const zones = [];
+  (((fc && fc.features) || [])).forEach(f => {
+    const p = (f && f.properties) || {};
+    const level = numProp(p, ['level', 'level_mean', 'label']);
+    const ha = numProp(p, ['ha', 'ha_mean']);
+    if (level == null || level < 1 || ha == null || ha < ZONE_MIN_HA || !usableGeom(f && f.geometry)) return;
+    const lst = numProp(p, ['lst', 'lst_mean']);
+    const ndvi = numProp(p, ['ndvi', 'ndvi_mean']);
+    const popHa = numProp(p, ['popHa', 'popHa_mean']);
+    const lat = numProp(p, ['lat', 'lat_mean']);
+    const lng = numProp(p, ['lng', 'lng_mean']);
+    zones.push({
+      level: Math.round(level),
+      ha: round2(ha),
+      lst: lst == null ? null : round1(lst),
+      ndvi: ndvi == null ? null : round2(ndvi),
+      popHa: popHa == null ? null : round1(popHa),
+      pop: popHa == null ? null : Math.round(popHa * ha),
+      lat,
+      lng,
+      ward: p.ward || p.tenXa || '',
+      lstGap: cityLst != null && lst != null ? round1(lst - cityLst) : null,
+      geometry: f.geometry
+    });
+  });
+  zones.sort((a, b) => b.level - a.level || b.ha - a.ha);
+  return zones.slice(0, ZONE_LIMIT).map((z, i) => ({ id: i + 1, ...z }));
 }
 
 function cemeteryImage(ee, buffers) {
@@ -302,11 +397,95 @@ function buildTreeRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
   return { vis, meanFc, sumFc, cellM: TREE_SCALE_M };
 }
 
+/**
+ * Vùng ưu tiên trên lưới 30 m: chỉ ô nóng, ít cây và có dân cư.
+ * NDVI 10 m lấy trung bình về lưới nhiệt. Làm trơn 3×3 rồi bỏ mảng nhỏ hơn khoảng 0,7 ha.
+ * Tên phường gán sau khi đã giới hạn 160 vùng lớn nhất.
+ */
+function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year, buffers) {
+  const proj = ee.Projection('EPSG:32648').atScale(ZONE_SCALE_M);
+  const region = wards.geometry();
+  const scale = popScale || ZONE_SCALE_M;
+  const crs = popCrs || proj;
+  const cem = cemeteryImage(ee, buffers);
+  const urban = urbanMask(ee, wards, year, cem);
+  const lst30 = sat.lstImage(ee, wards, year).reproject(proj).rename('lst');
+  const ndvi = sat.ndviImage(ee, wards, year)
+    .setDefaultProjection({ crs: 'EPSG:32648', scale: NDVI_FINE_M })
+    .reduceResolution({ reducer: ee.Reducer.mean(), maxPixels: 16, bestEffort: true })
+    .reproject(proj)
+    .rename('ndvi');
+  let popHa;
+  let residential;
+  if (popPeople) {
+    popHa = popImage.unmask(0).reproject({ crs, scale }).divide(scale * scale).multiply(10000);
+    residential = popHa.gte(RES_POP_HA);
+  } else {
+    residential = popImage.mask();
+    popHa = popImage.unmask(0).divide(scale * scale).multiply(10000);
+  }
+  const res30 = residential.unmask(0).reproject(proj);
+  let level = ee.Image(0).clip(region);
+  level = level.where(res30.gt(0).and(lst30.gte(LST_L1)).and(ndvi.lte(NDVI_L1)), 1);
+  level = level.where(res30.gt(0).and(lst30.gte(LST_L2)).and(ndvi.lte(NDVI_L2)), 2);
+  level = level.where(res30.gt(0).and(lst30.gte(LST_L3)).and(ndvi.lte(NDVI_L3)), 3);
+  const urban30 = urban.unmask(0).reproject(proj);
+  const onGrid = level.updateMask(urban).unmask(0).reproject(proj);
+  const smooth = onGrid.focalMode(1, 'square', 'pixels').reproject(proj).multiply(urban30);
+  const keep = smooth.gt(0).selfMask().connectedPixelCount(128, true).gte(ZONE_MIN_PIXELS);
+  const zoned = smooth.updateMask(keep).toInt().rename('level').clip(region);
+
+  const ranked = zoned.reduceToVectors({
+    geometry: region,
+    crs: 'EPSG:32648',
+    scale: ZONE_SCALE_M,
+    geometryType: 'polygon',
+    eightConnected: true,
+    labelProperty: 'level',
+    maxPixels: 1e8,
+    tileScale: 4
+  }).map(f => {
+    const geom = f.geometry().simplify(20);
+    const ha = geom.area(1).divide(1e4);
+    const rankKey = ee.Number(f.get('level')).multiply(100000).add(ha);
+    return ee.Feature(geom).set({ level: f.get('level'), ha, rankKey });
+  }).filter(ee.Filter.gte('ha', ZONE_MIN_HA)).limit(ZONE_LIMIT, 'rankKey', false);
+
+  const shaped = ranked.map(f => {
+    const centroid = f.geometry().centroid(1);
+    const coords = centroid.coordinates();
+    const hit = wards.filterBounds(centroid);
+    const ward = ee.Algorithms.If(hit.size().gt(0), hit.first().get('tenXa'), '');
+    return f.set({ lat: coords.get(1), lng: coords.get(0), ward });
+  });
+
+  const zones = lst30.addBands(ndvi).addBands(popHa.rename('popHa')).reduceRegions({
+    collection: shaped,
+    reducer: ee.Reducer.mean(),
+    scale: ZONE_SCALE_M,
+    crs: 'EPSG:32648',
+    tileScale: 4
+  });
+  const city = lst30.updateMask(urban).addBands(ndvi.updateMask(urban)).reduceRegion({
+    reducer: ee.Reducer.mean(),
+    geometry: region,
+    scale: 100,
+    crs: 'EPSG:32648',
+    maxPixels: 1e8,
+    tileScale: 4,
+    bestEffort: true
+  });
+  return { zones, city, scaleM: ZONE_SCALE_M };
+}
+
 module.exports = {
   MIN_BUILT_HA,
   TREE_SCALE_M,
+  ZONE_SCALE_M,
+  ZONE_MIN_HA,
   TREE_FIRST_YEAR,
   TREE_VIS,
+  ZONE_LEVELS,
   cemeteryRadius,
   cemeteryBuffers,
   acceptYear,
@@ -314,5 +493,9 @@ module.exports = {
   popFromPixels,
   assignFallbackPop,
   scoreTreeWards,
-  buildTreeRequest
+  zoneLevel,
+  landKind,
+  normalizeZones,
+  buildTreeRequest,
+  buildZoneRequest
 };

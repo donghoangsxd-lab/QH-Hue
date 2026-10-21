@@ -1,4 +1,4 @@
-const { cemeteryRadius, cemeteryBuffers, acceptYear, rowsFromFeatures, popFromPixels, assignFallbackPop, scoreTreeWards, MIN_BUILT_HA } = require('../services/treePriority');
+const { cemeteryRadius, cemeteryBuffers, acceptYear, rowsFromFeatures, popFromPixels, assignFallbackPop, scoreTreeWards, MIN_BUILT_HA, zoneLevel, landKind, normalizeZones, ZONE_LEVELS } = require('../services/treePriority');
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -70,5 +70,46 @@ assert(tied.wards[0].name === 'Phường A' && tied.wards[1].name === 'Xa B', 'h
 
 const missing = scoreTreeWards([{ name: 'D', builtHa: 40, lst: null, ndvi: 0.2, pop: 1000 }]);
 assert(missing.wards[0].rank == null, 'thiếu nhiệt thì không xếp');
+
+assert(zoneLevel(37, 0.25, true) === 3, 'rất cần');
+assert(zoneLevel(36, 0.35, true) === 2, 'cần');
+assert(zoneLevel(34.2, 0.44, true) === 1, 'theo dõi');
+assert(zoneLevel(38, 0.2, false) === 0, 'không có dân cư');
+assert(zoneLevel(33, 0.2, true) === 0, 'chưa đủ nóng');
+assert(zoneLevel(36.5, 0.32, true) === 3 && zoneLevel(35.5, 0.38, true) === 2 && zoneLevel(34, 0.45, true) === 1, 'đúng ngưỡng');
+
+assert(landKind({ lotCode: 'DGD', density: 80 }) === 'sân trường', 'đất giáo dục');
+assert(landKind({ facilityType: '4-TH', name: 'Trường gần chợ' }) === 'sân trường', 'trường học');
+assert(landKind({ lotCode: 'TMD-1' }) === 'khu chợ', 'thương mại');
+assert(landKind({ facilityType: '9-TM' }) === 'khu chợ', 'loại chợ');
+assert(landKind({ name: 'Chợ Đông Ba' }) === 'khu chợ', 'tên chợ');
+assert(landKind({ name: 'Cho An Cuu' }) === 'khu chợ', 'tên không dấu');
+assert(landKind({ lotCode: 'DGT' }) === 'dải phố', 'giao thông');
+assert(landKind({ lotCode: 'GT1' }) === 'dải phố', 'mã GT');
+assert(landKind({ lotCode: 'DTT' }) === 'sân thể thao', 'thể thao');
+assert(landKind({ facilityType: '8-VH' }) === 'sân thể thao', 'văn hóa');
+assert(landKind({ lotCode: 'ODT' }) === 'khu ở', 'đất ở đô thị');
+assert(landKind({ lotCode: 'ONT' }) === 'khu ở', 'đất ở nông thôn');
+assert(landKind({ density: 40, ndvi: 0.4 }) === 'khu ở', 'mật độ cao');
+assert(landKind({ density: 20, ndvi: 0.2 }) === 'sân, bãi', 'sân bãi');
+assert(landKind({ density: 10, ndvi: 0.4 }) === 'khu dân cư', 'mặc định');
+assert(landKind({ name: 'school yard', density: 10, ndvi: 0.4 }) === 'khu dân cư', 'không nhận nhầm chữ school');
+
+const ring = { type: 'Polygon', coordinates: [[[107.5, 16.4], [107.51, 16.4], [107.51, 16.41], [107.5, 16.4]]] };
+const zones = normalizeZones({
+  features: [
+    { properties: { level: 1, ha: 2, lst_mean: 34.2, ndvi_mean: 0.4, popHa_mean: 20, lat: 16.4, lng: 107.5, ward: 'A' }, geometry: ring },
+    { properties: { level: 3, ha: 1.2, lst: 37, ndvi: 0.2, popHa: 50, lat: 16.5, lng: 107.6, ward: 'B' }, geometry: ring },
+    { properties: { level: 3, ha: 4, lst: 38, ndvi: 0.2, popHa: 10, lat: 16.46, lng: 107.58, ward: 'C' }, geometry: ring },
+    { properties: { level: 3, ha: 0.2, lst: 37, ndvi: 0.2, popHa: 50 }, geometry: ring },
+    { properties: { level: 0, ha: 5, lst: 30 }, geometry: ring },
+    { properties: { level: 2, ha: 4, lst: 36 }, geometry: null }
+  ]
+}, { lst: 35.4 });
+assert(zones.length === 3, 'bỏ vùng nhỏ, mức 0 và thiếu hình');
+assert(zones[0].level === 3 && zones[0].ward === 'C' && zones[0].ha === 4 && zones[0].id === 1, 'mức cao, diện tích lớn trước');
+assert(zones[1].level === 3 && zones[1].ward === 'B' && zones[1].lstGap === 1.6 && zones[1].pop === 60, 'dân và chênh nhiệt');
+assert(zones[2].level === 1 && zones[2].ward === 'A', 'theo dõi sau cùng');
+assert(ZONE_LEVELS.map(l => l.label).join('/') === 'Rất cần/Cần/Theo dõi', 'ba mức chú giải');
 
 console.log('ok tree priority');
