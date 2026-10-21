@@ -17,7 +17,12 @@ let nhaContext = null;
 let nhaBase = null;
 let nhaCompose = null;
 let nhaProbeAt = 0;
+let nhaScalePromise = null;
+let nhaPreferCoarse = false;
+let nhaFailNote = '';
+let nhaFailAt = 0;
 const NHA_PROBE_MS = 60 * 1000;
+const NHA_SCALE_BUDGET_MS = 24000;
 
 // Lưới đếm pixel có dân của phường. Mọi phép cộng/đếm trên popRasterNormalized phải dùng đúng lưới này:
 // mỗi pixel mang dân số phường / số pixel đếm ở lưới này, cộng ở lưới 30 m gốc sẽ ra gấp ~4 lần.
@@ -151,11 +156,14 @@ function getGeeContext(method) {
     popScale: POP_SCALE_M,
     popPeople: false,
     popSource: 'pixel',
-    popFallback: method === 'b' && !nhaContext
+    popFallback: method === 'b' && !nhaContext,
+    popFromTable: false,
+    popTableReady: !!(method === 'b' && nhaBase && nhaBase.fromTable),
+    popScaleNote: method === 'b' ? nhaFailNote : ''
   };
 }
 
-function nhaContextFrom(img, projection) {
+function nhaContextFrom(img, projection, extra = {}) {
   const { ee, wardVectorParsed, wardRegion } = geeBase;
   const masked = img.updateMask(img.gt(0)).rename('DanSoPixelNormalized');
   return {
@@ -163,10 +171,12 @@ function nhaContextFrom(img, projection) {
     popRasterNormalized: masked,
     popRasterNative: masked,
     popProjection: projection,
-    popScale: POP_NHA_SCALE_M,
+    popScale: extra.popScale || POP_NHA_SCALE_M,
     popPeople: true,
     popSource: 'nha',
-    popFallback: false
+    popFallback: false,
+    popFromTable: !!extra.popFromTable,
+    popScaleNote: extra.popScaleNote || ''
   };
 }
 
@@ -191,36 +201,91 @@ function aptGeometry(ee, it) {
   return ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(radius);
 }
 
-// Che nhà thấp tầng trong ranh chung cư hiện trạng, vẽ mật độ căn hộ, rồi co nhà thấp tầng theo phường
-// sao cho tổng pixel = dân số phường. Quy hoạch không vào đây.
-// Phần trừ lấy theo dấu chân nằm trong phường, không theo cột phường của sheet (cột đó thường trống).
-function composeNhaImage(items) {
-  const { ee, wardVectorParsed, wardRegion, wardPopSumImg } = geeBase;
-  const proj = nhaBase.projection;
-  const cell = POP_NHA_SCALE_M * POP_NHA_SCALE_M;
+function groupMap(stats, valueKey) {
+  const out = new Map();
+  const groups = stats && Array.isArray(stats.groups) ? stats.groups : [];
+  groups.forEach(g => {
+    const id = Math.round(Number(g.ID_Phuong));
+    const val = Number(g[valueKey]);
+    if (!Number.isFinite(id) || id < 0) return;
+    out.set(id, Number.isFinite(val) ? val : 0);
+  });
+  return out;
+}
+
+// Hệ số theo phường: (dân số chính thức − dân chung cư) / dân nhà thấp tầng.
+// Pixel là số người, nên tổng đưa vào đây phải là tổng không nhân diện tích ô.
+function scalesFromGroups(lowStats, aptStats, popStats) {
+  const lowMap = groupMap(lowStats, 'sum');
+  const aptMap = groupMap(aptStats, 'sum');
+  const popMap = groupMap(popStats, 'first');
+  const ids = [];
+  const scales = [];
+  let popTotal = 0;
+  popMap.forEach((danSo, id) => {
+    const lowSum = lowMap.get(id) || 0;
+    const aptSum = aptMap.get(id) || 0;
+    const target = Math.max(0, danSo - aptSum);
+    ids.push(id);
+    scales.push(lowSum > 0 ? target / lowSum : 0);
+    popTotal += danSo;
+  });
+  return { ids, scales, wards: popMap.size, popTotal };
+}
+
+function aptSig(items) {
+  let h = 2166136261;
+  const text = items.map(it => {
+    const g = it.geometry;
+    const coords = g && g.coordinates ? JSON.stringify(g.coordinates) : `${it.lng},${it.lat},${it.areaM2}`;
+    return `${it.pop}|${g && g.type}|${coords}`;
+  }).join(';');
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16);
+}
+
+function alignToGrid(img, proj, reducer) {
+  return img
+    .setDefaultProjection({ crs: 'EPSG:4326', scale: 10 })
+    .reduceResolution({ reducer, maxPixels: 1024 })
+    .reproject({ crs: proj });
+}
+
+// Che nhà thấp tầng trong ranh chung cư hiện trạng, vẽ mật độ căn hộ.
+// Phần trừ lấy theo dấu chân, không theo cột phường của sheet (cột đó thường trống). Quy hoạch không vào đây.
+function apartmentPaint(ee, items, proj, scaleM) {
+  const cell = scaleM * scaleM;
   const features = items.map(it => {
     const area = Number(it.areaM2) > 0 ? Number(it.areaM2) : Math.PI * 40 * 40;
     const density = Number(it.pop) / Math.max(1, area / cell);
     return ee.Feature(aptGeometry(ee, it), { density });
   });
   const fc = ee.FeatureCollection(features);
-  const align = (img, reducer) => img
-    .setDefaultProjection({ crs: 'EPSG:4326', scale: 10 })
-    .reduceResolution({ reducer, maxPixels: 1024 })
-    .reproject({ crs: proj });
-  const cover = align(ee.Image(0).byte().paint(fc, 1), ee.Reducer.max()).unmask(0);
-  const low = nhaBase.img.unmask(0).where(cover.gt(0), 0);
-  const apt = align(
+  const cover = alignToGrid(ee.Image(0).byte().paint(fc, 1), proj, ee.Reducer.max()).unmask(0);
+  const apt = alignToGrid(
     ee.Image(0).float().paint({ featureCollection: fc, color: 'density' }),
+    proj,
     ee.Reducer.mean()
   ).unmask(0);
+  return { cover, apt };
+}
+
+function composeNhaImage(items) {
+  const { ee, wardVectorParsed, wardRegion, wardPopSumImg } = geeBase;
+  const proj = nhaBase.projection;
+  const { cover, apt } = apartmentPaint(ee, items, proj, POP_NHA_SCALE_M);
+  const low = nhaBase.img.unmask(0).where(cover.gt(0), 0);
   const groupSum = (img) => {
     const stats = img.addBands(wardRegion).reduceRegion({
-      reducer: ee.Reducer.sum().group({ groupField: 1, groupName: 'ID_Phuong' }),
+      reducer: ee.Reducer.sum().unweighted().group({ groupField: 1, groupName: 'ID_Phuong' }),
       geometry: wardVectorParsed.geometry(),
       scale: POP_NHA_SCALE_M,
       crs: proj,
-      maxPixels: 1e10
+      maxPixels: 1e8,
+      tileScale: 4
     });
     const groups = ee.List(ee.Algorithms.If(stats.get('groups'), stats.get('groups'), ee.List([])));
     const dict = ee.Dictionary(groups.iterate((item, acc) => {
@@ -241,38 +306,159 @@ function composeNhaImage(items) {
   return low.multiply(scale).add(apt).rename('DanSoPixelNormalized');
 }
 
-/** Instance đang chạy thử lại asset nhà ở tối đa mỗi phút. pack là tab NOXH đã chuẩn hóa; đổi version thì dựng lại ảnh. */
+function lowRiseImage(ee, projection) {
+  return ee.FeatureCollection(POP_NHA_TABLE)
+    .reduceToImage({ properties: ['people'], reducer: ee.Reducer.sum() })
+    .rename('DanSoPixel')
+    .setDefaultProjection(projection);
+}
+
+function projectionFor(ee, scaleM) {
+  if (scaleM === POP_NHA_SCALE_M) return ee.Image(POP_ASSET).projection();
+  return ee.Image.constant(0).setDefaultProjection({ crs: 'EPSG:4326', scale: scaleM }).projection();
+}
+
+function eeEvaluateBudget(obj, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    eeEvaluate(obj).then(
+      v => { clearTimeout(timer); resolve(v); },
+      err => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
+// Tính hệ số một lần. Ảnh trả về chỉ còn reduceToImage trong từng ô bản đồ, không nhúng reduceRegion cả tỉnh.
+async function computeTablePack(items, scaleM, budgetMs) {
+  const { ee, wardVectorParsed, wardRegion, wardPopSumImg } = geeBase;
+  const projection = projectionFor(ee, scaleM);
+  const lowImg = lowRiseImage(ee, projection);
+  const painted = items.length ? apartmentPaint(ee, items, projection, scaleM) : null;
+  const low = painted ? lowImg.unmask(0).where(painted.cover.gt(0), 0) : lowImg.unmask(0);
+  const apt = painted ? painted.apt : ee.Image.constant(0);
+  const opts = {
+    geometry: wardVectorParsed.geometry(),
+    scale: scaleM,
+    crs: projection,
+    maxPixels: 1e8,
+    tileScale: 8
+  };
+  const raw = await eeEvaluateBudget(ee.Dictionary({
+    low: low.addBands(wardRegion).reduceRegion({
+      reducer: ee.Reducer.sum().unweighted().group({ groupField: 1, groupName: 'ID_Phuong' }),
+      ...opts
+    }),
+    apt: apt.addBands(wardRegion).reduceRegion({
+      reducer: ee.Reducer.sum().unweighted().group({ groupField: 1, groupName: 'ID_Phuong' }),
+      ...opts
+    }),
+    pop: wardPopSumImg.addBands(wardRegion).reduceRegion({
+      reducer: ee.Reducer.first().unweighted().group({ groupField: 1, groupName: 'ID_Phuong' }),
+      ...opts
+    })
+  }), budgetMs);
+  const built = scalesFromGroups(raw && raw.low, raw && raw.apt, raw && raw.pop);
+  if (built.wards < 30 || !(built.popTotal > 1000000)) throw new Error('Không đọc đủ dân số phường');
+  const scaleImg = wardRegion.remap(ee.List(built.ids), ee.List(built.scales), 1).unmask(1).toFloat();
+  const note = scaleM === POP_NHA_SCALE_M
+    ? ''
+    : 'Đang dùng ô 60 m vì tính ô 30 m không kịp trong hạn 60 giây của máy chủ.';
+  return {
+    img: low.multiply(scaleImg).add(apt).rename('DanSoPixelNormalized'),
+    projection,
+    scaleM,
+    note
+  };
+}
+
+async function tablePack(items, key) {
+  if (nhaScalePromise && nhaScalePromise.key === key) return nhaScalePromise.run;
+  const run = (async () => {
+    if (!nhaPreferCoarse) {
+      try {
+        return await computeTablePack(items, POP_NHA_SCALE_M, NHA_SCALE_BUDGET_MS);
+      } catch (err) {
+        console.warn('Hệ số dân nhà ở 30 m:', err && err.message);
+        nhaPreferCoarse = true;
+      }
+    }
+    return computeTablePack(items, 60, 20000);
+  })();
+  nhaScalePromise = { key, run };
+  try {
+    return await run;
+  } catch (err) {
+    if (nhaScalePromise && nhaScalePromise.key === key) nhaScalePromise = null;
+    throw err;
+  }
+}
+
+/** pack là tab NOXH đã chuẩn hóa. Thiếu ảnh raster thì dựng từ bảng điểm, cache theo phiên bản gói. */
 async function ensureNha(method, pack) {
   if (method !== 'b') return getGeeContext('old');
   if (!nhaBase && Date.now() - nhaProbeAt >= NHA_PROBE_MS) await loadNha();
   if (!nhaBase) return getGeeContext('b');
   const items = liveApartments(pack);
-  const key = items.length ? ((pack && pack.version) || 'apt') : 'base';
+  const key = (nhaBase.fromTable ? 'table:' : 'asset:') + (items.length ? `${(pack && pack.version) || 'apt'}:${aptSig(items)}` : 'base');
   if (!nhaCompose || nhaCompose.key !== key) {
-    const img = items.length ? composeNhaImage(items) : nhaBase.img;
-    nhaCompose = { key, context: nhaContextFrom(img, nhaBase.projection) };
+    if (nhaBase.fromTable) {
+      if (nhaFailAt && Date.now() - nhaFailAt < NHA_PROBE_MS) return getGeeContext('b');
+      try {
+        const packed = await tablePack(items, key);
+        nhaFailNote = '';
+        nhaFailAt = 0;
+        nhaCompose = {
+          key,
+          context: nhaContextFrom(packed.img, packed.projection, {
+            popFromTable: true,
+            popScale: packed.scaleM,
+            popScaleNote: packed.note
+          })
+        };
+      } catch (err) {
+        console.warn('Không tính được dân từ bảng điểm:', err && err.message);
+        nhaFailNote = 'Chưa tính được bảng điểm nhà ở trong hạn 60 giây, đang dùng pixel cũ.';
+        nhaFailAt = Date.now();
+        nhaContext = null;
+        return getGeeContext('b');
+      }
+    } else {
+      const img = items.length ? composeNhaImage(items) : nhaBase.img;
+      nhaCompose = { key, context: nhaContextFrom(img, nhaBase.projection) };
+    }
   }
   nhaContext = nhaCompose.context;
   return nhaContext;
 }
 
-/** Asset Pixel-danso-nha là nền nhà thấp tầng. Thiếu asset thì các phép đếm dùng pixel cũ. */
+/** Ảnh Pixel-danso-nha nếu có. Không có thì dùng bảng Pixel-danso-nha-diem, không evaluate cả raster. */
 async function loadNha() {
   nhaProbeAt = Date.now();
   nhaCompose = null;
   nhaBase = null;
   nhaContext = null;
+  nhaScalePromise = null;
+  nhaFailNote = '';
   if (!geeBase) return;
   const { ee } = geeBase;
   try {
     const img = ee.Image(POP_NHA_ASSET).select(0);
     await eeEvaluate(img.bandNames());
     const projection = img.projection();
-    nhaBase = { img, projection };
+    nhaBase = { img, projection, fromTable: false };
     nhaContext = nhaContextFrom(img, projection);
+    return;
+  } catch (err) {
+    console.warn('Chưa có asset Pixel-danso-nha:', err && err.message);
+  }
+  try {
+    if (!(await assetExists(ee, POP_NHA_TABLE))) return;
+    const projection = ee.Image(POP_ASSET).projection();
+    nhaBase = { img: lowRiseImage(ee, projection), projection, fromTable: true };
+    nhaContext = null;
   } catch (err) {
     nhaContext = null;
-    console.warn('Chưa có asset Pixel-danso-nha:', err && err.message);
+    console.warn('Chưa đọc được bảng điểm nhà ở:', err && err.message);
   }
 }
 
@@ -319,28 +505,22 @@ async function startPopNhaTask(phase) {
   const live = await assetExists(ee, POP_NHA_ASSET);
   const assetId = live ? `${POP_NHA_ASSET}-next` : POP_NHA_ASSET;
   if (assetId !== POP_NHA_ASSET && await assetExists(ee, assetId)) await deleteAsset(ee, assetId);
+  // Cùng lưới 30 m với phép tính trực tiếp. Ảnh 10 m cả tỉnh không được worker nhận (started null).
   const proj = ee.Image(POP_ASSET).projection();
-  const summed = ee.FeatureCollection(POP_NHA_TABLE).reduceToImage({
-    properties: ['people'],
-    reducer: ee.Reducer.sum()
-  }).rename('DanSoPixel');
-  // Ô ~10 m rồi cộng vào đúng lưới 30 m của Pixel-danso để tổng dân không bị nearest-neighbor làm lệch.
-  const aligned = summed.setDefaultProjection({ crs: 'EPSG:4326', scale: 10 })
-    .reduceResolution({ reducer: ee.Reducer.sum(), maxPixels: 1024 })
-    .reproject({ crs: proj });
+  const summed = lowRiseImage(ee, proj);
   const [projInfo, bounds] = await Promise.all([
     eeEvaluate(proj),
     eeEvaluate(wardVectorParsed.geometry().bounds(1))
   ]);
   const task = ee.batch.Export.image.toAsset({
-    image: aligned.updateMask(aligned.gt(0)).toFloat(),
+    image: summed.updateMask(summed.gt(0)).toFloat(),
     description: 'QH-Hue_Pixel-danso-nha',
     assetId,
     pyramidingPolicy: { '.default': 'mean' },
     region: ee.Geometry(bounds),
     crs: projInfo.crs,
     crsTransform: projInfo.transform,
-    maxPixels: 1e10
+    maxPixels: 1e8
   });
   await new Promise((resolve, reject) => task.start(resolve, (err) => reject(new Error(String(err)))));
   if (!task.id) throw new Error('GEE không trả về mã tác vụ');
@@ -445,6 +625,6 @@ async function promoteNhaAsset(assetId) {
 
 module.exports = {
   initGEE, getGeeContext, ensureNha, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, loadNha,
-  startPopNhaTask, listRecentTasks, cancelGeeTask, popNhaAssets, promoteNhaAsset,
+  startPopNhaTask, listRecentTasks, cancelGeeTask, popNhaAssets, promoteNhaAsset, scalesFromGroups,
   POP_SCALE_M, POP_NHA_SCALE_M, POP_NHA_ASSET, POP_NHA_CSV
 };

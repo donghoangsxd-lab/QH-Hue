@@ -341,7 +341,7 @@ export function initApartmentLayer() {
   function armPopNhaPoll(data) {
     clearInterval(popNhaTimer);
     popNhaTimer = null;
-    const live = data && (data.phase === 'table' || data.phase === 'image') && data.state !== 'FAILED' && data.state !== 'CANCELLED' && data.state !== 'ASSET_MISSING';
+    const live = data && (data.phase === 'table' || data.phase === 'image') && data.state === 'RUNNING';
     if (!live) return;
     popNhaTimer = setInterval(() => askIngest('status'), 20000);
   }
@@ -359,7 +359,8 @@ export function initApartmentLayer() {
       const data = await postAdmin('ingestPopNha', {
         rebuild: mode === 'rebuild',
         cancel: mode === 'cancel',
-        restart: mode === 'restart'
+        restart: mode === 'restart',
+        start: mode === 'check'
       });
       if (status) status.textContent = popNhaLines(data);
       armPopNhaPoll(data);
