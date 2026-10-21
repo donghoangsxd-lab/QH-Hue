@@ -1,6 +1,7 @@
 // Lớp 14. Chung cư (Khu đất): vẽ mọi dòng tab 14-NOXH. Hiện trạng tính dân; quy hoạch chỉ để xem.
 // Bật hay tắt lớp không đổi gói dân đưa vào setPopData.
-import { map } from './mapEngine.js';
+import { map, WARD_BOUNDS_EVENT } from './mapEngine.js';
+import { assignNoxhWards } from './noxhWard.js';
 import { planMap } from './planMap.js';
 import { state } from './state.js';
 import { geeApi } from './api.js';
@@ -29,6 +30,10 @@ let planL = null;
 let planR = null;
 let loaded = false;
 let planItems = [];
+let rawLive = [];
+let rawPlan = [];
+let popWeights = null;
+let faqQuestions = [];
 let kindFilter = '';
 
 function isAdmin() {
@@ -204,9 +209,17 @@ function readCfg() {
   if (on) draw();
 }
 
+function publishPop() {
+  const wards = state.wardLabelsList || [];
+  const items = assignNoxhWards(rawLive, wards);
+  planItems = assignNoxhWards(rawPlan, wards);
+  setPopData({ v: 1, hhSize: 3.3, items }, popWeights, faqQuestions);
+}
+
 async function load() {
-  const weights = await fetch('data/gba/pop-b.json').then(r => (r.ok ? r.json() : null)).catch(() => null);
+  popWeights = await fetch('data/gba/pop-b.json').then(r => (r.ok ? r.json() : null)).catch(() => null);
   const faq = await fetch('data/gba/pop-faq.json').then(r => (r.ok ? r.json() : null)).catch(() => null);
+  faqQuestions = (faq && faq.questions) || [];
   let items = [];
   let plans = [];
   let fromSheet = false;
@@ -224,8 +237,9 @@ async function load() {
     items = (seed && seed.items) || [];
     plans = (plan && plan.items) || [];
   }
-  planItems = plans;
-  setPopData({ v: 1, hhSize: 3.3, items }, weights, faq && faq.questions);
+  rawLive = items;
+  rawPlan = plans;
+  publishPop();
   loaded = true;
   paintBox();
   if (on) draw();
@@ -241,7 +255,7 @@ async function saveItem(it) {
         id: it.id,
         name: it.name,
         detail: it.detail || '',
-        ward: it.ward || '',
+        ward: it.sheetWard != null ? it.sheetWard : (it.ward || ''),
         lat: it.lat,
         lng: it.lng,
         floors: it.floors,
@@ -336,5 +350,11 @@ export function initApartmentLayer() {
     if (on) draw();
   });
   window.addEventListener(POP_METHOD_EVENT, paintBox);
+  window.addEventListener(WARD_BOUNDS_EVENT, () => {
+    if (!loaded) return;
+    publishPop();
+    paintBox();
+    if (on) draw();
+  });
   load().catch(() => { /* file seed thiếu thì lớp trống */ });
 }
