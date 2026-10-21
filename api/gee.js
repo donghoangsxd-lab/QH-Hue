@@ -3868,7 +3868,7 @@ module.exports = async (req, res) => {
       const buffers = tree.cemeteryBuffers(list);
       const part = req.query.part === 'tile' ? 'tile' : (req.query.part === 'zones' ? 'zones' : 'stats');
       const packVersion = noxhPack && noxhPack.version ? noxhPack.version : 'none';
-      const key = `tree|v8|${part}|${year}|${popSource}|${packVersion}|${getDataVersion()}`;
+      const key = `tree|v9|${part}|${year}|${popSource}|${packVersion}|${getDataVersion()}`;
       if (!cachedSatStats.has(key) && !treeJobs.has(key)) {
         const job = (async () => {
           const args = [ee, wardVectorParsed, popRasterNormalized, popProjection, popScale, !!popPeople, year, buffers];

@@ -8,12 +8,12 @@ const ZONE_SCALE_M = 60;
 const ZONE_MIN_HA = 0.3;
 const ZONE_LIMIT = 160;
 const TREE_FIRST_YEAR = 2017;
-const LST_L3 = 36.5;
-const NDVI_L3 = 0.32;
-const LST_L2 = 35.5;
-const NDVI_L2 = 0.38;
-const LST_L1 = 34;
-const NDVI_L1 = 0.45;
+const LST_L3 = 40;
+const NDVI_L3 = 0.22;
+const LST_L2 = 37.5;
+const NDVI_L2 = 0.28;
+const LST_L1 = 35.5;
+const NDVI_L1 = 0.38;
 const RES_POP_HA = 15;
 const LST_REF = 30;
 const LST_SPAN = 12;
@@ -276,7 +276,7 @@ function landKind({ lotCode, facilityType, name, density, ndvi } = {}) {
   return 'khu dân cư';
 }
 
-/** Mức 3/2/1 theo ngưỡng cố định mùa nóng 2025. Không đủ điều kiện thì 0 (ẩn). */
+/** Mức 3/2/1 theo ngưỡng cố định đã chỉnh trên mùa nóng 2025 (nhiệt thành phố khoảng 35 °C). Không đủ điều kiện thì 0 (ẩn). */
 function zoneLevel(lst, ndvi, residential) {
   if (residential !== true) return 0;
   const t = finite(lst);
@@ -430,7 +430,7 @@ function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
     maxPixels: 1e8,
     tileScale: 8
   });
-  const shaped = vectors.map(f => {
+  const zones = vectors.map(f => {
     const geom = f.geometry().simplify(20);
     const ha = geom.area(1).divide(1e4);
     const label = ee.Number(ee.List([f.get('level'), f.get('klass'), f.get('klass_mean')]).reduce(ee.Reducer.firstNonNull())).round();
@@ -442,9 +442,7 @@ function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
       lng: coords.get(0),
       ward: ''
     });
-  }).filter(ee.Filter.gte('ha', ZONE_MIN_HA));
-  const pick = (lvl, n) => shaped.filter(ee.Filter.eq('level', lvl)).limit(n, 'ha', false);
-  const zones = pick(3, 50).merge(pick(2, 40)).merge(pick(1, 30));
+  }).filter(ee.Filter.gte('ha', ZONE_MIN_HA)).limit(100, 'ha', false);
 
   const city = lst.updateMask(urban).addBands(ndvi.updateMask(urban)).reduceRegion({
     reducer: ee.Reducer.mean(),
