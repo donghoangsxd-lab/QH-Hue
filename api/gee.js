@@ -3862,7 +3862,7 @@ module.exports = async (req, res) => {
       }
     }
     const ctx = await ensureNha(popMethodReq, noxhPack);
-    const { ee, wardVectorParsed, popRasterNormalized, popRasterNative, popProjection, popPeople, popScale, popSource, popFallback, popFromTable, popScaleNote } = ctx;
+    const { ee, wardVectorParsed, popRasterNormalized, popRasterNative, popRasterDisplay, popProjection, popPeople, popScale, popSource, popFallback, popFromTable, popScaleNote } = ctx;
 
     // --- Thao tác cần Earth Engine nhưng không cần danh sách công trình ---
     if (action === 'saveParcelInfra' || action === 'deleteParcelInfra') {
@@ -4061,8 +4061,9 @@ module.exports = async (req, res) => {
       // pv: Admin vừa lưu vùng hiệu chỉnh → lấy ảnh mới ngay; người dùng khác nhận ảnh mới sau tối đa 5 phút
       res.setHeader('Cache-Control', req.query.pv ? 'no-store' : 's-maxage=300, stale-while-revalidate=300');
       const popMax = popPeople ? 30 : 5;
+      const tileImg = popRasterDisplay || popRasterNormalized;
       const mapId = await new Promise((resolve, reject) => {
-        popRasterNormalized.getMap(
+        tileImg.getMap(
           { min: 0, max: popMax, palette: ['blue', 'cyan', 'green', 'yellow', 'orange', 'red'] },
           (m, err) => err ? reject(err) : resolve(m)
         );

@@ -166,10 +166,14 @@ function getGeeContext(method) {
 function nhaContextFrom(img, projection, extra = {}) {
   const { ee, wardVectorParsed, wardRegion } = geeBase;
   const masked = img.updateMask(img.gt(0)).rename('DanSoPixelNormalized');
+  const displaySrc = extra.displayImg || img;
+  let display = displaySrc.updateMask(displaySrc.gt(0)).rename('DanSoPixelNormalized');
+  if (extra.displayImg) display = display.resample('bilinear');
   return {
     ee, wardVectorParsed, wardRegion,
     popRasterNormalized: masked,
     popRasterNative: masked,
+    popRasterDisplay: display,
     popProjection: projection,
     popScale: extra.popScale || POP_NHA_SCALE_M,
     popPeople: true,
@@ -328,7 +332,14 @@ function eeEvaluateBudget(obj, ms) {
   });
 }
 
-// Tính hệ số một lần. Ảnh trả về chỉ còn reduceToImage trong từng ô bản đồ, không nhúng reduceRegion cả tỉnh.
+// reduceToImage không khóa lưới: tile bản đồ tính lại theo mức phóng, mỗi điểm thành một pixel.
+// Ảnh hiển thị ép về đúng lưới tính dân (30 m, hoặc 60 m khi quá hạn) rồi nội suy khi thu nhỏ.
+// Ảnh tính tổng phường vẫn là low × hệ số + chung cư, không đi qua reproject này.
+function displayFromTable(low, scaleImg, apt, projection) {
+  return low.multiply(scaleImg).add(apt).reproject({ crs: projection });
+}
+
+// Tính hệ số một lần. Ảnh tính dân chỉ còn reduceToImage theo lưới phường, không nhúng reduceRegion cả tỉnh.
 async function computeTablePack(items, scaleM, budgetMs) {
   const { ee, wardVectorParsed, wardRegion, wardPopSumImg } = geeBase;
   const projection = projectionFor(ee, scaleM);
@@ -363,8 +374,10 @@ async function computeTablePack(items, scaleM, budgetMs) {
   const note = scaleM === POP_NHA_SCALE_M
     ? ''
     : 'Đang dùng ô 60 m vì tính ô 30 m không kịp trong hạn 60 giây của máy chủ.';
+  const img = low.multiply(scaleImg).add(apt).rename('DanSoPixelNormalized');
   return {
-    img: low.multiply(scaleImg).add(apt).rename('DanSoPixelNormalized'),
+    img,
+    display: displayFromTable(low, scaleImg, apt, projection),
     projection,
     scaleM,
     note
@@ -412,7 +425,8 @@ async function ensureNha(method, pack) {
           context: nhaContextFrom(packed.img, packed.projection, {
             popFromTable: true,
             popScale: packed.scaleM,
-            popScaleNote: packed.note
+            popScaleNote: packed.note,
+            displayImg: packed.display
           })
         };
       } catch (err) {
