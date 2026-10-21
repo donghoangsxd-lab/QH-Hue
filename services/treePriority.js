@@ -4,7 +4,7 @@ const sat = require('./satService');
 
 const MIN_BUILT_HA = 15;
 const TREE_SCALE_M = 100;
-const ZONE_SCALE_M = 30;
+const ZONE_SCALE_M = 60;
 const NDVI_FINE_M = 10;
 const ZONE_MIN_HA = 0.5;
 const ZONE_LIMIT = 160;
@@ -397,10 +397,10 @@ function buildTreeRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
 }
 
 /**
- * Vùng ưu tiên trên lưới 30 m: chỉ ô nóng, ít cây và có dân cư.
- * NDVI 10 m lấy trung bình về lưới nhiệt. Làm trơn 3×3; mảng dưới 0,5 ha bị loại sau khi vẽ vùng.
+ * Vùng ưu tiên trên lưới 60 m (30 m vượt hạn 60 giây của hàm): chỉ ô nóng, ít cây và có dân cư.
+ * NDVI 10 m lấy trung bình về lưới này. Làm trơn 3×3; mảng dưới 0,5 ha bị loại sau khi vẽ vùng.
  * Không dùng connectedPixelCount: phép đó vượt bộ nhớ Earth Engine trên cả tỉnh.
- * Tên phường gán sau khi đã giới hạn 160 vùng lớn nhất.
+ * Tên phường gán ở trình duyệt.
  */
 function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year, buffers) {
   const proj = ee.Projection('EPSG:32648').atScale(ZONE_SCALE_M);
@@ -412,7 +412,7 @@ function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
   const lst30 = sat.lstImage(ee, wards, year).reproject(proj).rename('lst');
   const ndvi = sat.ndviImage(ee, wards, year)
     .setDefaultProjection({ crs: 'EPSG:32648', scale: NDVI_FINE_M })
-    .reduceResolution({ reducer: ee.Reducer.mean(), maxPixels: 16, bestEffort: true })
+    .reduceResolution({ reducer: ee.Reducer.mean(), maxPixels: 64, bestEffort: true })
     .reproject(proj)
     .rename('ndvi');
   let popHa;
@@ -452,11 +452,8 @@ function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
   }).filter(ee.Filter.gte('ha', ZONE_MIN_HA)).limit(ZONE_LIMIT, 'rankKey', false);
 
   const shaped = ranked.map(f => {
-    const centroid = f.geometry().centroid(1);
-    const coords = centroid.coordinates();
-    const hit = wards.filterBounds(centroid);
-    const ward = ee.Algorithms.If(hit.size().gt(0), hit.first().get('tenXa'), '');
-    return f.set({ lat: coords.get(1), lng: coords.get(0), ward });
+    const coords = f.geometry().centroid(1).coordinates();
+    return f.set({ lat: coords.get(1), lng: coords.get(0), ward: '' });
   });
 
   const zones = lst30.addBands(ndvi).addBands(popHa.rename('popHa')).reduceRegions({
