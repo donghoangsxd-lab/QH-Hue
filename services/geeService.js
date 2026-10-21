@@ -193,6 +193,7 @@ function aptGeometry(ee, it) {
 
 // Che nhà thấp tầng trong ranh chung cư hiện trạng, vẽ mật độ căn hộ, rồi co nhà thấp tầng theo phường
 // sao cho tổng pixel = dân số phường. Quy hoạch không vào đây.
+// Phần trừ lấy theo dấu chân nằm trong phường, không theo cột phường của sheet (cột đó thường trống).
 function composeNhaImage(items) {
   const { ee, wardVectorParsed, wardRegion, wardPopSumImg } = geeBase;
   const proj = nhaBase.projection;

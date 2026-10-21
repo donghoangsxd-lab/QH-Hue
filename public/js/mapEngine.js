@@ -264,6 +264,8 @@ function handleCompareChange(on) {
   else if (planHeatStale) refreshPlanHeat();
 }
 
+export const WARD_BOUNDS_EVENT = 'qh:ward-bounds';
+
 export async function loadBoundaryLayer() {
   if (!map) return;
 
@@ -296,6 +298,7 @@ export async function loadBoundaryLayer() {
     });
     state.wardLabelsList = labels;
     wardBBoxes.clear();
+    window.dispatchEvent(new CustomEvent(WARD_BOUNDS_EVENT));
 
     labels.forEach(item => {
       const icon = L.divIcon({

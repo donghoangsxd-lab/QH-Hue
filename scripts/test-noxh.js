@@ -2,6 +2,21 @@
 const { phaseOf, kindOf, fold, parseWktPolygon, peopleOf, normalizeNoxhItem, normalizeNoxhPack, isNoxhSheetName, pickNoxhSheetName, confidenceOf } = require('../services/noxh');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
+
+function loadWardAssign() {
+  const file = path.join(__dirname, '../public/js/noxhWard.js');
+  const src = fs.readFileSync(file, 'utf8').replace(/^export /gm, '');
+  const sandbox = { exports: {} };
+  vm.runInNewContext(
+    `${src}\nexports.assignNoxhWards=assignNoxhWards;\nexports.cleanWardName=cleanWardName;\nexports.apartmentWardFit=apartmentWardFit;`,
+    sandbox,
+    { filename: file }
+  );
+  return sandbox.exports;
+}
+
+const { assignNoxhWards, cleanWardName, apartmentWardFit } = loadWardAssign();
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -108,5 +123,53 @@ assert(row.wkt.indexOf('MULTIPOLYGON') === 0, 'giữ WKT gốc');
 
 const plan = normalizeNoxhItem({ name: 'Khu B', status: 'quy_hoach', units: 40, wkt: multiWkt }, 6);
 assert(plan && plan.status === 'quy_hoach' && plan.pop === 0 && plan.geometry.type === 'MultiPolygon', 'quy hoạch không tính dân');
+
+assert(cleanWardName('Phường Phú Xuân') === 'phú xuân', 'bỏ tiền tố phường');
+assert(cleanWardName('P. Thuận Hóa') === 'thuận hóa', 'bỏ P.');
+assert(cleanWardName('Xã A Lưới 1') === 'a lưới 1', 'bỏ xã');
+assert(cleanWardName('  ') === '', 'tên trống');
+
+function square(x0, y0, x1, y1) {
+  return { type: 'Polygon', coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] };
+}
+const wardBoxes = [
+  { name: 'Phường Bắc', geometry: square(0, 1.01, 4, 3) },
+  { name: 'Phường Nam', geometry: square(0, 0, 4, 0.99) }
+];
+const inBac = square(0.4, 1.3, 1.2, 2.1);
+const placed = assignNoxhWards([{ id: 'a', ward: '', geometry: inBac, pop: 10, status: 'hien_trang' }], wardBoxes);
+assert(placed[0].ward === 'Phường Bắc' && placed[0].sheetWard === '', 'tâm nằm trong phường');
+const placedAgain = assignNoxhWards(placed, wardBoxes);
+assert(placedAgain[0].ward === 'Phường Bắc' && placedAgain[0].sheetWard === '', 'gán lại không đổi cột gốc');
+
+const sheetWins = assignNoxhWards([{ id: 'b', ward: 'Nam', geometry: inBac }], wardBoxes);
+assert(sheetWins[0].ward === 'Phường Nam' && sheetWins[0].sheetWard === 'Nam', 'cột sheet hợp lệ thắng giao cắt');
+const sheetBad = assignNoxhWards([{ id: 'c', ward: 'Không có', geometry: inBac }], wardBoxes);
+assert(sheetBad[0].ward === 'Phường Bắc', 'cột không khớp ranh thì bỏ');
+assert(assignNoxhWards([{ ward: 'Nam', geometry: inBac }], [])[0].ward === 'Nam', 'chưa có ranh thì giữ nguyên');
+
+const spike = {
+  type: 'Polygon',
+  coordinates: [[
+    [0.2, 0.1], [3.5, 0.1], [3.5, 0.9], [0.55, 0.9], [0.5, 2.2], [0.5, 2.2], [0.45, 0.9], [0.2, 0.9], [0.2, 0.1]
+  ]]
+};
+const sliver = assignNoxhWards([{ id: 'd', ward: '', geometry: spike }], wardBoxes);
+assert(sliver[0].ward === 'Phường Nam', 'tâm lệch khỏi đa giác thì lấy phần chồng lớn');
+const sliverFit = apartmentWardFit({ ward: '', geometry: spike }, wardBoxes);
+assert(sliverFit.ward === 'Phường Nam' && sliverFit.inWard > sliverFit.spill, 'phần lớn mẫu ở phường được gán');
+
+const multiGeom = {
+  type: 'MultiPolygon',
+  coordinates: [square(0.2, 0.15, 1.8, 0.85).coordinates, square(0.3, 1.4, 0.5, 1.7).coordinates]
+};
+const multiWard = assignNoxhWards([{ id: 'e', ward: '', geometry: multiGeom }], wardBoxes);
+assert(multiWard[0].ward === 'Phường Nam', 'mảnh lớn hơn quyết định phường');
+
+const pointOnly = assignNoxhWards([{ id: 'f', ward: '', lat: 1.6, lng: 0.6 }], wardBoxes);
+assert(pointOnly[0].ward === 'Phường Bắc', 'không có WKT thì dùng điểm');
+
+const planned = assignNoxhWards([{ id: 'g', ward: '', status: 'quy_hoach', pop: 0, geometry: inBac }], wardBoxes);
+assert(planned[0].ward === 'Phường Bắc' && planned[0].pop === 0, 'quy hoạch có phường nhưng không có dân');
 
 console.log('noxh: ok', seeded.version);
