@@ -554,6 +554,7 @@
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div><button type="button" class="layer-mini-btn active" id="btnWardNames" title="Bật/tắt tên phường, xã trên bản đồ" aria-label="Bật/tắt tên phường, xã" aria-pressed="true">Aa</button></div>
           <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap và tuyến do quản trị viên bổ sung. Thu nhỏ vẫn hiện trục chính."><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(phóng to để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
+          <div class="layer-row layer-subrow"><div><input type="checkbox" id="chk_osmRail" data-layer-sub><label for="chk_osmRail" title="Đường sắt và ga hiện trạng trên OpenStreetMap. Không gồm tuyến bỏ hay quy hoạch, không nhập vào mạng đường bộ. Huế chưa có đường sắt đô thị trong OSM.">Đường sắt hiện trạng</label></div></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
             <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
             <span class="road-legend-item"><i style="background:#60a5fa; height:2px;"></i>Khu vực</span>
@@ -561,7 +562,10 @@
             <span class="road-legend-item" title="Đường xe đạp: OpenStreetMap và tuyến do quản trị viên bổ sung"><i style="background:repeating-linear-gradient(90deg,#4ade80 0 5px,transparent 5px 8px); height:2px;"></i>Xe đạp</span>
             <span class="road-legend-item"><i style="background:#fde047; height:2px;"></i>Chưa phân loại</span>
           </div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_osmRail"><label for="chk_osmRail" title="Đường sắt và ga đang dùng trên OpenStreetMap (railway=rail, light_rail, subway, tram, station, halt). Không gồm tuyến bỏ, quy hoạch. Huế chưa có đường sắt đô thị trong OSM. Lớp tham chiếu cho tiêu chuẩn giao thông công cộng, chưa tính dân số trong 500 m."><svg class="ico ico-layer"><use href="#i-road"/></svg>Đường sắt (OSM)</label></div></div>
+          <div class="road-legend layer-legend" id="railLegend" style="display:none;">
+            <span class="road-legend-item" title="Nét đậm và tà vẹt sáng, cùng kiểu đường sắt quốc gia hiện trạng"><svg class="rail-swatch" viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><line x1="1" y1="6" x2="27" y2="6" stroke="#1e293b" stroke-width="4"/><line x1="1" y1="6" x2="27" y2="6" stroke="#f8fafc" stroke-width="1.6" stroke-dasharray="7 7"/></svg>Đường sắt, ga</span>
+            <span class="rail-status" id="railStatus"></span>
+          </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_osmWater"><label for="chk_osmWater" title="Sông, kênh và bến phà trên OpenStreetMap (waterway=river|canal, amenity=ferry_terminal). Đây là tuyến nước, không phải mạng tàu thủy hành khách. Lớp tham chiếu cho tiêu chuẩn giao thông công cộng."><svg class="ico ico-layer"><use href="#i-stream"/></svg>Đường thủy nội địa (OSM)</label></div></div>
           <div class="flood-box" id="osmOpenBox" style="display:none;">
             <div class="sat-legend" id="osmOpenLegend"></div>

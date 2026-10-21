@@ -542,6 +542,9 @@ function legendRows(s) {
     });
     rows.push(`<div class="pa3-lg-row"><i class="pa3-lg-sym pa3-lg-line pa3-lg-dash" style="--c:#4ade80; --w:${(2 * s).toFixed(2)}px"></i>Đường xe đạp</div>`);
   }
+  if (checked('chk_osmRail')) {
+    rows.push(`<div class="pa3-lg-row"><i class="pa3-lg-sym pa3-lg-line" style="--c:#1e293b; --w:${(3 * s).toFixed(2)}px"></i>Đường sắt hiện trạng</div>`);
+  }
   const ramps = [];
   if (checked('chk_heat')) {
     ramps.push(`<div class="pa3-lg-ramp"><div class="pa3-lg-ramp-title">Độ phủ hạ tầng (số nhóm tiếp cận được)</div>

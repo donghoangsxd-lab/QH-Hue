@@ -121,7 +121,7 @@ function initLayerMapTabs() {
     const pane = root.querySelector(`[data-map-pane="${btn.dataset.mapTab}"]`);
     const badge = btn.querySelector('.layer-map-count');
     if (!badge || !pane) return;
-    const n = pane.querySelectorAll('input[type="checkbox"]:checked').length;
+    const n = pane.querySelectorAll('input[type="checkbox"]:checked:not([data-layer-sub])').length;
     badge.textContent = n ? String(n) : '';
   });
   root.addEventListener('change', refreshCounts);

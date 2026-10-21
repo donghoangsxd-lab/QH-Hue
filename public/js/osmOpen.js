@@ -8,8 +8,8 @@ import { clipOsmFeatures, countGroups } from './osmClip.js';
 
 const $ = (id) => document.getElementById(id);
 const GROUPS = [
-  { id: 'chk_osmRail', group: 'rail', color: '#334155' },
-  { id: 'chk_osmWater', group: 'water', color: '#0284c7' }
+  { id: 'chk_osmRail', group: 'rail' },
+  { id: 'chk_osmWater', group: 'water' }
 ];
 
 let maps = [];
@@ -105,41 +105,25 @@ export function transitNote(names) {
   return `OSM (không tính vào % phủ): ${stops} ga trong phạm vi, ${fmtNum(Math.round(km('rail') * 10) / 10)} km đường sắt trong ranh 40 phường xã, ${ferry} bến thủy trong phạm vi, ${fmtNum(Math.round(km('water') * 10) / 10)} km sông/kênh trong ranh 40 phường xã. OSM chưa đủ và chưa có đường sắt đô thị.`;
 }
 
-function anyOn() {
-  return GROUPS.some(g => $(g.id)?.checked);
+function groupOn(id) {
+  return !!$(id)?.checked;
 }
 
-function draw() {
-  layers.forEach(layer => maps.forEach(m => { if (m.hasLayer(layer)) m.removeLayer(layer); }));
-  layers = [];
-  const feats = hueFeatures();
-  if (!feats || !anyOn()) return;
-  const on = new Set(GROUPS.filter(g => $(g.id)?.checked).map(g => g.group));
-  const features = feats.filter(f => {
-    const g = f.properties && f.properties.group;
-    if (g === 'railStop') return on.has('rail');
-    if (g === 'ferry') return on.has('water');
-    return on.has(g);
-  });
-  const opts = {
-    style: (f) => {
-      const g = f.properties.group;
-      const color = g === 'water' || g === 'ferry' ? '#0284c7' : '#334155';
-      return { color, weight: g === 'rail' || g === 'water' ? 2.5 : 1.5, fillColor: color, fillOpacity: 0.35 };
-    },
-    pointToLayer: (f, latlng) => L.circleMarker(latlng, {
-      radius: 5,
-      color: f.properties.group === 'ferry' ? '#0284c7' : '#334155',
-      weight: 2,
-      fillColor: '#fff',
-      fillOpacity: 1
-    }),
-    onEachFeature: (f, layer) => {
-      const p = f.properties || {};
-      const extra = p.lengthKm > 0 ? `<div>${fmtNum(p.lengthKm)} km</div>` : '';
-      layer.bindPopup(`<b>${escapeHtml(p.name || '')}</b><div>${escapeHtml(p.kind || '')}</div>${extra}<div>OpenStreetMap, trong ranh 40 phường xã</div>`);
-    }
-  };
+function anyOn() {
+  return GROUPS.some(g => groupOn(g.id));
+}
+
+const RAIL_BASE = { color: '#1e293b', weight: 5.5, opacity: 1 };
+const RAIL_TIES = { color: '#f8fafc', weight: 2, opacity: 0.95, dashArray: '7 7' };
+
+function popupOf(f, layer) {
+  const p = f.properties || {};
+  const extra = p.lengthKm > 0 ? `<div>${fmtNum(p.lengthKm)} km</div>` : '';
+  layer.bindPopup(`<b>${escapeHtml(p.name || '')}</b><div>${escapeHtml(p.kind || '')}</div>${extra}<div>OpenStreetMap, trong ranh 40 phường xã</div>`);
+}
+
+function addLayer(features, opts) {
+  if (!features.length) return;
   maps.forEach(m => {
     const layer = L.geoJSON({ type: 'FeatureCollection', features }, opts);
     layer.addTo(m);
@@ -147,15 +131,59 @@ function draw() {
   });
 }
 
+function draw() {
+  layers.forEach(layer => maps.forEach(m => { if (m.hasLayer(layer)) m.removeLayer(layer); }));
+  layers = [];
+  const feats = hueFeatures();
+  paintRail();
+  if (!feats || !anyOn()) return;
+  const rail = groupOn('chk_osmRail');
+  const water = groupOn('chk_osmWater');
+  const pick = (group) => feats.filter(f => f.properties && f.properties.group === group);
+  if (water) {
+    addLayer(pick('water').concat(pick('ferry')), {
+      style: () => ({ color: '#0284c7', weight: 2.5 }),
+      pointToLayer: (_f, latlng) => L.circleMarker(latlng, {
+        radius: 5, color: '#0284c7', weight: 2, fillColor: '#fff', fillOpacity: 1
+      }),
+      onEachFeature: popupOf
+    });
+  }
+  if (!rail) return;
+  const lines = pick('rail');
+  addLayer(lines, { style: () => ({ ...RAIL_BASE, interactive: false }) });
+  addLayer(lines, { style: () => RAIL_TIES, onEachFeature: popupOf });
+  addLayer(pick('railStop'), {
+    pointToLayer: (_f, latlng) => L.circleMarker(latlng, {
+      radius: 5, color: '#1e293b', weight: 2, fillColor: '#fff', fillOpacity: 1
+    }),
+    onEachFeature: popupOf
+  });
+}
+
+function paintRail() {
+  const legend = $('railLegend');
+  const on = groupOn('chk_osmRail');
+  if (legend) legend.style.display = on ? '' : 'none';
+  const st = $('railStatus');
+  if (!st) return;
+  st.classList.remove('is-warn');
+  if (!on) { st.textContent = ''; return; }
+  if (loadError && !raw) { st.textContent = 'Chưa tải được đường sắt.'; st.classList.add('is-warn'); return; }
+  if (!hueFeatures()) { st.textContent = raw ? 'Đang cắt theo ranh phường, xã…' : 'Đang tải đường sắt…'; return; }
+  st.textContent = '';
+}
+
 function paintBox(data) {
   const box = $('osmOpenBox');
   const legend = $('osmOpenLegend');
   const stats = $('osmOpenStats');
-  if (box) box.style.display = anyOn() ? '' : 'none';
-  if (!anyOn()) return;
+  const water = groupOn('chk_osmWater');
+  paintRail();
+  if (box) box.style.display = water ? '' : 'none';
+  if (!water) return;
   if (legend) {
-    legend.innerHTML = `<span><i class="sat-swatch" style="background:#334155"></i>Đường sắt, ga</span>
-      <span><i class="sat-swatch" style="background:#0284c7"></i>Sông, kênh, bến thủy</span>`;
+    legend.innerHTML = '<span><i class="sat-swatch" style="background:#0284c7"></i>Sông, kênh, bến thủy</span>';
   }
   if (!stats) return;
   if (!data) {
@@ -169,8 +197,6 @@ function paintBox(data) {
   }
   const c = countGroups(feats);
   stats.innerHTML = `<div class="flood-wards">
-      <span>Đoạn đường sắt <b>${fmtNum(c.rail || 0)}</b></span>
-      <span>Ga <b>${fmtNum(c.railStop || 0)}</b></span>
       <span>Sông, kênh <b>${fmtNum(c.water || 0)}</b></span>
       <span>Bến thủy <b>${fmtNum(c.ferry || 0)}</b></span>
     </div>
