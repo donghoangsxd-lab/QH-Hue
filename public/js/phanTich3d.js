@@ -1,5 +1,6 @@
 // Bản mẫu bốn thành phần đô thị. Ô vuông cạnh 2×r (r vẫn là tham số bán kính, nay là nửa cạnh).
 // Chiều cao đùn bằng mét từ data/gba/bldg-hf.bin (làm tròn 0,5 m). Số tầng = round(h / 3.3).
+// Tháp bị GBA lọc hoặc ước thấp nằm ở bldg-overrides.geojson (draw) và được vẽ thêm.
 // Màu khối tích vẫn theo nhóm tương đối c của buildings.pmtiles. Dân phường không nhân theo diện tích ô.
 
 const GBA_URL = 'https://storage.googleapis.com/hue-infra-data-us/gba/buildings.pmtiles';
@@ -1294,6 +1295,28 @@ function pointInGeo(lng, lat, geometry) {
   return polys.some((poly) => pointInRing([lng, lat], poly[0]) && !poly.slice(1).some((hole) => pointInRing([lng, lat], hole)));
 }
 
+async function loadOverrideFootprints() {
+  try {
+    const res = await fetch('data/gba/bldg-overrides.geojson');
+    if (!res.ok) return [];
+    const fc = await res.json();
+    const out = [];
+    for (const f of fc.features || []) {
+      if (!f.properties || !f.properties.draw || !f.geometry) continue;
+      const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates]
+        : f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates : [];
+      for (const coords of polys) {
+        const rings = coords.map((ring) => ring.map(([lng, lat]) => [lng, lat]));
+        if (Math.abs(signedArea(rings[0].map(([lng, lat]) => [(lng - 107.59) * 106800, (lat - 16.46) * 110540]))) < 80) continue;
+        out.push({ rings, props: { c: 3 } });
+      }
+    }
+    return out;
+  } catch (e) {
+    return [];
+  }
+}
+
 async function loadWard(lat, lng) {
   const [boundary, imm] = await Promise.all([
     fetch('data/ward-boundary.json').then((r) => r.json()),
@@ -1334,7 +1357,7 @@ async function start() {
       return index;
     }).catch(() => null)
   ]);
-  raw.gba = gba;
+  raw.gba = gba.concat(await loadOverrideFootprints());
   raw.cadastre = cad;
   raw.osm = osm;
   raw.heightMeta = heights && heights.meta;

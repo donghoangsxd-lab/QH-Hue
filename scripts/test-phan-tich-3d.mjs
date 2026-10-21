@@ -50,6 +50,9 @@ for (let i = 0; i < 10; i++) {
   if (h) found = h;
 }
 if (found == null || found < 1 || found > 80) throw new Error(`chiều cao Hùng Vương ${found}`);
+const vin = idx.lookup(107.594238, 16.463008);
+if (vin < 150) throw new Error(`Vinpearl ${vin}`);
+if (!js.includes('bldg-overrides.geojson')) throw new Error('thiếu dấu chân tháp bổ sung');
 const api = fs.readFileSync(new URL('../api/pmtilesRange.js', import.meta.url), 'utf8');
 if (!api.includes('buildings.pmtiles') || !api.includes('thuadat-2016.pmtiles')) throw new Error('thiếu tệp tile');
 if (/req\.query\.(u|url|data)\b/.test(api)) throw new Error('proxy nhận URL tự do');
