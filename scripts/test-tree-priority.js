@@ -1,4 +1,4 @@
-const { cemeteryRadius, cemeteryBuffers, acceptYear, rowsFromFeatures, scoreTreeWards, MIN_BUILT_HA } = require('../services/treePriority');
+const { cemeteryRadius, cemeteryBuffers, acceptYear, rowsFromFeatures, popFromPixels, assignFallbackPop, scoreTreeWards, MIN_BUILT_HA } = require('../services/treePriority');
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -35,6 +35,11 @@ const bare = rowsFromFeatures(
   { features: [{ properties: { tenXa: 'C', pop: 50, builtHa: 10 } }] }
 );
 assert(bare[0].lst === 33 && bare[0].pop === 50, 'đọc tên band');
+assert(popFromPixels(1000, 25, 100) === 250, 'dân theo tỉ lệ pixel');
+assert(popFromPixels(1000, 0, 100) === 0, 'không có pixel xây dựng');
+assert(popFromPixels(0, 10, 10) === null, 'thiếu dân số phường');
+const fb = assignFallbackPop([{ name: 'V', danSo: 49684, urbanPix: 40, allPix: 80, pop: 99999, builtHa: 10, lst: 36, ndvi: 0.3 }]);
+assert(fb[0].pop === 24842, 'raster cũ lấy một nửa dân phường');
 
 const scored = scoreTreeWards([
   { name: 'A', builtHa: 100, lst: 40, ndvi: 0.15, pop: 20000 },

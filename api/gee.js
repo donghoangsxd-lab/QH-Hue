@@ -3868,10 +3868,10 @@ module.exports = async (req, res) => {
       const buffers = tree.cemeteryBuffers(list);
       const part = req.query.part === 'tile' ? 'tile' : 'stats';
       const packVersion = noxhPack && noxhPack.version ? noxhPack.version : 'none';
-      const key = `tree|v1|${part}|${year}|${popSource}|${packVersion}|${getDataVersion()}`;
+      const key = `tree|v2|${part}|${year}|${popSource}|${packVersion}|${getDataVersion()}`;
       if (!cachedSatStats.has(key) && !treeJobs.has(key)) {
         const job = (async () => {
-          const built = tree.buildTreeRequest(ee, wardVectorParsed, popRasterNormalized, popProjection, popScale, year, buffers);
+          const built = tree.buildTreeRequest(ee, wardVectorParsed, popRasterNormalized, popProjection, popScale, !!popPeople, year, buffers);
           const payload = part === 'tile'
             ? {
               year,
@@ -3881,7 +3881,8 @@ module.exports = async (req, res) => {
             }
             : await (async () => {
               const [meanFc, sumFc] = await Promise.all([eeEvaluate(built.meanFc), eeEvaluate(built.sumFc)]);
-              const scored = tree.scoreTreeWards(tree.rowsFromFeatures(meanFc, sumFc));
+              const rawRows = tree.rowsFromFeatures(meanFc, sumFc);
+              const scored = tree.scoreTreeWards(popPeople ? rawRows : tree.assignFallbackPop(rawRows));
               return {
                 year,
                 ndviPartial: year === new Date().getFullYear(),
