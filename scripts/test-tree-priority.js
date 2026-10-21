@@ -71,12 +71,12 @@ assert(tied.wards[0].name === 'Phường A' && tied.wards[1].name === 'Xa B', 'h
 const missing = scoreTreeWards([{ name: 'D', builtHa: 40, lst: null, ndvi: 0.2, pop: 1000 }]);
 assert(missing.wards[0].rank == null, 'thiếu nhiệt thì không xếp');
 
-assert(zoneLevel(37, 0.25, true) === 3, 'rất cần');
-assert(zoneLevel(36, 0.35, true) === 2, 'cần');
-assert(zoneLevel(34.2, 0.44, true) === 1, 'theo dõi');
+assert(zoneLevel(41, 0.2, true) === 3, 'rất cần');
+assert(zoneLevel(38, 0.25, true) === 2, 'cần');
+assert(zoneLevel(36, 0.35, true) === 1, 'theo dõi');
 assert(zoneLevel(38, 0.2, false) === 0, 'không có dân cư');
-assert(zoneLevel(33, 0.2, true) === 0, 'chưa đủ nóng');
-assert(zoneLevel(36.5, 0.32, true) === 3 && zoneLevel(35.5, 0.38, true) === 2 && zoneLevel(34, 0.45, true) === 1, 'đúng ngưỡng');
+assert(zoneLevel(34, 0.2, true) === 0, 'chưa đủ nóng');
+assert(zoneLevel(40, 0.22, true) === 3 && zoneLevel(37.5, 0.28, true) === 2 && zoneLevel(35.5, 0.38, true) === 1, 'đúng ngưỡng');
 
 assert(landKind({ lotCode: 'DGD', density: 80 }) === 'sân trường', 'đất giáo dục');
 assert(landKind({ facilityType: '4-TH', name: 'Trường gần chợ' }) === 'sân trường', 'trường học');
