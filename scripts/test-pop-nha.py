@@ -6,10 +6,11 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 manifest = json.loads((root / 'public/data/gba/pop-nha.json').read_text(encoding='utf-8'))
-assert manifest['rows'] == 664217
+assert manifest['rows'] == 664255
 assert abs(float(manifest['people']) - 1452683) < 1
 assert manifest['droppedNtd'] == 47
-assert manifest['droppedAptFootprints'] == 42
+assert manifest['droppedAptFootprints'] == 0
+assert manifest['base'] == 'lowrise'
 
 apt = json.loads((root / 'public/data/gba/apartments.json').read_text(encoding='utf-8'))
 assert len(apt['items']) == 4
@@ -28,4 +29,12 @@ with gzip.open(gz, 'rt', encoding='utf-8') as handle:
     rows = sum(1 for _ in handle)
 assert header == 'longitude,latitude,people', header
 assert rows == manifest['rows']
-print('ok', rows)
+peak = 0.0
+with gzip.open(gz, 'rt', encoding='utf-8') as handle:
+    next(handle)
+    for line in handle:
+        p = float(line.rsplit(',', 1)[1])
+        if p > peak:
+            peak = p
+assert peak < 1200, peak
+print('ok', rows, round(peak, 1))

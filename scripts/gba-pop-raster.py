@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-# Bảng điểm dân số phương pháp B để nạp asset GEE Pixel-danso-nha.
-# Mỗi dòng là một điểm: phần dân số phường còn lại sau khi trừ chung cư,
-# chia theo trọng số dấu chân nhà ở × (bậc chiều cao tương đối + 1).
-# Điểm chạm thửa NTD bị loại (NTD thắng ODT/ONT). Chung cư là điểm riêng.
+# Nền nhà thấp tầng cho asset GEE Pixel-danso-nha. Nạp một lần.
+# Mỗi dấu chân nhà ở (trừ thửa NTD) nhận một phần dân số phường theo diện tích × (bậc + 1).
+# Không trừ chung cư và không ghi điểm chung cư: tab NOXH được gắn lúc chạy.
 #   python3 scripts/gba-pop-raster.py
 
 import csv
@@ -19,8 +18,6 @@ OUT_DIR = os.path.join(ROOT, 'public', 'data', 'gba')
 
 
 def main():
-    apt = json.load(open(os.path.join(OUT_DIR, 'apartments.json'), encoding='utf-8'))
-    items = apt.get('items') or []
     con = duckdb.connect()
     con.execute('LOAD spatial')
     con.execute('SET threads=2')
@@ -58,62 +55,25 @@ def main():
     y = np.array([r[6] for r in rows], dtype='float64')
     wb = np.array([r[7] for r in rows], dtype='float64')
 
-    # Chỉ dấu chân nằm trong ranh chung cư hiện trạng (có polygon) rời khỏi nhà thấp tầng.
-    drop_ids = set()
-    geoms = []
-    for it in items:
-        if it.get('status') == 'quy_hoach' or not it.get('geometry'):
-            continue
-        if float(it.get('pop') or 0) <= 0:
-            continue
-        geoms.append(json.dumps(it['geometry']))
-    if geoms:
-        con.execute('CREATE TABLE apt (geom GEOMETRY)')
-        con.executemany(
-            "INSERT INTO apt VALUES (ST_MakeValid(ST_SetCRS(ST_GeomFromGeoJSON(?), 'EPSG:4326')))",
-            [(g,) for g in geoms]
-        )
-        drop_ids = {r[0] for r in con.execute("""
-            SELECT b.id FROM b
-            WHERE EXISTS (
-                SELECT 1 FROM apt g
-                WHERE ST_Intersects(g.geom, ST_SetCRS(ST_Point(b.x, b.y), 'EPSG:4326'))
-            )
-        """).fetchall()}
-    ids = np.array([r[0] for r in rows])
-    drop = np.isin(ids, np.fromiter(drop_ids, dtype='int64', count=len(drop_ids))) if drop_ids else np.zeros(len(rows), dtype=bool)
-    print(f'bỏ dấu chân trong ranh chung cư hiện trạng {int(drop.sum())} / {len(geoms)} khu')
-    keep = ~drop
-
-    apt_pop = {}
-    for it in items:
-        if it.get('status') == 'quy_hoach':
-            continue
-        apt_pop[it['ward']] = apt_pop.get(it['ward'], 0.0) + float(it.get('pop') or 0)
-
+    # Giữ mọi dấu chân nhà ở còn lại, kể cả mái nằm trong ranh chung cư.
+    # Dân phường chia hết cho các dấu chân này. Chung cư gắn lúc chạy từ tab NOXH.
     out_rows = []
     people = 0.0
-    names = set(ward.tolist()) | {it['ward'] for it in items}
-    for name in sorted(names):
-        m = (ward == name) & keep
+    peak = 0.0
+    for name in sorted(set(ward.tolist())):
+        m = ward == name
         official = float(pop[m][0]) if np.any(m) else 0.0
-        remain = max(0.0, official - apt_pop.get(name, 0.0))
         tw = float(wb[m].sum())
-        if tw > 0 and remain > 0:
-            share = remain * wb[m] / tw
-            for lng, lat, p in zip(x[m], y[m], share):
-                if p < 0.0005:
-                    continue
-                out_rows.append((float(lng), float(lat), float(p)))
-                people += float(p)
-        for it in items:
-            if it['ward'] != name:
+        if tw <= 0 or official <= 0:
+            continue
+        share = official * wb[m] / tw
+        for lng, lat, p in zip(x[m], y[m], share):
+            if p < 0.0005:
                 continue
-            p = float(it.get('pop') or 0)
-            if p <= 0:
-                continue
-            out_rows.append((float(it['lng']), float(it['lat']), p))
-            people += p
+            out_rows.append((float(lng), float(lat), float(p)))
+            people += float(p)
+            if p > peak:
+                peak = float(p)
 
     os.makedirs(OUT_DIR, exist_ok=True)
     gz_path = os.path.join(OUT_DIR, 'pop-weights.csv.gz')
@@ -130,12 +90,13 @@ def main():
         'rows': len(out_rows),
         'people': round(people, 1),
         'droppedNtd': int(n0 - n1),
-        'droppedAptFootprints': int(drop.sum()),
-        'note': 'Điểm nhà ở: dân số phường trừ nhà ở xã hội đã hoàn thành, chia theo diện tích dấu chân × (bậc tương đối + 1). Điểm chạm NTD đã bỏ. Khu quy hoạch không trừ. Chung cư có số dân là điểm riêng.'
+        'droppedAptFootprints': 0,
+        'base': 'lowrise',
+        'note': 'Nền nhà thấp tầng nạp một lần: mọi dấu chân nhà ở trừ thửa NTD, dân số phường chia theo diện tích × (bậc tương đối + 1). Không trừ chung cư và không ghi điểm chung cư. Tab NOXH gắn lúc chạy.'
     }
     with open(os.path.join(OUT_DIR, 'pop-nha.json'), 'w', encoding='utf-8') as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
-    print(f'{len(out_rows)} điểm, {people:,.1f} người, {os.path.getsize(gz_path)/1e6:.1f} MB gz')
+    print(f'{len(out_rows)} điểm, {people:,.1f} người, điểm lớn nhất {peak:,.1f}, {os.path.getsize(gz_path)/1e6:.1f} MB gz')
 
 
 if __name__ == '__main__':

@@ -563,30 +563,40 @@
           </div>
           <div class="flood-box" id="gbaBox" style="display:none;"></div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_apt"><label for="chk_apt" title="Chung cư hiện trạng: nhà ở xã hội đã hoàn thành. Dân = dân số trong bảng nếu có, không thì số căn × cỡ hộ. Chung cư thương mại thêm sau qua tab Chung cư. Không lấy nhà cao trên đất ở làm chung cư."><svg class="ico ico-layer"><use href="#i-floors"/></svg>Chung cư <small class="layer-hint" id="aptHint"></small></label></div>
+            <div><input type="checkbox" id="chk_apt"><label for="chk_apt" title="Chung cư hiện trạng trên tab NOXH (cột Trạng thái = Hiện trạng). Dân = cột Dân số nếu có, không thì Số căn hộ × 3,3. Cột Loại (NOXH hoặc Thương mại) chỉ để lọc nhãn; cả hai đều tính dân."><svg class="ico ico-layer"><use href="#i-floors"/></svg>Chung cư <small class="layer-hint" id="aptHint"></small></label></div>
           </div>
           <div class="flood-box" id="aptBox" style="display:none;">
             <p class="apt-summary" id="aptSummary"></p>
-            <div id="aptAdmin" hidden>
-              <label>Cách chia dân
-                <select id="aptMethod" aria-label="Cách chia dân số">
-                  <option value="b">B + chung cư</option>
-                  <option value="old">Pixel (so sánh)</option>
-                </select>
-              </label>
-              <p class="cad-hint" id="aptMethodNote">Pixel cũ gán khoảng 4% dân số thành phố lên đất nghĩa trang (mã thửa NTD và lô nghĩa trang). Cách nhà ở không chia dân cho mộ.</p>
-              <p class="cad-hint">Chung cư thương mại thêm bằng tab Chung cư (số dân hoặc số căn). Thẻ phường tính ngay; raster cần tải CSV mới rồi bấm Nạp lại.</p>
+            <label class="apt-kind">Lọc nhãn
+              <select id="aptKind" aria-label="Lọc chung cư theo loại">
+                <option value="">Mọi loại</option>
+                <option value="noxh">Nhà ở xã hội</option>
+                <option value="thuongmai">Thương mại</option>
+              </select>
+            </label>
+          </div>
+          <div id="aptAdmin" hidden>
+            <p class="cad-hint"><b>Nạp raster nhà ở (một lần).</b> Hai nút này chỉ dùng cho file nền nhà thấp tầng. Thêm chung cư bằng một dòng trên tab Google Sheet <b>NOXH</b>, không bấm lại hai nút này.</p>
+            <div class="apt-ingest" id="aptIngest">
               <button type="button" class="layer-mini-btn" id="btnPopNha">Nạp raster dân nhà ở</button>
               <button type="button" class="layer-mini-btn" id="btnPopNhaRebuild">Nạp lại từ CSV mới</button>
-              <p id="popNhaStatus" class="apt-status"></p>
-              <label>Người/hộ <input id="aptHh" type="number" min="1" max="8" step="0.1" value="3.3"></label>
-              <label>m²/người <input id="aptM2" type="number" min="8" max="80" step="1" value="25"></label>
-              <label>Hiệu suất sàn <input id="aptEff" type="number" min="0.4" max="1" step="0.05" value="0.75"></label>
-              <p id="aptStatus" class="apt-status"></p>
             </div>
+            <p id="popNhaStatus" class="apt-status"></p>
+            <label>Cách chia dân
+              <select id="aptMethod" aria-label="Cách chia dân số">
+                <option value="b">B + chung cư</option>
+                <option value="old">Pixel (so sánh)</option>
+              </select>
+            </label>
+            <p class="cad-hint" id="aptMethodNote">Pixel cũ gán khoảng 4% dân số thành phố lên đất nghĩa trang (mã thửa NTD và lô nghĩa trang). Cách nhà ở không chia dân cho mộ.</p>
+            <label>Người/hộ <input id="aptHh" type="number" min="1" max="8" step="0.1" value="3.3"></label>
+            <label>m²/người <input id="aptM2" type="number" min="8" max="80" step="1" value="25"></label>
+            <label>Hiệu suất sàn <input id="aptEff" type="number" min="0.4" max="1" step="0.05" value="0.75"></label>
+            <p class="cad-hint">Ô người/hộ chỉ đổi ghi chú phường trên máy này. Raster dùng cố định 3,3 người/căn.</p>
+            <p id="aptStatus" class="apt-status"></p>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_noxhPlan"><label for="chk_noxhPlan" title="Nhà ở xã hội chưa hoàn thành: đang khởi công, lựa chọn nhà đầu tư, kêu gọi đầu tư hoặc quỹ đất 20%. Chỉ xem vị trí quy hoạch, không tính dân hiện trạng."><svg class="ico ico-layer"><use href="#i-floors"/></svg>Nhà ở xã hội (quy hoạch) <small class="layer-hint" id="noxhPlanHint"></small></label></div>
+            <div><input type="checkbox" id="chk_noxhPlan"><label for="chk_noxhPlan" title="Dòng tab NOXH có Trạng thái để trống hoặc Quy hoạch. Chỉ xem vị trí, không tính dân hiện trạng. Cột Loại không đổi việc có tính dân hay không."><svg class="ico ico-layer"><use href="#i-floors"/></svg>Nhà ở xã hội (quy hoạch) <small class="layer-hint" id="noxhPlanHint"></small></label></div>
           </div>
           <div class="flood-box" id="noxhPlanBox" style="display:none;">
             <p class="apt-summary" id="noxhPlanSummary"></p>
@@ -1002,7 +1012,8 @@
             <button type="button" id="btnPopUndo" title="Xóa nét cọ cuối (Backspace / Ctrl+Z)" disabled><svg class="ico"><use href="#i-undo"/></svg>Hoàn tác nét</button>
           </div>
           <div id="popDrawInfo" class="road-draw-info"></div>
-          <div class="cad-hint" id="popHint" title="Vùng thêm được áp sau vùng xóa">Giữ chuột và rê để tô. Tổng dân số phường, xã giữ nguyên: xóa ô dân cư thì dân số dồn sang các ô còn lại.</div>
+          <div class="cad-hint" id="popHint" title="Vùng thêm được áp sau vùng xóa">Giữ chuột và rê để tô. Tổng dân số phường, xã giữ nguyên: xóa ô dân cư thì dân số dồn sang các ô còn lại. Nạp raster dân nhà ở nằm ở Lớp dữ liệu → Bản đồ nền, ngay dưới dòng Chung cư (không cần bật lớp).</div>
+          <button type="button" class="layer-mini-btn" id="btnPopNhaJump">Mở nút nạp raster</button>
           <button type="button" class="btn-submit" id="btnPopSave" disabled title="Ghi danh sách vùng hiệu chỉnh dân cư"><svg class="ico"><use href="#i-save"/></svg>Lưu vùng hiệu chỉnh</button>
           <div id="popStatus" class="rp-status" role="status" aria-live="polite"></div>
           <div class="pop-bake">

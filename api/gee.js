@@ -17,6 +17,7 @@ const osmSports = require('../services/osmSports');
 const fs = require('fs');
 const path = require('path');
 const parcelInfra = require('../services/parcelInfraInventory');
+const noxh = require('../services/noxh');
 
 let cachedWardStats = null;
 let cachedWardStatsPop = '';
@@ -424,6 +425,114 @@ function sanitizeChungCuItems(raw) {
     });
   }
   return items;
+}
+
+function noxhWkt(raw, geometry) {
+  let wkt = String(raw || '').trim();
+  if (!/^POLYGON\s*\(/i.test(wkt)) wkt = '';
+  if (wkt.length > 45000) wkt = '';
+  if (wkt) return wkt;
+  const ring = geometry && geometry.type === 'Polygon' && Array.isArray(geometry.coordinates) ? geometry.coordinates[0] : null;
+  if (!ring || ring.length < 4 || ring.length > 8000) return '';
+  const parts = [];
+  for (const c of ring) {
+    if (!Array.isArray(c)) return '';
+    const pt = parseCoordInBounds(c[1], c[0]);
+    if (!pt) return '';
+    parts.push(`${Number(pt.lng.toFixed(6))} ${Number(pt.lat.toFixed(6))}`);
+  }
+  return `POLYGON ((${parts.join(', ')}))`;
+}
+
+// Dòng tab NOXH: hiện trạng và quy hoạch, NOXH hoặc thương mại. Cả hai loại đều là chung cư khi tính dân.
+function sanitizeNoxhItems(raw) {
+  if (!Array.isArray(raw) || raw.length > 80) return null;
+  const items = [];
+  for (const it of raw) {
+    if (!it || typeof it !== 'object') return null;
+    const id = sanitizeSheetText(it.id, 64);
+    if (id && !/^[A-Za-z0-9_-]+$/.test(id)) return null;
+    const name = sanitizeSheetText(it.name, 180);
+    const wkt = noxhWkt(it.wkt, it.geometry);
+    const pt = parseCoordInBounds(it.lat, it.lng);
+    if (!name && !wkt && !pt) return null;
+    const kind = noxh.kindOf(it.kind);
+    items.push({
+      id,
+      name,
+      detail: sanitizeSheetText(it.detail, 400),
+      ward: sanitizeSheetText(it.ward, 80),
+      lat: pt ? Number(pt.lat.toFixed(6)) : null,
+      lng: pt ? Number(pt.lng.toFixed(6)) : null,
+      floors: chungCuOptionalNumber(it.floors, 1, 80),
+      units: chungCuOptionalNumber(it.units, 0, 20000),
+      residents: chungCuOptionalNumber(it.residents, 0, 100000),
+      siteHa: chungCuOptionalNumber(it.siteHa, 0, 500),
+      footprint: chungCuOptionalNumber(it.footprint, 0, 500000),
+      coverage: chungCuOptionalNumber(it.coverage, 0, 100),
+      far: chungCuOptionalNumber(it.far, 0, 30),
+      status: noxh.phaseOf(it.status || it.detail),
+      kind,
+      wkt
+    });
+  }
+  return items;
+}
+
+let noxhCache = null;
+const NOXH_PROBE_MS = 60 * 1000;
+
+function packFromNoxhSheet(data) {
+  if (!data || data.missing === true || !Array.isArray(data.items)) return null;
+  if (data.type === 'FeatureCollection' && data.items == null) return null;
+  return noxh.normalizeNoxhPack(data);
+}
+
+function seedNoxhPack() {
+  const raw = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'public', 'data', 'gba', 'apartments.json'), 'utf8'));
+  const pack = noxh.normalizeNoxhPack(raw);
+  pack.items.forEach(it => { it.source = 'seed'; });
+  return pack;
+}
+
+// Tab NOXH nếu đã có; tab trống thì không chung cư; chưa có tab thì 4 dự án hiện trạng đóng gói sẵn.
+async function loadNoxhPack() {
+  if (noxhCache && Date.now() - noxhCache.at < NOXH_PROBE_MS) return noxhCache;
+  let pack = null;
+  let source = 'seed';
+  try {
+    const data = await callAppsScript({ action: 'getNoxh' });
+    const parsed = packFromNoxhSheet(data);
+    if (parsed) {
+      pack = parsed;
+      source = 'sheet';
+    }
+  } catch (err) {
+    console.warn('Đọc tab NOXH qua Apps Script lỗi:', err.message);
+  }
+  if (!pack) {
+    try {
+      const r = await axios.get(`${constants.GBA_GCS_BASE}noxh.json`, { timeout: 12000, validateStatus: () => true });
+      const parsed = r.status < 400 ? packFromNoxhSheet(r.data) : null;
+      if (parsed) {
+        pack = parsed;
+        source = 'sheet';
+      }
+    } catch (err) {
+      console.warn('Đọc noxh.json lỗi:', err.message);
+    }
+  }
+  if (!pack) {
+    try {
+      pack = seedNoxhPack();
+    } catch (err) {
+      pack = { v: 1, version: 'empty', items: [] };
+    }
+    source = 'seed';
+  }
+  pack.items.forEach(it => { if (source === 'sheet') it.source = 'sheet'; });
+  noxhCache = { at: Date.now(), pack, source };
+  return noxhCache;
 }
 
 // ============================ NHẬP LÔ ĐẤT TỪ DXF ============================
@@ -940,7 +1049,7 @@ async function readPopNhaTask() {
 
 function popNhaMessage(rec) {
   if (rec.message) return rec.message;
-  if (rec.phase === 'ready') return 'Asset Pixel-danso-nha đã sẵn sàng. Tải lại trang; máy chủ đang chạy nhận lớp mới trong khoảng 1 phút.';
+      if (rec.phase === 'ready') return 'Nền nhà thấp tầng đã sẵn sàng. Thêm chung cư ở tab NOXH, không cần nạp lại CSV. Tải lại trang sau khoảng 1 phút.';
   if (rec.phase === 'table') return 'Đang nạp bảng điểm lên Earth Engine. Bấm lại sau vài phút để xuất raster.';
   if (rec.phase === 'image') return 'Đang xuất raster Pixel-danso-nha. Bấm lại sau vài phút.';
   return 'Đang xử lý raster dân nhà ở.';
@@ -962,7 +1071,7 @@ async function advancePopNha(opts = {}) {
       return {
         saved: true, phase: 'ready', state: 'READY', asset: POP_NHA_ASSET, popSource: 'nha',
         people: rec.people || popNhaPeople(),
-        message: 'Asset Pixel-danso-nha đang dùng cho mọi phép đếm dân. Tải lại trang nếu vừa nạp xong. CSV trên bucket vừa đổi thì bấm Nạp lại từ CSV mới.'
+        message: 'Nền Pixel-danso-nha là nhà thấp tầng, nạp một lần. Thêm hoặc sửa chung cư trên tab NOXH rồi tải lại trang; không tải CSV và không bấm Nạp lại. Chỉ bấm Nạp lại từ CSV mới khi vừa thay file nền trên bucket.'
       };
     }
     if (!rec.seenMiss) {
@@ -988,7 +1097,7 @@ async function advancePopNha(opts = {}) {
         state: ready.popSource === 'nha' ? 'READY' : 'ASSET_MISSING',
         at: Date.now(), people: popNhaPeople(), popSource: ready.popSource,
         message: ready.popSource === 'nha'
-          ? 'Asset Pixel-danso-nha đã sẵn sàng. Tải lại trang; máy chủ đang chạy nhận lớp mới trong khoảng 1 phút.'
+          ? 'Nền nhà thấp tầng đã sẵn sàng. Chung cư lấy từ tab NOXH lúc mở bản đồ, không cần nạp lại CSV. Tải lại trang sau khoảng 1 phút.'
           : 'Earth Engine báo xuất xong nhưng chưa đọc được asset. Bấm lại sau một phút.'
       };
     } else if (t.state === 'FAILED' || t.state === 'CANCELLED') {
@@ -2453,6 +2562,32 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, saved: true, count: result.count || items.length });
     }
 
+    // Tab NOXH: nguồn chung cư. Chưa có tab thì trả 4 dự án hiện trạng đóng gói sẵn.
+    if (action === 'getNoxh') {
+      const live = await loadNoxhPack();
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=300');
+      return res.status(200).json({
+        v: 1,
+        source: live.source,
+        version: live.pack.version,
+        items: live.pack.items
+      });
+    }
+
+    if (action === 'saveNoxh') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const items = sanitizeNoxhItems(body && body.items);
+      if (!items || !items.length) return res.status(400).json({ error: true, message: 'Không có dòng NOXH hợp lệ' });
+      const result = await callAppsScript({ action: 'saveNoxh' }, { action: 'saveNoxh', items });
+      if (result.saved !== true) {
+        return res.status(502).json({ error: true, message: 'Apps Script chưa ghi được tab NOXH. Dán apps-script/Code.gs rồi Deploy phiên bản mới.' });
+      }
+      noxhCache = null;
+      return res.status(200).json({ success: true, saved: true, count: result.count || items.length });
+    }
+
     // Đường trục chính rút gọn cả thành phố (mức phóng còn thấy một lúc nhiều phường, trên mức một biểu đồ tròn)
     if (action === 'getMainRoads') {
       const cv = Math.max(0, Math.round(Number(req.query.cv) || 0));
@@ -3423,7 +3558,15 @@ module.exports = async (req, res) => {
     }
 
     const popMethodReq = String(req.query.pop || '') === 'old' ? 'old' : 'b';
-    const ctx = await ensureNha(popMethodReq);
+    let noxhPack = null;
+    if (popMethodReq === 'b') {
+      try {
+        noxhPack = (await loadNoxhPack()).pack;
+      } catch (err) {
+        console.warn('Gói NOXH:', err.message);
+      }
+    }
+    const ctx = await ensureNha(popMethodReq, noxhPack);
     const { ee, wardVectorParsed, popRasterNormalized, popRasterNative, popProjection, popPeople, popScale, popSource, popFallback } = ctx;
 
     // --- Thao tác cần Earth Engine nhưng không cần danh sách công trình ---

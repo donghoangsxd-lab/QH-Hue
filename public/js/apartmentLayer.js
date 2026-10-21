@@ -1,9 +1,9 @@
-// Lớp chung cư: icon riêng, dân số tách khỏi nhà thấp tầng. Admin sửa số và ghi tab sheet Chung cư.
+// Lớp chung cư: đọc tab NOXH. Hiện trạng tính dân; quy hoạch chỉ để xem. Loại chỉ để lọc nhãn.
 import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { state } from './state.js';
 import { geeApi } from './api.js';
-import { escapeHtml, ico } from './utils.js';
+import { escapeHtml, RIGHT_TAB_EVENT } from './utils.js';
 import { postAdmin } from './wardRoads.js';
 import { setWardPopHtml } from './uiComponents.js';
 import {
@@ -13,7 +13,8 @@ import {
 
 const $ = (id) => document.getElementById(id);
 const CONF = { high: 'Cao', medium: 'Vừa', low: 'Thấp' };
-const SOURCE = { noxh: 'Danh sách nhà ở xã hội', sheet: 'Tab Chung cư', manual: 'Bổ sung', thuongmai: 'Chung cư thương mại' };
+const SOURCE = { noxh: 'Tab NOXH', sheet: 'Tab NOXH', seed: 'Danh sách sẵn', manual: 'Bổ sung', thuongmai: 'Chung cư thương mại' };
+const KIND = { noxh: 'Nhà ở xã hội', thuongmai: 'Thương mại' };
 const EXIST_STYLE = { color: '#ddd6fe', weight: 2, fillColor: '#6d28d9', fillOpacity: 0.35 };
 const PLAN_STYLE = { color: '#fbbf24', weight: 2, dashArray: '6 4', fillColor: '#f59e0b', fillOpacity: 0.16 };
 
@@ -25,6 +26,7 @@ let planL = null;
 let planR = null;
 let loaded = false;
 let planItems = [];
+let kindFilter = '';
 
 function isAdmin() {
   return state.currentUserRole === 'ADMIN' && !!state.authToken;
@@ -40,6 +42,27 @@ function icon(conf, plan) {
   });
 }
 
+function passesKind(it) {
+  if (!kindFilter) return true;
+  if (kindFilter === 'thuongmai') return it.kind === 'thuongmai';
+  return it.kind !== 'thuongmai';
+}
+
+function wktOf(it) {
+  const ring = it.geometry && it.geometry.type === 'Polygon' ? it.geometry.coordinates[0] : null;
+  if (!ring || ring.length < 4) return '';
+  return `POLYGON ((${ring.map(p => `${p[0]} ${p[1]}`).join(', ')}))`;
+}
+
+function asPlan(it) {
+  const detail = String(it.detail || '');
+  return {
+    ...it,
+    plannedPop: it.plannedPop || it.residents || null,
+    uncertain: !!it.uncertain || /lệch|lech/i.test(detail)
+  };
+}
+
 function popupHtml(it) {
   const row = apartmentPopulation(it, popConfig());
   const people = row.how === 'thieu' ? 'Chưa tính được' : `${Math.round(row.pop).toLocaleString('vi-VN')} người`;
@@ -47,6 +70,7 @@ function popupHtml(it) {
     ['Phường, xã', it.ward],
     ['Tình trạng', it.detail || 'Đã hoàn thành'],
     ['Căn cứ', it.evidence || ''],
+    ['Loại', KIND[it.kind] || ''],
     ['Nguồn', SOURCE[it.source] || it.source],
     ['Độ tin cậy', CONF[it.confidence] || it.confidence],
     ['Diện tích khu', it.siteHa ? `${it.siteHa} ha` : ''],
@@ -62,7 +86,7 @@ function popupHtml(it) {
       <label>Số căn <input name="units" type="number" min="0" step="1" value="${it.units || ''}"></label>
       <label>Số dân <input name="residents" type="number" min="0" step="1" value="${it.residents || ''}"></label>
       <label class="apt-check"><input name="verified" type="checkbox"${it.verified ? ' checked' : ''}> Đã xác minh</label>
-      <button type="submit">Ghi tab Chung cư</button>
+      <button type="submit">Ghi tab NOXH</button>
     </form>` : '';
   return `<div class="apt-pop"><b>${escapeHtml(it.name || 'Chung cư')}</b><div class="apt-pop-n">${people}</div>
     <dl>${bits.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>${edit}</div>`;
@@ -83,7 +107,7 @@ function draw() {
   groupL = L.layerGroup();
   groupR = L.layerGroup();
   if (!on) return;
-  popItems().forEach(it => {
+  popItems().filter(passesKind).forEach(it => {
     const html = () => popupHtml(it);
     addSite(groupL, it, EXIST_STYLE, html, false);
     addSite(groupR, it, EXIST_STYLE, html, false);
@@ -99,7 +123,8 @@ function planHtml(it) {
     ['Diện tích', it.siteHa ? `${it.siteHa} ha` : ''],
     ['Số tầng', it.floors || ''],
     ['Số căn', it.units || ''],
-    ['Dân số ghi trong bảng', it.plannedPop || '']
+    ['Loại', KIND[it.kind] || ''],
+    ['Dân số ghi trong bảng', it.plannedPop || it.residents || '']
   ].filter((pair) => pair[1]);
   const warn = it.uncertain ? '<p>Số liệu chưa chắc vì cột trong bảng gốc bị lệch.</p>' : '';
   return `<div class="apt-pop"><b>${escapeHtml(it.name || 'Nhà ở xã hội')}</b><div class="apt-pop-n">Quy hoạch — không tính dân hiện trạng</div>
@@ -112,7 +137,7 @@ function drawPlan() {
   planL = L.layerGroup();
   planR = L.layerGroup();
   if (!planOn) return;
-  planItems.forEach(it => {
+  planItems.filter(passesKind).forEach(it => {
     const html = () => planHtml(it);
     addSite(planL, it, PLAN_STYLE, html, true);
     addSite(planR, it, PLAN_STYLE, html, true);
@@ -124,7 +149,9 @@ function drawPlan() {
 function summaryText() {
   const s = cityApartmentSummary();
   const warns = s.warns.length ? ` Cảnh báo vượt dân số: ${s.warns.join(', ')}.` : '';
-  return `${s.n} chung cư hiện trạng, khoảng ${Math.round(s.apt).toLocaleString('vi-VN')} người.${warns}`;
+  const tm = popItems().filter(it => it.kind === 'thuongmai').length;
+  const kind = tm ? ` Trong đó ${tm} thương mại.` : '';
+  return `${s.n} chung cư hiện trạng, khoảng ${Math.round(s.apt).toLocaleString('vi-VN')} người.${kind}${warns}`;
 }
 
 function planSummaryText() {
@@ -170,24 +197,27 @@ function readCfg() {
 }
 
 async function load() {
-  const seed = await fetch('data/gba/apartments.json').then(r => (r.ok ? r.json() : Promise.reject(new Error('seed')))).catch(() => null);
-  const plan = await fetch('data/gba/noxh-plan.json').then(r => (r.ok ? r.json() : null)).catch(() => null);
-  planItems = (plan && plan.items) || [];
   const weights = await fetch('data/gba/pop-b.json').then(r => (r.ok ? r.json() : null)).catch(() => null);
   const faq = await fetch('data/gba/pop-faq.json').then(r => (r.ok ? r.json() : null)).catch(() => null);
-  let items = (seed && seed.items) || [];
+  let items = [];
+  let plans = [];
+  let fromSheet = false;
   try {
-    const live = await fetch(geeApi('action=getChungCu')).then(r => (r.ok ? r.json() : null));
-    if (live && Array.isArray(live.items) && live.items.length) {
-      const by = new Map(items.map(it => [it.id, { ...it }]));
-      live.items.forEach(it => {
-        if (!it || !it.id) return;
-        by.set(it.id, { ...(by.get(it.id) || {}), ...it });
-      });
-      items = [...by.values()];
+    const live = await fetch(geeApi('action=getNoxh')).then(r => (r.ok ? r.json() : null));
+    if (live && live.source === 'sheet' && Array.isArray(live.items)) {
+      fromSheet = true;
+      items = live.items.filter(it => it.status !== 'quy_hoach');
+      plans = live.items.filter(it => it.status === 'quy_hoach').map(asPlan);
     }
-  } catch (e) { /* sheet chưa có trên máy chủ */ }
-  setPopData(seed ? { ...seed, items } : { v: 1, items }, weights, faq && faq.questions);
+  } catch (e) { /* tab NOXH chưa deploy */ }
+  if (!fromSheet) {
+    const seed = await fetch('data/gba/apartments.json').then(r => (r.ok ? r.json() : null)).catch(() => null);
+    const plan = await fetch('data/gba/noxh-plan.json').then(r => (r.ok ? r.json() : null)).catch(() => null);
+    items = (seed && seed.items) || [];
+    plans = (plan && plan.items) || [];
+  }
+  planItems = plans;
+  setPopData({ v: 1, hhSize: 3.3, items }, weights, faq && faq.questions);
   loaded = true;
   paintBox();
   if (on) draw();
@@ -199,10 +229,27 @@ async function saveItem(it) {
   if (!isAdmin()) return;
   if (status) status.textContent = 'Đang ghi sheet…';
   try {
-    await postAdmin('saveChungCu', { items: [it] });
-    if (status) status.textContent = `Đã ghi ${it.id} lên tab Chung cư.`;
+    await postAdmin('saveNoxh', {
+      items: [{
+        id: it.id,
+        name: it.name,
+        detail: it.detail || '',
+        ward: it.ward || '',
+        lat: it.lat,
+        lng: it.lng,
+        floors: it.floors,
+        units: it.units,
+        residents: it.residents,
+        siteHa: it.siteHa,
+        footprint: it.footprint,
+        status: it.status || 'hien_trang',
+        kind: it.kind || 'noxh',
+        wkt: wktOf(it)
+      }]
+    });
+    if (status) status.textContent = `Đã ghi ${it.name || it.id} lên tab NOXH.`;
   } catch (err) {
-    if (status) status.textContent = err.message || 'Chưa ghi được sheet. Deploy Code.gs mới rồi thử lại.';
+    if (status) status.textContent = err.message || 'Chưa ghi được tab NOXH. Dán Code.gs mới rồi Deploy phiên bản mới.';
   }
 }
 
@@ -222,7 +269,8 @@ function onPopupSubmit(e) {
   it.units = num('units');
   it.residents = num('residents');
   it.verified = !!form.elements.verified.checked;
-  it.source = it.source || 'sheet';
+  it.source = 'sheet';
+  it.status = it.status || 'hien_trang';
   draw();
   paintBox();
   saveItem(it);
@@ -266,6 +314,16 @@ export function initApartmentLayer() {
   }
   $('btnPopNha')?.addEventListener('click', () => askIngest(false));
   $('btnPopNhaRebuild')?.addEventListener('click', () => askIngest(true));
+  $('aptKind')?.addEventListener('change', (e) => {
+    kindFilter = e.target.value || '';
+    if (on) draw();
+    if (planOn) drawPlan();
+  });
+  $('btnPopNhaJump')?.addEventListener('click', () => {
+    document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers' } }));
+    document.querySelector('[data-map-tab="base"]')?.click();
+    $('aptIngest')?.scrollIntoView({ block: 'center' });
+  });
   document.addEventListener('submit', onPopupSubmit);
   document.addEventListener('auth:change', () => {
     if (!isAdmin() && popMethod() === 'old') setPopMethod('b');
