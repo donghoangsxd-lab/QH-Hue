@@ -5399,6 +5399,14 @@ body.project-review.la-page #projectReviewHost {
 .lot-buildup .is-ok { color: var(--accent-green); }
 .lot-buildup .is-miss, .lot-buildup .lot-note { color: var(--text-muted); }
 .lot-buildup span { white-space: normal; }
+.violate-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 4px 0; font-size: 12px; }
+.violate-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.violate-table-wrap { overflow: auto; max-width: 100%; }
+.violate-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.violate-table th, .violate-table td { text-align: left; padding: 2px 6px 2px 0; white-space: nowrap; }
+.violate-table td:not(:first-child), .violate-table th:not(:first-child) { text-align: right; }
+.violate-pop { display: flex; flex-direction: column; gap: 3px; font-size: 12px; line-height: 1.35; }
+.violate-canvas { position: absolute; left: 0; top: 0; pointer-events: none; }
 .apt-pin { background: none; border: 0; }
 .apt-pin svg { display: block; width: 22px; height: 30px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
 .apt-summary, .apt-status, .apt-ward { margin: 6px 0 0; font-size: 12px; }
