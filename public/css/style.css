@@ -5297,6 +5297,8 @@ body.project-review.la-page #projectReviewHost {
 .apt-pin svg { display: block; width: 22px; height: 30px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
 .apt-summary, .apt-status, .apt-ward { margin: 6px 0 0; font-size: 12px; }
 #popNhaStatus { white-space: pre-line; }
+.pop-nha-live { margin: 4px 0 0; font-size: 12px; line-height: 1.35; color: #5b21b6; }
+.pop-nha-live[hidden] { display: none; }
 .apt-pop dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 6px 0; }
 .apt-pop-n { font-weight: 700; margin-top: 2px; }
 .apt-edit { display: flex; flex-direction: column; gap: 4px; }

@@ -10,6 +10,9 @@ const POP_ASSET = "projects/optimistic-yew-488501-s0/assets/Pixel-danso";
 // Dân số nhà ở (phương pháp B): giá trị pixel là số người, cùng lưới 30 m với Pixel-danso sau khi nạp.
 const POP_NHA_ASSET = "projects/optimistic-yew-488501-s0/assets/Pixel-danso-nha";
 const POP_NHA_TABLE = "projects/optimistic-yew-488501-s0/assets/Pixel-danso-nha-diem";
+const POP_NHA_TABLE_NEW = `${POP_NHA_TABLE}-new`;
+let activePopTable = POP_NHA_TABLE;
+let activePopTableAt = 0;
 const POP_NHA_CSV = "gs://hue-infra-data-us/gba/pop-weights.csv";
 const POP_NHA_SCALE_M = 30;
 let popAssetId = POP_ASSET;
@@ -310,8 +313,30 @@ function composeNhaImage(items) {
   return low.multiply(scale).add(apt).rename('DanSoPixelNormalized');
 }
 
+function activePopTableId() {
+  return activePopTable;
+}
+
+function setActivePopTable(id) {
+  if (id) activePopTable = id;
+  activePopTableAt = Date.now();
+}
+
+async function refreshActivePopTable() {
+  if (Date.now() - activePopTableAt < 30000) return activePopTable;
+  activePopTableAt = Date.now();
+  try {
+    const gcsWrite = require('./gcsWrite');
+    const row = await gcsWrite.readJson('gba/pop-nha-task.json');
+    const data = row && row.data;
+    const rec = typeof data === 'string' ? JSON.parse(data) : data;
+    if (rec && rec.liveTable) activePopTable = rec.liveTable;
+  } catch (err) { /* giữ bảng đang dùng */ }
+  return activePopTable;
+}
+
 function lowRiseImage(ee, projection) {
-  return ee.FeatureCollection(POP_NHA_TABLE)
+  return ee.FeatureCollection(activePopTable)
     .reduceToImage({ properties: ['people'], reducer: ee.Reducer.sum() })
     .rename('DanSoPixel')
     .setDefaultProjection(projection);
@@ -454,6 +479,7 @@ async function loadNha() {
   nhaScalePromise = null;
   nhaFailNote = '';
   if (!geeBase) return;
+  await refreshActivePopTable();
   const { ee } = geeBase;
   try {
     const img = ee.Image(POP_NHA_ASSET).select(0);
@@ -466,7 +492,7 @@ async function loadNha() {
     console.warn('Chưa có asset Pixel-danso-nha:', err && err.message);
   }
   try {
-    if (!(await assetExists(ee, POP_NHA_TABLE))) return;
+    if (!(await assetExists(ee, activePopTable))) return;
     const projection = ee.Image(POP_ASSET).projection();
     nhaBase = { img: lowRiseImage(ee, projection), projection, fromTable: true };
     nhaContext = null;
@@ -492,14 +518,18 @@ function deleteAsset(ee, id) {
  * Nạp bảng điểm nhà ở từ gs://hue-infra-data-us/gba/pop-weights.csv rồi xuất asset Pixel-danso-nha
  * đúng lưới Pixel-danso. phase = table (đang nạp điểm) hoặc image (đang xuất raster).
  */
-async function startPopNhaTask(phase) {
+async function startPopNhaTask(phase, liveTable) {
   const { ee, wardVectorParsed } = getGeeContext('old');
   if (phase === 'table') {
-    if (await assetExists(ee, POP_NHA_TABLE)) await deleteAsset(ee, POP_NHA_TABLE);
+    const live = liveTable || activePopTable;
+    const liveOk = await assetExists(ee, live);
+    // Bảng đang phục vụ giữ nguyên. File mới vào bảng kia. Chỉ khi bảng đang dùng không còn thì nạp thẳng vào tên gốc.
+    const dest = liveOk ? (live === POP_NHA_TABLE_NEW ? POP_NHA_TABLE : POP_NHA_TABLE_NEW) : POP_NHA_TABLE;
+    if (dest !== live && await assetExists(ee, dest)) await deleteAsset(ee, dest);
     const taskId = ee.data.newTaskId(1)[0];
     const response = await new Promise((resolve, reject) => {
       ee.data.startTableIngestion(taskId, {
-        id: POP_NHA_TABLE,
+        id: dest,
         sources: [{
           primaryPath: POP_NHA_CSV,
           xColumn: 'longitude',
@@ -508,9 +538,9 @@ async function startPopNhaTask(phase) {
         }]
       }, (res, err) => (err ? reject(new Error(String(err))) : resolve(res || {})));
     });
-    return { phase: 'table', task: response.taskId || taskId, asset: POP_NHA_TABLE };
+    return { phase: 'table', task: response.taskId || taskId, asset: dest, promote: dest !== live };
   }
-  if (!(await assetExists(ee, POP_NHA_TABLE))) {
+  if (!(await assetExists(ee, activePopTable))) {
     const err = new Error('Chưa có bảng điểm trên GEE');
     err.code = 'NO_TABLE';
     throw err;
@@ -579,7 +609,9 @@ function taskView(t, fallbackId) {
     state: String(t.state || 'UNKNOWN'),
     error: t.error_message || '',
     description: t.description || '',
-    type: t.task_type || '',
+    type: t.task_type || t.type || '',
+    sources: [].concat(t.source_uris || [], t.sources || []),
+    destinations: [].concat(t.destination_uris || [], t.output_url || []),
     created: t.creation_timestamp_ms || null,
     updated: t.update_timestamp_ms || null,
     started: t.start_timestamp_ms || null,
@@ -619,12 +651,13 @@ function cancelGeeTask(taskId) {
 
 async function popNhaAssets() {
   const { ee } = getGeeContext('old');
-  const [table, image, next] = await Promise.all([
-    assetExists(ee, POP_NHA_TABLE),
+  const [table, tableNew, image, next] = await Promise.all([
+    assetExists(ee, activePopTable),
+    assetExists(ee, activePopTable === POP_NHA_TABLE ? POP_NHA_TABLE_NEW : POP_NHA_TABLE),
     assetExists(ee, POP_NHA_ASSET),
     assetExists(ee, `${POP_NHA_ASSET}-next`)
   ]);
-  return { table, image, next };
+  return { table, tableNew, image, next, liveTable: activePopTable };
 }
 
 async function promoteNhaAsset(assetId) {
@@ -640,5 +673,6 @@ async function promoteNhaAsset(assetId) {
 module.exports = {
   initGEE, getGeeContext, ensureNha, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, loadNha,
   startPopNhaTask, listRecentTasks, cancelGeeTask, popNhaAssets, promoteNhaAsset, scalesFromGroups,
-  POP_SCALE_M, POP_NHA_SCALE_M, POP_NHA_ASSET, POP_NHA_CSV
+  activePopTableId, setActivePopTable, refreshActivePopTable,
+  POP_SCALE_M, POP_NHA_SCALE_M, POP_NHA_ASSET, POP_NHA_TABLE, POP_NHA_TABLE_NEW, POP_NHA_CSV
 };

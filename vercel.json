@@ -1,4 +1,7 @@
 {
+  "crons": [
+    { "path": "/api/gee?action=syncPopNha", "schedule": "15 1 * * *" }
+  ],
   "functions": {
     "api/gee.js": {
       "maxDuration": 60

@@ -258,7 +258,7 @@ function syncToolUi() {
   const undo = $('btnPopUndo');
   if (undo) { undo.innerHTML = `${ico('undo')}${t.undo}`; undo.title = t.undoTitle; }
   const hint = $('popHint');
-  if (hint) hint.textContent = `${t.hint} Tổng dân số phường giữ nguyên: xóa pixel thì dân dồn sang pixel còn lại. Công cụ này chỉ sửa raster Pixel cũ dùng để so sánh, không sửa lớp nhà ở.`;
+  if (hint) hint.textContent = `${t.hint} Tổng dân số phường giữ nguyên: xóa pixel thì dân dồn sang pixel còn lại. Công cụ này chỉ sửa raster Pixel cũ dùng để so sánh, không sửa lớp nhà ở. Tải pop-weights.csv lên bucket là đủ: máy chủ tự nạp bảng mới, bảng đang dùng vẫn phục vụ đến khi bảng mới xong.`;
 }
 
 function undoLast() {

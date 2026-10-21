@@ -1039,7 +1039,8 @@
             <button type="button" id="btnPopUndo" title="Xóa nét cọ cuối (Backspace / Ctrl+Z)" disabled><svg class="ico"><use href="#i-undo"/></svg>Hoàn tác nét</button>
           </div>
           <div id="popDrawInfo" class="road-draw-info"></div>
-          <div class="cad-hint" id="popHint" title="Vùng thêm được áp sau vùng xóa">Giữ chuột và rê để tô. Tổng dân số phường, xã giữ nguyên: xóa ô dân cư thì dân số dồn sang các ô còn lại. Nạp raster dân nhà ở nằm ở Lớp dữ liệu → Bản đồ nền, mục Dân số nhà ở (quản trị). Không cần bật lớp 14. Chung cư.</div>
+          <div class="cad-hint" id="popHint" title="Vùng thêm được áp sau vùng xóa">Giữ chuột và rê để tô. Tổng dân số phường giữ nguyên: xóa pixel thì dân dồn sang pixel còn lại. Công cụ này chỉ sửa raster Pixel cũ dùng để so sánh, không sửa lớp nhà ở. Tải pop-weights.csv lên bucket là đủ: máy chủ tự nạp bảng mới, bảng đang dùng vẫn phục vụ đến khi bảng mới xong.</div>
+          <p id="popNhaLive" class="pop-nha-live" hidden></p>
           <button type="button" class="layer-mini-btn" id="btnPopNhaJump">Mở nút nạp raster</button>
           <button type="button" class="btn-submit" id="btnPopSave" disabled title="Ghi danh sách vùng hiệu chỉnh dân cư"><svg class="ico"><use href="#i-save"/></svg>Lưu vùng hiệu chỉnh</button>
           <div id="popStatus" class="rp-status" role="status" aria-live="polite"></div>

@@ -40,7 +40,11 @@ function popNhaStatusText(rec, now = Date.now()) {
     return `${what} đã hủy.${err}${hint}${tail}`;
   }
   if (row.phase === 'table') {
-    if (state === 'RUNNING') return `Đang nạp bảng điểm lên Earth Engine.${hint}`;
+    if (state !== 'FAILED' && state !== 'CANCELLED' && state !== 'COMPLETED') {
+      const mins = minutesSince(row.at, now);
+      const n = mins == null ? 'vài phút' : `${mins} phút`;
+      return `Đang cập nhật dữ liệu dân số mới (${n})…`;
+    }
     return `Bảng điểm đang chờ Earth Engine, chưa chạy.${hint}${err}`;
   }
   if (row.phase === 'image') {

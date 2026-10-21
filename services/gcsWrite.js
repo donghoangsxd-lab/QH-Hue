@@ -179,7 +179,15 @@ async function objectMeta(name) {
   });
   if (res.status === 404) return null;
   if (res.status !== 200) throw fail(name, res.status, 'Đọc');
-  return { size: Number(res.data && res.data.size) || 0, contentType: String((res.data && res.data.contentType) || '') };
+  const data = res.data || {};
+  return {
+    size: Number(data.size) || 0,
+    contentType: String(data.contentType || ''),
+    contentEncoding: String(data.contentEncoding || ''),
+    md5: String(data.md5Hash || ''),
+    updated: String(data.updated || ''),
+    generation: String(data.generation || '')
+  };
 }
 
 async function readBytes(name, start, end) {

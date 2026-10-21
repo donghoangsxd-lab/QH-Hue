@@ -2,8 +2,9 @@ const axios = require('axios');
 const crypto = require('crypto');
 const zlib = require('zlib');
 const constants = require('../config/constants');
-const { initGEE, getGeeContext, ensureNha, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, loadNha, startPopNhaTask, listRecentTasks, cancelGeeTask, popNhaAssets, promoteNhaAsset, POP_SCALE_M, POP_NHA_ASSET } = require('../services/geeService');
+const { initGEE, getGeeContext, ensureNha, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, loadNha, startPopNhaTask, listRecentTasks, cancelGeeTask, popNhaAssets, promoteNhaAsset, setActivePopTable, POP_SCALE_M, POP_NHA_ASSET, POP_NHA_TABLE } = require('../services/geeService');
 const { popNhaStatusText } = require('../services/popNhaStatus');
+const popWatch = require('../services/popNhaWatch');
 const { getRawDataList, getCadParcels, getInvestCalls, getInvestEdits, forgetTextFile, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion } = require('../services/gcsService');
 const gcsWrite = require('../services/gcsWrite');
 const { requireAdmin, httpError } = require('../services/authService');
@@ -1218,35 +1219,94 @@ async function popNhaCsvInfo() {
     + 'gunzip -c public/data/gba/pop-weights.csv.gz > /tmp/pop-weights.csv\n'
     + 'gcloud storage cp /tmp/pop-weights.csv gs://hue-infra-data-us/gba/pop-weights.csv --content-type=text/csv';
   try {
-    const res = await axios.head(POP_NHA_PUBLIC, { timeout: 8000, validateStatus: () => true });
-    const len = Number(res.headers['content-length'] || 0);
-    const type = String(res.headers['content-type'] || '');
-    const enc = String(res.headers['content-encoding'] || '');
-    if (res.status !== 200) return { ok: false, message: `Chưa thấy file trên bucket. ${upload}` };
-    if (enc.includes('gzip') || type.includes('gzip') || (len > 0 && len < POP_NHA_MIN_BYTES)) {
-      return { ok: false, message: `File trên bucket có vẻ còn nén hoặc quá nhỏ (${len} byte). Earth Engine cần CSV không nén, cột longitude,latitude,people. ${upload}` };
+    const meta = await gcsWrite.objectMeta('gba/pop-weights.csv');
+    if (!meta) return { ok: false, message: `Chưa thấy file trên bucket. ${upload}` };
+    const enc = meta.contentEncoding || '';
+    const type = meta.contentType || '';
+    if (enc.includes('gzip') || type.includes('gzip') || (meta.size > 0 && meta.size < POP_NHA_MIN_BYTES)) {
+      return { ok: false, message: `File trên bucket có vẻ còn nén hoặc quá nhỏ (${meta.size} byte). Earth Engine cần CSV không nén, cột longitude,latitude,people. ${upload}` };
     }
-    return { ok: true, bytes: len };
+    return { ok: true, bytes: meta.size, md5: meta.md5, updated: meta.updated };
   } catch (err) {
-    return { ok: false, message: `Không kiểm tra được file CSV: ${err.message}` };
+    try {
+      const res = await axios.head(POP_NHA_PUBLIC, { timeout: 8000, validateStatus: () => true });
+      const len = Number(res.headers['content-length'] || 0);
+      if (res.status !== 200) return { ok: false, message: `Chưa thấy file trên bucket. ${upload}` };
+      if (len > 0 && len < POP_NHA_MIN_BYTES) {
+        return { ok: false, message: `File trên bucket có vẻ còn nén hoặc quá nhỏ (${len} byte). Earth Engine cần CSV không nén, cột longitude,latitude,people. ${upload}` };
+      }
+      return { ok: true, bytes: len, md5: '', updated: '' };
+    } catch (headErr) {
+      return { ok: false, message: `Không kiểm tra được file CSV: ${err.message}` };
+    }
   }
 }
 
 async function readPopNhaTask() {
   try {
-    const buf = await gcsWrite.readBytes(POP_NHA_TASK, 0, 200000);
-    return JSON.parse(buf.toString('utf8'));
+    const row = await gcsWrite.readJson(POP_NHA_TASK);
+    if (!row) return null;
+    const data = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+    if (!data || typeof data !== 'object') return null;
+    return { ...data, _generation: row.generation };
   } catch (err) {
     return null;
   }
 }
 
-const POP_NHA_STALE_MS = 6 * 60 * 60 * 1000;
-
 function withPopNhaText(rec, extra = {}) {
   const next = { ...rec, message: '' };
+  delete next._generation;
+  delete next._claimed;
   next.message = popNhaStatusText(next);
   return { saved: true, ...next, ...extra };
+}
+
+function isBusyRecord(rec) {
+  if (!rec) return false;
+  if (rec.state === 'STARTING' && Date.now() - Number(rec.at) < 120000) return true;
+  return (rec.phase === 'table' || rec.phase === 'image') && !!rec.task && popWatch.isBusyState(rec.state);
+}
+
+async function savePopNha(rec, generation) {
+  const body = withPopNhaText(rec);
+  try {
+    const written = await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(body), generation || undefined);
+    return { ...body, _generation: written.generation };
+  } catch (err) {
+    if (err.code !== 'GEN') throw err;
+    const other = await readPopNhaTask();
+    return other ? withPopNhaText(other) : body;
+  }
+}
+
+function adoptTableTask(task, prev, csv) {
+  return {
+    phase: 'table',
+    task: task.id,
+    asset: popWatch.assetOfTask(task),
+    state: task.state || 'RUNNING',
+    at: Number(task.created) || (prev && prev.at) || Date.now(),
+    people: popNhaPeople(),
+    liveTable: (prev && prev.liveTable) || POP_NHA_TABLE,
+    csvMd5: (prev && prev.csvMd5) || (csv && csv.md5) || '',
+    csvUpdated: (prev && prev.csvUpdated) || (csv && csv.updated) || '',
+    ingestedMd5: (prev && prev.ingestedMd5) || '',
+    ingestedUpdated: (prev && prev.ingestedUpdated) || '',
+    error: task.error || '',
+    description: task.description || '',
+    started: task.started || null,
+    updated: task.updated || null,
+    adopted: true,
+    note: ''
+  };
+}
+
+function cronAuthorized(req) {
+  const secret = process.env.CRON_SECRET || '';
+  const header = String((req.headers && (req.headers.authorization || req.headers.Authorization)) || '');
+  if (secret) return header === `Bearer ${secret}`;
+  return String((req.headers && (req.headers['x-vercel-cron'] || req.headers['X-Vercel-Cron'])) || '') === '1';
 }
 
 async function popNhaSnapshot() {
@@ -1254,7 +1314,7 @@ async function popNhaSnapshot() {
   try { out.assets = await popNhaAssets(); } catch (err) { out.assetsError = err.message; }
   try {
     const tasks = await listRecentTasks(40);
-    out.tasks = tasks.filter(t => /Pixel-danso-nha|QH-Hue_Pixel-danso/i.test(`${t.description} ${t.id}`)).slice(0, 8);
+    out.tasks = tasks.filter(t => popWatch.isPopTableTask(t) || /Pixel-danso-nha|QH-Hue_Pixel-danso/i.test(`${t.description} ${t.id}`)).slice(0, 8);
     out.queued = tasks.filter(t => t.state === 'READY' || t.state === 'RUNNING').length;
   } catch (err) { out.tasksError = err.message; }
   return out;
@@ -1267,7 +1327,7 @@ async function cancelPopNha(rec) {
 
 async function beginPopNha(phase, extra = {}) {
   try {
-    const started = await startPopNhaTask(phase);
+    const started = await startPopNhaTask(phase, extra.liveTable);
     return {
       phase,
       task: started.task,
@@ -1277,7 +1337,12 @@ async function beginPopNha(phase, extra = {}) {
       at: Date.now(),
       people: popNhaPeople(),
       restarts: extra.restarts || 0,
-      note: extra.note || ''
+      note: '',
+      liveTable: extra.liveTable || POP_NHA_TABLE,
+      csvMd5: extra.csvMd5 || '',
+      csvUpdated: extra.csvUpdated || '',
+      ingestedMd5: extra.ingestedMd5 || '',
+      ingestedUpdated: extra.ingestedUpdated || ''
     };
   } catch (err) {
     if (phase === 'image' && err.code === 'NO_TABLE') return beginPopNha('table', extra);
@@ -1285,52 +1350,155 @@ async function beginPopNha(phase, extra = {}) {
   }
 }
 
+async function claimAndBegin(phase, rec, csv) {
+  const claim = {
+    phase,
+    state: 'STARTING',
+    at: Date.now(),
+    task: '',
+    people: popNhaPeople(),
+    liveTable: (rec && rec.liveTable) || POP_NHA_TABLE,
+    csvMd5: (csv && csv.md5) || '',
+    csvUpdated: (csv && csv.updated) || '',
+    ingestedMd5: (rec && rec.ingestedMd5) || '',
+    ingestedUpdated: (rec && rec.ingestedUpdated) || '',
+    note: ''
+  };
+  let generation = '';
+  try {
+    const match = rec && rec._generation ? rec._generation : (rec ? undefined : '0');
+    const written = await gcsWrite.putJson(
+      POP_NHA_TASK,
+      JSON.stringify(withPopNhaText(claim)),
+      match
+    );
+    generation = written.generation;
+  } catch (err) {
+    if (err.code === 'GEN') {
+      const other = await readPopNhaTask();
+      return other ? { ...other, _claimed: false } : { ...claim, _claimed: false };
+    }
+    throw err;
+  }
+  const started = await beginPopNha(phase, claim);
+  return { ...started, _generation: generation, _claimed: true };
+}
+
 /**
- * Trạng thái nạp nhà ở. Chỉ nộp tác vụ khi admin bấm Nạp / Nạp lại / Chạy lại.
- * Xuất ảnh kẹt READY (started null) không bị hủy để nộp lại: worker không nhận tác vụ mới.
- * Quá 6 giờ mà vẫn chưa bắt đầu thì hủy một lần, không nộp lại.
+ * Theo dõi CSV và tác vụ nạp. Tác vụ READY hoặc RUNNING không bị hủy.
+ * Bấm lại khi đang chạy chỉ trả tác vụ đó. Bảng đang dùng không bị xóa trước khi bảng mới xong.
  */
 async function advancePopNha(opts = {}) {
   const csv = await popNhaCsvInfo();
   if (!csv.ok) return { saved: true, phase: 'csv', state: 'NEED_CSV', message: csv.message, ...(await popNhaSnapshot()) };
   let rec = await readPopNhaTask();
+  if (rec && rec.liveTable) setActivePopTable(rec.liveTable);
+  let activeTable = null;
+  let tasksKnown = true;
+  try {
+    activeTable = popWatch.pickActiveTask(await listRecentTasks(40));
+  } catch (err) {
+    activeTable = null;
+    tasksKnown = false;
+  }
   if (opts.cancel) {
     await cancelPopNha(rec);
-    rec = {
+    const stopped = {
       phase: 'idle', state: 'CANCELLED', task: rec && rec.task, asset: rec && rec.asset,
-      at: Date.now(), people: popNhaPeople(), error: '', note: ''
+      at: Date.now(), people: popNhaPeople(), error: '', note: '',
+      liveTable: (rec && rec.liveTable) || POP_NHA_TABLE,
+      ingestedMd5: (rec && rec.ingestedMd5) || '',
+      ingestedUpdated: (rec && rec.ingestedUpdated) || ''
     };
-    const body = withPopNhaText(rec);
-    await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(body));
+    const body = await savePopNha(stopped, rec && rec._generation);
     return { ...body, ...(await popNhaSnapshot()) };
   }
-  if (opts.restart || opts.rebuild) {
-    await cancelPopNha(rec);
-    rec = await beginPopNha(opts.rebuild ? 'table' : 'image', { restarts: 0 });
+  const needKnown = !activeTable && (
+    !rec || !rec.ingestedMd5 || (rec.task === popWatch.KNOWN_TASK && popWatch.isBusyState(rec.state))
+  );
+  if (needKnown) {
+    try {
+      const known = await getTaskState(popWatch.KNOWN_TASK);
+      if (known && (known.state === 'READY' || known.state === 'RUNNING')) {
+        activeTable = known;
+        tasksKnown = true;
+      }
+    } catch (err) { /* mã đang chạy không đọc được thì không nạp thêm */ }
+  }
+  const imageBusy = rec && rec.phase === 'image' && isBusyRecord(rec);
+  if (activeTable && !imageBusy && (!rec || rec.task !== activeTable.id || !isBusyRecord(rec))) {
+    rec = { ...adoptTableTask(activeTable, rec, csv), _generation: rec && rec._generation };
+  }
+  const busy = isBusyRecord(rec) || !!(activeTable && popWatch.isBusyState(activeTable.state));
+  const askStart = !!(opts.rebuild || opts.restart || opts.start || opts.watch);
+  if (!tasksKnown && !busy && askStart) {
+    const held = rec && rec.phase !== 'idle' ? rec : {
+      phase: 'idle', state: 'IDLE', people: popNhaPeople(), at: Date.now(), note: '',
+      liveTable: (rec && rec.liveTable) || POP_NHA_TABLE,
+      ingestedMd5: (rec && rec.ingestedMd5) || '',
+      ingestedUpdated: (rec && rec.ingestedUpdated) || ''
+    };
+    const heldBody = withPopNhaText(held);
+    heldBody.message = `${heldBody.message} Chưa đọc được danh sách tác vụ nên chưa nạp thêm.`;
+    return { ...heldBody, ...(await popNhaSnapshot()) };
+  }
+  if (!busy && opts.rebuild) {
+    rec = await claimAndBegin('table', rec, csv);
+  } else if (!busy && opts.restart) {
+    rec = await claimAndBegin('image', rec, csv);
+  } else if (!busy && opts.start && (!rec || rec.phase === 'idle')) {
+    rec = await claimAndBegin('table', rec, csv);
+  } else if (!busy && opts.watch && popWatch.csvChanged(rec, csv)) {
+    rec = await claimAndBegin('table', rec, csv);
+  } else if (!busy && opts.watch && (!rec || !rec.ingestedMd5)) {
+    const assets = await popNhaAssets().catch(() => null);
+    if (assets && assets.table) {
+      rec = {
+        ...(rec || {}),
+        phase: 'ready',
+        state: 'TABLE_READY',
+        liveTable: (rec && rec.liveTable) || POP_NHA_TABLE,
+        ingestedMd5: csv.md5,
+        ingestedUpdated: csv.updated,
+        popFromTable: true,
+        at: (rec && rec.at) || Date.now(),
+        people: popNhaPeople(),
+        error: '',
+        note: ''
+      };
+    } else {
+      rec = await claimAndBegin('table', rec, csv);
+    }
   }
   if (rec && rec.phase === 'idle') rec = null;
   if (rec && rec.phase === 'ready' && rec.state !== 'TABLE_READY') {
     await loadNha();
     const ready = getGeeContext('b');
+    const kept = {
+      liveTable: rec.liveTable || POP_NHA_TABLE,
+      ingestedMd5: rec.ingestedMd5 || '',
+      ingestedUpdated: rec.ingestedUpdated || '',
+      _generation: rec._generation
+    };
     if (ready.popSource === 'nha' && !ready.popFromTable) {
       rec = {
+        ...kept,
         phase: 'ready', state: 'ASSET_READY', asset: POP_NHA_ASSET, popSource: 'nha',
         people: rec.people || popNhaPeople(), at: rec.at || Date.now(), note: ''
       };
-      const body = withPopNhaText(rec);
-      await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(body));
+      const body = await savePopNha(rec, rec._generation);
       return { ...body, ...(await popNhaSnapshot()) };
     }
     rec = {
       ...rec,
+      ...kept,
       phase: 'image',
       state: 'ASSET_MISSING',
       popFromTable: !!ready.popTableReady,
       error: '',
       note: ''
     };
-    const missing = withPopNhaText(rec);
-    await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(missing));
+    const missing = await savePopNha(rec, rec._generation);
     return { ...missing, ...(await popNhaSnapshot()) };
   }
   if (rec && rec.task && (rec.phase === 'table' || rec.phase === 'image')) {
@@ -1340,6 +1508,10 @@ async function advancePopNha(opts = {}) {
     } catch (err) {
       t = { state: rec.state || 'UNKNOWN', error: err.message || '' };
     }
+    const generation = rec._generation;
+    const liveTable = rec.liveTable || POP_NHA_TABLE;
+    const ingestedMd5 = rec.ingestedMd5 || '';
+    const ingestedUpdated = rec.ingestedUpdated || '';
     rec = {
       ...rec,
       state: t.state,
@@ -1348,27 +1520,44 @@ async function advancePopNha(opts = {}) {
       started: t.started,
       updated: t.updated,
       people: rec.people || popNhaPeople(),
-      note: ''
+      liveTable,
+      ingestedMd5,
+      ingestedUpdated,
+      note: '',
+      _generation: generation
     };
     if (t.state === 'COMPLETED' && rec.phase === 'table') {
+      const asset = rec.asset || POP_NHA_TABLE;
+      const startedMd5 = rec.csvMd5 || '';
+      const startedUpdated = rec.csvUpdated || '';
+      setActivePopTable(asset);
       rec = {
         phase: 'ready',
         state: 'TABLE_READY',
         task: rec.task,
-        asset: POP_NHA_TABLE,
+        asset,
+        liveTable: asset,
+        csvMd5: startedMd5,
+        csvUpdated: startedUpdated,
+        ingestedMd5: startedMd5 || csv.md5 || '',
+        ingestedUpdated: startedUpdated || csv.updated || '',
         at: Date.now(),
         people: popNhaPeople(),
         popFromTable: true,
         error: '',
-        note: ''
+        note: '',
+        _generation: generation
       };
+      const drifted = !!(csv.md5 && startedMd5 && (
+        csv.md5 !== startedMd5 || String(csv.updated || '') !== String(startedUpdated || '')
+      ));
+      if (drifted) rec = await claimAndBegin('table', rec, csv);
     } else if (t.state === 'COMPLETED' && rec.phase === 'image') {
       try {
         if (rec.promote || (rec.asset && rec.asset !== POP_NHA_ASSET)) await promoteNhaAsset(rec.asset);
       } catch (err) {
-        rec = { ...rec, state: 'FAILED', error: `Chưa đổi được ảnh mới vào asset: ${err.message}`, note: '' };
-        const failed = withPopNhaText(rec);
-        await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(failed));
+        rec = { ...rec, state: 'FAILED', error: `Chưa đổi được ảnh mới vào asset: ${err.message}`, note: '', _generation: generation };
+        const failed = await savePopNha(rec, generation);
         return { ...failed, ...(await popNhaSnapshot()) };
       }
       await loadNha();
@@ -1383,39 +1572,28 @@ async function advancePopNha(opts = {}) {
         people: popNhaPeople(),
         popSource: ready.popSource,
         popFromTable: !!ready.popTableReady,
+        liveTable,
+        ingestedMd5,
+        ingestedUpdated,
         error: '',
-        note: ''
+        note: '',
+        _generation: generation
       };
     } else if (t.state === 'FAILED' || t.state === 'CANCELLED') {
-      const stopped = withPopNhaText(rec);
-      await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(stopped));
+      const stopped = await savePopNha(rec, generation);
       return { ...stopped, ...(await popNhaSnapshot()) };
-    } else if ((t.state === 'READY' || t.state === 'UNKNOWN') && !t.started && Date.now() - (Number(rec.at) || 0) > POP_NHA_STALE_MS) {
-      await cancelPopNha(rec);
-      const idle = withPopNhaText({
-        phase: 'idle',
-        state: 'CANCELLED',
-        task: rec.task,
-        asset: rec.asset,
-        at: Date.now(),
-        people: popNhaPeople(),
-        error: '',
-        note: ''
-      });
-      await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(idle));
-      return { ...idle, ...(await popNhaSnapshot()) };
     }
+  }
+  if (rec && rec._claimed === false) {
+    return { ...withPopNhaText(rec), ...(await popNhaSnapshot()) };
   }
   if (!rec) {
-    if (!opts.start) {
-      return withPopNhaText({
-        phase: 'idle', state: 'IDLE', people: popNhaPeople(), at: Date.now(), note: ''
-      }, await popNhaSnapshot());
-    }
-    rec = await beginPopNha('table');
+    return withPopNhaText({
+      phase: 'idle', state: 'IDLE', people: popNhaPeople(), at: Date.now(), note: '',
+      liveTable: POP_NHA_TABLE
+    }, await popNhaSnapshot());
   }
-  const body = withPopNhaText(rec);
-  await gcsWrite.putJson(POP_NHA_TASK, JSON.stringify(body));
+  const body = await savePopNha(rec, rec._generation);
   return { ...body, ...(await popNhaSnapshot()) };
 }
 
@@ -3777,6 +3955,19 @@ module.exports = async (req, res) => {
     }
 
     await initGEE();
+
+    // Một lần mỗi ngày (01:15 UTC): gói Hobby từ chối cron dày hơn và làm fail cả lần deploy.
+    // Trang quản trị đang mở vẫn đối chiếu CSV mỗi phút.
+    if (action === 'syncPopNha') {
+      if (!cronAuthorized(req)) return res.status(401).json({ error: true, message: 'Không đúng lịch' });
+      try {
+        return res.status(200).json(await advancePopNha({ watch: true }));
+      } catch (err) {
+        console.error('Đồng bộ CSV dân nhà ở lỗi:', err.message);
+        return res.status(502).json({ error: true, message: `Chưa đồng bộ được CSV dân nhà ở: ${err.message}` });
+      }
+    }
+
     await syncPopEdits(Math.round(Number(req.query.pv) || 0));
 
     // Ghi cố định vùng hiệu chỉnh dân cư vào asset mới (tác vụ GEE chạy nền); trong lúc chạy vẫn tính theo asset cũ + vùng
@@ -3833,7 +4024,8 @@ module.exports = async (req, res) => {
           rebuild: body.rebuild === true,
           cancel: body.cancel === true,
           restart: body.restart === true,
-          start: body.start === true
+          start: body.start === true,
+          watch: body.watch === true
         }));
       } catch (err) {
         console.error('Nạp Pixel-danso-nha lỗi:', err.message);
