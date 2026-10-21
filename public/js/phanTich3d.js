@@ -1,6 +1,6 @@
-// Bản mẫu: bốn thành phần đô thị (khối, khoảng trống, chức năng, liên kết) trong một vòng tròn.
-// Chiều cao công trình trên hình chỉ để tách nhóm tương đối của Global Building Atlas, không phải mét đo đạc.
-// Dân số phường không được nhân theo diện tích vòng tròn.
+// Bản mẫu bốn thành phần đô thị. Ô vuông cạnh 2×r (r vẫn là tham số bán kính, nay là nửa cạnh).
+// Chiều cao đùn bằng mét từ data/gba/bldg-hf.bin (làm tròn 0,5 m). Số tầng = round(h / 3.3).
+// Màu khối tích vẫn theo nhóm tương đối c của buildings.pmtiles. Dân phường không nhân theo diện tích ô.
 
 const GBA_URL = 'https://storage.googleapis.com/hue-infra-data-us/gba/buildings.pmtiles';
 const CAD_URL = 'https://storage.googleapis.com/hue-infra-data-us/cadastre/thuadat-2016.pmtiles';
@@ -16,12 +16,29 @@ const OVERPASS = [
   'https://overpass-api.de/api/interpreter'
 ];
 const CLASS_NAME = ['Thấp', 'Trung bình', 'Cao', 'Rất cao'];
-// Bậc vẽ, không phải số mét. Cùng thứ tự nhóm c = 0..3 trong buildings.pmtiles.
-const CLASS_DRAW = [9, 18, 32, 52];
-const VOLUME_FILL = [[250, 214, 214], [246, 196, 196], [240, 174, 174], [232, 150, 150]];
-const VOLUME_LINE = [156, 74, 74, 200];
-const LIFT = { links: 0, uses: 90, voids: 180, volumes: 270 };
+const VOLUME_FILL = [[255, 252, 250, 238], [248, 214, 210, 240], [236, 164, 162, 242], [214, 112, 118, 245]];
+const USE_FILL = {
+  'Đất ở': [214, 150, 230, 240],
+  'Cơ quan, công cộng': [126, 160, 236, 240],
+  'Sản xuất, kinh doanh': [240, 148, 64, 240],
+  'Nông nghiệp': [240, 206, 64, 235],
+  'Rừng': [120, 190, 110, 235],
+  'Mặt nước, thủy sản': [130, 198, 232, 235],
+  'Giao thông, thủy lợi': [100, 150, 220, 235],
+  'Chưa sử dụng, khác': [196, 196, 202, 220],
+  'Chưa có mã': [206, 206, 210, 210]
+};
+const PLATE = 3;
+const LIFT = { links: 0, uses: 1100, voids: 2200, volumes: 3300 };
+const PLATE_FILL = {
+  links: [232, 232, 230, 255],
+  uses: [244, 244, 246, 255],
+  voids: [236, 242, 236, 255],
+  volumes: [248, 240, 238, 255]
+};
+const SOFT = { ambient: 0.52, diffuse: 0.74, shininess: 12, specularColor: [255, 250, 248] };
 const SEARCH_M = 2000;
+const HEIGHT_LIM = 160;
 
 const GROUPS = [
   { label: 'Đất ở', codes: ['ODT', 'ONT'] },
@@ -34,32 +51,25 @@ const GROUPS = [
   { label: 'Chưa sử dụng, khác', codes: [] }
 ];
 const GROUP_OF = new Map(GROUPS.flatMap((g) => g.codes.map((c) => [c, g.label])));
-const LAND_COLORS = {
-  LUC: '#ffff64', LUK: '#ffff78', LUN: '#ffff8c', LUA: '#ffff78', BHK: '#fff0b4', NHK: '#fff0b4', HNK: '#fff0b4',
-  CLN: '#ffd7aa', NKH: '#f5f08c', RSX: '#b4ffb4', RPH: '#beff1e', RDD: '#6eff64', NTS: '#aaffff', LMU: '#fafafa',
-  ODT: '#ffa0ff', ONT: '#ffd0ff', CQP: '#ff5046', CAN: '#ff5046', DGT: '#ffaa32', DTL: '#aaffff',
-  SON: '#a0ffff', MNC: '#b4ffff', NTD: '#d2d2d2', SKS: '#cdaacd', SKX: '#cdaacd', DRA: '#cdaacd',
-  BCS: '#fafafa', DCS: '#fafafa', NCS: '#e6e6c8'
-};
-const PUBLIC_COLOR = '#ffaaa0';
-const NO_CODE_COLOR = '#d4d4d4';
 const ROAD_RANK = {
   motorway: 'truc', motorway_link: 'truc', trunk: 'truc', trunk_link: 'truc', primary: 'truc', primary_link: 'truc',
-  secondary: 'khuvuc', secondary_link: 'khuvuc', tertiary: 'khuvuc', tertiary_link: 'khuvuc',
+  secondary: 'khuvuc', secondary_link: 'khuvuc',
+  tertiary: 'tertiary', tertiary_link: 'tertiary',
   unclassified: 'noibo', residential: 'noibo', living_street: 'noibo', service: 'noibo',
   cycleway: 'xedap', pedestrian: 'dibo', footway: 'dibo', path: 'dibo', steps: 'dibo'
 };
 const ROAD_COLOR = {
-  truc: [224, 122, 61, 230],
-  khuvuc: [96, 150, 214, 230],
-  noibo: [176, 184, 194, 220],
-  xedap: [110, 168, 120, 220],
-  dibo: [196, 186, 170, 200],
-  rail: [107, 76, 122, 230],
-  water: [74, 163, 199, 230]
+  truc: [214, 48, 48, 255],
+  khuvuc: [224, 176, 40, 255],
+  tertiary: [58, 118, 210, 255],
+  noibo: [176, 182, 190, 230],
+  xedap: [96, 168, 118, 220],
+  dibo: [196, 186, 170, 180],
+  rail: [120, 86, 150, 230],
+  water: [96, 176, 214, 220]
 };
-const ROAD_HALF = { truc: 4.2, khuvuc: 3.1, noibo: 2.1, xedap: 1.5, dibo: 1.3, rail: 3.2, water: 2.4 };
-const DENSITY_RANKS = new Set(['truc', 'khuvuc', 'noibo']);
+const ROAD_WIDTH = { truc: 16, khuvuc: 11, tertiary: 8, noibo: 4.2, xedap: 2.4, dibo: 2, rail: 5, water: 4 };
+const ARROW_RANK = new Set(['truc', 'khuvuc', 'tertiary']);
 
 const $ = (id) => document.getElementById(id);
 
@@ -78,6 +88,11 @@ export function parseCenter(search) {
   return { lat, lng, r: clampRadius(q.get('r')), view: q.get('view') === 'gop' ? 'gop' : 'tach' };
 }
 
+export function floorsFromHeight(h) {
+  if (!Number.isFinite(h) || h <= 0) return null;
+  return Math.max(1, Math.round(h / 3.3));
+}
+
 export function circleRing(r, n = 64) {
   const ring = [];
   for (let i = 0; i < n; i++) {
@@ -85,6 +100,14 @@ export function circleRing(r, n = 64) {
     ring.push([Math.cos(a) * r, Math.sin(a) * r]);
   }
   return ring;
+}
+
+export function squareRing(r) {
+  return [[-r, -r], [r, -r], [r, r], [-r, r]];
+}
+
+function plateRing(r) {
+  return [[-r, -r], [-r, r], [r, r], [r, -r]];
 }
 
 function leftOf(p, a, b) {
@@ -153,25 +176,6 @@ export function shannon(areas) {
   return h;
 }
 
-function bboxOutside(ring, r) {
-  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
-  for (const p of ring) {
-    if (p[0] < minx) minx = p[0];
-    if (p[1] < miny) miny = p[1];
-    if (p[0] > maxx) maxx = p[0];
-    if (p[1] > maxy) maxy = p[1];
-  }
-  const cx = minx > 0 ? minx : maxx < 0 ? maxx : 0;
-  const cy = miny > 0 ? miny : maxy < 0 ? maxy : 0;
-  return cx * cx + cy * cy > r * r;
-}
-
-function fullyInside(ring, r) {
-  const r2 = r * r;
-  for (const p of ring) if (p[0] * p[0] + p[1] * p[1] > r2) return false;
-  return true;
-}
-
 export function clipSegment(a, b, r) {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
@@ -191,23 +195,6 @@ export function clipSegment(a, b, r) {
   return [[p(lo), p(hi)]];
 }
 
-export function clipPolyline(line, r) {
-  const parts = [];
-  let cur = null;
-  for (let i = 1; i < line.length; i++) {
-    const bits = clipSegment(line[i - 1], line[i], r);
-    for (const [a, b] of bits) {
-      if (cur && Math.hypot(cur[cur.length - 1][0] - a[0], cur[cur.length - 1][1] - a[1]) < 0.25) cur.push(b);
-      else {
-        if (cur && cur.length > 1) parts.push(cur);
-        cur = [a, b];
-      }
-    }
-  }
-  if (cur && cur.length > 1) parts.push(cur);
-  return parts;
-}
-
 function pointInRing(p, ring) {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -220,18 +207,8 @@ function pointInRing(p, ring) {
   return inside;
 }
 
-function hexRgb(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 210];
-}
-
 function landCode(l) {
   return (String(l || '').toUpperCase().match(/[A-Z]{3}/) || [''])[0];
-}
-
-function landColor(code) {
-  if (!code) return hexRgb(NO_CODE_COLOR);
-  return hexRgb(LAND_COLORS[code] || PUBLIC_COLOR);
 }
 
 function groupLabel(code) {
@@ -352,24 +329,50 @@ function signedArea(ring) {
   return s / 2;
 }
 
-// Vòng đầu là viền ngoài. Vòng cùng chiều là phần tách; vòng ngược chiều là lỗ.
+function wind(rings) {
+  const out = rings.map((ring) => ring.slice());
+  if (signedArea(out[0]) > 0) out[0].reverse();
+  for (let i = 1; i < out.length; i++) if (signedArea(out[i]) < 0) out[i].reverse();
+  return out;
+}
+
+function bboxMissSquare(ring, r) {
+  let minx = Infinity;
+  let miny = Infinity;
+  let maxx = -Infinity;
+  let maxy = -Infinity;
+  for (const p of ring) {
+    if (p[0] < minx) minx = p[0];
+    if (p[1] < miny) miny = p[1];
+    if (p[0] > maxx) maxx = p[0];
+    if (p[1] > maxy) maxy = p[1];
+  }
+  return maxx < -r || minx > r || maxy < -r || miny > r;
+}
+
+function fullyInsideSquare(ring, r) {
+  for (const p of ring) if (Math.abs(p[0]) > r + 0.05 || Math.abs(p[1]) > r + 0.05) return false;
+  return true;
+}
+
 function clipFeature(feat, origin, clip, r) {
   const rings = feat.rings.map((ring) => ring.map(([lng, lat]) => toLocal(lng, lat, origin)));
-  if (!rings.length || bboxOutside(rings[0], r)) return [];
+  if (!rings.length || bboxMissSquare(rings[0], r)) return [];
   const parts = [];
   let current = null;
   const signOf = (ring) => Math.sign(signedArea(ring)) || 1;
   rings.forEach((ring, index) => {
-    const cut = fullyInside(ring, r) ? ring : clipRing(ring, clip);
+    const cut = fullyInsideSquare(ring, r) ? ring : clipRing(ring, clip);
     if (!cut) return;
     const sign = signOf(cut);
     if (!current || (index > 0 && sign === current.sign)) {
       if (current && current.area > 1) parts.push(current);
-      current = { rings: [cut], area: ringArea(cut), sign };
+      current = { rings: wind([cut]), area: ringArea(cut), sign };
       return;
     }
     current.rings.push(cut);
     current.area -= ringArea(cut);
+    current.rings = wind(current.rings);
   });
   if (current && current.area > 1) parts.push(current);
   return parts;
@@ -382,50 +385,122 @@ function centroid(ring) {
   return [x / ring.length, y / ring.length];
 }
 
-function quad(a, b, half) {
-  const dx = b[0] - a[0];
-  const dy = b[1] - a[1];
-  const len = Math.hypot(dx, dy) || 1;
-  const nx = (-dy / len) * half;
-  const ny = (dx / len) * half;
-  return [
-    [a[0] + nx, a[1] + ny],
-    [b[0] + nx, b[1] + ny],
-    [b[0] - nx, b[1] - ny],
-    [a[0] - nx, a[1] - ny]
-  ];
-}
-
-function arrowHead(p, dir) {
+function arrowHead(p, dir, head) {
   const h = Math.hypot(dir[0], dir[1]) || 1;
   const dx = dir[0] / h;
   const dy = dir[1] / h;
   const px = -dy;
   const py = dx;
+  const tip = [p[0] + dx * head, p[1] + dy * head];
   return [
-    [p[0] + dx * 7, p[1] + dy * 7],
-    [p[0] - dx * 5 + px * 4, p[1] - dy * 5 + py * 4],
-    [p[0] - dx * 5 - px * 4, p[1] - dy * 5 - py * 4]
+    tip,
+    [p[0] - dx * head * 0.2 + px * head * 0.55, p[1] - dy * head * 0.2 + py * head * 0.55],
+    [p[0] - dx * head * 0.2 - px * head * 0.55, p[1] - dy * head * 0.2 - py * head * 0.55]
   ];
 }
 
-function arrowsAlong(line) {
-  const heads = [];
-  let acc = 0;
-  let next = 80;
-  for (let i = 1; i < line.length; i++) {
-    const a = line[i - 1];
-    const b = line[i];
-    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    if (len < 0.5) continue;
-    while (acc + len >= next) {
-      const t = (next - acc) / len;
-      heads.push(arrowHead([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], [b[0] - a[0], b[1] - a[1]]));
-      next += 80;
+function clipSegSquare(a, b, r) {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const p = [-dx, dx, -dy, dy];
+  const q = [a[0] + r, r - a[0], a[1] + r, r - a[1]];
+  for (let i = 0; i < 4; i++) {
+    if (Math.abs(p[i]) < 1e-12) {
+      if (q[i] < 0) return null;
+    } else {
+      const t = q[i] / p[i];
+      if (p[i] < 0) {
+        if (t > t1) return null;
+        if (t > t0) t0 = t;
+      } else {
+        if (t < t0) return null;
+        if (t < t1) t1 = t;
+      }
     }
-    acc += len;
   }
-  return heads;
+  if (t1 - t0 < 1e-5) return null;
+  return {
+    a: [a[0] + dx * t0, a[1] + dy * t0],
+    b: [a[0] + dx * t1, a[1] + dy * t1],
+    exit: t1 < 0.999
+  };
+}
+
+function clipPolylineSquare(line, r) {
+  const parts = [];
+  const exits = [];
+  let cur = null;
+  const flush = () => {
+    if (cur && cur.length > 1) parts.push(cur);
+    cur = null;
+  };
+  for (let i = 1; i < line.length; i++) {
+    const hit = clipSegSquare(line[i - 1], line[i], r);
+    if (!hit) { flush(); continue; }
+    if (cur && Math.hypot(cur[cur.length - 1][0] - hit.a[0], cur[cur.length - 1][1] - hit.a[1]) < 0.4) cur.push(hit.b);
+    else {
+      flush();
+      cur = [hit.a, hit.b];
+    }
+    if (hit.exit) {
+      exits.push({ p: hit.b, dir: [hit.b[0] - hit.a[0], hit.b[1] - hit.a[1]] });
+      flush();
+    }
+  }
+  flush();
+  return { parts, exits };
+}
+
+function lineLength(parts) {
+  let m = 0;
+  for (const line of parts) {
+    for (let i = 1; i < line.length; i++) m += Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]);
+  }
+  return m;
+}
+
+function collectNodes(lines, r) {
+  const cell = 18;
+  const buckets = new Map();
+  for (const line of lines) {
+    for (const p of line) {
+      if (Math.abs(p[0]) > r - 12 || Math.abs(p[1]) > r - 12) continue;
+      const k = `${Math.round(p[0] / cell)}_${Math.round(p[1] / cell)}`;
+      const b = buckets.get(k) || { n: 0, x: 0, y: 0 };
+      b.n += 1;
+      b.x += p[0];
+      b.y += p[1];
+      buckets.set(k, b);
+    }
+  }
+  const nodes = [];
+  for (const b of buckets.values()) if (b.n >= 4) nodes.push([b.x / b.n, b.y / b.n]);
+  return nodes.slice(0, 48);
+}
+
+function scatterTrees(rings, r, cap) {
+  const out = [];
+  if (!rings.length) return out;
+  const step = 22;
+  let salt = 1;
+  for (let y = -r + 14; y <= r - 14 && out.length < cap; y += step) {
+    for (let x = -r + 14; x <= r - 14 && out.length < cap; x += step) {
+      salt += 1;
+      const jx = x + Math.sin(salt * 12.989) * 9;
+      const jy = y + Math.cos(salt * 78.233) * 9;
+      if (Math.abs(jx) > r - 8 || Math.abs(jy) > r - 8) continue;
+      if (!rings.some((ring) => pointInRing([jx, jy], ring))) continue;
+      out.push({
+        x: jx,
+        y: jy,
+        r: 8 + (salt % 4) * 2.4,
+        shade: salt % 2 ? [70, 160, 72, 255] : [48, 130, 58, 255]
+      });
+    }
+  }
+  return out;
 }
 
 function voidKind(tags) {
@@ -508,11 +583,6 @@ node["public_transport"~"^(platform|stop_position)$"](${s});
   throw new Error(last);
 }
 
-function pointInGeo(lng, lat, geometry) {
-  const polys = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.type === 'MultiPolygon' ? geometry.coordinates : [];
-  return polys.some((poly) => pointInRing([lng, lat], poly[0]) && !poly.slice(1).some((hole) => pointInRing([lng, lat], hole)));
-}
-
 function hav(lng1, lat1, lng2, lat2) {
   const R = 6371000;
   const p1 = (lat1 * Math.PI) / 180;
@@ -525,21 +595,16 @@ function hav(lng1, lat1, lng2, lat2) {
 
 function coverRatio(polys, r) {
   if (!polys.length) return 0;
-  const step = r / 36;
+  const step = (r * 2) / 36;
   let inside = 0;
   let hit = 0;
   for (let y = -r; y <= r; y += step) {
     for (let x = -r; x <= r; x += step) {
-      if (x * x + y * y > r * r) continue;
       inside += 1;
       if (polys.some((ring) => pointInRing([x, y], ring))) hit += 1;
     }
   }
   return inside ? hit / inside : 0;
-}
-
-function polyFeature(rings, plane, h, fill, line) {
-  return { rings, plane, h, fill, line };
 }
 
 function indexParcels(parcels) {
@@ -572,33 +637,107 @@ function indexParcels(parcels) {
   };
 }
 
-function lineLength(parts) {
-  let m = 0;
-  for (const line of parts) {
-    for (let i = 1; i < line.length; i++) m += Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]);
-  }
-  return m;
+function tileParts(lng, lat) {
+  const n = 65536;
+  const xf = ((lng + 180) / 360) * n;
+  const s = Math.sin((lat * Math.PI) / 180);
+  const yf = (1 - Math.log((1 + s) / (1 - s)) / (2 * Math.PI)) * n / 2;
+  const x = Math.floor(xf);
+  const y = Math.floor(yf);
+  return { x, y, cx: Math.floor((xf - x) * 4096), cy: Math.floor((yf - y) * 4096) };
 }
 
-function buildModel(raw, origin, r) {
-  const clip = circleRing(r, 64);
-  const features = [];
+export function parseHeightIndex(buf) {
+  const dv = new DataView(buf);
+  const magic = String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3));
+  if (magic !== 'GBH2') throw new Error('tệp chiều cao không đúng');
+  const tiles = dv.getUint32(4, true);
+  const rec0 = 12 + tiles * 12;
+  const index = new Map();
+  let p = 12;
+  for (let i = 0; i < tiles; i++) {
+    const key = dv.getUint32(p, true);
+    const start = dv.getUint32(p + 4, true);
+    const count = dv.getUint32(p + 8, true);
+    index.set(key, { start, count });
+    p += 12;
+  }
+  function scan(tx, ty, gx, gy, best) {
+    const ent = index.get(tx * 65536 + ty);
+    if (!ent) return best;
+    const base = rec0 + ent.start * 8;
+    for (let i = 0; i < ent.count; i++) {
+      const o = base + i * 8;
+      const dx = tx * 4096 + dv.getUint16(o, true) - gx;
+      const dy = ty * 4096 + dv.getUint16(o + 2, true) - gy;
+      const d = dx * dx + dy * dy;
+      if (d < best.d) best = { d, h: dv.getUint16(o + 4, true) / 2 };
+    }
+    return best;
+  }
+  return {
+    lookup(lng, lat) {
+      const part = tileParts(lng, lat);
+      const gx = part.x * 4096 + part.cx;
+      const gy = part.y * 4096 + part.cy;
+      let best = scan(part.x, part.y, gx, gy, { d: HEIGHT_LIM * HEIGHT_LIM, h: null });
+      if (best.d > 70 * 70) {
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            if (!dx && !dy) continue;
+            best = scan(part.x + dx, part.y + dy, gx, gy, best);
+          }
+        }
+      }
+      return best.h;
+    }
+  };
+}
+
+function buildModel(raw, origin, r, heights) {
+  const clip = squareRing(r);
   const gaps = [];
-  const buildings = [];
+  const volumes = [];
+  const uses = [];
+  const greens = [];
+  const waters = [];
+  const squares = [];
+  const roads = [];
+  const arrows = [];
+  const majorLines = [];
   let footprint = 0;
+  let matchedFp = 0;
+  let gfa = 0;
+  let hSum = 0;
+  let heightMiss = 0;
   const classArea = [0, 0, 0, 0];
+  const buildings = [];
   if (raw.gbaError) gaps.push('Không đọc được dấu chân công trình (Global Building Atlas).');
   else {
     for (const feat of raw.gba) {
       const c = Math.max(0, Math.min(3, Number(feat.props.c) || 0));
       for (const cut of clipFeature(feat, origin, clip, r)) {
+        const mid = centroid(cut.rings[0]);
+        const lng = origin.lng + mid[0] / origin.mLng;
+        const lat = origin.lat + mid[1] / origin.mLat;
+        const h = heights ? heights.lookup(lng, lat) : null;
+        const f = floorsFromHeight(h);
         footprint += cut.area;
         classArea[c] += cut.area;
-        buildings.push({ ...cut, c });
+        if (h == null) heightMiss += 1;
+        else {
+          matchedFp += cut.area;
+          gfa += cut.area * f;
+          hSum += cut.area * h;
+        }
+        const drawH = h == null ? 3.3 : h;
+        buildings.push(cut);
+        volumes.push({ rings: cut.rings, h: drawH, fill: VOLUME_FILL[c] });
       }
     }
-    if (!buildings.length) gaps.push('Không có dấu chân công trình trong vòng tròn.');
+    if (!buildings.length) gaps.push('Không có dấu chân công trình trong ô vuông.');
   }
+  if (!heights) gaps.push('Không đọc được tệp chiều cao mét. Hình dùng tạm 3,3 m cho mỗi dấu chân, không tính sàn.');
 
   const parcels = [];
   const groupArea = new Map();
@@ -614,29 +753,22 @@ function buildModel(raw, origin, r) {
         parcels.push({ ...cut, code, label });
       }
     }
-    if (!parcels.length) gaps.push('Không có thửa đất trong vòng tròn.');
+    if (!parcels.length) gaps.push('Không có thửa đất trong ô vuông.');
   }
-
   const findParcel = indexParcels(parcels);
-  const disc = circleRing(r, 72);
-  features.push(polyFeature([disc], 'links', 0.4, [252, 249, 244, 255], [0, 0, 0, 0]));
-  for (const p of parcels) {
-    const fill = landColor(p.code);
-    features.push(polyFeature(p.rings, 'uses', 4, fill, [120, 100, 90, 140]));
-  }
   let unassigned = 0;
-  for (const b of buildings) {
+  for (let i = 0; i < buildings.length; i++) {
+    const b = buildings[i];
     const hit = findParcel(...centroid(b.rings[0]));
-    const fill = hit ? landColor(hit.code) : [228, 224, 218, 180];
+    const label = hit ? hit.label : 'Chưa có mã';
     if (!hit) unassigned += 1;
-    features.push(polyFeature(b.rings, 'uses', 8, fill, [120, 100, 90, 120]));
-    features.push(polyFeature(b.rings, 'volumes', CLASS_DRAW[b.c], VOLUME_FILL[b.c].concat(225), VOLUME_LINE));
+    uses.push({ rings: volumes[i].rings, h: volumes[i].h, fill: USE_FILL[label] || USE_FILL['Chưa có mã'] });
   }
 
   const greenRings = [];
   const waterRings = [];
   const squareRings = [];
-  const roadM = { truc: 0, khuvuc: 0, noibo: 0, xedap: 0, dibo: 0, rail: 0, water: 0 };
+  const roadM = { truc: 0, khuvuc: 0, tertiary: 0, noibo: 0, xedap: 0, dibo: 0, rail: 0, water: 0 };
   const nearest = { school: null, health: null, market: null, bus: null };
   let stopsInside = 0;
   if (raw.osmError) gaps.push(`${raw.osmError}. Không tính cây xanh, mặt nước, đường và khoảng cách công trình.`);
@@ -650,12 +782,19 @@ function buildModel(raw, origin, r) {
         if (kind && closed) {
           const cut = clipRing(local, clip);
           if (cut && ringArea(cut) > 8) {
-            const fill = kind === 'water' ? [168, 207, 232, 210] : kind === 'square' ? [214, 224, 196, 210] : kind === 'pitch' ? [198, 216, 176, 180] : [176, 214, 170, 210];
-            const line = kind === 'water' ? [61, 111, 143, 180] : [70, 120, 80, 160];
-            features.push(polyFeature([cut], 'voids', 6, fill, line));
-            if (kind === 'water') waterRings.push(cut);
-            else if (kind === 'square') squareRings.push(cut);
-            else if (kind === 'green') greenRings.push(cut);
+            const wound = wind([cut]);
+            if (kind === 'water') {
+              waters.push({ rings: wound, h: 4, fill: [150, 206, 232, 235] });
+              waterRings.push(cut);
+            } else if (kind === 'square') {
+              squares.push({ rings: wound, h: 2, fill: [226, 228, 220, 230] });
+              squareRings.push(cut);
+            } else if (kind === 'pitch') {
+              greens.push({ rings: wound, h: 2.2, fill: [170, 206, 140, 230] });
+            } else {
+              greens.push({ rings: wound, h: 3, fill: [96, 186, 104, 245] });
+              greenRings.push(cut);
+            }
           }
         }
         let rank = null;
@@ -663,16 +802,20 @@ function buildModel(raw, origin, r) {
         else if (tags.waterway) rank = 'water';
         else if (!(tags.highway === 'pedestrian' && tags.area === 'yes')) rank = ROAD_RANK[tags.highway] || null;
         if (rank) {
-          const parts = clipPolyline(local, r);
-          roadM[rank] += lineLength(parts);
+          const clipped = clipPolylineSquare(local, r);
+          roadM[rank] += lineLength(clipped.parts);
           const color = ROAD_COLOR[rank];
-          const half = ROAD_HALF[rank];
-          for (const part of parts) {
-            for (let i = 1; i < part.length; i++) {
-              features.push(polyFeature([quad(part[i - 1], part[i], half)], 'links', rank === 'rail' ? 4 : 3, color, color));
-            }
-            if (rank === 'truc' || rank === 'khuvuc' || rank === 'noibo' || rank === 'rail') {
-              for (const head of arrowsAlong(part)) features.push(polyFeature([head], 'links', 5, color, color));
+          for (const part of clipped.parts) {
+            roads.push({ path: part, color, width: ROAD_WIDTH[rank] });
+            if (rank === 'truc' || rank === 'khuvuc') majorLines.push(part);
+          }
+          if (ARROW_RANK.has(rank)) {
+            for (const ex of clipped.exits) {
+              const stem = 78;
+              const dir = ex.dir;
+              const len = Math.hypot(dir[0], dir[1]) || 1;
+              const tip = [ex.p[0] + (dir[0] / len) * stem, ex.p[1] + (dir[1] / len) * stem];
+              arrows.push({ stem: [ex.p, tip], head: arrowHead(tip, dir, 26), color, rank });
             }
           }
         }
@@ -692,38 +835,34 @@ function buildModel(raw, origin, r) {
       if (!nearest[fac] || row.dist < nearest[fac].dist) nearest[fac] = row;
       if (fac === 'bus') {
         const p = toLocal(lng, lat, origin);
-        if (p[0] * p[0] + p[1] * p[1] <= r * r) {
-          stopsInside += 1;
-          const stop = circleRing(5, 8).map(([x, y]) => [p[0] + x, p[1] + y]);
-          features.push(polyFeature([stop], 'links', 10, [217, 119, 6, 230], [146, 64, 14, 200]));
-        }
+        if (Math.abs(p[0]) <= r && Math.abs(p[1]) <= r) stopsInside += 1;
       }
     }
-    if (!greenRings.length) gaps.push('OpenStreetMap không có vùng cây xanh hoặc công viên (way) trong vòng tròn.');
-    if (!waterRings.length) gaps.push('OpenStreetMap không có mặt nước (way) trong vòng tròn.');
-    if (!squareRings.length) gaps.push('OpenStreetMap không có quảng trường trong vòng tròn.');
-    if (roadM.rail === 0) gaps.push('OpenStreetMap không có đường sắt trong vòng tròn.');
-    if (roadM.water === 0) gaps.push('OpenStreetMap không có đường thủy trong vòng tròn.');
+    if (!greenRings.length) gaps.push('OpenStreetMap không có vùng cây xanh hoặc công viên (way) trong ô vuông.');
+    if (!waterRings.length) gaps.push('OpenStreetMap không có mặt nước (way) trong ô vuông.');
+    if (!squareRings.length) gaps.push('OpenStreetMap không có quảng trường trong ô vuông.');
+    if (roadM.rail === 0) gaps.push('OpenStreetMap không có đường sắt trong ô vuông.');
+    if (roadM.water === 0) gaps.push('OpenStreetMap không có đường thủy trong ô vuông.');
   }
 
-  const anchors = [[0, 0]];
-  for (let i = 0; i < 4; i++) {
-    const a = (Math.PI / 4) + (i * Math.PI) / 2;
-    anchors.push([Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62]);
-  }
-  const connectors = anchors.map((a) => ({ a }));
-  const outlines = ['links', 'uses', 'voids', 'volumes'].map((plane) => ({ plane, ring: disc }));
-
-  const circleArea = Math.PI * r * r;
+  const phone = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const trees = scatterTrees(greenRings, r, phone ? 120 : 220);
+  const nodes = collectNodes(majorLines, r);
+  const corners = squareRing(r);
+  const squareArea = 4 * r * r;
   const mix = shannon(groupArea);
-  const driveM = roadM.truc + roadM.khuvuc + roadM.noibo;
+  const driveM = roadM.truc + roadM.khuvuc + roadM.tertiary + roadM.noibo;
+  const meanF = matchedFp > 0 ? gfa / matchedFp : null;
+  const meanH = matchedFp > 0 ? hSum / matchedFp : null;
   return {
-    features, connectors, outlines, gaps, nearest, stopsInside, roadM, driveM, circleArea, footprint,
-    buildings: buildings.length, classArea, parcels: parcels.length, groupArea, noCode, unassigned, mix,
+    volumes, uses, greens, waters, squares, roads, arrows, nodes, trees, corners, gaps, nearest, stopsInside,
+    roadM, driveM, squareArea, footprint, buildings: buildings.length, classArea, parcels: parcels.length,
+    groupArea, noCode, unassigned, mix, meanF, meanH, gfa, heightMiss, matched: buildings.length - heightMiss,
     green: coverRatio(greenRings, r),
     water: coverRatio(waterRings, r),
     square: coverRatio(squareRings, r),
-    osmDate: raw.osm && raw.osm.osm3s ? raw.osm.osm3s.timestamp_osm_base : ''
+    osmDate: raw.osm && raw.osm.osm3s ? raw.osm.osm3s.timestamp_osm_base : '',
+    heightMeta: raw.heightMeta || null
   };
 }
 
@@ -746,20 +885,30 @@ function li(label, value, note) {
   return item;
 }
 
-function legendItem(color, label, note) {
+function legendCard(num, color, label, note) {
   const item = document.createElement('li');
-  const sw = document.createElement('i');
-  sw.style.background = color;
+  item.className = 'card';
+  const badge = document.createElement('i');
+  badge.style.background = color;
+  badge.textContent = String(num);
   const span = document.createElement('span');
   const b = document.createElement('b');
   b.textContent = label;
   span.append(b);
-  if (note) {
-    const small = document.createElement('small');
-    small.textContent = note;
-    span.append(small);
-  }
-  item.append(sw, span);
+  const small = document.createElement('small');
+  small.textContent = note;
+  span.append(small);
+  item.append(badge, span);
+  return item;
+}
+
+function swatch(color, label) {
+  const item = document.createElement('li');
+  const badge = document.createElement('i');
+  badge.style.background = color;
+  const span = document.createElement('span');
+  span.textContent = label;
+  item.append(badge, span);
   return item;
 }
 
@@ -767,66 +916,88 @@ function nearestText(row, r, osmError) {
   if (osmError) return osmError;
   if (!row) return 'Không có trong OpenStreetMap trong bán kính tìm 2 km.';
   const name = row.name ? `${row.name}, ` : '';
-  const where = row.dist > r ? ', ngoài vòng phân tích' : ', trong vòng phân tích';
+  const edge = r * Math.SQRT2;
+  const where = row.dist > edge ? ', ngoài ô phân tích' : ', trong ô phân tích';
   return `${name}${fmt0(row.dist)} m${where}`;
 }
 
 function paintPanel(model, place, wardPop) {
   const legend = $('legend');
   legend.replaceChildren(
-    legendItem('#f4c4c4', 'Khối tích', 'Dấu chân công trình, màu đỏ nhạt. Chiều cao vẽ theo nhóm tương đối, không phải mét.'),
-    legendItem('#b0d6aa', 'Không gian mở', 'Công viên, cây, mặt nước và quảng trường trên OpenStreetMap.'),
-    legendItem('#ffa0ff', 'Chức năng sử dụng', 'Thửa và dấu chân tô theo mã loại đất địa chính 2016.'),
-    legendItem('#e07a3d', 'Liên kết', 'Đường theo thứ bậc, đường sắt, đường thủy, điểm dừng xe buýt. Mũi tên chỉ hướng đoạn đường.')
+    legendCard(1, '#d63a46', 'Khối tích', 'Khối nhà theo chiều cao thật, màu theo bốn nhóm tương đối.'),
+    legendCard(2, '#2e9650', 'Không gian mở', 'Công viên, tán cây và mặt nước.'),
+    legendCard(3, '#306cd4', 'Chức năng', 'Chức năng sử dụng đất trên từng công trình.'),
+    legendCard(4, '#d6a820', 'Liên kết', 'Đường phân cấp, nút giao và mũi tên hướng ra mép ô.')
   );
-  const areaHa = model.circleArea / 10000;
+  $('keys').replaceChildren(
+    swatch('#f6d6d2', 'Thấp'),
+    swatch('#eca4a2', 'Cao'),
+    swatch('#d67076', 'Rất cao'),
+    swatch('#f4b0d6', 'Ở'),
+    swatch('#baa6e6', 'Công cộng'),
+    swatch('#f0a860', 'Sản xuất'),
+    swatch('#f2d660', 'Nông nghiệp'),
+    swatch('#8eb0e6', 'Hạ tầng'),
+    swatch('#d63030', 'Đường trục'),
+    swatch('#e0b028', 'Đường khu vực'),
+    swatch('#3a76d2', 'Đường gom')
+  );
+  const areaHa = model.squareArea / 10000;
   const stats = $('stats');
   const items = [
-    li('Diện tích vòng tròn', `${fmt1(areaHa)} ha`, `Bán kính ${fmt0(place.r)} m.`),
-    li('Mật độ xây dựng', model.buildings ? `${fmt1(model.footprint / model.circleArea * 100)}%` : 'Không có dấu chân trong vòng.',
-      model.buildings ? `${fmt0(model.buildings)} công trình, dấu chân ${fmt1(model.footprint / 10000)} ha. Phần thửa bị cắt theo vòng.` : ''),
-    li('Tầng cao trung bình', 'Không tính được.', 'Tệp buildings.pmtiles chỉ có bốn nhóm chiều cao tương đối, không có số tầng.'),
-    li('Tổng diện tích sàn', 'Không tính được.', 'Không có chiều cao bằng mét hoặc số tầng để nhân với dấu chân.')
+    li('Diện tích ô vuông', `${fmt1(areaHa)} ha`, `Nửa cạnh ${fmt0(place.r)} m (tham số bán kính). Cạnh ô ${fmt0(place.r * 2)} m.`),
+    li('Mật độ xây dựng', model.buildings ? `${fmt1(model.footprint / model.squareArea * 100)}%` : 'Không có dấu chân trong ô.',
+      model.buildings ? `${fmt0(model.buildings)} công trình, dấu chân ${fmt1(model.footprint / 10000)} ha.` : '')
   ];
+  if (model.meanF == null) {
+    items.push(li('Tầng cao trung bình', 'Không có số mét.', 'Thiếu tệp chiều cao hoặc không khớp dấu chân.'));
+    items.push(li('Tổng diện tích sàn', 'Không có số mét.', 'Cần chiều cao mét để nhân với dấu chân.'));
+  } else {
+    items.push(li('Tầng cao trung bình', fmt1(model.meanF), 'Trung bình theo diện tích dấu chân. Số tầng = làm tròn (chiều cao / 3,3).'));
+    items.push(li('Tổng diện tích sàn', `${fmt0(model.gfa)} m²`, `Khoảng ${fmt1(model.gfa / 10000)} ha sàn. Dấu chân trong ô nhân số tầng.`));
+    items.push(li('Chiều cao trung bình', `${fmt1(model.meanH)} m`, 'Trung bình theo diện tích dấu chân, mét đã làm tròn 0,5 m.'));
+  }
   if (model.buildings) {
     const parts = CLASS_NAME.map((name, i) => `${name} ${fmt0(model.classArea[i] / model.footprint * 100)}%`).join(', ');
-    items.push(li('Nhóm chiều cao tương đối', parts, 'Tỷ lệ theo diện tích dấu chân trong vòng. Không quy ra mét.'));
+    items.push(li('Nhóm chiều cao tương đối', parts, 'Tỷ lệ theo diện tích dấu chân. Màu lớp khối tích theo nhóm này. Không quy nhóm ra mét.'));
   }
   items.push(
     li('Tỷ lệ cây xanh, công viên', model.osmError ? 'Không có số liệu.' : `${fmt1(model.green * 100)}%`,
-      'Phần lưới mẫu trong vòng rơi vào way cây xanh hoặc công viên. Không phải kiểm kê cây. Bỏ sân thể thao và relation multipolygon.'),
-    li('Tỷ lệ mặt nước', model.osmError ? 'Không có số liệu.' : `${fmt1(model.water * 100)}%`,
-      'Cùng cách lấy mẫu, với mặt nước trên OpenStreetMap. Không cộng thửa địa chính để tránh đếm trùng.'),
+      'Ô mẫu rơi vào way cây xanh hoặc công viên. Tán cây trên hình rải trong các vùng này.'),
+    li('Tỷ lệ mặt nước', model.osmError ? 'Không có số liệu.' : `${fmt1(model.water * 100)}%`, 'Mặt nước OpenStreetMap trong ô.'),
     li('Quảng trường', model.osmError ? 'Không có số liệu.' : (model.square > 0 ? `${fmt1(model.square * 100)}%` : 'Không có trong dữ liệu.'),
       'place=square hoặc đường đi bộ dạng vùng.')
   );
   if (model.mix == null) {
-    items.push(li('Chỉ số đa dạng chức năng', 'Chưa đủ hai nhóm loại đất.', 'Shannon (ln) theo diện tích nhóm mã Thông tư 28/2014/TT-BTNMT. Bỏ thửa không có mã.'));
+    items.push(li('Chỉ số đa dạng chức năng', 'Chưa đủ hai nhóm loại đất.', 'Shannon (ln) theo diện tích nhóm mã Thông tư 28/2014/TT-BTNMT.'));
   } else {
+    const total = [...model.groupArea.values()].reduce((s, n) => s + n, 0);
     const top = [...model.groupArea.entries()].filter(([, v]) => v > 1).sort((a, b) => b[1] - a[1]).slice(0, 3)
-      .map(([name, v]) => `${name} ${fmt0(v / [...model.groupArea.values()].reduce((s, n) => s + n, 0) * 100)}%`).join('; ');
+      .map(([name, v]) => `${name} ${fmt0(v / total * 100)}%`).join('; ');
     items.push(li('Chỉ số đa dạng chức năng', fmt2(model.mix), `Shannon (ln) theo nhóm loại đất địa chính. ${top}`));
   }
-  const km2 = model.circleArea / 1e6;
+  const km2 = model.squareArea / 1e6;
   items.push(li('Mật độ mạng đường', model.osmError ? 'Không có số liệu.' : `${fmt2(model.driveM / 1000 / km2)} km/km²`,
-    'Chiều dài đường trục, khu vực và nội bộ trên OpenStreetMap, cắt theo vòng. Không gồm đường đi bộ và làn xe đạp. Bề rộng nét trên hình chỉ để phân thứ bậc.'));
+    'Đường trục, khu vực, gom và nội bộ, cắt theo ô vuông.'));
   items.push(
     li('Trường học gần nhất', nearestText(model.nearest.school, place.r, model.osmError), 'Trường, mầm non, cao đẳng, đại học trên OpenStreetMap.'),
     li('Cơ sở y tế gần nhất', nearestText(model.nearest.health, place.r, model.osmError), 'Bệnh viện, phòng khám, bác sĩ trên OpenStreetMap.'),
     li('Chợ gần nhất', nearestText(model.nearest.market, place.r, model.osmError), 'amenity=marketplace trên OpenStreetMap.'),
-    li('Điểm dừng xe buýt gần nhất', nearestText(model.nearest.bus, place.r, model.osmError), model.stopsInside ? `${model.stopsInside} điểm nằm trong vòng.` : 'Đếm điểm trong vòng nếu có.')
+    li('Điểm dừng xe buýt gần nhất', nearestText(model.nearest.bus, place.r, model.osmError), model.stopsInside ? `${model.stopsInside} điểm nằm trong ô.` : 'Đếm điểm trong ô nếu có.')
   );
-  items.push(li('Dân số trong vòng tròn', 'Không có.', 'Lớp dân số nhà ở không cắt theo bán kính trên trang này. Không suy từ dân số phường.'));
+  items.push(li('Dân số trong ô', 'Không có.', 'Không suy từ dân số phường.'));
   if (wardPop && wardPop.pop > 0) {
-    items.push(li('Dân số cả phường', `${fmt0(wardPop.pop)} người`, `${wardPop.name}. Số của cả phường trong bộ chỉ số đã tính, không phải dân số vòng tròn.`));
+    items.push(li('Dân số cả phường', `${fmt0(wardPop.pop)} người`, `${wardPop.name}. Số của cả phường, không phải dân trong ô.`));
   } else {
-    items.push(li('Dân số cả phường', 'Không xác định được phường tại tâm vòng.', ''));
+    items.push(li('Dân số cả phường', 'Không xác định được phường tại tâm ô.', ''));
   }
   stats.replaceChildren(...items);
   const gapList = [...model.gaps];
-  gapList.push('Lớp công trình đã duyệt không có cách cắt theo bán kính nên không dùng để đo khoảng cách.');
-  gapList.push('Đồ án quy hoạch sử dụng đất không đưa vào trang này. Màu chức năng là mã địa chính năm 2016.');
-  if (model.noCode > model.circleArea * 0.005) gapList.push(`Một phần thửa (${fmt1(model.noCode / model.circleArea * 100)}% vòng) không có mã loại đất.`);
+  const meta = model.heightMeta;
+  if (meta) gapList.push(`${meta.note} ${meta.spikeRule} Đã hạ ${fmt0(meta.spikeResets)} dấu chân.`);
+  if (model.heightMiss) gapList.push(`${fmt0(model.heightMiss)} dấu chân không khớp tệp chiều cao, vẽ tạm 3,3 m và không tính vào sàn.`);
+  gapList.push('Đồ án quy hoạch sử dụng đất không đưa vào trang này. Màu chức năng theo mã địa chính năm 2016.');
+  if (model.noCode > model.squareArea * 0.005) gapList.push(`Một phần thửa (${fmt1(model.noCode / model.squareArea * 100)}% ô) không có mã loại đất.`);
   if (model.unassigned) gapList.push(`${fmt0(model.unassigned)} dấu chân không rơi vào thửa đã cắt, tô xám ở lớp chức năng.`);
   $('gaps').replaceChildren(...gapList.map((text) => {
     const item = document.createElement('li');
@@ -834,102 +1005,245 @@ function paintPanel(model, place, wardPop) {
     return item;
   }));
   const when = model.osmDate ? ` OpenStreetMap ${String(model.osmDate).slice(0, 10)}.` : '';
-  $('src').textContent = `Dấu chân © TUM, Global Building Atlas, CC BY-NC 4.0. Thửa đất địa chính 2016. Đường và không gian mở © người đóng góp OpenStreetMap, ODbL.${when}`;
+  $('src').textContent = `Dấu chân và chiều cao © TUM, Global Building Atlas, CC BY-NC 4.0. Thửa đất địa chính 2016. Đường và không gian mở © người đóng góp OpenStreetMap, ODbL.${when}`;
+}
+
+function lift(z) {
+  return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, z, 1];
 }
 
 function bootMap(place, model) {
-  const map = new maplibregl.Map({
-    container: 'map',
-    style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#f4f1ea' } }] },
-    center: [place.lng, place.lat],
-    zoom: 16,
-    pitch: 60,
-    bearing: -28,
-    maxPitch: 70,
-    attributionControl: true,
-    customAttribution: 'GBA © TUM · Địa chính 2016 · © OpenStreetMap'
-  });
-  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true, showZoom: false }), 'bottom-right');
-  const view = { k: place.view === 'gop' ? 0 : 1, tick: 0 };
-  let overlay = null;
-  const planeZ = (plane) => LIFT[plane] * view.k;
-  const toPoly = (rings, z) => rings.map((ring) => ring.map((p) => [place.lng + p[0] / place.mLng, place.lat + p[1] / place.mLat, z]));
-  const dash = new deck.PathStyleExtension({ dash: true });
-  // Mỗi khoảng giữa hai lớp là một đoạn riêng: PathLayer chỉ nhận một đường cho mỗi đối tượng.
-  const connectorData = () => {
-    if (view.k <= 0.08) return [];
-    const out = [];
-    const pairs = [['links', 'uses', 4], ['uses', 'voids', 9], ['voids', 'volumes', 8]];
-    model.connectors.forEach((d) => {
-      pairs.forEach(([a, b, pad]) => {
-        const z0 = planeZ(a) + pad;
-        const z1 = planeZ(b);
-        if (z1 - z0 < 8) return;
-        out.push([
-          [place.lng + d.a[0] / place.mLng, place.lat + d.a[1] / place.mLat, z0],
-          [place.lng + d.a[0] / place.mLng, place.lat + d.a[1] / place.mLat, z1]
-        ]);
-      });
+  const parent = $('map');
+  const CART = deck.COORDINATE_SYSTEM.CARTESIAN;
+  let sphere = null;
+  try { sphere = new deck.SphereGeometry({ radius: 1, nlat: 5, nlong: 8 }); } catch (err) { sphere = null; }
+  let lights = null;
+  try {
+    lights = new deck.LightingEffect({
+      ambient: new deck.AmbientLight({ color: [255, 255, 255], intensity: 0.55 }),
+      sun: new deck.DirectionalLight({ color: [255, 244, 236], intensity: 1.35, direction: [-0.45, -0.7, -1] })
     });
-    return out;
-  };
-  const draw = () => {
-    const stack = [
-      new deck.PolygonLayer({
-        id: 'sheets',
-        data: model.features,
-        extruded: true,
-        filled: true,
-        stroked: true,
-        wireframe: false,
-        pickable: false,
-        getPolygon: (d) => toPoly(d.rings, planeZ(d.plane)),
-        getElevation: (d) => d.h,
-        getFillColor: (d) => d.fill,
-        getLineColor: (d) => d.line,
-        lineWidthUnits: 'pixels',
-        getLineWidth: 1,
-        lineWidthMinPixels: 1,
-        updateTriggers: { getPolygon: view.tick },
-        material: { ambient: 0.8, diffuse: 0.25, shininess: 0, specularColor: [0, 0, 0] }
-      }),
-      new deck.PathLayer({
-        id: 'rings',
-        data: model.outlines,
-        getPath: (d) => toPoly([d.ring], planeZ(d.plane))[0],
-        getColor: [140, 132, 122, 180],
-        getWidth: 1.2,
+  } catch (err) { lights = null; }
+  const dash = new deck.PathStyleExtension({ dash: true });
+  const view = { k: place.view === 'gop' ? 0 : 1 };
+  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  let camera = null;
+  let deckgl = null;
+
+  function fitState(k) {
+    const w = parent.clientWidth || 900;
+    const hgt = parent.clientHeight || 700;
+    const pitch = 56 * Math.PI / 180;
+    const span = place.r * 2;
+    const top = LIFT.volumes * k + PLATE + 30;
+    const halfH = top * 0.5 * Math.sin(pitch) + span * 0.55 * Math.cos(pitch) + 40;
+    const halfW = span * 0.78;
+    const zoom = Math.min(Math.log2((w * 0.9) / (halfW * 2)), Math.log2((hgt * 0.88) / (halfH * 2)));
+    return {
+      target: [0, 0, top * 0.46],
+      rotationX: camera ? camera.rotationX : 56,
+      rotationOrbit: camera ? camera.rotationOrbit : 40,
+      zoom,
+      minZoom: zoom - 1.8,
+      maxZoom: zoom + 2.6
+    };
+  }
+
+  function planeZ(name) {
+    return LIFT[name] * view.k;
+  }
+
+  function polys(id, data, z) {
+    return new deck.PolygonLayer({
+      id,
+      data,
+      coordinateSystem: CART,
+      modelMatrix: lift(z),
+      extruded: true,
+      filled: true,
+      stroked: false,
+      wireframe: false,
+      pickable: false,
+      getPolygon: (d) => d.rings,
+      getElevation: (d) => d.h,
+      getFillColor: (d) => d.fill,
+      material: SOFT
+    });
+  }
+
+  function draw() {
+    const k = view.k;
+    const zLinks = planeZ('links');
+    const zUses = planeZ('uses');
+    const zVoids = planeZ('voids');
+    const zVolumes = planeZ('volumes');
+    const showStack = k > 0.08;
+    const layers = [
+      polys('plate-links', [{ rings: [plateRing(place.r)], h: PLATE, fill: PLATE_FILL.links }], zLinks)
+    ];
+    if (showStack) {
+      layers.push(polys('plate-uses', [{ rings: [plateRing(place.r)], h: PLATE, fill: PLATE_FILL.uses }], zUses));
+      layers.push(polys('plate-voids', [{ rings: [plateRing(place.r)], h: PLATE, fill: PLATE_FILL.voids }], zVoids));
+      layers.push(polys('plate-vol', [{ rings: [plateRing(place.r)], h: PLATE, fill: PLATE_FILL.volumes }], zVolumes));
+    }
+    layers.push(polys('greens', model.greens, zVoids + PLATE));
+    layers.push(polys('waters', model.waters, zVoids + PLATE));
+    layers.push(polys('squares', model.squares, zVoids + PLATE));
+    layers.push(polys('volumes', model.volumes, zVolumes + PLATE));
+    if (k > 0.12) layers.push(polys('uses', model.uses, zUses + PLATE));
+    if (!coarse || model.volumes.length < 3500) {
+      layers.push(new deck.PathLayer({
+        id: 'roofs',
+        data: model.volumes,
+        coordinateSystem: CART,
+        modelMatrix: lift(zVolumes + PLATE + 0.35),
+        getPath: (d) => d.rings[0].map((p) => [p[0], p[1], d.h]),
+        getColor: [104, 48, 52, 230],
+        getWidth: 1.4,
         widthUnits: 'pixels',
-        widthMinPixels: 1,
-        updateTriggers: { getPath: view.tick }
-      }),
-      new deck.PathLayer({
+        widthMinPixels: 1
+      }));
+    }
+    if (sphere && model.trees.length) {
+      layers.push(new deck.SimpleMeshLayer({
+        id: 'trees',
+        mesh: sphere,
+        data: model.trees,
+        coordinateSystem: CART,
+        getPosition: (d) => [d.x, d.y, zVoids + PLATE + d.r * 0.82],
+        getScale: (d) => [d.r, d.r, d.r * 0.92],
+        getColor: (d) => d.shade,
+        material: SOFT
+      }));
+    }
+    layers.push(new deck.PathLayer({
+      id: 'roads',
+      data: model.roads,
+      coordinateSystem: CART,
+      modelMatrix: lift(zLinks + PLATE + 0.8),
+      getPath: (d) => d.path,
+      getColor: (d) => d.color,
+      getWidth: (d) => d.width,
+      widthUnits: 'meters',
+      widthMinPixels: 2,
+      capRounded: true,
+      jointRounded: true
+    }));
+    layers.push(new deck.PathLayer({
+      id: 'arrow-stems',
+      data: model.arrows,
+      coordinateSystem: CART,
+      modelMatrix: lift(zLinks + PLATE + 1.4),
+      getPath: (d) => d.stem,
+      getColor: (d) => d.color,
+      getWidth: 4.5,
+      widthUnits: 'meters',
+      widthMinPixels: 2
+    }));
+    layers.push(new deck.PolygonLayer({
+      id: 'arrow-heads',
+      data: model.arrows,
+      coordinateSystem: CART,
+      modelMatrix: lift(zLinks + PLATE + 1.6),
+      extruded: true,
+      filled: true,
+      stroked: false,
+      getPolygon: (d) => d.head,
+      getElevation: 2,
+      getFillColor: (d) => d.color,
+      material: SOFT
+    }));
+    layers.push(new deck.ScatterplotLayer({
+      id: 'nodes',
+      data: model.nodes,
+      coordinateSystem: CART,
+      modelMatrix: lift(zLinks + PLATE + 2),
+      getPosition: (d) => d,
+      getRadius: 8,
+      radiusUnits: 'meters',
+      getFillColor: [255, 255, 255, 255],
+      stroked: true,
+      getLineColor: [55, 55, 58, 255],
+      lineWidthUnits: 'pixels',
+      getLineWidth: 2
+    }));
+    if (showStack) {
+      const posts = [];
+      const seams = [['links', 'uses'], ['uses', 'voids'], ['voids', 'volumes']];
+      model.corners.forEach((c) => {
+        seams.forEach(([a, b]) => {
+          const z0 = planeZ(a) + PLATE;
+          const z1 = planeZ(b);
+          if (z1 - z0 < 16) return;
+          posts.push([[c[0], c[1], z0], [c[0], c[1], z1]]);
+        });
+      });
+      layers.push(new deck.PathLayer({
         id: 'posts',
-        data: connectorData(),
+        data: posts,
+        coordinateSystem: CART,
         getPath: (d) => d,
-        getColor: [120, 113, 108, 190],
+        getColor: [150, 150, 148, 210],
         getWidth: 1.4,
         widthUnits: 'pixels',
         widthMinPixels: 1,
         extensions: [dash],
         getDashArray: () => [3, 2]
-      })
-    ];
-    overlay.setProps({ layers: stack });
-  };
-  map.on('load', () => {
-    const w = map.getContainer().clientWidth || 800;
-    const h = map.getContainer().clientHeight || 600;
-    const mpp = (place.r * 2 * (h < 520 ? 1.18 : 1.45)) / w;
-    const zoom = Math.log2((156543.03392 * Math.cos((place.lat * Math.PI) / 180)) / mpp);
-    map.jumpTo({ center: [place.lng, place.lat], zoom: Math.max(14.6, Math.min(17.3, zoom)), pitch: 60, bearing: -28 });
-    overlay = new deck.MapboxOverlay({ interleaved: false, layers: [] });
-    map.addControl(overlay);
-    draw();
-    $('btnTach').disabled = false;
-    $('btnGop').disabled = false;
-    document.body.dataset.ready = '1';
+      }));
+      const badges = [
+        { plane: 'volumes', color: [214, 54, 66, 255] },
+        { plane: 'voids', color: [46, 150, 78, 255] },
+        { plane: 'uses', color: [48, 108, 210, 255] },
+        { plane: 'links', color: [214, 168, 32, 255] }
+      ];
+      const badgePos = (d) => [-place.r - 28, -place.r + 20, planeZ(d.plane) + 18];
+      layers.push(new deck.ScatterplotLayer({
+        id: 'badges',
+        data: badges,
+        coordinateSystem: CART,
+        getPosition: badgePos,
+        getRadius: 16,
+        radiusUnits: 'meters',
+        getFillColor: (d) => d.color,
+        stroked: true,
+        getLineColor: [255, 255, 255, 230],
+        lineWidthMinPixels: 2,
+        getLineWidth: 2
+      }));
+      try {
+        layers.push(new deck.TextLayer({
+          id: 'badge-num',
+          data: badges.map((d, i) => ({ ...d, t: String(i + 1) })),
+          coordinateSystem: CART,
+          getPosition: badgePos,
+          getText: (d) => d.t,
+          getColor: [255, 255, 255, 255],
+          getSize: 16,
+          sizeUnits: 'pixels',
+          fontFamily: 'sans-serif',
+          billboard: true,
+          characterSet: '1234'
+        }));
+      } catch (err) { /* số nằm trên thẻ bên trái */ }
+    }
+    deckgl.setProps({ layers });
+  }
+
+  camera = fitState(view.k);
+  deckgl = new deck.Deck({
+    parent,
+    views: new deck.OrbitView({ orthographic: true, orbitAxis: 'Z' }),
+    controller: { scrollZoom: true, dragPan: true, dragRotate: true, touchRotate: true, doubleClickZoom: false, keyboard: false },
+    viewState: camera,
+    onViewStateChange: ({ viewState }) => {
+      camera = viewState;
+      deckgl.setProps({ viewState: camera });
+    },
+    effects: lights ? [lights] : [],
+    parameters: { clearColor: [0.976, 0.976, 0.973, 1] },
+    useDevicePixels: coarse ? 1 : Math.min(window.devicePixelRatio || 1, 1.75)
   });
+
   let job = 0;
   function animateTo(target) {
     const from = view.k;
@@ -937,16 +1251,13 @@ function bootMap(place, model) {
     const id = ++job;
     const step = (now) => {
       if (id !== job) return;
-      const t = Math.min(1, (now - t0) / 850);
+      const t = Math.min(1, (now - t0) / 700);
       const e = t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
       view.k = from + (target - from) * e;
-      view.tick += 1;
+      camera = fitState(view.k);
+      deckgl.setProps({ viewState: camera });
       draw();
       if (t < 1) requestAnimationFrame(step);
-      else {
-        view.k = target;
-        draw();
-      }
     };
     requestAnimationFrame(step);
   }
@@ -961,16 +1272,26 @@ function bootMap(place, model) {
     if (animate) animateTo(exploded ? 1 : 0);
     else {
       view.k = exploded ? 1 : 0;
-      view.tick += 1;
-      if (overlay) draw();
+      camera = fitState(view.k);
+      deckgl.setProps({ viewState: camera });
+      draw();
     }
   }
-  $('btnTach').disabled = true;
-  $('btnGop').disabled = true;
   $('btnTach').addEventListener('click', () => setMode('tach', true));
   $('btnGop').addEventListener('click', () => setMode('gop', true));
   setMode(place.view, false);
-  window.addEventListener('resize', () => map.resize());
+  window.addEventListener('resize', () => {
+    camera = fitState(view.k);
+    deckgl.setProps({ viewState: camera });
+  });
+  $('btnTach').disabled = false;
+  $('btnGop').disabled = false;
+  document.body.dataset.ready = '1';
+}
+
+function pointInGeo(lng, lat, geometry) {
+  const polys = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.type === 'MultiPolygon' ? geometry.coordinates : [];
+  return polys.some((poly) => pointInRing([lng, lat], poly[0]) && !poly.slice(1).some((hole) => pointInRing([lng, lat], hole)));
 }
 
 async function loadWard(lat, lng) {
@@ -991,37 +1312,66 @@ async function start() {
   const origin = { lat: place.lat, lng: place.lng, mLat, mLng };
   const nearDefault = Math.hypot(place.lat - 16.4637, place.lng - 107.5952) < 0.0008;
   $('place').textContent = nearDefault
-    ? `Ngã sáu Hùng Vương – Bà Triệu. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Bán kính ${fmt0(place.r)} m.`
-    : `Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Bán kính ${fmt0(place.r)} m.`;
+    ? `Ngã sáu Hùng Vương – Bà Triệu. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Nửa cạnh ${fmt0(place.r)} m.`
+    : `Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Nửa cạnh ${fmt0(place.r)} m.`;
   const tiles = tilesFor(place.lat, place.lng, place.r);
   if (tiles.length > 16) {
-    $('status').textContent = 'Bán kính quá lớn so với số tile cho phép trên trang này.';
+    $('status').textContent = 'Ô quá lớn so với số tile cho phép trên trang này.';
     return;
   }
-  const raw = { gba: [], cadastre: [], osm: null, gbaError: '', cadError: '', osmError: '' };
-  const [gba, cad, osm, ward] = await Promise.all([
+  const raw = { gba: [], cadastre: [], osm: null, gbaError: '', cadError: '', osmError: '', heightMeta: null };
+  const [gba, cad, osm, ward, heights] = await Promise.all([
     readLayer('gba', 'gba', tiles).catch((err) => { raw.gbaError = err.message; return []; }),
     readLayer('cadastre', 'thuadat', tiles).catch((err) => { raw.cadError = err.message; return []; }),
     loadOsm(place).catch((err) => { raw.osmError = err.message; return null; }),
-    loadWard(place.lat, place.lng).catch(() => ({ name: '', pop: 0 }))
+    loadWard(place.lat, place.lng).catch(() => ({ name: '', pop: 0 })),
+    fetch('data/gba/bldg-hf.bin').then(async (res) => {
+      if (!res.ok) throw new Error('bin');
+      const buf = await res.arrayBuffer();
+      const meta = await fetch('data/gba/bldg-hf.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      const index = parseHeightIndex(buf);
+      index.meta = meta;
+      return index;
+    }).catch(() => null)
   ]);
   raw.gba = gba;
   raw.cadastre = cad;
   raw.osm = osm;
+  raw.heightMeta = heights && heights.meta;
   if (ward.name && nearDefault) {
-    $('place').textContent = `Ngã sáu Hùng Vương – Bà Triệu, ${ward.name}. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Bán kính ${fmt0(place.r)} m.`;
+    $('place').textContent = `Ngã sáu Hùng Vương – Bà Triệu, ${ward.name}. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Nửa cạnh ${fmt0(place.r)} m.`;
   } else if (ward.name) {
-    $('place').textContent = `${ward.name}. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Bán kính ${fmt0(place.r)} m.`;
+    $('place').textContent = `${ward.name}. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Nửa cạnh ${fmt0(place.r)} m.`;
   }
   try {
-    const model = buildModel(raw, origin, place.r);
+    const model = buildModel(raw, origin, place.r, heights);
     model.osmError = raw.osmError;
     paintPanel(model, place, ward);
-    $('status').textContent = 'Số liệu chỉ tính phần nằm trong vòng tròn.';
+    $('status').textContent = model.meanF == null
+      ? 'Chưa có chiều cao mét trong ô.'
+      : `Số liệu trong ô vuông. Tầng cao trung bình ${fmt1(model.meanF)}, sàn ${fmt0(model.gfa)} m².`;
     $('status').classList.add('done');
+    if (model.meanF != null) document.body.dataset.meanF = String(model.meanF);
+    const hs = model.volumes.map((v) => v.h);
+    if (hs.length) {
+      document.body.dataset.minH = String(Math.min(...hs));
+      document.body.dataset.maxH = String(Math.max(...hs));
+    }
+    document.body.dataset.buildings = String(model.buildings);
+    document.body.dataset.trees = String(model.trees.length);
+    document.body.dataset.roads = String(model.roads.length);
+    document.body.dataset.greens = String(model.greens.length);
+    document.body.dataset.waters = String(model.waters.length);
+    document.body.dataset.arrows = String(model.arrows.length);
+    document.body.dataset.greenPct = String(model.green);
+    if (model.greens[0]) {
+      const ring = model.greens[0].rings[0];
+      document.body.dataset.g0 = `${ring.length}|${ring[0][0].toFixed(0)},${ring[0][1].toFixed(0)}|${Math.round(ringArea(ring))}`;
+    }
+    document.body.dataset.gfa = String(Math.round(model.gfa || 0));
     bootMap({ ...place, mLng, mLat }, model);
   } catch (err) {
-    $('status').textContent = 'Không dựng được mô hình trong vòng tròn.';
+    $('status').textContent = 'Không dựng được mô hình trong ô vuông.';
   }
 }
 

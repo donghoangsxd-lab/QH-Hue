@@ -1,6 +1,7 @@
 import fs from 'fs';
 import {
-  clampRadius, parseCenter, circleRing, clipRing, ringArea, shannon, clipSegment, tilesFor
+  clampRadius, parseCenter, circleRing, squareRing, clipRing, ringArea, shannon, clipSegment, tilesFor,
+  floorsFromHeight, parseHeightIndex
 } from '../public/js/phanTich3d.js';
 
 const clip = circleRing(100, 64);
@@ -12,6 +13,14 @@ if (clipRing([[200, 200], [220, 200], [220, 220], [200, 220]], clip)) throw new 
 const h = shannon(new Map([['a', 10], ['b', 10]]));
 if (Math.abs(h - Math.log(2)) > 1e-9) throw new Error(`shannon ${h}`);
 if (shannon(new Map([['a', 5]])) !== null) throw new Error('một nhóm vẫn có chỉ số');
+
+if (floorsFromHeight(3.3) !== 1 || floorsFromHeight(6.6) !== 2 || floorsFromHeight(0) !== null) {
+  throw new Error(`số tầng ${floorsFromHeight(3.3)} ${floorsFromHeight(6.6)}`);
+}
+const sq = squareRing(100);
+if (sq.length !== 4 || ringArea(sq) !== 40000) throw new Error('ô vuông');
+const cutSq = clipRing([[-200, -200], [200, -200], [200, 200], [-200, 200]], squareRing(50));
+if (Math.abs(ringArea(cutSq) - 10000) > 1) throw new Error(`cắt ô ${ringArea(cutSq)}`);
 
 if (clampRadius('x') !== 500 || clampRadius(10) !== 150 || clampRadius(5000) !== 800) throw new Error('bán kính');
 const p = parseCenter('?lat=16.4637&lng=107.5952&r=500&view=gop');
@@ -28,10 +37,19 @@ const js = fs.readFileSync(new URL('../public/js/phanTich3d.js', import.meta.url
 for (const s of ['Tách lớp', 'Gộp khối', 'phanTich3d.js']) {
   if (!html.includes(s)) throw new Error(`html thiếu ${s}`);
 }
-for (const s of ['Khối tích', 'Không gian mở', 'Chức năng sử dụng', 'Liên kết', 'Không tính được.', 'Không có.']) {
+for (const s of ['Khối tích', 'Không gian mở', 'Chức năng sử dụng', 'Liên kết', 'Không có.', 'h / 3.3']) {
   if (!js.includes(s)) throw new Error(`js thiếu ${s}`);
 }
-if (js.includes('tầng =') || js.includes('floors =')) throw new Error('có công thức số tầng');
+if (js.includes('CLASS_DRAW') || js.includes('Không tính được.')) throw new Error('vẫn đùn theo nhóm hoặc chưa có mét');
+const bin = fs.readFileSync(new URL('../public/data/gba/bldg-hf.bin', import.meta.url));
+if (bin.slice(0, 4).toString() !== 'GBH2') throw new Error('thiếu chiều cao');
+const idx = parseHeightIndex(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength));
+let found = null;
+for (let i = 0; i < 10; i++) {
+  const h = idx.lookup(107.5952 + (i - 5) * 0.00035, 16.4637 + ((i % 4) - 1) * 0.00028);
+  if (h) found = h;
+}
+if (found == null || found < 1 || found > 80) throw new Error(`chiều cao Hùng Vương ${found}`);
 const api = fs.readFileSync(new URL('../api/pmtilesRange.js', import.meta.url), 'utf8');
 if (!api.includes('buildings.pmtiles') || !api.includes('thuadat-2016.pmtiles')) throw new Error('thiếu tệp tile');
 if (/req\.query\.(u|url|data)\b/.test(api)) throw new Error('proxy nhận URL tự do');

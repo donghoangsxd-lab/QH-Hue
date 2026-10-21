@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="robots" content="noindex">
   <title>Phân tích điểm theo bốn thành phần đô thị</title>
-  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="css/phan-tich-3d.css">
 </head>
 <body>
@@ -22,9 +21,10 @@
     <section>
       <h2>Bốn lớp</h2>
       <ul id="legend" class="legend"></ul>
+      <ul id="keys" class="keys"></ul>
     </section>
     <section>
-      <h2>Chỉ số trong vòng tròn</h2>
+      <h2>Chỉ số trong ô vuông</h2>
       <p id="status" class="status">Đang đọc dấu chân công trình, thửa đất và dữ liệu mở…</p>
       <ul id="stats" class="stats"></ul>
     </section>
@@ -37,9 +37,7 @@
   <div id="map" role="region" aria-label="Khối ba chiều">
     <p id="modeChip">Tách bốn lớp</p>
   </div>
-  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
   <script src="https://unpkg.com/deck.gl@8.9.36/dist.min.js"></script>
-  <script src="https://unpkg.com/@deck.gl/mapbox@8.9.36/dist.min.js"></script>
   <script type="module" src="js/phanTich3d.js"></script>
 </body>
 </html>

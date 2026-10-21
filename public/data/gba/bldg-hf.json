@@ -1,0 +1,1 @@
+{"v": 2, "buildings": 967358, "tiles": 5589, "hStepM": 0.5, "floorDiv": 3.3, "spikeResets": 13, "spikeRule": "Dấu chân dưới 120 m² và cao từ 40 m đưa về 9 m.", "note": "Parquet GBA (google, osm, ms, ours2), cùng lọc var với PMTiles. Không có danh sách 293 tháp đã chỉnh khi dựng v2."}
