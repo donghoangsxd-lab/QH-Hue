@@ -1344,6 +1344,14 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .dev-ward-table th, .dev-ward-table td { padding: 1px 3px; border-bottom: 1px solid rgba(148, 163, 184, 0.15); text-align: right; }
 .dev-ward-table th:first-child, .dev-ward-table td:first-child { text-align: left; }
 .dev-ward-table th { color: var(--text-muted); font-weight: 600; }
+.tree-scroll { overflow: auto; max-height: 220px; margin-top: 4px; }
+.tree-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.tree-table th, .tree-table td { padding: 2px 4px; border-bottom: 1px solid rgba(148, 163, 184, 0.15); text-align: right; white-space: nowrap; }
+.tree-table th:nth-child(2), .tree-table td.tree-name { text-align: left; max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
+.tree-table th { color: var(--text-muted); font-weight: 600; }
+.tree-table tbody tr { cursor: pointer; }
+.tree-table tbody tr:hover, .tree-table tbody tr.is-on { background: rgba(var(--cyan-rgb), 0.12); }
+@media (max-height: 500px) { .tree-scroll { max-height: 110px; } }
 .flood-phase { display: flex; gap: 4px; margin: 2px 0 4px; }
 .flood-phase button { flex: 1; padding: 2px 6px; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: var(--r-sm); background: transparent; color: var(--text-muted); font: inherit; cursor: pointer; }
 .flood-phase button.active { border-color: var(--accent-cyan); color: var(--text-strong); background: rgba(var(--cyan-rgb), 0.15); }

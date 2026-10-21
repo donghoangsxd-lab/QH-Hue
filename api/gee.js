@@ -9,6 +9,7 @@ const { requireAdmin, httpError } = require('../services/authService');
 const roads = require('../services/roadsService');
 const popEdits = require('../services/popEditsService');
 const sat = require('../services/satService');
+const tree = require('../services/treePriority');
 const projects = require('../services/projectStore');
 const pdfLimits = require('../services/pdfLimits');
 const statsStore = require('../services/statsStore');
@@ -932,6 +933,7 @@ const FLOOD_BIN_MAX = 40;
 let cachedFloodBins = null;   // { version: phiên bản hiệu chỉnh dân cư, dem: nguồn cao độ, data }
 const FLOOD_DEM = 'fabdem-hue';
 const cachedSatStats = new Map();   // "lst|năm" hoặc "sar|năm|bản dân cư|bản dữ liệu" → kết quả thống kê lớp vệ tinh
+const treeJobs = new Map();
 // Tọa độ công trình là 1 điểm trong khu đất: xét rủi ro ngập / nhiệt trong vòng bán kính này quanh điểm
 const RISK_BUFFER_M = 30;
 // Trong vùng phát triển mới (satService.newDevImage) kiểm tra vườn hoa, bãi đỗ xe ≤ 400 m (Mục 2.2.3.3, đường chim bay)
@@ -3854,6 +3856,57 @@ module.exports = async (req, res) => {
         cachedSatStats.set(key, { year, city: n ? round1(sum / n) : null, wards });
       }
       return res.status(200).json(cachedSatStats.get(key));
+    }
+
+    // Ưu tiên trồng cây: nhiệt mùa nóng, NDVI trên đất xây dựng, mật độ dân. Điểm là mức tương đối.
+    if (action === 'getTreePriority') {
+      const year = tree.acceptYear(req.query.year, sat.lstYears());
+      if (year == null) return res.status(400).json({ error: true, message: 'Năm không hợp lệ' });
+      res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=86400');
+      let list = [];
+      try { list = await getRawDataList(); } catch (err) { console.warn('Nghĩa trang cho ưu tiên trồng cây:', err.message); }
+      const buffers = tree.cemeteryBuffers(list);
+      const part = req.query.part === 'tile' ? 'tile' : 'stats';
+      const packVersion = noxhPack && noxhPack.version ? noxhPack.version : 'none';
+      const key = `tree|v1|${part}|${year}|${popSource}|${packVersion}|${getDataVersion()}`;
+      if (!cachedSatStats.has(key) && !treeJobs.has(key)) {
+        const job = (async () => {
+          const built = tree.buildTreeRequest(ee, wardVectorParsed, popRasterNormalized, popProjection, popScale, year, buffers);
+          const payload = part === 'tile'
+            ? {
+              year,
+              cellM: built.cellM,
+              legend: tree.TREE_VIS,
+              urlFormat: await sat.mapUrl(ee, built.vis.visualize(tree.TREE_VIS))
+            }
+            : await (async () => {
+              const [meanFc, sumFc] = await Promise.all([eeEvaluate(built.meanFc), eeEvaluate(built.sumFc)]);
+              const scored = tree.scoreTreeWards(tree.rowsFromFeatures(meanFc, sumFc));
+              return {
+                year,
+                ndviPartial: year === new Date().getFullYear(),
+                popSource,
+                popFallback: !!popFallback,
+                cellM: built.cellM,
+                cemeteryCount: buffers.length,
+                indicative: true,
+                cityLst: scored.cityLst,
+                ranked: scored.ranked,
+                wards: scored.wards
+              };
+            })();
+          cachedSatStats.set(key, payload);
+          return payload;
+        })().finally(() => treeJobs.delete(key));
+        treeJobs.set(key, job);
+      }
+      try {
+        const payload = cachedSatStats.get(key) || await treeJobs.get(key);
+        return res.status(200).json(payload);
+      } catch (err) {
+        console.error('Ưu tiên trồng cây:', err && err.message);
+        return res.status(502).json({ error: true, message: 'Chưa tính được chỉ số trên Google Earth Engine' });
+      }
     }
 
     // NDVI trung vị Sentinel-2 cả năm, cắt 40 phường xã. compare = năm nền thì ảnh và thống kê là hiệu (năm − năm nền).

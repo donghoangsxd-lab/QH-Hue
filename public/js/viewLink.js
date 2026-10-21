@@ -34,6 +34,7 @@ const LAYERS = [
   ['ng', 'chk_flood'],
   ['s1', 'chk_sarflood'],
   ['nh', 'chk_lst'],
+  ['tc', 'chk_tree'],
   ['fr', 'chk_forest'],
   ['rr', 'chk_risk'],
   ['or', 'chk_osmRail'],
