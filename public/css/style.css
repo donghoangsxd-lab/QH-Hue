@@ -5259,6 +5259,7 @@ body.project-review.la-page #projectReviewHost {
 .apt-pin span { display: flex; width: 22px; height: 22px; border-radius: 6px; align-items: center; justify-content: center; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
 .apt-pin .ico { width: 14px; height: 14px; }
 .apt-summary, .apt-status, .apt-ward { margin: 6px 0 0; font-size: 12px; }
+#popNhaStatus { white-space: pre-line; }
 .apt-pop dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 6px 0; }
 .apt-pop-n { font-weight: 700; margin-top: 2px; }
 .apt-edit { display: flex; flex-direction: column; gap: 4px; }

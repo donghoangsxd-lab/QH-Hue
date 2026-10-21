@@ -322,18 +322,59 @@ export function initApartmentLayer() {
     setPopMethod(e.target.value);
   });
   ['aptHh', 'aptM2', 'aptEff'].forEach(id => $(id)?.addEventListener('change', readCfg));
-  async function askIngest(rebuild) {
+  let popNhaTimer = null;
+  let popNhaBusy = false;
+  function popNhaLines(data) {
+    const lines = [data.message || data.state || 'Đã gửi.'];
+    if (data.assets) {
+      lines.push(`Bảng điểm: ${data.assets.table ? 'có' : 'chưa có'}. Ảnh Pixel-danso-nha: ${data.assets.image ? 'có' : 'chưa có'}.`);
+    }
+    if (data.assetsError) lines.push(`Chưa kiểm tra được asset: ${data.assetsError}`);
+    (data.tasks || []).forEach(t => {
+      const name = t.description || t.type || 'Tác vụ';
+      lines.push(`${name}: ${t.state}${t.error ? ` — ${t.error}` : ''}`);
+    });
+    if (data.tasksError) lines.push(`Chưa đọc được danh sách tác vụ: ${data.tasksError}`);
+    if (Number.isFinite(data.queued)) lines.push(`Trong 40 tác vụ gần nhất có ${data.queued} tác vụ đang chờ hoặc đang chạy.`);
+    return lines.join('\n');
+  }
+  function armPopNhaPoll(data) {
+    clearInterval(popNhaTimer);
+    popNhaTimer = null;
+    const live = data && (data.phase === 'table' || data.phase === 'image') && data.state !== 'FAILED' && data.state !== 'CANCELLED' && data.state !== 'ASSET_MISSING';
+    if (!live) return;
+    popNhaTimer = setInterval(() => askIngest('status'), 20000);
+  }
+  async function askIngest(mode) {
+    if (popNhaBusy) return;
+    popNhaBusy = true;
     const status = $('popNhaStatus');
-    if (status) status.textContent = rebuild ? 'Đang nạp lại từ CSV trên bucket…' : 'Đang hỏi máy chủ…';
+    if (status && mode !== 'status') {
+      status.textContent = mode === 'rebuild' ? 'Đang nạp lại từ CSV trên bucket…'
+        : mode === 'cancel' ? 'Đang hủy tác vụ…'
+        : mode === 'restart' ? 'Đang gửi lại tác vụ…'
+        : 'Đang hỏi máy chủ…';
+    }
     try {
-      const data = await postAdmin('ingestPopNha', rebuild ? { rebuild: true } : {});
-      if (status) status.textContent = data.message || data.state || 'Đã gửi.';
+      const data = await postAdmin('ingestPopNha', {
+        rebuild: mode === 'rebuild',
+        cancel: mode === 'cancel',
+        restart: mode === 'restart'
+      });
+      if (status) status.textContent = popNhaLines(data);
+      armPopNhaPoll(data);
     } catch (err) {
       if (status) status.textContent = err.message || 'Chưa nạp được raster nhà ở.';
+      clearInterval(popNhaTimer);
+      popNhaTimer = null;
+    } finally {
+      popNhaBusy = false;
     }
   }
-  $('btnPopNha')?.addEventListener('click', () => askIngest(false));
-  $('btnPopNhaRebuild')?.addEventListener('click', () => askIngest(true));
+  $('btnPopNha')?.addEventListener('click', () => askIngest('check'));
+  $('btnPopNhaRebuild')?.addEventListener('click', () => askIngest('rebuild'));
+  $('btnPopNhaRestart')?.addEventListener('click', () => askIngest('restart'));
+  $('btnPopNhaCancel')?.addEventListener('click', () => askIngest('cancel'));
   $('aptKind')?.addEventListener('change', (e) => {
     kindFilter = e.target.value || '';
     if (on) draw();
@@ -348,7 +389,9 @@ export function initApartmentLayer() {
     if (!isAdmin() && popMethod() === 'old') setPopMethod('b');
     paintBox();
     if (on) draw();
+    if (isAdmin()) askIngest('status');
   });
+  if (isAdmin()) askIngest('status');
   window.addEventListener(POP_METHOD_EVENT, paintBox);
   window.addEventListener(WARD_BOUNDS_EVENT, () => {
     if (!loaded) return;
