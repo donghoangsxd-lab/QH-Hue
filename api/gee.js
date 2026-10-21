@@ -3858,7 +3858,7 @@ module.exports = async (req, res) => {
       return res.status(200).json(cachedSatStats.get(key));
     }
 
-    // Ưu tiên trồng cây: nhiệt mùa nóng, NDVI trên đất xây dựng, mật độ dân. Điểm là mức tương đối.
+    // Ưu tiên trồng cây: part=zones là vùng 30 m; part=stats là bảng phường; part=tile giữ lưới điểm cũ.
     if (action === 'getTreePriority') {
       const year = tree.acceptYear(req.query.year, sat.lstYears());
       if (year == null) return res.status(400).json({ error: true, message: 'Năm không hợp lệ' });
@@ -3866,36 +3866,59 @@ module.exports = async (req, res) => {
       let list = [];
       try { list = await getRawDataList(); } catch (err) { console.warn('Nghĩa trang cho ưu tiên trồng cây:', err.message); }
       const buffers = tree.cemeteryBuffers(list);
-      const part = req.query.part === 'tile' ? 'tile' : 'stats';
+      const part = req.query.part === 'tile' ? 'tile' : (req.query.part === 'zones' ? 'zones' : 'stats');
       const packVersion = noxhPack && noxhPack.version ? noxhPack.version : 'none';
-      const key = `tree|v2|${part}|${year}|${popSource}|${packVersion}|${getDataVersion()}`;
+      const key = `tree|v3|${part}|${year}|${popSource}|${packVersion}|${getDataVersion()}`;
       if (!cachedSatStats.has(key) && !treeJobs.has(key)) {
         const job = (async () => {
-          const built = tree.buildTreeRequest(ee, wardVectorParsed, popRasterNormalized, popProjection, popScale, !!popPeople, year, buffers);
-          const payload = part === 'tile'
-            ? {
+          const args = [ee, wardVectorParsed, popRasterNormalized, popProjection, popScale, !!popPeople, year, buffers];
+          let payload;
+          if (part === 'zones') {
+            const built = tree.buildZoneRequest(...args);
+            const [zonesFc, city] = await Promise.all([eeEvaluate(built.zones), eeEvaluate(built.city)]);
+            const cityObj = city || {};
+            const lstRaw = cityObj.lst != null ? cityObj.lst : cityObj.lst_mean;
+            const ndviRaw = cityObj.ndvi != null ? cityObj.ndvi : cityObj.ndvi_mean;
+            const zones = tree.normalizeZones(zonesFc, { lst: lstRaw, ndvi: ndviRaw });
+            payload = {
               year,
-              cellM: built.cellM,
-              legend: tree.TREE_VIS,
-              urlFormat: await sat.mapUrl(ee, built.vis.visualize(tree.TREE_VIS))
-            }
-            : await (async () => {
-              const [meanFc, sumFc] = await Promise.all([eeEvaluate(built.meanFc), eeEvaluate(built.sumFc)]);
-              const rawRows = tree.rowsFromFeatures(meanFc, sumFc);
-              const scored = tree.scoreTreeWards(popPeople ? rawRows : tree.assignFallbackPop(rawRows));
-              return {
+              cityLst: lstRaw == null || !Number.isFinite(Number(lstRaw)) ? null : round1(Number(lstRaw)),
+              cityNdvi: ndviRaw == null || !Number.isFinite(Number(ndviRaw)) ? null : Math.round(Number(ndviRaw) * 100) / 100,
+              scaleM: built.scaleM,
+              indicative: true,
+              popSource,
+              popFallback: !!popFallback,
+              cemeteryCount: buffers.length,
+              levels: tree.ZONE_LEVELS,
+              zones
+            };
+          } else {
+            const built = tree.buildTreeRequest(...args);
+            payload = part === 'tile'
+              ? {
                 year,
-                ndviPartial: year === new Date().getFullYear(),
-                popSource,
-                popFallback: !!popFallback,
                 cellM: built.cellM,
-                cemeteryCount: buffers.length,
-                indicative: true,
-                cityLst: scored.cityLst,
-                ranked: scored.ranked,
-                wards: scored.wards
-              };
-            })();
+                legend: tree.TREE_VIS,
+                urlFormat: await sat.mapUrl(ee, built.vis.visualize(tree.TREE_VIS))
+              }
+              : await (async () => {
+                const [meanFc, sumFc] = await Promise.all([eeEvaluate(built.meanFc), eeEvaluate(built.sumFc)]);
+                const rawRows = tree.rowsFromFeatures(meanFc, sumFc);
+                const scored = tree.scoreTreeWards(popPeople ? rawRows : tree.assignFallbackPop(rawRows));
+                return {
+                  year,
+                  ndviPartial: year === new Date().getFullYear(),
+                  popSource,
+                  popFallback: !!popFallback,
+                  cellM: built.cellM,
+                  cemeteryCount: buffers.length,
+                  indicative: true,
+                  cityLst: scored.cityLst,
+                  ranked: scored.ranked,
+                  wards: scored.wards
+                };
+              })();
+          }
           cachedSatStats.set(key, payload);
           return payload;
         })().finally(() => treeJobs.delete(key));
@@ -3905,8 +3928,12 @@ module.exports = async (req, res) => {
         const payload = cachedSatStats.get(key) || await treeJobs.get(key);
         return res.status(200).json(payload);
       } catch (err) {
-        console.error('Ưu tiên trồng cây:', err && err.message);
-        return res.status(502).json({ error: true, message: 'Chưa tính được chỉ số trên Google Earth Engine' });
+        console.error('Ưu tiên trồng cây:', err && err.stack ? err.stack : err);
+        const detail = err && err.message ? String(err.message).replace(/\s+/g, ' ').slice(0, 160) : '';
+        return res.status(502).json({
+          error: true,
+          message: detail ? `Chưa tính được chỉ số trên Google Earth Engine: ${detail}` : 'Chưa tính được chỉ số trên Google Earth Engine'
+        });
       }
     }
 

@@ -722,18 +722,24 @@
             <div class="flood-stats" id="ndviStats"></div>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_tree"><label for="chk_tree" title="Mức tương đối: nơi đất xây dựng nóng, ít cây và đông dân. Mang tính tham khảo."><svg class="ico ico-layer"><use href="#i-leaf"/></svg>Ưu tiên trồng cây xanh</label></div>
-            <span id="treeOpBox" class="layer-slider" style="display:none;"><input type="range" id="treeOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp ưu tiên trồng cây" aria-label="Độ trong suốt lớp ưu tiên trồng cây"></span>
+            <div><input type="checkbox" id="chk_tree"><label for="chk_tree" title="Vùng cần trồng cây: nóng, ít cây, có dân cư. Mang tính tham khảo."><svg class="ico ico-layer"><use href="#i-leaf"/></svg>Ưu tiên trồng cây xanh</label></div>
+            <span id="treeOpBox" class="layer-slider" style="display:none;"><input type="range" id="treeOpacity" class="opacity-slider" min="0" max="100" value="100" title="Độ trong suốt vùng ưu tiên trồng cây" aria-label="Độ trong suốt vùng ưu tiên trồng cây"></span>
           </div>
           <div class="flood-box" id="treeBox" style="display:none;">
             <div class="sat-pick"><label for="treeYear">Năm</label><select id="treeYear"></select></div>
-            <div class="sat-legend" id="treeLegend"></div>
+            <div class="tree-legend" id="treeLegend">
+              <span><i class="tree-swatch" style="background:#b91c1c"></i>Rất cần</span>
+              <span><i class="tree-swatch" style="background:#c2410c"></i>Cần</span>
+              <span><i class="tree-swatch" style="background:#a16207"></i>Theo dõi</span>
+            </div>
+            <p class="flood-muted">Chỉ vùng cần chú ý. Kết quả mang tính tham khảo.</p>
+            <div class="tree-zones" id="treeZones"></div>
+            <details class="detail-more" id="treeWardDetails"><summary>Bảng phường, xã</summary><div class="flood-stats" id="treeStats"></div></details>
             <details class="detail-more"><summary>Cách tính</summary><div class="detail-more-body">
-              <p>Điểm là mức tương đối giữa các phường, xã đủ từ 15 ha đất xây dựng. Ba thành phần ngang nhau: nhiệt độ bề mặt mùa nóng cao, NDVI trên đất xây dựng thấp, mật độ dân trên đất xây dựng cao.</p>
-              <p>Đất xây dựng theo ảnh vệ tinh (nhãn built hoặc GHSL), đã loại mặt nước, rừng, đất nông nghiệp và vùng đệm nghĩa trang đã duyệt. Nhiệt độ đo lúc vệ tinh bay qua, không phải nhiệt độ không khí.</p>
+              <p>Ba mức trên ô 30 m, chỉ nơi có dân cư: rất cần khi nhiệt bề mặt từ 36,5 °C và NDVI không quá 0,32; cần từ 35,5 °C và NDVI không quá 0,38; theo dõi từ 34 °C và NDVI không quá 0,45. Các ô liền kề được gộp thành vùng.</p>
+              <p>Đã loại mặt nước, rừng, đất nông nghiệp và vùng đệm nghĩa trang đã duyệt. Giữ sân, vườn trong khu dân cư. Nhiệt độ đo lúc vệ tinh bay qua, không phải nhiệt độ không khí.</p>
               <p id="treeMethod"></p>
             </div></details>
-            <div class="flood-stats" id="treeStats"></div>
           </div>
           <div class="layer-row">
             <div><input type="checkbox" id="chk_forest"><label for="chk_forest" title="Ước tính phủ thực vật và mất rừng từ ảnh vệ tinh. Không phải ranh 3 loại rừng."><svg class="ico ico-layer"><use href="#i-leaf"/></svg>Rừng, phủ thực vật</label></div>
