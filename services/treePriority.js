@@ -430,21 +430,21 @@ function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
     maxPixels: 1e8,
     tileScale: 8
   });
-  const zones = vectors.map(f => {
+  const shaped = vectors.map(f => {
     const geom = f.geometry().simplify(20);
     const ha = geom.area(1).divide(1e4);
-    const label = ee.List([f.get('level'), f.get('klass'), f.get('klass_mean')]).reduce(ee.Reducer.firstNonNull());
-    const rankKey = ee.Number(label).multiply(100000).add(ha);
+    const label = ee.Number(ee.List([f.get('level'), f.get('klass'), f.get('klass_mean')]).reduce(ee.Reducer.firstNonNull())).round();
     const coords = geom.centroid(1).coordinates();
     return ee.Feature(geom).copyProperties(f).set({
       level: label,
       ha,
-      rankKey,
       lat: coords.get(1),
       lng: coords.get(0),
       ward: ''
     });
-  }).filter(ee.Filter.gte('ha', ZONE_MIN_HA)).limit(ZONE_LIMIT, 'rankKey', false);
+  }).filter(ee.Filter.gte('ha', ZONE_MIN_HA));
+  const pick = (lvl, n) => shaped.filter(ee.Filter.eq('level', lvl)).limit(n, 'ha', false);
+  const zones = pick(3, 50).merge(pick(2, 40)).merge(pick(1, 30));
 
   const city = lst.updateMask(urban).addBands(ndvi.updateMask(urban)).reduceRegion({
     reducer: ee.Reducer.mean(),
