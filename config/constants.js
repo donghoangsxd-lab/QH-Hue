@@ -93,8 +93,8 @@ const networkConfig = {
   "10-PCCC": { label: "Trụ sở cảnh sát PCCC", radius: { DT: 3000, XA: 5000, XA_DT: 5000 }, noArea: true },
   // Mục 2.12.1.1: 1 nhà tang lễ / ≤ 250.000 người; 2.12.2.1: nghĩa trang tập trung ≥ 0,04 ha / 1.000 người = 0,4 m²/người
   "11-NT": { label: "Nhà tang lễ, nghĩa trang", funeralPopPer: 250000, cemeteryQuota: 0.4 },
-  // Nhà ở xã hội (tab 14-NOXH): chỉ thể hiện vị trí, diện tích; không có bán kính phục vụ
-  "14-NOXH": { label: "Nhà ở xã hội", radius: 0 }
+  // Chung cư (tab 14-NOXH): chỉ thể hiện vị trí, diện tích; không có bán kính phục vụ
+  "14-NOXH": { label: "Chung cư", radius: 0 }
 };
 // Phân loại nhóm 11-NT theo tên; safety = khoảng cách an toàn môi trường tới nhà ở (Bảng 23), 0 = không quy định
 const NT_KINDS = {
@@ -292,7 +292,7 @@ const constants = {
     { code: "11-NT", label: "Nhà tang lễ, nghĩa trang", unit: "ngôi", prefix: "NT", cap: "unit" },
     { code: "12-CSD", label: "Cơ sở chưa sử dụng", unit: "", prefix: "CSD", cap: "unit" },
     { code: "13-BUS", label: "Trạm dừng xe buýt", unit: "điểm", prefix: "BUS", cap: "urban", noArea: true },
-    { code: "14-NOXH", label: "Nhà ở xã hội", unit: "căn", prefix: "NOXH", cap: "unit" }
+    { code: "14-NOXH", label: "Chung cư", unit: "căn", prefix: "NOXH", cap: "unit" }
   ],
   PARCEL_INFRA_STATUS: [
     { id: "hoatdong", label: "Đang hoạt động", active: true },

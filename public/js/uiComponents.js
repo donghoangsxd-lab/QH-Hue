@@ -2172,7 +2172,7 @@ function loadWardNetworkCoverage(wardData) {
     });
 }
 
-const NET_TYPE_SHORT = { "13-BUS": "Trạm xe buýt", "10-PCCC": "Trụ sở PCCC", "11-NT": "Nhà tang lễ, nghĩa trang", "14-NOXH": "Nhà ở xã hội" };
+const NET_TYPE_SHORT = { "13-BUS": "Trạm xe buýt", "10-PCCC": "Trụ sở PCCC", "11-NT": "Nhà tang lễ, nghĩa trang", "14-NOXH": "Chung cư" };
 
 function networkSubRows(sectionId, items, gapMap = null, withType = false) {
   const rows = items.map(it => {
