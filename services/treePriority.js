@@ -5,7 +5,7 @@ const sat = require('./satService');
 const MIN_BUILT_HA = 15;
 const TREE_SCALE_M = 100;
 const ZONE_SCALE_M = 60;
-const ZONE_MIN_HA = 0.5;
+const ZONE_MIN_HA = 0.3;
 const ZONE_LIMIT = 160;
 const TREE_FIRST_YEAR = 2017;
 const LST_L3 = 36.5;
@@ -292,7 +292,7 @@ function usableGeom(g) {
   return !!g && (g.type === 'Polygon' || g.type === 'MultiPolygon') && Array.isArray(g.coordinates) && g.coordinates.length > 0;
 }
 
-/** GeoJSON reduceToVectors → vùng đã sắp mức cao rồi diện tích lớn. Bỏ mảnh dưới 0,5 ha. */
+/** GeoJSON reduceToVectors → vùng đã sắp mức cao rồi diện tích lớn. Bỏ mảnh dưới 0,3 ha. */
 function normalizeZones(fc, city) {
   const cityLst = finite(city && (city.lst != null ? city.lst : city.lst_mean));
   const zones = [];
@@ -406,8 +406,8 @@ function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
   const crs = popCrs || ee.Projection('EPSG:32648').atScale(scale);
   const cem = cemeteryImage(ee, buffers);
   const urban = urbanMask(ee, wards, year, cem);
-  const lst = sat.lstImage(ee, wards, year).resample('bilinear').rename('lst');
-  const ndvi = sat.ndviImage(ee, wards, year).resample('bilinear').rename('ndvi');
+  const lst = sat.lstImage(ee, wards, year).rename('lst');
+  const ndvi = sat.ndviImage(ee, wards, year).rename('ndvi');
   const popHa = (popPeople ? popImage.unmask(0).reproject({ crs, scale }) : popImage.unmask(0))
     .divide(scale * scale).multiply(10000).rename('popHa');
   const residential = popPeople ? popHa.gte(RES_POP_HA) : popImage.mask().unmask(0);
@@ -449,7 +449,7 @@ function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
   const city = lst.updateMask(urban).addBands(ndvi.updateMask(urban)).reduceRegion({
     reducer: ee.Reducer.mean(),
     geometry: region,
-    scale: 300,
+    scale: 100,
     crs: 'EPSG:32648',
     maxPixels: 1e8,
     tileScale: 4,

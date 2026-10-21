@@ -3868,7 +3868,7 @@ module.exports = async (req, res) => {
       const buffers = tree.cemeteryBuffers(list);
       const part = req.query.part === 'tile' ? 'tile' : (req.query.part === 'zones' ? 'zones' : 'stats');
       const packVersion = noxhPack && noxhPack.version ? noxhPack.version : 'none';
-      const key = `tree|v6|${part}|${year}|${popSource}|${packVersion}|${getDataVersion()}`;
+      const key = `tree|v7|${part}|${year}|${popSource}|${packVersion}|${getDataVersion()}`;
       if (!cachedSatStats.has(key) && !treeJobs.has(key)) {
         const job = (async () => {
           const args = [ee, wardVectorParsed, popRasterNormalized, popProjection, popScale, !!popPeople, year, buffers];
@@ -3879,6 +3879,7 @@ module.exports = async (req, res) => {
             const cityObj = city || {};
             const lstRaw = cityObj.lst != null ? cityObj.lst : cityObj.lst_mean;
             const ndviRaw = cityObj.ndvi != null ? cityObj.ndvi : cityObj.ndvi_mean;
+            const rawFeatures = (zonesFc && zonesFc.features) || [];
             const zones = tree.normalizeZones(zonesFc, { lst: lstRaw, ndvi: ndviRaw });
             payload = {
               year,
@@ -3890,8 +3891,12 @@ module.exports = async (req, res) => {
               popFallback: !!popFallback,
               cemeteryCount: buffers.length,
               levels: tree.ZONE_LEVELS,
-              zones
+              zones,
+              zoneRaw: rawFeatures.length
             };
+            if (!zones.length && rawFeatures.length) {
+              payload.zoneSample = rawFeatures.slice(0, 3).map(f => f.properties || {});
+            }
           } else {
             const built = tree.buildTreeRequest(...args);
             payload = part === 'tile'
