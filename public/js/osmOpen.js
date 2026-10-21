@@ -62,6 +62,11 @@ function indexRows() {
   return indexed;
 }
 
+/** Sông, kênh đang dùng cho lớp đường thủy: phần trong ranh khi đã có ranh, không thì cả khung tải. */
+export function osmWaterInput() {
+  return hueFeatures() || raw;
+}
+
 export function loadOsmOpen() {
   if (!promise) {
     promise = fetch(geeApi('action=getOsmOpen'))

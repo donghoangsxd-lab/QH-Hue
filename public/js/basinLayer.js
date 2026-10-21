@@ -9,6 +9,8 @@ import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { geeApi } from './api.js';
 import { escapeHtml } from './utils.js';
+import { loadOsmOpen, osmWaterInput } from './osmOpen.js';
+import { FLAG_M, buildWaterIndex, nearestOnRing, waterwaysFromFeatures } from './drainageNorm.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -133,6 +135,10 @@ function popupHtml(b) {
   if (b.cap === 1 && b.subs) rows.push(`Gồm ${b.subs} tiểu lưu vực`);
   if (b.parent) rows.push(`Thuộc lưu vực ${escapeHtml(b.parent)}`);
   if (Number.isFinite(b.zmin)) rows.push(`Cao độ cửa xả ≈ ${b.zmin.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} m`);
+  attachReceivers();
+  if (b.receiver && b.receiverFlag !== 'far') rows.push(`Nguồn tiếp nhận: ${escapeHtml(b.receiver)}`);
+  else if (b.receiver) rows.push(`Nguồn tiếp nhận gần nhất: ${escapeHtml(b.receiver)} (xa tuyến nước)`);
+  else if (data && data.receiverState === 'ok') rows.push('Nguồn tiếp nhận: chưa khớp sông, kênh');
   return `<div class="basin-popup"><b>${escapeHtml(titleOf(b))}</b><br>${rows.join('<br>')}`
     + `<div class="basin-note">${lv.note}</div></div>`;
 }
@@ -248,10 +254,70 @@ function createView(m) {
 
 let visible = false;
 let leftView = null, rightView = null;
+let waterTimer = null;
 
-function setStatus(text) {
+function watchWater() {
+  if (waterTimer) return;
+  waterTimer = setInterval(() => {
+    if (!visible) {
+      clearInterval(waterTimer);
+      waterTimer = null;
+      return;
+    }
+    const before = data && data.waterSrc;
+    attachReceivers();
+    if (data && data.waterSrc !== before) publishBasinStatus();
+  }, 600);
+}
+
+function setStatus(text, warn) {
   const el = $('basinStatus');
-  if (el) el.textContent = text;
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('is-warn', !!warn);
+}
+
+function ringLngLat(b) {
+  const out = [];
+  (b.polys || []).forEach(rings => {
+    const outer = rings[0];
+    if (!outer) return;
+    ringLatLngs(data.arcs, outer).forEach(([lat, lng]) => out.push([lng, lat]));
+  });
+  return out;
+}
+
+/** Gắn tên sông, kênh gần vành lưu vực nhất. Không đổi file lưu vực trên bucket. */
+function attachReceivers() {
+  if (!data) return;
+  const src = osmWaterInput();
+  if (!src || data.waterSrc === src) return;
+  const index = buildWaterIndex(waterwaysFromFeatures(src));
+  if (!index.segs.length) return;
+  data.basins.forEach(b => {
+    const hit = nearestOnRing(ringLngLat(b), index);
+    b.receiver = hit ? hit.name : '';
+    b.receiverM = hit ? Math.round(hit.dist) : null;
+    b.receiverFlag = hit && hit.dist <= FLAG_M ? '' : 'far';
+  });
+  data.waterSrc = src;
+  data.receiverState = 'ok';
+}
+
+function publishBasinStatus() {
+  if (!visible || !data) return;
+  if (!data.basins.length) {
+    setStatus('File lưu vực trên bucket không có lưu vực nào');
+    return;
+  }
+  if (data.receiverState === 'error') {
+    setStatus('Chưa đối chiếu được đường thủy nội địa.', true);
+    return;
+  }
+  if (data.receiverState !== 'ok') return;
+  const far = data.basins.filter(b => b.receiverFlag === 'far').length;
+  const named = data.basins.length - far;
+  setStatus(`Nguồn tiếp nhận: ${named} lưu vực gắn sông, kênh; ${far} chưa khớp.`);
 }
 
 function syncViews() {
@@ -269,18 +335,26 @@ export function setBasinVisible(on) {
   visible = !!on;
   const legend = $('basinLegend');
   if (legend) legend.style.display = visible ? '' : 'none';
-  if (!visible || data) {
-    syncViews();
-    setStatus(data && !data.basins.length ? 'File lưu vực trên bucket không có lưu vực nào' : '');
+  if (!visible) {
+    if (waterTimer) { clearInterval(waterTimer); waterTimer = null; }
+    setStatus('');
     return;
   }
-  setStatus('Đang tải ranh lưu vực…');
-  loadBasins().then(() => {
-    setStatus(data.basins.length ? '' : 'File lưu vực trên bucket không có lưu vực nào');
+  const ready = data ? Promise.resolve() : (setStatus('Đang tải ranh lưu vực…'), loadBasins());
+  ready.then(() => {
     syncViews();
+    publishBasinStatus();
+    return loadOsmOpen().then(() => {
+      attachReceivers();
+      publishBasinStatus();
+      watchWater();
+    }).catch(() => {
+      if (data) data.receiverState = data.receiverState === 'ok' ? 'ok' : 'error';
+      publishBasinStatus();
+    });
   }).catch(err => {
     console.warn('Không tải được ranh lưu vực:', err);
-    setStatus(`Chưa tải được: ${err.message}`);
+    setStatus(`Chưa tải được: ${err.message}`, true);
   });
 }
 

@@ -1313,7 +1313,8 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 @keyframes drainage-dash { to { stroke-dashoffset: -12; } }
 @media (prefers-reduced-motion: reduce) { .drainage-swatch-dash { animation: none; } }
 .drainage-status:empty { display: none; }
-.drainage-status { margin-top: 3px; color: var(--accent-orange); }
+.drainage-status { margin-top: 3px; color: var(--text-muted); }
+.drainage-status.is-warn { color: var(--accent-orange); }
 .basin-legend-note { margin-top: 3px; font-style: italic; }
 .basin-label { background: none; border: 0; }
 /* Cỡ chữ, độ đậm khớp LEVELS.font trong basinLayer.js (đo bề rộng để tránh chồng nhãn) */

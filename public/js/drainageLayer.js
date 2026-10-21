@@ -1,11 +1,17 @@
 // Lớp "Thoát nước, khe tụ thủy": mạng lưới dòng chảy (drainage/thoatnuoc.topojson trên bucket, đường vẽ xuôi dòng).
 // Nét đứt xanh ngọc trượt theo chiều nước chảy, mũi tên ở cuối mỗi đoạn chỉ hạ lưu; nét dày theo bậc Shreve (m).
 // Từ ARROW_MIN_ZOOM thêm mũi tên hướng thoát nước mặt vùng xây dựng (drainage/huongthoat/, scripts/build-huongthoat.js):
-// chia ô z12, chỉ tải ô phủ khung nhìn; nét đứt cyan dài dọc phố, chảy về sông hồ.
+// chia ô z12, chỉ tải ô phủ khung nhìn; nét đứt cyan dài dọc phố.
+// Lúc xem, sông và kênh của lớp đường thủy nội địa chuẩn hóa cửa xả và mũi tên (drainageNorm.js): bám mép, đảo hướng
+// nếu lệch tuyến nước, gắn nguồn tiếp nhận. File trên bucket giữ nguyên. Mũi tên cần rà vẽ hổ phách.
 // Mỗi bản đồ 2 canvas: nền + mũi tên vẽ lại khi dừng kéo / zoom; nét đứt vẽ lại mỗi khung (≤ 30 fps), chỉ đổi lineDashOffset.
 import { map } from './mapEngine.js';
 import { planMap, isCompareOn } from './planMap.js';
 import { geeApi } from './api.js';
+import { loadOsmOpen, osmWaterInput } from './osmOpen.js';
+import {
+  buildWaterIndex, waterwaysFromFeatures, normalizePolyline, outfallIndexes, mercXY, unmerc
+} from './drainageNorm.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -38,13 +44,9 @@ function classOf(m) {
   return 0;
 }
 
-// Web Mercator ở zoom 0 (0..256), trùng map.project(latlng, 0) của Leaflet
-const D2R = Math.PI / 180;
-const mercX = (lng) => (lng + 180) / 360 * 256;
-const mercY = (lat) => {
-  const s = Math.sin(Math.max(-85.0511, Math.min(85.0511, lat)) * D2R);
-  return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * 256;
-};
+// Web Mercator ở zoom 0 (0..256), trùng map.project(latlng, 0) của Leaflet — cùng công thức drainageNorm.js
+const mercX = (lng) => mercXY(lng, 0)[0];
+const mercY = (lat) => mercXY(0, lat)[1];
 
 /** TopoJSON → [{ c: Float64Array [x0,y0,x1,y1…] Mercator zoom 0, minX, minY, maxX, maxY, m }] */
 function decodeTopo(topo) {
@@ -106,16 +108,26 @@ function loadDrainage() {
         }
         return r.json();
       })
-      .then(topo => { lines = decodeTopo(topo); return lines; })
+        .then(topo => { lines = decodeTopo(topo); if (waterIndex) applyOutfalls(); return lines; })
       .catch(err => { dataPromise = null; throw err; });
   }
   return dataPromise;
 }
 
-// Mũi tên thoát nước mặt: index { z, at, tiles: { "z_x_y": số mũi tên } }; ô → [Float64Array Mercator zoom 0] hoặc null khi đang tải
+// Mũi tên thoát nước mặt: index { z, at, tiles }; ô thô giữ để chuẩn hóa lại khi đổi tuyến nước.
+// arrowTiles: key → { stamp, list: [{ c: Float64Array Mercator zoom 0, flag, snapped, reoriented, receiver }] }
 let arrowIndex = null;
 let arrowIndexPromise = null;
+const arrowRaw = new Map();
 const arrowTiles = new Map();
+const arrowInflight = new Set();
+let waterIndex = null;
+let waterSrc = null;
+let indexStamp = 0;
+let outfallBackup = null;
+let outfallSnapped = 0;
+let outfallReoriented = 0;
+let outfallFlagged = 0;
 
 function fetchJson(url) {
   return fetch(url).then(async r => {
@@ -127,35 +139,148 @@ function fetchJson(url) {
   });
 }
 
-/** Ô: { a: [[x0, y0, dx1, dy1, …]] } kinh / vĩ độ × 1e5, đỉnh sau là độ lệch */
+/** Ô: { a: [[x0, y0, dx1, dy1, …]] } kinh / vĩ độ × 1e5, đỉnh sau là độ lệch. Có tuyến nước thì bám mép và đảo hướng. */
 function decodeArrowTile(tile) {
   return (tile && Array.isArray(tile.a) ? tile.a : []).map(a => {
-    const c = new Float64Array(a.length);
+    const ll = [];
     let x = 0, y = 0;
     for (let k = 0; k + 1 < a.length; k += 2) {
       x += a[k]; y += a[k + 1];
-      c[k] = mercX(x / 1e5);
-      c[k + 1] = mercY(y / 1e5);
+      ll.push([x / 1e5, y / 1e5]);
     }
-    return c;
-  }).filter(c => c.length >= 4);
+    return ll;
+  }).filter(ll => ll.length >= 2).map(ll => {
+    const norm = waterIndex ? normalizePolyline(ll, waterIndex, 'arrow') : {
+      coords: ll, snapped: false, reoriented: false, flag: '', receiver: ''
+    };
+    const c = new Float64Array(norm.coords.length * 2);
+    norm.coords.forEach((p, i) => {
+      c[i * 2] = mercX(p[0]);
+      c[i * 2 + 1] = mercY(p[1]);
+    });
+    return { c, flag: norm.flag, snapped: norm.snapped, reoriented: norm.reoriented, receiver: norm.receiver || '' };
+  }).filter(a => a.c.length >= 4);
+}
+
+function storeArrow(key, tile) {
+  arrowRaw.set(key, tile);
+  arrowTiles.set(key, { stamp: indexStamp, list: decodeArrowTile(tile) });
+  refreshCounts();
+  refreshViews();
+}
+
+/** Tải hết các ô để số liệu bám / đảo / rà là toàn bộ lớp, không chỉ khung nhìn */
+function prefetchArrows() {
+  if (!arrowIndex || !waterIndex) return;
+  const keys = Object.keys(arrowIndex.tiles);
+  let active = 0;
+  const next = () => {
+    while (active < 4 && keys.length) {
+      const key = keys.shift();
+      if (!arrowIndex.tiles[key] || arrowRaw.has(key) || arrowInflight.has(key)) continue;
+      active++;
+      arrowInflight.add(key);
+      fetchJson(geeApi(`action=getDrainArrows&t=${key}&v=${encodeURIComponent(arrowIndex.at)}`))
+        .then(tile => storeArrow(key, tile))
+        .catch(err => { console.warn(`Ô mũi tên thoát nước ${key}:`, err.message); })
+        .then(() => { arrowInflight.delete(key); active--; next(); });
+    }
+  };
+  next();
+}
+
+function syncWater() {
+  const src = osmWaterInput();
+  if (!src) return false;
+  if (src === waterSrc && waterIndex) return true;
+  const linesW = waterwaysFromFeatures(src);
+  if (!linesW.length) return false;
+  waterSrc = src;
+  waterIndex = buildWaterIndex(linesW);
+  indexStamp++;
+  applyOutfalls();
+  arrowRaw.forEach((tile, key) => {
+    arrowTiles.set(key, { stamp: indexStamp, list: decodeArrowTile(tile) });
+  });
+  prefetchArrows();
+  refreshCounts();
+  refreshViews();
+  return true;
+}
+
+function reversePairs(c) {
+  const n = c.length;
+  for (let k = 0; k < n / 2; k += 2) {
+    const x = c[k], y = c[k + 1];
+    c[k] = c[n - 2 - k];
+    c[k + 1] = c[n - 1 - k];
+    c[n - 2 - k] = x;
+    c[n - 1 - k] = y;
+  }
+}
+
+/** Cửa xả: điểm cuối không có đoạn khác bắt đầu tại đó. Bám sông, kênh; đảo nếu hạ lưu xa tuyến hơn thượng lưu. */
+function applyOutfalls() {
+  if (outfallBackup && lines) {
+    outfallBackup.forEach(b => { lines[b.i].c.set(b.c); });
+  }
+  outfallBackup = [];
+  outfallSnapped = 0;
+  outfallReoriented = 0;
+  outfallFlagged = 0;
+  if (!lines || !waterIndex) return;
+  const ll = lines.map(ln => {
+    const c = ln.c;
+    return [unmerc(c[0], c[1]), unmerc(c[c.length - 2], c[c.length - 1])];
+  });
+  const mouths = new Set(outfallIndexes(ll));
+  lines.forEach((ln, i) => {
+    if (!mouths.has(i)) return;
+    const [s, e] = ll[i];
+    const norm = normalizePolyline([s, e], waterIndex, 'outfall');
+    if (!norm.snapped && !norm.reoriented && !norm.flag) return;
+    const c = ln.c;
+    outfallBackup.push({ i, c: Float64Array.from(c) });
+    if (norm.reoriented) {
+      reversePairs(c);
+      outfallReoriented++;
+    }
+    if (norm.snapped) {
+      const p = norm.coords[norm.coords.length - 1];
+      const m = mercXY(p[0], p[1]);
+      c[c.length - 2] = m[0];
+      c[c.length - 1] = m[1];
+      outfallSnapped++;
+    }
+    if (norm.flag) outfallFlagged++;
+    ln.receiver = norm.receiver || '';
+  });
 }
 
 /**
  * Mũi tên của các ô phủ vùng (Mercator zoom 0) đã có sẵn; ô chưa có thì tải nền, xong gọi onReady để vẽ lại.
  * Lỗi index (chưa đẩy dữ liệu) → coi như không có ô nào trong phiên; lỗi 1 ô → bỏ ô đó.
  */
+function ensureArrowIndex() {
+  if (arrowIndex) return Promise.resolve(arrowIndex);
+  if (!arrowIndexPromise) {
+    arrowIndexPromise = fetchJson(geeApi('action=getDrainArrows&t=index'))
+      .then(idx => {
+        arrowIndex = { z: Number(idx.z) || 12, at: String(idx.at || ''), tiles: idx.tiles || {} };
+        prefetchArrows();
+        refreshCounts();
+      })
+      .catch(err => {
+        console.warn('Không tải được mũi tên thoát nước mặt:', err.message);
+        arrowIndex = { z: 12, at: '', tiles: {} };
+      });
+  }
+  return arrowIndexPromise;
+}
+
 function arrowsIn(minX, minY, maxX, maxY, onReady) {
   if (!arrowIndex) {
-    if (!arrowIndexPromise) {
-      arrowIndexPromise = fetchJson(geeApi('action=getDrainArrows&t=index'))
-        .then(idx => { arrowIndex = { z: Number(idx.z) || 12, at: String(idx.at || ''), tiles: idx.tiles || {} }; })
-        .catch(err => {
-          console.warn('Không tải được mũi tên thoát nước mặt:', err.message);
-          arrowIndex = { z: 12, at: '', tiles: {} };
-        })
-        .then(onReady);
-    }
+    ensureArrowIndex().then(onReady);
     return [];
   }
   const { z, at, tiles } = arrowIndex;
@@ -165,16 +290,23 @@ function arrowsIn(minX, minY, maxX, maxY, onReady) {
     for (let ty = Math.floor(minY * n); ty <= Math.floor(maxY * n); ty++) {
       const key = `${z}_${tx}_${ty}`;
       if (!tiles[key]) continue;
-      if (!arrowTiles.has(key)) {
-        arrowTiles.set(key, null);
-        fetchJson(geeApi(`action=getDrainArrows&t=${key}&v=${encodeURIComponent(at)}`))
-          .then(decodeArrowTile)
-          .catch(err => { console.warn(`Ô mũi tên thoát nước ${key}:`, err.message); return []; })
-          .then(list => { arrowTiles.set(key, list); onReady(); });
+      const cached = arrowTiles.get(key);
+      if (cached && cached.stamp === indexStamp) {
+        out.push(...cached.list);
         continue;
       }
-      const list = arrowTiles.get(key);
-      if (list) out.push(...list);
+      if (arrowRaw.has(key)) {
+        const list = decodeArrowTile(arrowRaw.get(key));
+        arrowTiles.set(key, { stamp: indexStamp, list });
+        out.push(...list);
+        continue;
+      }
+      if (arrowInflight.has(key)) continue;
+      arrowInflight.add(key);
+      fetchJson(geeApi(`action=getDrainArrows&t=${key}&v=${encodeURIComponent(at)}`))
+        .then(tile => storeArrow(key, tile))
+        .catch(err => { console.warn(`Ô mũi tên thoát nước ${key}:`, err.message); })
+        .then(() => arrowInflight.delete(key));
     }
   }
   return out;
@@ -295,14 +427,20 @@ const DrainageLayer = L.Layer.extend({
     });
 
     // Mũi tên thoát nước mặt: thân dừng trước đầu mũi tên để nét đứt không chờm lên
-    let surface = null, surfaceHeads = null;
+    let surface = null, surfaceHeads = null, surfaceFlag = null, headsFlag = null;
     if (z >= ARROW_MIN_ZOOM) {
+      syncWater();
       const list = arrowsIn(minX, minY, maxX, maxY, refreshViews);
       if (list.length) {
         surface = new Path2D();
         surfaceHeads = new Path2D();
+        surfaceFlag = new Path2D();
+        headsFlag = new Path2D();
         const { head: al, headW: aw } = SURFACE;
-        list.forEach(c => {
+        list.forEach(arrow => {
+          const c = arrow.c;
+          const body = arrow.flag ? surfaceFlag : surface;
+          const heads = arrow.flag ? headsFlag : surfaceHeads;
           const n = c.length / 2;
           const xs = new Float64Array(n), ys = new Float64Array(n);
           for (let i = 0; i < n; i++) { xs[i] = c[i * 2] * k - o.x; ys[i] = c[i * 2 + 1] * k - o.y; }
@@ -312,18 +450,18 @@ const DrainageLayer = L.Layer.extend({
           const d = Math.hypot(ex - xs[j], ey - ys[j]);
           if (!(d > 0)) return;
           const ux = (ex - xs[j]) / d, uy = (ey - ys[j]) / d;
-          surface.moveTo(xs[0], ys[0]);
-          for (let i = 1; i <= j; i++) surface.lineTo(xs[i], ys[i]);
-          surface.lineTo(ex - ux * al * 0.6, ey - uy * al * 0.6);
-          surfaceHeads.moveTo(ex, ey);
-          surfaceHeads.lineTo(ex - ux * al - uy * aw, ey - uy * al + ux * aw);
-          surfaceHeads.lineTo(ex - ux * al * 0.62, ey - uy * al * 0.62);
-          surfaceHeads.lineTo(ex - ux * al + uy * aw, ey - uy * al - ux * aw);
-          surfaceHeads.closePath();
+          body.moveTo(xs[0], ys[0]);
+          for (let i = 1; i <= j; i++) body.lineTo(xs[i], ys[i]);
+          body.lineTo(ex - ux * al * 0.6, ey - uy * al * 0.6);
+          heads.moveTo(ex, ey);
+          heads.lineTo(ex - ux * al - uy * aw, ey - uy * al + ux * aw);
+          heads.lineTo(ex - ux * al * 0.62, ey - uy * al * 0.62);
+          heads.lineTo(ex - ux * al + uy * aw, ey - uy * al - ux * aw);
+          heads.closePath();
         });
       }
     }
-    this._view = { tl, size, paths, used, surface };
+    this._view = { tl, size, paths, used, surface, surfaceFlag };
 
     // Canvas đặt tại góc trên trái khung nhìn; khi kéo bản đồ cả pane trượt theo, không cần vẽ lại
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -348,16 +486,19 @@ const DrainageLayer = L.Layer.extend({
     ctx.lineWidth = 0.8;
     ctx.fill(arrows);
     ctx.stroke(arrows);
-    if (surface) {
+    const paintArrows = (body, heads, fill) => {
+      if (!body) return;
       ctx.lineWidth = SURFACE.w + 2.5;
       ctx.strokeStyle = 'rgba(8, 51, 68, 0.35)';
-      ctx.stroke(surface);
-      ctx.fillStyle = '#22d3ee';
+      ctx.stroke(body);
+      ctx.fillStyle = fill;
       ctx.strokeStyle = '#083344';
       ctx.lineWidth = 1;
-      ctx.fill(surfaceHeads);
-      ctx.stroke(surfaceHeads);
-    }
+      ctx.fill(heads);
+      ctx.stroke(heads);
+    };
+    paintArrows(surface, surfaceHeads, '#22d3ee');
+    paintArrows(surfaceFlag, headsFlag, '#fbbf24');
     fitCanvas(this._flow, size, FLOW_DPR);
   },
 
@@ -373,7 +514,7 @@ const DrainageLayer = L.Layer.extend({
     }
     if (!this._view) this._build();
     else if (this._reduce) return;
-    const { tl, size, paths, used, surface } = this._view;
+    const { tl, size, paths, used, surface, surfaceFlag } = this._view;
     const ctx = this._flow.getContext('2d');
     ctx.setTransform(FLOW_DPR, 0, 0, FLOW_DPR, -tl.x * FLOW_DPR, -tl.y * FLOW_DPR);
     ctx.clearRect(tl.x, tl.y, size.x, size.y);
@@ -388,13 +529,18 @@ const DrainageLayer = L.Layer.extend({
       ctx.lineDashOffset = -((t * cls.speed) % period);
       ctx.stroke(paths[i]);
     });
-    if (surface) {
-      ctx.lineCap = 'butt';
-      ctx.strokeStyle = '#22d3ee';
+    const dashFlow = (path, color) => {
+      if (!path) return;
+      ctx.strokeStyle = color;
       ctx.lineWidth = SURFACE.w;
       ctx.setLineDash(SURFACE.dash);
       ctx.lineDashOffset = -((t * SURFACE.speed) % (SURFACE.dash[0] + SURFACE.dash[1]));
-      ctx.stroke(surface);
+      ctx.stroke(path);
+    };
+    if (surface || surfaceFlag) {
+      ctx.lineCap = 'butt';
+      dashFlow(surface, '#22d3ee');
+      dashFlow(surfaceFlag, '#fbbf24');
     }
   }
 });
@@ -402,14 +548,37 @@ const DrainageLayer = L.Layer.extend({
 let visible = false;
 let leftLayer = null, rightLayer = null;
 
-function setStatus(text) {
+function setStatus(text, warn) {
   const el = $('drainageStatus');
-  if (el) el.textContent = text;
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('is-warn', !!warn);
 }
 
 /** Dữ liệu mới về (mạng lưới, ô mũi tên) → dựng lại khung nhìn ở khung hình kế tiếp */
 function refreshViews() {
   [leftLayer, rightLayer].forEach(l => { if (l) l._view = null; });
+}
+
+function refreshCounts() {
+  if (!visible) return;
+  if (!waterIndex) {
+    setStatus('Đang đối chiếu đường thủy nội địa…');
+    return;
+  }
+  let snapped = outfallSnapped, reoriented = outfallReoriented, flagged = outfallFlagged, have = 0;
+  arrowTiles.forEach(e => {
+    if (!e || e.stamp !== indexStamp) return;
+    have++;
+    e.list.forEach(a => {
+      if (a.snapped) snapped++;
+      if (a.reoriented) reoriented++;
+      if (a.flag) flagged++;
+    });
+  });
+  const total = arrowIndex ? Object.keys(arrowIndex.tiles).length : 0;
+  const tail = total && have < total ? ' Đang tải các ô còn lại.' : '';
+  setStatus(`Đối chiếu đường thủy nội địa: bám ${snapped}, đảo hướng ${reoriented}, cần rà ${flagged}.${tail}`);
 }
 
 function syncLayers() {
@@ -428,14 +597,16 @@ export function setDrainageVisible(on) {
   const legend = $('drainageLegend');
   if (legend) legend.style.display = visible ? '' : 'none';
   syncLayers();
-  if (!visible || lines) { setStatus(''); return; }
-  setStatus('Đang tải mạng lưới thoát nước…');
-  loadDrainage().then(() => {
-    setStatus('');
-    refreshViews();
-  }).catch(err => {
+  if (!visible) { setStatus(''); return; }
+  if (!lines) setStatus('Đang tải mạng lưới thoát nước…');
+  else refreshCounts();
+  const net = lines ? Promise.resolve() : loadDrainage().then(() => { refreshViews(); refreshCounts(); });
+  const water = loadOsmOpen().then(() => { syncWater(); ensureArrowIndex(); }).catch(() => {
+    if (visible && !waterIndex) setStatus('Chưa đối chiếu được đường thủy nội địa.', true);
+  });
+  Promise.all([net, water]).catch(err => {
     console.warn('Không tải được lớp thoát nước:', err);
-    setStatus(`Chưa tải được: ${err.message}`);
+    if (!lines) setStatus(`Chưa tải được: ${err.message}`, true);
   });
 }
 
