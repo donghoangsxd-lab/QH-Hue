@@ -526,7 +526,7 @@
         <div class="layer-map" id="layerMap">
           <div class="layer-map-tabs" role="tablist" aria-label="Bản đồ nền và bản đồ môi trường">
             <button type="button" class="layer-map-tab active" role="tab" data-map-tab="base" aria-selected="true" aria-controls="layerPaneBase" title="Ranh giới phường xã, mạng lưới đường, phân bổ dân cư, ranh lô công trình, đất xây dựng theo ảnh vệ tinh, bản đồ độ phủ và bán kính phục vụ giả lập."><span class="layer-map-label">Bản đồ nền</span><span class="layer-count layer-map-count" title="Số lớp đang bật">1</span></button>
-            <button type="button" class="layer-map-tab" role="tab" data-map-tab="env" aria-selected="false" aria-controls="layerPaneEnv" title="Địa hình, thoát nước, ngập, nhiệt độ bề mặt, phủ thực vật và công trình chịu rủi ro."><span class="layer-map-label">Bản đồ môi trường</span><span class="layer-count layer-map-count" title="Số lớp đang bật"></span></button>
+            <button type="button" class="layer-map-tab" role="tab" data-map-tab="env" aria-selected="false" aria-controls="layerPaneEnv" title="Địa hình, thoát nước, ngập, nhiệt độ bề mặt, phủ thực vật, ưu tiên trồng cây và công trình chịu rủi ro."><span class="layer-map-label">Bản đồ môi trường</span><span class="layer-count layer-map-count" title="Số lớp đang bật"></span></button>
           </div>
           <div class="layer-map-pane" id="layerPaneBase" data-map-pane="base" role="tabpanel">
           <div class="sat-pick basemap-pick">
@@ -720,6 +720,20 @@
             <div class="sat-pick"><label for="ndviCompare">So sánh</label><select id="ndviCompare"></select></div>
             <div class="sat-legend" id="ndviLegend"></div>
             <div class="flood-stats" id="ndviStats"></div>
+          </div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_tree"><label for="chk_tree" title="Mức tương đối: nơi đất xây dựng nóng, ít cây và đông dân. Mang tính tham khảo."><svg class="ico ico-layer"><use href="#i-leaf"/></svg>Ưu tiên trồng cây xanh</label></div>
+            <span id="treeOpBox" class="layer-slider" style="display:none;"><input type="range" id="treeOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp ưu tiên trồng cây" aria-label="Độ trong suốt lớp ưu tiên trồng cây"></span>
+          </div>
+          <div class="flood-box" id="treeBox" style="display:none;">
+            <div class="sat-pick"><label for="treeYear">Năm</label><select id="treeYear"></select></div>
+            <div class="sat-legend" id="treeLegend"></div>
+            <details class="detail-more"><summary>Cách tính</summary><div class="detail-more-body">
+              <p>Điểm là mức tương đối giữa các phường, xã đủ từ 15 ha đất xây dựng. Ba thành phần ngang nhau: nhiệt độ bề mặt mùa nóng cao, NDVI trên đất xây dựng thấp, mật độ dân trên đất xây dựng cao.</p>
+              <p>Đất xây dựng theo ảnh vệ tinh (nhãn built hoặc GHSL), đã loại mặt nước, rừng, đất nông nghiệp và vùng đệm nghĩa trang đã duyệt. Nhiệt độ đo lúc vệ tinh bay qua, không phải nhiệt độ không khí.</p>
+              <p id="treeMethod"></p>
+            </div></details>
+            <div class="flood-stats" id="treeStats"></div>
           </div>
           <div class="layer-row">
             <div><input type="checkbox" id="chk_forest"><label for="chk_forest" title="Ước tính phủ thực vật và mất rừng từ ảnh vệ tinh. Không phải ranh 3 loại rừng."><svg class="ico ico-layer"><use href="#i-leaf"/></svg>Rừng, phủ thực vật</label></div>
