@@ -7,7 +7,6 @@ const TREE_SCALE_M = 100;
 const ZONE_SCALE_M = 30;
 const NDVI_FINE_M = 10;
 const ZONE_MIN_HA = 0.5;
-const ZONE_MIN_PIXELS = 8;
 const ZONE_LIMIT = 160;
 const TREE_FIRST_YEAR = 2017;
 const LST_L3 = 36.5;
@@ -399,7 +398,8 @@ function buildTreeRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
 
 /**
  * Vùng ưu tiên trên lưới 30 m: chỉ ô nóng, ít cây và có dân cư.
- * NDVI 10 m lấy trung bình về lưới nhiệt. Làm trơn 3×3 rồi bỏ mảng nhỏ hơn khoảng 0,7 ha.
+ * NDVI 10 m lấy trung bình về lưới nhiệt. Làm trơn 3×3; mảng dưới 0,5 ha bị loại sau khi vẽ vùng.
+ * Không dùng connectedPixelCount: phép đó vượt bộ nhớ Earth Engine trên cả tỉnh.
  * Tên phường gán sau khi đã giới hạn 160 vùng lớn nhất.
  */
 function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year, buffers) {
@@ -425,17 +425,16 @@ function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
     popHa = popImage.unmask(0).divide(scale * scale).multiply(10000);
   }
   const res30 = residential.unmask(0).reproject(proj);
-  let level = ee.Image(0).clip(region);
-  level = level.where(res30.gt(0).and(lst30.gte(LST_L1)).and(ndvi.lte(NDVI_L1)), 1);
-  level = level.where(res30.gt(0).and(lst30.gte(LST_L2)).and(ndvi.lte(NDVI_L2)), 2);
-  level = level.where(res30.gt(0).and(lst30.gte(LST_L3)).and(ndvi.lte(NDVI_L3)), 3);
   const urban30 = urban.unmask(0).reproject(proj);
-  const onGrid = level.updateMask(urban).unmask(0).reproject(proj);
-  const smooth = onGrid.focalMode(1, 'square', 'pixels').reproject(proj).multiply(urban30);
-  const keep = smooth.gt(0).selfMask().connectedPixelCount(128, true).gte(ZONE_MIN_PIXELS);
-  const zoned = smooth.updateMask(keep).toInt().rename('level').clip(region);
+  const blank = ee.Image(0).setDefaultProjection(proj);
+  const hot = res30.gt(0).and(urban30);
+  let level = blank.where(hot.and(lst30.gte(LST_L1)).and(ndvi.lte(NDVI_L1)), 1);
+  level = level.where(hot.and(lst30.gte(LST_L2)).and(ndvi.lte(NDVI_L2)), 2);
+  level = level.where(hot.and(lst30.gte(LST_L3)).and(ndvi.lte(NDVI_L3)), 3);
+  const smooth = level.unmask(0).focalMode(1, 'square', 'pixels').multiply(urban30).toInt().rename('level');
+  const zoned = smooth.updateMask(smooth.gt(0)).clip(region);
 
-  const ranked = zoned.reduceToVectors({
+  const vectors = zoned.reduceToVectors({
     geometry: region,
     crs: 'EPSG:32648',
     scale: ZONE_SCALE_M,
@@ -443,8 +442,9 @@ function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
     eightConnected: true,
     labelProperty: 'level',
     maxPixels: 1e8,
-    tileScale: 4
-  }).map(f => {
+    tileScale: 16
+  });
+  const ranked = vectors.map(f => {
     const geom = f.geometry().simplify(20);
     const ha = geom.area(1).divide(1e4);
     const rankKey = ee.Number(f.get('level')).multiply(100000).add(ha);
@@ -464,7 +464,7 @@ function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
     reducer: ee.Reducer.mean(),
     scale: ZONE_SCALE_M,
     crs: 'EPSG:32648',
-    tileScale: 4
+    tileScale: 16
   });
   const city = lst30.updateMask(urban).addBands(ndvi.updateMask(urban)).reduceRegion({
     reducer: ee.Reducer.mean(),
@@ -472,7 +472,7 @@ function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
     scale: 100,
     crs: 'EPSG:32648',
     maxPixels: 1e8,
-    tileScale: 4,
+    tileScale: 8,
     bestEffort: true
   });
   return { zones, city, scaleM: ZONE_SCALE_M };
