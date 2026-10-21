@@ -31,12 +31,31 @@ function treeYears() {
   return { years: years.filter(y => y >= 2017).slice(0, 4), partial: now.getFullYear(), def };
 }
 
-function ensurePane(m) {
+const renderers = new WeakMap();
+
+function wardsReady() {
+  return (state.wardLabelsList || []).some(w => w.geometry);
+}
+
+function waitWards() {
+  if (wardsReady()) return Promise.resolve();
+  return new Promise(resolve => {
+    const t0 = Date.now();
+    const tick = () => {
+      if (wardsReady() || Date.now() - t0 > 20000) resolve();
+      else setTimeout(tick, 250);
+    };
+    tick();
+  });
+}
+
+function rendererFor(m) {
   if (!m.getPane(PANE)) {
     const pane = m.createPane(PANE);
     pane.style.zIndex = String(PANE_Z);
   }
-  return PANE;
+  if (!renderers.has(m)) renderers.set(m, L.canvas({ pane: PANE }));
+  return renderers.get(m);
 }
 
 function scoreColor(score) {
@@ -125,7 +144,8 @@ function choropleth(wards) {
   const fc = { type: 'FeatureCollection', features };
   return mapsOf().map(m => {
     const layer = L.geoJSON(fc, {
-      pane: ensurePane(m),
+      pane: PANE,
+      renderer: rendererFor(m),
       interactive: true,
       style: f => styleOf(f.properties.score, fill),
       onEachFeature: (feat, path) => {
@@ -210,6 +230,8 @@ async function show() {
   const tileP = load('tile');
   try {
     const d = await load('stats');
+    if (my !== seq || !visible) { task.cancel(); return; }
+    await waitWards();
     if (my !== seq || !visible) { task.cancel(); return; }
     task.set(50, 'Đang tải lưới ưu tiên');
     clearLayers();
