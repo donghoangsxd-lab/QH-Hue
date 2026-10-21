@@ -109,6 +109,7 @@ export function prjToCrs(prj) {
   const cm = s.match(/CENTRAL_MERIDIAN"\s*,\s*([-\d.]+)/);
   const lon0 = cm ? Number(cm[1]) : NaN;
   if (Math.abs(lon0 - 107) < 0.01) return 'HUE_3';
+  if (Math.abs(lon0 - 107.75) < 0.02) return 'HUE_107_45';
   if (Math.abs(lon0 - 105) < 0.01) return 'UTM48_6';
   return null;
 }

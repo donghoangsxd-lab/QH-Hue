@@ -824,12 +824,18 @@ function renderReport() {
   }
   const planned = parcels.filter(p => planOf(p)).length;
   if (planned) alerts.push(['info', `${fmtNum(planned)} lô có chỉ tiêu quy hoạch (tầng cao, mật độ, hệ số SDĐ)${current.stampFile ? ` từ <b>${escapeHtml(current.stampFile)}</b>` : ''}: ghi vào thuộc tính lô. Lô hạ tầng ghi thêm cột TangCao, MatDoXD, HeSoSDD và KyHieu trên Sheet.`]);
-  if (current.stampFile) {
-    const n = (current.stampView || []).length;
+  const stampN = (current.stampView || []).length;
+  if (current.stampFile || stampN || (current.inlineStamps && current.inlineStamps.length)) {
     const pend = (current.stampMatch && current.stampMatch.pending.length) || 0;
     const done = (current.stampMatch && current.stampMatch.assigned.length) || 0;
-    if (!n) alerts.push(['warn', `File ký hiệu <b>${escapeHtml(current.stampFile)}</b> không đọc được tem đất (chữ trong vòng tròn, hoặc block có thuộc tính ký hiệu / diện tích / mật độ / tầng cao).`]);
-    else if (!pend) alerts.push(['info', `Tem đất: đã gán ${fmtNum(done)}/${fmtNum(n)} từ <b>${escapeHtml(current.stampFile)}</b> vào polygon bên dưới.`]);
+    const left = (current.stampMatch && current.stampMatch.unmatchedLots.length) || 0;
+    const src = current.stampFile ? `từ <b>${escapeHtml(current.stampFile)}</b>` : 'từ block trong file sử dụng đất';
+    if (!stampN && current.stampFile) alerts.push(['warn', `File ký hiệu <b>${escapeHtml(current.stampFile)}</b> không đọc được tem đất (chữ trong vòng tròn, hoặc block có thuộc tính ký hiệu / diện tích / mật độ / tầng cao).`]);
+    else if (stampN) {
+      const examples = (current.stampMatch.pending || []).slice(0, 3).map(s => escapeHtml(stampLabel(s))).join('; ');
+      const crs = current.stampCrsNote ? ` Hệ tem: ${escapeHtml(current.stampCrsNote)}.` : '';
+      alerts.push([pend ? 'warn' : 'info', `Tem đất: đã gán ${fmtNum(done)}/${fmtNum(stampN)} ${src}.${pend ? ` Còn ${fmtNum(pend)} tem chưa vào lô${examples ? ` (${examples})` : ''}.` : ''}${left ? ` ${fmtNum(left)} lô chưa có tem.` : ''}${crs}`]);
+    }
   }
   if (current.bothPhases) {
     const names = current.slotFiles || {};
@@ -1284,15 +1290,23 @@ async function ensureKhParsed(force = false) {
   }
 }
 
-function stampToLatLng(stamps, wgs84, crs) {
-  if (wgs84) return (x, y) => [y, x];
-  const axes = detectAxes((stamps || []).map(s => ({ pt: [s.x, s.y] })));
-  const f = axes.valid ? axes.f : (x, y) => [x, y];
+function projector(axes, crs) {
+  const f = axes && axes.valid ? axes.f : (x, y) => [x, y];
   return (x, y) => {
     const [E, N] = f(x, y);
-    if (!axes.valid && E > 100 && E < 120 && N > 8 && N < 24) return [N, E];
+    if (axes && !axes.valid && E > 100 && E < 120 && N > 8 && N < 24) return [N, E];
     return vn2000ToWgs84(E, N, crs);
   };
+}
+
+function projectBest(stamps, lots, attempts) {
+  let best = null;
+  attempts.forEach(a => {
+    const projected = projectStamps(stamps, a.toLatLng);
+    const n = matchStamps(projected, lots).assigned.length;
+    if (!best || n > best.n) best = { projected, n, note: a.note || '' };
+  });
+  return best || { projected: [], n: 0, note: '' };
 }
 
 function writeStamp(p, stamp) {
@@ -1314,16 +1328,43 @@ function applyStamps(parcels) {
   });
   current.stampMatch = null;
   current.stampView = null;
+  current.stampCrsNote = '';
   current.stampFile = khState.fileName || '';
-  if (!khState.raw || !khState.raw.length) return;
+  const inline = current.inlineStamps || [];
+  const kh = khState.raw || [];
+  if (!inline.length && !kh.length) return;
   const crs = CRS_PRESETS[$('cadCrs')?.value] || CRS_PRESETS.HUE_3;
-  const projected = projectStamps(khState.raw, stampToLatLng(khState.raw, current.wgs84, crs));
-  current.stampView = projected;
   const lots = parcels.filter(p => p.polygons && p.polygons.length).map(p => ({
     key: String(p.src),
     area: p.area,
     rings: [...p.polygons, ...((p.partner && p.partner.polygons) || [])]
   }));
+  const hatchAxes = detectAxes(current.entities || []);
+  let projected = [];
+  if (inline.length) {
+    projected = projected.concat(current.wgs84
+      ? projectStamps(inline, (x, y) => [y, x])
+      : projectStamps(inline, projector(hatchAxes, crs)));
+  }
+  if (kh.length) {
+    const crss = [crs, CRS_PRESETS.HUE_3, CRS_PRESETS.HUE_107_45, CRS_PRESETS.UTM48_6]
+      .filter((c, i, arr) => c && arr.findIndex(q => q.lon0 === c.lon0 && q.k0 === c.k0) === i);
+    const axes = current.wgs84 ? [] : [detectAxes(kh.map(s => ({ pt: [s.x, s.y] }))), hatchAxes];
+    const attempts = current.wgs84
+      ? [{ toLatLng: (x, y) => [y, x], note: '' }]
+      : axes.flatMap(ax => crss.map(c => ({ toLatLng: projector(ax, c), note: c.label })));
+    const best = projectBest(kh, lots, attempts);
+    projected = projected.concat(best.projected);
+    if (best.note && best.note !== crs.label) current.stampCrsNote = best.note;
+  }
+  const seen = new Set();
+  projected = projected.filter(s => {
+    const k = `${s.code}|${s.floors}|${s.coverage}|${s.far}|${Math.round(s.x * 100)}|${Math.round(s.y * 100)}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  current.stampView = projected;
   const byKey = new Map(parcels.map(p => [String(p.src), p]));
   const match = matchStamps(projected, lots, { assign: khState.assign, skip: khState.skip });
   current.stampMatch = match;
@@ -1388,6 +1429,7 @@ async function readImportFile(file, opts) {
     if (head.startsWith('AutoCAD Binary DXF')) throw new Error('DXF dạng nhị phân chưa hỗ trợ — lưu lại dạng ASCII DXF.');
     text = await file.text();
     parsed = parseDxf(text, { lines: asLines });
+    if (!asLines) parsed.stamps = parseLandStampDxf(text);
   } else if (ext === 'json' || ext === 'geojson') {
     text = await file.text();
     parsed = parseGeoJson(text);
@@ -1667,7 +1709,8 @@ async function reloadDxfSlots() {
       parsed: {
         ...primary.parsed,
         entities: areas.flatMap(r => r.parsed.entities),
-        layers: areas.flatMap(r => r.parsed.layers || [])
+        layers: areas.flatMap(r => r.parsed.layers || []),
+        stamps: areas.flatMap(r => r.parsed.stamps || [])
       },
       text: primary.text,
       wgs84: primary.wgs84
@@ -1791,6 +1834,7 @@ function openParsed({ file, format, parsed, text, wgs84 }, pendingId, extras) {
     raw: { ext: format === 'shp' ? 'geojson' : format, text }, pendingId,
     crs: parsed.crs || null, crsUnknown: !!parsed.crsUnknown, layers: parsed.layers || [],
     points: points ? pointSource(points) : null,
+    inlineStamps: parsed.stamps || [],
     boundaryOnly: false, boundaryGeom: null, boundaryFailed: false, boundaryFile: ''
   };
   setBoundaryFrom(lines);

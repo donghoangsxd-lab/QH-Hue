@@ -131,7 +131,7 @@ async function textOf(file, limit = 8000) {
 function crsNote(prj) {
   if (!prj) return 'Thiếu file .prj';
   const crs = prjToCrs(prj);
-  if (crs === 'HUE_3' || crs === 'UTM48_6') return '';
+  if (crs === 'HUE_3' || crs === 'HUE_107_45' || crs === 'UTM48_6') return '';
   if (crs === 'WGS84') return 'Hệ tọa độ WGS84. Hồ sơ quy hoạch tại Huế thường dùng VN-2000 (kinh tuyến trục 107° hoặc múi 6°).';
   return 'Hệ tọa độ không phải VN-2000 múi Huế (107°) hay UTM 48 (105°).';
 }

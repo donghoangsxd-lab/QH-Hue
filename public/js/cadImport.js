@@ -8,6 +8,8 @@ const VN2000_TOWGS84 = [-191.90441429, -39.30318279, -111.45032835, -0.00928836,
 
 export const CRS_PRESETS = {
   HUE_3: { label: 'VN-2000 TT-Huế (KTT 107°00\', múi 3°)', lon0: 107, k0: 0.9999 },
+  // Bản vẽ địa chính Thừa Thiên Huế cũ đôi khi dùng kinh tuyến trục 107°45' thay vì 107°00'.
+  HUE_107_45: { label: 'VN-2000 KTT 107°45\', múi 3°', lon0: 107.75, k0: 0.9999 },
   UTM48_6: { label: 'VN-2000 UTM múi 48 (KTT 105°, múi 6°)', lon0: 105, k0: 0.9996 }
 };
 

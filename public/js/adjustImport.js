@@ -335,7 +335,8 @@ function khExtra() {
   const pend = (khMatch && khMatch.pending) || [];
   const done = (khMatch && khMatch.assigned.length) || 0;
   if (!record) return `<div class="adj-stamp">Đã đọc ${fmtNum(n)} tem. Thêm DXF ranh + hatch để gán vào lô.</div>`;
-  if (!pend.length) return `<div class="adj-stamp adj-ok">Đã gán ${fmtNum(done)}/${fmtNum(n)} tem vào lô.</div>`;
+  const left = (khMatch && khMatch.unmatchedLots && khMatch.unmatchedLots.length) || 0;
+  if (!pend.length) return `<div class="adj-stamp adj-ok">Đã gán ${fmtNum(done)}/${fmtNum(n)} tem vào lô.${left ? ` ${fmtNum(left)} lô chưa có tem.` : ''}</div>`;
   const cur = pend.find(s => s.id === stampPick) || pend[0];
   const chips = pend.map(s => `<button type="button" class="cad-stamp-chip${s.id === cur.id ? ' on' : ''}" data-adj-imp="stamp" data-stamp="${escapeHtml(s.id)}">${escapeHtml(stampLabel(s))}</button>`).join('');
   return `<div class="cad-stamp adj-stamp">
