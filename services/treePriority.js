@@ -73,13 +73,21 @@ function wardName(p) {
 }
 
 /** Ghép reduceRegions nhiệt/NDVI với dân số/diện tích. Đọc cả tên band và tên có hậu tố reducer. */
+function popFromPixels(danSo, urbanPix, allPix) {
+  const pop = finite(danSo);
+  const urban = finite(urbanPix);
+  const all = finite(allPix);
+  if (pop == null || pop <= 0 || all == null || all <= 0 || urban == null) return null;
+  return pop * Math.min(all, Math.max(0, urban)) / all;
+}
+
 function rowsFromFeatures(meanFc, sumFc) {
   const byName = new Map();
   const take = (fc, assign) => {
     ((fc && fc.features) || []).forEach(f => {
       const p = (f && f.properties) || {};
       const name = wardName(p);
-      const row = byName.get(name) || { name, builtHa: null, lst: null, ndvi: null, pop: null };
+      const row = byName.get(name) || { name, builtHa: null, lst: null, ndvi: null, pop: null, danSo: null, urbanPix: null, allPix: null };
       assign(row, p);
       byName.set(name, row);
     });
@@ -93,10 +101,24 @@ function rowsFromFeatures(meanFc, sumFc) {
   take(sumFc, (row, p) => {
     const pop = numProp(p, ['pop', 'pop_sum']);
     const builtHa = numProp(p, ['builtHa', 'builtHa_sum']);
+    const danSo = numProp(p, ['danSoNum', 'danSo']);
+    const urbanPix = numProp(p, ['urbanPix', 'urbanPix_sum']);
+    const allPix = numProp(p, ['allPix', 'allPix_sum']);
     if (pop != null) row.pop = pop;
     if (builtHa != null) row.builtHa = builtHa;
+    if (danSo != null) row.danSo = danSo;
+    if (urbanPix != null) row.urbanPix = urbanPix;
+    if (allPix != null) row.allPix = allPix;
   });
   return [...byName.values()];
+}
+
+/** Raster pixel cũ không cộng giá trị tô phường (sai lưới). Dân = dân số phường × pixel có dân nằm trên đất xây dựng / pixel có dân. */
+function assignFallbackPop(rows) {
+  return (rows || []).map(r => {
+    const pop = popFromPixels(r.danSo, r.urbanPix, r.allPix);
+    return pop == null ? r : { ...r, pop };
+  });
 }
 
 function percentileRanks(values) {
@@ -222,7 +244,7 @@ function cemeteryImage(ee, buffers) {
  * meanFc / sumFc: nhiệt, NDVI, dân, ha đất xây dựng theo phường.
  * Thang màu cố định (30–42 °C, NDVI 0,55–0,10, 0–150 người/ha), không phải hạng bách phân của bảng.
  */
-function buildTreeRequest(ee, wards, popImage, popCrs, popScale, year, buffers) {
+function buildTreeRequest(ee, wards, popImage, popCrs, popScale, popPeople, year, buffers) {
   const scale = popScale || 30;
   const crs = popCrs || ee.Projection('EPSG:32648').atScale(scale);
   const cem = cemeteryImage(ee, buffers);
@@ -249,16 +271,33 @@ function buildTreeRequest(ee, wards, popImage, popCrs, popScale, year, buffers) 
     tileScale: 4
   }).map(f => namedFeature(ee, f, { lst: ['lst', 'lst_mean'], ndvi: ['ndvi', 'ndvi_mean'] }));
 
-  const urbanOnPop = urban.reproject({ crs, scale }).unmask(0);
-  const pop = popImage.unmask(0).multiply(urbanOnPop).rename('pop');
-  const builtHa = urbanOnPop.multiply(ee.Image.pixelArea()).divide(1e4).rename('builtHa');
-  const sumFc = pop.addBands(builtHa).reduceRegions({
+  const sumOpts = {
     collection: wards,
     reducer: ee.Reducer.sum().unweighted(),
     scale,
-    crs,
     tileScale: 4
-  }).map(f => namedFeature(ee, f, { pop: ['pop', 'pop_sum'], builtHa: ['builtHa', 'builtHa_sum'] }));
+  };
+  let sumImg;
+  let sumFields;
+  if (popPeople) {
+    const urbanOnPop = urban.reproject({ crs, scale }).unmask(0);
+    sumImg = popImage.unmask(0).multiply(urbanOnPop).rename('pop')
+      .addBands(urbanOnPop.multiply(ee.Image.pixelArea()).divide(1e4).rename('builtHa'));
+    sumFields = { pop: ['pop', 'pop_sum'], builtHa: ['builtHa', 'builtHa_sum'] };
+    sumOpts.crs = crs;
+  } else {
+    const pix = popImage.mask().gt(0).unmask(0);
+    const urban01 = urban.unmask(0);
+    sumImg = pix.multiply(urban01).rename('urbanPix')
+      .addBands(pix.rename('allPix'))
+      .addBands(urban01.multiply(ee.Image.pixelArea()).divide(1e4).rename('builtHa'));
+    sumFields = {
+      urbanPix: ['urbanPix', 'urbanPix_sum'],
+      allPix: ['allPix', 'allPix_sum'],
+      builtHa: ['builtHa', 'builtHa_sum']
+    };
+  }
+  const sumFc = sumImg.reduceRegions(sumOpts).map(f => namedFeature(ee, f, sumFields));
 
   return { vis, meanFc, sumFc, cellM: TREE_SCALE_M };
 }
@@ -272,6 +311,8 @@ module.exports = {
   cemeteryBuffers,
   acceptYear,
   rowsFromFeatures,
+  popFromPixels,
+  assignFallbackPop,
   scoreTreeWards,
   buildTreeRequest
 };
