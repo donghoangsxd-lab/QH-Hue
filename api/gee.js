@@ -963,6 +963,168 @@ let cachedFloodBins = null;   // { version: phiên bản hiệu chỉnh dân cư
 const FLOOD_DEM = 'fabdem-hue';
 const cachedSatStats = new Map();   // "lst|năm" hoặc "sar|năm|bản dân cư|bản dữ liệu" → kết quả thống kê lớp vệ tinh
 const treeJobs = new Map();
+const treeZoneMemo = new Map();
+const TREE_ZONE_BUDGET_MS = 42000;
+const TREE_WARD_MS = 22000;
+
+function eeWithin(obj, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    eeEvaluate(obj).then(
+      v => { clearTimeout(timer); resolve(v); },
+      err => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
+async function loadTreeFile(name) {
+  try {
+    return await gcsWrite.readJson(name);
+  } catch (err) {
+    console.warn('Đọc cache vùng cây:', err.message);
+    return null;
+  }
+}
+
+async function persistTree(name, state) {
+  const file = {
+    names: state.names,
+    city: state.city,
+    cityFailed: !!state.cityFailed,
+    byWard: state.byWard,
+    coarse: state.coarse
+  };
+  const match = state.generation == null ? '0' : state.generation;
+  try {
+    const saved = await gcsWrite.putJson(name, JSON.stringify(file), match);
+    state.generation = saved.generation;
+  } catch (err) {
+    if (err.code !== 'GEN') {
+      console.warn('Ghi cache vùng cây:', err.message);
+      return;
+    }
+    const remote = await gcsWrite.readJson(name);
+    if (!remote) return;
+    const data = remote.data || {};
+    state.generation = remote ? remote.generation : state.generation;
+    state.names = state.names || data.names || null;
+    state.city = state.city || data.city || null;
+    state.cityFailed = !!(state.cityFailed || data.cityFailed);
+    state.byWard = { ...(data.byWard || {}), ...(state.byWard || {}) };
+    state.coarse = [...new Set([...(data.coarse || []), ...(state.coarse || [])])];
+    const saved = await gcsWrite.putJson(name, JSON.stringify({
+      names: state.names, city: state.city, cityFailed: !!state.cityFailed, byWard: state.byWard, coarse: state.coarse
+    }), state.generation);
+    state.generation = saved.generation;
+  }
+}
+
+function treeZoneFeatures(state) {
+  const out = [];
+  Object.entries(state.byWard || {}).forEach(([ward, row]) => {
+    (row.features || []).forEach(f => {
+      out.push({
+        type: 'Feature',
+        geometry: f.geometry,
+        properties: { ...(f.properties || {}), ward, scaleM: row.scale }
+      });
+    });
+  });
+  return out;
+}
+
+function treeZonePayload(state, meta) {
+  const cityObj = state.city || {};
+  const lstRaw = cityObj.lst != null ? cityObj.lst : cityObj.lst_mean;
+  const ndviRaw = cityObj.ndvi != null ? cityObj.ndvi : cityObj.ndvi_mean;
+  const zones = tree.normalizeZones({ features: treeZoneFeatures(state) }, { lst: lstRaw, ndvi: ndviRaw });
+  const fine = Object.values(state.byWard).some(row => row.scale === tree.ZONE_SCALE_M);
+  return {
+    year: meta.year,
+    cityLst: lstRaw == null || !Number.isFinite(Number(lstRaw)) ? null : round1(Number(lstRaw)),
+    cityNdvi: ndviRaw == null || !Number.isFinite(Number(ndviRaw)) ? null : Math.round(Number(ndviRaw) * 100) / 100,
+    scaleM: fine ? tree.ZONE_SCALE_M : tree.ZONE_SCALE_COARSE_M,
+    coarseCount: (state.coarse || []).length,
+    indicative: true,
+    popSource: meta.popSource,
+    popFallback: !!meta.popFallback,
+    popFromTable: !!meta.popFromTable,
+    popScaleNote: meta.popScaleNote || '',
+    cemeteryCount: meta.cemeteryCount,
+    levels: tree.ZONE_LEVELS,
+    zones
+  };
+}
+
+async function advanceTreeZones(ctx) {
+  const name = ctx.cacheName;
+  let state = treeZoneMemo.get(name);
+  if (!state) {
+    const remote = await loadTreeFile(name);
+    const data = (remote && remote.data) || {};
+    state = {
+      generation: remote ? remote.generation : null,
+      names: Array.isArray(data.names) ? data.names : null,
+      city: data.city || null,
+      cityFailed: !!data.cityFailed,
+      byWard: data.byWard || {},
+      coarse: data.coarse || []
+    };
+    treeZoneMemo.set(name, state);
+  }
+  const doneCount = () => Object.keys(state.byWard).length;
+  const total = () => (state.names || []).length;
+  if (state.names && total() > 0 && doneCount() >= total() && (state.city || state.cityFailed)) {
+    return { pending: false, payload: treeZonePayload(state, ctx.meta) };
+  }
+  const t0 = Date.now();
+  const left = () => TREE_ZONE_BUDGET_MS - (Date.now() - t0);
+  if (!state.names) {
+    const raw = await eeWithin(tree.wardNameList(ctx.ee, ctx.wards), Math.max(3000, Math.min(12000, left())));
+    state.names = [...new Set((raw || []).map(s => String(s || '').trim()).filter(Boolean))];
+    if (!state.names.length) throw new Error('Không đọc được danh sách phường');
+    await persistTree(name, state);
+  }
+  const pending = state.names.filter(n => !state.byWard[n]);
+  while (pending.length && left() > 6000) {
+    const ward = pending.shift();
+    let scale = tree.ZONE_SCALE_M;
+    let fc = null;
+    try {
+      const req = tree.zonesForWard(ctx.ee, ctx.wards, ward, ctx.popImage, ctx.popCrs, ctx.popScale, ctx.popPeople, ctx.year, ctx.buffers, scale);
+      fc = await eeWithin(req.zones, Math.min(TREE_WARD_MS, left() - 1500));
+    } catch (err) {
+      console.warn(`Vùng cây 30 m ${ward}:`, err.message);
+      if (left() < 7000) break;
+      scale = tree.ZONE_SCALE_COARSE_M;
+      try {
+        const req = tree.zonesForWard(ctx.ee, ctx.wards, ward, ctx.popImage, ctx.popCrs, ctx.popScale, ctx.popPeople, ctx.year, ctx.buffers, scale);
+        fc = await eeWithin(req.zones, Math.min(16000, left() - 1000));
+        state.coarse.push(ward);
+      } catch (err2) {
+        console.warn(`Vùng cây 60 m ${ward}:`, err2.message);
+        state.byWard[ward] = { scale, features: [] };
+        await persistTree(name, state);
+        continue;
+      }
+    }
+    state.byWard[ward] = { scale, features: (fc && fc.features) || [] };
+    await persistTree(name, state);
+  }
+  if (!state.city && !state.cityFailed && doneCount() >= total() && left() > 8000) {
+    try {
+      state.city = await eeWithin(tree.buildCityStats(ctx.ee, ctx.wards, ctx.year, ctx.buffers), Math.min(18000, left() - 1000));
+    } catch (err) {
+      state.cityFailed = true;
+      console.warn('Nhiệt thành phố cho vùng cây:', err.message);
+    }
+    await persistTree(name, state);
+  }
+  if (doneCount() >= total() && (state.city || state.cityFailed)) {
+    return { pending: false, payload: treeZonePayload(state, ctx.meta) };
+  }
+  return { pending: true, done: doneCount(), total: total() };
+}
 // Tọa độ công trình là 1 điểm trong khu đất: xét rủi ro ngập / nhiệt trong vòng bán kính này quanh điểm
 const RISK_BUFFER_M = 30;
 // Trong vùng phát triển mới (satService.newDevImage) kiểm tra vườn hoa, bãi đỗ xe ≤ 400 m (Mục 2.2.3.3, đường chim bay)
@@ -4003,37 +4165,35 @@ module.exports = async (req, res) => {
       const buffers = tree.cemeteryBuffers(list);
       const part = req.query.part === 'tile' ? 'tile' : (req.query.part === 'zones' ? 'zones' : 'stats');
       const packVersion = noxhPack && noxhPack.version ? noxhPack.version : 'none';
-      const key = `tree|v9|${part}|${year}|${popSource}${popFromTable ? '|tbl' : ''}${popScaleNote ? '|c60' : ''}|${packVersion}|${getDataVersion()}`;
+      const key = `tree|v10|${part}|${year}|${popSource}${popFromTable ? '|tbl' : ''}${popScaleNote ? '|c60' : ''}|${packVersion}|${getDataVersion()}`;
       if (!cachedSatStats.has(key) && !treeJobs.has(key)) {
         const job = (async () => {
           const args = [ee, wardVectorParsed, popRasterNormalized, popProjection, popScale, !!popPeople, year, buffers];
           let payload;
           if (part === 'zones') {
-            const built = tree.buildZoneRequest(...args);
-            const [zonesFc, city] = await Promise.all([eeEvaluate(built.zones), eeEvaluate(built.city)]);
-            const cityObj = city || {};
-            const lstRaw = cityObj.lst != null ? cityObj.lst : cityObj.lst_mean;
-            const ndviRaw = cityObj.ndvi != null ? cityObj.ndvi : cityObj.ndvi_mean;
-            const rawFeatures = (zonesFc && zonesFc.features) || [];
-            const zones = tree.normalizeZones(zonesFc, { lst: lstRaw, ndvi: ndviRaw });
-            payload = {
+            const cacheName = `cache/tree-zones/v10-${year}-${packVersion}-${popScale || 0}-${popPeople ? 1 : 0}-${popFromTable ? 1 : 0}-${buffers.length}-${getDataVersion()}.json`;
+            const step = await advanceTreeZones({
+              ee,
+              wards: wardVectorParsed,
+              popImage: popRasterNormalized,
+              popCrs: popProjection,
+              popScale,
+              popPeople: !!popPeople,
               year,
-              cityLst: lstRaw == null || !Number.isFinite(Number(lstRaw)) ? null : round1(Number(lstRaw)),
-              cityNdvi: ndviRaw == null || !Number.isFinite(Number(ndviRaw)) ? null : Math.round(Number(ndviRaw) * 100) / 100,
-              scaleM: built.scaleM,
-              indicative: true,
-              popSource,
-              popFallback: !!popFallback,
-              popFromTable: !!popFromTable,
-              popScaleNote: popScaleNote || '',
-              cemeteryCount: buffers.length,
-              levels: tree.ZONE_LEVELS,
-              zones,
-              zoneRaw: rawFeatures.length
-            };
-            if (!zones.length && rawFeatures.length) {
-              payload.zoneSample = rawFeatures.slice(0, 3).map(f => f.properties || {});
-            }
+              buffers,
+              cacheName,
+              meta: {
+                year,
+                popSource,
+                popFallback,
+                popFromTable,
+                popScaleNote: popScaleNote || '',
+                cemeteryCount: buffers.length
+              }
+            });
+            payload = step.pending
+              ? { pending: true, year, done: step.done, total: step.total }
+              : step.payload;
           } else {
             const built = tree.buildTreeRequest(...args);
             payload = part === 'tile'
@@ -4063,13 +4223,14 @@ module.exports = async (req, res) => {
                 };
               })();
           }
-          cachedSatStats.set(key, payload);
+          if (!payload || !payload.pending) cachedSatStats.set(key, payload);
           return payload;
         })().finally(() => treeJobs.delete(key));
         treeJobs.set(key, job);
       }
       try {
         const payload = cachedSatStats.get(key) || await treeJobs.get(key);
+        if (payload && payload.pending) res.setHeader('Cache-Control', 'no-store');
         return res.status(200).json(payload);
       } catch (err) {
         console.error('Ưu tiên trồng cây:', err && err.stack ? err.stack : err);

@@ -4,7 +4,8 @@ const sat = require('./satService');
 
 const MIN_BUILT_HA = 15;
 const TREE_SCALE_M = 100;
-const ZONE_SCALE_M = 60;
+const ZONE_SCALE_M = 30;
+const ZONE_SCALE_COARSE_M = 60;
 const ZONE_MIN_HA = 0.3;
 const ZONE_LIMIT = 160;
 const TREE_FIRST_YEAR = 2017;
@@ -89,6 +90,38 @@ function numProp(props, keys) {
 
 function wardName(p) {
   return (p && (p.tenXa || p.NAME_2 || p.name)) || 'Phường';
+}
+
+/**
+ * Ô vùng mịn hơn ô dân: nearest copy cả giá trị sang mỗi ô con. Số bản sao để chia lại, tổng người không đổi.
+ * Ô vùng bằng hoặc thô hơn ô dân thì không chia (ô thô hơn đã cộng bằng reduceResolution).
+ */
+function peopleCopies(popScale, zoneScale) {
+  const pop = Number(popScale);
+  const zone = Number(zoneScale);
+  if (!(pop > 0) || !(zone > 0) || zone >= pop) return 1;
+  return (pop / zone) * (pop / zone);
+}
+
+/** mean người/ô × số ô. count có thì dùng; không thì suy từ diện tích và cạnh ô vùng. */
+function zonePeople(meanPeople, count, ha, scaleM) {
+  const mean = finite(meanPeople);
+  if (mean == null) return null;
+  const n = finite(count);
+  if (n != null && n > 0) return Math.round(mean * n);
+  const area = finite(ha);
+  const scale = finite(scaleM);
+  if (area == null || !(scale > 0)) return null;
+  return Math.round(mean * area * 10000 / (scale * scale));
+}
+
+/** Trong cùng mức: nhiệt vượt 35,5 °C × NDVI dưới 0,55 × số người. Không đổi ngưỡng ba mức. */
+function affectScore(lst, ndvi, pop) {
+  const t = finite(lst);
+  const n = finite(ndvi);
+  const p = finite(pop);
+  if (t == null || n == null || p == null || p <= 0) return 0;
+  return Math.max(0, t - LST_L1) / LST_SPAN * Math.max(0, NDVI_REF - n) / NDVI_SPAN * p;
 }
 
 /** Ghép reduceRegions nhiệt/NDVI với dân số/diện tích. Đọc cả tên band và tên có hậu tố reducer. */
@@ -303,24 +336,34 @@ function normalizeZones(fc, city) {
     if (level == null || level < 1 || ha == null || ha < ZONE_MIN_HA || !usableGeom(f && f.geometry)) return;
     const lst = numProp(p, ['lst', 'lst_mean']);
     const ndvi = numProp(p, ['ndvi', 'ndvi_mean']);
-    const popHa = numProp(p, ['popHa', 'popHa_mean']);
+    const scaleM = numProp(p, ['scaleM', 'scaleM_mean']);
+    const peopleMean = numProp(p, ['people', 'people_mean']);
+    const count = numProp(p, ['count', 'people_count']);
+    let pop = zonePeople(peopleMean, count, ha, scaleM);
+    let popHa = numProp(p, ['popHa', 'popHa_mean']);
+    if (pop == null) pop = popHa == null ? null : Math.round(popHa * ha);
+    else if (ha > 0) popHa = pop / ha;
     const lat = numProp(p, ['lat', 'lat_mean']);
     const lng = numProp(p, ['lng', 'lng_mean']);
+    const lstR = lst == null ? null : round1(lst);
+    const ndviR = ndvi == null ? null : round2(ndvi);
     zones.push({
       level: Math.round(level),
       ha: round2(ha),
-      lst: lst == null ? null : round1(lst),
-      ndvi: ndvi == null ? null : round2(ndvi),
+      lst: lstR,
+      ndvi: ndviR,
       popHa: popHa == null ? null : round1(popHa),
-      pop: popHa == null ? null : Math.round(popHa * ha),
+      pop,
+      weight: Math.round(affectScore(lstR, ndviR, pop)),
       lat,
       lng,
       ward: p.ward || p.tenXa || '',
+      scaleM: scaleM == null ? null : scaleM,
       lstGap: cityLst != null && lst != null ? round1(lst - cityLst) : null,
       geometry: f.geometry
     });
   });
-  zones.sort((a, b) => b.level - a.level || b.ha - a.ha);
+  zones.sort((a, b) => b.level - a.level || b.weight - a.weight || b.ha - a.ha);
   return zones.slice(0, ZONE_LIMIT).map((z, i) => ({ id: i + 1, ...z }));
 }
 
@@ -395,35 +438,80 @@ function buildTreeRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
   return { vis, meanFc, sumFc, cellM: TREE_SCALE_M };
 }
 
+function withTreeName(ee, wards) {
+  return wards.map(f => {
+    const name = ee.String(ee.List([f.get('tenXa'), f.get('NAME_2'), f.get('name')]).reduce(ee.Reducer.firstNonNull()));
+    return f.set('treeName', name);
+  });
+}
+
+function wardNameList(ee, wards) {
+  return withTreeName(ee, wards).aggregate_array('treeName');
+}
+
 /**
- * Vùng ưu tiên: một lượt quét ở lưới 60 m (lưới 30 m và phép làm trơn vượt hạn 60 giây).
- * Ô liền kề cùng mức gộp thành vùng. Trung bình nhiệt, NDVI, dân đi cùng lượt quét.
- * Tên phường gán ở trình duyệt.
+ * Người trên đúng ô vùng. Ảnh dân là số người/ô gốc (nhà thấp tầng đã nhân hệ số phường, cộng chung cư).
+ * Không làm trơn: làm trơn ở 30 m vượt hạn 60 giây. Ô vùng nhỏ hơn ô dân thì chia đều để tổng không nhân lên.
  */
-function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year, buffers) {
-  const region = wards.geometry();
-  const scale = popScale || ZONE_SCALE_M;
-  const crs = popCrs || ee.Projection('EPSG:32648').atScale(scale);
+function peopleGrid(ee, popImage, popCrs, popScale, zoneScale) {
+  const zoneCrs = ee.Projection('EPSG:32648').atScale(zoneScale);
+  const copies = peopleCopies(popScale, zoneScale);
+  let img = popImage.unmask(0).setDefaultProjection(popCrs);
+  if (zoneScale > popScale) {
+    img = img.reduceResolution({ reducer: ee.Reducer.sum(), maxPixels: 256, bestEffort: true });
+  }
+  img = img.reproject({ crs: zoneCrs, scale: zoneScale });
+  if (copies > 1) img = img.divide(copies);
+  return img.rename('people');
+}
+
+function buildCityStats(ee, wards, year, buffers) {
   const cem = cemeteryImage(ee, buffers);
   const urban = urbanMask(ee, wards, year, cem);
   const lst = sat.lstImage(ee, wards, year).rename('lst');
   const ndvi = sat.ndviImage(ee, wards, year).rename('ndvi');
-  const popHa = (popPeople ? popImage.unmask(0).reproject({ crs, scale }) : popImage.unmask(0))
-    .divide(scale * scale).multiply(10000).rename('popHa');
-  const residential = popPeople ? popHa.gte(RES_POP_HA) : popImage.mask().unmask(0);
+  return lst.updateMask(urban).addBands(ndvi.updateMask(urban)).reduceRegion({
+    reducer: ee.Reducer.mean(),
+    geometry: wards.geometry(),
+    scale: 100,
+    crs: 'EPSG:32648',
+    maxPixels: 1e8,
+    tileScale: 4,
+    bestEffort: true
+  });
+}
+
+/**
+ * Vùng ưu tiên trên một nhóm phường, lưới zoneScale (30 m, hoặc 60 m nếu phường đó không kịp).
+ * Người/ô đi cùng lượt quét. Tên phường gán sau khi có kết quả, vì reduceToVectors không giữ thuộc tính phường.
+ */
+function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year, buffers, zoneScale) {
+  const grid = zoneScale || ZONE_SCALE_M;
+  const region = wards.geometry();
+  const cem = cemeteryImage(ee, buffers);
+  const urban = urbanMask(ee, wards, year, cem);
+  const lst = sat.lstImage(ee, wards, year).rename('lst');
+  const ndvi = sat.ndviImage(ee, wards, year).rename('ndvi');
+  const people = popPeople
+    ? peopleGrid(ee, popImage, popCrs || ee.Projection('EPSG:32648').atScale(popScale || grid), popScale || grid, grid)
+    : null;
+  const perHa = people ? people.divide(grid * grid).multiply(10000) : null;
+  const residential = perHa ? perHa.gte(RES_POP_HA) : popImage.mask().unmask(0);
   const hot = residential.gt(0).and(urban.unmask(0));
   let level = ee.Image(0);
   level = level.where(hot.and(lst.gte(LST_L1)).and(ndvi.lte(NDVI_L1)), 1);
   level = level.where(hot.and(lst.gte(LST_L2)).and(ndvi.lte(NDVI_L2)), 2);
   level = level.where(hot.and(lst.gte(LST_L3)).and(ndvi.lte(NDVI_L3)), 3);
   const klass = level.toInt().rename('klass');
-  const stack = klass.addBands(lst).addBands(ndvi).addBands(popHa).updateMask(klass.gt(0));
+  let stack = klass.addBands(lst).addBands(ndvi);
+  if (people) stack = stack.addBands(people);
+  stack = stack.updateMask(klass.gt(0));
 
   const vectors = stack.reduceToVectors({
     reducer: ee.Reducer.mean(),
     geometry: region,
     crs: 'EPSG:32648',
-    scale: ZONE_SCALE_M,
+    scale: grid,
     geometryType: 'polygon',
     eightConnected: true,
     labelProperty: 'level',
@@ -431,7 +519,7 @@ function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
     tileScale: 8
   });
   const zones = vectors.map(f => {
-    const geom = f.geometry().simplify(20);
+    const geom = f.geometry().simplify(grid >= ZONE_SCALE_COARSE_M ? 20 : 12);
     const ha = geom.area(1).divide(1e4);
     const label = ee.Number(ee.List([f.get('level'), f.get('klass'), f.get('klass_mean')]).reduce(ee.Reducer.firstNonNull())).round();
     const coords = geom.centroid(1).coordinates();
@@ -440,26 +528,25 @@ function buildZoneRequest(ee, wards, popImage, popCrs, popScale, popPeople, year
       ha,
       lat: coords.get(1),
       lng: coords.get(0),
+      scaleM: grid,
       ward: ''
     });
-  }).filter(ee.Filter.gte('ha', ZONE_MIN_HA)).limit(100, 'ha', false);
+  }).filter(ee.Filter.gte('ha', ZONE_MIN_HA)).limit(40, 'ha', false);
 
-  const city = lst.updateMask(urban).addBands(ndvi.updateMask(urban)).reduceRegion({
-    reducer: ee.Reducer.mean(),
-    geometry: region,
-    scale: 100,
-    crs: 'EPSG:32648',
-    maxPixels: 1e8,
-    tileScale: 4,
-    bestEffort: true
-  });
-  return { zones, city, scaleM: ZONE_SCALE_M };
+  return { zones, scaleM: grid };
+}
+
+function zonesForWard(ee, wards, name, popImage, popCrs, popScale, popPeople, year, buffers, zoneScale) {
+  const named = withTreeName(ee, wards);
+  const subset = named.filter(ee.Filter.eq('treeName', name));
+  return buildZoneRequest(ee, subset, popImage, popCrs, popScale, popPeople, year, buffers, zoneScale);
 }
 
 module.exports = {
   MIN_BUILT_HA,
   TREE_SCALE_M,
   ZONE_SCALE_M,
+  ZONE_SCALE_COARSE_M,
   ZONE_MIN_HA,
   TREE_FIRST_YEAR,
   TREE_VIS,
@@ -469,11 +556,17 @@ module.exports = {
   acceptYear,
   rowsFromFeatures,
   popFromPixels,
+  peopleCopies,
+  zonePeople,
+  affectScore,
   assignFallbackPop,
   scoreTreeWards,
   zoneLevel,
   landKind,
   normalizeZones,
   buildTreeRequest,
-  buildZoneRequest
+  buildZoneRequest,
+  buildCityStats,
+  wardNameList,
+  zonesForWard
 };

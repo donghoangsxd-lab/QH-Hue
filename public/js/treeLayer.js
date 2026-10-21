@@ -240,22 +240,25 @@ function listHtml(zones) {
     return `<button type="button" class="tree-zone" data-i="${i}">
       <i class="tree-swatch" style="background:${s.color}"></i>
       <span>${escapeHtml(zoneTitle(z))}</span>
-      <b>${z.ha == null ? '—' : fmtNum(z.ha)} ha</b>
+      <b>${z.ha == null ? '—' : `${fmtNum(z.ha)} ha`}${z.pop == null ? '' : ` · ${fmtNum(z.pop)} người`}</b>
     </button>`;
   }).join('');
 }
 
 function methodHtml(d) {
-  const pop = d.popFromTable
-    ? `Dân số lấy theo bảng điểm nhà ở${d.popScaleNote ? ` (${d.popScaleNote})` : ''}.`
-    : (d.popSource === 'nha'
-      ? 'Dân số lấy theo raster nhà ở.'
-      : 'Dân cư lấy theo raster pixel vì chưa có bảng điểm nhà ở, chỉ để tham khảo.');
-  const ndvi = Number(d.year) === new Date().getFullYear() ? ` NDVI năm ${d.year} chưa đủ 12 tháng.` : '';
-  const cem = d.cemeteryCount
-    ? ` Đã loại ${fmtNum(d.cemeteryCount)} nghĩa trang đã duyệt bằng vùng đệm quanh điểm.`
+  const grid = Number(d.scaleM) === 30 ? '30 m' : '60 m';
+  const coarse = d.coarseCount
+    ? ` ${fmtNum(d.coarseCount)} phường, xã rộng dùng ô 60 m vì ô 30 m không kịp hạn máy chủ.`
     : '';
-  return `Nhiệt độ bề mặt và NDVI cùng lưới khoảng 60 m. ${pop}${ndvi}${cem}`;
+  const pop = d.popFromTable
+    ? 'Dân số là nhà ở thấp tầng theo bảng điểm, đã chỉnh theo dân số từng phường, cộng dân chung cư hiện trạng.'
+    : (d.popSource === 'nha'
+      ? 'Dân số lấy theo raster nhà ở, cùng cách tính với dân số phường.'
+      : 'Chưa có bảng điểm nhà ở nên chưa ghi số người trong vùng.');
+  const note = d.popScaleNote ? ` ${d.popScaleNote}` : '';
+  const ndvi = Number(d.year) === new Date().getFullYear() ? ` NDVI năm ${d.year} chưa đủ 12 tháng.` : '';
+  const cem = d.cemeteryCount ? ` Đã loại ${fmtNum(d.cemeteryCount)} nghĩa trang đã duyệt.` : '';
+  return `Nhiệt độ bề mặt và NDVI trên ô khoảng ${grid}.${coarse} ${pop}${note}${ndvi}${cem}`;
 }
 
 function explainWard(w, ranked) {
@@ -326,13 +329,28 @@ async function getJson(query) {
   return d;
 }
 
-function load(part) {
+function load(part, alive) {
   const key = `${year}|${popQuery()}|${part}`;
-  if (!cache.has(key)) {
-    const q = `action=getTreePriority&part=${part}&year=${encodeURIComponent(year)}&pop=${encodeURIComponent(popQuery())}&tv=9`;
-    cache.set(key, getJson(q).catch(err => { cache.delete(key); throw err; }));
-  }
-  return cache.get(key);
+  if (cache.has(key)) return cache.get(key);
+  const q = `action=getTreePriority&part=${part}&year=${encodeURIComponent(year)}&pop=${encodeURIComponent(popQuery())}&tv=10`;
+  const run = part !== 'zones'
+    ? getJson(q)
+    : (async () => {
+      for (let i = 0; i < 60; i++) {
+        const d = await getJson(q);
+        if (!d.pending) return d;
+        if (!alive || alive()) {
+          const box = $('treeZones');
+          const n = `${fmtNum(d.done)}/${fmtNum(d.total)}`;
+          if (box) box.innerHTML = `<div class="flood-muted">Đang khoanh vùng (${n} phường, xã).</div>`;
+        }
+        await new Promise(r => setTimeout(r, 800));
+      }
+      throw new Error('Chưa khoanh xong vùng. Hãy bật lại lớp sau ít phút.');
+    })();
+  const tracked = run.catch(err => { cache.delete(key); throw err; });
+  cache.set(key, tracked);
+  return tracked;
 }
 
 function refreshNames() {
@@ -370,7 +388,7 @@ async function show() {
   task = startTaskProgress('Đang khoanh vùng ưu tiên trồng cây');
   task.creep(90, 8000);
   try {
-    const d = await load('zones');
+    const d = await load('zones', () => my === seq && visible);
     if (my !== seq || !visible) { task.cancel(); return; }
     clearLayers();
     const zones = (d.zones || []).map(enrichZone);
