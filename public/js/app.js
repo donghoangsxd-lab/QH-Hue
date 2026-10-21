@@ -31,6 +31,8 @@ import {
   reloadWardStats,
   toggleBottomPanelMaximized,
   setBottomPanelCollapsed,
+  setBottomPanelMaximized,
+  phoneBottomShell,
   toggleStatTable,
   exportBottomPanelPdf,
   initGoogleSignIn,
@@ -374,6 +376,67 @@ async function chooseWard(wardName) {
   await selectWardDetail(wardName);
 }
 
+// Vuốt panel dưới trên điện thoại: lên = toàn màn hình, xuống = thu gọn. Kéo ngắn vẫn là cú bấm.
+function bindPhoneBottomSwipe() {
+  const panel = document.getElementById('bottomPanel');
+  const THRESH = 48;
+  const bind = (el, dir) => {
+    if (!el) return;
+    let dx = 0;
+    let dy = 0;
+    let handled = false;
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || !phoneBottomShell()) return;
+      dx = 0;
+      dy = 0;
+      handled = false;
+      const x0 = e.clientX;
+      const y0 = e.clientY;
+      const move = (ev) => {
+        dx = ev.clientX - x0;
+        dy = ev.clientY - y0;
+        if (!panel || document.body.classList.contains('bottom-collapsed')) return;
+        if (dy > 4 && Math.abs(dy) > Math.abs(dx)) {
+          panel.style.transition = 'none';
+          panel.style.transform = `translateY(${dy}px)`;
+        }
+      };
+      const end = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', end);
+        window.removeEventListener('pointercancel', end);
+        if (panel) {
+          panel.style.transition = '';
+          panel.style.transform = '';
+        }
+        if (!phoneBottomShell()) return;
+        if (dir === 'up' && dy < -THRESH) {
+          setBottomPanelCollapsed(false);
+          handled = true;
+        } else if (dir === 'down' && dy > THRESH && dy > Math.abs(dx)) {
+          setBottomPanelCollapsed(true);
+          handled = true;
+        }
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', end);
+      window.addEventListener('pointercancel', end);
+    });
+    el.addEventListener('click', (e) => {
+      if (!handled) return;
+      e.preventDefault();
+      e.stopPropagation();
+      handled = false;
+    }, true);
+  };
+  bind(document.getElementById('btnExpandBottomPanel'), 'up');
+  bind(document.getElementById('btnBottomGrab'), 'down');
+  bind(document.getElementById('bpPhonePager'), 'down');
+  document.getElementById('btnBottomGrab')?.addEventListener('click', () => {
+    if (phoneBottomShell()) setBottomPanelCollapsed(true);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   initGoogleSignIn();
   const map = initMap();
@@ -678,6 +741,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnToggleBottomMax')?.addEventListener('click', toggleBottomPanelMaximized);
   document.getElementById('btnCollapseBottomPanel')?.addEventListener('click', () => setBottomPanelCollapsed(true));
+  bindPhoneBottomSwipe();
   const markBpPage = (index) => {
     document.querySelectorAll('#bpPhonePager button').forEach(b => {
       b.classList.toggle('is-on', Number(b.dataset.bpPage) === index);
@@ -698,6 +762,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     markBpPage(Math.round(body.scrollLeft / body.clientWidth));
   }, { passive: true });
   document.getElementById('btnExpandBottomPanel')?.addEventListener('click', () => setBottomPanelCollapsed(false));
+  const phoneBottomMq = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px))');
+  phoneBottomMq.addEventListener('change', () => {
+    if (phoneBottomShell() && !document.body.classList.contains('bottom-collapsed')) setBottomPanelMaximized(true);
+  });
   document.getElementById('btnToggleStatTable')?.addEventListener('click', toggleStatTable);
   document.getElementById('btnExportBottomPdf')?.addEventListener('click', exportBottomPanelPdf);
 

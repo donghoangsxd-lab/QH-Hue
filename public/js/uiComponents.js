@@ -1226,24 +1226,52 @@ export function reloadWardStats() {
   ensureWardStats().then(startBackgroundCoverageFill).catch(err => console.warn('Nạp lại thống kê phường lỗi:', err));
 }
 
+// Cùng mốc CSS điện thoại (style.css). Thẩm định đồ án giữ review-min / review-max.
+export function phoneBottomShell() {
+  return window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px))').matches
+    && !document.body.classList.contains('project-review');
+}
+
+function syncBottomMaxButton(maximized) {
+  const btn = document.getElementById('btnToggleBottomMax');
+  if (!btn) return;
+  btn.innerHTML = ico(maximized ? 'minimize' : 'maximize');
+  btn.title = maximized
+    ? (phoneBottomShell() ? 'Thu gọn' : 'Thu về 1/5 màn hình')
+    : 'Phóng to toàn màn hình';
+  btn.setAttribute('aria-label', btn.title);
+}
+
 export function setBottomPanelMaximized(maximized) {
+  if (phoneBottomShell()) {
+    document.body.classList.toggle('bottom-collapsed', !maximized);
+    document.body.classList.toggle('bottom-max', maximized);
+    if (maximized) setPart1Turn(0);
+    syncBottomMaxButton(maximized);
+    setBottomPanelHeader(isCityMode() ? CITY_NAME : state.selectedWard);
+    return;
+  }
   document.body.classList.toggle('bottom-max', maximized);
   if (maximized) setPart1Turn(0);
-  const btn = document.getElementById('btnToggleBottomMax');
-  if (btn) {
-    btn.innerHTML = ico(maximized ? 'minimize' : 'maximize');
-    btn.title = maximized ? 'Thu về 1/5 màn hình' : 'Phóng to toàn màn hình';
-    btn.setAttribute('aria-label', btn.title);
-  }
+  syncBottomMaxButton(maximized);
   setBottomPanelHeader(isCityMode() ? CITY_NAME : state.selectedWard);
 }
 
 export function toggleBottomPanelMaximized() {
+  if (phoneBottomShell()) {
+    setBottomPanelMaximized(document.body.classList.contains('bottom-collapsed'));
+    return;
+  }
   setBottomPanelMaximized(!document.body.classList.contains('bottom-max'));
 }
 
-// Thu gọn cả panel dưới (cơ cấu đất + bảng tổng hợp): bản đồ chiếm hết chiều cao, nút góc phải dưới mở lại
+// Thu gọn cả panel dưới (cơ cấu đất + bảng tổng hợp): bản đồ chiếm hết chiều cao, nút góc phải dưới mở lại.
+// Điện thoại không có mức giữa: mở là toàn màn hình, thu là chỉ còn nút.
 export function setBottomPanelCollapsed(collapsed) {
+  if (phoneBottomShell()) {
+    setBottomPanelMaximized(!collapsed);
+    return;
+  }
   if (collapsed && document.body.classList.contains('bottom-max')) setBottomPanelMaximized(false);
   document.body.classList.toggle('bottom-collapsed', collapsed);
 }
