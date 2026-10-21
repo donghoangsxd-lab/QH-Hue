@@ -1,12 +1,11 @@
-// Dấu chân Global Building Atlas: PMTiles z13–16 (nhóm chiều cao tương đối) và lưới 150 m cường độ xây dựng.
-// Không hiện mét chiều cao. Số liệu lô / phường lấy từ agg.json.
+// Dấu chân Global Building Atlas: PMTiles z13–16, tô theo bốn nhóm chiều cao tương đối.
+// Lưới cường độ 150 m không còn là lớp riêng. Số liệu lô / phường vẫn lấy từ agg.json.
 import { map, setLandPopupExtra } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { MAP_MAX_ZOOM } from './basemap.js';
 import { geeApi } from './api.js';
-import { detailDisclosure, escapeHtml } from './utils.js';
 import { setWardGbaHtml } from './uiComponents.js';
-import { GBA_CLASSES, GBA_COLORS, GBA_NOTE, gbaLotKey, gbaStatsHtml, gbaWardExtra } from './gbaStats.js';
+import { GBA_CLASSES, GBA_COLORS, gbaLotKey, gbaStatsHtml, gbaWardExtra } from './gbaStats.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -17,21 +16,18 @@ const LAYER = 'gba';
 const MIN_ZOOM = 13;
 const DATA_ZOOM = 16;
 const FOOT_PANE = 'gbaPane';
-const GRID_PANE = 'gbaGridPane';
 const FOOT_Z = 408;
-const GRID_Z = 348;
 const TILE_CACHE = 64;
 const ATTR = 'Công trình © TUM (Global Building Atlas), Google, Microsoft, OpenStreetMap · CC BY-NC 4.0, ODbL';
 
 const $ = (id) => document.getElementById(id);
 
 let feetOn = false;
-let gridOn = false;
 let agg = null;
 let aggP = null;
 let ready = null;
 const tiles = new Map();
-let footL = null, footR = null, gridL = null, gridR = null;
+let footL = null, footR = null;
 let attrOn = false;
 
 function pixelRatio() {
@@ -68,7 +64,7 @@ function loadAgg() {
     aggP = sources().then((info) => fetch(info.agg)).then((r) => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return r.json();
-    }).then((data) => { agg = data; indexCells(); return data; })
+    }).then((data) => { agg = data; return data; })
       .catch((err) => { aggP = null; throw err; });
   }
   return aggP;
@@ -201,54 +197,6 @@ const FootGrid = L.GridLayer.extend({
   }
 });
 
-let cellAt = null;
-function indexCells() {
-  cellAt = new Map();
-  (agg.grid || []).forEach(([col, row, cls]) => cellAt.set(`${col},${row}`, cls));
-}
-
-function drawIntensity(canvas, coords, size, dpr) {
-  if (!agg || !cellAt || !this._map) return;
-  const host = this._map;
-  const bounds = this._tileCoordsToBounds(coords);
-  const ctx = canvas.getContext('2d');
-  const nw = host.project(bounds.getNorthWest(), coords.z);
-  const scale = size / 256;
-  const c0 = Math.floor((bounds.getWest() - agg.origin[0]) / agg.dlng) - 1;
-  const c1 = Math.ceil((bounds.getEast() - agg.origin[0]) / agg.dlng) + 1;
-  const r0 = Math.floor((bounds.getSouth() - agg.origin[1]) / agg.dlat) - 1;
-  const r1 = Math.ceil((bounds.getNorth() - agg.origin[1]) / agg.dlat) + 1;
-  ctx.globalAlpha = 0.55;
-  for (let col = c0; col <= c1; col++) {
-    for (let row = r0; row <= r1; row++) {
-      const cls = cellAt.get(`${col},${row}`);
-      if (cls == null) continue;
-      const x0 = agg.origin[0] + col * agg.dlng;
-      const y0 = agg.origin[1] + row * agg.dlat;
-      const a = host.project([y0, x0], coords.z);
-      const b = host.project([y0 + agg.dlat, x0 + agg.dlng], coords.z);
-      const x = (Math.min(a.x, b.x) - nw.x) * scale * dpr;
-      const y = (Math.min(a.y, b.y) - nw.y) * scale * dpr;
-      ctx.fillStyle = GBA_COLORS[cls] || GBA_COLORS[0];
-      ctx.fillRect(x, y, Math.abs(b.x - a.x) * scale * dpr, Math.abs(b.y - a.y) * scale * dpr);
-    }
-  }
-  ctx.globalAlpha = 1;
-}
-
-const IntensityGrid = L.GridLayer.extend({
-  createTile(coords, done) {
-    const canvas = document.createElement('canvas');
-    const size = this.getTileSize().x;
-    const dpr = pixelRatio();
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    try { drawIntensity.call(this, canvas, coords, size, dpr); } catch (e) { /* ô lệch */ }
-    done(null, canvas);
-    return canvas;
-  }
-});
-
 function pane(m, name, z) {
   if (m.getPane(name)) return;
   const el = m.createPane(name);
@@ -257,7 +205,7 @@ function pane(m, name, z) {
 }
 
 function syncAttr() {
-  const on = feetOn || gridOn;
+  const on = feetOn;
   [map, planMap].forEach((m) => {
     if (!m || !m.attributionControl) return;
     if (on && !attrOn) m.attributionControl.addAttribution(ATTR);
@@ -268,31 +216,19 @@ function syncAttr() {
 
 function legendHtml() {
   const swatch = GBA_CLASSES.map((name, i) => `<span><i style="background:${GBA_COLORS[i]}"></i>${name}</span>`).join('');
-  return `<div class="gba-legend" aria-label="Nhóm chiều cao tương đối">${swatch}</div>
-    <p class="gba-attr">Nguồn: TUM, Google, Microsoft, OpenStreetMap. Giấy phép CC BY-NC 4.0 và ODbL.</p>
-    ${detailDisclosure(`<p>${escapeHtml(GBA_NOTE)}</p>`, 'Xem chi tiết')}`;
+  return `<div class="gba-legend" aria-label="Nhóm chiều cao công trình">${swatch}</div>`;
 }
 
 function paintBox() {
   const box = $('gbaBox');
-  if (box) box.style.display = (feetOn || gridOn) ? '' : 'none';
+  if (box) box.style.display = feetOn ? '' : 'none';
   const hint = $('gbaHint');
-  if (hint) {
-    if (!feetOn) hint.textContent = '';
-    else hint.textContent = map && map.getZoom() < MIN_ZOOM ? '(phóng tới mức 13)' : '';
-  }
-  const gHint = $('gbaGridHint');
-  if (gHint) gHint.textContent = gridOn ? '' : '';
+  if (hint) hint.textContent = feetOn && map && map.getZoom() < MIN_ZOOM ? '(phóng tới mức 13)' : '';
 }
 
 function addFeet(m) {
   pane(m, FOOT_PANE, FOOT_Z);
   return new FootGrid({ pane: FOOT_PANE, minZoom: MIN_ZOOM, maxZoom: MAP_MAX_ZOOM, updateWhenZooming: false, keepBuffer: 1 }).addTo(m);
-}
-
-function addGrid(m) {
-  pane(m, GRID_PANE, GRID_Z);
-  return new IntensityGrid({ pane: GRID_PANE, minZoom: 10, maxZoom: MAP_MAX_ZOOM, updateWhenZooming: false, keepBuffer: 1 }).addTo(m);
 }
 
 function applyFeet() {
@@ -302,16 +238,6 @@ function applyFeet() {
   } else {
     footL?.remove(); footL = null;
     footR?.remove(); footR = null;
-  }
-}
-
-function applyGrid() {
-  if (gridOn) {
-    if (map && !gridL) gridL = addGrid(map);
-    if (planMap && !gridR) gridR = addGrid(planMap);
-  } else {
-    gridL?.remove(); gridL = null;
-    gridR?.remove(); gridR = null;
   }
 }
 
@@ -341,13 +267,6 @@ export function initGbaLayer() {
   $('chk_gba')?.addEventListener('change', (e) => {
     feetOn = !!e.target.checked;
     applyFeet();
-    syncAttr();
-    paintBox();
-  });
-  $('chk_gbaGrid')?.addEventListener('change', (e) => {
-    gridOn = !!e.target.checked;
-    if (gridOn) loadAgg().then(() => { applyGrid(); gridL?.redraw(); gridR?.redraw(); }).catch(() => { gridOn = false; e.target.checked = false; });
-    else applyGrid();
     syncAttr();
     paintBox();
   });
