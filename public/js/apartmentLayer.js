@@ -6,7 +6,7 @@ import { assignNoxhWards } from './noxhWard.js';
 import { planMap } from './planMap.js';
 import { state } from './state.js';
 import { geeApi } from './api.js';
-import { escapeHtml, RIGHT_TAB_EVENT } from './utils.js';
+import { escapeHtml } from './utils.js';
 import { postAdmin } from './wardRoads.js';
 import { setWardPopHtml } from './uiComponents.js';
 import {
@@ -242,8 +242,6 @@ function paintBox() {
   if (hint) hint.textContent = loaded ? `(${popItems().length + planItems.length})` : '';
   const sum = $('aptSummary');
   if (sum) sum.textContent = on && loaded ? summaryText() : '';
-  const admin = $('aptAdmin');
-  if (admin) admin.hidden = !isAdmin();
   const mode = $('aptMethod');
   if (mode && mode.value !== popMethod()) mode.value = popMethod();
   const c = popConfig();
@@ -382,26 +380,12 @@ export function initApartmentLayer() {
   let popNhaWatchTimer = null;
   let popNhaBusy = false;
   const POP_NHA_LIVE = new Set(['READY', 'RUNNING', 'UNKNOWN', 'STARTING']);
-  function popNhaLines(data) {
-    const lines = [data.message || data.state || 'Đã gửi.'];
-    if (data.assets) {
-      lines.push(`Bảng điểm: ${data.assets.table ? 'có' : 'chưa có'}. Ảnh Pixel-danso-nha: ${data.assets.image ? 'có' : 'chưa có'}.`);
-    }
-    if (data.assetsError) lines.push(`Chưa kiểm tra được asset: ${data.assetsError}`);
-    (data.tasks || []).forEach(t => {
-      const name = t.description || t.type || t.id || 'Tác vụ';
-      lines.push(`${name}: ${t.state}${t.error ? ` — ${t.error}` : ''}`);
-    });
-    if (data.tasksError) lines.push(`Chưa đọc được danh sách tác vụ: ${data.tasksError}`);
-    if (Number.isFinite(data.queued)) lines.push(`Trong 40 tác vụ gần nhất có ${data.queued} tác vụ đang chờ hoặc đang chạy.`);
-    return lines.join('\n');
-  }
   function paintPopNhaLive(data) {
     const el = $('popNhaLive');
     if (!el) return;
     const show = data && (data.phase === 'table' || data.phase === 'image') && POP_NHA_LIVE.has(data.state);
     el.hidden = !show;
-    el.textContent = show ? (data.message || '') : '';
+    el.textContent = show ? 'Đang cập nhật dữ liệu dân số…' : '';
   }
   function armPopNhaWatch() {
     if (popNhaWatchTimer || !isAdmin()) return;
@@ -414,44 +398,17 @@ export function initApartmentLayer() {
     if (el) { el.hidden = true; el.textContent = ''; }
   }
   async function askIngest(mode) {
-    const user = mode !== 'watch' && mode !== 'status';
-    if (user && popNhaBusy) return;
-    if (user) popNhaBusy = true;
-    const status = $('popNhaStatus');
-    if (status && user) {
-      status.textContent = mode === 'rebuild' ? 'Đang kiểm tra tác vụ hiện có…'
-        : mode === 'cancel' ? 'Đang hủy tác vụ…'
-        : mode === 'restart' ? 'Đang kiểm tra tác vụ hiện có…'
-        : 'Đang hỏi máy chủ…';
-    }
+    if (mode !== 'watch' || popNhaBusy) return;
+    popNhaBusy = true;
     try {
-      const data = await postAdmin('ingestPopNha', {
-        rebuild: mode === 'rebuild',
-        cancel: mode === 'cancel',
-        restart: mode === 'restart',
-        start: mode === 'check',
-        watch: mode === 'watch'
-      });
-      if (status) status.textContent = popNhaLines(data);
+      const data = await postAdmin('ingestPopNha', { watch: true });
       paintPopNhaLive(data);
-    } catch (err) {
-      if (status && user) status.textContent = err.message || 'Chưa nạp được raster nhà ở.';
-    } finally {
-      if (user) popNhaBusy = false;
-    }
+    } catch (err) { /* dòng trạng thái chỉ hiện khi máy chủ trả về */ }
+    finally { popNhaBusy = false; }
   }
-  $('btnPopNha')?.addEventListener('click', () => askIngest('check'));
-  $('btnPopNhaRebuild')?.addEventListener('click', () => askIngest('rebuild'));
-  $('btnPopNhaRestart')?.addEventListener('click', () => askIngest('restart'));
-  $('btnPopNhaCancel')?.addEventListener('click', () => askIngest('cancel'));
   $('aptKind')?.addEventListener('change', (e) => {
     kindFilter = e.target.value || '';
     if (on) draw();
-  });
-  $('btnPopNhaJump')?.addEventListener('click', () => {
-    document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers' } }));
-    document.querySelector('[data-map-tab="base"]')?.click();
-    $('aptIngest')?.scrollIntoView({ block: 'center' });
   });
   document.addEventListener('submit', onPopupSubmit);
   document.addEventListener('auth:change', () => {

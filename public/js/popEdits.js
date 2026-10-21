@@ -258,7 +258,7 @@ function syncToolUi() {
   const undo = $('btnPopUndo');
   if (undo) { undo.innerHTML = `${ico('undo')}${t.undo}`; undo.title = t.undoTitle; }
   const hint = $('popHint');
-  if (hint) hint.textContent = `${t.hint} Tổng dân số phường giữ nguyên: xóa pixel thì dân dồn sang pixel còn lại. Công cụ này chỉ sửa raster Pixel cũ dùng để so sánh, không sửa lớp nhà ở. Tải pop-weights.csv lên bucket là đủ: máy chủ tự nạp bảng mới, bảng đang dùng vẫn phục vụ đến khi bảng mới xong.`;
+  if (hint) hint.textContent = `${t.hint} Tổng dân số phường giữ nguyên: xóa pixel thì dân dồn sang pixel còn lại. Công cụ này chỉ sửa raster Pixel cũ dùng để so sánh, không sửa lớp nhà ở. Tải pop-weights.csv lên bucket là đủ: máy chủ tự cập nhật, dữ liệu đang dùng vẫn phục vụ đến khi bản mới xong. Sau khi lưu vùng, máy chủ tự ghi vào nền.`;
 }
 
 function undoLast() {
@@ -304,13 +304,10 @@ const assetName = (id) => String(id || '').split('/').pop();
 function renderBake() {
   const info = $('popAssetInfo');
   if (info) {
-    info.innerHTML = !loaded ? ''
-      : bake ? `${ico('clock')}GEE đang xuất asset <b>${escapeHtml(assetName(bake.asset))}</b> (thường 2–10 phút) — tạm khóa sửa vùng`
-        : `Raster nền: <b>${escapeHtml(baseAsset ? assetName(baseAsset) : 'Pixel-danso (gốc)')}</b>`
-          + (edits.length ? ` · ${fmtNum(edits.length)} vùng đang áp khi tính` : ' · không có vùng chờ ghi');
+    info.textContent = !loaded ? ''
+      : bake ? 'Đang ghi vùng hiệu chỉnh vào nền…'
+        : '';
   }
-  const btn = $('btnPopBake');
-  if (btn) btn.disabled = !loaded || busy || !!bake || !edits.length || state.currentUserRole !== 'ADMIN';
 }
 
 function stopBakePoll() {
@@ -356,26 +353,19 @@ async function checkBake() {
   pollBake();
 }
 
-async function bakeNow() {
-  if (busy || bake || !edits.length) return;
-  if (!confirm(`Ghi cố định ${edits.length} vùng hiệu chỉnh vào asset GEE mới?\n\n`
-    + '• GEE xuất raster chạy nền khoảng 2–10 phút; trong lúc đó không sửa vùng được (bản đồ vẫn hiển thị đúng).\n'
-    + '• Xong: asset mới làm raster nền, danh sách vùng được xóa (đã nằm trong asset).\n'
-    + '• Asset gốc Pixel-danso giữ nguyên.')) return;
-  busy = true;
-  renderBake();
-  setStatus('⏳ Đang gửi tác vụ xuất asset lên GEE...', 'var(--accent-orange)');
+async function startBakeQuiet() {
+  if (bake || !edits.length) return;
   try {
     const d = await postAdmin('bakePopEdits', { base: savedAt });
-    bake = d.bake;
-    setStatus(`⏳ GEE đang xuất asset ${assetName(bake.asset)} — tự kiểm tra mỗi ${BAKE_POLL_MS / 1000} giây (đóng panel thì lần mở sau kiểm tra tiếp).`, 'var(--accent-orange)');
-    pollBake();
+    if (d && d.bake) {
+      bake = d.bake;
+      renderBake();
+      pollBake();
+    }
   } catch (err) {
-    setStatus(`❌ ${err.message}`, 'var(--accent-red)');
-  } finally {
-    busy = false;
-    renderEdits();
-    renderDraft();
+    if (!/409|đang có tác vụ/.test(String(err.message || ''))) {
+      setStatus(`Chưa ghi được vùng vào nền: ${err.message}`, 'var(--accent-orange)');
+    }
   }
 }
 
@@ -389,10 +379,12 @@ async function persist(next, okText) {
   await loadPopulationLayer(savedAt);
   reloadWardStats();
   setStatus(okText, 'var(--accent-green)');
+  await startBakeQuiet();
 }
 
 async function saveDraft() {
   if (busy || !loaded) return;
+  if (bake) { setStatus('Đang ghi vùng hiệu chỉnh vào nền — chờ xong rồi sửa tiếp.', 'var(--accent-orange)'); return; }
   if (state.currentUserRole !== 'ADMIN') { setStatus('Cần đăng nhập Admin.', 'var(--accent-red)'); return; }
   const op = selectedOp();
   const name = String($('popName')?.value || '').trim().slice(0, 120);
@@ -544,7 +536,6 @@ export function initPopEdits() {
   $('btnPopDraw')?.addEventListener('click', () => setDrawing(!drawing()));
   $('btnPopUndo')?.addEventListener('click', undoLast);
   $('btnPopSave')?.addEventListener('click', saveDraft);
-  $('btnPopBake')?.addEventListener('click', bakeNow);
   $('popOp')?.addEventListener('change', renderDraft);
   $('popTool')?.addEventListener('change', () => {
     clearDraft();

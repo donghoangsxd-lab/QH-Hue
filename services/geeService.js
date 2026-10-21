@@ -9,9 +9,11 @@ let initPromise = null;
 const POP_ASSET = "projects/optimistic-yew-488501-s0/assets/Pixel-danso";
 // Dân số nhà ở (phương pháp B): giá trị pixel là số người, cùng lưới 30 m với Pixel-danso sau khi nạp.
 const POP_NHA_ASSET = "projects/optimistic-yew-488501-s0/assets/Pixel-danso-nha";
+const POP_NHA_ASSET_NEXT = `${POP_NHA_ASSET}-next`;
 const POP_NHA_TABLE = "projects/optimistic-yew-488501-s0/assets/Pixel-danso-nha-diem";
 const POP_NHA_TABLE_NEW = `${POP_NHA_TABLE}-new`;
 let activePopTable = POP_NHA_TABLE;
+let activePopImage = POP_NHA_ASSET;
 let activePopTableAt = 0;
 const POP_NHA_CSV = "gs://hue-infra-data-us/gba/pop-weights.csv";
 const POP_NHA_SCALE_M = 30;
@@ -322,6 +324,11 @@ function setActivePopTable(id) {
   activePopTableAt = Date.now();
 }
 
+function setActivePopImage(id) {
+  if (id) activePopImage = id;
+  activePopTableAt = Date.now();
+}
+
 async function refreshActivePopTable() {
   if (Date.now() - activePopTableAt < 30000) return activePopTable;
   activePopTableAt = Date.now();
@@ -331,6 +338,7 @@ async function refreshActivePopTable() {
     const data = row && row.data;
     const rec = typeof data === 'string' ? JSON.parse(data) : data;
     if (rec && rec.liveTable) activePopTable = rec.liveTable;
+    if (rec && rec.liveImage) activePopImage = rec.liveImage;
   } catch (err) { /* giữ bảng đang dùng */ }
   return activePopTable;
 }
@@ -482,7 +490,7 @@ async function loadNha() {
   await refreshActivePopTable();
   const { ee } = geeBase;
   try {
-    const img = ee.Image(POP_NHA_ASSET).select(0);
+    const img = ee.Image(activePopImage).select(0);
     await eeEvaluate(img.bandNames());
     const projection = img.projection();
     nhaBase = { img, projection, fromTable: false };
@@ -518,7 +526,7 @@ function deleteAsset(ee, id) {
  * Nạp bảng điểm nhà ở từ gs://hue-infra-data-us/gba/pop-weights.csv rồi xuất asset Pixel-danso-nha
  * đúng lưới Pixel-danso. phase = table (đang nạp điểm) hoặc image (đang xuất raster).
  */
-async function startPopNhaTask(phase, liveTable) {
+async function startPopNhaTask(phase, liveTable, liveImage) {
   const { ee, wardVectorParsed } = getGeeContext('old');
   if (phase === 'table') {
     const live = liveTable || activePopTable;
@@ -545,10 +553,11 @@ async function startPopNhaTask(phase, liveTable) {
     err.code = 'NO_TABLE';
     throw err;
   }
-  // Giữ ảnh đang dùng. Ảnh mới ghi sang asset tạm, xong mới đổi tên. Xóa trước khi xuất từng làm mất nền khi tác vụ kẹt ở hàng chờ.
-  const live = await assetExists(ee, POP_NHA_ASSET);
-  const assetId = live ? `${POP_NHA_ASSET}-next` : POP_NHA_ASSET;
-  if (assetId !== POP_NHA_ASSET && await assetExists(ee, assetId)) await deleteAsset(ee, assetId);
+  // Ảnh đang phục vụ giữ nguyên. Ảnh mới ghi sang ô còn lại. Chỉ xóa ô sắp ghi, không xóa ảnh đang dùng.
+  const liveId = liveImage || activePopImage;
+  const liveOk = await assetExists(ee, liveId);
+  const assetId = liveOk ? (liveId === POP_NHA_ASSET_NEXT ? POP_NHA_ASSET : POP_NHA_ASSET_NEXT) : POP_NHA_ASSET;
+  if (assetId !== liveId && await assetExists(ee, assetId)) await deleteAsset(ee, assetId);
   // Cùng lưới 30 m với phép tính trực tiếp. Ảnh 10 m cả tỉnh không được worker nhận (started null).
   const proj = ee.Image(POP_ASSET).projection();
   const summed = lowRiseImage(ee, proj);
@@ -568,7 +577,7 @@ async function startPopNhaTask(phase, liveTable) {
   });
   await new Promise((resolve, reject) => task.start(resolve, (err) => reject(new Error(String(err)))));
   if (!task.id) throw new Error('GEE không trả về mã tác vụ');
-  return { phase: 'image', task: task.id, asset: assetId, promote: assetId !== POP_NHA_ASSET };
+  return { phase: 'image', task: task.id, asset: assetId, promote: false };
 }
 
 // evaluate của Earth Engine báo lỗi qua tham số thứ 2 của callback; bọc lại để lỗi không bị nuốt thành số 0
@@ -654,10 +663,10 @@ async function popNhaAssets() {
   const [table, tableNew, image, next] = await Promise.all([
     assetExists(ee, activePopTable),
     assetExists(ee, activePopTable === POP_NHA_TABLE ? POP_NHA_TABLE_NEW : POP_NHA_TABLE),
-    assetExists(ee, POP_NHA_ASSET),
-    assetExists(ee, `${POP_NHA_ASSET}-next`)
+    assetExists(ee, activePopImage),
+    assetExists(ee, activePopImage === POP_NHA_ASSET ? POP_NHA_ASSET_NEXT : POP_NHA_ASSET)
   ]);
-  return { table, tableNew, image, next, liveTable: activePopTable };
+  return { table, tableNew, image, next, liveTable: activePopTable, liveImage: activePopImage };
 }
 
 async function promoteNhaAsset(assetId) {
@@ -673,6 +682,6 @@ async function promoteNhaAsset(assetId) {
 module.exports = {
   initGEE, getGeeContext, ensureNha, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, loadNha,
   startPopNhaTask, listRecentTasks, cancelGeeTask, popNhaAssets, promoteNhaAsset, scalesFromGroups,
-  activePopTableId, setActivePopTable, refreshActivePopTable,
-  POP_SCALE_M, POP_NHA_SCALE_M, POP_NHA_ASSET, POP_NHA_TABLE, POP_NHA_TABLE_NEW, POP_NHA_CSV
+  activePopTableId, setActivePopTable, setActivePopImage, refreshActivePopTable,
+  POP_SCALE_M, POP_NHA_SCALE_M, POP_NHA_ASSET, POP_NHA_ASSET_NEXT, POP_NHA_TABLE, POP_NHA_TABLE_NEW, POP_NHA_CSV
 };

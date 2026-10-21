@@ -2,7 +2,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const zlib = require('zlib');
 const constants = require('../config/constants');
-const { initGEE, getGeeContext, ensureNha, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, loadNha, startPopNhaTask, listRecentTasks, cancelGeeTask, popNhaAssets, promoteNhaAsset, setActivePopTable, POP_SCALE_M, POP_NHA_ASSET, POP_NHA_TABLE } = require('../services/geeService');
+const { initGEE, getGeeContext, ensureNha, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, loadNha, startPopNhaTask, listRecentTasks, cancelGeeTask, popNhaAssets, setActivePopTable, setActivePopImage, POP_SCALE_M, POP_NHA_ASSET, POP_NHA_TABLE } = require('../services/geeService');
 const { popNhaStatusText } = require('../services/popNhaStatus');
 const popWatch = require('../services/popNhaWatch');
 const { getRawDataList, getCadParcels, getInvestCalls, getInvestEdits, forgetTextFile, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion } = require('../services/gcsService');
@@ -1289,6 +1289,9 @@ function adoptTableTask(task, prev, csv) {
     at: Number(task.created) || (prev && prev.at) || Date.now(),
     people: popNhaPeople(),
     liveTable: (prev && prev.liveTable) || POP_NHA_TABLE,
+    liveImage: (prev && prev.liveImage) || '',
+    imageMd5: (prev && prev.imageMd5) || '',
+    imageCsvMd5: (prev && prev.imageCsvMd5) || '',
     csvMd5: (prev && prev.csvMd5) || (csv && csv.md5) || '',
     csvUpdated: (prev && prev.csvUpdated) || (csv && csv.updated) || '',
     ingestedMd5: (prev && prev.ingestedMd5) || '',
@@ -1300,6 +1303,49 @@ function adoptTableTask(task, prev, csv) {
     adopted: true,
     note: ''
   };
+}
+
+function adoptImageTask(task, prev) {
+  return {
+    phase: 'image',
+    task: task.id,
+    asset: popWatch.imageAssetOfTask(task),
+    state: task.state || 'RUNNING',
+    at: Number(task.created) || (prev && prev.at) || Date.now(),
+    people: popNhaPeople(),
+    promote: false,
+    liveTable: (prev && prev.liveTable) || POP_NHA_TABLE,
+    liveImage: (prev && prev.liveImage) || '',
+    imageMd5: (prev && prev.imageMd5) || '',
+    imageCsvMd5: (prev && prev.imageCsvMd5) || '',
+    csvMd5: (prev && prev.csvMd5) || '',
+    csvUpdated: (prev && prev.csvUpdated) || '',
+    ingestedMd5: (prev && prev.ingestedMd5) || '',
+    ingestedUpdated: (prev && prev.ingestedUpdated) || '',
+    error: task.error || '',
+    description: task.description || '',
+    started: task.started || null,
+    updated: task.updated || null,
+    adopted: true,
+    note: ''
+  };
+}
+
+async function maybeStartImage(rec, csv, activeImage) {
+  if (!optsAllowsImage(rec, csv, activeImage)) return rec;
+  try {
+    return await claimAndBegin('image', rec, csv);
+  } catch (err) {
+    if (err.code === 'NO_TABLE') return rec;
+    throw err;
+  }
+}
+
+function optsAllowsImage(rec, csv, activeImage) {
+  if (activeImage && popWatch.isBusyState(activeImage.state)) return false;
+  if (!rec || (rec.state !== 'TABLE_READY' && rec.state !== 'ASSET_READY')) return false;
+  if (!rec.ingestedMd5 || !csv || rec.ingestedMd5 !== csv.md5) return false;
+  return rec.imageMd5 !== rec.ingestedMd5;
 }
 
 function cronAuthorized(req) {
@@ -1326,28 +1372,26 @@ async function cancelPopNha(rec) {
 }
 
 async function beginPopNha(phase, extra = {}) {
-  try {
-    const started = await startPopNhaTask(phase, extra.liveTable);
-    return {
+  const started = await startPopNhaTask(phase, extra.liveTable, extra.liveImage);
+  return {
       phase,
       task: started.task,
       asset: started.asset,
-      promote: !!started.promote,
+      promote: false,
       state: 'READY',
       at: Date.now(),
       people: popNhaPeople(),
       restarts: extra.restarts || 0,
       note: '',
       liveTable: extra.liveTable || POP_NHA_TABLE,
+      liveImage: extra.liveImage || '',
       csvMd5: extra.csvMd5 || '',
       csvUpdated: extra.csvUpdated || '',
       ingestedMd5: extra.ingestedMd5 || '',
-      ingestedUpdated: extra.ingestedUpdated || ''
-    };
-  } catch (err) {
-    if (phase === 'image' && err.code === 'NO_TABLE') return beginPopNha('table', extra);
-    throw err;
-  }
+      ingestedUpdated: extra.ingestedUpdated || '',
+      imageMd5: extra.imageMd5 || '',
+      imageCsvMd5: extra.imageCsvMd5 || ''
+  };
 }
 
 async function claimAndBegin(phase, rec, csv) {
@@ -1358,10 +1402,13 @@ async function claimAndBegin(phase, rec, csv) {
     task: '',
     people: popNhaPeople(),
     liveTable: (rec && rec.liveTable) || POP_NHA_TABLE,
+    liveImage: (rec && rec.liveImage) || '',
     csvMd5: (csv && csv.md5) || '',
     csvUpdated: (csv && csv.updated) || '',
     ingestedMd5: (rec && rec.ingestedMd5) || '',
     ingestedUpdated: (rec && rec.ingestedUpdated) || '',
+    imageMd5: (rec && rec.imageMd5) || '',
+    imageCsvMd5: phase === 'image' ? ((csv && csv.md5) || '') : ((rec && rec.imageCsvMd5) || ''),
     note: ''
   };
   let generation = '';
@@ -1393,12 +1440,17 @@ async function advancePopNha(opts = {}) {
   if (!csv.ok) return { saved: true, phase: 'csv', state: 'NEED_CSV', message: csv.message, ...(await popNhaSnapshot()) };
   let rec = await readPopNhaTask();
   if (rec && rec.liveTable) setActivePopTable(rec.liveTable);
+  if (rec && rec.liveImage) setActivePopImage(rec.liveImage);
   let activeTable = null;
+  let activeImage = null;
   let tasksKnown = true;
   try {
-    activeTable = popWatch.pickActiveTask(await listRecentTasks(40));
+    const recent = await listRecentTasks(40);
+    activeTable = popWatch.pickActiveTask(recent);
+    activeImage = popWatch.pickActiveImage(recent);
   } catch (err) {
     activeTable = null;
+    activeImage = null;
     tasksKnown = false;
   }
   if (opts.cancel) {
@@ -1428,8 +1480,12 @@ async function advancePopNha(opts = {}) {
   const imageBusy = rec && rec.phase === 'image' && isBusyRecord(rec);
   if (activeTable && !imageBusy && (!rec || rec.task !== activeTable.id || !isBusyRecord(rec))) {
     rec = { ...adoptTableTask(activeTable, rec, csv), _generation: rec && rec._generation };
+  } else if (activeImage && !(activeTable && popWatch.isBusyState(activeTable.state)) && (!rec || rec.task !== activeImage.id || !isBusyRecord(rec))) {
+    rec = { ...adoptImageTask(activeImage, rec), _generation: rec && rec._generation };
   }
-  const busy = isBusyRecord(rec) || !!(activeTable && popWatch.isBusyState(activeTable.state));
+  const busy = isBusyRecord(rec)
+    || !!(activeTable && popWatch.isBusyState(activeTable.state))
+    || !!(activeImage && popWatch.isBusyState(activeImage.state));
   const askStart = !!(opts.rebuild || opts.restart || opts.start || opts.watch);
   if (!tasksKnown && !busy && askStart) {
     const held = rec && rec.phase !== 'idle' ? rec : {
@@ -1471,7 +1527,7 @@ async function advancePopNha(opts = {}) {
     }
   }
   if (rec && rec.phase === 'idle') rec = null;
-  if (rec && rec.phase === 'ready' && rec.state !== 'TABLE_READY') {
+  if (rec && rec.phase === 'ready' && rec.state !== 'TABLE_READY' && !(opts.watch && optsAllowsImage(rec, csv, activeImage))) {
     await loadNha();
     const ready = getGeeContext('b');
     const kept = {
@@ -1553,28 +1609,24 @@ async function advancePopNha(opts = {}) {
       ));
       if (drifted) rec = await claimAndBegin('table', rec, csv);
     } else if (t.state === 'COMPLETED' && rec.phase === 'image') {
-      try {
-        if (rec.promote || (rec.asset && rec.asset !== POP_NHA_ASSET)) await promoteNhaAsset(rec.asset);
-      } catch (err) {
-        rec = { ...rec, state: 'FAILED', error: `Chưa đổi được ảnh mới vào asset: ${err.message}`, note: '', _generation: generation };
-        const failed = await savePopNha(rec, generation);
-        return { ...failed, ...(await popNhaSnapshot()) };
-      }
-      await loadNha();
-      const ready = getGeeContext('b');
-      const assetOk = ready.popSource === 'nha' && !ready.popFromTable;
+      const asset = rec.asset || POP_NHA_ASSET;
+      setActivePopImage(asset);
       rec = {
-        phase: assetOk ? 'ready' : 'image',
+        phase: 'ready',
+        state: 'ASSET_READY',
         task: rec.task,
-        asset: POP_NHA_ASSET,
-        state: assetOk ? 'ASSET_READY' : 'ASSET_MISSING',
+        asset,
         at: Date.now(),
         people: popNhaPeople(),
-        popSource: ready.popSource,
-        popFromTable: !!ready.popTableReady,
+        popFromTable: true,
         liveTable,
+        liveImage: asset,
         ingestedMd5,
         ingestedUpdated,
+        imageMd5: rec.imageCsvMd5 || ingestedMd5 || csv.md5 || '',
+        imageCsvMd5: rec.imageCsvMd5 || '',
+        csvMd5: rec.csvMd5 || '',
+        csvUpdated: rec.csvUpdated || '',
         error: '',
         note: '',
         _generation: generation
@@ -1583,6 +1635,12 @@ async function advancePopNha(opts = {}) {
       const stopped = await savePopNha(rec, generation);
       return { ...stopped, ...(await popNhaSnapshot()) };
     }
+  }
+  if (rec && rec._claimed === false) {
+    return { ...withPopNhaText(rec), ...(await popNhaSnapshot()) };
+  }
+  if (opts.watch && rec && !isBusyRecord(rec)) {
+    rec = await maybeStartImage(rec, csv, activeImage);
   }
   if (rec && rec._claimed === false) {
     return { ...withPopNhaText(rec), ...(await popNhaSnapshot()) };

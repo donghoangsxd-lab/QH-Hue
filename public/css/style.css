@@ -5296,22 +5296,18 @@ body.project-review.la-page #projectReviewHost {
 .apt-pin { background: none; border: 0; }
 .apt-pin svg { display: block; width: 22px; height: 30px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
 .apt-summary, .apt-status, .apt-ward { margin: 6px 0 0; font-size: 12px; }
-#popNhaStatus { white-space: pre-line; }
 .pop-nha-live { margin: 4px 0 0; font-size: 12px; line-height: 1.35; color: #5b21b6; }
 .pop-nha-live[hidden] { display: none; }
+.pop-method { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 12px; }
+.pop-method label { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.pop-method input[type="number"] { width: 5.5em; }
 .apt-pop dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 6px 0; }
 .apt-pop-n { font-weight: 700; margin-top: 2px; }
 .apt-edit { display: flex; flex-direction: column; gap: 4px; }
 .apt-edit label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
 .apt-edit input[type="number"] { width: 6em; }
-#aptAdmin { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 8px; padding: 6px 8px; border-radius: 8px; background: rgba(109, 40, 217, 0.08); }
-#aptAdmin[hidden] { display: none; }
 .apt-kind { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; }
-.apt-admin-title { margin: 0; font-size: 12px; font-weight: 700; }
 .apt-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; font-size: 12px; }
 .apt-mark { display: inline-block; width: 14px; height: 19px; margin-right: 3px; vertical-align: -4px; }
 .apt-mark svg { display: block; width: 14px; height: 19px; }
-.apt-ingest { display: flex; flex-direction: column; gap: 6px; margin: 4px 0; }
-.apt-ingest .layer-mini-btn { width: 100%; height: auto; min-height: 32px; padding: 6px 8px; font-size: 12.5px; font-weight: 700; border-radius: 8px; background: rgba(109, 40, 217, 0.28); }
-#addPop > #btnPopNhaJump { width: auto; height: auto; min-height: 28px; margin: 6px 0; padding: 4px 8px; font-size: 12px; }
 

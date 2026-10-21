@@ -467,6 +467,7 @@
               <option value="thuongmai">Thương mại</option>
             </select>
           </label>
+          <p id="aptStatus" class="apt-status"></p>
         </div>
         <div class="layer-row"><div><input type="checkbox" id="chk_invest"><label for="chk_invest" title="Dự án kêu gọi đầu tư, sheet 15-DA. Ranh từ file KML, thông tin từ danh sách. Nhóm sử dụng hạ tầng: không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ"><svg class="ico ico-layer"><use href="#i-coverage"/></svg>15. Dự án kêu gọi đầu tư <small class="layer-hint" id="investHint"></small></label></div></div>
         <div class="layer-status-legend" aria-label="Ghi chú trạng thái điểm">
@@ -579,29 +580,6 @@
             <div><input type="checkbox" id="chk_gba"><label for="chk_gba" title="Dấu chân công trình Global Building Atlas. Màu theo bốn nhóm chiều cao ước lượng trong địa bàn: Thấp đến phân vị 25, Trung bình đến phân vị 50, Cao đến phân vị 75, Rất cao trên phân vị 75. Không phải mét đo đạc. Hiện từ mức phóng 13."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Công trình xây dựng (GBA) <small class="layer-hint" id="gbaHint">(phóng tới mức 13)</small></label></div>
           </div>
           <div class="flood-box" id="gbaBox" style="display:none;"></div>
-          <div id="aptAdmin" hidden>
-            <p class="apt-admin-title">Dân số nhà ở (quản trị)</p>
-            <p class="cad-hint"><b>Dân số nhà ở tính từ bảng điểm đã nạp.</b> Ảnh raster là tùy chọn. Tác vụ xuất ảnh có thể đứng ở hàng chờ Earth Engine; các phép tính dân không đợi ảnh đó. Thêm chung cư bằng một dòng trên tab Google Sheet <b>NOXH</b> hoặc <b>14-NOXH</b>. Bật hay tắt lớp 14. Chung cư không đổi cách chia dân.</p>
-            <div class="apt-ingest" id="aptIngest">
-              <button type="button" class="layer-mini-btn" id="btnPopNha">Nạp raster dân nhà ở</button>
-              <button type="button" class="layer-mini-btn" id="btnPopNhaRebuild">Nạp lại từ CSV mới</button>
-              <button type="button" class="layer-mini-btn" id="btnPopNhaRestart">Chạy lại</button>
-              <button type="button" class="layer-mini-btn" id="btnPopNhaCancel">Hủy tác vụ</button>
-            </div>
-            <p id="popNhaStatus" class="apt-status"></p>
-            <label>Cách chia dân
-              <select id="aptMethod" aria-label="Cách chia dân số">
-                <option value="b">B + chung cư</option>
-                <option value="old">Pixel (so sánh)</option>
-              </select>
-            </label>
-            <p class="cad-hint" id="aptMethodNote">Pixel cũ gán khoảng 4% dân số thành phố lên đất nghĩa trang (mã thửa NTD và lô nghĩa trang). Cách nhà ở không chia dân cho mộ.</p>
-            <label>Người/hộ <input id="aptHh" type="number" min="1" max="8" step="0.1" value="3.3"></label>
-            <label>m²/người <input id="aptM2" type="number" min="8" max="80" step="1" value="25"></label>
-            <label>Hiệu suất sàn <input id="aptEff" type="number" min="0.4" max="1" step="0.05" value="0.75"></label>
-            <p class="cad-hint">Ô người/hộ chỉ đổi ghi chú phường trên máy này. Raster dùng cố định 3,3 người/căn.</p>
-            <p id="aptStatus" class="apt-status"></p>
-          </div>
           <div class="flood-box" id="cadastreBox" style="display:none;">
             <div class="cad-find">
               <select id="cadastreXa" aria-label="Xã/phường (địa giới cũ)"><option value="">Chọn xã/phường (địa giới cũ)</option></select>
@@ -612,7 +590,7 @@
             <div class="flood-stats" id="cadastreStatus"></div>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_pop"><label for="chk_pop" title="Mặc định là dân theo dấu chân nhà ở trên ô 30 m. Quản trị đổi sang pixel cũ ở mục Dân số nhà ở (quản trị), cùng nhóm Bản đồ nền. Pixel cũ gán khoảng 4% dân số lên đất nghĩa trang. Bật lớp 14. Chung cư không đổi số này."><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư <small class="layer-hint" id="popLayerHint"></small></label></div>
+            <div><input type="checkbox" id="chk_pop"><label for="chk_pop" title="Mặc định là dân theo dấu chân nhà ở trên ô 30 m. Pixel cũ gán khoảng 4% dân số lên đất nghĩa trang. Cách chia dân nằm ở Đề xuất → Quản trị → Ô dân cư. Bật lớp 14. Chung cư không đổi số này."><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư <small class="layer-hint" id="popLayerHint"></small></label></div>
             <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
           </div>
           <div class="layer-row">
@@ -1039,14 +1017,25 @@
             <button type="button" id="btnPopUndo" title="Xóa nét cọ cuối (Backspace / Ctrl+Z)" disabled><svg class="ico"><use href="#i-undo"/></svg>Hoàn tác nét</button>
           </div>
           <div id="popDrawInfo" class="road-draw-info"></div>
-          <div class="cad-hint" id="popHint" title="Vùng thêm được áp sau vùng xóa">Giữ chuột và rê để tô. Tổng dân số phường giữ nguyên: xóa pixel thì dân dồn sang pixel còn lại. Công cụ này chỉ sửa raster Pixel cũ dùng để so sánh, không sửa lớp nhà ở. Tải pop-weights.csv lên bucket là đủ: máy chủ tự nạp bảng mới, bảng đang dùng vẫn phục vụ đến khi bảng mới xong.</div>
+          <div class="cad-hint" id="popHint" title="Vùng thêm được áp sau vùng xóa">Giữ chuột và rê để tô. Tổng dân số phường giữ nguyên: xóa pixel thì dân dồn sang pixel còn lại. Công cụ này chỉ sửa raster Pixel cũ dùng để so sánh, không sửa lớp nhà ở. Tải pop-weights.csv lên bucket là đủ: máy chủ tự cập nhật, dữ liệu đang dùng vẫn phục vụ đến khi bản mới xong. Sau khi lưu vùng, máy chủ tự ghi vào nền.</div>
           <p id="popNhaLive" class="pop-nha-live" hidden></p>
-          <button type="button" class="layer-mini-btn" id="btnPopNhaJump">Mở nút nạp raster</button>
+          <div class="pop-method" id="popMethodBox">
+            <label>Cách chia dân
+              <select id="aptMethod" aria-label="Cách chia dân số">
+                <option value="b">B + chung cư</option>
+                <option value="old">Pixel (so sánh)</option>
+              </select>
+            </label>
+            <p class="cad-hint" id="aptMethodNote">Pixel cũ gán khoảng 4% dân số thành phố lên đất nghĩa trang (mã thửa NTD và lô nghĩa trang). Cách nhà ở không chia dân cho mộ.</p>
+            <label>Người/hộ <input id="aptHh" type="number" min="1" max="8" step="0.1" value="3.3"></label>
+            <label>m²/người <input id="aptM2" type="number" min="8" max="80" step="1" value="25"></label>
+            <label>Hiệu suất sàn <input id="aptEff" type="number" min="0.4" max="1" step="0.05" value="0.75"></label>
+            <p class="cad-hint">Ô người/hộ chỉ đổi ghi chú phường trên máy này. Raster dùng cố định 3,3 người/căn.</p>
+          </div>
           <button type="button" class="btn-submit" id="btnPopSave" disabled title="Ghi danh sách vùng hiệu chỉnh dân cư"><svg class="ico"><use href="#i-save"/></svg>Lưu vùng hiệu chỉnh</button>
           <div id="popStatus" class="rp-status" role="status" aria-live="polite"></div>
           <div class="pop-bake">
             <div class="pop-bake-info" id="popAssetInfo"></div>
-            <button type="button" id="btnPopBake" disabled title="Xuất raster đã áp các vùng thành asset GEE mới làm nền, rồi xóa danh sách vùng — tính toán nhẹ hơn. Asset gốc Pixel-danso giữ nguyên."><svg class="ico"><use href="#i-save"/></svg>Ghi cố định vào asset</button>
           </div>
           <div id="popList" class="cad-list"></div>
         </div>

@@ -61,5 +61,29 @@ assert(fn.includes('liveTable: asset'), 'xong thì trỏ bảng vừa nạp');
 assert(fn.includes("body.watch === true") === false, 'cờ watch nằm ở handler, không ở trong hàm');
 assert(src.includes('action === \'syncPopNha\''), 'có lịch đồng bộ');
 assert(src.includes('watch: body.watch === true'), 'nút và lịch cùng một lối');
+assert(!src.includes('promoteNhaAsset'), 'không xóa ảnh đang dùng để đổi tên');
+
+const imageTask = {
+  id: 'IMG123',
+  state: 'RUNNING',
+  description: 'QH-Hue_Pixel-danso-nha',
+  sources: [],
+  destinations: ['projects/optimistic-yew-488501-s0/assets/Pixel-danso-nha-next']
+};
+assert(popWatch.isPopImageTask(imageTask), 'nhận tác vụ xuất ảnh');
+assert(!popWatch.isPopImageTask(running), 'tác vụ bảng không phải ảnh');
+assert(popWatch.pickActiveImage([imageTask]) && popWatch.pickActiveImage([imageTask]).id === 'IMG123', 'giữ ảnh đang chạy');
+assert(!popWatch.pickActiveImage([{ ...imageTask, state: 'COMPLETED' }]), 'ảnh đã xong không giữ chỗ');
+assert(popWatch.imageAssetOfTask(imageTask) === popWatch.IMAGE_NEXT, 'ảnh tạm khi đích có -next');
+assert(popWatch.pickActiveTask([imageTask, running]).id === 'R5VL6OZT', 'bảng đang chạy vẫn được nhận khi có ảnh');
+
+const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+const base = html.slice(html.indexOf('id="layerPaneBase"'), html.indexOf('id="layerPaneEnv"'));
+assert(!base.includes('aptAdmin') && !base.includes('btnPopNha') && !base.includes('Nạp raster') && !base.includes('Nạp lại'), 'Bản đồ nền không còn nút nạp');
+assert(!html.includes('Mở nút nạp raster') && !html.includes('btnPopBake') && !html.includes('Hủy tác vụ'), 'không còn nút nạp tay');
+assert(html.includes('id="popNhaLive"'), 'dòng trạng thái nằm ở Quản trị');
+const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'apartmentLayer.js'), 'utf8');
+assert(client.includes('Đang cập nhật dữ liệu dân số…'), 'câu trạng thái ngắn');
+assert(!client.includes('btnPopNha'), 'giao diện không gắn nút nạp');
 
 console.log('pop-nha-watch: ok');
