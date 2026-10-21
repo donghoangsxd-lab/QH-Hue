@@ -1,4 +1,4 @@
-// Câu trạng thái nạp raster nhà ở. Không dùng lại câu cũ: trạng thái Earth Engine mới hơn câu đã lưu.
+// Câu trạng thái nạp raster nhà ở. Không dùng lại câu cũ và không nhắc bấm thêm.
 
 function minutesSince(at, now) {
   const n = Number(at);
@@ -22,19 +22,22 @@ function popNhaStatusText(rec, now = Date.now()) {
   const err = row.error ? ` Lỗi: ${row.error}` : '';
   const hint = taskHint(row) + waitHint(row, now);
   if (row.phase === 'csv') return row.message || 'Chưa có CSV trên bucket.';
+  if (state === 'TABLE_READY' || (row.phase === 'ready' && row.popFromTable)) {
+    return 'Bảng điểm đã có trên Earth Engine. Dân số nhà ở tính từ bảng này, không cần ảnh raster.';
+  }
   if (row.phase === 'ready' || state === 'ASSET_READY') {
-    return 'Nền nhà thấp tầng đã sẵn sàng. Thêm chung cư ở tab NOXH, không cần nạp lại CSV. Tải lại trang sau khoảng 1 phút.';
+    return 'Nền nhà thấp tầng đã sẵn sàng. Thêm chung cư ở tab NOXH, không cần nạp lại CSV.';
   }
-  if (row.phase === 'idle' || state === 'CANCELLED' && row.phase === 'idle') {
-    return row.message || 'Đã hủy tác vụ. Bấm Chạy lại để nạp tiếp.';
-  }
+  if (row.phase === 'idle') return 'Đã hủy tác vụ xuất ảnh. Dân số nhà ở vẫn tính từ bảng điểm đã nạp.';
   if (state === 'FAILED') {
     const what = row.phase === 'table' ? 'Nạp bảng điểm' : 'Xuất raster';
-    return `${what} lỗi.${err}${hint} Bấm Chạy lại.`;
+    const tail = row.phase === 'table' ? '' : ' Dân số nhà ở vẫn tính từ bảng điểm đã nạp.';
+    return `${what} lỗi.${err}${hint}${tail}`;
   }
   if (state === 'CANCELLED') {
     const what = row.phase === 'table' ? 'Nạp bảng điểm' : 'Xuất raster';
-    return `${what} đã hủy.${err}${hint} Bấm Chạy lại.`;
+    const tail = row.phase === 'table' ? '' : ' Dân số nhà ở vẫn tính từ bảng điểm đã nạp.';
+    return `${what} đã hủy.${err}${hint}${tail}`;
   }
   if (row.phase === 'table') {
     if (state === 'RUNNING') return `Đang nạp bảng điểm lên Earth Engine.${hint}`;
@@ -42,8 +45,12 @@ function popNhaStatusText(rec, now = Date.now()) {
   }
   if (row.phase === 'image') {
     if (state === 'RUNNING') return `Đang xuất raster Pixel-danso-nha.${hint}`;
-    if (state === 'ASSET_MISSING') return 'Earth Engine báo xuất xong nhưng chưa đọc được ảnh. Bấm Chạy lại sau một phút.';
-    return `Raster đang chờ Earth Engine, chưa bắt đầu xuất.${hint}${err}`;
+    if (state === 'ASSET_MISSING') {
+      return row.popFromTable
+        ? 'Chưa đọc được ảnh raster. Dân số nhà ở vẫn tính từ bảng điểm Pixel-danso-nha-diem.'
+        : 'Chưa đọc được ảnh raster và chưa có bảng điểm.';
+    }
+    return `Raster đang chờ Earth Engine, chưa bắt đầu xuất.${hint}${err} Dân số nhà ở vẫn tính từ bảng điểm Pixel-danso-nha-diem.`;
   }
   return 'Đang xử lý raster dân nhà ở.' + hint;
 }

@@ -246,9 +246,11 @@ function listHtml(zones) {
 }
 
 function methodHtml(d) {
-  const pop = d.popSource === 'nha'
-    ? 'Dân số lấy theo raster nhà ở.'
-    : 'Dân cư lấy theo raster pixel vì chưa có raster nhà ở, chỉ để tham khảo.';
+  const pop = d.popFromTable
+    ? `Dân số lấy theo bảng điểm nhà ở${d.popScaleNote ? ` (${d.popScaleNote})` : ''}.`
+    : (d.popSource === 'nha'
+      ? 'Dân số lấy theo raster nhà ở.'
+      : 'Dân cư lấy theo raster pixel vì chưa có bảng điểm nhà ở, chỉ để tham khảo.');
   const ndvi = Number(d.year) === new Date().getFullYear() ? ` NDVI năm ${d.year} chưa đủ 12 tháng.` : '';
   const cem = d.cemeteryCount
     ? ` Đã loại ${fmtNum(d.cemeteryCount)} nghĩa trang đã duyệt bằng vùng đệm quanh điểm.`

@@ -2706,7 +2706,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
           const polygon = r ? r.polygon : turf.circle([Number(p.lng), Number(p.lat)], itemRadius / 1000, { steps: 64 });
           return fetchServedPop(p, itemRadius, polygon).then(res => ({ res, real: !!(r && r.area) }));
         })
-        .then(({ res, real }) => fill('.js-served', `<span>${servedLabel}</span><div><b class="${ntKind && res.servedPop > 0 ? 'c-red' : servedCls}">~${fmtNum(res.servedPop || 0)} người</b> <span class="pp-sub">(${real ? 'trong phạm vi thực tế' : 'trong vòng tròn'}${scope})</span>${res.popFallback ? '<div class="pp-sub">Chưa có raster nhà ở, đang đếm pixel cũ.</div>' : ''}${servedQuotaHtml(res, p.size)}${ntNote(res.servedPop || 0)}</div>`))
+        .then(({ res, real }) => fill('.js-served', `<span>${servedLabel}</span><div><b class="${ntKind && res.servedPop > 0 ? 'c-red' : servedCls}">~${fmtNum(res.servedPop || 0)} người</b> <span class="pp-sub">(${real ? 'trong phạm vi thực tế' : 'trong vòng tròn'}${scope})</span>${res.popFallback ? '<div class="pp-sub">Chưa có bảng điểm nhà ở, đang đếm pixel cũ.</div>' : ''}${res.popScaleNote ? `<div class="pp-sub">${escapeHtml(res.popScaleNote)}</div>` : ''}${servedQuotaHtml(res, p.size)}${ntNote(res.servedPop || 0)}</div>`))
         .catch(() => fill('.js-served', `<span>${servedLabel}</span><span class="pp-sub">chưa tính được (GEE đang bận), mở lại sau.</span>`));
     }
   };
@@ -2792,7 +2792,19 @@ const POP_SERVER_PCT = 40;
 const POP_SERVER_TAU_MS = 2500;
 let popTask = null;
 
-export let popLayerMeta = { popSource: null, popFallback: false, max: null };
+export let popLayerMeta = { popSource: null, popFallback: false, popFromTable: false, max: null };
+
+function popLayerHintText(data) {
+  if (!data) return '';
+  if (data.popFallback) {
+    return data.popScaleNote ? `(tạm pixel cũ — ${data.popScaleNote})` : '(tạm pixel cũ — chưa có bảng điểm nhà ở)';
+  }
+  if (data.popFromTable) {
+    const cell = Number(data.popScale) > 30 ? `${data.popScale} m` : '30 m';
+    return data.popScaleNote ? `(nhà ở, ô ${cell}, từ bảng điểm)` : '(nhà ở, ô 30 m, từ bảng điểm)';
+  }
+  return data.popSource === 'nha' ? '(nhà ở, ô 30 m)' : '(pixel cũ)';
+}
 
 export async function loadPopulationLayer(pv) {
   if (!map) return;
@@ -2803,13 +2815,9 @@ export async function loadPopulationLayer(pv) {
     const res = await fetch(geeApi(`action=getPopRasterTile&pop=${encodeURIComponent(popQuery())}${pv ? `&pv=${pv}` : ''}`));
     const data = await res.json();
     if (data.urlFormat) {
-      popLayerMeta = { popSource: data.popSource || null, popFallback: !!data.popFallback, max: data.max || null };
+      popLayerMeta = { popSource: data.popSource || null, popFallback: !!data.popFallback, popFromTable: !!data.popFromTable, max: data.max || null };
       const hint = document.getElementById('popLayerHint');
-      if (hint) {
-        hint.textContent = data.popFallback
-          ? '(tạm pixel cũ — chưa có raster nhà ở)'
-          : (data.popSource === 'nha' ? '(nhà ở, ô 30 m)' : '(pixel cũ)');
-      }
+      if (hint) hint.textContent = popLayerHintText(data);
       const popOpacityEl = document.getElementById('popOpacity');
       const opacity = popOpacityEl ? popOpacityEl.value / 100 : 0.6;
       layers.pop.clearLayers();
@@ -2850,7 +2858,7 @@ export function ensurePopulationLayer() {
 if (typeof window !== 'undefined') {
   window.addEventListener(POP_METHOD_EVENT, (e) => {
     if (!e.detail || e.detail.kind !== 'method') return;
-    popLayerMeta = { popSource: null, popFallback: false, max: null };
+    popLayerMeta = { popSource: null, popFallback: false, popFromTable: false, max: null };
     popLayerPromise = null;
     const hint = document.getElementById('popLayerHint');
     if (hint) hint.textContent = '';
