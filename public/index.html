@@ -680,6 +680,12 @@
             <div class="flood-legend"><span>Sâu 0</span><div class="flood-legend-bar" id="floodLegendBar"></div><span>≥ 3 m</span></div>
             <div class="flood-stats" id="floodStats"></div>
           </div>
+          <div class="flood-box" id="floodGapBox">
+            <b>Số nhà trong vùng ngập</b>
+            <p>Chưa có lớp kịch bản ngập, lũ kèm độ sâu. Chưa tính số công trình, diện tích sàn và dân số chịu ảnh hưởng theo từng kịch bản.</p>
+            <p>Cần đa giác hoặc raster độ sâu của từng kịch bản, có tên, năm hoặc tần suất, đơn vị mét, phủ địa bàn thành phố.</p>
+            <p class="flood-muted">Mô phỏng ngập là thanh mực nước giả định trên cao độ nền FABDEM. Ngập Sentinel-1 là vùng quan sát, không có lớp độ sâu. Dân số mô phỏng tính theo nhà ở và chung cư 14-NOXH trên bậc cao độ nền, không gắn với dấu chân công trình.</p>
+          </div>
           <div class="layer-row">
             <div><input type="checkbox" id="chk_sarflood"><label for="chk_sarflood" title="Vùng thực tế bị ngập trong mùa lũ (15/9–15/12) phát hiện từ ảnh radar Sentinel-1 (ESA, 10 m), chụp xuyên mây, so với nền mùa khô cùng năm. Đã loại mặt nước thường xuyên (phá, sông lớn), vùng dốc và cao trên 30 m. Radar khó thấy ngập giữa nhà cửa dày đặc"><svg class="ico ico-layer"><use href="#i-sat"/></svg>Ngập thực tế (Sentinel-1)</label></div>
             <span id="sarFloodOpBox" class="layer-slider" style="display:none;"><input type="range" id="sarFloodOpacity" class="opacity-slider" min="0" max="100" value="75" title="Độ trong suốt lớp vùng ngập thực tế" aria-label="Độ trong suốt lớp vùng ngập thực tế"></span>

@@ -5407,6 +5407,9 @@ body.project-review.la-page #projectReviewHost {
 .violate-table td:not(:first-child), .violate-table th:not(:first-child) { text-align: right; }
 .violate-pop { display: flex; flex-direction: column; gap: 3px; font-size: 12px; line-height: 1.35; }
 .violate-canvas { position: absolute; left: 0; top: 0; pointer-events: none; }
+#floodGapBox { display: block; margin: 6px 0 8px; }
+#floodGapBox b { font-size: 12px; }
+#floodGapBox p { margin: 4px 0; font-size: 12px; line-height: 1.35; }
 .apt-pin { background: none; border: 0; }
 .apt-pin svg { display: block; width: 22px; height: 30px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
 .apt-summary, .apt-status, .apt-ward { margin: 6px 0 0; font-size: 12px; }
