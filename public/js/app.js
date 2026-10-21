@@ -979,36 +979,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const progressPercent = document.getElementById('progressPercent');
   const progressLabel = document.getElementById('progressLabel');
   const progressRow = document.querySelector('.rp-progress');
-  // Thanh mảnh dưới tiêu đề: nhảy theo mốc, giữa 2 mốc nhích dần (chưa chạm mốc sau) để không đứng im khi chờ máy chủ
-  const titleProgress = document.getElementById('titleProgress');
-  const titleFill = titleProgress?.firstElementChild;
-  let titlePct = 0;
-  let titleFloor = 0;
-  const paintTitle = () => {
-    titleFill.style.width = `${titlePct}%`;
-    titleProgress.setAttribute('aria-valuenow', String(Math.round(titlePct)));
-  };
-  const creep = titleFill ? setInterval(() => {
-    const cap = Math.min(titleFloor + 28, 97);
-    if (titlePct >= cap - 0.5) return;
-    titlePct += (cap - titlePct) * 0.06;
-    paintTitle();
-  }, 200) : null;
-  const endTitleProgress = () => {
-    clearInterval(creep);
-    titleProgress?.classList.add('done');
-  };
   const setProgress = (pct, label) => {
     if (progressBar) progressBar.style.width = `${pct}%`;
     if (progressPercent) progressPercent.textContent = `${pct}%`;
     if (progressLabel && label) progressLabel.textContent = label;
-    if (!titleFill) return;
-    titleFloor = pct;
-    titlePct = Math.max(titlePct, pct);
-    if (label) titleProgress.setAttribute('aria-valuetext', label);
-    paintTitle();
-    if (pct >= 100) endTitleProgress();
   };
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
   // 3 mốc xong theo thứ tự bất kỳ: lớp phủ đô thị (chờ ranh 40 phường xã), công trình, độ phủ (chờ công trình)
   const STEP_LABEL = { urban: 'Đang dựng lớp phủ đô thị', infra: 'Đang tải công trình', heat: 'Đang tính độ phủ' };
   const pending = new Set(Object.keys(STEP_LABEL));

@@ -6,6 +6,7 @@ import { MAP_MAX_ZOOM } from './basemap.js';
 import { geeApi } from './api.js';
 import { setWardGbaHtml } from './uiComponents.js';
 import { GBA_CLASSES, GBA_COLORS, gbaLotKey, gbaStatsHtml, gbaWardExtra } from './gbaStats.js';
+import { trackWork, watchTiles } from './loadProgress.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -228,7 +229,7 @@ function paintBox() {
 
 function addFeet(m) {
   pane(m, FOOT_PANE, FOOT_Z);
-  return new FootGrid({ pane: FOOT_PANE, minZoom: MIN_ZOOM, maxZoom: MAP_MAX_ZOOM, updateWhenZooming: false, keepBuffer: 1 }).addTo(m);
+  return watchTiles(new FootGrid({ pane: FOOT_PANE, minZoom: MIN_ZOOM, maxZoom: MAP_MAX_ZOOM, updateWhenZooming: false, keepBuffer: 1 }), 'Công trình xây dựng').addTo(m);
 }
 
 function applyFeet() {
@@ -241,7 +242,12 @@ function applyFeet() {
   }
 }
 
+function ensureAgg() {
+  if (!agg) loadAgg().catch(() => {});
+}
+
 function wardHtml(name) {
+  ensureAgg();
   const row = agg && (agg.wards || []).find((w) => w.name === name);
   if (!row) return '';
   const line = [row.n, row.fp, row.cov, row.cls, row.fai];
@@ -250,6 +256,7 @@ function wardHtml(name) {
 }
 
 function lotHtml(p) {
+  ensureAgg();
   if (!agg || !p) return '';
   const key = gbaLotKey(p.file, p.phase, p.id);
   const row = agg.lots && agg.lots[key];
@@ -262,10 +269,10 @@ export function initGbaLayer() {
   if (box) box.innerHTML = legendHtml();
   setLandPopupExtra(lotHtml);
   setWardGbaHtml(wardHtml);
-  loadAgg().catch(() => { /* thẻ lô bỏ qua nếu chưa có file */ });
   map.on('zoomend', paintBox);
   $('chk_gba')?.addEventListener('change', (e) => {
     feetOn = !!e.target.checked;
+    if (feetOn) trackWork('Công trình xây dựng', loadAgg().catch(() => {}));
     applyFeet();
     syncAttr();
     paintBox();

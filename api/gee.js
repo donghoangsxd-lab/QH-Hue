@@ -3758,7 +3758,7 @@ module.exports = async (req, res) => {
 
     // Thể thao, đường sắt, đường thủy nội địa từ OpenStreetMap. Không cần Earth Engine.
     if (action === 'getOsmOpen') {
-      res.setHeader('Cache-Control', 's-maxage=21600, stale-while-revalidate=86400');
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=21600, stale-while-revalidate=86400');
       const data = await osmOpen.loadOsmOpen();
       return res.status(200).json(data);
     }
@@ -4451,7 +4451,8 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'getBoundaryTile') {
-      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
+      // urlFormat là map id Earth Engine, hết hạn: trình duyệt không giữ, CDN giữ một giờ.
+      res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate, s-maxage=3600, stale-while-revalidate=86400');
       const wardOutline = ee.Image().byte().paint({ featureCollection: wardVectorParsed, color: 1, width: 2 });
       const mapId = await new Promise((resolve, reject) => {
         wardOutline.getMap({ palette: ['#00ffff'] }, (m, err) => err ? reject(err) : resolve(m));
@@ -4460,7 +4461,7 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'getWardLabels') {
-      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
+      res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800');
 
       const wardCentroidFc = wardVectorParsed.map(f =>
         f.set('centroidCoords', f.geometry().centroid(1).coordinates())
@@ -4482,7 +4483,7 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'getBoundaryVector') {
-      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
+      res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800');
       const fcGeoJson = (await eeEvaluate(wardVectorParsed)) || { type: 'FeatureCollection', features: [] };
       (fcGeoJson.features || []).forEach(f => { f.geometry = normalizeWardGeometry(f.geometry); });
       return res.status(200).json(fcGeoJson);

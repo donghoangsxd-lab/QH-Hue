@@ -15,6 +15,7 @@ import { tt16ParcelStyle, infraStyleKey, landParcelStyle, landLabel, landColor, 
 import { initLegendPanel } from './legendPanel.js';
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap, BASEMAP_EVENT, MAP_MAX_ZOOM, geeTileOpts } from './basemap.js';
+import { trackJob, watchTiles } from './loadProgress.js';
 import {
   getCoveredRightWidth, highlightPlanWard, highlightPlanWards, wardFocusLayer, planMap, planLayers, syncPlanLayer,
   setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, getViewMode, setViewMode, passToolClick, shownMaps
@@ -270,9 +271,21 @@ export async function loadBoundaryLayer() {
   if (!map) return;
 
   let features = [];
+  const endBound = trackJob('Ranh giới phường xã');
   try {
-    const boundRes = await fetch(geeApi(`action=getBoundaryVector&v=${WARD_GEOM_VERSION}`));
-    const boundData = await boundRes.json();
+    // File tĩnh đã đơn giản hóa (~5 m). Sai phiên bản hoặc lỗi thì dùng GeoJSON đầy đủ từ API.
+    const localUrl = new URL(`data/ward-boundary.json?v=${WARD_GEOM_VERSION}`, document.baseURI).href;
+    let boundData = null;
+    try {
+      const localRes = await fetch(localUrl);
+      if (localRes.ok) boundData = await localRes.json();
+    } catch (e) { /* file tĩnh lỗi thì dùng API */ }
+    const localOk = boundData && Array.isArray(boundData.features) && boundData.features.length
+      && Number(boundData.v) === WARD_GEOM_VERSION;
+    if (!localOk) {
+      const apiRes = await fetch(geeApi(`action=getBoundaryVector&v=${WARD_GEOM_VERSION}`));
+      boundData = await apiRes.json();
+    }
     
     if (boundData && boundData.features) {
       features = boundData.features;
@@ -282,6 +295,8 @@ export async function loadBoundaryLayer() {
     }
   } catch (err) {
     console.error("Lỗi tải ranh giới vector 40 phường xã:", err);
+  } finally {
+    endBound();
   }
 
   // Tên + điểm đặt nhãn lấy từ chính ranh vừa tải (cùng thứ tự, cùng tên như getWardLabels), không tải lại hình học lần 2
@@ -2000,7 +2015,7 @@ function setLeftHeatUrl(url, beforeAdd = null) {
   tileHeatmapLayer = null;
   if (!url) return;
   const heatOpacityEl = document.getElementById('heatOpacity');
-  tileHeatmapLayer = L.tileLayer(url, geeTileOpts({ opacity: heatOpacityEl ? heatOpacityEl.value / 100 : 0.3 }));
+  tileHeatmapLayer = watchTiles(L.tileLayer(url, geeTileOpts({ opacity: heatOpacityEl ? heatOpacityEl.value / 100 : 0.3 })), 'Độ phủ hạ tầng');
   if (beforeAdd) beforeAdd(tileHeatmapLayer);
   layers.heatmap.addLayer(tileHeatmapLayer);
 }
@@ -2822,8 +2837,8 @@ export async function loadPopulationLayer(pv) {
       const opacity = popOpacityEl ? popOpacityEl.value / 100 : 0.6;
       layers.pop.clearLayers();
       planLayers.pop?.clearLayers();
-      const left = L.tileLayer(data.urlFormat, geeTileOpts({ opacity }));
-      const right = L.tileLayer(data.urlFormat, geeTileOpts({ opacity }));
+      const left = watchTiles(L.tileLayer(data.urlFormat, geeTileOpts({ opacity })), 'Phân bổ dân cư');
+      const right = watchTiles(L.tileLayer(data.urlFormat, geeTileOpts({ opacity })), 'Phân bổ dân cư');
       // Chỉ đếm ô của bản đồ đang thấy và đang bật lớp (nhóm chưa vào bản đồ thì layer chưa tải ô)
       const shown = shownMaps();
       const tracked = [[map, layers.pop, left], [planMap, planLayers.pop, right]]

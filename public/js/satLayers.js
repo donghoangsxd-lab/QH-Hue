@@ -11,6 +11,7 @@ import { popQuery } from './popMethod.js';
 import { escapeHtml, fmtNum, startTaskProgress, trackTileLoads } from './utils.js';
 import { devFromYears, loadNewDevStats, devLegend, devStats, DEV_MIN_ZOOM } from './newDev.js';
 import { geeTileOpts } from './basemap.js';
+import { watchTiles } from './loadProgress.js';
 
 const $ = (id) => document.getElementById(id);
 const MAX_LIST = 150;
@@ -234,7 +235,7 @@ function setLayerUrl(cfg, rt, url, track) {
   rt.url = url;
   const shown = shownMaps();
   const sides = [['left', map], ['right', planMap]].filter(([, m]) => m)
-    .map(([side, m]) => ({ side, m, fresh: !rt[side], layer: rt[side] || L.tileLayer(url, opts) }));
+    .map(([side, m]) => ({ side, m, fresh: !rt[side], layer: rt[side] || watchTiles(L.tileLayer(url, opts), cfg.label) }));
   track(sides.filter(s => changed && shown.includes(s.m) && s.m.getZoom() >= opts.minZoom).map(s => s.layer));
   sides.forEach(({ side, m, fresh, layer }) => {
     if (fresh) rt[side] = layer.addTo(m);

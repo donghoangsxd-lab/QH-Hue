@@ -5,6 +5,7 @@ import { state } from './state.js';
 import { bareName } from './urbanStatus.js';
 import { escapeHtml, fmtNum } from './utils.js';
 import { clipOsmFeatures, countGroups } from './osmClip.js';
+import { trackWork } from './loadProgress.js';
 
 const $ = (id) => document.getElementById(id);
 const GROUPS = [
@@ -69,7 +70,7 @@ export function osmWaterInput() {
 
 export function loadOsmOpen() {
   if (!promise) {
-    promise = fetch(geeApi('action=getOsmOpen'))
+    promise = trackWork('Đường sắt, đường thủy', fetch(geeApi('action=getOsmOpen')))
       .then(async r => {
         const d = await r.json().catch(() => null);
         if (!r.ok || !d || d.error || !d.geojson || !Array.isArray(d.geojson.features)) {

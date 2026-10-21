@@ -3,6 +3,8 @@
 // WebGL hoặc kiểu Liberty lỗi thì đổi sang nền xám nhạt Esri. Lựa chọn ghi trên máy (qhhue.basemap).
 // Lớp cắt nền điều chỉnh cục bộ luôn lấy vệ tinh Google.
 // Mức phóng bản đồ cao hơn ô gốc: Leaflet phóng ô maxNativeZoom, không tắt lớp.
+import { trackJob, watchTiles } from './loadProgress.js';
+
 const STORE_KEY = 'qhhue.basemap';
 
 /** Mức phóng tối đa của mọi bản đồ Leaflet (hiện trạng, quy hoạch, định vị ảnh). */
@@ -185,9 +187,10 @@ function addTiles(m, id) {
   const def = id === 'positron'
     ? { url: ESRI_LIGHT.url, opts: ESRI_LIGHT.opts }
     : defOf(id);
-  return L.tileLayer(def.url, {
+  const name = id === 'google' ? 'Ảnh vệ tinh' : 'Nền đường phố';
+  return watchTiles(L.tileLayer(def.url, {
     maxZoom: layerMaxZoom(def.opts), zIndex: 0, crossOrigin: 'anonymous', ...def.opts
-  }).addTo(m);
+  }), name).addTo(m);
 }
 
 // Lớp trả về ngay; MapLibre gắn sau khi script và style về. remove() hủy cả lần tải đang chờ.
@@ -196,9 +199,13 @@ function addLiberty(m) {
   let glLayer = null;
   let cancelled = false;
   let timer = 0;
+  const endStreet = trackJob('Nền đường phố');
+  let ended = false;
+  const finish = () => { if (!ended) { ended = true; endStreet(); } };
   const api = {
     remove() {
       cancelled = true;
+      finish();
       if (timer) clearTimeout(timer);
       if (glLayer) {
         try { glLayer.remove(); } catch (e) { /* context đã mất */ }
@@ -208,7 +215,7 @@ function addLiberty(m) {
     }
   };
   ensureLibs().then(() => libertyStyle()).then(style => {
-    if (cancelled || lightKind === 'esri') return;
+    if (cancelled || lightKind === 'esri') { finish(); return; }
     ensureOfmPane(m);
     try {
       glLayer = L.maplibreGL({
@@ -234,15 +241,16 @@ function addLiberty(m) {
     let ok = false;
     const giveUp = () => {
       if (ok || cancelled || lightKind === 'esri') return;
+      finish();
       useEsriStreet();
     };
     timer = setTimeout(giveUp, 12000);
-    gl.on('load', () => { ok = true; clearTimeout(timer); });
+    gl.on('load', () => { ok = true; clearTimeout(timer); finish(); });
     gl.on('error', (ev) => {
       const msg = String((ev && ev.error && (ev.error.message || ev.error)) || '');
       if (!ok && /WebGL|Failed to initialize|load the style/i.test(msg)) giveUp();
     });
-  }).catch(() => { if (!cancelled) useEsriStreet(); });
+  }).catch(() => { finish(); if (!cancelled) useEsriStreet(); });
   return api;
 }
 
@@ -260,7 +268,7 @@ function addLabels(m) {
     pane.style.zIndex = 450;
     pane.style.pointerEvents = 'none';
   }
-  labelLayers.set(m, L.tileLayer(LABELS.url, { maxZoom: layerMaxZoom(LABELS.opts), pane: LABELS_PANE, ...LABELS.opts }).addTo(m));
+  labelLayers.set(m, watchTiles(L.tileLayer(LABELS.url, { maxZoom: layerMaxZoom(LABELS.opts), pane: LABELS_PANE, ...LABELS.opts }), 'Tem đường').addTo(m));
 }
 
 /** Bật / tắt tem đường, tên công trình trên mọi bản đồ đã gắn ảnh nền (nút nhỏ cuối dòng Mạng lưới đường) */

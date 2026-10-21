@@ -7,6 +7,7 @@ import { planMap } from './planMap.js';
 import { roadWaysAround } from './serviceArea.js';
 import { geeApi } from './api.js';
 import { customRoadsVersion } from './wardRoads.js';
+import { trackJob } from './loadProgress.js';
 
 const MIN_ZOOM = 14;
 // Nhóm đường hiện theo mức phóng: xa chỉ trục chính, gần hơn thêm đường khu vực + xe đạp, gần nhất thêm nội bộ / chưa phân loại.
@@ -72,6 +73,7 @@ function pump() {
     const key = queue.shift();
     const [i, j] = key.split(':').map(Number);
     active++;
+    const endCell = trackJob('Mạng lưới đường');
     roadWaysAround((i + 0.5) * CELL_DEG, (j + 0.5) * CELL_DEG, CELL_RADIUS_M)
       .then(ways => {
         const lines = { main: [], named: [], kiet: [], bike: [], unknown: [] };
@@ -79,7 +81,7 @@ function pump() {
         cells.set(key, { lines });
       })
       .catch(() => cells.delete(key))   // lần di chuyển bản đồ sau sẽ thử lại
-      .finally(() => { active--; if (visible) update(); pump(); });
+      .finally(() => { endCell(); active--; if (visible) update(); pump(); });
   }
 }
 
@@ -96,11 +98,16 @@ function clearDrawn() {
 async function overviewLines() {
   const cv = await customRoadsVersion().catch(() => 0);
   if (overviewCache && overviewCache.cv === cv) return overviewCache.lines;
-  const res = await fetch(geeApi(`action=getMainRoads&cv=${cv}`));
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !Array.isArray(data.lines)) throw new Error(data.message || `HTTP ${res.status}`);
-  overviewCache = { cv, lines: data.lines };
-  return data.lines;
+  const endMain = trackJob('Mạng lưới đường');
+  try {
+    const res = await fetch(geeApi(`action=getMainRoads&cv=${cv}`));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !Array.isArray(data.lines)) throw new Error(data.message || `HTTP ${res.status}`);
+    overviewCache = { cv, lines: data.lines };
+    return data.lines;
+  } finally {
+    endMain();
+  }
 }
 
 function drawMain(lines) {

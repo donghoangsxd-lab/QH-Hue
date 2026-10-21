@@ -10,6 +10,7 @@
 import { map, WARD_BOUNDS_EVENT } from './mapEngine.js';
 import { state } from './state.js';
 import { CITY_SCOPE, boundsOverlap, lngLatToTileLocal, pointInClip, tileBounds, wardClipFor } from './parcelWardClip.js';
+import { watchTiles } from './loadProgress.js';
 import { MAP_MAX_ZOOM } from './basemap.js';
 import { planMap, getViewMode, isSplitOn } from './planMap.js';
 import { geeApi } from './api.js';
@@ -339,7 +340,7 @@ function makeLayer(m, fill) {
     pane.style.pointerEvents = 'none';
   }
   const opacity = Number($('cadastreOpacity')?.value ?? 100) / 100;
-  return new CadastreGrid({ pane: PANE, minZoom: MIN_ZOOM, maxZoom: MAP_MAX_ZOOM, opacity, fill, updateWhenZooming: false, keepBuffer: 1 }).addTo(m);
+  return watchTiles(new CadastreGrid({ pane: PANE, minZoom: MIN_ZOOM, maxZoom: MAP_MAX_ZOOM, opacity, fill, updateWhenZooming: false, keepBuffer: 1 }), 'Thửa đất địa chính').addTo(m);
 }
 
 const activeMap = () => (planMap && !isSplitOn() && getViewMode() === 'QH' ? planMap : map);

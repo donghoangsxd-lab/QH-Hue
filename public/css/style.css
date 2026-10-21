@@ -226,7 +226,7 @@ body.split-offset .swipe-handle { display: none; }
   background: linear-gradient(90deg, transparent, rgb(var(--tone)) 25%, rgb(var(--tone)) 75%, transparent);
 }
 .map-title[data-view="HT"] { --tone: var(--cyan-rgb); }
-/* Tiến độ nạp lần đầu (app.js): thanh mảnh ở mép dưới tiêu đề, xong thì mờ dần */
+/* Tiến độ ô và lượt tải (loadProgress.js): thanh mảnh ở mép dưới tiêu đề, xong thì mờ dần */
 .map-title-progress {
   position: absolute;
   left: 0; right: 0; bottom: 0;
@@ -254,6 +254,23 @@ body.split-offset .swipe-handle { display: none; }
 }
 @keyframes title-progress-shine { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 .map-title-progress.done { opacity: 0; }
+.load-layer-label {
+  position: fixed;
+  top: calc(var(--title-h) + 8px);
+  left: 12px;
+  z-index: 1200;
+  max-width: min(68vw, 280px);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #f8fafc;
+  font-size: 11px;
+  line-height: 1.4;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 @media (prefers-reduced-motion: reduce) { .map-title-progress > i::after { animation: none; } }
 .map-title[data-view="split"]::before { background: linear-gradient(90deg, transparent, var(--accent-cyan) 20%, var(--accent-cyan) 48%, var(--accent-orange) 52%, var(--accent-orange) 80%, transparent); }
 body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-width: calc(100% - 2 * (var(--ov-w) + 24px)); }
@@ -4694,6 +4711,12 @@ body.project-review.la-page #projectReviewHost {
    Cỡ chữ một mức: chú thích 11.5, chữ 13, tiêu đề 14–15. Nút chạm 40–44px.
    Khóa html/body vào khung nhìn để thanh nowrap không đẩy trang sang trái. --right-w = 0 vì ngăn kéo phủ lên bản đồ. */
 @media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+  .load-layer-label {
+    top: var(--phone-chrome-top);
+    left: var(--phone-tool-left);
+    font-size: 10.5px;
+    max-width: min(52vw, 220px);
+  }
   html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   html, body {
     position: fixed;
