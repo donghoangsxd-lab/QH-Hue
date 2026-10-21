@@ -5255,12 +5255,78 @@ body.project-review.la-page #projectReviewHost {
   body.bottom-collapsed .leaflet-bottom.leaflet-right { margin-bottom: 60px; }
   .mobile-fs:not([hidden]) { top: auto; bottom: var(--phone-dock-bottom); }
 }
-/* Điện thoại dọc: tiêu đề bảng và nút không đè lên nhau; chỉ tiêu xuống dòng dưới. */
+/* Điện thoại dọc hẹp: tiêu đề khối không bị nút bóp. */
 @media (max-width: 840px) {
   .detail-more > summary { min-height: 44px; }
-  .bp-part2 .bp-part-head { flex-wrap: wrap; align-content: center; overflow: hidden; row-gap: 2px; }
   .bp-title-wrap { max-width: none; flex: 1 1 auto; min-width: 0; }
-  .bp-head-stats { flex: 1 1 100%; order: 3; height: 22px; }
+}
+/* Bảng tổng hợp trên điện thoại (dọc ≤840, hoặc cảm ứng ngang thấp kể cả ~1024×473):
+   hàng tên / địa bàn / nút một dòng như Cơ cấu đất, không đè lên chỉ tiêu.
+   Chỉ tiêu HT/QH xuống hàng dưới, cao đủ 2 dòng; thiếu bề ngang thì cuộn ngang, không cắt chữ.
+   Bảng phường cuộn trong phần còn lại; khối GBA nằm ngay dưới bảng, không tách khoảng trống. */
+@media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+  .bp-part2 .bp-part-head {
+    flex-wrap: wrap;
+    align-items: center;
+    align-content: flex-start;
+    overflow: hidden;
+    row-gap: 4px;
+    height: auto;
+    min-height: 0;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  .bp-part2 .bp-title-wrap { max-width: none; flex: 1 1 auto; min-width: 0; }
+  .bp-part2 .bp-actions { position: static; margin-left: auto; background: transparent; padding-left: 0; }
+  .bp-part2 .bp-head-stats {
+    flex: 1 1 100%;
+    order: 3;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+  }
+  .bp-part2 .hs-col { flex: 0 0 auto; }
+  .bp-part2 .hs-cell { height: auto; min-height: 18px; line-height: 1.25; }
+  /* Một vùng cuộn: bảng đủ hàng rồi tới GBA, không để GBA nuốt hết chiều cao. */
+  #wardSummaryView { min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
+  #wardSummaryCard {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: max-content;
+    min-width: 100%;
+  }
+  .bp-part2 #wardQuotaTableContainer { display: block; flex: none; height: auto; min-height: 0; width: auto; }
+  .bp-part2 .ward-table-scroll-container {
+    display: block;
+    flex: none;
+    height: auto;
+    width: max-content;
+    max-width: none;
+    overflow: visible;
+  }
+  .bp-part2 .gba-stats,
+  .bp-part2 .apt-ward {
+    position: sticky;
+    left: 0;
+    flex: none;
+    box-sizing: border-box;
+    width: min(720px, calc(100vw - 16px));
+    max-width: calc(100vw - 16px);
+  }
+  .bp-part2 .gba-stats {
+    margin-top: 6px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--r-md);
+    padding: 6px 8px 4px;
+    background: rgba(15, 23, 42, 0.92);
+  }
+  .bp-part2 .apt-ward { margin: 4px 0 0; padding: 0 2px; white-space: normal; }
 }
 /* Dọc hẹp: tiêu đề nằm trên một hàng, panel phải bắt đầu ngay dưới tiêu đề (không kéo full ngang, không phải ngăn kéo đáy). */
 @media (max-width: 700px) {
