@@ -3,9 +3,10 @@
   "asset": "projects/optimistic-yew-488501-s0/assets/Pixel-danso-nha",
   "table": "projects/optimistic-yew-488501-s0/assets/Pixel-danso-nha-diem",
   "gcs": "gba/pop-weights.csv",
-  "rows": 664217,
+  "rows": 664255,
   "people": 1452683.0,
   "droppedNtd": 47,
-  "droppedAptFootprints": 42,
-  "note": "Điểm nhà ở: dân số phường trừ nhà ở xã hội đã hoàn thành, chia theo diện tích dấu chân × (bậc tương đối + 1). Điểm chạm NTD đã bỏ. Khu quy hoạch không trừ. Chung cư có số dân là điểm riêng."
+  "droppedAptFootprints": 0,
+  "base": "lowrise",
+  "note": "Nền nhà thấp tầng nạp một lần: mọi dấu chân nhà ở trừ thửa NTD, dân số phường chia theo diện tích × (bậc tương đối + 1). Không trừ chung cư và không ghi điểm chung cư. Tab NOXH gắn lúc chạy."
 }

@@ -663,6 +663,7 @@ function syncSheetsToGCS(includeCad) {
     var investCalls = collectInvestCalls(ss);
     if (investCalls) uploadToGCS(JSON.stringify(investCalls), "invest_calls.json");
     syncChungCu(ss);
+    syncNoxh(ss);
     scheduleWebappWarm();
 
   } catch (err) {
@@ -817,6 +818,10 @@ function installedOnEdit(e) {
     syncChungCu(SpreadsheetApp.getActiveSpreadsheet());
     return;
   }
+  if (sheetName === "NOXH") {
+    syncNoxh(SpreadsheetApp.getActiveSpreadsheet());
+    return;
+  }
 
   if (!isValidInfraSheet(sheetName)) return;
 
@@ -948,6 +953,10 @@ function doGet(e) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (action === "getChungCu") {
       return ContentService.createTextOutput(JSON.stringify(readChungCu(ss)))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === "getNoxh") {
+      return ContentService.createTextOutput(JSON.stringify(readNoxh(ss)))
         .setMimeType(ContentService.MimeType.JSON);
     }
     var currentTime = Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm:ss");
@@ -1416,6 +1425,7 @@ function doPost(e) {
     if (action === "saveRoads") return jsonOutput(saveRoads(body));
     if (action === "savePopEdits") return jsonOutput(savePopEdits(body));
     if (action === "saveChungCu") return jsonOutput(saveChungCu(body));
+    if (action === "saveNoxh") return jsonOutput(saveNoxh(body));
     if (action === "saveDrainage") return jsonOutput(saveDrainage(body));
     if (action === "saveBasins") return jsonOutput(saveBasins(body));
     if (action === "saveDrainArrows") return jsonOutput(saveDrainArrows(body));
@@ -3301,5 +3311,199 @@ function saveChungCu(body) {
     }
   });
   var n = syncChungCu(ss);
+  return { saved: true, count: n };
+}
+
+// Tab NOXH: chung cư hiện trạng và quy hoạch. Chưa có tab thì missing=true, không tự tạo khi đọc.
+const NOXH_SHEET = "NOXH";
+const NOXH_HEADERS = ["Trạng thái", "Tên", "Mô tả", "Dân số", "Diện tích (ha)", "MĐXD (%)", "Tầng cao", "HSSDĐ", "Số căn hộ", "WKT", "Loại"];
+const NOXH_FILE = "gba/noxh.json";
+const NOXH_ALIAS = {
+  status: ["trangthai", "status", "tinhtrang"],
+  name: ["ten", "tencongtrinh", "name"],
+  detail: ["mota", "detail", "ghichu", "diengiai"],
+  residents: ["danso", "dancu", "residents", "sodan"],
+  siteHa: ["dientichha", "dientich", "siteha"],
+  coverage: ["mdxd", "mdxdpct", "coverage", "matdo"],
+  floors: ["tangcao", "tang", "sotang", "floors"],
+  far: ["hssdd", "far", "hesosdd"],
+  units: ["socanho", "socan", "units"],
+  wkt: ["wkt", "wktsimplified", "ranh"],
+  kind: ["loai", "phanloai", "kind", "nhom"],
+  id: ["id", "madoituong", "iddoiduong"],
+  lat: ["vido", "lat", "latitude"],
+  lng: ["kinhdo", "lng", "longitude"],
+  ward: ["phuongxa", "tenxaphuong", "ward", "xaphuong"]
+};
+
+function noxhFold(text) {
+  var s = String(text || "").toLowerCase();
+  var from = "àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ";
+  var to = "aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyyd";
+  var out = "";
+  for (var i = 0; i < s.length; i++) {
+    var p = from.indexOf(s.charAt(i));
+    out += p >= 0 ? to.charAt(p) : s.charAt(i);
+  }
+  return out.replace(/[^a-z0-9]+/g, "");
+}
+
+function noxhHeaderIndex(headers) {
+  var idx = {};
+  for (var i = 0; i < headers.length; i++) {
+    var f = noxhFold(headers[i]);
+    if (!f) continue;
+    for (var field in NOXH_ALIAS) {
+      if (idx[field] != null) continue;
+      if (NOXH_ALIAS[field].indexOf(f) !== -1) idx[field] = i;
+    }
+  }
+  return idx;
+}
+
+function noxhCell(row, idx, field) {
+  if (idx[field] == null) return "";
+  var v = row[idx[field]];
+  return v == null ? "" : v;
+}
+
+function readNoxh(ss) {
+  var sheet = ss.getSheetByName(NOXH_SHEET);
+  if (!sheet) return { v: 1, missing: true, items: [] };
+  if (sheet.getLastRow() < 1) return { v: 1, missing: false, items: [] };
+  var data = sheet.getDataRange().getValues();
+  var idx = noxhHeaderIndex(data[0]);
+  var items = [];
+  for (var r = 1; r < data.length; r++) {
+    var name = String(noxhCell(data[r], idx, "name") || "").trim();
+    var wkt = String(noxhCell(data[r], idx, "wkt") || "").trim();
+    var id = String(noxhCell(data[r], idx, "id") || "").trim();
+    var lat = chungCuNumber(noxhCell(data[r], idx, "lat"));
+    var lng = chungCuNumber(noxhCell(data[r], idx, "lng"));
+    if (!name && !wkt && !id && lat == null && lng == null) continue;
+    items.push({
+      id: id,
+      name: name,
+      detail: String(noxhCell(data[r], idx, "detail") || ""),
+      residents: chungCuNumber(noxhCell(data[r], idx, "residents")),
+      siteHa: chungCuNumber(noxhCell(data[r], idx, "siteHa")),
+      coverage: chungCuNumber(noxhCell(data[r], idx, "coverage")),
+      floors: chungCuNumber(noxhCell(data[r], idx, "floors")),
+      far: chungCuNumber(noxhCell(data[r], idx, "far")),
+      units: chungCuNumber(noxhCell(data[r], idx, "units")),
+      wkt: wkt,
+      status: String(noxhCell(data[r], idx, "status") || ""),
+      kind: String(noxhCell(data[r], idx, "kind") || ""),
+      lat: lat,
+      lng: lng,
+      ward: String(noxhCell(data[r], idx, "ward") || "")
+    });
+  }
+  return {
+    v: 1,
+    missing: false,
+    updated: Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "dd/MM/yyyy HH:mm:ss"),
+    items: items
+  };
+}
+
+function syncNoxh(ss) {
+  try {
+    var payload = readNoxh(ss);
+    uploadToGCS(JSON.stringify(payload), NOXH_FILE);
+    return payload.items.length;
+  } catch (err) {
+    Logger.log("⚠ NOXH: " + err);
+    return 0;
+  }
+}
+
+function noxhEnsureColumn(sheet, idx, field, title) {
+  if (idx[field] != null) return;
+  var col = Math.max(sheet.getLastColumn(), 1);
+  var head = String(sheet.getRange(1, col).getValue() || "").trim();
+  if (head) col += 1;
+  sheet.getRange(1, col).setValue(title);
+  idx[field] = col - 1;
+}
+
+function saveNoxh(body) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(NOXH_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(NOXH_SHEET);
+    sheet.getRange(1, 1, 1, NOXH_HEADERS.length).setValues([NOXH_HEADERS]);
+    sheet.setFrozenRows(1);
+  }
+  var items = (body && body.items) || [];
+  if (!items.length) return { error: "Không có dòng NOXH" };
+  if (sheet.getLastRow() < 1) {
+    sheet.getRange(1, 1, 1, NOXH_HEADERS.length).setValues([NOXH_HEADERS]);
+    sheet.setFrozenRows(1);
+  }
+  var width = Math.max(sheet.getLastColumn(), NOXH_HEADERS.length);
+  var headers = sheet.getRange(1, 1, 1, width).getValues()[0];
+  var idx = noxhHeaderIndex(headers);
+  if (idx.name == null && idx.wkt == null) {
+    sheet.getRange(1, 1, 1, NOXH_HEADERS.length).setValues([NOXH_HEADERS]);
+    headers = NOXH_HEADERS.slice();
+    idx = noxhHeaderIndex(headers);
+    width = NOXH_HEADERS.length;
+  }
+  noxhEnsureColumn(sheet, idx, "status", "Trạng thái");
+  noxhEnsureColumn(sheet, idx, "name", "Tên");
+  noxhEnsureColumn(sheet, idx, "wkt", "WKT");
+  noxhEnsureColumn(sheet, idx, "kind", "Loại");
+  var maxIdx = 0;
+  for (var field in idx) if (idx[field] > maxIdx) maxIdx = idx[field];
+  width = Math.max(sheet.getLastColumn(), width, maxIdx + 1);
+  var data = sheet.getLastRow() >= 1 ? sheet.getRange(1, 1, sheet.getLastRow(), width).getValues() : [NOXH_HEADERS];
+  items.forEach(function(it) {
+    var wantId = String(it.id || "").trim();
+    var wantName = String(it.name || "").trim();
+    var at = 0;
+    for (var r = 1; r < data.length; r++) {
+      var rid = String(noxhCell(data[r], idx, "id") || "").trim();
+      var rname = String(noxhCell(data[r], idx, "name") || "").trim();
+      if ((wantId && rid && rid === wantId) || (wantName && rname === wantName)) {
+        at = r + 1;
+        break;
+      }
+    }
+    var row = at ? data[at - 1].slice() : [];
+    while (row.length < width) row.push("");
+    function put(field, value) {
+      if (idx[field] == null) return;
+      row[idx[field]] = value == null ? "" : value;
+    }
+    var status = String(it.status || "");
+    var folded = noxhFold(status);
+    var hien = folded === "hientrang" || folded === "dahoanthanh" || folded === "hoanthanh" || folded === "true" || folded === "1" || folded.indexOf("hientrang") >= 0 || folded.indexOf("dahoanthanh") >= 0;
+    var kindFold = noxhFold(it.kind);
+    var kind = "";
+    if (kindFold.indexOf("thuongmai") >= 0 || kindFold === "tm") kind = "Thương mại";
+    else if (kindFold.indexOf("noxh") >= 0 || kindFold.indexOf("xahoi") >= 0) kind = "NOXH";
+    put("id", wantId);
+    put("status", hien ? "Hiện trạng" : "Quy hoạch");
+    put("name", wantName);
+    put("detail", it.detail || "");
+    put("residents", it.residents == null ? "" : it.residents);
+    put("siteHa", it.siteHa == null ? "" : it.siteHa);
+    put("coverage", it.coverage == null ? "" : it.coverage);
+    put("floors", it.floors == null ? "" : it.floors);
+    put("far", it.far == null ? "" : it.far);
+    put("units", it.units == null ? "" : it.units);
+    put("wkt", it.wkt || "");
+    put("kind", kind);
+    put("lat", it.lat == null ? "" : it.lat);
+    put("lng", it.lng == null ? "" : it.lng);
+    put("ward", it.ward || "");
+    if (at) sheet.getRange(at, 1, 1, width).setValues([row]);
+    else {
+      sheet.appendRow(row);
+      data.push(row);
+    }
+  });
+  var n = syncNoxh(ss);
   return { saved: true, count: n };
 }

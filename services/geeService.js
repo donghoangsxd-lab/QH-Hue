@@ -14,6 +14,8 @@ const POP_NHA_CSV = "gs://hue-infra-data-us/gba/pop-weights.csv";
 const POP_NHA_SCALE_M = 30;
 let popAssetId = POP_ASSET;
 let nhaContext = null;
+let nhaBase = null;
+let nhaCompose = null;
 let nhaProbeAt = 0;
 const NHA_PROBE_MS = 60 * 1000;
 
@@ -153,32 +155,120 @@ function getGeeContext(method) {
   };
 }
 
-/** Instance đang chạy thử lại asset nhà ở tối đa mỗi phút, để lần nạp xong không phải chờ tiến trình mới. */
-async function ensureNha(method) {
-  if (method !== 'b') return getGeeContext('old');
-  if (!nhaContext && Date.now() - nhaProbeAt >= NHA_PROBE_MS) await loadNha();
-  return getGeeContext('b');
+function nhaContextFrom(img, projection) {
+  const { ee, wardVectorParsed, wardRegion } = geeBase;
+  const masked = img.updateMask(img.gt(0)).rename('DanSoPixelNormalized');
+  return {
+    ee, wardVectorParsed, wardRegion,
+    popRasterNormalized: masked,
+    popRasterNative: masked,
+    popProjection: projection,
+    popScale: POP_NHA_SCALE_M,
+    popPeople: true,
+    popSource: 'nha',
+    popFallback: false
+  };
 }
 
-/** Asset Pixel-danso-nha: mỗi pixel là số người trên lưới 30 m. Thiếu asset thì các phép đếm dùng pixel cũ. */
+function liveApartments(pack) {
+  return ((pack && pack.items) || []).filter(it => {
+    if (!it || it.status === 'quy_hoach' || !(Number(it.pop) > 0)) return false;
+    if (it.geometry && (it.geometry.type === 'Polygon' || it.geometry.type === 'MultiPolygon')) return true;
+    return Number.isFinite(Number(it.lat)) && Number.isFinite(Number(it.lng));
+  });
+}
+
+function aptGeometry(ee, it) {
+  const g = it.geometry;
+  if (g && g.type === 'Polygon' && Array.isArray(g.coordinates)) {
+    return ee.Geometry.Polygon(g.coordinates, null, false);
+  }
+  if (g && g.type === 'MultiPolygon' && Array.isArray(g.coordinates)) {
+    return ee.Geometry.MultiPolygon(g.coordinates, null, false);
+  }
+  const area = Number(it.areaM2) > 0 ? Number(it.areaM2) : Math.PI * 40 * 40;
+  const radius = Math.max(40, Math.sqrt(area / Math.PI));
+  return ee.Geometry.Point([Number(it.lng), Number(it.lat)]).buffer(radius);
+}
+
+// Che nhà thấp tầng trong ranh chung cư hiện trạng, vẽ mật độ căn hộ, rồi co nhà thấp tầng theo phường
+// sao cho tổng pixel = dân số phường. Quy hoạch không vào đây.
+function composeNhaImage(items) {
+  const { ee, wardVectorParsed, wardRegion, wardPopSumImg } = geeBase;
+  const proj = nhaBase.projection;
+  const cell = POP_NHA_SCALE_M * POP_NHA_SCALE_M;
+  const features = items.map(it => {
+    const area = Number(it.areaM2) > 0 ? Number(it.areaM2) : Math.PI * 40 * 40;
+    const density = Number(it.pop) / Math.max(1, area / cell);
+    return ee.Feature(aptGeometry(ee, it), { density });
+  });
+  const fc = ee.FeatureCollection(features);
+  const align = (img, reducer) => img
+    .setDefaultProjection({ crs: 'EPSG:4326', scale: 10 })
+    .reduceResolution({ reducer, maxPixels: 1024 })
+    .reproject({ crs: proj });
+  const cover = align(ee.Image(0).byte().paint(fc, 1), ee.Reducer.max()).unmask(0);
+  const low = nhaBase.img.unmask(0).where(cover.gt(0), 0);
+  const apt = align(
+    ee.Image(0).float().paint({ featureCollection: fc, color: 'density' }),
+    ee.Reducer.mean()
+  ).unmask(0);
+  const groupSum = (img) => {
+    const stats = img.addBands(wardRegion).reduceRegion({
+      reducer: ee.Reducer.sum().group({ groupField: 1, groupName: 'ID_Phuong' }),
+      geometry: wardVectorParsed.geometry(),
+      scale: POP_NHA_SCALE_M,
+      crs: proj,
+      maxPixels: 1e10
+    });
+    const groups = ee.List(ee.Algorithms.If(stats.get('groups'), stats.get('groups'), ee.List([])));
+    const dict = ee.Dictionary(groups.iterate((item, acc) => {
+      const d = ee.Dictionary(item);
+      const idStr = ee.String(ee.Number(d.get('ID_Phuong')).toInt());
+      return ee.Dictionary(acc).set(idStr, d.get('sum'));
+    }, ee.Dictionary({})));
+    return ee.Image(ee.Algorithms.If(
+      dict.size().gt(0),
+      wardRegion.remap(dict.keys().map(k => ee.Number.parse(k)), dict.values()).unmask(0),
+      ee.Image.constant(0)
+    ));
+  };
+  const lowSum = groupSum(low);
+  const aptSum = groupSum(apt);
+  const target = wardPopSumImg.subtract(aptSum).max(0);
+  const scale = target.divide(lowSum.max(1e-9)).where(lowSum.lte(0), 0);
+  return low.multiply(scale).add(apt).rename('DanSoPixelNormalized');
+}
+
+/** Instance đang chạy thử lại asset nhà ở tối đa mỗi phút. pack là tab NOXH đã chuẩn hóa; đổi version thì dựng lại ảnh. */
+async function ensureNha(method, pack) {
+  if (method !== 'b') return getGeeContext('old');
+  if (!nhaBase && Date.now() - nhaProbeAt >= NHA_PROBE_MS) await loadNha();
+  if (!nhaBase) return getGeeContext('b');
+  const items = liveApartments(pack);
+  const key = items.length ? ((pack && pack.version) || 'apt') : 'base';
+  if (!nhaCompose || nhaCompose.key !== key) {
+    const img = items.length ? composeNhaImage(items) : nhaBase.img;
+    nhaCompose = { key, context: nhaContextFrom(img, nhaBase.projection) };
+  }
+  nhaContext = nhaCompose.context;
+  return nhaContext;
+}
+
+/** Asset Pixel-danso-nha là nền nhà thấp tầng. Thiếu asset thì các phép đếm dùng pixel cũ. */
 async function loadNha() {
   nhaProbeAt = Date.now();
+  nhaCompose = null;
+  nhaBase = null;
+  nhaContext = null;
   if (!geeBase) return;
-  const { ee, wardVectorParsed, wardRegion } = geeBase;
+  const { ee } = geeBase;
   try {
-    const img = ee.Image(POP_NHA_ASSET).select(0).rename('DanSoPixelNormalized');
+    const img = ee.Image(POP_NHA_ASSET).select(0);
     await eeEvaluate(img.bandNames());
-    const masked = img.updateMask(img.gt(0));
-    nhaContext = {
-      ee, wardVectorParsed, wardRegion,
-      popRasterNormalized: masked,
-      popRasterNative: masked,
-      popProjection: img.projection(),
-      popScale: POP_NHA_SCALE_M,
-      popPeople: true,
-      popSource: 'nha',
-      popFallback: false
-    };
+    const projection = img.projection();
+    nhaBase = { img, projection };
+    nhaContext = nhaContextFrom(img, projection);
   } catch (err) {
     nhaContext = null;
     console.warn('Chưa có asset Pixel-danso-nha:', err && err.message);
