@@ -106,7 +106,13 @@ function parseCoordinate(val, limit) {
   return rescaleCoord(parseCleanNumber(val), limit);
 }
 
+function isNoxhSheetName(name) {
+  var n = String(name || "");
+  return n === "NOXH" || /^\s*\d+\s*[-_.]\s*NOXH\s*$/i.test(n);
+}
+
 function isValidInfraSheet(sheetName) {
+  if (isNoxhSheetName(sheetName)) return false;
   var cleanName = sheetName.replace(/\s+/g, ' ').trim();
   return VALID_PREFIXES.some(function(prefix) {
     return cleanName.indexOf(prefix) === 0 || cleanName.startsWith(prefix);
@@ -219,7 +225,9 @@ function nextIdForSheet(data, idCol, prefix) {
 function findInfraSheet(ss, typeCode) {
   var sheets = ss.getSheets();
   for (var s = 0; s < sheets.length; s++) {
-    if (sheets[s].getName().trim().indexOf(typeCode) === 0) return sheets[s];
+    var name = sheets[s].getName().trim();
+    if (isNoxhSheetName(name)) continue;
+    if (name.indexOf(typeCode) === 0) return sheets[s];
   }
   return null;
 }
@@ -229,6 +237,7 @@ function findInfraSheet(ss, typeCode) {
 function ensureInfraSheet(ss, typeCode) {
   var sheet = findInfraSheet(ss, typeCode);
   if (sheet || !NETWORK_TABS.hasOwnProperty(typeCode)) return sheet;
+  if (ss.getSheetByName(typeCode)) return null;
   var after = findInfraSheet(ss, "12-CSD");
   var index = after ? after.getIndex() : ss.getNumSheets();
   sheet = ss.insertSheet(typeCode, index);
@@ -818,7 +827,7 @@ function installedOnEdit(e) {
     syncChungCu(SpreadsheetApp.getActiveSpreadsheet());
     return;
   }
-  if (sheetName === "NOXH") {
+  if (isNoxhSheetName(sheetName)) {
     syncNoxh(SpreadsheetApp.getActiveSpreadsheet());
     return;
   }
@@ -3314,9 +3323,9 @@ function saveChungCu(body) {
   return { saved: true, count: n };
 }
 
-// Tab NOXH: chung cư hiện trạng và quy hoạch. Chưa có tab thì missing=true, không tự tạo khi đọc.
+// Tab chung cư: đúng tên NOXH trước, không có thì tab đánh số (14-NOXH). Chưa có tab thì missing=true, không tự tạo khi đọc.
 const NOXH_SHEET = "NOXH";
-const NOXH_HEADERS = ["Trạng thái", "Tên", "Mô tả", "Dân số", "Diện tích (ha)", "MĐXD (%)", "Tầng cao", "HSSDĐ", "Số căn hộ", "WKT", "Loại"];
+const NOXH_HEADERS = ["Trạng thái", "Tên", "Mô tả", "Dân số", "Diện tích (ha)", "MĐXD (%)", "Tầng cao", "HSSDĐ", "Số căn hộ", "WKT", "Loại", "loai_chi_tiet", "do_tin_cay", "ghi_chu_dinh_vi"];
 const NOXH_FILE = "gba/noxh.json";
 const NOXH_ALIAS = {
   status: ["trangthai", "status", "tinhtrang"],
@@ -3330,11 +3339,24 @@ const NOXH_ALIAS = {
   units: ["socanho", "socan", "units"],
   wkt: ["wkt", "wktsimplified", "ranh"],
   kind: ["loai", "phanloai", "kind", "nhom"],
+  kindDetail: ["loaichitiet", "chitietloai", "kinddetail"],
+  confidence: ["dotincay", "tincay", "confidence"],
+  locateNote: ["ghichudinhvi", "dinhvi", "locatenote"],
   id: ["id", "madoituong", "iddoiduong"],
   lat: ["vido", "lat", "latitude"],
   lng: ["kinhdo", "lng", "longitude"],
   ward: ["phuongxa", "tenxaphuong", "ward", "xaphuong"]
 };
+
+function findNoxhSheet(ss) {
+  var exact = ss.getSheetByName(NOXH_SHEET);
+  if (exact) return exact;
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    if (/^\s*\d+\s*[-_.]\s*NOXH\s*$/i.test(sheets[i].getName())) return sheets[i];
+  }
+  return null;
+}
 
 function noxhFold(text) {
   var s = String(text || "").toLowerCase();
@@ -3368,7 +3390,7 @@ function noxhCell(row, idx, field) {
 }
 
 function readNoxh(ss) {
-  var sheet = ss.getSheetByName(NOXH_SHEET);
+  var sheet = findNoxhSheet(ss);
   if (!sheet) return { v: 1, missing: true, items: [] };
   if (sheet.getLastRow() < 1) return { v: 1, missing: false, items: [] };
   var data = sheet.getDataRange().getValues();
@@ -3394,6 +3416,9 @@ function readNoxh(ss) {
       wkt: wkt,
       status: String(noxhCell(data[r], idx, "status") || ""),
       kind: String(noxhCell(data[r], idx, "kind") || ""),
+      kindDetail: String(noxhCell(data[r], idx, "kindDetail") || ""),
+      confidence: String(noxhCell(data[r], idx, "confidence") || ""),
+      locateNote: String(noxhCell(data[r], idx, "locateNote") || ""),
       lat: lat,
       lng: lng,
       ward: String(noxhCell(data[r], idx, "ward") || "")
@@ -3429,7 +3454,7 @@ function noxhEnsureColumn(sheet, idx, field, title) {
 
 function saveNoxh(body) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(NOXH_SHEET);
+  var sheet = findNoxhSheet(ss);
   if (!sheet) {
     sheet = ss.insertSheet(NOXH_SHEET);
     sheet.getRange(1, 1, 1, NOXH_HEADERS.length).setValues([NOXH_HEADERS]);
@@ -3454,6 +3479,9 @@ function saveNoxh(body) {
   noxhEnsureColumn(sheet, idx, "name", "Tên");
   noxhEnsureColumn(sheet, idx, "wkt", "WKT");
   noxhEnsureColumn(sheet, idx, "kind", "Loại");
+  noxhEnsureColumn(sheet, idx, "kindDetail", "loai_chi_tiet");
+  noxhEnsureColumn(sheet, idx, "confidence", "do_tin_cay");
+  noxhEnsureColumn(sheet, idx, "locateNote", "ghi_chu_dinh_vi");
   var maxIdx = 0;
   for (var field in idx) if (idx[field] > maxIdx) maxIdx = idx[field];
   width = Math.max(sheet.getLastColumn(), width, maxIdx + 1);
@@ -3495,6 +3523,9 @@ function saveNoxh(body) {
     put("units", it.units == null ? "" : it.units);
     put("wkt", it.wkt || "");
     put("kind", kind);
+    if (it.kindDetail != null) put("kindDetail", it.kindDetail);
+    if (it.confidence != null) put("confidence", it.confidence);
+    if (it.locateNote != null) put("locateNote", it.locateNote);
     put("lat", it.lat == null ? "" : it.lat);
     put("lng", it.lng == null ? "" : it.lng);
     put("ward", it.ward || "");

@@ -48,10 +48,32 @@ function passesKind(it) {
   return it.kind !== 'thuongmai';
 }
 
+function ringWkt(ring) {
+  if (!Array.isArray(ring) || ring.length < 4) return '';
+  return `(${ring.map(p => `${p[0]} ${p[1]}`).join(', ')})`;
+}
+
 function wktOf(it) {
-  const ring = it.geometry && it.geometry.type === 'Polygon' ? it.geometry.coordinates[0] : null;
-  if (!ring || ring.length < 4) return '';
-  return `POLYGON ((${ring.map(p => `${p[0]} ${p[1]}`).join(', ')}))`;
+  const raw = String(it.wkt || '').trim();
+  if (/^(MULTI)?POLYGON\s*\(/i.test(raw)) return raw;
+  const g = it.geometry;
+  if (!g || !Array.isArray(g.coordinates)) return '';
+  if (g.type === 'Polygon') {
+    const rings = g.coordinates.map(ringWkt);
+    if (!rings.length || rings.some(r => !r)) return '';
+    return `POLYGON (${rings.join(', ')})`;
+  }
+  if (g.type === 'MultiPolygon') {
+    const polys = [];
+    for (const poly of g.coordinates) {
+      if (!Array.isArray(poly)) return '';
+      const rings = poly.map(ringWkt);
+      if (!rings.length || rings.some(r => !r)) return '';
+      polys.push(`(${rings.join(', ')})`);
+    }
+    return polys.length ? `MULTIPOLYGON (${polys.join(', ')})` : '';
+  }
+  return '';
 }
 
 function asPlan(it) {
@@ -71,8 +93,10 @@ function popupHtml(it) {
     ['Tình trạng', it.detail || 'Đã hoàn thành'],
     ['Căn cứ', it.evidence || ''],
     ['Loại', KIND[it.kind] || ''],
+    ['Loại chi tiết', it.kindDetail],
     ['Nguồn', SOURCE[it.source] || it.source],
     ['Độ tin cậy', CONF[it.confidence] || it.confidence],
+    ['Ghi chú định vị', it.locateNote],
     ['Diện tích khu', it.siteHa ? `${it.siteHa} ha` : ''],
     ['Dấu chân nhà', it.footprint ? `${Math.round(it.footprint).toLocaleString('vi-VN')} m²` : ''],
     ['Số tầng', it.floors || ''],
@@ -124,6 +148,9 @@ function planHtml(it) {
     ['Số tầng', it.floors || ''],
     ['Số căn', it.units || ''],
     ['Loại', KIND[it.kind] || ''],
+    ['Loại chi tiết', it.kindDetail],
+    ['Độ tin cậy', CONF[it.confidence] || it.confidence],
+    ['Ghi chú định vị', it.locateNote],
     ['Dân số ghi trong bảng', it.plannedPop || it.residents || '']
   ].filter((pair) => pair[1]);
   const warn = it.uncertain ? '<p>Số liệu chưa chắc vì cột trong bảng gốc bị lệch.</p>' : '';
@@ -244,6 +271,9 @@ async function saveItem(it) {
         footprint: it.footprint,
         status: it.status || 'hien_trang',
         kind: it.kind || 'noxh',
+        kindDetail: it.kindDetail,
+        confidence: it.confidence,
+        locateNote: it.locateNote,
         wkt: wktOf(it)
       }]
     });

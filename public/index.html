@@ -563,7 +563,7 @@
           </div>
           <div class="flood-box" id="gbaBox" style="display:none;"></div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_apt"><label for="chk_apt" title="Chung cư hiện trạng trên tab NOXH (cột Trạng thái = Hiện trạng). Dân = cột Dân số nếu có, không thì Số căn hộ × 3,3. Cột Loại (NOXH hoặc Thương mại) chỉ để lọc nhãn; cả hai đều tính dân."><svg class="ico ico-layer"><use href="#i-floors"/></svg>Chung cư <small class="layer-hint" id="aptHint"></small></label></div>
+            <div><input type="checkbox" id="chk_apt"><label for="chk_apt" title="Chung cư hiện trạng trên tab NOXH hoặc 14-NOXH (cột Trạng thái = Hiện trạng). Dân = cột Dân số nếu có, không thì Số căn hộ × 3,3. Cột Loại (NOXH hoặc Thương mại) chỉ để lọc nhãn; cả hai đều tính dân."><svg class="ico ico-layer"><use href="#i-floors"/></svg>Chung cư <small class="layer-hint" id="aptHint"></small></label></div>
           </div>
           <div class="flood-box" id="aptBox" style="display:none;">
             <p class="apt-summary" id="aptSummary"></p>
@@ -576,7 +576,7 @@
             </label>
           </div>
           <div id="aptAdmin" hidden>
-            <p class="cad-hint"><b>Nạp raster nhà ở (một lần).</b> Hai nút này chỉ dùng cho file nền nhà thấp tầng. Thêm chung cư bằng một dòng trên tab Google Sheet <b>NOXH</b>, không bấm lại hai nút này.</p>
+            <p class="cad-hint"><b>Nạp raster nhà ở (một lần).</b> Hai nút này chỉ dùng cho file nền nhà thấp tầng. Thêm chung cư bằng một dòng trên tab Google Sheet <b>NOXH</b> hoặc <b>14-NOXH</b>, không bấm lại hai nút này.</p>
             <div class="apt-ingest" id="aptIngest">
               <button type="button" class="layer-mini-btn" id="btnPopNha">Nạp raster dân nhà ở</button>
               <button type="button" class="layer-mini-btn" id="btnPopNhaRebuild">Nạp lại từ CSV mới</button>
@@ -596,7 +596,7 @@
             <p id="aptStatus" class="apt-status"></p>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_noxhPlan"><label for="chk_noxhPlan" title="Dòng tab NOXH có Trạng thái để trống hoặc Quy hoạch. Chỉ xem vị trí, không tính dân hiện trạng. Cột Loại không đổi việc có tính dân hay không."><svg class="ico ico-layer"><use href="#i-floors"/></svg>Nhà ở xã hội (quy hoạch) <small class="layer-hint" id="noxhPlanHint"></small></label></div>
+            <div><input type="checkbox" id="chk_noxhPlan"><label for="chk_noxhPlan" title="Dòng tab NOXH hoặc 14-NOXH có Trạng thái để trống hoặc Quy hoạch. Chỉ xem vị trí, không tính dân hiện trạng. Cột Loại không đổi việc có tính dân hay không."><svg class="ico ico-layer"><use href="#i-floors"/></svg>Nhà ở xã hội (quy hoạch) <small class="layer-hint" id="noxhPlanHint"></small></label></div>
           </div>
           <div class="flood-box" id="noxhPlanBox" style="display:none;">
             <p class="apt-summary" id="noxhPlanSummary"></p>

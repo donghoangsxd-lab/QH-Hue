@@ -428,13 +428,8 @@ function sanitizeChungCuItems(raw) {
   return items;
 }
 
-function noxhWkt(raw, geometry) {
-  let wkt = String(raw || '').trim();
-  if (!/^POLYGON\s*\(/i.test(wkt)) wkt = '';
-  if (wkt.length > 45000) wkt = '';
-  if (wkt) return wkt;
-  const ring = geometry && geometry.type === 'Polygon' && Array.isArray(geometry.coordinates) ? geometry.coordinates[0] : null;
-  if (!ring || ring.length < 4 || ring.length > 8000) return '';
+function noxhRingWkt(ring) {
+  if (!Array.isArray(ring) || ring.length < 4 || ring.length > 8000) return '';
   const parts = [];
   for (const c of ring) {
     if (!Array.isArray(c)) return '';
@@ -442,7 +437,30 @@ function noxhWkt(raw, geometry) {
     if (!pt) return '';
     parts.push(`${Number(pt.lng.toFixed(6))} ${Number(pt.lat.toFixed(6))}`);
   }
-  return `POLYGON ((${parts.join(', ')}))`;
+  return `(${parts.join(', ')})`;
+}
+
+function noxhWkt(raw, geometry) {
+  const wkt = String(raw || '').trim();
+  if (/^(MULTI)?POLYGON\s*\(/i.test(wkt) && wkt.length <= 45000) return wkt;
+  if (!geometry || !Array.isArray(geometry.coordinates)) return '';
+  if (geometry.type === 'Polygon') {
+    const rings = geometry.coordinates.map(noxhRingWkt);
+    if (!rings.length || rings.some(r => !r)) return '';
+    return `POLYGON (${rings.join(', ')})`;
+  }
+  if (geometry.type === 'MultiPolygon') {
+    const polys = [];
+    for (const poly of geometry.coordinates) {
+      if (!Array.isArray(poly)) return '';
+      const rings = poly.map(noxhRingWkt);
+      if (!rings.length || rings.some(r => !r)) return '';
+      polys.push(`(${rings.join(', ')})`);
+    }
+    if (!polys.length) return '';
+    return `MULTIPOLYGON (${polys.join(', ')})`;
+  }
+  return '';
 }
 
 // Dòng tab NOXH: hiện trạng và quy hoạch, NOXH hoặc thương mại. Cả hai loại đều là chung cư khi tính dân.
@@ -458,7 +476,7 @@ function sanitizeNoxhItems(raw) {
     const pt = parseCoordInBounds(it.lat, it.lng);
     if (!name && !wkt && !pt) return null;
     const kind = noxh.kindOf(it.kind);
-    items.push({
+    const item = {
       id,
       name,
       detail: sanitizeSheetText(it.detail, 400),
@@ -475,7 +493,17 @@ function sanitizeNoxhItems(raw) {
       status: noxh.phaseOf(it.status || it.detail),
       kind,
       wkt
-    });
+    };
+    if (it.kindDetail != null || it.loai_chi_tiet != null) {
+      item.kindDetail = sanitizeSheetText(it.kindDetail != null ? it.kindDetail : it.loai_chi_tiet, 180);
+    }
+    if (it.confidence != null || it.do_tin_cay != null) {
+      item.confidence = sanitizeSheetText(noxh.confidenceOf(it.confidence != null ? it.confidence : it.do_tin_cay), 80);
+    }
+    if (it.locateNote != null || it.ghi_chu_dinh_vi != null) {
+      item.locateNote = sanitizeSheetText(it.locateNote != null ? it.locateNote : it.ghi_chu_dinh_vi, 400);
+    }
+    items.push(item);
   }
   return items;
 }
