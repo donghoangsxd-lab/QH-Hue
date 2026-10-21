@@ -1659,6 +1659,7 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 #roadList:empty, #popList:empty { display: none; }
 .admin-sub-switch { display: flex; gap: 4px; margin-bottom: 8px; min-width: 0; }
 .admin-sub-btn { flex: 1; min-width: 0; padding: 4px 2px; border: 1px solid var(--border-color); border-radius: var(--r-md); background: transparent; color: var(--text-muted); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; line-height: 1.15; }
+#addParcelInfra { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-color); }
 .admin-sub-btn.active { border-color: var(--accent-orange); color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.1); }
 .road-del { flex-shrink: 0; width: 24px; height: 22px; padding: 0; border: none; border-radius: var(--r-sm); background: transparent; cursor: pointer; font-size: var(--fs-md); }
 .road-del:hover { background: rgba(var(--red-rgb), 0.2); }
