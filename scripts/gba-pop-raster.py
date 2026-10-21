@@ -8,7 +8,6 @@
 import csv
 import gzip
 import json
-import math
 import os
 
 import duckdb
@@ -17,8 +16,6 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = os.environ.get('GBA_TMP', '/tmp/gba')
 OUT_DIR = os.path.join(ROOT, 'public', 'data', 'gba')
-APT_M = 35.0
-M_PER_DEG = 111320.0
 
 
 def main():
@@ -61,25 +58,37 @@ def main():
     y = np.array([r[6] for r in rows], dtype='float64')
     wb = np.array([r[7] for r in rows], dtype='float64')
 
-    # Dấu chân rất cao đã gán cho ứng viên chung cư: không chia tiếp phần nhà thấp tầng.
-    drop = np.zeros(len(rows), dtype=bool)
-    tall = np.flatnonzero((area >= 300) & (cls == 3))
-    gba = [it for it in items if 'gba' in (it.get('signals') or []) or it.get('source') == 'gba']
-    if len(tall) and gba:
-        tx, ty, tward = x[tall], y[tall], ward[tall]
-        for it in gba:
-            lat, lng = float(it['lat']), float(it['lng'])
-            cos = math.cos(math.radians(lat))
-            dx = (tx - lng) * M_PER_DEG * cos
-            dy = (ty - lat) * M_PER_DEG
-            hit = (dx * dx + dy * dy) <= APT_M * APT_M
-            hit &= tward == it['ward']
-            drop[tall[hit]] = True
-    print(f'bỏ dấu chân chung cư {int(drop.sum())} / ứng viên {len(gba)}')
+    # Chỉ dấu chân nằm trong ranh chung cư hiện trạng (có polygon) rời khỏi nhà thấp tầng.
+    drop_ids = set()
+    geoms = []
+    for it in items:
+        if it.get('status') == 'quy_hoach' or not it.get('geometry'):
+            continue
+        if float(it.get('pop') or 0) <= 0:
+            continue
+        geoms.append(json.dumps(it['geometry']))
+    if geoms:
+        con.execute('CREATE TABLE apt (geom GEOMETRY)')
+        con.executemany(
+            "INSERT INTO apt VALUES (ST_MakeValid(ST_SetCRS(ST_GeomFromGeoJSON(?), 'EPSG:4326')))",
+            [(g,) for g in geoms]
+        )
+        drop_ids = {r[0] for r in con.execute("""
+            SELECT b.id FROM b
+            WHERE EXISTS (
+                SELECT 1 FROM apt g
+                WHERE ST_Intersects(g.geom, ST_SetCRS(ST_Point(b.x, b.y), 'EPSG:4326'))
+            )
+        """).fetchall()}
+    ids = np.array([r[0] for r in rows])
+    drop = np.isin(ids, np.fromiter(drop_ids, dtype='int64', count=len(drop_ids))) if drop_ids else np.zeros(len(rows), dtype=bool)
+    print(f'bỏ dấu chân trong ranh chung cư hiện trạng {int(drop.sum())} / {len(geoms)} khu')
     keep = ~drop
 
     apt_pop = {}
     for it in items:
+        if it.get('status') == 'quy_hoach':
+            continue
         apt_pop[it['ward']] = apt_pop.get(it['ward'], 0.0) + float(it.get('pop') or 0)
 
     out_rows = []
@@ -122,7 +131,7 @@ def main():
         'people': round(people, 1),
         'droppedNtd': int(n0 - n1),
         'droppedAptFootprints': int(drop.sum()),
-        'note': 'Điểm nhà ở: dân số phường trừ chung cư, chia theo diện tích dấu chân × (bậc tương đối + 1). Điểm chạm NTD đã bỏ. Chung cư có số dân là điểm riêng.'
+        'note': 'Điểm nhà ở: dân số phường trừ nhà ở xã hội đã hoàn thành, chia theo diện tích dấu chân × (bậc tương đối + 1). Điểm chạm NTD đã bỏ. Khu quy hoạch không trừ. Chung cư có số dân là điểm riêng.'
     }
     with open(os.path.join(OUT_DIR, 'pop-nha.json'), 'w', encoding='utf-8') as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)

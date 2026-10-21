@@ -50,7 +50,7 @@ export function popQuery() {
 }
 
 export function popItems() {
-  return (pack && pack.items) || [];
+  return ((pack && pack.items) || []).filter(it => it && it.status !== 'quy_hoach');
 }
 
 export function popWards() {
