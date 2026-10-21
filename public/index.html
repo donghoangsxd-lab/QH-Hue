@@ -451,13 +451,13 @@
         <div class="layer-row"><div><input type="checkbox" id="chk_c13"><label for="chk_c13" title="Vùng đệm = khoảng cách an toàn tới khu dân cư (QCVN 01:2026 Bảng 23). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Nghiatrang.svg" class="layer-type-icon" alt="" width="14" height="16">11. Nhà tang lễ, nghĩa trang</label></div><button type="button" class="btn-dot-buffer" data-buffer="b13" title="Bật/tắt khoảng cách an toàn" aria-label="Bật/tắt khoảng cách an toàn" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c9"><label for="chk_c9"><img src="./icons/Unused.png" class="layer-type-icon" alt="" width="14" height="16">12. Cơ sở chưa sử dụng</label></div></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c11"><label for="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Bus.svg" class="layer-type-icon" alt="" width="14" height="16">13. Trạm dừng xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" title="Bật/tắt phạm vi 500 m" aria-label="Bật/tắt phạm vi 500 m" aria-pressed="false">●</button></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c14"><label for="chk_c14" title="Ranh các dòng tab 14-NOXH: NOXH và thương mại, hiện trạng và quy hoạch. Quy hoạch vẽ nét đứt, không tính dân. Không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ. Tắt lớp không đổi dân số phường, xã."><img src="./icons/Noxh.svg" class="layer-type-icon" alt="" width="14" height="16">14. Chung cư <small class="layer-hint" id="aptHint"></small></label></div></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c14"><label for="chk_c14" title="Điểm tab 14-NOXH, cùng giọt nước với chú giải. NOXH và thương mại khác màu; quy hoạch để rỗng, viền nét đứt. Ranh lô chỉ hiện khi bấm điểm. Không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ. Tắt lớp không đổi dân số phường, xã."><img src="./icons/Noxh.svg" class="layer-type-icon" alt="" width="14" height="16">14. Chung cư <small class="layer-hint" id="aptHint"></small></label></div></div>
         <div class="flood-box" id="aptBox" style="display:none;">
           <div class="apt-legend" aria-label="Chú giải chung cư">
-            <span><i class="apt-swatch noxh"></i>NOXH, hiện trạng</span>
-            <span><i class="apt-swatch tm"></i>Thương mại, hiện trạng</span>
-            <span><i class="apt-swatch plan"></i>NOXH, quy hoạch</span>
-            <span><i class="apt-swatch plan-tm"></i>Thương mại, quy hoạch</span>
+            <span><i class="apt-mark" data-kind="noxh"></i>NOXH</span>
+            <span><i class="apt-mark" data-kind="thuongmai"></i>Thương mại</span>
+            <span><i class="apt-mark" data-kind="noxh" data-plan="1"></i>NOXH, quy hoạch</span>
+            <span><i class="apt-mark" data-kind="thuongmai" data-plan="1"></i>Thương mại, quy hoạch</span>
           </div>
           <p class="apt-summary" id="aptSummary"></p>
           <label class="apt-kind">Lọc loại

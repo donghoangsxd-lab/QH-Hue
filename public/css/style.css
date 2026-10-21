@@ -5294,8 +5294,7 @@ body.project-review.la-page #projectReviewHost {
 .gba-stats { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(148, 163, 184, 0.35); font-size: 12px; }
 .gba-stats b { font-size: 12px; }
 .apt-pin { background: none; border: 0; }
-.apt-pin span { display: flex; width: 22px; height: 22px; border-radius: 6px; align-items: center; justify-content: center; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
-.apt-pin .ico { width: 14px; height: 14px; }
+.apt-pin svg { display: block; width: 22px; height: 30px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
 .apt-summary, .apt-status, .apt-ward { margin: 6px 0 0; font-size: 12px; }
 #popNhaStatus { white-space: pre-line; }
 .apt-pop dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 6px 0; }
@@ -5308,11 +5307,8 @@ body.project-review.la-page #projectReviewHost {
 .apt-kind { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; }
 .apt-admin-title { margin: 0; font-size: 12px; font-weight: 700; }
 .apt-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; font-size: 12px; }
-.apt-swatch { display: inline-block; width: 16px; height: 10px; margin-right: 4px; border-radius: 2px; vertical-align: -1px; box-sizing: border-box; }
-.apt-swatch.noxh { background: rgba(109, 40, 217, 0.75); border: 2px solid #ddd6fe; }
-.apt-swatch.tm { background: rgba(3, 105, 161, 0.75); border: 2px solid #7dd3fc; }
-.apt-swatch.plan { background: rgba(245, 158, 11, 0.35); border: 2px dashed #fbbf24; }
-.apt-swatch.plan-tm { background: rgba(2, 132, 199, 0.35); border: 2px dashed #38bdf8; }
+.apt-mark { display: inline-block; width: 14px; height: 19px; margin-right: 3px; vertical-align: -4px; }
+.apt-mark svg { display: block; width: 14px; height: 19px; }
 .apt-ingest { display: flex; flex-direction: column; gap: 6px; margin: 4px 0; }
 .apt-ingest .layer-mini-btn { width: 100%; height: auto; min-height: 32px; padding: 6px 8px; font-size: 12.5px; font-weight: 700; border-radius: 8px; background: rgba(109, 40, 217, 0.28); }
 #addPop > #btnPopNhaJump { width: auto; height: auto; min-height: 28px; margin: 6px 0; padding: 4px 8px; font-size: 12px; }

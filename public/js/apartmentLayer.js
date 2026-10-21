@@ -1,4 +1,5 @@
-// Lớp 14. Chung cư (Khu đất): vẽ mọi dòng tab 14-NOXH. Hiện trạng tính dân; quy hoạch chỉ để xem.
+// Lớp 14. Chung cư: mỗi dòng tab 14-NOXH là giọt nước cùng kiểu Noxh.svg.
+// Polygon lấy tâm; multipolygon lấy điểm nằm trên mặt. Ranh lô chỉ hiện khi bấm điểm.
 // Bật hay tắt lớp không đổi gói dân đưa vào setPopData.
 import { map, WARD_BOUNDS_EVENT } from './mapEngine.js';
 import { assignNoxhWards } from './noxhWard.js';
@@ -16,12 +17,9 @@ import {
 const $ = (id) => document.getElementById(id);
 const CONF = { high: 'Cao', medium: 'Vừa', low: 'Thấp' };
 const KIND = { noxh: 'Nhà ở xã hội', thuongmai: 'Thương mại' };
-const STYLES = {
-  noxh: { color: '#ddd6fe', weight: 2, fillColor: '#6d28d9', fillOpacity: 0.35 },
-  thuongmai: { color: '#7dd3fc', weight: 2, fillColor: '#0369a1', fillOpacity: 0.35 },
-  plan: { color: '#fbbf24', weight: 2, dashArray: '6 4', fillColor: '#f59e0b', fillOpacity: 0.16 },
-  planTm: { color: '#38bdf8', weight: 2, dashArray: '6 4', fillColor: '#0284c7', fillOpacity: 0.16 }
-};
+const DROP = 'M35 2C16.8 2 2 16.8 2 35c0 21 24 41 31 57a2.2 2.2 0 004 0c7-16 31-36 31-57C68 16.8 53.2 2 35 2z';
+const HOUSE = 'M35 14L14 32h6v18h30V32h6z';
+const PIN = { noxh: ['#144677', '#0d2f52'], thuongmai: ['#0369a1', '#075985'] };
 
 let on = false;
 let groupL = null;
@@ -40,25 +38,59 @@ function isAdmin() {
   return state.currentUserRole === 'ADMIN' && !!state.authToken;
 }
 
-function styleOf(it) {
+function pinOf(it) {
+  return PIN[it && it.kind === 'thuongmai' ? 'thuongmai' : 'noxh'];
+}
+
+function dropletSvg(kind, plan) {
+  const [pin, edge] = PIN[kind === 'thuongmai' ? 'thuongmai' : 'noxh'];
+  const dash = plan ? ' stroke-dasharray="14 8"' : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 70 96" class="apt-drop" aria-hidden="true">
+    <path d="${DROP}" fill="${plan ? '#ffffff' : pin}" stroke="${plan ? pin : edge}" stroke-width="${plan ? 4.5 : 1.5}"${dash}/>
+    <circle cx="35" cy="35" r="26" fill="${plan ? 'none' : '#fff'}" ${plan ? `stroke="${pin}" stroke-width="2.5" stroke-dasharray="7 5"` : ''}/>
+    <path d="${HOUSE}" fill="#fab005" stroke="#c77c02" stroke-width="1.5" stroke-linejoin="round"/>
+    <rect x="24" y="35" width="7" height="6" fill="#fff"/>
+    <rect x="39" y="35" width="7" height="6" fill="#fff"/>
+    <rect x="31.5" y="42" width="7" height="8" fill="#7a4a00"/>
+  </svg>`;
+}
+
+function markerIcon(it) {
   const plan = it.status === 'quy_hoach';
-  const tm = it.kind === 'thuongmai';
-  if (plan) return tm ? STYLES.planTm : STYLES.plan;
-  return tm ? STYLES.thuongmai : STYLES.noxh;
+  return L.divIcon({
+    className: 'apt-pin',
+    html: dropletSvg(it.kind, plan),
+    iconSize: [22, 30],
+    iconAnchor: [11, 30]
+  });
+}
+
+function markerLatLng(it) {
+  const g = it && it.geometry;
+  if (g && (g.type === 'Polygon' || g.type === 'MultiPolygon') && typeof turf !== 'undefined') {
+    try {
+      const feature = turf.feature(g);
+      const pt = g.type === 'MultiPolygon' ? turf.pointOnFeature(feature) : turf.centroid(feature);
+      const [lng, lat] = pt.geometry.coordinates;
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return [lat, lng];
+    } catch (e) { /* điểm sheet */ }
+  }
+  const lat = Number(it && it.lat);
+  const lng = Number(it && it.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) return [lat, lng];
+  return null;
+}
+
+function paintLegend() {
+  document.querySelectorAll('.apt-mark').forEach(el => {
+    if (el.dataset.drawn) return;
+    el.innerHTML = dropletSvg(el.dataset.kind, el.dataset.plan === '1');
+    el.dataset.drawn = '1';
+  });
 }
 
 function yearOf(it) {
   return String(it.year || it.nam || '').trim();
-}
-
-function icon(conf, plan) {
-  const tone = plan ? '#b45309' : conf === 'high' ? '#6d28d9' : conf === 'medium' ? '#7c3aed' : '#a78bfa';
-  return L.divIcon({
-    className: 'apt-pin',
-    html: `<span style="background:${tone}"><svg class="ico"><use href="#i-floors"/></svg></span>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11]
-  });
 }
 
 function passesKind(it) {
@@ -140,13 +172,40 @@ function popupHtml(it) {
     <dl>${bits.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>${edit}</div>`;
 }
 
-function addSite(group, it, style, html, plan) {
-  if (it.geometry) {
-    group.addLayer(L.geoJSON(it.geometry, { style, bubblingMouseEvents: false }).bindPopup(html, { maxWidth: 300 }));
-  }
-  if (!Number.isFinite(it.lat) || !Number.isFinite(it.lng)) return;
-  const opt = { icon: icon(it.confidence, plan), bubblingMouseEvents: false };
-  group.addLayer(L.marker([it.lat, it.lng], opt).bindPopup(html, { maxWidth: 300 }));
+function clearFoot(group) {
+  if (!group || !group._aptFoot) return;
+  group.removeLayer(group._aptFoot);
+  group._aptFoot = null;
+}
+
+function showFoot(group, it) {
+  clearFoot(group);
+  if (!it.geometry) return;
+  const plan = it.status === 'quy_hoach';
+  const [color] = pinOf(it);
+  const layer = L.geoJSON(it.geometry, {
+    interactive: false,
+    style: {
+      color,
+      weight: 2,
+      dashArray: plan ? '6 4' : null,
+      fillColor: color,
+      fillOpacity: 0.22
+    }
+  });
+  group.addLayer(layer);
+  layer.eachLayer(path => path.getElement()?.classList.add('apt-foot'));
+  group._aptFoot = layer;
+}
+
+function addSite(group, it) {
+  const latlng = markerLatLng(it);
+  if (!latlng) return;
+  const marker = L.marker(latlng, { icon: markerIcon(it), bubblingMouseEvents: false, zIndexOffset: 400 });
+  marker.bindPopup(() => popupHtml(it), { maxWidth: 300 });
+  marker.on('popupopen', () => showFoot(group, it));
+  marker.on('popupclose', () => clearFoot(group));
+  group.addLayer(marker);
 }
 
 function draw() {
@@ -160,11 +219,8 @@ function draw() {
   groupR = L.layerGroup();
   if (!on) return;
   [...popItems(), ...planItems].filter(passesKind).forEach(it => {
-    const html = () => popupHtml(it);
-    const style = styleOf(it);
-    const plan = it.status === 'quy_hoach';
-    addSite(groupL, it, style, html, plan);
-    addSite(groupR, it, style, html, plan);
+    addSite(groupL, it);
+    addSite(groupR, it);
   });
   if (map) groupL.addTo(map);
   if (planMap) groupR.addTo(planMap);
@@ -302,6 +358,7 @@ function onPopupSubmit(e) {
 
 export function initApartmentLayer() {
   if (!map) return;
+  paintLegend();
   restorePopMethod();
   if (!isAdmin() && popMethod() === 'old') setPopMethod('b');
   setWardPopHtml(name => {
