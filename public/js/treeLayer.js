@@ -327,7 +327,7 @@ async function getJson(query) {
 function load(part) {
   const key = `${year}|${popQuery()}|${part}`;
   if (!cache.has(key)) {
-    const q = `action=getTreePriority&part=${part}&year=${encodeURIComponent(year)}&pop=${encodeURIComponent(popQuery())}&tv=7`;
+    const q = `action=getTreePriority&part=${part}&year=${encodeURIComponent(year)}&pop=${encodeURIComponent(popQuery())}&tv=8`;
     cache.set(key, getJson(q).catch(err => { cache.delete(key); throw err; }));
   }
   return cache.get(key);
