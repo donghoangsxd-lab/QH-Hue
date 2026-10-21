@@ -1757,6 +1757,16 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .cad-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; flex-shrink: 0; }
 .cad-list-title { margin-top: 6px; font-weight: 600; color: var(--accent-yellow); }
 .cad-list { margin-top: 5px; max-height: 170px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--r-md); }
+.qh-review-list { margin-top: 6px; max-height: 240px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--r-md); }
+.qh-review-row { padding: 6px 8px; border-bottom: 1px solid var(--border-color); }
+.qh-review-row:last-child { border-bottom: 0; }
+.qh-review-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.qh-review-actions button, #qhReviewMore { font-size: var(--fs-sm); padding: 3px 8px; border: 1px solid var(--border-color); border-radius: var(--r-sm, 4px); background: transparent; color: var(--text-main); cursor: pointer; }
+.qh-review-tag { color: var(--accent-cyan); font-weight: 600; }
+.qh-proven-reason { margin: 0 0 6px; }
+@media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+  .qh-review-list { max-height: 32vh; }
+}
 .cad-row { display: flex; align-items: center; gap: 4px; padding: 3px 5px; cursor: pointer; border-bottom: 1px solid var(--border-soft); transition: background 0.3s; }
 .cad-row:hover, .cad-row.flash { background: rgba(var(--cyan-rgb), 0.14); }
 .cad-row-main { flex: 1; min-width: 0; line-height: 1.25; overflow-wrap: anywhere; }

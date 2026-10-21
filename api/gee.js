@@ -20,6 +20,7 @@ const fs = require('fs');
 const path = require('path');
 const parcelInfra = require('../services/parcelInfraInventory');
 const noxh = require('../services/noxh');
+const qhHienTrang = require('../services/qhHienTrang');
 
 let cachedWardStats = null;
 let cachedWardStatsPop = '';
@@ -4490,13 +4491,77 @@ module.exports = async (req, res) => {
     }
 
     // --- Thao tác cần danh sách công trình ---
-    const allDataList = await getRawDataList();
+    const allDataListRaw = await getRawDataList();
+    const qhPack = await qhHienTrang.loadPack();
+
+    if (action === 'getQhReview') {
+      await requireAdmin(req);
+      const items = qhHienTrang.reviewRows(qhPack, allDataListRaw);
+      return res.status(200).json({
+        saved: true,
+        counts: qhHienTrang.countClasses(qhPack),
+        items
+      });
+    }
+
+    if (action === 'saveQhReview') {
+      requirePostFromApp(req);
+      const user = await requireAdmin(req);
+      const body = readJsonBody(req);
+      const id = String((body && body.id) || '').trim().slice(0, 80);
+      const cls = body && (body.cls == null || body.cls === '') ? null : String(body.cls || '');
+      if (!id || !qhPack.auto[id]) {
+        return res.status(404).json({ error: true, message: 'Không có lô này trong kết quả phân loại' });
+      }
+      if (cls != null && cls !== 'da_co' && cls !== 'chua_co') {
+        return res.status(400).json({ error: true, message: 'Quyết định không hợp lệ' });
+      }
+      const overrides = { ...(qhPack.overrides || {}) };
+      if (cls == null) delete overrides[id];
+      else overrides[id] = { cls, at: new Date().toISOString(), by: user.email };
+      try {
+        await qhHienTrang.writeRemote({ ...qhPack, overrides });
+      } catch (err) {
+        const message = err.code === 'NO_SA'
+          ? 'Máy chủ chưa có quyền ghi bucket, quyết định chưa được lưu.'
+          : (err.message || 'Không lưu được quyết định');
+        return res.status(err.status || 502).json({ error: true, message });
+      }
+      cachedWardStats = null;
+      cachedWardStatsVersion = -1;
+      return res.status(200).json({ saved: true, id, cls: cls || 'auto' });
+    }
+
+    if (action === 'reclassifyQhLots') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const fresh = qhHienTrang.reclassify(qhPack, allDataListRaw);
+      try {
+        await qhHienTrang.writeRemote({ ...qhPack, extra: fresh.extra });
+      } catch (err) {
+        const message = err.code === 'NO_SA'
+          ? 'Máy chủ chưa có quyền ghi bucket, chưa cập nhật được phân loại.'
+          : (err.message || 'Không cập nhật được phân loại');
+        return res.status(err.status || 502).json({ error: true, message });
+      }
+      cachedWardStats = null;
+      cachedWardStatsVersion = -1;
+      return res.status(200).json({
+        saved: true,
+        added: fresh.added,
+        dropped: fresh.dropped,
+        counts: qhHienTrang.countClasses({ ...qhPack, auto: { ...qhPack.auto, ...fresh.extra }, extra: fresh.extra })
+      });
+    }
+
     try {
-      applyStandardRadius(allDataList, await loadEvaluatedWards(wardVectorParsed));
+      applyStandardRadius(allDataListRaw, await loadEvaluatedWards(wardVectorParsed));
     } catch (e) {
       console.error("Không gán được bán kính theo ranh phường/xã:", e && e.message);
     }
-    // Mọi phép tính hiện trạng chỉ dùng công trình có QuyMo_HT (ô trống = hiện tại chưa hình thành)
+    // da_co (và quyết định quản trị Đã có) tính vào hiện trạng. Sheet không đổi.
+    const allDataList = qhHienTrang.apply(allDataListRaw, qhPack);
+    // Hiện trạng: công trình có QuyMo_HT, cộng lô file QH được phân loại da_co (apply đổi planChange thành keep)
     const rawDataList = allDataList.filter(it => it.planChange !== 'new' && it.planChange !== 'none');
 
     // Thống kê vùng ngập mùa lũ (Sentinel-1): diện tích, dân cư theo phường + công trình hiện trạng đã duyệt nằm trong vùng ngập
@@ -5349,7 +5414,7 @@ module.exports = async (req, res) => {
     const planDataList = allDataList.filter(it => it.planChange === 'new');
     // CDN giữ 30 s (tránh khởi động nguội GEE mỗi lượt mở trang); fresh = client vừa ghi dữ liệu → bỏ qua CDN
     res.setHeader('Cache-Control', req.query.fresh ? 'no-store' : 'public, max-age=0, s-maxage=30, stale-while-revalidate=120');
-    return res.status(200).json({ rawDataList, planDataList });
+    return res.status(200).json({ rawDataList, planDataList, qhApplied: true });
 
   } catch (err) {
     const status = err.status || 500;

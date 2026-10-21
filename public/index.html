@@ -991,6 +991,7 @@
           <button type="button" class="admin-sub-btn active" data-sub="addRoad" role="tab" aria-selected="true"><svg class="ico"><use href="#i-road"/></svg>Tuyến đường</button>
           <button type="button" class="admin-sub-btn" data-sub="addPop" role="tab" aria-selected="false"><svg class="ico"><use href="#i-users"/></svg>Ô dân cư</button>
           <button type="button" class="admin-sub-btn" data-sub="addOsm" role="tab" aria-selected="false" title="Nhập OSM và sổ hạ tầng từ thửa đất địa chính 2016"><svg class="ico"><use href="#i-map"/></svg>Dữ liệu OSM</button>
+          <button type="button" class="admin-sub-btn" data-sub="addQh" role="tab" aria-selected="false" title="Lô nhập từ file QH cần kiểm tra đã có trên thực địa hay chưa"><svg class="ico"><use href="#i-inspect"/></svg>Hiện trạng QH</button>
         </div>
         <div id="addRoad">
           <div class="form-grid">
@@ -1047,6 +1048,38 @@
             <button type="button" id="btnPopBake" disabled title="Xuất raster đã áp các vùng thành asset GEE mới làm nền, rồi xóa danh sách vùng — tính toán nhẹ hơn. Asset gốc Pixel-danso giữ nguyên."><svg class="ico"><use href="#i-save"/></svg>Ghi cố định vào asset</button>
           </div>
           <div id="popList" class="cad-list"></div>
+        </div>
+
+        <div id="addQh" style="display:none;">
+          <div class="cad-hint">Lô <b>da_co</b> đã hiện trên bản đồ hiện trạng và được tính vào độ phủ, popup ghi «Xác định từ file QH». Lô dưới đây mới khớp một tiêu chí (thửa 2016, mặt phủ hoặc OSM). Đánh dấu Đã có hoặc Chưa có thì ghi đè phân loại tự động. Không ghi vào Sheet. Nút chạy lại gắn kết quả không gian đã chốt và đưa lô nhập sau đó vào cần kiểm tra; không tính lại thửa, NDVI, GBA hay OSM.</div>
+          <button type="button" class="btn-submit" id="btnQhReclassify" title="Gắn lại kết quả phân loại đã chốt và đưa lô QH nhập sau đó vào danh sách cần kiểm tra">Chạy lại phân loại</button>
+          <div id="qhReviewStatus" class="rp-status" role="status" aria-live="polite"></div>
+          <div id="qhReviewSum" class="pp-sub"></div>
+          <div class="form-grid qh-review-filters">
+            <label for="qhReviewMode">Xem</label>
+            <select id="qhReviewMode">
+              <option value="pending" selected>Cần kiểm tra</option>
+              <option value="done">Đã quyết</option>
+              <option value="all">Cả hai</option>
+            </select>
+            <label for="qhReviewType">Loại</label>
+            <select id="qhReviewType">
+              <option value="">Tất cả</option>
+              <option value="1-CV">Công viên</option>
+              <option value="2-BDX">Bãi đỗ xe</option>
+              <option value="3-MN">Mầm non</option>
+              <option value="4-TH">Tiểu học</option>
+              <option value="5-THCS">THCS</option>
+              <option value="6-THPT">THPT</option>
+              <option value="7-YT">Y tế</option>
+              <option value="8-VH">Văn hóa</option>
+              <option value="9-TM">Chợ, TTTM</option>
+              <option value="11-NT">Nghĩa trang</option>
+            </select>
+            <label for="qhReviewSearch">Tìm</label>
+            <input type="search" id="qhReviewSearch" placeholder="Tên, mã, phường" aria-label="Tìm lô cần kiểm tra">
+          </div>
+          <div id="qhReviewList" class="qh-review-list"></div>
         </div>
 
         <div id="addOsm" style="display:none;">

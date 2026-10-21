@@ -88,6 +88,8 @@ import { initUrbanAreaLayer, refreshUrbanAreaLayer, urbanAreaReady } from './urb
 import { initLayerDecisions } from './layerDecisions.js';
 import { initBasemapUi } from './basemap.js';
 import { hasSharedCamera, initViewLink } from './viewLink.js';
+import { applyQhClassification } from './qhClass.js';
+import { initQhReview } from './qhReview.js';
 import { PROOF_FOCUS_EVENT } from './csdProof.js';
 
 const CITY_NAME = "Thành phố Huế";
@@ -338,8 +340,23 @@ async function loadInfraData() {
   const res = await fetch(infraListUrl());
   if (!res.ok) throw new Error(`Lỗi máy chủ (${res.status})`);
   const data = await res.json();
-  state.rawDataList = data.rawDataList || [];
-  state.planDataList = data.planDataList || [];
+  let raw = data.rawDataList || [];
+  let plan = data.planDataList || [];
+  // Máy chủ mới đã gắn qhApplied. Bản cũ: tự đưa lô da_co sang hiện trạng từ file phân loại.
+  if (!data.qhApplied) {
+    try {
+      const pack = await fetch('data/gba/qh-hientrang.json').then(r => (r.ok ? r.json() : null));
+      if (pack) {
+        const applied = applyQhClassification(raw, plan, pack);
+        raw = applied.raw;
+        plan = applied.plan;
+      }
+    } catch (err) {
+      console.warn('Không áp được phân loại lô QH:', err);
+    }
+  }
+  state.rawDataList = raw;
+  state.planDataList = plan;
   bumpDataVersion();
 }
 
@@ -395,6 +412,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initWardRoads();
   initCustomRoads();
   initPopEdits();
+  initQhReview({ onChanged: reloadAfterSheetWrite });
   initRoadNetworkLayer();
   initCadastreLayer();
   initGbaLayer();

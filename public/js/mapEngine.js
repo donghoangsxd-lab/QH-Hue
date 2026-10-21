@@ -2602,6 +2602,10 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
     html += `<div class="pp-row"><span>${radiusLabel}</span><b class="c-cyan">${noZone ? 'không quy định' : `${fmtNum(itemRadius)}&nbsp;m`}${refHtml}</b></div>`;
   }
   if (p.tenQH) html += `<div class="pp-row"><span>Đồ án</span><b>${escapeHtml(p.tenQH)}</b></div>`;
+  if (p.qhProven) {
+    html += `<div class="pp-row qh-proven"><span>Nguồn</span><b>Xác định từ file QH</b></div>`;
+    if (p.qhReason) html += `<div class="pp-sub qh-proven-reason">${escapeHtml(p.qhReason)}</div>`;
+  }
   const riskData = peekInfraRisk();
   if (riskData) html += `<div class="pp-row js-risk"><span>Rủi ro khí hậu</span><span class="pp-loading">${ico('clock')}đang tải...</span></div>`;
   html += `</div>`;
