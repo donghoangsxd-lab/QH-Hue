@@ -263,6 +263,51 @@ function lotHtml(p) {
   return row ? gbaStatsHtml(row) : '';
 }
 
+function lngLatOf(z, x, y, px, py, extent) {
+  const n = 2 ** z;
+  const gx = x + px / extent;
+  const gy = y + py / extent;
+  const lng = (gx / n) * 360 - 180;
+  const lat = Math.atan(Math.sinh(Math.PI * (1 - (2 * gy) / n))) * (180 / Math.PI);
+  return [lng, lat];
+}
+
+function tilesCovering(box) {
+  const z = DATA_ZOOM;
+  const n = 2 ** z;
+  const latY = (lat) => {
+    const rad = lat * Math.PI / 180;
+    return Math.floor((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2 * n);
+  };
+  const x0 = Math.max(0, Math.floor(((box.west + 180) / 360) * n));
+  const x1 = Math.min(n - 1, Math.floor(((box.east + 180) / 360) * n));
+  const y0 = Math.max(0, latY(box.north));
+  const y1 = Math.min(n - 1, latY(box.south));
+  const tiles = [];
+  if (x1 < x0 || y1 < y0) return tiles;
+  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) tiles.push([x, y]);
+  return tiles;
+}
+
+/** Dấu chân trong khung {west,south,east,north}, mức 16. Quá 48 ô thì chỉ trả số ô, không tải. */
+export async function gbaFootprintsIn(box) {
+  const tiles = tilesCovering(box);
+  if (tiles.length > 48) return { tiles: tiles.length, features: [] };
+  const loaded = await Promise.all(tiles.map(([x, y]) => loadTile(DATA_ZOOM, x, y)
+    .then((feats) => ({ x, y, feats }))
+    .catch(() => ({ x, y, feats: [] }))));
+  const features = [];
+  loaded.forEach(({ x, y, feats }) => {
+    feats.forEach((ft) => {
+      const extent = ft.extent || 4096;
+      features.push({
+        rings: ft.rings.map((ring) => ring.map(([px, py]) => lngLatOf(DATA_ZOOM, x, y, px, py, extent)))
+      });
+    });
+  });
+  return { tiles: tiles.length, features };
+}
+
 export function initGbaLayer() {
   if (!map) return;
   const box = $('gbaBox');

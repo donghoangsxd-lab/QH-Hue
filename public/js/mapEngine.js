@@ -1529,6 +1529,10 @@ let landPopupExtra = () => '';
 /** Module khác gắn thêm dòng vào thẻ lô đất (GBA), không import vòng */
 export function setLandPopupExtra(fn) { landPopupExtra = typeof fn === 'function' ? fn : () => ''; }
 
+let fillLotBuildup = () => {};
+/** Đối chiếu mật độ xây dựng thực tế sau khi thẻ lô đã mở */
+export function setLotBuildup(fn) { fillLotBuildup = typeof fn === 'function' ? fn : () => {}; }
+
 function landPopupHtml(p) {
   const key = landPatternKey(p.layer, p.name);
   const nhom = p.nhom || landLabel(p.layer);
@@ -1556,6 +1560,7 @@ function landPopupHtml(p) {
     ${lotStatsHtml(p.plan)}
     <dl class="lp-info">${info.map(([k, v]) => `<dt>${k}</dt><dd${k === 'Layer' ? ' class="lp-mono"' : ''}>${escapeHtml(String(v))}</dd>`).join('')}</dl>
     ${landPopupExtra(p)}
+    <div class="lot-buildup" data-lot-buildup>Đang đối chiếu dấu chân công trình…</div>
   </div>`;
 }
 
@@ -1661,6 +1666,7 @@ function openLandPopup(p, m) {
   addPopupCollapseToggle(popup, 'viền lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
   addLotEditButton(popup, { kind: 'DXF', land: p }, redrawLands);
   trackLandInfo(popup, p, m);
+  fillLotBuildup(popup, p);
 }
 
 /** Popup lô đồ án như khi bấm lô trên bản đồ: lô đất → thẻ sử dụng đất, lô hạ tầng → popup công trình bám lô */

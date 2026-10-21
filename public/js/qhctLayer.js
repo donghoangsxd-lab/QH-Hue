@@ -12,6 +12,7 @@ import { escapeHtml, fmtNum } from './utils.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace } from './planLandStats.js';
 import { landPatternKey, TT16_STYLES, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
+import { attachLotBuildup } from './lotBuildup.js';
 
 export const QHCT_URL = 'data/qhct/index.json';
 const PANE = 'qhctPane';
@@ -174,6 +175,7 @@ function popupHtml(p) {
   ].filter(([, v]) => v);
   return `<div class="qhc-pop"><div class="qhc-pop-head"><b>${escapeHtml(p.chucNang || 'Lô đất QHCT 1/500')}</b></div>
     <table class="qhc-pop-table">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${escapeHtml(String(v))}</td></tr>`).join('')}</table>
+    <div class="lot-buildup" data-lot-buildup>Đang đối chiếu dấu chân công trình…</div>
     <div class="qhc-pop-src">QHCT 1/500</div></div>`;
 }
 
@@ -203,6 +205,15 @@ function openQhctPopup(m, f, latlng) {
   const popup = L.popup({ maxWidth: 320, className: 'qhc-popup' }).setLatLng(latlng).setContent(popupHtml(f.properties || {}));
   qhctLotPop = { popup, f, map: m };
   popup.openOn(m);
+  attachLotBuildup(popup, {
+    geometry: f.geometry,
+    plan: null,
+    phase: 'QH',
+    file: (f.properties || {}).tenQH || '',
+    id: (f.properties || {}).kyHieu || '',
+    layer: (f.properties || {}).chucNang || '',
+    name: (f.properties || {}).chucNang || ''
+  });
   addPopupCollapseToggle(popup, 'nhãn tên lô', 'Bấm lại vào lô đất để hiện bảng thông tin');
   popup.on('remove', () => { if (qhctLotPop?.popup === popup) qhctLotPop = null; });
 }

@@ -69,6 +69,7 @@ import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 import { initCadastreLayer, cadastreClick } from './cadastreLayer.js';
 import { initGbaLayer } from './gbaLayer.js';
+import { initLotBuildup } from './lotBuildup.js';
 import { initApartmentLayer } from './apartmentLayer.js';
 import { initParcelInfra } from './parcelInfra.js';
 import { initInvestLayer } from './investLayer.js';
@@ -479,6 +480,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initRoadNetworkLayer();
   initCadastreLayer();
   initGbaLayer();
+  initLotBuildup();
   initApartmentLayer();
   initParcelInfra();
   initInvestLayer();
