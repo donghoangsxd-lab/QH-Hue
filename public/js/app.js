@@ -70,6 +70,7 @@ import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 import { initCadastreLayer, cadastreClick } from './cadastreLayer.js';
 import { initGbaLayer } from './gbaLayer.js';
 import { initLotBuildup } from './lotBuildup.js';
+import { initLotOver } from './lotOver.js';
 import { initViolateLayer } from './violateLayer.js';
 import { initApartmentLayer } from './apartmentLayer.js';
 import { initParcelInfra } from './parcelInfra.js';
@@ -482,6 +483,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCadastreLayer();
   initGbaLayer();
   initLotBuildup();
+  initLotOver();
   initViolateLayer();
   initApartmentLayer();
   initParcelInfra();

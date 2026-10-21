@@ -926,6 +926,7 @@ function renderCityTableFoot() {
     <td colspan="2"></td>
     ${roadCells}
     <td class="st-num st-bus">${fmtNum(list.reduce((s, w) => s + busCountOf(w), 0))}</td>
+    ${lotFootCells()}
   </tr>`;
 }
 
@@ -1145,6 +1146,7 @@ function wardRowHtml(w, idx) {
     <td class="st-scale st-scale-avg">${fmtPct(w.Avg_Scale_Score)}</td>
     ${roadCellsHtml(w.Ten_Phuong)}
     <td class="st-num st-bus">${fmtNum(busCountOf(w))}</td>
+    ${lotCellsHtml(w.Ten_Phuong)}
   </tr>`;
 }
 
@@ -1716,6 +1718,59 @@ const UNIT_POP = 20000;
 
 let wardGbaHtml = () => '';
 let wardPopHtml = () => '';
+let wardLotHtml = () => '';
+let lotCountsOf = () => null;
+
+function lotPair(name) {
+  const c = lotCountsOf(name);
+  if (!c) return null;
+  return { cover: Number(c.cover) || 0, floors: Number(c.floors) || 0 };
+}
+
+function lotCellsHtml(name) {
+  const c = lotPair(name);
+  const cover = c ? fmtNum(c.cover) : '…';
+  const floors = c ? fmtNum(c.floors) : '…';
+  const safe = escapeHtml(name);
+  return `<td class="st-num st-lot"><button type="button" class="ward-link link-btn" data-ward="${safe}" title="Số lô vượt mật độ">${cover}</button></td>`
+    + `<td class="st-num st-lot"><button type="button" class="ward-link link-btn" data-ward="${safe}" title="Số lô vượt tầng cao">${floors}</button></td>`;
+}
+
+function lotFootCells() {
+  const list = state.wardStatsData || [];
+  if (!list.length || !lotPair(list[0].Ten_Phuong)) return '<td class="st-num st-lot">…</td><td class="st-num st-lot">…</td>';
+  let cover = 0;
+  let floors = 0;
+  list.forEach((w) => {
+    const c = lotPair(w.Ten_Phuong) || { cover: 0, floors: 0 };
+    cover += c.cover;
+    floors += c.floors;
+  });
+  return `<td class="st-num st-lot" title="Tổng số lô vượt mật độ">${fmtNum(cover)}</td>`
+    + `<td class="st-num st-lot" title="Tổng số lô vượt tầng cao">${fmtNum(floors)}</td>`;
+}
+
+/** lotOver.js gọi khi đã có số lô vượt theo phường. */
+export function setLotCounts(fn) {
+  lotCountsOf = typeof fn === 'function' ? fn : () => null;
+  document.querySelectorAll('#statTableBody tr[data-ward-row]').forEach((tr) => {
+    const name = tr.getAttribute('data-ward-row');
+    const cells = tr.querySelectorAll('.st-lot');
+    if (cells.length !== 2) return;
+    const c = lotPair(name);
+    if (!c) return;
+    const buttons = [cells[0].querySelector('button'), cells[1].querySelector('button')];
+    if (buttons[0]) buttons[0].textContent = fmtNum(c.cover);
+    if (buttons[1]) buttons[1].textContent = fmtNum(c.floors);
+  });
+  renderCityTableFoot();
+  const ward = (state.wardStatsData || []).find((w) => w.Ten_Phuong === state.selectedWard);
+  const view = document.getElementById('wardSummaryView');
+  if (ward && view && view.style.display !== 'none' && view.innerHTML) renderWardSummary(ward);
+}
+
+/** Khối số lô vượt trên thẻ phường, phía trên bảng chỉ tiêu. */
+export function setWardLotHtml(fn) { wardLotHtml = typeof fn === 'function' ? fn : () => ''; }
 /** Lớp GBA gắn khối mật độ / nhóm chiều cao tương đối vào thẻ phường */
 export function setWardGbaHtml(fn) { wardGbaHtml = typeof fn === 'function' ? fn : () => ''; }
 /** Phân bổ dân số B + chung cư gắn câu dân vùng phục vụ vào thẻ phường */
@@ -1744,6 +1799,7 @@ function renderWardSummary(wardData) {
   if (!isBalanceMapOn(wardData.Ten_Phuong)) clearBalanceMap();
   const areaKm2 = Number(wardData.Dien_Tich_Km2) || 0;
   view.innerHTML = `<div id="wardSummaryCard">
+    ${wardLotHtml(wardData.Ten_Phuong)}
     <div id="wardQuotaTableContainer">${buildWardQuotaTableHtml(wardData, popProjected)}</div>
     ${wardGbaHtml(wardData.Ten_Phuong)}
     ${wardPopHtml(wardData.Ten_Phuong)}

@@ -5399,6 +5399,17 @@ body.project-review.la-page #projectReviewHost {
 .lot-buildup .is-ok { color: var(--accent-green); }
 .lot-buildup .is-miss, .lot-buildup .lot-note { color: var(--text-muted); }
 .lot-buildup span { white-space: normal; }
+.lot-over { margin: 0 0 8px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; }
+.lot-over h4 { margin: 0 0 6px; font-size: 13px; }
+.lot-over-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lot-over-kpis span { display: block; font-size: 11px; color: var(--text-muted); }
+.lot-over-kpis b { font-size: 18px; line-height: 1.15; color: var(--accent-red); }
+.lot-over-kpis em { font-style: normal; font-size: 11px; color: var(--text-muted); }
+.lot-over-list { display: flex; flex-direction: column; margin-top: 6px; max-height: 168px; overflow: auto; }
+.lot-over-item { display: flex; flex-direction: column; align-items: flex-start; gap: 0; width: 100%; margin: 0; padding: 3px 2px; border: 0; background: transparent; text-align: left; font: inherit; font-size: 12px; line-height: 1.3; color: inherit; cursor: pointer; }
+.lot-over-item:hover { background: rgba(248, 113, 113, 0.12); }
+.lot-over-more, .lot-over-empty { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); }
+.st-lot .link-btn { font-variant-numeric: tabular-nums; }
 .violate-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 4px 0; font-size: 12px; }
 .violate-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
 .violate-table-wrap { overflow: auto; max-width: 100%; }
