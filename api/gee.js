@@ -3868,7 +3868,7 @@ module.exports = async (req, res) => {
       const buffers = tree.cemeteryBuffers(list);
       const part = req.query.part === 'tile' ? 'tile' : (req.query.part === 'zones' ? 'zones' : 'stats');
       const packVersion = noxhPack && noxhPack.version ? noxhPack.version : 'none';
-      const key = `tree|v3|${part}|${year}|${popSource}|${packVersion}|${getDataVersion()}`;
+      const key = `tree|v4|${part}|${year}|${popSource}|${packVersion}|${getDataVersion()}`;
       if (!cachedSatStats.has(key) && !treeJobs.has(key)) {
         const job = (async () => {
           const args = [ee, wardVectorParsed, popRasterNormalized, popProjection, popScale, !!popPeople, year, buffers];
@@ -3930,6 +3930,7 @@ module.exports = async (req, res) => {
       } catch (err) {
         console.error('Ưu tiên trồng cây:', err && err.stack ? err.stack : err);
         const detail = err && err.message ? String(err.message).replace(/\s+/g, ' ').slice(0, 160) : '';
+        res.setHeader('Cache-Control', 'no-store');
         return res.status(502).json({
           error: true,
           message: detail ? `Chưa tính được chỉ số trên Google Earth Engine: ${detail}` : 'Chưa tính được chỉ số trên Google Earth Engine'
