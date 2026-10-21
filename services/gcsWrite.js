@@ -87,6 +87,27 @@ async function putJson(name, text, generation) {
   return putObject(name, text, 'application/json', generation);
 }
 
+/** JSON đã ghi. null nếu chưa có. generation dùng cho ifGenerationMatch ở lần ghi sau. */
+async function readJson(name) {
+  const access = await accessToken();
+  const metaRes = await axios.get(objectApiUrl(name), {
+    headers: { Authorization: `Bearer ${access}` },
+    timeout: 15000,
+    validateStatus: () => true
+  });
+  if (metaRes.status === 404) return null;
+  if (metaRes.status !== 200) throw fail(name, metaRes.status, 'Đọc');
+  const media = await axios.get(`${objectApiUrl(name)}?alt=media`, {
+    headers: { Authorization: `Bearer ${access}` },
+    timeout: 20000,
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity,
+    validateStatus: () => true
+  });
+  if (media.status !== 200) throw fail(name, media.status, 'Đọc');
+  return { generation: String(metaRes.data.generation || ''), data: media.data };
+}
+
 async function removeObject(name) {
   const access = await accessToken();
   const url = `https://storage.googleapis.com/storage/v1/b/${constants.GCS_BUCKET}/o/${encodeURIComponent(name)}`;
@@ -193,4 +214,4 @@ async function rewriteObject(src, dest) {
   throw fail(dest, 502, 'Chép');
 }
 
-module.exports = { accessToken, putJson, putObject, removeObject, signPutUrl, objectMeta, readBytes, rewriteObject };
+module.exports = { accessToken, putJson, readJson, putObject, removeObject, signPutUrl, objectMeta, readBytes, rewriteObject };

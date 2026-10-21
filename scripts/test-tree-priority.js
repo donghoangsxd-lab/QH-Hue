@@ -1,4 +1,4 @@
-const { cemeteryRadius, cemeteryBuffers, acceptYear, rowsFromFeatures, popFromPixels, assignFallbackPop, scoreTreeWards, MIN_BUILT_HA, zoneLevel, landKind, normalizeZones, ZONE_LEVELS } = require('../services/treePriority');
+const { cemeteryRadius, cemeteryBuffers, acceptYear, rowsFromFeatures, popFromPixels, peopleCopies, zonePeople, assignFallbackPop, scoreTreeWards, MIN_BUILT_HA, zoneLevel, landKind, normalizeZones, ZONE_LEVELS } = require('../services/treePriority');
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -99,7 +99,7 @@ const ring = { type: 'Polygon', coordinates: [[[107.5, 16.4], [107.51, 16.4], [1
 const zones = normalizeZones({
   features: [
     { properties: { level: 1, ha: 2, lst_mean: 34.2, ndvi_mean: 0.4, popHa_mean: 20, lat: 16.4, lng: 107.5, ward: 'A' }, geometry: ring },
-    { properties: { level: 3, ha: 1.2, lst: 37, ndvi: 0.2, popHa: 50, lat: 16.5, lng: 107.6, ward: 'B' }, geometry: ring },
+    { properties: { level: 3, ha: 1.2, lst: 41, ndvi: 0.18, popHa: 400, lat: 16.5, lng: 107.6, ward: 'B' }, geometry: ring },
     { properties: { level: 3, ha: 4, lst: 38, ndvi: 0.2, popHa: 10, lat: 16.46, lng: 107.58, ward: 'C' }, geometry: ring },
     { properties: { level: 3, ha: 0.2, lst: 37, ndvi: 0.2, popHa: 50 }, geometry: ring },
     { properties: { level: 0, ha: 5, lst: 30 }, geometry: ring },
@@ -107,9 +107,18 @@ const zones = normalizeZones({
   ]
 }, { lst: 35.4 });
 assert(zones.length === 3, 'bỏ vùng nhỏ, mức 0 và thiếu hình');
-assert(zones[0].level === 3 && zones[0].ward === 'C' && zones[0].ha === 4 && zones[0].id === 1, 'mức cao, diện tích lớn trước');
-assert(zones[1].level === 3 && zones[1].ward === 'B' && zones[1].lstGap === 1.6 && zones[1].pop === 60, 'dân và chênh nhiệt');
+assert(zones[0].level === 3 && zones[0].ward === 'B' && zones[0].pop === 480 && zones[0].lstGap === 5.6 && zones[0].id === 1, 'cùng mức, nhiều người và nóng hơn xếp trước');
+assert(zones[1].level === 3 && zones[1].ward === 'C' && zones[1].ha === 4, 'vùng rộng hơn nhưng ít người đứng sau');
 assert(zones[2].level === 1 && zones[2].ward === 'A', 'theo dõi sau cùng');
 assert(ZONE_LEVELS.map(l => l.label).join('/') === 'Rất cần/Cần/Theo dõi', 'ba mức chú giải');
+
+assert(peopleCopies(60, 30) === 4, 'ô 60 m thành 4 ô 30 m');
+assert(peopleCopies(30, 30) === 1 && peopleCopies(30, 60) === 1, 'không chia khi ô vùng không mịn hơn');
+assert(zonePeople(20, null, 0.36, 30) === 80, '20 người/ô trên 4 ô 30 m');
+assert(zonePeople(80, 1, 37.9, 60) === 80, 'một ô giữ 80 người, không nhân với hecta');
+const summed = normalizeZones({
+  features: [{ properties: { level: 3, ha: 0.36, lst: 40, ndvi: 0.2, people: 20, scaleM: 30, ward: 'P' }, geometry: ring }]
+}, { lst: 35 });
+assert(summed.length === 1 && summed[0].pop === 80 && summed[0].popHa === 222.2, 'dân vùng bằng tổng ô, mật độ theo diện tích');
 
 console.log('ok tree priority');
