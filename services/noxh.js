@@ -217,6 +217,7 @@ function normalizeNoxhItem(row, index) {
     kindDetail: String(row.kindDetail || row.loai_chi_tiet || '').trim(),
     confidence: confidenceOf(row.confidence != null ? row.confidence : row.do_tin_cay),
     locateNote: String(row.locateNote || row.ghi_chu_dinh_vi || '').trim(),
+    year: String(row.year || row.nam || row.nam_hoan_thanh || '').trim(),
     wkt: /^(MULTI)?POLYGON\s*\(/i.test(wktRaw) && wktRaw.length <= 45000 ? wktRaw : '',
     geometry: geometry || null,
     areaM2: areaM2Of(row, geometry),

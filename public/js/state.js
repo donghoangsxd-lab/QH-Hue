@@ -136,7 +136,7 @@ export const infraLabels = {
   "13-BUS": "Trạm dừng xe buýt",
   "10-PCCC": "Trụ sở cảnh sát PCCC",
   "11-NT": "Nhà tang lễ, nghĩa trang",
-  "14-NOXH": "Nhà ở xã hội"
+  "14-NOXH": "Chung cư"
 };
 
 // Ranh giới phường xã: nét viền ghi xám vẽ dưới + nét vàng nhạt vẽ trên (đổ bóng rẻ, không dùng CSS filter)

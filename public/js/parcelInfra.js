@@ -24,7 +24,7 @@ const TYPES = [
   { code: '11-NT', label: 'Nhà tang lễ, nghĩa trang', unit: 'ngôi', cap: 'unit' },
   { code: '12-CSD', label: 'Cơ sở chưa sử dụng', unit: '', cap: 'unit' },
   { code: '13-BUS', label: 'Trạm dừng xe buýt', unit: 'điểm', cap: 'urban', noArea: true },
-  { code: '14-NOXH', label: 'Nhà ở xã hội', unit: 'căn', cap: 'unit' }
+  { code: '14-NOXH', label: 'Chung cư', unit: 'căn', cap: 'unit' }
 ];
 const STATUSES = [
   { id: 'hoatdong', label: 'Đang hoạt động' },

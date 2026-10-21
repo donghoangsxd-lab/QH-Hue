@@ -1,4 +1,5 @@
-// Lớp chung cư: đọc tab NOXH. Hiện trạng tính dân; quy hoạch chỉ để xem. Loại chỉ để lọc nhãn.
+// Lớp 14. Chung cư (Khu đất): vẽ mọi dòng tab 14-NOXH. Hiện trạng tính dân; quy hoạch chỉ để xem.
+// Bật hay tắt lớp không đổi gói dân đưa vào setPopData.
 import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { state } from './state.js';
@@ -7,19 +8,21 @@ import { escapeHtml, RIGHT_TAB_EVENT } from './utils.js';
 import { postAdmin } from './wardRoads.js';
 import { setWardPopHtml } from './uiComponents.js';
 import {
-  POP_METHOD_EVENT, apartmentPopulation, howLabel, popConfig, popItems, popMethod,
+  POP_METHOD_EVENT, apartmentPopulation, popConfig, popItems, popMethod,
   restorePopMethod, setPopConfig, setPopData, setPopMethod, cityApartmentSummary, wardPopNote
 } from './popMethod.js';
 
 const $ = (id) => document.getElementById(id);
 const CONF = { high: 'Cao', medium: 'Vừa', low: 'Thấp' };
-const SOURCE = { noxh: 'Tab NOXH', sheet: 'Tab NOXH', seed: 'Danh sách sẵn', manual: 'Bổ sung', thuongmai: 'Chung cư thương mại' };
 const KIND = { noxh: 'Nhà ở xã hội', thuongmai: 'Thương mại' };
-const EXIST_STYLE = { color: '#ddd6fe', weight: 2, fillColor: '#6d28d9', fillOpacity: 0.35 };
-const PLAN_STYLE = { color: '#fbbf24', weight: 2, dashArray: '6 4', fillColor: '#f59e0b', fillOpacity: 0.16 };
+const STYLES = {
+  noxh: { color: '#ddd6fe', weight: 2, fillColor: '#6d28d9', fillOpacity: 0.35 },
+  thuongmai: { color: '#7dd3fc', weight: 2, fillColor: '#0369a1', fillOpacity: 0.35 },
+  plan: { color: '#fbbf24', weight: 2, dashArray: '6 4', fillColor: '#f59e0b', fillOpacity: 0.16 },
+  planTm: { color: '#38bdf8', weight: 2, dashArray: '6 4', fillColor: '#0284c7', fillOpacity: 0.16 }
+};
 
 let on = false;
-let planOn = false;
 let groupL = null;
 let groupR = null;
 let planL = null;
@@ -30,6 +33,17 @@ let kindFilter = '';
 
 function isAdmin() {
   return state.currentUserRole === 'ADMIN' && !!state.authToken;
+}
+
+function styleOf(it) {
+  const plan = it.status === 'quy_hoach';
+  const tm = it.kind === 'thuongmai';
+  if (plan) return tm ? STYLES.planTm : STYLES.plan;
+  return tm ? STYLES.thuongmai : STYLES.noxh;
+}
+
+function yearOf(it) {
+  return String(it.year || it.nam || '').trim();
 }
 
 function icon(conf, plan) {
@@ -86,26 +100,31 @@ function asPlan(it) {
 }
 
 function popupHtml(it) {
+  const plan = it.status === 'quy_hoach';
   const row = apartmentPopulation(it, popConfig());
-  const people = row.how === 'thieu' ? 'Chưa tính được' : `${Math.round(row.pop).toLocaleString('vi-VN')} người`;
+  const recorded = Number(it.residents);
+  const dan = plan
+    ? (Number.isFinite(recorded) && recorded > 0 ? Math.round(recorded) : null)
+    : (row.how === 'thieu' ? null : Math.round(row.pop));
+  const danText = dan != null
+    ? dan.toLocaleString('vi-VN')
+    : (plan ? 'Không tính vào dân hiện trạng' : 'Chưa có số');
+  const people = plan ? 'Quy hoạch — không tính dân hiện trạng' : (dan != null ? `${dan.toLocaleString('vi-VN')} người` : 'Hiện trạng');
   const bits = [
-    ['Phường, xã', it.ward],
-    ['Tình trạng', it.detail || 'Đã hoàn thành'],
-    ['Căn cứ', it.evidence || ''],
-    ['Loại', KIND[it.kind] || ''],
+    ['Loại', KIND[it.kind] || 'Chưa phân loại'],
+    ['Số căn', it.units ? String(it.units) : 'Chưa có số'],
+    ['Dân số', danText],
+    ['Trạng thái', plan ? 'Quy hoạch' : 'Hiện trạng']
+  ];
+  const year = yearOf(it);
+  if (year) bits.push(['Năm', year]);
+  [
     ['Loại chi tiết', it.kindDetail],
-    ['Nguồn', SOURCE[it.source] || it.source],
-    ['Độ tin cậy', CONF[it.confidence] || it.confidence],
+    ['Phường, xã', it.ward],
     ['Ghi chú định vị', it.locateNote],
-    ['Diện tích khu', it.siteHa ? `${it.siteHa} ha` : ''],
-    ['Dấu chân nhà', it.footprint ? `${Math.round(it.footprint).toLocaleString('vi-VN')} m²` : ''],
-    ['Số tầng', it.floors || ''],
-    ['Số căn', it.units || ''],
-    ['Dân đã ghi', it.residents || ''],
-    ['Cách tính', howLabel(row.how)],
-    ['Xác minh', it.verified ? 'Đã xác minh' : 'Chưa xác minh']
-  ].filter((pair) => pair[1]);
-  const edit = isAdmin() ? `<form class="apt-edit" data-apt="${escapeHtml(it.id)}">
+    ['Độ tin cậy', CONF[it.confidence] || it.confidence]
+  ].forEach(pair => { if (pair[1]) bits.push(pair); });
+  const edit = !plan && isAdmin() ? `<form class="apt-edit" data-apt="${escapeHtml(it.id)}">
       <label>Số tầng <input name="floors" type="number" min="1" max="80" value="${it.floors || ''}"></label>
       <label>Số căn <input name="units" type="number" min="0" step="1" value="${it.units || ''}"></label>
       <label>Số dân <input name="residents" type="number" min="0" step="1" value="${it.residents || ''}"></label>
@@ -128,78 +147,40 @@ function addSite(group, it, style, html, plan) {
 function draw() {
   groupL?.remove();
   groupR?.remove();
+  planL?.remove();
+  planR?.remove();
+  planL = null;
+  planR = null;
   groupL = L.layerGroup();
   groupR = L.layerGroup();
   if (!on) return;
-  popItems().filter(passesKind).forEach(it => {
+  [...popItems(), ...planItems].filter(passesKind).forEach(it => {
     const html = () => popupHtml(it);
-    addSite(groupL, it, EXIST_STYLE, html, false);
-    addSite(groupR, it, EXIST_STYLE, html, false);
+    const style = styleOf(it);
+    const plan = it.status === 'quy_hoach';
+    addSite(groupL, it, style, html, plan);
+    addSite(groupR, it, style, html, plan);
   });
   if (map) groupL.addTo(map);
   if (planMap) groupR.addTo(planMap);
 }
 
-function planHtml(it) {
-  const bits = [
-    ['Phường, xã', it.ward],
-    ['Tình trạng', it.detail || 'Quy hoạch'],
-    ['Diện tích', it.siteHa ? `${it.siteHa} ha` : ''],
-    ['Số tầng', it.floors || ''],
-    ['Số căn', it.units || ''],
-    ['Loại', KIND[it.kind] || ''],
-    ['Loại chi tiết', it.kindDetail],
-    ['Độ tin cậy', CONF[it.confidence] || it.confidence],
-    ['Ghi chú định vị', it.locateNote],
-    ['Dân số ghi trong bảng', it.plannedPop || it.residents || '']
-  ].filter((pair) => pair[1]);
-  const warn = it.uncertain ? '<p>Số liệu chưa chắc vì cột trong bảng gốc bị lệch.</p>' : '';
-  return `<div class="apt-pop"><b>${escapeHtml(it.name || 'Nhà ở xã hội')}</b><div class="apt-pop-n">Quy hoạch — không tính dân hiện trạng</div>
-    ${warn}<dl>${bits.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl></div>`;
-}
-
-function drawPlan() {
-  planL?.remove();
-  planR?.remove();
-  planL = L.layerGroup();
-  planR = L.layerGroup();
-  if (!planOn) return;
-  planItems.filter(passesKind).forEach(it => {
-    const html = () => planHtml(it);
-    addSite(planL, it, PLAN_STYLE, html, true);
-    addSite(planR, it, PLAN_STYLE, html, true);
-  });
-  if (map) planL.addTo(map);
-  if (planMap) planR.addTo(planMap);
-}
-
 function summaryText() {
   const s = cityApartmentSummary();
+  const ht = popItems();
+  const noxh = ht.filter(it => it.kind !== 'thuongmai').length;
+  const tm = ht.filter(it => it.kind === 'thuongmai').length;
   const warns = s.warns.length ? ` Cảnh báo vượt dân số: ${s.warns.join(', ')}.` : '';
-  const tm = popItems().filter(it => it.kind === 'thuongmai').length;
-  const kind = tm ? ` Trong đó ${tm} thương mại.` : '';
-  return `${s.n} chung cư hiện trạng, khoảng ${Math.round(s.apt).toLocaleString('vi-VN')} người.${kind}${warns}`;
-}
-
-function planSummaryText() {
-  const unsure = planItems.filter(it => it.uncertain).length;
-  const tail = unsure ? ` ${unsure} khu có số liệu chưa chắc.` : '';
-  return `${planItems.length} khu chưa hoàn thành, không tính vào dân hiện trạng.${tail}`;
+  return `${ht.length} hiện trạng (${noxh} NOXH, ${tm} thương mại), ${planItems.length} quy hoạch. Dân hiện trạng khoảng ${Math.round(s.apt).toLocaleString('vi-VN')} người. Quy hoạch không tính dân.${warns}`;
 }
 
 function paintBox() {
   const box = $('aptBox');
   if (box) box.style.display = on ? '' : 'none';
   const hint = $('aptHint');
-  if (hint) hint.textContent = loaded ? '' : '';
+  if (hint) hint.textContent = loaded ? `(${popItems().length + planItems.length})` : '';
   const sum = $('aptSummary');
   if (sum) sum.textContent = on && loaded ? summaryText() : '';
-  const planBox = $('noxhPlanBox');
-  if (planBox) planBox.style.display = planOn ? '' : 'none';
-  const planSum = $('noxhPlanSummary');
-  if (planSum) planSum.textContent = planOn && loaded ? planSummaryText() : '';
-  const planHint = $('noxhPlanHint');
-  if (planHint) planHint.textContent = loaded && planItems.length ? `(${planItems.length})` : '';
   const admin = $('aptAdmin');
   if (admin) admin.hidden = !isAdmin();
   const mode = $('aptMethod');
@@ -220,7 +201,7 @@ function readCfg() {
     efficiency: $('aptEff')?.value
   });
   paintBox();
-  draw();
+  if (on) draw();
 }
 
 async function load() {
@@ -248,7 +229,6 @@ async function load() {
   loaded = true;
   paintBox();
   if (on) draw();
-  if (planOn) drawPlan();
 }
 
 async function saveItem(it) {
@@ -315,18 +295,14 @@ export function initApartmentLayer() {
     const text = wardPopNote(name);
     return text ? `<p class="apt-ward">${escapeHtml(text)}</p>` : '';
   });
-  $('chk_apt')?.addEventListener('change', (e) => {
-    on = !!e.target.checked;
+  const syncFromCheckbox = () => {
+    on = !!$('chk_c14')?.checked;
     if (on && !loaded) load().then(draw);
     else draw();
     paintBox();
-  });
-  $('chk_noxhPlan')?.addEventListener('change', (e) => {
-    planOn = !!e.target.checked;
-    if (planOn && !loaded) load().then(drawPlan);
-    else drawPlan();
-    paintBox();
-  });
+  };
+  $('chk_c14')?.addEventListener('change', syncFromCheckbox);
+  $('btnToggleAllIcons')?.addEventListener('click', () => { setTimeout(syncFromCheckbox, 0); });
   $('aptMethod')?.addEventListener('change', (e) => {
     if (!isAdmin()) return;
     setPopMethod(e.target.value);
@@ -347,7 +323,6 @@ export function initApartmentLayer() {
   $('aptKind')?.addEventListener('change', (e) => {
     kindFilter = e.target.value || '';
     if (on) draw();
-    if (planOn) drawPlan();
   });
   $('btnPopNhaJump')?.addEventListener('click', () => {
     document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers' } }));
@@ -359,7 +334,6 @@ export function initApartmentLayer() {
     if (!isAdmin() && popMethod() === 'old') setPopMethod('b');
     paintBox();
     if (on) draw();
-    if (planOn) drawPlan();
   });
   window.addEventListener(POP_METHOD_EVENT, paintBox);
   load().catch(() => { /* file seed thiếu thì lớp trống */ });

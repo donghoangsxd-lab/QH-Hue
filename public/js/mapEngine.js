@@ -2298,7 +2298,7 @@ function formatCapCongTrinhLabel(raw) {
 // Dòng "Cấp công trình" gọn một dòng: "<công trình> (cấp …)"; y tế phân bệnh viện / trạm y tế theo cấp
 const CAP_NOUNS = {
   '2-BDX': 'Bãi đỗ xe', '3-MN': 'Trường mầm non', '4-TH': 'Trường tiểu học', '5-THCS': 'Trường THCS', '6-THPT': 'Trường THPT',
-  '8-VH': 'Văn hóa, TDTT', '9-TM': 'Chợ, TTTM', '12-CSD': 'Cơ sở nhà đất', '14-NOXH': 'Nhà ở xã hội'
+  '8-VH': 'Văn hóa, TDTT', '9-TM': 'Chợ, TTTM', '12-CSD': 'Cơ sở nhà đất', '14-NOXH': 'Chung cư'
 };
 function capCongTrinhText(p) {
   if (p.type === '1-CV') {

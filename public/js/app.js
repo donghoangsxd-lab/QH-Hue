@@ -201,7 +201,7 @@ function updateRadiusPreview() {
     return;
   }
   if (type === '14-NOXH') {
-    out.innerHTML = '<small>Nhà ở xã hội: không có bán kính phục vụ, chỉ thể hiện vị trí và diện tích</small>';
+    out.innerHTML = '<small>Chung cư: không có bán kính phục vụ, chỉ thể hiện vị trí và diện tích</small>';
     return;
   }
   if (isNetworkType(type)) {

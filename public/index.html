@@ -451,7 +451,23 @@
         <div class="layer-row"><div><input type="checkbox" id="chk_c13"><label for="chk_c13" title="Vùng đệm = khoảng cách an toàn tới khu dân cư (QCVN 01:2026 Bảng 23). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Nghiatrang.svg" class="layer-type-icon" alt="" width="14" height="16">11. Nhà tang lễ, nghĩa trang</label></div><button type="button" class="btn-dot-buffer" data-buffer="b13" title="Bật/tắt khoảng cách an toàn" aria-label="Bật/tắt khoảng cách an toàn" aria-pressed="false">●</button></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c9"><label for="chk_c9"><img src="./icons/Unused.png" class="layer-type-icon" alt="" width="14" height="16">12. Cơ sở chưa sử dụng</label></div></div>
         <div class="layer-row"><div><input type="checkbox" id="chk_c11"><label for="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Bus.svg" class="layer-type-icon" alt="" width="14" height="16">13. Trạm dừng xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" title="Bật/tắt phạm vi 500 m" aria-label="Bật/tắt phạm vi 500 m" aria-pressed="false">●</button></div>
-        <div class="layer-row"><div><input type="checkbox" id="chk_c14"><label for="chk_c14" title="Dữ liệu tab 14-NOXH. Chỉ thể hiện vị trí và diện tích, không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Noxh.svg" class="layer-type-icon" alt="" width="14" height="16">14. Nhà ở xã hội</label></div></div>
+        <div class="layer-row"><div><input type="checkbox" id="chk_c14"><label for="chk_c14" title="Ranh các dòng tab 14-NOXH: NOXH và thương mại, hiện trạng và quy hoạch. Quy hoạch vẽ nét đứt, không tính dân. Không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ. Tắt lớp không đổi dân số phường, xã."><img src="./icons/Noxh.svg" class="layer-type-icon" alt="" width="14" height="16">14. Chung cư <small class="layer-hint" id="aptHint"></small></label></div></div>
+        <div class="flood-box" id="aptBox" style="display:none;">
+          <div class="apt-legend" aria-label="Chú giải chung cư">
+            <span><i class="apt-swatch noxh"></i>NOXH, hiện trạng</span>
+            <span><i class="apt-swatch tm"></i>Thương mại, hiện trạng</span>
+            <span><i class="apt-swatch plan"></i>NOXH, quy hoạch</span>
+            <span><i class="apt-swatch plan-tm"></i>Thương mại, quy hoạch</span>
+          </div>
+          <p class="apt-summary" id="aptSummary"></p>
+          <label class="apt-kind">Lọc loại
+            <select id="aptKind" aria-label="Lọc chung cư theo loại">
+              <option value="">Tất cả</option>
+              <option value="noxh">NOXH</option>
+              <option value="thuongmai">Thương mại</option>
+            </select>
+          </label>
+        </div>
         <div class="layer-row"><div><input type="checkbox" id="chk_invest"><label for="chk_invest" title="Dự án kêu gọi đầu tư, sheet 15-DA. Ranh từ file KML, thông tin từ danh sách. Nhóm sử dụng hạ tầng: không có bán kính phục vụ, không tính vào quy mô m²/người và bản đồ độ phủ"><svg class="ico ico-layer"><use href="#i-coverage"/></svg>15. Dự án kêu gọi đầu tư <small class="layer-hint" id="investHint"></small></label></div></div>
         <div class="layer-status-legend" aria-label="Ghi chú trạng thái điểm">
           <span class="layer-status-title">Ghi chú:</span>
@@ -562,21 +578,9 @@
             <div><input type="checkbox" id="chk_gbaGrid"><label for="chk_gbaGrid" title="Lưới khoảng 150 m theo cường độ xây dựng tương đối (dấu chân nhân nhóm chiều cao, so trong địa bàn). Bốn nhóm: Thấp, Trung bình, Cao, Rất cao. Không phải mét chiều cao."><svg class="ico ico-layer"><use href="#i-coverage"/></svg>Cường độ xây dựng tương đối</label></div>
           </div>
           <div class="flood-box" id="gbaBox" style="display:none;"></div>
-          <div class="layer-row">
-            <div><input type="checkbox" id="chk_apt"><label for="chk_apt" title="Chung cư hiện trạng trên tab NOXH hoặc 14-NOXH (cột Trạng thái = Hiện trạng). Dân = cột Dân số nếu có, không thì Số căn hộ × 3,3. Cột Loại (NOXH hoặc Thương mại) chỉ để lọc nhãn; cả hai đều tính dân."><svg class="ico ico-layer"><use href="#i-floors"/></svg>Chung cư <small class="layer-hint" id="aptHint"></small></label></div>
-          </div>
-          <div class="flood-box" id="aptBox" style="display:none;">
-            <p class="apt-summary" id="aptSummary"></p>
-            <label class="apt-kind">Lọc nhãn
-              <select id="aptKind" aria-label="Lọc chung cư theo loại">
-                <option value="">Mọi loại</option>
-                <option value="noxh">Nhà ở xã hội</option>
-                <option value="thuongmai">Thương mại</option>
-              </select>
-            </label>
-          </div>
           <div id="aptAdmin" hidden>
-            <p class="cad-hint"><b>Nạp raster nhà ở (một lần).</b> Hai nút này chỉ dùng cho file nền nhà thấp tầng. Thêm chung cư bằng một dòng trên tab Google Sheet <b>NOXH</b> hoặc <b>14-NOXH</b>, không bấm lại hai nút này.</p>
+            <p class="apt-admin-title">Dân số nhà ở (quản trị)</p>
+            <p class="cad-hint"><b>Nạp raster nhà ở (một lần).</b> Hai nút này chỉ dùng cho file nền nhà thấp tầng. Thêm chung cư bằng một dòng trên tab Google Sheet <b>NOXH</b> hoặc <b>14-NOXH</b>. Bật hay tắt lớp 14. Chung cư không đổi cách chia dân.</p>
             <div class="apt-ingest" id="aptIngest">
               <button type="button" class="layer-mini-btn" id="btnPopNha">Nạp raster dân nhà ở</button>
               <button type="button" class="layer-mini-btn" id="btnPopNhaRebuild">Nạp lại từ CSV mới</button>
@@ -595,12 +599,6 @@
             <p class="cad-hint">Ô người/hộ chỉ đổi ghi chú phường trên máy này. Raster dùng cố định 3,3 người/căn.</p>
             <p id="aptStatus" class="apt-status"></p>
           </div>
-          <div class="layer-row">
-            <div><input type="checkbox" id="chk_noxhPlan"><label for="chk_noxhPlan" title="Dòng tab NOXH hoặc 14-NOXH có Trạng thái để trống hoặc Quy hoạch. Chỉ xem vị trí, không tính dân hiện trạng. Cột Loại không đổi việc có tính dân hay không."><svg class="ico ico-layer"><use href="#i-floors"/></svg>Nhà ở xã hội (quy hoạch) <small class="layer-hint" id="noxhPlanHint"></small></label></div>
-          </div>
-          <div class="flood-box" id="noxhPlanBox" style="display:none;">
-            <p class="apt-summary" id="noxhPlanSummary"></p>
-          </div>
           <div class="flood-box" id="cadastreBox" style="display:none;">
             <div class="cad-find">
               <select id="cadastreXa" aria-label="Xã/phường (địa giới cũ)"><option value="">Chọn xã/phường (địa giới cũ)</option></select>
@@ -611,7 +609,7 @@
             <div class="flood-stats" id="cadastreStatus"></div>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_pop"><label for="chk_pop" title="Mặc định là dân theo dấu chân nhà ở trên ô 30 m. Admin đổi sang pixel cũ trong lớp Chung cư để so sánh. Pixel cũ gán khoảng 4% dân số lên đất nghĩa trang."><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư <small class="layer-hint" id="popLayerHint"></small></label></div>
+            <div><input type="checkbox" id="chk_pop"><label for="chk_pop" title="Mặc định là dân theo dấu chân nhà ở trên ô 30 m. Quản trị đổi sang pixel cũ ở mục Dân số nhà ở (quản trị), cùng nhóm Bản đồ nền. Pixel cũ gán khoảng 4% dân số lên đất nghĩa trang. Bật lớp 14. Chung cư không đổi số này."><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư <small class="layer-hint" id="popLayerHint"></small></label></div>
             <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
           </div>
           <div class="layer-row">
@@ -792,7 +790,7 @@
           <option value="11-NT">11. Nhà tang lễ, nghĩa trang</option>
           <option value="12-CSD" selected>12. Cơ sở chưa sử dụng</option>
           <option value="13-BUS">13. Trạm dừng xe buýt</option>
-          <option value="14-NOXH">14. Nhà ở xã hội</option>
+          <option value="14-NOXH">14. Chung cư</option>
         </select>
 
         <label for="newPhase">Giai đoạn</label>
@@ -1032,7 +1030,7 @@
             <button type="button" id="btnPopUndo" title="Xóa nét cọ cuối (Backspace / Ctrl+Z)" disabled><svg class="ico"><use href="#i-undo"/></svg>Hoàn tác nét</button>
           </div>
           <div id="popDrawInfo" class="road-draw-info"></div>
-          <div class="cad-hint" id="popHint" title="Vùng thêm được áp sau vùng xóa">Giữ chuột và rê để tô. Tổng dân số phường, xã giữ nguyên: xóa ô dân cư thì dân số dồn sang các ô còn lại. Nạp raster dân nhà ở nằm ở Lớp dữ liệu → Bản đồ nền, ngay dưới dòng Chung cư (không cần bật lớp).</div>
+          <div class="cad-hint" id="popHint" title="Vùng thêm được áp sau vùng xóa">Giữ chuột và rê để tô. Tổng dân số phường, xã giữ nguyên: xóa ô dân cư thì dân số dồn sang các ô còn lại. Nạp raster dân nhà ở nằm ở Lớp dữ liệu → Bản đồ nền, mục Dân số nhà ở (quản trị). Không cần bật lớp 14. Chung cư.</div>
           <button type="button" class="layer-mini-btn" id="btnPopNhaJump">Mở nút nạp raster</button>
           <button type="button" class="btn-submit" id="btnPopSave" disabled title="Ghi danh sách vùng hiệu chỉnh dân cư"><svg class="ico"><use href="#i-save"/></svg>Lưu vùng hiệu chỉnh</button>
           <div id="popStatus" class="rp-status" role="status" aria-live="polite"></div>
