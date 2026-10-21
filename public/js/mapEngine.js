@@ -6,6 +6,7 @@ import {
 import { peekInfraRisk, riskSummaryHtml } from './riskLayer.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi, markDataWritten } from './api.js';
+import { POP_METHOD_EVENT, popQuery } from './popMethod.js';
 import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, planItems, startTaskProgress, trackTileLoad, trackTileLoads, announceTool, TOOL_START_EVENT } from './utils.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
@@ -2251,7 +2252,7 @@ export async function highlightSingleIsochrone(lat, lng, radius, group = layers.
 
 // Gửi loại + diện tích để server giới hạn dân số phục vụ theo chỉ tiêu m²/người
 async function fetchServedPop(p, radius, polygon) {
-  const res = await fetch(geeApi('action=analyzePoint'), {
+  const res = await fetch(geeApi(`action=analyzePoint&pop=${encodeURIComponent(popQuery())}`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -2702,7 +2703,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
           const polygon = r ? r.polygon : turf.circle([Number(p.lng), Number(p.lat)], itemRadius / 1000, { steps: 64 });
           return fetchServedPop(p, itemRadius, polygon).then(res => ({ res, real: !!(r && r.area) }));
         })
-        .then(({ res, real }) => fill('.js-served', `<span>${servedLabel}</span><div><b class="${ntKind && res.servedPop > 0 ? 'c-red' : servedCls}">~${fmtNum(res.servedPop || 0)} người</b> <span class="pp-sub">(${real ? 'trong phạm vi thực tế' : 'trong vòng tròn'}${scope})</span>${servedQuotaHtml(res, p.size)}${ntNote(res.servedPop || 0)}</div>`))
+        .then(({ res, real }) => fill('.js-served', `<span>${servedLabel}</span><div><b class="${ntKind && res.servedPop > 0 ? 'c-red' : servedCls}">~${fmtNum(res.servedPop || 0)} người</b> <span class="pp-sub">(${real ? 'trong phạm vi thực tế' : 'trong vòng tròn'}${scope})</span>${res.popFallback ? '<div class="pp-sub">Chưa có raster nhà ở, đang đếm pixel cũ.</div>' : ''}${servedQuotaHtml(res, p.size)}${ntNote(res.servedPop || 0)}</div>`))
         .catch(() => fill('.js-served', `<span>${servedLabel}</span><span class="pp-sub">chưa tính được (GEE đang bận), mở lại sau.</span>`));
     }
   };
@@ -2713,7 +2714,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
 
   if (isCSD && approved) {
     const csdQuery = `id=${encodeURIComponent(p.id || '')}&lat=${p.lat}&lng=${p.lng}&size=${Number(p.size) || 0}`;
-    fetchJson(geeApi(`action=analyzeCSD&${csdQuery}`))
+    fetchJson(geeApi(`action=analyzeCSD&${csdQuery}&pop=${encodeURIComponent(popQuery())}`))
       .then(res => {
         const suggestions = res.suggestions || [];
         let sugHtml = "";
@@ -2788,15 +2789,24 @@ const POP_SERVER_PCT = 40;
 const POP_SERVER_TAU_MS = 2500;
 let popTask = null;
 
+export let popLayerMeta = { popSource: null, popFallback: false, max: null };
+
 export async function loadPopulationLayer(pv) {
   if (!map) return;
   popTask?.cancel();
   const task = popTask = startTaskProgress('Đang tính lớp phân bổ dân cư (GEE)');
   task.creep(POP_SERVER_PCT, POP_SERVER_TAU_MS);
   try {
-    const res = await fetch(geeApi(`action=getPopRasterTile${pv ? `&pv=${pv}` : ''}`));
+    const res = await fetch(geeApi(`action=getPopRasterTile&pop=${encodeURIComponent(popQuery())}${pv ? `&pv=${pv}` : ''}`));
     const data = await res.json();
     if (data.urlFormat) {
+      popLayerMeta = { popSource: data.popSource || null, popFallback: !!data.popFallback, max: data.max || null };
+      const hint = document.getElementById('popLayerHint');
+      if (hint) {
+        hint.textContent = data.popFallback
+          ? '(tạm pixel cũ — chưa có raster nhà ở)'
+          : (data.popSource === 'nha' ? '(nhà ở, ô 30 m)' : '(pixel cũ)');
+      }
       const popOpacityEl = document.getElementById('popOpacity');
       const opacity = popOpacityEl ? popOpacityEl.value / 100 : 0.6;
       layers.pop.clearLayers();
@@ -2832,6 +2842,17 @@ export function ensurePopulationLayer() {
     });
   }
   return popLayerPromise;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(POP_METHOD_EVENT, (e) => {
+    if (!e.detail || e.detail.kind !== 'method') return;
+    popLayerMeta = { popSource: null, popFallback: false, max: null };
+    popLayerPromise = null;
+    const hint = document.getElementById('popLayerHint');
+    if (hint) hint.textContent = '';
+    if (document.getElementById('chk_pop')?.checked) loadPopulationLayer();
+  });
 }
 
 // ============================ TRA CỨU TẠI VỊ TRÍ ============================

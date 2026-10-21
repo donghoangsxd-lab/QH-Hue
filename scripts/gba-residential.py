@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 # Lọc nhà ở trên dấu chân GBA để phân bổ dân số (dasymetric).
-# Thứ tự: (1) mã thửa địa chính, (2) vùng OSM hoặc điểm hạ tầng trong 20 m,
+# Thứ tự: (1) mã thửa địa chính — NTD thắng cả khi điểm cũng chạm ODT/ONT,
+# (2) vùng OSM hoặc điểm hạ tầng trong 20 m,
 # (3) chức năng lô quy hoạch, (4) diện tích dấu chân > ngưỡng (mặc định 500 m²)
 # trừ khi thửa là đất ở (giữ chung cư).
+# Lô có tên hoặc layer nghĩa trang / nghĩa địa luôn là không phải nhà ở
+# (kể cả layer ghi "Đất ở", như Nghĩa trang Phan Bội Châu), trừ đài tưởng niệm.
 # Trọng số = diện tích dấu chân nhà ở × bậc chiều cao tương đối (1–4), không ghi mét.
 #   python3 scripts/gba-residential.py
 # Ngưỡng: GBA_LARGE_M2 (dấu chân lớn), GBA_SMALL_M2 (nhà kho, bếp, mái — không phải nhà ở dù thửa là đất ở).
@@ -10,6 +13,7 @@
 import json
 import math
 import os
+import re
 import time
 
 import duckdb
@@ -22,7 +26,7 @@ SMALL_M2 = float(os.environ.get('GBA_SMALL_M2', '20'))
 M_PER_DEG = 111320.0
 NEAR_M = 20.0
 
-# Mã Thông tư 28/2014/TT-BTNMT: đất ở thắng nếu tổ hợp có ODT/ONT.
+# Mã Thông tư 28/2014/TT-BTNMT. NTD (nghĩa trang) thắng khi điểm chạm cả NTD và ODT/ONT.
 RES_RE = r'(^|[^A-Z])(ODT|ONT)([^A-Z]|$)'
 NON_CODES = [
     'TSC', 'DTS', 'DVH', 'DYT', 'DGD', 'DTT', 'DKH', 'DXH', 'DNG', 'DSK', 'DSH', 'DKV', 'DCH',
@@ -30,6 +34,19 @@ NON_CODES = [
     'SKK', 'SKN', 'SKT', 'TMD', 'SKC', 'SKS', 'SKX', 'DGT', 'DTL'
 ]
 NON_RE = r'(^|[^A-Z])(' + '|'.join(NON_CODES) + r')([^A-Z]|$)'
+NTD_RE = r'(^|[^A-Z])NTD([^A-Z]|$)'
+# Tên/layer lô nghĩa trang. Đài tưởng niệm giữ nhãn file (không ép thành nghĩa trang).
+CEM_RE = r'nghĩa địa|nghia dia|nghĩa trang|nghia trang|nghĩatrang|nghiatrang'
+MEMORIAL_RE = r'tưởng niệm|tuong niem'
+
+
+def classify_lot(layer, name, file_use):
+    """Nhãn lô quy hoạch. Nghĩa trang / nghĩa địa luôn non, kể cả layer Đất ở."""
+    if re.search(MEMORIAL_RE, (name or '').lower()):
+        return file_use
+    if re.search(CEM_RE, f'{layer or ""} {name or ""}'.lower()):
+        return 'non'
+    return file_use
 
 
 def log(msg):
@@ -181,6 +198,7 @@ def main():
         SELECT
             regexp_matches(upper(l), '{RES_RE}') AS is_res,
             regexp_matches(upper(l), '{NON_RE}') AS is_non,
+            regexp_matches(upper(l), '{NTD_RE}') AS is_ntd,
             ST_MakeValid(ST_SetCRS(ST_GeomFromGeoJSON(to_json(geometry)::VARCHAR), 'EPSG:4326')) AS geom
         FROM read_ndjson('{os.path.join(TMP, 'cadastre.jsonl')}',
             columns={{'l': 'VARCHAR', 'geometry': 'JSON'}},
@@ -189,9 +207,10 @@ def main():
     """)
     con.execute("""
         CREATE TABLE cad_hit AS
-        SELECT b.id,
+            SELECT b.id,
                bool_or(c.is_res) AS is_res,
-               bool_or(c.is_non) AS is_non
+               bool_or(c.is_non) AS is_non,
+               bool_or(c.is_ntd) AS is_ntd
         FROM bldg b
         JOIN cad c ON ST_Intersects(c.geom, ST_SetCRS(ST_Point(b.x, b.y), 'EPSG:4326'))
         GROUP BY b.id
@@ -237,7 +256,7 @@ def main():
     log('lô quy hoạch')
     con.execute(f"""
         CREATE TABLE lots AS
-        SELECT k,
+        SELECT k, layer, name,
                ST_MakeValid(ST_SetCRS(geom, 'EPSG:4326')) AS geom,
                {area_sql("ST_SetCRS(geom, 'EPSG:4326')")} AS area_m2
         FROM ST_Read('{os.path.join(TMP, 'lots-use.geojson')}')
@@ -247,17 +266,25 @@ def main():
         CREATE TABLE lot_use AS
         SELECT k, use FROM read_ndjson('{os.path.join(TMP, 'lot-use.jsonl')}')
     """)
-    con.execute("""
+    # classify_lot: nghĩa trang / nghĩa địa → non, đài tưởng niệm giữ nhãn file.
+    con.execute(f"""
         CREATE TABLE lot_hit AS
         SELECT id, use FROM (
-            SELECT b.id, u.use,
-                   row_number() OVER (
-                       PARTITION BY b.id
-                       ORDER BY (u.use IS NULL OR u.use = ''), l.area_m2
-                   ) AS rn
-            FROM bldg b
-            JOIN lots l ON ST_Intersects(l.geom, ST_SetCRS(ST_Point(b.x, b.y), 'EPSG:4326'))
-            LEFT JOIN lot_use u ON u.k = l.k
+            SELECT id, use, row_number() OVER (
+                PARTITION BY id
+                ORDER BY (use IS NULL OR use = ''), area_m2
+            ) AS rn
+            FROM (
+                SELECT b.id, l.area_m2,
+                       CASE
+                           WHEN regexp_matches(lower(coalesce(l.name, '')), '{MEMORIAL_RE}') THEN u.use
+                           WHEN regexp_matches(lower(coalesce(l.layer, '') || ' ' || coalesce(l.name, '')), '{CEM_RE}') THEN 'non'
+                           ELSE u.use
+                       END AS use
+                FROM bldg b
+                JOIN lots l ON ST_Intersects(l.geom, ST_SetCRS(ST_Point(b.x, b.y), 'EPSG:4326'))
+                LEFT JOIN lot_use u ON u.k = l.k
+            )
         ) WHERE rn = 1 AND use IN ('res', 'non')
     """)
     log(f"lô quyết định {con.execute('SELECT count(*) FROM lot_hit').fetchone()[0]}")
@@ -269,6 +296,7 @@ def main():
             b.id, b.ward, b.pop, b.area_m2, b.cls, b.x, b.y,
             coalesce(c.is_res, false) AS cad_res,
             coalesce(c.is_non, false) AS cad_non,
+            coalesce(c.is_ntd, false) AS cad_ntd,
             o.id IS NOT NULL AS osm,
             i.id IS NOT NULL AS infra,
             h.use AS lot_use
@@ -284,7 +312,7 @@ def main():
         CREATE TABLE cls AS
         SELECT *,
             CASE
-                WHEN area_m2 < {SMALL_M2} AND (
+                WHEN area_m2 < {SMALL_M2} AND NOT coalesce(cad_ntd, false) AND (
                     coalesce(cad_res, false)
                     OR (
                         NOT coalesce(cad_non, false)
@@ -293,6 +321,7 @@ def main():
                         AND (lot_use IS NULL OR lot_use <> 'non')
                     )
                 ) THEN 'small'
+                WHEN cad_ntd THEN 'cad'
                 WHEN cad_res THEN 'keep'
                 WHEN cad_non THEN 'cad'
                 WHEN osm THEN 'osm'
@@ -304,6 +333,7 @@ def main():
             END AS reason,
             CASE
                 WHEN area_m2 < {SMALL_M2} THEN false
+                WHEN cad_ntd THEN false
                 WHEN cad_res THEN true
                 WHEN cad_non OR osm OR infra OR lot_use = 'non' THEN false
                 WHEN area_m2 > {LARGE_M2} THEN false
@@ -461,9 +491,11 @@ def main():
     }
     note = agg.get('note') or ''
     extra = (
-        ' Nhà ở để phân bổ dân số: ưu tiên mã thửa (ODT/ONT và tổ hợp có chúng là nhà ở; '
-        'mã công cộng, sản xuất, giao thông là không phải nhà ở), rồi vùng OSM (amenity, shop, office, '
-        'industrial, religious), điểm hạ tầng trong 20 m, chức năng lô quy hoạch, '
+        ' Nhà ở để phân bổ dân số: mã NTD (nghĩa trang) thắng cả khi điểm cũng chạm ODT/ONT. '
+        'Mã thửa khác: ODT/ONT và tổ hợp có chúng là nhà ở; '
+        'mã công cộng, sản xuất, giao thông là không phải nhà ở. Rồi vùng OSM (amenity, shop, office, '
+        'industrial, religious), điểm hạ tầng trong 20 m, chức năng lô quy hoạch '
+        '(lô nghĩa trang, nghĩa địa luôn không phải nhà ở, kể cả layer Đất ở), '
         f'và dấu chân lớn hơn {int(LARGE_M2)} m² trừ thửa đất ở. '
         f'Dấu chân nhỏ hơn {int(SMALL_M2)} m² (nhà kho, bếp, mái) không phải nhà ở dù thửa là đất ở. '
         'Trọng số là diện tích dấu chân nhà ở nhân bậc chiều cao tương đối, không phải mét.'

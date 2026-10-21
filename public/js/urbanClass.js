@@ -10,6 +10,7 @@ import { escapeHtml, fmtNum, ico, isApproved } from './utils.js';
 import { loadRoadTypeLengths, densityArea, loadBuiltAreas } from './wardRoads.js';
 import { state } from './state.js';
 import { geeApi } from './api.js';
+import { popQuery } from './popMethod.js';
 import { STATUS_REF, STATUS_DATE, URBANS_614, WARDS_614, RURAL_RULE, bareName as bare, wardLevel614, urbans614Of, urbans614ByPlan } from './urbanStatus.js';
 import { loadOsmOpen, osmTransitReady, transitNote } from './osmOpen.js';
 
@@ -363,7 +364,7 @@ function approvedBusCount(wards) {
 
 function busSig(wards) {
   const rows = typeIIBusBases(wards).map(r => `${r.id}:${r.expected}:${r.wards.length}:${r.n}:${r.pop}`).join('|');
-  return `${state.dataVersion}|${approvedBusCount(wards)}|${rows}`;
+  return `${state.dataVersion}|${popQuery()}|${approvedBusCount(wards)}|${rows}`;
 }
 
 // sig khớp bản dữ liệu đang xem. status: zero = không có trạm đã duyệt; ok = đã cộng dân số; loading | error | wait
@@ -399,7 +400,7 @@ function ensureBusCover(wards, redraw) {
   busCache.status = 'loading';
   const names = [...new Set(bases.flatMap(r => r.wards.map(w => w.Ten_Phuong)))];
   mapPool(names, 4, async (name) => {
-    const res = await fetch(geeApi(`action=getNetworkCoverage&ward=${encodeURIComponent(name)}`));
+    const res = await fetch(geeApi(`action=getNetworkCoverage&ward=${encodeURIComponent(name)}&pop=${encodeURIComponent(popQuery())}`));
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const body = await res.json();
     if (!body || !body.bus || body.popTotal == null) throw new Error('Thiếu dân số trong 500 m');

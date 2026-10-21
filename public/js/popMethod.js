@@ -22,7 +22,7 @@ export function setPopConfig(next) {
     m2PerPerson: clamp(next && next.m2PerPerson, 8, 80, POP_DEFAULTS.m2PerPerson),
     efficiency: clamp(next && next.efficiency, 0.4, 1, POP_DEFAULTS.efficiency)
   };
-  announce();
+  announce('config');
 }
 
 function clamp(v, min, max, fallback) {
@@ -42,7 +42,11 @@ export function setPopData(nextPack, nextWeights, faq) {
       efficiency: clamp(pack.efficiency, 0.4, 1, cfg.efficiency)
     };
   }
-  announce();
+  announce('data');
+}
+
+export function popQuery() {
+  return popMethod() === 'old' ? 'old' : 'b';
 }
 
 export function popItems() {
@@ -64,7 +68,7 @@ export function popMethod() {
 export function setPopMethod(id) {
   method = id === 'old' ? 'old' : 'b';
   try { localStorage.setItem(STORE, method); } catch (e) { /* riêng tư */ }
-  announce();
+  announce('method');
 }
 
 export function restorePopMethod() {
@@ -73,8 +77,8 @@ export function restorePopMethod() {
   method = saved === 'old' ? 'old' : 'b';
 }
 
-function announce() {
-  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(POP_METHOD_EVENT));
+function announce(kind) {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(POP_METHOD_EVENT, { detail: { kind: kind || 'data' } }));
 }
 
 /** { pop, how } — dan = số dân đã biết, can = số căn × cỡ hộ, tang = tầng × dấu chân × hiệu suất / m², thieu = chưa đủ số */

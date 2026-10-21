@@ -188,6 +188,16 @@ export function initApartmentLayer() {
     setPopMethod(e.target.value);
   });
   ['aptHh', 'aptM2', 'aptEff'].forEach(id => $(id)?.addEventListener('change', readCfg));
+  $('btnPopNha')?.addEventListener('click', async () => {
+    const status = $('popNhaStatus');
+    if (status) status.textContent = 'Đang hỏi máy chủ…';
+    try {
+      const data = await postAdmin('ingestPopNha', {});
+      if (status) status.textContent = data.message || data.state || 'Đã gửi.';
+    } catch (err) {
+      if (status) status.textContent = err.message || 'Chưa nạp được raster nhà ở.';
+    }
+  });
   document.addEventListener('submit', onPopupSubmit);
   document.addEventListener('auth:change', () => {
     if (!isAdmin() && popMethod() === 'old') setPopMethod('b');

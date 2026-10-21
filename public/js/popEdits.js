@@ -258,7 +258,7 @@ function syncToolUi() {
   const undo = $('btnPopUndo');
   if (undo) { undo.innerHTML = `${ico('undo')}${t.undo}`; undo.title = t.undoTitle; }
   const hint = $('popHint');
-  if (hint) hint.textContent = `${t.hint} Tổng dân số phường giữ nguyên: xóa pixel thì dân dồn sang pixel còn lại.`;
+  if (hint) hint.textContent = `${t.hint} Tổng dân số phường giữ nguyên: xóa pixel thì dân dồn sang pixel còn lại. Công cụ này chỉ sửa raster Pixel cũ dùng để so sánh, không sửa lớp nhà ở.`;
 }
 
 function undoLast() {
