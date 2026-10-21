@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-# Ứng viên chung cư cao tầng và phân bổ dân số phương pháp B sau khi trừ dân chung cư.
-# Không ghi mét chiều cao. Bậc GBA chỉ để nhận nhóm rất cao (cls = 3).
+# Chung cư hiện trạng = nhà ở xã hội đã hoàn thành (noxh-source.csv).
+# Khu còn lại ghi noxh-plan.json, không trừ dân. Dấu chân GBA không tự thành chung cư.
+# Dòng source sheet/manual/thuongmai trong apartments.json được giữ để thêm chung cư thương mại.
 #   python3 scripts/gba-apartments.py
 
+import csv
 import json
 import math
 import os
@@ -19,17 +21,18 @@ TMP = os.environ.get('GBA_TMP', '/tmp/gba')
 OUT_DIR = os.path.join(ROOT, 'public', 'data', 'gba')
 ART = os.environ.get('GBA_COMPARE_ART', '/opt/cursor/artifacts')
 M_PER_DEG = 111320.0
-MIN_M2 = float(os.environ.get('GBA_APT_M2', '300'))
-CLUSTER_M = 35.0
 HH = 3.3
 M2_PERSON = 25.0
 EFF = 0.75
 FLOOD_M = 5
 
-APT_RE = re.compile(r'CHUNG ?CU|NHA O CHUNG|DAT O CHUNG|DAT CHUNG CU|O CAO TANG|NHA O CAO TANG|DAT O CAO TANG')
-BAD_RE = re.compile(r'KHACH SAN|THUONG MAI|NGHI DUONG|DU LICH|VAN PHONG')
-MIX_RE = re.compile(r'HON HOP')
-RES_RE = r'(^|[^A-Z])(ODT|ONT)([^A-Z]|$)'
+KNOWN_ID = {
+    'Chung cư Xuân Phú (CHC2)': 'NOXH-CHC2',
+    'Chung cư Aranya (CHC1)': 'NOXH-CHC1',
+    'Chung cư Vicoland (CHC3)': 'NOXH-CHC3',
+    'Nhà ở xã hội XH3 (West Sky) - Khu phức hợp Thuỷ Vân GĐ 2': 'NOXH-XH3',
+}
+KEEP_SOURCE = {'sheet', 'manual', 'thuongmai'}
 
 
 def log(msg):
@@ -42,15 +45,154 @@ def fold(text):
     return s.replace('đ', 'd').replace('Đ', 'D').upper()
 
 
-def lot_kind(layer, name):
-    blob = fold(f'{layer or ""} {name or ""}')
-    if BAD_RE.search(blob) and not APT_RE.search(blob):
-        return ''
-    if APT_RE.search(blob):
-        return 'apt' if 'CHUNG' in blob else 'high'
-    if MIX_RE.search(blob):
-        return 'mix'
-    return ''
+def fnum(text):
+    s = str(text or '').strip().replace(' ', '')
+    if not s:
+        return None
+    try:
+        return float(s.replace(',', '.'))
+    except ValueError:
+        return None
+
+
+def uncertain_row(row):
+    note = str(row.get('mo_ta') or '')
+    return 'lệch' in note.lower() or 'COT GOC LECH' in fold(note)
+
+
+def plan_id(name, seen):
+    if name in KNOWN_ID:
+        return KNOWN_ID[name]
+    folded = fold(name)
+    if 'HUONG SO 1' in folded:
+        base = 'QH-I5-1'
+    elif 'HUONG SO 2' in folded:
+        base = 'QH-I5-2'
+    elif 'THANH TOAN' in folded:
+        base = 'QH-THANH-TOAN'
+    elif 'PHONG HIEN' in folded:
+        base = 'QH-PHONG-HIEN'
+    else:
+        m = re.match(r'^([IVX]+\.\d+(?:\.NOXH-\d+)?)', name.strip())
+        if m:
+            base = 'QH-' + m.group(1).replace('.', '-')
+        else:
+            base = 'QH-' + re.sub(r'[^A-Z0-9]+', '-', folded).strip('-')[:28]
+    if base in seen:
+        n = 2
+        while f'{base}-{n}' in seen:
+            n += 1
+        base = f'{base}-{n}'
+    seen.add(base)
+    return base
+
+
+def load_noxh(con):
+    path = os.path.join(OUT_DIR, 'noxh-source.csv')
+    if not os.path.exists(path):
+        raise SystemExit(f'Thiếu {path}')
+    with open(path, encoding='utf-8', newline='') as handle:
+        rows = list(csv.DictReader(handle))
+    con.execute('CREATE TABLE noxh_raw (i INTEGER, phase VARCHAR, wkt VARCHAR)')
+    payload = []
+    for i, row in enumerate(rows):
+        phase = (row.get('trang_thai') or '').strip()
+        if phase not in ('hien_trang', 'quy_hoach'):
+            raise SystemExit(f'Dòng {i + 2} có trang_thai lạ: {phase}')
+        wkt = (row.get('WKT_simplified') or '').strip()
+        if not wkt.upper().startswith('POLYGON'):
+            raise SystemExit(f'Dòng {i + 2} thiếu polygon')
+        payload.append((i, phase, wkt))
+    con.executemany('INSERT INTO noxh_raw VALUES (?, ?, ?)', payload)
+    con.execute("""
+        CREATE TABLE noxh AS
+        SELECT i, phase, ST_MakeValid(ST_SetCRS(ST_GeomFromText(wkt), 'EPSG:4326')) AS geom
+        FROM noxh_raw
+    """)
+    located = con.execute("""
+        SELECT i, name, x, y, gj FROM (
+            SELECT n.i, w.name,
+                   ST_X(ST_PointOnSurface(n.geom)) AS x,
+                   ST_Y(ST_PointOnSurface(n.geom)) AS y,
+                   ST_AsGeoJSON(n.geom) AS gj,
+                   row_number() OVER (PARTITION BY n.i ORDER BY w.name) AS rn
+            FROM noxh n
+            LEFT JOIN wards w ON ST_Intersects(w.geom, ST_PointOnSurface(n.geom))
+        ) WHERE rn = 1
+    """).fetchall()
+    loc = {r[0]: r[1:] for r in located}
+    hits = con.execute("""
+        SELECT n.i, b.id, b.area_m2, b.ward
+        FROM noxh n
+        JOIN bldg b ON n.phase = 'hien_trang'
+         AND ST_Intersects(n.geom, ST_SetCRS(ST_Point(b.x, b.y), 'EPSG:4326'))
+    """).fetchall()
+    by_i = {}
+    used = set()
+    for i, bid, area, ward in hits:
+        used.add(bid)
+        rec = by_i.setdefault(i, {'area': 0.0, 'n': 0, 'wards': {}})
+        rec['area'] += float(area or 0)
+        rec['n'] += 1
+        rec['wards'][ward] = rec['wards'].get(ward, 0.0) + float(area or 0)
+    seen = set(KNOWN_ID.values())
+    candidates = []
+    plan = []
+    for i, row in enumerate(rows):
+        name = (row.get('ten') or '').strip()
+        phase = (row.get('trang_thai') or '').strip()
+        info = loc.get(i)
+        if not info:
+            log(f'không định vị được {name}')
+            continue
+        ward, lng, lat, gj = info
+        ward = ward or ''
+        geom = json.loads(gj) if gj else None
+        uncertain = uncertain_row(row)
+        area_ha = fnum(row.get('dien_tich_ha'))
+        floors = fnum(row.get('tang'))
+        units = fnum(row.get('so_can'))
+        residents = fnum(row.get('dan_so'))
+        floors_i = int(floors) if floors and floors > 0 else None
+        units_i = int(round(units)) if units and units > 0 else None
+        residents_i = int(round(residents)) if residents and residents > 0 else None
+        pid = KNOWN_ID.get(name) or plan_id(name, seen)
+        point = {
+            'id': pid,
+            'name': name[:120],
+            'lat': round(float(lat), 6),
+            'lng': round(float(lng), 6),
+            'ward': ward,
+            'floors': floors_i,
+            'siteHa': area_ha,
+            'detail': (row.get('mo_ta') or '').strip(),
+            'uncertain': uncertain,
+            'geometry': geom,
+            'status': phase,
+        }
+        if phase == 'quy_hoach':
+            plan.append({
+                **point,
+                'units': units_i,
+                'plannedPop': residents_i,
+            })
+            continue
+        use_units = None if uncertain else units_i
+        use_residents = None if uncertain else residents_i
+        foot = by_i.get(i) or {}
+        if foot.get('wards'):
+            log(f"{pid}: {foot['n']} dấu chân trong ranh, {round(foot['area'])} m², {foot['wards']}")
+        candidates.append({
+            **point,
+            'units': use_units,
+            'residents': use_residents,
+            'footprint': round(foot['area']) if foot.get('area') else None,
+            'signals': {'noxh'},
+            'source': 'noxh',
+            'members': 1,
+        })
+    log(f'NOXH hiện trạng {len(candidates)}, quy hoạch {len(plan)}, dấu chân trả về nhà thấp tầng trừ {len(used)}')
+    return candidates, used, plan
 
 
 def connect():
@@ -68,17 +210,6 @@ def vn_int(n):
     if n is None or not math.isfinite(float(n)):
         return '—'
     return f'{int(math.floor(float(n) + 0.5)):,}'.replace(',', '.')
-
-
-def levels_of(tags):
-    raw = str((tags or {}).get('building:levels') or '').split(';')[0].strip().replace(',', '.')
-    try:
-        n = float(raw)
-    except ValueError:
-        return None
-    if not math.isfinite(n) or n <= 0 or n > 80:
-        return None
-    return int(math.floor(n + 0.5))
 
 
 def sample_dem(x, y):
@@ -139,25 +270,6 @@ def served(x, y, ward, facs, same):
     return hit
 
 
-def confidence(signals):
-    score = 0
-    if 'osm_apt' in signals and 'osm_levels' in signals:
-        score += 2
-    elif 'osm_apt' in signals or ('osm_res' in signals and 'osm_levels' in signals):
-        score += 1
-    if 'gba' in signals and ('cad' in signals or 'lot_apt' in signals or 'lot_high' in signals):
-        score += 1
-    elif 'gba' in signals and 'lot_mix' in signals:
-        score += 0
-    if 'lot_apt' in signals or 'lot_high' in signals:
-        score += 1
-    if score >= 2:
-        return 'high'
-    if score == 1:
-        return 'medium'
-    return 'low'
-
-
 def pop_of(floors, units, residents, footprint, cfg=None):
     cfg = cfg or {}
     hh = float(cfg.get('hhSize', HH))
@@ -199,247 +311,17 @@ def main():
     n_res = con.execute('SELECT count(*) FROM bldg').fetchone()[0]
     log(f'nhà ở {n_res}')
 
-    log('thửa đất ở')
-    cad = os.path.join(TMP, 'cad-res.jsonl')
-    con.execute(f"""
-        CREATE TABLE cad AS
-        SELECT ST_MakeValid(ST_SetCRS(ST_GeomFromGeoJSON(to_json(geometry)::VARCHAR), 'EPSG:4326')) AS geom
-        FROM read_ndjson('{cad}', columns={{'l': 'VARCHAR', 'geometry': 'JSON'}}, ignore_errors=true)
-        WHERE regexp_matches(upper(l), '{RES_RE}')
-    """)
-    con.execute(f"""
-        CREATE TABLE tall AS
-        SELECT * FROM bldg WHERE area_m2 >= {MIN_M2} AND cls = 3
-    """)
-    log(f"dấu chân rất cao ≥ {int(MIN_M2)} m²: {con.execute('SELECT count(*) FROM tall').fetchone()[0]}")
-    con.execute("""
-        CREATE TABLE cad_hit AS
-        SELECT DISTINCT t.id
-        FROM tall t
-        JOIN cad c ON ST_Intersects(c.geom, ST_SetCRS(ST_Point(t.x, t.y), 'EPSG:4326'))
-    """)
-    con.execute('DROP TABLE cad')
-    log(f"trên thửa ODT/ONT {con.execute('SELECT count(*) FROM cad_hit').fetchone()[0]}")
+    log('danh sách nhà ở xã hội')
+    candidates, used_tall, plan_items = load_noxh(con)
+    os.makedirs(OUT_DIR, exist_ok=True)
+    with open(os.path.join(OUT_DIR, 'noxh-plan.json'), 'w', encoding='utf-8') as handle:
+        json.dump({
+            'v': 1,
+            'note': 'Nhà ở xã hội chưa hoàn thành. Không tính vào dân hiện trạng. Chung cư thương mại thêm ở tab Chung cư hoặc giữ trong apartments.json với source sheet, manual hoặc thuongmai.',
+            'items': plan_items
+        }, handle, ensure_ascii=False, separators=(',', ':'))
+    log(f'hiện trạng {len(candidates)}, quy hoạch {len(plan_items)}')
 
-    log('lô quy hoạch')
-    con.execute(f"""
-        CREATE TABLE lots AS
-        SELECT k, layer, name,
-               ST_MakeValid(ST_SetCRS(geom, 'EPSG:4326')) AS geom
-        FROM ST_Read('{os.path.join(TMP, 'lots-use.geojson')}')
-    """)
-    rows = con.execute('SELECT k, layer, name FROM lots').fetchall()
-    kinds = [(k, lot_kind(layer, name)) for k, layer, name in rows]
-    kinds = [r for r in kinds if r[1]]
-    con.execute('CREATE TABLE lot_kind (k VARCHAR, kind VARCHAR)')
-    if kinds:
-        con.executemany('INSERT INTO lot_kind VALUES (?, ?)', kinds)
-    log(f'lô có chữ chung cư / cao tầng / hỗn hợp {len(kinds)}')
-    con.execute("""
-        CREATE TABLE lot_hit AS
-        SELECT id, kind, lot_name, k FROM (
-            SELECT t.id, lk.kind, l.name AS lot_name, l.k,
-                   row_number() OVER (PARTITION BY t.id ORDER BY ST_Area(l.geom)) AS rn
-            FROM tall t
-            JOIN lots l ON ST_Intersects(l.geom, ST_SetCRS(ST_Point(t.x, t.y), 'EPSG:4326'))
-            JOIN lot_kind lk ON lk.k = l.k
-        ) WHERE rn = 1
-    """)
-
-    named = con.execute("""
-        SELECT l.k, l.layer, l.name,
-               ST_X(ST_Centroid(l.geom)), ST_Y(ST_Centroid(l.geom)),
-               ST_Area(l.geom) * 111320.0 * (111320.0 * cos(radians(ST_Y(ST_Centroid(l.geom)))))
-        FROM lots l JOIN lot_kind lk ON lk.k = l.k
-        WHERE lk.kind IN ('apt', 'high')
-    """).fetchall()
-    log(f'lô đặt tên chung cư hoặc đất ở cao tầng {len(named)}')
-
-    tall_rows = con.execute("""
-        SELECT t.id, t.ward, t.pop, t.area_m2, t.cls, t.x, t.y, t.wb,
-               c.id IS NOT NULL, h.kind, h.lot_name, h.k
-        FROM tall t
-        LEFT JOIN cad_hit c ON c.id = t.id
-        LEFT JOIN lot_hit h ON h.id = t.id
-    """).fetchall()
-
-    osm_path = os.path.join(TMP, 'osm-apt.json')
-    osm_raw = json.load(open(osm_path, encoding='utf-8')) if os.path.exists(osm_path) else {'elements': []}
-    osm_pts = []
-    for el in osm_raw.get('elements') or []:
-        tags = el.get('tags') or {}
-        b = tags.get('building') or ''
-        if b not in ('apartments', 'residential'):
-            continue
-        lv = levels_of(tags)
-        if b == 'residential' and (lv is None or lv < 5):
-            continue
-        center = el.get('center') or {}
-        lat, lng = center.get('lat'), center.get('lon')
-        if lat is None or lng is None:
-            continue
-        osm_pts.append({
-            'lng': float(lng), 'lat': float(lat), 'levels': lv, 'building': b,
-            'name': tags.get('name:vi') or tags.get('name') or ''
-        })
-    log(f'OSM {len(osm_pts)}')
-    if osm_pts:
-        con.execute('CREATE TABLE osm (i INTEGER, x DOUBLE, y DOUBLE)')
-        con.executemany('INSERT INTO osm VALUES (?, ?, ?)', [(i, p['lng'], p['lat']) for i, p in enumerate(osm_pts)])
-        hit = dict(con.execute("""
-            SELECT i, name FROM (
-                SELECT o.i, w.name,
-                       row_number() OVER (PARTITION BY o.i ORDER BY w.name) AS rn
-                FROM osm o
-                JOIN wards w ON ST_Intersects(w.geom, ST_SetCRS(ST_Point(o.x, o.y), 'EPSG:4326'))
-            ) WHERE rn = 1
-        """).fetchall())
-        for i, p in enumerate(osm_pts):
-            p['ward'] = hit.get(i) or ''
-    osm_pts = [p for p in osm_pts if p.get('ward')]
-    log(f'OSM trong ranh phường {len(osm_pts)}')
-
-    # Gán OSM vào lô đặt tên hoặc dấu chân gần nhất
-    tall_xy = np.array([[r[5], r[6]] for r in tall_rows], dtype='float64') if tall_rows else np.zeros((0, 2))
-
-    def near_tall(lng, lat, meters):
-        if not len(tall_xy):
-            return []
-        cos = math.cos(math.radians(lat))
-        dx = (tall_xy[:, 0] - lng) * M_PER_DEG * cos
-        dy = (tall_xy[:, 1] - lat) * M_PER_DEG
-        return np.flatnonzero(dx * dx + dy * dy <= meters * meters).tolist()
-
-    used_tall = set()
-    candidates = []
-
-    def add(rec):
-        candidates.append(rec)
-
-    # Lô đặt tên: một ứng viên, gom dấu chân rất cao bên trong
-    named_ids = {r[0] for r in named}
-    inside = {}
-    if named_ids:
-        q = con.execute("""
-            SELECT h.k, t.id FROM lot_hit h
-            JOIN tall t ON t.id = h.id
-            WHERE h.kind IN ('apt', 'high')
-        """).fetchall()
-        for k, bid in q:
-            inside.setdefault(k, []).append(bid)
-    by_id = {r[0]: r for r in tall_rows}
-    for k, layer, name, x, y, area in named:
-        ids = inside.get(k) or []
-        for bid in ids:
-            used_tall.add(bid)
-        members = [by_id[i] for i in ids if i in by_id]
-        footprint = sum(m[3] for m in members) if members else float(area or 0)
-        ward = members[0][1] if members else ''
-        if not ward:
-            w = con.execute(
-                "SELECT name FROM wards WHERE ST_Intersects(geom, ST_SetCRS(ST_Point(?, ?), 'EPSG:4326')) LIMIT 1",
-                [float(x), float(y)]
-            ).fetchone()
-            ward = w[0] if w else ''
-        if not ward:
-            continue
-        signals = {'lot_apt' if lot_kind(layer, name) == 'apt' else 'lot_high', 'name'}
-        if members:
-            signals.add('gba')
-            if any(m[8] for m in members):
-                signals.add('cad')
-        lx, ly = (members[0][5], members[0][6]) if members else (float(x), float(y))
-        # OSM gần tâm lô
-        for p in osm_pts:
-            if p.get('used'):
-                continue
-            if p['ward'] != ward:
-                continue
-            cos = math.cos(math.radians(ly))
-            if ((p['lng'] - lx) * M_PER_DEG * cos) ** 2 + ((p['lat'] - ly) * M_PER_DEG) ** 2 <= CLUSTER_M ** 2:
-                p['used'] = True
-                p['lot'] = k
-                signals.add('osm_apt' if p['building'] == 'apartments' else 'osm_res')
-                if p['levels'] and p['levels'] >= 5:
-                    signals.add('osm_levels')
-        floors = max((p['levels'] for p in osm_pts if p.get('lot') == k and p.get('levels')), default=None)
-        add({
-            'name': (name or layer or 'Chung cư').split(' – ')[0].strip()[:80],
-            'lat': ly, 'lng': lx, 'ward': ward,
-            'floors': floors, 'units': None, 'residents': None,
-            'footprint': round(footprint),
-            'signals': signals,
-            'source': 'quyhoach',
-            'members': len(members) or 1
-        })
-
-    # OSM chưa gán
-    for p in osm_pts:
-        if p.get('used'):
-            continue
-        p['used'] = True
-        idxs = [i for i in near_tall(p['lng'], p['lat'], CLUSTER_M) if tall_rows[i][0] not in used_tall and tall_rows[i][1] == p['ward']]
-        members = []
-        for i in idxs:
-            used_tall.add(tall_rows[i][0])
-            members.append(tall_rows[i])
-        signals = {'osm_apt' if p['building'] == 'apartments' else 'osm_res'}
-        if p['levels'] and p['levels'] >= 5:
-            signals.add('osm_levels')
-        if members:
-            signals.add('gba')
-            if any(m[8] for m in members):
-                signals.add('cad')
-            kind = next((m[9] for m in members if m[9]), '')
-            if kind == 'apt':
-                signals.add('lot_apt')
-            elif kind == 'high':
-                signals.add('lot_high')
-            elif kind == 'mix':
-                signals.add('lot_mix')
-        footprint = sum(m[3] for m in members) if members else 0
-        add({
-            'name': (p['name'] or 'Chung cư OSM')[:80],
-            'lat': p['lat'], 'lng': p['lng'], 'ward': p['ward'],
-            'floors': p['levels'], 'units': None, 'residents': None,
-            'footprint': round(footprint) if footprint else None,
-            'signals': signals,
-            'source': 'osm',
-            'members': len(members) or 1
-        })
-
-    # Dấu chân còn lại: chỉ khi có thửa đất ở hoặc lô đúng loại
-    for r in tall_rows:
-        if r[0] in used_tall:
-            continue
-        cad = bool(r[8])
-        kind = r[9] or ''
-        if not cad and not kind:
-            continue
-        signals = {'gba'}
-        if cad:
-            signals.add('cad')
-        if kind == 'apt':
-            signals.add('lot_apt')
-        elif kind == 'high':
-            signals.add('lot_high')
-        elif kind == 'mix':
-            signals.add('lot_mix')
-        label = (r[10] or '').split(' – ')[0].strip()
-        if not label:
-            label = 'Khối nhà ở rất cao' if cad else 'Khối trên lô hỗn hợp'
-        add({
-            'name': label[:80],
-            'lat': r[6], 'lng': r[5], 'ward': r[1],
-            'floors': None, 'units': None, 'residents': None,
-            'footprint': round(r[3]),
-            'signals': signals,
-            'source': 'gba',
-            'members': 1,
-            'bid': r[0]
-        })
-
-    log(f'ứng viên {len(candidates)}')
 
     # Cao độ và vùng phục vụ của ứng viên
     ax = np.array([c['lng'] for c in candidates], dtype='float64')
@@ -454,10 +336,15 @@ def main():
 
     items = []
     for i, c in enumerate(candidates):
-        conf = confidence(c['signals'])
         people, how = pop_of(c['floors'], c['units'], c['residents'], c['footprint'])
+        if how == 'dan':
+            evidence = 'Danh sách nhà ở xã hội đã hoàn thành, có dân số.'
+        elif how == 'can':
+            evidence = 'Danh sách nhà ở xã hội đã hoàn thành. Bảng không có dân số, tính số căn × 3,3 người/hộ.'
+        else:
+            evidence = 'Danh sách nhà ở xã hội đã hoàn thành. Chưa có dân số và số căn.'
         items.append({
-            'id': f'CC{i+1:04d}',
+            'id': c['id'],
             'name': c['name'],
             'lat': round(float(c['lat']), 6),
             'lng': round(float(c['lng']), 6),
@@ -466,6 +353,10 @@ def main():
             'units': c['units'],
             'residents': c['residents'],
             'footprint': c['footprint'],
+            'siteHa': c.get('siteHa'),
+            'detail': c.get('detail') or '',
+            'uncertain': bool(c.get('uncertain')),
+            'geometry': c.get('geometry'),
             'elev': None if not math.isfinite(float(elev[i])) else int(bins[i]),
             'school': bool(catch['school'][i]),
             'health': bool(catch['health'][i]),
@@ -474,14 +365,16 @@ def main():
             'healthX': bool(catch['healthX'][i]),
             'parkX': bool(catch['parkX'][i]),
             'source': c['source'],
-            'confidence': conf,
-            'verified': False,
+            'status': 'hien_trang',
+            'confidence': 'high',
+            'verified': True,
+            'evidence': evidence,
             'signals': sorted(c['signals']),
             'pop': round(people),
             'how': how
         })
 
-    # Trọng số nhà thấp tầng = nhà ở trừ các dấu chân đã gán vào ứng viên có tín hiệu gba
+    # Chỉ dấu chân nằm trong ranh NOXH đã hoàn thành rời khỏi nhà thấp tầng.
     apt_bids = set(used_tall)
     for c in candidates:
         if c.get('bid'):
@@ -497,7 +390,7 @@ def main():
     bw = np.array([r[5] for r in b], dtype='float64')
     apt_arr = np.fromiter(apt_bids, dtype='int64', count=len(apt_bids)) if apt_bids else np.zeros(0, dtype='int64')
     keep = ~np.isin(bid, apt_arr)
-    log(f'bỏ {int((~keep).sum())} dấu chân đã tính là chung cư')
+    log(f'bỏ {int((~keep).sum())} dấu chân trong ranh NOXH đã hoàn thành')
     belev = sample_dem(bx, by)
     bbin = elev_bin(belev)
 
@@ -515,7 +408,27 @@ def main():
     pelev = sample_dem(px, py)
     pbin = elev_bin(pelev)
 
-    ward_names = sorted(set(bward.tolist()) | set(c['ward'] for c in items))
+    old_path = os.path.join(OUT_DIR, 'apartments.json')
+    if os.path.exists(old_path):
+        try:
+            old_items = json.load(open(old_path, encoding='utf-8')).get('items') or []
+        except (OSError, json.JSONDecodeError):
+            old_items = []
+        have = {it['id'] for it in items}
+        kept = []
+        for it in old_items:
+            if it.get('source') not in KEEP_SOURCE or it.get('status') == 'quy_hoach' or it.get('id') in have:
+                continue
+            people, how = pop_of(it.get('floors'), it.get('units'), it.get('residents'), it.get('footprint'))
+            it['pop'] = round(people)
+            it['how'] = how
+            it['status'] = it.get('status') or 'hien_trang'
+            kept.append(it)
+        if kept:
+            log(f'giữ {len(kept)} chung cư bổ sung (sheet/manual)')
+            items.extend(kept)
+
+    ward_names = sorted(set(bward.tolist()) | set(c['ward'] for c in items if c.get('ward')))
     wards_out = []
     warns = []
     for name in ward_names:
@@ -576,23 +489,21 @@ def main():
         row['flood5'] = round(remain * flood_w / low_w + apt_f) if low_w > 0 else round(apt_f)
         wards_out.append(row)
 
-    items.sort(key=lambda it: (-{'high': 3, 'medium': 2, 'low': 1}[it['confidence']], -it['pop'], it['ward']))
-    for i, it in enumerate(items):
-        it['id'] = f'CC{i+1:04d}'
+    items.sort(key=lambda it: (-it['pop'], it['ward'], it['id']))
 
     pack = {
-        'v': 1,
+        'v': 2,
         'hhSize': HH,
         'm2PerPerson': M2_PERSON,
         'efficiency': EFF,
-        'minM2': MIN_M2,
+        'note': 'Hiện trạng chỉ gồm nhà ở xã hội đã hoàn thành. Thêm chung cư thương mại ở tab Chung cư, hoặc trong file này với source sheet, manual hoặc thuongmai — lần chạy script sau giữ các dòng đó.',
         'items': items
     }
     weights = {
         'v': 1,
         'dem': 'Copernicus GLO-30',
         'floodM': FLOOD_M,
-        'note': 'Trọng số nhà thấp tầng = diện tích dấu chân nhà ở × (bậc tương đối + 1), đã bỏ dấu chân gán cho chung cư. Dân pixel cũ là WorldPop 2020 chia đều trong phường, chỉ để so sánh.',
+        'note': 'Trọng số nhà thấp tầng = diện tích dấu chân nhà ở × (bậc tương đối + 1), đã bỏ dấu chân nằm trong ranh nhà ở xã hội đã hoàn thành. Khu quy hoạch không trừ. Dân pixel cũ là WorldPop 2020 chia đều trong phường, chỉ để so sánh.',
         'wards': wards_out
     }
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -674,9 +585,9 @@ def main():
         faq.append({
             'id': 'pop-apt-ward',
             'q': 'Phường, xã nào có dân chung cư ước tính cao nhất?',
-            'a': f"{apt_best['name']}: khoảng {vn_int(apt_best['aptPop'])} người trong {apt_best['apt']} chung cư ứng viên.",
+            'a': f"{apt_best['name']}: khoảng {vn_int(apt_best['aptPop'])} người trong {apt_best['apt']} chung cư hiện trạng.",
             'wards': [apt_best['name']],
-            'source': 'Danh sách ứng viên. Dân biết trước, không thì số căn × 3,3, không thì số tầng × dấu chân × 0,75 / 25 m².'
+            'source': 'Nhà ở xã hội đã hoàn thành. Có dân số thì dùng dân số, không thì số căn × 3,3.'
         })
     with open(os.path.join(OUT_DIR, 'pop-faq.json'), 'w', encoding='utf-8') as f:
         json.dump({'v': 1, 'questions': faq}, f, ensure_ascii=False, indent=2)
@@ -700,15 +611,15 @@ def main():
     lines = [
         '# Chung cư và phân bổ dân số phương pháp B',
         '',
-        f'- Ứng viên: **{len(items)}** (cao {by_conf.get("high", 0)}, vừa {by_conf.get("medium", 0)}, thấp {by_conf.get("low", 0)}).',
-        f'- Đã xác minh trên sheet: **{verified}**. Có số dân ước tính: **{estimated}**. Thiếu số tầng nên chưa tính dân: **{missing}**.',
-        f'- Dân chung cư ước tính toàn thành phố: **{vn_int(city_apt)}** / dân số hành chính **{vn_int(city_pop)}**.',
+        f'- Chung cư hiện trạng: **{len(items)}** (cao {by_conf.get("high", 0)}, vừa {by_conf.get("medium", 0)}, thấp {by_conf.get("low", 0)}).',
+        f'- Đã xác minh: **{verified}**. Có số dân: **{estimated}**. Chưa đủ số để tính dân: **{missing}**.',
+        f'- Dân chung cư toàn thành phố: **{vn_int(city_apt)}** / dân số hành chính **{vn_int(city_pop)}**.',
         f'- Phường bị trừ về 0 vì chung cư vượt dân số: **{len(warns)}**.',
-        f'- Dân dưới 5 m: mới **{vn_int(city_flood)}**, pixel WorldPop **{vn_int(city_old_flood)}**. Chênh này là cách chia theo sàn nhà ở so với pixel, không phải do 261 người chung cư.',
+        f'- Dân dưới 5 m: mới **{vn_int(city_flood)}**, pixel WorldPop **{vn_int(city_old_flood)}**.',
         '',
-        'Dân chung cư: số dân đã biết, không thì số căn × 3,3 người/hộ, không thì số tầng × dấu chân × 0,75 / 25 m²/người. Phần còn lại của phường chia cho nhà ở thấp tầng theo diện tích dấu chân × bậc chiều cao tương đối. Không suy số tầng từ bậc chiều cao tương đối.',
+        'Dân chung cư hiện trạng: dân số trong bảng nếu có, không thì số căn × 3,3 người/hộ. Nhà ở xã hội chưa hoàn thành không trừ. Phần còn lại của phường chia cho nhà thấp tầng theo diện tích dấu chân × bậc chiều cao tương đối.',
         '',
-        'Ứng viên đã có tên hoặc đã tính được dân:',
+        'Chung cư hiện trạng:',
         '',
     ]
     for it in named:

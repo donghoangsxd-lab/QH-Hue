@@ -58,4 +58,13 @@ const flood = floodPopulation(5);
 assert(Math.round(flood.pop) === 580, 'ngập: 700 × 0,4 + chung cư cao độ 3');
 assert(flood.wards[0].name === 'P', 'có phường');
 
+setPopData({
+  items: [
+    { id: 'H', ward: 'P', units: 10, status: 'hien_trang' },
+    { id: 'Q', ward: 'P', units: 100, status: 'quy_hoach' }
+  ]
+}, { wards: [{ name: 'P', pop: 1000, lowW: 100, bins: [[2, 100]], schoolW: 0, healthW: 0, parkW: 0, schoolX: 0, healthX: 0, parkX: 0 }] });
+const onlyNow = wardSplit('P');
+assert(Math.round(onlyNow.apt) === 33 && onlyNow.remain === 967, 'quy hoạch không tính vào dân hiện trạng');
+
 console.log('apartments: ok');

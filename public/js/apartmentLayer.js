@@ -13,18 +13,25 @@ import {
 
 const $ = (id) => document.getElementById(id);
 const CONF = { high: 'Cao', medium: 'Vừa', low: 'Thấp' };
+const SOURCE = { noxh: 'Danh sách nhà ở xã hội', sheet: 'Tab Chung cư', manual: 'Bổ sung', thuongmai: 'Chung cư thương mại' };
+const EXIST_STYLE = { color: '#ddd6fe', weight: 2, fillColor: '#6d28d9', fillOpacity: 0.35 };
+const PLAN_STYLE = { color: '#fbbf24', weight: 2, dashArray: '6 4', fillColor: '#f59e0b', fillOpacity: 0.16 };
 
 let on = false;
+let planOn = false;
 let groupL = null;
 let groupR = null;
+let planL = null;
+let planR = null;
 let loaded = false;
+let planItems = [];
 
 function isAdmin() {
   return state.currentUserRole === 'ADMIN' && !!state.authToken;
 }
 
-function icon(conf) {
-  const tone = conf === 'high' ? '#6d28d9' : conf === 'medium' ? '#7c3aed' : '#a78bfa';
+function icon(conf, plan) {
+  const tone = plan ? '#b45309' : conf === 'high' ? '#6d28d9' : conf === 'medium' ? '#7c3aed' : '#a78bfa';
   return L.divIcon({
     className: 'apt-pin',
     html: `<span style="background:${tone}"><svg class="ico"><use href="#i-floors"/></svg></span>`,
@@ -38,14 +45,17 @@ function popupHtml(it) {
   const people = row.how === 'thieu' ? 'Chưa tính được' : `${Math.round(row.pop).toLocaleString('vi-VN')} người`;
   const bits = [
     ['Phường, xã', it.ward],
+    ['Tình trạng', it.detail || 'Đã hoàn thành'],
+    ['Căn cứ', it.evidence || ''],
+    ['Nguồn', SOURCE[it.source] || it.source],
     ['Độ tin cậy', CONF[it.confidence] || it.confidence],
-    ['Nguồn', it.source],
-    ['Dấu chân', it.footprint ? `${Math.round(it.footprint).toLocaleString('vi-VN')} m²` : ''],
+    ['Diện tích khu', it.siteHa ? `${it.siteHa} ha` : ''],
+    ['Dấu chân nhà', it.footprint ? `${Math.round(it.footprint).toLocaleString('vi-VN')} m²` : ''],
     ['Số tầng', it.floors || ''],
     ['Số căn', it.units || ''],
     ['Dân đã ghi', it.residents || ''],
     ['Cách tính', howLabel(row.how)],
-    ['Xác minh', it.verified ? 'Đã xác minh' : 'Ứng viên']
+    ['Xác minh', it.verified ? 'Đã xác minh' : 'Chưa xác minh']
   ].filter((pair) => pair[1]);
   const edit = isAdmin() ? `<form class="apt-edit" data-apt="${escapeHtml(it.id)}">
       <label>Số tầng <input name="floors" type="number" min="1" max="80" value="${it.floors || ''}"></label>
@@ -58,6 +68,15 @@ function popupHtml(it) {
     <dl>${bits.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl>${edit}</div>`;
 }
 
+function addSite(group, it, style, html, plan) {
+  if (it.geometry) {
+    group.addLayer(L.geoJSON(it.geometry, { style, bubblingMouseEvents: false }).bindPopup(html, { maxWidth: 300 }));
+  }
+  if (!Number.isFinite(it.lat) || !Number.isFinite(it.lng)) return;
+  const opt = { icon: icon(it.confidence, plan), bubblingMouseEvents: false };
+  group.addLayer(L.marker([it.lat, it.lng], opt).bindPopup(html, { maxWidth: 300 }));
+}
+
 function draw() {
   groupL?.remove();
   groupR?.remove();
@@ -65,21 +84,53 @@ function draw() {
   groupR = L.layerGroup();
   if (!on) return;
   popItems().forEach(it => {
-    if (!Number.isFinite(it.lat) || !Number.isFinite(it.lng)) return;
-    const opt = { icon: icon(it.confidence), bubblingMouseEvents: false };
-    const left = L.marker([it.lat, it.lng], opt).bindPopup(() => popupHtml(it), { maxWidth: 280 });
-    const right = L.marker([it.lat, it.lng], opt).bindPopup(() => popupHtml(it), { maxWidth: 280 });
-    groupL.addLayer(left);
-    groupR.addLayer(right);
+    const html = () => popupHtml(it);
+    addSite(groupL, it, EXIST_STYLE, html, false);
+    addSite(groupR, it, EXIST_STYLE, html, false);
   });
   if (map) groupL.addTo(map);
   if (planMap) groupR.addTo(planMap);
 }
 
+function planHtml(it) {
+  const bits = [
+    ['Phường, xã', it.ward],
+    ['Tình trạng', it.detail || 'Quy hoạch'],
+    ['Diện tích', it.siteHa ? `${it.siteHa} ha` : ''],
+    ['Số tầng', it.floors || ''],
+    ['Số căn', it.units || ''],
+    ['Dân số ghi trong bảng', it.plannedPop || '']
+  ].filter((pair) => pair[1]);
+  const warn = it.uncertain ? '<p>Số liệu chưa chắc vì cột trong bảng gốc bị lệch.</p>' : '';
+  return `<div class="apt-pop"><b>${escapeHtml(it.name || 'Nhà ở xã hội')}</b><div class="apt-pop-n">Quy hoạch — không tính dân hiện trạng</div>
+    ${warn}<dl>${bits.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}</dl></div>`;
+}
+
+function drawPlan() {
+  planL?.remove();
+  planR?.remove();
+  planL = L.layerGroup();
+  planR = L.layerGroup();
+  if (!planOn) return;
+  planItems.forEach(it => {
+    const html = () => planHtml(it);
+    addSite(planL, it, PLAN_STYLE, html, true);
+    addSite(planR, it, PLAN_STYLE, html, true);
+  });
+  if (map) planL.addTo(map);
+  if (planMap) planR.addTo(planMap);
+}
+
 function summaryText() {
   const s = cityApartmentSummary();
   const warns = s.warns.length ? ` Cảnh báo vượt dân số: ${s.warns.join(', ')}.` : '';
-  return `${s.n} ứng viên, ${s.verified} đã xác minh, ${s.estimated} có số dân, ${s.missing} còn thiếu số tầng.${warns}`;
+  return `${s.n} chung cư hiện trạng, khoảng ${Math.round(s.apt).toLocaleString('vi-VN')} người.${warns}`;
+}
+
+function planSummaryText() {
+  const unsure = planItems.filter(it => it.uncertain).length;
+  const tail = unsure ? ` ${unsure} khu có số liệu chưa chắc.` : '';
+  return `${planItems.length} khu chưa hoàn thành, không tính vào dân hiện trạng.${tail}`;
 }
 
 function paintBox() {
@@ -89,6 +140,12 @@ function paintBox() {
   if (hint) hint.textContent = loaded ? '' : '';
   const sum = $('aptSummary');
   if (sum) sum.textContent = on && loaded ? summaryText() : '';
+  const planBox = $('noxhPlanBox');
+  if (planBox) planBox.style.display = planOn ? '' : 'none';
+  const planSum = $('noxhPlanSummary');
+  if (planSum) planSum.textContent = planOn && loaded ? planSummaryText() : '';
+  const planHint = $('noxhPlanHint');
+  if (planHint) planHint.textContent = loaded && planItems.length ? `(${planItems.length})` : '';
   const admin = $('aptAdmin');
   if (admin) admin.hidden = !isAdmin();
   const mode = $('aptMethod');
@@ -114,6 +171,8 @@ function readCfg() {
 
 async function load() {
   const seed = await fetch('data/gba/apartments.json').then(r => (r.ok ? r.json() : Promise.reject(new Error('seed')))).catch(() => null);
+  const plan = await fetch('data/gba/noxh-plan.json').then(r => (r.ok ? r.json() : null)).catch(() => null);
+  planItems = (plan && plan.items) || [];
   const weights = await fetch('data/gba/pop-b.json').then(r => (r.ok ? r.json() : null)).catch(() => null);
   const faq = await fetch('data/gba/pop-faq.json').then(r => (r.ok ? r.json() : null)).catch(() => null);
   let items = (seed && seed.items) || [];
@@ -132,6 +191,7 @@ async function load() {
   loaded = true;
   paintBox();
   if (on) draw();
+  if (planOn) drawPlan();
 }
 
 async function saveItem(it) {
@@ -183,26 +243,35 @@ export function initApartmentLayer() {
     else draw();
     paintBox();
   });
+  $('chk_noxhPlan')?.addEventListener('change', (e) => {
+    planOn = !!e.target.checked;
+    if (planOn && !loaded) load().then(drawPlan);
+    else drawPlan();
+    paintBox();
+  });
   $('aptMethod')?.addEventListener('change', (e) => {
     if (!isAdmin()) return;
     setPopMethod(e.target.value);
   });
   ['aptHh', 'aptM2', 'aptEff'].forEach(id => $(id)?.addEventListener('change', readCfg));
-  $('btnPopNha')?.addEventListener('click', async () => {
+  async function askIngest(rebuild) {
     const status = $('popNhaStatus');
-    if (status) status.textContent = 'Đang hỏi máy chủ…';
+    if (status) status.textContent = rebuild ? 'Đang nạp lại từ CSV trên bucket…' : 'Đang hỏi máy chủ…';
     try {
-      const data = await postAdmin('ingestPopNha', {});
+      const data = await postAdmin('ingestPopNha', rebuild ? { rebuild: true } : {});
       if (status) status.textContent = data.message || data.state || 'Đã gửi.';
     } catch (err) {
       if (status) status.textContent = err.message || 'Chưa nạp được raster nhà ở.';
     }
-  });
+  }
+  $('btnPopNha')?.addEventListener('click', () => askIngest(false));
+  $('btnPopNhaRebuild')?.addEventListener('click', () => askIngest(true));
   document.addEventListener('submit', onPopupSubmit);
   document.addEventListener('auth:change', () => {
     if (!isAdmin() && popMethod() === 'old') setPopMethod('b');
     paintBox();
     if (on) draw();
+    if (planOn) drawPlan();
   });
   window.addEventListener(POP_METHOD_EVENT, paintBox);
   load().catch(() => { /* file seed thiếu thì lớp trống */ });

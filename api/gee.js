@@ -950,10 +950,11 @@ function popNhaMessage(rec) {
  * Một nút admin: thiếu CSV thì báo lệnh tải lên; chưa có tác vụ hoặc tác vụ lỗi thì nạp bảng;
  * bảng xong thì xuất ảnh; ảnh xong thì bật asset. Không cộng dân toàn thành phố trong request 60 giây.
  */
-async function advancePopNha() {
+async function advancePopNha(opts = {}) {
   const csv = await popNhaCsvInfo();
   if (!csv.ok) return { saved: true, phase: 'csv', state: 'NEED_CSV', message: csv.message };
   let rec = await readPopNhaTask();
+  if (opts.rebuild && rec && rec.phase === 'ready') rec = null;
   if (rec && rec.phase === 'ready') {
     await loadNha();
     const ready = getGeeContext('b');
@@ -961,7 +962,7 @@ async function advancePopNha() {
       return {
         saved: true, phase: 'ready', state: 'READY', asset: POP_NHA_ASSET, popSource: 'nha',
         people: rec.people || popNhaPeople(),
-        message: 'Asset Pixel-danso-nha đang dùng cho mọi phép đếm dân. Tải lại trang nếu vừa nạp xong.'
+        message: 'Asset Pixel-danso-nha đang dùng cho mọi phép đếm dân. Tải lại trang nếu vừa nạp xong. CSV trên bucket vừa đổi thì bấm Nạp lại từ CSV mới.'
       };
     }
     if (!rec.seenMiss) {
@@ -3402,7 +3403,7 @@ module.exports = async (req, res) => {
       requirePostFromApp(req);
       await requireAdmin(req);
       try {
-        return res.status(200).json(await advancePopNha());
+        return res.status(200).json(await advancePopNha({ rebuild: readJsonBody(req).rebuild === true }));
       } catch (err) {
         console.error('Nạp Pixel-danso-nha lỗi:', err.message);
         return res.status(502).json({ error: true, message: `GEE không nhận tác vụ nạp dân nhà ở: ${err.message}` });
