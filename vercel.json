@@ -5,6 +5,9 @@
   "functions": {
     "api/gee.js": {
       "maxDuration": 60
+    },
+    "api/osmClip.js": {
+      "maxDuration": 30
     }
   },
   "headers": [

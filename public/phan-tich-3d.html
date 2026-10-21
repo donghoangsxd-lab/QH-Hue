@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>Phân tích điểm theo bốn thành phần đô thị</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="css/phan-tich-3d.css">
+</head>
+<body>
+  <aside id="panel">
+    <div class="panel-head">
+      <p class="kicker">Bản mẫu để xem xét</p>
+      <h1>Phân tích điểm theo bốn thành phần đô thị</h1>
+      <p id="place" class="place">Đang xác định vị trí…</p>
+      <div class="switch" role="group" aria-label="Cách xem khối">
+        <button type="button" id="btnTach" aria-pressed="true">Tách lớp</button>
+        <button type="button" id="btnGop" aria-pressed="false">Gộp khối</button>
+      </div>
+    </div>
+    <section>
+      <h2>Bốn lớp</h2>
+      <ul id="legend" class="legend"></ul>
+    </section>
+    <section>
+      <h2>Chỉ số trong vòng tròn</h2>
+      <p id="status" class="status">Đang đọc dấu chân công trình, thửa đất và dữ liệu mở…</p>
+      <ul id="stats" class="stats"></ul>
+    </section>
+    <section>
+      <h2>Phần dữ liệu chưa có</h2>
+      <ul id="gaps" class="gaps"></ul>
+    </section>
+    <p id="src" class="src"></p>
+  </aside>
+  <div id="map" role="region" aria-label="Khối ba chiều">
+    <p id="modeChip">Tách bốn lớp</p>
+  </div>
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/deck.gl@8.9.36/dist.min.js"></script>
+  <script src="https://unpkg.com/@deck.gl/mapbox@8.9.36/dist.min.js"></script>
+  <script type="module" src="js/phanTich3d.js"></script>
+</body>
+</html>
