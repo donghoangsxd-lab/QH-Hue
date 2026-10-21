@@ -3,7 +3,8 @@
 // PDF gồm 3 tầng trong khung bản đồ: ảnh nền (ảnh vệ tinh, heatmap), đối tượng vector vẽ lại từ tọa độ (printVector.js),
 // ảnh icon trong suốt. Lưới, khung, chữ, chú giải là vector.
 // html2canvas không hiểu clip-path → khi so sánh chụp riêng 2 bản đồ rồi ghép theo vị trí thanh trượt.
-import { map } from './mapEngine.js';
+import { map, popLayerMeta } from './mapEngine.js';
+import { popMethod } from './popMethod.js';
 import { planMap, isCompareOn, isSplitOn, alignPlanView } from './planMap.js';
 import { state } from './state.js';
 import { wgs84ToVn2000 } from './cadImport.js';
@@ -547,8 +548,11 @@ function legendRows(s) {
       <div class="pa3-lg-bar pa3-lg-heat"></div><div class="pa3-lg-ticks">${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<span>${n}</span>`).join('')}</div></div>`);
   }
   if (checked('chk_pop')) {
-    ramps.push(`<div class="pa3-lg-ramp"><div class="pa3-lg-ramp-title">Phân bổ dân cư (người / ô 30 m)</div>
-      <div class="pa3-lg-bar pa3-lg-pop"></div><div class="pa3-lg-ticks">${[0, 1, 2, 3, 4, '≥5'].map(n => `<span>${n}</span>`).join('')}</div></div>`);
+    const nha = popMethod() !== 'old' && popLayerMeta.popSource !== 'pixel';
+    const title = nha ? 'Phân bổ dân cư theo nhà ở (người / ô 30 m)' : 'Phân bổ dân cư pixel cũ (so sánh)';
+    const ticks = nha ? [0, 5, 10, 15, 20, '≥30'] : [0, 1, 2, 3, 4, '≥5'];
+    ramps.push(`<div class="pa3-lg-ramp"><div class="pa3-lg-ramp-title">${title}</div>
+      <div class="pa3-lg-bar pa3-lg-pop"></div><div class="pa3-lg-ticks">${ticks.map(n => `<span>${n}</span>`).join('')}</div></div>`);
   }
   const level = levelLegendRows(s);
   const rest = rows.join('') + ramps.join('') + satPrintLegend();

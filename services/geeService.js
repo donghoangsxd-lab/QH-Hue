@@ -7,7 +7,15 @@ let initPromise = null;
 
 // Raster dân cư gốc; sau khi "ghi cố định" thì nền là asset Pixel-danso-hc-… (edits.json › asset)
 const POP_ASSET = "projects/optimistic-yew-488501-s0/assets/Pixel-danso";
+// Dân số nhà ở (phương pháp B): giá trị pixel là số người, cùng lưới 30 m với Pixel-danso sau khi nạp.
+const POP_NHA_ASSET = "projects/optimistic-yew-488501-s0/assets/Pixel-danso-nha";
+const POP_NHA_TABLE = "projects/optimistic-yew-488501-s0/assets/Pixel-danso-nha-diem";
+const POP_NHA_CSV = "gs://hue-infra-data-us/gba/pop-weights.csv";
+const POP_NHA_SCALE_M = 30;
 let popAssetId = POP_ASSET;
+let nhaContext = null;
+let nhaProbeAt = 0;
+const NHA_PROBE_MS = 60 * 1000;
 
 // Lưới đếm pixel có dân của phường. Mọi phép cộng/đếm trên popRasterNormalized phải dùng đúng lưới này:
 // mỗi pixel mang dân số phường / số pixel đếm ở lưới này, cộng ở lưới 30 m gốc sẽ ra gấp ~4 lần.
@@ -52,7 +60,7 @@ function createGeeContext() {
 
             geeBase = { ee, wardVectorParsed, popRaster, wardRegion, wardPopSumImg };
             applyPopEdits(0, []);
-            resolve();
+            loadNha().then(resolve, resolve);
           }, (err) => reject(new Error("GEE Init Fail: " + err)));
         }, 
         (err) => reject(new Error("GEE Auth Fail: " + err))
@@ -133,9 +141,116 @@ function getPopEditsVersion() {
   return popEditsVersion;
 }
 
-function getGeeContext() {
+function getGeeContext(method) {
   if (!geeContext) throw new Error("GEE Context chưa được khởi tạo!");
-  return geeContext;
+  if (method === 'b' && nhaContext) return nhaContext;
+  return {
+    ...geeContext,
+    popScale: POP_SCALE_M,
+    popPeople: false,
+    popSource: 'pixel',
+    popFallback: method === 'b' && !nhaContext
+  };
+}
+
+/** Instance đang chạy thử lại asset nhà ở tối đa mỗi phút, để lần nạp xong không phải chờ tiến trình mới. */
+async function ensureNha(method) {
+  if (method !== 'b') return getGeeContext('old');
+  if (!nhaContext && Date.now() - nhaProbeAt >= NHA_PROBE_MS) await loadNha();
+  return getGeeContext('b');
+}
+
+/** Asset Pixel-danso-nha: mỗi pixel là số người trên lưới 30 m. Thiếu asset thì các phép đếm dùng pixel cũ. */
+async function loadNha() {
+  nhaProbeAt = Date.now();
+  if (!geeBase) return;
+  const { ee, wardVectorParsed, wardRegion } = geeBase;
+  try {
+    const img = ee.Image(POP_NHA_ASSET).select(0).rename('DanSoPixelNormalized');
+    await eeEvaluate(img.bandNames());
+    const masked = img.updateMask(img.gt(0));
+    nhaContext = {
+      ee, wardVectorParsed, wardRegion,
+      popRasterNormalized: masked,
+      popRasterNative: masked,
+      popProjection: img.projection(),
+      popScale: POP_NHA_SCALE_M,
+      popPeople: true,
+      popSource: 'nha',
+      popFallback: false
+    };
+  } catch (err) {
+    nhaContext = null;
+    console.warn('Chưa có asset Pixel-danso-nha:', err && err.message);
+  }
+}
+
+function assetExists(ee, id) {
+  return new Promise(resolve => {
+    ee.data.getAsset(id, (asset, err) => resolve(!err && !!asset));
+  });
+}
+
+function deleteAsset(ee, id) {
+  return new Promise((resolve, reject) => {
+    ee.data.deleteAsset(id, (ok, err) => (err ? reject(new Error(String(err))) : resolve()));
+  });
+}
+
+/**
+ * Nạp bảng điểm nhà ở từ gs://hue-infra-data-us/gba/pop-weights.csv rồi xuất asset Pixel-danso-nha
+ * đúng lưới Pixel-danso. phase = table (đang nạp điểm) hoặc image (đang xuất raster).
+ */
+async function startPopNhaTask(phase) {
+  const { ee, wardVectorParsed } = getGeeContext('old');
+  if (phase === 'table') {
+    if (await assetExists(ee, POP_NHA_TABLE)) await deleteAsset(ee, POP_NHA_TABLE);
+    const taskId = ee.data.newTaskId(1)[0];
+    const response = await new Promise((resolve, reject) => {
+      ee.data.startTableIngestion(taskId, {
+        id: POP_NHA_TABLE,
+        sources: [{
+          primaryPath: POP_NHA_CSV,
+          xColumn: 'longitude',
+          yColumn: 'latitude',
+          crs: 'EPSG:4326'
+        }]
+      }, (res, err) => (err ? reject(new Error(String(err))) : resolve(res || {})));
+    });
+    return { phase: 'table', task: response.taskId || taskId, asset: POP_NHA_TABLE };
+  }
+  if (!(await assetExists(ee, POP_NHA_TABLE))) {
+    const err = new Error('Chưa có bảng điểm trên GEE');
+    err.code = 'NO_TABLE';
+    throw err;
+  }
+  if (await assetExists(ee, POP_NHA_ASSET)) await deleteAsset(ee, POP_NHA_ASSET);
+  const proj = ee.Image(POP_ASSET).projection();
+  const summed = ee.FeatureCollection(POP_NHA_TABLE).reduceToImage({
+    properties: ['people'],
+    reducer: ee.Reducer.sum()
+  }).rename('DanSoPixel');
+  // Ô ~10 m rồi cộng vào đúng lưới 30 m của Pixel-danso để tổng dân không bị nearest-neighbor làm lệch.
+  const aligned = summed.setDefaultProjection({ crs: 'EPSG:4326', scale: 10 })
+    .reduceResolution({ reducer: ee.Reducer.sum(), maxPixels: 1024 })
+    .reproject({ crs: proj });
+  const [projInfo, bounds] = await Promise.all([
+    eeEvaluate(proj),
+    eeEvaluate(wardVectorParsed.geometry().bounds(1))
+  ]);
+  const task = ee.batch.Export.image.toAsset({
+    image: aligned.updateMask(aligned.gt(0)).toFloat(),
+    description: 'QH-Hue_Pixel-danso-nha',
+    assetId: POP_NHA_ASSET,
+    pyramidingPolicy: { '.default': 'mean' },
+    region: ee.Geometry(bounds),
+    crs: projInfo.crs,
+    crsTransform: projInfo.transform,
+    maxPixels: 1e10
+  });
+  await new Promise((resolve, reject) => task.start(resolve, (err) => reject(new Error(String(err)))));
+  if (!task.id) throw new Error('GEE không trả về mã tác vụ');
+  return { phase: 'image', task: task.id, asset: POP_NHA_ASSET };
 }
 
 // evaluate của Earth Engine báo lỗi qua tham số thứ 2 của callback; bọc lại để lỗi không bị nuốt thành số 0
@@ -181,4 +296,7 @@ function getTaskState(taskId) {
   });
 }
 
-module.exports = { initGEE, getGeeContext, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, POP_SCALE_M };
+module.exports = {
+  initGEE, getGeeContext, ensureNha, eeEvaluate, applyPopEdits, getPopEditsVersion, startPopBake, getTaskState, loadNha,
+  startPopNhaTask, POP_SCALE_M, POP_NHA_SCALE_M, POP_NHA_ASSET, POP_NHA_CSV
+};

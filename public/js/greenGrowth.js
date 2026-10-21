@@ -4,6 +4,7 @@
 // Chỉ tiêu có dữ liệu trong webapp được tính ngay (calc); còn lại là khung chờ số liệu báo cáo (GTX_REPORTED).
 // Khu vực đô thị / nội thành = các phường thuộc bộ chỉ tiêu đô thị (profile 'DT', constants.wardProfile).
 import { geeApi } from './api.js';
+import { popQuery } from './popMethod.js';
 import { escapeHtml, fmtNum, ico } from './utils.js';
 import { loadRoadTypeLengths } from './wardRoads.js';
 import { sarSeasons } from './satLayers.js';
@@ -108,18 +109,21 @@ function loadRoads(force = false) {
   return roadsPromise;
 }
 
+const sarKey = (year) => `${year}|${popQuery()}`;
+
 function loadSar(year) {
-  if (!sarPromises.has(year)) {
-    sarPromises.set(year, fetch(geeApi(`action=getSarFloodStats&year=${year}`))
+  const key = sarKey(year);
+  if (!sarPromises.has(key)) {
+    sarPromises.set(key, fetch(geeApi(`action=getSarFloodStats&year=${year}&pop=${encodeURIComponent(popQuery())}`))
       .then(async r => {
         const d = await r.json().catch(() => null);
         if (!r.ok || !d || !Array.isArray(d.wards)) throw new Error((d && d.message) || `HTTP ${r.status}`);
-        sarResults.set(year, d);
+        sarResults.set(key, d);
         return d;
       })
-      .catch(err => { sarPromises.delete(year); throw err; }));
+      .catch(err => { sarPromises.delete(key); throw err; }));
   }
-  return sarPromises.get(year);
+  return sarPromises.get(key);
 }
 
 const currentYear = () => evalYear || sarSeasons().def;
@@ -254,7 +258,7 @@ const CALC = {
   },
   '0209'(ctx) {
     const year = currentYear();
-    const d = sarResults.get(year);
+    const d = sarResults.get(sarKey(year));
     if (!d) return pending(`Đang tải vùng ngập ${year}`);
     const hit = d.wards.filter(w => w.pop >= GTX_FLOOD_MIN_POP);
     const basis = `Vùng ngập thực tế mùa lũ 15/9–15/12/${year} (Sentinel-1); tính khi có ≥ ${GTX_FLOOD_MIN_POP} người trong vùng ngập.`;
@@ -447,7 +451,7 @@ export function renderGreenGrowth(el, { wardName, wards }) {
   const redraw = () => draw();
   if (!roads) loadRoads().then(redraw).catch(err => console.warn('Tăng trưởng xanh – mạng lưới đường lỗi:', err));
   const year = currentYear();
-  if (!sarResults.has(year)) loadSar(year).then(redraw).catch(err => console.warn('Tăng trưởng xanh – vùng ngập lỗi:', err));
+  if (!sarResults.has(sarKey(year))) loadSar(year).then(redraw).catch(err => console.warn('Tăng trưởng xanh – vùng ngập lỗi:', err));
   const waterYear = Math.min(year, GSW_MAX_YEAR);
   if (!waterResults.has(waterYear)) loadWater(waterYear).then(redraw).catch(err => console.warn('Tăng trưởng xanh – mặt nước lỗi:', err));
   if (!landPop) loadLandPop().then(redraw).catch(err => console.warn('Tăng trưởng xanh – dân số/đất xây dựng lỗi:', err));

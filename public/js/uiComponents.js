@@ -1,6 +1,7 @@
 import { state, BUFFER_COLORS, isNetworkType, NT_KIND_LABELS, layerType, infraLabels } from './state.js';
 import { map, renderGroupedPoints, focusWard, zoomToPoint } from './mapEngine.js';
 import { geeApi } from './api.js';
+import { popQuery } from './popMethod.js';
 import { escapeHtml, isApproved, fmtNum, fmtPct, loadHtml2Pdf, showToast, wardStatHtml, ico, setStatusContent, inlineSpriteIcons, detailDisclosure } from './utils.js';
 import { refreshWardCheck } from './wardCheck.js';
 import {
@@ -684,9 +685,9 @@ function mergeLocalCoverageIntoStats() {
 const inflightCoverage = new Map();
 
 function requestWardCoverage(ward, scenario = 'HT') {
-  const key = `${scenario}:${ward.Ten_Phuong}`;
+  const key = `${scenario}:${ward.Ten_Phuong}:${popQuery()}`;
   if (inflightCoverage.has(key)) return inflightCoverage.get(key);
-  const qs = `action=getWardCoverage${scenario === 'QH' ? '&scenario=QH' : ''}&ward=${encodeURIComponent(ward.Ten_Phuong)}`;
+  const qs = `action=getWardCoverage${scenario === 'QH' ? '&scenario=QH' : ''}&ward=${encodeURIComponent(ward.Ten_Phuong)}&pop=${encodeURIComponent(popQuery())}`;
   const p = (async () => {
     try {
       const res = await fetch(geeApi(qs));
@@ -775,7 +776,7 @@ async function fillCandidateCounts(wardNames) {
     let counted = 0;
     for (const name of wardNames) {
       for (let round = 0; round < 5 && state.wardStatsData === list; round++) {
-        const r = await fetch(geeApi(`action=countWardCandidates&ward=${encodeURIComponent(name)}`))
+        const r = await fetch(geeApi(`action=countWardCandidates&ward=${encodeURIComponent(name)}&pop=${encodeURIComponent(popQuery())}`))
           .then(res => (res.ok ? res.json() : null)).catch(() => null);
         if (!r) break;
         counted += r.counted || 0;
@@ -783,7 +784,7 @@ async function fillCandidateCounts(wardNames) {
       }
     }
     if (!counted || state.wardStatsData !== list) return;
-    const fresh = await fetch(geeApi('action=getWardStats&fresh=1'))
+    const fresh = await fetch(geeApi(`action=getWardStats&fresh=1&pop=${encodeURIComponent(popQuery())}`))
       .then(res => (res.ok ? res.json() : null)).catch(() => null);
     if (!fresh || state.wardStatsData !== list) return;
     const byName = new Map((fresh.data || []).map(w => [w.Ten_Phuong, w]));
@@ -1190,7 +1191,7 @@ function isCityMode() {
 export function ensureWardStats() {
   if (state.wardStatsData.length > 0) return Promise.resolve(state.wardStatsData);
   if (!wardStatsPromise) {
-    const promise = fetch(geeApi('action=getWardStats'))
+    const promise = fetch(geeApi(`action=getWardStats&pop=${encodeURIComponent(popQuery())}`))
       .then(r => {
         if (!r.ok) {
           throw new Error(r.status === 504
@@ -1692,7 +1693,12 @@ export function setWardGbaHtml(fn) { wardGbaHtml = typeof fn === 'function' ? fn
 /** Phân bổ dân số B + chung cư gắn câu dân vùng phục vụ vào thẻ phường */
 export function setWardPopHtml(fn) { wardPopHtml = typeof fn === 'function' ? fn : () => ''; }
 if (typeof window !== 'undefined') {
-  window.addEventListener('qh:pop-method', () => {
+  window.addEventListener('qh:pop-method', (e) => {
+    if (e.detail && e.detail.kind === 'method') {
+      netCoverageCache.clear();
+      reloadWardStats();
+      return;
+    }
     const name = state.selectedWard;
     const ward = (state.wardStatsData || []).find(w => w.Ten_Phuong === name);
     if (ward && document.getElementById('wardSummaryView')) renderWardSummary(ward);
@@ -2123,7 +2129,7 @@ function buildWardQuotaTableHtml(wardData, projPop) {
 // Dân số trong vùng phục vụ / vùng cách ly theo phường (action getNetworkCoverage): "phường|dataVersion" → kết quả | 'error'
 const netCoverageCache = new Map();
 const netCovInflight = new Set();
-const netCovKey = (ward) => `${ward}|${state.dataVersion}`;
+const netCovKey = (ward) => `${ward}|${state.dataVersion}|${popQuery()}`;
 
 function netCovCellHtml(ward, key) {
   const res = netCoverageCache.get(netCovKey(ward));
@@ -2155,7 +2161,7 @@ function loadWardNetworkCoverage(wardData) {
     return;
   }
   netCovInflight.add(key);
-  fetch(geeApi(`action=getNetworkCoverage&ward=${encodeURIComponent(ward)}`))
+  fetch(geeApi(`action=getNetworkCoverage&ward=${encodeURIComponent(ward)}&pop=${encodeURIComponent(popQuery())}`))
     .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
     .then(res => netCoverageCache.set(key, res))
     .catch(() => netCoverageCache.set(key, 'error'))

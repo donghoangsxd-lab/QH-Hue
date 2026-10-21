@@ -7,6 +7,7 @@ import { map, flyToVisible } from './mapEngine.js';
 import { planMap, shownMaps } from './planMap.js';
 import { state, BUFFER_COLORS, layerType } from './state.js';
 import { geeApi } from './api.js';
+import { popQuery } from './popMethod.js';
 import { escapeHtml, fmtNum, startTaskProgress, trackTileLoads } from './utils.js';
 import { devFromYears, loadNewDevStats, devLegend, devStats, DEV_MIN_ZOOM } from './newDev.js';
 import { geeTileOpts } from './basemap.js';
@@ -272,14 +273,17 @@ async function show(key) {
     }
     return;
   }
-  const q = cfg.statsQuery(year);
+  let q = cfg.statsQuery(year);
   if (!q) {
     if (statsEl) statsEl.innerHTML = '<div class="flood-muted">Màu càng đậm = càng nhiều mùa lũ bị ngập. Chọn 1 năm để xem số liệu theo phường.</div>';
     return;
   }
+  const popStats = key === 'sar' || key === 'dev';
+  if (popStats) q += `&pop=${encodeURIComponent(popQuery())}`;
   if (statsEl) statsEl.innerHTML = '<div class="flood-muted">Đang thống kê theo phường/xã (có thể mất 10–30 giây lần đầu)...</div>';
   try {
-    const d = await cached(rt.stats, year, () => (cfg.loadStats ? cfg.loadStats(year) : getJson(q)));
+    const statsKey = popStats ? `${year}|${popQuery()}` : year;
+    const d = await cached(rt.stats, statsKey, () => (cfg.loadStats ? cfg.loadStats(year) : getJson(q)));
     if (d && d.rawDataList && !d.wards && !d.city) throw new Error('máy chủ chưa hỗ trợ thống kê này');
     if (seq !== rt.seq || !rt.visible || !statsEl) return;
     statsEl.innerHTML = cfg.renderStats(d, rt);

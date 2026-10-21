@@ -574,6 +574,9 @@
                   <option value="old">Pixel (so sánh)</option>
                 </select>
               </label>
+              <p class="cad-hint" id="aptMethodNote">Pixel cũ gán khoảng 4% dân số thành phố lên đất nghĩa trang (mã thửa NTD và lô nghĩa trang). Cách nhà ở không chia dân cho mộ.</p>
+              <button type="button" class="layer-mini-btn" id="btnPopNha">Nạp raster dân nhà ở</button>
+              <p id="popNhaStatus" class="apt-status"></p>
               <label>Người/hộ <input id="aptHh" type="number" min="1" max="8" step="0.1" value="3.3"></label>
               <label>m²/người <input id="aptM2" type="number" min="8" max="80" step="1" value="25"></label>
               <label>Hiệu suất sàn <input id="aptEff" type="number" min="0.4" max="1" step="0.05" value="0.75"></label>
@@ -590,7 +593,7 @@
             <div class="flood-stats" id="cadastreStatus"></div>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_pop"><label for="chk_pop"><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư</label></div>
+            <div><input type="checkbox" id="chk_pop"><label for="chk_pop" title="Mặc định là dân theo dấu chân nhà ở trên ô 30 m. Admin đổi sang pixel cũ trong lớp Chung cư để so sánh. Pixel cũ gán khoảng 4% dân số lên đất nghĩa trang."><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư <small class="layer-hint" id="popLayerHint"></small></label></div>
             <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
           </div>
           <div class="layer-row">

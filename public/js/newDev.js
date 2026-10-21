@@ -6,6 +6,7 @@
 // vùng phát triển mới của phường bộ chỉ tiêu đô thị, không áp cho cả phường. Số liệu tính trên GEE (api/gee.js › getNewDevStats,
 // services/satService.js › newDevImage), bảng chi tiết phường luôn dùng năm gốc DEV_FROM_DEFAULT.
 import { geeApi } from './api.js';
+import { popMethod, popQuery } from './popMethod.js';
 import { escapeHtml, fmtNum, detailDisclosure } from './utils.js';
 
 export const DEV_FROM_DEFAULT = 2020;
@@ -29,9 +30,9 @@ const promises = new Map();
 const results = new Map();
 
 export function loadNewDevStats(from = DEV_FROM_DEFAULT) {
-  const key = String(from);
+  const key = `${from}|${popQuery()}`;
   if (!promises.has(key)) {
-    promises.set(key, fetch(geeApi(`action=getNewDevStats&from=${key}`))
+    promises.set(key, fetch(geeApi(`action=getNewDevStats&from=${from}&pop=${encodeURIComponent(popQuery())}`))
       .then(async r => {
         const d = await r.json().catch(() => null);
         if (!r.ok || !d || !Array.isArray(d.wards)) throw new Error((d && d.message) || `HTTP ${r.status}`);
@@ -50,7 +51,7 @@ const periodText = (d) => `${d.from} → ${yearsText(d.to)}`;
 
 /** { d, w } của 1 phường theo năm gốc mặc định; null khi chưa tải hoặc phường không có trong thống kê */
 export function newDevOf(wardName) {
-  const d = results.get(String(DEV_FROM_DEFAULT));
+  const d = results.get(`${DEV_FROM_DEFAULT}|${popQuery()}`);
   const w = d && d.wards.find(x => x.name === wardName);
   return w ? { d, w } : null;
 }
@@ -74,7 +75,7 @@ export function newDevRowHtml(wardName) {
   const { d, w } = r;
   const period = escapeHtml(periodText(d));
   const zoneTitle = `Vùng hiện trạng (ranh đỏ) ≈ ${HA.format(w.baseHa)} ha; vùng phát triển mới (ranh xanh) ≈ ${HA.format(w.devHa)} ha, `
-    + `≈ ${fmtNum(w.devPop)} người (dân số phường × tỷ lệ ô dân cư nằm trong vùng).\n${BASIS}`;
+    + `≈ ${fmtNum(w.devPop)} người (${popMethod() === 'old' ? 'dân số phường × tỷ lệ ô dân cư nằm trong vùng' : 'dân theo dấu chân nhà ở nằm trong vùng'}).\n${BASIS}`;
   if (!(w.devHa > 0)) {
     return `<tr class="wt-comp">
     <td></td>

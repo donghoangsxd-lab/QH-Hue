@@ -6,6 +6,7 @@
  */
 import { state, BUFFER_COLORS } from './state.js';
 import { geeApi } from './api.js';
+import { popQuery } from './popMethod.js';
 import { escapeHtml, fmtNum, ico, showToast, startTaskProgress, trackTileLoad, detailDisclosure } from './utils.js';
 import { geeTileOpts } from './basemap.js';
 
@@ -222,8 +223,20 @@ function buildPanelHtml(data, typeColor) {
     ${existingN ? detailDisclosure(`<p>${label} theo quy hoạch ở gần (${existingN})</p><ul class="proof-nearby">${listed}${more}</ul>`, 'Công trình quy hoạch lân cận') : ''}
     ${detailDisclosure(`
       <div class="proof-muted proof-note">Căn cứ kịch bản quy hoạch: công trình đã phê duyệt, có quy mô quy hoạch (gồm quy hoạch mới, không gồm công trình di dời). Nhu cầu tính theo dân số dự báo.
-        Bản đồ dân cư chia ô vuông ${cell} × ${cell} m; chỉ đếm ô có người. Chưa có lớp phân bố dân cư quy hoạch nên dùng phân bố hiện trạng.</div>
+        ${pop.popPeople
+          ? `Dân lấy theo dấu chân nhà ở (ô ${cell} m, mỗi ô là số người). Không chia đều như pixel cũ. Chưa có lớp phân bố dân cư quy hoạch nên dùng phân bố hiện trạng.`
+          : `Bản đồ dân cư chia ô vuông ${cell} × ${cell} m; chỉ đếm ô có người. Chưa có lớp phân bố dân cư quy hoạch nên dùng phân bố hiện trạng.`}</div>
       <table class="proof-table">
+      ${pop.popPeople ? `
+      <tr class="proof-group"><td colspan="2">① Dân nhà ở chưa được phục vụ</td></tr>
+      <tr><td>Dân trong phạm vi phục vụ</td><td>${fmtNum(px.buffer)} người</td></tr>
+      <tr><td>− Đã có ${label} theo quy hoạch phục vụ</td><td>${fmtNum(px.covered)} người</td></tr>
+      <tr class="proof-strong"><td>= Chưa được phục vụ</td><td>${fmtNum(px.net)} người</td></tr>
+      <tr class="proof-group"><td colspan="2">② Số dân được phục vụ thêm</td></tr>
+      <tr><td>Dân số phường</td><td>${fmtNum(pop.ward)} người</td></tr>
+      <tr><td>Dân nhà ở của phường trên raster</td><td>${fmtNum(px.wardTotal)} người</td></tr>
+      <tr class="proof-strong"><td>Quy về dân số phường</td><td>≈ ${fmtNum(reach)} người</td></tr>
+      ` : `
       <tr class="proof-group"><td colspan="2">① Ô dân cư chưa được phục vụ</td></tr>
       <tr><td>Ô dân cư trong phạm vi phục vụ</td><td>${fmtNum(px.buffer)} ô</td></tr>
       <tr><td>− Đã có ${label} theo quy hoạch phục vụ</td><td>${fmtNum(px.covered)} ô</td></tr>
@@ -232,6 +245,7 @@ function buildPanelHtml(data, typeColor) {
       <tr><td>Dân số phường</td><td>${fmtNum(pop.ward)} người</td></tr>
       <tr><td>÷ ${fmtNum(px.wardTotal)} ô dân cư = bình quân mỗi ô</td><td>${PER_PIXEL_FORMAT.format(pop.perPixel || 0)} người</td></tr>
       <tr class="proof-strong"><td>× ${fmtNum(px.net)} ô = Dân chưa được phục vụ</td><td>≈ ${fmtNum(reach)} người</td></tr>
+      `}
       ${pop.capacity != null ? `<tr><td>Sức chứa: ${fmtNum(data.scale ? data.scale.siteArea : 0)} m² ÷ ${QUOTA_FORMAT.format(pop.quota)} m²/người</td><td>${fmtNum(pop.capacity)} người</td></tr>` : ''}
       <tr class="proof-result"><td>= Số dân được phục vụ thêm${pop.capacity != null ? ' (lấy số nhỏ hơn)' : ''}</td><td>≈ ${fmtNum(pop.added)} người</td></tr>
       <tr class="proof-group"><td colspan="2">③ Độ phủ tăng thêm</td></tr>
@@ -289,7 +303,7 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
   let data;
   try {
     const q = `action=explainCSD&id=${encodeURIComponent(csd.id || '')}&lat=${csd.lat}&lng=${csd.lng}`
-      + `&size=${Number(csd.size) || 0}&code=${encodeURIComponent(suggestion.code)}`;
+      + `&size=${Number(csd.size) || 0}&code=${encodeURIComponent(suggestion.code)}&pop=${encodeURIComponent(popQuery())}`;
     const res = await fetch(geeApi(q));
     data = await res.json();
     if (!res.ok || data.error) throw new Error(data.message || `HTTP ${res.status}`);
