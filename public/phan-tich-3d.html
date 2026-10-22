@@ -10,13 +10,16 @@
 <body>
   <aside id="panel">
     <div class="panel-head">
-      <p class="kicker">Bản mẫu để xem xét</p>
-      <h1>Phân tích điểm theo bốn thành phần đô thị</h1>
+      <h1>Phân tích điểm</h1>
       <p id="place" class="place">Đang xác định vị trí…</p>
       <div class="switch" role="group" aria-label="Cách xem khối">
         <button type="button" id="btnTach" aria-pressed="true">Tách lớp</button>
         <button type="button" id="btnGop" aria-pressed="false">Gộp khối</button>
       </div>
+      <label id="gapRow" class="gap">
+        <span>Khoảng cách lớp</span>
+        <input id="gap" type="range" min="0.4" max="2" step="0.05" value="1">
+      </label>
     </div>
     <section>
       <h2>Bốn lớp</h2>
@@ -24,18 +27,9 @@
       <ul id="keys" class="keys"></ul>
     </section>
     <section>
-      <h2>Chỉ số trong ô vuông</h2>
-      <p id="status" class="status">Đang đọc dấu chân công trình, thửa đất và dữ liệu mở…</p>
+      <h2>Trong vòng tròn</h2>
+      <p id="status" class="status">Đang đọc dấu chân công trình và dữ liệu mở…</p>
       <ul id="stats" class="stats"></ul>
-    </section>
-    <section>
-      <h2>Khối đế và tháp</h2>
-      <p id="massingNote" class="src"></p>
-      <div id="massing"></div>
-    </section>
-    <section>
-      <h2>Phần dữ liệu chưa có</h2>
-      <ul id="gaps" class="gaps"></ul>
     </section>
     <p id="src" class="src"></p>
   </aside>

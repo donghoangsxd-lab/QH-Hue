@@ -24,6 +24,8 @@ const sq = squareRing(100);
 if (sq.length !== 4 || ringArea(sq) !== 40000) throw new Error('ô vuông');
 const cutSq = clipRing([[-200, -200], [200, -200], [200, 200], [-200, 200]], squareRing(50));
 if (Math.abs(ringArea(cutSq) - 10000) > 1) throw new Error(`cắt ô ${ringArea(cutSq)}`);
+const cutDisc = clipRing([[-200, -200], [200, -200], [200, 200], [-200, 200]], circleRing(50, 64));
+if (Math.abs(ringArea(cutDisc) - Math.PI * 2500) > 40) throw new Error(`cắt tròn ${ringArea(cutDisc)}`);
 
 if (clampRadius('x') !== 500 || clampRadius(10) !== 150 || clampRadius(5000) !== 800) throw new Error('bán kính');
 const p = parseCenter('?lat=16.4637&lng=107.5952&r=500&view=gop');
@@ -37,10 +39,10 @@ if (Math.abs(len - 1000) > 1) throw new Error(`cắt đoạn ${len}`);
 
 const html = fs.readFileSync(new URL('../public/phan-tich-3d.html', import.meta.url), 'utf8');
 const js = fs.readFileSync(new URL('../public/js/phanTich3d.js', import.meta.url), 'utf8');
-for (const s of ['Tách lớp', 'Gộp khối', 'phanTich3d.js']) {
+for (const s of ['Tách lớp', 'Gộp khối', 'Khoảng cách lớp', 'phanTich3d.js']) {
   if (!html.includes(s)) throw new Error(`html thiếu ${s}`);
 }
-for (const s of ['Khối tích', 'Không gian mở', 'Chức năng sử dụng', 'Liên kết', 'Không có.', 'h / 4', '1-2 tầng', '3-5 tầng', '6-10 tầng', '11-50 tầng']) {
+for (const s of ['Khối tích', 'Không gian mở', 'Tiếp cận hạ tầng', 'Liên kết', 'Không có số liệu.', 'h / 4', '1-2 tầng', '3-5 tầng', '6-10 tầng', '11-50 tầng', 'fovy: FOV_Y', 'Math.PI * r * r']) {
   if (!js.includes(s)) throw new Error(`js thiếu ${s}`);
 }
 if (js.includes('CLASS_DRAW') || js.includes('Không tính được.')) throw new Error('vẫn đùn theo nhóm hoặc chưa có mét');
@@ -77,5 +79,17 @@ if (!api.includes('buildings.pmtiles') || !api.includes('thuadat-2016.pmtiles'))
 if (/req\.query\.(u|url|data)\b/.test(api)) throw new Error('proxy nhận URL tự do');
 const osm = fs.readFileSync(new URL('../api/osmClip.js', import.meta.url), 'utf8');
 if (!osm.includes('queryFor') || /req\.query\.(u|url|data|q)\b/.test(osm)) throw new Error('osm nhận câu truy vấn tự do');
+const mapJs = fs.readFileSync(new URL('../public/js/mapEngine.js', import.meta.url), 'utf8');
+if (!mapJs.includes('class="proof-btn pp-3d"') || /phan-tich-3d\.html\?[^`]*target="_blank"/.test(mapJs)) {
+  throw new Error('nút Xem 3D vẫn mở tab mới');
+}
+const panel = fs.readFileSync(new URL('../public/js/view3dPanel.js', import.meta.url), 'utf8');
+const css = fs.readFileSync(new URL('../public/css/style.css', import.meta.url), 'utf8');
+if (!panel.includes('openView3d') || !css.includes('.view3d-panel') || !css.includes('(orientation: landscape) and (max-height: 520px)')) {
+  throw new Error('thiếu khung 3D nổi');
+}
+if (!js.includes('orthographic: false') || !js.includes('WHITE_BLOCK') || !js.includes('openBloom')) {
+  throw new Error('thiếu phối cảnh, khối trắng hoặc vầng không gian mở');
+}
 
 console.log('ok');

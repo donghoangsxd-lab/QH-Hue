@@ -2965,12 +2965,12 @@ table.ward-table th {
   font-family: inherit; font-size: var(--fs-sm); font-weight: 700; cursor: pointer;
 }
 .proof-btn:hover { background: rgba(var(--cyan-rgb), 0.25); }
-a.proof-btn.pp-3d {
+.proof-btn.pp-3d {
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  box-sizing: border-box; margin-top: 8px; min-height: 28px;
+  box-sizing: border-box; margin-top: 8px; min-height: 28px; width: 100%;
   text-decoration: none; text-align: center;
 }
-a.proof-btn.pp-3d .ico { margin: 0; }
+.proof-btn.pp-3d .ico { margin: 0; }
 .ht-assign { margin-top: 6px; }
 .ht-assign:empty { display: none; margin: 0; }
 .ht-form [hidden] { display: none; }
@@ -4733,6 +4733,32 @@ body.project-review.la-page #projectReviewHost {
 .sv-close:hover { color: var(--accent-red); }
 .sv-frame { flex: 1; width: 100%; border: 0; background: #1e293b; }
 .sv-panel.is-dragging .sv-frame { pointer-events: none; }
+.view3d-panel {
+  position: fixed; z-index: 1280; display: flex; flex-direction: column; overflow: hidden; resize: both;
+  min-width: 420px; min-height: 280px;
+  background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--r-md); box-shadow: var(--panel-shadow);
+}
+.view3d-head {
+  display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; cursor: move; user-select: none; touch-action: none;
+  border-bottom: 1px solid var(--border-color); background: var(--bg-head); font-size: var(--fs-sm);
+}
+.view3d-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-strong); font-weight: 600; }
+.view3d-max, .view3d-close {
+  border: 0; background: none; color: var(--text-muted); font-size: 16px; line-height: 1; cursor: pointer; padding: 2px 6px;
+}
+.view3d-close:hover { color: var(--accent-red); }
+.view3d-max:hover { color: var(--accent-cyan); }
+.view3d-frame { flex: 1; width: 100%; border: 0; background: #e8eef3; }
+.view3d-panel.is-dragging .view3d-frame { pointer-events: none; }
+.view3d-panel.is-max {
+  inset: 10px; width: auto; height: auto; max-width: none; max-height: none; resize: none; border-radius: var(--r-md);
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .view3d-panel, .view3d-panel.is-max {
+    inset: 0; width: auto; height: auto; min-width: 0; min-height: 0; max-width: none; max-height: none;
+    border-radius: 0; resize: none;
+  }
+}
 .sv-pin {
   border-radius: 50%; background: #f9b31c; border: 2px solid #fff; box-shadow: 0 0 0 3px rgba(249, 179, 28, 0.35), var(--shadow-sm);
 }

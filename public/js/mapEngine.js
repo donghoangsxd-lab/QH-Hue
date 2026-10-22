@@ -369,14 +369,13 @@ function popupFitOptions(targetMap, maxWidth, minWidth) {
   };
 }
 
-// Mở trang 3D đúng tâm và bán kính. Trang tự kẹp bán kính trong 150–800 m.
+// Nút mở khung 3D nổi đúng tâm và bán kính. Trang tự kẹp bán kính trong 150–800 m.
 function point3dButton(lat, lng, radius) {
   const la = Number(lat);
   const ln = Number(lng);
   if (!Number.isFinite(la) || !Number.isFinite(ln)) return '';
   const r = Math.min(800, Math.max(150, Math.round(Number(radius) || 150)));
-  const q = new URLSearchParams({ lat: la.toFixed(5), lng: ln.toFixed(5), r: String(r), view: 'gop' });
-  return `<a class="proof-btn pp-3d" href="phan-tich-3d.html?${q}" target="_blank" rel="noopener">${ico('floors')}Xem 3D</a>`;
+  return `<button type="button" class="proof-btn pp-3d" data-lat="${la.toFixed(5)}" data-lng="${ln.toFixed(5)}" data-r="${r}">${ico('floors')}Xem 3D</button>`;
 }
 
 function geometryCenter(geometry) {

@@ -1,4 +1,4 @@
-// Bản mẫu bốn thành phần đô thị. Ô vuông cạnh 2×r (r vẫn là tham số bán kính, nay là nửa cạnh).
+// Bốn lớp trong vòng tròn bán kính r. Camera phối cảnh fovy 36°: cạnh xa ngắn hơn cạnh gần.
 // Chiều cao đùn bằng mét từ data/gba/bldg-hf.bin (làm tròn 0,5 m). Số tầng = round(h / 4).
 // Tháp bị GBA lọc hoặc ước thấp nằm ở bldg-overrides.geojson (draw).
 // parts: khối đế và tháp, min_height / height là mét thật, số tầng là số công bố, không trần.
@@ -35,8 +35,19 @@ const USE_FILL = {
 };
 const PLATE = 3;
 const LIFT = { links: 0, uses: 1100, voids: 2200, volumes: 3300 };
+const FOV_Y = 36;
+const WHITE_BLOCK = [248, 250, 252, 232];
+const FACILITY = {
+  school: { label: 'Trường học', color: [217, 119, 6, 248], glow: [245, 158, 11], walk: 500, rank: 1 },
+  health: { label: 'Y tế', color: [220, 38, 38, 248], glow: [248, 113, 113], walk: 700, rank: 2 },
+  market: { label: 'Chợ', color: [202, 138, 4, 248], glow: [250, 204, 21], walk: 500, rank: 3 },
+  culture: { label: 'Văn hóa', color: [126, 34, 206, 248], glow: [192, 132, 252], walk: 600, rank: 4 },
+  parking: { label: 'Bãi đỗ', color: [29, 78, 216, 248], glow: [96, 165, 250], walk: 350, rank: 5 },
+  bus: { label: 'Xe buýt', color: [3, 105, 161, 248], glow: [56, 189, 248], walk: 400, rank: 6 }
+};
+const AMENITY_RE = 'school|kindergarten|college|university|hospital|clinic|doctors|pharmacy|marketplace|supermarket|library|community_centre|theatre|arts_centre|cinema|parking';
 const PLATE_FILL = {
-  links: [232, 232, 230, 255],
+  links: [214, 222, 230, 255],
   uses: [244, 244, 246, 255],
   voids: [236, 242, 236, 255],
   volumes: [248, 240, 238, 255]
@@ -119,7 +130,7 @@ export function squareRing(r) {
 }
 
 function plateRing(r) {
-  return [[-r, -r], [-r, r], [r, r], [r, -r]];
+  return circleRing(r, 96);
 }
 
 function leftOf(p, a, b) {
@@ -367,14 +378,36 @@ function fullyInsideSquare(ring, r) {
   return true;
 }
 
+function bboxMissDisc(ring, r) {
+  let minx = Infinity;
+  let miny = Infinity;
+  let maxx = -Infinity;
+  let maxy = -Infinity;
+  for (const p of ring) {
+    if (p[0] < minx) minx = p[0];
+    if (p[1] < miny) miny = p[1];
+    if (p[0] > maxx) maxx = p[0];
+    if (p[1] > maxy) maxy = p[1];
+  }
+  const cx = Math.max(minx, Math.min(0, maxx));
+  const cy = Math.max(miny, Math.min(0, maxy));
+  return cx * cx + cy * cy > r * r;
+}
+
+function fullyInsideDisc(ring, r) {
+  const lim = (r + 0.05) * (r + 0.05);
+  for (const p of ring) if (p[0] * p[0] + p[1] * p[1] > lim) return false;
+  return true;
+}
+
 function clipFeature(feat, origin, clip, r) {
   const rings = feat.rings.map((ring) => ring.map(([lng, lat]) => toLocal(lng, lat, origin)));
-  if (!rings.length || bboxMissSquare(rings[0], r)) return [];
+  if (!rings.length || bboxMissDisc(rings[0], r)) return [];
   const parts = [];
   let current = null;
   const signOf = (ring) => Math.sign(signedArea(ring)) || 1;
   rings.forEach((ring, index) => {
-    const cut = fullyInsideSquare(ring, r) ? ring : clipRing(ring, clip);
+    const cut = fullyInsideDisc(ring, r) ? ring : clipRing(ring, clip);
     if (!cut) return;
     const sign = signOf(cut);
     if (!current || (index > 0 && sign === current.sign)) {
@@ -440,6 +473,34 @@ function clipSegSquare(a, b, r) {
   };
 }
 
+function clipPolylineDisc(line, r) {
+  const parts = [];
+  const exits = [];
+  let cur = null;
+  const flush = () => {
+    if (cur && cur.length > 1) parts.push(cur);
+    cur = null;
+  };
+  const rim = r * 2.2;
+  const onRim = (p) => Math.abs(p[0] * p[0] + p[1] * p[1] - r * r) < rim;
+  for (let i = 1; i < line.length; i++) {
+    const hits = clipSegment(line[i - 1], line[i], r);
+    if (!hits.length) { flush(); continue; }
+    const [a, b] = hits[0];
+    if (cur && Math.hypot(cur[cur.length - 1][0] - a[0], cur[cur.length - 1][1] - a[1]) < 0.5) cur.push(b);
+    else {
+      flush();
+      cur = [a, b];
+    }
+    if (Math.hypot(b[0] - line[i][0], b[1] - line[i][1]) > 0.6 && onRim(b)) {
+      exits.push({ p: b, dir: [b[0] - a[0], b[1] - a[1]] });
+      flush();
+    }
+  }
+  flush();
+  return { parts, exits };
+}
+
 function clipPolylineSquare(line, r) {
   const parts = [];
   const exits = [];
@@ -478,7 +539,7 @@ function collectNodes(lines, r) {
   const buckets = new Map();
   for (const line of lines) {
     for (const p of line) {
-      if (Math.abs(p[0]) > r - 12 || Math.abs(p[1]) > r - 12) continue;
+      if (p[0] * p[0] + p[1] * p[1] > (r - 12) * (r - 12)) continue;
       const k = `${Math.round(p[0] / cell)}_${Math.round(p[1] / cell)}`;
       const b = buckets.get(k) || { n: 0, x: 0, y: 0 };
       b.n += 1;
@@ -502,7 +563,7 @@ function scatterTrees(rings, r, cap) {
       salt += 1;
       const jx = x + Math.sin(salt * 12.989) * 9;
       const jy = y + Math.cos(salt * 78.233) * 9;
-      if (Math.abs(jx) > r - 8 || Math.abs(jy) > r - 8) continue;
+      if (jx * jx + jy * jy > (r - 8) * (r - 8)) continue;
       if (!rings.some((ring) => pointInRing([jx, jy], ring))) continue;
       out.push({
         x: jx,
@@ -531,8 +592,10 @@ function voidKind(tags) {
 function facilityKind(tags) {
   const amenity = tags.amenity || '';
   if (['school', 'kindergarten', 'college', 'university'].includes(amenity)) return 'school';
-  if (['hospital', 'clinic', 'doctors'].includes(amenity)) return 'health';
-  if (amenity === 'marketplace') return 'market';
+  if (['hospital', 'clinic', 'doctors', 'pharmacy'].includes(amenity)) return 'health';
+  if (amenity === 'marketplace' || amenity === 'supermarket') return 'market';
+  if (['library', 'community_centre', 'theatre', 'arts_centre', 'cinema'].includes(amenity)) return 'culture';
+  if (amenity === 'parking') return 'parking';
   if (tags.highway === 'bus_stop' || tags.public_transport === 'platform' || tags.public_transport === 'stop_position') return 'bus';
   return null;
 }
@@ -570,8 +633,8 @@ way["highway"="pedestrian"]["area"="yes"](${c});
 way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|living_street|service|pedestrian|footway|path|cycleway|steps)$"](${c});
 way["railway"~"^(rail|light_rail|subway|tram|narrow_gauge)$"](${c});
 way["waterway"~"^(river|stream|canal|drain)$"](${c});
-node["amenity"~"^(school|kindergarten|college|university|hospital|clinic|doctors|marketplace)$"](${s});
-way["amenity"~"^(school|kindergarten|college|university|hospital|clinic|doctors|marketplace)$"](${s});
+node["amenity"~"^(${AMENITY_RE})$"](${s});
+way["amenity"~"^(${AMENITY_RE})$"](${s});
 node["highway"="bus_stop"](${s});
 node["public_transport"~"^(platform|stop_position)$"](${s});
 );out geom;`;
@@ -608,15 +671,60 @@ function hav(lng1, lat1, lng2, lat2) {
 function coverRatio(polys, r) {
   if (!polys.length) return 0;
   const step = (r * 2) / 36;
+  const r2 = r * r;
   let inside = 0;
   let hit = 0;
   for (let y = -r; y <= r; y += step) {
     for (let x = -r; x <= r; x += step) {
+      if (x * x + y * y > r2) continue;
       inside += 1;
       if (polys.some((ring) => pointInRing([x, y], ring))) hit += 1;
     }
   }
   return inside ? hit / inside : 0;
+}
+
+function pushHalo(list, ring, clip, rgb) {
+  [28, 70, 130].forEach((extra, i) => {
+    const grown = offsetRing(ring, extra);
+    const cut = clipRing(grown, clip);
+    if (!cut || ringArea(cut) < 30) return;
+    const alpha = [150, 88, 40][i];
+    list.push({ rings: wind([cut]), h: 0.8, fill: [rgb[0], rgb[1], rgb[2], alpha] });
+  });
+}
+
+function offsetRing(ring, extra) {
+  const c = centroid(ring);
+  return ring.map((p) => {
+    const dx = p[0] - c[0];
+    const dy = p[1] - c[1];
+    const len = Math.hypot(dx, dy) || 1;
+    return [p[0] + (dx / len) * extra, p[1] + (dy / len) * extra];
+  });
+}
+
+function glowSteps(x, y, reach, rgb, steps) {
+  const out = [];
+  for (let i = steps; i >= 1; i--) {
+    const t = i / steps;
+    const fade = (1 - t) ** 1.55;
+    out.push({
+      position: [x, y],
+      radius: Math.max(8, reach * t),
+      color: [rgb[0], rgb[1], rgb[2], Math.round(36 + 150 * fade)]
+    });
+  }
+  return out;
+}
+
+function discPosts(r) {
+  const pts = [];
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    pts.push([Math.cos(a) * r, Math.sin(a) * r]);
+  }
+  return pts;
 }
 
 function indexParcels(parcels) {
@@ -707,11 +815,10 @@ export function parseHeightIndex(buf) {
 }
 
 function buildModel(raw, origin, r, heights) {
-  const clip = squareRing(r);
+  const clip = circleRing(r, 48);
   const gaps = [];
   const volumes = [];
-  const uses = [];
-  const greens = [];
+    const greens = [];
   const waters = [];
   const squares = [];
   const roads = [];
@@ -774,7 +881,7 @@ function buildModel(raw, origin, r, heights) {
       }
     }
     for (let i = 0; i < classArea.length; i++) if (classArea[i] < 0) classArea[i] = 0;
-    if (!buildings.length) gaps.push('Không có dấu chân công trình trong ô vuông.');
+    if (!buildings.length) gaps.push('Không có dấu chân công trình trong vòng tròn.');
   }
   if (!heights) gaps.push('Không đọc được tệp chiều cao mét. Hình dùng tạm 4 m cho mỗi dấu chân, không tính sàn.');
 
@@ -792,23 +899,20 @@ function buildModel(raw, origin, r, heights) {
         parcels.push({ ...cut, code, label });
       }
     }
-    if (!parcels.length) gaps.push('Không có thửa đất trong ô vuông.');
+    if (!parcels.length) gaps.push('Không có thửa đất trong vòng tròn.');
   }
   const findParcel = indexParcels(parcels);
   let unassigned = 0;
-  for (let i = 0; i < buildings.length; i++) {
-    const b = buildings[i];
-    const hit = findParcel(...centroid(b.rings[0]));
-    const label = hit ? hit.label : 'Chưa có mã';
-    if (!hit) unassigned += 1;
-    uses.push({ rings: volumes[i].rings, h: volumes[i].h, fill: USE_FILL[label] || USE_FILL['Chưa có mã'] });
-  }
+  for (const b of buildings) if (!findParcel(...centroid(b.rings[0]))) unassigned += 1;
 
   const greenRings = [];
   const waterRings = [];
   const squareRings = [];
+  const halos = [];
+  const openBloom = [];
   const roadM = { truc: 0, khuvuc: 0, tertiary: 0, noibo: 0, xedap: 0, dibo: 0, rail: 0, water: 0 };
-  const nearest = { school: null, health: null, market: null, bus: null };
+  const nearest = { school: null, health: null, market: null, bus: null, culture: null, parking: null };
+  const found = [];
   let stopsInside = 0;
   if (raw.osmError) gaps.push(`${raw.osmError}. Không tính cây xanh, mặt nước, đường và khoảng cách công trình.`);
   else {
@@ -822,17 +926,26 @@ function buildModel(raw, origin, r, heights) {
           const cut = clipRing(local, clip);
           if (cut && ringArea(cut) > 8) {
             const wound = wind([cut]);
+            const area = ringArea(cut);
             if (kind === 'water') {
-              waters.push({ rings: wound, h: 4, fill: [150, 206, 232, 235] });
+              waters.push({ rings: wound, h: 2.4, fill: [14, 165, 233, 235] });
               waterRings.push(cut);
+              pushHalo(halos, cut, clip, [56, 189, 248]);
+              const c = centroid(cut);
+              openBloom.push(...glowSteps(c[0], c[1], Math.min(260, Math.max(46, Math.sqrt(area) * 1.15)), [56, 189, 248], 10));
             } else if (kind === 'square') {
-              squares.push({ rings: wound, h: 2, fill: [226, 228, 220, 230] });
+              squares.push({ rings: wound, h: 1.4, fill: [226, 232, 220, 210] });
               squareRings.push(cut);
             } else if (kind === 'pitch') {
-              greens.push({ rings: wound, h: 2.2, fill: [170, 206, 140, 230] });
-            } else {
-              greens.push({ rings: wound, h: 3, fill: [96, 186, 104, 245] });
+              greens.push({ rings: wound, h: 1.6, fill: [74, 222, 128, 220] });
               greenRings.push(cut);
+              pushHalo(halos, cut, clip, [34, 197, 94]);
+            } else {
+              greens.push({ rings: wound, h: 2.2, fill: [22, 163, 74, 235] });
+              greenRings.push(cut);
+              pushHalo(halos, cut, clip, [34, 197, 94]);
+              const c = centroid(cut);
+              openBloom.push(...glowSteps(c[0], c[1], Math.min(280, Math.max(50, Math.sqrt(area) * 1.2)), [34, 197, 94], 10));
             }
           }
         }
@@ -841,7 +954,7 @@ function buildModel(raw, origin, r, heights) {
         else if (tags.waterway) rank = 'water';
         else if (!(tags.highway === 'pedestrian' && tags.area === 'yes')) rank = ROAD_RANK[tags.highway] || null;
         if (rank) {
-          const clipped = clipPolylineSquare(local, r);
+          const clipped = clipPolylineDisc(local, r);
           roadM[rank] += lineLength(clipped.parts);
           const color = ROAD_COLOR[rank];
           for (const part of clipped.parts) {
@@ -850,11 +963,13 @@ function buildModel(raw, origin, r, heights) {
           }
           if (ARROW_RANK.has(rank)) {
             for (const ex of clipped.exits) {
-              const stem = 78;
               const dir = ex.dir;
               const len = Math.hypot(dir[0], dir[1]) || 1;
-              const tip = [ex.p[0] + (dir[0] / len) * stem, ex.p[1] + (dir[1] / len) * stem];
-              arrows.push({ stem: [ex.p, tip], head: arrowHead(tip, dir, 26), color, rank });
+              const ux = dir[0] / len;
+              const uy = dir[1] / len;
+              const base = [ex.p[0] - ux * 22, ex.p[1] - uy * 22];
+              const tail = [ex.p[0] - ux * 78, ex.p[1] - uy * 78];
+              arrows.push({ stem: [tail, base], head: arrowHead(base, dir, 20), color, rank });
             }
           }
         }
@@ -870,33 +985,108 @@ function buildModel(raw, origin, r, heights) {
       if (lng == null || lat == null) continue;
       const dist = hav(origin.lng, origin.lat, lng, lat);
       if (dist > SEARCH_M) continue;
-      const row = { dist, name: tags.name || '', lng, lat };
-      if (!nearest[fac] || row.dist < nearest[fac].dist) nearest[fac] = row;
-      if (fac === 'bus') {
-        const p = toLocal(lng, lat, origin);
-        if (Math.abs(p[0]) <= r && Math.abs(p[1]) <= r) stopsInside += 1;
+      const p = toLocal(lng, lat, origin);
+      const row = { id: fac, dist, name: tags.name || '', lng, lat, x: p[0], y: p[1], rings: null };
+      if (el.type === 'way' && Array.isArray(el.geometry) && el.geometry.length > 3) {
+        const local = el.geometry.map((pt) => toLocal(pt.lon, pt.lat, origin));
+        const closed = Math.hypot(local[0][0] - local[local.length - 1][0], local[0][1] - local[local.length - 1][1]) < 1.2;
+        if (closed) {
+          const cut = clipRing(local, clip);
+          if (cut && ringArea(cut) > 12) row.rings = wind([cut]);
+        }
       }
+      if (!nearest[fac] || row.dist < nearest[fac].dist) nearest[fac] = row;
+      if (row.dist <= r) found.push(row);
+      if (fac === 'bus' && row.x * row.x + row.y * row.y <= r * r) stopsInside += 1;
     }
-    if (!greenRings.length) gaps.push('OpenStreetMap không có vùng cây xanh hoặc công viên (way) trong ô vuông.');
-    if (!waterRings.length) gaps.push('OpenStreetMap không có mặt nước (way) trong ô vuông.');
-    if (!squareRings.length) gaps.push('OpenStreetMap không có quảng trường trong ô vuông.');
-    if (roadM.rail === 0) gaps.push('OpenStreetMap không có đường sắt trong ô vuông.');
-    if (roadM.water === 0) gaps.push('OpenStreetMap không có đường thủy trong ô vuông.');
+    if (!greenRings.length) gaps.push('OpenStreetMap không có vùng cây xanh hoặc công viên (way) trong vòng tròn.');
+    if (!waterRings.length) gaps.push('OpenStreetMap không có mặt nước (way) trong vòng tròn.');
+    if (!squareRings.length) gaps.push('OpenStreetMap không có quảng trường trong vòng tròn.');
+    if (roadM.rail === 0) gaps.push('OpenStreetMap không có đường sắt trong vòng tròn.');
+    if (roadM.water === 0) gaps.push('OpenStreetMap không có đường thủy trong vòng tròn.');
   }
 
+  const seen = new Set();
+  const facilities = [];
+  found.sort((a, b) => a.dist - b.dist);
+  for (const row of found) {
+    const key = `${row.id}:${Math.round(row.x / 22)}:${Math.round(row.y / 22)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    facilities.push(row);
+  }
+  const counts = { school: 0, health: 0, market: 0, culture: 0, parking: 0, bus: 0 };
+  facilities.forEach((f) => { counts[f.id] += 1; });
   const phone = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-  const trees = scatterTrees(greenRings, r, phone ? 120 : 220);
+  const steps = phone ? 7 : 11;
+  const access = [];
+  facilities.forEach((f) => {
+    const meta = FACILITY[f.id];
+    if (!meta) return;
+    const c = f.rings ? centroid(f.rings[0]) : [f.x, f.y];
+    if (c[0] * c[0] + c[1] * c[1] > r * r) return;
+    access.push(...glowSteps(c[0], c[1], meta.walk, meta.glow, steps));
+  });
+  const claimed = new Set();
+  const blocks = volumes.map((v) => ({ ...v, fill: WHITE_BLOCK, infra: false }));
+  facilities.slice().sort((a, b) => FACILITY[a.id].rank - FACILITY[b.id].rank).forEach((f) => {
+    const meta = FACILITY[f.id];
+    if (!meta) return;
+    let matched = 0;
+    if (f.rings) {
+      blocks.forEach((b, i) => {
+        if (claimed.has(i)) return;
+        if (!pointInRing(centroid(b.rings[0]), f.rings[0])) return;
+        claimed.add(i);
+        b.fill = meta.color;
+        b.infra = true;
+        matched += 1;
+      });
+    }
+    if (!matched) {
+      const lim = f.id === 'bus' ? 18 : 32;
+      let best = lim;
+      let hit = -1;
+      blocks.forEach((b, i) => {
+        if (claimed.has(i)) return;
+        const c = centroid(b.rings[0]);
+        const d = Math.hypot(c[0] - f.x, c[1] - f.y);
+        if (d < best) { best = d; hit = i; }
+      });
+      if (hit >= 0) {
+        claimed.add(hit);
+        blocks[hit].fill = meta.color;
+        blocks[hit].infra = true;
+        matched = 1;
+      }
+    }
+    if (matched) return;
+    if (f.rings) {
+      blocks.push({ rings: f.rings, h: 8, z0: 0, fill: meta.color, infra: true });
+      return;
+    }
+    if (f.x * f.x + f.y * f.y > r * r) return;
+    const s = 8;
+    blocks.push({
+      rings: [[[f.x - s, f.y - s], [f.x + s, f.y - s], [f.x + s, f.y + s], [f.x - s, f.y + s]]],
+      h: 12,
+      z0: 0,
+      fill: meta.color,
+      infra: true
+    });
+  });
+
   const nodes = collectNodes(majorLines, r);
-  const corners = squareRing(r);
-  const squareArea = 4 * r * r;
+  const corners = discPosts(r);
+  const area = Math.PI * r * r;
   const mix = shannon(groupArea);
   const driveM = roadM.truc + roadM.khuvuc + roadM.tertiary + roadM.noibo;
   const meanF = matchedFp > 0 ? gfa / matchedFp : null;
   const meanH = matchedFp > 0 ? hSum / matchedFp : null;
   for (let i = 0; i < classArea.length; i++) if (classArea[i] < 0) classArea[i] = 0;
   return {
-    volumes, uses, greens, waters, squares, roads, arrows, nodes, trees, corners, gaps, nearest, stopsInside,
-    roadM, driveM, squareArea, footprint, buildings: buildings.length, classArea, parcels: parcels.length,
+    volumes, blocks, greens, waters, squares, halos, openBloom, access, roads, arrows, nodes, corners, gaps, nearest, stopsInside, counts,
+    roadM, driveM, squareArea: area, area, footprint, buildings: buildings.length, classArea, parcels: parcels.length,
     groupArea, noCode, unassigned, mix, meanF, meanH, gfa, heightMiss, matched: buildings.length - heightMiss,
     green: coverRatio(greenRings, r),
     water: coverRatio(waterRings, r),
@@ -995,101 +1185,57 @@ function paintMassing(rows) {
 }
 
 function nearestText(row, r, osmError) {
-  if (osmError) return osmError;
-  if (!row) return 'Không có trong OpenStreetMap trong bán kính tìm 2 km.';
-  const name = row.name ? `${row.name}, ` : '';
-  const edge = r * Math.SQRT2;
-  const where = row.dist > edge ? ', ngoài ô phân tích' : ', trong ô phân tích';
-  return `${name}${fmt0(row.dist)} m${where}`;
+  if (osmError) return 'Không có số liệu.';
+  if (!row) return 'Không có trong bán kính 2 km.';
+  const name = row.name ? `${row.name} · ` : '';
+  const where = row.dist <= r ? 'trong vòng' : 'ngoài vòng';
+  return `${name}${fmt0(row.dist)} m, ${where}`;
 }
 
-function paintPanel(model, place, wardPop) {
+function paintPanel(model, place) {
   const legend = $('legend');
   legend.replaceChildren(
-    legendCard(1, '#ea580c', 'Khối tích', 'Khối nhà theo chiều cao thật, màu theo bốn nhóm số tầng.'),
-    legendCard(2, '#2e9650', 'Không gian mở', 'Công viên, tán cây và mặt nước.'),
-    legendCard(3, '#306cd4', 'Chức năng', 'Chức năng sử dụng đất trên từng công trình.'),
-    legendCard(4, '#d6a820', 'Liên kết', 'Đường phân cấp, nút giao và mũi tên hướng ra mép ô.')
+    legendCard(1, '#ea580c', 'Khối tích', 'Màu theo bốn nhóm số tầng.'),
+    legendCard(2, '#16a34a', 'Không gian mở', 'Công viên loang lục, mặt nước loang lam.'),
+    legendCard(3, '#0284c7', 'Tiếp cận hạ tầng', 'Công trình hạ tầng theo loại. Vầng màu nhạt theo khoảng đi bộ.'),
+    legendCard(4, '#d6a820', 'Liên kết', 'Đường phân cấp và hướng ra mép vòng.')
   );
-  $('keys').replaceChildren(
-    swatch('#ffedd5', '1-2 tầng'),
-    swatch('#fdba74', '3-5 tầng'),
-    swatch('#ea580c', '6-10 tầng'),
-    swatch('#9a3412', '11-50 tầng'),
-    swatch('#f4b0d6', 'Ở'),
-    swatch('#baa6e6', 'Công cộng'),
-    swatch('#f0a860', 'Sản xuất'),
-    swatch('#f2d660', 'Nông nghiệp'),
-    swatch('#8eb0e6', 'Hạ tầng'),
-    swatch('#d63030', 'Đường trục'),
-    swatch('#e0b028', 'Đường khu vực'),
-    swatch('#3a76d2', 'Đường gom')
-  );
-  const areaHa = model.squareArea / 10000;
-  const stats = $('stats');
+  const keys = $('keys');
+  if (keys) {
+    keys.replaceChildren(
+      swatch('#ffedd5', '1-2 tầng'),
+      swatch('#fdba74', '3-5 tầng'),
+      swatch('#ea580c', '6-10 tầng'),
+      swatch('#9a3412', '11-50 tầng'),
+      swatch('#d97706', 'Trường'),
+      swatch('#dc2626', 'Y tế'),
+      swatch('#ca8a04', 'Chợ'),
+      swatch('#7e22ce', 'Văn hóa'),
+      swatch('#1d4ed8', 'Bãi đỗ'),
+      swatch('#0369a1', 'Xe buýt')
+    );
+  }
+  const areaHa = model.area / 10000;
+  const counts = model.counts || {};
+  const countLine = ['school', 'health', 'market', 'culture', 'parking', 'bus']
+    .map((id) => `${FACILITY[id].label} ${fmt0(counts[id] || 0)}`).join(' · ');
   const items = [
-    li('Diện tích ô vuông', `${fmt1(areaHa)} ha`, `Nửa cạnh ${fmt0(place.r)} m (tham số bán kính). Cạnh ô ${fmt0(place.r * 2)} m.`),
-    li('Mật độ xây dựng', model.buildings ? `${fmt1(model.footprint / model.squareArea * 100)}%` : 'Không có dấu chân trong ô.',
-      model.buildings ? `${fmt0(model.buildings)} công trình, dấu chân ${fmt1(model.footprint / 10000)} ha.` : '')
+    li('Diện tích vòng tròn', `${fmt1(areaHa)} ha`, `Bán kính ${fmt0(place.r)} m.`),
+    li('Mật độ xây dựng', model.buildings ? `${fmt1(model.footprint / model.area * 100)}%` : 'Không có dấu chân.',
+      model.buildings ? `${fmt0(model.buildings)} công trình.` : ''),
+    li('Tầng trung bình', model.meanF == null ? 'Không có số mét.' : fmt1(model.meanF), 'Theo diện tích dấu chân. Tầng = làm tròn (mét / 4).'),
+    li('Diện tích sàn', model.meanF == null ? 'Không có số mét.' : `${fmt0(model.gfa)} m²`, 'Dấu chân trong vòng nhân số tầng.'),
+    li('Hạ tầng trong vòng', model.osmError ? 'Không có số liệu.' : countLine, 'Đếm tâm công trình nằm trong bán kính.'),
+    li('Cây xanh, công viên', model.osmError ? 'Không có số liệu.' : `${fmt1(model.green * 100)}%`, 'Phần diện tích vòng.'),
+    li('Mặt nước', model.osmError ? 'Không có số liệu.' : `${fmt1(model.water * 100)}%`, 'Phần diện tích vòng.'),
+    li('Trường học', nearestText(model.nearest.school, place.r, model.osmError), ''),
+    li('Y tế', nearestText(model.nearest.health, place.r, model.osmError), ''),
+    li('Chợ', nearestText(model.nearest.market, place.r, model.osmError), ''),
+    li('Xe buýt', nearestText(model.nearest.bus, place.r, model.osmError), '')
   ];
-  if (model.meanF == null) {
-    items.push(li('Tầng cao trung bình', 'Không có số mét.', 'Thiếu tệp chiều cao hoặc không khớp dấu chân.'));
-    items.push(li('Tổng diện tích sàn', 'Không có số mét.', 'Cần chiều cao mét để nhân với dấu chân.'));
-  } else {
-    items.push(li('Tầng cao trung bình', fmt1(model.meanF), 'Trung bình theo diện tích dấu chân. Số tầng = làm tròn (chiều cao / 4).'));
-    items.push(li('Tổng diện tích sàn', `${fmt0(model.gfa)} m²`, `Khoảng ${fmt1(model.gfa / 10000)} ha sàn. Dấu chân trong ô nhân số tầng.`));
-    items.push(li('Chiều cao trung bình', `${fmt1(model.meanH)} m`, 'Trung bình theo diện tích dấu chân, mét đã làm tròn 0,5 m.'));
-  }
-  if (model.buildings) {
-    const parts = CLASS_NAME.map((name, i) => `${name} ${fmt0(model.classArea[i] / model.footprint * 100)}%`).join(', ');
-    items.push(li('Nhóm số tầng', parts, 'Tỷ lệ theo diện tích dấu chân. Tầng = làm tròn (chiều cao / 4). Trên 50 tầng vẫn thuộc 11-50.'));
-  }
-  items.push(
-    li('Tỷ lệ cây xanh, công viên', model.osmError ? 'Không có số liệu.' : `${fmt1(model.green * 100)}%`,
-      'Ô mẫu rơi vào way cây xanh hoặc công viên. Tán cây trên hình rải trong các vùng này.'),
-    li('Tỷ lệ mặt nước', model.osmError ? 'Không có số liệu.' : `${fmt1(model.water * 100)}%`, 'Mặt nước OpenStreetMap trong ô.'),
-    li('Quảng trường', model.osmError ? 'Không có số liệu.' : (model.square > 0 ? `${fmt1(model.square * 100)}%` : 'Không có trong dữ liệu.'),
-      'place=square hoặc đường đi bộ dạng vùng.')
-  );
-  if (model.mix == null) {
-    items.push(li('Chỉ số đa dạng chức năng', 'Chưa đủ hai nhóm loại đất.', 'Shannon (ln) theo diện tích nhóm mã Thông tư 28/2014/TT-BTNMT.'));
-  } else {
-    const total = [...model.groupArea.values()].reduce((s, n) => s + n, 0);
-    const top = [...model.groupArea.entries()].filter(([, v]) => v > 1).sort((a, b) => b[1] - a[1]).slice(0, 3)
-      .map(([name, v]) => `${name} ${fmt0(v / total * 100)}%`).join('; ');
-    items.push(li('Chỉ số đa dạng chức năng', fmt2(model.mix), `Shannon (ln) theo nhóm loại đất địa chính. ${top}`));
-  }
-  const km2 = model.squareArea / 1e6;
-  items.push(li('Mật độ mạng đường', model.osmError ? 'Không có số liệu.' : `${fmt2(model.driveM / 1000 / km2)} km/km²`,
-    'Đường trục, khu vực, gom và nội bộ, cắt theo ô vuông.'));
-  items.push(
-    li('Trường học gần nhất', nearestText(model.nearest.school, place.r, model.osmError), 'Trường, mầm non, cao đẳng, đại học trên OpenStreetMap.'),
-    li('Cơ sở y tế gần nhất', nearestText(model.nearest.health, place.r, model.osmError), 'Bệnh viện, phòng khám, bác sĩ trên OpenStreetMap.'),
-    li('Chợ gần nhất', nearestText(model.nearest.market, place.r, model.osmError), 'amenity=marketplace trên OpenStreetMap.'),
-    li('Điểm dừng xe buýt gần nhất', nearestText(model.nearest.bus, place.r, model.osmError), model.stopsInside ? `${model.stopsInside} điểm nằm trong ô.` : 'Đếm điểm trong ô nếu có.')
-  );
-  items.push(li('Dân số trong ô', 'Không có.', 'Không suy từ dân số phường.'));
-  if (wardPop && wardPop.pop > 0) {
-    items.push(li('Dân số cả phường', `${fmt0(wardPop.pop)} người`, `${wardPop.name}. Số của cả phường, không phải dân trong ô.`));
-  } else {
-    items.push(li('Dân số cả phường', 'Không xác định được phường tại tâm ô.', ''));
-  }
-  stats.replaceChildren(...items);
-  paintMassing(model.massing || []);
-  const gapList = [...model.gaps];
-  const meta = model.heightMeta;
-  if (meta) gapList.push(`${meta.note} ${meta.spikeRule} Đã hạ ${fmt0(meta.spikeResets)} dấu chân.`);
-  if (model.heightMiss) gapList.push(`${fmt0(model.heightMiss)} dấu chân không khớp tệp chiều cao, vẽ tạm 4 m và không tính vào sàn.`);
-  gapList.push('Đồ án quy hoạch sử dụng đất không đưa vào trang này. Màu chức năng theo mã địa chính năm 2016.');
-  if (model.noCode > model.squareArea * 0.005) gapList.push(`Một phần thửa (${fmt1(model.noCode / model.squareArea * 100)}% ô) không có mã loại đất.`);
-  if (model.unassigned) gapList.push(`${fmt0(model.unassigned)} dấu chân không rơi vào thửa đã cắt, tô xám ở lớp chức năng.`);
-  $('gaps').replaceChildren(...gapList.map((text) => {
-    const item = document.createElement('li');
-    item.textContent = text;
-    return item;
-  }));
+  $('stats').replaceChildren(...items);
   const when = model.osmDate ? ` OpenStreetMap ${String(model.osmDate).slice(0, 10)}.` : '';
-  $('src').textContent = `Dấu chân và chiều cao © TUM, Global Building Atlas, CC BY-NC 4.0. Thửa đất địa chính 2016. Đường và không gian mở © người đóng góp OpenStreetMap, ODbL.${when}`;
+  $('src').textContent = `Dấu chân và chiều cao © TUM, Global Building Atlas, CC BY-NC 4.0. Đường, công viên và công trình © người đóng góp OpenStreetMap, ODbL.${when}`;
 }
 
 function lift(z) {
@@ -1114,31 +1260,63 @@ function bootMap(place, model) {
   let camera = null;
   let deckgl = null;
 
+  let maskExt = null;
+  try { maskExt = new deck.MaskExtension(); } catch (err) { maskExt = null; }
+  const orbit = new deck.OrbitView({ orbitAxis: 'Z', orthographic: false, fovy: FOV_Y, near: 0.01, far: 80 });
+
+  function gapValue() {
+    const n = Number($('gap') && $('gap').value);
+    return Number.isFinite(n) ? Math.min(2, Math.max(0.4, n)) : 1;
+  }
+
+  function withMask(props) {
+    if (!maskExt) return props;
+    return { ...props, extensions: [...(props.extensions || []), maskExt], maskId: 'disc-mask' };
+  }
+
   function fitState(k) {
-    const w = parent.clientWidth || 900;
-    const hgt = parent.clientHeight || 700;
-    const pitch = 56 * Math.PI / 180;
-    const span = place.r * 2;
-    const top = LIFT.volumes * k + PLATE + 30;
-    const halfH = top * 0.5 * Math.sin(pitch) + span * 0.55 * Math.cos(pitch) + 40;
-    const halfW = span * 0.78;
-    const zoom = Math.min(Math.log2((w * 0.9) / (halfW * 2)), Math.log2((hgt * 0.88) / (halfH * 2)));
-    return {
-      target: [0, 0, top * 0.46],
-      rotationX: camera ? camera.rotationX : 56,
-      rotationOrbit: camera ? camera.rotationOrbit : 40,
-      zoom,
-      minZoom: zoom - 1.8,
-      maxZoom: zoom + 2.6
-    };
+    const w = Math.max(parent.clientWidth || 900, 320);
+    const hgt = Math.max(parent.clientHeight || 700, 240);
+    const pad = 28;
+    const top = LIFT.volumes * k * gapValue() + 48;
+    const target = [0, 0, top * 0.32];
+    const rotationX = camera ? camera.rotationX : 50;
+    const rotationOrbit = camera ? camera.rotationOrbit : -32;
+    const pts = [];
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2;
+      pts.push([Math.cos(a) * place.r, Math.sin(a) * place.r, 0]);
+      pts.push([Math.cos(a) * place.r, Math.sin(a) * place.r, top]);
+    }
+    let lo = -8;
+    let hi = 4;
+    for (let i = 0; i < 22; i++) {
+      const zoom = (lo + hi) / 2;
+      const vp = orbit.makeViewport({
+        width: w,
+        height: hgt,
+        viewState: { target, rotationX, rotationOrbit, zoom, minZoom: -12, maxZoom: 12 }
+      });
+      let ok = true;
+      for (const pt of pts) {
+        const xy = vp.project(pt);
+        if (!xy || xy[2] < 0 || xy[2] > 1 || xy[0] < pad || xy[0] > w - pad || xy[1] < pad || xy[1] > hgt - pad) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) lo = zoom;
+      else hi = zoom;
+    }
+    return { target, rotationX, rotationOrbit, zoom: lo, minZoom: lo - 1.6, maxZoom: lo + 2.8 };
   }
 
   function planeZ(name) {
-    return LIFT[name] * view.k;
+    return LIFT[name] * view.k * gapValue();
   }
 
   function polys(id, data, z) {
-    return new deck.PolygonLayer({
+    return new deck.PolygonLayer(withMask({
       id,
       data,
       coordinateSystem: CART,
@@ -1152,7 +1330,23 @@ function bootMap(place, model) {
       getElevation: (d) => d.h,
       getFillColor: (d) => d.fill,
       material: SOFT
-    });
+    }));
+  }
+
+  function blooms(id, data, z) {
+    if (!data || !data.length) return null;
+    return new deck.ScatterplotLayer(withMask({
+      id,
+      data,
+      coordinateSystem: CART,
+      modelMatrix: lift(z),
+      getPosition: (d) => d.position,
+      getRadius: (d) => d.radius,
+      radiusUnits: 'meters',
+      getFillColor: (d) => d.color,
+      stroked: false,
+      pickable: false
+    }));
   }
 
   function draw() {
@@ -1162,17 +1356,66 @@ function bootMap(place, model) {
     const zVoids = planeZ('voids');
     const zVolumes = planeZ('volumes');
     const showStack = k > 0.08;
+    const disc = plateRing(place.r);
     const layers = [
-      polys('plate-links', [{ rings: [plateRing(place.r)], h: PLATE, fill: PLATE_FILL.links }], zLinks)
+      new deck.PolygonLayer({
+        id: 'disc-mask',
+        operation: 'mask',
+        data: [disc],
+        coordinateSystem: CART,
+        getPolygon: (d) => d,
+        getFillColor: [255, 255, 255, 255]
+      }),
+      polys('plate-links', [{ rings: [disc], h: PLATE, fill: PLATE_FILL.links }], zLinks),
+      new deck.PathLayer({
+        id: 'rim',
+        data: [{ path: disc.concat([disc[0]]) }],
+        coordinateSystem: CART,
+        modelMatrix: lift(zLinks + PLATE + 0.2),
+        getPath: (d) => d.path,
+        getColor: [51, 65, 85, 230],
+        getWidth: 2,
+        widthUnits: 'pixels',
+        widthMinPixels: 1.5
+      })
     ];
     if (showStack) {
-      layers.push(polys('plate-uses', [{ rings: [plateRing(place.r)], h: PLATE, fill: PLATE_FILL.uses }], zUses));
-      layers.push(polys('plate-voids', [{ rings: [plateRing(place.r)], h: PLATE, fill: PLATE_FILL.voids }], zVoids));
-      layers.push(polys('plate-vol', [{ rings: [plateRing(place.r)], h: PLATE, fill: PLATE_FILL.volumes }], zVolumes));
+      layers.push(polys('plate-uses', [{ rings: [disc], h: PLATE, fill: PLATE_FILL.uses }], zUses));
+      layers.push(polys('plate-voids', [{ rings: [disc], h: PLATE, fill: PLATE_FILL.voids }], zVoids));
+      layers.push(polys('plate-vol', [{ rings: [disc], h: PLATE, fill: PLATE_FILL.volumes }], zVolumes));
     }
+    layers.push(polys('halos', model.halos, zVoids + PLATE + 0.15));
     layers.push(polys('greens', model.greens, zVoids + PLATE));
     layers.push(polys('waters', model.waters, zVoids + PLATE));
     layers.push(polys('squares', model.squares, zVoids + PLATE));
+    const openBloom = blooms('open-bloom', model.openBloom, zVoids + PLATE + 1.1);
+    if (openBloom) layers.push(openBloom);
+    if (k > 0.12) {
+      const access = blooms('access', model.access, zUses + PLATE + 0.3);
+      if (access) layers.push(access);
+      const byBlock = new Map();
+      (model.blocks || []).forEach((v) => {
+        const key = v.z0 || 0;
+        if (!byBlock.has(key)) byBlock.set(key, []);
+        byBlock.get(key).push(v);
+      });
+      let bi = 0;
+      byBlock.forEach((data, z0) => {
+        layers.push(polys(bi ? `blocks-${bi}` : 'blocks', data, zUses + PLATE + z0));
+        bi += 1;
+      });
+      layers.push(new deck.PathLayer(withMask({
+        id: 'block-edge',
+        data: (model.blocks || []).filter((d) => d.infra),
+        coordinateSystem: CART,
+        modelMatrix: lift(zUses + PLATE + 0.45),
+        getPath: (d) => d.rings[0].map((pt) => [pt[0], pt[1], (d.z0 || 0) + d.h]),
+        getColor: [15, 23, 42, 255],
+        getWidth: 4.5,
+        widthUnits: 'pixels',
+        widthMinPixels: 2
+      })));
+    }
     const byBase = new Map();
     model.volumes.forEach((v) => {
       const key = v.z0 || 0;
@@ -1184,33 +1427,20 @@ function bootMap(place, model) {
       layers.push(polys(volI ? `volumes-${volI}` : 'volumes', data, zVolumes + PLATE + z0));
       volI += 1;
     });
-    if (k > 0.12) layers.push(polys('uses', model.uses, zUses + PLATE));
     if (!coarse || model.volumes.length < 3500) {
-      layers.push(new deck.PathLayer({
+      layers.push(new deck.PathLayer(withMask({
         id: 'roofs',
         data: model.volumes,
         coordinateSystem: CART,
         modelMatrix: lift(zVolumes + PLATE + 0.35),
-        getPath: (d) => d.rings[0].map((p) => [p[0], p[1], (d.z0 || 0) + d.h]),
-        getColor: [67, 20, 7, 230],
-        getWidth: 1.4,
+        getPath: (d) => d.rings[0].map((pt) => [pt[0], pt[1], (d.z0 || 0) + d.h]),
+        getColor: [67, 20, 7, 220],
+        getWidth: 1.2,
         widthUnits: 'pixels',
         widthMinPixels: 1
-      }));
+      })));
     }
-    if (sphere && model.trees.length) {
-      layers.push(new deck.SimpleMeshLayer({
-        id: 'trees',
-        mesh: sphere,
-        data: model.trees,
-        coordinateSystem: CART,
-        getPosition: (d) => [d.x, d.y, zVoids + PLATE + d.r * 0.82],
-        getScale: (d) => [d.r, d.r, d.r * 0.92],
-        getColor: (d) => d.shade,
-        material: SOFT
-      }));
-    }
-    layers.push(new deck.PathLayer({
+    layers.push(new deck.PathLayer(withMask({
       id: 'roads',
       data: model.roads,
       coordinateSystem: CART,
@@ -1222,8 +1452,8 @@ function bootMap(place, model) {
       widthMinPixels: 2,
       capRounded: true,
       jointRounded: true
-    }));
-    layers.push(new deck.PathLayer({
+    })));
+    layers.push(new deck.PathLayer(withMask({
       id: 'arrow-stems',
       data: model.arrows,
       coordinateSystem: CART,
@@ -1233,8 +1463,8 @@ function bootMap(place, model) {
       getWidth: 4.5,
       widthUnits: 'meters',
       widthMinPixels: 2
-    }));
-    layers.push(new deck.PolygonLayer({
+    })));
+    layers.push(new deck.PolygonLayer(withMask({
       id: 'arrow-heads',
       data: model.arrows,
       coordinateSystem: CART,
@@ -1246,8 +1476,8 @@ function bootMap(place, model) {
       getElevation: 2,
       getFillColor: (d) => d.color,
       material: SOFT
-    }));
-    layers.push(new deck.ScatterplotLayer({
+    })));
+    layers.push(new deck.ScatterplotLayer(withMask({
       id: 'nodes',
       data: model.nodes,
       coordinateSystem: CART,
@@ -1260,7 +1490,7 @@ function bootMap(place, model) {
       getLineColor: [55, 55, 58, 255],
       lineWidthUnits: 'pixels',
       getLineWidth: 2
-    }));
+    })));
     if (showStack) {
       const posts = [];
       const seams = [['links', 'uses'], ['uses', 'voids'], ['voids', 'volumes']];
@@ -1286,11 +1516,11 @@ function bootMap(place, model) {
       }));
       const badges = [
         { plane: 'volumes', color: [214, 54, 66, 255] },
-        { plane: 'voids', color: [46, 150, 78, 255] },
-        { plane: 'uses', color: [48, 108, 210, 255] },
+        { plane: 'voids', color: [22, 163, 74, 255] },
+        { plane: 'uses', color: [2, 132, 199, 255] },
         { plane: 'links', color: [214, 168, 32, 255] }
       ];
-      const badgePos = (d) => [-place.r - 28, -place.r + 20, planeZ(d.plane) + 18];
+      const badgePos = (d) => [-place.r - 42, 0, planeZ(d.plane) + 16];
       layers.push(new deck.ScatterplotLayer({
         id: 'badges',
         data: badges,
@@ -1326,7 +1556,7 @@ function bootMap(place, model) {
   camera = fitState(view.k);
   deckgl = new deck.Deck({
     parent,
-    views: new deck.OrbitView({ orthographic: true, orbitAxis: 'Z' }),
+    views: orbit,
     controller: { scrollZoom: true, dragPan: true, dragRotate: true, touchRotate: true, doubleClickZoom: false, keyboard: false },
     viewState: camera,
     onViewStateChange: ({ viewState }) => {
@@ -1334,7 +1564,7 @@ function bootMap(place, model) {
       deckgl.setProps({ viewState: camera });
     },
     effects: lights ? [lights] : [],
-    parameters: { clearColor: [0.976, 0.976, 0.973, 1] },
+    parameters: { clearColor: [0.91, 0.933, 0.953, 1] },
     useDevicePixels: coarse ? 1 : Math.min(window.devicePixelRatio || 1, 1.75)
   });
 
@@ -1360,6 +1590,8 @@ function bootMap(place, model) {
     $('btnTach').setAttribute('aria-pressed', exploded ? 'true' : 'false');
     $('btnGop').setAttribute('aria-pressed', exploded ? 'false' : 'true');
     $('modeChip').textContent = exploded ? 'Tách bốn lớp' : 'Gộp một khối';
+    const gapRow = $('gapRow');
+    if (gapRow) gapRow.hidden = !exploded;
     const url = new URL(location.href);
     url.searchParams.set('view', exploded ? 'tach' : 'gop');
     history.replaceState(null, '', url);
@@ -1373,6 +1605,12 @@ function bootMap(place, model) {
   }
   $('btnTach').addEventListener('click', () => setMode('tach', true));
   $('btnGop').addEventListener('click', () => setMode('gop', true));
+  $('gap')?.addEventListener('input', () => {
+    if (view.k < 0.5) return;
+    camera = fitState(view.k);
+    deckgl.setProps({ viewState: camera });
+    draw();
+  });
   setMode(place.view, false);
   window.addEventListener('resize', () => {
     camera = fitState(view.k);
@@ -1485,8 +1723,8 @@ async function start() {
   const origin = { lat: place.lat, lng: place.lng, mLat, mLng };
   const nearDefault = Math.hypot(place.lat - 16.4637, place.lng - 107.5952) < 0.0008;
   $('place').textContent = nearDefault
-    ? `Ngã sáu Hùng Vương – Bà Triệu. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Nửa cạnh ${fmt0(place.r)} m.`
-    : `Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Nửa cạnh ${fmt0(place.r)} m.`;
+    ? `Ngã sáu Hùng Vương – Bà Triệu. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Bán kính ${fmt0(place.r)} m.`
+    : `Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Bán kính ${fmt0(place.r)} m.`;
   const tiles = tilesFor(place.lat, place.lng, place.r);
   if (tiles.length > 16) {
     $('status').textContent = 'Ô quá lớn so với số tile cho phép trên trang này.';
@@ -1515,9 +1753,9 @@ async function start() {
   raw.osm = osm;
   raw.heightMeta = heights && heights.meta;
   if (ward.name && nearDefault) {
-    $('place').textContent = `Ngã sáu Hùng Vương – Bà Triệu, ${ward.name}. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Nửa cạnh ${fmt0(place.r)} m.`;
+    $('place').textContent = `Ngã sáu Hùng Vương – Bà Triệu, ${ward.name}. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Bán kính ${fmt0(place.r)} m.`;
   } else if (ward.name) {
-    $('place').textContent = `${ward.name}. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Nửa cạnh ${fmt0(place.r)} m.`;
+    $('place').textContent = `${ward.name}. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Bán kính ${fmt0(place.r)} m.`;
   }
   try {
     const model = buildModel(raw, origin, place.r, heights);
@@ -1525,7 +1763,7 @@ async function start() {
     paintPanel(model, place, ward);
     $('status').textContent = model.meanF == null
       ? 'Chưa có chiều cao mét trong ô.'
-      : `Số liệu trong ô vuông. Tầng cao trung bình ${fmt1(model.meanF)}, sàn ${fmt0(model.gfa)} m².`;
+      : `Số liệu trong vòng tròn. Tầng cao trung bình ${fmt1(model.meanF)}, sàn ${fmt0(model.gfa)} m².`;
     $('status').classList.add('done');
     if (model.meanF != null) document.body.dataset.meanF = String(model.meanF);
     const hs = model.volumes.map((v) => (v.z0 || 0) + v.h);
@@ -1535,7 +1773,8 @@ async function start() {
       document.body.dataset.raised = String(model.volumes.filter((v) => v.z0 > 0).length);
     }
     document.body.dataset.buildings = String(model.buildings);
-    document.body.dataset.trees = String(model.trees.length);
+    document.body.dataset.shape = 'circle';
+    document.body.dataset.area = String(Math.round(model.area));
     document.body.dataset.roads = String(model.roads.length);
     document.body.dataset.greens = String(model.greens.length);
     document.body.dataset.waters = String(model.waters.length);
@@ -1548,7 +1787,8 @@ async function start() {
     document.body.dataset.gfa = String(Math.round(model.gfa || 0));
     bootMap({ ...place, mLng, mLat }, model);
   } catch (err) {
-    $('status').textContent = 'Không dựng được mô hình trong ô vuông.';
+    console.warn('Mô hình 3D:', err);
+    $('status').textContent = 'Không dựng được mô hình trong vòng tròn.';
   }
 }
 
