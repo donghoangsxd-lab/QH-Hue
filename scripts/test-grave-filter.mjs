@@ -38,7 +38,7 @@ assert(!insideGraveMask(mask, 107.5786, 16.4694), 'kinh thành không phải ngh
 
 const layer = fs.readFileSync(new URL('../public/js/gbaLayer.js', import.meta.url), 'utf8');
 assert(layer.includes('const OUTLINE_ZOOM = 16'), 'ngưỡng viền');
-const strokeAt = layer.indexOf("ctx.strokeStyle = '#431407'");
+const strokeAt = layer.indexOf("ctx.strokeStyle = c < 0 ? MISSING_STROKE : '#431407'");
 const outlineAt = layer.indexOf('const outline = coords.z >= OUTLINE_ZOOM');
 const gate = layer.indexOf('if (!outline) return;', outlineAt);
 assert(outlineAt > 0 && gate > outlineAt && strokeAt > gate, 'viền chỉ vẽ từ mức 16');

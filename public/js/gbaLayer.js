@@ -16,6 +16,7 @@ import { showToast } from './utils.js';
 import { floorsAt, mergeFloorEdit, parseFloorPack } from './bldgFloorEdits.js';
 import { confirmedPartFeatures, partFloorLabel } from './bldgParts.js';
 import { prepareGraveMask, isCemeteryGrave } from './graveFilter.js';
+import { MISSING_FILL, MISSING_STROKE, missingPaintForTile, prepareMissingFootprints } from './bldgMissing.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -54,6 +55,9 @@ let floorPack = { v: 1, saved: 0, edits: {} };
 let editOn = false;
 let graveMask = null;
 let graveMaskP = null;
+let missingList = null;
+let missingReady = false;
+let missingP = null;
 const FLOOR_STORE = 'qh_bldg_floors';
 
 function pixelRatio() {
@@ -279,7 +283,7 @@ function drawFoot(canvas, feats, coords, dz, size, dpr) {
       if (y > maxy) maxy = y;
     }));
     if (maxx < view[0] || minx > view[2] || maxy < view[1] || miny > view[3]) return;
-    const c = Math.max(0, Math.min(3, ft.fc || 0));
+    const c = ft.unknown ? -1 : Math.max(0, Math.min(3, ft.fc || 0));
     if (!by.has(c)) by.set(c, []);
     by.get(c).push(ft);
   });
@@ -294,11 +298,11 @@ function drawFoot(canvas, feats, coords, dz, size, dpr) {
       ctx.closePath();
     }));
     ctx.globalAlpha = 0.72;
-    ctx.fillStyle = GBA_FLOOR_COLORS[c];
+    ctx.fillStyle = c < 0 ? MISSING_FILL : GBA_FLOOR_COLORS[c];
     ctx.fill('evenodd');
     if (!outline) return;
     ctx.globalAlpha = 0.9;
-    ctx.strokeStyle = '#431407';
+    ctx.strokeStyle = c < 0 ? MISSING_STROKE : '#431407';
     ctx.stroke();
   });
   ctx.globalAlpha = 1;
@@ -337,9 +341,9 @@ const FootGrid = L.GridLayer.extend({
     const dz = Math.max(0, coords.z - DATA_ZOOM);
     loadTile(coords.z - dz, coords.x >> dz, coords.y >> dz)
       .then((raw) => {
-        const paint = () => drawFoot(canvas, paintFeatures(raw), coords, dz, size, dpr);
+        const paint = () => drawFoot(canvas, paintFeatures(raw).concat(missingFor(coords, dz)), coords, dz, size, dpr);
         paint();
-        if (!heightsIdx || !graveMask) repaints.push(paint);
+        if (!heightsIdx || !graveMask || !missingReady) repaints.push(paint);
         done(null, canvas);
       })
       .catch((err) => done(err, canvas));
@@ -366,7 +370,8 @@ function syncAttr() {
 
 function legendHtml() {
   const swatch = GBA_FLOOR_CLASSES.map((name, i) => `<span><i style="background:${GBA_FLOOR_COLORS[i]}"></i>${name}</span>`).join('');
-  return `<div class="gba-legend" aria-label="Số tầng công trình, chiều cao chia 4">${swatch}</div>`;
+  const missing = `<span><i style="background:${MISSING_FILL}"></i>Chưa rõ tầng</span>`;
+  return `<div class="gba-legend" aria-label="Số tầng công trình, chiều cao chia 4">${swatch}${missing}</div>`;
 }
 
 function paintBox() {
@@ -381,10 +386,35 @@ function addFeet(m) {
   return watchTiles(new FootGrid({ pane: FOOT_PANE, minZoom: MIN_ZOOM, maxZoom: MAP_MAX_ZOOM, updateWhenZooming: false, keepBuffer: 1 }), 'Công trình xây dựng').addTo(m);
 }
 
+function missingFor(coords, dz) {
+  if (!missingList) return [];
+  return missingPaintForTile(missingList, { z: coords.z - dz, x: coords.x >> dz, y: coords.y >> dz });
+}
+
 function flushRepaints() {
-  if (!heightsIdx || !graveMask) return;
+  if (!heightsIdx || !graveMask || !missingReady) return;
   const jobs = repaints.splice(0);
   jobs.forEach((paint) => { try { paint(); } catch (err) { /* ô đã gỡ */ } });
+}
+
+function loadMissingFootprints() {
+  if (missingReady && missingList) return Promise.resolve(missingList);
+  if (!missingP) {
+    const url = withAssetVersion('data/gba/bldg-missing.geojson');
+    missingP = fetch(url).then((res) => (res.ok ? res.json() : null)).then((data) => {
+      missingList = prepareMissingFootprints(data);
+      missingReady = true;
+      flushRepaints();
+      return missingList;
+    }).catch(() => {
+      missingP = null;
+      missingList = [];
+      missingReady = true;
+      flushRepaints();
+      return missingList;
+    });
+  }
+  return missingP;
 }
 
 function loadGraveMask() {
@@ -753,6 +783,7 @@ export function initGbaLayer() {
   document.addEventListener('qh-admin-changed', syncFloorBtn);
   loadFloorEdits();
   loadGraveMask();
+  loadMissingFootprints();
   $('btnGbaFloors')?.addEventListener('click', () => {
     if (!isAdmin()) return;
     if (!feetOn) {
@@ -770,6 +801,7 @@ export function initGbaLayer() {
     if (feetOn) {
       trackWork('Công trình xây dựng', loadAgg().catch(() => {}));
       trackWork('Công trình xây dựng', loadGraveMask());
+      trackWork('Công trình xây dựng', loadMissingFootprints());
       trackWork('Công trình xây dựng', loadBuildingHeights().then((idx) => {
         heightsIdx = idx;
         flushRepaints();
