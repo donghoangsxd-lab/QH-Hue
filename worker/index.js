@@ -65,7 +65,38 @@ function limited(message) {
 
 function cors(headers) {
   headers.set('access-control-allow-origin', '*');
-  headers.set('access-control-expose-headers', 'Content-Length, Content-Range, Accept-Ranges, Content-Type, ETag, Cache-Control');
+  headers.set('access-control-expose-headers', 'Content-Length, Content-Range, Accept-Ranges, Content-Type, ETag, Cache-Control, cf-cache-status, x-qh-cache');
+  return headers;
+}
+
+// Chỉ nhận một đoạn đóng bytes=start-end, không quá STORE_MAX. bytes=0- và nhiều đoạn không lưu.
+export function normalizeByteRange(range) {
+  const text = String(range || '').trim();
+  if (!text) return '';
+  const m = /^bytes=(\d+)-(\d+)$/i.exec(text);
+  if (!m) return '';
+  const start = Number(m[1]);
+  const end = Number(m[2]);
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start) return '';
+  const span = end - start + 1;
+  if (span <= 0 || span > STORE_MAX) return '';
+  return `bytes=${start}-${end}`;
+}
+
+// Khóa = đường dẫn + ?v= (nếu có) + khoảng byte đã chuẩn hóa. Tham số khác không tách cache.
+export function gcsCacheUrl(requestUrl, normalizedRange) {
+  const url = new URL(requestUrl);
+  const key = new URL(`${url.origin}${url.pathname}`);
+  const version = url.searchParams.get('v');
+  if (version) key.searchParams.set('v', version);
+  if (normalizedRange) key.searchParams.set('__range', normalizedRange);
+  return key.toString();
+}
+
+function stampCache(headers, state) {
+  // CDN không gắn HIT cho phản hồi 206. Worker tự ghi; x-qh-cache phòng khi mép gỡ cf-cache-status.
+  headers.set('cf-cache-status', state);
+  headers.set('x-qh-cache', state);
   return headers;
 }
 
@@ -119,27 +150,31 @@ export async function proxyApi(request, env, ctx, now = Date.now()) {
 }
 
 function fromCache(hit) {
-  if (hit.headers.get('x-stored-status') !== '206') return hit;
-  const headers = cors(new Headers({
-    'content-type': hit.headers.get('content-type') || 'application/octet-stream',
-    'content-range': hit.headers.get('x-content-range') || '',
-    'accept-ranges': 'bytes',
-    'cache-control': hit.headers.get('cache-control') || ''
-  }));
-  return new Response(hit.body, { status: 206, headers });
+  const partial = hit.headers.get('x-stored-status') === '206';
+  const headers = cors(new Headers());
+  const type = hit.headers.get('content-type');
+  if (type) headers.set('content-type', type);
+  const len = hit.headers.get('content-length');
+  if (len) headers.set('content-length', len);
+  const cc = hit.headers.get('cache-control');
+  if (cc) headers.set('cache-control', cc);
+  headers.set('accept-ranges', 'bytes');
+  if (partial) headers.set('content-range', hit.headers.get('x-content-range') || '');
+  stampCache(headers, 'HIT');
+  return new Response(hit.body, { status: partial ? 206 : (hit.status || 200), headers });
 }
 
 async function remember(cache, key, res) {
   if (res.status === 206) {
-    await cache.put(key, new Response(res.body, {
-      status: 200,
-      headers: {
-        'content-type': res.headers.get('content-type') || 'application/octet-stream',
-        'cache-control': res.headers.get('cache-control') || '',
-        'x-content-range': res.headers.get('content-range') || '',
-        'x-stored-status': '206'
-      }
-    }));
+    const headers = {
+      'content-type': res.headers.get('content-type') || 'application/octet-stream',
+      'cache-control': res.headers.get('cache-control') || '',
+      'x-content-range': res.headers.get('content-range') || '',
+      'x-stored-status': '206'
+    };
+    const len = res.headers.get('content-length');
+    if (len) headers['content-length'] = len;
+    await cache.put(key, new Response(res.body, { status: 200, headers }));
     return;
   }
   if (res.status === 200) await cache.put(key, res);
@@ -156,23 +191,26 @@ export async function proxyGcs(request, ctx, objectName, now = Date.now()) {
     return new Response('Method Not Allowed', { status: 405, headers: { 'cache-control': 'no-store' } });
   }
   if (!objectName) return new Response('Đường dẫn không hợp lệ', { status: 400, headers: { 'cache-control': 'no-store' } });
+  const policy = cacheControlFor(objectName) || 'public, max-age=3600';
+  const rawRange = request.headers.get('range');
+  const normalized = rawRange ? normalizeByteRange(rawRange) : '';
+  const cacheableRange = !rawRange || !!normalized;
+  const cache = edgeCacheable(policy) && request.method === 'GET' && cacheableRange && typeof caches !== 'undefined'
+    ? caches.default
+    : null;
+  const cacheKey = cache ? new Request(gcsCacheUrl(request.url, normalized), { method: 'GET' }) : null;
+  if (cache && cacheKey) {
+    try {
+      const hit = await cache.match(cacheKey);
+      if (hit) return fromCache(hit);
+    } catch (e) { /* biên lỗi thì đọc GCS */ }
+  }
   if (!allow(gcsHits, clientIp(request), now, GCS_MAX, WINDOW_MS)) {
     return limited('Quá nhiều ô bản đồ, vui lòng chậm lại');
   }
-  const policy = cacheControlFor(objectName) || 'public, max-age=3600';
-  const range = request.headers.get('range');
-  const keyUrl = new URL(request.url);
-  keyUrl.hash = '';
-  if (range) keyUrl.searchParams.set('__range', range);
-  const cacheKey = new Request(keyUrl.toString(), { method: 'GET' });
-  const cache = edgeCacheable(policy) && request.method === 'GET' && typeof caches !== 'undefined' ? caches.default : null;
-  if (cache) {
-    const hit = await cache.match(cacheKey);
-    if (hit) return fromCache(hit);
-  }
   const target = GCS + objectName.split('/').map((part) => encodeURIComponent(part)).join('/');
   const headers = new Headers();
-  if (range) headers.set('range', range);
+  if (rawRange) headers.set('range', normalized || rawRange);
   let res;
   try {
     res = await fetch(target, { method: request.method, headers });
@@ -191,10 +229,11 @@ export async function proxyGcs(request, ctx, objectName, now = Date.now()) {
   if (contentRange) outHeaders.set('content-range', contentRange);
   outHeaders.set('accept-ranges', 'bytes');
   outHeaders.set('cache-control', policy);
+  stampCache(outHeaders, cache ? 'MISS' : 'BYPASS');
   cors(outHeaders);
   const out = new Response(request.method === 'HEAD' ? null : res.body, { status: res.status, headers: outHeaders });
   const size = Number(len || 0);
-  const store = cache && (res.status === 206 || (res.status === 200 && size > 0 && size <= STORE_MAX));
+  const store = cache && Number.isFinite(size) && size > 0 && size <= STORE_MAX && (res.status === 206 || res.status === 200);
   if (store && ctx && ctx.waitUntil) ctx.waitUntil(remember(cache, cacheKey, out.clone()).catch(() => {}));
   return out;
 }
