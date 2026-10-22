@@ -40,6 +40,8 @@ assert.match(src, /if \(directTiles\(\)\) return gcs/);
 assert.match(src, /workers\.dev/);
 assert.match(src, /data\/gba\/buildings\.pmtiles/);
 const wrangler = fs.readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+assert.match(wrangler, /"keep_vars": true/);
+assert.doesNotMatch(wrangler, /run\.app/);
 assert.match(wrangler, /"main": "worker\/index.js"/);
 assert.match(wrangler, /\/api\/\*/);
 assert.match(wrangler, /buildings\.pmtiles/);
