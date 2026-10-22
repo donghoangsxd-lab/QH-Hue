@@ -1101,7 +1101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Gọi song song: ranh giới (CDN cache), danh sách công trình, thống kê phường; heatmap chờ danh sách công trình
     const boundaryReady = loadBoundaryLayer().then(renderPlanBoundaries);
     boundaryReady.then(refreshUrbanAreaLayer).catch(() => {});
-    Promise.all([boundaryReady, urbanAreaReady()]).then(() => stepDone('urban'), () => {});
+    Promise.all([boundaryReady, urbanAreaReady()]).then(() => stepDone('urban'), () => stepDone('urban'));
     const statsReady = ensureWardStats();
     statsReady.catch(() => {});
     if (document.getElementById('chk_pop')?.checked) ensurePopulationLayer();
@@ -1150,6 +1150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (err) {
     console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
     showToast('Không nạp được dữ liệu bản đồ. Vui lòng tải lại trang.', 'error');
+    setBootProgress(100);
     if (progressRow) progressRow.style.display = 'none';
   }
 });
