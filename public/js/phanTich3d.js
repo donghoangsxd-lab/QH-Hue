@@ -6,6 +6,8 @@
 // Dân phường không nhân theo diện tích ô.
 
 import { withAssetVersion } from './gbaVersion.js';
+import { geeApi } from './api.js';
+import { floorsAt, floorsOnRing, metresForFloors, parseFloorPack } from './bldgFloorEdits.js';
 
 const GBA_URL = 'https://storage.googleapis.com/hue-infra-data-us/gba/buildings.pmtiles';
 const CAD_URL = 'https://storage.googleapis.com/hue-infra-data-us/cadastre/thuadat-2016.pmtiles';
@@ -814,7 +816,7 @@ export function parseHeightIndex(buf) {
   };
 }
 
-function buildModel(raw, origin, r, heights) {
+function buildModel(raw, origin, r, heights, floorPack) {
   const clip = circleRing(r, 48);
   const gaps = [];
   const volumes = [];
@@ -835,10 +837,12 @@ function buildModel(raw, origin, r, heights) {
   else {
     for (const feat of raw.gba) {
       if (feat.explicit) {
-        const top = feat.height;
-        const minH = feat.minHeight || 0;
+        const mid = ringCentroidLngLat(feat.rings && feat.rings[0]);
+        const edited = mid ? floorsAt(floorPack, mid[0], mid[1]) : null;
+        const top = edited != null ? metresForFloors(edited) : feat.height;
+        const minH = edited != null ? 0 : (feat.minHeight || 0);
         const extrusion = top - minH;
-        const f = feat.floors;
+        const f = edited != null ? edited : feat.floors;
         if (!(extrusion > 0) || !f) continue;
         for (const cut of clipFeature(feat, origin, clip, r)) {
           if (minH === 0) {
@@ -861,12 +865,15 @@ function buildModel(raw, origin, r, heights) {
         continue;
       }
       if (ringInsideMask(feat.rings && feat.rings[0], raw.masks)) continue;
+      const touched = floorsOnRing(floorPack, feat.rings && feat.rings[0]);
       for (const cut of clipFeature(feat, origin, clip, r)) {
         const mid = centroid(cut.rings[0]);
         const lng = origin.lng + mid[0] / origin.mLng;
         const lat = origin.lat + mid[1] / origin.mLat;
-        const h = heights ? heights.lookup(lng, lat) : null;
-        const f = floorsFromHeight(h);
+        const h0 = heights ? heights.lookup(lng, lat) : null;
+        const edited = touched != null ? touched : floorsAt(floorPack, lng, lat);
+        const h = edited != null ? metresForFloors(edited) : h0;
+        const f = edited != null ? edited : floorsFromHeight(h0);
         footprint += cut.area;
         classArea[floorBin(f)] += cut.area;
         if (h == null) heightMiss += 1;
@@ -1619,6 +1626,12 @@ function bootMap(place, model) {
   $('btnTach').disabled = false;
   $('btnGop').disabled = false;
   document.body.dataset.ready = '1';
+  return {
+    replace(next) {
+      model = next;
+      draw();
+    }
+  };
 }
 
 function pointInGeo(lng, lat, geometry) {
@@ -1716,6 +1729,63 @@ async function loadWard(lat, lng) {
   return { name, pop: row && row.pop ? row.pop : 0 };
 }
 
+let floorPack = { v: 1, saved: 0, edits: {} };
+let built = null;
+let view = null;
+
+async function loadFloorPack() {
+  let remote = { v: 1, saved: 0, edits: {} };
+  try {
+    const res = await fetch(geeApi('action=getBldgFloors'));
+    if (res.ok) remote = parseFloorPack(await res.json());
+  } catch (e) { /* máy chủ tĩnh */ }
+  try {
+    const local = parseFloorPack(JSON.parse(sessionStorage.getItem('qh_bldg_floors') || 'null'));
+    if (local.saved >= remote.saved && Object.keys(local.edits).length) remote = local;
+  } catch (e) { /* chưa có bản trong phiên */ }
+  floorPack = remote;
+}
+
+function showBuilt() {
+  if (!built) return;
+  const model = buildModel(built.raw, built.origin, built.place.r, built.heights, floorPack);
+  model.osmError = built.raw.osmError;
+  paintPanel(model, built.place, built.ward);
+  $('status').textContent = model.meanF == null
+    ? 'Chưa có chiều cao mét trong ô.'
+    : `Số liệu trong vòng tròn. Tầng cao trung bình ${fmt1(model.meanF)}, sàn ${fmt0(model.gfa)} m².`;
+  $('status').classList.add('done');
+  if (model.meanF != null) document.body.dataset.meanF = String(model.meanF);
+  const hs = model.volumes.map((v) => (v.z0 || 0) + v.h);
+  if (hs.length) {
+    document.body.dataset.minH = String(Math.min(...hs));
+    document.body.dataset.maxH = String(Math.max(...hs));
+    document.body.dataset.raised = String(model.volumes.filter((v) => v.z0 > 0).length);
+  }
+  document.body.dataset.buildings = String(model.buildings);
+  document.body.dataset.shape = 'circle';
+  document.body.dataset.area = String(Math.round(model.area));
+  document.body.dataset.roads = String(model.roads.length);
+  document.body.dataset.greens = String(model.greens.length);
+  document.body.dataset.waters = String(model.waters.length);
+  document.body.dataset.arrows = String(model.arrows.length);
+  document.body.dataset.greenPct = String(model.green);
+  if (model.greens[0]) {
+    const ring = model.greens[0].rings[0];
+    document.body.dataset.g0 = `${ring.length}|${ring[0][0].toFixed(0)},${ring[0][1].toFixed(0)}|${Math.round(ringArea(ring))}`;
+  }
+  document.body.dataset.gfa = String(Math.round(model.gfa || 0));
+  if (!view) view = bootMap(built.place, model);
+  else view.replace(model);
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== 'qh-floor-edit') return;
+    loadFloorPack().then(showBuilt).catch(() => {});
+  });
+}
+
 async function start() {
   const place = parseCenter(location.search);
   const mLat = 110540;
@@ -1758,34 +1828,9 @@ async function start() {
     $('place').textContent = `${ward.name}. Tâm ${place.lat.toFixed(4)}, ${place.lng.toFixed(4)}. Bán kính ${fmt0(place.r)} m.`;
   }
   try {
-    const model = buildModel(raw, origin, place.r, heights);
-    model.osmError = raw.osmError;
-    paintPanel(model, place, ward);
-    $('status').textContent = model.meanF == null
-      ? 'Chưa có chiều cao mét trong ô.'
-      : `Số liệu trong vòng tròn. Tầng cao trung bình ${fmt1(model.meanF)}, sàn ${fmt0(model.gfa)} m².`;
-    $('status').classList.add('done');
-    if (model.meanF != null) document.body.dataset.meanF = String(model.meanF);
-    const hs = model.volumes.map((v) => (v.z0 || 0) + v.h);
-    if (hs.length) {
-      document.body.dataset.minH = String(Math.min(...hs));
-      document.body.dataset.maxH = String(Math.max(...hs));
-      document.body.dataset.raised = String(model.volumes.filter((v) => v.z0 > 0).length);
-    }
-    document.body.dataset.buildings = String(model.buildings);
-    document.body.dataset.shape = 'circle';
-    document.body.dataset.area = String(Math.round(model.area));
-    document.body.dataset.roads = String(model.roads.length);
-    document.body.dataset.greens = String(model.greens.length);
-    document.body.dataset.waters = String(model.waters.length);
-    document.body.dataset.arrows = String(model.arrows.length);
-    document.body.dataset.greenPct = String(model.green);
-    if (model.greens[0]) {
-      const ring = model.greens[0].rings[0];
-      document.body.dataset.g0 = `${ring.length}|${ring[0][0].toFixed(0)},${ring[0][1].toFixed(0)}|${Math.round(ringArea(ring))}`;
-    }
-    document.body.dataset.gfa = String(Math.round(model.gfa || 0));
-    bootMap({ ...place, mLng, mLat }, model);
+    built = { raw, origin, place: { ...place, mLng, mLat }, heights, ward };
+    await loadFloorPack();
+    showBuilt();
   } catch (err) {
     console.warn('Mô hình 3D:', err);
     $('status').textContent = 'Không dựng được mô hình trong vòng tròn.';
