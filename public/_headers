@@ -1,0 +1,60 @@
+# Header tĩnh cho Cloudflare Workers. Vercel dùng vercel.json, không đọc file này.
+# _headers không bị tải lên như file công khai.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  Permissions-Policy: geolocation=(self), camera=(), microphone=()
+
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+
+/
+  Cache-Control: no-store
+
+/index.html
+  Cache-Control: no-store
+
+/phan-tich-3d.html
+  Cache-Control: no-store
+
+# html_handling auto-trailing-slash phục vụ trang này ở /phan-tich-3d (không còn đuôi .html).
+/phan-tich-3d
+  Cache-Control: no-store
+
+/*.html
+  Cache-Control: no-store
+
+/js/*
+  Cache-Control: no-store
+
+/css/*
+  Cache-Control: no-store
+
+/icons/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+/data/ward-boundary.json
+  Cache-Control: public, max-age=31536000, immutable
+
+/data/gba/agg.json
+  Cache-Control: public, max-age=31536000, immutable
+
+/data/gba/bldg-overrides.geojson
+  Cache-Control: public, max-age=31536000, immutable
+
+/data/gba/qh-hientrang.json
+  Cache-Control: public, max-age=31536000, immutable
+
+/data/qhc2045/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/data/gba/bldg-hf.bin
+  Cache-Control: public, max-age=31536000, immutable
+
+/data/gba/bldg-hf.json
+  Cache-Control: public, max-age=31536000, immutable
+
+/sw.js
+  Cache-Control: no-cache

@@ -1,0 +1,15 @@
+{
+  // Worker tĩnh cho Cloudflare (màn Import GitHub: npx wrangler deploy).
+  // Không có "main": không đóng gói api/ và không chạy hàm. Vercel không đọc file này.
+  "name": "qh-hue",
+  "compatibility_date": "2026-10-22",
+  "assets": {
+    "directory": "./public",
+    // Hai trang HTML thật (/ và /phan-tich-3d.html), không phải SPA.
+    // Đường không có file trả 404, không đổ nội dung index.html vào URL hỏng.
+    "not_found_handling": "none",
+    // / phục vụ index.html. /phan-tich-3d.html chuyển 307 tới /phan-tich-3d, không thêm dấu / cuối
+    // nên CSS/JS tương đối (css/..., js/...) vẫn trỏ đúng thư mục gốc.
+    "html_handling": "auto-trailing-slash"
+  }
+}
