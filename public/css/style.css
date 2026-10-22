@@ -3124,6 +3124,26 @@ table.ward-table th {
 .island-flag-name { color: #fff; font-size: 9px; letter-spacing: 0; }
 .island-flag-country { color: #fde047; font-size: 14px; letter-spacing: 0.03em; }
 
+/* Hệ thống đô thị dưới mức phóng 13: canvas và nét lớp phủ (ranh đồ án, biểu đồ, tem công trình)
+   không nhận chuột. Ký hiệu đô thị, nét ranh đô thị và vùng đồ án đang chọn đô thị vẫn bấm được. */
+.leaflet-container.detail-locked .leaflet-pane canvas,
+.leaflet-container.detail-locked .leaflet-pane .leaflet-interactive,
+.leaflet-container.detail-locked .leaflet-marker-pane > .leaflet-marker-icon {
+  pointer-events: none !important;
+}
+.leaflet-container.detail-locked .leaflet-urbanLine-pane .leaflet-interactive,
+.leaflet-container.detail-locked .leaflet-urbanHover-pane .leaflet-interactive,
+.leaflet-container.detail-locked .leaflet-urbanFocus-pane,
+.leaflet-container.detail-locked .leaflet-urbanFocus-pane canvas,
+.leaflet-container.detail-locked .leaflet-urbanFocus-pane .leaflet-interactive,
+.leaflet-container.detail-locked .leaflet-popup-pane,
+.leaflet-container.detail-locked .leaflet-popup-pane *,
+.leaflet-container.detail-locked .leaflet-tooltip-pane,
+.leaflet-container.detail-locked .leaflet-tooltip-pane *,
+.leaflet-container.detail-locked .leaflet-marker-pane > .ua-badge-icon {
+  pointer-events: auto !important;
+}
+
 /* Biểu đồ tròn tổng hợp mỗi phường xã ở zoom nhỏ */
 .ward-pie-mode .ward-label-text, .ward-names-off .ward-label-text { display: none; }
 .ward-pie-icon { background: transparent !important; border: none !important; }

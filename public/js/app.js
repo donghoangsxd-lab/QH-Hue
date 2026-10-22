@@ -46,7 +46,7 @@ import {
   getViewMode, getSplitKind, onViewChange, setViewMode, toggleViewMode, setSplitKind, isCompareOn
 } from './planMap.js';
 import { escapeHtml, setStatusContent, showToast, announceTool, TOOL_START_EVENT, RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './utils.js';
-import { initViewFlow, wardFromMapClick } from './viewFlow.js';
+import { initViewFlow, wardFromMapClick, detailClickLocked } from './viewFlow.js';
 import { initMapLevel, getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { initSplitPair } from './splitPair.js';
 import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
@@ -570,16 +570,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     // Thứ tự ưu tiên khi bấm: tem công trình > thửa hiện trạng (lớp thửa bật) > lô quy hoạch > phường (cuối cùng).
     // Lô tự bắt click (không nổi lên bản đồ); lớp thửa giành popup lô trong cadastreLayer.onPopupOpen
-    if (infraClickAt(e, targetMap)) return;
+    const detailLocked = detailClickLocked(targetMap);
+    if (!detailLocked && infraClickAt(e, targetMap)) return;
     if (state.isInspectMode) {
       if (nearPanelClick) return;
       handleInspectPointClick(e.latlng.lat, e.latlng.lng, targetMap);
       return;
     }
-    if (cadastreClick(e, targetMap)) return;
+    if (!detailLocked && cadastreClick(e, targetMap)) return;
     // Click vừa mở popup của điểm / lô (sự kiện nổi lên bản đồ) thì không đổi phường (đổi phường sẽ đóng popup)
     if (performance.now() - popupAt < 300) return;
-    if (qhcClick(e, targetMap)) return;
+    if (!detailLocked && qhcClick(e, targetMap)) return;
     // Bấm nền: chọn phường hay không do lớp quy hoạch đang xem quyết định (viewFlow.js)
     const ward = wardFromMapClick(e.latlng, targetMap);
     if (ward) chooseWard(ward);
