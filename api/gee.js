@@ -11,6 +11,7 @@ const { requireAdmin, httpError } = require('../services/authService');
 const roads = require('../services/roadsService');
 const popEdits = require('../services/popEditsService');
 const sat = require('../services/satService');
+const satTiles = require('../services/satTileCache');
 const tree = require('../services/treePriority');
 const projects = require('../services/projectStore');
 const pdfLimits = require('../services/pdfLimits');
@@ -4000,6 +4001,34 @@ module.exports = async (req, res) => {
       return res.status(200).json(data);
     }
 
+    // Chú giải + URL ô. Không tạo map id (map id hết hạn, CDN không được giữ).
+    if (action === 'getSatMeta') {
+      const body = satTiles.meta(req.query);
+      if (!body) return res.status(400).json({ error: true, message: 'Lớp vệ tinh không hợp lệ' });
+      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+      return res.status(200).json(body);
+    }
+
+    // Ô PNG: năm đã chốt lấy từ bucket nếu có; không thì GEE, thử lại, làm mới map id khi hết hạn.
+    if (action === 'getSatTile') {
+      try {
+        const out = await satTiles.serve(req.query, async () => {
+          await initGEE();
+          return getGeeContext();
+        });
+        if (out.body) {
+          Object.entries(out.headers || {}).forEach(([k, v]) => res.setHeader(k, v));
+          return res.status(out.status).send(out.body);
+        }
+        res.setHeader('Cache-Control', 'no-store');
+        return res.status(out.status).json({ error: true, message: out.message || 'Ô vệ tinh chưa tải được' });
+      } catch (err) {
+        console.error('Ô vệ tinh:', err && err.message ? err.message : err);
+        res.setHeader('Cache-Control', 'no-store');
+        return res.status(502).json({ error: true, message: 'Ô vệ tinh chưa tải được' });
+      }
+    }
+
     if (action === 'getSingleIsochrone') {
       const pt = parseCoordInBounds(req.query.lat, req.query.lng);
       if (!pt) return res.status(400).json({ error: true, message: "Tọa độ không hợp lệ" });
@@ -4369,9 +4398,14 @@ module.exports = async (req, res) => {
       const all = req.query.year === 'all';
       const year = all ? null : sat.parseYear(req.query.year, years);
       if (!all && year == null) return res.status(400).json({ error: true, message: "Năm không hợp lệ" });
-      res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=3600');
-      const { image, legend } = sat.sarFloodVis(ee, wardVectorParsed, year, years);
-      return res.status(200).json({ urlFormat: await sat.mapUrl(ee, image), legend, years });
+      res.setHeader('Cache-Control', 'no-store');
+      const spec = { layer: 'sar', year: all ? 'all' : year };
+      return res.status(200).json({
+        urlFormat: satTiles.template(spec),
+        legend: sat.tileLegend('sar', spec),
+        years,
+        maxNativeZoom: satTiles.LAYERS.sar.maxZ
+      });
     }
 
     // Nhiệt độ bề mặt mùa nóng (Landsat 8/9)
@@ -4379,9 +4413,14 @@ module.exports = async (req, res) => {
       const years = sat.lstYears();
       const year = sat.parseYear(req.query.year, years);
       if (year == null) return res.status(400).json({ error: true, message: "Năm không hợp lệ" });
-      res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=3600');
-      const image = sat.lstImage(ee, wardVectorParsed, year).visualize(sat.LST_VIS);
-      return res.status(200).json({ urlFormat: await sat.mapUrl(ee, image), legend: sat.LST_VIS, years });
+      res.setHeader('Cache-Control', 'no-store');
+      const spec = { layer: 'lst', year };
+      return res.status(200).json({
+        urlFormat: satTiles.template(spec),
+        legend: sat.tileLegend('lst', spec),
+        years,
+        maxNativeZoom: satTiles.LAYERS.lst.maxZ
+      });
     }
 
     if (action === 'getLstStats') {
@@ -4503,16 +4542,18 @@ module.exports = async (req, res) => {
       const compare = req.query.compare ? sat.parseYear(req.query.compare, years) : null;
       if (year == null || (req.query.compare && compare == null)) return res.status(400).json({ error: true, message: 'Năm không hợp lệ' });
       if (compare != null && compare === year) return res.status(400).json({ error: true, message: 'Hai năm so sánh phải khác nhau' });
-      res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=86400');
-      const img = compare == null ? sat.ndviImage(ee, wardVectorParsed, year) : sat.ndviDiff(ee, wardVectorParsed, year, compare);
       if (action === 'getNdviTile') {
-        const vis = compare == null ? sat.NDVI_VIS : sat.NDVI_DIFF_VIS;
+        res.setHeader('Cache-Control', 'no-store');
+        const spec = { layer: 'ndvi', year, compare };
         return res.status(200).json({
-          urlFormat: await sat.mapUrl(ee, img.visualize(vis)),
-          legend: { ...vis, diff: compare != null, year, compare },
-          years
+          urlFormat: satTiles.template(spec),
+          legend: sat.tileLegend('ndvi', spec),
+          years,
+          maxNativeZoom: satTiles.LAYERS.ndvi.maxZ
         });
       }
+      res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=86400');
+      const img = compare == null ? sat.ndviImage(ee, wardVectorParsed, year) : sat.ndviDiff(ee, wardVectorParsed, year, compare);
       const key = `ndvi|${year}|${compare || ''}`;
       if (!cachedSatStats.has(key)) {
         const fc = await eeEvaluate(img.reduceRegions({
@@ -4537,9 +4578,14 @@ module.exports = async (req, res) => {
     if (action === 'getForestTile') {
       const mode = sat.FOREST_MODES.includes(req.query.mode) ? req.query.mode : null;
       if (!mode) return res.status(400).json({ error: true, message: 'Lớp rừng không hợp lệ' });
-      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
-      const built = mode === 'loss' ? sat.forestLossVis(ee, wardVectorParsed) : sat.forestCoverVis(ee, wardVectorParsed);
-      return res.status(200).json({ urlFormat: await sat.mapUrl(ee, built.image), legend: built.legend, mode });
+      res.setHeader('Cache-Control', 'no-store');
+      const spec = { layer: 'forest', mode };
+      return res.status(200).json({
+        urlFormat: satTiles.template(spec),
+        legend: sat.tileLegend('forest', spec),
+        mode,
+        maxNativeZoom: satTiles.LAYERS.forest.maxZ
+      });
     }
 
     if (action === 'getForestStats') {
@@ -4682,12 +4728,13 @@ module.exports = async (req, res) => {
     if (action === 'getNewDevTile') {
       const from = Number(req.query.from);
       if (!sat.DEV_FROM_YEARS.includes(from)) return res.status(400).json({ error: true, message: "Năm gốc không hợp lệ" });
-      res.setHeader('Cache-Control', 's-maxage=43200, stale-while-revalidate=86400');
-      const image = sat.newDevVis(ee, wardVectorParsed, from);
+      res.setHeader('Cache-Control', 'no-store');
+      const spec = { layer: 'dev', from, endYear: sat.devRecentYears()[1] };
       return res.status(200).json({
-        urlFormat: await sat.mapUrl(ee, image),
-        legend: { color: sat.DEV_COLOR, baseColor: sat.DEV_BASE_COLOR, from, to: sat.devRecentYears() },
-        years: sat.DEV_FROM_YEARS
+        urlFormat: satTiles.template(spec),
+        legend: sat.tileLegend('dev', spec),
+        years: sat.DEV_FROM_YEARS,
+        maxNativeZoom: satTiles.LAYERS.dev.maxZ
       });
     }
 

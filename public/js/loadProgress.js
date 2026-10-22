@@ -93,15 +93,18 @@ function paint() {
     if (!job.pending) return;
     const row = rowOf(name);
     if (!row) return;
+    const failed = job.failed || 0;
     const pct = Math.max(0, Math.min(100, Math.round((100 * Math.min(job.done, job.pending)) / job.pending)));
     const el = badgeOf(name, row);
-    if (job.done < job.pending) el.classList.remove('is-fading');
+    if (job.done < job.pending || failed) el.classList.remove('is-fading');
     if (!el.classList.contains('is-fading')) {
       el.style.color = progressColor(pct);
-      el.textContent = `${pct}%`;
-      el.title = `${name}: ${pct}%`;
+      el.textContent = failed ? `${pct}% · ${failed} lỗi` : `${pct}%`;
+      el.title = failed
+        ? `${name}: ${job.done}/${job.pending} ô thành công, ${failed} ô lỗi`
+        : `${name}: ${pct}%`;
     }
-    if (job.done >= job.pending) armHide(name, job);
+    if (!failed && job.done >= job.pending) armHide(name, job);
     else if (job.hideTimer) {
       clearTimeout(job.hideTimer);
       job.hideTimer = 0;
@@ -115,13 +118,13 @@ function paint() {
 function slot(name) {
   let job = jobs.get(name);
   if (!job) {
-    job = { pending: 0, done: 0, watchers: 0, hideTimer: 0 };
+    job = { pending: 0, done: 0, failed: 0, watchers: 0, hideTimer: 0 };
     jobs.set(name, job);
   }
   return job;
 }
 
-/** Đếm tileloadstart / tileload / tileerror của một lớp Leaflet. */
+/** Đếm tileloadstart / tileload. tileerror là ô hỏng, không tính vào phần trăm đã xong. */
 export function watchTiles(layer, name) {
   if (!layer || !name || layer._loadProgressName === name) return layer;
   layer._loadProgressName = name;
@@ -131,8 +134,13 @@ export function watchTiles(layer, name) {
     slot(name).pending += 1;
     paint();
   });
-  layer.on('tileload tileerror', () => {
+  layer.on('tileload', () => {
     slot(name).done += 1;
+    paint();
+  });
+  layer.on('tileerror', () => {
+    const cur = slot(name);
+    cur.failed += 1;
     paint();
   });
   layer.on('remove', () => {

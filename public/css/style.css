@@ -2557,6 +2557,9 @@ table.data-table tfoot .st-total-note { font-weight: 400; font-style: italic; }
 /* Chấm sáng tuyến tiếp cận (flowAnimation.js): trên vùng phục vụ, dưới marker công trình và popup.
    Không dùng CSS filter: canvas vẽ lại mỗi khung hình, filter làm trình duyệt blur lại cả màn hình → lag */
 .flow-pane { z-index: 450; pointer-events: none; }
+img.gee-sat-tile.gee-tile-miss {
+  background: repeating-linear-gradient(-45deg, rgba(220, 38, 38, 0.4) 0 4px, rgba(15, 23, 42, 0.2) 4px 10px);
+}
 
 /* Chế độ âm bản khi chọn công trình (mapEngine.js highlightSingleIsochrone): icon ngoài phạm vi phục vụ mờ đi */
 .sel-active .custom-infra-icon-png { opacity: 0.35; transition: opacity 0.2s; }
