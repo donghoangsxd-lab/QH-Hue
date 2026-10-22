@@ -1073,6 +1073,7 @@ body.right-collapsed .right-panel {
 .layer-lot-btn:has(input:checked) { border-color: var(--accent-cyan); background: var(--accent-cyan); color: var(--bg-panel); }
 .layer-lot-btn:has(input:focus-visible) { outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
 .layer-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 24px; font-size: var(--fs-md); line-height: 1.25; }
+.layer-row[hidden] { display: none; }
 .layer-row > div { display: flex; align-items: center; min-width: 0; flex: 1; }
 .layer-row label { display: inline-flex; align-items: center; gap: 5px; min-width: 0; cursor: pointer; color: var(--text-main); }
 /* Phần trăm tải (loadProgress.js): cuối dòng, không xuống dòng. Bậc 0–100: đỏ → cam → vàng → lục. */

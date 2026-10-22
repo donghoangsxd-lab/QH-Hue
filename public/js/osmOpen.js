@@ -112,6 +112,22 @@ function groupOn(id) {
   return !!$(id)?.checked;
 }
 
+function roadsOn() {
+  return groupOn('chk_roads');
+}
+
+/** Đường sắt hiện trạng chỉ là mục con của Mạng lưới đường, và tắt theo đường. */
+function railWanted() {
+  return roadsOn() && groupOn('chk_osmRail');
+}
+
+function syncRailRow() {
+  const row = $('osmRailRow');
+  if (row) row.hidden = !roadsOn();
+  const rail = $('chk_osmRail');
+  if (rail && rail.checked && !roadsOn()) rail.checked = false;
+}
+
 function anyOn() {
   return GROUPS.some(g => groupOn(g.id));
 }
@@ -143,7 +159,7 @@ function draw() {
   const feats = hueFeatures();
   paintRail();
   if (!feats || !anyOn()) return;
-  const rail = groupOn('chk_osmRail');
+  const rail = railWanted();
   const water = groupOn('chk_osmWater');
   const pick = (group) => feats.filter(f => f.properties && f.properties.group === group);
   if (water) {
@@ -176,14 +192,14 @@ function railZoomOk() {
 function paintRailHint() {
   const hint = $('railHint');
   if (!hint) return;
-  const on = groupOn('chk_osmRail');
+  const on = railWanted();
   if (!on) { hint.textContent = ''; return; }
   hint.textContent = railZoomOk() ? '' : '(phóng tới mức 11)';
 }
 
 function paintRail() {
   const legend = $('railLegend');
-  const on = groupOn('chk_osmRail');
+  const on = railWanted();
   if (legend) legend.style.display = on ? '' : 'none';
   paintRailHint();
   const st = $('railStatus');
@@ -239,6 +255,7 @@ export function initOsmOpen(map, planMap) {
   maps = [map, planMap].filter(Boolean);
   if (!maps.length) return;
   const refresh = () => {
+    syncRailRow();
     paintBox(null);
     if (!anyOn()) {
       if (waitTimer) { clearInterval(waitTimer); waitTimer = null; }
@@ -251,11 +268,13 @@ export function initOsmOpen(map, planMap) {
     });
   };
   GROUPS.forEach(g => $(g.id)?.addEventListener('change', refresh));
+  $('chk_roads')?.addEventListener('change', refresh);
+  syncRailRow();
   maps.forEach(m => m.on('zoomend', () => {
     const ok = railZoomOk();
     paintRailHint();
     if (ok === lastRailOk) return;
-    if (groupOn('chk_osmRail')) draw();
+    if (railWanted()) draw();
     else lastRailOk = ok;
   }));
   paintRailHint();
