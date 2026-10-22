@@ -15,6 +15,7 @@ import { state } from './state.js';
 import { showToast } from './utils.js';
 import { floorsAt, mergeFloorEdit, parseFloorPack } from './bldgFloorEdits.js';
 import { confirmedPartFeatures, partFloorLabel } from './bldgParts.js';
+import { prepareGraveMask, isCemeteryGrave } from './graveFilter.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -24,6 +25,8 @@ const LIBS = {
 const LAYER = 'gba';
 const MIN_ZOOM = 13;
 const DATA_ZOOM = 16;
+// Dưới mức này chỉ tô mảng theo nhóm tầng, không viền từng dấu chân.
+const OUTLINE_ZOOM = 16;
 const FOOT_PANE = 'gbaPane';
 const FOOT_Z = 408;
 const PART_PANE = 'gbaPartPane';
@@ -49,6 +52,8 @@ let partRings = [];
 let attrOn = false;
 let floorPack = { v: 1, saved: 0, edits: {} };
 let editOn = false;
+let graveMask = null;
+let graveMaskP = null;
 const FLOOR_STORE = 'qh_bldg_floors';
 
 function pixelRatio() {
@@ -234,12 +239,13 @@ function readingOf(ft) {
   const h = heightsIdx ? heightAt(ft.lng, ft.lat, heightsIdx) : null;
   const published = edited != null ? edited : zoneFloors(ft.lng, ft.lat, ft.area, floorZones);
   const floors = floorsForReading(h, published);
-  return { floors, edited, fc: floorClassIndex(edited != null ? null : h, floors) };
+  return { floors, edited, h, fc: floorClassIndex(edited != null ? null : h, floors) };
 }
 
 function paintFeatures(raw) {
-  return raw.map((ft) => {
+  return raw.flatMap((ft) => {
     const read = readingOf(ft);
+    if (read.edited == null && isCemeteryGrave(graveMask, ft.area, read.h, ft.lng, ft.lat)) return [];
     const hidePublished = read.edited == null && coveredByPart(ft.lng, ft.lat);
     const anchor = read.floors == null || hidePublished ? null : poleOfInaccessibility(ft.rings, 8);
     return {
@@ -277,7 +283,8 @@ function drawFoot(canvas, feats, coords, dz, size, dpr) {
     if (!by.has(c)) by.set(c, []);
     by.get(c).push(ft);
   });
-  ctx.lineWidth = (coords.z >= 16 ? 0.6 : 0.35) * dpr;
+  const outline = coords.z >= OUTLINE_ZOOM;
+  ctx.lineWidth = 0.6 * dpr;
   ctx.lineJoin = 'round';
   by.forEach((list, c) => {
     ctx.beginPath();
@@ -289,6 +296,7 @@ function drawFoot(canvas, feats, coords, dz, size, dpr) {
     ctx.globalAlpha = 0.72;
     ctx.fillStyle = GBA_FLOOR_COLORS[c];
     ctx.fill('evenodd');
+    if (!outline) return;
     ctx.globalAlpha = 0.9;
     ctx.strokeStyle = '#431407';
     ctx.stroke();
@@ -331,7 +339,7 @@ const FootGrid = L.GridLayer.extend({
       .then((raw) => {
         const paint = () => drawFoot(canvas, paintFeatures(raw), coords, dz, size, dpr);
         paint();
-        if (!heightsIdx) repaints.push(paint);
+        if (!heightsIdx || !graveMask) repaints.push(paint);
         done(null, canvas);
       })
       .catch((err) => done(err, canvas));
@@ -371,6 +379,30 @@ function paintBox() {
 function addFeet(m) {
   pane(m, FOOT_PANE, FOOT_Z);
   return watchTiles(new FootGrid({ pane: FOOT_PANE, minZoom: MIN_ZOOM, maxZoom: MAP_MAX_ZOOM, updateWhenZooming: false, keepBuffer: 1 }), 'Công trình xây dựng').addTo(m);
+}
+
+function flushRepaints() {
+  if (!heightsIdx || !graveMask) return;
+  const jobs = repaints.splice(0);
+  jobs.forEach((paint) => { try { paint(); } catch (err) { /* ô đã gỡ */ } });
+}
+
+function loadGraveMask() {
+  if (graveMask) return Promise.resolve(graveMask);
+  if (!graveMaskP) {
+    const url = withAssetVersion('data/gba/cemetery-mask.geojson');
+    graveMaskP = fetch(url).then((res) => (res.ok ? res.json() : null)).then((data) => {
+      graveMask = prepareGraveMask(data);
+      flushRepaints();
+      return graveMask;
+    }).catch(() => {
+      graveMaskP = null;
+      graveMask = prepareGraveMask(null);
+      flushRepaints();
+      return graveMask;
+    });
+  }
+  return graveMaskP;
 }
 
 function redrawFeet() {
@@ -432,6 +464,8 @@ async function footprintAt(lat, lng) {
     const extent = ft.extent || 4096;
     const ring = (ft.rings[0] || []).map(([px, py]) => lngLatOf(z, x, y, px, py, extent));
     if (!pointInRing(lng, lat, ring)) return;
+    const read = readingOf(ft);
+    if (read.edited == null && isCemeteryGrave(graveMask, ft.area, read.h, ft.lng, ft.lat)) return;
     if (!best || ft.area < best.area) best = ft;
   });
   if (!best) return null;
@@ -718,6 +752,7 @@ export function initGbaLayer() {
   syncFloorBtn();
   document.addEventListener('qh-admin-changed', syncFloorBtn);
   loadFloorEdits();
+  loadGraveMask();
   $('btnGbaFloors')?.addEventListener('click', () => {
     if (!isAdmin()) return;
     if (!feetOn) {
@@ -734,10 +769,10 @@ export function initGbaLayer() {
     feetOn = !!e.target.checked;
     if (feetOn) {
       trackWork('Công trình xây dựng', loadAgg().catch(() => {}));
+      trackWork('Công trình xây dựng', loadGraveMask());
       trackWork('Công trình xây dựng', loadBuildingHeights().then((idx) => {
         heightsIdx = idx;
-        const jobs = repaints.splice(0);
-        jobs.forEach((paint) => { try { paint(); } catch (err) { /* ô đã gỡ */ } });
+        flushRepaints();
       }).catch(() => { repaints.length = 0; }));
     } else {
       repaints.length = 0;
