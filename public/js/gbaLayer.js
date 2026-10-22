@@ -14,6 +14,7 @@ import { trackWork, watchTiles } from './loadProgress.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
 import { floorsAt, mergeFloorEdit, parseFloorPack } from './bldgFloorEdits.js';
+import { confirmedPartFeatures } from './bldgParts.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -25,6 +26,8 @@ const MIN_ZOOM = 13;
 const DATA_ZOOM = 16;
 const FOOT_PANE = 'gbaPane';
 const FOOT_Z = 408;
+const PART_PANE = 'gbaPartPane';
+const PART_Z = 409;
 const TILE_CACHE = 64;
 const ATTR = 'Công trình © TUM (Global Building Atlas), Google, Microsoft, OpenStreetMap · CC BY-NC 4.0, ODbL';
 
@@ -40,6 +43,8 @@ let heightsIdx = null;
 const tiles = new Map();
 const repaints = [];
 let footL = null, footR = null;
+let partL = null, partR = null;
+let partP = null;
 let attrOn = false;
 let floorPack = { v: 1, saved: 0, edits: {} };
 let editOn = false;
@@ -504,6 +509,62 @@ export async function gbaFloorEditClick(e, targetMap) {
   return true;
 }
 
+function partStyle(feature) {
+  const podium = feature.properties && feature.properties.role === 'podium';
+  return podium
+    ? { color: '#fdba74', weight: 2, dashArray: '5 4', fillColor: '#ffedd5', fillOpacity: 0.4, opacity: 1 }
+    : { color: '#9a3412', weight: 2.5, fillColor: '#9a3412', fillOpacity: 0.35, opacity: 1 };
+}
+
+function loadPartOutlines() {
+  if (!partP) {
+    const url = withAssetVersion('data/gba/bldg-overrides.geojson');
+    partP = fetch(url).then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    }).then((fc) => confirmedPartFeatures(fc))
+      .catch(() => { partP = null; return { type: 'FeatureCollection', features: [] }; });
+  }
+  return partP;
+}
+
+function addParts(m, fc) {
+  pane(m, PART_PANE, PART_Z);
+  const layer = L.geoJSON(fc, { pane: PART_PANE, interactive: false, style: partStyle }).addTo(m);
+  const show = m.getZoom() >= MIN_ZOOM;
+  layer.eachLayer((l) => {
+    const el = l.getElement?.();
+    if (el) el.style.display = show ? '' : 'none';
+  });
+  return layer;
+}
+
+function dropParts() {
+  partL?.remove(); partL = null;
+  partR?.remove(); partR = null;
+}
+
+function refreshPartZoom() {
+  [[map, partL], [planMap, partR]].forEach(([m, layer]) => {
+    if (!m || !layer) return;
+    const show = m.getZoom() >= MIN_ZOOM;
+    layer.eachLayer((l) => {
+      const el = l.getElement?.();
+      if (el) el.style.display = show ? '' : 'none';
+    });
+  });
+}
+
+function applyParts() {
+  if (!feetOn) { dropParts(); return; }
+  loadPartOutlines().then((fc) => {
+    if (!feetOn) return;
+    dropParts();
+    if (map) partL = addParts(map, fc);
+    if (planMap) partR = addParts(planMap, fc);
+  }).catch(() => {});
+}
+
 function applyFeet() {
   if (feetOn) {
     if (map && !footL) footL = addFeet(map);
@@ -512,6 +573,7 @@ function applyFeet() {
     footL?.remove(); footL = null;
     footR?.remove(); footR = null;
   }
+  applyParts();
 }
 
 function ensureAgg() {
@@ -587,6 +649,8 @@ export function initGbaLayer() {
   setLandPopupExtra(lotHtml);
   setWardGbaHtml(wardHtml);
   map.on('zoomend', paintBox);
+  map.on('zoomend', refreshPartZoom);
+  planMap?.on('zoomend', refreshPartZoom);
   syncFloorBtn();
   document.addEventListener('qh-admin-changed', syncFloorBtn);
   loadFloorEdits();

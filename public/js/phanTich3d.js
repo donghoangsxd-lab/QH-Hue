@@ -1169,6 +1169,12 @@ function paintMassing(rows) {
     const name = document.createElement('td');
     name.textContent = row.drawn ? row.name : `${row.name} (chưa vẽ)`;
     if (!row.drawn) name.className = 'off';
+    if (!row.drawn && row.note) {
+      const small = document.createElement('small');
+      small.className = 'mass-note';
+      small.textContent = row.note;
+      name.append(small);
+    }
     const podium = document.createElement('td');
     podium.textContent = row.podiumFloors == null ? '—' : String(row.podiumFloors);
     const tower = document.createElement('td');
@@ -1243,6 +1249,7 @@ function paintPanel(model, place) {
   $('stats').replaceChildren(...items);
   const when = model.osmDate ? ` OpenStreetMap ${String(model.osmDate).slice(0, 10)}.` : '';
   $('src').textContent = `Dấu chân và chiều cao © TUM, Global Building Atlas, CC BY-NC 4.0. Đường, công viên và công trình © người đóng góp OpenStreetMap, ODbL.${when}`;
+  paintMassing(model.massing || []);
 }
 
 function lift(z) {
