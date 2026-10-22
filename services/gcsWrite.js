@@ -80,6 +80,7 @@ async function putObject(name, body, contentType, generation) {
     transformRequest: [(data) => data]
   });
   if (res.status !== 200) throw fail(name, res.status, 'Ghi');
+  await applyCache(name);
   return { generation: String((res.data && res.data.generation) || '') };
 }
 
@@ -222,4 +223,45 @@ async function rewriteObject(src, dest) {
   throw fail(dest, 502, 'Chép');
 }
 
-module.exports = { accessToken, putJson, readJson, putObject, removeObject, signPutUrl, objectMeta, readBytes, rewriteObject };
+module.exports = { accessToken, putJson, readJson, putObject, removeObject, signPutUrl, objectMeta, readBytes, rewriteObject, patchCacheControl, listObjects };
+
+async function patchCacheControl(name, cacheControl) {
+  const access = await accessToken();
+  const res = await axios.patch(`${objectApiUrl(name)}?updateMask=cacheControl`, { cacheControl }, {
+    headers: { Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+    timeout: 20000,
+    validateStatus: () => true
+  });
+  if (res.status !== 200) throw fail(name, res.status, 'Sửa metadata');
+}
+
+async function applyCache(name) {
+  try {
+    const { cacheControlFor } = await import('../config/gcsCachePolicy.mjs');
+    const desired = cacheControlFor(name);
+    if (!desired || /no-store/.test(desired)) return;
+    await patchCacheControl(name, desired);
+  } catch (err) {
+    console.warn('Không gắn Cache-Control:', name, err.message);
+  }
+}
+
+async function listObjects(prefix, pageToken) {
+  const access = await accessToken();
+  const q = new URLSearchParams({ maxResults: '1000' });
+  if (prefix) q.set('prefix', prefix);
+  if (pageToken) q.set('pageToken', pageToken);
+  const res = await axios.get(`https://storage.googleapis.com/storage/v1/b/${constants.GCS_BUCKET}/o?${q}`, {
+    headers: { Authorization: `Bearer ${access}` },
+    timeout: 30000,
+    validateStatus: () => true
+  });
+  if (res.status !== 200) throw fail(prefix || '/', res.status, 'Liệt kê');
+  return {
+    items: ((res.data && res.data.items) || []).map((it) => ({
+      name: it.name,
+      cacheControl: it.cacheControl || ''
+    })),
+    nextPageToken: (res.data && res.data.nextPageToken) || ''
+  };
+}

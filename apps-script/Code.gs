@@ -510,6 +510,20 @@ function uploadToGCS(content, fileName) {
 
     Logger.log("🚀 KẾT QUẢ UPLOAD GCS " + objectName + " [" + responseCode + "]: " + responseBody);
 
+    if (responseCode === 200 && objectName === GEOJSON_FILE_NAME) {
+      var stamp = UrlFetchApp.fetch(
+        "https://storage.googleapis.com/storage/v1/b/" + BUCKET_NAME + "/o/" + encodeURIComponent(objectName) + "?updateMask=cacheControl",
+        {
+          "method": "patch",
+          "contentType": "application/json",
+          "headers": { "Authorization": "Bearer " + token },
+          "payload": JSON.stringify({ cacheControl: "public, max-age=60, must-revalidate" }),
+          "muteHttpExceptions": true
+        }
+      );
+      if (stamp.getResponseCode() !== 200) console.error("Không gắn Cache-Control cho " + objectName + ": " + stamp.getContentText());
+    }
+
     if (responseCode !== 200) {
       console.error("Lỗi Upload GCS " + objectName + " Code " + responseCode + ": " + responseBody);
     }
