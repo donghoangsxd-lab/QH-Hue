@@ -1,8 +1,8 @@
 // Lớp vệ tinh (bảng lớp dữ liệu): vùng ngập thực tế mùa lũ (radar Sentinel-1), nhiệt độ bề mặt mùa nóng (Landsat 8/9),
 // NDVI Sentinel-2,
 // và vùng phát triển mới (Dynamic World, newDev.js).
-// Ảnh tính trên Google Earth Engine (api/gee.js › getSarFloodTile / getLstTile, services/satService.js), vẽ đồng thời trên
-// bản đồ hiện trạng và quy hoạch; thống kê theo phường chỉ tải khi bật lớp, mỗi năm 1 lần.
+// Ảnh đi qua getSatMeta / getSatTile (services/satTileCache.js): máy chủ giữ map id, thử lại, cache PNG năm đã chốt.
+// Vẽ đồng thời trên bản đồ hiện trạng và quy hoạch; thống kê theo phường chỉ tải khi bật lớp, mỗi năm 1 lần.
 import { map, flyToVisible } from './mapEngine.js';
 import { planMap, shownMaps } from './planMap.js';
 import { state, BUFFER_COLORS, layerType } from './state.js';
@@ -12,6 +12,9 @@ import { escapeHtml, fmtNum, startTaskProgress, trackTileLoads } from './utils.j
 import { devFromYears, loadNewDevStats, devLegend, devStats, DEV_MIN_ZOOM } from './newDev.js';
 import { geeTileOpts } from './basemap.js';
 import { watchTiles } from './loadProgress.js';
+import { geeTileLayer } from './geeTiles.js';
+
+const HUE_TILE_BOUNDS = L.latLngBounds([15.9, 106.9], [16.9, 108.3]);
 
 const $ = (id) => document.getElementById(id);
 const MAX_LIST = 150;
@@ -43,7 +46,8 @@ const LAYERS = {
     zIndex: 3,
     seasons: sarSeasons,
     extra: [['all', 'Số mùa lũ bị ngập (mọi năm)']],
-    tileQuery: (y) => `action=getSarFloodTile&year=${y}&dem=fabdem`,
+    maxNativeZoom: 15,
+    tileQuery: (y) => `action=getSatMeta&layer=sar&year=${encodeURIComponent(y)}`,
     statsQuery: (y) => (y === 'all' ? null : `action=getSarFloodStats&year=${y}&dem=fabdem`),
     renderLegend: sarLegend,
     renderStats: sarStats
@@ -54,7 +58,8 @@ const LAYERS = {
     zIndex: 1,
     seasons: lstSeasons,
     extra: [],
-    tileQuery: (y) => `action=getLstTile&year=${y}`,
+    maxNativeZoom: 14,
+    tileQuery: (y) => `action=getSatMeta&layer=lst&year=${encodeURIComponent(y)}`,
     statsQuery: (y) => `action=getLstStats&year=${y}`,
     renderLegend: lstLegend,
     renderStats: lstStats
@@ -66,7 +71,8 @@ const LAYERS = {
     seasons: ndviSeasons,
     extra: [],
     yearKey: ndviYearKey,
-    tileQuery: (y) => ndviQuery('getNdviTile', y),
+    maxNativeZoom: 15,
+    tileQuery: (y) => ndviQuery('getSatMeta', y).replace('action=getSatMeta', 'action=getSatMeta&layer=ndvi'),
     statsQuery: (y) => ndviQuery('getNdviStats', y),
     renderLegend: ndviLegend,
     renderStats: ndviStats
@@ -78,7 +84,8 @@ const LAYERS = {
     minZoom: DEV_MIN_ZOOM,
     seasons: devFromYears,
     extra: [],
-    tileQuery: (y) => `action=getNewDevTile&from=${y}`,
+    maxNativeZoom: 15,
+    tileQuery: (y) => `action=getSatMeta&layer=dev&from=${encodeURIComponent(y)}`,
     statsQuery: (y) => `action=getNewDevStats&from=${y}`,
     loadStats: loadNewDevStats,
     renderLegend: devLegend,
@@ -91,7 +98,8 @@ const LAYERS = {
     seasons: () => ({ years: ['cover', 'loss'], partial: null, def: 'cover' }),
     yearText: (y) => (y === 'loss' ? 'Mất rừng 2001–2025 (Hansen)' : 'Phủ thực vật 2021 (WorldCover)'),
     extra: [],
-    tileQuery: (y) => `action=getForestTile&mode=${y}`,
+    maxNativeZoom: 14,
+    tileQuery: (y) => `action=getSatMeta&layer=forest&mode=${encodeURIComponent(y)}`,
     statsQuery: (y) => `action=getForestStats&mode=${y}`,
     renderLegend: forestLegend,
     renderStats: forestStats
@@ -229,13 +237,23 @@ function opacityOf(cfg) {
 
 // track(layers): gắn đếm ô cho các layer đổi ảnh trên bản đồ đang thấy, gọi trước khi thêm / đổi URL để không sót ô đầu.
 // Cùng URL thì Leaflet không vẽ lại, dưới minZoom không tải ô: không đếm
-function setLayerUrl(cfg, rt, url, track) {
-  const opts = geeTileOpts({ minZoom: cfg.minZoom || 0, opacity: opacityOf(cfg), zIndex: cfg.zIndex });
+function setLayerUrl(cfg, rt, tile, track) {
+  const url = tile.urlFormat;
+  const opts = geeTileOpts({
+    minZoom: tile.minZoom || cfg.minZoom || 0,
+    maxNativeZoom: tile.maxNativeZoom || cfg.maxNativeZoom,
+    opacity: opacityOf(cfg),
+    zIndex: cfg.zIndex,
+    bounds: HUE_TILE_BOUNDS,
+    className: 'gee-sat-tile',
+    keepBuffer: 1,
+    updateWhenZooming: false
+  });
   const changed = rt.url !== url;
   rt.url = url;
   const shown = shownMaps();
   const sides = [['left', map], ['right', planMap]].filter(([, m]) => m)
-    .map(([side, m]) => ({ side, m, fresh: !rt[side], layer: rt[side] || watchTiles(L.tileLayer(url, opts), cfg.label) }));
+    .map(([side, m]) => ({ side, m, fresh: !rt[side], layer: rt[side] || watchTiles(geeTileLayer(url, opts), cfg.label) }));
   track(sides.filter(s => changed && shown.includes(s.m) && s.m.getZoom() >= opts.minZoom).map(s => s.layer));
   sides.forEach(({ side, m, fresh, layer }) => {
     if (fresh) rt[side] = layer.addTo(m);
@@ -259,9 +277,17 @@ async function show(key) {
     }));
     if (seq !== rt.seq || !rt.visible) { task.cancel(); return; }
     task.set(SERVER_PCT, `Đang tải ảnh ${cfg.label}`);
-    setLayerUrl(cfg, rt, tile.urlFormat, (tracked) => {
-      trackTileLoads(tracked, (n, total) => task.set(SERVER_PCT + (100 - SERVER_PCT) * 0.98 * (n / Math.max(total, 1))))
-        .then(() => { if (rt.task === task) task.done(`Đã tải ${cfg.label}`); });
+    setLayerUrl(cfg, rt, tile, (tracked) => {
+      trackTileLoads(tracked, (n, total, failed) => {
+        const note = failed ? ` (${failed} ô lỗi)` : '';
+        task.set(SERVER_PCT + (100 - SERVER_PCT) * 0.98 * (n / Math.max(total, 1)), `Đang tải ảnh ${cfg.label}${note}`);
+      }, 120000, { countError: false }).then((r) => {
+        if (rt.task !== task) return;
+        const missing = Math.max(0, (r?.total || 0) - (r?.loaded || 0) - (r?.failed || 0));
+        const failed = (r?.failed || 0) + missing;
+        if (failed) task.fail(`Thiếu ${failed} ô ${cfg.label}`);
+        else task.done(`Đã tải ${cfg.label}`);
+      });
     });
     rt.legend = tile.legend;
     if (legendEl) legendEl.innerHTML = cfg.renderLegend(tile.legend, year);

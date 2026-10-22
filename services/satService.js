@@ -374,6 +374,38 @@ function builtAreaM2(ee, wards, year) {
   return ee.Image.pixelArea().multiply(dwBuilt(ee, wards, year, year)).rename('m2').clipToCollection(wards);
 }
 
+/** Chú giải lớp môi trường, không cần Earth Engine. Khớp ảnh visualize của từng lớp. */
+function tileLegend(layer, q) {
+  if (layer === 'ndvi') {
+    const vis = q.compare == null ? NDVI_VIS : NDVI_DIFF_VIS;
+    return { ...vis, diff: q.compare != null, year: q.year, compare: q.compare == null ? null : q.compare };
+  }
+  if (layer === 'lst') return { ...LST_VIS };
+  if (layer === 'sar') {
+    if (q.year === 'all') {
+      const max = Math.min(sarYears().length, FREQ_PALETTE.length);
+      return { min: 1, max, palette: FREQ_PALETTE };
+    }
+    return { color: FLOOD_COLOR };
+  }
+  if (layer === 'forest') {
+    if (q.mode === 'loss') {
+      return {
+        mode: 'loss',
+        title: `Mất rừng ${LOSS_LEGEND.from}–${LOSS_LEGEND.to} (Hansen, tán năm 2000 ≥ ${TREE_MIN_PCT}%)`,
+        ...LOSS_LEGEND
+      };
+    }
+    return {
+      mode: 'cover',
+      title: `Phủ thực vật ${WORLDCOVER_YEAR} (ESA WorldCover 10 m)`,
+      classes: COVER_CLASSES.map(({ name, color }) => ({ name, color }))
+    };
+  }
+  if (layer === 'dev') return { color: DEV_COLOR, baseColor: DEV_BASE_COLOR, from: q.from, to: devRecentYears() };
+  return null;
+}
+
 /** Tạo ô bản đồ từ ảnh đã visualize; ép PNG để không bị nén JPEG (sai giá trị Terrarium) */
 function mapUrl(ee, visImage) {
   return new Promise((resolve, reject) => {
@@ -382,7 +414,7 @@ function mapUrl(ee, visImage) {
 }
 
 module.exports = {
-  sarYears, lstYears, ndviYears, parseYear, demImage, demRegion, terrariumImage, sarFloodMask, sarFloodVis, lstImage, ndviImage, ndviDiff, mapUrl,
+  sarYears, lstYears, ndviYears, parseYear, demImage, demRegion, terrariumImage, sarFloodMask, sarFloodVis, lstImage, ndviImage, ndviDiff, mapUrl, tileLegend,
   LST_VIS, NDVI_VIS, NDVI_DIFF_VIS, FLOOD_SEASON, HOT_SEASON, POP_REFS,
   newDevImage, newDevVis, devRecentYears, DEV_FROM_YEARS, DEV_FROM_DEFAULT, DEV_COLOR, DEV_BASE_COLOR, DEV_SCALE_M, DEV_CRS,
   FOREST_MODES, COVER_CLASSES, WORLDCOVER_YEAR, HANSEN_LOSS_MAX, TREE_MIN_PCT,

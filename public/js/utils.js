@@ -369,28 +369,48 @@ export function startTaskProgress(label) {
 }
 
 /**
- * Theo dõi tải ô ảnh của L.tileLayer: onProgress(số ô đã xong, tổng số ô đã yêu cầu). Gắn trước khi thêm layer vào bản đồ.
- * Xong khi layer phát 'load' (đủ ô trong khung nhìn), bị gỡ khỏi bản đồ hoặc quá timeoutMs.
+ * Theo dõi tải ô ảnh của L.tileLayer: onProgress(số ô thành công, tổng số ô đã yêu cầu, số ô lỗi).
+ * countError: false thì ô lỗi không cộng vào số đã xong (lớp vệ tinh). Mặc định giữ cách cũ cho các lớp khác.
+ * Xong khi layer phát 'load', bị gỡ, hoặc quá timeoutMs.
  */
-export function trackTileLoad(layer, onProgress, timeoutMs = 60000) {
+export function trackTileLoad(layer, onProgress, timeoutMs = 60000, opts = {}) {
+  const countError = opts.countError !== false;
   return new Promise(resolve => {
     let total = 0;
     let loaded = 0;
-    const onStart = () => { total++; onProgress(loaded, total); };
-    const onTile = () => { loaded++; onProgress(loaded, total); };
+    let failed = 0;
+    const report = () => onProgress(loaded, total, failed);
+    const onStart = () => { total++; report(); };
+    const onOk = () => { loaded++; report(); };
+    const onErr = () => {
+      if (countError) loaded++;
+      else failed++;
+      report();
+    };
     const finish = () => {
       clearTimeout(timer);
-      layer.off('tileloadstart', onStart).off('tileload tileerror', onTile).off('load remove', finish);
-      resolve();
+      layer.off('tileloadstart', onStart).off('tileload', onOk).off('tileerror', onErr).off('load remove', finish);
+      resolve({ loaded, failed, total });
     };
     const timer = setTimeout(finish, timeoutMs);
-    layer.on('tileloadstart', onStart).on('tileload tileerror', onTile).on('load remove', finish);
+    layer.on('tileloadstart', onStart).on('tileload', onOk).on('tileerror', onErr).on('load remove', finish);
   });
 }
 
-/** trackTileLoad cho nhiều layer cùng lúc (2 bản đồ khi chia đôi): onProgress(tổng ô đã xong, tổng ô đã yêu cầu) */
-export function trackTileLoads(layers, onProgress, timeoutMs) {
-  const counts = layers.map(() => [0, 0]);
-  const report = () => onProgress(counts.reduce((s, c) => s + c[0], 0), counts.reduce((s, c) => s + c[1], 0));
-  return Promise.all(layers.map((layer, i) => trackTileLoad(layer, (n, total) => { counts[i] = [n, total]; report(); }, timeoutMs)));
+/** trackTileLoad cho nhiều layer cùng lúc (2 bản đồ khi chia đôi) */
+export function trackTileLoads(layers, onProgress, timeoutMs, opts) {
+  const counts = layers.map(() => [0, 0, 0]);
+  const report = () => onProgress(
+    counts.reduce((s, c) => s + c[0], 0),
+    counts.reduce((s, c) => s + c[1], 0),
+    counts.reduce((s, c) => s + c[2], 0)
+  );
+  return Promise.all(layers.map((layer, i) => trackTileLoad(layer, (n, total, failed) => {
+    counts[i] = [n, total, failed || 0];
+    report();
+  }, timeoutMs, opts))).then(parts => ({
+    loaded: parts.reduce((s, p) => s + (p?.loaded || 0), 0),
+    failed: parts.reduce((s, p) => s + (p?.failed || 0), 0),
+    total: parts.reduce((s, p) => s + (p?.total || 0), 0)
+  }));
 }
