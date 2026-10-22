@@ -7,14 +7,14 @@ import { planMap } from './planMap.js';
 import { MAP_MAX_ZOOM } from './basemap.js';
 import { geeApi } from './api.js';
 import { setWardGbaHtml } from './uiComponents.js';
-import { GBA_FLOOR_CLASSES, GBA_FLOOR_COLORS, floorClassIndex, floorLabelVisible, floorsForReading, gbaLotKey, gbaStatsHtml, gbaWardExtra, poleOfInaccessibility } from './gbaStats.js';
+import { GBA_FLOOR_CLASSES, GBA_FLOOR_COLORS, FLOOR_LABEL_ZOOM, floorClassIndex, floorLabelVisible, floorsForReading, gbaLotKey, gbaStatsHtml, gbaWardExtra, poleOfInaccessibility } from './gbaStats.js';
 import { heightAt, loadBuildingHeights } from './bldgHeight.js';
 import { withAssetVersion } from './gbaVersion.js';
 import { trackWork, watchTiles } from './loadProgress.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
 import { floorsAt, mergeFloorEdit, parseFloorPack } from './bldgFloorEdits.js';
-import { confirmedPartFeatures } from './bldgParts.js';
+import { confirmedPartFeatures, partFloorLabel } from './bldgParts.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -45,6 +45,7 @@ const repaints = [];
 let footL = null, footR = null;
 let partL = null, partR = null;
 let partP = null;
+let partRings = [];
 let attrOn = false;
 let floorPack = { v: 1, saved: 0, edits: {} };
 let editOn = false;
@@ -239,7 +240,8 @@ function readingOf(ft) {
 function paintFeatures(raw) {
   return raw.map((ft) => {
     const read = readingOf(ft);
-    const anchor = read.floors == null ? null : poleOfInaccessibility(ft.rings, 8);
+    const hidePublished = read.edited == null && coveredByPart(ft.lng, ft.lat);
+    const anchor = read.floors == null || hidePublished ? null : poleOfInaccessibility(ft.rings, 8);
     return {
       rings: ft.rings,
       extent: ft.extent,
@@ -390,6 +392,7 @@ async function loadFloorEdits() {
     if (!res.ok) return;
     floorPack = parseFloorPack(await res.json());
     redrawFeet();
+    refreshPartLabels();
   } catch (e) { /* chưa có file hoặc máy chủ tĩnh */ }
 }
 
@@ -477,6 +480,7 @@ function openFloorEditor(targetMap, hit) {
     }
     rememberFloors(parseFloorPack({ v: 1, saved: data.at, edits: data.edits }));
     redrawFeet();
+    refreshPartLabels();
     targetMap.closePopup();
     showToast(floors == null ? 'Đã bỏ hiệu chỉnh số tầng.' : `Đã lưu ${floors} tầng.`, 'success');
   };
@@ -528,14 +532,55 @@ function loadPartOutlines() {
   return partP;
 }
 
+function partMid(feature) {
+  const geom = feature && feature.geometry;
+  const ring = geom && geom.type === 'Polygon' ? geom.coordinates[0]
+    : geom && geom.type === 'MultiPolygon' && geom.coordinates[0] ? geom.coordinates[0][0] : null;
+  if (!ring || ring.length < 3) return null;
+  let x = 0;
+  let y = 0;
+  let n = 0;
+  for (const p of ring) {
+    if (n && p[0] === ring[0][0] && p[1] === ring[0][1]) continue;
+    x += p[0];
+    y += p[1];
+    n += 1;
+  }
+  return n ? [x / n, y / n] : null;
+}
+
+function partLabelText(feature) {
+  const props = (feature && feature.properties) || {};
+  const mid = partMid(feature);
+  const edited = mid ? floorsAt(floorPack, mid[0], mid[1]) : null;
+  return partFloorLabel(props.role, edited != null ? edited : props.floors);
+}
+
+function rememberParts(fc) {
+  partRings = [];
+  for (const f of (fc && fc.features) || []) {
+    const geom = f.geometry;
+    const polys = !geom ? [] : geom.type === 'Polygon' ? [geom.coordinates] : geom.type === 'MultiPolygon' ? geom.coordinates : [];
+    for (const poly of polys) if (poly[0]) partRings.push(poly[0]);
+  }
+}
+
+function coveredByPart(lng, lat) {
+  return partRings.some((ring) => pointInRing(lng, lat, ring));
+}
+
 function addParts(m, fc) {
   pane(m, PART_PANE, PART_Z);
-  const layer = L.geoJSON(fc, { pane: PART_PANE, interactive: false, style: partStyle }).addTo(m);
-  const show = m.getZoom() >= MIN_ZOOM;
-  layer.eachLayer((l) => {
-    const el = l.getElement?.();
-    if (el) el.style.display = show ? '' : 'none';
-  });
+  const layer = L.geoJSON(fc, {
+    pane: PART_PANE,
+    interactive: false,
+    style: partStyle,
+    onEachFeature(feature, l) {
+      const text = partLabelText(feature);
+      if (!text) return;
+      l.bindTooltip(text, { permanent: false, direction: 'center', className: 'gba-part-label', opacity: 1 });
+    }
+  }).addTo(m);
   return layer;
 }
 
@@ -547,21 +592,40 @@ function dropParts() {
 function refreshPartZoom() {
   [[map, partL], [planMap, partR]].forEach(([m, layer]) => {
     if (!m || !layer) return;
-    const show = m.getZoom() >= MIN_ZOOM;
+    const zoom = m.getZoom();
+    const show = zoom >= MIN_ZOOM;
+    const label = zoom >= FLOOR_LABEL_ZOOM;
     layer.eachLayer((l) => {
       const el = l.getElement?.();
       if (el) el.style.display = show ? '' : 'none';
+      if (!l.getTooltip?.()) return;
+      if (show && label) l.openTooltip();
+      else l.closeTooltip();
     });
   });
+}
+
+function refreshPartLabels() {
+  [partL, partR].forEach((layer) => {
+    layer?.eachLayer((l) => {
+      const text = partLabelText(l.feature);
+      const tip = l.getTooltip?.();
+      if (tip && text) tip.setContent(text);
+    });
+  });
+  refreshPartZoom();
 }
 
 function applyParts() {
   if (!feetOn) { dropParts(); return; }
   loadPartOutlines().then((fc) => {
     if (!feetOn) return;
+    rememberParts(fc);
+    redrawFeet();
     dropParts();
     if (map) partL = addParts(map, fc);
     if (planMap) partR = addParts(planMap, fc);
+    refreshPartZoom();
   }).catch(() => {});
 }
 

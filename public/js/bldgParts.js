@@ -14,11 +14,19 @@ export function confirmedPartFeatures(fc) {
         geometry,
         properties: {
           role: part.role === 'podium' ? 'podium' : 'tower',
-          id: props.id || ''
+          id: props.id || '',
+          floors: Number(part.floors) || 0
         }
       });
     }
   }
   features.sort((a, b) => (a.properties.role === 'podium' ? 0 : 1) - (b.properties.role === 'podium' ? 0 : 1));
   return { type: 'FeatureCollection', features };
+}
+
+/** Nhãn riêng của khối, lấy số tầng của phần đó. Không lấy số tầng cả công trình. */
+export function partFloorLabel(role, floors) {
+  const n = Math.round(Number(floors));
+  if (!(n >= 1) || (role !== 'podium' && role !== 'tower')) return '';
+  return role === 'podium' ? `Đế ${n}` : `Tháp ${n}`;
 }
