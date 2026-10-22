@@ -14,8 +14,8 @@ export function geeApi(search = '') {
   return `${base}?${String(search).replace(/^\?/, '')}`;
 }
 
-// Danh sách công trình được CDN giữ tối đa 30 s + 120 s stale-while-revalidate (api/gee.js):
-// trình duyệt vừa ghi dữ liệu thì trong 3 phút luôn lấy bản mới, bỏ qua CDN
+// Danh sách công trình: CDN giữ 10 phút + 1 giờ stale-while-revalidate (api/gee.js).
+// Trình duyệt vừa ghi dữ liệu thì trong 3 phút gọi fresh= để bỏ qua bản CDN.
 const WRITE_KEY = 'qh_data_written_at';
 const FRESH_WINDOW_MS = 3 * 60 * 1000;
 

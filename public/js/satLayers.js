@@ -1,7 +1,7 @@
 // Lớp vệ tinh (bảng lớp dữ liệu): vùng ngập thực tế mùa lũ (radar Sentinel-1), nhiệt độ bề mặt mùa nóng (Landsat 8/9),
 // NDVI Sentinel-2,
 // và vùng phát triển mới (Dynamic World, newDev.js).
-// Ảnh đi qua getSatMeta / getSatTile (services/satTileCache.js): máy chủ giữ map id, thử lại, cache PNG năm đã chốt.
+// Ảnh năm đã chốt: PNG trên bucket (fallbackFormat khi ô chưa có). getSatMeta / getSatTile giữ map id cho năm đang chạy.
 // Vẽ đồng thời trên bản đồ hiện trạng và quy hoạch; thống kê theo phường chỉ tải khi bật lớp, mỗi năm 1 lần.
 import { map, flyToVisible } from './mapEngine.js';
 import { planMap, shownMaps } from './planMap.js';
@@ -247,17 +247,19 @@ function setLayerUrl(cfg, rt, tile, track) {
     bounds: HUE_TILE_BOUNDS,
     className: 'gee-sat-tile',
     keepBuffer: 1,
-    updateWhenZooming: false
+    updateWhenZooming: false,
+    fallbackUrl: tile.fallbackFormat || ''
   });
-  const changed = rt.url !== url;
+  const changed = rt.url !== url || rt.fallback !== opts.fallbackUrl;
   rt.url = url;
+  rt.fallback = opts.fallbackUrl;
   const shown = shownMaps();
   const sides = [['left', map], ['right', planMap]].filter(([, m]) => m)
     .map(([side, m]) => ({ side, m, fresh: !rt[side], layer: rt[side] || watchTiles(geeTileLayer(url, opts), cfg.label) }));
   if (track) track(sides.filter(s => changed && shown.includes(s.m) && s.m.getZoom() >= opts.minZoom).map(s => s.layer));
   sides.forEach(({ side, m, fresh, layer }) => {
     if (fresh) rt[side] = layer.addTo(m);
-    else if (changed) layer.setUrl(url);
+    else if (changed) layer.setUrl(url, opts.fallbackUrl);
   });
 }
 
