@@ -22,11 +22,18 @@ const diff = tiles.parseQuery({ layer: 'ndvi', year: '2024', compare: '2020', z:
 assert.equal(tiles.seriesId(diff), '2024-2020');
 assert.ok(diff.durable);
 assert.match(tiles.template(diff), /action=getSatTile&layer=ndvi&year=2024&compare=2020&z=\{z\}&x=\{x\}&y=\{y\}/);
+assert.match(tiles.tileUrls(diff, now).urlFormat, /storage\.googleapis\.com\/hue-infra-data-us\/cache\/sat\/v1\/ndvi\/2024-2020\/\{z\}\/\{x\}\/\{y\}\.png/);
+assert.match(tiles.tileUrls(diff, now).fallbackFormat, /action=getSatTile/);
+const live = tiles.parseQuery({ layer: 'ndvi', year: '2026', z: '15', x: '1', y: '1' }, now);
+assert.equal(live.durable, false);
+assert.match(tiles.tileUrls(live, now).urlFormat, /action=getSatTile/);
+assert.equal(tiles.tileUrls(live, now).fallbackFormat, undefined);
 
 const lst = tiles.meta({ layer: 'lst', year: '2024' }, now);
 assert.equal(lst.maxNativeZoom, 14);
 assert.ok(lst.legend.palette.length >= 5);
-assert.match(lst.urlFormat, /layer=lst&year=2024/);
+assert.match(lst.urlFormat, /cache\/sat\/v1\/lst\/2024\/\{z\}\/\{x\}\/\{y\}\.png/);
+assert.match(lst.fallbackFormat, /layer=lst&year=2024/);
 
 assert.equal(tiles.parseQuery({ layer: 'sar', year: 'all', z: '15', x: '1', y: '1' }, now).durable, true);
 assert.equal(tiles.parseQuery({ layer: 'forest', mode: 'cover', z: '14', x: '3', y: '4' }, now).durable, true);

@@ -26,7 +26,9 @@ module.exports = async (req, res) => {
       const v = upstream.headers.get(h);
       if (v) res.setHeader(h, v);
     }
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Vary', 'Range');
+    res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400');
+    res.setHeader('CDN-Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=86400');
     const buf = Buffer.from(await upstream.arrayBuffer());
     res.end(buf);
   } catch (err) {

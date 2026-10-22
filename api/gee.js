@@ -2830,6 +2830,20 @@ function parcelCap(type, area, requested) {
   return requested === 'urban' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
 }
 
+// CDN-Cache-Control là khóa biên Vercel. no-store chỉ còn cho hàng admin riêng và ?fresh= sau khi ghi.
+function setCdn(res, browser, edge) {
+  res.setHeader('Cache-Control', browser);
+  res.setHeader('CDN-Cache-Control', edge);
+}
+
+const CDN_READ = ['public, max-age=60, s-maxage=600, stale-while-revalidate=3600', 'public, s-maxage=600, stale-while-revalidate=3600'];
+const CDN_EDIT = ['public, max-age=0, s-maxage=120, stale-while-revalidate=600', 'public, s-maxage=120, stale-while-revalidate=600'];
+const CDN_META = ['public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400', 'public, s-maxage=86400, stale-while-revalidate=86400'];
+const CDN_MISS = ['public, max-age=0, s-maxage=30, stale-while-revalidate=60', 'public, s-maxage=30, stale-while-revalidate=60'];
+const CDN_STATS = ['public, max-age=60, s-maxage=900, stale-while-revalidate=3600', 'public, s-maxage=900, stale-while-revalidate=3600'];
+const CDN_LIST = ['public, max-age=60, s-maxage=600, stale-while-revalidate=3600', 'public, s-maxage=600, stale-while-revalidate=3600'];
+const CDN_COV = ['public, max-age=120, s-maxage=3600, stale-while-revalidate=86400', 'public, s-maxage=3600, stale-while-revalidate=86400'];
+
 // ============================ HANDLER ============================
 
 module.exports = async (req, res) => {
@@ -2861,12 +2875,13 @@ module.exports = async (req, res) => {
 
     if (action === 'getCadParcels') {
       const parcels = await getCadParcels();
+      setCdn(res, ...CDN_READ);
       return res.status(200).json({ parcels });
     }
 
     if (action === 'getProjectIndex') {
       const cat = await projects.catalog();
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_READ);
       return res.status(200).json({ v: 1, base: cat.base, migrated: cat.migrated, projects: cat.projects });
     }
 
@@ -2875,7 +2890,7 @@ module.exports = async (req, res) => {
       const project = String(req.query.project || '');
       const data = slug ? await projects.lotsBySlug(slug) : await projects.legacyLots(project);
       if (!data) return res.status(404).json({ error: true, message: 'Không có file đồ án này' });
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_READ);
       return res.status(200).json(data);
     }
 
@@ -2885,7 +2900,7 @@ module.exports = async (req, res) => {
       try {
         const file = await projects.readDecision(slug, String(req.query.doc || '').slice(0, 16));
         if (file.direct && file.url) {
-          res.setHeader('Cache-Control', 'private, no-store');
+          setCdn(res, ...CDN_META);
           res.setHeader('Location', file.url);
           return res.status(302).end();
         }
@@ -2903,13 +2918,13 @@ module.exports = async (req, res) => {
     // Quyết định của lớp bản đồ dùng chung (Phân loại đô thị, QHC 2045); file đọc qua getProjectDecision
     if (action === 'getLayerDecisions') {
       const data = await projects.layerDecisions();
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_READ);
       return res.status(200).json({ success: true, ...data });
     }
 
     if (action === 'getWardParcels') {
       const ward = await projects.wardParcels();
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_READ);
       return res.status(200).json(ward);
     }
 
@@ -2992,7 +3007,7 @@ module.exports = async (req, res) => {
       if (!base) return res.status(404).json({ error: true, message: 'Danh sách sheet 15-DA không đọc được' });
       const data = store.items.length ? applyInvestEdits(base, store.items) : base;
       data.groups = store.groups;
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_EDIT);
       return res.status(200).json(data);
     }
 
@@ -3062,7 +3077,7 @@ module.exports = async (req, res) => {
     if (action === 'getBldgFloors') {
       let pack = { v: 1, saved: 0, edits: {} };
       try { pack = await bldgFloors.readPack(); } catch (err) { console.warn('Đọc số tầng công trình:', err.message); }
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_EDIT);
       return res.status(200).json({ v: 1, saved: pack.saved || 0, edits: pack.edits || {} });
     }
 
@@ -3078,7 +3093,7 @@ module.exports = async (req, res) => {
     if (action === 'getBldgAdditions') {
       let pack = { v: 1, saved: 0, features: [] };
       try { pack = await bldgAdditions.readPack(); } catch (err) { console.warn('Đọc dấu chân nhà thêm:', err.message); }
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_EDIT);
       return res.status(200).json({ v: 1, saved: pack.saved || 0, features: pack.features || [] });
     }
 
@@ -3217,7 +3232,7 @@ module.exports = async (req, res) => {
     // Danh sách tuyến bổ sung đầy đủ (màn hình Admin vẽ / xóa tuyến)
     if (action === 'getCustomRoads') {
       const c = await roads.readCustomRoads(0, true);
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_EDIT);
       return res.status(200).json({ v: 2, saved: c.saved, roads: c.roads });
     }
 
@@ -3246,7 +3261,7 @@ module.exports = async (req, res) => {
     // Vùng hiệu chỉnh raster dân cư (Admin vẽ xóa / thêm pixel dân cư) — đọc đầy đủ cho màn hình Admin
     if (action === 'getPopEdits') {
       const d = await popEdits.readPopEdits(true);
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_EDIT);
       return res.status(200).json({ v: 1, saved: d.saved, edits: d.edits, asset: d.asset, bake: d.bake });
     }
 
@@ -3982,7 +3997,8 @@ module.exports = async (req, res) => {
     if (action === 'getAdjustments') {
       const admin = req.method === 'POST' ? await requireAdmin(req) : null;
       if (admin) requirePostFromApp(req);
-      res.setHeader('Cache-Control', 'no-store');
+      if (admin) res.setHeader('Cache-Control', 'private, no-store');
+      else setCdn(res, ...CDN_READ);
       return res.status(200).json({ v: 1, items: await projects.listAdjustments({ admin: !!admin }) });
     }
 
@@ -3990,7 +4006,8 @@ module.exports = async (req, res) => {
       const admin = req.method === 'POST' ? await requireAdmin(req) : null;
       if (admin) requirePostFromApp(req);
       const id = String(admin ? readJsonBody(req).id : req.query.id || '');
-      res.setHeader('Cache-Control', 'no-store');
+      if (admin) res.setHeader('Cache-Control', 'private, no-store');
+      else setCdn(res, ...CDN_READ);
       return res.status(200).json(await projects.readAdjustment(id, { admin: !!admin }));
     }
 
@@ -4000,7 +4017,8 @@ module.exports = async (req, res) => {
       const id = String(admin ? readJsonBody(req).id : req.query.id || '');
       const file = await projects.readAdjustPdf(id, { admin: !!admin });
       if (file.direct && file.url) {
-        res.setHeader('Cache-Control', 'no-store');
+        if (admin) res.setHeader('Cache-Control', 'private, no-store');
+        else setCdn(res, ...CDN_META);
         return res.status(200).json({ direct: true, url: file.url, name: file.name });
       }
       const ascii = String(file.name).replace(/[^\w.\-]+/g, '_') || 'dieu-chinh.pdf';
@@ -4035,11 +4053,11 @@ module.exports = async (req, res) => {
       return res.status(200).json(data);
     }
 
-    // Chú giải + URL ô. Không tạo map id (map id hết hạn, CDN không được giữ).
+    // Chú giải + URL ô. Năm đã chốt trỏ thẳng PNG trên bucket. Năm đang chạy trỏ getSatTile (map id nằm trong hàm, không ghi vào CDN).
     if (action === 'getSatMeta') {
       const body = satTiles.meta(req.query);
       if (!body) return res.status(400).json({ error: true, message: 'Lớp vệ tinh không hợp lệ' });
-      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+      setCdn(res, ...CDN_META);
       return res.status(200).json(body);
     }
 
@@ -4054,11 +4072,12 @@ module.exports = async (req, res) => {
           Object.entries(out.headers || {}).forEach(([k, v]) => res.setHeader(k, v));
           return res.status(out.status).send(out.body);
         }
-        res.setHeader('Cache-Control', 'no-store');
+        if (out.headers) Object.entries(out.headers).forEach(([k, v]) => res.setHeader(k, v));
+        else setCdn(res, ...CDN_MISS);
         return res.status(out.status).json({ error: true, message: out.message || 'Ô vệ tinh chưa tải được' });
       } catch (err) {
         console.error('Ô vệ tinh:', err && err.message ? err.message : err);
-        res.setHeader('Cache-Control', 'no-store');
+        setCdn(res, ...CDN_MISS);
         return res.status(502).json({ error: true, message: 'Ô vệ tinh chưa tải được' });
       }
     }
@@ -4077,8 +4096,7 @@ module.exports = async (req, res) => {
 
     await initGEE();
 
-    // Một lần mỗi ngày (01:15 UTC): gói Hobby từ chối cron dày hơn và làm fail cả lần deploy.
-    // Trang quản trị đang mở vẫn đối chiếu CSV mỗi phút.
+    // Cron Vercel đã tắt để khỏi đốt Fluid Active CPU. Admin vẫn nạp tay qua ingestPopNha.
     if (action === 'syncPopNha') {
       if (!cronAuthorized(req)) return res.status(401).json({ error: true, message: 'Không đúng lịch' });
       try {
@@ -4155,7 +4173,7 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'getParcelInfra') {
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_READ);
       try {
         const result = await callAppsScript({ action: 'getHaTangHienTrang' }, { action: 'getHaTangHienTrang' });
         const rows = Array.isArray(result.rows) ? result.rows : [];
@@ -4373,7 +4391,8 @@ module.exports = async (req, res) => {
 
     if (action === 'getPopRasterTile') {
       // pv: Admin vừa lưu vùng hiệu chỉnh → lấy ảnh mới ngay; người dùng khác nhận ảnh mới sau tối đa 5 phút
-      res.setHeader('Cache-Control', req.query.pv ? 'no-store' : 's-maxage=300, stale-while-revalidate=300');
+      res.setHeader('Cache-Control', req.query.pv ? 'private, no-store' : 'public, max-age=60, s-maxage=900, stale-while-revalidate=300');
+      res.setHeader('CDN-Cache-Control', req.query.pv ? 'private, no-store' : 'public, s-maxage=900, stale-while-revalidate=300');
       const popMax = popPeople ? 30 : 5;
       const tileImg = popRasterDisplay || popRasterNormalized;
       // Một sắc cam (ColorBrewer Oranges): ô đông đậm hơn. Khớp .pop-legend-bar và .pa3-lg-pop.
@@ -4434,10 +4453,10 @@ module.exports = async (req, res) => {
       const all = req.query.year === 'all';
       const year = all ? null : sat.parseYear(req.query.year, years);
       if (!all && year == null) return res.status(400).json({ error: true, message: "Năm không hợp lệ" });
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_META);
       const spec = { layer: 'sar', year: all ? 'all' : year };
       return res.status(200).json({
-        urlFormat: satTiles.template(spec),
+        ...satTiles.tileUrls(spec),
         legend: sat.tileLegend('sar', spec),
         years,
         maxNativeZoom: satTiles.LAYERS.sar.maxZ
@@ -4449,10 +4468,10 @@ module.exports = async (req, res) => {
       const years = sat.lstYears();
       const year = sat.parseYear(req.query.year, years);
       if (year == null) return res.status(400).json({ error: true, message: "Năm không hợp lệ" });
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_META);
       const spec = { layer: 'lst', year };
       return res.status(200).json({
-        urlFormat: satTiles.template(spec),
+        ...satTiles.tileUrls(spec),
         legend: sat.tileLegend('lst', spec),
         years,
         maxNativeZoom: satTiles.LAYERS.lst.maxZ
@@ -4562,7 +4581,7 @@ module.exports = async (req, res) => {
       } catch (err) {
         console.error('Ưu tiên trồng cây:', err && err.stack ? err.stack : err);
         const detail = err && err.message ? String(err.message).replace(/\s+/g, ' ').slice(0, 160) : '';
-        res.setHeader('Cache-Control', 'no-store');
+        setCdn(res, ...CDN_MISS);
         return res.status(502).json({
           error: true,
           message: detail ? `Chưa tính được chỉ số trên Google Earth Engine: ${detail}` : 'Chưa tính được chỉ số trên Google Earth Engine'
@@ -4579,10 +4598,10 @@ module.exports = async (req, res) => {
       if (year == null || (req.query.compare && compare == null)) return res.status(400).json({ error: true, message: 'Năm không hợp lệ' });
       if (compare != null && compare === year) return res.status(400).json({ error: true, message: 'Hai năm so sánh phải khác nhau' });
       if (action === 'getNdviTile') {
-        res.setHeader('Cache-Control', 'no-store');
+        setCdn(res, ...CDN_META);
         const spec = { layer: 'ndvi', year, compare };
         return res.status(200).json({
-          urlFormat: satTiles.template(spec),
+          ...satTiles.tileUrls(spec),
           legend: sat.tileLegend('ndvi', spec),
           years,
           maxNativeZoom: satTiles.LAYERS.ndvi.maxZ
@@ -4614,10 +4633,10 @@ module.exports = async (req, res) => {
     if (action === 'getForestTile') {
       const mode = sat.FOREST_MODES.includes(req.query.mode) ? req.query.mode : null;
       if (!mode) return res.status(400).json({ error: true, message: 'Lớp rừng không hợp lệ' });
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_META);
       const spec = { layer: 'forest', mode };
       return res.status(200).json({
-        urlFormat: satTiles.template(spec),
+        ...satTiles.tileUrls(spec),
         legend: sat.tileLegend('forest', spec),
         mode,
         maxNativeZoom: satTiles.LAYERS.forest.maxZ
@@ -4764,10 +4783,10 @@ module.exports = async (req, res) => {
     if (action === 'getNewDevTile') {
       const from = Number(req.query.from);
       if (!sat.DEV_FROM_YEARS.includes(from)) return res.status(400).json({ error: true, message: "Năm gốc không hợp lệ" });
-      res.setHeader('Cache-Control', 'no-store');
+      setCdn(res, ...CDN_META);
       const spec = { layer: 'dev', from, endYear: sat.devRecentYears()[1] };
       return res.status(200).json({
-        urlFormat: satTiles.template(spec),
+        ...satTiles.tileUrls(spec),
         legend: sat.tileLegend('dev', spec),
         years: sat.DEV_FROM_YEARS,
         maxNativeZoom: satTiles.LAYERS.dev.maxZ
@@ -5444,11 +5463,13 @@ module.exports = async (req, res) => {
 
       const hit = cachedCoverageByWard[cacheKey];
       if (hit && hit.sig === sig) {
+        setCdn(res, ...CDN_COV);
         return res.status(200).json(buildPayload(hit.ratios, hit.Avg_Coverage_Score, 'ok'));
       }
       const stored = await statsStore.getWardEntry(cacheKey, sig);
       if (stored && stored.ratios) {
         cachedCoverageByWard[cacheKey] = { sig, ratios: stored.ratios, Avg_Coverage_Score: stored.Avg_Coverage_Score };
+        setCdn(res, ...CDN_COV);
         return res.status(200).json(buildPayload(stored.ratios, stored.Avg_Coverage_Score, 'ok'));
       }
 
@@ -5468,10 +5489,14 @@ module.exports = async (req, res) => {
             Avg_Coverage_Score: payload.Avg_Coverage_Score
           };
           await statsStore.putWardEntry(cacheKey, cachedCoverageByWard[cacheKey]);
+          setCdn(res, ...CDN_COV);
+        } else {
+          setCdn(res, 'public, max-age=0, s-maxage=60, stale-while-revalidate=120', 'public, s-maxage=60, stale-while-revalidate=120');
         }
         return res.status(200).json(payload);
       } catch (err) {
         console.error("getWardCoverage error:", err && err.message);
+        setCdn(res, ...CDN_MISS);
         return res.status(502).json({ error: true, message: "Lỗi tính độ phủ từ GEE", coverageStatus: 'error' });
       }
     }
@@ -5485,6 +5510,8 @@ module.exports = async (req, res) => {
           && cachedWardStatsPop === popCacheTag
           && (now - lastWardStatsFetch < cachedWardStatsTtl)) {
         cachedWardStats.forEach(row => applyCachedCoverage(row, cachedWardStatsPeople));
+        if (req.query.fresh) res.setHeader('Cache-Control', 'private, no-store');
+        else setCdn(res, ...CDN_STATS);
         return res.status(200).json({
           data: cachedWardStats, network: cachedCityNetwork, coverageStatus: 'cached', countPending: cachedCountPending,
           popSource, popFallback: !!popFallback
@@ -5696,6 +5723,7 @@ module.exports = async (req, res) => {
         timing.total = Date.now() - startedAt;
         clearTimeout(watchdog);
         if (res.headersSent) return;
+        res.setHeader('Cache-Control', 'private, no-store');
         return res.status(200).json({
           ward: countWard, candidates: list.length, counted: timing.counted || 0, remaining: timing.uncounted || 0, timing
         });
@@ -5737,6 +5765,8 @@ module.exports = async (req, res) => {
       clearTimeout(watchdog);
       console.log('getWardStats timing (ms):', JSON.stringify(timing));
       if (res.headersSent) return;
+      if (req.query.fresh) res.setHeader('Cache-Control', 'private, no-store');
+      else setCdn(res, ...CDN_STATS);
 
       return res.status(200).json({
         data: resultTable, network: cityNetwork, coverageStatus: 'per_ward', countPending, timing,
@@ -5745,8 +5775,9 @@ module.exports = async (req, res) => {
     }
 
     const planDataList = allDataList.filter(it => it.planChange === 'new');
-    // CDN giữ 30 s (tránh khởi động nguội GEE mỗi lượt mở trang); fresh = client vừa ghi dữ liệu → bỏ qua CDN
-    res.setHeader('Cache-Control', req.query.fresh ? 'no-store' : 'public, max-age=0, s-maxage=30, stale-while-revalidate=120');
+    // CDN giữ 10 phút; fresh = client vừa ghi dữ liệu → bỏ qua CDN
+    if (req.query.fresh) res.setHeader('Cache-Control', 'private, no-store');
+    else setCdn(res, ...CDN_LIST);
     return res.status(200).json({ rawDataList, planDataList, qhApplied: true });
 
   } catch (err) {

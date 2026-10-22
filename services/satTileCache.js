@@ -9,7 +9,8 @@ const gcsWrite = require('./gcsWrite');
 const CACHE_V = 'v1';
 const MAP_TTL_MS = 20 * 60 * 1000;
 const GEE_TIMEOUT_MS = 15000;
-const GEE_TRIES = 3;
+// Hai lần: thêm lần nữa nhân thời gian Fluid Active CPU khi Earth Engine 429/quá hạn.
+const GEE_TRIES = 2;
 const READ_TIMEOUT_MS = 6000;
 
 // maxZ theo độ phân giải cảm biến: Sentinel-2 / radar ~10 m → z15, Landsat / Hansen ~30 m → z14.
@@ -112,11 +113,29 @@ function template(q) {
   return `/api/gee?${params.toString()}&z={z}&x={x}&y={y}`;
 }
 
+// Năm đã chốt nằm PNG công khai trên bucket. Trình duyệt lấy thẳng, không qua hàm.
+// {z}/{x}/{y} giữ nguyên (không encode) để Leaflet điền sau.
+function gcsTemplate(q) {
+  if (!q || !q.durable) return null;
+  const id = seriesId(q);
+  if (!/^[\w.-]+$/.test(id)) return null;
+  return `${constants.GCS_PUBLIC_BASE}cache/sat/${CACHE_V}/${q.layer}/${encodeURIComponent(id)}/{z}/{x}/{y}.png`;
+}
+
+function tileUrls(spec, now = new Date()) {
+  const q = { ...spec };
+  if (q.durable == null) q.durable = durable(q, now);
+  const api = template(q);
+  const gcs = gcsTemplate(q);
+  if (!gcs) return { urlFormat: api };
+  return { urlFormat: gcs, fallbackFormat: api };
+}
+
 function meta(query, now) {
   const q = parseQuery({ ...query, meta: '1' }, now);
   if (!q) return null;
   return {
-    urlFormat: template(q),
+    ...tileUrls(q, now),
     legend: sat.tileLegend(q.layer, q),
     maxNativeZoom: q.maxZ,
     minZoom: q.minZ
@@ -143,14 +162,24 @@ function classifyGee(status, body, contentType) {
 }
 
 function pngHeaders(durableTile, source) {
+  const cache = durableTile
+    ? 'public, max-age=86400, s-maxage=2592000, stale-while-revalidate=86400, immutable'
+    : 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400';
+  const edge = durableTile
+    ? 'public, s-maxage=2592000, stale-while-revalidate=86400'
+    : 'public, s-maxage=3600, stale-while-revalidate=86400';
   return {
     'Content-Type': 'image/png',
-    'Cache-Control': durableTile
-      ? 'public, max-age=86400, s-maxage=2592000, immutable'
-      : 'public, max-age=300, s-maxage=3600',
+    'Cache-Control': cache,
+    'CDN-Cache-Control': edge,
     'X-Sat-Tile': source
   };
 }
+
+const MISS_HEADERS = {
+  'Cache-Control': 'public, max-age=0, s-maxage=30, stale-while-revalidate=60',
+  'CDN-Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60'
+};
 
 function publicUrl(name) {
   const path = name.split('/').map(encodeURIComponent).join('/');
@@ -221,7 +250,7 @@ async function render(q, name, ensure) {
         await sleep(400 * 2 ** attempt);
         continue;
       }
-      return { status: 502, message: 'Ô vệ tinh chưa tải được' };
+      return { status: 502, message: 'Ô vệ tinh chưa tải được', headers: MISS_HEADERS };
     }
     const body = Buffer.from(res.data || []);
     const kind = classifyGee(res.status, body, res.headers && res.headers['content-type']);
@@ -244,7 +273,7 @@ async function render(q, name, ensure) {
     }
     break;
   }
-  return { status: 502, message: 'Ô vệ tinh chưa tải được' };
+  return { status: 502, message: 'Ô vệ tinh chưa tải được', headers: MISS_HEADERS };
 }
 
 async function loadTile(q, ensure) {
@@ -258,7 +287,7 @@ async function loadTile(q, ensure) {
 
 async function serve(query, ensure, now = new Date()) {
   const q = parseQuery(query, now);
-  if (!q || q.meta) return { status: 400, message: 'Ô vệ tinh không hợp lệ' };
+  if (!q || q.meta) return { status: 400, message: 'Ô vệ tinh không hợp lệ', headers: MISS_HEADERS };
   const key = `${mapKey(q)}|${q.z}/${q.x}/${q.y}`;
   let job = flights.get(key);
   if (!job) {
@@ -269,5 +298,5 @@ async function serve(query, ensure, now = new Date()) {
 }
 
 module.exports = {
-  LAYERS, parseQuery, objectName, template, meta, classifyGee, pngHeaders, serve, fillTemplate, durable, seriesId
+  LAYERS, parseQuery, objectName, template, gcsTemplate, tileUrls, meta, classifyGee, pngHeaders, serve, fillTemplate, durable, seriesId
 };

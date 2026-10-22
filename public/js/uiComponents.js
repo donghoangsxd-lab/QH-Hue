@@ -584,8 +584,8 @@ export function updateInfraPieChart(sourceList, planList = [], areaLists = null)
 const COVERAGE_LS_KEY = 'qh_hue_ward_coverage_v5';
 const COVERAGE_QH_LS_KEY = 'qh_hue_ward_coverage_qh_v2';
 const LEGACY_COVERAGE_KEYS = ['qh_hue_ward_coverage_v4', 'qh_hue_ward_coverage_v3', 'qh_hue_ward_coverage_qh_v1'];
-const BACKGROUND_RETRY_DELAYS = [20000, 60000, 180000];
-const DETAIL_RETRY_DELAYS = [15000, 45000, 90000];
+const BACKGROUND_RETRY_DELAYS = [120000];
+const DETAIL_RETRY_DELAYS = [90000];
 
 const COVERAGE_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "7-YT", "8-VH", "9-TM"];
 // Cột bảng 40 phường/xã: 8 mã trên + THPT (độ phủ Ratio_THPT); cột Tổng cộng vẫn bình quân 8 mã
@@ -743,7 +743,7 @@ function scheduleCoverageViewsRefresh() {
 const isWardCurrent = (ward) => state.wardStatsData.includes(ward);
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-// Tính lần lượt; phường lỗi/timeout/0% bất thường được thử lại sau 20s → 60s → 180s (không chặn lượt chính)
+// Tính lần lượt; phường lỗi/timeout/0% bất thường thử lại một lần sau 2 phút (không chặn lượt chính)
 async function fillCoverage(wards, scenario, attempt = 0) {
   const failed = [];
   for (const ward of wards) {
@@ -775,7 +775,7 @@ async function fillCandidateCounts(wardNames) {
   try {
     let counted = 0;
     for (const name of wardNames) {
-      for (let round = 0; round < 5 && state.wardStatsData === list; round++) {
+      for (let round = 0; round < 2 && state.wardStatsData === list; round++) {
         const r = await fetch(geeApi(`action=countWardCandidates&ward=${encodeURIComponent(name)}&pop=${encodeURIComponent(popQuery())}`))
           .then(res => (res.ok ? res.json() : null)).catch(() => null);
         if (!r) break;
@@ -1685,7 +1685,7 @@ function refreshWardQuotaTable(wardData) {
   openIds.forEach(id => setSubSectionOpen(container, id, true));
 }
 
-// Độ phủ phường đang xem: lỗi/timeout/0% bất thường → tự gọi lại sau 15s → 45s → 90s (1 chuỗi thử lại tại 1 thời điểm)
+// Độ phủ phường đang xem: lỗi/timeout/0% bất thường → tự gọi lại một lần sau 90s
 let wardRetryTimer = null;
 function loadWardDetailCoverage(wardData, attempt = 0) {
   const name = wardData.Ten_Phuong;

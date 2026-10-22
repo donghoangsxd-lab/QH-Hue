@@ -79,7 +79,6 @@ async function fetchOsm(lat, lng, r) {
 }
 
 module.exports = async (req, res) => {
-  res.setHeader('Cache-Control', 'public, max-age=600');
   const lat = num(req.query.lat, 15.5, 17.2, null);
   const lng = num(req.query.lng, 106.8, 108.4, null);
   const r = num(req.query.r, 150, 800, null);
@@ -88,8 +87,12 @@ module.exports = async (req, res) => {
   }
   try {
     const data = await fetchOsm(lat, lng, r);
+    res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800');
+    res.setHeader('CDN-Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
     return res.status(200).json(data);
   } catch (err) {
+    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=60, stale-while-revalidate=60');
+    res.setHeader('CDN-Cache-Control', 'public, s-maxage=60, stale-while-revalidate=60');
     return res.status(err.status || 502).json({ error: true, message: err.message });
   }
 };

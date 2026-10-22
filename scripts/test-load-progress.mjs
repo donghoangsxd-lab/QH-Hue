@@ -57,6 +57,7 @@ assert.match(sw, /skipWaiting/);
 assert.match(sw, /function shell/);
 assert.match(vercel, /"source": "\/js\/\(\.\*\)"[\s\S]*?"value": "no-store"/);
 assert.match(vercel, /"source": "\/css\/\(\.\*\)"[\s\S]*?"value": "no-store"/);
+assert.doesNotMatch(vercel, /"crons"/);
 assert.match(read('public/js/qhc2045Layer.js'), /withAssetVersion\(QHC2045\.urls\[kind\]\)/);
 assert.match(read('public/js/gbaLayer.js'), /withAssetVersion\('data\/gba\/bldg-overrides\.geojson'\)/);
 assert.match(read('public/js/app.js'), /setBootProgress\(pct\)/);

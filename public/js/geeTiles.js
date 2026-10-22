@@ -1,9 +1,9 @@
-// Ô lớp môi trường đi qua /api/gee?action=getSatTile (máy chủ giữ map id, thử lại, cache năm đã chốt).
-// Giới hạn 4 ô cùng lúc: Earth Engine trả 429 hoặc quá hạn nếu trình duyệt xin vài chục ô zoom cao một lúc.
+// Ô năm đã chốt lấy thẳng PNG trên bucket. Ô chưa có, hoặc lớp năm đang chạy, đi qua /api/gee?action=getSatTile.
+// Giới hạn 4 ô cùng lúc và một lần thử lại: Earth Engine 429/quá hạn, và mỗi lần thử lại giữ hàm Fluid.
 // Chỉ báo tileload khi có ảnh; tileerror sau khi hết lần thử — không tính ô lỗi là đã tải.
 
 export const TILE_CONCURRENCY = 4;
-export const TILE_RETRIES = 3;
+export const TILE_RETRIES = 1;
 
 let active = 0;
 const waiters = [];
@@ -115,9 +115,11 @@ function layerClass() {
       this._url = url;
       L.GridLayer.prototype.initialize.call(this, options);
     },
-    setUrl(url) {
-      if (this._url === url) return this;
+    setUrl(url, fallback) {
+      const next = fallback == null ? (this.options.fallbackUrl || '') : fallback;
+      if (this._url === url && (this.options.fallbackUrl || '') === next) return this;
       this._url = url;
+      if (fallback != null) this.options.fallbackUrl = fallback;
       this.redraw();
       return this;
     },
@@ -130,7 +132,15 @@ function layerClass() {
       img.draggable = false;
       const ctrl = new AbortController();
       img._abortGee = () => ctrl.abort();
-      fetchGeeTile(this.getTileUrl(coords), { signal: ctrl.signal }).then(blob => {
+      const fallback = this.options.fallbackUrl ? L.Util.template(this.options.fallbackUrl, coords) : '';
+      const primary = this.getTileUrl(coords);
+      const load = fetchGeeTile(primary, { signal: ctrl.signal }).catch(err => {
+        if (!fallback || err?.name === 'AbortError') throw err;
+        const status = err?.status;
+        if (status && status !== 404 && status !== 403 && status < 500) throw err;
+        return fetchGeeTile(fallback, { signal: ctrl.signal });
+      });
+      load.then(blob => {
         const blobUrl = URL.createObjectURL(blob);
         if (ctrl.signal.aborted) {
           URL.revokeObjectURL(blobUrl);
