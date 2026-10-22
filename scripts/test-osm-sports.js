@@ -72,6 +72,9 @@ const osm = fs.readFileSync(path.join(__dirname, '../public/js/osmOpen.js'), 'ut
 const roads = fs.readFileSync(path.join(__dirname, '../public/js/qhc2045Layer.js'), 'utf8');
 const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
 assert.ok(osm.includes('RAIL_MIN_ZOOM = 11') && osm.includes('phóng tới mức 11'), 'gợi ý zoom đường sắt');
+assert.ok(osm.includes('function railWanted') && osm.includes("groupOn('chk_roads')"), 'đường sắt tắt theo mạng đường');
+assert.ok(html.includes('id="osmRailRow" hidden'), 'dòng đường sắt ẩn khi chưa bật đường');
+assert.ok(!/id="chk_osmRail"[^>]*\bchecked\b/.test(html), 'đường sắt hiện trạng tắt mặc định');
 assert.ok(html.includes('id="chk_gt25rail"') && html.includes('id="chk_gt10rail"'), 'công tắc đường sắt QHC');
 assert.ok(roads.includes('chk_gt${scale}rail'), 'vẽ đường sắt theo công tắc');
 
