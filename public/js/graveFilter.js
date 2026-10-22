@@ -1,6 +1,6 @@
-// Ẩn mộ bị nhận nhầm là nhà: trong thửa NTD 2016, đất nghĩa trang quy hoạch/OSM, hoặc cụm mộ sát thửa.
-// Ngưỡng đọc từ file (mặc định 60 m² và 3,5 m). Nhà sát đường phố đã được đục khỏi mặt nạ.
-// PMTiles không bị sửa. enabled = false trong cemetery-mask.geojson thì vẽ lại hết.
+// Dấu chân giao thửa địa chính 2016 mã NTD đã gỡ khỏi dữ liệu xuất bản, không kể diện tích hay chiều cao.
+// Lúc xem vẫn ẩn mộ trên đất nghĩa trang quy hoạch/OSM và cụm sườn, theo ngưỡng trong file (mặc định 60 m² và 3,5 m).
+// enabled = false trong cemetery-mask.geojson thì vẽ lại phần còn lại.
 // Ô 0,02° chỉ để khỏi quét hàng chục nghìn thửa; kết quả giống quét tuần tự.
 
 const CELL = 0.02;

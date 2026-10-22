@@ -32,10 +32,10 @@ assert(!isCemeteryGrave({ ...square, enabled: false }, 12, 1, 0.2, 0.2), 'cờ t
 
 const mask = prepareGraveMask(JSON.parse(fs.readFileSync(new URL('../public/data/gba/cemetery-mask.geojson', import.meta.url), 'utf8')));
 assert(mask.enabled && mask.maxAreaM2 === 60 && mask.maxHeightM === 3.5 && mask.slopeAreaM2 === 180 && mask.lowHeightM === 2.5, 'ngưỡng file');
-assert(mask.parts.length > 1000, `quá ít vùng ${mask.parts.length}`);
-assert(insideGraveMask(mask, 107.594264, 16.443778), 'thửa 6 tờ 41 An Cựu nằm trong mặt nạ');
-assert(isCemeteryGrave(mask, 40, 2, 107.594264, 16.443778), 'mộ nhỏ trong thửa NTD thì ẩn');
-assert(!isCemeteryGrave(mask, 150, 1.5, 107.594264, 16.443778), 'dấu chân rộng trong thửa NTD thì giữ');
+assert(mask.parts.length >= 200, `quá ít vùng ${mask.parts.length}`);
+assert(insideGraveMask(mask, 107.594264, 16.443778), 'điểm An Cựu còn trong mặt nạ OSM sau khi gỡ NTD');
+assert(isCemeteryGrave(mask, 40, 2, 107.594264, 16.443778), 'mộ nhỏ trong vùng OSM thì ẩn');
+assert(!isCemeteryGrave(mask, 150, 1.5, 107.594264, 16.443778), 'dấu chân rộng trong vùng OSM thì giữ');
 assert(insideGraveMask(mask, 107.593, 16.446), 'sườn Ngự Bình nằm trong nghĩa trang');
 assert(insideGraveMask(mask, 107.5942, 16.4478), 'cụm mộ khoanh đỏ Ngự Bình vẫn bị che');
 assert(isCemeteryGrave(mask, 40, 3.5, 107.5942, 16.4478), 'mộ 40 m² cao 3,5 m trong cụm thì ẩn');
@@ -58,7 +58,7 @@ assert(!layer.includes('buildings.pmtiles.write') && layer.includes('cemetery-ma
 
 const raw = JSON.parse(fs.readFileSync(new URL('../public/data/gba/cemetery-mask.geojson', import.meta.url), 'utf8'));
 const srcs = new Set(raw.features.map((f) => f.properties.src));
-assert(srcs.has('ntd') && srcs.has('qh') && srcs.has('osm') && srcs.has('slope'), 'có NTD, quy hoạch, OSM và sườn');
+assert(!srcs.has('ntd') && srcs.has('qh') && srcs.has('osm') && srcs.has('slope'), 'đã gỡ NTD, còn quy hoạch, OSM và sườn');
 assert(raw.enabled === true, 'cờ bật');
 
 console.log('grave filter ok', mask.parts.length);
