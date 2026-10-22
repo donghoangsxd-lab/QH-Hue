@@ -1,4 +1,6 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const http = require('http');
 const { handle, parseBody } = require('../cloudrun/server');
 const { allow } = require('../services/rateWindow');
@@ -76,6 +78,15 @@ function once(handlers, opts) {
 
   const missing = await once({}, { path: '/api/khac' });
   assert.equal(missing.status, 404);
+
+  const docker = fs.readFileSync(path.join(__dirname, '../cloudrun/Dockerfile'), 'utf8');
+  ['public/js/projectNames.js', 'public/js/bldgAdditions.js', 'public/js/bldgParts.js', 'public/js/bldgFloorEdits.js'].forEach((rel) => {
+    assert.match(docker, new RegExp(rel.replace(/[.]/g, '\\.')));
+  });
+  const { splitProjectName } = await import('../public/js/projectNames.js');
+  const named = splitProjectName('QHPK khu trung tâm');
+  assert.equal(typeof named.tenDayDu, 'string');
+  assert.ok(named.tenRutGon);
   console.log('test-cloudrun ok');
 })().catch((err) => {
   console.error(err);
