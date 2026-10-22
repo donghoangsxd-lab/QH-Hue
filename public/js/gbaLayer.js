@@ -1,12 +1,13 @@
 // Dấu chân Global Building Atlas: PMTiles z13–16. Mã c trong tile là phân vị cũ;
 // màu vẽ theo số tầng (chiều cao mét / 3,3) từ bldg-hf.bin.
+// Từ mức phóng 17, số tầng ghi trên dấu chân đủ rộng, tại điểm xa biên nhất.
 // Lưới cường độ 150 m không còn là lớp riêng. Số liệu lô / phường vẫn lấy từ agg.json.
 import { map, setLandPopupExtra } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { MAP_MAX_ZOOM } from './basemap.js';
 import { geeApi } from './api.js';
 import { setWardGbaHtml } from './uiComponents.js';
-import { GBA_FLOOR_CLASSES, GBA_FLOOR_COLORS, floorClassIndex, gbaLotKey, gbaStatsHtml, gbaWardExtra } from './gbaStats.js';
+import { GBA_FLOOR_CLASSES, GBA_FLOOR_COLORS, floorClassIndex, floorLabelVisible, floorsFromMetres, gbaLotKey, gbaStatsHtml, gbaWardExtra, poleOfInaccessibility } from './gbaStats.js';
 import { heightAt, loadBuildingHeights } from './bldgHeight.js';
 import { trackWork, watchTiles } from './loadProgress.js';
 
@@ -135,9 +136,13 @@ function loadTile(z, x, y) {
       const n = ring.length || 1;
       const [lng, lat] = lngLatOf(z, x, y, sx / n, sy / n, layer.extent);
       const h = heights ? heightAt(lng, lat, heights) : null;
+      const floors = floorsFromMetres(h);
+      const anchor = floors == null ? null : poleOfInaccessibility(rings, 8);
       out.push({
         rings,
         fc: floorClassIndex(h),
+        floors,
+        label: anchor,
         extent: layer.extent
       });
     }
@@ -191,6 +196,29 @@ function drawFoot(canvas, feats, coords, dz, size, dpr) {
     ctx.stroke();
   });
   ctx.globalAlpha = 1;
+  if (coords.z < 17) return;
+  ctx.save();
+  ctx.font = `600 ${Math.round(11 * dpr)}px "Segoe UI", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.miterLimit = 2;
+  ctx.lineWidth = 1.35 * dpr;
+  ctx.strokeStyle = 'rgba(28, 16, 8, 0.92)';
+  ctx.fillStyle = '#ffffff';
+  feats.forEach((ft) => {
+    const anchor = ft.label;
+    if (!anchor || ft.floors == null) return;
+    if (anchor.x < view[0] || anchor.y < view[1] || anchor.x >= view[2] || anchor.y >= view[3]) return;
+    const cssR = (anchor.d * size * f) / ext;
+    if (!floorLabelVisible(coords.z, ft.floors, cssR)) return;
+    const x = px(anchor.x);
+    const y = py(anchor.y);
+    const text = String(ft.floors);
+    ctx.strokeText(text, x, y);
+    ctx.fillText(text, x, y);
+  });
+  ctx.restore();
 }
 
 const FootGrid = L.GridLayer.extend({

@@ -20,6 +20,106 @@ export function floorClassIndex(h) {
   return 3;
 }
 
+export const FLOOR_LABEL_ZOOM = 17;
+
+function segDistSq(px, py, a, b) {
+  let x = a[0];
+  let y = a[1];
+  let dx = b[0] - x;
+  let dy = b[1] - y;
+  if (dx !== 0 || dy !== 0) {
+    const t = ((px - x) * dx + (py - y) * dy) / (dx * dx + dy * dy);
+    if (t > 1) { x = b[0]; y = b[1]; }
+    else if (t > 0) { x += dx * t; y += dy * t; }
+  }
+  dx = px - x;
+  dy = py - y;
+  return dx * dx + dy * dy;
+}
+
+function pointToPolygonDist(x, y, rings) {
+  let inside = false;
+  let minSq = Infinity;
+  for (let r = 0; r < rings.length; r++) {
+    const ring = rings[r];
+    for (let i = 0, len = ring.length, j = len - 1; i < len; j = i++) {
+      const a = ring[i];
+      const b = ring[j];
+      if ((a[1] > y) !== (b[1] > y) && (x < ((b[0] - a[0]) * (y - a[1])) / (b[1] - a[1]) + a[0])) inside = !inside;
+      const d = segDistSq(x, y, a, b);
+      if (d < minSq) minSq = d;
+    }
+  }
+  return (inside ? 1 : -1) * Math.sqrt(minSq);
+}
+
+function labelCell(x, y, h, rings) {
+  const d = pointToPolygonDist(x, y, rings);
+  return { x, y, h, d, max: d + h * Math.SQRT2 };
+}
+
+/** Điểm trong vòng xa biên nhất, để số tầng không rơi ra ngoài nhà lõm. d là bán kính nội tiếp. */
+export function poleOfInaccessibility(rings, precision = 8) {
+  const outer = rings && rings[0];
+  if (!outer || outer.length < 3) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let sx = 0;
+  let sy = 0;
+  let n = 0;
+  for (let i = 0; i < outer.length; i++) {
+    const x = outer[i][0];
+    const y = outer[i][1];
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+    sx += x;
+    sy += y;
+    n += 1;
+  }
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const cellSize = Math.min(width, height);
+  if (!(cellSize > 0) || !n) return null;
+  let h = cellSize / 2;
+  const cells = [];
+  for (let x = minX; x < maxX; x += cellSize) {
+    for (let y = minY; y < maxY; y += cellSize) cells.push(labelCell(x + h, y + h, h, rings));
+  }
+  let best = labelCell(sx / n, sy / n, 0, rings);
+  const mid = labelCell(minX + width / 2, minY + height / 2, 0, rings);
+  if (mid.d > best.d) best = mid;
+  let probes = cells.length;
+  while (cells.length && probes < 900) {
+    let pick = 0;
+    for (let i = 1; i < cells.length; i++) if (cells[i].max > cells[pick].max) pick = i;
+    const cell = cells.splice(pick, 1)[0];
+    if (cell.d > best.d) best = cell;
+    if (cell.max - best.d <= precision) continue;
+    h = cell.h / 2;
+    cells.push(labelCell(cell.x - h, cell.y - h, h, rings));
+    cells.push(labelCell(cell.x + h, cell.y - h, h, rings));
+    cells.push(labelCell(cell.x - h, cell.y + h, h, rings));
+    cells.push(labelCell(cell.x + h, cell.y + h, h, rings));
+    probes += 4;
+  }
+  if (!(best.d > 0)) return null;
+  return { x: best.x, y: best.y, d: best.d };
+}
+
+export function floorLabelMinRadiusPx(floors) {
+  const digits = String(Math.abs(Math.round(Number(floors)))).length || 1;
+  return 4.5 + digits * 3.4;
+}
+
+export function floorLabelVisible(zoom, floors, inscribedCssPx) {
+  if (!(zoom >= FLOOR_LABEL_ZOOM) || floors == null || !(Number(floors) >= 1)) return false;
+  return inscribedCssPx + 1e-9 >= floorLabelMinRadiusPx(floors);
+}
+
 export const GBA_NOTE = 'Dữ liệu dấu chân công trình Global Building Atlas (Đại học Kỹ thuật Munich, 2025), từ dấu chân Google, OpenStreetMap và Microsoft khoảng năm 2023. Chiều cao chỉ là ước lượng tương đối để thấy nơi nhà cao hơn hoặc dày hơn, phục vụ nhận định nhu cầu hạ tầng. Không phải số mét đo đạc và không dùng để quản lý, khống chế chiều cao công trình. Dân số phân bổ theo dấu chân nhà ở (thửa đất ở, rồi mới loại công trình công cộng, sản xuất và dấu chân quá lớn; dấu chân quá nhỏ như nhà kho, bếp, mái không tính dù thửa là đất ở) nhân bậc chiều cao tương đối, không phải mét. Giấy phép CC BY-NC 4.0 (atlas) và ODbL (OpenStreetMap).';
 
 export function gbaLotKey(file, phase, id) {

@@ -1,5 +1,5 @@
 // Nhóm GBA là tương đối: thẻ không ghi mét chiều cao, có mật độ và giấy phép.
-import { GBA_CLASSES, GBA_FLOOR_CLASSES, GBA_NOTE, floorClassIndex, floorsFromMetres, gbaLotKey, gbaStatsHtml, gbaWardExtra } from '../public/js/gbaStats.js';
+import { GBA_CLASSES, GBA_FLOOR_CLASSES, GBA_NOTE, floorClassIndex, floorLabelMinRadiusPx, floorLabelVisible, floorsFromMetres, gbaLotKey, gbaStatsHtml, gbaWardExtra, poleOfInaccessibility } from '../public/js/gbaStats.js';
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -31,6 +31,18 @@ const extra = gbaWardExtra({
   rn: 10, rw: 100, tw: 150, pop: 1000, ratio: 1.5,
   drop: { small: [4, 40], cad: [1, 80] }
 }, { largeM2: 500, smallM2: 20 });
+const square = [[[0, 0], [100, 0], [100, 100], [0, 100]]];
+const pole = poleOfInaccessibility(square, 1);
+assert(pole && Math.abs(pole.x - 50) < 2 && Math.abs(pole.y - 50) < 2 && pole.d > 48, 'cực giữa hình vuông');
+const ell = [[[0, 0], [60, 0], [60, 20], [20, 20], [20, 60], [0, 60]]];
+const arm = poleOfInaccessibility(ell, 1);
+assert(arm && arm.x < 22 && arm.y < 22 && arm.d > 8, 'cực nằm trong nhánh chữ L');
+assert(!poleOfInaccessibility([], 1), 'vòng rỗng');
+assert(floorLabelMinRadiusPx(48) > floorLabelMinRadiusPx(2), 'số dài cần nhà rộng hơn');
+assert(!floorLabelVisible(16, 48, 40), 'dưới mức 17 không ghi');
+assert(!floorLabelVisible(17, null, 40), 'không có mét thì không ghi');
+assert(!floorLabelVisible(17, 2, 4), 'nhà hẹp hơn chữ số thì bỏ');
+assert(floorLabelVisible(17, 48, floorLabelMinRadiusPx(48)), 'đủ chỗ thì ghi');
 assert(extra.dropNote.includes('nhỏ hơn 20 m² 4'), 'ngưỡng dấu chân nhỏ');
 assert(extra.dropNote.includes('địa chính 1'), 'vẫn liệt kê quy tắc khác');
 console.log('gba: ok');
