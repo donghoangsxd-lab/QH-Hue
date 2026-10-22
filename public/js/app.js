@@ -1077,7 +1077,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (progressLabel && label) progressLabel.textContent = label;
   };
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    Promise.resolve(window.__qhSwReady).then(() => navigator.serviceWorker.register('./sw.js')).catch(() => {});
   }
   // 3 mốc xong theo thứ tự bất kỳ: lớp phủ đô thị (chờ ranh 40 phường xã), công trình, độ phủ (chờ công trình)
   const STEP_LABEL = { urban: 'Đang dựng lớp phủ đô thị', infra: 'Đang tải công trình', heat: 'Đang tính độ phủ' };

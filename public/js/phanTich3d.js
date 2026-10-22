@@ -5,6 +5,8 @@
 // Màu khối tích theo số tầng (làm tròn mét / 4): 1-2, 3-5, 6-10, 11-50. Trên 50 tầng vẫn nhóm trên.
 // Dân phường không nhân theo diện tích ô.
 
+import { withAssetVersion } from './gbaVersion.js';
+
 const GBA_URL = 'https://storage.googleapis.com/hue-infra-data-us/gba/buildings.pmtiles';
 const CAD_URL = 'https://storage.googleapis.com/hue-infra-data-us/cadastre/thuadat-2016.pmtiles';
 const LIBS = {
@@ -293,7 +295,7 @@ function byteSource(url) {
 const readyCache = new Map();
 function ready(kind) {
   if (!readyCache.has(kind)) {
-    const gcs = kind === 'gba' ? GBA_URL : CAD_URL;
+    const gcs = kind === 'gba' ? withAssetVersion(GBA_URL) : CAD_URL;
     const url = directTiles() ? gcs : `/api/pmtilesRange?file=${kind}`;
     readyCache.set(kind, Promise.all([
       import(LIBS.pmtiles), import(LIBS.vectorTile), import(LIBS.pbf)
@@ -1496,10 +1498,10 @@ async function start() {
     readLayer('cadastre', 'thuadat', tiles).catch((err) => { raw.cadError = err.message; return []; }),
     loadOsm(place).catch((err) => { raw.osmError = err.message; return null; }),
     loadWard(place.lat, place.lng).catch(() => ({ name: '', pop: 0 })),
-    fetch('data/gba/bldg-hf.bin').then(async (res) => {
+    fetch(withAssetVersion('data/gba/bldg-hf.bin')).then(async (res) => {
       if (!res.ok) throw new Error('bin');
       const buf = await res.arrayBuffer();
-      const meta = await fetch('data/gba/bldg-hf.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      const meta = await fetch(withAssetVersion('data/gba/bldg-hf.json')).then((r) => (r.ok ? r.json() : null)).catch(() => null);
       const index = parseHeightIndex(buf);
       index.meta = meta;
       return index;

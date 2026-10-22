@@ -9,6 +9,7 @@ import { geeApi } from './api.js';
 import { setWardGbaHtml } from './uiComponents.js';
 import { GBA_FLOOR_CLASSES, GBA_FLOOR_COLORS, floorClassIndex, floorLabelVisible, floorsForReading, gbaLotKey, gbaStatsHtml, gbaWardExtra, poleOfInaccessibility } from './gbaStats.js';
 import { heightAt, loadBuildingHeights } from './bldgHeight.js';
+import { withAssetVersion } from './gbaVersion.js';
 import { trackWork, watchTiles } from './loadProgress.js';
 
 const LIBS = {
@@ -31,7 +32,10 @@ let agg = null;
 let aggP = null;
 let ready = null;
 let floorZonesP = null;
+let floorZones = [];
+let heightsIdx = null;
 const tiles = new Map();
+const repaints = [];
 let footL = null, footR = null;
 let attrOn = false;
 
@@ -49,14 +53,22 @@ function localSources() {
   };
 }
 
+function versionedSources(info) {
+  return {
+    pmtiles: withAssetVersion(info.pmtiles),
+    agg: withAssetVersion(info.agg)
+  };
+}
+
 function sources() {
-  const local = localSources();
+  const local = versionedSources(localSources());
   return fetch(geeApi('action=getGbaInfo'))
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error('api'))))
     .then((info) => {
       if (!info || !info.pmtiles || !info.agg) throw new Error('api');
-      return fetch(info.pmtiles, { headers: { Range: 'bytes=0-7' } }).then((probe) => {
-        if (probe.status === 206 || probe.ok) return info;
+      const remote = versionedSources(info);
+      return fetch(remote.pmtiles, { headers: { Range: 'bytes=0-7' } }).then((probe) => {
+        if (probe.status === 206 || probe.ok) return remote;
         throw new Error('tiles');
       });
     })
@@ -146,14 +158,17 @@ function loadFloorZones() {
     floorZonesP = fetch(url).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
-    }).then((fc) => (fc.features || []).flatMap((f) => {
-      const floors = Number(f.properties && f.properties.labelFloors);
-      const geom = f.geometry;
-      if (!(floors > 0) || !geom) return [];
-      const polys = geom.type === 'Polygon' ? [geom.coordinates] : geom.type === 'MultiPolygon' ? geom.coordinates : [];
-      if (!polys.length) return [];
-      return [{ floors, minArea: Number(f.properties.minArea) || 0, polys }];
-    })).catch(() => { floorZonesP = null; return []; });
+    }).then((fc) => {
+      floorZones = (fc.features || []).flatMap((f) => {
+        const floors = Number(f.properties && f.properties.labelFloors);
+        const geom = f.geometry;
+        if (!(floors > 0) || !geom) return [];
+        const polys = geom.type === 'Polygon' ? [geom.coordinates] : geom.type === 'MultiPolygon' ? geom.coordinates : [];
+        if (!polys.length) return [];
+        return [{ floors, minArea: Number(f.properties.minArea) || 0, polys }];
+      });
+      return floorZones;
+    }).catch(() => { floorZonesP = null; floorZones = []; return []; });
   }
   return floorZonesP;
 }
@@ -172,7 +187,7 @@ function loadTile(z, x, y) {
   const key = `${z}/${x}/${y}`;
   let p = tiles.get(key);
   if (p) { tiles.delete(key); tiles.set(key, p); return p; }
-  p = Promise.all([ensureReady(), loadBuildingHeights().catch(() => null), loadFloorZones()]).then(async ([{ archive, VectorTile, Pbf }, heights, zones]) => {
+  p = Promise.all([ensureReady(), loadFloorZones()]).then(async ([{ archive, VectorTile, Pbf }]) => {
     const res = await archive.getZxy(z, x, y);
     if (!res || !res.data) return [];
     const layer = new VectorTile(new Pbf(new Uint8Array(res.data))).layers[LAYER];
@@ -186,16 +201,12 @@ function loadTile(z, x, y) {
       ring.forEach(([px, py]) => { sx += px; sy += py; });
       const n = ring.length || 1;
       const [lng, lat] = lngLatOf(z, x, y, sx / n, sy / n, layer.extent);
-      const h = heights ? heightAt(lng, lat, heights) : null;
-      const area = footprintAreaM2(z, x, y, ring, layer.extent);
-      const floors = floorsForReading(h, zoneFloors(lng, lat, area, zones));
-      const anchor = floors == null ? null : poleOfInaccessibility(rings, 8);
       out.push({
         rings,
-        fc: floorClassIndex(h, floors),
-        floors,
-        label: anchor,
-        extent: layer.extent
+        extent: layer.extent,
+        lng,
+        lat,
+        area: footprintAreaM2(z, x, y, ring, layer.extent)
       });
     }
     return out;
@@ -204,6 +215,21 @@ function loadTile(z, x, y) {
   tiles.set(key, p);
   while (tiles.size > TILE_CACHE) tiles.delete(tiles.keys().next().value);
   return p;
+}
+
+function paintFeatures(raw) {
+  return raw.map((ft) => {
+    const h = heightsIdx ? heightAt(ft.lng, ft.lat, heightsIdx) : null;
+    const floors = floorsForReading(h, zoneFloors(ft.lng, ft.lat, ft.area, floorZones));
+    const anchor = floors == null ? null : poleOfInaccessibility(ft.rings, 8);
+    return {
+      rings: ft.rings,
+      extent: ft.extent,
+      fc: floorClassIndex(h, floors),
+      floors,
+      label: anchor
+    };
+  });
 }
 
 function drawFoot(canvas, feats, coords, dz, size, dpr) {
@@ -282,7 +308,12 @@ const FootGrid = L.GridLayer.extend({
     canvas.height = size * dpr;
     const dz = Math.max(0, coords.z - DATA_ZOOM);
     loadTile(coords.z - dz, coords.x >> dz, coords.y >> dz)
-      .then((feats) => { drawFoot(canvas, feats, coords, dz, size, dpr); done(null, canvas); })
+      .then((raw) => {
+        const paint = () => drawFoot(canvas, paintFeatures(raw), coords, dz, size, dpr);
+        paint();
+        if (!heightsIdx) repaints.push(paint);
+        done(null, canvas);
+      })
       .catch((err) => done(err, canvas));
     return canvas;
   }
@@ -307,7 +338,7 @@ function syncAttr() {
 
 function legendHtml() {
   const swatch = GBA_FLOOR_CLASSES.map((name, i) => `<span><i style="background:${GBA_FLOOR_COLORS[i]}"></i>${name}</span>`).join('');
-  return `<div class="gba-legend" aria-label="Số tầng công trình, chiều cao chia 3,3">${swatch}</div>`;
+  return `<div class="gba-legend" aria-label="Số tầng công trình, chiều cao chia 4">${swatch}</div>`;
 }
 
 function paintBox() {
@@ -407,7 +438,16 @@ export function initGbaLayer() {
   map.on('zoomend', paintBox);
   $('chk_gba')?.addEventListener('change', (e) => {
     feetOn = !!e.target.checked;
-    if (feetOn) trackWork('Công trình xây dựng', loadAgg().catch(() => {}));
+    if (feetOn) {
+      trackWork('Công trình xây dựng', loadAgg().catch(() => {}));
+      trackWork('Công trình xây dựng', loadBuildingHeights().then((idx) => {
+        heightsIdx = idx;
+        const jobs = repaints.splice(0);
+        jobs.forEach((paint) => { try { paint(); } catch (err) { /* ô đã gỡ */ } });
+      }).catch(() => { repaints.length = 0; }));
+    } else {
+      repaints.length = 0;
+    }
     applyFeet();
     syncAttr();
     paintBox();

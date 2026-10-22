@@ -1,4 +1,5 @@
 // Chiều cao mét của dấu chân công trình, tệp public/data/gba/bldg-hf.bin (GBH2).
+import { withAssetVersion } from './gbaVersion.js';
 // Cùng chỉ mục với bản 3D: ô z16, mét = h2 / 2, khớp điểm gần nhất trong khoảng ~23 m.
 // PMTiles đã công bố chỉ có nhóm tương đối. Một số nhà cao lấy từ bảng bldg-overrides.geojson.
 
@@ -67,7 +68,7 @@ export function parseHeightIndex(buf) {
 export function loadBuildingHeights() {
   if (index) return Promise.resolve(index);
   if (!ready) {
-    const url = new URL('data/gba/bldg-hf.bin', document.baseURI).href;
+    const url = withAssetVersion('data/gba/bldg-hf.bin');
     ready = fetch(url).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.arrayBuffer();

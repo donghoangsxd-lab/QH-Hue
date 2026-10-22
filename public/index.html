@@ -577,7 +577,7 @@
             <span id="cadastreOpBox" class="layer-slider" style="display:none;"><input type="range" id="cadastreOpacity" class="opacity-slider" min="0" max="100" value="100" title="Độ trong suốt lớp thửa đất" aria-label="Độ trong suốt lớp thửa đất"></span>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_gba"><label for="chk_gba" title="Dấu chân công trình Global Building Atlas. Màu theo số tầng = làm tròn (chiều cao ước lượng / 4): 1-2, 3-5, 6-10, 11-50 tầng. Nhà trên 50 tầng cùng nhóm 11-50. Nhà đã công bố số tầng giữ số đó. Hiện từ mức phóng 13. Số tầng ghi trắng trên dấu chân từ mức 17; nhà quá nhỏ không ghi. Nhà đã hiệu chỉnh chiều cao dùng số mét đã ghi đè."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Công trình xây dựng (GBA) <small class="layer-hint" id="gbaHint">(phóng tới mức 13)</small></label></div>
+            <div><input type="checkbox" id="chk_gba"><label for="chk_gba" title="Dấu chân công trình Global Building Atlas. Ở Huế hầu hết là Google Open Buildings, ảnh đến năm 2021; nhà xây sau đó có thể chưa có dấu chân. Màu theo số tầng = làm tròn (chiều cao ước lượng / 4): 1-2, 3-5, 6-10, 11-50 tầng. Nhà trên 50 tầng cùng nhóm 11-50. Nhà đã công bố số tầng giữ số đó. Hiện từ mức phóng 13. Số tầng ghi trắng trên dấu chân từ mức 17; nhà quá nhỏ không ghi. Nhà đã hiệu chỉnh chiều cao dùng số mét đã ghi đè."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Công trình xây dựng (GBA) <small class="layer-hint" id="gbaHint">(phóng tới mức 13)</small></label></div>
           </div>
           <div class="flood-box" id="gbaBox" style="display:none;"></div>
           <div class="layer-row">
@@ -1372,19 +1372,28 @@
     <div id="authMsg" class="auth-msg auth-msg-strong" role="status" aria-live="polite"></div>
   </div>
 
-  <!-- Gỡ service worker và Cache Storage nếu hồ sơ còn bản đăng ký cũ, trước khi tải module. -->
+  <!-- Xóa service worker cũ một lần. Các lần sau giữ cache ô PMTiles và bldg-hf.bin. -->
   <script>
-    (function () {
+    window.__qhSwReady = (function () {
+      var purge = '20261022-gba';
+      try {
+        if (localStorage.getItem('qhhue_sw_purge') === purge) return Promise.resolve();
+        localStorage.setItem('qhhue_sw_purge', purge);
+      } catch (e) { return Promise.resolve(); }
+      var jobs = [];
       try {
         if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
-          navigator.serviceWorker.getRegistrations().then(function (list) {
-            list.forEach(function (reg) { reg.unregister(); });
-          });
+          jobs.push(navigator.serviceWorker.getRegistrations().then(function (list) {
+            return Promise.all(list.map(function (reg) { return reg.unregister(); }));
+          }));
         }
         if (window.caches && caches.keys) {
-          caches.keys().then(function (keys) { keys.forEach(function (key) { caches.delete(key); }); });
+          jobs.push(caches.keys().then(function (keys) {
+            return Promise.all(keys.map(function (key) { return caches.delete(key); }));
+          }));
         }
       } catch (e) { /* trình duyệt không có các API này */ }
+      return Promise.all(jobs);
     })();
   </script>
   <script type="module" src="./js/app.js"></script>

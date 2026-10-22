@@ -1,9 +1,20 @@
 // Bộ nhớ trình duyệt cho file tĩnh và ô PMTiles (Range). Không tải trước, không giữ ảnh Google.
-const CACHE = 'qh-hue-v1';
+// Tên cache khớp GBA_V trong gbaVersion.js: đổi phiên bản thì bỏ cache cũ.
+const CACHE = 'qh-hue-20261021';
 const GCS = 'https://storage.googleapis.com/hue-infra-data-us/';
 
+function versioned(url) {
+  try { return new URL(url).searchParams.has('v'); } catch (e) { return false; }
+}
+
+function gbaAsset(url) {
+  return url.includes('/gba/buildings.pmtiles') || url.includes('/gba/agg.json')
+    || url.includes('/data/gba/bldg-hf.bin') || url.includes('/data/gba/bldg-hf.json');
+}
+
 function cacheable(url) {
-  // GBA ghi đè cùng URL (buildings.pmtiles, agg.json): không giữ trong Cache API.
+  if (versioned(url) && gbaAsset(url)) return true;
+  // GBA không có ?v= vẫn bị ghi đè cùng đường dẫn: không giữ.
   if (url.startsWith(GCS)) return !url.includes('/gba/');
   if (!url.startsWith(self.location.origin)) return false;
   if (url.includes('/data/ward-boundary.json')) return true;
@@ -36,6 +47,10 @@ function partial(buf, contentRange, contentType) {
   });
 }
 
+self.addEventListener('activate', (event) => {
+  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim()));
+});
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET' || !cacheable(request.url)) return;
@@ -50,9 +65,10 @@ self.addEventListener('fetch', (event) => {
     }
     const res = await fetch(request);
     if (res.type === 'opaque' || res.type === 'opaqueredirect') return res;
+    const keep = versioned(request.url) || request.url.startsWith(self.location.origin) || longLived(res);
     if (res.status === 206) {
       const contentRange = res.headers.get('content-range');
-      if (contentRange && (request.url.startsWith(self.location.origin) || longLived(res))) {
+      if (contentRange && keep) {
         const stored = new Response(res.clone().body, {
           status: 200,
           headers: {
@@ -64,7 +80,7 @@ self.addEventListener('fetch', (event) => {
       }
       return res;
     }
-    if (res.ok && (request.url.startsWith(self.location.origin) || longLived(res))) cache.put(key, res.clone());
+    if (res.ok && keep) cache.put(key, res.clone());
     return res;
   })());
 });
