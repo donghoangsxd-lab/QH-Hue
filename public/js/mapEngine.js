@@ -369,6 +369,25 @@ function popupFitOptions(targetMap, maxWidth, minWidth) {
   };
 }
 
+// Mở trang 3D đúng tâm và bán kính. Trang tự kẹp bán kính trong 150–800 m.
+function point3dButton(lat, lng, radius) {
+  const la = Number(lat);
+  const ln = Number(lng);
+  if (!Number.isFinite(la) || !Number.isFinite(ln)) return '';
+  const r = Math.min(800, Math.max(150, Math.round(Number(radius) || 150)));
+  const q = new URLSearchParams({ lat: la.toFixed(5), lng: ln.toFixed(5), r: String(r), view: 'gop' });
+  return `<a class="proof-btn pp-3d" href="phan-tich-3d.html?${q}" target="_blank" rel="noopener">${ico('floors')}Xem 3D</a>`;
+}
+
+function geometryCenter(geometry) {
+  if (!geometry || typeof turf === 'undefined') return null;
+  try {
+    const c = turf.centroid(geometry).geometry.coordinates;
+    if (Number.isFinite(c[0]) && Number.isFinite(c[1])) return { lng: c[0], lat: c[1] };
+  } catch { /* ranh không đọc được */ }
+  return null;
+}
+
 // Công trình ở giữa phần nhìn thấy của bản đồ, thấy trọn vòng bán kính lý thuyết; không có bán kính → chỉ dời tâm, zoom ≥ 16
 function focusServiceRadius(targetMap, lat, lng, radius) {
   if (!targetMap) return;
@@ -384,8 +403,8 @@ function focusServiceRadius(targetMap, lat, lng, radius) {
   });
 }
 
-// Bảng công trình, lô đất ngoài nhóm hạ tầng và bảng tiếp cận nằm ở mép trái (cùng chỗ bảng thửa).
-// Pane bản đồ có transform nên không ghim bằng CSS trên popup Leaflet. Bảng đồ án chiếm cùng góc thì --brief-stack đẩy bảng này lên trên.
+// Bảng công trình, lô đất và bảng tra cứu điểm nằm ở cột trái (cùng chỗ bảng thửa).
+// Pane bản đồ có transform nên không ghim bằng CSS trên popup Leaflet. Bảng đồ án chiếm đầu cột thì --brief-stack đẩy bảng này xuống dưới.
 function pinDock(popup) {
   const el = popup.getElement();
   const host = document.getElementById('mapArea');
@@ -1549,6 +1568,8 @@ function landPopupHtml(p) {
     ['Đồ án', p.file],
     ['Layer', p.layer]
   ].filter(row => row && row[1]);
+  const center = geometryCenter(p.geometry);
+  const view3d = center ? point3dButton(center.lat, center.lng, p.area ? Math.sqrt(Number(p.area) / Math.PI) : 150) : '';
   return `<div class="land-popup">
     <div class="lp-head" title="${escapeHtml(p.name || '')}">
       <i class="lp-swatch" style="${swatch}"></i>
@@ -1561,6 +1582,7 @@ function landPopupHtml(p) {
     <dl class="lp-info">${info.map(([k, v]) => `<dt>${k}</dt><dd${k === 'Layer' ? ' class="lp-mono"' : ''}>${escapeHtml(String(v))}</dd>`).join('')}</dl>
     ${landPopupExtra(p)}
     <div class="lot-buildup" data-lot-buildup>Đang đối chiếu dấu chân công trình…</div>
+    ${view3d}
   </div>`;
 }
 
@@ -2615,6 +2637,7 @@ export function onPointClick(p, targetMap = map, parcelGeometry = null) {
   const riskData = peekInfraRisk();
   if (riskData) html += `<div class="pp-row js-risk"><span>Rủi ro khí hậu</span><span class="pp-loading">${ico('clock')}đang tải...</span></div>`;
   html += `</div>`;
+  html += point3dButton(p.lat, p.lng, noZone ? 150 : itemRadius);
 
   const servedCls = approved ? 'c-orange' : 'c-red';
   const showServed = !isCSD && !noZone;
@@ -3152,6 +3175,7 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
 
   let html = `<div class="pp">
     <div class="pp-title">${ico('chart')}MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ${isPlan ? ' (QUY HOẠCH)' : ''}</div>
+    ${point3dButton(clickLat, clickLng, ringRadius)}
     <div class="pp-row"><span>Tọa độ</span><b>${clickLat.toFixed(5)}, ${clickLng.toFixed(5)}</b></div>
     <div class="pp-row"><span>Địa bàn</span><b class="js-ward">${wardLocal ? escapeHtml(wardLocal) : ico('clock')}</b></div>
     <div class="pp-row"><span>Bán kính</span><b class="c-green">${override !== null ? `${fmtNum(override)} m (chung)` : 'theo từng công trình'}</b></div>

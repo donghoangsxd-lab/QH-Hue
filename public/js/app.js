@@ -1144,6 +1144,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error("Lỗi khởi tạo dữ liệu bản đồ:", err);
     showToast('Không nạp được dữ liệu bản đồ. Vui lòng tải lại trang.', 'error');
     if (progressRow) progressRow.style.display = 'none';
-    endTitleProgress();
   }
 });
