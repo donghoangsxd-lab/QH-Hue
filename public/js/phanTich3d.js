@@ -309,10 +309,20 @@ function byteSource(url) {
 }
 
 const readyCache = new Map();
+function tileUrl(kind) {
+  const gcs = kind === 'gba' ? withAssetVersion(GBA_URL) : CAD_URL;
+  if (directTiles()) return gcs;
+  // workers.dev không chứa file >25 MiB. Worker đọc GCS. Vercel production vẫn đi directTiles().
+  if (typeof location !== 'undefined' && /\.workers\.dev$/i.test(location.hostname || '')) {
+    if (kind === 'gba') return withAssetVersion(new URL('data/gba/buildings.pmtiles', document.baseURI).href);
+    if (kind === 'cadastre') return '/gcs/cadastre/thuadat-2016.pmtiles';
+  }
+  return `/api/pmtilesRange?file=${kind}`;
+}
+
 function ready(kind) {
   if (!readyCache.has(kind)) {
-    const gcs = kind === 'gba' ? withAssetVersion(GBA_URL) : CAD_URL;
-    const url = directTiles() ? gcs : `/api/pmtilesRange?file=${kind}`;
+    const url = tileUrl(kind);
     readyCache.set(kind, Promise.all([
       import(LIBS.pmtiles), import(LIBS.vectorTile), import(LIBS.pbf)
     ]).then(([pm, vt, pbf]) => ({
