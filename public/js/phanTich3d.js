@@ -9,6 +9,7 @@ import { withAssetVersion } from './gbaVersion.js';
 import { geeApi } from './api.js';
 import { floorsAt, floorsOnRing, metresForFloors, parseFloorPack } from './bldgFloorEdits.js';
 import { partFloorLabel } from './bldgParts.js';
+import { bindDeckNotchZoom } from './wheelZoom.js';
 
 const GBA_URL = 'https://storage.googleapis.com/hue-infra-data-us/gba/buildings.pmtiles';
 const CAD_URL = 'https://storage.googleapis.com/hue-infra-data-us/cadastre/thuadat-2016.pmtiles';
@@ -1603,7 +1604,7 @@ function bootMap(place, model) {
   deckgl = new deck.Deck({
     parent,
     views: orbit,
-    controller: { scrollZoom: true, dragPan: true, dragRotate: true, touchRotate: true, doubleClickZoom: false, keyboard: false },
+    controller: { scrollZoom: false, touchZoom: true, dragPan: true, dragRotate: true, touchRotate: true, doubleClickZoom: false, keyboard: false },
     viewState: camera,
     onViewStateChange: ({ viewState }) => {
       camera = viewState;
@@ -1658,6 +1659,10 @@ function bootMap(place, model) {
     draw();
   });
   setMode(place.view, false);
+  bindDeckNotchZoom(parent, () => camera, (zoom) => {
+    camera = { ...camera, zoom };
+    deckgl.setProps({ viewState: camera });
+  });
   window.addEventListener('resize', () => {
     camera = fitState(view.k);
     deckgl.setProps({ viewState: camera });

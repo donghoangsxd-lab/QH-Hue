@@ -25,6 +25,7 @@ import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, sch
 import { addLotEditButton } from './lotEdit.js';
 import { planLevelOf } from './generalPlan.js';
 import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
+import { bindNotchZoom } from './wheelZoom.js';
 
 export let map = null;
 export let measureLayerGroup = null;
@@ -201,6 +202,7 @@ function blockPagePinch() {
 
 export function initMap() {
   map = L.map('map', { renderer: L.canvas(), maxZoom: MAP_MAX_ZOOM, touchZoom: true }).setView(CITY_CENTER, CITY_ZOOM);
+  bindNotchZoom(map);
   blockPagePinch();
 
   attachBasemap(map);

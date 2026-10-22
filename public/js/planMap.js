@@ -4,6 +4,7 @@ import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap, MAP_MAX_ZOOM, geeTileOpts } from './basemap.js';
 import { watchTiles } from './loadProgress.js';
 import { geeTileLayer } from './geeTiles.js';
+import { bindNotchZoom } from './wheelZoom.js';
 
 export let planMap = null;
 let leftMap = null;
@@ -54,6 +55,7 @@ export function initPlanMap(mainMap, mainLayers) {
     touchZoom: true,
     zoomSnap: leftMap.options.zoomSnap
   }).setView(leftMap.getCenter(), leftMap.getZoom());
+  bindNotchZoom(planMap);
 
   attachBasemap(planMap);
 
