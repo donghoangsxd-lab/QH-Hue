@@ -1,4 +1,5 @@
-// Ẩn mộ bị nhận nhầm là nhà: nằm trong đất nghĩa trang, nhỏ và thấp.
+// Ẩn mộ bị nhận nhầm là nhà: trong đất nghĩa trang hoặc cụm mộ trên sườn, nhỏ và thấp.
+// Ngưỡng đọc từ file (mặc định 60 m² và 3,5 m). Nhà sát đường phố đã được đục khỏi mặt nạ.
 // PMTiles không bị sửa. enabled = false trong cemetery-mask.geojson thì vẽ lại hết.
 
 export function pointInRing(lng, lat, ring) {
@@ -12,7 +13,7 @@ export function pointInRing(lng, lat, ring) {
 }
 
 export function prepareGraveMask(data) {
-  if (!data || data.enabled === false) return { enabled: false, maxAreaM2: 20, maxHeightM: 2.5, parts: [] };
+  if (!data || data.enabled === false) return { enabled: false, maxAreaM2: 60, maxHeightM: 3.5, parts: [] };
   const parts = [];
   for (const feature of data.features || []) {
     const geometry = feature.geometry;
@@ -32,33 +33,44 @@ export function prepareGraveMask(data) {
         if (pt[0] > maxx) maxx = pt[0];
         if (pt[1] > maxy) maxy = pt[1];
       }
-      parts.push({ bbox: [minx, miny, maxx, maxy], outer, holes: poly.slice(1) });
+      const src = (feature.properties && feature.properties.src) || '';
+      parts.push({ bbox: [minx, miny, maxx, maxy], outer, holes: poly.slice(1), loose: src === 'slope' });
     }
   }
   return {
     enabled: true,
-    maxAreaM2: Number(data.maxAreaM2) > 0 ? Number(data.maxAreaM2) : 20,
-    maxHeightM: Number(data.maxHeightM) > 0 ? Number(data.maxHeightM) : 2.5,
+    maxAreaM2: Number(data.maxAreaM2) > 0 ? Number(data.maxAreaM2) : 60,
+    maxHeightM: Number(data.maxHeightM) > 0 ? Number(data.maxHeightM) : 3.5,
+    lowHeightM: Number(data.lowHeightM) > 0 ? Number(data.lowHeightM) : 2.5,
+    slopeAreaM2: Number(data.slopeAreaM2) > 0 ? Number(data.slopeAreaM2) : 180,
     parts
   };
 }
 
-export function insideGraveMask(mask, lng, lat) {
-  if (!mask || !mask.enabled) return false;
+function zoneAt(mask, lng, lat) {
+  if (!mask || !mask.enabled) return null;
+  let found = null;
   for (const part of mask.parts) {
     const box = part.bbox;
     if (lng < box[0] || lng > box[2] || lat < box[1] || lat > box[3]) continue;
     if (!pointInRing(lng, lat, part.outer)) continue;
     if (part.holes.some((hole) => hole && hole.length >= 3 && pointInRing(lng, lat, hole))) continue;
-    return true;
+    found = part;
+    if (part.loose) return part;
   }
-  return false;
+  return found;
 }
 
-/** Chiều cao không có thì giữ. Ngưỡng là không quá maxHeightM và diện tích dưới maxAreaM2. */
+export function insideGraveMask(mask, lng, lat) {
+  return !!zoneAt(mask, lng, lat);
+}
+
+/** Chiều cao không có thì giữ. Trên sườn, mộ rất thấp được ẩn tới slopeAreaM2. */
 export function isCemeteryGrave(mask, area, height, lng, lat) {
   if (!mask || !mask.enabled) return false;
-  if (!(area < mask.maxAreaM2)) return false;
+  const zone = zoneAt(mask, lng, lat);
+  if (!zone) return false;
   if (height == null || !(height <= mask.maxHeightM)) return false;
-  return insideGraveMask(mask, lng, lat);
+  const cap = zone.loose && height <= mask.lowHeightM ? mask.slopeAreaM2 : mask.maxAreaM2;
+  return area < cap;
 }
