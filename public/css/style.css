@@ -2822,7 +2822,7 @@ table.ward-table th {
 .pa3-lg-ramp-title { margin-bottom: 0.26em; font-weight: 700; }
 .pa3-lg-bar { height: 0.87em; border: 0.09em solid #475569; }
 .pa3-lg-heat { background: linear-gradient(to right, #5dade2, #2ecc71, #f1c40f, #f39c12, #e67e22, #d35400, #e74c3c, #900c3f); }
-.pa3-lg-pop { background: linear-gradient(to right, blue, cyan, green, yellow, orange, red); }
+.pa3-lg-pop, .pop-legend-bar { background: linear-gradient(to right, #fff5eb, #fee6ce, #fdd0a2, #fdae6b, #fd8d3c, #f16913, #d94801, #7f2704); }
 .pa3-lg-ticks { display: flex; justify-content: space-between; margin-top: 0.17em; font-size: 0.87em; }
 .pa3-info { padding-top: 0.73em; border-top: 0.09em solid #cbd5e1; font-size: 1.1em; line-height: 1.5; color: #334155; }
 .pa3-note { margin-top: 0.36em; font-style: italic; color: #64748b; }

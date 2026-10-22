@@ -597,6 +597,11 @@
             <div><input type="checkbox" id="chk_pop"><label for="chk_pop" title="Mặc định là dân theo dấu chân nhà ở trên ô 30 m. Pixel cũ gán khoảng 4% dân số lên đất nghĩa trang. Cách chia dân nằm ở Đề xuất → Quản trị → Ô dân cư. Bật lớp 14. Chung cư không đổi số này."><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư <small class="layer-hint" id="popLayerHint"></small></label></div>
             <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
           </div>
+          <div class="heat-legend" id="popLegend" hidden>
+            <div class="heat-legend-sub" id="popLegendTitle">Người / ô 30 m</div>
+            <div class="heat-legend-bar pop-legend-bar"></div>
+            <div class="heat-legend-ticks" id="popLegendTicks"><span>0</span><span>15</span><span>≥30</span></div>
+          </div>
           <div class="layer-row">
             <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Đất xây dựng theo ảnh vệ tinh. Ranh đỏ: hiện trạng đến năm gốc. Ranh xanh: phát triển mới. Phương pháp nằm trong chú thích khi bật lớp."><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Đất xây dựng (vệ tinh)</label></div>
             <span id="newDevOpBox" class="layer-slider" style="display:none;"><input type="range" id="newDevOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp vùng phát triển mới" aria-label="Độ trong suốt lớp vùng phát triển mới"></span>

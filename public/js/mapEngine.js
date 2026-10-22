@@ -582,7 +582,9 @@ export function toggleLayer(layerKey, isChecked) {
   const popBox = document.getElementById('popBox');
   const heatBox = document.getElementById('heatBox');
   const heatLegend = document.getElementById('heatLegend');
+  const popLegend = document.getElementById('popLegend');
   if (layerKey === 'pop' && popBox) popBox.style.display = isChecked ? '' : 'none';
+  if (layerKey === 'pop' && popLegend) popLegend.hidden = !isChecked;
   if (layerKey === 'heatmap' && heatBox) heatBox.style.display = isChecked ? '' : 'none';
   if (layerKey === 'heatmap' && heatLegend) heatLegend.hidden = !isChecked;
 }
@@ -2841,6 +2843,17 @@ let popTask = null;
 
 export let popLayerMeta = { popSource: null, popFallback: false, popFromTable: false, max: null };
 
+function paintPopLegend(data) {
+  const title = document.getElementById('popLegendTitle');
+  const ticks = document.getElementById('popLegendTicks');
+  if (!title || !ticks) return;
+  const max = Number(data && data.max) || 30;
+  const nha = max >= 30;
+  title.textContent = nha ? 'Người / ô 30 m' : 'Pixel cũ (so sánh)';
+  const mid = Math.round(max / 2);
+  ticks.innerHTML = `<span>0</span><span>${mid}</span><span>≥${max}</span>`;
+}
+
 function popLayerHintText(data) {
   if (!data) return '';
   if (data.popFallback) {
@@ -2865,6 +2878,7 @@ export async function loadPopulationLayer(pv) {
       popLayerMeta = { popSource: data.popSource || null, popFallback: !!data.popFallback, popFromTable: !!data.popFromTable, max: data.max || null };
       const hint = document.getElementById('popLayerHint');
       if (hint) hint.textContent = popLayerHintText(data);
+      paintPopLegend(data);
       const popOpacityEl = document.getElementById('popOpacity');
       const opacity = popOpacityEl ? popOpacityEl.value / 100 : 0.6;
       layers.pop.clearLayers();
