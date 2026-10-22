@@ -59,8 +59,11 @@
   --bp-head-h: calc(42px * var(--k));
   --face-w: calc(338px * var(--k));  /* 1 mặt khối xoay cơ cấu / số lượng / giao thông */
   --tb-btn: calc(34px * var(--k));   /* nút thanh công cụ trái */
-  --ov-w: calc(184px * var(--k));    /* nút Giới thiệu tổng quan góc trên trái */
+  --ov-w: var(--tb-btn);             /* nút Giới thiệu thu về ô vuông, cùng bề rộng thanh công cụ */
   --title-h: calc(48px * var(--k));  /* thanh tiêu đề giữa trên bản đồ */
+  --info-top: 12px;                  /* cột thông tin trái: mép trên */
+  --info-bottom: 12px;
+  --info-left: calc(12px + var(--tb-btn) + 10px); /* sát phải thanh công cụ */
 }
 @media (max-width: 1100px) { :root { --ov-w: var(--tb-btn); } }
 /* s < 1700 (laptop 14–17"): giữ nguyên. m < 2300 (21–24"), l ≥ 2300 (27–32").
@@ -254,31 +257,14 @@ body.split-offset .swipe-handle { display: none; }
 }
 @keyframes title-progress-shine { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 .map-title-progress.done { opacity: 0; }
-.load-layer-label {
-  position: fixed;
-  top: calc(var(--title-h) + 8px);
-  left: 12px;
-  z-index: 1200;
-  max-width: min(68vw, 280px);
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.72);
-  color: #f8fafc;
-  font-size: 11px;
-  line-height: 1.4;
-  pointer-events: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 @media (prefers-reduced-motion: reduce) { .map-title-progress > i::after { animation: none; } }
 .map-title[data-view="split"]::before { background: linear-gradient(90deg, transparent, var(--accent-cyan) 20%, var(--accent-cyan) 48%, var(--accent-orange) 52%, var(--accent-orange) 80%, transparent); }
 body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-width: calc(100% - 2 * (var(--ov-w) + 24px)); }
 /* Góc trên trái, cùng hàng tiêu đề: hiện khi đang chọn đồ án, QHC, phường xã hoặc đô thị (viewFlow.syncEscHint) */
 .esc-hint {
   position: absolute;
-  top: 12px;
-  left: calc(12px + var(--ov-w) + 12px);
+  top: var(--info-top);
+  left: calc(var(--info-left) + 308px);
   height: var(--title-h);
   margin: 0;
   z-index: 1100;
@@ -296,17 +282,17 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
 #mapArea.print-staging .esc-hint,
 #mapArea.print-staging .print-preview { display: none; }
 
-/* Bảng thông tin đồ án đang mở: mặc định góc dưới trái, cạnh thanh công cụ (projectBrief.js).
-   Bảng lô / công trình ở cùng góc được --brief-stack đẩy lên trên bảng này. Panel dưới mở thì lên góc trên trái. */
+/* Bảng đồ án: đầu cột trái, sát phải thanh công cụ. Cao theo nội dung.
+   --brief-stack (projectBrief.js) đẩy bảng lô / công trình xuống dưới bảng này. */
 .project-brief {
   --brief: var(--cyan-rgb);
   position: absolute;
   z-index: 1100;
-  top: auto;
-  bottom: 12px;
-  left: calc(12px + var(--tb-btn) + 10px);
-  width: min(276px, calc(100% - var(--tb-btn) - 28px));
-  max-height: min(460px, calc(100% - var(--title-h) - 24px));
+  top: var(--info-top);
+  bottom: auto;
+  left: var(--info-left);
+  width: min(300px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
+  max-height: min(42%, calc(100% - var(--info-top) - var(--info-bottom) - 72px));
   overflow: auto;
   box-sizing: border-box;
   padding: 6px 8px;
@@ -490,31 +476,22 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
 .project-brief-meter.is-on .project-brief-track i { min-width: 10px; }
 .project-brief-meter[data-tone="adjust"] .project-brief-track i { background: var(--accent-orange); }
 .project-brief-wait { color: var(--text-muted); font-weight: 600; }
-/* Panel dưới đang mở, hoặc tờ thẩm định chiếm đáy: bảng góc trái lên trên để không bị che */
+/* Panel dưới mở: thu cột thông tin (bảng tra cứu, lô, đồ án) để không che bản đồ phía trên bảng.
+   Đóng panel thì các bảng hiện lại đúng chỗ. Tờ thẩm định đã rút #mapArea lên trên tờ, không cần dời. */
 body:not(.bottom-collapsed) .project-brief,
 body:not(.bottom-collapsed) .urban-focus-bar,
 body:not(.bottom-collapsed) .ovd-card,
-body.project-review:not(.project-view) .project-brief,
-body.project-review:not(.project-view) .urban-focus-bar,
-body.project-review:not(.project-view) .ovd-card {
-  top: calc(12px + var(--title-h) + 8px);
-  bottom: auto;
+body:not(.bottom-collapsed) .cad-card,
+body:not(.bottom-collapsed) .leaflet-popup.dock-card {
+  display: none !important;
 }
-/* Bảng dự án kêu gọi đầu tư đã chiếm cột trái suốt chiều cao: thẻ đồ án sang phải bảng đó.
-   Điện thoại ghi đè left/top/bottom bằng !important trong media query. */
+/* Bảng dự án kêu gọi đầu tư chiếm cột trái: thẻ đồ án sang phải bảng đó. */
 body:has(#investCard:not([hidden])) .project-brief {
-  left: calc(12px + var(--tb-btn) + 18px + min(380px, calc(100% - var(--tb-btn) - var(--right-w) - 36px)));
-  top: calc(12px + var(--title-h) + 8px);
+  left: calc(var(--info-left) + min(380px, calc(100% - var(--tb-btn) - var(--right-w) - 36px)) + 8px);
+  top: var(--info-top);
   bottom: auto;
   width: min(276px, calc(100% - var(--tb-btn) - var(--right-w) - 380px - 56px));
-  max-height: min(460px, calc(100% - var(--title-h) - 24px));
-}
-body:not(.bottom-collapsed) .cad-card,
-body.project-review:not(.project-view) .cad-card,
-body:not(.bottom-collapsed) .leaflet-popup.dock-card,
-body.project-review:not(.project-view) .leaflet-popup.dock-card {
-  top: calc(12px + var(--title-h) + 8px + var(--brief-stack, 0px)) !important;
-  bottom: auto !important;
+  max-height: min(42%, calc(100% - var(--info-top) - var(--info-bottom) - 72px));
 }
 /* Nút lật trang Quy hoạch ⇄ Hiện trạng (biểu tượng bên trái tiêu đề) */
 .map-title-mark {
@@ -704,20 +681,21 @@ body.compare-on .map-title-split { display: inline-flex; }
   box-shadow: 0 0 10px rgba(var(--cyan-rgb), 0.55);
 }
 
-/* NÚT GIỚI THIỆU TỔNG QUAN (overview.js): góc trên trái, thanh công cụ dọc xếp ngay dưới */
+/* NÚT GIỚI THIỆU TỔNG QUAN (overview.js): ô vuông đầu cột công cụ. Hộp thoại chỉ tự mở lần đầu. */
 .ov-launch {
   position: absolute;
   top: 12px;
   left: 12px;
   z-index: 1100;
+  width: var(--tb-btn);
   height: var(--tb-btn);
   min-width: var(--tb-btn);
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 0 14px 0 10px;
+  gap: 0;
+  padding: 0;
   font-size: var(--fs-md);
   font-weight: 700;
   letter-spacing: 0.3px;
@@ -732,14 +710,21 @@ body.compare-on .map-title-split { display: inline-flex; }
   cursor: pointer;
   transition: all var(--ease);
 }
+.ov-launch-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .ov-launch .ico { margin: 0; width: calc(18px * var(--k)); height: calc(18px * var(--k)); color: var(--accent-cyan); }
 .ov-launch:hover { background: rgba(30, 41, 59, 0.98); border-color: var(--accent-cyan); box-shadow: 0 0 12px rgba(var(--cyan-rgb), 0.35); }
 .ov-launch[aria-expanded="true"] { background: var(--accent-cyan); border-color: var(--accent-cyan); color: var(--text-on-accent); }
 .ov-launch[aria-expanded="true"] .ico { color: var(--text-on-accent); }
-@media (max-width: 1100px) {
-  .ov-launch { padding: 0; }
-  .ov-launch-text { display: none; }
-}
 
 /* THANH CÔNG CỤ DỌC TRÊN BẢN ĐỒ (BÊN TRÁI): các nút rời, không có nền bao */
 .map-toolbar {
@@ -2977,6 +2962,12 @@ table.ward-table th {
   font-family: inherit; font-size: var(--fs-sm); font-weight: 700; cursor: pointer;
 }
 .proof-btn:hover { background: rgba(var(--cyan-rgb), 0.25); }
+a.proof-btn.pp-3d {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  box-sizing: border-box; margin-top: 8px; min-height: 28px;
+  text-decoration: none; text-align: center;
+}
+a.proof-btn.pp-3d .ico { margin: 0; }
 .ht-assign { margin-top: 6px; }
 .ht-assign:empty { display: none; margin: 0; }
 .ht-form [hidden] { display: none; }
@@ -3289,16 +3280,15 @@ table.ward-table th {
 .cad-plan:not(:empty) { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-color); }
 .cad-plan-btn { margin-top: 10px; }
 
-/* Bảng thửa và bảng lô/công trình: góc dưới trái, sát thanh công cụ.
-   Có bảng đồ án thì --brief-stack đẩy chúng lên trên bảng đó. Panel dưới mở thì cả cụm lên góc trên trái. */
+/* Bảng thửa và bảng lô: cột trái, dưới bảng đồ án nếu có. Cao theo nội dung, tối đa hết cột. */
 .cad-card {
   position: absolute;
   z-index: 1040;
-  top: auto;
-  bottom: calc(12px + var(--brief-stack, 0px));
-  left: calc(12px + var(--tb-btn) + 8px);
-  width: min(280px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
-  max-height: calc((100% - var(--title-h) - 20px - var(--brief-stack, 0px)) * 0.7);
+  top: calc(var(--info-top) + var(--brief-stack, 0px));
+  bottom: auto;
+  left: var(--info-left);
+  width: min(320px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
+  max-height: calc(100% - var(--info-top) - var(--info-bottom) - var(--brief-stack, 0px));
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -3313,10 +3303,10 @@ table.ward-table th {
 }
 .cad-card[hidden] { display: none; }
 .cad-card.invest-card {
-  top: calc(12px + var(--title-h) + 8px) !important;
-  bottom: auto !important;
+  top: var(--info-top) !important;
+  bottom: var(--info-bottom) !important;
   width: min(380px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
-  max-height: calc(100% - var(--title-h) - 28px);
+  max-height: none;
 }
 .invest-body { flex: 1; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; }
 .invest-card .lp-title { padding-right: 40px; }
@@ -3446,18 +3436,19 @@ table.ward-table th {
 }
 .leaflet-tooltip.invest-tip { font-size: 12px; font-weight: 600; }
 
-/* Bảng công trình, bảng lô đất ngoài nhóm hạ tầng và bảng tiếp cận: cùng góc với bảng thửa */
+/* Bảng công trình, bảng lô và bảng tra cứu điểm: cột trái, cao theo nội dung, cuộn khi dài hết cột */
 .leaflet-popup.dock-card {
   position: absolute !important;
   z-index: 1040;
-  top: auto !important;
-  left: calc(12px + var(--tb-btn) + 8px) !important;
-  bottom: calc(12px + var(--brief-stack, 0px)) !important;
+  top: calc(var(--info-top) + var(--brief-stack, 0px)) !important;
+  left: var(--info-left) !important;
+  bottom: auto !important;
   right: auto !important;
   margin: 0 !important;
   transform: none !important;
-  width: min(280px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
-  max-height: calc((100% - var(--title-h) - 20px - var(--brief-stack, 0px)) * 0.7);
+  width: min(320px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
+  max-height: calc(100% - var(--info-top) - var(--info-bottom) - var(--brief-stack, 0px));
+  height: auto;
   display: flex;
   flex-direction: column;
   pointer-events: auto;
@@ -3478,7 +3469,7 @@ table.ward-table th {
 }
 .dock-card .leaflet-popup-content {
   width: auto !important;
-  max-height: none !important;
+  max-height: calc(100dvh - var(--info-top) - var(--info-bottom) - var(--brief-stack, 0px) - 20px) !important;
   margin: 8px 10px !important;
   overflow-y: auto;
   flex: 1 1 auto;
@@ -3516,7 +3507,7 @@ table.ward-table th {
   border: 1px solid rgba(var(--cyan-rgb), 0.55);
   box-shadow: var(--panel-shadow);
 }
-.leaflet-popup.dock-card.pp-collapsed .leaflet-popup-content { margin: 0 !important; overflow: hidden; }
+.leaflet-popup.dock-card.pp-collapsed .leaflet-popup-content { margin: 0 !important; overflow: hidden; max-height: none !important; }
 .leaflet-popup.dock-card.pp-collapsed .pp-title,
 .leaflet-popup.dock-card.pp-collapsed .lp-title {
   text-shadow: none;
@@ -3579,7 +3570,7 @@ table.ward-table th {
   font-size: 10px; line-height: 1.3; margin-top: 2px;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.cad-page { flex: 1; min-height: 0; overflow: auto; padding: 2px 8px 6px; }
+.cad-page { flex: 1; min-height: 0; overflow: auto; padding: 2px 8px 6px; max-height: calc(100dvh - var(--info-top) - var(--info-bottom) - var(--brief-stack, 0px) - 72px); }
 .cad-page .pls-lots { max-height: none; gap: 2px; }
 .cad-page .pls-lot { padding: 2px 4px; cursor: pointer; }
 .cad-page .pls-lot.is-on { border-color: var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.16); }
@@ -3971,10 +3962,10 @@ table.ward-table th {
 .ov-btn-demo { color: var(--text-on-accent); background: var(--accent-cyan); border-color: var(--accent-cyan); }
 .ov-btn-demo:hover { filter: brightness(1.1); box-shadow: 0 0 10px rgba(var(--cyan-rgb), 0.45); }
 
-/* Thẻ thuyết minh trình diễn (overviewDemo.js): góc dưới trái, cạnh thanh công cụ; panel dưới mở thì lên trên */
+/* Thẻ thuyết minh trình diễn (overviewDemo.js): đầu cột trái */
 .ovd-card {
-  position: fixed; top: auto; bottom: 12px; left: calc(12px + var(--tb-btn) + 10px); z-index: 5000;
-  width: min(400px, calc(100vw - 72px)); max-height: calc(100vh - 96px);
+  position: fixed; top: var(--info-top); bottom: auto; left: var(--info-left); z-index: 5000;
+  width: min(400px, calc(100vw - var(--info-left) - 16px)); max-height: calc(100dvh - var(--info-top) - var(--info-bottom));
   display: flex; flex-direction: column; gap: 8px;
   padding: 12px 14px; box-sizing: border-box; overflow: auto;
   color: var(--text-main); background: var(--bg-card);
@@ -4005,7 +3996,13 @@ table.ward-table th {
 .ovd-btns { display: flex; gap: 6px; }
 .ovd-btns [data-ovd="keep"] { margin-right: auto; }
 .ovd-btns button:disabled { opacity: 0.45; cursor: default; filter: none; box-shadow: none; }
-@media (max-width: 700px) { .ovd-card { top: auto; bottom: 8px; left: 8px; width: calc(100vw - 16px); max-height: 50vh; } }
+@media (max-width: 700px) {
+  .ovd-card {
+    top: var(--info-top); bottom: auto; left: var(--info-left);
+    width: min(400px, calc(100vw - var(--info-left) - 8px));
+    max-height: calc(100dvh - var(--info-top) - var(--info-bottom));
+  }
+}
 
 .ov-crumb { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; min-width: 0; }
 .ov-crumb-sec { font-size: var(--fs-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -4198,13 +4195,15 @@ body.project-view #projectReviewHost { display: flex; padding: 0; overflow: hidd
 .lots-progress-bar > i { display: block; height: 100%; width: 0; background: var(--accent-cyan); transition: width 0.25s ease; }
 @keyframes lots-spin { to { transform: rotate(360deg); } }
 
-/* Ghi chú độ phủ quy hoạch của đô thị đang chọn (urbanFocus.js): góc dưới trái; panel dưới mở thì lên trên */
+/* Ghi chú độ phủ quy hoạch của đô thị đang chọn (urbanFocus.js): đầu cột trái */
 .urban-focus-bar {
   position: fixed; z-index: 950;
-  top: auto;
-  bottom: 12px;
-  left: calc(12px + var(--tb-btn) + 12px);
-  max-width: min(440px, calc(100vw - var(--right-w) - var(--tb-btn) - 52px));
+  top: var(--info-top);
+  bottom: auto;
+  left: var(--info-left);
+  max-width: min(440px, calc(100vw - var(--info-left) - var(--right-w) - 24px));
+  max-height: calc(100dvh - var(--info-top) - var(--info-bottom));
+  overflow: auto;
   display: flex; flex-direction: column; gap: 4px; padding: 8px 8px 8px 10px;
   background: var(--bg-dark); backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
   border: 1px solid rgba(var(--cyan-rgb), 0.55); border-radius: var(--r-lg);
@@ -4742,12 +4741,6 @@ body.project-review.la-page #projectReviewHost {
    Cỡ chữ một mức: chú thích 11.5, chữ 13, tiêu đề 14–15. Nút chạm 40–44px.
    Khóa html/body vào khung nhìn để thanh nowrap không đẩy trang sang trái. --right-w = 0 vì ngăn kéo phủ lên bản đồ. */
 @media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
-  .load-layer-label {
-    top: var(--phone-chrome-top);
-    left: var(--phone-tool-left);
-    font-size: 10.5px;
-    max-width: min(52vw, 220px);
-  }
   html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   html, body {
     position: fixed;
@@ -4776,6 +4769,9 @@ body.project-review.la-page #projectReviewHost {
     --phone-dock-bottom: max(8px, env(safe-area-inset-bottom));
     --phone-tool-left: calc(max(8px, env(safe-area-inset-left)) + var(--tb-btn) + 12px);
     --phone-fixed-bottom: var(--phone-dock-bottom);
+    --info-top: var(--phone-chrome-top);
+    --info-bottom: var(--phone-dock-bottom);
+    --info-left: var(--phone-tool-left);
     /* Panel phải là thẻ góc, không chiếm hết chiều ngang. Dấu để đối chiếu bản production. */
     --phone-panel-w: min(300px, calc(100vw - var(--phone-tool-left) - 8px));
     --phone-title-fit: 1;
@@ -5087,41 +5083,38 @@ body.project-review.la-page #projectReviewHost {
   }
   .sketch-palette { right: auto; width: min(360px, calc(100vw - 16px)); flex-direction: row; flex-wrap: wrap; }
   body .project-brief,
-  body:not(.bottom-collapsed) .project-brief,
   body.project-review:not(.project-view) .project-brief,
   body .urban-focus-bar,
-  body:not(.bottom-collapsed) .urban-focus-bar,
   body .ovd-card {
-    top: auto !important;
-    bottom: var(--phone-fixed-bottom) !important;
-    left: var(--phone-tool-left) !important;
-    width: min(320px, calc(100vw - var(--phone-tool-left) - 8px)) !important;
-    max-height: min(30dvh, 168px);
+    top: var(--info-top) !important;
+    bottom: auto !important;
+    left: var(--info-left) !important;
+    width: min(300px, calc(100vw - var(--info-left) - 8px)) !important;
+    max-height: calc(100dvh - var(--info-top) - var(--info-bottom) - var(--brief-stack, 0px));
+    height: auto;
     overflow: auto;
   }
   body .project-brief,
-  body:not(.bottom-collapsed) .project-brief,
   body.project-review:not(.project-view) .project-brief {
-    max-height: min(52dvh, 340px);
+    max-height: min(42%, calc(100dvh - var(--info-top) - var(--info-bottom) - 72px));
   }
   body .cad-card,
-  body:not(.bottom-collapsed) .cad-card,
   body.project-review:not(.project-view) .cad-card,
   body .leaflet-popup.dock-card,
-  body:not(.bottom-collapsed) .leaflet-popup.dock-card,
   body.project-review:not(.project-view) .leaflet-popup.dock-card {
-    top: auto !important;
-    bottom: calc(var(--phone-dock-bottom) + var(--brief-stack, 0px)) !important;
-    left: var(--phone-tool-left) !important;
+    top: calc(var(--info-top) + var(--brief-stack, 0px)) !important;
+    bottom: auto !important;
+    left: var(--info-left) !important;
     right: auto !important;
-    width: min(320px, calc(100vw - 16px)) !important;
-    max-width: min(320px, calc(100vw - 16px));
-    max-height: min(42dvh, calc(100dvh - var(--phone-chrome-top) - var(--phone-dock-bottom) - var(--brief-stack, 0px) - 8px));
+    width: min(300px, calc(100vw - var(--info-left) - 8px)) !important;
+    max-width: min(300px, calc(100vw - var(--info-left) - 8px));
+    height: auto;
+    max-height: calc(100dvh - var(--info-top) - var(--info-bottom) - var(--brief-stack, 0px));
   }
   body .cad-card.invest-card {
-    top: var(--phone-chrome-top) !important;
-    bottom: var(--phone-dock-bottom) !important;
-    max-height: calc(100dvh - var(--phone-chrome-top) - var(--phone-dock-bottom));
+    top: var(--info-top) !important;
+    bottom: var(--info-bottom) !important;
+    max-height: none;
   }
   .project-brief-close,
   .cad-card-x,
@@ -5294,11 +5287,16 @@ body.project-review.la-page #projectReviewHost {
   }
   .rp-collapse-btn::after { content: none; }
   #tabLayers, #tabLegend { height: auto; flex: 1 1 auto; min-height: 0; }
-  body .project-brief,
-  body .cad-card,
-  body .leaflet-popup.dock-card,
-  body .urban-focus-bar,
-  body .ovd-card { width: min(280px, 42vw) !important; }
+  :root {
+    --info-top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
+    --info-bottom: max(4px, env(safe-area-inset-bottom));
+    --info-left: calc(max(4px, env(safe-area-inset-left)) + var(--tb-btn) + 8px);
+  }
+  body.bottom-collapsed .project-brief,
+  body.bottom-collapsed .cad-card,
+  body.bottom-collapsed .leaflet-popup.dock-card,
+  body.bottom-collapsed .urban-focus-bar,
+  body.bottom-collapsed .ovd-card { width: min(280px, 42vw) !important; }
   .review-panel {
     left: auto;
     right: max(8px, env(safe-area-inset-right));

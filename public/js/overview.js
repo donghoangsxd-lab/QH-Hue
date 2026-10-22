@@ -13,6 +13,7 @@ import { floodReport } from './floodSim.js';
 import { startDemo, flash, openLayerTab } from './overviewDemo.js';
 
 const STORAGE_KEY = 'qhhue_intro_off';
+const SEEN_KEY = 'qhhue_overview_seen';
 // Khung tọa độ TP. Huế (WGS84): chặn nhập đảo thứ tự hoặc nhập nhầm tọa độ VN-2000
 const HUE_BOUNDS = { latMin: 15.9, latMax: 16.85, lngMin: 106.9, lngMax: 108.3 };
 
@@ -1024,6 +1025,13 @@ function close() {
 export function initOverview() {
   $('btnOverview')?.addEventListener('click', () => (isOpen() ? close() : openOverview()));
   let off = false;
-  try { off = localStorage.getItem(STORAGE_KEY) === '1'; } catch { /* chế độ riêng tư */ }
-  if (!off) setTimeout(() => { if (!document.querySelector('.tour-root:not([hidden])')) openOverview(); }, 1200);
+  let seen = false;
+  try {
+    off = localStorage.getItem(STORAGE_KEY) === '1';
+    seen = localStorage.getItem(SEEN_KEY) === '1';
+  } catch { /* chế độ riêng tư */ }
+  // Lần mở trang đầu (trình duyệt này) thì mở hộp. Các lần sau, kể cả tải lại, giữ thu.
+  if (off || seen) return;
+  try { localStorage.setItem(SEEN_KEY, '1'); } catch { /* chế độ riêng tư */ }
+  setTimeout(() => { if (!document.querySelector('.tour-root:not([hidden])')) openOverview(); }, 1200);
 }
