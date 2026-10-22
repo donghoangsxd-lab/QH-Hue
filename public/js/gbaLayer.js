@@ -1,11 +1,13 @@
-// Dấu chân Global Building Atlas: PMTiles z13–16, tô theo bốn nhóm chiều cao tương đối.
+// Dấu chân Global Building Atlas: PMTiles z13–16. Mã c trong tile là phân vị cũ;
+// màu vẽ theo số tầng (chiều cao mét / 3,3) từ bldg-hf.bin.
 // Lưới cường độ 150 m không còn là lớp riêng. Số liệu lô / phường vẫn lấy từ agg.json.
 import { map, setLandPopupExtra } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { MAP_MAX_ZOOM } from './basemap.js';
 import { geeApi } from './api.js';
 import { setWardGbaHtml } from './uiComponents.js';
-import { GBA_CLASSES, GBA_COLORS, gbaLotKey, gbaStatsHtml, gbaWardExtra } from './gbaStats.js';
+import { GBA_FLOOR_CLASSES, GBA_FLOOR_COLORS, floorClassIndex, gbaLotKey, gbaStatsHtml, gbaWardExtra } from './gbaStats.js';
+import { heightAt, loadBuildingHeights } from './bldgHeight.js';
 import { trackWork, watchTiles } from './loadProgress.js';
 
 const LIBS = {
@@ -118,16 +120,24 @@ function loadTile(z, x, y) {
   const key = `${z}/${x}/${y}`;
   let p = tiles.get(key);
   if (p) { tiles.delete(key); tiles.set(key, p); return p; }
-  p = ensureReady().then(async ({ archive, VectorTile, Pbf }) => {
+  p = Promise.all([ensureReady(), loadBuildingHeights().catch(() => null)]).then(async ([{ archive, VectorTile, Pbf }, heights]) => {
     const res = await archive.getZxy(z, x, y);
     if (!res || !res.data) return [];
     const layer = new VectorTile(new Pbf(new Uint8Array(res.data))).layers[LAYER];
     const out = [];
     for (let i = 0; layer && i < layer.length; i++) {
       const f = layer.feature(i);
+      const rings = f.loadGeometry().map((r) => r.map((pt) => [pt.x, pt.y]));
+      const ring = rings[0] || [];
+      let sx = 0;
+      let sy = 0;
+      ring.forEach(([px, py]) => { sx += px; sy += py; });
+      const n = ring.length || 1;
+      const [lng, lat] = lngLatOf(z, x, y, sx / n, sy / n, layer.extent);
+      const h = heights ? heightAt(lng, lat, heights) : null;
       out.push({
-        rings: f.loadGeometry().map((r) => r.map((pt) => [pt.x, pt.y])),
-        c: Number(f.properties.c) || 0,
+        rings,
+        fc: floorClassIndex(h),
         extent: layer.extent
       });
     }
@@ -160,7 +170,7 @@ function drawFoot(canvas, feats, coords, dz, size, dpr) {
       if (y > maxy) maxy = y;
     }));
     if (maxx < view[0] || minx > view[2] || maxy < view[1] || miny > view[3]) return;
-    const c = Math.max(0, Math.min(3, ft.c));
+    const c = Math.max(0, Math.min(3, ft.fc || 0));
     if (!by.has(c)) by.set(c, []);
     by.get(c).push(ft);
   });
@@ -174,10 +184,10 @@ function drawFoot(canvas, feats, coords, dz, size, dpr) {
       ctx.closePath();
     }));
     ctx.globalAlpha = 0.72;
-    ctx.fillStyle = GBA_COLORS[c];
+    ctx.fillStyle = GBA_FLOOR_COLORS[c];
     ctx.fill('evenodd');
     ctx.globalAlpha = 0.9;
-    ctx.strokeStyle = '#7c2d12';
+    ctx.strokeStyle = '#431407';
     ctx.stroke();
   });
   ctx.globalAlpha = 1;
@@ -216,8 +226,8 @@ function syncAttr() {
 }
 
 function legendHtml() {
-  const swatch = GBA_CLASSES.map((name, i) => `<span><i style="background:${GBA_COLORS[i]}"></i>${name}</span>`).join('');
-  return `<div class="gba-legend" aria-label="Nhóm chiều cao công trình">${swatch}</div>`;
+  const swatch = GBA_FLOOR_CLASSES.map((name, i) => `<span><i style="background:${GBA_FLOOR_COLORS[i]}"></i>${name}</span>`).join('');
+  return `<div class="gba-legend" aria-label="Số tầng công trình, chiều cao chia 3,3">${swatch}</div>`;
 }
 
 function paintBox() {

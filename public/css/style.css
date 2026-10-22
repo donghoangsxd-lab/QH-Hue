@@ -5388,7 +5388,7 @@ body.project-review.la-page #projectReviewHost {
 .leaflet-ofm-pane canvas {
   pointer-events: none !important;
 }
-/* Chú giải GBA: bốn nhóm chiều cao tương đối. */
+/* Chú giải GBA: bốn nhóm số tầng, một dải cam. */
 .gba-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
 .gba-legend i, .gba-cls i { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
 .gba-stats { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(148, 163, 184, 0.35); font-size: 12px; }

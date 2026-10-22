@@ -2,6 +2,24 @@
 export const GBA_CLASSES = ['Thấp', 'Trung bình', 'Cao', 'Rất cao'];
 export const GBA_COLORS = ['#fde68a', '#fb923c', '#ea580c', '#9a3412'];
 
+// Bốn lớp số tầng trên bản đồ. Tầng = làm tròn (mét / 3,3). Tầng 10 thuộc 6-10; trên 50 vẫn vào nhóm trên.
+export const GBA_FLOOR_CLASSES = ['1-2 tầng', '3-5 tầng', '6-10 tầng', '11-50 tầng'];
+export const GBA_FLOOR_COLORS = ['#ffedd5', '#fdba74', '#ea580c', '#9a3412'];
+
+export function floorsFromMetres(h) {
+  const n = Number(h);
+  if (!(n > 0)) return null;
+  return Math.max(1, Math.round(n / 3.3));
+}
+
+export function floorClassIndex(h) {
+  const f = floorsFromMetres(h);
+  if (f == null || f <= 2) return 0;
+  if (f <= 5) return 1;
+  if (f <= 10) return 2;
+  return 3;
+}
+
 export const GBA_NOTE = 'Dữ liệu dấu chân công trình Global Building Atlas (Đại học Kỹ thuật Munich, 2025), từ dấu chân Google, OpenStreetMap và Microsoft khoảng năm 2023. Chiều cao chỉ là ước lượng tương đối để thấy nơi nhà cao hơn hoặc dày hơn, phục vụ nhận định nhu cầu hạ tầng. Không phải số mét đo đạc và không dùng để quản lý, khống chế chiều cao công trình. Dân số phân bổ theo dấu chân nhà ở (thửa đất ở, rồi mới loại công trình công cộng, sản xuất và dấu chân quá lớn; dấu chân quá nhỏ như nhà kho, bếp, mái không tính dù thửa là đất ở) nhân bậc chiều cao tương đối, không phải mét. Giấy phép CC BY-NC 4.0 (atlas) và ODbL (OpenStreetMap).';
 
 export function gbaLotKey(file, phase, id) {
