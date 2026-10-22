@@ -54,7 +54,10 @@ gcloud run deploy "$SERVICE" \
 
 URL="$(gcloud run services describe "$SERVICE" --project "$GCP_PROJECT" --region "$REGION" --format='value(status.url)')"
 echo "URL Cloud Run: ${URL}"
-echo "Đặt biến trên dịch vụ (Console → Cloud Run → ${SERVICE} → Variables), không ghi vào git."
+echo "Kiểm tra: curl -fsS \"${URL}/api/health\""
+echo "Không gọi /healthz trên run.app: Google frontend giữ đường này và trả 404."
+echo "Đặt biến: Console → Cloud Run → vùng ${REGION} → ${SERVICE} → tab Containers → Edit → Variables & Secrets."
+echo "Console mới không còn nút Edit & deploy new revision. Không ghi biến vào git."
 echo "Không dùng --set-env-vars khi deploy lại: lệnh đó xóa biến cũ."
 echo "  GEE_PRIVATE_KEY  GAS_BASE_URL  GAS_SECRET  GOOGLE_CLIENT_ID  ALLOWED_ORIGINS"
 echo "ALLOWED_ORIGINS phải có origin Vercel và origin workers.dev, cách nhau bởi dấu phẩy."
