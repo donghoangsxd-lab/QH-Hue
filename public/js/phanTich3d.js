@@ -1,6 +1,7 @@
 // Bản mẫu bốn thành phần đô thị. Ô vuông cạnh 2×r (r vẫn là tham số bán kính, nay là nửa cạnh).
 // Chiều cao đùn bằng mét từ data/gba/bldg-hf.bin (làm tròn 0,5 m). Số tầng = round(h / 3.3).
-// Tháp bị GBA lọc hoặc ước thấp nằm ở bldg-overrides.geojson (draw) và được vẽ thêm.
+// Tháp bị GBA lọc hoặc ước thấp nằm ở bldg-overrides.geojson (draw).
+// parts: khối đế và tháp, min_height / height là mét thật, số tầng là số công bố, không trần.
 // Màu khối tích theo số tầng (làm tròn mét / 3,3): 1-2, 3-5, 6-10, 11-50. Trên 50 tầng vẫn nhóm trên.
 // Dân phường không nhân theo diện tích ô.
 
@@ -724,6 +725,33 @@ function buildModel(raw, origin, r, heights) {
   if (raw.gbaError) gaps.push('Không đọc được dấu chân công trình (Global Building Atlas).');
   else {
     for (const feat of raw.gba) {
+      if (feat.explicit) {
+        const top = feat.height;
+        const minH = feat.minHeight || 0;
+        const extrusion = top - minH;
+        const f = feat.floors;
+        if (!(extrusion > 0) || !f) continue;
+        for (const cut of clipFeature(feat, origin, clip, r)) {
+          if (minH === 0) {
+            footprint += cut.area;
+            matchedFp += cut.area;
+            classArea[floorBin(f)] += cut.area;
+            gfa += cut.area * f;
+            hSum += cut.area * top;
+            buildings.push(cut);
+          } else {
+            gfa += cut.area * f;
+            hSum += cut.area * extrusion;
+            if (feat.groundFloors) {
+              classArea[floorBin(feat.groundFloors)] -= cut.area;
+              classArea[floorBin(f)] += cut.area;
+            }
+          }
+          volumes.push({ rings: cut.rings, h: extrusion, z0: minH, fill: VOLUME_FILL[floorBin(f)] });
+        }
+        continue;
+      }
+      if (ringInsideMask(feat.rings && feat.rings[0], raw.masks)) continue;
       for (const cut of clipFeature(feat, origin, clip, r)) {
         const mid = centroid(cut.rings[0]);
         const lng = origin.lng + mid[0] / origin.mLng;
@@ -740,7 +768,7 @@ function buildModel(raw, origin, r, heights) {
         }
         const drawH = h == null ? 3.3 : h;
         buildings.push(cut);
-        volumes.push({ rings: cut.rings, h: drawH, fill: VOLUME_FILL[floorBin(f)] });
+        volumes.push({ rings: cut.rings, h: drawH, z0: 0, fill: VOLUME_FILL[floorBin(f)] });
       }
     }
     if (!buildings.length) gaps.push('Không có dấu chân công trình trong ô vuông.');
@@ -862,6 +890,7 @@ function buildModel(raw, origin, r, heights) {
   const driveM = roadM.truc + roadM.khuvuc + roadM.tertiary + roadM.noibo;
   const meanF = matchedFp > 0 ? gfa / matchedFp : null;
   const meanH = matchedFp > 0 ? hSum / matchedFp : null;
+  for (let i = 0; i < classArea.length; i++) if (classArea[i] < 0) classArea[i] = 0;
   return {
     volumes, uses, greens, waters, squares, roads, arrows, nodes, trees, corners, gaps, nearest, stopsInside,
     roadM, driveM, squareArea, footprint, buildings: buildings.length, classArea, parcels: parcels.length,
@@ -870,7 +899,8 @@ function buildModel(raw, origin, r, heights) {
     water: coverRatio(waterRings, r),
     square: coverRatio(squareRings, r),
     osmDate: raw.osm && raw.osm.osm3s ? raw.osm.osm3s.timestamp_osm_base : '',
-    heightMeta: raw.heightMeta || null
+    heightMeta: raw.heightMeta || null,
+    massing: raw.massing || []
   };
 }
 
@@ -918,6 +948,47 @@ function swatch(color, label) {
   span.textContent = label;
   item.append(badge, span);
   return item;
+}
+
+function paintMassing(rows) {
+  const host = $('massing');
+  const note = $('massingNote');
+  if (!host || !note) return;
+  note.textContent = 'Danh sách công bố của Huế dừng ở 13 công trình từ 50 m hoặc 15 tầng, cộng 3 công trình đang xây. Không đủ 20 công trình có số liệu. Khối đế chỉ tách khi có số tầng công bố. Nhà còn lại trong ô vẫn lấy mét chia 3,3.';
+  const table = document.createElement('table');
+  table.className = 'massing';
+  const head = document.createElement('tr');
+  ['Tên', 'Đế', 'Tháp', 'm', 'Nguồn'].forEach((label) => {
+    const cell = document.createElement('th');
+    cell.textContent = label;
+    head.append(cell);
+  });
+  table.append(head);
+  rows.forEach((row) => {
+    const tr = document.createElement('tr');
+    const name = document.createElement('td');
+    name.textContent = row.drawn ? row.name : `${row.name} (chưa vẽ)`;
+    if (!row.drawn) name.className = 'off';
+    const podium = document.createElement('td');
+    podium.textContent = row.podiumFloors == null ? '—' : String(row.podiumFloors);
+    const tower = document.createElement('td');
+    tower.textContent = row.towerFloors == null ? '—' : String(row.towerFloors);
+    const height = document.createElement('td');
+    height.textContent = row.height == null ? '—' : String(row.height).replace('.', ',');
+    const src = document.createElement('td');
+    if (row.source) {
+      const a = document.createElement('a');
+      a.href = row.source;
+      a.target = '_blank';
+      a.rel = 'noreferrer';
+      a.textContent = 'nguồn';
+      src.append(a);
+    }
+    tr.append(name, podium, tower, height, src);
+    if (row.note) tr.title = row.note;
+    table.append(tr);
+  });
+  host.replaceChildren(table);
 }
 
 function nearestText(row, r, osmError) {
@@ -1001,6 +1072,7 @@ function paintPanel(model, place, wardPop) {
     items.push(li('Dân số cả phường', 'Không xác định được phường tại tâm ô.', ''));
   }
   stats.replaceChildren(...items);
+  paintMassing(model.massing || []);
   const gapList = [...model.gaps];
   const meta = model.heightMeta;
   if (meta) gapList.push(`${meta.note} ${meta.spikeRule} Đã hạ ${fmt0(meta.spikeResets)} dấu chân.`);
@@ -1098,7 +1170,17 @@ function bootMap(place, model) {
     layers.push(polys('greens', model.greens, zVoids + PLATE));
     layers.push(polys('waters', model.waters, zVoids + PLATE));
     layers.push(polys('squares', model.squares, zVoids + PLATE));
-    layers.push(polys('volumes', model.volumes, zVolumes + PLATE));
+    const byBase = new Map();
+    model.volumes.forEach((v) => {
+      const key = v.z0 || 0;
+      if (!byBase.has(key)) byBase.set(key, []);
+      byBase.get(key).push(v);
+    });
+    let volI = 0;
+    byBase.forEach((data, z0) => {
+      layers.push(polys(volI ? `volumes-${volI}` : 'volumes', data, zVolumes + PLATE + z0));
+      volI += 1;
+    });
     if (k > 0.12) layers.push(polys('uses', model.uses, zUses + PLATE));
     if (!coarse || model.volumes.length < 3500) {
       layers.push(new deck.PathLayer({
@@ -1106,7 +1188,7 @@ function bootMap(place, model) {
         data: model.volumes,
         coordinateSystem: CART,
         modelMatrix: lift(zVolumes + PLATE + 0.35),
-        getPath: (d) => d.rings[0].map((p) => [p[0], p[1], d.h]),
+        getPath: (d) => d.rings[0].map((p) => [p[0], p[1], (d.z0 || 0) + d.h]),
         getColor: [67, 20, 7, 230],
         getWidth: 1.4,
         widthUnits: 'pixels',
@@ -1303,25 +1385,81 @@ function pointInGeo(lng, lat, geometry) {
   return polys.some((poly) => pointInRing([lng, lat], poly[0]) && !poly.slice(1).some((hole) => pointInRing([lng, lat], hole)));
 }
 
+function ringCentroidLngLat(ring) {
+  let x = 0;
+  let y = 0;
+  let n = 0;
+  for (const p of ring) {
+    if (n && p[0] === ring[0][0] && p[1] === ring[0][1]) continue;
+    x += p[0];
+    y += p[1];
+    n += 1;
+  }
+  return n ? [x / n, y / n] : null;
+}
+
+function ringInsideMask(ring, masks) {
+  if (!ring || !masks || !masks.length) return false;
+  const c = ringCentroidLngLat(ring);
+  return c ? masks.some((g) => pointInGeo(c[0], c[1], g)) : false;
+}
+
+function geometryAreaM2(geometry) {
+  const polys = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.type === 'MultiPolygon' ? geometry.coordinates : [];
+  let area = 0;
+  for (const coords of polys) {
+    const ring = coords[0].map(([lng, lat]) => [(lng - 107.59) * 106800, (lat - 16.46) * 110540]);
+    area += Math.abs(signedArea(ring));
+  }
+  return area;
+}
+
+function pushOverridePolys(out, geometry, spec) {
+  const polys = geometry.type === 'Polygon' ? [geometry.coordinates]
+    : geometry.type === 'MultiPolygon' ? geometry.coordinates : [];
+  for (const coords of polys) {
+    const rings = coords.map((ring) => ring.map(([lng, lat]) => [lng, lat]));
+    if (Math.abs(signedArea(rings[0].map(([lng, lat]) => [(lng - 107.59) * 106800, (lat - 16.46) * 110540]))) < 80) continue;
+    out.push({ rings, ...spec });
+  }
+}
+
 async function loadOverrideFootprints() {
+  const empty = { extras: [], masks: [], massing: [] };
   try {
     const res = await fetch('data/gba/bldg-overrides.geojson');
-    if (!res.ok) return [];
+    if (!res.ok) return empty;
     const fc = await res.json();
-    const out = [];
+    const extras = [];
+    const masks = [];
     for (const f of fc.features || []) {
-      if (!f.properties || !f.properties.draw || !f.geometry) continue;
-      const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates]
-        : f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates : [];
-      for (const coords of polys) {
-        const rings = coords.map((ring) => ring.map(([lng, lat]) => [lng, lat]));
-        if (Math.abs(signedArea(rings[0].map(([lng, lat]) => [(lng - 107.59) * 106800, (lat - 16.46) * 110540]))) < 80) continue;
-        out.push({ rings, props: { c: 3 } });
+      const props = f.properties || {};
+      if (!props.draw || !f.geometry) continue;
+      masks.push(f.geometry);
+      const parts = Array.isArray(props.parts) ? props.parts : [];
+      if (!parts.length) {
+        pushOverridePolys(extras, f.geometry, { explicit: false });
+        continue;
+      }
+      for (const part of parts) {
+        const geometry = part.geometry || f.geometry;
+        if (geometryAreaM2(geometry) >= 80) masks.push(geometry);
+        const height = Number(part.height);
+        const minHeight = Number(part.min_height) || 0;
+        const floors = Number(part.floors);
+        if (!(height > minHeight) || !floors) continue;
+        pushOverridePolys(extras, geometry, {
+          explicit: true,
+          height,
+          minHeight,
+          floors,
+          groundFloors: Number(part.groundFloors) || 0
+        });
       }
     }
-    return out;
+    return { extras, masks, massing: Array.isArray(fc.massing) ? fc.massing : [] };
   } catch (e) {
-    return [];
+    return empty;
   }
 }
 
@@ -1365,7 +1503,10 @@ async function start() {
       return index;
     }).catch(() => null)
   ]);
-  raw.gba = gba.concat(await loadOverrideFootprints());
+  const overrides = await loadOverrideFootprints();
+  raw.gba = gba.concat(overrides.extras);
+  raw.masks = overrides.masks;
+  raw.massing = overrides.massing;
   raw.cadastre = cad;
   raw.osm = osm;
   raw.heightMeta = heights && heights.meta;
@@ -1383,10 +1524,11 @@ async function start() {
       : `Số liệu trong ô vuông. Tầng cao trung bình ${fmt1(model.meanF)}, sàn ${fmt0(model.gfa)} m².`;
     $('status').classList.add('done');
     if (model.meanF != null) document.body.dataset.meanF = String(model.meanF);
-    const hs = model.volumes.map((v) => v.h);
+    const hs = model.volumes.map((v) => (v.z0 || 0) + v.h);
     if (hs.length) {
       document.body.dataset.minH = String(Math.min(...hs));
       document.body.dataset.maxH = String(Math.max(...hs));
+      document.body.dataset.raised = String(model.volumes.filter((v) => v.z0 > 0).length);
     }
     document.body.dataset.buildings = String(model.buildings);
     document.body.dataset.trees = String(model.trees.length);

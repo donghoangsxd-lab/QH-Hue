@@ -56,6 +56,22 @@ if (found == null || found < 1 || found > 80) throw new Error(`chiều cao Hùng
 const vin = idx.lookup(107.594238, 16.463008);
 if (vin < 150) throw new Error(`Vinpearl ${vin}`);
 if (!js.includes('bldg-overrides.geojson')) throw new Error('thiếu dấu chân tháp bổ sung');
+if (!js.includes('min_height') || !js.includes('z0')) throw new Error('thiếu khối đế nổi');
+const ov = JSON.parse(fs.readFileSync(new URL('../public/data/gba/bldg-overrides.geojson', import.meta.url), 'utf8'));
+const vinFeat = ov.features.find((f) => f.properties.id === 'vinpearl');
+const vinParts = vinFeat.properties.parts;
+const podium = vinParts.find((p) => p.role === 'podium');
+const tower = vinParts.find((p) => p.role === 'tower');
+if (vinFeat.properties.publishedFloors !== 39 || podium.floors !== 5 || tower.floors !== 34) {
+  throw new Error('số tầng Vinpearl');
+}
+if (tower.height !== 160 || tower.height <= podium.height) throw new Error('chiều cao tháp bị trần');
+if (Math.abs(podium.height - (160 * 5) / 39) > 0.02) throw new Error(`chiều cao đế ${podium.height}`);
+const manor = ov.features.find((f) => f.properties.id === 'manor-a');
+if (manor.properties.parts[0].height !== 74.9 || manor.properties.parts[0].floors !== 19) {
+  throw new Error('Manor vẫn bị trần 67 m');
+}
+if (!Array.isArray(ov.massing) || ov.massing.length < 13) throw new Error('thiếu bảng khối');
 const api = fs.readFileSync(new URL('../api/pmtilesRange.js', import.meta.url), 'utf8');
 if (!api.includes('buildings.pmtiles') || !api.includes('thuadat-2016.pmtiles')) throw new Error('thiếu tệp tile');
 if (/req\.query\.(u|url|data)\b/.test(api)) throw new Error('proxy nhận URL tự do');
