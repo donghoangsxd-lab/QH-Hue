@@ -8,6 +8,8 @@ import { clipOsmFeatures, countGroups } from './osmClip.js';
 import { trackWork } from './loadProgress.js';
 
 const $ = (id) => document.getElementById(id);
+// Cùng mốc đường trục chính (CITY_PIE_MAX_ZOOM + 1): dưới mức này chỉ gợi ý phóng to, không vẽ nét.
+const RAIL_MIN_ZOOM = 11;
 const GROUPS = [
   { id: 'chk_osmRail', group: 'rail' },
   { id: 'chk_osmWater', group: 'water' }
@@ -132,9 +134,12 @@ function addLayer(features, opts) {
   });
 }
 
+let lastRailOk = null;
+
 function draw() {
   layers.forEach(layer => maps.forEach(m => { if (m.hasLayer(layer)) m.removeLayer(layer); }));
   layers = [];
+  lastRailOk = railZoomOk();
   const feats = hueFeatures();
   paintRail();
   if (!feats || !anyOn()) return;
@@ -151,6 +156,7 @@ function draw() {
     });
   }
   if (!rail) return;
+  if (!railZoomOk()) return;
   const lines = pick('rail');
   addLayer(lines, { style: () => ({ ...RAIL_BASE, interactive: false }) });
   addLayer(lines, { style: () => RAIL_TIES, onEachFeature: popupOf });
@@ -162,10 +168,24 @@ function draw() {
   });
 }
 
+function railZoomOk() {
+  const z = maps.reduce((best, m) => Math.max(best, m?.getZoom?.() || 0), 0);
+  return z >= RAIL_MIN_ZOOM;
+}
+
+function paintRailHint() {
+  const hint = $('railHint');
+  if (!hint) return;
+  const on = groupOn('chk_osmRail');
+  if (!on) { hint.textContent = ''; return; }
+  hint.textContent = railZoomOk() ? '' : '(phóng tới mức 11)';
+}
+
 function paintRail() {
   const legend = $('railLegend');
   const on = groupOn('chk_osmRail');
   if (legend) legend.style.display = on ? '' : 'none';
+  paintRailHint();
   const st = $('railStatus');
   if (!st) return;
   st.classList.remove('is-warn');
@@ -231,4 +251,12 @@ export function initOsmOpen(map, planMap) {
     });
   };
   GROUPS.forEach(g => $(g.id)?.addEventListener('change', refresh));
+  maps.forEach(m => m.on('zoomend', () => {
+    const ok = railZoomOk();
+    paintRailHint();
+    if (ok === lastRailOk) return;
+    if (groupOn('chk_osmRail')) draw();
+    else lastRailOk = ok;
+  }));
+  paintRailHint();
 }

@@ -503,6 +503,10 @@
                 <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/25.000: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch. Bấm một tuyến để xem tên, cấp, chiều dài; bấm ký hiệu ở tab Chú giải để phóng tới và làm nổi cả loại tuyến">
                   <input type="checkbox" id="chk_gt25" data-qhc-child="25"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>QH giao thông (toàn TP)</span><small id="gt25Hint"></small></label>
               </div>
+              <div class="project-layer project-layer-sub">
+                <label class="project-layer-name" title="Đường sắt quốc gia, tốc độ cao và đường sắt đô thị của đồ án 1/25.000. Tắt riêng đường sắt, đường bộ vẫn hiện.">
+                  <input type="checkbox" id="chk_gt25rail" data-qhc-rail="25" checked><span>Đường sắt</span><small class="layer-hint" id="gt25RailHint"></small></label>
+              </div>
             </div>
           </div>
           <div class="plan-static" data-plan-static="QHC">
@@ -523,6 +527,10 @@
               <div class="project-layer">
                 <label class="project-layer-name" title="Mạng lưới giao thông đường bộ, đường sắt đồ án QHC 2045 tỷ lệ 1/10.000: màu theo cấp đường, nét liền hiện trạng, nét đứt quy hoạch, lọc theo hàng nút giai đoạn. Bấm một tuyến để xem tên, cấp, chiều dài và lộ giới theo mặt cắt">
                   <input type="checkbox" id="chk_gt10" data-qhc-child="10"><i class="project-layer-dot net" style="--dot:#94a3b8"></i><span>QH giao thông (trung tâm)</span><small id="gt10Hint"></small></label>
+              </div>
+              <div class="project-layer project-layer-sub">
+                <label class="project-layer-name" title="Đường sắt quốc gia, tốc độ cao và đường sắt đô thị của đồ án 1/10.000. Tắt riêng đường sắt, đường bộ vẫn hiện.">
+                  <input type="checkbox" id="chk_gt10rail" data-qhc-rail="10" checked><span>Đường sắt</span><small class="layer-hint" id="gt10RailHint"></small></label>
               </div>
             </div>
             <div class="qhc-stages" id="qhcStages" role="group" aria-label="Giai đoạn lô, tuyến giao thông và ranh mở rộng QHC 1/10.000" hidden></div>
@@ -555,7 +563,7 @@
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div><button type="button" class="layer-mini-btn active" id="btnWardNames" title="Bật/tắt tên phường, xã trên bản đồ" aria-label="Bật/tắt tên phường, xã" aria-pressed="true">Aa</button></div>
           <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap và tuyến do quản trị viên bổ sung. Thu nhỏ vẫn hiện trục chính."><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(phóng to để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
-          <div class="layer-row layer-subrow"><div><input type="checkbox" id="chk_osmRail" data-layer-sub><label for="chk_osmRail" title="Đường sắt và ga hiện trạng trên OpenStreetMap. Không gồm tuyến bỏ hay quy hoạch, không nhập vào mạng đường bộ. Huế chưa có đường sắt đô thị trong OSM.">Đường sắt hiện trạng</label></div></div>
+          <div class="layer-row layer-subrow"><div><input type="checkbox" id="chk_osmRail" data-layer-sub><label for="chk_osmRail" title="Đường sắt và ga hiện trạng trên OpenStreetMap. Không gồm tuyến bỏ hay quy hoạch, không nhập vào mạng đường bộ. Huế chưa có đường sắt đô thị trong OSM. Hiện từ mức phóng 11.">Đường sắt hiện trạng <small class="layer-hint" id="railHint">(phóng tới mức 11)</small></label></div></div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
             <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
             <span class="road-legend-item"><i style="background:#60a5fa; height:2px;"></i>Khu vực</span>

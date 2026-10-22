@@ -271,7 +271,10 @@ function drawRoads(scale) {
     }
   });
   const roads = feats.filter(f => !isRail(f));
-  const rails = feats.filter(isRail);
+  const railOn = $(`chk_gt${scale}rail`)?.checked !== false;
+  const rails = railOn ? feats.filter(isRail) : [];
+  const railHint = $(`gt${scale}RailHint`);
+  if (railHint) railHint.textContent = railOn ? '' : '(đang tắt)';
   const passes = [pass(roads, 0), pass(roads, 1), pass(rails, 0), pass(rails, 1)];
   if (focus) {
     const hit = feats.filter(f => trafficKey(f) === focus);
@@ -304,6 +307,8 @@ async function setRoads(scale) {
   [map, planMap].filter(Boolean).forEach(m => { if (!hosts.includes(m)) { use(m); dropRoads(scale); } });
   if (!hosts.length) {
     setHint(`gt${scale}Hint`, '');
+    const railHint = $(`gt${scale}RailHint`);
+    if (railHint) railHint.textContent = $(`chk_gt${scale}rail`)?.checked === false ? '(đang tắt)' : '';
     if (roadFocus[scale]) { roadFocus[scale] = null; emitRoadFocus(scale); }
     return;
   }
@@ -1237,6 +1242,9 @@ export function initQhc2045Layer() {
     setRoads(scale);
     syncStages();
   }));
+  document.querySelectorAll('[data-qhc-rail]').forEach(el => {
+    el.addEventListener('change', () => setRoads(el.dataset.qhcRail));
+  });
   document.addEventListener(ROAD_FOCUS_EVENT, (e) => { if (e.detail) focusRoads(String(e.detail.scale), e.detail.key); });
   const onZoom = (host) => {
     use(host);
