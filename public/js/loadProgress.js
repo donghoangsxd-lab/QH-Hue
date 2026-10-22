@@ -33,10 +33,14 @@ export function progressColor(pct) {
 
 const SEEN_KEY = 'qhhue_boot_seen';
 const NOTICE_IDLE_MS = 1200;
+const NOTICE_MAX_MS = 90000;
+const TILE_STUCK_MS = 20000;
 let bootPct = null;
 let bootDone = false;
 let dismiss = null;
 let noticeTimer = 0;
+let noticeCap = 0;
+let sweepTimer = 0;
 
 function alreadySeen() {
   if (dismiss != null) return dismiss;
@@ -58,8 +62,8 @@ export function combinedProgress(bootValue, parts) {
   }
   for (const job of parts || []) {
     const pending = Number(job && job.pending) || 0;
-    if (pending <= 0) continue;
-    const settled = Math.min(pending, (Number(job.done) || 0) + (Number(job.failed) || 0));
+    const settled = settledCount(job);
+    if (pending <= 0 || settled >= pending) continue;
     weight += pending;
     score += settled;
   }
@@ -67,12 +71,102 @@ export function combinedProgress(bootValue, parts) {
   return Math.max(0, Math.min(100, Math.round((100 * score) / weight)));
 }
 
+function settledCount(job) {
+  return (Number(job && job.done) || 0) + (Number(job && job.failed) || 0) + (Number(job && job.dropped) || 0);
+}
+
+function jobOpen(job) {
+  const pending = Number(job && job.pending) || 0;
+  return pending > settledCount(job);
+}
+
 function jobsBusy() {
-  for (const job of jobs.values()) {
-    const pending = job.pending || 0;
-    if (pending > 0 && (job.done || 0) + (job.failed || 0) < pending) return true;
-  }
+  for (const job of jobs.values()) if (jobOpen(job)) return true;
   return false;
+}
+
+function openLayerNames() {
+  const names = [];
+  for (const [name, job] of jobs) if (jobOpen(job)) names.push(name);
+  if (!bootDone) names.push('Nạp ban đầu');
+  return names;
+}
+
+function tileKey(coords) {
+  if (!coords) return '';
+  return `${coords.z}/${coords.x}/${coords.y}`;
+}
+
+function settleTile(name, coords, kind) {
+  const job = jobs.get(name);
+  if (!job || !job.tiles) return;
+  const key = tileKey(coords);
+  if (!job.tiles.has(key)) return;
+  job.tiles.delete(key);
+  if (kind === 'done') job.done += 1;
+  else if (kind === 'fail') job.failed += 1;
+  else job.dropped = (job.dropped || 0) + 1;
+  paint();
+}
+
+function dropStuckTiles() {
+  const now = Date.now();
+  let changed = false;
+  jobs.forEach((job) => {
+    if (!job.tiles) return;
+    for (const [key, at] of job.tiles) {
+      if (now - at < TILE_STUCK_MS) continue;
+      job.tiles.delete(key);
+      job.dropped = (job.dropped || 0) + 1;
+      changed = true;
+    }
+  });
+  if (![...jobs.values()].some((job) => job.tiles && job.tiles.size)) {
+    clearInterval(sweepTimer);
+    sweepTimer = 0;
+  }
+  if (changed) paint();
+}
+
+function ensureSweep() {
+  if (sweepTimer) return;
+  sweepTimer = setInterval(dropStuckTiles, 2000);
+}
+
+function closeOpenWork() {
+  jobs.forEach((job) => {
+    if (job.tiles) job.tiles.clear();
+    const gap = (job.pending || 0) - settledCount(job);
+    if (gap > 0) job.dropped = (job.dropped || 0) + gap;
+  });
+  bootPct = null;
+  bootDone = true;
+}
+
+function dismissNotice() {
+  dismiss = true;
+  try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* chế độ riêng tư */ }
+  const el = document.getElementById('mapTitleNotice');
+  if (el) el.hidden = true;
+  document.documentElement.classList.remove('show-boot-notice');
+  document.documentElement.classList.add('boot-seen');
+  clearTimeout(noticeTimer);
+  noticeTimer = 0;
+  clearTimeout(noticeCap);
+  noticeCap = 0;
+}
+
+function armNoticeCap() {
+  if (noticeCap || alreadySeen()) return;
+  noticeCap = setTimeout(() => {
+    noticeCap = 0;
+    if (alreadySeen()) return;
+    const names = openLayerNames();
+    if (names.length) console.warn(`Thông báo lần tải đầu tắt sau 90 giây. Lớp còn chờ: ${names.join(', ')}`);
+    closeOpenWork();
+    dismissNotice();
+    paint();
+  }, NOTICE_MAX_MS);
 }
 
 function syncNotice() {
@@ -90,17 +184,14 @@ function syncNotice() {
     noticeTimer = 0;
     el.hidden = false;
     root.classList.add('show-boot-notice');
+    armNoticeCap();
     return;
   }
   if (noticeTimer) return;
   noticeTimer = setTimeout(() => {
     noticeTimer = 0;
     if (!bootDone || jobsBusy()) return;
-    dismiss = true;
-    try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* chế độ riêng tư */ }
-    el.hidden = true;
-    root.classList.remove('show-boot-notice');
-    root.classList.add('boot-seen');
+    dismissNotice();
   }, NOTICE_IDLE_MS);
 }
 
@@ -148,7 +239,7 @@ function armHide(name, job) {
   if (job.hideTimer) return;
   job.hideTimer = setTimeout(() => {
     const cur = jobs.get(name);
-    if (!cur || cur.hideTimer !== job.hideTimer || cur.done < cur.pending) return;
+    if (!cur || cur.hideTimer !== job.hideTimer || jobOpen(cur)) return;
     const el = badges.get(name);
     if ((cur.watchers || 0) > 0) {
       cur.pending = 0;
@@ -193,7 +284,7 @@ function paint() {
     const row = rowOf(name);
     if (!row) return;
     const failed = job.failed || 0;
-    const pct = Math.max(0, Math.min(100, Math.round((100 * Math.min(job.done, job.pending)) / job.pending)));
+    const pct = Math.max(0, Math.min(100, Math.round((100 * Math.min(settledCount(job), job.pending)) / job.pending)));
     const el = badgeOf(name, row);
     if (job.done < job.pending || failed) el.classList.remove('is-fading');
     if (!el.classList.contains('is-fading')) {
@@ -203,7 +294,7 @@ function paint() {
         ? `${name}: ${job.done}/${job.pending} ô thành công, ${failed} ô lỗi`
         : `${name}: ${pct}%`;
     }
-    if (!failed && job.done >= job.pending) armHide(name, job);
+    if (!jobOpen(job) && !failed) armHide(name, job);
     else if (job.hideTimer) {
       clearTimeout(job.hideTimer);
       job.hideTimer = 0;
@@ -217,7 +308,7 @@ function paint() {
 function slot(name) {
   let job = jobs.get(name);
   if (!job) {
-    job = { pending: 0, done: 0, failed: 0, watchers: 0, hideTimer: 0 };
+    job = { pending: 0, done: 0, failed: 0, dropped: 0, watchers: 0, hideTimer: 0, tiles: new Map() };
     jobs.set(name, job);
   }
   return job;
@@ -229,19 +320,20 @@ export function watchTiles(layer, name) {
   layer._loadProgressName = name;
   const job = slot(name);
   job.watchers += 1;
-  layer.on('tileloadstart', () => {
-    slot(name).pending += 1;
+  layer.on('tileloadstart', (e) => {
+    const job = slot(name);
+    const key = tileKey(e.coords);
+    if (key && job.tiles.has(key)) return;
+    if (key) job.tiles.set(key, Date.now());
+    job.pending += 1;
+    ensureSweep();
     paint();
   });
-  layer.on('tileload', () => {
-    slot(name).done += 1;
-    paint();
-  });
-  layer.on('tileerror', () => {
-    const cur = slot(name);
-    cur.failed += 1;
-    paint();
-  });
+  layer.on('tileload', (e) => settleTile(name, e.coords, 'done'));
+  layer.on('tileerror', (e) => settleTile(name, e.coords, 'fail'));
+  // Đổi zoom / bản đồ quy hoạch bật sau khi đang ẩn: Leaflet hủy ô đang tải bằng tileabort, không bắn tileerror.
+  layer.on('tileabort', (e) => settleTile(name, e.coords, 'abort'));
+  layer.on('tileunload', (e) => settleTile(name, e.coords, 'abort'));
   layer.on('remove', () => {
     const cur = jobs.get(name);
     if (!cur) return;
@@ -268,6 +360,21 @@ export function trackJob(name) {
     job.done += 1;
     paint();
   };
+}
+
+export function progressSnapshot() {
+  const layers = [];
+  jobs.forEach((job, name) => {
+    layers.push({
+      name,
+      pending: job.pending || 0,
+      done: job.done || 0,
+      failed: job.failed || 0,
+      dropped: job.dropped || 0,
+      open: job.tiles ? job.tiles.size : 0
+    });
+  });
+  return { bootDone, busy: jobsBusy(), layers };
 }
 
 /** Gắn trackJob vào một promise, vẫn trả promise đó. */
