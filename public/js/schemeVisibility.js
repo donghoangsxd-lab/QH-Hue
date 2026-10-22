@@ -4,6 +4,16 @@
 // level: 'QHC' | 'QHPK' | 'QHCT'. hidden / layerOff: Set tên đồ án (Ten_QH).
 // Danh sách hidden đọc từ localStorage sau storageSchema.js: bản cũ ghi cả QHC vào qh_hidden_projects.
 
+export const NO_SCHEME_WARD = 'Chưa xác định phường, xã';
+
+// Danh sách toàn thành phố: mỗi đồ án một dòng. Đồ án liên phường nằm ở phường đang chọn nếu có, không thì ở phường đứng đầu bảng chữ cái.
+export function schemeHomeWard(wards, currentWard) {
+  const list = (Array.isArray(wards) ? wards : []).map(w => String(w || '').trim()).filter(Boolean);
+  if (!list.length) return NO_SCHEME_WARD;
+  if (currentWard && list.includes(currentWard)) return currentWard;
+  return [...list].sort((a, b) => a.localeCompare(b, 'vi'))[0];
+}
+
 export function enabledSchemes(projects, level, hidden, layerOff) {
   if (!level) return [];
   const hide = hidden instanceof Set ? hidden : new Set(hidden || []);
