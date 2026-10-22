@@ -927,6 +927,7 @@ function renderCityTableFoot() {
     ${roadCells}
     <td class="st-num st-bus">${fmtNum(list.reduce((s, w) => s + busCountOf(w), 0))}</td>
     ${lotFootCells()}
+    ${riverFootCells()}
   </tr>`;
 }
 
@@ -1147,6 +1148,7 @@ function wardRowHtml(w, idx) {
     ${roadCellsHtml(w.Ten_Phuong)}
     <td class="st-num st-bus">${fmtNum(busCountOf(w))}</td>
     ${lotCellsHtml(w.Ten_Phuong)}
+    ${riverCellsHtml(w.Ten_Phuong)}
   </tr>`;
 }
 
@@ -1449,7 +1451,7 @@ export async function renderBottomPanel() {
   const wardView = document.getElementById('wardSummaryView');
   if (state.wardStatsData.length === 0) {
     if (city && tbody) {
-      tbody.innerHTML = `<tr><td colspan="33" class="st-msg">${ico('clock')}Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="35" class="st-msg">${ico('clock')}Đang tính toán ma trận quy chuẩn từ GEE...</td></tr>`;
     }
     if (!city && wardView) {
       wardView.innerHTML = `<div class="rp-empty">${ico('clock')}Đang tổng hợp dữ liệu quy chuẩn cho ${escapeHtml(wardName)}...</div>`;
@@ -1461,7 +1463,7 @@ export async function renderBottomPanel() {
   } catch (err) {
     if (seq !== bottomRenderSeq) return;
     const msg = `${ico('error')}${escapeHtml(err.message || 'Lỗi nạp dữ liệu từ GEE Server.')}`;
-    if (city && tbody) tbody.innerHTML = `<tr><td colspan="33" class="st-msg c-red">${msg}</td></tr>`;
+    if (city && tbody) tbody.innerHTML = `<tr><td colspan="35" class="st-msg c-red">${msg}</td></tr>`;
     if (!city && wardView) wardView.innerHTML = `<div class="rp-empty c-red">${msg}</div>`;
     return;
   }
@@ -1720,6 +1722,8 @@ let wardGbaHtml = () => '';
 let wardPopHtml = () => '';
 let wardLotHtml = () => '';
 let lotCountsOf = () => null;
+let riverCountsOf = () => null;
+let wardRiverHtml = () => '';
 
 function lotPair(name) {
   const c = lotCountsOf(name);
@@ -1749,6 +1753,56 @@ function lotFootCells() {
   return `<td class="st-num st-lot" title="Tổng số lô vượt mật độ">${fmtNum(cover)}</td>`
     + `<td class="st-num st-lot" title="Tổng số lô vượt tầng cao">${fmtNum(floors)}</td>`;
 }
+
+function riverPair(name) {
+  const c = riverCountsOf(name);
+  if (!c) return null;
+  return { corridor: Number(c.corridor) || 0, forest: Number(c.forest) || 0 };
+}
+
+function riverCellsHtml(name) {
+  const c = riverPair(name);
+  const corridor = c ? fmtNum(c.corridor) : '…';
+  const forest = c ? fmtNum(c.forest) : '…';
+  const safe = escapeHtml(name);
+  return `<td class="st-num st-river"><button type="button" class="ward-link link-btn" data-ward="${safe}" title="Hành lang sông">${corridor}</button></td>`
+    + `<td class="st-num st-river"><button type="button" class="ward-link link-btn" data-ward="${safe}" title="Rừng phòng hộ, đặc dụng">${forest}</button></td>`;
+}
+
+function riverFootCells() {
+  const list = state.wardStatsData || [];
+  if (!list.length || !riverPair(list[0].Ten_Phuong)) return '<td class="st-num st-river">…</td><td class="st-num st-river">…</td>';
+  let corridor = 0;
+  let forest = 0;
+  list.forEach((w) => {
+    const c = riverPair(w.Ten_Phuong) || { corridor: 0, forest: 0 };
+    corridor += c.corridor;
+    forest += c.forest;
+  });
+  return `<td class="st-num st-river" title="Tổng công trình trong hành lang sông">${fmtNum(corridor)}</td>`
+    + `<td class="st-num st-river" title="Tổng công trình trên rừng phòng hộ, đặc dụng">${fmtNum(forest)}</td>`;
+}
+
+/** violateLayer.js gọi khi đã có số hành lang sông và rừng theo phường. */
+export function setRiverCounts(fn) {
+  riverCountsOf = typeof fn === 'function' ? fn : () => null;
+  document.querySelectorAll('#statTableBody tr[data-ward-row]').forEach((tr) => {
+    const name = tr.getAttribute('data-ward-row');
+    const cells = tr.querySelectorAll('.st-river');
+    if (cells.length !== 2) return;
+    const c = riverPair(name);
+    if (!c) return;
+    const buttons = [cells[0].querySelector('button'), cells[1].querySelector('button')];
+    if (buttons[0]) buttons[0].textContent = fmtNum(c.corridor);
+    if (buttons[1]) buttons[1].textContent = fmtNum(c.forest);
+  });
+  renderCityTableFoot();
+  const ward = (state.wardStatsData || []).find((w) => w.Ten_Phuong === state.selectedWard);
+  const view = document.getElementById('wardSummaryView');
+  if (ward && view && view.style.display !== 'none' && view.innerHTML) renderWardSummary(ward);
+}
+
+export function setWardRiverHtml(fn) { wardRiverHtml = typeof fn === 'function' ? fn : () => ''; }
 
 /** lotOver.js gọi khi đã có số lô vượt theo phường. */
 export function setLotCounts(fn) {
@@ -1800,6 +1854,7 @@ function renderWardSummary(wardData) {
   const areaKm2 = Number(wardData.Dien_Tich_Km2) || 0;
   view.innerHTML = `<div id="wardSummaryCard">
     ${wardLotHtml(wardData.Ten_Phuong)}
+    ${wardRiverHtml(wardData.Ten_Phuong)}
     <div id="wardQuotaTableContainer">${buildWardQuotaTableHtml(wardData, popProjected)}</div>
     ${wardGbaHtml(wardData.Ten_Phuong)}
     ${wardPopHtml(wardData.Ten_Phuong)}

@@ -3,6 +3,7 @@
 import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { escapeHtml, fmtNum } from './utils.js';
+import { setRiverCounts, setWardRiverHtml } from './uiComponents.js';
 
 const PANE = 'violatePane';
 const HIT_PANE = 'violateHitPane';
@@ -30,7 +31,7 @@ function colorOf(reason) {
 
 function reasonText(pt) {
   const parts = [];
-  if (pt.reason & 1) parts.push(`Hành lang 50 m ngoài bờ sông, kênh, mặt nước. Diện tích dấu chân trong hành lang ${fmtNum(pt.ac)} m².`);
+  if (pt.reason & 1) parts.push(`Hành lang 50 m ngoài bờ sông rộng hơn 100 m. Diện tích dấu chân trong hành lang ${fmtNum(pt.ac)} m².`);
   if (pt.reason & 2) parts.push('Nằm trên đất rừng phòng hộ quy hoạch.');
   if (pt.reason & 4) parts.push('Nằm trên đất rừng đặc dụng quy hoạch.');
   if (pt.reason & 6) parts.push(`Diện tích dấu chân trên đất rừng ${fmtNum(pt.af)} m².`);
@@ -99,7 +100,7 @@ function statsHtml(data) {
   const rows = rank.map((name) => byName.get(name)).filter(Boolean).slice(0, 40);
   const body = rows.map((row) => `<tr><td>${escapeHtml(row.name)}</td><td>${fmtNum(row.corridor)}</td><td>${fmtNum(row.forest)}</td><td>${fmtNum(row.both)}</td></tr>`).join('');
   return `<p>${escapeHtml(data.note || '')}</p>
-    <div class="flood-kpi"><span>Trong hành lang 50 m</span><b>${fmtNum(t.corridor || 0)}</b></div>
+    <div class="flood-kpi"><span>Trong hành lang sông</span><b>${fmtNum(t.corridor || 0)}</b></div>
     <div class="flood-kpi"><span>Trên đất rừng phòng hộ, đặc dụng</span><b>${fmtNum(t.forest || 0)}</b></div>
     <div class="flood-kpi"><span>Cả hai</span><b>${fmtNum(t.both || 0)}</b></div>
     <div class="violate-legend">
@@ -260,7 +261,27 @@ function setOn(next) {
   });
 }
 
+function wardHtml(name) {
+  if (!pack) return '';
+  const row = (pack.wards || []).find((w) => w.name === name) || { corridor: 0, forest: 0, both: 0 };
+  return `<section class="lot-over river-ward">
+    <h4>Hành lang sông và đất rừng</h4>
+    <div class="lot-over-kpis">
+      <div><span>Hành lang sông</span><b>${fmtNum(row.corridor)}</b></div>
+      <div><span>Rừng phòng hộ, đặc dụng</span><b>${fmtNum(row.forest)}</b></div>
+    </div>
+  </section>`;
+}
+
 export function initViolateLayer() {
   if (!map) return;
+  setWardRiverHtml(wardHtml);
   $('chk_violate')?.addEventListener('change', (e) => setOn(e.target.checked));
+  loadPack().then((data) => {
+    const byName = new Map((data.wards || []).map((w) => [w.name, w]));
+    setRiverCounts((name) => {
+      const w = byName.get(name);
+      return w ? { corridor: w.corridor || 0, forest: w.forest || 0 } : { corridor: 0, forest: 0 };
+    });
+  }).catch((err) => console.warn('Hành lang sông:', err));
 }
