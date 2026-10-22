@@ -1,7 +1,7 @@
 // Bộ nhớ trình duyệt cho file nặng đã có ?v= và ô PMTiles (Range). Không tải trước, không giữ ảnh Google.
 // Không giữ HTML, JS, CSS: những file đó luôn lấy từ mạng (Cache-Control: no-store).
 // Tên cache khớp GBA_V trong gbaVersion.js: đổi phiên bản file nặng thì bỏ cache cũ.
-const CACHE = 'qh-hue-20261023';
+const CACHE = 'qh-hue-20261026';
 const GCS = 'https://storage.googleapis.com/hue-infra-data-us/';
 
 function versioned(url) {
