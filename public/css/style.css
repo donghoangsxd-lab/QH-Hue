@@ -226,7 +226,7 @@ body.split-offset .swipe-handle { display: none; }
   background: linear-gradient(90deg, transparent, rgb(var(--tone)) 25%, rgb(var(--tone)) 75%, transparent);
 }
 .map-title[data-view="HT"] { --tone: var(--cyan-rgb); }
-/* Tiến độ ô và lượt tải (loadProgress.js): thanh mảnh ở mép dưới tiêu đề, xong thì mờ dần */
+/* Thanh dưới tiêu đề không còn hiện phần trăm chung. Phần trăm nằm cuối từng dòng lớp (.layer-load-pct). */
 .map-title-progress {
   position: absolute;
   left: 0; right: 0; bottom: 0;
@@ -1090,6 +1090,26 @@ body.right-collapsed .right-panel {
 .layer-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 24px; font-size: var(--fs-md); line-height: 1.25; }
 .layer-row > div { display: flex; align-items: center; min-width: 0; flex: 1; }
 .layer-row label { display: inline-flex; align-items: center; gap: 5px; min-width: 0; cursor: pointer; color: var(--text-main); }
+/* Phần trăm tải (loadProgress.js): cuối dòng, không xuống dòng. Bậc 0–100: đỏ → cam → vàng → lục. */
+.layer-load-pct {
+  flex: 0 0 auto;
+  min-width: 2.5em;
+  margin: 0;
+  padding: 0;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+.layer-load-pct.is-fading { opacity: 0; }
+.layer-row:has(> .layer-load-pct) { flex-wrap: nowrap; }
+.layer-row:has(> .layer-load-pct) > div { flex-wrap: nowrap; }
+.layer-row:has(> .layer-load-pct) label { flex: 1 1 auto; overflow: hidden; white-space: nowrap; }
+.basemap-pick:has(> .layer-load-pct) { flex-wrap: nowrap; }
 .layer-row label .ico { margin-right: 0; }
 .layer-row input[type="checkbox"] { accent-color: var(--accent-cyan); cursor: pointer; width: 13px; height: 13px; margin: 0 4px 0 0; flex-shrink: 0; }
 .layer-type-icon { width: 14px; height: 16px; object-fit: contain; flex-shrink: 0; }
@@ -5026,6 +5046,7 @@ body.project-review.la-page #projectReviewHost {
   .pl-hrow { height: 32px; }
   .pl-body .pg-head { top: 32px; }
   .pg-head, .project-row, .layer-row { min-height: 34px; }
+  .layer-load-pct { font-size: 11px; line-height: 1; }
   .project-search { height: 32px; margin: 2px 0; }
   .layer-row input[type="checkbox"], .project-name input { width: 18px; height: 18px; }
   .btn-dot-buffer { width: 32px; height: 32px; }
