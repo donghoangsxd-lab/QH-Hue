@@ -243,7 +243,7 @@ function renderStats() {
       <i style="background:${BUFFER_COLORS[f.kind]}"></i><span>${escapeHtml(f.item.name || 'Công trình')}</span><b>sâu ${fmtM(level - f.elev)}</b>
     </button>`).join('');
 
-  box.innerHTML = `${popLine}${wardsLine}
+  box.innerHTML = `${popLine}${wardsLine}${buildingHtml()}
     <div class="flood-sub">Công trình nằm trong vùng ngập</div>
     <div class="flood-phase" role="tablist">
       <button type="button" data-phase="HT" class="${phase === 'HT' ? 'active' : ''}" aria-selected="${phase === 'HT'}">Hiện trạng <b>${nHT}</b></button>
@@ -253,6 +253,46 @@ function renderStats() {
     ${rows ? `<div class="flood-list">${rows}</div>` : '<div class="flood-muted">Không có công trình đã duyệt nằm trong vùng ngập.</div>'}
     ${list.length > MAX_LIST ? `<div class="flood-muted">... và ${list.length - MAX_LIST} công trình khác</div>` : ''}`;
   shownList = list;
+}
+
+let floodBld = null;
+let floodBldP = null;
+
+function loadFloodBuildings() {
+  if (floodBld) return Promise.resolve(floodBld);
+  if (!floodBldP) {
+    const url = new URL('data/gba/bldg-flood.json', document.baseURI).href;
+    floodBldP = fetch(url).then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    }).then((data) => { floodBld = data; return data; })
+      .catch((err) => { floodBldP = null; throw err; });
+  }
+  return floodBldP;
+}
+
+function floodedBuildings(water) {
+  if (!floodBld) return null;
+  const step = Number(floodBld.step) || 0.5;
+  const wards = [];
+  let total = 0;
+  (floodBld.wards || []).forEach((w) => {
+    let n = 0;
+    (w.bins || []).forEach((c, i) => { if (i * step < water) n += Number(c) || 0; });
+    total += n;
+    if (n > 0) wards.push({ name: w.name, n });
+  });
+  wards.sort((a, b) => b.n - a.n);
+  return { total, wards };
+}
+
+function buildingHtml() {
+  const bld = floodedBuildings(level);
+  if (!bld) return '<div class="flood-kpi"><span>Nhà trong vùng ngập</span><b class="flood-muted">đang tải...</b></div>';
+  const rows = bld.wards.map((w) => `<tr><td>${escapeHtml(w.name)}</td><td>${fmtNum(w.n)}</td></tr>`).join('');
+  return `<div class="flood-kpi"><span>Nhà trong vùng ngập</span><b>${fmtNum(bld.total)}</b></div>
+    <div class="flood-sub">Nhà ngập theo phường, xã</div>
+    <div class="violate-table-wrap flood-bldg"><table class="violate-table"><thead><tr><th>Phường, xã</th><th>Nhà</th></tr></thead><tbody>${rows || '<tr><td colspan="2">Không có nhà dưới mực này</td></tr>'}</tbody></table></div>`;
 }
 
 let refreshSeq = 0;
@@ -266,6 +306,7 @@ async function refresh() {
     if (seq !== refreshSeq || !visible) return;
   }
   drawRings();
+  if (!floodBld) loadFloodBuildings().then(() => { if (visible && seq === refreshSeq) renderStats(); }).catch(() => {});
   renderStats();
 }
 
@@ -307,10 +348,12 @@ export function setFloodVisible(on) {
  * { level, all: [{ kind }], flooded: [{ name, kind, lat, lng, depth }] sâu trước, pop, popAll, area } — pop/area null nếu chưa tải được
  */
 export async function floodReport() {
-  await Promise.all([ensureFacilities(), ensureBins()]);
+  await Promise.all([ensureFacilities(), ensureBins(), loadFloodBuildings().catch(() => null)]);
   const ex = exposureByWard();
+  const bld = floodedBuildings(level);
   return {
     level,
+    buildings: bld ? bld.total : null,
     all: facilityLists.HT.map(f => ({ kind: f.kind })),
     flooded: flooded(facilityLists.HT).map(f => ({ name: f.item.name || 'Công trình', kind: f.kind, lat: f.lat, lng: f.lng, depth: level - f.elev })),
     pop: ex ? ex.pop : null,

@@ -10,7 +10,7 @@
   "scripts": {
     "start": "vercel dev",
     "build": "node scripts/write-version.js",
-    "test": "node scripts/test-scheme-visibility.js && node scripts/test-storage-schema.js && node scripts/test-osm-sports.js && node scripts/test-lot-outline.js && node scripts/test-parcel-infra.js && node scripts/test-gba.js && node scripts/test-lot-over.js && node scripts/test-tree-priority.js && node scripts/test-noxh.js && node scripts/test-apartments.js && node scripts/test-pop-nha-watch.js && node scripts/test-pop-nha-status.js && node scripts/test-parcel-ward-clip.js && node scripts/test-drainage-norm.mjs && node scripts/test-land-stamp.mjs && node scripts/test-qh-hientrang.js && python3 scripts/test-pop-filter.py && python3 scripts/test-pop-nha.py",
+    "test": "node scripts/test-scheme-visibility.js && node scripts/test-storage-schema.js && node scripts/test-osm-sports.js && node scripts/test-lot-outline.js && node scripts/test-parcel-infra.js && node scripts/test-gba.js && node scripts/test-lot-over.js && node scripts/test-bldg-flood.js && node scripts/test-tree-priority.js && node scripts/test-noxh.js && node scripts/test-apartments.js && node scripts/test-pop-nha-watch.js && node scripts/test-pop-nha-status.js && node scripts/test-parcel-ward-clip.js && node scripts/test-drainage-norm.mjs && node scripts/test-land-stamp.mjs && node scripts/test-qh-hientrang.js && python3 scripts/test-pop-filter.py && python3 scripts/test-pop-nha.py",
     "test:qhc-outlines": "node scripts/test-qhc-outlines.mjs"
   },
   "dependencies": {

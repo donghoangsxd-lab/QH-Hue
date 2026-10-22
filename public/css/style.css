@@ -5418,6 +5418,7 @@ body.project-review.la-page #projectReviewHost {
 .violate-table td:not(:first-child), .violate-table th:not(:first-child) { text-align: right; }
 .violate-pop { display: flex; flex-direction: column; gap: 3px; font-size: 12px; line-height: 1.35; }
 .violate-canvas { position: absolute; left: 0; top: 0; pointer-events: none; }
+.flood-bldg { max-height: 168px; }
 #floodGapBox { display: block; margin: 6px 0 8px; }
 #floodGapBox b { font-size: 12px; }
 #floodGapBox p { margin: 4px 0; font-size: 12px; line-height: 1.35; }
