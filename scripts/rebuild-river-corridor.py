@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Hành lang sông: chỉ sông rộng hơn 100 m (2×diện tích/chu vi), bỏ hồ ao đầm và mặt biển.
+# Hành lang sông: gộp mảnh cùng tên qua ranh đồ án, rồi chỉ giữ sông rộng hơn 100 m.
+# Bề rộng = 2×diện tích/chu vi của phần đã gộp, không đo từng lô. Bỏ hồ ao đầm và mặt biển.
 # Nhà trong hành lang nhưng bị đường trục chính hoặc đường có tên chắn phía bờ thì không tính.
 # Rừng phòng hộ / đặc dụng giữ nguyên bảng forest_hit.
 # Chạy: python3 scripts/rebuild-river-corridor.py
@@ -18,6 +19,7 @@ TMP = os.environ.get('GBA_TMP', '/tmp/gba')
 DB_PATH = os.path.join(TMP, 'screen.duck')
 LOTS = os.path.join(TMP, 'lots-use.geojson')
 OUT_PATH = os.path.join(ROOT, 'public', 'data', 'gba', 'bank-forest.json')
+LINE_PATH = os.path.join(ROOT, 'public', 'data', 'gba', 'river-corridor.json')
 ROADS_BASE = 'https://storage.googleapis.com/hue-infra-data-us/roads/v2/'
 ROAD_DIR = os.path.join(TMP, 'roads')
 WIDTH_MIN = 100.0
@@ -38,18 +40,20 @@ def fold(value):
     return f' {" ".join(text.split())} '
 
 
-def is_river(layer, name, width, compact):
-    if width <= WIDTH_MIN or compact >= COMPACT_MAX:
-        return False
+def name_kind(layer, name):
     bag = fold(f'{layer} {name}')
     if ' bien ' in bag or ' cang ' in bag:
-        return False
+        return 'sea'
     pond = any(tok in bag for tok in (' ho ', ' ao ', ' dam '))
     river = any(tok in bag for tok in (' song ', ' suoi ', ' kenh ', ' rach ', ' songsuoi ', ' ss '))
     generic = ' mat nuoc ' in bag or ' matnuoc ' in bag or ' nuoc mat ' in bag
     if pond and not river:
-        return False
-    return river or generic
+        return 'pond'
+    if river:
+        return 'river'
+    if generic:
+        return 'generic'
+    return 'other'
 
 
 def slug(name):
@@ -86,6 +90,42 @@ def unit(dx, dy):
     return (dx / n, dy / n)
 
 
+def round_coords(obj):
+    if isinstance(obj, list):
+        if obj and isinstance(obj[0], (int, float)) and not isinstance(obj[0], bool):
+            return [round(float(obj[0]), 5), round(float(obj[1]), 5)]
+        return [round_coords(item) for item in obj]
+    return obj
+
+
+def write_lines(con):
+    # Viền ngoài của đệm 50 m, cùng hình với vùng gắn cờ. DuckDB ghi EPSG:4326 theo trục vĩ độ–kinh độ.
+    geo = con.execute("""
+        SELECT ST_AsGeoJSON(
+            ST_FlipCoordinates(
+                ST_Transform(
+                    ST_SetCRS(ST_Simplify(ST_LineMerge(ST_Union_Agg(ST_Boundary(ST_Buffer(g, 50)))), 4), 'EPSG:32648'),
+                    'EPSG:4326'
+                )
+            )
+        )
+        FROM river_keep
+    """).fetchone()[0]
+    geom = json.loads(geo)
+    geom['coordinates'] = round_coords(geom.get('coordinates'))
+    payload = {
+        'type': 'FeatureCollection',
+        'features': [{
+            'type': 'Feature',
+            'properties': {'name': 'Hành lang 50 m'},
+            'geometry': geom
+        }]
+    }
+    with open(LINE_PATH, 'w', encoding='utf-8') as handle:
+        json.dump(payload, handle, ensure_ascii=False, separators=(',', ':'))
+    log(f'nét hành lang {os.path.getsize(LINE_PATH) / 1e3:.0f} KB')
+
+
 def parallel(road, shore, building):
     # road: list of (x, y) in metres. shore/building: (x, y)
     sx, sy = shore
@@ -115,31 +155,74 @@ def main():
     con.execute("SET memory_limit='6GB'")
     con.execute('SET threads=4')
     rows = con.execute(f"""
-        SELECT s.id, coalesce(l.layer, ''), coalesce(l.name, ''),
-               CASE WHEN ST_Perimeter(s.g) > 0 THEN 2 * ST_Area(s.g) / ST_Perimeter(s.g) ELSE 0 END,
-               CASE WHEN ST_Perimeter(s.g) > 0 THEN 4 * pi() * ST_Area(s.g) / power(ST_Perimeter(s.g), 2) ELSE 0 END
+        SELECT s.id, coalesce(l.layer, ''), coalesce(l.name, '')
         FROM water_src s
         JOIN st_read('{LOTS}') l ON l.OGC_FID = s.id
     """).fetchall()
-    ids = [int(r[0]) for r in rows if is_river(r[1], r[2], r[3], r[4])]
-    log(f'{len(ids)} sông rộng hơn {WIDTH_MIN:.0f} m / {len(rows)} mặt nước')
-    if len(ids) < 5:
+    river_ids = []
+    generic_ids = []
+    for fid, layer, name in rows:
+        kind = name_kind(layer, name)
+        if kind == 'river':
+            river_ids.append(int(fid))
+        elif kind == 'generic':
+            generic_ids.append(int(fid))
+    log(f'{len(river_ids)} mảnh tên sông / {len(rows)} mặt nước, {len(generic_ids)} mặt nước chung')
+    con.execute('DROP TABLE IF EXISTS named')
+    con.execute('CREATE TABLE named (id BIGINT)')
+    con.executemany('INSERT INTO named VALUES (?)', [(i,) for i in river_ids])
+    if generic_ids:
+        con.execute('CREATE TEMP TABLE generic (id BIGINT)')
+        con.executemany('INSERT INTO generic VALUES (?)', [(i,) for i in generic_ids])
+        con.execute("""
+            INSERT INTO named
+            SELECT g.id FROM generic g
+            JOIN water_src gs ON gs.id = g.id
+            WHERE EXISTS (
+                SELECT 1 FROM named n
+                JOIN water_src ns ON ns.id = n.id
+                WHERE ST_DWithin(gs.g, ns.g, 15)
+            )
+        """)
+    named_n = con.execute('SELECT count(*) FROM named').fetchone()[0]
+    log(f'{named_n} mảnh sau khi gắn mặt nước sát sông')
+    log('gộp qua ranh đồ án, rồi đo bề rộng')
+    con.execute('DROP TABLE IF EXISTS river_keep')
+    con.execute(f"""
+        CREATE TABLE river_keep AS
+        SELECT row_number() OVER () AS id, g FROM (
+            SELECT item.geom AS g
+            FROM (
+                SELECT unnest(ST_Dump(ST_MakeValid(ST_Buffer(ST_Union_Agg(ST_Buffer(w.g, 8)), -8)))) AS item
+                FROM water_src w
+                JOIN named n ON n.id = w.id
+                WHERE ST_IsValid(w.g)
+            )
+            WHERE item.geom IS NOT NULL AND NOT ST_IsEmpty(item.geom)
+              AND ST_GeometryType(item.geom) IN ('POLYGON', 'MULTIPOLYGON')
+        ) s
+        WHERE ST_Perimeter(g) > 0
+          AND 2 * ST_Area(g) / ST_Perimeter(g) > {WIDTH_MIN}
+          AND 4 * pi() * ST_Area(g) / power(ST_Perimeter(g), 2) < {COMPACT_MAX}
+    """)
+    kept_n = con.execute('SELECT count(*) FROM river_keep').fetchone()[0]
+    log(f'{kept_n} sông rộng hơn {WIDTH_MIN:.0f} m sau khi gộp')
+    if kept_n < 5:
         raise SystemExit('quá ít sông — dừng')
     con.execute('DROP TABLE IF EXISTS river')
-    con.execute('CREATE TABLE river (id BIGINT)')
-    con.executemany('INSERT INTO river VALUES (?)', [(i,) for i in ids])
+    con.execute('CREATE TABLE river AS SELECT id FROM river_keep')
     log('đệm 50 m ngoài bờ sông')
     con.execute('DROP TABLE IF EXISTS corridor')
     con.execute("""
         CREATE TABLE corridor AS
         SELECT w.id, ST_MakeValid(ST_Difference(ST_Buffer(w.g, 50), w.g)) AS g
-        FROM water_src w
-        JOIN river r ON r.id = w.id
+        FROM river_keep w
         WHERE ST_IsValid(w.g)
     """)
     con.execute("DELETE FROM corridor WHERE g IS NULL OR ST_IsEmpty(g) OR NOT ST_IsValid(g)")
     km2 = con.execute('SELECT coalesce(sum(ST_Area(g)), 0) / 1e6 FROM corridor').fetchone()[0]
     log(f'hành lang {km2:.2f} km²')
+    write_lines(con)
 
     con.execute('DROP TABLE IF EXISTS corr')
     con.execute('CREATE TABLE corr (id BIGINT, area DOUBLE, flag INTEGER)')
@@ -207,7 +290,7 @@ def main():
                    row_number() OVER (PARTITION BY c.id ORDER BY ST_Distance(ST_Centroid(b.g), w.g)) AS rn
             FROM corr c
             JOIN bldg_m b ON b.id = c.id
-            JOIN water_src w ON w.id IN (SELECT id FROM river) AND ST_DWithin(ST_Centroid(b.g), w.g, 70)
+            JOIN river_keep w ON ST_DWithin(ST_Centroid(b.g), w.g, 70)
         ) WHERE rn = 1
     """)
     hits = con.execute("""
@@ -286,9 +369,9 @@ def main():
     n_bldg = con.execute('SELECT count(*) FROM bldg_attr').fetchone()[0]
     n_forest = con.execute('SELECT count(*) FROM forest_src').fetchone()[0]
     payload = {
-        'v': 2,
+        'v': 3,
         'buildings': int(n_bldg),
-        'waterPolygons': len(ids),
+        'waterPolygons': int(kept_n),
         'forestPolygons': int(n_forest),
         'totals': {
             'corridor': corridor_n + both_n,
@@ -298,8 +381,9 @@ def main():
             'exemptRoad': len(exempt)
         },
         'note': (
-            f'Hành lang 50 m chỉ đệm ra ngoài bờ sông rộng hơn {WIDTH_MIN:.0f} m '
-            '(bề rộng ước lượng = 2 × diện tích / chu vi, hình kéo dài). '
+            f'Hành lang 50 m chỉ đệm ra ngoài bờ sông rộng hơn {WIDTH_MIN:.0f} m. '
+            'Mảnh sông được gộp qua ranh đồ án trước khi đo '
+            '(bề rộng = 2 × diện tích / chu vi của phần đã gộp, hình kéo dài). '
             'Không gồm hồ, ao, đầm, mặt biển và kênh nhỏ hơn 100 m. '
             'Nhà bị đường trục chính hoặc đường có tên (không phải cầu, không phải kiệt) chắn giữa nhà và bờ, chạy dọc bờ, không tính vào hành lang. '
             'Rừng chỉ gồm ô quy hoạch có cụm phòng hộ hoặc đặc dụng, hoặc mã RPH / RDD. '

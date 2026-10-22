@@ -1,5 +1,5 @@
-// Công trình giao hành lang 50 m ngoài bờ mặt nước quy hoạch, hoặc nằm trên rừng phòng hộ / đặc dụng.
-// Số liệu tính sẵn (scripts/build-gba-screen.py). Bật lớp là tải file, không có nút nạp lại.
+// Công trình giao hành lang 50 m ngoài bờ sông rộng hơn 100 m, hoặc nằm trên rừng phòng hộ / đặc dụng.
+// Số liệu tính sẵn (scripts/rebuild-river-corridor.py). Bật lớp mới tải nét ranh 50 m.
 import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
 import { escapeHtml, fmtNum } from './utils.js';
@@ -7,15 +7,20 @@ import { setRiverCounts, setWardRiverHtml } from './uiComponents.js';
 
 const PANE = 'violatePane';
 const HIT_PANE = 'violateHitPane';
+const LINE_PANE = 'violateLinePane';
 const PANE_Z = 462;
 const HIT_Z = 470;
+const LINE_Z = 650;
 const CELL = 0.008;
 
 const $ = (id) => document.getElementById(id);
 
 let pack = null;
 let loadP = null;
+let lineP = null;
 let on = false;
+const lineLayers = [];
+const lineRenderers = new WeakMap();
 const layers = new Map();
 const hits = new Map();
 const renderers = new WeakMap();
@@ -77,7 +82,7 @@ function pointsIn(bounds) {
 function loadPack() {
   if (pack) return Promise.resolve(pack);
   if (!loadP) {
-    const url = new URL('data/gba/bank-forest.json', document.baseURI).href;
+    const url = new URL('data/gba/bank-forest.json?v=3', document.baseURI).href;
     loadP = fetch(url).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
@@ -107,6 +112,7 @@ function statsHtml(data) {
       <span><i style="background:#f87171"></i>Hành lang</span>
       <span><i style="background:#fbbf24"></i>Đất rừng</span>
       <span><i style="background:#c084fc"></i>Cả hai</span>
+      <span><i class="violate-line"></i>Ranh 50 m</span>
     </div>
     <p class="flood-muted">Cột hành lang và cột rừng đều gồm công trình trùng. Phóng tới mức 16 và bấm dấu tròn để xem lý do, diện tích.</p>
     <details class="detail-more"><summary>Bảng phường, xã</summary>
@@ -240,8 +246,59 @@ function bind(m) {
   syncHits(m);
 }
 
+function loadLines() {
+  if (lineP) return lineP;
+  const url = new URL('data/gba/river-corridor.json?v=1', document.baseURI).href;
+  lineP = fetch(url).then((res) => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }).catch((err) => {
+    lineP = null;
+    throw err;
+  });
+  return lineP;
+}
+
+function clearLines() {
+  while (lineLayers.length) lineLayers.pop().remove();
+}
+
+function lineRenderer(m) {
+  if (!m.getPane(LINE_PANE)) {
+    const pane = m.createPane(LINE_PANE);
+    pane.style.zIndex = String(LINE_Z);
+    pane.style.pointerEvents = 'none';
+  }
+  // Bản đồ dùng canvas chung, nên nét này cần renderer riêng mới nằm trên các lớp khác.
+  let renderer = lineRenderers.get(m);
+  if (!renderer) {
+    renderer = L.svg({ pane: LINE_PANE });
+    lineRenderers.set(m, renderer);
+  }
+  return renderer;
+}
+
+function drawLines(m, geo) {
+  if (!m || !geo) return;
+  const layer = L.geoJSON(geo, {
+    pane: LINE_PANE,
+    renderer: lineRenderer(m),
+    interactive: false,
+    style: {
+      color: '#22d3ee',
+      weight: 2.5,
+      opacity: 1,
+      dashArray: '7 5',
+      lineCap: 'butt'
+    }
+  });
+  layer.addTo(m);
+  lineLayers.push(layer);
+}
+
 function clearMaps() {
   while (unbind.length) unbind.pop()();
+  clearLines();
 }
 
 function setOn(next) {
@@ -251,12 +308,17 @@ function setOn(next) {
   clearMaps();
   if (!on || !map) return;
   if (box) box.innerHTML = '<p class="flood-muted">Đang tải số liệu…</p>';
-  loadPack().then(() => {
+  Promise.all([loadPack(), loadLines()]).then(([, geo]) => {
     if (!on) return;
-    paintBox();
+    try { paintBox(); } catch (err) { console.warn('Hành lang sông:', err); }
+    try {
+      drawLines(map, geo);
+      if (planMap) drawLines(planMap, geo);
+    } catch (err) { console.warn('Nét hành lang:', err); }
     bind(map);
     if (planMap) bind(planMap);
-  }).catch(() => {
+  }).catch((err) => {
+    console.warn('Hành lang sông:', err);
     if (box) box.innerHTML = '<p>Chưa có tệp số liệu hành lang và đất rừng.</p>';
   });
 }
