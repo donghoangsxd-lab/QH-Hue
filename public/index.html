@@ -31,7 +31,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261022">
+  <link rel="stylesheet" href="css/style.css?v=20261023">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -592,7 +592,7 @@
             <span id="cadastreOpBox" class="layer-slider" style="display:none;"><input type="range" id="cadastreOpacity" class="opacity-slider" min="0" max="100" value="100" title="Độ trong suốt lớp thửa đất" aria-label="Độ trong suốt lớp thửa đất"></span>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_gba"><label for="chk_gba" title="Dấu chân công trình Global Building Atlas. Ở Huế hầu hết là Google Open Buildings, ảnh đến năm 2021; nhà xây sau đó có thể chưa có dấu chân. Màu theo số tầng = làm tròn (chiều cao ước lượng / 4): 1-2, 3-5, 6-10, 11-50 tầng. Nhà trên 50 tầng cùng nhóm 11-50. Nhà đã công bố số tầng giữ số đó. Hiện từ mức phóng 13. Dưới mức 16 chỉ tô mảng theo nhóm tầng, không viền từng nhà; viền trở lại từ mức 16. Số tầng ghi trắng trên dấu chân từ mức 17; nhà quá nhỏ không ghi. Dấu chân dưới 60 m² và không cao quá 3,5 m trong đất nghĩa trang được ẩn. Cụm mộ trên sườn, cách đường phố, cao không quá 2,5 m thì ẩn tới dưới 180 m². Đặt enabled = false trong cemetery-mask để vẽ lại. Nhà đã hiệu chỉnh chiều cao dùng số mét đã ghi đè. Tấm xám là dấu chân Microsoft trên 1000 m² chưa có trong GBA và chưa có số tầng. Dấu chân quản trị vẽ thêm nằm cùng lớp, có số tầng, có thể tách đế và tháp."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Công trình xây dựng (GBA) <small class="layer-hint" id="gbaHint">(phóng tới mức 13)</small></label></div>
+            <div><input type="checkbox" id="chk_gba"><label for="chk_gba" title="Dấu chân công trình Global Building Atlas. Ở Huế hầu hết là Google Open Buildings, ảnh đến năm 2021; nhà xây sau đó có thể chưa có dấu chân. Màu theo số tầng = làm tròn (chiều cao ước lượng / 4): 1-2, 3-5, 6-10, 11-50 tầng. Nhà trên 50 tầng cùng nhóm 11-50. Nhà đã công bố số tầng giữ số đó. Hiện từ mức phóng 13. Dưới mức 16 chỉ tô mảng theo nhóm tầng, không viền từng nhà; viền trở lại từ mức 16. Số tầng ghi trắng trên dấu chân từ mức 17; nhà quá nhỏ không ghi. Dấu chân dưới 60 m² và không cao quá 3,5 m trong thửa địa chính 2016 mã NTD (nghĩa trang, nghĩa địa), cùng đất nghĩa trang quy hoạch và OSM, được ẩn. Cụm mộ sát thửa, cách đường phố, cao không quá 2,5 m thì ẩn tới dưới 180 m². Đặt enabled = false trong cemetery-mask để vẽ lại. Nhà đã hiệu chỉnh chiều cao dùng số mét đã ghi đè. Tấm xám là dấu chân Microsoft trên 1000 m² chưa có trong GBA và chưa có số tầng. Dấu chân quản trị vẽ thêm nằm cùng lớp, có số tầng, có thể tách đế và tháp."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Công trình xây dựng (GBA) <small class="layer-hint" id="gbaHint">(phóng tới mức 13)</small></label></div>
             <span class="layer-actions">
               <button type="button" class="layer-mini-btn" id="btnGbaDraw" hidden title="Quản trị: vẽ dấu chân nhà mới, đặt số tầng, có thể tách đế và tháp. Lưu riêng cạnh bản sửa tầng, không ghi vào bảng nhà cao.">Vẽ</button>
               <button type="button" class="layer-mini-btn" id="btnGbaFloors" hidden title="Quản trị: bấm dấu chân để sửa số tầng. Lưu riêng, không ghi đè bảng nhà cao.">Tầng</button>
@@ -1399,7 +1399,7 @@
   <!-- Xóa service worker cũ một lần. Các lần sau giữ cache ô PMTiles và bldg-hf.bin. -->
   <script>
     window.__qhSwReady = (function () {
-      var purge = '20261022-gba';
+      var purge = '20261023-gba';
       try {
         if (localStorage.getItem('qhhue_sw_purge') === purge) return Promise.resolve();
         localStorage.setItem('qhhue_sw_purge', purge);
@@ -1420,6 +1420,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261022"></script>
+  <script type="module" src="./js/app.js?v=20261023"></script>
 </body>
 </html>

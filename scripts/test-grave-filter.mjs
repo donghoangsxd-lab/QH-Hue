@@ -32,9 +32,12 @@ assert(!isCemeteryGrave({ ...square, enabled: false }, 12, 1, 0.2, 0.2), 'cờ t
 
 const mask = prepareGraveMask(JSON.parse(fs.readFileSync(new URL('../public/data/gba/cemetery-mask.geojson', import.meta.url), 'utf8')));
 assert(mask.enabled && mask.maxAreaM2 === 60 && mask.maxHeightM === 3.5 && mask.slopeAreaM2 === 180 && mask.lowHeightM === 2.5, 'ngưỡng file');
-assert(mask.parts.length > 40, `quá ít vùng ${mask.parts.length}`);
-assert(insideGraveMask(mask, 107.593, 16.446), 'sườn Ngự Bình nằm trong nghĩa trang OSM');
-assert(insideGraveMask(mask, 107.5942, 16.4478), 'cụm mộ ngoài đa giác OSM vẫn bị che');
+assert(mask.parts.length > 1000, `quá ít vùng ${mask.parts.length}`);
+assert(insideGraveMask(mask, 107.594264, 16.443778), 'thửa 6 tờ 41 An Cựu nằm trong mặt nạ');
+assert(isCemeteryGrave(mask, 40, 2, 107.594264, 16.443778), 'mộ nhỏ trong thửa NTD thì ẩn');
+assert(!isCemeteryGrave(mask, 150, 1.5, 107.594264, 16.443778), 'dấu chân rộng trong thửa NTD thì giữ');
+assert(insideGraveMask(mask, 107.593, 16.446), 'sườn Ngự Bình nằm trong nghĩa trang');
+assert(insideGraveMask(mask, 107.5942, 16.4478), 'cụm mộ khoanh đỏ Ngự Bình vẫn bị che');
 assert(isCemeteryGrave(mask, 40, 3.5, 107.5942, 16.4478), 'mộ 40 m² cao 3,5 m trong cụm thì ẩn');
 assert(isCemeteryGrave(mask, 150, 1.5, 107.5942, 16.4478), 'lăng thấp 150 m² trên sườn thì ẩn');
 assert(!isCemeteryGrave(mask, 70, 3.2, 107.5942, 16.4478), 'trên 60 m² và cao hơn 2,5 m thì giữ');
@@ -42,6 +45,7 @@ assert(!isCemeteryGrave(mask, 180, 1, 107.5942, 16.4478), 'đủ 180 m² trên s
 assert(!isCemeteryGrave(mask, 40, 3.6, 107.5942, 16.4478), 'cao hơn 3,5 m thì giữ');
 assert(!insideGraveMask(mask, 107.5786, 16.4694), 'kinh thành không phải nghĩa trang');
 assert(!insideGraveMask(mask, 107.5905, 16.4637), 'nhà trong phố không nằm trong mặt nạ');
+assert(!insideGraveMask(mask, 107.5905, 16.4495), 'điểm ven đường phía tây cụm không nằm trong mặt nạ');
 
 const layer = fs.readFileSync(new URL('../public/js/gbaLayer.js', import.meta.url), 'utf8');
 assert(layer.includes('const OUTLINE_ZOOM = 16'), 'ngưỡng viền');
@@ -54,7 +58,7 @@ assert(!layer.includes('buildings.pmtiles.write') && layer.includes('cemetery-ma
 
 const raw = JSON.parse(fs.readFileSync(new URL('../public/data/gba/cemetery-mask.geojson', import.meta.url), 'utf8'));
 const srcs = new Set(raw.features.map((f) => f.properties.src));
-assert(srcs.has('qh') && srcs.has('osm') && srcs.has('slope'), 'có quy hoạch, OSM và sườn');
+assert(srcs.has('ntd') && srcs.has('qh') && srcs.has('osm') && srcs.has('slope'), 'có NTD, quy hoạch, OSM và sườn');
 assert(raw.enabled === true, 'cờ bật');
 
 console.log('grave filter ok', mask.parts.length);

@@ -1,6 +1,9 @@
-// Ẩn mộ bị nhận nhầm là nhà: trong đất nghĩa trang hoặc cụm mộ trên sườn, nhỏ và thấp.
+// Ẩn mộ bị nhận nhầm là nhà: trong thửa NTD 2016, đất nghĩa trang quy hoạch/OSM, hoặc cụm mộ sát thửa.
 // Ngưỡng đọc từ file (mặc định 60 m² và 3,5 m). Nhà sát đường phố đã được đục khỏi mặt nạ.
 // PMTiles không bị sửa. enabled = false trong cemetery-mask.geojson thì vẽ lại hết.
+// Ô 0,02° chỉ để khỏi quét hàng chục nghìn thửa; kết quả giống quét tuần tự.
+
+const CELL = 0.02;
 
 export function pointInRing(lng, lat, ring) {
   let inside = false;
@@ -13,8 +16,9 @@ export function pointInRing(lng, lat, ring) {
 }
 
 export function prepareGraveMask(data) {
-  if (!data || data.enabled === false) return { enabled: false, maxAreaM2: 60, maxHeightM: 3.5, parts: [] };
+  if (!data || data.enabled === false) return { enabled: false, maxAreaM2: 60, maxHeightM: 3.5, parts: [], cells: new Map() };
   const parts = [];
+  const cells = new Map();
   for (const feature of data.features || []) {
     const geometry = feature.geometry;
     if (!geometry) continue;
@@ -34,7 +38,20 @@ export function prepareGraveMask(data) {
         if (pt[1] > maxy) maxy = pt[1];
       }
       const src = (feature.properties && feature.properties.src) || '';
-      parts.push({ bbox: [minx, miny, maxx, maxy], outer, holes: poly.slice(1), loose: src === 'slope' });
+      const part = { bbox: [minx, miny, maxx, maxy], outer, holes: poly.slice(1), loose: src === 'slope' };
+      parts.push(part);
+      const x0 = Math.floor(minx / CELL);
+      const x1 = Math.floor(maxx / CELL);
+      const y0 = Math.floor(miny / CELL);
+      const y1 = Math.floor(maxy / CELL);
+      for (let x = x0; x <= x1; x++) {
+        for (let y = y0; y <= y1; y++) {
+          const key = x + ':' + y;
+          const list = cells.get(key);
+          if (list) list.push(part);
+          else cells.set(key, [part]);
+        }
+      }
     }
   }
   return {
@@ -43,14 +60,17 @@ export function prepareGraveMask(data) {
     maxHeightM: Number(data.maxHeightM) > 0 ? Number(data.maxHeightM) : 3.5,
     lowHeightM: Number(data.lowHeightM) > 0 ? Number(data.lowHeightM) : 2.5,
     slopeAreaM2: Number(data.slopeAreaM2) > 0 ? Number(data.slopeAreaM2) : 180,
-    parts
+    parts,
+    cells
   };
 }
 
 function zoneAt(mask, lng, lat) {
-  if (!mask || !mask.enabled) return null;
+  if (!mask || !mask.enabled || !mask.cells) return null;
+  const list = mask.cells.get(Math.floor(lng / CELL) + ':' + Math.floor(lat / CELL));
+  if (!list) return null;
   let found = null;
-  for (const part of mask.parts) {
+  for (const part of list) {
     const box = part.bbox;
     if (lng < box[0] || lng > box[2] || lat < box[1] || lat > box[3]) continue;
     if (!pointInRing(lng, lat, part.outer)) continue;
