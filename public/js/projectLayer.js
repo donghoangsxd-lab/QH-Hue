@@ -1,6 +1,6 @@
 // Mục Quy hoạch (tab Lớp dữ liệu): 4 nhóm cấp theo droplist (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000,
 // QHCT 1/500) gồm dòng lớp riêng của cấp (#planStaticRows) và đồ án nhập; QHPK, QHCT nhóm đồ án theo phường
-// (đồ án liên phường có mặt ở mỗi phường), QHC liệt kê thẳng; mỗi đồ án (Ten_QH)
+// (mỗi đồ án một dòng, kể cả liên phường), QHC liệt kê thẳng; mỗi đồ án (Ten_QH)
 // bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + bảng góc trái + thông tin ở panel dưới),
 // Admin xóa / chuyển đồ án cũ.
 // Nút file mở PDF quyết định phê duyệt. Admin gắn, thay hoặc gỡ (PDF tối đa 10 MB hoặc link).
@@ -37,7 +37,7 @@ import { escapeHtml, fmtNum, ico, showToast, RIGHT_TAB_EVENT } from './utils.js'
 import { openOrAssign, openAssign, openDecision, openPropose, openProposalReview } from './decisionViewer.js';
 import { adjustmentsOf, refreshAdjustLayer, ADJUST_LAYER_KEY, ADJUST_CHANGE_EVENT } from './adjustLayer.js';
 import { namesOfProject } from './projectNames.js';
-import { enabledSchemes } from './schemeVisibility.js';
+import { enabledSchemes, schemeHomeWard, NO_SCHEME_WARD } from './schemeVisibility.js';
 import {
   STORAGE_VERSION, STORAGE_VERSION_KEY, HIDDEN_KIND_FIX_KEY, readStorageVersion, parseNameList, migrateHiddenState
 } from './storageSchema.js';
@@ -69,7 +69,7 @@ const PALETTES = {
 const NEIGHBOR_PAD_DEG = 0.003;
 
 const CITY_NAME = 'Thành phố Huế';
-const NO_WARD = 'Chưa xác định phường, xã';
+const NO_WARD = NO_SCHEME_WARD;
 
 const $ = (id) => document.getElementById(id);
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
@@ -937,10 +937,9 @@ function renderList() {
 function wardGroups(items) {
   const groups = new Map();
   items.forEach(item => {
-    (item.p.wards.length ? item.p.wards : [NO_WARD]).forEach(w => {
-      if (!groups.has(w)) groups.set(w, []);
-      groups.get(w).push(item);
-    });
+    const home = schemeHomeWard(item.p.wards, currentWard);
+    if (!groups.has(home)) groups.set(home, []);
+    groups.get(home).push(item);
   });
   return [...groups.entries()].sort(([a], [b]) => (a === NO_WARD) - (b === NO_WARD) || a.localeCompare(b, 'vi'));
 }
@@ -966,7 +965,7 @@ function rowHtml(p, idx, admin) {
   const boxTitle = 'Hiện ranh, tên và lô của đồ án';
   return `<div class="project-row${on ? '' : ' is-off'}${p.name === pickedName ? ' is-picked' : ''}">
       <label class="project-name" title="${escapeHtml(p.full || p.name)} — bấm để mở đồ án">
-        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''} title="${boxTitle}"><span data-focus="${idx}">${idx + 1}. ${escapeHtml(p.short || p.name)}</span></label>
+        <input type="checkbox" data-project="${idx}"${on ? ' checked' : ''} title="${boxTitle}"><span data-focus="${idx}">${idx + 1}. ${escapeHtml(p.short || p.name)}${p.wards.length > 1 ? `<small class="layer-hint"> · ${p.wards.length} phường, xã</small>` : ''}</span></label>
       <span class="project-tools">
         <button type="button" class="project-btn project-expand${open ? ' open' : ''}" data-expand="${idx}" title="${open ? 'Ẩn' : 'Xem'} các lớp dữ liệu của đồ án" aria-label="Các lớp dữ liệu của đồ án" aria-expanded="${open}">${ico('chev-down')}</button>
         <button type="button" class="project-btn" data-info="${idx}" title="Thông tin đồ án ở panel dưới: cơ cấu sử dụng đất, bảng tổng hợp sử dụng đất và đánh giá chỉ tiêu QCVN 01:2026" aria-label="Thông tin đồ án">${ico('table')}</button>
@@ -1010,7 +1009,7 @@ function revealInList(p) {
     const search = $('projectSearch');
     if (search) search.value = '';
   }
-  if (!query.trim() && !(currentWard && p.wards.includes(currentWard))) openGroups.add(p.wards[0] || NO_WARD);
+  if (!query.trim() && !(currentWard && p.wards.includes(currentWard))) openGroups.add(schemeHomeWard(p.wards, currentWard));
   closedLevels.delete(p.level);
   renderList();
   markPicked(p.name);
