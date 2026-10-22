@@ -71,7 +71,7 @@ import { initView3d } from './view3dPanel.js';
 import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 import { initCadastreLayer, cadastreClick } from './cadastreLayer.js';
-import { initGbaLayer } from './gbaLayer.js';
+import { initGbaLayer, gbaFloorEditClick } from './gbaLayer.js';
 import { initLotBuildup } from './lotBuildup.js';
 import { initLotOver } from './lotOver.js';
 import { initViolateLayer } from './violateLayer.js';
@@ -545,7 +545,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.isPickMode = false;
   };
 
-  const handleMapClick = (e, targetMap) => {
+  const handleMapClick = async (e, targetMap) => {
     // Vẽ tuyến / vùng dân cư chỉ có trên bản đồ hiện trạng. Phác thảo ghi lên bản đồ đang xem.
     if (state.adminDrawMode && targetMap !== map && !isSplitOn()) {
       setViewMode('HT');
@@ -570,6 +570,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       handleMeasureClick(e.latlng, targetMap);
       return;
     }
+    if (await gbaFloorEditClick(e, targetMap)) return;
     // Thứ tự ưu tiên khi bấm: tem công trình > thửa hiện trạng (lớp thửa bật) > lô quy hoạch > phường (cuối cùng).
     // Lô tự bắt click (không nổi lên bản đồ); lớp thửa giành popup lô trong cadastreLayer.onPopupOpen
     const detailLocked = detailClickLocked(targetMap);

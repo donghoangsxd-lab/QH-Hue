@@ -1449,6 +1449,13 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .layer-mini-btn { height: 16px; min-width: 22px; padding: 0 4px; border: none; border-radius: 8px; background: rgba(148, 163, 184, 0.35); color: var(--text-strong); font-family: inherit; font-size: 9.5px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--ease); flex-shrink: 0; }
 .layer-mini-btn:hover { background: rgba(var(--cyan-rgb), 0.45); }
 .layer-mini-btn.active { background: var(--accent-cyan); color: var(--text-on-accent); box-shadow: 0 0 8px rgba(var(--cyan-rgb), 0.6); }
+#btnGbaFloors[hidden] { display: none; }
+.leaflet-container.gba-floor-edit { cursor: crosshair; }
+.gba-floor-pop .leaflet-popup-content { margin: 8px 10px; min-width: 168px; }
+.gba-floor-form { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.gba-floor-form b { font-size: 13px; }
+.gba-floor-form input { width: 100%; box-sizing: border-box; min-height: 32px; }
+.gba-floor-form .bp-btn { min-height: 32px; }
 .btn-dot-buffer { width: 16px; height: 16px; padding: 0; border: none; font-family: inherit; line-height: 1; border-radius: 50%; background: transparent; color: var(--buf, var(--text-strong)); box-shadow: inset 0 0 0 1.5px var(--buf, rgba(148, 163, 184, 0.55)); font-size: var(--fs-xs); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--ease); flex-shrink: 0; }
 .btn-dot-buffer:hover { background: rgba(var(--cyan-rgb), 0.2); }
 .btn-dot-buffer.active { background: var(--buf, var(--accent-cyan)); color: var(--text-strong); box-shadow: none; }

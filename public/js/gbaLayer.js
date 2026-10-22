@@ -11,6 +11,9 @@ import { GBA_FLOOR_CLASSES, GBA_FLOOR_COLORS, floorClassIndex, floorLabelVisible
 import { heightAt, loadBuildingHeights } from './bldgHeight.js';
 import { withAssetVersion } from './gbaVersion.js';
 import { trackWork, watchTiles } from './loadProgress.js';
+import { state } from './state.js';
+import { showToast } from './utils.js';
+import { floorsAt, mergeFloorEdit, parseFloorPack } from './bldgFloorEdits.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -38,6 +41,9 @@ const tiles = new Map();
 const repaints = [];
 let footL = null, footR = null;
 let attrOn = false;
+let floorPack = { v: 1, saved: 0, edits: {} };
+let editOn = false;
+const FLOOR_STORE = 'qh_bldg_floors';
 
 function pixelRatio() {
   const dpr = window.devicePixelRatio || 1;
@@ -217,16 +223,23 @@ function loadTile(z, x, y) {
   return p;
 }
 
+function readingOf(ft) {
+  const edited = floorsAt(floorPack, ft.lng, ft.lat);
+  const h = heightsIdx ? heightAt(ft.lng, ft.lat, heightsIdx) : null;
+  const published = edited != null ? edited : zoneFloors(ft.lng, ft.lat, ft.area, floorZones);
+  const floors = floorsForReading(h, published);
+  return { floors, edited, fc: floorClassIndex(edited != null ? null : h, floors) };
+}
+
 function paintFeatures(raw) {
   return raw.map((ft) => {
-    const h = heightsIdx ? heightAt(ft.lng, ft.lat, heightsIdx) : null;
-    const floors = floorsForReading(h, zoneFloors(ft.lng, ft.lat, ft.area, floorZones));
-    const anchor = floors == null ? null : poleOfInaccessibility(ft.rings, 8);
+    const read = readingOf(ft);
+    const anchor = read.floors == null ? null : poleOfInaccessibility(ft.rings, 8);
     return {
       rings: ft.rings,
       extent: ft.extent,
-      fc: floorClassIndex(h, floors),
-      floors,
+      fc: read.fc,
+      floors: read.floors,
       label: anchor
     };
   });
@@ -353,6 +366,144 @@ function addFeet(m) {
   return watchTiles(new FootGrid({ pane: FOOT_PANE, minZoom: MIN_ZOOM, maxZoom: MAP_MAX_ZOOM, updateWhenZooming: false, keepBuffer: 1 }), 'Công trình xây dựng').addTo(m);
 }
 
+function redrawFeet() {
+  try { footL?.redraw(); } catch (e) { /* lớp chưa gắn */ }
+  try { footR?.redraw(); } catch (e) { /* lớp chưa gắn */ }
+}
+
+function rememberFloors(pack) {
+  floorPack = pack;
+  try { sessionStorage.setItem(FLOOR_STORE, JSON.stringify({ v: 1, saved: pack.saved, edits: pack.edits })); } catch (e) { /* riêng tư */ }
+  document.querySelectorAll('.view3d-frame').forEach((frame) => {
+    try { frame.contentWindow?.postMessage({ type: 'qh-floor-edit', saved: pack.saved }, location.origin); } catch (err) { /* khung đã đóng */ }
+  });
+}
+
+async function loadFloorEdits() {
+  try {
+    const res = await fetch(geeApi('action=getBldgFloors'));
+    if (!res.ok) return;
+    floorPack = parseFloorPack(await res.json());
+    redrawFeet();
+  } catch (e) { /* chưa có file hoặc máy chủ tĩnh */ }
+}
+
+function isAdmin() {
+  return state.currentUserRole === 'ADMIN' && !!state.authToken;
+}
+
+function syncFloorBtn() {
+  const btn = $('btnGbaFloors');
+  if (!btn) return;
+  const admin = isAdmin();
+  btn.hidden = !admin;
+  if (!admin && editOn) setFloorEdit(false);
+}
+
+function setFloorEdit(on) {
+  editOn = !!on && isAdmin();
+  $('btnGbaFloors')?.classList.toggle('active', editOn);
+  $('btnGbaFloors')?.setAttribute('aria-pressed', editOn ? 'true' : 'false');
+  [map, planMap].forEach((m) => m?.getContainer()?.classList.toggle('gba-floor-edit', editOn));
+}
+
+function tileIndex(lat, lng) {
+  const z = DATA_ZOOM;
+  const n = 2 ** z;
+  const x = Math.floor(((lng + 180) / 360) * n);
+  const rad = lat * Math.PI / 180;
+  const y = Math.floor((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2 * n);
+  return { z, x, y };
+}
+
+async function footprintAt(lat, lng) {
+  const { z, x, y } = tileIndex(lat, lng);
+  const feats = await loadTile(z, x, y);
+  let best = null;
+  feats.forEach((ft) => {
+    const extent = ft.extent || 4096;
+    const ring = (ft.rings[0] || []).map(([px, py]) => lngLatOf(z, x, y, px, py, extent));
+    if (!pointInRing(lng, lat, ring)) return;
+    if (!best || ft.area < best.area) best = ft;
+  });
+  if (!best) return null;
+  const read = readingOf(best);
+  return { lng: best.lng, lat: best.lat, area: best.area, floors: read.floors, edited: read.edited };
+}
+
+function openFloorEditor(targetMap, hit) {
+  const current = hit.floors != null ? String(hit.floors) : '';
+  const note = hit.edited != null ? 'Đang dùng số quản trị đã lưu.' : 'Đang lấy từ chiều cao hoặc số đã công bố.';
+  const html = `<form class="gba-floor-form">
+    <b>Sửa số tầng</b>
+    <span>${note}</span>
+    <label>Số tầng<input name="floors" type="number" min="1" max="80" step="1" inputmode="numeric" value="${current}" required></label>
+    <button type="submit" class="bp-btn">Lưu</button>
+    ${hit.edited != null ? '<button type="button" class="bp-btn" data-clear>Bỏ hiệu chỉnh</button>' : ''}
+  </form>`;
+  const pop = L.popup({ className: 'gba-floor-pop', closeButton: true, autoPan: true, maxWidth: 240 })
+    .setLatLng([hit.lat, hit.lng])
+    .setContent(html)
+    .openOn(targetMap);
+  const form = pop.getElement()?.querySelector('form');
+  if (!form) return;
+  const send = async (floors) => {
+    const next = mergeFloorEdit(floorPack, hit.lng, hit.lat, floors);
+    if (!next) {
+      showToast('Số tầng từ 1 đến 80.', 'error');
+      return;
+    }
+    let res;
+    try {
+      res = await fetch(geeApi('action=saveBldgFloor'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.authToken}` },
+        body: JSON.stringify({ lng: hit.lng, lat: hit.lat, floors, base: floorPack.saved || 0 })
+      });
+    } catch (err) {
+      showToast('Chưa lưu được số tầng.', 'error');
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast(data.message || 'Chưa lưu được số tầng.', 'error');
+      if (res.status === 409) loadFloorEdits();
+      return;
+    }
+    rememberFloors(parseFloorPack({ v: 1, saved: data.at, edits: data.edits }));
+    redrawFeet();
+    targetMap.closePopup();
+    showToast(floors == null ? 'Đã bỏ hiệu chỉnh số tầng.' : `Đã lưu ${floors} tầng.`, 'success');
+  };
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const n = Math.round(Number(new FormData(form).get('floors')));
+    send(n);
+  });
+  form.querySelector('[data-clear]')?.addEventListener('click', () => send(null));
+}
+
+/** true khi đang sửa tầng: nuốt click để không đổi phường. */
+export async function gbaFloorEditClick(e, targetMap) {
+  if (!editOn || !isAdmin()) return false;
+  if (!feetOn) {
+    showToast('Bật lớp công trình xây dựng trước khi sửa tầng.', 'info');
+    return true;
+  }
+  if (!targetMap || targetMap.getZoom() < DATA_ZOOM) {
+    showToast('Phóng tới mức 16 để sửa tầng.', 'info');
+    return true;
+  }
+  let hit = null;
+  try { hit = await footprintAt(e.latlng.lat, e.latlng.lng); } catch (err) { hit = null; }
+  if (!hit) {
+    showToast('Không có dấu chân tại điểm này.', 'info');
+    return true;
+  }
+  openFloorEditor(targetMap, hit);
+  return true;
+}
+
 function applyFeet() {
   if (feetOn) {
     if (map && !footL) footL = addFeet(map);
@@ -436,6 +587,21 @@ export function initGbaLayer() {
   setLandPopupExtra(lotHtml);
   setWardGbaHtml(wardHtml);
   map.on('zoomend', paintBox);
+  syncFloorBtn();
+  document.addEventListener('qh-admin-changed', syncFloorBtn);
+  loadFloorEdits();
+  $('btnGbaFloors')?.addEventListener('click', () => {
+    if (!isAdmin()) return;
+    if (!feetOn) {
+      const chk = $('chk_gba');
+      if (chk && !chk.checked) {
+        chk.checked = true;
+        chk.dispatchEvent(new Event('change'));
+      }
+    }
+    setFloorEdit(!editOn);
+    if (editOn) showToast('Bấm một dấu chân để sửa số tầng.', 'info');
+  });
   $('chk_gba')?.addEventListener('change', (e) => {
     feetOn = !!e.target.checked;
     if (feetOn) {
@@ -447,6 +613,7 @@ export function initGbaLayer() {
       }).catch(() => { repaints.length = 0; }));
     } else {
       repaints.length = 0;
+      if (editOn) setFloorEdit(false);
     }
     applyFeet();
     syncAttr();

@@ -23,6 +23,7 @@ const path = require('path');
 const parcelInfra = require('../services/parcelInfraInventory');
 const noxh = require('../services/noxh');
 const qhHienTrang = require('../services/qhHienTrang');
+const bldgFloors = require('../services/bldgFloors');
 
 let cachedWardStats = null;
 let cachedWardStatsPop = '';
@@ -3054,6 +3055,22 @@ module.exports = async (req, res) => {
       const base = constants.GBA_GCS_BASE;
       res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
       return res.status(200).json({ pmtiles: base + 'buildings.pmtiles', agg: base + 'agg.json' });
+    }
+
+    // Số tầng quản trị sửa trên dấu chân. File riêng, không đụng bldg-overrides.
+    if (action === 'getBldgFloors') {
+      let pack = { v: 1, saved: 0, edits: {} };
+      try { pack = await bldgFloors.readPack(); } catch (err) { console.warn('Đọc số tầng công trình:', err.message); }
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ v: 1, saved: pack.saved || 0, edits: pack.edits || {} });
+    }
+
+    if (action === 'saveBldgFloor') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      const body = readJsonBody(req);
+      const next = await bldgFloors.saveEdit(body);
+      return res.status(200).json({ success: true, saved: true, at: next.saved, edits: next.edits });
     }
 
     // Tab Chung cư: Apps Script đọc sheet; chưa deploy thì lấy bản đã đồng bộ trên bucket
