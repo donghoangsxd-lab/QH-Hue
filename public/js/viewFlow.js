@@ -25,7 +25,7 @@ import { WARD_SELECT_EVENT, selectWardDetail } from './uiComponents.js';
 import { closeProjectView, PROJECT_VIEW_EXIT_EVENT } from './projectReview.js';
 import { revealWardProjects, clearProjectFocus, projectContains, openInspectProjects, stashInspectView, frameVisibleSchemes } from './projectLayer.js';
 import { LOTS_PROGRESS_EVENT, PROJECT_INFO_EVENT } from './projectFiles.js';
-import { RIGHT_TAB_EVENT } from './utils.js';
+import { RIGHT_TAB_EVENT, TOOL_START_EVENT } from './utils.js';
 import { URBAN_PICK_EVENT, urbanVisionFeature, urbanVisionAt } from './urbanAreaLayer.js';
 import { focusUrban, clearUrbanFocus, urbanFocusHolds, urbanFocused, initUrbanFocus, FOCUS_CORE_EVENT } from './urbanFocus.js';
 import { fitCenter, isCoreWard, setCoreOpen, isCoreOpen, coreContains, setQhcPlaceMode, setPreferPlace, QHC_CORE_EVENT } from './qhc2045Layer.js';
@@ -38,6 +38,8 @@ const CITY_NAME = 'Thành phố Huế';
 const KEEP = new Set(['chk_bound', 'chk_parcel', 'chk_projectInfra', 'chk_hillshade', ...LEVELS.map(l => l.chk)]);
 // Bấm bản đồ chọn phường chỉ khi nhìn rộng; phóng gần là đang xem chi tiết, bấm không đổi địa bàn
 const WARD_PICK_MAX_ZOOM = 14;
+// Hệ thống đô thị: dưới mức này tem công trình, biểu đồ và ranh đồ án không nhận chuột để còn bấm được ranh đô thị
+export const URBAN_DETAIL_ZOOM = 13;
 // Từ mức này trở lên (hoặc đang chọn phường / đồ án) là đang xem một địa điểm, không phải toàn thành phố
 const PLACE_ZOOM = 14;
 // Tải lô nhanh hơn ngưỡng này thì không hiện thanh tiến độ (tránh nháy)
@@ -46,6 +48,28 @@ const PROGRESS_DELAY_MS = 250;
 const CENTER_URBAN_IDS = new Set(['trung-tam']);
 
 const isCity = (name) => !name || name === CITY_NAME;
+
+function toolBlocksDetailLock() {
+  return !!(state.sketchTool || state.adminDrawMode || state.isPickMode || state.activeMeasureType || state.isInspectMode);
+}
+
+/** Lớp Hệ thống đô thị đang xem rộng: click chi tiết (tem, lô, giao thông) nhường cho ranh và ký hiệu đô thị */
+export function detailClickLocked(m) {
+  if (!m || getLevel() !== 'urban' || toolBlocksDetailLock()) return false;
+  return m.getZoom() < URBAN_DETAIL_ZOOM;
+}
+
+function paintDetailLock() {
+  [map, planMap].filter(Boolean).forEach(m => {
+    m.getContainer()?.classList.toggle('detail-locked', detailClickLocked(m));
+  });
+  const hint = document.getElementById('urbanLockHint');
+  if (!hint) return;
+  const shown = [map, planMap].filter(m => m && m.getContainer()?.offsetParent);
+  const locked = getLevel() === 'urban' && !toolBlocksDetailLock()
+    && shown.some(m => m.getZoom() < URBAN_DETAIL_ZOOM);
+  hint.textContent = locked ? '(phóng tới mức 13 để bấm công trình)' : '';
+}
 
 function setChecked(id, on) {
   const el = document.getElementById(id);
@@ -378,7 +402,13 @@ function onEscape(e) {
 
 export function initViewFlow() {
   document.addEventListener('keydown', onEscape);
-  document.addEventListener(LEVEL_EVENT, (e) => onLevelChange(e.detail));
+  document.addEventListener(LEVEL_EVENT, (e) => { onLevelChange(e.detail); paintDetailLock(); });
+  document.addEventListener(TOOL_START_EVENT, paintDetailLock);
+  document.addEventListener('click', (e) => {
+    if (e.target.closest?.('.map-toolbar, .tb-chooser')) paintDetailLock();
+  });
+  [map, planMap].filter(Boolean).forEach(m => m.on('zoomend', paintDetailLock));
+  paintDetailLock();
   document.addEventListener(WARD_SELECT_EVENT, (e) => onWardSelected(e.detail));
   document.addEventListener(PROJECT_INFO_EVENT, onProjectOpened);
   document.addEventListener(PROJECT_VIEW_EXIT_EVENT, onProjectExit);
