@@ -587,6 +587,11 @@
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div><button type="button" class="layer-mini-btn active" id="btnWardNames" title="Bật/tắt tên phường, xã trên bản đồ" aria-label="Bật/tắt tên phường, xã" aria-pressed="true">Aa</button></div>
           <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap và tuyến do quản trị viên bổ sung. Thu nhỏ vẫn hiện trục chính."><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(phóng to để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
           <div class="layer-row layer-subrow" id="osmRailRow" hidden><div><input type="checkbox" id="chk_osmRail" data-layer-sub><label for="chk_osmRail" title="Đường sắt và ga hiện trạng trên OpenStreetMap. Chỉ hiện khi bật Mạng lưới đường. Không gồm tuyến bỏ hay quy hoạch, không nhập vào mạng đường bộ. Huế chưa có đường sắt đô thị trong OSM. Hiện từ mức phóng 11.">Đường sắt hiện trạng <small class="layer-hint" id="railHint"></small></label></div></div>
+          <div class="layer-row layer-subrow" id="osmWaterRow" hidden><div><input type="checkbox" id="chk_osmWater" data-layer-sub><label for="chk_osmWater" title="Sông, kênh và bến phà trên OpenStreetMap (waterway=river|canal, amenity=ferry_terminal). Đây là tuyến nước, không phải mạng tàu thủy hành khách. Lớp tham chiếu cho tiêu chuẩn giao thông công cộng. Chỉ hiện khi bật Mạng lưới đường, và tắt theo lớp đó.">Đường thủy nội địa (OSM)</label></div></div>
+          <div class="flood-box" id="osmOpenBox" style="display:none;">
+            <div class="sat-legend" id="osmOpenLegend"></div>
+            <div class="flood-stats" id="osmOpenStats"></div>
+          </div>
           <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
             <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
             <span class="road-legend-item"><i style="background:#60a5fa; height:2px;"></i>Khu vực</span>
@@ -598,11 +603,6 @@
             <span class="road-legend-item" title="Nét đậm và tà vẹt sáng, cùng kiểu đường sắt quốc gia hiện trạng"><svg class="rail-swatch" viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><line x1="1" y1="6" x2="27" y2="6" stroke="#1e293b" stroke-width="4"/><line x1="1" y1="6" x2="27" y2="6" stroke="#f8fafc" stroke-width="1.6" stroke-dasharray="7 7"/></svg>Đường sắt, ga</span>
             <span class="rail-status" id="railStatus"></span>
           </div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_osmWater"><label for="chk_osmWater" title="Sông, kênh và bến phà trên OpenStreetMap (waterway=river|canal, amenity=ferry_terminal). Đây là tuyến nước, không phải mạng tàu thủy hành khách. Lớp tham chiếu cho tiêu chuẩn giao thông công cộng."><svg class="ico ico-layer"><use href="#i-stream"/></svg>Đường thủy nội địa (OSM)</label></div></div>
-          <div class="flood-box" id="osmOpenBox" style="display:none;">
-            <div class="sat-legend" id="osmOpenLegend"></div>
-            <div class="flood-stats" id="osmOpenStats"></div>
-          </div>
           <div class="layer-row">
             <div><input type="checkbox" id="chk_cadastre"><label for="chk_cadastre" title="Thửa đất địa chính tỉnh Thừa Thiên Huế cũ (gis21.hue.gov.vn, lập năm 2016): số tờ, số thửa, diện tích, loại đất, địa chỉ; không gồm tên chủ sử dụng. Hiện từ mức phóng 15, bấm vào thửa để xem thông tin. Nguồn chưa có Quảng Điền, Phú Lộc, Nam Đông."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Thửa đất địa chính 2016 <small class="layer-hint" id="cadastreHint">(phóng to để xem)</small></label></div>
             <span id="cadastreOpBox" class="layer-slider" style="display:none;"><input type="range" id="cadastreOpacity" class="opacity-slider" min="0" max="100" value="100" title="Độ trong suốt lớp thửa đất" aria-label="Độ trong suốt lớp thửa đất"></span>
@@ -613,11 +613,12 @@
               <button type="button" class="layer-mini-btn" id="btnGbaDraw" hidden title="Quản trị: vẽ dấu chân nhà mới, đặt số tầng, có thể tách đế và tháp. Lưu riêng cạnh bản sửa tầng, không ghi vào bảng nhà cao.">Vẽ</button>
               <button type="button" class="layer-mini-btn" id="btnGbaFloors" hidden title="Quản trị: bấm dấu chân để sửa số tầng. Lưu riêng, không ghi đè bảng nhà cao.">Tầng</button>
             </span>
+            <label class="layer-alert" title="Công trình vi phạm hành lang/đất rừng">
+              <input type="checkbox" id="chk_violate" aria-label="Công trình vi phạm hành lang/đất rừng">
+              <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg>
+            </label>
           </div>
           <div class="flood-box" id="gbaBox" style="display:none;"></div>
-          <div class="layer-row">
-            <div><input type="checkbox" id="chk_violate"><label for="chk_violate" title="Dấu chân công trình trong hành lang 50 m ngoài bờ sông rộng hơn 100 m, hoặc trên rừng phòng hộ và rừng đặc dụng. Không gồm hồ, ao, kênh nhỏ, rừng sản xuất. Nhà có đường ven sông chắn phía bờ không tính. Số liệu tính sẵn."><svg class="ico ico-layer"><use href="#i-alert"/></svg>Công trình vi phạm hành lang/đất rừng</label></div>
-          </div>
           <div class="flood-box" id="violateBox" style="display:none;"></div>
           <div class="flood-box" id="cadastreBox" style="display:none;">
             <div class="cad-find">

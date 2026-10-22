@@ -237,7 +237,7 @@ function badgeOf(name, row) {
   el.className = 'layer-load-pct';
   el.dataset.loadName = name;
   badges.set(name, el);
-  const before = row.querySelector(':scope > .layer-slider, :scope > .layer-decisions, :scope > .layer-mini-btn, :scope > select');
+  const before = row.querySelector(':scope > .layer-slider, :scope > .layer-decisions, :scope > .layer-mini-btn, :scope > .layer-alert, :scope > select');
   if (before) row.insertBefore(el, before);
   else row.appendChild(el);
   return el;

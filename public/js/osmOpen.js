@@ -116,16 +116,26 @@ function roadsOn() {
   return groupOn('chk_roads');
 }
 
-/** Đường sắt hiện trạng chỉ là mục con của Mạng lưới đường, và tắt theo đường. */
+/** Đường sắt và đường thủy chỉ là mục con của Mạng lưới đường, và tắt theo đường. */
 function railWanted() {
   return roadsOn() && groupOn('chk_osmRail');
 }
 
-function syncRailRow() {
-  const row = $('osmRailRow');
-  if (row) row.hidden = !roadsOn();
-  const rail = $('chk_osmRail');
-  if (rail && rail.checked && !roadsOn()) rail.checked = false;
+function waterWanted() {
+  return roadsOn() && groupOn('chk_osmWater');
+}
+
+function syncRoadChildren() {
+  const roads = roadsOn();
+  ['osmRailRow', 'osmWaterRow'].forEach((id) => {
+    const row = $(id);
+    if (row) row.hidden = !roads;
+  });
+  if (roads) return;
+  ['chk_osmRail', 'chk_osmWater'].forEach((id) => {
+    const el = $(id);
+    if (el && el.checked) el.checked = false;
+  });
 }
 
 function anyOn() {
@@ -160,7 +170,7 @@ function draw() {
   paintRail();
   if (!feats || !anyOn()) return;
   const rail = railWanted();
-  const water = groupOn('chk_osmWater');
+  const water = waterWanted();
   const pick = (group) => feats.filter(f => f.properties && f.properties.group === group);
   if (water) {
     addLayer(pick('water').concat(pick('ferry')), {
@@ -215,7 +225,7 @@ function paintBox(data) {
   const box = $('osmOpenBox');
   const legend = $('osmOpenLegend');
   const stats = $('osmOpenStats');
-  const water = groupOn('chk_osmWater');
+  const water = waterWanted();
   paintRail();
   if (box) box.style.display = water ? '' : 'none';
   if (!water) return;
@@ -255,7 +265,7 @@ export function initOsmOpen(map, planMap) {
   maps = [map, planMap].filter(Boolean);
   if (!maps.length) return;
   const refresh = () => {
-    syncRailRow();
+    syncRoadChildren();
     paintBox(null);
     if (!anyOn()) {
       if (waitTimer) { clearInterval(waitTimer); waitTimer = null; }
@@ -269,7 +279,7 @@ export function initOsmOpen(map, planMap) {
   };
   GROUPS.forEach(g => $(g.id)?.addEventListener('change', refresh));
   $('chk_roads')?.addEventListener('change', refresh);
-  syncRailRow();
+  syncRoadChildren();
   maps.forEach(m => m.on('zoomend', () => {
     const ok = railZoomOk();
     paintRailHint();

@@ -1449,6 +1449,20 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .layer-mini-btn:hover { background: rgba(var(--cyan-rgb), 0.45); }
 .layer-mini-btn.active { background: var(--accent-cyan); color: var(--text-on-accent); box-shadow: 0 0 8px rgba(var(--cyan-rgb), 0.6); }
 .layer-actions { display: inline-flex; gap: 3px; align-items: center; flex-shrink: 0; }
+.layer-actions:not(:has(button:not([hidden]))) { display: none; }
+.layer-alert {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 18px; flex: 0 0 auto; margin: 0 0 0 2px; cursor: pointer;
+}
+.layer-row .layer-alert { color: #94a3b8; }
+.layer-row .layer-alert input[type="checkbox"] {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer;
+}
+.layer-alert .ico { width: 15px; height: 15px; margin: 0; pointer-events: none; }
+.layer-row .layer-alert:hover { color: #cbd5e1; }
+.layer-row .layer-alert:has(input:checked) { color: #ef4444; }
+.layer-row .layer-alert:has(input:checked):hover { color: #f87171; }
+.layer-alert:focus-within { outline: 1px solid var(--accent-cyan); outline-offset: 1px; border-radius: 3px; }
 #btnGbaFloors[hidden], #btnGbaDraw[hidden], #bldgDrawBox[hidden] { display: none; }
 .leaflet-container.gba-floor-edit, .leaflet-container.bldg-draw { cursor: crosshair; }
 .bldg-draw-bar {
@@ -5134,6 +5148,9 @@ body.project-review.la-page #projectReviewHost {
   .layer-load-pct { font-size: 11px; line-height: 1; }
   .project-search { height: 32px; margin: 2px 0; }
   .layer-row input[type="checkbox"], .project-name input { width: 18px; height: 18px; }
+  .layer-alert { width: 28px; height: 28px; }
+  .layer-alert .ico { width: 18px; height: 18px; }
+  .layer-row .layer-alert input[type="checkbox"] { width: 100%; height: 100%; }
   .btn-dot-buffer { width: 32px; height: 32px; }
   .bottom-panel { border-radius: 16px 16px 0 0; }
   .bp-btn { min-height: 32px; height: auto; padding: 0 8px; }
