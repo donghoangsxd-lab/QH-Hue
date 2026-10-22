@@ -1,6 +1,5 @@
 // Chọn thư mục HoSoGIS trên máy (không gửi file lên server) và mở bảng kết quả ở nửa dưới màn hình.
 import { readZip } from './kmlImport.js';
-import { inspectGisFiles } from './gisDossierRead.js';
 import { escapeHtml, fmtNum, ico, showToast } from './utils.js';
 
 const VERDICT = {
@@ -138,12 +137,12 @@ export function gisReportHtml(report, filter, sizeHtml) {
           <span>Lớp đã đọc</span><span><b>${fmtNum(report.counts.layers)}</b></span>
           <span>Mã hồ sơ</span><span>${escapeHtml(code)}</span>
         </div>
-        <small class="review-card-foot">Phụ lục II Thông tư 16/2025/TT-BXD. Thiếu chuyên đề ở Phần 3 chỉ là cảnh báo. Không chấm chất lượng đo đạc và không chấm ký hiệu Phụ lục I.</small>
+        <small class="review-card-foot">Phụ lục II Thông tư 16/2025/TT-BXD. phanLoai của lớp ChucNangSuDungDat_A đối chiếu Phụ lục I. Các lớp phải cùng VN-2000, kinh tuyến trục 107°, múi 3°. Thiếu chuyên đề Phần 3 chỉ là cảnh báo.</small>
       </div>
       <div class="review-card">
         <div class="review-card-title">Bốn cơ sở dữ liệu</div>
         <div class="gis-pkgs">${pkgs}</div>
-        <small class="review-card-foot">File chỉ đọc trên máy này. Shapefile bỏ qua phần tọa độ. File Geodatabase (.gdb) cần xuất GeoPackage hoặc shapefile để chấm bên trong.</small>
+        <small class="review-card-foot">File chỉ đọc trên máy này. Nếu có Excel siêu dữ liệu thì kiểm tra sheet HoSo, BanVe và VanBan. File Geodatabase cần xuất GeoPackage hoặc shapefile để đọc bên trong.</small>
       </div>
     </div>
     ${issueTable}
@@ -179,6 +178,7 @@ async function runCheck() {
   if (btn) btn.disabled = true;
   const status = $('gisPickLabel');
   try {
+    const { inspectGisFiles } = await import('./gisDossierRead.js');
     const report = await inspectGisFiles(picked.files, picked.label, (msg) => { if (status) status.textContent = msg; });
     lastReport = report;
     lastFilter = 'all';
