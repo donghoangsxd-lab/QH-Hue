@@ -1,5 +1,7 @@
 // Chuyển tiếp Range của đúng hai file PMTiles. Bucket chỉ mở CORS cho origin production và localhost,
 // nên trang xem trước trên miền Vercel khác không đọc thẳng được. Không nhận URL tự do.
+const { limitPublicGet, PMTILES_MAX, WINDOW_MS } = require('../services/getRate');
+
 const FILES = {
   gba: 'https://storage.googleapis.com/hue-infra-data-us/gba/buildings.pmtiles',
   cadastre: 'https://storage.googleapis.com/hue-infra-data-us/cadastre/thuadat-2016.pmtiles'
@@ -11,6 +13,13 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Range');
   res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges, Content-Type');
   if (req.method === 'OPTIONS') return res.status(204).end();
+  // Một lần kéo bản đồ bắn nhiều Range. Trần thấp (vài trăm/phút) sẽ làm đứt lớp công trình.
+  if (limitPublicGet(req, res, {
+    name: 'pmtiles-range',
+    max: PMTILES_MAX,
+    windowMs: WINDOW_MS,
+    message: 'Quá nhiều yêu cầu tile, vui lòng chậm lại một chút'
+  })) return;
   const url = FILES[String(req.query.file || '')];
   if (!url) return res.status(400).json({ error: true, message: 'Tệp không được phép' });
   const range = String(req.headers.range || 'bytes=0-16383');

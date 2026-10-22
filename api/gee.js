@@ -8,6 +8,7 @@ const popWatch = require('../services/popNhaWatch');
 const { getRawDataList, getCadParcels, getInvestCalls, getInvestEdits, forgetTextFile, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion } = require('../services/gcsService');
 const gcsWrite = require('../services/gcsWrite');
 const { requireAdmin, httpError } = require('../services/authService');
+const { limitPublicGet, geeLimitOpts } = require('../services/getRate');
 const roads = require('../services/roadsService');
 const popEdits = require('../services/popEditsService');
 const sat = require('../services/satService');
@@ -2850,6 +2851,9 @@ module.exports = async (req, res) => {
   const startedAt = Date.now();
   applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
+  // GET/POST đọc công khai. Ô vệ tinh và dân cư đi bucket riêng (một khung nhìn là nhiều ô).
+  // Giới hạn ghi (đề xuất, hồ sơ) vẫn kiểm riêng, chặt hơn, bên trong từng action.
+  if (limitPublicGet(req, res, geeLimitOpts(req.query && req.query.action))) return;
 
   try {
     const action = String(req.query.action || 'getInitData');

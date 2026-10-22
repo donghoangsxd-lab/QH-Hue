@@ -1,5 +1,7 @@
 // Truy vấn OpenStreetMap trong vòng tròn (và bán kính tìm 2 km cho điểm dịch vụ).
 // Máy chủ gọi Overpass vì một số máy chỉ mở CORS cho origin rỗng hoặc trả bản không có ngày.
+const { limitPublicGet, OSM_MAX, WINDOW_MS } = require('../services/getRate');
+
 const OVERPASS = [
   'https://overpass.openstreetmap.fr/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
@@ -79,6 +81,13 @@ async function fetchOsm(lat, lng, r) {
 }
 
 module.exports = async (req, res) => {
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (limitPublicGet(req, res, {
+    name: 'osm-clip',
+    max: OSM_MAX,
+    windowMs: WINDOW_MS,
+    message: 'Quá nhiều yêu cầu OpenStreetMap, vui lòng thử lại sau một phút'
+  })) return;
   const lat = num(req.query.lat, 15.5, 17.2, null);
   const lng = num(req.query.lng, 106.8, 108.4, null);
   const r = num(req.query.r, 150, 800, null);
