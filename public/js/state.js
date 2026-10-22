@@ -62,7 +62,7 @@ export const state = {
   // Trạng thái các chế độ tương tác
   isPickMode: false,
   isInspectMode: false,
-  adminDrawMode: null,     // Admin đang vẽ: 'road' = tuyến đường bổ sung (customRoads.js), 'pop' = vùng hiệu chỉnh dân cư (popEdits.js)
+  adminDrawMode: null,     // Admin đang vẽ: 'road' = tuyến đường bổ sung (customRoads.js), 'pop' = vùng hiệu chỉnh dân cư (popEdits.js), 'bldg' = dấu chân nhà mới (bldgDraw.js)
   sketchTool: null,        // công cụ phác thảo đang chọn (sketchLayer.js): 'line' | 'polyline' | 'polygon' | 'arrow' | 'circle' | 'text'
   lotShapeEdit: false,     // Admin đang kéo đỉnh ranh 1 lô đất (lotShapeEdit.js): chặn click mở popup khác
 

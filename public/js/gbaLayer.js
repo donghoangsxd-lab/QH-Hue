@@ -17,6 +17,7 @@ import { floorsAt, mergeFloorEdit, parseFloorPack } from './bldgFloorEdits.js';
 import { confirmedPartFeatures, partFloorLabel } from './bldgParts.js';
 import { prepareGraveMask, isCemeteryGrave } from './graveFilter.js';
 import { MISSING_FILL, MISSING_STROKE, missingPaintForTile, prepareMissingFootprints } from './bldgMissing.js';
+import { initBldgDraw, noteBldgFloorEdit, syncBldgFeet } from './bldgDraw.js';
 
 const LIBS = {
   pmtiles: 'https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/+esm',
@@ -58,6 +59,7 @@ let graveMaskP = null;
 let missingList = null;
 let missingReady = false;
 let missingP = null;
+let additionRings = [];
 const FLOOR_STORE = 'qh_bldg_floors';
 
 function pixelRatio() {
@@ -238,6 +240,10 @@ function loadTile(z, x, y) {
   return p;
 }
 
+function coveredByAddition(lng, lat) {
+  return additionRings.some((ring) => pointInRing(lng, lat, ring));
+}
+
 function readingOf(ft) {
   const edited = floorsAt(floorPack, ft.lng, ft.lat);
   const h = heightsIdx ? heightAt(ft.lng, ft.lat, heightsIdx) : null;
@@ -249,6 +255,7 @@ function readingOf(ft) {
 function paintFeatures(raw) {
   return raw.flatMap((ft) => {
     const read = readingOf(ft);
+    if (coveredByAddition(ft.lng, ft.lat)) return [];
     if (read.edited == null && isCemeteryGrave(graveMask, ft.area, read.h, ft.lng, ft.lat)) return [];
     const hidePublished = read.edited == null && coveredByPart(ft.lng, ft.lat);
     const anchor = read.floors == null || hidePublished ? null : poleOfInaccessibility(ft.rings, 8);
@@ -475,6 +482,7 @@ function setFloorEdit(on) {
   $('btnGbaFloors')?.classList.toggle('active', editOn);
   $('btnGbaFloors')?.setAttribute('aria-pressed', editOn ? 'true' : 'false');
   [map, planMap].forEach((m) => m?.getContainer()?.classList.toggle('gba-floor-edit', editOn));
+  noteBldgFloorEdit(editOn);
 }
 
 function tileIndex(lat, lng) {
@@ -702,6 +710,7 @@ function applyFeet() {
     footR?.remove(); footR = null;
   }
   applyParts();
+  syncBldgFeet(feetOn);
 }
 
 function ensureAgg() {
@@ -781,6 +790,11 @@ export function initGbaLayer() {
   planMap?.on('zoomend', refreshPartZoom);
   syncFloorBtn();
   document.addEventListener('qh-admin-changed', syncFloorBtn);
+  document.addEventListener('qh-bldg-covers', (e) => {
+    additionRings = Array.isArray(e.detail) ? e.detail : [];
+    redrawFeet();
+  });
+  initBldgDraw();
   loadFloorEdits();
   loadGraveMask();
   loadMissingFootprints();

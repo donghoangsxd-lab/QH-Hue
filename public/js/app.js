@@ -72,6 +72,7 @@ import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
 import { initCadastreLayer, cadastreClick } from './cadastreLayer.js';
 import { initGbaLayer, gbaFloorEditClick } from './gbaLayer.js';
+import { handleBldgDrawClick } from './bldgDraw.js';
 import { initLotBuildup } from './lotBuildup.js';
 import { initLotOver } from './lotOver.js';
 import { initViolateLayer } from './violateLayer.js';
@@ -549,7 +550,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Vẽ tuyến / vùng dân cư chỉ có trên bản đồ hiện trạng. Phác thảo ghi lên bản đồ đang xem.
     if (state.adminDrawMode && targetMap !== map && !isSplitOn()) {
       setViewMode('HT');
-      showToast('Vẽ tuyến / vùng dân cư thực hiện trên bản đồ hiện trạng: đã lật sang bản đồ hiện trạng', 'info');
+      showToast(state.adminDrawMode === 'bldg'
+        ? 'Vẽ dấu chân nhà thực hiện trên bản đồ hiện trạng: đã lật sang bản đồ hiện trạng'
+        : 'Vẽ tuyến / vùng dân cư thực hiện trên bản đồ hiện trạng: đã lật sang bản đồ hiện trạng', 'info');
       targetMap = map;
     }
     if (state.sketchTool) {
@@ -559,6 +562,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (state.adminDrawMode) {
       if (targetMap !== map) return;
       if (state.adminDrawMode === 'road') handleRoadDrawClick(e.latlng);
+      else if (state.adminDrawMode === 'bldg') handleBldgDrawClick(e.latlng);
       else handlePopDrawClick(e.latlng);
       return;
     }
