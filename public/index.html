@@ -31,7 +31,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261023">
+  <link rel="stylesheet" href="css/style.css?v=20261024">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -148,8 +148,8 @@
         <button type="button" class="map-title-seg" data-split-kind="offset" role="radio" aria-checked="false" title="Lệch tâm: hiện trạng ở giữa nửa trái, quy hoạch ở giữa nửa phải"><svg class="ico"><use href="#i-split-offset"/></svg>Lệch tâm</button>
       </div>
       <div class="map-title-progress done" id="titleProgress" role="progressbar" aria-hidden="true" aria-label="Tiến độ tải bản đồ" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
+      <p class="esc-hint" id="escHint" hidden>Bấm ESC để thoát</p>
     </header>
-    <p class="esc-hint" id="escHint" hidden>Bấm ESC để thoát</p>
 
     <!-- GIỚI THIỆU TỔNG QUAN (overview.js): giới thiệu webapp + mục lục tính năng, góc trên trái -->
     <button type="button" class="ov-launch" id="btnOverview" title="Giới thiệu tổng quan: mục đích trang web, các nhóm tính năng chính và hướng dẫn sử dụng" aria-haspopup="dialog" aria-expanded="false"><svg class="ico"><use href="#i-overview"/></svg><span class="ov-launch-text">Giới thiệu tổng quan</span></button>
@@ -1420,6 +1420,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261023"></script>
+  <script type="module" src="./js/app.js?v=20261024"></script>
 </body>
 </html>

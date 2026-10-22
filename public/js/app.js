@@ -261,24 +261,39 @@ function initMapTitle() {
   const text = document.getElementById('mapTitleText');
   const flip = document.getElementById('btnFlipView');
   let titleKey = 'QH';
-  // Hộp tiêu đề vừa chữ, không tràn vào cột công cụ hay panel Lớp dữ liệu.
+  // Hộp tiêu đề co chữ để không đè bảng thông tin bên trái, cột công cụ, panel phải, và giữ nút chọn lớp bên phải.
   const fitTitle = () => {
     if (!text) return;
     const vw = document.documentElement.clientWidth || window.innerWidth;
     const toolRight = document.querySelector('.map-toolbar')?.getBoundingClientRect().right ?? 12;
     const panel = document.getElementById('rightPanel');
-    const panelBox = panel?.getBoundingClientRect();
-    const panelOpen = panel && !document.body.classList.contains('right-collapsed') && panelBox.width > 8 && panelBox.left < vw - 4;
-    const rightBound = (panelOpen ? panelBox.left : vw) - 8;
-    const leftBound = toolRight + 8;
+    const panelOpen = panel && !document.body.classList.contains('right-collapsed') && panel.offsetWidth > 8;
+    let rightBound = vw - 8;
+    if (panelOpen) {
+      const parked = parseFloat(getComputedStyle(panel).right) || 0;
+      rightBound = vw - parked - panel.offsetWidth - 8;
+    }
+    root.style.left = '';
     root.style.width = 'fit-content';
     root.style.maxWidth = 'none';
-    const box = root.getBoundingClientRect();
+    const titleBox = root.getBoundingClientRect();
+    let leftBound = toolRight + 8;
+    document.querySelectorAll('.leaflet-popup.dock-card, .project-brief:not([hidden]), .cad-card:not([hidden]), .urban-focus-bar:not([hidden]), .ovd-card:not([hidden]), #investCard:not([hidden])').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8 || r.bottom < titleBox.top + 4 || r.top > titleBox.bottom - 4) return;
+      leftBound = Math.max(leftBound, r.right + 8);
+    });
     const centered = getComputedStyle(root).transform !== 'none';
-    const avail = centered
-      ? Math.floor(2 * Math.min(box.left + box.width / 2 - leftBound, rightBound - (box.left + box.width / 2)))
-      : Math.floor(rightBound - box.left);
-    root.style.maxWidth = `${Math.max(140, avail)}px`;
+    const gap = Math.max(0, rightBound - leftBound);
+    const avail = Math.max(148, Math.floor(centered ? gap : rightBound - titleBox.left));
+    if (centered) {
+      const half = Math.min(titleBox.width, avail) / 2;
+      const natural = titleBox.left + titleBox.width / 2;
+      if (natural - half < leftBound - 0.5 || natural + half > rightBound + 0.5) {
+        root.style.left = `${(leftBound + rightBound) / 2}px`;
+      }
+    }
+    root.style.maxWidth = `${avail}px`;
     const full = VIEW_TITLES[titleKey] || text.textContent;
     const short = VIEW_TITLES_SHORT[titleKey] || full;
     const apply = (label, size) => {
@@ -341,8 +356,16 @@ function initMapTitle() {
   flip?.addEventListener('click', toggleViewMode);
   root.querySelectorAll('[data-split-kind]').forEach(btn => btn.addEventListener('click', () => setSplitKind(btn.dataset.splitKind)));
   paint({ view: getViewMode(), split: isSplitOn(), kind: getSplitKind() });
+  const refit = () => requestAnimationFrame(fitTitle);
   window.addEventListener('resize', fitTitle);
   new MutationObserver(fitTitle).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  map?.on('popupopen popupclose', refit);
+  planMap?.on('popupopen popupclose', refit);
+  document.addEventListener('qh-dock-card', refit);
+  ['projectBrief', 'cadParcelCard', 'investCard'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) new MutationObserver(refit).observe(el, { attributes: true, attributeFilter: ['hidden', 'class'] });
+  });
 }
 
 async function loadInfraData() {

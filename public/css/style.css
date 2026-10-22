@@ -219,7 +219,7 @@ body.split-offset .swipe-handle { display: none; }
   border: 1px solid var(--border-color);
   border-radius: var(--r-lg);
   box-shadow: var(--panel-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  overflow: hidden;
+  overflow: visible;
   perspective: 600px;
   transition: left var(--ease), border-color var(--ease);
 }
@@ -278,16 +278,15 @@ html.show-boot-notice .map-title { padding-bottom: 5px; }
 @media (prefers-reduced-motion: reduce) { .map-title-progress > i::after { animation: none; } }
 .map-title[data-view="split"]::before { background: linear-gradient(90deg, transparent, var(--accent-cyan) 20%, var(--accent-cyan) 48%, var(--accent-orange) 52%, var(--accent-orange) 80%, transparent); }
 body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-width: calc(100% - 2 * (var(--ov-w) + 24px)); }
-/* Góc trên trái, cùng hàng tiêu đề: hiện khi đang chọn đồ án, QHC, phường xã hoặc đô thị (viewFlow.syncEscHint) */
+/* Ngay dưới thanh tiêu đề, canh giữa thanh đó. Hiện khi đang chọn đồ án, QHC, phường xã hoặc đô thị. */
 .esc-hint {
   position: absolute;
-  top: var(--info-top);
-  left: calc(var(--info-left) + 308px);
-  height: var(--title-h);
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  height: auto;
   margin: 0;
-  z-index: 1100;
-  display: flex;
-  align-items: center;
+  z-index: 2;
   font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0.2px;
@@ -528,7 +527,7 @@ body:has(#investCard:not([hidden])) .project-brief {
 .map-title-mark:hover:not(:disabled) { border-color: rgba(var(--tone), 0.9); background: rgba(var(--tone), 0.24); box-shadow: 0 0 10px rgba(var(--tone), 0.4); }
 .map-title-mark:hover:not(:disabled) .ico { transform: rotateY(180deg); }
 .map-title-mark:disabled { cursor: default; opacity: 0.75; }
-.map-title-body { min-width: 0; display: flex; flex-direction: column; justify-content: center; transform-origin: 50% 50%; }
+.map-title-body { min-width: 0; flex: 0 1 auto; overflow: hidden; display: flex; flex-direction: column; justify-content: center; transform-origin: 50% 50%; }
 /* Hẹp thì xuống tối đa 2 dòng trong chiều cao cố định --title-h (nhãn khung so sánh, thanh QHC căn theo biến này) */
 .map-title-text {
   margin: 0;
@@ -4861,6 +4860,11 @@ body.project-review.la-page #projectReviewHost {
     --phone-panel-w: min(300px, calc(100vw - var(--phone-tool-left) - 8px));
     --phone-title-fit: 1;
   }
+  @media (pointer: fine) {
+    html:has(#escHint:not([hidden])) {
+      --info-top: calc(max(8px, env(safe-area-inset-top)) + var(--title-h) + 26px);
+    }
+  }
   body:not(.bottom-collapsed) { --phone-fixed-bottom: calc(var(--bottom-h) + var(--phone-dock-bottom)); }
   /* Điện thoại chỉ hai mức: thu gọn hoặc phủ hết khung nhìn. Không còn sheet ~46dvh. */
   body:not(.bottom-collapsed):not(.project-review) {
@@ -4926,7 +4930,7 @@ body.project-review.la-page #projectReviewHost {
   }
   .map-title-level-text { display: none; }
   .map-title-level { min-width: 44px; min-height: 40px; padding: 0 6px; }
-  .esc-hint { top: var(--phone-chrome-top); left: max(8px, env(safe-area-inset-left)); height: auto; }
+  .esc-hint { top: calc(100% + 4px); left: 50%; height: auto; transform: translateX(-50%); }
   .level-item { min-height: 44px; font-size: 13px; padding-top: 8px; padding-bottom: 8px; }
   .ov-launch { top: max(8px, env(safe-area-inset-top)); left: 8px; }
   .rp-expand-btn { width: 44px; height: 44px; top: max(8px, env(safe-area-inset-top)); right: 8px; }
@@ -5376,6 +5380,11 @@ body.project-review.la-page #projectReviewHost {
     --info-top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
     --info-bottom: max(4px, env(safe-area-inset-bottom));
     --info-left: calc(max(4px, env(safe-area-inset-left)) + var(--tb-btn) + 8px);
+  }
+  @media (pointer: fine) {
+    html:has(#escHint:not([hidden])) {
+      --info-top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 26px);
+    }
   }
   body.bottom-collapsed .project-brief,
   body.bottom-collapsed .cad-card,
