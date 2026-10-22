@@ -1271,6 +1271,7 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-migrate:disabled { opacity: 0.5; cursor: wait; }
 .road-legend.layer-legend { margin: 0 0 4px 22px; flex-wrap: wrap; row-gap: 2px; }
 .layer-subrow { margin-left: 22px; min-height: 22px; font-size: var(--fs-sm); }
+.project-layer-sub { margin-left: 22px; }
 .rail-swatch { display: block; flex-shrink: 0; }
 .rail-status:empty { display: none; }
 .rail-status { flex-basis: 100%; color: var(--text-muted); }
