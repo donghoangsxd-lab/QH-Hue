@@ -98,7 +98,9 @@ async function handle(req, res, handlers) {
   try {
     const host = req.headers.host || 'localhost';
     const url = new URL(req.url || '/', `http://${host}`);
-    if (req.method === 'GET' && (url.pathname === '/healthz' || url.pathname === '/')) {
+    // *.run.app giữ /healthz ở frontend của Google và trả 404 trước khi tới container.
+    // /api/health trả trước bộ đếm để lần kiểm tra không ăn trần đọc.
+    if (req.method === 'GET' && (url.pathname === '/api/health' || url.pathname === '/healthz' || url.pathname === '/')) {
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json({ ok: true, service: 'qh-hue-api' });
     }

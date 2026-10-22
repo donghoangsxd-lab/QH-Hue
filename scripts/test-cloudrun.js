@@ -37,10 +37,12 @@ function once(handlers, opts) {
 }
 
 (async () => {
-  const health = await once({}, { path: '/healthz' });
+  const health = await once({}, { path: '/api/health' });
   assert.equal(health.status, 200);
-  assert.match(health.body, /qh-hue-api/);
+  assert.equal(health.body, '{"ok":true,"service":"qh-hue-api"}');
   assert.match(health.headers['cache-control'], /no-store/);
+  const legacy = await once({}, { path: '/healthz' });
+  assert.equal(legacy.status, 200);
 
   const gee = await once({
     '/api/gee': (req, res) => res.status(200).json({ action: req.query.action, n: req.body.n })
@@ -64,6 +66,8 @@ function once(handlers, opts) {
   assert.equal(second.status, 429);
   assert.match(second.headers['cache-control'], /no-store/);
   assert.equal(second.headers['retry-after'], '60');
+  const healthAfter = await once({}, { path: '/api/health', headers: { 'x-forwarded-for': '203.0.113.10' } });
+  assert.equal(healthAfter.status, 200);
   const tile = await once({
     '/api/gee': (req, res) => res.status(200).json({ ok: true })
   }, { path: '/api/gee?action=getSatTile', headers: { 'x-forwarded-for': '203.0.113.10' } });

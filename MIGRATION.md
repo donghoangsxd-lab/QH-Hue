@@ -62,12 +62,13 @@ Không tạo secret `GEE_PRIVATE_KEY` trên GitHub.
 
 ## 4. Deploy Cloud Run
 
-Cách bấm tay: GitHub → **Actions → Cloud Run → Run workflow**. Ô region để trống thì script dùng `asia-southeast1`. Điền `us-central1` nếu muốn vùng luôn miễn phí.
+Cách bấm tay: GitHub → **Actions → Cloud Run → Run workflow**. Dịch vụ `qh-hue-api` đang chạy ở `us-central1`. Deploy lại phải điền `us-central1`. Để trống thì script dùng `asia-southeast1` và tạo một dịch vụ khác.
 
 Hoặc trên máy đã `gcloud auth login` (không dán khóa vào lệnh):
 
 ```bash
 export GCP_PROJECT=optimistic-yew-488501-s0
+export REGION=us-central1
 bash scripts/deploy-cloudrun.sh
 ```
 
@@ -75,7 +76,13 @@ Script đặt `min-instances=0`, `max-instances=3`, `concurrency=80`, 1 vCPU, 1 
 
 Lần đầu có thể lỗi nếu policy cấm public. Khi đó Console → **Cloud Run → qh-hue-api → Security → Authentication → Allow unauthenticated invocations**.
 
-Biến môi trường gắn trên Console → Cloud Run → `qh-hue-api` → **Edit & deploy new revision → Variables & secrets → Variables** (không ghi vào git):
+Biến môi trường gắn trên Console, không ghi vào git. Dịch vụ `qh-hue-api` đang ở vùng `us-central1`.
+
+1. Mở [Cloud Run](https://console.cloud.google.com/run?project=optimistic-yew-488501-s0), chọn vùng **us-central1**, mở dịch vụ `qh-hue-api`.
+2. Tab **Containers** → **Edit**.
+3. Mục **Variables & Secrets** → **Variables**. Thêm hoặc sửa từng biến, rồi deploy revision mới.
+
+Console mới không còn nút **Edit & deploy new revision**.
 
 | Tên | Giá trị |
 | --- | --- |
@@ -87,13 +94,13 @@ Biến môi trường gắn trên Console → Cloud Run → `qh-hue-api` → **E
 
 `CRON_SECRET` không bắt buộc (cron đã tắt). `QH_GET_LIMIT` không cần đặt (mặc định 600 cho đọc JSON).
 
-Kiểm tra một lần:
+Kiểm tra một lần. Google frontend trên `*.run.app` giữ đường `/healthz` và trả 404 của Google trước khi request tới container. Dùng `/api/health`:
 
 ```bash
-curl -fsS "$URL/healthz"
+curl -fsS "$URL/api/health"
 ```
 
-Phải ra `{"ok":true,"service":"qh-hue-api"}`. `$URL` là dòng `URL Cloud Run:` script in ra, dạng `https://qh-hue-api-….asia-southeast1.run.app`, không có dấu `/` cuối.
+Phải ra `{"ok":true,"service":"qh-hue-api"}`. `$URL` là dòng `URL Cloud Run:` script in ra, không có dấu `/` cuối. Dịch vụ hiện tại: `https://qh-hue-api-dgwn67tqyq-uc.a.run.app` (hậu tố `uc` là `us-central1`).
 
 ## 5. Cloudflare Workers
 
