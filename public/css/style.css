@@ -1454,6 +1454,27 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
   position: relative; display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 18px; flex: 0 0 auto; margin: 0 0 0 2px; cursor: pointer;
 }
+/* Tam giác vi phạm và cụm nút cuối hàng neo sát mép phải, cùng cột với nút Aa. Nhãn dài cắt bằng dấu ba chấm. */
+.layer-row > div { overflow: hidden; }
+.layer-row > div label,
+.layer-row:has(> .layer-load-pct) > div label {
+  display: block;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.layer-row > div label .ico,
+.layer-row > div label .layer-type-icon { margin-right: 4px; vertical-align: -3px; }
+.layer-row > .layer-alert,
+.layer-row > .layer-load-pct,
+.layer-row > div + .layer-actions:has(button:not([hidden])),
+.layer-row > div + .layer-mini-btn,
+.layer-row > div + .layer-slider { margin-left: auto; }
+.layer-row > .layer-load-pct ~ .layer-alert,
+.layer-row > .layer-actions:has(button:not([hidden])) ~ .layer-alert,
+.layer-row > .layer-load-pct ~ .layer-actions:has(button:not([hidden])) { margin-left: 2px; }
 .layer-row .layer-alert { color: #94a3b8; }
 .layer-row .layer-alert input[type="checkbox"] {
   position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer;
