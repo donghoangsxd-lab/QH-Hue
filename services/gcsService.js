@@ -52,8 +52,14 @@ function attachWardParts(items) {
   return out;
 }
 
-// Object công khai không đặt Cache-Control bị cache biên của Google giữ tới 1 giờ: thêm ?v= để HEAD/GET luôn tới bản gốc
+const gcsWrite = require('./gcsWrite');
+const { revisionUrl, needsRevisionCheck } = require('./gcsRevision');
+
+// File khác infrastructure_hue.json vẫn phá cache biên Google (object không có Cache-Control bị giữ tới 1 giờ).
 const bypassEdge = (url) => `${url}?v=${Date.now()}`;
+
+let infraCheckedAt = 0;
+let infraGeneration = '';
 
 // Sheet locale vi-VN đọc dấu chấm thập phân thành dấu phân cách nghìn (16.452800 → 16452800): chia 10 tới khi vào miền hợp lệ
 function rescaleCoord(num, limit) {
@@ -64,22 +70,27 @@ function rescaleCoord(num, limit) {
 }
 const tagOf = (res) => (res && (res.headers['etag'] || res.headers['last-modified'])) || null;
 
-async function getRawDataList() {
+async function getRawDataList(opts = {}) {
+  const now = opts.now || Date.now();
+  const force = Boolean(opts.force);
   try {
-    let currentETag = null;
-    try {
-      currentETag = tagOf(await axios.head(bypassEdge(constants.GCS_URL), { timeout: 5000 }));
-    } catch (headErr) {
-      // Bẫy lỗi an toàn cho HEAD request
+    if (cachedGeoJSON && !needsRevisionCheck({ generation: infraGeneration, checkedAt: infraCheckedAt }, now, force)) {
+      return cachedGeoJSON;
     }
-
-    if (cachedGeoJSON && currentETag && currentETag === lastETag) {
+    let generation = '';
+    try {
+      const meta = await gcsWrite.objectMeta('infrastructure_hue.json');
+      generation = meta && meta.generation ? String(meta.generation) : '';
+    } catch (err) {
+      generation = '';
+    }
+    if (cachedGeoJSON && generation && generation === infraGeneration) {
+      infraCheckedAt = now;
       return cachedGeoJSON;
     }
 
-    const response = await axios.get(bypassEdge(constants.GCS_URL), { timeout: 10000 });
-    // ETag theo đúng bản vừa tải (file có thể đổi giữa HEAD và GET)
-    const loadedETag = tagOf(response) || currentETag;
+    const response = await axios.get(revisionUrl(constants.GCS_URL, generation), { timeout: 10000 });
+    const loadedETag = generation || tagOf(response);
     const geojson = response.data || {};
     const features = geojson.features || [];
 
@@ -144,9 +155,10 @@ async function getRawDataList() {
       && Math.abs(item.lat) <= 90 && Math.abs(item.lng) <= 180);
     cachedGeoJSON = attachWardParts(cachedGeoJSON);
 
-    // Chỉ tăng phiên bản khi dữ liệu thật sự đổi (HEAD lỗi thì vẫn tải lại nhưng không làm mất các cache tính toán phía sau)
     if (!loadedETag || loadedETag !== lastETag) dataVersion++;
     lastETag = loadedETag;
+    infraGeneration = generation || lastETag || '';
+    infraCheckedAt = now;
     return cachedGeoJSON;
   } catch (e) {
     console.error("Lỗi nạp GCS Data:", e.message);
@@ -293,6 +305,8 @@ const getHillshade = (key) => (key === 'index'
 function invalidateCache() {
   cachedGeoJSON = null;
   lastETag = null;
+  infraGeneration = '';
+  infraCheckedAt = 0;
   cachedParcels = null;
   lastParcelETag = null;
 }

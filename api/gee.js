@@ -4843,7 +4843,7 @@ module.exports = async (req, res) => {
     }
 
     // --- Thao tác cần danh sách công trình ---
-    const allDataListRaw = await getRawDataList();
+    const allDataListRaw = await getRawDataList({ force: Boolean(req.query.fresh) });
     const qhPack = await qhHienTrang.loadPack();
 
     if (action === 'getQhReview') {
