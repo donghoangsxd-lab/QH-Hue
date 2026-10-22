@@ -1,12 +1,13 @@
 // So sánh mật độ, hệ số sử dụng đất và tầng cao thực tế với chỉ tiêu tối đa của lô.
-// Tầng cao = làm tròn (mét / 3,3). Chiều cao GBA là ước lượng, sai số khoảng ±1 tầng.
+// Tầng cao = làm tròn (mét / 4). Chiều cao GBA là ước lượng, sai số khoảng ±1 tầng.
+// Số tầng công bố gắn ở lotBuildup, không nằm trong hàm thuần này.
 
 const EPS = { '%': 0.05, 'lần': 0.005, 'tầng': 0.01 };
 
 export function floorsFromHeight(meters) {
   const h = Number(meters);
   if (!(h > 0)) return null;
-  return Math.max(1, Math.round(h / 3.3));
+  return Math.max(1, Math.round(h / 4));
 }
 
 /** Chỉ tiêu tối đa. Khoảng "3-5" lấy cận trên. Mật độ ≤ 1 hiểu là tỉ lệ (0,4 = 40%). */
@@ -99,7 +100,7 @@ export function buildupHtml(stats) {
     ? `<span class="is-miss">${num(missing, 0)} công trình không khớp chiều cao, không tính vào sàn và tầng cao.</span>`
     : '';
   const note = heightReady
-    ? '<span class="lot-note">Chiều cao là ước lượng Global Building Atlas, đã chỉnh theo OSM hoặc số công bố ở một số nhà cao. Tầng cao ≈ mét / 3,3, sai số khoảng ±1 tầng, chỉ để sàng lọc.</span>'
+    ? '<span class="lot-note">Chiều cao là ước lượng Global Building Atlas, đã chỉnh theo OSM hoặc số công bố ở một số nhà cao. Tầng cao ≈ mét / 4; nhà đã công bố số tầng giữ số đó. Sai số khoảng ±1 tầng, chỉ để sàng lọc.</span>'
     : '';
   return `<b>Kiểm tra mật độ xây dựng thực tế</b>
     ${compare}

@@ -577,7 +577,7 @@
             <span id="cadastreOpBox" class="layer-slider" style="display:none;"><input type="range" id="cadastreOpacity" class="opacity-slider" min="0" max="100" value="100" title="Độ trong suốt lớp thửa đất" aria-label="Độ trong suốt lớp thửa đất"></span>
           </div>
           <div class="layer-row">
-            <div><input type="checkbox" id="chk_gba"><label for="chk_gba" title="Dấu chân công trình Global Building Atlas. Màu theo số tầng = làm tròn (chiều cao ước lượng / 3,3): 1-2, 3-5, 6-10, 11-50 tầng. Nhà trên 50 tầng cùng nhóm 11-50. Hiện từ mức phóng 13. Số tầng ghi trắng trên dấu chân từ mức 17; nhà quá nhỏ không ghi. Nhà đã hiệu chỉnh chiều cao dùng số mét đã ghi đè."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Công trình xây dựng (GBA) <small class="layer-hint" id="gbaHint">(phóng tới mức 13)</small></label></div>
+            <div><input type="checkbox" id="chk_gba"><label for="chk_gba" title="Dấu chân công trình Global Building Atlas. Màu theo số tầng = làm tròn (chiều cao ước lượng / 4): 1-2, 3-5, 6-10, 11-50 tầng. Nhà trên 50 tầng cùng nhóm 11-50. Nhà đã công bố số tầng giữ số đó. Hiện từ mức phóng 13. Số tầng ghi trắng trên dấu chân từ mức 17; nhà quá nhỏ không ghi. Nhà đã hiệu chỉnh chiều cao dùng số mét đã ghi đè."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Công trình xây dựng (GBA) <small class="layer-hint" id="gbaHint">(phóng tới mức 13)</small></label></div>
           </div>
           <div class="flood-box" id="gbaBox" style="display:none;"></div>
           <div class="layer-row">
@@ -1286,7 +1286,7 @@
                     <th colspan="4" title="Chiều dài theo OpenStreetMap và tuyến do quản trị viên bổ sung, cắt theo ranh phường, xã">Đường giao thông (km)</th>
                     <th rowspan="2" title="Số trạm dừng xe buýt đã duyệt trong ranh phường/xã">Trạm<br>xe buýt</th>
                     <th rowspan="2" title="Lô quy hoạch có mật độ xây dựng thực tế cao hơn chỉ tiêu. Dấu chân công trình cắt theo ranh lô.">Số lô vượt<br>mật độ</th>
-                    <th rowspan="2" title="Lô quy hoạch có tầng cao thực tế (chiều cao mét / 3,3) cao hơn chỉ tiêu. Không tính lô còn công trình chưa khớp chiều cao.">Số lô vượt<br>tầng cao</th>
+                    <th rowspan="2" title="Lô quy hoạch có tầng cao thực tế (chiều cao mét / 4, hoặc số tầng đã công bố) cao hơn chỉ tiêu. Không tính lô còn công trình chưa khớp chiều cao.">Số lô vượt<br>tầng cao</th>
                     <th rowspan="2" title="Công trình trong hành lang 50 m ngoài bờ sông rộng hơn 100 m. Không gồm hồ, ao, kênh nhỏ và nhà có đường ven sông chắn phía bờ.">Hành lang<br>sông</th>
                     <th rowspan="2" title="Công trình trên đất rừng phòng hộ hoặc rừng đặc dụng theo quy hoạch. Không gồm rừng sản xuất.">Rừng<br>PH, ĐD</th>
                   </tr>

@@ -1,5 +1,5 @@
 // Số lô vượt mật độ và tầng cao theo phường, xã (public/data/gba/lot-over.json).
-// Cùng quy tắc với đối chiếu từng lô: mật độ = dấu chân cắt trong ranh; tầng = làm tròn mét / 3,3.
+// Cùng quy tắc với đối chiếu từng lô: mật độ = dấu chân cắt trong ranh; tầng = làm tròn mét / 4, trừ số tầng đã công bố.
 import { map, flyToVisible } from './mapEngine.js';
 import { escapeHtml, fmtNum } from './utils.js';
 import { setLotCounts, setWardLotHtml } from './uiComponents.js';

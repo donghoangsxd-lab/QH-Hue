@@ -2,18 +2,27 @@
 export const GBA_CLASSES = ['Thấp', 'Trung bình', 'Cao', 'Rất cao'];
 export const GBA_COLORS = ['#fde68a', '#fb923c', '#ea580c', '#9a3412'];
 
-// Bốn lớp số tầng trên bản đồ. Tầng = làm tròn (mét / 3,3). Tầng 10 thuộc 6-10; trên 50 vẫn vào nhóm trên.
+// Bốn lớp số tầng trên bản đồ. Tầng = làm tròn (mét / 4) cho cả thành phố.
+// Số tầng công bố (labelFloors) thắng công thức. Tầng 10 thuộc 6-10; trên 50 vẫn vào nhóm trên.
+export const FLOOR_HEIGHT_M = 4;
 export const GBA_FLOOR_CLASSES = ['1-2 tầng', '3-5 tầng', '6-10 tầng', '11-50 tầng'];
 export const GBA_FLOOR_COLORS = ['#ffedd5', '#fdba74', '#ea580c', '#9a3412'];
 
 export function floorsFromMetres(h) {
   const n = Number(h);
   if (!(n > 0)) return null;
-  return Math.max(1, Math.round(n / 3.3));
+  return Math.max(1, Math.round(n / FLOOR_HEIGHT_M));
 }
 
-export function floorClassIndex(h) {
-  const f = floorsFromMetres(h);
+/** Số tầng đã công bố thắng mét / 4. published rỗng thì dùng chiều cao. */
+export function floorsForReading(h, published) {
+  const p = Number(published);
+  if (p > 0) return Math.max(1, Math.round(p));
+  return floorsFromMetres(h);
+}
+
+export function floorClassIndex(h, floors) {
+  const f = floors != null && floors > 0 ? floors : floorsFromMetres(h);
   if (f == null || f <= 2) return 0;
   if (f <= 5) return 1;
   if (f <= 10) return 2;

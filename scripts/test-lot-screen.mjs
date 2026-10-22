@@ -6,8 +6,8 @@ const buf = readFileSync(new URL('../public/data/gba/bldg-hf.bin', import.meta.u
 const idx = parseHeightIndex(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 const vin = idx.lookup(107.594238, 16.463008);
 if (!(vin >= 150)) throw new Error(`Vinpearl ${vin}`);
-if (floorsFromHeight(vin) !== 48) throw new Error(`tầng Vinpearl ${floorsFromHeight(vin)}`);
-if (floorsFromHeight(67) !== 20) throw new Error('Indochine');
+if (floorsFromHeight(vin) !== 40) throw new Error(`tầng Vinpearl ${floorsFromHeight(vin)}`);
+if (floorsFromHeight(67) !== 17) throw new Error('67 m');
 if (planLimit({ coverage: 0.4, floors: '3-5', far: 2.5 }, 'coverage') !== 40) throw new Error('mật độ');
 if (planLimit({ floors: '3-5' }, 'floors') !== 5) throw new Error('tầng');
 const over = screenVerdict(55, 40, '%');

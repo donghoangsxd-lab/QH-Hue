@@ -80,9 +80,9 @@ function overlaps(a, b) {
   return a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
 }
 
-function loadOverrideParts() {
+function loadOverridePack() {
   const turf = globalThis.turf;
-  if (!turf) return Promise.resolve([]);
+  if (!turf) return Promise.resolve({ parts: [], zones: [] });
   if (!overridesP) {
     const url = new URL('data/gba/bldg-overrides.geojson', document.baseURI).href;
     overridesP = fetch(url).then((res) => {
@@ -90,26 +90,43 @@ function loadOverrideParts() {
       return res.json();
     }).then((fc) => {
       const parts = [];
+      const zones = [];
       (fc.features || []).forEach((f) => {
-        if (!f.properties || !f.properties.draw || !f.geometry) return;
+        if (!f.properties || !f.geometry) return;
         const g = f.geometry;
         const coords = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+        const floors = Number(f.properties.labelFloors);
         coords.forEach((ring) => {
           try {
             let poly = turf.polygon(ring);
             if (turf.rewind) poly = turf.rewind(poly);
             if (turf.area(poly) < 80) return;
-            parts.push(poly);
+            if (f.properties.draw) parts.push(poly);
+            if (floors > 0) zones.push({ poly, floors, minArea: Number(f.properties.minArea) || 0 });
           } catch (e) { /* vòng hỏng */ }
         });
       });
-      return parts;
+      return { parts, zones };
     }).catch((err) => {
       overridesP = null;
       throw err;
     });
   }
   return overridesP;
+}
+
+function publishedFloors(center, areaM2, zones) {
+  const turf = globalThis.turf;
+  if (!center || !zones.length) return null;
+  const pt = turf.point(center);
+  let best = null;
+  zones.forEach((z) => {
+    if (z.minArea && areaM2 < z.minArea) return;
+    try {
+      if (turf.booleanPointInPolygon(pt, z.poly) && (best == null || z.floors > best)) best = z.floors;
+    } catch (e) { /* điểm ngoài vòng */ }
+  });
+  return best;
 }
 
 function insideOverride(center, extras) {
@@ -121,7 +138,7 @@ function insideOverride(center, extras) {
   });
 }
 
-async function measure(lotFeature, polys, heights, heightReady) {
+async function measure(lotFeature, polys, heights, heightReady, zones) {
   const turf = globalThis.turf;
   let footM2 = 0;
   let count = 0;
@@ -141,7 +158,8 @@ async function measure(lotFeature, polys, heights, heightReady) {
     let center = null;
     try { center = turf.centroid(poly).geometry.coordinates; } catch (e) { center = null; }
     const meters = heightReady && center ? heightAt(center[0], center[1], heights) : null;
-    const storey = floorsFromHeight(meters);
+    const published = center ? publishedFloors(center, turf.area(poly), zones) : null;
+    const storey = published != null ? published : floorsFromHeight(meters);
     if (storey == null) {
       if (heightReady) missingHeight += 1;
       continue;
@@ -178,7 +196,12 @@ async function compute(lot) {
     return `<span>Lô phủ ${pack.tiles} ô bản đồ. Chỉ cắt dấu chân khi lô nằm trong ${MAX_TILES} ô mức 16.</span>`;
   }
   let extras = [];
-  try { extras = await loadOverrideParts(); } catch (e) { extras = []; }
+  let zones = [];
+  try {
+    const pack = await loadOverridePack();
+    extras = pack.parts;
+    zones = pack.zones;
+  } catch (e) { extras = []; zones = []; }
   const lotBox = [box.west, box.south, box.east, box.north];
   const extraHits = extras.filter((poly) => {
     const b = bboxOf(poly);
@@ -210,7 +233,7 @@ async function compute(lot) {
   } catch (e) {
     heightReady = false;
   }
-  const measured = await measure(feature, polys, heights, heightReady);
+  const measured = await measure(feature, polys, heights, heightReady, zones);
   return buildupHtml({
     lotM2,
     ...measured,

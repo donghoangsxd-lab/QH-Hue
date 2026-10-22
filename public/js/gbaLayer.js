@@ -1,5 +1,5 @@
 // Dấu chân Global Building Atlas: PMTiles z13–16. Mã c trong tile là phân vị cũ;
-// màu vẽ theo số tầng (chiều cao mét / 3,3) từ bldg-hf.bin.
+// màu vẽ theo số tầng (chiều cao mét / 4) từ bldg-hf.bin. Nhà có labelFloors giữ số công bố.
 // Từ mức phóng 17, số tầng ghi trên dấu chân đủ rộng, tại điểm xa biên nhất.
 // Lưới cường độ 150 m không còn là lớp riêng. Số liệu lô / phường vẫn lấy từ agg.json.
 import { map, setLandPopupExtra } from './mapEngine.js';
@@ -7,7 +7,7 @@ import { planMap } from './planMap.js';
 import { MAP_MAX_ZOOM } from './basemap.js';
 import { geeApi } from './api.js';
 import { setWardGbaHtml } from './uiComponents.js';
-import { GBA_FLOOR_CLASSES, GBA_FLOOR_COLORS, floorClassIndex, floorLabelVisible, floorsFromMetres, gbaLotKey, gbaStatsHtml, gbaWardExtra, poleOfInaccessibility } from './gbaStats.js';
+import { GBA_FLOOR_CLASSES, GBA_FLOOR_COLORS, floorClassIndex, floorLabelVisible, floorsForReading, gbaLotKey, gbaStatsHtml, gbaWardExtra, poleOfInaccessibility } from './gbaStats.js';
 import { heightAt, loadBuildingHeights } from './bldgHeight.js';
 import { trackWork, watchTiles } from './loadProgress.js';
 
@@ -30,6 +30,7 @@ let feetOn = false;
 let agg = null;
 let aggP = null;
 let ready = null;
+let floorZonesP = null;
 const tiles = new Map();
 let footL = null, footR = null;
 let attrOn = false;
@@ -117,11 +118,61 @@ function ensureReady() {
   return ready;
 }
 
+function pointInRing(lng, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const yi = ring[i][1];
+    const yj = ring[j][1];
+    if ((yi > lat) !== (yj > lat) && lng < ((ring[j][0] - ring[i][0]) * (lat - yi)) / (yj - yi) + ring[i][0]) inside = !inside;
+  }
+  return inside;
+}
+
+function footprintAreaM2(z, x, y, ring, extent) {
+  if (!ring || ring.length < 3) return 0;
+  const ll = ring.map(([px, py]) => lngLatOf(z, x, y, px, py, extent));
+  const mlat = 110540;
+  const mlng = 111320 * Math.cos(ll[0][1] * Math.PI / 180);
+  let sum = 0;
+  for (let i = 0, j = ll.length - 1; i < ll.length; j = i++) {
+    sum += (ll[j][0] * mlng) * (ll[i][1] * mlat) - (ll[i][0] * mlng) * (ll[j][1] * mlat);
+  }
+  return Math.abs(sum) / 2;
+}
+
+function loadFloorZones() {
+  if (!floorZonesP) {
+    const url = new URL('data/gba/bldg-overrides.geojson', document.baseURI).href;
+    floorZonesP = fetch(url).then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    }).then((fc) => (fc.features || []).flatMap((f) => {
+      const floors = Number(f.properties && f.properties.labelFloors);
+      const geom = f.geometry;
+      if (!(floors > 0) || !geom) return [];
+      const polys = geom.type === 'Polygon' ? [geom.coordinates] : geom.type === 'MultiPolygon' ? geom.coordinates : [];
+      if (!polys.length) return [];
+      return [{ floors, minArea: Number(f.properties.minArea) || 0, polys }];
+    })).catch(() => { floorZonesP = null; return []; });
+  }
+  return floorZonesP;
+}
+
+function zoneFloors(lng, lat, area, zones) {
+  let best = null;
+  (zones || []).forEach((z) => {
+    if (z.minArea && area < z.minArea) return;
+    const hit = z.polys.some((poly) => poly[0] && pointInRing(lng, lat, poly[0]));
+    if (hit && (best == null || z.floors > best)) best = z.floors;
+  });
+  return best;
+}
+
 function loadTile(z, x, y) {
   const key = `${z}/${x}/${y}`;
   let p = tiles.get(key);
   if (p) { tiles.delete(key); tiles.set(key, p); return p; }
-  p = Promise.all([ensureReady(), loadBuildingHeights().catch(() => null)]).then(async ([{ archive, VectorTile, Pbf }, heights]) => {
+  p = Promise.all([ensureReady(), loadBuildingHeights().catch(() => null), loadFloorZones()]).then(async ([{ archive, VectorTile, Pbf }, heights, zones]) => {
     const res = await archive.getZxy(z, x, y);
     if (!res || !res.data) return [];
     const layer = new VectorTile(new Pbf(new Uint8Array(res.data))).layers[LAYER];
@@ -136,11 +187,12 @@ function loadTile(z, x, y) {
       const n = ring.length || 1;
       const [lng, lat] = lngLatOf(z, x, y, sx / n, sy / n, layer.extent);
       const h = heights ? heightAt(lng, lat, heights) : null;
-      const floors = floorsFromMetres(h);
+      const area = footprintAreaM2(z, x, y, ring, layer.extent);
+      const floors = floorsForReading(h, zoneFloors(lng, lat, area, zones));
       const anchor = floors == null ? null : poleOfInaccessibility(rings, 8);
       out.push({
         rings,
-        fc: floorClassIndex(h),
+        fc: floorClassIndex(h, floors),
         floors,
         label: anchor,
         extent: layer.extent

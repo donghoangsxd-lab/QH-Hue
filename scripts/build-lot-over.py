@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # Đếm lô quy hoạch có mật độ xây dựng hoặc tầng cao thực tế vượt chỉ tiêu.
 # Cùng quy tắc popup lô (lotScreen.js): chiếm đất = dấu chân cắt ranh lô;
-# tầng cao = làm tròn (mét / 3,3); chưa kết luận tầng nếu còn nhà chưa có chiều cao.
+# tầng cao = làm tròn (mét / 4), nửa .5 làm tròn lên như Math.round;
+# nhà có labelFloors giữ số tầng công bố. Chưa kết luận tầng nếu còn nhà chưa có chiều cao.
 # Gán phường/xã theo tâm lô nằm trong ranh 40 đơn vị sau sáp nhập.
 # Chạy: python3 scripts/build-lot-over.py
 # Đọc JSON lớp đồ án đã tải ở GBA_LOT_CACHE (mặc định /tmp/tt16-cache) và screen.duck.
@@ -51,12 +52,6 @@ def plan_limit(plan, key):
     if key == 'coverage' and n <= 1:
         n *= 100
     return n
-
-
-def floors_of(meters):
-    if not (meters and meters > 0):
-        return None
-    return max(1, round(meters / 3.3))
 
 
 def write_lots():
@@ -185,10 +180,38 @@ def prepare(con):
             SELECT ST_MakeValid(ST_Transform(ST_SetCRS(ST_GeomFromGeoJSON(?), 'OGC:CRS84'), 'EPSG:32648'))
         """, [raw])
 
+    con.execute('DROP TABLE IF EXISTS ov_floors')
+    con.execute('CREATE TABLE ov_floors (floors DOUBLE, min_area DOUBLE, g GEOMETRY)')
+    for feat in fc.get('features') or []:
+        props = feat.get('properties') or {}
+        geom = feat.get('geometry')
+        floors = props.get('labelFloors')
+        try:
+            floors = float(floors)
+        except (TypeError, ValueError):
+            floors = 0
+        if not geom or not (floors > 0):
+            continue
+        raw = json.dumps(geom, separators=(',', ':'))
+        con.execute("""
+            INSERT INTO ov_floors
+            SELECT ?, ?, ST_MakeValid(ST_Transform(ST_SetCRS(ST_GeomFromGeoJSON(?), 'OGC:CRS84'), 'EPSG:32648'))
+        """, [floors, float(props.get('minArea') or 0), raw])
+    con.execute('DROP TABLE IF EXISTS ov_label')
+    labeled = con.execute("""
+        CREATE TABLE ov_label AS
+        SELECT b.id, max(o.floors) AS floors
+        FROM bldg_m b
+        JOIN ov_floors o ON ST_Contains(o.g, ST_Centroid(b.g))
+        WHERE b.area_m2 >= o.min_area
+        GROUP BY b.id
+    """)
+    log(f'nhà giữ số tầng công bố: {con.execute("SELECT count(*) FROM ov_label").fetchone()[0]}')
+
 
 def intersect(con):
     con.execute('DROP TABLE IF EXISTS lot_hit')
-    con.execute('CREATE TABLE lot_hit (lid VARCHAR, foot DOUBLE, height DOUBLE)')
+    con.execute('CREATE TABLE lot_hit (lid VARCHAR, foot DOUBLE, height DOUBLE, floors DOUBLE)')
     spans = con.execute('SELECT (id // 80000) * 80000 AS lo FROM bldg_m GROUP BY 1 ORDER BY 1').fetchall()
     for (start,) in spans:
         end = int(start) + 80000
@@ -197,10 +220,15 @@ def intersect(con):
             INSERT INTO lot_hit
             SELECT l.lid,
                    ST_Area(ST_Intersection(l.g, b.g)) AS foot,
-                   h.height
+                   h.height,
+                   coalesce(
+                     lab.floors,
+                     CASE WHEN h.height > 0 THEN greatest(1, round(h.height / 4.0)) END
+                   )
             FROM plan_lots l
             JOIN bldg_m b ON ST_Intersects(l.g, b.g)
             JOIN screen_h h ON h.id = b.id
+            LEFT JOIN ov_label lab ON lab.id = b.id
             WHERE b.id >= {int(start)} AND b.id < {end}
               AND ST_Area(ST_Intersection(l.g, b.g)) > 1
               AND NOT (
@@ -222,15 +250,15 @@ def aggregate(con):
                ST_Y(ST_Transform(ST_SetCRS(ST_Centroid(l.g), 'EPSG:32648'), 'OGC:CRS84')) AS lat,
                coalesce(sum(t.foot), 0) AS foot,
                count(t.lid) AS n,
-               count(t.lid) FILTER (WHERE t.height IS NULL OR t.height <= 0) AS missing,
-               max(t.height) FILTER (WHERE t.height > 0) AS max_h
+               count(t.lid) FILTER (WHERE t.floors IS NULL) AS missing,
+               max(t.floors) AS max_f_raw
         FROM plan_lots l
         LEFT JOIN lot_hit t ON t.lid = l.lid
         GROUP BY l.lid, l.lot, l.qh, l.ward, l.cover_lim, l.floor_lim, l.g
     """).fetchall()
     wards = {}
     totals = {'cover': 0, 'floors': 0, 'lots': 0, 'withCover': 0, 'withFloors': 0, 'outside': 0}
-    for lid, lot, qh, ward, cover_lim, floor_lim, lot_m2, lng, lat, foot, n, missing, max_h in rows:
+    for lid, lot, qh, ward, cover_lim, floor_lim, lot_m2, lng, lat, foot, n, missing, max_f_raw in rows:
         totals['lots'] += 1
         name = ward or 'Ngoài ranh'
         if not ward:
@@ -238,7 +266,7 @@ def aggregate(con):
         slot = wards.setdefault(name, {'cover': 0, 'floors': 0, 'withCover': 0, 'withFloors': 0, 'items': []})
         cover = (100.0 * foot / lot_m2) if lot_m2 and lot_m2 > 1 else None
         complete = missing == 0
-        max_f = floors_of(max_h) if complete and n else (0 if complete and n == 0 else None)
+        max_f = int(max_f_raw) if complete and n and max_f_raw else (0 if complete and n == 0 else None)
         over_c = cover is not None and cover_lim is not None and (cover - cover_lim) > EPS_COVER
         over_f = max_f is not None and floor_lim is not None and (max_f - floor_lim) > EPS_FLOOR
         if cover_lim is not None:
@@ -275,7 +303,7 @@ def aggregate(con):
         'note': (
             'Số lô có chỉ tiêu mật độ hoặc tầng cao mà phần xây thực tế vượt chỉ tiêu. '
             'Mật độ = diện tích dấu chân công trình cắt trong ranh lô, chia diện tích lô. '
-            'Tầng cao = làm tròn chiều cao mét / 3,3; không kết luận nếu còn công trình chưa khớp chiều cao. '
+            'Tầng cao = làm tròn chiều cao mét / 4; công trình đã công bố số tầng giữ số đó. Không kết luận nếu còn công trình chưa khớp chiều cao. '
             'Phường, xã theo tâm lô trong ranh 40 đơn vị sau sáp nhập.'
         ),
         'wards': [{
