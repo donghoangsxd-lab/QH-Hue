@@ -2,8 +2,8 @@
 // Vẽ trên canvas riêng (pane flowPane) để mỗi khung hình chỉ vẽ lại vài chục chấm, không đụng lớp marker công trình
 
 const PANE = 'flowPane';
-const DOTS_PER_PATH = 3;
-const SPEED_MPS = 260;     // tốc độ chấm trên bản đồ (m thực địa / giây hiển thị)
+const DOTS_PER_PATH = 1;   // một chấm sáng trên mỗi tuyến nối
+const SPEED_MPS = 130;     // nửa tốc độ cũ (260 m/s): vẫn mượt, không tăng số lần vẽ
 const FRAME_MS = 1000 / 30;
 // Quầng sáng vẽ bằng nét viền bán trong suốt của chính chấm (thay CSS drop-shadow trên cả canvas)
 const DOT_STYLE = { radius: 4.5, weight: 4, color: '#22d3ee', opacity: 0.45, fillColor: '#ffffff', fillOpacity: 1, interactive: false };
