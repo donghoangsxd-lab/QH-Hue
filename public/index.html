@@ -13,10 +13,26 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Hạ tầng Huế">
+  <meta name="description" content="Tra cứu quy hoạch và hiện trạng đô thị thành phố Huế.">
+  <meta name="apple-mobile-web-app-title" content="QH đô thị Huế">
+  <meta property="og:title" content="Bản đồ Quy hoạch đô thị - TP Huế">
+  <meta property="og:site_name" content="Bản đồ Quy hoạch đô thị - TP Huế">
+  <meta property="og:description" content="Tra cứu quy hoạch và hiện trạng đô thị thành phố Huế.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="/icons/og.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Ngọ Môn, Bản đồ Quy hoạch đô thị - TP Huế">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Bản đồ Quy hoạch đô thị - TP Huế">
+  <meta name="twitter:description" content="Tra cứu quy hoạch và hiện trạng đô thị thành phố Huế.">
+  <meta name="twitter:image" content="/icons/og.png">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icons/pwa-192.png">
-  <title>Bản đồ Phân tích Hạ tầng Đô thị TP. Huế (Headless GIS)</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/favicon.ico" sizes="32x32">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>Bản đồ Quy hoạch đô thị - TP Huế</title>
   <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
   <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
   <link rel="preconnect" href="https://earthengine.googleapis.com" crossorigin>
@@ -31,7 +47,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261024">
+  <link rel="stylesheet" href="css/style.css?v=20261025">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -1420,6 +1436,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261024"></script>
+  <script type="module" src="./js/app.js?v=20261025"></script>
 </body>
 </html>
