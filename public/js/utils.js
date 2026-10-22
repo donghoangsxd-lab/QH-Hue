@@ -1,6 +1,7 @@
 /**
  * Tiện ích dùng chung: chống XSS khi ghép HTML, định dạng số kiểu Việt Nam, khoảng cách, tải thư viện khi cần.
  */
+export { startTaskProgress } from './loadProgress.js';
 const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
 // Mọi chuỗi lấy từ dữ liệu (tên công trình, phường, ghi chú...) phải qua hàm này trước khi đưa vào innerHTML
@@ -298,75 +299,7 @@ export function showToast(message, type = 'info') {
   toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
 }
 
-// Thanh tiến độ nổi phía trên bản đồ cho tác vụ chờ GEE. Server không báo tiến độ nên giai đoạn chờ chạy theo thời gian
-// ước lượng (tiệm cận mức đích, không tự chạm 100%); giai đoạn tải ô ảnh tính theo số ô đã tải (trackTileLoad).
-let taskStack = null;
-const CREEP_TICK_MS = 200;
-
-export function startTaskProgress(label) {
-  if (!taskStack) {
-    taskStack = document.createElement('div');
-    taskStack.className = 'task-progress-stack';
-    taskStack.setAttribute('role', 'status');
-    taskStack.setAttribute('aria-live', 'polite');
-    document.body.appendChild(taskStack);
-  }
-  const el = document.createElement('div');
-  el.className = 'task-progress';
-  el.innerHTML = '<div class="tp-head"><span class="tp-label"></span><b class="tp-pct">0%</b></div>'
-    + '<div class="progress-bar-bg"><div class="progress-bar-fill"></div></div>';
-  taskStack.appendChild(el);
-  const labelEl = el.querySelector('.tp-label');
-  const pctEl = el.querySelector('.tp-pct');
-  const fill = el.querySelector('.progress-bar-fill');
-  let pct = 0;
-  let timer = null;
-  let closed = false;
-  const paint = (v, text) => {
-    pct = Math.max(pct, Math.min(100, v));
-    fill.style.width = `${pct}%`;
-    pctEl.textContent = `${Math.floor(pct)}%`;
-    if (text) labelEl.textContent = text;
-  };
-  const stopCreep = () => { clearInterval(timer); timer = null; };
-  const close = (delayMs) => {
-    if (closed) return;
-    closed = true;
-    stopCreep();
-    setTimeout(() => el.remove(), delayMs);
-  };
-  paint(0, label);
-  return {
-    /** Chạy dần tới gần `to`: sau tauMs đi được ~63% quãng còn lại, sau 3·tauMs ~95% */
-    creep(to, tauMs, text) {
-      if (closed) return;
-      stopCreep();
-      paint(pct, text);
-      const from = pct;
-      const t0 = performance.now();
-      timer = setInterval(() => paint(from + (to - from) * (1 - Math.exp(-(performance.now() - t0) / tauMs))), CREEP_TICK_MS);
-    },
-    set(v, text) {
-      if (closed) return;
-      stopCreep();
-      paint(v, text);
-    },
-    done(text) {
-      if (closed) return;
-      paint(100, text);
-      el.classList.add('is-done');
-      close(700);
-    },
-    fail(text) {
-      if (closed) return;
-      stopCreep();
-      if (text) labelEl.textContent = text;
-      el.classList.add('is-error');
-      close(2500);
-    },
-    cancel() { close(0); }
-  };
-}
+// Tiến độ chung nằm ở thanh tiêu đề (loadProgress.startTaskProgress), không có hộp nổi riêng.
 
 /**
  * Theo dõi tải ô ảnh của L.tileLayer: onProgress(số ô thành công, tổng số ô đã yêu cầu, số ô lỗi).

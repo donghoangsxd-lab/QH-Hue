@@ -8,7 +8,7 @@ import { planMap, shownMaps } from './planMap.js';
 import { state, BUFFER_COLORS, layerType } from './state.js';
 import { geeApi } from './api.js';
 import { popQuery } from './popMethod.js';
-import { escapeHtml, fmtNum, startTaskProgress, trackTileLoads } from './utils.js';
+import { escapeHtml, fmtNum, startTaskProgress } from './utils.js';
 import { devFromYears, loadNewDevStats, devLegend, devStats, DEV_MIN_ZOOM } from './newDev.js';
 import { geeTileOpts } from './basemap.js';
 import { watchTiles } from './loadProgress.js';
@@ -254,7 +254,7 @@ function setLayerUrl(cfg, rt, tile, track) {
   const shown = shownMaps();
   const sides = [['left', map], ['right', planMap]].filter(([, m]) => m)
     .map(([side, m]) => ({ side, m, fresh: !rt[side], layer: rt[side] || watchTiles(geeTileLayer(url, opts), cfg.label) }));
-  track(sides.filter(s => changed && shown.includes(s.m) && s.m.getZoom() >= opts.minZoom).map(s => s.layer));
+  if (track) track(sides.filter(s => changed && shown.includes(s.m) && s.m.getZoom() >= opts.minZoom).map(s => s.layer));
   sides.forEach(({ side, m, fresh, layer }) => {
     if (fresh) rt[side] = layer.addTo(m);
     else if (changed) layer.setUrl(url);
@@ -276,19 +276,8 @@ async function show(key) {
       return d;
     }));
     if (seq !== rt.seq || !rt.visible) { task.cancel(); return; }
-    task.set(SERVER_PCT, `Đang tải ảnh ${cfg.label}`);
-    setLayerUrl(cfg, rt, tile, (tracked) => {
-      trackTileLoads(tracked, (n, total, failed) => {
-        const note = failed ? ` (${failed} ô lỗi)` : '';
-        task.set(SERVER_PCT + (100 - SERVER_PCT) * 0.98 * (n / Math.max(total, 1)), `Đang tải ảnh ${cfg.label}${note}`);
-      }, 120000, { countError: false }).then((r) => {
-        if (rt.task !== task) return;
-        const missing = Math.max(0, (r?.total || 0) - (r?.loaded || 0) - (r?.failed || 0));
-        const failed = (r?.failed || 0) + missing;
-        if (failed) task.fail(`Thiếu ${failed} ô ${cfg.label}`);
-        else task.done(`Đã tải ${cfg.label}`);
-      });
-    });
+    task.done();
+    setLayerUrl(cfg, rt, tile);
     rt.legend = tile.legend;
     if (legendEl) legendEl.innerHTML = cfg.renderLegend(tile.legend, year);
   } catch (err) {

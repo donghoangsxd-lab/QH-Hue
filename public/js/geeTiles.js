@@ -53,6 +53,18 @@ function shouldRetry(status) {
   return status === 408 || status === 429 || status >= 500;
 }
 
+// Ô heatmap/dân cư ngoài vùng tô màu: Earth Engine trả 400 «empty / fully masked», trình duyệt coi là ảnh hỏng.
+// Đó không phải ô lỗi (đúng lý do một khung nhìn báo hàng chục «lỗi» trong khi vùng có hạ tầng vẫn hiện).
+const EMPTY_PNG = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='), c => c.charCodeAt(0));
+
+function emptyTile() {
+  return new Blob([EMPTY_PNG], { type: 'image/png' });
+}
+
+function isMaskedTile(status, text) {
+  return (status === 400 || status === 404) && /empty|fully masked|masked/i.test(String(text || ''));
+}
+
 /** Tải một ô. Ném lỗi khi hết lần thử. sleep tiêm vào để kiểm thử không chờ thật. */
 export async function fetchGeeTile(url, opts = {}) {
   const doFetch = opts.fetchImpl || fetch;
@@ -72,6 +84,8 @@ export async function fetchGeeTile(url, opts = {}) {
         last = new Error('not-image');
         retry = true;
       } else {
+        const text = await res.text().catch(() => '');
+        if (isMaskedTile(res.status, text)) return emptyTile();
         last = new Error(`HTTP ${res.status}`);
         last.status = res.status;
         retry = shouldRetry(res.status);

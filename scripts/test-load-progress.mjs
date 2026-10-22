@@ -25,12 +25,15 @@ assert.equal(progressColor('80'), '#84cc16');
 
 assert.equal(combinedProgress(10, []), 10);
 assert.equal(combinedProgress(40, [{ pending: 20, done: 10, failed: 0 }]), 42);
-assert.equal(combinedProgress(null, [{ pending: 4, done: 1, failed: 1 }]), 50);
+assert.equal(combinedProgress(null, [{ pending: 4, done: 1, failed: 1 }]), 25);
 assert.equal(combinedProgress(100, []), null);
 assert.equal(combinedProgress(null, []), null);
 assert.equal(combinedProgress(30, [{ pending: 5, done: 2, failed: 3 }]), 30);
 assert.equal(combinedProgress(null, [{ pending: 10, done: 8, dropped: 2 }]), null);
 assert.equal(combinedProgress(null, [{ pending: 10, done: 9, dropped: 0 }]), 90);
+assert.equal(combinedProgress(null, [{ pending: 5, done: 2, failed: 3 }]), 40);
+assert.notEqual(combinedProgress(null, [{ pending: 10, done: 9, failed: 1 }]), 100);
+assert.equal(combinedProgress(null, [{ pending: 10, done: 9, failed: 1 }]), 90);
 
 const root = new URL('..', import.meta.url);
 const read = (rel) => fs.readFileSync(new URL(rel, root), 'utf8');
@@ -63,4 +66,10 @@ assert.match(progress, /tileabort/);
 assert.match(progress, /NOTICE_MAX_MS = 90000/);
 assert.match(progress, /TILE_STUCK_MS = 20000/);
 assert.match(progress, /dropped/);
+assert.match(progress, /export function startTaskProgress/);
+assert.doesNotMatch(read('public/js/utils.js'), /task-progress-stack/);
+assert.doesNotMatch(css, /task-progress-stack/);
+assert.match(read('public/js/mapEngine.js'), /geeTileLayer\(url, geeTileOpts/);
+assert.match(read('public/js/geeTiles.js'), /fully masked/);
+assert.doesNotMatch(read('public/js/mapEngine.js'), /Đã tải bản đồ độ phủ/);
 console.log('test-load-progress ok');

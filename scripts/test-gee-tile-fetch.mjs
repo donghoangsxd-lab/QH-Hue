@@ -38,6 +38,20 @@ resetTileQueue();
 resetTileQueue();
 {
   let n = 0;
+  const blob = await fetchGeeTile('http://tile.test/masked', {
+    sleep,
+    fetchImpl: async () => {
+      n += 1;
+      return response(400, 'application/json', '{"error":{"message":"Tile is empty or fully masked."}}');
+    }
+  });
+  assert.equal(blob.type, 'image/png');
+  assert.equal(n, 1);
+}
+
+resetTileQueue();
+{
+  let n = 0;
   await assert.rejects(() => fetchGeeTile('http://tile.test/c', {
     sleep,
     fetchImpl: async () => {
