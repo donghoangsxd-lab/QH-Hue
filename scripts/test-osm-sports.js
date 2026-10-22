@@ -72,9 +72,15 @@ const osm = fs.readFileSync(path.join(__dirname, '../public/js/osmOpen.js'), 'ut
 const roads = fs.readFileSync(path.join(__dirname, '../public/js/qhc2045Layer.js'), 'utf8');
 const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
 assert.ok(osm.includes('RAIL_MIN_ZOOM = 11') && osm.includes('phóng tới mức 11'), 'gợi ý zoom đường sắt');
-assert.ok(osm.includes('function railWanted') && osm.includes("groupOn('chk_roads')"), 'đường sắt tắt theo mạng đường');
+assert.ok(osm.includes('function railWanted') && osm.includes('function waterWanted') && osm.includes("groupOn('chk_roads')"), 'đường sắt và đường thủy tắt theo mạng đường');
 assert.ok(html.includes('id="osmRailRow" hidden'), 'dòng đường sắt ẩn khi chưa bật đường');
+assert.ok(html.includes('id="osmWaterRow" hidden'), 'dòng đường thủy ẩn khi chưa bật đường');
+assert.match(html, /id="osmWaterRow" hidden[\s\S]*?id="chk_osmWater" data-layer-sub/);
 assert.ok(!/id="chk_osmRail"[^>]*\bchecked\b/.test(html), 'đường sắt hiện trạng tắt mặc định');
+assert.ok(!/id="chk_osmWater"[^>]*\bchecked\b/.test(html), 'đường thủy tắt mặc định');
+assert.match(html, /class="layer-alert" title="Công trình vi phạm hành lang\/đất rừng"/);
+assert.match(html, /id="chk_violate"/);
+assert.doesNotMatch(html, /<label[^>]*>[\s\S]*?Công trình vi phạm hành lang\/đất rừng<\/label>/);
 assert.ok(html.includes('id="chk_gt25rail"') && html.includes('id="chk_gt10rail"'), 'công tắc đường sắt QHC');
 assert.ok(roads.includes('chk_gt${scale}rail'), 'vẽ đường sắt theo công tắc');
 

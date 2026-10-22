@@ -68,6 +68,7 @@ assert.match(progress, /NOTICE_MAX_MS = 90000/);
 assert.match(progress, /TILE_STUCK_MS = 20000/);
 assert.match(progress, /dropped/);
 assert.match(progress, /export function startTaskProgress/);
+assert.match(progress, /:scope > \.layer-alert/);
 assert.doesNotMatch(read('public/js/utils.js'), /task-progress-stack/);
 assert.doesNotMatch(css, /task-progress-stack/);
 assert.match(read('public/js/mapEngine.js'), /geeTileLayer\(url, geeTileOpts/);
