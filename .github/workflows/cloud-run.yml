@@ -1,0 +1,25 @@
+# Chỉ chạy tay (workflow_dispatch). Không chạy trên mỗi push nên không đụng deploy Vercel.
+name: Cloud Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: Vùng Cloud Run (mặc định Singapore). us-central1 mới thuộc hạn mức luôn miễn phí.
+        required: false
+        default: asia-southeast1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy Cloud Run
+        env:
+          GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
+          REGION: ${{ inputs.region }}
+        run: bash scripts/deploy-cloudrun.sh

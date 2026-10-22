@@ -1,0 +1,9 @@
+.git
+node_modules
+**/*.pmtiles
+**/*.tif
+**/*.tiff
+public/data/gba/*.bin
+public/data/gba/*.csv.gz
+**/__pycache__
+.cursor

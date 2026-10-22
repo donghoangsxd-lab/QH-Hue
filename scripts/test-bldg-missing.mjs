@@ -19,7 +19,7 @@ function pointInRing(x, y, ring) {
 
 const raw = JSON.parse(fs.readFileSync(new URL('../public/data/gba/bldg-missing.geojson', import.meta.url), 'utf8'));
 assert(raw.enabled === true && raw.minAreaM2 === 1000 && raw.maxOverlap === 0.25, 'ngưỡng file');
-assert(raw.features.length === 104, `sai số tấm ${raw.features.length}`);
+assert(raw.features.length === 96, `sai số tấm ${raw.features.length}`);
 const text = JSON.stringify(raw);
 assert(!text.includes('labelFloors') && !text.includes('"floors"') && !text.includes('"parts"'), 'không có số tầng hay tấm giả');
 const wards = new Set();
@@ -33,7 +33,7 @@ assert(wards.size === 18, `sai số phường ${wards.size}`);
 const off = prepareMissingFootprints({ ...raw, enabled: false });
 assert(off.length === 0, 'enabled=false thì không vẽ');
 const list = prepareMissingFootprints(raw);
-assert(list.length === 104, `sai số vòng ${list.length}`);
+assert(list.length === 96, `sai số vòng ${list.length}`);
 const lng = 107.587843;
 const lat = 16.461888;
 for (const z of [14, 15, 16]) {

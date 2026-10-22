@@ -1,0 +1,11 @@
+.git
+.gitignore
+node_modules
+**/*.pmtiles
+**/*.tif
+**/*.tiff
+public/data/gba/*.bin
+public/data/gba/*.csv.gz
+public/data/gba/*.geojson
+**/__pycache__
+.cursor
