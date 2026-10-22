@@ -9,6 +9,7 @@ import { withAssetVersion } from './gbaVersion.js';
 import { geeApi } from './api.js';
 import { floorsAt, floorsOnRing, metresForFloors, parseFloorPack } from './bldgFloorEdits.js';
 import { partFloorLabel } from './bldgParts.js';
+import { parseAdditionPack, toExplicitVolumes } from './bldgAdditions.js';
 import { bindDeckNotchZoom } from './wheelZoom.js';
 
 const GBA_URL = 'https://storage.googleapis.com/hue-infra-data-us/gba/buildings.pmtiles';
@@ -862,12 +863,15 @@ function buildModel(raw, origin, r, heights, floorPack) {
               classArea[floorBin(f)] += cut.area;
             }
           }
+          const partLabel = feat.added && feat.role !== 'podium' && feat.role !== 'tower'
+            ? String(f)
+            : partFloorLabel(feat.role, f);
           volumes.push({
             rings: cut.rings,
             h: extrusion,
             z0: minH,
             fill: VOLUME_FILL[floorBin(f)],
-            partLabel: partFloorLabel(feat.role, f)
+            partLabel
           });
         }
         continue;
@@ -1775,8 +1779,35 @@ async function loadWard(lat, lng) {
 }
 
 let floorPack = { v: 1, saved: 0, edits: {} };
+let additionPack = { v: 1, saved: 0, features: [] };
 let built = null;
 let view = null;
+
+const ADD_STORE = 'qh_bldg_additions';
+
+function mountAdditions(next) {
+  additionPack = next;
+  try { sessionStorage.setItem(ADD_STORE, JSON.stringify({ v: 1, saved: next.saved, features: next.features })); } catch (e) { /* riêng tư */ }
+  if (!built) return;
+  const vol = toExplicitVolumes(next.features);
+  built.raw.gba = (built.raw.gba || []).filter((feat) => !feat.added).concat(vol.extras);
+  built.raw.masks = (built.raw.maskBase || []).concat(vol.masks);
+}
+
+async function loadAdditionPack() {
+  let remote = { v: 1, saved: 0, features: [] };
+  try {
+    const res = await fetch(geeApi('action=getBldgAdditions'));
+    if (res.ok) remote = parseAdditionPack(await res.json());
+  } catch (e) { /* máy chủ tĩnh */ }
+  try {
+    const local = parseAdditionPack(JSON.parse(sessionStorage.getItem(ADD_STORE) || 'null'));
+    if (local.saved >= remote.saved && local.features.length) remote = local;
+  } catch (e) { /* chưa có bản trong phiên */ }
+  if (additionPack.saved > remote.saved) return additionPack;
+  additionPack = remote;
+  return additionPack;
+}
 
 async function loadFloorPack() {
   let remote = { v: 1, saved: 0, edits: {} };
@@ -1827,7 +1858,13 @@ function showBuilt() {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('message', (e) => {
-    if (e.origin !== location.origin || !e.data || e.data.type !== 'qh-floor-edit') return;
+    if (e.origin !== location.origin || !e.data) return;
+    if (e.data.type === 'qh-bldg-add') {
+      mountAdditions(parseAdditionPack(e.data.pack));
+      showBuilt();
+      return;
+    }
+    if (e.data.type !== 'qh-floor-edit') return;
     loadFloorPack().then(showBuilt).catch(() => {});
   });
 }
@@ -1862,8 +1899,11 @@ async function start() {
     }).catch(() => null)
   ]);
   const overrides = await loadOverrideFootprints();
-  raw.gba = gba.concat(overrides.extras);
-  raw.masks = overrides.masks;
+  const additions = await loadAdditionPack();
+  const added = toExplicitVolumes(additions.features);
+  raw.maskBase = overrides.masks;
+  raw.gba = gba.concat(overrides.extras, added.extras);
+  raw.masks = raw.maskBase.concat(added.masks);
   raw.massing = overrides.massing;
   raw.cadastre = cad;
   raw.osm = osm;

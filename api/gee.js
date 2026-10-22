@@ -24,6 +24,7 @@ const parcelInfra = require('../services/parcelInfraInventory');
 const noxh = require('../services/noxh');
 const qhHienTrang = require('../services/qhHienTrang');
 const bldgFloors = require('../services/bldgFloors');
+const bldgAdditions = require('../services/bldgAdditions');
 
 let cachedWardStats = null;
 let cachedWardStatsPop = '';
@@ -3071,6 +3072,22 @@ module.exports = async (req, res) => {
       const body = readJsonBody(req);
       const next = await bldgFloors.saveEdit(body);
       return res.status(200).json({ success: true, saved: true, at: next.saved, edits: next.edits });
+    }
+
+    // Dấu chân nhà quản trị vẽ thêm. File riêng, cạnh bản sửa tầng, không đụng bldg-overrides.
+    if (action === 'getBldgAdditions') {
+      let pack = { v: 1, saved: 0, features: [] };
+      try { pack = await bldgAdditions.readPack(); } catch (err) { console.warn('Đọc dấu chân nhà thêm:', err.message); }
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ v: 1, saved: pack.saved || 0, features: pack.features || [] });
+    }
+
+    if (action === 'saveBldgAddition') {
+      requirePostFromApp(req);
+      const user = await requireAdmin(req);
+      const body = readJsonBody(req);
+      const next = await bldgAdditions.saveChange(body, user);
+      return res.status(200).json({ success: true, saved: true, at: next.saved, features: next.features });
     }
 
     // Tab Chung cư: Apps Script đọc sheet; chưa deploy thì lấy bản đã đồng bộ trên bucket
