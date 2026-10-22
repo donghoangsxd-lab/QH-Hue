@@ -14,7 +14,7 @@ Project GCP đang gắn Earth Engine và bucket: `optimistic-yew-488501-s0`. Buc
 
 Trần mỗi phút mỗi IP: đọc JSON 600, ô `getSatTile` / `getPopRasterTile` 2000, OpenStreetMap 300, Range PMTiles và proxy GCS 2000. `OPTIONS` không tính trên Worker.
 
-Nếu Cloudflare Workers Builds đang theo dõi nhánh `main`, lần merge có `wrangler.jsonc` mới sẽ tự deploy lên `https://qh-hue.donghoangsxd.workers.dev`. Khi đó `/api/gee` trả 503 cho đến khi có `API_UPSTREAM`. Bản Vercel không đổi. Muốn workers.dev giữ nguyên bản tĩnh thì tắt production deploy của integration trước khi merge, rồi tự `npx wrangler deploy` sau.
+Nếu Cloudflare Workers Builds đang theo dõi nhánh `main`, lần merge có `wrangler.jsonc` mới sẽ tự deploy lên `https://qh-hue.donghoangsxd.workers.dev`. `API_UPSTREAM` đã gắn trên dashboard và `/api/gee` trả 200. `keep_vars: true` trong `wrangler.jsonc` để lần deploy đó không xóa biến dashboard. Không ghi URL vào file. Bản Vercel không đổi.
 
 ## 1. GCP — bật thanh toán và chặn $1
 
@@ -112,7 +112,7 @@ Màn Import GitHub, nhánh `main`, sau khi `main` đã có `worker/index.js`:
 - Biến build: `NODE_VERSION` = `22`
 - Biến Worker runtime (không phải biến build): `API_UPSTREAM` = URL Cloud Run, không có dấu `/` cuối
 
-Không ghi `API_UPSTREAM` vào `wrangler.jsonc`.
+Không ghi `API_UPSTREAM` vào `wrangler.jsonc`. File có `"keep_vars": true` để Workers Builds giữ biến runtime đã gắn trên dashboard.
 
 Chưa có `API_UPSTREAM` thì trang tĩnh vẫn mở, `/api/gee` báo chưa cấu hình, dấu chân trên `*.workers.dev` vẫn lấy PMTiles qua Worker (Range từ GCS). `directTiles()` trên `web-hatang-hue-4.vercel.app` vẫn đọc thẳng GCS, không đi Worker.
 
