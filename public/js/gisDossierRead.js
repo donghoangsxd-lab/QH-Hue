@@ -50,6 +50,9 @@ export function scanDbf(buf, cpg, layerName) {
   const dec = dbfDecoder(cpg, buf.subarray(meta.headLen, sampleEnd));
   const stats = {};
   const codes = new Set();
+  const phanLoai = [];
+  const seenClass = new Set();
+  const wantClass = /chucnangsudungdat_a$/i.test(String(layerName || '').replace(/\s+/g, ''));
   let mojibake = false;
   const badBag = {};
   const warnBag = {};
@@ -72,6 +75,10 @@ export function scanDbf(buf, cpg, layerName) {
       if (val.length > (spec === 'maThongTinQH' || spec === 'maHoSoQH' ? 15 : spec === 'maDoiTuong' || spec === 'tenDoiTuong' ? 100 : 250)) {
         if (badBag[spec].length < 5) badBag[spec].push(val.slice(0, 40));
       }
+    }
+    if (wantClass && row.phanLoai && !seenClass.has(row.phanLoai) && seenClass.size < 80) {
+      seenClass.add(row.phanLoai);
+      phanLoai.push(row.phanLoai);
     }
     const code = row.maHoSoQH || '';
     if (code) {
@@ -97,7 +104,8 @@ export function scanDbf(buf, cpg, layerName) {
     codes: [...codes],
     mojibake,
     rows: maxRec,
-    partial
+    partial,
+    phanLoai
   };
 }
 
@@ -128,12 +136,9 @@ async function textOf(file, limit = 8000) {
   return new TextDecoder().decode(buf);
 }
 
-function crsNote(prj) {
-  if (!prj) return 'Thiếu file .prj';
-  const crs = prjToCrs(prj);
-  if (crs === 'HUE_3' || crs === 'HUE_107_45' || crs === 'UTM48_6') return '';
-  if (crs === 'WGS84') return 'Hệ tọa độ WGS84. Hồ sơ quy hoạch tại Huế thường dùng VN-2000 (kinh tuyến trục 107° hoặc múi 6°).';
-  return 'Hệ tọa độ không phải VN-2000 múi Huế (107°) hay UTM 48 (105°).';
+function crsId(prj) {
+  if (!prj) return '';
+  return prjToCrs(prj) || 'OTHER';
 }
 
 async function readShapefile(parts) {
@@ -154,9 +159,7 @@ async function readShapefile(parts) {
   const cpg = parts.cpg ? await textOf(parts.cpg, 80) : '';
   const dbfBuf = await readBytes(dbf, 0, dbf.size);
   const scanned = scanDbf(dbfBuf, cpg, loc.name);
-  let prjNote = '';
-  if (parts.prj) prjNote = crsNote(await textOf(parts.prj, 4000));
-  else prjNote = 'Thiếu file .prj';
+  const prj = parts.prj ? await textOf(parts.prj, 4000) : '';
   if (scanned.mojibake && scanned.values) scanned.values.mojibake = true;
   return {
     ...loc,
@@ -168,7 +171,8 @@ async function readShapefile(parts) {
     values: scanned.values,
     codes: scanned.codes,
     rows: scanned.rows,
-    prjNote,
+    phanLoai: scanned.phanLoai,
+    crs: crsId(prj),
     partial: scanned.partial
   };
 }
@@ -215,6 +219,20 @@ function geomOfTable(text, name) {
   return { geom: null, multi: false };
 }
 
+function crsFromGpkg(latin) {
+  const up = String(latin || '').toUpperCase();
+  const m = up.match(/CENTRAL_MERIDIAN"\s*,\s*([-\d.]+)/);
+  if (m) {
+    const lon = Number(m[1]);
+    if (Math.abs(lon - 107) < 0.01) return 'HUE_3';
+    if (Math.abs(lon - 107.75) < 0.02) return 'HUE_107_45';
+    if (Math.abs(lon - 105) < 0.01) return 'UTM48_6';
+    return 'OTHER';
+  }
+  if (/\b9209\b/.test(latin)) return 'HUE_3';
+  return '';
+}
+
 async function readGpkg(file) {
   const head = await readBytes(file, 0, Math.min(file.size, 3 * 1024 * 1024));
   const latin = new TextDecoder('latin1').decode(head);
@@ -223,10 +241,11 @@ async function readGpkg(file) {
   const tables = gpkgTables(latin);
   const locFile = layerFromPath(file.path);
   const pkg = packageIdOf(file.path.split('/').pop()) || locFile.pkg;
+  const crs = crsFromGpkg(latin);
   const layers = tables.map(t => {
     const g = geomOfTable(latin, t.name);
     const loc = pkg ? { pkg, group: '', name: t.name } : layerFromPath(`${file.path}/${t.name}.gpkg`);
-    return { ...loc, pkg: pkg || loc.pkg, name: t.name, geom: g.geom, multi: g.multi, source: 'gpkg', fields: t.fields, values: null, codes: [], path: file.path };
+    return { ...loc, pkg: pkg || loc.pkg, name: t.name, geom: g.geom, multi: g.multi, source: 'gpkg', fields: t.fields, values: null, codes: [], path: file.path, crs, phanLoai: [] };
   });
   const codes = new Set();
   const step = 1024 * 1024;
@@ -294,6 +313,7 @@ export async function inspectGisFiles(files, label, onProgress) {
   const byStem = new Map();
   const gpkg = [];
   const present = [];
+  const workbooks = [];
   const seenGdb = new Set();
 
   for (const file of files) {
@@ -317,6 +337,7 @@ export async function inspectGisFiles(files, label, onProgress) {
     const leaf = parts[parts.length - 1];
     const ext = (leaf.match(/\.([^.]+)$/) || [, ''])[1].toLowerCase();
     if (ext === 'gpkg') { gpkg.push({ ...file, path }); rememberPkg(packages, packageIdOf(leaf), 'gpkg', false); }
+    else if (ext === 'xlsx' || ext === 'xlsm') workbooks.push({ ...file, path });
     else if (PRESENT_EXT.test(leaf)) present.push({ ...file, path });
     else if (/^(shp|dbf|prj|cpg)$/.test(ext)) {
       const stem = path.slice(0, -(ext.length + 1)).toLowerCase();
@@ -368,6 +389,27 @@ export async function inspectGisFiles(files, label, onProgress) {
   const codes = [];
   for (const file of gpkg) (file._codeList || []).forEach(c => codes.push(c));
 
+  const books = [];
+  if (workbooks.length) {
+    if (onProgress) onProgress('Đang đọc Excel siêu dữ liệu');
+    const { readMetaWorkbook, looksLikeMeta } = await import('./gisXlsx.js');
+    for (const file of workbooks) {
+      const leaf = file.path.split('/').pop();
+      const meta = looksLikeMeta(file.path);
+      if (file.size > 8 * 1024 * 1024) {
+        if (meta) books.push({ name: leaf, relevant: true, error: `${leaf}: file Excel lớn hơn 8 MB, chưa kiểm tra sheet.` });
+        continue;
+      }
+      try {
+        const buf = await readBytes(file, 0, file.size);
+        const book = await readMetaWorkbook(buf, file.path);
+        if (book.relevant) books.push(book);
+      } catch (e) {
+        if (meta) books.push({ name: leaf, relevant: true, error: `${leaf}: không đọc được Excel (${e.message}).` });
+      }
+    }
+  }
+
   if (onProgress) onProgress('Đang chấm');
-  return assessGis({ label, packages, layers, presentation, errors, warnings, codes });
+  return assessGis({ label, packages, layers, presentation, errors, warnings, codes, workbooks: books });
 }

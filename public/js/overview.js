@@ -468,16 +468,16 @@ const SECTIONS = [
         id: 'gis16', btn: 'guide', status: 'trial',
         title: 'Kiểm tra hồ sơ GIS theo Phụ lục II Thông tư 16/2025',
         note: 'Hỗ trợ kiểm tra thư mục hồ sơ trên máy tính.',
-        lead: 'Chọn thư mục HoSoGIS để đối chiếu bốn gói dữ liệu, tên lớp, kiểu hình và sáu trường thuộc tính bắt buộc.',
+        lead: 'Chọn thư mục HoSoGIS để đối chiếu bốn gói dữ liệu, tên lớp, kiểu hình, sáu trường bắt buộc, mã phanLoai và hệ tọa độ.',
         steps: [
           'Thanh công cụ trái, bấm nút cam <b>Thẩm định đồ án quy hoạch</b>, chọn <b>Hồ sơ GIS</b>.',
-          'Bấm <b>CHỌN THƯ MỤC HOSOGIS</b> (Chrome hoặc Edge). Hộp thoại có thể ghi tải lên — file vẫn chỉ đọc trên máy. Nếu trình duyệt không chọn được thư mục, dùng <b>Hoặc chọn file .zip</b>.',
-          'Bấm <b>KIỂM TRA THÀNH PHẦN</b>. Bảng ở nửa dưới màn hình ghi Không đạt, Cảnh báo hoặc Đạt.'
+          'Bấm <b>Chọn thư mục hồ sơ GIS</b> (Chrome hoặc Edge). Hộp thoại có thể ghi tải lên — file vẫn chỉ đọc trên máy. Nếu trình duyệt không chọn được thư mục, dùng <b>Hoặc chọn file .zip</b>.',
+          'Bấm <b>Kiểm tra thành phần hồ sơ</b>. Bảng ở nửa dưới màn hình ghi Không đạt, Cảnh báo hoặc Đạt.'
         ],
         facts: [
-          'Đọc trên máy, không gửi file đi. File Geodatabase (.gdb) chưa mở được bên trong.',
-          'Shapefile chỉ đọc đầu file .shp, file .dbf và .prj. Phần tọa độ bỏ qua.',
-          'Thiếu chuyên đề trong Phần 3 là cảnh báo, vì danh mục đó là tham khảo.'
+          'Đọc trên máy, không gửi file đi. File Geodatabase chưa mở được bên trong.',
+          'phanLoai của lớp ChucNangSuDungDat_A đối chiếu Phụ lục I Thông tư 16/2025, không dùng mã địa chính.',
+          'Các lớp phải cùng VN-2000, kinh tuyến trục 107°, múi 3°. Có Excel thì kiểm tra sheet HoSo, BanVe, VanBan.'
         ],
         actions: [{ label: 'Mở công cụ thẩm định', icon: 'table', run: reviewOn }]
       },

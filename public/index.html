@@ -228,7 +228,7 @@
             <div id="reviewDrafts"></div>
             </div>
             <div id="reviewGisPane" hidden>
-              <p class="review-note">Đối chiếu Phụ lục II Thông tư 16/2025: bốn gói NenDiaHinh, HienTrang, QuyHoach, MocGioi, tên lớp, kiểu hình và sáu trường bắt buộc. File đọc trên máy, không gửi đi.</p>
+              <p class="review-note">Đối chiếu Phụ lục II Thông tư 16/2025/TT-BXD: bốn gói dữ liệu, tên lớp, kiểu hình, sáu trường bắt buộc, mã phanLoai theo Phụ lục I, và một hệ VN-2000. File chỉ đọc trên máy.</p>
               <button type="button" class="btn-submit" id="btnGisFolder">Chọn thư mục hồ sơ GIS</button>
               <label class="cad-drop review-file gis-zip" for="gisZip">
                 <span class="cad-drop-main"><b>Hoặc chọn file .zip</b></span>
@@ -241,9 +241,10 @@
               <div class="cad-hint review-hint">
                 <div class="cad-hint-title">Máy kiểm những gì</div>
                 <ol>
-                  <li>Shapefile: 100 byte đầu file .shp, cả file .dbf và .prj. Phần tọa độ bỏ qua.</li>
-                  <li>GeoPackage: tên bảng và cột. File Geodatabase (.gdb): mới xác nhận có thư mục.</li>
-                  <li>Thiếu một chuyên đề trong Phần 3 chỉ là cảnh báo, vì danh mục đó là tham khảo.</li>
+                  <li>Shapefile: đầu file .shp, toàn bộ .dbf và .prj. Không đọc tọa độ.</li>
+                  <li>GeoPackage: tên bảng và cột. File Geodatabase: chỉ ghi nhận thư mục.</li>
+                  <li>Nếu có Excel siêu dữ liệu: kiểm tra sheet HoSo, BanVe, VanBan.</li>
+                  <li>Thiếu chuyên đề ở Phần 3 chỉ là cảnh báo.</li>
                 </ol>
               </div>
             </div>

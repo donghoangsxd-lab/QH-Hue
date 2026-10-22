@@ -85,6 +85,35 @@ const FIELD_SPEC = [
 ];
 
 const GEOM_LABEL = { A: 'vùng', P: 'điểm', L: 'đường' };
+
+// Phụ lục I Thông tư 16/2025/TT-BXD: tên phân lớp CAD, không phải mã địa chính TT 16/2021/TT-BTNMT.
+// Cùng loại hồ sơ có vài tỷ lệ: lấy hợp các bảng của loại đó vì maHoSoQH không ghi tỷ lệ.
+const QHC_10K = ['DAT_DD_Donvio', 'DAT_DD_Honhop', 'DAT_DD_DVCCdothi', 'DAT_DD_Coquandothi', 'DAT_DD_CayxanhCCdothi', 'DAT_DD_Giaothongdothi', 'DAT_DD_HTkhacdothi', 'DAT_NDD_Congnghiep', 'DAT_NDD_Daotao', 'DAT_NDD_Coquan', 'DAT_NDD_Dulich', 'DAT_NDD_Yte', 'DAT_NDD_Vanhoathethao', 'DAT_NDD_CayxanhSDHC', 'DAT_NDD_CayxanhCD', 'DAT_NDD_Ditich', 'DAT_NDD_DancuNT', 'DAT_NDD_Anninh', 'DAT_NDD_Quocphong', 'DAT_NNK_Nongnghiep', 'DAT_NNK_Rungdacdung', 'DAT_NNK_Rungphongho', 'DAT_NNK_Rungsanxuat', 'DAT_NNK_Thuysan', 'DAT_NNK_Chuasudung', 'DAT_NNK_Honuoc', 'DAT_NNK_Songsuoi', 'DAT_NNK_Matnuocbien'];
+const QHC_5K = ['DAT_DD_Nhomnhao', 'DAT_DD_Honhop_Nhomo', 'DAT_DD_TruongTHPT', 'DAT_DD_Truonghoc', 'DAT_DD_DVCCdothi', 'DAT_DD_Coquandothi', 'DAT_DD_CayxanhCCdothi', 'DAT_DD_Giaothongdothi', 'DAT_DD_HTkhacdothi', 'DAT_NDD_Congnghiep', 'DAT_NDD_Daotao', 'DAT_NDD_Coquan', 'DAT_NDD_Dulich', 'DAT_NDD_Yte', 'DAT_NDD_Vanhoathethao', 'DAT_NDD_CayxanhSDHC', 'DAT_NDD_CayxanhCD', 'DAT_NDD_Ditich', 'DAT_NDD_Anninh', 'DAT_NDD_Quocphong', 'DAT_NNK_Nongnghiep', 'DAT_NNK_Rungdacdung', 'DAT_NNK_Rungphongho', 'DAT_NNK_Rungsanxuat', 'DAT_NNK_Thuysan', 'DAT_NNK_Chuasudung', 'DAT_NNK_Honuoc', 'DAT_NNK_Songsuoi', 'DAT_NNK_Matnuocbien'];
+const QHC_KXD = ['DAT_KXD_Dancudothi', 'DAT_KXD_Dancunongthon', 'DAT_KXD_Honhop', 'DAT_KXD_Dichvucongcong', 'DAT_KXD_CayxanhCC', 'DAT_KXD_CayxanhSDHC', 'DAT_KXD_CayxanhCD', 'DAT_KXD_Congnghiep', 'DAT_KXD_Daotao', 'DAT_KXD_Coquantruso', 'DAT_KXD_Yte', 'DAT_KXD_Vanhoathethao', 'DAT_KXD_Dulich', 'DAT_KXD_Ditich', 'DAT_KXD_Anninh', 'DAT_KXD_Quocphong', 'DAT_KXD_Giaothong', 'DAT_KXD_HTKTkhac', 'DAT_NNK_Nongnghiep', 'DAT_NNK_Rungdacdung', 'DAT_NNK_Rungphongho', 'DAT_NNK_Rungsanxuat', 'DAT_NNK_Thuysan', 'DAT_NNK_Chuasudung', 'DAT_NNK_Honuoc', 'DAT_NNK_Songsuoi', 'DAT_NNK_Matnuocbien'];
+const QHPK_CODES = ['DAT_O_Nhomnhao', 'DAT_O_Honhop_Nhomo', 'DAT_O_Langxom', 'DAT_HTXH_Yte', 'DAT_HTXH_Vanhoa', 'DAT_HTXH_TruongTHPT', 'DAT_HTXH_Truonghoc', 'DAT_HTXH_CayxanhCC', 'DAT_Cayxanhhanche', 'DAT_Cayxanhchuyendung', 'DAT_SX_Congnghiep', 'DAT_SX_Vatlieu', 'DAT_DaotaoNC', 'DAT_Coquan', 'DAT_Dichvu', 'DAT_Dulich', 'DAT_Ditich_tongiao', 'DAT_Anninh', 'DAT_Quocphong', 'DAT_HTKT_DuongGT', 'DAT_HTKT_Baidoxe', 'DAT_HTKT_Nghiatrang', 'DAT_NN_Nongnghiep', 'DAT_NN_Rungdacdung', 'DAT_NN_Rungphongho', 'DAT_NN_Rungsanxuat', 'DAT_NN_Thuysan', 'DAT_KHAC_Chuasudung', 'DAT_KHAC_Honuoc', 'DAT_KHAC_Songsuoi', 'DAT_KHAC_Matnuocbien'];
+const QHCT_CODES = ['DAT_NO_Nhaolienke', 'DAT_NO_Nhaobietthu', 'DAT_NO_Nhaochungcu', 'DAT_NO_NhaochungcuHH', 'DAT_NO_Nhaonongthon', 'DAT_CTHTXH_Vanhoa', 'DAT_CTHTXH_Yte', 'DAT_CTHTXH_TruongTHPT', 'DAT_CTHTXH_Truonghoc', 'DAT_CTHTXH_Theducthethao', 'DAT_CTHTXH_CayxanhCC', 'DAT_CTHTXD_ThuongmaiDV', 'DAT_CTSX_Congnghiep', 'DAT_CT_Daotaonghiencuu', 'DAT_CT_Coquan', 'DAT_CT_Dichvu', 'DAT_CT_Dulich', 'DAT_CT_Ditichtongiao', 'DAT_CT_Cayxanhhanche', 'DAT_CT_Cayxanhchuyendung', 'DAT_CTHTKT_DuongGT', 'DAT_CTHTKT_Baidoxe', 'DAT_CTHTKT_Nghiatrang', 'DAT_CTHTKT_Hatangkhac', 'DAT_CT_Anninh', 'DAT_CT_Quocphong', 'DAT_NLK_Nongnghiep', 'DAT_NLK_Rungdacdung', 'DAT_NLK_Rungphongho', 'DAT_NLK_Rungsanxuat', 'DAT_NLK_Thuysan', 'DAT_NLK_Chuasudung', 'DAT_NLK_Honuoc', 'DAT_NLK_Songsuoi', 'DAT_NLK_Matnuocbien'];
+const LAND_USE = {
+  QHC: new Set([...QHC_10K, ...QHC_5K, ...QHC_KXD]),
+  QPK: new Set(QHPK_CODES),
+  QCT: new Set(QHCT_CODES)
+};
+const KIND_LABEL = { QHC: 'QHC', QPK: 'QHPK', QCT: 'QHCT' };
+
+// Phụ lục II Phần 1 mục 5b. Văn bản ghi sheet HoSo 19 cột nhưng liệt kê 20 mục.
+export const META_COLUMNS = {
+  HoSo: ['Mã hồ sơ', 'Mã thông tin quy hoạch', 'Tên đồ án', 'Loại quy hoạch', 'Tỷ lệ', 'Số quyết định phê duyệt nhiệm vụ quy hoạch', 'Ngày quyết định phê duyệt nhiệm vụ quy hoạch', 'Số quyết định phê duyệt quy hoạch', 'Ngày ra quyết định phê duyệt quy hoạch', 'Đơn vị tư vấn lập quy hoạch', 'Đơn vị ra quyết định phê duyệt quy hoạch', 'Tình trạng', 'Hệ tọa độ', 'Địa điểm', 'Chủ đầu tư', 'Thư mục', 'Có HoSoBASIC', 'Có HoSoGIS', 'Từ khóa', 'Ghi chú'],
+  BanVe: ['Mã hồ sơ', 'Số hiệu bản vẽ', 'Tên rút gọn', 'Tên bản Vẽ', 'Số tờ', 'Tên thư mục', 'Tỷ lệ', 'Ghi chú'],
+  VanBan: ['Mã hồ sơ', 'Mã văn bản/Tên file', 'Tên văn bản', 'Loại văn bản', 'Số hiệu văn bản', 'Trích yếu', 'Ngày ký', 'Đơn vị ban hành', 'Số trang', 'Ghi chú']
+};
+
+const CRS_NAME = {
+  HUE_3: 'VN-2000, kinh tuyến trục 107°, múi 3°',
+  HUE_107_45: 'VN-2000, kinh tuyến trục 107°45′',
+  UTM48_6: 'VN-2000 UTM, múi 6°, kinh tuyến 105°',
+  WGS84: 'WGS84',
+  OTHER: 'hệ khác'
+};
 // Ví dụ Thông tư dùng 0 cho lần lập đầu; lời văn ghi 1. Cả hai đều được, có ghi chú một lần.
 const MA_HO_SO = /^(\d{2})(QHC|QPK|QCT)(\d)(\d{2})(\d{4})$/;
 
@@ -208,7 +237,6 @@ function checkLayer(layer) {
       text: layer.source === 'shp' ? 'Thiếu file .shp hoặc không đọc được kiểu hình' : 'Chưa đọc được kiểu hình trong GeoPackage, mới đối chiếu hậu tố tên lớp'
     });
   }
-  if (layer.prjNote) issues.push({ level: 'warn', pkg: layer.pkg, group: layer.group, layer: name, text: layer.prjNote });
   if (layer.partial) issues.push({ level: 'warn', pkg: layer.pkg, group: layer.group, layer: name, text: 'File .dbf lớn, mới đọc phần đầu' });
   if (hit) {
     if (compact(name) !== hit.name) {
@@ -256,9 +284,150 @@ function missingGroups(pkg, layers) {
   return out;
 }
 
+export function planKindOf(code) {
+  const m = String(code || '').trim().match(/^\d{2}(QHC|QPK|QCT)/);
+  return m ? m[1] : '';
+}
+
+export function landUseDomain(kinds) {
+  const known = [...kinds].filter(k => LAND_USE[k]);
+  const use = known.length ? known : Object.keys(LAND_USE);
+  const set = new Set();
+  use.forEach(k => LAND_USE[k].forEach(code => set.add(code)));
+  return {
+    set,
+    label: known.length ? known.map(k => KIND_LABEL[k]).join(', ') : 'Phụ lục I',
+    guessed: !known.length
+  };
+}
+
+function isLandLayer(layer) {
+  return keyOf(layer.name) === 'chucnangsudungdat_a' && (layer.pkg === 'HienTrang' || layer.pkg === 'QuyHoach');
+}
+
+export function phanLoaiIssues(layer, domain) {
+  if (!isLandLayer(layer)) return [];
+  const where = { pkg: layer.pkg, group: layer.group || '', layer: layer.name };
+  const list = Array.isArray(layer.phanLoai) ? layer.phanLoai : [];
+  if (!list.length) {
+    if (layer.source === 'gpkg') {
+      return [{ ...where, level: 'warn', text: 'Chưa đọc được giá trị phanLoai trong GeoPackage.' }];
+    }
+    return [];
+  }
+  const ht = layer.pkg === 'HienTrang';
+  const bad = [];
+  const prefix = [];
+  list.forEach(raw => {
+    const val = String(raw || '').trim();
+    if (!val) return;
+    const marked = val.startsWith('HT_');
+    const bare = marked ? val.slice(3) : val;
+    const known = domain.set.has(bare);
+    if (ht) {
+      if (marked && known) return;
+      if (!marked && known) { prefix.push(val); return; }
+    } else if (!marked && known) return;
+    else if (marked && known) { prefix.push(val); return; }
+    bad.push(val);
+  });
+  const out = [];
+  if (bad.length) {
+    out.push({
+      ...where, level: 'fail',
+      text: `phanLoai không thuộc Phụ lục I (${domain.label}): ${bad.slice(0, 4).join(', ')}. Không dùng mã địa chính.`
+    });
+  }
+  if (prefix.length) {
+    out.push({
+      ...where, level: 'warn',
+      text: ht
+        ? `phanLoai thiếu tiền tố HT_ của lớp hiện trạng: ${prefix.slice(0, 4).join(', ')}.`
+        : `phanLoai của lớp quy hoạch không dùng tiền tố HT_: ${prefix.slice(0, 4).join(', ')}.`
+    });
+  }
+  return out;
+}
+
+export function crsIssues(layers) {
+  const rows = (layers || []).filter(l => l && l.source !== 'qgz');
+  if (!rows.length) return [];
+  const known = [];
+  const missing = [];
+  rows.forEach(layer => {
+    const id = layer.crs || '';
+    if (!id) missing.push(layer.name || 'lớp');
+    else known.push({ name: layer.name || 'lớp', pkg: layer.pkg || '', crs: id });
+  });
+  const out = [];
+  const uniq = [...new Set(known.map(row => row.crs))];
+  if (uniq.length > 1) {
+    const bits = uniq.map(id => {
+      const names = known.filter(row => row.crs === id).slice(0, 3).map(row => row.pkg ? `${row.pkg}/${row.name}` : row.name).join(', ');
+      return `${CRS_NAME[id] || id} (${names})`;
+    });
+    out.push({ level: 'warn', pkg: '', group: '', layer: '', text: `Các lớp không cùng một hệ tọa độ: ${bits.join('; ')}.` });
+  }
+  uniq.filter(id => id !== 'HUE_3').forEach(id => {
+    out.push({
+      level: 'warn', pkg: '', group: '', layer: '',
+      text: uniq.length === 1
+        ? `Các lớp cùng hệ ${CRS_NAME[id] || id}. Hồ sơ tại Huế cần VN-2000, kinh tuyến trục 107°, múi 3°.`
+        : `Có lớp dùng ${CRS_NAME[id] || id}. Hệ chung phải là VN-2000, kinh tuyến trục 107°, múi 3°.`
+    });
+  });
+  if (missing.length && known.length) {
+    out.push({ level: 'warn', pkg: '', group: '', layer: '', text: `Thiếu hệ tọa độ ở ${missing.length} lớp, ví dụ ${missing.slice(0, 4).join(', ')}.` });
+  } else if (missing.length && !known.length) {
+    out.push({ level: 'warn', pkg: '', group: '', layer: '', text: 'Chưa đọc được hệ tọa độ VN-2000 của các lớp.' });
+  }
+  return out;
+}
+
+function normHead(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().normalize('NFC');
+}
+
+export function metaSheetIssues(book, gisCodes) {
+  const base = { pkg: '', group: 'Siêu dữ liệu', layer: book.name || '' };
+  if (!book || !book.relevant) return [];
+  if (book.error) return [{ ...base, level: 'fail', text: book.error }];
+  const out = [];
+  const sheetCodes = new Set();
+  for (const [sheet, cols] of Object.entries(META_COLUMNS)) {
+    const got = book.sheets && book.sheets[sheet];
+    if (!got) {
+      out.push({ ...base, level: 'fail', text: `Thiếu sheet ${sheet}.` });
+      continue;
+    }
+    const headers = (got.headers || []).map(normHead).filter(Boolean);
+    const missing = cols.filter(col => !headers.includes(normHead(col)));
+    if (missing.length) out.push({ ...base, level: 'fail', text: `Sheet ${sheet} thiếu cột: ${missing.join('; ')}.` });
+    const orderOk = !missing.length && cols.every((col, i) => normHead(headers[i] || '') === normHead(col));
+    if (!missing.length && !orderOk) {
+      out.push({ ...base, level: 'warn', text: `Sheet ${sheet} đủ cột nhưng chưa đúng thứ tự Phụ lục II.` });
+    }
+    const bad = (got.maHoSo || []).map(v => String(v || '').trim()).filter(v => v && !MA_HO_SO.test(v));
+    (got.maHoSo || []).forEach(v => { if (MA_HO_SO.test(String(v || '').trim())) sheetCodes.add(String(v).trim()); });
+    if (bad.length) {
+      out.push({ ...base, level: 'fail', text: `Sheet ${sheet}, mã hồ sơ chưa đúng mẫu, ví dụ ${bad.slice(0, 3).join(', ')}.` });
+    }
+  }
+  const gis = new Set(gisCodes || []);
+  if (gis.size && sheetCodes.size && ![...sheetCodes].some(code => gis.has(code))) {
+    out.push({ ...base, level: 'warn', text: 'Mã hồ sơ trong Excel không trùng mã đọc được trên các lớp.' });
+  }
+  return out;
+}
+
+function applyLevel(layer, issue) {
+  if (issue.level === 'fail') layer.level = 'fail';
+  else if (issue.level === 'warn' && layer.level !== 'fail') layer.level = 'warn';
+}
+
 /**
- * inventory: { label, packages: {id: {found, form, unreadable}}, layers: [], presentation: [], errors: [] }
- * layer: { pkg, group, name, geom, multi, source, fields, values }
+ * inventory: { label, packages, layers, presentation, errors, workbooks }
+ * layer: { pkg, group, name, geom, source, fields, values, crs, phanLoai }
  */
 export function assessGis(inventory) {
   const issues = [];
@@ -283,9 +452,32 @@ export function assessGis(inventory) {
   const layers = [];
   for (const layer of inventory.layers || []) {
     const judged = checkLayer(layer);
-    layers.push({ ...layer, level: judged.level });
+    const row = { ...layer, level: judged.level };
+    layers.push(row);
     judged.issues.forEach(i => issues.push(i));
   }
+
+  const codeBag = new Set(inventory.codes || []);
+  (inventory.layers || []).forEach(layer => (layer.codes || []).forEach(code => codeBag.add(code)));
+  const kinds = new Set();
+  codeBag.forEach(code => { const k = planKindOf(code); if (k) kinds.add(k); });
+  const domain = landUseDomain(kinds);
+  const landLayers = layers.filter(isLandLayer);
+  if (landLayers.length && domain.guessed) {
+    issues.push({ level: 'warn', pkg: '', group: '', layer: '', text: 'Chưa đọc được loại quy hoạch trong maHoSoQH. phanLoai được đối chiếu với toàn bộ Phụ lục I.' });
+  } else if (kinds.size > 1 && landLayers.length) {
+    issues.push({ level: 'warn', pkg: '', group: '', layer: '', text: `Hồ sơ có nhiều loại quy hoạch (${[...kinds].map(k => KIND_LABEL[k]).join(', ')}). phanLoai được đối chiếu theo các loại đã gặp.` });
+  }
+  landLayers.forEach(layer => {
+    phanLoaiIssues(layer, domain).forEach(issue => {
+      applyLevel(layer, issue);
+      issues.push(issue);
+    });
+  });
+  crsIssues(layers).forEach(issue => issues.push(issue));
+  (inventory.workbooks || []).forEach(book => {
+    metaSheetIssues(book, [...codeBag]).forEach(issue => issues.push(issue));
+  });
 
   const dataLayers = (inventory.layers || []).filter(l => l.source !== 'qgz');
   for (const id of ['HienTrang', 'QuyHoach', 'MocGioi']) {
