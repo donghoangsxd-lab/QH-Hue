@@ -2,6 +2,12 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
+  <script>
+    try {
+      if (localStorage.getItem('qhhue_boot_seen') === '1') document.documentElement.classList.add('boot-seen');
+      else document.documentElement.classList.add('show-boot-notice');
+    } catch (e) { document.documentElement.classList.add('show-boot-notice'); }
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0f172a">
   <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +31,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20261022">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -132,6 +138,7 @@
       <button type="button" class="map-title-mark" id="btnFlipView" title="Lật sang bản đồ hiện trạng" aria-label="Lật sang bản đồ hiện trạng"><svg class="ico"><use href="#i-pageflip"/></svg></button>
       <div class="map-title-body">
         <h1 class="map-title-text" id="mapTitleText">BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ</h1>
+        <p class="map-title-notice" id="mapTitleNotice">Bản đồ tải lần đầu mất 30–60 giây. Vui lòng chờ!</p>
       </div>
       <button type="button" class="map-title-level" id="btnMapLevel" aria-haspopup="listbox" aria-expanded="false" aria-controls="mapLevelMenu">
         <svg class="ico"><use href="#i-layers"/></svg><span class="map-title-level-text">HỆ THỐNG ĐÔ THỊ</span><svg class="ico map-title-level-chev"><use href="#i-chev-down"/></svg>
@@ -1409,6 +1416,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/app.js?v=20261022"></script>
 </body>
 </html>

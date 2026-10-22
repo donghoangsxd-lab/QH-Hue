@@ -23,6 +23,7 @@ import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { analyzeParcelZones, parcelZonesHtml, analyzeParcelPlan, parcelPlanHtml, planPlace } from './planLandStats.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { isLevelPair, sideOf, mapsForLevel, onSplitPair } from './splitPair.js';
+import { withAssetVersion } from './gbaVersion.js';
 import {
   QHC2045, QHC_CENTER_INFO_EVENT, CENTER_UNITS, ZONE_NAMES, STAGE_LAYERS, landOf, bareWard, isCoreWard,
   visionColor, visionLineStyle, WATER_KINDS, GREEN_COLOR
@@ -109,7 +110,7 @@ const tvFeatures = () => (data.frame ? data.frame.features.filter(f => f.propert
 function load(kind) {
   if (data[kind]) return Promise.resolve(data[kind]);
   if (!loading[kind]) {
-    loading[kind] = fetch(QHC2045.urls[kind])
+    loading[kind] = fetch(withAssetVersion(QHC2045.urls[kind]))
       .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
       .then(fc => { data[kind] = fc; return fc; })
       .finally(() => { delete loading[kind]; });

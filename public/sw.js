@@ -1,5 +1,6 @@
-// Bộ nhớ trình duyệt cho file tĩnh và ô PMTiles (Range). Không tải trước, không giữ ảnh Google.
-// Tên cache khớp GBA_V trong gbaVersion.js: đổi phiên bản thì bỏ cache cũ.
+// Bộ nhớ trình duyệt cho file nặng đã có ?v= và ô PMTiles (Range). Không tải trước, không giữ ảnh Google.
+// Không giữ HTML, JS, CSS: những file đó luôn lấy từ mạng (Cache-Control: no-store).
+// Tên cache khớp GBA_V trong gbaVersion.js: đổi phiên bản file nặng thì bỏ cache cũ.
 const CACHE = 'qh-hue-20261021';
 const GCS = 'https://storage.googleapis.com/hue-infra-data-us/';
 
@@ -12,8 +13,24 @@ function gbaAsset(url) {
     || url.includes('/data/gba/bldg-hf.bin') || url.includes('/data/gba/bldg-hf.json');
 }
 
+function shell(url) {
+  try {
+    const u = new URL(url);
+    if (u.origin !== self.location.origin) return false;
+    return u.pathname === '/' || /\.(html|js|mjs|css)$/.test(u.pathname);
+  } catch (e) { return false; }
+}
+
+function localData(url) {
+  try {
+    const u = new URL(url);
+    return u.origin === self.location.origin && u.pathname.startsWith('/data/');
+  } catch (e) { return false; }
+}
+
 function cacheable(url) {
-  if (versioned(url) && gbaAsset(url)) return true;
+  if (shell(url)) return false;
+  if (versioned(url) && (gbaAsset(url) || localData(url))) return true;
   // GBA không có ?v= vẫn bị ghi đè cùng đường dẫn: không giữ.
   if (url.startsWith(GCS)) return !url.includes('/gba/');
   if (!url.startsWith(self.location.origin)) return false;
@@ -46,6 +63,8 @@ function partial(buf, contentRange, contentType) {
     }
   });
 }
+
+self.addEventListener('install', () => { self.skipWaiting(); });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim()));

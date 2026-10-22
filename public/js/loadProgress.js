@@ -1,5 +1,5 @@
-// Phần trăm tải của từng lớp nặng, gắn cuối dòng tên trong panel (không gom một nhãn chung).
-// Bậc màu: 0 đỏ, 20, 40, 60, 80, 100 xanh. Xong thì giữ một lát rồi mờ.
+// Phần trăm từng lớp nặng gắn cuối dòng tên trong panel (bậc 0 đỏ → 100 xanh).
+// Thanh tiêu đề là một mức chung, vàng, không phụ thuộc nền bản đồ. Câu chờ chỉ hiện lần tải đầu.
 
 const STEP_COLOR = ['#dc2626', '#ea580c', '#f59e0b', '#eab308', '#84cc16', '#16a34a'];
 const HIDE_MS = 700;
@@ -29,6 +29,92 @@ const badges = new Map();
 export function progressColor(pct) {
   const n = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
   return STEP_COLOR[Math.min(STEP_COLOR.length - 1, Math.floor(n / 20))];
+}
+
+const SEEN_KEY = 'qhhue_boot_seen';
+const NOTICE_IDLE_MS = 1200;
+let bootPct = null;
+let bootDone = false;
+let dismiss = null;
+let noticeTimer = 0;
+
+function alreadySeen() {
+  if (dismiss != null) return dismiss;
+  try {
+    dismiss = localStorage.getItem(SEEN_KEY) === '1'
+      || document.documentElement.classList.contains('boot-seen');
+  } catch (e) { dismiss = false; }
+  return dismiss;
+}
+
+/** bootPct < 100 là một phần 100; mỗi việc cộng thêm số phần đang chờ. null khi không còn gì để tải. */
+export function combinedProgress(bootValue, parts) {
+  let weight = 0;
+  let score = 0;
+  if (bootValue != null && bootValue < 100) {
+    const n = Math.max(0, Math.min(100, Number(bootValue) || 0));
+    weight += 100;
+    score += n;
+  }
+  for (const job of parts || []) {
+    const pending = Number(job && job.pending) || 0;
+    if (pending <= 0) continue;
+    const settled = Math.min(pending, (Number(job.done) || 0) + (Number(job.failed) || 0));
+    weight += pending;
+    score += settled;
+  }
+  if (!weight) return null;
+  return Math.max(0, Math.min(100, Math.round((100 * score) / weight)));
+}
+
+function jobsBusy() {
+  for (const job of jobs.values()) {
+    const pending = job.pending || 0;
+    if (pending > 0 && (job.done || 0) + (job.failed || 0) < pending) return true;
+  }
+  return false;
+}
+
+function syncNotice() {
+  const el = document.getElementById('mapTitleNotice');
+  const root = document.documentElement;
+  if (!el) return;
+  if (alreadySeen()) {
+    el.hidden = true;
+    root.classList.remove('show-boot-notice');
+    return;
+  }
+  const busy = !bootDone || jobsBusy();
+  if (busy) {
+    clearTimeout(noticeTimer);
+    noticeTimer = 0;
+    el.hidden = false;
+    root.classList.add('show-boot-notice');
+    return;
+  }
+  if (noticeTimer) return;
+  noticeTimer = setTimeout(() => {
+    noticeTimer = 0;
+    if (!bootDone || jobsBusy()) return;
+    dismiss = true;
+    try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* chế độ riêng tư */ }
+    el.hidden = true;
+    root.classList.remove('show-boot-notice');
+    root.classList.add('boot-seen');
+  }, NOTICE_IDLE_MS);
+}
+
+/** Mốc nạp ban đầu (lớp phủ, công trình, độ phủ). 100 thì nhường thanh cho các lớp còn lại. */
+export function setBootProgress(pct) {
+  const n = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+  if (n >= 100) {
+    bootPct = null;
+    bootDone = true;
+  } else {
+    bootPct = n;
+    bootDone = false;
+  }
+  paint();
 }
 
 function rowOf(name) {
@@ -86,8 +172,21 @@ function armHide(name, job) {
 function paint() {
   const bar = document.getElementById('titleProgress');
   if (bar) {
-    bar.classList.add('done');
-    bar.setAttribute('aria-hidden', 'true');
+    const parts = [];
+    jobs.forEach((job) => parts.push(job));
+    const pct = combinedProgress(bootPct, parts);
+    const fill = bar.querySelector('i');
+    if (pct == null) {
+      bar.classList.add('done');
+      bar.setAttribute('aria-hidden', 'true');
+      bar.setAttribute('aria-valuenow', '0');
+    } else {
+      bar.classList.remove('done');
+      bar.removeAttribute('aria-hidden');
+      bar.setAttribute('aria-valuenow', String(pct));
+      if (fill) fill.style.width = `${pct}%`;
+    }
+    syncNotice();
   }
   jobs.forEach((job, name) => {
     if (!job.pending) return;

@@ -65,6 +65,8 @@
   --info-bottom: 12px;
   --info-left: calc(12px + var(--tb-btn) + 10px); /* sát phải thanh công cụ */
 }
+/* Lần tải đầu: một dòng vàng dưới tiêu đề. Mọi vị trí bám --title-h dịch xuống theo. */
+html.show-boot-notice { --title-h: calc(66px * var(--k)); }
 @media (max-width: 1100px) { :root { --ov-w: var(--tb-btn); } }
 /* s < 1700 (laptop 14–17"): giữ nguyên. m < 2300 (21–24"), l ≥ 2300 (27–32").
    Panel dưới cao đúng N dòng bảng (tiêu đề + 2 dòng đầu bảng + N dòng + dòng tổng), không cắt nửa dòng */
@@ -229,23 +231,39 @@ body.split-offset .swipe-handle { display: none; }
   background: linear-gradient(90deg, transparent, rgb(var(--tone)) 25%, rgb(var(--tone)) 75%, transparent);
 }
 .map-title[data-view="HT"] { --tone: var(--cyan-rgb); }
-/* Thanh dưới tiêu đề không còn hiện phần trăm chung. Phần trăm nằm cuối từng dòng lớp (.layer-load-pct). */
+/* Một thanh tiến độ chung dưới tiêu đề, vàng cho mọi nền và mọi chế độ. Phần trăm từng lớp vẫn ở .layer-load-pct. */
+.map-title-notice {
+  margin: 1px 0 0;
+  color: var(--accent-yellow);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+html.boot-seen .map-title-notice,
+html:not(.show-boot-notice) .map-title-notice { display: none; }
+html.show-boot-notice .map-title { padding-bottom: 5px; }
 .map-title-progress {
   position: absolute;
   left: 0; right: 0; bottom: 0;
   height: 3px;
-  background: rgba(var(--tone), 0.15);
+  background: rgba(var(--yellow-rgb), 0.28);
   pointer-events: none;
   transition: opacity 0.6s ease 0.4s;
 }
 .map-title-progress > i {
   position: relative;
   display: block;
-  width: 4%;
+  width: 0;
   height: 100%;
   overflow: hidden;
-  background: rgb(var(--tone));
-  box-shadow: 0 0 6px rgba(var(--tone), 0.8);
+  background: var(--accent-yellow);
+  box-shadow: 0 0 8px rgba(var(--yellow-rgb), 0.95);
   transition: width 0.4s ease;
 }
 .map-title-progress > i::after {

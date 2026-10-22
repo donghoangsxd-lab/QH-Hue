@@ -2,6 +2,7 @@
 // scripts/build-qhc2045.js): cấp đường, loại đường sắt, kiểu nét theo giai đoạn, popup đoạn tuyến (lộ giới tra theo ký hiệu
 // mặt cắt – roadSections.js), thống kê km và chú giải. Không phụ thuộc Leaflet: lớp bản đồ ở qhc2045Layer.js.
 import { QHC2045 } from './qhc2045.js';
+import { withAssetVersion } from './gbaVersion.js';
 import { roadSectionOf, roadSectionSvg, fmtWidth } from './roadSections.js';
 import { escapeHtml, fmtNum } from './utils.js';
 
@@ -41,7 +42,7 @@ const cache = {};
 /** FeatureCollection giao thông tỷ lệ scale ('10' | '25'), tải một lần */
 export function loadTraffic(scale) {
   if (!cache[scale]) {
-    cache[scale] = fetch(QHC2045.urls[`road${scale}`])
+    cache[scale] = fetch(withAssetVersion(QHC2045.urls[`road${scale}`]))
       .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
       .catch(err => { delete cache[scale]; throw err; });
   }
