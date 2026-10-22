@@ -4342,9 +4342,11 @@ module.exports = async (req, res) => {
       res.setHeader('Cache-Control', req.query.pv ? 'no-store' : 's-maxage=300, stale-while-revalidate=300');
       const popMax = popPeople ? 30 : 5;
       const tileImg = popRasterDisplay || popRasterNormalized;
+      // Một sắc cam (ColorBrewer Oranges): ô đông đậm hơn. Khớp .pop-legend-bar và .pa3-lg-pop.
+      const popPalette = ['#fff5eb', '#fee6ce', '#fdd0a2', '#fdae6b', '#fd8d3c', '#f16913', '#d94801', '#7f2704'];
       const mapId = await new Promise((resolve, reject) => {
         tileImg.getMap(
-          { min: 0, max: popMax, palette: ['blue', 'cyan', 'green', 'yellow', 'orange', 'red'] },
+          { min: 0, max: popMax, palette: popPalette },
           (m, err) => err ? reject(err) : resolve(m)
         );
       });
