@@ -23,6 +23,8 @@ import { adjustmentPacks } from './adjustLayer.js';
 import { initGisDossier, handleGisClick } from './gisDossierUi.js';
 import { QHC2045, QHC_CENTER_INFO_EVENT, landOf } from './qhc2045.js';
 import { withAssetVersion } from './gbaVersion.js';
+import { watchTiles } from './loadProgress.js';
+import { geeTileLayer } from './geeTiles.js';
 
 const STORE_KEY = 'qh_review_dossiers_v2';
 const CITY_NAME = 'Thành phố Huế';
@@ -397,7 +399,7 @@ function drawHeat(phase) {
   clearHeat(phase);
   if (!want) return;
   const opacityEl = $('heatOpacity');
-  h.tile = L.tileLayer(h.url, geeTileOpts({ opacity: opacityEl ? opacityEl.value / 100 : 0.3 })).addTo(m);
+  h.tile = watchTiles(geeTileLayer(h.url, geeTileOpts({ opacity: opacityEl ? opacityEl.value / 100 : 0.3 })), 'Độ phủ hạ tầng').addTo(m);
   h.tileUrl = h.url;
   h.tileMap = m;
 }

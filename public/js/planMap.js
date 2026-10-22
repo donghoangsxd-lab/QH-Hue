@@ -2,6 +2,8 @@ import { state, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_FOCUS
 import { escapeHtml, wardLabelFontSize } from './utils.js';
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap, MAP_MAX_ZOOM, geeTileOpts } from './basemap.js';
+import { watchTiles } from './loadProgress.js';
+import { geeTileLayer } from './geeTiles.js';
 
 export let planMap = null;
 let leftMap = null;
@@ -201,7 +203,7 @@ export function setPlanHeatUrl(url) {
   planHeatTile = null;
   if (!url) return;
   const opacityEl = document.getElementById('heatOpacity');
-  planHeatTile = L.tileLayer(url, geeTileOpts({ opacity: opacityEl ? opacityEl.value / 100 : 0.3 }));
+  planHeatTile = watchTiles(geeTileLayer(url, geeTileOpts({ opacity: opacityEl ? opacityEl.value / 100 : 0.3 })), 'Độ phủ hạ tầng');
   planLayers.heatmap.addLayer(planHeatTile);
 }
 

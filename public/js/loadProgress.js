@@ -51,7 +51,25 @@ function alreadySeen() {
   return dismiss;
 }
 
-/** bootPct < 100 là một phần 100; mỗi việc cộng thêm số phần đang chờ. null khi không còn gì để tải. */
+/**
+ * Một trạng thái cho thanh tiêu đề và % cuối dòng lớp: success / (success + failed + đang tải).
+ * Ô hủy (đổi zoom, bản đồ ẩn) không nằm ở mẫu số. Việc đã xong và không lỗi thì bỏ qua.
+ * null khi không còn gì để hiện — không bao giờ trả 100 nếu còn ô lỗi.
+ */
+export function jobView(job) {
+  const done = Number(job && job.done) || 0;
+  const failed = Number(job && job.failed) || 0;
+  const pending = Number(job && job.pending) || 0;
+  const dropped = Number(job && job.dropped) || 0;
+  const tileOpen = job && job.tiles ? job.tiles.size : (Number(job && job.open) || 0);
+  const open = job && job.tiles
+    ? tileOpen + Math.max(0, pending - done - failed - dropped - tileOpen)
+    : Math.max(0, pending - done - failed - dropped);
+  const weight = done + failed + open;
+  const pct = weight ? Math.round((100 * done) / weight) : null;
+  return { done, failed, open, weight, pct };
+}
+
 export function combinedProgress(bootValue, parts) {
   let weight = 0;
   let score = 0;
@@ -61,23 +79,20 @@ export function combinedProgress(bootValue, parts) {
     score += n;
   }
   for (const job of parts || []) {
-    const pending = Number(job && job.pending) || 0;
-    const settled = settledCount(job);
-    if (pending <= 0 || settled >= pending) continue;
-    weight += pending;
-    score += settled;
+    const view = jobView(job);
+    if (!view.weight || (!view.open && !view.failed)) continue;
+    weight += view.weight;
+    score += view.done;
   }
   if (!weight) return null;
-  return Math.max(0, Math.min(100, Math.round((100 * score) / weight)));
-}
-
-function settledCount(job) {
-  return (Number(job && job.done) || 0) + (Number(job && job.failed) || 0) + (Number(job && job.dropped) || 0);
+  const pct = Math.round((100 * score) / weight);
+  const anyFail = (parts || []).some((job) => jobView(job).failed > 0 && jobView(job).weight);
+  if (anyFail) return Math.max(0, Math.min(99, pct));
+  return Math.max(0, Math.min(100, pct));
 }
 
 function jobOpen(job) {
-  const pending = Number(job && job.pending) || 0;
-  return pending > settledCount(job);
+  return jobView(job).open > 0;
 }
 
 function jobsBusy() {
@@ -136,7 +151,7 @@ function ensureSweep() {
 function closeOpenWork() {
   jobs.forEach((job) => {
     if (job.tiles) job.tiles.clear();
-    const gap = (job.pending || 0) - settledCount(job);
+    const gap = jobView(job).open;
     if (gap > 0) job.dropped = (job.dropped || 0) + gap;
   });
   bootPct = null;
@@ -261,20 +276,32 @@ function armHide(name, job) {
 }
 
 function paint() {
+  for (const [name, job] of [...jobs]) {
+    const view = jobView(job);
+    if (!job.pending && !job.watchers && !view.open && !view.failed) {
+      jobs.delete(name);
+      dropBadge(name);
+    }
+  }
   const bar = document.getElementById('titleProgress');
   if (bar) {
     const parts = [];
     jobs.forEach((job) => parts.push(job));
     const pct = combinedProgress(bootPct, parts);
     const fill = bar.querySelector('i');
+    const failed = parts.reduce((sum, job) => sum + jobView(job).failed, 0);
     if (pct == null) {
       bar.classList.add('done');
+      bar.classList.remove('has-error');
       bar.setAttribute('aria-hidden', 'true');
       bar.setAttribute('aria-valuenow', '0');
+      bar.removeAttribute('aria-valuetext');
     } else {
       bar.classList.remove('done');
+      bar.classList.toggle('has-error', failed > 0);
       bar.removeAttribute('aria-hidden');
       bar.setAttribute('aria-valuenow', String(pct));
+      bar.setAttribute('aria-valuetext', failed ? `${pct}% · ${failed} lỗi` : `${pct}%`);
       if (fill) fill.style.width = `${pct}%`;
     }
     syncNotice();
@@ -283,18 +310,19 @@ function paint() {
     if (!job.pending) return;
     const row = rowOf(name);
     if (!row) return;
-    const failed = job.failed || 0;
-    const pct = Math.max(0, Math.min(100, Math.round((100 * Math.min(settledCount(job), job.pending)) / job.pending)));
+    const view = jobView(job);
+    const failed = view.failed;
+    const pct = view.pct == null ? 0 : view.pct;
     const el = badgeOf(name, row);
-    if (job.done < job.pending || failed) el.classList.remove('is-fading');
+    if (view.open || failed) el.classList.remove('is-fading');
     if (!el.classList.contains('is-fading')) {
       el.style.color = progressColor(pct);
       el.textContent = failed ? `${pct}% · ${failed} lỗi` : `${pct}%`;
       el.title = failed
-        ? `${name}: ${job.done}/${job.pending} ô thành công, ${failed} ô lỗi`
+        ? `${name}: ${view.done} ô thành công, ${failed} ô lỗi, ${view.open} ô đang tải`
         : `${name}: ${pct}%`;
     }
-    if (!jobOpen(job) && !failed) armHide(name, job);
+    if (!view.open && !failed) armHide(name, job);
     else if (job.hideTimer) {
       clearTimeout(job.hideTimer);
       job.hideTimer = 0;
@@ -312,6 +340,44 @@ function slot(name) {
     jobs.set(name, job);
   }
   return job;
+}
+
+function taskName(label) {
+  const text = String(label || '');
+  for (const name of Object.keys(ROW)) {
+    if (text.includes(name)) return name;
+  }
+  if (/độ phủ|heatmap/i.test(text)) return 'Độ phủ hạ tầng';
+  if (/dân cư/i.test(text)) return 'Phân bổ dân cư';
+  if (/địa hình|lát cắt|cao độ/i.test(text)) return 'Địa hình';
+  if (/trồng cây/i.test(text)) return 'Cây xanh';
+  return text.slice(0, 80) || 'Tác vụ';
+}
+
+/** Việc chờ máy chủ. Thanh tiêu đề và % dòng lớp đọc cùng job với watchTiles — không có hộp nổi riêng. */
+export function startTaskProgress(label) {
+  const name = taskName(label);
+  const job = slot(name);
+  job.pending += 1;
+  let state = 'open';
+  paint();
+  const finish = (kind) => {
+    if (state !== 'open') return;
+    state = kind;
+    const cur = jobs.get(name);
+    if (!cur) return;
+    if (kind === 'done') cur.done += 1;
+    else if (kind === 'fail') cur.failed += 1;
+    else cur.pending = Math.max(0, cur.pending - 1);
+    paint();
+  };
+  return {
+    creep() {},
+    set() {},
+    done() { finish('done'); },
+    fail() { finish('fail'); },
+    cancel() { finish('cancel'); }
+  };
 }
 
 /** Đếm tileloadstart / tileload. tileerror là ô hỏng, không tính vào phần trăm đã xong. */

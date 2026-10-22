@@ -7,8 +7,10 @@
 import { state, BUFFER_COLORS } from './state.js';
 import { geeApi } from './api.js';
 import { popQuery } from './popMethod.js';
-import { escapeHtml, fmtNum, ico, showToast, startTaskProgress, trackTileLoad, detailDisclosure } from './utils.js';
+import { escapeHtml, fmtNum, ico, showToast, startTaskProgress, detailDisclosure } from './utils.js';
 import { geeTileOpts } from './basemap.js';
+import { watchTiles } from './loadProgress.js';
+import { geeTileLayer } from './geeTiles.js';
 
 export const PROOF_FOCUS_EVENT = 'csd-proof-focus';
 
@@ -324,11 +326,8 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
   const group = L.layerGroup();
   ensurePanes(targetMap);
 
-  let tiles = null;
   if (data.tileUrl) {
-    const tileLayer = L.tileLayer(data.tileUrl, geeTileOpts({ opacity: 0.8, zIndex: 50 }));
-    tiles = trackTileLoad(tileLayer, (n, total) => myTask.set(DRAW_PCT + (100 - DRAW_PCT) * (n / Math.max(total, 1)), 'Đang tải ảnh dân cư'));
-    group.addLayer(tileLayer);
+    group.addLayer(watchTiles(geeTileLayer(data.tileUrl, geeTileOpts({ opacity: 0.8, zIndex: 50 })), 'Minh chứng dân cư'));
   }
 
   // Làm tối bản đồ ngoài phạm vi khu đất (cả icon) để mắt tập trung vào vùng phân tích
@@ -395,11 +394,10 @@ export async function showCsdProof(csd, suggestion, targetMap, fit) {
   countUp(panel.getContainer());
 
   active = { group, panel };
-  Promise.resolve(tiles).then(() => {
-    if (task !== myTask) return;
-    myTask.done('Đã lập bảng chi tiết');
+  if (task === myTask) {
+    myTask.done();
     task = null;
-  });
+  }
 
   targetMap.closePopup();
   const bounds = L.latLng(c.lat, c.lng).toBounds(c.radius * 2.3);
