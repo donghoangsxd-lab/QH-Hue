@@ -1456,6 +1456,17 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .gba-floor-form b { font-size: 13px; }
 .gba-floor-form input { width: 100%; box-sizing: border-box; min-height: 32px; }
 .gba-floor-form .bp-btn { min-height: 32px; }
+.leaflet-tooltip.gba-part-label {
+  pointer-events: none;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: #fff;
+  font: 650 12px/1.1 "Segoe UI", "Noto Sans", sans-serif;
+  text-shadow: 0 0 2px #1c1008, 0 1px 1px #1c1008, 1px 0 1px #1c1008, -1px 0 1px #1c1008;
+  padding: 0;
+}
+.leaflet-tooltip.gba-part-label::before { display: none; }
 .btn-dot-buffer { width: 16px; height: 16px; padding: 0; border: none; font-family: inherit; line-height: 1; border-radius: 50%; background: transparent; color: var(--buf, var(--text-strong)); box-shadow: inset 0 0 0 1.5px var(--buf, rgba(148, 163, 184, 0.55)); font-size: var(--fs-xs); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--ease); flex-shrink: 0; }
 .btn-dot-buffer:hover { background: rgba(var(--cyan-rgb), 0.2); }
 .btn-dot-buffer.active { background: var(--buf, var(--accent-cyan)); color: var(--text-strong); box-shadow: none; }

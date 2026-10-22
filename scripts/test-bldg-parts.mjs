@@ -1,14 +1,23 @@
 import fs from 'fs';
-import { confirmedPartFeatures } from '../public/js/bldgParts.js';
+import { confirmedPartFeatures, partFloorLabel } from '../public/js/bldgParts.js';
 
 const ov = JSON.parse(fs.readFileSync(new URL('../public/data/gba/bldg-overrides.geojson', import.meta.url), 'utf8'));
 const fc = confirmedPartFeatures(ov);
 const ids = fc.features.map((f) => f.properties.id);
 if (ids.filter((id) => id === 'vinpearl').length !== 2) throw new Error(`Vincom ${ids.filter((id) => id === 'vinpearl').length}`);
 const vin = fc.features.filter((f) => f.properties.id === 'vinpearl');
-if (!vin.some((f) => f.properties.role === 'podium') || !vin.some((f) => f.properties.role === 'tower')) {
-  throw new Error('Vincom thiếu đế hoặc tháp');
+const vinPodium = vin.find((f) => f.properties.role === 'podium');
+const vinTower = vin.find((f) => f.properties.role === 'tower');
+if (!vinPodium || !vinTower) throw new Error('Vincom thiếu đế hoặc tháp');
+if (vinPodium.properties.floors !== 5 || vinTower.properties.floors !== 34) {
+  throw new Error(`tầng phần ${vinPodium.properties.floors}/${vinTower.properties.floors}`);
 }
+if (partFloorLabel('podium', 5) !== 'Đế 5' || partFloorLabel('tower', 34) !== 'Tháp 34') throw new Error('nhãn đế tháp');
+const vinPublished = ov.features.find((f) => f.properties.id === 'vinpearl').properties.labelFloors;
+if (partFloorLabel('tower', vinPublished) === partFloorLabel('tower', vinTower.properties.floors)) {
+  throw new Error('nhãn tháp trùng số tầng cả khối');
+}
+if (partFloorLabel('', 34) || partFloorLabel('tower', 0)) throw new Error('nhãn rỗng');
 for (const id of ['manor-a', 'manor-b', 'indochine']) {
   if (!ids.includes(id)) throw new Error(`thiếu ${id}`);
 }
@@ -35,6 +44,15 @@ const css = fs.readFileSync(new URL('../public/css/phan-tich-3d.css', import.met
 if (!js.includes('confirmedPartFeatures') || !js.includes('applyParts') || !js.includes("role === 'podium'")) {
   throw new Error('bản đồ 2D chưa vẽ phần đã xác nhận');
 }
+if (!js.includes('partFloorLabel') || !js.includes('FLOOR_LABEL_ZOOM') || !js.includes('hidePublished')) {
+  throw new Error('bản đồ 2D chưa ghi nhãn đế tháp');
+}
+if (!view.includes("id: 'part-floors'") || !view.includes('partFloorLabel(feat.role, f)') || !view.includes('dataset.partLabels')) {
+  throw new Error('khối 3D chưa ghi nhãn đế tháp');
+}
+if (!view.includes('fontSettings: { sdf: true }')) throw new Error('nhãn 3D thiếu sdf nên viền cắt mất chữ');
+if (!view.includes('if (raw.gba.length)')) throw new Error('lỗi tile làm mất tháp đã công bố');
+if (view.includes('partFloorLabel(feat.role, props.labelFloors)')) throw new Error('tháp lấy số tầng cả khối');
 if (!html.includes('id="massing"') || !html.includes('id="massingNote"')) throw new Error('thiếu bảng nhà cao');
 if (!view.includes('paintMassing(model.massing') || !view.includes('small.textContent = row.note')) {
   throw new Error('bảng chưa ghi lý do chưa vẽ');

@@ -8,6 +8,7 @@
 import { withAssetVersion } from './gbaVersion.js';
 import { geeApi } from './api.js';
 import { floorsAt, floorsOnRing, metresForFloors, parseFloorPack } from './bldgFloorEdits.js';
+import { partFloorLabel } from './bldgParts.js';
 
 const GBA_URL = 'https://storage.googleapis.com/hue-infra-data-us/gba/buildings.pmtiles';
 const CAD_URL = 'https://storage.googleapis.com/hue-infra-data-us/cadastre/thuadat-2016.pmtiles';
@@ -834,7 +835,7 @@ function buildModel(raw, origin, r, heights, floorPack) {
   const classArea = [0, 0, 0, 0];
   const buildings = [];
   if (raw.gbaError) gaps.push('Không đọc được dấu chân công trình (Global Building Atlas).');
-  else {
+  if (raw.gba.length) {
     for (const feat of raw.gba) {
       if (feat.explicit) {
         const mid = ringCentroidLngLat(feat.rings && feat.rings[0]);
@@ -860,7 +861,13 @@ function buildModel(raw, origin, r, heights, floorPack) {
               classArea[floorBin(f)] += cut.area;
             }
           }
-          volumes.push({ rings: cut.rings, h: extrusion, z0: minH, fill: VOLUME_FILL[floorBin(f)] });
+          volumes.push({
+            rings: cut.rings,
+            h: extrusion,
+            z0: minH,
+            fill: VOLUME_FILL[floorBin(f)],
+            partLabel: partFloorLabel(feat.role, f)
+          });
         }
         continue;
       }
@@ -1454,6 +1461,31 @@ function bootMap(place, model) {
         widthMinPixels: 1
       })));
     }
+    const partTags = model.volumes.filter((v) => v.partLabel).map((v) => {
+      const c = centroid(v.rings[0]);
+      return { t: v.partLabel, position: [c[0], c[1], PLATE + (v.z0 || 0) + v.h + 3] };
+    });
+    if (partTags.length) {
+      try {
+        layers.push(new deck.TextLayer({
+          id: 'part-floors',
+          data: partTags,
+          coordinateSystem: CART,
+          modelMatrix: lift(zVolumes),
+          getPosition: (d) => d.position,
+          getText: (d) => d.t,
+          getColor: [255, 255, 255, 255],
+          getSize: 16,
+          sizeUnits: 'pixels',
+          fontFamily: 'sans-serif',
+          fontSettings: { sdf: true }, // viền chỉ vẽ được khi sdf; thiếu sdf thì chữ bị cắt
+          billboard: true,
+          outlineWidth: 4,
+          outlineColor: [28, 16, 8, 240],
+          characterSet: 'Đế Tháp0123456789'
+        }));
+      } catch (err) { /* số tầng vẫn ở bảng bên trái */ }
+    }
     layers.push(new deck.PathLayer(withMask({
       id: 'roads',
       data: model.roads,
@@ -1715,7 +1747,8 @@ async function loadOverrideFootprints() {
           height,
           minHeight,
           floors,
-          groundFloors: Number(part.groundFloors) || 0
+          groundFloors: Number(part.groundFloors) || 0,
+          role: props.draw ? (part.role === 'podium' ? 'podium' : 'tower') : ''
         });
       }
     }
@@ -1782,6 +1815,7 @@ function showBuilt() {
     document.body.dataset.g0 = `${ring.length}|${ring[0][0].toFixed(0)},${ring[0][1].toFixed(0)}|${Math.round(ringArea(ring))}`;
   }
   document.body.dataset.gfa = String(Math.round(model.gfa || 0));
+  document.body.dataset.partLabels = model.volumes.map((v) => v.partLabel).filter(Boolean).join('|');
   if (!view) view = bootMap(built.place, model);
   else view.replace(model);
 }
