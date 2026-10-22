@@ -1668,7 +1668,7 @@ function pushOverridePolys(out, geometry, spec) {
 async function loadOverrideFootprints() {
   const empty = { extras: [], masks: [], massing: [] };
   try {
-    const res = await fetch('data/gba/bldg-overrides.geojson');
+    const res = await fetch(withAssetVersion('data/gba/bldg-overrides.geojson'));
     if (!res.ok) return empty;
     const fc = await res.json();
     const extras = [];
@@ -1707,7 +1707,7 @@ async function loadOverrideFootprints() {
 
 async function loadWard(lat, lng) {
   const [boundary, imm] = await Promise.all([
-    fetch('data/ward-boundary.json').then((r) => r.json()),
+    fetch(withAssetVersion('data/ward-boundary.json')).then((r) => r.json()),
     fetch('data/imm.json').then((r) => r.json())
   ]);
   const feat = (boundary.features || []).find((f) => f.geometry && pointInGeo(lng, lat, f.geometry));

@@ -5,6 +5,7 @@ import { flyToVisible } from './mapEngine.js';
 import { planMap, isCompareOn, setViewMode } from './planMap.js';
 import { escapeHtml, showToast } from './utils.js';
 import { reviewFromPack } from './qhClass.js';
+import { withAssetVersion } from './gbaVersion.js';
 
 const $ = (id) => document.getElementById(id);
 let rows = [];
@@ -32,7 +33,7 @@ async function loadRows() {
       return data.items || [];
     }
   }
-  const pack = await fetch('data/gba/qh-hientrang.json').then(r => {
+  const pack = await fetch(withAssetVersion('data/gba/qh-hientrang.json')).then(r => {
     if (!r.ok) throw new Error('Không đọc được file phân loại');
     return r.json();
   });

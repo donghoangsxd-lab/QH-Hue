@@ -3,6 +3,7 @@ import { setLotBuildup } from './mapEngine.js';
 import { gbaFootprintsIn } from './gbaLayer.js';
 import { heightAt, loadBuildingHeights } from './bldgHeight.js';
 import { buildupHtml, floorsFromHeight } from './lotScreen.js';
+import { withAssetVersion } from './gbaVersion.js';
 
 const MAX_TILES = 48;
 
@@ -84,7 +85,7 @@ function loadOverridePack() {
   const turf = globalThis.turf;
   if (!turf) return Promise.resolve({ parts: [], zones: [] });
   if (!overridesP) {
-    const url = new URL('data/gba/bldg-overrides.geojson', document.baseURI).href;
+    const url = withAssetVersion('data/gba/bldg-overrides.geojson');
     overridesP = fetch(url).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();

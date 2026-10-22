@@ -1,5 +1,7 @@
 import { state, bumpDataVersion, BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, infraLabels, isNetworkType, ntKindOf, NT_KIND_LABELS, parkTierOf } from './state.js';
 import { geeApi, infraListUrl, markDataWritten } from './api.js';
+import { setBootProgress } from './loadProgress.js';
+import { withAssetVersion } from './gbaVersion.js';
 import {
   initMap,
   map,
@@ -351,7 +353,7 @@ async function loadInfraData() {
   // Máy chủ mới đã gắn qhApplied. Bản cũ: tự đưa lô da_co sang hiện trạng từ file phân loại.
   if (!data.qhApplied) {
     try {
-      const pack = await fetch('data/gba/qh-hientrang.json').then(r => (r.ok ? r.json() : null));
+      const pack = await fetch(withAssetVersion('data/gba/qh-hientrang.json')).then(r => (r.ok ? r.json() : null));
       if (pack) {
         const applied = applyQhClassification(raw, plan, pack);
         raw = applied.raw;
@@ -1078,9 +1080,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (progressBar) progressBar.style.width = `${pct}%`;
     if (progressPercent) progressPercent.textContent = `${pct}%`;
     if (progressLabel && label) progressLabel.textContent = label;
+    setBootProgress(pct);
   };
   if ('serviceWorker' in navigator) {
-    Promise.resolve(window.__qhSwReady).then(() => navigator.serviceWorker.register('./sw.js')).catch(() => {});
+    Promise.resolve(window.__qhSwReady).then(() => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })).catch(() => {});
   }
   // 3 mốc xong theo thứ tự bất kỳ: lớp phủ đô thị (chờ ranh 40 phường xã), công trình, độ phủ (chờ công trình)
   const STEP_LABEL = { urban: 'Đang dựng lớp phủ đô thị', infra: 'Đang tải công trình', heat: 'Đang tính độ phủ' };

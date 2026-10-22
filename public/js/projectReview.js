@@ -22,6 +22,7 @@ import { projectLayersOf, cachedLots, PROJECT_INFO_EVENT } from './projectFiles.
 import { adjustmentPacks } from './adjustLayer.js';
 import { initGisDossier, handleGisClick } from './gisDossierUi.js';
 import { QHC2045, QHC_CENTER_INFO_EVENT, landOf } from './qhc2045.js';
+import { withAssetVersion } from './gbaVersion.js';
 
 const STORE_KEY = 'qh_review_dossiers_v2';
 const CITY_NAME = 'Thành phố Huế';
@@ -1738,7 +1739,7 @@ async function openQhcCenterInfo() {
   showToast('Đang tổng hợp chỉ tiêu QHC trung tâm…');
   let fc;
   try {
-    const res = await fetch(QHC2045.urls.land);
+    const res = await fetch(withAssetVersion(QHC2045.urls.land));
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     fc = await res.json();
   } catch (err) {

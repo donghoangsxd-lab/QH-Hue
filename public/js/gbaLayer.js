@@ -154,7 +154,7 @@ function footprintAreaM2(z, x, y, ring, extent) {
 
 function loadFloorZones() {
   if (!floorZonesP) {
-    const url = new URL('data/gba/bldg-overrides.geojson', document.baseURI).href;
+    const url = withAssetVersion('data/gba/bldg-overrides.geojson');
     floorZonesP = fetch(url).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
