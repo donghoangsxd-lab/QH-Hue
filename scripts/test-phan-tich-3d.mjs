@@ -1,7 +1,7 @@
 import fs from 'fs';
 import {
   clampRadius, parseCenter, circleRing, squareRing, clipRing, ringArea, shannon, clipSegment, tilesFor,
-  floorsFromHeight, parseHeightIndex
+  floorsFromHeight, floorBin, parseHeightIndex
 } from '../public/js/phanTich3d.js';
 
 const clip = circleRing(100, 64);
@@ -16,6 +16,9 @@ if (shannon(new Map([['a', 5]])) !== null) throw new Error('một nhóm vẫn c�
 
 if (floorsFromHeight(3.3) !== 1 || floorsFromHeight(6.6) !== 2 || floorsFromHeight(0) !== null) {
   throw new Error(`số tầng ${floorsFromHeight(3.3)} ${floorsFromHeight(6.6)}`);
+}
+if (floorBin(2) !== 0 || floorBin(5) !== 1 || floorBin(10) !== 2 || floorBin(48) !== 3 || floorBin(61) !== 3) {
+  throw new Error('nhóm tầng');
 }
 const sq = squareRing(100);
 if (sq.length !== 4 || ringArea(sq) !== 40000) throw new Error('ô vuông');
@@ -37,7 +40,7 @@ const js = fs.readFileSync(new URL('../public/js/phanTich3d.js', import.meta.url
 for (const s of ['Tách lớp', 'Gộp khối', 'phanTich3d.js']) {
   if (!html.includes(s)) throw new Error(`html thiếu ${s}`);
 }
-for (const s of ['Khối tích', 'Không gian mở', 'Chức năng sử dụng', 'Liên kết', 'Không có.', 'h / 3.3']) {
+for (const s of ['Khối tích', 'Không gian mở', 'Chức năng sử dụng', 'Liên kết', 'Không có.', 'h / 3.3', '1-2 tầng', '3-5 tầng', '6-10 tầng', '11-50 tầng']) {
   if (!js.includes(s)) throw new Error(`js thiếu ${s}`);
 }
 if (js.includes('CLASS_DRAW') || js.includes('Không tính được.')) throw new Error('vẫn đùn theo nhóm hoặc chưa có mét');

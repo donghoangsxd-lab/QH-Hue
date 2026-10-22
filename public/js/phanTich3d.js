@@ -1,7 +1,8 @@
 // Bản mẫu bốn thành phần đô thị. Ô vuông cạnh 2×r (r vẫn là tham số bán kính, nay là nửa cạnh).
 // Chiều cao đùn bằng mét từ data/gba/bldg-hf.bin (làm tròn 0,5 m). Số tầng = round(h / 3.3).
 // Tháp bị GBA lọc hoặc ước thấp nằm ở bldg-overrides.geojson (draw) và được vẽ thêm.
-// Màu khối tích vẫn theo nhóm tương đối c của buildings.pmtiles. Dân phường không nhân theo diện tích ô.
+// Màu khối tích theo số tầng (làm tròn mét / 3,3): 1-2, 3-5, 6-10, 11-50. Trên 50 tầng vẫn nhóm trên.
+// Dân phường không nhân theo diện tích ô.
 
 const GBA_URL = 'https://storage.googleapis.com/hue-infra-data-us/gba/buildings.pmtiles';
 const CAD_URL = 'https://storage.googleapis.com/hue-infra-data-us/cadastre/thuadat-2016.pmtiles';
@@ -16,8 +17,8 @@ const OVERPASS = [
   'https://overpass.private.coffee/api/interpreter',
   'https://overpass-api.de/api/interpreter'
 ];
-const CLASS_NAME = ['Thấp', 'Trung bình', 'Cao', 'Rất cao'];
-const VOLUME_FILL = [[255, 252, 250, 238], [248, 214, 210, 240], [236, 164, 162, 242], [214, 112, 118, 245]];
+const CLASS_NAME = ['1-2 tầng', '3-5 tầng', '6-10 tầng', '11-50 tầng'];
+const VOLUME_FILL = [[255, 237, 213, 235], [253, 186, 116, 240], [234, 88, 12, 242], [154, 52, 18, 248]];
 const USE_FILL = {
   'Đất ở': [214, 150, 230, 240],
   'Cơ quan, công cộng': [126, 160, 236, 240],
@@ -92,6 +93,13 @@ export function parseCenter(search) {
 export function floorsFromHeight(h) {
   if (!Number.isFinite(h) || h <= 0) return null;
   return Math.max(1, Math.round(h / 3.3));
+}
+
+export function floorBin(floors) {
+  if (floors == null || floors <= 2) return 0;
+  if (floors <= 5) return 1;
+  if (floors <= 10) return 2;
+  return 3;
 }
 
 export function circleRing(r, n = 64) {
@@ -716,7 +724,6 @@ function buildModel(raw, origin, r, heights) {
   if (raw.gbaError) gaps.push('Không đọc được dấu chân công trình (Global Building Atlas).');
   else {
     for (const feat of raw.gba) {
-      const c = Math.max(0, Math.min(3, Number(feat.props.c) || 0));
       for (const cut of clipFeature(feat, origin, clip, r)) {
         const mid = centroid(cut.rings[0]);
         const lng = origin.lng + mid[0] / origin.mLng;
@@ -724,7 +731,7 @@ function buildModel(raw, origin, r, heights) {
         const h = heights ? heights.lookup(lng, lat) : null;
         const f = floorsFromHeight(h);
         footprint += cut.area;
-        classArea[c] += cut.area;
+        classArea[floorBin(f)] += cut.area;
         if (h == null) heightMiss += 1;
         else {
           matchedFp += cut.area;
@@ -733,7 +740,7 @@ function buildModel(raw, origin, r, heights) {
         }
         const drawH = h == null ? 3.3 : h;
         buildings.push(cut);
-        volumes.push({ rings: cut.rings, h: drawH, fill: VOLUME_FILL[c] });
+        volumes.push({ rings: cut.rings, h: drawH, fill: VOLUME_FILL[floorBin(f)] });
       }
     }
     if (!buildings.length) gaps.push('Không có dấu chân công trình trong ô vuông.');
@@ -925,15 +932,16 @@ function nearestText(row, r, osmError) {
 function paintPanel(model, place, wardPop) {
   const legend = $('legend');
   legend.replaceChildren(
-    legendCard(1, '#d63a46', 'Khối tích', 'Khối nhà theo chiều cao thật, màu theo bốn nhóm tương đối.'),
+    legendCard(1, '#ea580c', 'Khối tích', 'Khối nhà theo chiều cao thật, màu theo bốn nhóm số tầng.'),
     legendCard(2, '#2e9650', 'Không gian mở', 'Công viên, tán cây và mặt nước.'),
     legendCard(3, '#306cd4', 'Chức năng', 'Chức năng sử dụng đất trên từng công trình.'),
     legendCard(4, '#d6a820', 'Liên kết', 'Đường phân cấp, nút giao và mũi tên hướng ra mép ô.')
   );
   $('keys').replaceChildren(
-    swatch('#f6d6d2', 'Thấp'),
-    swatch('#eca4a2', 'Cao'),
-    swatch('#d67076', 'Rất cao'),
+    swatch('#ffedd5', '1-2 tầng'),
+    swatch('#fdba74', '3-5 tầng'),
+    swatch('#ea580c', '6-10 tầng'),
+    swatch('#9a3412', '11-50 tầng'),
     swatch('#f4b0d6', 'Ở'),
     swatch('#baa6e6', 'Công cộng'),
     swatch('#f0a860', 'Sản xuất'),
@@ -960,7 +968,7 @@ function paintPanel(model, place, wardPop) {
   }
   if (model.buildings) {
     const parts = CLASS_NAME.map((name, i) => `${name} ${fmt0(model.classArea[i] / model.footprint * 100)}%`).join(', ');
-    items.push(li('Nhóm chiều cao tương đối', parts, 'Tỷ lệ theo diện tích dấu chân. Màu lớp khối tích theo nhóm này. Không quy nhóm ra mét.'));
+    items.push(li('Nhóm số tầng', parts, 'Tỷ lệ theo diện tích dấu chân. Tầng = làm tròn (chiều cao / 3,3). Trên 50 tầng vẫn thuộc 11-50.'));
   }
   items.push(
     li('Tỷ lệ cây xanh, công viên', model.osmError ? 'Không có số liệu.' : `${fmt1(model.green * 100)}%`,
@@ -1099,7 +1107,7 @@ function bootMap(place, model) {
         coordinateSystem: CART,
         modelMatrix: lift(zVolumes + PLATE + 0.35),
         getPath: (d) => d.rings[0].map((p) => [p[0], p[1], d.h]),
-        getColor: [104, 48, 52, 230],
+        getColor: [67, 20, 7, 230],
         getWidth: 1.4,
         widthUnits: 'pixels',
         widthMinPixels: 1
