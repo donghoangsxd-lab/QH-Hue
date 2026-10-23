@@ -140,7 +140,7 @@ function initLayerMapTabs() {
   show('base');
   refreshCounts();
 }
-const MAIN_AXES = new Set(['hanhchinh', 'quyhoach', 'hatang', 'kientruc']);
+const MAIN_AXES = new Set(['hanhchinh', 'quyhoach', 'hatang', 'xahoi', 'kientruc']);
 
 function initLayerMainTabs() {
   const root = document.getElementById('layerMain');

@@ -54,7 +54,7 @@
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45);
   --ease: 0.2s ease;
 
-  --right-w: calc(272px * var(--k));
+  --right-w: calc(328px * var(--k));
   --bottom-h: max(20vh, 190px);
   --bp-head-h: calc(42px * var(--k));
   --face-w: calc(338px * var(--k));  /* 1 mặt khối xoay cơ cấu / số lượng / giao thông */
@@ -1053,20 +1053,41 @@ body.right-collapsed .right-panel {
 .layer-main-tabs .layer-eye-btn { width: 26px; height: 26px; margin-left: 3px; padding: 0; justify-content: center; box-sizing: border-box; }
 .layer-main-tabs .layer-eye-btn[hidden] { display: none; }
 .layer-main-tabs .layer-eye-btn:disabled, .layer-pane-tools .layer-eye-btn:disabled { opacity: 0.5; cursor: default; }
-/* Tab Lớp dữ liệu: đúng bốn trục, nhãn in hoa, số đếm ở dòng dưới */
-#layerMain > .layer-main-tabs { display: block; padding: 0; overflow: hidden; }
-#layerMain > .layer-main-tabs [role="tablist"] { display: flex; align-items: stretch; width: 100%; min-width: 0; }
-#layerMain > .layer-main-tabs .layer-main-tab { flex: 1 1 0; flex-direction: column; gap: 0; height: auto; min-height: 36px; padding: 4px 1px 3px; letter-spacing: 0; white-space: normal; text-transform: uppercase; font-size: 10px; line-height: 1.1; }
-#layerMain > .layer-main-tabs .layer-main-label { overflow: hidden; text-overflow: ellipsis; white-space: normal; text-align: center; max-width: 100%; }
-#layerMain > .layer-main-tabs .layer-main-count { font-size: 9px; line-height: 1.1; }
+/* Băng đạn: một tiêu đề panel đang mở, các panel khác là vạch nghiêng */
+.layer-mag { position: relative; z-index: 6; display: flex; align-items: center; gap: 2px; padding: 4px 4px 3px; border-bottom: 1px solid var(--border-soft); background: var(--bg-panel); }
+.mag-nav, .layer-mag .rp-collapse-btn { flex: 0 0 24px; width: 24px; height: 24px; min-width: 24px; padding: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-muted); }
+.mag-nav { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.mag-nav:hover, .layer-mag .rp-collapse-btn:hover { color: var(--text-main); }
+.mag-nav:disabled { opacity: 0.35; cursor: default; }
+.mag-nav .ico, .layer-mag .rp-collapse-btn .ico { width: 16px; height: 16px; margin: 0; }
+.mag-track { flex: 1 1 auto; min-width: 0; height: 30px; display: flex; align-items: center; justify-content: center; gap: 1px; perspective: 380px; touch-action: none; }
+.mag-item { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 10px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; transform-style: preserve-3d; }
+.mag-item .layer-main-label { display: none; }
+.mag-bar { display: block; width: 5px; height: 18px; border-radius: 1px; background: linear-gradient(90deg, rgba(15, 23, 42, 0.55), rgba(226, 232, 240, 0.9) 42%, rgba(148, 163, 184, 0.35)); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14); }
+.mag-item.is-before { transform: rotateY(58deg); transform-origin: right center; }
+.mag-item.is-after { transform: rotateY(-58deg); transform-origin: left center; }
+.mag-item[data-dist="2"] .mag-bar { height: 14px; opacity: 0.8; }
+.mag-item[data-dist="3"] .mag-bar { height: 11px; opacity: 0.6; }
+.mag-item[data-dist="4"] .mag-bar { height: 8px; opacity: 0.45; }
+.mag-item.is-current { flex: 1 1 auto; width: auto; min-width: 0; transform: none; }
+.mag-item.is-current .mag-bar { display: none; }
+.mag-item.is-current .layer-main-label { display: block; max-width: 100%; overflow: hidden; text-overflow: clip; white-space: nowrap; text-align: center; text-transform: uppercase; font-size: 10px; font-weight: 700; letter-spacing: 0; line-height: 1.15; color: var(--text-main); }
+.mag-item:focus-visible, .mag-nav:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
+.mag-menu { position: absolute; z-index: 2; min-width: 220px; padding: 4px; border: 1px solid var(--border-color); border-radius: var(--r-md); background: var(--bg-dark); box-shadow: var(--panel-shadow); }
+.mag-menu[hidden] { display: none !important; }
+.mag-menu button { display: block; width: 100%; margin: 0; padding: 6px 8px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-main); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .01em; line-height: 1.25; text-align: left; text-transform: uppercase; cursor: pointer; }
+.mag-menu button[aria-selected="true"] { color: var(--text-on-accent); background: var(--accent-cyan); }
+.mag-menu button:hover { background: rgba(255, 255, 255, 0.06); }
+.mag-menu button[aria-selected="true"]:hover { background: var(--accent-cyan); }
 .layer-tools { display: flex; align-items: center; gap: 4px; padding: 4px 6px; border-bottom: 1px solid var(--border-soft); background: var(--bg-panel); }
 .layer-tools .project-search { flex: 1 1 auto; width: auto; min-width: 72px; height: 28px; margin: 0; }
 .view-switch { display: flex; flex: 0 0 auto; border: 1px solid var(--border-color); border-radius: var(--r-sm); overflow: hidden; }
-.view-switch button { height: 26px; min-width: 28px; padding: 0 6px; border: 0; background: transparent; color: var(--text-muted); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.view-switch button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
+.view-switch button .ico { width: 16px; height: 16px; margin: 0; }
 .view-switch button.active { background: var(--accent-cyan); color: var(--text-on-accent); }
-#btnAxisAll { flex: 0 0 auto; height: 26px; padding: 0 6px; border: 1px solid var(--border-color); border-radius: var(--r-sm); background: var(--bg-input); color: var(--text-main); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
-#btnAxisAll:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
-.layer-tools .rp-collapse-btn { flex: 0 0 28px; width: 28px; height: 28px; min-width: 28px; padding: 0; border: 1px solid var(--border-color); border-radius: var(--r-sm); background: var(--bg-input); }
+.view-switch button:focus-visible, #btnAxisAll:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
+#btnAxisAll { flex: 0 0 28px; width: 28px; height: 28px; padding: 0; justify-content: center; }
+#btnAxisAll .ico { margin: 0; }
 .admin-tabs { display: flex; gap: 0; margin: 0 0 4px; border-bottom: 1px solid var(--border-soft); }
 .admin-tab { flex: 1 1 0; height: 28px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
 .admin-tab.active { color: var(--text-main); border-bottom-color: var(--main-accent); }
@@ -5243,8 +5264,8 @@ body.project-review.la-page #projectReviewHost {
   .legend-main .layer-main-tab { flex: 0 0 auto; height: 32px; min-height: 32px; min-width: 0; padding: 0 8px; }
   .legend-main .layer-main-label { flex-direction: row; gap: 3px; white-space: nowrap; overflow: visible; text-overflow: clip; line-height: 1.2; font-size: 11.5px; justify-content: center; }
   .legend-main .layer-main-label small { display: inline; font-size: 11.5px; }
-  #layerMain > .layer-main-tabs { overflow: hidden; }
-  #layerMain > .layer-main-tabs .layer-main-tab { flex: 1 1 0; height: auto; min-height: 36px; padding: 4px 1px; }
+  .mag-item.is-current .layer-main-label { font-size: 9px; }
+  .mag-nav, .layer-mag .rp-collapse-btn { flex-basis: 28px; width: 28px; height: 28px; }
   .layer-map-tab { height: 32px; min-height: 32px; }
   .layer-main-pane, .layer-map-pane, .tab-body { padding: 2px 6px 4px; }
   .layer-pane-tools { padding: 2px 0 2px; margin-bottom: 2px; }
@@ -5707,7 +5728,11 @@ body.project-review.la-page #projectReviewHost {
 .axis-dock button:focus-visible, .cn-sector:focus-visible, .cn-level:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
 .axis-scope { margin: 6px 8px; font-size: 12px; color: var(--text-muted); }
 .axis-tools, .cn-tools { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 6px 8px; }
-.cn-soon { border: 1px dashed var(--border-color); background: transparent; color: var(--text-muted); border-radius: 6px; padding: 2px 6px; font: inherit; font-size: 11px; cursor: not-allowed; }
+.cn-soon { display: none !important; }
+.cn-tools:not(:has(.cn-levels, button:not(.cn-soon))) { display: none; }
+#tabLayers .layer-type-icon,
+#tabLayers .layer-status-legend,
+#tabLayers .apt-legend { display: none; }
 .cn-soon small { margin-left: 4px; font-size: 10px; }
 .cn-sectors { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 6px 8px; }
 .cn-sector { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 44px; padding: 4px 2px; border: 1px solid var(--border-soft); border-radius: 8px; background: transparent; color: var(--text-muted); font: inherit; font-size: 10px; line-height: 1.15; cursor: pointer; }
@@ -5786,7 +5811,7 @@ body.right-collapsed .axis-dock { display: flex; position: fixed; z-index: 1250;
   right: calc(var(--right-w) + 20px);
   bottom: 16px;
   width: min(340px, calc(100vw - var(--right-w) - 96px));
-  max-height: 42vh;
+  max-height: min(520px, 58vh);
   height: auto;
   flex: 0 0 auto;
   overflow: auto;
@@ -5794,6 +5819,21 @@ body.right-collapsed .axis-dock { display: flex; position: fixed; z-index: 1250;
   display: flex;
   flex-direction: column;
 }
+/* Khung nổi cao theo nội dung: flex 1 1 0 + min-height 0 làm co mất ô hoa văn và bảng đô thị */
+#tabLegend.map-float .layer-tree,
+#tabLegend.map-float .legend-main,
+#tabLegend.map-float .layer-main-pane,
+#tabLegend.map-float .legend-display,
+#tabLegend.map-float .legend-extra,
+#tabLegend.map-float .layer-map-pane {
+  display: block;
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  flex: none;
+  overflow: visible;
+}
+#tabLegend .tt16-swatch { background-repeat: repeat; }
 body.right-collapsed #tabLegend.map-float { right: 12px; }
 body:not(.bottom-collapsed) #tabLegend.map-float { bottom: calc(var(--bottom-h) + 12px); }
 #tabAdd.propose-sheet {
@@ -5851,6 +5891,7 @@ body:not(.bottom-collapsed) #tabLegend.map-float { bottom: calc(var(--bottom-h) 
 body.right-collapsed .legend-chip { right: 12px; }
 body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px); }
 .legend-point { display: flex; align-items: center; gap: 6px; padding: 2px 8px; font-size: 12px; }
+#legendPointList .apt-legend { display: flex; margin: 2px 8px 6px; }
 .legend-point img { width: 14px; height: 16px; }
 .legend-status { display: flex; gap: 12px; padding: 2px 8px 6px; font-size: 11px; color: var(--text-muted); }
 .legend-extra .road-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 0 8px 6px; }

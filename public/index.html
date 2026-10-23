@@ -68,6 +68,8 @@
     <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19M9 7h6"/></symbol>
     <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m6 7 5 5-5 5M13 7l5 5-5 5"/></symbol>
     <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="m18 7-5 5 5 5M11 7l-5 5 5 5"/></symbol>
+    <symbol id="i-step-left" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></symbol>
+    <symbol id="i-step-right" viewBox="0 0 24 24"><path d="m10 6 6 6-6 6"/></symbol>
     <symbol id="i-chev-up" viewBox="0 0 24 24"><path d="m7 18 5-5 5 5M7 11l5-5 5 5"/></symbol>
     <symbol id="i-chevs-down" viewBox="0 0 24 24"><path d="m7 6 5 5 5-5M7 13l5 5 5-5"/></symbol>
     <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 14.8h18M9 9.5V20M15 9.5V20"/></symbol>
@@ -420,11 +422,12 @@
     </div>
 
     <button type="button" class="rp-expand-btn ui-panel-format" id="btnExpandRightPanel" title="Mở panel công cụ" aria-label="Mở panel công cụ"><svg class="ico"><use href="#i-chev-left"/></svg></button>
-    <div class="axis-dock" id="axisDock" role="tablist" aria-label="Bốn trục">
-      <button type="button" data-axis-dock="hanhchinh" role="tab" aria-selected="false" title="Hành chính"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V9l6-5 6 5v11"/><path d="M10 20v-6h4v6"/></svg><span>Hành chính</span></button>
-      <button type="button" data-axis-dock="quyhoach" class="active" role="tab" aria-selected="true" title="Quy hoạch"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M4 10h16M10 10v9"/></svg><span>Quy hoạch</span></button>
-      <button type="button" data-axis-dock="hatang" role="tab" aria-selected="false" title="Hạ tầng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17h16M6 17V8h4v9M14 17V5h4v12"/></svg><span>Hạ tầng</span></button>
-      <button type="button" data-axis-dock="kientruc" role="tab" aria-selected="false" title="Kiến trúc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M5 20V9l7-5 7 5v11"/><path d="M9 20v-5h6v5"/></svg><span>Kiến trúc</span></button>
+    <div class="axis-dock" id="axisDock" role="tablist" aria-label="Năm panel">
+      <button type="button" data-axis-dock="hanhchinh" role="tab" aria-selected="false" title="Quản lý đơn vị hành chính"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V9l6-5 6 5v11"/><path d="M10 20v-6h4v6"/></svg><span>Hành chính</span></button>
+      <button type="button" data-axis-dock="quyhoach" class="active" role="tab" aria-selected="true" title="Hệ thống bản đồ quy hoạch"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M4 10h16M10 10v9"/></svg><span>Quy hoạch</span></button>
+      <button type="button" data-axis-dock="hatang" role="tab" aria-selected="false" title="Hệ thống hạ tầng kỹ thuật"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17h16M6 17V8h4v9M14 17V5h4v12"/></svg><span>Hạ tầng KT</span></button>
+      <button type="button" data-axis-dock="xahoi" role="tab" aria-selected="false" title="Hệ thống hạ tầng xã hội"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 19a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.4"/><path d="M16 19a5 5 0 0 1 5-4"/></svg><span>Hạ tầng XH</span></button>
+      <button type="button" data-axis-dock="kientruc" role="tab" aria-selected="false" title="Quản lý lĩnh vực kiến trúc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M5 20V9l7-5 7 5v11"/><path d="M9 20v-5h6v5"/></svg><span>Kiến trúc</span></button>
     </div>
     <button type="button" class="rp-expand-btn bp-expand-btn ui-panel-format" id="btnExpandBottomPanel" title="Mở bảng tổng hợp hạ tầng và cơ cấu đất" aria-label="Mở bảng tổng hợp hạ tầng và cơ cấu đất"><svg class="ico"><use href="#i-chev-up"/></svg></button>
   </div>
@@ -444,28 +447,32 @@
       <div class="tab-body" id="tabLayers">
         <div class="layer-tree">
         <div class="layer-main" id="layerMain">
-          <div class="layer-main-tabs">
-            <div role="tablist" aria-label="Hành chính, quy hoạch, hạ tầng và kiến trúc">
-            <button type="button" class="layer-main-tab" role="tab" data-main-tab="hanhchinh" aria-selected="false" aria-controls="layerPaneHanhChinh" title="Phạm vi thành phố, đô thị, xã và phường. Phân loại đô thị và hồ sơ từng đô thị."><span class="layer-main-label">Hành chính</span><span class="layer-main-count" id="urbanTabCount" title="Số đô thị đang hiện / tổng số"></span></button>
-            <button type="button" class="layer-main-tab active" role="tab" data-main-tab="quyhoach" aria-selected="true" aria-controls="layerPaneQuyHoach" title="Các lớp quy hoạch theo cấp: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Ở QHPK 1/2.000, bản đồ hiện ranh các đồ án; tick một hoặc nhiều đồ án để hiện lô bên trong."><span class="layer-main-label">Quy hoạch</span><span class="layer-main-count" id="planTabCount" title="Số đồ án đang hiện / tổng số"></span></button>
-            <button type="button" class="layer-main-tab" role="tab" data-main-tab="hatang" aria-selected="false" aria-controls="layerPaneHaTang" title="Bảy chuyên ngành hạ tầng kỹ thuật theo cấp đồ án."><span class="layer-main-label">Hạ tầng</span></button>
-            <button type="button" class="layer-main-tab" role="tab" data-main-tab="kientruc" aria-selected="false" aria-controls="layerPaneKienTruc" title="Quy chế quản lý kiến trúc và công trình kiến trúc có giá trị."><span class="layer-main-label">Kiến trúc</span></button>
+          <div class="layer-mag" id="layerMag">
+            <button type="button" class="mag-nav" data-mag-step="-1" title="Panel phía trước" aria-label="Panel phía trước"><svg class="ico"><use href="#i-step-left"/></svg></button>
+            <div class="mag-track" id="layerMagTrack" role="tablist" aria-label="Năm panel lớp dữ liệu">
+              <button type="button" class="mag-item is-before" role="tab" data-main-tab="hanhchinh" data-dist="1" aria-selected="false" aria-controls="layerPaneHanhChinh" title="Quản lý đơn vị hành chính"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">Quản lý đơn vị hành chính</span></button>
+              <button type="button" class="mag-item is-current active" role="tab" data-main-tab="quyhoach" aria-selected="true" aria-controls="layerPaneQuyHoach" title="Hệ thống bản đồ quy hoạch"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">Hệ thống bản đồ quy hoạch</span></button>
+              <button type="button" class="mag-item is-after" role="tab" data-main-tab="hatang" data-dist="1" aria-selected="false" aria-controls="layerPaneHaTang" title="Hệ thống hạ tầng kỹ thuật"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">Hệ thống hạ tầng kỹ thuật</span></button>
+              <button type="button" class="mag-item is-after" role="tab" data-main-tab="xahoi" data-dist="2" aria-selected="false" aria-controls="layerPaneXaHoi" title="Hệ thống hạ tầng xã hội"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">Hệ thống hạ tầng xã hội</span></button>
+              <button type="button" class="mag-item is-after" role="tab" data-main-tab="kientruc" data-dist="3" aria-selected="false" aria-controls="layerPaneKienTruc" title="Quản lý lĩnh vực kiến trúc"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">Quản lý lĩnh vực kiến trúc</span></button>
             </div>
+            <button type="button" class="mag-nav" data-mag-step="1" title="Panel phía sau" aria-label="Panel phía sau"><svg class="ico"><use href="#i-step-right"/></svg></button>
+            <button type="button" class="rp-collapse-btn" id="btnCollapseRightPanel" title="Ẩn panel" aria-label="Ẩn panel"><svg class="ico"><use href="#i-chev-right"/></svg></button>
+            <div class="mag-menu" id="layerMagMenu" hidden role="listbox" aria-label="Chọn panel"></div>
           </div>
           <div class="layer-tools" id="layerTools">
             <input type="search" id="layerSearch" class="project-search" placeholder="Tìm kiếm" aria-label="Tìm trong nhóm đang mở">
             <div class="view-switch" role="group" aria-label="Hiện trạng hoặc quy hoạch">
-              <button type="button" data-view-mode="HT" title="Hiện trạng" aria-pressed="false">HT</button>
-              <button type="button" data-view-mode="QH" class="active" title="Quy hoạch" aria-pressed="true">QH</button>
+              <button type="button" data-view-mode="HT" title="Hiện trạng" aria-label="Hiện trạng" aria-pressed="false"><svg class="ico"><use href="#i-locate"/></svg></button>
+              <button type="button" data-view-mode="QH" class="active" title="Quy hoạch" aria-label="Quy hoạch" aria-pressed="true"><svg class="ico"><use href="#i-layers"/></svg></button>
             </div>
-            <button type="button" id="btnAxisAll" title="Bật hoặc tắt các lớp đang hiện trong nhóm này">Cả nhóm</button>
-            <button type="button" class="rp-collapse-btn" id="btnCollapseRightPanel" title="Ẩn panel" aria-label="Ẩn panel"><svg class="ico"><use href="#i-chev-right"/></svg></button>
+            <button type="button" class="layer-eye-btn" id="btnAxisAll" title="Bật hoặc tắt các lớp đang hiện trong nhóm này" aria-label="Bật hoặc tắt cả nhóm" aria-pressed="false"><svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg></button>
           </div>
           <div class="layer-main-pane" id="layerPaneHanhChinh" data-main-pane="hanhchinh" role="tabpanel" hidden>
             <div id="axisHanhChinh">
               <p class="axis-scope" id="axisScopeAdmin"></p>
               <div class="admin-tabs" role="tablist" aria-label="Đô thị và đơn vị hành chính">
-                <button type="button" class="admin-tab active" data-admin-tab="dothi" role="tab" aria-selected="true" aria-controls="adminPaneDoThi">Đô thị</button>
+                <button type="button" class="admin-tab active" data-admin-tab="dothi" role="tab" aria-selected="true" aria-controls="adminPaneDoThi">Đô thị <span class="layer-main-count" id="urbanTabCount" title="Số đô thị đang hiện / tổng số"></span></button>
                 <button type="button" class="admin-tab" data-admin-tab="dvhc" role="tab" aria-selected="false" aria-controls="adminPaneDvhc" title="Xã, phường">ĐVHC</button>
               </div>
               <div id="adminPaneDoThi" data-admin-pane="dothi">
@@ -484,7 +491,7 @@
           <div class="layer-main-pane" id="layerPaneQuyHoach" data-main-pane="quyhoach" role="tabpanel">
         <div id="axisQuyHoach">
         <div class="cn-tools" id="axisToolsQuyHoach"></div>
-        <p class="axis-scope" id="axisScopeQuyHoach">Phạm vi: Toàn thành phố</p>
+        <p class="axis-scope" id="axisScopeQuyHoach">Phạm vi: Toàn thành phố <span class="layer-main-count" id="planTabCount" title="Số đồ án đang hiện / tổng số"></span></p>
         <div hidden>
           <input type="checkbox" id="chk_projects" title="QHPK 1/2.000: ranh các đồ án. Bấm ranh hoặc tick đồ án để hiện lô. Chọn phường thì hiện đủ lô trong phường.">
           <input type="checkbox" id="chk_projectInfra" checked title="Lô hạ tầng của đồ án đang bật vẽ cùng lớp Quy hoạch, không theo 14 nhóm Khu đất.">
@@ -602,6 +609,14 @@
           <span class="legend-pending" title="Đề xuất chưa chấp thuận (TrangThai = FALSE)"><img src="./icons/Park2.png" class="legend-icon" alt=""><b>Chờ duyệt</b></span>
         </div>
           </section>
+          </div>
+          <div class="layer-main-pane" id="layerPaneXaHoi" data-main-pane="xahoi" role="tabpanel" hidden>
+            <div id="axisXaHoi">
+              <p class="axis-scope" id="axisScopeXaHoi"></p>
+              <p class="cn-empty">Giáo dục, y tế, văn hóa, thương mại, cây xanh và nhà ở. Danh sách công trình điểm sẽ đặt tại panel này.</p>
+              <div id="xahoiPoints"></div>
+            </div>
+            <section class="axis-base" id="baseXaHoi"></section>
           </div>
           <div class="layer-main-pane" id="layerPaneKienTruc" data-main-pane="kientruc" role="tabpanel" hidden>
             <div id="axisKienTruc"></div>
@@ -1202,6 +1217,7 @@
             <button type="button" class="layer-main-tab" role="tab" data-legend-set="QHC" aria-selected="false" title="Ký hiệu chức năng sử dụng đất đồ án quy hoạch chung đô thị theo Thông tư 16/2025/TT-BXD, Phụ lục I Mục 02 (PL1, tỷ lệ 1/10.000)"><span class="layer-main-label"><small>QHC</small>1/10.000</span></button>
             <button type="button" class="layer-main-tab active" role="tab" data-legend-set="QHPK" aria-selected="true" title="Ký hiệu sử dụng đất đồ án quy hoạch phân khu theo Thông tư 16/2025/TT-BXD, Phụ lục I Mục 04 (QHPK 1/2.000, 1/5.000) — bộ đang dùng cho toàn bộ đồ án hiện có. Thu nhỏ tô đặc màu ký hiệu; phóng to từ mức 17 hiện hoa văn"><span class="layer-main-label"><small>QHPK</small>1/2.000</span></button>
             <button type="button" class="layer-main-tab" role="tab" data-legend-set="QHCT" aria-selected="false" title="Ký hiệu sử dụng đất đồ án quy hoạch chi tiết theo Thông tư 16/2025/TT-BXD, Phụ lục I Mục 05 (QHCT 1/500). Cùng hoa văn Mục 04, màu ACI của Mục 05"><span class="layer-main-label"><small>QHCT</small>1/500</span></button>
+            <button type="button" class="layer-main-tab" role="tab" data-legend-set="SECTOR" aria-selected="false" hidden title="Ký hiệu ngành hạ tầng kỹ thuật đang bật"><span class="layer-main-label"><small>HẠ TẦNG</small><span id="legendSectorName">Ngành</span></span></button>
             <button type="button" class="layer-eye-btn" id="btnLegendFold" aria-pressed="false" title="Thu gọn mọi nhóm" aria-label="Thu gọn / mở mọi nhóm ký hiệu"><svg class="ico"><use href="#i-chevs-down"/></svg></button>
           </div>
           <div class="layer-main-pane">
@@ -1210,6 +1226,7 @@
             <div class="tt16-legend road-net" id="roadNet25" data-legend-pane="QHC25" hidden></div>
             <div class="tt16-legend road-net" id="roadNet10" data-legend-pane="QHC" hidden></div>
             <div class="tt16-legend road-sections" id="roadSections" data-legend-pane="QHC" hidden></div>
+            <div class="tt16-legend" id="legendSector" data-legend-pane="SECTOR" hidden></div>
             <div class="ua-legend-pane" data-legend-pane="URBAN" hidden>
               <div class="tt16-legend" id="urbanLegend">
                 <details class="tt16-group" open>
