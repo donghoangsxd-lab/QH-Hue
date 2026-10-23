@@ -41,7 +41,20 @@ const cases = [
   ['Đường đồng mức thiết kế', 'san-nen-thoat-mua'],
   ['Chỉ giới đường đỏ', 'sdd'],
   ['Hướng thoát nước thải', 'thoat-nuoc-thai'],
-  ['Hướng thoát nước mưa', 'san-nen-thoat-mua']
+  ['Hướng thoát nước mưa', 'san-nen-thoat-mua'],
+  ['Cơ cấu phân lô', 'sdd'],
+  ['Phân ô quy hoạch', 'sdd'],
+  ['Mốc giới', 'sdd'],
+  ['Hành lang an toàn', 'sdd'],
+  ['Xây dựng ngầm', 'sdd'],
+  ['Tim đường', 'giao-thong'],
+  ['Cao độ nền', 'san-nen-thoat-mua'],
+  ['Chuẩn bị kỹ thuật', 'san-nen-thoat-mua'],
+  ['Độ dốc', 'san-nen-thoat-mua'],
+  ['Phân lô san nền', 'san-nen-thoat-mua'],
+  ['Phân ô san nền', 'san-nen-thoat-mua'],
+  ['Đầu nối', 'cap-nuoc'],
+  ['Thoát mước thải', 'thoat-nuoc-thai']
 ];
 
 cases.forEach(([name, sector]) => {
@@ -52,6 +65,11 @@ assert.strictEqual(scaleOf('Quy hoạch giao thông (1-25.000)'), 25000);
 assert.strictEqual(scaleOf('Hiện trạng (1:10.000)'), 10000);
 assert.strictEqual(statusOf('Hiện trạng (1-25.000)'), 'hien-trang');
 assert.strictEqual(statusOf('Quy hoạch cấp nước (1-10.000)'), 'quy-hoach');
+assert.strictEqual(statusOf('B.9.Sử dụng đất quy hoạch'), 'quy-hoach');
+assert.strictEqual(statusOf('C.3.Hiện trạng sử dụng đất'), 'hien-trang');
+assert.strictEqual(statusOf('B.1.Vị trí ranh giới'), 'quy-hoach');
+assert.strictEqual(statusOf('Ranh giới hiện trạng dạng vùng'), 'hien-trang');
+assert.strictEqual(statusOf('Khong nhom'), null);
 assert.strictEqual(slug('Mạng lưới thoát nước thải'), 'mang-luoi-thoat-nuoc-thai');
 assert.strictEqual(landUseName('Hiện trạng sử dụng đất'), true);
 assert.strictEqual(landUseName('Chức năng sử dụng đất'), true);

@@ -73,3 +73,16 @@ Lớp nguyên nhóm thì `qhFetchLayers` thay cho `qhFetchMany`. Dump lớn: gá
 - Dòng không có hình bị bỏ qua và ghi cảnh báo (lớp Bó vỉa mapid 21817 thiếu 8 dòng).
 - Bảng dùng chung nhiều đồ án thì script cắt theo ranh (`scopeDump`). Đọc cảnh báo `scope` trong JSON trả về.
 - Thửa đất là luồng riêng: `node scripts/cadastre-to-shp.js --listen 8800 --out "<thư mục>"`, trang gis21 đã mở bằng link có gtoken, rồi `qcStart({ base })`. Chạy lại được: xã đã ghi thì bỏ qua.
+
+## Sau khi tải một đồ án QHCT
+
+Không viết API mới. Dựng catalog bằng `scripts/build-chuyen-nganh.js --append --schemes <file.json> "<thư mục LOP>"`. `--append` giữ đồ án đã có; không chạy lệnh dựng đầy đủ lên đúng thư mục QHCT vì lệnh đó ghi đè `index.json`. File lớp trên 5 MB đưa lên `hue-infra-data-us/chuyen-nganh/v1/` (`--upload`), không commit. Đăng ký `projects/index.json` (tên bắt đầu `QHCT`, không chứa `1/2000`), `public/data/chuyen-nganh/schemes.json` (`parent` là QHPK/QHC chứa ranh nếu xác định được, `priority` 3, `overrideArea` là ranh QHCT).
+
+Lô đất hạ tầng ghép với danh sách Sheet (`scripts/sync-plan-infra.js`, `services/planInfraSync.js`):
+
+1. Luôn ghi lô QHCT 1/500 và ghép với dòng Sheet. Lô này sát ranh thật hơn.
+2. Lô QHPK đã ghép: chỉ gỡ ghép (`unpairInfraLot` đổi INFRA thành DXF, giữ polygon). Không xóa polygon QHPK. Không từ chối lô QHCT vì đã có ghép QHPK.
+3. Trước khi ghép, đọc khóa `pairings` trong `public/data/su-dung-dat-index.json` (cùng file chỉ mục lớp sử dụng đất; không ghi đè `layers` hay `aliases`). Khóa từng dòng là `sheetId`. Nếu `level` là `QHPK` (hoặc `Ten_QH` trên Sheet xếp loại QHPK), ghi nhận chuyển ghép, không bỏ lô. Sau khi ghi, dòng đó chuyển `level` sang `QHCT`.
+4. Mỗi lần gỡ ghi một dòng vào `docs/qhct-unpair.json`: mã lô QHPK, đồ án QHPK, mã lô QHCT, mã dòng hạ tầng.
+
+Trường học nhiều cấp (`TRUONG`) và thương mại/dịch vụ chưa tách chợ (`CHOTM`) không tự ghép.
