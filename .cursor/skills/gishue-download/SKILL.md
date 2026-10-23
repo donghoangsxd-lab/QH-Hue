@@ -26,6 +26,14 @@ description: >-
 - Nguyên nhóm / lớp trên cây (không gán vai trò đồ án): `qhFetchLayers({ mapid, nhom: ['62723'], lop: ['Tên lớp'], postUrl })`. `nhom` nhận mã nhóm hoặc tên nhóm.
 - Chưa rõ cây lớp: `await qhListLayers(mapid)` rồi mới tải. Đừng tải cả bản đồ khi chỉ cần vài lớp.
 
+## Trước khi tải lớp sử dụng đất
+
+Đọc `public/data/su-dung-dat-index.json` (scheme, mapid, layer, role `quy-hoach` hoặc `hien-trang`, path). Không tải lại lớp đã có. Không xóa file trên bucket.
+
+- Tên lớp có «sử dụng đất» (gồm «chức năng sử dụng đất» và «hiện trạng sử dụng đất»): nếu chỉ mục đã có cùng `mapid` và cùng `role`, bỏ lớp đó và ghi `path` đang dùng.
+- mapid 21817 đã có lớp quy hoạch cho cả 1/25.000 (`qhc-hue-2045` → `data/qhc2045/dinhhuong.json`) và 1/10.000 (`qhc-trung-tam` → `data/qhc2045/sdd.json`). Bỏ mọi lớp sử dụng đất của mapid này, kể cả hiện trạng: file tĩnh đã gồm các giai đoạn.
+- Khớp `scheme` + `role` cũng bỏ. `aliases` trong chỉ mục là mục sheetOnly trùng đồ án tĩnh, không tải thành đồ án mới.
+
 ## Luồng nhanh
 
 Một máy nhận, một tab geditor, một `Runtime.evaluate`. Mỗi lệnh shell trên máy này mất khoảng 7 giây chỉ để khởi động; đừng tách bật máy nhận, phục vụ script, tóm tắt, ghi file thành nhiều lệnh.

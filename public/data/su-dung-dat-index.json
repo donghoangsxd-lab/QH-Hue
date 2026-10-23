@@ -1,0 +1,974 @@
+{
+  "v": 1,
+  "built": "2026-10-23",
+  "count": 95,
+  "note": "95 lớp có dữ liệu sử dụng đất. Kỳ vọng khoảng 117 không khớp: projects/index.json có 136 mục, 40 đã xóa, 96 còn lại; 93 đồ án có file projects/<slug>/su-dung-dat.json (lands > 0) và 3 mục sheetOnly không có lô (hai đồ án mapid 21817 và QHC Khu công nghiệp Phong Điền). Cộng 2 lớp tĩnh mapid 21817 (qhc-hue-2045, qhc-trung-tam) thành 95. 91 file hien-trang.json trên bucket đều parcels rỗng nên không tính. cad_parcels.json không còn lô DXF (6675 INFRA và 93 khung PROJECT).",
+  "aliases": [
+    {
+      "slug": "qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1",
+      "scheme": "qhc-hue-2045",
+      "mapid": 21817,
+      "path": "data/qhc2045/dinhhuong.json"
+    },
+    {
+      "slug": "qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72",
+      "scheme": "qhc-trung-tam",
+      "mapid": 21817,
+      "path": "data/qhc2045/sdd.json"
+    }
+  ],
+  "layers": [
+    {
+      "scheme": "qhc-hue-2045",
+      "name": "Sơ đồ phát triển không gian TP",
+      "mapid": 21817,
+      "layer": "dinhhuong",
+      "role": "quy-hoach",
+      "scale": 25000,
+      "bind": "chk_qhc25",
+      "path": "data/qhc2045/dinhhuong.json",
+      "source": "static"
+    },
+    {
+      "scheme": "qhc-trung-tam",
+      "name": "QH sử dụng đất (trung tâm)",
+      "mapid": 21817,
+      "layer": "sdd",
+      "role": "quy-hoach",
+      "scale": 10000,
+      "bind": "chk_qhc10",
+      "path": "data/qhc2045/sdd.json",
+      "source": "static"
+    },
+    {
+      "scheme": "qhc-chan-may-lang-co-a44cfad0",
+      "name": "QHC Chân Mây - Lăng Cô",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhc-chan-may-lang-co-a44cfad0/su-dung-dat.json",
+      "lands": 1017,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhc-do-thi-moi-vinh-hung-8899f27b",
+      "name": "QHC Đô thị mới Vinh Hưng",
+      "mapid": 22906,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhc-do-thi-moi-vinh-hung-8899f27b/su-dung-dat.json",
+      "lands": 303,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+      "name": "QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3/su-dung-dat.json",
+      "lands": 6963,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhc-khe-tre-4a4803cd",
+      "name": "QHC Khe Tre",
+      "mapid": 20778,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhc-khe-tre-4a4803cd/su-dung-dat.json",
+      "lands": 124,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhc-quang-phu-9156e437",
+      "name": "QHC Quảng Phú",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhc-quang-phu-9156e437/su-dung-dat.json",
+      "lands": 2401,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhc-tt-phu-loc-19e96a86",
+      "name": "QHC TT Phú Lộc",
+      "mapid": 20674,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhc-tt-phu-loc-19e96a86/su-dung-dat.json",
+      "lands": 1131,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-dan-nam-giao-va-vung-phu-can-a07164ce",
+      "name": "QHCT (1/2000) Đàn Nam Giao",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-dan-nam-giao-va-vung-phu-can-a07164ce/su-dung-dat.json",
+      "lands": 172,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-khu-do-thi-chan-may-cfa632bd",
+      "name": "QHCT (1/2000) Đô thị Chân Mây (2012)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-khu-do-thi-chan-may-cfa632bd/su-dung-dat.json",
+      "lands": 1511,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-qh-chi-tiet-xd-khu-vuc-doi-vong-canh-va-vung-phu-can-7118ac5a",
+      "name": "QHCT (1/2000) đồi Vọng Cảnh (2015)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-qh-chi-tiet-xd-khu-vuc-doi-vong-canh-va-vung-phu-can-7118ac5a/su-dung-dat.json",
+      "lands": 83,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-xay-dung-khu-vuc-huong-long-af939c14",
+      "name": "QHCT (1/2000) Hương Long",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-xay-dung-khu-vuc-huong-long-af939c14/su-dung-dat.json",
+      "lands": 268,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-phia-tay-dam-lap-an-a7c135bf",
+      "name": "QHCT (1/2000) Tây đầm Lập An (2012)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-phia-tay-dam-lap-an-a7c135bf/su-dung-dat.json",
+      "lands": 494,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-lang-co-va-lang-chai-87aa3c2b",
+      "name": "QHCT (1/2000) thị trấn Lăng Cô",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-lang-co-va-lang-chai-87aa3c2b/su-dung-dat.json",
+      "lands": 310,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-don-sam-fef2d27c",
+      "name": "QHCT Độn Sầm",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-don-sam-fef2d27c/su-dung-dat.json",
+      "lands": 96,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-khu-do-thi-moi-an-cuu-ed8ebfb2",
+      "name": "QHCT Khu đô thị mới An Cựu",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-khu-do-thi-moi-an-cuu-ed8ebfb2/su-dung-dat.json",
+      "lands": 161,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-khu-do-thi-moi-dong-nam-thuy-an-b2359b2d",
+      "name": "QHCT Khu đô thị mới Đông Nam Thủy An",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-khu-do-thi-moi-dong-nam-thuy-an-b2359b2d/su-dung-dat.json",
+      "lands": 54,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-khu-do-thi-phu-my-an-3e4a832c",
+      "name": "QHCT Khu đô thị Phú Mỹ An",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-khu-do-thi-phu-my-an-3e4a832c/su-dung-dat.json",
+      "lands": 88,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-khu-do-thi-sinh-thai-thuy-thanh-00b303df",
+      "name": "QHCT Khu đô thị sinh thái Thủy Thanh",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-khu-do-thi-sinh-thai-thuy-thanh-00b303df/su-dung-dat.json",
+      "lands": 169,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-khu-tai-dinh-cu-tdc2-khu-a-an-van-duong-b6cab766",
+      "name": "QHCT Khu tái định cư TDC2 khu A An Vân Dương",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-khu-tai-dinh-cu-tdc2-khu-a-an-van-duong-b6cab766/su-dung-dat.json",
+      "lands": 46,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-khu-tai-dinh-cu-thuy-duong-gd3-ff9ee965",
+      "name": "QHCT Khu tái định cư Thủy Dương GĐ3",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-khu-tai-dinh-cu-thuy-duong-gd3-ff9ee965/su-dung-dat.json",
+      "lands": 40,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-quang-truong-ven-song-pho-co-bao-vinh-0b1f45ea",
+      "name": "QHCT Quảng trường ven sông phố cổ Bao Vinh",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-quang-truong-ven-song-pho-co-bao-vinh-0b1f45ea/su-dung-dat.json",
+      "lands": 71,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-tt-dao-tao-can-bo-vietinbank-tai-hue-6f6e821e",
+      "name": "QHCT TT đào tạo cán bộ VietinBank tại Huế",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-tt-dao-tao-can-bo-vietinbank-tai-hue-6f6e821e/su-dung-dat.json",
+      "lands": 34,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-an-tay-6d71f2e1",
+      "name": "QHPK An Tây",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-an-tay-6d71f2e1/su-dung-dat.json",
+      "lands": 567,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-bao-tang-thien-nhien-phong-dien-d8e2a402",
+      "name": "QHPK Bảo tàng thiên nhiên Phong Điền",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-bao-tang-thien-nhien-phong-dien-d8e2a402/su-dung-dat.json",
+      "lands": 66,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-cac-diem-du-lich-phan-tan-thuoc-khu-kinh-te-ch-cdf3cf9c",
+      "name": "QHPK các điểm du lịch phân tán (2024)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-cac-diem-du-lich-phan-tan-thuoc-khu-kinh-te-ch-cdf3cf9c/su-dung-dat.json",
+      "lands": 116,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-dien-hai-phong-hai-dinh-huong-thanh-lap-phuong-b21cbb69",
+      "name": "QHPK Điền Hải - Phong Hải (định hướng thành lập phường)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-dien-hai-phong-hai-dinh-huong-thanh-lap-phuong-b21cbb69/su-dung-dat.json",
+      "lands": 355,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-dien-hoa-dien-loc-a53fc958",
+      "name": "QHPK Điền Hòa - Điền Lộc",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-dien-hoa-dien-loc-a53fc958/su-dung-dat.json",
+      "lands": 430,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-dieu-chinh-quy-hoach-phan-khu-khu-vuc-phuong-huong-so-v-e6020b93",
+      "name": "QHPK Điều chỉnh Quy hoạch phân khu Khu vực phường Hương Sơ và phường An Hòa",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-dieu-chinh-quy-hoach-phan-khu-khu-vuc-phuong-huong-so-v-e6020b93/su-dung-dat.json",
+      "lands": 159,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-dieu-chinh-quy-hoach-phan-khu-xay-dung-cang-chan-may-xa-f0b20f4f",
+      "name": "QHPK Điều chỉnh Quy hoạch Phân khu Xây dựng Cảng Chân Mây- xã Chân Mây-Lăng Cô",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-dieu-chinh-quy-hoach-phan-khu-xay-dung-cang-chan-may-xa-f0b20f4f/su-dung-dat.json",
+      "lands": 47,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-dieu-chinh-quy-hoach-phan-khu-khu-b-thuoc-khu-do-thi-mo-943a92bb",
+      "name": "QHPK Điều chỉnh quy hoạch phân khu, khu B thuộc khu đô thị mới An Vân Dương",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-dieu-chinh-quy-hoach-phan-khu-khu-b-thuoc-khu-do-thi-mo-943a92bb/su-dung-dat.json",
+      "lands": 129,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-khu-do-thi-phia-bac-phuong-huong-long-phuong-an-hoa-phu-e3db3e41",
+      "name": "QHPK Đô thị Bắc Hương Long (2025)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-khu-do-thi-phia-bac-phuong-huong-long-phuong-an-hoa-phu-e3db3e41/su-dung-dat.json",
+      "lands": 179,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-do-thi-vinh-thanh-va-vung-phu-can-5e9961cc",
+      "name": "QHPK Đô thị Vinh Thanh và vùng phụ cận",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-do-thi-vinh-thanh-va-vung-phu-can-5e9961cc/su-dung-dat.json",
+      "lands": 405,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-e-do-thi-moi-an-van-duong-fcef7c2e",
+      "name": "QHPK E - Đô thị mới An Vân Dương -",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-e-do-thi-moi-an-van-duong-fcef7c2e/su-dung-dat.json",
+      "lands": 140,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-hai-duong-huong-phong-484db23b",
+      "name": "QHPK Hải Dương - Hương Phong",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-hai-duong-huong-phong-484db23b/su-dung-dat.json",
+      "lands": 460,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-huong-an-a1028a1f",
+      "name": "QHPK Hương An",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-huong-an-a1028a1f/su-dung-dat.json",
+      "lands": 229,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-huong-chu-f46c7752",
+      "name": "QHPK Hương Chữ",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-huong-chu-f46c7752/su-dung-dat.json",
+      "lands": 370,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-huong-ho-5f497092",
+      "name": "QHPK Hương Hồ",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-huong-ho-5f497092/su-dung-dat.json",
+      "lands": 718,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-huong-tho-d3f4a73d",
+      "name": "QHPK Hương Thọ",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-huong-tho-d3f4a73d/su-dung-dat.json",
+      "lands": 728,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-huong-toan-55617930",
+      "name": "QHPK Hương Toàn",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-huong-toan-55617930/su-dung-dat.json",
+      "lands": 352,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-huong-van-3bf10273",
+      "name": "QHPK Hương Văn",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-huong-van-3bf10273/su-dung-dat.json",
+      "lands": 400,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-huong-van-89c88354",
+      "name": "QHPK Hương Vân",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-huong-van-89c88354/su-dung-dat.json",
+      "lands": 444,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-huong-vinh-b96cb01b",
+      "name": "QHPK Hương Vinh",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-huong-vinh-b96cb01b/su-dung-dat.json",
+      "lands": 246,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-huong-xuan-c682ec7d",
+      "name": "QHPK Hương Xuân",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-huong-xuan-c682ec7d/su-dung-dat.json",
+      "lands": 421,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-cong-nghiep-huong-lam-khu-kinh-te-cua-khau-cdbfaf10",
+      "name": "QHPK KCN Hương Lâm (2025)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-cong-nghiep-huong-lam-khu-kinh-te-cua-khau-cdbfaf10/su-dung-dat.json",
+      "lands": 57,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-cong-nghiep-la-son-d27596e1",
+      "name": "QHPK KCN La Sơn (2025)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-cong-nghiep-la-son-d27596e1/su-dung-dat.json",
+      "lands": 178,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-dieu-chinh-quy-hoach-phan-khu-xay-dung-khu-cong-nghiep-6ab36a63",
+      "name": "QHPK KCN Phú Bài I, II, III (2024)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-dieu-chinh-quy-hoach-phan-khu-xay-dung-khu-cong-nghiep-6ab36a63/su-dung-dat.json",
+      "lands": 82,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-dieu-chinh-kcn-phu-bai-giai-doan-iv-dot-2-07d68e17",
+      "name": "QHPK KCN Phú Bài IV - Đợt 2 (2020)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-dieu-chinh-kcn-phu-bai-giai-doan-iv-dot-2-07d68e17/su-dung-dat.json",
+      "lands": 46,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-cong-nghiep-so-02-03-tai-khu-kinh-te-chan-819fb047",
+      "name": "QHPK KCN số 02, 03 (2023)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-cong-nghiep-so-02-03-tai-khu-kinh-te-chan-819fb047/su-dung-dat.json",
+      "lands": 67,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhct-xay-dung-khu-du-lich-sinh-thai-bai-chuoi-9595d752",
+      "name": "QHPK KDL Bãi Chuối (2021)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhct-xay-dung-khu-du-lich-sinh-thai-bai-chuoi-9595d752/su-dung-dat.json",
+      "lands": 236,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-du-lich-nghi-duong-thuong-mai-dich-vu-vui-df29592a",
+      "name": "QHPK KDL Lộc Bình (2024)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-du-lich-nghi-duong-thuong-mai-dich-vu-vui-df29592a/su-dung-dat.json",
+      "lands": 36,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-dich-vu-du-lich-phu-dien-4d7f0d27",
+      "name": "QHPK KDL Phú Diên (2025)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-dich-vu-du-lich-phu-dien-4d7f0d27/su-dung-dat.json",
+      "lands": 39,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-du-lich-nghi-duong-va-san-gon-la-van-6cc0463a",
+      "name": "QHPK KDL sân gôn La Vân (2026)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-du-lich-nghi-duong-va-san-gon-la-van-6cc0463a/su-dung-dat.json",
+      "lands": 22,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-du-lich-sinh-thai-ngu-ho-e2a247d5",
+      "name": "QHPK KDL sinh thái Ngũ Hồ (2024)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-du-lich-sinh-thai-ngu-ho-e2a247d5/su-dung-dat.json",
+      "lands": 72,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-du-lich-ven-bien-vinh-my-8fa50db0",
+      "name": "QHPK KDL ven biển Vinh Mỹ (2025)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-du-lich-ven-bien-vinh-my-8fa50db0/su-dung-dat.json",
+      "lands": 22,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-kdt-sinh-thai-va-nghi-duong-ven-bien-tai-xa-vinh-hai-va-b22e2941",
+      "name": "QHPK KĐT sinh thái và nghỉ dưỡng ven biển tại xã Vinh Hải và xã Vinh Hiền",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-kdt-sinh-thai-va-nghi-duong-ven-bien-tai-xa-vinh-hai-va-b22e2941/su-dung-dat.json",
+      "lands": 271,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-a-6cfacf24",
+      "name": "QHPK Khu A - ĐTM An Vân Dương",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-a-6cfacf24/su-dung-dat.json",
+      "lands": 163,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-dieu-chinh-quy-hoach-phan-khu-khu-c-do-thi-moi-an-van-d-d5c72b7d",
+      "name": "QHPK Khu C - ĐTM An Vân Dương (2024)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-dieu-chinh-quy-hoach-phan-khu-khu-c-do-thi-moi-an-van-d-d5c72b7d/su-dung-dat.json",
+      "lands": 176,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-d-do-thi-moi-an-van-duong-44e6f969",
+      "name": "QHPK Khu D - An Vân Dương (2025)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-d-do-thi-moi-an-van-duong-44e6f969/su-dung-dat.json",
+      "lands": 160,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-do-thi-du-lich-sinh-thai-bien-canh-duong-d44ba039",
+      "name": "QHPK Khu đô thị Cảnh Dương",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-do-thi-du-lich-sinh-thai-bien-canh-duong-d44ba039/su-dung-dat.json",
+      "lands": 111,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-khu-do-thi-phia-bac-phuong-an-hoa-huong-so-huong-vinh-3e6ba744",
+      "name": "QHPK Khu đô thị phía Bắc, phường An Hòa, Hương Sơ, Hương Vinh",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-khu-do-thi-phia-bac-phuong-an-hoa-huong-so-huong-vinh-3e6ba744/su-dung-dat.json",
+      "lands": 127,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-khu-do-thi-sinh-thai-thanh-tien-8298ff70",
+      "name": "QHPK Khu đô thị sinh thái Thanh Tiên",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-khu-do-thi-sinh-thai-thanh-tien-8298ff70/su-dung-dat.json",
+      "lands": 356,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-khu-do-thi-sinh-thai-thanh-toan-ac57aa8b",
+      "name": "QHPK Khu đô thị sinh thái Thanh Toàn",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-khu-do-thi-sinh-thai-thanh-toan-ac57aa8b/su-dung-dat.json",
+      "lands": 130,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-khu-do-thi-ven-bien-thuan-an-a3b72c3e",
+      "name": "QHPK Khu đô thị ven biển Thuận An",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-khu-do-thi-ven-bien-thuan-an-a3b72c3e/su-dung-dat.json",
+      "lands": 104,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-khu-phi-thue-quan-sg-cm-489d181a",
+      "name": "QHPK Khu phi thue quan SG-CM",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-khu-phi-thue-quan-sg-cm-489d181a/su-dung-dat.json",
+      "lands": 38,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-phi-thue-quan-chan-may-25bb6d8d",
+      "name": "QHPK Khu phi thuế quan (2021)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-phi-thue-quan-chan-may-25bb6d8d/su-dung-dat.json",
+      "lands": 27,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-kim-long-b479902d",
+      "name": "QHPK Kim Long",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-kim-long-b479902d/su-dung-dat.json",
+      "lands": 383,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-kinh-thanh-hue-ed57054e",
+      "name": "QHPK Kinh thành Huế",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-kinh-thanh-hue-ed57054e/su-dung-dat.json",
+      "lands": 1098,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhp-1-557fea01",
+      "name": "QHPK Phía Bắc trục trung tâm Lăng Cô (2023)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhp-1-557fea01/su-dung-dat.json",
+      "lands": 118,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-phia-nam-truc-trung-tam-khu-di-lich-lang-c-41f07169",
+      "name": "QHPK Phía Nam trục trung tâm Lăng Cô (2021)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-phia-nam-truc-trung-tam-khu-di-lich-lang-c-41f07169/su-dung-dat.json",
+      "lands": 96,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-phong-an-dinh-huong-thanh-lap-phuong-cc7a72ac",
+      "name": "QHPK Phong An (Định hướng thành lập phường)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-phong-an-dinh-huong-thanh-lap-phuong-cc7a72ac/su-dung-dat.json",
+      "lands": 1098,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-phong-hien-dinh-huong-thanh-lap-phuong-f572a061",
+      "name": "QHPK Phong Hiền (định hướng thành lập phường)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-phong-hien-dinh-huong-thanh-lap-phuong-f572a061/su-dung-dat.json",
+      "lands": 383,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-quy-hoach-phan-khu-khu-vuc-phong-hoa-dinh-huong-thanh-l-2c3fe249",
+      "name": "QHPK Phong Hòa (2024)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-quy-hoach-phan-khu-khu-vuc-phong-hoa-dinh-huong-thanh-l-2c3fe249/su-dung-dat.json",
+      "lands": 393,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-phu-bai-7a7efc45",
+      "name": "QHPK Phú Bài",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-phu-bai-7a7efc45/su-dung-dat.json",
+      "lands": 153,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-phu-hau-phu-hiep-phu-cat-a90b5eea",
+      "name": "QHPK Phú Hậu – Phú Hiệp – Phú Cát",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-phu-hau-phu-hiep-phu-cat-a90b5eea/su-dung-dat.json",
+      "lands": 338,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-phu-mau-phu-thanh-phu-duong-79657619",
+      "name": "QHPK Phú Mậu - Phú Thanh - Phú Dương",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-phu-mau-phu-thanh-phu-duong-79657619/su-dung-dat.json",
+      "lands": 509,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-phu-son-1bef3f16",
+      "name": "QHPK Phú Sơn",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-phu-son-1bef3f16/su-dung-dat.json",
+      "lands": 451,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-phu-thuan-0f613e35",
+      "name": "QHPK Phú Thuận",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-phu-thuan-0f613e35/su-dung-dat.json",
+      "lands": 174,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-du-lich-nghi-duong-ket-hop-san-gon-va-cac-2832f3fc",
+      "name": "QHPK Sân golf Phong Phú (2025)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-du-lich-nghi-duong-ket-hop-san-gon-va-cac-2832f3fc/su-dung-dat.json",
+      "lands": 11,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-du-lich-san-gon-phuong-kim-long-va-xa-binh-99fa8e90",
+      "name": "QHPK Sân gôn Kim Long - Bình Điền (2025)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-du-lich-san-gon-phuong-kim-long-va-xa-binh-99fa8e90/su-dung-dat.json",
+      "lands": 15,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-thuan-an-f9e5ffc1",
+      "name": "QHPK Thuận An",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-thuan-an-f9e5ffc1/su-dung-dat.json",
+      "lands": 141,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-thuy-bang-dinh-huong-thanh-lap-phuong-5b438d7f",
+      "name": "QHPK Thủy Bằng (2024)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-thuy-bang-dinh-huong-thanh-lap-phuong-5b438d7f/su-dung-dat.json",
+      "lands": 657,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-thuy-bieu-3c2fbc98",
+      "name": "QHPK Thủy Biều",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-thuy-bieu-3c2fbc98/su-dung-dat.json",
+      "lands": 198,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-thuy-chau-b8d972ba",
+      "name": "QHPK Thuỷ Châu",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-thuy-chau-b8d972ba/su-dung-dat.json",
+      "lands": 436,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-thuy-luong-fb46573d",
+      "name": "QHPK Thuỷ Lương",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-thuy-luong-fb46573d/su-dung-dat.json",
+      "lands": 286,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-thuy-phu-c0bf3482",
+      "name": "QHPK Thủy Phù",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-thuy-phu-c0bf3482/su-dung-dat.json",
+      "lands": 590,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-thuy-tan-92336420",
+      "name": "QHPK Thủy Tân",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-thuy-tan-92336420/su-dung-dat.json",
+      "lands": 183,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-thuy-xuan-38831d2c",
+      "name": "QHPK Thủy Xuân",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-thuy-xuan-38831d2c/su-dung-dat.json",
+      "lands": 428,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-tt-phia-dong-26123071",
+      "name": "QHPK TT phía Đông",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-tt-phia-dong-26123071/su-dung-dat.json",
+      "lands": 246,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-tt-phia-nam-0f29aa49",
+      "name": "QHPK TT phía Nam",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-tt-phia-nam-0f29aa49/su-dung-dat.json",
+      "lands": 373,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-tt-phia-tay-8e910b7b",
+      "name": "QHPK TT phía Tây",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-tt-phia-tay-8e910b7b/su-dung-dat.json",
+      "lands": 293,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-tt-phong-dien-phong-thu-dinh-huong-thanh-lap-phuong-f058bfe9",
+      "name": "QHPK TT Phong Điền – Phong Thu (định hướng thành lập phường)",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-tt-phong-dien-phong-thu-dinh-huong-thanh-lap-phuong-f058bfe9/su-dung-dat.json",
+      "lands": 524,
+      "source": "projects"
+    },
+    {
+      "scheme": "2-dieu-chinh-quy-hoach-phan-khu-trung-tam-van-hoa-tay-nam-86b103c6",
+      "name": "QHPK TT Văn hóa Tây Nam",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/2-dieu-chinh-quy-hoach-phan-khu-trung-tam-van-hoa-tay-nam-86b103c6/su-dung-dat.json",
+      "lands": 144,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-vy-da-1b5f0ef9",
+      "name": "QHPK Vỹ Dạ",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-vy-da-1b5f0ef9/su-dung-dat.json",
+      "lands": 393,
+      "source": "projects"
+    },
+    {
+      "scheme": "qhpk-xay-dung-khu-trung-tam-tiep-van-hang-hoa-va-thuong-mai-ad90e300",
+      "name": "QHPK Xây dựng Khu trung tâm tiếp vận hàng hóa và thương mại dịch vụ đầu mối",
+      "mapid": null,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "path": "projects/qhpk-xay-dung-khu-trung-tam-tiep-van-hang-hoa-va-thuong-mai-ad90e300/su-dung-dat.json",
+      "lands": 52,
+      "source": "projects"
+    }
+  ]
+}

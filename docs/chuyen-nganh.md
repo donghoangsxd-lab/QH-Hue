@@ -18,6 +18,8 @@ Bộ dữ liệu hạ tầng chuyên ngành, gắn tab Hạ tầng. Mô hình b�
 
 QHC Khu công nghiệp Phong Điền nằm trong QHC đô thị Phong Điền. Trong ranh KCN, KCN ghi đè Phong Điền (`overrides`, `overrideArea: ranh KCN`, priority 2 > 1). Không cắt dữ liệu.
 
+Hai thư mục mapid 21817 giữ slug lưu trữ. Catalog gắn `catalogScheme`: 1/25.000 → `qhc-hue-2045`, 1/10.000 → `qhc-trung-tam`. Lớp sử dụng đất của hai đồ án này là file tĩnh đã có (`data/qhc2045/dinhhuong.json`, `data/qhc2045/sdd.json`), không phát hành bản thô. Chỉ mục lớp đã có: `public/data/su-dung-dat-index.json`.
+
 Metadata bản đồ gServer không có số quyết định. Số dưới đây lấy từ thuộc tính lớp ranh (ngày dạng M/D/YYYY của shapefile, đã đổi sang ISO). QHC TT Phú Lộc: nhiệm vụ 3134/QĐ-UBND ngày 2019-12-16, phê duyệt 1101/QĐ-UBND ngày 2020-04-17 (UBND tỉnh; 1/5 vùng ranh có giá trị). QHC Khe Tre: nhiệm vụ 1022/QĐ-UBND ngày 2016-05-16, phê duyệt 688/QĐ-UBND ngày 2020-03-13. QHC Đô thị mới Vinh Hưng: phê duyệt 193/QĐ-UBND ngày 2025-01-21 (UBND thành phố Huế). QHC Khu công nghiệp Phong Điền: trường có trên lớp ranh nhưng để trống. Hai đồ án mapid 21817: lô này chưa có lớp ranh quy hoạch.
 
 ## Catalog
@@ -65,7 +67,7 @@ Metadata bản đồ gServer không có số quyết định. Số dưới đây
 | QHC đô thị Thừa Thiên Huế 1/25.000 | Thông tin liên lạc | Hiện trạng | Hiện trạng mạng lưới trạm thông tin dạng điểm | Point | 27 |
 | QHC đô thị Thừa Thiên Huế 1/25.000 | Thông tin liên lạc | Quy hoạch | Mạng lưới thông tin liên lạc | LineString | 42 |
 | QHC đô thị Thừa Thiên Huế 1/25.000 | Thông tin liên lạc | Quy hoạch | Mạng lưới trạm thông tin dạng điểm | Point | 50 |
-| QHC đô thị Thừa Thiên Huế 1/25.000 | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng sử dụng đất | Polygon | 4659 |
+| QHC đô thị Huế 2045 | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Sơ đồ phát triển không gian TP (trỏ `data/qhc2045/dinhhuong.json`) | Polygon | — |
 | QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Hiện trạng | Hiện trạng công trình đầu mối giao thông | Point | 18 |
 | QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Hiện trạng | Hiện trạng mạng lưới giao thông đường bộ | LineString | 53 |
 | QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Hiện trạng | Hiện trạng mạng lưới giao thông đường sắt | LineString | 1 |
@@ -116,7 +118,7 @@ Metadata bản đồ gServer không có số quyết định. Số dưới đây
 | QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Thông tin liên lạc | Hiện trạng | Hiện trạng mạng lưới trạm thông tin dạng điểm | Point | 12 |
 | QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Thông tin liên lạc | Quy hoạch | Mạng lưới thông tin liên lạc | LineString | 183 |
 | QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Thông tin liên lạc | Quy hoạch | Mạng lưới trạm thông tin dạng điểm | Point | 88 |
-| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng sử dụng đất | Polygon | 3746 |
+| QHC đô thị TTHuế 2045 (Trung tâm) | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | QH sử dụng đất (trung tâm) (trỏ `data/qhc2045/sdd.json`) | Polygon | — |
 | QHC TT Phú Lộc | Giao thông | Quy hoạch | Công trình đầu mối giao thông | Point | 177 |
 | QHC TT Phú Lộc | Giao thông | Quy hoạch | Đường sắt cao tốc | LineString | 1 |
 | QHC TT Phú Lộc | Giao thông | Quy hoạch | Mạng lưới giao thông | LineString | 203 |
@@ -136,7 +138,7 @@ Metadata bản đồ gServer không có số quyết định. Số dưới đây
 | QHC TT Phú Lộc | Thông tin liên lạc | Quy hoạch | Mạng lưới thông tin liên lạc | LineString | 74 |
 | QHC TT Phú Lộc | Thông tin liên lạc | Quy hoạch | Trạm thông tin | Point | 41 |
 | QHC TT Phú Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng sử dụng đất | Polygon | 2863 |
-| QHC TT Phú Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chức năng sử dụng đất | Polygon | 1467 |
+| QHC TT Phú Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chức năng sử dụng đất (trỏ `projects/qhc-tt-phu-loc-19e96a86/su-dung-dat.json`) | Polygon | 1467 |
 | QHC TT Phú Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Điểm chức năng | Point | 94 |
 | QHC TT Phú Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Đường ranh giới quy hoạch | LineString | 1 |
 | QHC TT Phú Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Vùng ranh giới quy hoạch | Polygon | 5 |
@@ -153,7 +155,7 @@ Metadata bản đồ gServer không có số quyết định. Số dưới đây
 | QHC Khe Tre | Thoát nước thải | Quy hoạch | Công trình xử lý nước thải | Point | 578 |
 | QHC Khe Tre | Thoát nước thải | Quy hoạch | Mạng lưới thoát nước thải | LineString | 69 |
 | QHC Khe Tre | Thông tin liên lạc | Quy hoạch | Mạng lưới thông tin liên lạc | LineString | 33 |
-| QHC Khe Tre | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chức năng sử dụng đất | Polygon | 158 |
+| QHC Khe Tre | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chức năng sử dụng đất (trỏ `projects/qhc-khe-tre-4a4803cd/su-dung-dat.json`) | Polygon | 158 |
 | QHC Khe Tre | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Đánh giá môi trường chiến lược | Point | 5 |
 | QHC Khe Tre | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch | LineString | 1 |
 | QHC Khe Tre | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Vùng ranh giới quy hoạch | Polygon | 1 |
@@ -188,7 +190,7 @@ Metadata bản đồ gServer không có số quyết định. Số dưới đây
 | QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng điểm chức năng | Point | 24 |
 | QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng sử dụng đất | Polygon | 2433 |
 | QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chỉ giới đường đỏ | LineString | 101 |
-| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chức năng sử dụng đất | Polygon | 321 |
+| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chức năng sử dụng đất (trỏ `projects/qhc-do-thi-moi-vinh-hung-8899f27b/su-dung-dat.json`) | Polygon | 321 |
 | QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | dinhViRanhGioi | Point | 30 |
 | QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Đánh giá tổng hợp lựa chọn đất xây dựng | Polygon | 2436 |
 | QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Điểm chức năng | Point | 22 |
@@ -236,17 +238,16 @@ Metadata bản đồ gServer không có số quyết định. Số dưới đây
 - Hiện trạng công trình thủy lợi dạng đường, QHC 1/25.000: 28 dòng trên gServer, tất cả thiếu hình.
 - QHC đô thị Thừa Thiên Huế 1/25.000, San nền và thoát nước mưa, Hiện trạng: Hiện trạng công trình thủy lợi dạng đường — Mọi dòng không có hình hợp lệ, đã bỏ.
 - QHC đô thị Thừa Thiên Huế 1/25.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Ranh giới quy hoạch dạng vùng / dạng đường — Nhóm có trên cây mapid 21817, lô này chưa tải.
+- QHC đô thị Huế 2045, Sử dụng đất: đã có `data/qhc2045/dinhhuong.json` (không tải bản thô mapid 21817).
 - QHC đô thị Thừa Thiên Huế 1/25.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Sơ đồ tổ chức không gian, kiến trúc cảnh quan — Nhóm có trên cây mapid 21817, lô này chưa tải.
 - QHC đô thị Thừa Thiên Huế 1/25.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Đánh giá tổng hợp lựa chọn đất xây dựng — Nhóm có trên cây mapid 21817, lô này chưa tải.
 - QHC đô thị trung tâm Thừa Thiên Huế 1/10.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Ranh giới quy hoạch dạng vùng / dạng đường — Nhóm có trên cây mapid 21817, lô này chưa tải.
-- QHC đô thị trung tâm Thừa Thiên Huế 1/10.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Chức năng sử dụng đất, phân khu, tiểu vùng, điểm chức năng — Nhóm có trên cây mapid 21817, lô này chưa tải.
+- QHC đô thị trung tâm, Sử dụng đất: đã có `data/qhc2045/sdd.json`. Phần phân khu, tiểu vùng, điểm chức năng của nhóm này chưa tải.
 - QHC đô thị trung tâm Thừa Thiên Huế 1/10.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Sơ đồ tổ chức không gian — Nhóm có trên cây mapid 21817, lô này chưa tải.
 - QHC đô thị trung tâm Thừa Thiên Huế 1/10.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Công trình ngầm dạng vùng / đường / điểm — Nhóm có trên cây mapid 21817, lô này chưa tải.
 
 Ô không có lớp (ngành × hiện trạng/quy hoạch):
 
-- QHC đô thị Thừa Thiên Huế 1/25.000 — Sử dụng đất, ranh và lớp quy hoạch khác — Quy hoạch
-- QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 — Sử dụng đất, ranh và lớp quy hoạch khác — Quy hoạch
 - QHC TT Phú Lộc — Giao thông — Hiện trạng
 - QHC TT Phú Lộc — Cấp nước — Hiện trạng
 - QHC TT Phú Lộc — Cấp điện — Hiện trạng
@@ -273,10 +274,8 @@ Metadata bản đồ gServer không có số quyết định. Số dưới đây
 
 ## Lưu trữ
 
-File trên 5 MB nằm trên GCS `hue-infra-data-us/chuyen-nganh/v1/`, `Cache-Control: public, max-age=31536000, immutable`. Không dựng pmtiles (chưa có tippecanoe; lớp lớn là polygon sử dụng đất).
+File trên 5 MB nằm trên GCS `hue-infra-data-us/chuyen-nganh/v1/`, `Cache-Control: public, max-age=31536000, immutable`. Không dựng pmtiles (chưa có tippecanoe; lớp lớn là polygon sử dụng đất). Hai object sử dụng đất mapid 21817 vẫn nằm trên bucket, manifest không trỏ tới chúng.
 - https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhc-tt-phu-loc-19e96a86/sdd/hien-trang/hien-trang-su-dung-dat.geojson (geojson 5499576, zip 1117459)
-- https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/sdd/hien-trang/hien-trang-su-dung-dat.geojson (geojson 39110679, zip 11063910)
-- https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/sdd/hien-trang/hien-trang-su-dung-dat.geojson (geojson 63931754, zip 19482569)
 - https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhc-do-thi-moi-vinh-hung-8899f27b/sdd/hien-trang/hien-trang-su-dung-dat.geojson (geojson 5373719, zip 1395528)
 - https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhc-do-thi-moi-vinh-hung-8899f27b/sdd/quy-hoach/danh-gia-tong-hop-lua-chon-dat-xay-dung.geojson (geojson 5455563, zip 1353638)
 
