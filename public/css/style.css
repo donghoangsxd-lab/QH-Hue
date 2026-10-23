@@ -3030,7 +3030,39 @@ table.ward-table th {
 .leaflet-container a.pp-del-btn.busy { opacity: 0.4; cursor: progress; }
 .pp-edit-btn .ico, .pp-del-btn .ico { width: 14px; height: 14px; margin: 0; }
 .leaflet-container .pp-collapsed a.pp-edit-btn, .leaflet-container .pp-collapsed a.pp-del-btn,
-.dock-card.pp-collapsed a.pp-edit-btn, .dock-card.pp-collapsed a.pp-del-btn { display: none; }
+.dock-card.pp-collapsed a.pp-edit-btn, .dock-card.pp-collapsed a.pp-del-btn,
+.leaflet-container .pp-collapsed a.pp-share-btn, .leaflet-container .pp-collapsed a.pp-route-btn,
+.dock-card.pp-collapsed a.pp-share-btn, .dock-card.pp-collapsed a.pp-route-btn { display: none; }
+.leaflet-container .pp-located a.pp-share-btn,
+.leaflet-container .pp-located a.pp-route-btn,
+.dock-card.pp-located a.pp-share-btn,
+.dock-card.pp-located a.pp-route-btn {
+  position: absolute; top: 2px; width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); text-decoration: none; border-radius: var(--r-sm);
+}
+.leaflet-container .pp-located a.pp-share-btn:hover,
+.leaflet-container .pp-located a.pp-route-btn:hover,
+.dock-card.pp-located a.pp-share-btn:hover,
+.dock-card.pp-located a.pp-route-btn:hover { color: var(--accent-cyan); }
+.pp-share-btn .ico, .pp-route-btn .ico { width: 14px; height: 14px; margin: 0; }
+.dock-card.pp-located a.pp-collapse-btn,
+.leaflet-container .pp-located a.pp-collapse-btn { right: 26px; top: 2px; }
+.dock-card.pp-located a.pp-route-btn,
+.leaflet-container .pp-located a.pp-route-btn { right: 50px; }
+.dock-card.pp-located a.pp-share-btn,
+.leaflet-container .pp-located a.pp-share-btn { right: 74px; }
+.leaflet-container .pp-located a.pp-edit-btn,
+.dock-card.pp-located a.pp-edit-btn { right: 98px; }
+.leaflet-container .pp-located a.pp-del-btn,
+.dock-card.pp-located a.pp-del-btn { right: 122px; }
+.pp-located .lp-head,
+.pp-located .pp-title.lp-head,
+.infra-popup.pp-located .pp-title.lp-head,
+.land-lot-popup.pp-located.pp-collapsible .lp-head { padding-right: 100px; }
+.pp-located.pp-editable .pp-title.lp-head,
+.infra-popup.pp-located.pp-editable .pp-title.lp-head,
+.land-lot-popup.pp-located.pp-collapsible.pp-editable .lp-head { padding-right: 150px; }
 .infra-popup.pp-editable .pp-title { padding-right: 70px; }
 .lot-edit { min-width: 240px; font-size: var(--fs-sm); }
 .lot-edit-title { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; padding-right: 64px; font-weight: 700; }
@@ -4498,8 +4530,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 /* Mã lô + nhãn giai đoạn chung 1 hàng (mã lô ngắn), loại đất ở hàng dưới */
 .lp-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
 .lp-title { min-width: 0; color: #fff; font-size: var(--fs-xl); font-weight: 700; letter-spacing: 0.2px; overflow-wrap: anywhere; }
+.land-popup .lp-title { font-size: 18px; font-weight: 700; letter-spacing: 0; line-height: 1.25; }
 .lp-sub { margin-top: 2px; color: var(--text-muted); font-size: var(--fs-sm); }
+.land-popup .lp-kind { margin-top: 2px; color: var(--accent-orange); font-size: 16px; font-weight: 600; line-height: 1.3; }
 .lp-phase { flex: none; padding: 1px 7px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+.land-popup .lp-phase { padding: 0 6px; font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; }
 .lp-phase-qh { color: var(--accent-orange); background: rgba(var(--orange-rgb), 0.14); border: 1px solid rgba(var(--orange-rgb), 0.4); }
 .lp-phase-ht { color: var(--accent-green); background: rgba(var(--green-rgb), 0.14); border: 1px solid rgba(var(--green-rgb), 0.4); }
 .lp-stats { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; margin-top: 10px; }
@@ -4512,6 +4547,37 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .lp-info dt { color: var(--text-muted); white-space: nowrap; }
 .lp-info dd { margin: 0; color: var(--text-main); font-weight: 600; overflow-wrap: anywhere; }
 .lp-info dd.lp-mono { font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 400; color: var(--text-muted); }
+.land-popup .lp-specs { margin-top: 8px; font-size: 14px; line-height: 1.35; color: var(--text-main); }
+.land-popup .lp-specs:empty { display: none; }
+.land-popup .lp-spec { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; }
+.land-popup .lp-spec + .lp-spec,
+.land-popup .lp-limits { margin-top: 2px; }
+.land-popup .lp-spec-k,
+.land-popup .lp-limit-k { color: var(--text-muted); font-weight: 400; }
+.land-popup .lp-spec b,
+.land-popup .lp-limit b { font-weight: 600; }
+.land-popup .lp-spec-note { font-size: 12px; font-style: normal; font-weight: 600; }
+.land-popup .lp-limits { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; }
+.land-popup .lp-limit { white-space: nowrap; }
+.land-popup .lp-meta { margin-top: 8px; font-size: 12px; line-height: 1.35; }
+.land-popup .lp-meta:empty { display: none; }
+.land-popup .lp-project-row > b { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-weight: 600; }
+.land-popup .lp-project-name { min-width: 0; }
+.land-popup .lp-dossier {
+  flex: none; margin: 0; padding: 1px 6px; border: 1px solid rgba(var(--orange-rgb), 0.55);
+  border-radius: var(--r-sm); background: transparent; color: var(--accent-orange);
+  font: 600 12px/1.3 var(--font-sans); cursor: pointer;
+}
+.land-popup .lp-dossier:hover { background: rgba(var(--orange-rgb), 0.14); }
+.land-popup .lp-actions { display: flex; align-items: stretch; gap: 6px; margin-top: 8px; }
+.land-popup .lp-actions:empty { display: none; }
+.land-popup .lp-actions .js-analysis { flex: 1 1 0; min-width: 0; display: flex; }
+.land-popup .lp-actions .proof-btn,
+.land-popup .lp-actions .proof-btn.pp-3d {
+  flex: 1 1 0; width: auto; min-width: 0; margin-top: 0; min-height: 34px; padding: 4px 6px;
+  font-size: 13px; font-weight: 700; line-height: 1.2; white-space: normal;
+}
+.land-popup .lp-action-sub { display: block; margin-top: 1px; font-size: 12px; font-weight: 600; }
 /* Popup công trình hạ tầng cùng khuôn lô đất: dòng .pp-row (kết quả nạp chậm ghi lại cả dòng) xếp vào lưới .lp-info */
 .infra-popup .leaflet-popup-content { margin: 12px 14px 10px; }
 .infra-popup .pp-title.lp-head { flex-wrap: nowrap; gap: 10px; margin: 0; padding: 0 46px 9px 0; color: inherit; font-size: inherit; border-bottom-color: var(--border-soft); }
@@ -4528,8 +4594,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, #swipeDivider:f
 .leaflet-popup.land-lot-popup.pp-collapsed .land-popup { min-width: 0; }
 .leaflet-popup.land-lot-popup.pp-collapsed .land-popup > :not(.lp-head) { display: none; }
 .leaflet-popup.land-lot-popup.pp-collapsed .lp-head { padding: 0; border-bottom: 0; }
-.pp-collapsed .lp-head .lp-swatch, .pp-collapsed .lp-head .lp-sub, .pp-collapsed .lp-head .lp-phase { display: none; }
-.leaflet-popup.pp-collapsed .lp-title { font-size: var(--fs-sm); }
+.pp-collapsed .lp-head .lp-swatch, .pp-collapsed .lp-head .lp-sub, .pp-collapsed .lp-head .lp-kind, .pp-collapsed .lp-head .lp-phase { display: none; }
+.leaflet-popup.pp-collapsed .lp-title,
+.leaflet-popup.pp-collapsed .land-popup .lp-title { font-size: 13px; font-weight: 700; }
 .leaflet-popup.land-lot-popup.pp-collapsed .lp-title {
   white-space: nowrap;
   text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000;
@@ -5268,6 +5335,21 @@ body.project-review.la-page #projectReviewHost {
     width: 40px; height: 40px; min-width: 40px; min-height: 40px;
     display: inline-flex; align-items: center; justify-content: center;
   }
+  .dock-card.pp-located a.pp-collapse-btn,
+  .dock-card.pp-located a.pp-route-btn,
+  .dock-card.pp-located a.pp-share-btn {
+    top: 2px; width: 40px; height: 40px;
+  }
+  .dock-card.pp-located a.pp-collapse-btn { right: 42px; }
+  .dock-card.pp-located a.pp-route-btn { right: 84px; }
+  .dock-card.pp-located a.pp-share-btn { right: 126px; }
+  .dock-card.pp-located a.pp-edit-btn { right: 168px; width: 40px; height: 40px; }
+  .dock-card.pp-located a.pp-del-btn { right: 210px; width: 40px; height: 40px; }
+  .dock-card.infra-popup.pp-located .pp-title.lp-head,
+  .dock-card.land-lot-popup.pp-located .lp-head,
+  .dock-card.land-lot-popup.pp-located.pp-collapsible .lp-head { padding: 46px 4px 9px 0; }
+  .dock-card.infra-popup.pp-located.pp-editable .pp-title.lp-head,
+  .dock-card.land-lot-popup.pp-located.pp-collapsible.pp-editable .lp-head { padding: 46px 4px 9px 0; }
   .cad-tabs { gap: 2px; padding: 4px 40px 0 4px; }
   .cad-tab { min-height: 40px; padding: 2px 1px; }
   .cad-tab b, .cad-tab small,

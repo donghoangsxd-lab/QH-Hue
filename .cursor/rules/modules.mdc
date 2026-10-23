@@ -51,7 +51,7 @@ Heatmap GEE dùng buffer tròn. Bám đường là Dijkstra `computeServiceArea`
 
 ## MOD-10 Tra cứu, định vị, popup
 
-`mapEngine.js`: `infraClickAt`, `onPointClick`, `zoomToPoint`, `handleInspectPointClick`, `clearInspectResult`, `approvePointStatus`. `csdProof.js` `showCsdProof`. `app.js` `chooseWard`. `decisionViewer.js` `openDecision`.
+`mapEngine.js`: `infraClickAt`, `onPointClick`, `zoomToPoint`, `handleInspectPointClick`, `clearInspectResult`, `approvePointStatus`, `openSharedLot`. `lotPopup.js`: `lotHeading`, `projectFullName`, `limitsHtml`, `dossierButtons`. `csdProof.js` `showCsdProof`. `app.js` `chooseWard`. `decisionViewer.js` `openDecision`. `viewLink.js` `viewUrlWithLot` (tham số `lo`).
 
 ## MOD-11 Đề xuất điểm
 

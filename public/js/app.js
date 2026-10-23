@@ -1151,6 +1151,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadInfraData();
     stepDone('infra');
     renderGroupedPoints();
+    document.dispatchEvent(new CustomEvent('infra:ready'));
     loadCadParcels();
     const heatReady = refreshHeatmapOnly();
 
