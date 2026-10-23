@@ -2,6 +2,7 @@
  * Quản lý trạng thái ứng dụng & Danh mục cấu hình UI Frontend
  */
 import { TT16_STYLES } from './tt16Symbols.js';
+import { getWardDraw, sealWardDraw } from './wardSeam.js';
 
 export const state = {
   // Phân quyền người dùng: 'VIEWER' (mặc định) hoặc 'ADMIN' — chỉ đặt ADMIN sau khi server xác minh Google token
@@ -142,27 +143,15 @@ export const infraLabels = {
   "14-NOXH": "Chung cư"
 };
 
-// Ranh giới phường xã: nét viền ghi xám vẽ dưới + nét vàng nhạt vẽ trên (đổ bóng rẻ, không dùng CSS filter)
-export const WARD_BOUNDARY_SHADOW_STYLE = { color: '#64748b', weight: 4, opacity: 0.55, fill: false, interactive: false };
-export const WARD_BOUNDARY_LINE_STYLE = { color: '#fde68a', weight: 1.6, opacity: 0.95, fill: false, interactive: false };
-// Ranh phường chỉ để vẽ: rút gọn ~2 m (dưới 1 px tới zoom 17) vì mỗi lần zoom Leaflet chiếu lại toàn bộ đỉnh trên cả
-// 2 bản đồ (ranh gốc ~140 nghìn đỉnh × 2 nét). Tra phường chứa điểm, cắt ranh... vẫn dùng hình gốc
-const WARD_DRAW_TOLERANCE = 0.00002;
-const wardDrawMemo = new WeakMap();
+// Ranh giới phường xã: một nét ghi xám dưới + một nét vàng trên. smoothFactor 0 để Leaflet không
+// rút từng polygon riêng (cạnh chung sẽ tách thành hai nét và hở nền sáng).
+const WARD_LINE_DRAW = { fill: false, interactive: false, smoothFactor: 0, lineJoin: 'round', lineCap: 'round' };
+export const WARD_BOUNDARY_SHADOW_STYLE = { ...WARD_LINE_DRAW, color: '#64748b', weight: 4, opacity: 0.55 };
+export const WARD_BOUNDARY_LINE_STYLE = { ...WARD_LINE_DRAW, color: '#fde68a', weight: 1.6, opacity: 0.95 };
+// Hình để tô / vẽ nét. Tra phường chứa điểm vẫn dùng hình gốc. prepareWardDraw đã chạy thì lấy bản nhớ.
 export function wardDrawFC(features) {
-  return {
-    type: 'FeatureCollection',
-    features: features.filter(f => f && f.geometry).map(f => {
-      let geometry = wardDrawMemo.get(f.geometry);
-      if (!geometry) {
-        try {
-          geometry = turf.simplify({ type: 'Feature', geometry: f.geometry, properties: {} }, { tolerance: WARD_DRAW_TOLERANCE }).geometry;
-        } catch (e) { geometry = f.geometry; }
-        wardDrawMemo.set(f.geometry, geometry);
-      }
-      return { type: 'Feature', geometry, properties: f.properties || {} };
-    })
-  };
+  const pack = getWardDraw() || sealWardDraw(features);
+  return { type: 'FeatureCollection', features: pack.features };
 }
 // Phường đang chọn: nền đỏ nhạt nằm dưới lô đồ án (không che hoa văn), viền đỏ tươi + quầng tối nằm trên ranh đồ án
 export const WARD_FOCUS_STYLE = {

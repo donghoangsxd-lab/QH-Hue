@@ -27,7 +27,7 @@ JS giao diện nằm dưới `public/js/`. File lớn: `rg` tên hàm hoặc `ac
 
 ## MOD-05 Bản đồ Leaflet, ranh giới
 
-`mapEngine.js`: `initMap`, `loadBoundaryLayer`, `centerOnCity`, `flyToVisible`, `highlightWardBoundary`, `highlightWardNames`, `focusWard`, `wardNameAt`, `outerWardLines`. `islandFlags.js` `addIslandFlags`. `boundaryLines.js` `boundaryFromLines`. `parcelWardClip.js`. `basemap.js` `initBasemapUi`, `selectBasemap`. `wheelZoom.js` `bindNotchZoom`.
+`mapEngine.js`: `initMap`, `loadBoundaryLayer`, `centerOnCity`, `flyToVisible`, `highlightWardBoundary`, `highlightWardNames`, `focusWard`, `wardNameAt`, `outerWardLines`. `wardSeam.js` `prepareWardDraw`, `sealWardDraw`. `islandFlags.js` `addIslandFlags`. `boundaryLines.js` `boundaryFromLines`. `parcelWardClip.js`. `basemap.js` `initBasemapUi`, `selectBasemap`. `wheelZoom.js` `bindNotchZoom`.
 
 ## MOD-06 Hiện trạng: marker, buffer, ký hiệu TT16
 
