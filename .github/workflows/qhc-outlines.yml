@@ -15,6 +15,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Install duckdb
+        run: python3 -m pip install --disable-pip-version-check duckdb
       - name: Install Chrome
         run: |
           if ! command -v google-chrome-stable >/dev/null 2>&1 && ! command -v google-chrome >/dev/null 2>&1; then
