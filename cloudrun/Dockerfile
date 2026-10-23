@@ -19,6 +19,8 @@ COPY public/js/projectNames.js ./public/js/projectNames.js
 COPY public/js/bldgAdditions.js ./public/js/bldgAdditions.js
 COPY public/js/bldgParts.js ./public/js/bldgParts.js
 COPY public/js/bldgFloorEdits.js ./public/js/bldgFloorEdits.js
+COPY public/js/touchGroups.js ./public/js/touchGroups.js
+COPY public/data/infra-touch-groups.json ./public/data/infra-touch-groups.json
 
 ENV NODE_ENV=production
 ENV PORT=8080

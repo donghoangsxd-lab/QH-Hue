@@ -556,12 +556,12 @@ function round1(n) {
 export function scoreRows(lots, pop, kind) {
   const units = unitsFromPop(pop);
   const people = Number(pop) > 0 ? Number(pop) : 0;
-  const planned = lots.filter(p => p.role === 'score' && p.scoreKey);
+  const planned = lots.filter(p => p.role === 'score' && p.scoreKey && !p.touchMember);
   const byKey = {};
   planned.forEach(p => {
     (byKey[p.scoreKey] = byKey[p.scoreKey] || []).push(p);
   });
-  const areaOf = (key) => (byKey[key] || []).reduce((s, p) => s + (Number(p.area) || 0), 0);
+  const areaOf = (key) => (byKey[key] || []).reduce((s, p) => s + (Number(p.touchScoreArea != null ? p.touchScoreArea : p.area) || 0), 0);
   const rows = reviewRowsFor(kind, pop).map(def => {
     const members = def.sumOf ? def.sumOf.flatMap(k => byKey[k] || []) : (byKey[def.key] || []);
     const area = def.sumOf ? def.sumOf.reduce((s, k) => s + areaOf(k), 0) : areaOf(def.key);

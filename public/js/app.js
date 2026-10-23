@@ -1,4 +1,5 @@
 import { state, bumpDataVersion, BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, infraLabels, isNetworkType, ntKindOf, NT_KIND_LABELS, parkTierOf } from './state.js';
+import { applyTouchGroups, setTouchAlias } from './touchGroups.js';
 import { geeApi, infraListUrl, markDataWritten } from './api.js';
 import { setBootProgress } from './loadProgress.js';
 import { withAssetVersion } from './gbaVersion.js';
@@ -490,8 +491,29 @@ function initMapTitle() {
   });
 }
 
+async function loadTouchGroups() {
+  try {
+    const res = await fetch('data/infra-touch-groups.json');
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.groups) ? data.groups : [];
+  } catch (err) {
+    console.warn('Không đọc được nhóm lô chạm ranh:', err);
+    return [];
+  }
+}
+
+function withMergedRadius(list, qh) {
+  return list.map(it => {
+    if (!it.touchIds || it.type !== '1-CV') return it;
+    const size = qh ? (Number(it.sizeQH) || 0) : (Number(it.sizeHT) || Number(it.size) || 0);
+    if (!(size > 0)) return it;
+    return { ...it, radius: parkTierOf(size, it.nhomHaTang).radius };
+  });
+}
+
 async function loadInfraData() {
-  const res = await fetch(infraListUrl());
+  const [res, groups] = await Promise.all([fetch(infraListUrl()), loadTouchGroups()]);
   if (!res.ok) throw new Error(`Lỗi máy chủ (${res.status})`);
   const data = await res.json();
   let raw = data.rawDataList || [];
@@ -509,6 +531,9 @@ async function loadInfraData() {
       console.warn('Không áp được phân loại lô QH:', err);
     }
   }
+  setTouchAlias(groups);
+  raw = withMergedRadius(applyTouchGroups(raw, groups), false);
+  plan = withMergedRadius(applyTouchGroups(plan, groups), true);
   state.rawDataList = raw;
   state.planDataList = plan;
   bumpDataVersion();

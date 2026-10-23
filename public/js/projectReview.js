@@ -25,6 +25,7 @@ import { QHC2045, QHC_CENTER_INFO_EVENT, landOf } from './qhc2045.js';
 import { withAssetVersion } from './gbaVersion.js';
 import { watchTiles } from './loadProgress.js';
 import { geeTileLayer } from './geeTiles.js';
+import { clusterTouching, ringsFromPolygons, groupCentroid, joinLabels, compareIds } from './touchGroups.js';
 
 const STORE_KEY = 'qh_review_dossiers_v2';
 const CITY_NAME = 'Thành phố Huế';
@@ -169,6 +170,7 @@ function applyTags() {
     const sheetRows = new Map([...(state.rawDataList || []), ...(state.planDataList || [])].map(it => [String(it.id), it]));
     session.lots.forEach(lot => tagSaved(lot, sheetRows));
     session.queue = [];
+    collapseTouchScores();
     return;
   }
   session.lots.forEach(lot => {
@@ -208,6 +210,7 @@ function applyTags() {
   const ids = session.lots.filter(l => usable(l) && l.decisionKind).map(l => l.id);
   const queued = new Set(session.queue || []);
   if (!session.queue || ids.length !== queued.size || ids.some(id => !queued.has(id))) orderQueue();
+  collapseTouchScores();
 }
 
 function askLayers() {
@@ -343,9 +346,60 @@ function hookZoom(m) {
 
 const targetMap = (phase) => (phase === 'QH' && isCompareOn() && planMap ? planMap : map);
 
+function scoreArea(lot) {
+  return Number(lot.touchScoreArea != null ? lot.touchScoreArea : lot.area) || 0;
+}
+
+function pinOf(lot) {
+  const lat = Number.isFinite(lot.touchLat) ? lot.touchLat : lot.lat;
+  const lng = Number.isFinite(lot.touchLng) ? lot.touchLng : lot.lng;
+  return { lat, lng };
+}
+
+// Lô chấm điểm chạm ranh cùng loại, cùng giai đoạn: một ghim, một bán kính, một dòng điểm. Polygon từng mảnh giữ nguyên.
+function collapseTouchScores() {
+  if (!session) return;
+  session.lots.forEach(lot => {
+    lot.touchMember = false;
+    delete lot.touchScoreArea;
+    delete lot.touchLat;
+    delete lot.touchLng;
+  });
+  ['HT', 'QH'].forEach(phase => {
+    const score = session.lots.filter(lot => lot.phase === phase && lot.role === 'score' && usable(lot) && lot.polygons && lot.polygons.length);
+    if (score.length < 2) return;
+    const lots = score.map(lot => ({
+      id: lot.id,
+      type: lot.scoreKey || lot.type || '',
+      phase,
+      project: session.project || '',
+      rings: ringsFromPolygons(lot.polygons)
+    }));
+    clusterTouching(lots).forEach(idxs => {
+      const members = idxs.map(i => score[i]);
+      const lead = members.slice().sort((a, b) => compareIds(a.id, b.id))[0];
+      const area = Math.round(members.reduce((s, p) => s + (Number(p.area) || 0), 0) * 10) / 10;
+      const center = groupCentroid(members.map(p => ({ rings: ringsFromPolygons(p.polygons), lat: p.lat, lng: p.lng, area: p.area })));
+      const name = joinLabels(members.map(p => ({ lotCode: p.lotCode, name: p.pointName || p.displayName || p.name, id: p.id })));
+      members.forEach(p => {
+        if (p === lead) return;
+        p.touchMember = true;
+        p.radius = 0;
+      });
+      lead.touchScoreArea = area;
+      if (center) {
+        lead.touchLat = center.lat;
+        lead.touchLng = center.lng;
+      }
+      if (name) lead.pointName = name;
+      lead.radius = lotRadius({ ...lead, area });
+    });
+  });
+}
+
 function minSizeWarn(lot) {
   const min = lot.role === 'score' ? rowMinSize(lot.scoreKey) : 0;
-  return min > 0 && lot.area < min ? min : 0;
+  return min > 0 && scoreArea(lot) < min ? min : 0;
 }
 
 function lotTip(lot) {
@@ -354,7 +408,7 @@ function lotTip(lot) {
       : lot.role === 'score' ? rowLabel(lot.scoreKey)
         : `${landRowByKey(session.kind, lot.landKey)?.label || 'Không tính'}${lot.decision ? ` · ${DECISION_LABEL[lot.decision]}` : ''}`;
   const min = minSizeWarn(lot);
-  return `<b>${lot.phase}</b> · ${escapeHtml(lot.layer)} · ${fmtNum(Math.round(lot.area))} m²`
+  return `<b>${lot.phase}</b> · ${escapeHtml(lot.layer)} · ${fmtNum(Math.round(scoreArea(lot)))} m²`
     + `${lot.pointName ? `<br><b>${escapeHtml(lot.pointName)}</b> (công trình đã có)` : ''}`
     + `<br>${escapeHtml(what)}${lot.radius ? ` · R ${fmtNum(lot.radius)} m` : ''}`
     + `${min ? `<br><span class="c-orange">Nhỏ hơn quy mô tối thiểu ${fmtNum(min)} m²</span>` : ''}`;
@@ -365,9 +419,11 @@ function lotTip(lot) {
 function heatGroups(phase) {
   const groups = {};
   session.lots.forEach(lot => {
-    if (lot.phase !== phase || !usable(lot) || lot.role !== 'score' || !lot.type || !(lot.radius > 0)) return;
+    if (lot.phase !== phase || !usable(lot) || lot.role !== 'score' || lot.touchMember || !lot.type || !(lot.radius > 0)) return;
     if (!Number.isFinite(lot.lat) || !Number.isFinite(lot.lng)) return;
-    (groups[lot.type] = groups[lot.type] || []).push([Number(lot.lat.toFixed(6)), Number(lot.lng.toFixed(6)), Math.round(lot.radius)]);
+    const pin = pinOf(lot);
+    if (!Number.isFinite(pin.lat) || !Number.isFinite(pin.lng)) return;
+    (groups[lot.type] = groups[lot.type] || []).push([Number(pin.lat.toFixed(6)), Number(pin.lng.toFixed(6)), Math.round(lot.radius)]);
   });
   return groups;
 }
@@ -487,12 +543,13 @@ function drawPhase(phase) {
       });
     g.addLayer(shape);
     lotLayers.push({ lot, shape });
-    if (lot.role === 'score' && groupShown(lot.type)) {
+    if (lot.role === 'score' && !lot.touchMember && groupShown(lot.type)) {
       const color = BUFFER_COLORS[lot.type] || '#38bdf8';
-      g.addLayer(L.circleMarker([lot.lat, lot.lng], { radius: 4.5, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 1, interactive: false }));
+      const pin = pinOf(lot);
+      g.addLayer(L.circleMarker([pin.lat, pin.lng], { radius: 4.5, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 1, interactive: false }));
       const ring = phase === 'QH' ? groupBufferOn(lot.type) || bufferFocused(lot) : isSplitOn() && groupBufferOn(lot.type);
       if (lot.radius > 0 && ring) {
-        g.addLayer(L.circle([lot.lat, lot.lng], { radius: lot.radius, color, weight: 1.2, dashArray: '6 5', fillColor: color, fillOpacity: 0.05, interactive: false }));
+        g.addLayer(L.circle([pin.lat, pin.lng], { radius: lot.radius, color, weight: 1.2, dashArray: '6 5', fillColor: color, fillOpacity: 0.05, interactive: false }));
       }
     }
   });
@@ -832,9 +889,9 @@ const MIN_SIZE_TITLE = 'Quy mô tối thiểu mỗi công trình theo QCVN 01:20
 function minVerdictHtml(lot) {
   const min = rowMinSize(lot.scoreKey);
   if (!min) return '<span class="c-muted">—</span>';
-  const pct = Math.round(lot.area / min * 1000) / 10;
+  const pct = Math.round(scoreArea(lot) / min * 1000) / 10;
   const title = `${MIN_SIZE_TITLE}: ${fmtNum(min)} m² · đạt ${fmtNum(pct)}%`;
-  return lot.area >= min
+  return scoreArea(lot) >= min
     ? `<b class="c-green" title="${title}">Đạt QM tối thiểu</b>`
     : `<span class="min-size-warn" title="${title}">${ico('alert')}Chưa đạt (${fmtNum(pct)}%)</span>`;
 }
@@ -854,7 +911,7 @@ function memberRowsHtml(row) {
     return `<tr class="wt-sub${focusKey === `lot:${p.id}` ? ' on' : ''}" data-focus="lot:${p.id}">
       <td>-</td>
       <td><button type="button" class="link-btn" data-zoom-lot="${p.id}" title="${p.pointName ? 'Tên theo công trình đã có trong dữ liệu nằm trong lô. ' : ''}Zoom tới công trình">${escapeHtml(memberName(p))}</button></td>
-      <td>${fmtNum(Math.round(p.area))}</td>
+      <td>${fmtNum(Math.round(scoreArea(p)))}</td>
       <td>-</td>
       <td${min ? ` title="Diện tích tối thiểu mỗi công trình (${MIN_SIZE_TITLE})"` : ''}>${min ? `≥ ${fmtNum(min)}` : '-'}</td>
       <td>-</td>

@@ -23,6 +23,7 @@ import { queryOverpassHedged } from './serviceArea.js';
 import { lotKeysOf } from './projectFiles.js';
 import { parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
 import { openEntryFlow } from './entryFlows.js';
+import { groupInfraParcels } from './touchGroups.js';
 
 // Diện tích tối thiểu theo loại (khớp config/constants.js → infraConfig.minSize)
 const MIN_SIZE = { "1-CV": 300, "2-BDX": 200, "3-MN": 800, "4-TH": 2000, "5-THCS": 2500, "7-YT": 1000, "8-VH": 500, "9-TM": 1500 };
@@ -1239,16 +1240,18 @@ function refreshParcels() {
   const base = current.base;
   applyLevels(base.parcels);
   applyFilePhase(base.parcels);
+  // Gộp trên bản sao. Lô gốc trong base giữ nguyên để lần sau đổi cấp trường vẫn tách/ghép lại được.
+  const parcels = groupInfraParcels(base.parcels);
   const existing = [...state.rawDataList, ...state.planDataList];
-  matchExisting(base.parcels, existing);
+  matchExisting(parcels, existing);
   current.items = new Map(existing.filter(it => it.id).map(it => [it.id, it]));
   const prevChoices = new Map((current.result?.parcels || []).filter(p => p.choice).map(p => [parcelKey(p), p.choice]));
-  base.parcels.forEach(p => {
+  parcels.forEach(p => {
     if (!p.matchConflict) { p.choice = null; return; }
     const prev = prevChoices.get(parcelKey(p));
     p.choice = prev && (prev === CHOICE_NEW || prev === CHOICE_SKIP || p.matchConflict.includes(prev)) ? prev : nearestChoice(p);
   });
-  const linked = linkStages(base.parcels);
+  const linked = linkStages(parcels);
   markUnchanged(linked.parcels);
   current.result = { ...base, parcels: linked.parcels, stageDupes: linked.stageDupes };
   current.outsideBoundary = current.boundaryGeom ? outsideBoundaryStats(linked.parcels, current.boundaryGeom) : null;
