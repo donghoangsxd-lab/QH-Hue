@@ -1,8 +1,9 @@
 import {
-  state, infraLabels, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, wardDrawFC, PLAN_CHANGE_INFO,
+  state, infraLabels, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, PLAN_CHANGE_INFO,
   BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, getBufferStyle, getPlanScenarioList, effectiveRadius, bumpDataVersion, layerType,
   isNetworkType, ntKindOf, NT_KIND_LABELS, parkTierOf
 } from './state.js';
+import { prepareWardDraw, getWardDraw, wardDrawGeometry } from './wardSeam.js';
 import { peekInfraRisk, riskSummaryHtml } from './riskLayer.js';
 import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponents.js';
 import { geeApi, markDataWritten } from './api.js';
@@ -281,6 +282,17 @@ function handleCompareChange(on) {
 
 export const WARD_BOUNDS_EVENT = 'qh:ward-bounds';
 
+function addWardBoundaryLines(group) {
+  const pack = getWardDraw();
+  if (!pack || !pack.lines.length) return;
+  const shadow = L.polyline(pack.lines, WARD_BOUNDARY_SHADOW_STYLE);
+  const line = L.polyline(pack.lines, WARD_BOUNDARY_LINE_STYLE);
+  shadow.options.wardRole = 'shadow';
+  line.options.wardRole = 'line';
+  group.addLayer(shadow);
+  group.addLayer(line);
+}
+
 export async function loadBoundaryLayer() {
   if (!map) return;
 
@@ -303,13 +315,8 @@ export async function loadBoundaryLayer() {
     
     if (boundData && boundData.features) {
       features = boundData.features;
-      const drawn = wardDrawFC(features);
-      const shadow = L.geoJSON(drawn, { style: WARD_BOUNDARY_SHADOW_STYLE, interactive: false });
-      const line = L.geoJSON(drawn, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false });
-      shadow.options.wardRole = 'shadow';
-      line.options.wardRole = 'line';
-      layers.boundary.addLayer(shadow);
-      layers.boundary.addLayer(line);
+      prepareWardDraw(features);
+      addWardBoundaryLines(layers.boundary);
     }
   } catch (err) {
     console.error("Lỗi tải ranh giới vector 40 phường xã:", err);
@@ -506,7 +513,7 @@ export function highlightWardBoundary(wardName, { fitView = true } = {}) {
 
   const wardInfo = state.wardLabelsList.find(w => w.name === wardName);
   if (wardInfo && wardInfo.geometry) {
-    const highlightLayer = wardFocusLayer(map, wardInfo.geometry);
+    const highlightLayer = wardFocusLayer(map, wardDrawGeometry(wardInfo.name) || wardInfo.geometry);
     layers.highlightWard.addLayer(highlightLayer);
 
     if (fitView) {
@@ -542,7 +549,7 @@ export function highlightWardNames(names, { fitView = true } = {}) {
   list.forEach(name => {
     const wardInfo = state.wardLabelsList.find(w => w.name === name);
     if (!wardInfo || !wardInfo.geometry) return;
-    const layer = wardFocusLayer(map, wardInfo.geometry);
+    const layer = wardFocusLayer(map, wardDrawGeometry(wardInfo.name) || wardInfo.geometry);
     layers.highlightWard.addLayer(layer);
     const b = layer.getBounds();
     if (b && b.isValid()) bounds.extend(b);
@@ -1106,7 +1113,8 @@ function paintWardGroup(group, host) {
     else if (role === 'line') layer.setStyle(on ? WARD_INNER_LINE : WARD_BOUNDARY_LINE_STYLE);
   });
   if (!on) { cityEdgeOwned.delete(host); return; }
-  const wards = state.wardLabelsList || [];
+  const pack = getWardDraw();
+  const wards = pack ? pack.features.map(f => ({ geometry: f.geometry })) : (state.wardLabelsList || []);
   const lines = wards.length ? outerWardLines(wards) : [];
   if (!lines.length) { cityEdgeOwned.delete(host); return; }
   const outline = createCityOutline(lines, cityRendererOf(host));
