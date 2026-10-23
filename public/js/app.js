@@ -52,6 +52,7 @@ import { initViewFlow, wardFromMapClick, detailClickLocked } from './viewFlow.js
 import { initMapLevel, getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { initSplitPair } from './splitPair.js';
 import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
+import { initChuyenNganh } from './chuyenNganh.js';
 import { initQhctLayer } from './qhctLayer.js';
 import { initCadImport } from './cadImportUi.js';
 import { initProjectLayer } from './projectLayer.js';
@@ -1097,6 +1098,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnScreenshot')?.addEventListener('click', captureMapScreenshot);
   document.getElementById('btnPrintA3')?.addEventListener('click', exportMapA3);
+  initChuyenNganh();
   initViewLink();
 
   // ---------- Nạp dữ liệu ban đầu ----------

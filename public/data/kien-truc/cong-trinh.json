@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "moTa": "Công trình kiến trúc có giá trị (điểm). items để trống cho đến khi nhập liệu. Có lng/lat thì giao diện mới vẽ.",
+  "schema": {
+    "items": {
+      "id": "mã ổn định",
+      "ten": "tên công trình",
+      "diaChi": "địa chỉ",
+      "phuong": "phường hoặc xã",
+      "namXayDung": "năm xây dựng",
+      "phongCach": "phong cách hoặc hình thức",
+      "xepHang": "xếp hạng",
+      "anh": "liên kết ảnh",
+      "nguon": "nguồn",
+      "lng": "kinh độ WGS84, bỏ trống nếu chưa định vị",
+      "lat": "vĩ độ WGS84, bỏ trống nếu chưa định vị"
+    }
+  },
+  "items": []
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "moTa": "Quy chế quản lý kiến trúc theo khu vực. items để trống cho đến khi nhập liệu. Không ghi đè file này bằng dữ liệu thử.",
+  "schema": {
+    "items": {
+      "id": "mã ổn định",
+      "area": { "type": "tp | dothi | xa | tdp", "code": "mã khu vực", "parent": "mã cha, hoặc null với thành phố" },
+      "name": "tên vùng hoặc tên quy chế",
+      "doc": { "title": "tên văn bản", "url": "liên kết PDF" },
+      "rules": {
+        "tangCao": "tầng cao tối đa",
+        "matDo": "mật độ xây dựng",
+        "khoangLui": "khoảng lùi",
+        "mauSac": "màu sắc",
+        "hinhThucMai": "hình thức mái"
+      }
+    }
+  },
+  "items": []
+}

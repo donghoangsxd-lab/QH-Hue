@@ -1,5 +1,5 @@
 ---
-description: Danh sách file MOD-01..MOD-22. Đọc trước khi sửa để rg đúng file, hoặc khi thêm, đổi chỗ, xóa file.
+description: Danh sách file MOD-01..MOD-23. Đọc trước khi sửa để rg đúng file, hoặc khi thêm, đổi chỗ, xóa file.
 alwaysApply: false
 ---
 
@@ -11,7 +11,7 @@ JS giao diện nằm dưới `public/js/`. File lớn: `rg` tên hàm hoặc `ac
 
 `public/index.html` (rg id), `public/css/style.css` (rg selector), `public/phan-tich-3d.html`, `public/css/phan-tich-3d.css`, `public/sw.js`, `public/manifest.webmanifest`.
 
-`app.js`: `loadInfraData`, `chooseWard`, `initMapTitle`, `initLayerMapTabs`, `initLayerMainTabs`. `introTour.js` `openIntroTour`. `mobileShell.js` `initMobileShell`. `faqPanel.js` `initFaqPanel`. `legendPanel.js` `initLegendPanel`. `loadProgress.js`. `overview.js` `initOverview`, `openOverview`. `overviewDemo.js`. `mapLevel.js` `initMapLevel`, `setLevel`. `viewFlow.js` `initViewFlow`. `viewLink.js` `initViewLink`. `streetView.js`. `schemeVisibility.js`. `scripts/build-faq.js`.
+`app.js`: `loadInfraData`, `chooseWard`, `initMapTitle`, `initLayerMapTabs`, `initLayerMainTabs`. `introTour.js` `openIntroTour`. `mobileShell.js` `initMobileShell`. `faqPanel.js` `initFaqPanel`. `legendPanel.js` `initLegendPanel`. `loadProgress.js`. `overview.js` `initOverview`, `openOverview`. `overviewDemo.js`. `mapLevel.js` `initMapLevel`, `setLevel`. `viewFlow.js` `initViewFlow`. `viewLink.js` `initViewLink` (ghép `kv` / `nganh` / `truc` từ MOD-23, không còn `tt`). `streetView.js`. `schemeVisibility.js`. `scripts/build-faq.js`.
 
 ## MOD-02 UI dùng chung
 
@@ -120,3 +120,11 @@ Vi phạm: `violateLayer.js` `initViolateLayer`, `setOn` (checkbox `chk_violate`
 Pipeline dấu chân: `scripts/build-gba.py` (ra `buildings.pmtiles`, không commit tiles), `scripts/build-gba-screen.py`, `scripts/drop-ntd-footprints.py`, `scripts/restore-ntd-footprints.py` (PR #97 gỡ dấu chân trên thửa NTD; `archive/gba/ntd-footprints.jsonl.gz` là kho, không đọc), `scripts/infer-tower-podium.py`, `scripts/gba-residential.py`. `scripts/test-bldg-additions.mjs`, `test-bldg-floors.mjs`, `test-bldg-parts.mjs`, `test-bldg-missing.mjs`, `test-bldg-flood.js`, `test-grave-filter.mjs`.
 
 `api/gee.js` `action ===`: `getGbaInfo`, `getBldgFloors`, `saveBldgFloor`, `getBldgAdditions`, `saveBldgAddition`.
+
+## MOD-23 Bốn trục: hành chính, quy hoạch, hạ tầng, kiến trúc
+
+`facetStore.js`: `normalizeLayer`, `loadFacetCatalog`, `setAreaFilter`, `layerPassesFilter`, `schemesAt`, `layersFor`, `baseLayers`, `facetQuery`, `applyFacetSearch`. `chuyenNganh.js` `initChuyenNganh` (gọi cuối `app.js`, trước `initViewLink`). `scripts/test-facet-store.mjs`. `scripts/stage-chuyen-nganh.mjs`. `docs/bon-truc.md`.
+
+Catalog 91 lớp và GeoJSON gốc: MOD-07 (`public/data/chuyen-nganh/index.json`, `data/chuyen-nganh/`). Symlink phục vụ: `public/data/chuyen-nganh/10000`, `public/data/chuyen-nganh/25000`. Kiến trúc rỗng: `public/data/kien-truc/quy-che.json`, `cong-trinh.json`.
+
+Tab trong `#layerPanePlan`: `#axisTabs`, `#axisHanhChinh`, `#axisQuyHoach` (giữ `#projectList`, `#planStaticRows`), `#browseNganh`, `#axisKienTruc`. Hàng icon khi sidebar thu: `#axisDock`. Ma trận trong `#addAdmin` / `#cnMatrix`. `chk_gt25` / `chk_gt10` không gắn vào 91 file.

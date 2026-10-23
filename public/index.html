@@ -44,7 +44,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261025">
+  <link rel="stylesheet" href="css/style.css?v=20261028">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -420,6 +420,12 @@
     </div>
 
     <button type="button" class="rp-expand-btn ui-panel-format" id="btnExpandRightPanel" title="Mở panel công cụ" aria-label="Mở panel công cụ"><svg class="ico"><use href="#i-chev-left"/></svg></button>
+    <div class="axis-dock" id="axisDock" role="tablist" aria-label="Bốn trục">
+      <button type="button" data-axis-dock="hanhchinh" role="tab" aria-selected="false" title="Hành chính"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V9l6-5 6 5v11"/><path d="M10 20v-6h4v6"/></svg><span>Hành chính</span></button>
+      <button type="button" data-axis-dock="quyhoach" class="active" role="tab" aria-selected="true" title="Quy hoạch"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M4 10h16M10 10v9"/></svg><span>Quy hoạch</span></button>
+      <button type="button" data-axis-dock="hatang" role="tab" aria-selected="false" title="Hạ tầng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17h16M6 17V8h4v9M14 17V5h4v12"/></svg><span>Hạ tầng</span></button>
+      <button type="button" data-axis-dock="kientruc" role="tab" aria-selected="false" title="Kiến trúc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M5 20V9l7-5 7 5v11"/><path d="M9 20v-5h6v5"/></svg><span>Kiến trúc</span></button>
+    </div>
     <button type="button" class="rp-expand-btn bp-expand-btn ui-panel-format" id="btnExpandBottomPanel" title="Mở bảng tổng hợp hạ tầng và cơ cấu đất" aria-label="Mở bảng tổng hợp hạ tầng và cơ cấu đất"><svg class="ico"><use href="#i-chev-up"/></svg></button>
   </div>
 
@@ -498,6 +504,16 @@
         </div>
           </div>
           <div class="layer-main-pane" id="layerPanePlan" data-main-pane="plan" role="tabpanel" hidden>
+        <div class="axis-tabs" id="axisTabs" role="tablist" aria-label="Hành chính, quy hoạch, hạ tầng, kiến trúc">
+          <button type="button" class="axis-tab" data-axis="hanhchinh" role="tab" aria-selected="false">Hành chính</button>
+          <button type="button" class="axis-tab active" data-axis="quyhoach" role="tab" aria-selected="true">Quy hoạch</button>
+          <button type="button" class="axis-tab" data-axis="hatang" role="tab" aria-selected="false">Hạ tầng</button>
+          <button type="button" class="axis-tab" data-axis="kientruc" role="tab" aria-selected="false">Kiến trúc</button>
+        </div>
+        <div id="axisHanhChinh" data-axis-pane="hanhchinh" hidden></div>
+        <div id="axisQuyHoach" data-axis-pane="quyhoach">
+        <div class="cn-tools" id="axisToolsQuyHoach"></div>
+        <p class="axis-scope" id="axisScopeQuyHoach">Phạm vi: Toàn thành phố</p>
         <div hidden>
           <input type="checkbox" id="chk_projects" title="QHPK 1/2.000: ranh các đồ án. Bấm ranh hoặc tick đồ án để hiện lô. Chọn phường thì hiện đủ lô trong phường.">
           <input type="checkbox" id="chk_projectInfra" checked title="Lô hạ tầng của đồ án đang bật vẽ cùng lớp Quy hoạch, không theo 14 nhóm Khu đất.">
@@ -560,6 +576,13 @@
             <div class="layer-row"><div><input type="checkbox" id="chk_qhct"><label for="chk_qhct" title="Quy hoạch chi tiết tỷ lệ 1/500: ranh, lô đất các đồ án QHCT đã nhập (tên đồ án bắt đầu bằng QHCT hoặc Quy hoạch chi tiết). Bấm ranh hoặc lô để xem chi tiết"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Đồ án QHCT 1/500 <small class="layer-hint" id="qhctHint">(chưa có dữ liệu)</small></label></div></div>
           </div>
         </div>
+        <section class="axis-base" id="baseQuyHoach"></section>
+        </div>
+        <div id="axisHaTang" data-axis-pane="hatang" hidden>
+          <div id="browseNganh"></div>
+          <section class="axis-base" id="baseHaTang"></section>
+        </div>
+        <div id="axisKienTruc" data-axis-pane="kientruc" hidden></div>
           </div>
           <div class="layer-main-pane" id="layerPaneUrban" data-main-pane="urban" role="tabpanel">
           <div class="urban-static">
@@ -579,7 +602,7 @@
             <label for="basemapSelect" title="Ảnh nền cho bản đồ hiện trạng và quy hoạch. Bản đồ đường phố là OpenFreeMap Liberty, có tên đường; nếu không tải được thì nền xám nhạt. Lựa chọn được ghi nhớ trên máy này"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ảnh nền</label>
             <select id="basemapSelect" aria-label="Ảnh nền bản đồ">
               <option value="google">Google vệ tinh</option>
-              <option value="positron">Bản đồ đường phố</option>
+              <option value="positron" selected>Bản đồ đường phố</option>
             </select>
           </div>
           <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div><button type="button" class="layer-mini-btn active" id="btnWardNames" title="Bật/tắt tên phường, xã trên bản đồ" aria-label="Bật/tắt tên phường, xã" aria-pressed="true">Aa</button></div>
@@ -1014,6 +1037,10 @@
         </div>
 
         <div id="addAdmin" style="display:none;">
+        <details id="cnMatrix" class="cn-matrix-details">
+          <summary>Ma trận đồ án × hạ tầng</summary>
+          <div id="cnMatrixBody"></div>
+        </details>
         <div class="admin-sub-switch" role="tablist" aria-label="Công cụ hiệu chỉnh">
           <button type="button" class="admin-sub-btn active" data-sub="addRoad" role="tab" aria-selected="true"><svg class="ico"><use href="#i-road"/></svg>Tuyến đường</button>
           <button type="button" class="admin-sub-btn" data-sub="addPop" role="tab" aria-selected="false"><svg class="ico"><use href="#i-users"/></svg>Ô dân cư</button>
@@ -1435,6 +1462,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261025"></script>
+  <script type="module" src="./js/app.js?v=20261028"></script>
 </body>
 </html>
