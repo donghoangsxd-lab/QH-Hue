@@ -15,6 +15,23 @@ const KIND_LABEL = {
 };
 
 let preview = null;
+let previewRenderer = null;
+
+function lotRenderer() {
+  if (!map.getPane('lotPreview')) {
+    const pane = map.createPane('lotPreview');
+    pane.style.zIndex = '460';
+  }
+  if (!previewRenderer) previewRenderer = L.svg({ pane: 'lotPreview' });
+  return previewRenderer;
+}
+let openId = '';
+
+function clearKeep() {
+  openId = '';
+  const box = $('choKeep');
+  if (box) box.innerHTML = '';
+}
 
 function clearPreview() {
   if (preview && map) map.removeLayer(preview);
@@ -34,19 +51,39 @@ async function post(action, body) {
   return data;
 }
 
-function showFeatures(features) {
+function showFeatures(features, review) {
   clearPreview();
-  if (!map || typeof L === 'undefined' || !features.length) return;
+  const rows = [];
+  (review || []).forEach(item => {
+    if (!item || !item.geometry) return;
+    rows.push({ geometry: item.geometry, props: { _mau: 'do', _status: item.status, nhan: item.name || '' } });
+  });
+  (features || []).forEach(row => rows.push(row));
+  if (!map || typeof L === 'undefined' || !rows.length) return;
   const fc = {
     type: 'FeatureCollection',
-    features: features.map(row => ({
+    features: rows.map(row => ({
       type: 'Feature',
       geometry: row.geometry,
       properties: row.props || {}
     }))
   };
   preview = L.geoJSON(fc, {
-    style: { color: '#b45309', weight: 2, fillColor: '#fdba74', fillOpacity: 0.35 },
+    pane: 'lotPreview',
+    renderer: lotRenderer(),
+    style: (f) => {
+      if (f.properties && f.properties._mau === 'do') {
+        const cut = f.properties._status === 'cat';
+        return {
+          color: '#dc2626',
+          weight: cut ? 3 : 2,
+          dashArray: cut ? '5 4' : null,
+          fillColor: '#f87171',
+          fillOpacity: cut ? 0.12 : 0.45
+        };
+      }
+      return { color: '#b45309', weight: 2, fillColor: '#fdba74', fillOpacity: 0.35 };
+    },
     pointToLayer: (_f, latlng) => L.circleMarker(latlng, { radius: 6, color: '#9a3412', weight: 2, fillColor: '#fb923c', fillOpacity: 0.95 })
   });
   preview.addTo(map);
@@ -71,11 +108,27 @@ function rowHtml(row) {
   </article>`;
 }
 
+function paintKeep(id, review, clip) {
+  openId = id;
+  const box = $('choKeep');
+  if (!box) return;
+  if (!review.length) {
+    box.innerHTML = '';
+    return;
+  }
+  const bo = review.filter(item => item.status === 'bo').length;
+  const cat = review.length - bo;
+  const edge = clip && clip.edgeM ? clip.edgeM : 5;
+  box.innerHTML = `<p class="entry-note lot-flag">Đỏ: ${review.length} lô (bỏ ${bo}, cắt ${cat}). Dung sai ${edge} m. Tick lô muốn giữ nguyên hình gốc. Lựa chọn ghi vào dòng ChoDuyet khi bấm Duyệt.</p>
+    <div class="lot-keep">${review.map(item => `<label><input type="checkbox" data-keep="${escapeHtml(item.id)}"> ${escapeHtml(item.name || item.id)} — ${item.status === 'bo' ? 'bỏ, ngoài ranh' : 'cắt theo ranh'}</label>`).join('')}</div>`;
+}
+
 async function loadList() {
   const status = $('choStatus');
   const list = $('choList');
   if (!list) return;
   clearPreview();
+  clearKeep();
   if (status) status.textContent = 'Đang tải hàng chờ.';
   try {
     const data = await post('listChoDuyet', {});
@@ -96,17 +149,24 @@ async function onListClick(event) {
     if (button.dataset.act === 'preview') {
       const data = await post('previewChoDuyet', { id });
       const features = data.features || [];
-      if (features.length) showFeatures(features);
+      const review = data.lotReview || [];
+      if (features.length || review.length) showFeatures(features, review);
       else clearPreview();
-      if (status) status.textContent = features.length
-        ? `Đang xem ${features.length} đối tượng. Chưa công bố.`
+      paintKeep(id, review, data.clip);
+      const red = review.length;
+      if (status) status.textContent = (features.length || red)
+        ? `Đang xem ${features.length} đối tượng${red ? `, ${red} lô đỏ` : ''}. Chưa công bố.`
         : (data.summary || 'Hồ sơ này không có hình để vẽ.');
       return;
     }
     if (button.dataset.act === 'approve') {
       if (status) status.textContent = 'Đang duyệt.';
-      const data = await post('approveChoDuyet', { id });
+      const keepIds = openId === id
+        ? [...document.querySelectorAll('#choKeep input[data-keep]:checked')].map(el => el.dataset.keep)
+        : [];
+      const data = await post('approveChoDuyet', { id, keepIds });
       clearPreview();
+      clearKeep();
       await loadList();
       if (status) status.textContent = data.note || (data.published ? 'Đã công bố.' : 'Đã xử lý.');
       return;
@@ -119,6 +179,7 @@ async function onListClick(event) {
       }
       await post('rejectChoDuyet', { id, reason });
       clearPreview();
+      clearKeep();
       if (status) status.textContent = 'Đã từ chối.';
       await loadList();
     }
@@ -127,10 +188,18 @@ async function onListClick(event) {
   }
 }
 
+export function paintPendingReview(features, review, clip) {
+  showFeatures(features, review);
+  paintKeep('xem', review, clip);
+}
+
 export function initReviewQueue() {
   $('btnChoLoad')?.addEventListener('click', loadList);
   $('choList')?.addEventListener('click', onListClick);
   document.addEventListener('qh-admin-changed', () => {
-    if (state.currentUserRole !== 'ADMIN') clearPreview();
+    if (state.currentUserRole !== 'ADMIN') {
+      clearPreview();
+      clearKeep();
+    }
   });
 }

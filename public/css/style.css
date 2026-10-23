@@ -1741,6 +1741,9 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .entry-officer { display: grid; gap: 6px; margin-bottom: 8px; font-size: var(--fs-sm); }
 .entry-officer label { display: grid; gap: 2px; }
 .entry-note { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.4; margin: 6px 0; }
+.lot-flag { color: var(--accent-red); }
+.lot-keep { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; }
+.lot-keep label { display: flex; gap: 8px; align-items: flex-start; font-size: var(--fs-sm); }
 .entry-steps { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow: auto; margin: 6px 0; }
 .entry-step-btn { text-align: left; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main); border-radius: var(--r-sm); padding: 4px 6px; font-size: var(--fs-xs); cursor: pointer; }
 .entry-step-btn.on { border-color: var(--accent-cyan); color: var(--accent-cyan); }

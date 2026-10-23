@@ -44,7 +44,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261032">
+  <link rel="stylesheet" href="css/style.css?v=20261034">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -1150,9 +1150,10 @@
         </div>
 
         <div id="addCho" style="display:none;">
-          <div class="cad-hint">Hồ sơ cán bộ (tab CanBo, Trạng thái TRUE) nằm ở đây cho đến khi duyệt. Duyệt chuyển vào bảng hoặc lớp bản đồ của đồ án. Từ chối ghi lý do. Người xem bản đồ không thấy hàng chờ. Bấm tải danh sách mới đọc Sheet.</div>
+          <div class="cad-hint">Hồ sơ cán bộ (tab CanBo, Trạng thái TRUE) nằm ở đây cho đến khi duyệt. Duyệt chuyển vào bảng hoặc lớp bản đồ của đồ án. Từ chối ghi lý do. Người xem bản đồ không thấy hàng chờ. Bấm tải danh sách mới đọc Sheet. Xem trên bản đồ: lô đỏ là lô ngoài ranh hoặc bị cắt. Tick lô đỏ để giữ hình gốc; lựa chọn ghi vào cột Lý do của dòng ChoDuyet.</div>
           <button type="button" class="btn-submit" id="btnChoLoad">Tải danh sách chờ duyệt</button>
           <div id="choStatus" class="rp-status" role="status" aria-live="polite"></div>
+          <div id="choKeep"></div>
           <div id="choList" class="cad-list"></div>
         </div>
 
@@ -1520,6 +1521,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261033"></script>
+  <script type="module" src="./js/app.js?v=20261034"></script>
 </body>
 </html>

@@ -8,6 +8,7 @@ import { SECTORS, FACET_LEVELS, listAreas } from './facetStore.js';
 import { EVAL_URBANS, fieldsForScope, gapRows } from './urbanEntrySchema.js';
 import { readUnit, writeUnit, replaceAll, officerCanEdit, readAll } from './urbanInputs.js';
 import { readDrawingFile, tagFeatures, asCollection, DRAW_MAX_BYTES } from './drawingReaders.js';
+import { SCHEME_EDGE_M, schemeBoundaryOf, clipSchemeLots, clipSentence } from './schemeLotClip.js';
 import { putSignedPdf, PDF_INLINE_MAX_BYTES } from './pdfLimits.js';
 
 const MB = 1024 * 1024;
@@ -16,6 +17,16 @@ const $ = (id) => document.getElementById(id);
 let submitInfraPoint = async () => {};
 let updateRadiusPreview = () => {};
 let preview = null;
+let previewRenderer = null;
+
+function lotRenderer() {
+  if (!map.getPane('lotPreview')) {
+    const pane = map.createPane('lotPreview');
+    pane.style.zIndex = '460';
+  }
+  if (!previewRenderer) previewRenderer = L.svg({ pane: 'lotPreview' });
+  return previewRenderer;
+}
 let stepId = 'qd';
 let crsId = 'HUE_3';
 let crsLon0 = '';
@@ -93,23 +104,50 @@ function clearPreview() {
   preview = null;
 }
 
-function showPreview(features) {
+function showPreview(features, review) {
   clearPreview();
-  if (!map || typeof L === 'undefined' || !features.length) return;
-  const fc = asCollection(features);
+  const draw = [];
+  (review || []).forEach(item => {
+    if (!item || !item.geometry) return;
+    draw.push({
+      type: 'Feature',
+      geometry: item.geometry,
+      properties: { _mau: 'do', _status: item.status }
+    });
+  });
+  (features || []).forEach(feature => draw.push(feature));
+  if (!map || typeof L === 'undefined' || !draw.length) return;
+  const fc = asCollection(draw);
   preview = L.geoJSON(fc, {
-    style: (f) => ({
-      color: f.geometry && f.geometry.type === 'LineString' ? '#2563eb' : '#7c3aed',
-      weight: 2,
-      fillColor: '#c4b5fd',
-      fillOpacity: 0.28
-    }),
+    pane: 'lotPreview',
+    renderer: lotRenderer(),
+    style: (f) => {
+      if (f.properties && f.properties._mau === 'ranh') {
+        return { color: '#0f172a', weight: 2, fillOpacity: 0 };
+      }
+      if (f.properties && f.properties._mau === 'do') {
+        const cut = f.properties._status === 'cat';
+        return {
+          color: '#dc2626',
+          weight: cut ? 3 : 2,
+          dashArray: cut ? '5 4' : null,
+          fillColor: '#f87171',
+          fillOpacity: cut ? 0.2 : 0.55
+        };
+      }
+      return {
+        color: f.geometry && f.geometry.type === 'LineString' ? '#2563eb' : '#7c3aed',
+        weight: 2,
+        fillColor: '#c4b5fd',
+        fillOpacity: 0.28
+      };
+    },
     pointToLayer: (_f, latlng) => L.circleMarker(latlng, { radius: 6, color: '#b45309', weight: 2, fillColor: '#fbbf24', fillOpacity: 0.95 })
   });
   preview.addTo(map);
   try {
     const b = preview.getBounds();
-    if (b.isValid()) map.fitBounds(b.pad(0.15));
+    if (b.isValid()) map.fitBounds(b.pad(0.2));
   } catch (e) { /* ranh rỗng */ }
 }
 
@@ -289,6 +327,85 @@ async function loadHanhChinh() {
   }
 }
 
+function applyLandClip(step, source) {
+  const prev = held[step.id] || {};
+  const base = { ...prev, source };
+  if (step.draw !== 'land') {
+    held[step.id] = { ...base, features: source, review: [], counts: null, clipNote: '' };
+    return;
+  }
+  const boundary = schemeBoundaryOf((held.ranh && held.ranh.source) || []);
+  if (!boundary) {
+    held[step.id] = {
+      ...base,
+      features: source,
+      review: [],
+      counts: null,
+      clipNote: 'Chưa có ranh đồ án trong hồ sơ này, chưa lọc lô.'
+    };
+    return;
+  }
+  const clip = clipSchemeLots(source, boundary);
+  held[step.id] = { ...base, features: clip.features, review: clip.review, counts: clip.counts, clipNote: '' };
+}
+
+function reclipLands() {
+  STEPS.forEach(step => {
+    if (step.draw !== 'land') return;
+    const bag = held[step.id];
+    if (!bag || !bag.source) return;
+    applyLandClip(step, bag.source);
+  });
+}
+
+function showStepPreview() {
+  const step = STEPS.find(s => s.id === stepId);
+  const bag = step && held[step.id];
+  if (!bag || ((!bag.features || !bag.features.length) && !(bag.review && bag.review.length))) {
+    clearPreview();
+    return;
+  }
+  const draw = (bag.features || []).slice();
+  if (step.draw === 'land' && held.ranh && held.ranh.source) {
+    held.ranh.source.forEach(feature => {
+      if (!feature || !feature.geometry) return;
+      draw.push({
+        type: 'Feature',
+        geometry: feature.geometry,
+        properties: { ...(feature.properties || {}), _mau: 'ranh' }
+      });
+    });
+  }
+  showPreview(draw, bag.review || []);
+}
+
+function reviewBody(step, bag, tagged) {
+  const meta = hoMeta(step);
+  const area = meta.area || {};
+  return (bag.review || []).map(item => {
+    const taggedProps = item.status === 'cat' && tagged[item.index] ? tagged[item.index].properties : null;
+    const props = taggedProps || {
+      ...(item.props || {}),
+      scheme: meta.scheme || '',
+      level: meta.level || '',
+      sector: meta.sector || '',
+      kind: meta.kind || '',
+      areaType: area.type || '',
+      areaCode: area.code || '',
+      areaParent: area.parent == null ? '' : String(area.parent),
+      step: meta.step || ''
+    };
+    return {
+      id: item.id,
+      status: item.status,
+      index: item.index,
+      name: item.name || '',
+      geometry: item.geometry,
+      props
+    };
+  });
+}
+
 function hoMeta(step) {
   const area = selectedArea('hoScope', 'hoUnit');
   return {
@@ -315,7 +432,7 @@ function renderHoSo() {
     return `<button type="button" class="entry-step-btn${s.id === stepId ? ' on' : ''}" data-step="${s.id}">${i + 1}. ${escapeHtml(s.label)}${done ? ' · có file' : ''}</button>`;
   }).join('');
   const levels = FACET_LEVELS.map(l => `<option value="${l.id}"${l.id === level ? ' selected' : ''}>${escapeHtml(l.label)}</option>`).join('');
-  root.innerHTML = `<p class="entry-note">Một đồ án, hai nhóm hồ sơ: quy hoạch sử dụng đất và bảy ngành hạ tầng. Quản trị: sử dụng đất và ranh thành lớp ngay, trừ đồ án đã có lớp đó. Cán bộ: gửi hàng chờ.</p>
+  root.innerHTML = `<p class="entry-note">Một đồ án, hai nhóm hồ sơ: quy hoạch sử dụng đất và bảy ngành hạ tầng. Quản trị: sử dụng đất và ranh thành lớp ngay, trừ đồ án đã có lớp đó. Cán bộ: gửi hàng chờ. Lô sử dụng đất lọc theo ranh đã tải trong hồ sơ: lệch không quá ${SCHEME_EDGE_M} m thì giữ nguyên hình; lô đỏ là lô bị bỏ hoặc bị cắt. Quản trị tick lô đỏ muốn giữ hình gốc khi duyệt.</p>
     <div class="form-grid">
       <label for="hoScheme">Đồ án</label>
       <input id="hoScheme" maxlength="120" placeholder="Tên đồ án đã có trên bucket" value="${escapeHtml(scheme)}">
@@ -367,8 +484,11 @@ function renderActive() {
       <label for="hoLon0">Kinh tuyến trục</label>
       <input id="hoLon0" type="number" min="102" max="110" step="0.25" placeholder="Ví dụ 107.5" value="${escapeHtml(crsLon0)}"${crsId === 'custom' ? '' : ' disabled'}>
     </div>` : '';
+  const clipHtml = got?.clipNote
+    ? `<p class="entry-note">${escapeHtml(got.clipNote)}</p>`
+    : (got?.counts ? `<p class="entry-note lot-flag">${escapeHtml(clipSentence(got.counts))}</p>` : '');
   const note = got
-    ? `<p class="entry-note">${escapeHtml(got.file?.name || '')}${got.warning ? ` — ${escapeHtml(got.warning)}` : ''}${got.error ? ` — ${escapeHtml(got.error)}` : ''}${got.features ? ` — ${got.features.length} đối tượng` : ''}</p>`
+    ? `<p class="entry-note">${escapeHtml(got.file?.name || '')}${got.warning ? ` — ${escapeHtml(got.warning)}` : ''}${got.error ? ` — ${escapeHtml(got.error)}` : ''}${got.features ? ` — ${got.features.length} đối tượng` : ''}</p>${clipHtml}`
     : '';
   box.innerHTML = `<h3 class="entry-step-title">${escapeHtml(step.label)}</h3>
     <p class="entry-note">${limit}. ${step.file === 'draw' ? 'Bản vẽ VN-2000 cần đúng kinh tuyến trục trước khi xem trên bản đồ.' : ''}</p>
@@ -394,6 +514,7 @@ function renderActive() {
     if (step.file === 'pdf') takePdf(step, file);
     else takeDraw(step, file);
   });
+  showStepPreview();
 }
 
 function fileError(file, step) {
@@ -423,9 +544,9 @@ async function takeDraw(step, file) {
   try {
     const parsed = await readDrawingFile(file, step.draw, choice);
     const features = parsed.error ? [] : tagFeatures(parsed.features, hoMeta(step));
-    held[step.id] = { file, error: parsed.error || '', warning: parsed.warning || '', features, needCrs: parsed.needCrs };
-    if (features.length) showPreview(features);
-    else clearPreview();
+    held[step.id] = { file, error: parsed.error || '', warning: parsed.warning || '', needCrs: parsed.needCrs };
+    applyLandClip(step, features);
+    if (step.id === 'ranh') reclipLands();
   } catch (err) {
     held[step.id] = { file, error: err.message || 'Không đọc được bản vẽ.' };
     clearPreview();
@@ -526,15 +647,19 @@ async function saveHoSo() {
     const unitKey = area ? unitKeyOf(area.type, area.code) : '';
     if (!officerCanEdit(unitKey)) {
       notes.push('bản vẽ giữ trên máy — cần đăng nhập đúng đơn vị');
-    } else if (isAdmin()) {
+      } else if (isAdmin()) {
       for (const step of STEPS) {
         const bag = held[step.id];
-        if (!bag?.features?.length) continue;
+        if (!bag?.features?.length) {
+          if (bag?.counts) notes.push(`${step.label} (${clipSentence(bag.counts)}; không ghi)`);
+          continue;
+        }
         const rows = netPayload(tagFeatures(bag.features, hoMeta(step)));
         const kind = PUBLISH_KIND[step.id];
         if (kind) {
           const done = await postJson('publishSchemeDraw', { tenQH, kind, features: rows });
-          notes.push(done.skipped ? `${step.label} (${done.note || 'đã có lớp'})` : step.label);
+          const clipNote = bag.counts ? ` ${clipSentence(bag.counts)}` : '';
+          notes.push(done.skipped ? `${step.label} (${done.note || 'đã có lớp'})` : `${step.label}.${clipNote}`.trim());
         } else if (step.role) {
           await postJson('putProjectNet', { tenQH, role: step.role, features: rows });
           notes.push(step.label);
@@ -543,18 +668,23 @@ async function saveHoSo() {
     } else {
       for (const step of STEPS) {
         const bag = held[step.id];
-        if (!bag?.features?.length) continue;
-        const rows = netPayload(tagFeatures(bag.features, hoMeta(step)));
+        const hasDraw = bag?.features?.length || bag?.review?.length;
+        if (!hasDraw) continue;
+        const tagged = tagFeatures(bag.features || [], hoMeta(step));
+        const rows = netPayload(tagged);
         const kind = PUBLISH_KIND[step.id] || 'ban-ve';
+        const review = step.draw === 'land' ? reviewBody(step, bag, tagged) : [];
         await postJson('submitChoDuyet', {
           kind,
           unitKey,
           tenQH,
           role: kind === 'ban-ve' ? step.role : '',
-          summary: `${step.label} · ${rows.length} đối tượng`,
-          features: rows
+          summary: `${step.label} · ${rows.length} đối tượng${bag.counts ? ` · đỏ ${bag.counts.bo + bag.counts.cat}` : ''}`.slice(0, 180),
+          features: rows,
+          lotReview: review,
+          clip: bag.counts ? { edgeM: SCHEME_EDGE_M, ...bag.counts } : undefined
         });
-        notes.push(`${step.label} (chờ duyệt)`);
+        notes.push(`${step.label} (chờ duyệt)${bag.counts ? ` — ${clipSentence(bag.counts)}` : ''}`);
       }
     }
     if (features.length) downloadHoSo();

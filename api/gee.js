@@ -4528,7 +4528,9 @@ module.exports = async (req, res) => {
         tenQH: body.tenQH,
         role: body.role,
         summary: body.summary,
-        features: body.features
+        features: body.features,
+        lotReview: body.lotReview,
+        clip: body.clip
       });
       return res.status(200).json({ success: true, staged: true, id: staged.id });
     }
@@ -4577,7 +4579,9 @@ module.exports = async (req, res) => {
           summary: row.summary || '',
           tenQH: row.tenQH || '',
           unit: row.unit || '',
-          features
+          features,
+          lotReview: Array.isArray(obj.lotReview) ? obj.lotReview : [],
+          clip: obj.clip || null
         });
       }
       if (action === 'rejectChoDuyet') {
@@ -4588,18 +4592,21 @@ module.exports = async (req, res) => {
         return res.status(200).json({ success: true, id, status: 'tu_choi' });
       }
       const obj = await choDuyet.readJson(row.gcs);
+      const keepIds = Array.isArray(body.keepIds) ? body.keepIds.map(item => String(item).slice(0, 40)).filter(Boolean).slice(0, 4000) : [];
+      obj.keepIds = keepIds;
       const done = await applyPublication(obj, {
         projects,
         callAppsScript: (params, payload) => scriptEntry(params.action, payload),
         publishKienTruc: (point, email) => publishKienTrucPoint(point, email)
       });
+      const keepNote = keepIds.length ? `Giữ hình gốc: ${keepIds.join(', ')}` : '';
       await scriptEntry('setChoDuyet', {
         action: 'setChoDuyet',
         admin: true,
         email: user.email,
         id,
         status: 'da_duyet',
-        lyDo: done.note || ''
+        lyDo: [done.note, keepNote].filter(Boolean).join(' ').slice(0, 300)
       });
       try { await choDuyet.remove(row.gcs); } catch (err) { /* lớp đã ghi, file chờ xóa sau */ }
       return res.status(200).json({ success: true, id, status: 'da_duyet', published: !!done.published, skipped: !!done.skipped, note: done.note || '' });

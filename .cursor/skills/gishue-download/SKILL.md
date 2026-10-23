@@ -86,3 +86,11 @@ Lô đất hạ tầng ghép với danh sách Sheet (`scripts/sync-plan-infra.js
 4. Mỗi lần gỡ ghi một dòng vào `docs/qhct-unpair.json`: mã lô QHPK, đồ án QHPK, mã lô QHCT, mã dòng hạ tầng.
 
 Trường học nhiều cấp (`TRUONG`) và thương mại/dịch vụ chưa tách chợ (`CHOTM`) không tự ghép.
+
+Lớp chức năng sử dụng đất (polygon) lọc theo vùng ranh giới quy hoạch của đúng đồ án trước khi dựng catalog:
+
+```bash
+node scripts/clip-scheme-lots.mjs --land "<hien-trang hoặc su-dung-dat.geojson>" --boundary "<vung ranh gioi quy hoach.geojson>" --out "<file se ghi>"
+```
+
+Dung sai 5 m. Script bỏ lô ngoài ranh, cắt lô vắt ranh, in số lô và thêm một dòng vào `docs/cat-lo-ngoai-ranh.jsonl` (bỏ, cắt, giữ). Không hỏi quản trị. Không xóa polygon QHPK, không gỡ ghép, không gộp lô hạ tầng chung ranh.
