@@ -26,6 +26,7 @@ import { addLotEditButton } from './lotEdit.js';
 import { planLevelOf } from './generalPlan.js';
 import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
 import { bindNotchZoom } from './wheelZoom.js';
+import { lotBuildupSlotHtml } from './lotScreen.js';
 
 export let map = null;
 export let measureLayerGroup = null;
@@ -1553,7 +1554,7 @@ let landPopupExtra = () => '';
 export function setLandPopupExtra(fn) { landPopupExtra = typeof fn === 'function' ? fn : () => ''; }
 
 let fillLotBuildup = () => {};
-/** Đối chiếu mật độ xây dựng thực tế sau khi thẻ lô đã mở */
+/** Gắn nút kiểm tra mật độ. Phép tính và tải dấu chân chỉ chạy khi bấm nút. */
 export function setLotBuildup(fn) { fillLotBuildup = typeof fn === 'function' ? fn : () => {}; }
 
 function landPopupHtml(p) {
@@ -1585,7 +1586,7 @@ function landPopupHtml(p) {
     ${lotStatsHtml(p.plan)}
     <dl class="lp-info">${info.map(([k, v]) => `<dt>${k}</dt><dd${k === 'Layer' ? ' class="lp-mono"' : ''}>${escapeHtml(String(v))}</dd>`).join('')}</dl>
     ${landPopupExtra(p)}
-    <div class="lot-buildup" data-lot-buildup>Đang đối chiếu dấu chân công trình…</div>
+    ${lotBuildupSlotHtml()}
     ${view3d}
   </div>`;
 }

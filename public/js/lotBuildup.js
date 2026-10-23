@@ -1,8 +1,9 @@
-// Khi bấm ô đất quy hoạch: cắt dấu chân công trình theo ranh lô, đối chiếu mật độ / hệ số / tầng cao.
+// Nút trên thẻ lô mới cắt dấu chân theo ranh và đối chiếu mật độ, hệ số, tầng cao.
+// Mở thẻ không gọi mạng và không tính.
 import { setLotBuildup } from './mapEngine.js';
 import { gbaFootprintsIn } from './gbaLayer.js';
 import { heightAt, loadBuildingHeights } from './bldgHeight.js';
-import { buildupHtml, floorsFromHeight } from './lotScreen.js';
+import { buildupHtml, floorsFromHeight, lotBuildupButtonHtml } from './lotScreen.js';
 import { withAssetVersion } from './gbaVersion.js';
 
 const MAX_TILES = 48;
@@ -243,23 +244,53 @@ async function compute(lot) {
   });
 }
 
+const LOADING = 'Đang đối chiếu dấu chân công trình…';
+
+function relayout(popup) {
+  try {
+    if (typeof popup._updateLayout === 'function') popup._updateLayout();
+    if (typeof popup._updatePosition === 'function') popup._updatePosition();
+  } catch (e) { /* thẻ đã đóng */ }
+}
+
+function stopMapClick(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  globalThis.L?.DomEvent?.stop(e);
+}
+
 export function attachLotBuildup(popup, lot) {
-  const run = () => {
+  const arm = () => {
     const el = popup.getElement()?.querySelector('[data-lot-buildup]');
-    if (!el) return;
-    const token = `${Date.now()}-${Math.random()}`;
-    el.dataset.token = token;
-    el.textContent = 'Đang đối chiếu dấu chân công trình…';
-    compute(lot).then((html) => {
-      if (el.dataset.token !== token) return;
-      el.innerHTML = html;
-    }).catch(() => {
-      if (el.dataset.token !== token) return;
-      el.textContent = 'Chưa đối chiếu được dấu chân công trình.';
+    if (!el || el.dataset.armed === '1') return;
+    el.dataset.armed = '1';
+    if (!el.querySelector('[data-lot-buildup-run]')) el.innerHTML = lotBuildupButtonHtml();
+    el.addEventListener('click', (e) => {
+      const btn = e.target.closest?.('[data-lot-buildup-run]');
+      if (!btn || !el.contains(btn)) return;
+      stopMapClick(e);
+      if (el.dataset.running === '1') return;
+      el.dataset.running = '1';
+      const token = `${Date.now()}-${Math.random()}`;
+      el.dataset.token = token;
+      el.textContent = LOADING;
+      relayout(popup);
+      const alive = () => popup.isOpen?.() !== false && el.dataset.token === token;
+      compute(lot).then((html) => {
+        if (!alive()) return;
+        el.innerHTML = html;
+        delete el.dataset.running;
+        relayout(popup);
+      }).catch(() => {
+        if (!alive()) return;
+        el.dataset.running = '';
+        el.innerHTML = `<span class="is-miss">Chưa đối chiếu được dấu chân công trình.</span>${lotBuildupButtonHtml()}`;
+        relayout(popup);
+      });
     });
   };
-  if (popup.getElement()) run();
-  else popup.once('add', run);
+  if (popup.getElement()) arm();
+  else popup.once('add', arm);
 }
 
 export function initLotBuildup() {

@@ -13,6 +13,7 @@ import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace } from './planLandStats.js';
 import { landPatternKey, TT16_STYLES, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
 import { attachLotBuildup } from './lotBuildup.js';
+import { lotBuildupSlotHtml } from './lotScreen.js';
 
 export const QHCT_URL = 'data/qhct/index.json';
 const PANE = 'qhctPane';
@@ -175,7 +176,7 @@ function popupHtml(p) {
   ].filter(([, v]) => v);
   return `<div class="qhc-pop"><div class="qhc-pop-head"><b>${escapeHtml(p.chucNang || 'Lô đất QHCT 1/500')}</b></div>
     <table class="qhc-pop-table">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${escapeHtml(String(v))}</td></tr>`).join('')}</table>
-    <div class="lot-buildup" data-lot-buildup>Đang đối chiếu dấu chân công trình…</div>
+    ${lotBuildupSlotHtml()}
     <div class="qhc-pop-src">QHCT 1/500</div></div>`;
 }
 

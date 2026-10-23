@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { parseHeightIndex } from '../public/js/bldgHeight.js';
-import { floorsFromHeight, planLimit, screenVerdict, buildupHtml } from '../public/js/lotScreen.js';
+import { floorsFromHeight, planLimit, screenVerdict, buildupHtml, lotBuildupSlotHtml } from '../public/js/lotScreen.js';
 
 const buf = readFileSync(new URL('../public/data/gba/bldg-hf.bin', import.meta.url));
 const idx = parseHeightIndex(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
@@ -24,4 +24,22 @@ const partial = buildupHtml({
   plan: { coverage: 40, floors: 3 }
 });
 if (!partial.includes('chưa kết luận')) throw new Error('thiếu chiều cao vẫn kết luận');
+const slot = lotBuildupSlotHtml();
+if (!slot.includes('data-lot-buildup-run') || !slot.includes('Kiểm tra mật độ xây dựng thực tế')) {
+  throw new Error('thẻ lô thiếu nút kiểm tra mật độ');
+}
+if (slot.includes('Đang đối chiếu')) throw new Error('nút không được tự đối chiếu');
+const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
+for (const rel of ['../public/js/mapEngine.js', '../public/js/qhctLayer.js']) {
+  const file = src(rel);
+  if (file.includes('Đang đối chiếu dấu chân')) throw new Error(`${rel} vẫn tự đối chiếu khi mở thẻ`);
+  if (!file.includes('lotBuildupSlotHtml()')) throw new Error(`${rel} thiếu nút`);
+}
+const attach = src('../public/js/lotBuildup.js').split('export function attachLotBuildup')[1] || '';
+const beforeClick = attach.split("addEventListener('click'")[0];
+if (beforeClick.includes('compute(')) throw new Error('đối chiếu chạy trước khi bấm');
+if (!attach.includes('el.textContent = LOADING')) throw new Error('thiếu trạng thái đang kiểm tra');
+if (!src('../public/js/lotBuildup.js').includes("const LOADING = 'Đang đối chiếu dấu chân công trình…'")) {
+  throw new Error('thiếu câu đang đối chiếu');
+}
 console.log('ok', vin);
