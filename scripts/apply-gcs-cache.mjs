@@ -9,7 +9,8 @@ const PREFIXES = [
   'infrastructure_hue.json',
   'cadastre/thuadat-2016.pmtiles',
   'gba/buildings.pmtiles',
-  'cache/sat/v1/'
+  'cache/sat/v1/',
+  'chuyen-nganh/v1/'
 ];
 
 function parseArgs(argv) {

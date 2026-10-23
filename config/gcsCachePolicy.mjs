@@ -9,6 +9,7 @@ export function cacheControlFor(name) {
   if (n === 'cadastre/thuadat-2016.pmtiles') return IMMUTABLE;
   if (n === 'gba/buildings.pmtiles') return IMMUTABLE;
   if (n.startsWith('cache/sat/v1/') && n.endsWith('.png')) return IMMUTABLE;
+  if (n.startsWith('chuyen-nganh/v1/')) return IMMUTABLE;
   return '';
 }
 
