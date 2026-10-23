@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
-  AREA_TP, SECTORS, WARD_NAMES, applyFacetSearch, areaCodeFromName, areaLabel, baseLayers,
+  AREA_TP, SCHEME_ALIAS, SECTORS, WARD_NAMES, applyFacetSearch, areaCodeFromName, areaLabel, baseLayers,
   browseState, canonicalSector, facetQuery, findArea, formatKv, getLayers, layerPassesFilter,
   layersFor, listAreas, loadFacetCatalog, normalizeArea, normalizeLayer, parseKv, registerAreas,
   schemesAt, setAreaFilter, setBrowseState, getAreaFilter
@@ -153,5 +153,30 @@ assert.deepEqual(quyChe.items, []);
 assert.deepEqual(congTrinh.items, []);
 assert.ok(quyChe.schema);
 assert.ok(congTrinh.schema);
+
+const landIndex = JSON.parse(fs.readFileSync('public/data/su-dung-dat-index.json', 'utf8'));
+assert.deepEqual(Object.keys(SCHEME_ALIAS).sort(), landIndex.aliases.map(a => a.slug).sort());
+const aliased = schemesAt('QHC10', [{
+  tenQH: 'QHC đô thị trung tâm Thừa Thiên Huế 1/10.000',
+  slug: 'qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72',
+  wards: []
+}]);
+assert.equal(aliased.some(s => s.slug === 'qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72'), false);
+assert.ok(aliased.some(s => s.slug === 'qhc-trung-tam'));
+
+await loadFacetCatalog(async () => ({
+  ok: true,
+  json: async () => ({
+    layers: [
+      { sector: 'sdd', scale: 10000, status: 'quy-hoach', scheme: 'qhc-trung-tam', name: 'QH sử dụng đất (trung tâm)', file: 'data/qhc2045/sdd.json', ref: 'data/qhc2045/sdd.json' },
+      { sector: 'sdd', scale: 10000, status: 'quy-hoach', scheme: 'qhc-khe-tre-4a4803cd', name: 'Chức năng sử dụng đất', file: 'projects/qhc-khe-tre-4a4803cd/su-dung-dat.json', ref: 'projects/qhc-khe-tre-4a4803cd/su-dung-dat.json' },
+      { sector: 'giao-thong', scale: 25000, status: 'hien-trang', scheme: 'qhc-hue-2045', name: 'Đường', file: 'data/chuyen-nganh/a.geojson' }
+    ]
+  })
+}));
+assert.equal(getLayers().some(l => l.ref), false);
+assert.equal(getLayers().some(l => String(l.file).startsWith('projects/')), false);
+assert.equal(getLayers().filter(l => l.file === 'data/qhc2045/sdd.json').length, 1);
+assert.ok(getLayers().some(l => l.file === 'data/chuyen-nganh/a.geojson' && l.scheme === 'qhc-hue-2045'));
 
 console.log('facet store ok');

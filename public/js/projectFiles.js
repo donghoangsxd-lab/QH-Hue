@@ -7,6 +7,7 @@
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { planLevelOf } from './generalPlan.js';
+import { SCHEME_ALIAS } from './facetStore.js';
 import { getLevel } from './mapLevel.js';
 import { isLevelPair, sideOf } from './splitPair.js';
 import { planMap } from './planMap.js';
@@ -763,7 +764,9 @@ export async function loadCatalog() {
   const data = await res.json();
   base = data.base || '';
   state.projectBase = base;
-  state.projectCatalog = dropLegacyDuplicates(Array.isArray(data.projects) ? data.projects : []).map(trimMinorWards);
+  state.projectCatalog = dropLegacyDuplicates(Array.isArray(data.projects) ? data.projects : [])
+    .filter(p => !(p && SCHEME_ALIAS[p.slug]))
+    .map(trimMinorWards);
   state.projectAreas = state.projectCatalog.filter(p => p && p.boundary).map(p => ({
     id: p.tenQH,
     kind: 'PROJECT',

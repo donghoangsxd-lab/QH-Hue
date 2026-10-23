@@ -1,5 +1,6 @@
 const assert = require('assert');
-const { classifySector, scaleOf, statusOf, slug } = require('./build-chuyen-nganh');
+const fs = require('fs');
+const { classifySector, scaleOf, statusOf, slug, landUseName, retargetManifest } = require('./build-chuyen-nganh');
 
 const cases = [
   ['Mạng lưới giao thông đường bộ', 'giao-thong'],
@@ -52,4 +53,27 @@ assert.strictEqual(scaleOf('Hiện trạng (1:10.000)'), 10000);
 assert.strictEqual(statusOf('Hiện trạng (1-25.000)'), 'hien-trang');
 assert.strictEqual(statusOf('Quy hoạch cấp nước (1-10.000)'), 'quy-hoach');
 assert.strictEqual(slug('Mạng lưới thoát nước thải'), 'mang-luoi-thoat-nuoc-thai');
+assert.strictEqual(landUseName('Hiện trạng sử dụng đất'), true);
+assert.strictEqual(landUseName('Chức năng sử dụng đất'), true);
+assert.strictEqual(landUseName('Ranh giới quy hoạch'), false);
+
+const index = JSON.parse(fs.readFileSync('public/data/su-dung-dat-index.json', 'utf8'));
+assert.strictEqual(index.count, index.layers.length);
+assert.strictEqual(index.count, 95);
+assert.ok(index.layers.some(l => l.scheme === 'qhc-hue-2045' && l.path === 'data/qhc2045/dinhhuong.json' && l.mapid === 21817));
+assert.ok(index.layers.some(l => l.scheme === 'qhc-trung-tam' && l.path === 'data/qhc2045/sdd.json' && l.mapid === 21817));
+assert.ok(index.layers.some(l => l.scheme === 'qhc-khe-tre-4a4803cd' && l.layer === 'su-dung-dat' && l.mapid === 20778));
+assert.ok(!index.layers.some(l => l.scheme === 'qhc-khu-cong-nghiep-phong-dien-f997bd2c'));
+
+const manifest = JSON.parse(fs.readFileSync('public/data/chuyen-nganh/index.json', 'utf8'));
+const raw21817 = manifest.layers.filter(l => landUseName(l.name) && /qhc-do-thi-thua-thien-hue-1-25-000|qhc-do-thi-trung-tam-thua-thien-hue-1-10-000/.test(String(l.file || '')));
+assert.strictEqual(raw21817.length, 0);
+assert.ok(manifest.layers.some(l => l.scheme === 'qhc-hue-2045' && l.ref === 'data/qhc2045/dinhhuong.json'));
+assert.ok(manifest.layers.some(l => l.scheme === 'qhc-trung-tam' && l.ref === 'data/qhc2045/sdd.json'));
+assert.ok(manifest.layers.some(l => l.scheme === 'qhc-khe-tre-4a4803cd' && l.ref === 'projects/qhc-khe-tre-4a4803cd/su-dung-dat.json'));
+assert.ok(manifest.layers.some(l => l.scheme === 'qhc-khu-cong-nghiep-phong-dien-f997bd2c' && l.name === 'Chức năng sử dụng đất' && !l.ref));
+assert.ok(manifest.layers.some(l => l.scheme === 'qhc-hue-2045' && l.sector === 'giao-thong' && String(l.file).includes('qhc-do-thi-thua-thien-hue-1-25-000')));
+const again = retargetManifest(manifest, index);
+assert.strictEqual(again.layers.filter(l => landUseName(l.name) && /thua-thien-hue-1-25-000|trung-tam-thua-thien-hue-1-10-000/.test(String(l.file || ''))).length, 0);
+assert.ok(again.layers.some(l => l.scheme === 'qhc-tt-phu-loc-19e96a86' && l.status === 'hien-trang' && landUseName(l.name) && !l.ref));
 console.log('ok', cases.length);

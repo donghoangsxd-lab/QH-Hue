@@ -38,8 +38,8 @@ const RULES = [
 
 // Slug trùng projects/index.json khi đồ án đã có. Đồ án mới dùng projectSlug(tên).
 const SCHEMES = [
-  { slug: 'qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1', name: 'QHC đô thị Thừa Thiên Huế 1/25.000', level: 'QHC', mapid: 21817, scale: 25000, parent: null, overrides: [], priority: 1, gcs: 'add' },
-  { slug: 'qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72', name: 'QHC đô thị trung tâm Thừa Thiên Huế 1/10.000', level: 'QHC', mapid: 21817, scale: 10000, parent: null, overrides: [], priority: 1, gcs: 'add' },
+  { slug: 'qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1', catalogScheme: 'qhc-hue-2045', name: 'QHC đô thị Thừa Thiên Huế 1/25.000', level: 'QHC', mapid: 21817, scale: 25000, parent: null, overrides: [], priority: 1, gcs: 'add' },
+  { slug: 'qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72', catalogScheme: 'qhc-trung-tam', name: 'QHC đô thị trung tâm Thừa Thiên Huế 1/10.000', level: 'QHC', mapid: 21817, scale: 10000, parent: null, overrides: [], priority: 1, gcs: 'add' },
   { slug: 'qhc-tt-phu-loc-19e96a86', name: 'QHC TT Phú Lộc', level: 'QHC', mapid: 20674, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', taskDecision: '3134/QĐ-UBND', taskDecisionDate: '2019-12-16', decision: '1101/QĐ-UBND', decisionDate: '2020-04-17', authority: 'UBND tỉnh' },
   { slug: 'qhc-khe-tre-4a4803cd', name: 'QHC Khe Tre', level: 'QHC', mapid: 20778, scale: 2000, parent: null, overrides: [], priority: 1, gcs: 'exists', taskDecision: '1022/QĐ-UBND', taskDecisionDate: '2016-05-16', decision: '688/QĐ-UBND', decisionDate: '2020-03-13' },
   { slug: 'qhc-do-thi-moi-vinh-hung-8899f27b', name: 'QHC Đô thị mới Vinh Hưng', level: 'QHC', mapid: 22906, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', decision: '193/QĐ-UBND', decisionDate: '2025-01-21', authority: 'UBND thành phố Huế' },
@@ -83,6 +83,83 @@ function classifySector(name) {
     if (re.test(key)) return sector;
   }
   return undefined;
+}
+
+function landUseName(name) {
+  return /su dung dat/.test(words(name));
+}
+
+function aliasMap(indexDoc) {
+  const map = {};
+  SCHEMES.forEach((s) => { if (s.catalogScheme) map[s.slug] = s.catalogScheme; });
+  (indexDoc && indexDoc.aliases || []).forEach((a) => {
+    if (a && a.slug && a.scheme) map[a.slug] = a.scheme;
+  });
+  return map;
+}
+
+function loadLandIndex(repo) {
+  const file = path.join(repo, 'public', 'data', 'su-dung-dat-index.json');
+  if (!fs.existsSync(file)) return { layers: [], aliases: [] };
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+
+// Lớp sử dụng đất đã có trong chỉ mục thì trỏ path cũ, không phát hành bản thô thứ hai.
+// mapid 21817: bỏ lớp thô (kể cả hiện trạng); đồ án giữ data/qhc2045.
+function retargetManifest(doc, indexDoc) {
+  const alias = aliasMap(indexDoc || {});
+  const rows = (indexDoc && indexDoc.layers) || [];
+  const byRole = new Map(rows.map((l) => [`${l.scheme}|${l.role}`, l]));
+  const byMap = new Map(rows.filter((l) => l.mapid != null).map((l) => [`${l.mapid}|${l.scheme}`, l]));
+  const rawSlug = (layer) => Object.keys(alias).find((slug) => String(layer.file || '').includes(`/${slug}/`));
+  const layers = [];
+  (doc.layers || []).forEach((layer) => {
+    const storage = layer.scheme;
+    const catalog = alias[storage] || storage;
+    const fromFile = rawSlug(layer);
+    if (landUseName(layer.name) && (alias[storage] || fromFile)) return;
+    const next = { ...layer, scheme: catalog };
+    const hit = byRole.get(`${catalog}|${layer.status}`);
+    if (landUseName(layer.name) && layer.file && hit) {
+      next.file = hit.path;
+      next.ref = hit.path;
+    }
+    layers.push(next);
+  });
+  rows.filter((l) => l.source === 'static').forEach((row) => {
+    if (layers.some((l) => l.scheme === row.scheme && l.ref === row.path)) return;
+    layers.unshift({
+      sector: 'sdd', scale: row.scale, status: row.role, scheme: row.scheme, level: 'QHC',
+      name: row.name, geomType: 'Polygon', file: row.path, ref: row.path, mapid: row.mapid, bind: row.bind
+    });
+  });
+  const gaps = (doc.gaps || []).map((g) => {
+    const storage = g.scheme;
+    const catalog = alias[storage] || storage;
+    const next = { ...g, scheme: catalog };
+    if (!alias[storage]) return next;
+    const hit = byMap.get(`21817|${catalog}`);
+    const covered = hit && (landUseName(g.name) || (g.sector === 'sdd' && g.status === 'quy-hoach' && !g.name));
+    if (!covered) return next;
+    next.ref = hit.path;
+    next.reason = g.name
+      ? `Phần sử dụng đất đã có tại ${hit.path}. Phần còn lại của nhóm chưa tải.`
+      : `Đã có lớp sử dụng đất ${hit.path}`;
+    if (!next.name) next.name = hit.name;
+    return next;
+  });
+  return { ...doc, layers, gaps };
+}
+
+function markLandSkip(layers, indexDoc) {
+  const alias = aliasMap(indexDoc || {});
+  const byRole = new Map(((indexDoc && indexDoc.layers) || []).map((l) => [`${l.scheme}|${l.role}`, l]));
+  layers.forEach((layer) => {
+    const catalog = alias[layer.scheme] || layer.scheme;
+    if (landUseName(layer.name) && (alias[layer.scheme] || byRole.get(`${catalog}|${layer.status}`))) {
+      layer.skipPlace = true;
+    }
+  });
 }
 
 function scaleOf(dirName) {
@@ -218,6 +295,7 @@ function place(layers, repo) {
   const used = new Set();
   const heavy = [];
   for (const layer of layers) {
+    if (layer.skipPlace) continue;
     const base = slug(layer.name);
     let stem = base;
     let n = 2;
@@ -323,6 +401,7 @@ function schemesDoc() {
       parent: s.parent,
       overrides: s.overrides,
       priority: s.priority,
+      ...(s.catalogScheme ? { catalogScheme: s.catalogScheme } : {}),
       ...(s.scale != null ? { scale: s.scale } : {}),
       ...(s.overrideArea ? { overrideArea: s.overrideArea } : {}),
       ...(s.decision ? { decision: s.decision, decisionDate: s.decisionDate } : {}),
@@ -339,6 +418,8 @@ function statusLabel(status) {
 function docOf(manifest, heavy) {
   const lines = [];
   const nameOf = Object.fromEntries(SCHEMES.map((s) => [s.slug, s.name]));
+  nameOf['qhc-hue-2045'] = 'QHC đô thị Huế 2045';
+  nameOf['qhc-trung-tam'] = 'QHC đô thị TTHuế 2045 (Trung tâm)';
   lines.push('# Hạ tầng chuyên ngành');
   lines.push('');
   lines.push('Bộ dữ liệu hạ tầng chuyên ngành, gắn tab Hạ tầng. Mô hình bốn trục: [docs/bon-truc.md](bon-truc.md). CRS **EPSG:4326**.');
@@ -399,7 +480,7 @@ function docOf(manifest, heavy) {
 }
 
 function writeOutputs(repo, layers, gaps, heavy) {
-  const manifest = manifestOf(layers, gaps);
+  const manifest = retargetManifest(manifestOf(layers, gaps), loadLandIndex(repo));
   const outJson = path.join(repo, 'public', 'data', 'chuyen-nganh', 'index.json');
   fs.mkdirSync(path.dirname(outJson), { recursive: true });
   fs.writeFileSync(outJson, JSON.stringify(manifest, null, 2) + '\n');
@@ -486,6 +567,7 @@ async function main() {
     console.error(JSON.stringify({ unclassified }));
     process.exit(1);
   }
+  markLandSkip(layers, loadLandIndex(repo));
   const heavy = place(layers, repo);
   const allGaps = gaps.concat(emptyCells(layers), missing21817());
   writeOutputs(repo, layers, allGaps, heavy);
@@ -505,7 +587,9 @@ async function main() {
   }));
 }
 
-module.exports = { classifySector, scaleOf, statusOf, slug, words, SECTORS, RULES, SCHEMES };
+module.exports = {
+  classifySector, scaleOf, statusOf, slug, words, landUseName, retargetManifest, SECTORS, RULES, SCHEMES
+};
 
 if (require.main === module) {
   main().catch((err) => {

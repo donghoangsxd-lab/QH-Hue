@@ -173,6 +173,12 @@ function schemeForScale(scale) {
   return '';
 }
 
+// Mục sheetOnly mapid 21817. Lớp sử dụng đất nằm ở đồ án tĩnh. Khớp aliases trong su-dung-dat-index.json.
+export const SCHEME_ALIAS = {
+  'qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1': 'qhc-hue-2045',
+  'qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72': 'qhc-trung-tam'
+};
+
 function areaForScale(scale) {
   return String(scale ?? '') === '10000' ? { ...AREA_TRUNG_TAM } : { ...AREA_TP };
 }
@@ -396,7 +402,8 @@ export async function loadFacetCatalog(fetchImpl) {
       doc = null;
     }
   }
-  const rawLayers = Array.isArray(doc) ? doc : doc && Array.isArray(doc.layers) ? doc.layers : null;
+  const listed = Array.isArray(doc) ? doc : doc && Array.isArray(doc.layers) ? doc.layers : null;
+  const rawLayers = listed ? listed.filter(l => l && !l.ref) : null;
   if (!rawLayers) {
     replaceLayers([], 'fallback');
     return catalogFrom;
@@ -427,6 +434,7 @@ export function schemesAt(level, catalog = []) {
     });
   }
   (catalog || []).forEach(p => {
+    if (!p || SCHEME_ALIAS[p.slug]) return;
     const kind = planLevelOf(p.tenQH);
     const lv = kind === 'QHC' ? 'QHC10' : kind === 'QHPK' ? 'QHPK' : kind === 'QHCT' ? 'QHCT' : '';
     if (lv !== level) return;
@@ -435,9 +443,10 @@ export function schemesAt(level, catalog = []) {
   });
   layers.forEach(l => {
     if (l.level !== level || !l.scheme) return;
-    const project = (catalog || []).find(p => p && p.slug === l.scheme);
-    const name = project ? (namesOfProject(project).tenRutGon || project.tenQH || l.scheme) : l.scheme;
-    add(schemeRow(l.scheme, name, level));
+    const slug = SCHEME_ALIAS[l.scheme] || l.scheme;
+    const project = (catalog || []).find(p => p && p.slug === slug);
+    const name = project ? (namesOfProject(project).tenRutGon || project.tenQH || slug) : slug;
+    add(schemeRow(slug, name, level));
   });
   return rows;
 }
