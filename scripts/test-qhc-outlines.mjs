@@ -303,16 +303,17 @@ async function scene(page, name) {
     box.checked = false;
     box.dispatchEvent(new Event('change', { bubbles: true }));
     const { state } = await import('./js/state.js');
-    const { lotShown } = await import('./js/projectFiles.js');
+    const { projectLotsDrawn } = await import('./js/projectFiles.js');
     const { visibleOutlineNames } = await import('./js/projectLayer.js');
-    const name = [...state.hiddenProjects].find(n => /Chân Mây/.test(n));
+    const name = (state.projectCatalog || []).map(p => p.tenQH).find(n => /Chân Mây/.test(String(n || '')));
     const still = visibleOutlineNames('QHC').some(p => /Chân Mây/.test(p.name));
-    return { ok: !!name && !still && lotShown(name) === false, name, still, lots: name ? lotShown(name) : null };
+    const lots = name ? projectLotsDrawn(name) : null;
+    return { ok: !!name && still && lots === false && box.checked === false, name, still, lots, checked: box.checked };
   });
-  if (!hidden.ok) throw new Error(`${name}: bỏ chọn không ẩn ranh/lô ${JSON.stringify(hidden)}`);
+  if (!hidden.ok) throw new Error(`${name}: bỏ chọn QHC 1/10.000 phải giữ ranh và tắt lô ${JSON.stringify(hidden)}`);
   const after = await rendered(page, 'QHC');
   assertCount(`${name} sau bỏ chọn`, after);
-  if (after.names.some(n => /Chân Mây/.test(n))) throw new Error(`${name}: Chân Mây vẫn trong danh sách ranh`);
+  if (!after.names.some(n => /Chân Mây/.test(n))) throw new Error(`${name}: Chân Mây mất khỏi danh sách ranh`);
 }
 
 async function main() {
