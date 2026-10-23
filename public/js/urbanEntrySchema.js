@@ -93,6 +93,25 @@ export function fieldsForScope(scope) {
   return ENTRY_FIELDS.filter(f => f.scopes.includes(scope));
 }
 
+const LAYER_NOTE = {
+  ldPhiNong: 'Không có lớp việc làm trong 7 lớp hiện trạng. Cán bộ nhập.',
+  nuocSach: 'Lớp cấp nước tạm thời chỉ có chiều dài ống và congsuat điểm, không có dân được phục vụ. Ô % vẫn thiếu; cán bộ nhập để ghi đè.',
+  matDoCong: 'Lớp san nền hiện trạng chưa phải kiểm kê cống chính và chưa có file gộp. Ô km/km² vẫn thiếu.',
+  xlnt: 'Điểm XLNT hiện trạng có congsuat, không có cặp vận hành/thiết kế. Ô % vẫn thiếu.',
+  ctr: 'Điểm CTR hiện trạng không có tỷ lệ xử lý đạt. Ô % vẫn thiếu.',
+  nghiaTrang: 'Điểm nghĩa trang hiện trạng không có tỷ lệ diện tích đã xây trên quy hoạch. Ô % vẫn thiếu.',
+  giuongBenh: 'Điểm y tế không nằm trong 7 lớp mạng và không có số giường.',
+  khongGianXanh: 'Hiện trạng sử dụng đất trong repo chỉ phủ KCN Phong Điền. Không suy tỷ lệ xanh cả đô thị. Ô % vẫn thiếu.',
+  vaiTro: 'Không có thuộc tính vai trò trên lớp hiện trạng.',
+  trungTam: 'Không có thuộc tính vai trò trung tâm trên lớp hiện trạng.',
+  dauMoiGt: 'Điểm đầu mối tạm thời không có cấp vùng, tỉnh, xã. Ô mức vẫn thiếu.',
+  quyCheKt: 'PDF quy chế không ghi số năm đã thực hiện.'
+};
+
+function entryNote(key) {
+  return LAYER_NOTE[key] || 'Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính.';
+}
+
 function row(unit, unitKey, field, code, status, note, key = '') {
   return { unit, unitKey, field, code: code || '', status, label: STATUS_LABEL[status] || status, note, key };
 }
@@ -105,7 +124,10 @@ function urbanFieldRows(u) {
     out.push(row(u.name, u.key, 'Dân số tạm trú cộng thêm', '', 'bo-sung', 'Webapp chưa tách tạm trú.', 'danSoTamTru'));
     out.push(row(u.name, u.key, 'Diện tích tự nhiên', '', 'co-san', 'Tổng diện tích các phường, xã.', 'dienTich'));
     ENTRY_FIELDS.filter(f => f.scopes.includes('tp') && f.kind === 'yesno').forEach(f => {
-      out.push(row(u.name, u.key, f.label, f.code, 'thieu', 'Tiêu chuẩn chữ Phụ lục I, chưa có nguồn tính.', f.key));
+      const note = f.key === 'i11'
+        ? 'Điểm đầu mối tạm thời không ghi cấp khu vực hoặc quốc tế. Ô đạt/chưa đạt vẫn nhập tay.'
+        : 'Tiêu chuẩn chữ Phụ lục I, chưa có nguồn tính.';
+      out.push(row(u.name, u.key, f.label, f.code, 'thieu', note, f.key));
     });
     out.push(row(u.name, u.key, 'Tỷ lệ phường đạt trình độ loại II', '1.II.10', 'khong-nhap', 'Cần Bảng 2B. Webapp chưa chấm Bảng 2B, không có ô nhập.'));
     return out;
@@ -126,7 +148,7 @@ function urbanFieldRows(u) {
     bound ? 'Bằng mật độ đường của xã chủ: chiều dài đường và đất xây dựng chỉ có theo xã. Ô nhập để đính chính.'
       : (partial ? 'Chưa có ranh nên không chia mạng đường. Có ô nhập.' : 'Tính từ OpenStreetMap và đất xây dựng nếu đủ. Ô nhập dùng khi thiếu.'), 'matDoDuong'));
   ENTRY_FIELDS.filter(f => f.code && f.code.startsWith('2A.') && !f.override).forEach(f => {
-    out.push(row(u.name, u.key, f.label, f.code, 'thieu', 'Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính.', f.key));
+    out.push(row(u.name, u.key, f.label, f.code, 'thieu', entryNote(f.key), f.key));
   });
   return out;
 }
@@ -147,7 +169,7 @@ function wardFieldRows(name) {
       bound ? `${bound.km2} km², polygon ${host.id} trong public/data/urban614.geojson.` : `Nhập tại ${host.name}, không dùng diện tích cả xã.`));
   }
   ENTRY_FIELDS.filter(f => f.scopes.includes('xa') && !f.override).forEach(f => {
-    out.push(row(name, key, f.label, f.code, 'thieu', 'Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm.', f.key));
+    out.push(row(name, key, f.label, f.code, 'thieu', entryNote(f.key), f.key));
   });
   return out;
 }
@@ -179,7 +201,7 @@ export function gapMarkdown() {
     '',
     'Nguồn đối chiếu: `urbanClass.js` (Nghị quyết 111/2025/UBTVQH15, Quyết định 756/QĐ-UBND). Bảng này là lúc chưa có số cán bộ nhập.',
     '',
-    `Tổng ${counts.rows} ô (đơn vị × trường). Trong đó **${counts.thieu} ô thiếu**. ${counts.partialDanSo} đô thị một phần xã lấy ranh từ public/data/urban614.geojson; dân số ước theo tỷ lệ diện tích, không còn ô thiếu cho ranh, dân số, diện tích và mật độ đường của các đô thị đó.`,
+    `Tổng ${counts.rows} ô (đơn vị × trường). Trong đó **${counts.thieu} ô thiếu**. ${counts.partialDanSo} đô thị một phần xã lấy ranh từ public/data/urban614.geojson; dân số ước theo tỷ lệ diện tích, không còn ô thiếu cho ranh, dân số, diện tích và mật độ đường của các đô thị đó. Lớp hiện trạng (kể cả file tạm thời giao thông, cấp điện, cấp nước) cho biết chiều dài và số điểm khi mở bảng chấm, không điền các ô tỷ lệ còn thiếu.`,
     '',
     'Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng phường hoặc ranh; Miễn = không xem xét với đô thị di sản; Phụ thuộc = tính được nếu dữ liệu nền đủ, vẫn có ô nhập; Bổ sung = nên có, chưa chặn chấm; Không nhập = chưa có cách chấm (Bảng 2B).',
     '',

@@ -2464,7 +2464,7 @@ table.uc-table.uc-ntable :is(th, td) { white-space: normal; }
 table.uc-table td.uc-name { white-space: normal; text-align: left; min-width: 220px; }
 table.uc-table td.uc-scope { text-align: left; }
 table.uc-table td.uc-code { color: var(--accent-cyan); font-weight: 700; }
-table.uc-table td.uc-val { text-align: right; }
+table.uc-table td.uc-val .uc-aside { display: block; margin-top: 2px; color: var(--text-muted); font-size: 10px; font-weight: 500; line-height: 1.2; white-space: normal; }
 table.uc-table tr.uc-group td { text-align: left; font-weight: 700; color: var(--accent-green); background: rgba(var(--green-rgb), 0.12); }
 table.uc-table tr.uc-sub td { text-align: left; font-weight: 700; color: var(--accent-cyan); background: rgba(56, 189, 248, 0.08); }
 table.uc-table tr.uc-here td { background: rgba(56, 189, 248, 0.1); }

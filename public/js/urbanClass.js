@@ -17,6 +17,7 @@ import { areaCodeFromName } from './facetStore.js';
 import { MANUAL_2A, MANUAL_I } from './urbanEntrySchema.js';
 import { valueOf } from './urbanInputs.js';
 import { PART_BOUNDS, loadPartGeoms, partFeature, partGeomReady, pointInFeature, shareOf } from './urbanPartGeom.js';
+import { describeHt, htFootNote, loadHienTrangFacts, mergeEntry } from './hienTrangScore.js';
 
 export const CLASS_REF = 'Nghị quyết 111/2025/UBTVQH15';
 export const PLAN_REF = 'Quyết định 756/QĐ-UBND ngày 28/02/2026';
@@ -351,7 +352,7 @@ function measure(calc, urban, wards, roads) {
   }
   if (calc === 'roads') {
     const entered = numOrNull(valueOf(urbanKey(urban), 'matDoDuong'));
-    if (entered != null) return { value: entered, note: 'Mật độ đường do cán bộ nhập' };
+    if (entered != null) return { value: entered, officer: true, note: 'Mật độ đường do cán bộ nhập' };
     if (!roads) return { pending: true, note: 'Đang tải mạng lưới đường' };
     let km = 0, built = 0, have = 0, natural = 0, wait = false;
     list.forEach(w => {
@@ -564,9 +565,15 @@ function judgeI(std, facts) {
   const manualKey = MANUAL_I[std.code];
   if (manualKey) {
     const raw = valueOf('tp:TP', manualKey);
-    if (raw == null || raw === '') return { level: 'wait', text: '—', note: std.method || 'Chưa nhập' };
+    const ht = describeHt(std.code, { id: 'hue' });
+    if (raw == null || raw === '') {
+      return { level: 'wait', text: '—', aside: ht && ht.aside, note: [std.method || 'Chưa nhập', ht && ht.text].filter(Boolean).join(' ') };
+    }
     const ok = raw === 'yes';
-    return { level: ok ? 'hi' : 'no', text: ok ? 'Đạt' : 'Chưa đạt', note: 'Cán bộ nhập trên luồng Hành chính.' };
+    const note = ht && ht.text
+      ? `Cán bộ nhập trên luồng Hành chính. Ghi đè số tự tính. Không dùng: ${ht.text}`
+      : 'Cán bộ nhập trên luồng Hành chính.';
+    return { level: ok ? 'hi' : 'no', text: ok ? 'Đạt' : 'Chưa đạt', note };
   }
   if (std.calc === 'iPop') {
     const ok = facts.pop >= 2500000;
@@ -580,16 +587,22 @@ function judgeI(std, facts) {
     const rows = facts.bus2 || [];
     if (!rows.length || rows.some(r => r.pct == null)) {
       const why = rows.map(r => r.note).filter(Boolean)[0];
-      return { level: 'wait', text: '…', note: why || 'Đang tính dân số trong 500 m của trạm đã duyệt.' };
+      const ht = describeHt('1.III.12', { id: 'hue' });
+      return {
+        level: 'wait', text: '…', aside: ht && ht.aside,
+        note: [why || 'Đang tính dân số trong 500 m của trạm đã duyệt.', ht && ht.text].filter(Boolean).join(' ')
+      };
     }
     const ok = rows.every(r => r.pct + 1e-6 >= 100);
     const head = rows.map(r => `${r.name}: ${fmtNum(r.covered)}/${fmtNum(r.total)} người trong 500 m (${fmtNum(r.n)} trạm trong phạm vi).`).join(' ');
     const zero = busCache.status === 'zero' ? ' Toàn thành phố có 0 trạm xe buýt đã duyệt, nên dân số trong 500 m bằng 0.' : '';
     const osm = transitNote(facts.osmNames);
+    const ht = describeHt('1.III.12', { id: 'hue' });
     return {
       level: ok ? 'hi' : 'no',
       text: rows.map(r => `${r.name} ${N1.format(r.pct)}%`).join(' · '),
-      note: `${head}${zero} ${std.method}${osm ? ` ${osm}` : ''}`
+      aside: ht && ht.aside,
+      note: `${head}${zero} ${std.method}${osm ? ` ${osm}` : ''}${ht && ht.text ? ` ${ht.text}` : ''}`
     };
   }
   if (std.calc === 'iRate') {
@@ -642,16 +655,17 @@ function manualMeasure(std, urban) {
   if (!spec) return null;
   const raw = valueOf(urbanKey(urban), spec.key);
   if (raw == null || raw === '') return { pending: true, note: 'Chưa có số liệu nhập' };
-  if (spec.qual) return { choice: raw, note: 'Cán bộ nhập trên luồng Hành chính.' };
+  if (spec.qual) return { choice: raw, officer: true, note: 'Cán bộ nhập trên luồng Hành chính.' };
   const n = Number(raw);
   if (!Number.isFinite(n)) return { pending: true, note: 'Giá trị không phải số' };
-  return { value: n, note: 'Cán bộ nhập trên luồng Hành chính.' };
+  return { value: n, officer: true, note: 'Cán bộ nhập trên luồng Hành chính.' };
 }
 
 function measureStd(std, urban, wards) {
-  if (MANUAL_2A[std.code]) return manualMeasure(std, urban);
-  if (!std.calc) return null;
-  return measure(std.calc, urban, wards, roads);
+  let m = null;
+  if (MANUAL_2A[std.code]) m = manualMeasure(std, urban);
+  else if (std.calc) m = measure(std.calc, urban, wards, roads);
+  return mergeEntry(m, describeHt(std.code, urban));
 }
 
 function readMeasure(std, urban, wards) {
@@ -699,13 +713,17 @@ function stdTip(std, urban, m, j) {
     + `${m && m.note ? `\n${m.note}` : ''}${j ? `\n${LEVEL_TEXT[j.level]}` : ''}`;
 }
 
+function asideHtml(m) {
+  return m && m.aside ? `<small class="uc-aside">${escapeHtml(m.aside)}</small>` : '';
+}
+
 function listCell(code, urban, wards) {
   const std = STD_2A.find(s => s.code === code);
   const m = readMeasure(std, urban, wards);
   const j = judge(std, urban, m);
-  if (!m || m.pending || m.value == null) return `<td class="uc-val" title="${escapeHtml(m?.note || stdTip(std, urban))}"><span class="gtx-wait">${ico('clock')}</span></td>`;
+  if (!m || m.pending || m.value == null) return `<td class="uc-val" title="${escapeHtml(m?.note || stdTip(std, urban))}"><span class="gtx-wait">${ico('clock')}</span>${asideHtml(m)}</td>`;
   return `<td class="uc-val" title="${escapeHtml(stdTip(std, urban, m, j))}"><span class="uc-cell">`
-    + `<b class="${levelCls(j.level)}">${j.lower ? '≥ ' : ''}${fmtNum(m.value)}</b>${meterHtml(m.value, bandOf(std, urban.cls).hi, adjustedFloor(std, urban), j.level)}</span></td>`;
+    + `<b class="${levelCls(j.level)}">${j.lower ? '≥ ' : ''}${fmtNum(m.value)}</b>${meterHtml(m.value, bandOf(std, urban.cls).hi, adjustedFloor(std, urban), j.level)}</span>${asideHtml(m)}</td>`;
 }
 
 function scoreCell(urban, wards) {
@@ -840,12 +858,12 @@ const LEVEL_SHORT = { hi: 'Tối đa', mid: 'Tối thiểu', adj: 'Tối thiểu
 
 function nowCellHtml(std, urban, m, j) {
   if (m && m.choice) return `<td class="uc-val"><b class="${levelCls(j.level)}">${LEVEL_SHORT[j.level] || ''}</b></td>`;
-  if ((urban.partial || !std.calc) && (!m || m.pending || m.value == null)) return '<td class="uc-val">—</td>';
-  if (m && m.pending) return `<td class="uc-val"><span class="gtx-wait">${ico('clock')}</span></td>`;
-  if (m && m.reference && m.value != null) return `<td class="uc-val"><b>${fmtNum(m.value)}</b></td>`;
-  if (!m || m.value == null) return '<td class="uc-val">—</td>';
+  if ((urban.partial || !std.calc) && (!m || m.pending || m.value == null)) return `<td class="uc-val">—${asideHtml(m)}</td>`;
+  if (m && m.pending) return `<td class="uc-val"><span class="gtx-wait">${ico('clock')}</span>${asideHtml(m)}</td>`;
+  if (m && m.reference && m.value != null) return `<td class="uc-val"><b>${fmtNum(m.value)}</b>${asideHtml(m)}</td>`;
+  if (!m || m.value == null) return `<td class="uc-val">—${asideHtml(m)}</td>`;
   const meter = j.level === 'skip' ? '' : meterHtml(m.value, bandOf(std, urban.cls).hi, adjustedFloor(std, urban), j.level);
-  return `<td class="uc-val"><span class="uc-cell"><b class="${levelCls(j.level)}">${fmtNum(m.value)}</b>${meter}</span></td>`;
+  return `<td class="uc-val"><span class="uc-cell"><b class="${levelCls(j.level)}">${fmtNum(m.value)}</b>${meter}</span>${asideHtml(m)}</td>`;
 }
 
 // Số không kèm đơn vị (đơn vị ở tên ngắn); * = mức tối thiểu đã giảm theo Điều 8 khoản 2 điểm d
@@ -911,7 +929,7 @@ function detailRowsI(wards, list) {
       <td class="uc-code">${std.code}</td>
       <td class="uc-name" title="${escapeHtml(j.note || std.method || '')}">${escapeHtml(std.name)}${inheritHtml(std)}</td>
       <td>${escapeHtml(std.target || 'Đạt / không đạt')}</td>
-      <td class="uc-val" title="${escapeHtml(j.note || '')}">${val}</td>
+      <td class="uc-val" title="${escapeHtml(j.note || '')}">${val}${j.aside ? `<small class="uc-aside">${escapeHtml(j.aside)}</small>` : ''}</td>
       <td class="${levelCls(j.level)}">${j.level === 'hi' ? 'Đạt' : (j.level === 'part' ? 'Chưa kết luận' : LEVEL_TEXT[j.level] || 'Chờ số liệu')}</td>
     </tr>`;
   }).join('');
@@ -930,7 +948,7 @@ function ruleNote(urban) {
 }
 
 // Tổng kết dưới bảng thứ 2: điểm / số tiêu chuẩn đạt, quy định áp dụng, chú giải màu
-function detailSumHtml(urban, wards) {
+function detailSumHtml(urban, wards, wardName) {
   let score = '';
   if (urban.cls === 'I') {
     const facts = typeIFacts(wards);
@@ -952,14 +970,16 @@ function detailSumHtml(urban, wards) {
         + `<span>${STD_2A.length - sc.evaluated} tiêu chuẩn còn lại là tiêu chuẩn chữ hoặc chưa có lớp dữ liệu. Ngưỡng công nhận cả Bảng 2A là 75/100.</span>`;
     }
   }
-  return `<div class="uc-dsum">${score}<p title="${escapeHtml(urban.note)}">${ico('info')} ${escapeHtml(ruleNote(urban))}</p>${legendHtml()}</div>`;
+  const foot = htFootNote(urban, wardName);
+  return `<div class="uc-dsum">${score}<p title="${escapeHtml(urban.note)}">${ico('info')} ${escapeHtml(ruleNote(urban))}</p>${legendHtml()}`
+    + (foot ? `<p class="uc-note">${escapeHtml(foot)}</p>` : '') + '</div>';
 }
 
 // Bề rộng cột cố định, chung cho 2 bảng; cột Tiêu chuẩn (rỗng) nhận phần còn lại
 const COLS_2A = ['2.2em', '5.4em', '', '5.6em', '5.6em', '10em', '3.4em', '7.6em'];
 const COLS_I = ['2.2em', '4.4em', '', '9em', '8.5em', '7em'];
 
-function detailHtml(urban, wards, redraw) {
+function detailHtml(urban, wards, redraw, wardName) {
   const isI = urban.cls === 'I';
   if (isI) ensureBusCover(wards, redraw);
   const cols = (isI ? COLS_I : COLS_2A).map(w => `<col${w ? ` style="width:${w}"` : ''}>`).join('');
@@ -981,7 +1001,7 @@ function detailHtml(urban, wards, redraw) {
     </div>
     <div class="uc-dsplit">
       <div class="uc-dcol">${table(rows(list.filter(left)))}</div>
-      <div class="uc-dcol">${table(rows(list.filter(s => !left(s))))}${detailSumHtml(urban, wards)}</div>
+      <div class="uc-dcol">${table(rows(list.filter(s => !left(s))))}${detailSumHtml(urban, wards, wardName)}</div>
     </div>`;
 }
 
@@ -1095,7 +1115,7 @@ function paint(el, wardName, wards, redraw) {
   const picked = mode !== 'auto' && mode !== 'all' ? URBANS.find(u => u.id === mode) : null;
   const autoUrban = mode === 'auto' && wardName ? urbanByWard(wardName) : null;
   const urban = picked || autoUrban;
-  el.innerHTML = urban ? detailHtml(urban, wards, redraw) : overviewHtml(wards, wardName);
+  el.innerHTML = urban ? detailHtml(urban, wards, redraw, wardName) : overviewHtml(wards, wardName);
 }
 
 /** Vẽ bảng vào el. wardName rỗng = toàn thành phố. */
@@ -1109,6 +1129,7 @@ export function renderUrbanClass(el, { wardName, wards }) {
     if (!el.isConnected || el.dataset.ward !== key) return;
     paint(el, key, wards, draw);
   };
+  loadHienTrangFacts(URBANS).then(draw).catch(err => console.warn('Phân loại đô thị – lớp hiện trạng lỗi:', err));
   draw();
   if (!roads) loadRoads().then(draw).catch(err => console.warn('Phân loại đô thị – mạng lưới đường lỗi:', err));
   if (!partGeomReady()) loadPartGeoms().then(draw).catch(err => console.warn('Phân loại đô thị – ranh hiện trạng lỗi:', err));

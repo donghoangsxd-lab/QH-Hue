@@ -13,6 +13,7 @@ export const PART_BOUNDS = {
 
 let byId = null;
 let promise = null;
+let allFeatures = [];
 
 export function partGeomReady() {
   return !!byId;
@@ -25,12 +26,17 @@ export function shareOf(id, wardKm2) {
 }
 
 function index(fc) {
+  allFeatures = fc.features || [];
   const map = new Map();
-  (fc.features || []).forEach(f => {
+  allFeatures.forEach(f => {
     const id = f.properties && f.properties.id;
     if (PART_BOUNDS[id]) map.set(id, f);
   });
   return map;
+}
+
+export function allPartFeatures() {
+  return allFeatures;
 }
 
 export function setPartGeoms(fc) {
