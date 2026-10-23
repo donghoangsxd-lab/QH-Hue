@@ -860,7 +860,7 @@ export function initChuyenNganh() {
   window.addEventListener('resize', () => { if (!document.getElementById('layerMagMenu')?.hidden) placeMagMenu(); });
   const openDeep = q.has('nganh') || q.has('truc');
   if (openDeep) showAxis(browseState().axis, { openPanel: true, url: false });
-  else paint();
+  else showAxis(getLevel() === 'urban' ? 'hanhchinh' : (browseState().axis || 'quyhoach'), { url: false });
   listenLevel = true;
   document.getElementById('layerSearch')?.addEventListener('input', (e) => {
     layerQuery = e.target.value || '';

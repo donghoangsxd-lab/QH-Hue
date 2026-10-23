@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <Placemark><name>Trong ranh</name><Polygon><outerBoundaryIs><LinearRing><coordinates>
+    107.582,16.462,0 107.585,16.462,0 107.585,16.465,0 107.582,16.465,0 107.582,16.462,0
+  </coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+  <Placemark><name>Sat ranh</name><Polygon><outerBoundaryIs><LinearRing><coordinates>
+    107.590009,16.464,0 107.590027,16.464,0 107.590027,16.466,0 107.590009,16.466,0 107.590009,16.464,0
+  </coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+  <Placemark><name>Ngoai ranh</name><Polygon><outerBoundaryIs><LinearRing><coordinates>
+    107.592,16.464,0 107.594,16.464,0 107.594,16.466,0 107.592,16.466,0 107.592,16.464,0
+  </coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+  <Placemark><name>Vat ranh</name><Polygon><outerBoundaryIs><LinearRing><coordinates>
+    107.588,16.464,0 107.590225,16.464,0 107.590225,16.466,0 107.588,16.466,0 107.588,16.464,0
+  </coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+  <Placemark><name>Me ranh</name><Polygon><outerBoundaryIs><LinearRing><coordinates>
+    107.588,16.462,0 107.590018,16.462,0 107.590018,16.463,0 107.588,16.463,0 107.588,16.462,0
+  </coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+</Document>
+</kml>

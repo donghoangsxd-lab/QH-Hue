@@ -330,6 +330,36 @@ function readPoint(tags, i) {
   return [ent, i];
 }
 
+// INSERT kèm ATTRIB (mã 66 = 1, kết thúc bằng SEQEND). Tem đất và ký hiệu công trình đầu mối dùng block này.
+function readInsert(tags, i) {
+  const ent = { kind: 'INSERT', layer: '0', name: '', x: NaN, y: NaN, attrs: {} };
+  let follow = false;
+  for (; i < tags.length && tags[i][0] !== 0; i++) {
+    const [code, v] = tags[i];
+    if (code === 8) ent.layer = v;
+    else if (code === 2) ent.name = v;
+    else if (code === 10) ent.x = parseFloat(v);
+    else if (code === 20) ent.y = parseFloat(v);
+    else if (code === 66) follow = parseInt(v, 10) === 1;
+  }
+  if (!follow) return [ent, i];
+  while (i < tags.length && tags[i][0] === 0 && tags[i][1] !== 'SEQEND') {
+    const kind = tags[i][1];
+    i++;
+    let tag = '', val = '';
+    for (; i < tags.length && tags[i][0] !== 0; i++) {
+      if (tags[i][0] === 2) tag = tags[i][1];
+      else if (tags[i][0] === 1) val = tags[i][1];
+    }
+    if (kind === 'ATTRIB' && tag) ent.attrs[tag] = val;
+  }
+  if (i < tags.length && tags[i][0] === 0 && tags[i][1] === 'SEQEND') {
+    i++;
+    for (; i < tags.length && tags[i][0] !== 0; i++);
+  }
+  return [ent, i];
+}
+
 // Tên hiển thị của đối tượng DXF bị bỏ qua (chỉ nhận HATCH và polyline khép kín)
 const DXF_SKIP_LABEL = { LINE: 'line', TEXT: 'text', MTEXT: 'mtext', INSERT: 'block', ATTDEF: 'attdef', DIMENSION: 'dimension', POINT: 'point' };
 
@@ -380,6 +410,62 @@ export function parseDxf(text, opts) {
     countSkipped(stats, 'polyline kín ở layer đã có hatch', dropped);
   }
   return { entities: kept, stats };
+}
+
+/**
+ * Đọc ENTITIES đủ cho hồ sơ: vùng (HATCH, polyline kín), đường (LINE, polyline hở), block INSERT kèm thuộc tính.
+ * Không đổi parseDxf. Polyline kín trên layer đã có HATCH bị bỏ (trùng biên hatch).
+ */
+export function readDxfBag(text) {
+  const tags = readTags(text);
+  const stats = { hatch: 0, polyline: 0, line: 0, insert: 0, skipped: {} };
+  const polygons = [];
+  const lines = [];
+  const inserts = [];
+  let section = null;
+  for (let i = 0; i < tags.length;) {
+    const [code, v] = tags[i];
+    if (code !== 0) { i++; continue; }
+    if (v === 'SECTION') { section = tags[i + 1] && tags[i + 1][1]; i += 2; continue; }
+    if (v === 'ENDSEC') { section = null; i++; continue; }
+    if (section !== 'ENTITIES') { i++; continue; }
+    if (v === 'HATCH') {
+      let ent;
+      [ent, i] = readHatch(tags, i + 1, stats);
+      if (ent.rings.length) { polygons.push({ layer: ent.layer, rings: ent.rings, kind: 'HATCH' }); stats.hatch++; }
+      else countSkipped(stats, 'hatch lỗi biên');
+      continue;
+    }
+    if (v === 'LWPOLYLINE' || v === 'POLYLINE') {
+      let ent;
+      [ent, i] = v === 'LWPOLYLINE' ? readLwPolyline(tags, i + 1, true) : readPolyline(tags, i + 1, true);
+      if (ent.kind === 'LINE' && ent.rings[0]) { lines.push({ layer: ent.layer, pts: ent.rings[0] }); stats.line++; }
+      else if (ent.rings.length) { polygons.push({ layer: ent.layer, rings: ent.rings, kind: 'POLY' }); stats.polyline++; }
+      else countSkipped(stats, 'pline hở');
+      continue;
+    }
+    if (v === 'LINE') {
+      let ent;
+      [ent, i] = readLine(tags, i + 1);
+      if (ent.rings[0]) { lines.push({ layer: ent.layer, pts: ent.rings[0] }); stats.line++; }
+      else countSkipped(stats, 'line lỗi');
+      continue;
+    }
+    if (v === 'INSERT') {
+      let ent;
+      [ent, i] = readInsert(tags, i + 1);
+      if (Number.isFinite(ent.x) && Number.isFinite(ent.y)) { inserts.push(ent); stats.insert++; }
+      else countSkipped(stats, 'insert lỗi');
+      continue;
+    }
+    countSkipped(stats, DXF_SKIP_LABEL[v] || String(v || '').toLowerCase());
+    for (i++; i < tags.length && tags[i][0] !== 0; i++);
+  }
+  const hatchLayers = new Set(polygons.filter(p => p.kind === 'HATCH').map(p => p.layer));
+  const kept = polygons.filter(p => p.kind === 'HATCH' || !hatchLayers.has(p.layer));
+  const dropped = polygons.length - kept.length;
+  if (dropped) countSkipped(stats, 'polyline kín ở layer đã có hatch', dropped);
+  return { polygons: kept, lines, inserts, stats };
 }
 
 // ============================ HÌNH HỌC (mét, VN-2000) ============================

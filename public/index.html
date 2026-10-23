@@ -44,7 +44,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261028">
+  <link rel="stylesheet" href="css/style.css?v=20261034">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -860,6 +860,17 @@
       <!-- TAB: ĐỀ XUẤT ĐIỂM MỚI -->
       <div class="tab-body add-point-form propose-sheet map-float" id="tabAdd" hidden>
         <div class="float-head"><b>Đề xuất</b><button type="button" class="float-close" id="btnProposeClose" aria-label="Đóng đề xuất"><svg class="ico"><use href="#i-close"/></svg></button></div>
+        <div class="add-mode-switch entry-flows" id="entryFlows" role="tablist" aria-label="Luồng nhập thông tin">
+          <button type="button" class="entry-flow-btn active" data-flow="flowHanhChinh" role="tab" aria-selected="true">Hành chính</button>
+          <button type="button" class="entry-flow-btn" data-flow="flowHoSo" role="tab" aria-selected="false">Quy hoạch, hạ tầng</button>
+          <button type="button" class="entry-flow-btn" data-flow="flowKienTruc" role="tab" aria-selected="false">Kiến trúc</button>
+        </div>
+        <div id="entryOfficer"></div>
+        <div id="flowHanhChinh"></div>
+        <div id="flowHoSo" hidden>
+          <div id="hoSoBox"></div>
+          <details class="entry-legacy" id="entryLegacy">
+            <summary>Nhập điểm hạ tầng, nhập hàng loạt, quản trị</summary>
         <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
           <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true"><svg class="ico"><use href="#i-pen"/></svg>Nhập 1 điểm</button>
           <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ, GeoJSON, shapefile (.zip)"><svg class="ico"><use href="#i-folder"/></svg>Nhập hàng loạt</button>
@@ -1082,6 +1093,7 @@
           <button type="button" class="admin-sub-btn" data-sub="addPop" role="tab" aria-selected="false"><svg class="ico"><use href="#i-users"/></svg>Ô dân cư</button>
           <button type="button" class="admin-sub-btn" data-sub="addOsm" role="tab" aria-selected="false" title="Nhập OSM và sổ hạ tầng từ thửa đất địa chính 2016"><svg class="ico"><use href="#i-map"/></svg>Dữ liệu OSM</button>
           <button type="button" class="admin-sub-btn" data-sub="addQh" role="tab" aria-selected="false" title="Lô nhập từ file QH cần kiểm tra đã có trên thực địa hay chưa"><svg class="ico"><use href="#i-inspect"/></svg>Hiện trạng QH</button>
+          <button type="button" class="admin-sub-btn" data-sub="addCho" role="tab" aria-selected="false" title="Hồ sơ cán bộ gửi, chưa hiện trên bản đồ"><svg class="ico"><use href="#i-clock"/></svg>Chờ duyệt</button>
         </div>
         <div id="addRoad">
           <div class="form-grid">
@@ -1152,6 +1164,14 @@
           <div id="popList" class="cad-list"></div>
         </div>
 
+        <div id="addCho" style="display:none;">
+          <div class="cad-hint">Hồ sơ cán bộ (tab CanBo, Trạng thái TRUE) nằm ở đây cho đến khi duyệt. Duyệt chuyển vào bảng hoặc lớp bản đồ của đồ án. Từ chối ghi lý do. Người xem bản đồ không thấy hàng chờ. Bấm tải danh sách mới đọc Sheet. Xem trên bản đồ: lô đỏ là lô ngoài ranh hoặc bị cắt. Tick lô đỏ để giữ hình gốc; lựa chọn ghi vào cột Lý do của dòng ChoDuyet.</div>
+          <button type="button" class="btn-submit" id="btnChoLoad">Tải danh sách chờ duyệt</button>
+          <div id="choStatus" class="rp-status" role="status" aria-live="polite"></div>
+          <div id="choKeep"></div>
+          <div id="choList" class="cad-list"></div>
+        </div>
+
         <div id="addQh" style="display:none;">
           <div class="cad-hint">Lô <b>da_co</b> đã hiện trên bản đồ hiện trạng và được tính vào độ phủ, popup ghi «Xác định từ file QH». Lô dưới đây mới khớp một tiêu chí (thửa 2016, mặt phủ hoặc OSM). Đánh dấu Đã có hoặc Chưa có thì ghi đè phân loại tự động. Không ghi vào Sheet. Nút chạy lại gắn kết quả không gian đã chốt và đưa lô nhập sau đó vào cần kiểm tra; không tính lại thửa, NDVI, GBA hay OSM.</div>
           <button type="button" class="btn-submit" id="btnQhReclassify" title="Gắn lại kết quả phân loại đã chốt và đưa lô QH nhập sau đó vào danh sách cần kiểm tra">Chạy lại phân loại</button>
@@ -1204,6 +1224,9 @@
           </div>
         </div>
         </div>
+          </details>
+        </div>
+        <div id="flowKienTruc" hidden></div>
       </div>
 
       <!-- TAB: CHÚ GIẢI -->
@@ -1515,6 +1538,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261028"></script>
+  <script type="module" src="./js/app.js?v=20261034"></script>
 </body>
 </html>

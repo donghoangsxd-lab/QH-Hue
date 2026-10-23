@@ -199,6 +199,7 @@ export function byProjectAreaDesc(a, b) {
 }
 
 // Lớp sử dụng đất + ranh. Bản vẽ hạ tầng (NET_LAYERS) là file riêng projects/<slug>/<key>.json, bật/tắt bổ trợ lớp đất.
+// Không gồm ht-dat-hoso, qh-dat-hoso, ranh-hoso: file cũ, không bật thành lớp. Form nhập ghi su-dung-dat, hien-trang, ranh-gioi.
 // Mỗi lớp = 1 file. Khớp LAYER_ROLES / NET_ROLES trong services/projectStore.js.
 export const NET_LAYERS = [
   { key: 'ht-giao-thong', phase: 'HT', group: 'giao-thong', label: 'Giao thông', color: '#fbbf24' },
@@ -208,7 +209,15 @@ export const NET_LAYERS = [
   { key: 'ht-thoat-nuoc', phase: 'HT', group: 'thoat-nuoc', label: 'Thoát nước', color: '#2dd4bf' },
   { key: 'qh-thoat-nuoc', phase: 'QH', group: 'thoat-nuoc', label: 'Thoát nước', color: '#0f766e' },
   { key: 'ht-cap-dien', phase: 'HT', group: 'cap-dien', label: 'Cấp điện', color: '#e879f9' },
-  { key: 'qh-cap-dien', phase: 'QH', group: 'cap-dien', label: 'Cấp điện', color: '#a21caf' }
+  { key: 'qh-cap-dien', phase: 'QH', group: 'cap-dien', label: 'Cấp điện', color: '#a21caf' },
+  { key: 'ht-san-nen', phase: 'HT', group: 'san-nen', label: 'San nền và thoát nước mưa', color: '#86efac' },
+  { key: 'qh-san-nen', phase: 'QH', group: 'san-nen', label: 'San nền và thoát nước mưa', color: '#16a34a' },
+  { key: 'ht-thoat-thai', phase: 'HT', group: 'thoat-thai', label: 'Thoát nước thải', color: '#67e8f9' },
+  { key: 'qh-thoat-thai', phase: 'QH', group: 'thoat-thai', label: 'Thoát nước thải', color: '#0e7490' },
+  { key: 'ht-chat-thai', phase: 'HT', group: 'chat-thai', label: 'Chất thải rắn và nghĩa trang', color: '#fdba74' },
+  { key: 'qh-chat-thai', phase: 'QH', group: 'chat-thai', label: 'Chất thải rắn và nghĩa trang', color: '#c2410c' },
+  { key: 'ht-vien-thong', phase: 'HT', group: 'vien-thong', label: 'Thông tin liên lạc', color: '#c4b5fd' },
+  { key: 'qh-vien-thong', phase: 'QH', group: 'vien-thong', label: 'Thông tin liên lạc', color: '#6d28d9' }
 ];
 export const PROJECT_LAYERS = [
   { key: 'su-dung-dat', phase: 'QH', kind: 'lots', label: 'Sử dụng đất quy hoạch', color: '#fb923c' },
@@ -268,6 +277,10 @@ export function netFeaturesFromText(text) {
         matCat: clipProp(props, MAT_CAT_RE, 80)
       }
     };
+    ['scheme', 'level', 'sector', 'kind', 'areaType', 'areaCode', 'areaParent', 'step', 'nhan'].forEach(key => {
+      const v = props[key] == null ? '' : String(props[key]).trim().slice(0, key === 'scheme' || key === 'nhan' ? 120 : 40);
+      if (v) row.props[key] = v;
+    });
     out.push(row);
   });
   if (!out.length) throw new Error('Không có điểm, đường hoặc vùng trong file.');

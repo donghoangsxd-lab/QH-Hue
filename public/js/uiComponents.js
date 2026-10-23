@@ -25,6 +25,7 @@ let infraPieInstance = null;
 // Quyền admin do máy chủ xác minh (chữ ký Google + danh sách email), client chỉ giữ token để gửi kèm yêu cầu phê duyệt
 const GOOGLE_CLIENT_ID = "409688791128-s7b4uohia2a9n3u27rl0gmkdupiig554.apps.googleusercontent.com";
 const ADMIN_SESSION_KEY = 'qh_hue_admin_session';
+const OFFICER_SESSION_KEY = 'qh_hue_officer_session';
 let googleSignInReady = false;
 
 function setAuthMsg(text, color = 'var(--text-main)') {
@@ -73,13 +74,28 @@ export function toggleAuthModal() {
   const opening = modal.style.display !== 'block';
   modal.style.display = opening ? 'block' : 'none';
   if (!opening) return;
-  if (state.currentUserRole === 'ADMIN' && state.authUser) {
-    setAuthMsg(`✓ Đang đăng nhập quản trị: ${state.authUser.email}`, 'var(--accent-green)');
+  if (state.authUser && state.authToken) {
+    const who = state.currentUserRole === 'ADMIN' ? 'quản trị' : 'cán bộ';
+    setAuthMsg(`✓ Đang đăng nhập ${who}: ${state.authUser.email}`, 'var(--accent-green)');
   } else {
     setAuthMsg('');
     initGoogleSignIn();
   }
   updateAuthUi();
+}
+
+async function fetchOfficer(token) {
+  const res = await fetch(geeApi('action=getOfficer'), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.success === false || data.error) {
+    const err = new Error(data.message || `Lỗi xác thực (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
 }
 
 async function verifyAdminToken(token) {
@@ -96,18 +112,35 @@ async function verifyAdminToken(token) {
   return data;
 }
 
+function closeAuthModalSoon() {
+  setTimeout(() => {
+    const modal = document.getElementById('authModal');
+    if (modal) modal.style.display = 'none';
+  }, 1000);
+}
+
 async function handleGoogleCredentialResponse(response) {
-  setAuthMsg('⏳ Đang xác minh quyền quản trị với máy chủ...', 'var(--accent-orange)');
+  setAuthMsg('⏳ Đang xác minh tài khoản Google...', 'var(--accent-orange)');
   try {
     const info = await verifyAdminToken(response.credential);
     setAdminSession(response.credential, info);
     setAuthMsg(`✓ Xin chào Admin (${info.name || info.email})`, 'var(--accent-green)');
-    setTimeout(() => {
-      const modal = document.getElementById('authModal');
-      if (modal) modal.style.display = 'none';
-    }, 1000);
+    closeAuthModalSoon();
   } catch (err) {
-    setAuthMsg(`❌ ${err.message}`, 'var(--accent-red)');
+    if (err.status !== 403) {
+      setAuthMsg(`❌ ${err.message}`, 'var(--accent-red)');
+      return;
+    }
+    try {
+      const info = await fetchOfficer(response.credential);
+      if (info.admin) setAdminSession(response.credential, info);
+      else setOfficerSession(response.credential, info);
+      const who = info.admin ? 'Admin' : (info.name || info.email);
+      setAuthMsg(`✓ Xin chào ${who}`, 'var(--accent-green)');
+      closeAuthModalSoon();
+    } catch (officerErr) {
+      setAuthMsg(`❌ ${officerErr.message}`, 'var(--accent-red)');
+    }
   }
 }
 
@@ -115,11 +148,26 @@ function setAdminSession(token, info) {
   state.currentUserRole = 'ADMIN';
   state.authToken = token;
   state.authUser = { email: info.email, name: info.name || info.email, exp: Number(info.exp) || 0 };
+  state.entryUnits = null;
   try {
     sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({ token, ...state.authUser }));
+    sessionStorage.removeItem(OFFICER_SESSION_KEY);
   } catch (e) {}
   updateAuthUi();
   renderGroupedPoints();
+  document.dispatchEvent(new CustomEvent('qh-admin-changed'));
+}
+
+function setOfficerSession(token, info) {
+  state.currentUserRole = 'VIEWER';
+  state.authToken = token;
+  state.authUser = { email: info.email, name: info.name || info.email, exp: Number(info.exp) || 0 };
+  state.entryUnits = Array.isArray(info.units) ? info.units.slice() : [];
+  try {
+    sessionStorage.setItem(OFFICER_SESSION_KEY, JSON.stringify({ token, ...state.authUser, units: state.entryUnits }));
+    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  } catch (e) {}
+  updateAuthUi();
   document.dispatchEvent(new CustomEvent('qh-admin-changed'));
 }
 
@@ -128,7 +176,11 @@ export function signOutAdmin() {
   state.currentUserRole = 'VIEWER';
   state.authToken = null;
   state.authUser = null;
-  try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch (e) {}
+  state.entryUnits = null;
+  try {
+    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    sessionStorage.removeItem(OFFICER_SESSION_KEY);
+  } catch (e) {}
   window.google?.accounts?.id?.disableAutoSelect?.();
   updateAuthUi();
   document.dispatchEvent(new CustomEvent('qh-admin-changed'));
@@ -138,34 +190,51 @@ export function signOutAdmin() {
   }
 }
 
-// Khôi phục phiên admin khi tải lại trang (token Google còn hạn và máy chủ vẫn xác nhận quyền)
+// Khôi phục phiên khi tải lại trang. Quản trị không phụ thuộc tab CanBo. Cán bộ hỏi getOfficer.
 export async function restoreAdminSession() {
   let saved = null;
   try { saved = JSON.parse(sessionStorage.getItem(ADMIN_SESSION_KEY) || 'null'); } catch (e) {}
-  if (!saved || !saved.token || !(Number(saved.exp) * 1000 > Date.now() + 60000)) {
-    try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch (e) {}
+  if (saved && saved.token && Number(saved.exp) * 1000 > Date.now() + 60000) {
+    try {
+      const info = await verifyAdminToken(saved.token);
+      setAdminSession(saved.token, info);
+      return;
+    } catch (err) {
+      if (err.status === 401 || err.status === 403) signOutAdmin();
+      return;
+    }
+  }
+  try { sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch (e) {}
+  let officer = null;
+  try { officer = JSON.parse(sessionStorage.getItem(OFFICER_SESSION_KEY) || 'null'); } catch (e) {}
+  if (!officer || !officer.token || !(Number(officer.exp) * 1000 > Date.now() + 60000)) {
+    try { sessionStorage.removeItem(OFFICER_SESSION_KEY); } catch (e) {}
     return;
   }
   try {
-    const info = await verifyAdminToken(saved.token);
-    setAdminSession(saved.token, info);
+    const info = await fetchOfficer(officer.token);
+    if (info.admin) setAdminSession(officer.token, info);
+    else setOfficerSession(officer.token, info);
   } catch (err) {
-    if (err.status === 401 || err.status === 403) signOutAdmin();
+    if (err.status === 401 || err.status === 403 || err.status === 503) signOutAdmin();
   }
 }
 
 function updateAuthUi() {
   const isAdmin = state.currentUserRole === 'ADMIN' && !!state.authUser;
+  const signed = !!(state.authToken && state.authUser);
   const btnAuth = document.getElementById('btnAuth');
   if (btnAuth) {
     btnAuth.classList.toggle('is-admin', isAdmin);
-    btnAuth.title = isAdmin ? `Đã đăng nhập: Admin (${state.authUser.name})` : 'Đăng nhập quản trị';
+    btnAuth.title = isAdmin
+      ? `Đã đăng nhập: Admin (${state.authUser.name})`
+      : (signed ? `Đã đăng nhập: ${state.authUser.name}` : 'Đăng nhập');
     btnAuth.setAttribute('aria-label', btnAuth.title);
-    btnAuth.innerHTML = ico(isAdmin ? 'user' : 'key');
+    btnAuth.innerHTML = ico(signed ? 'user' : 'key');
   }
   document.dispatchEvent(new CustomEvent('auth:change'));
   const signOut = document.getElementById('btnSignOut');
-  if (signOut) signOut.style.display = isAdmin ? '' : 'none';
+  if (signOut) signOut.style.display = signed ? '' : 'none';
   const wardRoadsBtn = document.getElementById('btnWardRoads');
   if (wardRoadsBtn) wardRoadsBtn.style.display = isAdmin ? '' : 'none';
   const roadModeBtn = document.getElementById('btnAddRoadMode');
@@ -177,7 +246,7 @@ function updateAuthUi() {
   refreshPopPanel();
   refreshCadRole();
   const gBtn = document.getElementById('googleSignInBtn');
-  if (gBtn) gBtn.style.display = isAdmin ? 'none' : '';
+  if (gBtn) gBtn.style.display = signed ? 'none' : '';
   refreshWardCheck();
 }
 
