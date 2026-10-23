@@ -24,7 +24,8 @@ export function openLayerTab({ main, pane } = {}) {
   document.body.classList.remove('right-collapsed');
   const tab = MAIN_TAB[main] || main;
   if (tab) document.querySelector(`[data-main-tab="${tab}"]`)?.click();
-  if (main === 'infra') document.getElementById('layerPaneInfra')?.scrollIntoView({ block: 'nearest' });
+  if (main === 'xahoi' || main === 'infra') document.getElementById('xahoiPoints')?.scrollIntoView({ block: 'nearest' });
+  if (main === 'quyhoach') document.getElementById('planPoints')?.scrollIntoView({ block: 'nearest' });
   if (pane) document.querySelector(`[data-map-tab="${pane}"]`)?.click();
 }
 

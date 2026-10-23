@@ -1044,7 +1044,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const on = keys.includes(k);
     if (!chk || chk.checked === on) return;
     chk.checked = on;
-    toggleLayer(k, on);
+    chk.dispatchEvent(new Event('change', { bubbles: true }));
   });
   btnEye?.addEventListener('click', () => {
     const allOn = ICON_GROUPS.every(k => iconCheck(k)?.checked);
@@ -1053,6 +1053,71 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   ICON_GROUPS.forEach(k => iconCheck(k)?.addEventListener('change', syncEyeButton));
   syncEyeButton();
+
+  const EDU_LEVELS = { all: ['c3', 'c4', 'c5', 'c10'], mn: ['c3'], th: ['c4'], thcs: ['c5'], thpt: ['c10'] };
+  const EDU_KEYS = ['c3', 'c4', 'c5', 'c10'];
+  let eduLevel = 'all';
+  const paintEduLevel = () => {
+    document.querySelectorAll('[data-edu-level]').forEach(b => b.classList.toggle('active', b.dataset.eduLevel === eduLevel));
+  };
+  const applyEdu = (on) => {
+    const allow = new Set(EDU_LEVELS[eduLevel] || EDU_LEVELS.all);
+    EDU_KEYS.forEach(k => {
+      const chk = document.getElementById(`chk_${k}`);
+      const next = on && allow.has(k);
+      if (!chk || chk.checked === next) return;
+      chk.checked = next;
+      chk.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  };
+  document.getElementById('chk_edu')?.addEventListener('change', (e) => applyEdu(e.target.checked));
+  document.querySelectorAll('[data-edu-level]').forEach(btn => btn.addEventListener('click', () => {
+    eduLevel = btn.dataset.eduLevel || 'all';
+    paintEduLevel();
+    const master = document.getElementById('chk_edu');
+    if (master && !master.checked) {
+      master.checked = true;
+      applyEdu(true);
+      return;
+    }
+    applyEdu(true);
+  }));
+  EDU_KEYS.forEach(k => {
+    document.getElementById(`chk_${k}`)?.addEventListener('change', () => {
+      const master = document.getElementById('chk_edu');
+      const on = EDU_KEYS.filter(id => document.getElementById(`chk_${id}`)?.checked);
+      if (master && master.checked !== (on.length > 0)) master.checked = on.length > 0;
+      const match = Object.entries(EDU_LEVELS).find(([, keys]) => keys.length === on.length && keys.every(id => on.includes(id)));
+      if (!match) return;
+      eduLevel = match[0];
+      paintEduLevel();
+    });
+  });
+
+  const funeralBox = document.getElementById('chk_nt_funeral');
+  const graveBox = document.getElementById('chk_nt_grave');
+  const c13 = document.getElementById('chk_c13');
+  let syncingNt = false;
+  const applyNt = () => {
+    if (!c13) return;
+    const on = !!(funeralBox?.checked || graveBox?.checked);
+    if (c13.checked === on) {
+      renderGroupedPoints();
+      return;
+    }
+    syncingNt = true;
+    c13.checked = on;
+    c13.dispatchEvent(new Event('change', { bubbles: true }));
+    syncingNt = false;
+  };
+  funeralBox?.addEventListener('change', applyNt);
+  graveBox?.addEventListener('change', applyNt);
+  c13?.addEventListener('change', () => {
+    if (syncingNt) return;
+    if (funeralBox) funeralBox.checked = c13.checked;
+    if (graveBox) graveBox.checked = c13.checked;
+    renderGroupedPoints();
+  });
 
   // Bấm ô số lượng: tắt mọi lớp khác (kể cả bản đồ độ phủ), chỉ bật đúng loại công trình, vùng phủ của loại đó và ranh 40 phường xã.
   // Bấm lại cùng ô để khôi phục đúng các lớp đang bật trước đó.

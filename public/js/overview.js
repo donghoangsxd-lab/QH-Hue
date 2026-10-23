@@ -126,8 +126,8 @@ const FLOOD_DEMO = {
     },
     {
       title: 'Bật tem các trường học',
-      run: (d) => SCHOOL_CHKS.forEach(id => d.check(id, { main: 'infra' })),
-      text: '<p>Bảng bên phải › <b>Khu đất</b> đã bật 4 nhóm <b>Mầm non, Tiểu học, THCS, THPT</b>. Trường nằm trong vùng ngập được đánh <b class="c-red">chấm đỏ</b> ngay tại tem công trình.</p>'
+      run: (d) => SCHOOL_CHKS.forEach(id => d.check(id, { main: 'xahoi' })),
+      text: '<p>Bảng bên phải › panel <b>Hạ tầng xã hội</b> › <b>Giáo dục</b> đã bật bốn cấp <b>Mầm non, Tiểu học, THCS, THPT</b>. Trường nằm trong vùng ngập được đánh <b class="c-red">chấm đỏ</b> ngay tại tem công trình.</p>'
     },
     {
       title: `Các trường bị ngập khi nước lên ${FLOOD_DEMO_M} m`,
@@ -220,8 +220,8 @@ const CSD_DEMO = {
   scenes: [
     {
       title: 'Các cơ sở chưa sử dụng',
-      run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 12); d.check('chk_c9', { main: 'infra' }); },
-      text: '<p>Bảng bên phải › <b>Khu đất</b> › <b>12. Cơ sở chưa sử dụng</b> đã bật: các cơ sở nhà đất dôi dư sau sắp xếp hiện trên bản đồ.</p>'
+      run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 12); d.check('chk_c9', { main: 'quyhoach' }); },
+      text: '<p>Bảng bên phải › <b>Quy hoạch</b> › <b>Quỹ đất và công trình</b> › <b>12. Cơ sở chưa sử dụng</b> đã bật: các cơ sở nhà đất dôi dư sau sắp xếp hiện trên bản đồ.</p>'
     },
     {
       title: 'Phương án cho khu đất lớn nhất',
@@ -304,7 +304,7 @@ const SECTIONS = [
         title: 'Đánh giá khả năng phục vụ của 1 công trình hạ tầng',
         lead: 'Dựng vùng phục vụ thực tế của công trình theo mạng lưới đường và ước tính số dân được phục vụ, đối chiếu với bán kính quy chuẩn.',
         steps: [
-          'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Khu đất</b>. Chọn nhóm công trình cần xem (ví dụ <b>4. Trường Tiểu học</b>).',
+          'Bảng bên phải › panel <b>Hạ tầng xã hội</b>. Chọn nhóm công trình cần xem (ví dụ <b>Giáo dục</b> › <b>Tiểu học</b>).',
           'Bấm biểu tượng công trình trên bản đồ. Bảng thông tin nêu quy mô hiện trạng, quy hoạch và bán kính phục vụ.',
           'Trong bảng, bấm nút <b>Xem bán kính phục vụ</b> (kèm số mét). Trạm xe buýt là <b>Xem phạm vi đi bộ</b>; nhà tang lễ, nghĩa trang là <b>Xem khoảng cách an toàn</b>. Bản đồ chuyển âm bản, dựng phạm vi đi được theo đường và tính dân số phục vụ.',
           'Nút con mắt trên bảng thu bảng về tên công trình để nhìn trọn vùng; bấm lại công trình để mở bảng. Nút tròn ● cạnh tên nhóm bật vùng phủ cả nhóm (chú thích <b>Bật/tắt vùng phủ</b>, <b>Bật/tắt bán kính phục vụ</b>, <b>Bật/tắt khoảng cách an toàn</b> hoặc <b>Bật/tắt phạm vi 500 m</b> tùy nhóm).'
@@ -313,14 +313,14 @@ const SECTIONS = [
           'Vùng phục vụ tính trên mạng đường OpenStreetMap và tuyến do quản trị viên bổ sung (đường đi ngắn nhất trên mạng đường).',
           'Dân số phục vụ lấy từ lớp phân bổ dân cư đã hiệu chỉnh.'
         ],
-        actions: [{ label: 'Mở danh sách công trình', icon: 'layers', run: () => openLayerTab({ main: 'infra' }) }]
+        actions: [{ label: 'Mở danh sách công trình', icon: 'layers', run: () => openLayerTab({ main: 'xahoi' }) }]
       },
       {
         id: 'invest', btn: 'guide', status: 'trial',
         title: 'Tra cứu dự án kêu gọi đầu tư',
         lead: 'Xem ranh và thông tin dự án trong danh sách kêu gọi đầu tư, rồi kiểm tra quy hoạch sử dụng đất nằm trong ranh đó.',
         steps: [
-          'Bảng bên phải › <b>Hạ tầng</b> › mục <b>Công trình điểm</b>. Bật <b>15. Dự án kêu gọi đầu tư</b>.',
+          'Bảng bên phải › <b>Quy hoạch</b> › mục <b>Quỹ đất và công trình</b>. Bật <b>15. Dự án kêu gọi đầu tư</b>.',
           'Bấm ranh dự án trên bản đồ. Bảng góc trái có hai tab <b>Tổng quan</b> và <b>Chi tiết</b>.',
           'Ở <b>Tổng quan</b>, bấm <b>Kiểm tra quy hoạch theo ranh giới dự án</b>. Bảng cắt ranh với lô quy hoạch theo các cấp đang có dữ liệu.',
           'Bấm <b>Ẩn kiểm tra quy hoạch</b> để thu phần đó. Nút đóng ở góc bảng để thoát.'
@@ -329,7 +329,7 @@ const SECTIONS = [
           'Ranh lấy từ file KML, thông tin từ sheet danh sách dự án. Dự án chưa ghép được ranh không vẽ trên bản đồ.',
           'Nhóm này không có bán kính phục vụ và không tính vào bản đồ độ phủ.'
         ],
-        actions: [{ label: 'Bật lớp dự án', icon: 'layers', run: () => showLayer('chk_invest', { main: 'infra' }) }]
+        actions: [{ label: 'Bật lớp dự án', icon: 'layers', run: () => showLayer('chk_invest', { main: 'quyhoach' }) }]
       }
     ]
   },
@@ -344,12 +344,12 @@ const SECTIONS = [
         steps: [
           'Nếu panel phải đang thu, bấm <b>Mở panel công cụ</b>. Tab <b>Lớp dữ liệu</b> đang mở mặc định.',
           'Hàng tab trên: <b>Hành chính</b>, <b>Quy hoạch</b>, <b>Hạ tầng</b>, <b>Kiến trúc</b>. Trong Hành chính có tab nhỏ <b>Đô thị</b> và <b>ĐVHC</b> (xã, phường).',
-          'Ngay dưới là ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b>, nút <b>Cả nhóm</b> và nút ẩn panel. Mục <b>Công trình điểm</b> nằm trong Hạ tầng: nút <b>Tất cả</b> bật hoặc tắt các nhóm; ô <b>Ranh lô</b> bật ranh theo nhóm đang tick.',
+          'Dòng dưới băng đạn có ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b> và nút <b>Cả nhóm</b>. Công trình xã hội ở panel <b>Hạ tầng xã hội</b>. <b>Ranh lô</b>, cơ sở chưa sử dụng và chung cư ở Quy hoạch. Nút <b>Tất cả</b> bật hoặc tắt 14 nhóm điểm.',
           'Hàng tab dưới: <b>Bản đồ nền</b> (ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư, độ phủ…) và <b>Bản đồ môi trường</b> (địa hình, ngập…). Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường.'
         ],
         facts: [
           'Thu panel bằng nút mũi tên <b>Ẩn panel</b> trên hàng công cụ của panel. Lớp đã bật vẫn giữ.',
-          'Ghi chú cuối mục <b>Công trình điểm</b>: tem màu thường là <b>Đã duyệt</b>, tem nhạt là <b>Chờ duyệt</b>.'
+          'Ghi chú cuối mục <b>Hạ tầng xã hội</b>: tem màu thường là <b>Đã duyệt</b>, tem nhạt là <b>Chờ duyệt</b>.'
         ],
         actions: [{ label: 'Mở lớp dữ liệu', icon: 'layers', run: () => openLayerTab({ main: 'quyhoach' }) }]
       },
@@ -519,7 +519,7 @@ const SECTIONS = [
         lead: 'Thể hiện phân bổ dân cư theo ô lưới, làm cơ sở tính dân số được phục vụ và đánh giá nhu cầu hạ tầng khi lập quy hoạch.',
         steps: [
           'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Bản đồ nền</b> › bật <b>Phân bổ dân cư</b>. Kéo thanh trượt cạnh tên lớp để chỉnh độ trong suốt.',
-          'Bật thêm nhóm ở <b>Khu đất</b> và lớp <b>Bản đồ độ phủ hạ tầng</b> để thấy khu đông dân còn thiếu hạ tầng.',
+          'Bật thêm nhóm ở <b>Hạ tầng xã hội</b> và lớp <b>Bản đồ độ phủ hạ tầng</b> để thấy khu đông dân còn thiếu hạ tầng.',
           'Sau khi đăng nhập quản trị: tab <b>Đề xuất</b> › nút <b>Quản trị</b> › <b>Ô dân cư</b>. Chọn <b>Xóa ô dân cư (không có dân)</b> hoặc <b>Thêm ô dân cư (khu dân cư mới)</b>, rồi <b>Cọ tô</b> hoặc <b>Vùng đa giác</b>.'
         ],
         facts: [
@@ -670,7 +670,7 @@ const SECTIONS = [
         actions: [{
           label: 'Xem trên bản đồ', icon: 'map',
           run: () => {
-            showLayer('chk_c9', { main: 'infra' });
+            showLayer('chk_c9', { main: 'quyhoach' });
             showToast('Bấm vào biểu tượng cơ sở chưa sử dụng trên bản đồ để xem phương án đề xuất', 'info');
           }
         }]

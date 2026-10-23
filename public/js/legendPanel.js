@@ -154,7 +154,8 @@ export function initLegendPanel() {
     if (display) display.hidden = !land;
     const pointHost = document.getElementById('legendPoints');
     const pointList = document.getElementById('legendPointList');
-    const pointRows = [...document.querySelectorAll('#layerPaneInfra .layer-row input[type="checkbox"]:checked, .infra-point input[type="checkbox"]:checked')];
+    const pointRows = [...document.querySelectorAll('.infra-point input[type="checkbox"]:checked')]
+      .filter(inp => inp.id !== 'chk_c13');
     if (pointHost && pointList) {
       pointList.replaceChildren();
       pointRows.forEach(inp => {
