@@ -1,6 +1,6 @@
-// Tab Chú giải: Phân loại đô thị (ký hiệu + quyết định phê duyệt, phần tĩnh trong index.html) và ký hiệu theo cấp đồ án
+// Khung chú giải nổi trên bản đồ: Phân loại đô thị (ký hiệu + quyết định phê duyệt, phần tĩnh trong index.html) và ký hiệu theo cấp đồ án
 // (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500), mỗi bộ chia nhóm (tìm theo tên loại đất / tên layer CAD,
-// thu gọn từng nhóm; tìm và thu gọn chỉ áp lên bộ đang xem). Mọi phần tử [data-legend-pane] trong tab hiện theo bộ đang xem.
+// thu gọn từng nhóm; tìm và thu gọn chỉ áp lên bộ đang xem). Chỉ hiện bộ của lớp đang bật. Mọi phần tử [data-legend-pane] hiện theo bộ đang xem.
 // Chọn lớp ở droplist (mapLevel.js) thì chuyển sang bộ của cấp đó. Bộ QHC 1/25.000 và 1/10.000 kèm nhóm mạng lưới giao thông
 // (qhcRoads.js); 1/10.000 thêm nhóm mặt cắt ngang đường (roadSections.js).
 // + mục Hiển thị lô đất: thanh độ trong suốt phần tô lô và chú giải viền theo giai đoạn.
@@ -96,10 +96,88 @@ export function initLegendPanel() {
     syncToggle();
   }));
   syncToggle();
+  const frame = document.getElementById('tabLegend');
+  const chip = document.getElementById('legendChip');
+  const checked = (id) => !!document.getElementById(id)?.checked;
+  const anyOn = (ids) => ids.some(checked);
+  const SET_ON = {
+    URBAN: ['chk_urban'],
+    QHC25: ['chk_qhc25', 'chk_gt25', 'chk_qhc25head'],
+    QHC: ['chk_qhc10', 'chk_gt10', 'chk_qhc10head'],
+    QHPK: ['chk_projects'],
+    QHCT: ['chk_qhct']
+  };
+  const LAND = ['chk_qhc25', 'chk_qhc10', 'chk_projects', 'chk_qhct', 'chk_parcel'];
+  const syncLegend = () => {
+    if (!frame) return;
+    const visible = new Set();
+    tabs.forEach(t => {
+      const show = anyOn(SET_ON[t.dataset.legendSet] || []);
+      t.hidden = !show;
+      if (show) visible.add(t.dataset.legendSet);
+    });
+    if (!visible.has(active)) {
+      const next = tabs.find(t => !t.hidden);
+      if (next) {
+        active = next.dataset.legendSet;
+        tabs.forEach(x => {
+          const on = x === next;
+          x.classList.toggle('active', on);
+          x.setAttribute('aria-selected', String(on));
+        });
+        showPane();
+        applySearch();
+        syncToggle();
+      }
+    }
+    const symbols = visible.size > 0;
+    const land = anyOn(LAND);
+    const main = frame.querySelector('.legend-main');
+    if (main) main.hidden = !symbols;
+    const display = frame.querySelector('.legend-display');
+    if (display) display.hidden = !land;
+    const pointHost = document.getElementById('legendPoints');
+    const pointList = document.getElementById('legendPointList');
+    const pointRows = [...document.querySelectorAll('#layerPaneInfra .layer-row input[type="checkbox"]:checked')];
+    if (pointHost && pointList) {
+      pointList.replaceChildren();
+      pointRows.forEach(inp => {
+        const row = document.createElement('div');
+        row.className = 'legend-point';
+        const img = inp.closest('.layer-row')?.querySelector('img');
+        if (img) row.append(img.cloneNode(true));
+        const name = (inp.closest('label')?.textContent || '').replace(/\s+/g, ' ').trim();
+        row.append(document.createTextNode(name));
+        pointList.append(row);
+      });
+      pointHost.hidden = pointRows.length === 0;
+    }
+    const roads = document.getElementById('legendRoads');
+    if (roads) roads.hidden = !checked('chk_roads');
+    const extra = document.getElementById('legendExtra');
+    const extraOn = pointRows.length > 0 || checked('chk_roads');
+    if (extra) extra.hidden = !extraOn;
+    const something = symbols || land || extraOn;
+    const dismissed = frame.dataset.userHide === '1';
+    frame.hidden = !something || dismissed;
+    if (chip) chip.hidden = !something || !dismissed;
+  };
+  document.getElementById('btnLegendClose')?.addEventListener('click', () => {
+    frame.dataset.userHide = '1';
+    syncLegend();
+  });
+  chip?.addEventListener('click', () => {
+    delete frame.dataset.userHide;
+    syncLegend();
+  });
+  document.addEventListener('change', syncLegend);
+  document.addEventListener('qh:legend-sync', syncLegend);
   document.addEventListener(LEVEL_EVENT, (e) => {
     const set = LEVEL_SET[e.detail?.level];
     if (set && set !== active) tabs.find(t => t.dataset.legendSet === set)?.click();
+    syncLegend();
   });
+  syncLegend();
 
   const slider = document.getElementById('lotOpacity');
   const out = document.getElementById('lotOpacityValue');

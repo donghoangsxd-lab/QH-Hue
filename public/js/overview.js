@@ -320,7 +320,7 @@ const SECTIONS = [
         title: 'Tra cứu dự án kêu gọi đầu tư',
         lead: 'Xem ranh và thông tin dự án trong danh sách kêu gọi đầu tư, rồi kiểm tra quy hoạch sử dụng đất nằm trong ranh đó.',
         steps: [
-          'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Khu đất</b>. Bật <b>15. Dự án kêu gọi đầu tư</b>.',
+          'Bảng bên phải › <b>Hạ tầng</b> › mục <b>Công trình điểm</b>. Bật <b>15. Dự án kêu gọi đầu tư</b>.',
           'Bấm ranh dự án trên bản đồ. Bảng góc trái có hai tab <b>Tổng quan</b> và <b>Chi tiết</b>.',
           'Ở <b>Tổng quan</b>, bấm <b>Kiểm tra quy hoạch theo ranh giới dự án</b>. Bảng cắt ranh với lô quy hoạch theo các cấp đang có dữ liệu.',
           'Bấm <b>Ẩn kiểm tra quy hoạch</b> để thu phần đó. Nút đóng ở góc bảng để thoát.'
@@ -343,13 +343,13 @@ const SECTIONS = [
         lead: 'Chọn lớp cần xem ở panel phải. Lớp bật vẽ ngay trên bản đồ đang mở (quy hoạch hoặc hiện trạng).',
         steps: [
           'Nếu panel phải đang thu, bấm <b>Mở panel công cụ</b>. Tab <b>Lớp dữ liệu</b> đang mở mặc định.',
-          'Hàng tab trên: <b>Hành chính</b> (đô thị, xã và phường), <b>Quy hoạch</b> (QHC, QHPK, QHCT), <b>Hạ tầng</b>, <b>Kiến trúc</b> và <b>Khu đất</b>. Tab không vừa thì bấm <b>&gt;&gt;</b>.',
-          'Ở <b>Khu đất</b>, nút <b>Tất cả</b> bật hoặc tắt các nhóm công trình; ô <b>Ranh lô</b> bật ranh lô theo nhóm đang tick. Số đang bật hiện cạnh tiêu đề tab.',
+          'Hàng tab trên: <b>Hành chính</b>, <b>Quy hoạch</b>, <b>Hạ tầng</b>, <b>Kiến trúc</b>. Trong Hành chính có tab nhỏ <b>Đô thị</b> và <b>ĐVHC</b> (xã, phường).',
+          'Ngay dưới là ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b>, nút <b>Cả nhóm</b> và nút ẩn panel. Mục <b>Công trình điểm</b> nằm trong Hạ tầng: nút <b>Tất cả</b> bật hoặc tắt các nhóm; ô <b>Ranh lô</b> bật ranh theo nhóm đang tick.',
           'Hàng tab dưới: <b>Bản đồ nền</b> (ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư, độ phủ…) và <b>Bản đồ môi trường</b> (địa hình, ngập…). Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường.'
         ],
         facts: [
-          'Thu panel bằng nút mũi tên <b>Thu gọn panel</b> trên thanh tiêu đề panel phải. Lớp đã bật vẫn giữ.',
-          'Ghi chú cuối mục <b>Khu đất</b>: tem màu thường là <b>Đã duyệt</b>, tem nhạt là <b>Chờ duyệt</b>.'
+          'Thu panel bằng nút mũi tên <b>Ẩn panel</b> trên hàng công cụ của panel. Lớp đã bật vẫn giữ.',
+          'Ghi chú cuối mục <b>Công trình điểm</b>: tem màu thường là <b>Đã duyệt</b>, tem nhạt là <b>Chờ duyệt</b>.'
         ],
         actions: [{ label: 'Mở lớp dữ liệu', icon: 'layers', run: () => openLayerTab({ main: 'quyhoach' }) }]
       },
@@ -358,7 +358,7 @@ const SECTIONS = [
         title: 'Đọc chú giải ký hiệu',
         lead: 'Tra ký hiệu sử dụng đất, phân loại đô thị và kiểu viền lô theo giai đoạn.',
         steps: [
-          'Bảng bên phải › tab <b>Chú giải</b>.',
+          'Khung <b>Chú giải</b> nổi trên bản đồ khi có lớp đang bật. Chỉ hiện bộ ký hiệu của lớp đó.',
           'Chọn bộ ký hiệu: <b>Đô thị</b>, <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b> hoặc <b>QHCT 1/500</b>.',
           'Gõ vào ô <b>Tìm loại đất, tên layer CAD...</b> để lọc. Nút mũi tên kép <b>Thu gọn / mở mọi nhóm ký hiệu</b> đóng hoặc mở các nhóm.',
           'Phần <b>Hiển thị lô đất</b>: kéo thanh <b>Độ trong suốt</b> (bấm số % để trả về 100%). Bảng <b>Viền lô theo giai đoạn</b> gồm Hiện trạng, QH đợt đầu, Chờ duyệt và QH dài hạn.'
@@ -367,7 +367,7 @@ const SECTIONS = [
           'QHPK 1/2.000 là bộ đang dùng cho các đồ án đã nạp. Thu nhỏ thì lô tô màu; phóng từ mức 17 thì hiện hoa văn Thông tư 16/2025/TT-BXD.',
           'Mục <b>Đô thị</b> có nút quyết định <b>QĐ 614</b> (hiện trạng) và <b>QĐ 756</b> (quy hoạch).'
         ],
-        actions: [{ label: 'Mở chú giải', icon: 'book', run: () => { document.querySelector('.rp-tabs .tab-btn[data-tab="tabLegend"]')?.click(); flash($('tabLegend')); } }]
+        actions: [{ label: 'Mở chú giải', icon: 'book', run: () => { delete $('tabLegend')?.dataset.userHide; document.dispatchEvent(new CustomEvent('qh:legend-sync')); flash($('tabLegend')); } }]
       },
       {
         id: 'compare', btn: 'guide', status: 'trial',
@@ -680,7 +680,7 @@ const SECTIONS = [
         title: 'Đề xuất điểm hạ tầng mới',
         lead: 'Gửi một vị trí công trình mới để quản trị viên phê duyệt. Điểm chưa phê duyệt hiện ký hiệu nhạt, nhãn Chờ phê duyệt.',
         steps: [
-          'Bảng bên phải › tab <b>Đề xuất</b>. Mục <b>Nhập 1 điểm</b> đang mở.',
+          'Thanh công cụ bên trái, bấm nút <b>Đề xuất</b>. Mục <b>Nhập 1 điểm</b> đang mở.',
           'Chọn <b>Loại</b>, <b>Giai đoạn</b> (Hiện trạng hoặc Quy hoạch mới) và <b>Phân cấp</b> (Cấp đô thị hoặc Cấp đơn vị ở).',
           'Nhập <b>Tên</b>. Ô <b>Tọa độ</b>: gõ vĩ độ, kinh độ, hoặc bấm nút ghim <b>Ghim tọa độ trên bản đồ</b> rồi bấm vị trí. <b>Phường/Xã</b> tự điền theo tọa độ. Nhập <b>Diện tích</b> (m²). Ô <b>Bán kính</b> chỉ đọc, tính theo QCVN.',
           'Bấm <b>Gửi đề xuất</b>. Dòng trạng thái ngay dưới nút báo kết quả. Sau khi phê duyệt, điểm chuyển thành <b>Đã phê duyệt</b>.'
@@ -689,7 +689,7 @@ const SECTIONS = [
           'Mục <b>Nhập hàng loạt</b> nhận DXF, KML, KMZ, GeoJSON, shapefile (.zip). Chưa đăng nhập: file ≤ 2 MB vào hàng chờ.',
           'Nút <b>Quản trị</b> trên tab này chỉ hiện sau khi đăng nhập quản trị (tuyến đường, ô dân cư, dữ liệu OpenStreetMap).'
         ],
-        actions: [{ label: 'Mở tab Đề xuất', icon: 'plus', run: () => { document.querySelector('.rp-tabs .tab-btn[data-tab="tabAdd"]')?.click(); flash($('tabAdd')); } }]
+        actions: [{ label: 'Mở đề xuất', icon: 'plus', run: () => { document.dispatchEvent(new CustomEvent('qh:right-tab', { detail: { tab: 'tabAdd', open: true } })); flash($('tabAdd')); } }]
       }
     ]
   }
