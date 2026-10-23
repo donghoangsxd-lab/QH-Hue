@@ -1053,10 +1053,21 @@ body.right-collapsed .right-panel {
 .layer-main-tabs .layer-eye-btn { width: 26px; height: 26px; margin-left: 3px; padding: 0; justify-content: center; box-sizing: border-box; }
 .layer-main-tabs .layer-eye-btn[hidden] { display: none; }
 .layer-main-tabs .layer-eye-btn:disabled, .layer-pane-tools .layer-eye-btn:disabled { opacity: 0.5; cursor: default; }
-/* Tab Lớp dữ liệu: 3 tab "TÊN (đang hiện/tổng)" trên 1 dòng, rộng theo nội dung; không cắt chữ */
-#layerMain > .layer-main-tabs { padding: 0 4px; }
-#layerMain > .layer-main-tabs .layer-main-tab { flex: 1 1 auto; gap: 3px; padding: 0 3px; letter-spacing: 0; white-space: nowrap; }
+/* Tab Lớp dữ liệu: năm tab cấp một, nhãn thường. Tab không vừa thì nút >> */
+#layerMain > .layer-main-tabs { display: flex; align-items: stretch; gap: 0; padding: 0 4px; overflow: visible; }
+#layerMain > .layer-main-tabs [role="tablist"] { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; overflow: hidden; }
+#layerMain > .layer-main-tabs .layer-main-tab { flex: 0 0 auto; gap: 3px; padding: 0 7px; letter-spacing: 0; white-space: nowrap; text-transform: none; font-size: 12px; }
 #layerMain > .layer-main-tabs .layer-main-label { overflow: visible; }
+#layerMain > .layer-main-tabs .layer-main-tab[hidden] { display: none; }
+.layer-main-more { flex: 0 0 auto; align-self: center; height: 26px; min-width: 28px; margin-left: 2px; padding: 0 6px; border: 1px solid var(--border-color); border-radius: var(--r-sm); background: var(--bg-input); color: var(--text-main); font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0; cursor: pointer; }
+.layer-main-more[hidden] { display: none; }
+.layer-main-more[aria-expanded="true"], .layer-main-more:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.layer-main-overflow { position: fixed; z-index: 1400; display: flex; flex-direction: column; min-width: 168px; padding: 4px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--r-md); box-shadow: var(--panel-shadow); }
+.layer-main-overflow[hidden] { display: none; }
+.layer-main-overflow button { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 4px 10px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-main); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.layer-main-overflow button:hover, .layer-main-overflow button:focus-visible { background: var(--bg-hover); outline: none; }
+.layer-main-overflow button[aria-checked="true"] { color: var(--accent-cyan); font-weight: 700; }
+.layer-main-overflow small { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .layer-main-count { flex-shrink: 0; font-size: calc(var(--fs-xs) * 0.9); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-muted); }
 .layer-main-count:empty { display: none; }
 .layer-main-tab.active .layer-main-count { color: var(--main-accent); }
@@ -5160,8 +5171,8 @@ body.project-review.la-page #projectReviewHost {
   .legend-main .layer-main-tab { flex: 0 0 auto; height: 32px; min-height: 32px; min-width: 0; padding: 0 8px; }
   .legend-main .layer-main-label { flex-direction: row; gap: 3px; white-space: nowrap; overflow: visible; text-overflow: clip; line-height: 1.2; font-size: 11.5px; justify-content: center; }
   .legend-main .layer-main-label small { display: inline; font-size: 11.5px; }
-  #layerMain > .layer-main-tabs { overflow-x: auto; }
-  #layerMain > .layer-main-tabs .layer-main-tab { flex: 0 0 auto; height: 32px; min-height: 32px; padding: 0 4px; }
+  #layerMain > .layer-main-tabs { overflow: visible; }
+  #layerMain > .layer-main-tabs .layer-main-tab { flex: 0 0 auto; height: 32px; min-height: 32px; padding: 0 6px; }
   .layer-map-tab { height: 32px; min-height: 32px; }
   .layer-main-pane, .layer-map-pane, .tab-body { padding: 2px 6px 4px; }
   .layer-pane-tools { padding: 2px 0 2px; margin-bottom: 2px; }
@@ -5606,10 +5617,7 @@ body.project-review.la-page #projectReviewHost {
 .apt-mark { display: inline-block; width: 14px; height: 19px; margin-right: 3px; vertical-align: -4px; }
 .apt-mark svg { display: block; width: 14px; height: 19px; }
 
-.axis-tabs { position: sticky; top: 0; z-index: 3; display: flex; gap: 0; padding: 0 4px; border-bottom: 1px solid var(--border-soft); background: var(--bg-panel); }
-.axis-tab { flex: 1 1 0; min-width: 0; height: 32px; padding: 0 2px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0; cursor: pointer; }
-.axis-tab.active { color: var(--text-main); border-bottom-color: var(--main-accent); }
-.axis-tab:focus-visible, .axis-dock button:focus-visible, .cn-sector:focus-visible, .cn-level:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
+.axis-dock button:focus-visible, .cn-sector:focus-visible, .cn-level:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
 .axis-scope { margin: 6px 8px; font-size: 12px; color: var(--text-muted); }
 .axis-tools, .cn-tools { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 6px 8px; }
 .cn-soon { border: 1px dashed var(--border-color); background: transparent; color: var(--text-muted); border-radius: 6px; padding: 2px 6px; font: inherit; font-size: 11px; cursor: not-allowed; }

@@ -80,7 +80,7 @@ function setChecked(id, on) {
 
 function showLayersTab() {
   document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers', open: false } }));
-  document.querySelector('[data-main-tab="plan"]')?.click();
+  document.querySelector('[data-main-tab="quyhoach"]')?.click();
 }
 
 // ---------- Lớp quy hoạch ----------
