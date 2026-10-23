@@ -590,16 +590,27 @@ function docOf(manifest, heavy) {
 
 function writeOutputs(repo, layers, gaps, heavy, options) {
   const append = !!(options && options.append);
+  const land = loadLandIndex(repo);
   let manifest = manifestOf(layers, gaps);
   if (append) {
     const outJson = path.join(repo, 'public', 'data', 'chuyen-nganh', 'index.json');
     const prev = fs.existsSync(outJson) ? JSON.parse(fs.readFileSync(outJson, 'utf8')) : { layers: [], gaps: [] };
     const fresh = new Set(layers.map((l) => l.scheme));
-    const keptLayers = (prev.layers || []).filter((l) => !fresh.has(l.scheme));
+    const seen = new Set();
+    const keptLayers = (prev.layers || []).filter((l) => {
+      if (fresh.has(l.scheme)) return false;
+      if (l.file && seen.has(l.file)) return false;
+      if (l.file) seen.add(l.file);
+      return true;
+    });
     const keptGaps = (prev.gaps || []).filter((g) => !fresh.has(g.scheme));
-    manifest = { ...manifest, layers: keptLayers.concat(manifest.layers), gaps: keptGaps.concat(gaps) };
+    const added = manifest.layers.filter((l) => !(l.file && seen.has(l.file)));
+    const freshDoc = retargetManifest({ ...manifest, layers: added, gaps }, land);
+    const freshLayers = freshDoc.layers.filter((l) => !(l.file && seen.has(l.file)));
+    manifest = { ...freshDoc, layers: keptLayers.concat(freshLayers), gaps: keptGaps.concat(freshDoc.gaps) };
+  } else {
+    manifest = retargetManifest(manifest, land);
   }
-  manifest = retargetManifest(manifest, loadLandIndex(repo));
   const outJson = path.join(repo, 'public', 'data', 'chuyen-nganh', 'index.json');
   fs.mkdirSync(path.dirname(outJson), { recursive: true });
   fs.writeFileSync(outJson, JSON.stringify(manifest, null, 2) + '\n');
