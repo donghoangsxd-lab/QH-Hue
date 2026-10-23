@@ -13,6 +13,9 @@ import { geeApi } from './api.js';
 import { popQuery } from './popMethod.js';
 import { STATUS_REF, STATUS_DATE, URBANS_614, WARDS_614, RURAL_RULE, bareName as bare, wardLevel614, urbans614Of, urbans614ByPlan } from './urbanStatus.js';
 import { loadOsmOpen, osmTransitReady, transitNote } from './osmOpen.js';
+import { areaCodeFromName } from './facetStore.js';
+import { MANUAL_2A, MANUAL_I } from './urbanEntrySchema.js';
+import { readUnit, valueOf } from './urbanInputs.js';
 
 export const CLASS_REF = 'Nghị quyết 111/2025/UBTVQH15';
 export const PLAN_REF = 'Quyết định 756/QĐ-UBND ngày 28/02/2026';
@@ -232,22 +235,85 @@ function areaOf(wards, pairs) {
 }
 
 const popOf = (wards) => wards.reduce((s, w) => s + (Number(w.Dan_So_Vector) || 0), 0);
-const areaKmOf = (wards) => wards.reduce((s, w) => s + (Number(w.Dien_Tich_Km2) || 0), 0);
+
+function urbanKey(urban) {
+  if (!urban || urban.cls === 'I' || urban.id === 'hue') return 'tp:TP';
+  return `dothi:${urban.id}`;
+}
+
+function wardKey(name) {
+  return `xa:${areaCodeFromName(name)}`;
+}
+
+function numOrNull(v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function popWithEntry(urban, list) {
+  const over = numOrNull(valueOf(urbanKey(urban), 'danSo'));
+  if (over != null) return over;
+  let pop = 0;
+  list.forEach(w => {
+    const o = numOrNull(valueOf(wardKey(w.Ten_Phuong), 'danSo'));
+    pop += o != null ? o : (Number(w.Dan_So_Vector) || 0);
+  });
+  const tam = numOrNull(valueOf(urbanKey(urban), 'danSoTamTru'));
+  if (tam != null && tam > 0) pop += tam;
+  return pop;
+}
+
+function areaWithEntry(urban, list) {
+  const over = numOrNull(valueOf(urbanKey(urban), 'dienTich'));
+  if (over != null) return over;
+  let km = 0;
+  list.forEach(w => {
+    const o = numOrNull(valueOf(wardKey(w.Ten_Phuong), 'dienTich'));
+    km += o != null ? o : (Number(w.Dien_Tich_Km2) || 0);
+  });
+  return km;
+}
+
+function measurePartial(calc, urban) {
+  const key = urbanKey(urban);
+  if (calc === 'pop') {
+    const n = numOrNull(valueOf(key, 'danSo'));
+    if (n == null) return { pending: true, note: 'Chưa có dân số phần đô thị' };
+    return { value: n, note: 'Dân số phần đô thị do cán bộ nhập. Chưa có ranh nên chưa kiểm tra không gian.' };
+  }
+  if (calc === 'dens') {
+    const pop = numOrNull(valueOf(key, 'danSo'));
+    const km = numOrNull(valueOf(key, 'dienTich'));
+    if (!(pop > 0) || !(km > 0)) return { pending: true, note: 'Chưa đủ dân số và diện tích phần đô thị' };
+    return { value: pop / km, note: 'Mật độ phần đô thị do cán bộ nhập' };
+  }
+  if (calc === 'roads') {
+    const d = numOrNull(valueOf(key, 'matDoDuong'));
+    if (d == null) return { pending: true, note: 'Chưa có mật độ đường phần đô thị' };
+    return { value: d, note: 'Mật độ đường do cán bộ nhập' };
+  }
+  return { pending: true, note: 'Chưa tách ranh giới đô thị' };
+}
 
 function measure(calc, urban, wards, roads) {
+  if (urban.partial) return measurePartial(calc, urban);
   const list = wardsOf(urban, wards);
-  const pop = popOf(list);
+  const pop = popWithEntry(urban, list);
   const missing = (urban.units || []).length - list.length;
   if (urban.cls !== 'I' && missing > 0) return { pending: true, note: `Thiếu số liệu ${missing} đơn vị trong phạm vi đô thị` };
   if (calc === 'pop') {
-    return { value: pop, note: `${fmtNum(pop)} người trên ${list.length} đơn vị. ${STD_2A.find(s => s.calc === 'pop').method}` };
+    const entered = numOrNull(valueOf(urbanKey(urban), 'danSo')) != null || numOrNull(valueOf(urbanKey(urban), 'danSoTamTru')) != null;
+    return { value: pop, note: `${fmtNum(pop)} người trên ${list.length} đơn vị.${entered ? ' Có số cán bộ nhập.' : ''} ${STD_2A.find(s => s.calc === 'pop').method}` };
   }
   if (calc === 'dens') {
-    const km = areaKmOf(list);
+    const km = areaWithEntry(urban, list);
     if (!(km > 0)) return { pending: true, note: 'Chưa có diện tích tự nhiên' };
     return { value: pop / km, note: `${fmtNum(pop)} người / ${N1.format(km)} km²` };
   }
   if (calc === 'roads') {
+    const entered = numOrNull(valueOf(urbanKey(urban), 'matDoDuong'));
+    if (entered != null) return { value: entered, note: 'Mật độ đường do cán bộ nhập' };
     if (!roads) return { pending: true, note: 'Đang tải mạng lưới đường' };
     let km = 0, built = 0, have = 0, natural = 0, wait = false;
     list.forEach(w => {
@@ -315,8 +381,13 @@ function measure(calc, urban, wards, roads) {
 
 function judge(std, urban, m) {
   if (densityExempt(urban, std)) return { level: 'skip', pts: urban.partial ? null : std.pts.lo };
-  if (urban.partial) return { level: 'na', pts: null };
-  if (!std.calc) return { level: 'wait', pts: null };
+  if (m && m.choice) {
+    if (m.choice === 'hi') return { pts: std.pts.hi, level: 'hi' };
+    if (m.choice === 'lo') return { pts: std.pts.lo, level: 'mid' };
+    return { pts: 0, level: 'no' };
+  }
+  if (urban.partial && (!m || m.pending || m.value == null)) return { level: 'na', pts: null };
+  if (!std.calc && (!m || m.value == null)) return { level: 'wait', pts: null };
   if (!m || m.pending || m.value == null) return { level: 'wait', pts: null };
   if (m.reference) return { level: 'ref', pts: null };
   if (std.code === '2A.III.13' && urban.cls === 'III' && m.value < 1) return { level: 'wait', pts: null };
@@ -429,7 +500,9 @@ function ensureBusCover(wards, redraw) {
 }
 
 function typeIFacts(wards) {
-  const pop = popOf(wards);
+  const over = numOrNull(valueOf('tp:TP', 'danSo'));
+  const tam = numOrNull(valueOf('tp:TP', 'danSoTamTru'));
+  const pop = over != null ? over : popOf(wards) + (tam > 0 ? tam : 0);
   const popUrban = (u) => popOf(wardsOf(u, wards));
   const pop2 = URBANS.filter(u => u.cls === 'II').reduce((s, u) => s + popUrban(u), 0);
   const popFull = URBANS.filter(u => u.cls === 'II' || (u.cls === 'III' && !u.partial)).reduce((s, u) => s + popUrban(u), 0);
@@ -439,6 +512,13 @@ function typeIFacts(wards) {
 }
 
 function judgeI(std, facts) {
+  const manualKey = MANUAL_I[std.code];
+  if (manualKey) {
+    const raw = valueOf('tp:TP', manualKey);
+    if (raw == null || raw === '') return { level: 'wait', text: '—', note: std.method || 'Chưa nhập' };
+    const ok = raw === 'yes';
+    return { level: ok ? 'hi' : 'no', text: ok ? 'Đạt' : 'Chưa đạt', note: 'Cán bộ nhập trên luồng Hành chính.' };
+  }
   if (std.calc === 'iPop') {
     const ok = facts.pop >= 2500000;
     return { level: ok ? 'hi' : 'no', text: `${fmtNum(facts.pop)} người`, note: 'Dân số hiện trạng toàn thành phố, chưa tách thường trú và tạm trú.' };
@@ -508,9 +588,32 @@ function loadRoads(force = false) {
 
 const measured = new Map();
 
+function manualMeasure(std, urban) {
+  const spec = MANUAL_2A[std.code];
+  if (!spec) return null;
+  const raw = valueOf(urbanKey(urban), spec.key);
+  if (raw == null || raw === '') return { pending: true, note: 'Chưa có số liệu nhập' };
+  if (spec.qual) return { choice: raw, note: 'Cán bộ nhập trên luồng Hành chính.' };
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return { pending: true, note: 'Giá trị không phải số' };
+  return { value: n, note: 'Cán bộ nhập trên luồng Hành chính.' };
+}
+
+function measureStd(std, urban, wards) {
+  if (MANUAL_2A[std.code]) return manualMeasure(std, urban);
+  if (!std.calc) return null;
+  return measure(std.calc, urban, wards, roads);
+}
+
+function hasEntry(urban) {
+  const row = readUnit(urbanKey(urban));
+  if (!row) return false;
+  return Object.keys(row).some(k => !k.startsWith('_') && row[k] !== '' && row[k] != null);
+}
+
 function readMeasure(std, urban, wards) {
-  const key = `${urban.id}:${std.calc}`;
-  if (!measured.has(key)) measured.set(key, measure(std.calc, urban, wards, roads));
+  const key = `${urban.id}:${std.code}`;
+  if (!measured.has(key)) measured.set(key, measureStd(std, urban, wards));
   return measured.get(key);
 }
 
@@ -535,8 +638,9 @@ function meterHtml(value, hi, floor, level) {
 function scoreOf(urban, wards) {
   const out = { pts: 0, max: 0, met: 0, evaluated: 0, pending: false, levels: [] };
   STD_2A.forEach(std => {
-    if (!std.calc || urban.partial) return;
     const m = readMeasure(std, urban, wards);
+    if (!m || m.pending || m.reference) return;
+    if (m.value == null && !m.choice) return;
     const j = judge(std, urban, m);
     if (j.level === 'wait' && m && m.pending) out.pending = true;
     if (j.pts == null) return;
@@ -609,7 +713,8 @@ function sideHtml(urban, wards) {
   const head = `<div class="uc-side-head"><b class="uc-${urban.cls}">Loại ${urban.cls}</b><span class="uc-side-name" title="${escapeHtml(scopeTitle(urban))}">${escapeHtml(urban.name)}</span>`
     + `<span class="c-muted">${escapeHtml(scopeLabel(urban))}</span></div>`;
   const more = `<button type="button" class="bp-btn uc-more" data-uc="${urban.id}">Bảng đủ ${STD_2A.length} tiêu chuẩn${ico('chev-right')}</button>`;
-  if (urban.partial) return `${head}<div class="uc-side-note">${ico('info')} ${escapeHtml(urban.note)}</div>${more}`;
+  const partialNote = urban.partial ? `<div class="uc-side-note">${ico('info')} ${escapeHtml(urban.note)}</div>` : '';
+  if (urban.partial && !hasEntry(urban)) return `${head}${partialNote}${more}`;
   const sc = scoreOf(urban, wards);
   const rows = STD_2A.filter(s => s.calc).map(std => {
     const m = readMeasure(std, urban, wards);
@@ -629,7 +734,7 @@ function sideHtml(urban, wards) {
     ? `<div class="uc-side-score" title="Ngưỡng công nhận cả Bảng 2A là 75/100 điểm"><span>Đã chấm ${sc.evaluated} tiêu chuẩn · đạt mức tối thiểu ${sc.met}/${sc.evaluated}</span>`
       + `<b>${N1.format(sc.pts)}<span class="c-muted"> / ${N1.format(sc.max)} điểm</span></b>${meterHtml(sc.pts, sc.max, null, sc.met === sc.evaluated ? 'hi' : 'mid')}</div>`
     : '';
-  return `${head}${score}<div class="uc-stds">${rows}</div>${more}`;
+  return `${head}${partialNote}${score}<div class="uc-stds">${rows}</div>${more}`;
 }
 
 function overviewHtml(wards, wardName) {
@@ -696,7 +801,8 @@ const SHORT_2A = {
 const LEVEL_SHORT = { hi: 'Tối đa', mid: 'Tối thiểu', adj: 'Tối thiểu (giảm)', skip: 'Không xét', no: 'Chưa đạt', part: 'Một phần', wait: 'Chờ số liệu', na: 'Chưa tách ranh', ref: 'Tham khảo, chưa tính điểm' };
 
 function nowCellHtml(std, urban, m, j) {
-  if (urban.partial || !std.calc) return '<td class="uc-val">—</td>';
+  if (m && m.choice) return `<td class="uc-val"><b class="${levelCls(j.level)}">${LEVEL_SHORT[j.level] || ''}</b></td>`;
+  if ((urban.partial || !std.calc) && (!m || m.pending || m.value == null)) return '<td class="uc-val">—</td>';
   if (m && m.pending) return `<td class="uc-val"><span class="gtx-wait">${ico('clock')}</span></td>`;
   if (m && m.reference && m.value != null) return `<td class="uc-val"><b>${fmtNum(m.value)}</b></td>`;
   if (!m || m.value == null) return '<td class="uc-val">—</td>';
@@ -724,7 +830,7 @@ function detailRows2A(urban, wards, list) {
     const subHead = std.sub && std.sub !== sub
       ? `<tr class="uc-sub"><td colspan="8">${escapeHtml(std.sub)}</td></tr>` : '';
     sub = std.sub || sub;
-    const m = std.calc && !urban.partial ? readMeasure(std, urban, wards) : null;
+    const m = readMeasure(std, urban, wards);
     const j = judge(std, urban, m);
     const pts = j.pts == null ? '—' : `${j.lower ? '≥ ' : ''}${N2.format(j.pts)}`;
     const tip = [`${std.name}${std.unit ? ` (${std.unit})` : ''}`, std.inherit && `Kế thừa: ${std.inherit}`, std.method, m && m.note, urban.note].filter(Boolean).join('\n');
