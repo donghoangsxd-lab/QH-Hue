@@ -3,7 +3,40 @@
   "version": 1,
   "title": "Quy tắc tuân thủ quy hoạch từ dưới lên",
   "updated": "2026-10-23",
-  "principle": "Quy hoạch cấp dưới phải phù hợp quy hoạch cấp trên đang có hiệu lực. Thứ bậc: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Mỗi đồ án chỉ đối chiếu với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì đối chiếu lên cấp còn lại. Trong vùng override của schemes.json, đồ án có priority lớn hơn thay thế đồ án bị ghi đè. Giá trị rỗng hoặc bằng 0 ở trường đo đạc được coi là chưa có số liệu: quy tắc bỏ qua, không được ghi là đạt.",
+  "principle": "Quy hoạch cấp dưới phải phù hợp quy hoạch cấp trên đang có hiệu lực. Thứ bậc: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. QHC 1/25.000 có thể không ghi chi tiết. Với từng trường, gốc là giá trị khác rỗng đầu tiên khi đi từ cấp cao nhất còn phủ vị trí đó xuống dưới; thiếu, bằng 0 hoặc không xác định ở 1/25.000 thì lấy QHC 1/10.000 làm gốc cho QHPK và QHCT. Trong vùng override của schemes.json, đồ án có priority lớn hơn thay thế đồ án bị ghi đè. Giá trị rỗng hoặc bằng 0 không được ghi là đạt.",
+  "referenceFallback": {
+    "id": "goc-theo-truong",
+    "decision": "QHC 1/25.000 có thể không ghi chi tiết. Trường thiếu, bằng 0 hoặc không xác định ở cấp này thì QHC 1/10.000 là gốc khi so QHPK và QHCT.",
+    "walk": [
+      "QHC25",
+      "QHC10",
+      "QHPK",
+      "QHCT"
+    ],
+    "perField": true,
+    "coversLocation": "Chỉ xét những cấp có phạm vi phủ vị trí đang so, sau khi đã áp dụng UT-01.",
+    "missingValues": [
+      null,
+      "",
+      0,
+      0.0,
+      "0",
+      "0.0",
+      "0.00"
+    ],
+    "unspecifiedText": [
+      "không xác định",
+      "khong xac dinh",
+      "n/a",
+      "na",
+      "-",
+      "null"
+    ],
+    "resolution": "Với từng trường, đi từ cấp cao nhất còn phủ vị trí xuống cấp thấp hơn. Giá trị không thuộc missingValues và không thuộc unspecifiedText là gốc. Dừng tại gốc đó. Cấp dưới gốc phải tuân thủ giá trị này. Không lấy cấp thấp hơn để thay một gốc đã có số.",
+    "message": "Giá trị gốc lấy từ {referenceLevel}.",
+    "appliesTo": "Mọi quy tắc so giá trị hoặc hình học. UT-01 và UT-02 chọn đồ án có hiệu lực trước, không chọn giá trị trường.",
+    "notAViolation": "Cấp trên bỏ trống một trường không phải lỗi của cấp đó. Trường bỏ trống chỉ làm cấp đó không còn là gốc."
+  },
   "hierarchy": [
     {
       "id": "QHC25",
@@ -87,7 +120,7 @@
     "diameterToleranceMm": 0,
     "areaRelativeTolerance": 0.02,
     "areaBasis": "2% diện tích để khỏi bắt phần vụn do dựng hình. Cần xác minh.",
-    "treatZeroAsMissing": "Với trường đo (lộ giới, đường kính, công suất, diện tích, cao độ, hành lang, dung lượng), giá trị 0 và chuỗi rỗng không phải số liệu. Quy tắc trả về bỏ qua.",
+    "treatZeroAsMissing": "referenceFallback.missingValues và unspecifiedText. Giá trị đó không phải số liệu: cấp đang xét không phải gốc của trường, quy tắc không được ghi là đạt.",
     "onMissing": "bo-qua nghĩa là không kết luận đạt và không kết luận vi phạm."
   },
   "codebooks": {
@@ -474,7 +507,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "gte",
@@ -499,7 +532,7 @@
         ]
       },
       "severity": "lỗi",
-      "message": "Lộ giới cấp dưới ({lower} m) nhỏ hơn lộ giới đã xác định ở cấp trên ({higher} m) trên cùng tuyến.",
+      "message": "Lộ giới cấp dưới ({lower} m) nhỏ hơn lộ giới đã xác định ở cấp trên ({higher} m) trên cùng tuyến. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Lộ giới là chỉ tiêu khống chế của cấp trên; cấp dưới không được thu hẹp hành lang đã dành.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -511,7 +544,7 @@
           "Giá trị lộ giới khác 0 trên QHC 1/25.000 và QHC 1/10.000. Hai lớp đường bộ này đang để logioi = 0 trên toàn bộ đối tượng.",
           "Số liệu dùng được hiện có ở một số đồ án địa phương (Khe Tre, Vinh Hưng, KCN Phong Điền)."
         ],
-        "text": "Có cột nhưng cặp QHC 1/25.000 và 1/10.000 chưa có số lộ giới. Chưa đối chiếu được đúng ví dụ đường 36 m xuống 24 m trên hai đồ án này."
+        "text": "Có cột nhưng cặp QHC 1/25.000 và 1/10.000 chưa có số lộ giới. Chưa đối chiếu được đúng ví dụ đường 36 m xuống 24 m trên hai đồ án này. Fallback không tạo được gốc: logioi của QHC 1/10.000 cũng bằng 0 trên toàn bộ đường bộ."
       },
       "example": "Đường lộ giới 36 m ở QHC không được thể hiện 24 m ở QHPK."
     },
@@ -554,7 +587,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "lte",
@@ -577,7 +610,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "cảnh báo",
-      "message": "Lộ giới cấp dưới ({lower} m) lớn hơn lộ giới tối đa đã xác định ở cấp trên ({higher} m).",
+      "message": "Lộ giới cấp dưới ({lower} m) lớn hơn lộ giới tối đa đã xác định ở cấp trên ({higher} m). Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Trần lộ giới, nếu cấp trên đã ghi logioimax, là giới hạn để khỏi chiếm quỹ đất khác. Số bảng cần xác minh.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -587,7 +620,7 @@
         "needed": [
           "logioimax khác 0. Trên QHC 1/25.000 và 1/10.000 cột này đang bằng 0."
         ],
-        "text": "Có cột logioimax nhưng chưa có giá trị dùng được trên hai đồ án tỷ lệ lớn."
+        "text": "Có cột logioimax nhưng chưa có giá trị dùng được trên hai đồ án tỷ lệ lớn. Fallback không tạo được gốc: logioimax của QHC 1/10.000 cũng bằng 0."
       }
     },
     {
@@ -629,7 +662,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "rank-gte",
@@ -650,7 +683,7 @@
         "note": "Không so sánh mã số thô caphangduongbo giữa 1/25.000 và 1/10.000. Mã 3 ở 1/25.000 không cùng nghĩa với mã 3 ở 1/10.000."
       },
       "severity": "lỗi",
-      "message": "Cấp đường cấp dưới thấp hơn cấp đường đã xác định ở cấp trên trên cùng tuyến.",
+      "message": "Cấp đường cấp dưới thấp hơn cấp đường đã xác định ở cấp trên trên cùng tuyến. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Cấp đường xác định vai trò của tuyến. Không hạ cấp một tuyến đã xếp ở quy hoạch cấp trên.",
       "dataNotes": {
         "status": "doi-chieu-duoc",
@@ -704,7 +737,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "section",
@@ -735,7 +768,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "cảnh báo",
-      "message": "Mặt cắt cấp dưới không tương ứng mặt cắt cấp trên: bề rộng nhỏ hơn, hoặc khác ký hiệu mặt cắt khi chưa có kích thước.",
+      "message": "Mặt cắt cấp dưới không tương ứng mặt cắt cấp trên: bề rộng nhỏ hơn, hoặc khác ký hiệu mặt cắt khi chưa có kích thước. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Mặt cắt ngang thể hiện thành phần và bề rộng. Số bảng cần xác minh. Khi chỉ có ký hiệu, khác ký hiệu là cảnh báo, chưa đủ để kết luận bề rộng.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -746,7 +779,7 @@
         "needed": [
           "Cột matcat đang rỗng. chieurong chỉ có trên lớp cầu và phần lớn bằng 0. Chưa có bề rộng từng thành phần mặt cắt."
         ],
-        "text": "Đối chiếu được khác ký hiệu mặt cắt. Chưa kết luận được mặt cắt số mét vì không có kích thước."
+        "text": "Đối chiếu được khác ký hiệu mặt cắt. Chưa kết luận được mặt cắt số mét vì không có kích thước. Ký hiệu mặt cắt có thể lấy từ QHC 1/10.000 (441/802 tuyến đường bộ) khi cấp trên bỏ trống. Bề rộng số vẫn không có vì matcat rỗng ở cả hai cấp."
       }
     },
     {
@@ -788,7 +821,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "offset-lte",
@@ -803,7 +836,7 @@
         "note": "Chỉ áp dụng cho tuyến đã khớp theo tên hoặc theo đoạn chồng. Tuyến mới trong cấp dưới không bị bắt trùng tim tuyến cấp trên."
       },
       "severity": "lỗi",
-      "message": "Tim tuyến cấp dưới lệch khỏi tim tuyến cấp trên quá dung sai theo tỷ lệ bản vẽ cấp trên.",
+      "message": "Tim tuyến cấp dưới lệch khỏi tim tuyến cấp trên quá dung sai theo tỷ lệ bản vẽ cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). Dung sai Dung sai vị trí lấy theo tỷ lệ cấp trên (definitions.positionalToleranceM). Căn cứ độ chính xác bản đồ theo tỷ lệ cần xác minh; đây là ngưỡng đồ họa để khỏi bắt lệch do tỷ lệ vẽ.",
       "dataNotes": {
         "status": "doi-chieu-duoc",
@@ -856,7 +889,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "gte",
@@ -878,10 +911,10 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Cao độ tim đường cấp dưới thấp hơn cao độ khống chế đã xác định ở cấp trên.",
+      "message": "Cao độ tim đường cấp dưới thấp hơn cao độ khống chế đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Cao độ khống chế tim đường phục vụ thoát nước và đấu nối. Số mục cần xác minh.",
       "dataNotes": {
-        "status": "thieu-truong",
+        "status": "doi-chieu-duoc",
         "available": [
           "Cột caodothietke, caodotunhien có tên trên một số lớp giao thông nhưng không có giá trị.",
           "Cao độ có số ở lớp san nền: quy-hoach-chieu-cao (caodothietke) và duong-dong-muc-thiet-ke (caododuong), chủ yếu tại 1/10.000 và một số đồ án địa phương."
@@ -889,7 +922,7 @@
         "needed": [
           "Cao độ tim đường gắn với tuyến giao thông ở cả hai cấp. QHC 1/25.000 chưa có lớp cao độ khống chế."
         ],
-        "text": "Chưa đối chiếu được cao độ tim đường. Phải chờ số liệu trên tuyến, hoặc quy ước lấy cao độ san nền lân cận. Quy ước đó chưa lập."
+        "text": "QHC 1/25.000 không có cao độ tim. Gốc là caodothietke và caodonenthietke của QHC 1/10.000 (363 điểm). QHPK và QHCT so với điểm gốc gần tim tuyến. Tuyến giao thông vẫn chưa có cột cao độ riêng."
       }
     },
     {
@@ -931,7 +964,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "point-kept",
@@ -946,7 +979,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "cảnh báo",
-      "message": "Nút giao của các tuyến đã xác định ở cấp trên không còn ở cấp dưới trong dung sai vị trí.",
+      "message": "Nút giao của các tuyến đã xác định ở cấp trên không còn ở cấp dưới trong dung sai vị trí. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Vị trí nút giao trên các tuyến chính là nội dung khống chế. Chưa có lớp nút riêng nên kết quả suy từ giao cắt hình học, có thể báo thừa ở nút khác mức. Số mục cần xác minh.",
       "dataNotes": {
         "status": "doi-chieu-duoc",
@@ -998,7 +1031,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "downstream-gte",
@@ -1025,7 +1058,7 @@
         "note": "quyMo chỉ dùng khi parse được số milimét. Không so sánh chuỗi khác đơn vị."
       },
       "severity": "lỗi",
-      "message": "Ống cấp nước cấp dưới (Ø{lower} mm) đấu vào tuyến nhận có đường kính nhỏ hơn (Ø{higher} mm).",
+      "message": "Ống cấp nước cấp dưới (Ø{lower} mm) đấu vào tuyến nhận có đường kính nhỏ hơn (Ø{higher} mm). Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). TCVN 33:2006 về thiết kế mạng lưới cấp nước (điều khoản và bản còn hiệu lực cần xác minh). Tuyến nhận phải có đường kính không nhỏ hơn ống đấu vào.",
       "dataNotes": {
         "status": "doi-chieu-duoc",
@@ -1079,7 +1112,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "gte",
@@ -1099,7 +1132,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Đường kính tuyến trục cấp nước cấp dưới nhỏ hơn đường kính đã xác định ở cấp trên trên cùng tuyến.",
+      "message": "Đường kính tuyến trục cấp nước cấp dưới nhỏ hơn đường kính đã xác định ở cấp trên trên cùng tuyến. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Tuyến trục đã xác định ở cấp trên là khống chế. Cấp dưới không thu nhỏ đường kính trục.",
       "dataNotes": {
         "status": "doi-chieu-duoc",
@@ -1151,7 +1184,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "gte",
@@ -1175,7 +1208,7 @@
         "note": "Không quy đổi đơn vị. loaicongtrinh đang trộn mã số (2, 8) và chữ (Họng cứu hỏa, Trạm bơm); chưa có bảng mã."
       },
       "severity": "lỗi",
-      "message": "Công suất công trình đầu mối cấp nước cấp dưới nhỏ hơn công suất đã xác định ở cấp trên.",
+      "message": "Công suất công trình đầu mối cấp nước cấp dưới nhỏ hơn công suất đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Công suất nhà máy và trạm bơm đã xác định ở cấp trên không bị giảm khi lập cấp dưới. Đơn vị công suất cần xác minh theo thuyết minh từng lớp.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -1186,7 +1219,7 @@
         "needed": [
           "Công suất khác 0 cho cùng một công trình ở cả hai cấp. Bảng đơn vị (m³/ngày hay đơn vị khác)."
         ],
-        "text": "Có cột công suất nhưng chưa đủ cặp giá trị khác 0 để đối chiếu hàng loạt. Chỉ xét khi cả hai bên khác 0 và cùng loại công trình."
+        "text": "Có cột công suất nhưng chưa đủ cặp giá trị khác 0 để đối chiếu hàng loạt. Chỉ xét khi cả hai bên khác 0 và cùng loại công trình. Fallback chỉ lấp công trình mà QHC 1/25.000 bằng 0 và QHC 1/10.000 có số (5/15 trạm). Phần còn lại vẫn bỏ qua."
       }
     },
     {
@@ -1228,7 +1261,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "point-kept",
@@ -1255,7 +1288,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Công trình đầu mối cấp nước đã xác định ở cấp trên không còn trong dung sai vị trí ở cấp dưới.",
+      "message": "Công trình đầu mối cấp nước đã xác định ở cấp trên không còn trong dung sai vị trí ở cấp dưới. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). Vị trí nhà máy nước, trạm bơm đã xác định ở cấp trên là khống chế. QCVN 07:2023/BXD (số mục cần xác minh). Số mục cần xác minh.",
       "dataNotes": {
         "status": "doi-chieu-duoc",
@@ -1307,7 +1340,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "rank-gte",
@@ -1327,7 +1360,7 @@
         "note": "Mã số chưa có trong codebook thì bỏ qua, không suy rank."
       },
       "severity": "lỗi",
-      "message": "Cấp điện áp cấp dưới không phù hợp cấp trên: tuyến trục bị hạ cấp, hoặc nhánh đấu vào tuyến có cấp điện áp thấp hơn.",
+      "message": "Cấp điện áp cấp dưới không phù hợp cấp trên: tuyến trục bị hạ cấp, hoặc nhánh đấu vào tuyến có cấp điện áp thấp hơn. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Cấp điện áp của đường dây trục là khống chế. Nhánh không được có cấp điện áp cao hơn tuyến nhận. Số mục cần xác minh.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -1337,7 +1370,7 @@
         "needed": [
           "Cột dienap (kV) đang rỗng trên các lớp đã xem. Bảng quy đổi mã 1, 2, 3 sang cấp điện áp. Chưa có trong kho."
         ],
-        "text": "Chưa đối chiếu được cặp QHC vì hai cấp không cùng cách ghi. Chỉ so khi cả hai bên cùng là chữ Cao thế, Trung thế hoặc Hạ thế."
+        "text": "Chưa đối chiếu được cặp QHC vì hai cấp không cùng cách ghi. Chỉ so khi cả hai bên cùng là chữ Cao thế, Trung thế hoặc Hạ thế. Fallback không quy đổi được mã. QHC 1/10.000 ghi capdienthe bằng 1, 2, 3; chưa có bảng ra kV. dienap vẫn rỗng."
       }
     },
     {
@@ -1379,7 +1412,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "gte",
@@ -1404,7 +1437,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Công suất trạm điện cấp dưới nhỏ hơn công suất đã xác định ở cấp trên.",
+      "message": "Công suất trạm điện cấp dưới nhỏ hơn công suất đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Công suất trạm nguồn đã xác định ở cấp trên không bị giảm. Tổng công suất trạm cấp dưới đấu vào một trạm nguồn không vượt công suất trạm đó là kiểm tra bổ sung, hiện thiếu phụ tải nên chỉ để cảnh báo khi có số.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -1415,7 +1448,7 @@
         "needed": [
           "Đơn vị (kVA hay MVA) cần xác minh trước khi so hai lớp. quymo của công trình năng lượng đang bằng 0. Phụ tải từng xuất tuyến chưa có."
         ],
-        "text": "Có một phần công suất trạm. Chưa đối chiếu hàng loạt vì đơn vị chưa chốt và nhiều bản ghi bằng 0."
+        "text": "Có một phần công suất trạm. Chưa đối chiếu hàng loạt vì đơn vị chưa chốt và nhiều bản ghi bằng 0. QHC 1/10.000 có congsuat trên 21/21 trạm điểm, nhưng đơn vị kVA hay MVA chưa chốt nên chưa lấy làm gốc để so."
       }
     },
     {
@@ -1457,7 +1490,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "gte",
@@ -1480,7 +1513,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Hành lang an toàn đường dây cấp dưới hẹp hơn hành lang đã xác định ở cấp trên.",
+      "message": "Hành lang an toàn đường dây cấp dưới hẹp hơn hành lang đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Hành lang an toàn lưới điện. Nghị định 14/2014/NĐ-CP về an toàn điện; văn bản sửa đổi đang hiệu lực và phụ lục chiều rộng theo cấp điện áp cần xác minh.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -1490,7 +1523,7 @@
         "needed": [
           "Giá trị khác 0. Các bản ghi đã xem đang bằng 0. dienap cũng rỗng nên không suy được bề rộng hành lang theo cấp điện áp."
         ],
-        "text": "Có tên cột hành lang nhưng chưa có số. Chưa đối chiếu được."
+        "text": "Có tên cột hành lang nhưng chưa có số. Chưa đối chiếu được. Fallback không tạo được gốc: hanhlangantoan của QHC 1/10.000 cũng bằng 0."
       }
     },
     {
@@ -1532,7 +1565,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "point-kept",
@@ -1550,7 +1583,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Trạm điện hoặc công trình năng lượng đã xác định ở cấp trên không còn trong dung sai vị trí ở cấp dưới.",
+      "message": "Trạm điện hoặc công trình năng lượng đã xác định ở cấp trên không còn trong dung sai vị trí ở cấp dưới. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). Vị trí trạm nguồn và công trình năng lượng đã xác định ở cấp trên là khống chế. QCVN 07:2023/BXD (số mục cần xác minh). Số mục cần xác minh.",
       "dataNotes": {
         "status": "doi-chieu-duoc",
@@ -1602,7 +1635,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "gte",
@@ -1624,10 +1657,10 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Cao độ san nền thiết kế cấp dưới thấp hơn cao độ khống chế đã xác định ở cấp trên tại cùng vị trí.",
+      "message": "Cao độ san nền thiết kế cấp dưới thấp hơn cao độ khống chế đã xác định ở cấp trên tại cùng vị trí. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Cao độ xây dựng khống chế nền. QCVN 07:2023/BXD (số mục cần xác minh). Số mục cần xác minh.",
       "dataNotes": {
-        "status": "thieu-gia-tri",
+        "status": "doi-chieu-duoc",
         "available": [
           "caodothietke và caodotunhien trên quy-hoach-chieu-cao của QHC 1/10.000 và một số đồ án địa phương.",
           "caodonenthietke trên diem-do-cao-thoat-nuoc của QHC 1/10.000.",
@@ -1636,7 +1669,7 @@
         "needed": [
           "Lớp cao độ khống chế của QHC 1/25.000. Cao độ tương ứng ở QHPK và QHCT."
         ],
-        "text": "Có số cao độ ở 1/10.000, chưa có lớp tương ứng ở 1/25.000 nên chưa đối chiếu được cặp cao nhất."
+        "text": "QHC 1/25.000 không có lớp cao độ khống chế. Gốc là quy-hoach-chieu-cao của QHC 1/10.000 (363/363 điểm có caodothietke khác 0)."
       }
     },
     {
@@ -1678,7 +1711,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "downstream-gte",
@@ -1706,17 +1739,17 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Đường kính cống thoát nước mưa hạ lưu nhỏ hơn thượng lưu, hoặc ống cấp dưới đấu vào tuyến nhận có đường kính nhỏ hơn.",
+      "message": "Đường kính cống thoát nước mưa hạ lưu nhỏ hơn thượng lưu, hoặc ống cấp dưới đấu vào tuyến nhận có đường kính nhỏ hơn. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). TCVN 7957:2008 về thoát nước, mạng lưới và công trình bên ngoài (điều khoản và bản còn hiệu lực cần xác minh). Đường kính hạ lưu không nhỏ hơn thượng lưu.",
       "dataNotes": {
-        "status": "thieu-gia-tri",
+        "status": "doi-chieu-duoc",
         "available": [
           "duongkinh trên mang-luoi-thoat-nuoc của QHC 1/10.000 (một phần tuyến có 800, 2000, 2500) và một số đồ án địa phương."
         ],
         "needed": [
           "QHC 1/25.000: cột có nhưng giá trị đang bằng 0. diemdau và diemcuoi rỗng. Hướng dòng phải lấy từ lớp huong-thoat-nuoc hoặc chiều số hóa; quy ước chiều số hóa cần xác minh."
         ],
-        "text": "Chưa đối chiếu được cặp QHC vì đường kính 1/25.000 bằng 0. Đối chiếu nội bộ 1/10.000 chỉ khi xác định được hướng dòng."
+        "text": "Đường kính QHC 1/25.000 bằng 0. Gốc là QHC 1/10.000 trên 536/1533 đoạn có duongkinh khác 0. Đoạn bằng 0 vẫn bỏ qua. diemdau và diemcuoi vẫn rỗng; hướng dòng lấy từ lớp huong-thoat-nuoc."
       }
     },
     {
@@ -1758,7 +1791,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "azimuth-within",
@@ -1776,7 +1809,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "cảnh báo",
-      "message": "Hướng thoát nước mưa cấp dưới lệch quá ngưỡng hoặc đảo chiều so với hướng đã xác định ở cấp trên.",
+      "message": "Hướng thoát nước mưa cấp dưới lệch quá ngưỡng hoặc đảo chiều so với hướng đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Hướng thoát chính đã xác định ở cấp trên là khống chế lưu vực. Ngưỡng góc là dung sai nội bộ, cần xác minh.",
       "dataNotes": {
         "status": "doi-chieu-duoc",
@@ -1828,7 +1861,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "catchment-within",
@@ -1842,7 +1875,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Lưu vực thoát nước mưa cấp dưới đổ sang lưu vực khác với lưu vực đã xác định ở cấp trên.",
+      "message": "Lưu vực thoát nước mưa cấp dưới đổ sang lưu vực khác với lưu vực đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Phân vùng lưu vực ở cấp trên khống chế hướng tiêu. Cấp dưới được chia nhỏ trong một lưu vực, không được chuyển nước sang lưu vực khác.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -1853,7 +1886,7 @@
         "needed": [
           "Vùng lưu vực ở cấp 1/10.000, QHPK và QHCT. Tên lưu vực tenphanluu không có trong các lớp đã xem."
         ],
-        "text": "Có vùng lưu vực ở 1/25.000. Thiếu vùng ở cấp dưới nên chưa đối chiếu được cặp."
+        "text": "Có vùng lưu vực ở 1/25.000. Thiếu vùng ở cấp dưới nên chưa đối chiếu được cặp. QHC 1/10.000 không có vùng lưu vực nên không thay gốc. Vùng đã có ở QHC 1/25.000 vẫn là gốc nếu phủ vị trí."
       }
     },
     {
@@ -1895,7 +1928,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "gte",
@@ -1914,7 +1947,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Công suất trạm bơm hoặc công trình tiêu cấp dưới nhỏ hơn công suất đã xác định ở cấp trên.",
+      "message": "Công suất trạm bơm hoặc công trình tiêu cấp dưới nhỏ hơn công suất đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Công suất tiêu đã xác định ở cấp trên không bị giảm. Đơn vị cần xác minh.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -1924,7 +1957,7 @@
         "needed": [
           "Giá trị khác 0. Các điểm đã xem đang bằng 0."
         ],
-        "text": "Có cột công suất tiêu nhưng chưa có số dùng được."
+        "text": "Có cột công suất tiêu nhưng chưa có số dùng được. Fallback không tạo được gốc: congsuat công trình tiêu của QHC 1/10.000 bằng 0 trên 874/874 điểm."
       }
     },
     {
@@ -1966,7 +1999,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "downstream-gte",
@@ -1994,17 +2027,17 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Đường kính cống thoát nước thải hạ lưu nhỏ hơn thượng lưu, hoặc ống cấp dưới đấu vào tuyến nhận có đường kính nhỏ hơn.",
+      "message": "Đường kính cống thoát nước thải hạ lưu nhỏ hơn thượng lưu, hoặc ống cấp dưới đấu vào tuyến nhận có đường kính nhỏ hơn. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). TCVN 7957:2008 (điều khoản và bản còn hiệu lực cần xác minh). Cùng nguyên tắc với thoát mưa: hạ lưu và tuyến nhận không nhỏ hơn thượng lưu và ống đấu vào.",
       "dataNotes": {
-        "status": "thieu-gia-tri",
+        "status": "doi-chieu-duoc",
         "available": [
           "duongkinh trên mang-luoi-thoat-nuoc-thai của QHC 1/10.000 (giá trị như 300) và một số đồ án địa phương."
         ],
         "needed": [
           "QHC 1/25.000: cột có, giá trị đang bằng 0. diemdau, diemcuoi rỗng. Đường kính trong props bản vẽ QHPK và QHCT chưa có trường riêng."
         ],
-        "text": "Chưa đối chiếu được cặp QHC vì đường kính 1/25.000 bằng 0."
+        "text": "Đường kính QHC 1/25.000 bằng 0. Gốc là QHC 1/10.000 trên 419/599 đoạn có duongkinh khác 0. Đoạn bằng 0 bỏ qua."
       }
     },
     {
@@ -2046,7 +2079,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "azimuth-within",
@@ -2068,10 +2101,10 @@
         "onMissing": "bo-qua"
       },
       "severity": "cảnh báo",
-      "message": "Hướng dòng thoát nước thải cấp dưới ngược với độ dốc hoặc hướng đã xác định ở cấp trên.",
+      "message": "Hướng dòng thoát nước thải cấp dưới ngược với độ dốc hoặc hướng đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Độ dốc và hướng chảy về trạm đã chọn ở cấp trên là khống chế. Ngưỡng góc cần xác minh.",
       "dataNotes": {
-        "status": "thieu-gia-tri",
+        "status": "doi-chieu-duoc",
         "available": [
           "dodoc có số trên QHC 1/10.000 (ví dụ 0,003).",
           "caodonenthietke trên diem-do-cao-thoat-nuoc-thai của QHC 1/10.000."
@@ -2079,7 +2112,7 @@
         "needed": [
           "dodoc của QHC 1/25.000 đang bằng 0. diemdau và diemcuoi rỗng. Chưa có lớp hướng thoát nước thải riêng như thoát mưa."
         ],
-        "text": "Có độ dốc ở 1/10.000, chưa có ở 1/25.000. Chưa đối chiếu được cặp cao nhất."
+        "text": "dodoc của QHC 1/25.000 bằng 0. Gốc là QHC 1/10.000 trên 355/599 đoạn có dodoc khác 0. Chưa có lớp hướng thoát nước thải riêng."
       }
     },
     {
@@ -2121,7 +2154,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "gte",
@@ -2146,10 +2179,10 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Công suất trạm xử lý nước thải cấp dưới nhỏ hơn công suất đã xác định ở cấp trên.",
+      "message": "Công suất trạm xử lý nước thải cấp dưới nhỏ hơn công suất đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Công suất trạm xử lý đã xác định ở cấp trên không bị giảm. Lưu lượng đổ về không vượt công suất trạm là kiểm tra bổ sung khi có lưu lượng.",
       "dataNotes": {
-        "status": "thieu-gia-tri",
+        "status": "doi-chieu-duoc",
         "available": [
           "congsuat trên cong-trinh-xu-ly-nuoc-thai của QHC 1/10.000 (ví dụ 500, 1500) và một số đồ án.",
           "props.congSuat trên bản vẽ đồ án."
@@ -2157,7 +2190,7 @@
         "needed": [
           "QHC 1/25.000 phần lớn bằng 0. luuluongdongchay và luuluongchuyenqua trên tuyến trục hai cấp QHC đang bằng 0. Đơn vị công suất cần xác minh."
         ],
-        "text": "Có công suất một phần ở 1/10.000. Chưa đủ cặp với 1/25.000. Vế lưu lượng vượt công suất chưa có số."
+        "text": "Công suất QHC 1/25.000 phần lớn bằng 0. Gốc là QHC 1/10.000 trên 12/440 trạm có congsuat khác 0. Trạm bằng 0 bỏ qua. Lưu lượng tuyến vẫn bằng 0 nên vế lưu lượng vượt công suất chưa chạy."
       }
     },
     {
@@ -2199,7 +2232,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "catchment-within",
@@ -2216,7 +2249,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Lưu vực thu gom nước thải cấp dưới chuyển về trạm khác với trạm đã xác định ở cấp trên.",
+      "message": "Lưu vực thu gom nước thải cấp dưới chuyển về trạm khác với trạm đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Lưu vực và trạm tiếp nhận đã xác định ở cấp trên là khống chế. Cấp dưới được chia nhỏ lưu vực, không đổi trạm tiếp nhận.",
       "dataNotes": {
         "status": "thieu-truong",
@@ -2226,7 +2259,7 @@
         "needed": [
           "Lớp vùng lưu vực thoát nước thải. nguontiepnhan và loaituyen đang rỗng."
         ],
-        "text": "Chưa có ranh lưu vực nước thải. Chưa đối chiếu được cho đến khi có vùng hoặc trường trạm tiếp nhận."
+        "text": "Chưa có ranh lưu vực nước thải. Chưa đối chiếu được cho đến khi có vùng hoặc trường trạm tiếp nhận. Fallback không tạo được gốc: QHC 1/10.000 cũng chưa có vùng lưu vực nước thải."
       }
     },
     {
@@ -2268,7 +2301,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "point-kept",
@@ -2290,7 +2323,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Khu xử lý chất thải rắn hoặc nghĩa trang đã xác định ở cấp trên không còn trong quỹ đất tương ứng ở cấp dưới.",
+      "message": "Khu xử lý chất thải rắn hoặc nghĩa trang đã xác định ở cấp trên không còn trong quỹ đất tương ứng ở cấp dưới. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). Vị trí khu xử lý và nghĩa trang đã xác định ở cấp trên là khống chế quỹ đất. QCVN 01:2021/BXD (số mục, bảng cần xác minh). Số mục cần xác minh.",
       "dataNotes": {
         "status": "doi-chieu-duoc",
@@ -2344,7 +2377,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "gte",
@@ -2367,10 +2400,10 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Công suất hoặc diện tích khu xử lý chất thải rắn và nghĩa trang cấp dưới nhỏ hơn quy mô đã xác định ở cấp trên.",
+      "message": "Công suất hoặc diện tích khu xử lý chất thải rắn và nghĩa trang cấp dưới nhỏ hơn quy mô đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Quy mô khu xử lý và nghĩa trang đã xác định ở cấp trên không bị thu hẹp. Đơn vị công suất và diện tích cần xác minh.",
       "dataNotes": {
-        "status": "thieu-gia-tri",
+        "status": "doi-chieu-duoc",
         "available": [
           "dientich nghĩa trang QHC 1/25.000 có số (ví dụ 60, 45, 140). Phân khu CTR có dientich.",
           "Cột congsuat và khoiluongctr có tên."
@@ -2378,7 +2411,7 @@
         "needed": [
           "congsuat và khoiluongctr đang bằng 0. dientich nghĩa trang QHC 1/10.000 đang bằng 0. Đơn vị diện tích (m² hay ha) cần xác minh từng lớp."
         ],
-        "text": "Có một phần diện tích ở 1/25.000. Chưa đủ cặp giá trị khác 0 với 1/10.000."
+        "text": "Gốc diện tích là cấp cao nhất có dientich khác 0. QHC 1/10.000 có số ở 13/30 nghĩa trang, 2/5 điểm xử lý và 3/3 phân khu khi cấp trên bỏ trống. congsuat vẫn bằng 0 nên vế công suất chưa chạy."
       }
     },
     {
@@ -2420,7 +2453,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "gte",
@@ -2444,7 +2477,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Khoảng cách từ nghĩa trang hoặc khu xử lý chất thải rắn đến đất ở, công trình công cộng hoặc nguồn nước nhỏ hơn khoảng cách đã thể hiện ở cấp trên.",
+      "message": "Khoảng cách từ nghĩa trang hoặc khu xử lý chất thải rắn đến đất ở, công trình công cộng hoặc nguồn nước nhỏ hơn khoảng cách đã thể hiện ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Khoảng cách an toàn đến nghĩa trang và công trình xử lý chất thải. Số bảng của QCVN 01:2021/BXD cần xác minh. Kho mã nguồn đang trích QCVN 01:2026/BXD Bảng 23 cho khoảng cách an toàn nghĩa trang; không lấy số bảng đó gán cho QCVN 01:2021/BXD.",
       "dataNotes": {
         "status": "thieu-truong",
@@ -2454,7 +2487,7 @@
         "needed": [
           "Trường khoảng cách ly trên đối tượng. Ngưỡng mét đã được xác nhận cho QCVN 01:2021/BXD. Khoảng cách mà chính cấp trên đã thể hiện, nếu không có vùng cách ly vẽ sẵn."
         ],
-        "text": "Chưa có trường khoảng cách ly và chưa chốt ngưỡng mét. Chưa đối chiếu được. Không suy ngưỡng từ Bảng 23 của bản QCVN 01:2026 mà kho đang dùng."
+        "text": "Chưa có trường khoảng cách ly và chưa chốt ngưỡng mét. Chưa đối chiếu được. Không suy ngưỡng từ Bảng 23 của bản QCVN 01:2026 mà kho đang dùng. Fallback không tạo được gốc: QHC 1/10.000 cũng không có trường khoảng cách ly và chưa chốt ngưỡng mét."
       }
     },
     {
@@ -2496,7 +2529,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "rank-gte",
@@ -2514,7 +2547,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "cảnh báo",
-      "message": "Cấp nghĩa trang cấp dưới thấp hơn cấp đã xác định ở cấp trên.",
+      "message": "Cấp nghĩa trang cấp dưới thấp hơn cấp đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Cấp nghĩa trang đã xác định ở cấp trên không bị hạ. Bảng mã capnghiatrang cần xác minh.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -2524,7 +2557,7 @@
         "needed": [
           "Bảng mã: số lớn hơn là cấp cao hơn hay chỉ là mã loại. Chưa có chú giải trong kho."
         ],
-        "text": "Có mã cấp nhưng chưa đối chiếu được thứ bậc. Khác mã thì cảnh báo, không kết luận hạ cấp."
+        "text": "Có mã cấp nhưng chưa đối chiếu được thứ bậc. Khác mã thì cảnh báo, không kết luận hạ cấp. QHC 1/10.000 có capnghiatrang trên 30/30 điểm nhưng chưa có chú giải thứ bậc, nên khác mã vẫn chỉ là cảnh báo."
       }
     },
     {
@@ -2566,7 +2599,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "point-kept",
@@ -2584,7 +2617,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Trạm thông tin liên lạc đã xác định ở cấp trên không còn trong dung sai vị trí ở cấp dưới.",
+      "message": "Trạm thông tin liên lạc đã xác định ở cấp trên không còn trong dung sai vị trí ở cấp dưới. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Vị trí trạm viễn thông đã xác định ở cấp trên là khống chế. Số mục cần xác minh.",
       "dataNotes": {
         "status": "doi-chieu-duoc",
@@ -2636,7 +2669,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "gte",
@@ -2656,7 +2689,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Dung lượng tuyến trục thông tin liên lạc cấp dưới nhỏ hơn dung lượng đã xác định ở cấp trên.",
+      "message": "Dung lượng tuyến trục thông tin liên lạc cấp dưới nhỏ hơn dung lượng đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Dung lượng tuyến trục đã xác định ở cấp trên không bị giảm. Số mục cần xác minh.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -2668,7 +2701,7 @@
         "needed": [
           "dungluong số khác 0 trên cặp QHC. Quy ước đổi 96FO và Cáp 200 đôi về cùng một đơn vị. Cần xác minh trước khi so hai kiểu chuỗi khác nhau."
         ],
-        "text": "Chỉ so được khi hai bên cùng đơn vị: cùng số FO, hoặc cùng số đôi. Chuỗi khác kiểu thì bỏ qua."
+        "text": "Chỉ so được khi hai bên cùng đơn vị: cùng số FO, hoặc cùng số đôi. Chuỗi khác kiểu thì bỏ qua. dungluong trạm QHC 1/10.000 bằng 0. tenduongday chỉ có chữ trên 19/183 tuyến; chỉ so khi cùng đơn vị với cấp dưới."
       }
     },
     {
@@ -2710,7 +2743,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "lte",
@@ -2728,7 +2761,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Tuyến thông tin liên lạc đã xác định đi ngầm ở cấp trên bị thể hiện là tuyến nổi ở cấp dưới.",
+      "message": "Tuyến thông tin liên lạc đã xác định đi ngầm ở cấp trên bị thể hiện là tuyến nổi ở cấp dưới. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 07:2023/BXD (số mục cần xác minh). Yêu cầu ngầm hóa đã xác định ở cấp trên không bị đảo thành đi nổi. Số mục cần xác minh.",
       "dataNotes": {
         "status": "doi-chieu-duoc",
@@ -2780,7 +2813,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "function-compatible",
@@ -2810,7 +2843,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Chức năng sử dụng đất cấp dưới không thuộc nhóm chức năng mà cấp trên cho phép chi tiết hóa.",
+      "message": "Chức năng sử dụng đất cấp dưới không thuộc nhóm chức năng mà cấp trên cho phép chi tiết hóa. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Chức năng đất cấp trên là khống chế. Cấp dưới được chia nhỏ trong nhóm được phép, không đổi sang nhóm bị cấm. Ma trận codebooks.landUse là khung tối thiểu, các cặp chưa liệt kê cần xác minh.",
       "dataNotes": {
         "status": "doi-chieu-duoc",
@@ -2865,7 +2898,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "lte",
@@ -2889,7 +2922,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Mật độ xây dựng cấp dưới vượt mật độ tối đa đã xác định ở cấp trên.",
+      "message": "Mật độ xây dựng cấp dưới vượt mật độ tối đa đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Mật độ xây dựng tối đa của cấp trên là trần. Cấp dưới không được vượt. Số bảng QCVN cần xác minh; trần áp dụng trước là chỉ tiêu của đồ án cấp trên.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -2900,7 +2933,7 @@
         "needed": [
           "Mật độ trên QHC 1/25.000 và QHC 1/10.000. sdd.json không có trường mật độ. Phần lớn lớp chức năng đất khác để trống."
         ],
-        "text": "Chưa đối chiếu được cặp QHC. Chỉ xét được nơi cả hai cấp đều có mật độ khác 0, hoặc lô cấp dưới có plan.coverage và cấp trên có matdoxaydung."
+        "text": "Chưa đối chiếu được cặp QHC. Chỉ xét được nơi cả hai cấp đều có mật độ khác 0, hoặc lô cấp dưới có plan.coverage và cấp trên có matdoxaydung. Fallback không tạo được gốc: QHC 1/10.000 (sdd.json) không có mật độ xây dựng."
       }
     },
     {
@@ -2942,7 +2975,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "lte",
@@ -2966,7 +2999,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Tầng cao cấp dưới vượt tầng cao tối đa đã xác định ở cấp trên.",
+      "message": "Tầng cao cấp dưới vượt tầng cao tối đa đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Tầng cao tối đa của cấp trên là trần. Số mục cần xác minh.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -2977,7 +3010,7 @@
         "needed": [
           "Tầng cao trên hai lớp sử dụng đất QHC tỷ lệ lớn. sdd.json không có trường tầng cao."
         ],
-        "text": "Chưa đối chiếu được cặp QHC. Có số ở một số đồ án địa phương và trên lô đồ án khi đã nhập chỉ tiêu."
+        "text": "Chưa đối chiếu được cặp QHC. Có số ở một số đồ án địa phương và trên lô đồ án khi đã nhập chỉ tiêu. Fallback không tạo được gốc: QHC 1/10.000 (sdd.json) không có tầng cao."
       }
     },
     {
@@ -3019,7 +3052,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "lte",
@@ -3043,7 +3076,7 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Hệ số sử dụng đất cấp dưới vượt hệ số đã xác định ở cấp trên.",
+      "message": "Hệ số sử dụng đất cấp dưới vượt hệ số đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Hệ số sử dụng đất tối đa của cấp trên là trần. Số mục cần xác minh.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -3054,7 +3087,7 @@
         "needed": [
           "Hệ số trên QHC 1/25.000 và 1/10.000. sdd.json không có trường này."
         ],
-        "text": "Chưa đối chiếu được cặp QHC. Có số ở một số đồ án địa phương và trên lô đồ án."
+        "text": "Chưa đối chiếu được cặp QHC. Có số ở một số đồ án địa phương và trên lô đồ án. Fallback không tạo được gốc: QHC 1/10.000 (sdd.json) không có hệ số sử dụng đất."
       }
     },
     {
@@ -3096,7 +3129,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "area-gte",
@@ -3120,10 +3153,10 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Diện tích đất cây xanh công cộng trong phạm vi cấp dưới nhỏ hơn diện tích đã xác định ở cấp trên.",
+      "message": "Diện tích đất cây xanh công cộng trong phạm vi cấp dưới nhỏ hơn diện tích đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Quỹ đất cây xanh sử dụng công cộng đã xác định ở cấp trên không bị thu hẹp. Số bảng định mức m²/người cần xác minh; quy tắc này so diện tích đã vẽ, chưa so định mức dân số.",
       "dataNotes": {
-        "status": "thieu-gia-tri",
+        "status": "doi-chieu-duoc",
         "available": [
           "QHC 1/10.000: mã chức năng 5 (đất cây xanh sử dụng công cộng đô thị) trong sdd.json, diện tích lấy theo hình học vì cột a không phải lúc nào cũng điền.",
           "QHC 1/25.000: lớp không gian cây xanh trong dinhhuong.json (L = x).",
@@ -3132,7 +3165,7 @@
         "needed": [
           "Bảng quy đổi giữa không gian cây xanh 1/25.000 và mã 5 của 1/10.000. Hai phân loại chưa chứng minh là cùng một quỹ đất."
         ],
-        "text": "Có hình học cả hai cấp nhưng chưa cùng định nghĩa quỹ cây xanh. Khi hai bên cùng mã 5 thì so diện tích được. So L = x với mã 5 chỉ là cảnh báo."
+        "text": "QHC 1/25.000 không tách mã lô cây xanh công cộng. Khi so QHPK và QHCT, gốc là mã 5 của QHC 1/10.000. So với lớp không gian cây xanh 1/25.000 vẫn chỉ là cảnh báo vì hai phân loại chưa trùng định nghĩa."
       }
     },
     {
@@ -3174,7 +3207,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "area-gte",
@@ -3192,10 +3225,10 @@
         "onMissing": "bo-qua"
       },
       "severity": "lỗi",
-      "message": "Diện tích đất công cộng trong phạm vi cấp dưới nhỏ hơn diện tích đã xác định ở cấp trên.",
+      "message": "Diện tích đất công cộng trong phạm vi cấp dưới nhỏ hơn diện tích đã xác định ở cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). QCVN 01:2021/BXD (số mục, bảng cần xác minh). Quỹ đất dịch vụ, công cộng đã xác định ở cấp trên không bị thu hẹp. Số bảng cần xác minh. Không gộp đất thương mại vào nhóm này.",
       "dataNotes": {
-        "status": "thieu-gia-tri",
+        "status": "doi-chieu-duoc",
         "available": [
           "QHC 1/10.000: mã 2, đất dịch vụ - công cộng đô thị, trong sdd.json.",
           "Nhãn chữ công cộng trên chucnangsudungdat của một số đồ án."
@@ -3203,7 +3236,7 @@
         "needed": [
           "QHC 1/25.000 không tách đất công cộng thành mã lô; vùng không gian cấp vùng trộn hành chính, thương mại và dịch vụ. Chưa có bảng tách quỹ công cộng."
         ],
-        "text": "Đối chiếu mã 2 được ở những cấp cùng dùng mã này. Chưa đối chiếu được với vùng hỗn hợp của 1/25.000."
+        "text": "QHC 1/25.000 không tách quỹ đất công cộng thành mã lô. Khi so QHPK và QHCT, gốc là mã 2 của QHC 1/10.000."
       }
     },
     {
@@ -3245,7 +3278,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "polygon-within",
@@ -3263,7 +3296,7 @@
         ]
       },
       "severity": "lỗi",
-      "message": "Ranh quy hoạch cấp dưới không nằm trong ranh quy hoạch cấp trên; phần lọt ra ngoài vượt dung sai theo tỷ lệ cấp trên.",
+      "message": "Ranh quy hoạch cấp dưới không nằm trong ranh quy hoạch cấp trên; phần lọt ra ngoài vượt dung sai theo tỷ lệ cấp trên. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). Phạm vi quy hoạch phân khu và quy hoạch chi tiết phải nằm trong phạm vi quy hoạch cấp trên. Số điều cần xác minh.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -3276,7 +3309,7 @@
           "Ranh vùng của chính QHC 1/25.000 và QHC 1/10.000. Tài liệu chuyên ngành ghi hai đồ án mapid 21817 chưa có lớp ranh quy hoạch trong lô dữ liệu này.",
           "Ranh QHPK và QHCT nằm ở projects/<slug>, không có trong git."
         ],
-        "text": "Đối chiếu được giữa các đồ án địa phương đã có polygon. Chưa đối chiếu được cặp hai đồ án tỷ lệ lớn với nhau."
+        "text": "Đối chiếu được giữa các đồ án địa phương đã có polygon. Chưa đối chiếu được cặp hai đồ án tỷ lệ lớn với nhau. Fallback không tạo được gốc: QHC 1/10.000 vẫn chưa có lớp ranh quy hoạch. khung.json là tiểu vùng, không thay ranh phê duyệt."
       }
     },
     {
@@ -3318,7 +3351,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "single-parent",
@@ -3334,7 +3367,7 @@
         "exception": "UT-01"
       },
       "severity": "lỗi",
-      "message": "Ranh cấp dưới giao quá dung sai với nhiều hơn một ranh cấp trên cùng bậc.",
+      "message": "Ranh cấp dưới giao quá dung sai với nhiều hơn một ranh cấp trên cùng bậc. Giá trị gốc lấy từ {referenceLevel}.",
       "legalBasis": "Luật Quy hoạch đô thị và nông thôn năm 2024, nguyên tắc quy hoạch cấp dưới phù hợp quy hoạch cấp trên đã được phê duyệt (số điều cần xác minh). Một đồ án cấp dưới thuộc phạm vi một đồ án cấp trên đang có hiệu lực, trừ khi schemes.json ghi override. Số điều cần xác minh.",
       "dataNotes": {
         "status": "thieu-gia-tri",
@@ -3344,7 +3377,7 @@
         "needed": [
           "Đủ ranh QHPK để biết một QHCT có nằm trùm hai phân khu hay không. File ranh đồ án nằm trên GCS, không có trong git."
         ],
-        "text": "Quy tắc đã đủ để chạy khi có hai ranh cấp trên cùng bậc. Kho git chưa đủ ranh QHPK và QHCT."
+        "text": "Quy tắc đã đủ để chạy khi có hai ranh cấp trên cùng bậc. Kho git chưa đủ ranh QHPK và QHCT. Fallback không tạo thêm ranh QHPK hay QHCT."
       }
     },
     {
@@ -3386,7 +3419,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "precedence",
@@ -3455,7 +3488,7 @@
             "QHCT"
           ]
         ],
-        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing."
+        "note": "Chỉ đối chiếu cấp dưới với cấp trên gần nhất còn hiệu lực trong cùng phạm vi. Thiếu cấp trung gian thì dùng fallbackWhenIntermediateMissing. Gốc từng trường theo referenceFallback: giá trị khác rỗng đầu tiên từ cấp cao nhất phủ vị trí."
       },
       "condition": {
         "operator": "precedence",
