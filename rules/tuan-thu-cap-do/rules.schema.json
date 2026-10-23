@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rules.schema.json",
+  "title": "Quy tắc tuân thủ cấp độ quy hoạch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "title",
+    "updated",
+    "principle",
+    "referenceFallback",
+    "hierarchy",
+    "sectors",
+    "definitions",
+    "codebooks",
+    "sources",
+    "rules"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "updated": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "principle": { "type": "string", "minLength": 1 },
+    "referenceFallback": { "$ref": "#/$defs/referenceFallback" },
+    "hierarchy": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "scale", "rank"],
+        "properties": {
+          "id": { "enum": ["QHC25", "QHC10", "QHPK", "QHCT"] },
+          "label": { "type": "string" },
+          "scale": { "type": "integer", "exclusiveMinimum": 0 },
+          "rank": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "sectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "label": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "definitions": { "type": "object" },
+    "codebooks": { "type": "object" },
+    "sources": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/rule" }
+    }
+  },
+  "$defs": {
+    "referenceFallback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "decision",
+        "walk",
+        "perField",
+        "coversLocation",
+        "missingValues",
+        "unspecifiedText",
+        "resolution",
+        "message",
+        "appliesTo",
+        "notAViolation"
+      ],
+      "properties": {
+        "id": { "const": "goc-theo-truong" },
+        "decision": { "type": "string", "minLength": 1 },
+        "walk": {
+          "type": "array",
+          "minItems": 4,
+          "items": { "enum": ["QHC25", "QHC10", "QHPK", "QHCT"] }
+        },
+        "perField": { "const": true },
+        "coversLocation": { "type": "string" },
+        "missingValues": {
+          "type": "array",
+          "items": { "type": ["string", "number", "null"] }
+        },
+        "unspecifiedText": { "type": "array", "items": { "type": "string" } },
+        "resolution": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "pattern": "\\{referenceLevel\\}" },
+        "appliesTo": { "type": "string" },
+        "notAViolation": { "type": "string" }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sector",
+        "title",
+        "levelsCompared",
+        "condition",
+        "severity",
+        "message",
+        "legalBasis",
+        "dataNotes"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Z]{2,3}-[0-9]{2}$" },
+        "sector": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "title": { "type": "string", "minLength": 1 },
+        "levelsCompared": { "$ref": "#/$defs/levels" },
+        "condition": { "$ref": "#/$defs/condition" },
+        "severity": { "enum": ["lỗi", "cảnh báo"] },
+        "message": { "type": "string", "minLength": 1 },
+        "legalBasis": { "type": "string", "minLength": 1 },
+        "dataNotes": { "$ref": "#/$defs/dataNotes" },
+        "example": { "type": "string" }
+      }
+    },
+    "levels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["order", "pairs", "fallbackWhenIntermediateMissing"],
+      "properties": {
+        "order": {
+          "type": "array",
+          "items": { "enum": ["QHC25", "QHC10", "QHPK", "QHCT"] }
+        },
+        "pairs": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "enum": ["QHC25", "QHC10", "QHPK", "QHCT"] }
+          }
+        },
+        "fallbackWhenIntermediateMissing": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "enum": ["QHC25", "QHC10", "QHPK", "QHCT"] }
+          }
+        },
+        "note": { "type": "string" }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["operator", "formula", "onMissing"],
+      "properties": {
+        "operator": {
+          "enum": [
+            "gte",
+            "lte",
+            "rank-gte",
+            "section",
+            "offset-lte",
+            "downstream-gte",
+            "azimuth-within",
+            "catchment-within",
+            "point-kept",
+            "area-gte",
+            "function-compatible",
+            "polygon-within",
+            "single-parent",
+            "precedence"
+          ]
+        },
+        "field": { "type": "string" },
+        "aliases": { "type": "array", "items": { "type": "string" } },
+        "unit": { "type": "string" },
+        "formula": { "type": "string", "minLength": 1 },
+        "onMissing": { "const": "bo-qua" },
+        "treatZeroAsMissing": { "type": "boolean" },
+        "toleranceRef": { "type": "string" },
+        "codebook": { "type": "string" },
+        "match": { "type": "object" },
+        "note": { "type": "string" },
+        "severityIf": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["when", "severity"],
+            "properties": {
+              "when": { "type": "string" },
+              "severity": { "enum": ["lỗi", "cảnh báo"] }
+            }
+          }
+        }
+      }
+    },
+    "dataNotes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "available", "needed", "text"],
+      "properties": {
+        "status": { "enum": ["doi-chieu-duoc", "thieu-gia-tri", "thieu-truong"] },
+        "available": { "type": "array", "items": { "type": "string" } },
+        "needed": { "type": "array", "items": { "type": "string" } },
+        "text": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
