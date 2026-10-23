@@ -8,7 +8,7 @@
   "compatibility_date": "2026-10-22",
   "main": "worker/index.js",
   "build": {
-    "command": "node scripts/stage-chuyen-nganh.mjs"
+    "command": "node scripts/stage-chuyen-nganh.mjs --materialize"
   },
   "assets": {
     "directory": "./public",

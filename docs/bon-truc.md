@@ -24,4 +24,4 @@ Phạm vi hẹp vẫn hiện lớp gắn thành phố. Không suy ra xã nằm t
 
 ## Phục vụ file
 
-`index.json` ghi đè tại chỗ, cache 300 giây. GeoJSON chuyên ngành cache 1 ngày, không `immutable`. Kiến trúc cache 300 giây. Không endpoint mới, không đọc GCS.
+`index.json` ghi đè tại chỗ, cache 300 giây. GeoJSON chuyên ngành cache 1 ngày, không `immutable`. Kiến trúc cache 300 giây. Không endpoint mới, không đọc GCS. Wrangler bung symlink GeoJSON lúc deploy (`--materialize`). Lớp catalog có sẵn `scheme` hoặc `level` thì kho dùng đúng trường đó, không suy lại từ tỷ lệ.

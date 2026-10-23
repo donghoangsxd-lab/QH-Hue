@@ -147,4 +147,4 @@ Các bản đồ scan (2A–3E, 7A–7F, 10A–10F) là nhóm không có lớp v
 
 ## Lưu trữ
 
-Từng file GeoJSON và zip đều dưới 5 MB nên nằm trong git. Không đẩy GCS, không dựng pmtiles. Worker chỉ phục vụ `public/`: `public/data/chuyen-nganh/10000` và `25000` là symlink tới `data/chuyen-nganh/` (không nhân bản trong git). Lúc deploy CI, `scripts/stage-chuyen-nganh.mjs` bung symlink thành thư mục nếu biến `CI` bật.
+Từng file GeoJSON và zip đều dưới 5 MB nên nằm trong git. Không đẩy GCS, không dựng pmtiles. Worker chỉ phục vụ `public/`: `public/data/chuyen-nganh/10000` và `25000` là symlink tới `data/chuyen-nganh/` (không nhân bản trong git). Lệnh build của Wrangler chạy `scripts/stage-chuyen-nganh.mjs --materialize` để bung symlink thành thư mục lúc deploy.
