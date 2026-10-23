@@ -210,10 +210,13 @@ export const layerKey = (tenQH, key) => `${tenQH}|${key}`;
 export const isLayerHidden = (tenQH, key) => state.hiddenProjectLayers.has(layerKey(tenQH, key));
 export const isNetOn = (tenQH, key) => state.shownProjectNets.has(layerKey(tenQH, key));
 
-const NET_GEOM = new Set(['LineString', 'MultiLineString', 'Polygon', 'MultiPolygon']);
+const NET_GEOM = new Set(['Point', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon']);
 const QUY_MO_RE = /quy\s*mo|duong\s*kinh|tiet\s*dien|^dn$|width|diameter/i;
 const CONG_SUAT_RE = /cong\s*suat|capacity/i;
 const LOAI_RE = /^(loai|type|layer|ten\s*lop)$/i;
+const CAP_DUONG_RE = /cap\s*hang\s*duong|cap\s*duong|cap\s*hang\s*cong\s*trinh|^caphangduongbo$|^caphangduongsat$|^caphangcongtrinh$/i;
+const LO_GIOI_RE = /^lo\s*gioi$|^logioi$/i;
+const MAT_CAT_RE = /^mat\s*cat$|^matcat$|ky\s*hieu\s*mat\s*cat|^kyhieumatcat$|loai\s*mat\s*cat|^loaimatcat$/i;
 
 function clipProp(props, re, n) {
   const key = Object.keys(props).find(k => re.test(String(k).replace(/[_-]+/g, ' ')));
@@ -221,7 +224,7 @@ function clipProp(props, re, n) {
   return v.slice(0, n);
 }
 
-/** GeoJSON WGS84 (FeatureCollection) → đối tượng đường/vùng để ghi lớp bản vẽ hạ tầng của đồ án */
+/** GeoJSON WGS84 (FeatureCollection) → đối tượng điểm/đường/vùng để ghi lớp bản vẽ hạ tầng của đồ án */
 export function netFeaturesFromText(text) {
   let data;
   try { data = JSON.parse(text); } catch (e) { throw new Error('File JSON lỗi cú pháp.'); }
@@ -229,25 +232,30 @@ export function netFeaturesFromText(text) {
     : data && data.type === 'Feature' ? [data]
     : data && NET_GEOM.has(data.type) ? [{ type: 'Feature', properties: {}, geometry: data }]
     : null;
-  if (!Array.isArray(features)) throw new Error('Cần GeoJSON (FeatureCollection) gồm đường hoặc vùng.');
+  if (!Array.isArray(features)) throw new Error('Cần GeoJSON (FeatureCollection) gồm điểm, đường hoặc vùng.');
   const out = [];
   features.forEach(f => {
     const g = f && f.geometry;
     if (!g || !NET_GEOM.has(g.type)) return;
     const props = f.properties && typeof f.properties === 'object' ? f.properties : {};
-    const nameKey = Object.keys(props).find(k => /^(ten|name|ten\s*cong\s*trinh)$/i.test(String(k).replace(/[_-]+/g, ' ')));
+    const nameKey = Object.keys(props).find(k => /^(ten\s*duong|tenduong)$/i.test(String(k).replace(/[_-]+/g, ' ')))
+      || Object.keys(props).find(k => /^(ten\s*cong\s*trinh|tencongtrinh)$/i.test(String(k).replace(/[_-]+/g, ' ')))
+      || Object.keys(props).find(k => /^(ten|name)$/i.test(String(k).replace(/[_-]+/g, ' ')));
     const row = {
       name: nameKey ? String(props[nameKey] || '').trim().slice(0, 120) : '',
       geometry: g,
       props: {
         quyMo: clipProp(props, QUY_MO_RE, 40),
         congSuat: clipProp(props, CONG_SUAT_RE, 40),
-        loai: clipProp(props, LOAI_RE, 80)
+        loai: clipProp(props, LOAI_RE, 80),
+        capDuong: clipProp(props, CAP_DUONG_RE, 80),
+        loGioi: clipProp(props, LO_GIOI_RE, 40),
+        matCat: clipProp(props, MAT_CAT_RE, 80)
       }
     };
     out.push(row);
   });
-  if (!out.length) throw new Error('Không có đường hoặc vùng trong file.');
+  if (!out.length) throw new Error('Không có điểm, đường hoặc vùng trong file.');
   if (out.length > 4000) throw new Error('File nhiều hơn 4000 đối tượng.');
   return out;
 }
