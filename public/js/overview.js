@@ -680,14 +680,15 @@ const SECTIONS = [
         title: 'Đề xuất điểm hạ tầng mới',
         lead: 'Gửi một vị trí công trình mới để quản trị viên phê duyệt. Điểm chưa phê duyệt hiện ký hiệu nhạt, nhãn Chờ phê duyệt.',
         steps: [
-          'Thanh công cụ bên trái, bấm nút <b>Đề xuất</b>. Mục <b>Nhập 1 điểm</b> đang mở.',
+          'Thanh công cụ bên trái, bấm nút <b>Đề xuất</b>. Ba luồng: <b>Hành chính</b>, <b>Quy hoạch và hạ tầng</b>, <b>Kiến trúc</b>.',
+          'Điểm hạ tầng nằm trong mục <b>Nhập điểm hạ tầng, nhập hàng loạt, quản trị</b> của luồng Quy hoạch và hạ tầng. Chọn <b>Nhập 1 điểm</b>.',
           'Chọn <b>Loại</b>, <b>Giai đoạn</b> (Hiện trạng hoặc Quy hoạch mới) và <b>Phân cấp</b> (Cấp đô thị hoặc Cấp đơn vị ở).',
-          'Nhập <b>Tên</b>. Ô <b>Tọa độ</b>: gõ vĩ độ, kinh độ, hoặc bấm nút ghim <b>Ghim tọa độ trên bản đồ</b> rồi bấm vị trí. <b>Phường/Xã</b> tự điền theo tọa độ. Nhập <b>Diện tích</b> (m²). Ô <b>Bán kính</b> chỉ đọc, tính theo QCVN.',
-          'Bấm <b>Gửi đề xuất</b>. Dòng trạng thái ngay dưới nút báo kết quả. Sau khi phê duyệt, điểm chuyển thành <b>Đã phê duyệt</b>.'
+          'Nhập <b>Tên</b>. Ô <b>Tọa độ</b>: gõ vĩ độ, kinh độ, hoặc bấm nút ghim rồi bấm vị trí. <b>Phường/Xã</b> tự điền theo tọa độ. Nhập <b>Diện tích</b> (m²). Ô <b>Bán kính</b> chỉ đọc, tính theo QCVN.',
+          'Bấm <b>Gửi đề xuất</b>. Dòng trạng thái ngay dưới nút báo kết quả. Sau khi phê duyệt, điểm chuyển thành <b>Đã phê duyệt</b>. Công trình kiến trúc dùng cùng mẫu này ở luồng Kiến trúc và ghi tab riêng.'
         ],
         facts: [
           'Mục <b>Nhập hàng loạt</b> nhận DXF, KML, KMZ, GeoJSON, shapefile (.zip). Chưa đăng nhập: file ≤ 2 MB vào hàng chờ.',
-          'Nút <b>Quản trị</b> trên tab này chỉ hiện sau khi đăng nhập quản trị (tuyến đường, ô dân cư, dữ liệu OpenStreetMap).'
+          'Nút <b>Quản trị</b> chỉ hiện sau khi đăng nhập quản trị (tuyến đường, ô dân cư, dữ liệu OpenStreetMap).'
         ],
         actions: [{ label: 'Mở đề xuất', icon: 'plus', run: () => { document.dispatchEvent(new CustomEvent('qh:right-tab', { detail: { tab: 'tabAdd', open: true } })); flash($('tabAdd')); } }]
       }

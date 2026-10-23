@@ -49,12 +49,16 @@ async function verifyGoogleIdToken(token) {
   return user;
 }
 
+function isAdminEmail(email) {
+  return constants.ADMIN_EMAILS.includes(String(email || '').toLowerCase());
+}
+
 async function requireAdmin(req) {
   const user = await verifyGoogleIdToken(readBearerToken(req));
-  if (!constants.ADMIN_EMAILS.includes(user.email)) {
+  if (!isAdminEmail(user.email)) {
     throw httpError(403, `Tài khoản ${user.email} không có quyền quản trị`);
   }
   return user;
 }
 
-module.exports = { requireAdmin, httpError };
+module.exports = { requireAdmin, httpError, verifyGoogleIdToken, readBearerToken, isAdminEmail };

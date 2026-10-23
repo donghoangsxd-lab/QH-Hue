@@ -22,6 +22,7 @@ import { setLabelsOverlay, labelsOverlayOn } from './basemap.js';
 import { queryOverpassHedged } from './serviceArea.js';
 import { lotKeysOf } from './projectFiles.js';
 import { parseLandStampDxf, projectStamps, matchStamps, stampAreaM2, stampLabel } from './landStamp.js';
+import { openEntryFlow } from './entryFlows.js';
 
 // Diện tích tối thiểu theo loại (khớp config/constants.js → infraConfig.minSize)
 const MIN_SIZE = { "1-CV": 300, "2-BDX": 200, "3-MN": 800, "4-TH": 2000, "5-THCS": 2500, "7-YT": 1000, "8-VH": 500, "9-TM": 1500 };
@@ -1147,6 +1148,7 @@ export const REVIEW_DOSSIER_EVENT = 'review-dossier-open';
 export async function importReviewDossier(text, fileName, pendingId) {
   if (!isAdmin()) return;
   document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabAdd', open: true } }));
+  openEntryFlow('flowHoSo', { legacy: true });
   document.querySelector('.add-mode-btn[data-mode="addBulk"]')?.click();
   await loadFile(new File([text], fileName), pendingId);
 }

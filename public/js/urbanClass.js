@@ -13,6 +13,11 @@ import { geeApi } from './api.js';
 import { popQuery } from './popMethod.js';
 import { STATUS_REF, STATUS_DATE, URBANS_614, WARDS_614, RURAL_RULE, bareName as bare, wardLevel614, urbans614Of, urbans614ByPlan } from './urbanStatus.js';
 import { loadOsmOpen, osmTransitReady, transitNote } from './osmOpen.js';
+import { areaCodeFromName } from './facetStore.js';
+import { MANUAL_2A, MANUAL_I, MAP_2A } from './urbanEntrySchema.js';
+import { valueOf } from './urbanInputs.js';
+import { PART_BOUNDS, loadPartGeoms, partFeature, partGeomReady, pointInFeature, shareOf } from './urbanPartGeom.js';
+import { describeHt, factsForUrban, htFootNote, htReady, loadHienTrangFacts, measures, mergeEntry } from './hienTrangScore.js';
 
 export const CLASS_REF = 'Nghị quyết 111/2025/UBTVQH15';
 export const PLAN_REF = 'Quyết định 756/QĐ-UBND ngày 28/02/2026';
@@ -22,6 +27,7 @@ const N2 = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 
 // adjust: unesco = Điều 8 khoản 2 điểm d. Cả hệ thống Huế dùng một quy định này (khoản 3 không cộng điểm c vùng hay điểm c miền núi).
 const HERITAGE = 'Thuộc thành phố cố đô, di sản UNESCO nên áp Điều 8 khoản 2 điểm d, không áp hệ số Bắc Trung Bộ hay miền núi.';
+const partNote = (ward) => `Một phần xã ${ward}. Ranh là polygon hiện trạng trong public/data/urban614.geojson. Dân số ước bằng dân số xã × diện tích polygon / diện tích xã. Mật độ đường lấy bằng mật độ của xã chủ. ${HERITAGE}`;
 const URBANS = [
   { id: 'hue', name: 'Thành phố Huế', cls: 'I', adjust: 'unesco',
     note: 'Điều 15: Huế tiếp tục là đô thị loại I. Di sản UNESCO: cần tối thiểu 10/15 tiêu chuẩn (vai trò ≥ 4, đô thị hóa ≥ 2, hạ tầng ≥ 4) thay vì 12 (Điều 8 khoản 2 điểm d, Điều 9 khoản 3 điểm a).' },
@@ -48,17 +54,17 @@ const URBANS = [
   { id: 'a-luoi-2', name: 'Đô thị A Lưới 2', cls: 'III', adjust: 'unesco', unitKind: 'xã', units: ['A Lưới 2'],
     note: `Đô thị loại III trên xã miền núi. ${HERITAGE}` },
   { id: 'vinh-thanh', name: 'Đô thị mới Vinh Thanh', cls: 'III', adjust: 'unesco', partial: 'Phú Vinh',
-    note: `Một phần xã Phú Vinh. Chưa có ranh giới đô thị trong webapp nên không lấy số liệu cả xã để chấm. ${HERITAGE}` },
+    note: partNote('Phú Vinh') },
   { id: 'phu-da', name: 'Đô thị mới Phú Đa', cls: 'III', adjust: 'unesco', partial: 'Phú Vang',
-    note: `Một phần xã Phú Vang. Chưa tách ranh giới đô thị. ${HERITAGE}` },
+    note: partNote('Phú Vang') },
   { id: 'loc-son', name: 'Đô thị mới Lộc Sơn', cls: 'III', adjust: 'unesco', partial: 'Hưng Lộc',
-    note: `Một phần xã Hưng Lộc. Chưa tách ranh giới đô thị. ${HERITAGE}` },
+    note: partNote('Hưng Lộc') },
   { id: 'khe-tre', name: 'Đô thị mới Khe Tre', cls: 'III', adjust: 'unesco', partial: 'Khe Tre',
-    note: `Một phần xã Khe Tre (miền núi). Chưa tách ranh giới đô thị. ${HERITAGE}` },
+    note: partNote('Khe Tre') },
   { id: 'phu-loc', name: 'Đô thị mới Phú Lộc', cls: 'III', adjust: 'unesco', partial: 'Phú Lộc',
-    note: `Một phần xã Phú Lộc. Chưa tách ranh giới đô thị. ${HERITAGE}` },
+    note: partNote('Phú Lộc') },
   { id: 'vinh-hien', name: 'Đô thị mới Vinh Hiền', cls: 'III', adjust: 'unesco', partial: 'Vinh Lộc',
-    note: `Một phần xã Vinh Lộc. Chưa tách ranh giới đô thị. ${HERITAGE}` }
+    note: partNote('Vinh Lộc') }
 ];
 
 export const planUrbanOf = (id) => URBANS.find(u => u.id === id) || null;
@@ -92,13 +98,16 @@ const STD_2A = [
   { code: '2A.III.08', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', name: 'Tỷ lệ dân số được cấp nước sạch tập trung', unit: '%',
     band: { II: { hi: 100, lo: 90 }, III: { hi: 95, lo: 85 } }, pts: { hi: 3, lo: 2 } },
   { code: '2A.III.09', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', name: 'Mật độ đường cống thoát nước chính', unit: 'km/km²',
-    band: { II: { hi: 4.5, lo: 3.5 }, III: { hi: 3.5, lo: 3 } }, pts: { hi: 3, lo: 2 } },
+    band: { II: { hi: 4.5, lo: 3.5 }, III: { hi: 3.5, lo: 3 } }, pts: { hi: 3, lo: 2 },
+    method: 'Km cống chính / km² đất xây dựng đô thị (Nghị quyết 111, chú thích 2A.III.09). Cống chính là tuyến cấp 1 (QCVN 07:2023/BXD mục 1.4.9). Lớp đồ án không có trường cấp: lấy đường kính hoặc bề rộng ≥ 400 mm (mục 2.2.2, cống mưa ngoài đường phố) và tuyến phân lưu loại 1. Tuyến trên lớp mạng chưa ghi kích thước vẫn được cộng, ghi tạm thời. Mẫu số là đất xây dựng Dynamic World theo xã; đô thị một phần dùng diện tích polygon urban614.' },
   { code: '2A.III.10', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', name: 'Công suất vận hành trạm xử lý nước thải so với công suất thiết kế theo quy hoạch', unit: '%',
-    band: { II: { hi: 80, lo: 60 }, III: { hi: 70, lo: 50 } }, pts: { hi: 1, lo: 0.75 } },
+    band: { II: { hi: 80, lo: 60 }, III: { hi: 70, lo: 50 } }, pts: { hi: 1, lo: 0.75 },
+    method: 'Tổng congsuat điểm xử lý nước thải hiện trạng / tổng congsuat điểm quy hoạch. Lớp không tách vận hành và công suất ghi trên bản vẽ, nên tỷ lệ là một phần. Chỉ có thiết kế thì chưa ra phần trăm.' },
   { code: '2A.III.11', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', name: 'Tỷ lệ chất thải rắn sinh hoạt được xử lý đạt yêu cầu môi trường', unit: '%',
     band: { II: { hi: 90, lo: 80 }, III: { hi: 80, lo: 70 } }, pts: { hi: 3, lo: 2 } },
   { code: '2A.III.12', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', name: 'Tỷ lệ diện tích nghĩa trang nhân dân được xây dựng theo quy hoạch', unit: '%',
-    band: { II: { hi: 80, lo: 60 }, III: { hi: 70, lo: 50 } }, pts: { hi: 3, lo: 2 } },
+    band: { II: { hi: 80, lo: 60 }, III: { hi: 70, lo: 50 } }, pts: { hi: 3, lo: 2 },
+    method: 'Diện tích nghĩa trang đã có / diện tích nghĩa trang theo quy hoạch. Ưu tiên polygon mã NTD (hiện trạng) và NTR (quy hoạch). Lớp mạng là điểm: dientich nhỏ hơn 10.000 được hiểu là ha. Thiếu một vế thì chưa ra phần trăm.' },
   { code: '2A.III.13', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', calc: 'funeral', inherit: 'QCVN 11-NT', name: 'Nhà tang lễ', unit: 'cơ sở',
     band: { II: { hi: 2, lo: 1 }, III: { hi: 1, lo: 1 } }, pts: { hi: 3, lo: 2.5 },
     method: 'Đếm nhà tang lễ đã duyệt, cùng lớp 11-NT của quy chuẩn (QCVN 01:2026 Bảng 23). Loại III: mức tối thiểu là có dự án, mức tối đa là ≥ 1 cơ sở.' },
@@ -126,7 +135,7 @@ const STD_2A = [
   { code: '2A.III.21', group: 'III', sub: 'III.3 Không gian, kiến trúc, cảnh quan', landscape: true,
     name: 'Tỷ lệ diện tích không gian xanh trên diện tích tự nhiên', unit: '%',
     band: { both: { hi: 35, lo: 25 } }, pts: { hi: 3, lo: 2 },
-    method: 'Rừng, nông lâm nghiệp, cây xanh công cộng và phủ xanh khác trên diện tích tự nhiên. Chưa có lớp phủ xanh đủ để tính.' },
+    method: 'Rừng, nông lâm nghiệp, cây xanh, mặt nước trên diện tích tự nhiên (Nghị quyết 111, chú thích 2A.III.21). Ưu tiên hiện trạng sử dụng đất khi lớp phủ ít nhất một nửa ranh. Không đủ thì tạm thời ESA WorldCover (cây, bụi, cỏ, trồng trọt, đất ngập nước, rừng ngập mặn, mặt nước), một lần khi mở bảng.' },
   { code: '2A.III.22', group: 'III', sub: 'III.3 Không gian, kiến trúc, cảnh quan', calc: 'greenCap', landscape: true, inherit: 'QCVN 1-CV · 0201',
     name: 'Đất cây xanh sử dụng công cộng trong khu vực dân dụng đô thị', unit: 'm²/người',
     band: { II: { hi: 8, lo: 6 }, III: { hi: 7, lo: 2.5 } }, pts: { hi: 3, lo: 2.5 },
@@ -151,7 +160,7 @@ const STD_I = [
   { code: '1.I.06', group: 'I', name: 'Không nhận bổ sung cân đối từ ngân sách trung ương' },
   { code: '1.II.07', group: 'II', calc: 'iPop', name: 'Quy mô dân số đô thị ≥ 2.500.000 người', target: '≥ 2.500.000 người' },
   { code: '1.II.08', group: 'II', calc: 'iRate', name: 'Tỷ lệ đô thị hóa từ 45%', target: '≥ 45%',
-    method: 'Dân số các đô thị loại II, III được công nhận / dân số đô thị loại I. Webapp ước tính theo phạm vi QĐ 756, chưa gồm 6 đô thị một phần xã.' },
+    method: 'Dân số các đô thị loại II, III / dân số thành phố. Sáu đô thị một phần xã lấy dân số xã × diện tích polygon hiện trạng / diện tích xã (public/data/urban614.geojson), nên tỷ lệ là ước lượng.' },
   { code: '1.II.09', group: 'II', calc: 'iPop2', name: 'Tổng quy mô dân số các đô thị loại II ≥ 600.000 người', target: '≥ 600.000 người' },
   { code: '1.II.10', group: 'II', name: '≥ 50% số phường đạt trình độ phát triển đô thị loại II', target: '≥ 50% số phường',
     method: 'Chấm theo Bảng 2B loại II. Webapp chưa chấm Bảng 2B.' },
@@ -219,10 +228,12 @@ function sportInfraName(name) {
     && !s.includes('VANHOA');
 }
 
-function itemsOf(wards, pairs) {
+function itemsOf(wards, pairs, keep) {
   const out = [];
   wards.forEach(w => pairs.forEach(([bucket, key]) => {
-    ((w[bucket] && w[bucket][key] && w[bucket][key].subItems) || []).forEach(s => out.push(s));
+    ((w[bucket] && w[bucket][key] && w[bucket][key].subItems) || []).forEach(s => {
+      if (!keep || keep(s)) out.push(s);
+    });
   }));
   return out;
 }
@@ -232,22 +243,119 @@ function areaOf(wards, pairs) {
 }
 
 const popOf = (wards) => wards.reduce((s, w) => s + (Number(w.Dan_So_Vector) || 0), 0);
-const areaKmOf = (wards) => wards.reduce((s, w) => s + (Number(w.Dien_Tich_Km2) || 0), 0);
 
-function measure(calc, urban, wards, roads) {
-  const list = wardsOf(urban, wards);
-  const pop = popOf(list);
-  const missing = (urban.units || []).length - list.length;
-  if (urban.cls !== 'I' && missing > 0) return { pending: true, note: `Thiếu số liệu ${missing} đơn vị trong phạm vi đô thị` };
+function urbanKey(urban) {
+  if (!urban || urban.cls === 'I' || urban.id === 'hue') return 'tp:TP';
+  return `dothi:${urban.id}`;
+}
+
+function wardKey(name) {
+  return `xa:${areaCodeFromName(name)}`;
+}
+
+function numOrNull(v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function popWithEntry(urban, list) {
+  const over = numOrNull(valueOf(urbanKey(urban), 'danSo'));
+  if (over != null) return over;
+  let pop = 0;
+  list.forEach(w => {
+    const o = numOrNull(valueOf(wardKey(w.Ten_Phuong), 'danSo'));
+    pop += o != null ? o : (Number(w.Dan_So_Vector) || 0);
+  });
+  const tam = numOrNull(valueOf(urbanKey(urban), 'danSoTamTru'));
+  if (tam != null && tam > 0) pop += tam;
+  return pop;
+}
+
+function areaWithEntry(urban, list) {
+  const over = numOrNull(valueOf(urbanKey(urban), 'dienTich'));
+  if (over != null) return over;
+  let km = 0;
+  list.forEach(w => {
+    const o = numOrNull(valueOf(wardKey(w.Ten_Phuong), 'dienTich'));
+    km += o != null ? o : (Number(w.Dien_Tich_Km2) || 0);
+  });
+  return km;
+}
+
+function measurePartial(calc, urban) {
+  const key = urbanKey(urban);
   if (calc === 'pop') {
-    return { value: pop, note: `${fmtNum(pop)} người trên ${list.length} đơn vị. ${STD_2A.find(s => s.calc === 'pop').method}` };
+    const n = numOrNull(valueOf(key, 'danSo'));
+    if (n == null) return { pending: true, note: 'Chưa có dân số phần đô thị' };
+    return { value: n, note: 'Dân số phần đô thị do cán bộ nhập. Chưa có ranh nên chưa kiểm tra không gian.' };
   }
   if (calc === 'dens') {
-    const km = areaKmOf(list);
+    const pop = numOrNull(valueOf(key, 'danSo'));
+    const km = numOrNull(valueOf(key, 'dienTich'));
+    if (!(pop > 0) || !(km > 0)) return { pending: true, note: 'Chưa đủ dân số và diện tích phần đô thị' };
+    return { value: pop / km, note: 'Mật độ phần đô thị do cán bộ nhập' };
+  }
+  if (calc === 'roads') {
+    const d = numOrNull(valueOf(key, 'matDoDuong'));
+    if (d == null) return { pending: true, note: 'Chưa có mật độ đường phần đô thị' };
+    return { value: d, note: 'Mật độ đường do cán bộ nhập' };
+  }
+  return { pending: true, note: 'Chưa tách ranh giới đô thị' };
+}
+
+function clipOf(urban, wards) {
+  if (!urban.partial || !PART_BOUNDS[urban.id]) return null;
+  const host = (wards || []).find(w => bare(w.Ten_Phuong) === bare(urban.partial));
+  if (!host) return { pending: true, note: 'Chưa có số liệu xã chủ' };
+  const wardKm = Number(host.Dien_Tich_Km2) || 0;
+  const share = shareOf(urban.id, wardKm);
+  if (!share) return { pending: true, note: 'Chưa có diện tích xã chủ' };
+  const overPop = numOrNull(valueOf(urbanKey(urban), 'danSo'));
+  const tam = numOrNull(valueOf(urbanKey(urban), 'danSoTamTru'));
+  const overKm = numOrNull(valueOf(urbanKey(urban), 'dienTich'));
+  let pop = overPop != null ? overPop : (Number(host.Dan_So_Vector) || 0) * share.share;
+  if (overPop == null && tam > 0) pop += tam;
+  const pct = N0pct(share.share);
+  return {
+    list: [host],
+    host,
+    pop,
+    km2: overKm != null ? overKm : share.km2,
+    estimatedPop: overPop == null,
+    feat: partFeature(urban.id),
+    popNote: overPop != null
+      ? 'Dân số phần đô thị do cán bộ nhập.'
+      : `Ước ${fmtNum(Math.round(pop))} người = dân số ${host.Ten_Phuong} × ${N1.format(share.km2)} / ${N1.format(wardKm)} km² (${pct}).`
+  };
+}
+
+const POINT_CALCS = new Set(['funeral', 'edu', 'culture', 'sports', 'commerce', 'service', 'green2', 'greenCap']);
+
+function measure(calc, urban, wards, roads) {
+  const clip = clipOf(urban, wards);
+  if (urban.partial && !clip) return measurePartial(calc, urban);
+  if (clip && clip.pending) return { pending: true, note: clip.note };
+  if (clip && POINT_CALCS.has(calc) && !clip.feat) return { pending: true, note: 'Đang tải ranh đô thị hiện trạng' };
+  const keep = clip && clip.feat ? (it => pointInFeature(clip.feat, it.lng, it.lat)) : null;
+  const list = clip ? clip.list : wardsOf(urban, wards);
+  const pop = clip ? clip.pop : popWithEntry(urban, list);
+  const missing = clip ? 0 : (urban.units || []).length - list.length;
+  if (urban.cls !== 'I' && missing > 0) return { pending: true, note: `Thiếu số liệu ${missing} đơn vị trong phạm vi đô thị` };
+  if (calc === 'pop') {
+    if (clip) return { value: pop, partial: clip.estimatedPop, note: clip.popNote };
+    const entered = numOrNull(valueOf(urbanKey(urban), 'danSo')) != null || numOrNull(valueOf(urbanKey(urban), 'danSoTamTru')) != null;
+    return { value: pop, note: `${fmtNum(pop)} người trên ${list.length} đơn vị.${entered ? ' Có số cán bộ nhập.' : ''} ${STD_2A.find(s => s.calc === 'pop').method}` };
+  }
+  if (calc === 'dens') {
+    const km = clip ? clip.km2 : areaWithEntry(urban, list);
     if (!(km > 0)) return { pending: true, note: 'Chưa có diện tích tự nhiên' };
+    if (clip) return { value: pop / km, partial: clip.estimatedPop, note: `${fmtNum(pop)} người / ${N1.format(km)} km² ranh hiện trạng` };
     return { value: pop / km, note: `${fmtNum(pop)} người / ${N1.format(km)} km²` };
   }
   if (calc === 'roads') {
+    const entered = numOrNull(valueOf(urbanKey(urban), 'matDoDuong'));
+    if (entered != null) return { value: entered, officer: true, note: 'Mật độ đường do cán bộ nhập' };
     if (!roads) return { pending: true, note: 'Đang tải mạng lưới đường' };
     let km = 0, built = 0, have = 0, natural = 0, wait = false;
     list.forEach(w => {
@@ -268,57 +376,68 @@ function measure(calc, urban, wards, roads) {
           : `Mới có mạng lưới đường ${have}/${list.length} đơn vị`)
       };
     }
-    return { value: km / built, note: `${N1.format(km)} km đường đô thị / ${N1.format(built)} km² đất xây dựng` };
+    const roadNote = clip
+      ? `Ước bằng mật độ đường của ${clip.host.Ten_Phuong}: ${N1.format(km)} km / ${N1.format(built)} km² đất xây dựng. Chiều dài đường và đất xây dựng chỉ có theo xã, nên tỷ lệ diện tích ranh triệt tiêu.`
+      : `${N1.format(km)} km đường đô thị / ${N1.format(built)} km² đất xây dựng`;
+    return { value: km / built, partial: !!clip, note: roadNote };
   }
   if (calc === 'funeral') {
-    const n = list.reduce((s, w) => s + ((w.network && w.network.nt) || []).filter(it => it.ntKind === 'funeral').length, 0);
-    return { value: n, note: 'Nhà tang lễ đã duyệt trong phạm vi đô thị' };
+    const n = list.reduce((s, w) => s + ((w.network && w.network.nt) || []).filter(it => it.ntKind === 'funeral' && (!keep || keep(it))).length, 0);
+    return { value: n, note: clip ? 'Nhà tang lễ đã duyệt nằm trong ranh hiện trạng' : 'Nhà tang lễ đã duyệt trong phạm vi đô thị' };
   }
   if (calc === 'edu') {
-    const n = itemsOf(list, [['urbanResults', 'THPT']]).length;
+    const n = itemsOf(list, [['urbanResults', 'THPT']], keep).length;
     return { value: n, partial: true, note: STD_2A.find(s => s.calc === 'edu').method };
   }
   if (calc === 'culture') {
-    const n = itemsOf(list, [['urbanResults', 'VH_DT'], ['unitResults', 'VH_DV']]).length;
+    const n = itemsOf(list, [['urbanResults', 'VH_DT'], ['unitResults', 'VH_DV']], keep).length;
     return { value: n, partial: true, note: STD_2A.find(s => s.calc === 'culture').method };
   }
   if (calc === 'sports') {
-    const rows = itemsOf(list, [['urbanResults', 'VH_DT'], ['unitResults', 'VH_DV']]);
+    const rows = itemsOf(list, [['urbanResults', 'VH_DT'], ['unitResults', 'VH_DV']], keep);
     const n = rows.filter(s => sportInfraName(s.name)).length;
     return { value: n, reference: true, note: `${n} công trình thể thao trong mã 8-VH đã duyệt. Tham khảo, chưa tính điểm. ${STD_2A.find(s => s.calc === 'sports').method}` };
   }
   if (calc === 'commerce') {
-    const n = itemsOf(list, [['urbanResults', 'TM_DT'], ['unitResults', 'TM_DV']]).length;
+    const n = itemsOf(list, [['urbanResults', 'TM_DT'], ['unitResults', 'TM_DV']], keep).length;
     return { value: n, note: STD_2A.find(s => s.calc === 'commerce').method };
   }
   if (calc === 'service') {
     const pairs = [['urbanResults', 'THPT'], ['urbanResults', 'YT_DT'], ['unitResults', 'YT_DV'], ['urbanResults', 'VH_DT'], ['unitResults', 'VH_DV'], ['urbanResults', 'TM_DT'], ['unitResults', 'TM_DV']];
-    const rows = itemsOf(list, pairs);
+    const rows = itemsOf(list, pairs, keep);
     const unknown = rows.some(s => !(Number(s.size) > 0));
     if (!(pop > 0)) return { pending: true, note: 'Chưa có dân số' };
-    return { value: areaOf(list, pairs) / pop, partial: true, note: `${STD_2A.find(s => s.calc === 'service').method}${unknown ? ' Có công trình chưa rõ diện tích.' : ''}` };
+    const area = clip ? rows.reduce((s, it) => s + (Number(it.size) || 0), 0) : areaOf(list, pairs);
+    return { value: area / pop, partial: true, high: !!(clip && clip.estimatedPop), note: `${STD_2A.find(s => s.calc === 'service').method}${unknown ? ' Có công trình chưa rõ diện tích.' : ''}` };
   }
   if (calc === 'green2') {
-    const rows = itemsOf(list, [['urbanResults', 'CV_DT'], ['unitResults', 'CV_DV']]);
+    const rows = itemsOf(list, [['urbanResults', 'CV_DT'], ['unitResults', 'CV_DV']], keep);
     const unknown = rows.filter(s => !(Number(s.size) > 0)).length;
     const n = rows.filter(s => Number(s.size) >= 20000).length;
     return { value: n, partial: unknown > 0, note: `${n} khu ≥ 2 ha${unknown ? `; ${unknown} công trình chưa rõ diện tích` : ''}` };
   }
   if (calc === 'greenCap') {
-    const rows = itemsOf(list, [['urbanResults', 'CV_DT']]);
+    const rows = itemsOf(list, [['urbanResults', 'CV_DT']], keep);
     const unknown = rows.some(s => !(Number(s.size) > 0));
     if (!(pop > 0)) return { pending: true, note: 'Chưa có dân số' };
-    return { value: areaOf(list, [['urbanResults', 'CV_DT']]) / pop, partial: unknown, note: STD_2A.find(s => s.calc === 'greenCap').method };
+    const area = clip ? rows.reduce((s, it) => s + (Number(it.size) || 0), 0) : areaOf(list, [['urbanResults', 'CV_DT']]);
+    return { value: area / pop, partial: unknown || !!(clip && clip.estimatedPop), high: !!(clip && clip.estimatedPop), note: STD_2A.find(s => s.calc === 'greenCap').method };
   }
   return null;
 }
 
 function judge(std, urban, m) {
-  if (densityExempt(urban, std)) return { level: 'skip', pts: urban.partial ? null : std.pts.lo };
-  if (urban.partial) return { level: 'na', pts: null };
-  if (!std.calc) return { level: 'wait', pts: null };
+  if (densityExempt(urban, std)) return { level: 'skip', pts: urban.partial && !PART_BOUNDS[urban.id] ? null : std.pts.lo };
+  if (m && m.choice) {
+    if (m.choice === 'hi') return { pts: std.pts.hi, level: 'hi' };
+    if (m.choice === 'lo') return { pts: std.pts.lo, level: 'mid' };
+    return { pts: 0, level: 'no' };
+  }
+  if (urban.partial && (!m || m.pending || m.value == null)) return { level: 'na', pts: null };
+  if (!std.calc && (!m || m.value == null)) return { level: 'wait', pts: null };
   if (!m || m.pending || m.value == null) return { level: 'wait', pts: null };
   if (m.reference) return { level: 'ref', pts: null };
+  if (m.high) return { level: 'part', pts: null };
   if (std.code === '2A.III.13' && urban.cls === 'III' && m.value < 1) return { level: 'wait', pts: null };
   const b = bandOf(std, urban.cls);
   if (!b) return { level: 'wait', pts: null };
@@ -429,16 +548,36 @@ function ensureBusCover(wards, redraw) {
 }
 
 function typeIFacts(wards) {
-  const pop = popOf(wards);
-  const popUrban = (u) => popOf(wardsOf(u, wards));
+  const over = numOrNull(valueOf('tp:TP', 'danSo'));
+  const tam = numOrNull(valueOf('tp:TP', 'danSoTamTru'));
+  const pop = over != null ? over : popOf(wards) + (tam > 0 ? tam : 0);
+  const popUrban = (u) => {
+    if (!u.partial) return popOf(wardsOf(u, wards));
+    const clip = clipOf(u, wards);
+    return clip && !clip.pending ? clip.pop : 0;
+  };
   const pop2 = URBANS.filter(u => u.cls === 'II').reduce((s, u) => s + popUrban(u), 0);
-  const popFull = URBANS.filter(u => u.cls === 'II' || (u.cls === 'III' && !u.partial)).reduce((s, u) => s + popUrban(u), 0);
+  const popFull = URBANS.filter(u => u.cls === 'II' || u.cls === 'III').reduce((s, u) => s + popUrban(u), 0);
+  const rateEstimated = URBANS.some(u => u.partial && PART_BOUNDS[u.id] && numOrNull(valueOf(urbanKey(u), 'danSo')) == null);
   const bus2 = busCache.rows || typeIIBusBases(wards).map(r => ({ name: r.name, n: r.n, pct: null, total: r.pop }));
   const osmNames = typeIIBusBases(wards).flatMap(r => r.wards.map(w => w.Ten_Phuong));
-  return { pop, pop2, rate: pop > 0 ? popFull / pop * 100 : null, bus2, osmNames };
+  return { pop, pop2, rate: pop > 0 ? popFull / pop * 100 : null, rateEstimated, bus2, osmNames };
 }
 
 function judgeI(std, facts) {
+  const manualKey = MANUAL_I[std.code];
+  if (manualKey) {
+    const raw = valueOf('tp:TP', manualKey);
+    const ht = describeHt(std.code, { id: 'hue' });
+    if (raw == null || raw === '') {
+      return { level: 'wait', text: '—', aside: ht && ht.aside, note: [std.method || 'Chưa nhập', ht && ht.text].filter(Boolean).join(' ') };
+    }
+    const ok = raw === 'yes';
+    const note = ht && ht.text
+      ? `Cán bộ nhập trên luồng Hành chính. Ghi đè số tự tính. Không dùng: ${ht.text}`
+      : 'Cán bộ nhập trên luồng Hành chính.';
+    return { level: ok ? 'hi' : 'no', text: ok ? 'Đạt' : 'Chưa đạt', note };
+  }
   if (std.calc === 'iPop') {
     const ok = facts.pop >= 2500000;
     return { level: ok ? 'hi' : 'no', text: `${fmtNum(facts.pop)} người`, note: 'Dân số hiện trạng toàn thành phố, chưa tách thường trú và tạm trú.' };
@@ -451,23 +590,29 @@ function judgeI(std, facts) {
     const rows = facts.bus2 || [];
     if (!rows.length || rows.some(r => r.pct == null)) {
       const why = rows.map(r => r.note).filter(Boolean)[0];
-      return { level: 'wait', text: '…', note: why || 'Đang tính dân số trong 500 m của trạm đã duyệt.' };
+      const ht = describeHt('1.III.12', { id: 'hue' });
+      return {
+        level: 'wait', text: '…', aside: ht && ht.aside,
+        note: [why || 'Đang tính dân số trong 500 m của trạm đã duyệt.', ht && ht.text].filter(Boolean).join(' ')
+      };
     }
     const ok = rows.every(r => r.pct + 1e-6 >= 100);
     const head = rows.map(r => `${r.name}: ${fmtNum(r.covered)}/${fmtNum(r.total)} người trong 500 m (${fmtNum(r.n)} trạm trong phạm vi).`).join(' ');
     const zero = busCache.status === 'zero' ? ' Toàn thành phố có 0 trạm xe buýt đã duyệt, nên dân số trong 500 m bằng 0.' : '';
     const osm = transitNote(facts.osmNames);
+    const ht = describeHt('1.III.12', { id: 'hue' });
     return {
       level: ok ? 'hi' : 'no',
       text: rows.map(r => `${r.name} ${N1.format(r.pct)}%`).join(' · '),
-      note: `${head}${zero} ${std.method}${osm ? ` ${osm}` : ''}`
+      aside: ht && ht.aside,
+      note: `${head}${zero} ${std.method}${osm ? ` ${osm}` : ''}${ht && ht.text ? ` ${ht.text}` : ''}`
     };
   }
   if (std.calc === 'iRate') {
     if (facts.rate == null) return { level: 'wait', text: '—' };
     const ok = facts.rate >= 45;
     return {
-      level: ok ? 'hi' : 'part',
+      level: ok && !facts.rateEstimated ? 'hi' : 'part',
       text: `≥ ${N1.format(facts.rate)}%`,
       note: std.method
     };
@@ -479,7 +624,7 @@ const levelCls = (level) => (level === 'hi' ? 'c-green' : (level === 'no' ? 'c-r
 
 function scopeLabel(urban) {
   if (urban.cls === 'I') return 'Toàn thành phố';
-  if (urban.partial) return `Một phần xã ${urban.partial}`;
+  if (urban.partial) return `Ranh hiện trạng, xã ${urban.partial}`;
   return `${urban.units.length} ${urban.unitKind}`;
 }
 
@@ -508,9 +653,129 @@ function loadRoads(force = false) {
 
 const measured = new Map();
 
+function manualMeasure(std, urban) {
+  const spec = MANUAL_2A[std.code];
+  if (!spec) return null;
+  const raw = valueOf(urbanKey(urban), spec.key);
+  if (raw == null || raw === '') return { pending: true, note: 'Chưa có số liệu nhập' };
+  if (spec.qual) return { choice: raw, officer: true, note: 'Cán bộ nhập trên luồng Hành chính.' };
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return { pending: true, note: 'Giá trị không phải số' };
+  return { value: n, officer: true, note: 'Cán bộ nhập trên luồng Hành chính.' };
+}
+
+const COVER_KEYS = ['tree', 'shrub', 'grass', 'crop', 'wetland', 'mangrove', 'water'];
+let coverByBare = null;
+let coverFailed = false;
+let coverPromise = null;
+
+function loadCover() {
+  if (!coverPromise) {
+    coverPromise = fetch(geeApi('action=getForestStats&mode=cover'))
+      .then(async (res) => {
+        const body = await res.json().catch(() => null);
+        if (!res.ok || !body || !Array.isArray(body.wards)) throw new Error('Không có phủ xanh');
+        const map = new Map();
+        body.wards.forEach(w => {
+          const ha = COVER_KEYS.reduce((s, k) => s + (Number(w[k]) || 0), 0);
+          if (w.name) map.set(bare(w.name), ha);
+        });
+        coverByBare = map;
+        coverFailed = false;
+      })
+      .catch(err => {
+        coverPromise = null;
+        coverFailed = true;
+        coverByBare = new Map();
+        console.warn('Phân loại đô thị – phủ xanh:', err);
+      });
+  }
+  return coverPromise;
+}
+
+function coverOf(list) {
+  if (!coverByBare) return null;
+  let ha = 0;
+  let km = 0;
+  let n = 0;
+  list.forEach(w => {
+    const h = coverByBare.get(bare(w.Ten_Phuong));
+    if (h == null) return;
+    n += 1;
+    ha += h;
+    km += Number(w.Dien_Tich_Km2) || 0;
+  });
+  if (n < list.length || !(km > 0)) return null;
+  return { ha, km };
+}
+
+function builtDenom(urban, wards) {
+  const clip = clipOf(urban, wards);
+  if (urban.partial) {
+    if (!clip || clip.pending || !(clip.km2 > 0)) return null;
+    return { km2: clip.km2, builtExact: false };
+  }
+  const list = clip && clip.list ? clip.list : wardsOf(urban, wards);
+  let km = 0;
+  let exact = true;
+  let have = 0;
+  let wait = false;
+  list.forEach(w => {
+    const a = densityArea(w.Ten_Phuong, Number(w.Dien_Tich_Km2) || 0);
+    if (!a) { wait = true; return; }
+    have += 1;
+    km += a.km2;
+    if (!a.built) exact = false;
+  });
+  if (wait || have < list.length || !(km > 0)) return null;
+  return { km2: km, builtExact: exact };
+}
+
+function mapAuto(code, urban, wards) {
+  if (!htReady()) return { pending: true, note: 'Đang tải lớp hiện trạng.' };
+  const bundle = factsForUrban(urban);
+  if (!bundle) return { pending: true, note: 'Chưa có ranh để cắt lớp hiện trạng.' };
+  const ctx = {};
+  if (code === '2A.III.09') {
+    const denom = builtDenom(urban, wards);
+    if (!denom) return { pending: true, aside: bundle.mainM > 0 ? `${N1.format(bundle.mainM / 1000)} km` : '', note: 'Đang tải diện tích đất xây dựng để tính mật độ cống chính.' };
+    ctx.builtKm2 = denom.km2;
+    ctx.builtExact = denom.builtExact;
+  }
+  if (code === '2A.III.21') {
+    const frac = bundle.areaM2 > 0 ? bundle.landM2 / bundle.areaM2 : 0;
+    if (frac < 0.5) {
+      if (!coverByBare && !coverFailed) return { pending: true, note: 'Đang tải phủ xanh.' };
+      const clip = urban.partial ? clipOf(urban, wards) : null;
+      const list = clip && clip.list ? clip.list : wardsOf(urban, wards);
+      const cover = coverOf(list);
+      if (cover) {
+        ctx.coverHa = cover.ha;
+        ctx.naturalKm2 = cover.km;
+      }
+    }
+  }
+  return measures(bundle, ctx)[code] || { pending: true, note: 'Chưa tính được từ lớp hiện trạng.' };
+}
+
+function measureStd(std, urban, wards) {
+  if (MAP_2A[std.code]) {
+    const raw = valueOf(urbanKey(urban), MAP_2A[std.code]);
+    if (raw != null && raw !== '' && Number.isFinite(Number(raw))) {
+      const officer = { value: Number(raw), officer: true, note: 'Cán bộ nhập trên luồng Hành chính.' };
+      return mergeEntry(officer, describeHt(std.code, urban));
+    }
+    return mapAuto(std.code, urban, wards);
+  }
+  let m = null;
+  if (MANUAL_2A[std.code]) m = manualMeasure(std, urban);
+  else if (std.calc) m = measure(std.calc, urban, wards, roads);
+  return mergeEntry(m, describeHt(std.code, urban));
+}
+
 function readMeasure(std, urban, wards) {
-  const key = `${urban.id}:${std.calc}`;
-  if (!measured.has(key)) measured.set(key, measure(std.calc, urban, wards, roads));
+  const key = `${urban.id}:${std.code}`;
+  if (!measured.has(key)) measured.set(key, measureStd(std, urban, wards));
   return measured.get(key);
 }
 
@@ -535,8 +800,9 @@ function meterHtml(value, hi, floor, level) {
 function scoreOf(urban, wards) {
   const out = { pts: 0, max: 0, met: 0, evaluated: 0, pending: false, levels: [] };
   STD_2A.forEach(std => {
-    if (!std.calc || urban.partial) return;
     const m = readMeasure(std, urban, wards);
+    if (!m || m.pending || m.reference) return;
+    if (m.value == null && !m.choice) return;
     const j = judge(std, urban, m);
     if (j.level === 'wait' && m && m.pending) out.pending = true;
     if (j.pts == null) return;
@@ -552,13 +818,17 @@ function stdTip(std, urban, m, j) {
     + `${m && m.note ? `\n${m.note}` : ''}${j ? `\n${LEVEL_TEXT[j.level]}` : ''}`;
 }
 
+function asideHtml(m) {
+  return m && m.aside ? `<small class="uc-aside">${escapeHtml(m.aside)}</small>` : '';
+}
+
 function listCell(code, urban, wards) {
   const std = STD_2A.find(s => s.code === code);
   const m = readMeasure(std, urban, wards);
   const j = judge(std, urban, m);
-  if (!m || m.pending || m.value == null) return `<td class="uc-val" title="${escapeHtml(m?.note || stdTip(std, urban))}"><span class="gtx-wait">${ico('clock')}</span></td>`;
+  if (!m || m.pending || m.value == null) return `<td class="uc-val" title="${escapeHtml(m?.note || stdTip(std, urban))}"><span class="gtx-wait">${ico('clock')}</span>${asideHtml(m)}</td>`;
   return `<td class="uc-val" title="${escapeHtml(stdTip(std, urban, m, j))}"><span class="uc-cell">`
-    + `<b class="${levelCls(j.level)}">${j.lower ? '≥ ' : ''}${fmtNum(m.value)}</b>${meterHtml(m.value, bandOf(std, urban.cls).hi, adjustedFloor(std, urban), j.level)}</span></td>`;
+    + `<b class="${levelCls(j.level)}">${j.lower ? '≥ ' : ''}${fmtNum(m.value)}</b>${meterHtml(m.value, bandOf(std, urban.cls).hi, adjustedFloor(std, urban), j.level)}</span>${asideHtml(m)}</td>`;
 }
 
 function scoreCell(urban, wards) {
@@ -581,7 +851,7 @@ function cityCardHtml(wards) {
   const lv = (ok) => (ok ? 'hi' : 'no');
   const kpi = (label, value, level, meter, target, tip) => `<div class="uc-kpi" title="${escapeHtml(tip)}">
       <span>${label}</span><b class="${levelCls(level)}">${value}</b>${meter}<em>${target}</em></div>`;
-  const rateLv = f.rate == null ? 'wait' : (f.rate >= 45 ? 'hi' : 'part');
+  const rateLv = f.rate == null ? 'wait' : (f.rate >= 45 && !f.rateEstimated ? 'hi' : 'part');
   return `<aside class="uc-city">
       <div class="uc-city-head"><b class="uc-I">Loại I</b><button type="button" class="uc-link" data-uc="hue" title="Xem đủ 15 tiêu chuẩn loại I">Thành phố Huế</button></div>
       ${kpi('Dân số', fmtNum(f.pop), lv(f.pop >= 2500000), meterHtml(f.pop, 2500000, null, lv(f.pop >= 2500000)), 'mục tiêu ≥ 2.500.000', 'Tiêu chuẩn 1.II.07')}
@@ -609,7 +879,7 @@ function sideHtml(urban, wards) {
   const head = `<div class="uc-side-head"><b class="uc-${urban.cls}">Loại ${urban.cls}</b><span class="uc-side-name" title="${escapeHtml(scopeTitle(urban))}">${escapeHtml(urban.name)}</span>`
     + `<span class="c-muted">${escapeHtml(scopeLabel(urban))}</span></div>`;
   const more = `<button type="button" class="bp-btn uc-more" data-uc="${urban.id}">Bảng đủ ${STD_2A.length} tiêu chuẩn${ico('chev-right')}</button>`;
-  if (urban.partial) return `${head}<div class="uc-side-note">${ico('info')} ${escapeHtml(urban.note)}</div>${more}`;
+  const partialNote = urban.partial ? `<div class="uc-side-note">${ico('info')} ${escapeHtml(urban.note)}</div>` : '';
   const sc = scoreOf(urban, wards);
   const rows = STD_2A.filter(s => s.calc).map(std => {
     const m = readMeasure(std, urban, wards);
@@ -629,7 +899,7 @@ function sideHtml(urban, wards) {
     ? `<div class="uc-side-score" title="Ngưỡng công nhận cả Bảng 2A là 75/100 điểm"><span>Đã chấm ${sc.evaluated} tiêu chuẩn · đạt mức tối thiểu ${sc.met}/${sc.evaluated}</span>`
       + `<b>${N1.format(sc.pts)}<span class="c-muted"> / ${N1.format(sc.max)} điểm</span></b>${meterHtml(sc.pts, sc.max, null, sc.met === sc.evaluated ? 'hi' : 'mid')}</div>`
     : '';
-  return `${head}${score}<div class="uc-stds">${rows}</div>${more}`;
+  return `${head}${partialNote}${score}<div class="uc-stds">${rows}</div>${more}`;
 }
 
 function overviewHtml(wards, wardName) {
@@ -637,8 +907,7 @@ function overviewHtml(wards, wardName) {
   const banner = outside
     ? `<div class="uc-note">${ico('info')} ${escapeHtml(wardName)} không thuộc 15 đô thị loại II, III đến năm 2030. Bảng dưới là cả hệ thống.</div>`
     : '';
-  const full = URBANS.filter(u => u.cls !== 'I' && !u.partial);
-  const partial = URBANS.filter(u => u.partial);
+  const full = URBANS.filter(u => u.cls !== 'I');
   const pick = URBANS.find(u => u.id === picked && u.cls !== 'I') || (wardName && urbanByWard(wardName)) || full[0];
   let stt = 0;
   const rows = ['II', 'III'].map(cls => {
@@ -654,9 +923,6 @@ function overviewHtml(wards, wardName) {
       </tr>`;
     }).join('');
   }).join('');
-  const partialRow = `<tr class="uc-partial"><td></td><td colspan="${LIST_CODES.length + 3}"><span class="c-muted">${partial.length} đô thị mới chưa tách ranh:</span> `
-    + partial.map(u => `<button type="button" class="uc-link${u === pick ? ' is-sel' : ''}" data-pick="${u.id}" title="${escapeHtml(u.note)}">${escapeHtml(u.name.replace(/^Đô thị mới /, ''))}</button>`).join(' · ')
-    + '</td></tr>';
   return `${tabsHtml(`<b>${URBANS.length} đô thị</b> đến 2030 · ${PLAN_REF}`)}${banner}${cityLineHtml(wards)}<div class="uc-layout">
       ${cityCardHtml(wards)}
       <div class="table-container uc-list">
@@ -669,7 +935,7 @@ function overviewHtml(wards, wardName) {
             <th title="2A.III.22, m² đất cây xanh cấp đô thị / người">Cây xanh / người</th>
             <th title="Điểm các tiêu chuẩn webapp đã chấm / tối đa của các tiêu chuẩn đó; mỗi chấm là 1 tiêu chuẩn. Ngưỡng công nhận Bảng 2A là 75 điểm">Điểm đã chấm</th>
           </tr></thead>
-          <tbody>${rows}${partialRow}</tbody>
+          <tbody>${rows}</tbody>
         </table>
       </div>
       <aside class="uc-side">${pick ? sideHtml(pick, wards) : ''}</aside>
@@ -696,12 +962,13 @@ const SHORT_2A = {
 const LEVEL_SHORT = { hi: 'Tối đa', mid: 'Tối thiểu', adj: 'Tối thiểu (giảm)', skip: 'Không xét', no: 'Chưa đạt', part: 'Một phần', wait: 'Chờ số liệu', na: 'Chưa tách ranh', ref: 'Tham khảo, chưa tính điểm' };
 
 function nowCellHtml(std, urban, m, j) {
-  if (urban.partial || !std.calc) return '<td class="uc-val">—</td>';
-  if (m && m.pending) return `<td class="uc-val"><span class="gtx-wait">${ico('clock')}</span></td>`;
-  if (m && m.reference && m.value != null) return `<td class="uc-val"><b>${fmtNum(m.value)}</b></td>`;
-  if (!m || m.value == null) return '<td class="uc-val">—</td>';
+  if (m && m.choice) return `<td class="uc-val"><b class="${levelCls(j.level)}">${LEVEL_SHORT[j.level] || ''}</b></td>`;
+  if ((urban.partial || !std.calc) && (!m || m.pending || m.value == null)) return `<td class="uc-val">—${asideHtml(m)}</td>`;
+  if (m && m.pending) return `<td class="uc-val"><span class="gtx-wait">${ico('clock')}</span>${asideHtml(m)}</td>`;
+  if (m && m.reference && m.value != null) return `<td class="uc-val"><b>${fmtNum(m.value)}</b>${asideHtml(m)}</td>`;
+  if (!m || m.value == null) return `<td class="uc-val">—${asideHtml(m)}</td>`;
   const meter = j.level === 'skip' ? '' : meterHtml(m.value, bandOf(std, urban.cls).hi, adjustedFloor(std, urban), j.level);
-  return `<td class="uc-val"><span class="uc-cell"><b class="${levelCls(j.level)}">${fmtNum(m.value)}</b>${meter}</span></td>`;
+  return `<td class="uc-val"><span class="uc-cell"><b class="${levelCls(j.level)}">${fmtNum(m.value)}</b>${meter}</span>${asideHtml(m)}</td>`;
 }
 
 // Số không kèm đơn vị (đơn vị ở tên ngắn); * = mức tối thiểu đã giảm theo Điều 8 khoản 2 điểm d
@@ -724,7 +991,7 @@ function detailRows2A(urban, wards, list) {
     const subHead = std.sub && std.sub !== sub
       ? `<tr class="uc-sub"><td colspan="8">${escapeHtml(std.sub)}</td></tr>` : '';
     sub = std.sub || sub;
-    const m = std.calc && !urban.partial ? readMeasure(std, urban, wards) : null;
+    const m = readMeasure(std, urban, wards);
     const j = judge(std, urban, m);
     const pts = j.pts == null ? '—' : `${j.lower ? '≥ ' : ''}${N2.format(j.pts)}`;
     const tip = [`${std.name}${std.unit ? ` (${std.unit})` : ''}`, std.inherit && `Kế thừa: ${std.inherit}`, std.method, m && m.note, urban.note].filter(Boolean).join('\n');
@@ -767,7 +1034,7 @@ function detailRowsI(wards, list) {
       <td class="uc-code">${std.code}</td>
       <td class="uc-name" title="${escapeHtml(j.note || std.method || '')}">${escapeHtml(std.name)}${inheritHtml(std)}</td>
       <td>${escapeHtml(std.target || 'Đạt / không đạt')}</td>
-      <td class="uc-val" title="${escapeHtml(j.note || '')}">${val}</td>
+      <td class="uc-val" title="${escapeHtml(j.note || '')}">${val}${j.aside ? `<small class="uc-aside">${escapeHtml(j.aside)}</small>` : ''}</td>
       <td class="${levelCls(j.level)}">${j.level === 'hi' ? 'Đạt' : (j.level === 'part' ? 'Chưa kết luận' : LEVEL_TEXT[j.level] || 'Chờ số liệu')}</td>
     </tr>`;
   }).join('');
@@ -786,7 +1053,7 @@ function ruleNote(urban) {
 }
 
 // Tổng kết dưới bảng thứ 2: điểm / số tiêu chuẩn đạt, quy định áp dụng, chú giải màu
-function detailSumHtml(urban, wards) {
+function detailSumHtml(urban, wards, wardName) {
   let score = '';
   if (urban.cls === 'I') {
     const facts = typeIFacts(wards);
@@ -800,7 +1067,7 @@ function detailSumHtml(urban, wards) {
     const met = metOf(STD_I);
     score = `<div class="uc-side-score"><span>Đạt ${met}/${STD_I.length} tiêu chuẩn · cần ≥ 10 (di sản)</span><b>${met}<span class="c-muted"> / ${STD_I.length}</span></b>`
       + `${meterHtml(met, STD_I.length, 10, met >= 10 ? 'hi' : 'no')}</div><div class="uc-dsum-groups">${groups.join('')}</div>`;
-  } else if (!urban.partial) {
+  } else {
     const sc = scoreOf(urban, wards);
     if (sc.evaluated) {
       score = `<div class="uc-side-score" title="Ngưỡng công nhận cả Bảng 2A là 75/100 điểm"><span>Đã chấm ${sc.evaluated}/${STD_2A.length} tiêu chuẩn · đạt mức tối thiểu ${sc.met}/${sc.evaluated}</span>`
@@ -808,14 +1075,16 @@ function detailSumHtml(urban, wards) {
         + `<span>${STD_2A.length - sc.evaluated} tiêu chuẩn còn lại là tiêu chuẩn chữ hoặc chưa có lớp dữ liệu. Ngưỡng công nhận cả Bảng 2A là 75/100.</span>`;
     }
   }
-  return `<div class="uc-dsum">${score}<p title="${escapeHtml(urban.note)}">${ico('info')} ${escapeHtml(ruleNote(urban))}</p>${legendHtml()}</div>`;
+  const foot = htFootNote(urban, wardName);
+  return `<div class="uc-dsum">${score}<p title="${escapeHtml(urban.note)}">${ico('info')} ${escapeHtml(ruleNote(urban))}</p>${legendHtml()}`
+    + (foot ? `<p class="uc-note">${escapeHtml(foot)}</p>` : '') + '</div>';
 }
 
 // Bề rộng cột cố định, chung cho 2 bảng; cột Tiêu chuẩn (rỗng) nhận phần còn lại
 const COLS_2A = ['2.2em', '5.4em', '', '5.6em', '5.6em', '10em', '3.4em', '7.6em'];
 const COLS_I = ['2.2em', '4.4em', '', '9em', '8.5em', '7em'];
 
-function detailHtml(urban, wards, redraw) {
+function detailHtml(urban, wards, redraw, wardName) {
   const isI = urban.cls === 'I';
   if (isI) ensureBusCover(wards, redraw);
   const cols = (isI ? COLS_I : COLS_2A).map(w => `<col${w ? ` style="width:${w}"` : ''}>`).join('');
@@ -837,7 +1106,7 @@ function detailHtml(urban, wards, redraw) {
     </div>
     <div class="uc-dsplit">
       <div class="uc-dcol">${table(rows(list.filter(left)))}</div>
-      <div class="uc-dcol">${table(rows(list.filter(s => !left(s))))}${detailSumHtml(urban, wards)}</div>
+      <div class="uc-dcol">${table(rows(list.filter(s => !left(s))))}${detailSumHtml(urban, wards, wardName)}</div>
     </div>`;
 }
 
@@ -932,7 +1201,7 @@ function nowHtml(wardName, wards) {
       <div class="uc-dcol">${nowUrbanTableHtml(wardName)}
         <div class="uc-dsum"><p>${ico('info')} Phụ lục I: danh mục đô thị từ ${STATUS_DATE}. Thị xã loại IV, thị trấn và đô thị loại V chuyển tiếp thành đô thị loại III (Điều 15 ${CLASS_REF}).
           Phạm vi đô thị sau chuyển tiếp trùng phạm vi đã được công nhận; cột Phạm vi hiện nay là phường, xã kế thừa.</p>
-          <p>${parts} đô thị chỉ chiếm một phần phường, xã và chưa có ranh giới riêng trong webapp nên chưa chấm tiêu chuẩn theo số liệu hiện trạng.</p></div>
+          <p>${parts} đô thị chỉ chiếm một phần phường, xã. Ranh là polygon trong data/urban614.geojson.</p></div>
       </div>
       <div class="uc-dcol">${nowWardTableHtml(wardName)}
         <div class="uc-dsum"><p><b>*</b> ${escapeHtml(RURAL_RULE)}</p>
@@ -951,7 +1220,7 @@ function paint(el, wardName, wards, redraw) {
   const picked = mode !== 'auto' && mode !== 'all' ? URBANS.find(u => u.id === mode) : null;
   const autoUrban = mode === 'auto' && wardName ? urbanByWard(wardName) : null;
   const urban = picked || autoUrban;
-  el.innerHTML = urban ? detailHtml(urban, wards, redraw) : overviewHtml(wards, wardName);
+  el.innerHTML = urban ? detailHtml(urban, wards, redraw, wardName) : overviewHtml(wards, wardName);
 }
 
 /** Vẽ bảng vào el. wardName rỗng = toàn thành phố. */
@@ -960,13 +1229,16 @@ export function renderUrbanClass(el, { wardName, wards }) {
   const key = wardName || '';
   if (key !== seenKey) { seenKey = key; mode = 'auto'; }
   el.dataset.ward = key;
-  loadBuiltAreas();
   const draw = () => {
     if (!el.isConnected || el.dataset.ward !== key) return;
     paint(el, key, wards, draw);
   };
+  loadBuiltAreas().then(draw).catch(() => {});
+  loadCover().then(draw).catch(() => {});
+  loadHienTrangFacts(URBANS).then(draw).catch(err => console.warn('Phân loại đô thị – lớp hiện trạng lỗi:', err));
   draw();
   if (!roads) loadRoads().then(draw).catch(err => console.warn('Phân loại đô thị – mạng lưới đường lỗi:', err));
+  if (!partGeomReady()) loadPartGeoms().then(draw).catch(err => console.warn('Phân loại đô thị – ranh hiện trạng lỗi:', err));
   if (!osmTransitReady()) loadOsmOpen().then(draw).catch(err => console.warn('Phân loại đô thị – OSM lỗi:', err));
 }
 

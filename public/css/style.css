@@ -1735,6 +1735,23 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .add-mode-switch:has(#btnAddRoadMode:not([style*="none"])) .add-mode-btn { padding: 5px 2px; }
 .add-mode-btn { flex: 1; padding: 5px 4px; border: none; border-radius: var(--r-md); background: transparent; color: var(--text-muted); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; white-space: nowrap; }
 .add-mode-btn.active { background: var(--accent-cyan); color: var(--bg-panel); }
+.entry-flows { flex-wrap: nowrap; }
+.entry-flow-btn { flex: 1 1 0; min-width: 0; padding: 5px 3px; border: none; border-radius: var(--r-md); background: transparent; color: var(--text-muted); font-size: var(--fs-sm); font-weight: 700; line-height: 1.25; white-space: normal; cursor: pointer; }
+.entry-flow-btn.active { background: var(--accent-cyan); color: var(--bg-panel); }
+.entry-officer { display: grid; gap: 6px; margin-bottom: 8px; font-size: var(--fs-sm); }
+.entry-officer label { display: grid; gap: 2px; }
+.entry-note { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.4; margin: 6px 0; }
+.lot-flag { color: var(--accent-red); }
+.lot-keep { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; }
+.lot-keep label { display: flex; gap: 8px; align-items: flex-start; font-size: var(--fs-sm); }
+.entry-steps { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow: auto; margin: 6px 0; }
+.entry-step-btn { text-align: left; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main); border-radius: var(--r-sm); padding: 4px 6px; font-size: var(--fs-xs); cursor: pointer; }
+.entry-step-btn.on { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.entry-step-title { font-size: var(--fs-sm); margin: 8px 0 4px; }
+.entry-miss { width: 100%; border-collapse: collapse; font-size: var(--fs-xs); }
+.entry-miss th, .entry-miss td { border-bottom: 1px solid var(--border-color); padding: 3px 4px; text-align: left; vertical-align: top; }
+.entry-legacy { margin-top: 10px; }
+.entry-legacy > summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 700; color: var(--text-main); }
 .add-point-form select:disabled { opacity: 0.45; cursor: not-allowed; }
 .cad-dxf-slots { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .cad-slot-row { display: flex; align-items: stretch; gap: 4px; }
@@ -2450,7 +2467,7 @@ table.uc-table.uc-ntable :is(th, td) { white-space: normal; }
 table.uc-table td.uc-name { white-space: normal; text-align: left; min-width: 220px; }
 table.uc-table td.uc-scope { text-align: left; }
 table.uc-table td.uc-code { color: var(--accent-cyan); font-weight: 700; }
-table.uc-table td.uc-val { text-align: right; }
+table.uc-table td.uc-val .uc-aside { display: block; margin-top: 2px; color: var(--text-muted); font-size: 10px; font-weight: 500; line-height: 1.2; white-space: normal; }
 table.uc-table tr.uc-group td { text-align: left; font-weight: 700; color: var(--accent-green); background: rgba(var(--green-rgb), 0.12); }
 table.uc-table tr.uc-sub td { text-align: left; font-weight: 700; color: var(--accent-cyan); background: rgba(56, 189, 248, 0.08); }
 table.uc-table tr.uc-here td { background: rgba(56, 189, 248, 0.1); }

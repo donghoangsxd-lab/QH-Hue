@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+<Placemark><name>Lo ODT</name>
+<ExtendedData><Data name="KYHIEU"><value>ODT</value></Data></ExtendedData>
+<Polygon><outerBoundaryIs><LinearRing><coordinates>
+107.585,16.463 107.586,16.463 107.586,16.464 107.585,16.464 107.585,16.463
+</coordinates></LinearRing></outerBoundaryIs></Polygon>
+</Placemark>
+<Placemark><name>Tem</name>
+<ExtendedData><Data name="KYHIEU"><value>ODT</value></Data><Data name="DIENTICH"><value>1200</value></Data></ExtendedData>
+<Point><coordinates>107.5855,16.4635,0</coordinates></Point>
+</Placemark>
+<Placemark><name>Tuyen</name>
+<ExtendedData><Data name="LOAI"><value>Duong khu vuc</value></Data></ExtendedData>
+<LineString><coordinates>107.585,16.463 107.587,16.465</coordinates></LineString>
+</Placemark>
+</Document></kml>

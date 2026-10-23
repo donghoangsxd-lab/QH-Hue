@@ -9,6 +9,8 @@ export const state = {
   // Google ID token của Admin, gửi kèm mỗi thao tác phê duyệt để server kiểm tra lại
   authToken: null,
   authUser: null,
+  // Đơn vị cán bộ được phép gửi. null khi chưa đăng nhập hoặc đang là quản trị (không khóa).
+  entryUnits: null,
 
   // Dữ liệu công trình hạ tầng & Ma trận 40 Phường/Xã
   rawDataList: [],
@@ -61,6 +63,7 @@ export const state = {
 
   // Trạng thái các chế độ tương tác
   isPickMode: false,
+  pickTarget: 'infra',
   isInspectMode: false,
   adminDrawMode: null,     // Admin đang vẽ: 'road' = tuyến đường bổ sung (customRoads.js), 'pop' = vùng hiệu chỉnh dân cư (popEdits.js), 'bldg' = dấu chân nhà mới (bldgDraw.js)
   sketchTool: null,        // công cụ phác thảo đang chọn (sketchLayer.js): 'line' | 'polyline' | 'polygon' | 'arrow' | 'circle' | 'text'
