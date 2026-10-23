@@ -141,3 +141,20 @@ const LINE_STYLES = [
   [/khoáng sản/i, { color: '#64748b', weight: 1, dashArray: '3 3' }]
 ];
 export const visionLineStyle = (name) => (LINE_STYLES.find(([re]) => re.test(name || '')) || [null, { color: '#e2e8f0', weight: 1.5, dashArray: '4 4' }])[1];
+
+const HA_FORMAT = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+
+/** Hecta: thuộc tính a (ha) nếu > 0, không thì diện tích địa đo areaM2 / 10.000. */
+export function zoneAreaHa(properties, areaM2) {
+  const attr = Number(properties && properties.a);
+  if (attr > 0) return attr;
+  const m2 = Number(areaM2);
+  if (!(m2 > 0)) return null;
+  return m2 / 10000;
+}
+
+export function zoneAreaHtml(properties, areaM2) {
+  const ha = zoneAreaHa(properties, areaM2);
+  if (!(ha > 0)) return '';
+  return `<div class="qhc-pop-area">Diện tích: <b>${HA_FORMAT.format(ha)} ha</b></div>`;
+}

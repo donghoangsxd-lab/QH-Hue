@@ -26,7 +26,7 @@ import { isLevelPair, sideOf, mapsForLevel, onSplitPair } from './splitPair.js';
 import { withAssetVersion } from './gbaVersion.js';
 import {
   QHC2045, QHC_CENTER_INFO_EVENT, CENTER_UNITS, ZONE_NAMES, STAGE_LAYERS, landOf, bareWard, isCoreWard,
-  visionColor, visionLineStyle, WATER_KINDS, GREEN_COLOR
+  visionColor, visionLineStyle, zoneAreaHtml, WATER_KINDS, GREEN_COLOR
 } from './qhc2045.js';
 import {
   loadTraffic, trafficStyles, trafficRank, trafficPopupHtml, trafficKey, trafficGlowColor, isRail, ROAD_FOCUS_EVENT, ROAD_FOCUS_STATE
@@ -854,9 +854,14 @@ function openVisionPopup(f, latlng) {
   const cats = data.vision.cats;
   const zone = cats.zones[f.properties.k] || 'Khác';
   const desc = cats.funcs[f.properties.f] || '';
+  let areaM2 = null;
+  if (typeof turf !== 'undefined' && f.geometry) {
+    try { areaM2 = turf.area(f); } catch (e) { areaM2 = null; }
+  }
   const html = `<div class="qhc-pop">
       <div class="qhc-pop-head"><i class="qhc-sw" style="background:${visionColor(zone)}"></i><b>${escapeHtml(zone)}</b></div>
       ${f.properties.n ? `<div>${escapeHtml(f.properties.n)}</div>` : ''}
+      ${zoneAreaHtml(f.properties, areaM2)}
       ${desc ? `<p class="qhc-pop-desc">${escapeHtml(desc)}</p>` : ''}
       <div class="qhc-pop-src">${escapeHtml(QHC2045.short)} · Sơ đồ tổ chức không gian 1/25.000 · <span class="qhc-flag">${escapeHtml(QHC2045.status)}</span></div>
     </div>`;
