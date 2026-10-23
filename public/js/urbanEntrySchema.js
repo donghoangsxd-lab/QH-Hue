@@ -2,6 +2,7 @@
 // Số «có sẵn» lấy từ bảng phường (dân số, diện tích). Đô thị một phần xã không được dùng số cả xã.
 import { WARD_NAMES, areaCodeFromName } from './facetStore.js';
 import { bareName } from './urbanStatus.js';
+import { PART_BOUNDS } from './urbanPartGeom.js';
 
 export const ENTRY_STORE_KEY = 'qh_urban_entry_v1';
 export const OFFICER_STORE_KEY = 'qh_entry_officer_v1';
@@ -109,16 +110,21 @@ function urbanFieldRows(u) {
     out.push(row(u.name, u.key, 'Tỷ lệ phường đạt trình độ loại II', '1.II.10', 'khong-nhap', 'Cần Bảng 2B. Webapp chưa chấm Bảng 2B, không có ô nhập.'));
     return out;
   }
-  out.push(row(u.name, u.key, 'Ranh giới đô thị', '', partial ? 'thieu' : 'co-san',
-    partial ? `Một phần xã ${u.partial}. Chưa có ranh riêng nên chưa chấm các tiêu chuẩn không gian.` : 'Ghép từ ranh phường, xã trong phạm vi.'));
-  out.push(row(u.name, u.key, 'Dân số phần đô thị', '2A.II.03', partial ? 'thieu' : 'co-san',
-    partial ? 'Không lấy dân số cả xã. Cán bộ nhập dân số phần đô thị.' : 'Cộng dân số hiện trạng các phường, xã trong phạm vi.', 'danSo'));
-  out.push(row(u.name, u.key, 'Diện tích tự nhiên', '2A.II.04', partial ? 'thieu' : 'co-san',
-    partial ? 'Không lấy diện tích cả xã.' : 'Cộng diện tích các phường, xã. Mật độ trên diện tích tự nhiên được miễn với đô thị di sản.', 'dienTich'));
+  const bound = partial ? PART_BOUNDS[u.id] : null;
+  out.push(row(u.name, u.key, 'Ranh giới đô thị', '', bound || !partial ? 'co-san' : 'thieu',
+    bound ? `Polygon ${u.id} trong public/data/urban614.geojson, ${bound.km2} km², trong xã ${u.partial}.`
+      : (partial ? `Một phần xã ${u.partial}. Chưa có ranh riêng.` : 'Ghép từ ranh phường, xã trong phạm vi.')));
+  out.push(row(u.name, u.key, 'Dân số phần đô thị', '2A.II.03', bound ? 'phu-thuoc' : (partial ? 'thieu' : 'co-san'),
+    bound ? `Dân số xã ${u.partial} × ${bound.km2} km² / diện tích xã. Ô nhập để đính chính.`
+      : (partial ? 'Không lấy dân số cả xã. Cán bộ nhập dân số phần đô thị.' : 'Cộng dân số hiện trạng các phường, xã trong phạm vi.'), 'danSo'));
+  out.push(row(u.name, u.key, 'Diện tích tự nhiên', '2A.II.04', bound || !partial ? 'co-san' : 'thieu',
+    bound ? `Diện tích polygon ${bound.km2} km². Mật độ dân số vẫn được miễn với đô thị di sản.`
+      : (partial ? 'Không lấy diện tích cả xã.' : 'Cộng diện tích các phường, xã. Mật độ trên diện tích tự nhiên được miễn với đô thị di sản.'), 'dienTich'));
   out.push(row(u.name, u.key, 'Mật độ dân số', '2A.II.04', 'mien', 'Điều 8 khoản 2 điểm d: không xem xét, tính điểm tối thiểu.'));
   out.push(row(u.name, u.key, 'Dân số tạm trú cộng thêm', '', 'bo-sung', 'Dân số phường chưa tách tạm trú.', 'danSoTamTru'));
-  out.push(row(u.name, u.key, 'Mật độ đường', '2A.III.07', partial ? 'thieu' : 'phu-thuoc',
-    partial ? 'Chưa có ranh nên không chia mạng đường. Có ô nhập.' : 'Tính từ OpenStreetMap và đất xây dựng nếu đủ. Ô nhập dùng khi thiếu.', 'matDoDuong'));
+  out.push(row(u.name, u.key, 'Mật độ đường', '2A.III.07', bound || !partial ? 'phu-thuoc' : 'thieu',
+    bound ? 'Bằng mật độ đường của xã chủ: chiều dài đường và đất xây dựng chỉ có theo xã. Ô nhập để đính chính.'
+      : (partial ? 'Chưa có ranh nên không chia mạng đường. Có ô nhập.' : 'Tính từ OpenStreetMap và đất xây dựng nếu đủ. Ô nhập dùng khi thiếu.'), 'matDoDuong'));
   ENTRY_FIELDS.filter(f => f.code && f.code.startsWith('2A.') && !f.override).forEach(f => {
     out.push(row(u.name, u.key, f.label, f.code, 'thieu', 'Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính.', f.key));
   });
@@ -134,8 +140,11 @@ function wardFieldRows(name) {
     row(name, key, 'Diện tích cả xã, phường', '2A.II.04', 'co-san', 'Cột diện tích bảng phường. Ô nhập chỉ để đính chính.', 'dienTich')
   ];
   if (host) {
-    out.push(row(name, key, 'Dân số phần đô thị', '2A.II.03', 'thieu', `Nhập tại ${host.name}, không dùng dân số cả xã.`));
-    out.push(row(name, key, 'Diện tích phần đô thị', '2A.II.04', 'thieu', `Nhập tại ${host.name}, không dùng diện tích cả xã.`));
+    const bound = PART_BOUNDS[host.id];
+    out.push(row(name, key, 'Dân số phần đô thị', '2A.II.03', bound ? 'phu-thuoc' : 'thieu',
+      bound ? `Ước tại ${host.name}: dân số cả xã × ${bound.km2} km² / diện tích xã.` : `Nhập tại ${host.name}, không dùng dân số cả xã.`));
+    out.push(row(name, key, 'Diện tích phần đô thị', '2A.II.04', bound ? 'co-san' : 'thieu',
+      bound ? `${bound.km2} km², polygon ${host.id} trong public/data/urban614.geojson.` : `Nhập tại ${host.name}, không dùng diện tích cả xã.`));
   }
   ENTRY_FIELDS.filter(f => f.scopes.includes('xa') && !f.override).forEach(f => {
     out.push(row(name, key, f.label, f.code, 'thieu', 'Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm.', f.key));
@@ -170,7 +179,7 @@ export function gapMarkdown() {
     '',
     'Nguồn đối chiếu: `urbanClass.js` (Nghị quyết 111/2025/UBTVQH15, Quyết định 756/QĐ-UBND). Bảng này là lúc chưa có số cán bộ nhập.',
     '',
-    `Tổng ${counts.rows} ô (đơn vị × trường). Trong đó **${counts.thieu} ô thiếu**. ${counts.partialDanSo} đô thị mới chưa có ranh nên không chấm được bằng số cả xã.`,
+    `Tổng ${counts.rows} ô (đơn vị × trường). Trong đó **${counts.thieu} ô thiếu**. ${counts.partialDanSo} đô thị một phần xã lấy ranh từ public/data/urban614.geojson; dân số ước theo tỷ lệ diện tích, không còn ô thiếu cho ranh, dân số, diện tích và mật độ đường của các đô thị đó.`,
     '',
     'Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng phường hoặc ranh; Miễn = không xem xét với đô thị di sản; Phụ thuộc = tính được nếu dữ liệu nền đủ, vẫn có ô nhập; Bổ sung = nên có, chưa chặn chấm; Không nhập = chưa có cách chấm (Bảng 2B).',
     '',

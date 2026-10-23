@@ -2,7 +2,7 @@
 
 Nguồn đối chiếu: `urbanClass.js` (Nghị quyết 111/2025/UBTVQH15, Quyết định 756/QĐ-UBND). Bảng này là lúc chưa có số cán bộ nhập.
 
-Tổng 696 ô (đơn vị × trường). Trong đó **546 ô thiếu**. 6 đô thị mới chưa có ranh nên không chấm được bằng số cả xã.
+Tổng 696 ô (đơn vị × trường). Trong đó **510 ô thiếu**. 6 đô thị một phần xã lấy ranh từ public/data/urban614.geojson; dân số ước theo tỷ lệ diện tích, không còn ô thiếu cho ranh, dân số, diện tích và mật độ đường của các đô thị đó.
 
 Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng phường hoặc ranh; Miễn = không xem xét với đô thị di sản; Phụ thuộc = tính được nếu dữ liệu nền đủ, vẫn có ô nhập; Bổ sung = nên có, chưa chặn chấm; Không nhập = chưa có cách chấm (Bảng 2B).
 
@@ -184,12 +184,12 @@ Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng
 | Đô thị A Lưới 2 | dothi:a-luoi-2 | Vai trò đô thị trung tâm | 2A.I.02 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị A Lưới 2 | dothi:a-luoi-2 | Đầu mối giao thông | 2A.III.06 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị A Lưới 2 | dothi:a-luoi-2 | Quy chế quản lý kiến trúc đô thị | 2A.III.23 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
-| Đô thị mới Vinh Thanh | dothi:vinh-thanh | Ranh giới đô thị |  | Thiếu | Một phần xã Phú Vinh. Chưa có ranh riêng nên chưa chấm các tiêu chuẩn không gian. |
-| Đô thị mới Vinh Thanh | dothi:vinh-thanh | Dân số phần đô thị | 2A.II.03 | Thiếu | Không lấy dân số cả xã. Cán bộ nhập dân số phần đô thị. |
-| Đô thị mới Vinh Thanh | dothi:vinh-thanh | Diện tích tự nhiên | 2A.II.04 | Thiếu | Không lấy diện tích cả xã. |
+| Đô thị mới Vinh Thanh | dothi:vinh-thanh | Ranh giới đô thị |  | Có sẵn | Polygon vinh-thanh trong public/data/urban614.geojson, 10.44 km², trong xã Phú Vinh. |
+| Đô thị mới Vinh Thanh | dothi:vinh-thanh | Dân số phần đô thị | 2A.II.03 | Phụ thuộc | Dân số xã Phú Vinh × 10.44 km² / diện tích xã. Ô nhập để đính chính. |
+| Đô thị mới Vinh Thanh | dothi:vinh-thanh | Diện tích tự nhiên | 2A.II.04 | Có sẵn | Diện tích polygon 10.44 km². Mật độ dân số vẫn được miễn với đô thị di sản. |
 | Đô thị mới Vinh Thanh | dothi:vinh-thanh | Mật độ dân số | 2A.II.04 | Miễn | Điều 8 khoản 2 điểm d: không xem xét, tính điểm tối thiểu. |
 | Đô thị mới Vinh Thanh | dothi:vinh-thanh | Dân số tạm trú cộng thêm |  | Bổ sung | Dân số phường chưa tách tạm trú. |
-| Đô thị mới Vinh Thanh | dothi:vinh-thanh | Mật độ đường | 2A.III.07 | Thiếu | Chưa có ranh nên không chia mạng đường. Có ô nhập. |
+| Đô thị mới Vinh Thanh | dothi:vinh-thanh | Mật độ đường | 2A.III.07 | Phụ thuộc | Bằng mật độ đường của xã chủ: chiều dài đường và đất xây dựng chỉ có theo xã. Ô nhập để đính chính. |
 | Đô thị mới Vinh Thanh | dothi:vinh-thanh | Tỷ lệ lao động phi nông nghiệp | 2A.II.05 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Vinh Thanh | dothi:vinh-thanh | Dân số được cấp nước sạch tập trung | 2A.III.08 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Vinh Thanh | dothi:vinh-thanh | Mật độ đường cống thoát nước chính | 2A.III.09 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
@@ -202,12 +202,12 @@ Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng
 | Đô thị mới Vinh Thanh | dothi:vinh-thanh | Vai trò đô thị trung tâm | 2A.I.02 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Vinh Thanh | dothi:vinh-thanh | Đầu mối giao thông | 2A.III.06 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Vinh Thanh | dothi:vinh-thanh | Quy chế quản lý kiến trúc đô thị | 2A.III.23 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
-| Đô thị mới Phú Đa | dothi:phu-da | Ranh giới đô thị |  | Thiếu | Một phần xã Phú Vang. Chưa có ranh riêng nên chưa chấm các tiêu chuẩn không gian. |
-| Đô thị mới Phú Đa | dothi:phu-da | Dân số phần đô thị | 2A.II.03 | Thiếu | Không lấy dân số cả xã. Cán bộ nhập dân số phần đô thị. |
-| Đô thị mới Phú Đa | dothi:phu-da | Diện tích tự nhiên | 2A.II.04 | Thiếu | Không lấy diện tích cả xã. |
+| Đô thị mới Phú Đa | dothi:phu-da | Ranh giới đô thị |  | Có sẵn | Polygon phu-da trong public/data/urban614.geojson, 29.84 km², trong xã Phú Vang. |
+| Đô thị mới Phú Đa | dothi:phu-da | Dân số phần đô thị | 2A.II.03 | Phụ thuộc | Dân số xã Phú Vang × 29.84 km² / diện tích xã. Ô nhập để đính chính. |
+| Đô thị mới Phú Đa | dothi:phu-da | Diện tích tự nhiên | 2A.II.04 | Có sẵn | Diện tích polygon 29.84 km². Mật độ dân số vẫn được miễn với đô thị di sản. |
 | Đô thị mới Phú Đa | dothi:phu-da | Mật độ dân số | 2A.II.04 | Miễn | Điều 8 khoản 2 điểm d: không xem xét, tính điểm tối thiểu. |
 | Đô thị mới Phú Đa | dothi:phu-da | Dân số tạm trú cộng thêm |  | Bổ sung | Dân số phường chưa tách tạm trú. |
-| Đô thị mới Phú Đa | dothi:phu-da | Mật độ đường | 2A.III.07 | Thiếu | Chưa có ranh nên không chia mạng đường. Có ô nhập. |
+| Đô thị mới Phú Đa | dothi:phu-da | Mật độ đường | 2A.III.07 | Phụ thuộc | Bằng mật độ đường của xã chủ: chiều dài đường và đất xây dựng chỉ có theo xã. Ô nhập để đính chính. |
 | Đô thị mới Phú Đa | dothi:phu-da | Tỷ lệ lao động phi nông nghiệp | 2A.II.05 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Phú Đa | dothi:phu-da | Dân số được cấp nước sạch tập trung | 2A.III.08 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Phú Đa | dothi:phu-da | Mật độ đường cống thoát nước chính | 2A.III.09 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
@@ -220,12 +220,12 @@ Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng
 | Đô thị mới Phú Đa | dothi:phu-da | Vai trò đô thị trung tâm | 2A.I.02 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Phú Đa | dothi:phu-da | Đầu mối giao thông | 2A.III.06 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Phú Đa | dothi:phu-da | Quy chế quản lý kiến trúc đô thị | 2A.III.23 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
-| Đô thị mới Lộc Sơn | dothi:loc-son | Ranh giới đô thị |  | Thiếu | Một phần xã Hưng Lộc. Chưa có ranh riêng nên chưa chấm các tiêu chuẩn không gian. |
-| Đô thị mới Lộc Sơn | dothi:loc-son | Dân số phần đô thị | 2A.II.03 | Thiếu | Không lấy dân số cả xã. Cán bộ nhập dân số phần đô thị. |
-| Đô thị mới Lộc Sơn | dothi:loc-son | Diện tích tự nhiên | 2A.II.04 | Thiếu | Không lấy diện tích cả xã. |
+| Đô thị mới Lộc Sơn | dothi:loc-son | Ranh giới đô thị |  | Có sẵn | Polygon loc-son trong public/data/urban614.geojson, 18.82 km², trong xã Hưng Lộc. |
+| Đô thị mới Lộc Sơn | dothi:loc-son | Dân số phần đô thị | 2A.II.03 | Phụ thuộc | Dân số xã Hưng Lộc × 18.82 km² / diện tích xã. Ô nhập để đính chính. |
+| Đô thị mới Lộc Sơn | dothi:loc-son | Diện tích tự nhiên | 2A.II.04 | Có sẵn | Diện tích polygon 18.82 km². Mật độ dân số vẫn được miễn với đô thị di sản. |
 | Đô thị mới Lộc Sơn | dothi:loc-son | Mật độ dân số | 2A.II.04 | Miễn | Điều 8 khoản 2 điểm d: không xem xét, tính điểm tối thiểu. |
 | Đô thị mới Lộc Sơn | dothi:loc-son | Dân số tạm trú cộng thêm |  | Bổ sung | Dân số phường chưa tách tạm trú. |
-| Đô thị mới Lộc Sơn | dothi:loc-son | Mật độ đường | 2A.III.07 | Thiếu | Chưa có ranh nên không chia mạng đường. Có ô nhập. |
+| Đô thị mới Lộc Sơn | dothi:loc-son | Mật độ đường | 2A.III.07 | Phụ thuộc | Bằng mật độ đường của xã chủ: chiều dài đường và đất xây dựng chỉ có theo xã. Ô nhập để đính chính. |
 | Đô thị mới Lộc Sơn | dothi:loc-son | Tỷ lệ lao động phi nông nghiệp | 2A.II.05 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Lộc Sơn | dothi:loc-son | Dân số được cấp nước sạch tập trung | 2A.III.08 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Lộc Sơn | dothi:loc-son | Mật độ đường cống thoát nước chính | 2A.III.09 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
@@ -238,12 +238,12 @@ Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng
 | Đô thị mới Lộc Sơn | dothi:loc-son | Vai trò đô thị trung tâm | 2A.I.02 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Lộc Sơn | dothi:loc-son | Đầu mối giao thông | 2A.III.06 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Lộc Sơn | dothi:loc-son | Quy chế quản lý kiến trúc đô thị | 2A.III.23 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
-| Đô thị mới Khe Tre | dothi:khe-tre | Ranh giới đô thị |  | Thiếu | Một phần xã Khe Tre. Chưa có ranh riêng nên chưa chấm các tiêu chuẩn không gian. |
-| Đô thị mới Khe Tre | dothi:khe-tre | Dân số phần đô thị | 2A.II.03 | Thiếu | Không lấy dân số cả xã. Cán bộ nhập dân số phần đô thị. |
-| Đô thị mới Khe Tre | dothi:khe-tre | Diện tích tự nhiên | 2A.II.04 | Thiếu | Không lấy diện tích cả xã. |
+| Đô thị mới Khe Tre | dothi:khe-tre | Ranh giới đô thị |  | Có sẵn | Polygon khe-tre trong public/data/urban614.geojson, 4.34 km², trong xã Khe Tre. |
+| Đô thị mới Khe Tre | dothi:khe-tre | Dân số phần đô thị | 2A.II.03 | Phụ thuộc | Dân số xã Khe Tre × 4.34 km² / diện tích xã. Ô nhập để đính chính. |
+| Đô thị mới Khe Tre | dothi:khe-tre | Diện tích tự nhiên | 2A.II.04 | Có sẵn | Diện tích polygon 4.34 km². Mật độ dân số vẫn được miễn với đô thị di sản. |
 | Đô thị mới Khe Tre | dothi:khe-tre | Mật độ dân số | 2A.II.04 | Miễn | Điều 8 khoản 2 điểm d: không xem xét, tính điểm tối thiểu. |
 | Đô thị mới Khe Tre | dothi:khe-tre | Dân số tạm trú cộng thêm |  | Bổ sung | Dân số phường chưa tách tạm trú. |
-| Đô thị mới Khe Tre | dothi:khe-tre | Mật độ đường | 2A.III.07 | Thiếu | Chưa có ranh nên không chia mạng đường. Có ô nhập. |
+| Đô thị mới Khe Tre | dothi:khe-tre | Mật độ đường | 2A.III.07 | Phụ thuộc | Bằng mật độ đường của xã chủ: chiều dài đường và đất xây dựng chỉ có theo xã. Ô nhập để đính chính. |
 | Đô thị mới Khe Tre | dothi:khe-tre | Tỷ lệ lao động phi nông nghiệp | 2A.II.05 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Khe Tre | dothi:khe-tre | Dân số được cấp nước sạch tập trung | 2A.III.08 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Khe Tre | dothi:khe-tre | Mật độ đường cống thoát nước chính | 2A.III.09 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
@@ -256,12 +256,12 @@ Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng
 | Đô thị mới Khe Tre | dothi:khe-tre | Vai trò đô thị trung tâm | 2A.I.02 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Khe Tre | dothi:khe-tre | Đầu mối giao thông | 2A.III.06 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Khe Tre | dothi:khe-tre | Quy chế quản lý kiến trúc đô thị | 2A.III.23 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
-| Đô thị mới Phú Lộc | dothi:phu-loc | Ranh giới đô thị |  | Thiếu | Một phần xã Phú Lộc. Chưa có ranh riêng nên chưa chấm các tiêu chuẩn không gian. |
-| Đô thị mới Phú Lộc | dothi:phu-loc | Dân số phần đô thị | 2A.II.03 | Thiếu | Không lấy dân số cả xã. Cán bộ nhập dân số phần đô thị. |
-| Đô thị mới Phú Lộc | dothi:phu-loc | Diện tích tự nhiên | 2A.II.04 | Thiếu | Không lấy diện tích cả xã. |
+| Đô thị mới Phú Lộc | dothi:phu-loc | Ranh giới đô thị |  | Có sẵn | Polygon phu-loc trong public/data/urban614.geojson, 29.98 km², trong xã Phú Lộc. |
+| Đô thị mới Phú Lộc | dothi:phu-loc | Dân số phần đô thị | 2A.II.03 | Phụ thuộc | Dân số xã Phú Lộc × 29.98 km² / diện tích xã. Ô nhập để đính chính. |
+| Đô thị mới Phú Lộc | dothi:phu-loc | Diện tích tự nhiên | 2A.II.04 | Có sẵn | Diện tích polygon 29.98 km². Mật độ dân số vẫn được miễn với đô thị di sản. |
 | Đô thị mới Phú Lộc | dothi:phu-loc | Mật độ dân số | 2A.II.04 | Miễn | Điều 8 khoản 2 điểm d: không xem xét, tính điểm tối thiểu. |
 | Đô thị mới Phú Lộc | dothi:phu-loc | Dân số tạm trú cộng thêm |  | Bổ sung | Dân số phường chưa tách tạm trú. |
-| Đô thị mới Phú Lộc | dothi:phu-loc | Mật độ đường | 2A.III.07 | Thiếu | Chưa có ranh nên không chia mạng đường. Có ô nhập. |
+| Đô thị mới Phú Lộc | dothi:phu-loc | Mật độ đường | 2A.III.07 | Phụ thuộc | Bằng mật độ đường của xã chủ: chiều dài đường và đất xây dựng chỉ có theo xã. Ô nhập để đính chính. |
 | Đô thị mới Phú Lộc | dothi:phu-loc | Tỷ lệ lao động phi nông nghiệp | 2A.II.05 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Phú Lộc | dothi:phu-loc | Dân số được cấp nước sạch tập trung | 2A.III.08 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Phú Lộc | dothi:phu-loc | Mật độ đường cống thoát nước chính | 2A.III.09 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
@@ -274,12 +274,12 @@ Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng
 | Đô thị mới Phú Lộc | dothi:phu-loc | Vai trò đô thị trung tâm | 2A.I.02 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Phú Lộc | dothi:phu-loc | Đầu mối giao thông | 2A.III.06 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Phú Lộc | dothi:phu-loc | Quy chế quản lý kiến trúc đô thị | 2A.III.23 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
-| Đô thị mới Vinh Hiền | dothi:vinh-hien | Ranh giới đô thị |  | Thiếu | Một phần xã Vinh Lộc. Chưa có ranh riêng nên chưa chấm các tiêu chuẩn không gian. |
-| Đô thị mới Vinh Hiền | dothi:vinh-hien | Dân số phần đô thị | 2A.II.03 | Thiếu | Không lấy dân số cả xã. Cán bộ nhập dân số phần đô thị. |
-| Đô thị mới Vinh Hiền | dothi:vinh-hien | Diện tích tự nhiên | 2A.II.04 | Thiếu | Không lấy diện tích cả xã. |
+| Đô thị mới Vinh Hiền | dothi:vinh-hien | Ranh giới đô thị |  | Có sẵn | Polygon vinh-hien trong public/data/urban614.geojson, 19.59 km², trong xã Vinh Lộc. |
+| Đô thị mới Vinh Hiền | dothi:vinh-hien | Dân số phần đô thị | 2A.II.03 | Phụ thuộc | Dân số xã Vinh Lộc × 19.59 km² / diện tích xã. Ô nhập để đính chính. |
+| Đô thị mới Vinh Hiền | dothi:vinh-hien | Diện tích tự nhiên | 2A.II.04 | Có sẵn | Diện tích polygon 19.59 km². Mật độ dân số vẫn được miễn với đô thị di sản. |
 | Đô thị mới Vinh Hiền | dothi:vinh-hien | Mật độ dân số | 2A.II.04 | Miễn | Điều 8 khoản 2 điểm d: không xem xét, tính điểm tối thiểu. |
 | Đô thị mới Vinh Hiền | dothi:vinh-hien | Dân số tạm trú cộng thêm |  | Bổ sung | Dân số phường chưa tách tạm trú. |
-| Đô thị mới Vinh Hiền | dothi:vinh-hien | Mật độ đường | 2A.III.07 | Thiếu | Chưa có ranh nên không chia mạng đường. Có ô nhập. |
+| Đô thị mới Vinh Hiền | dothi:vinh-hien | Mật độ đường | 2A.III.07 | Phụ thuộc | Bằng mật độ đường của xã chủ: chiều dài đường và đất xây dựng chỉ có theo xã. Ô nhập để đính chính. |
 | Đô thị mới Vinh Hiền | dothi:vinh-hien | Tỷ lệ lao động phi nông nghiệp | 2A.II.05 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Vinh Hiền | dothi:vinh-hien | Dân số được cấp nước sạch tập trung | 2A.III.08 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
 | Đô thị mới Vinh Hiền | dothi:vinh-hien | Mật độ đường cống thoát nước chính | 2A.III.09 | Thiếu | Chưa có số liệu trong webapp. Cán bộ nhập ở luồng Hành chính. |
@@ -584,8 +584,8 @@ Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng
 | Xã Đan Điền | xa:dan-dien | Tỷ lệ diện tích không gian xanh trên diện tích tự nhiên | 2A.III.21 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Hưng Lộc | xa:hung-loc | Dân số cả xã, phường | 2A.II.03 | Có sẵn | Cột dân số bảng phường. Ô nhập chỉ để đính chính. |
 | Xã Hưng Lộc | xa:hung-loc | Diện tích cả xã, phường | 2A.II.04 | Có sẵn | Cột diện tích bảng phường. Ô nhập chỉ để đính chính. |
-| Xã Hưng Lộc | xa:hung-loc | Dân số phần đô thị | 2A.II.03 | Thiếu | Nhập tại Đô thị mới Lộc Sơn, không dùng dân số cả xã. |
-| Xã Hưng Lộc | xa:hung-loc | Diện tích phần đô thị | 2A.II.04 | Thiếu | Nhập tại Đô thị mới Lộc Sơn, không dùng diện tích cả xã. |
+| Xã Hưng Lộc | xa:hung-loc | Dân số phần đô thị | 2A.II.03 | Phụ thuộc | Ước tại Đô thị mới Lộc Sơn: dân số cả xã × 18.82 km² / diện tích xã. |
+| Xã Hưng Lộc | xa:hung-loc | Diện tích phần đô thị | 2A.II.04 | Có sẵn | 18.82 km², polygon loc-son trong public/data/urban614.geojson. |
 | Xã Hưng Lộc | xa:hung-loc | Tỷ lệ lao động phi nông nghiệp | 2A.II.05 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Hưng Lộc | xa:hung-loc | Dân số được cấp nước sạch tập trung | 2A.III.08 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Hưng Lộc | xa:hung-loc | Mật độ đường cống thoát nước chính | 2A.III.09 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
@@ -596,8 +596,8 @@ Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng
 | Xã Hưng Lộc | xa:hung-loc | Tỷ lệ diện tích không gian xanh trên diện tích tự nhiên | 2A.III.21 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Khe Tre | xa:khe-tre | Dân số cả xã, phường | 2A.II.03 | Có sẵn | Cột dân số bảng phường. Ô nhập chỉ để đính chính. |
 | Xã Khe Tre | xa:khe-tre | Diện tích cả xã, phường | 2A.II.04 | Có sẵn | Cột diện tích bảng phường. Ô nhập chỉ để đính chính. |
-| Xã Khe Tre | xa:khe-tre | Dân số phần đô thị | 2A.II.03 | Thiếu | Nhập tại Đô thị mới Khe Tre, không dùng dân số cả xã. |
-| Xã Khe Tre | xa:khe-tre | Diện tích phần đô thị | 2A.II.04 | Thiếu | Nhập tại Đô thị mới Khe Tre, không dùng diện tích cả xã. |
+| Xã Khe Tre | xa:khe-tre | Dân số phần đô thị | 2A.II.03 | Phụ thuộc | Ước tại Đô thị mới Khe Tre: dân số cả xã × 4.34 km² / diện tích xã. |
+| Xã Khe Tre | xa:khe-tre | Diện tích phần đô thị | 2A.II.04 | Có sẵn | 4.34 km², polygon khe-tre trong public/data/urban614.geojson. |
 | Xã Khe Tre | xa:khe-tre | Tỷ lệ lao động phi nông nghiệp | 2A.II.05 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Khe Tre | xa:khe-tre | Dân số được cấp nước sạch tập trung | 2A.III.08 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Khe Tre | xa:khe-tre | Mật độ đường cống thoát nước chính | 2A.III.09 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
@@ -648,8 +648,8 @@ Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng
 | Xã Phú Hồ | xa:phu-ho | Tỷ lệ diện tích không gian xanh trên diện tích tự nhiên | 2A.III.21 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Phú Lộc | xa:phu-loc | Dân số cả xã, phường | 2A.II.03 | Có sẵn | Cột dân số bảng phường. Ô nhập chỉ để đính chính. |
 | Xã Phú Lộc | xa:phu-loc | Diện tích cả xã, phường | 2A.II.04 | Có sẵn | Cột diện tích bảng phường. Ô nhập chỉ để đính chính. |
-| Xã Phú Lộc | xa:phu-loc | Dân số phần đô thị | 2A.II.03 | Thiếu | Nhập tại Đô thị mới Phú Lộc, không dùng dân số cả xã. |
-| Xã Phú Lộc | xa:phu-loc | Diện tích phần đô thị | 2A.II.04 | Thiếu | Nhập tại Đô thị mới Phú Lộc, không dùng diện tích cả xã. |
+| Xã Phú Lộc | xa:phu-loc | Dân số phần đô thị | 2A.II.03 | Phụ thuộc | Ước tại Đô thị mới Phú Lộc: dân số cả xã × 29.98 km² / diện tích xã. |
+| Xã Phú Lộc | xa:phu-loc | Diện tích phần đô thị | 2A.II.04 | Có sẵn | 29.98 km², polygon phu-loc trong public/data/urban614.geojson. |
 | Xã Phú Lộc | xa:phu-loc | Tỷ lệ lao động phi nông nghiệp | 2A.II.05 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Phú Lộc | xa:phu-loc | Dân số được cấp nước sạch tập trung | 2A.III.08 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Phú Lộc | xa:phu-loc | Mật độ đường cống thoát nước chính | 2A.III.09 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
@@ -660,8 +660,8 @@ Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng
 | Xã Phú Lộc | xa:phu-loc | Tỷ lệ diện tích không gian xanh trên diện tích tự nhiên | 2A.III.21 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Phú Vang | xa:phu-vang | Dân số cả xã, phường | 2A.II.03 | Có sẵn | Cột dân số bảng phường. Ô nhập chỉ để đính chính. |
 | Xã Phú Vang | xa:phu-vang | Diện tích cả xã, phường | 2A.II.04 | Có sẵn | Cột diện tích bảng phường. Ô nhập chỉ để đính chính. |
-| Xã Phú Vang | xa:phu-vang | Dân số phần đô thị | 2A.II.03 | Thiếu | Nhập tại Đô thị mới Phú Đa, không dùng dân số cả xã. |
-| Xã Phú Vang | xa:phu-vang | Diện tích phần đô thị | 2A.II.04 | Thiếu | Nhập tại Đô thị mới Phú Đa, không dùng diện tích cả xã. |
+| Xã Phú Vang | xa:phu-vang | Dân số phần đô thị | 2A.II.03 | Phụ thuộc | Ước tại Đô thị mới Phú Đa: dân số cả xã × 29.84 km² / diện tích xã. |
+| Xã Phú Vang | xa:phu-vang | Diện tích phần đô thị | 2A.II.04 | Có sẵn | 29.84 km², polygon phu-da trong public/data/urban614.geojson. |
 | Xã Phú Vang | xa:phu-vang | Tỷ lệ lao động phi nông nghiệp | 2A.II.05 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Phú Vang | xa:phu-vang | Dân số được cấp nước sạch tập trung | 2A.III.08 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Phú Vang | xa:phu-vang | Mật độ đường cống thoát nước chính | 2A.III.09 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
@@ -672,8 +672,8 @@ Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng
 | Xã Phú Vang | xa:phu-vang | Tỷ lệ diện tích không gian xanh trên diện tích tự nhiên | 2A.III.21 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Phú Vinh | xa:phu-vinh | Dân số cả xã, phường | 2A.II.03 | Có sẵn | Cột dân số bảng phường. Ô nhập chỉ để đính chính. |
 | Xã Phú Vinh | xa:phu-vinh | Diện tích cả xã, phường | 2A.II.04 | Có sẵn | Cột diện tích bảng phường. Ô nhập chỉ để đính chính. |
-| Xã Phú Vinh | xa:phu-vinh | Dân số phần đô thị | 2A.II.03 | Thiếu | Nhập tại Đô thị mới Vinh Thanh, không dùng dân số cả xã. |
-| Xã Phú Vinh | xa:phu-vinh | Diện tích phần đô thị | 2A.II.04 | Thiếu | Nhập tại Đô thị mới Vinh Thanh, không dùng diện tích cả xã. |
+| Xã Phú Vinh | xa:phu-vinh | Dân số phần đô thị | 2A.II.03 | Phụ thuộc | Ước tại Đô thị mới Vinh Thanh: dân số cả xã × 10.44 km² / diện tích xã. |
+| Xã Phú Vinh | xa:phu-vinh | Diện tích phần đô thị | 2A.II.04 | Có sẵn | 10.44 km², polygon vinh-thanh trong public/data/urban614.geojson. |
 | Xã Phú Vinh | xa:phu-vinh | Tỷ lệ lao động phi nông nghiệp | 2A.II.05 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Phú Vinh | xa:phu-vinh | Dân số được cấp nước sạch tập trung | 2A.III.08 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Phú Vinh | xa:phu-vinh | Mật độ đường cống thoát nước chính | 2A.III.09 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
@@ -694,8 +694,8 @@ Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng
 | Xã Quảng Điền | xa:quang-dien | Tỷ lệ diện tích không gian xanh trên diện tích tự nhiên | 2A.III.21 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Vinh Lộc | xa:vinh-loc | Dân số cả xã, phường | 2A.II.03 | Có sẵn | Cột dân số bảng phường. Ô nhập chỉ để đính chính. |
 | Xã Vinh Lộc | xa:vinh-loc | Diện tích cả xã, phường | 2A.II.04 | Có sẵn | Cột diện tích bảng phường. Ô nhập chỉ để đính chính. |
-| Xã Vinh Lộc | xa:vinh-loc | Dân số phần đô thị | 2A.II.03 | Thiếu | Nhập tại Đô thị mới Vinh Hiền, không dùng dân số cả xã. |
-| Xã Vinh Lộc | xa:vinh-loc | Diện tích phần đô thị | 2A.II.04 | Thiếu | Nhập tại Đô thị mới Vinh Hiền, không dùng diện tích cả xã. |
+| Xã Vinh Lộc | xa:vinh-loc | Dân số phần đô thị | 2A.II.03 | Phụ thuộc | Ước tại Đô thị mới Vinh Hiền: dân số cả xã × 19.59 km² / diện tích xã. |
+| Xã Vinh Lộc | xa:vinh-loc | Diện tích phần đô thị | 2A.II.04 | Có sẵn | 19.59 km², polygon vinh-hien trong public/data/urban614.geojson. |
 | Xã Vinh Lộc | xa:vinh-loc | Tỷ lệ lao động phi nông nghiệp | 2A.II.05 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Vinh Lộc | xa:vinh-loc | Dân số được cấp nước sạch tập trung | 2A.III.08 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
 | Xã Vinh Lộc | xa:vinh-loc | Mật độ đường cống thoát nước chính | 2A.III.09 | Thiếu | Cán bộ xã nhập. Đô thị cha dùng số của đô thị nếu đã có; chưa có thì còn thiếu khi chấm. |
