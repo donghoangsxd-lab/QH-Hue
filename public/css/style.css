@@ -5550,6 +5550,18 @@ body.project-review.la-page #projectReviewHost {
 .lot-buildup .is-ok { color: var(--accent-green); }
 .lot-buildup .is-miss, .lot-buildup .lot-note { color: var(--text-muted); }
 .lot-buildup span { white-space: normal; }
+.lot-buildup .lot-buildup-btn {
+  margin-top: 0;
+  min-width: 0;
+  min-height: 36px;
+  height: auto;
+  padding: 6px 8px;
+  white-space: normal;
+  line-height: 1.3;
+}
+@media (pointer: coarse) {
+  .lot-buildup .lot-buildup-btn { min-height: 44px; }
+}
 .lot-over { margin: 0 0 8px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; }
 .lot-over h4 { margin: 0 0 6px; font-size: 13px; }
 .lot-over-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

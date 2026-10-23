@@ -4,6 +4,16 @@
 
 const EPS = { '%': 0.05, 'lần': 0.005, 'tầng': 0.01 };
 
+export const LOT_BUILDUP_LABEL = 'Kiểm tra mật độ xây dựng thực tế';
+
+export function lotBuildupButtonHtml() {
+  return `<button type="button" class="proof-btn lot-buildup-btn" data-lot-buildup-run>${LOT_BUILDUP_LABEL}</button>`;
+}
+
+export function lotBuildupSlotHtml() {
+  return `<div class="lot-buildup" data-lot-buildup>${lotBuildupButtonHtml()}</div>`;
+}
+
 export function floorsFromHeight(meters) {
   const h = Number(meters);
   if (!(h > 0)) return null;
@@ -102,7 +112,7 @@ export function buildupHtml(stats) {
   const note = heightReady
     ? '<span class="lot-note">Chiều cao là ước lượng Global Building Atlas, đã chỉnh theo OSM hoặc số công bố ở một số nhà cao. Tầng cao ≈ mét / 4; nhà đã công bố số tầng giữ số đó. Sai số khoảng ±1 tầng, chỉ để sàng lọc.</span>'
     : '';
-  return `<b>Kiểm tra mật độ xây dựng thực tế</b>
+  return `<b>${LOT_BUILDUP_LABEL}</b>
     ${compare}
     <span>Diện tích lô ${num(lot, 0)} m² · chiếm đất ${num(foot, 0)} m² · ${num(count, 0)} công trình · mật độ ${num(cover, 1)}%</span>
     ${floorLine}
