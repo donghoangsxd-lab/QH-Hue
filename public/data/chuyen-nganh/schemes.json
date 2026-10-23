@@ -1,0 +1,86 @@
+{
+  "priority": "Số lớn hơn được ưu tiên trong overrideArea. Không cắt hình.",
+  "schemes": [
+    {
+      "slug": "qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1",
+      "name": "QHC đô thị Thừa Thiên Huế 1/25.000",
+      "level": "QHC",
+      "mapid": 21817,
+      "parent": null,
+      "overrides": [],
+      "priority": 1,
+      "scale": 25000
+    },
+    {
+      "slug": "qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72",
+      "name": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "level": "QHC",
+      "mapid": 21817,
+      "parent": null,
+      "overrides": [],
+      "priority": 1,
+      "scale": 10000
+    },
+    {
+      "slug": "qhc-tt-phu-loc-19e96a86",
+      "name": "QHC TT Phú Lộc",
+      "level": "QHC",
+      "mapid": 20674,
+      "parent": null,
+      "overrides": [],
+      "priority": 1,
+      "decision": "1101/QĐ-UBND",
+      "decisionDate": "2020-04-17",
+      "taskDecision": "3134/QĐ-UBND",
+      "taskDecisionDate": "2019-12-16",
+      "authority": "UBND tỉnh"
+    },
+    {
+      "slug": "qhc-khe-tre-4a4803cd",
+      "name": "QHC Khe Tre",
+      "level": "QHC",
+      "mapid": 20778,
+      "parent": null,
+      "overrides": [],
+      "priority": 1,
+      "scale": 2000,
+      "decision": "688/QĐ-UBND",
+      "decisionDate": "2020-03-13",
+      "taskDecision": "1022/QĐ-UBND",
+      "taskDecisionDate": "2016-05-16"
+    },
+    {
+      "slug": "qhc-do-thi-moi-vinh-hung-8899f27b",
+      "name": "QHC Đô thị mới Vinh Hưng",
+      "level": "QHC",
+      "mapid": 22906,
+      "parent": null,
+      "overrides": [],
+      "priority": 1,
+      "decision": "193/QĐ-UBND",
+      "decisionDate": "2025-01-21",
+      "authority": "UBND thành phố Huế"
+    },
+    {
+      "slug": "qhc-khu-cong-nghiep-phong-dien-f997bd2c",
+      "name": "QHC Khu công nghiệp Phong Điền",
+      "level": "QHC",
+      "mapid": 22880,
+      "parent": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+      "overrides": [
+        "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3"
+      ],
+      "priority": 2,
+      "overrideArea": "ranh KCN"
+    },
+    {
+      "slug": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+      "name": "QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045",
+      "level": "QHC",
+      "mapid": null,
+      "parent": null,
+      "overrides": [],
+      "priority": 1
+    }
+  ]
+}

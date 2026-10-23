@@ -1,150 +1,283 @@
-# Hạ tầng chuyên ngành QHC đô thị Thừa Thiên Huế
+# Hạ tầng chuyên ngành
 
-Bộ dữ liệu hạ tầng 7 chuyên ngành, gắn tab Hạ tầng. Mô hình bốn trục: [docs/bon-truc.md](bon-truc.md).
+Bộ dữ liệu hạ tầng chuyên ngành, gắn tab Hạ tầng. Mô hình bốn trục: [docs/bon-truc.md](bon-truc.md). CRS **EPSG:4326**.
 
-Nguồn: [mapid 21817](https://gissonganh.hue.gov.vn/geditor.aspx?mapid=21817) (Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045). Tải bằng `qhFetchLayers` theo nhóm trên cây lớp, máy nhận `gserver-to-shp.js`. Hai nhóm giao thông quy hoạch đã có sẵn trên máy và được dùng lại. CRS **EPSG:4326** (WGS84), cùng hệ Leaflet và `scripts/build-qhc2045.js`.
+Đường dẫn: `data/chuyen-nganh/<scheme>/<sector>/<hien-trang|quy-hoach>/` (GeoJSON đủ thuộc tính, zip shapefile UTF-8, `-ten-truong.txt`). Manifest: `public/data/chuyen-nganh/index.json`. Quan hệ đồ án: `public/data/chuyen-nganh/schemes.json`.
 
-Mỗi lớp: `data/chuyen-nganh/<tỷ lệ>/<chuyên ngành>/<hien-trang|quy-hoach>/<lớp>.geojson` (đủ thuộc tính), `.zip` shapefile UTF-8, và `-ten-truong.txt` (tên trường DBF 10 ký tự → tên gốc). Manifest: `public/data/chuyen-nganh/index.json`.
+## Đồ án
+
+| Slug | Tên | Cấp | mapid | Ưu tiên |
+|---|---|---|---:|---:|
+| qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1 | QHC đô thị Thừa Thiên Huế 1/25.000 | QHC | 21817 | 1 |
+| qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72 | QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | QHC | 21817 | 1 |
+| qhc-tt-phu-loc-19e96a86 | QHC TT Phú Lộc | QHC | 20674 | 1 |
+| qhc-khe-tre-4a4803cd | QHC Khe Tre | QHC | 20778 | 1 |
+| qhc-do-thi-moi-vinh-hung-8899f27b | QHC Đô thị mới Vinh Hưng | QHC | 22906 | 1 |
+| qhc-khu-cong-nghiep-phong-dien-f997bd2c | QHC Khu công nghiệp Phong Điền | QHC | 22880 | 2 |
+| qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3 | QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045 | QHC | — | 1 |
+
+QHC Khu công nghiệp Phong Điền nằm trong QHC đô thị Phong Điền. Trong ranh KCN, KCN ghi đè Phong Điền (`overrides`, `overrideArea: ranh KCN`, priority 2 > 1). Không cắt dữ liệu.
+
+Metadata bản đồ gServer không có số quyết định. Số dưới đây lấy từ thuộc tính lớp ranh (ngày dạng M/D/YYYY của shapefile, đã đổi sang ISO). QHC TT Phú Lộc: nhiệm vụ 3134/QĐ-UBND ngày 2019-12-16, phê duyệt 1101/QĐ-UBND ngày 2020-04-17 (UBND tỉnh; 1/5 vùng ranh có giá trị). QHC Khe Tre: nhiệm vụ 1022/QĐ-UBND ngày 2016-05-16, phê duyệt 688/QĐ-UBND ngày 2020-03-13. QHC Đô thị mới Vinh Hưng: phê duyệt 193/QĐ-UBND ngày 2025-01-21 (UBND thành phố Huế). QHC Khu công nghiệp Phong Điền: trường có trên lớp ranh nhưng để trống. Hai đồ án mapid 21817: lô này chưa có lớp ranh quy hoạch.
 
 ## Catalog
 
-| Chuyên ngành | Tỷ lệ | Trạng thái | Lớp | Kiểu | Số đối tượng |
-|---|---:|---|---|---|---:|
-| Giao thông | 1/10.000 | Hiện trạng | Hiện trạng công trình đầu mối giao thông | Point | 18 |
-| Giao thông | 1/10.000 | Hiện trạng | Hiện trạng mạng lưới giao thông đường bộ | LineString | 53 |
-| Giao thông | 1/10.000 | Hiện trạng | Hiện trạng mạng lưới giao thông đường sắt | LineString | 1 |
-| Giao thông | 1/10.000 | Hiện trạng | Hiện trạng mạng lưới giao thông đường thủy | LineString | 7 |
-| Giao thông | 1/10.000 | Hiện trạng | Hiện trạng mặt cắt | LineString | 63 |
-| Giao thông | 1/10.000 | Quy hoạch | Bó vỉa | LineString | 1180 |
-| Giao thông | 1/10.000 | Quy hoạch | Cầu giao thông dạng đường | LineString | 449 |
-| Giao thông | 1/10.000 | Quy hoạch | Công trình đầu mối giao thông | Point | 58 |
-| Giao thông | 1/10.000 | Quy hoạch | Mạng lưới giao thông đường bộ | LineString | 802 |
-| Giao thông | 1/10.000 | Quy hoạch | Mạng lưới giao thông đường sắt | LineString | 13 |
-| Giao thông | 1/10.000 | Quy hoạch | Mạng lưới giao thông đường thủy | LineString | 6 |
-| Giao thông | 1/10.000 | Quy hoạch | Mặt cắt | LineString | 564 |
-| Giao thông | 1/10.000 | Quy hoạch | Mặt đường bộ | Polygon | 76 |
-| Giao thông | 1/25.000 | Hiện trạng | Hiện trạng công trình đầu mối giao thông | Point | 24 |
-| Giao thông | 1/25.000 | Hiện trạng | Hiện trạng mạng lưới giao thông đường bộ | LineString | 98 |
-| Giao thông | 1/25.000 | Hiện trạng | Hiện trạng mạng lưới giao thông đường sắt | LineString | 1 |
-| Giao thông | 1/25.000 | Hiện trạng | Hiện trạng mạng lưới giao thông đường thủy | LineString | 6 |
-| Giao thông | 1/25.000 | Quy hoạch | Cầu giao thông dạng đường | LineString | 14 |
-| Giao thông | 1/25.000 | Quy hoạch | Công trình đầu mối giao thông | Point | 125 |
-| Giao thông | 1/25.000 | Quy hoạch | Mạng lưới giao thông đường bộ | LineString | 180 |
-| Giao thông | 1/25.000 | Quy hoạch | Mạng lưới giao thông đường sắt | LineString | 10 |
-| Giao thông | 1/25.000 | Quy hoạch | Mạng lưới giao thông đường thủy | LineString | 14 |
-| Cấp nước | 1/10.000 | Hiện trạng | Hiện trạng công trình đầu mối cấp nước | Point | 9 |
-| Cấp nước | 1/10.000 | Hiện trạng | Hiện trạng mạng lưới cấp nước | LineString | 309 |
-| Cấp nước | 1/10.000 | Quy hoạch | Công trình đầu mối cấp nước | Point | 15 |
-| Cấp nước | 1/10.000 | Quy hoạch | Mạng lưới cấp nước | LineString | 598 |
-| Cấp nước | 1/25.000 | Hiện trạng | Hiện trạng công trình đầu mối cấp nước | Point | 20 |
-| Cấp nước | 1/25.000 | Hiện trạng | Hiện trạng mạng lưới cấp nước | LineString | 485 |
-| Cấp nước | 1/25.000 | Quy hoạch | Công trình đầu mối cấp nước | Point | 52 |
-| Cấp nước | 1/25.000 | Quy hoạch | Mạng lưới cấp nước | LineString | 904 |
-| Cấp điện | 1/10.000 | Hiện trạng | Hiện trạng công trình cấp điện dạng điểm | Point | 9 |
-| Cấp điện | 1/10.000 | Hiện trạng | Hiện trạng mạng lưới phân phối điện | LineString | 195 |
-| Cấp điện | 1/10.000 | Quy hoạch | Công trình cấp điện dạng điểm | Point | 21 |
-| Cấp điện | 1/10.000 | Quy hoạch | Công trình năng lượng | Point | 4 |
-| Cấp điện | 1/10.000 | Quy hoạch | Mạng lưới phân phối điện | LineString | 112 |
-| Cấp điện | 1/25.000 | Hiện trạng | Hiện trạng công trình cấp điện dạng điểm | Point | 18 |
-| Cấp điện | 1/25.000 | Hiện trạng | Hiện trạng công trình năng lượng | Point | 15 |
-| Cấp điện | 1/25.000 | Hiện trạng | Hiện trạng mạng lưới phân phối điện | LineString | 35 |
-| Cấp điện | 1/25.000 | Quy hoạch | Công trình cấp điện dạng điểm | Point | 51 |
-| Cấp điện | 1/25.000 | Quy hoạch | Công trình năng lượng | Point | 28 |
-| Cấp điện | 1/25.000 | Quy hoạch | Mạng lưới phân phối điện | LineString | 74 |
-| San nền và thoát nước mưa | 1/10.000 | Hiện trạng | Hiện trạng công trình thủy lợi dạng điểm | Point | 5 |
-| San nền và thoát nước mưa | 1/10.000 | Hiện trạng | Hiện trạng công trình thủy lợi dạng đường | LineString | 17 |
-| San nền và thoát nước mưa | 1/10.000 | Hiện trạng | Hiện trạng công trình tiêu thoát nước | Point | 13 |
-| San nền và thoát nước mưa | 1/10.000 | Hiện trạng | Hiện trạng hướng thoát nước | LineString | 6 |
-| San nền và thoát nước mưa | 1/10.000 | Hiện trạng | Hiện trạng mạng lưới thoát nước dạng đường | LineString | 38 |
-| San nền và thoát nước mưa | 1/10.000 | Quy hoạch | Công trình thủy lợi dạng điểm | Point | 6 |
-| San nền và thoát nước mưa | 1/10.000 | Quy hoạch | Công trình thủy lợi dạng đường | LineString | 28 |
-| San nền và thoát nước mưa | 1/10.000 | Quy hoạch | Công trình tiêu thoát nước | Point | 874 |
-| San nền và thoát nước mưa | 1/10.000 | Quy hoạch | Điểm độ cao thoát nước | Point | 363 |
-| San nền và thoát nước mưa | 1/10.000 | Quy hoạch | Hướng thoát nước | LineString | 555 |
-| San nền và thoát nước mưa | 1/10.000 | Quy hoạch | Mạng lưới thoát nước dạng đường | LineString | 1533 |
-| San nền và thoát nước mưa | 1/10.000 | Quy hoạch | Phân vùng lưu vực dạng đường | LineString | 3 |
-| San nền và thoát nước mưa | 1/10.000 | Quy hoạch | Quy hoạch chiều cao | Point | 363 |
-| San nền và thoát nước mưa | 1/25.000 | Hiện trạng | Hiện trạng công trình thủy lợi dạng điểm | Point | 17 |
-| San nền và thoát nước mưa | 1/25.000 | Hiện trạng | Hiện trạng phân lưu thoát nước dạng đường | LineString | 8 |
-| San nền và thoát nước mưa | 1/25.000 | Hiện trạng | Hiện trạng phân lưu thoát nước dạng vùng | Polygon | 8 |
-| San nền và thoát nước mưa | 1/25.000 | Quy hoạch | Công trình thủy lợi dạng điểm | Point | 10 |
-| San nền và thoát nước mưa | 1/25.000 | Quy hoạch | Công trình thủy lợi dạng đường | LineString | 26 |
-| San nền và thoát nước mưa | 1/25.000 | Quy hoạch | Hướng thoát nước | LineString | 49 |
-| San nền và thoát nước mưa | 1/25.000 | Quy hoạch | Mạng lưới thoát nước dạng đường | LineString | 65 |
-| San nền và thoát nước mưa | 1/25.000 | Quy hoạch | Phân vùng lưu vực dạng đường | LineString | 32 |
-| San nền và thoát nước mưa | 1/25.000 | Quy hoạch | Phân vùng lưu vực dạng vùng | Polygon | 8 |
-| Thoát nước thải | 1/10.000 | Hiện trạng | Hiện trạng công trình xử lý nước thải dạng điểm | Point | 17 |
-| Thoát nước thải | 1/10.000 | Hiện trạng | Hiện trạng mạng lưới thoát nước thải | LineString | 54 |
-| Thoát nước thải | 1/10.000 | Quy hoạch | Công trình xử lý nước thải dạng điểm | Point | 440 |
-| Thoát nước thải | 1/10.000 | Quy hoạch | Điểm độ cao thoát nước thải | Point | 276 |
-| Thoát nước thải | 1/10.000 | Quy hoạch | Mạng lưới thoát nước thải | LineString | 599 |
-| Thoát nước thải | 1/25.000 | Hiện trạng | Hiện trạng công trình xử lý nước thải dạng điểm | Point | 10 |
-| Thoát nước thải | 1/25.000 | Hiện trạng | Hiện trạng mạng lưới thoát nước thải | LineString | 38 |
-| Thoát nước thải | 1/25.000 | Quy hoạch | Công trình xử lý nước thải dạng điểm | Point | 476 |
-| Thoát nước thải | 1/25.000 | Quy hoạch | Mạng lưới thoát nước thải | LineString | 597 |
-| Chất thải rắn và nghĩa trang | 1/10.000 | Hiện trạng | Hiện trạng điểm xử lý chất thải rắn | Point | 4 |
-| Chất thải rắn và nghĩa trang | 1/10.000 | Hiện trạng | Hiện trạng mạng lưới nghĩa trang | Point | 17 |
-| Chất thải rắn và nghĩa trang | 1/10.000 | Hiện trạng | Hiện trạng phân khu chất thải rắn | Polygon | 1 |
-| Chất thải rắn và nghĩa trang | 1/10.000 | Quy hoạch | Điểm xử lý chất thải rắn | Point | 5 |
-| Chất thải rắn và nghĩa trang | 1/10.000 | Quy hoạch | Mạng lưới nghĩa trang | Point | 30 |
-| Chất thải rắn và nghĩa trang | 1/10.000 | Quy hoạch | Phân khu chất thải rắn | Polygon | 3 |
-| Chất thải rắn và nghĩa trang | 1/25.000 | Hiện trạng | Hiện trạng mạng lưới chất thải rắn | Point | 7 |
-| Chất thải rắn và nghĩa trang | 1/25.000 | Hiện trạng | Hiện trạng mạng lưới nghĩa trang | Point | 65 |
-| Chất thải rắn và nghĩa trang | 1/25.000 | Quy hoạch | Điểm xử lý chất thải rắn | Point | 17 |
-| Chất thải rắn và nghĩa trang | 1/25.000 | Quy hoạch | Mạng lưới nghĩa trang | Point | 61 |
-| Chất thải rắn và nghĩa trang | 1/25.000 | Quy hoạch | Phân khu chất thải rắn | Polygon | 3 |
-| Thông tin liên lạc | 1/10.000 | Hiện trạng | Hiện trạng mạng lưới thông tin liên lạc | LineString | 13 |
-| Thông tin liên lạc | 1/10.000 | Hiện trạng | Hiện trạng mạng lưới trạm thông tin dạng điểm | Point | 12 |
-| Thông tin liên lạc | 1/10.000 | Quy hoạch | Mạng lưới thông tin liên lạc | LineString | 183 |
-| Thông tin liên lạc | 1/10.000 | Quy hoạch | Mạng lưới trạm thông tin dạng điểm | Point | 88 |
-| Thông tin liên lạc | 1/25.000 | Hiện trạng | Hiện trạng mạng lưới thông tin liên lạc | LineString | 13 |
-| Thông tin liên lạc | 1/25.000 | Hiện trạng | Hiện trạng mạng lưới trạm thông tin dạng điểm | Point | 27 |
-| Thông tin liên lạc | 1/25.000 | Quy hoạch | Mạng lưới thông tin liên lạc | LineString | 42 |
-| Thông tin liên lạc | 1/25.000 | Quy hoạch | Mạng lưới trạm thông tin dạng điểm | Point | 50 |
+| Đồ án | Ngành | Trạng thái | Lớp | Kiểu | Số đối tượng |
+|---|---|---|---|---|---:|
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Giao thông | Hiện trạng | Hiện trạng công trình đầu mối giao thông | Point | 24 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Giao thông | Hiện trạng | Hiện trạng mạng lưới giao thông đường bộ | LineString | 98 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Giao thông | Hiện trạng | Hiện trạng mạng lưới giao thông đường sắt | LineString | 1 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Giao thông | Hiện trạng | Hiện trạng mạng lưới giao thông đường thủy | LineString | 6 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Giao thông | Quy hoạch | Cầu giao thông dạng đường | LineString | 14 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Giao thông | Quy hoạch | Công trình đầu mối giao thông | Point | 125 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Giao thông | Quy hoạch | Mạng lưới giao thông đường bộ | LineString | 180 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Giao thông | Quy hoạch | Mạng lưới giao thông đường sắt | LineString | 10 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Giao thông | Quy hoạch | Mạng lưới giao thông đường thủy | LineString | 14 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Cấp nước | Hiện trạng | Hiện trạng công trình đầu mối cấp nước | Point | 20 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Cấp nước | Hiện trạng | Hiện trạng mạng lưới cấp nước | LineString | 485 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Cấp nước | Quy hoạch | Công trình đầu mối cấp nước | Point | 52 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Cấp nước | Quy hoạch | Mạng lưới cấp nước | LineString | 904 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Cấp điện | Hiện trạng | Hiện trạng công trình cấp điện dạng điểm | Point | 18 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Cấp điện | Hiện trạng | Hiện trạng công trình năng lượng | Point | 15 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Cấp điện | Hiện trạng | Hiện trạng mạng lưới phân phối điện | LineString | 35 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Cấp điện | Quy hoạch | Công trình cấp điện dạng điểm | Point | 51 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Cấp điện | Quy hoạch | Công trình năng lượng | Point | 28 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Cấp điện | Quy hoạch | Mạng lưới phân phối điện | LineString | 74 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | San nền và thoát nước mưa | Hiện trạng | Hiện trạng công trình thủy lợi dạng điểm | Point | 17 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | San nền và thoát nước mưa | Hiện trạng | Hiện trạng phân lưu thoát nước dạng đường | LineString | 8 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | San nền và thoát nước mưa | Hiện trạng | Hiện trạng phân lưu thoát nước dạng vùng | Polygon | 8 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | San nền và thoát nước mưa | Quy hoạch | Công trình thủy lợi dạng điểm | Point | 10 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | San nền và thoát nước mưa | Quy hoạch | Công trình thủy lợi dạng đường | LineString | 26 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | San nền và thoát nước mưa | Quy hoạch | Hướng thoát nước | LineString | 49 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | San nền và thoát nước mưa | Quy hoạch | Mạng lưới thoát nước dạng đường | LineString | 65 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | San nền và thoát nước mưa | Quy hoạch | Phân vùng lưu vực dạng đường | LineString | 32 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | San nền và thoát nước mưa | Quy hoạch | Phân vùng lưu vực dạng vùng | Polygon | 8 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Thoát nước thải | Hiện trạng | Hiện trạng công trình xử lý nước thải dạng điểm | Point | 10 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Thoát nước thải | Hiện trạng | Hiện trạng mạng lưới thoát nước thải | LineString | 38 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Thoát nước thải | Quy hoạch | Công trình xử lý nước thải dạng điểm | Point | 476 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Thoát nước thải | Quy hoạch | Mạng lưới thoát nước thải | LineString | 597 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Chất thải rắn và nghĩa trang | Hiện trạng | Hiện trạng mạng lưới chất thải rắn | Point | 7 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Chất thải rắn và nghĩa trang | Hiện trạng | Hiện trạng mạng lưới nghĩa trang | Point | 65 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Chất thải rắn và nghĩa trang | Quy hoạch | Điểm xử lý chất thải rắn | Point | 17 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Chất thải rắn và nghĩa trang | Quy hoạch | Mạng lưới nghĩa trang | Point | 61 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Chất thải rắn và nghĩa trang | Quy hoạch | Phân khu chất thải rắn | Polygon | 3 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Thông tin liên lạc | Hiện trạng | Hiện trạng mạng lưới thông tin liên lạc | LineString | 13 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Thông tin liên lạc | Hiện trạng | Hiện trạng mạng lưới trạm thông tin dạng điểm | Point | 27 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Thông tin liên lạc | Quy hoạch | Mạng lưới thông tin liên lạc | LineString | 42 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Thông tin liên lạc | Quy hoạch | Mạng lưới trạm thông tin dạng điểm | Point | 50 |
+| QHC đô thị Thừa Thiên Huế 1/25.000 | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng sử dụng đất | Polygon | 4659 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Hiện trạng | Hiện trạng công trình đầu mối giao thông | Point | 18 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Hiện trạng | Hiện trạng mạng lưới giao thông đường bộ | LineString | 53 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Hiện trạng | Hiện trạng mạng lưới giao thông đường sắt | LineString | 1 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Hiện trạng | Hiện trạng mạng lưới giao thông đường thủy | LineString | 7 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Hiện trạng | Hiện trạng mặt cắt | LineString | 63 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Quy hoạch | Bó vỉa | LineString | 1180 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Quy hoạch | Cầu giao thông dạng đường | LineString | 449 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Quy hoạch | Công trình đầu mối giao thông | Point | 58 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Quy hoạch | Mạng lưới giao thông đường bộ | LineString | 802 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Quy hoạch | Mạng lưới giao thông đường sắt | LineString | 13 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Quy hoạch | Mạng lưới giao thông đường thủy | LineString | 6 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Quy hoạch | Mặt cắt | LineString | 564 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Giao thông | Quy hoạch | Mặt đường bộ | Polygon | 76 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Cấp nước | Hiện trạng | Hiện trạng công trình đầu mối cấp nước | Point | 9 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Cấp nước | Hiện trạng | Hiện trạng mạng lưới cấp nước | LineString | 309 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Cấp nước | Quy hoạch | Công trình đầu mối cấp nước | Point | 15 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Cấp nước | Quy hoạch | Mạng lưới cấp nước | LineString | 598 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Cấp điện | Hiện trạng | Hiện trạng công trình cấp điện dạng điểm | Point | 9 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Cấp điện | Hiện trạng | Hiện trạng mạng lưới phân phối điện | LineString | 195 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Cấp điện | Quy hoạch | Công trình cấp điện dạng điểm | Point | 21 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Cấp điện | Quy hoạch | Công trình năng lượng | Point | 4 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Cấp điện | Quy hoạch | Mạng lưới phân phối điện | LineString | 112 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | San nền và thoát nước mưa | Hiện trạng | Hiện trạng công trình thủy lợi dạng điểm | Point | 5 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | San nền và thoát nước mưa | Hiện trạng | Hiện trạng công trình thủy lợi dạng đường | LineString | 17 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | San nền và thoát nước mưa | Hiện trạng | Hiện trạng công trình tiêu thoát nước | Point | 13 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | San nền và thoát nước mưa | Hiện trạng | Hiện trạng hướng thoát nước | LineString | 6 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | San nền và thoát nước mưa | Hiện trạng | Hiện trạng mạng lưới thoát nước dạng đường | LineString | 38 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | San nền và thoát nước mưa | Quy hoạch | Công trình thủy lợi dạng điểm | Point | 6 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | San nền và thoát nước mưa | Quy hoạch | Công trình thủy lợi dạng đường | LineString | 28 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | San nền và thoát nước mưa | Quy hoạch | Công trình tiêu thoát nước | Point | 874 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | San nền và thoát nước mưa | Quy hoạch | Điểm độ cao thoát nước | Point | 363 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | San nền và thoát nước mưa | Quy hoạch | Hướng thoát nước | LineString | 555 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | San nền và thoát nước mưa | Quy hoạch | Mạng lưới thoát nước dạng đường | LineString | 1533 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | San nền và thoát nước mưa | Quy hoạch | Phân vùng lưu vực dạng đường | LineString | 3 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | San nền và thoát nước mưa | Quy hoạch | Quy hoạch chiều cao | Point | 363 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Thoát nước thải | Hiện trạng | Hiện trạng công trình xử lý nước thải dạng điểm | Point | 17 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Thoát nước thải | Hiện trạng | Hiện trạng mạng lưới thoát nước thải | LineString | 54 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Thoát nước thải | Quy hoạch | Công trình xử lý nước thải dạng điểm | Point | 440 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Thoát nước thải | Quy hoạch | Điểm độ cao thoát nước thải | Point | 276 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Thoát nước thải | Quy hoạch | Mạng lưới thoát nước thải | LineString | 599 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Chất thải rắn và nghĩa trang | Hiện trạng | Hiện trạng điểm xử lý chất thải rắn | Point | 4 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Chất thải rắn và nghĩa trang | Hiện trạng | Hiện trạng mạng lưới nghĩa trang | Point | 17 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Chất thải rắn và nghĩa trang | Hiện trạng | Hiện trạng phân khu chất thải rắn | Polygon | 1 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Chất thải rắn và nghĩa trang | Quy hoạch | Điểm xử lý chất thải rắn | Point | 5 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Chất thải rắn và nghĩa trang | Quy hoạch | Mạng lưới nghĩa trang | Point | 30 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Chất thải rắn và nghĩa trang | Quy hoạch | Phân khu chất thải rắn | Polygon | 3 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Thông tin liên lạc | Hiện trạng | Hiện trạng mạng lưới thông tin liên lạc | LineString | 13 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Thông tin liên lạc | Hiện trạng | Hiện trạng mạng lưới trạm thông tin dạng điểm | Point | 12 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Thông tin liên lạc | Quy hoạch | Mạng lưới thông tin liên lạc | LineString | 183 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Thông tin liên lạc | Quy hoạch | Mạng lưới trạm thông tin dạng điểm | Point | 88 |
+| QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng sử dụng đất | Polygon | 3746 |
+| QHC TT Phú Lộc | Giao thông | Quy hoạch | Công trình đầu mối giao thông | Point | 177 |
+| QHC TT Phú Lộc | Giao thông | Quy hoạch | Đường sắt cao tốc | LineString | 1 |
+| QHC TT Phú Lộc | Giao thông | Quy hoạch | Mạng lưới giao thông | LineString | 203 |
+| QHC TT Phú Lộc | Giao thông | Quy hoạch | Mặt đường bộ | Polygon | 592 |
+| QHC TT Phú Lộc | Cấp nước | Quy hoạch | Công trình đầu mối cấp nước | Point | 1 |
+| QHC TT Phú Lộc | Cấp nước | Quy hoạch | Mạng lưới cấp nước | LineString | 160 |
+| QHC TT Phú Lộc | Cấp điện | Quy hoạch | Công trình cấp điện | Point | 33 |
+| QHC TT Phú Lộc | Cấp điện | Quy hoạch | Đèn chiếu sáng | Point | 1876 |
+| QHC TT Phú Lộc | Cấp điện | Quy hoạch | Mạng lưới điện chiếu sáng | LineString | 18 |
+| QHC TT Phú Lộc | Cấp điện | Quy hoạch | Mạng lưới phân phối điện | LineString | 71 |
+| QHC TT Phú Lộc | San nền và thoát nước mưa | Quy hoạch | Hướng thoát nước | LineString | 651 |
+| QHC TT Phú Lộc | San nền và thoát nước mưa | Quy hoạch | Mạng lưới thoát nước | LineString | 480 |
+| QHC TT Phú Lộc | San nền và thoát nước mưa | Quy hoạch | Quy hoạch chiều cao | Point | 189 |
+| QHC TT Phú Lộc | Thoát nước thải | Quy hoạch | Công trình xử lý nước thải | Point | 6 |
+| QHC TT Phú Lộc | Thoát nước thải | Quy hoạch | Mạng lưới thoát nước thải | LineString | 94 |
+| QHC TT Phú Lộc | Chất thải rắn và nghĩa trang | Quy hoạch | Điểm xử lý chất thải rắn | Point | 16 |
+| QHC TT Phú Lộc | Thông tin liên lạc | Quy hoạch | Mạng lưới thông tin liên lạc | LineString | 74 |
+| QHC TT Phú Lộc | Thông tin liên lạc | Quy hoạch | Trạm thông tin | Point | 41 |
+| QHC TT Phú Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng sử dụng đất | Polygon | 2863 |
+| QHC TT Phú Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chức năng sử dụng đất | Polygon | 1467 |
+| QHC TT Phú Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Điểm chức năng | Point | 94 |
+| QHC TT Phú Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Đường ranh giới quy hoạch | LineString | 1 |
+| QHC TT Phú Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Vùng ranh giới quy hoạch | Polygon | 5 |
+| QHC Khe Tre | Giao thông | Quy hoạch | Bó vĩa | LineString | 443 |
+| QHC Khe Tre | Giao thông | Quy hoạch | Mạng lưới giao thông | LineString | 74 |
+| QHC Khe Tre | Giao thông | Quy hoạch | Mặt cắt | LineString | 77 |
+| QHC Khe Tre | Giao thông | Quy hoạch | Mặt đường bộ | Polygon | 136 |
+| QHC Khe Tre | Cấp nước | Quy hoạch | Công trình đầu mối cấp nước | Point | 13 |
+| QHC Khe Tre | Cấp nước | Quy hoạch | Mạng lưới cấp nước | LineString | 77 |
+| QHC Khe Tre | Cấp điện | Quy hoạch | Công trình cấp điện | Point | 12 |
+| QHC Khe Tre | Cấp điện | Quy hoạch | Mạng lưới phân phối điện | LineString | 96 |
+| QHC Khe Tre | San nền và thoát nước mưa | Quy hoạch | Công trình tiêu thoát nước | Point | 452 |
+| QHC Khe Tre | San nền và thoát nước mưa | Quy hoạch | Mạng lưới thoát nước mưa | LineString | 60 |
+| QHC Khe Tre | Thoát nước thải | Quy hoạch | Công trình xử lý nước thải | Point | 578 |
+| QHC Khe Tre | Thoát nước thải | Quy hoạch | Mạng lưới thoát nước thải | LineString | 69 |
+| QHC Khe Tre | Thông tin liên lạc | Quy hoạch | Mạng lưới thông tin liên lạc | LineString | 33 |
+| QHC Khe Tre | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chức năng sử dụng đất | Polygon | 158 |
+| QHC Khe Tre | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Đánh giá môi trường chiến lược | Point | 5 |
+| QHC Khe Tre | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch | LineString | 1 |
+| QHC Khe Tre | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Vùng ranh giới quy hoạch | Polygon | 1 |
+| QHC Đô thị mới Vinh Hưng | Giao thông | Hiện trạng | Hiện trạng công trình đầu mối giao thông | Point | 2 |
+| QHC Đô thị mới Vinh Hưng | Giao thông | Hiện trạng | Hiện trạng mạng lưới giao thông | LineString | 45 |
+| QHC Đô thị mới Vinh Hưng | Giao thông | Quy hoạch | Bó vỉa | LineString | 282 |
+| QHC Đô thị mới Vinh Hưng | Giao thông | Quy hoạch | Công trình đầu mối giao thông | Point | 19 |
+| QHC Đô thị mới Vinh Hưng | Giao thông | Quy hoạch | Mạng lưới giao thông | LineString | 41 |
+| QHC Đô thị mới Vinh Hưng | Giao thông | Quy hoạch | Mặt cắt | LineString | 54 |
+| QHC Đô thị mới Vinh Hưng | Giao thông | Quy hoạch | Mặt đường bộ | Polygon | 204 |
+| QHC Đô thị mới Vinh Hưng | Cấp nước | Hiện trạng | Hiện trạng mạng lưới cấp nước | LineString | 3 |
+| QHC Đô thị mới Vinh Hưng | Cấp nước | Quy hoạch | Công trình đầu mối cấp nước | Point | 278 |
+| QHC Đô thị mới Vinh Hưng | Cấp nước | Quy hoạch | Mạng lưới cấp nước | LineString | 202 |
+| QHC Đô thị mới Vinh Hưng | Cấp điện | Hiện trạng | Hiện trạng công trình cấp điện | Point | 14 |
+| QHC Đô thị mới Vinh Hưng | Cấp điện | Hiện trạng | Hiện trạng mạng lưới phân phối điện | LineString | 11 |
+| QHC Đô thị mới Vinh Hưng | Cấp điện | Quy hoạch | Công trình cấp điện | Point | 21 |
+| QHC Đô thị mới Vinh Hưng | Cấp điện | Quy hoạch | Cột đèn chiếu sáng | Point | 2979 |
+| QHC Đô thị mới Vinh Hưng | Cấp điện | Quy hoạch | Mạng lưới chiếu sáng | LineString | 141 |
+| QHC Đô thị mới Vinh Hưng | Cấp điện | Quy hoạch | Mạng lưới phân phối điện | LineString | 15 |
+| QHC Đô thị mới Vinh Hưng | San nền và thoát nước mưa | Quy hoạch | congTrinhThuyLoiL | LineString | 2190 |
+| QHC Đô thị mới Vinh Hưng | San nền và thoát nước mưa | Quy hoạch | Công trình tiêu thoát nước | Point | 56 |
+| QHC Đô thị mới Vinh Hưng | San nền và thoát nước mưa | Quy hoạch | Mạng lưới thoát nước | LineString | 261 |
+| QHC Đô thị mới Vinh Hưng | San nền và thoát nước mưa | Quy hoạch | Quy hoạch chiều cao | Point | 64 |
+| QHC Đô thị mới Vinh Hưng | Thoát nước thải | Quy hoạch | Công trình xử lý nước thải | Point | 4 |
+| QHC Đô thị mới Vinh Hưng | Thoát nước thải | Quy hoạch | Mạng lưới thoát nước thải | LineString | 91 |
+| QHC Đô thị mới Vinh Hưng | Chất thải rắn và nghĩa trang | Hiện trạng | Hiện trạng hệ thống nghĩa trang | Point | 60 |
+| QHC Đô thị mới Vinh Hưng | Chất thải rắn và nghĩa trang | Quy hoạch | Điểm xử lý chất thải rắn | Point | 61 |
+| QHC Đô thị mới Vinh Hưng | Chất thải rắn và nghĩa trang | Quy hoạch | mangLuoiNghiaTrang | Point | 3 |
+| QHC Đô thị mới Vinh Hưng | Thông tin liên lạc | Hiện trạng | Hiện trạng trạm thông tin liên lạc | Point | 6 |
+| QHC Đô thị mới Vinh Hưng | Thông tin liên lạc | Quy hoạch | Mạng lưới thông tin liên lạc | LineString | 171 |
+| QHC Đô thị mới Vinh Hưng | Thông tin liên lạc | Quy hoạch | Mạng lưới trạm thông tin | Point | 25 |
+| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng điểm chức năng | Point | 24 |
+| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng sử dụng đất | Polygon | 2433 |
+| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chỉ giới đường đỏ | LineString | 101 |
+| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chức năng sử dụng đất | Polygon | 321 |
+| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | dinhViRanhGioi | Point | 30 |
+| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Đánh giá tổng hợp lựa chọn đất xây dựng | Polygon | 2436 |
+| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Điểm chức năng | Point | 22 |
+| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Không gian cây xanh | Polygon | 76 |
+| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Không gian mặt nước | Polygon | 28 |
+| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Phân khu chức năng | Polygon | 4 |
+| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch (Dạng đường) | LineString | 1 |
+| QHC Đô thị mới Vinh Hưng | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch (Dạng vùng) | Polygon | 1 |
+| QHC Khu công nghiệp Phong Điền | Giao thông | Hiện trạng | Hiện trạng mạng lưới giao thông | LineString | 1 |
+| QHC Khu công nghiệp Phong Điền | Giao thông | Quy hoạch | Bó vỉa | LineString | 666 |
+| QHC Khu công nghiệp Phong Điền | Giao thông | Quy hoạch | Mạng lưới giao thông | LineString | 71 |
+| QHC Khu công nghiệp Phong Điền | Giao thông | Quy hoạch | Mặt cắt | LineString | 97 |
+| QHC Khu công nghiệp Phong Điền | Giao thông | Quy hoạch | Mặt đường bộ | Polygon | 107 |
+| QHC Khu công nghiệp Phong Điền | Cấp nước | Quy hoạch | Công trình đầu mối cấp nước | Point | 3 |
+| QHC Khu công nghiệp Phong Điền | Cấp nước | Quy hoạch | Mạng lưới cấp nước | LineString | 169 |
+| QHC Khu công nghiệp Phong Điền | Cấp điện | Hiện trạng | Hiện trạng mạng lưới phân phối điện | LineString | 7 |
+| QHC Khu công nghiệp Phong Điền | Cấp điện | Quy hoạch | Công trình cấp điện | Point | 115 |
+| QHC Khu công nghiệp Phong Điền | Cấp điện | Quy hoạch | Công trình cấp điện dạng vùng | Polygon | 115 |
+| QHC Khu công nghiệp Phong Điền | Cấp điện | Quy hoạch | Cột đèn chiếu sáng | Point | 1750 |
+| QHC Khu công nghiệp Phong Điền | Cấp điện | Quy hoạch | Mạng lưới điện chiếu sáng | LineString | 143 |
+| QHC Khu công nghiệp Phong Điền | Cấp điện | Quy hoạch | Mạng lưới phân phối điện | LineString | 134 |
+| QHC Khu công nghiệp Phong Điền | San nền và thoát nước mưa | Quy hoạch | Công trình tiêu thoát nước | Point | 35 |
+| QHC Khu công nghiệp Phong Điền | San nền và thoát nước mưa | Quy hoạch | Đường đồng mức thiết kế | LineString | 166 |
+| QHC Khu công nghiệp Phong Điền | San nền và thoát nước mưa | Quy hoạch | Hướng thoát nước | LineString | 37 |
+| QHC Khu công nghiệp Phong Điền | San nền và thoát nước mưa | Quy hoạch | Hướng thoát nước mưa | LineString | 295 |
+| QHC Khu công nghiệp Phong Điền | San nền và thoát nước mưa | Quy hoạch | Mạng lưới thoát nước mưa | LineString | 1258 |
+| QHC Khu công nghiệp Phong Điền | San nền và thoát nước mưa | Quy hoạch | Quy hoạch chiều cao | Point | 75 |
+| QHC Khu công nghiệp Phong Điền | Thoát nước thải | Quy hoạch | Công trình xử lý nước thải | Point | 3 |
+| QHC Khu công nghiệp Phong Điền | Thoát nước thải | Quy hoạch | Hướng thoát nước thải | LineString | 1 |
+| QHC Khu công nghiệp Phong Điền | Thoát nước thải | Quy hoạch | Mạng lưới thoát nước thải | LineString | 148 |
+| QHC Khu công nghiệp Phong Điền | Chất thải rắn và nghĩa trang | Quy hoạch | Điểm xử lý chất thải rắn | Point | 1 |
+| QHC Khu công nghiệp Phong Điền | Thông tin liên lạc | Quy hoạch | Mạng lưới trạm thông tin | Point | 16 |
+| QHC Khu công nghiệp Phong Điền | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng sử dụng đất | Polygon | 43 |
+| QHC Khu công nghiệp Phong Điền | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chỉ giới đường đỏ | LineString | 265 |
+| QHC Khu công nghiệp Phong Điền | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chỉ giới xây dựng | LineString | 32 |
+| QHC Khu công nghiệp Phong Điền | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chức năng sử dụng đất | Polygon | 168 |
+| QHC Khu công nghiệp Phong Điền | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Phân khu chức năng | Polygon | 5 |
+| QHC Khu công nghiệp Phong Điền | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch A | Polygon | 1 |
+| QHC Khu công nghiệp Phong Điền | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch L | LineString | 1 |
 
 ## Khoảng trống
 
-- 1/25.000 không có lớp cao độ nền hay quy hoạch chiều cao (san nền). Chỉ có hướng thoát nước (quy hoạch) và phân lưu / thủy lợi (hiện trạng).
-- 1/10.000 hiện trạng không có lớp cao độ nền. Quy hoạch chiều cao chỉ có ở nhóm chuẩn bị kỹ thuật 1/10.000.
-- Không có lớp chiếu sáng riêng trong nhóm điện (cây lớp gộp vào cung cấp năng lượng, điện, chiếu sáng).
-- Hiện trạng 1/25.000 liệt kê hai lần «Hiện trạng phân lưu thoát nước dạng đường» cùng một bảng; script gộp còn một lớp (8 đối tượng).
-- Bó vỉa 1/10.000: lần tải trước bỏ 8 dòng không có hình. Catalog đếm số hình đã ghi.
-- Hiện trạng 1/10.000 không có lớp công trình năng lượng (có ở hiện trạng 1/25.000 và quy hoạch cả hai tỷ lệ).
-- Hiện trạng 1/25.000 chất thải rắn chỉ có điểm, không có phân khu vùng.
-- Hiện trạng công trình thủy lợi dạng đường 1/25.000 có 28 dòng trên gServer, tất cả thiếu hình.
-- San nền và thoát nước mưa, 1/25.000, hiện trạng: «Hiện trạng công trình thủy lợi dạng đường» — Mọi dòng không có hình hợp lệ, đã bỏ.
+- Bó vỉa QHC trung tâm 1/10.000: lần tải trước bỏ 8 dòng không có hình.
+- Bó vỉa QHC Khu công nghiệp Phong Điền: 668 dòng, 2 dòng không có hình, catalog giữ 666.
+- Hiện trạng công trình thủy lợi dạng đường, QHC 1/25.000: 28 dòng trên gServer, tất cả thiếu hình.
+- QHC đô thị Thừa Thiên Huế 1/25.000, San nền và thoát nước mưa, Hiện trạng: Hiện trạng công trình thủy lợi dạng đường — Mọi dòng không có hình hợp lệ, đã bỏ.
+- QHC đô thị Thừa Thiên Huế 1/25.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Ranh giới quy hoạch dạng vùng / dạng đường — Nhóm có trên cây mapid 21817, lô này chưa tải.
+- QHC đô thị Thừa Thiên Huế 1/25.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Sơ đồ tổ chức không gian, kiến trúc cảnh quan — Nhóm có trên cây mapid 21817, lô này chưa tải.
+- QHC đô thị Thừa Thiên Huế 1/25.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Đánh giá tổng hợp lựa chọn đất xây dựng — Nhóm có trên cây mapid 21817, lô này chưa tải.
+- QHC đô thị trung tâm Thừa Thiên Huế 1/10.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Ranh giới quy hoạch dạng vùng / dạng đường — Nhóm có trên cây mapid 21817, lô này chưa tải.
+- QHC đô thị trung tâm Thừa Thiên Huế 1/10.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Chức năng sử dụng đất, phân khu, tiểu vùng, điểm chức năng — Nhóm có trên cây mapid 21817, lô này chưa tải.
+- QHC đô thị trung tâm Thừa Thiên Huế 1/10.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Sơ đồ tổ chức không gian — Nhóm có trên cây mapid 21817, lô này chưa tải.
+- QHC đô thị trung tâm Thừa Thiên Huế 1/10.000, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Công trình ngầm dạng vùng / đường / điểm — Nhóm có trên cây mapid 21817, lô này chưa tải.
 
-## Lớp không xếp vào 7 chuyên ngành
+Ô không có lớp (ngành × hiện trạng/quy hoạch):
 
-| Tỷ lệ | Nhóm / trạng thái | Lớp | Số đối tượng | Lý do |
-|---:|---|---|---:|---|
-| 1/10.000 | Hiện trạng (1-10.000) | Hiện trạng sử dụng đất | 3746 | Không thuộc 7 chuyên ngành hạ tầng |
-| 1/25.000 | Hiện trạng (1-25.000) | Hiện trạng sử dụng đất | 4659 | Không thuộc 7 chuyên ngành hạ tầng |
-| 1/25.000 | Ranh giới quy hoạch (1:25.000) | Ranh giới quy hoạch dạng vùng | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/25.000 | Ranh giới quy hoạch (1:25.000) | Ranh giới quy hoạch dạng đường | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/10.000 | Ranh giới quy hoạch (1:10.000) | Ranh giới quy hoạch dạng vùng | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/10.000 | Ranh giới quy hoạch (1:10.000) | Ranh giới quy hoạch dạng đường | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/10.000 | Quy hoạch tổng mặt bằng sử dụng đất (1:10.000) | Chức năng sử dụng đất | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/10.000 | Quy hoạch tổng mặt bằng sử dụng đất (1:10.000) | Phân khu chức năng | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/10.000 | Quy hoạch tổng mặt bằng sử dụng đất (1:10.000) | Sơ đồ tiểu vùng | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/10.000 | Quy hoạch tổng mặt bằng sử dụng đất (1:10.000) | Điểm chức năng | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/25.000 | Sơ đồ tổ chức không gian, kiến trúc cảnh quan (1:25.000) | Quy hoạch vùng không gian | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/25.000 | Sơ đồ tổ chức không gian, kiến trúc cảnh quan (1:25.000) | Không gian mặt nước | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/25.000 | Sơ đồ tổ chức không gian, kiến trúc cảnh quan (1:25.000) | Không gian cây xanh | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/25.000 | Sơ đồ tổ chức không gian, kiến trúc cảnh quan (1:25.000) | Quy hoạch đường không gian | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/25.000 | Sơ đồ tổ chức không gian, kiến trúc cảnh quan (1:25.000) | Định hướng phát triển đô thị | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/10.000 | Sơ đồ tổ chức không gian, kiến trúc cảnh quan (1:10.000) | Quy hoạch vùng không gian | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/10.000 | Sơ đồ tổ chức không gian, kiến trúc cảnh quan (1:10.000) | Không gian cây xanh | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/10.000 | Sơ đồ tổ chức không gian, kiến trúc cảnh quan (1:10.000) | Không gian mặt nước | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/10.000 | Sơ đồ tổ chức không gian, kiến trúc cảnh quan (1:10.000) | Quy hoạch đường không gian | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/10.000 | Quy hoạch công trình ngầm (1:10.000) | Công trình ngầm dạng vùng | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/10.000 | Quy hoạch công trình ngầm (1:10.000) | Công trình ngầm dạng đường | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/10.000 | Quy hoạch công trình ngầm (1:10.000) | Công trình ngầm dạng điểm | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/25.000 | Đánh giá môi trường chiến lược (1:25.000) | Đánh giá tổng hợp lựa chọn đất xây dựng dạng vùng | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-| 1/25.000 | Đánh giá môi trường chiến lược (1:25.000) | Đánh giá tổng hợp lựa chọn đất xây dựng dạng điểm | — | Nhóm trên cây lớp không thuộc 7 chuyên ngành, không đưa vào bộ dữ liệu |
-
-Các bản đồ scan (2A–3E, 7A–7F, 10A–10F) là nhóm không có lớp vector. «Hình ảnh các bản vẽ thiết kế đô thị» kiểu DATA, không có hình.
+- QHC đô thị Thừa Thiên Huế 1/25.000 — Sử dụng đất, ranh và lớp quy hoạch khác — Quy hoạch
+- QHC đô thị trung tâm Thừa Thiên Huế 1/10.000 — Sử dụng đất, ranh và lớp quy hoạch khác — Quy hoạch
+- QHC TT Phú Lộc — Giao thông — Hiện trạng
+- QHC TT Phú Lộc — Cấp nước — Hiện trạng
+- QHC TT Phú Lộc — Cấp điện — Hiện trạng
+- QHC TT Phú Lộc — San nền và thoát nước mưa — Hiện trạng
+- QHC TT Phú Lộc — Thoát nước thải — Hiện trạng
+- QHC TT Phú Lộc — Chất thải rắn và nghĩa trang — Hiện trạng
+- QHC TT Phú Lộc — Thông tin liên lạc — Hiện trạng
+- QHC Khe Tre — Giao thông — Hiện trạng
+- QHC Khe Tre — Cấp nước — Hiện trạng
+- QHC Khe Tre — Cấp điện — Hiện trạng
+- QHC Khe Tre — San nền và thoát nước mưa — Hiện trạng
+- QHC Khe Tre — Thoát nước thải — Hiện trạng
+- QHC Khe Tre — Chất thải rắn và nghĩa trang — Hiện trạng
+- QHC Khe Tre — Chất thải rắn và nghĩa trang — Quy hoạch
+- QHC Khe Tre — Thông tin liên lạc — Hiện trạng
+- QHC Khe Tre — Sử dụng đất, ranh và lớp quy hoạch khác — Hiện trạng
+- QHC Đô thị mới Vinh Hưng — San nền và thoát nước mưa — Hiện trạng
+- QHC Đô thị mới Vinh Hưng — Thoát nước thải — Hiện trạng
+- QHC Khu công nghiệp Phong Điền — Cấp nước — Hiện trạng
+- QHC Khu công nghiệp Phong Điền — San nền và thoát nước mưa — Hiện trạng
+- QHC Khu công nghiệp Phong Điền — Thoát nước thải — Hiện trạng
+- QHC Khu công nghiệp Phong Điền — Chất thải rắn và nghĩa trang — Hiện trạng
+- QHC Khu công nghiệp Phong Điền — Thông tin liên lạc — Hiện trạng
 
 ## Lưu trữ
 
-Từng file GeoJSON và zip đều dưới 5 MB nên nằm trong git. Không đẩy GCS, không dựng pmtiles. Worker chỉ phục vụ `public/`: `public/data/chuyen-nganh/10000` và `25000` là symlink tới `data/chuyen-nganh/` (không nhân bản trong git). Lệnh build của Wrangler chạy `scripts/stage-chuyen-nganh.mjs --materialize` để bung symlink thành thư mục lúc deploy.
+File trên 5 MB nằm trên GCS `hue-infra-data-us/chuyen-nganh/v1/`, `Cache-Control: public, max-age=31536000, immutable`. Không dựng pmtiles (chưa có tippecanoe; lớp lớn là polygon sử dụng đất).
+- https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhc-tt-phu-loc-19e96a86/sdd/hien-trang/hien-trang-su-dung-dat.geojson (geojson 5499576, zip 1117459)
+- https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/sdd/hien-trang/hien-trang-su-dung-dat.geojson (geojson 39110679, zip 11063910)
+- https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/sdd/hien-trang/hien-trang-su-dung-dat.geojson (geojson 63931754, zip 19482569)
+- https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhc-do-thi-moi-vinh-hung-8899f27b/sdd/hien-trang/hien-trang-su-dung-dat.geojson (geojson 5373719, zip 1395528)
+- https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhc-do-thi-moi-vinh-hung-8899f27b/sdd/quy-hoach/danh-gia-tong-hop-lua-chon-dat-xay-dung.geojson (geojson 5455563, zip 1353638)
+
+Worker chỉ phục vụ `public/`. `scripts/stage-chuyen-nganh.mjs` symlink từng thư mục đồ án từ `data/chuyen-nganh/` sang `public/data/chuyen-nganh/` (không nhân bản trong git) và bung thành bản sao lúc deploy.

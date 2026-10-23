@@ -65,6 +65,18 @@ assert.equal(core.level, 'QHC10');
 assert.equal(core.scheme, 'qhc-trung-tam');
 assert.deepEqual(core.area, { type: 'dothi', code: 'trung-tam', parent: 'TP' });
 
+const qhc25 = normalizeLayer({
+  sector: 'giao-thong', level: 'QHC', scale: 25000, status: 'hien-trang',
+  scheme: 'qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1', name: 'Đường'
+});
+assert.equal(qhc25.level, 'QHC25');
+assert.equal(qhc25.scheme, 'qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1');
+const qhcTown = normalizeLayer({
+  sector: 'giao-thong', level: 'QHC', scale: 2000, status: 'quy-hoach',
+  scheme: 'qhc-khe-tre-4a4803cd', name: 'GT'
+});
+assert.equal(qhcTown.level, 'QHC10');
+
 assert.equal(normalizeLayer({ sector: 'sdd', level: 'QHPK', status: 'hien-trang', name: 'Đất' }).sector, 'sdd');
 assert.equal(normalizeLayer({ sector: 'khac', level: 'QHC25', status: 'hien-trang' }), null);
 assert.equal(normalizeLayer({ base: true, sector: '', kind: 'hien-trang', name: 'Thửa', bind: 'chk_cadastre', id: 'base-cadastre' }).level, null);
@@ -128,7 +140,7 @@ assert.ok(schemesAt('QHC25', []).some(s => s.slug === 'qhc-hue-2045'));
 const withProject = schemesAt('QHPK', [{ tenQH: 'QHPK Khu A', slug: 'khu-a', wards: ['Thuận Hóa'] }]);
 assert.ok(withProject.some(s => s.slug === 'khu-a'));
 
-const link = 'public/data/chuyen-nganh/10000';
+const link = 'public/data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72';
 const sample = `${link}/giao-thong/hien-trang/hien-trang-cong-trinh-dau-moi-giao-thong.geojson`;
 const st = fs.lstatSync(link);
 assert.ok(st.isSymbolicLink() || st.isDirectory());

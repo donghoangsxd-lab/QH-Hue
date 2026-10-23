@@ -28,10 +28,19 @@ const cases = [
   ['Điểm xử lý chất thải rắn', 'chat-thai-ran-nghia-trang'],
   ['Mạng lưới thông tin liên lạc', 'thong-tin-lien-lac'],
   ['Mạng lưới trạm thông tin dạng điểm', 'thong-tin-lien-lac'],
-  ['Hiện trạng sử dụng đất', null],
-  ['Chức năng sử dụng đất', null],
-  ['Công trình ngầm dạng đường', null],
-  ['Ranh giới quy hoạch dạng vùng', null]
+  ['Hiện trạng sử dụng đất', 'sdd'],
+  ['Chức năng sử dụng đất', 'sdd'],
+  ['Công trình ngầm dạng đường', 'sdd'],
+  ['Ranh giới quy hoạch dạng vùng', 'sdd'],
+  ['mangLuoiNghiaTrang', 'chat-thai-ran-nghia-trang'],
+  ['congTrinhThuyLoiL', 'san-nen-thoat-mua'],
+  ['dinhViRanhGioi', 'sdd'],
+  ['Đèn chiếu sáng', 'cap-dien'],
+  ['Đường sắt cao tốc', 'giao-thong'],
+  ['Đường đồng mức thiết kế', 'san-nen-thoat-mua'],
+  ['Chỉ giới đường đỏ', 'sdd'],
+  ['Hướng thoát nước thải', 'thoat-nuoc-thai'],
+  ['Hướng thoát nước mưa', 'san-nen-thoat-mua']
 ];
 
 cases.forEach(([name, sector]) => {

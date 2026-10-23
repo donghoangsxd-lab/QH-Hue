@@ -156,6 +156,13 @@ export function areaLabel(area) {
 function normalizeLevel(raw, scale) {
   const id = String(raw || '').trim();
   if (LEVEL_IDS.has(id)) return id;
+  // Catalog ghi cấp đồ án «QHC». Tab 1/25.000 và 1/10.000 tách theo scale; QHC không ghi scale (thị trấn, KCN, 1/2.000) nằm cùng tab QHC10 vì schemesAt xếp mọi đồ án QHC vào đó.
+  if (id === 'QHC') {
+    const s = String(scale ?? '');
+    if (s === '25000') return 'QHC25';
+    if (s === '10000') return 'QHC10';
+    return 'QHC10';
+  }
   return SCALE_LEVEL[String(scale ?? '').trim()] || null;
 }
 
@@ -427,7 +434,10 @@ export function schemesAt(level, catalog = []) {
     add(schemeRow(p.slug || areaCodeFromName(p.tenQH), names.tenRutGon || names.tenQH, level));
   });
   layers.forEach(l => {
-    if (l.level === level && l.scheme) add(schemeRow(l.scheme, l.scheme, level));
+    if (l.level !== level || !l.scheme) return;
+    const project = (catalog || []).find(p => p && p.slug === l.scheme);
+    const name = project ? (namesOfProject(project).tenRutGon || project.tenQH || l.scheme) : l.scheme;
+    add(schemeRow(l.scheme, name, level));
   });
   return rows;
 }
