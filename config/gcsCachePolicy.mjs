@@ -10,6 +10,7 @@ export function cacheControlFor(name) {
   if (n === 'gba/buildings.pmtiles') return IMMUTABLE;
   if (n.startsWith('cache/sat/v1/') && n.endsWith('.png')) return IMMUTABLE;
   if (n.startsWith('chuyen-nganh/v1/')) return IMMUTABLE;
+  if (/^kien-truc\/[a-z0-9]+(?:-[a-z0-9]+)*\/quy-che\.pdf$/.test(n)) return INFRA_JSON;
   return '';
 }
 

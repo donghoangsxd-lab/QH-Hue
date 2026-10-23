@@ -55,6 +55,7 @@ import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
 import { initChuyenNganh } from './chuyenNganh.js';
 import { initQhctLayer } from './qhctLayer.js';
 import { initCadImport } from './cadImportUi.js';
+import { initEntryFlows } from './entryFlows.js';
 import { initProjectLayer } from './projectLayer.js';
 import { initProjectBrief } from './projectBrief.js';
 import { initProjectReview } from './projectReview.js';
@@ -199,16 +200,37 @@ function qcvnRadius(type, nhomHaTang, ward, name, size) {
   return /^xã\s/i.test(String(ward || '').trim()) && !["1-CV", "2-BDX"].includes(type) ? RURAL_UNIT_RADIUS : UNIT_DEFAULT_RADIUS[type];
 }
 
-function updateRadiusPreview() {
-  const out = document.getElementById('newRadius');
+const POINT_IDS = {
+  new: { type: 'newType', nhom: 'newNhomHaTang', name: 'newName', lat: 'newLat', lng: 'newLng', ward: 'newWard', size: 'newSize', phase: 'newPhase', radius: 'newRadius' },
+  kt: { type: 'ktType', nhom: 'ktNhomHaTang', name: 'ktName', lat: 'ktLat', lng: 'ktLng', ward: 'ktWard', size: 'ktSize', phase: 'ktPhase', radius: 'ktRadius' }
+};
+
+function pointIds(prefix) {
+  return POINT_IDS[prefix] || POINT_IDS.new;
+}
+
+function pointStatus(prefix, text, color) {
+  if (prefix !== 'kt') {
+    setStatus(text, color);
+    return;
+  }
+  const el = document.getElementById('ktStatus');
+  if (!el) return;
+  el.style.color = color || '';
+  el.textContent = text;
+}
+
+export function updateRadiusPreview(prefix = 'new') {
+  const ids = pointIds(prefix);
+  const out = document.getElementById(ids.radius);
   if (!out) return;
-  const type = document.getElementById('newType')?.value;
-  const nhom = document.getElementById('newNhomHaTang')?.value;
-  const ward = document.getElementById('newWard')?.value || '';
-  const name = document.getElementById('newName')?.value;
-  const size = Number(document.getElementById('newSize')?.value) || 0;
+  const type = document.getElementById(ids.type)?.value;
+  const nhom = document.getElementById(ids.nhom)?.value;
+  const ward = document.getElementById(ids.ward)?.value || '';
+  const name = document.getElementById(ids.name)?.value;
+  const size = Number(document.getElementById(ids.size)?.value) || 0;
   const r = qcvnRadius(type, nhom, ward, name, size);
-  const nhomEl = document.getElementById('newNhomHaTang');
+  const nhomEl = document.getElementById(ids.nhom);
   if (nhomEl) nhomEl.disabled = isNetworkType(type);
   if (type === '11-NT') {
     const kind = ntKindOf({ name });
@@ -246,6 +268,95 @@ function setStatus(text, color) {
   if (!el) return;
   el.style.color = color;
   setStatusContent(el, text);
+}
+
+let pointSubmitting = false;
+export async function submitInfraPoint(prefix, extra = {}) {
+  if (pointSubmitting) return;
+  const ids = pointIds(prefix);
+  const arch = prefix === 'kt';
+  const type = document.getElementById(ids.type)?.value;
+  const nhomHaTang = document.getElementById(ids.nhom)?.value || 'Cấp đơn vị ở';
+  const name = (document.getElementById(ids.name)?.value || '').trim();
+  const lat = Number(document.getElementById(ids.lat)?.value);
+  const lng = Number(document.getElementById(ids.lng)?.value);
+  const size = Number(document.getElementById(ids.size)?.value || 0);
+  const phase = document.getElementById(ids.phase)?.value === 'QH' ? 'QH' : 'HT';
+
+  if (!name || !Number.isFinite(lat) || !Number.isFinite(lng) || !document.getElementById(ids.lat)?.value) {
+    pointStatus(prefix, 'Vui lòng nhập đủ tên và tọa độ hợp lệ.', 'var(--accent-red)');
+    return;
+  }
+  if (!Number.isFinite(size) || size < 0) {
+    pointStatus(prefix, 'Diện tích không hợp lệ.', 'var(--accent-red)');
+    return;
+  }
+  if (phase === 'QH' && !(size > 0) && !NO_AREA_TYPES.includes(type)) {
+    pointStatus(prefix, 'Điểm quy hoạch mới cần diện tích lớn hơn 0 m².', 'var(--accent-red)');
+    return;
+  }
+
+  pointSubmitting = true;
+  pointStatus(prefix, arch ? 'Đang gửi công trình.' : 'Đang gửi đề xuất.', 'var(--accent-orange)');
+  try {
+    const body = { type, nhomHaTang, name, lat, lng, size, phase };
+    if (arch && extra.fields) Object.assign(body, extra.fields);
+    if (!arch) markDataWritten();
+    const res = await fetch(geeApi(`action=${arch ? 'addKienTruc' : 'addPoint'}`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      pointStatus(prefix, data.message || `Không gửi được (mã ${res.status}).`, 'var(--accent-red)');
+      return;
+    }
+    const radiusNote = data.radius ? `, bán kính ${Number(data.radius).toLocaleString('vi-VN')} m theo QCVN 01:2026` : '';
+    pointStatus(
+      prefix,
+      arch
+        ? `Đã lưu công trình${data.id ? ` (mã ${data.id})` : ''}${radiusNote}.`
+        : `Đã lưu đề xuất${data.id ? ` (mã ${data.id})` : ''}${radiusNote}, chờ quản trị phê duyệt.`,
+      'var(--accent-green)'
+    );
+    [ids.name, ids.lat, ids.lng, ids.ward, ids.size].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    if (arch) {
+      ['ktLinkAnh', 'ktLink3d'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+    }
+    updateRadiusPreview(prefix);
+    if (arch) return;
+
+    try {
+      await loadInfraData();
+    } catch (err) {
+      const newItem = {
+        id: data.id || `${type === '6-THPT' ? 'THPT' : 'NEW'}-${Date.now()}`,
+        name, ward: data.ward || '', type: type === '6-THPT' ? '4-TH' : type, nhomHaTang, lat, lng,
+        size: phase === 'QH' ? 0 : size,
+        radius: data.radius ?? qcvnRadius(type, nhomHaTang, data.ward, name, size) ?? 500,
+        sizeHT: phase === 'QH' ? null : size,
+        sizeQH: phase === 'QH' ? size : null,
+        planChange: phase === 'QH' ? 'new' : 'relocate',
+        status: false
+      };
+      if (phase === 'QH') state.planDataList.push(newItem);
+      else state.rawDataList.push(newItem);
+      bumpDataVersion();
+    }
+    renderGroupedPoints();
+    if (state.wardStatsData.length) reloadWardStats();
+  } catch (err) {
+    pointStatus(prefix, 'Không kết nối được máy chủ.', 'var(--accent-red)');
+  } finally {
+    pointSubmitting = false;
+  }
 }
 
 // Thanh tiêu đề: nút lật trang (biểu tượng bên trái) Quy hoạch ⇄ Hiện trạng, droplist lớp quy hoạch bên phải (mapLevel.js,
@@ -498,6 +609,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     refreshWardCheck();
   };
   initCadImport({ onImported: reloadAfterSheetWrite });
+  initEntryFlows({ submitInfraPoint, updateRadiusPreview });
   initProjectLayer({ onDeleted: reloadAfterSheetWrite });
   initProjectBrief();
   initProjectReview();
@@ -552,26 +664,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lat = latlng.lat.toFixed(6);
     const lng = latlng.lng.toFixed(6);
     const seq = ++pickSeq;
-    const inputLat = document.getElementById('newLat');
-    const inputLng = document.getElementById('newLng');
+    const prefix = state.pickTarget === 'kientruc' ? 'kt' : 'new';
+    const ids = pointIds(prefix);
+    const inputLat = document.getElementById(ids.lat);
+    const inputLng = document.getElementById(ids.lng);
     if (inputLat) inputLat.value = lat;
     if (inputLng) inputLng.value = lng;
-    setStatus("⏳ Đang tra cứu địa bàn...", "var(--accent-orange)");
+    pointStatus(prefix, "Đang tra cứu địa bàn...", "var(--accent-orange)");
 
     fetch(geeApi(`action=getWardFromPoint&lat=${lat}&lng=${lng}`))
       .then(r => (r.ok ? r.json() : {}))
       .then(res => {
-        if (seq !== pickSeq) return;   // đã ghim vị trí khác sau lần này
+        if (seq !== pickSeq) return;
         const wardName = res.ward || "";
-        const inputWard = document.getElementById('newWard');
+        const inputWard = document.getElementById(ids.ward);
         if (inputWard) inputWard.value = wardName;
-        updateRadiusPreview();
-        setStatus(
-          wardName ? `✓ Thuộc địa bàn: ${wardName}` : "⚠ Vị trí nằm ngoài ranh giới 40 phường/xã",
+        updateRadiusPreview(prefix);
+        pointStatus(
+          prefix,
+          wardName ? `Thuộc địa bàn: ${wardName}` : "Vị trí nằm ngoài ranh giới 40 phường/xã",
           wardName ? "var(--accent-green)" : "var(--accent-orange)"
         );
       })
-      .catch(() => { if (seq === pickSeq) setStatus("✓ Đã ghim tọa độ (chưa tra cứu được địa bàn)", "var(--accent-orange)"); });
+      .catch(() => { if (seq === pickSeq) pointStatus(prefix, "Đã ghim tọa độ (chưa tra cứu được địa bàn)", "var(--accent-orange)"); });
     state.isPickMode = false;
   };
 
@@ -892,83 +1007,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateRadiusPreview();
   document.getElementById('btnPickOnMap')?.addEventListener('click', () => {
     announceTool('pick');
+    state.pickTarget = 'infra';
     state.isPickMode = true;
-    setStatus("👉 Click trực tiếp trên bản đồ để chọn tọa độ...", "var(--accent-orange)");
+    setStatus("Chọn một điểm trên bản đồ.", "var(--accent-orange)");
   });
 
-  let submitting = false;
-  document.getElementById('btnSubmitNewPoint')?.addEventListener('click', async () => {
-    if (submitting) return;
-    const type = document.getElementById('newType')?.value;
-    const nhomHaTang = document.getElementById('newNhomHaTang')?.value || "Cấp đơn vị ở";
-    const name = (document.getElementById('newName')?.value || '').trim();
-    const lat = Number(document.getElementById('newLat')?.value);
-    const lng = Number(document.getElementById('newLng')?.value);
-    const size = Number(document.getElementById('newSize')?.value || 0);
-    const phase = document.getElementById('newPhase')?.value === 'QH' ? 'QH' : 'HT';
-
-    if (!name || !Number.isFinite(lat) || !Number.isFinite(lng) || !document.getElementById('newLat')?.value) {
-      setStatus("Vui lòng nhập đủ tên và tọa độ hợp lệ.", "var(--accent-red)");
-      return;
-    }
-    if (!Number.isFinite(size) || size < 0) {
-      setStatus("Diện tích không hợp lệ.", "var(--accent-red)");
-      return;
-    }
-    if (phase === 'QH' && !(size > 0) && !NO_AREA_TYPES.includes(type)) {
-      setStatus("Điểm quy hoạch mới cần diện tích lớn hơn 0 m².", "var(--accent-red)");
-      return;
-    }
-
-    submitting = true;
-    setStatus("Đang gửi đề xuất.", "var(--accent-orange)");
-    try {
-      markDataWritten();
-      const res = await fetch(geeApi('action=addPoint'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, nhomHaTang, name, lat, lng, size, phase })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        setStatus(data.message || `Không gửi được đề xuất (mã ${res.status}).`, "var(--accent-red)");
-        return;
-      }
-
-      const radiusNote = data.radius ? `, bán kính ${Number(data.radius).toLocaleString('vi-VN')} m theo QCVN 01:2026` : '';
-      setStatus(`✓ Đã lưu đề xuất${data.id ? ` (mã ${data.id})` : ''}${radiusNote}, chờ quản trị phê duyệt.`, "var(--accent-green)");
-      ['newName', 'newLat', 'newLng', 'newWard', 'newSize'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-      });
-      updateRadiusPreview();
-
-      // Lấy lại danh sách từ máy chủ (đã đồng bộ Sheets → GCS); lỗi thì tạm thêm điểm vào danh sách cục bộ
-      try {
-        await loadInfraData();
-      } catch (err) {
-        const newItem = {
-          id: data.id || `${type === '6-THPT' ? 'THPT' : 'NEW'}-${Date.now()}`,
-          name, ward: data.ward || '', type: type === '6-THPT' ? '4-TH' : type, nhomHaTang, lat, lng,
-          size: phase === 'QH' ? 0 : size,
-          radius: data.radius ?? qcvnRadius(type, nhomHaTang, data.ward, name, size) ?? 500,
-          sizeHT: phase === 'QH' ? null : size,
-          sizeQH: phase === 'QH' ? size : null,
-          planChange: phase === 'QH' ? 'new' : 'relocate',
-          status: false
-        };
-        if (phase === 'QH') state.planDataList.push(newItem);
-        else state.rawDataList.push(newItem);
-        bumpDataVersion();
-      }
-      renderGroupedPoints();
-      if (state.wardStatsData.length) reloadWardStats();
-    } catch (err) {
-      setStatus("Không kết nối được máy chủ.", "var(--accent-red)");
-    } finally {
-      submitting = false;
-    }
-  });
+  document.getElementById('btnSubmitNewPoint')?.addEventListener('click', () => submitInfraPoint('new'));
 
   // ---------- Ẩn/hiện toàn bộ icon (thanh đầu tab Lớp dữ liệu) ----------
   // Đủ 14 nhóm đang bật: bấm tắt hết; còn nhóm nào tắt: bấm bật cả 14 nhóm

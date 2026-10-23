@@ -61,6 +61,7 @@ export const state = {
 
   // Trạng thái các chế độ tương tác
   isPickMode: false,
+  pickTarget: 'infra',
   isInspectMode: false,
   adminDrawMode: null,     // Admin đang vẽ: 'road' = tuyến đường bổ sung (customRoads.js), 'pop' = vùng hiệu chỉnh dân cư (popEdits.js), 'bldg' = dấu chân nhà mới (bldgDraw.js)
   sketchTool: null,        // công cụ phác thảo đang chọn (sketchLayer.js): 'line' | 'polyline' | 'polygon' | 'arrow' | 'circle' | 'text'

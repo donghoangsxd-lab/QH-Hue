@@ -44,7 +44,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261028">
+  <link rel="stylesheet" href="css/style.css?v=20261030">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -845,6 +845,17 @@
       <!-- TAB: ĐỀ XUẤT ĐIỂM MỚI -->
       <div class="tab-body add-point-form propose-sheet map-float" id="tabAdd" hidden>
         <div class="float-head"><b>Đề xuất</b><button type="button" class="float-close" id="btnProposeClose" aria-label="Đóng đề xuất"><svg class="ico"><use href="#i-close"/></svg></button></div>
+        <div class="add-mode-switch entry-flows" id="entryFlows" role="tablist" aria-label="Luồng nhập thông tin">
+          <button type="button" class="entry-flow-btn active" data-flow="flowHanhChinh" role="tab" aria-selected="true">Hành chính</button>
+          <button type="button" class="entry-flow-btn" data-flow="flowHoSo" role="tab" aria-selected="false">Quy hoạch, hạ tầng</button>
+          <button type="button" class="entry-flow-btn" data-flow="flowKienTruc" role="tab" aria-selected="false">Kiến trúc</button>
+        </div>
+        <div id="entryOfficer"></div>
+        <div id="flowHanhChinh"></div>
+        <div id="flowHoSo" hidden>
+          <div id="hoSoBox"></div>
+          <details class="entry-legacy" id="entryLegacy">
+            <summary>Nhập điểm hạ tầng, nhập hàng loạt, quản trị</summary>
         <div class="add-mode-switch" role="tablist" aria-label="Cách đề xuất">
           <button type="button" class="add-mode-btn active" data-mode="addSingle" role="tab" aria-selected="true"><svg class="ico"><use href="#i-pen"/></svg>Nhập 1 điểm</button>
           <button type="button" class="add-mode-btn" data-mode="addBulk" role="tab" aria-selected="false" title="Nhập từ file DXF, KML, KMZ, GeoJSON, shapefile (.zip)"><svg class="ico"><use href="#i-folder"/></svg>Nhập hàng loạt</button>
@@ -1189,6 +1200,9 @@
           </div>
         </div>
         </div>
+          </details>
+        </div>
+        <div id="flowKienTruc" hidden></div>
       </div>
 
       <!-- TAB: CHÚ GIẢI -->
@@ -1498,6 +1512,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261028"></script>
+  <script type="module" src="./js/app.js?v=20261030"></script>
 </body>
 </html>

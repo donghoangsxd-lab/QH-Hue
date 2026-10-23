@@ -1050,7 +1050,8 @@ function revealInList(p) {
 const DOC_ROLE = {
   'phe-duyet': { short: 'PD', label: 'Quyết định phê duyệt' },
   'dinh-chinh': { short: 'ĐC', label: 'Quyết định đính chính' },
-  'quy-dinh': { short: 'QL', label: 'Quy định quản lý' }
+  'quy-dinh': { short: 'QL', label: 'Quy định quản lý' },
+  'thuyet-minh': { short: 'TM', label: 'Thuyết minh' }
 };
 
 function decisionNote(p, idx) {
@@ -1067,6 +1068,7 @@ function docsHtml(p, idx, admin) {
       <select data-doc-role="${idx}" aria-label="Loại văn bản kèm theo">
         <option value="dinh-chinh">Quyết định đính chính</option>
         <option value="quy-dinh">Quy định quản lý</option>
+        <option value="thuyet-minh">Thuyết minh</option>
         <option value="phe-duyet">Quyết định phê duyệt</option>
       </select>
       <button type="button" data-doc-add="${idx}"${busy ? ' disabled' : ''}>Thêm PDF</button>

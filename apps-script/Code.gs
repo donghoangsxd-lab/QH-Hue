@@ -1422,6 +1422,114 @@ function appendHtFeatures(ss, features) {
   }
 }
 
+// Tab chỉ tiêu đô thị và công trình kiến trúc. Tên tab Dong xác nhận: ChiTieuDoThi, KienTruc.
+// Không nằm trong VALID_PREFIXES nên syncSheetsToGCS không đóng gói vào infrastructure_hue.json.
+var CHI_TIEU_SHEET = "ChiTieuDoThi";
+var KIEN_TRUC_SHEET = "KienTruc";
+var CHI_TIEU_HEADERS = ["UnitKey", "UnitType", "UnitCode", "UnitName", "Field", "Value", "Officer", "ThoiGianCapNhat"];
+var KIEN_TRUC_HEADERS = ["ID_DoiTuong", "Ten_CongTrinh", "Ten_XaPhuong", "Nhom_HaTang", "Latitude", "Longitude", "QuyMo_HT", "QuyMo_QH", "BanKinh", "TrangThai", "ThoiGianCapNhat", "Note", "Loai", "KhuVuc", "LinkAnh", "Link3D"];
+
+function ensureNamedSheet(ss, name, headers) {
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function saveUrbanInputs(body) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ensureNamedSheet(ss, CHI_TIEU_SHEET, CHI_TIEU_HEADERS);
+    var fields = body.fields && typeof body.fields === "object" ? body.fields : {};
+    var keys = Object.keys(fields);
+    var data = sheet.getDataRange().getValues();
+    var index = {};
+    for (var r = 1; r < data.length; r++) index[String(data[r][0]) + "\t" + String(data[r][4])] = r + 1;
+    var now = new Date();
+    var saved = 0;
+    keys.forEach(function(field) {
+      var value = String(fields[field] == null ? "" : fields[field]).slice(0, 40);
+      var at = index[String(body.unitKey || "") + "\t" + field];
+      var row = [body.unitKey || "", body.unitType || "", body.unitCode || "", body.unitName || "", field, value, body.officer || "", now];
+      if (at) sheet.getRange(at, 1, 1, row.length).setValues([row]);
+      else if (value) {
+        sheet.appendRow(row);
+        index[String(body.unitKey || "") + "\t" + field] = sheet.getLastRow();
+      }
+      if (value || at) saved++;
+    });
+    return { "success": true, "saved": saved };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getUrbanInputs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CHI_TIEU_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return { "success": true, "rows": [] };
+  var data = sheet.getDataRange().getValues();
+  var rows = [];
+  for (var r = 1; r < data.length; r++) {
+    if (!data[r][0] || !data[r][4] || !data[r][5]) continue;
+    rows.push({
+      "unitKey": String(data[r][0]),
+      "field": String(data[r][4]),
+      "value": String(data[r][5]),
+      "officer": String(data[r][6] || "")
+    });
+  }
+  return { "success": true, "rows": rows };
+}
+
+function addKienTruc(body) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ensureNamedSheet(ss, KIEN_TRUC_SHEET, KIEN_TRUC_HEADERS);
+    var data = sheet.getDataRange().getValues();
+    var n = 1;
+    for (var i = 1; i < data.length; i++) {
+      var m = String(data[i][0] || "").match(/^KT-(\d+)$/);
+      if (m && Number(m[1]) >= n) n = Number(m[1]) + 1;
+    }
+    var idNum = String(n);
+    while (idNum.length < 3) idNum = "0" + idNum;
+    var phase = String(body.phase || "HT").toUpperCase() === "QH" ? "QH" : "HT";
+    var size = Number(body.size) || 0;
+    var row = [
+      "KT-" + idNum,
+      body.name || "",
+      sheetWard(body.ward) || "",
+      sheetNhom(body.nhomHaTang),
+      "'" + String(body.lat || ""),
+      "'" + String(body.lng || ""),
+      phase === "QH" ? "" : size,
+      phase === "QH" ? size : "",
+      body.radius || "",
+      false,
+      new Date(),
+      "Công trình kiến trúc từ webapp",
+      body.type || "",
+      body.khuVuc || "",
+      body.linkAnh || "",
+      body.link3d || ""
+    ];
+    sheet.appendRow(row);
+    var lastRow = sheet.getLastRow();
+    sheet.getRange(lastRow, 5, 1, 2).setNumberFormat("@");
+    return { "success": true, "id": row[0] };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // 4. GHI HÀNG LOẠT (POST JSON, CHỈ MÁY CHỦ WEBAPP CÓ KHÓA API_SECRET)
 function doPost(e) {
   try {
@@ -1465,6 +1573,10 @@ function doPost(e) {
       }
       return jsonOutput(addPendingPoints(body));
     }
+    // Tab ChiTieuDoThi và KienTruc do Dong xác nhận tên. Không thuộc 14 nhóm hạ tầng, không gọi syncSheetsToGCS.
+    if (action === "saveUrbanInputs") return jsonOutput(saveUrbanInputs(body));
+    if (action === "getUrbanInputs") return jsonOutput(getUrbanInputs());
+    if (action === "addKienTruc") return jsonOutput(addKienTruc(body));
     return jsonOutput({ "error": "Action không hợp lệ: " + action });
   } catch (err) {
     return jsonOutput({ "error": err.toString() });
@@ -2193,10 +2305,14 @@ function putBucketObject(body) {
   return { "success": true, "saved": uploadToGCS(content, name) };
 }
 
+function bucketKienTrucPdf(name) {
+  return /^kien-truc\/[a-z0-9]+(?:-[a-z0-9]+)*\/quy-che\.pdf$/.test(name);
+}
+
 function putBucketPdf(body) {
   var name = String(body.name || "");
   var b64 = String(body.content || "").replace(/\s+/g, "");
-  if (!bucketDecisionPdf(name)) return { "error": "Tên file bucket không hợp lệ" };
+  if (!bucketDecisionPdf(name) && !bucketKienTrucPdf(name)) return { "error": "Tên file bucket không hợp lệ" };
   if (!b64) return { "error": "File PDF rỗng." };
   if (b64.length > 2796204) return { "error": "File PDF tối đa 2 MB." };
   var bytes;

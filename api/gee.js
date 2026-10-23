@@ -297,6 +297,25 @@ function checkAddPointRate(req) {
   checkRate(addPointHits, req, 10, 10 * 60 * 1000, 'Gửi quá nhiều đề xuất, vui lòng thử lại sau ít phút');
 }
 
+const urbanEntryHits = new Map();
+function checkUrbanEntryRate(req) {
+  checkRate(urbanEntryHits, req, 20, 10 * 60 * 1000, 'Gửi chỉ tiêu quá nhiều, vui lòng thử lại sau ít phút');
+}
+const kienTrucPdfHits = new Map();
+function checkKienTrucPdfRate(req) {
+  checkRate(kienTrucPdfHits, req, 8, 60 * 60 * 1000, 'Mỗi máy chỉ ghi được 8 quy chế mỗi giờ');
+}
+const URBAN_UNIT_RE = /^(tp:TP|dothi:[a-z0-9]+(?:-[a-z0-9]+)*|xa:[a-z0-9]+(?:-[a-z0-9]+)*)$/;
+const URBAN_FIELDS = new Set([
+  'danSo', 'danSoTamTru', 'dienTich', 'matDoDuong', 'ldPhiNong', 'nuocSach', 'matDoCong', 'xlnt', 'ctr',
+  'nghiaTrang', 'giuongBenh', 'khongGianXanh', 'vaiTro', 'trungTam', 'dauMoiGt', 'quyCheKt',
+  'i01', 'i02', 'i03', 'i04', 'i05', 'i06', 'i11', 'i13', 'i14', 'i15'
+]);
+function httpsLink(raw) {
+  const s = sanitizeSheetText(raw, 300);
+  return /^https:\/\//i.test(s) ? s : '';
+}
+
 // Hồ sơ file chờ duyệt (người dùng chưa đăng nhập): mỗi IP tối đa 3 file / giờ, mỗi file ≤ 2 MB
 const PENDING_CAD_MAX_BYTES = 2 * 1024 * 1024;
 const PENDING_CAD_EXTS = ['dxf', 'kml', 'geojson'];
@@ -4307,6 +4326,101 @@ module.exports = async (req, res) => {
       });
       invalidateAllCaches();
       return res.status(200).json({ success: true, id: result.id || null, ward: geoWard, radius });
+    }
+
+    // Chỉ tiêu đô thị và công trình kiến trúc: chỉ khi bấm Lưu / Gửi. Không invalidate cache hạ tầng, không sync infrastructure_hue.json.
+    if (action === 'saveUrbanInputs' || action === 'getUrbanInputs') {
+      requirePostFromApp(req);
+      checkUrbanEntryRate(req);
+      const body = action === 'getUrbanInputs' ? {} : readJsonBody(req);
+      let payload = { action };
+      if (action === 'saveUrbanInputs') {
+        const unitKey = String(body.unitKey || '');
+        if (!URBAN_UNIT_RE.test(unitKey)) return res.status(400).json({ error: true, message: 'Đơn vị không hợp lệ' });
+        const src = body.fields && typeof body.fields === 'object' ? body.fields : {};
+        const fields = {};
+        Object.keys(src).forEach(key => {
+          if (!URBAN_FIELDS.has(key)) return;
+          fields[key] = sanitizeSheetText(src[key], 40);
+        });
+        payload = {
+          action,
+          unitKey,
+          unitType: sanitizeSheetText(body.unitType, 12),
+          unitCode: sanitizeSheetText(body.unitCode, 40),
+          unitName: sanitizeSheetText(body.unitName, 80),
+          officer: sanitizeSheetText(body.officer, 80),
+          fields
+        };
+      }
+      const result = await callAppsScript({ action }, payload);
+      return res.status(200).json({
+        success: true,
+        saved: result.saved || 0,
+        rows: Array.isArray(result.rows) ? result.rows.slice(0, 4000) : []
+      });
+    }
+
+    if (action === 'addKienTruc') {
+      requirePostFromApp(req);
+      checkAddPointRate(req);
+      const body = readJsonBody(req);
+      const type = String(body.type || '');
+      const name = sanitizeSheetText(body.name, 150);
+      const isNetwork = constants.isNetworkCode(type);
+      const nhomHaTang = isNetwork || body.nhomHaTang === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
+      const phase = body.phase === 'QH' ? 'QH' : 'HT';
+      const size = Number(body.size || 0);
+      const pt = parseCoordInBounds(body.lat, body.lng);
+      const noArea = isNetwork && !!constants.networkConfig[type].noArea;
+      const khuVuc = String(body.khuVuc || '');
+      if (![...CODES, '6-THPT', '12-CSD', ...constants.NETWORK_CODES].includes(type)) return res.status(400).json({ error: true, message: 'Loại công trình không hợp lệ' });
+      if (!name) return res.status(400).json({ error: true, message: 'Thiếu tên công trình' });
+      if (!pt) return res.status(400).json({ error: true, message: 'Tọa độ không hợp lệ hoặc nằm ngoài TP. Huế' });
+      if (!Number.isFinite(size) || size < 0 || size > 1e8) return res.status(400).json({ error: true, message: 'Diện tích không hợp lệ' });
+      if (phase === 'QH' && !(size > 0) && !noArea) return res.status(400).json({ error: true, message: 'Điểm quy hoạch mới cần diện tích > 0' });
+      if (khuVuc && !URBAN_UNIT_RE.test(khuVuc)) return res.status(400).json({ error: true, message: 'Đơn vị không hợp lệ' });
+      const evaluatedWardsForKt = await loadEvaluatedWards(wardVectorParsed);
+      const geoWard = assignWardByGeometry(pt.lng, pt.lat, evaluatedWardsForKt);
+      if (!geoWard) return res.status(400).json({ error: true, message: 'Vị trí nằm ngoài ranh giới 40 phường/xã' });
+      const radius = qcvnRadius({ type, name, nhomHaTang, size }, geoWard);
+      const result = await callAppsScript({ action: 'addKienTruc' }, {
+        action: 'addKienTruc',
+        type,
+        nhomHaTang,
+        name,
+        ward: geoWard,
+        lat: pt.lat.toFixed(6),
+        lng: pt.lng.toFixed(6),
+        size: String(size),
+        radius: radius ? String(radius) : '',
+        phase,
+        khuVuc,
+        linkAnh: httpsLink(body.linkAnh),
+        link3d: httpsLink(body.link3d)
+      });
+      return res.status(200).json({ success: true, id: result.id || null, ward: geoWard, radius });
+    }
+
+    if (action === 'putKienTrucPdf') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      checkKienTrucPdfRate(req);
+      const body = readJsonBody(req);
+      const unitKey = String(body.unitKey || '');
+      if (!URBAN_UNIT_RE.test(unitKey)) return res.status(400).json({ error: true, message: 'Đơn vị không hợp lệ' });
+      const staged = stagedTokenOf(body);
+      let buffer = null;
+      if (!staged) {
+        try { buffer = pdfLimits.inlineBuffer(body.pdf, true); }
+        catch (err) { return sendInlinePdfError(res, err); }
+      }
+      try {
+        const saved = await projects.saveKienTrucPdf({ unitKey, fileName: body.name, buffer, stagedToken: staged });
+        return res.status(200).json({ success: true, ...saved });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được quy chế' });
+      }
     }
 
     if (action === 'analyzePoint') {

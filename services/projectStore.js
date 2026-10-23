@@ -374,7 +374,7 @@ const PROPOSALS_NAME = 'projects/decision-proposals.json';
 const PROPOSAL_FILE = 'quyet-dinh-cho.pdf';
 const STAGED_RE = /^[a-f0-9]{32}$/;
 // Văn bản kèm theo quyết định phê duyệt. id 8 ký tự hex, file projects/<slug>/vb-<id>.pdf
-const DOC_ROLES = { 'phe-duyet': 'Quyết định phê duyệt', 'dinh-chinh': 'Quyết định đính chính', 'quy-dinh': 'Quy định quản lý' };
+const DOC_ROLES = { 'phe-duyet': 'Quyết định phê duyệt', 'dinh-chinh': 'Quyết định đính chính', 'quy-dinh': 'Quy định quản lý', 'thuyet-minh': 'Thuyết minh' };
 const DOC_MAX = 8;
 const DOC_ID_RE = /^[a-f0-9]{8}$/;
 
@@ -1817,8 +1817,14 @@ async function linkInfraLots({ tenQH, pairs }) {
 
 // Lớp chính của đồ án = 1 file role (khớp PROJECT_LAYERS ở public/js/projectFiles.js)
 const LAYER_ROLES = [ROLE_QH, ROLE_POINTS, ROLE_BOUNDARY, ROLE_HT];
-// Bản vẽ hạ tầng riêng từng đồ án. props giữ để đối chiếu đấu nối: quyMo, congSuat, loai, và với giao thông là capDuong, loGioi, matCat.
-const NET_ROLES = ['ht-giao-thong', 'qh-giao-thong', 'ht-cap-nuoc', 'qh-cap-nuoc', 'ht-thoat-nuoc', 'qh-thoat-nuoc', 'ht-cap-dien', 'qh-cap-dien'];
+// Bản vẽ riêng từng đồ án. Khớp NET_LAYERS, trừ ba role *-hoso: ghi bucket để giữ trục,
+// không đưa vào lớp bản đồ (đã có ranh-gioi, hien-trang, su-dung-dat và catalog sử dụng đất).
+// ht-thoat-nuoc giữ nguyên. Nước thải dùng ht-thoat-thai / qh-thoat-thai.
+const NET_ROLES = [
+  'ht-giao-thong', 'qh-giao-thong', 'ht-cap-nuoc', 'qh-cap-nuoc', 'ht-thoat-nuoc', 'qh-thoat-nuoc', 'ht-cap-dien', 'qh-cap-dien',
+  'ht-san-nen', 'qh-san-nen', 'ht-thoat-thai', 'qh-thoat-thai', 'ht-chat-thai', 'qh-chat-thai', 'ht-vien-thong', 'qh-vien-thong',
+  'ht-dat-hoso', 'qh-dat-hoso', 'ranh-hoso'
+];
 const NET_GEOM = new Set(['Point', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon']);
 const NET_MAX_FEATURES = 4000;
 const NET_MAX_CHARS = 1500000;
@@ -1872,21 +1878,32 @@ function cleanGeom(g) {
   return polys.length ? { type: 'MultiPolygon', coordinates: polys } : null;
 }
 
+const NET_AXIS = ['scheme', 'level', 'sector', 'kind', 'areaType', 'areaCode', 'areaParent', 'step', 'nhan'];
+const NET_PROP_KEYS = ['quyMo', 'congSuat', 'loai', 'capDuong', 'loGioi', 'matCat', ...NET_AXIS];
+
 function cleanNetProps(raw) {
   const p = raw && typeof raw === 'object' ? raw : {};
   const out = {};
-  const quyMo = clipText(p.quyMo, 40);
-  const congSuat = clipText(p.congSuat, 40);
-  const loai = clipText(p.loai, 80);
-  const capDuong = clipText(p.capDuong, 80);
-  const loGioi = clipText(p.loGioi, 40);
-  const matCat = clipText(p.matCat, 80);
-  if (quyMo) out.quyMo = quyMo;
-  if (congSuat) out.congSuat = congSuat;
-  if (loai) out.loai = loai;
-  if (capDuong) out.capDuong = capDuong;
-  if (loGioi) out.loGioi = loGioi;
-  if (matCat) out.matCat = matCat;
+  const put = (key, n) => {
+    const v = clipText(p[key], n);
+    if (v) out[key] = v;
+  };
+  put('quyMo', 40);
+  put('congSuat', 40);
+  put('loai', 80);
+  put('capDuong', 80);
+  put('loGioi', 40);
+  put('matCat', 80);
+  NET_AXIS.forEach(key => put(key, key === 'scheme' || key === 'nhan' ? 120 : 40));
+  let extra = 0;
+  Object.keys(p).forEach(key => {
+    if (extra >= 12 || NET_PROP_KEYS.includes(key) || out[key]) return;
+    if (!/^[A-Za-z][A-Za-z0-9_]{0,23}$/.test(key)) return;
+    const v = clipText(p[key], 80);
+    if (!v) return;
+    out[key] = v;
+    extra += 1;
+  });
   return out;
 }
 
@@ -2735,10 +2752,45 @@ async function wardParcels() {
   return { parcels, lands };
 }
 
+const KIEN_TRUC_UNIT = /^(tp:TP|dothi:[a-z0-9]+(?:-[a-z0-9]+)*|xa:[a-z0-9]+(?:-[a-z0-9]+)*)$/;
+
+function kienTrucObject(unitKey) {
+  return `kien-truc/${String(unitKey).replace(':', '-').toLowerCase()}/quy-che.pdf`;
+}
+
+async function stampShortCache(name) {
+  try {
+    const { cacheControlFor } = await import('../config/gcsCachePolicy.mjs');
+    const cc = cacheControlFor(name);
+    if (cc) await gcsWrite.patchCacheControl(name, cc);
+  } catch (err) { /* metadata cache không chặn lần ghi */ }
+}
+
+async function saveKienTrucPdf({ unitKey, fileName, buffer, stagedToken }) {
+  if (!KIEN_TRUC_UNIT.test(String(unitKey || ''))) {
+    const err = new Error('Đơn vị không hợp lệ');
+    err.status = 400;
+    throw err;
+  }
+  const dest = kienTrucObject(unitKey);
+  let bytes = 0;
+  let via = 'direct';
+  if (stagedToken) {
+    bytes = await takeStagedPdf(stagedToken, dest, pdfLimits.PDF_ADMIN_MAX_BYTES);
+  } else {
+    if (!pdfOk(buffer, pdfLimits.PDF_ADMIN_MAX_BYTES)) rejectPdf(buffer, pdfLimits.PDF_ADMIN_MAX_BYTES);
+    const written = await writeBytes(dest, buffer, 'application/pdf');
+    via = written.via;
+    bytes = buffer.length;
+  }
+  await stampShortCache(dest);
+  return { name: decisionFileName(fileName), bytes, url: `${publicUrl(dest)}?v=${Date.now()}`, via };
+}
+
 module.exports = {
   setTransport, projectTitle, projectSlug, splitProjectName, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, unpairInfraLot, linkInfraLots, deleteLayer, deleteProjectFiles, renameProject,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision, layerDecisions, removeLayerDecision,
-  saveProjectDoc, removeProjectDoc, saveNet,
+  saveProjectDoc, removeProjectDoc, saveNet, saveKienTrucPdf,
   saveDecisionProposal, readDecisionProposal, approveDecisionProposal, rejectDecisionProposal,
   migratePage, lotsBySlug, legacyLots, wardParcels, applyPhaseParcels, namedPhase,
   saveAdjustment, attachAdjustPdf, attachAdjustScan, listAdjustments, readAdjustment, readAdjustPdf, readAdjustScan,
