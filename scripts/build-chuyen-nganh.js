@@ -1,8 +1,11 @@
 // Dựng catalog hạ tầng chuyên ngành từ thư mục LOP-mapid* (gserver-to-shp.js).
 //   node scripts/build-chuyen-nganh.js "<thư mục chứa LOP-mapid…>"
+//   node scripts/build-chuyen-nganh.js --append --schemes scripts/qhct-500-schemes.json "<thư mục>" [--upload]
 //   node scripts/build-chuyen-nganh.js --gcs
 // Giữ nguyên GeoJSON và zip. EPSG:4326. Không in hình ra stdout.
+const crypto = require('crypto');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { verifyOut } = require('./gserver-to-shp');
 
@@ -26,14 +29,14 @@ const SECTOR_LABEL = Object.fromEntries(SECTORS);
 // Tách camelCase trước khi bỏ dấu: mangLuoiNghiaTrang → «nghia trang».
 // sdd đứng trước hạ tầng để ranh / sử dụng đất không bị nuốt. Thải đứng trước «thoát nước» mưa.
 const RULES = [
-  [/su dung dat|chuc nang|diem chuc nang|khong gian|ranh gioi|dinh vi ranh|chi gioi|danh gia moi truong|danh gia tong hop|lua chon dat|cong trinh ngam|dinh huong phat trien/, 'sdd'],
+  [/su dung dat|chuc nang|diem chuc nang|khong gian|ranh gioi|dinh vi ranh|chi gioi|danh gia moi truong|danh gia tong hop|lua chon dat|cong trinh ngam|xay dung ngam|dinh huong phat trien|co cau phan lo|phan o quy hoach|moc gioi|hanh lang an toan/, 'sdd'],
   [/chat thai ran|nghia trang/, 'chat-thai-ran-nghia-trang'],
-  [/thoat nuoc thai|xu ly nuoc thai/, 'thoat-nuoc-thai'],
+  [/thoat nuoc thai|thoat muoc thai|xu ly nuoc thai|vsmt/, 'thoat-nuoc-thai'],
   [/thong tin|tram thong tin/, 'thong-tin-lien-lac'],
-  [/cap nuoc/, 'cap-nuoc'],
+  [/cap nuoc|dau noi/, 'cap-nuoc'],
   [/cap dien|phan phoi dien|nang luong|chieu sang|den chieu sang|cot den/, 'cap-dien'],
-  [/giao thong|duong bo|duong sat|duong thuy|cau giao thong|bo via|mat duong|mat cat/, 'giao-thong'],
-  [/thoat nuoc|thuy loi|luu vuc|phan luu|huong thoat|chieu cao|tieu thoat|do cao thoat|san nen|dong muc/, 'san-nen-thoat-mua']
+  [/giao thong|duong bo|duong sat|duong thuy|cau giao thong|bo via|mat duong|mat cat|tim duong/, 'giao-thong'],
+  [/thoat nuoc|thuy loi|luu vuc|phan luu|huong thoat|chieu cao|tieu thoat|do cao thoat|san nen|dong muc|cao do nen|chuan bi ky thuat|do doc|phan lo san nen|phan o san nen|phan vung san nen/, 'san-nen-thoat-mua']
 ];
 
 // Slug trùng projects/index.json khi đồ án đã có. Đồ án mới dùng projectSlug(tên).
@@ -187,8 +190,8 @@ function scaleOf(dirName) {
 
 function statusOf(dirName) {
   const s = strip(dirName);
-  if (s.startsWith('hien trang')) return 'hien-trang';
-  if (s.startsWith('quy hoach') || s.startsWith('ranh gioi') || s.startsWith('so do') || s.startsWith('danh gia')) return 'quy-hoach';
+  if (/(^|[^a-z])hien trang/.test(s)) return 'hien-trang';
+  if (/(^|[^a-z])(quy hoach|ranh gioi|so do|danh gia|chi gioi|moc gioi)/.test(s)) return 'quy-hoach';
   return null;
 }
 
@@ -219,6 +222,52 @@ function round6(n) {
 function hueBbox(bbox) {
   const [minx, miny, maxx, maxy] = bbox;
   return minx >= 106 && maxx <= 110 && miny >= 15 && maxy <= 18;
+}
+
+function coordsInHue(geometry) {
+  let ok = true;
+  const walk = (c) => {
+    if (!ok || !Array.isArray(c)) return;
+    if (typeof c[0] === 'number') {
+      if (c[0] < 106 || c[0] > 110 || c[1] < 15 || c[1] > 18) ok = false;
+      return;
+    }
+    c.forEach(walk);
+  };
+  if (!geometry || !geometry.coordinates) return false;
+  walk(geometry.coordinates);
+  return ok;
+}
+
+function bboxFromFeatures(features) {
+  let minx = Infinity; let miny = Infinity; let maxx = -Infinity; let maxy = -Infinity;
+  const walk = (c) => {
+    if (!Array.isArray(c)) return;
+    if (typeof c[0] === 'number') {
+      minx = Math.min(minx, c[0]); maxx = Math.max(maxx, c[0]);
+      miny = Math.min(miny, c[1]); maxy = Math.max(maxy, c[1]);
+      return;
+    }
+    c.forEach(walk);
+  };
+  features.forEach((f) => walk(f.geometry && f.geometry.coordinates));
+  return [minx, miny, maxx, maxy].map(round6);
+}
+
+// Điểm lệch (null island, đỉnh hỏng) không được kéo bbox cả lớp. Giữ đối tượng nằm trong Huế.
+function cleanHueFile(geojsonPath) {
+  const doc = JSON.parse(fs.readFileSync(geojsonPath, 'utf8'));
+  const kept = [];
+  let dropped = 0;
+  (doc.features || []).forEach((f) => {
+    if (f && coordsInHue(f.geometry)) kept.push(f);
+    else dropped += 1;
+  });
+  if (!kept.length) return { dropped, kept: 0, file: geojsonPath, bbox: null };
+  const out = path.join(os.tmpdir(), 'qh-hue-clean', `${crypto.createHash('sha1').update(geojsonPath).digest('hex')}.geojson`);
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, JSON.stringify({ type: 'FeatureCollection', features: kept }));
+  return { dropped, kept: kept.length, file: out, bbox: bboxFromFeatures(kept) };
 }
 
 function layerStem(zipName) {
@@ -263,15 +312,29 @@ function collect(roots) {
             });
             continue;
           }
-          const bbox = row.bbox.map(round6);
-          if (!hueBbox(bbox)) throw new Error(`${dirName}/${name}: bbox ngoài WGS84 vùng Huế ${bbox.join(',')}`);
+          let bbox = row.bbox.map(round6);
+          let featureCount = row.geojson;
+          let geojson = path.join(dir, `${name}.geojson`);
+          if (!hueBbox(bbox)) {
+            const cleaned = cleanHueFile(geojson);
+            gaps.push({
+              scheme: scheme.slug, sector: sector || null, scale: scheme.scale, status, level: scheme.level,
+              name, featureCount: cleaned.dropped,
+              reason: `Bỏ ${cleaned.dropped} đối tượng có tọa độ ngoài vùng Huế`
+            });
+            if (!cleaned.kept || !hueBbox(cleaned.bbox)) {
+              continue;
+            }
+            geojson = cleaned.file;
+            featureCount = cleaned.kept;
+            bbox = cleaned.bbox;
+          }
           if (!sector) {
             unclassified.push({ mapid, name, group: dirName });
             continue;
           }
           const dict = path.join(dir, `${name}-ten-truong.txt`);
           if (!fs.existsSync(dict)) throw new Error(`Thiếu từ điển trường: ${dict}`);
-          const geojson = path.join(dir, `${name}.geojson`);
           layers.push({
             scheme: scheme.slug,
             level: scheme.level,
@@ -280,7 +343,7 @@ function collect(roots) {
             status,
             name,
             geomType: geomTypeOf(row.type),
-            featureCount: row.geojson,
+            featureCount,
             fields: fieldsOf(dict),
             bbox,
             geojson,
@@ -295,12 +358,15 @@ function collect(roots) {
   return { layers, gaps, unclassified };
 }
 
-function place(layers, repo) {
+function place(layers, repo, options) {
+  const keepOthers = !!(options && options.keepOthers);
   const root = path.join(repo, 'data', 'chuyen-nganh');
   fs.mkdirSync(root, { recursive: true });
-  for (const old of ['10000', '25000']) {
-    const p = path.join(root, old);
-    if (fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true });
+  if (!keepOthers) {
+    for (const old of ['10000', '25000']) {
+      const p = path.join(root, old);
+      if (fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true });
+    }
   }
   const slugs = new Set(layers.map((l) => l.scheme));
   slugs.forEach((slugName) => {
@@ -345,9 +411,10 @@ function place(layers, repo) {
   return heavy;
 }
 
-function emptyCells(layers) {
+function emptyCells(layers, options) {
   const out = [];
-  SCHEMES.filter((s) => !s.skipLayers).forEach((scheme) => {
+  const onlyFresh = !!(options && options.onlyFresh);
+  SCHEMES.filter((s) => !s.skipLayers && (!onlyFresh || s.fresh)).forEach((scheme) => {
     SECTORS.forEach(([sector]) => {
       ['hien-trang', 'quy-hoach'].forEach((status) => {
         const hit = layers.some((l) => l.scheme === scheme.slug && l.sector === sector && l.status === status);
@@ -400,12 +467,19 @@ function manifestOf(layers, gaps) {
     source: 'https://gissonganh.hue.gov.vn/geditor.aspx',
     crs: 'EPSG:4326',
     sectors: SECTOR_LABEL,
-    relations: [
-      { scheme: KCN, overrides: [PHONG_DIEN], overrideArea: 'ranh KCN' }
-    ],
+    relations: relationsOf(),
     layers: items,
     gaps
   };
+}
+
+function relationsOf() {
+  const rel = [{ scheme: KCN, overrides: [PHONG_DIEN], overrideArea: 'ranh KCN' }];
+  SCHEMES.forEach((s) => {
+    if (!s.overrides || !s.overrides.length || s.slug === KCN) return;
+    rel.push({ scheme: s.slug, overrides: s.overrides, overrideArea: s.overrideArea || 'ranh QHCT' });
+  });
+  return rel;
 }
 
 function schemesDoc() {
@@ -459,6 +533,10 @@ function docOf(manifest, heavy) {
   lines.push('');
   lines.push('Phạm vi Hành chính gắn trên đồ án (`area` trong `schemes.json`), không suy xã nằm trong đô thị. Phú Lộc: `xa:phu-loc`. Khe Tre: `dothi:khe-tre` (`catalogScheme` `qhc-khe-tre`). Vinh Hưng: `xa:vinh-loc`. KCN Phong Điền: `dothi:phong-dien` (không gộp vào đồ án Phong Điền). Chân Mây – Lăng Cô: `dothi:chan-may` (`catalogScheme` `qhc-chan-may`). Hai đồ án mapid 21817 giữ phạm vi theo tỷ lệ (1/25.000 toàn thành phố, 1/10.000 đô thị trung tâm). Tab Hạ tầng nhóm lớp theo từng đồ án trong ngành; đồ án địa phương hiện ở cả tab QHC 1/25.000 và 1/10.000, rồi bị lọc theo phạm vi đang chọn.');
   lines.push('');
+  lines.push('QHCT 1/500 nằm trong QHPK hoặc QHC cha khi xác định được (`parent`, `overrides`, `overrideArea: ranh QHCT`, priority 3). Trong ranh QHCT, QHCT được ưu tiên hơn đồ án cha. Không cắt hình cha.');
+  lines.push('');
+  lines.push('Lô đất hạ tầng (ghép danh sách hạ tầng trên Sheet): luôn ghi lô QHCT và ghép với dòng Sheet — sát ranh thửa thật hơn. Lô QHPK đã ghép trước đó chỉ gỡ ghép (đổi mã INFRA thành DXF, giữ polygon), không xóa và không từ chối lô QHCT. Mỗi lần gỡ ghi `docs/qhct-unpair.json` (mã lô QHPK, đồ án, mã lô QHCT, mã dòng hạ tầng). Chỉ mục ghép nằm ở khóa `pairings` của `public/data/su-dung-dat-index.json` (cùng file với chỉ mục lớp sử dụng đất, không ghi đè `layers`).');
+  lines.push('');
   lines.push('Metadata bản đồ gServer không có số quyết định. Số dưới đây lấy từ thuộc tính lớp ranh (ngày dạng M/D/YYYY của shapefile, đã đổi sang ISO). QHC TT Phú Lộc: nhiệm vụ 3134/QĐ-UBND ngày 2019-12-16, phê duyệt 1101/QĐ-UBND ngày 2020-04-17 (UBND tỉnh; 1/5 vùng ranh có giá trị). QHC Khe Tre: nhiệm vụ 1022/QĐ-UBND ngày 2016-05-16, phê duyệt 688/QĐ-UBND ngày 2020-03-13. QHC Đô thị mới Vinh Hưng: phê duyệt 193/QĐ-UBND ngày 2025-01-21 (UBND thành phố Huế). QHC Khu công nghiệp Phong Điền: trường có trên lớp ranh nhưng để trống. Hai đồ án mapid 21817: lô này chưa có lớp ranh quy hoạch.');
   lines.push('');
   lines.push('## Catalog');
@@ -510,8 +588,29 @@ function docOf(manifest, heavy) {
   return lines.join('\n');
 }
 
-function writeOutputs(repo, layers, gaps, heavy) {
-  const manifest = retargetManifest(manifestOf(layers, gaps), loadLandIndex(repo));
+function writeOutputs(repo, layers, gaps, heavy, options) {
+  const append = !!(options && options.append);
+  const land = loadLandIndex(repo);
+  let manifest = manifestOf(layers, gaps);
+  if (append) {
+    const outJson = path.join(repo, 'public', 'data', 'chuyen-nganh', 'index.json');
+    const prev = fs.existsSync(outJson) ? JSON.parse(fs.readFileSync(outJson, 'utf8')) : { layers: [], gaps: [] };
+    const fresh = new Set(layers.map((l) => l.scheme));
+    const seen = new Set();
+    const keptLayers = (prev.layers || []).filter((l) => {
+      if (fresh.has(l.scheme)) return false;
+      if (l.file && seen.has(l.file)) return false;
+      if (l.file) seen.add(l.file);
+      return true;
+    });
+    const keptGaps = (prev.gaps || []).filter((g) => !fresh.has(g.scheme));
+    const added = manifest.layers.filter((l) => !(l.file && seen.has(l.file)));
+    const freshDoc = retargetManifest({ ...manifest, layers: added, gaps }, land);
+    const freshLayers = freshDoc.layers.filter((l) => !(l.file && seen.has(l.file)));
+    manifest = { ...freshDoc, layers: keptLayers.concat(freshLayers), gaps: keptGaps.concat(freshDoc.gaps) };
+  } else {
+    manifest = retargetManifest(manifest, land);
+  }
   const outJson = path.join(repo, 'public', 'data', 'chuyen-nganh', 'index.json');
   fs.mkdirSync(path.dirname(outJson), { recursive: true });
   fs.writeFileSync(outJson, JSON.stringify(manifest, null, 2) + '\n');
@@ -519,6 +618,37 @@ function writeOutputs(repo, layers, gaps, heavy) {
   fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
   fs.writeFileSync(path.join(repo, 'docs', 'chuyen-nganh.md'), docOf(manifest, heavy));
   return manifest;
+}
+
+function loadSchemes(file) {
+  const extra = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const list = Array.isArray(extra) ? extra : extra.schemes;
+  if (!Array.isArray(list)) throw new Error('File scheme không phải mảng');
+  list.forEach((s) => {
+    if (!s || !s.slug || s.mapid == null) throw new Error('scheme thiếu slug hoặc mapid');
+    if (SCHEMES.some((x) => x.slug === s.slug)) return;
+    SCHEMES.push({
+      priority: 3,
+      overrides: [],
+      parent: null,
+      gcs: 'lots',
+      level: 'QHCT',
+      fresh: true,
+      ...s,
+      fresh: true
+    });
+  });
+}
+
+async function uploadHeavy(heavy) {
+  const gcs = require('../services/gcsWrite');
+  for (const item of heavy) {
+    for (const up of item.uploads || []) {
+      const body = fs.readFileSync(up.local);
+      await gcs.putObject(up.object, body, up.type);
+      console.log(JSON.stringify({ uploaded: up.object, bytes: body.length }));
+    }
+  }
 }
 
 function loadGeeKey(repo) {
@@ -581,14 +711,28 @@ async function addMissingSchemes(repo) {
   console.log(JSON.stringify({ gcs: 'added', added }));
 }
 
+function rootsOf(argv) {
+  const roots = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--schemes') { i += 1; continue; }
+    if (a.startsWith('--')) continue;
+    roots.push(a);
+  }
+  return roots;
+}
+
 async function main() {
   const repo = path.resolve(path.join(__dirname, '..'));
   const args = process.argv.slice(2);
+  const schemeIdx = args.indexOf('--schemes');
+  if (schemeIdx >= 0) loadSchemes(path.resolve(args[schemeIdx + 1]));
+  const append = args.includes('--append');
   if (args.includes('--gcs')) {
     await addMissingSchemes(repo);
     if (args.length === 1) return;
   }
-  const roots = args.filter((a) => !a.startsWith('--'));
+  const roots = rootsOf(args);
   if (!roots.length) {
     console.error('Thiếu thư mục chứa LOP-mapid');
     process.exit(1);
@@ -599,9 +743,13 @@ async function main() {
     process.exit(1);
   }
   markLandSkip(layers, loadLandIndex(repo));
-  const heavy = place(layers, repo);
-  const allGaps = gaps.concat(emptyCells(layers), missing21817());
-  writeOutputs(repo, layers, allGaps, heavy);
+  const heavy = place(layers, repo, { keepOthers: append });
+  const allGaps = gaps.concat(emptyCells(layers, { onlyFresh: append }), append ? [] : missing21817());
+  writeOutputs(repo, layers, allGaps, heavy, { append });
+  if (args.includes('--upload') && heavy.length) {
+    loadGeeKey(repo);
+    await uploadHeavy(heavy);
+  }
   const by = {};
   layers.forEach((l) => {
     const k = `${l.scheme}|${l.sector}|${l.status}`;

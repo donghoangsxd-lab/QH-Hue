@@ -970,5 +970,1218 @@
       "lands": 52,
       "source": "projects"
     }
+  ],
+  "pairings": [
+    {
+      "sheetId": "CV-183",
+      "lotId": "DXF-004",
+      "tenQH": "QHCT Khu nhà ở An Đông",
+      "level": "QHCT",
+      "name": "N - QH - cay xanh dvo DCX-32 – QH-QHPK TT phía Đông #80"
+    },
+    {
+      "sheetId": "CV-174",
+      "lotId": "DXF-017",
+      "tenQH": "QHCT Khu nhà ở An Đông",
+      "level": "QHCT",
+      "name": "N - QH - cay xanh dvo DCX-28 – QH-QHPK TT phía Đông #60"
+    },
+    {
+      "sheetId": "CV-185",
+      "lotId": "DXF-022",
+      "tenQH": "QHCT Khu nhà ở An Đông",
+      "level": "QHCT",
+      "name": "N - QH - cay xanh dvo DCX-27 – QH-QHPK TT phía Đông #88"
+    },
+    {
+      "sheetId": "CV-182",
+      "lotId": "DXF-051",
+      "tenQH": "QHCT Khu nhà ở An Đông",
+      "level": "QHCT",
+      "name": "N - QH - cay xanh dvo – QH-QHPK TT phía Đông #78"
+    },
+    {
+      "sheetId": "BDX-580",
+      "lotId": "DXF-010",
+      "tenQH": "QHCT Khu dịch vụ bãi tắm Thuận An",
+      "level": "QHCT",
+      "name": "Đất bãi đỗ xe P.01 – QH-QHPK Phú Thuận #197"
+    },
+    {
+      "sheetId": "BDX-622",
+      "lotId": "DXF-058",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-A5 – QH-QHPK Thuỷ Châu #297"
+    },
+    {
+      "sheetId": "MN-360",
+      "lotId": "DXF-060",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trường THCS, tiểu học, mầm non"
+    },
+    {
+      "sheetId": "CV-1337",
+      "lotId": "DXF-066",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #273"
+    },
+    {
+      "sheetId": "CV-1331",
+      "lotId": "DXF-067",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #266"
+    },
+    {
+      "sheetId": "CV-1329",
+      "lotId": "DXF-069",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A14 – QH-QHPK Thuỷ Châu #254"
+    },
+    {
+      "sheetId": "CV-1309",
+      "lotId": "DXF-088",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-B1 – QH-QHPK Thuỷ Châu #9"
+    },
+    {
+      "sheetId": "YT-121",
+      "lotId": "DXF-090",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm y tế YT-B1"
+    },
+    {
+      "sheetId": "BDX-616",
+      "lotId": "DXF-094",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-B2 – QH-QHPK Thuỷ Châu #15"
+    },
+    {
+      "sheetId": "CV-1310",
+      "lotId": "DXF-115",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #36"
+    },
+    {
+      "sheetId": "BDX-617",
+      "lotId": "DXF-117",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-B4 – QH-QHPK Thuỷ Châu #38"
+    },
+    {
+      "sheetId": "BDX-618",
+      "lotId": "DXF-118",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-B3 – QH-QHPK Thuỷ Châu #39"
+    },
+    {
+      "sheetId": "CV-1311",
+      "lotId": "DXF-119",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-B2 – QH-QHPK Thuỷ Châu #40"
+    },
+    {
+      "sheetId": "THPT-041",
+      "lotId": "DXF-123",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trường trung học phổ thông"
+    },
+    {
+      "sheetId": "VH-483",
+      "lotId": "DXF-133",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm TDTT (Sân bóng thị xã, TTVH thanh thiếu niên, câu lạc bộ...)"
+    },
+    {
+      "sheetId": "VH-484",
+      "lotId": "DXF-177",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm TDTT (Sân bóng thị xã, TTVH thanh thiếu niên, câu lạc bộ...)"
+    },
+    {
+      "sheetId": "CV-1312",
+      "lotId": "DXF-192",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #113"
+    },
+    {
+      "sheetId": "CV-1313",
+      "lotId": "DXF-196",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-C2 – QH-QHPK Thuỷ Châu #117"
+    },
+    {
+      "sheetId": "VH-485",
+      "lotId": "DXF-197",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Nhà văn hóa"
+    },
+    {
+      "sheetId": "CV-1314",
+      "lotId": "DXF-204",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #125"
+    },
+    {
+      "sheetId": "CV-1315",
+      "lotId": "DXF-206",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #127"
+    },
+    {
+      "sheetId": "CV-1316",
+      "lotId": "DXF-236",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #157"
+    },
+    {
+      "sheetId": "THPT-042",
+      "lotId": "DXF-241",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trường trung học phổ thông"
+    },
+    {
+      "sheetId": "VH-486",
+      "lotId": "DXF-250",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_Theducthethao TT-A1 – QH-QHPK Thuỷ Châu #171"
+    },
+    {
+      "sheetId": "VH-487",
+      "lotId": "DXF-258",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm TDTT (Sân bóng thị xã, TTVH thanh thiếu niên, câu lạc bộ...)"
+    },
+    {
+      "sheetId": "CV-1317",
+      "lotId": "DXF-259",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #180"
+    },
+    {
+      "sheetId": "CV-1318",
+      "lotId": "DXF-260",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #181"
+    },
+    {
+      "sheetId": "CV-1319",
+      "lotId": "DXF-261",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #182"
+    },
+    {
+      "sheetId": "CV-1320",
+      "lotId": "DXF-262",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #183"
+    },
+    {
+      "sheetId": "VH-488",
+      "lotId": "DXF-267",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm TDTT (Sân bóng thị xã, TTVH thanh thiếu niên, câu lạc bộ...)"
+    },
+    {
+      "sheetId": "VH-489",
+      "lotId": "DXF-268",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Nhà văn hóa"
+    },
+    {
+      "sheetId": "CV-1321",
+      "lotId": "DXF-273",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Công trình dịch vụ thương mại"
+    },
+    {
+      "sheetId": "CV-1322",
+      "lotId": "DXF-284",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #205"
+    },
+    {
+      "sheetId": "CV-1323",
+      "lotId": "DXF-286",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A16 – QH-QHPK Thuỷ Châu #207"
+    },
+    {
+      "sheetId": "CV-1324",
+      "lotId": "DXF-287",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A17 – QH-QHPK Thuỷ Châu #208"
+    },
+    {
+      "sheetId": "CV-1325",
+      "lotId": "DXF-288",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A9 – QH-QHPK Thuỷ Châu #209"
+    },
+    {
+      "sheetId": "CV-1326",
+      "lotId": "DXF-289",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A12 – QH-QHPK Thuỷ Châu #210"
+    },
+    {
+      "sheetId": "CV-1327",
+      "lotId": "DXF-290",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A10 – QH-QHPK Thuỷ Châu #211"
+    },
+    {
+      "sheetId": "CV-1328",
+      "lotId": "DXF-314",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A1 – QH-QHPK Thuỷ Châu #235"
+    },
+    {
+      "sheetId": "VH-490",
+      "lotId": "DXF-320",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm TDTT (Sân bóng thị xã, TTVH thanh thiếu niên, câu lạc bộ...)"
+    },
+    {
+      "sheetId": "CV-1330",
+      "lotId": "DXF-343",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A15 – QH-QHPK Thuỷ Châu #264"
+    },
+    {
+      "sheetId": "CV-1332",
+      "lotId": "DXF-346",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A13 – QH-QHPK Thuỷ Châu #267"
+    },
+    {
+      "sheetId": "CV-1333",
+      "lotId": "DXF-347",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #268"
+    },
+    {
+      "sheetId": "CV-1334",
+      "lotId": "DXF-348",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #269"
+    },
+    {
+      "sheetId": "CV-1335",
+      "lotId": "DXF-350",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #271"
+    },
+    {
+      "sheetId": "CV-1336",
+      "lotId": "DXF-351",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #272"
+    },
+    {
+      "sheetId": "CV-1338",
+      "lotId": "DXF-354",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-C5 – QH-QHPK Thuỷ Châu #275"
+    },
+    {
+      "sheetId": "CV-1339",
+      "lotId": "DXF-355",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-C6 – QH-QHPK Thuỷ Châu #276"
+    },
+    {
+      "sheetId": "CV-1340",
+      "lotId": "DXF-356",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A8 – QH-QHPK Thuỷ Châu #277"
+    },
+    {
+      "sheetId": "CV-1341",
+      "lotId": "DXF-358",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #279"
+    },
+    {
+      "sheetId": "CV-1342",
+      "lotId": "DXF-361",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #282"
+    },
+    {
+      "sheetId": "CV-1343",
+      "lotId": "DXF-362",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #283"
+    },
+    {
+      "sheetId": "CV-1344",
+      "lotId": "DXF-367",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #288"
+    },
+    {
+      "sheetId": "CV-1345",
+      "lotId": "DXF-368",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-B3 – QH-QHPK Thuỷ Châu #289"
+    },
+    {
+      "sheetId": "VH-491",
+      "lotId": "DXF-369",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm TDTT (Sân bóng thị xã, TTVH thanh thiếu niên, câu lạc bộ...)"
+    },
+    {
+      "sheetId": "BDX-619",
+      "lotId": "DXF-373",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-C1 – QH-QHPK Thuỷ Châu #294"
+    },
+    {
+      "sheetId": "BDX-620",
+      "lotId": "DXF-374",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-A3 – QH-QHPK Thuỷ Châu #295"
+    },
+    {
+      "sheetId": "BDX-621",
+      "lotId": "DXF-375",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-C4 – QH-QHPK Thuỷ Châu #296"
+    },
+    {
+      "sheetId": "CV-1346",
+      "lotId": "DXF-378",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #299"
+    },
+    {
+      "sheetId": "CV-1347",
+      "lotId": "DXF-389",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-C1 – QH-QHPK Thuỷ Châu #310"
+    },
+    {
+      "sheetId": "VH-492",
+      "lotId": "DXF-390",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_Theducthethao – QH-QHPK Thuỷ Châu #311"
+    },
+    {
+      "sheetId": "VH-493",
+      "lotId": "DXF-399",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm TDTT (Sân bóng thị xã, TTVH thanh thiếu niên, câu lạc bộ...)"
+    },
+    {
+      "sheetId": "BDX-623",
+      "lotId": "DXF-411",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-A1 – QH-QHPK Thuỷ Châu #332"
+    },
+    {
+      "sheetId": "BDX-624",
+      "lotId": "DXF-412",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-C3 – QH-QHPK Thuỷ Châu #333"
+    },
+    {
+      "sheetId": "CV-1348",
+      "lotId": "DXF-418",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #339"
+    },
+    {
+      "sheetId": "CV-1349",
+      "lotId": "DXF-419",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #340"
+    },
+    {
+      "sheetId": "CV-1350",
+      "lotId": "DXF-420",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #341"
+    },
+    {
+      "sheetId": "CV-1351",
+      "lotId": "DXF-421",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #342"
+    },
+    {
+      "sheetId": "CV-1352",
+      "lotId": "DXF-422",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #343"
+    },
+    {
+      "sheetId": "CV-1353",
+      "lotId": "DXF-423",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #344"
+    },
+    {
+      "sheetId": "CV-1354",
+      "lotId": "DXF-424",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #345"
+    },
+    {
+      "sheetId": "CV-1355",
+      "lotId": "DXF-432",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A7 – QH-QHPK Thuỷ Châu #353"
+    },
+    {
+      "sheetId": "CV-1356",
+      "lotId": "DXF-433",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A5 – QH-QHPK Thuỷ Châu #354"
+    },
+    {
+      "sheetId": "CV-1357",
+      "lotId": "DXF-442",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A6 – QH-QHPK Thuỷ Châu #363"
+    },
+    {
+      "sheetId": "CV-1358",
+      "lotId": "DXF-517",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #438"
+    },
+    {
+      "sheetId": "CV-1359",
+      "lotId": "DXF-519",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #440"
+    },
+    {
+      "sheetId": "CV-1360",
+      "lotId": "DXF-520",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #441"
+    },
+    {
+      "sheetId": "BDX-625",
+      "lotId": "DXF-528",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-B5 – QH-QHPK Thuỷ Châu #449"
+    },
+    {
+      "sheetId": "CV-1361",
+      "lotId": "DXF-579",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-C8 – QH-QHPK Thuỷ Châu #500"
+    },
+    {
+      "sheetId": "CV-1362",
+      "lotId": "DXF-581",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #502"
+    },
+    {
+      "sheetId": "CV-1363",
+      "lotId": "DXF-582",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #503"
+    },
+    {
+      "sheetId": "CV-1364",
+      "lotId": "DXF-583",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #504"
+    },
+    {
+      "sheetId": "CV-1365",
+      "lotId": "DXF-584",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #505"
+    },
+    {
+      "sheetId": "CV-1366",
+      "lotId": "DXF-585",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #506"
+    },
+    {
+      "sheetId": "CV-1367",
+      "lotId": "DXF-586",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #507"
+    },
+    {
+      "sheetId": "CV-1368",
+      "lotId": "DXF-587",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #508"
+    },
+    {
+      "sheetId": "CV-1369",
+      "lotId": "DXF-588",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #509"
+    },
+    {
+      "sheetId": "CV-1370",
+      "lotId": "DXF-589",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #510"
+    },
+    {
+      "sheetId": "CV-1371",
+      "lotId": "DXF-590",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #511"
+    },
+    {
+      "sheetId": "CV-1372",
+      "lotId": "DXF-591",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #512"
+    },
+    {
+      "sheetId": "CV-1373",
+      "lotId": "DXF-592",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #513"
+    },
+    {
+      "sheetId": "CV-1374",
+      "lotId": "DXF-593",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #514"
+    },
+    {
+      "sheetId": "CV-1375",
+      "lotId": "DXF-594",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #515"
+    },
+    {
+      "sheetId": "CV-1376",
+      "lotId": "DXF-595",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #516"
+    },
+    {
+      "sheetId": "CV-1377",
+      "lotId": "DXF-605",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trường THCS, tiểu học, mầm non"
+    },
+    {
+      "sheetId": "VH-494",
+      "lotId": "DXF-615",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm TDTT (Sân bóng thị xã, TTVH thanh thiếu niên, câu lạc bộ...)"
+    },
+    {
+      "sheetId": "BDX-626",
+      "lotId": "DXF-616",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-A4 – QH-QHPK Thuỷ Châu #537"
+    },
+    {
+      "sheetId": "CV-1378",
+      "lotId": "DXF-619",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-C4 – QH-QHPK Thuỷ Châu #540"
+    },
+    {
+      "sheetId": "CV-1379",
+      "lotId": "DXF-620",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #541"
+    },
+    {
+      "sheetId": "CV-1380",
+      "lotId": "DXF-621",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #542"
+    },
+    {
+      "sheetId": "CV-1381",
+      "lotId": "DXF-623",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A19 – QH-QHPK Thuỷ Châu #544"
+    },
+    {
+      "sheetId": "YT-122",
+      "lotId": "DXF-624",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm y tế YT-C1"
+    },
+    {
+      "sheetId": "YT-123",
+      "lotId": "DXF-625",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm y tế YT-A1"
+    },
+    {
+      "sheetId": "CV-1382",
+      "lotId": "DXF-626",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC – QH-QHPK Thuỷ Châu #547"
+    },
+    {
+      "sheetId": "BDX-627",
+      "lotId": "DXF-627",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-A2 – QH-QHPK Thuỷ Châu #548"
+    },
+    {
+      "sheetId": "CV-1383",
+      "lotId": "DXF-628",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A3 – QH-QHPK Thuỷ Châu #549"
+    },
+    {
+      "sheetId": "CV-1384",
+      "lotId": "DXF-633",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A11 – QH-QHPK Thuỷ Châu #554"
+    },
+    {
+      "sheetId": "VH-495",
+      "lotId": "DXF-634",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm TDTT (Sân bóng thị xã, TTVH thanh thiếu niên, câu lạc bộ...)"
+    },
+    {
+      "sheetId": "VH-496",
+      "lotId": "DXF-638",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Nhà văn hóa"
+    },
+    {
+      "sheetId": "VH-497",
+      "lotId": "DXF-639",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Nhà văn hóa"
+    },
+    {
+      "sheetId": "CV-1385",
+      "lotId": "DXF-646",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-C3 – QH-QHPK Thuỷ Châu #567"
+    },
+    {
+      "sheetId": "BDX-628",
+      "lotId": "DXF-649",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-A6 – QH-QHPK Thuỷ Châu #570"
+    },
+    {
+      "sheetId": "CV-1386",
+      "lotId": "DXF-650",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A18 – QH-QHPK Thuỷ Châu #571"
+    },
+    {
+      "sheetId": "BDX-629",
+      "lotId": "DXF-651",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-B1 – QH-QHPK Thuỷ Châu #572"
+    },
+    {
+      "sheetId": "BDX-630",
+      "lotId": "DXF-652",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTKT_Baidoxe P-C2 – QH-QHPK Thuỷ Châu #573"
+    },
+    {
+      "sheetId": "VH-498",
+      "lotId": "DXF-653",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "VH VH-B4 – QH-QHPK Thuỷ Châu #574"
+    },
+    {
+      "sheetId": "VH-499",
+      "lotId": "DXF-654",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Nhà văn hóa"
+    },
+    {
+      "sheetId": "VH-500",
+      "lotId": "DXF-655",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Nhà văn hóa"
+    },
+    {
+      "sheetId": "VH-501",
+      "lotId": "DXF-656",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Nhà văn hóa"
+    },
+    {
+      "sheetId": "VH-502",
+      "lotId": "DXF-657",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Nhà văn hóa"
+    },
+    {
+      "sheetId": "VH-503",
+      "lotId": "DXF-658",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Nhà văn hóa"
+    },
+    {
+      "sheetId": "VH-504",
+      "lotId": "DXF-659",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Nhà văn hóa"
+    },
+    {
+      "sheetId": "VH-505",
+      "lotId": "DXF-661",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Nhà văn hóa"
+    },
+    {
+      "sheetId": "CV-1387",
+      "lotId": "DXF-665",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-A2 – QH-QHPK Thuỷ Châu #586"
+    },
+    {
+      "sheetId": "VH-506",
+      "lotId": "DXF-666",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm TDTT (Sân bóng thị xã, TTVH thanh thiếu niên, câu lạc bộ...)"
+    },
+    {
+      "sheetId": "CV-1388",
+      "lotId": "DXF-667",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "DAT_HTXH_CayxanhCC CXCC-C7 – QH-QHPK Thuỷ Châu #588"
+    },
+    {
+      "sheetId": "VH-476",
+      "lotId": "DXF-673",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Đất thể dục thể thao TT2.1 – QH-QHPK Phú Bài #1"
+    },
+    {
+      "sheetId": "VH-477",
+      "lotId": "DXF-681",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trung tâm văn hóa thông tin thị xã Hương Thủy"
+    },
+    {
+      "sheetId": "NT-114",
+      "lotId": "DXF-684",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Nghĩa trang liệt sỹ thị xã Hương Thủy"
+    },
+    {
+      "sheetId": "CV-3495",
+      "lotId": "DXF-691",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Đất cây xanh sử dụng công cộng"
+    },
+    {
+      "sheetId": "VH-478",
+      "lotId": "DXF-693",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "VH VH1.1 – QH-QHPK Phú Bài #21"
+    },
+    {
+      "sheetId": "VH-479",
+      "lotId": "DXF-726",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Đất văn hóa – QH-QHPK Phú Bài #54"
+    },
+    {
+      "sheetId": "CV-1467",
+      "lotId": "DXF-728",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Đất cây xanh đơn vị ở CXTT13 – QH-QHPK Thuỷ Lương #45"
+    },
+    {
+      "sheetId": "BDX-606",
+      "lotId": "DXF-730",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "BDX P1.5 – QH-QHPK Phú Bài #58"
+    },
+    {
+      "sheetId": "BDX-607",
+      "lotId": "DXF-733",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "BDX P1.2 – QH-QHPK Phú Bài #61"
+    },
+    {
+      "sheetId": "BDX-608",
+      "lotId": "DXF-744",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "BDX P2.2 – QH-QHPK Phú Bài #72"
+    },
+    {
+      "sheetId": "BDX-609",
+      "lotId": "DXF-746",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "BDX P1.6 – QH-QHPK Phú Bài #74"
+    },
+    {
+      "sheetId": "BDX-610",
+      "lotId": "DXF-753",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "BDX P3.1 – QH-QHPK Phú Bài #81"
+    },
+    {
+      "sheetId": "BDX-611",
+      "lotId": "DXF-755",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "BDX P2.1 – QH-QHPK Phú Bài #83"
+    },
+    {
+      "sheetId": "THPT-040",
+      "lotId": "DXF-756",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Trường THPT"
+    },
+    {
+      "sheetId": "VH-480",
+      "lotId": "DXF-758",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "VH – QH-QHPK Phú Bài #86"
+    },
+    {
+      "sheetId": "BDX-612",
+      "lotId": "DXF-759",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "BDX P1.1 – QH-QHPK Phú Bài #87"
+    },
+    {
+      "sheetId": "VH-481",
+      "lotId": "DXF-766",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Đất thể dục thể thao TT1.1 – QH-QHPK Phú Bài #94"
+    },
+    {
+      "sheetId": "BDX-613",
+      "lotId": "DXF-775",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "BDX P2.3 – QH-QHPK Phú Bài #103"
+    },
+    {
+      "sheetId": "YT-119",
+      "lotId": "DXF-783",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Đất y tế YT – QH-QHPK Phú Bài #111"
+    },
+    {
+      "sheetId": "BDX-614",
+      "lotId": "DXF-798",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "BDX P1.4 – QH-QHPK Phú Bài #126"
+    },
+    {
+      "sheetId": "BDX-615",
+      "lotId": "DXF-802",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "Công ty TNHH MTV lương thực Thừa Thiên Huế"
+    },
+    {
+      "sheetId": "YT-120",
+      "lotId": "DXF-803",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "YT YT – QH-QHPK Phú Bài #131"
+    },
+    {
+      "sheetId": "VH-482",
+      "lotId": "DXF-811",
+      "tenQH": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "level": "QHCT",
+      "name": "VH VH1.4 – QH-QHPK Phú Bài #139"
+    },
+    {
+      "sheetId": "CV-3479",
+      "lotId": "DXF-107",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh sử dụng công cộng"
+    },
+    {
+      "sheetId": "CV-3480",
+      "lotId": "DXF-108",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh sử dụng công cộng"
+    },
+    {
+      "sheetId": "CV-3481",
+      "lotId": "DXF-112",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh sử dụng công cộng"
+    },
+    {
+      "sheetId": "CV-3482",
+      "lotId": "DXF-114",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh sử dụng công cộng"
+    },
+    {
+      "sheetId": "CV-1420",
+      "lotId": "DXF-115",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh cảnh quan ven sông I.31 – QH-QHPK Khu đô thị sinh thái Thanh Toàn #12"
+    },
+    {
+      "sheetId": "CV-1421",
+      "lotId": "DXF-117",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh cảnh quan ven sông I.32 – QH-QHPK Khu đô thị sinh thái Thanh Toàn #13"
+    },
+    {
+      "sheetId": "CV-3483",
+      "lotId": "DXF-118",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh sử dụng công cộng"
+    },
+    {
+      "sheetId": "CV-3484",
+      "lotId": "DXF-119",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh sử dụng công cộng"
+    },
+    {
+      "sheetId": "CV-1423",
+      "lotId": "DXF-120",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh đơn vị ở I.27 – QH-QHPK Khu đô thị sinh thái Thanh Toàn #15"
+    },
+    {
+      "sheetId": "CV-3485",
+      "lotId": "DXF-121",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh sử dụng công cộng"
+    },
+    {
+      "sheetId": "CV-3486",
+      "lotId": "DXF-122",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh sử dụng công cộng"
+    },
+    {
+      "sheetId": "CV-3487",
+      "lotId": "DXF-123",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh sử dụng công cộng"
+    },
+    {
+      "sheetId": "BDX-657",
+      "lotId": "DXF-124",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất bãi đỗ xe I.47 – QH-QHPK Khu đô thị sinh thái Thanh Toàn #127"
+    },
+    {
+      "sheetId": "BDX-651",
+      "lotId": "DXF-125",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất bãi đỗ xe I.46 – QH-QHPK Khu đô thị sinh thái Thanh Toàn #10"
+    },
+    {
+      "sheetId": "VH-879",
+      "lotId": "DXF-126",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất văn hóa"
+    },
+    {
+      "sheetId": "VH-880",
+      "lotId": "DXF-127",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất thể dục thể thao"
+    },
+    {
+      "sheetId": "CV-3488",
+      "lotId": "DXF-170",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh sử dụng công cộng"
+    },
+    {
+      "sheetId": "CV-3489",
+      "lotId": "DXF-171",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh sử dụng công cộng"
+    },
+    {
+      "sheetId": "CV-3490",
+      "lotId": "DXF-224",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất cây xanh sử dụng công cộng"
+    },
+    {
+      "sheetId": "YT-265",
+      "lotId": "DXF-225",
+      "tenQH": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "level": "QHCT",
+      "name": "Đất y tế"
+    }
   ]
 }

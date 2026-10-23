@@ -1,0 +1,171 @@
+[
+  {
+    "slug": "qhct-tdc-phu-my-khu-c-7bfa4d26",
+    "name": "QHCT TĐC Phú Mỹ (Khu C)",
+    "level": "QHCT",
+    "mapid": 20642,
+    "scale": 1000,
+    "parent": "qhpk-dieu-chinh-quy-hoach-phan-khu-khu-c-do-thi-moi-an-van-d-d5c72b7d",
+    "overrides": [
+      "qhpk-dieu-chinh-quy-hoach-phan-khu-khu-c-do-thi-moi-an-van-d-d5c72b7d"
+    ],
+    "overrideArea": "ranh QHCT",
+    "priority": 3,
+    "gcs": "lots",
+    "fresh": true,
+    "decision": "1881/QĐ-UBND",
+    "decisionDate": "2006-08-14",
+    "authority": "UBND tỉnh Thừa Thiên Huế"
+  },
+  {
+    "slug": "qhct-tdc-thuy-van-giai-doan-2-khu-e-33b92316",
+    "name": "QHCT TĐC Thủy Vân giai đoạn 2 (Khu E)",
+    "level": "QHCT",
+    "mapid": 20644,
+    "scale": 500,
+    "parent": "qhpk-e-do-thi-moi-an-van-duong-fcef7c2e",
+    "overrides": [
+      "qhpk-e-do-thi-moi-an-van-duong-fcef7c2e"
+    ],
+    "overrideArea": "ranh QHCT",
+    "priority": 3,
+    "gcs": "lots",
+    "fresh": true
+  },
+  {
+    "slug": "qhct-trong-rung-ngap-man-ru-cha-c09cda81",
+    "name": "QHCT Trồng rừng ngập mặn Rú Chá",
+    "level": "QHCT",
+    "mapid": 23967,
+    "scale": 500,
+    "parent": "qhpk-hai-duong-huong-phong-484db23b",
+    "overrides": [
+      "qhpk-hai-duong-huong-phong-484db23b"
+    ],
+    "overrideArea": "ranh QHCT",
+    "priority": 3,
+    "gcs": "lots",
+    "fresh": true,
+    "decision": "13/QĐ-UBND",
+    "decisionDate": "2026-01-10",
+    "taskDecision": "1147/QĐ-UBND",
+    "taskDecisionDate": "2025-10-21",
+    "authority": "UBND Phường Hóa Châu"
+  },
+  {
+    "slug": "qhct-khu-nha-o-an-dong-e03fe6e1",
+    "name": "QHCT Khu nhà ở An Đông",
+    "level": "QHCT",
+    "mapid": 20601,
+    "scale": 500,
+    "parent": "qhpk-tt-phia-dong-26123071",
+    "overrides": [
+      "qhpk-tt-phia-dong-26123071"
+    ],
+    "overrideArea": "ranh QHCT",
+    "priority": 3,
+    "gcs": "lots",
+    "fresh": true,
+    "decision": "2084/QĐ-UBND",
+    "decisionDate": "2015-10-12",
+    "taskDecision": "1197/QĐ-UBND",
+    "taskDecisionDate": "2015-06-26",
+    "authority": "UBND tỉnh Thừa Thiên Huế"
+  },
+  {
+    "slug": "qhct-khu-dich-vu-bai-tam-thuan-an-51628c24",
+    "name": "QHCT Khu dịch vụ bãi tắm Thuận An",
+    "level": "QHCT",
+    "mapid": 24981,
+    "scale": 500,
+    "parent": "qhpk-khu-do-thi-ven-bien-thuan-an-a3b72c3e",
+    "overrides": [
+      "qhpk-khu-do-thi-ven-bien-thuan-an-a3b72c3e"
+    ],
+    "overrideArea": "ranh QHCT",
+    "priority": 3,
+    "gcs": "lots",
+    "fresh": true,
+    "decision": "1050/UBND-KTHT-ĐT",
+    "decisionDate": "2026-05-11",
+    "authority": "UBND thành phố Huế"
+  },
+  {
+    "slug": "qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d",
+    "name": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+    "level": "QHCT",
+    "mapid": 22861,
+    "scale": 500,
+    "parent": "qhpk-thuy-chau-b8d972ba",
+    "overrides": [
+      "qhpk-thuy-chau-b8d972ba"
+    ],
+    "overrideArea": "ranh QHCT",
+    "priority": 3,
+    "gcs": "lots",
+    "fresh": true,
+    "decision": "7937/QĐ-UBND",
+    "decisionDate": "2024-10-01",
+    "taskDecision": "2135/QĐ-UBND",
+    "taskDecisionDate": "2023-07-17",
+    "authority": "ỦY BAN NHÂN DÂN THỊ XÃ HƯƠNG THỦY"
+  },
+  {
+    "slug": "qhct-nghia-trang-nhan-dan-phia-nam-7bbdf92c",
+    "name": "QHCT Nghĩa trang Nhân dân phía Nam",
+    "level": "QHCT",
+    "mapid": 23953,
+    "scale": 2000,
+    "parent": "qhpk-phu-son-1bef3f16",
+    "overrides": [
+      "qhpk-phu-son-1bef3f16"
+    ],
+    "overrideArea": "ranh QHCT",
+    "priority": 3,
+    "gcs": "lots",
+    "fresh": true,
+    "decision": "3491/QĐ-UBND",
+    "decisionDate": "2025-11-12",
+    "taskDecision": "508/QĐ-UBND",
+    "taskDecisionDate": "2021-03-10",
+    "authority": "UBND Thành Phố Huế"
+  },
+  {
+    "slug": "qhct-tram-trung-chuyen-dieu-ap-phu-bai-36fb0207",
+    "name": "QHCT Trạm trung chuyển điều áp Phú Bài",
+    "level": "QHCT",
+    "mapid": 23946,
+    "scale": 500,
+    "parent": "qhpk-phu-bai-7a7efc45",
+    "overrides": [
+      "qhpk-phu-bai-7a7efc45"
+    ],
+    "overrideArea": "ranh QHCT",
+    "priority": 3,
+    "gcs": "lots",
+    "fresh": true,
+    "decision": "2224/QĐ-UBND",
+    "decisionDate": "2025-06-02",
+    "authority": "UBND Thị xã Hương Thủy"
+  },
+  {
+    "slug": "qhct-khu-do-thi-sinh-thai-thanh-thuy-93bfd064",
+    "name": "QHCT Khu đô thị sinh thái Thanh Thủy",
+    "level": "QHCT",
+    "mapid": 23954,
+    "scale": 500,
+    "parent": "qhpk-khu-do-thi-sinh-thai-thanh-toan-ac57aa8b",
+    "overrides": [
+      "qhpk-khu-do-thi-sinh-thai-thanh-toan-ac57aa8b"
+    ],
+    "overrideArea": "ranh QHCT",
+    "priority": 3,
+    "gcs": "lots",
+    "fresh": true,
+    "decision": "1407/QĐ-UBND",
+    "decisionDate": "2025-11-12",
+    "taskDecision": "2722/QĐ-UBND",
+    "taskDecisionDate": "2025-06-26",
+    "authority": "UBND phường Thanh Thủy"
+  }
+]
