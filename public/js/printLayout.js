@@ -1,6 +1,6 @@
 // Chụp bản đồ (PNG) và in khung bản đồ ngang (PDF): khung xem trước để căn vùng in, khổ A4–A0,
 // lưới tọa độ VN-2000, hướng Bắc, tỷ lệ, chú giải theo lớp đang bật và cấp quy hoạch đang chọn.
-// PDF gồm 3 tầng trong khung bản đồ: ảnh nền (ảnh vệ tinh, heatmap), đối tượng vector vẽ lại từ tọa độ (printVector.js),
+// PDF gồm 3 tầng trong khung bản đồ: ảnh nền (ô vệ tinh / canvas đường phố, heatmap), đối tượng vector vẽ lại từ tọa độ (printVector.js),
 // ảnh icon trong suốt. Lưới, khung, chữ, chú giải là vector.
 // html2canvas không hiểu clip-path → khi so sánh chụp riêng 2 bản đồ rồi ghép theo vị trí thanh trượt.
 import { map, popLayerMeta } from './mapEngine.js';
@@ -9,7 +9,7 @@ import { planMap, isCompareOn, isSplitOn, alignPlanView } from './planMap.js';
 import { state } from './state.js';
 import { wgs84ToVn2000 } from './cadImport.js';
 import { satPrintLegend } from './satLayers.js';
-import { basemapLabel } from './basemap.js';
+import { basemapLabel, isLightBasemap, whenBasemapSettled } from './basemap.js';
 import { getLevel, levelChk, LEVELS } from './mapLevel.js';
 import { LEGEND_SETS, TT16_STYLES, tt16SwatchCss } from './tt16Symbols.js';
 import {
@@ -178,11 +178,86 @@ function layerFilter(m, mode) {
   };
 }
 
+// html2canvas đọc canvas WebGL của nền đường phố ra trong suốt vì buffer đã bị xóa, vùng nền thành một màu đặc.
+// Ô ảnh và canvas nền được chép theo vị trí trên màn hình, đặt dưới nét vector.
+function ownRaster(n) {
+  if (!n.classList) return false;
+  if (n.tagName === 'IMG' && n.classList.contains('leaflet-tile')) {
+    const src = n.currentSrc || n.src || '';
+    return src.startsWith('blob:') || src.startsWith('data:') || !!n.crossOrigin;
+  }
+  return n.tagName === 'CANVAS' && (n.classList.contains('maplibregl-canvas') || n.classList.contains('leaflet-tile'));
+}
+
+function paneZ(node) {
+  const pane = node.closest('.leaflet-pane');
+  return pane ? (parseInt(getComputedStyle(pane).zIndex, 10) || 0) : 0;
+}
+
+function shownAlpha(node, stop) {
+  let a = 1;
+  for (let n = node; n && n !== stop; n = n.parentElement) {
+    const cs = getComputedStyle(n);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return 0;
+    a *= Number(cs.opacity);
+  }
+  return a;
+}
+
+function readableRaster(node) {
+  if (node.tagName === 'IMG' && (!node.complete || !node.naturalWidth)) return false;
+  if (node.tagName === 'CANVAS' && (!node.width || !node.height)) return false;
+  const probe = document.createElement('canvas');
+  probe.width = probe.height = 1;
+  try {
+    const pctx = probe.getContext('2d', { willReadFrequently: true });
+    pctx.drawImage(node, 0, 0, 1, 1);
+    pctx.getImageData(0, 0, 1, 1);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Vẽ nền xuống dưới lớp html2canvas (vector, icon). destination-over giữ nét đã chụp ở trên.
+function underlayRasters(overlay, el) {
+  const origin = el.getBoundingClientRect();
+  if (origin.width < 2 || origin.height < 2) return overlay;
+  const ctx = overlay.getContext('2d');
+  const sx = overlay.width / origin.width;
+  const sy = overlay.height / origin.height;
+  // html2canvas để lại scale/translate trên context; vẽ theo pixel canvas.
+  const nodes = [...el.querySelectorAll('img.leaflet-tile, canvas.maplibregl-canvas, canvas.leaflet-tile')]
+    .filter(ownRaster)
+    .filter(node => shownAlpha(node, el) > 0.01 && readableRaster(node))
+    .map((node, i) => ({ node, i, z: paneZ(node), alpha: shownAlpha(node, el) }))
+    .sort((a, b) => b.z - a.z || b.i - a.i);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = 'destination-over';
+  ctx.globalAlpha = 1;
+  nodes.forEach(({ node, alpha }) => {
+    const r = node.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return;
+    ctx.save();
+    if (alpha < 1) ctx.globalAlpha = alpha;
+    try {
+      ctx.drawImage(node, (r.left - origin.left) * sx, (r.top - origin.top) * sy, r.width * sx, r.height * sy);
+    } catch (e) { /* ô khác nguồn */ }
+    ctx.restore();
+  });
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = isLightBasemap() ? '#f4f1ea' : '#0f172a';
+  ctx.fillRect(0, 0, overlay.width, overlay.height);
+  ctx.restore();
+  return overlay;
+}
+
 function snap(el, scale, size, { skip = null, transparent = false } = {}) {
   return window.html2canvas(el, {
     useCORS: true,
     logging: false,
-    backgroundColor: transparent ? null : '#0f172a',
+    backgroundColor: null,
     scale,
     scrollX: 0,
     scrollY: 0,
@@ -190,13 +265,13 @@ function snap(el, scale, size, { skip = null, transparent = false } = {}) {
     windowHeight: Math.max(window.innerHeight, size.y + 20),
     onclone: (doc) => {
       inlineSpriteIcons(doc);
-      if (transparent && el.id) {
+      if (el.id) {
         const clone = doc.getElementById(el.id);
-        if (clone) clone.style.background = 'transparent';
+        if (clone) clone.style.setProperty('background', 'transparent', 'important');
       }
     },
-    ignoreElements: (n) => SKIP_CLASSES.some(c => n.classList?.contains(c)) || (skip ? skip(n) : false)
-  });
+    ignoreElements: (n) => SKIP_CLASSES.some(c => n.classList?.contains(c)) || (skip ? skip(n) : false) || ownRaster(n)
+  }).then(canvas => (transparent ? canvas : underlayRasters(canvas, el)));
 }
 
 /** Chụp một bản đồ (không ghép thanh trượt) — dùng cho bố cục dual HT|QH */
@@ -278,8 +353,14 @@ async function waitTiles(maps, timeout = 12000) {
   await sleep(200);
   const loading = [];
   maps.forEach(m => m.eachLayer(l => { if (l instanceof L.GridLayer && l.isLoading()) loading.push(l); }));
-  await Promise.race([Promise.all(loading.map(l => new Promise(r => l.once('load', r)))), sleep(timeout)]);
-  await sleep(500);
+  await Promise.race([
+    Promise.all([
+      ...loading.map(l => new Promise(r => l.once('load', r))),
+      ...maps.map(m => whenBasemapSettled(m, timeout))
+    ]),
+    sleep(timeout)
+  ]);
+  await sleep(300);
 }
 
 function setViewExact(m, center, zoom) {

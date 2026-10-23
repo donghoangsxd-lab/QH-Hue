@@ -211,7 +211,28 @@ function addLiberty(m) {
         try { glLayer.remove(); } catch (e) { /* context đã mất */ }
         glLayer = null;
       }
+      api._gl = null;
       try { holder.remove(); } catch (e) { /* đã gỡ */ }
+    },
+    // Sau khi phóng khung in, chờ MapLibre vẽ xong khung mới rồi mới chụp (idle không lặp nếu đã đứng yên).
+    settled(timeout = 8000) {
+      return new Promise(resolve => {
+        const gl = api._gl;
+        if (!gl) { resolve(); return; }
+        let finished = false;
+        const finishSettle = () => {
+          if (finished) return;
+          finished = true;
+          clearTimeout(timerId);
+          try { gl.off('idle', finishSettle); } catch (e) { /* map đã hủy */ }
+          resolve();
+        };
+        const timerId = setTimeout(finishSettle, timeout);
+        try {
+          gl.on('idle', finishSettle);
+          gl.triggerRepaint();
+        } catch (e) { finishSettle(); }
+      });
     }
   };
   ensureLibs().then(() => libertyStyle()).then(style => {
@@ -228,7 +249,8 @@ function addLiberty(m) {
         maxZoom: MAP_MAX_ZOOM,
         maxPitch: 0,
         refreshExpiredTiles: false,
-        canvasContextAttributes: { antialias: false }
+        // PDF đọc canvas bằng drawImage. Tắt preserveDrawingBuffer thì khung WebGL bị xóa sau khi vẽ, tờ in chỉ còn nền đặc.
+        canvasContextAttributes: { antialias: false, preserveDrawingBuffer: true }
       });
       glLayer.addTo(m);
     } catch (e) {
@@ -246,6 +268,7 @@ function addLiberty(m) {
     };
     timer = setTimeout(giveUp, 12000);
     gl.on('load', () => { ok = true; clearTimeout(timer); finish(); });
+    api._gl = gl;
     gl.on('error', (ev) => {
       const msg = String((ev && ev.error && (ev.error.message || ev.error)) || '');
       if (!ok && /WebGL|Failed to initialize|load the style/i.test(msg)) giveUp();
@@ -268,7 +291,9 @@ function addLabels(m) {
     pane.style.zIndex = 450;
     pane.style.pointerEvents = 'none';
   }
-  labelLayers.set(m, watchTiles(L.tileLayer(LABELS.url, { maxZoom: layerMaxZoom(LABELS.opts), pane: LABELS_PANE, ...LABELS.opts }), 'Tem đường').addTo(m));
+  labelLayers.set(m, watchTiles(L.tileLayer(LABELS.url, {
+    maxZoom: layerMaxZoom(LABELS.opts), pane: LABELS_PANE, crossOrigin: 'anonymous', ...LABELS.opts
+  }), 'Tem đường').addTo(m));
 }
 
 /** Bật / tắt tem đường, tên công trình trên mọi bản đồ đã gắn ảnh nền (nút nhỏ cuối dòng Mạng lưới đường) */
@@ -323,6 +348,20 @@ export function selectBasemap(id) {
 
 export function basemapLabel() {
   return defOf(current).label;
+}
+
+/** Nền của một bản đồ đã vẽ xong khung hiện tại (ô ảnh Leaflet hoặc MapLibre idle). */
+export function whenBasemapSettled(m, timeout = 8000) {
+  const layer = maps.get(m)?.layer;
+  if (!layer) return Promise.resolve();
+  if (typeof layer.settled === 'function') return layer.settled(timeout);
+  if (typeof L !== 'undefined' && layer instanceof L.GridLayer && layer.isLoading?.()) {
+    return new Promise(resolve => {
+      const t = setTimeout(resolve, timeout);
+      layer.once('load', () => { clearTimeout(t); resolve(); });
+    });
+  }
+  return Promise.resolve();
 }
 
 /** Ảnh vệ tinh Google cho lớp cắt nền điều chỉnh cục bộ, không đổi theo nền nhạt đang xem */
