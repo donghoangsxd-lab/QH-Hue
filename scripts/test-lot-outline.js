@@ -30,7 +30,8 @@ assert(b.l > a.l + 0.2, `quốc phòng phải sáng hơn: ${dark} → ${lit}`);
 assert(Math.abs(b.h - a.h) < 0.04, `giữ hue: ${a.h.toFixed(3)} → ${b.h.toFixed(3)}`);
 assert(b.l < 0.8, `không trắng hóa: ${lit}`);
 
-assert(!isLightBasemap(), 'mặc định là nền vệ tinh');
+assert(isLightBasemap(), 'lần đầu là bản đồ đường phố');
+selectBasemap('google');
 assert(thinLightOutline('QP') && thinLightOutline('AN') && thinLightOutline('RSX') && thinLightOutline('RPH') && thinLightOutline('RDD'), 'năm nhóm tối trên vệ tinh');
 assert(thinLightOutline('C-QP') && thinLightOutline('T-RSX'), 'khóa quy hoạch chung và chi tiết cùng quy tắc');
 assert(!thinLightOutline('1-CV') && !thinLightOutline('O-LX') && !thinLightOutline('NN'), 'loại khác không làm sáng');
