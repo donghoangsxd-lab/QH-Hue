@@ -54,7 +54,7 @@
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45);
   --ease: 0.2s ease;
 
-  --right-w: calc(328px * var(--k));
+  --right-w: 340px;
   --bottom-h: max(20vh, 190px);
   --bp-head-h: calc(42px * var(--k));
   --face-w: calc(338px * var(--k));  /* 1 mặt khối xoay cơ cấu / số lượng / giao thông */
@@ -308,7 +308,7 @@ body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-wid
   top: var(--info-top);
   bottom: auto;
   left: var(--info-left);
-  width: min(300px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
+  width: min(300px, calc(100% - var(--tb-btn) - var(--right-w) - 48px));
   max-height: min(42%, calc(100% - var(--info-top) - var(--info-bottom) - 72px));
   overflow: auto;
   box-sizing: border-box;
@@ -504,7 +504,7 @@ body:not(.bottom-collapsed) .leaflet-popup.dock-card {
 }
 /* Bảng dự án kêu gọi đầu tư chiếm cột trái: thẻ đồ án sang phải bảng đó. */
 body:has(#investCard:not([hidden])) .project-brief {
-  left: calc(var(--info-left) + min(380px, calc(100% - var(--tb-btn) - var(--right-w) - 36px)) + 8px);
+  left: calc(var(--info-left) + min(380px, calc(100% - var(--tb-btn) - var(--right-w) - 48px)) + 8px);
   top: var(--info-top);
   bottom: auto;
   width: min(276px, calc(100% - var(--tb-btn) - var(--right-w) - 380px - 56px));
@@ -937,10 +937,10 @@ body.bottom-collapsed:not(.project-review:not(.project-view)) .leaflet-bottom.le
 /* Cao vừa nội dung, chỉ cuộn khi vượt quá khoảng trống phía trên panel dưới */
 .right-panel {
   position: absolute;
-  top: 12px;
+  top: calc(12px + var(--title-h) + 8px);
   right: 12px;
-  width: var(--right-w);
-  max-height: calc(100vh - var(--side-gap) - 24px);
+  width: min(var(--right-w), calc(100% - var(--info-left) - 16px));
+  max-height: calc(100vh - var(--title-h) - var(--side-gap) - 32px);
   z-index: 1200;
   display: flex;
   flex-direction: column;
@@ -1033,9 +1033,8 @@ body.right-collapsed .right-panel {
 .rp-body::-webkit-scrollbar-thumb, .layer-main-pane::-webkit-scrollbar-thumb, .layer-map-pane::-webkit-scrollbar-thumb, #rightPanel .tab-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.25); border-radius: var(--r-sm); }
 .tab-body { padding: 8px 10px; box-sizing: border-box; flex: 1 1 auto; min-height: 0; overflow: auto; }
 
-/* LỚP DỮ LIỆU: Quy hoạch / Công trình là 2 tab cùng cấp ở trên; Bản đồ nền / Bản đồ môi trường là 2 tab ở dưới. Khung có chiều cao cố định, danh sách cuộn bên trong.
-   Cao bằng max-height của .right-panel rồi co (flex-shrink) phần thanh tab, thanh tiến độ: panel luôn chạm đáy, cách panel dưới 12px như mép trên. */
-#tabLayers { display: flex; flex-direction: column; overflow: hidden; padding: 0; height: calc(100vh - var(--side-gap) - 24px); }
+/* Lớp dữ liệu cao theo nội dung, không vượt khung nhìn; danh sách cuộn trong pane. */
+#tabLayers { display: flex; flex-direction: column; overflow: hidden; padding: 0; height: auto; max-height: calc(100vh - var(--title-h) - var(--side-gap) - 72px); min-height: 0; }
 .layer-tree { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; margin: 0; }
 /* --project-rgb: màu nhấn danh sách đồ án (đổi sang var(--orange-rgb) nếu muốn tương phản với tab Công trình) */
 .layer-main { flex: 1 1 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; --project-rgb: var(--cyan-rgb); --main-accent: rgb(var(--project-rgb)); }
@@ -1091,8 +1090,14 @@ body.right-collapsed .right-panel {
 .admin-tabs { display: flex; gap: 0; margin: 0 0 4px; border-bottom: 1px solid var(--border-soft); }
 .admin-tab { flex: 1 1 0; height: 28px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
 .admin-tab.active { color: var(--text-main); border-bottom-color: var(--main-accent); }
-.infra-block { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-soft); }
-.infra-block-title { margin: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+.axis-group { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-soft); }
+.axis-group-title { margin: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+.edu-levels { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 4px 22px; }
+.edu-levels button { height: 24px; padding: 0 6px; border: 1px solid var(--border-color); border-radius: var(--r-sm); background: transparent; color: var(--text-muted); font: inherit; font-size: 11px; cursor: pointer; }
+.edu-levels button.active { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.lp-axes { margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(148, 163, 184, .35); }
+.lp-axes h4 { margin: 6px 0 2px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+.lp-axes p { margin: 0; font-size: 12px; color: var(--text-main); }
 .is-filter-hide { display: none !important; }
 .layer-main-count { flex-shrink: 0; font-size: calc(var(--fs-xs) * 0.9); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-muted); }
 .layer-main-count:empty { display: none; }
@@ -1101,7 +1106,7 @@ body.right-collapsed .right-panel {
 .layer-pane-tools { display: flex; align-items: center; gap: 6px; padding: 2px 0 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border-soft); }
 .layer-pane-note { flex: 1 1 auto; min-width: 0; font-size: var(--fs-xs); color: var(--text-muted); }
 .layer-pane-note b { color: var(--text-main); font-variant-numeric: tabular-nums; }
-.layer-main-pane { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 10px 8px; }
+.layer-main-pane { flex: 1 1 auto; min-height: min(240px, 36vh); max-height: min(48vh, calc(100vh - var(--title-h) - var(--side-gap) - 200px)); overflow-y: auto; padding: 4px 10px 8px; }
 .layer-main-pane[hidden] { display: none; }
 .layer-count { flex-shrink: 0; padding: 1px 6px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent-cyan); background: rgba(var(--cyan-rgb), 0.12); border: 1px solid rgba(var(--cyan-rgb), 0.35); }
 .layer-count.none, .layer-map-count:empty { color: var(--text-muted); background: transparent; border-color: var(--border-color); }
@@ -3487,7 +3492,7 @@ table.ward-table th {
   top: calc(var(--info-top) + var(--brief-stack, 0px));
   bottom: auto;
   left: var(--info-left);
-  width: min(320px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
+  width: min(320px, calc(100% - var(--tb-btn) - var(--right-w) - 48px));
   max-height: calc(100% - var(--info-top) - var(--info-bottom) - var(--brief-stack, 0px));
   display: flex;
   flex-direction: column;
@@ -3505,7 +3510,7 @@ table.ward-table th {
 .cad-card.invest-card {
   top: var(--info-top) !important;
   bottom: var(--info-bottom) !important;
-  width: min(380px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
+  width: min(380px, calc(100% - var(--tb-btn) - var(--right-w) - 48px));
   max-height: none;
 }
 .invest-body { flex: 1; min-height: 0; min-width: 0; overflow-x: hidden; overflow-y: auto; }
@@ -3646,7 +3651,7 @@ table.ward-table th {
   right: auto !important;
   margin: 0 !important;
   transform: none !important;
-  width: min(320px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
+  width: min(320px, calc(100% - var(--tb-btn) - var(--right-w) - 48px));
   max-height: calc(100% - var(--info-top) - var(--info-bottom) - var(--brief-stack, 0px));
   height: auto;
   display: flex;
@@ -4763,7 +4768,7 @@ body.project-review.la-page #projectReviewHost {
   bottom: auto !important;
   margin: 0 !important;
   transform: none !important;
-  width: min(340px, calc(100% - var(--tb-btn) - var(--right-w) - 36px));
+  width: min(340px, calc(100% - var(--tb-btn) - var(--right-w) - 48px));
   max-height: calc(100% - var(--title-h) - 28px);
   display: flex;
   flex-direction: column;
@@ -5072,7 +5077,7 @@ body.project-review.la-page #projectReviewHost {
   }
   /* Panel đang mở: hộp tiêu đề dừng trước panel, không kéo một thanh trống sang phải. */
   body:not(.right-collapsed) .map-title {
-    max-width: calc(100vw - 60px - var(--phone-panel-w) - 16px);
+    max-width: calc(100vw - 60px - 52px - max(8px, env(safe-area-inset-right)));
   }
   .map-title-body { flex: 0 1 auto; min-width: 0; }
   .map-title-text {
@@ -5137,24 +5142,44 @@ body.project-review.la-page #projectReviewHost {
   .gp-meta-short { display: inline; }
   .gp-meta { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
   .gp-row { column-gap: 4px; padding: 3px 4px; }
-  /* Thẻ góc trên-phải, sát mép. Cao theo nội dung, tối đa phần màn hình còn lại; thân tab cuộn. */
+  /* Tờ dưới, tối đa nửa màn hình, không đè cột nút trái. */
   .right-panel {
-    top: max(8px, env(safe-area-inset-top));
+    top: auto;
     right: max(8px, env(safe-area-inset-right));
-    left: auto;
-    bottom: auto;
-    width: var(--phone-panel-w);
+    left: var(--phone-tool-left);
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: auto;
     height: auto;
-    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
-    border-radius: var(--r-lg);
-    transform-origin: top right;
+    max-height: 50dvh;
+    border-radius: 16px 16px 0 0;
+    transform-origin: bottom center;
   }
   body:not(.bottom-collapsed) .right-panel {
-    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - 8px);
+    max-height: 50dvh;
   }
   body:not(.right-collapsed).bottom-collapsed .bp-expand-btn { right: calc(var(--phone-panel-w) + 12px); }
-  body.right-collapsed .right-panel { transform: translateX(110%); visibility: hidden; }
-  .rp-sheet-handle { display: none; }
+  body.right-collapsed .right-panel { transform: translateY(110%); visibility: hidden; }
+  .rp-sheet-handle {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 18px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: grab;
+    touch-action: none;
+  }
+  .rp-sheet-handle::before {
+    content: '';
+    width: 36px;
+    height: 4px;
+    border-radius: 4px;
+    background: rgba(148, 163, 184, 0.85);
+  }
   .rp-collapse-btn {
     display: inline-flex;
     align-items: center;
@@ -5195,10 +5220,10 @@ body.project-review.la-page #projectReviewHost {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
-    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)) - 70px);
+    max-height: calc(50dvh - 36px);
   }
   body:not(.bottom-collapsed) #tabLayers {
-    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - 78px);
+    max-height: calc(50dvh - 36px);
   }
   #tabLayers .layer-tree,
   #tabLayers .layer-main,
@@ -5522,22 +5547,19 @@ body.project-review.la-page #projectReviewHost {
   body:not(.right-collapsed) .map-toolbar { right: auto; }
   body:not(.right-collapsed).bottom-collapsed .bp-expand-btn { right: calc(var(--phone-panel-w) + 12px); }
   .right-panel {
-    top: max(8px, env(safe-area-inset-top));
+    top: auto;
+    left: calc(max(4px, env(safe-area-inset-left)) + var(--tb-btn) + 8px);
     right: max(8px, env(safe-area-inset-right));
-    bottom: auto;
-    left: auto;
-    width: var(--phone-panel-w);
+    bottom: max(4px, env(safe-area-inset-bottom));
+    width: auto;
     height: auto;
-    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom)));
-    border-radius: var(--r-lg);
-    transform-origin: top right;
+    max-height: 50dvh;
+    border-radius: 16px 16px 0 0;
+    transform-origin: bottom center;
   }
-  body:not(.bottom-collapsed) .right-panel {
-    bottom: auto;
-    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - 8px);
-  }
-  body.right-collapsed .right-panel { transform: translateX(110%); visibility: hidden; opacity: 0; }
-  .rp-sheet-handle { display: none; }
+  body:not(.bottom-collapsed) .right-panel { max-height: 50dvh; }
+  body.right-collapsed .right-panel { transform: translateY(110%); visibility: hidden; opacity: 0; }
+  .rp-sheet-handle { display: flex; }
   .rp-collapse-btn {
     display: inline-flex;
     align-items: center;
@@ -5651,21 +5673,23 @@ body.project-review.la-page #projectReviewHost {
   }
   .bp-part2 .apt-ward { margin: 4px 0 0; padding: 0 2px; white-space: normal; }
 }
-/* Dọc hẹp: tiêu đề nằm trên một hàng, panel phải bắt đầu ngay dưới tiêu đề (không kéo full ngang, không phải ngăn kéo đáy). */
+/* Dọc hẹp: tờ dưới giữ tối đa nửa màn hình. */
 @media (max-width: 700px) {
   body:not(.right-collapsed) .map-title {
     max-width: calc(100vw - 68px - max(8px, env(safe-area-inset-right)));
   }
   .right-panel {
-    top: calc(max(8px, env(safe-area-inset-top)) + var(--title-h) + 6px);
+    top: auto;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    max-height: 50dvh;
   }
   #tabLayers, #tabLegend, #tabAdd {
-    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)) - var(--title-h) - max(8px, env(safe-area-inset-bottom)) - 78px);
+    max-height: calc(50dvh - 36px);
   }
   body:not(.bottom-collapsed) #tabLayers,
   body:not(.bottom-collapsed) #tabLegend,
   body:not(.bottom-collapsed) #tabAdd {
-    max-height: calc(100dvh - var(--bottom-h) - max(8px, env(safe-area-inset-top)) - var(--title-h) - 86px);
+    max-height: calc(50dvh - 36px);
   }
 }
 @media print and (max-width: 840px) {
@@ -5825,9 +5849,9 @@ body.right-collapsed .axis-dock { display: flex; position: fixed; z-index: 1250;
 .legend-chip[hidden],
 #tabLegend [hidden] { display: none !important; }
 #tabLegend.map-float {
-  right: calc(var(--right-w) + 20px);
+  right: calc(var(--right-w) + 28px);
   bottom: 16px;
-  width: min(340px, calc(100vw - var(--right-w) - 96px));
+  width: min(340px, calc(100vw - var(--right-w) - 104px));
   max-height: min(520px, 58vh);
   height: auto;
   flex: 0 0 auto;
@@ -5892,7 +5916,7 @@ body:not(.bottom-collapsed) #tabLegend.map-float { bottom: calc(var(--bottom-h) 
 .legend-chip {
   position: absolute;
   z-index: 1000;
-  right: calc(var(--right-w) + 20px);
+  right: calc(var(--right-w) + 28px);
   bottom: 16px;
   height: 28px;
   padding: 0 10px;
@@ -5921,7 +5945,17 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
     bottom: max(8px, env(safe-area-inset-bottom));
   }
   body.right-collapsed #tabLegend.map-float { right: auto; }
+  body.bottom-collapsed:not(.right-collapsed) #tabLegend.map-float {
+    bottom: calc(50dvh + 10px);
+    max-height: min(22vh, calc(50dvh - var(--title-h) - 24px));
+  }
   body:not(.bottom-collapsed) #tabLegend.map-float { bottom: calc(var(--bottom-h) + 8px); }
+  body.bottom-collapsed:not(.right-collapsed) .legend-chip { bottom: calc(50dvh + 10px); }
+  body.bottom-collapsed:not(.right-collapsed) .leaflet-popup.dock-card,
+  body.bottom-collapsed:not(.right-collapsed) .cad-card,
+  body.bottom-collapsed:not(.right-collapsed) .project-brief {
+    max-height: calc(50dvh - var(--info-top) - 16px) !important;
+  }
   #tabAdd.propose-sheet {
     left: 8px;
     top: calc(max(8px, env(safe-area-inset-top)) + var(--title-h) + 8px);

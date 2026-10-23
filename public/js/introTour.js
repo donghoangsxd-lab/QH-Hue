@@ -31,7 +31,7 @@ const STEPS = [
   {
     target: ['#rightPanel', '#btnExpandRightPanel'],
     title: 'Bật / tắt lớp dữ liệu',
-    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm mũi tên ‹ ở mép phải để mở, › để thu gọn. Khu đất và Quy hoạch mở theo chiều dọc. Nền bản đồ, Phân tích và Môi trường nằm trên một hàng tab. Số cạnh tên cho biết bao nhiêu lớp đang bật. Thẻ Chú giải chỉ giải thích trạng thái điểm và ký hiệu lô đất.'
+    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm mũi tên ‹ ở mép phải để mở, › để thu gọn. Hàng trên có bốn trục: Hành chính, Quy hoạch, Hạ tầng, Kiến trúc. Ngay dưới là ô tìm kiếm, nút HT/QH, nút Cả nhóm và nút ẩn panel. Chú giải nổi trên bản đồ, chỉ hiện lớp đang bật.'
   },
   {
     target: ['#btnInspectPick', '#btnInspectMode'],

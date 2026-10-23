@@ -568,7 +568,15 @@ function paint() {
   const tools = document.getElementById('axisToolsQuyHoach');
   if (tools) tools.hidden = true;
   applyLayerQuery();
+  syncTrafficPoints();
   publishSectorLegend(false);
+}
+
+function syncTrafficPoints() {
+  const box = document.getElementById('trafficPoints');
+  if (!box) return;
+  const b = browseState();
+  box.hidden = b.axis !== 'hatang' || b.sector !== 'giao-thong';
 }
 
 function showPlanPane() {
@@ -664,6 +672,7 @@ async function loadKienTruc() {
     pull('data/kien-truc/cong-trinh.json')
   ]);
   kienTruc = { quyChe, congTrinh };
+  state.kienTruc = kienTruc;
   if (browseState().axis === 'kientruc') paintKienTruc();
 }
 
@@ -859,7 +868,7 @@ export function initChuyenNganh() {
   });
   window.addEventListener('resize', () => { if (!document.getElementById('layerMagMenu')?.hidden) placeMagMenu(); });
   const openDeep = q.has('nganh') || q.has('truc');
-  if (openDeep) showAxis(browseState().axis, { openPanel: true, url: false });
+  if (openDeep) showAxis(browseState().axis, { url: false });
   else showAxis(getLevel() === 'urban' ? 'hanhchinh' : (browseState().axis || 'quyhoach'), { url: false });
   listenLevel = true;
   document.getElementById('layerSearch')?.addEventListener('input', (e) => {
