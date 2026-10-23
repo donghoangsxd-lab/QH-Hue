@@ -2,7 +2,7 @@
 const assert = require('assert');
 
 (async () => {
-  const { enabledSchemes, schemeHomeWard, NO_SCHEME_WARD } = await import('../public/js/schemeVisibility.js');
+  const { enabledSchemes, schemeHomeWard, NO_SCHEME_WARD, groupSchemesByWard } = await import('../public/js/schemeVisibility.js');
   const list = [
     { name: 'QHC Chân Mây - Lăng Cô', level: 'QHC', boundary: { type: 'Polygon' } },
     { name: 'QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045', level: 'QHC', boundary: { type: 'Polygon' } },
@@ -40,6 +40,13 @@ const assert = require('assert');
   const homes = rows.map(r => schemeHomeWard(r.wards, null));
   assert.strictEqual(new Set(homes).size, 2, 'liên phường không thành dòng thứ ba');
   assert.strictEqual(homes.filter(h => h === 'An Cựu').length, 2);
+  assert.strictEqual(groupSchemesByWard({}), false);
+  assert.strictEqual(groupSchemesByWard({ ward: null, areaType: 'tp' }), false);
+  assert.strictEqual(groupSchemesByWard({ ward: null, areaType: null }), false);
+  assert.strictEqual(groupSchemesByWard({ ward: 'Phường An Cựu', areaType: 'tp' }), true);
+  assert.strictEqual(groupSchemesByWard({ areaType: 'dothi' }), true);
+  assert.strictEqual(groupSchemesByWard({ areaType: 'xa' }), true);
+  assert.strictEqual(groupSchemesByWard({ areaType: 'tdp' }), true);
   console.log('schemeVisibility: ok');
 })().catch((err) => {
   console.error(err);

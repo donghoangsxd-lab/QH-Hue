@@ -19,12 +19,14 @@ import { trackJob, watchTiles } from './loadProgress.js';
 import { geeTileLayer } from './geeTiles.js';
 import {
   getCoveredRightWidth, highlightPlanWard, highlightPlanWards, wardFocusLayer, planMap, planLayers, syncPlanLayer,
-  setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, getViewMode, setViewMode, passToolClick, shownMaps
+  setPlanHeatUrl, setPlanHeatOpacity, isCompareOn, isSplitOn, onCompareChange, onViewChange, onPlanBoundariesPainted,
+  getViewMode, setViewMode, passToolClick, shownMaps
 } from './planMap.js';
 import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, infraLotOf, byProjectAreaDesc, lotShown } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
 import { planLevelOf } from './generalPlan.js';
 import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
+import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { bindNotchZoom } from './wheelZoom.js';
 import { lotBuildupSlotHtml } from './lotScreen.js';
 
@@ -231,6 +233,10 @@ export function initMap() {
   onChangeLots(() => { redrawParcels(); redrawLands(); });
   updateWardLabelFontSize();
   onCompareChange(handleCompareChange);
+  onPlanBoundariesPainted(() => syncWardBoundaryPaint());
+  onViewChange(() => syncWardBoundaryPaint());
+  onSplitPair(() => syncWardBoundaryPaint());
+  document.addEventListener(LEVEL_EVENT, () => syncWardBoundaryPaint());
   initLegendPanel();
   window.addEventListener(LOT_OPACITY_EVENT, () => { redrawParcels(); redrawLands(); });
   window.addEventListener(BASEMAP_EVENT, () => { redrawParcels(); redrawLands(); });
@@ -294,8 +300,12 @@ export async function loadBoundaryLayer() {
     if (boundData && boundData.features) {
       features = boundData.features;
       const drawn = wardDrawFC(features);
-      layers.boundary.addLayer(L.geoJSON(drawn, { style: WARD_BOUNDARY_SHADOW_STYLE, interactive: false }));
-      layers.boundary.addLayer(L.geoJSON(drawn, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false }));
+      const shadow = L.geoJSON(drawn, { style: WARD_BOUNDARY_SHADOW_STYLE, interactive: false });
+      const line = L.geoJSON(drawn, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false });
+      shadow.options.wardRole = 'shadow';
+      line.options.wardRole = 'line';
+      layers.boundary.addLayer(shadow);
+      layers.boundary.addLayer(line);
     }
   } catch (err) {
     console.error("Lỗi tải ranh giới vector 40 phường xã:", err);
@@ -333,6 +343,7 @@ export async function loadBoundaryLayer() {
   } catch (err) {
     console.error("Lỗi tải tên 40 phường xã:", err);
   }
+  syncWardBoundaryPaint();
 }
 
 export function getRightObstruction() {
@@ -1050,6 +1061,64 @@ function createCityOutline(lines, renderer) {
   ]);
 }
 
+// QHC 1/25.000: ranh phường nội bộ mảnh, không quầng. Quầng vàng chỉ trên vành ngoài thành phố.
+const WARD_INNER_LINE = { color: '#94a3b8', weight: 1.1, opacity: 0.85, fill: false, interactive: false };
+const WARD_INNER_SHADOW = { opacity: 0, weight: 0, fill: false, interactive: false };
+const cityEdgeOwned = new WeakSet();
+const cityEdgeLayer = new WeakMap();
+const cityOutlineRenderers = new WeakMap();
+
+function qhc25BoundaryOn(m) {
+  if (!m) return false;
+  if (isLevelPair()) return sideOf(m) === 'qhc25';
+  if (getLevel() !== 'qhc25') return false;
+  if (getViewMode() === 'HT' && !isSplitOn()) return false;
+  if (isSplitOn()) return m === planMap;
+  return m === planMap || m === map;
+}
+
+function cityEdgeGlowOn(m) {
+  return !!m && cityEdgeOwned.has(m) && qhc25BoundaryOn(m);
+}
+
+function cityRendererOf(m) {
+  let renderer = cityOutlineRenderers.get(m);
+  if (!renderer) cityOutlineRenderers.set(m, renderer = L.svg({ padding: 0.5 }));
+  return renderer;
+}
+
+function paintWardGroup(group, host) {
+  if (!group || !host) return;
+  const on = qhc25BoundaryOn(host);
+  const prev = cityEdgeLayer.get(host);
+  if (prev) {
+    group.removeLayer(prev);
+    prev.remove();
+    cityEdgeLayer.delete(host);
+  }
+  group.eachLayer(layer => {
+    const role = layer.options && layer.options.wardRole;
+    if (role === 'shadow') layer.setStyle(on ? WARD_INNER_SHADOW : WARD_BOUNDARY_SHADOW_STYLE);
+    else if (role === 'line') layer.setStyle(on ? WARD_INNER_LINE : WARD_BOUNDARY_LINE_STYLE);
+  });
+  if (!on) { cityEdgeOwned.delete(host); return; }
+  const wards = state.wardLabelsList || [];
+  const lines = wards.length ? outerWardLines(wards) : [];
+  if (!lines.length) { cityEdgeOwned.delete(host); return; }
+  const outline = createCityOutline(lines, cityRendererOf(host));
+  outline.options.wardRole = 'city';
+  group.addLayer(outline);
+  cityEdgeLayer.set(host, outline);
+  cityEdgeOwned.add(host);
+}
+
+function syncWardBoundaryPaint() {
+  if (map) paintWardGroup(layers.boundary, map);
+  if (planMap) paintWardGroup(planLayers.boundary, planMap);
+  try { leftRenderer.refreshPoints(); } catch (err) { /* renderer chưa sẵn */ }
+  try { planRenderer.refreshPoints(); } catch (err) { /* bản đồ quy hoạch chưa mở */ }
+}
+
 // Bản đồ quy hoạch ưu tiên ranh QH, chưa có thì dùng ranh hiện trạng của cùng công trình → { geometry, layer }
 function parcelFor(p) {
   const parcels = state.cadParcels;
@@ -1192,8 +1261,8 @@ function createRenderer(getMap, groups, isActive, scenarioLabel) {
   };
 
   const showCityOutline = (m, on) => {
-    m.getContainer().classList.toggle('city-pie-mode', on);
-    if (!on) { outlineLayer?.remove(); return; }
+    m.getContainer().classList.toggle('city-pie-mode', !!on);
+    if (!on || cityEdgeGlowOn(m)) { outlineLayer?.remove(); return; }
     const shape = cityShapeOf(state.wardLabelsList);
     if (!outlineLayer || outlineLayer.source !== shape) {
       outlineLayer?.remove();

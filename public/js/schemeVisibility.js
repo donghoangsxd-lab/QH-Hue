@@ -14,6 +14,12 @@ export function schemeHomeWard(wards, currentWard) {
   return [...list].sort((a, b) => a.localeCompare(b, 'vi'))[0];
 }
 
+// QHPK / QHCT: toàn thành phố thì liệt kê phẳng. Chỉ gom theo phường khi đang chọn phường hoặc phạm vi đô thị / xã.
+export function groupSchemesByWard({ ward = null, areaType = null } = {}) {
+  if (ward) return true;
+  return areaType === 'xa' || areaType === 'dothi' || areaType === 'tdp';
+}
+
 export function enabledSchemes(projects, level, hidden, layerOff) {
   if (!level) return [];
   const hide = hidden instanceof Set ? hidden : new Set(hidden || []);
