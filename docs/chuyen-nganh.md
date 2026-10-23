@@ -1,6 +1,6 @@
 # Hạ tầng chuyên ngành QHC đô thị Thừa Thiên Huế
 
-Bộ dữ liệu gốc cho các tính năng sau này. Chưa có giao diện.
+Bộ dữ liệu hạ tầng 7 chuyên ngành, gắn tab Hạ tầng. Mô hình bốn trục: [docs/bon-truc.md](bon-truc.md).
 
 Nguồn: [mapid 21817](https://gissonganh.hue.gov.vn/geditor.aspx?mapid=21817) (Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045). Tải bằng `qhFetchLayers` theo nhóm trên cây lớp, máy nhận `gserver-to-shp.js`. Hai nhóm giao thông quy hoạch đã có sẵn trên máy và được dùng lại. CRS **EPSG:4326** (WGS84), cùng hệ Leaflet và `scripts/build-qhc2045.js`.
 
@@ -147,4 +147,4 @@ Các bản đồ scan (2A–3E, 7A–7F, 10A–10F) là nhóm không có lớp v
 
 ## Lưu trữ
 
-Từng file GeoJSON và zip đều dưới 5 MB nên nằm trong git. Không đẩy GCS, không dựng pmtiles.
+Từng file GeoJSON và zip đều dưới 5 MB nên nằm trong git. Không đẩy GCS, không dựng pmtiles. Worker chỉ phục vụ `public/`: `public/data/chuyen-nganh/10000` và `25000` là symlink tới `data/chuyen-nganh/` (không nhân bản trong git). Lệnh build của Wrangler chạy `scripts/stage-chuyen-nganh.mjs --materialize` để bung symlink thành thư mục lúc deploy.

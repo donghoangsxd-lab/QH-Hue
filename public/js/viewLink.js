@@ -7,6 +7,7 @@ import { getLevel, setLevel, LEVELS } from './mapLevel.js';
 import { labelsOverlayOn, setLabelsOverlay } from './basemap.js';
 import { focusedProjectName } from './projectFiles.js';
 import { shareOpenProject } from './projectLayer.js';
+import { facetQuery } from './facetStore.js';
 import { showToast } from './utils.js';
 
 const LEVEL_CODE = { urban: 'dt', qhc25: '25', qhc10: '10', qhpk: 'pk', qhct: 'ct' };
@@ -170,6 +171,10 @@ function buildUrl() {
   if (labelsOverlayOn()) q.set('lb', '1');
   const openName = focusedProjectName();
   if (openName) q.set('da', openName);
+  const facet = facetQuery();
+  if (facet.kv) q.set('kv', facet.kv);
+  if (facet.truc) q.set('truc', facet.truc);
+  if (facet.nganh) q.set('nganh', facet.nganh);
   url.search = q.toString();
   return url.toString();
 }

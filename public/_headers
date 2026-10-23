@@ -50,6 +50,15 @@
 /data/qhc2045/*
   Cache-Control: public, max-age=31536000, immutable
 
+/data/chuyen-nganh/*
+  Cache-Control: public, max-age=86400
+
+/data/chuyen-nganh/index.json
+  Cache-Control: public, max-age=300
+
+/data/kien-truc/*
+  Cache-Control: public, max-age=300
+
 /data/gba/bldg-hf.bin
   Cache-Control: public, max-age=31536000, immutable
 
