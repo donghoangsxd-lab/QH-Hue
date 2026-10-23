@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
 const shotDir = process.env.QHC_SHOT_DIR || '/opt/cursor/artifacts';
+const LIVE_ORIGIN = 'https://qh-hue.donghoangsxd.workers.dev';
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -21,9 +22,27 @@ const TYPES = {
   '.woff2': 'font/woff2'
 };
 
+function proxyLive(req, res, url) {
+  const target = new URL(url.pathname + url.search, LIVE_ORIGIN);
+  fetch(target, { method: req.method, headers: { accept: req.headers.accept || '*/*' } }).then(async (up) => {
+    const headers = { 'content-type': up.headers.get('content-type') || 'application/octet-stream' };
+    const cc = up.headers.get('cache-control');
+    if (cc) headers['cache-control'] = cc;
+    res.writeHead(up.status, headers);
+    res.end(Buffer.from(await up.arrayBuffer()));
+  }).catch((err) => {
+    res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end(String(err && err.message || err));
+  });
+}
+
 function startServer() {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
+    if (url.pathname.startsWith('/api/')) {
+      proxyLive(req, res, url);
+      return;
+    }
     let rel = decodeURIComponent(url.pathname);
     if (rel.endsWith('/')) rel += 'index.html';
     const file = path.normalize(path.join(root, rel));
@@ -33,10 +52,11 @@ function startServer() {
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
     fs.createReadStream(file).pipe(res);
   });
-  // Cổng nằm trong STATIC_DEV_PORTS (api.js) để trang gọi API production, không phải /api/gee của máy tĩnh.
+  // 8792 ngoài STATIC_DEV_PORTS (api.js): trang gọi /api/gee cùng nguồn, máy tĩnh chuyển sang Worker.
+  // Vercel legacy trả 402 nên không dùng làm danh mục.
   return new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(8791, '127.0.0.1', () => resolve(server));
+    server.listen(8792, '127.0.0.1', () => resolve(server));
   });
 }
 
@@ -107,7 +127,7 @@ function assertCount(label, info) {
 }
 
 async function liveQhcNames() {
-  const res = await fetch('https://web-hatang-hue-4.vercel.app/api/gee?action=getProjectIndex');
+  const res = await fetch(`${LIVE_ORIGIN}/api/gee?action=getProjectIndex`);
   if (!res.ok) throw new Error(`getProjectIndex HTTP ${res.status}`);
   const data = await res.json();
   const names = (data.projects || [])
