@@ -1091,6 +1091,10 @@ body.right-collapsed .right-panel {
 .admin-tab { flex: 1 1 0; height: 28px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
 .admin-tab.active { color: var(--text-main); border-bottom-color: var(--main-accent); }
 .axis-group { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-soft); }
+#pointWorks > .axis-group { margin-top: 4px; }
+#pointCatalog .point-level { margin: 6px 0 0; }
+#pointCatalog summary { cursor: pointer; font-size: 12px; font-weight: 700; }
+#pointCatalog summary small { font-weight: 600; color: var(--text-muted); }
 .axis-group-title { margin: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
 .edu-levels { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 4px 22px; }
 .edu-levels button { height: 24px; padding: 0 6px; border: 1px solid var(--border-color); border-radius: var(--r-sm); background: transparent; color: var(--text-muted); font: inherit; font-size: 11px; cursor: pointer; }

@@ -44,7 +44,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261035">
+  <link rel="stylesheet" href="css/style.css?v=20261036">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -594,27 +594,29 @@
           <div class="layer-main-pane" id="layerPaneHaTang" data-main-pane="hatang" role="tabpanel" hidden>
             <div id="browseNganh"></div>
             <section class="axis-base" id="baseHaTang"></section>
-                    <section class="axis-group" id="pcccInfra">
-        <h3 class="axis-group-title">PCCC</h3>
-        
-        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c12"><label for="chk_c12" title="Bán kính phục vụ ≤ 3 km phường, ≤ 5 km xã (QCVN 01:2026 Mục 2.5.13.1). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Pccc.svg" class="layer-type-icon" alt="" width="14" height="16">10. Trụ sở cảnh sát PCCC</label></div><button type="button" class="btn-dot-buffer" data-buffer="b12" title="Bật/tắt bán kính phục vụ" aria-label="Bật/tắt bán kính phục vụ" aria-pressed="false">●</button></div>
-
-          </section>
-          <div class="axis-group" id="trafficPoints" hidden>
-        <h3 class="axis-group-title">Điểm giao thông</h3>
-        
-        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c2"><label for="chk_c2"><img src="./icons/Parking.png" class="layer-type-icon" alt="" width="14" height="16">2. Bãi đỗ xe, trạm sạc</label></div><button type="button" class="btn-dot-buffer" data-buffer="b2" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
-
-        
-        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c11"><label for="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Bus.svg" class="layer-type-icon" alt="" width="14" height="16">13. Trạm dừng xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" title="Bật/tắt phạm vi 500 m" aria-label="Bật/tắt phạm vi 500 m" aria-pressed="false">●</button></div>
-
-          </div>
-
           </div>
           <div class="layer-main-pane" id="layerPaneXaHoi" data-main-pane="xahoi" role="tabpanel" hidden>
             <div id="axisXaHoi">
               <p class="axis-scope" id="axisScopeXaHoi"></p>
               <div id="xahoiPoints">
+<section class="axis-group" id="pointWorks">
+        <h3 class="axis-group-title">Công trình điểm</h3>
+        <section class="axis-group" id="pcccInfra">
+          <h3 class="axis-group-title">PCCC</h3>
+          <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c12"><label for="chk_c12" title="Bán kính phục vụ ≤ 3 km phường, ≤ 5 km xã (QCVN 01:2026 Mục 2.5.13.1). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Pccc.svg" class="layer-type-icon" alt="" width="14" height="16">10. Trụ sở cảnh sát PCCC</label></div><button type="button" class="btn-dot-buffer" data-buffer="b12" title="Bật/tắt bán kính phục vụ" aria-label="Bật/tắt bán kính phục vụ" aria-pressed="false">●</button></div>
+        </section>
+        <div class="axis-group" id="trafficPoints">
+          <h3 class="axis-group-title">Điểm giao thông</h3>
+          <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c2"><label for="chk_c2"><img src="./icons/Parking.png" class="layer-type-icon" alt="" width="14" height="16">2. Bãi đỗ xe, trạm sạc</label></div><button type="button" class="btn-dot-buffer" data-buffer="b2" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+          <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c11"><label for="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Bus.svg" class="layer-type-icon" alt="" width="14" height="16">13. Trạm dừng xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" title="Bật/tắt phạm vi 500 m" aria-label="Bật/tắt phạm vi 500 m" aria-pressed="false">●</button></div>
+        </div>
+        <div class="layer-status-legend" aria-label="Ghi chú trạng thái điểm giao thông và PCCC">
+          <span class="layer-status-title">Ghi chú:</span>
+          <span title="Đã được quản trị viên phê duyệt"><img src="./icons/Park.png" class="legend-icon" alt="">Đã phê duyệt</span>
+          <span class="legend-pending" title="Đề xuất chưa chấp thuận (TrangThai = FALSE)"><img src="./icons/Park2.png" class="legend-icon" alt=""><b>Chờ duyệt</b></span>
+        </div>
+        <div id="pointCatalog"></div>
+</section>
 <section class="axis-group" id="socialInfra">
         <h3 class="axis-group-title">Hạ tầng xã hội <span class="layer-main-count" id="infraTabCount" title="Số nhóm công trình đang bật / tổng số"></span></h3>
         <div class="layer-pane-tools">
@@ -1596,6 +1598,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261035"></script>
+  <script type="module" src="./js/app.js?v=20261036"></script>
 </body>
 </html>

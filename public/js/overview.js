@@ -344,7 +344,7 @@ const SECTIONS = [
         steps: [
           'Nếu panel phải đang thu, bấm <b>Mở panel công cụ</b>. Tab <b>Lớp dữ liệu</b> đang mở mặc định.',
           'Hàng tab trên: <b>Hành chính</b>, <b>Quy hoạch</b>, <b>Hạ tầng</b>, <b>Kiến trúc</b>. Trong Hành chính có tab nhỏ <b>Đô thị</b> và <b>ĐVHC</b> (xã, phường).',
-          'Dòng dưới băng đạn có ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b> và nút <b>Cả nhóm</b>. Công trình xã hội ở panel <b>Hạ tầng xã hội</b>. <b>Ranh lô</b>, cơ sở chưa sử dụng và chung cư ở Quy hoạch. Nút <b>Tất cả</b> bật hoặc tắt 14 nhóm điểm.',
+          'Dòng dưới băng đạn có ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b> và nút <b>Cả nhóm</b>. Công trình xã hội, PCCC, điểm giao thông và lớp điểm theo đồ án ở panel <b>Hạ tầng xã hội</b>. <b>Ranh lô</b>, cơ sở chưa sử dụng và chung cư ở Quy hoạch. Nút <b>Tất cả</b> bật hoặc tắt 14 nhóm điểm.',
           'Hàng tab dưới: <b>Bản đồ nền</b> (ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư, độ phủ…) và <b>Bản đồ môi trường</b> (địa hình, ngập…). Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường.'
         ],
         facts: [
