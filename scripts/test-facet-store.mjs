@@ -261,6 +261,13 @@ for (const sector of ['giao-thong', 'cap-dien', 'cap-nuoc']) {
   }
   assert.ok(baseLayers({ axis: 'hatang', sector }).some(l => l.name === 'Hiện trạng (tạm thời, tổng hợp từ các đồ án)'));
 }
+const coastProject = schemesForSector('giao-thong', 'QHC10', [
+  { slug: 'qhc-chan-may-lang-co-a44cfad0', tenQH: 'QHC Chân Mây - Lăng Cô' }
+]);
+const mayRows = coastProject.filter(s => s.slug === 'qhc-chan-may' || s.slug === 'qhc-chan-may-lang-co-a44cfad0');
+assert.equal(mayRows.length, 1);
+assert.equal(mayRows[0].slug, 'qhc-chan-may');
+assert.ok(layersFor('giao-thong', mayRows[0].level, mayRows[0].slug).some(l => l.name === 'Quy hoạch giao thông'));
 setAreaFilter({ type: 'dothi', code: 'chan-may' }, 'user', { url: false });
 const coast = schemesForSector('giao-thong', 'QHC25', []);
 assert.ok(coast.some(s => s.slug === 'qhc-chan-may'));

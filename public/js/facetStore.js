@@ -488,7 +488,11 @@ export function schemesAt(level, catalog = []) {
     const lv = kind === 'QHC' ? 'QHC10' : kind === 'QHPK' ? 'QHPK' : kind === 'QHCT' ? 'QHCT' : '';
     if (lv !== level) return;
     const names = namesOfProject(p);
-    add(schemeRow(p.slug || areaCodeFromName(p.tenQH), names.tenRutGon || names.tenQH, level));
+    let slug = p.slug || areaCodeFromName(p.tenQH);
+    const meta = schemeMeta(slug);
+    if (meta && meta.catalogScheme) slug = String(meta.catalogScheme);
+    const name = (meta && meta.name) || names.tenRutGon || names.tenQH;
+    add(schemeRow(slug, name, level));
   });
   layers.forEach(l => {
     if (l.level !== level || !l.scheme) return;
