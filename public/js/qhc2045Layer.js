@@ -20,6 +20,7 @@ import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
 import { BASEMAP_EVENT } from './basemap.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
+import { setOutsideMask, PROJECT_UNFOCUS_EVENT } from './projectLayer.js';
 import { analyzeParcelZones, parcelZonesHtml, analyzeParcelPlan, parcelPlanHtml, planPlace } from './planLandStats.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { isLevelPair, sideOf, mapsForLevel, onSplitPair } from './splitPair.js';
@@ -575,11 +576,23 @@ function drawCore() {
   layers.core = group.addTo(m);
 }
 
+// Lô trung tâm đang hiện, không mở đồ án nhập: cùng phủ tối ngoài ranh với các đồ án QHC khác.
+function syncCoreMask() {
+  if (isLevelPair() || getLevel() !== 'qhc10' || state.focusedProject || collapsed()) {
+    setOutsideMask(null);
+    return;
+  }
+  const m = target();
+  if (!m || !qhcOn(m, 'qhc10', 'chk_qhc10')) { setOutsideMask(null); return; }
+  const shape = unionTv();
+  setOutsideMask(shape?.geometry || null);
+}
+
 function applyCore() {
   const m = target();
-  if (!m) return;
+  if (!m) { syncCoreMask(); return; }
   use(m);
-  if (!qhcOn(m, 'qhc10', 'chk_qhc10') || !data.land) return;
+  if (!qhcOn(m, 'qhc10', 'chk_qhc10') || !data.land) { syncCoreMask(); return; }
   if (collapsed()) dropLand();
   else if (!layers.land) drawLand();
   if (placeLots) {
@@ -589,11 +602,13 @@ function applyCore() {
     clearCoreHover();
     layers.wash?.remove();
     layers.wash = null;
+    syncCoreMask();
     return;
   }
   if (!layers.frame && data.frame) drawFrame();
   drawWash();
   drawCore();
+  syncCoreMask();
 }
 
 /** true: đang xem một địa điểm — QHC 1/10.000 chỉ vẽ lô, QHC 1/25.000 bỏ các nét ranh */
@@ -631,6 +646,7 @@ async function setLand(on) {
   if (!maps.length) {
     both.forEach(m => clearQhc(m, ['land', 'core', 'wash', 'hover', 'frame', 'ext']));
     setHint('qhc10Hint', 'Trung tâm');
+    syncCoreMask();
     return;
   }
   setHint('qhc10Hint', 'đang tải…');
@@ -677,6 +693,7 @@ async function setLand(on) {
       drawCore();
     });
     setHint('qhc10Hint', 'Trung tâm');
+    syncCoreMask();
   };
   try { paint(); }
   catch (err) {
@@ -1227,6 +1244,7 @@ function initUi() {
 }
 
 export function initQhc2045Layer() {
+  document.addEventListener(PROJECT_UNFOCUS_EVENT, () => syncCoreMask());
   const m = target();
   if (!m) return;
   use(m);

@@ -85,11 +85,24 @@ export function wardScopeName() {
   return state.showProjects && w && w !== CITY_NAME ? w : null;
 }
 
-/** Lô của đồ án name được vẽ: phường thì mọi đồ án đang hiện; QHPK toàn TP thì đồ án bấm ranh hoặc tick panel */
+// QHC 1/10.000, không so sánh hai cấp: lô chỉ đồ án đang mở, hoặc các đồ án cùng lần tra cứu nhiều đồ án.
+function qhcPeerLots(name) {
+  const focus = state.focusedProject;
+  if (!focus || focus === name || state.lotProjects.size <= 1) return false;
+  if (!state.lotProjects.has(name) || !state.lotProjects.has(focus)) return false;
+  return planLevelOf(focus) === 'QHC' && planLevelOf(name) === 'QHC';
+}
+
+/** Lô của đồ án name được vẽ: phường thì mọi đồ án đang hiện; QHPK toàn TP thì đồ án bấm ranh hoặc tick panel.
+ *  QHC 1/10.000: chỉ đồ án đang chọn (và các đồ án cùng lỗ tra cứu). Bỏ chọn thì không vẽ lô. */
 export function projectLotsDrawn(name) {
   if (!name) return false;
+  if (!isLevelPair() && getLevel() === 'qhc10' && planLevelOf(name) === 'QHC') {
+    if (!lotShown(name)) return false;
+    return name === state.focusedProject || qhcPeerLots(name);
+  }
   if (wardScopeName()) return lotShown(name);
-  if ((getLevel() === 'qhct' || getLevel() === 'qhc10') && state.lotProjects.has(name)) return lotShown(name);
+  if (getLevel() === 'qhct' && state.lotProjects.has(name)) return lotShown(name);
   if (qhpkBoundaryOnly()) {
     if (state.hiddenProjects.has(name)) return false;
     return name === state.focusedProject || state.lotProjects.has(name);
@@ -131,7 +144,8 @@ function wanted() {
     if (!p || !p.tenQH || p.sheetOnly) return false;
     if (force.has(p.tenQH)) return state.showLand || !state.hiddenProjects.has(p.tenQH);
     if (p.tenQH === focus) return true;
-    if ((getLevel() === 'qhct' || getLevel() === 'qhc10') && state.lotProjects.has(p.tenQH)) return lotShown(p.tenQH);
+    if (!isLevelPair() && getLevel() === 'qhc10' && planLevelOf(p.tenQH) === 'QHC') return qhcPeerLots(p.tenQH) && lotShown(p.tenQH);
+    if (getLevel() === 'qhct' && state.lotProjects.has(p.tenQH)) return lotShown(p.tenQH);
     if (wardName && inWard(p, wardName) && lotShown(p.tenQH)) return true;
     if (qhpkBoundaryOnly() && !state.hiddenProjects.has(p.tenQH) && (p.tenQH === state.focusedProject || state.lotProjects.has(p.tenQH))) return true;
     if (!layerOn) return false;

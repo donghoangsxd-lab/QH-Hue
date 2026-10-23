@@ -20,6 +20,12 @@ const SPLIT_KIND_KEY = 'qh_split_kind';
 const planHighlightLayer = L.layerGroup();
 const compareListeners = [];
 const viewListeners = [];
+const boundaryPainted = [];
+
+/** Sau mỗi lần dựng lại ranh phường trên bản đồ quy hoạch. mapEngine gắn kiểu ranh QHC 1/25.000. */
+export function onPlanBoundariesPainted(fn) {
+  boundaryPainted.push(fn);
+}
 
 // Cùng khóa với `layers` của bản đồ hiện trạng (mapEngine.js) để bật/tắt đồng thời
 export const planLayers = {
@@ -154,13 +160,18 @@ export function renderPlanBoundaries() {
   group.clearLayers();
   const wards = state.wardLabelsList || [];
   const fc = wardDrawFC(wards.map(w => ({ type: 'Feature', geometry: w.geometry, properties: { name: w.name } })));
-  group.addLayer(L.geoJSON(fc, { style: WARD_BOUNDARY_SHADOW_STYLE, interactive: false }));
-  group.addLayer(L.geoJSON(fc, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false }));
+  const shadow = L.geoJSON(fc, { style: WARD_BOUNDARY_SHADOW_STYLE, interactive: false });
+  const line = L.geoJSON(fc, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false });
+  shadow.options.wardRole = 'shadow';
+  line.options.wardRole = 'line';
+  group.addLayer(shadow);
+  group.addLayer(line);
   wards.forEach(item => {
     if (item.lat == null || item.lng == null) return;
     const icon = L.divIcon({ className: 'ward-label-icon', html: `<span class="ward-label-text">${escapeHtml(item.name)}</span>`, iconSize: [0, 0] });
     group.addLayer(L.marker([item.lat, item.lng], { icon, interactive: false }));
   });
+  boundaryPainted.forEach(fn => { try { fn(); } catch (err) { console.warn('ranh phường:', err); } });
 }
 
 // Viền phường đang chọn nằm trên ranh đồ án (projectGlowPane 445) và lô đất, dưới nhãn đường (450) và biểu tượng (600)
