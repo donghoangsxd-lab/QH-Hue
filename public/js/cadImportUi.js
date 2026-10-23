@@ -6,7 +6,7 @@ import { map } from './mapEngine.js';
 import { planMap, getViewMode, isSplitOn, onViewChange } from './planMap.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
-import { escapeHtml, fmtNum, distanceMeters, ico, setStatusContent, planRows } from './utils.js';
+import { escapeHtml, fmtNum, distanceMeters, ico, setStatusContent, planRows, RIGHT_TAB_EVENT } from './utils.js';
 import {
   parseDxf, buildParcels, buildParcelsLonLat, assignWards, matchExisting, layerToType, tt16Layer, linkStages, sameSite,
   filePhaseFromName, LAYER_PREFIXES, SCHOOL_PENDING, MARKET_PENDING, CRS_PRESETS, detectAxes, vn2000ToWgs84, CITY_EDGE_M,
@@ -1146,7 +1146,7 @@ export const REVIEW_DOSSIER_EVENT = 'review-dossier-open';
  */
 export async function importReviewDossier(text, fileName, pendingId) {
   if (!isAdmin()) return;
-  document.querySelector('.tab-btn[data-tab="tabAdd"]')?.click();
+  document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabAdd', open: true } }));
   document.querySelector('.add-mode-btn[data-mode="addBulk"]')?.click();
   await loadFile(new File([text], fileName), pendingId);
 }

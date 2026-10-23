@@ -1,7 +1,7 @@
-// Bốn trục là tab cấp một của panel Lớp dữ liệu, cùng tab Khu đất. Cùng một cờ bật/tắt: checkbox có bind dùng lớp sẵn,
+// Bốn trục là tab cấp một của panel Lớp dữ liệu. Cùng một cờ bật/tắt: checkbox có bind dùng lớp sẵn,
 // lớp catalog chỉ tải GeoJSON khi bật và gỡ layer khi tắt.
 import { map } from './mapEngine.js';
-import { planMap, getViewMode } from './planMap.js';
+import { planMap, getViewMode, setViewMode, onViewChange } from './planMap.js';
 import { getLevel, setLevel, LEVEL_EVENT } from './mapLevel.js';
 import { state } from './state.js';
 import { escapeHtml, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
@@ -57,7 +57,7 @@ const openSchemes = new Set([
   'qhc-hue-2045', 'qhc-trung-tam', 'qhc-khe-tre', 'qhc-chan-may',
   'qhc-tt-phu-loc-19e96a86', 'qhc-do-thi-moi-vinh-hung-8899f27b', 'qhc-khu-cong-nghiep-phong-dien-f997bd2c'
 ]);
-let areaQuery = '';
+let layerQuery = '';
 let applying = false;
 let booted = false;
 let ready = false;
@@ -297,31 +297,19 @@ function paintBase(axisId, hostId, sector) {
 }
 
 function paintAdmin() {
-  const box = document.getElementById('axisHanhChinh');
-  if (!box) return;
-  if (!box.dataset.ready) {
-    box.dataset.ready = '1';
-    box.innerHTML = `<p class="axis-scope" id="axisScopeAdmin"></p>
-      <input type="search" id="axisAreaFilter" class="project-search" placeholder="Tìm đô thị, xã, phường..." aria-label="Tìm khu vực">
-      <div id="axisAreaList"></div>
-      <div id="axisAreaTools"></div>`;
-    box.querySelector('#axisAreaFilter')?.addEventListener('input', (e) => {
-      areaQuery = e.target.value || '';
-      paintAdminList();
-    });
-  }
   const scope = document.getElementById('axisScopeAdmin');
   if (scope) scope.textContent = `Phạm vi: ${areaLabel(getAreaFilter() || AREA_TP)}`;
   paintAdminList();
 }
 
 function paintAdminList() {
-  const list = document.getElementById('axisAreaList');
+  const townsHost = document.getElementById('axisTownList');
+  const wardsHost = document.getElementById('axisWardList');
   const tools = document.getElementById('axisAreaTools');
-  if (!list) return;
+  if (!townsHost || !wardsHost) return;
   const current = formatKv(getAreaFilter() || AREA_TP);
-  const q = areaQuery.trim().toLowerCase();
-  const match = (a) => !q || a.name.toLowerCase().includes(q) || a.code.includes(q);
+  const q = layerQuery.trim().toLowerCase();
+  const match = (a) => !q || a.name.toLowerCase().includes(q) || String(a.code || '').includes(q);
   const button = (a) => {
     const kv = formatKv(a);
     const on = kv === current;
@@ -330,14 +318,14 @@ function paintAdminList() {
   const towns = listAreas('dothi').filter(match);
   const wards = listAreas('xa').filter(match);
   const tp = listAreas('tp')[0] || { ...AREA_TP, name: 'Toàn thành phố' };
-  list.innerHTML = `${match(tp) ? button(tp) : ''}
-    <details class="axis-area-group" open><summary>Đô thị (${towns.length})</summary><div class="axis-area-list">${towns.map(button).join('') || '<p class="cn-empty">Không khớp</p>'}</div></details>
-    <details class="axis-area-group" ${q ? 'open' : ''}><summary>Xã/phường (${wards.length})</summary><div class="axis-area-list">${wards.map(button).join('') || '<p class="cn-empty">Không khớp</p>'}</div></details>`;
+  townsHost.innerHTML = towns.map(button).join('') || (q ? '<p class="cn-empty">Không khớp</p>' : '');
+  wardsHost.innerHTML = `${match(tp) ? button(tp) : ''}${wards.map(button).join('') || (q ? '<p class="cn-empty">Không khớp</p>' : '')}`;
   const area = getAreaFilter() || AREA_TP;
   if (tools) {
     tools.innerHTML = (area.type === 'dothi' || area.type === 'xa')
       ? `<div class="cn-tools">${soon('Đánh giá phân loại đô thị')}</div>` : '';
   }
+  filterGp();
 }
 
 function paintKienTruc() {
@@ -366,6 +354,83 @@ function paintDock() {
   });
 }
 
+const foldQuery = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+
+function filterGp() {
+  const box = document.getElementById('gpList');
+  if (!box) return;
+  const q = foldQuery(layerQuery);
+  const rows = [...box.children];
+  rows.forEach(el => {
+    if (!el.classList.contains('gp-row')) return;
+    const name = el.querySelector('.gp-name')?.textContent || '';
+    el.classList.toggle('is-filter-hide', !!q && !foldQuery(name).includes(q));
+  });
+  rows.forEach(el => {
+    if (!el.classList.contains('gp-grp')) return;
+    let n = el.nextElementSibling;
+    let any = !q;
+    while (n && !n.classList.contains('gp-grp')) {
+      if (n.classList.contains('gp-row') && !n.classList.contains('is-filter-hide')) any = true;
+      n = n.nextElementSibling;
+    }
+    el.classList.toggle('is-filter-hide', !any);
+  });
+}
+
+function applyLayerQuery() {
+  const q = foldQuery(layerQuery);
+  ['#layerPaneHaTang', '#layerPaneKienTruc', '#baseQuyHoach'].forEach(sel => {
+    document.querySelectorAll(`${sel} .cn-scheme, ${sel} .layer-row, ${sel} .axis-arch li, ${sel} .cn-layer`).forEach(el => {
+      el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
+    });
+  });
+  document.querySelectorAll('#axisQuyHoach .project-row, #axisQuyHoach .project-layer, #axisQuyHoach .layer-row').forEach(el => {
+    if (el.closest('#projectList')) return;
+    el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
+  });
+  filterGp();
+  const ps = document.getElementById('projectSearch');
+  if (ps && ps.value !== layerQuery) {
+    ps.value = layerQuery;
+    ps.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+
+function paintViewSwitch() {
+  const mode = getViewMode() === 'HT' ? 'HT' : 'QH';
+  document.querySelectorAll('#layerTools [data-view-mode]').forEach(btn => {
+    const on = btn.dataset.viewMode === mode;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', String(on));
+  });
+}
+
+function toggleAxisAll() {
+  if (browseState().axis === 'hatang') {
+    const all = document.querySelector('#browseNganh [data-cn-all]');
+    if (all && !all.disabled) {
+      all.click();
+      return;
+    }
+  }
+  const pane = document.querySelector(`#layerMain [data-main-pane="${browseState().axis}"]`);
+  if (!pane) return;
+  const boxes = [...pane.querySelectorAll('input[type="checkbox"]')].filter(el => {
+    if (el.id === 'chk_parcel') return false;
+    if (el.closest('#projectList')) return false;
+    if (el.closest('[hidden]') || el.closest('.is-filter-hide')) return false;
+    return true;
+  });
+  if (!boxes.length) return;
+  const turnOn = boxes.some(el => !el.checked);
+  boxes.forEach(el => {
+    if (el.checked === turnOn) return;
+    el.checked = turnOn;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
 function paint() {
   paintDock();
   paintScopes();
@@ -381,6 +446,7 @@ function paint() {
     tools.dataset.ready = '1';
     tools.innerHTML = `${soon('Thống kê')}${soon('Khớp nối')}${soon('So sánh hiện trạng – quy hoạch')}`;
   }
+  applyLayerQuery();
 }
 
 function showPlanPane() {
@@ -503,6 +569,27 @@ export function initChuyenNganh() {
   }
 
   document.getElementById('layerMain')?.addEventListener('click', (e) => {
+    const viewBtn = e.target.closest('[data-view-mode]');
+    if (viewBtn) {
+      setViewMode(viewBtn.dataset.viewMode);
+      paintViewSwitch();
+      return;
+    }
+    if (e.target.closest('#btnAxisAll')) {
+      toggleAxisAll();
+      return;
+    }
+    const adminTab = e.target.closest('[data-admin-tab]');
+    if (adminTab) {
+      const id = adminTab.dataset.adminTab;
+      document.querySelectorAll('[data-admin-tab]').forEach(btn => {
+        const on = btn.dataset.adminTab === id;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-selected', String(on));
+      });
+      document.querySelectorAll('[data-admin-pane]').forEach(pane => { pane.hidden = pane.dataset.adminPane !== id; });
+      return;
+    }
     const sectorBtn = e.target.closest('[data-cn-sector]');
     if (sectorBtn) {
       setBrowseState({ sector: sectorBtn.dataset.cnSector, axis: 'hatang' });
@@ -567,6 +654,7 @@ export function initChuyenNganh() {
       if (browseState().axis !== 'hanhchinh') axisBeforeUrban = browseState().axis;
       levelTab = true;
       showAxis('hanhchinh', { url: false });
+      document.querySelector('[data-admin-tab="dothi"]')?.click();
       return;
     }
     if (!levelTab || !axisBeforeUrban) return;
@@ -608,6 +696,15 @@ export function initChuyenNganh() {
   if (openDeep) showAxis(browseState().axis, { openPanel: true, url: false });
   else paint();
   listenLevel = true;
+  document.getElementById('layerSearch')?.addEventListener('input', (e) => {
+    layerQuery = e.target.value || '';
+    paintAdminList();
+    applyLayerQuery();
+  });
+  onViewChange(paintViewSwitch);
+  paintViewSwitch();
+  const gp = document.getElementById('gpList');
+  if (gp) new MutationObserver(() => filterGp()).observe(gp, { childList: true });
 
   loadKienTruc();
   loadFacetCatalog().then(() => {

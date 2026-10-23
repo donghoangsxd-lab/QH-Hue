@@ -90,7 +90,7 @@ import { initTreeLayer } from './treeLayer.js';
 import { initOsmOpen } from './osmOpen.js';
 import { initSketchLayer, handleSketchClick } from './sketchLayer.js';
 import { initFaqPanel } from './faqPanel.js';
-import { captureMapScreenshot, exportMapA3 } from './printLayout.js';
+import { exportMapA3 } from './printLayout.js';
 import { initOverview } from './overview.js';
 import { initMobileShell } from './mobileShell.js';
 import { initRiskLayer } from './riskLayer.js';
@@ -146,82 +146,6 @@ function initLayerMainTabs() {
   const root = document.getElementById('layerMain');
   if (!root) return;
   const tabs = [...root.querySelectorAll('[data-main-tab]')];
-  const more = document.getElementById('layerMainMore');
-  const menu = document.createElement('div');
-  menu.id = 'layerMainOverflow';
-  menu.className = 'layer-main-overflow';
-  menu.setAttribute('role', 'menu');
-  menu.hidden = true;
-  document.body.appendChild(menu);
-
-  const fitTabs = () => {
-    const bar = root.querySelector('.layer-main-tabs');
-    if (!bar || !more) return;
-    tabs.forEach(t => { t.hidden = false; });
-    more.hidden = true;
-    const barWidth = bar.clientWidth;
-    if (!barWidth) return;
-    const widths = tabs.map(t => t.offsetWidth);
-    const sum = widths.reduce((a, b) => a + b, 0);
-    if (sum <= barWidth + 1) {
-      menu.hidden = true;
-      more.setAttribute('aria-expanded', 'false');
-      return;
-    }
-    more.hidden = false;
-    const budget = Math.max(0, barWidth - more.offsetWidth);
-    const active = Math.max(0, tabs.findIndex(t => t.classList.contains('active')));
-    const keep = new Set();
-    let used = 0;
-    for (let i = 0; i < tabs.length; i++) {
-      if (used + widths[i] > budget + 1) break;
-      keep.add(i);
-      used += widths[i];
-    }
-    if (!keep.has(active)) {
-      for (const i of [...keep].sort((a, b) => b - a)) {
-        if (used + widths[active] <= budget + 1) break;
-        keep.delete(i);
-        used -= widths[i];
-      }
-      if (used + widths[active] > budget + 1) keep.clear();
-      keep.add(active);
-    }
-    tabs.forEach((t, i) => { t.hidden = !keep.has(i); });
-    const hiddenTabs = tabs.filter(t => t.hidden);
-    if (!hiddenTabs.length) {
-      more.hidden = true;
-      menu.hidden = true;
-      more.setAttribute('aria-expanded', 'false');
-      return;
-    }
-    const wasOpen = !menu.hidden;
-    menu.replaceChildren(...hiddenTabs.map(t => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.setAttribute('role', 'menuitemradio');
-      btn.dataset.mainMore = t.dataset.mainTab;
-      btn.setAttribute('aria-checked', String(t.classList.contains('active')));
-      btn.append(document.createTextNode(t.querySelector('.layer-main-label')?.textContent || ''));
-      const count = t.querySelector('.layer-main-count')?.textContent || '';
-      if (count) {
-        const small = document.createElement('small');
-        small.textContent = count;
-        btn.append(small);
-      }
-      return btn;
-    }));
-    if (!wasOpen) menu.hidden = true;
-  };
-
-  const placeMenu = () => {
-    if (!more || menu.hidden) return;
-    const r = more.getBoundingClientRect();
-    menu.style.top = `${Math.round(r.bottom + 4)}px`;
-    menu.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
-    menu.style.left = 'auto';
-  };
-
   const show = (id) => {
     tabs.forEach(btn => {
       const on = btn.dataset.mainTab === id;
@@ -230,11 +154,7 @@ function initLayerMainTabs() {
     });
     root.querySelectorAll('[data-main-pane]').forEach(pane => { pane.hidden = pane.dataset.mainPane !== id; });
     root.dataset.active = id;
-    menu.hidden = true;
-    more?.setAttribute('aria-expanded', 'false');
-    fitTabs();
   };
-
   tabs.forEach(btn => btn.addEventListener('click', () => {
     const id = btn.dataset.mainTab;
     show(id);
@@ -244,40 +164,7 @@ function initLayerMainTabs() {
     }
     if (MAIN_AXES.has(id)) document.dispatchEvent(new CustomEvent('qh:axis-tab', { detail: { id } }));
   }));
-  menu.addEventListener('click', (e) => {
-    const id = e.target.closest('[data-main-more]')?.dataset.mainMore;
-    if (!id) return;
-    root.querySelector(`[data-main-tab="${id}"]`)?.click();
-  });
-  more?.addEventListener('click', () => {
-    const open = menu.hidden;
-    if (open) fitTabs();
-    menu.hidden = !open;
-    more.setAttribute('aria-expanded', String(open));
-    if (open) placeMenu();
-  });
-  document.addEventListener('click', (e) => {
-    if (menu.hidden) return;
-    if (e.target.closest('#layerMainMore, #layerMainOverflow')) return;
-    menu.hidden = true;
-    more?.setAttribute('aria-expanded', 'false');
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || menu.hidden) return;
-    menu.hidden = true;
-    more?.setAttribute('aria-expanded', 'false');
-  });
-  const bar = root.querySelector('.layer-main-tabs');
-  if (bar && typeof ResizeObserver !== 'undefined') new ResizeObserver(() => fitTabs()).observe(bar);
-  const mo = new MutationObserver(() => fitTabs());
-  tabs.forEach(t => {
-    const count = t.querySelector('.layer-main-count');
-    if (count) mo.observe(count, { childList: true, characterData: true, subtree: true });
-  });
-  window.addEventListener('resize', () => { fitTabs(); placeMenu(); });
   show(getLevel() === 'urban' ? 'hanhchinh' : 'quyhoach');
-  requestAnimationFrame(fitTabs);
-  document.fonts?.ready.then(() => fitTabs());
 }
 
 function initLayerGroups() {
@@ -838,35 +725,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.detail !== 'pick') state.isPickMode = false;
   });
 
-  // ---------- Panel phải ----------
-  const tabButtons = document.querySelectorAll('.rp-tabs .tab-btn');
-  let activeTab = 'tabLayers';
+  // ---------- Panel phải, khung Đề xuất ----------
   const setRightPanelCollapsed = (collapsed) => {
     document.body.classList.toggle('right-collapsed', collapsed);
   };
-  const showRightTab = (tabId, open = true) => {
-    activeTab = tabId;
-    if (open) setRightPanelCollapsed(false);
-    tabButtons.forEach(btn => {
-      const on = btn.dataset.tab === tabId;
-      btn.classList.toggle('active', on);
-      btn.setAttribute('aria-selected', String(on));
-    });
-    ['tabLayers', 'tabAdd', 'tabLegend'].forEach(id => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.style.display = id === tabId ? (id === 'tabAdd' ? 'block' : 'flex') : 'none';
-    });
-    if (tabId !== 'tabAdd') state.isPickMode = false;
+  const proposeBtn = document.getElementById('btnPropose');
+  const setPropose = (on) => {
+    const sheet = document.getElementById('tabAdd');
+    if (!sheet) return;
+    sheet.hidden = !on;
+    proposeBtn?.classList.toggle('active', on);
+    proposeBtn?.setAttribute('aria-pressed', String(on));
+    if (!on) state.isPickMode = false;
   };
-  tabButtons.forEach(btn => btn.addEventListener('click', () => showRightTab(btn.dataset.tab)));
+  const showRightTab = (tabId, open = true) => {
+    if (tabId === 'tabAdd') {
+      setPropose(open !== false);
+      return;
+    }
+    if (tabId === 'tabLegend') {
+      const frame = document.getElementById('tabLegend');
+      if (frame && open !== false) delete frame.dataset.userHide;
+      document.dispatchEvent(new CustomEvent('qh:legend-sync'));
+      return;
+    }
+    if (open) setRightPanelCollapsed(false);
+  };
+  proposeBtn?.addEventListener('click', () => {
+    const sheet = document.getElementById('tabAdd');
+    setPropose(!!sheet?.hidden);
+  });
+  document.getElementById('btnProposeClose')?.addEventListener('click', () => setPropose(false));
   document.addEventListener(RIGHT_TAB_EVENT, (e) => {
     const { tab, open } = e.detail || {};
     if (tab) showRightTab(tab, open !== false);
   });
 
   document.getElementById('btnCollapseRightPanel')?.addEventListener('click', () => setRightPanelCollapsed(true));
-  document.getElementById('btnExpandRightPanel')?.addEventListener('click', () => showRightTab(activeTab));
+  document.getElementById('btnExpandRightPanel')?.addEventListener('click', () => setRightPanelCollapsed(false));
   const sheetHandle = document.getElementById('btnSheetHandle');
   if (sheetHandle) {
     let sheetDrag = 0;
@@ -1214,7 +1110,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     );
   });
 
-  document.getElementById('btnScreenshot')?.addEventListener('click', captureMapScreenshot);
   document.getElementById('btnPrintA3')?.addEventListener('click', exportMapA3);
   initChuyenNganh();
   initViewLink();

@@ -18,11 +18,13 @@ export function flash(el) {
   setTimeout(() => el.classList.remove('ov-flash'), 2000);
 }
 
-const MAIN_TAB = { plan: 'quyhoach', urban: 'hanhchinh' };
+const MAIN_TAB = { plan: 'quyhoach', urban: 'hanhchinh', infra: 'hatang' };
 
 export function openLayerTab({ main, pane } = {}) {
-  document.querySelector('.rp-tabs .tab-btn[data-tab="tabLayers"]')?.click();
-  if (main) document.querySelector(`[data-main-tab="${MAIN_TAB[main] || main}"]`)?.click();
+  document.body.classList.remove('right-collapsed');
+  const tab = MAIN_TAB[main] || main;
+  if (tab) document.querySelector(`[data-main-tab="${tab}"]`)?.click();
+  if (main === 'infra') document.getElementById('layerPaneInfra')?.scrollIntoView({ block: 'nearest' });
   if (pane) document.querySelector(`[data-map-tab="${pane}"]`)?.click();
 }
 
