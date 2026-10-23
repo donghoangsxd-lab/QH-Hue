@@ -1,4 +1,5 @@
-// Khung chú giải nổi trên bản đồ: Phân loại đô thị (ký hiệu + quyết định phê duyệt, phần tĩnh trong index.html) và ký hiệu theo cấp đồ án
+// Khung chú giải nổi trên bản đồ: Phân loại đô thị (ký hiệu + quyết định phê duyệt, phần tĩnh trong index.html), ký hiệu theo cấp đồ án
+// và ký hiệu ngành hạ tầng khi bật lớp. Tự mở khi đổi cấp, khi chọn tab Đô thị, khi bật ngành hoặc nhóm điểm.
 // (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500), mỗi bộ chia nhóm (tìm theo tên loại đất / tên layer CAD,
 // thu gọn từng nhóm; tìm và thu gọn chỉ áp lên bộ đang xem). Chỉ hiện bộ của lớp đang bật. Mọi phần tử [data-legend-pane] hiện theo bộ đang xem.
 // Chọn lớp ở droplist (mapLevel.js) thì chuyển sang bộ của cấp đó. Bộ QHC 1/25.000 và 1/10.000 kèm nhóm mạng lưới giao thông
@@ -108,28 +109,43 @@ export function initLegendPanel() {
     QHCT: ['chk_qhct']
   };
   const LAND = ['chk_qhc25', 'chk_qhc10', 'chk_projects', 'chk_qhct', 'chk_parcel'];
+  let sectorOn = false;
+  let prefer = null;
+  const selectSet = (set) => {
+    const t = tabs.find(x => x.dataset.legendSet === set && !x.hidden);
+    if (!t) return false;
+    if (set !== active) {
+      if (savedOpen) groupsOf().forEach((g, i) => { g.open = savedOpen[i]; });
+      savedOpen = null;
+      active = set;
+      tabs.forEach(x => {
+        const on = x === t;
+        x.classList.toggle('active', on);
+        x.setAttribute('aria-selected', String(on));
+      });
+      showPane();
+      applySearch();
+      syncToggle();
+    }
+    return true;
+  };
+  const reveal = (set) => {
+    if (!frame) return;
+    delete frame.dataset.userHide;
+    if (set) prefer = set;
+    syncLegend();
+  };
   const syncLegend = () => {
     if (!frame) return;
     const visible = new Set();
     tabs.forEach(t => {
-      const show = anyOn(SET_ON[t.dataset.legendSet] || []);
+      const set = t.dataset.legendSet;
+      const show = set === 'SECTOR' ? sectorOn : (anyOn(SET_ON[set] || []) || prefer === set);
       t.hidden = !show;
-      if (show) visible.add(t.dataset.legendSet);
+      if (show) visible.add(set);
     });
-    if (!visible.has(active)) {
-      const next = tabs.find(t => !t.hidden);
-      if (next) {
-        active = next.dataset.legendSet;
-        tabs.forEach(x => {
-          const on = x === next;
-          x.classList.toggle('active', on);
-          x.setAttribute('aria-selected', String(on));
-        });
-        showPane();
-        applySearch();
-        syncToggle();
-      }
-    }
+    if (prefer && visible.has(prefer)) selectSet(prefer);
+    else if (!visible.has(active)) selectSet([...visible][0]);
     const symbols = visible.size > 0;
     const land = anyOn(LAND);
     const main = frame.querySelector('.legend-main');
@@ -138,18 +154,22 @@ export function initLegendPanel() {
     if (display) display.hidden = !land;
     const pointHost = document.getElementById('legendPoints');
     const pointList = document.getElementById('legendPointList');
-    const pointRows = [...document.querySelectorAll('#layerPaneInfra .layer-row input[type="checkbox"]:checked')];
+    const pointRows = [...document.querySelectorAll('#layerPaneInfra .layer-row input[type="checkbox"]:checked, .infra-point input[type="checkbox"]:checked')];
     if (pointHost && pointList) {
       pointList.replaceChildren();
       pointRows.forEach(inp => {
         const row = document.createElement('div');
         row.className = 'legend-point';
-        const img = inp.closest('.layer-row')?.querySelector('img');
+        const img = inp.closest('.layer-row')?.querySelector('img.layer-type-icon, img');
         if (img) row.append(img.cloneNode(true));
-        const name = (inp.closest('label')?.textContent || '').replace(/\s+/g, ' ').trim();
+        const name = (inp.closest('.layer-row')?.querySelector('label')?.textContent || '').replace(/\s+/g, ' ').trim();
         row.append(document.createTextNode(name));
         pointList.append(row);
       });
+      if (checked('chk_c14')) {
+        const apt = document.querySelector('#aptBox .apt-legend');
+        if (apt) pointList.append(apt.cloneNode(true));
+      }
       pointHost.hidden = pointRows.length === 0;
     }
     const roads = document.getElementById('legendRoads');
@@ -170,12 +190,28 @@ export function initLegendPanel() {
     delete frame.dataset.userHide;
     syncLegend();
   });
-  document.addEventListener('change', syncLegend);
+  tabs.forEach(t => t.addEventListener('click', () => { prefer = t.dataset.legendSet; }));
+  document.addEventListener('change', (e) => {
+    const id = e.target?.id || '';
+    if (e.target?.checked && (/^chk_c\d+$/.test(id) || id === 'chk_invest')) delete frame?.dataset.userHide;
+    syncLegend();
+  });
   document.addEventListener('qh:legend-sync', syncLegend);
+  document.addEventListener('qh:legend-open', (e) => reveal(e.detail?.set));
+  document.addEventListener('qh:sector-legend', (e) => {
+    const d = e.detail || {};
+    sectorOn = !!d.on;
+    const name = document.getElementById('legendSectorName');
+    if (name && d.label) name.textContent = d.label;
+    const host = document.getElementById('legendSector');
+    if (host && d.html != null) host.innerHTML = d.html;
+    if (d.open) reveal('SECTOR');
+    else syncLegend();
+  });
   document.addEventListener(LEVEL_EVENT, (e) => {
     const set = LEVEL_SET[e.detail?.level];
-    if (set && set !== active) tabs.find(t => t.dataset.legendSet === set)?.click();
-    syncLegend();
+    if (set) reveal(set);
+    else syncLegend();
   });
   syncLegend();
 
