@@ -4,7 +4,7 @@ Phân loại tiêu chí theo dữ liệu bản đồ đang có. Sáu đô thị 
 
 Căn cứ webapp đang dùng là **Nghị quyết 111/2025/UBTVQH15** (hiệu lực 01/01/2026), hiện trạng theo Quyết định 614/QĐ-UBND, mục tiêu 16 đô thị theo Quyết định 756/QĐ-UBND. Nghị quyết 26/2022/UBTVQH15 không còn là bộ tiêu chí trong code. Loại II và III chấm Bảng 2A (23 tiêu chuẩn, tối đa 100). Loại I chấm Phụ lục I (15 tiêu chuẩn, đạt khi ≥ 10/15). Cả 16 đô thị áp Điều 8 khoản 2 điểm d (di sản UNESCO): mật độ dân số không xét; mức tối thiểu các tiêu chuẩn không thuộc nhóm cảnh quan còn 50%. **Bảng 2B chưa chấm** (1.II.10 để trống).
 
-Đếm: **7 tiêu chí nhóm A, 16 nhóm B, 15 nhóm C** (38 tiêu chí). Gắn lớp hiện trạng không chuyển nhóm và không giảm ô thiếu: thuộc tính hình học không phải chỉ tiêu pháp lý (không có dân được cấp nước, không có % xử lý, không có cấp đầu mối). Ô thiếu vẫn **510**.
+Đếm: **8 tiêu chí nhóm A, 13 nhóm B, 17 nhóm C** (38 tiêu chí). Bốn tỷ lệ thống kê chỉ nhập một lần ở cấp đô thị. Bốn tỷ lệ đo từ bản đồ được tính khi mở bảng chấm. Ô thiếu còn **130**.
 
 ## Đơn vị đủ dữ liệu không gian
 
@@ -31,13 +31,14 @@ Ba file `public/data/hien-trang-tam/` đã gộp, cờ `tam_thoi`. Bốn ngành 
 | Giao thông | `hien-trang-tam/giao-thong.geojson` | đường `nhom=mang`; điểm đầu mối; `nhom=duong-sat`, `duong-thuy` | 2A.III.07 (km đối chiếu, không thay mật độ OSM), 2A.III.06, 1.III.11, 1.III.12 |
 | Cấp nước | `hien-trang-tam/cap-nuoc.geojson` | đường ống; điểm `congsuat` | 2A.III.08 |
 | Cấp điện | `hien-trang-tam/cap-dien.geojson` | đường dây; điểm trạm | Không có tiêu chí A/B. Km và số trạm ở cuối bảng. |
-| San nền, thoát nước mưa | đường thoát hiện trạng QHC 1/25.000 và 1/10.000 | chiều dài hình học | 2A.III.09 |
-| Thoát nước thải | đường và điểm XLNT hiện trạng cùng hai đồ án | đường; điểm `congsuat` | 2A.III.10 |
-| Chất thải rắn, nghĩa trang | điểm hiện trạng QHC 1/25.000, 1/10.000 và Vinh Hưng | số điểm | 2A.III.11, 2A.III.12 |
+| San nền, thoát nước mưa | đường thoát hiện trạng QHC 1/25.000 và 1/10.000 | `duongkinh`, `chieurong`, `loaiphanluu` | 2A.III.09 |
+| Thoát nước thải | điểm XLNT hiện trạng và quy hoạch cùng hai đồ án | điểm `congsuat` | 2A.III.10 |
+| Chất thải rắn, nghĩa trang | điểm hiện trạng và quy hoạch QHC 1/25.000, 1/10.000, Vinh Hưng | `dientich` (ha nếu &lt; 10.000); mã đất `NTD`, `NTR` | 2A.III.12 |
 | Thông tin liên lạc | đường và điểm trạm hiện trạng | chiều dài; số trạm | Không có tiêu chí A/B. Số ở cuối bảng. |
-| Sử dụng đất hiện trạng | `qhc-khu-cong-nghiep-phong-dien` `sdd/hien-trang` | `maloaidat`, `dientich` (m²) | 2A.III.21 |
+| Sử dụng đất hiện trạng | `qhc-khu-cong-nghiep-phong-dien` `sdd/hien-trang` | `maloaidat`, `dientich` (m²) | 2A.III.21 khi lớp phủ ≥ 50% ranh |
+| Phủ xanh tạm | `getForestStats&mode=cover` (ESA WorldCover, đã có trên API) | ha cây, bụi, cỏ, trồng trọt, đất ngập nước, rừng ngập mặn, mặt nước | 2A.III.21 khi lớp đất không đủ |
 
-Phú Lộc và Vinh Hưng có hiện trạng sử dụng đất trên GCS. Bảng chấm không tải hai file đó. Số tự tính hiện cạnh giá trị, kèm «tạm thời» với ba file đã gộp. Ô cán bộ nhập ghi đè giá trị đem chấm; chú thích vẫn ghi số lớp và chữ «không dùng».
+Phú Lộc và Vinh Hưng có hiện trạng sử dụng đất trên GCS. Bảng chấm không tải hai file đó. Số tự tính hiện cạnh giá trị, kèm «tạm thời» khi tuyến cống chưa có kích thước hoặc khi xanh lấy từ WorldCover. Ô cán bộ nhập ghi đè giá trị đem chấm; chú thích vẫn ghi số lớp và chữ «không dùng».
 
 ## Bảng tóm tắt
 
@@ -47,23 +48,23 @@ Phú Lộc và Vinh Hưng có hiện trạng sử dụng đất trên GCS. Bản
 | 2A.I.02 Vai trò đô thị trung tâm | C | Trụ sở, đầu mối kết nối: nhận định. |
 | 2A.II.03 Quy mô dân số | A | Không lấy từ 7 lớp mạng. Đô thị đủ xã: `P = Σ Dan_So_Vector`. Sáu đô thị một phần: `P_xã × km² polygon / km² xã`. |
 | 2A.II.04 Mật độ trên diện tích tự nhiên | A | Không lấy từ 7 lớp mạng. Đô thị đủ xã: `P / Σ Dien_Tich_Km2`. Sáu đô thị một phần: `P / km² polygon`. Điểm vẫn miễn. |
-| 2A.II.05 Tỷ lệ lao động phi nông nghiệp | C | Không có lớp việc làm. Dynamic World «built» không phải tỷ lệ này. |
+| 2A.II.05 Tỷ lệ lao động phi nông nghiệp | C | Số thống kê. Nhập một lần ở cấp đô thị, không theo xã. |
 | 2A.III.06 Đầu mối giao thông | B | Điểm trong `hien-trang-tam/giao-thong.geojson` (tạm thời). Thiếu cấp vùng / tỉnh / xã. |
 | 2A.III.07 Mật độ đường đô thị | A | Giá trị chấm: `(km main + km kiet) / km² đất xây dựng`. Đối chiếu tạm thời: km `nhom=mang` trong ranh, không thay mật độ. |
-| 2A.III.08 Tỷ lệ dân được cấp nước sạch | B | Ống và `congsuat` điểm trong `hien-trang-tam/cap-nuoc.geojson` (tạm thời). Thiếu dân được phục vụ. |
-| 2A.III.09 Mật độ cống thoát nước chính | B | Đường thoát mưa hiện trạng đồ án (chưa gộp). Không phải kiểm kê cống chính. |
-| 2A.III.10 Công suất trạm XLNT / thiết kế | B | Điểm XLNT hiện trạng, thuộc tính `congsuat`. Thiếu cặp vận hành và thiết kế. |
-| 2A.III.11 Tỷ lệ CTR xử lý đạt | B | Điểm CTR hiện trạng. Thiếu tấn hoặc tỷ lệ xử lý. |
-| 2A.III.12 Nghĩa trang xây theo quy hoạch | B | Điểm nghĩa trang hiện trạng. Thiếu tỷ lệ diện tích HT/QH. |
+| 2A.III.08 Tỷ lệ dân được cấp nước sạch | C | Số thống kê. Nhập một lần ở cấp đô thị. Ống và `congsuat` không phải tỷ lệ dân. |
+| 2A.III.09 Mật độ cống thoát nước chính | A | Km cống chính / đất xây dựng. Cấp 1 theo QCVN 07:2023/BXD mục 1.4.9; không có cấp thì ≥ 400 mm (mục 2.2.2) hoặc tuyến chưa ghi kích thước trên lớp mạng. |
+| 2A.III.10 Công suất trạm XLNT / thiết kế | B | `congsuat` hiện trạng / `congsuat` quy hoạch. Một phần vì không tách vận hành. Chỉ thiết kế thì chưa ra %. |
+| 2A.III.11 Tỷ lệ CTR xử lý đạt | C | Số thống kê. Nhập một lần ở cấp đô thị. Điểm CTR không có tỷ lệ xử lý. |
+| 2A.III.12 Nghĩa trang xây theo quy hoạch | B | `dientich` điểm hiện trạng / quy hoạch, cộng polygon `NTD`/`NTR` nếu có. Thiếu một vế thì chưa ra %. |
 | 2A.III.13 Nhà tang lễ | A | Không lấy từ 7 lớp mạng. Đếm `11-NT` đã duyệt, `ntKind = funeral`. |
-| 2A.III.14 Giường bệnh / 10.000 dân | C | Có điểm `7-YT`, không có số giường. |
+| 2A.III.14 Giường bệnh / 10.000 dân | C | Số thống kê. Nhập một lần ở cấp đô thị. Điểm `7-YT` không có số giường. |
 | 2A.III.15 Cơ sở giáo dục, đào tạo | B | Đếm được THPT đã duyệt (cận dưới). Không nằm trong 7 lớp mạng. Thiếu ĐH, CĐ, trung cấp, dạy nghề. |
 | 2A.III.16 Công trình văn hóa | B | Đếm `8-VH` đã duyệt. Không nằm trong 7 lớp mạng. Cùng mã còn sân thể thao, chưa tách. |
 | 2A.III.17 Công trình thể thao | B | Lọc tên trong `8-VH`. Không có lớp riêng trong 7 ngành. |
 | 2A.III.18 Thương mại, dịch vụ | A | Không lấy từ 7 lớp mạng. Đếm `9-TM` đã duyệt (`TM_DT` + `TM_DV`). |
 | 2A.III.19 Đất dịch vụ công cộng / người | B | `Σ size` của THPT, `7-YT`, `8-VH`, `9-TM` / P. Không lấy từ lớp sử dụng đất hiện trạng. |
 | 2A.III.20 Không gian xanh ≥ 2 ha | B | Đếm `1-CV` có `size ≥ 20.000` m². Không lấy từ mã đất hiện trạng. |
-| 2A.III.21 Tỷ lệ xanh trên diện tích tự nhiên | B | `maloaidat` + `dientich` của hiện trạng sử dụng đất KCN Phong Điền. Không phủ cả thành phố. |
+| 2A.III.21 Tỷ lệ xanh trên diện tích tự nhiên | B | Lớp sử dụng đất khi phủ ≥ 50% ranh. Không đủ thì tạm thời ESA WorldCover, một lần khi mở bảng. |
 | 2A.III.22 Cây xanh công cộng / người | B | `Σ size` công viên cấp đô thị `CV_DT` / P. Không lấy từ 7 lớp mạng. |
 | 2A.III.23 Quy chế quản lý kiến trúc | C | PDF quy chế không ghi số năm đã thực hiện. |
 | 1.I.01 Khu chức năng cấp quốc gia, quốc tế | C | Có / không. Không có lớp. |
@@ -92,6 +93,8 @@ Mười đô thị loại II/III đủ xã và thành phố cộng nguyên đơn
 
 **2A.III.07.** `G = (main + kiet) / đất xây dựng` từ `roads/v2/index.json` và `getBuiltArea` (Dynamic World, lưới 20 m). Sáu đô thị một phần không có chiều dài đường OSM cắt theo polygon, nên mật độ bằng mật độ xã chủ. Khi mở bảng, km `nhom=mang` của file tạm thời hiện cạnh số này và không thay giá trị đem chấm. Ô `matDoDuong` ghi đè.
 
+**2A.III.09.** `km cống chính / km² đất xây dựng đô thị` (Nghị quyết 111, chú thích 2A.III.09). Cống chính là tuyến cấp 1 (QCVN 07:2023/BXD mục 1.4.9); quy chuẩn không nêu đường kính cho cấp 1. Lớp đồ án không có trường cấp: cộng tuyến có đường kính hoặc bề rộng ≥ 400 mm (mục 2.2.2, cống mưa ngoài đường phố) và tuyến `loaiphanluu = 1`. Tuyến trên lớp mạng thoát mưa chưa ghi kích thước vẫn được cộng và ghi tạm thời. Thủy lợi, hướng thoát và công trình tiêu không tính. Mẫu số đô thị đủ xã là đất xây dựng Dynamic World (`getBuiltArea`, cùng lần tải với mật độ đường). Đô thị một phần dùng diện tích polygon `urban614` vì đất xây dựng chưa cắt theo polygon. Ô `matDoCong` ghi đè.
+
 **2A.III.13.** Đếm `11-NT` đã duyệt, `ntKind === 'funeral'`. Sáu đô thị một phần chỉ lấy điểm có tọa độ nằm trong polygon.
 
 **2A.III.18.** Đếm `9-TM` đã duyệt. Sáu đô thị một phần chỉ lấy điểm nằm trong polygon.
@@ -104,15 +107,9 @@ Mười đô thị loại II/III đủ xã và thành phố cộng nguyên đơn
 
 **2A.III.06 và 1.III.11.** Điểm trong `public/data/hien-trang-tam/giao-thong.geojson` (cờ tạm thời, đã gộp từ hiện trạng các đồ án). Thiếu thuộc tính cấp (vùng, tỉnh, xã, khu vực, quốc tế). Không tự gán mức điểm từ tên điểm. Ô mức và ô đạt/chưa đạt vẫn thiếu.
 
-**2A.III.08.** Đường và điểm `public/data/hien-trang-tam/cap-nuoc.geojson`. `congsuat` là số trên điểm công trình, không phải dân được đấu nối. Chiều dài ống không ra được phần trăm. Ô % vẫn thiếu; cán bộ nhập thì ghi đè.
+**2A.III.10.** `congsuat` điểm XLNT hiện trạng / `congsuat` điểm XLNT quy hoạch của QHC 1/25.000 và 1/10.000. Lớp không có trường vận hành riêng, nên tỷ lệ là một phần: dưới ngưỡng thì chưa kết luận chưa đạt. Chỉ có công suất thiết kế, hoặc chỉ có hiện trạng, thì chưa ra phần trăm. Ô `xlnt` ghi đè.
 
-**2A.III.09.** Đường thoát nước mưa hiện trạng của QHC 1/25.000 và 1/10.000, chưa có file gộp tạm thời. Thủy lợi và mũi tên hướng thoát không tính. Chưa đủ để ra km/km² cống chính. Ô vẫn thiếu.
-
-**2A.III.10.** Điểm trạm xử lý nước thải hiện trạng, thuộc tính `congsuat`. Không có cặp công suất vận hành và công suất thiết kế. Ô % vẫn thiếu.
-
-**2A.III.11.** Điểm chất thải rắn hiện trạng. Không có khối lượng hay tỷ lệ xử lý đạt. Ô % vẫn thiếu.
-
-**2A.III.12.** Điểm nghĩa trang hiện trạng (1/25.000, 1/10.000 và Vinh Hưng). Không có tỷ lệ diện tích đã xây trên diện tích quy hoạch. Ô % vẫn thiếu.
+**2A.III.12.** Diện tích nghĩa trang đã có / diện tích theo quy hoạch. Polygon mã `NTD` (hiện trạng) và `NTR` (quy hoạch) được cộng khi có trong lớp sử dụng đất. Lớp mạng nghĩa trang trong repo là điểm: `dientich` nhỏ hơn 10.000 được hiểu là ha (cùng cách với 9,5 ha của nhà máy phía nam sông Hương). Thiếu một vế thì chưa ra phần trăm. Ô `nghiaTrang` ghi đè.
 
 **2A.III.15.** Webapp đếm THPT đã duyệt (`urbanResults.THPT`) và ghi là cận dưới. Sáu đô thị một phần chỉ đếm điểm trong polygon. Bộ tiêu chí còn đại học, cao đẳng, trung cấp, dạy nghề. Mầm non, tiểu học, THCS không được cộng.
 
@@ -124,7 +121,7 @@ Mười đô thị loại II/III đủ xã và thành phố cộng nguyên đơn
 
 **2A.III.20.** Đếm `1-CV` (cả `CV_DT` và `CV_DV`) có `size ≥ 20.000`. Sáu đô thị một phần chỉ đếm điểm trong polygon. Không rõ diện tích thì không đếm. Chưa có lớp quảng trường hay phố đi bộ.
 
-**2A.III.21.** Hiện trạng sử dụng đất trong repo chỉ có lớp KCN Phong Điền (`maloaidat`, `dientich`). Hai lớp Phú Lộc và Vinh Hưng nằm trên GCS, không tải khi mở bảng. Mã trong KCN không phải tỷ lệ cây xanh trên diện tích tự nhiên của đô thị. Ô % vẫn thiếu. Quy hoạch sử dụng đất (`sdd.json`, `dinhhuong.json`) không dùng cho chỉ tiêu hiện trạng này.
+**2A.III.21.** Nếu hiện trạng sử dụng đất phủ ít nhất một nửa diện tích ranh thì tỷ lệ là diện tích mã xanh và mặt nước (rừng, nông nghiệp, cây xanh, sông, mặt nước) chia diện tích tự nhiên. Repo mới có lớp KCN Phong Điền, không đơn vị nào đạt một nửa ranh, nên bảng dùng tạm ESA WorldCover (`getForestStats&mode=cover`, đã có trên API): cây, bụi, cỏ, trồng trọt, đất ngập nước, rừng ngập mặn và mặt nước, chia diện tích tự nhiên của các xã trong phạm vi. Đô thị một phần lấy tỷ lệ cả xã chủ. Ghi tạm thời. Không tải file sử dụng đất Phú Lộc và Vinh Hưng trên GCS. Quy hoạch sử dụng đất (`sdd.json`, `dinhhuong.json`) không dùng. Ô `khongGianXanh` ghi đè.
 
 **2A.III.22.** `Σ size` của `CV_DT` nằm trong phạm vi / P. Sáu đô thị một phần dùng dân số ước ở mẫu số nên chưa cộng điểm, cùng lý do 2A.III.19.
 
@@ -134,26 +131,42 @@ Mười đô thị loại II/III đủ xã và thành phố cộng nguyên đơn
 
 ## Nhóm C — chỉ nhập tay
 
-2A.I.01, 2A.I.02, 2A.II.05, 2A.III.14, 2A.III.23, 1.I.01–1.I.06, 1.II.10, 1.III.13, 1.III.14, 1.III.15.
+2A.I.01, 2A.I.02, 2A.II.05, 2A.III.08, 2A.III.11, 2A.III.14, 2A.III.23, 1.I.01–1.I.06, 1.II.10, 1.III.13, 1.III.14, 1.III.15.
 
-Điểm y tế (`7-YT`) cho biết có cơ sở, không cho số giường. File quy chế kiến trúc (`kien-truc/<đơn vị>/quy-che.pdf`) không có năm bắt đầu thực hiện. 1.II.10 không có ô trên form vì chưa có Bảng 2B.
+2A.II.05, 2A.III.08, 2A.III.11 và 2A.III.14 là số thống kê, nhập một lần ở cấp đô thị. Form xã, phường không còn bốn ô này. Ống cấp nước và điểm chất thải rắn vẫn hiện cạnh bảng để đối chiếu, không điền phần trăm. Điểm y tế (`7-YT`) không có số giường. File quy chế kiến trúc (`kien-truc/<đơn vị>/quy-che.pdf`) không có năm bắt đầu thực hiện. 1.II.10 không có ô trên form vì chưa có Bảng 2B.
 
-## 510 ô thiếu và việc tự điền
+## 130 ô thiếu
 
-`gapRows()` lúc chưa có số cán bộ: 696 ô, **510 ô thiếu** (trước khi dùng polygon hiện trạng là 546). Ranh, dân số, diện tích và mật độ đường của sáu đô thị một phần xã ra khỏi danh sách thiếu: 36 ô (6 ranh, 6 dân số đô thị, 6 diện tích đô thị, 6 mật độ đường, 6 dân số phần xã, 6 diện tích phần xã).
-
-Cơ cấu 510 ô còn lại không đổi sau khi gắn lớp hiện trạng: số km và số điểm không thay các ô tỷ lệ.
+`gapRows()` lúc chưa có số cán bộ: **130 ô thiếu**. Trước khi đo bốn tỷ lệ từ bản đồ và rút bốn tỷ lệ thống kê khỏi form xã, danh sách thiếu là 510.
 
 | Khối | Số ô | Nhóm tiêu chí |
 |---|---:|---|
-| 8 tỷ lệ trên 15 đô thị loại II/III và 40 xã-phường (55 × 8) | 440 | B hoặc C: 2A.II.05, 08, 09, 10, 11, 12, 14, 21 |
+| 4 tỷ lệ thống kê trên 15 đô thị loại II/III | 60 | C: 2A.II.05, 08, 11, 14 |
 | 4 tiêu chí chữ trên 15 đô thị loại II/III | 60 | C hoặc B: 2A.I.01, I.02, III.06, III.23 |
 | 10 câu có/không của loại I | 10 | C |
 
-Dân số sáu đô thị là trạng thái phụ thuộc (ước theo tỷ lệ diện tích). Diện tích và ranh là có sẵn. Mật độ đường là phụ thuộc (bằng mật độ xã chủ).
+Bốn tỷ lệ đo được (09, 10, 12, 21) trên 15 đô thị và 40 xã-phường là phụ thuộc, không tính vào ô thiếu. Cán bộ vẫn ghi đè được. Nơi lớp không ra được tỷ lệ, bảng chấm để trống và ghi lý do, không chấm 0.
 
-Việc nên làm trên form Hành chính:
+## Độ phủ bốn tỷ lệ đo được
 
-1. Giữ ô nhập cho nhóm C.
-2. Ô `danSo` của sáu đô thị chỉ để đính chính ước lượng, không bắt buộc để chấm.
-3. Muốn giảm mạnh mà không bịa số: bỏ 8 tỷ lệ khỏi form từng xã (320 ô) và chỉ giữ một lần trên mỗi đô thị. Các ô đô thị tương ứng (120 ô) vẫn là B hoặc C.
+Số dưới đây cắt trên máy, mẫu số mật độ cống trong bảng chấm là đất xây dựng khi mở bảng (không phải diện tích tự nhiên). Chiều dài là km cống chính trong ranh.
+
+| Đô thị | Cống chính | XLNT hiện trạng / thiết kế | Nghĩa trang HT / QH | Xanh từ lớp đất |
+|---|---|---|---|---|
+| Trung tâm | 78,8 km | 82,2%, một phần | 30,3% (điểm, ha) | chưa đủ lớp, WorldCover |
+| Hương Thủy | 33,9 km | chỉ thiết kế | 14,5% (điểm, ha) | chưa đủ lớp, WorldCover |
+| Hương Trà | 39,9 km | chỉ thiết kế | có quy hoạch, thiếu ha hiện trạng | chưa đủ lớp, WorldCover |
+| Phong Điền | 75,9 km | chỉ thiết kế | có quy hoạch, thiếu ha hiện trạng | 1,7 ha mặt nước KCN, phủ 0,7% ranh |
+| Hóa Châu | 18 km | chỉ thiết kế | không có ha | chưa đủ lớp, WorldCover |
+| Mỹ Thượng | 12,1 km | không có điểm có số | không có ha | chưa đủ lớp, WorldCover |
+| Chân Mây – Lăng Cô | 0,8 km | 100%, một phần | có quy hoạch, thiếu ha hiện trạng | chưa đủ lớp, WorldCover |
+| Quảng Điền | 4,7 km | không có điểm có số | không có ha | chưa đủ lớp, WorldCover |
+| A Lưới 2 | 4,5 km | chỉ thiết kế | không có ha | chưa đủ lớp, WorldCover |
+| Vinh Thanh | 0,3 km | không có điểm có số | không có ha | chưa đủ lớp, WorldCover |
+| Phú Đa | 5,1 km | chỉ thiết kế | có quy hoạch, thiếu ha hiện trạng | chưa đủ lớp, WorldCover |
+| Lộc Sơn | dưới 0,1 km | không có điểm có số | có quy hoạch, thiếu ha hiện trạng | chưa đủ lớp, WorldCover |
+| Khe Tre | dưới 0,1 km | không có điểm có số | không có ha | chưa đủ lớp, WorldCover |
+| Phú Lộc | 8 km | không có điểm có số | có quy hoạch, thiếu ha hiện trạng | chưa đủ lớp, WorldCover |
+| Vinh Hiền | 6,3 km | không có điểm có số | không có ha | chưa đủ lớp, WorldCover |
+
+40 xã-phường: 38 có km cống chính (không có: Nam Đông, Hương Thủy); 2 có cả `congsuat` hiện trạng và thiết kế (An Cựu, Chân Mây - Lăng Cô); 18 chỉ có thiết kế; 1 có đủ ha nghĩa trang hai vế trên cùng xã (Kim Long). Không xã nào có lớp sử dụng đất phủ một nửa ranh, nên 2A.III.21 của xã lấy tạm WorldCover khi mở bảng.

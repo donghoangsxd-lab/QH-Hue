@@ -25,14 +25,14 @@ export const ENTRY_FIELDS = [
   { key: 'danSoTamTru', label: 'Dân số tạm trú cộng thêm', unit: 'người', kind: 'num', scopes: ['tp', 'dothi', 'xa'], override: true, optional: true, code: '' },
   { key: 'dienTich', label: 'Diện tích tự nhiên', unit: 'km²', kind: 'num', scopes: ['tp', 'dothi', 'xa'], override: true, code: '2A.II.04' },
   { key: 'matDoDuong', label: 'Mật độ đường giao thông', unit: 'km/km²', kind: 'num', scopes: ['dothi', 'xa'], override: true, optional: true, code: '2A.III.07' },
-  { key: 'ldPhiNong', label: 'Tỷ lệ lao động phi nông nghiệp', unit: '%', kind: 'num', scopes: ['dothi', 'xa'], code: '2A.II.05' },
-  { key: 'nuocSach', label: 'Dân số được cấp nước sạch tập trung', unit: '%', kind: 'num', scopes: ['dothi', 'xa'], code: '2A.III.08' },
-  { key: 'matDoCong', label: 'Mật độ đường cống thoát nước chính', unit: 'km/km²', kind: 'num', scopes: ['dothi', 'xa'], code: '2A.III.09' },
-  { key: 'xlnt', label: 'Công suất trạm xử lý nước thải so với thiết kế', unit: '%', kind: 'num', scopes: ['dothi', 'xa'], code: '2A.III.10' },
-  { key: 'ctr', label: 'Chất thải rắn sinh hoạt được xử lý đạt yêu cầu', unit: '%', kind: 'num', scopes: ['dothi', 'xa'], code: '2A.III.11' },
-  { key: 'nghiaTrang', label: 'Diện tích nghĩa trang xây dựng theo quy hoạch', unit: '%', kind: 'num', scopes: ['dothi', 'xa'], code: '2A.III.12' },
-  { key: 'giuongBenh', label: 'Số giường bệnh', unit: 'giường/10.000 dân', kind: 'num', scopes: ['dothi', 'xa'], code: '2A.III.14' },
-  { key: 'khongGianXanh', label: 'Tỷ lệ diện tích không gian xanh trên diện tích tự nhiên', unit: '%', kind: 'num', scopes: ['dothi', 'xa'], code: '2A.III.21' },
+  { key: 'ldPhiNong', label: 'Tỷ lệ lao động phi nông nghiệp', unit: '%', kind: 'num', scopes: ['dothi'], stat: true, code: '2A.II.05' },
+  { key: 'nuocSach', label: 'Dân số được cấp nước sạch tập trung', unit: '%', kind: 'num', scopes: ['dothi'], stat: true, code: '2A.III.08' },
+  { key: 'matDoCong', label: 'Mật độ đường cống thoát nước chính', unit: 'km/km²', kind: 'num', scopes: ['dothi', 'xa'], map: true, optional: true, code: '2A.III.09' },
+  { key: 'xlnt', label: 'Công suất trạm xử lý nước thải so với thiết kế', unit: '%', kind: 'num', scopes: ['dothi', 'xa'], map: true, optional: true, code: '2A.III.10' },
+  { key: 'ctr', label: 'Chất thải rắn sinh hoạt được xử lý đạt yêu cầu', unit: '%', kind: 'num', scopes: ['dothi'], stat: true, code: '2A.III.11' },
+  { key: 'nghiaTrang', label: 'Diện tích nghĩa trang xây dựng theo quy hoạch', unit: '%', kind: 'num', scopes: ['dothi', 'xa'], map: true, optional: true, code: '2A.III.12' },
+  { key: 'giuongBenh', label: 'Số giường bệnh', unit: 'giường/10.000 dân', kind: 'num', scopes: ['dothi'], stat: true, code: '2A.III.14' },
+  { key: 'khongGianXanh', label: 'Tỷ lệ diện tích không gian xanh trên diện tích tự nhiên', unit: '%', kind: 'num', scopes: ['dothi', 'xa'], map: true, optional: true, code: '2A.III.21' },
   { key: 'vaiTro', label: 'Vai trò, vị trí theo quy hoạch được phê duyệt', kind: 'qual', scopes: ['dothi'], options: QUAL, code: '2A.I.01' },
   { key: 'trungTam', label: 'Vai trò đô thị trung tâm', kind: 'qual', scopes: ['dothi'], options: QUAL, code: '2A.I.02' },
   { key: 'dauMoiGt', label: 'Đầu mối giao thông', kind: 'qual', scopes: ['dothi'], options: QUAL, code: '2A.III.06' },
@@ -50,7 +50,10 @@ export const ENTRY_FIELDS = [
 ];
 
 export const MANUAL_2A = Object.fromEntries(
-  ENTRY_FIELDS.filter(f => f.code && f.code.startsWith('2A.') && !f.override).map(f => [f.code, { key: f.key, qual: f.kind === 'qual' }])
+  ENTRY_FIELDS.filter(f => f.code && f.code.startsWith('2A.') && !f.override && !f.map).map(f => [f.code, { key: f.key, qual: f.kind === 'qual' }])
+);
+export const MAP_2A = Object.fromEntries(
+  ENTRY_FIELDS.filter(f => f.map && f.code).map(f => [f.code, f.key])
 );
 export const MANUAL_I = Object.fromEntries(
   ENTRY_FIELDS.filter(f => f.code && f.code.startsWith('1.')).map(f => [f.code, f.key])
@@ -94,14 +97,14 @@ export function fieldsForScope(scope) {
 }
 
 const LAYER_NOTE = {
-  ldPhiNong: 'Không có lớp việc làm trong 7 lớp hiện trạng. Cán bộ nhập.',
-  nuocSach: 'Lớp cấp nước tạm thời chỉ có chiều dài ống và congsuat điểm, không có dân được phục vụ. Ô % vẫn thiếu; cán bộ nhập để ghi đè.',
-  matDoCong: 'Lớp san nền hiện trạng chưa phải kiểm kê cống chính và chưa có file gộp. Ô km/km² vẫn thiếu.',
-  xlnt: 'Điểm XLNT hiện trạng có congsuat, không có cặp vận hành/thiết kế. Ô % vẫn thiếu.',
-  ctr: 'Điểm CTR hiện trạng không có tỷ lệ xử lý đạt. Ô % vẫn thiếu.',
-  nghiaTrang: 'Điểm nghĩa trang hiện trạng không có tỷ lệ diện tích đã xây trên quy hoạch. Ô % vẫn thiếu.',
-  giuongBenh: 'Điểm y tế không nằm trong 7 lớp mạng và không có số giường.',
-  khongGianXanh: 'Hiện trạng sử dụng đất trong repo chỉ phủ KCN Phong Điền. Không suy tỷ lệ xanh cả đô thị. Ô % vẫn thiếu.',
+  ldPhiNong: 'Số thống kê. Nhập một lần ở cấp đô thị, không có ô theo xã.',
+  nuocSach: 'Số thống kê. Nhập một lần ở cấp đô thị. Ống và congsuat cấp nước không phải tỷ lệ dân.',
+  matDoCong: 'Tính khi mở bảng: km cống chính / đất xây dựng. Cống chính là tuyến cấp 1 (QCVN 07:2023/BXD mục 1.4.9); lớp không có cấp thì lấy đường kính hoặc bề rộng ≥ 400 mm (mục 2.2.2) và tuyến chưa ghi kích thước trên lớp mạng. Ô để ghi đè.',
+  xlnt: 'Tính khi mở bảng: congsuat điểm XLNT hiện trạng / congsuat điểm quy hoạch. Chỉ có thiết kế thì chưa ra %. Ô để ghi đè.',
+  ctr: 'Số thống kê. Nhập một lần ở cấp đô thị. Điểm CTR không có tỷ lệ xử lý.',
+  nghiaTrang: 'Tính khi mở bảng: dientich nghĩa trang hiện trạng / quy hoạch, cộng polygon mã NTD hoặc NTR nếu có. Ô để ghi đè.',
+  giuongBenh: 'Số thống kê. Nhập một lần ở cấp đô thị. Điểm y tế không có số giường.',
+  khongGianXanh: 'Tính khi mở bảng: hiện trạng sử dụng đất nếu phủ đa số ranh; không đủ thì tạm thời ESA WorldCover. Ô để ghi đè.',
   vaiTro: 'Không có thuộc tính vai trò trên lớp hiện trạng.',
   trungTam: 'Không có thuộc tính vai trò trung tâm trên lớp hiện trạng.',
   dauMoiGt: 'Điểm đầu mối tạm thời không có cấp vùng, tỉnh, xã. Ô mức vẫn thiếu.',
@@ -148,7 +151,7 @@ function urbanFieldRows(u) {
     bound ? 'Bằng mật độ đường của xã chủ: chiều dài đường và đất xây dựng chỉ có theo xã. Ô nhập để đính chính.'
       : (partial ? 'Chưa có ranh nên không chia mạng đường. Có ô nhập.' : 'Tính từ OpenStreetMap và đất xây dựng nếu đủ. Ô nhập dùng khi thiếu.'), 'matDoDuong'));
   ENTRY_FIELDS.filter(f => f.code && f.code.startsWith('2A.') && !f.override).forEach(f => {
-    out.push(row(u.name, u.key, f.label, f.code, 'thieu', entryNote(f.key), f.key));
+    out.push(row(u.name, u.key, f.label, f.code, f.map ? 'phu-thuoc' : 'thieu', entryNote(f.key), f.key));
   });
   return out;
 }
@@ -169,7 +172,7 @@ function wardFieldRows(name) {
       bound ? `${bound.km2} km², polygon ${host.id} trong public/data/urban614.geojson.` : `Nhập tại ${host.name}, không dùng diện tích cả xã.`));
   }
   ENTRY_FIELDS.filter(f => f.scopes.includes('xa') && !f.override).forEach(f => {
-    out.push(row(name, key, f.label, f.code, 'thieu', entryNote(f.key), f.key));
+    out.push(row(name, key, f.label, f.code, f.map ? 'phu-thuoc' : 'thieu', entryNote(f.key), f.key));
   });
   return out;
 }
@@ -201,7 +204,7 @@ export function gapMarkdown() {
     '',
     'Nguồn đối chiếu: `urbanClass.js` (Nghị quyết 111/2025/UBTVQH15, Quyết định 756/QĐ-UBND). Bảng này là lúc chưa có số cán bộ nhập.',
     '',
-    `Tổng ${counts.rows} ô (đơn vị × trường). Trong đó **${counts.thieu} ô thiếu**. ${counts.partialDanSo} đô thị một phần xã lấy ranh từ public/data/urban614.geojson; dân số ước theo tỷ lệ diện tích, không còn ô thiếu cho ranh, dân số, diện tích và mật độ đường của các đô thị đó. Lớp hiện trạng (kể cả file tạm thời giao thông, cấp điện, cấp nước) cho biết chiều dài và số điểm khi mở bảng chấm, không điền các ô tỷ lệ còn thiếu.`,
+    `Tổng ${counts.rows} ô (đơn vị × trường). Trong đó **${counts.thieu} ô thiếu**. ${counts.partialDanSo} đô thị một phần xã lấy ranh từ public/data/urban614.geojson. Bốn tỷ lệ thống kê (2A.II.05, 2A.III.08, 2A.III.11, 2A.III.14) chỉ nhập một lần ở cấp đô thị, không còn ô theo xã. Bốn tỷ lệ đo từ bản đồ (2A.III.09, 2A.III.10, 2A.III.12, 2A.III.21) là phụ thuộc: tính khi mở bảng chấm, cán bộ ghi đè được, không tính vào ô thiếu.`,
     '',
     'Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng phường hoặc ranh; Miễn = không xem xét với đô thị di sản; Phụ thuộc = tính được nếu dữ liệu nền đủ, vẫn có ô nhập; Bổ sung = nên có, chưa chặn chấm; Không nhập = chưa có cách chấm (Bảng 2B).',
     '',

@@ -14,10 +14,10 @@ import { popQuery } from './popMethod.js';
 import { STATUS_REF, STATUS_DATE, URBANS_614, WARDS_614, RURAL_RULE, bareName as bare, wardLevel614, urbans614Of, urbans614ByPlan } from './urbanStatus.js';
 import { loadOsmOpen, osmTransitReady, transitNote } from './osmOpen.js';
 import { areaCodeFromName } from './facetStore.js';
-import { MANUAL_2A, MANUAL_I } from './urbanEntrySchema.js';
+import { MANUAL_2A, MANUAL_I, MAP_2A } from './urbanEntrySchema.js';
 import { valueOf } from './urbanInputs.js';
 import { PART_BOUNDS, loadPartGeoms, partFeature, partGeomReady, pointInFeature, shareOf } from './urbanPartGeom.js';
-import { describeHt, htFootNote, loadHienTrangFacts, mergeEntry } from './hienTrangScore.js';
+import { describeHt, factsForUrban, htFootNote, htReady, loadHienTrangFacts, measures, mergeEntry } from './hienTrangScore.js';
 
 export const CLASS_REF = 'Nghị quyết 111/2025/UBTVQH15';
 export const PLAN_REF = 'Quyết định 756/QĐ-UBND ngày 28/02/2026';
@@ -98,13 +98,16 @@ const STD_2A = [
   { code: '2A.III.08', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', name: 'Tỷ lệ dân số được cấp nước sạch tập trung', unit: '%',
     band: { II: { hi: 100, lo: 90 }, III: { hi: 95, lo: 85 } }, pts: { hi: 3, lo: 2 } },
   { code: '2A.III.09', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', name: 'Mật độ đường cống thoát nước chính', unit: 'km/km²',
-    band: { II: { hi: 4.5, lo: 3.5 }, III: { hi: 3.5, lo: 3 } }, pts: { hi: 3, lo: 2 } },
+    band: { II: { hi: 4.5, lo: 3.5 }, III: { hi: 3.5, lo: 3 } }, pts: { hi: 3, lo: 2 },
+    method: 'Km cống chính / km² đất xây dựng đô thị (Nghị quyết 111, chú thích 2A.III.09). Cống chính là tuyến cấp 1 (QCVN 07:2023/BXD mục 1.4.9). Lớp đồ án không có trường cấp: lấy đường kính hoặc bề rộng ≥ 400 mm (mục 2.2.2, cống mưa ngoài đường phố) và tuyến phân lưu loại 1. Tuyến trên lớp mạng chưa ghi kích thước vẫn được cộng, ghi tạm thời. Mẫu số là đất xây dựng Dynamic World theo xã; đô thị một phần dùng diện tích polygon urban614.' },
   { code: '2A.III.10', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', name: 'Công suất vận hành trạm xử lý nước thải so với công suất thiết kế theo quy hoạch', unit: '%',
-    band: { II: { hi: 80, lo: 60 }, III: { hi: 70, lo: 50 } }, pts: { hi: 1, lo: 0.75 } },
+    band: { II: { hi: 80, lo: 60 }, III: { hi: 70, lo: 50 } }, pts: { hi: 1, lo: 0.75 },
+    method: 'Tổng congsuat điểm xử lý nước thải hiện trạng / tổng congsuat điểm quy hoạch. Lớp không tách vận hành và công suất ghi trên bản vẽ, nên tỷ lệ là một phần. Chỉ có thiết kế thì chưa ra phần trăm.' },
   { code: '2A.III.11', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', name: 'Tỷ lệ chất thải rắn sinh hoạt được xử lý đạt yêu cầu môi trường', unit: '%',
     band: { II: { hi: 90, lo: 80 }, III: { hi: 80, lo: 70 } }, pts: { hi: 3, lo: 2 } },
   { code: '2A.III.12', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', name: 'Tỷ lệ diện tích nghĩa trang nhân dân được xây dựng theo quy hoạch', unit: '%',
-    band: { II: { hi: 80, lo: 60 }, III: { hi: 70, lo: 50 } }, pts: { hi: 3, lo: 2 } },
+    band: { II: { hi: 80, lo: 60 }, III: { hi: 70, lo: 50 } }, pts: { hi: 3, lo: 2 },
+    method: 'Diện tích nghĩa trang đã có / diện tích nghĩa trang theo quy hoạch. Ưu tiên polygon mã NTD (hiện trạng) và NTR (quy hoạch). Lớp mạng là điểm: dientich nhỏ hơn 10.000 được hiểu là ha. Thiếu một vế thì chưa ra phần trăm.' },
   { code: '2A.III.13', group: 'III', sub: 'III.1 Hạ tầng kỹ thuật', calc: 'funeral', inherit: 'QCVN 11-NT', name: 'Nhà tang lễ', unit: 'cơ sở',
     band: { II: { hi: 2, lo: 1 }, III: { hi: 1, lo: 1 } }, pts: { hi: 3, lo: 2.5 },
     method: 'Đếm nhà tang lễ đã duyệt, cùng lớp 11-NT của quy chuẩn (QCVN 01:2026 Bảng 23). Loại III: mức tối thiểu là có dự án, mức tối đa là ≥ 1 cơ sở.' },
@@ -132,7 +135,7 @@ const STD_2A = [
   { code: '2A.III.21', group: 'III', sub: 'III.3 Không gian, kiến trúc, cảnh quan', landscape: true,
     name: 'Tỷ lệ diện tích không gian xanh trên diện tích tự nhiên', unit: '%',
     band: { both: { hi: 35, lo: 25 } }, pts: { hi: 3, lo: 2 },
-    method: 'Rừng, nông lâm nghiệp, cây xanh công cộng và phủ xanh khác trên diện tích tự nhiên. Chưa có lớp phủ xanh đủ để tính.' },
+    method: 'Rừng, nông lâm nghiệp, cây xanh, mặt nước trên diện tích tự nhiên (Nghị quyết 111, chú thích 2A.III.21). Ưu tiên hiện trạng sử dụng đất khi lớp phủ ít nhất một nửa ranh. Không đủ thì tạm thời ESA WorldCover (cây, bụi, cỏ, trồng trọt, đất ngập nước, rừng ngập mặn, mặt nước), một lần khi mở bảng.' },
   { code: '2A.III.22', group: 'III', sub: 'III.3 Không gian, kiến trúc, cảnh quan', calc: 'greenCap', landscape: true, inherit: 'QCVN 1-CV · 0201',
     name: 'Đất cây xanh sử dụng công cộng trong khu vực dân dụng đô thị', unit: 'm²/người',
     band: { II: { hi: 8, lo: 6 }, III: { hi: 7, lo: 2.5 } }, pts: { hi: 3, lo: 2.5 },
@@ -661,7 +664,109 @@ function manualMeasure(std, urban) {
   return { value: n, officer: true, note: 'Cán bộ nhập trên luồng Hành chính.' };
 }
 
+const COVER_KEYS = ['tree', 'shrub', 'grass', 'crop', 'wetland', 'mangrove', 'water'];
+let coverByBare = null;
+let coverFailed = false;
+let coverPromise = null;
+
+function loadCover() {
+  if (!coverPromise) {
+    coverPromise = fetch(geeApi('action=getForestStats&mode=cover'))
+      .then(async (res) => {
+        const body = await res.json().catch(() => null);
+        if (!res.ok || !body || !Array.isArray(body.wards)) throw new Error('Không có phủ xanh');
+        const map = new Map();
+        body.wards.forEach(w => {
+          const ha = COVER_KEYS.reduce((s, k) => s + (Number(w[k]) || 0), 0);
+          if (w.name) map.set(bare(w.name), ha);
+        });
+        coverByBare = map;
+        coverFailed = false;
+      })
+      .catch(err => {
+        coverPromise = null;
+        coverFailed = true;
+        coverByBare = new Map();
+        console.warn('Phân loại đô thị – phủ xanh:', err);
+      });
+  }
+  return coverPromise;
+}
+
+function coverOf(list) {
+  if (!coverByBare) return null;
+  let ha = 0;
+  let km = 0;
+  let n = 0;
+  list.forEach(w => {
+    const h = coverByBare.get(bare(w.Ten_Phuong));
+    if (h == null) return;
+    n += 1;
+    ha += h;
+    km += Number(w.Dien_Tich_Km2) || 0;
+  });
+  if (n < list.length || !(km > 0)) return null;
+  return { ha, km };
+}
+
+function builtDenom(urban, wards) {
+  const clip = clipOf(urban, wards);
+  if (urban.partial) {
+    if (!clip || clip.pending || !(clip.km2 > 0)) return null;
+    return { km2: clip.km2, builtExact: false };
+  }
+  const list = clip && clip.list ? clip.list : wardsOf(urban, wards);
+  let km = 0;
+  let exact = true;
+  let have = 0;
+  let wait = false;
+  list.forEach(w => {
+    const a = densityArea(w.Ten_Phuong, Number(w.Dien_Tich_Km2) || 0);
+    if (!a) { wait = true; return; }
+    have += 1;
+    km += a.km2;
+    if (!a.built) exact = false;
+  });
+  if (wait || have < list.length || !(km > 0)) return null;
+  return { km2: km, builtExact: exact };
+}
+
+function mapAuto(code, urban, wards) {
+  if (!htReady()) return { pending: true, note: 'Đang tải lớp hiện trạng.' };
+  const bundle = factsForUrban(urban);
+  if (!bundle) return { pending: true, note: 'Chưa có ranh để cắt lớp hiện trạng.' };
+  const ctx = {};
+  if (code === '2A.III.09') {
+    const denom = builtDenom(urban, wards);
+    if (!denom) return { pending: true, aside: bundle.mainM > 0 ? `${N1.format(bundle.mainM / 1000)} km` : '', note: 'Đang tải diện tích đất xây dựng để tính mật độ cống chính.' };
+    ctx.builtKm2 = denom.km2;
+    ctx.builtExact = denom.builtExact;
+  }
+  if (code === '2A.III.21') {
+    const frac = bundle.areaM2 > 0 ? bundle.landM2 / bundle.areaM2 : 0;
+    if (frac < 0.5) {
+      if (!coverByBare && !coverFailed) return { pending: true, note: 'Đang tải phủ xanh.' };
+      const clip = urban.partial ? clipOf(urban, wards) : null;
+      const list = clip && clip.list ? clip.list : wardsOf(urban, wards);
+      const cover = coverOf(list);
+      if (cover) {
+        ctx.coverHa = cover.ha;
+        ctx.naturalKm2 = cover.km;
+      }
+    }
+  }
+  return measures(bundle, ctx)[code] || { pending: true, note: 'Chưa tính được từ lớp hiện trạng.' };
+}
+
 function measureStd(std, urban, wards) {
+  if (MAP_2A[std.code]) {
+    const raw = valueOf(urbanKey(urban), MAP_2A[std.code]);
+    if (raw != null && raw !== '' && Number.isFinite(Number(raw))) {
+      const officer = { value: Number(raw), officer: true, note: 'Cán bộ nhập trên luồng Hành chính.' };
+      return mergeEntry(officer, describeHt(std.code, urban));
+    }
+    return mapAuto(std.code, urban, wards);
+  }
   let m = null;
   if (MANUAL_2A[std.code]) m = manualMeasure(std, urban);
   else if (std.calc) m = measure(std.calc, urban, wards, roads);
@@ -1124,11 +1229,12 @@ export function renderUrbanClass(el, { wardName, wards }) {
   const key = wardName || '';
   if (key !== seenKey) { seenKey = key; mode = 'auto'; }
   el.dataset.ward = key;
-  loadBuiltAreas();
   const draw = () => {
     if (!el.isConnected || el.dataset.ward !== key) return;
     paint(el, key, wards, draw);
   };
+  loadBuiltAreas().then(draw).catch(() => {});
+  loadCover().then(draw).catch(() => {});
   loadHienTrangFacts(URBANS).then(draw).catch(err => console.warn('Phân loại đô thị – lớp hiện trạng lỗi:', err));
   draw();
   if (!roads) loadRoads().then(draw).catch(err => console.warn('Phân loại đô thị – mạng lưới đường lỗi:', err));
