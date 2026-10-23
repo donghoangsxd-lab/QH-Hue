@@ -1,0 +1,122 @@
+---
+description: Danh sách file MOD-01..MOD-22. Đọc trước khi sửa để rg đúng file, hoặc khi thêm, đổi chỗ, xóa file.
+alwaysApply: false
+---
+
+# Bản đồ file
+
+JS giao diện nằm dưới `public/js/`. File lớn: `rg` tên hàm hoặc `action === '...'` rồi đọc đoạn đó. Không đọc GeoJSON, JSON nặng, TIF, XLSX, PDF, pmtiles. `scripts/test-*` chỉ đọc khi sửa đúng test.
+
+## MOD-01 Khung, layout, khởi động
+
+`public/index.html` (rg id), `public/css/style.css` (rg selector), `public/phan-tich-3d.html`, `public/css/phan-tich-3d.css`, `public/sw.js`, `public/manifest.webmanifest`.
+
+`app.js`: `loadInfraData`, `chooseWard`, `initMapTitle`, `initLayerMapTabs`, `initLayerMainTabs`. `introTour.js` `openIntroTour`. `mobileShell.js` `initMobileShell`. `faqPanel.js` `initFaqPanel`. `legendPanel.js` `initLegendPanel`. `loadProgress.js`. `overview.js` `initOverview`, `openOverview`. `overviewDemo.js`. `mapLevel.js` `initMapLevel`, `setLevel`. `viewFlow.js` `initViewFlow`. `viewLink.js` `initViewLink`. `streetView.js`. `schemeVisibility.js`. `scripts/build-faq.js`.
+
+## MOD-02 UI dùng chung
+
+`utils.js`, `telex.js` `attachTelex`, `drawAssist.js` `setDrawAssist`. Popup trong `mapEngine.js`: `addPopupCollapseToggle`, `expandCollapsedPopup`, `openOutlinedPopup`, `closePointPopup`, `getRightObstruction`.
+
+## MOD-03 Thống kê phường, biểu đồ
+
+`uiComponents.js`: `renderBottomPanel`, `updateInfraPieChart`, `ensureWardStats`, `reloadWardStats`, `exportBottomPanelPdf`, `selectWardDetail`, `setRiverCounts`, `setWardGbaHtml`, `setWardPopHtml`. `urbanClass.js` `renderUrbanClass`. `greenGrowth.js` `renderGreenGrowth`. `wardBalance.js` `wardBalance`. `immIndicators.js` `renderImm`. `urbanStatus.js`, `urbanVision.js`, `urbanAreaLayer.js` `initUrbanAreaLayer`, `urbanFocus.js` `initUrbanFocus`. `planLandStats.js`. `services/statsStore.js` `getWardEntry`. `scripts/build-imm.js`, `build-urban614.js`, `build-urban-vision.js`, `urbanGeo.js`, `wardBoundary.js`.
+
+## MOD-04 State, hằng số, QCVN
+
+`state.js`: `state`, `effectiveRadius`, `getPlanScenarioList`, `PLAN_CHANGE_INFO`. `api.js`: `geeApi`, `infraListUrl`, `markDataWritten`. `storageSchema.js`. `config/constants.js`: `defaultRadius`, `standardRadius`, `GCS_BUCKET`. Fallback domain (`PROD_ORIGIN`, URL GCS) không sửa.
+
+## MOD-05 Bản đồ Leaflet, ranh giới
+
+`mapEngine.js`: `initMap`, `loadBoundaryLayer`, `centerOnCity`, `flyToVisible`, `highlightWardBoundary`, `highlightWardNames`, `focusWard`, `wardNameAt`, `outerWardLines`. `islandFlags.js` `addIslandFlags`. `boundaryLines.js` `boundaryFromLines`. `parcelWardClip.js`. `basemap.js` `initBasemapUi`, `selectBasemap`. `wheelZoom.js` `bindNotchZoom`.
+
+## MOD-06 Hiện trạng: marker, buffer, ký hiệu TT16
+
+`mapEngine.js`: `renderGroupedPoints`, `refreshBuffers`, `toggleLayer`, `toggleBuffer`, `loadCadParcels`, `refreshProjectLots`, `showProjectLot`, `setParcelsVisible`, `setLandVisible`, `landCode`, `openLotPopup`. `tt16Symbols.js`. `public/icons/` (không mở từng ảnh). `cadastreLayer.js` `initCadastreLayer`, `cadastreClick`. Nhà, vi phạm, pmtiles: MOD-22. Hồ sơ GIS: MOD-21.
+
+## MOD-07 Quy hoạch, đồ án, so sánh
+
+`planMap.js`: `initPlanMap`, `setViewMode`, `toggleSplit`, `renderPlanBoundaries`. `gcsService.js` `classifyPlanChange` (ETag: MOD-14). `generalPlan.js`, `generalPlanUi.js`, `qhc2045.js`, `qhc2045Layer.js` `initQhc2045Layer`, `qhctLayer.js` `initQhctLayer`, `qhpkCover.js`, `qhClass.js`, `qhReview.js` `initQhReview`. `splitPair.js` `initSplitPair`. `projectLayer.js` `initProjectLayer`, `openProjectAt`. `projectFiles.js`, `projectBrief.js` `initProjectBrief`. `projectReview.js` `initProjectReview`, `projectReviewCore.js`. `services/projectStore.js`: `catalog`, `renameProject`, `saveDecision`, `saveAdjustment`, `saveChunk`. `services/planInfraSync.js` `diffPlanInfra`. `services/qhHienTrang.js`. `investLayer.js` `initInvestLayer`, `investMatch.js` `matchInvestRows`, `investGroups.js`. `layerDecisions.js`, `decisionViewer.js`. `scripts/build-qhc2045.js`, `build-general-plan.js`, `build-invest.js`, `sync-plan-infra.js`, `dedupe-plan-lots.js`. `.github/workflows/qhc-outlines.yml`.
+
+`api/gee.js` `action ===`: `getProjectIndex`, `getProjectLots`, `renameProject`, `deleteProject`, `migrateProjects`, `getInvestCalls`, `saveInvestProject`, `saveInvestGroup`, `getQhReview`, `saveQhReview`, `reclassifyQhLots`, `getLayerDecisions`, `reviewProjectDecision`, `putProjectDecision`, `putProjectDoc`, `putProjectNet`. Tên đồ án: `projectNames.js` (MOD-22).
+
+## MOD-08 Heatmap, đẳng thời, vùng phục vụ
+
+`mapEngine.js`: `refreshHeatmapOnly`, `setHeatOpacity`, `highlightSingleIsochrone`. `serviceArea.js`: `computeServiceArea`, `computeAccessRoutes`, `roadWaysAround`. `flowAnimation.js` `startFlowAnimation`. `api/gee.js`: `calculateNetworkIsochrone16`; `action ===` `getHeatmapTile`, `getSingleIsochrone`, `getNetworkCoverage`, `getWardCoverage`.
+
+Heatmap GEE dùng buffer tròn. Bám đường là Dijkstra `computeServiceArea` trên trình duyệt. Đẳng thời là `calculateNetworkIsochrone16` (16 tia OSRM).
+
+## MOD-09 Đo, phác thảo, in, 3D
+
+`mapEngine.js`: `toggleMeasure`, `clearMeasure`, `handleMeasureClick`, `setMeasureListener`. `sketchLayer.js` `initSketchLayer`, `handleSketchClick`. `sketchExport.js` `exportKml`, `exportDxf`. `printLayout.js` `exportMapA3`, `captureMapScreenshot`. `printVector.js` `drawMapPaths`. `terrainProfile.js` `syncTerrainProfile`. `cadastreLayer.js` `openMeasurePlan`. `phanTich3d.js`, `view3dPanel.js` `openView3d`. 3D đọc `buildings.pmtiles` qua Range; pipeline và cache mép: MOD-20 và MOD-22.
+
+## MOD-10 Tra cứu, định vị, popup
+
+`mapEngine.js`: `infraClickAt`, `onPointClick`, `zoomToPoint`, `handleInspectPointClick`, `clearInspectResult`, `approvePointStatus`. `csdProof.js` `showCsdProof`. `app.js` `chooseWard`. `decisionViewer.js` `openDecision`.
+
+## MOD-11 Đề xuất điểm
+
+`app.js`: `qcvnRadius`, `updateRadiusPreview`, `networkRadius`. `api/gee.js` `action ===` `addPoint`, `analyzePoint`, `analyzeCSD`, `explainCSD`. `apps-script/Code.gs` `doPost`. `osmImport.js` `initOsmImport`.
+
+## MOD-12 Nhập CAD/KML/SHP/OSM, thẩm định lô
+
+`cadImport.js`, `cadImportUi.js` `initCadImport`, `importReviewDossier`. `cadTypeMapping.js`. `kmlImport.js`, `kmlLoad.js`. `geojsonImport.js` `parseGeoJson`. `shpImport.js` `parseShapefileZip`. `osmImport.js`, `public/js/osmClip.js` `clipOsmFeatures`. `landStamp.js`. `scanGeoref.js`. `parcelInfra.js`, `parcelInfraImport.js`. `services/parcelInfraInventory.js`, `services/osmSports.js`. `lotEdit.js`, `lotShapeEdit.js`, `lotBuildup.js`, `lotOver.js`, `lotScreen.js`. `localAdjust.js`, `adjustImport.js`, `adjustLayer.js`. `scripts/cadastre-to-pmtiles.mjs`, `cadastre-page-fetch.js`, `cadastre-to-shp.js`, `gserver-to-shp.js`, `gserver-page-fetch.js`, `build-parcel-infra.js`, `import-osm-sports.js`.
+
+`api/gee.js` `action ===`: `importCadBatch`, `submitCadPending`, `getCadPending`, `editLot`, `deleteLot`, `submitAdjust`, `approveAdjust`, `importOsmNetwork`, `importParcelInfra`, `getParcelInfra`, `saveParcelInfra`. Hồ sơ TT16: MOD-21.
+
+## MOD-13 Xác thực admin
+
+`services/authService.js` `requireAdmin`. `uiComponents.js`: `initGoogleSignIn`, `restoreAdminSession`, `signOutAdmin`. `wardCheck.js` `initWardCheck`. `api/gee.js`: `adminOrNull`; `action ===` `verifyAdmin`, `approvePoint`.
+
+## MOD-14 GCS, cache ETag
+
+`services/gcsService.js`: `getRawDataList`, `classifyPlanChange`, `invalidateCache`. `services/gcsWrite.js`, `services/gcsRevision.js` `needsRevisionCheck`. `api.js` `infraListUrl`, `markDataWritten`. `config/gcsCachePolicy.mjs`. `scripts/apply-gcs-cache.mjs`. Giữ HEAD/ETag khi sửa luồng đọc.
+
+## MOD-15 Apps Script (Sheet → GCS)
+
+`apps-script/Code.gs`: `syncSheetsToGCS`, `installedOnEdit`, `doGet`, `doPost`, `uploadToGCS`, `collectFeatures`, `splitProjectName`. `apps-script/appsscript.json`. `scripts/gasClient.js`, `sync-plan-infra.js`.
+
+## MOD-16 Dân số GEE, hiệu chỉnh
+
+`services/geeService.js`: `initGEE`, `applyPopEdits`, `startPopNhaTask`. `services/popEditsService.js`, `popNhaStatus.js`, `popNhaWatch.js`. `popEdits.js` `initPopEdits`. `popMethod.js`. `geeTiles.js` `fetchGeeTile`. `apartmentLayer.js` `initApartmentLayer`. `noxhWard.js` `assignNoxhWards`. `services/noxh.js` `normalizeNoxhPack`. `newDev.js` phần dân số phát triển mới.
+
+`api/gee.js` `action ===`: `getPopRasterTile`, `getPopEdits`, `savePopEdits`, `bakePopEdits`, `popBakeStatus`, `syncPopNha`, `ingestPopNha`, `getPopCheck`, `getLandPopRatio`, `getNoxh`, `saveNoxh`, `getChungCu`, `saveChungCu`. `mapEngine.js`: `loadPopulationLayer`, `ensurePopulationLayer`. `scripts/gba-pop-compare.py`, `gba-pop-raster.py`, `gba-pop-radii.js`, `test-pop-nha.py`, `test-pop-nha-watch.js`, `test-pop-nha-status.js`, `test-pop-filter.py`, `gba-apartments.py`.
+
+## MOD-17 Môi trường, viễn thám
+
+`satLayers.js` `initSatLayers`. `terrainLayer.js` `initTerrainLayer`. `floodSim.js` `initFloodSim`. `riskLayer.js` `initRiskLayer`. `drainageLayer.js` `initDrainageLayer`. `drainageNorm.js`. `basinLayer.js` `initBasinLayer`. `treeLayer.js` `initTreeLayer`. `osmOpen.js` `initOsmOpen`. `services/satService.js`, `satTileCache.js`, `treePriority.js`, `services/osmOpen.js`.
+
+`api/gee.js` `action ===`: `getSatMeta`, `getSatTile`, `getFloodBins`, `getDemTile`, `getSarFloodTile`, `getLstTile`, `getNdviTile`, `getNdviStats`, `getForestTile`, `getForestStats`, `getWaterChange`, `getNewDevTile`, `getNewDevStats`, `getTreePriority`, `getInfraRisk`, `getHillshade`, `getDrainage`, `getBasins`, `getDrainArrows`, `getBuiltArea`, `getOsmOpen`. `scripts/build-bldg-flood.py`, `build-luuvuc.js`, `build-huongthoat.js`, `build-otieunuoc.js`, `hydroCommon.js`, `push-thoatnuoc.js`, `push-luuvuc.js`, `push-huongthoat.js`, `build-hillshade.js`. Hành lang sông: MOD-22.
+
+## MOD-18 Giao thông
+
+`services/roadsService.js`: `waysAround`, `mainRoadLines`, `readCustomRoads`. `wardRoads.js`, `customRoads.js` `initCustomRoads`, `roadNetworkLayer.js` `initRoadNetworkLayer`, `roadSections.js`, `qhcRoads.js`. `api/gee.js` `action ===`: `getRoads`, `getWardRoads`, `getMainRoads`, `getRoadPart`, `getCustomRoads`, `saveCustomRoads`, `saveRoadNetwork`, `saveWardRoads`. `scripts/build-main-roads.js`.
+
+## MOD-19 Rate-limit, CORS, cache API
+
+PR #98: trần đọc công khai, trả 429. Cloud Run và Worker đếm riêng, không dùng chung bộ nhớ.
+
+`api/gee.js`: `isAllowedOrigin`, `applyCors`, `requirePostFromApp`, `checkRate`, `checkAddPointRate`, `checkCadPendingRate`, `checkAdjustRate`, `checkDecisionProposalRate`, `setCdn`, `invalidateAllCaches`. Cổng: `module.exports = async (req, res)` rồi nhánh `action ===`. `services/getRate.js`: `limitPublicGet`, `geeLimitOpts`. `services/rateWindow.js` `allow`. `worker/index.js`: `allow`, `apiMax`. `cloudrun/server.js` `limitFor`. `api/osmClip.js`, `api/pmtilesRange.js`. `services/pdfLimits.js`, `public/js/pdfLimits.js`. `geeTiles.js` `TILE_CONCURRENCY`. `scripts/test-get-rate.mjs`.
+
+## MOD-20 Worker + Cloud Run + GCS
+
+Thay Vercel. `vercel.json` để lại, không deploy bằng file đó, không xóa.
+
+`worker/index.js`: `proxyApi`, `proxyGcs`, `routeKind`, `objectNameFromPath`, `normalizeByteRange`, `gcsCacheUrl` (cache Range ở mép, gắn `cf-cache-status` và `x-qh-cache`). `wrangler.jsonc`: `keep_vars`, `main` = `worker/index.js`, `run_worker_first` cho `/api/*`, `/gcs/*`, `/data/gba/buildings.pmtiles`.
+
+`cloudrun/Dockerfile` (COPY `api`, `services`, `config`, `cloudrun/server.js`, `public/js/projectNames.js`, `bldgAdditions.js`, `bldgParts.js`, `bldgFloorEdits.js`), `cloudrun/cloudbuild.yaml`, `cloudrun/server.js` (`/api/health` vì `*.run.app` giữ `/healthz`; `limitFor`). `scripts/deploy-cloudrun.sh`. `scripts/test-cloudrun.js`, `scripts/test-worker.mjs`. `.github/workflows/cloud-run.yml` (chỉ `workflow_dispatch`). `MIGRATION.md`. `.dockerignore`, `.gcloudignore`, `public/_headers`, `public/.assetsignore` (pmtiles vượt 25 MiB, không đưa vào asset Worker). `package.json`, `.gitignore`, `scripts/write-version.js`.
+
+Phát hành pmtiles: `scripts/build-gba.py` hoặc `scripts/cadastre-to-pmtiles.mjs` ghi file, đẩy GCS, `scripts/apply-gcs-cache.mjs` với `config/gcsCachePolicy.mjs` (`immutable` cho `gba/buildings.pmtiles` và `cadastre/thuadat-2016.pmtiles`). Worker proxy Range. Không đọc file pmtiles.
+
+## MOD-21 Hồ sơ GIS TT16
+
+PR #100. `gisDossierCore.js`: `assessGis`, `phanLoaiIssues`, `crsIssues`, `metaSheetIssues`, `GIS_CATALOG`, `checkMaHoSo`, `checkMaDoiTuong`. `gisDossierRead.js`: `inspectGisFiles`, `scanDbf`. `gisDossierUi.js`: `initGisDossier`, `gisReportHtml`, `handleGisClick`. `gisXlsx.js`: `readMetaWorkbook`, `looksLikeMeta`. `scripts/test-gis-dossier.mjs`. Chỗ mở trên UI: `overview.js` (rg `gis`).
+
+## MOD-22 Nhà, dấu chân, vi phạm, hành lang sông
+
+`bldgAdditions.js`, `bldgParts.js` `confirmedPartFeatures`, `bldgFloorEdits.js` `mergeFloorEdit`, `floorsAt`, `bldgDraw.js` `initBldgDraw`, `bldgHeight.js` `heightAt`, `bldgMissing.js` `prepareMissingFootprints`. `services/bldgAdditions.js` `readPack`, `saveChange`. `services/bldgFloors.js` `readPack`, `saveEdit`. `projectNames.js`: `splitProjectName`, `namesOfProject` (cùng luật `splitProjectName` trong `Code.gs`; Dockerfile COPY file này). `gbaLayer.js` `initGbaLayer`. `gbaStats.js`, `gbaVersion.js`. `graveFilter.js` `isCemeteryGrave`, `insideGraveMask`.
+
+Vi phạm: `violateLayer.js` `initViolateLayer`, `setOn` (checkbox `chk_violate` trong `index.html`). Tam giác neo mép phải: `style.css` selector `.layer-row > .layer-alert` (cùng cột nút Aa). Nét hành lang 50 m: `loadLines` đọc `public/data/gba/river-corridor.json` — không đọc JSON; sửa bằng `scripts/rebuild-river-corridor.py`. Số trên panel: `uiComponents.js` `setRiverCounts`.
+
+Pipeline dấu chân: `scripts/build-gba.py` (ra `buildings.pmtiles`, không commit tiles), `scripts/build-gba-screen.py`, `scripts/drop-ntd-footprints.py`, `scripts/restore-ntd-footprints.py` (PR #97 gỡ dấu chân trên thửa NTD; `archive/gba/ntd-footprints.jsonl.gz` là kho, không đọc), `scripts/infer-tower-podium.py`, `scripts/gba-residential.py`. `scripts/test-bldg-additions.mjs`, `test-bldg-floors.mjs`, `test-bldg-parts.mjs`, `test-bldg-missing.mjs`, `test-bldg-flood.js`, `test-grave-filter.mjs`.
+
+`api/gee.js` `action ===`: `getGbaInfo`, `getBldgFloors`, `saveBldgFloor`, `getBldgAdditions`, `saveBldgAddition`.
