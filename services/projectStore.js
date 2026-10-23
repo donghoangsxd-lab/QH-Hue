@@ -1724,9 +1724,9 @@ async function landToInfra({ tenQH, id, phase, newId, layer }) {
 
 // Lớp chính của đồ án = 1 file role (khớp PROJECT_LAYERS ở public/js/projectFiles.js)
 const LAYER_ROLES = [ROLE_QH, ROLE_POINTS, ROLE_BOUNDARY, ROLE_HT];
-// Bản vẽ hạ tầng riêng từng đồ án. props.quyMo / congSuat / loai giữ để giai đoạn sau đối chiếu đấu nối toàn thành phố; bước này chỉ lưu và vẽ.
+// Bản vẽ hạ tầng riêng từng đồ án. props giữ để đối chiếu đấu nối: quyMo, congSuat, loai, và với giao thông là capDuong, loGioi, matCat.
 const NET_ROLES = ['ht-giao-thong', 'qh-giao-thong', 'ht-cap-nuoc', 'qh-cap-nuoc', 'ht-thoat-nuoc', 'qh-thoat-nuoc', 'ht-cap-dien', 'qh-cap-dien'];
-const NET_GEOM = new Set(['LineString', 'MultiLineString', 'Polygon', 'MultiPolygon']);
+const NET_GEOM = new Set(['Point', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon']);
 const NET_MAX_FEATURES = 4000;
 const NET_MAX_CHARS = 1500000;
 
@@ -1759,6 +1759,10 @@ function closeRing(coords) {
 
 function cleanGeom(g) {
   if (!g || !NET_GEOM.has(g.type)) return null;
+  if (g.type === 'Point') {
+    const xy = cleanCoord(g.coordinates);
+    return xy ? { type: 'Point', coordinates: xy } : null;
+  }
   if (g.type === 'LineString') {
     const pts = cleanLine(g.coordinates);
     return pts ? { type: 'LineString', coordinates: pts } : null;
@@ -1781,9 +1785,15 @@ function cleanNetProps(raw) {
   const quyMo = clipText(p.quyMo, 40);
   const congSuat = clipText(p.congSuat, 40);
   const loai = clipText(p.loai, 80);
+  const capDuong = clipText(p.capDuong, 80);
+  const loGioi = clipText(p.loGioi, 40);
+  const matCat = clipText(p.matCat, 80);
   if (quyMo) out.quyMo = quyMo;
   if (congSuat) out.congSuat = congSuat;
   if (loai) out.loai = loai;
+  if (capDuong) out.capDuong = capDuong;
+  if (loGioi) out.loGioi = loGioi;
+  if (matCat) out.matCat = matCat;
   return out;
 }
 
@@ -1799,7 +1809,7 @@ function cleanNetFeatures(features) {
     if (Object.keys(props).length) row.props = props;
     out.push(row);
   });
-  if (!out.length) rejectReview('Không có đường hoặc vùng hợp lệ (tọa độ kinh độ, vĩ độ)');
+  if (!out.length) rejectReview('Không có điểm, đường hoặc vùng hợp lệ (tọa độ kinh độ, vĩ độ)');
   if (JSON.stringify(out).length > NET_MAX_CHARS) rejectReview('Bản vẽ lớn hơn 1,5 MB');
   return out;
 }

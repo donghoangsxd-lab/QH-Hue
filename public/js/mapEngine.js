@@ -1894,6 +1894,36 @@ function redrawLands() {
 const netGroups = new Map();
 const NET_PANE = 'projectNetPane';
 
+function netWeight(f) {
+  const loai = String(f.props && f.props.loai || '');
+  if (loai === 'Đường bộ' || loai === 'Cầu') return 3.2;
+  if (loai === 'Đường sắt' || loai === 'Đường thủy' || loai === 'Hầm') return 2.4;
+  if (loai === 'Bó vỉa' || loai === 'Mặt cắt' || loai === 'Mặt đường') return 1.3;
+  return String(f.geometry && f.geometry.type || '').includes('Line') ? 2.6 : 1.4;
+}
+
+function meterText(v) {
+  const s = String(v).trim();
+  return /^\d+(?:[.,]\d+)?$/.test(s) ? `${s} m` : s;
+}
+
+function netTip(f) {
+  const p = f.props || {};
+  const loai = String(p.loai || '');
+  const capLabel = /sắt/.test(loai) ? 'cấp đường sắt' : /đầu mối|công trình/.test(loai) ? 'cấp công trình' : 'cấp đường';
+  return [
+    f.label,
+    f.phase === 'QH' ? 'quy hoạch' : 'hiện trạng',
+    f.name,
+    loai,
+    p.capDuong && `${capLabel} ${p.capDuong}`,
+    p.loGioi && `lộ giới ${meterText(p.loGioi)}`,
+    p.matCat && `mặt cắt ${p.matCat}`,
+    p.quyMo && `quy mô ${p.quyMo}`,
+    p.congSuat && `công suất ${p.congSuat}`
+  ].filter(Boolean).join(' · ');
+}
+
 function drawNetsOn(m, list) {
   const old = netGroups.get(m);
   if (old) {
@@ -1909,12 +1939,23 @@ function drawNetsOn(m, list) {
   const group = L.featureGroup();
   list.forEach(f => {
     const line = String(f.geometry && f.geometry.type || '').includes('Line');
+    const poly = String(f.geometry && f.geometry.type || '').includes('Polygon');
+    const weight = netWeight(f);
     const layer = L.geoJSON(f.geometry, {
       pane: NET_PANE,
-      style: { color: f.color, weight: line ? 2.6 : 1.4, opacity: 0.92, fillColor: f.color, fillOpacity: line ? 0 : 0.16 }
+      style: {
+        color: f.color,
+        weight,
+        opacity: 0.92,
+        fillColor: f.color,
+        fillOpacity: line ? 0 : (poly ? 0.2 : 0),
+        dashArray: f.props && f.props.loai === 'Mặt cắt' ? '1 3' : null
+      },
+      pointToLayer: (geo, latlng) => L.circleMarker(latlng, {
+        pane: NET_PANE, radius: 4.5, color: f.color, weight: 1.5, fillColor: f.color, fillOpacity: 0.9
+      })
     });
-    const tip = [f.label, f.phase === 'QH' ? 'quy hoạch' : 'hiện trạng', f.name, f.props && f.props.loai, f.props && f.props.quyMo && `quy mô ${f.props.quyMo}`, f.props && f.props.congSuat && `công suất ${f.props.congSuat}`].filter(Boolean).join(' · ');
-    layer.bindTooltip(tip, { sticky: true, opacity: 0.95 });
+    layer.bindTooltip(netTip(f), { sticky: true, opacity: 0.95 });
     group.addLayer(layer);
   });
   group.addTo(m);
