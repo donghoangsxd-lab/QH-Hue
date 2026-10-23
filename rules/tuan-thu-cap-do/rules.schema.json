@@ -9,6 +9,7 @@
     "title",
     "updated",
     "principle",
+    "referenceFallback",
     "hierarchy",
     "sectors",
     "definitions",
@@ -22,6 +23,7 @@
     "title": { "type": "string", "minLength": 1 },
     "updated": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
     "principle": { "type": "string", "minLength": 1 },
+    "referenceFallback": { "$ref": "#/$defs/referenceFallback" },
     "hierarchy": {
       "type": "array",
       "minItems": 4,
@@ -63,6 +65,43 @@
     }
   },
   "$defs": {
+    "referenceFallback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "decision",
+        "walk",
+        "perField",
+        "coversLocation",
+        "missingValues",
+        "unspecifiedText",
+        "resolution",
+        "message",
+        "appliesTo",
+        "notAViolation"
+      ],
+      "properties": {
+        "id": { "const": "goc-theo-truong" },
+        "decision": { "type": "string", "minLength": 1 },
+        "walk": {
+          "type": "array",
+          "minItems": 4,
+          "items": { "enum": ["QHC25", "QHC10", "QHPK", "QHCT"] }
+        },
+        "perField": { "const": true },
+        "coversLocation": { "type": "string" },
+        "missingValues": {
+          "type": "array",
+          "items": { "type": ["string", "number", "null"] }
+        },
+        "unspecifiedText": { "type": "array", "items": { "type": "string" } },
+        "resolution": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "pattern": "\\{referenceLevel\\}" },
+        "appliesTo": { "type": "string" },
+        "notAViolation": { "type": "string" }
+      }
+    },
     "rule": {
       "type": "object",
       "additionalProperties": false,
