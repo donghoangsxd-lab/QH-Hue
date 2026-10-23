@@ -22,6 +22,7 @@ assert.equal(cacheControlFor('chuyen-nganh/v1/qhc/sdd/hien-trang/a.geojson'), IM
 assert.equal(cacheControlFor('infrastructure_hue.json'), INFRA_JSON);
 assert.equal(cacheControlFor('kien-truc/dothi-vinh-thanh/quy-che.pdf'), INFRA_JSON);
 assert.equal(cacheControlFor('projects/a/lots.json'), '');
+assert.equal(cacheControlFor('cho-duyet/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json'), 'private, no-store');
 assert.equal(cacheControlFor('../secrets.json'), 'private, no-store');
 assert.equal(plan('gba/buildings.pmtiles', '').change, true);
 assert.equal(plan('gba/buildings.pmtiles', IMMUTABLE).change, false);

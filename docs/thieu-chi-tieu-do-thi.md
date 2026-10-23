@@ -707,10 +707,10 @@ Trạng thái: Thiếu = cần nhập; Có sẵn = webapp đã tính từ bảng
 
 ## Cách giao một cán bộ mỗi xã, phường
 
-Mô hình đã có trên form: `{ unitKey, officerName, fields }`. `unitKey` là `tp:TP`, `dothi:<mã>` hoặc `xa:<mã>`. Khóa phạm vi lưu trên trình duyệt (`qh_entry_officer_v1`) và chỉ ẩn đơn vị khác. Máy chủ chưa kiểm tra người gửi.
+Tab `CanBo` trên cùng Google Sheet: Họ tên, SĐT, Đơn vị công tác (droplist `mã — tên`), Email, Trạng thái TRUE/FALSE. Email TRUE chỉ gửi đúng đơn vị của mình. Quản trị không bị khóa. Đăng nhập vẫn là nút Google sẵn có, không thêm nhà cung cấp và không cron.
 
-1. Giữ như hiện tại: cán bộ tự chọn đơn vị trên máy. Phù hợp thử nghiệm, không đủ để giao việc.
-2. Nên dùng, vẫn trong hạn mức: thêm tab `CanBo` trên cùng Google Sheet (email Google đã dùng để đăng nhập quản trị → `unitKey`). Khi ghi, máy chủ đối chiếu email. Không thêm nhà cung cấp đăng nhập, không thêm cron. Mỗi lần Lưu là một lần gọi Apps Script, cùng kiểu với nhập một điểm.
-3. Ngoài hạn mức hiện tại: Cloudflare Access hoặc tài khoản Google Workspace cho từng cán bộ xã.
+Máy chủ đối chiếu email lúc ghi. Quản trị ghi thẳng bản công bố. Cán bộ ghi hàng chờ: tab `ChoDuyet` (cho_duyet / da_duyet / tu_choi) và object `cho-duyet/` trên bucket. Duyệt hoặc từ chối chỉ khi quản trị bấm trong mục Quản trị. Bản chờ không lên bản đồ công khai.
+
+Commit trong repo và bản quản trị tải sử dụng đất hoặc ranh là bản công bố. Nếu `su-dung-dat-index.json` hoặc file đồ án đã có lớp cùng vai trò thì không thêm bản sao.
 
 Tab chỉ tiêu đề xuất: `ChiTieuDoThi`. Tab công trình kiến trúc đề xuất: `KienTruc`. Cả hai không thuộc 14 nhóm hạ tầng nên không đẩy vào `infrastructure_hue.json`.

@@ -28,6 +28,7 @@ assert.equal(routeKind('/js/app.js'), 'asset');
 assert.equal(objectNameFromPath('/data/gba/buildings.pmtiles', 'large'), 'gba/buildings.pmtiles');
 assert.equal(objectNameFromPath('/gcs/cache/sat/v1/ndvi/2020/12/1/2.png', 'gcs'), 'cache/sat/v1/ndvi/2020/12/1/2.png');
 assert.equal(objectNameFromPath('/gcs/../secret', 'gcs'), '');
+assert.equal(objectNameFromPath('/gcs/cho-duyet/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json', 'gcs'), '');
 
 const missing = await proxyApi(new Request('https://qh-hue.example.workers.dev/api/gee'), {}, null);
 assert.equal(missing.status, 503);

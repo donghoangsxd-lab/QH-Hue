@@ -1078,6 +1078,7 @@
           <button type="button" class="admin-sub-btn" data-sub="addPop" role="tab" aria-selected="false"><svg class="ico"><use href="#i-users"/></svg>Ô dân cư</button>
           <button type="button" class="admin-sub-btn" data-sub="addOsm" role="tab" aria-selected="false" title="Nhập OSM và sổ hạ tầng từ thửa đất địa chính 2016"><svg class="ico"><use href="#i-map"/></svg>Dữ liệu OSM</button>
           <button type="button" class="admin-sub-btn" data-sub="addQh" role="tab" aria-selected="false" title="Lô nhập từ file QH cần kiểm tra đã có trên thực địa hay chưa"><svg class="ico"><use href="#i-inspect"/></svg>Hiện trạng QH</button>
+          <button type="button" class="admin-sub-btn" data-sub="addCho" role="tab" aria-selected="false" title="Hồ sơ cán bộ gửi, chưa hiện trên bản đồ"><svg class="ico"><use href="#i-clock"/></svg>Chờ duyệt</button>
         </div>
         <div id="addRoad">
           <div class="form-grid">
@@ -1146,6 +1147,13 @@
             <div class="pop-bake-info" id="popAssetInfo"></div>
           </div>
           <div id="popList" class="cad-list"></div>
+        </div>
+
+        <div id="addCho" style="display:none;">
+          <div class="cad-hint">Hồ sơ cán bộ (tab CanBo, Trạng thái TRUE) nằm ở đây cho đến khi duyệt. Duyệt chuyển vào bảng hoặc lớp bản đồ của đồ án. Từ chối ghi lý do. Người xem bản đồ không thấy hàng chờ. Bấm tải danh sách mới đọc Sheet.</div>
+          <button type="button" class="btn-submit" id="btnChoLoad">Tải danh sách chờ duyệt</button>
+          <div id="choStatus" class="rp-status" role="status" aria-live="polite"></div>
+          <div id="choList" class="cad-list"></div>
         </div>
 
         <div id="addQh" style="display:none;">
@@ -1512,6 +1520,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261030"></script>
+  <script type="module" src="./js/app.js?v=20261031"></script>
 </body>
 </html>

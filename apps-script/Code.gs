@@ -1426,6 +1426,10 @@ function appendHtFeatures(ss, features) {
 // Không nằm trong VALID_PREFIXES nên syncSheetsToGCS không đóng gói vào infrastructure_hue.json.
 var CHI_TIEU_SHEET = "ChiTieuDoThi";
 var KIEN_TRUC_SHEET = "KienTruc";
+var CANBO_SHEET = "CanBo";
+var CHO_DUYET_SHEET = "ChoDuyet";
+var CHO_DUYET_HEADERS = ["Id", "Email", "HoTen", "DonVi", "Loai", "DoAn", "TrangThai", "ThoiGian", "LyDo", "Gcs", "TomTat"];
+var CHO_DUYET_KINDS = { "chi-tieu": true, "kien-truc": true, "su-dung-dat": true, "hien-trang": true, "ranh-gioi": true, "ban-ve": true };
 var CHI_TIEU_HEADERS = ["UnitKey", "UnitType", "UnitCode", "UnitName", "Field", "Value", "Officer", "ThoiGianCapNhat"];
 var KIEN_TRUC_HEADERS = ["ID_DoiTuong", "Ten_CongTrinh", "Ten_XaPhuong", "Nhom_HaTang", "Latitude", "Longitude", "QuyMo_HT", "QuyMo_QH", "BanKinh", "TrangThai", "ThoiGianCapNhat", "Note", "Loai", "KhuVuc", "LinkAnh", "Link3D"];
 
@@ -1439,7 +1443,138 @@ function ensureNamedSheet(ss, name, headers) {
   return sheet;
 }
 
+function canBoUnitLabels_() {
+  return [
+    "tp:TP — Toàn thành phố",
+    "dothi:trung-tam — Khu vực đô thị trung tâm",
+    "dothi:huong-thuy — Khu vực đô thị Hương Thủy",
+    "dothi:huong-tra — Khu vực đô thị Hương Trà",
+    "dothi:phong-dien — Quy hoạch chung đô thị Phong Điền",
+    "dothi:chan-may — Quy hoạch chung đô thị Chân Mây",
+    "dothi:a-luoi — Quy hoạch chung đô thị A Lưới",
+    "dothi:quang-dien — Quy hoạch chung đô thị Quảng Điền",
+    "dothi:vinh-thanh — Đô thị Vinh Thanh",
+    "dothi:phu-da — Đô thị Phú Đa",
+    "dothi:loc-son — Đô thị Lộc Sơn",
+    "dothi:khe-tre — Quy hoạch chung đô thị Khe Tre",
+    "dothi:sia — Đô thị Sịa",
+    "dothi:phu-loc — Đô thị Phú Lộc",
+    "dothi:lang-co — Đô thị Lăng Cô",
+    "dothi:vinh-hien — Đô thị Vinh Hiền",
+    "dothi:thanh-ha — Đô thị Thanh Hà",
+    "dothi:hoa-chau — Đô thị Hóa Châu",
+    "dothi:my-thuong — Đô thị Mỹ Thượng",
+    "dothi:phu-ho — Quy hoạch chung đô thị Phú Hồ",
+    "dothi:phu-vinh — Quy hoạch chung đô thị Phú Vinh",
+    "dothi:phu-vang — Quy hoạch chung đô thị Phú Vang",
+    "dothi:hung-loc — Quy hoạch chung đô thị Hưng Lộc",
+    "dothi:hue-core — Vùng đô thị lõi trung tâm",
+    "dothi:hue-outer — Các vùng còn lại",
+    "xa:an-cuu — Phường An Cựu",
+    "xa:duong-no — Phường Dương Nỗ",
+    "xa:hoa-chau — Phường Hóa Châu",
+    "xa:huong-an — Phường Hương An",
+    "xa:huong-thuy — Phường Hương Thủy",
+    "xa:huong-tra — Phường Hương Trà",
+    "xa:kim-long — Phường Kim Long",
+    "xa:kim-tra — Phường Kim Trà",
+    "xa:my-thuong — Phường Mỹ Thượng",
+    "xa:phong-dinh — Phường Phong Dinh",
+    "xa:phong-phu — Phường Phong Phú",
+    "xa:phong-quang — Phường Phong Quảng",
+    "xa:phong-thai — Phường Phong Thái",
+    "xa:phong-dien — Phường Phong Điền",
+    "xa:phu-bai — Phường Phú Bài",
+    "xa:phu-xuan — Phường Phú Xuân",
+    "xa:thanh-thuy — Phường Thanh Thủy",
+    "xa:thuan-an — Phường Thuận An",
+    "xa:thuan-hoa — Phường Thuận Hóa",
+    "xa:thuy-xuan — Phường Thủy Xuân",
+    "xa:vy-da — Phường Vỹ Dạ",
+    "xa:a-luoi-1 — Xã A Lưới 1",
+    "xa:a-luoi-2 — Xã A Lưới 2",
+    "xa:a-luoi-3 — Xã A Lưới 3",
+    "xa:a-luoi-4 — Xã A Lưới 4",
+    "xa:a-luoi-5 — Xã A Lưới 5",
+    "xa:binh-dien — Xã Bình Điền",
+    "xa:chan-may-lang-co — Xã Chân Mây - Lăng Cô",
+    "xa:dan-dien — Xã Đan Điền",
+    "xa:hung-loc — Xã Hưng Lộc",
+    "xa:khe-tre — Xã Khe Tre",
+    "xa:long-quang — Xã Long Quảng",
+    "xa:loc-an — Xã Lộc An",
+    "xa:nam-dong — Xã Nam Đông",
+    "xa:phu-ho — Xã Phú Hồ",
+    "xa:phu-loc — Xã Phú Lộc",
+    "xa:phu-vang — Xã Phú Vang",
+    "xa:phu-vinh — Xã Phú Vinh",
+    "xa:quang-dien — Xã Quảng Điền",
+    "xa:vinh-loc — Xã Vinh Lộc"
+  ];
+}
+
+// Cùng luật public/js/canBoGate.js. Email lấy từ token Google mà Cloud Run đã kiểm, không lấy Session.getActiveUser
+// (doPost chạy bằng tài khoản web app, không phải người đang đăng nhập trên trình duyệt).
+function canBoUnitId_(cell) {
+  var raw = String(cell || "").replace(/^\s+|\s+$/g, "");
+  if (!raw) return "";
+  return raw.split(" — ")[0].replace(/^\s+|\s+$/g, "");
+}
+
+function canBoStatusOn_(value) {
+  return value === true || String(value == null ? "" : value).replace(/^\s+|\s+$/g, "").toUpperCase() === "TRUE";
+}
+
+function ensureCanBoSheet(ss) {
+  var headers = ["Họ tên", "SĐT", "Đơn vị công tác", "Email", "Trạng thái"];
+  var sheet = ss.getSheetByName(CANBO_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(CANBO_SHEET);
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
+    sheet.setFrozenRows(1);
+  }
+  var labels = canBoUnitLabels_();
+  var firstLabel = labels.length ? labels[0] : "";
+  if (String(sheet.getRange(1, 7).getValue() || "") !== "Mã đơn vị" || String(sheet.getRange(2, 7).getValue() || "") !== firstLabel) {
+    var rows = labels.map(function(label) { return [label]; });
+    sheet.getRange(1, 7).setValue("Mã đơn vị").setFontWeight("bold");
+    sheet.getRange(2, 7, rows.length, 1).setValues(rows);
+    sheet.hideColumns(7);
+  }
+  var rule = SpreadsheetApp.newDataValidation().requireValueInRange(sheet.getRange(2, 7, labels.length, 1), true).setAllowInvalid(false).build();
+  sheet.getRange(2, 3, 500, 1).setDataValidation(rule);
+  var flag = SpreadsheetApp.newDataValidation().requireValueInList(["TRUE", "FALSE"], true).setAllowInvalid(false).build();
+  sheet.getRange(2, 5, 500, 1).setDataValidation(flag);
+  return sheet;
+}
+
+function canBoUnitsFor_(email) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ensureCanBoSheet(ss);
+  var data = sheet.getDataRange().getValues();
+  var want = String(email || "").replace(/^\s+|\s+$/g, "").toLowerCase();
+  var units = [];
+  var name = "";
+  for (var r = 1; r < data.length; r++) {
+    var mail = String(data[r][3] || "").replace(/^\s+|\s+$/g, "").toLowerCase();
+    if (!want || mail !== want || !canBoStatusOn_(data[r][4])) continue;
+    var id = canBoUnitId_(data[r][2]);
+    if (!id || units.indexOf(id) >= 0) continue;
+    if (!name) name = String(data[r][0] || "");
+    units.push(id);
+  }
+  return { "name": name, "units": units };
+}
+
+function assertCanWrite_(email, unitKey, admin) {
+  if (admin) return;
+  if (!email) throw new Error("Chưa đăng nhập Google");
+  var found = canBoUnitsFor_(email);
+  if (found.units.indexOf(String(unitKey || "")) < 0) throw new Error("Email không được ghi đơn vị này");
+}
+
 function saveUrbanInputs(body) {
+  assertCanWrite_(body.email, body.unitKey, body.admin);
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
@@ -1469,7 +1604,15 @@ function saveUrbanInputs(body) {
   }
 }
 
-function getUrbanInputs() {
+function getUrbanInputs(body) {
+  body = body || {};
+  if (!body.admin && !body.email) throw new Error("Chưa đăng nhập Google");
+  var allow = null;
+  if (!body.admin) {
+    var found = canBoUnitsFor_(body.email);
+    allow = {};
+    found.units.forEach(function(id) { allow[id] = true; });
+  }
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(CHI_TIEU_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return { "success": true, "rows": [] };
@@ -1477,6 +1620,7 @@ function getUrbanInputs() {
   var rows = [];
   for (var r = 1; r < data.length; r++) {
     if (!data[r][0] || !data[r][4] || !data[r][5]) continue;
+    if (allow && !allow[String(data[r][0])]) continue;
     rows.push({
       "unitKey": String(data[r][0]),
       "field": String(data[r][4]),
@@ -1488,6 +1632,7 @@ function getUrbanInputs() {
 }
 
 function addKienTruc(body) {
+  assertCanWrite_(body.email, body.khuVuc, body.admin);
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
@@ -1525,6 +1670,125 @@ function addKienTruc(body) {
     var lastRow = sheet.getLastRow();
     sheet.getRange(lastRow, 5, 1, 2).setNumberFormat("@");
     return { "success": true, "id": row[0] };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function choDuyetId_(gcs) {
+  var m = String(gcs || "").match(/^cho-duyet\/([a-f0-9]{32})\.json$/);
+  if (!m) throw new Error("Đường dẫn chờ duyệt không hợp lệ");
+  return m[1];
+}
+
+function choDuyetSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CHO_DUYET_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(CHO_DUYET_SHEET);
+    sheet.getRange(1, 1, 1, CHO_DUYET_HEADERS.length).setValues([CHO_DUYET_HEADERS]).setFontWeight("bold");
+    sheet.setFrozenRows(1);
+    var flag = SpreadsheetApp.newDataValidation().requireValueInList(["cho_duyet", "da_duyet", "tu_choi"], true).setAllowInvalid(false).build();
+    sheet.getRange(2, 7, 500, 1).setDataValidation(flag);
+  }
+  return sheet;
+}
+
+function choDuyetRow_(values) {
+  return {
+    "id": String(values[0] || ""),
+    "email": String(values[1] || ""),
+    "name": String(values[2] || ""),
+    "unit": String(values[3] || ""),
+    "kind": String(values[4] || ""),
+    "tenQH": String(values[5] || ""),
+    "status": String(values[6] || ""),
+    "time": values[7] || "",
+    "reason": String(values[8] || ""),
+    "gcs": String(values[9] || ""),
+    "summary": String(values[10] || "")
+  };
+}
+
+function addChoDuyet(body) {
+  assertCanWrite_(body.email, body.unit, false);
+  if (!CHO_DUYET_KINDS[String(body.kind || "")]) throw new Error("Loại hồ sơ không hợp lệ");
+  var id = choDuyetId_(body.gcs);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = choDuyetSheet_();
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0] || "") === id) throw new Error("Hồ sơ chờ duyệt đã có");
+    }
+    sheet.appendRow([
+      id,
+      String(body.email || "").toLowerCase(),
+      String(body.name || "").slice(0, 80),
+      String(body.unit || ""),
+      String(body.kind || ""),
+      String(body.tenQH || "").slice(0, 120),
+      "cho_duyet",
+      new Date(),
+      "",
+      String(body.gcs || ""),
+      String(body.summary || "").slice(0, 180)
+    ]);
+    return { "success": true, "id": id };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function listChoDuyet(body) {
+  if (!body || !body.admin) throw new Error("Chỉ quản trị xem hàng chờ");
+  var sheet = choDuyetSheet_();
+  if (sheet.getLastRow() < 2) return { "success": true, "rows": [] };
+  var data = sheet.getDataRange().getValues();
+  var rows = [];
+  for (var r = 1; r < data.length; r++) {
+    if (String(data[r][6] || "") !== "cho_duyet") continue;
+    var row = choDuyetRow_(data[r]);
+    delete row.gcs;
+    rows.push(row);
+    if (rows.length >= 100) break;
+  }
+  return { "success": true, "rows": rows };
+}
+
+function getChoDuyet(body) {
+  if (!body || !body.admin) throw new Error("Chỉ quản trị xem hàng chờ");
+  var id = String(body.id || "");
+  if (!/^[a-f0-9]{32}$/.test(id)) throw new Error("Mã hàng chờ không hợp lệ");
+  var sheet = choDuyetSheet_();
+  var data = sheet.getDataRange().getValues();
+  for (var r = 1; r < data.length; r++) {
+    if (String(data[r][0] || "") === id) return { "success": true, "row": choDuyetRow_(data[r]) };
+  }
+  throw new Error("Không có hồ sơ chờ duyệt này");
+}
+
+function setChoDuyet(body) {
+  if (!body || !body.admin) throw new Error("Chỉ quản trị xử lý hàng chờ");
+  var status = String(body.status || "");
+  if (status !== "da_duyet" && status !== "tu_choi") throw new Error("Trạng thái không hợp lệ");
+  if (status === "tu_choi" && !String(body.lyDo || "").replace(/^\s+|\s+$/g, "")) throw new Error("Cần lý do từ chối");
+  var id = String(body.id || "");
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sheet = choDuyetSheet_();
+    var data = sheet.getDataRange().getValues();
+    for (var r = 1; r < data.length; r++) {
+      if (String(data[r][0] || "") !== id) continue;
+      if (String(data[r][6] || "") !== "cho_duyet") throw new Error("Hồ sơ đã được xử lý");
+      var at = r + 1;
+      sheet.getRange(at, 7).setValue(status);
+      sheet.getRange(at, 9).setValue(String(body.lyDo || "").slice(0, 300));
+      return { "success": true, "id": id, "status": status, "gcs": String(data[r][9] || "") };
+    }
+    throw new Error("Không có hồ sơ chờ duyệt này");
   } finally {
     lock.releaseLock();
   }
@@ -1575,8 +1839,13 @@ function doPost(e) {
     }
     // Tab ChiTieuDoThi và KienTruc do Dong xác nhận tên. Không thuộc 14 nhóm hạ tầng, không gọi syncSheetsToGCS.
     if (action === "saveUrbanInputs") return jsonOutput(saveUrbanInputs(body));
-    if (action === "getUrbanInputs") return jsonOutput(getUrbanInputs());
+    if (action === "getUrbanInputs") return jsonOutput(getUrbanInputs(body));
+    if (action === "getCanBo") return jsonOutput(canBoUnitsFor_(body.email));
     if (action === "addKienTruc") return jsonOutput(addKienTruc(body));
+    if (action === "addChoDuyet") return jsonOutput(addChoDuyet(body));
+    if (action === "listChoDuyet") return jsonOutput(listChoDuyet(body));
+    if (action === "getChoDuyet") return jsonOutput(getChoDuyet(body));
+    if (action === "setChoDuyet") return jsonOutput(setChoDuyet(body));
     return jsonOutput({ "error": "Action không hợp lệ: " + action });
   } catch (err) {
     return jsonOutput({ "error": err.toString() });

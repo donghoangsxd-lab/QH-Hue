@@ -1817,8 +1817,8 @@ async function linkInfraLots({ tenQH, pairs }) {
 
 // Lớp chính của đồ án = 1 file role (khớp PROJECT_LAYERS ở public/js/projectFiles.js)
 const LAYER_ROLES = [ROLE_QH, ROLE_POINTS, ROLE_BOUNDARY, ROLE_HT];
-// Bản vẽ riêng từng đồ án. Khớp NET_LAYERS, trừ ba role *-hoso: ghi bucket để giữ trục,
-// không đưa vào lớp bản đồ (đã có ranh-gioi, hien-trang, su-dung-dat và catalog sử dụng đất).
+// Bản vẽ riêng từng đồ án. Khớp NET_LAYERS. Ba role *-hoso là file cũ, không lên lớp.
+// Form nhập của quản trị ghi su-dung-dat, hien-trang hoặc ranh-gioi (publishSchemeDraw).
 // ht-thoat-nuoc giữ nguyên. Nước thải dùng ht-thoat-thai / qh-thoat-thai.
 const NET_ROLES = [
   'ht-giao-thong', 'qh-giao-thong', 'ht-cap-nuoc', 'qh-cap-nuoc', 'ht-thoat-nuoc', 'qh-thoat-nuoc', 'ht-cap-dien', 'qh-cap-dien',
@@ -2787,8 +2787,64 @@ async function saveKienTrucPdf({ unitKey, fileName, buffer, stagedToken }) {
   return { name: decisionFileName(fileName), bytes, url: `${publicUrl(dest)}?v=${Date.now()}`, via };
 }
 
+// Quản trị (hoặc lúc duyệt hàng chờ): bản vẽ sử dụng đất / ranh thành lớp đồ án.
+// Đồ án đã có lớp cùng vai trò trong su-dung-dat-index.json, hoặc file lô đã có polygon, thì không ghi thêm.
+async function publishSchemeDraw({ tenQH, kind, features }) {
+  const dedupe = require('./landDedupe');
+  const name = String(tenQH || '').trim();
+  if (!name) rejectReview('Thiếu tên đồ án');
+  const stored = await readIndex();
+  const entry = ((stored.data && stored.data.projects) || []).find(p => p && p.tenQH === name && !p.deleted) || null;
+  const slug = entry && (entry.slug || projectSlug(name));
+  const index = dedupe.loadLandIndex();
+  if (kind === ROLE_QH || kind === ROLE_HT) {
+    const phase = kind === ROLE_QH ? 'QH' : 'HT';
+    const role = phase === 'QH' ? 'quy-hoach' : 'hien-trang';
+    if (dedupe.schemeHasLand(index, { tenQH: name, slug }, role)) return { skipped: true, reason: 'da-co' };
+    if (slug && SLUG_RE.test(slug)) {
+      const doc = await readRoleDoc(slug, kind);
+      if (dedupe.dxfCount(doc, phase) > 0) return { skipped: true, reason: 'da-co' };
+    }
+    const lands = dedupe.landsFromFeatures(features, phase).map(row => {
+      const geometry = cleanGeom(row.geometry);
+      return geometry ? { ...row, geometry } : null;
+    }).filter(Boolean);
+    if (!lands.length) rejectReview('Bản vẽ sử dụng đất cần vùng (polygon)');
+    const saved = await saveChunk({
+      tenQH: name,
+      fileName: name,
+      lands,
+      landsReset: phase,
+      registry: { keepBoundary: true }
+    });
+    return { skipped: false, slug: saved.slug, lands: saved.lands };
+  }
+  if (kind === ROLE_BOUNDARY) {
+    const raw = dedupe.boundaryFromFeatures(features);
+    const boundary = raw && cleanGeom(raw);
+    if (!boundary) rejectReview('Ranh giới cần vùng (polygon)');
+    if (entry && entry.boundary) return { skipped: true, reason: 'da-co-ranh' };
+    if (slug && SLUG_RE.test(slug)) {
+      const doc = await readRoleDoc(slug, ROLE_BOUNDARY);
+      if (doc && doc.boundary) return { skipped: true, reason: 'da-co-ranh' };
+    }
+    if (entry && entry.dir) {
+      const done = await patchBoundary({ tenQH: name, boundary, boundarySource: 'gis' });
+      return { skipped: false, slug: done.slug };
+    }
+    const saved = await saveChunk({
+      tenQH: name,
+      fileName: name,
+      lands: [],
+      registry: { boundary, boundarySource: 'gis', keepBoundary: false }
+    });
+    return { skipped: false, slug: saved.slug };
+  }
+  rejectReview('Lớp bản vẽ không hợp lệ');
+}
+
 module.exports = {
-  setTransport, projectTitle, projectSlug, splitProjectName, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, unpairInfraLot, linkInfraLots, deleteLayer, deleteProjectFiles, renameProject,
+  setTransport, projectTitle, projectSlug, splitProjectName, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, unpairInfraLot, linkInfraLots, deleteLayer, deleteProjectFiles, renameProject, publishSchemeDraw,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision, layerDecisions, removeLayerDecision,
   saveProjectDoc, removeProjectDoc, saveNet, saveKienTrucPdf,
   saveDecisionProposal, readDecisionProposal, approveDecisionProposal, rejectDecisionProposal,

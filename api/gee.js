@@ -7,7 +7,9 @@ const { popNhaStatusText } = require('../services/popNhaStatus');
 const popWatch = require('../services/popNhaWatch');
 const { getRawDataList, getCadParcels, getInvestCalls, getInvestEdits, forgetTextFile, getDrainage, getBasins, getDrainArrows, getHillshade, invalidateCache, getDataVersion } = require('../services/gcsService');
 const gcsWrite = require('../services/gcsWrite');
-const { requireAdmin, httpError } = require('../services/authService');
+const { requireAdmin, httpError, verifyGoogleIdToken, readBearerToken, isAdminEmail } = require('../services/authService');
+const choDuyet = require('../services/choDuyetStore');
+const { stageSpec, applyPublication } = require('../services/reviewPublish');
 const { limitPublicGet, geeLimitOpts } = require('../services/getRate');
 const roads = require('../services/roadsService');
 const popEdits = require('../services/popEditsService');
@@ -314,6 +316,85 @@ const URBAN_FIELDS = new Set([
 function httpsLink(raw) {
   const s = sanitizeSheetText(raw, 300);
   return /^https:\/\//i.test(s) ? s : '';
+}
+
+async function entryActor(req) {
+  const user = await verifyGoogleIdToken(readBearerToken(req));
+  return { email: user.email, name: user.name, exp: user.exp, admin: isAdminEmail(user.email) };
+}
+
+async function scriptEntry(action, payload) {
+  try {
+    return await callAppsScript({ action }, payload);
+  } catch (err) {
+    const msg = String(err.message || '').replace(/^Apps Script:\s*/, '').split('. Web app')[0];
+    if (/Email không được ghi|Chưa đăng nhập Google/.test(msg)) throw httpError(403, msg);
+    throw err;
+  }
+}
+
+async function stageChoDuyet(actor, spec) {
+  const stored = stageSpec({ ...spec, unit: spec.unit });
+  stored.email = actor.email;
+  stored.name = actor.name || '';
+  const id = choDuyet.newId();
+  const gcs = await choDuyet.putJson(id, stored);
+  try {
+    await scriptEntry('addChoDuyet', {
+      action: 'addChoDuyet',
+      email: actor.email,
+      name: actor.name || '',
+      unit: stored.unit,
+      kind: stored.kind,
+      tenQH: stored.tenQH || '',
+      gcs,
+      summary: stored.summary || ''
+    });
+  } catch (err) {
+    try { await choDuyet.remove(gcs); } catch (drop) { /* file mồ côi vẫn bị Worker chặn */ }
+    throw err;
+  }
+  return { id };
+}
+
+async function publishKienTrucPoint(point, email) {
+  const type = String(point.type || '');
+  const name = sanitizeSheetText(point.name, 150);
+  const isNetwork = constants.isNetworkCode(type);
+  const nhomHaTang = isNetwork || point.nhomHaTang === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
+  const phase = point.phase === 'QH' ? 'QH' : 'HT';
+  const size = Number(point.size || 0);
+  const pt = parseCoordInBounds(point.lat, point.lng);
+  const noArea = isNetwork && !!constants.networkConfig[type].noArea;
+  const khuVuc = String(point.khuVuc || '');
+  if (![...CODES, '6-THPT', '12-CSD', ...constants.NETWORK_CODES].includes(type)) throw httpError(400, 'Loại công trình không hợp lệ');
+  if (!name) throw httpError(400, 'Thiếu tên công trình');
+  if (!pt) throw httpError(400, 'Tọa độ không hợp lệ hoặc nằm ngoài TP. Huế');
+  if (!Number.isFinite(size) || size < 0 || size > 1e8) throw httpError(400, 'Diện tích không hợp lệ');
+  if (phase === 'QH' && !(size > 0) && !noArea) throw httpError(400, 'Điểm quy hoạch mới cần diện tích > 0');
+  if (khuVuc && !URBAN_UNIT_RE.test(khuVuc)) throw httpError(400, 'Đơn vị không hợp lệ');
+  const evaluatedWardsForKt = await loadEvaluatedWards(wardVectorParsed);
+  const geoWard = assignWardByGeometry(pt.lng, pt.lat, evaluatedWardsForKt);
+  if (!geoWard) throw httpError(400, 'Vị trí nằm ngoài ranh giới 40 phường/xã');
+  const radius = qcvnRadius({ type, name, nhomHaTang, size }, geoWard);
+  const result = await scriptEntry('addKienTruc', {
+    action: 'addKienTruc',
+    admin: true,
+    email,
+    type,
+    nhomHaTang,
+    name,
+    ward: geoWard,
+    lat: pt.lat.toFixed(6),
+    lng: pt.lng.toFixed(6),
+    size: String(size),
+    radius: radius ? String(radius) : '',
+    phase,
+    khuVuc,
+    linkAnh: httpsLink(point.linkAnh),
+    link3d: httpsLink(point.link3d)
+  });
+  return { id: result.id || null, ward: geoWard, radius };
 }
 
 // Hồ sơ file chờ duyệt (người dùng chưa đăng nhập): mỗi IP tối đa 3 file / giờ, mỗi file ≤ 2 MB
@@ -2884,6 +2965,35 @@ module.exports = async (req, res) => {
       return res.status(200).json({ admin: true, email: user.email, name: user.name, exp: user.exp });
     }
 
+    if (action === 'getOfficer') {
+      requirePostFromApp(req);
+      checkUrbanEntryRate(req);
+      const user = await verifyGoogleIdToken(readBearerToken(req));
+      if (isAdminEmail(user.email)) {
+        return res.status(200).json({ success: true, admin: true, email: user.email, name: user.name, exp: user.exp, units: [] });
+      }
+      let found;
+      try {
+        found = await callAppsScript({ action: 'getCanBo' }, { action: 'getCanBo', email: user.email });
+      } catch (err) {
+        const msg = String(err.message || '');
+        if (msg.includes('Action không hợp lệ')) {
+          return res.status(503).json({ error: true, message: 'Web app trên Sheet vẫn là bản cũ. Deploy Apps Script: Version New version, rồi đăng nhập lại.' });
+        }
+        throw err;
+      }
+      const units = Array.isArray(found.units) ? found.units.filter(id => URBAN_UNIT_RE.test(id)) : [];
+      if (!units.length) return res.status(403).json({ error: true, message: 'Email chưa được giao đơn vị hoặc đang tắt.' });
+      return res.status(200).json({
+        success: true,
+        admin: false,
+        email: user.email,
+        name: found.name || user.name,
+        exp: user.exp,
+        units
+      });
+    }
+
     if (action === 'approvePoint') {
       requirePostFromApp(req);
       await requireAdmin(req);
@@ -4329,11 +4439,12 @@ module.exports = async (req, res) => {
     }
 
     // Chỉ tiêu đô thị và công trình kiến trúc: chỉ khi bấm Lưu / Gửi. Không invalidate cache hạ tầng, không sync infrastructure_hue.json.
+    // Quản trị ghi thẳng tab công bố. Cán bộ (CanBo, TRUE) vào hàng chờ ChoDuyet + object cho-duyet/.
     if (action === 'saveUrbanInputs' || action === 'getUrbanInputs') {
       requirePostFromApp(req);
       checkUrbanEntryRate(req);
+      const actor = await entryActor(req);
       const body = action === 'getUrbanInputs' ? {} : readJsonBody(req);
-      let payload = { action };
       if (action === 'saveUrbanInputs') {
         const unitKey = String(body.unitKey || '');
         if (!URBAN_UNIT_RE.test(unitKey)) return res.status(400).json({ error: true, message: 'Đơn vị không hợp lệ' });
@@ -4343,20 +4454,26 @@ module.exports = async (req, res) => {
           if (!URBAN_FIELDS.has(key)) return;
           fields[key] = sanitizeSheetText(src[key], 40);
         });
-        payload = {
-          action,
+        if (!Object.values(fields).some(value => value)) return res.status(400).json({ error: true, message: 'Chưa có chỉ tiêu để gửi' });
+        const packet = {
           unitKey,
           unitType: sanitizeSheetText(body.unitType, 12),
           unitCode: sanitizeSheetText(body.unitCode, 40),
           unitName: sanitizeSheetText(body.unitName, 80),
-          officer: sanitizeSheetText(body.officer, 80),
+          officer: sanitizeSheetText(body.officer, 80) || actor.name || actor.email,
           fields
         };
+        if (!actor.admin) {
+          const staged = await stageChoDuyet(actor, { kind: 'chi-tieu', unit: unitKey, summary: unitKey, fields: packet });
+          return res.status(200).json({ success: true, staged: true, id: staged.id });
+        }
+        const result = await scriptEntry('saveUrbanInputs', { action: 'saveUrbanInputs', admin: true, email: actor.email, ...packet });
+        return res.status(200).json({ success: true, saved: result.saved || 0, staged: false });
       }
-      const result = await callAppsScript({ action }, payload);
+      const result = await scriptEntry('getUrbanInputs', { action: 'getUrbanInputs', admin: actor.admin, email: actor.email });
       return res.status(200).json({
         success: true,
-        saved: result.saved || 0,
+        saved: 0,
         rows: Array.isArray(result.rows) ? result.rows.slice(0, 4000) : []
       });
     }
@@ -4364,42 +4481,128 @@ module.exports = async (req, res) => {
     if (action === 'addKienTruc') {
       requirePostFromApp(req);
       checkAddPointRate(req);
+      const actor = await entryActor(req);
       const body = readJsonBody(req);
-      const type = String(body.type || '');
-      const name = sanitizeSheetText(body.name, 150);
-      const isNetwork = constants.isNetworkCode(type);
-      const nhomHaTang = isNetwork || body.nhomHaTang === 'Cấp đô thị' ? 'Cấp đô thị' : 'Cấp đơn vị ở';
-      const phase = body.phase === 'QH' ? 'QH' : 'HT';
-      const size = Number(body.size || 0);
-      const pt = parseCoordInBounds(body.lat, body.lng);
-      const noArea = isNetwork && !!constants.networkConfig[type].noArea;
       const khuVuc = String(body.khuVuc || '');
-      if (![...CODES, '6-THPT', '12-CSD', ...constants.NETWORK_CODES].includes(type)) return res.status(400).json({ error: true, message: 'Loại công trình không hợp lệ' });
-      if (!name) return res.status(400).json({ error: true, message: 'Thiếu tên công trình' });
-      if (!pt) return res.status(400).json({ error: true, message: 'Tọa độ không hợp lệ hoặc nằm ngoài TP. Huế' });
-      if (!Number.isFinite(size) || size < 0 || size > 1e8) return res.status(400).json({ error: true, message: 'Diện tích không hợp lệ' });
-      if (phase === 'QH' && !(size > 0) && !noArea) return res.status(400).json({ error: true, message: 'Điểm quy hoạch mới cần diện tích > 0' });
-      if (khuVuc && !URBAN_UNIT_RE.test(khuVuc)) return res.status(400).json({ error: true, message: 'Đơn vị không hợp lệ' });
-      const evaluatedWardsForKt = await loadEvaluatedWards(wardVectorParsed);
-      const geoWard = assignWardByGeometry(pt.lng, pt.lat, evaluatedWardsForKt);
-      if (!geoWard) return res.status(400).json({ error: true, message: 'Vị trí nằm ngoài ranh giới 40 phường/xã' });
-      const radius = qcvnRadius({ type, name, nhomHaTang, size }, geoWard);
-      const result = await callAppsScript({ action: 'addKienTruc' }, {
-        action: 'addKienTruc',
-        type,
-        nhomHaTang,
-        name,
-        ward: geoWard,
-        lat: pt.lat.toFixed(6),
-        lng: pt.lng.toFixed(6),
-        size: String(size),
-        radius: radius ? String(radius) : '',
-        phase,
-        khuVuc,
-        linkAnh: httpsLink(body.linkAnh),
-        link3d: httpsLink(body.link3d)
+      if (!actor.admin) {
+        if (!URBAN_UNIT_RE.test(khuVuc)) return res.status(400).json({ error: true, message: 'Cán bộ phải chọn đơn vị được giao' });
+        const type = String(body.type || '');
+        const name = sanitizeSheetText(body.name, 150);
+        const pt = parseCoordInBounds(body.lat, body.lng);
+        if (![...CODES, '6-THPT', '12-CSD', ...constants.NETWORK_CODES].includes(type)) return res.status(400).json({ error: true, message: 'Loại công trình không hợp lệ' });
+        if (!name || !pt) return res.status(400).json({ error: true, message: 'Thiếu tên hoặc tọa độ hợp lệ' });
+        const staged = await stageChoDuyet(actor, {
+          kind: 'kien-truc',
+          unit: khuVuc,
+          summary: name,
+          point: {
+            type: String(body.type || ''),
+            nhomHaTang: body.nhomHaTang,
+            name,
+            lat: body.lat,
+            lng: body.lng,
+            size: body.size,
+            phase: body.phase,
+            khuVuc,
+            linkAnh: body.linkAnh,
+            link3d: body.link3d
+          }
+        });
+        return res.status(200).json({ success: true, staged: true, id: staged.id });
+      }
+      const saved = await publishKienTrucPoint(body, actor.email);
+      return res.status(200).json({ success: true, staged: false, id: saved.id, ward: saved.ward, radius: saved.radius });
+    }
+
+    if (action === 'submitChoDuyet') {
+      requirePostFromApp(req);
+      checkUrbanEntryRate(req);
+      const actor = await entryActor(req);
+      if (actor.admin) return res.status(400).json({ error: true, message: 'Quản trị ghi thẳng lớp công bố, không gửi hàng chờ' });
+      const body = readJsonBody(req);
+      const unit = String(body.unitKey || '');
+      if (!URBAN_UNIT_RE.test(unit)) return res.status(400).json({ error: true, message: 'Đơn vị không hợp lệ' });
+      const staged = await stageChoDuyet(actor, {
+        kind: body.kind,
+        unit,
+        tenQH: body.tenQH,
+        role: body.role,
+        summary: body.summary,
+        features: body.features
       });
-      return res.status(200).json({ success: true, id: result.id || null, ward: geoWard, radius });
+      return res.status(200).json({ success: true, staged: true, id: staged.id });
+    }
+
+    if (action === 'publishSchemeDraw') {
+      requirePostFromApp(req);
+      await requireAdmin(req);
+      checkUrbanEntryRate(req);
+      const body = readJsonBody(req);
+      const tenQH = sanitizeSheetText(body.tenQH, 120);
+      const kind = String(body.kind || '');
+      if (!tenQH) return res.status(400).json({ error: true, message: 'Thiếu tên đồ án' });
+      try {
+        const done = await projects.publishSchemeDraw({ tenQH, kind, features: body.features });
+        const note = done.skipped
+          ? (kind === 'ranh-gioi' ? 'Đồ án đã có ranh, không thêm bản sao.' : 'Đồ án đã có lớp sử dụng đất, không thêm bản sao.')
+          : '';
+        return res.status(200).json({ success: true, skipped: !!done.skipped, note, slug: done.slug || '' });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không ghi được lớp' });
+      }
+    }
+
+    if (action === 'listChoDuyet' || action === 'previewChoDuyet' || action === 'approveChoDuyet' || action === 'rejectChoDuyet') {
+      requirePostFromApp(req);
+      const user = await requireAdmin(req);
+      checkUrbanEntryRate(req);
+      res.setHeader('Cache-Control', 'private, no-store');
+      const body = readJsonBody(req);
+      if (action === 'listChoDuyet') {
+        const result = await scriptEntry('listChoDuyet', { action: 'listChoDuyet', admin: true, email: user.email });
+        return res.status(200).json({ success: true, rows: Array.isArray(result.rows) ? result.rows : [] });
+      }
+      const id = String(body.id || '');
+      if (!/^[a-f0-9]{32}$/.test(id)) return res.status(400).json({ error: true, message: 'Mã hàng chờ không hợp lệ' });
+      const found = await scriptEntry('getChoDuyet', { action: 'getChoDuyet', admin: true, email: user.email, id });
+      const row = found.row || {};
+      if (row.status !== 'cho_duyet') return res.status(409).json({ error: true, message: 'Hồ sơ đã được xử lý' });
+      if (action === 'previewChoDuyet') {
+        const obj = await choDuyet.readJson(row.gcs);
+        const features = Array.isArray(obj.features) ? obj.features : [];
+        return res.status(200).json({
+          success: true,
+          id,
+          kind: row.kind,
+          summary: row.summary || '',
+          tenQH: row.tenQH || '',
+          unit: row.unit || '',
+          features
+        });
+      }
+      if (action === 'rejectChoDuyet') {
+        const reason = sanitizeSheetText(body.reason, 300);
+        if (!reason) return res.status(400).json({ error: true, message: 'Cần lý do từ chối' });
+        await scriptEntry('setChoDuyet', { action: 'setChoDuyet', admin: true, email: user.email, id, status: 'tu_choi', lyDo: reason });
+        try { await choDuyet.remove(row.gcs); } catch (err) { /* hàng đã đóng */ }
+        return res.status(200).json({ success: true, id, status: 'tu_choi' });
+      }
+      const obj = await choDuyet.readJson(row.gcs);
+      const done = await applyPublication(obj, {
+        projects,
+        callAppsScript: (params, payload) => scriptEntry(params.action, payload),
+        publishKienTruc: (point, email) => publishKienTrucPoint(point, email)
+      });
+      await scriptEntry('setChoDuyet', {
+        action: 'setChoDuyet',
+        admin: true,
+        email: user.email,
+        id,
+        status: 'da_duyet',
+        lyDo: done.note || ''
+      });
+      try { await choDuyet.remove(row.gcs); } catch (err) { /* lớp đã ghi, file chờ xóa sau */ }
+      return res.status(200).json({ success: true, id, status: 'da_duyet', published: !!done.published, skipped: !!done.skipped, note: done.note || '' });
     }
 
     if (action === 'putKienTrucPdf') {

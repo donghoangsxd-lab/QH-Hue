@@ -1,4 +1,5 @@
 // Số cán bộ nhập, chỉ trên trình duyệt. Bảng phân loại đọc kho này, không gọi mạng khi mở.
+import { state } from './state.js';
 import { ENTRY_STORE_KEY, OFFICER_STORE_KEY } from './urbanEntrySchema.js';
 
 function memory() {
@@ -77,7 +78,7 @@ export function writeOfficer(officer) {
 }
 
 export function officerCanEdit(unitKey) {
-  const lock = readOfficer().unitKey;
-  if (!lock) return true;
-  return lock === unitKey;
+  if (state.currentUserRole === 'ADMIN' && state.authToken) return true;
+  if (!state.authToken || !Array.isArray(state.entryUnits)) return false;
+  return state.entryUnits.includes(unitKey);
 }

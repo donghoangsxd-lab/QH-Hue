@@ -101,6 +101,7 @@ import { initBasemapUi } from './basemap.js';
 import { hasSharedCamera, initViewLink } from './viewLink.js';
 import { applyQhClassification } from './qhClass.js';
 import { initQhReview } from './qhReview.js';
+import { initReviewQueue } from './reviewQueue.js';
 import { PROOF_FOCUS_EVENT } from './csdProof.js';
 
 const CITY_NAME = "Thành phố Huế";
@@ -302,9 +303,11 @@ export async function submitInfraPoint(prefix, extra = {}) {
     const body = { type, nhomHaTang, name, lat, lng, size, phase };
     if (arch && extra.fields) Object.assign(body, extra.fields);
     if (!arch) markDataWritten();
+    const headers = { 'Content-Type': 'application/json' };
+    if (arch && state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
     const res = await fetch(geeApi(`action=${arch ? 'addKienTruc' : 'addPoint'}`), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body)
     });
     const data = await res.json().catch(() => ({}));
@@ -316,7 +319,9 @@ export async function submitInfraPoint(prefix, extra = {}) {
     pointStatus(
       prefix,
       arch
-        ? `Đã lưu công trình${data.id ? ` (mã ${data.id})` : ''}${radiusNote}.`
+        ? (data.staged
+          ? `Đã gửi hàng chờ duyệt${data.id ? ` (mã ${data.id.slice(0, 8)}…)` : ''}. Chưa hiện trên bản đồ.`
+          : `Đã lưu công trình${data.id ? ` (mã ${data.id})` : ''}${radiusNote}.`)
         : `Đã lưu đề xuất${data.id ? ` (mã ${data.id})` : ''}${radiusNote}, chờ quản trị phê duyệt.`,
       'var(--accent-green)'
     );
@@ -624,6 +629,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCustomRoads();
   initPopEdits();
   initQhReview({ onChanged: reloadAfterSheetWrite });
+  initReviewQueue();
   initRoadNetworkLayer();
   initCadastreLayer();
   initGbaLayer();

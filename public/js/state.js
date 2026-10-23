@@ -9,6 +9,8 @@ export const state = {
   // Google ID token của Admin, gửi kèm mỗi thao tác phê duyệt để server kiểm tra lại
   authToken: null,
   authUser: null,
+  // Đơn vị cán bộ được phép gửi. null khi chưa đăng nhập hoặc đang là quản trị (không khóa).
+  entryUnits: null,
 
   // Dữ liệu công trình hạ tầng & Ma trận 40 Phường/Xã
   rawDataList: [],

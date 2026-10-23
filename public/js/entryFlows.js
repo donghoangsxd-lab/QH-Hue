@@ -1,12 +1,12 @@
 // Ba luồng nhập: Hành chính, Quy hoạch và hạ tầng, Kiến trúc.
-// Đọc bản vẽ và xem trước trên máy. Ghi bucket chỉ khi bấm Lưu và đã đăng nhập quản trị, qua endpoint sẵn có.
+// Quản trị ghi thẳng lớp công bố. Cán bộ CanBo gửi hàng chờ. Chưa đăng nhập thì không gửi.
 import { map } from './mapEngine.js';
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml, announceTool } from './utils.js';
 import { SECTORS, FACET_LEVELS, listAreas } from './facetStore.js';
 import { EVAL_URBANS, fieldsForScope, gapRows } from './urbanEntrySchema.js';
-import { readOfficer, writeOfficer, readUnit, writeUnit, replaceAll, officerCanEdit, readAll } from './urbanInputs.js';
+import { readUnit, writeUnit, replaceAll, officerCanEdit, readAll } from './urbanInputs.js';
 import { readDrawingFile, tagFeatures, asCollection, DRAW_MAX_BYTES } from './drawingReaders.js';
 import { putSignedPdf, PDF_INLINE_MAX_BYTES } from './pdfLimits.js';
 
@@ -77,6 +77,16 @@ SECTORS.forEach(s => {
 });
 
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
+const PUBLISH_KIND = { ranh: 'ranh-gioi', 'dat-ht': 'hien-trang', 'dat-qh': 'su-dung-dat' };
+
+function allowedKeys() {
+  if (isAdmin()) return null;
+  return Array.isArray(state.entryUnits) ? state.entryUnits : [];
+}
+
+function signedIn() {
+  return isAdmin() || (Array.isArray(state.entryUnits) && !!state.authToken);
+}
 
 function clearPreview() {
   if (preview && map) map.removeLayer(preview);
@@ -113,13 +123,9 @@ function unitKeyOf(type, code) {
   return `${type}:${code}`;
 }
 
-function lockKey() {
-  return readOfficer().unitKey || '';
-}
-
 function optionsHtml(type, selected) {
-  const lock = lockKey();
-  return areasOf(type).filter(a => !lock || unitKeyOf(a.type, a.code) === lock).map(a => {
+  const allow = allowedKeys();
+  return areasOf(type).filter(a => !allow || allow.includes(unitKeyOf(a.type, a.code))).map(a => {
     const key = unitKeyOf(a.type, a.code);
     return `<option value="${escapeHtml(key)}"${key === selected ? ' selected' : ''}>${escapeHtml(a.name)}</option>`;
   }).join('');
@@ -134,29 +140,20 @@ function selectedArea(scopeId, unitId) {
 }
 
 function officerBar() {
-  const off = readOfficer();
-  const units = [{ value: '', label: 'Chưa khóa — xem mọi đơn vị' }];
-  units.push({ value: 'tp:TP', label: 'Thành phố Huế' });
-  listAreas('dothi').forEach(a => units.push({ value: `dothi:${a.code}`, label: a.name }));
-  listAreas('xa').forEach(a => units.push({ value: `xa:${a.code}`, label: a.name }));
-  const opts = units.map(u => `<option value="${escapeHtml(u.value)}"${u.value === off.unitKey ? ' selected' : ''}>${escapeHtml(u.label)}</option>`).join('');
-  return `<div class="entry-officer">
-    <label for="entryOfficerName">Cán bộ<input id="entryOfficerName" maxlength="80" placeholder="Họ tên" value="${escapeHtml(off.name)}"></label>
-    <label for="entryOfficerUnit">Khóa đơn vị<select id="entryOfficerUnit">${opts}</select></label>
-    <p class="entry-note">Khóa chỉ có hiệu lực trên trình duyệt này. Máy chủ chưa kiểm tra người gửi. Cách gắn email nằm ở báo cáo số liệu thiếu.</p>
-  </div>`;
+  if (isAdmin()) {
+    return `<p class="entry-note">Đang đăng nhập quản trị. Chỉ tiêu, công trình và bản vẽ ghi thẳng bản công bố. Đồ án đã có lớp sử dụng đất hoặc ranh thì không thêm bản sao.</p>`;
+  }
+  if (signedIn()) {
+    const who = state.authUser && (state.authUser.name || state.authUser.email) || '';
+    return `<p class="entry-note">Cán bộ ${escapeHtml(who)}. Danh sách đơn vị lấy từ tab CanBo. Bản gửi vào hàng chờ, chưa hiện trên bản đồ công khai.</p>`;
+  }
+  return `<p class="entry-note">Đăng nhập Google. Email có trong tab CanBo và Trạng thái TRUE mới gửi được, đúng đơn vị được giao. Quản trị không bị khóa đơn vị.</p>`;
 }
 
 function paintOfficer() {
   const box = $('entryOfficer');
   if (!box) return;
   box.innerHTML = officerBar();
-  $('entryOfficerName')?.addEventListener('change', saveOfficer);
-  $('entryOfficerUnit')?.addEventListener('change', () => { saveOfficer(); renderHanhChinh(); renderKienTruc(); });
-}
-
-function saveOfficer() {
-  writeOfficer({ name: $('entryOfficerName')?.value || '', unitKey: $('entryOfficerUnit')?.value || '' });
 }
 
 function scopeOfKey(key) {
@@ -169,27 +166,28 @@ function scopeOfKey(key) {
 function renderHanhChinh() {
   const root = $('flowHanhChinh');
   if (!root) return;
-  const lock = lockKey();
-  const scope = lock ? scopeOfKey(lock) : ($('hcScope')?.value || 'dothi');
-  const unit = lock || $('hcUnit')?.value || optionsFirst(scope);
+  const allow = allowedKeys();
+  const locked = Array.isArray(allow) && allow.length === 1;
+  const scope = locked ? scopeOfKey(allow[0]) : ($('hcScope')?.value || 'dothi');
+  const unit = locked ? allow[0] : ($('hcUnit')?.value || optionsFirst(scope));
   const partial = EVAL_URBANS.find(u => u.key === unit && u.partial);
-  const known = EVAL_URBANS.some(u => u.key === unit) || unit.startsWith('xa:') || unit === 'tp:TP';
+  const known = !unit || EVAL_URBANS.some(u => u.key === unit) || unit.startsWith('xa:') || unit === 'tp:TP';
   const fields = fieldsForScope(scope === 'tp' ? 'tp' : scope === 'xa' ? 'xa' : 'dothi');
   const saved = readUnit(unit) || {};
   const inputs = fields.map(f => fieldHtml(f, saved[f.key] || '')).join('');
   const miss = missHtml(unit);
-  root.innerHTML = `<p class="entry-note">Nhập chỉ tiêu dùng khi chấm phân loại, nâng cấp đô thị. Dân số và diện tích cả phường đã có trong bảng thống kê; ô dưới để đính chính. Sáu đô thị mới chưa có ranh thì nhập dân số và diện tích của phần đô thị, không nhập cả xã.</p>
+  root.innerHTML = `<p class="entry-note">Nhập chỉ tiêu dùng khi chấm phân loại, nâng cấp đô thị. Dân số và diện tích cả phường đã có trong bảng thống kê; ô dưới để đính chính. Đô thị một phần xã: nhập phần trong ranh hiện trạng, không nhập cả xã.</p>
     <div class="form-grid">
       <label for="hcScope">Cấp</label>
-      <select id="hcScope"${lock ? ' disabled' : ''}>
+      <select id="hcScope"${locked ? ' disabled' : ''}>
         <option value="tp"${scope === 'tp' ? ' selected' : ''}>Thành phố</option>
         <option value="dothi"${scope === 'dothi' ? ' selected' : ''}>Đô thị</option>
         <option value="xa"${scope === 'xa' ? ' selected' : ''}>Xã, phường</option>
       </select>
       <label for="hcUnit">Đơn vị</label>
-      <select id="hcUnit"${lock ? ' disabled' : ''}>${optionsHtml(scope, unit)}</select>
+      <select id="hcUnit"${locked ? ' disabled' : ''}>${optionsHtml(scope, unit)}</select>
     </div>
-    ${partial ? `<p class="entry-note">Đô thị này là một phần xã ${escapeHtml(partial.partial)}. Chưa có ranh riêng trong webapp.</p>` : ''}
+    ${partial ? `<p class="entry-note">Đô thị này là một phần xã ${escapeHtml(partial.partial)}. Dân số ước theo ranh hiện trạng; ô dân số để đính chính.</p>` : ''}
     ${!known ? '<p class="entry-note">Đơn vị này không thuộc 16 đô thị của Quyết định 756. Số vẫn lưu; bảng chấm hiện chỉ đọc 16 đô thị đó và các xã, phường.</p>' : ''}
     <div class="form-grid">${inputs}</div>
     <button type="button" class="btn-submit" id="hcSave">Lưu trên máy và gửi bảng</button>
@@ -203,11 +201,10 @@ function renderHanhChinh() {
 }
 
 function optionsFirst(scope) {
-  const lock = lockKey();
-  if (lock) return lock;
-  const list = areasOf(scope);
+  const allow = allowedKeys();
+  const list = areasOf(scope).filter(a => !allow || allow.includes(unitKeyOf(a.type, a.code)));
   const first = list[0];
-  return first ? unitKeyOf(first.type, first.code) : 'tp:TP';
+  return first ? unitKeyOf(first.type, first.code) : '';
 }
 
 function fieldHtml(f, value) {
@@ -253,17 +250,17 @@ async function saveHanhChinh() {
   const status = $('hcStatus');
   const unit = $('hcUnit')?.value || '';
   if (!officerCanEdit(unit)) {
-    if (status) status.textContent = 'Đơn vị này nằm ngoài phạm vi được khóa.';
+    if (status) status.textContent = 'Đăng nhập cán bộ hoặc quản trị, đúng đơn vị được giao.';
     return;
   }
   const fields = collectFields($('flowHanhChinh'));
-  const officer = readOfficer().name;
+  const officer = (state.authUser && (state.authUser.name || state.authUser.email)) || '';
   writeUnit(unit, fields, { officer });
   const [type, code] = unit.split(':');
   const name = areasOf(type === 'tp' ? 'tp' : type).find(a => unitKeyOf(a.type, a.code) === unit)?.name || unit;
   try {
-    await postJson('saveUrbanInputs', { unitKey: unit, unitType: type, unitCode: code, unitName: name, officer, fields });
-    if (status) status.textContent = 'Đã lưu trên máy và gửi bảng chỉ tiêu.';
+    const data = await postJson('saveUrbanInputs', { unitKey: unit, unitType: type, unitCode: code, unitName: name, officer, fields });
+    if (status) status.textContent = data.staged ? 'Đã lưu trên máy và gửi hàng chờ duyệt.' : 'Đã lưu trên máy và ghi bảng chỉ tiêu.';
   } catch (err) {
     if (status) status.textContent = `Đã lưu trên máy. Chưa gửi được bảng: ${err.message}`;
   }
@@ -307,30 +304,31 @@ function hoMeta(step) {
 function renderHoSo() {
   const root = $('hoSoBox');
   if (!root) return;
-  const lock = lockKey();
+  const allow = allowedKeys();
+  const locked = Array.isArray(allow) && allow.length === 1;
   const scheme = $('hoScheme')?.value || '';
   const level = $('hoLevel')?.value || 'QHPK';
-  const scope = lock ? scopeOfKey(lock) : ($('hoScope')?.value || 'xa');
-  const unit = lock || $('hoUnit')?.value || optionsFirst(scope);
+  const scope = locked ? scopeOfKey(allow[0]) : ($('hoScope')?.value || 'xa');
+  const unit = locked ? allow[0] : ($('hoUnit')?.value || optionsFirst(scope));
   const nav = STEPS.map((s, i) => {
     const done = held[s.id] && !held[s.id].error && (held[s.id].file || held[s.id].features);
     return `<button type="button" class="entry-step-btn${s.id === stepId ? ' on' : ''}" data-step="${s.id}">${i + 1}. ${escapeHtml(s.label)}${done ? ' · có file' : ''}</button>`;
   }).join('');
   const levels = FACET_LEVELS.map(l => `<option value="${l.id}"${l.id === level ? ' selected' : ''}>${escapeHtml(l.label)}</option>`).join('');
-  root.innerHTML = `<p class="entry-note">Một đồ án, hai nhóm hồ sơ: quy hoạch sử dụng đất và bảy ngành hạ tầng. Xem trên bản đồ trước khi lưu. Lớp sử dụng đất có sẵn không bị thêm bản sao trên catalog.</p>
+  root.innerHTML = `<p class="entry-note">Một đồ án, hai nhóm hồ sơ: quy hoạch sử dụng đất và bảy ngành hạ tầng. Quản trị: sử dụng đất và ranh thành lớp ngay, trừ đồ án đã có lớp đó. Cán bộ: gửi hàng chờ.</p>
     <div class="form-grid">
       <label for="hoScheme">Đồ án</label>
       <input id="hoScheme" maxlength="120" placeholder="Tên đồ án đã có trên bucket" value="${escapeHtml(scheme)}">
       <label for="hoLevel">Cấp</label>
       <select id="hoLevel">${levels}</select>
       <label for="hoScope">Đơn vị</label>
-      <select id="hoScope"${lock ? ' disabled' : ''}>
+      <select id="hoScope"${locked ? ' disabled' : ''}>
         <option value="tp"${scope === 'tp' ? ' selected' : ''}>Thành phố</option>
         <option value="dothi"${scope === 'dothi' ? ' selected' : ''}>Đô thị</option>
         <option value="xa"${scope === 'xa' ? ' selected' : ''}>Xã, phường</option>
       </select>
       <label for="hoUnit">Phạm vi</label>
-      <select id="hoUnit"${lock ? ' disabled' : ''}>${optionsHtml(scope, unit)}</select>
+      <select id="hoUnit"${locked ? ' disabled' : ''}>${optionsHtml(scope, unit)}</select>
     </div>
     <div class="entry-steps" id="hoNav">${nav}</div>
     <div id="hoActive"></div>
@@ -524,16 +522,41 @@ async function saveHoSo() {
         else if (!isAdmin()) notes.push(`${step.label} giữ trên máy (cần quản trị để ghi bucket)`);
       }
     }
-    if (isAdmin()) {
+    const area = selectedArea('hoScope', 'hoUnit');
+    const unitKey = area ? unitKeyOf(area.type, area.code) : '';
+    if (!officerCanEdit(unitKey)) {
+      notes.push('bản vẽ giữ trên máy — cần đăng nhập đúng đơn vị');
+    } else if (isAdmin()) {
       for (const step of STEPS) {
         const bag = held[step.id];
-        if (!step.role || !bag?.features?.length) continue;
+        if (!bag?.features?.length) continue;
         const rows = netPayload(tagFeatures(bag.features, hoMeta(step)));
-        await postJson('putProjectNet', { tenQH, role: step.role, features: rows });
-        const hidden = step.role.endsWith('-hoso');
-        notes.push(hidden ? `${step.label} (file bucket, chưa bật lớp)` : step.label);
+        const kind = PUBLISH_KIND[step.id];
+        if (kind) {
+          const done = await postJson('publishSchemeDraw', { tenQH, kind, features: rows });
+          notes.push(done.skipped ? `${step.label} (${done.note || 'đã có lớp'})` : step.label);
+        } else if (step.role) {
+          await postJson('putProjectNet', { tenQH, role: step.role, features: rows });
+          notes.push(step.label);
+        }
       }
-    } else if (features.length) notes.push('bản vẽ giữ trên máy');
+    } else {
+      for (const step of STEPS) {
+        const bag = held[step.id];
+        if (!bag?.features?.length) continue;
+        const rows = netPayload(tagFeatures(bag.features, hoMeta(step)));
+        const kind = PUBLISH_KIND[step.id] || 'ban-ve';
+        await postJson('submitChoDuyet', {
+          kind,
+          unitKey,
+          tenQH,
+          role: kind === 'ban-ve' ? step.role : '',
+          summary: `${step.label} · ${rows.length} đối tượng`,
+          features: rows
+        });
+        notes.push(`${step.label} (chờ duyệt)`);
+      }
+    }
     if (features.length) downloadHoSo();
     if (status) status.textContent = notes.length ? `Đã xử lý: ${notes.join('; ')}.` : 'Chưa có file hợp lệ.';
   } catch (err) {
@@ -544,19 +567,20 @@ async function saveHoSo() {
 function renderKienTruc() {
   const root = $('flowKienTruc');
   if (!root) return;
-  const lock = lockKey();
-  const scope = lock ? scopeOfKey(lock) : ($('ktScope')?.value || 'xa');
-  const unit = lock || $('ktUnit')?.value || optionsFirst(scope);
+  const allow = allowedKeys();
+  const locked = Array.isArray(allow) && allow.length === 1;
+  const scope = locked ? scopeOfKey(allow[0]) : ($('ktScope')?.value || 'xa');
+  const unit = locked ? allow[0] : ($('ktUnit')?.value || optionsFirst(scope));
   root.innerHTML = `<p class="entry-note">Quy chế quản lý kiến trúc theo phạm vi. Công trình có giá trị dùng cùng mẫu nhập một điểm hạ tầng và ghi tab ${'KienTruc'}.</p>
     <div class="form-grid">
       <label for="ktScope">Cấp</label>
-      <select id="ktScope"${lock ? ' disabled' : ''}>
+      <select id="ktScope"${locked ? ' disabled' : ''}>
         <option value="tp"${scope === 'tp' ? ' selected' : ''}>Thành phố</option>
         <option value="dothi"${scope === 'dothi' ? ' selected' : ''}>Đô thị</option>
         <option value="xa"${scope === 'xa' ? ' selected' : ''}>Xã, phường</option>
       </select>
       <label for="ktUnit">Đơn vị</label>
-      <select id="ktUnit"${lock ? ' disabled' : ''}>${optionsHtml(scope, unit)}</select>
+      <select id="ktUnit"${locked ? ' disabled' : ''}>${optionsHtml(scope, unit)}</select>
     </div>
     <label class="cad-drop" for="ktPdf">
       <span class="cad-drop-main"><b>Quy chế quản lý kiến trúc</b></span>
@@ -620,9 +644,9 @@ function renderKienTruc() {
   $('ktPdfSave')?.addEventListener('click', saveKtPdf);
   $('ktSubmit')?.addEventListener('click', async () => {
     const area = selectedArea('ktScope', 'ktUnit');
-    if (area && !officerCanEdit(unitKeyOf(area.type, area.code))) {
+    if (!area || !officerCanEdit(unitKeyOf(area.type, area.code))) {
       const st = $('ktStatus');
-      if (st) st.textContent = 'Đơn vị này nằm ngoài phạm vi được khóa.';
+      if (st) st.textContent = 'Đăng nhập cán bộ hoặc quản trị, đúng đơn vị được giao.';
       return;
     }
     await submitInfraPoint('kt', {
@@ -646,7 +670,7 @@ async function saveKtPdf() {
     return;
   }
   if (!area || !officerCanEdit(unitKeyOf(area.type, area.code))) {
-    if (note) note.textContent = 'Đơn vị này nằm ngoài phạm vi được khóa.';
+    if (note) note.textContent = 'Đăng nhập cán bộ hoặc quản trị, đúng đơn vị được giao.';
     return;
   }
   if (!isAdmin()) {
@@ -694,6 +718,12 @@ export function initEntryFlows(hooks = {}) {
   renderHanhChinh();
   renderHoSo();
   renderKienTruc();
+  document.addEventListener('auth:change', () => {
+    paintOfficer();
+    renderHanhChinh();
+    renderHoSo();
+    renderKienTruc();
+  });
   $('entryFlows')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-flow]');
     if (!btn) return;
