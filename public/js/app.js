@@ -1228,6 +1228,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btnPrintA3')?.addEventListener('click', exportMapA3);
   initChuyenNganh();
   initViewLink();
+  // Liên kết ?nganh= / ?truc= chỉ chọn panel, không mở khung. Nút thu/mở là cách mở duy nhất lúc tải trang.
+  document.body.classList.add('right-collapsed');
 
   // ---------- Nạp dữ liệu ban đầu ----------
   const progressBar = document.getElementById('progressBar');
