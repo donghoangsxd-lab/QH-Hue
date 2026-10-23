@@ -1,0 +1,210 @@
+{
+  "tam_thoi": true,
+  "rule": [
+    "Giữ đối tượng của đồ án chi tiết hơn (mẫu số tỷ lệ nhỏ hơn).",
+    "Đồ án không ghi tỷ lệ xếp như 1/5.000.",
+    "Cùng tỷ lệ thì năm phê duyệt mới hơn, rồi priority trong schemes.json, rồi slug.",
+    "Trùng điểm: trong 100 m, cùng nhóm.",
+    "Trùng đường: ít nhất 60% điểm mẫu nằm trong 60 m của đường đã giữ, cùng nhóm (đường bộ, đường sắt, đường thủy, mặt cắt, năng lượng không xóa lẫn nhau).",
+    "Cùng một đồ án không tự loại.",
+    "Trong ranh KCN, bỏ đối tượng của đồ án bị ghi đè (Phong Điền), kể cả khi không trùng hình."
+  ],
+  "replace": "Thay public/data/hien-trang-tam/<ngành>.geojson. Lớp giao diện trỏ đúng đường dẫn đó.",
+  "sectors": {
+    "giao-thong": {
+      "file": "data/hien-trang-tam/giao-thong.geojson",
+      "bytes": 2017592,
+      "kept": 280,
+      "lines": 243,
+      "points": 37,
+      "polygons": 0,
+      "droppedDuplicate": 39,
+      "droppedOverride": 0,
+      "byScheme": {
+        "qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1": {
+          "in": 129,
+          "kept": 90,
+          "name": "QHC đô thị Thừa Thiên Huế 1/25.000"
+        },
+        "qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72": {
+          "in": 142,
+          "kept": 142,
+          "name": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000"
+        },
+        "qhc-do-thi-moi-vinh-hung-8899f27b": {
+          "in": 47,
+          "kept": 47,
+          "name": "QHC Đô thị mới Vinh Hưng"
+        },
+        "qhc-khu-cong-nghiep-phong-dien-f997bd2c": {
+          "in": 1,
+          "kept": 1,
+          "name": "QHC Khu công nghiệp Phong Điền"
+        }
+      },
+      "noHienTrang": [
+        {
+          "slug": "qhc-tt-phu-loc-19e96a86",
+          "name": "QHC TT Phú Lộc",
+          "mapid": 20674
+        },
+        {
+          "slug": "qhc-khe-tre-4a4803cd",
+          "name": "QHC Khe Tre",
+          "mapid": 20778
+        },
+        {
+          "slug": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+          "name": "QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045",
+          "mapid": null
+        },
+        {
+          "slug": "qhc-chan-may-lang-co-a44cfad0",
+          "name": "QHC Chân Mây - Lăng Cô",
+          "mapid": 23935
+        }
+      ],
+      "wardsWithData": 34,
+      "wardsEmpty": [
+        "Xã A Lưới 5",
+        "Xã Phú Vinh",
+        "Xã A Lưới 1",
+        "Xã Phú Hồ",
+        "Xã Nam Đông",
+        "Xã A Lưới 3"
+      ],
+      "outsideWard": 15
+    },
+    "cap-dien": {
+      "file": "data/hien-trang-tam/cap-dien.geojson",
+      "bytes": 483097,
+      "kept": 286,
+      "lines": 235,
+      "points": 51,
+      "polygons": 0,
+      "droppedDuplicate": 18,
+      "droppedOverride": 0,
+      "byScheme": {
+        "qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1": {
+          "in": 68,
+          "kept": 50,
+          "name": "QHC đô thị Thừa Thiên Huế 1/25.000"
+        },
+        "qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72": {
+          "in": 204,
+          "kept": 204,
+          "name": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000"
+        },
+        "qhc-do-thi-moi-vinh-hung-8899f27b": {
+          "in": 25,
+          "kept": 25,
+          "name": "QHC Đô thị mới Vinh Hưng"
+        },
+        "qhc-khu-cong-nghiep-phong-dien-f997bd2c": {
+          "in": 7,
+          "kept": 7,
+          "name": "QHC Khu công nghiệp Phong Điền"
+        }
+      },
+      "noHienTrang": [
+        {
+          "slug": "qhc-tt-phu-loc-19e96a86",
+          "name": "QHC TT Phú Lộc",
+          "mapid": 20674
+        },
+        {
+          "slug": "qhc-khe-tre-4a4803cd",
+          "name": "QHC Khe Tre",
+          "mapid": 20778
+        },
+        {
+          "slug": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+          "name": "QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045",
+          "mapid": null
+        },
+        {
+          "slug": "qhc-chan-may-lang-co-a44cfad0",
+          "name": "QHC Chân Mây - Lăng Cô",
+          "mapid": 23935
+        }
+      ],
+      "wardsWithData": 27,
+      "wardsEmpty": [
+        "Xã Long Quảng",
+        "Xã Đan Điền",
+        "Xã Khe Tre",
+        "Xã Phú Vang",
+        "Xã Phú Hồ",
+        "Phường Phong Quảng",
+        "Xã Lộc An",
+        "Xã Nam Đông",
+        "Phường Phong Dinh",
+        "Xã A Lưới 2",
+        "Xã Phú Lộc",
+        "Xã Quảng Điền",
+        "Xã A Lưới 3"
+      ],
+      "outsideWard": 0
+    },
+    "cap-nuoc": {
+      "file": "data/hien-trang-tam/cap-nuoc.geojson",
+      "bytes": 982147,
+      "kept": 632,
+      "lines": 610,
+      "points": 22,
+      "polygons": 0,
+      "droppedDuplicate": 194,
+      "droppedOverride": 0,
+      "byScheme": {
+        "qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1": {
+          "in": 505,
+          "kept": 311,
+          "name": "QHC đô thị Thừa Thiên Huế 1/25.000"
+        },
+        "qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72": {
+          "in": 318,
+          "kept": 318,
+          "name": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000"
+        },
+        "qhc-do-thi-moi-vinh-hung-8899f27b": {
+          "in": 3,
+          "kept": 3,
+          "name": "QHC Đô thị mới Vinh Hưng"
+        }
+      },
+      "noHienTrang": [
+        {
+          "slug": "qhc-tt-phu-loc-19e96a86",
+          "name": "QHC TT Phú Lộc",
+          "mapid": 20674
+        },
+        {
+          "slug": "qhc-khe-tre-4a4803cd",
+          "name": "QHC Khe Tre",
+          "mapid": 20778
+        },
+        {
+          "slug": "qhc-khu-cong-nghiep-phong-dien-f997bd2c",
+          "name": "QHC Khu công nghiệp Phong Điền",
+          "mapid": 22880
+        },
+        {
+          "slug": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+          "name": "QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045",
+          "mapid": null
+        },
+        {
+          "slug": "qhc-chan-may-lang-co-a44cfad0",
+          "name": "QHC Chân Mây - Lăng Cô",
+          "mapid": 23935
+        }
+      ],
+      "wardsWithData": 38,
+      "wardsEmpty": [
+        "Xã A Lưới 5",
+        "Xã A Lưới 4"
+      ],
+      "outsideWard": 0
+    }
+  }
+}

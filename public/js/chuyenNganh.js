@@ -6,12 +6,13 @@ import { getLevel, setLevel } from './mapLevel.js';
 import { state } from './state.js';
 import { escapeHtml, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
 import { withAssetVersion } from './gbaVersion.js';
+import { toFeatureCollection } from './geoDoc.js';
 import { GP_SCOPE_EVENT, URBAN_FOCUS_EVENT } from './generalPlan.js';
 import { ROAD_CLASSES, RAIL_KINDS, ROAD_STAGES } from './qhcRoads.js';
 import {
   AXES, AREA_TP, SECTORS, FACET_LEVELS, listAreas, areaLabel, formatKv, parseKv, getLayers,
   getAreaFilter, isLayerOn, setLayerFlag, layerPassesFilter, noteUrbanFocus, setBrowseState,
-  setAreaFilter, readFacetUrl, loadFacetCatalog, onFacet, schemesAt, layersFor, baseLayers, browseState
+  setAreaFilter, readFacetUrl, loadFacetCatalog, onFacet, schemesAt, schemesForSector, layersFor, baseLayers, browseState
 } from './facetStore.js';
 
 const STORE_KEY = 'qh_axes_v1';
@@ -44,9 +45,18 @@ const DOCK_ICON = {
   kientruc: '<path d="M3 20h18M5 20V9l7-5 7 5v11"/><path d="M9 20v-5h6v5"/>'
 };
 
+const NHOM_COLOR = {
+  'duong-sat': '#b45309',
+  'duong-thuy': '#0f766e',
+  'mat-cat': '#64748b',
+  'nang-luong': '#ea580c'
+};
 const fileCache = new Map();
 const drawn = new Map();
-const openSchemes = new Set(['qhc-hue-2045', 'qhc-trung-tam']);
+const openSchemes = new Set([
+  'qhc-hue-2045', 'qhc-trung-tam', 'qhc-khe-tre', 'qhc-chan-may',
+  'qhc-tt-phu-loc-19e96a86', 'qhc-do-thi-moi-vinh-hung-8899f27b', 'qhc-khu-cong-nghiep-phong-dien-f997bd2c'
+]);
 let areaQuery = '';
 let applying = false;
 let booted = false;
@@ -75,10 +85,35 @@ function loadFile(file) {
   if (!fileCache.has(file)) {
     fileCache.set(file, fetch(withAssetVersion(file)).then(res => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
+      return res.json().then(toFeatureCollection);
     }).catch(err => { fileCache.delete(file); throw err; }));
   }
   return fileCache.get(file);
+}
+
+function featureColor(layer, props) {
+  return NHOM_COLOR[props && props.nhom] || SECTOR_COLOR[layer.sector] || '#94a3b8';
+}
+
+function featureTitle(props, layer) {
+  return props.tencongtrinh || props.tendoituong || props.tenduong || props.ten || props.name || layer.name;
+}
+
+function popupHtml(layer, props) {
+  const title = featureTitle(props, layer);
+  const bits = [];
+  if (props.loai) bits.push(props.loai);
+  if (props.capDuong) bits.push(props.capDuong);
+  if (props.loGioi) bits.push(`lộ giới ${props.loGioi}`);
+  if (props.matCat) bits.push(`mặt cắt ${props.matCat}`);
+  let html = `<b>${escapeHtml(String(title || layer.name))}</b>`;
+  if (bits.length) html += `<br>${escapeHtml(bits.join(' · '))}`;
+  if (props.tam_thoi) {
+    const scale = props.nguon_ty_le ? `1/${Number(props.nguon_ty_le).toLocaleString('vi-VN')}` : '';
+    const src = [props.nguon_ten || props.nguon_do_an, props.nguon_nam, scale].filter(Boolean);
+    html += `<br><small>Tạm thời. Nguồn: ${escapeHtml(src.join(' · ') || 'không rõ đồ án')}</small>`;
+  } else if (!bits.length) html += `<br>${escapeHtml(layer.name)}`;
+  return html;
 }
 
 async function showFile(layer, frame) {
@@ -86,15 +121,28 @@ async function showFile(layer, frame) {
   const fc = await loadFile(layer.file);
   if (!isLayerOn(layer.id)) return;
   clearDrawn(layer.id);
-  const color = SECTOR_COLOR[layer.sector] || '#94a3b8';
   const dash = layer.kind === 'quy-hoach' ? '8 6' : null;
   const groups = hosts().map(m => L.geoJSON(fc, {
-    style: { color, weight: 2.4, opacity: 0.95, dashArray: dash, fillOpacity: 0.25 },
-    pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 4, color, weight: 1, fillColor: color, fillOpacity: 0.85 }),
+    style: (f) => {
+      const props = f.properties || {};
+      const color = featureColor(layer, props);
+      const polygon = /Polygon/.test(f.geometry && f.geometry.type || '');
+      return {
+        color, weight: props.nhom === 'mat-cat' ? 1.5 : 2.6, opacity: 0.95, dashArray: dash,
+        fillColor: color, fillOpacity: polygon ? 0.18 : 0
+      };
+    },
+    pointToLayer: (f, latlng) => {
+      const color = featureColor(layer, f.properties || {});
+      return L.circleMarker(latlng, { radius: 5, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 0.95 });
+    },
     onEachFeature: (f, l) => {
       const props = f.properties || {};
-      const title = props.tencongtrinh || props.tendoituong || props.name || props.ten || layer.name;
-      l.bindPopup(`<b>${escapeHtml(String(title))}</b><br>${escapeHtml(layer.name)}`);
+      if (props.tam_thoi) {
+        const src = props.nguon_ten || props.nguon_do_an || 'đồ án';
+        l.bindTooltip(`Nguồn: ${src}`, { sticky: true, opacity: 0.95 });
+      }
+      l.bindPopup(popupHtml(layer, props));
     }
   }).addTo(m));
   drawn.set(layer.id, groups);
@@ -209,7 +257,7 @@ function schemeBlock(sector, levelId, scheme) {
   }).join('');
   return `<div class="cn-scheme${has ? '' : ' is-missing'}">
     <div class="cn-scheme-row">
-      <label><input type="checkbox" data-cn-scheme="${escapeHtml(scheme.slug)}"${on ? ' checked' : ''}${has ? '' : ' disabled'}${some && !on ? ' data-mixed="1"' : ''}><span>${escapeHtml(scheme.name)}</span></label>
+      <label><input type="checkbox" data-cn-scheme="${escapeHtml(scheme.slug)}" data-cn-level="${escapeHtml(levelId)}"${on ? ' checked' : ''}${has ? '' : ' disabled'}${some && !on ? ' data-mixed="1"' : ''}><span>${escapeHtml(scheme.name)}</span></label>
       <b class="cn-badge ${has ? 'is-on' : 'is-off'}">${has ? 'Có dữ liệu' : 'Chưa có'}</b>
       ${has ? `<button type="button" class="cn-fold" data-cn-fold="${escapeHtml(scheme.slug)}" aria-expanded="${open}">${ico(open ? 'chev-down' : 'chev-right')}</button>` : ''}
     </div>
@@ -224,8 +272,8 @@ function paintHaTang() {
   const pane = document.getElementById('layerPanePlan');
   const top = pane ? pane.scrollTop : 0;
   const catalog = state.projectCatalog || [];
-  const schemes = schemesAt(level, catalog);
-  const listed = schemes.flatMap(s => layersFor(sector, level, s.slug));
+  const schemes = schemesForSector(sector, level, catalog);
+  const listed = schemes.flatMap(s => layersFor(sector, s.level, s.slug));
   const allOn = listed.length > 0 && listed.every(l => isLayerOn(l.id));
   box.innerHTML = `<div class="cn-sectors" role="tablist" aria-label="Hạ tầng">${SECTORS.map(s => `<button type="button" class="cn-sector${s.id === sector ? ' active' : ''}" role="tab" data-cn-sector="${s.id}" aria-selected="${s.id === sector}" title="${escapeHtml(s.label)}">${icon(s.id)}<span>${escapeHtml(s.label)}</span></button>`).join('')}</div>
     <div class="cn-tools">
@@ -235,7 +283,7 @@ function paintHaTang() {
     </div>
     ${scopeHtml()}
     ${legendHtml(sector)}
-    <div class="cn-schemes">${schemes.length ? schemes.map(s => schemeBlock(sector, level, s)).join('') : '<p class="cn-empty">Chưa có đồ án ở cấp này.</p>'}</div>`;
+    <div class="cn-schemes">${schemes.length ? schemes.map(s => schemeBlock(sector, s.level, s)).join('') : '<p class="cn-empty">Chưa có đồ án ở cấp này.</p>'}</div>`;
   box.querySelectorAll('[data-mixed="1"]').forEach(el => { el.indeterminate = true; });
   if (pane) pane.scrollTop = top;
 }
@@ -245,7 +293,7 @@ function paintBase(axisId, hostId, sector) {
   if (!host) return;
   const rows = baseLayers({ axis: axisId, sector, filter: true });
   if (!rows.length) { host.innerHTML = ''; return; }
-  host.innerHTML = `<h3 class="axis-base-title">Dữ liệu hiện trạng</h3>${rows.map(l => `<label class="cn-layer"><input type="checkbox" data-cn-layer="${escapeHtml(l.id)}"${isLayerOn(l.id) ? ' checked' : ''}><span>${escapeHtml(l.name)}</span></label>`).join('')}`;
+  host.innerHTML = `<h3 class="axis-base-title">Dữ liệu hiện trạng</h3>${rows.map(l => `<label class="cn-layer"${l.hint ? ` title="${escapeHtml(l.hint)}"` : ''}><input type="checkbox" data-cn-layer="${escapeHtml(l.id)}"${isLayerOn(l.id) ? ' checked' : ''}><span>${escapeHtml(l.name)}</span></label>`).join('')}`;
 }
 
 function paintAdmin() {
@@ -476,7 +524,7 @@ export function initChuyenNganh() {
     }
     if (e.target.closest('[data-cn-all]')) {
       const { sector, level } = browseState();
-      const listed = schemesAt(level, state.projectCatalog || []).flatMap(s => layersFor(sector, level, s.slug));
+      const listed = schemesForSector(sector, level, state.projectCatalog || []).flatMap(s => layersFor(sector, s.level, s.slug));
       const turnOn = listed.some(l => !isLayerOn(l.id));
       listed.forEach(l => setLayerOn(l, turnOn));
     }
@@ -488,10 +536,11 @@ export function initChuyenNganh() {
       if (layer) setLayerOn(layer, e.target.checked, { frame: e.target.checked && !layer.bind });
       return;
     }
-    const slug = e.target.closest('[data-cn-scheme]')?.dataset.cnScheme;
+    const schemeEl = e.target.closest('[data-cn-scheme]');
+    const slug = schemeEl?.dataset.cnScheme;
     if (!slug) return;
     const { sector, level } = browseState();
-    const rows = layersFor(sector, level, slug);
+    const rows = layersFor(sector, schemeEl.dataset.cnLevel || level, slug);
     if (e.target.checked) openSchemes.add(slug);
     rows.forEach(l => setLayerOn(l, e.target.checked));
   });

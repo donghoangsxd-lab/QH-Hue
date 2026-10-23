@@ -184,6 +184,22 @@ function areaForScale(scale) {
 }
 
 let seq = 0;
+const schemeBySlug = new Map();
+
+export function setSchemeCatalog(doc) {
+  schemeBySlug.clear();
+  const list = doc && Array.isArray(doc.schemes) ? doc.schemes : [];
+  list.forEach(row => {
+    if (!row || !row.slug) return;
+    schemeBySlug.set(String(row.slug), row);
+    if (row.catalogScheme) schemeBySlug.set(String(row.catalogScheme), row);
+  });
+}
+
+function schemeMeta(slug) {
+  return slug ? schemeBySlug.get(String(slug)) : null;
+}
+
 export function normalizeLayer(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const sector = canonicalSector(raw.sector ?? '');
@@ -199,10 +215,13 @@ export function normalizeLayer(raw) {
     if (!level) return null;
     scheme = raw.scheme == null || raw.scheme === '' ? schemeForScale(raw.scale) : String(raw.scheme);
   }
-  const area = normalizeArea(raw.area) || (isBase ? { ...AREA_TP } : areaForScale(raw.scale));
+  const meta = schemeMeta(scheme);
+  if (meta && meta.catalogScheme) scheme = String(meta.catalogScheme);
+  const area = normalizeArea(raw.area) || normalizeArea(meta && meta.area) || (isBase ? { ...AREA_TP } : areaForScale(raw.scale));
   const file = String(raw.file || '').trim();
   const name = String(raw.name || file || sector || 'Lớp');
   const bind = typeof raw.bind === 'string' && /^chk_[\w-]+$/.test(raw.bind) ? raw.bind : '';
+  const hint = String(raw.hint || '').trim();
   const id = String(raw.id || bind || file || `${sector}|${level}|${kind}|${scheme}|${seq++}`);
   const featureCount = Number.isFinite(Number(raw.featureCount)) ? Number(raw.featureCount) : null;
   const fields = Array.isArray(raw.fields) ? raw.fields.map(f => String(f)) : [];
@@ -210,7 +229,7 @@ export function normalizeLayer(raw) {
     ? raw.bbox.map(Number) : null;
   const axes = Array.isArray(raw.axes) ? raw.axes.filter(a => AXIS_IDS.has(a)) : null;
   return {
-    id, sector, level, scheme, kind, area, name, bind, file, base: isBase,
+    id, sector, level, scheme, kind, area, name, bind, file, hint, base: isBase,
     axes: axes && axes.length ? axes : null,
     geomType: String(raw.geomType || ''),
     featureCount, fields, bbox
@@ -236,7 +255,25 @@ const BASE = [
   { id: 'base-water', base: true, sector: 'giao-thong', kind: 'hien-trang', name: 'Đường thủy nội địa', bind: 'chk_osmWater', axes: ['hatang'], area: { ...AREA_TP } },
   { id: 'base-cadastre', base: true, sector: '', kind: 'hien-trang', name: 'Thửa đất địa chính 2016', bind: 'chk_cadastre', axes: ['quyhoach'], area: { ...AREA_TP } },
   { id: 'base-gba', base: true, sector: '', kind: 'hien-trang', name: 'Công trình xây dựng (GBA)', bind: 'chk_gba', axes: ['kientruc'], area: { ...AREA_TP } },
-  { id: 'base-violate', base: true, sector: '', kind: 'hien-trang', name: 'Công trình vi phạm', bind: 'chk_violate', axes: ['quyhoach', 'kientruc'], area: { ...AREA_TP } }
+  { id: 'base-violate', base: true, sector: '', kind: 'hien-trang', name: 'Công trình vi phạm', bind: 'chk_violate', axes: ['quyhoach', 'kientruc'], area: { ...AREA_TP } },
+  {
+    id: 'ht-tam-giao-thong', base: true, sector: 'giao-thong', kind: 'hien-trang',
+    name: 'Hiện trạng (tạm thời, tổng hợp từ các đồ án)',
+    hint: 'Tổng hợp tạm thời từ hiện trạng các đồ án. Bấm đối tượng để xem đồ án nguồn.',
+    file: 'data/hien-trang-tam/giao-thong.geojson', geomType: 'LineString', axes: ['hatang'], area: { ...AREA_TP }
+  },
+  {
+    id: 'ht-tam-cap-dien', base: true, sector: 'cap-dien', kind: 'hien-trang',
+    name: 'Hiện trạng (tạm thời, tổng hợp từ các đồ án)',
+    hint: 'Tổng hợp tạm thời từ hiện trạng các đồ án. Bấm đối tượng để xem đồ án nguồn.',
+    file: 'data/hien-trang-tam/cap-dien.geojson', geomType: 'LineString', axes: ['hatang'], area: { ...AREA_TP }
+  },
+  {
+    id: 'ht-tam-cap-nuoc', base: true, sector: 'cap-nuoc', kind: 'hien-trang',
+    name: 'Hiện trạng (tạm thời, tổng hợp từ các đồ án)',
+    hint: 'Tổng hợp tạm thời từ hiện trạng các đồ án. Bấm đối tượng để xem đồ án nguồn.',
+    file: 'data/hien-trang-tam/cap-nuoc.geojson', geomType: 'LineString', axes: ['hatang'], area: { ...AREA_TP }
+  }
 ];
 
 // Chỉ khi manifest 404. Không gộp vào catalog 91 lớp (chk_gt25/chk_gt10 là bộ khác).
@@ -388,20 +425,30 @@ export function replaceLayers(list, source) {
   emit('catalog');
 }
 
+function catalogUrl(file) {
+  return typeof document !== 'undefined'
+    ? new URL(file, document.baseURI).href
+    : file;
+}
+
+async function pullJson(doFetch, file) {
+  if (!doFetch) return null;
+  try {
+    const res = await doFetch(catalogUrl(file));
+    if (!res || !res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
 export async function loadFacetCatalog(fetchImpl) {
   const doFetch = fetchImpl || (typeof fetch === 'function' ? fetch : null);
-  let doc = null;
-  const href = typeof document !== 'undefined'
-    ? new URL('data/chuyen-nganh/index.json', document.baseURI).href
-    : 'data/chuyen-nganh/index.json';
-  if (doFetch) {
-    try {
-      const res = await doFetch(href);
-      if (res && res.ok) doc = await res.json();
-    } catch (e) {
-      doc = null;
-    }
-  }
+  const [doc, schemesDoc] = await Promise.all([
+    pullJson(doFetch, 'data/chuyen-nganh/index.json'),
+    pullJson(doFetch, 'data/chuyen-nganh/schemes.json')
+  ]);
+  setSchemeCatalog(schemesDoc);
   const listed = Array.isArray(doc) ? doc : doc && Array.isArray(doc.layers) ? doc.layers : null;
   const rawLayers = listed ? listed.filter(l => l && !l.ref) : null;
   if (!rawLayers) {
@@ -430,7 +477,9 @@ export function schemesAt(level, catalog = []) {
     add(schemeRow('qhc-trung-tam', 'QHC đô thị TTHuế 2045 (Trung tâm)', level));
     GENERAL_PLANS.forEach(plan => {
       if (plan.city || planProjectOf(plan, catalog)) return;
-      add(schemeRow(`qhc-${plan.id}`, plan.name, level));
+      const slug = `qhc-${plan.id}`;
+      const meta = schemeMeta(slug);
+      add(schemeRow(slug, meta && meta.name || plan.name, level));
     });
   }
   (catalog || []).forEach(p => {
@@ -444,11 +493,39 @@ export function schemesAt(level, catalog = []) {
   layers.forEach(l => {
     if (l.level !== level || !l.scheme) return;
     const slug = SCHEME_ALIAS[l.scheme] || l.scheme;
+    const meta = schemeMeta(slug);
     const project = (catalog || []).find(p => p && p.slug === slug);
-    const name = project ? (namesOfProject(project).tenRutGon || project.tenQH || slug) : slug;
+    const name = project
+      ? (namesOfProject(project).tenRutGon || project.tenQH || slug)
+      : (meta && meta.name) || slug;
     add(schemeRow(slug, name, level));
   });
   return rows;
+}
+
+const CITY_SCHEMES = new Set(['qhc-hue-2045', 'qhc-trung-tam']);
+
+// Đồ án QHC địa phương (Phú Lộc, Khe Tre, Vinh Hưng, KCN, Chân Mây) hiện ở cả hai tab QHC,
+// không chỉ khi đang chọn đúng mức 1/10.000. Phạm vi hành chính vẫn lọc lớp.
+export function schemesForSector(sector, level, catalog = []) {
+  const rows = schemesAt(level, catalog).map(s => ({ ...s }));
+  if (level !== 'QHC25' && level !== 'QHC10') return rows;
+  const seen = new Set(rows.map(s => s.slug));
+  const extras = [];
+  ['QHC25', 'QHC10'].forEach(lv => {
+    schemesAt(lv, catalog).forEach(s => {
+      if (seen.has(s.slug) || CITY_SCHEMES.has(s.slug)) return;
+      if (!layersFor(sector, lv, s.slug, { filter: false }).length) return;
+      seen.add(s.slug);
+      extras.push({ ...s, level: lv, local: true });
+    });
+  });
+  const keep = (s) => {
+    const all = layersFor(sector, s.level, s.slug, { filter: false });
+    if (!all.length) return true;
+    return layersFor(sector, s.level, s.slug).length > 0;
+  };
+  return rows.filter(keep).concat(extras.filter(keep));
 }
 
 export function layersFor(sector, level, scheme, { filter = true } = {}) {

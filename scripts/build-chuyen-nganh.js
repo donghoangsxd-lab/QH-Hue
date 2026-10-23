@@ -40,11 +40,24 @@ const RULES = [
 const SCHEMES = [
   { slug: 'qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1', catalogScheme: 'qhc-hue-2045', name: 'QHC đô thị Thừa Thiên Huế 1/25.000', level: 'QHC', mapid: 21817, scale: 25000, parent: null, overrides: [], priority: 1, gcs: 'add' },
   { slug: 'qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72', catalogScheme: 'qhc-trung-tam', name: 'QHC đô thị trung tâm Thừa Thiên Huế 1/10.000', level: 'QHC', mapid: 21817, scale: 10000, parent: null, overrides: [], priority: 1, gcs: 'add' },
-  { slug: 'qhc-tt-phu-loc-19e96a86', name: 'QHC TT Phú Lộc', level: 'QHC', mapid: 20674, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', taskDecision: '3134/QĐ-UBND', taskDecisionDate: '2019-12-16', decision: '1101/QĐ-UBND', decisionDate: '2020-04-17', authority: 'UBND tỉnh' },
-  { slug: 'qhc-khe-tre-4a4803cd', name: 'QHC Khe Tre', level: 'QHC', mapid: 20778, scale: 2000, parent: null, overrides: [], priority: 1, gcs: 'exists', taskDecision: '1022/QĐ-UBND', taskDecisionDate: '2016-05-16', decision: '688/QĐ-UBND', decisionDate: '2020-03-13' },
-  { slug: 'qhc-do-thi-moi-vinh-hung-8899f27b', name: 'QHC Đô thị mới Vinh Hưng', level: 'QHC', mapid: 22906, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', decision: '193/QĐ-UBND', decisionDate: '2025-01-21', authority: 'UBND thành phố Huế' },
-  { slug: KCN, name: 'QHC Khu công nghiệp Phong Điền', level: 'QHC', mapid: 22880, scale: null, parent: PHONG_DIEN, overrides: [PHONG_DIEN], overrideArea: 'ranh KCN', priority: 2, gcs: 'add' },
-  { slug: PHONG_DIEN, name: 'QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045', level: 'QHC', mapid: null, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', skipLayers: true }
+  { slug: 'qhc-tt-phu-loc-19e96a86', name: 'QHC TT Phú Lộc', level: 'QHC', mapid: 20674, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', area: { type: 'xa', code: 'phu-loc' }, taskDecision: '3134/QĐ-UBND', taskDecisionDate: '2019-12-16', decision: '1101/QĐ-UBND', decisionDate: '2020-04-17', authority: 'UBND tỉnh' },
+  { slug: 'qhc-khe-tre-4a4803cd', name: 'QHC Khe Tre', level: 'QHC', mapid: 20778, scale: 2000, parent: null, overrides: [], priority: 1, gcs: 'exists', catalogScheme: 'qhc-khe-tre', area: { type: 'dothi', code: 'khe-tre' }, taskDecision: '1022/QĐ-UBND', taskDecisionDate: '2016-05-16', decision: '688/QĐ-UBND', decisionDate: '2020-03-13' },
+  { slug: 'qhc-do-thi-moi-vinh-hung-8899f27b', name: 'QHC Đô thị mới Vinh Hưng', level: 'QHC', mapid: 22906, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', area: { type: 'xa', code: 'vinh-loc' }, decision: '193/QĐ-UBND', decisionDate: '2025-01-21', authority: 'UBND thành phố Huế' },
+  { slug: KCN, name: 'QHC Khu công nghiệp Phong Điền', level: 'QHC', mapid: 22880, scale: null, parent: PHONG_DIEN, overrides: [PHONG_DIEN], overrideArea: 'ranh KCN', priority: 2, gcs: 'add', area: { type: 'dothi', code: 'phong-dien' }, boundaryFile: `data/chuyen-nganh/${KCN}/sdd/quy-hoach/ranh-gioi-quy-hoach-a.geojson` },
+  { slug: PHONG_DIEN, name: 'QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045', level: 'QHC', mapid: null, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', skipLayers: true },
+  { slug: 'qhc-chan-may-lang-co-a44cfad0', name: 'QHC Chân Mây - Lăng Cô', level: 'QHC', mapid: 23935, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', catalogScheme: 'qhc-chan-may', area: { type: 'dothi', code: 'chan-may' } }
+];
+
+// Không có thư mục LOP. Bản vẽ mạng lưới đã nằm trên GCS (đồ án), chỉ ngành giao thông, quy hoạch.
+const EXTERNAL_LAYERS = [
+  {
+    sector: 'giao-thong', scale: null, status: 'quy-hoach', scheme: 'qhc-chan-may-lang-co-a44cfad0', level: 'QHC',
+    name: 'Quy hoạch giao thông', geomType: 'Mixed', featureCount: 773,
+    fields: ['ten', 'loai', 'capDuong', 'loGioi', 'matCat'],
+    file: 'https://storage.googleapis.com/hue-infra-data-us/projects/qhc-chan-may-lang-co-a44cfad0/qh-giao-thong.json',
+    bbox: [107.799193, 16.158494, 108.202886, 16.377232],
+    area: { type: 'dothi', code: 'chan-may' }, mapid: 23935
+  }
 ];
 
 // Nhóm quy hoạch 21817 chưa nằm trong thư mục LOP đã tải (chỉ có hạ tầng + hiện trạng sử dụng đất).
@@ -117,7 +130,9 @@ function retargetManifest(doc, indexDoc) {
     const storage = layer.scheme;
     const catalog = alias[storage] || storage;
     const fromFile = rawSlug(layer);
-    if (landUseName(layer.name) && (alias[storage] || fromFile)) return;
+    // Chỉ đồ án 21817 bỏ lớp sử dụng đất thô; catalogScheme của đồ án khác giữ lớp.
+    const cityLand = catalog === 'qhc-hue-2045' || catalog === 'qhc-trung-tam';
+    if (landUseName(layer.name) && cityLand && (alias[storage] || fromFile)) return;
     const next = { ...layer, scheme: catalog };
     const hit = byRole.get(`${catalog}|${layer.status}`);
     if (landUseName(layer.name) && layer.file && hit) {
@@ -372,6 +387,9 @@ function manifestOf(layers, gaps) {
     file: layer.file,
     bbox: layer.bbox
   }));
+  EXTERNAL_LAYERS.forEach((layer) => {
+    if (!items.some((row) => row.file === layer.file)) items.push({ ...layer });
+  });
   items.sort((a, b) => (
     SCHEMES.findIndex((s) => s.slug === a.scheme) - SCHEMES.findIndex((s) => s.slug === b.scheme)
     || SECTORS.findIndex((s) => s[0] === a.sector) - SECTORS.findIndex((s) => s[0] === b.sector)
@@ -404,6 +422,8 @@ function schemesDoc() {
       ...(s.catalogScheme ? { catalogScheme: s.catalogScheme } : {}),
       ...(s.scale != null ? { scale: s.scale } : {}),
       ...(s.overrideArea ? { overrideArea: s.overrideArea } : {}),
+      ...(s.area ? { area: s.area } : {}),
+      ...(s.boundaryFile ? { boundaryFile: s.boundaryFile } : {}),
       ...(s.decision ? { decision: s.decision, decisionDate: s.decisionDate } : {}),
       ...(s.taskDecision ? { taskDecision: s.taskDecision, taskDecisionDate: s.taskDecisionDate } : {}),
       ...(s.authority ? { authority: s.authority } : {})
@@ -418,6 +438,7 @@ function statusLabel(status) {
 function docOf(manifest, heavy) {
   const lines = [];
   const nameOf = Object.fromEntries(SCHEMES.map((s) => [s.slug, s.name]));
+  SCHEMES.forEach((s) => { if (s.catalogScheme) nameOf[s.catalogScheme] = s.name; });
   nameOf['qhc-hue-2045'] = 'QHC đô thị Huế 2045';
   nameOf['qhc-trung-tam'] = 'QHC đô thị TTHuế 2045 (Trung tâm)';
   lines.push('# Hạ tầng chuyên ngành');
@@ -435,6 +456,8 @@ function docOf(manifest, heavy) {
   });
   lines.push('');
   lines.push('QHC Khu công nghiệp Phong Điền nằm trong QHC đô thị Phong Điền. Trong ranh KCN, KCN ghi đè Phong Điền (`overrides`, `overrideArea: ranh KCN`, priority 2 > 1). Không cắt dữ liệu.');
+  lines.push('');
+  lines.push('Phạm vi Hành chính gắn trên đồ án (`area` trong `schemes.json`), không suy xã nằm trong đô thị. Phú Lộc: `xa:phu-loc`. Khe Tre: `dothi:khe-tre` (`catalogScheme` `qhc-khe-tre`). Vinh Hưng: `xa:vinh-loc`. KCN Phong Điền: `dothi:phong-dien` (không gộp vào đồ án Phong Điền). Chân Mây – Lăng Cô: `dothi:chan-may` (`catalogScheme` `qhc-chan-may`). Hai đồ án mapid 21817 giữ phạm vi theo tỷ lệ (1/25.000 toàn thành phố, 1/10.000 đô thị trung tâm). Tab Hạ tầng nhóm lớp theo từng đồ án trong ngành; đồ án địa phương hiện ở cả tab QHC 1/25.000 và 1/10.000, rồi bị lọc theo phạm vi đang chọn.');
   lines.push('');
   lines.push('Metadata bản đồ gServer không có số quyết định. Số dưới đây lấy từ thuộc tính lớp ranh (ngày dạng M/D/YYYY của shapefile, đã đổi sang ISO). QHC TT Phú Lộc: nhiệm vụ 3134/QĐ-UBND ngày 2019-12-16, phê duyệt 1101/QĐ-UBND ngày 2020-04-17 (UBND tỉnh; 1/5 vùng ranh có giá trị). QHC Khe Tre: nhiệm vụ 1022/QĐ-UBND ngày 2016-05-16, phê duyệt 688/QĐ-UBND ngày 2020-03-13. QHC Đô thị mới Vinh Hưng: phê duyệt 193/QĐ-UBND ngày 2025-01-21 (UBND thành phố Huế). QHC Khu công nghiệp Phong Điền: trường có trên lớp ranh nhưng để trống. Hai đồ án mapid 21817: lô này chưa có lớp ranh quy hoạch.');
   lines.push('');
@@ -464,6 +487,14 @@ function docOf(manifest, heavy) {
       lines.push(`- ${nameOf[g.scheme]} — ${SECTOR_LABEL[g.sector]} — ${statusLabel(g.status)}`);
     });
   }
+  lines.push('');
+  lines.push('## Hiện trạng tạm thời');
+  lines.push('');
+  lines.push('Ba file `public/data/hien-trang-tam/giao-thong.geojson`, `cap-dien.geojson`, `cap-nuoc.geojson` là lớp hiện trạng toàn thành phố, tạm thời. Nhãn trên tab Hạ tầng: «Hiện trạng (tạm thời, tổng hợp từ các đồ án)». Mỗi đối tượng giữ thuộc tính gốc và thêm `nguon_do_an`, `nguon_ten`, `nguon_mapid`, `nguon_nam`, `nguon_ty_le`, `nguon_lop`, `tam_thoi: true`. Sinh lại bằng `node scripts/build-hien-trang-tam.mjs`. Thay bằng dữ liệu chính thức: ghi đè đúng ba file đó.');
+  lines.push('');
+  lines.push('Quy tắc chồng lấn: ưu tiên đồ án chi tiết hơn (mẫu số nhỏ hơn; đồ án không ghi tỷ lệ xếp như 1/5.000, không ghi 5000 vào `nguon_ty_le`). Cùng tỷ lệ thì năm phê duyệt mới hơn, rồi `priority`, rồi slug. Điểm trùng trong 100 m cùng nhóm. Đường trùng khi ít nhất 60% điểm mẫu nằm trong 60 m đường đã giữ, cùng nhóm (đường bộ, đường sắt, đường thủy, mặt cắt, năng lượng không xóa lẫn nhau). Cùng một đồ án không tự loại. Vùng không khử trùng. Trong ranh KCN thì bỏ đối tượng của đồ án bị ghi đè, kể cả khi không trùng hình. Không đục cả lớp thô trong khung đồ án chi tiết.');
+  lines.push('');
+  lines.push('QHC Chân Mây – Lăng Cô (mapid 23935) chỉ có quy hoạch giao thông, file bản vẽ trên GCS `projects/qhc-chan-may-lang-co-a44cfad0/qh-giao-thong.json` (773 đối tượng), không đưa vào lớp tạm. Các ngành khác của đồ án này chưa có. Số liệu phủ: `public/data/hien-trang-tam/coverage.json`.');
   lines.push('');
   lines.push('## Lưu trữ');
   lines.push('');

@@ -31,6 +31,7 @@
       "parent": null,
       "overrides": [],
       "priority": 1,
+      "area": { "type": "xa", "code": "phu-loc" },
       "decision": "1101/QĐ-UBND",
       "decisionDate": "2020-04-17",
       "taskDecision": "3134/QĐ-UBND",
@@ -46,6 +47,8 @@
       "overrides": [],
       "priority": 1,
       "scale": 2000,
+      "catalogScheme": "qhc-khe-tre",
+      "area": { "type": "dothi", "code": "khe-tre" },
       "decision": "688/QĐ-UBND",
       "decisionDate": "2020-03-13",
       "taskDecision": "1022/QĐ-UBND",
@@ -59,6 +62,7 @@
       "parent": null,
       "overrides": [],
       "priority": 1,
+      "area": { "type": "xa", "code": "vinh-loc" },
       "decision": "193/QĐ-UBND",
       "decisionDate": "2025-01-21",
       "authority": "UBND thành phố Huế"
@@ -73,7 +77,9 @@
         "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3"
       ],
       "priority": 2,
-      "overrideArea": "ranh KCN"
+      "overrideArea": "ranh KCN",
+      "area": { "type": "dothi", "code": "phong-dien" },
+      "boundaryFile": "data/chuyen-nganh/qhc-khu-cong-nghiep-phong-dien-f997bd2c/sdd/quy-hoach/ranh-gioi-quy-hoach-a.geojson"
     },
     {
       "slug": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
@@ -83,6 +89,17 @@
       "parent": null,
       "overrides": [],
       "priority": 1
+    },
+    {
+      "slug": "qhc-chan-may-lang-co-a44cfad0",
+      "name": "QHC Chân Mây - Lăng Cô",
+      "level": "QHC",
+      "mapid": 23935,
+      "parent": null,
+      "overrides": [],
+      "priority": 1,
+      "catalogScheme": "qhc-chan-may",
+      "area": { "type": "dothi", "code": "chan-may" }
     }
   ]
 }

@@ -4,6 +4,7 @@ import {
   AREA_TP, SCHEME_ALIAS, SECTORS, WARD_NAMES, applyFacetSearch, areaCodeFromName, areaLabel, baseLayers,
   browseState, canonicalSector, facetQuery, findArea, formatKv, getLayers, layerPassesFilter,
   layersFor, listAreas, loadFacetCatalog, normalizeArea, normalizeLayer, parseKv, registerAreas,
+  schemesForSector,
   schemesAt, setAreaFilter, setBrowseState, getAreaFilter
 } from '../public/js/facetStore.js';
 
@@ -178,5 +179,93 @@ assert.equal(getLayers().some(l => l.ref), false);
 assert.equal(getLayers().some(l => String(l.file).startsWith('projects/')), false);
 assert.equal(getLayers().filter(l => l.file === 'data/qhc2045/sdd.json').length, 1);
 assert.ok(getLayers().some(l => l.file === 'data/chuyen-nganh/a.geojson' && l.scheme === 'qhc-hue-2045'));
+
+await loadFacetCatalog(async (url) => {
+  if (String(url).includes('schemes.json')) {
+    return {
+      ok: true,
+      json: async () => ({
+        schemes: [
+          { slug: 'qhc-tt-phu-loc-19e96a86', name: 'QHC TT Phú Lộc', area: { type: 'xa', code: 'phu-loc' } },
+          { slug: 'qhc-khe-tre-4a4803cd', name: 'QHC Khe Tre', catalogScheme: 'qhc-khe-tre', area: { type: 'dothi', code: 'khe-tre' } },
+          { slug: 'qhc-chan-may-lang-co-a44cfad0', name: 'QHC Chân Mây - Lăng Cô', catalogScheme: 'qhc-chan-may', area: { type: 'dothi', code: 'chan-may' } }
+        ]
+      })
+    };
+  }
+  return {
+    ok: true,
+    json: async () => ({
+      layers: [
+        { sector: 'giao-thong', level: 'QHC', scale: null, status: 'quy-hoach', scheme: 'qhc-tt-phu-loc-19e96a86', name: 'Mạng lưới', file: 'data/phu.geojson' },
+        { sector: 'giao-thong', level: 'QHC', scale: 2000, status: 'hien-trang', scheme: 'qhc-khe-tre-4a4803cd', name: 'Đường', file: 'data/khe.geojson' },
+        { sector: 'giao-thong', level: 'QHC', scale: null, status: 'quy-hoach', scheme: 'qhc-chan-may-lang-co-a44cfad0', name: 'Quy hoạch giao thông', file: 'https://storage.googleapis.com/hue-infra-data-us/projects/qhc-chan-may-lang-co-a44cfad0/qh-giao-thong.json', area: { type: 'dothi', code: 'chan-may' } }
+      ]
+    })
+  };
+});
+const phu = getLayers().find(l => l.file === 'data/phu.geojson');
+assert.equal(phu.area.code, 'phu-loc');
+assert.equal(phu.level, 'QHC10');
+const khe = getLayers().find(l => l.file === 'data/khe.geojson');
+assert.equal(khe.scheme, 'qhc-khe-tre');
+assert.equal(khe.area.type, 'dothi');
+const may = getLayers().find(l => l.name === 'Quy hoạch giao thông');
+assert.equal(may.scheme, 'qhc-chan-may');
+assert.equal(may.area.code, 'chan-may');
+const on25 = schemesForSector('giao-thong', 'QHC25', []);
+assert.ok(on25.some(s => s.slug === 'qhc-tt-phu-loc-19e96a86' && s.name === 'QHC TT Phú Lộc'));
+assert.ok(on25.some(s => s.slug === 'qhc-khe-tre' && s.name === 'QHC Khe Tre'));
+assert.ok(on25.some(s => s.slug === 'qhc-chan-may' && s.name === 'QHC Chân Mây - Lăng Cô'));
+assert.ok(baseLayers({ axis: 'hatang', sector: 'cap-nuoc' }).some(l => l.id === 'ht-tam-cap-nuoc'));
+assert.equal(baseLayers({ axis: 'hatang', sector: 'giao-thong' }).some(l => l.id === 'ht-tam-cap-nuoc'), false);
+setAreaFilter({ type: 'xa', code: 'phu-loc' }, 'user', { url: false });
+const scoped = schemesForSector('giao-thong', 'QHC25', []);
+assert.ok(scoped.some(s => s.slug === 'qhc-tt-phu-loc-19e96a86'));
+assert.equal(scoped.some(s => s.slug === 'qhc-khe-tre'), false);
+const on10 = schemesForSector('giao-thong', 'QHC10', []);
+assert.ok(on10.some(s => s.slug === 'qhc-tt-phu-loc-19e96a86'));
+assert.equal(on10.some(s => s.slug === 'qhc-khe-tre'), false);
+setAreaFilter({ ...AREA_TP }, 'user', { url: false });
+
+await loadFacetCatalog(async (url) => {
+  const text = fs.readFileSync(`public/${String(url)}`, 'utf8');
+  return { ok: true, json: async () => JSON.parse(text) };
+});
+const localSlugs = [
+  'qhc-tt-phu-loc-19e96a86',
+  'qhc-khe-tre',
+  'qhc-do-thi-moi-vinh-hung-8899f27b',
+  'qhc-khu-cong-nghiep-phong-dien-f997bd2c'
+];
+for (const sector of ['giao-thong', 'cap-dien', 'cap-nuoc']) {
+  const rows = schemesForSector(sector, 'QHC25', []);
+  for (const slug of localSlugs) {
+    const scheme = rows.find(s => s.slug === slug);
+    assert.ok(scheme, `${sector} ${slug}`);
+    const layers = layersFor(sector, scheme.level, slug);
+    assert.ok(layers.some(l => l.kind === 'quy-hoach'), `${sector} quy-hoach ${slug}`);
+    const needHt = slug === 'qhc-do-thi-moi-vinh-hung-8899f27b'
+      || (slug === 'qhc-khu-cong-nghiep-phong-dien-f997bd2c' && sector !== 'cap-nuoc');
+    if (needHt) assert.ok(layers.some(l => l.kind === 'hien-trang'), `${sector} hien-trang ${slug}`);
+  }
+  const may = rows.find(s => s.slug === 'qhc-chan-may');
+  if (sector === 'giao-thong') {
+    assert.ok(may);
+    const layers = layersFor('giao-thong', may.level, may.slug);
+    assert.equal(layers.length, 1);
+    assert.equal(layers[0].kind, 'quy-hoach');
+    assert.equal(layers[0].area.code, 'chan-may');
+  } else {
+    assert.equal(may, undefined);
+  }
+  assert.ok(baseLayers({ axis: 'hatang', sector }).some(l => l.name === 'Hiện trạng (tạm thời, tổng hợp từ các đồ án)'));
+}
+setAreaFilter({ type: 'dothi', code: 'chan-may' }, 'user', { url: false });
+const coast = schemesForSector('giao-thong', 'QHC25', []);
+assert.ok(coast.some(s => s.slug === 'qhc-chan-may'));
+assert.equal(coast.some(s => s.slug === 'qhc-khe-tre'), false);
+assert.ok(coast.some(s => s.slug === 'qhc-hue-2045'));
+setAreaFilter({ ...AREA_TP }, 'user', { url: false });
 
 console.log('facet store ok');
