@@ -1,4 +1,4 @@
-// Công trình giao hành lang 50 m ngoài bờ sông rộng hơn 100 m, hoặc nằm trên rừng phòng hộ / đặc dụng.
+// Công trình giao hành lang 50 m ngoài mép nước (đoạn sông rộng hơn 100 m tại chỗ), hoặc nằm trên rừng phòng hộ / đặc dụng.
 // Số liệu tính sẵn (scripts/rebuild-river-corridor.py). Bật lớp mới tải nét ranh 50 m.
 import { map } from './mapEngine.js';
 import { planMap } from './planMap.js';
@@ -36,7 +36,7 @@ function colorOf(reason) {
 
 function reasonText(pt) {
   const parts = [];
-  if (pt.reason & 1) parts.push(`Hành lang 50 m ngoài bờ sông rộng hơn 100 m. Diện tích dấu chân trong hành lang ${fmtNum(pt.ac)} m².`);
+  if (pt.reason & 1) parts.push(`Hành lang 50 m ngoài mép nước, đoạn sông rộng hơn 100 m tại chỗ. Diện tích dấu chân trong hành lang ${fmtNum(pt.ac)} m².`);
   if (pt.reason & 2) parts.push('Nằm trên đất rừng phòng hộ quy hoạch.');
   if (pt.reason & 4) parts.push('Nằm trên đất rừng đặc dụng quy hoạch.');
   if (pt.reason & 6) parts.push(`Diện tích dấu chân trên đất rừng ${fmtNum(pt.af)} m².`);
@@ -82,7 +82,7 @@ function pointsIn(bounds) {
 function loadPack() {
   if (pack) return Promise.resolve(pack);
   if (!loadP) {
-    const url = new URL('data/gba/bank-forest.json?v=3', document.baseURI).href;
+    const url = new URL('data/gba/bank-forest.json?v=4', document.baseURI).href;
     loadP = fetch(url).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
@@ -248,7 +248,7 @@ function bind(m) {
 
 function loadLines() {
   if (lineP) return lineP;
-  const url = new URL('data/gba/river-corridor.json?v=1', document.baseURI).href;
+  const url = new URL('data/gba/river-corridor.json?v=2', document.baseURI).href;
   lineP = fetch(url).then((res) => {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
