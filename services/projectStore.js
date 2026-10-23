@@ -1722,6 +1722,99 @@ async function landToInfra({ tenQH, id, phase, newId, layer }) {
   return { saved: savedAt, via: indexed.via, lot };
 }
 
+// Gỡ ghép lô QHPK khỏi danh sách hạ tầng: INFRA → DXF mã mới, giữ nguyên polygon.
+// Đồ án cũ (không dir) hoặc không thấy lô: changed 0, missing true — lô QHCT vẫn được ghép.
+async function unpairInfraLot({ tenQH, id, ids }) {
+  const name = String(tenQH || '').trim();
+  const bases = [...new Set((ids && ids.length ? ids : [id]).filter(Boolean).map((v) => String(v).replace(/\.\d+$/, '')))];
+  if (!name || !bases.length) return { changed: 0, missing: true, newIds: [] };
+  let entry;
+  try {
+    entry = await dirEntry(name, 'gỡ ghép lô');
+  } catch (err) {
+    if (err.status === 409 || err.status === 404) return { changed: 0, missing: true, newIds: [] };
+    throw err;
+  }
+  const slug = entry.slug || projectSlug(name);
+  const { unpairLotRows } = require('./planInfraSync');
+  const docs = {};
+  let max = 0;
+  for (const role of [ROLE_HT, ROLE_QH]) {
+    const doc = await readRoleDoc(slug, role);
+    docs[role] = doc && Array.isArray(doc.parcels) ? doc.parcels : [];
+    docs[role].forEach((p) => {
+      if (p && p.kind === 'DXF') max = Math.max(max, dxfNum(p.id));
+    });
+  }
+  const savedAt = Date.now();
+  let changed = 0;
+  const newIds = [];
+  for (const role of [ROLE_HT, ROLE_QH]) {
+    let parcels = docs[role];
+    let roleChanged = 0;
+    bases.forEach((baseId) => {
+      const step = unpairLotRows(parcels, baseId, max);
+      if (!step.changed) return;
+      max = step.nextNum;
+      roleChanged += step.changed;
+      parcels = step.parcels;
+      newIds.push(...step.ids.map((row) => ({ ...row, role })));
+    });
+    if (!roleChanged) continue;
+    changed += roleChanged;
+    docs[role] = parcels;
+    await writeRole(slug, role, roleDoc(role, name, slug, savedAt, { parcels }));
+  }
+  if (!changed) return { changed: 0, missing: false, newIds };
+  const all = [...docs[ROLE_HT], ...docs[ROLE_QH]];
+  const counts = countParcels(all);
+  const indexed = await updateIndex((cur) => ({
+    ...cur,
+    projects: (cur.projects || []).map((p) => (p && p.tenQH === name && !p.deleted
+      ? { ...p, saved: savedAt, infra: counts.infra, lands: counts.lands, landArea: landAreaOf(all) }
+      : p))
+  }));
+  return { changed, missing: false, newIds, saved: savedAt, via: indexed.via };
+}
+
+// Gắn nhiều lô DXF của một đồ án vào mã Sheet trong một lần ghi.
+async function linkInfraLots({ tenQH, pairs }) {
+  const name = String(tenQH || '').trim();
+  const list = (pairs || []).filter((p) => p && p.id && p.newId && String(p.id) !== String(p.newId));
+  if (!name || !list.length) return { changed: 0 };
+  const entry = await dirEntry(name, 'ghép lô');
+  const slug = entry.slug || projectSlug(name);
+  const doc = await readRoleDoc(slug, ROLE_QH);
+  const parcels = doc && Array.isArray(doc.parcels) ? doc.parcels : [];
+  const byId = new Map(list.map((p) => [String(p.id), p]));
+  const used = new Set();
+  let changed = 0;
+  const next = parcels.map((p) => {
+    if (!p || p.kind !== 'DXF' || parcelPhase(p) !== 'QH') return p;
+    const hit = byId.get(String(p.id));
+    if (!hit || used.has(String(hit.newId))) return p;
+    used.add(String(hit.newId));
+    changed += 1;
+    return {
+      kind: 'INFRA', id: String(hit.newId), phase: 'QH', layer: hit.layer || p.layer || '',
+      area: p.area ?? null, geometry: p.geometry, name: p.name || ''
+    };
+  });
+  if (!changed) return { changed: 0 };
+  const savedAt = Date.now();
+  await writeRole(slug, ROLE_QH, roleDoc(ROLE_QH, name, slug, savedAt, { parcels: next }));
+  const other = (await readRoleDoc(slug, ROLE_HT)) || { parcels: [] };
+  const all = [...next, ...(other.parcels || [])];
+  const counts = countParcels(all);
+  const indexed = await updateIndex((cur) => ({
+    ...cur,
+    projects: (cur.projects || []).map((p) => (p && p.tenQH === name && !p.deleted
+      ? { ...p, saved: savedAt, infra: counts.infra, lands: counts.lands, landArea: landAreaOf(all) }
+      : p))
+  }));
+  return { changed, saved: savedAt, via: indexed.via };
+}
+
 // Lớp chính của đồ án = 1 file role (khớp PROJECT_LAYERS ở public/js/projectFiles.js)
 const LAYER_ROLES = [ROLE_QH, ROLE_POINTS, ROLE_BOUNDARY, ROLE_HT];
 // Bản vẽ hạ tầng riêng từng đồ án. props giữ để đối chiếu đấu nối: quyMo, congSuat, loai, và với giao thông là capDuong, loGioi, matCat.
@@ -2643,7 +2736,7 @@ async function wardParcels() {
 }
 
 module.exports = {
-  setTransport, projectTitle, projectSlug, splitProjectName, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, deleteLayer, deleteProjectFiles, renameProject,
+  setTransport, projectTitle, projectSlug, splitProjectName, catalog, saveChunk, patchBoundary, patchLand, deleteLot, deleteInfraLots, retypeInfraLot, readLand, landToInfra, unpairInfraLot, linkInfraLots, deleteLayer, deleteProjectFiles, renameProject,
   saveDecision, saveDecisionLink, reviewDecisionLink, removeDecision, readDecision, layerDecisions, removeLayerDecision,
   saveProjectDoc, removeProjectDoc, saveNet,
   saveDecisionProposal, readDecisionProposal, approveDecisionProposal, rejectDecisionProposal,

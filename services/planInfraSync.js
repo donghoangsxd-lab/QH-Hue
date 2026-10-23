@@ -26,10 +26,11 @@ function roundArea(n) {
   return Number.isFinite(v) ? Math.round(v * 10) / 10 : null;
 }
 
-function sameSize(current, area) {
+function sameSize(current, area, ratio) {
   if (current === null || current === undefined || current === '') return false;
   const n = Number(current);
-  return Number.isFinite(n) && Math.abs(n - area) < 0.05;
+  const tol = Math.max(0.05, Math.abs(Number(area) || 0) * (Number(ratio) || 0));
+  return Number.isFinite(n) && Math.abs(n - area) < tol;
 }
 
 function polygonsOf(geometry) {
@@ -87,12 +88,46 @@ function sameKind(meta, row) {
   return (meta.code === 'THPT') === (sheetCode(row) === 'THPT');
 }
 
+function pairingOf(index, sheetId) {
+  const list = index && Array.isArray(index.pairings) ? index.pairings : [];
+  return list.find((p) => p && String(p.sheetId) === String(sheetId)) || null;
+}
+
+// QHCT 1/500 sát ranh thửa thật hơn QHPK. Ghép dòng Sheet sang lô QHCT;
+// lô QHPK chỉ gỡ ghép (đổi mã, giữ polygon), không xóa và không từ chối lô QHCT.
+function qhctUnpair(sheetRow, parcelId, meta, options) {
+  if (!options || options.incomingLevel !== 'QHCT' || !sheetRow) return null;
+  const hit = pairingOf(options.index, sheetRow.id);
+  const ownerLevel = hit
+    ? hit.level
+    : (typeof options.levelOf === 'function' ? options.levelOf(sheetRow.tenQH) : '');
+  if (ownerLevel !== 'QHPK') return null;
+  return {
+    fromProject: hit ? String(hit.tenQH || sheetRow.tenQH || '') : String(sheetRow.tenQH || ''),
+    fromLotId: hit ? String(hit.lotId || sheetRow.id) : String(sheetRow.id),
+    fromLevel: 'QHPK',
+    toLotId: String(parcelId || ''),
+    sheetId: String(sheetRow.id),
+    infraName: String((hit && hit.name) || sheetRow.name || ''),
+    code: meta.code
+  };
+}
+
+function withUnpair(row, unpair, area, ratio) {
+  if (!unpair) return row;
+  const action = row.action === 'same' || sameSize(row.sheetSize, area, ratio) ? 'rebind' : row.action;
+  return { ...row, action, unpair };
+}
+
 /**
  * classify(layer, name, kind) → { code, type, nhom } | null
- * sheet: [{ id, name, ward, tab, sizeQH, lat, lng }]
- * → mỗi lô quy hoạch thuộc mã được chọn: same | update | create | conflict | skip
+ * sheet: [{ id, name, ward, tab, sizeQH, lat, lng, tenQH }]
+ * incomingLevel 'QHCT': lô QHCT được ghép cả khi dòng Sheet đang gắn lô QHPK.
+ * index: public/data/su-dung-dat-index.json. Giữ layers/aliases; chỉ sửa pairings: [{ sheetId, lotId, tenQH, level }].
+ * → mỗi lô quy hoạch thuộc mã được chọn: same | update | rebind | create | conflict | skip
  */
-function diffPlanInfra(parcels, sheet, { codes, classify }) {
+function diffPlanInfra(parcels, sheet, options) {
+  const { codes, classify } = options || {};
   const want = codes instanceof Set ? codes : new Set(codes || []);
   const all = (sheet || []).filter(r => r && want.has(sheetCode(r)));
   const rows = all.filter(r => !isFragment(r.id));
@@ -154,11 +189,50 @@ function diffPlanInfra(parcels, sheet, { codes, classify }) {
       name: base.name || sheetRow.name || '',
       how
     };
-    out.push(sameSize(sheetRow.sizeQH, area)
-      ? { ...linked, action: 'same' }
-      : { ...linked, action: 'update' });
+    const ratio = options && options.sameRatio;
+    const unpair = qhctUnpair(sheetRow, base.parcelId, meta, options);
+    const action = sameSize(sheetRow.sizeQH, area, ratio) ? 'same' : 'update';
+    out.push(withUnpair({ ...linked, action }, unpair, area, ratio));
   });
   return out;
+}
+
+function movePairing(index, unpair, to) {
+  const pairings = ((index && index.pairings) || []).filter((p) => String(p.sheetId) !== String(unpair.sheetId));
+  pairings.push({
+    sheetId: String(unpair.sheetId),
+    lotId: String(unpair.toLotId || ''),
+    tenQH: String((to && to.tenQH) || ''),
+    level: 'QHCT',
+    name: String(unpair.infraName || '')
+  });
+  const base = (index && typeof index === 'object') ? { ...index } : { v: 1 };
+  base.v = base.v || 1;
+  base.pairings = pairings;
+  return base;
+}
+
+function dxfLabel(n) {
+  return `DXF-${n < 1000 ? String(n).padStart(3, '0') : String(n)}`;
+}
+
+// Lô INFRA id / id.N thành DXF mã mới. Giữ geometry, layer, area. Không xóa.
+function unpairLotRows(parcels, baseId, nextNum) {
+  const id = String(baseId || '');
+  let n = Number(nextNum) || 0;
+  let changed = 0;
+  const ids = [];
+  const next = (parcels || []).map((p) => {
+    if (!p || p.kind !== 'INFRA' || !id) return p;
+    const s = String(p.id || '');
+    if (s !== id && !s.startsWith(`${id}.`)) return p;
+    n += 1;
+    changed += 1;
+    const to = dxfLabel(n);
+    ids.push({ from: s, to });
+    return { ...p, kind: 'DXF', id: to };
+  });
+  return { parcels: next, changed, nextNum: n, ids };
 }
 
 /**
@@ -219,6 +293,42 @@ function selftest() {
   if (got.find(r => r.parcelId === 'DXF-1').sheetId !== 'THPT-009') throw new Error('không khớp công trình nằm trong lô');
   if (got.find(r => r.parcelId === 'DXF-2').sheetId) throw new Error('lô THPT không được khớp trường Tiểu học nằm trong lô');
 
+  const levelOf = (name) => (String(name).startsWith('QHPK') ? 'QHPK' : '');
+  const qhpkSheet = sheet.map((r) => ({ ...r, tenQH: r.id === 'THPT-001' ? 'QHPK Nam' : '' }));
+  const qhct = diffPlanInfra(parcels, qhpkSheet, { codes: ['THPT'], classify, incomingLevel: 'QHCT', levelOf });
+  const moved = qhct.find((r) => r.parcelId === 'THPT-001');
+  if (!moved || moved.action !== 'rebind' || !moved.unpair || moved.unpair.fromLotId !== 'THPT-001' || moved.unpair.fromProject !== 'QHPK Nam') {
+    throw new Error('QHCT phải gỡ ghép lô QHPK, không bỏ lô');
+  }
+  const indexed = diffPlanInfra(
+    [{ id: 'DXF-9', kind: 'DXF', phase: 'QH', layer: 'QHDD_DAT_HTXH_TruongTHPT', area: 100, ward: 'Thuận Hóa', geometry: poly(107.58, 16.46) }],
+    [{ id: 'THPT-001', ward: 'Thuận Hóa', tab: '6-THPT', sizeQH: 100, lat: 16.4605, lng: 107.585, tenQH: '' }],
+    {
+      codes: ['THPT'], classify, incomingLevel: 'QHCT',
+      index: { pairings: [{ sheetId: 'THPT-001', lotId: 'THPT-001', tenQH: 'QHPK Nam', level: 'QHPK' }] }
+    }
+  );
+  if (!indexed[0] || indexed[0].action !== 'rebind' || indexed[0].unpair.fromProject !== 'QHPK Nam') {
+    throw new Error('chỉ mục QHPK không được chặn lô QHCT');
+  }
+  const nextIdx = movePairing({ pairings: [{ sheetId: 'THPT-001', lotId: 'THPT-001', tenQH: 'QHPK Nam', level: 'QHPK' }] }, indexed[0].unpair, { tenQH: 'QHCT An Đông' });
+  if (nextIdx.pairings.length !== 1 || nextIdx.pairings[0].level !== 'QHCT' || nextIdx.pairings[0].tenQH !== 'QHCT An Đông') {
+    throw new Error('chỉ mục chưa chuyển ghép sang QHCT');
+  }
+  const ring = poly(107.58, 16.46);
+  const unpaired = unpairLotRows([
+    { kind: 'INFRA', id: 'THPT-001', geometry: ring, layer: 'HT', area: 100 },
+    { kind: 'INFRA', id: 'THPT-001.2', geometry: ring, layer: 'HT', area: 10 },
+    { kind: 'DXF', id: 'DXF-004', geometry: ring },
+    { kind: 'INFRA', id: 'CV-9', geometry: ring }
+  ], 'THPT-001', 4);
+  if (unpaired.changed !== 2 || unpaired.parcels[0].kind !== 'DXF' || unpaired.parcels[0].id !== 'DXF-005' || unpaired.parcels[0].geometry !== ring) {
+    throw new Error('gỡ ghép phải giữ polygon và đổi mã DXF');
+  }
+  if (unpaired.parcels[2].id !== 'DXF-004' || unpaired.parcels[3].id !== 'CV-9') {
+    throw new Error('gỡ ghép đụng lô khác');
+  }
+
   const dupRows = ['CV-1', 'CV-2', 'CV-3'].map(id => ({ id, tab: '1-CV', tenQH: 'A', lat: 16.1, lng: 107.1, sizeHT: null, sizeQH: 5 }))
     .concat([{ id: 'CV-4', tab: '1-CV', tenQH: 'A', lat: 16.1, lng: 107.1, sizeHT: null, sizeQH: 6 }]);
   const dups = findDuplicates(dupRows, 'A', ['CV-3']);
@@ -228,4 +338,4 @@ function selftest() {
   return got.length;
 }
 
-module.exports = { CODE_META, diffPlanInfra, findDuplicates, sheetCode, selftest };
+module.exports = { CODE_META, diffPlanInfra, findDuplicates, sheetCode, movePairing, pairingOf, unpairLotRows, selftest };

@@ -62,7 +62,7 @@ const GUESS_RULES = [
   ['CV', /cong vien|cay xanh|vuon hoa|diem xanh|\bpark\b|green (place|land)|\bcxcc\b/,
     /cay xanh (su dung )?(han che|chuyen dung|cach ly|giao thong)|for transport/],
   ['BDX', /bai do|do xe|bai xe|parking|tram sac|\bbdx\b/],
-  ['NT', /nghia trang|nghia dia|nha tang le|hoa tang|\bntr\b|\bntd\b|cemetery/],
+  ['NT', /nghia trang|nghia dia|nha tang le|hoa tang|chon cat|\bntr\b|\bntd\b|cemetery/],
   ['YT', /y te|benh vien|tram y|phong kham|health|hospital/],
   ['VH', /van hoa|the thao|\btdtt\b|san van dong|\bnvh\b|cultur|\bsport/],
   [MARKET_PICK, /\bcho\b|thuong mai|\btttm\b|sieu thi|\bdvtm\b|\btmdv\b|dich vu|commercial|\bmarket\b/,
@@ -85,7 +85,7 @@ const PATTERN_CODE = {
 };
 const codeOfPattern = (key) => PATTERN_CODE[key] || (MANUAL_LAND_KEYS.includes(key) ? `${LAND_KEY_PREFIX}${key}` : '');
 
-function guessCode(value) {
+export function guessCode(value) {
   // Ký hiệu lô viết tắt ("CX4.14", "OB 1.22", "MN.02" = mặt nước) xét trước từ khóa (\bmn\b = mầm non trong tên)
   const lot = codeOfPattern(lotCodePatternKey(value));
   if (lot) return /.DT$/.test(lotCodePrefix(value)) && VALID_CODES.has(`${lot}_DT`) ? `${lot}_DT` : lot;
