@@ -56,6 +56,12 @@
 /data/chuyen-nganh/index.json
   Cache-Control: public, max-age=300
 
+/data/chuyen-nganh/schemes.json
+  Cache-Control: public, max-age=300
+
+/data/hien-trang-tam/*
+  Cache-Control: public, max-age=300
+
 /data/su-dung-dat-index.json
   Cache-Control: public, max-age=300
 

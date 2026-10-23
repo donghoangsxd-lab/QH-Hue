@@ -15,8 +15,11 @@ Bộ dữ liệu hạ tầng chuyên ngành, gắn tab Hạ tầng. Mô hình b�
 | qhc-do-thi-moi-vinh-hung-8899f27b | QHC Đô thị mới Vinh Hưng | QHC | 22906 | 1 |
 | qhc-khu-cong-nghiep-phong-dien-f997bd2c | QHC Khu công nghiệp Phong Điền | QHC | 22880 | 2 |
 | qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3 | QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045 | QHC | — | 1 |
+| qhc-chan-may-lang-co-a44cfad0 | QHC Chân Mây - Lăng Cô | QHC | 23935 | 1 |
 
 QHC Khu công nghiệp Phong Điền nằm trong QHC đô thị Phong Điền. Trong ranh KCN, KCN ghi đè Phong Điền (`overrides`, `overrideArea: ranh KCN`, priority 2 > 1). Không cắt dữ liệu.
+
+Phạm vi Hành chính gắn trên đồ án (`area` trong `schemes.json`), không suy xã nằm trong đô thị. Phú Lộc: `xa:phu-loc`. Khe Tre: `dothi:khe-tre` (`catalogScheme` `qhc-khe-tre`). Vinh Hưng: `xa:vinh-loc`. KCN Phong Điền: `dothi:phong-dien` (không gộp vào đồ án Phong Điền). Chân Mây – Lăng Cô: `dothi:chan-may` (`catalogScheme` `qhc-chan-may`). Hai đồ án mapid 21817 giữ phạm vi theo tỷ lệ (1/25.000 toàn thành phố, 1/10.000 đô thị trung tâm). Tab Hạ tầng nhóm lớp theo từng đồ án trong ngành; đồ án địa phương hiện ở cả tab QHC 1/25.000 và 1/10.000, rồi bị lọc theo phạm vi đang chọn.
 
 Hai thư mục mapid 21817 giữ slug lưu trữ. Catalog gắn `catalogScheme`: 1/25.000 → `qhc-hue-2045`, 1/10.000 → `qhc-trung-tam`. Lớp sử dụng đất của hai đồ án này là file tĩnh đã có (`data/qhc2045/dinhhuong.json`, `data/qhc2045/sdd.json`), không phát hành bản thô. Chỉ mục lớp đã có: `public/data/su-dung-dat-index.json`.
 
@@ -230,6 +233,7 @@ Metadata bản đồ gServer không có số quyết định. Số dưới đây
 | QHC Khu công nghiệp Phong Điền | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Phân khu chức năng | Polygon | 5 |
 | QHC Khu công nghiệp Phong Điền | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch A | Polygon | 1 |
 | QHC Khu công nghiệp Phong Điền | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch L | LineString | 1 |
+| QHC Chân Mây - Lăng Cô | Giao thông | Quy hoạch | Quy hoạch giao thông | Mixed | 773 |
 
 ## Khoảng trống
 
@@ -271,6 +275,24 @@ Metadata bản đồ gServer không có số quyết định. Số dưới đây
 - QHC Khu công nghiệp Phong Điền — Thoát nước thải — Hiện trạng
 - QHC Khu công nghiệp Phong Điền — Chất thải rắn và nghĩa trang — Hiện trạng
 - QHC Khu công nghiệp Phong Điền — Thông tin liên lạc — Hiện trạng
+
+## Hiện trạng tạm thời
+
+Ba file `public/data/hien-trang-tam/giao-thong.geojson`, `cap-dien.geojson`, `cap-nuoc.geojson` là lớp hiện trạng toàn thành phố, tạm thời. Nhãn trên tab Hạ tầng: «Hiện trạng (tạm thời, tổng hợp từ các đồ án)». Mỗi đối tượng giữ thuộc tính gốc và thêm `nguon_do_an`, `nguon_ten`, `nguon_mapid`, `nguon_nam`, `nguon_ty_le`, `nguon_lop`, `tam_thoi: true`. Sinh lại bằng `node scripts/build-hien-trang-tam.mjs`. Thay bằng dữ liệu chính thức: ghi đè đúng ba file đó.
+
+Quy tắc chồng lấn: ưu tiên đồ án chi tiết hơn (mẫu số nhỏ hơn; đồ án không ghi tỷ lệ xếp như 1/5.000, không ghi 5000 vào `nguon_ty_le`). Cùng tỷ lệ thì năm phê duyệt mới hơn, rồi `priority`, rồi slug. Điểm trùng trong 100 m cùng nhóm. Đường trùng khi ít nhất 60% điểm mẫu nằm trong 60 m đường đã giữ, cùng nhóm (đường bộ, đường sắt, đường thủy, mặt cắt, năng lượng không xóa lẫn nhau). Cùng một đồ án không tự loại. Vùng không khử trùng. Trong ranh KCN thì bỏ đối tượng của đồ án bị ghi đè, kể cả khi không trùng hình. Không đục cả lớp thô trong khung đồ án chi tiết.
+
+QHC Chân Mây – Lăng Cô (mapid 23935) chỉ có quy hoạch giao thông, file bản vẽ trên GCS `projects/qhc-chan-may-lang-co-a44cfad0/qh-giao-thong.json` (773 đối tượng), không đưa vào lớp tạm. Các ngành khác của đồ án này chưa có.
+
+Số đối tượng giữ lại (đếm theo đồ án nguồn):
+
+| Ngành | Giữ | Đường | Điểm | Bỏ trùng | 1/25.000 | 1/10.000 | Vinh Hưng | KCN | Chưa có hiện trạng |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| Giao thông | 280 | 243 | 37 | 39 | 90/129 | 142/142 | 47/47 | 1/1 | Phú Lộc, Khe Tre, Phong Điền, Chân Mây |
+| Cấp điện | 286 | 235 | 51 | 18 | 50/68 | 204/204 | 25/25 | 7/7 | Phú Lộc, Khe Tre, Phong Điền, Chân Mây |
+| Cấp nước | 632 | 610 | 22 | 194 | 311/505 | 318/318 | 3/3 | — | Phú Lộc, Khe Tre, KCN, Phong Điền, Chân Mây |
+
+Giao thông chưa phủ: Xã A Lưới 5, Xã Phú Vinh, Xã A Lưới 1, Xã Phú Hồ, Xã Nam Đông, Xã A Lưới 3 (15 đối tượng ngoài ranh phường). Cấp điện chưa phủ: Xã Long Quảng, Xã Đan Điền, Xã Khe Tre, Xã Phú Vang, Xã Phú Hồ, Phường Phong Quảng, Xã Lộc An, Xã Nam Đông, Phường Phong Dinh, Xã A Lưới 2, Xã Phú Lộc, Xã Quảng Điền, Xã A Lưới 3. Cấp nước chưa phủ: Xã A Lưới 5, Xã A Lưới 4. Chi tiết: `public/data/hien-trang-tam/coverage.json`.
 
 ## Lưu trữ
 

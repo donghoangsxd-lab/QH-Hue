@@ -8521,6 +8521,35 @@
         107.395022,
         16.606998
       ]
+    },
+    {
+      "sector": "giao-thong",
+      "scale": null,
+      "status": "quy-hoach",
+      "scheme": "qhc-chan-may-lang-co-a44cfad0",
+      "level": "QHC",
+      "name": "Quy hoạch giao thông",
+      "geomType": "Mixed",
+      "featureCount": 773,
+      "fields": [
+        "ten",
+        "loai",
+        "capDuong",
+        "loGioi",
+        "matCat"
+      ],
+      "file": "https://storage.googleapis.com/hue-infra-data-us/projects/qhc-chan-may-lang-co-a44cfad0/qh-giao-thong.json",
+      "bbox": [
+        107.799193,
+        16.158494,
+        108.202886,
+        16.377232
+      ],
+      "area": {
+        "type": "dothi",
+        "code": "chan-may"
+      },
+      "mapid": 23935
     }
   ],
   "gaps": [
