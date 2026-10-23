@@ -253,7 +253,7 @@ const REPORT_FACTS = [
   'Kỳ báo cáo: năm, số liệu tính đến ngày 31/12.'
 ];
 const AREA_COLS = ['Địa bàn', 'Diện tích phải phủ (ha)', 'Diện tích đã phủ (ha)', 'Tỷ lệ (%)'];
-const openPlanList = { label: 'Mở danh sách đồ án', icon: 'layers', run: () => openLayerTab({ main: 'plan' }) };
+const openPlanList = { label: 'Mở danh sách đồ án', icon: 'layers', run: () => openLayerTab({ main: 'quyhoach' }) };
 
 const SECTIONS = [
   {
@@ -343,7 +343,7 @@ const SECTIONS = [
         lead: 'Chọn lớp cần xem ở panel phải. Lớp bật vẽ ngay trên bản đồ đang mở (quy hoạch hoặc hiện trạng).',
         steps: [
           'Nếu panel phải đang thu, bấm <b>Mở panel công cụ</b>. Tab <b>Lớp dữ liệu</b> đang mở mặc định.',
-          'Hàng tab trên: <b>Đô thị</b> (phân loại đô thị và hồ sơ từng đô thị), <b>Quy hoạch</b> (QHC, QHPK, QHCT), <b>Khu đất</b> (công trình hạ tầng). Chọn lớp cần hiện.',
+          'Hàng tab trên: <b>Hành chính</b> (đô thị, xã và phường), <b>Quy hoạch</b> (QHC, QHPK, QHCT), <b>Hạ tầng</b>, <b>Kiến trúc</b> và <b>Khu đất</b>. Tab không vừa thì bấm <b>&gt;&gt;</b>.',
           'Ở <b>Khu đất</b>, nút <b>Tất cả</b> bật hoặc tắt các nhóm công trình; ô <b>Ranh lô</b> bật ranh lô theo nhóm đang tick. Số đang bật hiện cạnh tiêu đề tab.',
           'Hàng tab dưới: <b>Bản đồ nền</b> (ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư, độ phủ…) và <b>Bản đồ môi trường</b> (địa hình, ngập…). Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường.'
         ],
@@ -351,7 +351,7 @@ const SECTIONS = [
           'Thu panel bằng nút mũi tên <b>Thu gọn panel</b> trên thanh tiêu đề panel phải. Lớp đã bật vẫn giữ.',
           'Ghi chú cuối mục <b>Khu đất</b>: tem màu thường là <b>Đã duyệt</b>, tem nhạt là <b>Chờ duyệt</b>.'
         ],
-        actions: [{ label: 'Mở lớp dữ liệu', icon: 'layers', run: () => openLayerTab({ main: 'plan' }) }]
+        actions: [{ label: 'Mở lớp dữ liệu', icon: 'layers', run: () => openLayerTab({ main: 'quyhoach' }) }]
       },
       {
         id: 'legend', btn: 'guide', status: 'trial',
@@ -627,7 +627,7 @@ const SECTIONS = [
         title: 'Quy hoạch chung từng đô thị và chỉ số trưởng thành đô thị',
         lead: 'Quy hoạch chung là cấp trung gian giữa Quyết định 756/QĐ-UBND và QHPK 1/2.000, xác lập chỉ tiêu phân loại, nâng cấp đô thị. QHC thành phố Huế (loại I) lập cho toàn thành phố, vùng lõi 1/10.000 gồm khu vực trung tâm, Hương Thủy, Hương Trà, Hóa Châu, Mỹ Thượng; đô thị vệ tinh Phong Điền, Chân Mây và 7 đô thị loại III lập QHC riêng.',
         steps: [
-          'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Đô thị</b>. Bấm một đô thị hoặc khu vực vùng lõi trong danh sách để vẽ phạm vi trên bản đồ và mở hồ sơ.',
+          'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Hành chính</b>. Bấm một đô thị hoặc khu vực vùng lõi trong danh sách để vẽ phạm vi trên bản đồ và mở hồ sơ.',
           'Mở bảng tổng hợp phía dưới (nút mũi tên <b>Mở bảng tổng hợp hạ tầng và cơ cấu đất</b> nếu đang thu). Chấm trang <b>Quy hoạch chung</b>: 10 QHC theo nhóm thành phố, đô thị vệ tinh, đô thị loại III; 5 khu vực vùng lõi xếp dưới QHC thành phố Huế. Bấm tên để xem hồ sơ, phân vùng 1/10.000 – 1/25.000, các QHPK 1/2.000 và chỉ số trưởng thành.',
           'Chỉ số trưởng thành = hiện trạng so với chỉ tiêu QHC (khu vực vùng lõi: chỉ tiêu do QHC thành phố Huế quy định); chưa có chỉ tiêu thì so với mức tối đa Bảng 2A Nghị quyết 111/2025/UBTVQH15 của loại đô thị định hướng.'
         ],

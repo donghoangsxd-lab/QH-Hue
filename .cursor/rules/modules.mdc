@@ -127,4 +127,4 @@ Pipeline dấu chân: `scripts/build-gba.py` (ra `buildings.pmtiles`, không com
 
 Catalog chuyên ngành và GeoJSON gốc: MOD-07 (`public/data/chuyen-nganh/index.json`, `schemes.json`, `data/chuyen-nganh/<scheme>/`). Symlink phục vụ: `public/data/chuyen-nganh/<scheme>` (`scripts/stage-chuyen-nganh.mjs`). Kiến trúc rỗng: `public/data/kien-truc/quy-che.json`, `cong-trinh.json`.
 
-Tab trong `#layerPanePlan`: `#axisTabs`, `#axisHanhChinh`, `#axisQuyHoach` (giữ `#projectList`, `#planStaticRows`), `#browseNganh`, `#axisKienTruc`. Hàng icon khi sidebar thu: `#axisDock`. Ma trận trong `#addAdmin` / `#cnMatrix`. `chk_gt25` / `chk_gt10` không gắn vào 91 file.
+Tab cấp một trong `#layerMain`: Hành chính (`#axisHanhChinh`, kèm `#gpList`), Quy hoạch (`#projectList`, `#planStaticRows`), Hạ tầng (`#browseNganh`), Kiến trúc (`#axisKienTruc`), Khu đất. Không còn `#axisTabs`. Hàng icon khi sidebar thu: `#axisDock`. Ma trận trong `#addAdmin` / `#cnMatrix`. `chk_gt25` / `chk_gt10` không gắn vào 91 file.

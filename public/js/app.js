@@ -49,7 +49,7 @@ import {
 } from './planMap.js';
 import { escapeHtml, setStatusContent, showToast, announceTool, TOOL_START_EVENT, RIGHT_TAB_EVENT, WARD_PICK_EVENT } from './utils.js';
 import { initViewFlow, wardFromMapClick, detailClickLocked } from './viewFlow.js';
-import { initMapLevel, getLevel, LEVEL_EVENT } from './mapLevel.js';
+import { initMapLevel, getLevel } from './mapLevel.js';
 import { initSplitPair } from './splitPair.js';
 import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
 import { initChuyenNganh } from './chuyenNganh.js';
@@ -140,10 +140,88 @@ function initLayerMapTabs() {
   show('base');
   refreshCounts();
 }
+const MAIN_AXES = new Set(['hanhchinh', 'quyhoach', 'hatang', 'kientruc']);
+
 function initLayerMainTabs() {
   const root = document.getElementById('layerMain');
   if (!root) return;
   const tabs = [...root.querySelectorAll('[data-main-tab]')];
+  const more = document.getElementById('layerMainMore');
+  const menu = document.createElement('div');
+  menu.id = 'layerMainOverflow';
+  menu.className = 'layer-main-overflow';
+  menu.setAttribute('role', 'menu');
+  menu.hidden = true;
+  document.body.appendChild(menu);
+
+  const fitTabs = () => {
+    const bar = root.querySelector('.layer-main-tabs');
+    if (!bar || !more) return;
+    tabs.forEach(t => { t.hidden = false; });
+    more.hidden = true;
+    const barWidth = bar.clientWidth;
+    if (!barWidth) return;
+    const widths = tabs.map(t => t.offsetWidth);
+    const sum = widths.reduce((a, b) => a + b, 0);
+    if (sum <= barWidth + 1) {
+      menu.hidden = true;
+      more.setAttribute('aria-expanded', 'false');
+      return;
+    }
+    more.hidden = false;
+    const budget = Math.max(0, barWidth - more.offsetWidth);
+    const active = Math.max(0, tabs.findIndex(t => t.classList.contains('active')));
+    const keep = new Set();
+    let used = 0;
+    for (let i = 0; i < tabs.length; i++) {
+      if (used + widths[i] > budget + 1) break;
+      keep.add(i);
+      used += widths[i];
+    }
+    if (!keep.has(active)) {
+      for (const i of [...keep].sort((a, b) => b - a)) {
+        if (used + widths[active] <= budget + 1) break;
+        keep.delete(i);
+        used -= widths[i];
+      }
+      if (used + widths[active] > budget + 1) keep.clear();
+      keep.add(active);
+    }
+    tabs.forEach((t, i) => { t.hidden = !keep.has(i); });
+    const hiddenTabs = tabs.filter(t => t.hidden);
+    if (!hiddenTabs.length) {
+      more.hidden = true;
+      menu.hidden = true;
+      more.setAttribute('aria-expanded', 'false');
+      return;
+    }
+    const wasOpen = !menu.hidden;
+    menu.replaceChildren(...hiddenTabs.map(t => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.setAttribute('role', 'menuitemradio');
+      btn.dataset.mainMore = t.dataset.mainTab;
+      btn.setAttribute('aria-checked', String(t.classList.contains('active')));
+      btn.append(document.createTextNode(t.querySelector('.layer-main-label')?.textContent || ''));
+      const count = t.querySelector('.layer-main-count')?.textContent || '';
+      if (count) {
+        const small = document.createElement('small');
+        small.textContent = count;
+        btn.append(small);
+      }
+      return btn;
+    }));
+    if (!wasOpen) menu.hidden = true;
+  };
+
+  const placeMenu = () => {
+    if (!more || menu.hidden) return;
+    const r = more.getBoundingClientRect();
+    menu.style.top = `${Math.round(r.bottom + 4)}px`;
+    menu.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
+    menu.style.left = 'auto';
+  };
+
   const show = (id) => {
     tabs.forEach(btn => {
       const on = btn.dataset.mainTab === id;
@@ -152,14 +230,54 @@ function initLayerMainTabs() {
     });
     root.querySelectorAll('[data-main-pane]').forEach(pane => { pane.hidden = pane.dataset.mainPane !== id; });
     root.dataset.active = id;
+    menu.hidden = true;
+    more?.setAttribute('aria-expanded', 'false');
+    fitTabs();
   };
-  tabs.forEach(btn => btn.addEventListener('click', () => show(btn.dataset.mainTab)));
-  const tabOf = (level) => (level === 'urban' ? 'urban' : 'plan');
-  document.addEventListener(LEVEL_EVENT, (e) => {
-    const { level, prev } = e.detail || {};
-    if (level !== prev) show(tabOf(level));
+
+  tabs.forEach(btn => btn.addEventListener('click', () => {
+    const id = btn.dataset.mainTab;
+    show(id);
+    if (btn.dataset.axisSync === '0') {
+      delete btn.dataset.axisSync;
+      return;
+    }
+    if (MAIN_AXES.has(id)) document.dispatchEvent(new CustomEvent('qh:axis-tab', { detail: { id } }));
+  }));
+  menu.addEventListener('click', (e) => {
+    const id = e.target.closest('[data-main-more]')?.dataset.mainMore;
+    if (!id) return;
+    root.querySelector(`[data-main-tab="${id}"]`)?.click();
   });
-  show(tabOf(getLevel()));
+  more?.addEventListener('click', () => {
+    const open = menu.hidden;
+    if (open) fitTabs();
+    menu.hidden = !open;
+    more.setAttribute('aria-expanded', String(open));
+    if (open) placeMenu();
+  });
+  document.addEventListener('click', (e) => {
+    if (menu.hidden) return;
+    if (e.target.closest('#layerMainMore, #layerMainOverflow')) return;
+    menu.hidden = true;
+    more?.setAttribute('aria-expanded', 'false');
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || menu.hidden) return;
+    menu.hidden = true;
+    more?.setAttribute('aria-expanded', 'false');
+  });
+  const bar = root.querySelector('.layer-main-tabs');
+  if (bar && typeof ResizeObserver !== 'undefined') new ResizeObserver(() => fitTabs()).observe(bar);
+  const mo = new MutationObserver(() => fitTabs());
+  tabs.forEach(t => {
+    const count = t.querySelector('.layer-main-count');
+    if (count) mo.observe(count, { childList: true, characterData: true, subtree: true });
+  });
+  window.addEventListener('resize', () => { fitTabs(); placeMenu(); });
+  show(getLevel() === 'urban' ? 'hanhchinh' : 'quyhoach');
+  requestAnimationFrame(fitTabs);
+  document.fonts?.ready.then(() => fitTabs());
 }
 
 function initLayerGroups() {

@@ -18,9 +18,11 @@ export function flash(el) {
   setTimeout(() => el.classList.remove('ov-flash'), 2000);
 }
 
+const MAIN_TAB = { plan: 'quyhoach', urban: 'hanhchinh' };
+
 export function openLayerTab({ main, pane } = {}) {
   document.querySelector('.rp-tabs .tab-btn[data-tab="tabLayers"]')?.click();
-  if (main) document.querySelector(`[data-main-tab="${main}"]`)?.click();
+  if (main) document.querySelector(`[data-main-tab="${MAIN_TAB[main] || main}"]`)?.click();
   if (pane) document.querySelector(`[data-map-tab="${pane}"]`)?.click();
 }
 

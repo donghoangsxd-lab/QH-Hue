@@ -1,8 +1,8 @@
-// Bốn trục trong mục Quy hoạch của panel lớp. Cùng một cờ bật/tắt: checkbox có bind dùng lớp sẵn,
+// Bốn trục là tab cấp một của panel Lớp dữ liệu, cùng tab Khu đất. Cùng một cờ bật/tắt: checkbox có bind dùng lớp sẵn,
 // lớp catalog chỉ tải GeoJSON khi bật và gỡ layer khi tắt.
 import { map } from './mapEngine.js';
 import { planMap, getViewMode } from './planMap.js';
-import { getLevel, setLevel } from './mapLevel.js';
+import { getLevel, setLevel, LEVEL_EVENT } from './mapLevel.js';
 import { state } from './state.js';
 import { escapeHtml, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
 import { withAssetVersion } from './gbaVersion.js';
@@ -269,7 +269,7 @@ function paintHaTang() {
   const box = document.getElementById('browseNganh');
   if (!box || browseState().axis !== 'hatang') return;
   const { sector, level } = browseState();
-  const pane = document.getElementById('layerPanePlan');
+  const pane = document.getElementById('layerPaneHaTang');
   const top = pane ? pane.scrollTop : 0;
   const catalog = state.projectCatalog || [];
   const schemes = schemesForSector(sector, level, catalog);
@@ -370,8 +370,7 @@ function paint() {
   paintDock();
   paintScopes();
   const axis = browseState().axis;
-  document.querySelectorAll('[data-axis-pane]').forEach(pane => { pane.hidden = pane.dataset.axisPane !== axis; });
-  if (axis === 'hanhchinh') paintAdmin();
+  paintAdmin();
   if (axis === 'hatang') paintHaTang();
   if (axis === 'kientruc') paintKienTruc();
   paintBase('quyhoach', 'baseQuyHoach');
@@ -385,7 +384,8 @@ function paint() {
 }
 
 function showPlanPane() {
-  document.querySelector('[data-main-tab="plan"]')?.click();
+  const id = browseState().axis || 'quyhoach';
+  document.querySelector(`[data-main-tab="${id}"]`)?.click();
 }
 
 function openQhc25Layers() {
@@ -399,10 +399,17 @@ function openQhc25Layers() {
   }
 }
 
+let openingAxis = false;
+let listenLevel = false;
+let levelTab = false;
+let axisBeforeUrban = null;
+
 function showAxis(id, { openPanel = false, url = true } = {}) {
   if (!AXES.some(a => a.id === id)) return;
   setBrowseState({ axis: id }, { url });
-  showPlanPane();
+  openingAxis = true;
+  document.querySelector(`[data-main-tab="${id}"]`)?.click();
+  openingAxis = false;
   if (openPanel) document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers', open: true } }));
   paint();
   scheduleSave();
@@ -472,7 +479,7 @@ async function loadKienTruc() {
 }
 
 export function initChuyenNganh() {
-  if (booted || !document.getElementById('axisTabs')) return;
+  if (booted || !document.getElementById('axisHanhChinh')) return;
   booted = true;
   const q = searchParams();
   const shareView = SHARE_KEYS.some(k => q.has(k));
@@ -495,7 +502,7 @@ export function initChuyenNganh() {
     setBrowseState({ axis: deep.axis || (deep.nganh ? 'hatang' : 'quyhoach'), sector: deep.nganh || undefined }, { url: false });
   }
 
-  document.getElementById('layerPanePlan')?.addEventListener('click', (e) => {
+  document.getElementById('layerMain')?.addEventListener('click', (e) => {
     const sectorBtn = e.target.closest('[data-cn-sector]');
     if (sectorBtn) {
       setBrowseState({ sector: sectorBtn.dataset.cnSector, axis: 'hatang' });
@@ -529,7 +536,7 @@ export function initChuyenNganh() {
       listed.forEach(l => setLayerOn(l, turnOn));
     }
   });
-  document.getElementById('layerPanePlan')?.addEventListener('change', (e) => {
+  document.getElementById('layerMain')?.addEventListener('change', (e) => {
     const layerId = e.target.closest('[data-cn-layer]')?.dataset.cnLayer;
     if (layerId) {
       const layer = getLayers().find(l => l.id === layerId);
@@ -544,9 +551,29 @@ export function initChuyenNganh() {
     if (e.target.checked) openSchemes.add(slug);
     rows.forEach(l => setLayerOn(l, e.target.checked));
   });
-  document.getElementById('axisTabs')?.addEventListener('click', (e) => {
-    const tab = e.target.closest('[data-axis]');
-    if (tab) showAxis(tab.dataset.axis);
+  document.addEventListener('qh:axis-tab', (e) => {
+    const id = e.detail?.id;
+    if (!id || openingAxis) return;
+    levelTab = false;
+    axisBeforeUrban = null;
+    if (browseState().axis === id) return;
+    showAxis(id);
+  });
+  document.addEventListener(LEVEL_EVENT, (e) => {
+    if (!listenLevel) return;
+    const { level, prev } = e.detail || {};
+    if (!level || level === prev) return;
+    if (level === 'urban') {
+      if (browseState().axis !== 'hanhchinh') axisBeforeUrban = browseState().axis;
+      levelTab = true;
+      showAxis('hanhchinh', { url: false });
+      return;
+    }
+    if (!levelTab || !axisBeforeUrban) return;
+    const back = axisBeforeUrban;
+    axisBeforeUrban = null;
+    levelTab = false;
+    showAxis(back, { url: false });
   });
   document.getElementById('axisDock')?.addEventListener('click', (e) => {
     const tab = e.target.closest('[data-axis-dock]');
@@ -580,6 +607,7 @@ export function initChuyenNganh() {
   const openDeep = q.has('nganh') || q.has('truc');
   if (openDeep) showAxis(browseState().axis, { openPanel: true, url: false });
   else paint();
+  listenLevel = true;
 
   loadKienTruc();
   loadFacetCatalog().then(() => {
