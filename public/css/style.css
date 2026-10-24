@@ -6492,3 +6492,4 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
 .cd-gaps b { color: var(--axis-color-strong); }
 .cd-chart-switch { display: flex; gap: 8px; }
 .cd-auto { display: inline-block; margin-left: 4px; padding: 0 4px; border-radius: var(--r-sm); background: var(--axis-bg-hover); color: var(--main-accent); font-size: var(--axis-fs-chip); font-weight: 700; }
+.cd-val { margin-left: 4px; color: var(--axis-color-strong); font-weight: 700; }

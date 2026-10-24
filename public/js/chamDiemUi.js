@@ -1,4 +1,4 @@
-// Tab Chấm điểm trên trục Hành chính. Số liệu chỉ từ CSV, không suy ra từ bản đồ.
+// Tab Chấm điểm trên trục Hành chính. Ô trống lấy số tự tính; bảng ghi đè.
 import { escapeHtml } from './utils.js';
 import { highlightWardBoundary, highlightWardNames } from './mapEngine.js';
 import { state } from './state.js';
@@ -14,7 +14,7 @@ import { densityArea, loadBuiltAreas, loadRoadTypeLengths } from './wardRoads.js
 import { URBANS } from './urbanClass.js';
 import { loadPartGeoms } from './urbanPartGeom.js';
 
-const NF = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
+const NF = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 3 });
 const fmt = (n) => (n == null || !Number.isFinite(Number(n)) ? '—' : NF.format(Number(n)));
 const KET = { dat: 'Đạt', khong: 'Không đạt', chua: 'Chưa đánh giá' };
 const ketCls = { dat: 'c-green', khong: 'c-red', chua: 'c-muted' };
@@ -194,13 +194,23 @@ function badge(pack, id) {
   return '';
 }
 
+function shownValue(raw) {
+  if (raw == null || raw === '') return '';
+  const text = String(raw).trim();
+  if (/^-?\d+(?:[.,]\d+)?$/.test(text)) return fmt(Number(text.replace(',', '.')));
+  return text;
+}
+
 function rowHtml(it, pack) {
   const spec = tieuChuan(it.id);
   const ten = spec ? spec.ten : it.id;
   const cell = pack.nguon && pack.nguon.get(it.id);
+  const val = shownValue(cell && cell.value);
+  const unit = val && spec && spec.donVi && /^-?\d/.test(val) ? ` ${spec.donVi.trim()}` : '';
+  const valHtml = val ? `<span class="cd-val">${escapeHtml(val + unit)}</span>` : '';
   const note = (it.notes || []).length ? `<small class="cd-mini">${escapeHtml(it.notes[0])}</small>` : '';
   const why = cell && cell.ghiChu ? `<small class="cd-mini">${escapeHtml(cell.ghiChu)}</small>` : '';
-  return `<li><b>${escapeHtml(it.id)}</b> ${escapeHtml(ten)} ${badge(pack, it.id)} <span>${escapeHtml(gapText(it))}</span>${note}${why}</li>`;
+  return `<li><b>${escapeHtml(it.id)}</b> ${escapeHtml(ten)} ${badge(pack, it.id)} ${valHtml} <span>${escapeHtml(gapText(it))}</span>${note}${why}</li>`;
 }
 
 function section(title, list, open, pack) {
