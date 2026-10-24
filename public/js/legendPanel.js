@@ -190,6 +190,10 @@ export function initLegendPanel() {
     if (legendFoldEl.open) delete frame.dataset.userHide;
     else frame.dataset.userHide = '1';
   });
+  // Nút cấp và nút thu nhóm nằm trong summary: chặn toggle của details.
+  legendFoldEl?.querySelector('summary')?.addEventListener('click', (e) => {
+    if (e.target.closest('button')) e.preventDefault();
+  });
   chip?.addEventListener('click', () => {
     delete frame.dataset.userHide;
     syncLegend();

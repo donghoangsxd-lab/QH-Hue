@@ -44,7 +44,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261043">
+  <link rel="stylesheet" href="css/style.css?v=20261044">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -851,20 +851,22 @@
     </div>
     <div class="rp-dock" id="rpDock">
       <details class="dock-fold" id="legendFold">
-        <summary>Chú giải</summary>
-        <div class="dock-body">
-<div class="tab-body legend-inpanel" id="tabLegend">
-        <div class="layer-tree">
-        <div class="layer-main legend-main">
-          <div class="layer-main-tabs" role="tablist" aria-label="Ký hiệu sử dụng đất theo cấp đồ án">
+        <summary class="legend-sum">
+          <span class="legend-sum-title">Chú giải</span>
+          <span class="layer-main-tabs legend-level-chips" role="tablist" aria-label="Ký hiệu sử dụng đất theo cấp đồ án">
             <button type="button" class="layer-main-tab" role="tab" data-legend-set="URBAN" aria-selected="false" title="Ký hiệu lớp Phân loại đô thị: hiện trạng theo Quyết định 614/QĐ-UBND, quy hoạch theo Quyết định 756/QĐ-UBND; xem quyết định phê duyệt"><span class="layer-main-label"><small>PHÂN LOẠI</small>Đô thị</span></button>
             <button type="button" class="layer-main-tab" role="tab" data-legend-set="QHC25" aria-selected="false" title="Ký hiệu sơ đồ tổ chức không gian đồ án quy hoạch chung tỷ lệ 1/25.000 (sẽ bổ sung)"><span class="layer-main-label"><small>QHC</small>1/25.000</span></button>
             <button type="button" class="layer-main-tab" role="tab" data-legend-set="QHC" aria-selected="false" title="Ký hiệu chức năng sử dụng đất đồ án quy hoạch chung đô thị theo Thông tư 16/2025/TT-BXD, Phụ lục I Mục 02 (PL1, tỷ lệ 1/10.000)"><span class="layer-main-label"><small>QHC</small>1/10.000</span></button>
             <button type="button" class="layer-main-tab active" role="tab" data-legend-set="QHPK" aria-selected="true" title="Ký hiệu sử dụng đất đồ án quy hoạch phân khu theo Thông tư 16/2025/TT-BXD, Phụ lục I Mục 04 (QHPK 1/2.000, 1/5.000) — bộ đang dùng cho toàn bộ đồ án hiện có. Thu nhỏ tô đặc màu ký hiệu; phóng to từ mức 17 hiện hoa văn"><span class="layer-main-label"><small>QHPK</small>1/2.000</span></button>
             <button type="button" class="layer-main-tab" role="tab" data-legend-set="QHCT" aria-selected="false" title="Ký hiệu sử dụng đất đồ án quy hoạch chi tiết theo Thông tư 16/2025/TT-BXD, Phụ lục I Mục 05 (QHCT 1/500). Cùng hoa văn Mục 04, màu ACI của Mục 05"><span class="layer-main-label"><small>QHCT</small>1/500</span></button>
             <button type="button" class="layer-main-tab" role="tab" data-legend-set="SECTOR" aria-selected="false" hidden title="Ký hiệu ngành hạ tầng kỹ thuật đang bật"><span class="layer-main-label"><small>HẠ TẦNG</small><span id="legendSectorName">Ngành</span></span></button>
-            <button type="button" class="layer-eye-btn" id="btnLegendFold" aria-pressed="false" title="Thu gọn mọi nhóm" aria-label="Thu gọn / mở mọi nhóm ký hiệu"><svg class="ico"><use href="#i-chevs-down"/></svg></button>
-          </div>
+          </span>
+          <button type="button" class="layer-eye-btn" id="btnLegendFold" aria-pressed="false" title="Thu gọn mọi nhóm" aria-label="Thu gọn / mở mọi nhóm ký hiệu"><svg class="ico"><use href="#i-chevs-down"/></svg></button>
+        </summary>
+        <div class="dock-body">
+<div class="tab-body legend-inpanel" id="tabLegend">
+        <div class="layer-tree">
+        <div class="layer-main legend-main">
           <div class="layer-main-pane">
             <input type="search" id="legendSearch" class="project-search" placeholder="Tìm loại đất, tên layer CAD..." aria-label="Tìm ký hiệu sử dụng đất">
             <div class="tt16-legend" id="parcelLegend"></div>
@@ -1627,6 +1629,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261043"></script>
+  <script type="module" src="./js/app.js?v=20261044"></script>
 </body>
 </html>
