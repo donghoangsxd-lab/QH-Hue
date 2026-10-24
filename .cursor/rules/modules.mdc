@@ -11,7 +11,7 @@ JS giao diện nằm dưới `public/js/`. File lớn: `rg` tên hàm hoặc `ac
 
 `public/index.html` (rg id), `public/css/style.css` (rg selector), `public/phan-tich-3d.html`, `public/css/phan-tich-3d.css`, `public/sw.js`, `public/manifest.webmanifest`.
 
-`app.js`: `loadInfraData`, `chooseWard`, `initMapTitle`, `initLayerMapTabs`, `initLayerMainTabs`. `introTour.js` `openIntroTour`. `mobileShell.js` `initMobileShell`. `faqPanel.js` `initFaqPanel`. `legendPanel.js` `initLegendPanel`. `loadProgress.js`. `overview.js` `initOverview`, `openOverview`. `overviewDemo.js`. `mapLevel.js` `initMapLevel`, `setLevel`. `viewFlow.js` `initViewFlow`. `viewLink.js` `initViewLink` (ghép `kv` / `nganh` / `truc` từ MOD-23, không còn `tt`). `streetView.js`. `schemeVisibility.js`. `scripts/build-faq.js`.
+`app.js`: `loadInfraData`, `chooseWard`, `initMapTitle`, `initLayerMapTabs`, `initLayerMainTabs`. `introTour.js` `openIntroTour`. `mobileShell.js` `initMobileShell`. `faqPanel.js` `initFaqPanel`. `legendPanel.js` `initLegendPanel`. `loadProgress.js`. `overview.js` `initOverview`, `openOverview`. `overviewDemo.js`. `mapLevel.js` `initMapLevel`, `setLevel`. `viewFlow.js` `initViewFlow`. `viewLink.js` `initViewLink` (ghép `kv` / `nganh` / `truc` từ MOD-23, không còn `tt`). `streetView.js`. `mapContext.js` `initMapContext` (menu chuột phải). `schemeVisibility.js`. `scripts/build-faq.js`.
 
 ## MOD-02 UI dùng chung
 

@@ -1,4 +1,4 @@
-// Lớp quy hoạch đang xem (droplist trên thanh tiêu đề). Mỗi lớp một luồng tương tác riêng; viewFlow.js định tuyến click
+// Lớp quy hoạch đang xem (hàng nút trên panel phải). Mỗi lớp một luồng tương tác riêng; viewFlow.js định tuyến click
 // bản đồ quy hoạch theo lớp đang chọn (không lớp nào chọn phường từ bản đồ; chọn phường ở droplist bảng tổng hợp):
 //  urban  Hệ thống đô thị (chk_urban)   bấm đô thị → nổi ranh + phạm vi đã có QHC / QHPK / QHCT (urbanFocus.js), bấm vùng
 //                                        đồ án → chi tiết
@@ -8,7 +8,7 @@
 //  qhpk   QHPK 1/2.000 (chk_projects)    ranh mọi đồ án; bấm ranh hoặc tick đồ án mới hiện lô.
 //                                        Ranh điều chỉnh và QHCT chỉ khi đang mở một đồ án. Chọn phường: lô cả phường
 //  qhct   QHCT 1/500 (chk_qhct)          ranh + tên các đồ án QHCT nhập, bấm đồ án → chi tiết; lô QHCT tĩnh (qhctLayer.js)
-// Chọn từ droplist: bật lớp đó, tắt 4 lớp còn lại. Bật thêm lớp ở panel Lớp dữ liệu để so sánh: lớp đang chọn giữ nguyên;
+// Chọn một nút ở panel phải: bật lớp đó, tắt 4 lớp còn lại. Bật thêm lớp ở danh sách để so sánh: lớp đang chọn giữ nguyên;
 // lớp đang chọn bị tắt mà còn lớp khác bật thì chuyển sang lớp đó.
 import { escapeHtml, ico } from './utils.js';
 
@@ -31,8 +31,7 @@ let origin = null;
 let applying = false;
 // Tab kiểm tra quy hoạch đang tự chọn lớp: mở đồ án giao vùng không được kéo droplist sang cấp đồ án kia
 let levelLock = 0;
-let button = null;
-let menu = null;
+let host = null;
 
 export const getLevel = () => level;
 export const levelOrigin = () => origin;
@@ -60,7 +59,7 @@ export function withLevelLock(fn) {
 }
 
 /** Chọn lớp: bật lớp này, tắt 4 lớp còn lại (gọi lại cùng lớp để đặt lại về chỉ một lớp).
- *  opts.origin: lớp chuyển sang. opts.keepView: droplist QHC 1/10.000 và 1/25.000 không phóng khung hình.
+ *  opts.origin: lớp chuyển sang. opts.keepView: chọn QHC 1/10.000 và 1/25.000 không phóng khung hình.
  *  opts.fromHold: được phép đổi lớp khi đang withLevelLock (tab kiểm tra tự chọn). */
 export function setLevel(id, { origin: from = null, keepView = false, fromHold = false } = {}) {
   if (levelLock && !fromHold) return;
@@ -102,111 +101,29 @@ function onLayerChange(e) {
   emit(prev);
 }
 
-// ---------- Droplist ----------
 function paint() {
   const cur = byId.get(level);
   document.body.dataset.level = level;
-  if (button) {
-    const text = button.querySelector('.map-title-level-text');
-    if (text) text.textContent = cur.label;
-    button.title = `Lớp đang xem: ${cur.label}. Bấm để chọn lớp khác`;
-    button.dataset.level = level;
-  }
-  if (!menu) return;
-  menu.querySelectorAll('[data-level]').forEach(el => {
+  if (!host) return;
+  host.dataset.level = level;
+  host.querySelectorAll('[data-level]').forEach(el => {
     const on = el.dataset.level === level;
-    el.hidden = false;
     el.classList.toggle('is-current', on);
     el.setAttribute('aria-selected', String(on));
     el.classList.toggle('is-on', isOn(byId.get(el.dataset.level).chk));
-  });
-}
-
-// Nút giữ bề rộng của nhãn dài nhất: đổi lớp không làm nút (và menu thẳng hàng với nút) xê dịch
-function fitButton() {
-  const text = button?.querySelector('.map-title-level-text');
-  if (!text) return;
-  const cur = text.textContent;
-  text.style.minWidth = '';
-  const widest = Math.max(...LEVELS.map(l => { text.textContent = l.label; return text.scrollWidth; }));
-  text.textContent = cur;
-  const cap = parseFloat(getComputedStyle(text).maxWidth) || Infinity;
-  text.style.minWidth = `${Math.ceil(Math.min(widest, cap))}px`;
-}
-
-// Cùng điều kiện với khối điện thoại trong style.css. Máy tính (chuột, cửa sổ hẹp) giữ menu trùng mép nút.
-const PHONE_LAYOUT = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px))');
-
-// Menu rộng bằng nhãn dài nhất, không cắt chữ. Cao hơn phần màn hình còn lại thì cuộn trong danh sách.
-function placeMenu() {
-  const r = button.getBoundingClientRect();
-  const icon = button.querySelector('.ico');
-  const inset = menu.clientLeft + parseFloat(getComputedStyle(menu).paddingLeft);
-  const vw = document.documentElement.clientWidth || window.innerWidth;
-  const vh = document.documentElement.clientHeight || window.innerHeight;
-  menu.style.width = 'max-content';
-  menu.style.maxWidth = 'none';
-  menu.style.maxHeight = 'none';
-  const need = menu.scrollWidth;
-  const width = Math.min(Math.max(need, 160), Math.max(160, vw - 16));
-  menu.style.width = `${width}px`;
-  let left = PHONE_LAYOUT.matches ? Math.round(r.right - width) : Math.round(r.left);
-  if (left < 8) left = 8;
-  if (left + width > vw - 8) left = Math.max(8, vw - 8 - width);
-  const top = Math.round(r.bottom + 6);
-  const maxH = Math.max(96, vh - top - 8);
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
-  menu.style.maxHeight = `${maxH}px`;
-  if (icon) menu.style.setProperty('--level-indent', `${Math.max(0, Math.round(icon.getBoundingClientRect().left - r.left - inset))}px`);
-}
-
-function openMenu(on) {
-  if (!menu || !button) return;
-  menu.hidden = !on;
-  button.setAttribute('aria-expanded', String(on));
-  if (!on) return;
-  paint();
-  placeMenu();
-  (menu.querySelector('[data-level].is-current') || menu.querySelector('[data-level]'))?.focus();
-}
-
-function buildMenu() {
-  menu = document.createElement('div');
-  menu.className = 'level-menu';
-  menu.id = 'mapLevelMenu';
-  menu.setAttribute('role', 'listbox');
-  menu.setAttribute('aria-label', 'Chọn lớp quy hoạch');
-  menu.hidden = true;
-  menu.innerHTML = LEVELS.map(l => `<button type="button" class="level-item${l.pending ? ' is-pending' : ''}" role="option" data-level="${l.id}"${l.pending ? ' title="Chưa có dữ liệu"' : ''}>${ico('layers')}<span>${escapeHtml(l.label)}</span></button>`).join('');
-  document.body.appendChild(menu);
-  menu.addEventListener('click', (e) => {
-    const item = e.target.closest('[data-level]');
-    if (!item) return;
-    openMenu(false);
-    setLevel(item.dataset.level, { keepView: item.dataset.level === 'qhc10' || item.dataset.level === 'qhc25' });
-    button.focus();
-  });
-  menu.addEventListener('keydown', (e) => {
-    const items = [...menu.querySelectorAll('[data-level]:not([hidden])')];
-    const i = items.indexOf(document.activeElement);
-    if (e.key === 'Escape') { openMenu(false); button.focus(); e.preventDefault(); }
-    else if (e.key === 'ArrowDown') { items[(i + 1) % items.length].focus(); e.preventDefault(); }
-    else if (e.key === 'ArrowUp') { items[(i - 1 + items.length) % items.length].focus(); e.preventDefault(); }
+    el.title = on ? `Đang xem: ${cur.label}` : `Xem ${byId.get(el.dataset.level).label}`;
   });
 }
 
 export function initMapLevel() {
-  button = document.getElementById('btnMapLevel');
-  if (button) {
-    buildMenu();
-    fitButton();
-    document.fonts?.ready.then(fitButton);
-    button.addEventListener('click', () => openMenu(menu.hidden));
-    document.addEventListener('pointerdown', (e) => {
-      if (!menu.hidden && !menu.contains(e.target) && !button.contains(e.target)) openMenu(false);
+  host = document.getElementById('levelPick');
+  if (host && !host.childElementCount) {
+    host.innerHTML = LEVELS.map(l => `<button type="button" class="level-pick-btn${l.pending ? ' is-pending' : ''}" role="option" data-level="${l.id}">${ico('layers')}<span>${escapeHtml(l.label)}</span></button>`).join('');
+    host.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-level]');
+      if (!item) return;
+      setLevel(item.dataset.level, { keepView: item.dataset.level === 'qhc10' || item.dataset.level === 'qhc25' });
     });
-    window.addEventListener('resize', () => { fitButton(); if (!menu.hidden) placeMenu(); });
   }
   document.addEventListener('change', onLayerChange);
   // Mở trang luôn về Hệ thống đô thị. Ô lớp trình duyệt khôi phục từ lần trước không được thắng.

@@ -763,6 +763,108 @@ export function openMeasurePlan(ring, targetMap) {
   if (bounds) requestAnimationFrame(() => nudgeParcel(targetMap, bounds));
 }
 
+/** Cùng lối với bấm thửa: mở bảng thửa (hoặc popup) tại điểm, kể cả khi lớp đang tắt. */
+export function openParcelAt(latlng, targetMap) {
+  return openParcel(latlng, targetMap, null);
+}
+
+/** Địa chỉ và xã cũ trên thửa chứa điểm. null nếu không có thửa. Không gọi dịch vụ trả phí. */
+export async function parcelFactsAt(latlng) {
+  const found = await parcelAt(latlng);
+  if (!found) return null;
+  await loadXaList().catch(() => null);
+  const p = found.hit.props;
+  const xa = xaByCode.get(String(p.m));
+  return {
+    address: String(p.d || '').trim(),
+    oldWard: xa ? `${xa.tenxa}${xa.tenhuyen ? `, ${xa.tenhuyen}` : ''}` : ''
+  };
+}
+
+const PLAN_FINEST = ['qhct', 'qhpk', 'qhc10', 'qhc25'];
+const pageHasLots = (page) => String(page?.html || '').includes('pls-lot');
+
+function pointSquare(latlng) {
+  const dLat = 0.00003;
+  const dLng = 0.00003 / Math.max(0.2, Math.cos(latlng.lat * Math.PI / 180));
+  const { lat, lng } = latlng;
+  return {
+    type: 'Polygon',
+    coordinates: [[[lng - dLng, lat - dLat], [lng + dLng, lat - dLat], [lng + dLng, lat + dLat], [lng - dLng, lat + dLat], [lng - dLng, lat - dLat]]]
+  };
+}
+
+function planPointCardHtml(tab, place) {
+  const sub = place === 'point' ? 'Điểm bấm, không có thửa' : 'Theo ranh thửa tại điểm bấm';
+  return `${tabsBar(tab, 'Lớp quy hoạch tại vị trí', 'Đóng bảng quy hoạch')}
+    <div class="cad-id"><div class="lp-head"><div class="lp-head-main">
+      <div class="lp-title-row"><span class="lp-title">Quy hoạch tại vị trí</span></div>
+      <div class="lp-sub">${sub}</div>
+    </div></div></div>
+    <div class="cad-page" role="tabpanel"><div class="cad-busy">Đang chọn cấp chi tiết nhất tại điểm này…</div></div>`;
+}
+
+/**
+ * Bảng 4 cấp như bảng thửa. Mặc định cấp có lô tại điểm, chi tiết nhất trước:
+ * QHCT 1/500, QHPK 1/2.000, QHC 1/10.000, QHC 1/25.000. Bấm tab để đổi cấp.
+ */
+export async function openPlanAt(latlng, targetMap) {
+  if (!targetMap || !latlng) return false;
+  document.dispatchEvent(new CustomEvent('qh-dock-card', { detail: 'cadastre' }));
+  closeDocked();
+  closeParcel();
+  const mySeq = clickSeq;
+  let geom = null;
+  let recorded = 0;
+  let place = 'point';
+  try {
+    const found = await parcelAt(latlng);
+    if (mySeq !== clickSeq) return false;
+    if (found) {
+      const shape = await parcelShape(found.hit, DATA_ZOOM, found.x, found.y);
+      if (mySeq !== clickSeq) return false;
+      geom = shape?.geometry || null;
+      recorded = Number(found.hit.props.a) || 0;
+      place = 'parcel';
+    }
+  } catch (err) {
+    console.warn('Không lấy được thửa để đối chiếu quy hoạch:', err);
+  }
+  if (mySeq !== clickSeq) return false;
+  if (!geom) geom = pointSquare(latlng);
+  const el = ensureCard();
+  cardState = {
+    kind: 'plan', place, tab: 'qhct', cache: new Map(),
+    recorded, geom, map: targetMap, bounds: null, landKey: null
+  };
+  el.innerHTML = planPointCardHtml('qhct', place);
+  el.hidden = false;
+  el.setAttribute('aria-label', 'Thông tin quy hoạch tại vị trí');
+  const feature = { type: 'Feature', properties: {}, geometry: geom };
+  drawHighlight(feature, targetMap);
+  const mine = cardState;
+  const dropped = () => {
+    if (clickSeq === mySeq && cardState === mine) return false;
+    if (cardState === mine) closeParcel();
+    return true;
+  };
+  let chosen = 'qhc25';
+  for (const id of PLAN_FINEST) {
+    if (dropped()) return false;
+    try {
+      const page = await planPage(id, geom, recorded, place === 'parcel' ? undefined : place);
+      if (dropped()) return false;
+      mine.cache.set(id, page);
+      if (pageHasLots(page)) { chosen = id; break; }
+    } catch (err) {
+      console.warn('Đối chiếu quy hoạch', id, err);
+    }
+  }
+  if (dropped()) return false;
+  showTab(chosen);
+  return true;
+}
+
 // replaced: popup lô đồ án mở cùng cú bấm, chỉ đóng khi tìm thấy thửa (không thấy thì giữ popup lô)
 async function openParcel(latlng, targetMap, replaced) {
   const seq = ++clickSeq;
@@ -771,7 +873,7 @@ async function openParcel(latlng, targetMap, replaced) {
     [found] = await Promise.all([parcelAt(latlng), loadXaList().catch(() => null)]);
   } catch (err) {
     if (seq === clickSeq) showToast(`Chưa tải được dữ liệu thửa đất: ${err.message}`, 'error');
-    return false;
+    return null;
   }
   if (seq !== clickSeq) return false;
   if (!found) {

@@ -240,11 +240,14 @@ async function staleDesktop(page, base, { qhc, panel, shot, keepQhpk }) {
 }
 
 async function openLevel(page, id) {
-  const current = await page.getAttribute('#btnMapLevel', 'data-level');
+  const current = await page.getAttribute('#levelPick', 'data-level');
   if (current === id) return;
-  await page.click('#btnMapLevel');
-  await page.locator(`#mapLevelMenu [data-level="${id}"]`).click();
-  await page.waitForFunction((want) => document.getElementById('btnMapLevel')?.dataset.level === want, id);
+  if (await page.evaluate(() => document.body.classList.contains('right-collapsed'))) {
+    await page.click('#btnExpandRightPanel');
+    await page.waitForFunction(() => !document.body.classList.contains('right-collapsed'));
+  }
+  await page.locator(`#levelPick [data-level="${id}"]`).click();
+  await page.waitForFunction((want) => document.getElementById('levelPick')?.dataset.level === want, id);
 }
 
 async function scene(page, name) {

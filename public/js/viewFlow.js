@@ -1,6 +1,6 @@
 // Luồng xem theo lớp quy hoạch (mapLevel.js) và địa bàn:
 // 1. Mở trang: bản đồ quy hoạch toàn TP, lớp Hệ thống đô thị (ranh 40 phường xã + phân loại đô thị), panel dưới và phải ẩn.
-// 2. Đổi lớp ở droplist tiêu đề: bật lớp đó, tắt 4 lớp kia, vào luồng riêng của lớp. Bấm bản đồ quy hoạch không chọn
+// 2. Đổi lớp ở hàng «Lớp đang xem» trên panel phải: bật lớp đó, tắt 4 lớp kia, vào luồng riêng của lớp. Bấm bản đồ quy hoạch không chọn
 //    phường ở mọi lớp; chọn phường ở droplist bảng tổng hợp (panel dưới).
 //    - Hệ thống đô thị: bấm ký hiệu, nét ranh hoặc trong ranh một đô thị → chọn đô thị (urbanFocus.js): nổi ranh, tô phạm vi
 //      đã có QHC / QHPK / QHCT, bấm vùng đồ án để mở; vùng QHC đô thị TT Huế 2045 → QHC 1/10.000 và mở lô.

@@ -70,6 +70,7 @@ import { initLotEdit } from './lotEdit.js';
 import { initWardRoads } from './wardRoads.js';
 import { initCustomRoads, handleRoadDrawClick } from './customRoads.js';
 import { initStreetView } from './streetView.js';
+import { initMapContext } from './mapContext.js';
 import { initView3d } from './view3dPanel.js';
 import { initPopEdits, handlePopDrawClick } from './popEdits.js';
 import { initRoadNetworkLayer } from './roadNetworkLayer.js';
@@ -117,8 +118,9 @@ function addTypeSwatches() {
   });
 }
 
-// Đô thị / Quy hoạch / Công trình là 3 tab cùng cấp; đổi lớp ở droplist (mapLevel.js) thì mở tab Đô thị (Hệ thống đô thị)
-// hoặc Quy hoạch (4 cấp còn lại). Bản đồ nền / Bản đồ môi trường là 2 tab ở dưới. Chuyển tab chỉ đổi danh sách đang xem, không bật/tắt lớp.
+// Đô thị / Quy hoạch / Công trình là 3 tab cùng cấp; đổi lớp ở hàng «Lớp đang xem» trên panel phải (mapLevel.js)
+// thì mở tab Đô thị (Hệ thống đô thị) hoặc Quy hoạch (4 cấp còn lại). Bản đồ nền / Bản đồ môi trường là 2 tab ở dưới.
+// Chuyển tab chỉ đổi danh sách đang xem, không bật/tắt lớp.
 function initLayerMapTabs() {
   const root = document.getElementById('layerMap');
   if (!root) return;
@@ -365,8 +367,8 @@ export async function submitInfraPoint(prefix, extra = {}) {
   }
 }
 
-// Thanh tiêu đề: nút lật trang (biểu tượng bên trái) Quy hoạch ⇄ Hiện trạng, droplist lớp quy hoạch bên phải (mapLevel.js,
-// chỉ hiện trên bản đồ quy hoạch), chia đôi thì chọn cùng tâm / lệch tâm.
+// Thanh tiêu đề gộp một dòng giới thiệu, đóng được. Chọn lớp ở panel phải (mapLevel.js).
+// Nút lật trang (biểu tượng bên trái) Quy hoạch ⇄ Hiện trạng; chia đôi thì chọn cùng tâm / lệch tâm.
 // Lớp đồ án QHPK theo lớp đang chọn: đang xem QHPK thì lật sang hiện trạng tắt, lật về quy hoạch bật lại.
 const VIEW_TITLES = {
   QH: 'BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ',
@@ -378,13 +380,29 @@ const VIEW_TITLES_SHORT = {
   HT: 'BẢN ĐỒ HIỆN TRẠNG TP HUẾ',
   split: 'SO SÁNH HT – QH TP HUẾ'
 };
+const TITLE_OFF_KEY = 'qhhue_title_off';
 function initMapTitle() {
   const root = document.getElementById('mapTitle');
   if (!root) return;
+  const titleOff = () => {
+    try { return localStorage.getItem(TITLE_OFF_KEY) === '1'; } catch { return false; }
+  };
+  const syncTitleBox = () => {
+    const off = titleOff();
+    document.documentElement.classList.toggle('title-dismissed', off);
+    const launch = document.getElementById('btnOverview');
+    if (launch) launch.hidden = !off;
+    if (off) {
+      document.documentElement.style.setProperty('--title-h', '8px');
+      return;
+    }
+    const h = root.offsetHeight;
+    if (h > 8) document.documentElement.style.setProperty('--title-h', `${Math.ceil(h)}px`);
+  };
   const text = document.getElementById('mapTitleText');
   const flip = document.getElementById('btnFlipView');
   let titleKey = 'QH';
-  // Hộp tiêu đề co chữ để không đè bảng thông tin bên trái, cột công cụ, panel phải, và giữ nút chọn lớp bên phải.
+  // Hộp tiêu đề co chữ để không đè bảng thông tin bên trái, cột công cụ và panel phải.
   const fitTitle = () => {
     if (!text) return;
     const vw = document.documentElement.clientWidth || window.innerWidth;
@@ -426,16 +444,22 @@ function initMapTitle() {
     };
     const fits = () => root.scrollWidth <= root.clientWidth + 1;
     apply(full, 0);
-    if (fits()) return;
-    const base = parseFloat(getComputedStyle(text).fontSize) || 14;
-    for (const size of [base - 1, base - 2, Math.max(11, base - 3)]) {
-      apply(full, size);
-      if (fits()) return;
+    if (!fits()) {
+      const base = parseFloat(getComputedStyle(text).fontSize) || 14;
+      let fitted = false;
+      for (const size of [base - 1, base - 2, Math.max(11, base - 3)]) {
+        apply(full, size);
+        if (fits()) { fitted = true; break; }
+      }
+      if (!fitted) {
+        apply(short, 0);
+        if (!fits()) {
+          const base2 = parseFloat(getComputedStyle(text).fontSize) || 13;
+          apply(short, Math.max(11, base2 - 1));
+        }
+      }
     }
-    apply(short, 0);
-    if (fits()) return;
-    const base2 = parseFloat(getComputedStyle(text).fontSize) || 13;
-    apply(short, Math.max(11, base2 - 1));
+    syncTitleBox();
   };
   const setProjects = (on) => {
     const chk = document.getElementById('chk_projects');
@@ -479,6 +503,16 @@ function initMapTitle() {
   flip?.addEventListener('click', toggleViewMode);
   root.querySelectorAll('[data-split-kind]').forEach(btn => btn.addEventListener('click', () => setSplitKind(btn.dataset.splitKind)));
   paint({ view: getViewMode(), split: isSplitOn(), kind: getSplitKind() });
+  document.getElementById('btnTitleDismiss')?.addEventListener('click', () => {
+    try { localStorage.setItem(TITLE_OFF_KEY, '1'); } catch { /* chế độ riêng tư */ }
+    syncTitleBox();
+  });
+  document.addEventListener('qh-title-restore', () => {
+    try { localStorage.removeItem(TITLE_OFF_KEY); } catch { /* chế độ riêng tư */ }
+    syncTitleBox();
+    requestAnimationFrame(fitTitle);
+  });
+  syncTitleBox();
   const refit = () => requestAnimationFrame(fitTitle);
   window.addEventListener('resize', fitTitle);
   new MutationObserver(fitTitle).observe(document.body, { attributes: true, attributeFilter: ['class'] });
@@ -787,7 +821,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }));
   map.on('click', (e) => handleMapClick(e, map));
   planMap?.on('click', (e) => handleMapClick(e, planMap));
-  initStreetView([map, planMap]);
+  initStreetView();
+  initMapContext([map, planMap]);
   initView3d([map, planMap]);
 
   document.getElementById('btnMeasureDist')?.addEventListener('click', () => toggleMeasure('distance'));
