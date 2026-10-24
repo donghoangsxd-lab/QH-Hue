@@ -44,7 +44,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261049">
+  <link rel="stylesheet" href="css/style.css?v=20261050">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -424,9 +424,8 @@
       </div>
     </div>
 
-    <button type="button" class="rp-expand-btn ui-panel-format" id="btnExpandRightPanel" title="Mở panel công cụ" aria-label="Mở panel công cụ"><svg class="ico"><use href="#i-chev-right"/></svg></button>
     <div class="axis-dock" id="axisDock" role="tablist" aria-label="Năm panel">
-      <button type="button" data-axis-dock="hanhchinh" role="tab" aria-selected="false" title="Quản lý theo đơn vị hành chính"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V9l6-5 6 5v11"/><path d="M10 20v-6h4v6"/></svg><span>Hành chính</span></button>
+      <button type="button" data-axis-dock="hanhchinh" role="tab" aria-selected="false" title="Quản lý phát triển đô thị"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V9l6-5 6 5v11"/><path d="M10 20v-6h4v6"/></svg><span>Hành chính</span></button>
       <button type="button" data-axis-dock="quyhoach" class="active" role="tab" aria-selected="true" title="Hệ thống bản đồ quy hoạch"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M4 10h16M10 10v9"/></svg><span>Quy hoạch</span></button>
       <button type="button" data-axis-dock="hatang" role="tab" aria-selected="false" title="Hệ thống hạ tầng kỹ thuật"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17h16M6 17V8h4v9M14 17V5h4v12"/></svg><span>Hạ tầng KT</span></button>
       <button type="button" data-axis-dock="xahoi" role="tab" aria-selected="false" title="Hệ thống hạ tầng xã hội"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 19a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.4"/><path d="M16 19a5 5 0 0 1 5-4"/></svg><span>Hạ tầng XH</span></button>
@@ -452,7 +451,7 @@
           <div class="layer-mag" id="layerMag">
             <button type="button" class="mag-nav" data-mag-step="-1" title="Panel phía trước" aria-label="Panel phía trước"><svg class="ico"><use href="#i-step-left"/></svg></button>
             <div class="mag-track" id="layerMagTrack" role="tablist" aria-label="Năm panel lớp dữ liệu">
-              <button type="button" class="mag-item is-before" role="tab" data-main-tab="hanhchinh" data-dist="1" aria-selected="false" aria-controls="layerPaneHanhChinh" title="Quản lý theo đơn vị hành chính"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">Quản lý theo đơn vị hành chính</span></button>
+              <button type="button" class="mag-item is-before" role="tab" data-main-tab="hanhchinh" data-dist="1" aria-selected="false" aria-controls="layerPaneHanhChinh" title="Quản lý phát triển đô thị"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">Quản lý phát triển đô thị</span></button>
               <button type="button" class="mag-item is-current active" role="tab" data-main-tab="quyhoach" aria-selected="true" aria-controls="layerPaneQuyHoach" title="Hệ thống bản đồ quy hoạch"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">Hệ thống bản đồ quy hoạch</span></button>
               <button type="button" class="mag-item is-after" role="tab" data-main-tab="hatang" data-dist="1" aria-selected="false" aria-controls="layerPaneHaTang" title="Hệ thống hạ tầng kỹ thuật"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">Hệ thống hạ tầng kỹ thuật</span></button>
               <button type="button" class="mag-item is-after" role="tab" data-main-tab="xahoi" data-dist="2" aria-selected="false" aria-controls="layerPaneXaHoi" title="Hệ thống hạ tầng xã hội"><span class="mag-bar" aria-hidden="true"></span><span class="layer-main-label">Hệ thống hạ tầng xã hội</span></button>
@@ -463,14 +462,14 @@
             <div class="mag-menu" id="layerMagMenu" hidden role="listbox" aria-label="Chọn panel"></div>
           </div>
           <div class="admin-tabs" id="adminTabs" role="tablist" aria-label="Đơn vị hành chính và đô thị">
-            <button type="button" class="admin-tab active" data-admin-tab="dvhc" role="tab" aria-selected="true" aria-controls="adminPaneDvhc">Đơn vị hành chính (40)</button>
-            <button type="button" class="admin-tab" data-admin-tab="dothi" role="tab" aria-selected="false" aria-controls="adminPaneDoThi">Đô thị (25)</button>
+            <button type="button" class="admin-tab active" data-admin-tab="dvhc" role="tab" aria-selected="true" aria-controls="adminPaneDvhc">Đơn vị hành chính</button>
+            <button type="button" class="admin-tab" data-admin-tab="dothi" role="tab" aria-selected="false" aria-controls="adminPaneDoThi">Đô thị</button>
           </div>
           <div class="layer-tools" id="layerTools">
             <input type="search" id="layerSearch" class="project-search" placeholder="Tìm kiếm" aria-label="Tìm trong nhóm đang mở">
             <div class="view-switch" role="group" aria-label="Hiện trạng hoặc quy hoạch">
-              <button type="button" data-view-mode="HT" title="Hiện trạng" aria-label="Hiện trạng" aria-pressed="false"><svg class="ico"><use href="#i-locate"/></svg></button>
-              <button type="button" data-view-mode="QH" class="active" title="Quy hoạch" aria-label="Quy hoạch" aria-pressed="true"><svg class="ico"><use href="#i-layers"/></svg></button>
+              <button type="button" data-view-mode="HT" title="Hiện trạng (QĐ 614)" aria-label="Hiện trạng (QĐ 614)" aria-pressed="false"><svg class="ico"><use href="#i-locate"/></svg></button>
+              <button type="button" data-view-mode="QH" class="active" title="Quy hoạch (QĐ 756)" aria-label="Quy hoạch (QĐ 756)" aria-pressed="true"><svg class="ico"><use href="#i-layers"/></svg></button>
             </div>
             <button type="button" class="layer-eye-btn" id="btnAxisAll" title="Bật hoặc tắt các lớp đang hiện trong nhóm này" aria-label="Bật hoặc tắt cả nhóm" aria-pressed="false"><svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg></button>
           </div>
@@ -1625,6 +1624,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261049"></script>
+  <script type="module" src="./js/app.js?v=20261050"></script>
 </body>
 </html>

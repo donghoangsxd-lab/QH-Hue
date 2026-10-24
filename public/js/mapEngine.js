@@ -67,7 +67,7 @@ const CITY_CENTER = [16.4637, 107.5905];
 const CITY_ZOOM = 13;
 const CITY_BOUNDS = [[15.995, 107.034], [16.743, 108.195]];
 const CITY_FIT_PAD = 12;
-const WARD_GEOM_VERSION = 2;
+const WARD_GEOM_VERSION = 3;
 const INFRA_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "7-YT", "8-VH", "9-TM"];
 // 10 nhóm đã có bán kính phục vụ trên panel Hạ tầng xã hội (thêm THPT và PCCC so với 8 nhóm độ phủ).
 const ACCESS_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-THPT", "7-YT", "8-VH", "9-TM", "10-PCCC"];
@@ -518,6 +518,11 @@ export function flyToVisible(latlng, zoom, options) {
   }
   const target = map.project(L.latLng(latlng), zoom).subtract([shift, 0]);
   map.flyTo(map.unproject(target, zoom), zoom, options);
+}
+
+export function clearWardHighlight() {
+  if (layers.highlightWard) layers.highlightWard.clearLayers();
+  highlightPlanWard('');
 }
 
 export function highlightWardBoundary(wardName, { fitView = true } = {}) {
@@ -1081,7 +1086,7 @@ function cityShapeOf(wards) {
       sx += x * area; sy += y * area; sa += area;
     } catch (e) { /* hình học lỗi: bỏ qua khi tính tâm */ }
   });
-  const lines = outerWardLines(wards);
+  const lines = cityOutlineLines();
 
   let center = sa ? { lat: sy / sa, lng: sx / sa } : { lat: CITY_CENTER[0], lng: CITY_CENTER[1] };
   if (!wardNameAt(center.lat, center.lng)) {
@@ -1091,6 +1096,12 @@ function cityShapeOf(wards) {
   }
   cityShape = { source: wards, lines, center };
   return cityShape;
+}
+
+// Quầng vàng chỉ của vành thành phố. Cạnh nội bộ không đi qua hàm này.
+function cityOutlineLines() {
+  const pack = getWardDraw();
+  return pack && pack.outer ? pack.outer : [];
 }
 
 // Ranh TP nổi bật: nét trắng trên quầng vàng nhấp nháy (SVG riêng để tạo hiệu ứng CSS; bản đồ chính vẽ canvas)
@@ -1138,9 +1149,7 @@ function paintWardGroup(group, host) {
     if (layer.options && layer.options.wardRole === 'line') layer.setStyle(WARD_BOUNDARY_LINE_STYLE);
   });
   if (!on) { cityEdgeOwned.delete(host); return; }
-  const pack = getWardDraw();
-  const wards = pack ? pack.features.map(f => ({ geometry: f.geometry })) : (state.wardLabelsList || []);
-  const lines = wards.length ? outerWardLines(wards) : [];
+  const lines = cityOutlineLines();
   if (!lines.length) { cityEdgeOwned.delete(host); return; }
   const outline = createCityOutline(lines, cityRendererOf(host));
   outline.options.wardRole = 'city';

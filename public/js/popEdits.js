@@ -531,7 +531,7 @@ export function initPopEdits() {
       if (panel) panel.style.display = on ? '' : 'none';
     });
   }));
-  document.querySelectorAll('.tab-btn, .add-mode-btn, .admin-sub-btn, .rp-collapse-btn, #btnExpandRightPanel')
+  document.querySelectorAll('.tab-btn, .add-mode-btn, .admin-sub-btn, .rp-collapse-btn')
     .forEach(b => b.addEventListener('click', refreshPopPanel));
   $('btnPopDraw')?.addEventListener('click', () => setDrawing(!drawing()));
   $('btnPopUndo')?.addEventListener('click', undoLast);

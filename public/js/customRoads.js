@@ -419,7 +419,7 @@ export function refreshRoadPanel() {
 }
 
 export function initCustomRoads() {
-  document.querySelectorAll('.tab-btn, .add-mode-btn, .admin-sub-btn, .rp-collapse-btn, #btnExpandRightPanel')
+  document.querySelectorAll('.tab-btn, .add-mode-btn, .admin-sub-btn, .rp-collapse-btn')
     .forEach(b => b.addEventListener('click', refreshRoadPanel));
   $('btnRoadDraw')?.addEventListener('click', () => setDrawing(!drawing()));
   document.addEventListener(TOOL_START_EVENT, (e) => { if (e.detail !== 'road' && drawing()) setDrawing(false); });

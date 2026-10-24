@@ -182,12 +182,17 @@ async function labelsOnScreen(page) {
   });
 }
 
+async function openAxisPanel(page) {
+  if (!(await page.evaluate(() => document.body.classList.contains('right-collapsed')))) return;
+  await page.click('#axisDock [data-axis-dock="quyhoach"]');
+  await page.waitForFunction(() => !document.body.classList.contains('right-collapsed'));
+}
+
 async function staleDesktop(page, base, { qhc, panel, shot, keepQhpk }) {
   await page.goto(base, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await waitCatalog(page);
   if (panel) {
-    await page.click('#btnExpandRightPanel');
-    await page.waitForFunction(() => !document.body.classList.contains('right-collapsed'));
+    await openAxisPanel(page);
     await page.waitForTimeout(400);
   }
   await openLevel(page, 'qhc10');
@@ -242,10 +247,7 @@ async function staleDesktop(page, base, { qhc, panel, shot, keepQhpk }) {
 async function openLevel(page, id) {
   const current = await page.evaluate(() => document.body.dataset.level || '');
   if (current === id) return;
-  if (await page.evaluate(() => document.body.classList.contains('right-collapsed'))) {
-    await page.click('#btnExpandRightPanel');
-    await page.waitForFunction(() => !document.body.classList.contains('right-collapsed'));
-  }
+  await openAxisPanel(page);
   const axis = id === 'urban' ? 'hanhchinh' : 'quyhoach';
   const host = '#levelPickQh';
   const onAxis = await page.evaluate((want) => document.querySelector('#layerMagTrack .is-current')?.dataset.mainTab === want, axis);

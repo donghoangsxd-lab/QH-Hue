@@ -57,7 +57,6 @@ const STAGES = [
 const STAGE_NAMES = ['Hiện trạng', 'Ngắn hạn đến 2030', 'Dài hạn đến 2045'];
 const MISSING_STYLE = { color: '#ef4444', weight: 2.2, dashArray: '8 5', fillColor: '#ef4444', fillOpacity: 0.28, interactive: true };
 const EXT_LINE = { color: '#f43f5e', weight: 3, opacity: 1, dashArray: '12 6' };
-const EXT_HALO = { color: '#0f172a', weight: 6.5, opacity: 0.55 };
 // Mở lô TTHuế 2045 (bấm vào ranh khi đang xem QHC 1/10.000): viewFlow.js bỏ đồ án QHC nhập đang chọn
 export const QHC_CORE_EVENT = 'qh:qhc-core-open';
 // Cùng cách ranh QHC nhập (OUTLINE_QHC): viền liền đậm, nền màu đồ án. Xanh nhạt (họ lạnh QHC); nền chỉ khi đang thu gọn (chưa mở lô)
@@ -745,7 +744,6 @@ async function setExt(on) {
     });
     const lines = outerWardLines(wards);
     const lr = ensureLineRenderer(m);
-    L.polyline(lines, { pane: LINE_PANE[0], renderer: lr, interactive: false, ...EXT_HALO }).addTo(group);
     L.polyline(lines, { pane: LINE_PANE[0], renderer: lr, interactive: false, ...EXT_LINE }).addTo(group);
     layers.ext = group.addTo(m);
     restack();

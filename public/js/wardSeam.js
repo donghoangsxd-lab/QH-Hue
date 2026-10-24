@@ -1,7 +1,6 @@
-// Ranh 40 phường/xã không khít cạnh chung (lệch vài mét) và Leaflet simplify từng polygon
-// (smoothFactor) nên hai nét / hai nền lệch nhau, để lộ nền sáng dọc ranh ở mọi mức phóng.
-// Bản vẽ khép khe ≤ SNAP_M về một cạnh, mỗi cạnh chỉ giữ một lần. Đỉnh đã nằm trên cạnh
-// gần nhất, và cạnh đã trùng một polygon khác, giữ nguyên. Tra điểm vẫn dùng hình gốc.
+// Ranh 40 phường/xã không khít cạnh chung (lệch vài mét). Bản vẽ khép khe ≤ SNAP_M.
+// Cạnh nội bộ (cách ranh đơn vị khác ≤ SNAP_M) chỉ giữ một nét. Vành ngoài thành phố
+// là các cạnh không kề đơn vị khác. Tra điểm vẫn dùng hình gốc.
 
 const SNAP_M = 8;
 const DENSIFY_M = 12;
@@ -339,7 +338,38 @@ function chainLines(segs) {
   return lines;
 }
 
-function dedupedSegments(items) {
+function sampleHitsOther(grid, seg, p) {
+  const cx = Math.floor(p[0] / CELL), cy = Math.floor(p[1] / CELL);
+  for (let dx = -2; dx <= 2; dx++) {
+    for (let dy = -2; dy <= 2; dy++) {
+      const bucket = grid.get(`${cx + dx},${cy + dy}`);
+      if (!bucket) continue;
+      for (let i = 0; i < bucket.length; i++) {
+        const other = bucket[i];
+        if (other.fi === seg.fi) continue;
+        const hit = proj(p, other.a, other.b);
+        if (hit.d <= SNAP_M && hit.t > 0.02 && hit.t < 0.98) return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Một nét cho mỗi cạnh. Cạnh sát đơn vị khác trong SNAP_M bị bỏ nếu đã có nét.
+// Cùng một đơn vị chỉ gom nét trùng ≤ DEDUPE_M, để hành lang hẹp không bị nuốt.
+function meshOf(items) {
+  const { grid, segs } = indexSegs(items);
+  const tagged = segs.map(seg => {
+    let internal = false;
+    const ax = seg.a[0], ay = seg.a[1], bx = seg.b[0], by = seg.b[1];
+    for (const t of [0.5, 0.25, 0.75]) {
+      if (sampleHitsOther(grid, seg, [ax + (bx - ax) * t, ay + (by - ay) * t])) {
+        internal = true;
+        break;
+      }
+    }
+    return { a: seg.a, b: seg.b, fi: seg.fi, internal };
+  });
   const kept = [];
   const keptGrid = new Map();
   const put = (seg) => {
@@ -350,23 +380,20 @@ function dedupedSegments(items) {
       bucket.push(seg);
     });
   };
-  items.forEach(item => {
-    if (!item) return;
-    allRings(item).forEach(ring => {
-      const pts = ring.pts;
-      for (let i = 0; i < pts.length - 1; i++) {
-        const a = pts[i], b = pts[i + 1];
-        if (distM(a, b) < 0.05) continue;
-        const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-        let covered = false;
-        for (const seg of nearSegs(keptGrid, mid)) {
-          if (proj(mid, seg.a, seg.b).d <= DEDUPE_M) { covered = true; break; }
-        }
-        if (!covered) put({ a: [a[0], a[1]], b: [b[0], b[1]] });
-      }
-    });
+  tagged.forEach(seg => {
+    if (distM(seg.a, seg.b) < 0.05) return;
+    const mid = [(seg.a[0] + seg.b[0]) / 2, (seg.a[1] + seg.b[1]) / 2];
+    let covered = false;
+    for (const prev of nearSegs(keptGrid, mid, 2)) {
+      const d = proj(mid, prev.a, prev.b).d;
+      if (d <= DEDUPE_M || (prev.fi !== seg.fi && d <= SNAP_M)) { covered = true; break; }
+    }
+    if (!covered) put({ a: [seg.a[0], seg.a[1]], b: [seg.b[0], seg.b[1]], fi: seg.fi, internal: seg.internal });
   });
-  return kept;
+  return {
+    lines: chainLines(kept),
+    outer: chainLines(kept.filter(s => !s.internal))
+  };
 }
 
 export function sealWardDraw(features) {
@@ -382,7 +409,7 @@ export function sealWardDraw(features) {
       if (r.pts.length >= 2) r.pts[r.pts.length - 1] = r.pts[0];
     });
   });
-  const lines = chainLines(dedupedSegments(items));
+  const mesh = meshOf(items);
   const outFeatures = [];
   const byName = new Map();
   list.forEach((f, i) => {
@@ -395,7 +422,7 @@ export function sealWardDraw(features) {
     const name = wardKey(f.properties, f.name);
     if (name) byName.set(name, geometry);
   });
-  return { features: outFeatures, lines, byName };
+  return { features: outFeatures, lines: mesh.lines, outer: mesh.outer, byName };
 }
 
 let cached = null;

@@ -99,7 +99,6 @@ html.title-dismissed { --title-h: 8px; }
 }
 
 body.right-collapsed { --info-left: 12px; }
-body.right-collapsed .map-title { left: 50%; }
 body, html {
   margin: 0; padding: 0; height: 100vh;
   font-family: var(--font-sans);
@@ -114,7 +113,7 @@ button, input, select, textarea { font-family: inherit; }
   width: 1.25em; height: 1.25em; flex-shrink: 0; vertical-align: -0.28em; margin-right: 0.35em;
   fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
 }
-.map-toolbar .ico, .rp-expand-btn .ico, .rp-collapse-btn .ico, .bp-icon .ico, .swipe-handle .ico,
+.map-toolbar .ico, .rp-collapse-btn .ico, .bp-icon .ico, .swipe-handle .ico,
 .auth-close-btn .ico, .road-del .ico, #btnPickOnMap .ico, .proof-close .ico, .ward-check-close .ico { margin-right: 0; }
 .map-toolbar .ico { width: calc(18px * var(--k)); height: calc(18px * var(--k)); }
 .ico-layer { color: var(--text-muted); width: 1.15em; height: 1.15em; }
@@ -221,11 +220,15 @@ body.split-offset .swipe-handle { display: none; }
   --tone: var(--orange-rgb);
   position: absolute;
   top: 12px;
-  left: calc(50% + (var(--right-w) + 12px) / 2);
-  transform: translateX(-50%);
+  left: calc(12px + var(--right-w) + 16px);
+  right: calc(12px + var(--tb-btn) + 16px);
+  width: max-content;
+  max-width: calc(100% - (12px + var(--right-w) + 16px) - (12px + var(--tb-btn) + 16px));
+  margin-left: auto;
+  margin-right: auto;
+  transform: none;
   z-index: 1100;
   height: auto;
-  max-width: calc(100% - var(--right-w) - 12px - 2 * (var(--ov-w) + 24px));
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -295,7 +298,7 @@ html.show-boot-notice .map-title { padding-bottom: 5px; }
 .map-title-progress.done { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .map-title-progress > i::after { animation: none; } }
 .map-title[data-view="split"]::before { background: linear-gradient(90deg, transparent, var(--accent-cyan) 20%, var(--accent-cyan) 48%, var(--accent-orange) 52%, var(--accent-orange) 80%, transparent); }
-body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-width: calc(100% - 2 * (var(--ov-w) + 24px)); }
+body.right-collapsed .map-title, body.compare-on .map-title { left: calc(12px + var(--right-w) + 16px); right: calc(12px + var(--tb-btn) + 16px); transform: none; }
 /* Ngay dưới thanh tiêu đề, canh giữa thanh đó. Hiện khi đang chọn đồ án, QHC, phường xã hoặc đô thị. */
 .esc-hint {
   position: absolute;
@@ -545,7 +548,7 @@ body:has(#investCard:not([hidden])) .project-brief {
 .map-title-mark:hover:not(:disabled) { border-color: rgba(var(--tone), 0.9); background: rgba(var(--tone), 0.24); box-shadow: 0 0 10px rgba(var(--tone), 0.4); }
 .map-title-mark:hover:not(:disabled) .ico { transform: rotateY(180deg); }
 .map-title-mark:disabled { cursor: default; opacity: 0.75; }
-.map-title-body { min-width: 0; flex: 1 1 auto; overflow: hidden; display: flex; flex-direction: column; justify-content: center; gap: 1px; transform-origin: 50% 50%; }
+.map-title-body { min-width: max-content; flex: 0 0 auto; overflow: visible; display: flex; flex-direction: column; justify-content: center; gap: 1px; transform-origin: 50% 50%; }
 .map-intro-kicker {
   margin: 0;
   font-size: var(--fs-xs);
@@ -589,12 +592,10 @@ body:has(#investCard:not([hidden])) .project-brief {
   letter-spacing: 0.6px;
   color: var(--text-strong);
   line-height: 1.15;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  text-wrap: balance;
-  overflow: hidden;
+  display: block;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
 }
 .map-title.flipping .map-title-body, .map-title.flipping .map-title-mark { animation: map-title-flip 0.5s ease; }
@@ -1036,27 +1037,7 @@ body.compare-on .map-title-split { display: inline-flex; }
   background: rgba(2, 6, 23, 0.55); border: 1px dashed currentColor; border-radius: var(--r-sm);
   outline: none; resize: none; overflow: hidden; field-sizing: content;
 }
-.rp-expand-btn {
-  display: flex;
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  right: auto;
-  z-index: 1001;
-  width: calc(var(--tb-btn) + 8px);
-  height: var(--tb-btn);
-  color: var(--accent-cyan);
-  font-size: var(--fs-xl);
-  font-weight: bold;
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.2s ease, visibility 0s linear 0.2s;
-}
-body.right-collapsed .rp-expand-btn:not(.bp-expand-btn) { opacity: 1; visibility: visible; transition: opacity 0.2s ease 0.1s, visibility 0s; }
-/* Mở lại panel dưới: đối xứng nút mở panel phải qua cạnh dưới */
+/* Mỏ bảng tổng hợp: tab bo phía trên, cùng bề rộng và cùng mép phải cột nút công cụ. */
 .bp-expand-btn { top: auto; bottom: 12px; }
 .map-toolbar #btnExpandBottomPanel { display: none; position: static; top: auto; right: auto; bottom: auto; width: var(--tb-btn); height: var(--tb-btn); opacity: 1; visibility: visible; }
 body.bottom-collapsed:not(.project-review:not(.project-view)) .map-toolbar #btnExpandBottomPanel { display: inline-flex; }
@@ -1067,8 +1048,11 @@ body.bottom-collapsed:not(.project-review:not(.project-view)) .map-toolbar #btnE
     bottom: 0;
     left: auto;
     top: auto;
-    width: 72px;
+    width: var(--tb-btn);
     height: 28px;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
     border-radius: 8px 8px 0 0;
     z-index: 1300;
   }
@@ -5315,8 +5299,6 @@ body.project-review.la-page #projectReviewHost {
   .esc-hint { top: calc(100% + 4px); left: 50%; height: auto; transform: translateX(-50%); }
   .level-item { min-height: 44px; font-size: 13px; padding-top: 8px; padding-bottom: 8px; }
   .ov-launch { top: max(8px, env(safe-area-inset-top)); left: 8px; right: auto; }
-  .rp-expand-btn { left: auto; right: 8px; }
-  .rp-expand-btn { width: 44px; height: 44px; top: max(8px, env(safe-area-inset-top)); right: 8px; }
   .bp-expand-btn { top: auto; bottom: max(8px, env(safe-area-inset-bottom)); right: 8px; }
   /* Cột dọc sát mép trái, dưới tiêu đề, cuộn dọc nếu nút nhiều hơn khoảng trống. Không trải ngang đáy. */
   .map-toolbar {
@@ -6064,7 +6046,7 @@ body.project-review.la-page #projectReviewHost {
 .axis-area-pop, .axis-area-km { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .axis-area.axis-dvhc,
 .axis-area-head.axis-dvhc {
-  grid-template-columns: 2em minmax(0, 1fr) 9.2ch 8.2ch 3.2ch 6.6ch;
+  grid-template-columns: 2em minmax(0, 1fr) 9.2ch 8.2ch 9ch;
   column-gap: 3px;
   padding-right: 1px;
 }
