@@ -3,6 +3,7 @@
 // phường, xã tô riêng theo ranh thị trấn, xã cũ). Bản đồ quy hoạch: hệ thống đô thị sau năm 2030 theo Quyết định 756/QĐ-UBND
 // (urbanVision.js, ranh dựng bằng scripts/build-urban-vision.js). Cùng một checkbox, mỗi bản đồ vẽ nội dung của mình.
 import { map } from './mapEngine.js';
+import { getWardDraw } from './wardSeam.js';
 import { planMap, isCompareOn, isSplitOn, whenMapsIdle } from './planMap.js';
 import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
 import { state } from './state.js';
@@ -34,6 +35,34 @@ const LINE_STYLE = {
 const CLS_RANK = { I: 0, II: 1, III: 2 };
 // Thu nhỏ (≤ 12) tô đậm như bản đồ phân vùng; phóng to thì nhạt dần để không che công trình
 const fillOpacity = (z) => (z <= 10 ? 0.55 : z <= 11 ? 0.42 : z <= 12 ? 0.3 : z <= 14 ? 0.14 : 0.06);
+
+// Nền bán trong suốt vẽ từng polygon bị khử răng cưa thành khe sáng 1 px trên cạnh chung.
+// Vẽ đặc (kèm nét cùng màu 2 px để lấp mép) rồi hạ opacity cả canvas — mép và lòng cùng độ đục.
+const SealCanvas = L.Canvas.extend({
+  onAdd(map) {
+    L.Canvas.prototype.onAdd.call(this, map);
+    this._applySealOpacity();
+  },
+  setSealOpacity(op) {
+    this.options.sealOpacity = op;
+    this._applySealOpacity();
+  },
+  _applySealOpacity() {
+    if (this._container && this.options.sealOpacity != null) this._container.style.opacity = String(this.options.sealOpacity);
+  },
+  _fillStroke(ctx, layer) {
+    const options = layer.options;
+    if (!options.fill) return;
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = options.fillColor || options.color;
+    ctx.fill(options.fillRule || 'evenodd');
+    ctx.strokeStyle = ctx.fillStyle;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  }
+});
 const BADGE_MAX_ZOOM = 15;
 const BADGE_SMALL_ZOOM = 10;
 
@@ -119,7 +148,8 @@ function createUrbanLayer(content) {
   let m = null;
   let visible = false;
   let dataPromise = null;
-  let fillRenderer = null;
+  let urbanRenderer = null;
+  let ruralRenderer = null;
   let townRenderer = null;
   let lineRenderer = null;
   let hoverRenderer = null;
@@ -203,19 +233,24 @@ function createUrbanLayer(content) {
     groups.wards.clearLayers();
     clearWardHover();
     wardHits = [];
-    const op = fillOpacity(m.getZoom());
+    syncFillOpacity();
+    const pack = getWardDraw();
+    const pending = [];
     (state.wardLabelsList || []).forEach(w => {
       if (!w.geometry) return;
       const level = content.wardLevel(w.name);
-      const layer = L.geoJSON(w.geometry, {
-        pane: FILL_PANE, renderer: fillRenderer, interactive: false,
-        style: { stroke: false, fillColor: level ? LEVEL_FILL[level] : RURAL_FILL, fillOpacity: level ? op : op * 0.5 }
+      const geometry = (pack && pack.byName.get(w.name)) || w.geometry;
+      const rural = !level;
+      const layer = L.geoJSON(geometry, {
+        pane: FILL_PANE, renderer: rural ? ruralRenderer : urbanRenderer, interactive: false, smoothFactor: 0,
+        style: { stroke: false, fill: true, fillColor: level ? LEVEL_FILL[level] : RURAL_FILL, fillOpacity: 1 }
       });
-      layer.eachLayer(l => { l.options.uaRural = !level; });
-      groups.wards.addLayer(layer);
+      pending.push({ rural, layer });
       const feat = { type: 'Feature', properties: {}, geometry: w.geometry };
       wardHits.push({ name: w.name, feat, bbox: turf.bbox(feat) });
     });
+    pending.filter(p => p.rural).forEach(p => groups.wards.addLayer(p.layer));
+    pending.filter(p => !p.rural).forEach(p => groups.wards.addLayer(p.layer));
   }
 
   function drawUrbans(fc) {
@@ -223,7 +258,7 @@ function createUrbanLayer(content) {
     groups.lines.clearLayers();
     groups.badges.clearLayers();
     clearUrbanHover();
-    const op = fillOpacity(m.getZoom());
+    syncFillOpacity();
     const pick = (id) => document.dispatchEvent(new CustomEvent(URBAN_PICK_EVENT, { detail: { id, side: content.side } }));
     // Loại I vẽ trước, loại III sau cùng để nét đô thị nhỏ nằm trên
     const rank = (f) => CLS_RANK[byId.get(f.properties.id)?.cls] ?? 3;
@@ -235,8 +270,8 @@ function createUrbanLayer(content) {
       const style = LINE_STYLE[u.cls] || LINE_STYLE.III;
       if (isArea && u.part && LEVEL_FILL[u.cls]) {
         groups.towns.addLayer(L.geoJSON(f.geometry, {
-          pane: TOWN_PANE, renderer: townRenderer, interactive: false,
-          style: { stroke: false, fillColor: LEVEL_FILL[u.cls], fillOpacity: op }
+          pane: TOWN_PANE, renderer: townRenderer, interactive: false, smoothFactor: 0,
+          style: { stroke: false, fill: true, fillColor: LEVEL_FILL[u.cls], fillOpacity: 1 }
         }));
       }
       if (rings) {
@@ -268,12 +303,18 @@ function createUrbanLayer(content) {
     });
   }
 
+  function syncFillOpacity() {
+    if (!m) return;
+    const op = fillOpacity(m.getZoom());
+    urbanRenderer?.setSealOpacity(op);
+    ruralRenderer?.setSealOpacity(op * 0.5);
+    townRenderer?.setSealOpacity(op);
+  }
+
   function restyle() {
     if (!visible) return;
     const z = m.getZoom();
-    const op = fillOpacity(z);
-    groups.wards.eachLayer(g => g.eachLayer?.(l => l.setStyle({ fillOpacity: l.options.uaRural ? op * 0.5 : op })));
-    groups.towns.eachLayer(g => g.setStyle?.({ fillOpacity: op }));
+    syncFillOpacity();
     m.getContainer().classList.toggle('ua-zoom-low', z <= BADGE_SMALL_ZOOM);
     if (z > BADGE_MAX_ZOOM) groups.badges.remove();
     else if (!m.hasLayer(groups.badges)) groups.badges.addTo(m);
@@ -297,8 +338,10 @@ function createUrbanLayer(content) {
       const hoverPane = m.getPane(HOVER_PANE) || m.createPane(HOVER_PANE);
       hoverPane.style.zIndex = HOVER_Z;
       hoverPane.style.pointerEvents = 'none';
-      fillRenderer = L.canvas({ pane: FILL_PANE });
-      townRenderer = L.canvas({ pane: TOWN_PANE });
+      const op = fillOpacity(m.getZoom());
+      ruralRenderer = new SealCanvas({ pane: FILL_PANE, sealOpacity: op * 0.5 });
+      urbanRenderer = new SealCanvas({ pane: FILL_PANE, sealOpacity: op });
+      townRenderer = new SealCanvas({ pane: TOWN_PANE, sealOpacity: op });
       lineRenderer = L.svg({ pane: LINE_PANE });
       hoverRenderer = L.svg({ pane: HOVER_PANE });
       m.on('zoomend', restyle);

@@ -1,4 +1,5 @@
-import { state, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_FOCUS_STYLE, wardDrawFC } from './state.js';
+import { state, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, WARD_FOCUS_STYLE } from './state.js';
+import { getWardDraw, prepareWardDraw, wardDrawGeometry } from './wardSeam.js';
 import { escapeHtml, wardLabelFontSize } from './utils.js';
 import { addIslandFlags } from './islandFlags.js';
 import { attachBasemap, MAP_MAX_ZOOM, geeTileOpts } from './basemap.js';
@@ -159,13 +160,18 @@ export function renderPlanBoundaries() {
   const group = planLayers.boundary;
   group.clearLayers();
   const wards = state.wardLabelsList || [];
-  const fc = wardDrawFC(wards.map(w => ({ type: 'Feature', geometry: w.geometry, properties: { name: w.name } })));
-  const shadow = L.geoJSON(fc, { style: WARD_BOUNDARY_SHADOW_STYLE, interactive: false });
-  const line = L.geoJSON(fc, { style: WARD_BOUNDARY_LINE_STYLE, interactive: false });
-  shadow.options.wardRole = 'shadow';
-  line.options.wardRole = 'line';
-  group.addLayer(shadow);
-  group.addLayer(line);
+  if (!getWardDraw() && wards.length) {
+    prepareWardDraw(wards.map(w => ({ type: 'Feature', geometry: w.geometry, properties: { tenXa: w.name } })));
+  }
+  const lines = getWardDraw()?.lines || [];
+  if (lines.length) {
+    const shadow = L.polyline(lines, WARD_BOUNDARY_SHADOW_STYLE);
+    const line = L.polyline(lines, WARD_BOUNDARY_LINE_STYLE);
+    shadow.options.wardRole = 'shadow';
+    line.options.wardRole = 'line';
+    group.addLayer(shadow);
+    group.addLayer(line);
+  }
   wards.forEach(item => {
     if (item.lat == null || item.lng == null) return;
     const icon = L.divIcon({ className: 'ward-label-icon', html: `<span class="ward-label-text">${escapeHtml(item.name)}</span>`, iconSize: [0, 0] });
@@ -207,7 +213,7 @@ export function highlightPlanWards(names) {
   (names || []).forEach(wardName => {
     if (!wardName || wardName === 'Thành phố Huế') return;
     const w = (state.wardLabelsList || []).find(x => x.name === wardName);
-    if (w && w.geometry) planHighlightLayer.addLayer(wardFocusLayer(planMap, w.geometry));
+    if (w && w.geometry) planHighlightLayer.addLayer(wardFocusLayer(planMap, wardDrawGeometry(w.name) || w.geometry));
   });
 }
 
@@ -414,7 +420,7 @@ function applyState(next) {
   if (btn) {
     btn.classList.toggle('active', split);
     btn.setAttribute('aria-pressed', String(split));
-    btn.title = split ? 'Tắt chia đôi màn hình' : 'Chia đôi màn hình. Bật rồi chọn từng bên ở droplist: hiện trạng, quy hoạch, hoặc một cấp QH';
+    btn.title = split ? 'Tắt chia đôi màn hình' : 'Chia đôi màn hình. Bật rồi chọn từng bên trên panel phải: hiện trạng, quy hoạch, hoặc một cấp QH';
   }
   if (planMap && leftMap) {
     // Vào / ra lệch tâm: dời bản đồ hiện trạng 1/4 bề ngang để điểm đang ở giữa màn hình về giữa nửa trái (và ngược lại)

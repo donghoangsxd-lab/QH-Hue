@@ -45,6 +45,7 @@ export function objectNameFromPath(pathname, kind) {
   if (!raw || raw.includes('..') || raw.includes('\\') || raw.includes('\0')) return '';
   try { raw = raw.split('/').map((part) => decodeURIComponent(part)).join('/'); } catch (e) { return ''; }
   if (!raw || raw.startsWith('/') || raw.includes('..')) return '';
+  if (raw === 'cho-duyet' || raw.startsWith('cho-duyet/')) return '';
   return raw;
 }
 

@@ -1,11 +1,11 @@
 // Link chia sẻ khung nhìn: query trên URL là trạng thái (không ghi máy chủ, không localStorage).
 // Gồm tâm bản đồ, mức phóng, lớp droplist, các ô lớp đang bật, vùng phủ, chế độ xem, độ mờ thửa
 // và đồ án đang mở (da). Không gồm phác thảo, đồ án khác đang tick để hiện lô, hay danh sách ẩn riêng từng máy.
-import { map, layers, toggleBuffer } from './mapEngine.js';
+import { map, layers, toggleBuffer, openSharedLot } from './mapEngine.js';
 import { getViewMode, setViewMode, isSplitOn, setSplit, getSplitKind, setSplitKind } from './planMap.js';
 import { getLevel, setLevel, LEVELS } from './mapLevel.js';
 import { labelsOverlayOn, setLabelsOverlay } from './basemap.js';
-import { focusedProjectName } from './projectFiles.js';
+import { focusedProjectName, LOTS_PROGRESS_EVENT } from './projectFiles.js';
 import { shareOpenProject } from './projectLayer.js';
 import { facetQuery } from './facetStore.js';
 import { showToast } from './utils.js';
@@ -132,14 +132,50 @@ function applyOpenProject(q) {
   document.addEventListener('cadparcels:loaded', once);
 }
 
+/** Link khung nhìn hiện tại, trỏ tâm và mã lô. */
+export function viewUrlWithLot({ lat, lng, token, project }) {
+  const url = new URL(buildUrl());
+  const q = url.searchParams;
+  const zRaw = map ? Math.max(Number(map.getZoom()) || 16, 16) : 17;
+  const z = Number.isInteger(zRaw) ? String(zRaw) : zRaw.toFixed(2);
+  q.set('ll', `${Number(lat).toFixed(5)},${Number(lng).toFixed(5)},${z}`);
+  if (project) q.set('da', project);
+  if (token) q.set('lo', token);
+  else q.delete('lo');
+  url.search = q.toString();
+  return url.toString();
+}
+
+function applySharedLot(q) {
+  const token = (q.get('lo') || '').trim();
+  if (!token || token.length > 400) return;
+  let opened = false;
+  const tryOpen = () => {
+    if (opened) return;
+    let ok = false;
+    try { ok = openSharedLot(token); }
+    catch (err) { console.warn('Không mở được lô từ link:', err); return; }
+    if (!ok) return;
+    opened = true;
+    document.removeEventListener('infra:ready', tryOpen);
+    document.removeEventListener('cadparcels:loaded', tryOpen);
+    document.removeEventListener(LOTS_PROGRESS_EVENT, tryOpen);
+  };
+  document.addEventListener('infra:ready', tryOpen);
+  document.addEventListener('cadparcels:loaded', tryOpen);
+  document.addEventListener(LOTS_PROGRESS_EVENT, tryOpen);
+  tryOpen();
+}
+
 /** Khôi phục khung nhìn nếu URL có tham số chia sẻ. Gọi sau khi ô lớp đã gắn sự kiện. */
 export function applyViewLink() {
   const q = params();
-  if (![...q.keys()].some(k => ['ll', 'ly', 'lv', 'm', 'sp', 'bf', 'lb', 'tho', 'da'].includes(k))) return;
+  if (![...q.keys()].some(k => ['ll', 'ly', 'lv', 'm', 'sp', 'bf', 'lb', 'tho', 'da', 'lo'].includes(k))) return;
   applyLayers(q);
   applyBuffers(q);
   applyChrome(q);
   applyOpenProject(q);
+  applySharedLot(q);
   const name = (q.get('da') || '').trim();
   showToast(name ? `Đã mở khung nhìn và đồ án «${name}»` : 'Đã mở khung nhìn được chia sẻ', 'info');
 }

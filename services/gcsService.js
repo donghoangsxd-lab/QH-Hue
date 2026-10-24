@@ -70,6 +70,24 @@ function rescaleCoord(num, limit) {
 }
 const tagOf = (res) => (res && (res.headers['etag'] || res.headers['last-modified'])) || null;
 
+let touchGroupsMod = null;
+
+// Một lần khi nạp cache: các điểm cùng nhóm chạm ranh thành một công trình. Không thêm lượt đọc GCS.
+async function collapseTouchGroups(items) {
+  try {
+    if (!touchGroupsMod) touchGroupsMod = await import('../public/js/touchGroups.js');
+    const packed = require('../public/data/infra-touch-groups.json');
+    const groups = packed && packed.groups;
+    if (!groups || !groups.length) return items;
+    return touchGroupsMod.applyTouchGroups(items, groups).map(it => (
+      it.touchIds ? { ...it, radius: constants.defaultRadius(it) } : it
+    ));
+  } catch (err) {
+    console.warn('Không gộp được lô chạm ranh:', err.message);
+    return items;
+  }
+}
+
 async function getRawDataList(opts = {}) {
   const now = opts.now || Date.now();
   const force = Boolean(opts.force);
@@ -154,6 +172,7 @@ async function getRawDataList(opts = {}) {
     }).filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng)
       && Math.abs(item.lat) <= 90 && Math.abs(item.lng) <= 180);
     cachedGeoJSON = attachWardParts(cachedGeoJSON);
+    cachedGeoJSON = await collapseTouchGroups(cachedGeoJSON);
 
     if (!loadedETag || loadedETag !== lastETag) dataVersion++;
     lastETag = loadedETag;

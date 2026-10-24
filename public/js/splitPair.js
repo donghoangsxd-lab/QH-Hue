@@ -1,7 +1,7 @@
 // Cặp so sánh khi chia đôi màn hình. Mặc định trái = hiện trạng, phải = quy hoạch (công trình) — đúng cách
-// chia đôi cũ. Hai droplist trên thanh tiêu đề chọn linh hoạt từng bên: hiện trạng, quy hoạch, hoặc một cấp
+// chia đôi cũ. Hai danh sách trên panel phải chọn linh hoạt từng bên: hiện trạng, quy hoạch, hoặc một cấp
 // QH (hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500). Cấp đang chọn ở một bên
-// bị loại khỏi droplist bên kia. Đổi cấp không đụng ô lớp ở panel.
+// bị loại khỏi danh sách bên kia. Đổi cấp không đụng ô lớp ở panel.
 import { isSplitOn, onViewChange, planMap } from './planMap.js';
 import { LEVELS } from './mapLevel.js';
 
@@ -83,9 +83,11 @@ export function setSplitSide(which, id) {
 }
 
 function paint() {
-  const box = document.getElementById('splitPair');
+  const box = document.getElementById('levelSplit');
   const on = isSplitOn();
   if (box) box.hidden = !on;
+  const label = document.getElementById('levelHostLabel');
+  if (label) label.textContent = on ? 'Lớp mỗi bên' : 'Lớp đang xem';
   document.body.classList.toggle('level-pair', isLevelPair());
   ['left', 'right'].forEach(which => {
     const sel = document.getElementById(which === 'left' ? 'splitSideLeft' : 'splitSideRight');
@@ -113,32 +115,21 @@ function fillSelect(el, which) {
   el.value = cur;
 }
 
-function buildSelect(id, which, label) {
-  const el = document.createElement('select');
-  el.id = id;
-  el.className = `split-side-select split-side-${which}`;
+function bindSelect(id, which, label) {
+  const el = document.getElementById(id);
+  if (!el || el.dataset.bound) return;
+  el.dataset.bound = '1';
+  el.classList.add('split-side-select', `split-side-${which}`);
   el.setAttribute('aria-label', label);
   el.title = label;
-  fillSelect(el, which);
   el.addEventListener('change', () => setSplitSide(which, el.value));
-  return el;
 }
 
 export function initSplitPair(map) {
   leftMap = map;
   loadSides();
-  const host = document.querySelector('.map-title-split');
-  if (host && !document.getElementById('splitPair')) {
-    const box = document.createElement('div');
-    box.className = 'map-title-pair';
-    box.id = 'splitPair';
-    box.hidden = true;
-    box.append(
-      buildSelect('splitSideLeft', 'left', 'Lớp bên trái'),
-      buildSelect('splitSideRight', 'right', 'Lớp bên phải')
-    );
-    host.before(box);
-  }
+  bindSelect('splitSideLeft', 'left', 'Lớp bên trái');
+  bindSelect('splitSideRight', 'right', 'Lớp bên phải');
   onViewChange(({ split }) => {
     const prev = wasSplit;
     wasSplit = !!split;

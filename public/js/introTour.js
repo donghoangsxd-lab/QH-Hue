@@ -31,7 +31,7 @@ const STEPS = [
   {
     target: ['#rightPanel', '#btnExpandRightPanel'],
     title: 'Bật / tắt lớp dữ liệu',
-    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm mũi tên ‹ ở mép phải để mở, › để thu gọn. Khu đất và Quy hoạch mở theo chiều dọc. Nền bản đồ, Phân tích và Môi trường nằm trên một hàng tab. Số cạnh tên cho biết bao nhiêu lớp đang bật. Thẻ Chú giải chỉ giải thích trạng thái điểm và ký hiệu lô đất.'
+    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm mũi tên ‹ ở mép phải để mở, › để thu gọn. Hàng trên có bốn trục: Hành chính, Quy hoạch, Hạ tầng, Kiến trúc. Ngay dưới là ô tìm kiếm, nút HT/QH, nút Cả nhóm và nút ẩn panel. Chú giải nổi trên bản đồ, chỉ hiện lớp đang bật.'
   },
   {
     target: ['#btnInspectPick', '#btnInspectMode'],
@@ -41,12 +41,12 @@ const STEPS = [
   {
     target: '#mapTitle',
     title: 'Bản đồ Quy hoạch / Hiện trạng và lớp quy hoạch',
-    text: 'Thanh tiêu đề cho biết bản đồ đang xem. Mở trang là bản đồ quy hoạch; bấm biểu tượng lật trang đầu thanh để sang bản đồ hiện trạng (công trình đang có) và ngược lại. Ô bên phải chọn lớp quy hoạch: Hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500 — chọn một lớp thì các lớp kia tắt; muốn so sánh nhiều lớp thì bật thêm ở panel Lớp dữ liệu.'
+    text: 'Thanh tiêu đề cho biết bản đồ đang xem và một dòng giới thiệu. Mở trang là bản đồ quy hoạch; bấm biểu tượng lật trang để sang bản đồ hiện trạng và ngược lại. Nút Mục lục mở bảng tính năng. Nút đóng ẩn thanh này; nút góc trái hiện lại. Chọn lớp quy hoạch ở panel phải: Hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500 — chọn một lớp thì các lớp kia tắt; muốn so sánh nhiều lớp thì bật thêm ở danh sách.'
   },
   {
     target: '#btnToggleCompare',
     title: 'So sánh Hiện trạng – Quy hoạch',
-    text: 'Chia đôi màn hình. Mặc định bên trái là hiện trạng, bên phải là quy hoạch. Hai droplist trên thanh tiêu đề chọn từng bên: Hiện trạng, Quy hoạch, Hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000 hoặc QHCT 1/500 — ví dụ QHC 1/25.000 đối chiếu QHC 1/10.000. Cùng tâm: hai bản đồ chồng khít, kéo thanh ở giữa. Lệch tâm: mỗi bản đồ lấy tâm ở giữa nửa màn hình của nó.'
+    text: 'Chia đôi màn hình. Mặc định bên trái là hiện trạng, bên phải là quy hoạch. Hai danh sách trên panel phải chọn từng bên: Hiện trạng, Quy hoạch, Hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000 hoặc QHCT 1/500 — ví dụ QHC 1/25.000 đối chiếu QHC 1/10.000. Cùng tâm: hai bản đồ chồng khít, kéo thanh ở giữa. Lệch tâm: mỗi bản đồ lấy tâm ở giữa nửa màn hình của nó.'
   },
   {
     target: ['#bottomPanel', '#btnExpandBottomPanel'],
@@ -59,9 +59,9 @@ const STEPS = [
     text: 'Thanh công cụ bên trái còn có: đo chiều dài, đo diện tích, lát cắt địa hình, định vị GPS, xuất bản đồ (A3 đến A0), đề xuất điểm mới và phác thảo.\nNút Đề xuất mở phiếu nhập điểm. Điểm mới được đánh dấu "Chờ duyệt" cho đến khi quản trị viên Sở Xây dựng phê duyệt.'
   },
   {
-    target: '#btnOverview',
-    title: 'Giới thiệu tổng quan',
-    text: 'Nút ở góc trên bên trái mở bảng giới thiệu các nhóm tính năng chính, kèm hướng dẫn và lối mở nhanh từng tính năng. Chúc bạn khám phá bản đồ hiệu quả!'
+    target: '#btnMapCatalog',
+    title: 'Mục lục tính năng',
+    text: 'Nút Mục lục trên thanh tiêu đề mở bảng các nhóm tính năng chính, kèm hướng dẫn và lối mở nhanh từng tính năng. Chúc bạn khám phá bản đồ hiệu quả!'
   }
 ];
 

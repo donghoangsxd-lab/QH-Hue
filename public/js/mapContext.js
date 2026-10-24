@@ -1,0 +1,327 @@
+// Menu chuột phải trên bản đồ (máy tính). Chạm giữ trên màn hình cảm ứng mở cùng menu.
+// Mọi mục gọi lại công cụ đã có: thửa, bảng quy hoạch 4 cấp, tra cứu bán kính, đo, Street View.
+// Ghi chú nằm trên máy (localStorage), không gửi máy chủ.
+import { state } from './state.js';
+import { map, wardNameAt, toggleMeasure, clearMeasure, handleMeasureClick, inspectAccessAt, consumeMeasureContext } from './mapEngine.js';
+import { planMap } from './planMap.js';
+import { openParcelAt, openPlanAt, parcelFactsAt } from './cadastreLayer.js';
+import { streetViewUrl } from './streetView.js';
+import { escapeHtml, ico, showToast } from './utils.js';
+
+const NOTE_KEY = 'qhhue_map_notes';
+const LONG_MS = 600;
+const LONG_SLOP = 12;
+
+let menuEl = null;
+let placeEl = null;
+let noteEditor = null;
+const noteGroups = new Map();
+let notes = [];
+
+const mapsOf = () => [map, planMap].filter(Boolean);
+
+function loadNotes() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(NOTE_KEY) || '[]');
+    notes = Array.isArray(raw) ? raw.filter(n => n && Number.isFinite(n.lat) && Number.isFinite(n.lng)) : [];
+  } catch {
+    notes = [];
+  }
+}
+
+function saveNotes() {
+  try { localStorage.setItem(NOTE_KEY, JSON.stringify(notes)); } catch { /* chế độ riêng tư */ }
+}
+
+function closeMenu() {
+  menuEl?.remove();
+  menuEl = null;
+}
+
+function closePlace() {
+  placeEl?.remove();
+  placeEl = null;
+}
+
+function closeNoteEditor(commit) {
+  if (!noteEditor) return;
+  const ed = noteEditor;
+  noteEditor = null;
+  const text = ed.input.value.replace(/\s+$/g, '').trim();
+  ed.el.remove();
+  if (!commit) return;
+  if (ed.id) {
+    const row = notes.find(n => n.id === ed.id);
+    if (!row) return;
+    if (!text) notes = notes.filter(n => n.id !== ed.id);
+    else row.text = text;
+  } else if (text) {
+    notes.push({ id: `n${Date.now().toString(36)}`, lat: ed.lat, lng: ed.lng, text });
+  }
+  saveNotes();
+  drawNotes();
+}
+
+function groupFor(m) {
+  let g = noteGroups.get(m);
+  if (!g) {
+    g = L.layerGroup().addTo(m);
+    noteGroups.set(m, g);
+  }
+  return g;
+}
+
+function drawNotes() {
+  mapsOf().forEach(m => {
+    const g = groupFor(m);
+    g.clearLayers();
+    notes.forEach(n => {
+      const marker = L.marker([n.lat, n.lng], {
+        keyboard: false,
+        zIndexOffset: 800,
+        icon: L.divIcon({
+          className: 'map-note-pin',
+          html: '<span></span>',
+          iconSize: [16, 16],
+          iconAnchor: [8, 16]
+        })
+      });
+      marker.bindTooltip(escapeHtml(n.text || 'Ghi chú'), { direction: 'top', className: 'dot-tip', opacity: 1 });
+      marker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        openNoteEditor({ clientX: e.originalEvent?.clientX || 80, clientY: e.originalEvent?.clientY || 80 }, n);
+      });
+      g.addLayer(marker);
+    });
+  });
+}
+
+function clampBox(el, x, y) {
+  const pad = 8;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  el.style.maxHeight = `${Math.max(120, vh - pad * 2)}px`;
+  el.style.maxWidth = `${Math.max(180, vw - pad * 2)}px`;
+  const r = el.getBoundingClientRect();
+  let left = x;
+  let top = y;
+  if (left + r.width > vw - pad) left = vw - pad - r.width;
+  if (top + r.height > vh - pad) top = vh - pad - r.height;
+  el.style.left = `${Math.max(pad, left)}px`;
+  el.style.top = `${Math.max(pad, top)}px`;
+}
+
+function openNoteEditor(ev, note) {
+  closeMenu();
+  closeNoteEditor(false);
+  const el = document.createElement('form');
+  el.className = 'note-editor';
+  el.innerHTML = `<div class="note-editor-title">${ico('pin')}Đánh dấu và ghi chú</div>
+    <textarea maxlength="500" rows="3" placeholder="Nội dung ghi chú" aria-label="Nội dung ghi chú"></textarea>
+    <div class="note-editor-acts">
+      ${note?.id ? '<button type="button" data-act="del">Xóa</button>' : ''}
+      <button type="button" data-act="cancel">Hủy</button>
+      <button type="submit" data-act="save">Lưu</button>
+    </div>`;
+  document.body.appendChild(el);
+  const input = el.querySelector('textarea');
+  input.value = note?.text || '';
+  noteEditor = { el, input, id: note?.id || null, lat: note?.lat, lng: note?.lng };
+  clampBox(el, ev.clientX, ev.clientY);
+  input.focus();
+  el.addEventListener('submit', (e) => { e.preventDefault(); closeNoteEditor(true); });
+  el.addEventListener('click', (e) => {
+    const act = e.target.closest('button')?.dataset.act;
+    if (act === 'cancel') closeNoteEditor(false);
+    else if (act === 'del') {
+      notes = notes.filter(n => n.id !== note.id);
+      saveNotes();
+      drawNotes();
+      closeNoteEditor(false);
+    }
+  });
+}
+
+async function copyText(text) {
+  const value = String(text || '').trim();
+  if (!value) return;
+  try {
+    await navigator.clipboard.writeText(value);
+    showToast('Đã sao chép', 'success');
+  } catch {
+    showToast('Không sao chép được', 'error');
+  }
+}
+
+function openPlace(ev, latlng) {
+  closePlace();
+  const lat = latlng.lat;
+  const lng = latlng.lng;
+  const coord = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  const ward = wardNameAt(lat, lng) || '';
+  const el = document.createElement('aside');
+  el.className = 'place-card';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', 'Thông tin địa điểm');
+  const row = (key, label, value, pending) => `<button type="button" class="place-row" data-copy="${key}" ${value ? '' : 'disabled'}>
+      <span>${label}</span><b>${pending ? 'Đang tra dữ liệu thửa…' : escapeHtml(value || 'Không có trong dữ liệu')}</b></button>`;
+  el.innerHTML = `<header class="place-head"><span>${ico('locate')}Thông tin địa điểm</span>
+      <button type="button" class="place-x" title="Đóng" aria-label="Đóng">${ico('close')}</button></header>
+    ${row('coord', 'Tọa độ', coord)}
+    ${row('ward', 'Phường, xã', ward)}
+    ${row('addr', 'Địa chỉ', '', true)}
+    <a class="place-dir" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lat},${lng}`)}">${ico('pin')}Chỉ đường tới điểm này</a>`;
+  document.body.appendChild(el);
+  placeEl = el;
+  clampBox(el, ev.clientX, ev.clientY);
+  el.querySelector('.place-x').addEventListener('click', closePlace);
+  el.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-copy]');
+    if (!btn || btn.disabled) return;
+    copyText(btn.querySelector('b')?.textContent);
+  });
+  parcelFactsAt(latlng).then(facts => {
+    if (placeEl !== el) return;
+    const btn = el.querySelector('[data-copy="addr"]');
+    const b = btn?.querySelector('b');
+    if (!btn || !b) return;
+    const addr = [facts?.address, facts?.oldWard].filter(Boolean).join(' · ');
+    b.textContent = addr || 'Không có trong dữ liệu thửa';
+    btn.disabled = !addr;
+  }).catch(() => {
+    if (placeEl !== el) return;
+    const btn = el.querySelector('[data-copy="addr"]');
+    const b = btn?.querySelector('b');
+    if (b) b.textContent = 'Không có trong dữ liệu thửa';
+    if (btn) btn.disabled = true;
+  });
+}
+
+function startMeasure(type, latlng, m) {
+  if (state.activeMeasureType !== type) toggleMeasure(type);
+  handleMeasureClick(latlng, m);
+}
+
+function item(act, icon, label) {
+  return `<button type="button" class="map-ctx-item" role="menuitem" data-act="${act}">${ico(icon)}<span>${label}</span></button>`;
+}
+
+function openMenu(ev, latlng, targetMap) {
+  closeMenu();
+  closeNoteEditor(false);
+  const el = document.createElement('div');
+  el.className = 'map-ctx-menu';
+  el.setAttribute('role', 'menu');
+  el.innerHTML = [
+    item('parcel', 'parcel', 'Xem thông tin thửa đất'),
+    item('plan', 'layers', 'Xem thông tin quy hoạch'),
+    item('access', 'inspect', 'Xem khả năng tiếp cận hạ tầng'),
+    item('place', 'locate', 'Xem thông tin địa điểm'),
+    '<div class="map-ctx-sep"></div>',
+    item('note', 'pin', 'Đánh dấu và ghi chú'),
+    '<div class="map-ctx-sep"></div>',
+    item('dist', 'ruler', 'Đo khoảng cách'),
+    item('area', 'area', 'Đo diện tích'),
+    item('clear', 'trash', 'Xóa kết quả đo'),
+    '<div class="map-ctx-sep"></div>',
+    item('sv', 'camera', 'Xem Street View')
+  ].join('');
+  el.style.left = `${ev.clientX}px`;
+  el.style.top = `${ev.clientY}px`;
+  el.style.visibility = 'hidden';
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+  document.body.appendChild(el);
+  menuEl = el;
+  clampBox(el, ev.clientX, ev.clientY);
+  el.style.visibility = '';
+  el.addEventListener('click', (e) => {
+    const act = e.target.closest('button')?.dataset.act;
+    if (!act) return;
+    closeMenu();
+    if (act === 'parcel') {
+      openParcelAt(latlng, targetMap).then(ok => {
+        if (ok === false) showToast('Không có thửa đất tại vị trí này.', 'info');
+      });
+    } else if (act === 'plan') {
+      openPlanAt(latlng, targetMap);
+    } else if (act === 'access') {
+      inspectAccessAt(latlng.lat, latlng.lng, targetMap);
+    } else if (act === 'place') {
+      openPlace(ev, latlng);
+    } else if (act === 'note') {
+      openNoteEditor(ev, { lat: latlng.lat, lng: latlng.lng });
+    } else if (act === 'dist') {
+      startMeasure('distance', latlng, targetMap);
+    } else if (act === 'area') {
+      startMeasure('area', latlng, targetMap);
+    } else if (act === 'clear') {
+      clearMeasure();
+    } else if (act === 'sv') {
+      window.open(streetViewUrl(latlng), '_blank', 'noopener');
+    }
+  });
+}
+
+function onContext(e, m) {
+  e.originalEvent?.preventDefault();
+  const t = e.originalEvent?.target;
+  if (t?.closest?.('.leaflet-popup, .cad-card, .map-ctx-menu, .place-card, .note-editor, .sv-panel')) return;
+  if (consumeMeasureContext()) return;
+  if (state.sketchTool || state.adminDrawMode || state.lotShapeEdit) return;
+  openMenu(e.originalEvent, e.latlng, m);
+}
+
+function bindLongPress(m) {
+  const box = m.getContainer();
+  let timer = 0;
+  let x = 0;
+  let y = 0;
+  let pid = null;
+  let opened = false;
+  const cancel = () => { clearTimeout(timer); timer = 0; pid = null; };
+  box.addEventListener('pointerdown', (ev) => {
+    if (ev.pointerType === 'mouse' || ev.button !== 0) return;
+    cancel();
+    opened = false;
+    x = ev.clientX;
+    y = ev.clientY;
+    pid = ev.pointerId;
+    timer = setTimeout(() => {
+      timer = 0;
+      if (state.sketchTool || state.adminDrawMode || state.lotShapeEdit || state.activeMeasureType) return;
+      opened = true;
+      const latlng = m.mouseEventToLatLng({ clientX: x, clientY: y });
+      openMenu({ clientX: x, clientY: y, preventDefault() {} }, latlng, m);
+    }, LONG_MS);
+  });
+  box.addEventListener('pointermove', (ev) => {
+    if (ev.pointerId !== pid) return;
+    if (Math.hypot(ev.clientX - x, ev.clientY - y) > LONG_SLOP) cancel();
+  });
+  box.addEventListener('pointerup', (ev) => {
+    if (ev.pointerId !== pid) return;
+    if (opened) ev.preventDefault();
+    cancel();
+  });
+  box.addEventListener('pointercancel', cancel);
+}
+
+export function initMapContext(list) {
+  loadNotes();
+  (list || mapsOf()).filter(Boolean).forEach(m => {
+    m.on('contextmenu', (e) => onContext(e, m));
+    m.on('movestart', closeMenu);
+    bindLongPress(m);
+  });
+  drawNotes();
+  document.addEventListener('pointerdown', (e) => {
+    if (menuEl && !menuEl.contains(e.target)) closeMenu();
+    if (placeEl && !placeEl.contains(e.target)) closePlace();
+  }, true);
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (menuEl) { closeMenu(); e.stopPropagation(); }
+    else if (noteEditor) closeNoteEditor(false);
+    else if (placeEl) closePlace();
+  });
+}

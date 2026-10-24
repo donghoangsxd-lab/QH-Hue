@@ -2,7 +2,7 @@
 // Bấm tên mục để xổ các bước; nút Hướng dẫn mở trang đủ chú thích và lối tắt.
 // Mục có demo: nút «Xem trên bản đồ» chạy chuỗi thao tác trực tiếp kèm thuyết minh (overviewDemo.js).
 // Mở tính năng bằng cách bấm hộ nút / tab / ô tick sẵn có trên giao diện, không đụng trạng thái nội bộ của module khác.
-// Tự hiện ở lần mở trang đầu; ô "Không tự hiện" dùng chung khóa với introTour.js.
+// Tiêu đề trên bản đồ đã gộp dòng giới thiệu. Hộp này là mục lục, mở từ nút Mục lục.
 import { ico, showToast, escapeHtml, fmtNum, fmtPct, detailDisclosure } from './utils.js';
 import { map, handleInspectPointClick, zoomToPoint } from './mapEngine.js';
 import { ensureWardStats } from './uiComponents.js';
@@ -13,7 +13,6 @@ import { floodReport } from './floodSim.js';
 import { startDemo, flash, openLayerTab } from './overviewDemo.js';
 
 const STORAGE_KEY = 'qhhue_intro_off';
-const SEEN_KEY = 'qhhue_overview_seen';
 // Khung tọa độ TP. Huế (WGS84): chặn nhập đảo thứ tự hoặc nhập nhầm tọa độ VN-2000
 const HUE_BOUNDS = { latMin: 15.9, latMax: 16.85, lngMin: 106.9, lngMax: 108.3 };
 
@@ -126,8 +125,8 @@ const FLOOD_DEMO = {
     },
     {
       title: 'Bật tem các trường học',
-      run: (d) => SCHOOL_CHKS.forEach(id => d.check(id, { main: 'infra' })),
-      text: '<p>Bảng bên phải › <b>Khu đất</b> đã bật 4 nhóm <b>Mầm non, Tiểu học, THCS, THPT</b>. Trường nằm trong vùng ngập được đánh <b class="c-red">chấm đỏ</b> ngay tại tem công trình.</p>'
+      run: (d) => SCHOOL_CHKS.forEach(id => d.check(id, { main: 'xahoi' })),
+      text: '<p>Bảng bên phải › panel <b>Hạ tầng xã hội</b> › <b>Giáo dục</b> đã bật bốn cấp <b>Mầm non, Tiểu học, THCS, THPT</b>. Trường nằm trong vùng ngập được đánh <b class="c-red">chấm đỏ</b> ngay tại tem công trình.</p>'
     },
     {
       title: `Các trường bị ngập khi nước lên ${FLOOD_DEMO_M} m`,
@@ -220,8 +219,8 @@ const CSD_DEMO = {
   scenes: [
     {
       title: 'Các cơ sở chưa sử dụng',
-      run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 12); d.check('chk_c9', { main: 'infra' }); },
-      text: '<p>Bảng bên phải › <b>Khu đất</b> › <b>12. Cơ sở chưa sử dụng</b> đã bật: các cơ sở nhà đất dôi dư sau sắp xếp hiện trên bản đồ.</p>'
+      run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 12); d.check('chk_c9', { main: 'quyhoach' }); },
+      text: '<p>Bảng bên phải › <b>Quy hoạch</b> › <b>Quỹ đất và công trình</b> › <b>12. Cơ sở chưa sử dụng</b> đã bật: các cơ sở nhà đất dôi dư sau sắp xếp hiện trên bản đồ.</p>'
     },
     {
       title: 'Phương án cho khu đất lớn nhất',
@@ -270,8 +269,8 @@ const SECTIONS = [
           'Bật lớp <b>Thửa đất địa chính 2016</b>. Ranh thửa hiện từ mức phóng 15, số thửa từ mức 18. Hộp tìm hiện ngay dưới tên lớp.',
           'Tìm theo hồ sơ: trong ô <b>Chọn xã/phường (địa giới cũ)</b>, nhập <b>Tờ</b> và <b>Thửa</b>, bấm <b>Tìm</b>. Hoặc phóng tới vị trí (có thể nhập tọa độ ở cuối trang Hướng dẫn) rồi bấm vào thửa trên bản đồ.',
           'Bảng thửa hiện diện tích hồ sơ, loại đất theo Thông tư 28/2014/TT-BTNMT, địa chỉ và xã/phường cũ. Thửa được viền vàng.',
-          'Danh sách chọn trên thanh tiêu đề đang là <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b> hoặc <b>QHCT 1/500</b>: bảng thửa đặt góc trái, sát thanh công cụ, có 4 trang cùng tên bốn cấp đó. Trang đang mở theo lớp droplist; bấm trang khác để xem lớp đó, kể cả khi lớp đang tắt. Mỗi trang có biểu đồ tròn loại đất trên thửa, diện tích và chỉ tiêu từng lô.',
-          'Danh sách chọn đang là <b>HỆ THỐNG ĐÔ THỊ</b>: bảng mở ngay tại thửa. Bấm <b>Xem chỉ tiêu quy hoạch</b> để cắt thửa với lô các đồ án đã nạp (diện tích, %, tầng cao, mật độ, hệ số sử dụng đất).',
+          'Lớp đang xem trên panel phải là <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b> hoặc <b>QHCT 1/500</b>: bảng thửa đặt góc trái, sát thanh công cụ, có 4 trang cùng tên bốn cấp đó. Trang đang mở theo lớp đã chọn; bấm trang khác để xem lớp đó, kể cả khi lớp đang tắt. Mỗi trang có biểu đồ tròn loại đất trên thửa, diện tích và chỉ tiêu từng lô.',
+          'Lớp đang xem là <b>HỆ THỐNG ĐÔ THỊ</b>: bảng mở ngay tại thửa. Bấm <b>Xem chỉ tiêu quy hoạch</b> để cắt thửa với lô các đồ án đã nạp (diện tích, %, tầng cao, mật độ, hệ số sử dụng đất).',
           'Đang xem bản đồ quy hoạch: bấm thửa nằm trên một lô vẫn mở bảng thửa. Tắt lớp <b>Thửa đất địa chính 2016</b> để xem bảng lô như trước.'
         ],
         facts: [
@@ -304,7 +303,7 @@ const SECTIONS = [
         title: 'Đánh giá khả năng phục vụ của 1 công trình hạ tầng',
         lead: 'Dựng vùng phục vụ thực tế của công trình theo mạng lưới đường và ước tính số dân được phục vụ, đối chiếu với bán kính quy chuẩn.',
         steps: [
-          'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Khu đất</b>. Chọn nhóm công trình cần xem (ví dụ <b>4. Trường Tiểu học</b>).',
+          'Bảng bên phải › panel <b>Hạ tầng xã hội</b>. Chọn nhóm công trình cần xem (ví dụ <b>Giáo dục</b> › <b>Tiểu học</b>).',
           'Bấm biểu tượng công trình trên bản đồ. Bảng thông tin nêu quy mô hiện trạng, quy hoạch và bán kính phục vụ.',
           'Trong bảng, bấm nút <b>Xem bán kính phục vụ</b> (kèm số mét). Trạm xe buýt là <b>Xem phạm vi đi bộ</b>; nhà tang lễ, nghĩa trang là <b>Xem khoảng cách an toàn</b>. Bản đồ chuyển âm bản, dựng phạm vi đi được theo đường và tính dân số phục vụ.',
           'Nút con mắt trên bảng thu bảng về tên công trình để nhìn trọn vùng; bấm lại công trình để mở bảng. Nút tròn ● cạnh tên nhóm bật vùng phủ cả nhóm (chú thích <b>Bật/tắt vùng phủ</b>, <b>Bật/tắt bán kính phục vụ</b>, <b>Bật/tắt khoảng cách an toàn</b> hoặc <b>Bật/tắt phạm vi 500 m</b> tùy nhóm).'
@@ -313,14 +312,14 @@ const SECTIONS = [
           'Vùng phục vụ tính trên mạng đường OpenStreetMap và tuyến do quản trị viên bổ sung (đường đi ngắn nhất trên mạng đường).',
           'Dân số phục vụ lấy từ lớp phân bổ dân cư đã hiệu chỉnh.'
         ],
-        actions: [{ label: 'Mở danh sách công trình', icon: 'layers', run: () => openLayerTab({ main: 'infra' }) }]
+        actions: [{ label: 'Mở danh sách công trình', icon: 'layers', run: () => openLayerTab({ main: 'xahoi' }) }]
       },
       {
         id: 'invest', btn: 'guide', status: 'trial',
         title: 'Tra cứu dự án kêu gọi đầu tư',
         lead: 'Xem ranh và thông tin dự án trong danh sách kêu gọi đầu tư, rồi kiểm tra quy hoạch sử dụng đất nằm trong ranh đó.',
         steps: [
-          'Bảng bên phải › <b>Hạ tầng</b> › mục <b>Công trình điểm</b>. Bật <b>15. Dự án kêu gọi đầu tư</b>.',
+          'Bảng bên phải › <b>Quy hoạch</b> › mục <b>Quỹ đất và công trình</b>. Bật <b>15. Dự án kêu gọi đầu tư</b>.',
           'Bấm ranh dự án trên bản đồ. Bảng góc trái có hai tab <b>Tổng quan</b> và <b>Chi tiết</b>.',
           'Ở <b>Tổng quan</b>, bấm <b>Kiểm tra quy hoạch theo ranh giới dự án</b>. Bảng cắt ranh với lô quy hoạch theo các cấp đang có dữ liệu.',
           'Bấm <b>Ẩn kiểm tra quy hoạch</b> để thu phần đó. Nút đóng ở góc bảng để thoát.'
@@ -329,7 +328,7 @@ const SECTIONS = [
           'Ranh lấy từ file KML, thông tin từ sheet danh sách dự án. Dự án chưa ghép được ranh không vẽ trên bản đồ.',
           'Nhóm này không có bán kính phục vụ và không tính vào bản đồ độ phủ.'
         ],
-        actions: [{ label: 'Bật lớp dự án', icon: 'layers', run: () => showLayer('chk_invest', { main: 'infra' }) }]
+        actions: [{ label: 'Bật lớp dự án', icon: 'layers', run: () => showLayer('chk_invest', { main: 'quyhoach' }) }]
       }
     ]
   },
@@ -344,12 +343,12 @@ const SECTIONS = [
         steps: [
           'Nếu panel phải đang thu, bấm <b>Mở panel công cụ</b>. Tab <b>Lớp dữ liệu</b> đang mở mặc định.',
           'Hàng tab trên: <b>Hành chính</b>, <b>Quy hoạch</b>, <b>Hạ tầng</b>, <b>Kiến trúc</b>. Trong Hành chính có tab nhỏ <b>Đô thị</b> và <b>ĐVHC</b> (xã, phường).',
-          'Ngay dưới là ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b>, nút <b>Cả nhóm</b> và nút ẩn panel. Mục <b>Công trình điểm</b> nằm trong Hạ tầng: nút <b>Tất cả</b> bật hoặc tắt các nhóm; ô <b>Ranh lô</b> bật ranh theo nhóm đang tick.',
+          'Dòng dưới băng đạn có ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b> và nút <b>Cả nhóm</b>. Công trình xã hội, PCCC, điểm giao thông và lớp điểm theo đồ án ở panel <b>Hạ tầng xã hội</b>. <b>Ranh lô</b>, cơ sở chưa sử dụng và chung cư ở Quy hoạch. Nút <b>Tất cả</b> bật hoặc tắt 14 nhóm điểm.',
           'Hàng tab dưới: <b>Bản đồ nền</b> (ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư, độ phủ…) và <b>Bản đồ môi trường</b> (địa hình, ngập…). Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường.'
         ],
         facts: [
           'Thu panel bằng nút mũi tên <b>Ẩn panel</b> trên hàng công cụ của panel. Lớp đã bật vẫn giữ.',
-          'Ghi chú cuối mục <b>Công trình điểm</b>: tem màu thường là <b>Đã duyệt</b>, tem nhạt là <b>Chờ duyệt</b>.'
+          'Ghi chú cuối mục <b>Hạ tầng xã hội</b>: tem màu thường là <b>Đã duyệt</b>, tem nhạt là <b>Chờ duyệt</b>.'
         ],
         actions: [{ label: 'Mở lớp dữ liệu', icon: 'layers', run: () => openLayerTab({ main: 'quyhoach' }) }]
       },
@@ -375,11 +374,11 @@ const SECTIONS = [
         lead: 'Xem một bản đồ toàn màn hình, hoặc chia đôi để đối chiếu hiện trạng và quy hoạch cùng khung nhìn.',
         steps: [
           'Nút lật trang ở đầu thanh tiêu đề (giữa phía trên) chuyển <b>BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ</b> sang bản đồ hiện trạng và ngược lại.',
-          'Danh sách chọn cạnh tiêu đề chọn lớp: <b>HỆ THỐNG ĐÔ THỊ</b>, <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b>, <b>QHCT 1/500</b>.',
+          'Mở panel phải, hàng <b>Lớp đang xem</b> chọn: <b>HỆ THỐNG ĐÔ THỊ</b>, <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b>, <b>QHCT 1/500</b>.',
           'Thanh công cụ trái, bấm nút <b>Chia đôi màn hình so sánh</b>. Trên tiêu đề chọn <b>Cùng tâm</b> hoặc <b>Lệch tâm</b>.',
           '<b>Cùng tâm</b>: kéo thanh giữa (hoặc phím ← →). Nhãn hai bên là <b>BẢN ĐỒ HIỆN TRẠNG</b> và <b>BẢN ĐỒ QUY HOẠCH</b>. Bấm lại nút chia đôi để tắt.'
         ],
-        facts: ['Mỗi bên chia đôi chọn được lớp ở droplist của bên đó.'],
+        facts: ['Mỗi bên chia đôi chọn được lớp ở hai danh sách trên panel phải.'],
         actions: [{ label: 'Bật chia đôi màn hình', icon: 'compare', run: () => pressTool('btnToggleCompare', b => b.getAttribute('aria-pressed') === 'true') }]
       },
       {
@@ -519,7 +518,7 @@ const SECTIONS = [
         lead: 'Thể hiện phân bổ dân cư theo ô lưới, làm cơ sở tính dân số được phục vụ và đánh giá nhu cầu hạ tầng khi lập quy hoạch.',
         steps: [
           'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Bản đồ nền</b> › bật <b>Phân bổ dân cư</b>. Kéo thanh trượt cạnh tên lớp để chỉnh độ trong suốt.',
-          'Bật thêm nhóm ở <b>Khu đất</b> và lớp <b>Bản đồ độ phủ hạ tầng</b> để thấy khu đông dân còn thiếu hạ tầng.',
+          'Bật thêm nhóm ở <b>Hạ tầng xã hội</b> và lớp <b>Bản đồ độ phủ hạ tầng</b> để thấy khu đông dân còn thiếu hạ tầng.',
           'Sau khi đăng nhập quản trị: tab <b>Đề xuất</b> › nút <b>Quản trị</b> › <b>Ô dân cư</b>. Chọn <b>Xóa ô dân cư (không có dân)</b> hoặc <b>Thêm ô dân cư (khu dân cư mới)</b>, rồi <b>Cọ tô</b> hoặc <b>Vùng đa giác</b>.'
         ],
         facts: [
@@ -670,7 +669,7 @@ const SECTIONS = [
         actions: [{
           label: 'Xem trên bản đồ', icon: 'map',
           run: () => {
-            showLayer('chk_c9', { main: 'infra' });
+            showLayer('chk_c9', { main: 'quyhoach' });
             showToast('Bấm vào biểu tượng cơ sở chưa sử dụng trên bản đồ để xem phương án đề xuất', 'info');
           }
         }]
@@ -680,14 +679,15 @@ const SECTIONS = [
         title: 'Đề xuất điểm hạ tầng mới',
         lead: 'Gửi một vị trí công trình mới để quản trị viên phê duyệt. Điểm chưa phê duyệt hiện ký hiệu nhạt, nhãn Chờ phê duyệt.',
         steps: [
-          'Thanh công cụ bên trái, bấm nút <b>Đề xuất</b>. Mục <b>Nhập 1 điểm</b> đang mở.',
+          'Thanh công cụ bên trái, bấm nút <b>Đề xuất</b>. Ba luồng: <b>Hành chính</b>, <b>Quy hoạch và hạ tầng</b>, <b>Kiến trúc</b>.',
+          'Điểm hạ tầng nằm trong mục <b>Nhập điểm hạ tầng, nhập hàng loạt, quản trị</b> của luồng Quy hoạch và hạ tầng. Chọn <b>Nhập 1 điểm</b>.',
           'Chọn <b>Loại</b>, <b>Giai đoạn</b> (Hiện trạng hoặc Quy hoạch mới) và <b>Phân cấp</b> (Cấp đô thị hoặc Cấp đơn vị ở).',
-          'Nhập <b>Tên</b>. Ô <b>Tọa độ</b>: gõ vĩ độ, kinh độ, hoặc bấm nút ghim <b>Ghim tọa độ trên bản đồ</b> rồi bấm vị trí. <b>Phường/Xã</b> tự điền theo tọa độ. Nhập <b>Diện tích</b> (m²). Ô <b>Bán kính</b> chỉ đọc, tính theo QCVN.',
-          'Bấm <b>Gửi đề xuất</b>. Dòng trạng thái ngay dưới nút báo kết quả. Sau khi phê duyệt, điểm chuyển thành <b>Đã phê duyệt</b>.'
+          'Nhập <b>Tên</b>. Ô <b>Tọa độ</b>: gõ vĩ độ, kinh độ, hoặc bấm nút ghim rồi bấm vị trí. <b>Phường/Xã</b> tự điền theo tọa độ. Nhập <b>Diện tích</b> (m²). Ô <b>Bán kính</b> chỉ đọc, tính theo QCVN.',
+          'Bấm <b>Gửi đề xuất</b>. Dòng trạng thái ngay dưới nút báo kết quả. Sau khi phê duyệt, điểm chuyển thành <b>Đã phê duyệt</b>. Công trình kiến trúc dùng cùng mẫu này ở luồng Kiến trúc và ghi tab riêng.'
         ],
         facts: [
           'Mục <b>Nhập hàng loạt</b> nhận DXF, KML, KMZ, GeoJSON, shapefile (.zip). Chưa đăng nhập: file ≤ 2 MB vào hàng chờ.',
-          'Nút <b>Quản trị</b> trên tab này chỉ hiện sau khi đăng nhập quản trị (tuyến đường, ô dân cư, dữ liệu OpenStreetMap).'
+          'Nút <b>Quản trị</b> chỉ hiện sau khi đăng nhập quản trị (tuyến đường, ô dân cư, dữ liệu OpenStreetMap).'
         ],
         actions: [{ label: 'Mở đề xuất', icon: 'plus', run: () => { document.dispatchEvent(new CustomEvent('qh:right-tab', { detail: { tab: 'tabAdd', open: true } })); flash($('tabAdd')); } }]
       }
@@ -941,7 +941,7 @@ function build() {
       <header class="ov-head">
         <span class="ov-mark">${ico('overview')}</span>
         <div class="ov-head-text">
-          <div class="ov-kicker">Bản đồ quy hoạch và hạ tầng đô thị TP. Huế · Sở Xây dựng thành phố Huế</div>
+          <div class="ov-kicker">Sở Xây dựng thành phố Huế</div>
           <h2 class="ov-title" id="ovTitle">GIỚI THIỆU TỔNG QUAN</h2>
         </div>
         <div class="ov-stage">
@@ -1023,15 +1023,9 @@ function close() {
 }
 
 export function initOverview() {
-  $('btnOverview')?.addEventListener('click', () => (isOpen() ? close() : openOverview()));
-  let off = false;
-  let seen = false;
-  try {
-    off = localStorage.getItem(STORAGE_KEY) === '1';
-    seen = localStorage.getItem(SEEN_KEY) === '1';
-  } catch { /* chế độ riêng tư */ }
-  // Lần mở trang đầu (trình duyệt này) thì mở hộp. Các lần sau, kể cả tải lại, giữ thu.
-  if (off || seen) return;
-  try { localStorage.setItem(SEEN_KEY, '1'); } catch { /* chế độ riêng tư */ }
-  setTimeout(() => { if (!document.querySelector('.tour-root:not([hidden])')) openOverview(); }, 1200);
+  $('btnMapCatalog')?.addEventListener('click', () => (isOpen() ? close() : openOverview()));
+  $('btnOverview')?.addEventListener('click', () => {
+    try { localStorage.removeItem('qhhue_title_off'); } catch { /* chế độ riêng tư */ }
+    document.dispatchEvent(new CustomEvent('qh-title-restore'));
+  });
 }

@@ -42,6 +42,7 @@ const DOCK_ICON = {
   hanhchinh: '<path d="M4 20h16M6 20V9l6-5 6 5v11"/><path d="M10 20v-6h4v6"/>',
   quyhoach: '<path d="M4 5h16v14H4z"/><path d="M4 10h16M10 10v9"/>',
   hatang: '<path d="M4 17h16M6 17V8h4v9M14 17V5h4v12"/>',
+  xahoi: '<circle cx="9" cy="8" r="3"/><path d="M3 19a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.4"/><path d="M16 19a5 5 0 0 1 5-4"/>',
   kientruc: '<path d="M3 20h18M5 20V9l7-5 7 5v11"/><path d="M9 20v-5h6v5"/>'
 };
 
@@ -65,7 +66,6 @@ let saveTimer = 0;
 let kienTruc = null;
 
 const icon = (id) => `<svg class="cn-ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[id] || ''}</svg>`;
-const soon = (label) => `<button type="button" class="cn-soon" disabled>${escapeHtml(label)} <small>Sắp có</small></button>`;
 
 function hosts() {
   return [map, planMap].filter(Boolean);
@@ -240,9 +240,29 @@ function scopeHtml() {
   return `<p class="axis-scope">Phạm vi: ${escapeHtml(areaLabel(area))}</p>`;
 }
 
+const POINT_SECTORS = new Set(SECTORS.map(s => s.id));
+
+// Lớp điểm của bảy ngành hạ tầng kỹ thuật hiện ở panel Hạ tầng xã hội. Tuyến và vùng giữ ở panel này.
+function isPointWork(layer) {
+  return !!(layer && layer.geomType === 'Point' && POINT_SECTORS.has(layer.sector) && !layer.base);
+}
+
+function hatangSchemes(sector, level) {
+  const catalog = state.projectCatalog || [];
+  return schemesForSector(sector, level, catalog).filter(s => {
+    const all = layersFor(sector, s.level, s.slug, { filter: false });
+    if (!all.length) return true;
+    return all.some(l => !isPointWork(l));
+  });
+}
+
+function hatangLayers(sector, level) {
+  return hatangSchemes(sector, level).flatMap(s => layersFor(sector, s.level, s.slug).filter(l => !isPointWork(l)));
+}
+
 function schemeBlock(sector, levelId, scheme) {
   const all = layersFor(sector, levelId, scheme.slug, { filter: false });
-  const shown = all.filter(layerPassesFilter);
+  const shown = all.filter(layerPassesFilter).filter(l => !isPointWork(l));
   const has = shown.length > 0;
   const on = has && shown.every(l => isLayerOn(l.id));
   const some = shown.some(l => isLayerOn(l.id));
@@ -271,18 +291,15 @@ function paintHaTang() {
   const { sector, level } = browseState();
   const pane = document.getElementById('layerPaneHaTang');
   const top = pane ? pane.scrollTop : 0;
-  const catalog = state.projectCatalog || [];
-  const schemes = schemesForSector(sector, level, catalog);
-  const listed = schemes.flatMap(s => layersFor(sector, s.level, s.slug));
+  const schemes = hatangSchemes(sector, level);
+  const listed = hatangLayers(sector, level);
   const allOn = listed.length > 0 && listed.every(l => isLayerOn(l.id));
-  box.innerHTML = `<div class="cn-sectors" role="tablist" aria-label="Hạ tầng">${SECTORS.map(s => `<button type="button" class="cn-sector${s.id === sector ? ' active' : ''}" role="tab" data-cn-sector="${s.id}" aria-selected="${s.id === sector}" title="${escapeHtml(s.label)}">${icon(s.id)}<span>${escapeHtml(s.label)}</span></button>`).join('')}</div>
+  box.innerHTML = `<div class="cn-sectors" role="tablist" aria-label="Hạ tầng kỹ thuật">${SECTORS.map(s => `<button type="button" class="cn-sector${s.id === sector ? ' active' : ''}" role="tab" data-cn-sector="${s.id}" aria-selected="${s.id === sector}" title="${escapeHtml(s.label)}">${icon(s.id)}<span>${escapeHtml(s.label)}</span></button>`).join('')}</div>
     <div class="cn-tools">
       <div class="cn-levels" role="group" aria-label="Cấp đồ án">${FACET_LEVELS.map(l => `<button type="button" class="cn-level${l.id === level ? ' active' : ''}" data-cn-level="${l.id}">${escapeHtml(l.label)}</button>`).join('')}</div>
       <button type="button" class="layer-eye-btn" data-cn-all ${listed.length ? '' : 'disabled'}>${allOn ? 'Tắt tất cả' : 'Bật tất cả'}</button>
-      ${soon('Thống kê')}${soon('Khớp nối')}${soon('So sánh hiện trạng – quy hoạch')}
     </div>
     ${scopeHtml()}
-    ${legendHtml(sector)}
     <div class="cn-schemes">${schemes.length ? schemes.map(s => schemeBlock(sector, s.level, s)).join('') : '<p class="cn-empty">Chưa có đồ án ở cấp này.</p>'}</div>`;
   box.querySelectorAll('[data-mixed="1"]').forEach(el => { el.indeterminate = true; });
   if (pane) pane.scrollTop = top;
@@ -321,10 +338,7 @@ function paintAdminList() {
   townsHost.innerHTML = towns.map(button).join('') || (q ? '<p class="cn-empty">Không khớp</p>' : '');
   wardsHost.innerHTML = `${match(tp) ? button(tp) : ''}${wards.map(button).join('') || (q ? '<p class="cn-empty">Không khớp</p>' : '')}`;
   const area = getAreaFilter() || AREA_TP;
-  if (tools) {
-    tools.innerHTML = (area.type === 'dothi' || area.type === 'xa')
-      ? `<div class="cn-tools">${soon('Đánh giá phân loại đô thị')}</div>` : '';
-  }
+  if (tools) tools.innerHTML = '';
   filterGp();
 }
 
@@ -341,7 +355,10 @@ function paintKienTruc() {
 
 function paintScopes() {
   const q = document.getElementById('axisScopeQuyHoach');
-  if (q) q.innerHTML = `Phạm vi: ${escapeHtml(areaLabel(getAreaFilter() || AREA_TP))}`;
+  if (!q) return;
+  const count = document.getElementById('planTabCount');
+  q.textContent = `Phạm vi: ${areaLabel(getAreaFilter() || AREA_TP)} `;
+  if (count) q.append(count);
 }
 
 function paintDock() {
@@ -352,6 +369,131 @@ function paintDock() {
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-selected', String(on));
   });
+  paintMag();
+}
+
+const MAG_ORDER = ['hanhchinh', 'quyhoach', 'hatang', 'xahoi', 'kientruc'];
+
+function paintMag() {
+  const track = document.getElementById('layerMagTrack');
+  if (!track) return;
+  const id = browseState().axis || 'quyhoach';
+  const cur = Math.max(0, MAG_ORDER.indexOf(id));
+  const items = [...track.querySelectorAll('[data-main-tab]')];
+  items.forEach((btn, i) => {
+    const dist = Math.abs(i - cur);
+    const on = i === cur;
+    btn.classList.toggle('is-current', on);
+    btn.classList.toggle('is-before', i < cur);
+    btn.classList.toggle('is-after', i > cur);
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-selected', String(on));
+    if (dist) btn.dataset.dist = String(dist);
+    else delete btn.dataset.dist;
+    const label = btn.querySelector('.layer-main-label');
+    if (on && label && label.parentElement.clientWidth > 24) {
+      label.style.fontSize = '11px';
+      const host = label.parentElement;
+      let size = 11;
+      while (size > 9 && label.scrollWidth > host.clientWidth + 1) {
+        size -= 0.5;
+        label.style.fontSize = `${size}px`;
+      }
+    }
+  });
+  const prev = document.querySelector('[data-mag-step="-1"]');
+  const next = document.querySelector('[data-mag-step="1"]');
+  if (prev) prev.disabled = cur <= 0;
+  if (next) next.disabled = cur >= MAG_ORDER.length - 1;
+  const menu = document.getElementById('layerMagMenu');
+  if (menu && !menu.hidden) placeMagMenu();
+}
+
+function placeMagMenu() {
+  const menu = document.getElementById('layerMagMenu');
+  const cur = document.querySelector('#layerMagTrack .is-current');
+  const host = document.getElementById('layerMag');
+  if (!menu || !cur || !host) return;
+  const r = cur.getBoundingClientRect();
+  const h = host.getBoundingClientRect();
+  const width = Math.round(Math.max(220, Math.min(r.width, h.width - 8)));
+  const left = Math.round(r.left - h.left);
+  menu.style.top = `${Math.round(r.bottom - h.top + 4)}px`;
+  menu.style.left = `${Math.max(0, Math.min(left, h.width - width))}px`;
+  menu.style.width = `${width}px`;
+}
+
+function fillMagMenu() {
+  const menu = document.getElementById('layerMagMenu');
+  const track = document.getElementById('layerMagTrack');
+  if (!menu || !track || menu.dataset.ready) return;
+  menu.dataset.ready = '1';
+  menu.innerHTML = [...track.querySelectorAll('[data-main-tab]')].map(btn => {
+    const id = btn.dataset.mainTab;
+    const name = btn.title || btn.textContent;
+    return `<button type="button" role="option" data-mag-go="${escapeHtml(id)}">${escapeHtml(name)}</button>`;
+  }).join('');
+}
+
+function setMagMenu(open) {
+  const menu = document.getElementById('layerMagMenu');
+  if (!menu) return;
+  fillMagMenu();
+  const id = browseState().axis;
+  menu.querySelectorAll('[data-mag-go]').forEach(btn => btn.setAttribute('aria-selected', String(btn.dataset.magGo === id)));
+  menu.hidden = !open;
+  if (open) placeMagMenu();
+}
+
+function stepMag(dir) {
+  const cur = Math.max(0, MAG_ORDER.indexOf(browseState().axis || 'quyhoach'));
+  goMag(MAG_ORDER[cur + dir]);
+}
+
+function goMag(id) {
+  if (!id) return;
+  setMagMenu(false);
+  magGoing = true;
+  document.querySelector(`#layerMagTrack [data-main-tab="${id}"]`)?.click();
+  magGoing = false;
+}
+
+let sectorHold = false;
+function publishSectorLegend(open, sectorId) {
+  const b = browseState();
+  const sector = sectorId || b.sector;
+  const listed = schemesForSector(sector, b.level, state.projectCatalog || []).flatMap(s => layersFor(sector, s.level, s.slug));
+  const layersOn = listed.some(l => isLayerOn(l.id));
+  if (open) sectorHold = true;
+  if (!open && !layersOn && b.axis !== 'hatang') sectorHold = false;
+  const show = layersOn || sectorHold;
+  document.dispatchEvent(new CustomEvent('qh:sector-legend', {
+    detail: {
+      on: show,
+      open: !!open && show,
+      label: SECTORS.find(s => s.id === sector)?.label || 'Hạ tầng',
+      html: legendHtml(sector)
+    }
+  }));
+}
+
+function paintXaHoi() {
+  const scope = document.getElementById('axisScopeXaHoi');
+  if (scope) scope.textContent = `Phạm vi: ${areaLabel(getAreaFilter() || AREA_TP)}`;
+}
+
+function paintAxisAll() {
+  const btn = document.getElementById('btnAxisAll');
+  const pane = document.querySelector(`#layerMain [data-main-pane="${browseState().axis}"]`);
+  if (!btn || !pane) return;
+  const boxes = [...pane.querySelectorAll('input[type="checkbox"]')].filter(el => {
+    if (el.id === 'chk_parcel') return false;
+    if (el.closest('#projectList') || el.closest('#pointCatalog') || el.closest('[hidden]') || el.closest('.is-filter-hide')) return false;
+    return true;
+  });
+  const allOn = boxes.length > 0 && boxes.every(el => el.checked);
+  btn.setAttribute('aria-pressed', String(allOn));
+  btn.title = allOn ? 'Tắt các lớp đang hiện trong nhóm này' : 'Bật các lớp đang hiện trong nhóm này';
 }
 
 const foldQuery = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
@@ -380,7 +522,7 @@ function filterGp() {
 
 function applyLayerQuery() {
   const q = foldQuery(layerQuery);
-  ['#layerPaneHaTang', '#layerPaneKienTruc', '#baseQuyHoach'].forEach(sel => {
+  ['#layerPaneHaTang', '#layerPaneXaHoi', '#layerPaneKienTruc', '#baseQuyHoach'].forEach(sel => {
     document.querySelectorAll(`${sel} .cn-scheme, ${sel} .layer-row, ${sel} .axis-arch li, ${sel} .cn-layer`).forEach(el => {
       el.classList.toggle('is-filter-hide', !!q && !foldQuery(el.textContent).includes(q));
     });
@@ -418,7 +560,7 @@ function toggleAxisAll() {
   if (!pane) return;
   const boxes = [...pane.querySelectorAll('input[type="checkbox"]')].filter(el => {
     if (el.id === 'chk_parcel') return false;
-    if (el.closest('#projectList')) return false;
+    if (el.closest('#projectList') || el.closest('#pointCatalog')) return false;
     if (el.closest('[hidden]') || el.closest('.is-filter-hide')) return false;
     return true;
   });
@@ -441,12 +583,58 @@ function paint() {
   paintBase('quyhoach', 'baseQuyHoach');
   paintBase('hatang', 'baseHaTang', browseState().sector);
   paintBase('kientruc', 'baseKienTruc');
+  paintXaHoi();
+  paintPointWorks();
+  paintAxisAll();
   const tools = document.getElementById('axisToolsQuyHoach');
-  if (tools && !tools.dataset.ready) {
-    tools.dataset.ready = '1';
-    tools.innerHTML = `${soon('Thống kê')}${soon('Khớp nối')}${soon('So sánh hiện trạng – quy hoạch')}`;
-  }
+  if (tools) tools.hidden = true;
   applyLayerQuery();
+  publishSectorLegend(false);
+}
+
+let pointLevelsReady = false;
+
+function paintPointWorks() {
+  const host = document.getElementById('pointCatalog');
+  if (!host) return;
+  const pane = document.getElementById('layerPaneXaHoi');
+  const top = pane ? pane.scrollTop : 0;
+  const opened = new Set([...host.querySelectorAll('details[open]')].map(el => el.dataset.pointLevel));
+  const points = getLayers().filter(l => isPointWork(l) && layerPassesFilter(l));
+  if (!points.length) {
+    host.innerHTML = '';
+    if (pane) pane.scrollTop = top;
+    return;
+  }
+  const byLevel = new Map(FACET_LEVELS.map(l => [l.id, []]));
+  points.forEach(l => {
+    if (!byLevel.has(l.level)) byLevel.set(l.level, []);
+    byLevel.get(l.level).push(l);
+  });
+  if (!pointLevelsReady) {
+    const prefer = browseState().level || 'QHC25';
+    const pick = byLevel.get(prefer)?.length ? prefer : [...byLevel.keys()].find(id => byLevel.get(id).length);
+    if (pick) opened.add(pick);
+    pointLevelsReady = true;
+  }
+  const catalog = state.projectCatalog || [];
+  const searching = !!foldQuery(layerQuery);
+  host.innerHTML = [...byLevel.entries()].filter(([, rows]) => rows.length).map(([levelId, rows]) => {
+    const label = FACET_LEVELS.find(l => l.id === levelId)?.label || levelId;
+    const names = new Map(schemesAt(levelId, catalog).map(s => [s.slug, s.name]));
+    const body = SECTORS.map(sec => {
+      const mine = rows.filter(l => l.sector === sec.id);
+      if (!mine.length) return '';
+      const lines = mine.map(l => {
+        const scheme = names.get(l.scheme) || l.scheme || '';
+        return `<label class="cn-layer"><input type="checkbox" data-cn-layer="${escapeHtml(l.id)}"${isLayerOn(l.id) ? ' checked' : ''}><span>${escapeHtml(l.name)}</span><small>${escapeHtml(scheme)}</small></label>`;
+      }).join('');
+      return `<div class="cn-status"><b>${escapeHtml(sec.label)}</b>${lines}</div>`;
+    }).join('');
+    const open = searching || opened.has(levelId) ? ' open' : '';
+    return `<details class="point-level" data-point-level="${escapeHtml(levelId)}"${open}><summary>${escapeHtml(label)} <small>(${rows.length})</small></summary>${body}</details>`;
+  }).join('');
+  if (pane) pane.scrollTop = top;
 }
 
 function showPlanPane() {
@@ -466,6 +654,7 @@ function openQhc25Layers() {
 }
 
 let openingAxis = false;
+let magGoing = false;
 let listenLevel = false;
 let levelTab = false;
 let axisBeforeUrban = null;
@@ -541,6 +730,7 @@ async function loadKienTruc() {
     pull('data/kien-truc/cong-trinh.json')
   ]);
   kienTruc = { quyChe, congTrinh };
+  state.kienTruc = kienTruc;
   if (browseState().axis === 'kientruc') paintKienTruc();
 }
 
@@ -588,12 +778,14 @@ export function initChuyenNganh() {
         btn.setAttribute('aria-selected', String(on));
       });
       document.querySelectorAll('[data-admin-pane]').forEach(pane => { pane.hidden = pane.dataset.adminPane !== id; });
+      if (id === 'dothi') document.dispatchEvent(new CustomEvent('qh:legend-open', { detail: { set: 'URBAN' } }));
       return;
     }
     const sectorBtn = e.target.closest('[data-cn-sector]');
     if (sectorBtn) {
       setBrowseState({ sector: sectorBtn.dataset.cnSector, axis: 'hatang' });
       paint();
+      publishSectorLegend(true);
       scheduleSave();
       return;
     }
@@ -618,9 +810,10 @@ export function initChuyenNganh() {
     }
     if (e.target.closest('[data-cn-all]')) {
       const { sector, level } = browseState();
-      const listed = schemesForSector(sector, level, state.projectCatalog || []).flatMap(s => layersFor(sector, s.level, s.slug));
+      const listed = hatangLayers(sector, level);
       const turnOn = listed.some(l => !isLayerOn(l.id));
       listed.forEach(l => setLayerOn(l, turnOn));
+      publishSectorLegend(turnOn);
     }
   });
   document.getElementById('layerMain')?.addEventListener('change', (e) => {
@@ -628,15 +821,17 @@ export function initChuyenNganh() {
     if (layerId) {
       const layer = getLayers().find(l => l.id === layerId);
       if (layer) setLayerOn(layer, e.target.checked, { frame: e.target.checked && !layer.bind });
+      if (e.target.checked && layer) publishSectorLegend(true, layer.sector);
       return;
     }
     const schemeEl = e.target.closest('[data-cn-scheme]');
     const slug = schemeEl?.dataset.cnScheme;
     if (!slug) return;
     const { sector, level } = browseState();
-    const rows = layersFor(sector, schemeEl.dataset.cnLevel || level, slug);
+    const rows = layersFor(sector, schemeEl.dataset.cnLevel || level, slug).filter(l => !isPointWork(l));
     if (e.target.checked) openSchemes.add(slug);
     rows.forEach(l => setLayerOn(l, e.target.checked));
+    if (e.target.checked) publishSectorLegend(true);
   });
   document.addEventListener('qh:axis-tab', (e) => {
     const id = e.detail?.id;
@@ -692,9 +887,47 @@ export function initChuyenNganh() {
   onFacet(() => paint());
   document.getElementById('cnMatrix')?.addEventListener('toggle', (e) => { if (e.target.open) paintMatrix(); });
 
+  const track = document.getElementById('layerMagTrack');
+  let swipeX = null;
+  let swiped = false;
+  track?.addEventListener('pointerdown', (e) => {
+    swipeX = e.clientX;
+    if (e.pointerType === 'touch') track.setPointerCapture?.(e.pointerId);
+  });
+  track?.addEventListener('pointerup', (e) => {
+    if (swipeX == null) return;
+    const dx = e.clientX - swipeX;
+    swipeX = null;
+    if (Math.abs(dx) < 42) return;
+    stepMag(dx < 0 ? 1 : -1);
+    swiped = true;
+    setTimeout(() => { swiped = false; }, 0);
+  });
+  track?.addEventListener('click', (e) => {
+    if (openingAxis || magGoing) return;
+    if (swiped) { swiped = false; e.stopPropagation(); e.preventDefault(); return; }
+    const tab = e.target.closest('[data-main-tab]');
+    if (!tab) return;
+    if (tab.dataset.mainTab !== browseState().axis) { setMagMenu(false); return; }
+    e.stopPropagation();
+    e.preventDefault();
+    const menu = document.getElementById('layerMagMenu');
+    setMagMenu(!!menu?.hidden);
+  }, true);
+  document.getElementById('layerMag')?.addEventListener('click', (e) => {
+    const step = e.target.closest('[data-mag-step]');
+    if (step) { stepMag(Number(step.dataset.magStep)); return; }
+    const go = e.target.closest('[data-mag-go]');
+    if (!go) return;
+    goMag(go.dataset.magGo);
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#layerMag')) setMagMenu(false);
+  });
+  window.addEventListener('resize', () => { if (!document.getElementById('layerMagMenu')?.hidden) placeMagMenu(); });
   const openDeep = q.has('nganh') || q.has('truc');
-  if (openDeep) showAxis(browseState().axis, { openPanel: true, url: false });
-  else paint();
+  if (openDeep) showAxis(browseState().axis, { url: false });
+  else showAxis(getLevel() === 'urban' ? 'hanhchinh' : (browseState().axis || 'quyhoach'), { url: false });
   listenLevel = true;
   document.getElementById('layerSearch')?.addEventListener('input', (e) => {
     layerQuery = e.target.value || '';

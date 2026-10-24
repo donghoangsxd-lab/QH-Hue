@@ -342,13 +342,16 @@ const fmtArea = (m2) => (m2 >= 10000 ? `${fmtNum(m2 / 10000)} ha` : `${fmtNum(Ma
 const fmtM2 = (m2) => `${fmtNum(Math.round(m2))} m²`;
 const fmtPct = (p) => (p > 0 && p < 0.05 ? `<${fmtNum(0.1)}%` : `${fmtNum(Math.round(p * 10) / 10)}%`);
 
-/** place 'measure': câu chữ bảng vùng đo; mặc định bảng thửa */
+/** place 'measure': câu chữ bảng vùng đo; 'point': điểm bấm không có thửa; mặc định bảng thửa */
 export function planPlace(place) {
   if (place === 'measure') {
     return { on: 'trong vùng đo', it: 'Vùng đo', cut: 'vùng đo', shape: 'Vùng đo', pie: 'trong vùng đo' };
   }
   if (place === 'invest') {
     return { on: 'trong ranh dự án', it: 'Ranh dự án', cut: 'ranh dự án', shape: 'Ranh dự án', pie: 'trong ranh dự án' };
+  }
+  if (place === 'point') {
+    return { on: 'tại vị trí', it: 'Vị trí', cut: 'vị trí', shape: 'Vị trí', pie: 'tại vị trí' };
   }
   return { on: 'trên thửa đất', it: 'Thửa', cut: 'thửa', shape: 'Hình thửa', pie: 'trên thửa' };
 }
