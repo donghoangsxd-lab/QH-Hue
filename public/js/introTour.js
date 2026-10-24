@@ -31,7 +31,7 @@ const STEPS = [
   {
     target: ['#rightPanel', '#btnExpandRightPanel'],
     title: 'Bật / tắt lớp dữ liệu',
-    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm mũi tên ‹ ở mép phải để mở, › để thu gọn. Hàng trên là băng đạn năm panel: Hành chính, Quy hoạch, Hạ tầng kỹ thuật, Hạ tầng xã hội, Kiến trúc. Ngay dưới là ô tìm kiếm, nút HT/QH, nút bật tắt cả nhóm và nút ẩn panel. Chú giải nổi trên bản đồ, chỉ hiện lớp đang bật.'
+    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm mũi tên ‹ ở mép phải để mở, › để thu gọn. Hàng trên là droplist năm panel: Hành chính, Quy hoạch, Hạ tầng kỹ thuật, Hạ tầng xã hội, Kiến trúc. Ngay dưới là ô tìm kiếm, nút HT/QH, nút bật tắt cả nhóm và nút ẩn panel. Chú giải và lớp nền ghim ở đáy panel.'
   },
   {
     target: ['#btnInspectPick', '#btnInspectMode'],
@@ -41,7 +41,7 @@ const STEPS = [
   {
     target: '#mapTitle',
     title: 'Bản đồ Quy hoạch / Hiện trạng và lớp quy hoạch',
-    text: 'Thanh tiêu đề cho biết bản đồ đang xem và một dòng giới thiệu. Mở trang là bản đồ quy hoạch; bấm biểu tượng lật trang để sang bản đồ hiện trạng và ngược lại. Nút Mục lục mở bảng tính năng. Nút đóng ẩn thanh này; nút góc trái hiện lại. Hệ thống đô thị nằm trong panel Hành chính. Bốn cấp QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500 nằm trong panel Quy hoạch — chọn một cấp thì các cấp kia tắt; muốn so sánh nhiều lớp thì bật thêm ở danh sách.'
+    text: 'Thanh tiêu đề cho biết bản đồ đang xem và một dòng giới thiệu. Mở trang là bản đồ quy hoạch; bấm biểu tượng lật trang để sang bản đồ hiện trạng và ngược lại. Nút Giới thiệu ở góc trên trái mở bảng tính năng. Nút đóng ẩn thanh này; bấm lại nút góc trái để hiện thanh tiêu đề. Hệ thống đô thị nằm trong panel Hành chính. Bốn cấp QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500 nằm trong panel Quy hoạch — chọn một cấp thì các cấp kia tắt; muốn so sánh nhiều lớp thì bật thêm ở danh sách.'
   },
   {
     target: '#btnToggleCompare',
@@ -51,7 +51,7 @@ const STEPS = [
   {
     target: ['#bottomPanel', '#btnExpandBottomPanel'],
     title: 'Bảng chỉ tiêu 40 phường xã',
-    text: 'Bảng phía dưới so sánh diện tích từng loại hạ tầng với chỉ tiêu m²/người của quy chuẩn, kèm biểu đồ cột. Chọn phường/xã trong danh sách để xem riêng từng địa bàn. Nút mũi tên kép cuối thanh tiêu đề thu gọn bảng; nút ở góc phải dưới mở lại.'
+    text: 'Bảng phía dưới so sánh diện tích từng loại hạ tầng với chỉ tiêu m²/người của quy chuẩn, kèm biểu đồ cột. Chọn phường/xã trong danh sách để xem riêng từng địa bàn. Nút mũi tên kép cuối thanh tiêu đề thu gọn bảng; nút trên thanh công cụ trái mở lại.'
   },
   {
     target: '.map-toolbar',
@@ -59,9 +59,9 @@ const STEPS = [
     text: 'Thanh công cụ bên trái còn có: đo chiều dài, đo diện tích, lát cắt địa hình, định vị GPS, xuất bản đồ (A3 đến A0), đề xuất điểm mới và phác thảo.\nNút Đề xuất mở phiếu nhập điểm. Điểm mới được đánh dấu "Chờ duyệt" cho đến khi quản trị viên Sở Xây dựng phê duyệt.'
   },
   {
-    target: '#btnMapCatalog',
-    title: 'Mục lục tính năng',
-    text: 'Nút Mục lục trên thanh tiêu đề mở bảng các nhóm tính năng chính, kèm hướng dẫn và lối mở nhanh từng tính năng. Chúc bạn khám phá bản đồ hiệu quả!'
+    target: '#btnOverview',
+    title: 'Giới thiệu',
+    text: 'Nút Giới thiệu ở góc trên trái mở bảng các nhóm tính năng chính, kèm hướng dẫn và lối mở nhanh từng tính năng. Chúc bạn khám phá bản đồ hiệu quả!'
   }
 ];
 

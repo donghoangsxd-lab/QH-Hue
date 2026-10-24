@@ -390,7 +390,7 @@ function initMapTitle() {
     const off = titleOff();
     document.documentElement.classList.toggle('title-dismissed', off);
     const launch = document.getElementById('btnOverview');
-    if (launch) launch.hidden = !off;
+    if (launch) launch.hidden = false;
     if (off) {
       document.documentElement.style.setProperty('--title-h', '8px');
       return;
