@@ -143,11 +143,10 @@ export const infraLabels = {
   "14-NOXH": "Chung cư"
 };
 
-// Ranh giới phường xã: một nét ghi xám dưới + một nét vàng trên. smoothFactor 0 để Leaflet không
-// rút từng polygon riêng (cạnh chung sẽ tách thành hai nét và hở nền sáng).
-const WARD_LINE_DRAW = { fill: false, interactive: false, smoothFactor: 0, lineJoin: 'round', lineCap: 'round' };
-export const WARD_BOUNDARY_SHADOW_STYLE = { ...WARD_LINE_DRAW, color: '#64748b', weight: 4, opacity: 0.55 };
-export const WARD_BOUNDARY_LINE_STYLE = { ...WARD_LINE_DRAW, color: '#fde68a', weight: 1.6, opacity: 0.95 };
+// Cạnh chung đã gom vẫn sáng nếu vẽ hai lần (quầng dày bán trong suốt + nét vàng, hoặc blur/drop-shadow).
+// Một nét mảnh, đủ đục. Quầng vàng chỉ gắn vào vành ngoài thành phố.
+const WARD_LINE_DRAW = { fill: false, interactive: false, smoothFactor: 0, lineJoin: 'round', lineCap: 'butt' };
+export const WARD_BOUNDARY_LINE_STYLE = { ...WARD_LINE_DRAW, color: '#334155', weight: 1.2, opacity: 1 };
 // Hình để tô / vẽ nét. Tra phường chứa điểm vẫn dùng hình gốc. prepareWardDraw đã chạy thì lấy bản nhớ.
 export function wardDrawFC(features) {
   const pack = getWardDraw() || sealWardDraw(features);

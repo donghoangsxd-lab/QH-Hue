@@ -1,5 +1,5 @@
 import {
-  state, infraLabels, WARD_BOUNDARY_SHADOW_STYLE, WARD_BOUNDARY_LINE_STYLE, PLAN_CHANGE_INFO,
+  state, infraLabels, WARD_BOUNDARY_LINE_STYLE, PLAN_CHANGE_INFO,
   BUFFER_COLORS, BUFFER_KEYS, ICON_GROUP_KEYS, getBufferStyle, getPlanScenarioList, effectiveRadius, bumpDataVersion, layerType,
   isNetworkType, ntKindOf, NT_KIND_LABELS, parkTierOf
 } from './state.js';
@@ -288,11 +288,8 @@ export const WARD_BOUNDS_EVENT = 'qh:ward-bounds';
 function addWardBoundaryLines(group) {
   const pack = getWardDraw();
   if (!pack || !pack.lines.length) return;
-  const shadow = L.polyline(pack.lines, WARD_BOUNDARY_SHADOW_STYLE);
   const line = L.polyline(pack.lines, WARD_BOUNDARY_LINE_STYLE);
-  shadow.options.wardRole = 'shadow';
   line.options.wardRole = 'line';
-  group.addLayer(shadow);
   group.addLayer(line);
 }
 
@@ -1085,9 +1082,7 @@ function createCityOutline(lines, renderer) {
   ]);
 }
 
-// QHC 1/25.000: ranh phường nội bộ mảnh, không quầng. Quầng vàng chỉ trên vành ngoài thành phố.
-const WARD_INNER_LINE = { color: '#94a3b8', weight: 1.1, opacity: 0.85, fill: false, interactive: false };
-const WARD_INNER_SHADOW = { opacity: 0, weight: 0, fill: false, interactive: false };
+// Quầng vàng chỉ trên vành ngoài thành phố. Cạnh nội bộ giữ một nét mảnh, kể cả khi không ở QHC 1/25.000.
 const cityEdgeOwned = new WeakSet();
 const cityEdgeLayer = new WeakMap();
 const cityOutlineRenderers = new WeakMap();
@@ -1121,9 +1116,7 @@ function paintWardGroup(group, host) {
     cityEdgeLayer.delete(host);
   }
   group.eachLayer(layer => {
-    const role = layer.options && layer.options.wardRole;
-    if (role === 'shadow') layer.setStyle(on ? WARD_INNER_SHADOW : WARD_BOUNDARY_SHADOW_STYLE);
-    else if (role === 'line') layer.setStyle(on ? WARD_INNER_LINE : WARD_BOUNDARY_LINE_STYLE);
+    if (layer.options && layer.options.wardRole === 'line') layer.setStyle(WARD_BOUNDARY_LINE_STYLE);
   });
   if (!on) { cityEdgeOwned.delete(host); return; }
   const pack = getWardDraw();
