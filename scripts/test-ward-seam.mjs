@@ -154,4 +154,13 @@ assert.ok(before.km > 40, 'dữ liệu gốc còn khe');
 assert.ok(after.km < before.km * 0.02, `còn ${after.km.toFixed(2)} km khe 0,4–8 m`);
 assert.ok(real.lines.length > 10 && real.lines.length < 8000, 'nét ranh gom thành đường');
 assert.equal(real.byName.size, 40);
+
+const stateSrc = fs.readFileSync(new URL('../public/js/state.js', import.meta.url), 'utf8');
+const mapSrc = fs.readFileSync(new URL('../public/js/mapEngine.js', import.meta.url), 'utf8');
+const planSrc = fs.readFileSync(new URL('../public/js/planMap.js', import.meta.url), 'utf8');
+const lineStyle = /WARD_BOUNDARY_LINE_STYLE = \{[^}]*weight:\s*([0-9.]+)/.exec(stateSrc);
+assert.ok(lineStyle && Number(lineStyle[1]) <= 1.5, 'nét ranh nội bộ phải mảnh');
+assert.doesNotMatch(stateSrc, /WARD_BOUNDARY_SHADOW_STYLE/);
+assert.doesNotMatch(mapSrc, /WARD_BOUNDARY_SHADOW_STYLE/);
+assert.doesNotMatch(planSrc, /WARD_BOUNDARY_SHADOW_STYLE/);
 console.log('test-ward-seam ok');

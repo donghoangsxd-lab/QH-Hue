@@ -3,7 +3,7 @@
 // Khớp tên cache trong sw.js. HTML/JS/CSS không dùng số này — các file đó luôn tải mới.
 export const GBA_V = '20261026';
 // Đối chiếu query trên index.html. Đổi khi muốn cắt URL cũ của app.js / style.css.
-export const SHELL_V = '20261042';
+export const SHELL_V = '20261043';
 
 export function withAssetVersion(href, base) {
   const root = base || (typeof document !== 'undefined' ? document.baseURI : 'https://local.invalid/');
