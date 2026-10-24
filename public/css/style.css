@@ -1230,7 +1230,7 @@ body.right-collapsed .right-panel {
 .admin-tab { flex: 1 1 0; height: var(--axis-head-h); border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-header); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
 .admin-tab.active { color: var(--axis-color); border-bottom-color: var(--main-accent); }
 .axis-group { margin-top: 4px; padding-top: 2px; border-top: 1px solid var(--axis-line); }
-#xahoiTabs { display: flex; gap: 4px; margin: 4px 0; overflow-x: auto; scrollbar-width: none; }
+#xahoiTabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
 #xahoiTabs::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .xh-tab { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; height: var(--axis-chip-h); padding: 0 4px; border: 1px solid var(--axis-chip-border); border-radius: 8px; color: var(--axis-color-muted); background: transparent; }
 .xh-tab.is-on { color: var(--axis-color); border-color: var(--accent-cyan); background: var(--axis-bg-active); }
