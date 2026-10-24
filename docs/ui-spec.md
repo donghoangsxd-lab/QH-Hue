@@ -28,7 +28,8 @@ Tab trên ô tìm kiếm: `Đơn vị hành chính (40)`, rồi `Đô thị (25)
 
 - ĐVHC: dòng Thành phố Huế không số, đậm, nền vàng nhạt; 40 đơn vị đánh số. Cột dân số và km² thẳng nhau.
 - Bấm một dòng (đơn vị, đô thị, hoặc Thành phố Huế) phóng tới và tô cả ranh. Thành phố tô viền ngoài.
-- Đô thị: không nút «Hệ thống đô thị» (trùng ô Phân loại đô thị). Mục Quy hoạch đứng trước, hai tab `Đến 2030` và `Sau 2030` ngay đầu danh sách. Mục Hiện trạng chỉ hiện khi bấm HT, nối phía dưới. Mỗi dòng cùng lưới dân số / km² với ĐVHC.
+- Hai tab `Đơn vị hành chính (40)` và `Đô thị (25)` cùng một hàng, chữ không chồng, không cắt ở bề rộng panel.
+- Đô thị: không nút «Hệ thống đô thị» (trùng ô Phân loại đô thị). Mục Quy hoạch đứng trước, hai tab `Đến 2030` và `Sau 2030` ngay đầu danh sách. Mục Hiện trạng chỉ hiện khi bấm HT (mặc định đang QH thì ẩn), nối phía dưới. Dòng Thành phố Huế không số; các đô thị đánh số từ 1. Mỗi dòng cùng lưới dân số / km² với ĐVHC.
 
 ### Quy hoạch
 

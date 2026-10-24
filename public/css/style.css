@@ -1224,6 +1224,8 @@ body.right-collapsed .right-panel {
 #btnAxisAll .ico { margin: 0; }
 #layerMain:not([data-active="hanhchinh"]) > .admin-tabs { display: none; }
 .admin-tabs { display: flex; gap: 0; margin: 0; padding: 0 6px; border-bottom: 1px solid var(--border-soft); }
+#adminTabs { padding: 0 4px; }
+#adminTabs .admin-tab { flex: 1 1 auto; width: auto; min-width: max-content; padding: 0 4px; letter-spacing: 0; white-space: nowrap; }
 .axis-num { margin: 0; color: var(--axis-color-muted); font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
 .admin-tab { flex: 1 1 0; height: var(--axis-head-h); border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-header); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
 .admin-tab.active { color: var(--axis-color); border-bottom-color: var(--main-accent); }

@@ -324,16 +324,28 @@ function statCell(value, fmt) {
   return value == null || !Number.isFinite(Number(value)) ? '—' : fmt.format(Number(value));
 }
 
+function isCityRow(raw) {
+  const item = resolved(raw);
+  const name = item.short || item.name;
+  return item.id === 'hue' || item.city === true || name === DVHC_CITY.name;
+}
+
 function areaBtn(raw, n, period) {
   const item = resolved(raw);
   const stats = statsFor(item, period);
   const pop = statCell(stats.pop, POP_FMT);
   const km = statCell(stats.km2, KM_FMT);
   const name = item.short || item.name;
-  const city = name === DVHC_CITY.name || item.id === 'hue';
+  const city = isCityRow(item);
   const kv = city ? 'TP' : `dothi:${item.id}`;
   const on = item.id === picked;
-  return `<button type="button" class="axis-area gp-row${city ? ' axis-area-city' : ''}${on ? ' active' : ''}" data-gp-pick="${escapeHtml(item.id)}" data-kv="${escapeHtml(kv)}" aria-pressed="${on}" title="${escapeHtml(`${name}: dân số ${pop}, diện tích ${km} km²`)}"><span class="axis-num">${n}.</span><span class="axis-area-name">${escapeHtml(name)}</span><span class="axis-area-pop">${pop}</span><span class="axis-area-km">${km}</span></button>`;
+  const num = city ? '' : `${n}.`;
+  return `<button type="button" class="axis-area gp-row${city ? ' axis-area-city' : ''}${on ? ' active' : ''}" data-gp-pick="${escapeHtml(item.id)}" data-kv="${escapeHtml(kv)}" aria-pressed="${on}" title="${escapeHtml(`${name}: dân số ${pop}, diện tích ${km} km²`)}"><span class="axis-num">${num}</span><span class="axis-area-name">${escapeHtml(name)}</span><span class="axis-area-pop">${pop}</span><span class="axis-area-km">${km}</span></button>`;
+}
+
+function numberedRows(list, period) {
+  let n = 0;
+  return list.map(item => areaBtn(item, isCityRow(item) ? null : ++n, period)).join('');
 }
 
 const AREA_HEAD = `<div class="axis-area-head"><span class="axis-num"></span><span class="axis-area-name">Đô thị</span><span class="axis-area-pop">Dân số</span><span class="axis-area-km">km²</span></div>`;
@@ -356,12 +368,10 @@ function renderPanel() {
   const ht = htItems();
   urbanTotal = ht.length;
   paintUrbanCount();
-  let n = 0;
   const plan = gpPeriod === 'vision' ? URBANS_VISION : URBANS;
-  const qhHtml = plan.map(item => areaBtn(item, ++n, 'qh')).join('');
-  n = 0;
+  const qhHtml = numberedRows(plan, 'qh');
   const htHtml = htOn
-    ? `<div class="gp-grp">Hiện trạng</div>${AREA_HEAD}${ht.map(item => areaBtn(item, ++n, 'ht')).join('')}`
+    ? `<div class="gp-grp">Hiện trạng</div>${AREA_HEAD}${numberedRows(ht, 'ht')}`
     : '';
   box.innerHTML = `<div class="gp-grp">Quy hoạch</div><div class="admin-tabs gp-periods" role="tablist" aria-label="Giai đoạn quy hoạch đô thị"><button type="button" class="admin-tab${gpPeriod === '2030' ? ' active' : ''}" data-gp-period="2030" aria-selected="${gpPeriod === '2030'}">Đến 2030</button><button type="button" class="admin-tab${gpPeriod === 'vision' ? ' active' : ''}" data-gp-period="vision" aria-selected="${gpPeriod === 'vision'}">Sau 2030</button></div>${AREA_HEAD}${qhHtml}${htHtml}`;
 }

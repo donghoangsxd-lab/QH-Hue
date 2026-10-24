@@ -204,8 +204,14 @@ assert.match(css, /\.map-toolbar\s*\{[^}]*right:\s*12px/);
 assert.match(css, /body\.right-collapsed \.axis-dock\s*\{[^}]*left:\s*max\(8px/);
 assert.match(css, /\.axis-area-city\s*\{[^}]*#fef3c7/);
 assert.match(read('public/js/basemap.js'), /waybackconfig\.json/);
-assert.match(read('public/js/generalPlanUi.js'), /Đến 2030/);
-assert.match(read('public/js/generalPlanUi.js'), /Sau 2030/);
+const gp = read('public/js/generalPlanUi.js');
+assert.match(gp, /Đến 2030/);
+assert.match(gp, /Sau 2030/);
+assert.match(gp, /function isCityRow/);
+assert.match(gp, /isCityRow\(item\) \? null : \+\+n/);
+assert.match(gp, /const num = city \? '' : `\$\{n\}\.`/);
+assert.match(gp, /getViewMode\(\) === 'HT'/);
+assert.match(css, /#adminTabs \.admin-tab\s*\{[^}]*min-width:\s*max-content/);
 assert.match(read('.cursorrules'), /docs\/ui-spec\.md/);
 
 console.log('core ui ok');
