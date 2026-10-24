@@ -14,6 +14,7 @@ import {
   getAreaFilter, isLayerOn, setLayerFlag, layerPassesFilter, noteUrbanFocus, setBrowseState,
   setAreaFilter, readFacetUrl, loadFacetCatalog, onFacet, schemesAt, schemesForSector, layersFor, baseLayers, browseState
 } from './facetStore.js';
+import { DVHC_CITY, dvhcOf } from './dvhcStats.js';
 
 const STORE_KEY = 'qh_axes_v1';
 const EXTRA_CHECKS = ['chk_gt25', 'chk_gt10', 'chk_gt25rail', 'chk_gt10rail', 'chk_bound', 'chk_urban', 'chk_projects', 'chk_qhct'];
@@ -320,24 +321,40 @@ function paintAdmin() {
   paintAdminList();
 }
 
+const POP_FMT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
+const KM_FMT = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function statText(value, fmt) {
+  return value == null || !Number.isFinite(Number(value)) ? '—' : fmt.format(Number(value));
+}
+
 function paintAdminList() {
   const wardsHost = document.getElementById('axisWardList');
   const tools = document.getElementById('axisAreaTools');
   if (!wardsHost) return;
+  const top = wardsHost.scrollTop;
   const current = formatKv(getAreaFilter() || AREA_TP);
   const q = layerQuery.trim().toLowerCase();
-  const match = (a) => !q || a.name.toLowerCase().includes(q) || String(a.code || '').includes(q);
-  const button = (a, n) => {
-    const kv = formatKv(a);
+  const hit = (...parts) => !q || parts.some(p => String(p || '').toLowerCase().includes(q));
+  const button = (area, label, num) => {
+    const kv = formatKv(area);
     const on = kv === current;
-    return `<button type="button" class="axis-area${on ? ' active' : ''}" data-kv="${escapeHtml(kv)}" aria-pressed="${on}"><span class="axis-num">${n}.</span>${escapeHtml(a.name)}</button>`;
+    const stats = area.type === 'tp' ? DVHC_CITY : dvhcOf(label);
+    const pop = statText(stats && stats.pop, POP_FMT);
+    const km = statText(stats && stats.km2, KM_FMT);
+    const numHtml = num ? `${num}.` : '';
+    return `<button type="button" class="axis-area${area.type === 'tp' ? ' axis-area-city' : ''}${on ? ' active' : ''}" data-kv="${escapeHtml(kv)}" aria-pressed="${on}" title="${escapeHtml(`${label}: dân số ${pop}, diện tích ${km} km²`)}"><span class="axis-num">${numHtml}</span><span class="axis-area-name">${escapeHtml(label)}</span><span class="axis-area-pop">${escapeHtml(pop)}</span><span class="axis-area-km">${escapeHtml(km)}</span></button>`;
   };
-  const wards = listAreas('xa').filter(match);
-  const tp = listAreas('tp')[0] || { ...AREA_TP, name: 'Toàn thành phố' };
-  const rows = [];
-  if (match(tp)) rows.push(tp);
-  rows.push(...wards);
-  wardsHost.innerHTML = rows.length ? rows.map((a, i) => button(a, i + 1)).join('') : (q ? '<p class="cn-empty">Không khớp</p>' : '');
+  const wards = listAreas('xa');
+  const tp = listAreas('tp')[0] || { ...AREA_TP, name: DVHC_CITY.name };
+  const rows = [`<div class="axis-area-head"><span class="axis-num"></span><span class="axis-area-name">Đơn vị</span><span class="axis-area-pop">Dân số</span><span class="axis-area-km">km²</span></div>`];
+  if (hit(DVHC_CITY.name, tp.name, 'TP')) rows.push(button({ ...tp, type: 'tp' }, DVHC_CITY.name, null));
+  wards.forEach((area, i) => {
+    if (hit(area.name, area.code)) rows.push(button(area, area.name, i + 1));
+  });
+  const onlyHead = rows.length === 1;
+  wardsHost.innerHTML = onlyHead ? (q ? '<p class="cn-empty">Không khớp</p>' : rows[0]) : rows.join('');
+  wardsHost.scrollTop = top;
   if (tools) tools.innerHTML = '';
   filterGp();
 }
@@ -582,6 +599,7 @@ function paint() {
   if (tools) tools.hidden = true;
   applyLayerQuery();
   publishSectorLegend(false);
+  document.dispatchEvent(new CustomEvent('qh:legend-sync'));
 }
 
 let pointLevelsReady = false;

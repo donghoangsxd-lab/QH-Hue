@@ -172,4 +172,20 @@ assert.doesNotMatch(levelJs, /getElementById\('levelPick'\)/);
 assert.match(read('public/js/chuyenNganh.js'), /isoSlotHaTang/);
 assert.match(read('public/js/chuyenNganh.js'), /isoSlotXaHoi/);
 
+const cn = read('public/js/chuyenNganh.js');
+assert.match(cn, /axis-area-city/);
+assert.match(cn, /axis-area-pop/);
+assert.match(cn, /Dân số/);
+assert.match(cn, /DVHC_CITY\.name, null/);
+const legendJs = read('public/js/legendPanel.js');
+assert.match(legendJs, /new Set\(\['hanhchinh', 'kientruc'\]\)/);
+assert.match(legendJs, /legendFoldEl\.hidden = legendOff\(\)/);
+const css = read('public/css/style.css');
+assert.match(css, /--axis-font:\s*var\(--font-sans\)/);
+assert.match(css, /--axis-fs-header:\s*12px/);
+assert.match(css, /--axis-fs-row:\s*12px/);
+assert.match(css, /--axis-fs-chip:\s*11px/);
+assert.match(css, /--axis-row-h:\s*22px/);
+assert.match(css, /#legendFold\[hidden\]/);
+
 console.log('core ui ok');
