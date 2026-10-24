@@ -1,6 +1,6 @@
 // Bốn trục là tab cấp một của panel Lớp dữ liệu. Cùng một cờ bật/tắt: checkbox có bind dùng lớp sẵn,
 // lớp catalog chỉ tải GeoJSON khi bật và gỡ layer khi tắt.
-import { map, focusWard } from './mapEngine.js';
+import { map, focusWard, clearWardHighlight } from './mapEngine.js';
 import { planMap, getViewMode, setViewMode, onViewChange } from './planMap.js';
 import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
 import { state } from './state.js';
@@ -14,7 +14,7 @@ import {
   getAreaFilter, isLayerOn, setLayerFlag, layerPassesFilter, noteUrbanFocus, setBrowseState,
   setAreaFilter, readFacetUrl, loadFacetCatalog, onFacet, schemesAt, schemesForSector, layersFor, baseLayers, browseState
 } from './facetStore.js';
-import { DVHC_CITY, dvhcOf } from './dvhcStats.js';
+import { DVHC_CITY, dvhcOf, shortPlaceName } from './dvhcStats.js';
 import { wardMarks, PLAN_FOOT } from './doThiQd756.js';
 import {
   HTKT_GROUPS, PIPE_SECTORS, SYNTH_LABEL, formAllows, gcsObjectPath, geomKind,
@@ -453,8 +453,9 @@ function paintAdminList() {
   if (!wardsHost) return;
   const top = wardsHost.scrollTop;
   const current = formatKv(getAreaFilter() || AREA_TP);
-  const q = layerQuery.trim().toLowerCase();
-  const hit = (...parts) => !q || parts.some(p => String(p || '').toLowerCase().includes(q));
+  const q = foldQuery(layerQuery);
+  const hit = (...parts) => !q || parts.some(p => foldQuery(p).includes(q));
+  const htMode = getViewMode() === 'HT';
   const lvCell = (text, title) => {
     const muted = text === '—';
     const tip = title ? ` title="${escapeHtml(title)}"` : '';
@@ -468,21 +469,27 @@ function paintAdminList() {
     const km = statText(stats && stats.km2, KM_FMT);
     const numHtml = num ? `${num}.` : '';
     const marks = wardMarks(label);
+    const shown = shortPlaceName(label);
     const bits = [`${label}: dân số ${pop}, diện tích ${km} km²`];
     if (marks.ht !== '—') bits.push(`HT ${marks.ht}${marks.htTitle ? ` (${marks.htTitle})` : ''}`);
     if (marks.plan !== '—') bits.push(`2030 ${marks.plan}${marks.planTitle ? ` (${marks.planTitle})` : ''}`);
     if (marks.note) bits.push(`Ghi chú: ${marks.note}`);
-    return `<button type="button" class="axis-area axis-dvhc${area.type === 'tp' ? ' axis-area-city' : ''}${on ? ' active' : ''}" data-kv="${escapeHtml(kv)}" aria-pressed="${on}" title="${escapeHtml(bits.join('. '))}"><span class="axis-num">${numHtml}</span><span class="axis-area-name">${escapeHtml(label)}</span><span class="axis-area-pop">${escapeHtml(pop)}</span><span class="axis-area-km">${escapeHtml(km)}</span>${lvCell(marks.ht, marks.htTitle)}${lvCell(marks.plan, marks.planTitle)}</button>`;
+    const loai = htMode ? lvCell(marks.ht, marks.htTitle) : lvCell(marks.plan, marks.planTitle);
+    return `<button type="button" class="axis-area axis-dvhc${area.type === 'tp' ? ' axis-area-city' : ''}${on ? ' active' : ''}" data-kv="${escapeHtml(kv)}" data-name="${escapeHtml(label)}" aria-pressed="${on}" title="${escapeHtml(bits.join('. '))}"><span class="axis-num">${numHtml}</span><span class="axis-area-name">${escapeHtml(shown)}</span><span class="axis-area-pop">${escapeHtml(pop)}</span><span class="axis-area-km">${escapeHtml(km)}</span>${loai}</button>`;
   };
   const wards = listAreas('xa');
   const tp = listAreas('tp')[0] || { ...AREA_TP, name: DVHC_CITY.name };
-  const rows = [`<div class="axis-area-head axis-dvhc"><span class="axis-num"></span><span class="axis-area-name">Đơn vị</span><span class="axis-area-pop">Dân số</span><span class="axis-area-km">km²</span><span class="axis-lv" title="Trình độ phát triển đô thị hiện trạng theo QĐ 614">HT</span><span class="axis-lv" title="Trình độ định hướng đến 2030 theo QĐ 756">2030</span></div>`];
-  if (hit(DVHC_CITY.name, tp.name, 'TP')) rows.push(button({ ...tp, type: 'tp' }, DVHC_CITY.name, null));
+  const loaiHead = htMode
+    ? '<span class="axis-lv" title="Trình độ phát triển đô thị hiện trạng theo QĐ 614">Loại HT</span>'
+    : '<span class="axis-lv" title="Trình độ định hướng đến 2030 theo QĐ 756">Loại 2030</span>';
+  const rows = [`<div class="axis-area-head axis-dvhc"><span class="axis-num"></span><span class="axis-area-name">Đơn vị</span><span class="axis-area-pop">Dân số</span><span class="axis-area-km">km²</span>${loaiHead}</div>`];
+  if (hit(DVHC_CITY.name, shortPlaceName(DVHC_CITY.name), tp.name, 'TP')) rows.push(button({ ...tp, type: 'tp' }, DVHC_CITY.name, null));
   wards.forEach((area, i) => {
-    if (hit(area.name, area.code)) rows.push(button(area, area.name, i + 1));
+    if (hit(area.name, shortPlaceName(area.name), area.code)) rows.push(button(area, area.name, i + 1));
   });
   const onlyHead = rows.length === 1;
-  const foot = `<p class="axis-qd-foot">${escapeHtml(PLAN_FOOT)}</p>`;
+  const footNote = htMode ? 'Theo QĐ 614; loại trước chuyển tiếp' : PLAN_FOOT;
+  const foot = `<p class="axis-qd-foot">${escapeHtml(footNote)}</p>`;
   wardsHost.innerHTML = (onlyHead ? (q ? '<p class="cn-empty">Không khớp</p>' : rows[0]) : rows.join('')) + foot;
   wardsHost.scrollTop = top;
   if (tools) tools.innerHTML = '';
@@ -655,7 +662,8 @@ function filterGp() {
   rows.forEach(el => {
     if (!el.classList.contains('gp-row')) return;
     const name = el.querySelector('.axis-area-name, .gp-name')?.textContent || '';
-    el.classList.toggle('is-filter-hide', !!q && !foldQuery(name).includes(q));
+    const full = el.getAttribute('data-name') || '';
+    el.classList.toggle('is-filter-hide', !!q && !foldQuery(`${name} ${full}`).includes(q));
   });
   rows.forEach(el => {
     if (!el.classList.contains('gp-grp')) return;
@@ -695,6 +703,8 @@ function paintViewSwitch() {
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', String(on));
   });
+  paintAdminList();
+  document.dispatchEvent(new CustomEvent('qh:view-column'));
 }
 
 function toggleAxisAll() {
@@ -775,6 +785,7 @@ function placeIsoRadius(axis) {
 function releaseAdminAnchor() {
   const area = getAreaFilter();
   if (!area || area.type !== 'tp') setAreaFilter({ ...AREA_TP }, 'axis');
+  clearWardHighlight();
   if (state.selectedWard && state.selectedWard !== DVHC_CITY.name) focusWard(DVHC_CITY.name);
   document.dispatchEvent(new CustomEvent('qh:admin-release'));
 }

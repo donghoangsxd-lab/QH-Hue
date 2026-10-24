@@ -9,6 +9,8 @@ import { updateInfraPieChart, reloadWardStats, signOutAdmin } from './uiComponen
 import { geeApi, markDataWritten } from './api.js';
 import { POP_METHOD_EVENT, popQuery } from './popMethod.js';
 import { escapeHtml, isApproved, fmtNum, distanceMeters, wardLabelFontSize, showToast, wardLabelPoint, ico, startTaskProgress, announceTool, TOOL_START_EVENT } from './utils.js';
+import { createSketchEditSession } from './sketchEdit.js';
+import { createVertexHandles, vertexMenuButton } from './vertexHandles.js';
 import { showCsdProof, clearCsdProof } from './csdProof.js';
 import { computeServiceArea, computeAccessRoutes } from './serviceArea.js';
 import { startFlowAnimation } from './flowAnimation.js';
@@ -39,6 +41,8 @@ import {
 export let map = null;
 export let measureLayerGroup = null;
 let planMeasureGroup = null;
+let measureEditGroup = null;
+let planMeasureEditGroup = null;
 
 export const layers = {
   pop: L.layerGroup(),
@@ -67,7 +71,7 @@ const CITY_CENTER = [16.4637, 107.5905];
 const CITY_ZOOM = 13;
 const CITY_BOUNDS = [[15.995, 107.034], [16.743, 108.195]];
 const CITY_FIT_PAD = 12;
-const WARD_GEOM_VERSION = 2;
+const WARD_GEOM_VERSION = 3;
 const INFRA_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "7-YT", "8-VH", "9-TM"];
 // 10 nhóm đã có bán kính phục vụ trên panel Hạ tầng xã hội (thêm THPT và PCCC so với 8 nhóm độ phủ).
 const ACCESS_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-THPT", "7-YT", "8-VH", "9-TM", "10-PCCC"];
@@ -219,6 +223,7 @@ export function initMap() {
   attachBasemap(map);
 
   measureLayerGroup = L.layerGroup().addTo(map);
+  measureEditGroup = L.layerGroup().addTo(map);
   addIslandFlags(map);
 
   layers.boundary.addTo(map);
@@ -232,7 +237,9 @@ export function initMap() {
     closePointPopup();
   });
   document.addEventListener('keydown', onMeasureKeyDown);
+  document.addEventListener('keydown', onMeasureEditKey, true);
   map.on('contextmenu', onMeasureContextMenu);
+  map.on('dblclick', onMeasureDblClick);
   map.on('mousemove', onMeasureMouseMove);
   map.on('mouseout', onMeasureMouseOut);
   map.on('zoomend', () => { updateWardLabelFontSize(); redrawLandsOnPattern(); refreshMeasureSnap(); });
@@ -257,7 +264,9 @@ function ensurePlanHooks() {
   if (planHooked || !planMap) return;
   planHooked = true;
   planMeasureGroup = L.layerGroup().addTo(planMap);
+  planMeasureEditGroup = L.layerGroup().addTo(planMap);
   planMap.on('contextmenu', onMeasureContextMenu);
+  planMap.on('dblclick', onMeasureDblClick);
   planMap.on('mousemove', onMeasureMouseMove);
   planMap.on('mouseout', onMeasureMouseOut);
   planMap.on('zoomend', refreshMeasureSnap);
@@ -520,6 +529,11 @@ export function flyToVisible(latlng, zoom, options) {
   map.flyTo(map.unproject(target, zoom), zoom, options);
 }
 
+export function clearWardHighlight() {
+  if (layers.highlightWard) layers.highlightWard.clearLayers();
+  highlightPlanWard('');
+}
+
 export function highlightWardBoundary(wardName, { fitView = true } = {}) {
   if (!layers.highlightWard || !map) return;
   layers.highlightWard.clearLayers();
@@ -657,6 +671,14 @@ const MEASURE_BTN = {
 };
 
 let measureListener = null;
+let measureResults = [];
+let measureLive = null;
+let measureSeq = 0;
+let measureGuardAt = 0;
+let measureHandles = null;
+const MEASURE_DUP_PX = 4;
+const MEASURE_CLOSE_PX = 10;
+const MEASURE_HIT_PX = 12;
 
 /** Gọi sau mỗi lần đổi hình đo. type: 'distance' | 'area' | 'profile' | null */
 export function setMeasureListener(fn) { measureListener = fn; }
@@ -687,13 +709,27 @@ function resetMeasureButtons() {
   syncMeasurePick();
 }
 
+function syncMeasureZoom() {
+  const on = state.activeMeasureType === 'distance' || state.activeMeasureType === 'area';
+  [map, planMap].filter(Boolean).forEach(m => {
+    if (!m.doubleClickZoom) return;
+    if (on) m.doubleClickZoom.disable();
+    else if (!state.sketchTool) m.doubleClickZoom.enable();
+  });
+}
+
 function wipeMeasure() {
+  measureHandles?.clear();
+  setMeasureChrome(false);
+  measureLive = null;
+  measureResults = [];
   state.activeMeasureType = null;
   state.measurePoints = [];
   clearMeasureSnap();
   [measureLayerGroup, planMeasureGroup].forEach(g => g && g.clearLayers());
   dismissMeasurePlan();
   resetMeasureButtons();
+  syncMeasureZoom();
 }
 
 export function toggleMeasure(type) {
@@ -711,6 +747,7 @@ export function toggleMeasure(type) {
     btn.innerHTML = ico('close');
   }
   syncMeasurePick();
+  syncMeasureZoom();
   notifyMeasure();
 }
 
@@ -720,9 +757,36 @@ export function clearMeasure() {
 }
 
 export function handleMeasureClick(latlng, hostMap) {
+  if (measureLive?.session.isEditing()) return;
+  if (performance.now() - measureGuardAt < 40) return;
+  const host = hostMap || map;
+  const type = state.activeMeasureType;
+  const editable = type === 'distance' || type === 'area';
+  const picked = topMeasureAt(host, latlng);
+  if (picked) {
+    measureGuardAt = performance.now();
+    selectMeasure(picked, host);
+    return;
+  }
+  const pts = state.measurePoints;
+  if (editable && pts.length && host) {
+    const last = pts[pts.length - 1];
+    if (pxDist(host, latlng, L.latLng(last[1], last[0])) < MEASURE_DUP_PX) return;
+  }
+  if (type === 'area' && pts.length >= 3 && host) {
+    const first = pts[0];
+    if (pxDist(host, latlng, L.latLng(first[1], first[0])) < MEASURE_CLOSE_PX) {
+      finishMeasureDraft();
+      return;
+    }
+  }
+  if (editable && pts.length >= (type === 'area' ? 3 : 2) && hitMeasureGeom(host, latlng, pts, type)) {
+    const made = finishMeasureDraft();
+    if (made) selectMeasure(made, host);
+    return;
+  }
   state.measurePoints.push([latlng.lng, latlng.lat]);
   measureCursor = latlng;
-  const host = hostMap || measureCursorMap;
   if (host) {
     measureCursorMap = host;
     measureHover = state.measurePoints.length - 1;
@@ -826,13 +890,44 @@ function refreshMeasureSnap() {
   if (hit !== measureHover) paintMeasureSnap(hit, measureCursorMap);
 }
 
-function onMeasureKeyDown(e) {
-  if (!state.activeMeasureType || e.key !== 'Backspace' || !state.measurePoints.length) return;
+function measureKeyField(e) {
   const tag = e.target && e.target.tagName;
-  if ((tag && /^(INPUT|SELECT|TEXTAREA)$/.test(tag)) || e.target.isContentEditable) return;
+  return (tag && /^(INPUT|SELECT|TEXTAREA)$/.test(tag)) || e.target?.isContentEditable;
+}
+
+function onMeasureKeyDown(e) {
+  if (measureLive?.session.isEditing() || measureKeyField(e)) return;
+  if (!state.activeMeasureType) return;
+  if (e.key === 'Enter' && (state.activeMeasureType === 'distance' || state.activeMeasureType === 'area')) {
+    e.preventDefault();
+    finishMeasureDraft();
+    return;
+  }
+  if (e.key !== 'Backspace' || !state.measurePoints.length) return;
   e.preventDefault();
   state.measurePoints.pop();
   drawMeasure();
+}
+
+function onMeasureEditKey(e) {
+  if (!measureLive?.session.isEditing() || measureKeyField(e)) return;
+  if (e.key === 'Escape') {
+    if (document.querySelector('.map-ctx-menu')) return;
+    const host = measureLive.host || map;
+    if (document.querySelector('.sketch-popup')) {
+      host?.closePopup();
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    cancelMeasureEdit();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    e.stopPropagation();
+    finishMeasureEdit();
+  }
 }
 
 let measureContextHit = false;
@@ -844,7 +939,9 @@ export function consumeMeasureContext() {
 }
 
 function onMeasureContextMenu(e) {
+  if (e.originalEvent?._measureHandled) return;
   measureContextHit = false;
+  if (measureLive?.session.isEditing()) return;
   if (!state.activeMeasureType || !state.measurePoints.length || !e.latlng) return;
   const hit = nearestVertexIndex(e.target, e.latlng, state.measurePoints);
   if (hit < 0) return;
@@ -857,62 +954,370 @@ function onMeasureContextMenu(e) {
   drawMeasure();
 }
 
-// Vẽ lại toàn bộ hình đo trên cả 2 bản đồ; kết quả hiển thị bằng 1 nhãn duy nhất ở điểm cuối (không chồng popup)
+function pxDist(m, a, b) {
+  if (!m) return Infinity;
+  try { return m.latLngToContainerPoint(a).distanceTo(m.latLngToContainerPoint(b)); }
+  catch (err) { return Infinity; }
+}
+
+function asLngLats(pts) {
+  return (pts || []).map(p => (Array.isArray(p) ? [+p[0], +p[1]] : [+p.lng, +p.lat]));
+}
+
+function pointSegDistPx(p, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (!len2) return p.distanceTo(a);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+  return p.distanceTo(L.point(a.x + dx * t, a.y + dy * t));
+}
+
+function hitMeasureGeom(m, latlng, pts, type) {
+  if (!m || !latlng || !pts || pts.length < 2) return false;
+  const lnglats = asLngLats(pts);
+  if (type === 'area' && lnglats.length >= 3) {
+    try {
+      const ring = [...lnglats, lnglats[0]];
+      if (turf.booleanPointInPolygon(turf.point([latlng.lng, latlng.lat]), turf.polygon([ring]))) return true;
+    } catch (err) { /* vòng không khép được */ }
+  }
+  let p;
+  try { p = m.latLngToContainerPoint(latlng); } catch (err) { return false; }
+  const pix = lnglats.map(([lng, lat]) => m.latLngToContainerPoint([lat, lng]));
+  const n = pix.length;
+  const last = type === 'area' ? n : n - 1;
+  for (let i = 0; i < last; i++) {
+    if (pointSegDistPx(p, pix[i], pix[(i + 1) % n]) <= MEASURE_HIT_PX) return true;
+  }
+  return false;
+}
+
+function topMeasureAt(m, latlng) {
+  for (let i = measureResults.length - 1; i >= 0; i--) {
+    const item = measureResults[i];
+    if (hitMeasureGeom(m, latlng, item.pts, item.type)) return item;
+  }
+  return null;
+}
+
+function measureHosts() {
+  const out = [];
+  if (measureLayerGroup && map) out.push({ group: measureLayerGroup, map });
+  if (planMeasureGroup && planMap) out.push({ group: planMeasureGroup, map: planMap });
+  return out;
+}
+
+function measureText(type, pts) {
+  const lnglats = asLngLats(pts);
+  if (type !== 'area' && lnglats.length >= 2) {
+    const meters = turf.length(turf.lineString(lnglats), { units: 'meters' });
+    const len = meters >= 1000 ? `${fmtNum(meters / 1000)} km` : `${fmtNum(Math.round(meters))} m`;
+    return type === 'profile' ? `${ico('profile')}Lát cắt: ${len}` : `${ico('ruler')}Chiều dài: ${len}`;
+  }
+  if (type === 'area' && lnglats.length >= 3) {
+    const sqm = turf.area(turf.polygon([[...lnglats, lnglats[0]]]));
+    const area = sqm >= 10000 ? `${fmtNum(sqm / 10000)} ha` : `${fmtNum(Math.round(sqm))} m²`;
+    return `${ico('area')}Diện tích: ${area}`;
+  }
+  return '';
+}
+
+function setMeasureChrome(on, m) {
+  [map, planMap].filter(Boolean).forEach(host => {
+    const active = !!(on && (!m || host === m));
+    host.getContainer()?.classList.toggle('measure-editing', active);
+  });
+}
+
+function measureEditLayer() {
+  const m = measureLive?.host || map;
+  if (m === planMap) {
+    ensurePlanHooks();
+    return planMeasureEditGroup;
+  }
+  return measureEditGroup;
+}
+
+function measureHandleApi() {
+  if (measureHandles) return measureHandles;
+  measureHandles = createVertexHandles({
+    sessionOf: () => measureLive?.session || null,
+    mapOf: () => measureLive?.host || map,
+    layerOf: () => measureEditLayer(),
+    paint(pts) {
+      if (!measureLive?.item) return;
+      measureLive.item.pts = pts.map(p => ({ lat: +p.lat, lng: +p.lng }));
+      drawMeasure();
+    },
+    finish: () => finishMeasureEdit(),
+    minLabel: () => (measureLive?.item?.type === 'area'
+      ? 'Vùng đo cần ít nhất 3 đỉnh.'
+      : 'Đường đo cần ít nhất 2 đỉnh.')
+  });
+  return measureHandles;
+}
+
+function finishMeasureDraft() {
+  const type = state.activeMeasureType;
+  if (type !== 'distance' && type !== 'area') return null;
+  if (state.measurePoints.length < (type === 'area' ? 3 : 2)) return null;
+  const item = {
+    id: ++measureSeq,
+    type,
+    pts: state.measurePoints.map(([lng, lat]) => ({ lat, lng }))
+  };
+  measureResults.push(item);
+  state.measurePoints = [];
+  clearMeasureSnap();
+  drawMeasure();
+  return item;
+}
+
+function selectMeasure(item, host) {
+  if (!item) return;
+  if (measureLive?.item === item) {
+    measureLive.session.select();
+    if (host) measureLive.host = host;
+    drawMeasure();
+    return;
+  }
+  if (measureLive?.session.isEditing()) finishMeasureEdit();
+  measureLive = {
+    item,
+    host: host || map,
+    session: createSketchEditSession(
+      item.pts.map(p => ({ lat: p.lat, lng: p.lng })),
+      item.type === 'area' ? 'polygon' : 'polyline'
+    )
+  };
+  measureLive.session.select();
+  drawMeasure();
+}
+
+function startMeasureEdit(item, host) {
+  selectMeasure(item, host);
+  if (!measureLive || measureLive.item !== item) return;
+  measureLive.host = host || measureLive.host || map;
+  if (!measureLive.session.isEditing()) measureLive.session.startAdjust();
+  setMeasureChrome(true, measureLive.host);
+  (measureLive.host || map).closePopup();
+  drawMeasure();
+  measureHandleApi().draw();
+}
+
+function finishMeasureEdit() {
+  if (!measureLive?.session.isEditing()) {
+    measureHandles?.clear();
+    setMeasureChrome(false);
+    return;
+  }
+  const host = measureLive.host || map;
+  measureLive.item.pts = measureLive.session.finish().map(p => ({ lat: +p.lat, lng: +p.lng }));
+  measureHandleApi().clear();
+  setMeasureChrome(false, host);
+  host?.closePopup();
+  drawMeasure();
+}
+
+function cancelMeasureEdit() {
+  if (!measureLive?.session.isEditing()) return;
+  const host = measureLive.host || map;
+  measureLive.item.pts = measureLive.session.cancel().map(p => ({ lat: +p.lat, lng: +p.lng }));
+  measureHandleApi().clear();
+  setMeasureChrome(false, host);
+  host?.closePopup();
+  drawMeasure();
+}
+
+function deleteMeasure(item) {
+  if (measureLive?.item === item) {
+    measureHandles?.clear();
+    setMeasureChrome(false, measureLive.host);
+    measureLive = null;
+  }
+  measureResults = measureResults.filter(x => x !== item);
+  drawMeasure();
+}
+
+function openMeasureMenu(item, latlng, hostMap) {
+  if (measureLive?.session.isEditing() && measureLive.item !== item) finishMeasureEdit();
+  selectMeasure(item, hostMap);
+  if (!measureLive || measureLive.item !== item) return;
+  const m = hostMap || map;
+  const box = L.DomUtil.create('div', 'sketch-menu');
+  const items = measureLive.session.openMenu();
+  if (items.includes('Điều chỉnh')) {
+    vertexMenuButton(box, 'Điều chỉnh', 'sketch-act', 'pen', () => {
+      m.closePopup();
+      startMeasureEdit(item, m);
+    });
+  }
+  if (items.includes('Xong')) {
+    vertexMenuButton(box, 'Xong', 'sketch-act', 'check', () => {
+      m.closePopup();
+      finishMeasureEdit();
+    });
+  }
+  vertexMenuButton(box, 'Xóa phép đo', 'sketch-del', 'trash', () => {
+    m.closePopup();
+    deleteMeasure(item);
+  });
+  L.popup({ className: 'sketch-popup', closeButton: false, autoPan: false })
+    .setLatLng(latlng)
+    .setContent(box)
+    .openOn(m);
+}
+
+function stopMeasureEvent(e) {
+  L.DomEvent.stop(e);
+  const raw = e.originalEvent;
+  if (!raw) return;
+  raw._measureHandled = true;
+  raw._stopped = true;
+}
+
+function onMeasureShapeClick(e, item, hostMap) {
+  stopMeasureEvent(e);
+  measureGuardAt = performance.now();
+  if (measureLive?.session.isEditing()) return;
+  if (item) { selectMeasure(item, hostMap); return; }
+  const made = finishMeasureDraft();
+  if (made) selectMeasure(made, hostMap);
+}
+
+function onMeasureShapeMenu(e, item, hostMap) {
+  if (!item) {
+    const near = nearestVertexIndex(hostMap, e.latlng, state.measurePoints);
+    if (near >= 0) {
+      stopMeasureEvent(e);
+      measureContextHit = true;
+      state.measurePoints.splice(near, 1);
+      measureCursor = e.latlng;
+      measureCursorMap = hostMap;
+      measureHover = nearestVertexIndex(hostMap, e.latlng, state.measurePoints);
+      measureSnapHost = hostMap;
+      drawMeasure();
+      return;
+    }
+  }
+  stopMeasureEvent(e);
+  measureContextHit = true;
+  const target = item || finishMeasureDraft();
+  if (target) openMeasureMenu(target, e.latlng, hostMap);
+}
+
+function onMeasureDblClick(e) {
+  if (measureLive?.session.isEditing()) return;
+  const type = state.activeMeasureType;
+  if (type !== 'distance' && type !== 'area') return;
+  if (state.measurePoints.length < (type === 'area' ? 3 : 2)) return;
+  L.DomEvent.stop(e);
+  finishMeasureDraft();
+}
+
+/** Click vùng trống khi đang Điều chỉnh: ghi phép đo, không chấm thêm đỉnh. */
+export function consumeMeasureMapClick(e) {
+  const recent = performance.now() - measureGuardAt < 40;
+  if (!measureLive?.session.isEditing()) return recent && !!state.activeMeasureType;
+  if (performance.now() - measureHandleApi().dragAt() < 450) return true;
+  const t = e.originalEvent?.target;
+  if (t?.closest?.('.sketch-handle, .sketch-menu, .sketch-popup, .leaflet-popup, .measure-label, .map-ctx-menu')) return true;
+  const item = measureLive.item;
+  if (item && hitMeasureGeom(e.target, e.latlng, item.pts, item.type)) {
+    measureGuardAt = performance.now();
+    return true;
+  }
+  finishMeasureEdit();
+  measureGuardAt = performance.now();
+  return true;
+}
+
+function addMeasureLabel(group, hostMap, latlng, color, label, ringLngLat, editing) {
+  const btn = ringLngLat
+    ? `<button type="button" class="measure-plan-btn" title="Quy hoạch sử dụng đất trong vùng đo, chuyển 4 cấp như bảng thửa">${ico('area')}Phân tích QH</button>`
+    : '';
+  const marker = L.marker(latlng, {
+    interactive: false,
+    keyboard: false,
+    zIndexOffset: editing ? 700 : 0,
+    icon: L.divIcon({
+      className: `measure-label${editing ? ' measure-label-live' : ''}`,
+      html: `<span style="border-color:${color};">${label}${btn}</span>`,
+      iconSize: [0, 0]
+    })
+  }).addTo(group);
+  const el = btn && marker.getElement();
+  if (!el) return;
+  L.DomEvent.disableClickPropagation(el);
+  el.querySelector('.measure-plan-btn')?.addEventListener('click', () => {
+    measurePlanApi().then(api => api.openMeasurePlan([...ringLngLat, ringLngLat[0]], hostMap));
+  });
+}
+
+function paintMeasureShape(groups, pts, type, opt) {
+  const lnglats = asLngLats(pts);
+  if (!lnglats.length) return;
+  const isArea = type === 'area';
+  const isProfile = type === 'profile';
+  const color = isArea ? '#f59e0b' : isProfile ? '#fb923c' : '#38bdf8';
+  const latlngs = lnglats.map(([lng, lat]) => [lat, lng]);
+  const label = measureText(type, pts);
+  const item = opt.item || null;
+  const editing = !!(item && measureLive?.item === item && measureLive.session.isEditing());
+  const selected = !!(item && measureLive?.item === item);
+  const min = isArea ? 3 : 2;
+  const canPick = !isProfile && lnglats.length >= min;
+  groups.forEach(({ group, map: hostMap }) => {
+    latlngs.forEach(ll => L.circleMarker(ll, {
+      radius: 4, color, fillColor: color, fillOpacity: 1, interactive: false
+    }).addTo(group));
+    if (!isArea && latlngs.length >= 2) {
+      const lineOpt = { color, weight: selected ? 5 : 3, interactive: false };
+      if (!isProfile) lineOpt.dashArray = '4,4';
+      L.polyline(latlngs, lineOpt).addTo(group);
+    }
+    if (isArea && latlngs.length >= 3) {
+      L.polygon(latlngs, {
+        color, weight: selected ? 3 : 2, fillColor: color, fillOpacity: 0.2, interactive: false
+      }).addTo(group);
+    }
+    if (canPick) {
+      const hitOpt = {
+        color, weight: 18, opacity: 0, interactive: true, bubblingMouseEvents: false, className: 'measure-hit'
+      };
+      if (isArea) { hitOpt.fillColor = color; hitOpt.fillOpacity = 0; }
+      const hit = (isArea ? L.polygon(latlngs, hitOpt) : L.polyline(latlngs, hitOpt)).addTo(group);
+      hit.on('click', (e) => onMeasureShapeClick(e, item, hostMap));
+      hit.on('contextmenu', (e) => onMeasureShapeMenu(e, item, hostMap));
+    }
+    if (label) {
+      addMeasureLabel(
+        group, hostMap, latlngs[latlngs.length - 1], color, label,
+        isArea && lnglats.length >= 3 ? lnglats : null, editing
+      );
+    }
+  });
+}
+
+// Nét đang chấm và phép đo đã kết thúc. Nhãn số đo ở đỉnh cuối. Núm chỉnh nằm ở nhóm riêng.
 function drawMeasure() {
-  const groups = [measureLayerGroup, planMeasureGroup].filter(Boolean);
+  const groups = measureHosts();
   const hover = measureHover;
   const host = measureSnapHost;
+  const draft = state.measurePoints;
   measureSnapMarks.forEach(dropSnapMarker);
   measureSnapMarks = [];
-  groups.forEach(g => g.clearLayers());
-  dismissMeasurePlan();
-  const pts = state.measurePoints;
-  if (!pts.length) {
+  groups.forEach(({ group }) => group.clearLayers());
+  if (!measureLive?.session.isEditing()) dismissMeasurePlan();
+  if (draft.length && state.activeMeasureType) paintMeasureShape(groups, draft, state.activeMeasureType, {});
+  measureResults.forEach(item => paintMeasureShape(groups, item.pts, item.type, { item }));
+  if (!draft.length && !measureResults.length) {
     measureHover = -1;
     notifyMeasure();
     return;
   }
-  const isArea = state.activeMeasureType === 'area';
-  const isProfile = state.activeMeasureType === 'profile';
-  const color = isArea ? '#f59e0b' : isProfile ? '#fb923c' : '#38bdf8';
-  const latlngs = pts.map(pt => [pt[1], pt[0]]);
-
-  let label = '';
-  if (!isArea && pts.length >= 2) {
-    const meters = turf.length(turf.lineString(pts), { units: 'meters' });
-    const len = meters >= 1000 ? `${fmtNum(meters / 1000)} km` : `${fmtNum(Math.round(meters))} m`;
-    label = isProfile ? `${ico('profile')}Lát cắt: ${len}` : `${ico('ruler')}Chiều dài: ${len}`;
-  } else if (isArea && pts.length >= 3) {
-    const sqm = turf.area(turf.polygon([[...pts, pts[0]]]));
-    label = `${ico('area')}Diện tích: ${sqm >= 10000 ? `${fmtNum(sqm / 10000)} ha` : `${fmtNum(Math.round(sqm))} m²`}`;
-  }
-
-  groups.forEach(g => {
-    latlngs.forEach(ll => L.circleMarker(ll, { radius: 4, color, fillColor: color, fillOpacity: 1, interactive: false }).addTo(g));
-    if (!isArea && latlngs.length >= 2) {
-      const opt = { color, weight: 3, interactive: false };
-      if (!isProfile) opt.dashArray = '4,4';
-      L.polyline(latlngs, opt).addTo(g);
-    }
-    if (isArea && latlngs.length >= 3) L.polygon(latlngs, { color, weight: 2, fillColor: color, fillOpacity: 0.2, interactive: false }).addTo(g);
-    if (label) {
-      const btn = isArea ? `<button type="button" class="measure-plan-btn" title="Quy hoạch sử dụng đất trong vùng đo, chuyển 4 cấp như bảng thửa">${ico('area')}Phân tích QH</button>` : '';
-      const marker = L.marker(latlngs[latlngs.length - 1], {
-        interactive: false,
-        icon: L.divIcon({ className: 'measure-label', html: `<span style="border-color:${color};">${label}${btn}</span>`, iconSize: [0, 0] })
-      }).addTo(g);
-      const el = btn && marker.getElement();
-      if (el) {
-        L.DomEvent.disableClickPropagation(el);
-        el.querySelector('.measure-plan-btn')?.addEventListener('click', () => {
-          const ring = [...pts, pts[0]];
-          const host = g === planMeasureGroup ? planMap : map;
-          measurePlanApi().then(m => m.openMeasurePlan(ring, host));
-        });
-      }
-    }
-  });
-  if (hover >= 0 && hover < pts.length) paintMeasureSnap(hover, host);
+  if (hover >= 0 && hover < draft.length) paintMeasureSnap(hover, host);
   else measureHover = -1;
   notifyMeasure();
 }
@@ -1081,7 +1486,7 @@ function cityShapeOf(wards) {
       sx += x * area; sy += y * area; sa += area;
     } catch (e) { /* hình học lỗi: bỏ qua khi tính tâm */ }
   });
-  const lines = outerWardLines(wards);
+  const lines = cityOutlineLines();
 
   let center = sa ? { lat: sy / sa, lng: sx / sa } : { lat: CITY_CENTER[0], lng: CITY_CENTER[1] };
   if (!wardNameAt(center.lat, center.lng)) {
@@ -1091,6 +1496,12 @@ function cityShapeOf(wards) {
   }
   cityShape = { source: wards, lines, center };
   return cityShape;
+}
+
+// Quầng vàng chỉ của vành thành phố. Cạnh nội bộ không đi qua hàm này.
+function cityOutlineLines() {
+  const pack = getWardDraw();
+  return pack && pack.outer ? pack.outer : [];
 }
 
 // Ranh TP nổi bật: nét trắng trên quầng vàng nhấp nháy (SVG riêng để tạo hiệu ứng CSS; bản đồ chính vẽ canvas)
@@ -1138,9 +1549,7 @@ function paintWardGroup(group, host) {
     if (layer.options && layer.options.wardRole === 'line') layer.setStyle(WARD_BOUNDARY_LINE_STYLE);
   });
   if (!on) { cityEdgeOwned.delete(host); return; }
-  const pack = getWardDraw();
-  const wards = pack ? pack.features.map(f => ({ geometry: f.geometry })) : (state.wardLabelsList || []);
-  const lines = wards.length ? outerWardLines(wards) : [];
+  const lines = cityOutlineLines();
   if (!lines.length) { cityEdgeOwned.delete(host); return; }
   const outline = createCityOutline(lines, cityRendererOf(host));
   outline.options.wardRole = 'city';

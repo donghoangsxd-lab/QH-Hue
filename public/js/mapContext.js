@@ -262,12 +262,18 @@ function openMenu(ev, latlng, targetMap) {
   });
 }
 
+function onSketchDom(target) {
+  return !!target?.closest?.('.sketch-handle, .sketch-menu, .sketch-popup');
+}
+
 function onContext(e, m) {
   e.originalEvent?.preventDefault();
   const t = e.originalEvent?.target;
   if (t?.closest?.('.leaflet-popup, .cad-card, .map-ctx-menu, .place-card, .note-editor, .sv-panel')) return;
+  if (onSketchDom(t)) return;
+  if (e.originalEvent?._sketchHandled || e.originalEvent?._measureHandled) return;
   if (consumeMeasureContext()) return;
-  if (state.sketchTool || state.adminDrawMode || state.lotShapeEdit) return;
+  if (state.adminDrawMode || state.lotShapeEdit) return;
   openMenu(e.originalEvent, e.latlng, m);
 }
 
@@ -281,6 +287,7 @@ function bindLongPress(m) {
   const cancel = () => { clearTimeout(timer); timer = 0; pid = null; };
   box.addEventListener('pointerdown', (ev) => {
     if (ev.pointerType === 'mouse' || ev.button !== 0) return;
+    if (ev.target?.closest?.('.leaflet-popup, .sketch-handle, .sketch-menu, .sketch-popup')) return;
     cancel();
     opened = false;
     x = ev.clientX;
@@ -288,7 +295,7 @@ function bindLongPress(m) {
     pid = ev.pointerId;
     timer = setTimeout(() => {
       timer = 0;
-      if (state.sketchTool || state.adminDrawMode || state.lotShapeEdit || state.activeMeasureType) return;
+      if (state.adminDrawMode || state.lotShapeEdit || state.activeMeasureType) return;
       opened = true;
       const latlng = m.mouseEventToLatLng({ clientX: x, clientY: y });
       openMenu({ clientX: x, clientY: y, preventDefault() {} }, latlng, m);

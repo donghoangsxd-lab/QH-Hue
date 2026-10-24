@@ -11,6 +11,7 @@ import {
   toggleMeasure,
   setMeasureListener,
   handleMeasureClick,
+  consumeMeasureMapClick,
   renderGroupedPoints,
   refreshBuffers,
   refreshHeatmapOnly,
@@ -54,6 +55,7 @@ import { initMapLevel, getLevel } from './mapLevel.js';
 import { initSplitPair } from './splitPair.js';
 import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
 import { initChuyenNganh } from './chuyenNganh.js';
+import { initChamDiem } from './chamDiemUi.js';
 import { initQhctLayer } from './qhctLayer.js';
 import { initCadImport } from './cadImportUi.js';
 import { initEntryFlows } from './entryFlows.js';
@@ -91,7 +93,7 @@ import { initFloodSim } from './floodSim.js';
 import { initSatLayers } from './satLayers.js';
 import { initTreeLayer } from './treeLayer.js';
 import { initOsmOpen } from './osmOpen.js';
-import { initSketchLayer, handleSketchClick } from './sketchLayer.js';
+import { initSketchLayer, handleSketchClick, consumeSketchMapClick } from './sketchLayer.js';
 import { initFaqPanel } from './faqPanel.js';
 import { exportMapA3 } from './printLayout.js';
 import { initOverview } from './overview.js';
@@ -755,6 +757,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   const handleMapClick = async (e, targetMap) => {
+    if (consumeSketchMapClick(e)) return;
+    if (consumeMeasureMapClick(e)) return;
     // Vẽ tuyến / vùng dân cư chỉ có trên bản đồ hiện trạng. Phác thảo ghi lên bản đồ đang xem.
     if (state.adminDrawMode && targetMap !== map && !isSplitOn()) {
       setViewMode('HT');
@@ -942,7 +946,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('btnCollapseRightPanel')?.addEventListener('click', () => setRightPanelCollapsed(true));
-  document.getElementById('btnExpandRightPanel')?.addEventListener('click', () => setRightPanelCollapsed(false));
   const sheetHandle = document.getElementById('btnSheetHandle');
   if (sheetHandle) {
     let sheetDrag = 0;
@@ -1286,6 +1289,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnPrintA3')?.addEventListener('click', exportMapA3);
   initChuyenNganh();
+  initChamDiem();
   initViewLink();
   // Liên kết ?nganh= / ?truc= chỉ chọn panel, không mở khung. Nút thu/mở là cách mở duy nhất lúc tải trang.
   document.body.classList.add('right-collapsed');

@@ -182,7 +182,7 @@ const WARD_FOCUS_PANE = 'wardFocusPane';
 const WARD_FOCUS_Z = 448;
 const focusRenderers = new WeakMap();
 
-/** Lớp phường đang chọn trên bản đồ m: nền đỏ nhạt (overlayPane) + quầng tối và viền đỏ tươi (pane riêng) */
+/** Lớp phường đang chọn: nền đỏ nhạt và một viền đỏ. Không quầng. */
 export function wardFocusLayer(m, geometry) {
   if (!m.getPane(WARD_FOCUS_PANE)) {
     const pane = m.createPane(WARD_FOCUS_PANE);
@@ -192,10 +192,9 @@ export function wardFocusLayer(m, geometry) {
   if (!focusRenderers.has(m)) focusRenderers.set(m, L.canvas({ pane: WARD_FOCUS_PANE }));
   const renderer = focusRenderers.get(m);
   const feature = { type: 'Feature', geometry, properties: {} };
-  const { fill, halo, line } = WARD_FOCUS_STYLE;
+  const { fill, line } = WARD_FOCUS_STYLE;
   return L.featureGroup([
     L.geoJSON(feature, { style: fill, interactive: false }),
-    L.geoJSON(feature, { style: halo, interactive: false, renderer, pane: WARD_FOCUS_PANE }),
     L.geoJSON(feature, { style: line, interactive: false, renderer, pane: WARD_FOCUS_PANE })
   ]);
 }
