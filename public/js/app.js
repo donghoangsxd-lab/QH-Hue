@@ -11,6 +11,7 @@ import {
   toggleMeasure,
   setMeasureListener,
   handleMeasureClick,
+  consumeMeasureMapClick,
   renderGroupedPoints,
   refreshBuffers,
   refreshHeatmapOnly,
@@ -756,6 +757,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const handleMapClick = async (e, targetMap) => {
     if (consumeSketchMapClick(e)) return;
+    if (consumeMeasureMapClick(e)) return;
     // Vẽ tuyến / vùng dân cư chỉ có trên bản đồ hiện trạng. Phác thảo ghi lên bản đồ đang xem.
     if (state.adminDrawMode && targetMap !== map && !isSplitOn()) {
       setViewMode('HT');

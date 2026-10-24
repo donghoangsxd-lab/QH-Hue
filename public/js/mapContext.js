@@ -271,7 +271,7 @@ function onContext(e, m) {
   const t = e.originalEvent?.target;
   if (t?.closest?.('.leaflet-popup, .cad-card, .map-ctx-menu, .place-card, .note-editor, .sv-panel')) return;
   if (onSketchDom(t)) return;
-  if (e.originalEvent?._sketchHandled) return;
+  if (e.originalEvent?._sketchHandled || e.originalEvent?._measureHandled) return;
   if (consumeMeasureContext()) return;
   if (state.adminDrawMode || state.lotShapeEdit) return;
   openMenu(e.originalEvent, e.latlng, m);

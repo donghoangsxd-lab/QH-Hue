@@ -262,21 +262,57 @@ assert.equal(shortPlaceName('Khu vực đô thị A'), 'Khu vực đô thị A')
 
 const spec = read('docs/ui-spec.md');
 assert.match(spec, /## Phác thảo/);
+assert.match(spec, /## Đo khoảng cách và diện tích/);
 assert.match(spec, /Điều chỉnh/);
 assert.match(spec, /Xóa đỉnh/);
+assert.match(spec, /Xóa phép đo/);
+assert.match(spec, /Xóa kết quả đo/);
 assert.match(spec, /Esc hủy/);
+
+const handles = read('public/js/vertexHandles.js');
+assert.match(handles, /dragging\.disable\(\)/);
+assert.match(handles, /insertMidpoint/);
+assert.match(handles, /dragVertex/);
+assert.match(handles, /Xóa đỉnh/);
+assert.match(handles, /Xong/);
+assert.equal((handles.match(/dragging\.disable\(\)/g) || []).length, 1);
 
 const sketch = read('public/js/sketchLayer.js');
 assert.match(sketch, /selectShape\(fg\)/);
 assert.match(sketch, /Điều chỉnh/);
 assert.match(sketch, /Xóa đỉnh/);
 assert.match(sketch, /Xong/);
-assert.match(sketch, /dragging\.disable\(\)/);
+assert.match(sketch, /createVertexHandles/);
+assert.doesNotMatch(sketch, /dragging\.disable\(\)/);
 assert.match(sketch, /cancelAdjust\(\)/);
 assert.match(sketch, /consumeSketchMapClick/);
 assert.match(sketch, /createSketchEditSession/);
 assert.match(read('public/js/mapContext.js'), /sketch-handle/);
 assert.match(read('public/js/app.js'), /consumeSketchMapClick\(e\)/);
+
+const measureJs = read('public/js/mapEngine.js');
+assert.match(measureJs, /createVertexHandles/);
+assert.match(measureJs, /createSketchEditSession/);
+assert.doesNotMatch(measureJs, /dragging\.disable\(\)/);
+assert.doesNotMatch(measureJs, /function moveVertex|function insertVertex|function segmentMidpoints/);
+assert.match(measureJs, /Điều chỉnh/);
+assert.match(measureJs, /Xóa phép đo/);
+assert.match(measureJs, /Xong/);
+assert.match(measureJs, /cancelMeasureEdit/);
+assert.match(measureJs, /finishMeasureEdit/);
+assert.match(measureJs, /consumeMeasureMapClick/);
+assert.match(measureJs, /measureResults = \[\]/);
+assert.match(measureJs, /Đường đo cần ít nhất 2 đỉnh/);
+assert.match(measureJs, /Vùng đo cần ít nhất 3 đỉnh/);
+assert.match(measureJs, /item\.type === 'area' \? 'polygon' : 'polyline'/);
+assert.match(read('public/js/app.js'), /consumeMeasureMapClick\(e\)/);
+const ctxNow = read('public/js/mapContext.js');
+const onContext = ctxNow.slice(ctxNow.indexOf('function onContext'), ctxNow.indexOf('function bindLongPress'));
+assert.match(onContext, /_measureHandled/);
+assert.doesNotMatch(onContext, /activeMeasureType/);
+assert.match(ctxNow, /Xóa kết quả đo/);
+assert.match(read('public/index.html'), /id="btnMeasureDist"[^>]*Điều chỉnh/);
+assert.match(read('public/index.html'), /id="btnMeasureArea"[^>]*Điều chỉnh/);
 
 const linePts = [
   { lat: 16.46, lng: 107.58 },
@@ -331,5 +367,26 @@ poly.startAdjust();
 poly.dragVertex(0, { lat: 10, lng: 20 });
 assert.equal(poly.workingPts()[0].lat, 10);
 assert.deepEqual(poly.cancel(), kept);
+
+const distPts = [
+  { lat: 16.47, lng: 107.58 },
+  { lat: 16.48, lng: 107.60 }
+];
+const dist = createSketchEditSession(distPts, 'polyline');
+dist.select();
+assert.ok(dist.openMenu().includes('Điều chỉnh'));
+dist.startAdjust();
+assert.equal(minVertices('polyline'), 2);
+assert.equal(dist.deleteVertex(0).removed, false, 'đo khoảng cách giữ ít nhất 2 đỉnh');
+assert.equal(dist.midpoints().length, 1);
+dist.insertMidpoint(1, dist.midpoints()[0].at);
+assert.equal(dist.workingPts().length, 3);
+dist.dragVertex(1, { lat: 16.475, lng: 107.59 });
+assert.equal(dist.workingPts()[1].lat, 16.475);
+assert.deepEqual(dist.cancel(), distPts, 'Esc trả lại đường đo');
+dist.startAdjust();
+dist.dragVertex(0, { lat: 16.5, lng: 107.7 });
+assert.equal(dist.finish()[0].lat, 16.5);
+assert.equal(dist.isEditing(), false);
 
 console.log('core ui ok');

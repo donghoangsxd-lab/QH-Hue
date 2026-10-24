@@ -1030,7 +1030,8 @@ body.compare-on .map-title-split { display: inline-flex; }
 }
 .sketch-handle-vertex:active { cursor: grabbing; }
 .leaflet-container.sketch-editing,
-.leaflet-container.sketch-editing.sketch-mode { cursor: default !important; }
+.leaflet-container.sketch-editing.sketch-mode,
+.leaflet-container.measure-editing { cursor: default !important; }
 /* Hàng phụ: tùy chọn chữ, chọn định dạng lưu */
 .sketch-sub { gap: 6px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-muted); }
 .sketch-sub[hidden] { display: none; }
@@ -3598,6 +3599,7 @@ table.ward-table th {
   cursor: pointer;
 }
 .measure-label .measure-plan-btn:hover { background: rgba(56, 189, 248, 0.35); }
+.measure-label-live span { box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.55); }
 
 /* Đỉnh đang được gợi ý xóa (đo đạc, phác thảo): sáng theo con trỏ, chuột phải xóa */
 .vtx-snap { background: none !important; border: none !important; }
