@@ -126,7 +126,13 @@ assert.doesNotMatch(plan, /id="inputIsoRadius"/);
 assert.match(html, /id="tabLegend"/);
 const legend = innerById(html, 'tabLegend');
 assert.match(legend, /id="parcelLegend"/);
-assert.match(legend, />Chú giải</);
+assert.doesNotMatch(legend, /id="btnLegendClose"/);
+assert.doesNotMatch(legend, /id="lotOpacity"/);
+assert.doesNotMatch(legend, /Quyết định phê duyệt/);
+const base = innerById(html, 'layerPaneBase');
+assert.match(base, /id="lotOpacity"/);
+assert.match(base, /Hiển thị lô đất/);
+assert.match(base, /Quyết định phê duyệt/);
 
 const title = innerById(html, 'mapTitle');
 assert.match(html, /<header class="map-title map-intro" id="mapTitle"/);

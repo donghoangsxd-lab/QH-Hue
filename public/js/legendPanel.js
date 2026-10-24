@@ -156,7 +156,7 @@ export function initLegendPanel() {
     const land = anyOn(LAND);
     const main = frame.querySelector('.legend-main');
     if (main) main.hidden = !symbols;
-    const display = frame.querySelector('.legend-display');
+    const display = document.querySelector('#layerPaneBase .legend-display');
     if (display) display.hidden = !land;
     const pointHost = document.getElementById('legendPoints');
     const pointList = document.getElementById('legendPointList');
@@ -186,11 +186,6 @@ export function initLegendPanel() {
     if (extra) extra.hidden = !extraOn;
     if (chip) chip.hidden = true;
   };
-  document.getElementById('btnLegendClose')?.addEventListener('click', () => {
-    frame.dataset.userHide = '1';
-    if (legendFoldEl) legendFoldEl.open = false;
-    syncLegend();
-  });
   legendFoldEl?.addEventListener('toggle', () => {
     if (legendFoldEl.open) delete frame.dataset.userHide;
     else frame.dataset.userHide = '1';

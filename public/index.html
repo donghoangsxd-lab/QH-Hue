@@ -44,7 +44,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261039">
+  <link rel="stylesheet" href="css/style.css?v=20261040">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -854,7 +854,6 @@
         <summary>Chú giải</summary>
         <div class="dock-body">
 <div class="tab-body legend-inpanel" id="tabLegend">
-        <div class="float-head"><b>Chú giải</b><button type="button" class="float-close" id="btnLegendClose" aria-label="Ẩn chú giải"><svg class="ico"><use href="#i-close"/></svg></button></div>
         <div class="layer-tree">
         <div class="layer-main legend-main">
           <div class="layer-main-tabs" role="tablist" aria-label="Ký hiệu sử dụng đất theo cấp đồ án">
@@ -893,15 +892,6 @@
                   <div class="tt16-row ua-legend-item"><i class="ua-sw" style="background:#4ade80; opacity:0.6"></i><span>Nông thôn</span></div>
                 </details>
               </div>
-              <div class="legend-sub">Quyết định phê duyệt</div>
-              <div class="legend-decision">
-                <span class="ua-legend-note">Hiện trạng: QĐ 614 (từ 01/01/2026); đô thị loại V cũ trong xã tô theo ranh thị trấn, xã cũ (địa giới trước 2020).</span>
-                <button type="button" class="layer-decision" data-layer-decision="do-thi-hien-trang" data-label-name></button>
-              </div>
-              <div class="legend-decision">
-                <span class="ua-legend-note">Quy hoạch: QĐ 756, giai đoạn sau năm 2030.</span>
-                <button type="button" class="layer-decision" data-layer-decision="do-thi-quy-hoach" data-label-name></button>
-              </div>
             </div>
           </div>
         </div>
@@ -921,25 +911,6 @@
             </div>
           </div>
         </div>
-        <div class="layer-map legend-display">
-          <div class="layer-map-tabs">
-            <span class="layer-map-tab active legend-head"><span class="layer-map-label">Hiển thị lô đất</span></span>
-          </div>
-          <div class="layer-map-pane">
-            <div class="layer-row lot-opacity-row">
-              <label for="lotOpacity" title="Độ trong suốt phần tô màu / hoa văn của mọi lô đất và lô công trình (hiện trạng, quy hoạch, thẩm định). Viền lô giữ nguyên; kéo về 0% chỉ còn viền"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Độ trong suốt</label>
-              <input type="range" id="lotOpacity" class="opacity-slider" min="0" max="100" step="5" value="100" aria-label="Độ trong suốt lô đất">
-              <button type="button" class="lot-opacity-value" id="lotOpacityValue" title="Bấm để trả về mặc định (100%)">100%</button>
-            </div>
-            <div class="legend-sub">Viền lô theo giai đoạn</div>
-            <div class="tt16-frames">
-              <div class="tt16-row"><i class="tt16-frame tt16-frame-ht"></i><span>Hiện trạng</span></div>
-              <div class="tt16-row"><i class="tt16-frame tt16-frame-dd"></i><span>QH đợt đầu</span></div>
-              <div class="tt16-row" title="Công trình đề xuất chưa được phê duyệt"><i class="tt16-frame tt16-frame-pending"></i><span>Chờ phê duyệt</span></div>
-              <div class="tt16-row"><i class="tt16-frame tt16-frame-dh"></i><span>QH dài hạn</span></div>
-            </div>
-          </div>
-        </div>
         </div>
       </div>
         </div>
@@ -947,6 +918,36 @@
 <details class="axis-fold dock-fold" id="axisBaseFold">
               <summary>Lớp nền</summary>
               <div class="layer-map-pane" id="layerPaneBase" data-map-pane="base" role="tabpanel">
+          <div class="base-decisions">
+            <div class="legend-sub">Quyết định phê duyệt</div>
+            <div class="legend-decision">
+              <span class="ua-legend-note">Hiện trạng: QĐ 614 (từ 01/01/2026); đô thị loại V cũ trong xã tô theo ranh thị trấn, xã cũ (địa giới trước 2020).</span>
+              <button type="button" class="layer-decision" data-layer-decision="do-thi-hien-trang" data-label-name></button>
+            </div>
+            <div class="legend-decision">
+              <span class="ua-legend-note">Quy hoạch: QĐ 756, giai đoạn sau năm 2030.</span>
+              <button type="button" class="layer-decision" data-layer-decision="do-thi-quy-hoach" data-label-name></button>
+            </div>
+          </div>
+          <div class="layer-map legend-display">
+            <div class="layer-map-tabs">
+              <span class="layer-map-tab active legend-head"><span class="layer-map-label">Hiển thị lô đất</span></span>
+            </div>
+            <div class="layer-map-pane">
+              <div class="layer-row lot-opacity-row">
+                <label for="lotOpacity" title="Độ trong suốt phần tô màu / hoa văn của mọi lô đất và lô công trình (hiện trạng, quy hoạch, thẩm định). Viền lô giữ nguyên; kéo về 0% chỉ còn viền"><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Độ trong suốt</label>
+                <input type="range" id="lotOpacity" class="opacity-slider" min="0" max="100" step="5" value="100" aria-label="Độ trong suốt lô đất">
+                <button type="button" class="lot-opacity-value" id="lotOpacityValue" title="Bấm để trả về mặc định (100%)">100%</button>
+              </div>
+              <div class="legend-sub">Viền lô theo giai đoạn</div>
+              <div class="tt16-frames">
+                <div class="tt16-row"><i class="tt16-frame tt16-frame-ht"></i><span>Hiện trạng</span></div>
+                <div class="tt16-row"><i class="tt16-frame tt16-frame-dd"></i><span>QH đợt đầu</span></div>
+                <div class="tt16-row" title="Công trình đề xuất chưa được phê duyệt"><i class="tt16-frame tt16-frame-pending"></i><span>Chờ phê duyệt</span></div>
+                <div class="tt16-row"><i class="tt16-frame tt16-frame-dh"></i><span>QH dài hạn</span></div>
+              </div>
+            </div>
+          </div>
           <div class="sat-pick basemap-pick">
             <label for="basemapSelect" title="Ảnh nền cho bản đồ hiện trạng và quy hoạch. Bản đồ đường phố là OpenFreeMap Liberty, có tên đường; nếu không tải được thì nền xám nhạt. Lựa chọn được ghi nhớ trên máy này"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ảnh nền</label>
             <select id="basemapSelect" aria-label="Ảnh nền bản đồ">
@@ -1626,6 +1627,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261039"></script>
+  <script type="module" src="./js/app.js?v=20261040"></script>
 </body>
 </html>
