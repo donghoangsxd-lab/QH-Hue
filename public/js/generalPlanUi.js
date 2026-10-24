@@ -12,7 +12,7 @@ import { measure2A, ensureClassRoads, CLASS_REF, URBANS } from './urbanClass.js'
 import { STATUS_REF, URBANS_614, bareName } from './urbanStatus.js';
 import { URBANS_VISION } from './urbanVision.js';
 import { DOTHI_2030, DOTHI_SAU, HT_GROUPS, HT_URBANS, NOTE_2030 } from './doThiQd756.js';
-import { DVHC_WARDS, DVHC_CITY } from './dvhcStats.js';
+import { DVHC_WARDS, DVHC_CITY, shortPlaceName } from './dvhcStats.js';
 import { PART_BOUNDS, loadPartGeoms, partFeature } from './urbanPartGeom.js';
 import { AREA_TP, setAreaFilter, parseKv } from './facetStore.js';
 import { getLevel } from './mapLevel.js';
@@ -323,7 +323,8 @@ function areaBtn(raw, n, period) {
     : statsFor(item, period);
   const pop = statCell(stats.pop, POP_FMT);
   const km = statCell(stats.km2, KM_FMT);
-  const name = item.short || item.name;
+  const full = item.name || item.short || '';
+  const name = shortPlaceName(item.short || item.name);
   const city = isCityRow(item);
   const kv = item.kv || (city ? 'TP' : `dothi:${item.id}`);
   const on = item.id === picked;
@@ -336,8 +337,9 @@ function areaBtn(raw, n, period) {
   const qdAttr = qd
     ? ` data-gp-qd="1"${item.cityPlan ? ' data-gp-city="1"' : ''}${geom ? ` data-gp-file="${escapeHtml(geom.file)}" data-gp-geom="${escapeHtml(geom.id)}"` : ''}`
     : '';
-  const tip = item.tip || `${name}: dân số ${pop}, diện tích ${km} km²`;
-  return `<button type="button" class="axis-area gp-row${mark}${on ? ' active' : ''}" data-gp-pick="${escapeHtml(item.id)}" data-kv="${escapeHtml(kv)}"${qdAttr} aria-pressed="${on}" title="${escapeHtml(tip)}"><span class="axis-num">${num}</span><span class="${nameCls}">${nameInner}</span><span class="axis-area-pop">${pop}</span><span class="axis-area-km">${km}</span></button>`;
+  const tipBase = item.tip || `${full}: dân số ${pop}, diện tích ${km} km²`;
+  const tip = full && !tipBase.includes(full) ? `${full}. ${tipBase}` : tipBase;
+  return `<button type="button" class="axis-area gp-row${mark}${on ? ' active' : ''}" data-gp-pick="${escapeHtml(item.id)}" data-kv="${escapeHtml(kv)}" data-name="${escapeHtml(full)}"${qdAttr} aria-pressed="${on}" title="${escapeHtml(tip)}"><span class="axis-num">${num}</span><span class="${nameCls}">${nameInner}</span><span class="axis-area-pop">${pop}</span><span class="axis-area-km">${km}</span></button>`;
 }
 
 function groupHtml(groups, period) {
@@ -356,13 +358,14 @@ function renderPanel() {
   const htOn = getViewMode() === 'HT';
   urbanTotal = HT_URBANS.length;
   paintUrbanCount();
+  if (htOn) {
+    box.innerHTML = `<div class="gp-sec">Hiện trạng</div>${AREA_HEAD}${groupHtml(HT_GROUPS, 'ht')}`;
+    return;
+  }
   const groups = gpPeriod === 'vision' ? DOTHI_SAU : DOTHI_2030;
   const note = gpPeriod === 'vision' ? '' : `<p class="gp-qd-note">${escapeHtml(NOTE_2030)}</p>`;
   const periods = `<div class="admin-tabs gp-periods" role="tablist" aria-label="Giai đoạn quy hoạch đô thị"><button type="button" class="admin-tab${gpPeriod === '2030' ? ' active' : ''}" data-gp-period="2030" aria-selected="${gpPeriod === '2030'}">Đến 2030</button><button type="button" class="admin-tab${gpPeriod === 'vision' ? ' active' : ''}" data-gp-period="vision" aria-selected="${gpPeriod === 'vision'}">Sau 2030</button></div>`;
-  const htHtml = htOn
-    ? `<div class="gp-sec">Hiện trạng</div>${AREA_HEAD}${groupHtml(HT_GROUPS, 'ht')}`
-    : '';
-  box.innerHTML = `<div class="gp-sec">Quy hoạch</div>${periods}${AREA_HEAD}${groupHtml(groups, 'qh')}${note}${htHtml}`;
+  box.innerHTML = `<div class="gp-sec">Quy hoạch</div>${periods}${AREA_HEAD}${groupHtml(groups, 'qh')}${note}`;
 }
 
 export const refreshGeneralPlanPanel = renderPanel;
@@ -626,6 +629,7 @@ export function initGeneralPlanEvents(el, rerender) {
     else pick(id);
   });
   onViewChange(() => renderPanel());
+  document.addEventListener('qh:view-column', renderPanel);
   document.addEventListener('qh:admin-release', () => { if (picked) pick(null); });
   document.addEventListener('cadparcels:loaded', renderPanel);
   $('chk_urban')?.addEventListener('change', paintUrbanCount);

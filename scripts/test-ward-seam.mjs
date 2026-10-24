@@ -81,8 +81,36 @@ pack.lines.forEach(line => {
   }
 });
 assert.ok(sharedY.length >= 1, 'có một nét trên cạnh chung');
-const parallel = sharedY.length;
-assert.equal(parallel > 0, true);
+function countLat(lines, y, tolM) {
+  let n = 0;
+  (lines || []).forEach(line => {
+    for (let i = 1; i < line.length; i++) {
+      const ay = line[i - 1][0];
+      const by = line[i][0];
+      if (Math.abs((ay + by) / 2 - y) * M_LAT < tolM && Math.abs(ay - by) * M_LAT < tolM) n++;
+    }
+  });
+  return n;
+}
+function overlapPairs(lines, tolM) {
+  const segs = [];
+  (lines || []).forEach((line, li) => {
+    for (let i = 1; i < line.length; i++) segs.push({ a: [line[i - 1][1], line[i - 1][0]], b: [line[i][1], line[i][0]], li, i });
+  });
+  let n = 0;
+  segs.forEach((s, i) => {
+    const mid = [(s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2];
+    for (let j = 0; j < segs.length; j++) {
+      if (i === j) continue;
+      if (s.li === segs[j].li && Math.abs(s.i - segs[j].i) <= 1) continue;
+      if (proj(mid, segs[j].a, segs[j].b) <= tolM) n++;
+    }
+  });
+  return n;
+}
+assert.equal(countLat(pack.outer, southTop, 2), 0, 'cạnh chung không được quầng thành phố');
+assert.ok(countLat(pack.lines, southTop, 2) >= 1, 'cạnh chung có trong lưới');
+assert.equal(overlapPairs(pack.lines, 0.5), 0, 'lưới thử không vẽ đè');
 
 function nearMissKm(features, lo, hi) {
   const feats = features.filter(f => f && f.geometry);
@@ -154,6 +182,62 @@ assert.ok(before.km > 40, 'dữ liệu gốc còn khe');
 assert.ok(after.km < before.km * 0.02, `còn ${after.km.toFixed(2)} km khe 0,4–8 m`);
 assert.ok(real.lines.length > 10 && real.lines.length < 8000, 'nét ranh gom thành đường');
 assert.equal(real.byName.size, 40);
+assert.ok(real.outer && real.outer.length > 0, 'có vành ngoài thành phố');
+
+function lineFalseKm(lines, features) {
+  const CELL = 0.0002;
+  const grid = new Map();
+  const segs = [];
+  features.forEach((f, fi) => {
+    ringsOf(f.geometry).forEach(ring => {
+      for (let i = 0; i < ring.length - 1; i++) {
+        const a = ring[i], b = ring[i + 1];
+        const id = segs.length;
+        segs.push({ a, b, fi });
+        const minx = Math.min(a[0], b[0]), maxx = Math.max(a[0], b[0]);
+        const miny = Math.min(a[1], b[1]), maxy = Math.max(a[1], b[1]);
+        for (let x = Math.floor(minx / CELL); x <= Math.floor(maxx / CELL); x++) {
+          for (let y = Math.floor(miny / CELL); y <= Math.floor(maxy / CELL); y++) {
+            const k = `${x},${y}`;
+            if (!grid.has(k)) grid.set(k, []);
+            grid.get(k).push(id);
+          }
+        }
+      }
+    });
+  });
+  let km = 0;
+  (lines || []).forEach(line => {
+    for (let i = 1; i < line.length; i++) {
+      const a = [line[i - 1][1], line[i - 1][0]];
+      const b = [line[i][1], line[i][0]];
+      const len = distM(a, b);
+      if (len < 0.05) continue;
+      const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      const cx = Math.floor(mid[0] / CELL), cy = Math.floor(mid[1] / CELL);
+      const seen = new Set();
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const bucket = grid.get(`${cx + dx},${cy + dy}`);
+          if (!bucket) continue;
+          for (const id of bucket) {
+            if (seen.has(id)) continue;
+            seen.add(id);
+            const hit = proj(mid, segs[id].a, segs[id].b);
+            if (hit <= 8) seen.add(`f${segs[id].fi}`);
+          }
+        }
+      }
+      let owners = 0;
+      seen.forEach(k => { if (String(k).startsWith('f')) owners++; });
+      if (owners >= 2) km += len;
+    }
+  });
+  return km / 1000;
+}
+const falseOuter = lineFalseKm(real.outer, real.features);
+console.log(JSON.stringify({ falseOuterKm: +falseOuter.toFixed(2), outerLines: real.outer.length }));
+assert.ok(falseOuter < 2, `quầng thành phố bám ${falseOuter.toFixed(2)} km cạnh nội bộ`);
 
 const stateSrc = fs.readFileSync(new URL('../public/js/state.js', import.meta.url), 'utf8');
 const mapSrc = fs.readFileSync(new URL('../public/js/mapEngine.js', import.meta.url), 'utf8');

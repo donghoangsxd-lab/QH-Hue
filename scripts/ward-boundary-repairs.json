@@ -1,0 +1,166 @@
+{
+  "v": 3,
+  "repairs": [
+    {
+      "tenXa": "Xã Vinh Lộc",
+      "defect": "manh-nho",
+      "areaM2": 73,
+      "lng": 107.9437,
+      "lat": 16.344
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "manh-nho",
+      "areaM2": 62,
+      "lng": 107.0499,
+      "lat": 16.3028
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "manh-nho",
+      "areaM2": 314,
+      "lng": 107.0717,
+      "lat": 16.3038
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "manh-nho",
+      "areaM2": 78,
+      "lng": 107.0696,
+      "lat": 16.304
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "manh-nho",
+      "areaM2": 28,
+      "lng": 107.0327,
+      "lat": 16.3088
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "manh-nho",
+      "areaM2": 198,
+      "lng": 107.0498,
+      "lat": 16.3022
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "manh-nho",
+      "areaM2": 466,
+      "lng": 107.0282,
+      "lat": 16.3111
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "manh-nho",
+      "areaM2": 58,
+      "lng": 107.0495,
+      "lat": 16.3008
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "dai-mong",
+      "areaM2": 2819,
+      "lng": 107.0335,
+      "lat": 16.307
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "manh-nho",
+      "areaM2": 389,
+      "lng": 107.0788,
+      "lat": 16.3108
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "manh-nho",
+      "areaM2": 268,
+      "lng": 107.0602,
+      "lat": 16.3051
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "manh-nho",
+      "areaM2": 246,
+      "lng": 107.0723,
+      "lat": 16.3047
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "dai-mong",
+      "areaM2": 1082,
+      "lng": 107.0445,
+      "lat": 16.3004
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "dai-mong",
+      "areaM2": 829,
+      "lng": 107.0423,
+      "lat": 16.3016
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "dai-mong",
+      "areaM2": 1322,
+      "lng": 107.0297,
+      "lat": 16.3095
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "dai-mong",
+      "areaM2": 1468,
+      "lng": 107.0361,
+      "lat": 16.3058
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "dai-mong",
+      "areaM2": 5119,
+      "lng": 107.0398,
+      "lat": 16.3035
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "dai-mong",
+      "areaM2": 2996,
+      "lng": 107.074,
+      "lat": 16.3073
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "dai-mong",
+      "areaM2": 2481,
+      "lng": 107.0768,
+      "lat": 16.3098
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "dai-mong",
+      "areaM2": 13159,
+      "lng": 107.0629,
+      "lat": 16.3046
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "dai-mong",
+      "areaM2": 12415,
+      "lng": 107.0561,
+      "lat": 16.306
+    },
+    {
+      "tenXa": "Xã A Lưới 1",
+      "defect": "dai-mong",
+      "areaM2": 15240,
+      "lng": 107.0528,
+      "lat": 16.3063
+    },
+    {
+      "tenXa": "Phường Phong Quảng",
+      "defect": "dai-mong",
+      "areaM2": 12725,
+      "lng": 107.5755,
+      "lat": 16.601
+    }
+  ]
+}

@@ -143,7 +143,6 @@ export const infraLabels = {
   "14-NOXH": "Chung cư"
 };
 
-// Cạnh chung đã gom vẫn sáng nếu vẽ hai lần (quầng dày bán trong suốt + nét vàng, hoặc blur/drop-shadow).
 // Một nét mảnh, đủ đục. Quầng vàng chỉ gắn vào vành ngoài thành phố.
 const WARD_LINE_DRAW = { fill: false, interactive: false, smoothFactor: 0, lineJoin: 'round', lineCap: 'butt' };
 export const WARD_BOUNDARY_LINE_STYLE = { ...WARD_LINE_DRAW, color: '#334155', weight: 1.2, opacity: 1 };
@@ -152,10 +151,9 @@ export function wardDrawFC(features) {
   const pack = getWardDraw() || sealWardDraw(features);
   return { type: 'FeatureCollection', features: pack.features };
 }
-// Phường đang chọn: nền đỏ nhạt nằm dưới lô đồ án (không che hoa văn), viền đỏ tươi + quầng tối nằm trên ranh đồ án
+// Phường đang chọn: nền đỏ nhạt và một viền đỏ. Không quầng, không nét đôi.
 export const WARD_FOCUS_STYLE = {
   fill: { stroke: false, fillColor: '#ff1f1f', fillOpacity: 0.1 },
-  halo: { color: '#1a0505', weight: 7, opacity: 0.5, fill: false, lineJoin: 'round' },
   line: { color: '#ff1f1f', weight: 3.5, opacity: 1, fill: false, lineJoin: 'round' }
 };
 

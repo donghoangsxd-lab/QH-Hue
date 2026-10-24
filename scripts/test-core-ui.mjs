@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { shortPlaceName } from '../public/js/dvhcStats.js';
 
 const root = new URL('..', import.meta.url);
 const read = (rel) => fs.readFileSync(new URL(rel, root), 'utf8');
@@ -25,7 +26,7 @@ function innerById(src, id) {
 }
 
 const TITLES = [
-  ['hanhchinh', 'Quản lý theo đơn vị hành chính'],
+  ['hanhchinh', 'Quản lý phát triển đô thị'],
   ['quyhoach', 'Hệ thống bản đồ quy hoạch'],
   ['hatang', 'Hệ thống hạ tầng kỹ thuật'],
   ['xahoi', 'Hệ thống hạ tầng xã hội'],
@@ -216,5 +217,33 @@ assert.doesNotMatch(gp, /const num = city \? '' :/);
 assert.match(gp, /getViewMode\(\) === 'HT'/);
 assert.match(css, /#adminTabs \.admin-tab\s*\{[^}]*min-width:\s*max-content/);
 assert.match(read('.cursorrules'), /docs\/ui-spec\.md/);
+assert.match(cn, /shortPlaceName/);
+assert.match(cn, /Loại HT/);
+assert.match(cn, /Loại 2030/);
+assert.match(cn, /const loai = htMode \? lvCell\(marks\.ht/);
+assert.doesNotMatch(cn, /\$\{lvCell\(marks\.ht[\s\S]{0,40}\$\{lvCell\(marks\.plan/);
+assert.match(cn, /clearWardHighlight\(\)/);
+const release = cn.slice(cn.indexOf('function releaseAdminAnchor'), cn.indexOf('function showAxis'));
+assert.match(release, /clearWardHighlight\(\)/);
+assert.match(gp, /if \(htOn\)/);
+assert.match(gp, /shortPlaceName/);
+assert.doesNotMatch(gp, /\$\{htHtml\}/);
+assert.match(css, /left:\s*calc\(12px \+ var\(--right-w\) \+ 16px\)/);
+assert.match(css, /right:\s*calc\(12px \+ var\(--tb-btn\) \+ 16px\)/);
+assert.match(css, /\.map-title-text\s*\{[^}]*white-space:\s*nowrap/);
+assert.match(css, /grid-template-columns:\s*2em minmax\(0, 1fr\) 9\.2ch 8\.2ch 9ch/);
+assert.doesNotMatch(css, /3\.2ch 6\.6ch/);
+assert.match(html, /title="Hiện trạng \(QĐ 614\)"/);
+assert.match(html, /title="Quy hoạch \(QĐ 756\)"/);
+assert.match(read('public/js/dvhcStats.js'), /export function shortPlaceName/);
+assert.match(read('public/js/facetStore.js'), /Quản lý phát triển đô thị/);
+assert.doesNotMatch(html, /Quản lý theo đơn vị hành chính/);
+assert.match(html, /Đơn vị hành chính \(40\)/);
+assert.match(html, /Đô thị \(25\)/);
+assert.equal(shortPlaceName('Thành phố Huế'), 'TP Huế');
+assert.equal(shortPlaceName('Phường Thuận An'), 'P. Thuận An');
+assert.equal(shortPlaceName('Xã A Lưới 1'), 'X. A Lưới 1');
+assert.equal(shortPlaceName('Đô thị Huế'), 'Đô thị Huế');
+assert.equal(shortPlaceName('Khu vực đô thị A'), 'Khu vực đô thị A');
 
 console.log('core ui ok');

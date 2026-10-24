@@ -99,7 +99,6 @@ html.title-dismissed { --title-h: 8px; }
 }
 
 body.right-collapsed { --info-left: 12px; }
-body.right-collapsed .map-title { left: 50%; }
 body, html {
   margin: 0; padding: 0; height: 100vh;
   font-family: var(--font-sans);
@@ -221,11 +220,15 @@ body.split-offset .swipe-handle { display: none; }
   --tone: var(--orange-rgb);
   position: absolute;
   top: 12px;
-  left: calc(50% + (var(--right-w) + 12px) / 2);
-  transform: translateX(-50%);
+  left: calc(12px + var(--right-w) + 16px);
+  right: calc(12px + var(--tb-btn) + 16px);
+  width: max-content;
+  max-width: calc(100% - (12px + var(--right-w) + 16px) - (12px + var(--tb-btn) + 16px));
+  margin-left: auto;
+  margin-right: auto;
+  transform: none;
   z-index: 1100;
   height: auto;
-  max-width: calc(100% - var(--right-w) - 12px - 2 * (var(--ov-w) + 24px));
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -295,7 +298,7 @@ html.show-boot-notice .map-title { padding-bottom: 5px; }
 .map-title-progress.done { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .map-title-progress > i::after { animation: none; } }
 .map-title[data-view="split"]::before { background: linear-gradient(90deg, transparent, var(--accent-cyan) 20%, var(--accent-cyan) 48%, var(--accent-orange) 52%, var(--accent-orange) 80%, transparent); }
-body.right-collapsed .map-title, body.compare-on .map-title { left: 50%; max-width: calc(100% - 2 * (var(--ov-w) + 24px)); }
+body.right-collapsed .map-title, body.compare-on .map-title { left: calc(12px + var(--right-w) + 16px); right: calc(12px + var(--tb-btn) + 16px); transform: none; }
 /* Ngay dưới thanh tiêu đề, canh giữa thanh đó. Hiện khi đang chọn đồ án, QHC, phường xã hoặc đô thị. */
 .esc-hint {
   position: absolute;
@@ -545,7 +548,7 @@ body:has(#investCard:not([hidden])) .project-brief {
 .map-title-mark:hover:not(:disabled) { border-color: rgba(var(--tone), 0.9); background: rgba(var(--tone), 0.24); box-shadow: 0 0 10px rgba(var(--tone), 0.4); }
 .map-title-mark:hover:not(:disabled) .ico { transform: rotateY(180deg); }
 .map-title-mark:disabled { cursor: default; opacity: 0.75; }
-.map-title-body { min-width: 0; flex: 1 1 auto; overflow: hidden; display: flex; flex-direction: column; justify-content: center; gap: 1px; transform-origin: 50% 50%; }
+.map-title-body { min-width: max-content; flex: 0 0 auto; overflow: visible; display: flex; flex-direction: column; justify-content: center; gap: 1px; transform-origin: 50% 50%; }
 .map-intro-kicker {
   margin: 0;
   font-size: var(--fs-xs);
@@ -589,12 +592,10 @@ body:has(#investCard:not([hidden])) .project-brief {
   letter-spacing: 0.6px;
   color: var(--text-strong);
   line-height: 1.15;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  text-wrap: balance;
-  overflow: hidden;
+  display: block;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
 }
 .map-title.flipping .map-title-body, .map-title.flipping .map-title-mark { animation: map-title-flip 0.5s ease; }
@@ -6064,7 +6065,7 @@ body.project-review.la-page #projectReviewHost {
 .axis-area-pop, .axis-area-km { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .axis-area.axis-dvhc,
 .axis-area-head.axis-dvhc {
-  grid-template-columns: 2em minmax(0, 1fr) 9.2ch 8.2ch 3.2ch 6.6ch;
+  grid-template-columns: 2em minmax(0, 1fr) 9.2ch 8.2ch 9ch;
   column-gap: 3px;
   padding-right: 1px;
 }
