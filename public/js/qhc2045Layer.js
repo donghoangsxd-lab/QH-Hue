@@ -14,7 +14,7 @@
 // nằm ở overlayPane, phủ kín bản đồ khi có bất kỳ lớp vector nào và nuốt click của canvas QHC bên dưới, nên click lô / vùng
 // được dò lại ở cấp bản đồ (qhcClick, gọi từ app.js) bằng bbox + point-in-polygon.
 import { state } from './state.js';
-import { map, wardNameAt, outerWardLines, openOutlinedPopup, getRightObstruction, addPopupCollapseToggle, expandCollapsedPopup } from './mapEngine.js';
+import { map, wardNameAt, outerWardLines, openOutlinedPopup, getLeftObstruction, getRightObstruction, addPopupCollapseToggle, expandCollapsedPopup } from './mapEngine.js';
 import { planMap, isCompareOn, isSplitOn, getViewMode, setViewMode, passToolClick, whenMapsIdle } from './planMap.js';
 import { escapeHtml, fmtNum, ico, WARD_PICK_EVENT } from './utils.js';
 import { tt16SymbolStyle, tt16SwatchCss, TT16_STYLES, TT16_PATTERN_ZOOM, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
@@ -340,8 +340,9 @@ async function focusRoads(scale, key) {
   const m = roadHosts(scale)[0];
   if (!hit.length || !m) return;
   const [w, s, e, n] = turf.bbox(fcOf(hit));
+  const left = isLevelPair() ? 0 : getLeftObstruction();
   const right = isLevelPair() ? 0 : getRightObstruction();
-  m.flyToBounds([[s, w], [n, e]], { paddingTopLeft: [70, 40], paddingBottomRight: [40 + right, 40], duration: 0.8 });
+  m.flyToBounds([[s, w], [n, e]], { paddingTopLeft: [70 + left, 40], paddingBottomRight: [40 + right, 40], duration: 0.8 });
 }
 
 /** Tuyến gần điểm bấm nhất trong ROAD_HIT_PX điểm ảnh (canvas giao thông không nhận click) */

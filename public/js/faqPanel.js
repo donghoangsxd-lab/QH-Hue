@@ -1,6 +1,6 @@
 // Hỏi đáp số liệu đã tính sẵn (public/data/faq.json, dựng bằng scripts/build-faq.js).
 // Bấm câu trả lời thì tô các phường, xã nêu trong câu. Câu ưu tiên đầu tư tô thêm công trình và buffer QCVN.
-import { getRightObstruction, highlightWardNames, map } from './mapEngine.js';
+import { getLeftObstruction, getRightObstruction, highlightWardNames, map } from './mapEngine.js';
 import { escapeHtml, showToast, detailDisclosure } from './utils.js';
 import { POP_METHOD_EVENT, spatialQuestions } from './popMethod.js';
 
@@ -99,7 +99,7 @@ function showFacility(name, item) {
   const bounds = circle.getBounds();
   if (bounds && bounds.isValid()) {
     map.fitBounds(bounds, {
-      paddingTopLeft: [24, 24],
+      paddingTopLeft: [24 + getLeftObstruction(), 24],
       paddingBottomRight: [24 + getRightObstruction(), 24],
       maxZoom: 16,
       animate: true

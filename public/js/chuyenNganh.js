@@ -1,8 +1,8 @@
 // Bốn trục là tab cấp một của panel Lớp dữ liệu. Cùng một cờ bật/tắt: checkbox có bind dùng lớp sẵn,
 // lớp catalog chỉ tải GeoJSON khi bật và gỡ layer khi tắt.
-import { map } from './mapEngine.js';
+import { map, focusWard } from './mapEngine.js';
 import { planMap, getViewMode, setViewMode, onViewChange } from './planMap.js';
-import { getLevel, setLevel, LEVEL_EVENT } from './mapLevel.js';
+import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
 import { state } from './state.js';
 import { escapeHtml, ico, showToast, RIGHT_TAB_EVENT } from './utils.js';
 import { withAssetVersion } from './gbaVersion.js';
@@ -365,8 +365,7 @@ function paintKienTruc() {
   const quy = kienTruc?.quyChe?.items || [];
   const ct = kienTruc?.congTrinh?.items || [];
   const list = (items, render) => items.length ? `<ul class="axis-arch-list">${items.map(render).join('')}</ul>` : '<p class="cn-empty">Chưa có dữ liệu</p>';
-  box.innerHTML = `${scopeHtml()}
-    <section class="axis-arch"><h3>Quy chế quản lý kiến trúc</h3>${list(quy, item => `<li><b>${escapeHtml(item.name || item.id || 'Quy chế')}</b>${item.doc?.title ? `<small>${escapeHtml(item.doc.title)}</small>` : ''}</li>`)}</section>
+  box.innerHTML = `<section class="axis-arch"><h3>Quy chế quản lý kiến trúc</h3>${list(quy, item => `<li><b>${escapeHtml(item.name || item.id || 'Quy chế')}</b>${item.doc?.title ? `<small>${escapeHtml(item.doc.title)}</small>` : ''}</li>`)}</section>
     <section class="axis-arch"><h3>Công trình kiến trúc có giá trị</h3>${list(ct, item => `<li><b>${escapeHtml(item.ten || item.id || 'Công trình')}</b>${item.phuong ? `<small>${escapeHtml(item.phuong)}</small>` : ''}</li>`)}</section>`;
 }
 
@@ -514,7 +513,7 @@ function filterGp() {
   const rows = [...box.children];
   rows.forEach(el => {
     if (!el.classList.contains('gp-row')) return;
-    const name = el.querySelector('.gp-name')?.textContent || '';
+    const name = el.querySelector('.axis-area-name, .gp-name')?.textContent || '';
     el.classList.toggle('is-filter-hide', !!q && !foldQuery(name).includes(q));
   });
   rows.forEach(el => {
@@ -676,8 +675,17 @@ function placeIsoRadius(axis) {
   if (field && slot && field.parentElement !== slot) slot.append(field);
 }
 
+function releaseAdminAnchor() {
+  const area = getAreaFilter();
+  if (!area || area.type !== 'tp') setAreaFilter({ ...AREA_TP }, 'axis');
+  if (state.selectedWard && state.selectedWard !== DVHC_CITY.name) focusWard(DVHC_CITY.name);
+  document.dispatchEvent(new CustomEvent('qh:admin-release'));
+}
+
 function showAxis(id, { openPanel = false, url = true } = {}) {
   if (!AXES.some(a => a.id === id)) return;
+  if (id !== 'hanhchinh') releaseAdminAnchor();
+  if (id === 'quyhoach') ensurePlanTab('qhc25');
   placeIsoRadius(id);
   setBrowseState({ axis: id }, { url });
   openingAxis = true;
@@ -823,7 +831,10 @@ export function initChuyenNganh() {
     }
     const kvBtn = e.target.closest('[data-kv]');
     if (kvBtn) {
-      setAreaFilter(parseKv(kvBtn.dataset.kv) || AREA_TP, 'user');
+      const area = parseKv(kvBtn.dataset.kv) || { ...AREA_TP };
+      setAreaFilter(area, 'user');
+      if (area.type === 'xa') focusWard(areaLabel(area));
+      else if (area.type === 'tp') focusWard(DVHC_CITY.name);
       return;
     }
     if (e.target.closest('[data-cn-all]')) {

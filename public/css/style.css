@@ -78,7 +78,7 @@
   --title-h: calc(86px * var(--k));  /* tiêu đề gộp giới thiệu, giữa trên bản đồ */
   --info-top: 12px;                  /* cột thông tin trái: mép trên */
   --info-bottom: 12px;
-  --info-left: calc(12px + var(--tb-btn) + 10px); /* sát phải thanh công cụ */
+  --info-left: calc(12px + var(--right-w) + 16px); /* sát phải panel trục bên trái */
 }
 /* Lần tải đầu: một dòng vàng dưới tiêu đề. Mọi vị trí bám --title-h dịch xuống theo. */
 html.show-boot-notice { --title-h: calc(108px * var(--k)); }
@@ -98,6 +98,8 @@ html.title-dismissed { --title-h: 8px; }
   body { --bp-rows: 12; }
 }
 
+body.right-collapsed { --info-left: 12px; }
+body.right-collapsed .map-title { left: 50%; }
 body, html {
   margin: 0; padding: 0; height: 100vh;
   font-family: var(--font-sans);
@@ -219,7 +221,7 @@ body.split-offset .swipe-handle { display: none; }
   --tone: var(--orange-rgb);
   position: absolute;
   top: 12px;
-  left: calc(50% - (var(--right-w) + 12px) / 2);
+  left: calc(50% + (var(--right-w) + 12px) / 2);
   transform: translateX(-50%);
   z-index: 1100;
   height: auto;
@@ -731,6 +733,11 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
   color: var(--axis-color-muted);
 }
 .level-pick-btn .ico { width: 12px; height: 12px; margin: 0; color: var(--accent-cyan); }
+#levelHostQh .level-host-label { display: none; }
+#levelPickQh { width: 100%; }
+#levelPickQh .level-pick-btn { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0 2px; }
+#levelPickQh .level-pick-btn span { overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
+.level-pick-btn.is-on { background: rgba(var(--orange-rgb), 0.2); color: var(--text-strong); }
 .level-pick-btn.is-current {
   background: var(--axis-bg-active);
   border-color: var(--accent-cyan);
@@ -818,7 +825,8 @@ body.compare-on .map-title-split { display: inline-flex; }
 .ov-launch {
   position: fixed;
   top: 12px;
-  left: 12px;
+  left: auto;
+  right: 12px;
   z-index: 1400;
   width: var(--tb-btn);
   height: var(--tb-btn);
@@ -860,11 +868,12 @@ body.compare-on .map-title-split { display: inline-flex; }
 .ov-launch[aria-expanded="true"] { background: var(--accent-cyan); border-color: var(--accent-cyan); color: var(--text-on-accent); }
 .ov-launch[aria-expanded="true"] .ico { color: var(--text-on-accent); }
 
-/* THANH CÔNG CỤ DỌC TRÊN BẢN ĐỒ (BÊN TRÁI): các nút rời, không có nền bao */
+/* THANH CÔNG CỤ DỌC TRÊN BẢN ĐỒ (BÊN PHẢI): các nút rời, không có nền bao */
 .map-toolbar {
   position: absolute;
   top: calc(12px + var(--tb-btn) + 8px);
-  left: 12px;
+  left: auto;
+  right: 12px;
   z-index: 1000;
   display: flex;
   flex-direction: column;
@@ -887,7 +896,7 @@ body.compare-on .map-title-split { display: inline-flex; }
 
 /* HỎI ĐÁP: câu đã tính sẵn, bấm để tô phường */
 .faq-panel {
-  position: absolute; left: calc(var(--tb-btn) + 20px); top: 72px; z-index: 1000;
+  position: absolute; left: auto; right: calc(var(--tb-btn) + 20px); top: 72px; z-index: 1000;
   width: min(380px, calc(100vw - 84px)); max-height: min(72vh, 640px); overflow: auto;
   padding: 8px 10px 10px; background: var(--bg-dark); color: var(--text-main);
   backdrop-filter: var(--panel-blur); -webkit-backdrop-filter: var(--panel-blur);
@@ -963,7 +972,8 @@ body.compare-on .map-title-split { display: inline-flex; }
 /* PHÁC THẢO: bảng công cụ mở ngang cạnh nút (top đặt theo nút trong sketchLayer.js) */
 .sketch-palette {
   position: absolute;
-  left: calc(var(--tb-btn) + 8px);
+  left: auto;
+  right: calc(var(--tb-btn) + 8px);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -977,7 +987,7 @@ body.compare-on .map-title-split { display: inline-flex; }
 }
 .sketch-palette[hidden] { display: none; }
 /* Công cụ đang bật: một nút ngay cạnh nút Phác thảo, cùng cỡ nút thanh công cụ */
-.sketch-pin { position: absolute; left: calc(var(--tb-btn) + 8px); z-index: 1; }
+.sketch-pin { position: absolute; left: auto; right: calc(var(--tb-btn) + 8px); z-index: 1; }
 .sketch-pin[hidden] { display: none !important; }
 .sketch-row { display: flex; align-items: center; gap: 2px; }
 .sketch-btn {
@@ -1030,7 +1040,8 @@ body.compare-on .map-title-split { display: inline-flex; }
   display: flex;
   position: absolute;
   top: 12px;
-  right: 12px;
+  left: 12px;
+  right: auto;
   z-index: 1001;
   width: calc(var(--tb-btn) + 8px);
   height: var(--tb-btn);
@@ -1049,6 +1060,19 @@ body.right-collapsed .rp-expand-btn:not(.bp-expand-btn) { opacity: 1; visibility
 .bp-expand-btn { top: auto; bottom: 12px; }
 .map-toolbar #btnExpandBottomPanel { display: none; position: static; top: auto; right: auto; bottom: auto; width: var(--tb-btn); height: var(--tb-btn); opacity: 1; visibility: visible; }
 body.bottom-collapsed:not(.project-review:not(.project-view)) .map-toolbar #btnExpandBottomPanel { display: inline-flex; }
+@media (min-width: 841px) {
+  body.bottom-collapsed:not(.project-review:not(.project-view)) .map-toolbar #btnExpandBottomPanel {
+    position: fixed;
+    right: 12px;
+    bottom: 0;
+    left: auto;
+    top: auto;
+    width: 72px;
+    height: 28px;
+    border-radius: 8px 8px 0 0;
+    z-index: 1300;
+  }
+}
 body.bottom-collapsed:not(.project-review:not(.project-view)) .bp-expand-btn { opacity: 1; visibility: visible; transition: opacity 0.2s ease 0.1s, visibility 0s; }
 
 /* ===================== PANEL PHẢI ===================== */
@@ -1056,9 +1080,10 @@ body.bottom-collapsed:not(.project-review:not(.project-view)) .bp-expand-btn { o
 .right-panel {
   position: absolute;
   top: 12px;
-  right: 12px;
+  left: 12px;
+  right: auto;
   bottom: 12px;
-  width: min(var(--right-w), calc(100% - var(--info-left) - 16px));
+  width: min(var(--right-w), calc(100% - var(--tb-btn) - 36px));
   max-height: none;
   z-index: 1200;
   display: flex;
@@ -1071,14 +1096,14 @@ body.bottom-collapsed:not(.project-review:not(.project-view)) .bp-expand-btn { o
   box-shadow: var(--panel-shadow);
   box-sizing: border-box;
   overflow: hidden;
-  transform-origin: top right;
+  transform-origin: top left;
   transition: transform 0.25s ease, opacity 0.2s ease;
 }
 @media (min-width: 841px) {
   body:not(.bottom-collapsed) .right-panel { bottom: calc(var(--bottom-h) + 12px); }
 }
 body.right-collapsed .right-panel {
-  transform: translateX(24px) scale(0.96);
+  transform: translateX(-24px) scale(0.96);
   opacity: 0;
   pointer-events: none;
 }
@@ -5286,7 +5311,8 @@ body.project-review.la-page #projectReviewHost {
   .map-title-level { min-width: 44px; min-height: 40px; padding: 0 6px; }
   .esc-hint { top: calc(100% + 4px); left: 50%; height: auto; transform: translateX(-50%); }
   .level-item { min-height: 44px; font-size: 13px; padding-top: 8px; padding-bottom: 8px; }
-  .ov-launch { top: max(8px, env(safe-area-inset-top)); left: 8px; }
+  .ov-launch { top: max(8px, env(safe-area-inset-top)); left: 8px; right: auto; }
+  .rp-expand-btn { left: auto; right: 8px; }
   .rp-expand-btn { width: 44px; height: 44px; top: max(8px, env(safe-area-inset-top)); right: 8px; }
   .bp-expand-btn { top: auto; bottom: max(8px, env(safe-area-inset-bottom)); right: 8px; }
   /* Cột dọc sát mép trái, dưới tiêu đề, cuộn dọc nếu nút nhiều hơn khoảng trống. Không trải ngang đáy. */
@@ -6030,9 +6056,16 @@ body.project-review.la-page #projectReviewHost {
 }
 .axis-area-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .axis-area-pop, .axis-area-km { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.axis-area-city .axis-area-name { font-weight: 700; }
+.axis-area-city,
+.axis-area-city .axis-area-name,
+.axis-area-city .axis-area-pop,
+.axis-area-city .axis-area-km,
+.axis-area-city .axis-num { font-weight: 700; color: #1c1917; }
 .axis-area:hover { background: var(--axis-bg-hover); }
 .axis-area.active { background: var(--axis-bg-active); color: var(--axis-color-strong); }
+.axis-area-city { background: #fef3c7; }
+.axis-area-city.active,
+.axis-area-city:hover { background: #fde68a; }
 .axis-area-group { margin: 2px 6px; }
 .axis-area-group summary { cursor: pointer; min-height: var(--axis-head-h); font-family: var(--axis-font); font-size: var(--axis-fs-header); font-weight: 700; color: var(--axis-color); }
 .axis-area-list { max-height: none; overflow: auto; }
@@ -6046,7 +6079,7 @@ body.project-review.la-page #projectReviewHost {
 .cn-matrix th, .cn-matrix td { padding: 2px 6px; border-bottom: 1px solid var(--border-soft); white-space: nowrap; text-align: left; }
 .cn-matrix td.is-on { color: #166534; font-weight: 700; }
 .axis-dock { display: none; }
-body.right-collapsed .axis-dock { display: flex; position: fixed; z-index: 1250; top: 50%; right: max(8px, env(safe-area-inset-right)); transform: translateY(-50%); flex-direction: column; gap: 6px; padding: 6px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); box-shadow: var(--panel-shadow); }
+body.right-collapsed .axis-dock { display: flex; position: fixed; z-index: 1250; top: 50%; left: max(8px, env(safe-area-inset-left)); right: auto; transform: translateY(-50%); flex-direction: column; gap: 6px; padding: 6px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); box-shadow: var(--panel-shadow); }
 .axis-dock button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 64px; min-height: 44px; padding: 4px; border: 0; border-radius: 8px; background: transparent; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-chip); line-height: 1.1; cursor: pointer; }
 .axis-dock button.active { color: var(--axis-color); background: var(--axis-bg-active); }
 @media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {

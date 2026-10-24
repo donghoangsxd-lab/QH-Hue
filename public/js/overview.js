@@ -339,12 +339,12 @@ const SECTIONS = [
       {
         id: 'layers', btn: 'guide', status: 'trial',
         title: 'Bật lớp dữ liệu trên bản đồ',
-        lead: 'Chọn lớp cần xem ở panel phải. Lớp bật vẽ ngay trên bản đồ đang mở (quy hoạch hoặc hiện trạng).',
+        lead: 'Chọn lớp cần xem ở panel trái. Lớp bật vẽ ngay trên bản đồ đang mở (quy hoạch hoặc hiện trạng).',
         steps: [
-          'Nếu panel phải đang thu, bấm <b>Mở panel công cụ</b>. Tab <b>Lớp dữ liệu</b> đang mở mặc định.',
-          'Băng đạn: <b>Hành chính</b>, <b>Quy hoạch</b>, <b>Hạ tầng kỹ thuật</b>, <b>Hạ tầng xã hội</b>, <b>Kiến trúc</b>. Trong Hành chính có tab nhỏ <b>Đô thị</b> (Hệ thống đô thị) và <b>ĐVHC</b>. Trong Quy hoạch có bốn cấp QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500.',
-          'Dòng dưới băng đạn có ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b> và nút <b>Cả nhóm</b>. Công trình xã hội, PCCC, điểm giao thông và lớp điểm theo đồ án ở panel <b>Hạ tầng xã hội</b>. <b>Ranh lô</b>, cơ sở chưa sử dụng và chung cư ở Quy hoạch. Nút <b>Tất cả</b> bật hoặc tắt 14 nhóm điểm.',
-          'Mục <b>Lớp nền</b> trong Hành chính: ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư, độ phủ. Mục <b>Môi trường</b> trong Hạ tầng kỹ thuật: địa hình, ngập. Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường. Ô <b>Giả lập bán kính chung</b> ở Hạ tầng xã hội và Hạ tầng kỹ thuật.'
+          'Nếu panel trái đang thu, bấm <b>Mở panel công cụ</b>. Tab <b>Lớp dữ liệu</b> đang mở mặc định.',
+          'Droplist: <b>Quản lý theo đơn vị hành chính</b>, <b>Hệ thống bản đồ quy hoạch</b>, <b>Hệ thống hạ tầng kỹ thuật</b>, <b>Hệ thống hạ tầng xã hội</b>, <b>Quản lý lĩnh vực kiến trúc</b>. Trong Hành chính có tab <b>Đơn vị hành chính (40)</b> và <b>Đô thị (25)</b>. Trong Quy hoạch, bốn cấp có thể bật cùng lúc.',
+          'Dòng dưới droplist có ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b> và nút cả nhóm. Công trình xã hội, PCCC, điểm giao thông, lớp điểm theo đồ án và mục <b>Quỹ đất và công trình</b> ở panel <b>Hạ tầng xã hội</b>. Nút <b>Tất cả</b> bật hoặc tắt 14 nhóm điểm.',
+          'Mục <b>Lớp nền</b> ghim đáy mọi trục: ảnh nền, ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư, độ phủ. Mục <b>Môi trường</b> trong Hạ tầng kỹ thuật: địa hình, ngập. Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường. Ô <b>Giả lập bán kính chung</b> ở Hạ tầng xã hội và Hạ tầng kỹ thuật.'
         ],
         facts: [
           'Thu panel bằng nút mũi tên <b>Ẩn panel</b> trên hàng công cụ của panel. Lớp đã bật vẫn giữ.',

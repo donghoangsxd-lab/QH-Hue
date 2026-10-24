@@ -41,7 +41,7 @@ const STEPS = [
   {
     target: '#mapTitle',
     title: 'Bản đồ Quy hoạch / Hiện trạng và lớp quy hoạch',
-    text: 'Thanh tiêu đề cho biết bản đồ đang xem và một dòng giới thiệu. Mở trang là bản đồ quy hoạch; bấm biểu tượng lật trang để sang bản đồ hiện trạng và ngược lại. Nút Giới thiệu ở góc trên trái mở bảng tính năng. Nút đóng ẩn thanh này; bấm lại nút góc trái để hiện thanh tiêu đề. Hệ thống đô thị nằm trong panel Hành chính. Bốn cấp QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500 nằm trong panel Quy hoạch — chọn một cấp thì các cấp kia tắt; muốn so sánh nhiều lớp thì bật thêm ở danh sách.'
+    text: 'Thanh tiêu đề cho biết bản đồ đang xem và một dòng giới thiệu. Mở trang là bản đồ quy hoạch; bấm biểu tượng lật trang để sang bản đồ hiện trạng và ngược lại. Nút Giới thiệu ở góc trên phải, đầu cột công cụ, mở bảng tính năng. Nút đóng ẩn thanh này; bấm lại nút đó để hiện thanh tiêu đề. Phân loại đô thị nằm trong panel Hành chính, tab Đô thị. Bốn cấp QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500 nằm trong panel Quy hoạch — bấm để bật thêm cấp, danh sách của mỗi cấp hiện nối tiếp.'
   },
   {
     target: '#btnToggleCompare',
@@ -51,17 +51,17 @@ const STEPS = [
   {
     target: ['#bottomPanel', '#btnExpandBottomPanel'],
     title: 'Bảng chỉ tiêu 40 phường xã',
-    text: 'Bảng phía dưới so sánh diện tích từng loại hạ tầng với chỉ tiêu m²/người của quy chuẩn, kèm biểu đồ cột. Chọn phường/xã trong danh sách để xem riêng từng địa bàn. Nút mũi tên kép cuối thanh tiêu đề thu gọn bảng; nút trên thanh công cụ trái mở lại.'
+    text: 'Bảng phía dưới so sánh diện tích từng loại hạ tầng với chỉ tiêu m²/người của quy chuẩn, kèm biểu đồ cột. Chọn phường/xã trong danh sách để xem riêng từng địa bàn. Nút mũi tên kép cuối thanh tiêu đề thu gọn bảng; khi bảng đang ẩn, mỏ ở góc dưới phải mở lại.'
   },
   {
     target: '.map-toolbar',
     title: 'Công cụ khác',
-    text: 'Thanh công cụ bên trái còn có: đo chiều dài, đo diện tích, lát cắt địa hình, định vị GPS, xuất bản đồ (A3 đến A0), đề xuất điểm mới và phác thảo.\nNút Đề xuất mở phiếu nhập điểm. Điểm mới được đánh dấu "Chờ duyệt" cho đến khi quản trị viên Sở Xây dựng phê duyệt.'
+    text: 'Thanh công cụ bên phải còn có: đo chiều dài, đo diện tích, lát cắt địa hình, định vị GPS, xuất bản đồ (A3 đến A0), đề xuất điểm mới và phác thảo.\nNút Đề xuất mở phiếu nhập điểm. Điểm mới được đánh dấu "Chờ duyệt" cho đến khi quản trị viên Sở Xây dựng phê duyệt.'
   },
   {
     target: '#btnOverview',
     title: 'Giới thiệu',
-    text: 'Nút Giới thiệu ở góc trên trái mở bảng các nhóm tính năng chính, kèm hướng dẫn và lối mở nhanh từng tính năng. Chúc bạn khám phá bản đồ hiệu quả!'
+    text: 'Nút Giới thiệu ở góc trên phải mở bảng các nhóm tính năng chính, kèm hướng dẫn và lối mở nhanh từng tính năng. Chúc bạn khám phá bản đồ hiệu quả!'
   }
 ];
 
