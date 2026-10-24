@@ -91,7 +91,7 @@ import { initFloodSim } from './floodSim.js';
 import { initSatLayers } from './satLayers.js';
 import { initTreeLayer } from './treeLayer.js';
 import { initOsmOpen } from './osmOpen.js';
-import { initSketchLayer, handleSketchClick } from './sketchLayer.js';
+import { initSketchLayer, handleSketchClick, consumeSketchMapClick } from './sketchLayer.js';
 import { initFaqPanel } from './faqPanel.js';
 import { exportMapA3 } from './printLayout.js';
 import { initOverview } from './overview.js';
@@ -755,6 +755,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   const handleMapClick = async (e, targetMap) => {
+    if (consumeSketchMapClick(e)) return;
     // Vẽ tuyến / vùng dân cư chỉ có trên bản đồ hiện trạng. Phác thảo ghi lên bản đồ đang xem.
     if (state.adminDrawMode && targetMap !== map && !isSplitOn()) {
       setViewMode('HT');

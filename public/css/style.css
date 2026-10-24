@@ -1014,7 +1014,23 @@ body.compare-on .map-title-split { display: inline-flex; }
 .sketch-popup .leaflet-popup-content { margin: 6px; }
 .sketch-menu { display: flex; flex-direction: column; gap: 4px; }
 .sketch-del { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-red); font-size: var(--fs-sm); padding: 4px 8px; }
-.sketch-menu .sketch-del:first-child:not(:last-child) { color: var(--accent-cyan); }
+.sketch-menu .sketch-act { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-cyan); font-size: var(--fs-sm); padding: 4px 8px; }
+.sketch-handle { background: none !important; border: none !important; }
+.sketch-handle span {
+  display: block; box-sizing: border-box; border-radius: 50%; touch-action: none; pointer-events: none;
+}
+.sketch-handle-vertex { cursor: grab; }
+.sketch-handle-vertex span {
+  width: 14px; height: 14px; margin: 9px; background: #fff; border: 2px solid #0f172a;
+  box-shadow: 0 0 0 2px #38bdf8;
+}
+.sketch-handle-mid { cursor: crosshair; }
+.sketch-handle-mid span {
+  width: 10px; height: 10px; margin: 11px; background: #fff; border: 2px solid #38bdf8;
+}
+.sketch-handle-vertex:active { cursor: grabbing; }
+.leaflet-container.sketch-editing,
+.leaflet-container.sketch-editing.sketch-mode { cursor: default !important; }
 /* Hàng phụ: tùy chọn chữ, chọn định dạng lưu */
 .sketch-sub { gap: 6px; padding: 0 4px; font-size: var(--fs-sm); color: var(--text-muted); }
 .sketch-sub[hidden] { display: none; }
