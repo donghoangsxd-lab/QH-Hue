@@ -240,14 +240,26 @@ async function staleDesktop(page, base, { qhc, panel, shot, keepQhpk }) {
 }
 
 async function openLevel(page, id) {
-  const current = await page.getAttribute('#levelPick', 'data-level');
+  const current = await page.evaluate(() => document.body.dataset.level || '');
   if (current === id) return;
   if (await page.evaluate(() => document.body.classList.contains('right-collapsed'))) {
     await page.click('#btnExpandRightPanel');
     await page.waitForFunction(() => !document.body.classList.contains('right-collapsed'));
   }
-  await page.locator(`#levelPick [data-level="${id}"]`).click();
-  await page.waitForFunction((want) => document.getElementById('levelPick')?.dataset.level === want, id);
+  const axis = id === 'urban' ? 'hanhchinh' : 'quyhoach';
+  const host = id === 'urban' ? '#levelPickUrban' : '#levelPickQh';
+  const onAxis = await page.evaluate((want) => document.querySelector('#layerMagTrack .is-current')?.dataset.mainTab === want, axis);
+  if (!onAxis) {
+    await page.locator('#layerMagTrack .is-current').click({ force: true });
+    await page.locator(`#layerMagMenu:not([hidden]) [data-mag-go="${axis}"]`).click();
+    await page.waitForFunction((want) => document.querySelector('#layerMagTrack .is-current')?.dataset.mainTab === want, axis);
+  }
+  await page.evaluate(() => {
+    const menu = document.getElementById('layerMagMenu');
+    if (menu) menu.hidden = true;
+  });
+  await page.locator(`${host} [data-level="${id}"]`).click();
+  await page.waitForFunction((want) => document.body.dataset.level === want, id);
 }
 
 async function scene(page, name) {

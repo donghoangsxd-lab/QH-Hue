@@ -1,4 +1,4 @@
-// Lớp quy hoạch đang xem (hàng nút trên panel phải). Mỗi lớp một luồng tương tác riêng; viewFlow.js định tuyến click
+// Lớp quy hoạch đang xem (nút trong panel Hành chính và Quy hoạch). Mỗi lớp một luồng tương tác riêng; viewFlow.js định tuyến click
 // bản đồ quy hoạch theo lớp đang chọn (không lớp nào chọn phường từ bản đồ; chọn phường ở droplist bảng tổng hợp):
 //  urban  Hệ thống đô thị (chk_urban)   bấm đô thị → nổi ranh + phạm vi đã có QHC / QHPK / QHCT (urbanFocus.js), bấm vùng
 //                                        đồ án → chi tiết
@@ -8,10 +8,8 @@
 //  qhpk   QHPK 1/2.000 (chk_projects)    ranh mọi đồ án; bấm ranh hoặc tick đồ án mới hiện lô.
 //                                        Ranh điều chỉnh và QHCT chỉ khi đang mở một đồ án. Chọn phường: lô cả phường
 //  qhct   QHCT 1/500 (chk_qhct)          ranh + tên các đồ án QHCT nhập, bấm đồ án → chi tiết; lô QHCT tĩnh (qhctLayer.js)
-// Chọn một nút ở panel phải: bật lớp đó, tắt 4 lớp còn lại. Bật thêm lớp ở danh sách để so sánh: lớp đang chọn giữ nguyên;
+// Chọn một nút trong panel: bật lớp đó, tắt 4 lớp còn lại. Bật thêm lớp ở danh sách để so sánh: lớp đang chọn giữ nguyên;
 // lớp đang chọn bị tắt mà còn lớp khác bật thì chuyển sang lớp đó.
-import { escapeHtml, ico } from './utils.js';
-
 export const LEVELS = [
   { id: 'urban', chk: 'chk_urban', label: 'HỆ THỐNG ĐÔ THỊ' },
   { id: 'qhc25', chk: 'chk_qhc25', label: 'QHC 1/25.000' },
@@ -29,9 +27,8 @@ let level = DEFAULT_LEVEL;
 // Lớp đã chuyển sang lớp hiện tại (VD mở QHPK khi đang xem QHC 1/10.000 → 'qhc10') để thoát đồ án thì quay lại
 let origin = null;
 let applying = false;
-// Tab kiểm tra quy hoạch đang tự chọn lớp: mở đồ án giao vùng không được kéo droplist sang cấp đồ án kia
+// Tab kiểm tra quy hoạch đang tự chọn lớp: mở đồ án giao vùng không được kéo nút cấp sang cấp đồ án kia
 let levelLock = 0;
-let host = null;
 
 export const getLevel = () => level;
 export const levelOrigin = () => origin;
@@ -104,27 +101,26 @@ function onLayerChange(e) {
 function paint() {
   const cur = byId.get(level);
   document.body.dataset.level = level;
-  if (!host) return;
-  host.dataset.level = level;
-  host.querySelectorAll('[data-level]').forEach(el => {
+  document.querySelectorAll('[data-level-pick]').forEach(host => { host.dataset.level = level; });
+  document.querySelectorAll('[data-level-pick] [data-level]').forEach(el => {
+    const meta = byId.get(el.dataset.level);
+    if (!meta) return;
     const on = el.dataset.level === level;
     el.classList.toggle('is-current', on);
     el.setAttribute('aria-selected', String(on));
-    el.classList.toggle('is-on', isOn(byId.get(el.dataset.level).chk));
-    el.title = on ? `Đang xem: ${cur.label}` : `Xem ${byId.get(el.dataset.level).label}`;
+    el.classList.toggle('is-on', isOn(meta.chk));
+    el.title = on ? `Đang xem: ${cur.label}` : `Xem ${meta.label}`;
   });
 }
 
 export function initMapLevel() {
-  host = document.getElementById('levelPick');
-  if (host && !host.childElementCount) {
-    host.innerHTML = LEVELS.map(l => `<button type="button" class="level-pick-btn${l.pending ? ' is-pending' : ''}" role="option" data-level="${l.id}">${ico('layers')}<span>${escapeHtml(l.label)}</span></button>`).join('');
-    host.addEventListener('click', (e) => {
-      const item = e.target.closest('[data-level]');
-      if (!item) return;
-      setLevel(item.dataset.level, { keepView: item.dataset.level === 'qhc10' || item.dataset.level === 'qhc25' });
-    });
-  }
+  const root = document.getElementById('layerMain');
+  root?.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-level]');
+    if (!item?.closest('[data-level-pick]')) return;
+    const id = item.dataset.level;
+    setLevel(id, { keepView: id === 'qhc10' || id === 'qhc25' });
+  });
   document.addEventListener('change', onLayerChange);
   // Mở trang luôn về Hệ thống đô thị. Ô lớp trình duyệt khôi phục từ lần trước không được thắng.
   // Link chia sẻ (có lv hoặc ly) do viewLink áp sau bước này.
