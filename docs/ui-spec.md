@@ -33,7 +33,7 @@ Tab trên ô tìm kiếm: `Đơn vị hành chính (40)`, rồi `Đô thị (25)
 
 ### Quy hoạch
 
-Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Mở panel thì QHC 1/25.000 đang bật. Bấm thêm để bật nhiều cấp; mỗi cấp đang bật gắn danh sách đồ án của cấp đó phía dưới. Không dòng «Phạm vi: Toàn thành phố».
+Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Mở panel thì QHC 1/25.000 đang bật. Bấm cấp chưa mở để bật thêm. Bấm cấp đang mở nhưng chưa xem thì chuyển sang xem cấp đó. Bấm lại cấp đang xem thì tắt nếu còn cấp khác. Mỗi cấp đang bật gắn danh sách đồ án của cấp đó phía dưới. Không dòng «Phạm vi: Toàn thành phố».
 
 ### Hạ tầng kỹ thuật
 

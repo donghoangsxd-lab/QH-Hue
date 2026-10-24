@@ -176,6 +176,7 @@ const levelJs = read('public/js/mapLevel.js');
 assert.match(levelJs, /data-level-pick/);
 assert.match(levelJs, /keepOthers/);
 assert.match(levelJs, /togglePlanTab/);
+assert.match(levelJs, /listed\.has\(id\) && level !== id/);
 assert.match(levelJs, /ensurePlanTab/);
 assert.doesNotMatch(levelJs, /getElementById\('levelPick'\)/);
 assert.match(read('public/js/chuyenNganh.js'), /isoSlotHaTang/);

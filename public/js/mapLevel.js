@@ -84,9 +84,13 @@ export function setLevel(id, { origin: from = null, keepView = false, fromHold =
   emit(prev, keepView ? { keepView: true } : {});
 }
 
-/** Bật thêm một cấp quy hoạch, hoặc tắt nếu còn cấp khác. Không tắt hết. */
+/** Bật thêm một cấp. Bấm cấp đang mở nhưng chưa phải cấp đang xem thì chuyển sang xem cấp đó. Bấm lại cấp đang xem thì tắt nếu còn cấp khác. */
 export function togglePlanTab(id) {
   if (!PLAN_TABS.includes(id)) return;
+  if (listed.has(id) && level !== id) {
+    setLevel(id, { keepView: true, keepOthers: true });
+    return;
+  }
   const open = PLAN_TABS.filter(x => listed.has(x));
   if (listed.has(id) && open.length > 1) {
     listed.delete(id);
