@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { shortPlaceName } from '../public/js/dvhcStats.js';
+import { createSketchEditSession, minVertices } from '../public/js/sketchEdit.js';
 
 const root = new URL('..', import.meta.url);
 const read = (rel) => fs.readFileSync(new URL(rel, root), 'utf8');
@@ -25,7 +27,7 @@ function innerById(src, id) {
 }
 
 const TITLES = [
-  ['hanhchinh', 'Quản lý theo đơn vị hành chính'],
+  ['hanhchinh', 'Quản lý phát triển đô thị'],
   ['quyhoach', 'Hệ thống bản đồ quy hoạch'],
   ['hatang', 'Hệ thống hạ tầng kỹ thuật'],
   ['xahoi', 'Hệ thống hạ tầng xã hội'],
@@ -70,8 +72,9 @@ assert.match(tools, /id="btnAxisAll"/);
 const admin = innerById(html, 'layerPaneHanhChinh');
 const tabs = innerById(html, 'adminTabs');
 assert.ok(tabs.indexOf('data-admin-tab="dvhc"') < tabs.indexOf('data-admin-tab="dothi"'), 'Đơn vị hành chính đứng trước Đô thị');
-assert.match(tabs, /Đơn vị hành chính \(40\)/);
-assert.match(tabs, /Đô thị \(25\)/);
+assert.match(tabs, />Đơn vị hành chính</);
+assert.match(tabs, />Đô thị</);
+assert.doesNotMatch(tabs, /\(40\)|\(25\)/);
 assert.doesNotMatch(html, /id="levelPickUrban"/);
 assert.doesNotMatch(admin, /Hệ thống đô thị/);
 assert.match(admin, /id="gpList"/);
@@ -209,10 +212,124 @@ const gp = read('public/js/generalPlanUi.js');
 assert.match(gp, /Đến 2030/);
 assert.match(gp, /Sau 2030/);
 assert.match(gp, /function isCityRow/);
-assert.match(gp, /isCityRow\(item\) \? null : \+\+n/);
-assert.match(gp, /const num = city \? '' : `\$\{n\}\.`/);
+assert.match(gp, /const num = `\$\{n\}\.`/);
+assert.match(gp, /g\.rows\.map\(item => areaBtn\(item, \+\+n, period\)\)/);
+assert.doesNotMatch(gp, /isCityRow\(item\) \? null : \+\+n/);
+assert.doesNotMatch(gp, /const num = city \? '' :/);
 assert.match(gp, /getViewMode\(\) === 'HT'/);
 assert.match(css, /#adminTabs \.admin-tab\s*\{[^}]*min-width:\s*max-content/);
 assert.match(read('.cursorrules'), /docs\/ui-spec\.md/);
+assert.match(cn, /shortPlaceName/);
+assert.match(cn, /Loại HT/);
+assert.match(cn, /Loại 2030/);
+assert.match(cn, /const loai = htMode \? lvCell\(marks\.ht/);
+assert.doesNotMatch(cn, /\$\{lvCell\(marks\.ht[\s\S]{0,40}\$\{lvCell\(marks\.plan/);
+assert.match(cn, /clearWardHighlight\(\)/);
+const release = cn.slice(cn.indexOf('function releaseAdminAnchor'), cn.indexOf('function showAxis'));
+assert.match(release, /clearWardHighlight\(\)/);
+assert.match(gp, /if \(htOn\)/);
+assert.match(gp, /shortPlaceName/);
+assert.doesNotMatch(gp, /\$\{htHtml\}/);
+assert.match(css, /left:\s*calc\(12px \+ var\(--right-w\) \+ 16px\)/);
+assert.match(css, /right:\s*calc\(12px \+ var\(--tb-btn\) \+ 16px\)/);
+assert.match(css, /\.map-title-text\s*\{[^}]*white-space:\s*nowrap/);
+assert.match(css, /grid-template-columns:\s*2em minmax\(0, 1fr\) 9\.2ch 8\.2ch 9ch/);
+assert.doesNotMatch(css, /3\.2ch 6\.6ch/);
+assert.match(html, /title="Hiện trạng \(QĐ 614\)"/);
+assert.match(html, /title="Quy hoạch \(QĐ 756\)"/);
+assert.match(read('public/js/dvhcStats.js'), /export function shortPlaceName/);
+assert.match(read('public/js/facetStore.js'), /Quản lý phát triển đô thị/);
+assert.doesNotMatch(html, /Quản lý theo đơn vị hành chính/);
+assert.match(html, />Đơn vị hành chính</);
+assert.match(html, />Đô thị</);
+assert.doesNotMatch(html, /Đơn vị hành chính \(40\)|Đô thị \(25\)/);
+assert.doesNotMatch(html, /btnExpandRightPanel|rp-expand-btn/);
+assert.match(html, /id="axisDock"/);
+assert.match(html, /id="btnCollapseRightPanel"/);
+assert.match(html, /id="btnExpandBottomPanel"/);
+assert.match(cn, /showAxis\(tab\.dataset\.axisDock, \{ openPanel: true \}\)/);
+assert.doesNotMatch(read('public/js/app.js'), /btnExpandRightPanel/);
+assert.doesNotMatch(css, /#btnExpandBottomPanel[\s\S]{0,320}width:\s*72px/);
+assert.match(css, /#btnExpandBottomPanel \{[\s\S]{0,220}width:\s*var\(--tb-btn\)/);
+assert.match(css, /#btnExpandBottomPanel \{[\s\S]{0,180}right:\s*12px/);
+assert.match(read('docs/ui-spec.md'), /không có nút «>>»/);
+assert.match(read('docs/ui-spec.md'), /cùng bề rộng và cùng mép phải/);
+assert.equal(shortPlaceName('Thành phố Huế'), 'TP Huế');
+assert.equal(shortPlaceName('Phường Thuận An'), 'P. Thuận An');
+assert.equal(shortPlaceName('Xã A Lưới 1'), 'X. A Lưới 1');
+assert.equal(shortPlaceName('Đô thị Huế'), 'Đô thị Huế');
+assert.equal(shortPlaceName('Khu vực đô thị A'), 'Khu vực đô thị A');
+
+const spec = read('docs/ui-spec.md');
+assert.match(spec, /## Phác thảo/);
+assert.match(spec, /Điều chỉnh/);
+assert.match(spec, /Xóa đỉnh/);
+assert.match(spec, /Esc hủy/);
+
+const sketch = read('public/js/sketchLayer.js');
+assert.match(sketch, /selectShape\(fg\)/);
+assert.match(sketch, /Điều chỉnh/);
+assert.match(sketch, /Xóa đỉnh/);
+assert.match(sketch, /Xong/);
+assert.match(sketch, /dragging\.disable\(\)/);
+assert.match(sketch, /cancelAdjust\(\)/);
+assert.match(sketch, /consumeSketchMapClick/);
+assert.match(sketch, /createSketchEditSession/);
+assert.match(read('public/js/mapContext.js'), /sketch-handle/);
+assert.match(read('public/js/app.js'), /consumeSketchMapClick\(e\)/);
+
+const linePts = [
+  { lat: 16.46, lng: 107.58 },
+  { lat: 16.47, lng: 107.59 }
+];
+const line = createSketchEditSession(linePts, 'line');
+line.select();
+assert.equal(line.isSelected(), true);
+const menu = line.openMenu();
+assert.ok(menu.includes('Điều chỉnh'), 'menu có Điều chỉnh');
+assert.ok(menu.includes('Xóa hình này'));
+line.startAdjust();
+assert.ok(line.isEditing());
+assert.deepEqual(line.vertexMenu(), ['Xóa đỉnh', 'Xong']);
+assert.equal(line.deleteVertex(0).removed, false, 'đường giữ ít nhất 2 đỉnh');
+assert.equal(minVertices('line'), 2);
+assert.equal(line.workingPts().length, 2);
+const dragged = line.dragVertex(1, { lat: 16.5, lng: 107.62 });
+assert.equal(dragged[1].lat, 16.5);
+assert.equal(dragged[1].lng, 107.62);
+assert.notEqual(dragged[1].lat, linePts[1].lat);
+const restored = line.cancel();
+assert.equal(line.isEditing(), false);
+assert.equal(restored[1].lat, linePts[1].lat, 'Esc trả lại vĩ độ');
+assert.equal(restored[1].lng, linePts[1].lng, 'Esc trả lại kinh độ');
+assert.equal(line.savedPts()[1].lat, linePts[1].lat);
+
+const polyPts = [
+  { lat: 16.45, lng: 107.55 },
+  { lat: 16.46, lng: 107.55 },
+  { lat: 16.46, lng: 107.56 }
+];
+const poly = createSketchEditSession(polyPts, 'polygon');
+poly.select();
+assert.ok(poly.openMenu().includes('Điều chỉnh'));
+poly.startAdjust();
+assert.equal(minVertices('polygon'), 3);
+assert.equal(poly.deleteVertex(1).removed, false, 'đa giác giữ ít nhất 3 đỉnh');
+const mids = poly.midpoints();
+assert.equal(mids.length, 3);
+poly.insertMidpoint(mids[0].insertAt, mids[0].at);
+assert.equal(poly.workingPts().length, 4);
+poly.dragVertex(mids[0].insertAt, { lat: 16.455, lng: 107.552 });
+assert.equal(poly.workingPts()[mids[0].insertAt].lat, 16.455);
+assert.equal(poly.deleteVertex(mids[0].insertAt).removed, true);
+assert.equal(poly.workingPts().length, 3);
+const kept = poly.finish();
+assert.equal(kept.length, 3);
+assert.equal(poly.isEditing(), false);
+assert.deepEqual(poly.savedPts(), kept);
+poly.startAdjust();
+poly.dragVertex(0, { lat: 10, lng: 20 });
+assert.equal(poly.workingPts()[0].lat, 10);
+assert.deepEqual(poly.cancel(), kept);
 
 console.log('core ui ok');

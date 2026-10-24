@@ -4,9 +4,10 @@ Hợp đồng đã thống nhất. Sửa layout, panel, chú giải, lớp nền
 
 ## Bố cục (desktop)
 
-- Panel trục bên trái, cách mép 12px, cao gần hết màn hình, co lên khi mở bảng tổng hợp phía dưới. Khi panel thu, dải năm trục nằm bên trái; nút mở trỏ vào trong bản đồ, nút thu trỏ ra mép trái.
+- Panel trục bên trái, cách mép 12px, cao gần hết màn hình, co lên khi mở bảng tổng hợp phía dưới. Khi panel thu, dải năm trục bên trái là lối mở duy nhất; không có nút «>>» góc trên trái. Nút thu nằm trên hàng tiêu đề của panel.
 - Cột nút công cụ bên phải. Nút Giới thiệu là ô vuông đầu cột, góc trên phải. Menu chuột phải giữ nguyên.
-- Bảng tổng hợp thu thì mỏ `#btnExpandBottomPanel` nằm góc dưới phải, dạng tab (bo phía trên), cùng màu nút công cụ.
+- Hộp tiêu đề `#mapTitle` đứng trong khoảng trống giữa panel trục và cột nút: mép trái `12px + bề rộng panel + 16px`, mép phải `12px + ô nút + 16px`, canh giữa khoảng đó. Vị trí không nhảy khi mở hoặc đóng panel trục hay bảng tổng hợp. Câu «BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ» một dòng, không cắt. Điện thoại (≤840px) giữ cột nút trái và tiêu đề phía trên cột nút.
+- Bảng tổng hợp thu thì mỏ `#btnExpandBottomPanel` nằm góc dưới phải, dạng tab (bo phía trên), cùng màu, cùng bề rộng và cùng mép phải với cột nút công cụ.
 - Điện thoại giữ cột nút trái và panel dạng sheet. Không áp gương desktop vào media điện thoại.
 - Thẻ thông tin lô và menu chuột phải không gỡ.
 
@@ -14,7 +15,7 @@ Hợp đồng đã thống nhất. Sửa layout, panel, chú giải, lớp nền
 
 Droplist `#layerMag`: một tiêu đề 12px; bấm mở danh sách cùng cỡ chữ; nút thu cùng hàng. Thứ tự:
 
-1. Quản lý theo đơn vị hành chính
+1. Quản lý phát triển đô thị
 2. Hệ thống bản đồ quy hoạch
 3. Hệ thống hạ tầng kỹ thuật
 4. Hệ thống hạ tầng xã hội
@@ -24,13 +25,13 @@ Hàng dưới tiêu đề: một ô tìm kiếm, một nút HT/QH, một nút b�
 
 ### Hành chính
 
-Tab trên ô tìm kiếm: `Đơn vị hành chính (40)`, rồi `Đô thị (25)`, rồi `Chấm điểm`.
+Tab trên ô tìm kiếm: `Đơn vị hành chính`, rồi `Đô thị`, rồi `Chấm điểm`. Không ghi số lượng trên nhãn tab.
 
-- ĐVHC: dòng Thành phố Huế không số, đậm, nền vàng nhạt; 40 đơn vị đánh số. Cột dân số và km² thẳng nhau.
+- ĐVHC: dòng Thành phố Huế không số, đậm, nền vàng nhạt; 40 đơn vị đánh số 1–40. Tên hiện rút gọn: «TP Huế», «P. …», «X. …». Tooltip và ô tìm vẫn dùng tên đầy đủ, và tìm được cả dạng rút gọn. Cột một hàng, không xuống dòng: số, tên, dân số, km², và đúng một cột loại theo nút HT/QH trên thanh công cụ. Nút hiện trạng (`data-view-mode="HT"`) → cột «Loại HT» (QĐ 614, tooltip: loại trước chuyển tiếp), chú thích `Theo QĐ 614; loại trước chuyển tiếp`. Nút quy hoạch (`data-view-mode="QH"`, mặc định) → cột «Loại 2030» (QĐ 756: I / II / III / `PĐ III`, tooltip đúng câu `Phấn đấu đạt loại III`), chú thích `Theo QĐ 756; kế hoạch nâng loại có thể thay đổi theo nghiên cứu cụ thể`. Thiếu mức thì «—» mờ. Không hiện cả hai cột cùng lúc. Không thêm bộ lọc theo cột này. Hai nút vẫn đổi cả bản đồ hiện trạng / quy hoạch như trước.
 - Bấm một dòng (đơn vị, đô thị, hoặc Thành phố Huế) phóng tới và tô cả ranh. Thành phố tô viền ngoài.
-- Ba tab `Đơn vị hành chính (40)`, `Đô thị (25)` và `Chấm điểm` cùng một hàng, chữ không chồng, không cắt. Hẹp thì cuộn ngang.
+- Ba tab `Đơn vị hành chính`, `Đô thị` và `Chấm điểm` cùng một hàng, không có `(40)` hay `(25)`, chữ không chồng, không cắt. Hẹp thì cuộn ngang.
 - Chấm điểm: ba mức Huế (Phụ lục I, đạt hoặc không đạt), Đô thị (Bảng 2A, cùng danh sách quy hoạch của tab Đô thị, trừ Thành phố Huế), Phường và xã (Bảng 2B, 40 đơn vị). Mỗi đơn vị có tổng điểm hoặc số tiêu chuẩn đạt, kết luận Điều 9.3, danh sách tiêu chuẩn chưa đạt kèm phần trăm thiếu, biểu đồ theo quý và năm, bản đồ tô theo điểm. Thiếu số liệu thì «—» và «chưa đánh giá», không tính là đạt. Số liệu lấy từ CSV, không bịa. Ô trống được tự tính khi đã có công thức trong dữ liệu bản đồ; cạnh nhãn «tự tính» là giá trị đo. Ô có số trong bảng thì ghi đè và hiện nhãn «ghi đè».
-- Đô thị: không nút «Hệ thống đô thị» (trùng ô Phân loại đô thị). Mục Quy hoạch đứng trước, hai tab `Đến 2030` và `Sau 2030` ngay đầu danh sách. Mục Hiện trạng chỉ hiện khi bấm HT (mặc định đang QH thì ẩn), nối phía dưới. Dòng Thành phố Huế không số; các đô thị đánh số từ 1. Mỗi dòng cùng lưới dân số / km² với ĐVHC.
+- Đô thị: không nút «Hệ thống đô thị» (trùng ô Phân loại đô thị). Cùng nút HT/QH với ĐVHC: HT chỉ danh sách Hiện trạng; QH chỉ Quy hoạch, hai tab `Đến 2030` và `Sau 2030` ngay đầu danh sách. Không hiện cả hai trạng thái cùng lúc. Tên «Thành phố Huế», «Phường …», «Xã …» rút gọn như ĐVHC; «Đô thị …» và «Khu vực đô thị …» giữ nguyên. Tooltip và tìm kiếm giữ tên đầy đủ. Mỗi danh sách đang hiện đánh số Huế là dòng 1, các đô thị sau tiếp tục. Tab ĐVHC vẫn để Thành phố Huế không số. Nhóm `Loại I`, `Loại II`, `Loại III`. Nhãn `(phấn đấu)`, `(lõi: …)`, `(chưa có ranh)` nằm cuối tên, không bị cắt. Bấm dòng có ranh thì phóng và tô polygon đó. Dòng quy hoạch Thành phố Huế tô ranh thành phố. Dòng chưa có ranh không vẽ. Mỗi dòng lưới dân số / km².
 
 ### Quy hoạch
 
@@ -76,17 +77,23 @@ Một bộ biến cho mọi trục và chú giải, trong `public/css/style.css`
 
 ## Danh sách và ranh
 
-- Lưới ĐVHC và đô thị: số, tên, dân số, km². Thiếu số thì «—», không bịa.
-- Ranh trong giữa các phường/xã: nét mảnh `#334155`. Chỉ ranh ngoài thành phố có quầng sáng.
+- Lưới đô thị: số, tên, dân số, km². Lưới ĐVHC thêm đúng một cột loại (Loại HT hoặc Loại 2030). Thiếu số thì «—», không bịa. Huế trong tab Đô thị có số 1; Thành phố Huế trong tab ĐVHC không số. Danh sách không hiện tiền tố «Thành phố Huế», «Phường », «Xã »; dạng rút gọn là «TP Huế», «P. », «X. ».
+- Ranh trong giữa các phường/xã: một nét mảnh `#334155`, không quầng, không bóng, không nét đôi. Mỗi cạnh chung chỉ vẽ một lần. Quầng sáng chỉ có trên vành ngoài thành phố (lớp `city-outline-glow`). Chọn một đơn vị vẫn tô nền đỏ nhạt và một viền đỏ; đổi đơn vị hoặc rời trục thì xóa tô đó.
 - Dòng Thành phố Huế: đậm, nền `#fef3c7`.
 
 ## Số liệu không bịa
 
-Chỉ số có trong repo. Dân số và diện tích ĐVHC lấy `dvhcStats.js`. Diện tích đô thị ghép trọn đơn vị là tổng km² các đơn vị đó. Đô thị một phần xã lấy km² trong `PART_BOUNDS` nếu có.
+Chỉ số có trong repo. Dân số và diện tích ĐVHC lấy `dvhcStats.js`. Danh sách Đô thị theo QĐ 756 và QĐ 614 lấy km² từ `properties.km2` của polygon được dẫn trong `doThiQd756.js` (đã tính sẵn, không cộng lại trên máy chủ). Thành phố Huế ở kỳ quy hoạch dùng km² toàn thành phố trong `dvhcStats`. Hiện trạng Đô thị Huế không có polygon phạm vi đã công nhận, nên dùng ranh thành phố `urban614` #hue và km² `properties.km2` của polygon đó. Dân số hiện trạng chỉ cộng khi phạm vi đã công nhận phủ trọn các đơn vị hiện nay (Hương Thủy, Hương Trà).
+
+Đô thị cấp xã đến 2030 (Vinh Thanh, Phú Đa, Lộc Sơn, Khe Tre, Phú Lộc, Vinh Hiền, Quảng Điền, A Lưới 2) dùng polygon lõi trong `urban614`, không lấy ranh cả xã. Đô thị Hóa Châu đến 2030 là cả phường (`generalPlan` #hoa-chau), không phải lõi Thanh Hà. Đô thị Chân Mây – Lăng Cô đến 2030 dùng ranh GIS đồ án QHC Chân Mây - Lăng Cô (`dothi-chan-may.geojson`), không dùng thị trấn Lăng Cô và không dùng ranh ba xã của KVĐT Chân Mây. Sau 2030, Phú Vinh, Phú Vang, Hưng Lộc và Khe Tre dùng polygon cả xã trong `urbanVision` (id `vinh-thanh`, `phu-da`, `loc-son`, `khe-tre`). Phú Hồ không có id trong `urbanVision`; dùng `generalPlan` #phu-ho. Chỉ để «(chưa có ranh)» khi không còn polygon trong các lớp đô thị đã có.
 
 Không có trong repo, cột để «—»:
 
-- Dân số dự báo đến 2030 và sau 2030 (`URBANS`, `URBANS_VISION`, `GENERAL_PLANS` không có số dân kỳ quy hoạch).
-- Dân số phần đô thị của sáu đô thị một phần xã (chỉ có km², không ước theo tỷ lệ dân).
-- km² riêng của đô thị Sịa, Lăng Cô, Thanh Hà (không có trong `PART_BOUNDS`).
+- Dân số dự báo đến 2030 và sau 2030.
+- Dân số đô thị chỉ chiếm một phần đơn vị (không ước theo tỷ lệ dân). Dân số phạm vi đã công nhận của Đô thị Huế hiện trạng không có số riêng.
+- km² khi chưa có polygon đúng phạm vi.
 - km² và dân số của «Các vùng còn lại» (`hue-outer`).
+
+## Phác thảo
+
+Hình chỉ trong phiên làm việc (bộ nhớ trang), không ghi máy chủ. Bấm một đường hoặc đa giác để chọn. Chuột phải trên hình mở menu phác thảo, có «Điều chỉnh»; chuột phải chỗ khác vẫn là menu bản đồ. «Điều chỉnh» hiện núm đỉnh và núm giữa cạnh (chèn đỉnh). Kéo núm bằng chuột hoặc chạm: bản đồ không kéo theo khi đang giữ núm; hình và số đo cập nhật ngay. Chuột phải núm đỉnh: «Xóa đỉnh» (đường giữ ít nhất 2 đỉnh, đa giác ít nhất 3). Xong bằng Enter, bấm vùng trống trên bản đồ, hoặc mục «Xong». Esc hủy và trả hình về lúc bắt đầu chỉnh. Tọa độ đã ghi nằm lại đúng phiên đó.

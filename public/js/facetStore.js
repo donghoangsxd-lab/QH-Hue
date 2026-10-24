@@ -10,7 +10,7 @@ import { CORE_AREAS, GENERAL_PLANS, planLevelOf, planProjectOf } from './general
 import { namesOfProject } from './projectNames.js';
 
 export const AXES = [
-  { id: 'hanhchinh', label: 'Quản lý theo đơn vị hành chính' },
+  { id: 'hanhchinh', label: 'Quản lý phát triển đô thị' },
   { id: 'quyhoach', label: 'Hệ thống bản đồ quy hoạch' },
   { id: 'hatang', label: 'Hệ thống hạ tầng kỹ thuật' },
   { id: 'xahoi', label: 'Hệ thống hạ tầng xã hội' },

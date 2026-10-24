@@ -3,7 +3,7 @@
 // và nét ranh phạm vi trên bản đồ (data/generalPlan.geojson). Khu vực vùng lõi là mục con của QHC thành phố Huế.
 // Chọn ở panel phải hay bảng dưới đều dùng chung picked; không import uiComponents.js (tránh vòng import), mở trang bằng nút sẵn có.
 import { state } from './state.js';
-import { map, highlightWardNames, focusWard, getLeftObstruction, getRightObstruction } from './mapEngine.js';
+import { map, highlightWardNames, highlightWardBoundary, focusWard, getLeftObstruction, getRightObstruction } from './mapEngine.js';
 import { planMap, isCompareOn, isSplitOn, getViewMode, onViewChange } from './planMap.js';
 import { escapeHtml, fmtNum, ico } from './utils.js';
 import { namesOfProject } from './projectNames.js';
@@ -11,7 +11,8 @@ import { loadBuiltAreas } from './wardRoads.js';
 import { measure2A, ensureClassRoads, CLASS_REF, URBANS } from './urbanClass.js';
 import { STATUS_REF, URBANS_614, bareName } from './urbanStatus.js';
 import { URBANS_VISION } from './urbanVision.js';
-import { DVHC_WARDS, DVHC_CITY } from './dvhcStats.js';
+import { DOTHI_2030, DOTHI_SAU, HT_GROUPS, HT_URBANS, NOTE_2030 } from './doThiQd756.js';
+import { DVHC_WARDS, DVHC_CITY, shortPlaceName } from './dvhcStats.js';
 import { PART_BOUNDS, loadPartGeoms, partFeature } from './urbanPartGeom.js';
 import { AREA_TP, setAreaFilter, parseKv } from './facetStore.js';
 import { getLevel } from './mapLevel.js';
@@ -47,10 +48,6 @@ let scopeId = null;
 
 const ctx = () => ({ wards: state.wardStatsData || [], catalog: state.projectCatalog || [], measure2A });
 const pctText = (p) => (p == null ? '—' : `${Math.round(p * 100)}%`);
-const GP_STATUS_SHORT = {
-  unknown: 'Chưa rõ', none: 'Chưa lập', drafting: 'Đang lập',
-  review: 'Thẩm định', approved: 'Đã duyệt', revising: 'Điều chỉnh'
-};
 const meterHtml = (ratio, level) => `<span class="uc-meter lv-${level}"><i style="width:${ratio == null ? 0 : (ratio * 100).toFixed(1)}%"></i></span>`;
 const levelCls = (level) => (level === 'hi' ? 'c-green' : level === 'no' ? 'c-red' : level === 'wait' ? 'uc-skip' : 'c-orange');
 const statusChip = (plan) => (plan.parent
@@ -197,9 +194,45 @@ function openPage() {
   document.querySelector(`#part2Dots i[data-page="${GP_PAGE}"]`)?.click();
 }
 
-function pick(id, { page = false } = {}) {
+const geomPromises = new Map();
+
+function loadGeom(file) {
+  if (file === SCOPE_URL) return loadScopes();
+  if (!geomPromises.has(file)) {
+    const pending = fetch(file)
+      .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .catch(err => { geomPromises.delete(file); throw err; });
+    geomPromises.set(file, pending);
+  }
+  return geomPromises.get(file);
+}
+
+// Danh sách Đô thị: vẽ đúng polygon đã dẫn, hoặc ranh thành phố với dòng quy hoạch Huế.
+// Dòng chưa có ranh chỉ bỏ lớp cũ, không gọi showScope (showScope sẽ lấy ranh cả xã trong generalPlan).
+function showListGeom(id, { geom, cityPlan } = {}) {
+  clearScope();
+  highlightWardBoundary('', { fitView: false });
+  if (!id) return;
+  scopeId = id;
+  if (cityPlan) {
+    focusWard(DVHC_CITY.name);
+    return;
+  }
+  if (!geom || !geom.file || !geom.id) return;
+  const token = id;
+  loadGeom(geom.file).then(fc => {
+    if (scopeId !== token) return;
+    const feature = (fc.features || []).find(f => f.properties && f.properties.id === geom.id);
+    if (!feature) return;
+    paintGeom(token, feature);
+  }).catch(err => console.warn('Đô thị – không tải được ranh:', err));
+}
+
+function pick(id, { page = false, list = false, geom = null, cityPlan = false } = {}) {
   picked = id;
-  if (id) showScope(id); else clearScope();
+  if (list) showListGeom(id, { geom, cityPlan });
+  else if (id) showScope(id);
+  else clearScope();
   renderPanel();
   if (page) openPage();
   else rerenderPage?.();
@@ -208,68 +241,11 @@ function pick(id, { page = false } = {}) {
 /** Mở hồ sơ một QHC ở trang Quy hoạch chung (bảng dưới) và vẽ phạm vi */
 export const showGeneralPlan = (id) => pick(id, { page: true });
 
-// ---------- Panel phải: mục Đô thị ----------
-// Đô thị là dòng chính; QHC, QHPK, mức trưởng thành là thông tin phụ. Khu vực vùng lõi theo QHC thành phố Huế (1/10.000)
-const URBAN_GROUPS = [
-  { title: 'Đô thị loại I', list: () => [CITY_PLAN] },
-  { title: 'Khu vực đô thị loại II', list: () => CORE_AREAS.filter(a => a.cls === 'II') },
-  { title: 'Khu vực đô thị loại III', list: () => CORE_AREAS.filter(a => a.cls === 'III') },
-  { title: 'Đô thị loại III', list: () => GENERAL_PLANS.filter(p => !p.city) }
-];
-
-function panelRow(plan, c, here, n) {
-  const kids = childProjects(plan, c.catalog).length;
-  const mat = c.wards.length ? maturityOf(plan, c) : null;
-  const cls = ['gp-row', plan.id === picked ? 'is-sel' : '', here.has(plan.id) ? 'is-here' : ''].filter(Boolean).join(' ');
-  const pct = mat ? pctText(mat.pct) : '…';
-  const qhcFull = plan.parent ? 'Theo QHC TP Huế' : `QHC: ${GP_STATUS[plan.status]}`;
-  const qhcShort = plan.parent ? 'QHC TP Huế' : `QHC: ${GP_STATUS_SHORT[plan.status] || GP_STATUS[plan.status]}`;
-  const metaFull = `${qhcFull} · ${kids} QHPK · trưởng thành ${pct}`;
-  const parentTip = plan.parent ? ` title="Không lập QHC riêng; chỉ tiêu do ${escapeHtml(plan.parent.name)} quy định"` : '';
-  const qhc = plan.parent
-    ? `<span class="gp-st-sub"${parentTip}>Theo QHC TP Huế</span>`
-    : `<span class="gp-st-${plan.status}">QHC: ${GP_STATUS[plan.status]}</span>`;
-  const qhcCompact = plan.parent
-    ? `<span class="gp-st-sub"${parentTip}>QHC TP Huế</span>`
-    : `<span class="gp-st-${plan.status}">${escapeHtml(qhcShort)}</span>`;
-  const tip = [plan.name, plan.parent ? `Vùng lõi ${plan.parent.name} (1/10.000)` : GP_KINDS[plan.kind], clsTip(plan), metaFull].join('\n');
-  const to = plan.target !== plan.cls
-    ? `<span class="gp-to uc-${plan.target}" title="Loại định hướng">${ico('chev-right')}${plan.target}</span>` : '';
-  const kv = plan.city ? 'TP' : `dothi:${plan.id}`;
-  return `<button type="button" class="${cls}" data-gp-pick="${plan.id}" data-kv="${escapeHtml(kv)}" title="${escapeHtml(tip)}">
-      <b class="gp-cls uc-${plan.cls}">${plan.cls}</b>
-      <span class="gp-name"><span class="axis-num">${n}.</span>${escapeHtml(plan.short)}</span>
-      ${to}
-      <small class="gp-meta" title="${escapeHtml(metaFull)}"><span class="gp-meta-full">${qhc} · ${kids} QHPK · trưởng thành ${pct}</span><span class="gp-meta-short">${qhcCompact} · ${kids} QHPK · ${pct}</span></small>
-    </button>`;
-}
-
-// Tab Đô thị: lớp Phân loại đô thị (chk_urban) bật thì mọi đô thị trong danh sách đều đang hiện trên bản đồ
+// Tab Đô thị: lớp Phân loại đô thị (chk_urban). Mẫu số là 14 đô thị Phụ lục I QĐ 614.
 let urbanTotal = 0;
 function paintUrbanCount() {
   const count = $('urbanTabCount');
   if (count) count.textContent = `(${$('chk_urban')?.checked ? urbanTotal : 0}/${urbanTotal})`;
-}
-
-function orphanTowns() {
-  const known = new Set([...GENERAL_PLANS, ...CORE_AREAS].map(p => p.id));
-  const rows = [];
-  for (const u of URBANS_614) {
-    if (u.city || known.has(u.id)) continue;
-    rows.push({ id: u.id, cls: u.cls || 'III', name: u.name, tip: u.scope || u.name });
-  }
-  for (const z of CITY_PLAN.zones || []) {
-    if (known.has(z.id)) continue;
-    rows.push({ id: z.id, cls: 'I', name: z.name, tip: z.scale ? `Tỷ lệ ${z.scale}` : z.name });
-  }
-  return rows;
-}
-
-function extraRow(item, n) {
-  return `<button type="button" class="gp-row" data-kv="dothi:${escapeHtml(item.id)}" title="${escapeHtml(item.tip || item.name)}">
-      <b class="gp-cls uc-${escapeHtml(item.cls)}">${escapeHtml(item.cls)}</b>
-      <span class="gp-name"><span class="axis-num">${n}.</span>${escapeHtml(item.name)}</span>
-    </button>`;
 }
 
 function wardStat(short) {
@@ -325,55 +301,71 @@ function statCell(value, fmt) {
 }
 
 function isCityRow(raw) {
-  const item = resolved(raw);
+  const item = raw && raw.qd756 ? raw : resolved(raw);
   const name = item.short || item.name;
   return item.id === 'hue' || item.city === true || name === DVHC_CITY.name;
 }
 
-function areaBtn(raw, n, period) {
-  const item = resolved(raw);
-  const stats = statsFor(item, period);
-  const pop = statCell(stats.pop, POP_FMT);
-  const km = statCell(stats.km2, KM_FMT);
-  const name = item.short || item.name;
-  const city = isCityRow(item);
-  const kv = city ? 'TP' : `dothi:${item.id}`;
-  const on = item.id === picked;
-  const num = city ? '' : `${n}.`;
-  return `<button type="button" class="axis-area gp-row${city ? ' axis-area-city' : ''}${on ? ' active' : ''}" data-gp-pick="${escapeHtml(item.id)}" data-kv="${escapeHtml(kv)}" aria-pressed="${on}" title="${escapeHtml(`${name}: dân số ${pop}, diện tích ${km} km²`)}"><span class="axis-num">${num}</span><span class="axis-area-name">${escapeHtml(name)}</span><span class="axis-area-pop">${pop}</span><span class="axis-area-km">${km}</span></button>`;
+function tagHtml(item) {
+  const tags = [];
+  if (item.strive) tags.push('(phấn đấu)');
+  if (item.core) tags.push(`(lõi: ${item.core})`);
+  if (item.missing) tags.push('(chưa có ranh)');
+  if (!tags.length) return '';
+  return tags.map(text => `<span class="axis-tag">${escapeHtml(text)}</span>`).join('');
 }
 
-function numberedRows(list, period) {
+function areaBtn(raw, n, period) {
+  const qd = !!(raw && raw.qd756);
+  const item = qd ? raw : resolved(raw);
+  const stats = qd
+    ? { pop: period === 'ht' ? item.pop : null, km2: item.km2 }
+    : statsFor(item, period);
+  const pop = statCell(stats.pop, POP_FMT);
+  const km = statCell(stats.km2, KM_FMT);
+  const full = item.name || item.short || '';
+  const name = shortPlaceName(item.short || item.name);
+  const city = isCityRow(item);
+  const kv = item.kv || (city ? 'TP' : `dothi:${item.id}`);
+  const on = item.id === picked;
+  const num = `${n}.`;
+  const tags = qd ? tagHtml(item) : '';
+  const nameCls = tags ? 'axis-area-name has-tags' : 'axis-area-name';
+  const nameInner = tags ? `<span class="axis-area-label">${escapeHtml(name)}</span>${tags}` : escapeHtml(name);
+  const mark = city || item.hue ? ' axis-area-city' : '';
+  const geom = item.geom;
+  const qdAttr = qd
+    ? ` data-gp-qd="1"${item.cityPlan ? ' data-gp-city="1"' : ''}${geom ? ` data-gp-file="${escapeHtml(geom.file)}" data-gp-geom="${escapeHtml(geom.id)}"` : ''}`
+    : '';
+  const tipBase = item.tip || `${full}: dân số ${pop}, diện tích ${km} km²`;
+  const tip = full && !tipBase.includes(full) ? `${full}. ${tipBase}` : tipBase;
+  return `<button type="button" class="axis-area gp-row${mark}${on ? ' active' : ''}" data-gp-pick="${escapeHtml(item.id)}" data-kv="${escapeHtml(kv)}" data-name="${escapeHtml(full)}"${qdAttr} aria-pressed="${on}" title="${escapeHtml(tip)}"><span class="axis-num">${num}</span><span class="${nameCls}">${nameInner}</span><span class="axis-area-pop">${pop}</span><span class="axis-area-km">${km}</span></button>`;
+}
+
+function groupHtml(groups, period) {
   let n = 0;
-  return list.map(item => areaBtn(item, isCityRow(item) ? null : ++n, period)).join('');
+  return groups.map(g => {
+    const rows = g.rows.map(item => areaBtn(item, ++n, period)).join('');
+    return `<div class="gp-grp">${escapeHtml(g.title)}</div>${rows}`;
+  }).join('');
 }
 
 const AREA_HEAD = `<div class="axis-area-head"><span class="axis-num"></span><span class="axis-area-name">Đô thị</span><span class="axis-area-pop">Dân số</span><span class="axis-area-km">km²</span></div>`;
-
-function htItems() {
-  const groups = URBAN_GROUPS.map(g => ({ title: g.title, list: g.list() })).filter(g => g.list.length);
-  const bucket = { 'Đô thị loại I': [], 'Khu vực đô thị loại II': [], 'Đô thị loại III': [] };
-  for (const item of orphanTowns()) (bucket[item.cls === 'I' ? 'Đô thị loại I' : item.cls === 'II' ? 'Khu vực đô thị loại II' : 'Đô thị loại III'] || []).push(item);
-  const rows = [];
-  groups.forEach(g => {
-    rows.push(...g.list, ...(bucket[g.title] || []));
-  });
-  return rows;
-}
 
 function renderPanel() {
   const box = $('gpList');
   if (!box) return;
   const htOn = getViewMode() === 'HT';
-  const ht = htItems();
-  urbanTotal = ht.length;
+  urbanTotal = HT_URBANS.length;
   paintUrbanCount();
-  const plan = gpPeriod === 'vision' ? URBANS_VISION : URBANS;
-  const qhHtml = numberedRows(plan, 'qh');
-  const htHtml = htOn
-    ? `<div class="gp-grp">Hiện trạng</div>${AREA_HEAD}${numberedRows(ht, 'ht')}`
-    : '';
-  box.innerHTML = `<div class="gp-grp">Quy hoạch</div><div class="admin-tabs gp-periods" role="tablist" aria-label="Giai đoạn quy hoạch đô thị"><button type="button" class="admin-tab${gpPeriod === '2030' ? ' active' : ''}" data-gp-period="2030" aria-selected="${gpPeriod === '2030'}">Đến 2030</button><button type="button" class="admin-tab${gpPeriod === 'vision' ? ' active' : ''}" data-gp-period="vision" aria-selected="${gpPeriod === 'vision'}">Sau 2030</button></div>${AREA_HEAD}${qhHtml}${htHtml}`;
+  if (htOn) {
+    box.innerHTML = `<div class="gp-sec">Hiện trạng</div>${AREA_HEAD}${groupHtml(HT_GROUPS, 'ht')}`;
+    return;
+  }
+  const groups = gpPeriod === 'vision' ? DOTHI_SAU : DOTHI_2030;
+  const note = gpPeriod === 'vision' ? '' : `<p class="gp-qd-note">${escapeHtml(NOTE_2030)}</p>`;
+  const periods = `<div class="admin-tabs gp-periods" role="tablist" aria-label="Giai đoạn quy hoạch đô thị"><button type="button" class="admin-tab${gpPeriod === '2030' ? ' active' : ''}" data-gp-period="2030" aria-selected="${gpPeriod === '2030'}">Đến 2030</button><button type="button" class="admin-tab${gpPeriod === 'vision' ? ' active' : ''}" data-gp-period="vision" aria-selected="${gpPeriod === 'vision'}">Sau 2030</button></div>`;
+  box.innerHTML = `<div class="gp-sec">Quy hoạch</div>${periods}${AREA_HEAD}${groupHtml(groups, 'qh')}${note}`;
 }
 
 export const refreshGeneralPlanPanel = renderPanel;
@@ -624,11 +616,20 @@ export function initGeneralPlanEvents(el, rerender) {
     const id = row.dataset.gpPick;
     const area = parseKv(row.dataset.kv) || { ...AREA_TP };
     setAreaFilter(area, 'user');
+    if (row.dataset.gpQd === '1') {
+      if (id === picked) pick(null, { list: true });
+      else {
+        const geom = row.dataset.gpFile ? { file: row.dataset.gpFile, id: row.dataset.gpGeom } : null;
+        pick(id, { list: true, geom, cityPlan: row.dataset.gpCity === '1' });
+      }
+      return;
+    }
     if (id === 'hue' || area.type === 'tp') focusWard(DVHC_CITY.name);
     if (id === picked && scopeLayers.length) pick(null);
     else pick(id);
   });
   onViewChange(() => renderPanel());
+  document.addEventListener('qh:view-column', renderPanel);
   document.addEventListener('qh:admin-release', () => { if (picked) pick(null); });
   document.addEventListener('cadparcels:loaded', renderPanel);
   $('chk_urban')?.addEventListener('change', paintUrbanCount);
