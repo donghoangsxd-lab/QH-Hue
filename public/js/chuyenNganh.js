@@ -15,6 +15,7 @@ import {
   setAreaFilter, readFacetUrl, loadFacetCatalog, onFacet, schemesAt, schemesForSector, layersFor, baseLayers, browseState
 } from './facetStore.js';
 import { DVHC_CITY, dvhcOf } from './dvhcStats.js';
+import { wardMarks, PLAN_FOOT } from './doThiQd756.js';
 
 const STORE_KEY = 'qh_axes_v1';
 const EXTRA_CHECKS = ['chk_gt25', 'chk_gt10', 'chk_gt25rail', 'chk_gt10rail', 'chk_bound', 'chk_urban', 'chk_projects', 'chk_qhct'];
@@ -336,6 +337,11 @@ function paintAdminList() {
   const current = formatKv(getAreaFilter() || AREA_TP);
   const q = layerQuery.trim().toLowerCase();
   const hit = (...parts) => !q || parts.some(p => String(p || '').toLowerCase().includes(q));
+  const lvCell = (text, title) => {
+    const muted = text === '—';
+    const tip = title ? ` title="${escapeHtml(title)}"` : '';
+    return `<span class="axis-lv${muted ? ' is-muted' : ''}"${tip}>${escapeHtml(text)}</span>`;
+  };
   const button = (area, label, num) => {
     const kv = formatKv(area);
     const on = kv === current;
@@ -343,17 +349,23 @@ function paintAdminList() {
     const pop = statText(stats && stats.pop, POP_FMT);
     const km = statText(stats && stats.km2, KM_FMT);
     const numHtml = num ? `${num}.` : '';
-    return `<button type="button" class="axis-area${area.type === 'tp' ? ' axis-area-city' : ''}${on ? ' active' : ''}" data-kv="${escapeHtml(kv)}" aria-pressed="${on}" title="${escapeHtml(`${label}: dân số ${pop}, diện tích ${km} km²`)}"><span class="axis-num">${numHtml}</span><span class="axis-area-name">${escapeHtml(label)}</span><span class="axis-area-pop">${escapeHtml(pop)}</span><span class="axis-area-km">${escapeHtml(km)}</span></button>`;
+    const marks = wardMarks(label);
+    const bits = [`${label}: dân số ${pop}, diện tích ${km} km²`];
+    if (marks.ht !== '—') bits.push(`HT ${marks.ht}${marks.htTitle ? ` (${marks.htTitle})` : ''}`);
+    if (marks.plan !== '—') bits.push(`2030 ${marks.plan}${marks.planTitle ? ` (${marks.planTitle})` : ''}`);
+    if (marks.note) bits.push(`Ghi chú: ${marks.note}`);
+    return `<button type="button" class="axis-area axis-dvhc${area.type === 'tp' ? ' axis-area-city' : ''}${on ? ' active' : ''}" data-kv="${escapeHtml(kv)}" aria-pressed="${on}" title="${escapeHtml(bits.join('. '))}"><span class="axis-num">${numHtml}</span><span class="axis-area-name">${escapeHtml(label)}</span><span class="axis-area-pop">${escapeHtml(pop)}</span><span class="axis-area-km">${escapeHtml(km)}</span>${lvCell(marks.ht, marks.htTitle)}${lvCell(marks.plan, marks.planTitle)}</button>`;
   };
   const wards = listAreas('xa');
   const tp = listAreas('tp')[0] || { ...AREA_TP, name: DVHC_CITY.name };
-  const rows = [`<div class="axis-area-head"><span class="axis-num"></span><span class="axis-area-name">Đơn vị</span><span class="axis-area-pop">Dân số</span><span class="axis-area-km">km²</span></div>`];
+  const rows = [`<div class="axis-area-head axis-dvhc"><span class="axis-num"></span><span class="axis-area-name">Đơn vị</span><span class="axis-area-pop">Dân số</span><span class="axis-area-km">km²</span><span class="axis-lv" title="Trình độ phát triển đô thị hiện trạng theo QĐ 614">HT</span><span class="axis-lv" title="Trình độ định hướng đến 2030 theo QĐ 756">2030</span></div>`];
   if (hit(DVHC_CITY.name, tp.name, 'TP')) rows.push(button({ ...tp, type: 'tp' }, DVHC_CITY.name, null));
   wards.forEach((area, i) => {
     if (hit(area.name, area.code)) rows.push(button(area, area.name, i + 1));
   });
   const onlyHead = rows.length === 1;
-  wardsHost.innerHTML = onlyHead ? (q ? '<p class="cn-empty">Không khớp</p>' : rows[0]) : rows.join('');
+  const foot = `<p class="axis-qd-foot">${escapeHtml(PLAN_FOOT)}</p>`;
+  wardsHost.innerHTML = (onlyHead ? (q ? '<p class="cn-empty">Không khớp</p>' : rows[0]) : rows.join('')) + foot;
   wardsHost.scrollTop = top;
   if (tools) tools.innerHTML = '';
   filterGp();

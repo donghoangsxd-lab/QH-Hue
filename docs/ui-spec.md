@@ -26,10 +26,10 @@ Hàng dưới tiêu đề: một ô tìm kiếm, một nút HT/QH, một nút b�
 
 Tab trên ô tìm kiếm: `Đơn vị hành chính (40)`, rồi `Đô thị (25)`.
 
-- ĐVHC: dòng Thành phố Huế không số, đậm, nền vàng nhạt; 40 đơn vị đánh số. Cột dân số và km² thẳng nhau.
+- ĐVHC: dòng Thành phố Huế không số, đậm, nền vàng nhạt; 40 đơn vị đánh số 1–40. Cột một hàng, không xuống dòng: số, tên, dân số, km², HT, 2030. HT và 2030 canh giữa. Thiếu mức thì «—» mờ. HT theo QĐ 614 (tooltip: loại trước chuyển tiếp). 2030 theo QĐ 756: I / II / III / `PĐ III` (tooltip đúng câu `Phấn đấu đạt loại III`). Dưới danh sách: `Theo QĐ 756; kế hoạch nâng loại có thể thay đổi theo nghiên cứu cụ thể`. Không thêm bộ lọc theo cột này.
 - Bấm một dòng (đơn vị, đô thị, hoặc Thành phố Huế) phóng tới và tô cả ranh. Thành phố tô viền ngoài.
 - Hai tab `Đơn vị hành chính (40)` và `Đô thị (25)` cùng một hàng, chữ không chồng, không cắt ở bề rộng panel.
-- Đô thị: không nút «Hệ thống đô thị» (trùng ô Phân loại đô thị). Mục Quy hoạch đứng trước, hai tab `Đến 2030` và `Sau 2030` ngay đầu danh sách. Mục Hiện trạng chỉ hiện khi bấm HT (mặc định đang QH thì ẩn), nối phía dưới. Dòng Thành phố Huế không số; các đô thị đánh số từ 1. Mỗi dòng cùng lưới dân số / km² với ĐVHC.
+- Đô thị: không nút «Hệ thống đô thị» (trùng ô Phân loại đô thị). Mục Quy hoạch đứng trước, hai tab `Đến 2030` và `Sau 2030` ngay đầu danh sách. Mục Hiện trạng chỉ hiện khi bấm HT (mặc định đang QH thì ẩn), nối phía dưới. Cả ba danh sách (Hiện trạng, Đến 2030, Sau 2030) đánh số Huế là dòng 1, các đô thị sau tiếp tục. Tab ĐVHC vẫn để Thành phố Huế không số. Nhóm `Loại I`, `Loại II`, `Loại III`. Nhãn `(phấn đấu)`, `(lõi: …)`, `(chưa có ranh)` nằm cuối tên, không bị cắt. Bấm dòng có ranh thì phóng và tô polygon đó. Dòng quy hoạch Thành phố Huế tô ranh thành phố. Dòng chưa có ranh không vẽ. Mỗi dòng lưới dân số / km².
 
 ### Quy hoạch
 
@@ -75,17 +75,19 @@ Một bộ biến cho mọi trục và chú giải, trong `public/css/style.css`
 
 ## Danh sách và ranh
 
-- Lưới ĐVHC và đô thị: số, tên, dân số, km². Thiếu số thì «—», không bịa.
+- Lưới đô thị: số, tên, dân số, km². Lưới ĐVHC thêm HT và 2030. Thiếu số thì «—», không bịa. Huế trong tab Đô thị có số 1; Thành phố Huế trong tab ĐVHC không số.
 - Ranh trong giữa các phường/xã: nét mảnh `#334155`. Chỉ ranh ngoài thành phố có quầng sáng.
 - Dòng Thành phố Huế: đậm, nền `#fef3c7`.
 
 ## Số liệu không bịa
 
-Chỉ số có trong repo. Dân số và diện tích ĐVHC lấy `dvhcStats.js`. Diện tích đô thị ghép trọn đơn vị là tổng km² các đơn vị đó. Đô thị một phần xã lấy km² trong `PART_BOUNDS` nếu có.
+Chỉ số có trong repo. Dân số và diện tích ĐVHC lấy `dvhcStats.js`. Danh sách Đô thị theo QĐ 756 và QĐ 614 lấy km² từ `properties.km2` của polygon được dẫn trong `doThiQd756.js` (đã tính sẵn, không cộng lại trên máy chủ). Thành phố Huế ở kỳ quy hoạch dùng km² toàn thành phố trong `dvhcStats`. Dân số hiện trạng chỉ cộng khi phạm vi đã công nhận phủ trọn các đơn vị hiện nay (Hương Thủy, Hương Trà).
+
+Đô thị cấp xã (Vinh Thanh, Phú Đa, Lộc Sơn, Khe Tre, Phú Lộc, Vinh Hiền, và sau 2030 Phú Hồ, Phú Vinh, Phú Vang, Hưng Lộc, Khe Tre) không lấy ranh cả xã. Có polygon lõi thì dùng polygon đó; không có thì «(chưa có ranh)». `urban614` #hue là hợp 40 đơn vị, không phải phạm vi TP Huế đã công nhận. Đô thị Chân Mây – Lăng Cô đến 2030 không dùng ranh thị trấn Lăng Cô. Đô thị Hóa Châu đến 2030 là cả phường, không phải lõi Thanh Hà.
 
 Không có trong repo, cột để «—»:
 
-- Dân số dự báo đến 2030 và sau 2030 (`URBANS`, `URBANS_VISION`, `GENERAL_PLANS` không có số dân kỳ quy hoạch).
-- Dân số phần đô thị của sáu đô thị một phần xã (chỉ có km², không ước theo tỷ lệ dân).
-- km² riêng của đô thị Sịa, Lăng Cô, Thanh Hà (không có trong `PART_BOUNDS`).
+- Dân số dự báo đến 2030 và sau 2030.
+- Dân số đô thị chỉ chiếm một phần đơn vị (không ước theo tỷ lệ dân), kể cả Đô thị Huế hiện trạng khi chưa có ranh đã công nhận.
+- km² khi chưa có polygon đúng phạm vi.
 - km² và dân số của «Các vùng còn lại» (`hue-outer`).

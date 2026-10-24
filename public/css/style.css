@@ -2768,7 +2768,8 @@ table.gp-mat td { overflow: hidden; overflow-wrap: anywhere; }
 .gp-meta-full { display: none; }
 .gp-meta-short { display: inline; }
 .gp-st-sub { color: #fb923c; }
-.gp-grp { margin-top: 2px; font-family: var(--axis-font); font-size: var(--axis-fs-header); font-weight: 700; color: var(--axis-color-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.gp-grp, .gp-sec { margin-top: 2px; font-family: var(--axis-font); font-size: var(--axis-fs-header); font-weight: 700; color: var(--axis-color-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.gp-qd-note, .axis-qd-foot { margin: 4px 2px 2px; font-family: var(--axis-font); font-size: var(--axis-fs-chip); line-height: 1.35; color: var(--axis-color-muted); }
 .gp-to { display: inline-flex; align-items: center; font-size: var(--fs-xs); font-weight: 700; white-space: nowrap; }
 .gp-to .ico { width: 10px; height: 10px; }
 tr.gp-sub td.uc-name { padding-left: 1.4em; }
@@ -6057,12 +6058,26 @@ body.project-review.la-page #projectReviewHost {
   background: var(--bg-panel);
 }
 .axis-area-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.axis-area-name.has-tags { display: flex; align-items: center; gap: 4px; text-overflow: clip; }
+.axis-area-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.axis-tag { flex: 0 0 auto; color: var(--axis-color-muted); font-size: var(--axis-fs-chip); font-weight: 500; white-space: nowrap; }
 .axis-area-pop, .axis-area-km { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.axis-area.axis-dvhc,
+.axis-area-head.axis-dvhc {
+  grid-template-columns: 2em minmax(0, 1fr) 9.2ch 8.2ch 3.2ch 6.6ch;
+  column-gap: 3px;
+  padding-right: 1px;
+}
+.axis-lv { text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.axis-lv.is-muted { color: var(--axis-color-muted); }
 .axis-area-city,
 .axis-area-city .axis-area-name,
+.axis-area-city .axis-area-label,
 .axis-area-city .axis-area-pop,
 .axis-area-city .axis-area-km,
+.axis-area-city .axis-lv,
 .axis-area-city .axis-num { font-weight: 700; color: #1c1917; }
+.axis-area-city .axis-tag { font-weight: 500; color: var(--axis-color-muted); }
 .axis-area:hover { background: var(--axis-bg-hover); }
 .axis-area.active { background: var(--axis-bg-active); color: var(--axis-color-strong); }
 .axis-area-city { background: #fef3c7; }
