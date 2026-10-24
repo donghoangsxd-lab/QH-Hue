@@ -281,6 +281,36 @@
       "taskDecision": "2722/QĐ-UBND",
       "taskDecisionDate": "2025-06-26",
       "authority": "UBND phường Thanh Thủy"
+    },
+    {
+      "slug": "qhc-xa-huong-huu-cb7f4149",
+      "name": "QHC xã Hương Hữu",
+      "level": "QHC",
+      "mapid": 20800,
+      "parent": null,
+      "overrides": [],
+      "priority": 1,
+      "scale": 25000,
+      "area": {
+        "type": "xa",
+        "code": "nam-dong"
+      },
+      "authority": "UBND huyện Nam Đông"
+    },
+    {
+      "slug": "qhc-xa-huong-loc-1487608f",
+      "name": "QHC xã Hương Lộc",
+      "level": "QHC",
+      "mapid": 20799,
+      "parent": null,
+      "overrides": [],
+      "priority": 1,
+      "scale": 25000,
+      "area": {
+        "type": "xa",
+        "code": "nam-dong"
+      },
+      "authority": "UBND huyện Nam Đông"
     }
   ]
 }

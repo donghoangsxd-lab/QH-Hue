@@ -26,6 +26,8 @@ Bộ dữ liệu hạ tầng chuyên ngành, gắn tab Hạ tầng. Mô hình b�
 | qhct-nghia-trang-nhan-dan-phia-nam-7bbdf92c | QHCT Nghĩa trang Nhân dân phía Nam | QHCT | 23953 | 3 |
 | qhct-tram-trung-chuyen-dieu-ap-phu-bai-36fb0207 | QHCT Trạm trung chuyển điều áp Phú Bài | QHCT | 23946 | 3 |
 | qhct-khu-do-thi-sinh-thai-thanh-thuy-93bfd064 | QHCT Khu đô thị sinh thái Thanh Thủy | QHCT | 23954 | 3 |
+| qhc-xa-huong-huu-cb7f4149 | QHC xã Hương Hữu | QHC | 20800 | 1 |
+| qhc-xa-huong-loc-1487608f | QHC xã Hương Lộc | QHC | 20799 | 1 |
 
 QHC Khu công nghiệp Phong Điền nằm trong QHC đô thị Phong Điền. Trong ranh KCN, KCN ghi đè Phong Điền (`overrides`, `overrideArea: ranh KCN`, priority 2 > 1). Không cắt dữ liệu.
 
@@ -506,6 +508,45 @@ Metadata bản đồ gServer không có số quyết định. Số dưới đây
 | QHC xã Thượng Long | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Điểm chức năng | Point | 19 |
 | QHC xã Thượng Long | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch(dạng đường) | LineString | 1 |
 | QHC xã Thượng Long | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch(dạng vùng) | Polygon | 1 |
+| QHC xã Hương Hữu | Giao thông | Hiện trạng | Hiện trạng mạng lưới giao thông | LineString | 42 |
+| QHC xã Hương Hữu | Giao thông | Quy hoạch | Bó vĩa | LineString | 118 |
+| QHC xã Hương Hữu | Giao thông | Quy hoạch | Mạng lưới giao thông | LineString | 69 |
+| QHC xã Hương Hữu | Giao thông | Quy hoạch | Mặt cắt | LineString | 86 |
+| QHC xã Hương Hữu | Giao thông | Quy hoạch | Mặt đường bộ | Polygon | 2 |
+| QHC xã Hương Hữu | Cấp nước | Quy hoạch | Mạng lưới cấp nước | LineString | 16 |
+| QHC xã Hương Hữu | Cấp điện | Quy hoạch | Công trình cấp điện | Polygon | 2 |
+| QHC xã Hương Hữu | Cấp điện | Quy hoạch | Mạng lưới phân phối điện | LineString | 2 |
+| QHC xã Hương Hữu | San nền và thoát nước mưa | Quy hoạch | Công trình tiêu thoát nước | Polygon | 2 |
+| QHC xã Hương Hữu | San nền và thoát nước mưa | Quy hoạch | Công trình tiêu thoát nước dạng đường | LineString | 8 |
+| QHC xã Hương Hữu | San nền và thoát nước mưa | Quy hoạch | Mạng lưới thoát nước mưa | LineString | 10 |
+| QHC xã Hương Hữu | San nền và thoát nước mưa | Quy hoạch | Quy hoạch chiều cao | Point | 26 |
+| QHC xã Hương Hữu | Chất thải rắn và nghĩa trang | Quy hoạch | Điểm xử lý chất thải rắn | Point | 7 |
+| QHC xã Hương Hữu | Chất thải rắn và nghĩa trang | Quy hoạch | Mạng lưới nghĩa trang | Point | 4 |
+| QHC xã Hương Hữu | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng điểm chức năng | Point | 14 |
+| QHC xã Hương Hữu | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng sử dụng đất | Polygon | 4802 |
+| QHC xã Hương Hữu | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chỉ giới đường đỏ | LineString | 60 |
+| QHC xã Hương Hữu | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chức năng sử dụng đất | Polygon | 4743 |
+| QHC xã Hương Hữu | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Đánh giá tổng hợp lựa chọn đất xây dựng | Polygon | 10 |
+| QHC xã Hương Hữu | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Điểm chức năng | Point | 19 |
+| QHC xã Hương Hữu | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Phân khu chức năng | Polygon | 7 |
+| QHC xã Hương Hữu | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch (dạng đường) | LineString | 1 |
+| QHC xã Hương Hữu | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch(dạng vùng) | Polygon | 1 |
+| QHC xã Hương Lộc | Giao thông | Quy hoạch | Bó vĩa | LineString | 145 |
+| QHC xã Hương Lộc | Giao thông | Quy hoạch | Mạng lưới giao thông | LineString | 70 |
+| QHC xã Hương Lộc | Giao thông | Quy hoạch | Mặt cắt | LineString | 66 |
+| QHC xã Hương Lộc | Giao thông | Quy hoạch | Mặt đường bộ | Polygon | 2 |
+| QHC xã Hương Lộc | Cấp nước | Quy hoạch | Mạng lưới cấp nước | LineString | 16 |
+| QHC xã Hương Lộc | Cấp điện | Quy hoạch | Mạng lưới phân phối điện | LineString | 2 |
+| QHC xã Hương Lộc | San nền và thoát nước mưa | Quy hoạch | Quy hoạch chiều cao | Point | 22 |
+| QHC xã Hương Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng điểm chức năng | Point | 17 |
+| QHC xã Hương Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng sử dụng đất | Polygon | 388 |
+| QHC xã Hương Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chỉ giới đường đỏ | LineString | 90 |
+| QHC xã Hương Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chức năng sử dụng đất | Polygon | 478 |
+| QHC xã Hương Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Đánh giá tổng hợp lựa chọn đất xây dựng | Polygon | 17 |
+| QHC xã Hương Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Điểm chức năng | Point | 17 |
+| QHC xã Hương Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Phân khu chức năng | Polygon | 4 |
+| QHC xã Hương Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch (dạng vùng) | Polygon | 1 |
+| QHC xã Hương Lộc | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch (dạng đường) | LineString | 1 |
 
 ## Khoảng trống
 
@@ -629,6 +670,24 @@ Metadata bản đồ gServer không có số quyết định. Số dưới đây
 - QHCT Khu đô thị sinh thái Thanh Thủy — Chất thải rắn và nghĩa trang — Hiện trạng
 - QHCT Khu đô thị sinh thái Thanh Thủy — Chất thải rắn và nghĩa trang — Quy hoạch
 - QHCT Khu đô thị sinh thái Thanh Thủy — Thông tin liên lạc — Hiện trạng
+- QHC xã Hương Hữu — Cấp nước — Hiện trạng
+- QHC xã Hương Hữu — Cấp điện — Hiện trạng
+- QHC xã Hương Hữu — San nền và thoát nước mưa — Hiện trạng
+- QHC xã Hương Hữu — Thoát nước thải — Hiện trạng
+- QHC xã Hương Hữu — Thoát nước thải — Quy hoạch
+- QHC xã Hương Hữu — Chất thải rắn và nghĩa trang — Hiện trạng
+- QHC xã Hương Hữu — Thông tin liên lạc — Hiện trạng
+- QHC xã Hương Hữu — Thông tin liên lạc — Quy hoạch
+- QHC xã Hương Lộc — Giao thông — Hiện trạng
+- QHC xã Hương Lộc — Cấp nước — Hiện trạng
+- QHC xã Hương Lộc — Cấp điện — Hiện trạng
+- QHC xã Hương Lộc — San nền và thoát nước mưa — Hiện trạng
+- QHC xã Hương Lộc — Thoát nước thải — Hiện trạng
+- QHC xã Hương Lộc — Thoát nước thải — Quy hoạch
+- QHC xã Hương Lộc — Chất thải rắn và nghĩa trang — Hiện trạng
+- QHC xã Hương Lộc — Chất thải rắn và nghĩa trang — Quy hoạch
+- QHC xã Hương Lộc — Thông tin liên lạc — Hiện trạng
+- QHC xã Hương Lộc — Thông tin liên lạc — Quy hoạch
 
 ## Hiện trạng tạm thời
 

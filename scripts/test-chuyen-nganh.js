@@ -77,7 +77,9 @@ assert.strictEqual(landUseName('Ranh giới quy hoạch'), false);
 
 const index = JSON.parse(fs.readFileSync('public/data/su-dung-dat-index.json', 'utf8'));
 assert.strictEqual(index.count, index.layers.length);
-assert.strictEqual(index.count, 95);
+assert.strictEqual(index.count, 99);
+assert.ok(index.layers.some(l => l.mapid === 20800 && l.role === 'quy-hoach' && l.scheme === 'qhc-xa-huong-huu-cb7f4149'));
+assert.ok(index.layers.some(l => l.mapid === 20799 && l.role === 'hien-trang' && l.scheme === 'qhc-xa-huong-loc-1487608f'));
 assert.ok(index.layers.some(l => l.scheme === 'qhc-hue-2045' && l.path === 'data/qhc2045/dinhhuong.json' && l.mapid === 21817));
 assert.ok(index.layers.some(l => l.scheme === 'qhc-trung-tam' && l.path === 'data/qhc2045/sdd.json' && l.mapid === 21817));
 assert.ok(index.layers.some(l => l.scheme === 'qhc-khe-tre-4a4803cd' && l.layer === 'su-dung-dat' && l.mapid === 20778));
