@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { shortPlaceName } from '../public/js/dvhcStats.js';
+import { createSketchEditSession, minVertices } from '../public/js/sketchEdit.js';
 
 const root = new URL('..', import.meta.url);
 const read = (rel) => fs.readFileSync(new URL(rel, root), 'utf8');
@@ -258,5 +259,77 @@ assert.equal(shortPlaceName('Phường Thuận An'), 'P. Thuận An');
 assert.equal(shortPlaceName('Xã A Lưới 1'), 'X. A Lưới 1');
 assert.equal(shortPlaceName('Đô thị Huế'), 'Đô thị Huế');
 assert.equal(shortPlaceName('Khu vực đô thị A'), 'Khu vực đô thị A');
+
+const spec = read('docs/ui-spec.md');
+assert.match(spec, /## Phác thảo/);
+assert.match(spec, /Điều chỉnh/);
+assert.match(spec, /Xóa đỉnh/);
+assert.match(spec, /Esc hủy/);
+
+const sketch = read('public/js/sketchLayer.js');
+assert.match(sketch, /selectShape\(fg\)/);
+assert.match(sketch, /Điều chỉnh/);
+assert.match(sketch, /Xóa đỉnh/);
+assert.match(sketch, /Xong/);
+assert.match(sketch, /dragging\.disable\(\)/);
+assert.match(sketch, /cancelAdjust\(\)/);
+assert.match(sketch, /consumeSketchMapClick/);
+assert.match(sketch, /createSketchEditSession/);
+assert.match(read('public/js/mapContext.js'), /sketch-handle/);
+assert.match(read('public/js/app.js'), /consumeSketchMapClick\(e\)/);
+
+const linePts = [
+  { lat: 16.46, lng: 107.58 },
+  { lat: 16.47, lng: 107.59 }
+];
+const line = createSketchEditSession(linePts, 'line');
+line.select();
+assert.equal(line.isSelected(), true);
+const menu = line.openMenu();
+assert.ok(menu.includes('Điều chỉnh'), 'menu có Điều chỉnh');
+assert.ok(menu.includes('Xóa hình này'));
+line.startAdjust();
+assert.ok(line.isEditing());
+assert.deepEqual(line.vertexMenu(), ['Xóa đỉnh', 'Xong']);
+assert.equal(line.deleteVertex(0).removed, false, 'đường giữ ít nhất 2 đỉnh');
+assert.equal(minVertices('line'), 2);
+assert.equal(line.workingPts().length, 2);
+const dragged = line.dragVertex(1, { lat: 16.5, lng: 107.62 });
+assert.equal(dragged[1].lat, 16.5);
+assert.equal(dragged[1].lng, 107.62);
+assert.notEqual(dragged[1].lat, linePts[1].lat);
+const restored = line.cancel();
+assert.equal(line.isEditing(), false);
+assert.equal(restored[1].lat, linePts[1].lat, 'Esc trả lại vĩ độ');
+assert.equal(restored[1].lng, linePts[1].lng, 'Esc trả lại kinh độ');
+assert.equal(line.savedPts()[1].lat, linePts[1].lat);
+
+const polyPts = [
+  { lat: 16.45, lng: 107.55 },
+  { lat: 16.46, lng: 107.55 },
+  { lat: 16.46, lng: 107.56 }
+];
+const poly = createSketchEditSession(polyPts, 'polygon');
+poly.select();
+assert.ok(poly.openMenu().includes('Điều chỉnh'));
+poly.startAdjust();
+assert.equal(minVertices('polygon'), 3);
+assert.equal(poly.deleteVertex(1).removed, false, 'đa giác giữ ít nhất 3 đỉnh');
+const mids = poly.midpoints();
+assert.equal(mids.length, 3);
+poly.insertMidpoint(mids[0].insertAt, mids[0].at);
+assert.equal(poly.workingPts().length, 4);
+poly.dragVertex(mids[0].insertAt, { lat: 16.455, lng: 107.552 });
+assert.equal(poly.workingPts()[mids[0].insertAt].lat, 16.455);
+assert.equal(poly.deleteVertex(mids[0].insertAt).removed, true);
+assert.equal(poly.workingPts().length, 3);
+const kept = poly.finish();
+assert.equal(kept.length, 3);
+assert.equal(poly.isEditing(), false);
+assert.deepEqual(poly.savedPts(), kept);
+poly.startAdjust();
+poly.dragVertex(0, { lat: 10, lng: 20 });
+assert.equal(poly.workingPts()[0].lat, 10);
+assert.deepEqual(poly.cancel(), kept);
 
 console.log('core ui ok');

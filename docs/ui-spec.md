@@ -92,3 +92,7 @@ Không có trong repo, cột để «—»:
 - Dân số đô thị chỉ chiếm một phần đơn vị (không ước theo tỷ lệ dân). Dân số phạm vi đã công nhận của Đô thị Huế hiện trạng không có số riêng.
 - km² khi chưa có polygon đúng phạm vi.
 - km² và dân số của «Các vùng còn lại» (`hue-outer`).
+
+## Phác thảo
+
+Hình chỉ trong phiên làm việc (bộ nhớ trang), không ghi máy chủ. Bấm một đường hoặc đa giác để chọn. Chuột phải trên hình mở menu phác thảo, có «Điều chỉnh»; chuột phải chỗ khác vẫn là menu bản đồ. «Điều chỉnh» hiện núm đỉnh và núm giữa cạnh (chèn đỉnh). Kéo núm bằng chuột hoặc chạm: bản đồ không kéo theo khi đang giữ núm; hình và số đo cập nhật ngay. Chuột phải núm đỉnh: «Xóa đỉnh» (đường giữ ít nhất 2 đỉnh, đa giác ít nhất 3). Xong bằng Enter, bấm vùng trống trên bản đồ, hoặc mục «Xong». Esc hủy và trả hình về lúc bắt đầu chỉnh. Tọa độ đã ghi nằm lại đúng phiên đó.

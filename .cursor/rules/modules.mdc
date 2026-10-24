@@ -47,7 +47,7 @@ Heatmap GEE dùng buffer tròn. Bám đường là Dijkstra `computeServiceArea`
 
 ## MOD-09 Đo, phác thảo, in, 3D
 
-`mapEngine.js`: `toggleMeasure`, `clearMeasure`, `handleMeasureClick`, `setMeasureListener`. `sketchLayer.js` `initSketchLayer`, `handleSketchClick`. `sketchExport.js` `exportKml`, `exportDxf`. `printLayout.js` `exportMapA3`, `captureMapScreenshot`. `printVector.js` `drawMapPaths`. `terrainProfile.js` `syncTerrainProfile`. `cadastreLayer.js` `openMeasurePlan`. `phanTich3d.js`, `view3dPanel.js` `openView3d`. 3D đọc `buildings.pmtiles` qua Range; pipeline và cache mép: MOD-20 và MOD-22.
+`mapEngine.js`: `toggleMeasure`, `clearMeasure`, `handleMeasureClick`, `setMeasureListener`. `sketchLayer.js` `initSketchLayer`, `handleSketchClick`, `consumeSketchMapClick`. `sketchEdit.js` `createSketchEditSession`. `sketchExport.js` `exportKml`, `exportDxf`. `printLayout.js` `exportMapA3`, `captureMapScreenshot`. `printVector.js` `drawMapPaths`. `terrainProfile.js` `syncTerrainProfile`. `cadastreLayer.js` `openMeasurePlan`. `phanTich3d.js`, `view3dPanel.js` `openView3d`. 3D đọc `buildings.pmtiles` qua Range; pipeline và cache mép: MOD-20 và MOD-22.
 
 ## MOD-10 Tra cứu, định vị, popup
 
