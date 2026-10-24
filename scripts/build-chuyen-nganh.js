@@ -48,7 +48,8 @@ const SCHEMES = [
   { slug: 'qhc-do-thi-moi-vinh-hung-8899f27b', name: 'QHC Đô thị mới Vinh Hưng', level: 'QHC', mapid: 22906, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', area: { type: 'xa', code: 'vinh-loc' }, decision: '193/QĐ-UBND', decisionDate: '2025-01-21', authority: 'UBND thành phố Huế' },
   { slug: KCN, name: 'QHC Khu công nghiệp Phong Điền', level: 'QHC', mapid: 22880, scale: null, parent: PHONG_DIEN, overrides: [PHONG_DIEN], overrideArea: 'ranh KCN', priority: 2, gcs: 'add', area: { type: 'dothi', code: 'phong-dien' }, boundaryFile: `data/chuyen-nganh/${KCN}/sdd/quy-hoach/ranh-gioi-quy-hoach-a.geojson` },
   { slug: PHONG_DIEN, name: 'QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045', level: 'QHC', mapid: null, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', skipLayers: true },
-  { slug: 'qhc-chan-may-lang-co-a44cfad0', name: 'QHC Chân Mây - Lăng Cô', level: 'QHC', mapid: 23935, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', catalogScheme: 'qhc-chan-may', area: { type: 'dothi', code: 'chan-may' } }
+  { slug: 'qhc-chan-may-lang-co-a44cfad0', name: 'QHC Chân Mây - Lăng Cô', level: 'QHC', mapid: 23935, scale: null, parent: null, overrides: [], priority: 1, gcs: 'exists', catalogScheme: 'qhc-chan-may', area: { type: 'dothi', code: 'chan-may' } },
+  { slug: 'qhc-xa-thuong-long-3f2c4da4', name: 'QHC xã Thượng Long', level: 'QHC', mapid: 20797, scale: 25000, parent: null, overrides: [], priority: 1, gcs: 'exists', area: { type: 'xa', code: 'long-quang' }, authority: 'UBND huyện Nam Đông, tỉnh Thừa Thiên Huế' }
 ];
 
 // Không có thư mục LOP. Bản vẽ mạng lưới đã nằm trên GCS (đồ án), chỉ ngành giao thông, quy hoạch.
@@ -414,7 +415,8 @@ function place(layers, repo, options) {
 function emptyCells(layers, options) {
   const out = [];
   const onlyFresh = !!(options && options.onlyFresh);
-  SCHEMES.filter((s) => !s.skipLayers && (!onlyFresh || s.fresh)).forEach((scheme) => {
+  const present = options && options.present;
+  SCHEMES.filter((s) => !s.skipLayers && (!onlyFresh || s.fresh) && (!present || present.has(s.slug))).forEach((scheme) => {
     SECTORS.forEach(([sector]) => {
       ['hien-trang', 'quy-hoach'].forEach((status) => {
         const hit = layers.some((l) => l.scheme === scheme.slug && l.sector === sector && l.status === status);
@@ -531,13 +533,13 @@ function docOf(manifest, heavy) {
   lines.push('');
   lines.push('QHC Khu công nghiệp Phong Điền nằm trong QHC đô thị Phong Điền. Trong ranh KCN, KCN ghi đè Phong Điền (`overrides`, `overrideArea: ranh KCN`, priority 2 > 1). Không cắt dữ liệu.');
   lines.push('');
-  lines.push('Phạm vi Hành chính gắn trên đồ án (`area` trong `schemes.json`), không suy xã nằm trong đô thị. Phú Lộc: `xa:phu-loc`. Khe Tre: `dothi:khe-tre` (`catalogScheme` `qhc-khe-tre`). Vinh Hưng: `xa:vinh-loc`. KCN Phong Điền: `dothi:phong-dien` (không gộp vào đồ án Phong Điền). Chân Mây – Lăng Cô: `dothi:chan-may` (`catalogScheme` `qhc-chan-may`). Hai đồ án mapid 21817 giữ phạm vi theo tỷ lệ (1/25.000 toàn thành phố, 1/10.000 đô thị trung tâm). Tab Hạ tầng nhóm lớp theo từng đồ án trong ngành; đồ án địa phương hiện ở cả tab QHC 1/25.000 và 1/10.000, rồi bị lọc theo phạm vi đang chọn.');
+  lines.push('Phạm vi Hành chính gắn trên đồ án (`area` trong `schemes.json`), không suy xã nằm trong đô thị. Phú Lộc: `xa:phu-loc`. Thượng Long: `xa:long-quang`. Khe Tre: `dothi:khe-tre` (`catalogScheme` `qhc-khe-tre`). Vinh Hưng: `xa:vinh-loc`. KCN Phong Điền: `dothi:phong-dien` (không gộp vào đồ án Phong Điền). Chân Mây – Lăng Cô: `dothi:chan-may` (`catalogScheme` `qhc-chan-may`). Hai đồ án mapid 21817 giữ phạm vi theo tỷ lệ (1/25.000 toàn thành phố, 1/10.000 đô thị trung tâm). Tab Hạ tầng nhóm lớp theo từng đồ án trong ngành; đồ án địa phương hiện ở cả tab QHC 1/25.000 và 1/10.000, rồi bị lọc theo phạm vi đang chọn.');
   lines.push('');
   lines.push('QHCT 1/500 nằm trong QHPK hoặc QHC cha khi xác định được (`parent`, `overrides`, `overrideArea: ranh QHCT`, priority 3). Trong ranh QHCT, QHCT được ưu tiên hơn đồ án cha. Không cắt hình cha.');
   lines.push('');
   lines.push('Lô đất hạ tầng (ghép danh sách hạ tầng trên Sheet): luôn ghi lô QHCT và ghép với dòng Sheet — sát ranh thửa thật hơn. Lô QHPK đã ghép trước đó chỉ gỡ ghép (đổi mã INFRA thành DXF, giữ polygon), không xóa và không từ chối lô QHCT. Mỗi lần gỡ ghi `docs/qhct-unpair.json` (mã lô QHPK, đồ án, mã lô QHCT, mã dòng hạ tầng). Chỉ mục ghép nằm ở khóa `pairings` của `public/data/su-dung-dat-index.json` (cùng file với chỉ mục lớp sử dụng đất, không ghi đè `layers`).');
   lines.push('');
-  lines.push('Metadata bản đồ gServer không có số quyết định. Số dưới đây lấy từ thuộc tính lớp ranh (ngày dạng M/D/YYYY của shapefile, đã đổi sang ISO). QHC TT Phú Lộc: nhiệm vụ 3134/QĐ-UBND ngày 2019-12-16, phê duyệt 1101/QĐ-UBND ngày 2020-04-17 (UBND tỉnh; 1/5 vùng ranh có giá trị). QHC Khe Tre: nhiệm vụ 1022/QĐ-UBND ngày 2016-05-16, phê duyệt 688/QĐ-UBND ngày 2020-03-13. QHC Đô thị mới Vinh Hưng: phê duyệt 193/QĐ-UBND ngày 2025-01-21 (UBND thành phố Huế). QHC Khu công nghiệp Phong Điền: trường có trên lớp ranh nhưng để trống. Hai đồ án mapid 21817: lô này chưa có lớp ranh quy hoạch.');
+  lines.push('Metadata bản đồ gServer không có số quyết định. Số dưới đây lấy từ thuộc tính lớp ranh (ngày dạng M/D/YYYY của shapefile, đã đổi sang ISO). QHC TT Phú Lộc: nhiệm vụ 3134/QĐ-UBND ngày 2019-12-16, phê duyệt 1101/QĐ-UBND ngày 2020-04-17 (UBND tỉnh; 1/5 vùng ranh có giá trị). QHC Khe Tre: nhiệm vụ 1022/QĐ-UBND ngày 2016-05-16, phê duyệt 688/QĐ-UBND ngày 2020-03-13. QHC Đô thị mới Vinh Hưng: phê duyệt 193/QĐ-UBND ngày 2025-01-21 (UBND thành phố Huế). QHC Khu công nghiệp Phong Điền: trường có trên lớp ranh nhưng để trống. QHC xã Thượng Long (mapid 20797, 1/25.000): cơ quan UBND huyện Nam Đông, tỉnh Thừa Thiên Huế; số quyết định trên lớp ranh để trống. Hai đồ án mapid 21817: lô này chưa có lớp ranh quy hoạch.');
   lines.push('');
   lines.push('## Catalog');
   lines.push('');
@@ -552,6 +554,7 @@ function docOf(manifest, heavy) {
   lines.push('- Bó vỉa QHC trung tâm 1/10.000: lần tải trước bỏ 8 dòng không có hình.');
   lines.push('- Bó vỉa QHC Khu công nghiệp Phong Điền: 668 dòng, 2 dòng không có hình, catalog giữ 666.');
   lines.push('- Hiện trạng công trình thủy lợi dạng đường, QHC 1/25.000: 28 dòng trên gServer, tất cả thiếu hình.');
+  lines.push('- Chức năng sử dụng đất QHC xã Thượng Long: 1056 dòng trên gServer, 26 dòng không có hình hợp lệ, catalog giữ 1027 sau khi cắt ranh (bỏ 3, cắt 2). Hiện trạng sử dụng đất: 798 dòng, bỏ 5 lô ngoài ranh, catalog giữ 793.');
   const shown = manifest.gaps.filter((g) => g.reason !== 'Không có lớp' || g.name);
   const empty = manifest.gaps.filter((g) => g.reason === 'Không có lớp');
   shown.forEach((g) => {
@@ -607,7 +610,16 @@ function writeOutputs(repo, layers, gaps, heavy, options) {
     const added = manifest.layers.filter((l) => !(l.file && seen.has(l.file)));
     const freshDoc = retargetManifest({ ...manifest, layers: added, gaps }, land);
     const freshLayers = freshDoc.layers.filter((l) => !(l.file && seen.has(l.file)));
-    manifest = { ...freshDoc, layers: keptLayers.concat(freshLayers), gaps: keptGaps.concat(freshDoc.gaps) };
+    // --schemes đánh fresh mọi QHCT đã có; chạy lại --append không được nhân ô trống.
+    const gapSeen = new Set();
+    const gapsOut = [];
+    keptGaps.concat(freshDoc.gaps).forEach((g) => {
+      const key = `${g.scheme}|${g.sector}|${g.status}|${g.name}|${g.reason}`;
+      if (gapSeen.has(key)) return;
+      gapSeen.add(key);
+      gapsOut.push(g);
+    });
+    manifest = { ...freshDoc, layers: keptLayers.concat(freshLayers), gaps: gapsOut };
   } else {
     manifest = retargetManifest(manifest, land);
   }
@@ -744,7 +756,8 @@ async function main() {
   }
   markLandSkip(layers, loadLandIndex(repo));
   const heavy = place(layers, repo, { keepOthers: append });
-  const allGaps = gaps.concat(emptyCells(layers, { onlyFresh: append }), append ? [] : missing21817());
+  const collected = new Set(layers.map((l) => l.scheme));
+  const allGaps = gaps.concat(emptyCells(layers, { onlyFresh: append, present: append ? collected : null }), append ? [] : missing21817());
   writeOutputs(repo, layers, allGaps, heavy, { append });
   if (args.includes('--upload') && heavy.length) {
     loadGeeKey(repo);
