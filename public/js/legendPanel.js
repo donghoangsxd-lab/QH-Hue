@@ -99,6 +99,13 @@ export function initLegendPanel() {
   syncToggle();
   const frame = document.getElementById('tabLegend');
   const legendFoldEl = document.getElementById('legendFold');
+  // Hành chính và kiến trúc không có ký hiệu lớp: ẩn cả hàng Chú giải. Quy hoạch và hai panel hạ tầng giữ chú giải theo lớp đang bật.
+  const LEGEND_OFF = new Set(['hanhchinh', 'kientruc']);
+  const legendOff = () => LEGEND_OFF.has(document.getElementById('layerMain')?.dataset.active || '');
+  const applyLegendGate = () => {
+    if (!legendFoldEl) return;
+    legendFoldEl.hidden = legendOff();
+  };
   const chip = document.getElementById('legendChip');
   const checked = (id) => !!document.getElementById(id)?.checked;
   const anyOn = (ids) => ids.some(checked);
@@ -132,6 +139,10 @@ export function initLegendPanel() {
   };
   const reveal = (set) => {
     if (!frame) return;
+    if (legendOff()) {
+      applyLegendGate();
+      return;
+    }
     if (frame.dataset.userHide === '1') {
       if (set) prefer = set;
       syncLegend();
@@ -143,6 +154,7 @@ export function initLegendPanel() {
   };
   const syncLegend = () => {
     if (!frame) return;
+    applyLegendGate();
     const visible = new Set();
     tabs.forEach(t => {
       const set = t.dataset.legendSet;
