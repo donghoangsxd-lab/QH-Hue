@@ -1,46 +1,17 @@
-// Chuột phải trên bản đồ → menu "Xem Street View tại đây": mở khung Street View nổi ngay trong webapp.
+// Khung Street View nổi. Menu chuột phải (mapContext.js) mở Google Street View ở thẻ mới.
 // Nhúng kiểu cũ output=svembed không cần khóa Maps Embed API (khóa API bị Google giới hạn vùng); kiểu này Google
 // không công bố chính thức, khung trắng thì dùng nút "Mở Google Maps" trên thanh tiêu đề.
-import { state } from './state.js';
-import { showToast } from './utils.js';
-
 const EMBED_URL = 'https://maps.google.com/maps';
 const PANO_URL = 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=';
 
-let menuEl = null;
 let panelEl = null;
 let marker = null;
 
 const fmt = (ll) => `${ll.lat.toFixed(6)},${ll.lng.toFixed(6)}`;
 const panoUrl = (ll) => PANO_URL + fmt(ll);
+export const streetViewUrl = (ll) => panoUrl(ll);
 // cbp = 11,hướng,0,zoom,góc ngẩng
 const embedUrl = (ll) => `${EMBED_URL}?${new URLSearchParams({ layer: 'c', cbll: fmt(ll), cbp: '11,0,0,0,0', hl: 'vi', output: 'svembed' })}`;
-
-function closeMenu() {
-  menuEl?.remove();
-  menuEl = null;
-}
-
-function openMenu(ev, latlng, targetMap) {
-  closeMenu();
-  menuEl = document.createElement('div');
-  menuEl.className = 'map-ctx-menu';
-  menuEl.innerHTML = `
-    <button type="button" data-act="sv">Xem Street View tại đây</button>
-    <button type="button" data-act="copy" title="Sao chép tọa độ">${fmt(latlng).replace(',', ', ')}</button>`;
-  document.body.appendChild(menuEl);
-  const { innerWidth: w, innerHeight: h } = window;
-  const r = menuEl.getBoundingClientRect();
-  menuEl.style.left = `${Math.min(ev.clientX, w - r.width - 4)}px`;
-  menuEl.style.top = `${Math.min(ev.clientY, h - r.height - 4)}px`;
-  menuEl.addEventListener('click', (e) => {
-    const act = e.target.closest('button')?.dataset.act;
-    if (!act) return;
-    closeMenu();
-    if (act === 'sv') openStreetView(latlng, targetMap);
-    else navigator.clipboard?.writeText(fmt(latlng)).then(() => showToast('Đã sao chép tọa độ', 'success'), () => {});
-  });
-}
 
 function placeMarker(latlng, targetMap) {
   marker?.remove();
@@ -110,18 +81,8 @@ function openStreetView(latlng, targetMap) {
   placeMarker(latlng, targetMap);
 }
 
-export function initStreetView(maps) {
-  maps.filter(Boolean).forEach(m => {
-    m.on('contextmenu', (e) => {
-      if (state.sketchTool || state.adminDrawMode || state.activeMeasureType) return;
-      openMenu(e.originalEvent, e.latlng, m);
-    });
-    m.on('movestart zoomstart', closeMenu);
-  });
-  document.addEventListener('pointerdown', (e) => { if (menuEl && !menuEl.contains(e.target)) closeMenu(); }, true);
+export function initStreetView() {
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    if (menuEl) closeMenu();
-    else if (panelEl) closePanel();
+    if (e.key === 'Escape' && panelEl) closePanel();
   });
 }

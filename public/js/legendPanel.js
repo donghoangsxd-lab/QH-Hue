@@ -2,7 +2,7 @@
 // và ký hiệu ngành hạ tầng khi bật lớp. Tự mở khi đổi cấp, khi chọn tab Đô thị, khi bật ngành hoặc nhóm điểm.
 // (QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500), mỗi bộ chia nhóm (tìm theo tên loại đất / tên layer CAD,
 // thu gọn từng nhóm; tìm và thu gọn chỉ áp lên bộ đang xem). Chỉ hiện bộ của lớp đang bật. Mọi phần tử [data-legend-pane] hiện theo bộ đang xem.
-// Chọn lớp ở droplist (mapLevel.js) thì chuyển sang bộ của cấp đó. Bộ QHC 1/25.000 và 1/10.000 kèm nhóm mạng lưới giao thông
+// Chọn lớp ở panel phải (mapLevel.js) thì chuyển sang bộ của cấp đó. Bộ QHC 1/25.000 và 1/10.000 kèm nhóm mạng lưới giao thông
 // (qhcRoads.js); 1/10.000 thêm nhóm mặt cắt ngang đường (roadSections.js).
 // + mục Hiển thị lô đất: thanh độ trong suốt phần tô lô và chú giải viền theo giai đoạn.
 import { renderTt16Legend, getLotOpacity, setLotOpacity, LEGEND_SETS } from './tt16Symbols.js';

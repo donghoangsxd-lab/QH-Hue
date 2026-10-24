@@ -44,7 +44,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261036">
+  <link rel="stylesheet" href="css/style.css?v=20261037">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -148,16 +148,19 @@
       <span class="swipe-label swipe-label-right">BẢN ĐỒ QUY HOẠCH</span>
     </div>
 
-    <!-- THANH TIÊU ĐỀ: nút lật trang Quy hoạch ⇄ Hiện trạng; droplist lớp quy hoạch (mapLevel.js); chia đôi thì chọn cùng tâm / lệch tâm -->
-    <header class="map-title" id="mapTitle" data-view="QH">
+    <!-- THANH TIÊU ĐỀ gộp giới thiệu: một tiêu đề, đóng được. Chọn lớp ở panel phải (mapLevel.js). Chia đôi thì chọn cùng tâm / lệch tâm -->
+    <header class="map-title map-intro" id="mapTitle" data-view="QH">
       <button type="button" class="map-title-mark" id="btnFlipView" title="Lật sang bản đồ hiện trạng" aria-label="Lật sang bản đồ hiện trạng"><svg class="ico"><use href="#i-pageflip"/></svg></button>
       <div class="map-title-body">
+        <p class="map-intro-kicker">Sở Xây dựng thành phố Huế</p>
         <h1 class="map-title-text" id="mapTitleText">BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ</h1>
+        <p class="map-intro-line">Trang thông tin phục vụ quản lý quy hoạch và hạ tầng đô thị.</p>
         <p class="map-title-notice" id="mapTitleNotice">Bản đồ tải lần đầu mất 30–60 giây. Vui lòng chờ!</p>
       </div>
-      <button type="button" class="map-title-level" id="btnMapLevel" aria-haspopup="listbox" aria-expanded="false" aria-controls="mapLevelMenu">
-        <svg class="ico"><use href="#i-layers"/></svg><span class="map-title-level-text">HỆ THỐNG ĐÔ THỊ</span><svg class="ico map-title-level-chev"><use href="#i-chev-down"/></svg>
-      </button>
+      <div class="map-title-actions">
+        <button type="button" class="map-title-catalog" id="btnMapCatalog" title="Mục lục tính năng và hướng dẫn sử dụng">Mục lục</button>
+        <button type="button" class="map-title-x" id="btnTitleDismiss" title="Ẩn tiêu đề" aria-label="Ẩn tiêu đề"><svg class="ico"><use href="#i-close"/></svg></button>
+      </div>
       <div class="map-title-split" role="radiogroup" aria-label="Kiểu so sánh">
         <button type="button" class="map-title-seg" data-split-kind="same" role="radio" aria-checked="true" title="Cùng tâm: hai bản đồ chồng khít, kéo thanh trượt để so sánh"><svg class="ico"><use href="#i-split-same"/></svg>Cùng tâm</button>
         <button type="button" class="map-title-seg" data-split-kind="offset" role="radio" aria-checked="false" title="Lệch tâm: hiện trạng ở giữa nửa trái, quy hoạch ở giữa nửa phải"><svg class="ico"><use href="#i-split-offset"/></svg>Lệch tâm</button>
@@ -446,6 +449,14 @@
       <!-- TAB: LỚP DỮ LIỆU -->
       <div class="tab-body" id="tabLayers">
         <div class="layer-tree">
+        <div class="level-host" id="levelHost">
+          <div class="level-host-label" id="levelHostLabel">Lớp đang xem</div>
+          <div class="level-pick" id="levelPick" role="listbox" aria-label="Chọn lớp quy hoạch"></div>
+          <div class="level-split" id="levelSplit">
+            <label>Bên trái<select id="splitSideLeft" aria-label="Lớp bên trái"></select></label>
+            <label>Bên phải<select id="splitSideRight" aria-label="Lớp bên phải"></select></label>
+          </div>
+        </div>
         <div class="layer-main" id="layerMain">
           <div class="layer-mag" id="layerMag">
             <button type="button" class="mag-nav" data-mag-step="-1" title="Panel phía trước" aria-label="Panel phía trước"><svg class="ico"><use href="#i-step-left"/></svg></button>
@@ -1598,6 +1609,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261036"></script>
+  <script type="module" src="./js/app.js?v=20261037"></script>
 </body>
 </html>

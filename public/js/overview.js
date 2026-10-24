@@ -2,7 +2,7 @@
 // Bấm tên mục để xổ các bước; nút Hướng dẫn mở trang đủ chú thích và lối tắt.
 // Mục có demo: nút «Xem trên bản đồ» chạy chuỗi thao tác trực tiếp kèm thuyết minh (overviewDemo.js).
 // Mở tính năng bằng cách bấm hộ nút / tab / ô tick sẵn có trên giao diện, không đụng trạng thái nội bộ của module khác.
-// Tự hiện ở lần mở trang đầu; ô "Không tự hiện" dùng chung khóa với introTour.js.
+// Tiêu đề trên bản đồ đã gộp dòng giới thiệu. Hộp này là mục lục, mở từ nút Mục lục.
 import { ico, showToast, escapeHtml, fmtNum, fmtPct, detailDisclosure } from './utils.js';
 import { map, handleInspectPointClick, zoomToPoint } from './mapEngine.js';
 import { ensureWardStats } from './uiComponents.js';
@@ -13,7 +13,6 @@ import { floodReport } from './floodSim.js';
 import { startDemo, flash, openLayerTab } from './overviewDemo.js';
 
 const STORAGE_KEY = 'qhhue_intro_off';
-const SEEN_KEY = 'qhhue_overview_seen';
 // Khung tọa độ TP. Huế (WGS84): chặn nhập đảo thứ tự hoặc nhập nhầm tọa độ VN-2000
 const HUE_BOUNDS = { latMin: 15.9, latMax: 16.85, lngMin: 106.9, lngMax: 108.3 };
 
@@ -270,8 +269,8 @@ const SECTIONS = [
           'Bật lớp <b>Thửa đất địa chính 2016</b>. Ranh thửa hiện từ mức phóng 15, số thửa từ mức 18. Hộp tìm hiện ngay dưới tên lớp.',
           'Tìm theo hồ sơ: trong ô <b>Chọn xã/phường (địa giới cũ)</b>, nhập <b>Tờ</b> và <b>Thửa</b>, bấm <b>Tìm</b>. Hoặc phóng tới vị trí (có thể nhập tọa độ ở cuối trang Hướng dẫn) rồi bấm vào thửa trên bản đồ.',
           'Bảng thửa hiện diện tích hồ sơ, loại đất theo Thông tư 28/2014/TT-BTNMT, địa chỉ và xã/phường cũ. Thửa được viền vàng.',
-          'Danh sách chọn trên thanh tiêu đề đang là <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b> hoặc <b>QHCT 1/500</b>: bảng thửa đặt góc trái, sát thanh công cụ, có 4 trang cùng tên bốn cấp đó. Trang đang mở theo lớp droplist; bấm trang khác để xem lớp đó, kể cả khi lớp đang tắt. Mỗi trang có biểu đồ tròn loại đất trên thửa, diện tích và chỉ tiêu từng lô.',
-          'Danh sách chọn đang là <b>HỆ THỐNG ĐÔ THỊ</b>: bảng mở ngay tại thửa. Bấm <b>Xem chỉ tiêu quy hoạch</b> để cắt thửa với lô các đồ án đã nạp (diện tích, %, tầng cao, mật độ, hệ số sử dụng đất).',
+          'Lớp đang xem trên panel phải là <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b> hoặc <b>QHCT 1/500</b>: bảng thửa đặt góc trái, sát thanh công cụ, có 4 trang cùng tên bốn cấp đó. Trang đang mở theo lớp đã chọn; bấm trang khác để xem lớp đó, kể cả khi lớp đang tắt. Mỗi trang có biểu đồ tròn loại đất trên thửa, diện tích và chỉ tiêu từng lô.',
+          'Lớp đang xem là <b>HỆ THỐNG ĐÔ THỊ</b>: bảng mở ngay tại thửa. Bấm <b>Xem chỉ tiêu quy hoạch</b> để cắt thửa với lô các đồ án đã nạp (diện tích, %, tầng cao, mật độ, hệ số sử dụng đất).',
           'Đang xem bản đồ quy hoạch: bấm thửa nằm trên một lô vẫn mở bảng thửa. Tắt lớp <b>Thửa đất địa chính 2016</b> để xem bảng lô như trước.'
         ],
         facts: [
@@ -375,11 +374,11 @@ const SECTIONS = [
         lead: 'Xem một bản đồ toàn màn hình, hoặc chia đôi để đối chiếu hiện trạng và quy hoạch cùng khung nhìn.',
         steps: [
           'Nút lật trang ở đầu thanh tiêu đề (giữa phía trên) chuyển <b>BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ</b> sang bản đồ hiện trạng và ngược lại.',
-          'Danh sách chọn cạnh tiêu đề chọn lớp: <b>HỆ THỐNG ĐÔ THỊ</b>, <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b>, <b>QHCT 1/500</b>.',
+          'Mở panel phải, hàng <b>Lớp đang xem</b> chọn: <b>HỆ THỐNG ĐÔ THỊ</b>, <b>QHC 1/25.000</b>, <b>QHC 1/10.000</b>, <b>QHPK 1/2.000</b>, <b>QHCT 1/500</b>.',
           'Thanh công cụ trái, bấm nút <b>Chia đôi màn hình so sánh</b>. Trên tiêu đề chọn <b>Cùng tâm</b> hoặc <b>Lệch tâm</b>.',
           '<b>Cùng tâm</b>: kéo thanh giữa (hoặc phím ← →). Nhãn hai bên là <b>BẢN ĐỒ HIỆN TRẠNG</b> và <b>BẢN ĐỒ QUY HOẠCH</b>. Bấm lại nút chia đôi để tắt.'
         ],
-        facts: ['Mỗi bên chia đôi chọn được lớp ở droplist của bên đó.'],
+        facts: ['Mỗi bên chia đôi chọn được lớp ở hai danh sách trên panel phải.'],
         actions: [{ label: 'Bật chia đôi màn hình', icon: 'compare', run: () => pressTool('btnToggleCompare', b => b.getAttribute('aria-pressed') === 'true') }]
       },
       {
@@ -942,7 +941,7 @@ function build() {
       <header class="ov-head">
         <span class="ov-mark">${ico('overview')}</span>
         <div class="ov-head-text">
-          <div class="ov-kicker">Bản đồ quy hoạch và hạ tầng đô thị TP. Huế · Sở Xây dựng thành phố Huế</div>
+          <div class="ov-kicker">Sở Xây dựng thành phố Huế</div>
           <h2 class="ov-title" id="ovTitle">GIỚI THIỆU TỔNG QUAN</h2>
         </div>
         <div class="ov-stage">
@@ -1024,15 +1023,9 @@ function close() {
 }
 
 export function initOverview() {
-  $('btnOverview')?.addEventListener('click', () => (isOpen() ? close() : openOverview()));
-  let off = false;
-  let seen = false;
-  try {
-    off = localStorage.getItem(STORAGE_KEY) === '1';
-    seen = localStorage.getItem(SEEN_KEY) === '1';
-  } catch { /* chế độ riêng tư */ }
-  // Lần mở trang đầu (trình duyệt này) thì mở hộp. Các lần sau, kể cả tải lại, giữ thu.
-  if (off || seen) return;
-  try { localStorage.setItem(SEEN_KEY, '1'); } catch { /* chế độ riêng tư */ }
-  setTimeout(() => { if (!document.querySelector('.tour-root:not([hidden])')) openOverview(); }, 1200);
+  $('btnMapCatalog')?.addEventListener('click', () => (isOpen() ? close() : openOverview()));
+  $('btnOverview')?.addEventListener('click', () => {
+    try { localStorage.removeItem('qhhue_title_off'); } catch { /* chế độ riêng tư */ }
+    document.dispatchEvent(new CustomEvent('qh-title-restore'));
+  });
 }

@@ -68,6 +68,8 @@ const CITY_BOUNDS = [[15.995, 107.034], [16.743, 108.195]];
 const CITY_FIT_PAD = 12;
 const WARD_GEOM_VERSION = 2;
 const INFRA_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "7-YT", "8-VH", "9-TM"];
+// 10 nhóm đã có bán kính phục vụ trên panel Hạ tầng xã hội (thêm THPT và PCCC so với 8 nhóm độ phủ).
+const ACCESS_CODES = ["1-CV", "2-BDX", "3-MN", "4-TH", "5-THCS", "6-THPT", "7-YT", "8-VH", "9-TM", "10-PCCC"];
 // Số điểm trong khung nhìn ≤ ngưỡng thì vẽ icon PNG (DOM); vượt ngưỡng vẽ chấm tròn trên canvas cho nhẹ
 const ICON_MAX_VISIBLE = 1500;
 // Đánh dấu công trình quy hoạch khác hiện trạng, khớp --plan-mark (style.css)
@@ -816,10 +818,20 @@ function onMeasureKeyDown(e) {
   drawMeasure();
 }
 
+let measureContextHit = false;
+/** true nếu chuột phải vừa xóa một đỉnh đo (menu bản đồ không mở đè). */
+export function consumeMeasureContext() {
+  const hit = measureContextHit;
+  measureContextHit = false;
+  return hit;
+}
+
 function onMeasureContextMenu(e) {
+  measureContextHit = false;
   if (!state.activeMeasureType || !state.measurePoints.length || !e.latlng) return;
   const hit = nearestVertexIndex(e.target, e.latlng, state.measurePoints);
   if (hit < 0) return;
+  measureContextHit = true;
   state.measurePoints.splice(hit, 1);
   measureCursor = e.latlng;
   measureCursorMap = e.target;
@@ -3325,17 +3337,40 @@ const ROUTE_CANDIDATES = 4;   // mỗi nhóm thử vài công trình gần nhấ
 const WALK_M_PER_MIN = 80;    // đi bộ ~4,8 km/h
 const fmtDist = (m) => (m >= 1000 ? `${fmtNum(Math.round(m / 100) / 10)} km` : `${fmtNum(Math.round(m / 10) * 10)} m`);
 
+// legacy: đúng luật tra cứu cũ (8 nhóm, type gốc; Tiểu học không lấy trường mang tên THPT).
+function routeCode(item, codes, legacy) {
+  if (legacy) {
+    if (!codes.includes(item.type)) return null;
+    if (item.type === '4-TH' && layerType(item) !== '4-TH') return null;
+    return item.type;
+  }
+  const code = layerType(item) || item.type;
+  return codes.includes(code) ? code : null;
+}
+
+function coverageCode(item, codes, legacy) {
+  if (legacy) return codes.includes(item.type) ? item.type : null;
+  const code = layerType(item) || item.type;
+  return codes.includes(code) ? code : null;
+}
+
+// PCCC dùng đúng ngưỡng Mục 2.5.13.1 đã có ở mục mạng lưới; các nhóm còn lại theo bán kính công trình.
+function serveRadius(item, code, wardName, legacy) {
+  if (!legacy && code === '10-PCCC') return /^xã\s/i.test(String(wardName || '').trim()) ? 5000 : 3000;
+  return effectiveRadius(item);
+}
+
 // Ứng viên chỉ đường của mỗi nhóm: công trình đã duyệt gần nhất theo đường chim bay; nhóm Tiểu học không lấy trường THPT
-function nearestByGroup(source, lat, lng) {
+function nearestByGroup(source, lat, lng, codes = INFRA_CODES, legacy = true) {
   const out = {};
-  INFRA_CODES.forEach(code => { out[code] = []; });
+  codes.forEach(code => { out[code] = []; });
   source.forEach(item => {
-    if (!INFRA_CODES.includes(item.type) || !isApproved(item.status) || !hasValidCoord(item)) return;
-    if (item.type === '4-TH' && layerType(item) !== '4-TH') return;
+    const code = routeCode(item, codes, legacy);
+    if (!code || !isApproved(item.status) || !hasValidCoord(item)) return;
     const ilat = Number(item.lat), ilng = Number(item.lng);
-    out[item.type].push({ lat: ilat, lng: ilng, ref: item, d: distanceMeters(lat, lng, ilat, ilng) });
+    out[code].push({ lat: ilat, lng: ilng, ref: item, d: distanceMeters(lat, lng, ilat, ilng) });
   });
-  INFRA_CODES.forEach(code => { out[code] = out[code].sort((a, b) => a.d - b.d).slice(0, ROUTE_CANDIDATES); });
+  codes.forEach(code => { out[code] = out[code].sort((a, b) => a.d - b.d).slice(0, ROUTE_CANDIDATES); });
   return out;
 }
 
@@ -3352,7 +3387,7 @@ async function showAccessRoutes(lat, lng, m, cands, popup, seq, hiKeys) {
   const isPlan = m === planMap;
   const group = isPlan ? planLayers.singleIso : layers.singleIso;
   const box = () => (popup.isOpen() ? popup.getElement()?.querySelector('.js-routes') : null);
-  const codes = INFRA_CODES.filter(code => cands[code].length);
+  const codes = Object.keys(cands).filter(code => cands[code].length);
   if (!codes.length) {
     const el = box();
     if (el) el.innerHTML = `<div class="sug-card ineligible">(Chưa có công trình đã duyệt)</div>`;
@@ -3433,7 +3468,7 @@ async function showAccessRoutes(lat, lng, m, cands, popup, seq, hiKeys) {
 
 // Mạng lưới tại vị trí tra cứu (đường chim bay): trạm xe buýt ≤ 500 m (Mục 2.8.3.3), trụ sở PCCC ≤ 3 km phường / 5 km xã
 // (Mục 2.5.13.1), vị trí nằm trong khoảng cách an toàn nghĩa trang / cơ sở hỏa táng (Bảng 23)
-function networkInspectHtml(source, lat, lng, wardName, num) {
+function networkInspectHtml(source, lat, lng, wardName, num, skip = null) {
   const approvedOf = (type) => source.filter(it => it.type === type && isApproved(it.status) && hasValidCoord(it))
     .map(it => ({ it, d: distanceMeters(lat, lng, Number(it.lat), Number(it.lng)) }));
   const nearest = (list) => list.reduce((best, x) => (!best || x.d < best.d ? x : best), null);
@@ -3446,8 +3481,8 @@ function networkInspectHtml(source, lat, lng, wardName, num) {
   };
   const pcccLimit = /^xã\s/i.test(String(wardName || '').trim()) ? 5000 : 3000;
   let html = `<div class="pp-section c-orange">${num}. Mạng lưới hạ tầng khác</div>`;
-  html += row('Trạm dừng xe buýt', nearest(approvedOf('13-BUS')), 500, 'Mục 2.8.3.3');
-  html += row('Trụ sở cảnh sát PCCC', nearest(approvedOf('10-PCCC')), pcccLimit, 'Mục 2.5.13.1');
+  if (!skip?.has('13-BUS')) html += row('Trạm dừng xe buýt', nearest(approvedOf('13-BUS')), 500, 'Mục 2.8.3.3');
+  if (!skip?.has('10-PCCC')) html += row('Trụ sở cảnh sát PCCC', nearest(approvedOf('10-PCCC')), pcccLimit, 'Mục 2.5.13.1');
   const inside = approvedOf('11-NT').filter(x => Number(x.it.radius) > 0 && x.d <= Number(x.it.radius));
   html += inside.length
     ? inside.map(x => `<div class="sug-card ineligible">${ico('alert')}<b>Trong khoảng cách an toàn (Bảng 23)</b>
@@ -3465,12 +3500,13 @@ const PLAN_NEAR_MAX = 6;
 
 // Công trình đã duyệt phủ tới vị trí, theo nhóm: { type: Map(tên → công trình) }. Buffer mỗi công trình là vòng tròn
 // bán kính R: điểm được phục vụ khi khoảng cách ≤ R.
-function coverageAt(list, lat, lng) {
+function coverageAt(list, lat, lng, codes = INFRA_CODES, legacy = true, wardName = '') {
   const out = {};
   list.forEach(item => {
-    if (!INFRA_CODES.includes(item.type) || !isApproved(item.status) || !hasValidCoord(item)) return;
-    if (distanceMeters(lat, lng, Number(item.lat), Number(item.lng)) > effectiveRadius(item)) return;
-    const names = out[item.type] || (out[item.type] = new Map());
+    const code = coverageCode(item, codes, legacy);
+    if (!code || !isApproved(item.status) || !hasValidCoord(item)) return;
+    if (distanceMeters(lat, lng, Number(item.lat), Number(item.lng)) > serveRadius(item, code, wardName, legacy)) return;
+    const names = out[code] || (out[code] = new Map());
     const name = item.name || 'Công trình';
     if (!names.has(name) || PLAN_CHANGE_INFO[item.planChange]) names.set(name, item);
   });
@@ -3499,9 +3535,9 @@ function planChangesHtml(source, lat, lng, ringRadius, num) {
 
 // Mỗi nhóm đang phủ tới vị trí: công trình gần nhất. Ký hiệu nằm trên tên, neo tại tâm lô (chưa có ranh thì tại điểm công trình).
 // Cả ký hiệu lẫn tên nằm trong singleIso nên tắt kiểm tra (clearSingleIsochrone) gỡ hết.
-function nearestCovered(groups, lat, lng) {
+function nearestCovered(groups, lat, lng, codes = INFRA_CODES) {
   const out = [];
-  INFRA_CODES.forEach(code => {
+  codes.forEach(code => {
     const bag = groups[code];
     if (!bag || !bag.size) return;
     let best = null;
@@ -3554,8 +3590,15 @@ async function showAccessedLots(targetMap, items, seq, isPlan) {
 
 // Tính trực tiếp trên toàn TP (không phụ thuộc phường đang lọc). Bản đồ quy hoạch dò theo kịch bản QH (gồm công trình
 // quy hoạch mới, bỏ công trình di dời) và so với hiện trạng tại cùng vị trí.
-export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
+/** 10 nhóm hạ tầng xã hội đã có bán kính (công viên → PCCC), cùng luật phủ với tra cứu. */
+export function inspectAccessAt(clickLat, clickLng, targetMap = map) {
+  return handleInspectPointClick(clickLat, clickLng, targetMap, { codes: ACCESS_CODES, legacy: false });
+}
+
+export function handleInspectPointClick(clickLat, clickLng, targetMap = map, opts = {}) {
   if (!targetMap) return;
+  const codes = opts.codes || INFRA_CODES;
+  const legacy = opts.legacy !== false && !opts.codes;
   clearSingleIsochrone();
   const routeSeq = singleIsoSeq;
   const isPlan = !!planMap && targetMap === planMap;
@@ -3563,12 +3606,13 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
   state.tempMarker = L.marker([clickLat, clickLng], { interactive: false }).addTo(targetMap);
 
   const source = isPlan ? getPlanScenarioList() : state.rawDataList;
-  const coveredGroups = coverageAt(source, clickLat, clickLng);
-  const missingCodes = INFRA_CODES.filter(code => !coveredGroups[code]);
-  const coveredCount = INFRA_CODES.length - missingCodes.length;
-  const htGroups = isPlan ? coverageAt(state.rawDataList, clickLat, clickLng) : null;
-  const override = state.globalBufferRadiusOverride;
   const wardLocal = resolveWardNameFromCoords(clickLat, clickLng);
+  const coveredGroups = coverageAt(source, clickLat, clickLng, codes, legacy, wardLocal);
+  const missingCodes = codes.filter(code => !coveredGroups[code]);
+  const coveredCount = codes.length - missingCodes.length;
+  const htGroups = isPlan ? coverageAt(state.rawDataList, clickLat, clickLng, codes, legacy, wardLocal) : null;
+  const override = state.globalBufferRadiusOverride;
+  const total = codes.length;
 
   const ringRadius = override !== null ? override : INSPECT_RING_M;
   addNegativeRing(isPlan ? planLayers.singleIso : layers.singleIso, targetMap, clickLat, clickLng, ringRadius, INSPECT_INNER_OPACITY);
@@ -3576,7 +3620,7 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
     .filter(it => hasValidCoord(it) && distanceMeters(clickLat, clickLng, Number(it.lat), Number(it.lng)) <= ringRadius)
     .map(pointKey));
   (isPlan ? planRenderer : leftRenderer).highlight(hiKeys);
-  showAccessedLots(targetMap, nearestCovered(coveredGroups, clickLat, clickLng), routeSeq, isPlan);
+  showAccessedLots(targetMap, nearestCovered(coveredGroups, clickLat, clickLng, codes), routeSeq, isPlan);
 
   let html = `<div class="pp">
     <div class="pp-title">${ico('chart')}MẬT ĐỘ HẠ TẦNG TẠI VỊ TRÍ${isPlan ? ' (QUY HOẠCH)' : ''}</div>
@@ -3586,15 +3630,15 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
     <div class="pp-row"><span>Bán kính</span><b class="c-green">${override !== null ? `${fmtNum(override)} m (chung)` : 'theo từng công trình'}</b></div>
     <div class="pp-row"><span>Vòng nét đứt</span><b>${fmtNum(ringRadius)} m${override !== null ? '' : ' <span class="pp-sub">(đi bộ cấp đơn vị ở)</span>'}</b></div>`;
   if (htGroups) {
-    const htCount = INFRA_CODES.filter(code => htGroups[code]).length;
+    const htCount = codes.filter(code => htGroups[code]).length;
     const diff = coveredCount - htCount;
     const cls = diff > 0 ? 'c-green' : diff < 0 ? 'c-red' : '';
-    html += `<div class="pp-row"><span>Hiện trạng → Quy hoạch</span><b class="${cls}">${htCount}/8 → ${coveredCount}/8 nhóm</b></div>`;
+    html += `<div class="pp-row"><span>Hiện trạng → Quy hoạch</span><b class="${cls}">${htCount}/${total} → ${coveredCount}/${total} nhóm</b></div>`;
   }
-  html += `<div class="pp-section c-green">1. Tiếp cận: ${coveredCount}/8 nhóm</div>`;
+  html += `<div class="pp-section c-green">1. Tiếp cận: ${coveredCount}/${total} nhóm</div>`;
 
   if (coveredCount > 0) {
-    INFRA_CODES.forEach(code => {
+    codes.forEach(code => {
       if (!coveredGroups[code]) return;
       const items = [...coveredGroups[code].values()].sort((a, b) => (PLAN_CHANGE_INFO[b.planChange] ? 1 : 0) - (PLAN_CHANGE_INFO[a.planChange] ? 1 : 0));
       const shown = items.slice(0, 5).map(it => `${escapeHtml(infraTitle(it.name || 'Công trình'))}${planTagHtml(it, isPlan)}`).join(', ')
@@ -3606,21 +3650,21 @@ export function handleInspectPointClick(clickLat, clickLng, targetMap = map) {
     html += `<div class="sug-card ineligible">(Chưa có hạ tầng phủ đến)</div>`;
   }
 
-  html += `<div class="pp-section c-red">2. Chưa tiếp cận: ${missingCodes.length}/8 nhóm</div>`;
+  html += `<div class="pp-section c-red">2. Chưa tiếp cận: ${missingCodes.length}/${total} nhóm</div>`;
   if (missingCodes.length > 0) {
     missingCodes.forEach(code => {
       const lost = htGroups && htGroups[code] ? ' <span class="pp-sub">(hiện trạng có, quy hoạch mất do di dời / thu hẹp)</span>' : '';
       html += `<div class="sug-card ineligible">${ico('error')}${escapeHtml(infraLabels[code] || code)}${lost}</div>`;
     });
   } else {
-    html += `<div class="sug-card priority">${ico('check')}Vị trí tiếp cận đủ 8 nhóm hạ tầng!</div>`;
+    html += `<div class="sug-card priority">${ico('check')}Vị trí tiếp cận đủ ${total} nhóm hạ tầng!</div>`;
   }
   let num = 3;
   if (isPlan) html += planChangesHtml(source, clickLat, clickLng, ringRadius, num++);
-  const routeCands = nearestByGroup(source, clickLat, clickLng);
+  const routeCands = nearestByGroup(source, clickLat, clickLng, codes, legacy);
   html += `<div class="pp-section c-cyan">${num++}. Đường đi tới công trình gần nhất${isPlan ? ' (theo quy hoạch)' : ''}</div>
     <div class="js-routes"><div class="pp-loading">${ico('clock')}đang tìm đường theo mạng giao thông...</div></div>`;
-  html += networkInspectHtml(source, clickLat, clickLng, wardLocal, num);
+  html += networkInspectHtml(source, clickLat, clickLng, wardLocal, num, legacy ? null : new Set(codes));
   html += `</div>`;
 
   const inspectPopup = openDockPopup(targetMap, 'inspect-popup', html);
