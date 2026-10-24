@@ -81,13 +81,13 @@ Một bộ biến cho mọi trục và chú giải, trong `public/css/style.css`
 
 ## Số liệu không bịa
 
-Chỉ số có trong repo. Dân số và diện tích ĐVHC lấy `dvhcStats.js`. Danh sách Đô thị theo QĐ 756 và QĐ 614 lấy km² từ `properties.km2` của polygon được dẫn trong `doThiQd756.js` (đã tính sẵn, không cộng lại trên máy chủ). Thành phố Huế ở kỳ quy hoạch dùng km² toàn thành phố trong `dvhcStats`. Dân số hiện trạng chỉ cộng khi phạm vi đã công nhận phủ trọn các đơn vị hiện nay (Hương Thủy, Hương Trà).
+Chỉ số có trong repo. Dân số và diện tích ĐVHC lấy `dvhcStats.js`. Danh sách Đô thị theo QĐ 756 và QĐ 614 lấy km² từ `properties.km2` của polygon được dẫn trong `doThiQd756.js` (đã tính sẵn, không cộng lại trên máy chủ). Thành phố Huế ở kỳ quy hoạch dùng km² toàn thành phố trong `dvhcStats`. Hiện trạng Đô thị Huế không có polygon phạm vi đã công nhận, nên dùng ranh thành phố `urban614` #hue và km² `properties.km2` của polygon đó. Dân số hiện trạng chỉ cộng khi phạm vi đã công nhận phủ trọn các đơn vị hiện nay (Hương Thủy, Hương Trà).
 
-Đô thị cấp xã (Vinh Thanh, Phú Đa, Lộc Sơn, Khe Tre, Phú Lộc, Vinh Hiền, và sau 2030 Phú Hồ, Phú Vinh, Phú Vang, Hưng Lộc, Khe Tre) không lấy ranh cả xã. Có polygon lõi thì dùng polygon đó; không có thì «(chưa có ranh)». `urban614` #hue là hợp 40 đơn vị, không phải phạm vi TP Huế đã công nhận. Đô thị Chân Mây – Lăng Cô đến 2030 không dùng ranh thị trấn Lăng Cô. Đô thị Hóa Châu đến 2030 là cả phường, không phải lõi Thanh Hà.
+Đô thị cấp xã đến 2030 (Vinh Thanh, Phú Đa, Lộc Sơn, Khe Tre, Phú Lộc, Vinh Hiền, Quảng Điền, A Lưới 2) dùng polygon lõi trong `urban614`, không lấy ranh cả xã. Đô thị Hóa Châu đến 2030 là cả phường (`generalPlan` #hoa-chau), không phải lõi Thanh Hà. Đô thị Chân Mây – Lăng Cô đến 2030 dùng ranh GIS đồ án QHC Chân Mây - Lăng Cô (`dothi-chan-may.geojson`), không dùng thị trấn Lăng Cô và không dùng ranh ba xã của KVĐT Chân Mây. Sau 2030, Phú Vinh, Phú Vang, Hưng Lộc và Khe Tre dùng polygon cả xã trong `urbanVision` (id `vinh-thanh`, `phu-da`, `loc-son`, `khe-tre`). Phú Hồ không có id trong `urbanVision`; dùng `generalPlan` #phu-ho. Chỉ để «(chưa có ranh)» khi không còn polygon trong các lớp đô thị đã có.
 
 Không có trong repo, cột để «—»:
 
 - Dân số dự báo đến 2030 và sau 2030.
-- Dân số đô thị chỉ chiếm một phần đơn vị (không ước theo tỷ lệ dân), kể cả Đô thị Huế hiện trạng khi chưa có ranh đã công nhận.
+- Dân số đô thị chỉ chiếm một phần đơn vị (không ước theo tỷ lệ dân). Dân số phạm vi đã công nhận của Đô thị Huế hiện trạng không có số riêng.
 - km² khi chưa có polygon đúng phạm vi.
 - km² và dân số của «Các vùng còn lại» (`hue-outer`).
