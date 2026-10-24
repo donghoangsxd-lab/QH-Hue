@@ -6144,3 +6144,21 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
   .legend-chip { left: calc(var(--tb-btn) + 16px); right: auto; }
   body.right-collapsed .legend-chip { right: auto; }
 }
+/* Panel điện thoại cao theo nội dung: % của dock không resolve, chú giải phình đè nút cấp quy hoạch. */
+@media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+  .right-panel { overflow: hidden; }
+  .rp-dock,
+  .rp-dock:has(> details[open]),
+  .rp-dock:has(> details[open] ~ details[open]) {
+    flex: 0 0 auto;
+    height: auto;
+    max-height: 22dvh;
+  }
+  #rpDock:has(#legendFold[open]):not(:has(#axisBaseFold[open])) > #legendFold > .dock-body,
+  #rpDock:has(#axisBaseFold[open]):not(:has(#legendFold[open])) > #axisBaseFold > .layer-map-pane,
+  #rpDock:has(#legendFold[open]):has(#axisBaseFold[open]) > #legendFold > .dock-body,
+  #rpDock:has(#legendFold[open]):has(#axisBaseFold[open]) > #axisBaseFold > .layer-map-pane {
+    height: auto;
+    max-height: 14dvh;
+  }
+}
