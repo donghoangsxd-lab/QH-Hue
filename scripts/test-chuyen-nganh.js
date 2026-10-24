@@ -94,4 +94,6 @@ assert.ok(manifest.layers.some(l => l.scheme === 'qhc-hue-2045' && l.sector === 
 const again = retargetManifest(manifest, index);
 assert.strictEqual(again.layers.filter(l => landUseName(l.name) && /thua-thien-hue-1-25-000|trung-tam-thua-thien-hue-1-10-000/.test(String(l.file || ''))).length, 0);
 assert.ok(again.layers.some(l => l.scheme === 'qhc-tt-phu-loc-19e96a86' && l.status === 'hien-trang' && landUseName(l.name) && !l.ref));
+assert.ok(manifest.layers.some(l => l.scheme === 'qhc-xa-thuong-long-3f2c4da4' && l.name === 'Chức năng sử dụng đất' && l.featureCount === 1027 && !l.ref));
+assert.ok(manifest.layers.some(l => l.scheme === 'qhc-xa-thuong-long-3f2c4da4' && l.status === 'hien-trang' && l.name === 'Hiện trạng sử dụng đất' && l.featureCount === 793 && !l.ref));
 console.log('ok', cases.length);

@@ -56,7 +56,8 @@ const fileCache = new Map();
 const drawn = new Map();
 const openSchemes = new Set([
   'qhc-hue-2045', 'qhc-trung-tam', 'qhc-khe-tre', 'qhc-chan-may',
-  'qhc-tt-phu-loc-19e96a86', 'qhc-do-thi-moi-vinh-hung-8899f27b', 'qhc-khu-cong-nghiep-phong-dien-f997bd2c'
+  'qhc-tt-phu-loc-19e96a86', 'qhc-do-thi-moi-vinh-hung-8899f27b', 'qhc-khu-cong-nghiep-phong-dien-f997bd2c',
+  'qhc-xa-thuong-long-3f2c4da4'
 ]);
 let layerQuery = '';
 let applying = false;
