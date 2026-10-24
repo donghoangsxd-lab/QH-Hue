@@ -1,7 +1,7 @@
 {
   "v": 1,
-  "built": "2026-10-23",
-  "count": 95,
+  "built": "2026-10-24",
+  "count": 99,
   "note": "95 lớp có dữ liệu sử dụng đất. Kỳ vọng khoảng 117 không khớp: projects/index.json có 136 mục, 40 đã xóa, 96 còn lại; 93 đồ án có file projects/<slug>/su-dung-dat.json (lands > 0) và 3 mục sheetOnly không có lô (hai đồ án mapid 21817 và QHC Khu công nghiệp Phong Điền). Cộng 2 lớp tĩnh mapid 21817 (qhc-hue-2045, qhc-trung-tam) thành 95. 91 file hien-trang.json trên bucket đều parcels rỗng nên không tính. cad_parcels.json không còn lô DXF (6675 INFRA và 93 khung PROJECT).",
   "aliases": [
     {
@@ -969,6 +969,46 @@
       "path": "projects/qhpk-xay-dung-khu-trung-tam-tiep-van-hang-hoa-va-thuong-mai-ad90e300/su-dung-dat.json",
       "lands": 52,
       "source": "projects"
+    },
+    {
+      "scheme": "qhc-xa-huong-huu-cb7f4149",
+      "name": "Hiện trạng sử dụng đất",
+      "mapid": 20800,
+      "layer": "su-dung-dat",
+      "role": "hien-trang",
+      "scale": 25000,
+      "path": "data/chuyen-nganh/qhc-xa-huong-huu-cb7f4149/sdd/hien-trang/hien-trang-su-dung-dat.geojson",
+      "source": "static"
+    },
+    {
+      "scheme": "qhc-xa-huong-huu-cb7f4149",
+      "name": "Chức năng sử dụng đất",
+      "mapid": 20800,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "scale": 25000,
+      "path": "data/chuyen-nganh/qhc-xa-huong-huu-cb7f4149/sdd/quy-hoach/chuc-nang-su-dung-dat.geojson",
+      "source": "static"
+    },
+    {
+      "scheme": "qhc-xa-huong-loc-1487608f",
+      "name": "Hiện trạng sử dụng đất",
+      "mapid": 20799,
+      "layer": "su-dung-dat",
+      "role": "hien-trang",
+      "scale": 25000,
+      "path": "data/chuyen-nganh/qhc-xa-huong-loc-1487608f/sdd/hien-trang/hien-trang-su-dung-dat.geojson",
+      "source": "static"
+    },
+    {
+      "scheme": "qhc-xa-huong-loc-1487608f",
+      "name": "Chức năng sử dụng đất",
+      "mapid": 20799,
+      "layer": "su-dung-dat",
+      "role": "quy-hoach",
+      "scale": 25000,
+      "path": "data/chuyen-nganh/qhc-xa-huong-loc-1487608f/sdd/quy-hoach/chuc-nang-su-dung-dat.geojson",
+      "source": "static"
     }
   ],
   "pairings": [

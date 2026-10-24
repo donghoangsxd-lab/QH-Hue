@@ -205,6 +205,10 @@ function qhEngine() {
       + (fieldQ ? '&fields=' + fieldQ : '');
   }
 
+  function geomMissing(v) {
+    return v == null || /^null$/i.test(String(v).trim());
+  }
+
   // gServer bỏ khóa có giá trị rỗng khỏi từng dòng: lấy hợp các khóa ở trang đầu và trang cuối.
   async function probe(src) {
     const first = await ajaxRetry(pageUrl(src, 0), src.ten + ' thăm dò');
@@ -216,9 +220,15 @@ function qhEngine() {
       (last.searchResult || []).forEach((r) => sample.push(r));
     }
     const fields = [];
-    sample.forEach((row) => Object.keys(row).forEach((k) => {
-      if (k !== 's_geo' && k !== 'resultnumber' && !fields.includes(k)) fields.push(k);
-    }));
+    let needSgeo = false;
+    sample.forEach((row) => {
+      // Một số lớp ghi hình ở s_geo, còn geom là chữ Null.
+      if (geomMissing(row.geom) && !geomMissing(row.s_geo)) needSgeo = true;
+      Object.keys(row).forEach((k) => {
+        if (k !== 's_geo' && k !== 'resultnumber' && !fields.includes(k)) fields.push(k);
+      });
+    });
+    if (needSgeo && !fields.includes('s_geo')) fields.push('s_geo');
     return { total, fields };
   }
 
@@ -233,6 +243,7 @@ function qhEngine() {
       const data = await ajaxRetry(pageUrl(src, pi, fieldQ), src.ten + ' trang ' + (pi + 1));
       const part = data.searchResult || [];
       part.forEach((row) => {
+        if (geomMissing(row.geom) && !geomMissing(row.s_geo)) row.geom = row.s_geo;
         delete row.s_geo;
         delete row.resultnumber;
       });

@@ -1,0 +1,17 @@
+tendoituon	tendoituong
+nhanbando	nhanbando
+malienket	malienket
+xdaidien	xdaidien
+ydaidien	ydaidien
+trangthai	trangthai
+s_xdaidien	s_xdaidien
+s_ydaidien	s_ydaidien
+objectid	objectid
+mahoso	mahoso
+trangthaiq	trangthaiquyhoach
+ghichu	ghichu
+manhandang	manhandang
+ngaythunha	ngaythunhan
+ngaycapnha	ngaycapnhat
+loaimatduo	loaimatduong
+madoituong	madoituong

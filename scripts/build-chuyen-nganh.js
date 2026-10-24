@@ -635,7 +635,7 @@ function loadSchemes(file) {
       level: 'QHCT',
       fresh: true,
       ...s,
-      fresh: true
+      fresh: s.fresh !== false
     });
   });
 }
