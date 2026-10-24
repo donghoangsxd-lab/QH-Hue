@@ -26,6 +26,7 @@ import {
 import { bindMap as bindProjectFiles, onChangeLots, loadCatalog, composeNow, scheduleLots, focusProject, projectLotsDrawn, infraLotOf, byProjectAreaDesc, lotShown } from './projectFiles.js';
 import { addLotEditButton } from './lotEdit.js';
 import { planLevelOf } from './generalPlan.js';
+import { touchPrimary } from './touchGroups.js';
 import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
 import { getLevel, LEVEL_EVENT } from './mapLevel.js';
 import { bindNotchZoom } from './wheelZoom.js';
@@ -2016,9 +2017,10 @@ function openLandPopup(p, m) {
 /** Popup lô đồ án như khi bấm lô trên bản đồ: lô đất → thẻ sử dụng đất, lô hạ tầng → popup công trình bám lô */
 export function openLotPopup(p, m, latlng) {
   if (!p || !m || !latlng) return;
+  const facilityId = touchPrimary(p.id) || p.id;
   const item = p.kind === 'DXF' ? null
-    : (m === planMap && getPlanScenarioList().find(it => it.id === p.id))
-      || state.rawDataList.find(it => it.id === p.id) || state.planDataList.find(it => it.id === p.id);
+    : (m === planMap && getPlanScenarioList().find(it => it.id === facilityId))
+      || state.rawDataList.find(it => it.id === facilityId) || state.planDataList.find(it => it.id === facilityId);
   if (item) onPointClick(item, m, p.geometry);
   else openLandPopup(p, m);
 }
@@ -2051,7 +2053,8 @@ function drawLandsOn(m, list, infra = []) {
       group.addLayer(landLotShape(p, m, detailed));
       return;
     }
-    const item = (qhById && qhById.get(p.id)) || byId.get(p.id);
+    const facilityId = touchPrimary(p.id) || p.id;
+    const item = (qhById && (qhById.get(p.id) || qhById.get(facilityId))) || byId.get(p.id) || byId.get(facilityId);
     group.addLayer(infraLotShape(p, item, m, detailed));
   });
   group.addTo(m);
@@ -2346,7 +2349,8 @@ export function showProjectLot(lot) {
     return;
   }
   const list = qh ? getPlanScenarioList() : state.rawDataList;
-  const item = list.find(it => it.id === lot.id) || state.rawDataList.find(it => it.id === lot.id);
+  const facilityId = touchPrimary(lot.id) || lot.id;
+  const item = list.find(it => it.id === facilityId) || state.rawDataList.find(it => it.id === facilityId);
   if (item) onPointClick(item, m, lot.geometry);
 }
 
@@ -2359,9 +2363,10 @@ export function openSharedLot(token) {
     const lists = parsed.scenario === 'QH'
       ? [getPlanScenarioList(), state.planDataList, state.rawDataList]
       : [state.rawDataList, state.planDataList, getPlanScenarioList()];
+    const facilityId = touchPrimary(parsed.id) || parsed.id;
     let item = null;
     for (const list of lists) {
-      item = (list || []).find(it => it && String(it.id) === parsed.id);
+      item = (list || []).find(it => it && (String(it.id) === facilityId || String(it.id) === parsed.id));
       if (item) break;
     }
     if (!item) return false;
