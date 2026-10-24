@@ -16,6 +16,7 @@ Bộ dữ liệu hạ tầng chuyên ngành, gắn tab Hạ tầng. Mô hình b�
 | qhc-khu-cong-nghiep-phong-dien-f997bd2c | QHC Khu công nghiệp Phong Điền | QHC | 22880 | 2 |
 | qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3 | QHC Đô thị Phong Điền đến năm 2030 tầm nhìn đến năm 2045 | QHC | — | 1 |
 | qhc-chan-may-lang-co-a44cfad0 | QHC Chân Mây - Lăng Cô | QHC | 23935 | 1 |
+| qhc-xa-thuong-long-3f2c4da4 | QHC xã Thượng Long | QHC | 20797 | 1 |
 | qhct-tdc-phu-my-khu-c-7bfa4d26 | QHCT TĐC Phú Mỹ (Khu C) | QHCT | 20642 | 3 |
 | qhct-tdc-thuy-van-giai-doan-2-khu-e-33b92316 | QHCT TĐC Thủy Vân giai đoạn 2 (Khu E) | QHCT | 20644 | 3 |
 | qhct-trong-rung-ngap-man-ru-cha-c09cda81 | QHCT Trồng rừng ngập mặn Rú Chá | QHCT | 23967 | 3 |
@@ -30,17 +31,13 @@ Bộ dữ liệu hạ tầng chuyên ngành, gắn tab Hạ tầng. Mô hình b�
 
 QHC Khu công nghiệp Phong Điền nằm trong QHC đô thị Phong Điền. Trong ranh KCN, KCN ghi đè Phong Điền (`overrides`, `overrideArea: ranh KCN`, priority 2 > 1). Không cắt dữ liệu.
 
-Phạm vi Hành chính gắn trên đồ án (`area` trong `schemes.json`), không suy xã nằm trong đô thị. Phú Lộc: `xa:phu-loc`. Khe Tre: `dothi:khe-tre` (`catalogScheme` `qhc-khe-tre`). Vinh Hưng: `xa:vinh-loc`. KCN Phong Điền: `dothi:phong-dien` (không gộp vào đồ án Phong Điền). Chân Mây – Lăng Cô: `dothi:chan-may` (`catalogScheme` `qhc-chan-may`). Hai đồ án mapid 21817 giữ phạm vi theo tỷ lệ (1/25.000 toàn thành phố, 1/10.000 đô thị trung tâm). Tab Hạ tầng nhóm lớp theo từng đồ án trong ngành; đồ án địa phương hiện ở cả tab QHC 1/25.000 và 1/10.000, rồi bị lọc theo phạm vi đang chọn.
+Phạm vi Hành chính gắn trên đồ án (`area` trong `schemes.json`), không suy xã nằm trong đô thị. Phú Lộc: `xa:phu-loc`. Thượng Long: `xa:long-quang`. Khe Tre: `dothi:khe-tre` (`catalogScheme` `qhc-khe-tre`). Vinh Hưng: `xa:vinh-loc`. KCN Phong Điền: `dothi:phong-dien` (không gộp vào đồ án Phong Điền). Chân Mây – Lăng Cô: `dothi:chan-may` (`catalogScheme` `qhc-chan-may`). Hai đồ án mapid 21817 giữ phạm vi theo tỷ lệ (1/25.000 toàn thành phố, 1/10.000 đô thị trung tâm). Tab Hạ tầng nhóm lớp theo từng đồ án trong ngành; đồ án địa phương hiện ở cả tab QHC 1/25.000 và 1/10.000, rồi bị lọc theo phạm vi đang chọn.
 
 QHCT 1/500 nằm trong QHPK hoặc QHC cha khi xác định được (`parent`, `overrides`, `overrideArea: ranh QHCT`, priority 3). Trong ranh QHCT, QHCT được ưu tiên hơn đồ án cha. Không cắt hình cha.
 
 Lô đất hạ tầng (ghép danh sách hạ tầng trên Sheet): luôn ghi lô QHCT và ghép với dòng Sheet — sát ranh thửa thật hơn. Lô QHPK đã ghép trước đó chỉ gỡ ghép (đổi mã INFRA thành DXF, giữ polygon), không xóa và không từ chối lô QHCT. Mỗi lần gỡ ghi `docs/qhct-unpair.json` (mã lô QHPK, đồ án, mã lô QHCT, mã dòng hạ tầng). Chỉ mục ghép nằm ở khóa `pairings` của `public/data/su-dung-dat-index.json` (cùng file với chỉ mục lớp sử dụng đất, không ghi đè `layers`).
 
-Lô chức năng sử dụng đất đưa vào đồ án được lọc theo vùng ranh giới quy hoạch của đồ án đó. Ngưỡng 5 m (`SCHEME_EDGE_M` trong `public/js/schemeLotClip.js`): lô chỉ lệch vài mét do sai số vẽ thì giữ nguyên; lô vắt quá 5 m thì cắt theo ranh; lô nằm trọn ngoài dải 5 m thì bỏ. Agent nhập đồ án chạy `node scripts/clip-scheme-lots.mjs --land … --boundary … --out …` trước khi dựng catalog và ghi số lô bỏ vào `docs/cat-lo-ngoai-ranh.jsonl`. Quy tắc này không đổi ghép hạ tầng QHCT/QHPK và không gộp lô hạ tầng chung ranh.
-
-Hai thư mục mapid 21817 giữ slug lưu trữ. Catalog gắn `catalogScheme`: 1/25.000 → `qhc-hue-2045`, 1/10.000 → `qhc-trung-tam`. Lớp sử dụng đất của hai đồ án này là file tĩnh đã có (`data/qhc2045/dinhhuong.json`, `data/qhc2045/sdd.json`), không phát hành bản thô. Chỉ mục lớp đã có: `public/data/su-dung-dat-index.json`. Commit trong repo và bản quản trị ghi qua form nhập là bản công bố. Không thêm lớp sử dụng đất lần hai nếu chỉ mục hoặc file đồ án đã có lớp cùng vai trò. Cán bộ không ghi thẳng các file này.
-
-Metadata bản đồ gServer không có số quyết định. Số dưới đây lấy từ thuộc tính lớp ranh (ngày dạng M/D/YYYY của shapefile, đã đổi sang ISO). QHC TT Phú Lộc: nhiệm vụ 3134/QĐ-UBND ngày 2019-12-16, phê duyệt 1101/QĐ-UBND ngày 2020-04-17 (UBND tỉnh; 1/5 vùng ranh có giá trị). QHC Khe Tre: nhiệm vụ 1022/QĐ-UBND ngày 2016-05-16, phê duyệt 688/QĐ-UBND ngày 2020-03-13. QHC Đô thị mới Vinh Hưng: phê duyệt 193/QĐ-UBND ngày 2025-01-21 (UBND thành phố Huế). QHC Khu công nghiệp Phong Điền: trường có trên lớp ranh nhưng để trống. Hai đồ án mapid 21817: lô này chưa có lớp ranh quy hoạch.
+Metadata bản đồ gServer không có số quyết định. Số dưới đây lấy từ thuộc tính lớp ranh (ngày dạng M/D/YYYY của shapefile, đã đổi sang ISO). QHC TT Phú Lộc: nhiệm vụ 3134/QĐ-UBND ngày 2019-12-16, phê duyệt 1101/QĐ-UBND ngày 2020-04-17 (UBND tỉnh; 1/5 vùng ranh có giá trị). QHC Khe Tre: nhiệm vụ 1022/QĐ-UBND ngày 2016-05-16, phê duyệt 688/QĐ-UBND ngày 2020-03-13. QHC Đô thị mới Vinh Hưng: phê duyệt 193/QĐ-UBND ngày 2025-01-21 (UBND thành phố Huế). QHC Khu công nghiệp Phong Điền: trường có trên lớp ranh nhưng để trống. QHC xã Thượng Long (mapid 20797, 1/25.000): cơ quan UBND huyện Nam Đông, tỉnh Thừa Thiên Huế; số quyết định trên lớp ranh để trống. Hai đồ án mapid 21817: lô này chưa có lớp ranh quy hoạch.
 
 ## Catalog
 
@@ -499,6 +496,18 @@ Metadata bản đồ gServer không có số quyết định. Số dưới đây
 | QHCT Khu đô thị sinh thái Thanh Thủy | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch_A | Polygon | 1 |
 | QHCT Khu đô thị sinh thái Thanh Thủy | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch_A | Polygon | 1 |
 | QHCT Khu đô thị sinh thái Thanh Thủy | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch_L | LineString | 1 |
+| QHC xã Thượng Long | Giao thông | Quy hoạch | Bó vĩa | LineString | 57 |
+| QHC xã Thượng Long | Giao thông | Quy hoạch | Mạng lưới giao thông | LineString | 37 |
+| QHC xã Thượng Long | Giao thông | Quy hoạch | Mặt cắt | LineString | 94 |
+| QHC xã Thượng Long | Giao thông | Quy hoạch | Mặt đường bộ | Polygon | 2 |
+| QHC xã Thượng Long | San nền và thoát nước mưa | Quy hoạch | Quy hoạch chiều cao | Point | 23 |
+| QHC xã Thượng Long | Sử dụng đất, ranh và lớp quy hoạch khác | Hiện trạng | Hiện trạng sử dụng đất | Polygon | 793 |
+| QHC xã Thượng Long | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chỉ giới đường đỏ | LineString | 46 |
+| QHC xã Thượng Long | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Chức năng sử dụng đất | Polygon | 1027 |
+| QHC xã Thượng Long | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Đánh giá tổng hợp lựa chọn đất xây dựng | Polygon | 28 |
+| QHC xã Thượng Long | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Điểm chức năng | Point | 19 |
+| QHC xã Thượng Long | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch(dạng đường) | LineString | 1 |
+| QHC xã Thượng Long | Sử dụng đất, ranh và lớp quy hoạch khác | Quy hoạch | Ranh giới quy hoạch(dạng vùng) | Polygon | 1 |
 | QHC xã Hương Hữu | Giao thông | Hiện trạng | Hiện trạng mạng lưới giao thông | LineString | 42 |
 | QHC xã Hương Hữu | Giao thông | Quy hoạch | Bó vĩa | LineString | 118 |
 | QHC xã Hương Hữu | Giao thông | Quy hoạch | Mạng lưới giao thông | LineString | 69 |
@@ -544,6 +553,7 @@ Metadata bản đồ gServer không có số quyết định. Số dưới đây
 - Bó vỉa QHC trung tâm 1/10.000: lần tải trước bỏ 8 dòng không có hình.
 - Bó vỉa QHC Khu công nghiệp Phong Điền: 668 dòng, 2 dòng không có hình, catalog giữ 666.
 - Hiện trạng công trình thủy lợi dạng đường, QHC 1/25.000: 28 dòng trên gServer, tất cả thiếu hình.
+- Chức năng sử dụng đất QHC xã Thượng Long: 1056 dòng trên gServer, 26 dòng không có hình hợp lệ, catalog giữ 1027 sau khi cắt ranh (bỏ 3, cắt 2). Hiện trạng sử dụng đất: 798 dòng, bỏ 5 lô ngoài ranh, catalog giữ 793.
 - QHC đô thị Huế 2045, San nền và thoát nước mưa, Hiện trạng: Hiện trạng công trình thủy lợi dạng đường — Mọi dòng không có hình hợp lệ, đã bỏ.
 - QHC đô thị Huế 2045, Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: Sơ đồ phát triển không gian TP — Đã có lớp sử dụng đất data/qhc2045/dinhhuong.json.
 - QHC đô thị TTHuế 2045 (Trung tâm), Sử dụng đất, ranh và lớp quy hoạch khác, Quy hoạch: QH sử dụng đất (trung tâm) — Đã có lớp sử dụng đất data/qhc2045/sdd.json.

@@ -117,6 +117,21 @@
       }
     },
     {
+      "slug": "qhc-xa-thuong-long-3f2c4da4",
+      "name": "QHC xã Thượng Long",
+      "level": "QHC",
+      "mapid": 20797,
+      "parent": null,
+      "overrides": [],
+      "priority": 1,
+      "scale": 25000,
+      "area": {
+        "type": "xa",
+        "code": "long-quang"
+      },
+      "authority": "UBND huyện Nam Đông, tỉnh Thừa Thiên Huế"
+    },
+    {
       "slug": "qhct-tdc-phu-my-khu-c-7bfa4d26",
       "name": "QHCT TĐC Phú Mỹ (Khu C)",
       "level": "QHCT",
