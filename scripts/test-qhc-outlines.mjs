@@ -240,14 +240,16 @@ async function staleDesktop(page, base, { qhc, panel, shot, keepQhpk }) {
 }
 
 async function openLevel(page, id) {
-  const current = await page.getAttribute('#levelPick', 'data-level');
+  const current = await page.evaluate(() => document.body.dataset.level || '');
   if (current === id) return;
   if (await page.evaluate(() => document.body.classList.contains('right-collapsed'))) {
     await page.click('#btnExpandRightPanel');
     await page.waitForFunction(() => !document.body.classList.contains('right-collapsed'));
   }
-  await page.locator(`#levelPick [data-level="${id}"]`).click();
-  await page.waitForFunction((want) => document.getElementById('levelPick')?.dataset.level === want, id);
+  const host = id === 'urban' ? '#levelPickUrban' : '#levelPickQh';
+  if (id !== 'urban') await page.click('[data-main-tab="quyhoach"]');
+  await page.locator(`${host} [data-level="${id}"]`).click();
+  await page.waitForFunction((want) => document.body.dataset.level === want, id);
 }
 
 async function scene(page, name) {

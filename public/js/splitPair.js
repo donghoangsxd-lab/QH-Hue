@@ -1,5 +1,5 @@
 // Cặp so sánh khi chia đôi màn hình. Mặc định trái = hiện trạng, phải = quy hoạch (công trình) — đúng cách
-// chia đôi cũ. Hai danh sách trên panel phải chọn linh hoạt từng bên: hiện trạng, quy hoạch, hoặc một cấp
+// chia đôi cũ. Hai danh sách trong panel Quy hoạch chọn linh hoạt từng bên: hiện trạng, quy hoạch, hoặc một cấp
 // QH (hệ thống đô thị, QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500). Cấp đang chọn ở một bên
 // bị loại khỏi danh sách bên kia. Đổi cấp không đụng ô lớp ở panel.
 import { isSplitOn, onViewChange, planMap } from './planMap.js';
@@ -86,8 +86,8 @@ function paint() {
   const box = document.getElementById('levelSplit');
   const on = isSplitOn();
   if (box) box.hidden = !on;
-  const label = document.getElementById('levelHostLabel');
-  if (label) label.textContent = on ? 'Lớp mỗi bên' : 'Lớp đang xem';
+  const label = document.getElementById('levelHostQhLabel');
+  if (label) label.textContent = on ? 'Lớp mỗi bên' : 'Cấp quy hoạch';
   document.body.classList.toggle('level-pair', isLevelPair());
   ['left', 'right'].forEach(which => {
     const sel = document.getElementById(which === 'left' ? 'splitSideLeft' : 'splitSideRight');

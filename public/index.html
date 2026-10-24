@@ -44,7 +44,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261037">
+  <link rel="stylesheet" href="css/style.css?v=20261038">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -449,14 +449,6 @@
       <!-- TAB: LỚP DỮ LIỆU -->
       <div class="tab-body" id="tabLayers">
         <div class="layer-tree">
-        <div class="level-host" id="levelHost">
-          <div class="level-host-label" id="levelHostLabel">Lớp đang xem</div>
-          <div class="level-pick" id="levelPick" role="listbox" aria-label="Chọn lớp quy hoạch"></div>
-          <div class="level-split" id="levelSplit">
-            <label>Bên trái<select id="splitSideLeft" aria-label="Lớp bên trái"></select></label>
-            <label>Bên phải<select id="splitSideRight" aria-label="Lớp bên phải"></select></label>
-          </div>
-        </div>
         <div class="layer-main" id="layerMain">
           <div class="layer-mag" id="layerMag">
             <button type="button" class="mag-nav" data-mag-step="-1" title="Panel phía trước" aria-label="Panel phía trước"><svg class="ico"><use href="#i-step-left"/></svg></button>
@@ -487,6 +479,9 @@
                 <button type="button" class="admin-tab" data-admin-tab="dvhc" role="tab" aria-selected="false" aria-controls="adminPaneDvhc" title="Xã, phường">ĐVHC</button>
               </div>
               <div id="adminPaneDoThi" data-admin-pane="dothi">
+                <div class="level-pick" id="levelPickUrban" data-level-pick role="listbox" aria-label="Hệ thống đô thị">
+                  <button type="button" class="level-pick-btn" role="option" data-level="urban"><span>Hệ thống đô thị</span></button>
+                </div>
                 <div id="axisTownList" class="axis-area-list"></div>
             <div class="urban-static">
               <div class="layer-row"><div><input type="checkbox" id="chk_urban" checked><label for="chk_urban" title="Bản đồ hiện trạng: đô thị và phường đạt trình độ phát triển đô thị từ 01/01/2026 theo Quyết định 614/QĐ-UBND ngày 10/02/2026. Bản đồ quy hoạch: hệ thống đô thị sau năm 2030 theo Quyết định 756/QĐ-UBND ngày 28/02/2026. Trỏ chuột vào ranh, ký hiệu hoặc phường để xem thông tin"><svg class="ico ico-layer"><use href="#i-flag"/></svg>Phân loại đô thị <small class="layer-hint" id="urbanLockHint"></small></label></div><span class="layer-decisions"><button type="button" class="layer-decision" data-layer-decision="do-thi-hien-trang" data-label="QĐ 614"></button><button type="button" class="layer-decision" data-layer-decision="do-thi-quy-hoach" data-label="QĐ 756"></button></span></div>
@@ -497,10 +492,109 @@
                 <div id="axisWardList" class="axis-area-list"></div>
               </div>
               <div id="axisAreaTools"></div>
+            <details class="axis-fold" id="axisBaseFold">
+              <summary>Lớp nền</summary>
+              <div class="layer-map-pane" id="layerPaneBase" data-map-pane="base" role="tabpanel">
+          <div class="sat-pick basemap-pick">
+            <label for="basemapSelect" title="Ảnh nền cho bản đồ hiện trạng và quy hoạch. Bản đồ đường phố là OpenFreeMap Liberty, có tên đường; nếu không tải được thì nền xám nhạt. Lựa chọn được ghi nhớ trên máy này"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ảnh nền</label>
+            <select id="basemapSelect" aria-label="Ảnh nền bản đồ">
+              <option value="google">Google vệ tinh</option>
+              <option value="positron" selected>Bản đồ đường phố</option>
+            </select>
+          </div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div><button type="button" class="layer-mini-btn active" id="btnWardNames" title="Bật/tắt tên phường, xã trên bản đồ" aria-label="Bật/tắt tên phường, xã" aria-pressed="true">Aa</button></div>
+          <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap và tuyến do quản trị viên bổ sung. Thu nhỏ vẫn hiện trục chính."><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(phóng to để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
+          <div class="layer-row layer-subrow" id="osmRailRow" hidden><div><input type="checkbox" id="chk_osmRail" data-layer-sub><label for="chk_osmRail" title="Đường sắt và ga hiện trạng trên OpenStreetMap. Chỉ hiện khi bật Mạng lưới đường. Không gồm tuyến bỏ hay quy hoạch, không nhập vào mạng đường bộ. Huế chưa có đường sắt đô thị trong OSM. Hiện từ mức phóng 11.">Đường sắt hiện trạng <small class="layer-hint" id="railHint"></small></label></div></div>
+          <div class="layer-row layer-subrow" id="osmWaterRow" hidden><div><input type="checkbox" id="chk_osmWater" data-layer-sub><label for="chk_osmWater" title="Sông, kênh và bến phà trên OpenStreetMap (waterway=river|canal, amenity=ferry_terminal). Đây là tuyến nước, không phải mạng tàu thủy hành khách. Lớp tham chiếu cho tiêu chuẩn giao thông công cộng. Chỉ hiện khi bật Mạng lưới đường, và tắt theo lớp đó.">Đường thủy nội địa (OSM)</label></div></div>
+          <div class="flood-box" id="osmOpenBox" style="display:none;">
+            <div class="sat-legend" id="osmOpenLegend"></div>
+            <div class="flood-stats" id="osmOpenStats"></div>
+          </div>
+          <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
+            <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
+            <span class="road-legend-item"><i style="background:#60a5fa; height:2px;"></i>Khu vực</span>
+            <span class="road-legend-item"><i style="background:#cbd5e1; height:2px;"></i>Nội bộ</span>
+            <span class="road-legend-item" title="Đường xe đạp: OpenStreetMap và tuyến do quản trị viên bổ sung"><i style="background:repeating-linear-gradient(90deg,#4ade80 0 5px,transparent 5px 8px); height:2px;"></i>Xe đạp</span>
+            <span class="road-legend-item"><i style="background:#fde047; height:2px;"></i>Chưa phân loại</span>
+          </div>
+          <div class="road-legend layer-legend" id="railLegend" style="display:none;">
+            <span class="road-legend-item" title="Nét đậm và tà vẹt sáng, cùng kiểu đường sắt quốc gia hiện trạng"><svg class="rail-swatch" viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><line x1="1" y1="6" x2="27" y2="6" stroke="#1e293b" stroke-width="4"/><line x1="1" y1="6" x2="27" y2="6" stroke="#f8fafc" stroke-width="1.6" stroke-dasharray="7 7"/></svg>Đường sắt, ga</span>
+            <span class="rail-status" id="railStatus"></span>
+          </div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_cadastre"><label for="chk_cadastre" title="Thửa đất địa chính tỉnh Thừa Thiên Huế cũ (gis21.hue.gov.vn, lập năm 2016): số tờ, số thửa, diện tích, loại đất, địa chỉ; không gồm tên chủ sử dụng. Hiện từ mức phóng 15, bấm vào thửa để xem thông tin. Nguồn chưa có Quảng Điền, Phú Lộc, Nam Đông."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Thửa đất địa chính 2016 <small class="layer-hint" id="cadastreHint">(phóng to để xem)</small></label></div>
+            <span id="cadastreOpBox" class="layer-slider" style="display:none;"><input type="range" id="cadastreOpacity" class="opacity-slider" min="0" max="100" value="100" title="Độ trong suốt lớp thửa đất" aria-label="Độ trong suốt lớp thửa đất"></span>
+          </div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_gba"><label for="chk_gba" title="Dấu chân công trình Global Building Atlas. Ở Huế hầu hết là Google Open Buildings, ảnh đến năm 2021; nhà xây sau đó có thể chưa có dấu chân. Màu theo số tầng = làm tròn (chiều cao ước lượng / 4): 1-2, 3-5, 6-10, 11-50 tầng. Nhà trên 50 tầng cùng nhóm 11-50. Nhà đã công bố số tầng giữ số đó. Hiện từ mức phóng 13. Dưới mức 16 chỉ tô mảng theo nhóm tầng, không viền từng nhà; viền trở lại từ mức 16. Số tầng ghi trắng trên dấu chân từ mức 17; nhà quá nhỏ không ghi. Dấu chân giao thửa địa chính 2016 có mã NTD (kể cả NTD+CLN và CLN+NTD), không kể diện tích hay chiều cao, đã gỡ khỏi dữ liệu đã xuất. Đất nghĩa trang quy hoạch, OSM và cụm sườn vẫn ẩn lúc xem nếu dưới 60 m² và không cao quá 3,5 m. Cụm sườn cao không quá 2,5 m thì ẩn tới dưới 180 m². Đặt enabled = false trong cemetery-mask để vẽ lại phần còn lại. Nhà đã hiệu chỉnh chiều cao dùng số mét đã ghi đè. Tấm xám là dấu chân Microsoft trên 1000 m² chưa có trong GBA và chưa có số tầng. Dấu chân quản trị vẽ thêm nằm cùng lớp, có số tầng, có thể tách đế và tháp."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Công trình xây dựng (GBA) <small class="layer-hint" id="gbaHint">(phóng tới mức 13)</small></label></div>
+            <span class="layer-actions">
+              <button type="button" class="layer-mini-btn" id="btnGbaDraw" hidden title="Quản trị: vẽ dấu chân nhà mới, đặt số tầng, có thể tách đế và tháp. Lưu riêng cạnh bản sửa tầng, không ghi vào bảng nhà cao.">Vẽ</button>
+              <button type="button" class="layer-mini-btn" id="btnGbaFloors" hidden title="Quản trị: bấm dấu chân để sửa số tầng. Lưu riêng, không ghi đè bảng nhà cao.">Tầng</button>
+            </span>
+            <label class="layer-alert" title="Công trình vi phạm hành lang/đất rừng">
+              <input type="checkbox" id="chk_violate" aria-label="Công trình vi phạm hành lang/đất rừng">
+              <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg>
+            </label>
+          </div>
+          <div class="flood-box" id="gbaBox" style="display:none;"></div>
+          <div class="flood-box" id="violateBox" style="display:none;"></div>
+          <div class="flood-box" id="cadastreBox" style="display:none;">
+            <div class="cad-find">
+              <select id="cadastreXa" aria-label="Xã/phường (địa giới cũ)"><option value="">Chọn xã/phường (địa giới cũ)</option></select>
+              <input type="text" id="cadastreTo" inputmode="numeric" placeholder="Tờ" aria-label="Số tờ bản đồ">
+              <input type="text" id="cadastreThua" inputmode="numeric" placeholder="Thửa" aria-label="Số thửa">
+              <button type="button" class="layer-mini-btn" id="btnCadastreFind" title="Tìm thửa theo xã, số tờ, số thửa">Tìm</button>
+            </div>
+            <div class="flood-stats" id="cadastreStatus"></div>
+          </div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_pop"><label for="chk_pop" title="Mặc định là dân theo dấu chân nhà ở trên ô 30 m. Pixel cũ gán khoảng 4% dân số lên đất nghĩa trang. Cách chia dân nằm ở Đề xuất → Quản trị → Ô dân cư. Bật lớp 14. Chung cư không đổi số này."><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư <small class="layer-hint" id="popLayerHint"></small></label></div>
+            <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
+          </div>
+          <div class="heat-legend" id="popLegend" hidden>
+            <div class="heat-legend-sub" id="popLegendTitle">Người / ô 30 m</div>
+            <div class="heat-legend-bar pop-legend-bar"></div>
+            <div class="heat-legend-ticks" id="popLegendTicks"><span>0</span><span>15</span><span>≥30</span></div>
+          </div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Đất xây dựng theo ảnh vệ tinh. Ranh đỏ: hiện trạng đến năm gốc. Ranh xanh: phát triển mới. Phương pháp nằm trong chú thích khi bật lớp."><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Đất xây dựng (vệ tinh)</label></div>
+            <span id="newDevOpBox" class="layer-slider" style="display:none;"><input type="range" id="newDevOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp vùng phát triển mới" aria-label="Độ trong suốt lớp vùng phát triển mới"></span>
+          </div>
+          <div class="flood-box" id="newDevBox" style="display:none;">
+            <div class="sat-pick"><label for="newDevYear">So với năm</label><select id="newDevYear"></select></div>
+            <div class="sat-legend" id="newDevLegend"></div>
+            <div class="flood-stats" id="newDevStats"></div>
+          </div>
+          <div class="layer-row">
+            <div><input type="checkbox" id="chk_heat"><label for="chk_heat"><svg class="ico ico-layer"><use href="#i-heat"/></svg>Bản đồ độ phủ hạ tầng</label></div>
+            <span id="heatBox" class="layer-slider" style="display:none;"><input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30" title="Độ trong suốt bản đồ độ phủ" aria-label="Độ trong suốt bản đồ độ phủ"></span>
+          </div>
+          <div class="heat-legend" id="heatLegend" hidden>
+            <div class="heat-legend-sub">Số nhóm hạ tầng tiếp cận được tại mỗi vị trí</div>
+            <div class="heat-legend-bar"></div>
+            <div class="heat-legend-ticks">
+              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
+            </div>
+          </div>
+          </div>
+            </details>
             </div>
           </div>
           <div class="layer-main-pane" id="layerPaneQuyHoach" data-main-pane="quyhoach" role="tabpanel">
         <div id="axisQuyHoach">
+        <div class="level-host" id="levelHostQh">
+          <div class="level-host-label" id="levelHostQhLabel">Cấp quy hoạch</div>
+          <div class="level-pick" id="levelPickQh" data-level-pick role="listbox" aria-label="Cấp quy hoạch">
+            <button type="button" class="level-pick-btn" role="option" data-level="qhc25"><span>QHC 1/25.000</span></button>
+            <button type="button" class="level-pick-btn" role="option" data-level="qhc10"><span>QHC 1/10.000</span></button>
+            <button type="button" class="level-pick-btn" role="option" data-level="qhpk"><span>QHPK 1/2.000</span></button>
+            <button type="button" class="level-pick-btn" role="option" data-level="qhct"><span>QHCT 1/500</span></button>
+          </div>
+          <div class="level-split" id="levelSplit" hidden>
+            <label>Bên trái<select id="splitSideLeft" aria-label="Lớp bên trái"></select></label>
+            <label>Bên phải<select id="splitSideRight" aria-label="Lớp bên phải"></select></label>
+          </div>
+        </div>
         <div class="cn-tools" id="axisToolsQuyHoach"></div>
         <p class="axis-scope" id="axisScopeQuyHoach">Phạm vi: Toàn thành phố <span class="layer-main-count" id="planTabCount" title="Số đồ án đang hiện / tổng số"></span></p>
         <div hidden>
@@ -603,191 +697,11 @@
         </div>
           </div>
           <div class="layer-main-pane" id="layerPaneHaTang" data-main-pane="hatang" role="tabpanel" hidden>
+            <div data-iso-slot id="isoSlotHaTang"></div>
             <div id="browseNganh"></div>
-            <section class="axis-base" id="baseHaTang"></section>
-          </div>
-          <div class="layer-main-pane" id="layerPaneXaHoi" data-main-pane="xahoi" role="tabpanel" hidden>
-            <div id="axisXaHoi">
-              <p class="axis-scope" id="axisScopeXaHoi"></p>
-              <div id="xahoiPoints">
-<section class="axis-group" id="pointWorks">
-        <h3 class="axis-group-title">Công trình điểm</h3>
-        <section class="axis-group" id="pcccInfra">
-          <h3 class="axis-group-title">PCCC</h3>
-          <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c12"><label for="chk_c12" title="Bán kính phục vụ ≤ 3 km phường, ≤ 5 km xã (QCVN 01:2026 Mục 2.5.13.1). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Pccc.svg" class="layer-type-icon" alt="" width="14" height="16">10. Trụ sở cảnh sát PCCC</label></div><button type="button" class="btn-dot-buffer" data-buffer="b12" title="Bật/tắt bán kính phục vụ" aria-label="Bật/tắt bán kính phục vụ" aria-pressed="false">●</button></div>
-        </section>
-        <div class="axis-group" id="trafficPoints">
-          <h3 class="axis-group-title">Điểm giao thông</h3>
-          <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c2"><label for="chk_c2"><img src="./icons/Parking.png" class="layer-type-icon" alt="" width="14" height="16">2. Bãi đỗ xe, trạm sạc</label></div><button type="button" class="btn-dot-buffer" data-buffer="b2" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
-          <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c11"><label for="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Bus.svg" class="layer-type-icon" alt="" width="14" height="16">13. Trạm dừng xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" title="Bật/tắt phạm vi 500 m" aria-label="Bật/tắt phạm vi 500 m" aria-pressed="false">●</button></div>
-        </div>
-        <div class="layer-status-legend" aria-label="Ghi chú trạng thái điểm giao thông và PCCC">
-          <span class="layer-status-title">Ghi chú:</span>
-          <span title="Đã được quản trị viên phê duyệt"><img src="./icons/Park.png" class="legend-icon" alt="">Đã phê duyệt</span>
-          <span class="legend-pending" title="Đề xuất chưa chấp thuận (TrangThai = FALSE)"><img src="./icons/Park2.png" class="legend-icon" alt=""><b>Chờ duyệt</b></span>
-        </div>
-        <div id="pointCatalog"></div>
-</section>
-<section class="axis-group" id="socialInfra">
-        <h3 class="axis-group-title">Hạ tầng xã hội <span class="layer-main-count" id="infraTabCount" title="Số nhóm công trình đang bật / tổng số"></span></h3>
-        <div class="layer-pane-tools">
-          <span class="layer-pane-note">Đang hiện <b id="layerCount">0/14</b> nhóm điểm</span>
-          <button type="button" class="layer-eye-btn" id="btnToggleAllIcons" aria-pressed="false" title="Bật / tắt toàn bộ 14 nhóm công trình" aria-label="Bật / tắt toàn bộ 14 nhóm công trình">
-            <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>Tất cả
-          </button>
-        </div>
-        
-        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c1"><label for="chk_c1"><img src="./icons/Park.png" class="layer-type-icon" alt="" width="14" height="16">1. Công viên, điểm xanh</label></div><button type="button" class="btn-dot-buffer" data-buffer="b1" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
-
-        
-        <div class="edu-group">
-          <div class="layer-row"><div><input type="checkbox" id="chk_edu" aria-label="Giáo dục"><label for="chk_edu">Giáo dục</label></div></div>
-          <div class="edu-levels" role="group" aria-label="Cấp học">
-            <button type="button" data-edu-level="all" class="active">Tất cả</button>
-            <button type="button" data-edu-level="mn">Mầm non</button>
-            <button type="button" data-edu-level="th">Tiểu học</button>
-            <button type="button" data-edu-level="thcs">THCS</button>
-            <button type="button" data-edu-level="thpt">THPT</button>
-          </div>
-          
-        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c3"><label for="chk_c3"><img src="./icons/Mamnon.png" class="layer-type-icon" alt="" width="14" height="16">3. Trường Mầm non</label></div><button type="button" class="btn-dot-buffer" data-buffer="b3" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
-
-          
-        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c4"><label for="chk_c4"><img src="./icons/Tieuhoc.png" class="layer-type-icon" alt="" width="14" height="16">4. Trường Tiểu học</label></div><button type="button" class="btn-dot-buffer" data-buffer="b4" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
-
-          
-        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c5"><label for="chk_c5"><img src="./icons/THCS.png" class="layer-type-icon" alt="" width="14" height="16">5. Trường THCS</label></div><button type="button" class="btn-dot-buffer" data-buffer="b5" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
-
-          
-        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c10"><label for="chk_c10"><img src="./icons/THPT.png" class="layer-type-icon" alt="" width="14" height="16">6. Trường THPT</label></div><button type="button" class="btn-dot-buffer" data-buffer="b10" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
-
-        </div>
-        
-        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c6"><label for="chk_c6"><img src="./icons/Yte.png" class="layer-type-icon" alt="" width="14" height="16">7. Bệnh viện, trạm y tế</label></div><button type="button" class="btn-dot-buffer" data-buffer="b6" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
-
-        
-        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c7"><label for="chk_c7"><img src="./icons/Vanhoa.png" class="layer-type-icon" alt="" width="14" height="16">8. Nhà văn hóa, thể thao</label></div><button type="button" class="btn-dot-buffer" data-buffer="b7" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
-
-        
-        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c8"><label for="chk_c8"><img src="./icons/Cho.png" class="layer-type-icon" alt="" width="14" height="16">9. Chợ, TTTM</label></div><button type="button" class="btn-dot-buffer" data-buffer="b8" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
-
-        
-        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_nt_funeral"><label for="chk_nt_funeral" title="Nhà tang lễ và cơ sở hỏa táng. Khoảng cách an toàn theo QCVN 01:2026 Bảng 23."><img src="./icons/Nghiatrang.svg" class="layer-type-icon" alt="" width="14" height="16">Nhà tang lễ</label></div></div>
-        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_nt_grave"><label for="chk_nt_grave" title="Nghĩa trang cát táng, hung táng và chôn cất một lần. Vùng đệm là khoảng cách an toàn tới khu dân cư (QCVN 01:2026 Bảng 23)."><img src="./icons/Nghiatrang.svg" class="layer-type-icon" alt="" width="14" height="16">Nghĩa trang</label></div><button type="button" class="btn-dot-buffer" data-buffer="b13" title="Bật/tắt khoảng cách an toàn" aria-label="Bật/tắt khoảng cách an toàn" aria-pressed="false">●</button></div>
-        
-        <div hidden><div><input type="checkbox" id="chk_c13"><label for="chk_c13" title="Vùng đệm = khoảng cách an toàn tới khu dân cư (QCVN 01:2026 Bảng 23). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Nghiatrang.svg" class="layer-type-icon" alt="" width="14" height="16">11. Nhà tang lễ, nghĩa trang</label></div></div>
-
-        
-        <div class="layer-status-legend" aria-label="Ghi chú trạng thái điểm">
-          <span class="layer-status-title">Ghi chú:</span>
-          <span title="Đã được quản trị viên phê duyệt"><img src="./icons/Park.png" class="legend-icon" alt="">Đã phê duyệt</span>
-          <span class="legend-pending" title="Đề xuất chưa chấp thuận (TrangThai = FALSE)"><img src="./icons/Park2.png" class="legend-icon" alt=""><b>Chờ duyệt</b></span>
-        </div>
-
-          </section>
-                        </div>
-            </div>
-            <section class="axis-base" id="baseXaHoi"></section>
-          </div>
-          <div class="layer-main-pane" id="layerPaneKienTruc" data-main-pane="kientruc" role="tabpanel" hidden>
-            <div id="axisKienTruc"></div>
-            <section class="axis-base" id="baseKienTruc"></section>
-          </div>
-        </div>
-
-        <div class="layer-map" id="layerMap">
-          <div class="layer-map-tabs" role="tablist" aria-label="Bản đồ nền và bản đồ môi trường">
-            <button type="button" class="layer-map-tab active" role="tab" data-map-tab="base" aria-selected="true" aria-controls="layerPaneBase" title="Ranh giới phường xã, mạng lưới đường, phân bổ dân cư, ranh lô công trình, đất xây dựng theo ảnh vệ tinh, bản đồ độ phủ và bán kính phục vụ giả lập."><span class="layer-map-label">Bản đồ nền</span><span class="layer-count layer-map-count" title="Số lớp đang bật">1</span></button>
-            <button type="button" class="layer-map-tab" role="tab" data-map-tab="env" aria-selected="false" aria-controls="layerPaneEnv" title="Địa hình, thoát nước, ngập, nhiệt độ bề mặt, phủ thực vật, ưu tiên trồng cây và công trình chịu rủi ro."><span class="layer-map-label">Bản đồ môi trường</span><span class="layer-count layer-map-count" title="Số lớp đang bật"></span></button>
-          </div>
-          <div class="layer-map-pane" id="layerPaneBase" data-map-pane="base" role="tabpanel">
-          <div class="sat-pick basemap-pick">
-            <label for="basemapSelect" title="Ảnh nền cho bản đồ hiện trạng và quy hoạch. Bản đồ đường phố là OpenFreeMap Liberty, có tên đường; nếu không tải được thì nền xám nhạt. Lựa chọn được ghi nhớ trên máy này"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ảnh nền</label>
-            <select id="basemapSelect" aria-label="Ảnh nền bản đồ">
-              <option value="google">Google vệ tinh</option>
-              <option value="positron" selected>Bản đồ đường phố</option>
-            </select>
-          </div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_bound" checked><label for="chk_bound"><svg class="ico ico-layer"><use href="#i-map"/></svg>Ranh giới 40 Phường Xã</label></div><button type="button" class="layer-mini-btn active" id="btnWardNames" title="Bật/tắt tên phường, xã trên bản đồ" aria-label="Bật/tắt tên phường, xã" aria-pressed="true">Aa</button></div>
-          <div class="layer-row"><div><input type="checkbox" id="chk_roads"><label for="chk_roads" title="Mạng lưới đường OpenStreetMap và tuyến do quản trị viên bổ sung. Thu nhỏ vẫn hiện trục chính."><svg class="ico ico-layer"><use href="#i-road"/></svg>Mạng lưới đường <small class="layer-hint" id="roadsHint">(phóng to để xem)</small></label></div><button type="button" class="layer-mini-btn" id="btnRoadLabels" title="Bật/tắt tem tên đường, tên công trình (Google) phủ trên bản đồ" aria-label="Bật/tắt tem đường" aria-pressed="false">Aa</button></div>
-          <div class="layer-row layer-subrow" id="osmRailRow" hidden><div><input type="checkbox" id="chk_osmRail" data-layer-sub><label for="chk_osmRail" title="Đường sắt và ga hiện trạng trên OpenStreetMap. Chỉ hiện khi bật Mạng lưới đường. Không gồm tuyến bỏ hay quy hoạch, không nhập vào mạng đường bộ. Huế chưa có đường sắt đô thị trong OSM. Hiện từ mức phóng 11.">Đường sắt hiện trạng <small class="layer-hint" id="railHint"></small></label></div></div>
-          <div class="layer-row layer-subrow" id="osmWaterRow" hidden><div><input type="checkbox" id="chk_osmWater" data-layer-sub><label for="chk_osmWater" title="Sông, kênh và bến phà trên OpenStreetMap (waterway=river|canal, amenity=ferry_terminal). Đây là tuyến nước, không phải mạng tàu thủy hành khách. Lớp tham chiếu cho tiêu chuẩn giao thông công cộng. Chỉ hiện khi bật Mạng lưới đường, và tắt theo lớp đó.">Đường thủy nội địa (OSM)</label></div></div>
-          <div class="flood-box" id="osmOpenBox" style="display:none;">
-            <div class="sat-legend" id="osmOpenLegend"></div>
-            <div class="flood-stats" id="osmOpenStats"></div>
-          </div>
-          <div class="road-legend layer-legend" id="roadsLegend" style="display:none;">
-            <span class="road-legend-item"><i style="background:#fb923c; height:3px;"></i>Trục chính</span>
-            <span class="road-legend-item"><i style="background:#60a5fa; height:2px;"></i>Khu vực</span>
-            <span class="road-legend-item"><i style="background:#cbd5e1; height:2px;"></i>Nội bộ</span>
-            <span class="road-legend-item" title="Đường xe đạp: OpenStreetMap và tuyến do quản trị viên bổ sung"><i style="background:repeating-linear-gradient(90deg,#4ade80 0 5px,transparent 5px 8px); height:2px;"></i>Xe đạp</span>
-            <span class="road-legend-item"><i style="background:#fde047; height:2px;"></i>Chưa phân loại</span>
-          </div>
-          <div class="road-legend layer-legend" id="railLegend" style="display:none;">
-            <span class="road-legend-item" title="Nét đậm và tà vẹt sáng, cùng kiểu đường sắt quốc gia hiện trạng"><svg class="rail-swatch" viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><line x1="1" y1="6" x2="27" y2="6" stroke="#1e293b" stroke-width="4"/><line x1="1" y1="6" x2="27" y2="6" stroke="#f8fafc" stroke-width="1.6" stroke-dasharray="7 7"/></svg>Đường sắt, ga</span>
-            <span class="rail-status" id="railStatus"></span>
-          </div>
-          <div class="layer-row">
-            <div><input type="checkbox" id="chk_cadastre"><label for="chk_cadastre" title="Thửa đất địa chính tỉnh Thừa Thiên Huế cũ (gis21.hue.gov.vn, lập năm 2016): số tờ, số thửa, diện tích, loại đất, địa chỉ; không gồm tên chủ sử dụng. Hiện từ mức phóng 15, bấm vào thửa để xem thông tin. Nguồn chưa có Quảng Điền, Phú Lộc, Nam Đông."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Thửa đất địa chính 2016 <small class="layer-hint" id="cadastreHint">(phóng to để xem)</small></label></div>
-            <span id="cadastreOpBox" class="layer-slider" style="display:none;"><input type="range" id="cadastreOpacity" class="opacity-slider" min="0" max="100" value="100" title="Độ trong suốt lớp thửa đất" aria-label="Độ trong suốt lớp thửa đất"></span>
-          </div>
-          <div class="layer-row">
-            <div><input type="checkbox" id="chk_gba"><label for="chk_gba" title="Dấu chân công trình Global Building Atlas. Ở Huế hầu hết là Google Open Buildings, ảnh đến năm 2021; nhà xây sau đó có thể chưa có dấu chân. Màu theo số tầng = làm tròn (chiều cao ước lượng / 4): 1-2, 3-5, 6-10, 11-50 tầng. Nhà trên 50 tầng cùng nhóm 11-50. Nhà đã công bố số tầng giữ số đó. Hiện từ mức phóng 13. Dưới mức 16 chỉ tô mảng theo nhóm tầng, không viền từng nhà; viền trở lại từ mức 16. Số tầng ghi trắng trên dấu chân từ mức 17; nhà quá nhỏ không ghi. Dấu chân giao thửa địa chính 2016 có mã NTD (kể cả NTD+CLN và CLN+NTD), không kể diện tích hay chiều cao, đã gỡ khỏi dữ liệu đã xuất. Đất nghĩa trang quy hoạch, OSM và cụm sườn vẫn ẩn lúc xem nếu dưới 60 m² và không cao quá 3,5 m. Cụm sườn cao không quá 2,5 m thì ẩn tới dưới 180 m². Đặt enabled = false trong cemetery-mask để vẽ lại phần còn lại. Nhà đã hiệu chỉnh chiều cao dùng số mét đã ghi đè. Tấm xám là dấu chân Microsoft trên 1000 m² chưa có trong GBA và chưa có số tầng. Dấu chân quản trị vẽ thêm nằm cùng lớp, có số tầng, có thể tách đế và tháp."><svg class="ico ico-layer"><use href="#i-parcel"/></svg>Công trình xây dựng (GBA) <small class="layer-hint" id="gbaHint">(phóng tới mức 13)</small></label></div>
-            <span class="layer-actions">
-              <button type="button" class="layer-mini-btn" id="btnGbaDraw" hidden title="Quản trị: vẽ dấu chân nhà mới, đặt số tầng, có thể tách đế và tháp. Lưu riêng cạnh bản sửa tầng, không ghi vào bảng nhà cao.">Vẽ</button>
-              <button type="button" class="layer-mini-btn" id="btnGbaFloors" hidden title="Quản trị: bấm dấu chân để sửa số tầng. Lưu riêng, không ghi đè bảng nhà cao.">Tầng</button>
-            </span>
-            <label class="layer-alert" title="Công trình vi phạm hành lang/đất rừng">
-              <input type="checkbox" id="chk_violate" aria-label="Công trình vi phạm hành lang/đất rừng">
-              <svg class="ico" aria-hidden="true"><use href="#i-alert"/></svg>
-            </label>
-          </div>
-          <div class="flood-box" id="gbaBox" style="display:none;"></div>
-          <div class="flood-box" id="violateBox" style="display:none;"></div>
-          <div class="flood-box" id="cadastreBox" style="display:none;">
-            <div class="cad-find">
-              <select id="cadastreXa" aria-label="Xã/phường (địa giới cũ)"><option value="">Chọn xã/phường (địa giới cũ)</option></select>
-              <input type="text" id="cadastreTo" inputmode="numeric" placeholder="Tờ" aria-label="Số tờ bản đồ">
-              <input type="text" id="cadastreThua" inputmode="numeric" placeholder="Thửa" aria-label="Số thửa">
-              <button type="button" class="layer-mini-btn" id="btnCadastreFind" title="Tìm thửa theo xã, số tờ, số thửa">Tìm</button>
-            </div>
-            <div class="flood-stats" id="cadastreStatus"></div>
-          </div>
-          <div class="layer-row">
-            <div><input type="checkbox" id="chk_pop"><label for="chk_pop" title="Mặc định là dân theo dấu chân nhà ở trên ô 30 m. Pixel cũ gán khoảng 4% dân số lên đất nghĩa trang. Cách chia dân nằm ở Đề xuất → Quản trị → Ô dân cư. Bật lớp 14. Chung cư không đổi số này."><svg class="ico ico-layer"><use href="#i-users"/></svg>Phân bổ dân cư <small class="layer-hint" id="popLayerHint"></small></label></div>
-            <span id="popBox" class="layer-slider" style="display:none;"><input type="range" id="popOpacity" class="opacity-slider" min="0" max="100" value="60" title="Độ trong suốt lớp dân cư" aria-label="Độ trong suốt lớp dân cư"></span>
-          </div>
-          <div class="heat-legend" id="popLegend" hidden>
-            <div class="heat-legend-sub" id="popLegendTitle">Người / ô 30 m</div>
-            <div class="heat-legend-bar pop-legend-bar"></div>
-            <div class="heat-legend-ticks" id="popLegendTicks"><span>0</span><span>15</span><span>≥30</span></div>
-          </div>
-          <div class="layer-row">
-            <div><input type="checkbox" id="chk_newdev"><label for="chk_newdev" title="Đất xây dựng theo ảnh vệ tinh. Ranh đỏ: hiện trạng đến năm gốc. Ranh xanh: phát triển mới. Phương pháp nằm trong chú thích khi bật lớp."><svg class="ico ico-layer"><use href="#i-sk-polygon"/></svg>Đất xây dựng (vệ tinh)</label></div>
-            <span id="newDevOpBox" class="layer-slider" style="display:none;"><input type="range" id="newDevOpacity" class="opacity-slider" min="0" max="100" value="70" title="Độ trong suốt lớp vùng phát triển mới" aria-label="Độ trong suốt lớp vùng phát triển mới"></span>
-          </div>
-          <div class="flood-box" id="newDevBox" style="display:none;">
-            <div class="sat-pick"><label for="newDevYear">So với năm</label><select id="newDevYear"></select></div>
-            <div class="sat-legend" id="newDevLegend"></div>
-            <div class="flood-stats" id="newDevStats"></div>
-          </div>
-          <div class="layer-row">
-            <div><input type="checkbox" id="chk_heat"><label for="chk_heat"><svg class="ico ico-layer"><use href="#i-heat"/></svg>Bản đồ độ phủ hạ tầng</label></div>
-            <span id="heatBox" class="layer-slider" style="display:none;"><input type="range" id="heatOpacity" class="opacity-slider" min="0" max="100" value="30" title="Độ trong suốt bản đồ độ phủ" aria-label="Độ trong suốt bản đồ độ phủ"></span>
-          </div>
-          <div class="heat-legend" id="heatLegend" hidden>
-            <div class="heat-legend-sub">Số nhóm hạ tầng tiếp cận được tại mỗi vị trí</div>
-            <div class="heat-legend-bar"></div>
-            <div class="heat-legend-ticks">
-              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
-            </div>
-          </div>
-          <div class="rp-inline-field">
-            <label for="inputIsoRadius"><svg class="ico ico-layer"><use href="#i-radius"/></svg>Giả lập bán kính chung (m)</label>
-            <input type="number" id="inputIsoRadius" placeholder="Mặc định" min="50" max="5000" step="50" title="Để trống = dùng bán kính riêng của từng công trình (50–5000 m)" />
-          </div>
-          </div>
-          <div class="layer-map-pane" id="layerPaneEnv" data-map-pane="env" role="tabpanel" hidden>
+            <details class="axis-fold" id="axisEnvFold">
+              <summary>Môi trường</summary>
+              <div class="layer-map-pane" id="layerPaneEnv" data-map-pane="env" role="tabpanel">
           <div class="layer-row">
             <div><input type="checkbox" id="chk_terrain"><label for="chk_terrain" title="Cao độ nền FABDEM ~30 m (Hawker &amp; Neal 2021, CC BY 4.0): đã gỡ nhà và tán cây khỏi Copernicus GLO-30, hệ EGM2008, trong ranh Huế. Ngoài vùng dữ liệu vẫn là cao độ bề mặt GLO-30. FABDEM is produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved."><svg class="ico ico-layer"><use href="#i-terrain"/></svg>Địa hình (cao độ nền)</label></div>
             <span id="terrainBox" class="layer-slider" style="display:none;"><input type="range" id="terrainOpacity" class="opacity-slider" min="0" max="100" value="55" title="Độ trong suốt lớp địa hình" aria-label="Độ trong suốt lớp địa hình"></span>
@@ -921,7 +835,104 @@
             <div class="flood-stats" id="riskStats"></div>
           </div>
           </div>
+            </details>
+            <section class="axis-base" id="baseHaTang"></section>
+          </div>
+          <div class="layer-main-pane" id="layerPaneXaHoi" data-main-pane="xahoi" role="tabpanel" hidden>
+            <div data-iso-slot id="isoSlotXaHoi">
+          <div class="rp-inline-field" id="isoRadiusField">
+            <label for="inputIsoRadius"><svg class="ico ico-layer"><use href="#i-radius"/></svg>Giả lập bán kính chung (m)</label>
+            <input type="number" id="inputIsoRadius" placeholder="Mặc định" min="50" max="5000" step="50" title="Để trống = dùng bán kính riêng của từng công trình (50–5000 m)" />
+          </div>
+            </div>
+            <div id="axisXaHoi">
+              <p class="axis-scope" id="axisScopeXaHoi"></p>
+              <div id="xahoiPoints">
+<section class="axis-group" id="pointWorks">
+        <h3 class="axis-group-title">Công trình điểm</h3>
+        <section class="axis-group" id="pcccInfra">
+          <h3 class="axis-group-title">PCCC</h3>
+          <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c12"><label for="chk_c12" title="Bán kính phục vụ ≤ 3 km phường, ≤ 5 km xã (QCVN 01:2026 Mục 2.5.13.1). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Pccc.svg" class="layer-type-icon" alt="" width="14" height="16">10. Trụ sở cảnh sát PCCC</label></div><button type="button" class="btn-dot-buffer" data-buffer="b12" title="Bật/tắt bán kính phục vụ" aria-label="Bật/tắt bán kính phục vụ" aria-pressed="false">●</button></div>
+        </section>
+        <div class="axis-group" id="trafficPoints">
+          <h3 class="axis-group-title">Điểm giao thông</h3>
+          <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c2"><label for="chk_c2"><img src="./icons/Parking.png" class="layer-type-icon" alt="" width="14" height="16">2. Bãi đỗ xe, trạm sạc</label></div><button type="button" class="btn-dot-buffer" data-buffer="b2" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+          <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c11"><label for="chk_c11" title="Phạm vi đi bộ tới trạm ≤ 500 m (QCVN 01:2026 Mục 2.8.3.3). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Bus.svg" class="layer-type-icon" alt="" width="14" height="16">13. Trạm dừng xe buýt</label></div><button type="button" class="btn-dot-buffer" data-buffer="b11" title="Bật/tắt phạm vi 500 m" aria-label="Bật/tắt phạm vi 500 m" aria-pressed="false">●</button></div>
         </div>
+        <div class="layer-status-legend" aria-label="Ghi chú trạng thái điểm giao thông và PCCC">
+          <span class="layer-status-title">Ghi chú:</span>
+          <span title="Đã được quản trị viên phê duyệt"><img src="./icons/Park.png" class="legend-icon" alt="">Đã phê duyệt</span>
+          <span class="legend-pending" title="Đề xuất chưa chấp thuận (TrangThai = FALSE)"><img src="./icons/Park2.png" class="legend-icon" alt=""><b>Chờ duyệt</b></span>
+        </div>
+        <div id="pointCatalog"></div>
+</section>
+<section class="axis-group" id="socialInfra">
+        <h3 class="axis-group-title">Hạ tầng xã hội <span class="layer-main-count" id="infraTabCount" title="Số nhóm công trình đang bật / tổng số"></span></h3>
+        <div class="layer-pane-tools">
+          <span class="layer-pane-note">Đang hiện <b id="layerCount">0/14</b> nhóm điểm</span>
+          <button type="button" class="layer-eye-btn" id="btnToggleAllIcons" aria-pressed="false" title="Bật / tắt toàn bộ 14 nhóm công trình" aria-label="Bật / tắt toàn bộ 14 nhóm công trình">
+            <svg class="ico eye-hide"><use href="#i-eye-off"/></svg><svg class="ico eye-show"><use href="#i-eye"/></svg>Tất cả
+          </button>
+        </div>
+        
+        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c1"><label for="chk_c1"><img src="./icons/Park.png" class="layer-type-icon" alt="" width="14" height="16">1. Công viên, điểm xanh</label></div><button type="button" class="btn-dot-buffer" data-buffer="b1" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+
+        
+        <div class="edu-group">
+          <div class="layer-row"><div><input type="checkbox" id="chk_edu" aria-label="Giáo dục"><label for="chk_edu">Giáo dục</label></div></div>
+          <div class="edu-levels" role="group" aria-label="Cấp học">
+            <button type="button" data-edu-level="all" class="active">Tất cả</button>
+            <button type="button" data-edu-level="mn">Mầm non</button>
+            <button type="button" data-edu-level="th">Tiểu học</button>
+            <button type="button" data-edu-level="thcs">THCS</button>
+            <button type="button" data-edu-level="thpt">THPT</button>
+          </div>
+          
+        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c3"><label for="chk_c3"><img src="./icons/Mamnon.png" class="layer-type-icon" alt="" width="14" height="16">3. Trường Mầm non</label></div><button type="button" class="btn-dot-buffer" data-buffer="b3" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+
+          
+        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c4"><label for="chk_c4"><img src="./icons/Tieuhoc.png" class="layer-type-icon" alt="" width="14" height="16">4. Trường Tiểu học</label></div><button type="button" class="btn-dot-buffer" data-buffer="b4" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+
+          
+        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c5"><label for="chk_c5"><img src="./icons/THCS.png" class="layer-type-icon" alt="" width="14" height="16">5. Trường THCS</label></div><button type="button" class="btn-dot-buffer" data-buffer="b5" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+
+          
+        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c10"><label for="chk_c10"><img src="./icons/THPT.png" class="layer-type-icon" alt="" width="14" height="16">6. Trường THPT</label></div><button type="button" class="btn-dot-buffer" data-buffer="b10" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+
+        </div>
+        
+        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c6"><label for="chk_c6"><img src="./icons/Yte.png" class="layer-type-icon" alt="" width="14" height="16">7. Bệnh viện, trạm y tế</label></div><button type="button" class="btn-dot-buffer" data-buffer="b6" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+
+        
+        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c7"><label for="chk_c7"><img src="./icons/Vanhoa.png" class="layer-type-icon" alt="" width="14" height="16">8. Nhà văn hóa, thể thao</label></div><button type="button" class="btn-dot-buffer" data-buffer="b7" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+
+        
+        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_c8"><label for="chk_c8"><img src="./icons/Cho.png" class="layer-type-icon" alt="" width="14" height="16">9. Chợ, TTTM</label></div><button type="button" class="btn-dot-buffer" data-buffer="b8" title="Bật/tắt vùng phủ" aria-label="Bật/tắt vùng phủ" aria-pressed="false">●</button></div>
+
+        
+        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_nt_funeral"><label for="chk_nt_funeral" title="Nhà tang lễ và cơ sở hỏa táng. Khoảng cách an toàn theo QCVN 01:2026 Bảng 23."><img src="./icons/Nghiatrang.svg" class="layer-type-icon" alt="" width="14" height="16">Nhà tang lễ</label></div></div>
+        <div class="layer-row infra-point"><div><input type="checkbox" id="chk_nt_grave"><label for="chk_nt_grave" title="Nghĩa trang cát táng, hung táng và chôn cất một lần. Vùng đệm là khoảng cách an toàn tới khu dân cư (QCVN 01:2026 Bảng 23)."><img src="./icons/Nghiatrang.svg" class="layer-type-icon" alt="" width="14" height="16">Nghĩa trang</label></div><button type="button" class="btn-dot-buffer" data-buffer="b13" title="Bật/tắt khoảng cách an toàn" aria-label="Bật/tắt khoảng cách an toàn" aria-pressed="false">●</button></div>
+        
+        <div hidden><div><input type="checkbox" id="chk_c13"><label for="chk_c13" title="Vùng đệm = khoảng cách an toàn tới khu dân cư (QCVN 01:2026 Bảng 23). Không tính vào quy mô m²/người và bản đồ độ phủ"><img src="./icons/Nghiatrang.svg" class="layer-type-icon" alt="" width="14" height="16">11. Nhà tang lễ, nghĩa trang</label></div></div>
+
+        
+        <div class="layer-status-legend" aria-label="Ghi chú trạng thái điểm">
+          <span class="layer-status-title">Ghi chú:</span>
+          <span title="Đã được quản trị viên phê duyệt"><img src="./icons/Park.png" class="legend-icon" alt="">Đã phê duyệt</span>
+          <span class="legend-pending" title="Đề xuất chưa chấp thuận (TrangThai = FALSE)"><img src="./icons/Park2.png" class="legend-icon" alt=""><b>Chờ duyệt</b></span>
+        </div>
+
+          </section>
+                        </div>
+            </div>
+            <section class="axis-base" id="baseXaHoi"></section>
+          </div>
+          <div class="layer-main-pane" id="layerPaneKienTruc" data-main-pane="kientruc" role="tabpanel" hidden>
+            <div id="axisKienTruc"></div>
+            <section class="axis-base" id="baseKienTruc"></section>
+          </div>
+        </div>
+
         </div>
       </div>
 
@@ -1609,6 +1620,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261037"></script>
+  <script type="module" src="./js/app.js?v=20261038"></script>
 </body>
 </html>

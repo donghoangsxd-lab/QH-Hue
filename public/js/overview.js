@@ -119,7 +119,7 @@ const FLOOD_DEMO = {
         d.range('floodLevel', FLOOD_DEMO_M);
         await d.wait(800);
       },
-      text: `<p>Bảng bên phải › <b>Bản đồ môi trường</b> › <b>Mô phỏng ngập</b> đã bật, thanh <b>Mực nước</b> đặt <b>${FLOOD_DEMO_M} m</b>.
+      text: `<p>Bảng bên phải › <b>Hạ tầng kỹ thuật › Môi trường</b> › <b>Mô phỏng ngập</b> đã bật, thanh <b>Mực nước</b> đặt <b>${FLOOD_DEMO_M} m</b>.
         Mọi ô đất có cao độ nền thấp hơn ${FLOOD_DEMO_M} m được tô xanh theo độ sâu: xanh nhạt ngập nông, xanh đậm ngập sâu.</p>
         <p class="ovd-note">Cao độ nền FABDEM (ô 30 m, hệ EGM2008), không phải số đọc mực nước tại trạm thủy văn.</p>`
     },
@@ -153,7 +153,7 @@ const TERRAIN_DEMO = {
     {
       title: 'Phủ lớp cao độ nền',
       run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 11); d.check('chk_terrain', { pane: 'env' }); },
-      text: '<p>Bảng bên phải › <b>Bản đồ môi trường</b> › <b>Địa hình (cao độ nền)</b> đã bật: màu thể hiện cao độ, vùng trũng thấp ven phá Tam Giang và hạ lưu sông Hương nổi rõ. Di chuột trên bản đồ để đọc cao độ tại vị trí.</p>'
+      text: '<p>Bảng bên phải › <b>Hạ tầng kỹ thuật › Môi trường</b> › <b>Địa hình (cao độ nền)</b> đã bật: màu thể hiện cao độ, vùng trũng thấp ven phá Tam Giang và hạ lưu sông Hương nổi rõ. Di chuột trên bản đồ để đọc cao độ tại vị trí.</p>'
     },
     {
       title: 'Hướng dòng chảy và lưu vực',
@@ -171,7 +171,7 @@ const PRIORITY_DEMO = {
     {
       title: 'Bản đồ độ phủ hạ tầng',
       run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 12); d.check('chk_heat', { pane: 'base' }); },
-      text: '<p>Bảng bên phải › <b>Bản đồ nền</b> › <b>Bản đồ độ phủ hạ tầng</b> đã bật: mỗi vị trí tô theo số nhóm hạ tầng tiếp cận được trong bán kính QCVN 01:2026/BXD (1–8 nhóm); màu càng nhạt càng thiếu.</p>'
+      text: '<p>Bảng bên phải › <b>Hành chính › Lớp nền</b> › <b>Bản đồ độ phủ hạ tầng</b> đã bật: mỗi vị trí tô theo số nhóm hạ tầng tiếp cận được trong bán kính QCVN 01:2026/BXD (1–8 nhóm); màu càng nhạt càng thiếu.</p>'
     },
     {
       title: 'Chồng lớp phân bổ dân cư',
@@ -265,7 +265,7 @@ const SECTIONS = [
         note: 'Dữ liệu bản đồ địa chính năm 2016 theo cổng thông tin địa chính tỉnh, chưa có các huyện cũ: Quảng Điền, Phú Lộc, Nam Đông',
         lead: 'Tra một thửa đất theo số tờ, số thửa hoặc bấm trên bản đồ để xem diện tích, loại đất, địa chỉ; kiểm tra quy hoạch trên thửa: diện tích từng loại đất quy hoạch (m²) và chỉ tiêu các lô quy hoạch.',
         steps: [
-          'Nếu panel phải đang thu, bấm nút mũi tên <b>Mở panel công cụ</b> ở mép phải. Chọn tab <b>Lớp dữ liệu</b>, phần dưới chọn <b>Bản đồ nền</b>.',
+          'Nếu panel phải đang thu, bấm nút mũi tên <b>Mở panel công cụ</b> ở mép phải. Mở panel <b>Hành chính</b>, rồi mục <b>Lớp nền</b>.',
           'Bật lớp <b>Thửa đất địa chính 2016</b>. Ranh thửa hiện từ mức phóng 15, số thửa từ mức 18. Hộp tìm hiện ngay dưới tên lớp.',
           'Tìm theo hồ sơ: trong ô <b>Chọn xã/phường (địa giới cũ)</b>, nhập <b>Tờ</b> và <b>Thửa</b>, bấm <b>Tìm</b>. Hoặc phóng tới vị trí (có thể nhập tọa độ ở cuối trang Hướng dẫn) rồi bấm vào thửa trên bản đồ.',
           'Bảng thửa hiện diện tích hồ sơ, loại đất theo Thông tư 28/2014/TT-BTNMT, địa chỉ và xã/phường cũ. Thửa được viền vàng.',
@@ -342,9 +342,9 @@ const SECTIONS = [
         lead: 'Chọn lớp cần xem ở panel phải. Lớp bật vẽ ngay trên bản đồ đang mở (quy hoạch hoặc hiện trạng).',
         steps: [
           'Nếu panel phải đang thu, bấm <b>Mở panel công cụ</b>. Tab <b>Lớp dữ liệu</b> đang mở mặc định.',
-          'Hàng tab trên: <b>Hành chính</b>, <b>Quy hoạch</b>, <b>Hạ tầng</b>, <b>Kiến trúc</b>. Trong Hành chính có tab nhỏ <b>Đô thị</b> và <b>ĐVHC</b> (xã, phường).',
+          'Băng đạn: <b>Hành chính</b>, <b>Quy hoạch</b>, <b>Hạ tầng kỹ thuật</b>, <b>Hạ tầng xã hội</b>, <b>Kiến trúc</b>. Trong Hành chính có tab nhỏ <b>Đô thị</b> (Hệ thống đô thị) và <b>ĐVHC</b>. Trong Quy hoạch có bốn cấp QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500.',
           'Dòng dưới băng đạn có ô <b>Tìm kiếm</b>, nút <b>HT</b> / <b>QH</b> và nút <b>Cả nhóm</b>. Công trình xã hội, PCCC, điểm giao thông và lớp điểm theo đồ án ở panel <b>Hạ tầng xã hội</b>. <b>Ranh lô</b>, cơ sở chưa sử dụng và chung cư ở Quy hoạch. Nút <b>Tất cả</b> bật hoặc tắt 14 nhóm điểm.',
-          'Hàng tab dưới: <b>Bản đồ nền</b> (ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư, độ phủ…) và <b>Bản đồ môi trường</b> (địa hình, ngập…). Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường.'
+          'Mục <b>Lớp nền</b> trong Hành chính: ranh <b>Ranh giới 40 Phường Xã</b>, <b>Mạng lưới đường</b>, thửa, dân cư, độ phủ. Mục <b>Môi trường</b> trong Hạ tầng kỹ thuật: địa hình, ngập. Nút <b>Aa</b> cạnh ranh phường bật tên phường, xã; nút <b>Aa</b> cạnh mạng đường bật tem tên đường. Ô <b>Giả lập bán kính chung</b> ở Hạ tầng xã hội và Hạ tầng kỹ thuật.'
         ],
         facts: [
           'Thu panel bằng nút mũi tên <b>Ẩn panel</b> trên hàng công cụ của panel. Lớp đã bật vẫn giữ.',
@@ -486,7 +486,7 @@ const SECTIONS = [
         note: 'Dữ liệu vệ tinh kích thước ô 30 m × 30 m, sai số ±1,0 m',
         lead: 'Phủ lớp cao độ nền lên bản đồ để xem xét san nền, hướng thoát nước và khu vực trũng thấp khi bố trí quy hoạch.',
         steps: [
-          'Bảng bên phải › <b>Bản đồ môi trường</b> › bật <b>Địa hình (cao độ nền)</b>.',
+          'Bảng bên phải › <b>Hạ tầng kỹ thuật › Môi trường</b> › bật <b>Địa hình (cao độ nền)</b>.',
           'Kéo thanh trượt để chỉnh độ trong suốt; di chuột trên bản đồ để đọc cao độ tại vị trí.',
           'Bật thêm <b>Thoát nước, khe tụ thủy</b> và <b>Lưu vực, đường phân thủy</b> để xem hướng dòng chảy.'
         ],
@@ -501,7 +501,7 @@ const SECTIONS = [
         title: 'Chồng lớp bản đồ ngập lụt và giả định kịch bản ngập',
         lead: 'Giả định mực nước để khoanh vùng có nguy cơ ngập, đối chiếu với vùng ngập thực tế qua các mùa lũ từ ảnh radar vệ tinh.',
         steps: [
-          'Bảng bên phải › <b>Bản đồ môi trường</b> › bật <b>Mô phỏng ngập</b>, kéo thanh <b>Mực nước</b> (0,5–15 m) để xem vùng ngập và thống kê diện tích.',
+          'Bảng bên phải › <b>Hạ tầng kỹ thuật › Môi trường</b> › bật <b>Mô phỏng ngập</b>, kéo thanh <b>Mực nước</b> (0,5–15 m) để xem vùng ngập và thống kê diện tích.',
           'Bật <b>Ngập thực tế (Sentinel-1)</b> và chọn mùa lũ để xem vùng đã ngập trong thực tế.',
           'Bật <b>Công trình chịu rủi ro ngập / nhiệt</b> để lọc công trình nằm trong vùng ngập nhiều mùa lũ.'
         ],
@@ -517,7 +517,7 @@ const SECTIONS = [
         note: 'Dữ liệu WorldPop kích thước lớn',
         lead: 'Thể hiện phân bổ dân cư theo ô lưới, làm cơ sở tính dân số được phục vụ và đánh giá nhu cầu hạ tầng khi lập quy hoạch.',
         steps: [
-          'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Bản đồ nền</b> › bật <b>Phân bổ dân cư</b>. Kéo thanh trượt cạnh tên lớp để chỉnh độ trong suốt.',
+          'Bảng bên phải › panel <b>Hành chính</b> › <b>Lớp nền</b> › bật <b>Phân bổ dân cư</b>. Kéo thanh trượt cạnh tên lớp để chỉnh độ trong suốt.',
           'Bật thêm nhóm ở <b>Hạ tầng xã hội</b> và lớp <b>Bản đồ độ phủ hạ tầng</b> để thấy khu đông dân còn thiếu hạ tầng.',
           'Sau khi đăng nhập quản trị: tab <b>Đề xuất</b> › nút <b>Quản trị</b> › <b>Ô dân cư</b>. Chọn <b>Xóa ô dân cư (không có dân)</b> hoặc <b>Thêm ô dân cư (khu dân cư mới)</b>, rồi <b>Cọ tô</b> hoặc <b>Vùng đa giác</b>.'
         ],
@@ -533,7 +533,7 @@ const SECTIONS = [
         note: 'Ước tính vệ tinh, chưa phải ranh 3 loại rừng',
         lead: 'Phủ lớp phủ thực vật năm 2021 và vùng mất rừng 2001–2025 lên bản đồ, kèm diện tích theo phường, xã, để xem xét khi bố trí quy hoạch trên đất có cây che phủ.',
         steps: [
-          'Bảng bên phải › <b>Bản đồ môi trường</b> › bật <b>Rừng, phủ thực vật</b>.',
+          'Bảng bên phải › <b>Hạ tầng kỹ thuật › Môi trường</b> › bật <b>Rừng, phủ thực vật</b>.',
           'Chọn <b>Phủ thực vật 2021</b> (ESA WorldCover 10 m) hoặc <b>Mất rừng 2001–2025</b> (Hansen, trên ô có tán cây năm 2000 từ 10%).',
           'Chú giải và bảng hectare nằm ngay dưới ô lớp. Kéo thanh trượt để chỉnh độ trong suốt.'
         ],
@@ -641,9 +641,9 @@ const SECTIONS = [
         title: 'Đề xuất các vùng cần ưu tiên đầu tư hạ tầng',
         lead: 'Bản đồ độ phủ cho biết mỗi vị trí tiếp cận được bao nhiêu nhóm hạ tầng; vùng màu nhạt mà đông dân là vùng nên ưu tiên đầu tư.',
         steps: [
-          'Bảng bên phải › tab <b>Lớp dữ liệu</b> › <b>Bản đồ nền</b> › bật <b>Bản đồ độ phủ hạ tầng</b>. Thanh màu dưới lớp đếm số nhóm hạ tầng tiếp cận được (1–8).',
+          'Bảng bên phải › panel <b>Hành chính</b> › <b>Lớp nền</b> › bật <b>Bản đồ độ phủ hạ tầng</b>. Thanh màu dưới lớp đếm số nhóm hạ tầng tiếp cận được (1–8).',
           'Bật thêm <b>Phân bổ dân cư</b> để nhận khu đông dân nằm trong vùng độ phủ thấp.',
-          'Ô <b>Giả lập bán kính chung (m)</b> ngay dưới lớp độ phủ: để trống là bán kính riêng từng công trình; nhập 50–5.000 m để áp một bán kính chung.',
+          'Ô <b>Giả lập bán kính chung (m)</b> ở panel <b>Hạ tầng xã hội</b> (cùng ô khi mở Hạ tầng kỹ thuật): để trống là bán kính riêng từng công trình; nhập 50–5.000 m để áp một bán kính chung.',
           'Bảng tổng hợp phía dưới cho biết phường, xã còn thiếu chỉ tiêu m²/người.'
         ],
         facts: [

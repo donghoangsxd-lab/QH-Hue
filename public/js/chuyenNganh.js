@@ -660,8 +660,16 @@ let listenLevel = false;
 let levelTab = false;
 let axisBeforeUrban = null;
 
+function placeIsoRadius(axis) {
+  if (axis !== 'hatang' && axis !== 'xahoi') return;
+  const field = document.getElementById('isoRadiusField');
+  const slot = document.getElementById(axis === 'hatang' ? 'isoSlotHaTang' : 'isoSlotXaHoi');
+  if (field && slot && field.parentElement !== slot) slot.append(field);
+}
+
 function showAxis(id, { openPanel = false, url = true } = {}) {
   if (!AXES.some(a => a.id === id)) return;
+  placeIsoRadius(id);
   setBrowseState({ axis: id }, { url });
   openingAxis = true;
   document.querySelector(`[data-main-tab="${id}"]`)?.click();

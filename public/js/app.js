@@ -118,9 +118,8 @@ function addTypeSwatches() {
   });
 }
 
-// Đô thị / Quy hoạch / Công trình là 3 tab cùng cấp; đổi lớp ở hàng «Lớp đang xem» trên panel phải (mapLevel.js)
-// thì mở tab Đô thị (Hệ thống đô thị) hoặc Quy hoạch (4 cấp còn lại). Bản đồ nền / Bản đồ môi trường là 2 tab ở dưới.
-// Chuyển tab chỉ đổi danh sách đang xem, không bật/tắt lớp.
+// Không còn hàng tab Bản đồ nền / Bản đồ môi trường. Lớp nền nằm trong Hành chính, môi trường trong Hạ tầng kỹ thuật.
+// Hàm giữ để markup cũ (nếu còn #layerMap) vẫn đổi pane; markup hiện tại không có nút đó.
 function initLayerMapTabs() {
   const root = document.getElementById('layerMap');
   if (!root) return;

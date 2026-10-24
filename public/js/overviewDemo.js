@@ -19,14 +19,19 @@ export function flash(el) {
 }
 
 const MAIN_TAB = { plan: 'quyhoach', urban: 'hanhchinh', infra: 'hatang' };
+const PANE_HOME = { base: { main: 'hanhchinh', fold: 'axisBaseFold' }, env: { main: 'hatang', fold: 'axisEnvFold' } };
 
 export function openLayerTab({ main, pane } = {}) {
   document.body.classList.remove('right-collapsed');
-  const tab = MAIN_TAB[main] || main;
+  const home = pane ? PANE_HOME[pane] : null;
+  const tab = MAIN_TAB[main] || main || home?.main;
   if (tab) document.querySelector(`[data-main-tab="${tab}"]`)?.click();
+  if (home?.fold) {
+    const fold = document.getElementById(home.fold);
+    if (fold) fold.open = true;
+  }
   if (main === 'xahoi' || main === 'infra') document.getElementById('xahoiPoints')?.scrollIntoView({ block: 'nearest' });
   if (main === 'quyhoach') document.getElementById('planPoints')?.scrollIntoView({ block: 'nearest' });
-  if (pane) document.querySelector(`[data-map-tab="${pane}"]`)?.click();
 }
 
 let card = null;
