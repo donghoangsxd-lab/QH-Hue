@@ -1202,28 +1202,13 @@ body.right-collapsed .right-panel {
 .layer-main-pane { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; padding: 4px 10px 8px; }
 .axis-fold { margin: 6px 0 2px; border-top: 1px solid var(--border-soft); }
 .axis-fold > summary { cursor: pointer; padding: 6px 2px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
-.rp-dock { flex: 0 0 auto; display: grid; grid-template-rows: auto auto; min-height: 0; overflow: hidden; border-top: 1px solid var(--border-color); background: var(--bg-panel); }
-.rp-dock:has(> details[open]) { flex: 0 0 33.333%; height: 33.333%; max-height: 33.333%; min-height: 0; }
-.rp-dock:has(> details[open] ~ details[open]) { flex: 0 0 66.666%; height: 66.666%; max-height: 66.666%; min-height: 0; }
-/* Hai summary luôn dính mép dưới; phần mở nở lên trên. details display:contents để hàng lưới nằm trên dock. */
-.rp-dock > details { display: contents; }
-.rp-dock > details > summary { position: relative; z-index: 1; cursor: pointer; padding: 7px 10px; border-top: 1px solid var(--border-soft); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-main); background: var(--bg-panel); }
+/* Dock không tạo hộp: mỗi details là mục flex của panel. Mở một mục = đúng 1/3; mở cả hai = mỗi mục 1/3, danh sách giữ 1/3 trên. */
+.rp-dock { display: contents; }
+.rp-dock > details { display: flex; flex-direction: column; flex: 0 0 auto; margin: 0; min-height: 0; overflow: hidden; background: var(--bg-panel); border-top: 1px solid var(--border-color); }
+.rp-dock > details[open] { flex: 0 0 33.333%; height: 33.333%; max-height: 33.333%; }
+.rp-dock > details > summary { flex: 0 0 auto; cursor: pointer; padding: 7px 10px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-main); background: var(--bg-panel); }
 .rp-dock > details:not([open]) > :not(summary) { display: none; }
-#legendFold > summary { grid-row: 1; }
-#axisBaseFold > summary { grid-row: 2; }
-#rpDock:has(#legendFold[open]):not(:has(#axisBaseFold[open])) { grid-template-rows: minmax(0, 1fr) auto auto; }
-#rpDock:has(#legendFold[open]):not(:has(#axisBaseFold[open])) > #legendFold > .dock-body { grid-row: 1; height: 100%; max-height: 100%; min-height: 0; overflow: auto; align-self: stretch; }
-#rpDock:has(#legendFold[open]):not(:has(#axisBaseFold[open])) > #legendFold > summary { grid-row: 2; }
-#rpDock:has(#legendFold[open]):not(:has(#axisBaseFold[open])) > #axisBaseFold > summary { grid-row: 3; }
-#rpDock:has(#axisBaseFold[open]):not(:has(#legendFold[open])) { grid-template-rows: minmax(0, 1fr) auto auto; }
-#rpDock:has(#axisBaseFold[open]):not(:has(#legendFold[open])) > #axisBaseFold > .layer-map-pane { grid-row: 1; height: 100%; max-height: 100%; min-height: 0; overflow: auto; align-self: stretch; }
-#rpDock:has(#axisBaseFold[open]):not(:has(#legendFold[open])) > #legendFold > summary { grid-row: 2; }
-#rpDock:has(#axisBaseFold[open]):not(:has(#legendFold[open])) > #axisBaseFold > summary { grid-row: 3; }
-#rpDock:has(#legendFold[open]):has(#axisBaseFold[open]) { grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) auto auto; }
-#rpDock:has(#legendFold[open]):has(#axisBaseFold[open]) > #legendFold > .dock-body { grid-row: 1; height: 100%; max-height: 100%; min-height: 0; overflow: auto; align-self: stretch; }
-#rpDock:has(#legendFold[open]):has(#axisBaseFold[open]) > #axisBaseFold > .layer-map-pane { grid-row: 2; height: 100%; max-height: 100%; min-height: 0; overflow: auto; align-self: stretch; }
-#rpDock:has(#legendFold[open]):has(#axisBaseFold[open]) > #legendFold > summary { grid-row: 3; }
-#rpDock:has(#legendFold[open]):has(#axisBaseFold[open]) > #axisBaseFold > summary { grid-row: 4; }
+.rp-dock > details[open] > :not(summary) { flex: 1 1 auto; min-height: 0; overflow: auto; }
 #rpDock #tabLegend { position: static; height: auto; max-height: none; min-height: 0; padding: 0; overflow: visible; display: block; flex: none; }
 #rpDock #tabLegend .layer-tree,
 #rpDock #tabLegend .legend-main,
@@ -6144,21 +6129,10 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
   .legend-chip { left: calc(var(--tb-btn) + 16px); right: auto; }
   body.right-collapsed .legend-chip { right: auto; }
 }
-/* Panel điện thoại cao theo nội dung: % của dock không resolve, chú giải phình đè nút cấp quy hoạch. */
+/* Panel điện thoại không có chiều cao cố định: gom dock lại để không đè nút cấp quy hoạch. */
 @media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
   .right-panel { overflow: hidden; }
-  .rp-dock,
-  .rp-dock:has(> details[open]),
-  .rp-dock:has(> details[open] ~ details[open]) {
-    flex: 0 0 auto;
-    height: auto;
-    max-height: 22dvh;
-  }
-  #rpDock:has(#legendFold[open]):not(:has(#axisBaseFold[open])) > #legendFold > .dock-body,
-  #rpDock:has(#axisBaseFold[open]):not(:has(#legendFold[open])) > #axisBaseFold > .layer-map-pane,
-  #rpDock:has(#legendFold[open]):has(#axisBaseFold[open]) > #legendFold > .dock-body,
-  #rpDock:has(#legendFold[open]):has(#axisBaseFold[open]) > #axisBaseFold > .layer-map-pane {
-    height: auto;
-    max-height: 14dvh;
-  }
+  .rp-dock { display: flex; flex-direction: column; flex: 0 0 auto; height: auto; max-height: 22dvh; min-height: 0; overflow: hidden; }
+  .rp-dock > details[open] { flex: 1 1 0; height: auto; max-height: none; }
+  .rp-dock > details[open] > :not(summary) { max-height: 14dvh; }
 }
