@@ -5,12 +5,13 @@
 import { state } from './state.js';
 import { map } from './mapEngine.js';
 import { planMap, shownMaps, isSplitOn, getSplitKind, onViewChange } from './planMap.js';
-import { escapeHtml, fmtNum, ico, announceTool, showToast, TOOL_START_EVENT } from './utils.js';
+import { escapeHtml, fmtNum, announceTool, showToast, TOOL_START_EVENT } from './utils.js';
 import { kmlTextFromFile, sketchShapesFromKml } from './kmlLoad.js';
 import { setDrawAssist } from './drawAssist.js';
 import { attachTelex } from './telex.js';
 import { exportKml, exportDxf } from './sketchExport.js';
 import { createSketchEditSession, isVertexShape } from './sketchEdit.js';
+import { createVertexHandles, vertexMenuButton as menuButton } from './vertexHandles.js';
 
 const TOOLS = {
   line: { label: 'Đường thẳng', hint: 'Click điểm đầu, rồi click điểm cuối', points: 2 },
@@ -44,11 +45,7 @@ let hoverFg = null;         // hình đang nằm dưới con trỏ
 let pickFg = null;          // hình vừa click — viền sáng giữ đến khi bấm chỗ khác
 let pickAt = 0;
 let live = null;            // { fg, session } hình đang chọn; fg.sketch là kho phiên (bộ nhớ trang)
-let vertexMarks = [];
-let midMarks = [];
-let vertexDragAt = 0;
-let mapDragWas = false;
-let mapDragMap = null;
+let vertexUiInst = null;
 
 const proj = (ll) => L.CRS.EPSG3857.project(L.latLng(ll));
 const unproj = (p) => L.CRS.EPSG3857.unproject(p);
@@ -306,14 +303,6 @@ function renderDraft() {
   }).addTo(draft));
 }
 
-function menuButton(box, label, cls, icon, fn) {
-  const b = L.DomUtil.create('button', `ui-btn-format ${cls}`, box);
-  b.type = 'button';
-  b.innerHTML = `${ico(icon)}${label}`;
-  b.addEventListener('click', fn);
-  return b;
-}
-
 function openShapeMenu(fg, e) {
   selectShape(fg);
   const m = fg.sketchHost || map;
@@ -436,19 +425,6 @@ function onShapePointerDown(ev, m) {
   document.addEventListener('pointermove', move, true);
 }
 
-function lockMapDrag(m) {
-  if (!m || mapDragMap) return;
-  mapDragMap = m;
-  mapDragWas = !!(m.dragging && m.dragging.enabled());
-  if (mapDragWas) m.dragging.disable();
-}
-
-function unlockMapDrag() {
-  if (mapDragWas && mapDragMap?.dragging) mapDragMap.dragging.enable();
-  mapDragWas = false;
-  mapDragMap = null;
-}
-
 function setEditChrome(on, m) {
   m?.getContainer()?.classList.toggle('sketch-editing', !!on);
 }
@@ -485,187 +461,29 @@ function paintShape(fg) {
   if (s.tool === 'arrow') s.head = lls.length === 2 ? arrowHead(lls[0], lls[1]) : null;
 }
 
-function applyWorking(rebuildHandles, active) {
-  if (!live?.session.isEditing()) return;
-  const fg = live.fg;
-  fg.sketch.pts = asLatLngs(live.session.workingPts());
-  paintShape(fg);
-  showEditHint();
-  if (rebuildHandles) drawHandles();
-  else syncIdleHandles(active);
+function vertexUi() {
+  if (vertexUiInst) return vertexUiInst;
+  vertexUiInst = createVertexHandles({
+    sessionOf: () => live?.session || null,
+    mapOf: () => live?.fg?.sketchHost || map,
+    layerOf: () => hostOf(live?.fg?.sketchHost || map).edit,
+    paint(pts) {
+      if (!live?.fg) return;
+      live.fg.sketch.pts = asLatLngs(pts);
+      paintShape(live.fg);
+      showEditHint();
+    },
+    finish: () => finishAdjust(),
+    minLabel: () => (live?.fg?.sketch?.tool === 'polygon'
+      ? 'Đa giác cần ít nhất 3 đỉnh.'
+      : 'Đường cần ít nhất 2 đỉnh.')
+  });
+  return vertexUiInst;
 }
 
-function clearHandles() {
-  unlockMapDrag();
-  vertexMarks.forEach(h => h.remove());
-  midMarks.forEach(h => h.remove());
-  vertexMarks = [];
-  midMarks = [];
-}
+function clearHandles() { vertexUi().clear(); }
+function drawHandles() { vertexUi().draw(); }
 
-function handleIcon(role) {
-  return L.divIcon({
-    className: `sketch-handle sketch-handle-${role}`,
-    html: '<span></span>',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-  });
-}
-
-function syncIdleHandles(active) {
-  if (!live?.session.isEditing()) return;
-  const pts = live.session.workingPts();
-  vertexMarks.forEach(h => {
-    if (h === active) return;
-    const p = pts[h._index];
-    if (p) h.setLatLng([p.lat, p.lng]);
-  });
-  if (!midMarks.length || active?._role !== 'vertex') return;
-  const mids = live.session.midpoints();
-  if (mids.length !== midMarks.length) return;
-  mids.forEach((mid, i) => {
-    midMarks[i].setLatLng([mid.at.lat, mid.at.lng]);
-    midMarks[i]._insertAt = mid.insertAt;
-  });
-}
-
-function bindHandle(mk, m) {
-  const armDom = () => {
-    const node = mk.getElement();
-    if (!node || node.dataset.sketchHandle) return;
-    node.dataset.sketchHandle = '1';
-    L.DomEvent.disableClickPropagation(node);
-    L.DomEvent.disableScrollPropagation(node);
-    const title = mk._role === 'mid' ? 'Kéo để chèn đỉnh' : 'Kéo để dịch đỉnh. Chuột phải: Xóa đỉnh';
-    node.title = title;
-    node.setAttribute('aria-label', title);
-    node.addEventListener('pointerdown', (ev) => {
-      if (ev.button != null && ev.button !== 0) return;
-      ev.stopPropagation();
-      lockMapDrag(m);
-      const up = () => {
-        document.removeEventListener('pointerup', up, true);
-        document.removeEventListener('pointercancel', up, true);
-        unlockMapDrag();
-      };
-      document.addEventListener('pointerup', up, true);
-      document.addEventListener('pointercancel', up, true);
-    });
-    node.addEventListener('contextmenu', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      if (mk._role === 'vertex') openVertexMenu(mk, { latlng: mk.getLatLng() });
-    });
-    if (mk._role !== 'vertex') return;
-    let timer = 0;
-    let x = 0;
-    let y = 0;
-    let pid = null;
-    const clear = () => { clearTimeout(timer); timer = 0; pid = null; };
-    node.addEventListener('pointerdown', (ev) => {
-      if (ev.pointerType === 'mouse') return;
-      clear();
-      x = ev.clientX;
-      y = ev.clientY;
-      pid = ev.pointerId;
-      timer = setTimeout(() => {
-        timer = 0;
-        if (mk._role === 'vertex') openVertexMenu(mk, { latlng: mk.getLatLng() });
-      }, 560);
-    });
-    node.addEventListener('pointermove', (ev) => {
-      if (ev.pointerId !== pid) return;
-      if (Math.hypot(ev.clientX - x, ev.clientY - y) > 8) clear();
-    });
-    node.addEventListener('pointerup', clear);
-    node.addEventListener('pointercancel', clear);
-  };
-  mk.on('add', armDom);
-  mk.on('dragstart', () => {
-    vertexDragAt = performance.now();
-    lockMapDrag(m);
-    if (mk._role !== 'mid' || !live?.session.isEditing()) return;
-    const ll = mk.getLatLng();
-    const at = mk._insertAt;
-    live.session.insertMidpoint(at, { lat: ll.lat, lng: ll.lng });
-    mk._role = 'vertex';
-    mk._index = at;
-    vertexMarks.splice(at, 0, mk);
-    vertexMarks.forEach((h, i) => { h._index = i; });
-    midMarks.forEach(h => { if (h !== mk) h.remove(); });
-    midMarks = [];
-    applyWorking(false, mk);
-  });
-  mk.on('drag', () => {
-    vertexDragAt = performance.now();
-    if (!live?.session.isEditing() || mk._role !== 'vertex') return;
-    const ll = mk.getLatLng();
-    live.session.dragVertex(mk._index, { lat: ll.lat, lng: ll.lng });
-    const fg = live.fg;
-    fg.sketch.pts = asLatLngs(live.session.workingPts());
-    paintShape(fg);
-    showEditHint();
-    syncIdleHandles(mk);
-  });
-  mk.on('dragend', () => {
-    vertexDragAt = performance.now();
-    unlockMapDrag();
-    requestAnimationFrame(() => {
-      if (live?.session.isEditing()) applyWorking(true);
-    });
-  });
-}
-
-function makeHandle(m, layer, role, p, index) {
-  const mk = L.marker([p.lat, p.lng], {
-    draggable: true,
-    autoPan: false,
-    keyboard: false,
-    zIndexOffset: role === 'vertex' ? 1400 : 1200,
-    bubblingMouseEvents: false,
-    icon: handleIcon(role)
-  });
-  mk._role = role;
-  if (role === 'vertex') mk._index = index;
-  else mk._insertAt = index;
-  bindHandle(mk, m);
-  mk.addTo(layer);
-  return mk;
-}
-
-function drawHandles() {
-  if (!live?.session.isEditing()) return;
-  const m = live.fg.sketchHost || map;
-  const layer = hostOf(m).edit;
-  clearHandles();
-  const pts = live.session.workingPts();
-  pts.forEach((p, i) => vertexMarks.push(makeHandle(m, layer, 'vertex', p, i)));
-  live.session.midpoints().forEach(mid => {
-    midMarks.push(makeHandle(m, layer, 'mid', mid.at, mid.insertAt));
-  });
-}
-
-function openVertexMenu(mk, e) {
-  if (!live?.session.isEditing() || mk._role !== 'vertex') return;
-  const m = live.fg.sketchHost || map;
-  const box = L.DomUtil.create('div', 'sketch-menu');
-  const items = live.session.vertexMenu();
-  if (items.includes('Xóa đỉnh')) {
-    menuButton(box, 'Xóa đỉnh', 'sketch-del', 'trash', () => {
-      m.closePopup();
-      const res = live.session.deleteVertex(mk._index);
-      if (!res.removed) {
-        showToast(live.fg.sketch.tool === 'polygon' ? 'Đa giác cần ít nhất 3 đỉnh.' : 'Đường cần ít nhất 2 đỉnh.', 'info');
-        return;
-      }
-      applyWorking(true);
-    });
-  }
-  if (items.includes('Xong')) {
-    menuButton(box, 'Xong', 'sketch-act', 'check', () => { m.closePopup(); finishAdjust(); });
-  }
-  L.popup({ className: 'sketch-popup', closeButton: false }).setLatLng(e.latlng || mk.getLatLng()).setContent(box).openOn(m);
-}
 
 function startAdjust(fg) {
   if (!isVertexShape(fg?.sketch?.tool)) return;
@@ -722,7 +540,7 @@ function dropAdjust() {
 export function consumeSketchMapClick(e) {
   if (!live?.session.isEditing()) return false;
   if (performance.now() - pickAt < 40) return true;
-  if (performance.now() - vertexDragAt < 450) return true;
+  if (performance.now() - vertexUi().dragAt() < 450) return true;
   const t = e.originalEvent?.target;
   if (t?.closest?.('.sketch-handle, .sketch-menu, .sketch-popup, .leaflet-popup')) return true;
   if (document.querySelector('.map-ctx-menu, .sketch-popup')) return true;

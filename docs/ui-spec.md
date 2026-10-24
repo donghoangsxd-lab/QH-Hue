@@ -96,3 +96,7 @@ Không có trong repo, cột để «—»:
 ## Phác thảo
 
 Hình chỉ trong phiên làm việc (bộ nhớ trang), không ghi máy chủ. Bấm một đường hoặc đa giác để chọn. Chuột phải trên hình mở menu phác thảo, có «Điều chỉnh»; chuột phải chỗ khác vẫn là menu bản đồ. «Điều chỉnh» hiện núm đỉnh và núm giữa cạnh (chèn đỉnh). Kéo núm bằng chuột hoặc chạm: bản đồ không kéo theo khi đang giữ núm; hình và số đo cập nhật ngay. Chuột phải núm đỉnh: «Xóa đỉnh» (đường giữ ít nhất 2 đỉnh, đa giác ít nhất 3). Xong bằng Enter, bấm vùng trống trên bản đồ, hoặc mục «Xong». Esc hủy và trả hình về lúc bắt đầu chỉnh. Tọa độ đã ghi nằm lại đúng phiên đó.
+
+## Đo khoảng cách và diện tích
+
+Phép đo chỉ nằm trong phiên làm việc, không ghi máy chủ. Chấm đỉnh trên bản đồ; nháy đúp hoặc Enter kết thúc nét (đường ít nhất 2 đỉnh, vùng ít nhất 3). Bấm một phép đo đã kết thúc để chọn. Chuột phải trên phép đo mở menu có «Điều chỉnh» và «Xóa phép đo»; chuột phải chỗ khác vẫn là menu bản đồ. «Điều chỉnh» dùng cùng núm đỉnh với phác thảo. Kéo núm: bản đồ không kéo theo; hình và số đo cập nhật ngay. Chuột phải núm đỉnh: «Xóa đỉnh» (đường giữ ít nhất 2 đỉnh, vùng ít nhất 3). Enter, bấm vùng trống hoặc «Xong» ghi. Esc hủy và trả phép đo về lúc bắt đầu chỉnh. «Xóa kết quả đo» xóa mọi phép đo. Khi đang chấm, đỉnh gần con trỏ vẫn xóa bằng chuột phải.
