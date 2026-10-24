@@ -9,6 +9,7 @@ import { bareName, RURAL_RULE } from './urbanStatus.js';
 const GP = 'data/generalPlan.geojson';
 const VIS = 'data/urbanVision.geojson';
 const U6 = 'data/urban614.geojson';
+const CHAN_MAY_FILE = 'data/dothi-chan-may.geojson';
 
 export const NOTE_2030 = '22 phường (12 loại II, 10 loại III); phấn đấu 2 xã Quảng Điền và A Lưới 2 đạt loại III.';
 export const PLAN_FOOT = 'Theo QĐ 756; kế hoạch nâng loại có thể thay đổi theo nghiên cứu cụ thể';
@@ -155,9 +156,10 @@ export const DOTHI_2030 = [
       members: ['Mỹ Thượng'], geom: { file: GP, id: 'my-thuong' }, km2: 29.2
     }),
     row({
-      id: 'chan-may', name: 'Đô thị Chân Mây – Lăng Cô', cls: 'III', missing: true,
+      id: 'chan-may', name: 'Đô thị Chân Mây – Lăng Cô', cls: 'III',
       members: ['Chân Mây - Lăng Cô'],
-      note: 'Xã định hướng lên phường. urban614 #lang-co chỉ là thị trấn Lăng Cô cũ, không phải cả xã.'
+      geom: { file: CHAN_MAY_FILE, id: 'chan-may-lang-co' }, km2: 264.37,
+      note: 'Ranh GIS đồ án QHC Chân Mây - Lăng Cô. Không dùng thị trấn Lăng Cô (urban614 #lang-co) và không dùng ranh ba xã urbanVision #chan-may.'
     }),
     row({
       id: 'quang-dien', name: 'Đô thị Quảng Điền', cls: 'III', strive: true,
@@ -237,29 +239,29 @@ export const DOTHI_SAU = [
       note: 'Giữ lõi Đô thị Sịa, không mở ra cả xã (diễn giải).'
     }),
     row({
-      id: 'phu-vinh', name: 'Phú Vinh', cls: 'III', core: 'Vinh Thanh', missing: true,
-      host: 'xã Phú Vinh',
-      note: 'Chưa có ranh mở rộng sau lõi Vinh Thanh. Không lấy cả xã Phú Vinh.'
+      id: 'phu-vinh', name: 'Phú Vinh', cls: 'III', core: 'Vinh Thanh',
+      host: 'xã Phú Vinh', geom: { file: VIS, id: 'vinh-thanh' }, km2: 57.98,
+      note: 'Ranh sau 2030 là urbanVision #vinh-thanh (cả xã Phú Vinh). Lõi Vinh Thanh giữ ở hiện trạng, không thay ranh này.'
     }),
     row({
-      id: 'phu-vang', name: 'Phú Vang', cls: 'III', core: 'Phú Đa', missing: true,
-      host: 'xã Phú Vang',
-      note: 'Chưa có ranh mở rộng sau lõi Phú Đa. Không lấy cả xã Phú Vang.'
+      id: 'phu-vang', name: 'Phú Vang', cls: 'III', core: 'Phú Đa',
+      host: 'xã Phú Vang', geom: { file: VIS, id: 'phu-da' }, km2: 86.77,
+      note: 'Ranh sau 2030 là urbanVision #phu-da (cả xã Phú Vang). Lõi Phú Đa giữ ở hiện trạng.'
     }),
     row({
-      id: 'hung-loc', name: 'Hưng Lộc', cls: 'III', core: 'Lộc Sơn', missing: true,
-      host: 'xã Hưng Lộc',
-      note: 'Diễn giải cùng kiểu Vinh Thanh → Phú Vinh: lõi Lộc Sơn, chưa có ranh mở rộng. Không lấy cả xã.'
+      id: 'hung-loc', name: 'Hưng Lộc', cls: 'III', core: 'Lộc Sơn',
+      host: 'xã Hưng Lộc', geom: { file: VIS, id: 'loc-son' }, km2: 95.82,
+      note: 'Ranh sau 2030 là urbanVision #loc-son (cả xã Hưng Lộc). Lõi Lộc Sơn giữ ở hiện trạng.'
     }),
     row({
-      id: 'phu-ho', name: 'Phú Hồ', cls: 'III', missing: true,
-      host: 'xã Phú Hồ',
-      note: 'QĐ 756 nêu xã Phú Hồ đạt loại III. Không có polygon ngoài ranh cả xã.'
+      id: 'phu-ho', name: 'Phú Hồ', cls: 'III',
+      host: 'xã Phú Hồ', geom: { file: GP, id: 'phu-ho' }, km2: 58.11,
+      note: 'urbanVision không có id Phú Hồ. Ranh là generalPlan #phu-ho (cả xã).'
     }),
     row({
-      id: 'khe-tre', name: 'Khe Tre', cls: 'III', missing: true,
-      host: 'xã Khe Tre',
-      note: 'QĐ 756 nêu cả xã đạt loại III. Không lấy cả xã; thị trấn cũ không phải ranh sau 2030.'
+      id: 'khe-tre', name: 'Khe Tre', cls: 'III',
+      host: 'xã Khe Tre', geom: { file: VIS, id: 'khe-tre' }, km2: 256.74,
+      note: 'Ranh sau 2030 là urbanVision #khe-tre (cả xã). Không dùng thị trấn cũ urban614 #khe-tre.'
     })
   ])
 ];
@@ -271,10 +273,11 @@ function htUrban(fields) {
 export const HT_GROUPS = [
   group('I', [
     htUrban({
-      id: 'ht-hue', name: 'Đô thị Huế', cls: 'I', hue: true, missing: true,
+      id: 'ht-hue', name: 'Đô thị Huế', cls: 'I', hue: true, kv: 'TP',
       before: 'I (Thành phố Huế)',
       basis: 'Quyết định số 924/QĐ-TTg ngày 30/8/2024 của Thủ tướng Chính phủ',
-      note: 'Phạm vi đã công nhận không có polygon. urban614 #hue là hợp 40 đơn vị hiện nay, không dùng.'
+      geom: { file: U6, id: 'hue' }, km2: 4956.11,
+      note: 'Không có polygon phạm vi đã công nhận theo QĐ 924. Dùng ranh thành phố hiện nay urban614 #hue. Dân số phạm vi đã công nhận không có số riêng.'
     })
   ]),
   group('III', [

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const turf = require('@turf/turf');
 import { DVHC_WARDS, DVHC_CITY } from '../public/js/dvhcStats.js';
 import {
   DOTHI_2030, DOTHI_SAU, HT_GROUPS, HT_URBANS, NOTE_2030, PLAN_FOOT,
@@ -22,10 +25,12 @@ function propsKm(file) {
 const km614 = propsKm('public/data/urban614.geojson');
 const kmVis = propsKm('public/data/urbanVision.geojson');
 const kmGp = propsKm('public/data/generalPlan.geojson');
+const kmChan = propsKm('public/data/dothi-chan-may.geojson');
 const kmOf = {
   'data/urban614.geojson': km614,
   'data/urbanVision.geojson': kmVis,
-  'data/generalPlan.geojson': kmGp
+  'data/generalPlan.geojson': kmGp,
+  'data/dothi-chan-may.geojson': kmChan
 };
 
 function flat(groups) {
@@ -75,8 +80,12 @@ expectGeom(rows2030.find(r => r.id === 'phong-dien'), 'data/urbanVision.geojson'
 expectGeom(rows2030.find(r => r.id === 'hoa-chau'), 'data/generalPlan.geojson', 'hoa-chau');
 expectGeom(rows2030.find(r => r.id === 'my-thuong'), 'data/generalPlan.geojson', 'my-thuong');
 const chan2030 = rows2030.find(r => r.id === 'chan-may');
-assert.equal(chan2030.missing, true);
-assert.equal(chan2030.geom, null);
+expectGeom(chan2030, 'data/dothi-chan-may.geojson', 'chan-may-lang-co');
+assert.notEqual(chan2030.km2, km614.get('lang-co'));
+assert.notEqual(chan2030.km2, kmVis.get('chan-may'));
+const chanFeat = JSON.parse(read('public/data/dothi-chan-may.geojson')).features[0];
+assert.equal(chanFeat.geometry.type, 'Polygon');
+assert.equal(chanFeat.properties.km2, Math.round(turf.area(chanFeat) / 1e4) / 100);
 expectGeom(rows2030.find(r => r.id === 'quang-dien'), 'data/urban614.geojson', 'sia');
 expectGeom(rows2030.find(r => r.id === 'a-luoi-2'), 'data/urban614.geojson', 'a-luoi');
 for (const [id, kmId] of [['vinh-thanh', 'vinh-thanh'], ['phu-da', 'phu-da'], ['loc-son', 'loc-son'], ['khe-tre', 'khe-tre'], ['phu-loc', 'phu-loc'], ['vinh-hien', 'vinh-hien']]) {
@@ -97,14 +106,15 @@ assert.equal(rowsSau.find(r => r.id === 'a-luoi').cls, 'III');
 const siaSau = rowsSau.find(r => r.id === 'quang-dien');
 expectGeom(siaSau, 'data/urban614.geojson', 'sia');
 assert.equal(siaSau.core, 'Sịa');
-for (const id of ['phu-vinh', 'phu-vang', 'hung-loc', 'phu-ho', 'khe-tre']) {
-  const item = rowsSau.find(r => r.id === id);
-  assert.equal(item.missing, true, id);
-  assert.equal(item.geom, null, id);
-}
+expectGeom(rowsSau.find(r => r.id === 'phu-vinh'), 'data/urbanVision.geojson', 'vinh-thanh');
+expectGeom(rowsSau.find(r => r.id === 'phu-vang'), 'data/urbanVision.geojson', 'phu-da');
+expectGeom(rowsSau.find(r => r.id === 'hung-loc'), 'data/urbanVision.geojson', 'loc-son');
+expectGeom(rowsSau.find(r => r.id === 'khe-tre'), 'data/urbanVision.geojson', 'khe-tre');
+expectGeom(rowsSau.find(r => r.id === 'phu-ho'), 'data/generalPlan.geojson', 'phu-ho');
 assert.equal(rowsSau.find(r => r.id === 'phu-vinh').core, 'Vinh Thanh');
 assert.equal(rowsSau.find(r => r.id === 'phu-vang').core, 'Phú Đa');
 assert.equal(rowsSau.find(r => r.id === 'hung-loc').core, 'Lộc Sơn');
+assert.notEqual(rowsSau.find(r => r.id === 'khe-tre').km2, km614.get('khe-tre'));
 for (const id of ['hoa-chau', 'my-thuong', 'vinh-thanh', 'phu-da', 'loc-son', 'vinh-hien', 'phu-loc', 'a-luoi-2']) {
   assert.equal(rowsSau.some(r => r.id === id), false, id);
 }
@@ -113,10 +123,9 @@ assert.equal(HT_URBANS.length, 14);
 assert.equal(rowsHt.length, 14);
 assert.equal(rowsHt[0].name, 'Đô thị Huế');
 assert.equal(rowsHt[0].cls, 'I');
-assert.equal(rowsHt[0].missing, true);
-assert.equal(rowsHt[0].geom, null);
 assert.equal(rowsHt[0].pop, null);
-assert.equal(rowsHt[0].km2, null);
+expectGeom(rowsHt[0], 'data/urban614.geojson', 'hue');
+assert.equal(rowsHt[0].kv, 'TP');
 assert.equal(rowsHt.filter(r => r.cls === 'III').length, 13);
 assert.equal(rowsHt[0].cityPlan, false);
 const thuy = rowsHt.find(r => r.id === 'ht-huong-thuy');
@@ -129,7 +138,25 @@ expectGeom(rowsHt.find(r => r.id === 'ht-phong-dien'), 'data/urban614.geojson', 
 assert.equal(rowsHt.find(r => r.id === 'ht-phong-dien').pop, null);
 for (const item of rowsHt.slice(1)) assert.equal(item.cls, 'III', item.id);
 for (const item of [...rows2030, ...rowsSau, ...rowsHt]) {
-  if (item.geom && item.geom.file === 'data/urban614.geojson') assert.notEqual(item.geom.id, 'hue');
+  if (item.geom && item.geom.file === 'data/urban614.geojson' && item.geom.id === 'hue') {
+    assert.equal(item.id, 'ht-hue');
+  }
+}
+const wired = [
+  [rowsHt, 'ht-hue'],
+  [rows2030, 'chan-may'],
+  [rowsSau, 'phu-vinh'],
+  [rowsSau, 'phu-vang'],
+  [rowsSau, 'hung-loc'],
+  [rowsSau, 'khe-tre'],
+  [rowsSau, 'phu-ho']
+];
+for (const [list, id] of wired) {
+  const item = list.find(r => r.id === id);
+  assert.equal(item.missing, false, id);
+  assert.ok(item.geom && item.geom.file && item.geom.id, id);
+  assert.equal(typeof item.km2, 'number', id);
+  assert.ok(item.km2 > 0, id);
 }
 
 let ii = 0; let iii = 0; let pd = 0; let dash = 0;
