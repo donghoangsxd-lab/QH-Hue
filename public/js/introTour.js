@@ -26,7 +26,7 @@ const STEPS = [
   {
     target: ['#chk_heat', '#axisBaseFold', '#btnExpandRightPanel'],
     title: 'Bản đồ độ phủ hạ tầng',
-    text: 'Lớp màu nhiệt thể hiện mức độ được phục vụ: nơi nằm trong tầm đi bộ của càng nhiều loại hạ tầng thì màu càng đậm; nơi màu nhạt là nơi còn thiếu. Khoảng cách được tính bám theo đường giao thông, không chỉ theo đường chim bay. Mở panel Hành chính, mục Lớp nền, để bật lớp này; thanh màu hiện ngay dưới ô bật.'
+    text: 'Lớp màu nhiệt thể hiện mức độ được phục vụ: nơi nằm trong tầm đi bộ của càng nhiều loại hạ tầng thì màu càng đậm; nơi màu nhạt là nơi còn thiếu. Khoảng cách được tính bám theo đường giao thông, không chỉ theo đường chim bay. Mở panel Hạ tầng xã hội để bật lớp này; thanh màu hiện ngay dưới ô bật.'
   },
   {
     target: ['#rightPanel', '#btnExpandRightPanel'],

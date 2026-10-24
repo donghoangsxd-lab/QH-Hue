@@ -30,7 +30,7 @@ export function openLayerTab({ main, pane } = {}) {
     const fold = document.getElementById(home.fold);
     if (fold) fold.open = true;
   }
-  if (main === 'xahoi' || main === 'infra') document.getElementById('xahoiPoints')?.scrollIntoView({ block: 'nearest' });
+  if (main === 'xahoi' || main === 'infra') document.getElementById('xahoiTabs')?.scrollIntoView({ block: 'nearest' });
   if (main === 'quyhoach') document.getElementById('planPoints')?.scrollIntoView({ block: 'nearest' });
 }
 

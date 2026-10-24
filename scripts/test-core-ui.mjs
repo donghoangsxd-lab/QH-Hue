@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {
+  HTKT_GROUPS, SNAP_TOLERANCE_M, SYNTH_LABEL, QHPK_HOOK_ID,
+  isCotDenLayer, isPipeLine, isHydrantLayer, layerTags, qhpkLayersFromHook, withinSnap
+} from '../public/js/htktModel.js';
+import { planRadiusM, formatRadius, setPlanRadii } from '../public/js/planRadius.js';
 
 const root = new URL('..', import.meta.url);
 const read = (rel) => fs.readFileSync(new URL(rel, root), 'utf8');
@@ -216,5 +221,93 @@ assert.doesNotMatch(gp, /const num = city \? '' :/);
 assert.match(gp, /getViewMode\(\) === 'HT'/);
 assert.match(css, /#adminTabs \.admin-tab\s*\{[^}]*min-width:\s*max-content/);
 assert.match(read('.cursorrules'), /docs\/ui-spec\.md/);
+
+const xhCodes = [...social.matchAll(/data-xh-tab="([^"]+)"/g)].map(m => m[1]);
+assert.deepEqual(xhCodes, ['1-CV', '3-MN', '4-TH', '5-THCS', '6-THPT', '7-YT', '8-VH', '9-TM']);
+assert.doesNotMatch(social, /data-xh-tab="2-BDX"/);
+assert.doesNotMatch(social, /Cột đèn|Cấp điện|Giao thông|pointCatalog/);
+assert.match(social, /id="xahoiList"/);
+assert.match(social, /id="xahoiHeat"/);
+assert.match(social, /id="chk_heat"/);
+assert.match(social, /id="xahoiRadiusOverlay"/);
+assert.match(social, /id="chk_c2"/);
+assert.match(social, /id="chk_c11"/);
+assert.match(social, /id="chk_c12"/);
+assert.match(social, /id="chk_nt_grave"/);
+assert.match(social, /id="chk_nt_funeral"/);
+assert.equal((html.match(/id="chk_heat"/g) || []).length, 1);
+assert.doesNotMatch(base, /id="chk_heat"/);
+assert.doesNotMatch(html, /id="pointCatalog"/);
+assert.match(html, /css\/style\.css\?v=20261050/);
+assert.match(html, /js\/app\.js\?v=20261050/);
+
+assert.equal(HTKT_GROUPS.length, 8);
+assert.equal(HTKT_GROUPS[7].id, 'tong-hop-duong-ong');
+assert.equal(HTKT_GROUPS[7].label, 'Tổng hợp đường ống');
+assert.deepEqual(SNAP_TOLERANCE_M, { QHCT: 0.5, QHPK: 1, QHC10: 10, QHC25: 100 });
+assert.equal(SYNTH_LABEL, 'dữ liệu tự tổng hợp');
+assert.equal(QHPK_HOOK_ID, 'qhpk-htkt');
+assert.equal(withinSnap(0.5, 'QHCT'), true);
+assert.equal(withinSnap(0.51, 'QHCT'), false);
+assert.equal(withinSnap(100, 'QHC25'), true);
+assert.equal(withinSnap(101, 'QHC25'), false);
+assert.equal(isCotDenLayer({ name: 'Cột đèn chiếu sáng', file: 'cot-den.geojson' }), true);
+assert.equal(isCotDenLayer({ name: 'Mạng lưới điện chiếu sáng', file: 'mang-luoi-dien-chieu-sang.geojson' }), false);
+assert.equal(isPipeLine({ sector: 'cap-nuoc', geomType: 'LineString', name: 'Mạng cấp nước', file: 'mang.geojson' }), true);
+assert.equal(isPipeLine({ sector: 'cap-dien', geomType: 'LineString', name: 'Cột đèn chiếu sáng(dạng đường)', file: 'cot-den.geojson' }), false);
+assert.equal(isPipeLine({ sector: 'giao-thong', geomType: 'LineString', name: 'Mặt đường', file: 'mat-duong.geojson' }), false);
+assert.equal(isHydrantLayer({ sector: 'cap-nuoc', name: 'Họng cứu hỏa', file: 'hong.geojson' }), true);
+assert.equal(isHydrantLayer({ sector: 'chat-thai-ran-nghia-trang', name: 'Họng cứu hỏa', file: 'hong.geojson' }), false);
+const hydrantTags = layerTags({ sector: 'cap-nuoc', geomType: 'Point', name: 'Họng cứu hỏa', file: 'hong.geojson', scheme: 'a', level: 'QHCT', kind: 'quy-hoach' });
+assert.ok(hydrantTags.includes('hong-cuu-hoa'));
+assert.ok(hydrantTags.includes('nhom:cap-nuoc'));
+assert.deepEqual(qhpkLayersFromHook({ layers: [] }), []);
+assert.equal(qhpkLayersFromHook({ layers: [{ level: 'QHPK', name: 'Tuyến', file: 't.geojson' }] }).length, 1);
+
+setPlanRadii([]);
+assert.equal(planRadiusM([], { scheme: 'a', sector: 'cap-nuoc', file: 'mang.geojson' }), null);
+assert.equal(formatRadius(null), '—');
+const filled = [{ maDoAn: 'a', nhom: 'cap-nuoc', subtype: 'mang', banKinh: '12,5' }];
+setPlanRadii(filled);
+assert.equal(planRadiusM(filled, { scheme: 'a', sector: 'cap-nuoc', file: 'mang.geojson' }), 12.5);
+setPlanRadii([]);
+
+const radii = JSON.parse(read('public/data/htkt/ban-kinh-quy-hoach.json'));
+assert.equal(radii.tab, 'BanKinhQuyHoach');
+assert.deepEqual(radii.rows, []);
+assert.match(read('docs/templates/ban-kinh-quy-hoach.csv'), /^Ma_DoAn,Ten_DoAn,Cap,Nhom_HTKT,Subtype,Ten_Lop,BanKinh_m,Nguon,GhiChu/);
+assert.match(read('docs/ban-kinh-quy-hoach.md'), /BanKinhQuyHoach/);
+assert.match(read('docs/ui-spec.md'), /Tổng hợp đường ống/);
+assert.match(read('docs/ui-spec.md'), /dữ liệu tự tổng hợp/);
+
+assert.match(cn, /tong-hop-duong-ong/);
+assert.match(cn, /\/gcs\//);
+assert.doesNotMatch(cn, /isPointWork|pointCatalog/);
+assert.match(read('public/js/xahoiList.js'), /SOCIAL_TABS/);
+assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261050'/);
+
+const synth = JSON.parse(read('public/data/htkt/synth.json'));
+assert.equal(synth.label, 'dữ liệu tự tổng hợp');
+assert.deepEqual(synth.snapM, SNAP_TOLERANCE_M);
+assert.equal(synth.qhpkHook.status, 'pending');
+assert.equal(synth.qhpkHook.id, 'qhpk-htkt');
+assert.deepEqual(synth.qhpkHook.layers, []);
+assert.ok(synth.qhpkHook.parents.every(slug => slug.startsWith('qhpk-')));
+assert.ok(synth.gcs.some(row => row.scheme === 'qhc-chan-may' && row.sector === 'giao-thong' && row.featureCount === 773));
+assert.ok(synth.gcs.some(row => String(row.file).includes('binh-thanh') && row.featureCount === 12872));
+const index = JSON.parse(read('public/data/chuyen-nganh/index.json'));
+const catalogFiles = new Set((index.layers || []).map(layer => layer.file));
+for (const row of synth.synth) {
+  assert.equal(row.label, 'dữ liệu tự tổng hợp');
+  assert.ok(row.files.length > 0, row.scheme);
+  for (const file of row.files) {
+    assert.equal(catalogFiles.has(file), true, file);
+    assert.equal(/cot[-_ ]?den/.test(file), false, file);
+  }
+}
+assert.equal(synth.cotDenHidden, 7);
+for (const id of ['qhc-phong-dien', 'qhc-quang-dien', 'qhc-a-luoi', 'qhc-phu-ho', 'qhc-phu-vinh', 'qhc-phu-vang', 'qhc-hung-loc']) {
+  assert.ok(synth.synth.some(row => row.scheme === id || (row.aliases || []).includes(id)), id);
+}
 
 console.log('core ui ok');

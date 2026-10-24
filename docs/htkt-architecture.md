@@ -1,6 +1,8 @@
 # Hệ thống hạ tầng kỹ thuật — một mạng, mỗi đồ án vẫn xem riêng
 
-Tài liệu nghiên cứu, chưa đổi code ứng dụng. Số liệu đếm ngày 2026-10-24 từ `public/data/chuyen-nganh/index.json`, `schemes.json` và GeoJSON local trong `data/chuyen-nganh/` (chỉ in tên lớp, kiểu hình, tên trường, số đối tượng, CRS, đồ án, mapid). Không GET GCS, không mở `infrastructure_hue.json`. CRS catalog: **EPSG:4326** (`index.json`, nguồn `gissonganh.hue.gov.vn/geditor.aspx`). File GeoJSON không có thành viên `crs`; tọa độ mẫu là kinh/vĩ độ Huế (khoảng 107,57°E, 16,39°N).
+Chốt với Dong, 2026-10-24: tám tab HTKT gồm Tổng hợp đường ống; gỡ lớp cột đèn khỏi panel; họng cứu hỏa ở lại cấp nước; dung sai snap QHCT 0,5 m, QHPK 1 m, QHC 1/10.000 là 10 m, QHC 1/25.000 là 100 m; Chân Mây và tuyến thoát nước Bình Thành trên GCS được trỏ qua `/gcs/`, không tải khi mở trang; đồ án thiếu tuyến ống thì trỏ lớp cùng cấp và ghi «dữ liệu tự tổng hợp»; QHPK để hook `qhpk-htkt`. HTXH còn tám loại theo mã Sheet, quỹ đất, độ phủ, và bốn điểm HTKT để bật bán kính.
+
+Tài liệu nghiên cứu bên dưới giữ số đếm catalog. Dung sai 2 m / 5 m ở mục 2 đã được thay bằng số chốt ở trên. Số liệu đếm ngày 2026-10-24 từ `public/data/chuyen-nganh/index.json`, `schemes.json` và GeoJSON local trong `data/chuyen-nganh/` (chỉ in tên lớp, kiểu hình, tên trường, số đối tượng, CRS, đồ án, mapid). Không GET GCS, không mở `infrastructure_hue.json`. CRS catalog: **EPSG:4326** (`index.json`, nguồn `gissonganh.hue.gov.vn/geditor.aspx`). File GeoJSON không có thành viên `crs`; tọa độ mẫu là kinh/vĩ độ Huế (khoảng 107,57°E, 16,39°N).
 
 Khung năm panel (Hành chính, Quy hoạch, HTKT, HTXH, Kiến trúc) giữ nguyên. Đề xuất dưới đây chỉ nằm trong panel HTKT và phần điểm dùng chung với HTXH.
 
@@ -166,7 +168,7 @@ Thứ tự giữ trên bản tổng hợp:
 Hiện chưa có mạng: không có id nút, `diemdau`/`diemcuoi` rỗng. Bước kiểm tra đề xuất, chạy lúc build, không chặn phát hành:
 
 - Bắt dính (snap) **đầu cuối tuyến trong cùng nhóm, cùng phase, cùng `ma_do_an`**. Không snap khác nhóm.
-- Dung sai xuất phát để Dong chỉnh: QHCT 0,5 m, QHPK 1 m, QHC 1/10.000 là 2 m, QHC 1/25.000 là 5 m.
+- Dung sai đã chốt: QHCT 0,5 m, QHPK 1 m, QHC 1/10.000 là 10 m, QHC 1/25.000 là 100 m.
 - Báo cáo: đầu tuyến không gặp nút, đoạn ngắn hơn dung sai, thành phần rời, điểm công trình đầu mối cách tuyến cùng nhóm xa hơn dung sai.
 - Trên view tổng hợp, chỉ nối các đối tượng `hien-hanh` sau giải trùng, để không nối ống của hai đời đồ án.
 

@@ -170,8 +170,8 @@ const PRIORITY_DEMO = {
   scenes: [
     {
       title: 'Bản đồ độ phủ hạ tầng',
-      run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 12); d.check('chk_heat', { pane: 'base' }); },
-      text: '<p>Bảng bên phải › <b>Hành chính › Lớp nền</b> › <b>Bản đồ độ phủ hạ tầng</b> đã bật: mỗi vị trí tô theo số nhóm hạ tầng tiếp cận được trong bán kính QCVN 01:2026/BXD (1–8 nhóm); màu càng nhạt càng thiếu.</p>'
+      run: (d) => { d.view('HT'); d.fly(HUE_CENTER, 12); d.check('chk_heat', { main: 'xahoi' }); },
+      text: '<p>Bảng bên phải › <b>Hạ tầng xã hội</b> › <b>Bản đồ độ phủ hạ tầng</b> đã bật: mỗi vị trí tô theo số nhóm hạ tầng tiếp cận được trong bán kính QCVN 01:2026/BXD (1–8 nhóm); màu càng nhạt càng thiếu.</p>'
     },
     {
       title: 'Chồng lớp phân bổ dân cư',
@@ -650,7 +650,7 @@ const SECTIONS = [
           'Độ phủ chỉ tính công trình đã được quản trị viên phê duyệt.',
           'Bản đồ độ phủ dùng vùng đệm tròn theo bán kính QCVN; vùng phục vụ bám đường xem ở từng công trình.'
         ],
-        actions: [{ label: 'Xem bản đồ độ phủ', icon: 'heat', run: () => showLayer('chk_heat', { pane: 'base' }) }]
+        actions: [{ label: 'Xem bản đồ độ phủ', icon: 'heat', run: () => showLayer('chk_heat', { main: 'xahoi' }) }]
       },
       {
         id: 'csd', btn: 'result', status: 'trial', csdTable: true, demo: CSD_DEMO,
