@@ -357,28 +357,47 @@ export async function loadBoundaryLayer() {
   syncWardBoundaryPaint();
 }
 
-export function getRightObstruction() {
-  if (!map) return 0;
-  let panelW = 0;
+function sideObstruction(targetMap) {
+  const mr = targetMap.getContainer().getBoundingClientRect();
+  let left = 0;
+  let right = 0;
   const rp = document.getElementById('rightPanel');
   if (rp && !document.body.classList.contains('right-collapsed')) {
-    panelW = Math.max(0, map.getContainer().getBoundingClientRect().right - rp.getBoundingClientRect().left);
+    const rr = rp.getBoundingClientRect();
+    const mid = (rr.left + rr.right) / 2;
+    const overlap = Math.max(0, Math.min(rr.right, mr.right) - Math.max(rr.left, mr.left));
+    if (mid < mr.left + mr.width / 2) left = Math.max(left, overlap);
+    else right = Math.max(right, overlap);
   }
-  const covered = Math.max(getCoveredRightWidth(), panelW);
-  return (map.getSize().x - covered) < 240 ? 0 : covered;
+  const tb = document.querySelector('.map-toolbar');
+  if (tb) {
+    const tr = tb.getBoundingClientRect();
+    const mid = (tr.left + tr.right) / 2;
+    const overlap = Math.max(0, Math.min(tr.right, mr.right) - Math.max(tr.left, mr.left));
+    if (mid < mr.left + mr.width / 2) left = Math.max(left, overlap);
+    else right = Math.max(right, overlap);
+  }
+  if (targetMap.getSize().x - left - right < 240) return { left: 0, right: 0 };
+  return { left, right };
+}
+
+export function getLeftObstruction() {
+  if (!map) return 0;
+  return sideObstruction(map).left;
+}
+
+export function getRightObstruction() {
+  if (!map) return 0;
+  return Math.max(getCoveredRightWidth(), sideObstruction(map).right);
 }
 
 // Popup chỉ được tự dời trong phần nhìn thấy của bản đồ chứa nó: khi so sánh, hiện trạng ở trái thanh trượt,
 // quy hoạch ở phải thanh trượt (bản đồ quy hoạch bị cắt ở nửa trái nên popup lọt sang đó sẽ bị ẩn)
 function popupFitOptions(targetMap, maxWidth, minWidth) {
   const size = targetMap.getSize();
-  let panelW = 0;
-  const rp = document.getElementById('rightPanel');
-  if (rp && !document.body.classList.contains('right-collapsed')) {
-    panelW = Math.max(0, targetMap.getContainer().getBoundingClientRect().right - rp.getBoundingClientRect().left);
-  }
-  let left = 20;
-  let right = 20 + panelW;
+  const side = sideObstruction(targetMap);
+  let left = 20 + side.left;
+  let right = 20 + side.right;
   const divider = document.getElementById('swipeDivider');
   if (isSplitOn() && divider) {
     const dividerX = divider.offsetLeft;
@@ -485,19 +504,19 @@ export function centerOnCity(options = { animate: false }) {
   if (!map) return;
   map.fitBounds(CITY_BOUNDS, {
     ...options,
-    paddingTopLeft: [CITY_FIT_PAD, CITY_FIT_PAD],
+    paddingTopLeft: [CITY_FIT_PAD + getLeftObstruction(), CITY_FIT_PAD],
     paddingBottomRight: [CITY_FIT_PAD + getRightObstruction(), CITY_FIT_PAD]
   });
 }
 
 export function flyToVisible(latlng, zoom, options) {
   if (!map) return;
-  const shift = getRightObstruction() / 2;
+  const shift = (getLeftObstruction() - getRightObstruction()) / 2;
   if (!shift) {
     map.flyTo(latlng, zoom, options);
     return;
   }
-  const target = map.project(L.latLng(latlng), zoom).add([shift, 0]);
+  const target = map.project(L.latLng(latlng), zoom).subtract([shift, 0]);
   map.flyTo(map.unproject(target, zoom), zoom, options);
 }
 
@@ -520,7 +539,7 @@ export function highlightWardBoundary(wardName, { fitView = true } = {}) {
       const bounds = highlightLayer.getBounds();
       if (bounds && bounds.isValid()) {
         map.fitBounds(bounds, {
-          paddingTopLeft: [20, 20],
+          paddingTopLeft: [20 + getLeftObstruction(), 20],
           paddingBottomRight: [20 + getRightObstruction(), 20],
           maxZoom: 15,
           animate: true,
@@ -556,7 +575,7 @@ export function highlightWardNames(names, { fitView = true } = {}) {
   });
   if (fitView && bounds.isValid()) {
     map.fitBounds(bounds, {
-      paddingTopLeft: [20, 20],
+      paddingTopLeft: [20 + getLeftObstruction(), 20],
       paddingBottomRight: [20 + getRightObstruction(), 20],
       maxZoom: 13,
       animate: true,

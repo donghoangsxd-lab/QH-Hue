@@ -23,6 +23,9 @@ export const LEVEL_EVENT = 'qh:level';
 
 const byId = new Map(LEVELS.map(l => [l.id, l]));
 const byChk = new Map(LEVELS.map(l => [l.chk, l]));
+const PLAN_TABS = ['qhc25', 'qhc10', 'qhpk', 'qhct'];
+// Tab quy hoạch được mở cùng lúc. Danh sách đồ án chỉ hiện các tab trong tập này.
+const listed = new Set(['qhc25']);
 let level = DEFAULT_LEVEL;
 // Lớp đã chuyển sang lớp hiện tại (VD mở QHPK khi đang xem QHC 1/10.000 → 'qhc10') để thoát đồ án thì quay lại
 let origin = null;
@@ -31,6 +34,7 @@ let applying = false;
 let levelLock = 0;
 
 export const getLevel = () => level;
+export const listedLevels = () => new Set(listed);
 export const levelOrigin = () => origin;
 export const levelChk = (id) => byId.get(id)?.chk || null;
 /** Cấp đồ án nhập (planLevelOf) hiện ranh theo lớp đang xem dù lớp QHPK (chk_projects) tắt; null = không có */
@@ -58,21 +62,52 @@ export function withLevelLock(fn) {
 /** Chọn lớp: bật lớp này, tắt 4 lớp còn lại (gọi lại cùng lớp để đặt lại về chỉ một lớp).
  *  opts.origin: lớp chuyển sang. opts.keepView: chọn QHC 1/10.000 và 1/25.000 không phóng khung hình.
  *  opts.fromHold: được phép đổi lớp khi đang withLevelLock (tab kiểm tra tự chọn). */
-export function setLevel(id, { origin: from = null, keepView = false, fromHold = false } = {}) {
+export function setLevel(id, { origin: from = null, keepView = false, fromHold = false, keepOthers = false } = {}) {
   if (levelLock && !fromHold) return;
   const next = byId.get(id);
   if (!next) return;
   const prev = level;
   level = id;
   origin = from;
+  if (keepOthers) listed.add(id);
+  else {
+    listed.clear();
+    listed.add(id);
+  }
   applying = true;
   try {
-    LEVELS.forEach(l => { if (l.id !== id) setChecked(l.chk, false); });
+    if (!keepOthers) LEVELS.forEach(l => { if (l.id !== id) setChecked(l.chk, false); });
     setChecked(next.chk, true);
   } finally {
     applying = false;
   }
   emit(prev, keepView ? { keepView: true } : {});
+}
+
+/** Bật thêm một cấp. Bấm cấp đang mở nhưng chưa phải cấp đang xem thì chuyển sang xem cấp đó. Bấm lại cấp đang xem thì tắt nếu còn cấp khác. */
+export function togglePlanTab(id) {
+  if (!PLAN_TABS.includes(id)) return;
+  if (listed.has(id) && level !== id) {
+    setLevel(id, { keepView: true, keepOthers: true });
+    return;
+  }
+  const open = PLAN_TABS.filter(x => listed.has(x));
+  if (listed.has(id) && open.length > 1) {
+    listed.delete(id);
+    applying = true;
+    setChecked(byId.get(id).chk, false);
+    applying = false;
+    if (level === id) setLevel(PLAN_TABS.find(x => listed.has(x)), { keepView: true, keepOthers: true });
+    else emit(level, { keepView: true, tabs: true });
+    return;
+  }
+  setLevel(id, { keepView: true, keepOthers: true });
+}
+
+/** Mở panel Quy hoạch mà chưa có tab cấp nào thì bật QHC 1/25.000. */
+export function ensurePlanTab(id = 'qhc25') {
+  if (PLAN_TABS.some(x => listed.has(x))) return;
+  setLevel(id, { keepView: true, keepOthers: true });
 }
 
 function onLayerChange(e) {
@@ -106,10 +141,12 @@ function paint() {
     const meta = byId.get(el.dataset.level);
     if (!meta) return;
     const on = el.dataset.level === level;
+    const tabOn = listed.has(el.dataset.level) || isOn(meta.chk);
     el.classList.toggle('is-current', on);
     el.setAttribute('aria-selected', String(on));
-    el.classList.toggle('is-on', isOn(meta.chk));
-    el.title = on ? `Đang xem: ${cur.label}` : `Xem ${meta.label}`;
+    el.setAttribute('aria-pressed', String(tabOn));
+    el.classList.toggle('is-on', tabOn);
+    el.title = on ? `Đang xem: ${cur.label}` : (tabOn ? `Đang mở: ${meta.label}` : `Xem ${meta.label}`);
   });
 }
 
@@ -119,6 +156,7 @@ export function initMapLevel() {
     const item = e.target.closest('[data-level]');
     if (!item?.closest('[data-level-pick]')) return;
     const id = item.dataset.level;
+    if (item.closest('#levelPickQh')) { togglePlanTab(id); return; }
     setLevel(id, { keepView: id === 'qhc10' || id === 'qhc25' });
   });
   document.addEventListener('change', onLayerChange);

@@ -3,13 +3,17 @@
 // và nét ranh phạm vi trên bản đồ (data/generalPlan.geojson). Khu vực vùng lõi là mục con của QHC thành phố Huế.
 // Chọn ở panel phải hay bảng dưới đều dùng chung picked; không import uiComponents.js (tránh vòng import), mở trang bằng nút sẵn có.
 import { state } from './state.js';
-import { map } from './mapEngine.js';
-import { planMap, isCompareOn, isSplitOn } from './planMap.js';
+import { map, highlightWardNames, focusWard, getLeftObstruction, getRightObstruction } from './mapEngine.js';
+import { planMap, isCompareOn, isSplitOn, getViewMode, onViewChange } from './planMap.js';
 import { escapeHtml, fmtNum, ico } from './utils.js';
 import { namesOfProject } from './projectNames.js';
 import { loadBuiltAreas } from './wardRoads.js';
-import { measure2A, ensureClassRoads, CLASS_REF } from './urbanClass.js';
-import { STATUS_REF, URBANS_614 } from './urbanStatus.js';
+import { measure2A, ensureClassRoads, CLASS_REF, URBANS } from './urbanClass.js';
+import { STATUS_REF, URBANS_614, bareName } from './urbanStatus.js';
+import { URBANS_VISION } from './urbanVision.js';
+import { DVHC_WARDS, DVHC_CITY } from './dvhcStats.js';
+import { PART_BOUNDS, loadPartGeoms, partFeature } from './urbanPartGeom.js';
+import { AREA_TP, setAreaFilter, parseKv } from './facetStore.js';
 import { getLevel } from './mapLevel.js';
 import {
   GENERAL_PLANS, CORE_AREAS, CORE_ZONE_ID, GP_KINDS, GP_STATUS, GP_PARENT_REF, OPEN_PROJECT_EVENT, MATURITY_GROUPS,
@@ -32,6 +36,9 @@ const OUTER_ZONE = CITY_PLAN.zones[1];
 const KIND_ORDER = ['city', 'satellite', 'town'];
 
 let picked = null;
+let gpPeriod = '2030';
+const POP_FMT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
+const KM_FMT = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 let rerenderPage = null;
 let roadsReady = false;
 let scopePromise = null;
@@ -104,7 +111,7 @@ function showScope(id) {
     if (scopeId !== id) return;
     const byId = (key) => (fc.features || []).find(f => f.properties && f.properties.id === key);
     const main = byId(id);
-    if (!main) return;
+    if (!main) { focusUrbanFallback(id); return; }
     const core = withCore ? byId(CORE_ZONE_ID) : null;
     const urbanLevel = getLevel() === 'urban';
     scopeLayers = [map, planMap].filter(m => m && !(urbanLevel && m === planMap)).map(m => {
@@ -122,8 +129,67 @@ function showScope(id) {
       detail: { id, name: plan ? plan.name : id, geometry: main.geometry, city: !!plan?.city }
     }));
     const shown = planMap && isCompareOn() && !isSplitOn() ? planMap : map;
-    shown.fitBounds(L.geoJSON(main).getBounds(), { padding: [40, 40] });
+    fitGeom(shown, main);
   }).catch(err => console.warn('Quy hoạch chung – không tải được ranh phạm vi:', err));
+}
+
+function fitGeom(shown, feature) {
+  if (!shown || !feature) return;
+  const bounds = L.geoJSON(feature).getBounds();
+  if (!bounds || !bounds.isValid()) return;
+  shown.fitBounds(bounds, {
+    paddingTopLeft: [40 + getLeftObstruction(), 40],
+    paddingBottomRight: [40 + getRightObstruction(), 40]
+  });
+}
+
+function paintGeom(id, feature) {
+  if (!map || !feature) return;
+  const urbanLevel = getLevel() === 'urban';
+  scopeLayers = [map, planMap].filter(m => m && !(urbanLevel && m === planMap)).map(m => {
+    if (!m.getPane(SCOPE_PANE)) {
+      const pane = m.createPane(SCOPE_PANE);
+      pane.style.zIndex = 415;
+      pane.style.pointerEvents = 'none';
+    }
+    const group = L.featureGroup();
+    L.geoJSON(feature, { style: SCOPE_STYLE }).addTo(group);
+    return group.addTo(m);
+  });
+  const shown = planMap && isCompareOn() && !isSplitOn() ? planMap : map;
+  fitGeom(shown, feature);
+  document.dispatchEvent(new CustomEvent(GP_SCOPE_EVENT, {
+    detail: { id, name: id, geometry: feature.geometry, city: id === 'hue' }
+  }));
+}
+
+function unitNames(id) {
+  const zone = (CITY_PLAN.zones || []).find(z => z.id === id);
+  const sources = [generalPlanOf(id), CORE_AREAS.find(a => a.id === id), URBANS.find(u => u.id === id), URBANS_VISION.find(u => u.id === id), URBANS_614.find(u => u.id === id), zone];
+  for (const s of sources) {
+    if (!s) continue;
+    if (s.city) return null;
+    if (s.units && s.units.length) return s.units;
+  }
+  return null;
+}
+
+function fullWardNames(units) {
+  return (units || []).map(u => {
+    const b = bareName(u);
+    return Object.keys(DVHC_WARDS).find(k => bareName(k) === b) || null;
+  }).filter(Boolean);
+}
+
+function focusUrbanFallback(id) {
+  if (id === 'hue') { focusWard(DVHC_CITY.name); return; }
+  loadPartGeoms().then(() => {
+    if (scopeId !== id) return;
+    const part = partFeature(id);
+    if (part) { paintGeom(id, part); return; }
+    const names = fullWardNames(unitNames(id));
+    if (names.length) highlightWardNames(names, { fitView: true });
+  }).catch(() => {});
 }
 
 function openPage() {
@@ -206,23 +272,108 @@ function extraRow(item, n) {
     </button>`;
 }
 
-function renderPanel() {
-  const box = $('gpList');
-  if (!box) return;
-  const c = ctx();
-  const here = new Set(state.selectedWard ? generalPlansOfWard(state.selectedWard).map(p => p.id) : []);
+function wardStat(short) {
+  const b = bareName(short);
+  const key = Object.keys(DVHC_WARDS).find(k => bareName(k) === b);
+  return key ? DVHC_WARDS[key] : null;
+}
+
+function sumUnits(units) {
+  if (!units || !units.length) return { pop: null, km2: null };
+  let pop = 0;
+  let km2 = 0;
+  for (const u of units) {
+    const row = wardStat(u);
+    if (!row) return { pop: null, km2: null };
+    pop += row.pop;
+    km2 += row.km2;
+  }
+  return { pop, km2: Math.round(km2 * 100) / 100 };
+}
+
+// period ht: dân số và km² hiện trạng trong repo. period qh: không có dân số dự báo → «—»; km² là tổng địa giới các đơn vị trong phạm vi, hoặc PART_BOUNDS nếu chỉ một phần xã.
+function resolved(item) {
+  if (item.units && item.units.length) return item;
+  const zone = (CITY_PLAN.zones || []).find(z => z.id === item.id);
+  if (zone && zone.units && zone.units.length) return { ...item, units: zone.units };
+  const u = URBANS_614.find(x => x.id === item.id);
+  if (u) return { ...item, units: u.units, part: item.part || u.part, city: item.city || u.city };
+  return item;
+}
+
+function statsFor(raw, period) {
+  const item = resolved(raw);
+  const partial = !!(item.partial || item.part);
+  if (item.city || item.id === 'hue') {
+    return period === 'ht'
+      ? { pop: DVHC_CITY.pop, km2: DVHC_CITY.km2 }
+      : { pop: null, km2: DVHC_CITY.km2 };
+  }
+  if (partial) {
+    const km = PART_BOUNDS[item.id] && PART_BOUNDS[item.id].km2;
+    return { pop: null, km2: km == null ? null : km };
+  }
+  if (item.units && item.units.length) {
+    const s = sumUnits(item.units);
+    return period === 'ht' ? s : { pop: null, km2: s.km2 };
+  }
+  return { pop: null, km2: null };
+}
+
+function statCell(value, fmt) {
+  return value == null || !Number.isFinite(Number(value)) ? '—' : fmt.format(Number(value));
+}
+
+function isCityRow(raw) {
+  const item = resolved(raw);
+  const name = item.short || item.name;
+  return item.id === 'hue' || item.city === true || name === DVHC_CITY.name;
+}
+
+function areaBtn(raw, n, period) {
+  const item = resolved(raw);
+  const stats = statsFor(item, period);
+  const pop = statCell(stats.pop, POP_FMT);
+  const km = statCell(stats.km2, KM_FMT);
+  const name = item.short || item.name;
+  const city = isCityRow(item);
+  const kv = city ? 'TP' : `dothi:${item.id}`;
+  const on = item.id === picked;
+  const num = city ? '' : `${n}.`;
+  return `<button type="button" class="axis-area gp-row${city ? ' axis-area-city' : ''}${on ? ' active' : ''}" data-gp-pick="${escapeHtml(item.id)}" data-kv="${escapeHtml(kv)}" aria-pressed="${on}" title="${escapeHtml(`${name}: dân số ${pop}, diện tích ${km} km²`)}"><span class="axis-num">${num}</span><span class="axis-area-name">${escapeHtml(name)}</span><span class="axis-area-pop">${pop}</span><span class="axis-area-km">${km}</span></button>`;
+}
+
+function numberedRows(list, period) {
+  let n = 0;
+  return list.map(item => areaBtn(item, isCityRow(item) ? null : ++n, period)).join('');
+}
+
+const AREA_HEAD = `<div class="axis-area-head"><span class="axis-num"></span><span class="axis-area-name">Đô thị</span><span class="axis-area-pop">Dân số</span><span class="axis-area-km">km²</span></div>`;
+
+function htItems() {
   const groups = URBAN_GROUPS.map(g => ({ title: g.title, list: g.list() })).filter(g => g.list.length);
   const bucket = { 'Đô thị loại I': [], 'Khu vực đô thị loại II': [], 'Đô thị loại III': [] };
   for (const item of orphanTowns()) (bucket[item.cls === 'I' ? 'Đô thị loại I' : item.cls === 'II' ? 'Khu vực đô thị loại II' : 'Đô thị loại III'] || []).push(item);
-  let n = 0;
-  urbanTotal = groups.reduce((sum, g) => sum + g.list.length + (bucket[g.title] || []).length, 0);
+  const rows = [];
+  groups.forEach(g => {
+    rows.push(...g.list, ...(bucket[g.title] || []));
+  });
+  return rows;
+}
+
+function renderPanel() {
+  const box = $('gpList');
+  if (!box) return;
+  const htOn = getViewMode() === 'HT';
+  const ht = htItems();
+  urbanTotal = ht.length;
   paintUrbanCount();
-  box.innerHTML = groups.map(g => {
-    const more = bucket[g.title] || [];
-    const count = g.list.length + more.length;
-    const body = g.list.map(plan => panelRow(plan, c, here, ++n)).join('') + more.map(item => extraRow(item, ++n)).join('');
-    return `<div class="gp-grp">${escapeHtml(g.title)}${count > 1 ? ` · ${count}` : ''}</div>${body}`;
-  }).join('');
+  const plan = gpPeriod === 'vision' ? URBANS_VISION : URBANS;
+  const qhHtml = numberedRows(plan, 'qh');
+  const htHtml = htOn
+    ? `<div class="gp-grp">Hiện trạng</div>${AREA_HEAD}${numberedRows(ht, 'ht')}`
+    : '';
+  box.innerHTML = `<div class="gp-grp">Quy hoạch</div><div class="admin-tabs gp-periods" role="tablist" aria-label="Giai đoạn quy hoạch đô thị"><button type="button" class="admin-tab${gpPeriod === '2030' ? ' active' : ''}" data-gp-period="2030" aria-selected="${gpPeriod === '2030'}">Đến 2030</button><button type="button" class="admin-tab${gpPeriod === 'vision' ? ' active' : ''}" data-gp-period="vision" aria-selected="${gpPeriod === 'vision'}">Sau 2030</button></div>${AREA_HEAD}${qhHtml}${htHtml}`;
 }
 
 export const refreshGeneralPlanPanel = renderPanel;
@@ -460,12 +611,25 @@ export function initGeneralPlanEvents(el, rerender) {
     if (row) pick(row.dataset.gpPick);
   });
   $('gpList')?.addEventListener('click', (e) => {
+    const period = e.target.closest('[data-gp-period]');
+    if (period) {
+      gpPeriod = period.dataset.gpPeriod === 'vision' ? 'vision' : '2030';
+      renderPanel();
+      e.stopPropagation();
+      return;
+    }
     const row = e.target.closest('[data-gp-pick]');
     if (!row) return;
+    e.stopPropagation();
     const id = row.dataset.gpPick;
+    const area = parseKv(row.dataset.kv) || { ...AREA_TP };
+    setAreaFilter(area, 'user');
+    if (id === 'hue' || area.type === 'tp') focusWard(DVHC_CITY.name);
     if (id === picked && scopeLayers.length) pick(null);
-    else pick(id, { page: true });
+    else pick(id);
   });
+  onViewChange(() => renderPanel());
+  document.addEventListener('qh:admin-release', () => { if (picked) pick(null); });
   document.addEventListener('cadparcels:loaded', renderPanel);
   $('chk_urban')?.addEventListener('change', paintUrbanCount);
   // Chọn đô thị trên bản đồ thay cho đô thị đang chọn ở mục Đô thị

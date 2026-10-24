@@ -28,7 +28,7 @@ const N2 = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
 // adjust: unesco = Điều 8 khoản 2 điểm d. Cả hệ thống Huế dùng một quy định này (khoản 3 không cộng điểm c vùng hay điểm c miền núi).
 const HERITAGE = 'Thuộc thành phố cố đô, di sản UNESCO nên áp Điều 8 khoản 2 điểm d, không áp hệ số Bắc Trung Bộ hay miền núi.';
 const partNote = (ward) => `Một phần xã ${ward}. Ranh là polygon hiện trạng trong public/data/urban614.geojson. Dân số ước bằng dân số xã × diện tích polygon / diện tích xã. Mật độ đường lấy bằng mật độ của xã chủ. ${HERITAGE}`;
-const URBANS = [
+export const URBANS = [
   { id: 'hue', name: 'Thành phố Huế', cls: 'I', adjust: 'unesco',
     note: 'Điều 15: Huế tiếp tục là đô thị loại I. Di sản UNESCO: cần tối thiểu 10/15 tiêu chuẩn (vai trò ≥ 4, đô thị hóa ≥ 2, hạ tầng ≥ 4) thay vì 12 (Điều 8 khoản 2 điểm d, Điều 9 khoản 3 điểm a).' },
   { id: 'trung-tam', name: 'Khu vực đô thị trung tâm', cls: 'II', adjust: 'unesco', unitKind: 'phường',

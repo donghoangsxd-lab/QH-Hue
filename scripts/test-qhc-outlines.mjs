@@ -247,7 +247,7 @@ async function openLevel(page, id) {
     await page.waitForFunction(() => !document.body.classList.contains('right-collapsed'));
   }
   const axis = id === 'urban' ? 'hanhchinh' : 'quyhoach';
-  const host = id === 'urban' ? '#levelPickUrban' : '#levelPickQh';
+  const host = '#levelPickQh';
   const onAxis = await page.evaluate((want) => document.querySelector('#layerMagTrack .is-current')?.dataset.mainTab === want, axis);
   if (!onAxis) {
     await page.locator('#layerMagTrack .is-current').click({ force: true });
@@ -258,7 +258,14 @@ async function openLevel(page, id) {
     const menu = document.getElementById('layerMagMenu');
     if (menu) menu.hidden = true;
   });
-  await page.locator(`${host} [data-level="${id}"]`).click();
+  if (id === 'urban') {
+    await page.evaluate(async () => {
+      const { setLevel } = await import('./js/mapLevel.js');
+      setLevel('urban', { keepView: true });
+    });
+  } else {
+    await page.locator(`${host} [data-level="${id}"]`).click();
+  }
   await page.waitForFunction((want) => document.body.dataset.level === want, id);
 }
 

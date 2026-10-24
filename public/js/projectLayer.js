@@ -30,7 +30,7 @@ import { landPatternKey, landLabel, TT16_STYLES } from './tt16Symbols.js';
 import { PLAN_LEVELS, planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { isCoreWard } from './qhc2045.js';
 import { refreshQhct } from './qhctLayer.js';
-import { getLevel, setLevel, levelScope, LEVEL_EVENT } from './mapLevel.js';
+import { getLevel, setLevel, levelScope, LEVEL_EVENT, listedLevels } from './mapLevel.js';
 import { isLevelPair, sideOf, onSplitPair } from './splitPair.js';
 import { geeApi, markDataWritten } from './api.js';
 import { signOutAdmin } from './uiComponents.js';
@@ -788,7 +788,7 @@ function renderHead() {
   const count = $('planTabCount');
   if (count) count.textContent = `(${shownN}/${projects.length})`;
   const search = $('projectSearch');
-  if (search) search.hidden = projects.length <= 5;
+  if (search) search.hidden = true;
 }
 
 // Nhóm cấp trong mục Quy hoạch, cùng thứ tự droplist (mapLevel.js); Hệ thống đô thị nằm ở mục Đô thị riêng
@@ -799,13 +799,16 @@ const LIST_LEVELS = [
 const levelLabel = (key) => LIST_LEVELS.find(l => l.key === key)?.label || key;
 // Lớp droplist (mapLevel.js) → nhóm cấp trong danh sách; Hệ thống đô thị không ứng nhóm nào
 const LEVEL_GROUP = { qhc25: 'QHC25', qhc10: 'QHC', qhpk: 'QHPK', qhct: 'QHCT' };
+const GROUP_LEVEL = { QHC25: 'qhc25', QHC: 'qhc10', QHPK: 'qhpk', QHCT: 'qhct' };
 const activeGroup = () => LEVEL_GROUP[getLevel()] || null;
 
-// Đổi lớp ở droplist: mở nhóm cấp của lớp đó, thu gọn các nhóm còn lại
+// Tab cấp đang bật thì mở nhóm danh sách của tab đó. Tab tắt thì không gắn nhóm.
 function focusLevelGroup() {
-  const key = activeGroup();
-  if (!key) return;
-  LIST_LEVELS.forEach(l => { if (l.key === key) closedLevels.delete(l.key); else closedLevels.add(l.key); });
+  const open = listedLevels();
+  LIST_LEVELS.forEach(l => {
+    if (open.has(GROUP_LEVEL[l.key])) closedLevels.delete(l.key);
+    else closedLevels.add(l.key);
+  });
   renderList();
 }
 
@@ -926,7 +929,8 @@ function renderList() {
     const seen = new Set();
     return items.filter(({ p }) => (seen.has(p.name) ? false : seen.add(p.name))).sort(bySchemeName);
   };
-  box.innerHTML = migrateBtn + LIST_LEVELS.map(level => {
+  const openTabs = listedLevels();
+  box.innerHTML = migrateBtn + LIST_LEVELS.filter(level => openTabs.has(GROUP_LEVEL[level.key])).map(level => {
     const scoped = coreOnly && level.key === 'QHPK';
     const all = visible.filter(({ p }) => p.level === level.key);
     const items = scoped ? all.filter(({ p }) => p.wards.some(isCoreWard)) : all;

@@ -25,7 +25,7 @@ function innerById(src, id) {
 }
 
 const TITLES = [
-  ['hanhchinh', 'Quản lý đơn vị hành chính'],
+  ['hanhchinh', 'Quản lý theo đơn vị hành chính'],
   ['quyhoach', 'Hệ thống bản đồ quy hoạch'],
   ['hatang', 'Hệ thống hạ tầng kỹ thuật'],
   ['xahoi', 'Hệ thống hạ tầng xã hội'],
@@ -70,12 +70,10 @@ assert.match(tools, /id="btnAxisAll"/);
 const admin = innerById(html, 'layerPaneHanhChinh');
 const tabs = innerById(html, 'adminTabs');
 assert.ok(tabs.indexOf('data-admin-tab="dvhc"') < tabs.indexOf('data-admin-tab="dothi"'), 'Đơn vị hành chính đứng trước Đô thị');
-assert.match(tabs, /Đơn vị hành chính/);
-assert.match(tabs, /Đô thị/);
-const urban = innerById(html, 'levelPickUrban');
-assert.match(admin, /id="levelPickUrban"/);
-assert.match(urban, /data-level="urban"/);
-assert.match(urban, /Hệ thống đô thị/);
+assert.match(tabs, /Đơn vị hành chính \(40\)/);
+assert.match(tabs, /Đô thị \(25\)/);
+assert.doesNotMatch(html, /id="levelPickUrban"/);
+assert.doesNotMatch(admin, /Hệ thống đô thị/);
 assert.match(admin, /id="gpList"/);
 assert.match(admin, /id="chk_urban"/);
 assert.match(admin, /Phân loại đô thị/);
@@ -89,8 +87,6 @@ assert.match(dock, /id="basemapSelect"/);
 assert.match(dock, /id="chk_bound"/);
 assert.match(dock, /id="chk_roads"/);
 assert.match(dock, /id="chk_cadastre"/);
-assert.doesNotMatch(urban, /data-level="qhc25"/);
-
 const plan = innerById(html, 'layerPaneQuyHoach');
 const pick = innerById(html, 'levelPickQh');
 let levelAt = 0;
@@ -106,6 +102,9 @@ for (const [id, label] of [
   assert.ok(pick.slice(at, at + 240).includes(label), `thiếu nhãn ${label}`);
 }
 assert.doesNotMatch(pick, /data-level="urban"/);
+assert.doesNotMatch(plan, /id="axisScopeQuyHoach"/);
+assert.doesNotMatch(plan, /id="planPoints"/);
+assert.match(plan, /id="projectSearch"[^>]*hidden/);
 assert.match(plan, /id="levelSplit"/);
 assert.match(plan, /id="splitSideLeft"/);
 assert.match(plan, /id="splitSideRight"/);
@@ -118,6 +117,8 @@ assert.match(tech, /id="isoSlotHaTang"/);
 assert.match(social, /id="isoSlotXaHoi"/);
 assert.match(social, /id="inputIsoRadius"/);
 assert.match(social, /Giả lập bán kính chung/);
+assert.match(social, /id="planPoints"/);
+assert.match(social, /Quỹ đất và công trình/);
 assert.match(social, /id="chk_c1"/);
 assert.match(social, /id="chk_edu"/);
 assert.doesNotMatch(admin, /id="inputIsoRadius"/);
@@ -130,6 +131,11 @@ assert.doesNotMatch(legend, /id="btnLegendClose"/);
 assert.doesNotMatch(legend, /id="lotOpacity"/);
 assert.doesNotMatch(legend, /Quyết định phê duyệt/);
 const base = innerById(html, 'layerPaneBase');
+assert.ok(base.indexOf('id="basemapSelect"') < base.indexOf('Quyết định phê duyệt'), 'Ảnh nền đứng trên phần còn lại của Lớp nền');
+for (const value of ['google', 'esri', 'wayback', 's2', 'positron']) {
+  assert.match(base, new RegExp(`value="${value}"`), `thiếu nền ${value}`);
+}
+assert.match(base, /id="waybackRelease"/);
 assert.match(base, /id="lotOpacity"/);
 assert.match(base, /Hiển thị lô đất/);
 assert.match(base, /Quyết định phê duyệt/);
@@ -168,11 +174,18 @@ assert.match(engine, /class="lp-title"/);
 
 const levelJs = read('public/js/mapLevel.js');
 assert.match(levelJs, /data-level-pick/);
+assert.match(levelJs, /keepOthers/);
+assert.match(levelJs, /togglePlanTab/);
+assert.match(levelJs, /listed\.has\(id\) && level !== id/);
+assert.match(levelJs, /ensurePlanTab/);
 assert.doesNotMatch(levelJs, /getElementById\('levelPick'\)/);
 assert.match(read('public/js/chuyenNganh.js'), /isoSlotHaTang/);
 assert.match(read('public/js/chuyenNganh.js'), /isoSlotXaHoi/);
 
 const cn = read('public/js/chuyenNganh.js');
+assert.match(cn, /releaseAdminAnchor/);
+assert.match(cn, /id !== 'hanhchinh'/);
+assert.match(cn, /focusWard/);
 assert.match(cn, /axis-area-city/);
 assert.match(cn, /axis-area-pop/);
 assert.match(cn, /Dân số/);
@@ -187,5 +200,19 @@ assert.match(css, /--axis-fs-row:\s*12px/);
 assert.match(css, /--axis-fs-chip:\s*11px/);
 assert.match(css, /--axis-row-h:\s*22px/);
 assert.match(css, /#legendFold\[hidden\]/);
+assert.match(css, /\.right-panel\s*\{[^}]*left:\s*12px/);
+assert.match(css, /\.map-toolbar\s*\{[^}]*right:\s*12px/);
+assert.match(css, /body\.right-collapsed \.axis-dock\s*\{[^}]*left:\s*max\(8px/);
+assert.match(css, /\.axis-area-city\s*\{[^}]*#fef3c7/);
+assert.match(read('public/js/basemap.js'), /waybackconfig\.json/);
+const gp = read('public/js/generalPlanUi.js');
+assert.match(gp, /Đến 2030/);
+assert.match(gp, /Sau 2030/);
+assert.match(gp, /function isCityRow/);
+assert.match(gp, /isCityRow\(item\) \? null : \+\+n/);
+assert.match(gp, /const num = city \? '' : `\$\{n\}\.`/);
+assert.match(gp, /getViewMode\(\) === 'HT'/);
+assert.match(css, /#adminTabs \.admin-tab\s*\{[^}]*min-width:\s*max-content/);
+assert.match(read('.cursorrules'), /docs\/ui-spec\.md/);
 
 console.log('core ui ok');
