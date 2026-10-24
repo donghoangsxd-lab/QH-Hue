@@ -328,6 +328,21 @@
       "decision": "1980/QĐ-UBND",
       "decisionDate": "2022-30-12",
       "authority": "UBND Thị xã Hương Trà"
+    },
+    {
+      "slug": "qhc-xa-thuong-nhat-550f030f",
+      "name": "QHC xã Thượng Nhật",
+      "level": "QHC",
+      "mapid": 20805,
+      "parent": null,
+      "overrides": [],
+      "priority": 1,
+      "scale": 25000,
+      "area": {
+        "type": "xa",
+        "code": "nam-dong"
+      },
+      "authority": "UBND huyện Nam Đông"
     }
   ]
 }
