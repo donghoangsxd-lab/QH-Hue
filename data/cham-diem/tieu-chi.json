@@ -1,0 +1,3145 @@
+{
+ "van_ban": {
+  "so": "111/2025/UBTVQH15",
+  "loai": "Nghị quyết",
+  "co_quan": "Ủy ban Thường vụ Quốc hội",
+  "ten": "Về phân loại đô thị",
+  "ngay_thong_qua": "24/12/2025 (Phiên họp thứ 52)",
+  "nguoi_ky": "Chủ tịch Quốc hội Trần Thanh Mẫn",
+  "hieu_luc": "01/01/2026",
+  "thay_the": "NQ 1210/2016/UBTVQH13 (đã sửa đổi bởi NQ 26/2022/UBTVQH15) hết hiệu lực từ 01/01/2026 (Điều 14) - KHÔNG dùng giá trị của văn bản cũ",
+  "nguon_chinh": "https://xaydungchinhsach.chinhphu.vn/nghi-quyet-so-111-2025-ubtvqh15-ve-phan-loai-do-thi-119260101170432239.htm",
+  "nguon_doi_chieu": [
+   "https://cdn.thuviennhadat.vn/upload/hinh-anh-bai-viet/2026/nhom1/CTA/thang-01/ngay-06/NQ-111-2025-UBTVQH15.pdf (DỰ THẢO sau thẩm tra 22/12/2025 - số liệu KHÁC bản chính thức, chỉ tham khảo)",
+   "https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Nghi-quyet-111-2025-UBTVQH15-phan-loai-do-thi-686750.aspx",
+   "https://vbpl.vn/TW/Pages/vbpq-van-ban-goc.aspx?ItemID=185716"
+  ]
+ },
+ "loai_do_thi": [
+  "đặc biệt",
+  "I",
+  "II",
+  "III"
+ ],
+ "luu_y_loai_IV_V": "NQ 111 không còn đô thị loại IV, V. Đô thị loại IV, V, thị xã, thị trấn cũ chuyển thành loại III (Điều 15.3).",
+ "chuyen_tiep_Hue": "Huế tiếp tục là đô thị loại I (Điều 15.1). Phường trong đô thị loại nào được xác định đạt trình độ phát triển đô thị của ĐVHC trong đô thị loại đó (Điều 15.4); phường có nhập/điều chỉnh địa giới với ĐVHC nông thôn → trình độ loại III (Điều 15.5).",
+ "phu_luc_I_loai_I": [
+  {
+   "id": "1.I.01",
+   "bang": "Phụ lục I",
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Đã triển khai đầu tư, xây dựng một trong các khu chức năng hoặc thuộc khu chức năng có vai trò cấp quốc gia, quốc tế",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.I.01",
+   "cach_tinh_phu_luc_III": []
+  },
+  {
+   "id": "1.I.02",
+   "bang": "Phụ lục I",
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Là trung tâm tổ chức ≥ 02 sự kiện quốc tế cấp khu vực trở lên bình quân 03 năm gần nhất",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.I.02",
+   "cach_tinh_phu_luc_III": [
+    "1.I.02. Sự kiện quốc tế cấp khu vực là các sự kiện lớn có sự tham gia của tổ chức, cá nhân quốc tế, do cấp tỉnh trở lên chủ trì, có tác động sâu rộng từ vùng liên tỉnh trở lên, thuộc thẩm quyền cấp phép của Bộ trưởng hoặc Thủ tướng Chính phủ theo quy định của pháp luật."
+   ]
+  },
+  {
+   "id": "1.I.03",
+   "bang": "Phụ lục I",
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Thu nhập bình quân đầu người trên năm cao hơn thu nhập bình quân đầu người trên năm của cả nước trong 03 năm gần nhất",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.I.03",
+   "cach_tinh_phu_luc_III": [
+    "1.I.03, 2B.I.02. Thu nhập bình quân đầu người trong 01 năm so với mức bình quân cả nước hoặc tỉnh, thành phố được tính toán, công bố theo quy định của pháp luật về thống kê."
+   ]
+  },
+  {
+   "id": "1.I.04",
+   "bang": "Phụ lục I",
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "thu_tu": "4",
+   "ten_tieu_chuan": "Tốc độ tăng tổng sản phẩm trên địa bàn (GRDP) trong 03 năm gần nhất đạt hoặc vượt tốc độ tăng tổng sản phẩm trong nước (GDP)",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.I.04",
+   "cach_tinh_phu_luc_III": []
+  },
+  {
+   "id": "1.I.05",
+   "bang": "Phụ lục I",
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "thu_tu": "5",
+   "ten_tieu_chuan": "Thu hút đầu tư trong nước hoặc đầu tư trực tiếp nước ngoài (FDI) thuộc nhóm 10 tỉnh, thành phố đứng đầu trong cả nước",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.I.05",
+   "cach_tinh_phu_luc_III": []
+  },
+  {
+   "id": "1.I.06",
+   "bang": "Phụ lục I",
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "thu_tu": "6",
+   "ten_tieu_chuan": "Thuộc nhóm các địa phương không nhận bổ sung cân đối từ ngân sách trung ương",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.I.06",
+   "cach_tinh_phu_luc_III": []
+  },
+  {
+   "id": "1.II.07",
+   "bang": "Phụ lục I",
+   "tieu_chi": "II. TIÊU CHÍ MỨC ĐỘ ĐÔ THỊ HÓA",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Quy mô dân số đô thị ≥ 2.500.000 người",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.II.07",
+   "cach_tinh_phu_luc_III": [
+    "1.II.07, 2A.II.03. Quy mô dân số đô thị:"
+   ]
+  },
+  {
+   "id": "1.II.08",
+   "bang": "Phụ lục I",
+   "tieu_chi": "II. TIÊU CHÍ MỨC ĐỘ ĐÔ THỊ HÓA",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Tỷ lệ đô thị hóa từ 45%",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.II.08",
+   "cach_tinh_phu_luc_III": [
+    "1.II.08. Tỷ lệ đô thị hóa là tỷ lệ phần trăm (%) giữa quy mô dân số đô thị (P) tại đô thị loại II, loại III được cấp có thẩm quyền công nhận so với quy mô dân số đô thị loại I."
+   ]
+  },
+  {
+   "id": "1.II.09",
+   "bang": "Phụ lục I",
+   "tieu_chi": "II. TIÊU CHÍ MỨC ĐỘ ĐÔ THỊ HÓA",
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Tổng quy mô dân số các đô thị loại II ≥ 600.000 người",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.II.09",
+   "cach_tinh_phu_luc_III": []
+  },
+  {
+   "id": "1.II.10",
+   "bang": "Phụ lục I",
+   "tieu_chi": "II. TIÊU CHÍ MỨC ĐỘ ĐÔ THỊ HÓA",
+   "thu_tu": "4",
+   "ten_tieu_chuan": "Có 50% số phường trở lên trên tổng số phường đạt trình độ phát triển đô thị loại II",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.II.10",
+   "cach_tinh_phu_luc_III": []
+  },
+  {
+   "id": "1.III.11",
+   "bang": "Phụ lục I",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Có ≥ 02 đầu mối hạ tầng giao thông cấp khu vực và quốc tế, cửa ngõ chính, trung tâm kết nối vùng",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.III.11",
+   "cach_tinh_phu_luc_III": []
+  },
+  {
+   "id": "1.III.12",
+   "bang": "Phụ lục I",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Có giao thông vận tải hành khách công cộng bao phủ 100% đô thị loại II",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.III.12",
+   "cach_tinh_phu_luc_III": [
+    "1.III.12. Có giao thông vận tải hành khách công cộng bao phủ 100% đô thị loại II bao gồm một trong các loại hình vận tải hành khách bằng đường sắt đô thị hoặc xe buýt hoặc tàu thủy."
+   ]
+  },
+  {
+   "id": "1.III.13",
+   "bang": "Phụ lục I",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Có ≥ 05 công trình kiến trúc, khu nhà ở, khu đô thị đã được đầu tư xây dựng đạt giải thưởng quốc gia, quốc tế",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.III.13",
+   "cach_tinh_phu_luc_III": []
+  },
+  {
+   "id": "1.III.14",
+   "bang": "Phụ lục I",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "thu_tu": "4",
+   "ten_tieu_chuan": "Phát triển đô thị bền vững đạt một trong các tiêu chuẩn sau: đô thị thông minh mức độ 1 hoặc 50% số lượng đô thị loại II, loại III có năng lực chống chịu, thích ứng với biến đổi khí hậu đạt mức khá trở lên",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.III.14",
+   "cach_tinh_phu_luc_III": [
+    "1.III.14. Phát triển đô thị bền vững đạt một trong các tiêu chuẩn sau: đô thị thông minh mức độ 1 hoặc 50% số lượng đô thị loại II, loại III có năng lực chống chịu, thích ứng với biến đổi khí hậu đạt mức khá trở lên theo hướng dẫn của cơ quan có thẩm quyền."
+   ]
+  },
+  {
+   "id": "1.III.15",
+   "bang": "Phụ lục I",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "thu_tu": "5",
+   "ten_tieu_chuan": "Hoàn thành nhiệm vụ xây dựng nông thôn mới theo giai đoạn gần nhất đã được cấp có thẩm quyền công nhận",
+   "danh_gia": "Đạt / Không đạt (không chấm điểm)",
+   "ap_dung": [
+    "do_thi_loai_I (toàn thành phố)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục I, mã 1.III.15",
+   "cach_tinh_phu_luc_III": []
+  }
+ ],
+ "bang_2A": [
+  {
+   "id": "2A.I.01",
+   "bang": "Bảng 2A",
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "nhom": null,
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Vai trò, vị trí theo quy hoạch được phê duyệt là trung tâm tổng hợp hoặc trung tâm chuyên ngành về các lĩnh vực: kinh tế, tài chính, văn hóa, giáo dục, đào tạo, y tế, du lịch, khoa học và công nghệ, đầu mối giao thông",
+   "don_vi": null,
+   "muc": [
+    {
+     "loai_II": "Cấp vùng",
+     "loai_III": "Cấp tỉnh",
+     "diem": "7",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "Cấp tỉnh",
+     "loai_III": "Cấp xã",
+     "diem": "5,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.I.01",
+   "cach_tinh_phu_luc_III": [
+    "2A.I.01. Vai trò, vị trí theo quy hoạch được phê duyệt là vai trò, vị trí của đô thị được xác định trong quy hoạch tổng thể hệ thống đô thị và nông thôn, quy hoạch tỉnh, quy hoạch chung đô thị."
+   ],
+   "diem_toi_da": 7.0,
+   "diem_toi_thieu": 5.5,
+   "muc_toi_da": {
+    "loai_II": "Cấp vùng",
+    "loai_III": "Cấp tỉnh"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "Cấp tỉnh",
+    "loai_III": "Cấp xã"
+   },
+   "loai_du_lieu": "dinh_tinh"
+  },
+  {
+   "id": "2A.I.02",
+   "bang": "Bảng 2A",
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "nhom": null,
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Vai trò, vị trí đô thị trung tâm: có công trình trụ sở hành chính, công trình hạ tầng đô thị đã đầu tư, xây dựng, là một trong các trung tâm, đầu mối kết nối",
+   "don_vi": null,
+   "muc": [
+    {
+     "loai_II": "Cấp vùng",
+     "loai_III": "Cấp tỉnh",
+     "diem": "8",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "Cấp tỉnh",
+     "loai_III": "Cấp xã",
+     "diem": "6",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.I.02",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 8.0,
+   "diem_toi_thieu": 6.0,
+   "muc_toi_da": {
+    "loai_II": "Cấp vùng",
+    "loai_III": "Cấp tỉnh"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "Cấp tỉnh",
+    "loai_III": "Cấp xã"
+   },
+   "loai_du_lieu": "dinh_tinh"
+  },
+  {
+   "id": "2A.II.03",
+   "bang": "Bảng 2A",
+   "tieu_chi": "II. TIÊU CHÍ MỨC ĐỘ ĐÔ THỊ HÓA",
+   "nhom": null,
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Quy mô dân số đô thị",
+   "don_vi": "nghìn người",
+   "muc": [
+    {
+     "loai_II": "≥ 500",
+     "loai_III": "≥ 200",
+     "diem": "7",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "200",
+     "loai_III": "20",
+     "diem": "5,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.II.03",
+   "cach_tinh_phu_luc_III": [
+    "1.II.07, 2A.II.03. Quy mô dân số đô thị:"
+   ],
+   "diem_toi_da": 7.0,
+   "diem_toi_thieu": 5.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 500",
+    "loai_III": "≥ 200"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "200",
+    "loai_III": "20"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.II.04",
+   "bang": "Bảng 2A",
+   "tieu_chi": "II. TIÊU CHÍ MỨC ĐỘ ĐÔ THỊ HÓA",
+   "nhom": null,
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Mật độ dân số bình quân trên diện tích tự nhiên",
+   "don_vi": "người/km 2",
+   "muc": [
+    {
+     "loai_II": "≥ 1.500",
+     "loai_III": "≥ 1.000",
+     "diem": "6",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "1.000",
+     "loai_III": "500",
+     "diem": "4,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.II.04",
+   "cach_tinh_phu_luc_III": [
+    "2A.II.04. Mật độ dân số bình quân trên diện tích tự nhiên được xác định bằng quy mô dân số đô thị (P) trên diện tích tự nhiên của đô thị."
+   ],
+   "diem_toi_da": 6.0,
+   "diem_toi_thieu": 4.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 1.500",
+    "loai_III": "≥ 1.000"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "1.000",
+    "loai_III": "500"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.II.05",
+   "bang": "Bảng 2A",
+   "tieu_chi": "II. TIÊU CHÍ MỨC ĐỘ ĐÔ THỊ HÓA",
+   "nhom": null,
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Tỷ lệ lao động phi nông nghiệp",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 95",
+     "loai_III": "≥ 65",
+     "diem": "7",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "65",
+     "loai_III": "55",
+     "diem": "5,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.II.05",
+   "cach_tinh_phu_luc_III": [
+    "2A.II.05. Tỷ lệ lao động phi nông nghiệp:"
+   ],
+   "diem_toi_da": 7.0,
+   "diem_toi_thieu": 5.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 95",
+    "loai_III": "≥ 65"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "65",
+    "loai_III": "55"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.06",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.1 Giao thông",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Đầu mối giao thông",
+   "don_vi": null,
+   "muc": [
+    {
+     "loai_II": "Cấp vùng",
+     "loai_III": "Cấp tỉnh",
+     "diem": "4",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "Cấp tỉnh",
+     "loai_III": "Cấp xã",
+     "diem": "3",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.06",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.06. Đầu mối giao thông bao gồm cảng hàng không, cảng đường thủy, cảng cạn, ga đường sắt, bến xe liên tỉnh."
+   ],
+   "diem_toi_da": 4.0,
+   "diem_toi_thieu": 3.0,
+   "muc_toi_da": {
+    "loai_II": "Cấp vùng",
+    "loai_III": "Cấp tỉnh"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "Cấp tỉnh",
+    "loai_III": "Cấp xã"
+   },
+   "loai_du_lieu": "dinh_tinh"
+  },
+  {
+   "id": "2A.III.07",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.1 Giao thông",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Mật độ đường giao thông đô thị",
+   "don_vi": "km/km 2",
+   "muc": [
+    {
+     "loai_II": "8",
+     "loai_III": "6",
+     "diem": "5",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "6",
+     "loai_III": "4",
+     "diem": "4",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.07",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.07. Mật độ đường giao thông đô thị được tính bằng tổng chiều dài các tuyến đường giao thông đô thị trên diện tích đất xây dựng đô thị."
+   ],
+   "diem_toi_da": 5.0,
+   "diem_toi_thieu": 4.0,
+   "muc_toi_da": {
+    "loai_II": "8",
+    "loai_III": "6"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "6",
+    "loai_III": "4"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.08",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.2 Cấp nước, thoát nước và xử lý nước thải",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Tỷ lệ dân số đô thị được cung cấp nước sạch qua hệ thống cấp nước tập trung",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "100",
+     "loai_III": "95",
+     "diem": "3",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "90",
+     "loai_III": "85",
+     "diem": "2",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.08",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.08. Tỷ lệ dân số đô thị được cung cấp nước sạch qua hệ thống cấp nước tập trung được tính bằng tỷ lệ phần trăm (%) giữa dân số được sử dụng nước sạch qua hệ thống cấp nước tập trung trên quy mô dân số."
+   ],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.0,
+   "muc_toi_da": {
+    "loai_II": "100",
+    "loai_III": "95"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "90",
+    "loai_III": "85"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.09",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.2 Cấp nước, thoát nước và xử lý nước thải",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Mật độ đường cống thoát nước chính",
+   "don_vi": "km/km 2",
+   "muc": [
+    {
+     "loai_II": "≥ 4,5",
+     "loai_III": "≥ 3,5",
+     "diem": "3",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "3,5",
+     "loai_III": "3",
+     "diem": "2",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.09",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.09. Mật độ đường cống thoát nước chính được tính bằng tổng chiều dài đường cống thoát nước chính trên tổng diện tích đất xây dựng đô thị."
+   ],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 4,5",
+    "loai_III": "≥ 3,5"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "3,5",
+    "loai_III": "3"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.10",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.2 Cấp nước, thoát nước và xử lý nước thải",
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Tỷ lệ công suất vận hành trạm xử lý nước thải so với tổng công suất thiết kế theo quy hoạch",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 80",
+     "loai_III": "≥ 70",
+     "diem": "1",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "60",
+     "loai_III": "50",
+     "diem": "0,75",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.10",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.10. Tỷ lệ công suất vận hành trạm xử lý nước thải so với tổng công suất thiết kế theo quy hoạch được tính bằng tỷ lệ phần trăm (%) giữa tổng công suất vận hành các trạm xử lý nước thải hiện trạng trên tổng công suất thiết kế các trạm xử lý nước thải theo quy hoạch."
+   ],
+   "diem_toi_da": 1.0,
+   "diem_toi_thieu": 0.75,
+   "muc_toi_da": {
+    "loai_II": "≥ 80",
+    "loai_III": "≥ 70"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "60",
+    "loai_III": "50"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.11",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.3 Xử lý chất thải rắn",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Tỷ lệ chất thải rắn sinh hoạt được xử lý đáp ứng yêu cầu bảo vệ môi trường",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 90",
+     "loai_III": "≥ 80",
+     "diem": "3",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "80",
+     "loai_III": "70",
+     "diem": "2",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.11",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.11. Tỷ lệ chất thải rắn sinh hoạt được xử lý đáp ứng yêu cầu bảo vệ môi trường được tính bằng tỷ lệ phần trăm (%) giữa khối lượng chất thải rắn sinh hoạt đã được xử lý đáp ứng yêu cầu bảo vệ môi trường trên tổng khối lượng chất thải rắn sinh hoạt phát thải."
+   ],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 90",
+    "loai_III": "≥ 80"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "80",
+    "loai_III": "70"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.12",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.4 Nghĩa trang đô thị",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Tỷ lệ diện tích nghĩa trang nhân dân được xây dựng theo quy hoạch",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 80",
+     "loai_III": "≥ 70",
+     "diem": "3",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "60",
+     "loai_III": "50",
+     "diem": "2",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.12",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.12. Tỷ lệ diện tích nghĩa trang nhân dân được xây dựng theo quy hoạch là tỷ lệ phần trăm (%) diện tích nghĩa trang nhân dân đã được xây dựng so với quy hoạch."
+   ],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 80",
+    "loai_III": "≥ 70"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "60",
+    "loai_III": "50"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.13",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.4 Nghĩa trang đô thị",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Nhà tang lễ",
+   "don_vi": "cơ sở",
+   "muc": [
+    {
+     "loai_II": "≥ 2",
+     "loai_III": "≥ 1",
+     "diem": "3",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "1",
+     "loai_III": "Có dự án",
+     "diem": "2,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.13",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 2",
+    "loai_III": "≥ 1"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "1",
+    "loai_III": "Có dự án"
+   },
+   "loai_du_lieu": "dinh_luong",
+   "ghi_chu_mo_ho": "Đơn vị \"cơ sở\"; mức tối thiểu loại III là \"Có dự án\" (định tính)."
+  },
+  {
+   "id": "2A.III.14",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "III.2 Về hạ tầng xã hội",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Số giường bệnh",
+   "don_vi": "giường/10.000 dân",
+   "muc": [
+    {
+     "loai_II": "≥ 40",
+     "loai_III": "≥ 35",
+     "diem": "5",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "35",
+     "loai_III": "30",
+     "diem": "3,75",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.14",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.14. Số giường bệnh là tổng số giường bệnh tại các trung tâm y tế, bệnh viện đa khoa, chuyên khoa các cấp (không bao gồm trạm y tế cấp xã)."
+   ],
+   "diem_toi_da": 5.0,
+   "diem_toi_thieu": 3.75,
+   "muc_toi_da": {
+    "loai_II": "≥ 40",
+    "loai_III": "≥ 35"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "35",
+    "loai_III": "30"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.15",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "III.2 Về hạ tầng xã hội",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Cơ sở giáo dục, đào tạo",
+   "don_vi": "cơ sở",
+   "muc": [
+    {
+     "loai_II": "≥ 25",
+     "loai_III": "≥ 10",
+     "diem": "5",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "10",
+     "loai_III": "1",
+     "diem": "3,75",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.15",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.15. Cơ sở giáo dục, đào tạo bao gồm các trường đại học, cao đẳng, trung học phổ thông, trung học chuyên nghiệp và dạy nghề."
+   ],
+   "diem_toi_da": 5.0,
+   "diem_toi_thieu": 3.75,
+   "muc_toi_da": {
+    "loai_II": "≥ 25",
+    "loai_III": "≥ 10"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "10",
+    "loai_III": "1"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.16",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "III.2 Về hạ tầng xã hội",
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Công trình văn hóa",
+   "don_vi": "công trình",
+   "muc": [
+    {
+     "loai_II": "≥ 20",
+     "loai_III": "≥ 10",
+     "diem": "5",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "10",
+     "loai_III": "2",
+     "diem": "3,75",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.16",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.16. Công trình văn hóa bao gồm thư viện, bảo tàng, triển lãm, nhà trưng bày, nhà hát, rạp xiếc, rạp chiếu phim, nhà văn hóa, nhà thiếu nhi, trung tâm hội nghị, câu lạc bộ, công trình vui chơi giải trí, công trình di tích lịch sử, văn hóa, công trình kiến trúc có giá trị, tượng đài và các công trình văn hóa cấp đô thị khác."
+   ],
+   "diem_toi_da": 5.0,
+   "diem_toi_thieu": 3.75,
+   "muc_toi_da": {
+    "loai_II": "≥ 20",
+    "loai_III": "≥ 10"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "10",
+    "loai_III": "2"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.17",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "III.2 Về hạ tầng xã hội",
+   "thu_tu": "4",
+   "ten_tieu_chuan": "Công trình thể dục, thể thao",
+   "don_vi": "công trình",
+   "muc": [
+    {
+     "loai_II": "≥ 10",
+     "loai_III": "≥ 5",
+     "diem": "4",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "5",
+     "loai_III": "2",
+     "diem": "3",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.17",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.17. Công trình thể dục, thể thao bao gồm sân thể thao, sân vận động, trung tâm thể dục, thể thao, nhà thi đấu, bể bơi và các công trình thể thao cấp đô thị khác."
+   ],
+   "diem_toi_da": 4.0,
+   "diem_toi_thieu": 3.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 10",
+    "loai_III": "≥ 5"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "5",
+    "loai_III": "2"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.18",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "III.2 Về hạ tầng xã hội",
+   "thu_tu": "5",
+   "ten_tieu_chuan": "Công trình thương mại, dịch vụ",
+   "don_vi": "công trình",
+   "muc": [
+    {
+     "loai_II": "≥ 10",
+     "loai_III": "≥ 5",
+     "diem": "3",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "5",
+     "loai_III": "2",
+     "diem": "2",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.18",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.18. Công trình thương mại, dịch vụ bao gồm chợ, siêu thị, trung tâm thương mại và các công trình thương mại, dịch vụ cấp đô thị khác."
+   ],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 10",
+    "loai_III": "≥ 5"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "5",
+    "loai_III": "2"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.19",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "III.2 Về hạ tầng xã hội",
+   "thu_tu": "6",
+   "ten_tieu_chuan": "Đất công trình dịch vụ - công cộng bình quân đầu người",
+   "don_vi": "m 2 /người",
+   "muc": [
+    {
+     "loai_II": "≥ 3",
+     "loai_III": "≥ 2",
+     "diem": "3",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "2",
+     "loai_III": "1,5",
+     "diem": "2",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.19",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.19. Đất công trình dịch vụ - công cộng bình quân đầu người được tính bằng tổng diện tích đất xây dựng các công trình y tế, văn hóa, giáo dục, thể dục, thể thao, thương mại, dịch vụ (diện tích công trình quy định tại các tiêu chuẩn 2A.III.14, 2A.III.15, 2A.III.16, 2A.III.17 và 2A.III.18) tính trên quy mô dân số."
+   ],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 3",
+    "loai_III": "≥ 2"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "2",
+    "loai_III": "1,5"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.20",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "III.3 Về không gian, kiến trúc, cảnh quan đô thị",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Số lượng không gian xanh sử dụng công cộng có quy mô 02 ha trở lên",
+   "don_vi": "khu",
+   "muc": [
+    {
+     "loai_II": "≥ 4",
+     "loai_III": "≥ 2",
+     "diem": "4",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "2",
+     "loai_III": "1",
+     "diem": "3",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.20",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.20, 2B.III.29. Số lượng không gian xanh công cộng là không gian cây xanh công cộng được bảo tồn hoặc xây dựng để phục vụ nhu cầu vui chơi giải trí, giao tiếp ngoài trời của cộng đồng dân cư, bảo đảm sự tự do tiếp cận của mọi người, tương ứng với các thể loại công trình như công viên, vườn hoa, sân chơi, quảng trường."
+   ],
+   "diem_toi_da": 4.0,
+   "diem_toi_thieu": 3.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 4",
+    "loai_III": "≥ 2"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "2",
+    "loai_III": "1"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.21",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "III.3 Về không gian, kiến trúc, cảnh quan đô thị",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Tỷ lệ diện tích không gian xanh trên diện tích tự nhiên",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 35",
+     "loai_III": "≥ 35",
+     "diem": "3",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "25",
+     "loai_III": "25",
+     "diem": "2",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.21",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.21. Tỷ lệ diện tích không gian xanh trên diện tích tự nhiên được tính bằng tỷ lệ phần trăm (%) tổng diện tích không gian xanh tự nhiên (rừng, đồi, núi, thảm thực vật ven sông, hồ và ven biển), không gian xanh bán tự nhiên (sản xuất nông lâm nghiệp, thủy sản) và không gian xanh nhân tạo (không gian xanh công cộng, cây xanh chuyên dụng, không gian cây xanh ngoài công cộng và các dạng phủ xanh khác) trên diện tích tự nhiên."
+   ],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 35",
+    "loai_III": "≥ 35"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "25",
+    "loai_III": "25"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.22",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "III.3 Về không gian, kiến trúc, cảnh quan đô thị",
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Đất cây xanh sử dụng công cộng trong khu vực dân dụng đô thị",
+   "don_vi": "m 2 /người",
+   "muc": [
+    {
+     "loai_II": "≥ 8",
+     "loai_III": "≥ 7",
+     "diem": "3",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "6",
+     "loai_III": "6",
+     "diem": "2,5",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.22",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.22. Đất cây xanh sử dụng công cộng trong khu vực dân dụng đô thị được tính bằng tổng diện tích đất công viên, vườn hoa cấp đô thị (không bao gồm đất cây xanh sử dụng công cộng cấp đơn vị ở) tính trên quy mô dân số."
+   ],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 8",
+    "loai_III": "≥ 7"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "6",
+    "loai_III": "6"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2A.III.23",
+   "bang": "Bảng 2A",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "III.3 Về không gian, kiến trúc, cảnh quan đô thị",
+   "thu_tu": "4",
+   "ten_tieu_chuan": "Quy chế quản lý kiến trúc đô thị",
+   "don_vi": "Quy chế",
+   "muc": [
+    {
+     "loai_II": "Đã thực hiện Quy chế từ 03 năm trở lên",
+     "loai_III": "Đã thực hiện Quy chế từ 03 năm trở lên",
+     "diem": "5",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "Đã thực hiện Quy chế từ 01 đến 03 năm",
+     "loai_III": "Đã thực hiện Quy chế từ 01 đến 03 năm",
+     "diem": "4",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "do_thi_loai_II",
+    "do_thi_loai_III (đánh giá toàn đô thị)"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2A, mã 2A.III.23",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 5.0,
+   "diem_toi_thieu": 4.0,
+   "muc_toi_da": {
+    "loai_II": "Đã thực hiện Quy chế từ 03 năm trở lên",
+    "loai_III": "Đã thực hiện Quy chế từ 03 năm trở lên"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "Đã thực hiện Quy chế từ 01 đến 03 năm",
+    "loai_III": "Đã thực hiện Quy chế từ 01 đến 03 năm"
+   },
+   "loai_du_lieu": "dinh_tinh"
+  }
+ ],
+ "bang_2A_khung_diem_nhom": [
+  {
+   "ma": "I",
+   "ten": "TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "khung_diem": "11,5-15",
+   "bang": "Bảng 2A"
+  },
+  {
+   "ma": "II",
+   "ten": "TIÊU CHÍ MỨC ĐỘ ĐÔ THỊ HÓA",
+   "khung_diem": "15,5-20",
+   "bang": "Bảng 2A"
+  },
+  {
+   "ma": "III",
+   "ten": "TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "khung_diem": "48-65",
+   "bang": "Bảng 2A"
+  },
+  {
+   "ma": "III.1",
+   "ten": "Về hạ tầng kỹ thuật",
+   "khung_diem": "18,25-25",
+   "bang": "Bảng 2A"
+  },
+  {
+   "ma": "3.1.1",
+   "ten": "Giao thông",
+   "khung_diem": "7-9",
+   "bang": "Bảng 2A"
+  },
+  {
+   "ma": "3.1.2",
+   "ten": "Cấp nước, thoát nước và xử lý nước thải",
+   "khung_diem": "4,75-7",
+   "bang": "Bảng 2A"
+  },
+  {
+   "ma": "3.1.3",
+   "ten": "Xử lý chất thải rắn",
+   "khung_diem": "2-3",
+   "bang": "Bảng 2A"
+  },
+  {
+   "ma": "3.1.4",
+   "ten": "Nghĩa trang đô thị",
+   "khung_diem": "4,5-6",
+   "bang": "Bảng 2A"
+  },
+  {
+   "ma": "III.2",
+   "ten": "Về hạ tầng xã hội",
+   "khung_diem": "18,25-25",
+   "bang": "Bảng 2A"
+  },
+  {
+   "ma": "III.3",
+   "ten": "Về không gian, kiến trúc, cảnh quan đô thị",
+   "khung_diem": "11,5-15",
+   "bang": "Bảng 2A"
+  }
+ ],
+ "bang_2A_diem_cong": [],
+ "bang_2B": [
+  {
+   "id": "2B.I.01",
+   "bang": "Bảng 2B",
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "nhom": null,
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Tỷ lệ tăng dân số",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 1,8",
+     "loai_III": "≥ 1,4",
+     "diem": "5",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "1,4",
+     "loai_III": "1",
+     "diem": "3,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.I.01",
+   "cach_tinh_phu_luc_III": [
+    "2B.I.01. Tỷ lệ tăng dân số là tỷ lệ tăng dân số hằng năm phản ánh mức tăng, giảm do tăng tự nhiên và di cư thuần được biểu thị bằng tỷ lệ phần trăm, được xác định theo phương pháp, số liệu theo quy định của pháp luật về thống kê."
+   ],
+   "diem_toi_da": 5.0,
+   "diem_toi_thieu": 3.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 1,8",
+    "loai_III": "≥ 1,4"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "1,4",
+    "loai_III": "1"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.I.02",
+   "bang": "Bảng 2B",
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "nhom": null,
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Thu nhập bình quân đầu người trên năm so với thu nhập bình quân của tỉnh, thành phố",
+   "don_vi": "lần",
+   "muc": [
+    {
+     "loai_II": "≥ 1,5",
+     "loai_III": "≥ 1,2",
+     "diem": "6",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "1,2",
+     "loai_III": "1",
+     "diem": "4,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.I.02",
+   "cach_tinh_phu_luc_III": [
+    "1.I.03, 2B.I.02. Thu nhập bình quân đầu người trong 01 năm so với mức bình quân cả nước hoặc tỉnh, thành phố được tính toán, công bố theo quy định của pháp luật về thống kê."
+   ],
+   "diem_toi_da": 6.0,
+   "diem_toi_thieu": 4.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 1,5",
+    "loai_III": "≥ 1,2"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "1,2",
+    "loai_III": "1"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.I.03",
+   "bang": "Bảng 2B",
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "nhom": null,
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Tỷ lệ hộ nghèo (theo chuẩn nghèo đa chiều)",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "< 2,5",
+     "loai_III": "< 4",
+     "diem": "4",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "3",
+     "loai_III": "5",
+     "diem": "3,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.I.03",
+   "cach_tinh_phu_luc_III": [
+    "2B.I.03. Tỷ lệ hộ nghèo (theo chuẩn nghèo đa chiều) được xác định theo số liệu công bố theo quy định của pháp luật về thống kê."
+   ],
+   "diem_toi_da": 4.0,
+   "diem_toi_thieu": 3.5,
+   "muc_toi_da": {
+    "loai_II": "< 2,5",
+    "loai_III": "< 4"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "3",
+    "loai_III": "5"
+   },
+   "loai_du_lieu": "dinh_luong",
+   "ghi_chu_mo_ho": "Chỉ tiêu nghịch (càng thấp càng tốt): mức tối đa là \"< 2,5\" (loại II) / \"< 4\" (loại III) được 4 điểm; mức tối thiểu \"3\"/\"5\" được 3,5 điểm. Khi nội suy, hướng ngược (giá trị nhỏ hơn = điểm cao hơn)."
+  },
+  {
+   "id": "2B.II.04",
+   "bang": "Bảng 2B",
+   "tieu_chi": "II. TIÊU CHÍ MỨC ĐỘ ĐÔ THỊ HÓA",
+   "nhom": null,
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Mật độ dân số tính trên diện tích đất xây dựng đô thị",
+   "don_vi": "người/km 2",
+   "muc": [
+    {
+     "loai_II": "≥ 8.000",
+     "loai_III": "≥ 6.000",
+     "diem": "10",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "6.000",
+     "loai_III": "4.000",
+     "diem": "8",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "> 25.000",
+     "loai_III": "> 25.000",
+     "diem": "8",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.II.04",
+   "cach_tinh_phu_luc_III": [
+    "2B.II.04. Mật độ dân số tính trên diện tích đất xây dựng đô thị:"
+   ],
+   "diem_toi_da": 10.0,
+   "diem_toi_thieu": 8.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 8.000",
+    "loai_III": "≥ 6.000"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "6.000",
+    "loai_III": "4.000"
+   },
+   "loai_du_lieu": "dinh_luong",
+   "ghi_chu_mo_ho": "Bảng có dòng thứ 3 \"> 25.000\" (gộp cột loại II/III) dùng chung ô điểm 8 với mức tối thiểu: hiểu là mật độ > 25.000 người/km2 chỉ được điểm tối thiểu 8 (bản dự thảo 22/12 ghi rõ như vậy)."
+  },
+  {
+   "id": "2B.II.05",
+   "bang": "Bảng 2B",
+   "tieu_chi": "II. TIÊU CHÍ MỨC ĐỘ ĐÔ THỊ HÓA",
+   "nhom": null,
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Tỷ lệ diện tích đất xây dựng đô thị hiện trạng so với diện tích đất xây dựng đô thị theo quy hoạch đô thị",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 75",
+     "loai_III": "≥ 75",
+     "diem": "6",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "50",
+     "loai_III": "50",
+     "diem": "4,5",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.II.05",
+   "cach_tinh_phu_luc_III": [
+    "2B.II.05. Tỷ lệ diện tích đất xây dựng đô thị hiện trạng so với diện tích đất xây dựng đô thị theo quy hoạch được tính bằng tỷ lệ phần trăm (%) giữa diện tích đất xây dựng đô thị hiện trạng trên diện tích đất xây dựng đô thị theo quy hoạch."
+   ],
+   "diem_toi_da": 6.0,
+   "diem_toi_thieu": 4.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 75",
+    "loai_III": "≥ 75"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "50",
+    "loai_III": "50"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.II.06",
+   "bang": "Bảng 2B",
+   "tieu_chi": "II. TIÊU CHÍ MỨC ĐỘ ĐÔ THỊ HÓA",
+   "nhom": null,
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Tăng tỷ trọng công nghiệp - xây dựng và dịch vụ",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "Vượt so với mục tiêu đề ra từ 4% trở lên",
+     "loai_III": "Vượt so với mục tiêu đề ra từ 4% trở lên",
+     "diem": "4",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "Đạt mục tiêu đề ra",
+     "loai_III": "Đạt mục tiêu đề ra",
+     "diem": "3",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.II.06",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 4.0,
+   "diem_toi_thieu": 3.0,
+   "muc_toi_da": {
+    "loai_II": "Vượt so với mục tiêu đề ra từ 4% trở lên",
+    "loai_III": "Vượt so với mục tiêu đề ra từ 4% trở lên"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "Đạt mục tiêu đề ra",
+    "loai_III": "Đạt mục tiêu đề ra"
+   },
+   "loai_du_lieu": "dinh_tinh"
+  },
+  {
+   "id": "2B.III.07",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.1 Giao thông",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Tỷ lệ diện tích đất giao thông đô thị so với đất xây dựng đô thị",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 22",
+     "loai_III": "≥ 17",
+     "diem": "3",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "15",
+     "loai_III": "12",
+     "diem": "2",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.07",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.07. Tỷ lệ diện tích đất giao thông đô thị so với đất xây dựng đô thị: Diện tích đất giao thông đô thị gồm diện tích đường đô thị; diện tích các công trình đầu mối giao thông, diện tích đường giao thông đối ngoại và diện tích bến, bãi đỗ xe trên địa bàn đô thị. Tỷ lệ đất giao thông đô thị so với đất xây dựng đô thị được tính bằng tỷ lệ phần trăm (%) giữa diện tích đất giao thông đô thị và diện tích đất xây dựng đô thị."
+   ],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 22",
+    "loai_III": "≥ 17"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "15",
+    "loai_III": "12"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.08",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.1 Giao thông",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Diện tích đất giao thông đô thị bình quân đầu người",
+   "don_vi": "m 2 /người",
+   "muc": [
+    {
+     "loai_II": "≥ 13",
+     "loai_III": "≥ 9",
+     "diem": "3",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "11",
+     "loai_III": "7",
+     "diem": "2",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.08",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.08. Diện tích đất giao thông đô thị bình quân đầu người được tính bằng diện tích đất giao thông đô thị trên tổng dân số đô thị."
+   ],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 13",
+    "loai_III": "≥ 9"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "11",
+    "loai_III": "7"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.09",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.1 Giao thông",
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Tỷ lệ ngầm hóa đường dây, đường cáp trên tuyến phố chính",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 70",
+     "loai_III": "≥ 50",
+     "diem": "3",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "50",
+     "loai_III": "40",
+     "diem": "2,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.09",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.09. Tỷ lệ ngầm hóa đường dây, đường cáp trên tuyến phố chính là tỷ lệ phần trăm (%) giữa các đoạn đường tính từ đường khu vực trở lên được ngầm hóa đường dây, cáp trên tổng chiều dài đường từ đường khu vực trở lên."
+   ],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 70",
+    "loai_III": "≥ 50"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "50",
+    "loai_III": "40"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.10",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.2 Cấp nước, thoát nước và xử lý nước thải",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Mức tiêu thụ nước sạch qua hệ thống cấp nước tập trung bình quân đầu người",
+   "don_vi": "lít/người/ngày đêm",
+   "muc": [
+    {
+     "loai_II": "100",
+     "loai_III": "100",
+     "diem": "2",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "80",
+     "loai_III": "80",
+     "diem": "1,5",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.10",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.10. Mức tiêu thụ nước sạch qua hệ thống cấp nước tập trung bình quân đầu người được tính bằng tổng số lít nước sạch sinh hoạt sử dụng trung bình trong 01 ngày đêm trên tổng dân số đô thị."
+   ],
+   "diem_toi_da": 2.0,
+   "diem_toi_thieu": 1.5,
+   "muc_toi_da": {
+    "loai_II": "100",
+    "loai_III": "100"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "80",
+    "loai_III": "80"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.11",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.2 Cấp nước, thoát nước và xử lý nước thải",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Thoát nước chống ngập úng đô thị",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 75",
+     "loai_III": "≥ 50",
+     "diem": "2",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "50",
+     "loai_III": "25",
+     "diem": "1,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.11",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.11. Thoát nước chống ngập úng đô thị được tính bằng tỷ lệ phần trăm (%) giữa số lượng điểm ngập úng (điểm ngập úng là điểm có một trong ba yếu tố sau: có thời gian ngập úng ≥ 01 giờ sau khi dứt mưa hoặc có diện tích ngập ≥ 4.000 m2 hoặc độ sâu ngập ≥ 0,3 m) được khắc phục trên tổng số điểm ngập úng trên địa bàn trong năm."
+   ],
+   "diem_toi_da": 2.0,
+   "diem_toi_thieu": 1.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 75",
+    "loai_III": "≥ 50"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "50",
+    "loai_III": "25"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.12",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.2 Cấp nước, thoát nước và xử lý nước thải",
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Tỷ lệ dân số đô thị được cung cấp dịch vụ thu gom và xử lý nước thải sinh hoạt đạt quy chuẩn kỹ thuật",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 50",
+     "loai_III": "≥ 35",
+     "diem": "2",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "35",
+     "loai_III": "20",
+     "diem": "1,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.12",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.12. Tỷ lệ dân số đô thị được cung cấp dịch vụ thu gom và xử lý nước thải sinh hoạt đạt quy chuẩn kỹ thuật được tính bằng tỷ lệ phần trăm (%) giữa dân số được cung cấp dịch vụ thu gom, xử lý nước thải sinh hoạt đạt quy chuẩn kỹ thuật trên tổng dân số đô thị."
+   ],
+   "diem_toi_da": 2.0,
+   "diem_toi_thieu": 1.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 50",
+    "loai_III": "≥ 35"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "35",
+    "loai_III": "20"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.13",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.3 Thu gom, xử lý chất thải rắn và môi trường đô thị",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Tỷ lệ chất thải rắn sinh hoạt được thu gom",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "100",
+     "loai_III": "≥ 90",
+     "diem": "2",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "90",
+     "loai_III": "80",
+     "diem": "1,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.13",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.13. Tỷ lệ chất thải rắn sinh hoạt được thu gom được tính bằng tỷ lệ phần trăm (%) giữa khối lượng chất thải rắn sinh hoạt đã được thu gom trên tổng lượng chất thải rắn sinh hoạt phát thải."
+   ],
+   "diem_toi_da": 2.0,
+   "diem_toi_thieu": 1.5,
+   "muc_toi_da": {
+    "loai_II": "100",
+    "loai_III": "≥ 90"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "90",
+    "loai_III": "80"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.14",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.3 Thu gom, xử lý chất thải rắn và môi trường đô thị",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Tỷ lệ cá nhân, hộ gia đình đã triển khai phân loại chất thải rắn tại nguồn",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 75",
+     "loai_III": "≥ 75",
+     "diem": "1",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "50",
+     "loai_III": "50",
+     "diem": "0,75",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.14",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 1.0,
+   "diem_toi_thieu": 0.75,
+   "muc_toi_da": {
+    "loai_II": "≥ 75",
+    "loai_III": "≥ 75"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "50",
+    "loai_III": "50"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.15",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.3 Thu gom, xử lý chất thải rắn và môi trường đô thị",
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Tỷ lệ sử dụng hình thức hỏa táng",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 30",
+     "loai_III": "≥ 15",
+     "diem": "1",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "15",
+     "loai_III": "5",
+     "diem": "0,75",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.15",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.15. Tỷ lệ sử dụng hình thức hỏa táng được tính bằng tỷ lệ phần trăm (%) giữa tổng số trường hợp sử dụng hình thức hỏa táng hoặc các hình thức táng hiện đại khác trên tổng số ca từ trần."
+   ],
+   "diem_toi_da": 1.0,
+   "diem_toi_thieu": 0.75,
+   "muc_toi_da": {
+    "loai_II": "≥ 30",
+    "loai_III": "≥ 15"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "15",
+    "loai_III": "5"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.16",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.4 Cấp điện và chiếu sáng công cộng",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Mức tiêu thụ điện sinh hoạt bình quân đầu người",
+   "don_vi": "kwh/người/năm",
+   "muc": [
+    {
+     "loai_II": "≥ 1.500",
+     "loai_III": "≥ 1.000",
+     "diem": "2",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "750",
+     "loai_III": "400",
+     "diem": "1,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.16",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.16. Mức tiêu thụ điện sinh hoạt bình quân đầu người được tính bằng bình quân tổng công suất sử dụng điện sinh hoạt trong năm trên tổng dân số đô thị."
+   ],
+   "diem_toi_da": 2.0,
+   "diem_toi_thieu": 1.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 1.500",
+    "loai_III": "≥ 1.000"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "750",
+    "loai_III": "400"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.17",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.4 Cấp điện và chiếu sáng công cộng",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Tỷ lệ đường cấp khu vực, cấp nội bộ được chiếu sáng",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 95",
+     "loai_III": "≥ 95",
+     "diem": "1",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "80",
+     "loai_III": "80",
+     "diem": "0,75",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.17",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.17. Tỷ lệ đường cấp khu vực, cấp nội bộ được chiếu sáng được tính bằng tỷ lệ phần trăm (%) giữa tổng chiều dài các đoạn đường cấp khu vực, cấp nội bộ được chiếu sáng trên tổng chiều dài tuyến đường cấp khu vực, cấp nội bộ trên địa bàn."
+   ],
+   "diem_toi_da": 1.0,
+   "diem_toi_thieu": 0.75,
+   "muc_toi_da": {
+    "loai_II": "≥ 95",
+    "loai_III": "≥ 95"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "80",
+    "loai_III": "80"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.18",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.4 Cấp điện và chiếu sáng công cộng",
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Tỷ lệ tuyến đường có ứng dụng chiếu sáng sử dụng năng lượng tái tạo, tiết kiệm năng lượng, chiếu sáng thông minh",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 50",
+     "loai_III": "≥ 50",
+     "diem": "1",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "15",
+     "loai_III": "15",
+     "diem": "0,75",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.18",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 1.0,
+   "diem_toi_thieu": 0.75,
+   "muc_toi_da": {
+    "loai_II": "≥ 50",
+    "loai_III": "≥ 50"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "15",
+    "loai_III": "15"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.19",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.5 Hạ tầng viễn thông",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Tỷ lệ hộ gia đình có cáp quang truy cập Internet qua mạng băng rộng cố định",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "100",
+     "loai_III": "100",
+     "diem": "2",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "90",
+     "loai_III": "80",
+     "diem": "1,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.19",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.19. Tỷ lệ hộ gia đình có cáp quang truy cập Internet qua mạng băng rộng cố định được tính bằng tỷ lệ phần trăm (%) giữa tổng số hộ gia đình có cáp quang truy cập Internet qua mạng băng rộng cố định trên tổng số hộ gia đình."
+   ],
+   "diem_toi_da": 2.0,
+   "diem_toi_thieu": 1.5,
+   "muc_toi_da": {
+    "loai_II": "100",
+    "loai_III": "100"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "90",
+    "loai_III": "80"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.20",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.2.1 Nhà ở",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Diện tích nhà ở bình quân đầu người",
+   "don_vi": "m 2 sàn/người",
+   "muc": [
+    {
+     "loai_II": "≥ 32",
+     "loai_III": "≥ 32",
+     "diem": "4",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "28",
+     "loai_III": "28",
+     "diem": "3",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.20",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.20. Diện tích nhà ở bình quân đầu người được tính bằng tổng diện tích sàn nhà ở trên quy mô dân số."
+   ],
+   "diem_toi_da": 4.0,
+   "diem_toi_thieu": 3.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 32",
+    "loai_III": "≥ 32"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "28",
+    "loai_III": "28"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.21",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.2.1 Nhà ở",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Nhà ở xã hội",
+   "don_vi": "dự án",
+   "muc": [
+    {
+     "loai_II": "≥ 2",
+     "loai_III": "≥ 1",
+     "diem": "2",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "1",
+     "loai_III": "Đang xây dựng",
+     "diem": "1,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.21",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 2.0,
+   "diem_toi_thieu": 1.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 2",
+    "loai_III": "≥ 1"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "1",
+    "loai_III": "Đang xây dựng"
+   },
+   "loai_du_lieu": "dinh_luong",
+   "ghi_chu_mo_ho": "Mức tối thiểu loại III là \"Đang xây dựng\" (định tính)."
+  },
+  {
+   "id": "2B.III.22",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.2.2 Công trình công cộng",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Đất dân dụng bình quân đầu người",
+   "don_vi": "m 2 /người",
+   "muc": [
+    {
+     "loai_II": "50 đến 90",
+     "loai_III": "50 đến 110",
+     "diem": "3",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "< 50",
+     "loai_III": "< 50",
+     "diem": "2",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "> 90",
+     "loai_III": "> 110",
+     "diem": "0",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.22",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.22. Đất dân dụng bình quân đầu người là đất xây dựng các công trình chủ yếu phục vụ các hoạt động dân dụng bao gồm đất đơn vị ở hoặc đất ở, đất công trình dịch vụ - công cộng đô thị, đất cây xanh công cộng đô thị và đất hạ tầng kỹ thuật tính bình quân trên quy mô dân số."
+   ],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.0,
+   "muc_toi_da": {
+    "loai_II": "50 đến 90",
+    "loai_III": "50 đến 110"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "< 50",
+    "loai_III": "< 50"
+   },
+   "loai_du_lieu": "dinh_tinh",
+   "ghi_chu_mo_ho": "Không đơn điệu: 50–90 (II) / 50–110 (III) m2/người = 3 điểm; < 50 = 2 điểm; > 90 (II) / > 110 (III) = 0 điểm. Không áp dụng nội suy thông thường."
+  },
+  {
+   "id": "2B.III.23",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.2.2 Công trình công cộng",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Đất xây dựng công trình dịch vụ - công cộng cấp đơn vị ở bình quân đầu người",
+   "don_vi": "m 2 /người",
+   "muc": [
+    {
+     "loai_II": "≥ 4,0",
+     "loai_III": "≥ 4,0",
+     "diem": "4",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "3",
+     "loai_III": "3",
+     "diem": "3",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.23",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.23. Đất xây dựng công trình dịch vụ - công cộng cấp đơn vị ở bình quân đầu người được tính bằng diện tích đất xây dựng các công trình y tế, văn hóa, giáo dục, thể dục, thể thao, thương mại cấp đơn vị ở trên quy mô dân số."
+   ],
+   "diem_toi_da": 4.0,
+   "diem_toi_thieu": 3.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 4,0",
+    "loai_III": "≥ 4,0"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "3",
+    "loai_III": "3"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.24",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.2.2 Công trình công cộng",
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Số trường công lập đạt chuẩn",
+   "don_vi": null,
+   "muc": [
+    {
+     "loai_II": "80% số trường mầm non, tiểu học, trung học cơ sở công lập đạt chuẩn quốc gia mức độ 1 trở lên, trong đó ít nhất có 20% đạt mức độ 2",
+     "loai_III": "80% số trường mầm non, tiểu học, trung học cơ sở công lập đạt chuẩn quốc gia mức độ 1 trở lên, trong đó ít nhất có 20% đạt mức độ 2",
+     "diem": "3",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "60% số trường mầm non, tiểu học, trung học cơ sở công lập đạt chuẩn quốc gia mức độ 1 trở lên",
+     "loai_III": "60% số trường mầm non, tiểu học, trung học cơ sở công lập đạt chuẩn quốc gia mức độ 1 trở lên",
+     "diem": "2,5",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.24",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.5,
+   "muc_toi_da": {
+    "loai_II": "80% số trường mầm non, tiểu học, trung học cơ sở công lập đạt chuẩn quốc gia mức độ 1 trở lên, trong đó ít nhất có 20% đạt mức độ 2",
+    "loai_III": "80% số trường mầm non, tiểu học, trung học cơ sở công lập đạt chuẩn quốc gia mức độ 1 trở lên, trong đó ít nhất có 20% đạt mức độ 2"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "60% số trường mầm non, tiểu học, trung học cơ sở công lập đạt chuẩn quốc gia mức độ 1 trở lên",
+    "loai_III": "60% số trường mầm non, tiểu học, trung học cơ sở công lập đạt chuẩn quốc gia mức độ 1 trở lên"
+   },
+   "loai_du_lieu": "dinh_tinh"
+  },
+  {
+   "id": "2B.III.25",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.2.2 Công trình công cộng",
+   "thu_tu": "4",
+   "ten_tieu_chuan": "Trường tiểu học công lập trên quy mô dân số",
+   "don_vi": "trường",
+   "muc": [
+    {
+     "loai_II": "Đáp ứng 01 trường/6.000 người",
+     "loai_III": "Đáp ứng 01 trường/6.000 người",
+     "diem": "3",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "Đáp ứng 01 trường/8.000 người",
+     "loai_III": "Đáp ứng 01 trường/8.000 người",
+     "diem": "2,5",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.25",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.5,
+   "muc_toi_da": {
+    "loai_II": "Đáp ứng 01 trường/6.000 người",
+    "loai_III": "Đáp ứng 01 trường/6.000 người"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "Đáp ứng 01 trường/8.000 người",
+    "loai_III": "Đáp ứng 01 trường/8.000 người"
+   },
+   "loai_du_lieu": "dinh_tinh"
+  },
+  {
+   "id": "2B.III.26",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.2.2 Công trình công cộng",
+   "thu_tu": "5",
+   "ten_tieu_chuan": "Đất công trình giáo dục cấp đơn vị ở (trường mầm non, tiểu học, trung học cơ sở) bình quân tính trên quy mô dân số",
+   "don_vi": "m 2 /người",
+   "muc": [
+    {
+     "loai_II": "≥ 2,0",
+     "loai_III": "≥ 2,0",
+     "diem": "3",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "1,8",
+     "loai_III": "1,8",
+     "diem": "2",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.26",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 2,0",
+    "loai_III": "≥ 2,0"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "1,8",
+    "loai_III": "1,8"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.27",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.2.2 Công trình công cộng",
+   "thu_tu": "6",
+   "ten_tieu_chuan": "Đất công trình văn hóa, thể dục, thể thao (sân chơi, sân luyện tập và các công trình văn hóa thể thao) cấp đơn vị ở bình quân tính trên quy mô dân số",
+   "don_vi": "m 2 /người",
+   "muc": [
+    {
+     "loai_II": "≥ 1,5",
+     "loai_III": "≥ 1,5",
+     "diem": "3",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "1",
+     "loai_III": "1",
+     "diem": "2",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.27",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 3.0,
+   "diem_toi_thieu": 2.0,
+   "muc_toi_da": {
+    "loai_II": "≥ 1,5",
+    "loai_III": "≥ 1,5"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "1",
+    "loai_III": "1"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.28",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.1 Không gian đô thị",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Đất cây xanh sử dụng công cộng bình quân đầu người",
+   "don_vi": "m 2 /người",
+   "muc": [
+    {
+     "loai_II": "≥ 3",
+     "loai_III": "≥ 3",
+     "diem": "2",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "2",
+     "loai_III": "2",
+     "diem": "1,5",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.28",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.28. Đất cây xanh sử dụng công cộng bình quân đầu người được tính bằng tổng diện tích đất công viên, vườn hoa, sân chơi cấp đơn vị ở (không bao gồm đất cây xanh sử dụng công cộng cấp đô thị) trên quy mô dân số."
+   ],
+   "diem_toi_da": 2.0,
+   "diem_toi_thieu": 1.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 3",
+    "loai_III": "≥ 3"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "2",
+    "loai_III": "2"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.29",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.1 Không gian đô thị",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Số lượng không gian xanh công cộng có quy mô từ 2.000 m 2 trở lên",
+   "don_vi": "số khu",
+   "muc": [
+    {
+     "loai_II": "≥ 10",
+     "loai_III": "≥ 5",
+     "diem": "2",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "5",
+     "loai_III": "1",
+     "diem": "1,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.29",
+   "cach_tinh_phu_luc_III": [
+    "2A.III.20, 2B.III.29. Số lượng không gian xanh công cộng là không gian cây xanh công cộng được bảo tồn hoặc xây dựng để phục vụ nhu cầu vui chơi giải trí, giao tiếp ngoài trời của cộng đồng dân cư, bảo đảm sự tự do tiếp cận của mọi người, tương ứng với các thể loại công trình như công viên, vườn hoa, sân chơi, quảng trường."
+   ],
+   "diem_toi_da": 2.0,
+   "diem_toi_thieu": 1.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 10",
+    "loai_III": "≥ 5"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "5",
+    "loai_III": "1"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.30",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.2 Kiến trúc, cảnh quan đô thị",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Tỷ lệ tuyến phố văn minh đô thị",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 60",
+     "loai_III": "≥ 40",
+     "diem": "2",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "40",
+     "loai_III": "20",
+     "diem": "1,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.30",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.30. Tỷ lệ tuyến phố văn minh đô thị là tỷ lệ phần trăm (%) giữa số lượng các tuyến phố được đánh giá, công nhận là tuyến phố văn minh đô thị trên tổng số các tuyến phố trên địa bàn."
+   ],
+   "diem_toi_da": 2.0,
+   "diem_toi_thieu": 1.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 60",
+    "loai_III": "≥ 40"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "40",
+    "loai_III": "20"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.31",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.2 Kiến trúc, cảnh quan đô thị",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Số lượng công trình kiến trúc có giá trị, công trình di sản được bảo vệ, gìn giữ",
+   "don_vi": "công trình",
+   "muc": [
+    {
+     "loai_II": "≥ 6",
+     "loai_III": "≥ 3",
+     "diem": "1",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "3",
+     "loai_III": "1",
+     "diem": "0,75",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.31",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.31. Số lượng công trình kiến trúc có giá trị, công trình di sản được bảo vệ, gìn giữ là công trình di sản văn hóa được cấp có thẩm quyền công nhận theo quy định của pháp luật về di sản văn hóa hoặc công trình công cộng, công trình kiến trúc có giá trị được cấp có thẩm quyền công nhận theo quy định của pháp luật về kiến trúc."
+   ],
+   "diem_toi_da": 1.0,
+   "diem_toi_thieu": 0.75,
+   "muc_toi_da": {
+    "loai_II": "≥ 6",
+    "loai_III": "≥ 3"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "3",
+    "loai_III": "1"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.32",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.2 Kiến trúc, cảnh quan đô thị",
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Công trình xanh",
+   "don_vi": "công trình",
+   "muc": [
+    {
+     "loai_II": "≥ 4",
+     "loai_III": "≥ 2",
+     "diem": "1",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "2",
+     "loai_III": "1",
+     "diem": "0,75",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.32",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.32. Công trình xanh là công trình đã được hệ thống chứng nhận công trình xanh có thẩm quyền (như LOTUS, LEED, Green Mark…) cấp giấy chứng nhận."
+   ],
+   "diem_toi_da": 1.0,
+   "diem_toi_thieu": 0.75,
+   "muc_toi_da": {
+    "loai_II": "≥ 4",
+    "loai_III": "≥ 2"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "2",
+    "loai_III": "1"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.33",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.3 Quản trị đô thị",
+   "thu_tu": "1",
+   "ten_tieu_chuan": "Kế hoạch phát triển đô thị",
+   "don_vi": null,
+   "muc": [
+    {
+     "loai_II": "Đã thực hiện ≥ 03 năm",
+     "loai_III": "Đã thực hiện ≥ 03 năm",
+     "diem": "1",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "Có kế hoạch",
+     "loai_III": "Có kế hoạch",
+     "diem": "0,5",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.33",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 1.0,
+   "diem_toi_thieu": 0.5,
+   "muc_toi_da": {
+    "loai_II": "Đã thực hiện ≥ 03 năm",
+    "loai_III": "Đã thực hiện ≥ 03 năm"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "Có kế hoạch",
+    "loai_III": "Có kế hoạch"
+   },
+   "loai_du_lieu": "dinh_tinh"
+  },
+  {
+   "id": "2B.III.34",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.3 Quản trị đô thị",
+   "thu_tu": "2",
+   "ten_tieu_chuan": "Tỷ lệ hồ sơ thủ tục hành chính được xử lý qua dịch vụ công trực tuyến toàn trình",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "≥ 80",
+     "loai_III": "≥ 60",
+     "diem": "2",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "50",
+     "loai_III": "35",
+     "diem": "1,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.34",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.34. Tỷ lệ hồ sơ thủ tục hành chính được xử lý qua dịch vụ công trực tuyến toàn trình là tổng số hồ sơ thủ tục hành chính được xử lý qua dịch vụ công trực tuyến toàn trình trên tổng số hồ sơ thủ tục hành chính."
+   ],
+   "diem_toi_da": 2.0,
+   "diem_toi_thieu": 1.5,
+   "muc_toi_da": {
+    "loai_II": "≥ 80",
+    "loai_III": "≥ 60"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "50",
+    "loai_III": "35"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.35",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.3 Quản trị đô thị",
+   "thu_tu": "3",
+   "ten_tieu_chuan": "Tỷ lệ tuyến phố chính được cải tạo, chỉnh trang so với kế hoạch",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "100",
+     "loai_III": "100",
+     "diem": "1",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "75",
+     "loai_III": "75",
+     "diem": "0,75",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.35",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 1.0,
+   "diem_toi_thieu": 0.75,
+   "muc_toi_da": {
+    "loai_II": "100",
+    "loai_III": "100"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "75",
+    "loai_III": "75"
+   },
+   "loai_du_lieu": "dinh_luong"
+  },
+  {
+   "id": "2B.III.36",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.3 Quản trị đô thị",
+   "thu_tu": "4",
+   "ten_tieu_chuan": "Quản lý phát triển đô thị thông minh",
+   "don_vi": null,
+   "muc": [
+    {
+     "loai_II": "Đã triển khai ≥ 01 dịch vụ tiện ích đô thị thông minh",
+     "loai_III": "Đã triển khai ≥ 01 dịch vụ tiện ích đô thị thông minh",
+     "diem": "1",
+     "gop_cot_II_III": true
+    },
+    {
+     "loai_II": "Có đề án hoặc kế hoạch phát triển đô thị thông minh",
+     "loai_III": "Có đề án hoặc kế hoạch phát triển đô thị thông minh",
+     "diem": "0,75",
+     "gop_cot_II_III": true
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.36",
+   "cach_tinh_phu_luc_III": [
+    "2B.III.36. Quản lý phát triển đô thị thông minh là các khu vực có đề án hoặc kế hoạch phát triển đô thị thông minh được cấp có thẩm quyền phê duyệt và đã triển khai ít nhất 01 dịch vụ tiện ích quản lý đô thị thông minh."
+   ],
+   "diem_toi_da": 1.0,
+   "diem_toi_thieu": 0.75,
+   "muc_toi_da": {
+    "loai_II": "Đã triển khai ≥ 01 dịch vụ tiện ích đô thị thông minh",
+    "loai_III": "Đã triển khai ≥ 01 dịch vụ tiện ích đô thị thông minh"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "Có đề án hoặc kế hoạch phát triển đô thị thông minh",
+    "loai_III": "Có đề án hoặc kế hoạch phát triển đô thị thông minh"
+   },
+   "loai_du_lieu": "dinh_tinh"
+  },
+  {
+   "id": "2B.III.37",
+   "bang": "Bảng 2B",
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.3 Quản trị đô thị",
+   "thu_tu": "5",
+   "ten_tieu_chuan": "Mức độ hài lòng về sử dụng dịch vụ hành chính công của người dân đô thị",
+   "don_vi": "%",
+   "muc": [
+    {
+     "loai_II": "100",
+     "loai_III": "≥ 95",
+     "diem": "2",
+     "gop_cot_II_III": false
+    },
+    {
+     "loai_II": "95",
+     "loai_III": "90",
+     "diem": "1,5",
+     "gop_cot_II_III": false
+    }
+   ],
+   "ap_dung": [
+    "don_vi_hanh_chinh_cap_xa trong đô thị (phường, xã, đặc khu) - trình độ phát triển đô thị loại II/III",
+    "do_thi_loai_II/III nằm trong 01 ĐVHC cấp xã"
+   ],
+   "nguon": "NQ 111/2025/UBTVQH15, Phụ lục II, Bảng 2B, mã 2B.III.37",
+   "cach_tinh_phu_luc_III": [],
+   "diem_toi_da": 2.0,
+   "diem_toi_thieu": 1.5,
+   "muc_toi_da": {
+    "loai_II": "100",
+    "loai_III": "≥ 95"
+   },
+   "muc_toi_thieu": {
+    "loai_II": "95",
+    "loai_III": "90"
+   },
+   "loai_du_lieu": "dinh_luong"
+  }
+ ],
+ "bang_2B_khung_diem_nhom": [
+  {
+   "ma": "I",
+   "ten": "TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "khung_diem": "11,5-15",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "II",
+   "ten": "TIÊU CHÍ MỨC ĐỘ ĐÔ THỊ HÓA",
+   "khung_diem": "15,5-20",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "III",
+   "ten": "TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "khung_diem": "48-65",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "III.1",
+   "ten": "Về hạ tầng kỹ thuật",
+   "khung_diem": "18,5-25",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "3.1.1",
+   "ten": "Giao thông",
+   "khung_diem": "6,5-9",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "3.1.2",
+   "ten": "Cấp nước, thoát nước và xử lý nước thải",
+   "khung_diem": "4,5-6",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "3.1.3",
+   "ten": "Thu gom, xử lý chất thải rắn và môi trường đô thị",
+   "khung_diem": "3-4",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "3.1.4",
+   "ten": "Cấp điện và chiếu sáng công cộng",
+   "khung_diem": "3-4",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "3.1.5",
+   "ten": "Hạ tầng viễn thông",
+   "khung_diem": "1,5-2",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "III.2",
+   "ten": "Về hạ tầng xã hội",
+   "khung_diem": "18,5-25",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "3.2.1",
+   "ten": "Nhà ở",
+   "khung_diem": "4,5-6",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "3.2.2",
+   "ten": "Công trình công cộng",
+   "khung_diem": "14-19",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "III.3",
+   "ten": "Về không gian, kiến trúc, cảnh quan đô thị",
+   "khung_diem": "11-15",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "3.3.1",
+   "ten": "Không gian đô thị",
+   "khung_diem": "3-4",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "3.3.2",
+   "ten": "Kiến trúc, cảnh quan đô thị",
+   "khung_diem": "3-4",
+   "bang": "Bảng 2B"
+  },
+  {
+   "ma": "3.3.3",
+   "ten": "Quản trị đô thị",
+   "khung_diem": "5-7",
+   "bang": "Bảng 2B"
+  }
+ ],
+ "bang_2B_diem_cong": [
+  {
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "nhom": null,
+   "noi_dung": "Có mức tăng thu 1% trở lên từ ngân sách địa phương (không bao gồm nguồn thu từ đất, trừ trường hợp phát triển theo mô hình TOD)",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của tiêu chí vai trò, vị trí và điều kiện phát triển kinh tế - xã hội"
+  },
+  {
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "nhom": null,
+   "noi_dung": "Có công trình cấp quốc gia, cấp tỉnh trên địa bàn",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của tiêu chí vai trò, vị trí và điều kiện phát triển kinh tế - xã hội"
+  },
+  {
+   "tieu_chi": "I. TIÊU CHÍ VAI TRÒ, VỊ TRÍ VÀ ĐIỀU KIỆN PHÁT TRIỂN KINH TẾ - XÃ HỘI",
+   "nhom": null,
+   "noi_dung": "Tỷ lệ lao động trình độ cao đạt từ 50% trở lên",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của tiêu chí vai trò, vị trí và điều kiện phát triển kinh tế - xã hội"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.1 Giao thông",
+   "noi_dung": "Có hệ thống giao thông ngầm",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về giao thông"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.1 Giao thông",
+   "noi_dung": "Có kế hoạch và triển khai chuyển đổi phương tiện giao thông công cộng sử dụng nhiên liệu giảm phát thải khí nhà kính",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về giao thông"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.1 Giao thông",
+   "noi_dung": "Có tuyến đường dành riêng cho xe đạp",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về giao thông"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.1 Giao thông",
+   "noi_dung": "100% tuyến đường chính có giao thông công cộng",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về giao thông"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.2 Cấp nước, thoát nước và xử lý nước thải",
+   "noi_dung": "Có giải pháp giảm tác động ngập lụt: xây dựng hồ điều hòa, thành phố bọt biển,…",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm các tiêu chuẩn về cấp nước, thoát nước và xử lý nước thải"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.2 Cấp nước, thoát nước và xử lý nước thải",
+   "noi_dung": "Có các khu vực công cộng sử dụng nước uống tại vòi",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm các tiêu chuẩn về cấp nước, thoát nước và xử lý nước thải"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.2 Cấp nước, thoát nước và xử lý nước thải",
+   "noi_dung": "Có trạm xử lý nước thải trên địa bàn",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm các tiêu chuẩn về cấp nước, thoát nước và xử lý nước thải"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.3 Thu gom, xử lý chất thải rắn và môi trường đô thị",
+   "noi_dung": "Có kế hoạch hình thành vùng phát thải thấp",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về thu gom, xử lý chất thải rắn và môi trường đô thị"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.3 Thu gom, xử lý chất thải rắn và môi trường đô thị",
+   "noi_dung": "Tỷ lệ số ngày trong năm có chất lượng không khí đạt mức tiêu chuẩn ≥ 95%",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về thu gom, xử lý chất thải rắn và môi trường đô thị"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.5 Hạ tầng viễn thông",
+   "noi_dung": "Cung cấp điểm truy cập WiFi miễn phí ở các điểm công cộng (khu vực trung tâm, nơi sinh hoạt cộng đồng, điểm du lịch cộng đồng…)",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về hạ tầng viễn thông"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.1.5 Hạ tầng viễn thông",
+   "noi_dung": "Tỷ lệ dân số được phủ sóng 5G đạt 80% trở lên",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về hạ tầng viễn thông"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.2.1 Nhà ở",
+   "noi_dung": "Đang triển khai chương trình cải tạo, chỉnh trang, tái thiết đồng bộ khu dân cư (tối thiểu là 4.000 người)",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về nhà ở"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.2.2 Công trình công cộng",
+   "noi_dung": "100% trường trung học phổ thông công lập đạt chuẩn quốc gia mức độ 1 trở lên",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về công trình công cộng."
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.2.2 Công trình công cộng",
+   "noi_dung": "Có cơ sở nghiên cứu khoa học, công nghệ, đổi mới sáng tạo",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về công trình công cộng."
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.1 Không gian đô thị",
+   "noi_dung": "Không gian xanh công cộng được xây dựng trên cao",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về không gian đô thị"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.1 Không gian đô thị",
+   "noi_dung": "Nhà vệ sinh công cộng đạt tiêu chuẩn tại các khu vực không gian công cộng",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về không gian đô thị"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.2 Kiến trúc, cảnh quan đô thị",
+   "noi_dung": "Phường được công nhận là phường đạt chuẩn văn minh đô thị",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về kiến trúc, cảnh quan đô thị"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.2 Kiến trúc, cảnh quan đô thị",
+   "noi_dung": "Có tuyến phố chính được lập và quản lý theo thiết kế đô thị",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về kiến trúc, cảnh quan đô thị"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.2 Kiến trúc, cảnh quan đô thị",
+   "noi_dung": "Có công trình kiến trúc, dự án khu nhà ở, khu đô thị đạt giải thưởng quốc gia, quốc tế",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về kiến trúc, cảnh quan đô thị"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.2 Kiến trúc, cảnh quan đô thị",
+   "noi_dung": "Có di tích cấp quốc gia đặc biệt, di sản văn hóa vật thể, các khu vực có giá trị văn hóa lịch sử, sản xuất nông nghiệp, làng nghề truyền thống có phương án bảo vệ",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về kiến trúc, cảnh quan đô thị"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.2 Kiến trúc, cảnh quan đô thị",
+   "noi_dung": "Có dự án tái sử dụng công trình có giá trị, kiến trúc công nghiệp",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về kiến trúc, cảnh quan đô thị"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.3 Quản trị đô thị",
+   "noi_dung": "Số vụ tai nạn giao thông gây hậu quả nghiêm trọng trung bình ≤ 01 vụ trên năm trong 03 năm gần nhất",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về quản trị đô thị"
+  },
+  {
+   "tieu_chi": "III. TIÊU CHÍ TRÌNH ĐỘ PHÁT TRIỂN HẠ TẦNG VÀ TỔ CHỨC KHÔNG GIAN ĐÔ THỊ",
+   "nhom": "3.3.3 Quản trị đô thị",
+   "noi_dung": "Số vụ cháy nổ nghiêm trọng xảy ra trung bình ≤ 01 vụ trên năm trong 03 năm gần nhất",
+   "diem": 0.5,
+   "bang": "Bảng 2B",
+   "quy_tac": "* Trường hợp đạt tiêu chuẩn điểm cộng thì mỗi tiêu chuẩn điểm cộng được cộng 0,5 điểm nhưng phải bảo đảm tổng số điểm không vượt quá điểm tối đa của nhóm tiêu chuẩn về quản trị đô thị"
+  }
+ ],
+ "quy_tac_dat": {
+  "loai_I": "Điều 9.3.a: tối thiểu 12 tiêu chuẩn đạt (Phụ lục I), trong đó tiêu chí I ≥ 05, tiêu chí II ≥ 03, tiêu chí III ≥ 04. Đô thị áp dụng điểm d khoản 2 Điều 8 (cố đô/di sản UNESCO - áp dụng cho Huế): tối thiểu 10 tiêu chuẩn đạt, trong đó tiêu chí I ≥ 04, II ≥ 02, III ≥ 04.",
+  "loai_II_III": "Điều 9.3.b: Bảng 2A tổng ≥ 75 điểm và mỗi tiêu chí đạt điểm tối thiểu trở lên; điểm trung bình các ĐVHC cấp xã theo mục III Bảng 2B ≥ 48 điểm; ít nhất 01 ĐVHC cấp xã đạt ≥ 75 điểm và các tiêu chí đạt điểm tối thiểu trở lên (Bảng 2B).",
+  "dvhc_cap_xa": "Điều 9.3.c: các tiêu chí đạt điểm tối thiểu và tổng điểm ≥ 75 điểm (Bảng 2B, theo loại đô thị tương ứng).",
+  "tong_diem_toi_da": "100 điểm (Điều 9.1)",
+  "cach_tinh_diem": "Điều 9.4.a: đạt mức tối đa → điểm tối đa; đạt mức tối thiểu → điểm tối thiểu; giữa hai mức → nội suy; dưới mức tối thiểu → 0 điểm. Tiêu chuẩn không xem xét theo Điều 8.2.d → tính điểm tối thiểu. Tiêu chuẩn chưa đạt mức tối thiểu nhưng được giảm % theo Điều 8 → tính điểm tối thiểu. Điều 9.4.b: tiêu chuẩn tính bằng công trình khi áp dụng Điều 8.2 → giảm số công trình theo tỷ lệ, làm tròn, không ít hơn 01.",
+  "dieu_chinh_vung_mien_Dieu_8": "Bắc Trung Bộ (Huế): khu vực trung du, miền núi áp dụng như Trung du và miền núi phía Bắc (quy mô dân số 60%, mật độ dân số trên diện tích tự nhiên 50%); khu vực còn lại quy mô dân số 80%, mật độ 70%. Yếu tố đặc trưng 8.2.d (cố đô/di sản UNESCO): không xem xét mật độ dân số trên diện tích tự nhiên và mật độ dân số trên đất xây dựng đô thị của ĐVHC cấp xã; loại II/III: tiêu chuẩn không gian, kiến trúc, cảnh quan giữ nguyên, các tiêu chuẩn khác tối thiểu bằng 50%. Chỉ áp dụng MỘT quy định của khoản 1 hoặc khoản 2 Điều 8 (Điều 8.3). Xem nguyên văn trong nq-fulltext.txt."
+ },
+ "cong_thuc_thieu_bao_nhieu_phan_tram": {
+  "chi_tieu_thuan (≥)": "thieu_% = max(0, (nguong - thuc_te) / nguong × 100). Tính 2 mức: so với mức tối thiểu (để đạt điểm) và so với mức tối đa (để đạt điểm tối đa).",
+  "chi_tieu_nghich (2B.I.03 tỷ lệ nghèo)": "thieu_% = max(0, (thuc_te - nguong) / nguong × 100)",
+  "chi_tieu_khoang (2B.III.22)": "đạt nếu trong khoảng; ngoài khoảng: % lệch so với cận gần nhất",
+  "dinh_tinh": "Đạt/Không đạt → thiếu 100% hoặc 0%",
+  "diem": "diem = diem_min + (thuc_te - muc_min)/(muc_max - muc_min) × (diem_max - diem_min), khi muc_min ≤ thuc_te < muc_max; ≥ muc_max → diem_max; < muc_min → 0. Thiếu điểm so với 75 = 75 - tổng điểm. Ghi chú: công thức nội suy tuyến tính là cách hiểu \"nội suy giữa cận trên và cận dưới\" của Điều 9.4.a, văn bản không ghi công thức cụ thể."
+ },
+ "kiem_tra_tong_diem": {
+  "bang_2A": {
+   "tong_toi_da": 100.0,
+   "tong_toi_thieu": 75.0
+  },
+  "bang_2B": {
+   "tong_toi_da": 100.0,
+   "tong_toi_thieu": 75.0
+  },
+  "ghi_chu": "Khớp khung điểm 75-100 (tối thiểu từng tiêu chí cộng lại = 75; tối đa = 100) cho cả 2 bảng"
+ }
+}

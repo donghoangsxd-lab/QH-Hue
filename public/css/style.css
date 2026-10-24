@@ -1224,7 +1224,7 @@ body.right-collapsed .right-panel {
 #btnAxisAll .ico { margin: 0; }
 #layerMain:not([data-active="hanhchinh"]) > .admin-tabs { display: none; }
 .admin-tabs { display: flex; gap: 0; margin: 0; padding: 0 6px; border-bottom: 1px solid var(--border-soft); }
-#adminTabs { padding: 0 4px; }
+#adminTabs { padding: 0 4px; overflow-x: auto; scrollbar-width: thin; }
 #adminTabs .admin-tab { flex: 1 1 auto; width: auto; min-width: max-content; padding: 0 4px; letter-spacing: 0; white-space: nowrap; }
 .axis-num { margin: 0; color: var(--axis-color-muted); font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
 .admin-tab { flex: 1 1 0; height: var(--axis-head-h); border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-header); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
@@ -6467,3 +6467,28 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
   width: 0;
   height: 0;
 }
+
+/* Tab Chấm điểm (NQ 111/2025/UBTVQH15) */
+.cd-switch { display: flex; gap: 0; margin: 2px 0; }
+.cd-switch button, .cd-chart-switch button { flex: 1 1 0; min-width: 0; height: var(--axis-head-h); border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-chip); font-weight: 700; cursor: pointer; }
+.cd-switch button.active, .cd-chart-switch button.active { color: var(--axis-color); border-bottom-color: var(--main-accent); }
+.cd-ky { display: flex; align-items: center; gap: 6px; margin: 4px 0; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-row); }
+.cd-ky select { flex: 1 1 auto; min-width: 0; height: var(--axis-head-h); border: 1px solid var(--axis-chip-border); border-radius: var(--r-sm); background: var(--bg-input); color: var(--axis-color); font-family: var(--axis-font); font-size: var(--axis-fs-row); }
+.cd-mini { margin: 2px 0 4px; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-chip); line-height: 1.35; }
+.cd-ramp { height: 8px; margin: 2px 0 4px; border-radius: 4px; background: linear-gradient(90deg, var(--accent-red), var(--accent-orange) 75%, var(--accent-green)); }
+.cd-list { list-style: none; margin: 0; padding: 0; }
+.cd-unit { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; width: 100%; min-height: var(--axis-row-h); padding: 2px 4px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--axis-color); font-family: var(--axis-font); font-size: var(--axis-fs-row); text-align: left; cursor: pointer; }
+.cd-unit span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-unit small, .cd-unit b { font-variant-numeric: tabular-nums; font-weight: 700; }
+.cd-unit.active, .cd-unit:hover { background: var(--axis-bg-hover); }
+.cd-title { margin: 4px 0; color: var(--axis-color-strong); font-family: var(--axis-font); font-size: var(--axis-fs-header); }
+.cd-score, .cd-fold, #chamDiemRoot p { margin: 2px 0; color: var(--axis-color); font-family: var(--axis-font); font-size: var(--axis-fs-row); line-height: 1.35; }
+.cd-back { margin: 2px 0; padding: 0; border: 0; background: transparent; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-chip); font-weight: 700; cursor: pointer; }
+.cd-chart { height: 140px; margin: 4px 0; }
+.cd-chart canvas { width: 100%; height: 120px; }
+.cd-fold > summary { cursor: pointer; color: var(--axis-color); font-weight: 700; }
+.cd-gaps { list-style: none; margin: 2px 0 6px; padding: 0; }
+.cd-gaps li { margin: 0 0 4px; color: var(--axis-color); font-family: var(--axis-font); font-size: var(--axis-fs-chip); line-height: 1.35; }
+.cd-gaps b { color: var(--axis-color-strong); }
+.cd-chart-switch { display: flex; gap: 8px; }
+.cd-auto { display: inline-block; margin-left: 4px; padding: 0 4px; border-radius: var(--r-sm); background: var(--axis-bg-hover); color: var(--main-accent); font-size: var(--axis-fs-chip); font-weight: 700; }

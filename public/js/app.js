@@ -54,6 +54,7 @@ import { initMapLevel, getLevel } from './mapLevel.js';
 import { initSplitPair } from './splitPair.js';
 import { initQhc2045Layer, qhcClick } from './qhc2045Layer.js';
 import { initChuyenNganh } from './chuyenNganh.js';
+import { initChamDiem } from './chamDiemUi.js';
 import { initQhctLayer } from './qhctLayer.js';
 import { initCadImport } from './cadImportUi.js';
 import { initEntryFlows } from './entryFlows.js';
@@ -1286,6 +1287,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnPrintA3')?.addEventListener('click', exportMapA3);
   initChuyenNganh();
+  initChamDiem();
   initViewLink();
   // Liên kết ?nganh= / ?truc= chỉ chọn panel, không mở khung. Nút thu/mở là cách mở duy nhất lúc tải trang.
   document.body.classList.add('right-collapsed');

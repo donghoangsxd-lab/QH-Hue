@@ -44,7 +44,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261047">
+  <link rel="stylesheet" href="css/style.css?v=20261049">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -465,6 +465,7 @@
           <div class="admin-tabs" id="adminTabs" role="tablist" aria-label="Đơn vị hành chính và đô thị">
             <button type="button" class="admin-tab active" data-admin-tab="dvhc" role="tab" aria-selected="true" aria-controls="adminPaneDvhc">Đơn vị hành chính (40)</button>
             <button type="button" class="admin-tab" data-admin-tab="dothi" role="tab" aria-selected="false" aria-controls="adminPaneDoThi">Đô thị (25)</button>
+            <button type="button" class="admin-tab" data-admin-tab="chamdiem" role="tab" aria-selected="false" aria-controls="adminPaneChamDiem">Chấm điểm</button>
           </div>
           <div class="layer-tools" id="layerTools">
             <input type="search" id="layerSearch" class="project-search" placeholder="Tìm kiếm" aria-label="Tìm trong nhóm đang mở">
@@ -484,6 +485,9 @@
               </div>
               <div id="adminPaneDvhc" data-admin-pane="dvhc">
                 <div id="axisWardList" class="axis-area-list"></div>
+              </div>
+              <div id="adminPaneChamDiem" data-admin-pane="chamdiem" hidden>
+                <div id="chamDiemRoot"></div>
               </div>
               <div id="axisAreaTools"></div>
             
@@ -1625,6 +1629,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261047"></script>
+  <script type="module" src="./js/app.js?v=20261049"></script>
 </body>
 </html>
