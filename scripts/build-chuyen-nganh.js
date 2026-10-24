@@ -29,14 +29,14 @@ const SECTOR_LABEL = Object.fromEntries(SECTORS);
 // Tách camelCase trước khi bỏ dấu: mangLuoiNghiaTrang → «nghia trang».
 // sdd đứng trước hạ tầng để ranh / sử dụng đất không bị nuốt. Thải đứng trước «thoát nước» mưa.
 const RULES = [
-  [/su dung dat|chuc nang|diem chuc nang|khong gian|ranh gioi|dinh vi ranh|chi gioi|danh gia moi truong|danh gia tong hop|lua chon dat|cong trinh ngam|xay dung ngam|dinh huong phat trien|co cau phan lo|phan o quy hoach|moc gioi|hanh lang an toan/, 'sdd'],
+  [/su dung dat|chuc nang|diem chuc nang|khong gian|ranh gioi|dinh vi ranh|chi gioi|danh gia moi truong|danh gia tong hop|lua chon dat|cong trinh ngam|xay dung ngam|dinh huong phat trien|co cau phan lo|phan o quy hoach|moc gioi|hanh lang an toan|cay xanh|quan trac/, 'sdd'],
   [/chat thai ran|nghia trang/, 'chat-thai-ran-nghia-trang'],
   [/thoat nuoc thai|thoat muoc thai|xu ly nuoc thai|vsmt/, 'thoat-nuoc-thai'],
   [/thong tin|tram thong tin/, 'thong-tin-lien-lac'],
   [/cap nuoc|dau noi/, 'cap-nuoc'],
   [/cap dien|phan phoi dien|nang luong|chieu sang|den chieu sang|cot den/, 'cap-dien'],
   [/giao thong|duong bo|duong sat|duong thuy|cau giao thong|bo via|mat duong|mat cat|tim duong/, 'giao-thong'],
-  [/thoat nuoc|thuy loi|luu vuc|phan luu|huong thoat|chieu cao|tieu thoat|do cao thoat|san nen|dong muc|cao do nen|chuan bi ky thuat|do doc|phan lo san nen|phan o san nen|phan vung san nen/, 'san-nen-thoat-mua']
+  [/thoat nuoc|thuy loi|luu vuc|phan luu|huong thoat|chieu cao|tieu thoat|do cao thoat|san nen|dong muc|cao do nen|chuan bi ky thuat|do doc|phan lo san nen|phan o san nen|phan vung san nen|dong chay/, 'san-nen-thoat-mua']
 ];
 
 // Slug trùng projects/index.json khi đồ án đã có. Đồ án mới dùng projectSlug(tên).
@@ -780,7 +780,8 @@ async function main() {
 }
 
 module.exports = {
-  classifySector, scaleOf, statusOf, slug, words, landUseName, retargetManifest, SECTORS, RULES, SCHEMES
+  classifySector, scaleOf, statusOf, slug, words, landUseName, retargetManifest, SECTORS, RULES, SCHEMES,
+  uploadHeavy, loadGeeKey
 };
 
 if (require.main === module) {

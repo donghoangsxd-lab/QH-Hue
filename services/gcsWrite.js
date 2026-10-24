@@ -66,14 +66,14 @@ function fail(name, status, verb) {
 }
 
 /** Ghi đè object. generation = nếu khớp (0 = chỉ tạo mới); bỏ qua khi không có. */
-async function putObject(name, body, contentType, generation) {
+async function putObject(name, body, contentType, generation, timeoutMs) {
   const access = await accessToken();
   const q = new URLSearchParams({ uploadType: 'media', name });
   if (generation != null && generation !== '') q.set('ifGenerationMatch', String(generation));
   const url = `https://storage.googleapis.com/upload/storage/v1/b/${constants.GCS_BUCKET}/o?${q}`;
   const res = await axios.post(url, body, {
     headers: { Authorization: `Bearer ${access}`, 'Content-Type': contentType },
-    timeout: 55000,
+    timeout: timeoutMs || 55000,
     maxBodyLength: Infinity,
     maxContentLength: Infinity,
     validateStatus: () => true,

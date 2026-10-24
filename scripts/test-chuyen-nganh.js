@@ -54,7 +54,12 @@ const cases = [
   ['Phân lô san nền', 'san-nen-thoat-mua'],
   ['Phân ô san nền', 'san-nen-thoat-mua'],
   ['Đầu nối', 'cap-nuoc'],
-  ['Thoát mước thải', 'thoat-nuoc-thai']
+  ['Thoát mước thải', 'thoat-nuoc-thai'],
+  ['Cây xanh(dạng điểm)', 'sdd'],
+  ['Không gian cây xanh', 'sdd'],
+  ['Không gian mặt nước', 'sdd'],
+  ['Điểm đo quan trắc phân tích đánh giá chất lượng môi trường', 'sdd'],
+  ['Hướng dòng chảy của mặt nước', 'san-nen-thoat-mua']
 ];
 
 cases.forEach(([name, sector]) => {

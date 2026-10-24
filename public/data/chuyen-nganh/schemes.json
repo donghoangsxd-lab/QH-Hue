@@ -311,6 +311,23 @@
         "code": "nam-dong"
       },
       "authority": "UBND huyện Nam Đông"
+    },
+    {
+      "slug": "qhct-cum-cong-nghiep-binh-thanh-9e1e7dbe",
+      "name": "QHCT Cụm công nghiệp Bình Thành",
+      "level": "QHCT",
+      "mapid": 20768,
+      "parent": null,
+      "overrides": [],
+      "priority": 3,
+      "scale": 500,
+      "area": {
+        "type": "xa",
+        "code": "binh-dien"
+      },
+      "decision": "1980/QĐ-UBND",
+      "decisionDate": "2022-30-12",
+      "authority": "UBND Thị xã Hương Trà"
     }
   ]
 }
