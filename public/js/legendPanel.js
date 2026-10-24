@@ -98,6 +98,7 @@ export function initLegendPanel() {
   }));
   syncToggle();
   const frame = document.getElementById('tabLegend');
+  const legendFoldEl = document.getElementById('legendFold');
   const chip = document.getElementById('legendChip');
   const checked = (id) => !!document.getElementById(id)?.checked;
   const anyOn = (ids) => ids.some(checked);
@@ -131,7 +132,12 @@ export function initLegendPanel() {
   };
   const reveal = (set) => {
     if (!frame) return;
-    delete frame.dataset.userHide;
+    if (frame.dataset.userHide === '1') {
+      if (set) prefer = set;
+      syncLegend();
+      return;
+    }
+    if (legendFoldEl) legendFoldEl.open = true;
     if (set) prefer = set;
     syncLegend();
   };
@@ -178,14 +184,16 @@ export function initLegendPanel() {
     const extra = document.getElementById('legendExtra');
     const extraOn = pointRows.length > 0 || checked('chk_roads');
     if (extra) extra.hidden = !extraOn;
-    const something = symbols || land || extraOn;
-    const dismissed = frame.dataset.userHide === '1';
-    frame.hidden = !something || dismissed;
-    if (chip) chip.hidden = !something || !dismissed;
+    if (chip) chip.hidden = true;
   };
   document.getElementById('btnLegendClose')?.addEventListener('click', () => {
     frame.dataset.userHide = '1';
+    if (legendFoldEl) legendFoldEl.open = false;
     syncLegend();
+  });
+  legendFoldEl?.addEventListener('toggle', () => {
+    if (legendFoldEl.open) delete frame.dataset.userHide;
+    else frame.dataset.userHide = '1';
   });
   chip?.addEventListener('click', () => {
     delete frame.dataset.userHide;

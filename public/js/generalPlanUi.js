@@ -9,7 +9,7 @@ import { escapeHtml, fmtNum, ico } from './utils.js';
 import { namesOfProject } from './projectNames.js';
 import { loadBuiltAreas } from './wardRoads.js';
 import { measure2A, ensureClassRoads, CLASS_REF } from './urbanClass.js';
-import { STATUS_REF } from './urbanStatus.js';
+import { STATUS_REF, URBANS_614 } from './urbanStatus.js';
 import { getLevel } from './mapLevel.js';
 import {
   GENERAL_PLANS, CORE_AREAS, CORE_ZONE_ID, GP_KINDS, GP_STATUS, GP_PARENT_REF, OPEN_PROJECT_EVENT, MATURITY_GROUPS,
@@ -151,7 +151,7 @@ const URBAN_GROUPS = [
   { title: 'Đô thị loại III', list: () => GENERAL_PLANS.filter(p => !p.city) }
 ];
 
-function panelRow(plan, c, here) {
+function panelRow(plan, c, here, n) {
   const kids = childProjects(plan, c.catalog).length;
   const mat = c.wards.length ? maturityOf(plan, c) : null;
   const cls = ['gp-row', plan.id === picked ? 'is-sel' : '', here.has(plan.id) ? 'is-here' : ''].filter(Boolean).join(' ');
@@ -169,9 +169,10 @@ function panelRow(plan, c, here) {
   const tip = [plan.name, plan.parent ? `Vùng lõi ${plan.parent.name} (1/10.000)` : GP_KINDS[plan.kind], clsTip(plan), metaFull].join('\n');
   const to = plan.target !== plan.cls
     ? `<span class="gp-to uc-${plan.target}" title="Loại định hướng">${ico('chev-right')}${plan.target}</span>` : '';
-  return `<button type="button" class="${cls}" data-gp-pick="${plan.id}" title="${escapeHtml(tip)}">
+  const kv = plan.city ? 'TP' : `dothi:${plan.id}`;
+  return `<button type="button" class="${cls}" data-gp-pick="${plan.id}" data-kv="${escapeHtml(kv)}" title="${escapeHtml(tip)}">
       <b class="gp-cls uc-${plan.cls}">${plan.cls}</b>
-      <span class="gp-name">${escapeHtml(plan.short)}</span>
+      <span class="gp-name"><span class="axis-num">${n}.</span>${escapeHtml(plan.short)}</span>
       ${to}
       <small class="gp-meta" title="${escapeHtml(metaFull)}"><span class="gp-meta-full">${qhc} · ${kids} QHPK · trưởng thành ${pct}</span><span class="gp-meta-short">${qhcCompact} · ${kids} QHPK · ${pct}</span></small>
     </button>`;
@@ -184,16 +185,44 @@ function paintUrbanCount() {
   if (count) count.textContent = `(${$('chk_urban')?.checked ? urbanTotal : 0}/${urbanTotal})`;
 }
 
+function orphanTowns() {
+  const known = new Set([...GENERAL_PLANS, ...CORE_AREAS].map(p => p.id));
+  const rows = [];
+  for (const u of URBANS_614) {
+    if (u.city || known.has(u.id)) continue;
+    rows.push({ id: u.id, cls: u.cls || 'III', name: u.name, tip: u.scope || u.name });
+  }
+  for (const z of CITY_PLAN.zones || []) {
+    if (known.has(z.id)) continue;
+    rows.push({ id: z.id, cls: 'I', name: z.name, tip: z.scale ? `Tỷ lệ ${z.scale}` : z.name });
+  }
+  return rows;
+}
+
+function extraRow(item, n) {
+  return `<button type="button" class="gp-row" data-kv="dothi:${escapeHtml(item.id)}" title="${escapeHtml(item.tip || item.name)}">
+      <b class="gp-cls uc-${escapeHtml(item.cls)}">${escapeHtml(item.cls)}</b>
+      <span class="gp-name"><span class="axis-num">${n}.</span>${escapeHtml(item.name)}</span>
+    </button>`;
+}
+
 function renderPanel() {
   const box = $('gpList');
   if (!box) return;
   const c = ctx();
   const here = new Set(state.selectedWard ? generalPlansOfWard(state.selectedWard).map(p => p.id) : []);
   const groups = URBAN_GROUPS.map(g => ({ title: g.title, list: g.list() })).filter(g => g.list.length);
-  urbanTotal = groups.reduce((n, g) => n + g.list.length, 0);
+  const bucket = { 'Đô thị loại I': [], 'Khu vực đô thị loại II': [], 'Đô thị loại III': [] };
+  for (const item of orphanTowns()) (bucket[item.cls === 'I' ? 'Đô thị loại I' : item.cls === 'II' ? 'Khu vực đô thị loại II' : 'Đô thị loại III'] || []).push(item);
+  let n = 0;
+  urbanTotal = groups.reduce((sum, g) => sum + g.list.length + (bucket[g.title] || []).length, 0);
   paintUrbanCount();
-  box.innerHTML = groups.map(g => `<div class="gp-grp">${escapeHtml(g.title)}${g.list.length > 1 ? ` · ${g.list.length}` : ''}</div>
-    ${g.list.map(plan => panelRow(plan, c, here)).join('')}`).join('');
+  box.innerHTML = groups.map(g => {
+    const more = bucket[g.title] || [];
+    const count = g.list.length + more.length;
+    const body = g.list.map(plan => panelRow(plan, c, here, ++n)).join('') + more.map(item => extraRow(item, ++n)).join('');
+    return `<div class="gp-grp">${escapeHtml(g.title)}${count > 1 ? ` · ${count}` : ''}</div>${body}`;
+  }).join('');
 }
 
 export const refreshGeneralPlanPanel = renderPanel;

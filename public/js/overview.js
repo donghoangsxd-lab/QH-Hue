@@ -2,7 +2,7 @@
 // Bấm tên mục để xổ các bước; nút Hướng dẫn mở trang đủ chú thích và lối tắt.
 // Mục có demo: nút «Xem trên bản đồ» chạy chuỗi thao tác trực tiếp kèm thuyết minh (overviewDemo.js).
 // Mở tính năng bằng cách bấm hộ nút / tab / ô tick sẵn có trên giao diện, không đụng trạng thái nội bộ của module khác.
-// Tiêu đề trên bản đồ đã gộp dòng giới thiệu. Hộp này là mục lục, mở từ nút Mục lục.
+// Tiêu đề trên bản đồ đã gộp dòng giới thiệu. Hộp này mở từ nút Giới thiệu góc trên trái.
 import { ico, showToast, escapeHtml, fmtNum, fmtPct, detailDisclosure } from './utils.js';
 import { map, handleInspectPointClick, zoomToPoint } from './mapEngine.js';
 import { ensureWardStats } from './uiComponents.js';
@@ -1023,9 +1023,11 @@ function close() {
 }
 
 export function initOverview() {
-  $('btnMapCatalog')?.addEventListener('click', () => (isOpen() ? close() : openOverview()));
   $('btnOverview')?.addEventListener('click', () => {
-    try { localStorage.removeItem('qhhue_title_off'); } catch { /* chế độ riêng tư */ }
-    document.dispatchEvent(new CustomEvent('qh-title-restore'));
+    if (document.documentElement.classList.contains('title-dismissed')) {
+      document.dispatchEvent(new CustomEvent('qh-title-restore'));
+    }
+    if (isOpen()) close();
+    else openOverview();
   });
 }

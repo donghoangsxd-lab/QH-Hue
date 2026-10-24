@@ -321,24 +321,23 @@ function paintAdmin() {
 }
 
 function paintAdminList() {
-  const townsHost = document.getElementById('axisTownList');
   const wardsHost = document.getElementById('axisWardList');
   const tools = document.getElementById('axisAreaTools');
-  if (!townsHost || !wardsHost) return;
+  if (!wardsHost) return;
   const current = formatKv(getAreaFilter() || AREA_TP);
   const q = layerQuery.trim().toLowerCase();
   const match = (a) => !q || a.name.toLowerCase().includes(q) || String(a.code || '').includes(q);
-  const button = (a) => {
+  const button = (a, n) => {
     const kv = formatKv(a);
     const on = kv === current;
-    return `<button type="button" class="axis-area${on ? ' active' : ''}" data-kv="${escapeHtml(kv)}" aria-pressed="${on}">${escapeHtml(a.name)}</button>`;
+    return `<button type="button" class="axis-area${on ? ' active' : ''}" data-kv="${escapeHtml(kv)}" aria-pressed="${on}"><span class="axis-num">${n}.</span>${escapeHtml(a.name)}</button>`;
   };
-  const towns = listAreas('dothi').filter(match);
   const wards = listAreas('xa').filter(match);
   const tp = listAreas('tp')[0] || { ...AREA_TP, name: 'Toàn thành phố' };
-  townsHost.innerHTML = towns.map(button).join('') || (q ? '<p class="cn-empty">Không khớp</p>' : '');
-  wardsHost.innerHTML = `${match(tp) ? button(tp) : ''}${wards.map(button).join('') || (q ? '<p class="cn-empty">Không khớp</p>' : '')}`;
-  const area = getAreaFilter() || AREA_TP;
+  const rows = [];
+  if (match(tp)) rows.push(tp);
+  rows.push(...wards);
+  wardsHost.innerHTML = rows.length ? rows.map((a, i) => button(a, i + 1)).join('') : (q ? '<p class="cn-empty">Không khớp</p>' : '');
   if (tools) tools.innerHTML = '';
   filterGp();
 }
@@ -392,15 +391,7 @@ function paintMag() {
     if (dist) btn.dataset.dist = String(dist);
     else delete btn.dataset.dist;
     const label = btn.querySelector('.layer-main-label');
-    if (on && label && label.parentElement.clientWidth > 24) {
-      label.style.fontSize = '11px';
-      const host = label.parentElement;
-      let size = 11;
-      while (size > 9 && label.scrollWidth > host.clientWidth + 1) {
-        size -= 0.5;
-        label.style.fontSize = `${size}px`;
-      }
-    }
+    if (label) label.style.fontSize = '';
   });
   const prev = document.querySelector('[data-mag-step="-1"]');
   const next = document.querySelector('[data-mag-step="1"]');
