@@ -24,14 +24,14 @@ const STEPS = [
     text: 'Mỗi biểu tượng trên bản đồ là 1 công trình. Bấm vào biểu tượng để xem bảng thông tin và vùng phục vụ của công trình đó.\nNút con mắt trên bảng thu gọn bảng về tên công trình để nhìn trọn vùng phục vụ; bấm lại vào công trình để mở lại bảng.'
   },
   {
-    target: ['#chk_heat', '#axisBaseFold', '#btnExpandRightPanel'],
+    target: ['#chk_heat', '#axisBaseFold', '#axisDock'],
     title: 'Bản đồ độ phủ hạ tầng',
     text: 'Lớp màu nhiệt thể hiện mức độ được phục vụ: nơi nằm trong tầm đi bộ của càng nhiều loại hạ tầng thì màu càng đậm; nơi màu nhạt là nơi còn thiếu. Khoảng cách được tính bám theo đường giao thông, không chỉ theo đường chim bay. Mở panel Hành chính, mục Lớp nền, để bật lớp này; thanh màu hiện ngay dưới ô bật.'
   },
   {
-    target: ['#rightPanel', '#btnExpandRightPanel'],
+    target: ['#rightPanel', '#axisDock'],
     title: 'Bật / tắt lớp dữ liệu',
-    text: 'Panel bên phải được ẩn sẵn cho rộng bản đồ; bấm mũi tên ‹ ở mép phải để mở, › để thu gọn. Hàng trên là droplist năm panel: Hành chính, Quy hoạch, Hạ tầng kỹ thuật, Hạ tầng xã hội, Kiến trúc. Ngay dưới là ô tìm kiếm, nút HT/QH, nút bật tắt cả nhóm và nút ẩn panel. Chú giải và lớp nền ghim ở đáy panel.'
+    text: 'Panel trục được ẩn sẵn cho rộng bản đồ; bấm một nút trên dải năm trục bên trái để mở, nút thu trên hàng tiêu đề để đóng. Hàng trên là droplist năm panel: Hành chính, Quy hoạch, Hạ tầng kỹ thuật, Hạ tầng xã hội, Kiến trúc. Ngay dưới là ô tìm kiếm, nút HT/QH, nút bật tắt cả nhóm và nút ẩn panel. Chú giải và lớp nền ghim ở đáy panel.'
   },
   {
     target: ['#btnInspectPick', '#btnInspectMode'],

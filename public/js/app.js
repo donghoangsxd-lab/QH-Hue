@@ -942,7 +942,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('btnCollapseRightPanel')?.addEventListener('click', () => setRightPanelCollapsed(true));
-  document.getElementById('btnExpandRightPanel')?.addEventListener('click', () => setRightPanelCollapsed(false));
   const sheetHandle = document.getElementById('btnSheetHandle');
   if (sheetHandle) {
     let sheetDrag = 0;

@@ -1,4 +1,5 @@
 // Hộp tiêu đề không đè cột nút, nút Giới thiệu hay panel trục; bề rộng đủ cả câu tiêu đề.
+// Không còn nút «>>» góc trên trái. Mỏ bảng tổng hợp cùng bề rộng và cùng mép phải cột nút.
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -75,6 +76,12 @@ async function measure(page) {
         .map(el => el.id || el.getAttribute('aria-label'));
       const panel = document.querySelector('.right-panel');
       const panelOpen = !document.body.classList.contains('right-collapsed');
+      const summaryOn = document.body.classList.contains('bottom-collapsed');
+      const summary = document.getElementById('btnExpandBottomPanel');
+      const tool = document.querySelector('.map-toolbar .ui-btn-format:not(#btnExpandBottomPanel)');
+      const s = summary ? box(summary) : null;
+      const tb = tool ? box(tool) : null;
+      const expand = document.getElementById('btnExpandRightPanel');
       return {
         name,
         width: t.width,
@@ -82,7 +89,13 @@ async function measure(page) {
         full: h1.textContent.trim(),
         clipped: h1.scrollWidth > h1.clientWidth + 1,
         tools,
-        panel: panelOpen && (hit(t, box(panel)) || hit(text, box(panel)))
+        panel: panelOpen && (hit(t, box(panel)) || hit(text, box(panel))),
+        expand: !!expand,
+        summaryOn,
+        summaryWidth: s ? s.width : 0,
+        toolWidth: tb ? tb.width : 0,
+        summaryRight: s ? s.right : 0,
+        toolRight: tb ? tb.right : 0
       };
     });
   }, STATES);
@@ -99,6 +112,11 @@ try {
       assert.ok(row.text >= 240, `${w} ${row.name} tiêu đề rộng ${row.text}`);
       assert.deepEqual(row.tools, [], `${w} ${row.name} đè nút ${row.tools}`);
       assert.equal(row.panel, false, `${w} ${row.name} đè panel trục`);
+      assert.equal(row.expand, false, `${w} ${row.name} còn nút mở góc trái`);
+      if (row.summaryOn) {
+        assert.ok(Math.abs(row.summaryWidth - row.toolWidth) < 0.6, `${w} ${row.name} mỏ ${row.summaryWidth} ≠ nút ${row.toolWidth}`);
+        assert.ok(Math.abs(row.summaryRight - row.toolRight) < 0.6, `${w} ${row.name} mép phải mỏ ${row.summaryRight} ≠ nút ${row.toolRight}`);
+      }
     });
     console.log(JSON.stringify({ w, states: rows.map(r => ({ name: r.name, width: Math.round(r.width), text: Math.round(r.text) })) }));
     await page.close();
