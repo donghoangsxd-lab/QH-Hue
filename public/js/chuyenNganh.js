@@ -16,6 +16,12 @@ import {
 } from './facetStore.js';
 import { DVHC_CITY, dvhcOf, shortPlaceName } from './dvhcStats.js';
 import { wardMarks, PLAN_FOOT } from './doThiQd756.js';
+import {
+  HTKT_GROUPS, PIPE_SECTORS, SYNTH_LABEL, formAllows, gcsObjectPath, geomKind,
+  isCotDenLayer, qhpkLayersFromHook
+} from './htktModel.js';
+import { formatRadius, getPlanRadii, loadPlanRadii, planRadiusM } from './planRadius.js';
+import { initXahoiList, paintXahoiList } from './xahoiList.js';
 
 const STORE_KEY = 'qh_axes_v1';
 const EXTRA_CHECKS = ['chk_gt25', 'chk_gt10', 'chk_gt25rail', 'chk_gt10rail', 'chk_bound', 'chk_urban', 'chk_projects', 'chk_qhct'];
@@ -29,7 +35,8 @@ const ICONS = {
   'san-nen-thoat-mua': '<path d="m3 18 5-8 4 5 3-4 6 7"/><path d="M4 21h16"/>',
   'thoat-nuoc-thai': '<path d="M4 7h16M6 7c0 6 2 8 6 8s6-2 6-8"/><path d="M12 15v4M9 19h6"/>',
   'chat-thai-ran-nghia-trang': '<path d="M12 3v18M7 7.5h10M8.5 21l3.5-6 3.5 6"/>',
-  'thong-tin-lien-lac': '<path d="M12 20v-6"/><path d="M8 14a6 6 0 0 1 8 0"/><path d="M5 11a10 10 0 0 1 14 0"/><circle cx="12" cy="20" r="1.2" fill="currentColor"/>'
+  'thong-tin-lien-lac': '<path d="M12 20v-6"/><path d="M8 14a6 6 0 0 1 8 0"/><path d="M5 11a10 10 0 0 1 14 0"/><circle cx="12" cy="20" r="1.2" fill="currentColor"/>',
+  'tong-hop-duong-ong': '<path d="M3 8h7v8H3zM14 8h7v8h-7zM10 12h4"/>'
 };
 const SECTOR_COLOR = {
   'giao-thong': '#0284c7',
@@ -38,7 +45,8 @@ const SECTOR_COLOR = {
   'san-nen-thoat-mua': '#a16207',
   'thoat-nuoc-thai': '#7c2d12',
   'chat-thai-ran-nghia-trang': '#57534e',
-  'thong-tin-lien-lac': '#7c3aed'
+  'thong-tin-lien-lac': '#7c3aed',
+  'tong-hop-duong-ong': '#0f766e'
 };
 const DOCK_ICON = {
   hanhchinh: '<path d="M4 20h16M6 20V9l6-5 6 5v11"/><path d="M10 20v-6h4v6"/>',
@@ -84,9 +92,14 @@ function clearDrawn(id) {
   drawn.delete(id);
 }
 
+function assetHref(file) {
+  const path = gcsObjectPath(file);
+  return path ? `/gcs/${path}` : file;
+}
+
 function loadFile(file) {
   if (!fileCache.has(file)) {
-    fileCache.set(file, fetch(withAssetVersion(file)).then(res => {
+    fileCache.set(file, fetch(withAssetVersion(assetHref(file))).then(res => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json().then(toFeatureCollection);
     }).catch(err => { fileCache.delete(file); throw err; }));
@@ -110,6 +123,9 @@ function popupHtml(layer, props) {
   if (props.loGioi) bits.push(`lộ giới ${props.loGioi}`);
   if (props.matCat) bits.push(`mặt cắt ${props.matCat}`);
   let html = `<b>${escapeHtml(String(title || layer.name))}</b>`;
+  if (geomKind(layer) === 'point') {
+    html += `<br>Bán kính phục vụ: ${escapeHtml(formatRadius(planRadiusM(getPlanRadii(), layer)))}`;
+  }
   if (bits.length) html += `<br>${escapeHtml(bits.join(' · '))}`;
   if (props.tam_thoi) {
     const scale = props.nguon_ty_le ? `1/${Number(props.nguon_ty_le).toLocaleString('vi-VN')}` : '';
@@ -243,49 +259,148 @@ function scopeHtml() {
   return `<p class="axis-scope">Phạm vi: ${escapeHtml(areaLabel(area))}</p>`;
 }
 
-const POINT_SECTORS = new Set(SECTORS.map(s => s.id));
+let synthDoc = {
+  synth: [],
+  gcs: [],
+  qhpkHook: { id: 'qhpk-htkt', status: 'pending', layers: [], parents: [], note: 'Chưa có lớp HTKT cấp QHPK.' }
+};
+let pipeOn = false;
+let geomOn = { point: true, line: true, polygon: true };
 
-// Lớp điểm của bảy ngành hạ tầng kỹ thuật hiện ở panel Hạ tầng xã hội. Tuyến và vùng giữ ở panel này.
-function isPointWork(layer) {
-  return !!(layer && layer.geomType === 'Point' && POINT_SECTORS.has(layer.sector) && !layer.base);
+function rawSectorLayers(sector, level, slug) {
+  if (pipeOn) {
+    return PIPE_SECTORS.flatMap(sec => layersFor(sec, level, slug, { filter: false }));
+  }
+  return layersFor(sector, level, slug, { filter: false });
+}
+
+function synthRowsFor(sector, level, slug) {
+  return (synthDoc.synth || []).filter(row => {
+    if (row.level !== level) return false;
+    const hit = row.scheme === slug || (row.aliases || []).includes(slug);
+    if (!hit) return false;
+    if (pipeOn) return !!row.pipe;
+    return row.sector === sector;
+  });
+}
+
+function layersByFiles(files) {
+  const want = new Set(files || []);
+  return getLayers().filter(layer => want.has(layer.file) || want.has(layer.id));
+}
+
+function shownSynthLayers(rows) {
+  return layersByFiles([].concat(...(rows || []).map(row => row.files || [])))
+    .filter(layerPassesFilter)
+    .filter(layer => formAllows(layer, geomOn, pipeOn));
+}
+
+function listedForScheme(sector, level, slug) {
+  const shown = rawSectorLayers(sector, level, slug).filter(layerPassesFilter).filter(layer => formAllows(layer, geomOn, pipeOn));
+  const extra = shownSynthLayers(synthRowsFor(sector, level, slug));
+  const seen = new Set();
+  return [...shown, ...extra].filter(layer => {
+    if (!layer || seen.has(layer.id)) return false;
+    seen.add(layer.id);
+    return true;
+  });
 }
 
 function hatangSchemes(sector, level) {
   const catalog = state.projectCatalog || [];
-  return schemesForSector(sector, level, catalog).filter(s => {
-    const all = layersFor(sector, s.level, s.slug, { filter: false });
-    if (!all.length) return true;
-    return all.some(l => !isPointWork(l));
+  if (!pipeOn) return schemesForSector(sector, level, catalog);
+  const seen = new Set();
+  const rows = [];
+  PIPE_SECTORS.forEach(sec => {
+    schemesForSector(sec, level, catalog).forEach(scheme => {
+      const key = `${scheme.level}|${scheme.slug}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      rows.push(scheme);
+    });
   });
+  return rows;
 }
 
 function hatangLayers(sector, level) {
-  return hatangSchemes(sector, level).flatMap(s => layersFor(sector, s.level, s.slug).filter(l => !isPointWork(l)));
+  const seen = new Set();
+  return hatangSchemes(sector, level).flatMap(scheme => listedForScheme(sector, scheme.level, scheme.slug)).filter(layer => {
+    if (seen.has(layer.id)) return false;
+    seen.add(layer.id);
+    return true;
+  });
+}
+
+function layerRow(layer, synth) {
+  const bits = [];
+  if (layer.featureCount != null) bits.push(`<small>${layer.featureCount}</small>`);
+  if (gcsObjectPath(layer.file)) bits.push('<small>GCS</small>');
+  if (synth) bits.push(`<small>${escapeHtml(SYNTH_LABEL)}</small>`);
+  return `<label class="cn-layer"><input type="checkbox" data-cn-layer="${escapeHtml(layer.id)}"${isLayerOn(layer.id) ? ' checked' : ''}><span>${escapeHtml(layer.name)}</span>${bits.join('')}</label>`;
+}
+
+function synthBlock(rows) {
+  if (!rows.length) return '';
+  const byDonor = new Map();
+  rows.forEach(row => {
+    if (!byDonor.has(row.donorScheme)) byDonor.set(row.donorScheme, { name: row.donorName, files: [] });
+    byDonor.get(row.donorScheme).files.push(...(row.files || []));
+  });
+  return [...byDonor.values()].map(donor => {
+    const layers = shownSynthLayers([{ files: [...new Set(donor.files)] }]);
+    const lines = layers.length ? layers.map(layer => layerRow(layer, true)).join('') : '<p class="cn-empty">Chưa có lớp nguồn.</p>';
+    return `<div class="cn-synth"><b>${escapeHtml(SYNTH_LABEL)}</b><small>Theo ${escapeHtml(donor.name || 'đồ án cùng cấp')}</small>${lines}</div>`;
+  }).join('');
 }
 
 function schemeBlock(sector, levelId, scheme) {
-  const all = layersFor(sector, levelId, scheme.slug, { filter: false });
-  const shown = all.filter(layerPassesFilter).filter(l => !isPointWork(l));
+  const all = rawSectorLayers(sector, levelId, scheme.slug);
+  const poles = all.filter(isCotDenLayer);
+  const shown = all.filter(layerPassesFilter).filter(layer => formAllows(layer, geomOn, pipeOn));
+  const synth = synthRowsFor(sector, levelId, scheme.slug);
   const has = shown.length > 0;
-  const on = has && shown.every(l => isLayerOn(l.id));
-  const some = shown.some(l => isLayerOn(l.id));
-  const open = has && openSchemes.has(scheme.slug);
+  const hasSynth = synth.length > 0;
+  const listed = listedForScheme(sector, levelId, scheme.slug);
+  const on = listed.length > 0 && listed.every(layer => isLayerOn(layer.id));
+  const some = listed.some(layer => isLayerOn(layer.id));
+  const open = (has || hasSynth || poles.length > 0) && openSchemes.has(scheme.slug);
   const groups = ['hien-trang', 'quy-hoach'].map(kind => {
-    const rows = shown.filter(l => l.kind === kind);
+    const rows = shown.filter(layer => layer.kind === kind);
     if (!rows.length && !open) return '';
-    const body = rows.length
-      ? rows.map(l => `<label class="cn-layer"><input type="checkbox" data-cn-layer="${escapeHtml(l.id)}"${isLayerOn(l.id) ? ' checked' : ''}><span>${escapeHtml(l.name)}</span>${l.featureCount != null ? `<small>${l.featureCount}</small>` : ''}</label>`).join('')
-      : '<p class="cn-empty">Chưa có lớp</p>';
+    const body = rows.length ? rows.map(layer => layerRow(layer, false)).join('') : '<p class="cn-empty">Chưa có lớp</p>';
     return `<div class="cn-status"><b>${KIND_LABEL[kind]}</b>${body}</div>`;
   }).join('');
-  return `<div class="cn-scheme${has ? '' : ' is-missing'}">
+  const poleNote = !shown.length && poles.length ? '<p class="cn-empty">Đã gỡ lớp cột đèn.</p>' : '';
+  const badge = has ? 'Có dữ liệu' : hasSynth ? SYNTH_LABEL : 'Chưa có';
+  const canOpen = has || hasSynth || poles.length > 0;
+  return `<div class="cn-scheme${canOpen ? '' : ' is-missing'}">
     <div class="cn-scheme-row">
-      <label><input type="checkbox" data-cn-scheme="${escapeHtml(scheme.slug)}" data-cn-level="${escapeHtml(levelId)}"${on ? ' checked' : ''}${has ? '' : ' disabled'}${some && !on ? ' data-mixed="1"' : ''}><span>${escapeHtml(scheme.name)}</span></label>
-      <b class="cn-badge ${has ? 'is-on' : 'is-off'}">${has ? 'Có dữ liệu' : 'Chưa có'}</b>
-      ${has ? `<button type="button" class="cn-fold" data-cn-fold="${escapeHtml(scheme.slug)}" aria-expanded="${open}">${ico(open ? 'chev-down' : 'chev-right')}</button>` : ''}
+      <label><input type="checkbox" data-cn-scheme="${escapeHtml(scheme.slug)}" data-cn-level="${escapeHtml(levelId)}"${on ? ' checked' : ''}${canOpen ? '' : ' disabled'}${some && !on ? ' data-mixed="1"' : ''}><span>${escapeHtml(scheme.name)}</span></label>
+      <b class="cn-badge ${has || hasSynth ? 'is-on' : 'is-off'}">${escapeHtml(badge)}</b>
+      ${canOpen ? `<button type="button" class="cn-fold" data-cn-fold="${escapeHtml(scheme.slug)}" aria-expanded="${open}">${ico(open ? 'chev-down' : 'chev-right')}</button>` : ''}
     </div>
-    ${open ? `<div class="cn-groups">${groups}</div>` : ''}
+    ${open ? `<div class="cn-groups">${groups}${synthBlock(synth)}${poleNote}</div>` : ''}
   </div>`;
+}
+
+function formsHtml() {
+  const item = (id, label) => {
+    const on = pipeOn ? id === 'line' : !!geomOn[id];
+    const dis = pipeOn && id !== 'line' ? ' disabled' : '';
+    return `<button type="button" class="cn-form${on ? ' active' : ''}" data-cn-form="${id}" aria-pressed="${on}"${dis}>${escapeHtml(label)}</button>`;
+  };
+  const note = pipeOn ? '<p class="cn-empty">Tuyến của giao thông, cấp nước, cấp điện, thoát nước và thông tin liên lạc.</p>' : '';
+  return `<div class="cn-forms" role="group" aria-label="Dạng dữ liệu">${item('point', 'Điểm công trình')}${item('line', 'Tuyến mạng')}${item('polygon', 'Vùng')}</div>${note}`;
+}
+
+function qhpkHookHtml() {
+  if (browseState().level !== 'QHPK') return '';
+  const hook = synthDoc.qhpkHook || {};
+  const extra = qhpkLayersFromHook(hook).map(layer => {
+    const known = getLayers().find(row => row.file === layer.file || row.id === layer.id);
+    return known ? layerRow(known, false) : `<p class="cn-layer"><span>${escapeHtml(layer.name || 'Lớp')}</span><small>Chưa gắn</small></p>`;
+  }).join('');
+  return `<div id="qhpkHtktHook" data-htkt-hook="${escapeHtml(hook.id || 'qhpk-htkt')}"><p class="cn-empty">${escapeHtml(hook.note || 'Chưa có lớp HTKT cấp QHPK.')}</p>${extra}</div>`;
 }
 
 function paintHaTang() {
@@ -294,14 +409,17 @@ function paintHaTang() {
   const { sector, level } = browseState();
   const pane = document.getElementById('layerPaneHaTang');
   const top = pane ? pane.scrollTop : 0;
+  const group = pipeOn ? 'tong-hop-duong-ong' : sector;
   const schemes = hatangSchemes(sector, level);
   const listed = hatangLayers(sector, level);
-  const allOn = listed.length > 0 && listed.every(l => isLayerOn(l.id));
-  box.innerHTML = `<div class="cn-sectors" role="tablist" aria-label="Hạ tầng kỹ thuật">${SECTORS.map(s => `<button type="button" class="cn-sector${s.id === sector ? ' active' : ''}" role="tab" data-cn-sector="${s.id}" aria-selected="${s.id === sector}" title="${escapeHtml(s.label)}">${icon(s.id)}<span>${escapeHtml(s.label)}</span></button>`).join('')}</div>
+  const allOn = listed.length > 0 && listed.every(layer => isLayerOn(layer.id));
+  box.innerHTML = `<div class="cn-sectors" role="tablist" aria-label="Hạ tầng kỹ thuật">${HTKT_GROUPS.map(s => `<button type="button" class="cn-sector${s.id === group ? ' active' : ''}" role="tab" data-cn-sector="${s.id}" aria-selected="${s.id === group}" title="${escapeHtml(s.label)}">${icon(s.id)}<span>${escapeHtml(s.label)}</span></button>`).join('')}</div>
     <div class="cn-tools">
       <div class="cn-levels" role="group" aria-label="Cấp đồ án">${FACET_LEVELS.map(l => `<button type="button" class="cn-level${l.id === level ? ' active' : ''}" data-cn-level="${l.id}">${escapeHtml(l.label)}</button>`).join('')}</div>
       <button type="button" class="layer-eye-btn" data-cn-all ${listed.length ? '' : 'disabled'}>${allOn ? 'Tắt tất cả' : 'Bật tất cả'}</button>
     </div>
+    ${formsHtml()}
+    ${qhpkHookHtml()}
     ${scopeHtml()}
     <div class="cn-schemes">${schemes.length ? schemes.map(s => schemeBlock(sector, s.level, s)).join('') : '<p class="cn-empty">Chưa có đồ án ở cấp này.</p>'}</div>`;
   box.querySelectorAll('[data-mixed="1"]').forEach(el => { el.indeterminate = true; });
@@ -487,6 +605,16 @@ function goMag(id) {
 
 let sectorHold = false;
 function publishSectorLegend(open, sectorId) {
+  if (pipeOn && browseState().axis === 'hatang') {
+    const html = PIPE_SECTORS.map(id => {
+      const label = HTKT_GROUPS.find(row => row.id === id)?.label || id;
+      return `<span><i style="background:${SECTOR_COLOR[id] || '#94a3b8'}"></i>${escapeHtml(label)}</span>`;
+    }).join('');
+    document.dispatchEvent(new CustomEvent('qh:sector-legend', {
+      detail: { on: true, open: !!open, label: 'Tổng hợp đường ống', html: `<div class="cn-legend" aria-label="Chú giải tổng hợp đường ống">${html}</div>` }
+    }));
+    return;
+  }
   const b = browseState();
   const sector = sectorId || b.sector;
   const listed = schemesForSector(sector, b.level, state.projectCatalog || []).flatMap(s => layersFor(sector, s.level, s.slug));
@@ -515,7 +643,8 @@ function paintAxisAll() {
   if (!btn || !pane) return;
   const boxes = [...pane.querySelectorAll('input[type="checkbox"]')].filter(el => {
     if (el.id === 'chk_parcel') return false;
-    if (el.closest('#projectList') || el.closest('#pointCatalog') || el.closest('[hidden]') || el.closest('.is-filter-hide')) return false;
+    if (el.closest('#xahoiHeat')) return false;
+    if (el.closest('#projectList') || el.closest('[hidden]') || el.closest('.is-filter-hide')) return false;
     return true;
   });
   const allOn = boxes.length > 0 && boxes.every(el => el.checked);
@@ -590,7 +719,8 @@ function toggleAxisAll() {
   if (!pane) return;
   const boxes = [...pane.querySelectorAll('input[type="checkbox"]')].filter(el => {
     if (el.id === 'chk_parcel') return false;
-    if (el.closest('#projectList') || el.closest('#pointCatalog')) return false;
+    if (el.closest('#xahoiHeat')) return false;
+    if (el.closest('#projectList')) return false;
     if (el.closest('[hidden]') || el.closest('.is-filter-hide')) return false;
     return true;
   });
@@ -611,61 +741,16 @@ function paint() {
   if (axis === 'hatang') paintHaTang();
   if (axis === 'kientruc') paintKienTruc();
   paintBase('quyhoach', 'baseQuyHoach');
-  paintBase('hatang', 'baseHaTang', browseState().sector);
+  paintBase('hatang', 'baseHaTang', pipeOn ? null : browseState().sector);
   paintBase('kientruc', 'baseKienTruc');
   paintXaHoi();
-  paintPointWorks();
+  paintXahoiList();
   paintAxisAll();
   const tools = document.getElementById('axisToolsQuyHoach');
   if (tools) tools.hidden = true;
   applyLayerQuery();
   publishSectorLegend(false);
   document.dispatchEvent(new CustomEvent('qh:legend-sync'));
-}
-
-let pointLevelsReady = false;
-
-function paintPointWorks() {
-  const host = document.getElementById('pointCatalog');
-  if (!host) return;
-  const pane = document.getElementById('layerPaneXaHoi');
-  const top = pane ? pane.scrollTop : 0;
-  const opened = new Set([...host.querySelectorAll('details[open]')].map(el => el.dataset.pointLevel));
-  const points = getLayers().filter(l => isPointWork(l) && layerPassesFilter(l));
-  if (!points.length) {
-    host.innerHTML = '';
-    if (pane) pane.scrollTop = top;
-    return;
-  }
-  const byLevel = new Map(FACET_LEVELS.map(l => [l.id, []]));
-  points.forEach(l => {
-    if (!byLevel.has(l.level)) byLevel.set(l.level, []);
-    byLevel.get(l.level).push(l);
-  });
-  if (!pointLevelsReady) {
-    const prefer = browseState().level || 'QHC25';
-    const pick = byLevel.get(prefer)?.length ? prefer : [...byLevel.keys()].find(id => byLevel.get(id).length);
-    if (pick) opened.add(pick);
-    pointLevelsReady = true;
-  }
-  const catalog = state.projectCatalog || [];
-  const searching = !!foldQuery(layerQuery);
-  host.innerHTML = [...byLevel.entries()].filter(([, rows]) => rows.length).map(([levelId, rows]) => {
-    const label = FACET_LEVELS.find(l => l.id === levelId)?.label || levelId;
-    const names = new Map(schemesAt(levelId, catalog).map(s => [s.slug, s.name]));
-    const body = SECTORS.map(sec => {
-      const mine = rows.filter(l => l.sector === sec.id);
-      if (!mine.length) return '';
-      const lines = mine.map(l => {
-        const scheme = names.get(l.scheme) || l.scheme || '';
-        return `<label class="cn-layer"><input type="checkbox" data-cn-layer="${escapeHtml(l.id)}"${isLayerOn(l.id) ? ' checked' : ''}><span>${escapeHtml(l.name)}</span><small>${escapeHtml(scheme)}</small></label>`;
-      }).join('');
-      return `<div class="cn-status"><b>${escapeHtml(sec.label)}</b>${lines}</div>`;
-    }).join('');
-    const open = searching || opened.has(levelId) ? ' open' : '';
-    return `<details class="point-level" data-point-level="${escapeHtml(levelId)}"${open}><summary>${escapeHtml(label)} <small>(${rows.length})</small></summary>${body}</details>`;
-  }).join('');
-  if (pane) pane.scrollTop = top;
 }
 
 function showPlanPane() {
@@ -763,6 +848,15 @@ function applySavedLayers(saved) {
   });
 }
 
+async function loadSynth() {
+  try {
+    const res = await fetch(withAssetVersion('data/htkt/synth.json'));
+    if (!res.ok) return;
+    const doc = await res.json();
+    if (doc && typeof doc === 'object') synthDoc = doc;
+  } catch (err) { /* không tổng hợp */ }
+}
+
 async function loadKienTruc() {
   const pull = async (file) => {
     try {
@@ -830,9 +924,24 @@ export function initChuyenNganh() {
       if (id === 'dothi') document.dispatchEvent(new CustomEvent('qh:legend-open', { detail: { set: 'URBAN' } }));
       return;
     }
+    const formBtn = e.target.closest('[data-cn-form]');
+    if (formBtn) {
+      if (formBtn.disabled || pipeOn) return;
+      const id = formBtn.dataset.cnForm;
+      const onCount = Object.values(geomOn).filter(Boolean).length;
+      if (geomOn[id] && onCount === 1) return;
+      geomOn[id] = !geomOn[id];
+      paint();
+      return;
+    }
     const sectorBtn = e.target.closest('[data-cn-sector]');
     if (sectorBtn) {
-      setBrowseState({ sector: sectorBtn.dataset.cnSector, axis: 'hatang' });
+      const id = sectorBtn.dataset.cnSector;
+      if (id === 'tong-hop-duong-ong') pipeOn = true;
+      else {
+        pipeOn = false;
+        setBrowseState({ sector: id, axis: 'hatang' });
+      }
       paint();
       publishSectorLegend(true);
       scheduleSave();
@@ -880,7 +989,7 @@ export function initChuyenNganh() {
     const slug = schemeEl?.dataset.cnScheme;
     if (!slug) return;
     const { sector, level } = browseState();
-    const rows = layersFor(sector, schemeEl.dataset.cnLevel || level, slug).filter(l => !isPointWork(l));
+    const rows = listedForScheme(sector, schemeEl.dataset.cnLevel || level, slug);
     if (e.target.checked) openSchemes.add(slug);
     rows.forEach(l => setLayerOn(l, e.target.checked));
     if (e.target.checked) publishSectorLegend(true);
@@ -984,15 +1093,17 @@ export function initChuyenNganh() {
   document.getElementById('layerSearch')?.addEventListener('input', (e) => {
     layerQuery = e.target.value || '';
     paintAdminList();
+    paintXahoiList();
     applyLayerQuery();
   });
   onViewChange(paintViewSwitch);
   paintViewSwitch();
+  initXahoiList();
   const gp = document.getElementById('gpList');
   if (gp) new MutationObserver(() => filterGp()).observe(gp, { childList: true });
 
   loadKienTruc();
-  loadFacetCatalog().then(() => {
+  Promise.all([loadFacetCatalog(), loadSynth(), loadPlanRadii()]).then(() => {
     seedFromDom();
     if (saved) {
       applyExtra(saved);

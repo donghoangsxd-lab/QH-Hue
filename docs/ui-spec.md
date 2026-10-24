@@ -39,11 +39,11 @@ Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000,
 
 ### Hạ tầng kỹ thuật
 
-Bảy ngành, lớp tuyến và vùng, môi trường, ô giả lập bán kính. Không quỹ đất.
+Tám nhóm: bảy ngành (giao thông, cấp nước, thoát nước mưa, thoát nước thải, cấp điện, thông tin liên lạc, chất thải rắn và nghĩa trang) rồi Tổng hợp đường ống. Trong mỗi nhóm có điểm công trình, tuyến mạng và vùng. Tổng hợp đường ống chỉ hiện tuyến của giao thông, cấp nước, cấp điện, thoát nước và thông tin liên lạc. Lớp cột đèn không hiện. Họng cứu hỏa ở lại cấp nước. Môi trường và ô giả lập bán kính giữ nguyên. Không quỹ đất. Đồ án thiếu tuyến thì ghi «dữ liệu tự tổng hợp». Cấp QHPK chưa có lớp thì để hook, không bịa tuyến.
 
 ### Hạ tầng xã hội
 
-Công trình điểm, hạ tầng xã hội, và cả mục Quỹ đất và công trình (ranh lô, cơ sở chưa sử dụng, chung cư, dự án kêu gọi đầu tư). Ô giả lập bán kính.
+Tám tab theo mã Sheet: công viên, mầm non, tiểu học, THCS, THPT, y tế, văn hóa, chợ. Mỗi tab liệt kê công trình theo phường/xã, có diện tích lô và tổng của phường/xã; thiếu số thì «—». Bấm một dòng phóng tới công trình. Nhà tang lễ ở lại panel này. Mục Quỹ đất và công trình (ranh lô, cơ sở chưa sử dụng, chung cư, dự án kêu gọi đầu tư) ở đây. Bản đồ độ phủ hạ tầng bật tại panel này. Bốn lớp điểm hạ tầng kỹ thuật bật bán kính tại đây, cùng một lớp với panel kỹ thuật: bãi đỗ xe, trạm xe buýt, trụ sở PCCC, nghĩa trang. Ô giả lập bán kính giữ nguyên.
 
 ### Kiến trúc
 

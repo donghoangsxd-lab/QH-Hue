@@ -1,0 +1,1232 @@
+{
+  "version": 1,
+  "snapM": {
+    "QHCT": 0.5,
+    "QHPK": 1,
+    "QHC10": 10,
+    "QHC25": 100
+  },
+  "label": "dữ liệu tự tổng hợp",
+  "qhpkHook": {
+    "id": "qhpk-htkt",
+    "level": "QHPK",
+    "status": "pending",
+    "note": "Chưa có lớp HTKT cấp QHPK. Script bổ sung gắn lớp vào hook này, không tự tổng hợp.",
+    "parents": [
+      "qhpk-dieu-chinh-quy-hoach-phan-khu-khu-c-do-thi-moi-an-van-d-d5c72b7d",
+      "qhpk-e-do-thi-moi-an-van-duong-fcef7c2e",
+      "qhpk-hai-duong-huong-phong-484db23b",
+      "qhpk-khu-do-thi-sinh-thai-thanh-toan-ac57aa8b",
+      "qhpk-khu-do-thi-ven-bien-thuan-an-a3b72c3e",
+      "qhpk-phu-bai-7a7efc45",
+      "qhpk-phu-son-1bef3f16",
+      "qhpk-thuy-chau-b8d972ba",
+      "qhpk-tt-phia-dong-26123071"
+    ],
+    "layers": []
+  },
+  "gcs": [
+    {
+      "scheme": "qhc-chan-may",
+      "level": "QHC10",
+      "sector": "giao-thong",
+      "name": "Quy hoạch giao thông",
+      "geomType": "Mixed",
+      "featureCount": 773,
+      "file": "https://storage.googleapis.com/hue-infra-data-us/projects/qhc-chan-may-lang-co-a44cfad0/qh-giao-thong.json"
+    },
+    {
+      "scheme": "qhct-cum-cong-nghiep-binh-thanh-9e1e7dbe",
+      "level": "QHCT",
+      "sector": "san-nen-thoat-mua",
+      "name": "Công trình tiêu thoát nước(dạng đường)",
+      "geomType": "LineString",
+      "featureCount": 12872,
+      "file": "https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhct-cum-cong-nghiep-binh-thanh-9e1e7dbe/san-nen-thoat-mua/quy-hoach/cong-trinh-tieu-thoat-nuoc-dang-duong.geojson"
+    }
+  ],
+  "cotDenHidden": 7,
+  "synth": [
+    {
+      "scheme": "qhc-khu-cong-nghiep-phong-dien-f997bd2c",
+      "aliases": [
+        "qhc-khu-cong-nghiep-phong-dien-f997bd2c"
+      ],
+      "level": "QHC10",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/hien-trang/hien-trang-mang-luoi-thong-tin-lien-lac.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+      "aliases": [
+        "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+        "qhc-phong-dien"
+      ],
+      "level": "QHC10",
+      "sector": "giao-thong",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-thuy.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/cau-giao-thong-dang-duong.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-thuy.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+      "aliases": [
+        "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+        "qhc-phong-dien"
+      ],
+      "level": "QHC10",
+      "sector": "cap-nuoc",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/hien-trang/hien-trang-mang-luoi-cap-nuoc.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/quy-hoach/mang-luoi-cap-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+      "aliases": [
+        "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+        "qhc-phong-dien"
+      ],
+      "level": "QHC10",
+      "sector": "cap-dien",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/hien-trang/hien-trang-mang-luoi-phan-phoi-dien.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/quy-hoach/mang-luoi-phan-phoi-dien.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+      "aliases": [
+        "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+        "qhc-phong-dien"
+      ],
+      "level": "QHC10",
+      "sector": "san-nen-thoat-mua",
+      "pipe": true,
+      "donorScheme": "qhc-do-thi-moi-vinh-hung-8899f27b",
+      "donorName": "QHC Đô thị mới Vinh Hưng",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/congtrinhthuyloil.geojson",
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/mang-luoi-thoat-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+      "aliases": [
+        "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+        "qhc-phong-dien"
+      ],
+      "level": "QHC10",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/hien-trang/hien-trang-mang-luoi-thoat-nuoc-thai.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+      "aliases": [
+        "qhc-do-thi-phong-dien-den-nam-2030-tam-nhin-den-nam-2045-5727c5b3",
+        "qhc-phong-dien"
+      ],
+      "level": "QHC10",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/hien-trang/hien-trang-mang-luoi-thong-tin-lien-lac.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-chan-may",
+      "aliases": [
+        "qhc-chan-may-lang-co-a44cfad0",
+        "qhc-chan-may"
+      ],
+      "level": "QHC10",
+      "sector": "cap-nuoc",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/hien-trang/hien-trang-mang-luoi-cap-nuoc.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/quy-hoach/mang-luoi-cap-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-chan-may",
+      "aliases": [
+        "qhc-chan-may-lang-co-a44cfad0",
+        "qhc-chan-may"
+      ],
+      "level": "QHC10",
+      "sector": "cap-dien",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/hien-trang/hien-trang-mang-luoi-phan-phoi-dien.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/quy-hoach/mang-luoi-phan-phoi-dien.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-chan-may",
+      "aliases": [
+        "qhc-chan-may-lang-co-a44cfad0",
+        "qhc-chan-may"
+      ],
+      "level": "QHC10",
+      "sector": "san-nen-thoat-mua",
+      "pipe": true,
+      "donorScheme": "qhc-do-thi-moi-vinh-hung-8899f27b",
+      "donorName": "QHC Đô thị mới Vinh Hưng",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/congtrinhthuyloil.geojson",
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/mang-luoi-thoat-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-chan-may",
+      "aliases": [
+        "qhc-chan-may-lang-co-a44cfad0",
+        "qhc-chan-may"
+      ],
+      "level": "QHC10",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/hien-trang/hien-trang-mang-luoi-thoat-nuoc-thai.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-chan-may",
+      "aliases": [
+        "qhc-chan-may-lang-co-a44cfad0",
+        "qhc-chan-may"
+      ],
+      "level": "QHC10",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/hien-trang/hien-trang-mang-luoi-thong-tin-lien-lac.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-xa-thuong-long-3f2c4da4",
+      "aliases": [
+        "qhc-xa-thuong-long-3f2c4da4"
+      ],
+      "level": "QHC25",
+      "sector": "cap-nuoc",
+      "pipe": true,
+      "donorScheme": "qhc-hue-2045",
+      "donorName": "QHC đô thị Thừa Thiên Huế 1/25.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/cap-nuoc/hien-trang/hien-trang-mang-luoi-cap-nuoc.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/cap-nuoc/quy-hoach/mang-luoi-cap-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-xa-thuong-long-3f2c4da4",
+      "aliases": [
+        "qhc-xa-thuong-long-3f2c4da4"
+      ],
+      "level": "QHC25",
+      "sector": "cap-dien",
+      "pipe": true,
+      "donorScheme": "qhc-hue-2045",
+      "donorName": "QHC đô thị Thừa Thiên Huế 1/25.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/cap-dien/hien-trang/hien-trang-mang-luoi-phan-phoi-dien.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/cap-dien/quy-hoach/mang-luoi-phan-phoi-dien.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-xa-thuong-long-3f2c4da4",
+      "aliases": [
+        "qhc-xa-thuong-long-3f2c4da4"
+      ],
+      "level": "QHC25",
+      "sector": "san-nen-thoat-mua",
+      "pipe": true,
+      "donorScheme": "qhc-hue-2045",
+      "donorName": "QHC đô thị Thừa Thiên Huế 1/25.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/san-nen-thoat-mua/hien-trang/hien-trang-phan-luu-thoat-nuoc-dang-duong.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/san-nen-thoat-mua/quy-hoach/cong-trinh-thuy-loi-dang-duong.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/san-nen-thoat-mua/quy-hoach/mang-luoi-thoat-nuoc-dang-duong.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/san-nen-thoat-mua/quy-hoach/phan-vung-luu-vuc-dang-duong.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-xa-thuong-long-3f2c4da4",
+      "aliases": [
+        "qhc-xa-thuong-long-3f2c4da4"
+      ],
+      "level": "QHC25",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhc-hue-2045",
+      "donorName": "QHC đô thị Thừa Thiên Huế 1/25.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thoat-nuoc-thai/hien-trang/hien-trang-mang-luoi-thoat-nuoc-thai.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-xa-thuong-long-3f2c4da4",
+      "aliases": [
+        "qhc-xa-thuong-long-3f2c4da4"
+      ],
+      "level": "QHC25",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhc-hue-2045",
+      "donorName": "QHC đô thị Thừa Thiên Huế 1/25.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thong-tin-lien-lac/hien-trang/hien-trang-mang-luoi-thong-tin-lien-lac.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhct-tdc-phu-my-khu-c-7bfa4d26",
+      "aliases": [
+        "qhct-tdc-phu-my-khu-c-7bfa4d26"
+      ],
+      "level": "QHCT",
+      "sector": "cap-dien",
+      "pipe": true,
+      "donorScheme": "qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d",
+      "donorName": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "files": [
+        "data/chuyen-nganh/qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d/cap-dien/quy-hoach/mang-luoi-dien-chieu-sang.geojson",
+        "data/chuyen-nganh/qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d/cap-dien/quy-hoach/mang-luoi-phan-phoi-dien.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhct-tdc-phu-my-khu-c-7bfa4d26",
+      "aliases": [
+        "qhct-tdc-phu-my-khu-c-7bfa4d26"
+      ],
+      "level": "QHCT",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhct-khu-do-thi-sinh-thai-thanh-thuy-93bfd064",
+      "donorName": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "files": [
+        "data/chuyen-nganh/qhct-khu-do-thi-sinh-thai-thanh-thuy-93bfd064/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai-l.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhct-tdc-phu-my-khu-c-7bfa4d26",
+      "aliases": [
+        "qhct-tdc-phu-my-khu-c-7bfa4d26"
+      ],
+      "level": "QHCT",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d",
+      "donorName": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "files": [
+        "data/chuyen-nganh/qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhct-tdc-thuy-van-giai-doan-2-khu-e-33b92316",
+      "aliases": [
+        "qhct-tdc-thuy-van-giai-doan-2-khu-e-33b92316"
+      ],
+      "level": "QHCT",
+      "sector": "cap-dien",
+      "pipe": true,
+      "donorScheme": "qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d",
+      "donorName": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "files": [
+        "data/chuyen-nganh/qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d/cap-dien/quy-hoach/mang-luoi-dien-chieu-sang.geojson",
+        "data/chuyen-nganh/qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d/cap-dien/quy-hoach/mang-luoi-phan-phoi-dien.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhct-tdc-thuy-van-giai-doan-2-khu-e-33b92316",
+      "aliases": [
+        "qhct-tdc-thuy-van-giai-doan-2-khu-e-33b92316"
+      ],
+      "level": "QHCT",
+      "sector": "san-nen-thoat-mua",
+      "pipe": true,
+      "donorScheme": "qhct-cum-cong-nghiep-binh-thanh-9e1e7dbe",
+      "donorName": "QHCT Cụm công nghiệp Bình Thành",
+      "files": [
+        "https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhct-cum-cong-nghiep-binh-thanh-9e1e7dbe/san-nen-thoat-mua/quy-hoach/cong-trinh-tieu-thoat-nuoc-dang-duong.geojson",
+        "data/chuyen-nganh/qhct-cum-cong-nghiep-binh-thanh-9e1e7dbe/san-nen-thoat-mua/quy-hoach/mang-luoi-thoat-nuoc-mua-dang-duong.geojson",
+        "data/chuyen-nganh/qhct-cum-cong-nghiep-binh-thanh-9e1e7dbe/san-nen-thoat-mua/quy-hoach/phan-luu-thoat-nuoc-dang-duong.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhct-tdc-thuy-van-giai-doan-2-khu-e-33b92316",
+      "aliases": [
+        "qhct-tdc-thuy-van-giai-doan-2-khu-e-33b92316"
+      ],
+      "level": "QHCT",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhct-khu-do-thi-sinh-thai-thanh-thuy-93bfd064",
+      "donorName": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "files": [
+        "data/chuyen-nganh/qhct-khu-do-thi-sinh-thai-thanh-thuy-93bfd064/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai-l.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhct-tdc-thuy-van-giai-doan-2-khu-e-33b92316",
+      "aliases": [
+        "qhct-tdc-thuy-van-giai-doan-2-khu-e-33b92316"
+      ],
+      "level": "QHCT",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d",
+      "donorName": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "files": [
+        "data/chuyen-nganh/qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhct-khu-nha-o-an-dong-e03fe6e1",
+      "aliases": [
+        "qhct-khu-nha-o-an-dong-e03fe6e1"
+      ],
+      "level": "QHCT",
+      "sector": "cap-nuoc",
+      "pipe": true,
+      "donorScheme": "qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d",
+      "donorName": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "files": [
+        "data/chuyen-nganh/qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d/cap-nuoc/quy-hoach/mang-luoi-cap-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhct-khu-nha-o-an-dong-e03fe6e1",
+      "aliases": [
+        "qhct-khu-nha-o-an-dong-e03fe6e1"
+      ],
+      "level": "QHCT",
+      "sector": "san-nen-thoat-mua",
+      "pipe": true,
+      "donorScheme": "qhct-cum-cong-nghiep-binh-thanh-9e1e7dbe",
+      "donorName": "QHCT Cụm công nghiệp Bình Thành",
+      "files": [
+        "https://storage.googleapis.com/hue-infra-data-us/chuyen-nganh/v1/qhct-cum-cong-nghiep-binh-thanh-9e1e7dbe/san-nen-thoat-mua/quy-hoach/cong-trinh-tieu-thoat-nuoc-dang-duong.geojson",
+        "data/chuyen-nganh/qhct-cum-cong-nghiep-binh-thanh-9e1e7dbe/san-nen-thoat-mua/quy-hoach/mang-luoi-thoat-nuoc-mua-dang-duong.geojson",
+        "data/chuyen-nganh/qhct-cum-cong-nghiep-binh-thanh-9e1e7dbe/san-nen-thoat-mua/quy-hoach/phan-luu-thoat-nuoc-dang-duong.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhct-khu-nha-o-an-dong-e03fe6e1",
+      "aliases": [
+        "qhct-khu-nha-o-an-dong-e03fe6e1"
+      ],
+      "level": "QHCT",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d",
+      "donorName": "QHCT Khu dân cư và tái định cư đường Tố Hữu",
+      "files": [
+        "data/chuyen-nganh/qhct-khu-dan-cu-va-tai-dinh-cu-duong-to-huu-b9e0890d/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhct-tram-trung-chuyen-dieu-ap-phu-bai-36fb0207",
+      "aliases": [
+        "qhct-tram-trung-chuyen-dieu-ap-phu-bai-36fb0207"
+      ],
+      "level": "QHCT",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhct-khu-do-thi-sinh-thai-thanh-thuy-93bfd064",
+      "donorName": "QHCT Khu đô thị sinh thái Thanh Thủy",
+      "files": [
+        "data/chuyen-nganh/qhct-khu-do-thi-sinh-thai-thanh-thuy-93bfd064/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai-l.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-xa-huong-huu-cb7f4149",
+      "aliases": [
+        "qhc-xa-huong-huu-cb7f4149"
+      ],
+      "level": "QHC25",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhc-hue-2045",
+      "donorName": "QHC đô thị Thừa Thiên Huế 1/25.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thoat-nuoc-thai/hien-trang/hien-trang-mang-luoi-thoat-nuoc-thai.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-xa-huong-huu-cb7f4149",
+      "aliases": [
+        "qhc-xa-huong-huu-cb7f4149"
+      ],
+      "level": "QHC25",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhc-hue-2045",
+      "donorName": "QHC đô thị Thừa Thiên Huế 1/25.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thong-tin-lien-lac/hien-trang/hien-trang-mang-luoi-thong-tin-lien-lac.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-xa-huong-loc-1487608f",
+      "aliases": [
+        "qhc-xa-huong-loc-1487608f"
+      ],
+      "level": "QHC25",
+      "sector": "san-nen-thoat-mua",
+      "pipe": true,
+      "donorScheme": "qhc-hue-2045",
+      "donorName": "QHC đô thị Thừa Thiên Huế 1/25.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/san-nen-thoat-mua/hien-trang/hien-trang-phan-luu-thoat-nuoc-dang-duong.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/san-nen-thoat-mua/quy-hoach/cong-trinh-thuy-loi-dang-duong.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/san-nen-thoat-mua/quy-hoach/mang-luoi-thoat-nuoc-dang-duong.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/san-nen-thoat-mua/quy-hoach/phan-vung-luu-vuc-dang-duong.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-xa-huong-loc-1487608f",
+      "aliases": [
+        "qhc-xa-huong-loc-1487608f"
+      ],
+      "level": "QHC25",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhc-hue-2045",
+      "donorName": "QHC đô thị Thừa Thiên Huế 1/25.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thoat-nuoc-thai/hien-trang/hien-trang-mang-luoi-thoat-nuoc-thai.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-xa-huong-loc-1487608f",
+      "aliases": [
+        "qhc-xa-huong-loc-1487608f"
+      ],
+      "level": "QHC25",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhc-hue-2045",
+      "donorName": "QHC đô thị Thừa Thiên Huế 1/25.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thong-tin-lien-lac/hien-trang/hien-trang-mang-luoi-thong-tin-lien-lac.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-xa-thuong-nhat-550f030f",
+      "aliases": [
+        "qhc-xa-thuong-nhat-550f030f"
+      ],
+      "level": "QHC25",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhc-hue-2045",
+      "donorName": "QHC đô thị Thừa Thiên Huế 1/25.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thoat-nuoc-thai/hien-trang/hien-trang-mang-luoi-thoat-nuoc-thai.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-xa-thuong-nhat-550f030f",
+      "aliases": [
+        "qhc-xa-thuong-nhat-550f030f"
+      ],
+      "level": "QHC25",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhc-hue-2045",
+      "donorName": "QHC đô thị Thừa Thiên Huế 1/25.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thong-tin-lien-lac/hien-trang/hien-trang-mang-luoi-thong-tin-lien-lac.geojson",
+        "data/chuyen-nganh/qhc-do-thi-thua-thien-hue-1-25-000-99f3eaf1/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-quang-dien",
+      "aliases": [
+        "qhc-quang-dien"
+      ],
+      "level": "QHC10",
+      "sector": "giao-thong",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-thuy.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/cau-giao-thong-dang-duong.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-thuy.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-quang-dien",
+      "aliases": [
+        "qhc-quang-dien"
+      ],
+      "level": "QHC10",
+      "sector": "cap-nuoc",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/hien-trang/hien-trang-mang-luoi-cap-nuoc.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/quy-hoach/mang-luoi-cap-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-quang-dien",
+      "aliases": [
+        "qhc-quang-dien"
+      ],
+      "level": "QHC10",
+      "sector": "cap-dien",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/hien-trang/hien-trang-mang-luoi-phan-phoi-dien.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/quy-hoach/mang-luoi-phan-phoi-dien.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-quang-dien",
+      "aliases": [
+        "qhc-quang-dien"
+      ],
+      "level": "QHC10",
+      "sector": "san-nen-thoat-mua",
+      "pipe": true,
+      "donorScheme": "qhc-do-thi-moi-vinh-hung-8899f27b",
+      "donorName": "QHC Đô thị mới Vinh Hưng",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/congtrinhthuyloil.geojson",
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/mang-luoi-thoat-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-quang-dien",
+      "aliases": [
+        "qhc-quang-dien"
+      ],
+      "level": "QHC10",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/hien-trang/hien-trang-mang-luoi-thoat-nuoc-thai.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-quang-dien",
+      "aliases": [
+        "qhc-quang-dien"
+      ],
+      "level": "QHC10",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/hien-trang/hien-trang-mang-luoi-thong-tin-lien-lac.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-a-luoi",
+      "aliases": [
+        "qhc-a-luoi"
+      ],
+      "level": "QHC10",
+      "sector": "giao-thong",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-thuy.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/cau-giao-thong-dang-duong.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-thuy.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-a-luoi",
+      "aliases": [
+        "qhc-a-luoi"
+      ],
+      "level": "QHC10",
+      "sector": "cap-nuoc",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/hien-trang/hien-trang-mang-luoi-cap-nuoc.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/quy-hoach/mang-luoi-cap-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-a-luoi",
+      "aliases": [
+        "qhc-a-luoi"
+      ],
+      "level": "QHC10",
+      "sector": "cap-dien",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/hien-trang/hien-trang-mang-luoi-phan-phoi-dien.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/quy-hoach/mang-luoi-phan-phoi-dien.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-a-luoi",
+      "aliases": [
+        "qhc-a-luoi"
+      ],
+      "level": "QHC10",
+      "sector": "san-nen-thoat-mua",
+      "pipe": true,
+      "donorScheme": "qhc-do-thi-moi-vinh-hung-8899f27b",
+      "donorName": "QHC Đô thị mới Vinh Hưng",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/congtrinhthuyloil.geojson",
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/mang-luoi-thoat-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-a-luoi",
+      "aliases": [
+        "qhc-a-luoi"
+      ],
+      "level": "QHC10",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/hien-trang/hien-trang-mang-luoi-thoat-nuoc-thai.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-a-luoi",
+      "aliases": [
+        "qhc-a-luoi"
+      ],
+      "level": "QHC10",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/hien-trang/hien-trang-mang-luoi-thong-tin-lien-lac.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-ho",
+      "aliases": [
+        "qhc-phu-ho"
+      ],
+      "level": "QHC10",
+      "sector": "giao-thong",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-thuy.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/cau-giao-thong-dang-duong.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-thuy.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-ho",
+      "aliases": [
+        "qhc-phu-ho"
+      ],
+      "level": "QHC10",
+      "sector": "cap-nuoc",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/hien-trang/hien-trang-mang-luoi-cap-nuoc.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/quy-hoach/mang-luoi-cap-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-ho",
+      "aliases": [
+        "qhc-phu-ho"
+      ],
+      "level": "QHC10",
+      "sector": "cap-dien",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/hien-trang/hien-trang-mang-luoi-phan-phoi-dien.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/quy-hoach/mang-luoi-phan-phoi-dien.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-ho",
+      "aliases": [
+        "qhc-phu-ho"
+      ],
+      "level": "QHC10",
+      "sector": "san-nen-thoat-mua",
+      "pipe": true,
+      "donorScheme": "qhc-do-thi-moi-vinh-hung-8899f27b",
+      "donorName": "QHC Đô thị mới Vinh Hưng",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/congtrinhthuyloil.geojson",
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/mang-luoi-thoat-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-ho",
+      "aliases": [
+        "qhc-phu-ho"
+      ],
+      "level": "QHC10",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/hien-trang/hien-trang-mang-luoi-thoat-nuoc-thai.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-ho",
+      "aliases": [
+        "qhc-phu-ho"
+      ],
+      "level": "QHC10",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/hien-trang/hien-trang-mang-luoi-thong-tin-lien-lac.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-vinh",
+      "aliases": [
+        "qhc-phu-vinh"
+      ],
+      "level": "QHC10",
+      "sector": "giao-thong",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-thuy.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/cau-giao-thong-dang-duong.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-thuy.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-vinh",
+      "aliases": [
+        "qhc-phu-vinh"
+      ],
+      "level": "QHC10",
+      "sector": "cap-nuoc",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/hien-trang/hien-trang-mang-luoi-cap-nuoc.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/quy-hoach/mang-luoi-cap-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-vinh",
+      "aliases": [
+        "qhc-phu-vinh"
+      ],
+      "level": "QHC10",
+      "sector": "cap-dien",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/hien-trang/hien-trang-mang-luoi-phan-phoi-dien.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/quy-hoach/mang-luoi-phan-phoi-dien.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-vinh",
+      "aliases": [
+        "qhc-phu-vinh"
+      ],
+      "level": "QHC10",
+      "sector": "san-nen-thoat-mua",
+      "pipe": true,
+      "donorScheme": "qhc-do-thi-moi-vinh-hung-8899f27b",
+      "donorName": "QHC Đô thị mới Vinh Hưng",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/congtrinhthuyloil.geojson",
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/mang-luoi-thoat-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-vinh",
+      "aliases": [
+        "qhc-phu-vinh"
+      ],
+      "level": "QHC10",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/hien-trang/hien-trang-mang-luoi-thoat-nuoc-thai.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-vinh",
+      "aliases": [
+        "qhc-phu-vinh"
+      ],
+      "level": "QHC10",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/hien-trang/hien-trang-mang-luoi-thong-tin-lien-lac.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-vang",
+      "aliases": [
+        "qhc-phu-vang"
+      ],
+      "level": "QHC10",
+      "sector": "giao-thong",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-thuy.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/cau-giao-thong-dang-duong.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-thuy.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-vang",
+      "aliases": [
+        "qhc-phu-vang"
+      ],
+      "level": "QHC10",
+      "sector": "cap-nuoc",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/hien-trang/hien-trang-mang-luoi-cap-nuoc.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/quy-hoach/mang-luoi-cap-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-vang",
+      "aliases": [
+        "qhc-phu-vang"
+      ],
+      "level": "QHC10",
+      "sector": "cap-dien",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/hien-trang/hien-trang-mang-luoi-phan-phoi-dien.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/quy-hoach/mang-luoi-phan-phoi-dien.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-vang",
+      "aliases": [
+        "qhc-phu-vang"
+      ],
+      "level": "QHC10",
+      "sector": "san-nen-thoat-mua",
+      "pipe": true,
+      "donorScheme": "qhc-do-thi-moi-vinh-hung-8899f27b",
+      "donorName": "QHC Đô thị mới Vinh Hưng",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/congtrinhthuyloil.geojson",
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/mang-luoi-thoat-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-vang",
+      "aliases": [
+        "qhc-phu-vang"
+      ],
+      "level": "QHC10",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/hien-trang/hien-trang-mang-luoi-thoat-nuoc-thai.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-phu-vang",
+      "aliases": [
+        "qhc-phu-vang"
+      ],
+      "level": "QHC10",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/hien-trang/hien-trang-mang-luoi-thong-tin-lien-lac.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-hung-loc",
+      "aliases": [
+        "qhc-hung-loc"
+      ],
+      "level": "QHC10",
+      "sector": "giao-thong",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/hien-trang/hien-trang-mang-luoi-giao-thong-duong-thuy.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/cau-giao-thong-dang-duong.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-bo.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-sat.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/giao-thong/quy-hoach/mang-luoi-giao-thong-duong-thuy.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-hung-loc",
+      "aliases": [
+        "qhc-hung-loc"
+      ],
+      "level": "QHC10",
+      "sector": "cap-nuoc",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/hien-trang/hien-trang-mang-luoi-cap-nuoc.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-nuoc/quy-hoach/mang-luoi-cap-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-hung-loc",
+      "aliases": [
+        "qhc-hung-loc"
+      ],
+      "level": "QHC10",
+      "sector": "cap-dien",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/hien-trang/hien-trang-mang-luoi-phan-phoi-dien.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/cap-dien/quy-hoach/mang-luoi-phan-phoi-dien.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-hung-loc",
+      "aliases": [
+        "qhc-hung-loc"
+      ],
+      "level": "QHC10",
+      "sector": "san-nen-thoat-mua",
+      "pipe": true,
+      "donorScheme": "qhc-do-thi-moi-vinh-hung-8899f27b",
+      "donorName": "QHC Đô thị mới Vinh Hưng",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/congtrinhthuyloil.geojson",
+        "data/chuyen-nganh/qhc-do-thi-moi-vinh-hung-8899f27b/san-nen-thoat-mua/quy-hoach/mang-luoi-thoat-nuoc.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-hung-loc",
+      "aliases": [
+        "qhc-hung-loc"
+      ],
+      "level": "QHC10",
+      "sector": "thoat-nuoc-thai",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/hien-trang/hien-trang-mang-luoi-thoat-nuoc-thai.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thoat-nuoc-thai/quy-hoach/mang-luoi-thoat-nuoc-thai.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    },
+    {
+      "scheme": "qhc-hung-loc",
+      "aliases": [
+        "qhc-hung-loc"
+      ],
+      "level": "QHC10",
+      "sector": "thong-tin-lien-lac",
+      "pipe": true,
+      "donorScheme": "qhc-trung-tam",
+      "donorName": "QHC đô thị trung tâm Thừa Thiên Huế 1/10.000",
+      "files": [
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/hien-trang/hien-trang-mang-luoi-thong-tin-lien-lac.geojson",
+        "data/chuyen-nganh/qhc-do-thi-trung-tam-thua-thien-hue-1-10-000-9406ec72/thong-tin-lien-lac/quy-hoach/mang-luoi-thong-tin-lien-lac.geojson"
+      ],
+      "label": "dữ liệu tự tổng hợp"
+    }
+  ]
+}
