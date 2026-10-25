@@ -11,6 +11,7 @@ import { escapeHtml, fmtNum, planItems } from './utils.js';
 import { landCode } from './mapEngine.js';
 import { namesOfProject } from './projectNames.js';
 import { planLevelOf } from './generalPlan.js';
+import { presentLandMix } from './planMix.js';
 
 const SAMPLE_MAX = 40000;
 // Lưới phủ cả khung bao: vùng đo mảnh, chéo thì khung lớn hơn nhiều polygon, giới hạn số ô để không tràn bộ nhớ
@@ -379,11 +380,11 @@ export function planLandHtml(res) {
   if (!res.rows.length) {
     return `<div class="plan-land-stats">${head}<div class="sug-card ineligible">Vùng đo chưa có lô quy hoạch của đồ án nào đã nhập (hoặc đồ án đang bị ẩn).</div></div>`;
   }
-  const rows = res.rows.map(r => rowHtml(r.label, r.color, r.key, r.area, r.pct, `${fmtNum(r.lots)} lô`)).join('');
-  const none = res.none.area > 0 ? rowHtml('Chưa có lô quy hoạch', NONE_COLOR, '', res.none.area, res.none.pct, 'đường, mặt nước… chưa vẽ lô') : '';
+  const rows = mixEntries(res, 'Chưa có lô quy hoạch', 'đường, mặt nước… chưa vẽ lô')
+    .map(s => rowHtml(s.label, s.color, s.pattern, s.area, s.pct, s.lots != null ? `${fmtNum(s.lots)} lô` : (s.sub || ''))).join('');
   const shown = res.projects.slice(0, 3).map(escapeHtml).join('; ');
   const more = res.projects.length > 3 ? ` và ${res.projects.length - 3} đồ án khác` : '';
-  return `<div class="plan-land-stats">${head}<div class="pls-list">${rows}${none}</div>
+  return `<div class="plan-land-stats">${head}<div class="pls-list">${rows}</div>
     ${shown ? `<div class="pp-sub">Đồ án: ${shown}${more}</div>` : ''}
     <div class="pp-sub">≈ Lấy mẫu lưới ${fmtNum(Math.round(res.step * 10) / 10)} m; đồ án chồng nhau ưu tiên đồ án phạm vi nhỏ hơn (chi tiết hơn). Đồ án đang ẩn không tính.</div>
   </div>`;
@@ -392,13 +393,24 @@ export function planLandHtml(res) {
 // Biểu đồ tròn loại đất trên thửa. mountParcelPies đọc .pls-pie-data sau khi gắn HTML
 const pieCharts = new Set();
 
-function pieHtml(res, noneLabel, where = 'trên thửa') {
-  const slices = res.rows.filter(r => r.area >= SLIVER_M2).map(r => ({
-    key: r.label, label: r.label, color: r.color || '#94a3b8', area: r.area, pct: r.pct
+function mixEntries(res, noneLabel, noneSub = '') {
+  const slices = (res.rows || []).filter(r => r.area >= SLIVER_M2).map(r => ({
+    key: r.label, label: r.label, color: r.color || '#94a3b8', pattern: r.key || '',
+    area: r.area, pct: r.pct, lots: r.lots
   }));
-  if (res.none.area >= SLIVER_M2) slices.push({ key: '__none', label: noneLabel, color: NONE_COLOR, area: res.none.area, pct: res.none.pct });
+  if (res.none && res.none.area >= SLIVER_M2) {
+    slices.push({
+      key: '__none', label: noneLabel, color: NONE_COLOR, pattern: '',
+      area: res.none.area, pct: res.none.pct, lots: null, sub: noneSub
+    });
+  }
+  return presentLandMix(slices);
+}
+
+function pieHtml(res, noneLabel, where = 'trên thửa') {
+  const slices = mixEntries(res, noneLabel);
   if (!slices.length) return '';
-  const legend = slices.map(s => `<li><button type="button" class="pls-pie-item" data-land="${escapeHtml(s.key)}" data-color="${escapeHtml(s.color)}" title="${escapeHtml(s.label)} · ${fmtM2(s.area)} · bấm để tô vùng trên bản đồ">
+  const legend = slices.map(s => `<li><button type="button" class="pls-pie-item" data-land="${escapeHtml(s.key)}" data-color="${escapeHtml(s.color)}" title="${escapeHtml(s.label)} · ${fmtM2(s.area)} (${fmtPct(s.rawPct)}) · bấm để tô vùng trên bản đồ">
     <i style="background:${escapeHtml(s.color)}"></i><span>${escapeHtml(s.label)}</span><em>${escapeHtml(fmtPct(s.pct))}</em>
   </button></li>`).join('');
   return `<div class="pls-pie-host">
@@ -450,7 +462,8 @@ export function mountParcelPies(root) {
             callbacks: {
               label: (ctx) => {
                 const s = slices[ctx.dataIndex];
-                return ` ${s.label}: ${fmtM2(s.area)} (${fmtPct(s.pct)})`;
+                const share = s.rawPct != null ? s.rawPct : s.pct;
+                return ` ${s.label}: ${fmtM2(s.area)} (${fmtPct(share)})`;
               }
             }
           }
