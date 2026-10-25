@@ -1,6 +1,7 @@
 // Bốn trục là tab cấp một của panel Lớp dữ liệu. Cùng một cờ bật/tắt: checkbox có bind dùng lớp sẵn,
 // lớp catalog chỉ tải GeoJSON khi bật và gỡ layer khi tắt.
-import { map, focusWard, clearWardHighlight } from './mapEngine.js';
+import { map, focusWard, clearWardHighlight, centerOnCity } from './mapEngine.js';
+import { showUrbanPlanOnBase } from './urbanAreaLayer.js';
 import { planMap, getViewMode, setViewMode, onViewChange } from './planMap.js';
 import { getLevel, setLevel, LEVEL_EVENT, ensurePlanTab } from './mapLevel.js';
 import { state } from './state.js';
@@ -467,7 +468,7 @@ function paintAdminList() {
   const current = formatKv(getAreaFilter() || AREA_TP);
   const q = foldQuery(layerQuery);
   const hit = (...parts) => !q || parts.some(p => foldQuery(p).includes(q));
-  const htMode = getViewMode() === 'HT';
+  const htMode = columnMode() === 'HT';
   const lvCell = (text, title) => {
     const muted = text === '—';
     const tip = title ? ` title="${escapeHtml(title)}"` : '';
@@ -709,14 +710,22 @@ function applyLayerQuery() {
 }
 
 function paintViewSwitch() {
-  const mode = getViewMode() === 'HT' ? 'HT' : 'QH';
+  const mode = columnMode();
   document.querySelectorAll('#layerTools [data-view-mode]').forEach(btn => {
     const on = btn.dataset.viewMode === mode;
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', String(on));
   });
   paintAdminList();
-  document.dispatchEvent(new CustomEvent('qh:view-column'));
+  if (adminMapOn) {
+    const titleEl = document.getElementById('mapTitleText');
+    const title = mode === 'QH' ? 'BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ' : 'BẢN ĐỒ HIỆN TRẠNG THÀNH PHỐ HUẾ';
+    if (titleEl) {
+      titleEl.textContent = title;
+      titleEl.title = title;
+    }
+  }
+  document.dispatchEvent(new CustomEvent('qh:view-column', { detail: { mode } }));
 }
 
 function toggleAxisAll() {
@@ -786,6 +795,45 @@ let magGoing = false;
 let listenLevel = false;
 let levelTab = false;
 let axisBeforeUrban = null;
+let adminViewHold = null;
+let adminUrbanHeld = null;
+let adminColumn = 'HT';
+let adminMapOn = false;
+
+export function columnMode() {
+  if (adminMapOn) return adminColumn === 'QH' ? 'QH' : 'HT';
+  return getViewMode() === 'HT' ? 'HT' : 'QH';
+}
+
+function setUrbanLayer(on) {
+  const urban = document.getElementById('chk_urban');
+  if (!urban || urban.checked === on) return;
+  urban.checked = on;
+  urban.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function enterAdminMap() {
+  if (adminViewHold == null) adminViewHold = getViewMode();
+  adminMapOn = true;
+  adminColumn = 'HT';
+  if (getViewMode() !== 'HT') setViewMode('HT');
+  showUrbanPlanOnBase(false);
+  const urban = document.getElementById('chk_urban');
+  if (urban && adminUrbanHeld == null) adminUrbanHeld = urban.checked;
+  setUrbanLayer(true);
+}
+
+function leaveAdminMap() {
+  adminMapOn = false;
+  adminColumn = 'HT';
+  if (adminUrbanHeld === false) setUrbanLayer(false);
+  else showUrbanPlanOnBase(false);
+  adminUrbanHeld = null;
+  const back = adminViewHold;
+  adminViewHold = null;
+  if (back && back !== getViewMode()) setViewMode(back);
+  else paintViewSwitch();
+}
 
 function placeIsoRadius(axis) {
   if (axis !== 'hatang' && axis !== 'xahoi') return;
@@ -802,9 +850,12 @@ function releaseAdminAnchor() {
   document.dispatchEvent(new CustomEvent('qh:admin-release'));
 }
 
-function showAxis(id, { openPanel = false, url = true } = {}) {
+function showAxis(id, { openPanel = false, url = true, keepCamera = false } = {}) {
   if (!AXES.some(a => a.id === id)) return;
-  if (id !== 'hanhchinh') releaseAdminAnchor();
+  if (id !== 'hanhchinh') {
+    leaveAdminMap();
+    releaseAdminAnchor();
+  } else enterAdminMap();
   if (id === 'quyhoach') ensurePlanTab('qhc25');
   placeIsoRadius(id);
   setBrowseState({ axis: id }, { url });
@@ -814,6 +865,7 @@ function showAxis(id, { openPanel = false, url = true } = {}) {
   if (openPanel) document.dispatchEvent(new CustomEvent(RIGHT_TAB_EVENT, { detail: { tab: 'tabLayers', open: true } }));
   paint();
   scheduleSave();
+  if (id === 'hanhchinh' && !keepCamera) requestAnimationFrame(() => centerOnCity({ animate: false }));
 }
 
 function paintMatrix() {
@@ -916,7 +968,15 @@ export function initChuyenNganh() {
   document.getElementById('layerMain')?.addEventListener('click', (e) => {
     const viewBtn = e.target.closest('[data-view-mode]');
     if (viewBtn) {
-      setViewMode(viewBtn.dataset.viewMode);
+      const mode = viewBtn.dataset.viewMode === 'HT' ? 'HT' : 'QH';
+      if (browseState().axis === 'hanhchinh') {
+        adminColumn = mode;
+        if (getViewMode() !== 'HT') setViewMode('HT');
+        showUrbanPlanOnBase(mode === 'QH');
+        paintViewSwitch();
+        return;
+      }
+      setViewMode(mode);
       paintViewSwitch();
       return;
     }
@@ -1105,7 +1165,7 @@ export function initChuyenNganh() {
     if (!e.target.closest('#layerMag')) setMagMenu(false);
   });
   window.addEventListener('resize', () => { if (!document.getElementById('layerMagMenu')?.hidden) placeMagMenu(); });
-  if (openDeep) showAxis(browseState().axis, { url: false });
+  if (openDeep) showAxis(browseState().axis, { url: false, keepCamera: searchParams().has('ll') });
   else if (!shareView) showAxis('quyhoach', { url: false });
   else showAxis(getLevel() === 'urban' ? 'hanhchinh' : (browseState().axis || 'quyhoach'), { url: false });
   listenLevel = true;
@@ -1115,7 +1175,15 @@ export function initChuyenNganh() {
     paintXahoiList();
     applyLayerQuery();
   });
-  onViewChange(paintViewSwitch);
+  onViewChange(({ view }) => {
+    if (adminMapOn && view === 'QH') {
+      adminColumn = 'QH';
+      setViewMode('HT');
+      showUrbanPlanOnBase(true);
+      return;
+    }
+    paintViewSwitch();
+  });
   paintViewSwitch();
   initXahoiList();
   const gp = document.getElementById('gpList');

@@ -352,10 +352,12 @@ function groupHtml(groups, period) {
 
 const AREA_HEAD = `<div class="axis-area-head"><span class="axis-num"></span><span class="axis-area-name">Đô thị</span><span class="axis-area-pop">Dân số</span><span class="axis-area-km">km²</span></div>`;
 
+let columnListed = null;
+
 function renderPanel() {
   const box = $('gpList');
   if (!box) return;
-  const htOn = getViewMode() === 'HT';
+  const htOn = (columnListed || (getViewMode() === 'HT' ? 'HT' : 'QH')) === 'HT';
   urbanTotal = HT_URBANS.length;
   paintUrbanCount();
   if (htOn) {
@@ -629,7 +631,10 @@ export function initGeneralPlanEvents(el, rerender) {
     else pick(id);
   });
   onViewChange(() => renderPanel());
-  document.addEventListener('qh:view-column', renderPanel);
+  document.addEventListener('qh:view-column', (e) => {
+    if (e.detail?.mode === 'HT' || e.detail?.mode === 'QH') columnListed = e.detail.mode;
+    renderPanel();
+  });
   document.addEventListener('qh:admin-release', () => { if (picked) pick(null); });
   document.addEventListener('cadparcels:loaded', renderPanel);
   $('chk_urban')?.addEventListener('change', paintUrbanCount);

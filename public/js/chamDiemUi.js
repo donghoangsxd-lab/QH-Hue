@@ -167,8 +167,10 @@ function namesOf(unit) {
   return unit.members.map(m => fullWardName(m.ma)).filter(Boolean);
 }
 
+let scoreUnderPlan = false;
+
 function paintMap() {
-  if (!paneOn()) { clearChamDiemMap(); return; }
+  if (!paneOn() || scoreUnderPlan) { clearChamDiemMap(); return; }
   const pieces = unitsNow().map(unit => ({ id: unit.id, names: namesOf(unit), ...paint(unit, packOf(unit)) }));
   paintChamDiemMap(pieces, (id) => {
     picked = id;
@@ -444,6 +446,12 @@ export function initChamDiem() {
   document.addEventListener('qh:axis-tab', (e) => {
     if (e.detail?.id !== 'hanhchinh') clearChamDiemMap();
     else if (paneOn()) paintMap();
+  });
+  document.addEventListener('qh:view-column', (e) => {
+    scoreUnderPlan = e.detail?.mode === 'QH';
+    const admin = document.getElementById('layerPaneHanhChinh');
+    if (!admin || admin.hidden || !paneOn()) return;
+    paintMap();
   });
   document.getElementById('layerSearch')?.addEventListener('input', () => { if (paneOn() && !picked) render(); });
   window.addEventListener(WARD_BOUNDS_EVENT, () => { if (paneOn()) paintMap(); });

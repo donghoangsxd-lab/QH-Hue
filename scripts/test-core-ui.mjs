@@ -203,9 +203,10 @@ assert.doesNotMatch(base, /Quyết định phê duyệt/);
 assert.doesNotMatch(base, /id="waybackRelease"/);
 assert.doesNotMatch(base, /value="wayback"/);
 assert.doesNotMatch(base, /Mốc Wayback/);
-for (const value of ['google', 'esri', 's2', 'positron']) {
+for (const value of ['google', 'positron']) {
   assert.match(base, new RegExp(`value="${value}"`), `thiếu nền ${value}`);
 }
+assert.doesNotMatch(base, /value="esri"|value="s2"|Esri World Imagery|Sentinel-2 Cloudless/);
 assert.doesNotMatch(base, /id="lotOpacity"/);
 assert.doesNotMatch(base, /Hiển thị lô đất/);
 assert.doesNotMatch(base, /Viền lô theo giai đoạn/);
@@ -276,6 +277,9 @@ assert.match(legendJs, /btnDockLegend/);
 assert.match(legendJs, /btnDockBase/);
 assert.match(legendJs, /btnDockEnv/);
 const css = read('public/css/style.css');
+assert.match(css, /--text-title:\s*#fde68a/);
+assert.match(css, /\.mag-item\.is-current \.layer-main-label\s*\{[^}]*color:\s*var\(--text-title\)/);
+assert.match(css, /\.mag-menu button\s*\{[^}]*color:\s*var\(--text-title\)/);
 assert.match(css, /--axis-font:\s*var\(--font-sans\)/);
 assert.match(css, /--axis-fs-header:\s*12px/);
 assert.match(css, /--axis-fs-row:\s*12px/);
@@ -315,6 +319,8 @@ assert.match(read('.cursorrules'), /docs\/ui-spec\.md/);
 assert.match(cn, /shortPlaceName/);
 assert.match(cn, /Loại HT/);
 assert.match(cn, /Loại 2030/);
+assert.match(cn, /showUrbanPlanOnBase/);
+assert.match(read('public/js/urbanAreaLayer.js'), /planOnBase/);
 assert.match(cn, /const loai = htMode \? lvCell\(marks\.ht/);
 assert.doesNotMatch(cn, /\$\{lvCell\(marks\.ht[\s\S]{0,40}\$\{lvCell\(marks\.plan/);
 assert.match(cn, /clearWardHighlight\(\)/);

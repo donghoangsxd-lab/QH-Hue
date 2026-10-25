@@ -384,15 +384,37 @@ function createUrbanLayer(content) {
 const statusLayer = createUrbanLayer(statusContent);
 const visionLayer = createUrbanLayer(visionContent);
 const visionLeft = createUrbanLayer(visionContent);
+// Panel hành chính bật quy hoạch: vẽ phân loại QĐ 756 trên ảnh nền, không mở bản đồ đồ án.
+let planOnBase = false;
+
+async function applyUrbanVisible(on) {
+  if (isLevelPair()) return syncUrbanPair();
+  if (!on) {
+    await Promise.all([statusLayer.setVisible(false), visionLayer.setVisible(false), visionLeft.setVisible(false)]);
+    return;
+  }
+  if (planOnBase) {
+    await statusLayer.setVisible(false);
+    await visionLayer.setVisible(false);
+    await visionLeft.setVisible(true);
+    return;
+  }
+  await Promise.all([statusLayer.setVisible(true), visionLayer.setVisible(true)]);
+  await visionLeft.setVisible(false);
+}
 
 async function setVisible(on, { fit = false } = {}) {
-  await Promise.all([statusLayer.setVisible(on), visionLayer.setVisible(on)]);
-  if (isLevelPair()) return syncUrbanPair();
-  await visionLeft.setVisible(false);
-  if (!on || !fit) return;
+  await applyUrbanVisible(on);
+  if (isLevelPair() || !on || !fit) return;
   const shown = isCompareOn() && !isSplitOn() && planMap ? planMap : map;
-  const b = statusLayer.bounds() || visionLayer.bounds();
+  const b = (planOnBase ? visionLeft.bounds() : statusLayer.bounds()) || visionLayer.bounds();
   if (shown.getZoom() > 11 && b && b.isValid()) shown.flyToBounds(b, { padding: [20, 20], maxZoom: 10, duration: 0.8 });
+}
+
+/** true: phân loại đô thị theo quy hoạch trên bản đồ nền. false: trả về cặp hiện trạng / bản đồ đồ án. */
+export function showUrbanPlanOnBase(on) {
+  planOnBase = !!on;
+  return applyUrbanVisible(!!$chk()?.checked);
 }
 
 async function syncUrbanPair() {
@@ -410,6 +432,7 @@ async function syncUrbanPair() {
 export function refreshUrbanAreaLayer() {
   statusLayer.refresh();
   visionLayer.refresh();
+  visionLeft.refresh();
 }
 
 /** Đô thị sau 2030 (QĐ 756) theo id, có ranh; null nếu chỉ có ký hiệu điểm */

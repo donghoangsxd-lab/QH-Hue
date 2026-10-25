@@ -15,7 +15,7 @@ Hợp đồng đã thống nhất. Sửa layout, panel, chú giải, lớp nền
 
 ## Năm trục
 
-Droplist `#layerMag`: một tiêu đề 12px; bấm mở danh sách cùng cỡ chữ; nút thu cùng hàng. Thứ tự:
+Droplist `#layerMag`: một tiêu đề 12px, chữ vàng nhạt (`--text-title`); bấm mở danh sách cùng cỡ chữ, cùng màu; nút thu cùng hàng. Thứ tự:
 
 1. Quản lý phát triển đô thị
 2. Hệ thống bản đồ quy hoạch
@@ -29,7 +29,7 @@ Hàng dưới tiêu đề: một ô tìm kiếm, một nút HT/QH, một nút b�
 
 Tab trên ô tìm kiếm: `Đơn vị hành chính`, rồi `Đô thị`, rồi `Chấm điểm`. Không ghi số lượng trên nhãn tab.
 
-- ĐVHC: dòng Thành phố Huế không số, đậm, nền vàng nhạt; 40 đơn vị đánh số 1–40. Tên hiện rút gọn: «TP Huế», «P. …», «X. …». Tooltip và ô tìm vẫn dùng tên đầy đủ, và tìm được cả dạng rút gọn. Cột một hàng, không xuống dòng: số, tên, dân số, km², và đúng một cột loại theo nút HT/QH trên thanh công cụ. Nút hiện trạng (`data-view-mode="HT"`) → cột «Loại HT» (QĐ 614, tooltip: loại trước chuyển tiếp), chú thích `Theo QĐ 614; loại trước chuyển tiếp`. Nút quy hoạch (`data-view-mode="QH"`, mặc định) → cột «Loại 2030» (QĐ 756: I / II / III / `PĐ III`, tooltip đúng câu `Phấn đấu đạt loại III`), chú thích `Theo QĐ 756; kế hoạch nâng loại có thể thay đổi theo nghiên cứu cụ thể`. Thiếu mức thì «—» mờ. Không hiện cả hai cột cùng lúc. Không thêm bộ lọc theo cột này. Hai nút vẫn đổi cả bản đồ hiện trạng / quy hoạch như trước.
+- ĐVHC: dòng Thành phố Huế không số, đậm, nền vàng nhạt; 40 đơn vị đánh số 1–40. Tên hiện rút gọn: «TP Huế», «P. …», «X. …». Tooltip và ô tìm vẫn dùng tên đầy đủ, và tìm được cả dạng rút gọn. Cột một hàng, không xuống dòng: số, tên, dân số, km², và đúng một cột loại theo nút HT/QH trên thanh công cụ. Nút hiện trạng (`data-view-mode="HT"`) → cột «Loại HT» (QĐ 614, tooltip: loại trước chuyển tiếp), chú thích `Theo QĐ 614; loại trước chuyển tiếp`. Nút quy hoạch (`data-view-mode="QH"`) → cột «Loại 2030» (QĐ 756: I / II / III / `PĐ III`, tooltip đúng câu `Phấn đấu đạt loại III`), chú thích `Theo QĐ 756; kế hoạch nâng loại có thể thay đổi theo nghiên cứu cụ thể`. Thiếu mức thì «—» mờ. Không hiện cả hai cột cùng lúc. Không thêm bộ lọc theo cột này. Nút hiện trạng hiện bản đồ phân loại đô thị hiện trạng (QĐ 614) trên ảnh nền. Nút quy hoạch hiện bản đồ phân loại đô thị theo quy hoạch đã có (QĐ 756) trên cùng ảnh nền, không bật QHC 1/25.000 và không mở bản đồ đồ án. Cả ba tab Đơn vị hành chính, Đô thị và Chấm điểm dùng chung hai nút này. Mở panel này thì nút hiện trạng đang bật và khung vừa cả thành phố. Hàng ô tìm và nút HT/QH giữ đủ chiều cao, không bị danh sách đè. Sang panel khác thì trả lại chế độ xem lúc trước. Không có camera trên link thì mới phóng khung thành phố.
 - Bấm một dòng (đơn vị, đô thị, hoặc Thành phố Huế) phóng tới và tô cả ranh. Thành phố tô viền ngoài.
 - Ba tab `Đơn vị hành chính`, `Đô thị` và `Chấm điểm` cùng một hàng, không có `(40)` hay `(25)`, chữ không chồng, không cắt. Hẹp thì cuộn ngang.
 - Chấm điểm: ba mức Huế (Phụ lục I, đạt hoặc không đạt), Đô thị (Bảng 2A, cùng danh sách quy hoạch của tab Đô thị, trừ Thành phố Huế), Phường và xã (Bảng 2B, 40 đơn vị). Mỗi đơn vị có tổng điểm hoặc số tiêu chuẩn đạt, kết luận Điều 9.3, danh sách tiêu chuẩn chưa đạt kèm phần trăm thiếu, biểu đồ theo quý và năm, bản đồ tô theo điểm. Thiếu số liệu thì «—» và «chưa đánh giá», không tính là đạt. Số liệu lấy từ CSV, không bịa. Ô trống được tự tính khi đã có công thức trong dữ liệu bản đồ; cạnh nhãn «tự tính» là giá trị đo. Ô có số trong bảng thì ghi đè và hiện nhãn «ghi đè».
@@ -59,11 +59,9 @@ Sang Quy hoạch, Hạ tầng kỹ thuật, Hạ tầng xã hội hoặc Kiến 
 
 Ghim đáy panel. Một hàng không xuống dòng, đúng ba tab: Chú giải, Lớp nền, Lớp môi trường. Không chip cấp (ví dụ QHPK 1/2.000) trên hàng này. Mỗi lúc một khung, cao một phần ba panel. Trên điện thoại khung đó cao khoảng một phần ba màn hình (`33dvh`) và cuộn được. Bấm tab thì đổi khung. Chú giải ẩn trên Hành chính và Kiến trúc (khi đó còn Lớp nền và Lớp môi trường). Tiêu đề nhóm ký hiệu sử dụng đất trong Chú giải (Phát triển đô thị, Công cộng, …) cỡ 10px. Chú giải theo cấp đang bật, gồm ký hiệu, mục Hiển thị lô đất (độ trong suốt) và Viền lô theo giai đoạn.
 
-Lớp nền độc lập với trục, dùng được trên mọi trục. Không chứa Hiển thị lô đất hay Viền lô theo giai đoạn. Khung Lớp nền và Lớp môi trường cuộn được. Ô chọn đứng đầu mục Lớp nền, đủ bốn lựa chọn:
+Lớp nền độc lập với trục, dùng được trên mọi trục. Không chứa Hiển thị lô đất hay Viền lô theo giai đoạn. Khung Lớp nền và Lớp môi trường cuộn được. Ô chọn đứng đầu mục Lớp nền, đủ hai lựa chọn:
 
 - Google vệ tinh
-- Esri World Imagery
-- Sentinel-2 Cloudless 2025
 - Bản đồ đường phố
 
 Không ô mốc Wayback. Không khối quyết định phê duyệt trong Lớp nền (QĐ 614 và QĐ 756 nằm ở tab Đô thị). Thửa đất địa chính 2016 và Công trình vi phạm nằm trong khung này, không lặp ở danh sách quy hoạch.

@@ -19,16 +19,6 @@ const BASEMAPS = {
     // Vệ tinh Google trên địa bàn Huế còn ảnh tới z22
     opts: { maxNativeZoom: 22, subdomains: '0123', attribution: 'Imagery &copy; Google' }
   },
-  esri: {
-    label: 'Esri World Imagery',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    opts: { maxNativeZoom: 19, attribution: 'Imagery &copy; Esri' }
-  },
-  s2: {
-    label: 'Sentinel-2 Cloudless 2025',
-    url: 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2025_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg',
-    opts: { maxNativeZoom: 15, attribution: 'Sentinel-2 cloudless &copy; EOX' }
-  },
   // light: nền đường phố (Liberty hoặc Esri Light Gray khi lỗi). Viền lô không làm sáng trên nền này.
   positron: { label: 'Bản đồ đường phố', light: true }
 };
@@ -81,6 +71,7 @@ let current = 'google';
 try {
   const saved = localStorage.getItem(STORE_KEY);
   if (BASEMAPS[saved]) current = saved;
+  else if (saved) localStorage.removeItem(STORE_KEY);
 } catch (e) { /* chế độ riêng tư */ }
 
 // 'ofm' thử Liberty; 'esri' khi phiên này đã lỗi hoặc máy không có WebGL.
