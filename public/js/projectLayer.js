@@ -5,7 +5,7 @@
 // bật/tắt riêng, tìm, bấm tên / nút bảng / ranh trên bản đồ để mở đồ án (phóng tới + bảng góc trái + thông tin ở panel dưới),
 // Admin xóa / chuyển đồ án cũ.
 // Nút file mở PDF quyết định phê duyệt. Admin gắn, thay hoặc gỡ (PDF tối đa 10 MB hoặc link).
-// Mở đồ án: hồ sơ văn bản thêm được nhiều PDF (phê duyệt thêm, đính chính, quy định quản lý).
+// Mở đồ án: hồ sơ văn bản thêm được nhiều PDF (quyết định phê duyệt / đính chính, quy chế, thuyết minh).
 // Nút lưu: người dùng gửi PDF tối đa 2 MB để admin duyệt; đang chờ thì nút đồng hồ, admin bấm để đồng ý hoặc từ chối.
 // Mũi tên cuối tên đồ án mở các lớp chính (PROJECT_LAYERS) và bản vẽ hạ tầng (giao thông, cấp nước, thoát nước, cấp điện).
 // Bản vẽ lưu riêng từng đồ án, bật/tắt để xem cùng lớp sử dụng đất. Admin xóa từng lớp, tìm lô trong đồ án.
@@ -1058,10 +1058,11 @@ function revealInList(p) {
   row.classList.add('is-flash');
 }
 
+// quy-dinh là quy chế theo đồ án. Giữ mã này để PDF đã lưu vẫn mở. Kind ChoDuyet quy-che là quy chế kiến trúc theo đơn vị, không gắn vào đồ án.
 const DOC_ROLE = {
   'phe-duyet': { short: 'PD', label: 'Quyết định phê duyệt' },
   'dinh-chinh': { short: 'ĐC', label: 'Quyết định đính chính' },
-  'quy-dinh': { short: 'QL', label: 'Quy định quản lý' },
+  'quy-dinh': { short: 'QC', label: 'Quy chế' },
   'thuyet-minh': { short: 'TM', label: 'Thuyết minh' }
 };
 
@@ -1077,10 +1078,12 @@ function docsHtml(p, idx, admin) {
   }).join('');
   const add = admin && !p.legacy ? `<div class="project-doc-add">
       <select data-doc-role="${idx}" aria-label="Loại văn bản kèm theo">
-        <option value="dinh-chinh">Quyết định đính chính</option>
-        <option value="quy-dinh">Quy định quản lý</option>
+        <optgroup label="Quyết định">
+          <option value="dinh-chinh">Quyết định đính chính</option>
+          <option value="phe-duyet">Quyết định phê duyệt</option>
+        </optgroup>
+        <option value="quy-dinh">Quy chế</option>
         <option value="thuyet-minh">Thuyết minh</option>
-        <option value="phe-duyet">Quyết định phê duyệt</option>
       </select>
       <button type="button" data-doc-add="${idx}"${busy ? ' disabled' : ''}>Thêm PDF</button>
     </div>` : '';

@@ -2447,8 +2447,8 @@ function bindDossier(popup, projectName) {
         openDecision({
           key: `doc:${name}:${doc.id}:quy-dinh`,
           title: projectFullName(name),
-          noun: 'quy định quản lý',
-          decision: decisionFile(doc, 'Quy định quản lý'),
+          noun: 'Quy chế',
+          decision: decisionFile(doc, 'Quy chế'),
           slug: doc.slug || entry.slug || '',
           body: { tenQH: name, docRole: 'quy-dinh', docId: String(doc.id) },
           isBusy: () => false,

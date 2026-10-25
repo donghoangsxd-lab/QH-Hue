@@ -3830,7 +3830,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Văn bản kèm hồ sơ đồ án: quyết định phê duyệt thêm, quyết định đính chính, quy định quản lý. Không ghi cột LinkQD.
+    // Văn bản kèm hồ sơ đồ án: quyết định phê duyệt thêm, quyết định đính chính, quy chế (role quy-dinh). Không ghi cột LinkQD.
     if (action === 'putProjectDoc') {
       requirePostFromApp(req);
       await requireAdmin(req);
@@ -4617,12 +4617,15 @@ module.exports = async (req, res) => {
       catch (err) { return sendInlinePdfError(res, err); }
       if (buffer.slice(0, 4).toString('ascii') !== '%PDF') return res.status(400).json({ error: true, message: 'Chỉ nhận file PDF.' });
       try {
+        const role = String(body.docRole || '').slice(0, 20);
+        const fileName = sanitizeSheetText(body.name, 120);
+        const roleLabel = kind === 'van-ban' ? projects.docRoleLabel(role) : '';
         const staged = await stagePdfChoDuyet(actor, {
           kind,
           unit,
           tenQH: kind === 'van-ban' ? sanitizeSheetText(body.tenQH, 120) : '',
-          role: String(body.docRole || '').slice(0, 20),
-          summary: sanitizeSheetText(body.name, 120),
+          role,
+          summary: roleLabel ? `${roleLabel} · ${fileName}`.slice(0, 180) : fileName,
           fileName: body.name,
           buffer
         });

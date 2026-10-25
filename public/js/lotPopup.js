@@ -119,13 +119,13 @@ export function limitsHtml(plan) {
   return `<div class="lp-limits">${items.map(s => `<span class="lp-limit"><span class="lp-limit-k">${escapeHtml(s.label)}</span> <b>${escapeHtml(s.text)}</b></span>`).join('')}</div>`;
 }
 
-/** Hồ sơ đã gắn: quy định quản lý, rồi quyết định phê duyệt. Chưa có file thì mảng rỗng. */
+/** Hồ sơ đã gắn: quy chế (role quy-dinh), rồi quyết định phê duyệt. Chưa có file thì mảng rỗng. */
 export function dossierButtons(entry) {
   if (!entry) return [];
   const out = [];
   const docs = Array.isArray(entry.docs) ? entry.docs : [];
   const reg = docs.find(d => d && d.role === 'quy-dinh' && d.id && (d.slug || d.url || entry.slug));
-  if (reg) out.push({ key: 'quy-dinh', label: 'Quy định quản lý' });
+  if (reg) out.push({ key: 'quy-dinh', label: 'Quy chế' });
   const dec = entry.decision;
   if (dec && (dec.slug || dec.url)) out.push({ key: 'phe-duyet', label: 'Quyết định' });
   return out;

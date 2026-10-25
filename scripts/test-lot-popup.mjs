@@ -47,7 +47,7 @@ assert.deepEqual(dossierButtons({ proposal: { name: 'chờ' } }), []);
 assert.deepEqual(dossierButtons({ decision: { slug: 'a', at: 1 } }).map(b => b.label), ['Quyết định']);
 assert.deepEqual(
   dossierButtons({ slug: 'da', decision: { slug: 'a' }, docs: [{ role: 'quy-dinh', id: '1', at: 2 }] }).map(b => b.label),
-  ['Quy định quản lý', 'Quyết định']
+  ['Quy chế', 'Quyết định']
 );
 const row = projectValueHtml('QHPK Khu A - ĐTM An Vân Dương', { slug: 'da', docs: [{ role: 'quy-dinh', id: '1', at: 2 }] });
 assert.match(row, /Quy hoạch phân khu/);
