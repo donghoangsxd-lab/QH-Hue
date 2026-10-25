@@ -926,7 +926,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     markBpPage(Math.round(body.scrollLeft / body.clientWidth));
   }, { passive: true });
   document.getElementById('btnExpandBottomPanel')?.addEventListener('click', () => setBottomPanelCollapsed(false));
-  const phoneBottomMq = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px))');
+  const phoneBottomMq = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px))');
   phoneBottomMq.addEventListener('change', () => {
     if (phoneBottomShell() && !document.body.classList.contains('bottom-collapsed')) setBottomPanelMaximized(true);
   });
@@ -1232,8 +1232,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (progressLabel && label) progressLabel.textContent = label;
     setBootProgress(pct);
   };
-  if ('serviceWorker' in navigator) {
-    Promise.resolve(window.__qhSwReady).then(() => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })).catch(() => {});
+  const swSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (swSecure && 'serviceWorker' in navigator) {
+    Promise.resolve(window.__qhSwReady).then(() => navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })).catch(() => {});
   }
   // 3 mốc xong theo thứ tự bất kỳ: lớp phủ đô thị (chờ ranh 40 phường xã), công trình, độ phủ (chờ công trình)
   const STEP_LABEL = { urban: 'Đang dựng lớp phủ đô thị', infra: 'Đang tải công trình', heat: 'Đang tính độ phủ' };

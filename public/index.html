@@ -26,10 +26,10 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Bản đồ quy hoạch TP Huế">
   <meta name="twitter:image" content="/icons/og-wide.png?v=20261029">
-  <link rel="manifest" href="manifest.webmanifest?v=20261057">
+  <link rel="manifest" href="/manifest.webmanifest?v=20261058">
   <link rel="icon" href="icons/favicon.ico?v=20261027" sizes="16x16 32x32 48x48">
   <link rel="icon" href="icons/favicon-32.png?v=20261027" type="image/png" sizes="32x32">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=20261027" sizes="180x180">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180">
   <title>Bản đồ quy hoạch TP Huế</title>
   <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
   <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
@@ -45,7 +45,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261057">
+  <link rel="stylesheet" href="css/style.css?v=20261058">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -1573,12 +1573,30 @@
   </section>
 
   <div class="mobile-fs" id="mobileFs" hidden>
-    <p id="mobileFsText"></p>
+    <p id="mobileFsText">Xoay máy ngang để xem bản đồ.</p>
     <div class="mobile-fs-actions">
-      <button type="button" class="mobile-fs-install" id="btnMobileInstall" hidden>Cài vào màn hình chính</button>
-      <button type="button" class="mobile-fs-go" id="btnMobileFs">Xoay ngang</button>
+      <button type="button" class="mobile-fs-go" id="btnMobileFs">Đóng</button>
       <button type="button" class="mobile-fs-later" id="btnMobileFsLater">Để sau</button>
     </div>
+  </div>
+
+  <button type="button" class="install-app" id="btnInstallApp" hidden>
+    <img src="/icons/apple-touch-icon.png" width="22" height="22" alt="">
+    Cài ứng dụng
+  </button>
+  <div class="install-guide" id="installGuide" hidden role="dialog" aria-modal="true" aria-labelledby="installGuideTitle">
+    <img src="/icons/apple-touch-icon.png" width="72" height="72" alt="Biểu tượng QH TP Huế">
+    <b id="installGuideTitle">Thêm vào Màn hình chính</b>
+    <ol id="installGuideIos">
+      <li>Bấm nút Chia sẻ.</li>
+      <li>Chọn «Thêm vào Màn hình chính».</li>
+      <li>Bấm «Thêm».</li>
+    </ol>
+    <ol id="installGuideAndroid" hidden>
+      <li>Mở trình đơn trình duyệt.</li>
+      <li>Chọn «Cài ứng dụng» hoặc «Thêm vào Màn hình chính».</li>
+    </ol>
+    <button type="button" id="btnInstallGuideClose">Đóng</button>
   </div>
 
   <!-- MODAL ĐĂNG NHẬP GOOGLE ADMIN -->
@@ -1595,30 +1613,38 @@
     <div id="authMsg" class="auth-msg auth-msg-strong" role="status" aria-live="polite"></div>
   </div>
 
-  <!-- Xóa service worker cũ một lần. Các lần sau giữ cache ô PMTiles và bldg-hf.bin. -->
+  <!-- Đăng ký service worker trên HTTPS và localhost. Xóa bản cũ một lần, rồi giữ cache ô PMTiles. -->
   <script>
     window.__qhSwReady = (function () {
+      function registerAppShell() {
+        if (!navigator.serviceWorker) return Promise.resolve();
+        var host = location.hostname;
+        var secure = location.protocol === 'https:' || host === 'localhost' || host === '127.0.0.1';
+        if (!secure) return Promise.resolve();
+        return navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch(function () {});
+      }
       var purge = '20261026-gba';
+      var ready = Promise.resolve();
       try {
-        if (localStorage.getItem('qhhue_sw_purge') === purge) return Promise.resolve();
-        localStorage.setItem('qhhue_sw_purge', purge);
-      } catch (e) { return Promise.resolve(); }
-      var jobs = [];
-      try {
-        if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
-          jobs.push(navigator.serviceWorker.getRegistrations().then(function (list) {
-            return Promise.all(list.map(function (reg) { return reg.unregister(); }));
-          }));
+        if (localStorage.getItem('qhhue_sw_purge') !== purge) {
+          localStorage.setItem('qhhue_sw_purge', purge);
+          var jobs = [];
+          if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+            jobs.push(navigator.serviceWorker.getRegistrations().then(function (list) {
+              return Promise.all(list.map(function (reg) { return reg.unregister(); }));
+            }));
+          }
+          if (window.caches && caches.keys) {
+            jobs.push(caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (key) { return caches.delete(key); }));
+            }));
+          }
+          ready = Promise.all(jobs);
         }
-        if (window.caches && caches.keys) {
-          jobs.push(caches.keys().then(function (keys) {
-            return Promise.all(keys.map(function (key) { return caches.delete(key); }));
-          }));
-        }
-      } catch (e) { /* trình duyệt không có các API này */ }
-      return Promise.all(jobs);
+      } catch (e) { /* chế độ riêng tư */ }
+      return ready.then(registerAppShell);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261057"></script>
+  <script type="module" src="./js/app.js?v=20261058"></script>
 </body>
 </html>

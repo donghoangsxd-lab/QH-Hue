@@ -907,6 +907,7 @@ body.compare-on .map-title-split { display: inline-flex; }
 .map-toolbar .ui-btn-format:hover { background: rgba(30, 41, 59, 0.98); border-color: var(--accent-cyan); }
 .tb-phone-pick { display: none; }
 .tb-rotate { display: none; }
+.install-app, .install-guide { display: none; }
 
 /* HỎI ĐÁP: câu đã tính sẵn, bấm để tô phường */
 .faq-panel {
@@ -1601,7 +1602,7 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .project-rail:has(input:not(:checked)) { color: var(--axis-color-muted); }
 .project-rail:hover, .project-rail:focus-within { color: var(--accent-cyan); background: var(--bg-hover); }
 .project-layer.is-off .project-rail { opacity: 0.55; }
-@media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+@media (max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
   .project-rail { width: 22px; height: 22px; }
   .project-rail .ico { width: 14px; height: 14px; }
 }
@@ -2208,7 +2209,7 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .qh-review-actions button, #qhReviewMore { font-size: var(--fs-sm); padding: 3px 8px; border: 1px solid var(--border-color); border-radius: var(--r-sm, 4px); background: transparent; color: var(--text-main); cursor: pointer; }
 .qh-review-tag { color: var(--accent-cyan); font-weight: 600; }
 .qh-proven-reason { margin: 0 0 6px; }
-@media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+@media (max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
   .qh-review-list { max-height: 32vh; }
 }
 .cad-row { display: flex; align-items: center; gap: 4px; padding: 3px 5px; cursor: pointer; border-bottom: 1px solid var(--border-soft); transition: background 0.3s; }
@@ -5327,18 +5328,20 @@ body.project-review.la-page #projectReviewHost {
 
 .bp-phone-pager { display: none; }
 .bp-phone-grab { display: none; }
-/* Điện thoại: dọc ≤840px, hoặc cảm ứng + ngang thấp (≤500px, ≤1200px, gồm ~1024×473).
+/* Điện thoại: dọc ≤840px, hoặc cảm ứng + ngang thấp (≤560px, ≤1400px).
    Cửa sổ chuột hẹp KHÔNG ăn khối này — desktop giữ nguyên bố cục trước khi có giao diện điện thoại.
    Cỡ chữ một mức: chú thích 11.5, chữ 13, tiêu đề 14–15. Nút chạm 40–44px.
    Khóa html/body vào khung nhìn để thanh nowrap không đẩy trang sang trái. --right-w = 0 vì ngăn kéo phủ lên bản đồ. */
-@media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+@media (max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
   html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   html, body {
     position: fixed;
     inset: 0;
     width: 100%;
+    width: 100dvw;
     max-width: 100%;
     height: 100%;
+    height: 100dvh;
     max-height: 100%;
     overflow: hidden;
   }
@@ -5868,8 +5871,8 @@ body.project-review.la-page #projectReviewHost {
   .esc-hint { display: none !important; }
 }
 /* Ngang thấp: cột nút trái, sheet góc phải, thanh trục ở đáy.
-   Rộng ≤840 và thấp, hoặc cảm ứng ≤1200×500. Cửa sổ chuột 1024×473 giữ desktop. */
-@media ((max-width: 840px) and (max-height: 500px)), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+   Rộng ≤840 và thấp, hoặc cảm ứng ngang ≤1400×560. Cửa sổ chuột 1024×473 giữ desktop. */
+@media ((max-width: 840px) and (max-height: 500px)), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
   :root {
     --right-w: min(300px, 36vw);
     --phone-panel-w: min(320px, 44vw);
@@ -5991,7 +5994,7 @@ body.project-review.la-page #projectReviewHost {
    hàng tên / địa bàn / nút một dòng như Cơ cấu đất, không đè lên chỉ tiêu.
    Chỉ tiêu HT/QH xuống hàng dưới, cao đủ 2 dòng; thiếu bề ngang thì cuộn ngang, không cắt chữ.
    Bảng phường cuộn trong phần còn lại; khối GBA nằm ngay dưới bảng, không tách khoảng trống. */
-@media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+@media (max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
   .bp-part2 .bp-part-head {
     flex-wrap: wrap;
     align-items: center;
@@ -6261,7 +6264,7 @@ body.project-review.la-page #projectReviewHost {
 body.right-collapsed .axis-dock { display: flex; position: fixed; z-index: 1250; top: 50%; left: max(8px, env(safe-area-inset-left)); right: auto; transform: translateY(-50%); flex-direction: column; gap: 6px; padding: 6px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); box-shadow: var(--panel-shadow); }
 .axis-dock button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 64px; min-height: 44px; padding: 4px; border: 0; border-radius: 8px; background: transparent; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-chip); line-height: 1.1; cursor: pointer; }
 .axis-dock button.active { color: var(--axis-color); background: var(--axis-bg-active); }
-@media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+@media (max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
   body.right-collapsed .axis-dock {
     top: auto;
     left: calc(max(8px, env(safe-area-inset-left)) + var(--tb-btn) + 8px);
@@ -6288,7 +6291,7 @@ body.right-collapsed .axis-dock { display: flex; position: fixed; z-index: 1250;
   .axis-dock svg { width: 15px; height: 15px; }
 }
 /* dock-landscape */
-@media ((max-width: 840px) and (orientation: landscape) and (max-height: 500px)), ((pointer: coarse) and (orientation: landscape) and (max-height: 500px) and (max-width: 1200px)) {
+@media ((max-width: 840px) and (orientation: landscape) and (max-height: 560px)), ((pointer: coarse) and (orientation: landscape) and (max-height: 560px) and (max-width: 1400px)) {
   .axis-dock button span {
     white-space: nowrap;
     font-size: 11px;
@@ -6298,6 +6301,157 @@ body.right-collapsed .axis-dock { display: flex; position: fixed; z-index: 1250;
   }
 }
 /* dock-landscape-end */
+
+/* orient-follow: máy đã ngang kể cả khi media query còn khung nhìn dọc. */
+html.is-phone.is-landscape {
+  --right-w: min(300px, 36vw);
+  --phone-panel-w: min(320px, 44vw);
+  --phone-dock-h: 48px;
+  --title-h: 36px;
+  --tb-btn: 40px;
+  --bottom-h: min(54dvh, 250px);
+  --bp-head-h: 36px;
+  --phone-chrome-top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
+  --info-top: var(--phone-chrome-top);
+  --info-bottom: max(4px, env(safe-area-inset-bottom));
+  --info-left: calc(max(4px, env(safe-area-inset-left)) + var(--tb-btn) + 8px);
+  --phone-tool-left: var(--info-left);
+  --vv-w: 100%;
+  --vv-h: 100%;
+}
+html.is-phone.is-landscape,
+html.is-phone.is-landscape body {
+  width: var(--vv-w, 100%);
+  height: var(--vv-h, 100dvh);
+}
+html.is-phone.is-landscape body .map-title,
+html.is-phone.is-landscape body.right-collapsed .map-title,
+html.is-phone.is-landscape body.compare-on .map-title {
+  right: auto;
+  top: max(4px, env(safe-area-inset-top));
+  left: calc(max(8px, env(safe-area-inset-left)) + var(--tb-btn) + 8px);
+  max-width: min(520px, calc(100vw - var(--tb-btn) - 24px));
+  padding: 2px 4px 3px;
+}
+html.is-phone.is-landscape .map-title-text { font-size: 12px; }
+html.is-phone.is-landscape .map-toolbar {
+  top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
+  bottom: max(4px, env(safe-area-inset-bottom));
+  left: max(4px, env(safe-area-inset-left));
+  right: auto;
+  width: var(--tb-btn);
+  flex-direction: column;
+}
+html.is-phone.is-landscape .map-toolbar .ui-btn-format,
+html.is-phone.is-landscape .map-toolbar .tb-phone-pick,
+html.is-phone.is-landscape .map-toolbar .tb-rotate {
+  flex: 0 0 var(--tb-btn);
+  width: 100%;
+  height: var(--tb-btn);
+  min-height: var(--tb-btn);
+  max-height: none;
+}
+html.is-phone.is-landscape .right-panel {
+  top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
+  bottom: max(4px, env(safe-area-inset-bottom));
+  left: auto;
+  right: max(4px, env(safe-area-inset-right));
+  width: var(--phone-panel-w);
+  height: auto;
+  max-height: none;
+  border-radius: 12px;
+  transform-origin: right center;
+}
+html.is-phone.is-landscape body.right-collapsed .right-panel {
+  transform: translateX(calc(100% + 16px));
+  visibility: hidden;
+  opacity: 0;
+}
+html.is-phone.is-landscape .rp-sheet-handle { display: none; }
+html.is-phone.is-landscape .axis-dock button span {
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.1;
+  max-height: none;
+  text-overflow: clip;
+}
+/* orient-follow-end */
+
+.mobile-fs-later[hidden],
+.mobile-fs-go[hidden] { display: none !important; }
+@media (max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
+  .install-app:not([hidden]) {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    position: fixed;
+    z-index: 1450;
+    top: calc(max(8px, env(safe-area-inset-top)) + var(--title-h) + 10px);
+    right: max(8px, env(safe-area-inset-right));
+    height: 40px;
+    padding: 0 12px 0 8px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--accent-cyan);
+    color: var(--text-on-accent);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--panel-shadow);
+  }
+  .install-app img {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    flex: 0 0 auto;
+  }
+  html.is-phone.is-landscape body:not(.right-collapsed) .install-app:not([hidden]) {
+    right: calc(var(--phone-panel-w) + 12px);
+  }
+  .install-guide:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    position: fixed;
+    z-index: 2700;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: calc(var(--phone-dock-h, 56px) + max(8px, env(safe-area-inset-bottom)));
+    width: auto;
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 12px;
+    box-sizing: border-box;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    border: 1px solid rgba(var(--cyan-rgb), 0.55);
+    border-radius: var(--r-lg);
+    box-shadow: var(--panel-shadow);
+  }
+  .install-guide img {
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
+  }
+  .install-guide b { font-size: 15px; color: var(--text-strong); }
+  .install-guide ol { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.45; }
+  .install-guide li { margin: 2px 0; }
+  .install-guide [hidden] { display: none !important; }
+  #btnInstallGuideClose {
+    align-self: flex-end;
+    min-height: 40px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: var(--accent-cyan);
+    color: var(--text-on-accent);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+}
 
 
 /* Khung nổi: chú giải trên bản đồ, phiếu đề xuất cạnh thanh công cụ. Không đặt position:fixed trong .right-panel (backdrop-filter cắt phần tử con). */
@@ -6438,7 +6592,7 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
   body.right-collapsed .legend-chip { right: auto; }
 }
 /* Panel điện thoại không có chiều cao cố định: gom dock lại để không đè nút cấp quy hoạch. */
-@media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
+@media (max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px)) {
   .right-panel { overflow: hidden; }
   .rp-dock { flex: 0 0 auto; height: auto; max-height: 22dvh; }
   .rp-dock > .dock-fold { max-height: 18dvh; }

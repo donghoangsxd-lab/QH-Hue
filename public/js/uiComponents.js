@@ -1301,7 +1301,7 @@ export function reloadWardStats() {
 
 // Cùng mốc CSS điện thoại (style.css). Thẩm định đồ án giữ review-min / review-max.
 export function phoneBottomShell() {
-  return window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px))').matches
+  return window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px))').matches
     && !document.body.classList.contains('project-review');
 }
 
@@ -2512,7 +2512,7 @@ function planStackDatasets(label, stack, color, series) {
 
 // Cùng mốc với style.css: chỉ điện thoại. Máy tính giữ cỡ nhãn và autoSkip như trước.
 function phoneLayout() {
-  return window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px))').matches;
+  return window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px))').matches;
 }
 
 function applyPhoneChartTicks(chart) {
