@@ -1,0 +1,9 @@
+{
+  "tab": "CongSuatDoAn",
+  "linkTab": "CongSuatLienKet",
+  "source": "Google Sheet",
+  "sheet": "HTXH-Hue-06.2026",
+  "note": "Ô GiaTri để trống khi chưa có số. Không điền số ước. Liên kết cha nằm ở links.",
+  "rows": [],
+  "links": []
+}

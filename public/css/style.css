@@ -6135,6 +6135,7 @@ body.project-review.la-page #projectReviewHost {
 .cn-badge.is-on { color: var(--accent-green); background: rgba(var(--green-rgb), 0.16); }
 .cn-badge.is-off { color: var(--axis-color-muted); background: rgba(148, 163, 184, 0.16); }
 .cn-fold { width: var(--axis-row-h); height: var(--axis-row-h); border: 0; background: transparent; color: inherit; cursor: pointer; }
+.cn-cap-btn { flex: 0 0 auto; border: 0; background: transparent; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-chip); cursor: pointer; }
 .cn-groups { margin: 0 0 2px 16px; }
 .cn-status { margin-top: 2px; }
 .cn-status b { display: block; font-family: var(--axis-font); font-size: var(--axis-fs-header); color: var(--axis-color-muted); margin-bottom: 1px; }
@@ -6142,6 +6143,16 @@ body.project-review.la-page #projectReviewHost {
 .cn-layer span { flex: 1 1 auto; min-width: 0; }
 .cn-layer small { color: var(--axis-color-muted); font-size: var(--axis-fs-chip); }
 .cn-empty { margin: 2px 8px; font-family: var(--axis-font); font-size: var(--axis-fs-row); color: var(--axis-color-muted); }
+.cn-capacity { margin: 2px 8px 6px; }
+.cn-capacity h4 { margin: 0 0 2px; font-family: var(--axis-font); font-size: var(--axis-fs-header); font-weight: 700; color: var(--axis-color); }
+.cn-capacity p { margin: 0 0 2px; font-family: var(--axis-font); font-size: var(--axis-fs-row); line-height: 1.35; color: var(--axis-color); }
+.cn-capacity .is-ok { color: var(--accent-green); }
+.cn-capacity .is-over { color: #b91c1c; font-weight: 700; }
+.cn-capacity .is-gap { color: var(--axis-color-muted); }
+.cn-capacity summary { cursor: pointer; font-family: var(--axis-font); font-size: var(--axis-fs-chip); color: var(--axis-color-muted); }
+.cn-capacity label { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 2px 0; font-family: var(--axis-font); font-size: var(--axis-fs-row); }
+.cn-capacity input { width: 8.5rem; min-width: 0; }
+.cn-capacity button { margin-top: 2px; }
 .axis-base { margin: 4px 6px; padding-top: 4px; border-top: 1px solid var(--axis-line); }
 .axis-base:empty { display: none; margin: 0; padding: 0; border: 0; }
 .axis-base-title, .axis-arch h3 { margin: 0 0 2px; font-family: var(--axis-font); font-size: var(--axis-fs-header); font-weight: 700; color: var(--axis-color-muted); }

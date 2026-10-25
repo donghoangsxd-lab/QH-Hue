@@ -45,6 +45,8 @@ import {
   STORAGE_VERSION, STORAGE_VERSION_KEY, HIDDEN_KIND_FIX_KEY, readStorageVersion, parseNameList, migrateHiddenState
 } from './storageSchema.js';
 import { kmlTextFromFile, boundaryPolygonsFromKml } from './kmlLoad.js';
+import { capacityPanelHtml } from './congSuatUi.js';
+import { schemeSlug } from './congSuat.js';
 
 const HIDDEN_KEY = 'qh_hidden_projects';
 const HIDDEN_LAYERS_KEY = 'qh_hidden_layers';
@@ -1004,7 +1006,12 @@ function rowHtml(p, idx, admin, labelNo = null) {
         ${admin ? `<button type="button" class="project-btn" data-rename="${idx}" title="Đổi tên đồ án (Sheet + danh mục bucket)" aria-label="Đổi tên đồ án"${busy ? ' disabled' : ''}>${ico('pen')}</button>` : ''}
         ${admin ? `<button type="button" class="project-btn danger" data-del="${idx}" title="Xóa toàn bộ đồ án" aria-label="Xóa đồ án"${busy ? ' disabled' : ''}>${deleting ? '…' : ico('trash')}</button>` : ''}
       </span>
-    </div>${open ? decisionNote(p, idx) + docsHtml(p, idx, admin) + proposalNote(p, idx) + layersHtml(p, idx, on, admin) : ''}`;
+    </div>${open ? capacityPanelHtml({
+      schemeId: p.slug || schemeSlug(p.name),
+      schemeName: p.short || p.name,
+      cap: p.level === 'QHPK' ? 'QHPK' : p.level === 'QHCT' ? 'QHCT' : p.level === 'QHC' ? 'QHC10' : '',
+      sector: null
+    }) + decisionNote(p, idx) + docsHtml(p, idx, admin) + proposalNote(p, idx) + layersHtml(p, idx, on, admin) : ''}`;
 }
 
 // Đồ án đang chọn (bấm ranh trên bản đồ hoặc bấm tên): dòng trong danh sách giữ nền sáng đến khi chọn đồ án khác

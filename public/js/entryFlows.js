@@ -10,6 +10,8 @@ import { readUnit, writeUnit, replaceAll, officerCanEdit, readAll } from './urba
 import { readDrawingFile, tagFeatures, asCollection, DRAW_MAX_BYTES } from './drawingReaders.js';
 import { SCHEME_EDGE_M, schemeBoundaryOf, clipSchemeLots, clipSentence } from './schemeLotClip.js';
 import { putSignedPdf, PDF_INLINE_MAX_BYTES } from './pdfLimits.js';
+import { loadCongSuat } from './congSuat.js';
+import { hosoCapacityHtml, readHosoCapacity, gateHosoCapacity, storeHosoCapacity } from './congSuatUi.js';
 
 const MB = 1024 * 1024;
 const $ = (id) => document.getElementById(id);
@@ -28,6 +30,7 @@ function lotRenderer() {
   return previewRenderer;
 }
 let stepId = 'qd';
+let hoCs = { id: '', parent: '', values: {} };
 let crsId = 'HUE_3';
 let crsLon0 = '';
 const held = {};
@@ -418,9 +421,15 @@ function hoMeta(step) {
   };
 }
 
+function rememberHosoCapacity() {
+  if (!$('hoCsParent') && !document.querySelector('[data-ho-cs]')) return;
+  hoCs = readHosoCapacity(document);
+}
+
 function renderHoSo() {
   const root = $('hoSoBox');
   if (!root) return;
+  rememberHosoCapacity();
   const allow = allowedKeys();
   const locked = Array.isArray(allow) && allow.length === 1;
   const scheme = $('hoScheme')?.value || '';
@@ -447,6 +456,7 @@ function renderHoSo() {
       <label for="hoUnit">Phạm vi</label>
       <select id="hoUnit"${locked ? ' disabled' : ''}>${optionsHtml(scope, unit)}</select>
     </div>
+    ${hosoCapacityHtml(hoCs)}
     <div class="entry-steps" id="hoNav">${nav}</div>
     <div id="hoActive"></div>
     <button type="button" class="btn-submit" id="hoSave">Lưu hồ sơ</button>
@@ -636,6 +646,21 @@ async function saveHoSo() {
     return;
   }
   try {
+    rememberHosoCapacity();
+    const filled = String(hoCs.parent || '').trim() || Object.values(hoCs.values || {}).some(row => String(row && row.giaTri || '').trim());
+    if (filled && !await loadCongSuat()) {
+      if (status) status.textContent = 'Chưa tải được sổ quy mô. Chưa ghi.';
+      return;
+    }
+    const gate = gateHosoCapacity({ name: tenQH, cap: $('hoLevel')?.value || '', draft: hoCs });
+    if (!gate.accept) {
+      if (status) status.textContent = gate.sentences.join(' ');
+      return;
+    }
+    if (gate.entries.length) {
+      storeHosoCapacity(gate, gate.entries);
+      notes.push(gate.sentences.join(' ') || (gate.label === 'OK' ? 'quy mô hạ tầng: OK' : 'quy mô hạ tầng: chưa đủ dữ liệu'));
+    }
     for (const step of STEPS) {
       if (step.file === 'pdf' && held[step.id]?.file && !held[step.id].error) {
         const saved = await savePdf(step, tenQH);
