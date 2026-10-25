@@ -193,6 +193,43 @@ export function pickContaining(geom, candidates, preferSlugs, ops) {
   return { chosen: best > 0 ? chosen : null, fallback: fallback && !!chosen };
 }
 
+/** parent trong schemes.json thắng nếu có lô giao vùng. links CongSuatLienKet chỉ bổ sung. Không có cả hai thì lấy theo hình. */
+export function pickDeclared(geom, candidates, schemeSlugs, linkSlugs, ops) {
+  const hasScheme = (schemeSlugs || []).some(Boolean);
+  const hasLink = (linkSlugs || []).some(Boolean);
+  if (hasScheme) {
+    const primary = pickContaining(geom, candidates, schemeSlugs, ops);
+    if (primary.chosen && !primary.fallback) return primary;
+    if (hasLink) {
+      const linked = pickContaining(geom, candidates, linkSlugs, ops);
+      if (linked.chosen && !linked.fallback) return linked;
+    }
+    return primary;
+  }
+  if (hasLink) {
+    const linked = pickContaining(geom, candidates, linkSlugs, ops);
+    if (linked.chosen && !linked.fallback) return linked;
+    return linked.chosen ? linked : pickContaining(geom, candidates, [], ops);
+  }
+  return pickContaining(geom, candidates, [], ops);
+}
+
+export function parentLinkMap(rows) {
+  const map = new Map();
+  (rows || []).forEach(row => {
+    if (!row || row.placeholder) return;
+    const child = String(row.child || row.Ma_Con || row.maCon || '').trim();
+    if (!child) return;
+    if (row.cleared) {
+      map.delete(child);
+      return;
+    }
+    const parent = String(row.parent || row.Ma_Cha || row.maCha || '').trim();
+    if (parent) map.set(child, parent);
+  });
+  return map;
+}
+
 function levelLabel(doc, id) {
   return (doc.levelLabels && doc.levelLabels[id]) || id || '';
 }
@@ -298,12 +335,18 @@ export function assessCompliance(input) {
       if (!geom) {
         return { kind: 'gap', rule, step, parent: null, text: `${rule.id}: chưa có hình lô để đối chiếu.` };
       }
-      const parentPick = pickContaining(geom, input.parents || [], part.parentSlugs, ops);
+      const parentPick = pickDeclared(geom, input.parents || [], part.parentSlugs, part.linkSlugs, ops);
       const parent = parentPick.chosen;
       const sameAnchor = parent && parent.level === rule.anchor.level;
       const anchorPick = sameAnchor
         ? parentPick
-        : pickContaining(geom, input.anchors || [], part.anchorSlugs, ops);
+        : pickDeclared(
+          geom,
+          input.anchors || [],
+          (part.anchorSlugs && part.anchorSlugs.length) ? part.anchorSlugs : (parent && parent.parentSlugs),
+          parent && parent.linkSlugs,
+          ops
+        );
       const anchor = anchorPick.chosen;
       const gate = anchorState(anchor, rule.anchor.category);
       const note = parentPick.fallback || anchorPick.fallback

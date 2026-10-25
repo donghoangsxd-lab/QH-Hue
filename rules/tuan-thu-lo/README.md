@@ -4,7 +4,7 @@ Máy kiểm tra đọc [`public/data/tuan-thu-lo/principles.json`](../../public/
 
 Ba kết luận: **Phù hợp**, **Chưa phù hợp**, **Chưa đủ dữ liệu**. Thiếu mã, thiếu hình, hoặc chưa có nguyên tắc cho đúng chức năng cấp trên thì không ghi phù hợp.
 
-Cấp trên trực tiếp: QHCT lấy lô QHPK chứa nó; QHPK lấy ô QHC 1/10.000 chứa nó. Có `parent` trong `public/data/chuyen-nganh/schemes.json` thì ưu tiên đúng đồ án cha khi đồ án đó có lô giao vùng. Không có thì lấy lô cấp trên theo hình học. Lô công trình (không phải lô đất) không dùng làm chức năng cấp trên.
+Cấp trên trực tiếp: QHCT lấy lô QHPK chứa nó; QHPK lấy ô QHC 1/10.000 chứa nó. Có `parent` trong `public/data/chuyen-nganh/schemes.json` thì ưu tiên đúng đồ án cha khi đồ án đó có lô giao vùng. Không có lô của `parent` thì dùng `links` trong `public/data/htkt/cong-suat.json` (tab CongSuatLienKet: `child`/`parent` hoặc `Ma_Con`/`Ma_Cha`). Không có cả hai thì lấy lô cấp trên theo hình học. Với QHCT, ô QHC neo cũng ưu tiên cha đã khai báo của lô QHPK (cùng thứ tự). Lô công trình (không phải lô đất) không dùng làm chức năng cấp trên.
 
 ## Nguyên tắc CXCC-01
 
@@ -26,4 +26,4 @@ Khóa ký hiệu hoặc mã đất nhận ra được nhưng không nằm trong 
 5. Chức năng cấp trên khác `anchor` thì nguyên tắc này bỏ qua. Không còn nguyên tắc nào khác thì bảng ghi chưa đủ dữ liệu, kèm tên chức năng cấp trên.
 6. Chạy `node scripts/test-plan-compliance.mjs`.
 
-Tầng cao, mật độ xây dựng, hệ số sử dụng đất chưa có trong bộ này: hai cấp phải cùng có `plan.floors`, `plan.coverage`, `plan.far` rồi hãy thêm bước so trần. Đồ án QHPK trong sổ `schemes.json` hiện thường chỉ là slug `parent` của QHCT, chưa có bản ghi riêng: điền bản ghi (slug, tên, `parent` trỏ QHC 1/10.000) thì máy ưu tiên đúng đồ án cha thay vì chỉ cắt hình.
+Tầng cao, mật độ xây dựng, hệ số sử dụng đất chưa có trong bộ này: hai cấp phải cùng có `plan.floors`, `plan.coverage`, `plan.far` rồi hãy thêm bước so trần. Đồ án QHPK trong sổ `schemes.json` hiện thường chỉ là slug `parent` của QHCT, chưa có bản ghi riêng: điền bản ghi (slug, tên, `parent` trỏ QHC 1/10.000) thì máy ưu tiên đúng đồ án cha thay vì chỉ cắt hình. Chưa có bản ghi QHPK thì thêm một dòng CongSuatLienKet (`Ma_Con` là slug QHPK, `Ma_Cha` là slug QHC 1/10.000) và xuất vào `links` của `cong-suat.json`.

@@ -6,18 +6,20 @@ import { landOf, QHC2045 } from './qhc2045.js';
 import { schemeRecords, setSchemeCatalog, SCHEME_ALIAS } from './facetStore.js';
 import { landPatternKey } from './tt16Symbols.js';
 import { escapeHtml } from './utils.js';
-import { SHELL_V } from './gbaVersion.js';
+import { SHELL_V, withAssetVersion } from './gbaVersion.js';
 import {
-  assessCompliance, classify, compilePrinciples, turfOps, bboxOf, bboxHits, CONCLUSION
+  assessCompliance, classify, compilePrinciples, turfOps, bboxOf, bboxHits, CONCLUSION, parentLinkMap
 } from './planComplianceCore.js';
 
 export const PRINCIPLES_URL = 'data/tuan-thu-lo/principles.json';
+const CAPACITY_URL = 'data/htkt/cong-suat.json';
 
 const SEA_CODE = 31;
 const TRUNG_TAM = ['qhc-trung-tam', ...Object.keys(SCHEME_ALIAS).filter(slug => SCHEME_ALIAS[slug] === 'qhc-trung-tam')];
 
 let principlesPromise = null;
 let schemesPromise = null;
+let linksPromise = null;
 let qhcCache = null;
 
 function loadPrinciples() {
@@ -30,6 +32,30 @@ function loadPrinciples() {
     principlesPromise.catch(() => { principlesPromise = null; });
   }
   return principlesPromise;
+}
+
+function loadCapacityLinks() {
+  if (!linksPromise) {
+    linksPromise = fetch(withAssetVersion(CAPACITY_URL))
+      .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+      .then(doc => parentLinkMap(doc && doc.links))
+      .catch(err => {
+        linksPromise = null;
+        console.warn('Chưa đọc liên kết đồ án cha:', err);
+        return new Map();
+      });
+  }
+  return linksPromise;
+}
+
+function declaredParents(scheme, slugs, linkMap) {
+  const parentSlugs = scheme && scheme.parent ? [String(scheme.parent)] : [];
+  const linkSlugs = [];
+  (slugs || []).forEach(slug => {
+    const parent = linkMap && linkMap.get(String(slug));
+    if (parent && !linkSlugs.includes(parent)) linkSlugs.push(parent);
+  });
+  return { parentSlugs, linkSlugs };
 }
 
 function ensureSchemes() {
@@ -85,18 +111,20 @@ async function landLots(level, box) {
   return lots;
 }
 
-function fromProjectLot(lot, levelId, principles, schemes, catalog) {
+function fromProjectLot(lot, levelId, principles, schemes, catalog, linkMap) {
   const file = lot.file || '';
   const scheme = schemeFor(file, schemes, catalog);
   if (levelId === 'QHC10' && !isQhc10(scheme, file)) return null;
   const texts = [lot.nhom, lot.chucNang, lot.layer, lot.name, lot.kyHieu].filter(Boolean).map(String);
   const patternKey = landPatternKey(String(lot.layer || lot.nhom || ''), texts.join(' '));
   const found = classify(principles, { code: readCode(lot), patternKey, texts });
+  const schemeSlugs = slugsFor(file, scheme, catalog);
   return {
     level: levelId,
     geometry: lot.geometry,
-    schemeSlugs: slugsFor(file, scheme, catalog),
+    schemeSlugs,
     schemeName: (scheme && scheme.name) || file,
+    ...declaredParents(scheme, schemeSlugs, linkMap),
     ...found,
     display: lot.nhom || lot.chucNang || lot.layer || found.label || 'chưa rõ chức năng'
   };
@@ -130,7 +158,7 @@ function fromQhcFeature(fc, principles, box) {
   return out;
 }
 
-function childOf(part, principles, schemes, catalog) {
+function childOf(part, principles, schemes, catalog, linkMap) {
   const lot = part.lot || {};
   const file = lot.file || '';
   const texts = [part.label, part.name, part.sub, lot.nhom, lot.chucNang, lot.layer, lot.name, lot.kyHieu].filter(Boolean).map(String);
@@ -139,8 +167,8 @@ function childOf(part, principles, schemes, catalog) {
   const scheme = schemeFor(file, schemes, catalog);
   return {
     geom: part.geom || part.sourceGeom || lot.geometry || null,
-    parentSlugs: scheme && scheme.parent ? [String(scheme.parent)] : [],
     anchorSlugs: [],
+    ...declaredParents(scheme, slugsFor(file, scheme, catalog), linkMap),
     ...found,
     display: part.label || part.name || found.label || 'chưa rõ chức năng'
   };
@@ -150,7 +178,7 @@ async function assessLevel(level, queryGeom, parts) {
   if (!globalThis.turf) throw new Error('Chưa có thư viện hình học');
   const box = bboxOf(queryGeom);
   if (!box) throw new Error('không có khung hình');
-  const [principles, schemes] = await Promise.all([loadPrinciples(), ensureSchemes()]);
+  const [principles, schemes, linkMap] = await Promise.all([loadPrinciples(), ensureSchemes(), loadCapacityLinks()]);
   const catalog = state.projectCatalog || [];
   const ops = turfOps(globalThis.turf);
   const wantQhc = level === 'QHPK' || level === 'QHCT';
@@ -163,17 +191,17 @@ async function assessLevel(level, queryGeom, parts) {
     }) : Promise.resolve(null)
   ]);
   const projectQhc = (level === 'QHCT' ? qhcLots : parentLots)
-    .map(lot => fromProjectLot(lot, 'QHC10', principles, schemes, catalog))
+    .map(lot => fromProjectLot(lot, 'QHC10', principles, schemes, catalog, linkMap))
     .filter(Boolean);
   const staticQhc = land ? fromQhcFeature(land, principles, box) : [];
   const anchors = [...staticQhc, ...projectQhc];
   const parents = level === 'QHCT'
-    ? parentLots.map(lot => fromProjectLot(lot, 'QHPK', principles, schemes, catalog)).filter(Boolean)
+    ? parentLots.map(lot => fromProjectLot(lot, 'QHPK', principles, schemes, catalog, linkMap)).filter(Boolean)
     : anchors;
   return assessCompliance({
     principles,
     childLevel: level,
-    parts: parts.map(part => childOf(part, principles, schemes, catalog)),
+    parts: parts.map(part => childOf(part, principles, schemes, catalog, linkMap)),
     parents,
     anchors,
     queryGeom,

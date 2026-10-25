@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as turf from '@turf/turf';
 import {
-  assessCompliance, classify, CONCLUSION, turfOps
+  assessCompliance, classify, CONCLUSION, parentLinkMap, turfOps
 } from '../public/js/planComplianceCore.js';
 
 const root = new URL('..', import.meta.url);
@@ -59,10 +59,11 @@ function parentQhc(code, display, geometry, slugs) {
   };
 }
 
-function child(patternKey, display, geometry, parentSlugs = []) {
+function child(patternKey, display, geometry, parentSlugs = [], linkSlugs = []) {
   return {
     geom: geometry,
     parentSlugs,
+    linkSlugs,
     anchorSlugs: [],
     ...found({ patternKey, texts: [display] }),
     display
@@ -124,7 +125,34 @@ assert.match(row.parentText, /cây xanh sử dụng công cộng/i);
 row = run('QHPK', [child('1-CV', 'Cây xanh', query)], [house, pocket])[0];
 assert.equal(row.status, 'chua-du-du-lieu');
 
+row = run('QHPK', [child('1-CV', 'Cây xanh', query, [], ['qhc-cx'])], [house, pocket])[0];
+assert.equal(row.status, 'phu-hop');
+assert.match(row.parentText, /cây xanh sử dụng công cộng/i);
+
+row = run('QHPK', [child('1-CV', 'Cây xanh', query, ['qhc-cx'], ['qhc-nha'])], [house, pocket])[0];
+assert.equal(row.status, 'phu-hop');
+
 const qhct = (patternKey, display, geometry) => child(patternKey, display, geometry);
+const qhpkLinked = { ...qhpkParent, parentSlugs: [], linkSlugs: ['qhc-cx'] };
+row = run('QHCT', [qhct('1-CV', 'Cây xanh', query)], [qhpkLinked], [house, pocket])[0];
+assert.equal(row.status, 'phu-hop', row.compareText);
+assert.match(row.parentText, /QHPK 1\/2\.000/);
+
+const qhpkSchemeHouse = { ...qhpkParent, parentSlugs: ['qhc-nha'], linkSlugs: ['qhc-cx'] };
+row = run('QHCT', [qhct('1-CV', 'Cây xanh', query)], [qhpkSchemeHouse], [house, pocket])[0];
+assert.equal(row.status, 'chua-du-du-lieu');
+assert.match(row.compareText, /không phải Đất cây xanh công cộng/);
+
+const links = parentLinkMap([
+  { Ma_Con: 'qhpk-a', Ma_Cha: 'qhc-trung-tam' },
+  { child: 'qhpk-a', parent: 'qhc-moi' },
+  { child: 'qhct-b', parent: 'qhpk-a', cleared: true },
+  { placeholder: true, child: 'qhpk-z', parent: 'qhc-z' }
+]);
+assert.equal(links.get('qhpk-a'), 'qhc-moi');
+assert.equal(links.has('qhct-b'), false);
+assert.equal(links.has('qhpk-z'), false);
+
 row = run('QHCT', [qhct('1-CV', 'Cây xanh', query)], [qhpkParent], greenParent)[0];
 assert.equal(row.status, 'phu-hop');
 assert.match(row.parentText, /QHPK 1\/2\.000/);
@@ -176,13 +204,15 @@ const qhctSrc = read('public/js/qhctLayer.js');
 const card = read('public/js/cadastreLayer.js');
 const lots = read('public/js/planLandStats.js');
 assert.match(ui, /data\/tuan-thu-lo\/principles\.json/);
+assert.match(ui, /data\/htkt\/cong-suat\.json/);
+assert.match(ui, /parentLinkMap/);
 assert.match(ui, /Chức năng cấp trên/);
 assert.match(ui, /Chỉ tiêu so sánh/);
 assert.match(ui, /Kết luận/);
 assert.match(qhctSrc, /annotateCompliance\('QHCT'/);
 assert.match(card, /annotateCompliance\('QHPK'/);
 assert.match(lots, /complianceHtml/);
-assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261065'/);
+assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261066'/);
 assert.match(read('rules/tuan-thu-lo/README.md'), /Thêm một nguyên tắc/);
 
 console.log('test-plan-compliance: ok');
