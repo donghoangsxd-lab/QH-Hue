@@ -136,6 +136,45 @@ assert.match(plan, /id="levelSplit"/);
 assert.match(plan, /id="splitSideLeft"/);
 assert.match(plan, /id="splitSideRight"/);
 
+function projectLayerAround(src, id) {
+  const at = src.indexOf(`id="${id}"`);
+  assert.ok(at > 0, id);
+  const start = src.lastIndexOf('<div class="project-layer', at);
+  assert.ok(start >= 0, `không thấy dòng lớp của ${id}`);
+  const token = /<\/?div\b[^>]*>/g;
+  const htmlSlice = src.slice(start);
+  let depth = 0;
+  let m;
+  while ((m = token.exec(htmlSlice))) {
+    if (m[0].startsWith('</')) depth -= 1;
+    else if (!m[0].endsWith('/>')) depth += 1;
+    if (depth === 0) return htmlSlice.slice(0, m.index + m[0].length);
+  }
+  assert.fail(`dòng lớp ${id} không đóng`);
+}
+
+for (const [roadId, railId, label] of [
+  ['chk_gt25', 'chk_gt25rail', 'QH giao thông (toàn TP)'],
+  ['chk_gt10', 'chk_gt10rail', 'QH giao thông (trung tâm)']
+]) {
+  const row = projectLayerAround(plan, roadId);
+  assert.match(row, new RegExp(label.replace(/[()]/g, '\\$&')));
+  assert.match(row, new RegExp(`id="${railId}"[^>]*\\bchecked\\b`));
+  assert.match(row, /data-qhc-rail=/);
+  assert.match(row, /class="project-rail"/);
+  assert.match(row, /title="Đường sắt"/);
+  assert.match(row, /aria-label="Đường sắt"/);
+  assert.match(row, /href="#i-rail"/);
+  assert.doesNotMatch(row, /project-layer-sub|<button/);
+  assert.ok(row.indexOf('project-layer-name') < row.indexOf('project-rail'), `icon đường sắt phải đứng sau tên ${label}`);
+  assert.match(row, /class="project-rail"[\s\S]*<\/label>\s*<\/div>\s*$/, `icon đường sắt phải là phần cuối dòng ${label}`);
+}
+assert.doesNotMatch(plan, /project-layer-sub/);
+assert.doesNotMatch(plan, /id="gt25RailHint"|id="gt10RailHint"/);
+assert.match(read('public/css/style.css'), /\.project-rail \{[^}]*width: 18px/);
+assert.match(read('public/css/style.css'), /\.project-rail \.ico \{[^}]*width: 13px/);
+assert.match(read('docs/ui-spec.md'), /icon «Đường sắt»/);
+
 const tech = innerById(html, 'layerPaneHaTang');
 const social = innerById(html, 'layerPaneXaHoi');
 assert.doesNotMatch(tech, /id="axisEnvFold"/);
@@ -480,8 +519,8 @@ assert.match(social, /id="chk_nt_funeral"/);
 assert.equal((html.match(/id="chk_heat"/g) || []).length, 1);
 assert.doesNotMatch(base, /id="chk_heat"/);
 assert.doesNotMatch(html, /id="pointCatalog"/);
-assert.match(html, /css\/style\.css\?v=20261056/);
-assert.match(html, /js\/app\.js\?v=20261056/);
+assert.match(html, /css\/style\.css\?v=20261057/);
+assert.match(html, /js\/app\.js\?v=20261057/);
 
 assert.equal(HTKT_GROUPS.length, 8);
 assert.equal(HTKT_GROUPS[7].id, 'tong-hop-duong-ong');
@@ -526,7 +565,7 @@ assert.match(cn, /tong-hop-duong-ong/);
 assert.match(cn, /\/gcs\//);
 assert.doesNotMatch(cn, /isPointWork|pointCatalog/);
 assert.match(read('public/js/xahoiList.js'), /SOCIAL_TABS/);
-assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261056'/);
+assert.match(read('public/js/gbaVersion.js'), /SHELL_V = '20261057'/);
 assert.match(read('docs/ui-spec.md'), /Mỗi lúc chỉ một cấp bật/);
 assert.match(read('docs/ui-spec.md'), /Không mục «Dữ liệu hiện trạng»/);
 assert.match(read('docs/ui-spec.md'), /Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền/);
@@ -574,7 +613,7 @@ assert.equal(manifest.theme_color, '#0f172a');
 assert.equal(manifest.background_color, '#0f172a');
 assert.ok(manifest.icons.some(icon => icon.sizes === '192x192' && icon.purpose === 'any' && icon.type === 'image/png'));
 assert.ok(manifest.icons.some(icon => icon.sizes === '512x512' && icon.purpose === 'any' && icon.type === 'image/png'));
-assert.match(html, /rel="manifest" href="manifest\.webmanifest\?v=20261056"/);
+assert.match(html, /rel="manifest" href="manifest\.webmanifest\?v=20261057"/);
 assert.match(html, /apple-mobile-web-app-capable" content="yes"/);
 assert.match(html, /apple-touch-icon/);
 assert.match(html, /id="btnMobileInstall"/);
