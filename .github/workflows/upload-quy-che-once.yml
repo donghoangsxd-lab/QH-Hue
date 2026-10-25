@@ -1,0 +1,45 @@
+# Đẩy dự thảo quy chế lên bucket. Secret GCP_SA_KEY gắn môi trường Production
+# (job Cloud Run trên main không chọn environment nên nhận chuỗi rỗng).
+name: Upload quy che
+
+on:
+  push:
+    branches:
+      - cursor/quy-che-kien-truc-pdf-e3d5
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Co GCP_SA_KEY
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          if [ -z "${GCP_SA_KEY}" ]; then
+            echo "GCP_SA_KEY khong duoc dua vao job"
+            exit 1
+          fi
+          echo "GCP_SA_KEY do dai ${#GCP_SA_KEY}"
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Day PDF len bucket
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin cb70a9a4117b059cc027fc06ba8ea038c7009293
+          git show FETCH_HEAD:public/docs/du-thao-quy-che-quan-ly-kien-truc-2026.pdf > /tmp/qc.pdf
+          size=$(wc -c < /tmp/qc.pdf)
+          test "$size" -eq 9718381
+          test "$(head -c 5 /tmp/qc.pdf)" = "%PDF-"
+          gcloud storage cp /tmp/qc.pdf gs://hue-infra-data-us/kien-truc/tp-tp/quy-che.pdf \
+            --content-type=application/pdf \
+            --cache-control="public, max-age=60, must-revalidate"
+          code=$(curl -sS -D /tmp/qc-hdr.txt -o /tmp/qc-head.bin -w '%{http_code}' -r 0-4 "https://storage.googleapis.com/hue-infra-data-us/kien-truc/tp-tp/quy-che.pdf")
+          echo "anon=$code"
+          tr -d '\r' < /tmp/qc-hdr.txt | awk 'BEGIN{IGNORECASE=1} /^content-type:/ {print}'
+          test "$code" = "200" -o "$code" = "206"
+          test "$(head -c 5 /tmp/qc-head.bin)" = "%PDF-"
+          rm -f /tmp/qc.pdf /tmp/qc-head.bin /tmp/qc-hdr.txt
