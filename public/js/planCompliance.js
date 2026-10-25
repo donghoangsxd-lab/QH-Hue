@@ -6,7 +6,7 @@ import { landOf, QHC2045 } from './qhc2045.js';
 import { schemeRecords, setSchemeCatalog, SCHEME_ALIAS } from './facetStore.js';
 import { landPatternKey } from './tt16Symbols.js';
 import { escapeHtml } from './utils.js';
-import { SHELL_V, withAssetVersion } from './gbaVersion.js';
+import { SHELL_V } from './gbaVersion.js';
 import {
   assessCompliance, classify, compilePrinciples, turfOps, bboxOf, bboxHits, CONCLUSION, parentLinkMap
 } from './planComplianceCore.js';
@@ -36,7 +36,9 @@ function loadPrinciples() {
 
 function loadCapacityLinks() {
   if (!linksPromise) {
-    linksPromise = fetch(withAssetVersion(CAPACITY_URL))
+    const capacityUrl = new URL(CAPACITY_URL, document.baseURI);
+    capacityUrl.searchParams.set('v', SHELL_V);
+    linksPromise = fetch(capacityUrl.href)
       .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
       .then(doc => parentLinkMap(doc && doc.links))
       .catch(err => {

@@ -1,0 +1,459 @@
+{
+  "quyetDinh": {
+    "so": "108/QĐ-TTg",
+    "ngay": "2024-01-26",
+    "coQuan": "Thủ tướng Chính phủ",
+    "ten": "Phê duyệt Quy hoạch chung đô thị Thừa Thiên Huế đến năm 2045, tầm nhìn đến năm 2065",
+    "file": "/docs/108-QD-TTg.pdf",
+    "apDung": "QHC 1/25.000 toàn đô thị và QHC 1/10.000 khu vực trung tâm dùng cùng quyết định. QĐ không tách số HTKT riêng cho tỷ lệ 1/10.000.",
+    "phuLuc": "QĐ dẫn Phụ lục I (dân số), Phụ lục II (đất đai), Phụ lục III (đất đô thị trung tâm). Ba phụ lục không có trong PDF quyết định này. Điều 2 nêu số liệu chi tiết nằm ở hồ sơ phê duyệt (thuyết minh, bản vẽ) do Bộ Xây dựng đóng dấu. Không điền số từ hồ sơ đó.",
+    "phanCachNghin": "Dấu chấm trong PDF là ngăn nghìn (480.000 = 480000). Số ghi «khoảng» giữ nguyên chữ số, không làm tròn thêm."
+  },
+  "tran": [
+    {
+      "nhom": "giao-thong",
+      "chiTieu": "khoi-luong",
+      "quyTac": null,
+      "trangThai": "chua-du-du-lieu",
+      "giaTri": null,
+      "donVi": null,
+      "lyDo": "QĐ không chốt một khối lượng giao thông (km, hành khách hoặc tấn). Có cỡ tàu, công suất cảng hàng không, tỷ lệ vận tải công cộng — khác chỉ tiêu."
+    },
+    {
+      "nhom": "cap-nuoc",
+      "chiTieu": "cong-suat",
+      "quyTac": "CN-03",
+      "trangThai": "da-dien",
+      "giaTri": 600000,
+      "donVi": "m³/ngày đêm",
+      "tenChiTieu": "nhu cầu dùng nước",
+      "nam": 2045,
+      "lyDo": "Một số tổng, đúng đơn vị m³/ngày đêm. QĐ gọi là nhu cầu dùng nước, không phải công suất từng nhà máy. Trần lấy mốc 2045."
+    },
+    {
+      "nhom": "cap-dien",
+      "chiTieu": "cong-suat",
+      "quyTac": "CD-02",
+      "trangThai": "da-dien",
+      "giaTri": 3000,
+      "donVi": "MW",
+      "tenChiTieu": "tổng nhu cầu cấp điện",
+      "nam": 2045,
+      "lyDo": "Một số tổng nhu cầu toàn đô thị. QĐ không ghi MVA từng trạm. Không quy đổi MW sang MVA."
+    },
+    {
+      "nhom": "san-nen-thoat-mua",
+      "chiTieu": "cong-suat",
+      "quyTac": "SN-05",
+      "trangThai": "chua-du-du-lieu",
+      "giaTri": null,
+      "donVi": null,
+      "lyDo": "QĐ nêu 8 lưu vực thoát nước mặt, không có công suất trạm bơm hay lưu lượng tiêu (m³/s)."
+    },
+    {
+      "nhom": "thoat-nuoc-thai",
+      "chiTieu": "cong-suat",
+      "quyTac": "NT-03",
+      "trangThai": "chua-du-du-lieu",
+      "giaTri": null,
+      "donVi": null,
+      "lyDo": "QĐ chỉ có tổng lượng nước thải ước tính, không có công suất trạm xử lý. Không đưa số ước vào trần."
+    },
+    {
+      "nhom": "chat-thai-ran-nghia-trang",
+      "chiTieu": "quy-mo",
+      "quyTac": "CTR-02",
+      "trangThai": "chua-du-du-lieu",
+      "giaTri": null,
+      "donVi": null,
+      "lyDo": "Chỉ tiêu gộp một ô. QĐ có dự báo chất thải rắn (tấn/ngày đêm) và nhu cầu đất nghĩa trang (ha). Không gộp hai đơn vị, không lấy số dự báo làm quy mô khu xử lý."
+    },
+    {
+      "nhom": "thong-tin-lien-lac",
+      "chiTieu": "dung-luong",
+      "quyTac": "TT-02",
+      "trangThai": "chua-du-du-lieu",
+      "giaTri": null,
+      "donVi": null,
+      "lyDo": "QĐ nêu Gb/s, Tb/s và 4G/5G/6G như loại hình, không chốt dung lượng một tuyến trục."
+    }
+  ],
+  "soLieu": [
+    {
+      "id": "dan-so",
+      "nhom": "dan-so-dat",
+      "ten": "Dân số toàn đô thị",
+      "muc": "5.a",
+      "donVi": "người",
+      "cachGhi": "khoảng",
+      "gom": "bao gồm dân số quy đổi",
+      "moc": [
+        { "nam": 2030, "giaTri": 1500000 },
+        { "nam": 2045, "giaTri": 1850000 },
+        { "nam": 2065, "giaTri": 2300000, "cachGhi": "có thể dung nạp tối đa khoảng" }
+      ],
+      "duaVaoTran": false
+    },
+    {
+      "id": "ty-le-do-thi-hoa",
+      "nhom": "dan-so-dat",
+      "ten": "Tỷ lệ đô thị hóa",
+      "muc": "5.a",
+      "donVi": "%",
+      "cachGhi": "khoảng",
+      "moc": [
+        { "nam": 2030, "giaTri": 70 },
+        { "nam": 2045, "giaTri": 75, "cachGhi": "chỉ tiêu đô thị hóa khoảng" }
+      ],
+      "duaVaoTran": false
+    },
+    {
+      "id": "khach-du-lich",
+      "nhom": "dan-so-dat",
+      "ten": "Khách du lịch",
+      "muc": "5.a",
+      "donVi": "triệu lượt",
+      "cachGhi": "dự kiến đạt",
+      "moc": [
+        { "nam": 2030, "min": 10, "max": 12, "giaTri": null },
+        { "nam": 2045, "min": 14, "max": 18, "giaTri": null }
+      ],
+      "duaVaoTran": false,
+      "lyDo": "Khoảng min-max, không lấy một số."
+    },
+    {
+      "id": "dat-xay-dung",
+      "nhom": "dan-so-dat",
+      "ten": "Đất xây dựng",
+      "muc": "5.b",
+      "donVi": "ha",
+      "cachGhi": "khoảng",
+      "moc": [
+        { "nam": 2030, "giaTri": 41500, "danDungHa": 10500, "ngoaiDanDungHa": 31000, "diemDanCuNongThonHa": 6400, "datDanDungM2Nguoi": { "min": 97, "max": 100 } },
+        { "nam": 2045, "giaTri": 52600, "danDungHa": 13900, "ngoaiDanDungHa": 38700, "diemDanCuNongThonHa": 5100, "datDanDungM2Nguoi": { "min": 95, "max": 100 } }
+      ],
+      "duaVaoTran": false
+    },
+    {
+      "id": "do-thi-trung-tam",
+      "nhom": "dan-so-dat",
+      "ten": "Khu vực đô thị trung tâm",
+      "muc": "6.c và mục 7",
+      "moc": [
+        { "nam": null, "dienTichHa": 108650, "cachGhi": "khoảng" },
+        { "nam": 2030, "danSo": 850, "donViDanSo": "nghìn người", "cachGhi": "khoảng" },
+        { "nam": 2045, "danSo": 1010, "donViDanSo": "nghìn người", "datXayDungDoThiHa": 21500, "cachGhi": "khoảng" }
+      ],
+      "duaVaoTran": false
+    },
+    {
+      "id": "quan-bac-song-huong",
+      "nhom": "dan-so-dat",
+      "ten": "Quận phía Bắc sông Hương",
+      "muc": "7",
+      "nam": 2045,
+      "datXayDungDoThiHa": 4300,
+      "danSoNginNguoi": { "min": 310, "max": 350 },
+      "cachGhi": "khoảng",
+      "duaVaoTran": false
+    },
+    {
+      "id": "quan-nam-song-huong",
+      "nhom": "dan-so-dat",
+      "ten": "Quận phía Nam sông Hương",
+      "muc": "7",
+      "nam": 2045,
+      "datXayDungDoThiHa": 6600,
+      "danSoNginNguoi": { "min": 370, "max": 410 },
+      "cachGhi": "khoảng",
+      "duaVaoTran": false
+    },
+    {
+      "id": "quan-huong-thuy",
+      "nhom": "dan-so-dat",
+      "ten": "Quận Hương Thủy",
+      "muc": "7",
+      "nam": 2045,
+      "datXayDungDoThiHa": 5800,
+      "danSoNginNguoi": { "min": 170, "max": 190 },
+      "cachGhi": "khoảng",
+      "duaVaoTran": false
+    },
+    {
+      "id": "quan-huong-tra",
+      "nhom": "dan-so-dat",
+      "ten": "Quận Hương Trà",
+      "muc": "7",
+      "nam": 2045,
+      "datXayDungDoThiHa": 4800,
+      "danSoNginNguoi": { "min": 100, "max": 120 },
+      "cachGhi": "khoảng",
+      "duaVaoTran": false
+    },
+    {
+      "id": "chan-may",
+      "nhom": "dan-so-dat",
+      "ten": "Đô thị Chân Mây",
+      "muc": "6.c",
+      "dienTichHa": 44700,
+      "moc": [
+        { "nam": 2030, "danSoNginNguoi": 140 },
+        { "nam": 2045, "danSoNginNguoi": 220 }
+      ],
+      "cachGhi": "khoảng",
+      "ghiChu": "Dân số được xác định cụ thể trong đề án thành lập thành phố Chân Mây.",
+      "duaVaoTran": false
+    },
+    {
+      "id": "phong-dien",
+      "nhom": "dan-so-dat",
+      "ten": "Đô thị Phong Điền",
+      "muc": "6.c",
+      "dienTichHa": 94600,
+      "moc": [
+        { "nam": 2030, "danSoNginNguoi": 125 },
+        { "nam": 2045, "danSoNginNguoi": 160 }
+      ],
+      "cachGhi": "khoảng",
+      "duaVaoTran": false
+    },
+    {
+      "id": "phu-vang",
+      "nhom": "dan-so-dat",
+      "ten": "Đô thị Phú Vang",
+      "muc": "6.c",
+      "dienTichHa": 23500,
+      "danSoNginNguoi": 160,
+      "nam": null,
+      "cachGhi": "khoảng",
+      "ghiChu": "QĐ không ghi năm của mức dân số này. Đến năm 2045 đạt tiêu chí đô thị loại IV.",
+      "duaVaoTran": false
+    },
+    {
+      "id": "quang-dien",
+      "nhom": "dan-so-dat",
+      "ten": "Đô thị Quảng Điền",
+      "muc": "6.c",
+      "dienTichHa": 16300,
+      "danSoNginNguoi": 108,
+      "nam": null,
+      "cachGhi": "khoảng",
+      "ghiChu": "QĐ không ghi năm của mức dân số này. Đến năm 2045 đạt tiêu chí đô thị loại IV.",
+      "duaVaoTran": false
+    },
+    {
+      "id": "dat-don-vi-o",
+      "nhom": "dan-so-dat",
+      "ten": "Đất đơn vị ở toàn đô thị",
+      "muc": "9.c",
+      "nam": 2045,
+      "ha": { "min": 8500, "max": 9500 },
+      "datMoiToiDaM2Nguoi": 55,
+      "cachGhi": "khoảng",
+      "duaVaoTran": false
+    },
+    {
+      "id": "cay-xanh-cong-cong",
+      "nhom": "dan-so-dat",
+      "ten": "Đất cây xanh sử dụng công cộng",
+      "muc": "6.e",
+      "donVi": "m²/người",
+      "doThiTrungTam": 9,
+      "doThiKhac": 5,
+      "nam": null,
+      "duaVaoTran": false
+    },
+    {
+      "id": "cap-nuoc-nhu-cau",
+      "nhom": "cap-nuoc",
+      "ten": "Nhu cầu dùng nước",
+      "muc": "11.c",
+      "donVi": "m³/ngày đêm",
+      "cachGhi": "khoảng",
+      "moc": [
+        { "nam": 2030, "giaTri": 480000 },
+        { "nam": 2045, "giaTri": 600000 }
+      ],
+      "trich": "Nhu cầu dùng nước: Đến năm 2030 khoảng 480.000 m3/ngày đêm; đến năm 2045 khoảng 600.000 m3/ngày đêm",
+      "duaVaoTran": true,
+      "tranNam": 2045
+    },
+    {
+      "id": "cap-nuoc-nha-may",
+      "nhom": "cap-nuoc",
+      "ten": "Nhà máy nước",
+      "muc": "11.c",
+      "xayMoi": ["Lộc Thủy", "Hương Vân", "Lộc Bổn", "A Lin", "A Sáp"],
+      "caiTao": ["Vạn Niên", "Tứ Hạ", "Phong Thu", "Lộc An"],
+      "congSuat": null,
+      "mangTruyenTai": "D160mm–D800mm, mạch vòng",
+      "duaVaoTran": false,
+      "lyDo": "QĐ không ghi công suất từng nhà máy."
+    },
+    {
+      "id": "cap-dien-nhu-cau",
+      "nhom": "cap-dien",
+      "ten": "Tổng nhu cầu cấp điện",
+      "muc": "11.d",
+      "donVi": "MW",
+      "cachGhi": "khoảng",
+      "moc": [
+        { "nam": 2030, "giaTri": 1600 },
+        { "nam": 2045, "giaTri": 3000 }
+      ],
+      "trich": "Tổng nhu cầu cấp điện đến năm 2030 khoảng 1.600MW; đến năm 2045 khoảng 3.000MW",
+      "nguonKhongCoCongSuat": ["thủy điện hiện có", "điện khí LNG tại Chân Mây", "điện gió tại Phong Điền", "điện mặt trời tại Phong Điền và Cầu Hai"],
+      "luoiKhongCoMVA": ["500kV", "220kV", "110kV trở xuống"],
+      "chieuSang": "Mục tiêu 100% đường phố, các hẻm lớn được tổ chức chiếu sáng giao thông",
+      "duaVaoTran": true,
+      "tranNam": 2045
+    },
+    {
+      "id": "thoat-mua",
+      "nhom": "san-nen-thoat-mua",
+      "ten": "Thoát nước mặt",
+      "muc": "11.b",
+      "soLuuVuc": 8,
+      "heThong": "Riêng hoàn toàn ở khu xây dựng mới; nửa riêng ở khu hiện trạng",
+      "congSuatTieu": null,
+      "duaVaoTran": false,
+      "lyDo": "Không có công suất công trình tiêu."
+    },
+    {
+      "id": "thoat-nuoc-thai-luong",
+      "nhom": "thoat-nuoc-thai",
+      "ten": "Tổng lượng nước thải ước tính",
+      "muc": "11.đ",
+      "donVi": "m³/ngày đêm",
+      "cachGhi": "ước tính khoảng",
+      "moc": [
+        { "nam": 2030, "giaTri": 430000 },
+        { "nam": 2045, "giaTri": 530000 }
+      ],
+      "trich": "Tổng lượng nước thải ước tính của toàn đô thị Huế đến năm 2030 khoảng 430.000 m3/ngày đêm; đến năm 2045 khoảng 530.000 m3/ngày đêm",
+      "congSuatTram": null,
+      "duaVaoTran": false,
+      "lyDo": "Số ước tính, và là lượng nước thải chứ không phải công suất trạm xử lý."
+    },
+    {
+      "id": "chat-thai-ran",
+      "nhom": "chat-thai-ran-nghia-trang",
+      "ten": "Dự báo tổng lượng chất thải rắn",
+      "muc": "11.g",
+      "donVi": "tấn/ngày đêm",
+      "cachGhi": "dự báo khoảng",
+      "moc": [
+        { "nam": 2030, "giaTri": 4000 },
+        { "nam": 2045, "giaTri": 5300 }
+      ],
+      "khuXuLyKhongCoCongSuat": ["Phú Sơn", "Hương Bình"],
+      "duaVaoTran": false,
+      "lyDo": "Dự báo lượng phát sinh, không phải quy mô khu xử lý. Không gộp với đất nghĩa trang."
+    },
+    {
+      "id": "nghia-trang",
+      "nhom": "chat-thai-ran-nghia-trang",
+      "ten": "Nhu cầu đất nghĩa trang mới",
+      "muc": "11.h",
+      "donVi": "ha",
+      "cachGhi": "khoảng",
+      "moc": [
+        { "nam": 2030, "giaTri": 90 },
+        { "nam": 2045, "giaTri": 111 }
+      ],
+      "trich": "Nhu cầu đất nghĩa trang mới cho đô thị Thừa Thiên Huế đến giai đoạn 2030 khoảng 90 ha; giai đoạn 2045 khoảng 111 ha (chưa bao gồm diện tích nghĩa trang phục vụ cho nhu cầu sắp xếp lại các nghĩa trang hiện trạng)",
+      "duaVaoTran": false,
+      "lyDo": "Chỉ tiêu CTR-02 là một ô cho cả chất thải rắn và nghĩa trang. Không lấy riêng 111 ha làm trần chung."
+    },
+    {
+      "id": "giao-thong-cong-cong",
+      "nhom": "giao-thong",
+      "ten": "Tỷ lệ vận tải hành khách công cộng",
+      "muc": "11.a",
+      "donVi": "%",
+      "cachGhi": "phấn đấu",
+      "moc": [
+        { "nam": 2030, "giaTri": 15 },
+        { "nam": 2045, "giaTri": 30 }
+      ],
+      "duaVaoTran": false,
+      "lyDo": "Tỷ lệ, không phải khối lượng giao thông."
+    },
+    {
+      "id": "cang-hang-khong-phu-bai",
+      "nhom": "giao-thong",
+      "ten": "Cảng hàng không quốc tế Phú Bài",
+      "muc": "11.a",
+      "donVi": "triệu hành khách/năm",
+      "cachGhi": "khoảng",
+      "moc": [
+        { "nam": 2030, "giaTri": 7 },
+        { "nam": 2050, "giaTri": 12 }
+      ],
+      "duaVaoTran": false,
+      "lyDo": "Công suất một cảng hàng không. Không có mốc 2045. Không phải khối lượng giao thông toàn đô thị."
+    },
+    {
+      "id": "cang-bien",
+      "nhom": "giao-thong",
+      "ten": "Cảng biển Thừa Thiên Huế",
+      "muc": "11.a",
+      "loai": "Cảng tổng hợp quốc gia, đầu mối khu vực, loại I",
+      "ben": [
+        {
+          "ten": "Chân Mây",
+          "tauTongHopHangRoiTan": { "min": 150000, "max": 200000 },
+          "containerTEU": 4000,
+          "tauKhachGT": 225000,
+          "hangLongKhiTan": 150000
+        },
+        { "ten": "Thuận An", "trongTaiTan": 5000 },
+        {
+          "ten": "Phong Điền",
+          "tauTongHopHangRoiTan": 50000,
+          "hangLongKhiTan": 150000
+        }
+      ],
+      "duaVaoTran": false,
+      "lyDo": "Cỡ tàu tiếp nhận, không phải sản lượng hàng hóa hay khối lượng giao thông đô thị."
+    },
+    {
+      "id": "duong-sat",
+      "nhom": "giao-thong",
+      "ten": "Đường sắt tốc độ cao",
+      "muc": "11.a",
+      "ga": ["Huế", "Chân Mây", "Phong Điền (ga mới)"],
+      "congSuat": null,
+      "duaVaoTran": false
+    },
+    {
+      "id": "duong-thuy",
+      "nhom": "giao-thong",
+      "ten": "Đường thủy nội địa",
+      "muc": "11.a",
+      "quocGiaToiThieu": "cấp IV",
+      "diaPhuongToiThieu": "cấp VI",
+      "duaVaoTran": false
+    },
+    {
+      "id": "duong-do-thi",
+      "nhom": "giao-thong",
+      "ten": "Đường đô thị",
+      "muc": "11.a",
+      "quyMoLanXe": { "min": 2, "max": 4, "cachGhi": "tối thiểu từ 2 đến 4 làn xe" },
+      "vanhDai": [1, 2, 3],
+      "km": null,
+      "duaVaoTran": false,
+      "lyDo": "Không có chiều dài mạng."
+    },
+    {
+      "id": "thong-tin",
+      "nhom": "thong-tin-lien-lac",
+      "ten": "Thông tin liên lạc",
+      "muc": "11.e",
+      "noiDung": "Truyền dẫn quang liên tỉnh và nội tỉnh; băng rộng cố định tốc độ cao (Gb/s, Tb/s); di động 4G/5G/6G; ngầm hóa cống bể.",
+      "dungLuongTuyenTruc": null,
+      "duaVaoTran": false
+    }
+  ]
+}

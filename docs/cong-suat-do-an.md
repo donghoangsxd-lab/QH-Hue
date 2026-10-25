@@ -54,3 +54,11 @@ QHC 1/10.000 không cần dòng liên kết: hệ thống cộng vào `qhc-hue-2
 Xuất hai tab vào `public/data/htkt/cong-suat.json` (`rows`, `links`). Trình duyệt đọc file này, không gọi Sheet mỗi lần mở. Bản nháp trên trình duyệt chỉ để thử; xóa nháp thì trở lại file.
 
 Đồ án mới nhập ở hồ sơ quy hoạch đi cùng cổng này. Có số mà vượt trần thì hồ sơ chưa ghi. Chưa đủ dữ liệu thì vẫn ghi hồ sơ và báo «chưa đủ dữ liệu».
+
+## Trần từ Quyết định 108/QĐ-TTg
+
+QHC 1/25.000 thành phố (`qhc-hue-2045`) lấy số tổng từ Quyết định 108/QĐ-TTg ngày 26/01/2024 khi quyết định chốt đúng một số cho chỉ tiêu đó, mốc năm 2045. File trích: `public/data/htkt/qd-108-htkt.json`. PDF: `public/docs/108-QD-TTg.pdf`.
+
+Đã đưa vào `cong-suat.json`: nhu cầu dùng nước 600.000 m³/ngày đêm; tổng nhu cầu cấp điện 3.000 MW. QĐ ghi «khoảng». Đây không phải công suất từng nhà máy hay từng trạm.
+
+Còn «chưa đủ dữ liệu», không điền: khối lượng giao thông; công suất công trình tiêu; công suất trạm xử lý nước thải (QĐ chỉ có lượng nước thải ước tính); quy mô chất thải rắn và nghĩa trang (dự báo tấn/ngày đêm và nhu cầu đất ha, không gộp); dung lượng tuyến trục. Mốc 2030 nằm ở file trích, không phải ô trần.

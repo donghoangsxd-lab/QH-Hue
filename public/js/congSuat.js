@@ -6,7 +6,7 @@
 // Đơn vị lấy từ dòng dữ liệu. Bộ quy tắc rules/tuan-thu-cap-do chưa chốt đơn vị một số ngành.
 
 import { catalogLevel } from './htktModel.js';
-import { withAssetVersion } from './gbaVersion.js';
+import { SHELL_V, withAssetVersion } from './gbaVersion.js';
 
 export const CITY_QHC25_ID = 'qhc-hue-2045';
 export const DRAFT_KEY = 'qh-cong-suat-draft-v1';
@@ -233,10 +233,11 @@ function unitBit(unit) {
   return unit ? ` ${unit}` : '';
 }
 
-export function totalSentence(name, metric, value, unit) {
+export function totalSentence(name, metric, value, unit, indicator) {
   const head = `Tổng ${metric.label} của đồ án ${name}`;
   if (value == null) return `${head}: chưa có số`;
-  return `${head}: ${formatQty(value)}${unitBit(unit)}`;
+  const extra = indicator && indicator !== metric.label ? ` (${indicator})` : '';
+  return `${head}: ${formatQty(value)}${unitBit(unit)}${extra}`;
 }
 
 export function rollupCheck({ title, metric, parent, children, index }) {
@@ -254,6 +255,7 @@ export function rollupCheck({ title, metric, parent, children, index }) {
     parentCap: parent ? parent.cap : '',
     parentValue,
     unit: parentRow ? parentRow.unit : '',
+    indicator: parentRow ? parentRow.tenChiTieu || '' : '',
     sum: null,
     delta: null,
     headroom: null,
@@ -290,12 +292,13 @@ export function checkSentence(check) {
   const parentBit = check.parentName ? ` của đồ án ${check.parentName}` : '';
   const head = `${check.title} — ${metric}${parentBit}`;
   const unit = unitBit(check.unit);
+  const indicator = check.indicator && check.indicator !== metric ? ` (${check.indicator})` : '';
   if (check.status === 'ok') {
-    return `${head}: OK. Tổng ${formatQty(check.sum)}${unit}, trần ${formatQty(check.parentValue)}${unit}, còn ${formatQty(check.headroom)}${unit}.`;
+    return `${head}: OK. Tổng ${formatQty(check.sum)}${unit}, trần ${formatQty(check.parentValue)}${unit}${indicator}, còn ${formatQty(check.headroom)}${unit}.`;
   }
   if (check.status === 'vuot') {
     const gap = check.missing && check.missing.length ? ` Còn ${check.missing.length} đồ án chưa có số.` : '';
-    return `${head}: vượt ${formatQty(check.delta)}${unit}. Tổng ${formatQty(check.sum)}${unit}, trần ${formatQty(check.parentValue)}${unit}.${gap}`;
+    return `${head}: vượt ${formatQty(check.delta)}${unit}. Tổng ${formatQty(check.sum)}${unit}, trần ${formatQty(check.parentValue)}${unit}${indicator}.${gap}`;
   }
   if (check.reason === 'khong-con') return `${head}: chưa đủ dữ liệu. Chưa có đồ án con liên kết.`;
   if (check.reason === 'khong-cha') return `${head}: chưa đủ dữ liệu. Chưa liên kết đồ án cha.`;
@@ -422,7 +425,7 @@ export function capacityView(schemeId, sectors, schemeName) {
       metric,
       value: row ? row.value : null,
       unit: row ? row.unit : '',
-      sentence: totalSentence(name, metric, row ? row.value : null, row ? row.unit : ''),
+      sentence: totalSentence(name, metric, row ? row.value : null, row ? row.unit : '', row ? row.tenChiTieu : ''),
       checks,
       status: combined.status,
       label: combined.label
@@ -669,11 +672,16 @@ export function applyCapacityDoc(doc, schemesDoc) {
 export async function loadCongSuat(fetchImpl) {
   const doFetch = fetchImpl || (typeof fetch === 'function' ? fetch : null);
   if (!doFetch) return false;
-  const href = file => (typeof document !== 'undefined' ? withAssetVersion(file) : file);
+  const href = (file, version) => {
+    if (typeof document === 'undefined') return file;
+    const u = new URL(file, document.baseURI);
+    u.searchParams.set('v', version);
+    return u.href;
+  };
   try {
     const [valueRes, schemeRes] = await Promise.all([
-      doFetch(href('data/htkt/cong-suat.json')),
-      doFetch(href('data/chuyen-nganh/schemes.json'))
+      doFetch(href('data/htkt/cong-suat.json', SHELL_V)),
+      doFetch(typeof document !== 'undefined' ? withAssetVersion('data/chuyen-nganh/schemes.json') : 'data/chuyen-nganh/schemes.json')
     ]);
     if (!valueRes || !valueRes.ok || !schemeRes || !schemeRes.ok) return false;
     applyCapacityDoc(await valueRes.json(), await schemeRes.json());
