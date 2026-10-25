@@ -2,9 +2,8 @@ name: QHC outlines
 
 on:
   push:
-    branches: [main, cursor/pwa-landscape-b078]
+    branches: [main]
   pull_request:
-  workflow_dispatch:
 
 jobs:
   outlines:
