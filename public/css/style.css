@@ -906,6 +906,7 @@ body.compare-on .map-title-split { display: inline-flex; }
 }
 .map-toolbar .ui-btn-format:hover { background: rgba(30, 41, 59, 0.98); border-color: var(--accent-cyan); }
 .tb-phone-pick { display: none; }
+.tb-rotate { display: none; }
 
 /* HỎI ĐÁP: câu đã tính sẵn, bấm để tô phường */
 .faq-panel {
@@ -5324,6 +5325,7 @@ body.project-review.la-page #projectReviewHost {
   :root {
     --tb-btn: 44px;
     --title-h: 44px;
+    --phone-dock-h: 56px;
     --right-w: 0px;
     --k: 1;
     --fs-xs: 11.5px;
@@ -5415,7 +5417,7 @@ body.project-review.la-page #projectReviewHost {
     text-overflow: ellipsis;
   }
   .map-intro-kicker { display: none; }
-  .map-intro-line { -webkit-line-clamp: 1; line-clamp: 1; }
+  .map-intro-line { display: none; }
   .map-title-level-text { display: none; }
   .map-title-level { min-width: 44px; min-height: 40px; padding: 0 6px; }
   .esc-hint { top: calc(100% + 4px); left: 50%; height: auto; transform: translateX(-50%); }
@@ -5435,7 +5437,7 @@ body.project-review.la-page #projectReviewHost {
     max-height: none;
     min-width: 0;
     box-sizing: border-box;
-    padding-bottom: 8px;
+    padding-bottom: 4px;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -5450,6 +5452,13 @@ body.project-review.la-page #projectReviewHost {
   /* Điện thoại: một nút Đo và một nút Tra cứu, mỗi nút mở menu. Nút gốc giữ cho desktop và cho script bấm hộ. */
   .tb-phone-pick { display: flex; position: relative; flex: 0 0 var(--tb-btn); width: var(--tb-btn); min-height: 0; }
   .tb-phone-pick .ui-btn-format { width: 100%; height: 100%; }
+  .tb-rotate {
+    display: inline-flex;
+    position: static;
+    margin-top: auto;
+    flex: 0 0 var(--tb-btn);
+    z-index: 2;
+  }
   #btnMeasureArea, #btnMeasureDist, #btnLocateGPS, #btnInspectMode { display: none !important; }
   .tb-chooser {
     position: fixed; z-index: 1400; display: flex; flex-direction: column; min-width: 168px; padding: 4px;
@@ -5806,25 +5815,31 @@ body.project-review.la-page #projectReviewHost {
     width: auto;
     max-width: 100%;
     box-sizing: border-box;
-    top: 60px;
-    padding: 10px 12px;
+    top: auto;
+    bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--phone-dock-h) + 8px);
+    padding: 8px 10px;
     background: var(--bg-dark);
     color: var(--text-main);
     border: 1px solid rgba(var(--cyan-rgb), 0.55);
     border-radius: var(--r-lg);
     box-shadow: var(--panel-shadow);
   }
+  html.is-phone.is-portrait .mobile-fs:not([hidden]) {
+    bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--phone-dock-h) + 8px);
+  }
+  .mobile-fs-go[hidden] { display: none !important; }
   .mobile-fs p { margin: 0 0 8px; }
-  .mobile-fs-actions { display: flex; gap: 8px; }
-  .mobile-fs-go, .mobile-fs-later {
+  .mobile-fs-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .mobile-fs-go, .mobile-fs-install, .mobile-fs-later {
     min-height: 44px;
-    padding: 0 14px;
+    padding: 0 12px;
     border-radius: var(--r-md);
     font: inherit;
     font-weight: 700;
     cursor: pointer;
   }
-  .mobile-fs-go { border: 0; background: var(--accent-cyan); color: var(--text-on-accent); }
+  .mobile-fs-go, .mobile-fs-install { border: 0; background: var(--accent-cyan); color: var(--text-on-accent); }
+  .mobile-fs-install[hidden] { display: none !important; }
   .mobile-fs-later { border: 1px solid var(--border-color); background: transparent; color: var(--text-main); }
 }
 .mobile-fs { display: none; }
@@ -5832,58 +5847,82 @@ body.project-review.la-page #projectReviewHost {
 @media (pointer: coarse) {
   .esc-hint { display: none !important; }
 }
-/* Ngang thấp: cột nút trái và panel góc trên-phải (không kéo tiêu đề, không ngăn kéo full-width).
-   Bắt buộc kèm điện thoại: rộng ≤840 và thấp, hoặc cảm ứng ≤1200×500. Cửa sổ chuột 1024×473 giữ desktop. */
+/* Ngang thấp: cột nút trái, sheet góc phải, thanh trục ở đáy.
+   Rộng ≤840 và thấp, hoặc cảm ứng ≤1200×500. Cửa sổ chuột 1024×473 giữ desktop. */
 @media ((max-width: 840px) and (max-height: 500px)), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
   :root {
     --right-w: min(300px, 36vw);
-    --phone-panel-w: var(--right-w);
+    --phone-panel-w: min(320px, 44vw);
+    --phone-dock-h: 48px;
+    --title-h: 36px;
     --bottom-h: min(54dvh, 250px);
     --bp-head-h: 36px;
+    --tb-btn: 40px;
   }
   body .map-title,
   body.right-collapsed .map-title,
-  body.compare-on .map-title { right: auto; }
-  :root { --tb-btn: 40px; }
+  body.compare-on .map-title {
+    right: auto;
+    top: max(4px, env(safe-area-inset-top));
+    left: calc(max(8px, env(safe-area-inset-left)) + var(--tb-btn) + 8px);
+    max-width: min(460px, calc(100vw - var(--tb-btn) - var(--phone-panel-w) - 28px));
+    padding: 2px 4px 3px;
+  }
+  body.right-collapsed .map-title {
+    max-width: min(520px, calc(100vw - var(--tb-btn) - 24px));
+  }
+  .map-title-text { font-size: 12px; }
   .map-toolbar {
-    top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 2px);
-    bottom: 2px;
+    top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
+    bottom: max(4px, env(safe-area-inset-bottom));
     left: max(4px, env(safe-area-inset-left));
     right: auto;
     width: var(--tb-btn);
     flex-direction: column;
-    gap: 0;
-    overflow: visible;
+    gap: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
     max-height: none;
     box-sizing: border-box;
-    padding-bottom: 0;
+    padding-bottom: 4px;
     z-index: 1300;
   }
+  /* phone-side-sheet */
   .map-toolbar .ui-btn-format,
   .map-toolbar .tb-phone-pick {
-    flex: 1 1 0;
+    flex: 0 0 var(--tb-btn);
     width: 100%;
-    height: 0;
-    min-height: 0;
-    max-height: 40px;
+    height: var(--tb-btn);
+    min-height: var(--tb-btn);
+    max-height: none;
   }
   .map-toolbar .tb-phone-pick .ui-btn-format { flex: none; width: 100%; height: 100%; max-height: none; }
   body:not(.right-collapsed) .map-toolbar { right: auto; }
-  body:not(.right-collapsed).bottom-collapsed .bp-expand-btn { right: calc(var(--phone-panel-w) + 12px); }
-  .right-panel {
+  body.bottom-collapsed:not(.project-review:not(.project-view)) .map-toolbar #btnExpandBottomPanel {
+    position: static;
+    right: auto;
+    bottom: auto;
+    left: auto;
     top: auto;
-    left: calc(max(4px, env(safe-area-inset-left)) + var(--tb-btn) + 8px);
-    right: max(8px, env(safe-area-inset-right));
-    bottom: max(4px, env(safe-area-inset-bottom));
-    width: auto;
-    height: auto;
-    max-height: 50dvh;
-    border-radius: 16px 16px 0 0;
-    transform-origin: bottom center;
+    width: var(--tb-btn);
+    height: var(--tb-btn);
+    border-radius: var(--r-lg);
   }
-  body:not(.bottom-collapsed) .right-panel { max-height: 50dvh; }
-  body.right-collapsed .right-panel { transform: translateY(110%); visibility: hidden; opacity: 0; }
-  .rp-sheet-handle { display: flex; }
+  .right-panel {
+    top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
+    bottom: max(4px, env(safe-area-inset-bottom));
+    left: auto;
+    right: max(4px, env(safe-area-inset-right));
+    width: var(--phone-panel-w);
+    height: auto;
+    max-height: none;
+    border-radius: 12px;
+    transform-origin: right center;
+  }
+  body:not(.bottom-collapsed) .right-panel { max-height: none; bottom: max(4px, env(safe-area-inset-bottom)); }
+  body.right-collapsed .right-panel { transform: translateX(calc(100% + 16px)); visibility: hidden; opacity: 0; }
+  .rp-sheet-handle { display: none; }
+  /* phone-side-sheet-end */
   .rp-collapse-btn {
     display: inline-flex;
     align-items: center;
@@ -5897,7 +5936,7 @@ body.project-review.la-page #projectReviewHost {
     background: rgba(255, 255, 255, 0.08);
   }
   .rp-collapse-btn::after { content: none; }
-  #tabLayers, #tabLegend { height: auto; flex: 1 1 auto; min-height: 0; }
+  #tabLayers, #tabLegend, #tabAdd { height: auto; flex: 1 1 0; min-height: 0; max-height: none; overflow-y: auto; }
   :root {
     --info-top: calc(max(4px, env(safe-area-inset-top)) + var(--title-h) + 4px);
     --info-bottom: max(4px, env(safe-area-inset-bottom));
@@ -5921,8 +5960,7 @@ body.project-review.la-page #projectReviewHost {
     width: min(300px, 40vw);
     max-height: none;
   }
-  body.bottom-collapsed .leaflet-bottom.leaflet-right { margin-bottom: 60px; }
-  .mobile-fs:not([hidden]) { top: auto; bottom: var(--phone-dock-bottom); }
+  body.bottom-collapsed .leaflet-bottom.leaflet-right { margin-bottom: calc(var(--phone-dock-h) + 6px); }
 }
 /* Điện thoại dọc hẹp: tiêu đề khối không bị nút bóp. */
 @media (max-width: 840px) {
@@ -5997,8 +6035,8 @@ body.project-review.la-page #projectReviewHost {
   }
   .bp-part2 .apt-ward { margin: 4px 0 0; padding: 0 2px; white-space: normal; }
 }
-/* Dọc hẹp: tờ dưới giữ tối đa nửa màn hình. */
-@media (max-width: 700px) {
+/* Dọc hẹp: tờ dưới giữ tối đa nửa màn hình. Ngang thấp dùng sheet góc phải. */
+@media (max-width: 700px) and (orientation: portrait) {
   body:not(.right-collapsed) .map-title {
     max-width: calc(100vw - 68px - max(8px, env(safe-area-inset-right)));
   }
@@ -6204,10 +6242,42 @@ body.right-collapsed .axis-dock { display: flex; position: fixed; z-index: 1250;
 .axis-dock button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 64px; min-height: 44px; padding: 4px; border: 0; border-radius: 8px; background: transparent; color: var(--axis-color-muted); font-family: var(--axis-font); font-size: var(--axis-fs-chip); line-height: 1.1; cursor: pointer; }
 .axis-dock button.active { color: var(--axis-color); background: var(--axis-bg-active); }
 @media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
-  body.right-collapsed .axis-dock { top: auto; right: 60px; left: 60px; bottom: max(8px, env(safe-area-inset-bottom)); transform: none; flex-direction: row; justify-content: center; }
-  .axis-dock button { flex: 1 1 0; width: auto; min-width: 0; }
-  .axis-dock button span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  body.right-collapsed .axis-dock {
+    top: auto;
+    left: calc(max(8px, env(safe-area-inset-left)) + var(--tb-btn) + 8px);
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(6px, env(safe-area-inset-bottom));
+    transform: none;
+    flex-direction: row;
+    justify-content: stretch;
+    gap: 2px;
+    padding: 3px;
+  }
+  .axis-dock button { flex: 1 1 0; width: auto; min-width: 0; min-height: 44px; padding: 2px 1px; gap: 1px; }
+  .axis-dock button span {
+    display: block;
+    overflow: hidden;
+    text-overflow: clip;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.05;
+    font-size: 10px;
+    max-height: 2.2em;
+    max-width: 100%;
+  }
+  .axis-dock svg { width: 15px; height: 15px; }
 }
+/* dock-landscape */
+@media ((max-width: 840px) and (orientation: landscape) and (max-height: 500px)), ((pointer: coarse) and (orientation: landscape) and (max-height: 500px) and (max-width: 1200px)) {
+  .axis-dock button span {
+    white-space: nowrap;
+    font-size: 11px;
+    line-height: 1.1;
+    max-height: none;
+    text-overflow: clip;
+  }
+}
+/* dock-landscape-end */
 
 
 /* Khung nổi: chú giải trên bản đồ, phiếu đề xuất cạnh thanh công cụ. Không đặt position:fixed trong .right-panel (backdrop-filter cắt phần tử con). */

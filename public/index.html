@@ -13,9 +13,10 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="QH đô thị Huế">
-  <meta property="og:title" content="Bản đồ Quy hoạch đô thị - TP Huế">
-  <meta property="og:site_name" content="Bản đồ Quy hoạch đô thị - TP Huế">
+  <meta name="apple-mobile-web-app-title" content="QH TP Huế">
+  <meta name="description" content="Bản đồ quy hoạch và hạ tầng đô thị thành phố Huế — Sở Xây dựng.">
+  <meta property="og:title" content="Bản đồ quy hoạch TP Huế">
+  <meta property="og:site_name" content="Sở Xây dựng — Bản đồ quy hoạch TP Huế">
   <meta property="og:type" content="website">
   <meta property="og:image" content="/icons/og-wide.png?v=20261029">
   <meta property="og:image:type" content="image/png">
@@ -23,13 +24,13 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Bản đồ Quy hoạch thành phố Huế">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Bản đồ Quy hoạch đô thị - TP Huế">
+  <meta name="twitter:title" content="Bản đồ quy hoạch TP Huế">
   <meta name="twitter:image" content="/icons/og-wide.png?v=20261029">
-  <link rel="manifest" href="manifest.webmanifest?v=20261027">
+  <link rel="manifest" href="manifest.webmanifest?v=20261056">
   <link rel="icon" href="icons/favicon.ico?v=20261027" sizes="16x16 32x32 48x48">
   <link rel="icon" href="icons/favicon-32.png?v=20261027" type="image/png" sizes="32x32">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=20261027">
-  <title>Bản đồ Quy hoạch đô thị - TP Huế</title>
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=20261027" sizes="180x180">
+  <title>Bản đồ quy hoạch TP Huế</title>
   <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
   <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
   <link rel="preconnect" href="https://earthengine.googleapis.com" crossorigin>
@@ -44,7 +45,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"
     integrity="sha384-82q0nm29xZzIo5BMtDYnh2/NxeO6FoaK1S/0nF84w3cEsqbBfun3JdMyDVYWfVY5" crossorigin="anonymous"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link rel="stylesheet" href="css/style.css?v=20261055">
+  <link rel="stylesheet" href="css/style.css?v=20261056">
 </head>
 <body class="right-collapsed bottom-collapsed">
   <!-- BỘ ICON NÉT MẢNH DÙNG CHUNG: <svg class="ico"><use href="#i-ten"/></svg> (JS: ico('ten') trong utils.js) -->
@@ -79,6 +80,7 @@
     <symbol id="i-minimize" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
     <symbol id="i-pageflip" viewBox="0 0 24 24"><path d="M3 6.5c2.8-1.2 5.8-1.2 9 .5v13c-3.2-1.7-6.2-1.7-9-.5z"/><path d="M12 7c1.6-2.4 4.4-3.6 8-3.4v10c-3.6-.2-6.4 1-8 3.4"/><path d="M15.5 19.5H21m-2-2 2 2-2 2"/></symbol>
     <symbol id="i-flip" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 21v-5h-5"/></symbol>
+    <symbol id="i-rotate" viewBox="0 0 24 24"><rect x="8" y="3.5" width="8" height="12" rx="1.4"/><path d="M6 15.2a6.2 6.2 0 0 0 11.4 1.6"/><path d="m14.8 14.4 2.8 2.5-3.3.6"/></symbol>
     <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19C5 10 10 5 20 4c-1 10-6 15-15 15z"/><path d="M5 19l8-8"/></symbol>
     <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></symbol>
     <symbol id="i-parcel" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 2.4"/><path d="M4 12h16M12 4v16" stroke-opacity=".45"/></symbol>
@@ -380,6 +382,7 @@
         <div class="sketch-hint" id="sketchHint" aria-live="polite"></div>
       </div>
       <button type="button" class="ui-btn-format bp-expand-btn" id="btnExpandBottomPanel" title="Mở bảng tổng hợp hạ tầng và cơ cấu đất" aria-label="Mở bảng tổng hợp hạ tầng và cơ cấu đất"><svg class="ico"><use href="#i-chev-up"/></svg></button>
+      <button type="button" class="ui-btn-format tb-rotate" id="btnRotateScreen" title="Xoay màn hình" aria-label="Xoay màn hình" aria-pressed="false"><svg class="ico"><use href="#i-rotate"/></svg></button>
     </div>
 
     <!-- KHUNG XEM TRƯỚC KHI IN (printLayout.js): kéo bản đồ vào khung, chọn khổ A4 → A0 -->
@@ -1572,7 +1575,8 @@
   <div class="mobile-fs" id="mobileFs" hidden>
     <p id="mobileFsText"></p>
     <div class="mobile-fs-actions">
-      <button type="button" class="mobile-fs-go" id="btnMobileFs">Toàn màn hình</button>
+      <button type="button" class="mobile-fs-install" id="btnMobileInstall" hidden>Cài vào màn hình chính</button>
+      <button type="button" class="mobile-fs-go" id="btnMobileFs">Xoay ngang</button>
       <button type="button" class="mobile-fs-later" id="btnMobileFsLater">Để sau</button>
     </div>
   </div>
@@ -1615,6 +1619,6 @@
       return Promise.all(jobs);
     })();
   </script>
-  <script type="module" src="./js/app.js?v=20261055"></script>
+  <script type="module" src="./js/app.js?v=20261056"></script>
 </body>
 </html>

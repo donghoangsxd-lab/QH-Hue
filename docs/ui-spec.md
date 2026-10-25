@@ -9,6 +9,7 @@ Hợp đồng đã thống nhất. Sửa layout, panel, chú giải, lớp nền
 - Hộp tiêu đề `#mapTitle` đứng trong khoảng trống giữa panel trục và cột nút: mép trái `12px + bề rộng panel + 16px`, mép phải `12px + ô nút + 16px`, canh giữa khoảng đó. Vị trí không nhảy khi mở hoặc đóng panel trục hay bảng tổng hợp. Câu «BẢN ĐỒ QUY HOẠCH THÀNH PHỐ HUẾ» một dòng, không cắt. Điện thoại (≤840px) giữ cột nút trái và tiêu đề phía trên cột nút.
 - Bảng tổng hợp thu thì mỏ `#btnExpandBottomPanel` nằm góc dưới phải, dạng tab (bo phía trên), cùng màu, cùng bề rộng và cùng mép phải với cột nút công cụ.
 - Điện thoại giữ cột nút trái và panel dạng sheet. Không áp gương desktop vào media điện thoại.
+- Điện thoại ngang (cao tối đa 500px): panel là sheet góc phải, không trải hết chiều ngang; thanh năm trục ở đáy, nhãn không cắt bằng dấu ba chấm; nút công cụ tối thiểu 40px, cuộn nếu thiếu chỗ. Lời nhắc xoay ngang chỉ khi máy đang dọc. Nút «Xoay màn hình» là mục cuối cột công cụ bên trái; desktop không hiện nút này.
 - Thẻ thông tin lô và menu chuột phải không gỡ.
 
 ## Năm trục
