@@ -11,11 +11,15 @@ const KIND_LABEL = {
   'su-dung-dat': 'Sử dụng đất quy hoạch',
   'hien-trang': 'Sử dụng đất hiện trạng',
   'ranh-gioi': 'Ranh giới',
-  'ban-ve': 'Bản vẽ hạ tầng'
+  'ban-ve': 'Bản vẽ hạ tầng',
+  'van-ban': 'Văn bản PDF',
+  'quy-che': 'Quy chế kiến trúc'
 };
+const PDF_KIND = new Set(['van-ban', 'quy-che']);
 
 let preview = null;
 let previewRenderer = null;
+let pdfUrl = '';
 
 function lotRenderer() {
   if (!map.getPane('lotPreview')) {
@@ -96,12 +100,13 @@ function showFeatures(features, review) {
 function rowHtml(row) {
   const id = escapeHtml(row.id || '');
   const kind = KIND_LABEL[row.kind] || row.kind || '';
+  const view = PDF_KIND.has(row.kind) ? 'Xem PDF' : 'Xem trên bản đồ';
   return `<article class="cad-item">
     <b>${escapeHtml(kind)}</b>
     <span>${escapeHtml(row.unit || '')}${row.tenQH ? ` · ${escapeHtml(row.tenQH)}` : ''}</span>
     <span>${escapeHtml(row.summary || '')}</span>
     <span>${escapeHtml(row.email || '')}</span>
-    <button type="button" class="btn-submit btn-secondary" data-act="preview" data-id="${id}">Xem trên bản đồ</button>
+    <button type="button" class="btn-submit btn-secondary" data-act="preview" data-id="${id}" data-kind="${escapeHtml(row.kind || '')}">${view}</button>
     <button type="button" class="btn-submit" data-act="approve" data-id="${id}">Duyệt</button>
     <input data-reason="${id}" maxlength="300" placeholder="Lý do từ chối">
     <button type="button" class="btn-submit btn-secondary" data-act="reject" data-id="${id}">Từ chối</button>
@@ -148,6 +153,33 @@ async function onListClick(event) {
   try {
     if (button.dataset.act === 'preview') {
       const data = await post('previewChoDuyet', { id });
+      if (data.pdf || PDF_KIND.has(button.dataset.kind || '')) {
+        clearPreview();
+        clearKeep();
+        const headers = { 'Content-Type': 'application/json' };
+        if (state.authToken) headers.Authorization = `Bearer ${state.authToken}`;
+        const res = await fetch(geeApi('action=getChoDuyetPdf'), {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ id })
+        });
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(errBody.message || `Không mở được PDF (${res.status})`);
+        }
+        if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+        pdfUrl = URL.createObjectURL(await res.blob());
+        if (status) {
+          status.textContent = `PDF chờ duyệt: ${data.pdf?.name || data.summary || 'file'}. Chưa công bố. `;
+          const link = document.createElement('a');
+          link.href = pdfUrl;
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.textContent = 'Mở file';
+          status.appendChild(link);
+        }
+        return;
+      }
       const features = data.features || [];
       const review = data.lotReview || [];
       if (features.length || review.length) showFeatures(features, review);

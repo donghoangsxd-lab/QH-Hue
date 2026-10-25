@@ -29,6 +29,11 @@ assert.equal(objectNameFromPath('/data/gba/buildings.pmtiles', 'large'), 'gba/bu
 assert.equal(objectNameFromPath('/gcs/cache/sat/v1/ndvi/2020/12/1/2.png', 'gcs'), 'cache/sat/v1/ndvi/2020/12/1/2.png');
 assert.equal(objectNameFromPath('/gcs/../secret', 'gcs'), '');
 assert.equal(objectNameFromPath('/gcs/cho-duyet/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json', 'gcs'), '');
+assert.equal(objectNameFromPath('/gcs/cho-duyet/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf', 'gcs'), '');
+assert.equal(objectNameFromPath('/gcs/projects/_pdf-in/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pdf', 'gcs'), '');
+assert.equal(objectNameFromPath('/gcs/projects/do-an/quyet-dinh-cho.pdf', 'gcs'), '');
+assert.equal(objectNameFromPath('/gcs/docs/614-QD-UBND.pdf', 'gcs'), 'docs/614-QD-UBND.pdf');
+assert.equal(objectNameFromPath('/gcs/docs/108-QD-TTg.pdf', 'gcs'), 'docs/108-QD-TTg.pdf');
 
 const missing = await proxyApi(new Request('https://qh-hue.example.workers.dev/api/gee'), {}, null);
 assert.equal(missing.status, 503);

@@ -5,7 +5,8 @@
 // Lô đất ngoài nhóm hạ tầng không ghi tab DXF-NN — webapp ghi thư mục projects/<slug>/ trên bucket
 // (hien-trang, su-dung-dat, diem-chuc-nang, ranh-gioi, quyet-dinh.pdf). File gộp projects/<slug>.json là bản cũ.
 // Quyết định phê duyệt: projects/decisions.json + projects/<slug>/quyet-dinh.pdf.
-// File người dùng gửi chờ duyệt: projects/decision-proposals.json + projects/<slug>/quyet-dinh-cho.pdf (tối đa 2 MB).
+// File người dùng gửi chờ duyệt: projects/decision-proposals.json (không ghi đường dẫn) + cho-duyet/<32 hex>.pdf (tối đa 2 MB).
+// Văn bản kèm và quy chế của cán bộ: cho-duyet/<id>.json + cho-duyet/<id>.pdf, dòng ChoDuyet kind van-ban / quy-che.
 // PDF admin lớn hơn 2 MB không đi qua Apps Script (URL ký trên Vercel, tối đa 10 MB).
 // putBucketPdf khi Vercel chưa ghi được PDF.
 // Tab DXF-NN cũ vẫn xóa cùng đồ án. Ranh tổng đồ án vẫn ở tab DS_DoAn.
@@ -1429,7 +1430,7 @@ var KIEN_TRUC_SHEET = "KienTruc";
 var CANBO_SHEET = "CanBo";
 var CHO_DUYET_SHEET = "ChoDuyet";
 var CHO_DUYET_HEADERS = ["Id", "Email", "HoTen", "DonVi", "Loai", "DoAn", "TrangThai", "ThoiGian", "LyDo", "Gcs", "TomTat"];
-var CHO_DUYET_KINDS = { "chi-tieu": true, "kien-truc": true, "su-dung-dat": true, "hien-trang": true, "ranh-gioi": true, "ban-ve": true };
+var CHO_DUYET_KINDS = { "chi-tieu": true, "kien-truc": true, "su-dung-dat": true, "hien-trang": true, "ranh-gioi": true, "ban-ve": true, "van-ban": true, "quy-che": true };
 var CHI_TIEU_HEADERS = ["UnitKey", "UnitType", "UnitCode", "UnitName", "Field", "Value", "Officer", "ThoiGianCapNhat"];
 var KIEN_TRUC_HEADERS = ["ID_DoiTuong", "Ten_CongTrinh", "Ten_XaPhuong", "Nhom_HaTang", "Latitude", "Longitude", "QuyMo_HT", "QuyMo_QH", "BanKinh", "TrangThai", "ThoiGianCapNhat", "Note", "Loai", "KhuVuc", "LinkAnh", "Link3D"];
 
@@ -2560,6 +2561,10 @@ function bucketDecisionPdf(name) {
   return /^projects\/[a-z0-9]+(?:-[a-z0-9]+)*\/quyet-dinh(?:-cho)?\.pdf$/.test(name);
 }
 
+function bucketPendingPdf(name) {
+  return /^cho-duyet\/[a-f0-9]{32}\.pdf$/.test(name);
+}
+
 function bucketObjectNameOk(name) {
   return name === "projects/index.json" || name === "projects/decisions.json" || name === "projects/decision-proposals.json"
     || name === "cad_parcels.json" || bucketProjectJson(name) || bucketProjectPart(name);
@@ -2581,7 +2586,7 @@ function bucketKienTrucPdf(name) {
 function putBucketPdf(body) {
   var name = String(body.name || "");
   var b64 = String(body.content || "").replace(/\s+/g, "");
-  if (!bucketDecisionPdf(name) && !bucketKienTrucPdf(name)) return { "error": "Tên file bucket không hợp lệ" };
+  if (!bucketDecisionPdf(name) && !bucketKienTrucPdf(name) && !bucketPendingPdf(name)) return { "error": "Tên file bucket không hợp lệ" };
   if (!b64) return { "error": "File PDF rỗng." };
   if (b64.length > 2796204) return { "error": "File PDF tối đa 2 MB." };
   var bytes;
@@ -2595,7 +2600,7 @@ function putBucketPdf(body) {
 
 function deleteBucketObject(body) {
   var name = String(body.name || "");
-  if (name === "projects/index.json" || name === "projects/decisions.json" || (!bucketProjectJson(name) && !bucketProjectPart(name) && !bucketDecisionPdf(name))) {
+  if (name === "projects/index.json" || name === "projects/decisions.json" || (!bucketProjectJson(name) && !bucketProjectPart(name) && !bucketDecisionPdf(name) && !bucketPendingPdf(name))) {
     return { "error": "Tên file bucket không hợp lệ" };
   }
   try {

@@ -479,7 +479,10 @@ function renderActive() {
   const step = STEPS.find(s => s.id === stepId) || STEPS[0];
   if (!box) return;
   const got = held[step.id];
-  const limit = step.file === 'pdf' ? `PDF tối đa ${step.max / MB} MB` : 'DXF, KML hoặc KMZ, tối đa 20 MB';
+  const cap = pdfCap(step);
+  const limit = step.file === 'pdf'
+    ? (isAdmin() ? `PDF tối đa ${cap / MB} MB, ghi thẳng bucket` : `PDF tối đa ${cap / MB} MB, gửi chờ duyệt`)
+    : 'DXF, KML hoặc KMZ, tối đa 20 MB';
   const crsOpts = [
     ['auto', 'Tự nhận'],
     ['WGS84', 'WGS84 (kinh, vĩ)'],
@@ -527,11 +530,18 @@ function renderActive() {
   showStepPreview();
 }
 
+function pdfCap(step) {
+  if (step.file !== 'pdf') return step.max;
+  if (isAdmin()) return step.max;
+  return Math.min(step.max, 2 * MB);
+}
+
 function fileError(file, step) {
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   if (step.file === 'pdf') {
     if (ext !== 'pdf') return 'Chỉ nhận file PDF.';
-    if (file.size > step.max) return `File tối đa ${step.max / MB} MB.`;
+    const cap = pdfCap(step);
+    if (file.size > cap) return isAdmin() ? `File tối đa ${cap / MB} MB.` : `Cán bộ gửi PDF tối đa ${cap / MB} MB. File lớn hơn để quản trị ghi thẳng.`;
   } else if (!['dxf', 'kml', 'kmz'].includes(ext)) return 'Chỉ nhận DXF, KML hoặc KMZ.';
   else if (file.size > DRAW_MAX_BYTES) return 'File tối đa 20 MB.';
   if (!(file.size > 0)) return 'File rỗng.';
@@ -613,7 +623,7 @@ function netPayload(features) {
   });
 }
 
-async function savePdf(step, tenQH) {
+async function savePdf(step, tenQH, unitKey) {
   const file = held[step.id]?.file;
   if (!file || held[step.id].error) return '';
   if (step.id === 'qd') {
@@ -621,9 +631,21 @@ async function savePdf(step, tenQH) {
     const pdf = await fileBase64(file);
     if (isAdmin()) await postJson('putProjectDecision', { tenQH, name: file.name, pdf });
     else await postJson('submitDecisionProposal', { tenQH, name: file.name, pdf });
-    return 'quyết định';
+    return isAdmin() ? 'quyết định' : 'quyết định (chờ duyệt)';
   }
-  if (!isAdmin()) return '';
+  if (!isAdmin()) {
+    if (!unitKey) return '';
+    if (file.size > 2 * MB) return 'PDF chờ duyệt tối đa 2 MB.';
+    await postJson('submitChoDuyetPdf', {
+      kind: 'van-ban',
+      unitKey,
+      tenQH,
+      docRole: step.docRole,
+      name: file.name,
+      pdf: await fileBase64(file)
+    });
+    return `${step.label} (chờ duyệt)`;
+  }
   const body = { tenQH, docRole: step.docRole, name: file.name };
   if (file.size > PDF_INLINE_MAX_BYTES) {
     const sign = await postJson('signProjectPdf', { purpose: 'doc', bytes: file.size, name: file.name });
@@ -661,15 +683,15 @@ async function saveHoSo() {
       storeHosoCapacity(gate, gate.entries);
       notes.push(gate.sentences.join(' ') || (gate.label === 'OK' ? 'quy mô hạ tầng: OK' : 'quy mô hạ tầng: chưa đủ dữ liệu'));
     }
-    for (const step of STEPS) {
-      if (step.file === 'pdf' && held[step.id]?.file && !held[step.id].error) {
-        const saved = await savePdf(step, tenQH);
-        if (saved) notes.push(saved);
-        else if (!isAdmin()) notes.push(`${step.label} giữ trên máy (cần quản trị để ghi bucket)`);
-      }
-    }
     const area = selectedArea('hoScope', 'hoUnit');
     const unitKey = area ? unitKeyOf(area.type, area.code) : '';
+    for (const step of STEPS) {
+      if (step.file === 'pdf' && held[step.id]?.file && !held[step.id].error) {
+        const saved = await savePdf(step, tenQH, unitKey);
+        if (saved) notes.push(saved);
+        else if (!isAdmin()) notes.push(`${step.label} giữ trên máy (chọn đúng đơn vị được giao, PDF tối đa 2 MB)`);
+      }
+    }
     if (!officerCanEdit(unitKey)) {
       notes.push('bản vẽ giữ trên máy — cần đăng nhập đúng đơn vị');
       } else if (isAdmin()) {
@@ -739,7 +761,7 @@ function renderKienTruc() {
     </div>
     <label class="cad-drop" for="ktPdf">
       <span class="cad-drop-main"><b>Quy chế quản lý kiến trúc</b></span>
-      <span class="cad-drop-sub">PDF tối đa 10 MB</span>
+      <span class="cad-drop-sub">Quản trị ghi thẳng, tối đa 10 MB. Cán bộ gửi chờ duyệt, tối đa 2 MB.</span>
       <input type="file" id="ktPdf" accept=".pdf" hidden>
     </label>
     <div id="ktPdfNote" class="entry-note"></div>
@@ -788,13 +810,16 @@ function renderKienTruc() {
     const file = e.target.files && e.target.files[0];
     const note = $('ktPdfNote');
     if (!file) return;
-    if ((file.name.split('.').pop() || '').toLowerCase() !== 'pdf' || file.size > 10 * MB) {
-      if (note) note.textContent = 'Chỉ nhận PDF không quá 10 MB.';
+    const cap = isAdmin() ? 10 * MB : 2 * MB;
+    if ((file.name.split('.').pop() || '').toLowerCase() !== 'pdf' || file.size > cap) {
+      if (note) note.textContent = isAdmin() ? 'Chỉ nhận PDF không quá 10 MB.' : 'Cán bộ chỉ gửi PDF không quá 2 MB. File lớn hơn cần quản trị ghi thẳng.';
       held.ktPdf = null;
       return;
     }
     held.ktPdf = file;
-    if (note) note.textContent = `${file.name} — ${(file.size / MB).toFixed(1)} MB. Bấm Lưu quy chế khi đã đăng nhập quản trị.`;
+    if (note) note.textContent = isAdmin()
+      ? `${file.name} — ${(file.size / MB).toFixed(1)} MB. Bấm Lưu quy chế để ghi bucket.`
+      : `${file.name} — ${(file.size / MB).toFixed(1)} MB. Bấm Lưu quy chế để gửi chờ duyệt.`;
   });
   $('ktPdfSave')?.addEventListener('click', saveKtPdf);
   $('ktSubmit')?.addEventListener('click', async () => {
@@ -828,11 +853,20 @@ async function saveKtPdf() {
     if (note) note.textContent = 'Đăng nhập cán bộ hoặc quản trị, đúng đơn vị được giao.';
     return;
   }
+  const unitKey = unitKeyOf(area.type, area.code);
   if (!isAdmin()) {
-    if (note) note.textContent = 'File giữ trên máy này. Cần đăng nhập quản trị để ghi bucket.';
+    if (file.size > 2 * MB) {
+      if (note) note.textContent = 'Cán bộ gửi PDF tối đa 2 MB.';
+      return;
+    }
+    try {
+      await postJson('submitChoDuyetPdf', { kind: 'quy-che', unitKey, name: file.name, pdf: await fileBase64(file) });
+      if (note) note.textContent = 'Đã gửi quy chế, chờ quản trị duyệt. Người xem chưa mở được file.';
+    } catch (err) {
+      if (note) note.textContent = err.message;
+    }
     return;
   }
-  const unitKey = unitKeyOf(area.type, area.code);
   try {
     const body = { unitKey, name: file.name };
     if (file.size > PDF_INLINE_MAX_BYTES) {

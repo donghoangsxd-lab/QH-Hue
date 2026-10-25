@@ -4,11 +4,12 @@
 //   projects/<slug>/su-dung-dat.json — chức năng sử dụng đất / bản đồ quy hoạch (lô QH)
 //   projects/<slug>/diem-chuc-nang.json — điểm chức năng
 //   projects/<slug>/ranh-gioi.json — ranh giới quy hoạch
-//   projects/<slug>/quyet-dinh.pdf — PDF quyết định phê duyệt (admin tối đa 10 MB, người dùng gửi chờ duyệt tối đa 2 MB).
-//   projects/<slug>/vb-<id>.pdf — văn bản kèm (đính chính, quy định quản lý, phê duyệt thêm), tối đa 8 file, cùng decisions.json.
+//   projects/<slug>/quyet-dinh.pdf — PDF quyết định đã duyệt (admin ghi thẳng, tối đa 10 MB).
+//   projects/<slug>/vb-<id>.pdf — văn bản kèm đã duyệt (đính chính, quy định quản lý, phê duyệt thêm), tối đa 8 file, cùng decisions.json.
 //   Link ngoài nằm ở projects/decisions.json (kind: link), chỉ gán sau khi máy chủ mở được link.
 //   projects/<slug>/ht-|qh-giao-thong|cap-nuoc|thoat-nuoc|cap-dien.json — bản vẽ hạ tầng riêng đồ án (bật/tắt, chưa nối mạng toàn thành phố).
-//   projects/<slug>/quyet-dinh-cho.pdf + projects/decision-proposals.json — PDF người dùng gửi, chờ admin duyệt.
+//   cho-duyet/<hmac 32 hex>.pdf — PDF quyết định người dùng gửi (tối đa 2 MB). Chỉ mục projects/decision-proposals.json không ghi đường dẫn.
+//   projects/<slug>/quyet-dinh-cho.pdf — đường cũ, chỉ đọc khi duyệt nốt rồi xóa.
 //   projects/<slug>/adjust/<id>.json|.pdf — hồ sơ điều chỉnh cục bộ, chỉ mục ở projects/adjustments.json
 // File cũ projects/<slug>.json vẫn đọc được cho tới lần ghi tiếp theo, rồi tách vào thư mục và xóa.
 // Slug: bỏ dấu, chữ thường, tối đa 60 ký tự, thêm 8 ký tự SHA-256 của Ten_QH (cùng tên → cùng thư mục).
@@ -20,6 +21,7 @@ const net = require('net');
 const constants = require('../config/constants');
 const pdfLimits = require('./pdfLimits');
 const gcsWrite = require('./gcsWrite');
+const { pendingDecisionObject } = require('./pdfPaths');
 const { getCadParcels, getRawDataList, invalidateCache } = require('./gcsService');
 
 const INDEX_NAME = 'projects/index.json';
@@ -922,16 +924,19 @@ function deliverStoredPdf(objectName, at, fileName, bytes) {
   return fetchStoredPdf(objectName, at, fileName);
 }
 
-async function saveProjectDoc({ tenQH, role, fileName, buffer, url, replaceId, stagedToken }) {
+async function saveProjectDoc({ tenQH, role, fileName, buffer, url, replaceId, stagedToken, fixedId }) {
   if (!Object.prototype.hasOwnProperty.call(DOC_ROLES, role)) rejectReview('Loại văn bản không hợp lệ');
-  const swap = DOC_ID_RE.test(String(replaceId || '')) ? String(replaceId) : '';
+  // fixedId giữ cùng mã khi duyệt lại một hồ sơ chờ, không thêm văn bản thứ hai.
+  const fixed = DOC_ID_RE.test(String(fixedId || '')) ? String(fixedId) : '';
+  const swap = !fixed && DOC_ID_RE.test(String(replaceId || '')) ? String(replaceId) : '';
   const { name, slug } = await listedProject(tenQH);
   const cur = await readDecisions();
   const prev = cur.data.items && cur.data.items[name];
   const existing = docsView(prev || {});
   if (swap && !existing.some(d => d.id === swap)) rejectReview('Không có văn bản này trong hồ sơ đồ án', 404);
-  if (!swap && existing.length >= DOC_MAX) rejectReview(`Mỗi đồ án tối đa ${DOC_MAX} văn bản kèm theo`);
-  const id = swap || newDocId();
+  const id = fixed || swap || newDocId();
+  const replacing = existing.some(d => d.id === id);
+  if (!replacing && existing.length >= DOC_MAX) rejectReview(`Mỗi đồ án tối đa ${DOC_MAX} văn bản kèm theo`);
   let meta;
   let via = 'direct';
   if (url) {
@@ -1002,7 +1007,17 @@ async function removeProjectDoc(tenQH, id) {
 // ============================ QUYẾT ĐỊNH CHỜ DUYỆT (người dùng gửi PDF tối đa 2 MB) ============================
 
 function proposalObject(slug) {
+  return pendingDecisionObject(slug);
+}
+
+function legacyProposalObject(slug) {
   return `projects/${slug}/${PROPOSAL_FILE}`;
+}
+
+function proposalNames(slug) {
+  const names = [legacyProposalObject(slug)];
+  try { names.unshift(proposalObject(slug)); } catch (err) { /* chưa có khóa thì chỉ đụng đường cũ */ }
+  return names;
 }
 
 function emptyProposals() {
@@ -1080,7 +1095,10 @@ async function saveDecisionProposal({ tenQH, fileName, buffer }) {
   const { name, slug } = await listedProject(tenQH);
   const cur = await readProposals();
   if (cur.data.items && cur.data.items[name]) rejectReview('Đồ án đang có file quyết định chờ admin duyệt', 409);
-  await writeBytes(proposalObject(slug), buffer, 'application/pdf');
+  const dest = proposalObject(slug);
+  await writeBytes(dest, buffer, 'application/pdf');
+  try { await gcsWrite.patchCacheControl(dest, 'private, no-store'); } catch (err) { /* metadata không chặn lần ghi */ }
+  try { await removeName(legacyProposalObject(slug)); } catch (err) { /* đường cũ không còn */ }
   const meta = { slug, name: decisionFileName(fileName), bytes: buffer.length, at: Date.now() };
   await updateProposals(base => {
     const items = { ...(base.items || {}) };
@@ -1096,15 +1114,22 @@ async function readDecisionProposal(tenQH) {
   const stored = await readProposals();
   const meta = stored.data.items && stored.data.items[name];
   if (!meta || !meta.at || !SLUG_RE.test(String(meta.slug || ''))) rejectReview('Không có file quyết định chờ duyệt', 404);
-  const res = await axios.get(`${publicUrl(proposalObject(meta.slug))}?v=${meta.at}`, {
-    timeout: 20000,
-    responseType: 'arraybuffer',
-    maxContentLength: pdfLimits.PDF_USER_MAX_BYTES + 4096,
-    validateStatus: () => true
-  });
-  if (res.status === 404) rejectReview('File quyết định chờ duyệt không còn trên bucket', 404);
-  if (res.status !== 200) rejectReview(`Đọc file chờ duyệt lỗi HTTP ${res.status}`, 502);
-  return { buffer: Buffer.from(res.data), name: decisionFileName(meta.name), at: Number(meta.at) || 0 };
+  let status = 404;
+  for (const objectName of proposalNames(meta.slug)) {
+    const res = await axios.get(`${publicUrl(objectName)}?v=${meta.at}`, {
+      timeout: 20000,
+      responseType: 'arraybuffer',
+      maxContentLength: pdfLimits.PDF_USER_MAX_BYTES + 4096,
+      validateStatus: () => true
+    });
+    status = res.status;
+    if (res.status === 200) {
+      return { buffer: Buffer.from(res.data), name: decisionFileName(meta.name), at: Number(meta.at) || 0 };
+    }
+    if (res.status !== 404) break;
+  }
+  if (status === 404) rejectReview('File quyết định chờ duyệt không còn trên bucket', 404);
+  rejectReview(`Đọc file chờ duyệt lỗi HTTP ${status}`, 502);
 }
 
 async function clearProposal(tenQH, fallbackSlug) {
@@ -1120,17 +1145,51 @@ async function clearProposal(tenQH, fallbackSlug) {
     });
   }
   if (SLUG_RE.test(String(slug))) {
-    try { await removeName(proposalObject(slug)); } catch (err) { /* file chưa có */ }
+    for (const objectName of proposalNames(slug)) {
+      try { await removeName(objectName); } catch (err) { /* file chưa có */ }
+    }
   }
   return { slug: slug || '' };
 }
 
 async function approveDecisionProposal(tenQH) {
   const { name, slug } = await listedProject(tenQH);
-  const file = await readDecisionProposal(name);
-  const saved = await saveDecision({
-    tenQH: name, fileName: file.name, buffer: file.buffer, maxBytes: pdfLimits.PDF_USER_MAX_BYTES
-  });
+  const stored = await readProposals();
+  const meta = stored.data.items && stored.data.items[name];
+  if (!meta || !meta.at || !SLUG_RE.test(String(meta.slug || ''))) rejectReview('Không có file quyết định chờ duyệt', 404);
+  const dest = decisionObject(slug);
+  let copied = false;
+  let bytes = Number(meta.bytes) || 0;
+  try {
+    for (const src of proposalNames(slug)) {
+      const info = await gcsWrite.objectMeta(src);
+      if (!info) continue;
+      await gcsWrite.rewriteObject(src, dest);
+      bytes = info.size || bytes;
+      copied = true;
+      break;
+    }
+  } catch (err) {
+    if (err.code !== 'NO_SA' && err.status !== 401 && err.status !== 403) throw err;
+    copied = false;
+  }
+  let saved;
+  if (copied) {
+    const at = Date.now();
+    const row = { kind: 'pdf', slug, name: decisionFileName(meta.name), bytes, at, embed: true };
+    const indexed = await updateDecisions(cur => {
+      const items = { ...(cur.items || {}) };
+      const prev = items[name];
+      items[name] = { ...row, docs: prev && Array.isArray(prev.docs) ? prev.docs : [] };
+      return { ...cur, items };
+    });
+    saved = { ...decisionView(row), via: indexed.via, accessUrl: publicUrl(dest) };
+  } else {
+    const file = await readDecisionProposal(name);
+    saved = await saveDecision({
+      tenQH: name, fileName: file.name, buffer: file.buffer, maxBytes: pdfLimits.PDF_USER_MAX_BYTES
+    });
+  }
   await clearProposal(name, slug);
   return saved;
 }

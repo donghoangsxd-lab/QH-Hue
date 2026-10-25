@@ -307,6 +307,10 @@ const kienTrucPdfHits = new Map();
 function checkKienTrucPdfRate(req) {
   checkRate(kienTrucPdfHits, req, 8, 60 * 60 * 1000, 'Mỗi máy chỉ ghi được 8 quy chế mỗi giờ');
 }
+const pendingPdfHits = new Map();
+function checkPendingPdfRate(req) {
+  checkRate(pendingPdfHits, req, 8, 60 * 60 * 1000, 'Mỗi máy chỉ gửi được 8 file PDF chờ duyệt mỗi giờ');
+}
 const URBAN_UNIT_RE = /^(tp:TP|dothi:[a-z0-9]+(?:-[a-z0-9]+)*|xa:[a-z0-9]+(?:-[a-z0-9]+)*)$/;
 const URBAN_FIELDS = new Set([
   'danSo', 'danSoTamTru', 'dienTich', 'matDoDuong', 'ldPhiNong', 'nuocSach', 'matDoCong', 'xlnt', 'ctr',
@@ -355,6 +359,50 @@ async function stageChoDuyet(actor, spec) {
     throw err;
   }
   return { id };
+}
+
+async function stagePdfChoDuyet(actor, spec) {
+  const id = choDuyet.newId();
+  const object = choDuyet.pdfObject(id);
+  const stored = stageSpec({
+    kind: spec.kind,
+    unit: spec.unit,
+    tenQH: spec.tenQH,
+    summary: spec.summary,
+    pdf: { name: spec.fileName, bytes: spec.buffer.length, role: spec.role, object }
+  });
+  stored.email = actor.email;
+  stored.name = actor.name || '';
+  await choDuyet.putPdf(id, spec.buffer);
+  let gcs;
+  try {
+    gcs = await choDuyet.putJson(id, stored);
+  } catch (err) {
+    try { await choDuyet.remove(object); } catch (drop) { /* file mồ côi vẫn bị Worker chặn */ }
+    throw err;
+  }
+  try {
+    await scriptEntry('addChoDuyet', {
+      action: 'addChoDuyet',
+      email: actor.email,
+      name: actor.name || '',
+      unit: stored.unit,
+      kind: stored.kind,
+      tenQH: stored.tenQH || '',
+      gcs,
+      summary: stored.summary || ''
+    });
+  } catch (err) {
+    try { await choDuyet.remove(gcs); } catch (drop) { /* file mồ côi vẫn bị Worker chặn */ }
+    try { await choDuyet.remove(object); } catch (drop) { /* file mồ côi vẫn bị Worker chặn */ }
+    throw err;
+  }
+  return { id };
+}
+
+async function dropChoDuyetFiles(id, jsonName) {
+  try { await choDuyet.remove(jsonName); } catch (err) { /* hàng đã đóng */ }
+  try { await choDuyet.remove(choDuyet.pdfObject(id)); } catch (err) { /* không kèm PDF */ }
 }
 
 async function publishKienTrucPoint(point, email) {
@@ -4554,7 +4602,37 @@ module.exports = async (req, res) => {
       }
     }
 
-    if (action === 'listChoDuyet' || action === 'previewChoDuyet' || action === 'approveChoDuyet' || action === 'rejectChoDuyet') {
+    if (action === 'submitChoDuyetPdf') {
+      requirePostFromApp(req);
+      const actor = await entryActor(req);
+      if (actor.admin) return res.status(400).json({ error: true, message: 'Quản trị ghi thẳng file đã duyệt, không gửi hàng chờ' });
+      checkPendingPdfRate(req);
+      const body = readJsonBody(req);
+      const kind = String(body.kind || '');
+      if (kind !== 'van-ban' && kind !== 'quy-che') return res.status(400).json({ error: true, message: 'Loại PDF không hợp lệ' });
+      const unit = String(body.unitKey || '');
+      if (!URBAN_UNIT_RE.test(unit)) return res.status(400).json({ error: true, message: 'Đơn vị không hợp lệ' });
+      let buffer;
+      try { buffer = pdfLimits.inlineBuffer(body.pdf, false); }
+      catch (err) { return sendInlinePdfError(res, err); }
+      if (buffer.slice(0, 4).toString('ascii') !== '%PDF') return res.status(400).json({ error: true, message: 'Chỉ nhận file PDF.' });
+      try {
+        const staged = await stagePdfChoDuyet(actor, {
+          kind,
+          unit,
+          tenQH: kind === 'van-ban' ? sanitizeSheetText(body.tenQH, 120) : '',
+          role: String(body.docRole || '').slice(0, 20),
+          summary: sanitizeSheetText(body.name, 120),
+          fileName: body.name,
+          buffer
+        });
+        return res.status(200).json({ success: true, staged: true, id: staged.id });
+      } catch (err) {
+        return res.status(err.status || 500).json({ error: true, message: err.message || 'Không gửi được PDF chờ duyệt' });
+      }
+    }
+
+    if (action === 'listChoDuyet' || action === 'previewChoDuyet' || action === 'getChoDuyetPdf' || action === 'approveChoDuyet' || action === 'rejectChoDuyet') {
       requirePostFromApp(req);
       const user = await requireAdmin(req);
       checkUrbanEntryRate(req);
@@ -4569,9 +4647,23 @@ module.exports = async (req, res) => {
       const found = await scriptEntry('getChoDuyet', { action: 'getChoDuyet', admin: true, email: user.email, id });
       const row = found.row || {};
       if (row.status !== 'cho_duyet') return res.status(409).json({ error: true, message: 'Hồ sơ đã được xử lý' });
-      if (action === 'previewChoDuyet') {
+      if (action === 'previewChoDuyet' || action === 'getChoDuyetPdf') {
         const obj = await choDuyet.readJson(row.gcs);
+        if (action === 'getChoDuyetPdf') {
+          const expect = choDuyet.pdfObject(id);
+          if (!obj.pdf || obj.pdf.object !== expect) return res.status(404).json({ error: true, message: 'Hồ sơ không kèm file PDF' });
+          let buffer;
+          try { buffer = await choDuyet.readPdf(expect); }
+          catch (err) { return res.status(err.status || 500).json({ error: true, message: err.message || 'Không đọc được PDF chờ duyệt' }); }
+          const ascii = String(obj.pdf.name || 'cho-duyet.pdf').replace(/[^\w.\-]+/g, '_') || 'cho-duyet.pdf';
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(obj.pdf.name || 'cho-duyet.pdf')}`);
+          res.setHeader('Cache-Control', 'private, no-store');
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          return res.status(200).send(buffer);
+        }
         const features = Array.isArray(obj.features) ? obj.features : [];
+        const pdf = obj.pdf && obj.pdf.name ? { name: String(obj.pdf.name).slice(0, 120), bytes: Number(obj.pdf.bytes) || 0 } : null;
         return res.status(200).json({
           success: true,
           id,
@@ -4580,6 +4672,7 @@ module.exports = async (req, res) => {
           tenQH: row.tenQH || '',
           unit: row.unit || '',
           features,
+          pdf,
           lotReview: Array.isArray(obj.lotReview) ? obj.lotReview : [],
           clip: obj.clip || null
         });
@@ -4588,16 +4681,18 @@ module.exports = async (req, res) => {
         const reason = sanitizeSheetText(body.reason, 300);
         if (!reason) return res.status(400).json({ error: true, message: 'Cần lý do từ chối' });
         await scriptEntry('setChoDuyet', { action: 'setChoDuyet', admin: true, email: user.email, id, status: 'tu_choi', lyDo: reason });
-        try { await choDuyet.remove(row.gcs); } catch (err) { /* hàng đã đóng */ }
+        await dropChoDuyetFiles(id, row.gcs);
         return res.status(200).json({ success: true, id, status: 'tu_choi' });
       }
       const obj = await choDuyet.readJson(row.gcs);
+      if (obj.pdf) obj.pdf.object = choDuyet.pdfObject(id);
       const keepIds = Array.isArray(body.keepIds) ? body.keepIds.map(item => String(item).slice(0, 40)).filter(Boolean).slice(0, 4000) : [];
       obj.keepIds = keepIds;
       const done = await applyPublication(obj, {
         projects,
         callAppsScript: (params, payload) => scriptEntry(params.action, payload),
-        publishKienTruc: (point, email) => publishKienTrucPoint(point, email)
+        publishKienTruc: (point, email) => publishKienTrucPoint(point, email),
+        readPendingPdf: (name) => choDuyet.readPdf(name)
       });
       const keepNote = keepIds.length ? `Giữ hình gốc: ${keepIds.join(', ')}` : '';
       await scriptEntry('setChoDuyet', {
@@ -4608,7 +4703,7 @@ module.exports = async (req, res) => {
         status: 'da_duyet',
         lyDo: [done.note, keepNote].filter(Boolean).join(' ').slice(0, 300)
       });
-      try { await choDuyet.remove(row.gcs); } catch (err) { /* lớp đã ghi, file chờ xóa sau */ }
+      await dropChoDuyetFiles(id, row.gcs);
       return res.status(200).json({ success: true, id, status: 'da_duyet', published: !!done.published, skipped: !!done.skipped, note: done.note || '' });
     }
 

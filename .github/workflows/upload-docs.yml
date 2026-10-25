@@ -1,0 +1,26 @@
+# Đẩy PDF quyết định lên bucket. Chỉ workflow_dispatch và push.
+# Sự kiện pull request không nhận secret GCP_SA_KEY (cursor bot / fork).
+# Push trên cùng repo thì có, cùng cách Cloud Run dùng credentials_json.
+name: Upload docs PDF
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'public/docs/**.pdf'
+      - 'scripts/upload-app-docs.sh'
+      - '.github/workflows/upload-docs.yml'
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Day PDF len bucket
+        run: bash scripts/upload-app-docs.sh

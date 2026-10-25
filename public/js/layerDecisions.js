@@ -3,8 +3,8 @@
 // Nút [data-layer-decision="<mã>"] ở dòng lớp (tab Đô thị, đồ án QHC); mã khớp LAYER_DECISIONS (projectStore.js).
 // Người dùng xem quyết định đã gắn; Admin gắn / thay / gỡ qua decisionViewer.js.
 // data-label: nhãn cố định cạnh biểu tượng; data-label-name: nhãn là tên file / trang quyết định.
-// QĐ 614 nằm tại public/docs/614-QD-UBND.pdf. QĐ 108 nằm tại public/docs/108-QD-TTg.pdf (QHC 1/25.000 và QHC 1/10.000 trung tâm cùng mã).
-// Bản bucket (getLayerDecisions) thắng nếu admin đã gắn cùng mã.
+// QĐ 614 và QĐ 108 nằm trên bucket docs/ (phục vụ /gcs/docs/…). Không đưa PDF vào git hay asset Worker.
+// Bản quyết định admin gắn cùng mã (getLayerDecisions) thắng file docs/.
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml, ico } from './utils.js';
@@ -17,7 +17,7 @@ const BUNDLED = {
   'do-thi-hien-trang': {
     slug: 'lop-do-thi-hien-trang',
     kind: 'pdf',
-    url: '/docs/614-QD-UBND.pdf',
+    url: '/gcs/docs/614-QD-UBND.pdf',
     name: '614-QD-UBND.pdf',
     bytes: 710578,
     at: 1770656400000,
@@ -26,7 +26,7 @@ const BUNDLED = {
   'qhc-2045': {
     slug: 'lop-qhc-2045',
     kind: 'pdf',
-    url: '/docs/108-QD-TTg.pdf',
+    url: '/gcs/docs/108-QD-TTg.pdf',
     name: '108-QD-TTg.pdf',
     bytes: 3401128,
     at: 1706202000000,

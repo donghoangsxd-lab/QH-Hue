@@ -13,6 +13,7 @@ Thumbs.db
 /.cache/
 /public/version.json
 /public/data/gba/*.pmtiles
+/public/docs/*.pdf
 .vercel
 .env*
 /optimistic-yew-*.json
