@@ -99,12 +99,25 @@ export function initLegendPanel() {
   syncToggle();
   const frame = document.getElementById('tabLegend');
   const legendFoldEl = document.getElementById('legendFold');
-  // Hành chính và kiến trúc không có ký hiệu lớp: ẩn cả hàng Chú giải. Quy hoạch và hai panel hạ tầng giữ chú giải theo lớp đang bật.
+  const baseFold = document.getElementById('axisBaseFold');
+  const legendTab = document.getElementById('btnDockLegend');
+  const baseTab = document.getElementById('btnDockBase');
+  // Hành chính và kiến trúc không có ký hiệu lớp: ẩn tab Chú giải, chỉ còn Lớp nền.
   const LEGEND_OFF = new Set(['hanhchinh', 'kientruc']);
   const legendOff = () => LEGEND_OFF.has(document.getElementById('layerMain')?.dataset.active || '');
-  const applyLegendGate = () => {
-    if (!legendFoldEl) return;
-    legendFoldEl.hidden = legendOff();
+  const applyDock = () => {
+    const off = legendOff();
+    if (legendTab) legendTab.hidden = off;
+    const showLegend = !off && frame?.dataset.userHide !== '1';
+    if (legendFoldEl) legendFoldEl.hidden = !showLegend;
+    if (baseFold) baseFold.hidden = showLegend;
+    const mark = (btn, on) => {
+      if (!btn) return;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-selected', String(on));
+    };
+    mark(legendTab, showLegend);
+    mark(baseTab, !showLegend);
   };
   const chip = document.getElementById('legendChip');
   const checked = (id) => !!document.getElementById(id)?.checked;
@@ -140,7 +153,7 @@ export function initLegendPanel() {
   const reveal = (set) => {
     if (!frame) return;
     if (legendOff()) {
-      applyLegendGate();
+      applyDock();
       return;
     }
     if (frame.dataset.userHide === '1') {
@@ -148,13 +161,12 @@ export function initLegendPanel() {
       syncLegend();
       return;
     }
-    if (legendFoldEl) legendFoldEl.open = true;
     if (set) prefer = set;
     syncLegend();
   };
   const syncLegend = () => {
     if (!frame) return;
-    applyLegendGate();
+    applyDock();
     const visible = new Set();
     tabs.forEach(t => {
       const set = t.dataset.legendSet;
@@ -198,13 +210,13 @@ export function initLegendPanel() {
     if (extra) extra.hidden = !extraOn;
     if (chip) chip.hidden = true;
   };
-  legendFoldEl?.addEventListener('toggle', () => {
-    if (legendFoldEl.open) delete frame.dataset.userHide;
-    else frame.dataset.userHide = '1';
+  legendTab?.addEventListener('click', () => {
+    delete frame?.dataset.userHide;
+    syncLegend();
   });
-  // Nút cấp và nút thu nhóm nằm trong summary: chặn toggle của details.
-  legendFoldEl?.querySelector('summary')?.addEventListener('click', (e) => {
-    if (e.target.closest('button')) e.preventDefault();
+  baseTab?.addEventListener('click', () => {
+    if (frame && !legendOff()) frame.dataset.userHide = '1';
+    syncLegend();
   });
   chip?.addEventListener('click', () => {
     delete frame.dataset.userHide;

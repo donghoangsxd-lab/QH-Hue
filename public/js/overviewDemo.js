@@ -26,7 +26,8 @@ export function openLayerTab({ main, pane } = {}) {
   const home = pane ? PANE_HOME[pane] : null;
   const tab = MAIN_TAB[main] || main || home?.main;
   if (tab) document.querySelector(`[data-main-tab="${tab}"]`)?.click();
-  if (home?.fold) {
+  if (home?.fold === 'axisBaseFold') document.getElementById('btnDockBase')?.click();
+  else if (home?.fold) {
     const fold = document.getElementById(home.fold);
     if (fold) fold.open = true;
   }

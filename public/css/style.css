@@ -735,16 +735,38 @@ body.compare-on .map-title-seg .ico { font-size: var(--fs-md); width: 1.15em; he
 }
 .level-pick-btn .ico { width: 12px; height: 12px; margin: 0; color: var(--accent-cyan); }
 #levelHostQh .level-host-label { display: none; }
-#levelPickQh { width: 100%; }
+#levelPickQh { width: 100%; overflow: visible; padding: 4px 2px; }
 #levelPickQh .level-pick-btn { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0 2px; }
 #levelPickQh .level-pick-btn span { overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
-.level-pick-btn.is-on { background: rgba(var(--orange-rgb), 0.2); color: var(--text-strong); }
-.level-pick-btn.is-current {
-  background: var(--axis-bg-active);
-  border-color: var(--accent-cyan);
-  color: var(--axis-color);
+.level-pick-btn.is-on {
+  background: var(--accent-orange);
+  border-color: var(--accent-orange);
+  color: var(--text-on-accent);
 }
-.level-pick-btn:hover, .level-pick-btn:focus-visible { background: var(--bg-hover); outline: none; }
+.level-pick-btn.is-current {
+  border-width: 2px;
+  border-style: dashed;
+  border-color: var(--text-strong);
+}
+.level-pick-btn.is-on.is-current {
+  background: var(--accent-orange);
+  border-width: 2px;
+  border-style: dashed;
+  border-color: var(--text-strong);
+  color: var(--text-on-accent);
+}
+.level-pick-btn:hover, .level-pick-btn:focus-visible { background: var(--bg-hover); }
+.level-pick-btn.is-on:hover,
+.level-pick-btn.is-on:focus-visible {
+  background: var(--accent-orange);
+  color: var(--text-on-accent);
+}
+.level-pick-btn.is-current:hover,
+.level-pick-btn.is-current:focus-visible {
+  border-width: 2px;
+  border-style: dashed;
+  border-color: var(--text-strong);
+}
 body.view-ht .level-host { display: none; }
 body.compare-on .level-pick { display: none; }
 .level-split { display: none; flex-direction: column; gap: 4px; }
@@ -1271,14 +1293,64 @@ body.right-collapsed .right-panel {
 .layer-main-pane { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; padding: 2px 8px 4px; }
 .axis-fold { margin: 6px 0 2px; border-top: 1px solid var(--border-soft); }
 .axis-fold > summary { cursor: pointer; min-height: var(--axis-head-h); padding: 2px; font-family: var(--axis-font); font-size: var(--axis-fs-header); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--axis-color-muted); }
-/* Dock không tạo hộp: mỗi details là mục flex của panel. Mở một mục = đúng 1/3; mở cả hai = mỗi mục 1/3, danh sách giữ 1/3 trên. */
-.rp-dock { display: contents; }
-.rp-dock > details { display: flex; flex-direction: column; flex: 0 0 auto; margin: 0; min-height: 0; overflow: hidden; background: var(--bg-panel); border-top: 1px solid var(--border-color); }
-.rp-dock > details[open] { flex: 0 0 33.333%; height: 33.333%; max-height: 33.333%; }
-.rp-dock > details > summary { flex: 0 0 auto; cursor: pointer; min-height: var(--axis-head-h); padding: 2px 8px; font-family: var(--axis-font); font-size: var(--axis-fs-header); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--axis-color); background: var(--bg-panel); }
-#legendFold[hidden] { display: none !important; }
-.rp-dock > details:not([open]) > :not(summary) { display: none; }
-.rp-dock > details[open] > :not(summary) { flex: 1 1 auto; min-height: 0; overflow: auto; }
+/* Chú giải và Lớp nền: hai tab cùng một hàng, mỗi lúc một khung, cao một phần ba panel. */
+.rp-dock {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 33.333%;
+  height: 33.333%;
+  max-height: 33.333%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-color);
+}
+.dock-switch {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--axis-head-h);
+  padding: 2px 6px;
+  background: var(--bg-panel);
+}
+.dock-tab {
+  height: var(--axis-chip-h);
+  padding: 0 8px;
+  border: 1px solid var(--axis-chip-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--axis-color-muted);
+  font-family: var(--axis-font);
+  font-size: var(--axis-fs-chip);
+  font-weight: 700;
+  letter-spacing: .04em;
+  line-height: 1;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.dock-tab.active {
+  border-color: var(--accent-cyan);
+  background: var(--axis-bg-active);
+  color: var(--axis-color);
+}
+.dock-tab:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
+.dock-tab[hidden],
+#legendFold[hidden],
+#axisBaseFold[hidden] { display: none !important; }
+.rp-dock > .dock-fold {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+#legendFold > .dock-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
 #rpDock #tabLegend { position: static; height: auto; max-height: none; min-height: 0; padding: 0; overflow: visible; display: block; flex: none; }
 #rpDock #tabLegend .layer-tree,
 #rpDock #tabLegend .legend-main,
@@ -1757,10 +1829,20 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
   text-align: center; font-weight: bold; font-size: var(--fs-md); box-sizing: border-box;
 }
 
-/* CHÚ GIẢI: ký hiệu sử dụng đất TT16 theo nhóm, nở trong dock. Độ trong suốt lô và quyết định phê duyệt nằm ở Lớp nền. */
+/* CHÚ GIẢI: ký hiệu sử dụng đất TT16 theo nhóm. Độ trong suốt lô nằm ở Lớp nền. */
 #tabLegend { flex-direction: column; overflow: visible; padding: 0; height: auto; max-height: none; }
-#layerPaneBase > .legend-display,
-#layerPaneBase > .base-decisions { max-height: none; height: auto; flex: none; overflow: visible; }
+#layerPaneBase {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: auto;
+  scrollbar-color: #94a3b8 #141c2e;
+}
+#layerPaneBase::-webkit-scrollbar { width: 8px; height: 8px; }
+#layerPaneBase::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+#layerPaneBase::-webkit-scrollbar-track { background: #141c2e; }
+#layerPaneBase > .legend-display { max-height: none; height: auto; flex: none; overflow: visible; }
 .legend-head { cursor: default; }
 .legend-head:hover { color: var(--text-main); }
 #btnLegendFold .ico { transform: rotate(180deg); transition: transform var(--ease); }
@@ -1798,7 +1880,7 @@ body[data-level="qhct"] .pl-group[data-level-group="QHCT"] > .pl-hrow > .pl-head
 .tt16-group[open] > summary::before { transform: rotate(45deg); }
 .tt16-group > summary:hover, .tt16-group[open] > summary { color: var(--axis-color); }
 .tt16-group > summary:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: -2px; }
-.tt16-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt16-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 .tt16-group-count { flex-shrink: 0; min-width: 18px; padding: 0 5px; border: 1px solid var(--axis-chip-border); border-radius: 999px; font-family: var(--axis-font); font-size: var(--axis-fs-chip); font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; color: var(--axis-color-muted); }
 .tt16-group[open] { padding-bottom: 2px; }
 .tt16-row { display: flex; align-items: center; gap: 6px; min-height: var(--axis-row-h); padding: 0 4px 0 6px; border-radius: var(--r-sm); font-family: var(--axis-font); font-size: var(--axis-fs-row); line-height: 1.2; color: var(--axis-color); }
@@ -6263,27 +6345,21 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
 /* Panel điện thoại không có chiều cao cố định: gom dock lại để không đè nút cấp quy hoạch. */
 @media (max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px)) {
   .right-panel { overflow: hidden; }
-  .rp-dock { display: flex; flex-direction: column; flex: 0 0 auto; height: auto; max-height: 22dvh; min-height: 0; overflow: hidden; }
-  .rp-dock > details[open] { flex: 1 1 0; height: auto; max-height: none; }
-  .rp-dock > details[open] > :not(summary) { max-height: 14dvh; }
+  .rp-dock { flex: 0 0 auto; height: auto; max-height: 22dvh; }
+  .rp-dock > .dock-fold { max-height: 18dvh; }
+  #layerPaneBase { max-height: 18dvh; }
 }
 
-/* Chú giải: cấp và nút thu nhóm cùng một dòng với tiêu đề. */
-#legendFold > summary {
+/* Chú giải: cấp và nút thu nhóm cùng một dòng trong khung tab. */
+#legendFold > .legend-sum {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex: 0 0 auto;
   flex-wrap: nowrap;
   min-width: 0;
-  list-style: none;
+  padding: 2px 6px;
 }
-#legendFold > summary::-webkit-details-marker { display: none; }
-#legendFold > summary::marker { content: ''; }
-.legend-sum-title { flex: 0 0 auto; white-space: nowrap; }
-.legend-sum-title::before { content: '▸'; margin-right: 6px; color: var(--text-muted); }
-#legendFold[open] > summary .legend-sum-title::before { content: '▾'; }
-.legend-sum-title::after { content: '·'; margin-left: 6px; color: var(--text-muted); font-weight: 600; }
-#legendFold:not(:has(.layer-main-tab:not([hidden]))) .legend-sum-title::after { content: none; }
 #legendFold .legend-level-chips {
   flex: 1 1 auto;
   min-width: 0;
@@ -6332,7 +6408,7 @@ body:not(.bottom-collapsed) .legend-chip { bottom: calc(var(--bottom-h) + 12px);
   line-height: 1;
 }
 #legendFold .layer-main-label small { font-size: var(--axis-fs-chip); font-weight: 700; letter-spacing: 0; opacity: .85; }
-#legendFold > summary #btnLegendFold {
+#legendFold > .legend-sum #btnLegendFold {
   flex: 0 0 auto;
   width: 22px;
   height: 22px;
