@@ -186,15 +186,22 @@ function areaForScale(scale) {
 
 let seq = 0;
 const schemeBySlug = new Map();
+let schemeList = [];
 
 export function setSchemeCatalog(doc) {
   schemeBySlug.clear();
+  schemeList = [];
   const list = doc && Array.isArray(doc.schemes) ? doc.schemes : [];
   list.forEach(row => {
     if (!row || !row.slug) return;
+    schemeList.push(row);
     schemeBySlug.set(String(row.slug), row);
     if (row.catalogScheme) schemeBySlug.set(String(row.catalogScheme), row);
   });
+}
+
+export function schemeRecords() {
+  return schemeList;
 }
 
 function schemeMeta(slug) {

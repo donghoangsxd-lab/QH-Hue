@@ -107,6 +107,10 @@ const qhcOn = (m, id, chk) => (isLevelPair() ? sideOf(m) === id : !!$(chk)?.chec
 const tvFeatures = () => (data.frame ? data.frame.features.filter(f => f.properties.k === 'tv') : []);
 
 // ---------- Tải dữ liệu ----------
+export function loadQhcLand() {
+  return load('land');
+}
+
 function load(kind) {
   if (data[kind]) return Promise.resolve(data[kind]);
   if (!loading[kind]) {

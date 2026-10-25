@@ -11,6 +11,7 @@ import { isLevelPair, mapsForLevel, onSplitPair } from './splitPair.js';
 import { escapeHtml, fmtNum } from './utils.js';
 import { planLevelOf, OPEN_PROJECT_EVENT } from './generalPlan.js';
 import { analyzeParcelPlan, parcelPlanHtml, planPlace } from './planLandStats.js';
+import { annotateCompliance } from './planCompliance.js';
 import { landPatternKey, TT16_STYLES, LOT_OPACITY_EVENT, getLotOpacity } from './tt16Symbols.js';
 import { attachLotBuildup } from './lotBuildup.js';
 import { lotBuildupSlotHtml } from './lotScreen.js';
@@ -154,6 +155,7 @@ export async function parcelQhctHtml(geometry, recorded, place) {
     };
   });
   const res = await analyzeParcelPlan(geometry, { level: 'QHCT', includeHidden: true, extras });
+  await annotateCompliance('QHCT', geometry, res.parts);
   const slip = place === 'measure' || place === 'invest' ? '' : ' Sai số ranh khoảng 0,5 m.';
   return {
     html: parcelPlanHtml(res, recorded, {
