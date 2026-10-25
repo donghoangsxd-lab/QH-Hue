@@ -124,7 +124,7 @@ function meterRow(label, title, value, share, tone) {
       <div class="project-brief-meter-top"><span>${label}</span><b>${value}</b></div>${meterBar(share)}</div>`;
 }
 
-const PHONE_LAYOUT = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 500px) and (max-width: 1200px))');
+const PHONE_LAYOUT = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px))');
 
 function briefBesideInvest() {
   const invest = document.getElementById('investCard');
