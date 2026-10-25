@@ -1,5 +1,6 @@
-// Điện thoại mở sẵn bố cục ngang. Khóa chiều bằng Screen Orientation API khi trình duyệt cho phép
-// (thường cần toàn màn hình và một cử chỉ). Bị chặn thì vẫn xoay khung bằng CSS, không hiện lời nhắc.
+// Lần mở ưu tiên chiều ngang thật: toàn màn hình rồi Screen Orientation API (cần cử chỉ trên nhiều trình duyệt).
+// Khóa bị chặn thì theo hướng khung nhìn, không xoay html/body bằng CSS. transform: rotate làm clientX/clientY
+// và canvas MapLibre/Leaflet lệch khỏi chỗ đang thấy — chạm, kéo bản đồ và cột nút đều trượt.
 // Cài ứng dụng: Android dùng beforeinstallprompt; iOS không có prompt, hướng dẫn Chia sẻ → Thêm vào Màn hình chính.
 const PHONE = window.matchMedia('(max-width: 840px), ((pointer: coarse) and (max-height: 560px) and (max-width: 1400px))');
 const VIEW_LAND = window.matchMedia('(orientation: landscape)');
@@ -9,8 +10,8 @@ const $ = (id) => document.getElementById(id);
 
 let deferredInstall = null;
 let lockHeld = false;
-// 'landscape' | 'portrait' trên điện thoại. null = máy tính, theo hướng cửa sổ.
-let presented = null;
+// Còn muốn xin khóa ngang sau cử chỉ đầu. Nút xoay tắt cờ này khi người dùng chọn dọc.
+let preferLandscape = true;
 let fsArmed = false;
 
 function iosDevice() {
@@ -37,12 +38,14 @@ function screenLandscape() {
 }
 
 function deviceLandscape() {
-  const viewLand = VIEW_LAND.matches || window.innerWidth > window.innerHeight;
-  // Màn hình máy tính luôn ngang dù cửa sổ hẹp. Chỉ tin screen.orientation trên cảm ứng,
-  // để điện thoại đã xoay vẫn ra bố cục ngang khi khung nhìn bị kẹt dọc.
-  const screenLand = screenLandscape();
-  if (COARSE.matches && screenLand !== null) return screenLand;
-  return viewLand;
+  // Bố cục bám cửa sổ (innerWidth/innerHeight), cùng hệ với chạm và canvas bản đồ.
+  // Không lấy visualViewport: bàn phím làm chiều cao nhìn thấy tụt xuống, dễ nhận nhầm là ngang.
+  // screen.orientation chỉ để khóa chiều, không ép lớp ngang khi cửa sổ vẫn dọc.
+  const w = window.innerWidth || 0;
+  const h = window.innerHeight || 0;
+  if (w > 0 && h > 0 && w !== h) return w > h;
+  if (VIEW_LAND.matches) return true;
+  return screenLandscape() === true;
 }
 
 function phoneNow() {
@@ -53,36 +56,21 @@ function phoneNow() {
   return Math.min(w, h) <= 560 && Math.max(w, h) <= 1400;
 }
 
-function wantLandscape() {
-  if (!phoneNow()) return deviceLandscape();
-  if (presented === 'portrait') return false;
-  return true;
-}
-
 function applyFrame() {
   const phone = phoneNow();
-  const land = wantLandscape();
+  const land = deviceLandscape();
   const root = document.documentElement;
   root.classList.toggle('is-phone', phone);
   root.classList.toggle('is-landscape', phone && land);
   root.classList.toggle('is-portrait', phone && !land);
   if (!phone) {
-    root.classList.remove('is-turned');
     root.style.removeProperty('--vv-w');
     root.style.removeProperty('--vv-h');
     return;
   }
   const vv = window.visualViewport;
-  let w = Math.round((vv && vv.width) || window.innerWidth || 0);
-  let h = Math.round((vv && vv.height) || window.innerHeight || 0);
-  const viewLand = w > h;
-  const turned = w > 0 && h > 0 && land !== viewLand;
-  root.classList.toggle('is-turned', turned);
-  if (turned) {
-    const swap = w;
-    w = h;
-    h = swap;
-  }
+  const w = Math.round((vv && vv.width) || window.innerWidth || 0);
+  const h = Math.round((vv && vv.height) || window.innerHeight || 0);
   if (w > 0 && h > 0) {
     const nextW = w + 'px';
     const nextH = h + 'px';
@@ -132,12 +120,13 @@ async function enterFullscreen() {
   }
 }
 
-// Toàn màn hình rồi khóa chiều. Từ chối thì bố cục CSS đã áp, không nhắc.
+// Toàn màn hình rồi khóa chiều. Từ chối thì giữ hướng khung nhìn, không nhắc và không xoay giả.
 async function engage(orient) {
+  if (!phoneNow()) return;
   if (orient === 'landscape') await enterFullscreen();
   const ok = await tryLock(orient);
   if (!ok && screen.orientation && screen.orientation.unlock && orient === 'portrait') {
-    try { screen.orientation.unlock(); } catch (e) { /* giữ bố cục CSS */ }
+    try { screen.orientation.unlock(); } catch (e) { /* máy giữ hướng thật */ }
     lockHeld = false;
   }
   applyFrame();
@@ -146,11 +135,11 @@ async function engage(orient) {
 
 async function toggleLandscape() {
   if (!phoneNow()) return;
-  presented = wantLandscape() ? 'portrait' : 'landscape';
-  applyFrame();
+  const next = deviceLandscape() ? 'portrait' : 'landscape';
+  preferLandscape = next === 'landscape';
+  fsArmed = true;
   nudgeViewport();
-  window.dispatchEvent(new Event('resize'));
-  await engage(presented);
+  await engage(next);
 }
 
 function syncInstallButton() {
@@ -215,7 +204,6 @@ function kick() {
 }
 
 export function initMobileShell() {
-  if (phoneNow()) presented = 'landscape';
   $('btnRotateScreen')?.addEventListener('click', () => { toggleLandscape(); });
   $('btnInstallApp')?.addEventListener('click', () => { installApp(); });
   $('btnInstallGuideClose')?.addEventListener('click', hideInstallGuide);
@@ -240,7 +228,7 @@ export function initMobileShell() {
     syncInstallButton();
   });
   const onFirstGesture = (event) => {
-    if (fsArmed || !phoneNow() || presented !== 'landscape') return;
+    if (fsArmed || !phoneNow() || !preferLandscape) return;
     if (event.target && event.target.closest && event.target.closest('#btnRotateScreen')) return;
     fsArmed = true;
     document.removeEventListener('pointerdown', onFirstGesture, true);
