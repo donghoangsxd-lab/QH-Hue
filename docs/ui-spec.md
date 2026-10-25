@@ -35,7 +35,7 @@ Tab trên ô tìm kiếm: `Đơn vị hành chính`, rồi `Đô thị`, rồi `
 
 ### Quy hoạch
 
-Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Mở panel thì QHC 1/25.000 đang bật. Mỗi lúc chỉ một cấp bật: bấm cấp khác thì bật cấp đó và tắt ba cấp còn lại. Không vẽ viền chọn. Cấp đang bật có nền cam `--accent-orange`. Danh sách phía dưới chỉ gồm đồ án của cấp đang bật; muốn xem đồ án cấp khác thì chuyển cấp rồi bật từng đồ án trong nhóm đó. Không dòng «Phạm vi: Toàn thành phố».
+Ngay dưới hàng tìm kiếm, một hàng bốn tab vừa khít: QHC 1/25.000, QHC 1/10.000, QHPK 1/2.000, QHCT 1/500. Mở panel thì QHC 1/25.000 đang bật. Mỗi lúc chỉ một cấp bật: bấm cấp khác thì bật cấp đó và tắt ba cấp còn lại. Không vẽ viền chọn. Cấp đang bật có nền cam `--accent-orange`. Danh sách phía dưới chỉ gồm đồ án của cấp đang bật; muốn xem đồ án cấp khác thì chuyển cấp rồi bật từng đồ án trong nhóm đó. Không dòng «Phạm vi: Toàn thành phố». Không mục «Dữ liệu hiện trạng» trong danh sách cấp và đồ án. Thửa đất địa chính 2016 và Công trình vi phạm chỉ ở Lớp nền.
 
 ### Hạ tầng kỹ thuật
 
@@ -64,7 +64,7 @@ Lớp nền độc lập với trục, dùng được trên mọi trục. Không
 - Sentinel-2 Cloudless 2025
 - Bản đồ đường phố
 
-Không ô mốc Wayback. Không khối quyết định phê duyệt trong Lớp nền (QĐ 614 và QĐ 756 nằm ở tab Đô thị).
+Không ô mốc Wayback. Không khối quyết định phê duyệt trong Lớp nền (QĐ 614 và QĐ 756 nằm ở tab Đô thị). Thửa đất địa chính 2016 và Công trình vi phạm nằm trong khung này, không lặp ở danh sách quy hoạch.
 
 Lớp môi trường dùng được trên mọi trục: địa hình, thoát nước, lưu vực, mô phỏng ngập, ngập Sentinel-1, nhiệt độ bề mặt, NDVI, ưu tiên trồng cây, rừng, công trình chịu rủi ro.
 
