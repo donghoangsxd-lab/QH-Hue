@@ -27,7 +27,7 @@ let proposalBlob = '';
 export function decisionUrl(t) {
   const d = t && t.decision;
   if (!d) return '';
-  if (d.kind === 'link' && d.url) return d.url;
+  if (d.url && (d.kind === 'link' || d.kind === 'pdf')) return d.url;
   const slug = d.slug || t.slug;
   if (!slug) return '';
   const doc = t.body && t.body.docId ? `&doc=${encodeURIComponent(t.body.docId)}` : '';

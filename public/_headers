@@ -35,6 +35,11 @@
 /icons/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 
+# PDF ghi đè cùng đường dẫn: cache ngắn, không immutable.
+/docs/614-QD-UBND.pdf
+  Content-Type: application/pdf
+  Cache-Control: public, max-age=86400
+
 /data/ward-boundary.json
   Cache-Control: public, max-age=31536000, immutable
 

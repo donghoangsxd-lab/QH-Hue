@@ -3,6 +3,7 @@
 // Nút [data-layer-decision="<mã>"] ở dòng lớp (tab Đô thị, đồ án QHC); mã khớp LAYER_DECISIONS (projectStore.js).
 // Người dùng xem quyết định đã gắn; Admin gắn / thay / gỡ qua decisionViewer.js.
 // data-label: nhãn cố định cạnh biểu tượng; data-label-name: nhãn là tên file / trang quyết định.
+// QĐ 614 nằm tại public/docs/614-QD-UBND.pdf. Bản bucket (getLayerDecisions) thắng nếu admin đã gắn cùng mã.
 import { state } from './state.js';
 import { geeApi } from './api.js';
 import { escapeHtml, ico } from './utils.js';
@@ -10,16 +11,40 @@ import { openOrAssign } from './decisionViewer.js';
 
 const isAdmin = () => state.currentUserRole === 'ADMIN' && !!state.authToken;
 
+// kind pdf + url cùng origin: khung xem mở file, không gọi getProjectDecision.
+const BUNDLED = {
+  'do-thi-hien-trang': {
+    slug: 'lop-do-thi-hien-trang',
+    kind: 'pdf',
+    url: '/docs/614-QD-UBND.pdf',
+    name: '614-QD-UBND.pdf',
+    bytes: 710578,
+    at: 1770656400000,
+    embed: true
+  }
+};
+const BUNDLED_TITLE = {
+  'do-thi-hien-trang': 'Phân loại đô thị · hiện trạng'
+};
+
 let titles = {};
 let items = {};
 let busyId = null;
 
+function decisionFor(id) {
+  return items[id] || BUNDLED[id] || null;
+}
+
+function titleFor(id) {
+  return titles[id] || BUNDLED_TITLE[id] || '';
+}
+
 function target(id) {
   return {
     key: `layer:${id}`,
-    title: titles[id] || id,
+    title: titleFor(id) || id,
     noun: 'lớp',
-    decision: items[id] || null,
+    decision: decisionFor(id),
     slug: `lop-${id}`,
     body: { layer: id },
     isBusy: () => !!busyId,
@@ -37,7 +62,7 @@ export function paintLayerDecisions(root = document) {
   const admin = isAdmin();
   root.querySelectorAll('[data-layer-decision]').forEach(btn => {
     const id = btn.dataset.layerDecision;
-    const d = items[id];
+    const d = decisionFor(id);
     const label = btn.hasAttribute('data-label-name')
       ? (d ? d.name : admin ? 'Gắn quyết định' : 'Chưa gắn quyết định')
       : (btn.dataset.label || '');
@@ -46,7 +71,7 @@ export function paintLayerDecisions(root = document) {
     btn.classList.toggle('has-decision', !!d);
     btn.classList.toggle('is-empty', !d && !admin);
     btn.innerHTML = `${ico(d ? 'file' : 'save')}${label ? `<span>${escapeHtml(label)}</span>` : ''}`;
-    const name = titles[id] ? ` · ${titles[id]}` : '';
+    const name = titleFor(id) ? ` · ${titleFor(id)}` : '';
     btn.title = d
       ? `Xem quyết định phê duyệt${name}: ${d.name}`
       : admin ? `Gắn quyết định phê duyệt${name} (PDF tối đa 10 MB hoặc link)` : `Chưa gắn quyết định phê duyệt${name}`;
@@ -75,7 +100,7 @@ export function initLayerDecisions() {
     e.preventDefault();
     e.stopPropagation();
     const id = btn.dataset.layerDecision;
-    if (btn.disabled || (!items[id] && !isAdmin())) return;
+    if (btn.disabled || (!decisionFor(id) && !isAdmin())) return;
     openOrAssign(target(id));
   });
   document.addEventListener('auth:change', () => paintLayerDecisions());
